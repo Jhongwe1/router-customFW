@@ -1,0 +1,224 @@
+{
+  "_comment": [
+    "Every external input this project depends on, with where to get it and what",
+    "it must hash to. This file is committed; the artefacts are not.",
+    "",
+    "Rule: a source is not usable until its hash is recorded here. `tools/fetch-sources.sh`",
+    "refuses to report success on a file whose hash does not match, and refuses to",
+    "silently skip one it could not fetch.",
+    "",
+    "`role` values:",
+    "  base        the primary source tree the build is derived from",
+    "  reference   read and cross-checked against, never built from",
+    "  doc         vendor documentation",
+    "  baseline    the upstream RE project, pinned, read-only, supplies the differential",
+    "",
+    "`fetch` values:",
+    "  now         needed before R0/R2 can start",
+    "  later       needed at the gate named in `needed_by`",
+    "  manual      cannot be scripted; a human obtains it"
+  ],
+
+  "upstream": {
+    "role": "baseline",
+    "kind": "git-submodule",
+    "url": "https://github.com/Jhongwe1/router-firmware-re.git",
+    "pin": {
+      "commit": "4d3ff26bfb8a32986d3db532ca25197ef3043fdb",
+      "branch_at_pin": "w08-writeup",
+      "date": "2026-08-22",
+      "subject": "A guard case that expired on the day the thing it guards started working",
+      "verified_on_remote": true
+    },
+    "mount": "upstream/",
+    "writable": false,
+    "why": "The differential proof in R9 is only credible if the baseline it compares against is one this project cannot edit. The commit hash IS that proof.",
+    "supplies": [
+      "test-cases.toml (58 registered tests with pre-written refutation conditions)",
+      "reports/*.json (74 measured reports across three builds)",
+      "notes/*.md (the findings, with addresses)",
+      "docs/disclosure.md (which findings are held and why)",
+      "tools/ (loader-tftp, mkramboot, console-lint, console-dump, loader-unpack, mkflash, rtcase, the CI checkers)",
+      "ghidra/scripts/*.java (BoaFormTable, BoaMnemonics, BoaStringXrefs, ...)"
+    ],
+    "detail": "plan/UPSTREAM-INVENTORY.md",
+    "fetch": "now"
+  },
+
+  "source_trees": [
+    {
+      "id": "rtl819x-toolchain",
+      "role": "base",
+      "kind": "git",
+      "url": "https://github.com/frederic/rtl819x-toolchain",
+      "clone": "--depth 1",
+      "dest": "src-vendor/rtl819x-toolchain",
+      "approx_size": "~700 MB",
+      "why": "The only public drop whose target board IS an RTL8196E (ALFA AIP-W512). Carries linux-2.6.30, busybox-1.13, users/, romfs/, boards/rtl8196eu/, and BOTH rsdk toolchains.",
+      "contains": {
+        "toolchain_primary": "toolchain/rsdk-1.5.5-5281-EB-2.6.30-0.9.30.3-110714",
+        "toolchain_secondary": "toolchain/rsdk-1.3.6-5281-EB-2.6.30-0.9.30",
+        "kernel": "linux-2.6.30"
+      },
+      "matches_device": "gcc 4.4.5-1.5.5p2 / uClibc 0.9.30.3 / Linux 2.6.30.9 — every field of the device's own kernel banner. HYPOTHESIS until R2a measures it.",
+      "caveat": "ALFA's board, not TOTOLINK's. DDR timing, PHY config and GPIO pin assignment may all differ, and getting them wrong does not necessarily crash.",
+      "needed_by": "R2, R3",
+      "fetch": "now"
+    },
+    {
+      "id": "wecb-vz-gpl",
+      "role": "reference",
+      "kind": "git",
+      "url": "https://github.com/jameshilliard/WECB-VZ-GPL",
+      "clone": "--depth 1",
+      "dest": "src-vendor/wecb-vz-gpl",
+      "why": "The only public source for the rtl819x BOOTLOADER (rtl819x/bootcode/). Needed to read what the loader does, and for R10c if a first-stage loader is ever attempted.",
+      "caveat": "A different bootcode generation from this unit's 2014.04.22 v1.3. Do not assume the command set matches — the device's own `?` output (upstream notes/uart-pinout.md) is authoritative.",
+      "needed_by": "R0 (reading), R10c (writing)",
+      "fetch": "now"
+    },
+    {
+      "id": "saturn49-wecb",
+      "role": "reference",
+      "kind": "git",
+      "url": "https://github.com/Saturn49/wecb",
+      "clone": "--depth 1",
+      "dest": "src-vendor/saturn49-wecb",
+      "why": "rtl819x/users/boa/apmib/apmib.{c,h} — the MIB table the device's libapmib.so is a build of. Upstream already used it to give the recovered MIB table an outside witness (SUPER_NAME=180, USER_NAME=182).",
+      "needed_by": "R2b, R7b (config store schema), D8 (CVE-2024-21778 TLV parser)",
+      "fetch": "now"
+    },
+    {
+      "id": "openwrt-rtk",
+      "role": "reference",
+      "kind": "git",
+      "url": "https://github.com/cgoder/openwrt_rtk",
+      "clone": "--depth 1",
+      "dest": "src-vendor/openwrt-rtk",
+      "approx_size": "~1 GB",
+      "why": "Realtek's own OpenWrt SDK. Carries arch/rlx (the Lexra kernel architecture port), drivers/net/rtl819x/ (rtl865x_*), drivers/net/wireless/rtl8192cd/.",
+      "caveat": "ODM-quality code. Read it as a description of what the hardware needs, never as a model of how to write a driver.",
+      "needed_by": "R6, R10a/b",
+      "fetch": "later"
+    },
+    {
+      "id": "utessel-edimax",
+      "role": "reference",
+      "kind": "git",
+      "url": "https://github.com/utessel/edimax",
+      "clone": "--depth 1",
+      "dest": "src-vendor/edimax",
+      "why": "A SECOND independent implementation of the rtl819x network driver (target/linux/realtek/files/drivers/net/rtl819x/, incl. rtl_nic.c). Two implementations of the same hardware is what makes a register reading a measurement instead of a transcription.",
+      "needed_by": "R6",
+      "fetch": "later"
+    },
+    {
+      "id": "vankel-rtl819x-sdk",
+      "role": "reference",
+      "kind": "git",
+      "url": "https://github.com/vankel/rtl819x-SDK",
+      "clone": "--depth 1",
+      "dest": "src-vendor/rtl819x-sdk-3.4.9.3",
+      "why": "SDK v3.4.9.3 on Linux 3.10 — the K2 candidate, i.e. the first kernel generation where MIPS has device tree.",
+      "caveat": "Its documented targets are RTL8198C/8814/8194. Whether RTL8196E is supported is UNVERIFIED.",
+      "needed_by": "R10a",
+      "fetch": "later"
+    },
+    {
+      "id": "ggbruno-openwrt",
+      "role": "reference",
+      "kind": "git",
+      "url": "https://github.com/ggbruno/openwrt",
+      "clone": "--depth 1",
+      "dest": "src-vendor/ggbruno-openwrt",
+      "approx_size": "~1.5 GB",
+      "why": "The furthest anyone has publicly taken RTL8196E on a modern kernel: OpenWrt master + Linux 4.14, arch/rlx, with GPIO/PCI/IRQ/timers working. K3 reference.",
+      "caveat": "'Working' is a forum claim, not a measurement. Switch driver incomplete, WiFi not started.",
+      "needed_by": "R10b",
+      "fetch": "later"
+    },
+    {
+      "id": "realtek-switch-hacking",
+      "role": "doc",
+      "kind": "git",
+      "url": "https://github.com/libc0607/Realtek_switch_hacking",
+      "clone": "--branch files --depth 1",
+      "dest": "src-vendor/realtek-switch-hacking-files",
+      "why": "The `files` branch carries the vendor datasheets. This is where refs/*.pdf come from.",
+      "needed_by": "R5, R6",
+      "fetch": "now"
+    }
+  ],
+
+  "documents": [
+    {
+      "id": "ds-rtl8196e-vex",
+      "role": "doc",
+      "kind": "file",
+      "url": "https://raw.githubusercontent.com/libc0607/Realtek_switch_hacking/files/RTL8196E-VEx-CG_Datasheet_1.1.pdf",
+      "dest": "refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf",
+      "bytes": 2654045,
+      "sha256": "0a2a27de552998eb106406aa28704b50d55042f5f42a1f70a1a2a3bedbe8bdca",
+      "pages": 83,
+      "kind_of_document": "register-level programming manual (text, extractable)",
+      "title": "RTL8196E-VE1/2/3 Draft Datasheet — 5-Port 10/100M Ethernet Router Network Processor",
+      "revision": "Rev. D1.1, 17 July 2013, TrackID JATR-3375-16",
+      "marking": "CONFIDENTIAL: Development Partners Only",
+      "handling": "CITE, DO NOT COMMIT. See plan/router-rebuild-plan.md D12.",
+      "supplies": {
+        "interrupt_controller": "base 0xB800_3000 — GIMR 3000, GISR 3004, IRR1 300C, IRR2 3010 (sec 8.1)",
+        "timer_watchdog": "base 0xB800_3100 — TC0DATA 3100, TC1DATA 3104, TC0CNT 3108, TC1CNT 310C, TCCNR 3110, TCIR 3114, CDBR 3118, WDT 311C (sec 8.2)",
+        "gpio": "base 0xB800_3500 — PABCD_CNR 3500, PABCD_DIR 3508, PABCD_DAT 350C (sec 8.3)",
+        "uart": "base 0xB800_2000, DLAB-switched at 0xB800_2100/2000 (sec 9.3)",
+        "memory_controller": "MCR 0xB800_1000 (sec 7.4.1)",
+        "spi_flash": "controller with memory-mapped read, serial + dual I/O, up to 96.875 MHz (sec 7.3/7.4)",
+        "switch_core": "base 0xBB80_4000 — Global Port Control 4000, MDC/MDIO Command 4004, MDC/MDIO Status 4008 (sec 11.1); LED control + topology + SCAN mode (sec 11.3)",
+        "pcie": "host mode base 0xB8B0_1000 (sec 10.3) — NOTE: 0xB8B0 is PCIe, NOT the network MAC",
+        "pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shared I/O Pin Mapping",
+        "ejtag": "standard 5-signal P1149.1 test port (sec 1); DC params sec 13.10; boundary scan sec 14.2.4",
+        "cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cache, 16KB I-MEM, 8KB D-MEM' / 'Supports MIPS-1 ISA, MIPS16 ISA' / 'Clock Rate: 400MHz'",
+        "absent": "no crypto / security engine section anywhere in the table of contents"
+      },
+      "caveats": [
+        "It is a DRAFT. Draft and production silicon can differ.",
+        "It is the -VE1/2/3 variant, which has embedded DRAM by MCM. THIS UNIT HAS EXTERNAL SDRAM (Winbond W9825G6KH) and is therefore NOT this part.",
+        "Its CPU claim (RLX4181, MIPS-1) contradicts the common 'RTL8196E = RLX5281' convention AND the 142 lwl/lwr/swl/swr instructions in this device's own /bin/boa. See plan F34 and gate R1.",
+        "Therefore: no register value goes into code on this document's authority alone. Two independent sources, always (D12)."
+      ],
+      "fetch": "now"
+    },
+    {
+      "id": "ds-rtl8196c",
+      "role": "doc",
+      "kind": "file",
+      "url": "https://raw.githubusercontent.com/libc0607/Realtek_switch_hacking/files/RTL8196C-GR_Datasheet_0.7.pdf",
+      "dest": "refs/RTL8196C-GR_Datasheet_0.7.pdf",
+      "bytes": 630510,
+      "sha256": "b8c26d5af2a5b228f9794b28a1eb7d7b987853d278ffaa7e06143ae78067d828",
+      "kind_of_document": "SCANNED IMAGES (11 CCITTFaxDecode streams, no text layer). Machine text extraction fails and correctly reports failure. A human reads it.",
+      "handling": "CITE, DO NOT COMMIT.",
+      "why": "The sibling part. Its CPU/Features bullet on the first pages is a FOURTH independent source for F34: if it also says RLX4181, the 'C=4181 / E=5281' convention is wrong in both directions and the R1 measurement is the only thing left standing.",
+      "task": "plan/DAY-ZERO.md item 6 — read one bullet with your eyes, ten seconds.",
+      "fetch": "now"
+    }
+  ],
+
+  "reference_only": {
+    "_comment": "Read, cited, never downloaded. Listed so a claim in the plan can be traced to where it came from.",
+    "cve_and_advisories": [
+      {"id": "TALOS-2024-1911 / CVE-2024-21778", "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2024-1911", "about": "rtl819x Jungle SDK config-file mib_init_value_array heap overflow — TLV length from the .dat file goes straight into memcpy. Drives D8's bounded TLV reader."},
+      {"id": "TALOS-2023-1899 / CVE-2023-50381,50382,50383", "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2023-1899", "about": "boa formWsc localPin OS command injection. Same defect site as CVE-2025-3987; two CVE families for one bug."},
+      {"id": "Talos roundup, 15 vulns in this SDK", "url": "https://blog.talosintelligence.com/vulnerability-roundup-july-10-2024/", "about": "The set upstream's prior-art.md refers to as 'Talos's fifteen reports on this SDK'."},
+      {"id": "TALOS-2023-1874 / CVE-2023-34435", "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2023-1874", "about": "Arbitrary firmware update on boa formUpload, CWE-347. The image-validation half of upstream D-12 is NOT original because of this."}
+    ],
+    "platform": [
+      {"url": "https://forum.openwrt.org/t/working-realtek-soc-rtl8196e-97d-97f-in-last-master/70975", "about": "ggbruno's RTL8196E/97D/97F port to OpenWrt master + Linux 4.14. What works, what does not."},
+      {"url": "https://forum.archive.openwrt.org/viewtopic.php?id=46606", "about": "The long Realtek SoC support thread. Contains the EJTAG/Lexra notes: tjtag v3.0.1 and UrJTAG needed device IDs added; eJTAG pins muxed with EPHY_LED on some parts."},
+      {"url": "https://www.mail-archive.com/openwrt-devel@lists.openwrt.org/msg10545.html", "about": "RFC: rtl8196 status — historical statement that mainline has no lexra support."},
+      {"url": "https://lkml.iu.edu/hypermail/linux/kernel/1810.0/00208.html", "about": "RFC v2: MIPS Lexra LX5280 CPU + Realtek RTL8186 SoC support. The mainline attempt."},
+      {"url": "https://www.probell.com/lexra/", "about": "Lexra history — cores execute virtually all MIPS instructions EXCEPT unaligned loads and stores. The patent story behind F34."},
+      {"url": "https://www.kernelconfig.io/config_of_flattree", "about": "CONFIG_OF_FLATTREE landed in 2.6.34; MIPS device tree in 2.6.37. Source for F20."},
+      {"url": "https://techinfodepot.shoutwiki.com/wiki/TOTOLINK_N150RT", "about": "Published spec: RTL8196C + 2 MB flash + 16 MB RAM. WRONG for this unit on all three counts — which is why a second-hand spare may genuinely be a different board."}
+    ]
+  }
+}

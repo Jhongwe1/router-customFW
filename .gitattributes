@@ -1,0 +1,16 @@
+# Line endings.
+#
+# This repository is written on Windows and executed under WSL against the same
+# files on /mnt/c. Git for Windows ships core.autocrlf=true, so without this
+# file a fresh clone hands the scripts back with CRLF endings and every one of
+# them fails as `/usr/bin/env: 'bash\r': No such file or directory` -- on the
+# machine they were written on. Store and check out LF everywhere.
+* text=auto eol=lf
+
+# Never touched.
+*.pdf   binary
+*.bin   binary
+*.img   binary
+*.png   binary
+*.jpg   binary
+*.squashfs binary

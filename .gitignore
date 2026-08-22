@@ -1,0 +1,88 @@
+# router-rebuild — what never enters git
+#
+# Three categories, and the reasons differ. Read the reason before adding an
+# exception: two of these are not tidiness, they are the difference between a
+# publishable repository and one that redistributes somebody else's property or
+# identifies one physical device.
+
+# ---------------------------------------------------------------------------
+# 1. Planning material. May address the author directly, may discuss career
+#    positioning. Committed files may not. (Same rule as the upstream repo.)
+# ---------------------------------------------------------------------------
+plan/
+archive/
+
+# ---------------------------------------------------------------------------
+# 2. Vendor documentation and vendor binaries. Not ours to redistribute.
+#    SOURCES.json records the URL and the sha256 so anyone can obtain the same
+#    file; that is the substitute for shipping it.
+#    refs/README.md IS committed — it says what should be in refs/ and why the
+#    directory is empty in a fresh clone.
+# ---------------------------------------------------------------------------
+refs/*
+!refs/README.md
+*.pdf
+*.web
+*.bin
+*.img
+
+# ---------------------------------------------------------------------------
+# 3. Per-unit artefacts. A flash dump contains this unit's MAC addresses and
+#    radio calibration; it identifies one physical device, not a model.
+#    Binaries live in $FWRE_WORK (ext4, inside WSL) — never here, never under
+#    /mnt/c. See plan/UPSTREAM-INVENTORY.md and the upstream
+#    docs/workspace-layout.md for why that is a correctness rule and not a
+#    performance one.
+# ---------------------------------------------------------------------------
+dumps/*
+!dumps/.gitkeep
+!dumps/README.md
+!dumps/MANIFEST.json
+work/
+extracted/
+
+# ---------------------------------------------------------------------------
+# Build output and toolchains
+# ---------------------------------------------------------------------------
+build/
+out/
+staging/
+toolchain/
+# cloned GPL drops -- SOURCES.json says how to re-fetch each one
+src-vendor/
+linux-*/
+squashfs-root/
+*.o
+*.ko
+*.a
+*.so
+*.squashfs
+*.lzma
+*.xz
+vmlinux
+System.map
+
+# ---------------------------------------------------------------------------
+# Ghidra
+# ---------------------------------------------------------------------------
+ghidra/decomp/
+*.rep/
+*.gpr
+*.lock
+
+# ---------------------------------------------------------------------------
+# Python / editors / OS
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
