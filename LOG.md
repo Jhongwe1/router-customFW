@@ -113,6 +113,28 @@ USB 上另有 `rlxfw-backup-2026-08-23/`（作者自行複製），經比對為 
    以及 `../router` 的未提交工作都在範圍之外。
 4. `S0a` 的副本 ② 假設有第二種實體媒體存在。開工當時沒有。
 
+### 版本控制（順序與 `DAY-ZERO` 第 3 項不同，理由記在這裡）
+
+`tools/test-gitignore.sh` 排在第一個 commit **之前**，而非計畫所寫的第 3 項結尾。
+git 歷史是這個專案裡唯一「做錯了難以收回」的地方，而 `refs/` 底下那份 datasheet
+標著 `CONFIDENTIAL: Development Partners Only`。結果 13/13，其中六個是正控制 ——
+一份只寫 `*` 的 `.gitignore` 光靠七個負案例就會拿到 7/7。
+
+新增 `.gitattributes`（`* text=auto eol=lf`）。這裡的腳本在 Windows 上編輯、
+在 WSL 下對著 `/mnt/c` 上同一份檔案執行，而 Git for Windows 的 `core.autocrlf`
+預設為 `true`：沒有這個檔案，clone 回來的腳本帶 CRLF，全部以
+`bash: No such file or directory` 失敗 —— 在它們被寫出來的那台機器上。
+
+第一個 commit `9c40aa4`，十個檔案。推送之前先把 `Jhongwe1/router-customFW`
+由 PUBLIC 改為 PRIVATE：`CHARTER.md` 寫的是「v0.1 起 public」，而現在是 S0。
+倉庫因此同時成為第四份副本（異地、帶版本歷史），但它不取代 `S0a` ——
+它不含 `dumps/`、`refs/`、`plan/`，而那些正是不可再生的部分。
+
+寫進 committed 檔案之前，`LOG.md` 與 `PROGRESS.md` 裡兩個未追蹤檔的檔名先被移除。
+那兩個檔名描述的是尚未寄出的揭露內容；把它們寫進一個將會公開的檔案，
+與稍早刻意不讓同類檔名以明文上雲端，是同一條理由 —— 原本的寫法前後不一致。
+
 ### 下一步
 
-`DAY-ZERO` 第 2a 項。第 1 項已於本次建立 manifest 時一併關閉。
+`DAY-ZERO` 第 2a 項。第 1 項已於本次建立 manifest 時一併關閉；
+第 3 項的其餘部分（submodule 釘 `4d3ff26`、`fetch-sources.sh`、`README.md` 第一屏）仍開著。

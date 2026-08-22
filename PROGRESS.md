@@ -15,8 +15,8 @@ the work (house rule 6).
 |---|---|
 | **Active gate** | `S0` — safety net |
 | **Active step** | `S0a` closed 2026-08-23 **with a recorded deviation**: the DoD says restore from copy ③, the drill was run from copy ② — C-10. `S0b` waits for the first bench session |
-| **Last session** | 2026-08-23, desk only — `S0a`. Seven encrypted archives, restore drill run from copy ② after a physical replug, five trees compared at zero differences. `LOG.md` |
-| **Next after this** | `DAY-ZERO` item 2a. Item 1 closed inside `S0a` — building the manifest *is* the verification, so they were one operation, not two |
+| **Last session** | 2026-08-23, desk only — `S0a`, then `git init`. Seven encrypted archives; restore drill from copy ② after a physical replug, five trees at zero differences; first commit `9c40aa4` pushed to a **private** `Jhongwe1/router-customFW` (`CHARTER.md`: public from v0.1, and this is S0). `LOG.md` |
+| **Next after this** | `DAY-ZERO` item 2a. Item 1 closed inside `S0a` — building the manifest *is* the verification, so they were one operation, not two. Item 3 is half done: `git init`, first commit and remote are in; the submodule pin at `4d3ff26`, `fetch-sources.sh` and the `README.md` first screen are not |
 | **Blocked on** | nothing at the desk. `S0b` needs the device on the bench |
 
 **Step list for the active gate**: `plan/DAY-ZERO.md` items 0–8.
