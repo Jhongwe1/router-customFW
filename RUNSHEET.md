@@ -68,8 +68,29 @@ them naturally.
 |---|---|
 | **A** | `python3 upstream/tools/console-dump.py catch` — streams ESC across power-on |
 | **B** | `python3 upstream/tools/console-dump.py cmd --at-prompt DW …` per cell. `DW` and `DB` are not on the refusal list |
+| **B2 §E** | the same tool. `PHYR` and `MDIOR` are not on the refusal list either — **and neither are `PHYW`, `MDIOW` and `PORT1`, which all write hardware.** See below |
 | **C, D** | close the tool, `picocom -b 38400 /dev/ttyUSB0`, type by hand, capture the log |
+| **B2 §F** | still in picocom, after `D3`. One cell, and it is the only one in the visit that can cost a power cycle |
 | afterwards | `python3 upstream/tools/console-lint.py` over the capture. **Read the log with the linter, not by eye** |
+
+> 🔴 **The refusal list is `("FLW", "EB", "EW", "AUTOBURN", "LOADADDR", "J ")`, and
+> it has no notion of a *register* write.** `PHYW` and `MDIOW` write PHY
+> registers; `PORT1` writes 884 of them and takes no arguments. The tool will
+> send all three without comment. That is not a bug in a tool pinned read-only at
+> `4d3ff26` — it is a model of "write" that predates these commands being read.
+> **The do-not-type list below carries the gap.**
+
+**Running order for the visit**: `B1 §A` → `B1 §B` → `B2 §E` → close the tool,
+open picocom → `B1 §C` → `B1 §D` → `B2 §F`. `B2 §E` is read-side and goes
+through the tool, so it belongs with `§B`; `B2 §F` is last on purpose, because
+if it is wrong it ends the session and by then nothing is left to lose.
+
+> ⚠️ **`B2` is a session name *and* a cell name in this file**, and they are not
+> the same thing: `B2` on its own is a cell of session B1 (`DW 8040FBD4 8`,
+> the JEDEC ID), while the second session is always written `session B2` or
+> `B2 §E` / `B2 §F`. Session B2's cells are lettered `E` and `F` for exactly
+> this reason. A command re-stated under the wrong label is how upstream's
+> `A2.7` went wrong four ways at once.
 
 > ⚠️ **`--at-prompt` is not optional once the board is sitting at `<RealTek>`.**
 > Without it the tool streams ESC for the full window and then reports *"nothing
@@ -141,7 +162,10 @@ loader's image (ends `0x8040DD10`) and far above the staged kernel
 
 | | why |
 |---|---|
-| a bare `EB`, `EW`, `LOADADDR`, `FLR`, `FLW`, `PHYR` or `PHYW` — no arguments | six handlers dereference `argv[0]` before any count test, and the tokeniser zeroes all twenty slots, so it reaches `strtoul(NULL, …)`. **Costs a power cycle.** Listed so it is not typed by accident |
+| 🔴 **`PORT1`, with or without arguments** | it reads no `argv` and no `argc`. It is a factory-test routine that walks a Gray-code table through PHY vendor register 19 on PHY addresses `{0, 2, 3, 4}` — **884 PHY register writes** (612 of the Gray-code payload into register 19, plus 272 page-select and control writes), with no way to stop it. `docs/loader-phy-and-switch.md` §4. **`console-dump.py` will send it** |
+| **`PHYW` or `MDIOW`, any arguments** | they write PHY registers, and B2 is a read session. Also on the tool's blind side |
+| a bare `EB`, `EW`, `LOADADDR`, `FLR`, `FLW`, `PHYR` or `PHYW` — no arguments | six handlers dereference `argv[0]` before any count test, and the tokeniser zeroes all twenty slots, so it reaches `strtoul(NULL, …)`. **Costs a power cycle.** Listed so it is not typed by accident. (`MDIOR` and `MDIOW` are **not** in this group — both check `argc` and print `Parameters not enough!`) |
+| **`MDIOR <phyid> <reg>`, the form its own help string gives** | the handler reads `argv[0]` only and parses it **base 10** as the *register*, then sweeps the PHY address itself. `MDIOR 0 2` silently sweeps register **0**. `docs/loader-phy-and-switch.md` §3 |
 | `J` with no argument | `blez a0` skips the parse and jumps to whatever is on the stack |
 | `FLW`, anything | it writes flash. Mainline is zero-write through R9 |
 | any TFTP upload | **`AUTOBURN` defaults to `1`** (B6). An upload that completes without `AUTOBURN 0` having been sent is burned to flash |
@@ -177,29 +201,77 @@ verdict even where it is the boring one.*
 
 ---
 
-## Session B2 — planned, not written
+## Session B2 — PHY and switch, on the same power cycle as B1
 
-**PHY and switch registers, through `MDIOR` / `PHYR`.** Zero risk, zero code,
-and the output is the input R6 needs: how `phylib` has to be configured for this
-part's five ports.
+**Written 2026-08-23 from `docs/loader-phy-and-switch.md`, which owns every claim
+below.** B2 does not have a power cycle of its own: it rides on B1's, in the two
+places the running order above puts it.
 
-**It is not in B1 and it must not be added to B1 by hand.** Four of the
-seventeen handlers were classified wrongly under a straight linear read
-(`docs/loader-command-semantics.md` §0), and `PHYR` and `PHYW` are two of the
-six that dereference `argv` without checking the count. **This file's rule is
-that a cell carries an expectation computed before the visit**, and neither
-handler has been traced.
+| | |
+|---|---|
+| **Power cycles** | **0 of its own.** Rides on B1's one |
+| **Flash bytes written** | **0** |
+| **RAM written** | **0** |
+| **Registers written** | 🔴 **not zero.** `MDCIOCR` once per PHY read, and **`GIMR` bit 8**, which `phy_read()` sets and never restores. B2 is zero-write to flash and memory; it is **not** register-read-only, and calling it "zero risk" would be wrong |
+| **New code needed** | none |
+| **Closes** | the input R6 needs — which PHY addresses exist, which port each one serves, and how the switch is left configured. Hands `C-8` its missing bus-clock number. Puts `PORT1` on the do-not-type list, which is where the desk work said it belongs |
 
-What B2 needs before it can be written:
+**Two things B2 needs that B1 does not.** An Ethernet cable with something at the
+far end — a PC NIC is enough, link only, no traffic. And **a clock you can read
+to the second**, for `E2`.
 
-1. `PHYR` (`0x80409D98`) and `MDIOR` (`0x80409C54`) read out of `stage2.bin`,
-   with the branch-walking reader as the second instrument — argument order,
-   radix, register width, and what they print;
-2. the vendor's `rtl865xc_asicregs.h` PHY block as the corroborating source, the
-   same way `docs/loader-flash-write.md` used it for the SPI controller;
-3. an expected value for at least one register that can be computed without the
-   device — a PHY ID register is the obvious candidate, since it is fixed in
-   silicon.
+### E — reads, through `console-dump.py`, alongside B1 §B
 
-Estimated 30–45 minutes at the desk. **That is a guess; nothing in this
-repository is calibrated yet.**
+`python3 upstream/tools/console-dump.py cmd --at-prompt <words…>`. `PHYR` and
+`MDIOR` are not on the refusal list. **`--at-prompt` is not optional** — same
+trap as B1.
+
+| | command | expected | what it refutes |
+|---|---|---|---|
+| **E1** | `DW 8040DCE8 1` | word 2 = `00002000` | **the gate's control.** `0x8040DCEC`'s initialiser in the image is `0x1000`; the code writes `8192` there immediately after `timer_init` returns. `00002000` means the timer was initialised. `00001000` means it was not, and then `E2` cannot pass. Word 1 is the tick counter — non-zero, value not predictable |
+| **E2** | wait **≥ 10 s by the clock**, then `DW 8040DCE8 1` again | word 1 advanced by ≈ **100 × seconds waited** | 🔴 **the gate, and the whole session's PHY half depends on it.** `phy_read()` calls `delay(10)`, which waits for the timer ISR to advance `0x8040DCE8`; `doBooting()` cleared `GIMR` on the way to this prompt. **No advance → send no PHY command: the board would hang inside the delay, not in the MDIO poll.** A rate that is not ~100 Hz → the compiled-in `200000000` at `0x8040DBA0` is not this board's clock, which is worth more than the number. `docs/loader-phy-and-switch.md` §2 |
+| **E3** | `DW B8003000 1` | word 1 (`GIMR`) **bit 8 = `0`**; word 4 (`IRR1`) = `00050004` | the "before" half of `E5`, and `IRR1` is its control — the loader writes exactly that constant at `0x80408F90`. If bit 8 is already `1`, something between `doBooting()` and the prompt sets it and §2's chain is incomplete |
+| **E4** | `PHYR 0 2` | `PHYID=0x0, regID=0x2 ,Find PHY Chip! UID=0x????` | **the first MDIO transaction this device has ever performed.** The two echoed fields are the control — `0x0` and `0x2` prove the base-16 parse. **`UID` cannot be predicted from any source** (§6: the datasheet has no PHY register map, the vendor's only ID constant is an external gigabit part, and no capture contains this string). It must be neither `0000` nor `ffff` |
+| **E5** | `DW B8003000 1` | word 1 **bit 8 now `1`**, word 4 unchanged | 🔴 **the causal control, and it was predicted from the code before the visit.** `phy_read()` does `GIMR \|= 1<<8` at `0x80402FB8`. A specific bit, predicted to change, on demand. If it does not change, the function at `0x80402F80` is not what §1 says it is |
+| **E6** | `PHYR 0 3` | as `E4`, `regID=0x3` | the low half of the identifier. Together with `E4` it is the 32-bit value everything else compares against |
+| **E7** | `PHYR 2 2`, `PHYR 3 2`, `PHYR 4 2` | **all three equal `E4`'s `UID`** | `PORT1` patches addresses `{0,2,3,4}` from one table — this unit's own code saying they are one PHY macro. Different values refute that, and refute using one `phylib` driver for all of them |
+| **E8** | `PHYR 1 2` | the same value again | **the address `PORT1` skips.** Same → the skip is about the port. Different, or no answer → it is about the PHY, and R6 needs to know that |
+| **E9** | `DW BB804100 8` | 🔴 **the load-bearing part**: word 1 = `00000001`, and words 3–6 **bits 30:26** = `1, 2, 3, 4` (top hex digits `04`, `08`, `0C`, `10`). *Weaker, same cell, judged separately*: bits 22:16 = `7F` on all four | **the PHY-address map, read without MDIO.** Word 1 is `PITCR`: the loader does `\|= 1` at two sites, and this unit printed `P0phymode=01, embedded phy` at boot — **against a datasheet that calls `01` Reserved.** Words 3–6 are `PCRP1`–`PCRP4`, which the loader never writes, so they hold reset defaults. **`ExtPHYID` at 30:26 is the half this session depends on and it is what `F2`'s sweep is checked against; the `FrcAbi`/`Pause` defaults at 22:16 come from a watermarked draft's default column and a wrong reading there must not be allowed to read as "the cell failed".** Word 2 is `PCRP0`, which the loader *does* configure — **record it, do not predict it** |
+| **E10** | `DW BB804128 8` | **`PSRP0`–`PSRP4`. With no cable in: every word bit 4 = `0`** | link state per port, no MDIO. Bit 4 = `LinkUp`, bit 3 = duplex, bits 1:0 = speed (`01` = 100M), bit 8 = `LinkDownEventFlag`, latched and **read-to-clear**. All-zero with nothing plugged in is the cheaper half of `E11`'s control: a zero that then becomes a one is worth more than a one on its own |
+| **E11** | plug the cable into **one LAN jack**; `DW BB804128 8`. Then move it to the **WAN jack**; `DW BB804128 8` again | **exactly one word has bit 4 set each time, and it is a different word the second time.** On the first read after the move, the vacated port's bit 8 reads `1`; read it again and bit 8 is `0` | 🔴 **the causal control on the whole switch-register reading.** This is what maps a physical RJ45 to a port index, and it is a change you make rather than a value you accept. If the bit does not follow the cable, the register is not port-indexed the way Table 62 says, and `E9`'s map means nothing. Upstream's boot log says port 0 carries vid 8 while ports 1–4 carry vid 9 — **so the WAN jack should light word 1** |
+| **E12** | `PHYR <n> 1`, where `n` is **the PHY address `E9` reports in bits 30:26 of the `PCRP` for the port `E11` lit** — not the port index, even though the default map makes them the same number | bit 2 (`Link Status`) set, bit 5 (`Autoneg Complete`) set | MII `BMSR`, the same fact through the other instrument. Two paths, one silicon. If `PSRP` and `BMSR` disagree about link, one of them is not reading the port you think it is. **Taking `n` from `E9` rather than from the port number is the point**: if `ExtPHYID` ever differs from the port index, the shortcut hides exactly the thing R6 needs |
+
+### F — last of the whole visit, in picocom, after `D3`
+
+**Everything above has been captured by the time this runs.** That is the point:
+`F1` is the only cell in either session that can end the visit.
+
+| | command | expected | what it refutes |
+|---|---|---|---|
+| **F1** | `PHYR 5 2` | **it returns**, with `UID=0xffff` or `0x0000` | 🔴 **the negative control, and it is the risk.** `phy_read()`'s wait on `MDCIOSR` bit 31 has **no timeout and no iteration bound** (`bltz v1, …` at `0x80402FD8`). The datasheet assigns `ExtPHYID` only for ports 0–4, so address 5 should not answer. **If it does not return, the board is stuck and the visit is over** — and the finding is that `MDIOR` must never be run on this part. If it returns `ffff`, that value is also what `F2`'s rows 5–31 must show |
+| **F2** | `MDIOR 2` — **only if `F1` returned** | 32 lines. `PhyID=0x00`…`0x04` carry `E4`/`E7`/`E8`'s value; `0x05`…`0x1f` carry `F1`'s | **the sweep, and its own refutation is built in: all 32 lines identical and plausible means the bus is echoing and nothing was measured.** Note the arity trap — `MDIOR` takes **one** argument, the register, **base 10**, and sweeps the address itself. Its help string says otherwise. If driving this through the tool, `--timeout 45`: 32 × 10 ms of erratum delay plus 32 lines at 38400 is under a second, but a tool timeout and a hung board look identical, and **the tool timing out does not un-stick the board** |
+
+---
+
+## Results — B2
+
+*Empty until the session. Fill the reading beside each row, and write the verdict
+even where it is the boring one.* **`E4`'s `UID` has no predicted value**, so its
+verdict is a measurement and not a confirmation — say so in the cell.
+
+| cell | reading | verdict |
+|---|---|---|
+| E1 | | |
+| E2 | | |
+| E3 | | |
+| E4 | | |
+| E5 | | |
+| E6 | | |
+| E7 | | |
+| E8 | | |
+| E9 | | |
+| E10 | | |
+| E11 | | |
+| E12 | | |
+| F1 | | |
+| F2 | | |

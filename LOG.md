@@ -827,3 +827,195 @@ A/B 段走工具（`DW`、`DB` 不在清單上），C/D 段關掉工具、開 pi
 而它們正好是六個「不檢查 argc 就 deref `argv`」裡的兩個，
 且四個 handler 在線性讀法下被分類錯過。**這份檔案的規矩是「每一格帶著上機前算出的期望值」**，
 所以未追過的命令不進 runsheet。B2 要開始之前需要三樣東西，列在檔案裡。
+
+---
+
+## 2026-08-23（同日，第四段）— B2：PHY 與交換器，以及「零風險」那句話是錯的
+
+桌面，沒碰路由器。目標是把 `PHYR`／`MDIOR` 追出來，讓 B2 有資格跟 B1 同一次上電。
+產物：`docs/loader-phy-and-switch.md`、`RUNSHEET.md` 的 B2 段與改過的 B1 框架。
+
+### MDIO 介面：三個來源，而且最強的那個是這顆 part 自己的 datasheet
+
+`phy_read` 在 `0x80402F80`、`phy_write` 在 `0x80402FF8`。
+
+`MDCIOCR = 0xBB804004`（bit31 讀/寫、PHYADD 28:24、REGADD 20:16、WRDATA 15:0）、
+`MDCIOSR = 0xBB804008`（bit31 忙碌、RDATA 15:0）——**A（這台自己的 code）、
+B（廠商 bootcode 標頭）、D（RTL8196E datasheet Table 57/58/59）逐個欄位對上**。
+再加一個：廠商 **kernel** 的 `rtl8651_getAsicEthernetPHYReg()` 跟 loader
+一句對一條指令。SPI 那次拿到兩個來源，這次是三個。
+
+順手撈到一件事：那句 `delay(10)` 在 B 裡是有條件的 ——
+`if (REG32(REVR) == RTL8196C_REVISION_A) mdelay(10); //wei add, for 8196C revision A.`
+**A 沒有那個版本判斷，無條件延遲 10 ms。** `MDIOR` 掃 32 次的成本就是這裡來的。
+
+### 🔴 「PHY read」會寫兩個暫存器，而它的延遲有四層前提
+
+`phy_read()` 寫 `MDCIOCR`，並且 **`GIMR |= 1<<8`（`TCIE`）而且不還原**。
+追下去才知道為什麼非寫不可：
+
+```
+timer ISR 0x80408EE0  ->  (*(uint32*)0x8040DCE8)++      ← 唯一的寫入者
+tick()    0x80408F10  ->  return *0x8040DCE8
+delay(ms) 0x80407CF0  ->  忙等 tick 前進 ms/10
+```
+
+`0x8040DCE8` 只有 ISR 會寫。所以 `delay()` 要回得來，需要四層同時成立：
+`Status.IM[7:2]` 沒被遮（`0x80406694`）、`Status.IE=1`（`0x8040865C`、
+`0x80408494`）、`TCCNR`/`TCIR` 有裝（`timer_init`）、以及 `GIMR` bit 8。
+
+**而第四層是 `doBooting()` 自己清掉的** —— `GIMR = 0` 寫在
+`0x804086E4` 和 `0x80408700`，它的兩條路都寫。所以 loader 自己的網路初始化
+是在 `GIMR = 0` 之後跑的，`phy_read` 那一行不是順手，是不寫就會卡死。
+
+**B2 的第一格因此是一道閘**：`DW 8040DCE8 1` 隔十秒讀兩次。
+不前進就一個 PHY 命令都不准送 —— 板子會卡在延遲裡，不是卡在 MDIO 輪詢裡。
+這是今天最值得的一格，因為在此之前第一次 `PHYR` 是在賭一次電源循環。
+
+### 這道閘順便把 C-8 缺的那個數字生出來了
+
+`timer_init` 的參數是 `0x8040DBA0` 的編譯期常數，image 裡是 **`0x0BEBC200`
+= 200,000,000**。配上 `CDBR` 除數 14 與 `TC0DATA = 142858`：
+
+```
+200e6 / 14 / 142858 = 100.0 Hz          （推論，待量測）
+```
+
+而 `delay(10)` 正好是一個 tick = 10 ms，跟 B 的 `mdelay(10)` 對得起來。
+
+C-8 現在寫的是「wall-clock 沒建立，因為 `CDBR` 除的那個匯流排時脈沒量過」。
+**兩個 `DW` 加一支碼錶就量到了。** 若 tick 是 100 Hz，200 MHz 就是矽片上量到的
+而不是編譯進去的信仰；若不是，那更值錢。
+
+### 四條命令、三種參數慣例，而 help 字串有一條是錯的
+
+| | argc 檢查 | argv[0] | argv[1] | argv[2] | 做什麼 |
+|---|---|---|---|---|---|
+| `MDIOR` | 有（`bgtz`） | **暫存器，十進位** | — | — | **掃 phyid 0…31** |
+| `MDIOW` | 有（`slti 3`） | phyid，十六 | **暫存器，十進位** | data，十六 | 單發寫 |
+| `PHYR` | **沒有** | phyid，十六 | 暫存器，**十六** | — | 單發讀 |
+| `PHYW` | **沒有** | phyid，十六 | 暫存器，**十六** | data，十六 | 寫完再讀回 |
+
+三件會產出「錯得很像對」的事：
+
+**一、`MDIOR` 的 help 說 `MDIOR <phyid> <reg>`，但它只吃一個參數，而那個參數是
+暫存器編號，十進位，PHY 位址是它自己掃的。** `MDIOR 0 2` 會被接受，把 `2` 丟掉，
+掃暫存器 **0**。32 行輸出裡沒有一行會告訴你。format string 是第二個證人：
+`Reg=%02d` 印十進位，旁邊兩個欄位印十六進位。
+
+**二、兩條 `MDIO*` 用十進位、兩條 `PHY*` 用十六進位解析暫存器。**
+0–9 一致，10 以上分歧，而 MII 的 vendor 空間從 16 開始。
+
+**三、`PHYR`／`PHYW` 完全不看 argc。** B 的 `CmdPHYregR` 也不看 —— 同一列命令表、
+同一句 help、同兩句 format string（連 `regID` 旁邊逗號的位置都一樣，這就是
+image 裡兩句 `Find PHY Chip!` 怎麼分辨的：`0x8040B5B8` 是 `PHYR` 的、
+`0x8040B5EC` 是 `PHYW` 讀回的那句）。
+
+**而 `MDIOR`／`MDIOW` 在廠商樹裡是別的東西** —— 唯一一處在 `test_slvpcie.c`，
+是 PCIe slave port 的暫存器讀寫，只是撞名。拿 B 去推 A 會得到一個很有自信的錯答案。
+所以 `MDIOR`／`MDIOW`／`PORT1` 三條都是單一來源，用到它們的格子上要寫明。
+
+### 🔴 `PORT1` 是工廠測試的 PHY 寫入迴圈，不吃參數，而工具擋不住它
+
+第 17 條命令，從沒追過，就在 PHY 那四條旁邊。help 說 `PORT1: port 1 patch for FT2`。
+`0x8040A294` 是三行 wrapper，真正的東西在 `0x8040A0A0`：
+
+```
+17 個字的表從 0x8040B84C 複製到堆疊        ; 5400 5440 54C0 5480 5580 ...
+0x8040B890 的四個位元組 = 00 02 03 04       ; 目標 PHY 位址
+外圈 17 次 × 中圈 4 次：
+    phy_write(4, 31, 1) ; phy_write(4, 20, 0xB20|(1<<phy)) ; phy_read(4, 20)
+    phy_write(phy, 31, 1)
+    內圈：phy_write(phy, 19, table[i])      ; printf("... gray_code=%x")
+    phy_write(phy, 31, 0)
+```
+
+**約六百次 PHY 暫存器寫入，用 31 號做 page select，沒有中止路徑。**
+loader 自己把那張表叫做 `gray_code`。
+
+而 `console-dump.py` 的 `FORBIDDEN = ("FLW","EB","EW","AUTOBURN","LOADADDR","J ")`
+**沒有「暫存器寫入」這個概念** —— `PHYW`、`MDIOW`、`PORT1` 三條都過得去。
+那支會拒絕 `EW`、附一句「這支工具只讀」的工具，會一聲不吭地送出 `PORT1`。
+
+不去改它：`upstream/` 釘死在 `4d3ff26`，那個釘就是 R9 差分證明的全部可信度。
+**改的是 runsheet 的「不准打」清單**，跟當初處理 `--at-prompt` 那個坑同一個做法。
+
+### 我本來要用的第二儀器，查完不成立
+
+原本想用 B 的 `PHY_BASE = SWCORE_BASE + 0x2000`（每個 port 的 MII 0–5
+記憶體映射影子，`PORT0_PHY_IDENTIFIER_1 = 0xBB802008`）當作**不經 MDIO** 的
+獨立第二路徑去讀 PHY ID。
+
+兩個理由不行：**D 的 §11 在這顆 part 上沒有這個 block**（Table 57 那個
+`0xBB80_4000` 區只有 `04` 和 `08` 兩格）；而且**把 image 裡 48 個 `lui …,0xbb80`
+全部解到後面的 `ori`／位移之後，13 個位址全在 `0xBB804xxx`，一個都不在
+`0xBB802xxx`**。單一來源，而且來源是別的世代。
+
+換上來的東西更好而且有兩個來源：**`PCRP1`–`PCRP4`（`0xBB804108`–`0xBB804114`）
+的 bit 30:26 是 `ExtPHYID`，datasheet Table 64 說 port0~4 預設就是 0x0~4，
+而 loader 只設定 `PCRP0`、沒有迴圈碰其他四個**，所以它們還是 reset 預設值。
+`DW BB804100 8` 一行，不經 MDIO 讀出交換器自己認定的 port↔PHY 位址對應。
+
+### PHY ID 算不出來，而這件事本身要寫進格子裡
+
+B2 的 stub 說「PHY ID 是矽片固定的，顯然可以先算出來」。找過了，**算不出來**：
+D 完全沒有 PHY 的 MII 暫存器表；B 裡唯一的 PHY-ID 常數是 `0x001CC912`，
+它自己的註解說那是「8212 two giga port」，外接千兆的東西；B 的工廠測試副程式
+是把期望值當參數傳進去而不是寫死；而**上游所有 console capture 裡沒有一次
+`Find PHY Chip!`** —— 因為那兩句只由 `PHYR` 和 `PHYW` 印，而這台從沒打過。
+
+所以 E4 那格帶的是結構性期望：不能是 `0000` 也不能是 `ffff`；
+**0、2、3、4 四個位址必須讀到同一個值**（`PORT1` 用同一張表 patch 這四個，
+那是 A 自己說它們是同一個 macro）；而**位址 1 是那個被跳過的**，
+一樣 → `PORT1` 跳過的理由跟 port 有關；不一樣或不回應 → 跟 PHY 有關。
+
+那一格的判定欄要寫「這是量測，不是確認」。
+
+### 一件 datasheet 說「保留」而板子自己反駁的事
+
+loader 在 `0x8040371C` 和 `0x80403904` 做 `PITCR |= 1`。
+D 的 Table 63：`Port0_TypeCfg[1:0]`，`00: UTP (10/100M embedded PHY)`、
+**`01: Reserved`**。
+
+而 `upstream/dumps/uart-bootloader.log`（**量到的**）在 `---Ethernet init Okay!`
+上面那行是：
+
+```
+P0phymode=01, embedded phy
+```
+
+**這顆晶片自己的 boot loader 給了一個 datasheet 說「保留」的值一個名字。**
+那份 datasheet 是草稿（`Rev. D1.1`，有浮水印）。記下來，不去解釋。
+
+### 順帶：同一份 capture 跟 C-13 對得上
+
+那份 capture 走到 `<RealTek>` 而**沒有印 `---Escape booting by user`**。
+那句話在 `doBooting()` 的非零分支（`0x804086D0`），沉默的是 `beqz a0` 那條 ——
+也就是 `check_image()` 回 0。而 C-13 說的就是 `gCHKKEY_HIT` 會讓
+`check_image()` 直接宣告「沒有 image」。
+
+**相符，不是證明**：`0x80408320` 那個 ESC 等待的回傳約定還沒追，翻過來讀法就翻。
+寫進 C-13 的格子裡，標著這句話。
+
+### 上機的執行順序
+
+`B1 §A` → `B1 §B` → `B2 §E`（走工具，`PHYR`/`MDIOR` 不在拒絕清單上）→
+關工具開 picocom → `B1 §C` → `B1 §D` → **`B2 §F`**。
+
+`§F` 只有兩格，而第一格 `PHYR 5 2` 是**整場唯一可能結束這次上電的一格** ——
+`MDCIOSR` 那個等待沒有 timeout、沒有次數上限，datasheet 說 `ExtPHYID` 只配到
+port 4，所以位址 5 應該不回應。回得來，`MDIOR` 才准掃。放在最後，
+是因為到那時候前面全部已經抓完了。
+
+### 今天改掉的說法
+
+- 「PHY 那一場零風險零程式碼」—— 零程式碼對，零風險錯。
+- 「用廠商的 `rtl865xc_asicregs.h` PHY block 當第二來源」—— 那個 block 在這顆上不存在。
+- 「PHY ID 可以先算出來」—— 算不出來，而且四個來源都查過了。
+- `PORT1` 不在「不准打」清單裡，而工具會送它。
+- `MDIOR` 的 help 是錯的，廠商樹裡的 `MDIOR` 是另一個東西。
+
+### 下一步
+
+上機跑 B1 + B2，一次上電。另外 **C-10 是十分鐘的桌面工作，而它是 `S0` 剩下的
+唯一一件事**。
