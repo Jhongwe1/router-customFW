@@ -199,11 +199,76 @@ Switch core initialization failed!
 而且在 2019 年關閉。因此 2a 交給 R2 的後續問題變成一個更窄也更好的問題：
 **`boa` 的建置方式有什麼不同，以及 2019 年改了什麼。**
 
+---
+
+## 2026-08-23 — `DAY-ZERO` 2b 與 2c
+
+同日，桌面工作，未接觸裝置。完整內容在 `notes/cache-model.md` 與
+`docs/loader-flash-write.md`。
+
+### 2b：快取管理模型（F49）
+
+2a 已經給了半個答案 —— `stage2` 程式碼區沒有任何 `cache` 指令。剩下的從兩處讀出：
+
+**一、loader 從 reset 之後第三段就切成 uncached 執行。** `0x80400498` 取自己下一條
+指令的位址、OR 上 `0xA0000000`、跳進 KSEG1 的別名。所以「它怎麼讓 I-cache 看見剛寫進
+RAM 的東西」對它自己的程式碼而言不成立 —— 它不需要。
+
+**二、它用一個 CP0 register 20 做快取操作**，慣用法是「清零、寫命令、再清零」，
+值有 `0x020`、`0x202`、`0x010`（開機初始化）與 `0x200`、`0x002`（封裝成函式）。
+`stage2` 從不設 `Status.IsC` 或 `SwC`。
+
+第二來源是廠商 kernel。`linux-2.6.30/arch/mips/mm/` 只有標準的
+`c-r3k.c`／`c-r4k.c`／`c-tx39.c`／`c-octeon.c`，**沒有 Lexra 專屬的快取檔**，
+而 `c-r3k.c` 裡有一模一樣的 `mtc0 $0,$20` / `mtc0 $8,$20` / `mtc0 $0,$20` 序列，
+並直接命名了值：**`2` = invalidate I-cache、`1` = flush D-cache、`512` = flush D-cache
+（819x 變體）**。它同時使用 `ST0_ISC`／`ST0_SWC`。
+
+所以模型是 **R3000 的**，CP0 register 20 是疊在上面的 Lexra 擴充，不是取代。
+`0x010` 與 `0x020` 只有一個來源、沒有名字，**記為未定**，沒有猜。
+
+`c-r3k.c` 裡還帶著日期的註解解釋了為什麼要先 D 後 I：
+
+> *Ghhuang (2007/3/9): RD-Center suggest that we need to flush D-cache entries
+> which might match to same address as I-cache ... when we flush I-cache.*
+
+而 `stage2` 的 `0x804066e8` 正是先呼叫 `0x804066c0`（`0x200`）再寫 `0x002`。
+這一條直接決定 R1d 怎麼把例外處理器裝進去。
+
+### 2c：`burn()` @ `0x80401318`（F45）
+
+`burn()` 不是 flash 寫入原語，是**映像解析器與派工器**。它比對八個四位元組區段簽章
+（`boot`、`sqsh`、`w6cp`、`jw6c`、`cwmp`、`ksap`、`ALL1`、`ALL2`），驗 checksum，
+印出 `burn Addr =0x%x! srcAddr=0x%x len =0x%x`，然後寫。
+
+**邊界檢查只有上界**：`目的位址 + 長度` 對晶片容量比較，超過就截斷。
+**沒有下界，而簽章表裡有 `boot`。** 也就是原廠升級路徑本身可以寫進 loader 區 ——
+`CLAUDE.md` 那條「永不寫 `0x000000`–`0x005FFF`」只能由我們自己的工具強制，
+**裝置不會幫忙**。
+
+SPI 控制器的暫存器與命令介面拿到了，而且是**兩個來源同意**：GPL drop 的
+`bootcode/boot/flash/spi_common.c` 命名了 `SFCR 0xb8001200`、`SFCR2 0xb8001204`、
+`SFCSR 0xb8001208`、`SFDR 0xb800120c`；這台自己的 `stage2` 分別引用了它們
+2／1／19／14 次。`SFDR2 0xb8001210` 只有 GPL 說，這台**零次引用**，記為
+「廠商宣告、此 loader 未用」。命令表含 **`RDID` = `0x9F`**，註解寫著
+"outputs JEDEC ID: 1 byte manufacturer ID & 2 byte device ID"。
+
+**JEDEC ID 這一格因此在桌面上就關掉了介面未知的部分** —— 讀它仍然需要在裝置上跑碼，
+但要發什麼、往哪個暫存器發，現在是規格而不是未知。
+
+第三段（映像壞掉時 loader 走哪條路）從 GPL 原始碼讀到：`doBooting()` 在
+`if (flag)` 為假時直接 `goToDownMode()`，也就是**壞映像不會讓你失去救援路徑，
+而是更快到達它**。但那是**另一個 bootcode 世代**的原始碼；這台的 `stage2` 有相同的
+`---Escape booting by user` 與 `Jump to image start=0x%x...`，卻**沒有**
+`no sys signature` 與 `sys checksum error`。所以結構對這台是推測，
+確認要在 bench 上做，而且只對 kernel 區做。
+
+### 這兩項用到的新來源
+
+廠商 kernel 與 WECB bootcode 都沒有 clone，是用 `gh api` 逐檔讀的 ——
+`fetch-sources.sh`（`DAY-ZERO` 第 3 項）尚未執行，`src-vendor/` 仍是空的。
+
 ### 下一步
 
-`DAY-ZERO` 第 2b 項（快取模型，F49）。2a 已經先給了它兩個資料點：
-`stage2` 程式碼區沒有任何 `cache` 指令，而 `mtc0`/`mfc0` 有 82 處，
-其中 57 次是 `c0_status`、13 次是 CP0 reg 20。
-
-第 1 項已於建立 manifest 時關閉；第 3 項其餘部分（submodule 釘 `4d3ff26`、
-`fetch-sources.sh`、`README.md` 第一屏）仍開著。
+`DAY-ZERO` 第 3 項的其餘部分：submodule 釘 `4d3ff26`、`fetch-sources.sh`、
+`README.md` 第一屏。第 0、1、2a、2b、2c 項已關閉。

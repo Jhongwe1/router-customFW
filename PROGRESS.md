@@ -14,9 +14,9 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | `S0` — safety net |
-| **Active step** | `DAY-ZERO` item 2a closed 2026-08-23 (`notes/lwl-mystery.md`). `S0a` closed the same day **with a recorded deviation** — C-10. `S0b` waits for the first bench session |
+| **Active step** | `DAY-ZERO` item 2 closed 2026-08-23 — 2a `notes/lwl-mystery.md`, 2b `notes/cache-model.md`, 2c `docs/loader-flash-write.md`. `S0a` closed the same day **with a recorded deviation** — C-10. `S0b` waits for the first bench session |
 | **Last session** | 2026-08-23, desk only — `S0a`, then `git init`. Seven encrypted archives; restore drill from copy ② after a physical replug, five trees at zero differences; first commit `9c40aa4` pushed to a **private** `Jhongwe1/router-customFW` (`CHARTER.md`: public from v0.1, and this is S0). `LOG.md` |
-| **Next after this** | `DAY-ZERO` item 2b (cache model, F49). Item 1 closed inside `S0a`; item 2a closed. Item 3 is half done: `git init`, first commit and a private remote are in; the submodule pin at `4d3ff26`, `fetch-sources.sh` and the `README.md` first screen are not |
+| **Next after this** | The rest of `DAY-ZERO` item 3 — submodule pin at `4d3ff26`, `fetch-sources.sh`, `README.md` first screen. `git init`, the first commit and a private remote are already in. Items 0, 1, 2a, 2b, 2c are closed |
 | **Blocked on** | nothing at the desk. `S0b` needs the device on the bench |
 
 **Step list for the active gate**: `plan/DAY-ZERO.md` items 0–8.
@@ -79,10 +79,10 @@ close it. **An item with no owning gate is a bug in this list.**
 |---|---|---|
 | C-1 | Does the loader scan for the `cr6c` tag, or is the kernel offset hard-coded? | R8 (A/B layout) |
 | C-2 | Is there anywhere to inject a kernel command line? (upstream `P9-1`) | R4 |
-| C-3 | `burn()` @ `0x80401318` — where does it write, and what is the SPI command interface? | R8 precondition ② |
-| C-4 | Does the loader still offer the ESC window when the kernel region is garbage? | R8 precondition ⑤ |
+| C-3 | Answered, `docs/loader-flash-write.md`: `burn()` is the image parser and dispatcher, bounds-checked only at the top against chip capacity, **no lower bound**, and `boot` is one of its eight accepted section signatures. SPI controller at `SFCR 0xb8001200` / `SFCR2 0xb8001204` / `SFCSR 0xb8001208` / `SFDR 0xb800120c`, two sources agreeing; `RDID` is `0x9F`. **Residual**: which of `burn()`'s four callees erases and which programs, and the `SFCSR` transaction bit layout, which is single-source. | R5b, R8 |
+| C-4 | Answered from vendor source of **a different bootcode generation**: a failed image check skips the ESC wait and goes straight to `goToDownMode()`, the same place ESC reaches. This unit's `stage2` carries the same two destination strings but not the same image-check messages, so the structure is inferred for this unit. **Confirm on the bench, kernel region only.** | R8 precondition ⑤ |
 | C-5 | Which instructions does the vendor kernel emulate? (`simulate_llsc`, `math-emu`, …) | R2d |
-| C-6 | Cache management model: R3000 (`Status.IsC`) or MIPS32 (`cache` insn)? — F49 | R1d |
+| C-6 | Answered, `notes/cache-model.md`: **R3000 model**. The vendor kernel reaches `c-r3k.c` through `cpu_has_3k_cache` and uses `Status.IsC`/`SwC`; the bootcode uses a Lexra CP0 register 20 instead and never touches `IsC`. `0x002` invalidates I-cache and `0x200` flushes D-cache, two sources agreeing. **Residual**: CP0 20 commands `0x010` and `0x020` are single-source and unnamed; cache size, line size and associativity unknown. | R1d, R1e |
 | C-7 | Answered at the desk, `notes/lwl-mystery.md`: stage2 0, busybox 0, boa 176 → 144 → 0 across builds from 2015 to 2020. **Residual, and it is the one that decides F34**: does the vendor kernel carry an unaligned-access emulation handler, and what changed in how `boa` was built between 2018-03-30 and 2019-03-15? | R2, then R1a on silicon |
 | C-8 | Does a watchdog reset still present the ESC window, or does bootcode take a different path? | R4 |
 | C-9 | Hazards beyond loads: stores, `mflo`/`mfhi`, `mfc0`/`mtc0` — F47, upstream open #100 | R1b |
@@ -97,6 +97,8 @@ that records where it was wrong is more credible than one that looks right.**
 
 | Date | What changed | Who caught it |
 |---|---|---|
+| 2026-08-23 | `DAY-ZERO` 2c placed the `WREN` / `PP` / `RDSR` sequence inside `burn()`. It is not there: `burn()` is the image parser and dispatcher, and the SPI command layer is at `0x804055ac`–`0x80405d44`, which it reaches indirectly. The plan was off by one layer. | reading `burn()`, `docs/loader-flash-write.md` |
+| 2026-08-23 | `DAY-ZERO` 2b argued the loader must have made the I-cache see freshly written RAM, "otherwise P9-12 would not have succeeded". Measured: from `0x804004a8` the loader jumps to the KSEG1 alias of its own next instruction and runs uncached, so for its own code it did not have to. It does flush D-then-I immediately before jumping to the kernel image, so the conclusion holds — but not for the stated reason. | reading the reset path, `notes/cache-model.md` |
 | 2026-08-23 | `DAY-ZERO` 2a predicted the split would be bare metal versus userspace: bootcode avoids the unaligned instructions, userspace takes the toolchain default and lets the kernel clean up. Measured: `busybox` is userspace on the same rootfs and has none either. The split is `boa` against everything else, and it closes in 2019. | `tools/opcount.py` over six firmware trees, `notes/lwl-mystery.md` |
 | 2026-08-23 | `DAY-ZERO` §現況 states the upstream working tree is clean. It is not: 13 modified tracked files and 2 untracked, none of them pushed. The two untracked files are unsent disclosure material; their names are deliberately not recorded in a public file, for the same reason the backup manifest was split into a K1 and a K2 side. | `git status` / `git log @{u}..`, run while enumerating what `S0a` had to cover |
 | 2026-08-23 | `S0a`'s DoD was "逐檔 `sha256sum` 相符". That check covers 6,346 of 7,770 paths and no mode bits at all, and it reports zero differences on a tree with a cleared setgid bit and a repointed symlink. Replaced by a type/mode/uid/gid/size/mtime/digest manifest (`tools/fsmanifest.py`) with one scope control and three negative controls. | `S0a` control N4 |
