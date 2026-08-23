@@ -92,17 +92,41 @@ is **not yet read out**. The SPI block below is what they reach.
 | `SFDR` | `0xb800120c` | data |
 | `SFDR2` | `0xb8001210` | second data register |
 
-**Two independent sources agree** on the first four, which is the bar
-`CLAUDE.md` sets:
+**Three independent sources agree**, which is more than the bar `CLAUDE.md`
+sets:
 
 - **B** names and documents them (`bootcode/boot/flash/spi_common.c`).
 - **A** — this unit's own loader — references `0xb8001200` at 2 sites,
   `0xb8001204` at 1, `0xb8001208` at 19, and `0xb800120c` at 14. Its SPI
   routines sit around `0x804055ac`–`0x80405d44`.
+- **D** — `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` §7.4.5–7.4.9, which is the
+  datasheet for **this** part rather than for the 8196C/8198 that B targets.
+  Every address matches.
 
-`SFDR2` is declared by B and referenced **zero** times by A. Recorded as
-*declared by the vendor, unused by this loader* rather than as a fact about the
-silicon.
+`SFDR2` is a real register on this part per D, and is referenced **zero** times
+by A. Recorded as *present on the silicon, unused by this loader*.
+
+### `SFCSR` bit layout
+
+From D, table 10, and every field matches B's shift macros exactly:
+
+| bits | field | meaning | B's macro |
+|---|---|---|---|
+| 31 | `SPI_CSB0` | chip select 0. `0` active, `1` not active. Reset `1` | `<< 31` |
+| 30 | `SPI_CSB1` | chip select 1, same encoding. Reset `1` | `<< 30` |
+| 29:28 | `LEN` | transfer length in bytes: `00`=1, `01`=2, `10`=3, `11`=4. Reset `11` | `<< 28`, 2 bits |
+| 27 | `SPI_RDY` | busy flag, read-only. `0` busy, `1` ready | `<< 27` |
+| 26:25 | `IO_WIDTH` | `00` serial, `01` dual, `10`/`11` reserved | `<< 25`, 2 bits |
+| 24 | `CHIP_SEL` | `0` = CS0#, `1` reserved | `<< 24` |
+| 23:16 | `CMD_BYTE` | the 8-bit SPI command. D's own examples: *"'Read Data' is `0x03`. 'Read ID' is `0x9F`."* | `<< 16`, 8 bits |
+| 15:0 | — | reserved | |
+
+**`SFCSR` and `SFDR` do not provide byte access** (D). They must be read and
+written 32 bits at a time. That is the kind of thing R5b would otherwise find
+out by writing a driver that silently does nothing.
+
+The `Read ID is 0x9F` example is D's own, so the JEDEC ID command is now
+attested by the datasheet for this part as well as by B.
 
 ### Commands
 
@@ -129,11 +153,12 @@ this device can issue `0x9F`, and B has a function that does exactly that,
 (R5b's MTD probe, or a bare-metal payload) — but the interface is specified now
 rather than unknown.
 
-**Not established:** the bit layout of `SFCSR` for one command transaction has
-been read from B only, and B is a different bootcode generation. Before any of
-it is used to *write*, the sequence must be confirmed against A's own SPI
-routines at `0x804055ac`–`0x80405d44`, or against C, which drives the same
-registers from Linux.
+**Not established:** the register map and the command codes are settled, but the
+*sequence* — how many `SFCSR` writes make one transaction, where the address
+bytes go, how the `SPI_RDY` poll is spaced — has been read from B only. Before
+any of it is used to **write**, that sequence must be confirmed against A's own
+SPI routines at `0x804055ac`–`0x80405d44`, or against C, which drives the same
+registers from Linux. Reading is the safe half; writing is not.
 
 ### What A says about `FLW`
 
