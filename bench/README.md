@@ -134,3 +134,147 @@ silently widening the tool:
 
 **The reviewing is the point.** A hit that is waved through without a written
 reason is a scanner that has been turned off one value at a time.
+
+## 2026-08-24b — seating 2, part two
+
+One power cycle (`A-catch` opened at 03:32:42, `CONT3` landed at 04:53:45 on the
+same boot), **zero flash bytes**, **33 captures** — 30 cells and three flushes.
+Every cell went through `tools/console-capture.py`, one byte-exact timestamped
+capture per cell (`.log` + `.timing` + `.meta.json`), so **nothing in this
+directory is a hand transcription** either. Nothing here was typed into a
+terminal and nothing was pasted back.
+
+| files | cell | what it covers |
+|---|---|---|
+| `A-catch.*` | `B1 §A` | ESC streamed from inside the capture loop across power-on, power applied 8.129 s in. Measured: with ESC collapsed the boot text is byte-identical to part one's `A-catch.log`; the loader echoed **730** ESC bytes in bursts `[128, 128, 128, 128, 128, 90]` |
+| `flush.*` | seating rule 2 | consumes the 90-byte remainder `A-catch` left, and returns **exactly one** `Unknown command !`. That is what makes `730 = 5 × 128 + 90` a partition rather than the number 128 turning up twice |
+| `A0.*` | `A0` | 71 bytes, byte-identical to part one's `A0b-reopen-control.log`. Third power cycle, same load base, same table address, same stride |
+| `C7-pre.*` `C7-pre2.*` | 🆕 `B1 §C` | `DW 81000400 28` and `DW 81800000 8`, read **before** anything was written there. Measured: `0x81000400` holds a live 32-byte-periodic structure whose `+0x18` and `+0x1C` words both read `81000418`, the address of the first of the two, and `0x81800000` holds a second one pointing ~12 MiB higher |
+| `G4-addr-probe.*` | 🆕 `B3 §G` | `DW 80A00000 8` — the replacement upload address, probed because the sheet's upload at `0x81000000` covers the structure `C7-pre` found. Eight words, no pointer-shaped word, no period |
+| `C7a.*` `C7a-rb.*` | `B1 §C` | a **119**-character `EW` line and its readback: twelve words land in order, and the four-word over-run control past the end is unchanged |
+| `C7b.*` `C7b-rb.*` | `B1 §C` | the **127**-character boundary control — the cell that makes `C7a` mean "the cliff is at 128" rather than "long lines are unsafe". Its over-run word was predicted from `C7-pre`'s period at an address never read, and came back as predicted |
+| `E10b.*` | `B2 §E` | all five `PSRP` with **no cable in any jack**. This is the zero `E10` never got to take: seating 1 had a cable in, so `E10`'s stated expectation was never actually measured |
+| `E11a.*` `E11a2.*` `E11b.*` `E11c.*` `E11c2.*` `E11d.*` `E11e.*` | `B2 §E` | one cable move per point, five points, each a `DW BB804128 8`. `E11a2` and `E11c2` are the pair: `E11a2` looked like "bit 8 is sticky", `E11c2` read a port whose jack was empty and took bit 8 from 1 to 0 |
+| `E1b.*` `E2b.*` | `B2 §E` | the timer gate re-established on this boot — no advance, no PHY command — and tick samples 1 and 2 of four |
+| `E12b.*` `E12c.*` `E12d.*` `E12e.*` | `B2 §E` | `ANLPAR` and `BMSR`, linked and unlinked, on different physical ports from seating 1's. `E12e` reads `ANLPAR` on an **unlinked** port, which no source here predicted and seating 1 never read |
+| `B7a.*` `B7b.*` | `B1 §B` | `PABCD` with the button **released**, and `0xB8000000` = `8196E001` — the SoC identifying itself at a fixed address while the boot log prints `chipName: UNKNOWN` |
+| `E9b.*` | `B2 §E` | `PCRP` re-read after four cable moves **inside one boot**, byte-identical to seating 1's `E9`. `F2`'s sweep now has a within-boot comparison basis instead of a cross-boot one |
+| `CONT.*` | 🆕 continuity | the first command after the console adapter re-enumerated. **Kept although it failed**, see below |
+| `flush-cont.*` | 🆕 continuity | a bare prompt, 11 bytes. **Kept although it failed** — it is the capture that refuted the residue explanation |
+| `CONT2.*` `CONT3.*` | 🆕 continuity | tick samples 3 and 4, and the reading that settles whether this is still the same boot: `CONT2` read 428,675 where a board that had reset during the console outage would have read ~60,000 |
+| `B7c.*` `flush-b7c.*` | 🆕 `B1 §B` | the button **held**. `PABCD_DAT` differs from `B7a` in bit 5 and in nothing else; `CNR` and `DIR` unchanged; no `Booting...`. Sent inside `--esc-after 20`, so ESC accounting `985 = 7 × 128 + 89` with seven `Unknown command !`, and `flush-b7c` took the remainder |
+| `PREDICTIONS-block1.md` `-block2.md` `-block3.md` `-block3b.md` | — | **not device output.** Expectations written at the desk for twelve of the captures above, and the mtime check that shows they were written first, see below |
+
+**`C7-pre` changes how part one's `C1`–`C4` rows above should be read.** Those
+cells wrote to `0x81000000` on the argument that it is scratch. Measured today,
+that region is not: `C7-pre` read a complete 32-byte period of a live structure
+at `0x81000400`, and `C3b`'s `00000400` at `0x81000100` — recorded in part one as
+unpredicted SDRAM — is the first word of that same period, untouched. The rows
+stay as they are and the readings in them are still what the device sent. What
+fell is the premise, and part one's writes landing on a live structure without
+breaking anything was luck rather than design.
+
+### `PREDICTIONS-block*.md` — mine, not the board's, and what they enforce
+
+`RUNSHEET.md` house rule 2: *a cell whose expectation is written afterwards
+illustrates; it cannot refute.* While the operator was driving cell by cell, the
+rule enforced itself — the expectation was in a message that had already been
+sent. From the point in this session where the console was driven directly, it
+had **no enforcement at all**: a prediction written after the reading is
+indistinguishable from one written before it, and the file it sits in cannot say
+which it was.
+
+These four files and `tools/check-predictions.py` are the enforcement. Each file
+carries one fenced block whose info string is `cells`, naming the captures it
+predicts, and the check is that the prediction file's mtime precedes the `.log`
+mtime of **every** capture it names — the same instrument `E1b`/`E2b` used for the
+timer, and it is re-runnable by anyone, afterwards, from the filesystem.
+
+```
+python3 tools/check-predictions.py bench/2026-08-24b/PREDICTIONS-block1.md
+```
+
+| file | captures it names | margin, prediction → capture |
+|---|---|---|
+| `PREDICTIONS-block1.md` | `E12b` `E12c` `E12d` `E12e` `B7a` `B7b` `E9b` | +8.246 s … +33.543 s |
+| `PREDICTIONS-block2.md` | `B7c` `flush-b7c` | +601.688 s … +650.412 s |
+| `PREDICTIONS-block3.md` | `CONT` | +92.330 s |
+| `PREDICTIONS-block3b.md` | `flush-cont` `CONT2` | +7.500 s … +10.727 s |
+
+All four report `N of N captures came after the prediction, 0 did not`, and each
+run prints its controls first — `P1` prediction-before-capture passes, `N1`
+capture-before-prediction is caught, `N2` a predicted cell with no capture is
+caught, `N3` an empty `cells` block is refused rather than reported clean. Three
+of the four must fail for a pass to mean anything, and the tool refuses to report
+on the file if any of them does not behave.
+
+**What this does not prove, and the tool says so in its own docstring**: mtime is
+not a cryptographic timestamp. `touch -d` rewrites it. It proves ordering to a
+cooperative auditor; it proves nothing against someone willing to forge it.
+**Consequence for anyone editing this directory: never touch a predictions file
+after its block has run.** Fixing a typo updates the mtime and the check fails —
+correctly, and it will look like a false alarm. Corrections go in a new file,
+which is what `PREDICTIONS-block3b.md` is: `block3` recorded what `CONT` was
+expected to do, `CONT` did something else, and `block3` is left as it was.
+
+**Coverage, stated rather than left to be assumed**: twelve of the 33 captures
+are named in a block, and they are not simply the last twelve. The twenty sent
+before `block1` went through the operator one at a time, where the expectation
+was already in a sent message; from `block1` on, these files stand in for that.
+**`CONT3` is the gap**: it was sent after the last block, no predictions file
+names it, and its ordering is therefore unenforced. It is one of the four tick
+samples the base-clock figure is fitted from, so the gap is named here rather
+than left for a reader to find. The fix costs nothing and is procedural — the
+block goes in before the cell is sent, not after the session has settled.
+
+### `CONT` and `flush-cont` are kept although they failed
+
+Same reason `A0-reopen-control.log` is kept above: the failure is the record.
+
+Measured. `CONT` (`DW 8040DCE8 1`, 24 bytes) came back as the echo, `\n\r` and
+`<RealTek>` — **no data line at all**, which is the shape `B8` produced when a
+length argument parsed to zero. The obvious reading was residue in the loader's
+line buffer, which is exactly the fault `A0-reopen-control` recorded.
+`flush-cont` (`--send ''`, 11 bytes) refuted it: a **bare prompt with no
+`Unknown command !`**, so the buffer was empty. `flush.log` and `flush-b7c.log`
+are 31 bytes each and do carry that line — that is what a flush which finds
+something looks like, and it is the control that makes `flush-cont`'s 11 bytes
+readable. `CONT2`, the identical command sent afterwards, worked.
+
+What is left is: **the first command sent after the console adapter re-enumerates
+on the host is echoed but not acted on**, signature *echo + prompt + no output*.
+The mechanism is inferred, pending a measurement — most likely the board's UART
+saw a break or a framing error during re-enumeration — but the behaviour is
+measured, and it is only measured because both captures are still here. **What
+would refute it**: one first-command-after-re-enumeration that returns its data
+line. There is a single supporting instance and no positive control, so it is a
+rule to follow and not yet a finding.
+
+The re-enumeration itself is not in these files and was not the board's doing:
+`dmesg` recorded the CP2102 leaving the host bus after 7 min 24 s of pure idle,
+Windows `usbipd list` moved the busid out of *Connected*, and `CONT2`'s tick
+value says the board ran continuously through it.
+
+### The redaction audit on this directory
+
+```
+python3 tools/audit-bench-log.py bench/2026-08-24b/*.log bench/2026-08-24b/*.json
+```
+
+All eight patterns fire on the synthetic control. **All 33 `.log` files and all
+33 `.meta.json` files report `0 hit(s)`, and nothing is waved through** — part
+one's `10.1.1.1` allowance has no counterpart here, because no TFTP, `IPCONFIG`
+or rescue command ran on this power cycle and there is no rescue JSON in this
+directory. The `PREDICTIONS-*.md` files are not scanned by that command line;
+they are prose written at this desk and hold no device output.
+
+**One caveat about the tool's own report, measured today.** Its byte column is a
+decoded character count, not the file size on disk: `audit-bench-log.py` reads
+each file with `io.open(p, encoding='utf-8', errors='replace')`, and Python's
+universal newlines collapse every `\r\n` to `\n`, so the count is short by
+exactly the number of CRLF pairs. `A-catch.log` is 1066 bytes on disk and reads
+`1058` there (8 CRLF pairs); `B7c.log` is 1273 and reads `1266` (7); the 71-byte
+and 118-byte captures have none and agree. No pattern in the tool spans a line
+ending, so this changes no hit — but **that column is not a byte count and must
+not be quoted as one.** The byte-exact claim in this file rests on `bench/**`
+being marked `-text` and on the stored-blob hash check, not on this scan.

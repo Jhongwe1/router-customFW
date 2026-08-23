@@ -137,6 +137,30 @@ def _check_send(value):
         )
     if "\n" in value or "\r" in value:
         _fail("--send takes one line; the carriage return is added here")
+    if any(ord(c) > 0x7F for c in value):
+        _fail(
+            f"--send {value!r} is not ASCII. capture() encodes the line with "
+            ".encode('ascii') AFTER the port is open, so a non-ASCII character "
+            "would raise there -- with the port already opened, which is the "
+            "ordering defect N4 exists to prevent."
+        )
+    n = len(value)
+    if n >= 128:
+        _fail(
+            f"--send is {n} characters and the loader's console line buffer is "
+            "128 bytes. Refusing.\n"
+            "  Measured on the device 2026-08-24: exactly 128 ESC bytes came\n"
+            "  back `Unknown command !`, seven times -- bench/2026-08-24/A-catch.log.\n"
+            "  Read out of the image: the command loop at 0x80409190/0x804091A0\n"
+            "  does memset(buf, 0, 128) then readline(buf, 128, 1), and readline\n"
+            "  writes its NUL only on the CR path (0x804070FC) -- the length-limit\n"
+            "  path (0x80407194, count < 128) returns without one. So a line that\n"
+            "  FILLS the buffer is unterminated, and the tokeniser at 0x80407248\n"
+            "  scans past sp+143 into the saved registers.\n"
+            "  The cliff is AT 128 and anything longer is cut to 128, so this is\n"
+            "  >= and not ==. Longest safe EW form: 12 values, 119 characters\n"
+            "  (11 + 9n < 128). RUNSHEET.md C7; docs/loader-command-semantics.md f."
+        )
     return value
 
 

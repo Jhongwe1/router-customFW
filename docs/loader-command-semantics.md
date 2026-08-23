@@ -439,6 +439,48 @@ the caller, because the loader will align it either way and will not mention it.
 command that never arrived** — which is the same disease as a control that
 expects zero, one layer up.
 
+### Measured 2026-08-24b: `EW` writes exactly `argc − 1` words, and the hex parse is `strtoul`-like
+
+Two lines sent at the top of the length cliff below, each with an **over-run
+control** — the word immediately past the last one the command should have
+written, read back in the same reply.
+
+| | line | chars | log | read back by |
+|---|---|---:|---:|---|
+| `C7a` | `EW 81000400` + **twelve** values | 119 | 130 bytes, echo only | `C7a-rb`, `DW 81000400 16` |
+| `C7b` | `EW 81000440` + **eleven** values, leading-zero padded | 127 | 138 bytes, echo only | `C7b-rb`, `DW 81000440 16` |
+
+**Measured: `EW` writes exactly `argc − 1` words, not "at least".** All twelve of
+`C7a`'s values landed in order across `0x81000400`–`0x8100042F`, and the fourth
+line of its readback, `0x81000430`, is byte-identical to the pre-state `C7-pre`
+read there before either write. All eleven of `C7b`'s landed, and word twelve at
+`0x8100046C` still reads the `00000000` `C7-pre` had read there.
+**Refutation condition, written before either cell ran:** any change
+at `0x81000430` or at `0x8100046C`. Neither moved. What those control words
+actually hold is not this file's question — `0x81000400` turned out not to be
+scratch memory, and that finding is owned elsewhere; what is used here is only
+that they did not move.
+
+That also puts consequence 2 below on silicon rather than in arithmetic: the
+twelve-word line was counted from the buffer size, and `C7a` executed it.
+
+**Measured: the loader's hex parse is `strtoul`-like, not fixed-width.** `C7b`'s
+first six arguments were written with **ten** characters — `00C7B00001` — and its
+last five with nine. Every one read back as the value with its leading zeros
+dropped: `C7B00001`, `0C7B00007` → `C7B00007`. **A fixed eight-digit reader would
+have taken `00C7B000` and left `01` dangling, shifting every argument after it.**
+Refutation condition: `00C7B000` in the readback, or `FFFFFFFF`, or the line
+answering `Unknown command !`. **What this does not test:** an argument whose
+*value* exceeds 32 bits. None was sent, so the overflow behaviour is still
+unmeasured.
+
+**No file in this repository predicted this.** The disassembly names
+`strtoul(_,_,16)` at `0x80409678`, and that reading is consistent with the
+result, but nothing here had turned it into a claim about digit count — the
+eight-digit argument was a convention, not a measurement. The padding was chosen
+as `C7b`'s method for exactly that reason: a wrong answer lands a wrong **value**
+at a known address rather than a wrong **address** somewhere unknown.
+
 ### 🔴 The console line buffer is 128 bytes, and exactly 128 is the dangerous length
 
 Two sources, and the first one arrived by accident.
@@ -448,6 +490,42 @@ after the prompt appeared. The transcript shows the loader taking **exactly 128
 ESC bytes and then answering `Unknown command !` — seven times, the same number
 every time** (`bench/2026-08-24/A-catch.log`). At roughly 50 ESC per second a
 timing artefact would not land on the same count seven times.
+
+**Measured again on a second power cycle, 2026-08-24b: the 128 is a partition of
+the byte stream, not the number 128 turning up.** Every ESC byte the loader
+echoes is accounted for as `128 × (Unknown command ! lines) + a residue`, and the
+residue is still sitting in the buffer when the capture ends:
+
+| capture | ESC echoed | bursts | `Unknown command !` | the residue, and what took it |
+|---|---:|---|---:|---|
+| `bench/2026-08-24/A-catch.log` | 908 | `[128 × 7, 12]` | 7 | 12 — consumed by the next command, consequence 3 below |
+| `bench/2026-08-24b/A-catch.log` | 730 | `[128 × 5, 90]` | 5 | 90 — consumed by `flush` (`--send ''`, one bare CR): 31 bytes and **exactly one** `Unknown command !` |
+| `bench/2026-08-24b/B7c.log` | 985 | `[128 × 7, 89]` | 7 | 89 — consumed by `flush-b7c`, one more `Unknown command !` |
+
+`730 = 5 × 128 + 90`; `985 = 7 × 128 + 89`. **Twelve unterminated fills across two
+independent power cycles**, and in both 24b cases the leftover was turned into
+exactly one further `Unknown command !` by one bare CR.
+
+**Refutation condition:** an ESC capture whose echoed byte count is not
+`128 × n + r` for `n` `Unknown command !` lines and `0 ≤ r < 128`, or a residue
+that a following bare CR does not turn into exactly one more.
+
+**Two things had to hold for that arithmetic to close, and both are measured.**
+*The ESC-window consumer does not echo; the command loop does* — about 115 ESC
+bytes were written between power-on (`t = 8.129 s` in the 24b capture) and the
+prompt (`t = 10.445 s`) and **not one appears in the log**, while every ESC after
+the prompt is echoed. `gCHKKEY_HIT`'s path and `readline` are different code, and
+the log counts only the second. And *the ESC rate is the host tool's ceiling, not
+the wire* — 730 bytes over 14.55 s = **50.2 ESC/s**, where at 38400 those same
+bytes are 0.19 s of wire time. The ceiling is `console-capture.py`'s
+`ser.write(ESC); drain(0.02)` loop, 20 ms per byte.
+
+**That is what makes an `--esc-after N` residue predictable, and it is an
+operating number.** `--esc-after 20` streams ≈ 1000 bytes ≈ 7 fills plus a
+residue near 100; `B7c` measured 985 and a residue of 89. A residue `r` followed
+by a command of length `L` with `r + L ≥ 128` **cuts that command** — the
+unterminated case above, reached with a line nobody typed. One bare CR before the
+next command removes `r`.
 
 **Read.** The command loop at `0x80409144`:
 
@@ -498,6 +576,50 @@ text is **shorter** than 128.
    console, which is the same access that can already write arbitrary memory
    with `EW`.
 
+**The standing flush rule, corrected 2026-08-24b: it named the wrong trigger, in
+both directions.** As written it read *"after any capture cut short by
+`--seconds`, send one bare CR"*.
+
+- **Wider than it needs to be.** **Measured:** part one's `C1 · C2 · C3a · C3b ·
+  C4a · C4b · C6-readback` — seven consecutive `--send` captures — were **all**
+  stopped by `--seconds` (each `meta.json` carries `stop_reason: --seconds N
+  elapsed` and `esc_seconds: 0.0`), **none** was flushed, and every one of them
+  is correct. The `--seconds` deadline ends the *reading*. It leaves nothing on
+  the wire, because the last byte a `--send` capture wrote to the port is the CR
+  the tool itself appended.
+- **The real trigger is *any capture whose last byte written to the port was not
+  a CR*** — in practice, any capture that ran `--esc` or `--esc-after`. Those
+  loops end on a wall-clock deadline and write no terminator, so whatever the
+  deadline cut mid-line stays in the buffer.
+- **Narrower than it reads.** A USB re-enumeration of the console adapter is not
+  a capture at all, and needs the same throwaway.
+
+**The re-enumeration case, measured.** After the CP2102 left the host's USB bus
+mid-session and was re-attached, the next command sent — `CONT`,
+`DW 8040DCE8 1` — came back **24 bytes**: the echo, `\n\r`, `<RealTek>`, and **no
+data line**. That is `len(command) + 11`, the shape of a *silent* command, and 47
+bytes — exactly one line — short of the 71 that command's reply weighs (*The read
+side*, below). The obvious explanation, residue in the line buffer, is
+**refuted**: the next cell, `flush-cont` (`--send ''`), returned **11 bytes, a
+bare prompt with no `Unknown command !`**, so the buffer was empty. `CONT2`, the
+identical command sent afterwards, returned the structural 71.
+
+> **The first thing sent after the console adapter re-enumerates is a throwaway,
+> and its signature is echo + prompt + no output.**
+
+*Inferred, pending a measurement:* the board's UART saw a break or a framing
+error during re-enumeration and `readline` discarded what it held, leaving the
+trailing CR to produce an empty-line prompt. The behaviour is measured; the
+mechanism is not.
+
+**Refutation condition for the corrected rule:** a capture that wrote a CR as its
+last byte and nevertheless left residue — a following bare CR answering
+`Unknown command !`. Three bare CRs were sent in `bench/2026-08-24b/` and the
+probe demonstrably fires: `flush` after `A-catch` and `flush-b7c` after `B7c`,
+both ESC captures, both answered `Unknown command !`; `flush-cont` after `CONT`,
+a `--send` capture, answered a bare prompt. Two firings and one silence, so the
+silence is a result and not a test that cannot fail.
+
 ### `FLR` — `0x804099AC`, and it is the one to be careful with
 
 Three `strtoul(_,_,16)`, **no bound check on any of them**, then:
@@ -514,6 +636,24 @@ third source for the argument order and the one that needs no device. A mistyped
 destination writes a flash region over whatever is there, including the loader's
 own `.data` at `0x8040D000`+. The `(Y)es` prompt is the only thing between a
 typo and that.
+
+**Two operating consequences, desk-verified 2026-08-24b, neither yet run on the
+device.**
+
+- **One `FLR` read costs three captures.** The confirmation at `0x80409B18`
+  prints `(Y)es , (N)o ? --> ` and takes `Y` or `y` on a second line (read out of
+  the code), and `console-capture.py`'s `_check_send` refuses a `\r` or `\n`
+  inside `--send`, so the two lines cannot be merged into one cell (read out of
+  the tool, `_check_send` in `tools/console-capture.py`). The sequence is
+  `FLR …`, then `Y`,
+  then the `DW` that reads what landed — three captures, and a runsheet that
+  budgets one is wrong by two.
+- **No TFTP `put` or `get` may follow an `FLR`.** `0x80409A04` stores the length
+  argument into `0x8040DD28`, which is the same global the TFTP read path serves
+  from (§c). An `FLR` therefore silently redefines how many bytes a later `get`
+  returns, and it says nothing about having done so. Any flash re-read that
+  brackets a transfer has to be split into one cell before it and one cell
+  after — not one cell on either side of a `put`.
 
 ### `EH` exists as code and cannot be reached
 
@@ -553,12 +693,77 @@ authority for this unit.
 - **the length is parsed base 10** (`li a2,10`) while every other numeric
   argument in the loader is base 16. `DB 80500000 64` reads 64 bytes, not 100.
 - `DB` defaults to 16 bytes. `DW` defaults to 1 and counts **words**, four to a
-  line, so it always reads a multiple of 16 bytes.
+  line. The loop steps `i` by 4 while `i < N` and each pass prints four words, so
+  `DW <addr> N` prints **`4 × ceil(N/4)` words** — always a multiple of 16 bytes,
+  never fewer than four words, and `N` rounded **up**. The next subsection is
+  that arithmetic written out, because a cell got it wrong.
 - **`DW` forces the address into KSEG0** when bit 31 is clear
   (`if ((signed)src >= 0) src |= 0x80000000`) and rounds up to 4. `DB` does
   neither. So `DB` and `DW` also disagree about what an address means.
 - `DW` is the only one of the four that guards `argv[0]` against NULL. It prints
   `Wrong argument number!` and survives.
+
+### 🔴 `DW <addr> N` prints `4 × ceil(N/4)` words, and `N = 3` is a truncation trap
+
+Read out of the code at `0x804094B4`, measured across two seatings. `N` is not a
+word count anything honours; it is a **line count in disguise, rounded up**:
+
+| `N` | words printed | lines | measured on |
+|---:|---:|---:|---|
+| 1 | 4 | 1 | `A0`, `E1b`, `CONT2` — 71 bytes each |
+| **3** | **4** | **1** | never sent, and the reason is below |
+| 8 | 8 | 2 | `C7-pre2`, `E10b`, `E9b`, `E11a` — 118 bytes each |
+| 10 | 12 | 3 | `B9`, `bench/2026-08-23/B.log` |
+| 16 | 16 | 4 | `C7a-rb`, `C7b-rb` — 213 bytes each |
+| 28 | 28 | 7 | `C7-pre` — 354 bytes |
+
+**The trap was live.** `RUNSHEET.md` `C7` asked for **`DW 81000400 3`** to read
+back the **twelve** words the cell had just written. That prints **one line of
+four**. And `C7`'s entire failure mode is the write being *truncated*, so a
+four-word readback would have looked exactly like a truncation at the fourth
+value: **the cell would have manufactured, out of its own read command, a false
+positive of precisely the thing it exists to catch.** Corrected at the bench to
+`28`, `16` and `16`.
+
+**Refutation condition, and it costs nothing to check on every future cell:** a
+`DW <addr> N` whose reply carries anything other than `4 × ceil(N/4)` words.
+
+#### What a reply weighs
+
+The loader echoes the line, prints fixed-width hex, and ends with a prompt that
+carries no newline, so the length of a reply is a function of the command alone:
+
+```
+bytes = len(command) + 2      the echo and its \n\r
+      + 47 × lines            9 for "AAAAAAAA:" + 4 × (tab + 8 hex) + 2
+      + 9                     "<RealTek>"
+```
+
+with `lines = ceil(N/4)` for `DW`, and **`lines = 0` for the silent writers** —
+`EW` and `EB` print nothing, so their whole reply is `len(command) + 11`.
+
+Six values, each predicted before its cell ran and each exact:
+
+| capture | command | predicted | `.log` |
+|---|---|---|---:|
+| `A0` | `DW 8040DBC0 1` | 13 + 2 + 47 + 9 | **71** |
+| `E10b` | `DW BB804128 8` | 13 + 2 + 2×47 + 9 | **118** |
+| `C7a-rb` | `DW 81000400 16` | 14 + 2 + 4×47 + 9 | **213** |
+| `C7-pre` | `DW 81000400 28` | 14 + 2 + 7×47 + 9 | **354** |
+| `C7a` | `EW …` twelve values, silent | 119 + 2 + 9 | **130** |
+| `C7b` | `EW …` eleven values, silent | 127 + 2 + 9 | **138** |
+
+**Scope, because the formula is easy to over-read.** It holds for `DW` and for
+the silent writers. It does **not** describe every command: `PHYR 1 5` (`E12b`)
+returns 87 bytes of prose, one line of its own shape. And it applies to
+`console-capture.py` `.log` files, which hold exactly the bytes the port
+delivered — not to a terminal transcript such as `bench/2026-08-23/B.log`.
+
+**Why it is worth carrying:** a predicted reply length is a control that costs
+nothing and that a truncated or stale capture cannot pass. A capture short by 47
+lost a line; short by 9, lost the prompt; off by anything else, it is not the
+reply to the command that was sent. `CONT`'s 24 bytes — 71 predicted, one line
+missing — is the case where this fired.
 
 ### The reset R4 needs, and it is already a command
 

@@ -5,6 +5,11 @@ was measured on the device**, except where a line is marked *(measured)* and
 names the capture it came from. Every other claim is marked *read out of the
 code* or *inferred, pending a measurement*.
 
+**Amended after the bench, 2026-08-23 and 2026-08-24.** Results from both
+seatings are folded in where they bear on a claim, each marked 🔴 and naming the
+capture it was read from. Superseded claims stay where they were, with the reason
+they fell and the cell that killed them.
+
 Sources are the same five as `docs/loader-command-semantics.md` §0, with the same
 weights. **A** = `stage2.bin` out of this unit's own dump
 (`sha256 f88869d1…c9c1b4ee`); **B** = vendor bootcode and kernel C, a different
@@ -125,7 +130,8 @@ Nothing else in B2 is worth a power cycle if that cell fails.
 
 and `delay(10)` is one tick = 10 ms, which is exactly `mdelay(10)` in **B**.
 
-🔴 **Measured on the device, 2026-08-23** (`RUNSHEET.md` `E2`, `E2b`):
+🔴 **Measured on the device, 2026-08-23** (`RUNSHEET.md` `E2`, `E2b`).
+**The rate in this table is superseded; it stays here with the reason it fell:**
 
 | | |
 |---|---|
@@ -136,15 +142,67 @@ and `delay(10)` is one tick = 10 ms, which is exactly `mdelay(10)` in **B**.
 | `TC0DATA` (`0xB8003100`) | `0x0022E0A0` = 142,858 << 4, read on the device |
 | ⇒ base clock | 99.74 × 14 × 142,858 = **199.48 MHz** |
 
-**Three of the four terms are now read on silicon**, so this is a derivation and
-not a coincidence: the compiled-in `0x0BEBC200` = 200 MHz is confirmed as this
-board's clock to a quarter of a percent. It also settles the divisor field's
-semantics without a second experiment — a divisor of 15 would put the base at
-213.7 MHz, which is not a clock anyone builds.
+**Three of the four terms are read on silicon**, so this is a derivation and not
+a coincidence, and it settles the divisor field's semantics without a second
+experiment — a divisor of 15 would put the base at 213.7 MHz, which is not a clock
+anyone builds. `CDBR` and `TC0DATA` still stand as read. **The rate does not.**
+
+🔴 **Superseded 2026-08-24, and the cause is the instrument, not the board.**
+That 61.842 s was **hand-timed**. A human reading a clock is good to about
+±0.15 s, which over 61.842 s is **±0.25 %** — the size of the deviation the row
+above reports as a property of this board. **The 0.26 % was the stopwatch.**
+
+**Measured on the device, 2026-08-24**, four reads of `DW 8040DCE8 1` with the
+interval taken from each capture's `.log` mtime instead of from a hand-held clock
+(`bench/2026-08-24b/`, cells `E1b`, `E2b`, `CONT2`, `CONT3`; one boot throughout).
+Ticks and mtimes: **252,061** at 04:14:52.116 · **277,390** at 04:19:05.387 ·
+**428,675** at 04:44:18.209 · **485,370** at 04:53:45.148.
+
+| baseline | seconds | f (Hz) | base (MHz) | ppm vs 200.000 |
+|---|---|---|---|---|
+| `E1b`→`E2b` | 253.270 | 100.0078 | 200.0168 | +84.1 |
+| `E1b`→`CONT2` | 1766.093 | 100.0027 | 200.0066 | +32.9 |
+| `E1b`→`CONT3` | 2333.032 | 100.0025 | 200.0062 | +30.8 |
+| **`E2b`→`CONT2`** | 1512.822 | **100.0018** | **200.0049** | **+24.3** |
+| **`E2b`→`CONT3`** | 2079.762 | **100.0018** | **200.0049** | **+24.3** |
+| **`CONT2`→`CONT3`** | 566.940 | **100.0018** | **200.0049** | **+24.4** |
+
+**Every baseline that excludes `E1b` returns `100.0018 Hz` to five significant
+figures** — three of them, over 567 s, 1513 s and 2080 s, and `CONT2`→`CONT3`
+shares no endpoint with `E2b`→`CONT2`. **The residual on the other three has one
+name**: `E1b`'s mtime sits ≈15 ms away from the instant its tick was sampled,
+which is the CP2102 latency-timer scale (1–16 ms). Fifteen milliseconds over
+253 s *is* +59 ppm, so the top row is an artefact of the capture that shrinks as
+the baseline grows, and it is why the 253-second fit reads +84 ppm.
+
+Base = f × `CDBR`(14) × `TC0DATA`(142,858), the last two read on the device in
+seating 1 and unchanged.
+
+> **Timer base clock = 200.0049 MHz ± 0.0015 MHz** (±7 ppm at a 2080-second
+> baseline); **tick = 100.0018 Hz**. The compiled-in `0x0BEBC200` = 200,000,000
+> at `0x8040DBA0` is **right to +24 ppm**, inside a normal crystal's tolerance.
+
+**Refutation:** a pair of reads on a later boot implying an `f` more than
+±0.0002 Hz from 100.0018 would make the agreement above a property of one boot
+rather than of the crystal. A `.log` mtime that is *not* the moment the last byte
+landed would void the method entirely — that is the assumption the whole
+measurement rests on, and it is checked against the `.timing` files.
+
+🔴 **The counter starts at ≈0 at boot, which dates `timer_init` on the wall
+clock.** *(measured, same four captures.)* Extrapolating `CONT3` back at
+`f = 100.0018` puts tick 0 at **03:32:51.54**; the first UART byte of that boot
+was at **03:32:50.13**. So **`timer_init` at `0x80408F20` runs 1.41 s into the
+boot** — after the banner (+0.585 s) and before the Ethernet/PHY init
+(+2.246 s), so layer 3 of the table above is armed before the network init runs
+rather than after it. Two derivations agree: a single read divided by elapsed,
+and the differential above.
+**Refutation:** a non-zero start would make the extrapolated zero point land
+*before* the first UART byte, or after the prompt.
 
 **What this does *not* settle, and it must not be read as settling it:** whether
 the watchdog counts the same `CDBR`-divided clock. If it does, `OVSEL[3:0]=0000`
-= 2¹⁵ ticks = **2.29 ms**; if it counts the undivided base it is 164 µs. `C-8`
+= 2¹⁵ ticks = **2.29 ms**; if it counts the undivided base it is 164 µs. (Both
+recomputed on 200.0049 MHz; neither moves at this precision.) `C-8`
 needs `D1`'s wall-clock delay to choose between them, and `D1` has not run.
 
 ---
@@ -243,6 +301,40 @@ Two things it hands B2 for free. **This unit's own loader names PHY addresses
 `{0, 2, 3, 4}` as PHYs** — and skips 1, which is a prediction B2 can test. And
 PHY address 4 is used as the control for register 20 while the others are
 targets, which says 4 is not merely another port.
+
+### Why address 1 is skipped, and the explanation that was killed at the bench
+
+`E8` settled the half of this that could be settled by MDIO: address 1 answers
+like the other four, so **the skip is about the port, not about the PHY**
+(`SPEC.md` `NET-07`). What it does not give is a reason.
+
+🔴 **One reason was proposed during seating 2 and is refuted.** The proposal was
+**"port 1 has no jack, so there is nothing to patch"**. It is wrong.
+*(Measured 2026-08-24, `bench/2026-08-24b/E11e.log`.)* With the cable in the
+fifth RJ45 counted from the WAN side, `PSRP1` read `0x000010F9` — bit 4
+`LinkUp` set, and the only port so set on that read. **Port 1 has a jack**;
+section 7 carries the whole map. The proposal rested on a jack count that was
+*reported at the bench, not measured*, and `E11e`'s refutation condition named
+this outcome before the cable was moved. It stays here with what killed it: the
+next explanation offered for the skip has to survive the same test.
+
+**The remaining candidate is the help string, read literally.**
+`PORT1: port 1 patch for FT2` parses as *a patch **for** port 1* — applied to
+the other four ports so that port 1 can be exercised on its own in factory test
+2. That is exactly the set the routine touches: the four bytes at `0x8040B890`
+are `{0, 2, 3, 4}`, port 1 absent, and the control writes go to PHY 4 rather than
+to the port being tested. *Inferred, pending a measurement.*
+
+**Refutation path: read what the routine writes.** The pseudocode above is the
+artefact and it is already decoded; what is missing is the *meaning* of the two
+payloads — page-1 vendor register 19 (the 17-word Gray-code table at
+`0x8040B84C`) and `0xB20 | (1<<phy)` written to register 20 on PHY 4, where the
+`1<<phy` shift is the only place a per-port selection appears. If that pair turns
+out to configure each target port for its own sake rather than to hold the other
+four out of the way, this reading falls and `NET-07`'s reason is open again. **No
+source held here documents either register**, so this is desk work against **A**
+alone, and it cannot be done by running the command: `PORT1` takes no arguments
+and cannot be stopped.
 
 **`PORT1` goes on `RUNSHEET.md`'s do-not-type list.** It was not on it before,
 because that list was written from the four memory-write paths, and `PORT1`
@@ -374,6 +466,17 @@ hold reset defaults, and **D** Table 64 makes bits 30:26 predictable: `ExtPHYID`
 = 1, 2, 3, 4. That is a read of the PHY-address assignment **that does not go
 through MDIO**, and it is the cross-check B2 uses on the sweep.
 
+🔴 **Reproduced within one boot, 2026-08-24.** `E9b` (`DW BB804100 8`,
+`bench/2026-08-24b/E9b.log`) returned
+`00000000 007F0039 047F0039 087F0039 / 0C7F0039 107F0039 00000000 187F0038`,
+**byte-identical to seating 1's `E9`** — on a boot during which the cable had
+been in four different jacks. So `PCRP` is **link-independent**: it holds
+configuration, not link state, and it does not move with the thing `PSRP` moves
+with. The practical consequence is that a later sweep of this block has a
+comparison basis taken **within the same boot** rather than across a power cycle.
+**Refutation:** any `PCRP` word differing between two reads with a cable move
+between them.
+
 `PSRP0`…`PSRP4` at `0xBB804128`–`0xBB804138` (**D** Table 62, and **B** agrees at
 `PCRAM_BASE + 0x28`) give link state per port without MDIO. **B** names the bits:
 8 `LinkDownEventFlag` (latched, **read to clear**), 7 NWayEnable, 6 RxPause,
@@ -382,6 +485,106 @@ Table 65 confirms bit 8 and the 7:0 field, and leaves 7:0's interior to B.
 
 One divergence, recorded: **B** defines `PSRP5` at `PCRAM_BASE + 0x3C`; **D**'s
 Table 62 skips `0x3C` and resumes at `0x40` with `PSRP6`. D is this part.
+
+### `PSRP` on silicon: the jack map, and three fields made to move
+
+🔴 **Measured on the device, 2026-08-24.** Eight reads of `DW BB804128 8` on
+one boot, five of them separated by a physical cable move — `bench/2026-08-24b/`,
+cells `E10b`, `E11a`, `E11a2`, `E11b`, `E11c`, `E11c2`, `E11d`, `E11e`. `E10b` is
+the negative control the sweep needed: **no cable in any jack**, and all five
+ports read `0x000010E0`, bit 4 clear on every one. Without that read, a bit 4
+that is always set and a bit 4 that follows the cable produce the same five rows
+below.
+
+**The jack ↔ port map, and it is not linear.** One cable move per row; exactly
+one port with bit 4 set on each read, and a different one each time:
+
+| RJ45, counted from the WAN side | register | linked in |
+|---|---|---|
+| 1 = **WAN** | `PSRP0` `0xBB804128` | `E11b` |
+| 2 | `PSRP2` `0xBB804130` | `E11a` |
+| 3 | `PSRP3` `0xBB804134` | `E11c` |
+| 4 | `PSRP4` `0xBB804138` | `E11d` |
+| 5 | **`PSRP1`** `0xBB80412C` | `E11e` |
+
+**Physical order `0, 2, 3, 4, 1`.** A driver that takes the port index from the
+jack's position on the case is right on four jacks and **wrong on exactly one** —
+and the one it is wrong on is the jack whose port `PORT1` skips (section 4). This
+is the concrete instance of a rule `RUNSHEET.md` `E12` had only stated in the
+abstract — *take the index from a register, not from a position* — except that
+the pair being confused here is silkscreen position against port index rather
+than `ExtPHYID` against port index. **Refutation:** any read with two
+ports' bit 4 set, or none, while exactly one cable is in the board.
+
+**Bit 8 is read-to-clear — confirmed, and only because the cell had a control.**
+In order:
+
+1. `E11a`, cable just pushed into jack 2: `PSRP2` = `0x000011F9`, **bit 8 set**.
+2. `E11a2`, nothing touched between the two reads: `PSRP2` = `0x000011F9`,
+   **bit 8 still set**. 🔴 **The conclusion drawn here — "bit 8 is sticky, and a
+   `DW` read does not clear it" — is retracted.** It stays recorded because it
+   was a reading of the device, not a slip: two consecutive reads of that port
+   really did both show bit 8.
+3. `E11c2`, the cell built to separate the two models: read `PSRP0`, which had
+   gone down at `E11c` and **whose jack was by then empty**, so no new down-event
+   was physically available. Bit 8 went **1 → 0** on a single read.
+
+⇒ **Bit 8 is read-to-clear**, as **B**'s `LinkDownEventFlag` and **D**'s Table 65
+both say. `E11a2` is then explained as a **second, real autoneg latch on a link
+that was still settling** — an event on the wire, not a defect in the instrument
+— and a third observation agrees: `PSRP3`'s bit 8 goes 1 → 0 between `E11d` and
+`E11e` while jack 3 stayed empty throughout. **The control is the whole finding.**
+On a port with a settling link, "a second latch" and "the read does not clear it"
+produce the identical reading, so reading the register twice is not a
+discriminator unless the port's jack is empty.
+
+🔴 **Bits 6 and 5 are the negotiated flow control, and they were made to move.**
+**B** names 6 `RxPause` and 5 `TxPause`; **D** leaves 7:0's interior to B. One
+source, and a name is not a measurement. The paired comparison, across two power
+cycles, two link partners and two instruments:
+
+| | link partner | `ANLPAR` | bit 11 `ASM_DIR` | bit 10 `PAUSE` | `PSRP` bits 6,5 when linked |
+|---|---|---|---|---|---|
+| seating 1 | a PC NIC | `0xC1E1` (`E12`, `PHYR 2 5`) | 0 | 0 | **clear** — `PSRP2` = `0x1099` |
+| 2026-08-24 | an RTL8153 USB GbE | **`0xCDE1`** (`E12b`, `PHYR 1 5`) | **1** | **1** | **set** — `PSRP1` = `0x10F9` |
+
+**`0xCDE1 XOR 0xC1E1 = 0x0C00`** and **`0x10F9 XOR 0x1099 = 0x0060`**: the two
+`ANLPAR`s differ in bits 11 and 10 and in nothing else, the two `PSRP` readings
+differ in bits 6 and 5 and in nothing else. That is the point — not that the bits
+were seen set, but that the only thing that changed on either side is the pair
+they name. **In the down state both are set on every port** (`0x10E0` on all five
+in `E10b`), so the default is "enabled" and it is a partner not advertising PAUSE
+that clears them. **Not settled, and it must not be read as settled:** which of
+the two is Rx and which is Tx. Both moved together, so the assignment is still
+**B**'s alone. **Refutation, and it is also the experiment that separates them:**
+a partner advertising exactly one of `ASM_DIR`/`PAUSE` should move exactly one of
+bits 6, 5; if both still move together, the two bits are not separable this way.
+
+🔴 **The 7th and 8th words of the read have no jack behind them.**
+`DW BB804128 8` returns eight words and the map above accounts for five. Words 7
+and 8 read **`0000007A`** on **all eight reads**, and word 6 reads `000000E2`
+throughout — byte-identical to seating 1's `E10`. `0x7A` is bit 4 `LinkUp` = 1,
+bit 3 `Duplex` = 1, and speed bits 1:0 = `10`, a code **above** `01` = 100M.
+
+**Five physical cable moves changed `PSRP0`–`PSRP4` and left these three
+untouched** — the invariance had five independent chances to fail and took none
+of them. *Inferred, pending a measurement:* they are the switch's internal /
+CPU-side ports, permanently up, full duplex, above 100M. `SPEC.md` `NET-10`
+already records that the `PCRP` stride past port 4 is an inference and that no
+source held here names those addresses; this is the same question on the `PSRP`
+side, with an invariance result attached. **Refutation:** a cable move that
+changes either word, or a change of link partner that moves the speed code.
+
+🔴 **An unlinked port's `ANLPAR` reads `0x0001`, the selector alone.**
+*(Measured 2026-08-24, `E12e`, `PHYR 0 5`, on a port whose jack was empty.)*
+`00001` is 802.3's selector field; every ability bit is clear. Two things follow.
+It is **different from `E12b`'s `0xCDE1`, read on address 1 minutes earlier on
+the same boot**, which refutes the failure mode that would have voided the
+flow-control comparison above — *the register is not per-port, and the MDIO block
+returns one value whatever address is asked for*. And an unlinked port's
+`ANLPAR` is **cleared rather than stale**: it does not keep the last partner's
+advertisement. **No source held here predicted this**, and seating 1 never read
+the register on an unlinked port.
 
 ---
 

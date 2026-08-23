@@ -1,0 +1,13 @@
+{
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-08-24T03:47:47+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "sent": "EW 81000400 C7A00001 C7A00002 C7A00003 C7A00004 C7A00005 C7A00006 C7A00007 C7A00008 C7A00009 C7A0000A C7A0000B C7A0000C",
+  "sent_hex": "45572038313030303430302043374130303030312043374130303030322043374130303030332043374130303030342043374130303030352043374130303030362043374130303030372043374130303030382043374130303030392043374130303030412043374130303030422043374130303030430d",
+  "stop_reason": "--seconds 4.0 elapsed",
+  "bytes": 130,
+  "duration_s": 4.071005,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}
