@@ -1119,3 +1119,64 @@ C-10 問的是另一個主張。要答 C-10 只能 `--download`，也就是真�
 `bash tools/verify-backup-copy.sh /home/key/rlxfw-backup/2026-08-23 <下載的目錄>`。
 `MISSING` 那幾行會直接說出上去的是完整 19 檔還是 11 檔的 K1 子集，
 而那兩種結果對 `S0` 的意思不一樣。
+
+---
+
+## 2026-08-23（同日，第六段）— C-10 關掉，`S0` 跟著關掉；以及上機前的四項檢查
+
+### C-10：副本 ③ 讀回來了
+
+作者從 Google Drive 下載到 `C:\Users\Key20\Desktop\rlxfw-backup`。19 個檔全在。
+
+| 檢查 | 結果 |
+|---|---|
+| `verify-backup-copy.sh` 對副本 ① | **19/19 逐位元組相同，0 MISSING、0 EXTRA** |
+| 下載的樹自己的 `sha256sum -c CIPHERTEXT-SHA256.txt` | 7/7 OK（獨立第二次） |
+| 正控制：把下載樹的 `K1.pub` 翻一個位元組 | **恰好一筆 `DIFFERS K1.pub`** |
+
+第三列是重點：**乾淨的結果來自一支在同一份資料上證明過會失敗的檢查。**
+
+**我上一段的懷疑是錯的。** 我看到 `C:\Users\Key20\rlxfw-backup-2026-08-23`
+是 11 檔的 K1 子集，推測上雲端的可能也是同一份。不是 —— 完整 19 檔都上去了。
+那是一個從資料夾名字做的推論，而它現在被量測推翻。
+
+### `S0` 因此關掉
+
+`S0a` 的 DoD 是「從副本 ③ 還原到空目錄，逐檔相符」。實際做到的是：
+**還原演練從副本 ②**（解密、解壓、manifest 比對，7,770 路徑零差異），
+**而副本 ③ 現在證明與該樹逐位元組相同**。
+所以「讀到位元組之後」的每一步都是決定性的；沒被測到的是「從 Drive 讀回來」
+這條路徑本身，而下載就是在測它。這個論證寫進 gate board 的 evidence 欄，
+不是打個勾了事。
+
+`S0` → `✓`，`Actual = 1`。現行 gate 改為 `R0`。**這是第一個關掉的 gate。**
+
+### 上機前的四項檢查，兩項本來會在通電之後才炸
+
+USB 透過 `usbipd` 掛進 WSL。`1-1`（CP2102）與 `3-4`（Realtek USB GbE）都已 `Shared`。
+
+**一、WSL 不會自己活著。** 第一次 `usbipd attach` 回
+`There is no WSL 2 distribution running`。這個 repo 的 `CLAUDE.md` 已經記過
+「distro 在工具呼叫之間會重啟」；解法是先開一個長命的 WSL 程序把它撐住。
+
+**二、`/dev/ttyUSB0` 起來了。** `cp210x converter now attached to ttyUSB0`，
+`key` 在 `dialout` 群組裡，用工具自己的 `Console` 類別開了又關，乾淨。
+板子關著時讀到 0 bytes —— 那是通電後「有東西進來」的基線。
+
+**三、🔴 `r8152` 不在 WSL 核心裡。**
+`modprobe: FATAL: Module r8152 not found in /lib/modules/6.6.87.2-microsoft-standard-WSL2`。
+Realtek RTL8153（`0bda:8153`）要的就是它；`cdc_ether`/`cdc_ncm` 在，但那顆預設不走 CDC。
+**所以把網卡 attach 進 WSL，很可能兩邊都看不到它** —— 而 B2 的 `E10`/`E11`
+需要的只是「對端有 link」。網卡留在 Windows 側就滿足了，而且保證有 link。
+B1／B2 全程不碰網路（runsheet 明文禁止任何 TFTP 上傳，因為 `AUTOBURN` 預設是 1）。
+**網卡不 attach。** 它是 R0 才需要的東西，那時再解 r8152。
+
+**四、我自己搞錯一次，值得記。** 我看到 login shell 的 `python3` 是
+`/home/key/.venvs/thermal/bin/python3` 而它沒有 `pyserial`，就判定
+runsheet 寫的 `python3 upstream/tools/console-dump.py …` 會在通電後炸掉。
+**錯了**：那支工具根本不用 `pyserial`，它用 `termios` + `os.open`，只靠標準函式庫，
+而且它自己的註解第 213 行就寫著這件事。用那個 venv 的 python3 實際建構它的
+`Console` 物件、開埠、關埠，全部正常。
+
+**從原始碼讀出來的結論要用執行來收尾。** 我讀了 `--help` 回 0 就假設是延遲 import，
+那是一個聽起來合理的錯誤解釋；直接跑那條路徑才是判準。
