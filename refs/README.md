@@ -46,4 +46,10 @@ alone.** Two independent sources, always — the datasheet, an SDK header, and a
 `devmem` read on the device, of which at least two must agree. Where they do not,
 the note records "undetermined" rather than picking one.
 
-The tool that enforces this is `tools/regmap-check.py`.
+**No tool enforces this, and this line used to say one did.** `tools/regmap-check.py`
+is named in the plan and does not exist; until it does, the two-source rule is
+enforced by reading. What *is* checked mechanically is weaker, and worth knowing
+exactly: `tools/spec-check.py` verifies that every row of `SPEC.md` names at
+least one source, that a row carrying no provenance mark is explicitly marked
+open, and that every open row has an experiment written against it. **It does
+not check that two sources agree** — nothing does.

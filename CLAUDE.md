@@ -5,8 +5,11 @@ core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from four
 vendors' GPL drops and one leaked draft datasheet, because TOTOLINK never
 released source.
 
-> **This file holds only what is true today**, and today the repo is at S0 —
-> nothing is built yet. Conventions for files that do not exist are not written
+> **This file holds only what is true today**, and today nothing is built:
+> no kernel, no driver, no image, and not one flash byte written. **Which gate
+> that is, `PROGRESS.md` says** — this file does not restate it, because one
+> piece of state has exactly one owner and a gate id copied to a second place
+> goes stale there. Conventions for files that do not exist are not written
 > here; they go in when the file appears. Where this contradicts the repo, the
 > repo wins and this file is wrong.
 
@@ -99,4 +102,5 @@ diff says what.
 a desk-only day is exactly when the next bench visit's plan changes. **If the
 session produced, changed or refuted a number, `SPEC.md` changes in the same
 commit** — a spec table that lags the finding is worse than no table, because it
-reads as current.
+reads as current. Then run `python3 tools/spec-check.py`: it runs its eight
+controls first and refuses to report on the file if any of them fails.

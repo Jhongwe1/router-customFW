@@ -30,7 +30,10 @@
 | **量** | **在這台裝置上量到的** —— 一次讀數，並指名是哪一份 capture。封裝絲印記為「量」而來源記 `P`：油墨是對這台的觀察，不是對它行為的觀察 |
 | **讀** | **從程式碼或 dump 讀出來的** —— 靜態，對指名的那份 artefact 為真 |
 | **推** | **推測的，待量測** |
+| **文** | **讀自文件的** —— datasheet 或廠商標頭說的，既不是這台的量測、也不是它自己的碼。單獨一個 `文` 永遠不夠讓一個值進到程式碼裡 |
 | **—** | **尚未確立。** 這一格是刻意留白的，§17 會說什麼能填它 |
+
+> **`V` 是 `—` 的列，值欄一定要帶一個明說的記號**：`留白`／`未定`／`未讀`（開著的問題，§17 欠它一個實驗），或 `§18`／`選定`（根本不是一個待量的值）。**沒有來源標記卻擺著一個值，讀起來就像已經確立。**`tools/spec-check.py` 的 C3 檢查這一條。
 
 來源，而它們的可信度並不相等：
 
@@ -47,6 +50,24 @@
 
 **兩個獨立來源，否則就是未定。** 來源欄只有一項的列，就是還沒達到
 `CLAUDE.md` 那條門檻的列 —— 而把這件事寫在表上，正是這一欄存在的理由。
+
+### 這張表怎麼被檢查
+
+`python3 tools/spec-check.py`。七項檢查：
+
+| | 檢查什麼 |
+|:---:|---|
+| C1 | 每一列都有格式正確且唯一的 id |
+| C2 | `V` 與 `N` 欄帶合法標記 |
+| C3 | 值標了 `留白`／`未定`／`未讀` ⇒ §17 一定列著它。`V` 是 `—` ⇒ 值一定帶一個明說的記號 |
+| C4 | 擁有者欄指到的檔案真的存在 |
+| C5 | 這一列的字面值（十六進位字、`0x` 形式、帶千分位的數）**仍然出現在它的擁有者檔案裡** |
+| C6 | §18 那條規則：把 `tools/audit-bench-log.py` 的樣式跑一遍，每個命中都必須在一張帶理由的白名單上 |
+| C7 | 帶著值的列至少寫出一個來源 |
+
+**八個突變，每一個都必須產生一個這個檔案原本沒有的 finding**，而且必須由指名的那一項檢查、用指名的那句話抓到 —— 被別的檢查抓到是一個假的控制，而重現一個本來就有的 finding 不算數。**控制在每次執行時都跑**（跟 `audit-bench-log.py` 同一個理由），任何一個沒立，工具就拒絕對檔案發表意見。
+
+**它抓不到的，寫在這裡免得乾淨的結果被讀成比它更多的東西**：C5 比對的是字面值不是意思，所以散文被改寫而數字沒動會過，數字正確但擁有者檔案本身錯了也會過；它完全不知道一個值對不對 —— 那只有 bench 知道。`plan/` 是 gitignored 的，在 clone 裡驗不了。**沒有任何東西在檢查「兩個來源互相同意」**，那條房規靠讀。
 
 ---
 
@@ -79,7 +100,7 @@
 | `CPU-10` | 硬體 watchpoint | `no` | 量 | — | C | 同上 |
 | `CPU-11` | 時脈 | **400 MHz** | 量 | — | 開機 banner（C、S）、D | `bench/2026-08-23/A-catch.log` |
 | `CPU-12` | 位元組序 | **big-endian** | 讀 | 讀 | A —— 每一支 ELF 都是 `ELFDATA2MSB` | `upstream/notes/anatomy-n150rt.md` |
-| `CPU-13` | 手冊宣稱的 ISA | `Supports MIPS-1 ISA, MIPS16 ISA` | — | 讀 | **只有 D** | `SOURCES.json` `ds-rtl8196e-vex` |
+| `CPU-13` | 手冊宣稱的 ISA | `Supports MIPS-1 ISA, MIPS16 ISA` | 文 | 讀 | **只有 D** | `SOURCES.json` `ds-rtl8196e-vex` |
 | `CPU-14` | **load delay slot** | **架構外露 —— 沒有 interlock** | 量 | 讀 | **×2** —— C 對 `stage2` 的指令普查（1,474 個 load，後面接「讀取剛載入暫存器」的比例 0.00%），以及矽片上一次單一變數實驗 | `plan/` F46 |
 | `CPU-15` | 矽片有沒有 `lwl`/`lwr`/`swl`/`swr` | *(未定)* | — | — | 裸機 RI 處理器下執行一條 `lwl` 就結案 | `notes/lwl-mystery.md`、gate R1a |
 | `CPU-16` | ……這台的 binary 裡有幾個 | `stage2` **0** · `busybox` **0** · `boa` **144** | 讀 | 讀 | A、`tools/opcount.py`，控制在 `tools/test-opcount.sh` | `notes/lwl-mystery.md` |
@@ -159,7 +180,7 @@
 | `NET-19` | `PITCR` `0xBB804100` | 讀到 **`0x00000000`** = `UTP (10/100M embedded PHY)`。會把 bit 0 設起來的那段 strap 分支，**在這片板上沒有跑** | 量 | 讀 | S `E9` + D Table 63 | 同上 §7 |
 | `NET-20` | `PCRP0` | `0x007F0039` —— `EnForceMode` 是 0，所以 loader 的 force-mode 設定同樣沒跑 | 量 | 讀 | S `E9` + D Table 64 | 同上 §7 |
 | `NET-21` | loader 碰過的交換器暫存器 | 48 個 `lui …,0xbb80` 站點收斂成 13 個相異位址，**全部落在 `0xBB804xxx`**：`4000 MACCR` · `4004 MDCIOCR` · `4008 MDCIOSR` · `4100 PITCR` · `4104 PCRP0` · `414C P0GMIICR` · **`4234` 無名** · `4418 SWTCR0` · `4428 FFCR` · `4A08 PVCR0` · `4D00 SWTACR` · `4D08 SWTAA` · `4D3C TCR7` | 讀 | 混合 —— 4 個有 D + B，8 個只有 B，**1 個兩者皆無** | A | 同上 §7、`C-15` |
-| `NET-22` | `0xBB802xxx`（B 的 MII 記憶體映射影子） | **這顆不能用** —— D 沒有這個區塊，而且 loader 那 48 個站點沒有一個落在裡面 | 讀 | — | A + D | 同上 §7 |
+| `NET-22` | `0xBB802xxx`（B 的 MII 記憶體映射影子） | **這顆不能用** —— D 沒有這個區塊，而且 loader 那 48 個站點沒有一個落在裡面 | 讀 | 讀 | A + D | `docs/loader-phy-and-switch.md` §7 |
 | `NET-23` | 網卡驅動怎麼稱呼這顆 | `chip name: 8196C, chip revid: 0` —— **錯的，而且它自己在兩行前就自我否定**：它宣告自己正在探測 RTL8186 | 量 | — | C | `upstream/notes/uart-findings.md` §2 |
 
 ## 6. 無線電
@@ -188,7 +209,7 @@
 | `BRD-08` | UART 排針 | 4 腳 2.54 mm，**出廠就焊好**，絲印寫 `UART`，在板子下緣 LED 排旁邊。**整個 W02 沒有任何一處需要焊接** | 量 | 量 | P + 逐腳掃描 | `upstream/notes/uart-pinout.md` |
 | `BRD-09` | UART 腳位 | 第 1 腳 **`VCC 3.3 V`** · 2 **`TX`**（板 → 你）· 3 **`RX`** · 4 **`GND`** | 量 | 量 | 每腳兩個來源；`RX` 是在 ESC 打進去中斷了開機之後才從論證變成量測 | 同上 §1、§5 |
 | `BRD-10` | 主控台參數 | **38400 8N1**，邏輯準位 **3.3 V** | 量 | 量 | 最窄脈衝 26 µs 對 38400 的 26.042 µs（差 0.16%），再用同一份 capture 裡的 52 µs 脈衝自我檢查，最後由解碼成可讀 ASCII 確認 | 同上 §2 |
-| `BRD-11` | EJTAG | D 說是 5 訊號 P1149.1。**板上沒有定位過**，也沒有轉接器 | — | 讀 | D §1 | `upstream/docs/lab-inventory.md` §3 |
+| `BRD-11` | EJTAG | D 說是 5 訊號 P1149.1。**板上沒有定位過**，也沒有轉接器 | 文 | 讀 | D §1 | `upstream/docs/lab-inventory.md` §3 |
 | `BRD-12` | 未貼裝的焊墊 | `U6` 周圍是空的。未調查 | 量 | — | P | `upstream/notes/hardware-inspection.md` §7.1 |
 
 ## 8. 位址地圖
@@ -197,22 +218,22 @@
 
 | id | 範圍／位址 | 是什麼 | V | N | 來源 | 擁有者 |
 |---|---|---|:-:|:-:|---|---|
-| `MAP-01` | `0x80000000` | KSEG0 —— 快取的 RAM | 讀 | 讀 | A、MIPS 標準 | `notes/cache-model.md` |
-| `MAP-02` | `0xA0000000` | KSEG1 —— 非快取別名。**loader 自己跑在這裡**：它在 `0x804004a8` 跳到自己下一條指令的 KSEG1 別名 | 讀 | 讀 | A | 同上 |
+| `MAP-01` | `0x80000000` | KSEG0 —— 快取的 RAM | 文 | 文 | MIPS 架構。**這個 repo 裡沒有任何檔案擁有這一列** —— `spec-check.py` 的 C5 就是這樣找出來的 | — |
+| `MAP-02` | `0xA0000000` | KSEG1 —— 非快取別名。**loader 自己跑在這裡**：它在 `0x804004a8` 跳到自己下一條指令的 KSEG1 別名 | 讀 | 讀 | A | `notes/cache-model.md` |
 | `MAP-03` | `0xB8000000` | SoC 周邊暫存器空間 | 讀 | 讀 | A + D | `plan/` F7 |
 | `MAP-04` | `0xB8001000` | 記憶體控制器（`MCR`） | 讀 | 讀 | D §7.4.1 | `SOURCES.json` |
 | `MAP-05` | `0xB8001200` | SPI flash 控制器 | 讀 | 讀 | **×3** —— A、B、D §7.4.5–7.4.9 | `docs/loader-flash-write.md` §2 |
 | `MAP-06` | `0xB8002000` | UART（DLAB 切換在 `0xB8002100`/`2000`） | 讀 | 讀 | D §9.3、A | `SOURCES.json` |
 | `MAP-07` | `0xB8003000` | 中斷控制器 | 讀 | 讀 | D §8.1、A、S | 見 §10 |
 | `MAP-08` | `0xB8003100` | 計時器／看門狗 | 讀 | 讀 | D §8.2、E、A、S | 見 §10 |
-| `MAP-09` | `0xB8003500` | GPIO —— `PABCD_CNR 3500`、`PABCD_DIR 3508`、`PABCD_DAT 350C` | — | 讀 | D §8.3。**本專案從未碰過** | `SOURCES.json` |
-| `MAP-10` | `0xB8B01000` | PCIe host 模式。**不是網路 MAC** | — | 讀 | D §10.3 | `SOURCES.json` |
+| `MAP-09` | `0xB8003500` | GPIO —— `PABCD_CNR 3500`、`PABCD_DIR 3508`、`PABCD_DAT 350C` | 文 | 讀 | D §8.3。**本專案從未碰過** | `SOURCES.json` |
+| `MAP-10` | `0xB8B01000` | PCIe host 模式。**不是網路 MAC** | 文 | 讀 | D §10.3 | `SOURCES.json` |
 | `MAP-11` | `0xBB804000` | 交換器核心 | 讀 | 讀 | A + D §11.1 | `docs/loader-phy-and-switch.md` §7 |
 | `MAP-12` | `0xBD000000` | SPI flash 的記憶體映射，KSEG1 | 量 | 讀 | loader 自己在 `FLW` 那行印的 | `upstream/notes/uart-pinout.md` §4 |
 | `MAP-13` | `0xBFC00000` | reset 向量 —— `J BFC00000` 就是重置命令 | 讀 | 讀 | A | `docs/loader-command-semantics.md` §f |
 | `MAP-14` | `0x80400000`–`0x8040DD10` | loader 自己的映像與 `.data`；`.bss` 從 `0x8040DD10` 起，堆疊在其下 | 讀 | 讀 | A；載入基底是從指標序列還原出來的，不是假設的 | `upstream/notes/loader-chip-table.md` §1 |
 | `MAP-15` | `0x80500000` | 這台的 kernel 映像被搬去的位置 —— 就是它自己容器標頭裡的 `startAddr` | 量 | 讀 | S `B3`/`B4` + A | `RUNSHEET.md` `B3` |
-| `MAP-16` | `0x81000000` | bench 用的 scratch —— 進 SDRAM 16 MiB，遠離 loader 與已就位的 kernel | — | — | 這是選的，不是裝置性質 | `RUNSHEET.md` §C |
+| `MAP-16` | `0x81000000` | *(選定)* bench 用的 scratch —— 進 SDRAM 16 MiB，遠離 loader 與已就位的 kernel | — | — | 這是選的，不是裝置性質 | `RUNSHEET.md` §C |
 
 ## 9. 在這台裝置上讀過或寫過的暫存器
 
@@ -226,21 +247,21 @@
 | `REG-03` | `0xB800300C` | `IRR1` | `0x30050004` —— loader 寫的是 `0x00050004`；bit 28 的 `SWIRS` = 3 | 量 | 讀 | S `E3` + A | 同上 |
 | `REG-04` | `0xB8003010` | `IRR2` | *(未讀)* | — | 讀 | D | — |
 | `REG-05` | `0xB8003100` | `TC0DATA` | `0x0022E0A0` = 142,858 << 4 —— **所以計數欄位是 bit 31:4** | 量 | 量 | S `E2b` + A 的編譯進去的值 | `docs/loader-phy-and-switch.md` §2 |
-| `REG-06` | `0xB8003104` | `TC1DATA` | `0x00000000` | 量 | 讀 | S `E2b` | 同上 |
-| `REG-07` | `0xB8003108` | `TC0CNT` | `0x0010B960` | 量 | 讀 | S `E2b` | 同上 |
-| `REG-08` | `0xB800310C` | `TC1CNT` | `0x00000000` | 量 | 讀 | S `E2b` | 同上 |
+| `REG-06` | `0xB8003104` | `TC1DATA` | `0x00000000` | 量 | 讀 | S `E2b` + `SOURCES.json` 的位移表 | `RUNSHEET.md` `E2b`、`SOURCES.json` |
+| `REG-07` | `0xB8003108` | `TC0CNT` | `0x0010B960` | 量 | 讀 | S `E2b` + `SOURCES.json` 的位移表 | `RUNSHEET.md` `E2b`、`SOURCES.json` |
+| `REG-08` | `0xB800310C` | `TC1CNT` | `0x00000000` | 量 | 讀 | S `E2b` + `SOURCES.json` 的位移表 | `RUNSHEET.md` `E2b`、`SOURCES.json` |
 | `REG-09` | `0xB8003110` | `TCCNR` | `0xC0000000` —— 與 `timer_init` 寫的完全一樣 | 量 | 讀 | S `B7` + A | `RUNSHEET.md` `B7` |
 | `REG-10` | `0xB8003114` | `TCIR` | `0x80000000` | 量 | 讀 | S `B7` + A | 同上 |
 | `REG-11` | `0xB8003118` | `CDBR` | `0x000E0000` —— 除頻欄位 **14** | 量 | 讀 | S `B7` + A + D | 同上 |
 | `REG-12` | `0xB800311C` | `WDTCNR` | `0xA5000000` —— `WDTE[7:0]` = `0xA5`，**停止**樣式；**上電重置後 `WatchDogIND` bit 20 = `0`**。🔴 **這是硬體 reset 預設值，不是 loader 寫的**：2026-08-24 桌面查證，loader 對 `WDTCNR` 只有兩個寫入點（`0x804012F8`、`0x804092E8`），兩個都是 `sw zero` 後緊接自跳迴圈，之後沒有任何指令執行。`B7` 原本的判讀暗示相反，已更正 | 量 | 讀 | **×4** —— S `B7`、D §8.2.9 Table 27、E、B | `RUNSHEET.md` `D2`、`docs/loader-command-semantics.md` §f |
-| `REG-13` | `0xB8001200`–`0x1210` | `SFCR` `SFCR2` `SFCSR` `SFDR` `SFDR2` | *(未在裝置上讀)* | — | 讀 | **×3** —— A（`SFCSR` 19 處參照、`SFDR` 14 處）、B、D | `docs/loader-flash-write.md` §2 |
+| `REG-13` | `0xB8001200`–`0x1210` | `SFCR` `SFCR2` `SFCSR` `SFDR` `SFDR2` | *(未讀 —— 從沒在裝置上讀過)* | — | 讀 | **×3** —— A（`SFCSR` 19 處參照、`SFDR` 14 處）、B、D | `docs/loader-flash-write.md` §2 |
 | `REG-14` | `0xB8001208` bit 27 | `SPI_RDY` | *(未讀)* —— 但**這台自己的 `ComSrlCmd_RDID()` 就是在等這個位元**，那是程式碼倚賴語意，比一份文件宣稱語意更硬 | — | 讀+ | A + D table 10 | 同上 |
 | `REG-15` | `0xBB804100` | `PITCR` | `0x00000000` | 量 | 讀 | S `E9` + D Table 63 | `docs/loader-phy-and-switch.md` §7 |
 | `REG-16` | `0xBB804104`–`0x4114` | `PCRP0`–`PCRP4` | `007F0039` `047F0039` `087F0039` `0C7F0039` `107F0039` | 量 | 讀 | S `E9` + D Table 64 | 同上 |
 | `REG-17` | `0xBB804128`–`0x4138` | `PSRP0`–`PSRP4` | `10E0` `10E0` **`1099`** `10E0` `10E0` | 量 | 讀 | S `E10` + D Table 62 + B | 同上 |
-| `REG-18` | `0xBB80413C` | B 稱 `PSRP5`；**D 的 Table 62 跳過 `0x3C`** | `0x000000E2` | 量 | — | S `E10`；兩份文件不一致，而 D 是這顆 | 同上 §7 |
-| `REG-19` | `0xBB804140` | D 稱 `PSRP6` | `0x0000007A` | 量 | 讀 | S `E10` + D Table 62 | 同上 |
-| `REG-19b` | `0xBB804144` | 依 `PSRP` 間距是下一埠；**沒有來源明寫** | `0x0000007A` | 量 | 推 | S `E10` | 同上 |
+| `REG-18` | `0xBB80413C` | B 稱 `PSRP5`；**D 的 Table 62 跳過 `0x3C`** | `0x000000E2` | 量 | — | S `E10`；兩份文件不一致，而 D 是這顆 | `RUNSHEET.md` `E10`、`docs/loader-phy-and-switch.md` §7 |
+| `REG-19` | `0xBB804140` | D 稱 `PSRP6` | `0x0000007A` | 量 | 讀 | S `E10` + D Table 62 | `RUNSHEET.md` `E10` |
+| `REG-19b` | `0xBB804144` | 依 `PSRP` 間距是下一埠；**沒有來源明寫** | `0x0000007A` | 量 | 推 | S `E10` | `RUNSHEET.md` `E10` |
 | `REG-20` | `0x8040DBC0` | loader 命令表的 `?` 那一列 | `8040B070 00000000 80409A9C 8040B074` —— 名稱指標、`argc`、handler、說明指標，16 位元組間距 | 量 | 讀 | S `B1` —— 這是整份 runsheet 其他位址的全域控制 | `RUNSHEET.md` `B1` |
 | `REG-21` | `0x8040FBD4` | flash 晶片描述子 | `001C7016 1C701600 16000000 00400000 / 00010000 00000040 00001000 00000400` | 量 | 讀 | S `B2` + A | `docs/loader-flash-write.md` §2 |
 | `REG-22` | `0x8040DBA4` | `gCHKKEY_HIT` | 從上電前就串流 ESC 時是 **`1`** —— 於是 `check_image()` 短路，checksum 迴圈從沒跑過 | 量 | 讀 | S `B5` + A + B | `C-13`、`C-16` |
@@ -320,7 +341,7 @@
 |---|---|---|:-:|:-:|---|---|
 | `FW-01` | 版本字串 | **`TOTOLINK-CX-N150RT-V2.1.6-B20171121.1002`** —— `/etc/version`，41 bytes | 讀 | 讀 | A，並由 `boa` 編譯進去的 `Model No. N150RT (Firmware V2.1.6)` 佐證 | `upstream/notes/dump-vs-official.md` |
 | `FW-02` | 二進位檔的建置日期 | **2018-01-10**，四個元件一致到分鐘 | 量 | 讀 | C | `upstream/notes/uart-findings.md` §1 |
-| `FW-03` | Kernel | `Linux version 2.6.30.9 (admin@office.hopeiot) (gcc 4.4.5-1.5.5p2) #1526 Wed Jan 10 14:50:54 CST 2018` | 量 | — | C，從運行中的裝置讀出 | `upstream/test-ledger.md` `P5-5` |
+| `FW-03` | Kernel | `Linux version 2.6.30.9 (admin@office.hopeiot) (gcc 4.4.5-1.5.5p2) #1526 Wed Jan 10 14:50:54 CST 2018` | 量 | — | C，從運行中的裝置讀出 | `upstream/test-ledger.md` `P5-5`、`upstream/PROGRESS.md` |
 | `FW-04` | Kernel 命令列 | 編譯進去的是 `console=ttyS0,38400 root=/dev/mtdblock1`，**沒有 `init=`**；`Kernel command line` 這個字串不存在，所以開機 log 永遠印不出命令列 | 讀 | 讀 | C | `docs/loader-command-semantics.md` §d |
 | `FW-05` | init／shell | BusyBox `v1.13.4 (2018-01-10 14:56:45 CST)`。**主控台上沒有 getty、沒有 shell** —— 打 `\r` 會回顯只是因為 tty 層在回顯 | 量 | 讀 | C | `upstream/notes/uart-pinout.md` §3 |
 | `FW-06` | Web 伺服器 | `Boa/0.94.14rc21`，建於 `Jan 10 2018 at 14:57:54`，**485,012 bytes**，`sha256 19fe29d7…`，`pid=350, port 80`，以 **root** 執行 | 量（banner）· 讀（大小、雜湊） | 讀 | C、A | `upstream/notes/dump-vs-official.md` |
@@ -333,7 +354,7 @@
 | `FW-13` | 升級路徑到底檢查什麼 | 一個 4 位元組 tag、一個**無金鑰**加總、一個型號字串。就這樣 | 讀 | 讀 | C，`UpgradeByData` 指令級讀完 | `upstream/notes/firmware-upgrade-path.md` |
 | `FW-14` | 型號相容 tag | `TOTOLINK-N150RT-V2.1.0` —— 這是硬體／產品標籤，**不是韌體版本**；兩份廠商映像雖然標成 2.1.2 與 3.4.0，裡面都是這個字串 | 讀 | 讀 | C | `upstream/notes/anatomy-n150rt.md` |
 | `FW-15` | 設定檔格式 | `COMPCS` 目前設定 · `COMPDS` 預設設定 · `COMPHS` 硬體設定 —— 是 `apmib` 表的**壓縮**（不是加密）TLV 序列化 | 讀 | 讀 | A + B | `upstream/notes/mib-and-config-dat.md` |
-| `FW-16` | 出廠的 shell 帳號 | `/etc/passwd.org` 裡的 `root:123456`、`onlime_r:12345`（uid 0）；這台的 `TELNET_ENABLED = 0` | 讀 | 讀 | C。屬於型號層級，且已載於 CVE 紀錄 | `upstream/notes/credentials.md`、`compcs-decode.md` |
+| `FW-16` | 出廠的 shell 帳號 | `/etc/passwd.org` 裡的 `root:123456`、`onlime_r:12345`（uid 0）；這台的 `TELNET_ENABLED = 0` | 讀 | 讀 | C。屬於型號層級，且已載於 CVE 紀錄 | `upstream/notes/credentials.md`、`upstream/notes/compcs-decode.md` |
 | `FW-17` | 預設 SSID 命名 | `TOTOLINK N150RT` 加上 MAC 末六碼（在沒改過的機器上） | 讀 | 讀 | C | `upstream/notes/compcs-decode.md` |
 | `FW-18` | 利用緩解機制 | **一個都沒有** —— 沒有 canary、沒有 RELRO、沒有 PIE、沒有 FORTIFY，而且每一支帶 `PT_GNU_STACK` 的 ELF 都標成 `RWE` | 讀 | 讀 | C，逐一數過每支 ELF | `upstream/notes/anatomy-n150rt.md` |
 | `FW-19` | 手上另外兩份可比對的 build | V2.1.2（2015-08-25）與 V3.4.0（2020-10-30）—— **這台一份都沒跑過** | 讀 | 讀 | C | `upstream/notes/dump-vs-official.md` §3 |
@@ -364,7 +385,7 @@
 |---|---|---|:-:|:-:|---|---|
 | `TC-01` | 建置這份原廠韌體的東西 | `gcc 4.4.5-1.5.5p2`、uClibc `0.9.30.3`、Linux `2.6.30.9` | 量 | — | C，kernel 自己的 banner | `upstream/test-ledger.md` `P5-5` |
 | `TC-02` | 候選的 GPL drop | `rtl819x-toolchain` 的 `toolchain/rsdk-1.5.5-5281-EB-2.6.30-0.9.30.3-110714` —— **banner 每一欄都對得上。在 R2a 量到之前它是假說** | 推 | — | `SOURCES.json` | gate R2 |
-| `TC-03` | 那份 drop 的但書 | 它的目標板是 ALFA AIP-W512，不是 TOTOLINK 這片。DDR timing、PHY 設定、GPIO 腳位都可能不同，**而弄錯不一定會當機** | — | — | `SOURCES.json` | gate R2 |
+| `TC-03` | 那份 drop 的但書 | 它的目標板是 ALFA AIP-W512，不是 TOTOLINK 這片。DDR timing、PHY 設定、GPIO 腳位都可能不同，**而弄錯不一定會當機** | 推 | 推 | `SOURCES.json` | gate R2 |
 | `TC-04` | `boa` 觀察到的 ELF flags | 到 2018-03-30 為止是 `0x1007` … pic … mips1；2019-03-15 起是 `0x1005` … mips1 | 讀 | 讀 | A + C，橫跨六個 build | `notes/lwl-mystery.md` |
 | `TC-05` | rlxfw 自己要用什麼建 | *(留白)* —— T-vendor 對 T-modern 是 gate R2 的決定。`-march=mips1`、big-endian、o32、soft-float 已定案，libc 未定 | — | — | — | `plan/` §5、gate R2 |
 
@@ -414,6 +435,9 @@ TechInfoDepot 的 TOTOLINK N150RT 條目。
 | `CPU-25` | 快取大小、line 大小、關聯度 | 在裸機上重現 `r3k_cache_size()` | R1d |
 | `CPU-27` | 提示字元下的 `Status.BEV` | 去追，或由 payload 讀出來 | R1d |
 | `MEM-08` | SDRAM timing | 讀 loader 對記憶體控制器的寫入 | R5 |
+| `REG-04` | `IRR2` 從沒被讀過 | 一次 `DW B8003010 1`，零風險，順手 | R6 |
+| `REG-13` | SPI 控制器的五個暫存器從沒在裝置上讀過 | 位址有三個來源，讀數一個都沒有。**寫 flash 之前必須先讀**，因為 B 給的是命令**序列**而序列只有一個來源 | R5b |
+| `REG-14` | `SFCSR` bit 27 `SPI_RDY` 的實際行為 | 這台自己的 `ComSrlCmd_RDID()` 就在等它，但沒人看過它翻 | R5b |
 | `FLS-15` | flash 的第二支儀器 | 一組 `VCC` 線可以斷開的夾具，**外加**觀察到 `SF_CS0#`/`SF_SCK` 在 reset 時是浮接的 | `⊘` —— `notes/power-and-programmer.md` §5 |
 | `FLS-06`–`FLS-08` | 這顆真正的 sector／page／block 大小 | EN25QH32B 的 datasheet，或 `RDID` 之後的後續命令。今天這三個值是 loader 的 fallback 預設 | R5b |
 | `NET-08` | PHY 位址 5–31 | `PHYR 5 2`，然後 `MDIOR 2` —— **而 `PHYR 5 2` 正是那格會終結一次上機的** | `RUNSHEET.md` §F |

@@ -51,6 +51,10 @@ tools/test-opcount.sh      15 cases. Two exist because a counter reading the wro
                            endianness, or ignoring alignment, is still a counter
 tools/fetch-sources.sh     hashes a known file, then a corrupted copy, and refuses
                            to trust its own verifier until the second one fails
+tools/spec-check.py        seven checks over SPEC.md, and eight mutations that must
+                           each produce a finding the file did not already have.
+                           The controls run on every invocation, and a control that
+                           fails stops the report rather than annotating it
 ```
 
 `tools/opcount.py` counts MIPS primary opcodes by linear scan rather than
