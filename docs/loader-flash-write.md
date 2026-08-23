@@ -128,6 +128,53 @@ out by writing a driver that silently does nothing.
 The `Read ID is 0x9F` example is D's own, so the JEDEC ID command is now
 attested by the datasheet for this part as well as by B.
 
+### A fourth source for the bit layout, and it is the strongest one
+
+A, B and D above are a binary's *references* to an address, a header's macros,
+and a document. **A's `RDID` routine is different in kind: it is this unit's own
+code demonstrating the semantics by depending on them.**
+
+`ComSrlCmd_RDID()` sits at `0x804058bc` in this unit's loader and is called
+twice:
+
+```
+8040591c   lui  v0,0xb800
+80405920   ori  a0,v0,0x1208     ; a0 = SFCSR
+80405924   lui  v1,0x800         ; 0x08000000  = bit 27
+80405928   lw   v0,0(a0)
+80405930   and  v0,v0,v1
+80405934   beqz v0,0x80405928    ; spin until bit 27 is set
+8040593c   ori  s0,s0,0x120c     ; s0 = SFDR
+80405940   lui  v0,0x9f00        ; 0x9F000000
+80405944   sw   v0,0(s0)         ; issue RDID
+   …
+8040595c   lw   s0,0(s0)         ; read the answer back out of SFDR
+80405970   move v0,s0            ; and return it
+```
+
+D's table 10 says bit 27 of `SFCSR` is `SPI_RDY`, `0` busy and `1` ready.
+**This loader spins on exactly that bit before touching the data register.**
+A document can be wrong about a part; code that has been booting this board
+since 2018 cannot be wrong about the bit it waits on.
+
+Two further things the sequence settles:
+
+- The command goes into **`SFDR`**, not into `SFCSR`'s `CMD_BYTE` field.
+  D marks `CMD_BYTE` as *"Only Used in MMIO Mode"*, and this is the serial path,
+  so the two agree.
+- **The chip has been answering `RDID` on every boot of this board since it left
+  the factory.** `upstream/notes/loader-chip-table.md` already established why
+  the banner prints `chipName: UNKNOWN` — the loader looks the answer up in a
+  32-entry table and this part has no row. What was missing was never the
+  measurement; it was the register-level specification needed to ask the
+  question from code we control.
+
+**The value is still not known.** Reading it needs code running on the device.
+`v0` is a return register, so it is not readable from a fixed address unless one
+of the two callers stores it — **that has not been traced**, and it is worth ten
+minutes, because if a caller does store it then the loader's `EB` command reads
+the JEDEC ID at the next bench session with no new code and no risk at all.
+
 ### Commands
 
 From B, `spi_common.c`, with the vendor's own comments:
