@@ -79,3 +79,58 @@ asks for the full boot log; `console-dump.py catch` prints the banner line and
 discards the rest of the pre-prompt stream, and nothing writes it to a file. The
 cell is unsatisfiable by the instrument the sheet names. `upstream/dumps/uart-bootloader.log`
 is the comparison in the meantime.
+
+## 2026-08-24 — seating 2, part one
+
+One power cycle, **zero flash bytes**, about twenty minutes. Every cell went
+through `tools/console-capture.py`, one byte-exact timestamped capture per cell
+(`.log` + `.timing` + `.meta.json`), so **nothing in this directory is a hand
+transcription** — the caveat the 2026-08-23 section had to make about `B.log`
+does not apply to any file here.
+
+| files | cell | what it covers |
+|---|---|---|
+| `A-catch.*` | `B1 §A` | ESC streamed across power-on **from inside the capture loop**, so the whole pre-prompt stream is kept. **This is what closes `A2`**, which the 2026-08-23 section recorded as unsatisfiable by the instrument the sheet named |
+| `A0-reopen-control.*` | 🆕 `A0`, first attempt | `Unknown command !` — and that is the informative one, see below |
+| `A0b-reopen-control.*` | 🆕 `A0`, second attempt | `B1` reproduced exactly on a second power cycle |
+| `C1.*` `C2.*` | `B1 §C` | `EW` is silent; both words land in order at `0x81000000` |
+| `C3a.*` `C3b.*` | `B1 §C` | `EW` rounds an unaligned address **up**, silently |
+| `C4a.*` `C4b.*` | `B1 §C` | `EB` takes the address **verbatim** — the opposite of `EW` |
+| `C6-rescue.json` `C6-readback.*` | `B1 §C` | `AUTOBURN 0` works, confirmed by the echo **and** by the word the burn path reads |
+
+**`A-catch.log` carries a finding nobody asked for.** The ESC stream kept
+running after the prompt appeared, and the loader answered `Unknown command !`
+after **exactly 128 ESC bytes, seven times**. That is the console line buffer,
+and the code agrees: `memset(buf,0,128)` then `readline(buf,128,1)`. It is
+written up in `docs/loader-command-semantics.md` §f and it rewrote `C7` before
+`C7` ran.
+
+**`A0-reopen-control.log` is kept although it failed**, because the failure is
+the record: `§A`'s capture was cut mid-ESC-stream by `--seconds`, twelve ESC
+bytes were still in the loader's line buffer, and this command appended to them.
+`SPEC.md` `LDR-16` already knew queued ESC poisons the next command — **the rule
+was in the table and not in the procedure, so it was rediscovered rather than
+followed.** Deleting the failed capture would delete that.
+
+### The redaction audit on this directory, and the one thing it flagged
+
+```
+python3 tools/audit-bench-log.py bench/2026-08-24/*.log bench/2026-08-24/*.json
+```
+
+All eight patterns fire on the synthetic control. Every `.log` and every
+`.meta.json` is clean. **`C6-rescue.json` hits `private IPv4` six times, on
+`10.1.1.1`, and it is committed anyway** — with the reason here rather than by
+silently widening the tool:
+
+> `10.1.1.1` is the address **this session chose and typed** (`IPCONFIG
+> 10.1.1.1`), and `10.1.1.2/24` is the workstation. Neither is a property of the
+> unit: the loader's own compiled-in address is `192.168.1.6` (`SPEC.md`
+> `LDR-25`), and this unit's configured addresses are in `H601` and the config
+> region, neither of which is in this repository. It is the same judgement
+> `SPEC.md`'s own redaction allowlist already records for `192.168.1.6` — the
+> pattern is right to fire, and the value is a statement about the experiment
+> and not about the device.
+
+**The reviewing is the point.** A hit that is waved through without a written
+reason is a scanner that has been turned off one value at a time.

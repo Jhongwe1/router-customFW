@@ -1,0 +1,21 @@
+{
+  "ip": "10.1.1.1",
+  "steps": [
+    {
+      "sent": "AUTOBURN: 0",
+      "reply": "AUTOBURN: 0\n\rUnknown command !\r\n\r<RealTek>"
+    },
+    {
+      "sent": "AUTOBURN 0",
+      "reply": "AUTOBURN 0\n\rAutoBurning=0\n\r<RealTek>"
+    },
+    {
+      "sent": "IPCONFIG:10.1.1.1",
+      "reply": "IPCONFIG:10.1.1.1\n\rUnknown command !\r\n\r<RealTek>"
+    },
+    {
+      "sent": "IPCONFIG 10.1.1.1",
+      "reply": "IPCONFIG 10.1.1.1\n\rNow your Target IP is 10.1.1.1\n\r<RealTek>"
+    }
+  ]
+}

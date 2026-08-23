@@ -418,6 +418,86 @@ is `blez` (signed) where `EW` uses `beqz`, and the loop index is truncated to
 8 bits (`andi s1,v0,0xff`) where `EW` truncates to 16. Both truncations are
 unreachable — a line is capped at 20 tokens.
 
+### Measured 2026-08-24: `EW` rounds up, `EB` does not, and the asymmetry is the finding
+
+Both were read out of the code above. Both are now measured on the device, in
+one seating, `bench/2026-08-24/C1`–`C4`.
+
+| sent | read back | reading |
+|---|---|---|
+| `EW 81000000 DEADBEEF CAFEBABE` | `81000000: DEADBEEF CAFEBABE …` | `EW` takes **several** values and writes them as consecutive 32-bit words from the address given. It prints **nothing** |
+| `EW 81000102 11111111` | `81000100: 00000400 **11111111** …` | 🔴 **`EW` rounds an unaligned address UP, silently.** `0x81000102` became `0x81000104`. Not down, and not refused |
+| `EB 81000200 41 42 43` | `81000200: 41 42 43 00   ABC.` | **`EB` takes the address verbatim.** No rounding |
+
+**One loader, two write primitives, opposite address handling, neither of them
+saying so.** For `R4`'s fixed-address command-line buffer that is not trivia:
+a byte-granular edit has to go through `EB`, and any `EW` has to be aligned by
+the caller, because the loader will align it either way and will not mention it.
+
+`EW`'s silence is only a measurement because the read-back is a separate cell.
+**A cell whose expected answer is "nothing" cannot tell a silent command from a
+command that never arrived** — which is the same disease as a control that
+expects zero, one layer up.
+
+### 🔴 The console line buffer is 128 bytes, and exactly 128 is the dangerous length
+
+Two sources, and the first one arrived by accident.
+
+**Measured.** `§A`'s capture streamed ESC across power-on and kept streaming
+after the prompt appeared. The transcript shows the loader taking **exactly 128
+ESC bytes and then answering `Unknown command !` — seven times, the same number
+every time** (`bench/2026-08-24/A-catch.log`). At roughly 50 ESC per second a
+timing artefact would not land on the same count seven times.
+
+**Read.** The command loop at `0x80409144`:
+
+```
+80409188:  move  a0,s5          ; s5 = sp+16, the line buffer
+80409190:  jal   memset         ; li a2,128    -- 128 bytes, zeroed every time
+804091a0:  jal   0x8040708c     ; li a1,128    -- readline(buf, 128, echo=1)
+```
+
+and `readline` itself has three exits, of which **only one writes a terminator**:
+
+```
+804070e8:  beq  a0,10 -> 8040719c     '
+'   returns, NO NUL
+804070f8:  j          -> 8040719c     ''   returns
+804070fc:    sb zero,0(s0)            ...     the NUL, in the delay slot
+80407190:  sltu v0,s2,s5              count < 128 ?
+80407194:  bnez v0    -> loop         count == 128 returns, NO NUL
+```
+
+So a line is terminated by one of two things: the `` path writing a NUL, or a
+**leftover zero from the caller's `memset`**. The second only exists while the
+text is **shorter** than 128.
+
+> **At exactly 128 characters the buffer is full of text, no NUL was written,
+> and there is no leftover zero.** The tokeniser at `0x80407248` then scans past
+> `sp+143` into the eight bytes of stack slack below the saved registers, and on
+> into `s0` at `sp+152`. The stack frame is 184 bytes with the buffer at `sp+16`.
+
+**Consequences, and the first one caught a cell before it ran.**
+
+1. **`RUNSHEET.md` `C7` sent a 173-character `EW` line.** `readline` would have
+   cut it at 128 — `EW 81000400 ` plus twelve values plus the thirteenth's eight
+   hex digits is exactly 128 — i.e. precisely the unterminated case, with `EW`
+   as the command and the argument count coming out of stack slack. C7 is
+   rewritten to twelve values, 119 characters, and **no command line anywhere may
+   be exactly 128 characters**.
+2. **One console line carries twelve words, 48 bytes.** A 1 KiB bare-metal probe
+   needs 22 lines, not the 15 the sheet assumed — `R1`'s no-network path is 47%
+   more expensive, and that is now a measurement.
+3. **The buffer is per-`readline`, not per-connection.** Twelve ESC bytes left
+   over from a truncated capture were still pending when the next command was
+   sent, and the loader dispatched the concatenation. Closing the serial port
+   does not clear it.
+4. For `R9`'s differential table: **the vendor loader's console reads past its
+   own input buffer on a full-length line.** Recorded here, not in
+   `$FWRE_WORK/disclosure/` — it needs an attacker who already has the serial
+   console, which is the same access that can already write arbitrary memory
+   with `EW`.
+
 ### `FLR` — `0x804099AC`, and it is the one to be careful with
 
 Three `strtoul(_,_,16)`, **no bound check on any of them**, then:
