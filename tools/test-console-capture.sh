@@ -7,7 +7,7 @@
 # writer on the master side plays a known script with known gaps, and the tool
 # reads the slave believing it is a serial port.
 #
-# Seven cases. Five of them are controls whose job is to FAIL, because a test
+# Ten cases. Six of them are controls whose job is to FAIL, because a test
 # suite that cannot fail proves nothing -- the same argument tools/audit-bench-log.py
 # makes about its own patterns and the reason PROGRESS.md rejected hazlint's
 # original "stage 2 must report zero" control.
@@ -20,6 +20,14 @@
 #   N4  whitespace refusal  --send " DW ..." must be refused, not sent
 #   N5  the --idle trap     an --idle shorter than the measured silence must
 #                           truncate loudly, not report a plausible interval
+#   P3  --esc-after        ESC is streamed AFTER the send, and the reply that
+#                           arrives during it still reaches the log
+#   N6  --esc-after can be off  with 0, no ESC follows the command, so P3 is
+#                           measuring the flag and not the tool's habits
+#
+# P3/N6 were added 2026-08-24, the day RUNSHEET section D was stopped before it
+# ran because --esc streams before --send and D1 needs the opposite. The option
+# was written at the desk with its control, rather than improvised at the bench.
 #
 # N5 is here because it happened. The first run of this file used --idle 0.8
 # against a played 1.50 s gap, the capture ended inside the silence at 29 bytes,
@@ -158,6 +166,76 @@ if "$PY" "$TOOL" report "$WORK/t" --from 'Jump to address=BFC00000'      --to 'R
   bad "N5 --idle 0.8 truncated the capture at ${TBYTES} bytes but report still gave an interval"
 else
   ok  "N5 --idle 0.8 truncates a 1.50s silence at ${TBYTES} bytes and the report refuses"
+fi
+
+# --- P3 / N6  --esc-after, and the pair is the point ----------------------
+# D1 sends `J BFC00000`, the board resets, and D2/D2b must read the prompt of
+# the WARM boot. So one capture has to send a command and THEN stream ESC across
+# the reboot that command caused. --esc streams before --send and cannot do it.
+# This is the option that can -- and N6 is what stops P3 from passing on a tool
+# that streams ESC unconditionally.
+#
+# The judgement is on what the TOOL WROTE, which the log never shows: the log is
+# what the device said. So the pty master is recorded and analysed separately.
+esc_case() {           # esc_case <outprefix> <esc_after_seconds> <masterdump>
+  "$PY" - "$TOOL" "$1" "$2" "$3" <<'INNERPY'
+import os, pty, select, subprocess, sys, time
+
+tool, out, esc_after, dump = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+master, slave = pty.openpty()
+name = os.ttyname(slave)
+proc = subprocess.Popen(
+    ["/usr/bin/python3", tool, "capture", "--port", name, "--out", out,
+     "--send", "J BFC00000", "--esc-after", esc_after, "--seconds", "6"],
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+time.sleep(0.6)
+seen = bytearray()
+deadline = time.monotonic() + 3.0
+while time.monotonic() < deadline:
+    r, _, _ = select.select([master], [], [], 0.05)
+    if r:
+        seen += os.read(master, 4096)
+# The "warm boot" arrives while ESC is being streamed. If --esc-after did not
+# keep the capture alive and reading, this never reaches the log.
+os.write(master, b"---RealTek(RTL8196E)at 2014.04.22-16:22+0800 v1.3 [16bit](400MHz)\r\n<RealTek>")
+proc.wait(timeout=15)
+open(dump, "wb").write(bytes(seen))
+os.close(master); os.close(slave)
+INNERPY
+}
+
+esc_after_count() {    # how many ESC bytes the tool wrote AFTER the command line
+  "$PY" - "$1" <<'INNERPY'
+import sys
+b = open(sys.argv[1], 'rb').read()
+i = b.find(b'J BFC00000\r')
+print(-1 if i < 0 else b[i + 11:].count(0x1b))
+INNERPY
+}
+
+esc_case "$WORK/e" 2.0 "$WORK/e.sent"
+NESC="$(esc_after_count "$WORK/e.sent")"
+if [ "$NESC" = "-1" ]; then
+  bad "P3 the command was never sent -- nothing below this means anything"
+elif [ "$NESC" -gt 0 ]; then
+  ok "P3 --esc-after wrote $NESC ESC bytes AFTER the command, which --esc cannot do"
+else
+  bad "P3 --esc-after wrote no ESC after the command"
+fi
+if grep -q 'RealTek(RTL8196E)' "$WORK/e.log" 2>/dev/null; then
+  ok "P3 the warm-boot banner played during ESC streaming reached the log"
+else
+  bad "P3 the banner played during ESC streaming did not reach the log"
+fi
+
+esc_case "$WORK/n" 0.0 "$WORK/n.sent"
+NESC0="$(esc_after_count "$WORK/n.sent")"
+if [ "$NESC0" = "0" ]; then
+  ok "N6 with --esc-after 0 no ESC follows the command, so P3 measures the flag"
+elif [ "$NESC0" = "-1" ]; then
+  bad "N6 the command was never sent"
+else
+  bad "N6 $NESC0 ESC bytes were sent with --esc-after 0 -- P3 proves nothing"
 fi
 
 echo

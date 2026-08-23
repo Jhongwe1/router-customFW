@@ -67,6 +67,19 @@ the error is three orders of magnitude below it.  For anything under ~50 ms this
 tool is the wrong instrument, and the watchdog timeout it was almost pointed at
 is exactly such a quantity.  Stated here rather than discovered later.
 
+``--esc`` and ``--esc-after`` are not the same window
+-----------------------------------------------------
+``--esc N`` streams ESC for N seconds **before** the send, which is what
+catching a cold boot needs -- ``B1 A1`` streams from before power is applied.
+``--esc-after N`` streams for N seconds **after** it, which is what ``D1``
+needs: send ``J BFC00000``, then catch the ESC window of the reboot that
+command causes, inside the same capture, so the interval from the jump to the
+banner is one file's timing rather than two wall-clocks a second apart.
+
+Without the second one ``D1`` boots the vendor kernel, ``D2`` and ``D2b`` lose
+the prompt they have to read, and getting it back costs a power cycle -- which
+destroys the warm-reset condition ``D2b`` exists to test.
+
 ``--idle`` is a trap for the one measurement this was built for
 ----------------------------------------------------------------
 ``--idle N`` stops the capture after N seconds with no bytes.  **The interval
@@ -156,6 +169,7 @@ def capture(args) -> int:
         "baud": args.baud,
         "started_wallclock": None,
         "esc_seconds": args.esc,
+        "esc_after_seconds": args.esc_after,
         "sent": None,
         "sent_hex": None,
         "stop_reason": None,
@@ -227,6 +241,26 @@ def capture(args) -> int:
                 meta["sent_hex"] = line.hex()
                 ser.write(line)
                 ser.flush()
+
+            if args.esc_after:
+                # ``--esc`` streams BEFORE the send, which is what catching a
+                # cold boot needs.  ``D1`` needs the opposite: send
+                # ``J BFC00000``, then stream ESC across the reboot that command
+                # causes, so the warm boot's ESC window is caught inside the
+                # SAME capture and the interval from the jump to the banner is
+                # one file's timing rather than two wall-clocks a second apart.
+                #
+                # Without this, ``D1`` boots the vendor kernel, ``D2`` and
+                # ``D2b`` lose the prompt they have to read, and recovering it
+                # costs a power cycle -- which destroys the warm-reset condition
+                # ``D2b`` exists to test.  Found 2026-08-24 by reading this
+                # function before running the cell; it is the third cell this
+                # repo has nearly lost to an instrument that could not do it
+                # (``A2``, ``E5``) and the first one caught in advance.
+                esc_deadline = time.monotonic() + args.esc_after
+                while time.monotonic() < esc_deadline:
+                    ser.write(ESC)
+                    drain(0.02)
 
             while True:
                 drain(0.05)
@@ -337,6 +371,10 @@ def main() -> int:
     c.add_argument("--port", required=True, help="e.g. /dev/ttyUSB0 (usbipd attach first)")
     c.add_argument("--baud", type=int, default=DEFAULT_BAUD)
     c.add_argument("--out", required=True, help="output path prefix, no extension")
+    c.add_argument("--esc-after", dest="esc_after", type=float, default=0.0,
+                   help="stream ESC for this many seconds AFTER --send, to catch "
+                        "the ESC window of a reboot the sent command caused. "
+                        "This is what D1 needs and --esc cannot give it")
     c.add_argument("--esc", type=float, default=0.0,
                    help="stream ESC for this many seconds before capturing")
     c.add_argument("--send", default=None,
