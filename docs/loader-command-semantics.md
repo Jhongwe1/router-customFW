@@ -542,7 +542,7 @@ not own it is how C's `A2.7` went wrong four ways at once.
 | **1** | `0x8040DD3C` holds the accepted candidate, biased by `0x05000000`; on this unit it reads `0x05060000` | any other value, or zero | read-only |
 | **2** | `0x8040DD48` holds the image's `startAddr` from its header; it reads `0x80500000` | any other value | read-only |
 | **3** | RAM at `0x80500000` already holds flash `0x060010` when the prompt appears, because the *check* copied it | the two differ | read-only |
-| **4** | a `DW` length argument is decimal, not hex | asking for `10` and getting 16 words | read-only |
+| **4** | a `DW` length argument is decimal, not hex. `DW <addr> 10` prints **three** lines (`i` runs 0, 4, 8 against a limit of ten) | four lines, which is the `0x10` reading | read-only |
 | **5** | `EW` rounds an unaligned address **up**; `EB` does not round at all | a write landing below the requested address, or `EW` refusing | writes RAM — pick a scratch address, never `0x8040D000`+ |
 | **6** | `EW` and `EB` print nothing on success | any output at all | as 5 |
 | **7** | `J BFC00000` resets the board, and **the ESC window still appears afterwards** | no reset; or a reset that boots straight through | reset, no flash write |
