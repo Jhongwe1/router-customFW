@@ -47,6 +47,40 @@ Read the whole of this section first. **One power cycle is the most expensive
 unit in this project**, so every question is listed before the board is plugged
 in — that is why the order below is fixed.
 
+### How this session is driven, and why it changes tools half way
+
+**Section B goes through `upstream/tools/console-dump.py`. Sections C and D are
+typed by hand.** That is not a convenience; the tool refuses to send them:
+
+```python
+FORBIDDEN = ("FLW", "EB", "EW", "AUTOBURN", "LOADADDR", "J ")
+```
+
+> *"refusing to send …: EW writes to the device. This tool only reads. If you
+> genuinely need to write, type it into picocom yourself, having decided to."*
+
+**Working around a deliberate refusal is worse than typing carefully**, so C and
+D are typed, having decided to. One serial port means one program at a time, and
+the sections are already ordered read-then-write, so the switch falls between
+them naturally.
+
+| section | how |
+|---|---|
+| **A** | `python3 upstream/tools/console-dump.py catch` — streams ESC across power-on |
+| **B** | `python3 upstream/tools/console-dump.py cmd --at-prompt DW …` per cell. `DW` and `DB` are not on the refusal list |
+| **C, D** | close the tool, `picocom -b 38400 /dev/ttyUSB0`, type by hand, capture the log |
+| afterwards | `python3 upstream/tools/console-lint.py` over the capture. **Read the log with the linter, not by eye** |
+
+> ⚠️ **`--at-prompt` is not optional once the board is sitting at `<RealTek>`.**
+> Without it the tool streams ESC for the full window and then reports *"nothing
+> came back at all — TX/RX swapped, wrong port, or the board never powered on"*,
+> which is three causes and none of them the real one. Upstream lost a session
+> to exactly this.
+
+**This session is driven cell by cell, live.** Paste each reply back before the
+next command is sent; several cells decide whether the next one is worth
+sending, and **B1 decides whether any of them are.**
+
 ### A — catch the prompt
 
 | | step | expected | if not |
@@ -140,3 +174,32 @@ verdict even where it is the boring one.*
 | D1 | | |
 | D2 | | |
 | D3 | | |
+
+---
+
+## Session B2 — planned, not written
+
+**PHY and switch registers, through `MDIOR` / `PHYR`.** Zero risk, zero code,
+and the output is the input R6 needs: how `phylib` has to be configured for this
+part's five ports.
+
+**It is not in B1 and it must not be added to B1 by hand.** Four of the
+seventeen handlers were classified wrongly under a straight linear read
+(`docs/loader-command-semantics.md` §0), and `PHYR` and `PHYW` are two of the
+six that dereference `argv` without checking the count. **This file's rule is
+that a cell carries an expectation computed before the visit**, and neither
+handler has been traced.
+
+What B2 needs before it can be written:
+
+1. `PHYR` (`0x80409D98`) and `MDIOR` (`0x80409C54`) read out of `stage2.bin`,
+   with the branch-walking reader as the second instrument — argument order,
+   radix, register width, and what they print;
+2. the vendor's `rtl865xc_asicregs.h` PHY block as the corroborating source, the
+   same way `docs/loader-flash-write.md` used it for the SPI controller;
+3. an expected value for at least one register that can be computed without the
+   device — a PHY ID register is the obvious candidate, since it is fixed in
+   silicon.
+
+Estimated 30–45 minutes at the desk. **That is a guess; nothing in this
+repository is calibrated yet.**
