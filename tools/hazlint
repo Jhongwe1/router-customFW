@@ -43,11 +43,30 @@ Main check (default).  A linear scan over 4-byte aligned big-endian words.
     reports them.)
   * If the load sits in a **delay slot**, the next instruction executed is the
     branch target, not the next word.  This tool computes the target for
-    `j`/`jal`/`b`/`bal` and checks both legs of a conditional branch.  For
-    `jr`/`jalr`, and for a target outside the scanned range, it reports
-    `unresolved` rather than silently checking the wrong word.  Measured on
-    `stage2.bin`: **0 loads sit in any delay slot**, so this path does not
-    touch the population control -- it exists for hand-written asm.
+    `j`/`jal`/`b`/`bal`, for the REGIMM branches including the four
+    branch-likely forms, and for the coprocessor branches, and it checks BOTH
+    legs of a conditional.  For `jr`/`jalr`, for a target outside the span, and
+    for an unlinked object's placeholder target, it reports `unresolved` rather
+    than silently checking the wrong word.  Measured on `stage2.bin`: **0 loads
+    sit in any delay slot**, so this path does not touch the population control
+    -- it exists for hand-written asm.
+  * **Nothing is read across a span boundary.**  Two `PT_LOAD`s, or two sections
+    of a `.o`, are not one run of instructions; the last word of one is not the
+    predecessor of the first word of the next.  In a relocatable object every
+    section reports `sh_addr == 0`, so each gets a synthetic base, the report
+    says the addresses are synthetic, and any absolute target computed from one
+    is reported unresolved instead of followed.
+
+`unresolved` and `notes` are different claims
+---------------------------------------------
+**unresolved**: the successor could not be determined.  An unchecked successor
+is an unchecked load, so this exits 1.
+
+**note**: the successor WAS determined and checked; what this file cannot rule
+out is a *second* one.  The only case today is word 0 of a section, whose
+predecessor is whatever the linker eventually places before it.  Stated on every
+run, and it does not fail the gate -- which is why the gate is pointed at the
+**linked** image and not at a `.o`.
 
 Subsidiary check, `--isa`.  ISA-level conformance: every instruction outside
 what this core is known to implement, with the code/data boundary given by the
@@ -96,6 +115,13 @@ fails**.  `--self-test` runs them and nothing else.
   K5  endianness and alignment: the K2 fixture read little-endian, and read
       from a 2-byte offset, must NOT reproduce K2's answer.  A scanner that
       ignored either would still be a scanner -- it would just be wrong.
+  K7  delay-slot successors.  Whole-span cases: an unconditional branch, a
+      REGIMM branch-likely, a coprocessor branch, a register jump, and an
+      unlinked `jal`.  Each puts something clean on the leg that is not taken
+      and a register read on the leg that is, so a checker that follows the
+      wrong leg reports 0.
+  K8  span boundary: a load at the end of one span and a read of it at the start
+      of the next must NOT be a violation, and must be reported.
   K6  ISA conformance (`--isa` and `--self-test`): `stage2.bin`'s code region
       `[0x80400000, 0x8040A000)` must give **exactly 18** hits -- `movz` x 12,
       `movn` x 6 -- at the addresses `docs/loader-command-semantics.md` §9
@@ -116,6 +142,26 @@ is what stops the next payload.  So the exit code is the product:
 `rlxprobe`'s build must run this on the linked payload and stop on anything but
 0.  Not a lint whose output someone reads: a gate that fails the build.
 
+Version 1.1, 2026-08-24
+-----------------------
+An adversarial review of 1.0 -- four independent lenses, every claim put to a
+separate agent whose job was to refute it -- returned **17 confirmed defects out
+of 24 claimed**.  The two that mattered most:
+
+  * The `lwl`/`lwr` pair exemption skipped the whole successor rather than the
+    `rt` merge alone, so it swallowed the successor's **base** register too --
+    and because `reads()` did not model the merge either, the exemption had only
+    ever suppressed true positives.  Both halves are fixed together.
+  * **K4 built its words with a private helper**, so the population control
+    exercised a code path no scanned file ever took.  It could not have caught
+    any defect in span construction, and it looked exactly like it could.  It
+    now goes through `raw_span()`, which is what `--raw` builds for a user file.
+
+The rest were span handling (six), scan coverage (two), decoder gaps (three) and
+control gaps (four).  `tools/test-hazlint.sh` grew M7-M9, U1 and U2 so that each
+fix has a mutation that fails without it -- the review's finding 6 was that the
+patched tool and the shipped tool were indistinguishable to the old suite.
+
 Usage
     tools/hazlint FILE [--base ADDR] [--range LO:HI] [--raw] [--section NAME]
                        [--survey] [--max-report N]
@@ -130,7 +176,7 @@ import os
 import struct
 import sys
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # --------------------------------------------------------------------------
 # The instruction model
@@ -244,6 +290,13 @@ def reads(w):
         return set() if rs in (0x00, 0x01, 0x02, 0x08) else {rt}
     if op == 0x13:                                  # COP1X (MIPS-IV)
         return {rs, rt}
+    if op in MERGING:
+        # `lwl`/`lwr` merge into rt, so **rt is a source as well as the
+        # target**.  This file's own MERGING comment said so and this function
+        # did not, which made the pair exemption in scan() suppress nothing at
+        # all -- it could only ever fire on a case that was already invisible.
+        # Found by the adversarial review, 2026-08-24.
+        return {rs, rt}
     if op in LOADS or op in (0x30, 0x31, 0x33, 0x35, 0x2F):
         return {rs}                                 # loads, ll, pref, cache
     if op in (0x28, 0x29, 0x2A, 0x2B, 0x2E, 0x38):  # sb sh swl sw swr sc
@@ -280,7 +333,17 @@ def control_flow(w, addr):
         return ('cond', tgt)
     if op in (0x14, 0x15, 0x16, 0x17):              # branch-likely (MIPS-II)
         return ('cond', tgt)
-    if op == 0x01 and rt in (0x00, 0x01, 0x10, 0x11):
+    if op == 0x01 and rt in (0x00, 0x01, 0x10, 0x11,
+                             0x02, 0x03, 0x12, 0x13):
+        # bltz bgez bltzal bgezal, plus the four MIPS-II branch-likely forms
+        # bltzl bgezl bltzall bgezall.  The second group was missing until
+        # 2026-08-24: a load in one of their delay slots had its successor
+        # resolved to the fall-through alone, which is one of the two legs.
+        return ('cond', tgt)
+    if op in (0x10, 0x11, 0x12) and rs == 0x08:
+        # bc0f / bc0t / bc1f / bc1t / bc2f / bc2t.  reads() already modelled the
+        # coprocessor branches as reading no general register; this function did
+        # not know they were branches at all.
         return ('cond', tgt)
     return (None, None)
 
@@ -382,88 +445,138 @@ class Result(object):
         self.loads = 0
         self.nop_after = 0
         self.violations = []      # (vaddr, foff, mnem, rt, saddr, sword, why, lw)
-        self.unresolved = []      # (vaddr, foff, reason)
+        self.unresolved = []      # (vaddr, foff, reason) -- successor NOT known
+        self.notes = []           # (vaddr, foff, reason) -- successor known,
+                                  # but this file cannot rule out a second one
 
 
-def successors(words, idx, i):
-    """([(index, why)], [unresolved reason]) for what executes after words[i]."""
-    out, unres = [], []
+def successors(sp, idx, i):
+    """([(index, why)], [unresolved reason]) for what executes after sp.words[i].
+
+    Everything here is asked of ONE span.  A predecessor or a successor that is
+    not in this span is not in this file, and saying so is the whole promise the
+    docstring makes -- "it reports unresolved rather than silently checking the
+    wrong word".  Until 2026-08-24 the word list was flat and this function
+    happily read across a section boundary.
+    """
+    out, unres, notes = [], [], []
     kind, tgt = (None, None)
     if i > 0:
-        kind, tgt = control_flow(words[i - 1][1], words[i - 1][0])
+        kind, tgt = control_flow(sp.words[i - 1][1], sp.words[i - 1][0])
+    elif sp.head_unknown:
+        # A NOTE and not an unresolved, and the difference is not cosmetic.
+        # The successor IS known -- it is the next word, and it is checked.
+        # What cannot be ruled out is a SECOND possible successor, if the
+        # linker ends up placing a branch immediately before this span.  That
+        # is a limit of scanning an unlinked object, which is why the gate is
+        # pointed at the linked image; stating it is not the same as failing
+        # on it, and failing on it would fail every .o whose first instruction
+        # happens to be a load.
+        notes.append('this load is word 0 of %s. Its successor is checked, but '
+                     'nothing in this file says what executes BEFORE it -- if '
+                     'the linker puts a branch there, this load is in a delay '
+                     'slot and has a second successor. Gate on the linked image'
+                     % sp.name)
+
+    have_next = i + 1 < len(sp.words)
 
     if kind is None:
-        if i + 1 < len(words):
+        if have_next:
             out.append((i + 1, 'next word'))
         else:
-            unres.append('the load is the last word in the scanned range; its '
-                         'successor is not in this file')
-        return out, unres
+            unres.append('the load is the last word of %s; its successor is not '
+                         'in this file' % sp.name)
+        return out, unres, notes
+
+    pa, pw = sp.words[i - 1][0], sp.words[i - 1][1]
+    # A PC-relative displacement survives having the whole section placed
+    # somewhere; an absolute `j`/`jal` target field does not, and in an
+    # unlinked object it is a placeholder the linker has not written yet.
+    placeholder = ((pw >> 26) in (0x02, 0x03)
+                   and (sp.relocatable or not sp.addressed))
 
     if kind == 'uncond':
         if tgt is None:
             unres.append('the load is in the delay slot of a register jump at '
-                         '0x%08x; the successor is not statically known'
-                         % words[i - 1][0])
+                         '0x%08x; the successor is not statically known' % pa)
+        elif placeholder:
+            unres.append('the load is in the delay slot of the jump at 0x%08x in '
+                         'an unlinked object; its target field is a placeholder, '
+                         'so the successor is not statically known' % pa)
         elif tgt in idx:
-            out.append((idx[tgt], 'jump target of 0x%08x' % words[i - 1][0]))
+            out.append((idx[tgt], 'jump target of 0x%08x' % pa))
         else:
             unres.append('the load is in the delay slot of a jump at 0x%08x to '
-                         '0x%08x, outside the scanned range'
-                         % (words[i - 1][0], tgt))
-        return out, unres
+                         '0x%08x, outside %s' % (pa, tgt, sp.name))
+        return out, unres, notes
 
     # Conditional: either leg can be the next instruction, so both are checked.
-    if tgt in idx:
-        out.append((idx[tgt], 'taken leg of 0x%08x' % words[i - 1][0]))
+    if placeholder:
+        unres.append('the load is in the delay slot of the branch at 0x%08x in '
+                     'an unlinked object; its taken leg is not statically known'
+                     % pa)
+    elif tgt in idx:
+        out.append((idx[tgt], 'taken leg of 0x%08x' % pa))
     else:
         unres.append('the load is in the delay slot of the branch at 0x%08x '
-                     'whose taken leg 0x%08x is outside the scanned range'
-                     % (words[i - 1][0], tgt))
-    if i + 1 < len(words):
-        out.append((i + 1, 'not-taken leg of 0x%08x' % words[i - 1][0]))
+                     'whose taken leg 0x%08x is outside %s' % (pa, tgt, sp.name))
+    if have_next:
+        out.append((i + 1, 'not-taken leg of 0x%08x' % pa))
     else:
-        unres.append('the not-taken leg of the branch at 0x%08x is outside the '
-                     'scanned range' % words[i - 1][0])
-    return out, unres
+        unres.append('the not-taken leg of the branch at 0x%08x is outside %s'
+                     % (pa, sp.name))
+    return out, unres, notes
 
 
-def scan(words, base_off=0):
-    """words is [(vaddr, word)], ascending, 4-byte aligned."""
+def scan(spans):
+    """spans is [Span], each already loaded.  Nothing crosses a span boundary."""
     r = Result()
-    r.words = len(words)
-    idx = {}
-    for i, aw in enumerate(words):
-        idx[aw[0]] = i
+    for sp in spans:
+        r.words += len(sp.words)
+        idx = {}
+        for i, aw in enumerate(sp.words):
+            idx[aw[0]] = i
 
-    for i, (a, w) in enumerate(words):
-        ld = load_of(w)
-        if ld is None:
-            continue
-        mnem, rt = ld
-        r.loads += 1
-        # "followed by an explicit nop" is a statement about the NEXT WORD, and
-        # that is what the 646 in the population control counts.
-        if i + 1 < len(words) and words[i + 1][1] == 0:
-            r.nop_after += 1
-
-        succ, unres = successors(words, idx, i)
-        for reason in unres:
-            r.unresolved.append((a, base_off + i * 4, reason))
-        for j, why in succ:
-            w2 = words[j][1]
-            # MIPS-I exempts the unaligned pair by name: lwl then lwr, or the
-            # reverse, on the same rt is the defined idiom and not a hazard.
-            if (w >> 26) in MERGING and (w2 >> 26) in MERGING \
-                    and rt_of(w2) == rt and (w2 >> 26) != (w >> 26):
+        for i, (a, w) in enumerate(sp.words):
+            ld = load_of(w)
+            if ld is None:
                 continue
-            if rt in reads(w2):
-                r.violations.append((a, base_off + i * 4, mnem, rt,
-                                     words[j][0], w2, why, w))
+            mnem, rt = ld
+            r.loads += 1
+            foff = sp.off + i * 4
+            # "followed by an explicit nop" is a statement about the NEXT WORD,
+            # and that is what the 646 in the population control counts.
+            if i + 1 < len(sp.words) and sp.words[i + 1][1] == 0:
+                r.nop_after += 1
+
+            succ, unres, notes = successors(sp, idx, i)
+            for reason in unres:
+                r.unresolved.append((a, foff, reason))
+            for reason in notes:
+                r.notes.append((a, foff, reason))
+            for j, why in succ:
+                w2 = sp.words[j][1]
+                # MIPS-I exempts the unaligned pair by name: lwl then lwr, or
+                # the reverse, on the same rt is the defined idiom.
+                #
+                # **Only the rt merge is exempt.**  The successor's BASE
+                # register is an ordinary read in the delay slot:
+                # `lwl t0,0(t1); lwr t0,3(t0)` takes the register being loaded
+                # as an address and gets the value from before the load.  Until
+                # 2026-08-24 the exemption skipped the whole successor, so it
+                # suppressed that -- and nothing else, because reads() did not
+                # model the merge either.  Both halves are fixed together.
+                if (w >> 26) in MERGING and (w2 >> 26) in MERGING \
+                        and rt_of(w2) == rt and (w2 >> 26) != (w >> 26) \
+                        and rs_of(w2) != rt:
+                    continue
+                if rt in reads(w2):
+                    r.violations.append((a, foff, mnem, rt,
+                                         sp.words[j][0], w2, why, w))
     return r
 
 
-def survey(words):
+def survey(spans):
     """Hazard shapes this tool has NO rule for.  Counts, never verdicts.
 
     `C-9`/`F47` -- stores, `mflo`/`mfhi`, `mfc0`/`mtc0` -- is open and `R1b`
@@ -473,7 +586,9 @@ def survey(words):
     """
     out = {'mult/div then mfhi/mflo': [], 'mtc0 then mfc0': [],
            'a load sitting in a delay slot': []}
-    for i in range(len(words) - 1):
+    for sp in spans:
+      words = sp.words
+      for i in range(len(words) - 1):
         a, w = words[i]
         n = words[i + 1][1]
         op, f = w >> 26, w & 0x3F
@@ -616,12 +731,70 @@ def die(msg):
     sys.exit(3)
 
 
+SYNTH_BASE = 0xFF000000     # for sections a relocatable object has not placed
+
+
+class Span(object):
+    """One contiguous run of instructions, and the fact that it IS contiguous.
+
+    Two `PT_LOAD`s, or two sections of a `.o`, are not one run of instructions.
+    Concatenating them into a flat word list makes the last word of one the
+    predecessor of the first word of the next, and an invented predecessor is
+    how the first word of a section ends up treated as somebody else's delay
+    slot.  Everything in this file that asks "what came before" or "what comes
+    next" asks it of a Span and never across two.
+
+    `addressed` is False when the address is this tool's invention rather than
+    the file's: in a relocatable object every section has `sh_addr == 0`, so a
+    synthetic base keeps them from colliding -- and any branch target computed
+    inside such a span is meaningless, which is reported rather than followed.
+
+    `relocatable` marks a span whose `j`/`jal` target fields are placeholders
+    the linker has not filled in yet.  A computed target there is a fiction.
+    """
+
+    def __init__(self, off, size, vaddr, name,
+                 addressed=True, relocatable=False, head_unknown=False):
+        self.off, self.size = off, size
+        self.vaddr, self.name = vaddr, name
+        self.addressed, self.relocatable = addressed, relocatable
+        # True when something outside this file may execute immediately before
+        # word 0 -- a section or segment of a larger image.  For a raw payload
+        # word 0 is the entry point and nothing precedes it.
+        self.head_unknown = head_unknown
+        self.words = []
+
+    def load(self, b):
+        for k in range(0, self.size, 4):
+            self.words.append((self.vaddr + k,
+                               struct.unpack_from('>I', b, self.off + k)[0]))
+        return self
+
+
+def _check_extent(b, off, size, what):
+    """A span that runs past EOF is an error, never a silently shorter span.
+
+    `p_filesz`/`sh_size` larger than the bytes present hides whatever was in the
+    missing part, and a scan that quietly covered less than it said it did is
+    the failure this whole tool exists to make impossible.
+    """
+    if off > len(b) or off + size > len(b):
+        die('%s claims file[0x%x .. 0x%x) but the file is 0x%x bytes. Refusing '
+            'to scan a shorter range than the header describes -- a silently '
+            'truncated scan reports 0 violations for the part it never read'
+            % (what, off, off + size, len(b)))
+
+
 def elf_ranges(b, want_section=None):
-    """[(file_offset, size, vaddr, name)] for the executable parts of an ELF32 BE.
+    """(spans, unscanned) for an ELF32 big-endian MIPS object.
 
     Program headers for an executable -- a stripped image still has to be
     loadable.  Section headers for a relocatable `.o`, which has no segments at
     all; that is the case `rlxprobe`'s build hands this tool.
+
+    `unscanned` lists the allocated parts this tool did NOT look at, so that
+    "code sitting in a segment that is not marked executable" is visible in the
+    report instead of being silently outside the population.
     """
     if b[:4] != b'\x7fELF':
         return None
@@ -634,7 +807,7 @@ def elf_ranges(b, want_section=None):
     if e_machine != 8:
         die('ELF e_machine is %d, not 8 (EM_MIPS)' % e_machine)
 
-    out = []
+    out, unscanned = [], []
     if e_type in (2, 3):                       # ET_EXEC, ET_DYN
         phoff, = struct.unpack_from('>I', b, 0x1C)
         phentsize, phnum = struct.unpack_from('>HH', b, 0x2A)
@@ -642,13 +815,20 @@ def elf_ranges(b, want_section=None):
             o = phoff + i * phentsize
             p_type, p_off, p_vaddr, _, p_filesz, _, p_flags, _ = \
                 struct.unpack_from('>8I', b, o)
-            if p_type == 1 and (p_flags & 1):  # PT_LOAD, PF_X
-                out.append((p_off, p_filesz, p_vaddr, 'PT_LOAD#%d' % i))
+            if p_type != 1 or not p_filesz:    # PT_LOAD only
+                continue
+            if p_flags & 1:                    # PF_X
+                _check_extent(b, p_off, p_filesz, 'PT_LOAD#%d' % i)
+                out.append(Span(p_off, p_filesz, p_vaddr, 'PT_LOAD#%d' % i,
+                                head_unknown=True))
+            else:
+                unscanned.append(('PT_LOAD#%d' % i, p_filesz,
+                                  'not PF_X -- flags %d' % p_flags))
         if not out:
             die('no executable PT_LOAD segment in this ELF -- there is nothing '
                 'to scan, and a tool that scanned nothing would report 0 '
                 'violations')
-        return out
+        return out, unscanned
 
     # ET_REL and anything else: executable sections.
     shoff, = struct.unpack_from('>I', b, 0x20)
@@ -656,42 +836,67 @@ def elf_ranges(b, want_section=None):
     if shoff == 0 or shnum == 0:
         die('this ELF has neither an executable segment nor section headers')
     stroff, = struct.unpack_from('>I', b, shoff + shstrndx * shentsize + 0x10)
+    rel = (e_type == 1)
+    synth = 0
     for i in range(shnum):
         o = shoff + i * shentsize
         sh_name, sh_type, sh_flags, sh_addr, sh_off, sh_size = \
             struct.unpack_from('>6I', b, o)
         end = b.index(b'\0', stroff + sh_name)
         name = b[stroff + sh_name:end].decode('ascii', 'replace')
+        exec_ = (sh_type == 1 and (sh_flags & 0x4))       # PROGBITS, EXECINSTR
         if want_section is not None:
             if name != want_section:
                 continue
-        elif not (sh_type == 1 and (sh_flags & 0x4)):   # PROGBITS, EXECINSTR
+        elif not exec_:
+            if (sh_flags & 0x2) and sh_size and sh_type == 1:   # SHF_ALLOC
+                unscanned.append((name, sh_size, 'allocated but not EXECINSTR'))
             continue
-        if sh_size:
-            out.append((sh_off, sh_size, sh_addr, name))
+        if not sh_size:
+            continue
+        _check_extent(b, sh_off, sh_size, 'section %r' % name)
+        # In a relocatable object nothing has been placed, so every section
+        # reports sh_addr == 0.  Left alone they all start at the same address,
+        # the address->index map keeps only the last, and a branch target
+        # resolves into a different section entirely.  A synthetic base per
+        # section keeps them apart, and `addressed=False` is what stops any
+        # target computed from it being believed.
+        if sh_addr == 0 and rel:
+            vaddr, addressed = SYNTH_BASE + synth, False
+            synth += (sh_size + 0xFFF) & ~0xFFF
+        else:
+            vaddr, addressed = sh_addr, True
+        out.append(Span(sh_off, sh_size, vaddr, name,
+                        addressed=addressed, relocatable=rel,
+                        head_unknown=True))
     if not out:
         die('no executable section in this ELF%s -- nothing to scan'
             % ('' if want_section is None else ' named %r' % want_section))
-    return out
+    return out, unscanned
 
 
-def words_from(b, ranges):
-    ws, spans = [], []
-    for off, size, vaddr, name in ranges:
-        if off + size > len(b):
-            size = max(0, len(b) - off)
-        size -= size % 4
-        if size <= 0:
+def load_spans(b, spans):
+    """Trim each span to a whole number of words and read them in."""
+    live = []
+    for sp in spans:
+        sp.size -= sp.size % 4
+        if sp.size <= 0:
             continue
-        spans.append((off, size, vaddr, name))
-        for k in range(0, size, 4):
-            ws.append((vaddr + k, struct.unpack_from('>I', b, off + k)[0]))
-    return ws, spans
+        live.append(sp.load(b))
+    return live
 
 
-def raw_words(b, vma):
-    return [(vma + o, struct.unpack_from('>I', b, o)[0])
-            for o in range(0, len(b) // 4 * 4, 4)]
+def raw_span(b, vma, lo=0, hi=None):
+    """The `--raw` span.  Every caller goes through this, K4 included.
+
+    K4 used to build its words with a private helper, so the population control
+    exercised a code path no user file ever took and could not have caught a
+    defect in span construction.  Found by the adversarial review 2026-08-24 and
+    it was the sharpest of the seventeen, because it made the control look like
+    it was guarding something it was not.
+    """
+    hi = len(b) if hi is None else hi
+    return load_spans(b, [Span(lo, hi - lo, vma + lo, 'raw')])
 
 
 # --------------------------------------------------------------------------
@@ -779,7 +984,40 @@ K1_CASES = [
     (0x8D080000, 0x00004012, False, "lw t0 then mflo t0 -- mflo reads no GPR"),
     (0x8D080000, 0x0810000A, False, "lw t0 then j -- j reads no GPR"),
     (0x8D080000, 0x40086000, False, "lw t0 then mfc0 t0 -- mfc0 WRITES rt"),
-    (0x88880000, 0x98880003, False, "lwl t0 then lwr t0 -- the MIPS-I unaligned pair"),
+    (0x88880000, 0x98880003, False, "lwl t0,0(a0) then lwr t0,3(a0) -- the MIPS-I unaligned pair"),
+    (0x89280000, 0x99080003, True,
+     "lwl t0,0(t1) then lwr t0,3(t0) -- the pair exemption covers the rt MERGE; "
+     "the successor's BASE register is an ordinary delay-slot read"),
+    (0x8D280000, 0x99480003, True,
+     "lw t0 then lwr t0,3(t2) -- unrelated base, so the ONLY reason this is a "
+     "hazard is that lwr reads rt to merge into it. Nothing exempts it: lw is "
+     "not one of the pair"),
+]
+
+# K7.  (words, expected violations, expected unresolved, relocatable, why).
+#
+# Each case is a whole span because the shape under test is "what executes after
+# a load that is itself in a delay slot", and that needs three or four words.
+# The leg that is NOT taken always carries something clean and the leg that IS
+# taken carries the read, so a checker that follows the wrong leg reports zero.
+_LW_T0   = 0x8D280000       # lw   t0,0(t1)
+_USE_T0  = 0x01005021       # addu t2,t0,zero
+_NOP     = 0x00000000
+K7_CASES = [
+    ([0x10000002, _LW_T0, _USE_T0, _USE_T0], 1, False, False,
+     "b +2, load in the delay slot: only the TARGET executes, so exactly one "
+     "of the two reads is a violation"),
+    ([0x05230002, _LW_T0, _NOP, _USE_T0], 1, False, False,
+     "bgezl t1,+2 (REGIMM branch-likely): the taken leg reads it. control_flow "
+     "did not recognise the four REGIMM branch-likely forms until 2026-08-24"),
+    ([0x45000002, _LW_T0, _NOP, _USE_T0], 1, False, False,
+     "bc1f +2 (coprocessor branch): reads() modelled it, control_flow did not"),
+    ([0x03E00008, _LW_T0, _USE_T0], 0, True, False,
+     "jr ra: the successor is not statically known, so it is reported "
+     "unresolved rather than checked against the next word"),
+    ([0x0C140000, _LW_T0, _USE_T0], 0, True, True,
+     "jal in an unlinked object: the target field is a placeholder, so a "
+     "computed target would be a fiction. Unresolved, not address 0"),
 ]
 
 
@@ -820,8 +1058,9 @@ def run_controls(stage2_path, waive_population, want_isa):
     # --- K1 --------------------------------------------------------------
     bad = []
     for lw, nw, expect, why in K1_CASES:
-        ws = [(PAYLOAD_VMA, lw), (PAYLOAD_VMA + 4, nw)]
-        if (len(scan(ws).violations) > 0) != expect:
+        two = Span(0, 8, PAYLOAD_VMA, 'K1')
+        two.words = [(PAYLOAD_VMA, lw), (PAYLOAD_VMA + 4, nw)]
+        if (len(scan([two]).violations) > 0) != expect:
             bad.append(why)
     c.add('K1  decoder cases', not bad,
           '%d/%d ok  (%d must fire, %d must not)'
@@ -833,7 +1072,7 @@ def run_controls(stage2_path, waive_population, want_isa):
     # --- K2 --------------------------------------------------------------
     v1 = unhex(P9_12_V1_HEX)
     sha1_ok = hashlib.sha256(v1).hexdigest() == P9_12_V1_SHA
-    r1 = scan(raw_words(v1, PAYLOAD_VMA))
+    r1 = scan(raw_span(v1, PAYLOAD_VMA))
     offs = sorted(v[1] for v in r1.violations)
     c.add('K2  negative control  P9-12 v1, %d B' % len(v1),
           sha1_ok and len(v1) == 148 and offs == [0x1C, 0x2C],
@@ -844,7 +1083,7 @@ def run_controls(stage2_path, waive_population, want_isa):
     # --- K3 --------------------------------------------------------------
     v2 = unhex(P9_12_V2_HEX)
     sha2_ok = hashlib.sha256(v2).hexdigest() == P9_12_V2_SHA
-    r2 = scan(raw_words(v2, PAYLOAD_VMA))
+    r2 = scan(raw_span(v2, PAYLOAD_VMA))
     # The single-variable claim itself, checked rather than repeated.  Upstream
     # wrote "two nops, nothing else changed", and at the source level that is
     # true; in the bytes it cannot be, because inserting two instructions moves
@@ -887,7 +1126,11 @@ def run_controls(stage2_path, waive_population, want_isa):
     else:
         b = open(stage2_path, 'rb').read()
         sha = hashlib.sha256(b).hexdigest()
-        r = scan(raw_words(b, STAGE2_VMA))
+        # Through raw_span(), which is exactly what `--raw` builds for a user's
+        # file.  It used to have its own private word list, so this control
+        # exercised a code path no scanned file ever took -- it could not have
+        # caught a defect in span construction, and it looked like it could.
+        r = scan(raw_span(b, STAGE2_VMA))
         ok = (sha == STAGE2_SHA and len(b) == STAGE2_SIZE
               and r.loads == STAGE2_LOADS and r.nop_after == STAGE2_NOPS
               and len(r.violations) == STAGE2_VIOLATIONS)
@@ -901,12 +1144,47 @@ def run_controls(stage2_path, waive_population, want_isa):
     # --- K5 --------------------------------------------------------------
     swapped = b''.join(struct.pack('>I', struct.unpack_from('<I', v1, i)[0])
                        for i in range(0, len(v1), 4))
-    n_swapped = len(scan(raw_words(swapped, PAYLOAD_VMA)).violations)
-    n_shifted = len(scan(raw_words(v1[2:], PAYLOAD_VMA)).violations)
+    n_swapped = len(scan(raw_span(swapped, PAYLOAD_VMA)).violations)
+    n_shifted = len(scan(raw_span(v1[2:], PAYLOAD_VMA)).violations)
     c.add('K5  endianness and alignment',
           n_swapped != 2 and n_shifted != 2,
           'byte-swapped -> %d violations, 2-byte shifted -> %d; both must '
           'differ from 2' % (n_swapped, n_shifted))
+
+    # --- K7, delay-slot successors ---------------------------------------
+    # K1 is two words, so it cannot reach the shape that matters here: what
+    # executes after a load that is ITSELF in a delay slot.  Every case below
+    # puts a clean instruction on the leg that is not taken and a reading one on
+    # the leg that is, so a checker that resolves to the wrong leg reports 0.
+    # Added 2026-08-24; three of the four would have caught a defect that
+    # shipped, and nothing in K1-K6 constrained any of them.
+    bad7 = []
+    for words, viol, unres, rel, why in K7_CASES:
+        sp = Span(0, 4 * len(words), 0x80500000, 'K7', relocatable=rel)
+        sp.words = [(0x80500000 + 4 * i, w) for i, w in enumerate(words)]
+        r7 = scan([sp])
+        if (len(r7.violations) != viol) or ((len(r7.unresolved) > 0) != unres):
+            bad7.append('%s (got %d violations, %d unresolved)'
+                        % (why, len(r7.violations), len(r7.unresolved)))
+    c.add('K7  delay-slot successors', not bad7,
+          '%d/%d ok' % (len(K7_CASES) - len(bad7), len(K7_CASES))
+          + ('' if not bad7 else '   first miss: ' + bad7[0]))
+
+    # --- K8, the span boundary -------------------------------------------
+    # Two spans are not one run of instructions.  The last word of one is not
+    # the predecessor of the first word of the next, and a flat word list makes
+    # it one.  Expect: no violation across the seam, and an unresolved saying
+    # why -- not silence.
+    a = Span(0, 4, 0x80500000, 'first')
+    a.words = [(0x80500000, 0x8D280000)]                  # lw t0,0(t1)
+    bsp = Span(4, 4, 0x81000000, 'second')
+    bsp.words = [(0x81000000, 0x01005021)]                # addu t2,t0,zero
+    r8 = scan([a, bsp])
+    c.add('K8  span boundary',
+          len(r8.violations) == 0 and len(r8.unresolved) >= 1,
+          '%d violations across the seam (must be 0), %d unresolved (must be '
+          '>= 1): the two spans are not adjacent and the tool says so rather '
+          'than reading across' % (len(r8.violations), len(r8.unresolved)))
 
     # --- K6, only where it is load-bearing -------------------------------
     if want_isa:
@@ -915,7 +1193,7 @@ def run_controls(stage2_path, waive_population, want_isa):
                   'NOT RUN -- stage2.bin was not found')
         else:
             b = open(stage2_path, 'rb').read()
-            ws = raw_words(b, STAGE2_VMA)
+            ws = raw_span(b, STAGE2_VMA)[0].words
             code = [x for x in ws if x[0] < STAGE2_CODE_HI]
             data = [x for x in ws if x[0] >= STAGE2_CODE_HI]
             s_code, l_code = isa_scan(code, True), isa_scan(code, False)
@@ -962,17 +1240,31 @@ def print_controls(c):
     print('')
 
 
-def report(path, spans, r, args, sur):
+def print_spans(path, spans, unscanned):
     print('file       %s   (%d bytes)' % (path, os.path.getsize(path)))
-    for off, size, vaddr, name in spans:
-        print('scanned    %-12s file[0x%x .. 0x%x)  ->  vma[0x%08x .. 0x%08x)'
-              % (name, off, off + size, vaddr, vaddr + size))
+    for sp in spans:
+        print('scanned    %-12s file[0x%x .. 0x%x)  ->  vma[0x%08x .. 0x%08x)%s'
+              % (sp.name, sp.off, sp.off + sp.size, sp.vaddr,
+                 sp.vaddr + sp.size,
+                 '   ADDRESSES ARE SYNTHETIC' if not sp.addressed else ''))
+    # What was NOT looked at, printed every run.  An executable payload can hide
+    # in a segment that is not marked executable, and one tiny PF_X segment is
+    # enough to satisfy the loads > 0 guard while the real code goes unscanned.
+    for name, size, why in unscanned:
+        print('NOT SCANNED %-11s %d bytes -- %s' % (name, size, why))
+    if not unscanned:
+        print('not scanned  nothing: every allocated part of this file was read')
+
+
+def report(path, spans, unscanned, r, args, sur):
+    print_spans(path, spans, unscanned)
     print('words      %d' % r.words)
     print('')
     print('  loads (MIPS-I load-to-GPR, rt != $zero)   %8d' % r.loads)
     print('  followed by an explicit nop               %8d   (%.2f%%)'
           % (r.nop_after, 100.0 * r.nop_after / max(r.loads, 1)))
     print('  successor unresolved                      %8d' % len(r.unresolved))
+    print('  notes (a stated limit, not a finding)     %8d' % len(r.notes))
     print('  VIOLATIONS                                %8d' % len(r.violations))
     print('')
 
@@ -995,11 +1287,21 @@ def report(path, spans, r, args, sur):
             print('')
 
     if r.unresolved:
-        print('  successors that could not be resolved -- reported, not guessed:')
+        print('  successors that could not be resolved -- reported, not guessed.')
+        print('  These fail the gate: an unchecked successor is an unchecked load.')
         for va, fo, reason in r.unresolved[:20]:
             print('    0x%08x  file 0x%-5x  %s' % (va, fo, reason))
         if len(r.unresolved) > 20:
             print('    ... %d more' % (len(r.unresolved) - 20))
+        print('')
+
+    if r.notes:
+        print('  notes -- the successor WAS checked; what this file cannot rule')
+        print('  out is a second one. Stated, not counted as a finding:')
+        for va, fo, reason in r.notes[:10]:
+            print('    0x%08x  file 0x%-5x  %s' % (va, fo, reason))
+        if len(r.notes) > 10:
+            print('    ... %d more' % (len(r.notes) - 10))
         print('')
 
     if sur is not None:
@@ -1013,13 +1315,11 @@ def report(path, spans, r, args, sur):
         print('')
 
 
-def report_isa(path, spans, words, args):
+def report_isa(path, spans, unscanned, args):
     strict = not args['loose']
     rng = args['code_range']
-    print('file       %s   (%d bytes)' % (path, os.path.getsize(path)))
-    for off, size, vaddr, name in spans:
-        print('scanned    %-12s file[0x%x .. 0x%x)  ->  vma[0x%08x .. 0x%08x)'
-              % (name, off, off + size, vaddr, vaddr + size))
+    words = [w for sp in spans for w in sp.words]
+    print_spans(path, spans, unscanned)
     print('classifier %s   -- strict also requires the fields an encoding fixes '
           'at zero to BE zero; --loose reads opcode and funct only'
           % ('loose' if args['loose'] else 'strict'))
@@ -1149,19 +1449,19 @@ def main(argv):
         die('%s: no such file' % args['path'])
 
     b = open(args['path'], 'rb').read()
-    ranges = None if args['raw'] else elf_ranges(b, args['section'])
-    if ranges is None:
-        if args['range']:
-            lo, hi = args['range']
-            ranges = [(lo, hi - lo, args['base'] + lo, 'raw')]
-        else:
-            ranges = [(0, len(b), args['base'], 'raw')]
-    words, spans = words_from(b, ranges)
-    if not words:
+    unscanned = []
+    elf = None if args['raw'] else elf_ranges(b, args['section'])
+    if elf is None:
+        lo, hi = args['range'] if args['range'] else (0, len(b))
+        spans = raw_span(b, args['base'], lo, hi)
+    else:
+        spans, unscanned = elf
+        spans = load_spans(b, spans)
+    if not spans or not any(sp.words for sp in spans):
         die('nothing to scan')
 
     if args['isa']:
-        bad = report_isa(args['path'], spans, words, args)
+        bad = report_isa(args['path'], spans, unscanned, args)
         if not c.population_ran:
             print('')
             print('POPULATION CONTROL NOT RUN -- this run certifies nothing. '
@@ -1169,9 +1469,9 @@ def main(argv):
             return 2
         return 1 if bad else 0
 
-    sur = survey(words) if args['survey'] else None
-    r = scan(words, base_off=spans[0][0])
-    report(args['path'], spans, r, args, sur)
+    sur = survey(spans) if args['survey'] else None
+    r = scan(spans)
+    report(args['path'], spans, unscanned, r, args, sur)
 
     if r.loads == 0 and not args['allow_zero']:
         print('REFUSED: %d words scanned and not one load. That is exactly what '

@@ -300,6 +300,80 @@ else
 fi
 
 echo
+echo "=== M7-M9: the 2026-08-24 fixes must each have a control that fails ==="
+# The adversarial review's finding 6 was that K1-K6 constrained none of the
+# decoder defects: the patched tool and the shipped tool were indistinguishable
+# to the suite. These three mutations undo one fix each and demand a refusal.
+mut () {   # mut <name> <python-mutation> <label>
+    "$PY" - "$HAZ" "$T/$1" <<'INNERPY'
+import sys
+src = open(sys.argv[1]).read()
+import os
+which = os.path.basename(sys.argv[2])
+if which == 'm7':          # the lwl/lwr exemption swallows the base register again
+    src = src.replace("and rs_of(w2) != rt:", "and True:", 1)
+elif which == 'm8':        # control_flow forgets the REGIMM branch-likely forms
+    src = src.replace("                             0x02, 0x03, 0x12, 0x13):",
+                      "                             ):", 1)
+elif which == 'm9':        # reads() forgets that lwl/lwr merge into rt
+    src = src.replace("""        # Found by the adversarial review, 2026-08-24.
+        return {rs, rt}""",
+                      """        # MUTATED: the merge read of rt is gone
+        return {rs}""", 1)
+open(sys.argv[2], 'w').write(src)
+INNERPY
+}
+mut m7; mut m8; mut m9
+ck "M7 mutation landed"  0 "$(grep -c 'and rs_of(w2) != rt:' "$T/m7")"
+ck "M8 mutation landed"  0 "$(grep -c '0x02, 0x03, 0x12, 0x13' "$T/m8")"
+ck "M9 mutation landed"  1 "$(grep -c 'MUTATED: the merge read' "$T/m9")"
+for m in m7 m8 m9; do
+    "$PY" "$T/$m" --self-test >/dev/null 2>&1
+    ck "$m self-test must refuse"  2 "$?"
+done
+
+echo
+echo "=== U1: an unchecked successor fails the gate ==="
+# Finding 14: the "unresolved -> exit 1" contract had zero coverage. A file
+# whose last word is a load has a successor that is not in the file at all.
+printf '\x8d\x28\x00\x00' > "$T/tail-load.bin"
+out="$("$PY" "$HAZ" "$T/tail-load.bin" --raw --base 0x80500000 2>&1)"; rc=$?
+ck "one load, no successor -> exit 1"     1 "$rc"
+ck "and it says why"                      1 "$(printf '%s\n' "$out" | grep -c 'last word of')"
+ck "with 0 violations, not a fake one"    0 "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
+
+echo
+echo "=== U2: two executable sections in one .o must not be read across ==="
+if command -v mips-linux-gnu-as >/dev/null 2>&1; then
+    cat > "$T/two.s" <<'ASM'
+	.set noreorder
+	.set nomacro
+	.section .text.a,"ax",@progbits
+	.globl _a
+_a:
+	lw	$t0, 0($t1)		# the LAST word of section a
+	.section .text.b,"ax",@progbits
+	.globl _b
+_b:
+	addu	$t2, $t0, $zero		# the FIRST word of section b, reads t0
+	jr	$ra
+	nop
+ASM
+    mips-linux-gnu-as -EB -march=mips1 -o "$T/two.o" "$T/two.s" 2>/dev/null
+    out="$("$PY" "$HAZ" "$T/two.o" 2>&1)"; rc=$?
+    ck "no violation across the section seam" 0 "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
+    ck "the seam is reported, not silent"     1 \
+       "$(printf '%s\n' "$out" | grep -c 'last word of .text.a')"
+    ck "both sections were scanned"           2 \
+       "$(printf '%s\n' "$out" | grep -c '^scanned    .text.')"
+    ck "and the addresses are flagged synthetic" 2 \
+       "$(printf '%s\n' "$out" | grep -c 'ADDRESSES ARE SYNTHETIC')"
+    ck "exit 1, because a successor is unknown" 1 "$rc"
+else
+    sk "two-section .o" "no mips-linux-gnu-as"
+fi
+
+echo
 if [ "$fail" -ne 0 ]; then
     printf 'RESULT: %d passed, \033[31m%d failed\033[0m, %d skipped\n' "$pass" "$fail" "$skip"
     exit 1
