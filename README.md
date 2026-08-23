@@ -55,6 +55,9 @@ tools/spec-check.py        seven checks over SPEC.md, and eight mutations that m
                            each produce a finding the file did not already have.
                            The controls run on every invocation, and a control that
                            fails stops the report rather than annotating it
+tools/test-file-modes.sh   reads the index rather than the working tree, because the
+                           working tree is what DrvFs lies about. Its control is a
+                           synthetic repo carrying one violation in each direction
 ```
 
 `tools/opcount.py` counts MIPS primary opcodes by linear scan rather than

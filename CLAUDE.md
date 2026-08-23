@@ -78,6 +78,13 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   case-insensitive, which silently drops **254 files** from the vendor kernel trees
   (`xt_CONNMARK.h` against `xt_connmark.h`). On this project part of the finding
   *is* filesystem metadata. `src-vendor/` is a symlink into `$FWRE_WORK/rebuild/`.
+  - **The same blindness quietly loses the executable bit on new tools.** With
+    `core.fileMode=false` a file is recorded with whatever mode `git add` happened
+    to capture and nothing ever corrects it: **7 of the first 10 files in `tools/`
+    drifted to `100644`** while the three oldest stayed `100755`. Every tool here
+    carries a shebang, so every tool is recorded `100755`; the fix for a drifted
+    one is `git update-index --chmod=+x <path>`, and `tools/test-file-modes.sh`
+    reads the **index** — the thing DrvFs cannot lie about — in both directions.
 - **Session working files do not go in WSL's `/tmp`.** Measured 2026-08-23: the
   distro restarts between tool calls (`uptime -s` moved forward mid-session,
   `uptime -p` read "up 0 minutes"), and `/usr/lib/tmpfiles.d/tmp.conf` carries
@@ -102,5 +109,6 @@ diff says what.
 a desk-only day is exactly when the next bench visit's plan changes. **If the
 session produced, changed or refuted a number, `SPEC.md` changes in the same
 commit** — a spec table that lags the finding is worse than no table, because it
-reads as current. Then run `python3 tools/spec-check.py`: it runs its eight
-controls first and refuses to report on the file if any of them fails.
+reads as current. Then run `python3 tools/spec-check.py` — it runs its eight
+controls first and refuses to report on the file if any of them fails — and
+`bash tools/test-file-modes.sh` if a file was added. Two seconds for both.
