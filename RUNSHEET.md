@@ -147,6 +147,7 @@ loader's image (ends `0x8040DD10`) and far above the staged kernel
 | **C2** | `DW 81000000 1` | `DEADBEEF CAFEBABE ???????? ????????` | `EW` writes 32-bit words at the address given, in order |
 | **C3** | `EW 81000102 11111111` then `DW 81000100 1` | `???????? 11111111 ???????? ????????` — the value at `0x81000104`, **not** `0x81000100` | 🔴 **`EW` rounds an unaligned address *up*, silently.** If `11111111` lands at `0x81000100`, it rounds down; if the command is refused, it validates. Either would change every `EW` written from now on |
 | **C4** | `EB 81000200 41 42 43` then `DB 81000200 4` | `41 42 43` at `…200`, `…201`, `…202` | `EB` writes bytes at the address **verbatim** — no rounding, unlike `EW` |
+| **C5** 🆕 | `DW B8003000 1` → `EW B8003000 8000` → `DW B8003000 1` → `PHYR 0 2` → `DW B8003000 1` | in order: `00008100` · *(silent)* · **`00008000`** · `UID=0x0000001c` · **`00008100`** | 🔴 **`E5` recovered as a write, because `E5` as a read was void on arrival** — `GIMR` bit 8 was already `1`, so the bit predicted to flip had nothing to flip from. Clearing it first makes the prediction testable: **`phy_read()` sets `GIMR` bit 8 at `0x80402FB8` and this is the only thing that would put it back.** Reading `00008000` in the middle is a second finding on its own — it proves the console survives with `TCIE` masked. The value `8000` preserves bit 15 (`SWIE`), which is also set. **Licensed by a call-graph walk**: no path from the command loop at `0x80409144` to `tick()`, `delay()` or the ESC-wait, with the same walker finding `PHYR → phy_read → delay → tick` as its control. **If the third command returns nothing, the walk was wrong and the board is hung — that is the risk, and it is one power cycle** |
 
 ### D — the reset. Last, because it ends the session's state
 
@@ -195,10 +196,11 @@ operator.** Logs: `$FWRE_WORK/rebuild/bench-2026-08-23/`.
 | B7 | `C0000000 80000000 000E0000 A5000000` | **exact, plus three free.** `CDBR = 000E0000` as predicted; `WatchDogIND` (w4 bit 20) = **0** after power-on, which is D2's baseline. Unasked and now known: `TCCNR = C0000000` and `TCIR = 80000000` are exactly what `timer_init` writes, and `WDTE[7:0] = 0xA5` is the stop pattern, so the watchdog is stopped as documented |
 | B8 | nothing at all | **exact.** `strtoul("A",_,10)` = 0, zero length, no output. The radix is decimal |
 | B9 | three lines | **exact.** And the three rows carry `?`/`DB`/`DW`'s handlers `80409A9C`/`804095D0`/`804094B4`, matching `loader.json` |
-| C1 | | pending -- needs the operator, in picocom |
-| C2 | | pending |
-| C3 | | pending |
+| C1 | *(partly, via `C5`)* `EW B8003000 8000` printed **nothing** | **the silence half holds**, on a hardware register rather than scratch RAM. C1's own cell -- two values, `0x81000000` -- has not run |
+| C2 | *(partly, via `C5`)* `EW B8003000 8000` then `DW B8003000 1` read `00008000` at that exact address | **`EW` writes a 32-bit word at the address it is given.** R4's kernel-command-line plan rests on this and it now has a measurement. **Not** covered: the multi-value form, which is C2's other half |
+| C3 | | pending -- the unaligned round-**up**, and it is the sharp one |
 | C4 | | pending |
+| **C5** | `00008100` -> *(silent)* -> **`00008000`** -> `UID=0x0000001c` -> **`00008100`** | **PASSES, and it is the causal control the whole of `E5` was for.** A bit cleared by hand came back, and `phy_read()`'s `GIMR \|= 1<<8` at `0x80402FB8` is the only thing that puts it there. **Two findings arrived free in the same transcript.** (a) The middle `DW` answered at all, so **the console does not need the timer** -- the call-graph walk that licensed this cell was right, and it is now measured rather than argued. (b) 🔴 **`GISR` moved `88000004` -> `88000104` -> `88000004`.** Bit 8 is `TCIP`, timer interrupt *pending*: with `TCIE` masked the interrupt could not be taken so it latched, and re-enabling it let the ISR run and ack. **The mask, the latch, the delivery and the ack are all visible in five lines**, and none of it was predicted |
 | D1 | | pending |
 | D2 | | pending |
 | D3 | | pending -- needs a button press |
