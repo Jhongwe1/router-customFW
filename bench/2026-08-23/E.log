@@ -1,0 +1,70 @@
+### E1   expect: w2=00002000 (timer_init ran); w1=tick, non-zero, unpredictable
+DW 8040DCE8 1
+8040DCE8:	0000473A	001E8000	0ED80000	8040A2B4
+<RealTek>
+### E2   expect: w1 advanced by ~100 x seconds
+DW 8040DCE8 1
+8040DCE8:	00005F52	001E8000	0ED80000	8040A2B4
+<RealTek>
+### E3   expect: w1=GIMR bit8 MUST be 0; w4=IRR1=00050004 (control)
+DW B8003000 1
+B8003000:	00008100	88000004	00000000	30050004
+<RealTek>
+### E2b(new)   expect: TC0DATA TC1DATA TC0CNT TC1CNT -- TC0DATA should read 142858<<4 = 0x22E0A0 if the count field is bits 31:4
+DW B8003100 1
+B8003100:	0022E0A0	00000000	0010B960	00000000
+<RealTek>
+### E4   expect: PHYID=0x0, regID=0x2 ,Find PHY Chip! UID=0x????  -- UID unpredictable, must not be 0000 or ffff
+PHYR 0 2
+PHYID=0x00000000, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c
+<RealTek>
+### E6   expect: the low half of the identifier
+PHYR 0 3
+PHYID=0x00000000, regID=0x00000003 ,Find PHY Chip! UID=0x0000c880
+<RealTek>
+### E7a   expect: must equal E4 = 0x1c
+PHYR 2 2
+PHYID=0x00000002, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c
+<RealTek>
+### E7b   expect: must equal E4 = 0x1c
+PHYR 3 2
+PHYID=0x00000003, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c
+<RealTek>
+### E7c   expect: must equal E4 = 0x1c
+PHYR 4 2
+PHYID=0x00000004, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c
+<RealTek>
+### E8   expect: the address PORT1 skips -- same => the skip is about the port
+PHYR 1 2
+PHYID=0x00000001, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c
+<RealTek>
+### E8b   expect: and its low half
+PHYR 1 3
+PHYID=0x00000001, regID=0x00000003 ,Find PHY Chip! UID=0x0000c880
+<RealTek>
+### E9   expect: w1 PITCR=00000001; w3..w6 = PCRP1..PCRP4, bits30:26 = 1,2,3,4 -> top byte 04,08,0C,10
+DW BB804100 8
+BB804100:	00000000	007F0039	047F0039	087F0039
+BB804110:	0C7F0039	107F0039	00000000	187F0038
+<RealTek>
+### E10   expect: PSRP0..PSRP4: exactly one word with bit4 (LinkUp) set = the port with the cable
+DW BB804128 8
+BB804128:	000010E0	000010E0	00001099	000010E0
+BB804138:	000010E0	000000E2	0000007A	0000007A
+<RealTek>
+### E12a   expect: BMSR of the ONE port with link: bit2 LinkStatus=1, bit5 AutonegComplete=1
+PHYR 2 1
+PHYID=0x00000002, regID=0x00000001 ,Find PHY Chip! UID=0x000078ed
+<RealTek>
+### E12b   expect: NEGATIVE CONTROL - same register, a port with no link: bit2 MUST be 0
+PHYR 0 1
+PHYID=0x00000000, regID=0x00000001 ,Find PHY Chip! UID=0x000078c9
+<RealTek>
+### E12c   expect: BMCR of the linked port: bit12 autoneg enable, bit13 speed sel
+PHYR 2 0
+PHYID=0x00000002, regID=0x00000000 ,Find PHY Chip! UID=0x00001100
+<RealTek>
+### E12d   expect: ANLPAR - what the far end advertised. Non-zero only because something is plugged in
+PHYR 2 5
+PHYID=0x00000002, regID=0x00000005 ,Find PHY Chip! UID=0x0000c1e1
+<RealTek>

@@ -1,0 +1,30 @@
+2026-08-23T21:51:16+08:00
+
+  streaming ESC.  >>> POWER THE ROUTER ON NOW <<<
+  (240s window; Ctrl-C to give up)
+  ok    <RealTek> - the boot loader is ours
+        ---RealTek(RTL8196E)at 2014.04.22-16:22+0800 v1.3 [16bit](400MHz)
+  ok    input buffer drained (the ESC stream leaves ESCs queued)
+  >>>   ?
+  ok    command set:
+        ----------------- COMMAND MODE HELP ------------------
+        HELP (?)				    : Print this help message
+        DB <Address> <Len>
+        DW <Address> <Len>
+        EB <Address> <Value1> <Value2>...
+        EW <Address> <Value1> <Value2>...
+        CMP: CMP <dst><src><length>
+        IPCONFIG:<TargetAddress>
+        AUTOBURN: 0/1
+        LOADADDR: <Load Address>
+        J: Jump to <TargetAddress>
+        FLR: FLR <dst><src><length>
+        FLW <dst_ROM_offset><src_RAM_addr><length_Byte> <SPI cnt#>: Write offset-data to SPI from RAM
+        MDIOR:  MDIOR <phyid> <reg>
+        MDIOW:  MDIOW <phyid> <reg> <data>
+        PHYR: PHYR <PHYID><reg>
+        PHYW: PHYW <PHYID><reg><data>
+        PORT1: port 1 patch for FT2
+        <RealTek>
+CATCH_EXIT=0
+2026-08-23T21:52:34+08:00

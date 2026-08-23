@@ -14,3 +14,13 @@
 *.png   binary
 *.jpg   binary
 *.squashfs binary
+
+# Bench transcripts are evidence, not source.
+#
+# The device sends CR in its own output -- the loader's PHY format strings end
+# \r\n -- so the `* text=auto eol=lf` rule above, which exists so a script
+# edited on Windows still runs under WSL, would quietly rewrite what the board
+# actually said.  Measured 2026-08-23: it would have taken 20 bytes out of
+# B.log and 47 out of E.log.  A transcript that has been normalised is not a
+# transcript.
+bench/**        -text

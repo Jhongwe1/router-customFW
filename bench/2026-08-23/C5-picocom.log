@@ -1,0 +1,13 @@
+# Session B1 section C, cell C5 -- typed by the operator in picocom, 2026-08-23.
+# E5 recovered as a write: clear GIMR bit 8, send one PHYR, read it back.
+# Pasted verbatim from the terminal; the run-together columns are tab rendering.
+<RealTek>DW B8003000 1
+B8003000:       00008100        8800000400000000        30050004
+<RealTek>EW B8003000 8000
+<RealTek>DW B8003000 1
+B8003000:       00008000        8800010400000000        30050004
+<RealTek>PHYR 0 2
+PHYID=0x00000000, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c
+<RealTek>DW B8003000 1
+B8003000:       00008100        8800000400000000        30050004
+<RealTek>
