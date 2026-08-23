@@ -148,13 +148,17 @@ loader's image (ends `0x8040DD10`) and far above the staged kernel
 | **C3** | `EW 81000102 11111111` then `DW 81000100 1` | `???????? 11111111 ???????? ????????` — the value at `0x81000104`, **not** `0x81000100` | 🔴 **`EW` rounds an unaligned address *up*, silently.** If `11111111` lands at `0x81000100`, it rounds down; if the command is refused, it validates. Either would change every `EW` written from now on |
 | **C4** | `EB 81000200 41 42 43` then `DB 81000200 4` | `41 42 43` at `…200`, `…201`, `…202` | `EB` writes bytes at the address **verbatim** — no rounding, unlike `EW` |
 | **C5** 🆕 | `DW B8003000 1` → `EW B8003000 8000` → `DW B8003000 1` → `PHYR 0 2` → `DW B8003000 1` | in order: `00008100` · *(silent)* · **`00008000`** · `UID=0x0000001c` · **`00008100`** | 🔴 **`E5` recovered as a write, because `E5` as a read was void on arrival** — `GIMR` bit 8 was already `1`, so the bit predicted to flip had nothing to flip from. Clearing it first makes the prediction testable: **`phy_read()` sets `GIMR` bit 8 at `0x80402FB8` and this is the only thing that would put it back.** Reading `00008000` in the middle is a second finding on its own — it proves the console survives with `TCIE` masked. The value `8000` preserves bit 15 (`SWIE`), which is also set. **Licensed by a call-graph walk**: no path from the command loop at `0x80409144` to `tick()`, `delay()` or the ESC-wait, with the same walker finding `PHYR → phy_read → delay → tick` as its control. **If the third command returns nothing, the walk was wrong and the board is hung — that is the risk, and it is one power cycle** |
+| **C6** 🆕 | `AUTOBURN 0` — **through `console-dump.py rescue`, not by hand** — then `DW 8040D4A0 1` | the loader echoes `AutoBurning=0`; then word 1 = **`00000000`**, against `B6`'s measured `00000001` | 🔴 **the one command standing between R0 and a flash write, and it has never been shown to work.** `AUTOBURN` is read at exactly one instruction in the whole image, `0x80401B9C`, on the upload-completion path, and `B6` measured the global at `0x8040D4A0` as `1` on this device. **Two independent sources are needed and only one exists today**: the loader's own echo is the loader telling you what it thinks; `DW 8040D4A0` reads the word the burn path actually consults. **And the syntax is not obvious** — the help prints `AUTOBURN: 0/1`, which is not the syntax, and the string table holds `AUTOBURN` and `AUTOBURN: 0/1` as two separate strings; `console-dump.py rescue` tries four forms, **every one of them carrying `0`**, and stops if the reply says `AutoBurning=1`. A wrong form returns `Unknown command !`, **which in a flow with no readback looks exactly like success.** Refuted by: the word reading `00000001` after the echo said `0` — then the echo is not the switch and nothing may be uploaded |
+| **C7** 🆕 | `EW 81000400 <v1> … <v18>` with eighteen distinct values, then `DW 81000400 5` | all eighteen words land, in order, at `0x81000400`…`0x81000444` | **how much code one console line can carry, and it is R1's no-network path.** Read out of the tokeniser at `0x80407248`: it `memset`s twenty pointers and stops splitting at twenty, and the dispatcher passes `argv+1`, so a line holds at most nineteen arguments of which the first is the address — **eighteen words, 72 bytes, in a 173-character line.** That is 15 lines for a 1 KiB bare-metal probe. **What is not read out of anything is the loader's input line buffer**: nothing in this repo has measured how long a line it accepts, upstream wrote `console-write.py probe-eb` because *"how many bytes one line accepts is a device fact nobody had measured"*, and a 173-character line into a shorter buffer is an overflow into the loader's own `.data`. **So this cell starts at eighteen and the failure mode to watch for is not refusal — it is truncation, or the prompt never coming back.** Scratch address `0x81000400` is clear of `C1`–`C4` |
 
 ### D — the reset. Last, because it ends the session's state
 
 | | command | expected | what it refutes |
 |---|---|---|---|
-| **D1** | `J BFC00000` | the console prints `---Jump to address=BFC00000`, then the board resets | it writes `WDTCNR = 0` and spins; only the watchdog can leave that loop. **The acceptance condition is not "it reset" — it is "the ESC window appears again afterwards"** (`C-8`). Catch the prompt again |
-| **D2** | `DW B8003110 1` | word 4 bit 20 (`WatchDogIND`) = **`1`**, against B7's `0` | 🔴 **this is the cell worth the seating.** The datasheet says `1` = a watchdog reset occurred, `0` = power-on or pin reset. If it reads the same in both cases the bit does not discriminate on this part, and `C-8` needs another observable before R4's `bench-ci` can be built on it |
+| **D1** 🔄 | **through the tool, not by hand**: `console-capture.py capture --port /dev/ttyUSB0 --out <dir>/D1 --send 'J BFC00000' --seconds 30` | the capture holds `---Jump to address=BFC00000`, a silence, then the stage-1 banner. Then `console-capture.py report <dir>/D1 --from 'Jump to address=BFC00000' --to 'RealTek\(RTL8196E\)'` | it writes `WDTCNR = 0` and spins; only the watchdog can leave that loop. **The acceptance condition is not "it reset" — it is "the ESC window appears again afterwards"** (`C-8`). Catch the prompt again |
+| **D1b** 🆕 | *(no command — read the number `D1`'s report prints)* | **a wall-clock interval, order of a second. Value not predicted** | 🔴 **What this number is NOT.** It is **not** the watchdog timeout. `WDTCNR = 0` selects `OVSEL[3:0] = 0000` = 2^15 base-clock ticks, and against `E2`'s measured 199.48 MHz that is **164 µs** undivided or **2.30 ms** through `CDBR`'s divisor of 14 — and even the longest of the ten settings (2^24) is 84 ms / 1.18 s. **Every one of those is below what any instrument in this session can resolve**, and the CP2102's latency timer (1–16 ms typical, unmeasured here) is a further floor. So the interval is the post-reset boot, and **that is the number `C-8`'s owner actually needs**: R4's `bench-ci` sets its timeout from it. Recording it as "the watchdog timeout" would be a measured quantity wearing another one's name. **Refuted by**: an interval over ~10 s (nothing in the model predicts that), or the banner never arriving (then `D1` failed, not this cell) |
+| **D2** 🔄 | `DW B8003110 1` | **word 4 = `A5100000`** — the whole word, not just the bit | 🔴 **this is the cell worth the seating, and it got stronger.** Measured at the desk 2026-08-24: **the loader never writes `WDTCNR` except at two sites, `0x804012F8` (the `reboot.......` path) and `0x804092E8` (this command), and both are `sw zero` followed immediately by `j` to themselves with a `nop` in the delay slot** — so nothing executes after either. Search coverage: the `0x311c` immediate (2 hits, both these), `TC_BASE 0x3100` + displacement 28 (the one `ori …,0x3100` at `0x80408F38` builds a constant, not a store), and every non-`sp` `sw …,28(reg)` (3, resolving to `0xBB804D00`, the SPI descriptor at `0x8040FBD4`, and `0xB8B20000`). **Positive control: the same method finds the `CDBR = 0x000E0000` write at `0x80408F34`, which `B7` measured on the device.** Two consequences. ① `B7`'s `A5000000` is the **hardware reset default**, not something the loader wrote — `B7`'s verdict implied otherwise and is corrected. ② **There is no software in `D2`'s path at all**, so it reads the hardware directly. `A5000000` here means `WatchDogIND` does not survive the reset it reports, **`C-8` loses its discriminator**, and R4's `bench-ci` falls back to `D2b` |
+| **D2b** 🆕 | `DW 81000000 1` | **`DEADBEEF CAFEBABE`** — the words `C1` wrote earlier in this same seating | 🆕 **a second discriminator for `C-8` that does not depend on `WatchDogIND`.** SDRAM contents survive a warm reset and not a power cycle, so a scratch word that is still there says "warm" without reading any status bit. Costs nothing: the value is already at that address from `C1`. **Its own refutation is `D3`**: after the button (a cold boot, if `C-14` says the button is `RESET#`) the same read must come back *changed*. If it reads `DEADBEEF` in both cases the loader does not clear DRAM and this discriminates nothing either; if it reads garbage in both, it clears DRAM on every init. **Two independent observables, and the session tells you which of them works** |
 | **D3** | press the push button beside the barrel jack, console attached | a full stage-1 cold boot: `Booting...` and the banner | **`C-14`.** Anything less — nothing, or a reboot without the stage-1 lines — means the button is a GPIO, not `RESET#`. `notes/power-and-programmer.md` §3 |
 
 ---
@@ -255,6 +259,7 @@ trap as B1.
 | | command | expected | what it refutes |
 |---|---|---|---|
 | **F1** | `PHYR 5 2` | **it returns**, with `UID=0xffff` or `0x0000` | 🔴 **the negative control, and it is the risk.** `phy_read()`'s wait on `MDCIOSR` bit 31 has **no timeout and no iteration bound** (`bltz v1, …` at `0x80402FD8`). The datasheet assigns `ExtPHYID` only for ports 0–4, so address 5 should not answer. **If it does not return, the board is stuck and the visit is over** — and the finding is that `MDIOR` must never be run on this part. If it returns `ffff`, that value is also what `F2`'s rows 5–31 must show |
+| | 🆕 **why that risk is accepted, written down rather than left as nerve** | | `MDCIOSR` bit 31 is the **controller's** completion flag, not the PHY's acknowledgement: an MDIO master clocks out its 64 bits and latches whatever the line holds, so an absent PHY yields `0xFFFF` from a bus pulled high rather than a transaction that never finishes. *Inferred from the register's role, pending this measurement* — the datasheet's Table 58 does not say what the bit does when nothing answers. `E4`, `E7` and `E8` already showed the controller completing eleven times. **So `F1` is placed before `D` and `R0` in seating 2 rather than last**: if the inference is wrong the cost is one power cycle, which also re-establishes `D2`'s power-on baseline, and the two cells behind it are worth more than `F` is |
 | **F2** | `MDIOR 2` — **only if `F1` returned** | 32 lines. `PhyID=0x00`…`0x04` carry `E4`/`E7`/`E8`'s value; `0x05`…`0x1f` carry `F1`'s | **the sweep, and its own refutation is built in: all 32 lines identical and plausible means the bus is echoing and nothing was measured.** Note the arity trap — `MDIOR` takes **one** argument, the register, **base 10**, and sweeps the address itself. Its help string says otherwise. If driving this through the tool, `--timeout 45`: 32 × 10 ms of erratum delay plus 32 lines at 38400 is under a second, but a tool timeout and a hung board look identical, and **the tool timing out does not un-stick the board** |
 
 ---
@@ -279,9 +284,126 @@ operator.**
 | E6 | `UID=0x0000c880` | full identifier **`0x001CC880`** |
 | E7 | `PHYR 2 2`, `PHYR 3 2`, `PHYR 4 2` -> `1c`, `1c`, `1c` | **all three equal E4.** One PHY macro, as `PORT1`'s single table implied |
 | E8 | `PHYR 1 2` -> `1c`; `PHYR 1 3` -> `c880` | **identical to the other four.** `PORT1` skipping address 1 is about the **port**, not the PHY. One driver covers all five |
-| E9 | `00000000 007F0039 047F0039 087F0039` / `0C7F0039 107F0039 00000000 187F0038` | **the load-bearing half is exact**: `ExtPHYID` (30:26) reads 0, 1, 2, 3, 4 across `PCRP0`-`PCRP4`. The weaker half passes too -- `7F` at 22:16 on all five, the datasheet's `FrcAbi` = `11111` and `Pause` = `11`. **But `PITCR` reads `00000000`, predicted `00000001`** -- and `PCRP0` shows `EnForceMode` = 0, so **the whole strap-gated force-mode branch did not run on this board.** `P0phymode=01` is therefore *not* `PITCR` bits 1:0, and the claim that the loader names a value the datasheet calls Reserved is **withdrawn**: `PITCR` = 0 is `UTP (10/100M embedded PHY)`, which is exactly what the boot line says |
+| E9 | `00000000 007F0039 047F0039 087F0039` / `0C7F0039 107F0039 00000000 187F0038` | **the load-bearing half is exact**: `ExtPHYID` (30:26) reads 0, 1, 2, 3, 4 across `PCRP0`-`PCRP4`. The weaker half passes too -- `7F` at 22:16 on all five, the datasheet's `FrcAbi` = `11111` and `Pause` = `11`. **But `PITCR` reads `00000000`, predicted `00000001`** -- and `PCRP0` shows `EnForceMode` = 0, so **the whole strap-gated force-mode branch did not run on this board.** `P0phymode=01` is therefore *not* `PITCR` bits 1:0, and the claim that the loader names a value the datasheet calls Reserved is **withdrawn**: `PITCR` = 0 is `UTP (10/100M embedded PHY)`, which is exactly what the boot line says. 🆕 **Words 7 and 8 were read and never judged**: `0xBB804118` = `00000000` and `0xBB80411C` = `187F0038`, the second carrying `30:26` = **6**. On the `PCRP` per-port stride those are ports 5 and 6 — the stride is an inference, and no source held here names either address. Recorded 2026-08-24 while building `SPEC.md`; `NET-10` there points at this cell |
 | E10 | `000010E0 000010E0 00001099 000010E0` / `000010E0 000000E2 0000007A 0000007A` | **exactly one port with `LinkUp`: `PSRP2`.** `0x1099` = NWayEnable, LinkUp, full duplex, speed `01` = 100M. The other four read `0x10E0`, bit 4 clear. **Independently corroborated off-device**: Windows reports the far end of that same cable `Up, 100 Mbps` |
 | E11 | | pending -- needs a cable move |
 | E12 | `PHYR 2 1` -> `78ED`; `PHYR 0 1` -> `78C9`; `PHYR 2 0` -> `1100`; `PHYR 2 5` -> `C1E1` | **a paired control on one instrument, which is what E5 was supposed to give.** Linked port: `LinkStatus` = 1, `AutonegComplete` = 1. Unlinked port, same register: both **0**. Capability bits 15:11 identical on both, so the difference is link state and not a different part. `BMCR` = `1100`, autoneg enabled and full duplex, agreeing with `PCRP2`'s `EnForceMode` = 0. `ANLPAR` = `C1E1`: selector `00001` = 802.3, 10/100 half and full, **Acknowledge set and Next Page set** -- the signature of a gigabit-capable partner, which is what is in fact on the other end |
 | F1 | | pending -- the one cell that can end a visit |
 | F2 | | pending |
+
+---
+
+## Seating 2 — the cells seating 1 could not reach, plus R0
+
+**Written 2026-08-24 at the desk, from the same dump as seating 1** (`sha256
+a800059a…10f37ea`, rule 2). **Nothing here needs preparation on the day.**
+
+Seating 1 ran `§A`, `§B`, `E1`–`E12` and `C5`. What is left is `§C1`–`C4`,
+`E11`, `§F` and `§D`; this seating adds five cells to them — `C6`, `C7`, `D1b`,
+`D2b`, `D4` — and one new session, **`B3`, which is R0**.
+
+### Running order, and it is not seating 1's
+
+`§A` capture → `§C1`–`C7` → `E11` → **`§F`** → `§D` → **session `B3` (R0)**
+
+Two changes from seating 1's order, both deliberate:
+
+| change | why |
+|---|---|
+| **`§F` moves from last to the middle** | seating 1 put it last on the argument that if it hangs, nothing is left to lose. That was right when nothing was behind it. Now `§D` and `B3` are, and they are worth more — `B3` closes the active gate. `F1`'s hang is also cheaper than the sheet implies (see the note under `F1`), and the power cycle it would cost **re-establishes `D2`'s power-on baseline**, which `§D` needs anyway |
+| **`§D` before `B3`** | `§D` resets the board twice (`D1`, `D3`) and `D4` resets it a third time. `B3` ends with a kernel running and the loader gone. Resets before the thing that is not coming back |
+
+> 🔴 **Every reset puts `AUTOBURN` back to `1`.** Its initialiser in the image is
+> `1` (`0x8040D4A0`) and `B6` measured `1` on the device. `C6` proves the switch
+> works; **`B3` sends it again, after the last reset, as the operative guard.**
+> Those are two different jobs and they are two cells.
+
+### Before power is applied — the instruments, checked
+
+**Two cells have already been lost to an instrument that could not do them**:
+`A2`, because `console-dump.py catch` discards the pre-prompt stream, and `E5`,
+whose "before" reading was already in its "after" state. A cell whose instrument
+cannot produce its output is a cell that reads as done. So the instruments are
+checked before the board is, and each check has an expected output.
+
+| | check | expected | why this one |
+|---|---|---|---|
+| **P0** | `/usr/bin/python3 -c 'import serial; print(serial.__version__)'` | `3.5` | 🔴 **Measured 2026-08-24: the command this sheet names does not run in a fresh login shell.** `python3` on this host resolves to `~/.venvs/thermal/bin/python3`, which has **no** `serial` module; the apt package `python3-serial` is installed for `/usr/bin/python3`. So `python3 upstream/tools/console-dump.py …` fails with `ModuleNotFoundError` depending on invisible shell state. **Every command in this file uses `/usr/bin/python3` explicitly** |
+| **P1** | `usbipd list` on Windows, then `usbipd attach --wsl --busid <id>` for `10c4:ea60` | `/dev/ttyUSB0` exists in WSL, group `dialout` | the CP2102 is `COM3` on the Windows side and is **not** in WSL until it is attached. It is in usbipd's persisted list, so it has been bound before |
+| **P2** | `bash tools/test-console-capture.sh` | `7 passed, 0 failed` | the timing instrument `D1` and `D4` depend on. Five of its seven cases are controls that must fail; three of them **did** fail on first run, which is why they are trusted |
+| **P3** | *(R0 only)* `ip -brief addr` in WSL | an interface that is **not** `eth0` | `eth0` is WSL2's NAT'd vNIC (`172.18.x`). **A TFTP reply comes from a different source port than the request went to**, and WinNAT has no conntrack helper for that, so a transfer through the NAT can hang with the board innocent. The USB GbE adapter is in usbipd's persisted list; attach it, or run `loader-tftp.py` from Windows' own Python (3.10.7, pyserial 3.5, both present) |
+| **P4** | *(R0 only)* `sha256sum $FWRE_WORK/rebuild/r0-vendor-kernel.bin` | `396561a0565f8cf62ffd7df6b4105ae3943337ada0fdedc109eb586445a03e90` | the payload, cut from the dump at the desk. **987,138 bytes** = `0x0F1002`, the length in the image's own header |
+
+### D4 — the cell that actually measures the watchdog
+
+`D1b` says why `D1`'s interval is not the watchdog timeout. **This is the cell
+that is**, and it works by changing the experiment rather than the instrument.
+
+| | command | expected | what it refutes |
+|---|---|---|---|
+| **D4** 🆕 | **last thing before an intended reset**: `EW B800311C 240000`, then type nothing | the board resets on its own. Capture it as `D1` was captured, and take the interval to the banner | 🔴 **`OVSEL` = `1001` instead of `0000` — the longest of the ten timeouts instead of the shortest.** Raw base clock → 2²⁴ / 199.48 MHz = **84.1 ms**; through `CDBR`'s divisor of 14 → **1.177 s**. Those are 14× apart and **both are far above the timestamp floor**, where `D1`'s 164 µs and 2.30 ms were both far below it. **`D1` is this cell's control**: `D1`'s interval is boot time plus a timeout of ≈ 0, so `D4 − D1` is the timeout alone and the boot cancels. `1.17 s` → the watchdog counts the divided clock; `84 ms` → it counts the raw one; **any other power of two → the `OVSEL` field is packed differently than `D` Table 27 was read**, which the measurement identifies rather than hides. Fills `SPEC.md` `CLK-08`, whose own row names a stopwatch — and a stopwatch cannot tell 164 µs from 2.30 ms |
+
+**Why `240000`.** `OVSEL[3:0] = 1001`, split across two fields: `OVSEL[1:0]` at
+bits 22:21 gives `1 << 21`, `OVSEL[3:2]` at bits 18:17 gives `1 << 18`. `WDTE` =
+`0x00`, which is ≠ `0xA5` and therefore **enables** the watchdog; bit 20 is
+written `0`, a no-op on a write-1-to-clear bit. The marginal risk over `D1` is
+nil: both end in a watchdog reset, which is the point of both.
+
+---
+
+## Session B3 — R0: the vendor kernel booted from RAM, zero flash bytes
+
+**This is the active gate.** Everything below is read out of this unit's own
+loader or measured on it, and the mechanism has been done once on this physical
+device — upstream's `P9-12`, 2026-08-21: `J 80500000` into a 156-byte image the
+device had never seen, zero flash bytes, `AutoBurning=0` echoed in the same boot.
+**What is new here is the payload: 987,138 bytes instead of 156, and a real entry
+point instead of a marker loop.**
+
+| | |
+|---|---|
+| **Power cycles** | 0 of its own; it runs after `§D`'s last reset |
+| **Flash bytes written** | **0**, and `G2` is what makes that a measurement |
+| **RAM written** | 987,138 bytes twice: at `0x81000000`, then at `0x80500000` |
+| **New code needed** | none. `upstream/tools/loader-tftp.py` — `plan/UPSTREAM-INVENTORY.md` says 引用, not rewrite |
+| **Closes** | **R0**, and it proves the transport `R1`'s bare-metal payload will use |
+
+### The image, cut at the desk
+
+The header at flash `0x060000` is `cr6c | 80500000 | 00060000 | 000F1002` —
+**signature, `startAddr`, flash offset, length**, in that order. *(Corrected
+2026-08-24: it had been assumed to be signature/length/startAddr/checksum, and
+the two numbers R0 needs came out of the wrong words. `B3`'s measured word 4 of
+`80500000` is what the corrected reading agrees with.)*
+
+So: payload = dump `[0x060010, 0x060010 + 0x0F1002)`, **987,138 bytes**, sha256
+`396561a0…45a03e90`, landing at `0x80500000`–`0x805F1002`.
+
+### G — the sequence
+
+| | command | expected | what it refutes |
+|---|---|---|---|
+| **G1** | `DW 805F0FF0 1` and `DW 80580000 1`, **before anything is uploaded** | tail = `00000000 00000000 00000000 00000000`; middle = `9D7111B4 08ABB9AE 978855A8 E63174AD` | 🔴 **is the whole image already in RAM?** `B4` measured the first 16 bytes there, and `C-16` records that nothing yet explains how. If the tail and the middle also match the dump, **the loader has already staged all 964 KiB and `J 80500000` boots the vendor kernel from RAM with no network at all** — that is `G6`, and it becomes the reference the network path is compared against. If they do not match, only the header region was copied and `G6` is skipped |
+| **G2** | `AUTOBURN 0` via `console-dump.py rescue`, then `DW 8040D4A0 1` | `AutoBurning=0` echoed; word 1 = `00000000` | 🔴 **the operative guard, and it is `C6` repeated because `§D` reset it.** Read at exactly one instruction, `0x80401B9C`, on the upload-completion path. **If word 1 is not `00000000`, stop. Nothing is uploaded.** With autoburn on, a transfer that completes is written to flash and R0's whole claim is gone |
+| **G3** | `IPCONFIG 10.1.1.1`, workstation at `10.1.1.2/24` | `Now your Target IP is 10.1.1.1` | `IPCONFIG` gives the **loader** its own address — it synthesises its MAC from that address, so it is the board's and not the peer's. The loader answers the network only after this |
+| **G4** | `LOADADDR 81000000`, then `loader-tftp.py put --host 10.1.1.1 --file r0-vendor-kernel.bin`, then `get` it back and `cmp` | `Set TFTP Load Addr 0x81000000`; the round trip is **byte-identical** to the file | 🔴 **the transport, proved without executing anything.** `0x81000000` and not `0x80500000` **on purpose**: `G1` may have shown the real bytes already sitting at `0x80500000`, and then "the upload arrived" and "it was already there" are the same reading. The scratch region holds only what `C1`–`C7` put there. **Blind spot, and it is why `G5` exists**: `put` and `get` both serve `[0x8040D3A8]`, so a round trip cannot catch a load address that is consistently wrong. Never a filename containing `nfjrom` or `boot.img` — those two force `0x80000000` and auto-execute with nobody at the console; `loader-tftp.py` refuses them |
+| **G5** | `EW 80500000 5A5A5A5A` · `EW 80580000 5A5A5A5A` · `EW 805F0FF0 5A5A5A5A`, then `LOADADDR 80500000`, then `put` again, then `DW` all three | after poisoning, `5A5A5A5A` at each; after the upload, `00000000` / `9D7111B4` / `00000000` — the dump's own bytes back | **that the upload landed where it was told**, which `G4` structurally cannot test. Three points spread across 964 KiB. Poisoning first is what makes a match mean anything: `G1` may have left the correct bytes there, and an unpoisoned re-read would pass whether or not anything arrived |
+| **G6** | *(only if `G1` matched)* `console-capture.py capture --send 'J 80500000' --seconds 60` | `---Jump to address=80500000`, then the vendor kernel's boot output | **the reference boot, from bytes the loader staged.** Run this *before* `G2`–`G5`, because it costs a power cycle to get back to the prompt and it is what makes every later comparison a comparison |
+| **G7** | `J 80500000` after `G5`, captured the same way | the same output as `G6`, **line for line to the first shell prompt** | 🔴 **R0 closes here.** The payload came over the wire this time. **`G6` is the positive control and that is the whole design**: the question is not "did a kernel boot" but "did the network path deliver the same bytes", and a difference is a transport fault caught against a reference produced twenty minutes earlier on the same board. Without `G6`, a successful boot proves only that *some* image booted |
+| **G8** | after `G7`: `DW 8040D4A0 1`, and re-read flash `0x000000` and `0x060000` through `FLR` + `DW` | `00000000`; the loader head and the `cr6c` header unchanged | **that nothing was written.** `G7` matching `G6` says the RAM path worked; it says nothing about flash. Three arguments, as `P9-12` used: the echo, the one-instruction read of `0x8040D4A0`, and the bytes themselves |
+
+### What `B3` cannot tell you, stated before it runs
+
+Upstream's `P9-12` wrote a three-outcome table for a `J` — banner repeats, only
+the jump line, nothing at all — **and what happened was the fourth**: the banner
+appeared and was cut at the same character every iteration, because a payload a
+simulator had approved sat an `andi` in a load delay slot. So:
+
+- **partial output is a fourth outcome, not a failure of `G7`.** The image here is
+  the vendor's, so a delay-slot bug inside it is not on the table — but any
+  output that stops mid-line is recorded as its own row rather than squeezed into
+  one of three.
+- **silence after `---Jump to address=` cannot separate "jumped and the target was
+  silent" from "never jumped."** The vendor kernel has a great deal to say, so
+  silence would be informative; it is still two causes and not one.
+- **`G7` says nothing about flash.** `G2` and `G8` are what do.

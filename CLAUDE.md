@@ -18,6 +18,7 @@ released source.
 | **`plan/`**       | gitignored, always present locally. Index: `plan/README.md`.  Whole plan: `plan/.md`                                        |
 | **`upstream/`**   | the RE project, submodule pinned at `4d3ff26`, **read-only** — that pin is the whole credibility of R9's differential proof |
 | **`$FWRE_WORK`**  | `/home/key/fwre-work` — every binary, shared with `../router`. This project's output goes in `$FWRE_WORK/rebuild/`          |
+| **`SPEC.md`**     | every number this project holds about the device — part numbers, register readings, addresses, budgets — each with a mark for where the **value** came from and a separate mark for where its **name** came from, and a link to the file that owns the finding. **An index, not an owner**: a finding or a correction lands in the owning file first and in `SPEC.md` in the same commit. Written in Chinese |
 
 **A gate is not a session.** R6 is 35 work-segments, about a month. A session is
 one step inside a gate. When I say "do R5", ask which driver.
@@ -90,8 +91,12 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 artefact it was measured on, stop. No résumé bullets, no "this proves I can X".
 `plan/` is gitignored and may address me directly; committed files may not.
 
-English, except the working log. Commit messages say *why* — the diff says what.
+English, except the working log and `SPEC.md`. Commit messages say *why* — the
+diff says what.
 
 **Before you stop**: update `PROGRESS.md` § Now, and append a dated entry to
 `LOG.md` (create it on the first session) — **including desk-only days**, because
-a desk-only day is exactly when the next bench visit's plan changes.
+a desk-only day is exactly when the next bench visit's plan changes. **If the
+session produced, changed or refuted a number, `SPEC.md` changes in the same
+commit** — a spec table that lags the finding is worse than no table, because it
+reads as current.
