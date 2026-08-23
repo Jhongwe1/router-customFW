@@ -66,7 +66,22 @@ BLANK_RX = re.compile(r'留白|未定|未讀')          # open -- section 17 owe
 NOTAVALUE_RX = re.compile(r'§18|選定')            # withheld, or chosen rather than measured
 
 # Backticked tokens that look like a path into this repository.
-PATH_RX = re.compile(r'`([^`]*?(?:/[^`]*)?\.(?:md|json|py|sh))`')
+#
+# Two shapes, and the second was added 2026-08-24 because the first could not
+# see `tools/hazlint`.  A program in this repo does not have to carry a suffix
+# -- `tools/hazlint` does not, and `tools/rlxprobe/` will not either -- and a
+# row whose owner is such a file was being counted as "owner is a gate or a
+# note rather than a file" and skipped by C4 and C5 alike.  **That is a check
+# quietly not checking**, which is the failure this file exists to catch, so it
+# was found by a row rather than by a control and that is recorded here.
+#
+#   1. anything ending in a known source suffix, with or without directories
+#   2. a slash-separated path whose last segment carries no dot at all
+#
+# Shape 2 deliberately requires a slash: a bare backticked word is far more
+# often a register or a command name than a file.
+PATH_RX = re.compile(r'`([^`]*?(?:/[^`]*)?\.(?:md|json|py|sh))`'
+                     r'|`((?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_-]+)`')
 
 # Literals worth chasing into an owner file.
 LIT_RXS = (
@@ -202,7 +217,8 @@ def normalise(blob):
 
 
 def owner_paths(cell):
-    return PATH_RX.findall(cell)
+    """PATH_RX has two alternatives, so findall gives pairs; keep whichever fired."""
+    return [a or b for a, b in PATH_RX.findall(cell)]
 
 
 def load_audit_patterns():

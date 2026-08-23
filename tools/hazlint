@@ -1,0 +1,1204 @@
+#!/usr/bin/env python3
+"""hazlint -- refuse a payload that reads a register in the load delay slot.
+
+Why this scans a binary, and not a `.s` file
+--------------------------------------------
+The failure this exists to stop has happened once, on this silicon, and it is
+on the record: upstream's `P9-12`, 2026-08-21 (`upstream/PROGRESS.md:6270`,
+`upstream/RUNBOOK.md:4003`, `upstream/BENCH-LOG.md:4460` `T-89`/`T-90`).
+
+A payload jumped, ran, and printed exactly 16 bytes per iteration for ten
+minutes.  `andi t2,t2,0x60` sat in the load delay slot of `lbu t2,0(t1)` and
+therefore masked the PREVIOUS line-status reading, which is permanently
+non-zero after the first character.  The wait loop never waited, 41 bytes went
+out back to back, the 16550's 16-deep transmit FIFO took 16 and dropped 25 --
+the nonce among them.
+
+**The delay slot was filled.  It was filled with the wrong instruction.**
+
+That is the whole design argument for this tool:
+
+  * A checker that asks "is the delay slot empty" passes that payload.
+  * A checker that reads `.s` files never sees that payload at all, because it
+    came out of an encoder in `tools/mkramboot.py`, not out of an assembler.
+  * `mkramboot.py` DID simulate every build, and it certified this one.  It
+    models a core with load interlocks.  This one has none.  A model kinder
+    than the device certifies exactly the bugs the device will reject.
+
+So the check is: **for every load, does an instruction that can execute next
+read the register that was loaded.**
+
+What it checks
+--------------
+Main check (default).  A linear scan over 4-byte aligned big-endian words.
+
+  * A **load** is a MIPS-I load that writes a general register --
+    `lb lbu lh lhu lw lwl lwr` -- whose `rt` is not `$zero`.
+  * A **violation** is any instruction that can be the next one executed and
+    that reads that `rt` as a general-register source.
+  * `lwl`/`lwr` immediately followed by the matching `lwr`/`lwl` on the same
+    `rt` is exempt.  MIPS-I defines that pair as the unaligned-access idiom and
+    exempts it by name.  (Whether this Lexra core implements those four
+    instructions at all is `C-7`/`F51`, still open -- the `--isa` mode is what
+    reports them.)
+  * If the load sits in a **delay slot**, the next instruction executed is the
+    branch target, not the next word.  This tool computes the target for
+    `j`/`jal`/`b`/`bal` and checks both legs of a conditional branch.  For
+    `jr`/`jalr`, and for a target outside the scanned range, it reports
+    `unresolved` rather than silently checking the wrong word.  Measured on
+    `stage2.bin`: **0 loads sit in any delay slot**, so this path does not
+    touch the population control -- it exists for hand-written asm.
+
+Subsidiary check, `--isa`.  ISA-level conformance: every instruction outside
+what this core is known to implement, with the code/data boundary given by the
+caller and the hex plus ASCII of every hit printed beside it.  Retained from
+this item's fourth revision; the fifth moved the weight to the main check.
+
+What it cannot do, stated so a clean result is not read as more than it is
+------------------------------------------------------------------------
+  * A linear scan decodes data as code.  It is a **superset** of the
+    instruction stream: it can count data as code but it cannot miss an
+    instruction.  So a **zero is rigorous and a non-zero needs adjudication**,
+    which is why every hit prints its word and its ASCII.
+  * It models the load-use hazard only.  `mflo`/`mfhi` after `mult`/`div`, and
+    the `mtc0` hazards, are `C-9`/`F47` and the rules for them are NOT
+    established on this core.  `--survey` counts those shapes and refuses to
+    call them violations, because a verdict without a rule is a guess wearing a
+    number.
+  * It says nothing about whether an instruction is REACHABLE.  A violation in
+    dead code is still reported; that is the safe direction.
+  * It cannot tell you the core's hazard rule.  It assumes the rule that
+    `stage2.bin` demonstrates the vendor's own compiler obeying, and `R1`
+    settles it on silicon.
+
+The controls, and why a clean run means something
+-------------------------------------------------
+Every invocation runs the controls first and **refuses to report if any of them
+fails**.  `--self-test` runs them and nothing else.
+
+  K1  decoder cases.  Hand-encoded (load, next) pairs with an expected verdict:
+      cases that MUST fire and near-misses that MUST NOT.
+  K2  negative control: upstream's own broken payload, the 148-byte `P9-12` v1.
+      It is not a hand-written fixture -- it is the image that failed on this
+      physical device.  Expected: **2 violations**, at file offsets `0x1c` and
+      `0x2c`.
+  K3  differential positive control: the same payload with the fix, 156 bytes.
+      Expected: 2 loads, 2 `nop`s, **0 violations**.  K2 and K3 differ by two
+      `nop`s and nothing else, and this tool asserts that too -- so the pair is
+      a single-variable experiment on the checker itself.
+  K4  **population control**: `stage2.bin`, the loader's own second stage.
+      Expected: **1,474 loads / 646 followed by `nop` / 0 violations.**
+      This is the control that answers the question a zero cannot:
+      **a tool that is not looking reports 0 loads, not 0 violations.**
+      If `stage2.bin` cannot be found, this tool REFUSES to certify anything:
+      `--no-population-control` lets you look at a file anyway, but the exit
+      code is then 2 whatever the file says, so no build gate can pass on it.
+  K5  endianness and alignment: the K2 fixture read little-endian, and read
+      from a 2-byte offset, must NOT reproduce K2's answer.  A scanner that
+      ignored either would still be a scanner -- it would just be wrong.
+  K6  ISA conformance (`--isa` and `--self-test`): `stage2.bin`'s code region
+      `[0x80400000, 0x8040A000)` must give **exactly 18** hits -- `movz` x 12,
+      `movn` x 6 -- at the addresses `docs/loader-command-semantics.md` §9
+      lists one by one, and the data region must reproduce the two false
+      positives that document names by address.
+
+Using it as a gate, which is the half that matters tomorrow
+-----------------------------------------------------------
+`P9-12`'s own conclusion was that catching it once is layer one and layer two
+is what stops the next payload.  So the exit code is the product:
+
+    0  clean, and every control held
+    1  at least one violation, or a successor that could not be resolved
+    2  refused: a control failed, the population control did not run, or the
+       scan found no loads at all
+    3  usage error
+
+`rlxprobe`'s build must run this on the linked payload and stop on anything but
+0.  Not a lint whose output someone reads: a gate that fails the build.
+
+Usage
+    tools/hazlint FILE [--base ADDR] [--range LO:HI] [--raw] [--section NAME]
+                       [--survey] [--max-report N]
+                       [--stage2 PATH] [--no-population-control]
+                       [--allow-zero-loads]
+    tools/hazlint --isa FILE [--code-range LO:HI] [--loose] [--base ADDR] ...
+    tools/hazlint --self-test
+"""
+
+import hashlib
+import os
+import struct
+import sys
+
+VERSION = "1.0"
+
+# --------------------------------------------------------------------------
+# The instruction model
+# --------------------------------------------------------------------------
+
+REGS = ('zero', 'at', 'v0', 'v1', 'a0', 'a1', 'a2', 'a3',
+        't0', 't1', 't2', 't3', 't4', 't5', 't6', 't7',
+        's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7',
+        't8', 't9', 'k0', 'k1', 'gp', 'sp', 's8', 'ra')
+
+# A load, here, is a MIPS-I load that writes a general register.
+#
+# `ll` (0x30), `lwc1` (0x31) and `ldc1` (0x35) are deliberately NOT on this
+# list.  This is a Lexra-family MIPS-I core: `ll` is MIPS-II and the two
+# coprocessor loads need an FPU that is not there.  The decision is checkable
+# rather than a matter of taste -- the one word in `stage2.bin` that decodes as
+# `ll` is at `0x8040AB14` and is `c0a80001`, which is `192.168.0.1`, and the
+# one that decodes as `lwr` is at `0x8040D760` in the same table region.  Both
+# are named as data in `docs/loader-command-semantics.md` §9, so both fall out
+# of the population control for a stated reason rather than by being subtracted
+# afterwards to make a number come out.
+LOADS = {0x20: 'lb', 0x21: 'lh', 0x22: 'lwl', 0x23: 'lw',
+         0x24: 'lbu', 0x25: 'lhu', 0x26: 'lwr'}
+MERGING = (0x22, 0x26)          # lwl / lwr: rt is a source as well as a target
+
+
+def rs_of(w):
+    return (w >> 21) & 0x1F
+
+
+def rt_of(w):
+    return (w >> 16) & 0x1F
+
+
+def rd_of(w):
+    return (w >> 11) & 0x1F
+
+
+def sa_of(w):
+    return (w >> 6) & 0x1F
+
+
+def simm(w):
+    v = w & 0xFFFF
+    return v - 0x10000 if v & 0x8000 else v
+
+
+def load_of(w):
+    """(mnemonic, rt) if w is a load that writes a general register, else None."""
+    op = w >> 26
+    if op in LOADS and rt_of(w) != 0:
+        return (LOADS[op], rt_of(w))
+    return None
+
+
+def reads(w):
+    """The set of general registers this instruction reads.
+
+    Conservative in the direction of reporting: an encoding this table does not
+    recognise is assumed to read `rs`, `rt` and `rd`.  A checker that guessed
+    the other way would be a model kinder than the device, which is the exact
+    thing `P9-12` was.
+    """
+    op = w >> 26
+    rs, rt, rd, f = rs_of(w), rt_of(w), rd_of(w), w & 0x3F
+
+    if op == 0x00:                                  # SPECIAL
+        if f in (0x00, 0x02, 0x03):                 # sll srl sra
+            return {rt}
+        if f in (0x04, 0x06, 0x07):                 # sllv srlv srav
+            return {rs, rt}
+        if f in (0x08, 0x09):                       # jr jalr
+            return {rs}
+        if f in (0x0C, 0x0D):                       # syscall break
+            return set()
+        if f == 0x0F:                               # sync (MIPS-II)
+            return set()
+        if f in (0x0A, 0x0B):                       # movz movn (MIPS-IV)
+            # rd is architecturally preserved rather than read, but a checker
+            # that assumed so would be assuming.  Counted as read.
+            return {rs, rt, rd}
+        if f in (0x10, 0x12):                       # mfhi mflo
+            return set()
+        if f in (0x11, 0x13):                       # mthi mtlo
+            return {rs}
+        if f in (0x18, 0x19, 0x1A, 0x1B):           # mult multu div divu
+            return {rs, rt}
+        if 0x20 <= f <= 0x2B:                       # add .. sltu
+            return {rs, rt}
+        if 0x30 <= f <= 0x36:                       # traps (MIPS-II)
+            return {rs, rt}
+        return {rs, rt, rd}                         # unknown SPECIAL
+
+    if op == 0x01:                                  # REGIMM: bltz bgez ...
+        return {rs}
+    if op in (0x02, 0x03):                          # j jal
+        return set()
+    if op in (0x04, 0x05, 0x14, 0x15):              # beq bne beql bnel
+        return {rs, rt}
+    if op in (0x06, 0x07, 0x16, 0x17):              # blez bgtz blezl bgtzl
+        return {rs}
+    if 0x08 <= op <= 0x0E:                          # addi .. xori
+        return {rs}
+    if op == 0x0F:                                  # lui
+        return set()
+    if op in (0x10, 0x11, 0x12):                    # COP0 COP1 COP2
+        # MT/CT move a general register INTO the coprocessor, so they read rt;
+        # MF/CF write rt.  Any other rs -- and this loader has four words at
+        # 0x80400C40..0x80400C7C with rs = 3, which no source held here names --
+        # is treated as reading rt, which is the reporting direction.
+        return set() if rs in (0x00, 0x01, 0x02, 0x08) else {rt}
+    if op == 0x13:                                  # COP1X (MIPS-IV)
+        return {rs, rt}
+    if op in LOADS or op in (0x30, 0x31, 0x33, 0x35, 0x2F):
+        return {rs}                                 # loads, ll, pref, cache
+    if op in (0x28, 0x29, 0x2A, 0x2B, 0x2E, 0x38):  # sb sh swl sw swr sc
+        return {rs, rt}
+    if op in (0x39, 0x3D):                          # swc1 sdc1
+        return {rs}
+    if op in (0x1C, 0x1F):                          # SPECIAL2 SPECIAL3
+        return {rs, rt}
+    if op == 0x1D:                                  # jalx
+        return set()
+    return {rs, rt}                                 # unknown primary opcode
+
+
+def control_flow(w, addr):
+    """(kind, target) for a branch or jump at `addr`, else (None, None).
+
+    kind is 'uncond' when the delay slot's successor is the target alone, and
+    'cond' when it is either the target or the fall-through.  `bal` and
+    `bgez $0` are always taken and are classified 'uncond' for that reason.
+    """
+    op = w >> 26
+    rs, rt = rs_of(w), rt_of(w)
+    tgt = addr + 4 + simm(w) * 4
+
+    if op in (0x02, 0x03):                          # j jal
+        return ('uncond', ((addr + 4) & 0xF0000000) | ((w & 0x03FFFFFF) << 2))
+    if op == 0x00 and (w & 0x3F) in (0x08, 0x09):   # jr jalr
+        return ('uncond', None)
+    if op == 0x04 and rs == 0 and rt == 0:          # b == beq $0,$0
+        return ('uncond', tgt)
+    if op == 0x01 and rt in (0x01, 0x11) and rs == 0:   # bgez/bal on $zero
+        return ('uncond', tgt)
+    if op in (0x04, 0x05, 0x06, 0x07):              # beq bne blez bgtz
+        return ('cond', tgt)
+    if op in (0x14, 0x15, 0x16, 0x17):              # branch-likely (MIPS-II)
+        return ('cond', tgt)
+    if op == 0x01 and rt in (0x00, 0x01, 0x10, 0x11):
+        return ('cond', tgt)
+    return (None, None)
+
+
+# --------------------------------------------------------------------------
+# Just enough disassembly to print evidence beside a verdict
+# --------------------------------------------------------------------------
+
+def text(w):
+    """A readable rendering, or `.word 0x...` when this decoder is not sure.
+
+    Deliberately partial.  Its job is to let a reader overturn a verdict, not
+    to be a disassembler; anything it does not recognise says so.
+    """
+    op = w >> 26
+    rs, rt, rd, sa, f = rs_of(w), rt_of(w), rd_of(w), sa_of(w), w & 0x3F
+    R = REGS
+    if w == 0:
+        return 'nop'
+    if op in LOADS:
+        return '%-5s %s,%d(%s)' % (LOADS[op], R[rt], simm(w), R[rs])
+    if op in (0x28, 0x29, 0x2A, 0x2B, 0x2E):
+        return '%-5s %s,%d(%s)' % ({0x28: 'sb', 0x29: 'sh', 0x2A: 'swl',
+                                    0x2B: 'sw', 0x2E: 'swr'}[op],
+                                   R[rt], simm(w), R[rs])
+    if op == 0x00:
+        n = {0x00: 'sll', 0x02: 'srl', 0x03: 'sra'}.get(f)
+        if n:
+            return '%-5s %s,%s,%d' % (n, R[rd], R[rt], sa)
+        n = {0x04: 'sllv', 0x06: 'srlv', 0x07: 'srav'}.get(f)
+        if n:
+            return '%-5s %s,%s,%s' % (n, R[rd], R[rt], R[rs])
+        if f == 0x08:
+            return 'jr    %s' % R[rs]
+        if f == 0x09:
+            return 'jalr  %s,%s' % (R[rd], R[rs])
+        n = {0x10: 'mfhi', 0x12: 'mflo'}.get(f)
+        if n:
+            return '%-5s %s' % (n, R[rd])
+        n = {0x11: 'mthi', 0x13: 'mtlo'}.get(f)
+        if n:
+            return '%-5s %s' % (n, R[rs])
+        n = {0x18: 'mult', 0x19: 'multu', 0x1A: 'div', 0x1B: 'divu'}.get(f)
+        if n:
+            return '%-5s %s,%s' % (n, R[rs], R[rt])
+        n = {0x20: 'add', 0x21: 'addu', 0x22: 'sub', 0x23: 'subu', 0x24: 'and',
+             0x25: 'or', 0x26: 'xor', 0x27: 'nor', 0x2A: 'slt',
+             0x2B: 'sltu'}.get(f)
+        if n:
+            return '%-5s %s,%s,%s' % (n, R[rd], R[rs], R[rt])
+        n = {0x0A: 'movz', 0x0B: 'movn'}.get(f)
+        if n:
+            return '%-5s %s,%s,%s' % (n, R[rd], R[rs], R[rt])
+        if f == 0x0F:
+            return 'sync'
+        return '.word 0x%08x' % w
+    if op == 0x01:
+        n = {0x00: 'bltz', 0x01: 'bgez', 0x10: 'bltzal', 0x11: 'bgezal'}.get(rt)
+        if n:
+            return '%-5s %s,%+d' % (n, R[rs], simm(w) * 4)
+        return '.word 0x%08x' % w
+    if op in (0x02, 0x03):
+        return '%-5s 0x%07x' % (('j', 'jal')[op - 2], (w & 0x03FFFFFF) << 2)
+    if op in (0x04, 0x05):
+        return '%-5s %s,%s,%+d' % (('beq', 'bne')[op - 4], R[rs], R[rt],
+                                   simm(w) * 4)
+    if op in (0x06, 0x07):
+        return '%-5s %s,%+d' % (('blez', 'bgtz')[op - 6], R[rs], simm(w) * 4)
+    if 0x08 <= op <= 0x0E:
+        n = {0x08: 'addi', 0x09: 'addiu', 0x0A: 'slti', 0x0B: 'sltiu',
+             0x0C: 'andi', 0x0D: 'ori', 0x0E: 'xori'}[op]
+        v = simm(w) if op in (0x08, 0x09, 0x0A, 0x0B) else (w & 0xFFFF)
+        return '%-5s %s,%s,%s' % (n, R[rt], R[rs],
+                                  ('0x%x' % v) if v >= 0 else str(v))
+    if op == 0x0F:
+        return 'lui   %s,0x%x' % (R[rt], w & 0xFFFF)
+    if op == 0x10:
+        if rs == 0x00:
+            return 'mfc0  %s,$%d' % (R[rt], rd)
+        if rs == 0x04:
+            return 'mtc0  %s,$%d' % (R[rt], rd)
+        return '.word 0x%08x  (COP0 rs=%d, unnamed by any source held here)' \
+            % (w, rs)
+    return '.word 0x%08x' % w
+
+
+def ascii_of(w):
+    b = struct.pack('>I', w)
+    return ''.join(chr(c) if 0x20 <= c < 0x7F else '.' for c in bytearray(b))
+
+
+# --------------------------------------------------------------------------
+# The scan
+# --------------------------------------------------------------------------
+
+class Result(object):
+    def __init__(self):
+        self.words = 0
+        self.loads = 0
+        self.nop_after = 0
+        self.violations = []      # (vaddr, foff, mnem, rt, saddr, sword, why, lw)
+        self.unresolved = []      # (vaddr, foff, reason)
+
+
+def successors(words, idx, i):
+    """([(index, why)], [unresolved reason]) for what executes after words[i]."""
+    out, unres = [], []
+    kind, tgt = (None, None)
+    if i > 0:
+        kind, tgt = control_flow(words[i - 1][1], words[i - 1][0])
+
+    if kind is None:
+        if i + 1 < len(words):
+            out.append((i + 1, 'next word'))
+        else:
+            unres.append('the load is the last word in the scanned range; its '
+                         'successor is not in this file')
+        return out, unres
+
+    if kind == 'uncond':
+        if tgt is None:
+            unres.append('the load is in the delay slot of a register jump at '
+                         '0x%08x; the successor is not statically known'
+                         % words[i - 1][0])
+        elif tgt in idx:
+            out.append((idx[tgt], 'jump target of 0x%08x' % words[i - 1][0]))
+        else:
+            unres.append('the load is in the delay slot of a jump at 0x%08x to '
+                         '0x%08x, outside the scanned range'
+                         % (words[i - 1][0], tgt))
+        return out, unres
+
+    # Conditional: either leg can be the next instruction, so both are checked.
+    if tgt in idx:
+        out.append((idx[tgt], 'taken leg of 0x%08x' % words[i - 1][0]))
+    else:
+        unres.append('the load is in the delay slot of the branch at 0x%08x '
+                     'whose taken leg 0x%08x is outside the scanned range'
+                     % (words[i - 1][0], tgt))
+    if i + 1 < len(words):
+        out.append((i + 1, 'not-taken leg of 0x%08x' % words[i - 1][0]))
+    else:
+        unres.append('the not-taken leg of the branch at 0x%08x is outside the '
+                     'scanned range' % words[i - 1][0])
+    return out, unres
+
+
+def scan(words, base_off=0):
+    """words is [(vaddr, word)], ascending, 4-byte aligned."""
+    r = Result()
+    r.words = len(words)
+    idx = {}
+    for i, aw in enumerate(words):
+        idx[aw[0]] = i
+
+    for i, (a, w) in enumerate(words):
+        ld = load_of(w)
+        if ld is None:
+            continue
+        mnem, rt = ld
+        r.loads += 1
+        # "followed by an explicit nop" is a statement about the NEXT WORD, and
+        # that is what the 646 in the population control counts.
+        if i + 1 < len(words) and words[i + 1][1] == 0:
+            r.nop_after += 1
+
+        succ, unres = successors(words, idx, i)
+        for reason in unres:
+            r.unresolved.append((a, base_off + i * 4, reason))
+        for j, why in succ:
+            w2 = words[j][1]
+            # MIPS-I exempts the unaligned pair by name: lwl then lwr, or the
+            # reverse, on the same rt is the defined idiom and not a hazard.
+            if (w >> 26) in MERGING and (w2 >> 26) in MERGING \
+                    and rt_of(w2) == rt and (w2 >> 26) != (w >> 26):
+                continue
+            if rt in reads(w2):
+                r.violations.append((a, base_off + i * 4, mnem, rt,
+                                     words[j][0], w2, why, w))
+    return r
+
+
+def survey(words):
+    """Hazard shapes this tool has NO rule for.  Counts, never verdicts.
+
+    `C-9`/`F47` -- stores, `mflo`/`mfhi`, `mfc0`/`mtc0` -- is open and `R1b`
+    owns it.  Printing a count is worth more than silence, because the shapes
+    are what R1b goes and measures.  Calling any of them a violation would be a
+    verdict without a rule.
+    """
+    out = {'mult/div then mfhi/mflo': [], 'mtc0 then mfc0': [],
+           'a load sitting in a delay slot': []}
+    for i in range(len(words) - 1):
+        a, w = words[i]
+        n = words[i + 1][1]
+        op, f = w >> 26, w & 0x3F
+        nop_, nf = n >> 26, n & 0x3F
+        if op == 0 and f in (0x18, 0x19, 0x1A, 0x1B) \
+                and nop_ == 0 and nf in (0x10, 0x12):
+            out['mult/div then mfhi/mflo'].append(a)
+        if op == 0x10 and rs_of(w) == 0x04 and nop_ == 0x10 and rs_of(n) == 0x00:
+            out['mtc0 then mfc0'].append(a)
+        if load_of(n) and control_flow(w, a)[0] is not None:
+            out['a load sitting in a delay slot'].append(words[i + 1][0])
+    return out
+
+
+# --------------------------------------------------------------------------
+# ISA-level conformance -- the fourth check, kept as a subsidiary
+# --------------------------------------------------------------------------
+#
+# The watch list is "what this core is not known to implement", which is two
+# different things and both belong on it:
+#
+#   * the four MIPS-I unaligned load/stores, because a Lexra core is MIPS-I
+#     MINUS those -- `C-7`/`F51` owns that question and it is still open;
+#   * everything above MIPS-I.
+#
+# `strict` requires the word to decode to a VALID instruction: the fields an
+# encoding fixes at zero must be zero.  `loose` looks only at opcode and funct.
+# Both are offered and both counts are printed, because the gap between them is
+# the whole lesson of this fixture.  `0x0000004b` in the loader's SPI chip
+# table is `movn` to a loose reader and is not an instruction at all to a
+# strict one.  **A count quoted without naming its classifier is not a
+# measurement**, and that is a claim this tool can demonstrate rather than
+# assert -- see K6c.
+
+ISA_TRAPS = {0x30: 'tge', 0x31: 'tgeu', 0x32: 'tlt', 0x33: 'tltu',
+             0x34: 'teq', 0x36: 'tne'}
+ISA_OPS = {0x22: ('lwl', 'MIPS-I unaligned'), 0x26: ('lwr', 'MIPS-I unaligned'),
+           0x2A: ('swl', 'MIPS-I unaligned'), 0x2E: ('swr', 'MIPS-I unaligned'),
+           0x14: ('beql', 'MIPS-II'), 0x15: ('bnel', 'MIPS-II'),
+           0x16: ('blezl', 'MIPS-II'), 0x17: ('bgtzl', 'MIPS-II'),
+           0x2F: ('cache', 'MIPS-II'), 0x30: ('ll', 'MIPS-II'),
+           0x38: ('sc', 'MIPS-II'), 0x33: ('pref', 'MIPS-IV'),
+           0x13: ('COP1X', 'MIPS-IV'), 0x1C: ('SPECIAL2', 'MIPS32'),
+           0x1F: ('SPECIAL3', 'MIPS32r2'), 0x1D: ('jalx', 'MIPS16'),
+           0x11: ('COP1', 'FPU'), 0x31: ('lwc1', 'FPU'),
+           0x35: ('ldc1', 'FPU'), 0x39: ('swc1', 'FPU'), 0x3D: ('sdc1', 'FPU')}
+ISA_S2 = {0x00: 'madd', 0x01: 'maddu', 0x02: 'mul', 0x04: 'msub',
+          0x05: 'msubu', 0x20: 'clz', 0x21: 'clo', 0x3F: 'sdbbp'}
+
+
+def isa_hit(w, strict):
+    """(mnemonic, level) if w is outside this core's known ISA, else None."""
+    op = w >> 26
+    rs, rt, rd, sa, f = rs_of(w), rt_of(w), rd_of(w), sa_of(w), w & 0x3F
+
+    if op == 0x00:
+        if w == 0:
+            return None
+        if f in (0x0A, 0x0B):
+            if strict and sa != 0:
+                return None
+            return (('movz', 'movn')[f - 0x0A], 'MIPS-IV')
+        if f == 0x0F:
+            if strict and (rs or rt or rd):
+                return None
+            return ('sync', 'MIPS-II')
+        if f in ISA_TRAPS:
+            return (ISA_TRAPS[f], 'MIPS-II')
+        return None
+
+    if op == 0x1C:
+        if not strict:
+            return ('SPECIAL2/%s' % ISA_S2.get(f, '0x%02x' % f), 'MIPS32')
+        if f in (0x00, 0x01, 0x04, 0x05) and rd == 0 and sa == 0:
+            return (ISA_S2[f], 'MIPS32')
+        if f == 0x02 and sa == 0:
+            return ('mul', 'MIPS32')
+        if f in (0x20, 0x21) and rt == rd and sa == 0:
+            return (ISA_S2[f], 'MIPS32')
+        if f == 0x3F:
+            return ('sdbbp', 'MIPS32')
+        return None
+
+    if op == 0x1F:
+        if not strict:
+            return ('SPECIAL3/0x%02x' % f, 'MIPS32r2')
+        if f in (0x00, 0x01, 0x02, 0x03, 0x04, 0x06, 0x07):
+            return ('ext/ins', 'MIPS32r2')
+        if f == 0x20 and rs == 0:
+            return ('bshfl', 'MIPS32r2')
+        if f == 0x3B and (w & 0x07C0) == 0:
+            return ('rdhwr', 'MIPS32r2')
+        return None
+
+    if op == 0x11:
+        if not strict:
+            return ('COP1', 'FPU')
+        if rs in (0x00, 0x02, 0x04, 0x06) and (w & 0x07FF) == 0:
+            return ({0: 'mfc1', 2: 'cfc1', 4: 'mtc1', 6: 'ctc1'}[rs], 'FPU')
+        if rs == 0x08 and rt in (0, 1, 2, 3):
+            return ('bc1', 'FPU')
+        if rs in (0x10, 0x11, 0x14) and f in (0x00, 0x01, 0x02, 0x03, 0x04,
+                                              0x05, 0x06, 0x07, 0x0C, 0x0D,
+                                              0x20, 0x21, 0x24, 0x30, 0x32,
+                                              0x3C, 0x3E):
+            return ('cop1.fmt', 'FPU')
+        return None
+
+    if op == 0x13:
+        if not strict:
+            return ('COP1X', 'MIPS-IV')
+        if f in (0x00, 0x01, 0x08, 0x09, 0x20, 0x21, 0x28, 0x29, 0x2C, 0x2D,
+                 0x2E, 0x2F, 0x30, 0x31, 0x38, 0x39):
+            return ('COP1X', 'MIPS-IV')
+        return None
+
+    if op in (0x16, 0x17) and strict and rt != 0:
+        return None
+
+    if op in ISA_OPS:
+        return ISA_OPS[op]
+    return None
+
+
+def isa_scan(words, strict):
+    out = []
+    for a, w in words:
+        h = isa_hit(w, strict)
+        if h:
+            out.append((a, w, h[0], h[1]))
+    return out
+
+
+# --------------------------------------------------------------------------
+# Getting words out of a file
+# --------------------------------------------------------------------------
+
+def die(msg):
+    sys.stderr.write('hazlint: %s\n' % msg)
+    sys.exit(3)
+
+
+def elf_ranges(b, want_section=None):
+    """[(file_offset, size, vaddr, name)] for the executable parts of an ELF32 BE.
+
+    Program headers for an executable -- a stripped image still has to be
+    loadable.  Section headers for a relocatable `.o`, which has no segments at
+    all; that is the case `rlxprobe`'s build hands this tool.
+    """
+    if b[:4] != b'\x7fELF':
+        return None
+    cls, data = bytearray(b[4:6])
+    if cls != 1 or data != 2:
+        die('not a 32-bit big-endian ELF. This project is big-endian only, and '
+            'a little-endian object here is a toolchain fault rather than a '
+            'file to scan')
+    e_type, e_machine = struct.unpack_from('>HH', b, 0x10)
+    if e_machine != 8:
+        die('ELF e_machine is %d, not 8 (EM_MIPS)' % e_machine)
+
+    out = []
+    if e_type in (2, 3):                       # ET_EXEC, ET_DYN
+        phoff, = struct.unpack_from('>I', b, 0x1C)
+        phentsize, phnum = struct.unpack_from('>HH', b, 0x2A)
+        for i in range(phnum):
+            o = phoff + i * phentsize
+            p_type, p_off, p_vaddr, _, p_filesz, _, p_flags, _ = \
+                struct.unpack_from('>8I', b, o)
+            if p_type == 1 and (p_flags & 1):  # PT_LOAD, PF_X
+                out.append((p_off, p_filesz, p_vaddr, 'PT_LOAD#%d' % i))
+        if not out:
+            die('no executable PT_LOAD segment in this ELF -- there is nothing '
+                'to scan, and a tool that scanned nothing would report 0 '
+                'violations')
+        return out
+
+    # ET_REL and anything else: executable sections.
+    shoff, = struct.unpack_from('>I', b, 0x20)
+    shentsize, shnum, shstrndx = struct.unpack_from('>HHH', b, 0x2E)
+    if shoff == 0 or shnum == 0:
+        die('this ELF has neither an executable segment nor section headers')
+    stroff, = struct.unpack_from('>I', b, shoff + shstrndx * shentsize + 0x10)
+    for i in range(shnum):
+        o = shoff + i * shentsize
+        sh_name, sh_type, sh_flags, sh_addr, sh_off, sh_size = \
+            struct.unpack_from('>6I', b, o)
+        end = b.index(b'\0', stroff + sh_name)
+        name = b[stroff + sh_name:end].decode('ascii', 'replace')
+        if want_section is not None:
+            if name != want_section:
+                continue
+        elif not (sh_type == 1 and (sh_flags & 0x4)):   # PROGBITS, EXECINSTR
+            continue
+        if sh_size:
+            out.append((sh_off, sh_size, sh_addr, name))
+    if not out:
+        die('no executable section in this ELF%s -- nothing to scan'
+            % ('' if want_section is None else ' named %r' % want_section))
+    return out
+
+
+def words_from(b, ranges):
+    ws, spans = [], []
+    for off, size, vaddr, name in ranges:
+        if off + size > len(b):
+            size = max(0, len(b) - off)
+        size -= size % 4
+        if size <= 0:
+            continue
+        spans.append((off, size, vaddr, name))
+        for k in range(0, size, 4):
+            ws.append((vaddr + k, struct.unpack_from('>I', b, off + k)[0]))
+    return ws, spans
+
+
+def raw_words(b, vma):
+    return [(vma + o, struct.unpack_from('>I', b, o)[0])
+            for o in range(0, len(b) // 4 * 4, 4)]
+
+
+# --------------------------------------------------------------------------
+# Controls
+# --------------------------------------------------------------------------
+#
+# K2 and K3 are upstream's own two payloads, carried here as hex rather than as
+# files.  Three reasons, and the third is the one that matters:
+#   * `*.bin` is gitignored, by a rule that exists for good reasons;
+#   * `$FWRE_WORK` is not in a clone, so a fixture living only there would make
+#     the control unrunnable for anybody else;
+#   * `tools/mkramboot.py` can no longer PRODUCE the broken one.  Its simulator
+#     was taught to refuse a register read in a load delay slot -- that is the
+#     second-layer fix `P9-12` concluded with.  The broken payload is a
+#     historical artefact now, and the only way to keep it is to keep the bytes.
+# Their sha256 is checked against the copies in `$FWRE_WORK` by
+# `tools/test-hazlint.sh` when those exist, so the embedded bytes have a second
+# source whenever the bench machine is the one running this.
+
+P9_12_V1_HEX = (
+    "041100010000000027f000603c08b80035092014350820000200882192240000"
+    "1080000b26310001240b198c912a0000314a006015400003256bffff1560fffb"
+    "00000000a10400001000fff4000000003c0c0800258cffff1580fffe00000000"
+    "1000ffed000000000d0a2a2a2a204e31353052542052414d424f4f542050392d"
+    "3132203462616565353137202a2a2a0d0a000000")
+P9_12_V1_SHA = "46370ce9537e1573d63c90d4afa7874f3e446b70b0e59c6cfac3fd63e9bb6b92"
+
+P9_12_V2_HEX = (
+    "041100010000000027f000683c08b80035092014350820000200882192240000"
+    "000000001080000c26310001240b198c912a000000000000314a006015400003"
+    "256bffff1560fffa00000000a10400001000fff2000000003c0c0800258cffff"
+    "1580fffe000000001000ffeb000000000d0a2a2a2a204e31353052542052414d"
+    "424f4f542050392d3132203462616565353137202a2a2a0d0a000000")
+P9_12_V2_SHA = "8af51ea73ac7a0e6373288687eb7da3d7a164f79b48fce8b900ac324ad3028a4"
+
+PAYLOAD_VMA = 0x80500000
+
+# K4.  The population control.  Measured in this repository on 2026-08-24 and
+# independently recorded by upstream on 2026-08-21 from a separate scan
+# (`upstream/BENCH-LOG.md:4485`, `upstream/PROGRESS.md:6300`) -- two sources for
+# the same three numbers, which is the rule this project runs on.
+STAGE2_SHA = "f88869d108cdafdfcff5d9461b0ead5c061a6725effb0314bb954572c9c1b4ee"
+STAGE2_VMA = 0x80400000
+STAGE2_SIZE = 56592
+STAGE2_LOADS = 1474
+STAGE2_NOPS = 646
+STAGE2_VIOLATIONS = 0
+
+# K6.  The code region's 18 and their addresses are cross-checked:
+# `docs/loader-command-semantics.md` §9 lists them one by one, and
+# `mips-linux-gnu-objdump -m mips:3000` emits a `.word` at every one of them.
+STAGE2_CODE_HI = 0x8040A000
+STAGE2_MOVZ = [0x80403C6C, 0x80403C94, 0x80403F30, 0x804047AC, 0x80405698,
+               0x80405874, 0x80405F1C, 0x80406EB4, 0x80406F2C, 0x804079F8,
+               0x80407E20, 0x80408900]
+STAGE2_MOVN = [0x80400D24, 0x804018A8, 0x80402394, 0x8040556C, 0x80407244,
+               0x80407ED8]
+# Two false positives `docs/loader-command-semantics.md` §9 names by value.
+# They are the data-region control: a classifier that fires nowhere in rodata
+# has not been shown to fire at all.
+STAGE2_DATA_LL = 0x8040AB14          # c0a80001 == 192.168.0.1
+STAGE2_DATA_MOVN = [0x8040D800, 0x8040D820, 0x8040D840,
+                    0x8040DB00, 0x8040DB20, 0x8040DB40]   # SPI table, 0x20 stride
+
+# K1.  (load word, following word, expect a violation, what the case is for).
+# The near-misses matter more than the hits: every one of them is a shape a
+# careless model would call a violation, or would miss.
+K1_CASES = [
+    (0x912A0000, 0x314A0060, True,
+     "P9-12's own bug: lbu t2,0(t1) then andi t2,t2,0x60"),
+    (0x92240000, 0x1080000B, True,
+     "the second one, which the write-up never named: lbu a0 then beqz a0"),
+    (0x8D080000, 0x01094020, True,  "lw t0 then add reading t0 as rs"),
+    (0x8D080000, 0x01284020, True,  "lw t0 then add reading t0 as rt"),
+    (0x8D080000, 0xAD090000, True,  "lw t0 then sw t1,0(t0) -- t0 is the base"),
+    (0x8D080000, 0x8D080000, True,  "lw t0 then lw t0,0(t0) -- base is the target"),
+    (0x8D080000, 0x8D090004, True,  "lw t0 then lw t1,4(t0) -- the base is a read"),
+    (0x8D080000, 0x40886000, True,  "lw t0 then mtc0 t0 -- a coprocessor move reads rt"),
+    (0x88880000, 0x01084020, True,  "lwl t0 then add reading t0 -- the pair exemption is narrow"),
+    (0x8D080000, 0x00000000, False, "lw t0 then nop -- the shape 646 of stage 2 uses"),
+    (0x8D080000, 0x012A4020, False, "lw t0 then add t0,t1,t2 -- t0 written, not read"),
+    (0x8D080000, 0x3C081234, False, "lw t0 then lui t0 -- lui reads nothing"),
+    (0x8D000000, 0x01004020, False, "lw zero -- rt is $zero, nothing was loaded"),
+    (0x8D080000, 0x8D290004, False, "lw t0 then lw t1,4(t1) -- unrelated registers"),
+    (0x8D080000, 0x00004012, False, "lw t0 then mflo t0 -- mflo reads no GPR"),
+    (0x8D080000, 0x0810000A, False, "lw t0 then j -- j reads no GPR"),
+    (0x8D080000, 0x40086000, False, "lw t0 then mfc0 t0 -- mfc0 WRITES rt"),
+    (0x88880000, 0x98880003, False, "lwl t0 then lwr t0 -- the MIPS-I unaligned pair"),
+]
+
+
+def unhex(h):
+    return bytes(bytearray(int(h[i:i + 2], 16) for i in range(0, len(h), 2)))
+
+
+def find_stage2(explicit):
+    cands = []
+    if explicit:
+        cands.append(explicit)
+    work = os.environ.get('FWRE_WORK', '/home/key/fwre-work')
+    cands += [os.path.join(work, 'stage2.bin'),
+              os.path.join(work, 'rebuild', 'work-item4', 'stage2.bin')]
+    for c in cands:
+        if c and os.path.isfile(c):
+            return c
+    return None
+
+
+class Controls(object):
+    def __init__(self):
+        self.rows = []          # (name, ok, detail)
+        self.population_ran = False
+
+    def add(self, name, ok, detail):
+        self.rows.append((name, bool(ok), detail))
+        return ok
+
+    @property
+    def failed(self):
+        return [r for r in self.rows if not r[1]]
+
+
+def run_controls(stage2_path, waive_population, want_isa):
+    c = Controls()
+
+    # --- K1 --------------------------------------------------------------
+    bad = []
+    for lw, nw, expect, why in K1_CASES:
+        ws = [(PAYLOAD_VMA, lw), (PAYLOAD_VMA + 4, nw)]
+        if (len(scan(ws).violations) > 0) != expect:
+            bad.append(why)
+    c.add('K1  decoder cases', not bad,
+          '%d/%d ok  (%d must fire, %d must not)'
+          % (len(K1_CASES) - len(bad), len(K1_CASES),
+             sum(1 for x in K1_CASES if x[2]),
+             sum(1 for x in K1_CASES if not x[2]))
+          + ('' if not bad else '   first miss: ' + bad[0]))
+
+    # --- K2 --------------------------------------------------------------
+    v1 = unhex(P9_12_V1_HEX)
+    sha1_ok = hashlib.sha256(v1).hexdigest() == P9_12_V1_SHA
+    r1 = scan(raw_words(v1, PAYLOAD_VMA))
+    offs = sorted(v[1] for v in r1.violations)
+    c.add('K2  negative control  P9-12 v1, %d B' % len(v1),
+          sha1_ok and len(v1) == 148 and offs == [0x1C, 0x2C],
+          'sha256 %s; %d violations at %s   (expected 2, at 0x1c and 0x2c)'
+          % ('ok' if sha1_ok else 'MISMATCH', len(offs),
+             ', '.join('0x%02x' % o for o in offs) or 'none'))
+
+    # --- K3 --------------------------------------------------------------
+    v2 = unhex(P9_12_V2_HEX)
+    sha2_ok = hashlib.sha256(v2).hexdigest() == P9_12_V2_SHA
+    r2 = scan(raw_words(v2, PAYLOAD_VMA))
+    # The single-variable claim itself, checked rather than repeated.  Upstream
+    # wrote "two nops, nothing else changed", and at the source level that is
+    # true; in the bytes it cannot be, because inserting two instructions moves
+    # every PC-relative displacement past them and the string base with them.
+    # So the assertion is the one that is actually available: strip v2's two
+    # nops and every remaining word must match v1 in its top 16 bits -- same
+    # opcode, same registers, same control-flow shape -- with each difference
+    # confined to a 16-bit immediate.
+    NOP_IDX = (0x20 // 4, 0x34 // 4)
+    w1 = [struct.unpack_from('>I', v1, i)[0] for i in range(0, len(v1), 4)]
+    w2 = [struct.unpack_from('>I', v2, i)[0] for i in range(0, len(v2), 4)]
+    ins = (len(w2) == len(w1) + 2
+           and all(w2[k] == 0 for k in NOP_IDX))
+    moved = []
+    if ins:
+        stripped = [w for k, w in enumerate(w2) if k not in NOP_IDX]
+        moved = [(k, a, b) for k, (a, b) in enumerate(zip(w1, stripped))
+                 if a != b]
+        ins = all((a >> 16) == (b >> 16) for k, a, b in moved)
+    c.add('K3  positive control  P9-12 v2, %d B' % len(v2),
+          sha2_ok and r2.loads == 2 and r2.nop_after == 2
+          and not r2.violations and ins,
+          '%d loads / %d nop / %d violations; v2 is v1 with nops at 0x20 and '
+          '0x34 and %d displacement(s) moved, nothing else: %s'
+          % (r2.loads, r2.nop_after, len(r2.violations), len(moved),
+             'yes' if ins else 'NO'))
+
+    # --- K4, the population control --------------------------------------
+    if stage2_path is None:
+        detail = ('NOT RUN -- stage2.bin was not found. Looked under $FWRE_WORK '
+                  '(%s). Pass --stage2 PATH, or --no-population-control to look '
+                  'at a file without certifying it'
+                  % os.environ.get('FWRE_WORK', '/home/key/fwre-work'))
+        if waive_population:
+            c.add('K4  population control  stage2.bin', True,
+                  'WAIVED by --no-population-control. Nothing this run says can '
+                  'pass a gate; the exit code will be 2 either way')
+        else:
+            c.add('K4  population control  stage2.bin', False, detail)
+    else:
+        b = open(stage2_path, 'rb').read()
+        sha = hashlib.sha256(b).hexdigest()
+        r = scan(raw_words(b, STAGE2_VMA))
+        ok = (sha == STAGE2_SHA and len(b) == STAGE2_SIZE
+              and r.loads == STAGE2_LOADS and r.nop_after == STAGE2_NOPS
+              and len(r.violations) == STAGE2_VIOLATIONS)
+        c.population_ran = ok
+        c.add('K4  population control  stage2.bin', ok,
+              '%d loads / %d nop (%.2f%%) / %d violations   expected %d / %d / %d'
+              % (r.loads, r.nop_after, 100.0 * r.nop_after / max(r.loads, 1),
+                 len(r.violations), STAGE2_LOADS, STAGE2_NOPS, STAGE2_VIOLATIONS)
+              + ('' if sha == STAGE2_SHA else '   sha256 MISMATCH: %s' % sha))
+
+    # --- K5 --------------------------------------------------------------
+    swapped = b''.join(struct.pack('>I', struct.unpack_from('<I', v1, i)[0])
+                       for i in range(0, len(v1), 4))
+    n_swapped = len(scan(raw_words(swapped, PAYLOAD_VMA)).violations)
+    n_shifted = len(scan(raw_words(v1[2:], PAYLOAD_VMA)).violations)
+    c.add('K5  endianness and alignment',
+          n_swapped != 2 and n_shifted != 2,
+          'byte-swapped -> %d violations, 2-byte shifted -> %d; both must '
+          'differ from 2' % (n_swapped, n_shifted))
+
+    # --- K6, only where it is load-bearing -------------------------------
+    if want_isa:
+        if stage2_path is None:
+            c.add('K6  ISA fixture  stage2.bin', bool(waive_population),
+                  'NOT RUN -- stage2.bin was not found')
+        else:
+            b = open(stage2_path, 'rb').read()
+            ws = raw_words(b, STAGE2_VMA)
+            code = [x for x in ws if x[0] < STAGE2_CODE_HI]
+            data = [x for x in ws if x[0] >= STAGE2_CODE_HI]
+            s_code, l_code = isa_scan(code, True), isa_scan(code, False)
+            movz = sorted(a for a, w, m, lv in s_code if m == 'movz')
+            movn = sorted(a for a, w, m, lv in s_code if m == 'movn')
+            addr_ok = (movz == STAGE2_MOVZ and movn == STAGE2_MOVN)
+            c.add('K6a ISA fixture, code region',
+                  len(s_code) == 18 and len(l_code) == 18 and addr_ok,
+                  '%d hits strict, %d loose; movz x%d, movn x%d; the addresses '
+                  'match docs §9 one for one: %s'
+                  % (len(s_code), len(l_code), len(movz), len(movn),
+                     'yes' if addr_ok else 'NO'))
+
+            l_data, s_data = isa_scan(data, False), isa_scan(data, True)
+            ll_hit = any(a == STAGE2_DATA_LL and m == 'll'
+                         for a, w, m, lv in l_data)
+            movn_hits = sorted(a for a, w, m, lv in l_data
+                               if m == 'movn' and a in STAGE2_DATA_MOVN)
+            c.add('K6b ISA fixture, the data region fires',
+                  ll_hit and movn_hits == sorted(STAGE2_DATA_MOVN),
+                  'loose finds ll at 0x%08x (%s) and %d/6 of the SPI table\'s '
+                  '0x0000004b -- the two false positives docs §9 names'
+                  % (STAGE2_DATA_LL, '192.168.0.1' if ll_hit else 'NOT FOUND',
+                     len(movn_hits)))
+
+            rejects = not any(a in STAGE2_DATA_MOVN for a, w, m, lv in s_data)
+            c.add('K6c strict and loose disagree, which is the point',
+                  rejects and len(l_data) != len(s_data),
+                  'data region: %d loose, %d strict. Strict rejects the SPI '
+                  'table\'s 0x4b because its sa field is 1: %s. A count quoted '
+                  'without its classifier is not a measurement'
+                  % (len(l_data), len(s_data), 'yes' if rejects else 'NO'))
+    return c
+
+
+# --------------------------------------------------------------------------
+# Reporting
+# --------------------------------------------------------------------------
+
+def print_controls(c):
+    print('controls   (every one can fail, and the run stops if one does)')
+    for name, ok, detail in c.rows:
+        print('  %-5s %-38s %s' % ('ok' if ok else 'FAIL', name, detail))
+    print('')
+
+
+def report(path, spans, r, args, sur):
+    print('file       %s   (%d bytes)' % (path, os.path.getsize(path)))
+    for off, size, vaddr, name in spans:
+        print('scanned    %-12s file[0x%x .. 0x%x)  ->  vma[0x%08x .. 0x%08x)'
+              % (name, off, off + size, vaddr, vaddr + size))
+    print('words      %d' % r.words)
+    print('')
+    print('  loads (MIPS-I load-to-GPR, rt != $zero)   %8d' % r.loads)
+    print('  followed by an explicit nop               %8d   (%.2f%%)'
+          % (r.nop_after, 100.0 * r.nop_after / max(r.loads, 1)))
+    print('  successor unresolved                      %8d' % len(r.unresolved))
+    print('  VIOLATIONS                                %8d' % len(r.violations))
+    print('')
+
+    if r.violations:
+        print('  a load whose result is read by the very next instruction. On')
+        print('  this core that read gets the PREVIOUS value: no fault, no')
+        print('  warning, just wrong.')
+        print('')
+        for n, v in enumerate(r.violations):
+            va, fo, mnem, rt, sa_, sw, why, lw = v
+            if args['max_report'] and n >= args['max_report']:
+                print('  ... %d more; --max-report 0 prints all'
+                      % (len(r.violations) - args['max_report']))
+                break
+            print('  0x%08x  file 0x%-5x  %-30s  %08x  |%s|'
+                  % (va, fo, text(lw), lw, ascii_of(lw)))
+            print('  0x%08x  %-12s  %-30s  %08x  |%s|'
+                  % (sa_, '', text(sw), sw, ascii_of(sw)))
+            print('  %-12s %-12s  reads $%s   [%s]' % ('', '', REGS[rt], why))
+            print('')
+
+    if r.unresolved:
+        print('  successors that could not be resolved -- reported, not guessed:')
+        for va, fo, reason in r.unresolved[:20]:
+            print('    0x%08x  file 0x%-5x  %s' % (va, fo, reason))
+        if len(r.unresolved) > 20:
+            print('    ... %d more' % (len(r.unresolved) - 20))
+        print('')
+
+    if sur is not None:
+        print('  survey -- hazard shapes with NO established rule on this core.')
+        print('  C-9 / F47 is open and R1b owns it. Counts, not verdicts.')
+        for k in sorted(sur):
+            v = sur[k]
+            print('    %-32s %5d   %s'
+                  % (k, len(v), ' '.join('0x%08x' % a for a in v[:6])
+                     + (' ...' if len(v) > 6 else '')))
+        print('')
+
+
+def report_isa(path, spans, words, args):
+    strict = not args['loose']
+    rng = args['code_range']
+    print('file       %s   (%d bytes)' % (path, os.path.getsize(path)))
+    for off, size, vaddr, name in spans:
+        print('scanned    %-12s file[0x%x .. 0x%x)  ->  vma[0x%08x .. 0x%08x)'
+              % (name, off, off + size, vaddr, vaddr + size))
+    print('classifier %s   -- strict also requires the fields an encoding fixes '
+          'at zero to BE zero; --loose reads opcode and funct only'
+          % ('loose' if args['loose'] else 'strict'))
+    print('')
+    if rng is None:
+        groups = [('everything scanned', words, True)]
+    else:
+        lo, hi = rng
+        groups = [('code   [0x%08x, 0x%08x)' % (lo, hi),
+                   [x for x in words if lo <= x[0] < hi], True),
+                  ('data   outside that range',
+                   [x for x in words if not (lo <= x[0] < hi)], False)]
+    bad = 0
+    for label, ws, is_code in groups:
+        hits = isa_scan(ws, strict)
+        other = isa_scan(ws, not strict)
+        print('  %-34s %6d words   %4d hits   (%d under --%s)'
+              % (label, len(ws), len(hits), len(other),
+                 'strict' if args['loose'] else 'loose'))
+        by = {}
+        for a, w, m, lv in hits:
+            by.setdefault((m, lv), []).append((a, w))
+        for key in sorted(by):
+            m, lv = key
+            v = by[key]
+            print('      %-18s %-12s %4d' % (m, lv, len(v)))
+            lim = args['max_report'] or len(v)
+            for a, w in v[:lim]:
+                print('          0x%08x  %08x  |%s|   %s'
+                      % (a, w, ascii_of(w), text(w)))
+            if len(v) > lim:
+                print('          ... %d more' % (len(v) - lim))
+        if is_code:
+            bad += len(hits)
+        print('')
+    print('  Every hit prints its word and its ASCII so a reader can overturn')
+    print('  it. That is the fix docs/loader-command-semantics.md §9 arrived at:')
+    print('  the answer to a decoder reading a string table is not a better')
+    print('  decoder, it is a tool that puts its evidence beside its verdict.')
+    return bad
+
+
+# --------------------------------------------------------------------------
+# Entry point
+# --------------------------------------------------------------------------
+
+def parse_args(argv):
+    a = {'path': None, 'base': 0, 'range': None, 'raw': False, 'section': None,
+         'survey': False, 'max_report': 20, 'stage2': None, 'no_pop': False,
+         'allow_zero': False, 'isa': False, 'loose': False, 'code_range': None,
+         'self_test': False}
+    flags = {'--self-test': 'self_test', '--isa': 'isa', '--loose': 'loose',
+             '--raw': 'raw', '--survey': 'survey',
+             '--no-population-control': 'no_pop',
+             '--allow-zero-loads': 'allow_zero'}
+    i = 0
+    while i < len(argv):
+        x = argv[i]
+        if x in flags:
+            a[flags[x]] = True
+            i += 1
+        elif x == '--base':
+            a['base'] = int(argv[i + 1], 0); i += 2
+        elif x == '--stage2':
+            a['stage2'] = argv[i + 1]; i += 2
+        elif x == '--section':
+            a['section'] = argv[i + 1]; i += 2
+        elif x == '--max-report':
+            a['max_report'] = int(argv[i + 1], 0); i += 2
+        elif x in ('--range', '--code-range'):
+            lo, hi = argv[i + 1].split(':')
+            a['range' if x == '--range' else 'code_range'] = \
+                (int(lo, 0), int(hi, 0))
+            i += 2
+        elif x.startswith('-'):
+            die('unknown option %s' % x)
+        else:
+            if a['path'] is not None:
+                die('more than one file given')
+            a['path'] = x
+            i += 1
+    return a
+
+
+def main(argv):
+    args = parse_args(argv)
+
+    print('hazlint %s -- a load whose result is read in the delay slot' % VERSION)
+    print('the failure this exists to stop: upstream P9-12, 2026-08-21, on this')
+    print('physical device. The delay slot was filled. It was filled wrong.')
+    print('')
+
+    if args['stage2'] and not os.path.isfile(args['stage2']):
+        die('--stage2 %s: no such file. This does NOT fall back to $FWRE_WORK: '
+            'a tool that quietly ran its control against a different file from '
+            'the one it was told to is the exact failure this repository keeps '
+            'catching' % args['stage2'])
+
+    stage2 = find_stage2(args['stage2'])
+    c = run_controls(stage2, args['no_pop'],
+                     want_isa=args['isa'] or args['self_test'])
+    print_controls(c)
+
+    if args['self_test']:
+        nf = len(c.failed)
+        if nf:
+            print('RESULT: %d passed, \033[31m%d failed\033[0m'
+                  % (len(c.rows) - nf, nf))
+            return 2
+        print('RESULT: \033[32m%d passed, 0 failed\033[0m' % len(c.rows))
+        if not c.population_ran:
+            print('        -- but the population control did not run, so this '
+                  'says nothing about whether the tool is looking.')
+            return 2
+        return 0
+
+    if c.failed:
+        print('REFUSED: %d control(s) failed. Nothing is reported about the file'
+              % len(c.failed))
+        print('         until the checker itself is trusted.')
+        return 2
+
+    if args['path'] is None:
+        die('no file given. --self-test runs the controls alone; the usage note '
+            'is at the bottom of the docstring')
+    if not os.path.isfile(args['path']):
+        die('%s: no such file' % args['path'])
+
+    b = open(args['path'], 'rb').read()
+    ranges = None if args['raw'] else elf_ranges(b, args['section'])
+    if ranges is None:
+        if args['range']:
+            lo, hi = args['range']
+            ranges = [(lo, hi - lo, args['base'] + lo, 'raw')]
+        else:
+            ranges = [(0, len(b), args['base'], 'raw')]
+    words, spans = words_from(b, ranges)
+    if not words:
+        die('nothing to scan')
+
+    if args['isa']:
+        bad = report_isa(args['path'], spans, words, args)
+        if not c.population_ran:
+            print('')
+            print('POPULATION CONTROL NOT RUN -- this run certifies nothing. '
+                  'Exit 2.')
+            return 2
+        return 1 if bad else 0
+
+    sur = survey(words) if args['survey'] else None
+    r = scan(words, base_off=spans[0][0])
+    report(args['path'], spans, r, args, sur)
+
+    if r.loads == 0 and not args['allow_zero']:
+        print('REFUSED: %d words scanned and not one load. That is exactly what '
+              'a tool' % r.words)
+        print('         that is not looking reports. --allow-zero-loads if the '
+              'payload really has none.')
+        return 2
+    if not c.population_ran:
+        print('POPULATION CONTROL NOT RUN -- this run certifies nothing, clean '
+              'or not. Exit 2.')
+        return 2
+    if r.violations:
+        print('RESULT: \033[31m%d violation(s)\033[0m. This payload must not be '
+              'run on this core.' % len(r.violations))
+        return 1
+    if r.unresolved:
+        print('RESULT: 0 violations, but %d successor(s) could not be resolved.'
+              % len(r.unresolved))
+        print('        Read them above before treating this as clean.')
+        return 1
+    print('RESULT: \033[32m0 violations\033[0m in %d loads, and the controls '
+          'that could have said otherwise held.' % r.loads)
+    return 0
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        sys.exit(3)
+    sys.exit(main(sys.argv[1:]))

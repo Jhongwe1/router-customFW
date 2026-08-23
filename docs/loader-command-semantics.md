@@ -581,6 +581,75 @@ The second row is the control. **Two decoders that reported zero everywhere
 would prove nothing; both demonstrably fire, and every false positive is visible
 as text in the hex dump beside it.**
 
+#### Correction, 2026-08-24: the code row reproduces exactly and the data row does not
+
+A third decoder — `tools/hazlint --isa`, written for `DAY-ZERO` item 7 — was run
+over the same file with the same boundary.
+
+**The code row is exact and now has three sources.** `[0x80400000, 0x8040A000)`
+gives **18** hits, `movz` × 12 and `movn` × 6, at the eighteen addresses above,
+one for one, under *both* of that tool's classifiers, and
+`mips-linux-gnu-objdump -m mips:3000` emits a `.word` at every one of them.
+(It emits four more, at `0x80400C40`, `0x80400C44`, `0x80400C68` and
+`0x80400C7C` — `COP0` words with `rs = 3`, which is neither `mfc0` nor `mtc0`
+and which no source held here names. They are almost certainly the Lexra CP0
+accesses `notes/cache-model.md` describes, and they are **not** counted above.
+Recorded here because a decoder that printed them and a decoder that did not
+were both called "18".)
+
+**The data row does not reproduce, and the reason is the finding.** Three
+classifiers over `[0x8040A000, 0x8040DD10)` give three answers:
+
+| classifier | hits |
+|---|---:|
+| `hazlint --isa --loose` — opcode and funct only | **445** |
+| `hazlint --isa` — strict; the fields an encoding fixes at zero must be zero | **236** |
+| `objdump -m mips:3000`, counting `.word` | **829** |
+
+None of them is 28, and no classifier that can be constructed from what this
+file records produces 28: the row names `0x0000004b` as `movn`, which a **loose**
+reader accepts and a strict one rejects (its `sa` field is 1), and it names
+`'pload, F'` as `clo`, which is `SPECIAL2`. A watch list narrow enough to give a
+number near 28 was in use, and **that list was never written down**.
+
+**So 28 is withdrawn as a control and kept as a record.** What replaces it is
+not another number but the property the row was reaching for, in a form that can
+fail: `hazlint` asserts that the loose classifier still finds `ll` at
+`0x8040AB14` (`c0a80001` = `192.168.0.1`) and `movn` at all six of the SPI
+table's `0x20`-stride `0x0000004b`s — **the two false positives this section
+names by value** — and that the strict classifier rejects those six. Both
+classifiers' counts are printed side by side on every run.
+
+> **A count whose classifier is not named is not a measurement.** That is the
+> general form of what went wrong here, and it is the same shape as the
+> hand-copied command table in §8.12.46 of upstream's runbook: a correct set of
+> values under a sentence that does not say what produced them reads exactly
+> like two correct things.
+
+#### And two hazard shapes that are not load hazards, counted while passing
+
+`tools/hazlint --survey` over the same file, **counts and not verdicts**, because
+`C-9` is open and `R1b` owns the rule:
+
+| shape | count | first addresses |
+|---|---:|---|
+| `mult`/`div` immediately followed by `mfhi`/`mflo` | **16** | `0x80403C14`, `0x80404248`, `0x804042A0`, `0x80405648` |
+| `mtc0` immediately followed by `mfc0` | **3** | `0x80400408`, `0x8040041C`, `0x80400660` |
+| a load sitting in any branch or jump delay slot | **0** | — |
+
+The first of the `mtc0` sites is `mtc0 zero,c0_status` at `0x80400408` followed
+at `0x8040040C` by `mfc0 t1,c0_status` — **the same register, written and then
+read with nothing between.** The vendor's compiler inserted no `nop` in any of
+the nineteen. That is consistent with a core that interlocks `HI`/`LO` and CP0
+while leaving the load delay slot exposed, and it is *also* consistent with
+nineteen latent bugs in the loader. **Counting them does not decide between
+those**, and R1b's experiment is one `mult`→`mflo` and one `mtc0`→`mfc0` on bare
+metal with 0, 1 and 2 `nop`s between.
+
+The third row is why the load check can use a linear scan at all: with zero
+loads in a delay slot, "the next word" and "the next instruction executed" are
+the same thing everywhere in this file.
+
 Three readings:
 
 1. **`ll`, `sc`, `cache`, `pref` and the FPU loads/stores are absent from the

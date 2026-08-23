@@ -101,11 +101,14 @@
 | `CPU-11` | 時脈 | **400 MHz** | 量 | — | 開機 banner（C、S）、D | `bench/2026-08-23/A-catch.log` |
 | `CPU-12` | 位元組序 | **big-endian** | 讀 | 讀 | A —— 每一支 ELF 都是 `ELFDATA2MSB` | `upstream/notes/anatomy-n150rt.md` |
 | `CPU-13` | 手冊宣稱的 ISA | `Supports MIPS-1 ISA, MIPS16 ISA` | 文 | 讀 | **只有 D** | `SOURCES.json` `ds-rtl8196e-vex` |
-| `CPU-14` | **load delay slot** | **架構外露 —— 沒有 interlock** | 量 | 讀 | **×2** —— C 對 `stage2` 的指令普查（1,474 個 load，後面接「讀取剛載入暫存器」的比例 0.00%），以及矽片上一次單一變數實驗 | `plan/` F46 |
+| `CPU-14` | **load delay slot** | **架構外露 —— 沒有 interlock** | 量 | 讀 | **×2** —— C 對 `stage2` 的指令普查（1,474 個 load、646 個後面接 `nop`、後面接「讀取剛載入暫存器」的 0 個），以及矽片上一次單一變數實驗。**2026-08-24 在本 repo 用 `tools/hazlint` 獨立重算，三個數字全中**，負控制是上游那份真的在這台上失敗過的 payload | `tools/hazlint` |
 | `CPU-15` | 矽片有沒有 `lwl`/`lwr`/`swl`/`swr` | *(未定)* | — | — | 裸機 RI 處理器下執行一條 `lwl` 就結案 | `notes/lwl-mystery.md`、gate R1a |
 | `CPU-16` | ……這台的 binary 裡有幾個 | `stage2` **0** · `busybox` **0** · `boa` **144** | 讀 | 讀 | A、`tools/opcount.py`，控制在 `tools/test-opcount.sh` | `notes/lwl-mystery.md` |
 | `CPU-17` | `movz` / `movn` | **loader 程式區裡 18 個**，其中兩個在 `check_image()` 裡，每次開機都會跑；18 份 capture 裡沒有任何例外訊息 | 讀（數量）· 量（那個「沒有」） | 讀 | A、C | `docs/loader-command-semantics.md` §9、`C-12` |
-| `CPU-18` | loader 程式區裡的 `ll` `sc` `cache` `pref` `sync`、branch-likely、SPECIAL2/3、FPU、`jalx` | **全部為零** | 讀 | 讀 | A，兩支解碼器，各自都在 rodata 裡示範過會誤報，那就是控制 | 同上 |
+| `CPU-18` | loader 程式區裡的 `ll` `sc` `cache` `pref` `sync`、branch-likely、SPECIAL2/3、FPU、`jalx` | **全部為零** | 讀 | 讀 | A，**三支**解碼器（第三支是 `tools/hazlint --isa`，寬鬆與嚴格兩種判準都得 18），每一支都在 rodata 裡示範過會誤報，那就是控制 | 同上 |
+| `CPU-29` | `mult`/`div` 後面緊接 `mfhi`/`mflo` 的位址數 | **16 個**，最早在 `0x80403C14` | 讀 | 讀 | A，`tools/hazlint --survey` | `docs/loader-command-semantics.md` §9 |
+| `CPU-30` | `mtc0` 後面緊接 `mfc0` 的位址數 | **3 個** —— `0x80400408`、`0x8040041C`、`0x80400660`，第一個是同一顆 `Status` 寫完立刻讀 | 讀 | 讀 | A，同上 | 同上 |
+| `CPU-31` | 非 load 的 hazard 規則（`HI`/`LO`、CP0） | *(未定)* —— `CPU-29`／`CPU-30` 說原廠編譯器**沒有**在中間補 `nop`，這與「有互鎖」相容，也與「有互鎖但這兩處是 bug」相容。數得出來不等於判得出來 | 讀（計數）· — （規則） | — | A | `C-9`、gate R1b |
 | `CPU-19` | 快取管理模型 | **R3000 式** —— `Status.IsC`/`SwC`，外加一顆 Lexra 的 CP0 20 號暫存器 | 讀 | 推（`CCTL` 這個名字） | A + B | `notes/cache-model.md` |
 | `CPU-20` | CP0 r20 —— invalidate I-cache | `0x002` | 讀 | 讀 | **×2** —— A `0x804066e8`、B `c-r3k.c` | 同上 |
 | `CPU-21` | CP0 r20 —— flush D-cache（819x 路徑） | `0x200` | 讀 | 讀 | **×2** —— A `0x804066c0`、B | 同上 |
@@ -388,6 +391,8 @@
 | `TC-03` | 那份 drop 的但書 | 它的目標板是 ALFA AIP-W512，不是 TOTOLINK 這片。DDR timing、PHY 設定、GPIO 腳位都可能不同，**而弄錯不一定會當機** | 推 | 推 | `SOURCES.json` | gate R2 |
 | `TC-04` | `boa` 觀察到的 ELF flags | 到 2018-03-30 為止是 `0x1007` … pic … mips1；2019-03-15 起是 `0x1005` … mips1 | 讀 | 讀 | A + C，橫跨六個 build | `notes/lwl-mystery.md` |
 | `TC-05` | rlxfw 自己要用什麼建 | *(留白)* —— T-vendor 對 T-modern 是 gate R2 的決定。`-march=mips1`、big-endian、o32、soft-float 已定案，libc 未定 | — | — | — | `plan/` §5、gate R2 |
+| `TC-06` | 🔴 `mips-linux-gnu-gcc-12` (12.4.0) 下 `-march=mips1` 的實際條件 | **單獨給 `-march=mips1` 會被拒絕**：`cc1: error: '-march=mips1' requires '-mfp32'`。`-msoft-float` 也滿足它，而且對一顆沒有 FPU 的核心那才是誠實的旗標。`-march=r3000` 同病 | 量 | 讀 | 2026-08-24 在本機量到；`plan/DAY-ZERO.md` 第 6、8 項記的建置行少了這個旗標，照抄不會編譯 | `tools/test-hazlint.sh` `E2` |
+| `TC-07` | 同一段 C 在兩個 `-march` 下的 `movz`/`movn` | `-march=mips1 -msoft-float` **0 個**；`-march=mips32 -msoft-float` **1 個**。兩個 `.o` 的 load-use 違規都是 0 | 量 | 讀 | 同上，而且「`.o` 真的產生了」本身是一個控制 —— 沒編出來的 0 跟編出來的 0 長得一樣 | 同上 |
 
 ## 15. rlxfw 的設計標的
 
@@ -432,6 +437,7 @@ TechInfoDepot 的 TOTOLINK N150RT 條目。
 | `CPU-15` | 矽片到底有沒有 `lwl`/`lwr`/`swl`/`swr` | 裸機 Reserved Instruction 處理器下的一條 `lwl` | R1a |
 | `CPU-17` | `movz`/`movn` 是矽片實作還是被靜默模擬 | 同一個處理器，一條指令 | R1a / `C-12` |
 | `CPU-24` | CP0 r20 的 `0x010` 與 `0x020` | 單一來源且無名；需要一次裸機讀取 | R1e |
+| `CPU-31` | `HI`/`LO` 與 CP0 的 hazard 規則 | 裸機上一組 `mult`→`mflo`、`mtc0`→`mfc0`，中間補 0/1/2 個 `nop`，看讀值何時開始正確。`CPU-29`／`CPU-30` 已經指出原廠一個都沒補 | R1b |
 | `CPU-25` | 快取大小、line 大小、關聯度 | 在裸機上重現 `r3k_cache_size()` | R1d |
 | `CPU-27` | 提示字元下的 `Status.BEV` | 去追，或由 payload 讀出來 | R1d |
 | `MEM-08` | SDRAM timing | 讀 loader 對記憶體控制器的寫入 | R5 |
