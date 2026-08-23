@@ -101,7 +101,7 @@ true at once:
 | 1 | `Status.IM[7:2]` unmasked, `BEV` cleared | `0x80406694`, called from `0x80408634` | set on the boot path, **never re-masked** |
 | 2 | `Status.IE = 1` | `0x8040865C`, and again at `0x80408494` immediately after `---Ethernet init Okay!` | set |
 | 3 | `TCCNR`/`TCIR` armed | `timer_init` at `0x80408F20`, reached via `0x80406780` | armed |
-| 4 | `GIMR` bit 8 | **`doBooting()` writes `GIMR = 0` at `0x804086E4` and `0x80408700`, on both of its paths** | **cleared** |
+| 4 | `GIMR` bit 8 | **`doBooting()` writes `GIMR = 0` at `0x804086E4` and `0x80408700`, on both of its paths** | 🔴 **measured 2026-08-23: `GIMR` reads `0x00008100` at the prompt — bit 8 is already `1`, and bit 15 (`SWIE`) with it.** `doBooting()`'s zero is not the last write before the prompt; something in the network init or the command-loop entry re-enables both. **This row said "cleared" and it is wrong.** It makes the position safer rather than less safe, and it voids `RUNSHEET.md` `E5`, whose whole design was a bit predicted to flip |
 
 Layer 4 is the one `phy_read` repairs itself. That is not a guess about intent:
 the loader's own network init runs *after* `GIMR = 0`, so any `phy_read` on that
@@ -120,16 +120,32 @@ Nothing else in B2 is worth a power cycle if that cell fails.
 `TC0DATA = 142858`, the tick is
 
 ```
-200e6 / 14 / 142858 = 100.0 Hz          (inferred, pending a measurement)
+200e6 / 14 / 142858 = 100.0 Hz          (predicted, before the visit)
 ```
 
 and `delay(10)` is one tick = 10 ms, which is exactly `mdelay(10)` in **B**.
-`C-8` currently records the watchdog's wall-clock timeout as *not established*
-because "the bus clock `CDBR` divides is unmeasured". **Two `DW`s and a stopwatch
-measure it**: if the tick advances at 100 counts per second, the base clock is
-200 MHz on silicon and `C-8` gets its missing input. If it advances at some other
-rate, the 200 MHz constant is a compile-time belief and not this board's clock —
-which is worth more than the number.
+
+🔴 **Measured on the device, 2026-08-23** (`RUNSHEET.md` `E2`, `E2b`):
+
+| | |
+|---|---|
+| `0x8040DCE8` | `0x0000473A` → `0x00005F52` = **6,168 counts** |
+| elapsed | **61.842 s**, from timestamps taken either side of each read |
+| **tick** | **99.74 Hz**, against 100.0 Hz predicted — **0.26 %** |
+| `CDBR` (`0xB8003118`) | `0x000E0000`, read on the device |
+| `TC0DATA` (`0xB8003100`) | `0x0022E0A0` = 142,858 << 4, read on the device |
+| ⇒ base clock | 99.74 × 14 × 142,858 = **199.48 MHz** |
+
+**Three of the four terms are now read on silicon**, so this is a derivation and
+not a coincidence: the compiled-in `0x0BEBC200` = 200 MHz is confirmed as this
+board's clock to a quarter of a percent. It also settles the divisor field's
+semantics without a second experiment — a divisor of 15 would put the base at
+213.7 MHz, which is not a clock anyone builds.
+
+**What this does *not* settle, and it must not be read as settling it:** whether
+the watchdog counts the same `CDBR`-divided clock. If it does, `OVSEL[3:0]=0000`
+= 2¹⁵ ticks = **2.29 ms**; if it counts the undivided base it is 164 µs. `C-8`
+needs `D1`'s wall-clock delay to choose between them, and `D1` has not run.
 
 ---
 
@@ -333,10 +349,18 @@ gives `Port0_TypeCfg[1:0]` at bits 1:0 with `00: UTP (10/100M embedded PHY)`,
 P0phymode=01, embedded phy
 ```
 
-**The loader prints a name for a value the datasheet calls Reserved.** The
-datasheet is a draft (`Rev. D1.1`, watermarked); the silicon's own boot loader
-disagrees with it. Recorded, not resolved — what B2 confirms is only that `PITCR`
-reads `0x00000001` on this board.
+🔴 **Withdrawn, 2026-08-23, by measurement.** `PITCR` reads **`0x00000000`** on
+this board (`RUNSHEET.md` `E9`), not `0x00000001`, and `PCRP0` reads
+`0x007F0039` — `EnForceMode` clear. **The whole strap-gated branch that does
+`PITCR |= 1` did not run on this unit**, so the two `|= 1` sites say nothing
+about what `PITCR` holds at the prompt.
+
+It follows that **`P0phymode=01` is not `PITCR` bits 1:0.** The paragraph this
+replaces claimed the loader names a value the datasheet calls Reserved, and that
+claim was built entirely on connecting a printed `01` to a register field
+without checking that the code writing that field had run. `PITCR = 0` is
+`00: UTP (10/100M embedded PHY)` — which is what the boot line says in words.
+**The datasheet and the loader agree; the contradiction was mine.**
 
 ### `PCRP0` is configured; `PCRP1`–`PCRP4` are not
 

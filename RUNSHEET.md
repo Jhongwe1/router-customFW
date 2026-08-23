@@ -179,25 +179,29 @@ loader's image (ends `0x8040DD10`) and far above the staged kernel
 *Empty until the session. Fill the reading beside each row, and write the
 verdict even where it is the boring one.*
 
+**Run 2026-08-23, from 21:51. Sections A and B complete; C and D pending an
+operator.** Logs: `$FWRE_WORK/rebuild/bench-2026-08-23/`.
+
 | cell | reading | verdict |
 |---|---|---|
-| A1 | | |
-| B1 | | |
-| B2 | | |
-| B3 | | |
-| B4 | | |
-| B5 | | |
-| B6 | | |
-| B7 | | |
-| B8 | | |
-| B9 | | |
-| C1 | | |
-| C2 | | |
-| C3 | | |
-| C4 | | |
-| D1 | | |
-| D2 | | |
-| D3 | | |
+| A1 | banner byte-identical to 2026-08-17/18: `---RealTek(RTL8196E)at 2014.04.22-16:22+0800 v1.3 [16bit](400MHz)`. `?` returned all seventeen commands | OK **and more than asked**: the command loop is confirmed *ready*, not merely the prompt drawn, because `?` echoed and returned. `MDIOR:  MDIOR <phyid> <reg>` and `PORT1: port 1 patch for FT2` appear on the device exactly as `loader.json` has them |
+| A2 | not captured | WARN **the instrument cannot do this cell.** `catch` prints the banner line and discards the rest of the pre-prompt stream. It costs nothing here -- `upstream/dumps/uart-bootloader.log` is the comparison -- but A2 is unsatisfiable as written |
+| B1 | `8040B070 00000000 80409A9C 8040B074` | **exact.** Load base, table address, 16-byte stride, field order, and "RAM holds what the dump says", all four at once |
+| B2 | `001C7016 1C701600 16000000 00400000` / `00010000 00000040 00001000 00000400` | **all four controls exact** (`+12/+16/+20/+24`), so the descriptor layout is right and the ID is trustworthy. **JEDEC ID = `0x1C7016`** -- manufacturer `0x1C`, capacity byte `0x16` = 2^22 = 4 MiB. `C-3`'s headline answered with a measured value |
+| B3 | `05060000 00000000 00000000 80500000` | WARN **value matches, reading refuted.** `0x8040DD3C` is written *before* each `check_image()` call (`0x804080C0`), so it holds the candidate **being tried**, not the accepted one. With `gCHKKEY_HIT` set (B5) every check fails, the sweep runs to the end, and the last candidate is `0x060000` -- which is also where the kernel is. **The cell cannot discriminate on this unit.** Word 4 `80500000` still stands |
+| B4 | `00000000 00008021 40906000 00000000` | WARN **value exact, mechanism refuted.** The cell says `check_image()` copied it during the check. It cannot have: `check_image()`'s first act is to read `gCHKKEY_HIT` and return before the copy. Something else fills `0x80500000` -- now `C-16` |
+| B5 | `00000001 00000000 00000000 00000001` | **REFUTED, and it is the most informative cell in the section.** Predicted `gCHKKEY_HIT` = 0 and counter = 16. Read 1 and 0. Streaming ESC from before power-on sets the flag, `check_image()` short-circuits, and the checksum loop never runs. **The prediction assumed a boot that was not interrupted -- which is not the boot this sheet produces.** It is what exposed B3 and B4 |
+| B6 | `00000001 00000000 00000000 00000000` | **`AUTOBURN` = 1 on the device.** The never-upload-without-`AUTOBURN 0` rule is now a measurement and not a reading |
+| B7 | `C0000000 80000000 000E0000 A5000000` | **exact, plus three free.** `CDBR = 000E0000` as predicted; `WatchDogIND` (w4 bit 20) = **0** after power-on, which is D2's baseline. Unasked and now known: `TCCNR = C0000000` and `TCIR = 80000000` are exactly what `timer_init` writes, and `WDTE[7:0] = 0xA5` is the stop pattern, so the watchdog is stopped as documented |
+| B8 | nothing at all | **exact.** `strtoul("A",_,10)` = 0, zero length, no output. The radix is decimal |
+| B9 | three lines | **exact.** And the three rows carry `?`/`DB`/`DW`'s handlers `80409A9C`/`804095D0`/`804094B4`, matching `loader.json` |
+| C1 | | pending -- needs the operator, in picocom |
+| C2 | | pending |
+| C3 | | pending |
+| C4 | | pending |
+| D1 | | pending |
+| D2 | | pending |
+| D3 | | pending -- needs a button press |
 
 ---
 
@@ -259,19 +263,23 @@ trap as B1.
 even where it is the boring one.* **`E4`'s `UID` has no predicted value**, so its
 verdict is a measurement and not a confirmation — say so in the cell.
 
+**Run 2026-08-23. `E1`-`E10` and `E12` complete; `E11` and section F pending an
+operator.**
+
 | cell | reading | verdict |
 |---|---|---|
-| E1 | | |
-| E2 | | |
-| E3 | | |
-| E4 | | |
-| E5 | | |
-| E6 | | |
-| E7 | | |
-| E8 | | |
-| E9 | | |
-| E10 | | |
-| E11 | | |
-| E12 | | |
-| F1 | | |
-| F2 | | |
+| E1 | `0000473A 001E8000 0ED80000 8040A2B4` | **the control was wrong.** Predicted w2 = `00002000` from `li v1,8192` at `0x80409004`; it reads `001E8000` = 2,000,000, so something writes it after that store. The cell's *purpose* is served by E2 far more directly, so the miss costs nothing -- but the control did not work |
+| E2 | `00005F52` after **61.842 s** measured -> **6168 counts** | **99.74 Hz against 100.0 Hz predicted, 0.26%.** The gate passes: the timer ISR runs, `delay(10)` returns, PHY commands are licensed. **And it hands `C-8` its clock**: with `CDBR` = 14 and `TC0DATA` = 142,858 both read on the device, base = 99.74 x 14 x 142858 = **199.48 MHz** against the compiled-in `0x0BEBC200` = 200 MHz. A divisor of 15 would give 213.7 MHz, so the measurement also settles the divisor field's semantics |
+| E2b NEW | `DW B8003100 1` -> `0022E0A0 00000000 0010B960 00000000` | **added at the bench, and it is what makes E2 a derivation rather than a coincidence.** `TC0DATA` = `0x22E0A0` = 142,858 << 4, exactly the image value, so the count field is bits 31:4 and the count is 142,858. Three of the four terms are now read on silicon |
+| E3 | `00008100 88000004 00000000 30050004` | **REFUTED, and it voids E5.** `GIMR` bit 8 (`TCIE`) is **already 1** at the prompt; predicted 0. Bit 15 (`SWIE`) is set too, and `IRR1` reads `30050004` where the loader writes `00050004` -- `SWIRS` = 3 at bit 28. **`doBooting()`'s `GIMR = 0` is not the last write before the prompt**, so `docs/loader-phy-and-switch.md` section 2 layer 4 is wrong. Internally consistent: the tick could not advance otherwise |
+| E4 | `PHYID=0x00000000, regID=0x00000002 ,Find PHY Chip! UID=0x0000001c` | **the first MDIO transaction this device has performed.** Both echoed fields correct, so the base-16 parse holds. `0x001C` -- neither `0000` nor `ffff`. Note the loader's `%x` pads to eight digits: the expected *rendering* in the cell was wrong, the values were not |
+| E5 | not runnable | **void as designed.** The bit it predicted would flip 0->1 was already 1. Recovering it needs `EW` to clear `GIMR` bit 8 first -- a register write, so it belongs in section C and needs a decision, not a bench improvisation |
+| E6 | `UID=0x0000c880` | full identifier **`0x001CC880`** |
+| E7 | `PHYR 2 2`, `PHYR 3 2`, `PHYR 4 2` -> `1c`, `1c`, `1c` | **all three equal E4.** One PHY macro, as `PORT1`'s single table implied |
+| E8 | `PHYR 1 2` -> `1c`; `PHYR 1 3` -> `c880` | **identical to the other four.** `PORT1` skipping address 1 is about the **port**, not the PHY. One driver covers all five |
+| E9 | `00000000 007F0039 047F0039 087F0039` / `0C7F0039 107F0039 00000000 187F0038` | **the load-bearing half is exact**: `ExtPHYID` (30:26) reads 0, 1, 2, 3, 4 across `PCRP0`-`PCRP4`. The weaker half passes too -- `7F` at 22:16 on all five, the datasheet's `FrcAbi` = `11111` and `Pause` = `11`. **But `PITCR` reads `00000000`, predicted `00000001`** -- and `PCRP0` shows `EnForceMode` = 0, so **the whole strap-gated force-mode branch did not run on this board.** `P0phymode=01` is therefore *not* `PITCR` bits 1:0, and the claim that the loader names a value the datasheet calls Reserved is **withdrawn**: `PITCR` = 0 is `UTP (10/100M embedded PHY)`, which is exactly what the boot line says |
+| E10 | `000010E0 000010E0 00001099 000010E0` / `000010E0 000000E2 0000007A 0000007A` | **exactly one port with `LinkUp`: `PSRP2`.** `0x1099` = NWayEnable, LinkUp, full duplex, speed `01` = 100M. The other four read `0x10E0`, bit 4 clear. **Independently corroborated off-device**: Windows reports the far end of that same cable `Up, 100 Mbps` |
+| E11 | | pending -- needs a cable move |
+| E12 | `PHYR 2 1` -> `78ED`; `PHYR 0 1` -> `78C9`; `PHYR 2 0` -> `1100`; `PHYR 2 5` -> `C1E1` | **a paired control on one instrument, which is what E5 was supposed to give.** Linked port: `LinkStatus` = 1, `AutonegComplete` = 1. Unlinked port, same register: both **0**. Capability bits 15:11 identical on both, so the difference is link state and not a different part. `BMCR` = `1100`, autoneg enabled and full duplex, agreeing with `PCRP2`'s `EnForceMode` = 0. `ANLPAR` = `C1E1`: selector `00001` = 802.3, 10/100 half and full, **Acknowledge set and Next Page set** -- the signature of a gigabit-capable partner, which is what is in fact on the other end |
+| F1 | | pending -- the one cell that can end a visit |
+| F2 | | pending |
