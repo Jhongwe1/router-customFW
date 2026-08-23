@@ -11,6 +11,10 @@
 # ---------------------------------------------------------------------------
 plan/
 archive/
+# study/ is the same category: teaching notes written for the author and for
+# whoever the author is explaining this to. They address people directly and
+# they restate things other files own. Committed files may not do either.
+study/
 
 # ---------------------------------------------------------------------------
 # 2. Vendor documentation and vendor binaries. Not ours to redistribute.

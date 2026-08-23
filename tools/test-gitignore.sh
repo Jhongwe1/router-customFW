@@ -36,12 +36,13 @@ KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/threat-
 
 # MUST be ignored, one per reason:
 #   plan/     planning material, may address the author directly
+#   study/    teaching notes, same reason
 #   refs/     vendor documentation, not ours to redistribute
 #   src-vendor/  cloned GPL drops, re-fetchable from SOURCES.json
 #   build/    build output
 #   dumps/    per-unit artefacts -- MACs and radio calibration
 #   *.img *.squashfs  images anywhere
-DROP="plan/router-rebuild-plan.md refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf src-vendor/x.c build/vmlinux dumps/flash.bin work.img rootfs.squashfs"
+DROP="plan/router-rebuild-plan.md study/20260823-study.md refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf src-vendor/x.c build/vmlinux dumps/flash.bin work.img rootfs.squashfs"
 
 cd "$T"
 cp "$GI" .gitignore
