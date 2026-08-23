@@ -74,6 +74,12 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   case-insensitive, which silently drops **254 files** from the vendor kernel trees
   (`xt_CONNMARK.h` against `xt_connmark.h`). On this project part of the finding
   *is* filesystem metadata. `src-vendor/` is a symlink into `$FWRE_WORK/rebuild/`.
+- **Session working files do not go in WSL's `/tmp`.** Measured 2026-08-23: the
+  distro restarts between tool calls (`uptime -s` moved forward mid-session,
+  `uptime -p` read "up 0 minutes"), and `/usr/lib/tmpfiles.d/tmp.conf` carries
+  `D /tmp` — a capital `D`, so `systemd-tmpfiles-setup` **empties it at every
+  start**. It is not a tmpfs; the wipe is deliberate, not a side effect. Derived
+  artefacts go in `$FWRE_WORK/rebuild/`, which is where they belong anyway.
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
   the commands and read what I paste back. One power cycle is the most expensive
   unit here, so list every question before the device is plugged in.
