@@ -123,7 +123,8 @@ git 歷史是這個專案裡唯一「做錯了難以收回」的地方，而 `re
 新增 `.gitattributes`（`* text=auto eol=lf`）。這裡的腳本在 Windows 上編輯、
 在 WSL 下對著 `/mnt/c` 上同一份檔案執行，而 Git for Windows 的 `core.autocrlf`
 預設為 `true`：沒有這個檔案，clone 回來的腳本帶 CRLF，全部以
-`bash: No such file or directory` 失敗 —— 在它們被寫出來的那台機器上。
+`bash
+: No such file or directory` 失敗 —— 在它們被寫出來的那台機器上。
 
 第一個 commit `9c40aa4`，十個檔案。推送之前先把 `Jhongwe1/router-customFW`
 由 PUBLIC 改為 PRIVATE：`CHARTER.md` 寫的是「v0.1 起 public」，而現在是 S0。
@@ -134,7 +135,75 @@ git 歷史是這個專案裡唯一「做錯了難以收回」的地方，而 `re
 那兩個檔名描述的是尚未寄出的揭露內容；把它們寫進一個將會公開的檔案，
 與稍早刻意不讓同類檔名以明文上雲端，是同一條理由 —— 原本的寫法前後不一致。
 
+---
+
+## 2026-08-23 — `DAY-ZERO` 2a：`lwl`/`lwr`/`swl`/`swr` 計數
+
+同日，桌面工作，未接觸裝置。完整內容在 `notes/lwl-mystery.md`；這裡只記過程與判讀。
+
+### 工具
+
+`tools/opcount.py`：把檔案當 big-endian 32 位元字、在每個 4-對齊位移做 primary opcode
+直方圖。載入位址 4-對齊 ⇒ 每條指令都落在 `≡ 0 (mod 4)` 的位移上 ⇒ 掃描是指令集合的
+**超集**：會把資料算成指令，但不可能漏掉指令。**所以每個計數都是上界，而且只有一種
+結果是嚴謹的 —— 零。** 這一題要的正好是零。
+
+先試 `objdump -d`，它在這些二進位上**輸出 0 行**：`/bin/boa` 的 section header 被 strip 掉，
+而 `-d` 只處理 section。它於是對每個助憶符都回報 0。一個看不見的工具照樣願意報一個數字。
+
+控制在 `tools/test-opcount.sh`，15 個案例：P1 已知計數的 fixture 必須逐項重現；
+N1 同一批位元組讀成 little-endian 必須得到不同答案（得 0）；N2 從位移 2 開始掃必須得到
+不同答案（得 0）；另有「寫死的機器碼是否仍與組譯器一致」一項。
+
+程式碼區的界線是由**四位元組皆可列印 ASCII 的佔比**這個獨立訊號推出來的，
+不是找一個能湊出預期數字的界線。
+
+### 量到的
+
+| 二進位 | 種類 | 程式碼區 | 四條合計 |
+|---|---|---|---:|
+| `stage2.bin` bootcode | **裸機** | `0x80400000`–`0x8040a000` | **0** |
+| `bin/busybox` unit-2018 | userspace | `0x403000`–`0x43c000` | **0** |
+| `bin/boa` unit-2018 | userspace | `0x403c00`–`0x462000` | **144** |
+
+`stage2` 的程式碼區內，`cache`、`ll`/`sc`、`sync`、branch-likely、SPECIAL2/3、FPU、
+MIPS16 `jalx` **全部為 0**。`busybox` 亦然。兩者都是嚴格的 MIPS-I **減去非對齊載入／
+儲存** —— 正好是 Lexra 出貨的那個子集。
+
+`boa` 跨六份韌體：2015、2016 兩份是 176；2018 兩份是 144；2019、2020 兩份是 **0**。
+六列的 `lwl` 全部等於 `lwr`、`swl` 全部等於 `swr`。配對是檢查而不是巧合：
+編譯器產生非對齊存取時成對發射，六個獨立界定的程式碼區都精確配對，
+說明界線是對的、而且這些是指令不是資料。
+
+`stage2` 全檔掃描回報 1 而非 0。三個命中全部在程式碼區之外，逐一裁決都是資料 ——
+其中 `ll` @ `0x8040ab14` 那個字是 `c0a80001`，也就是 **`192.168.0.1`**，
+它後面四個位元組就是字串 `"
+Switch core initialization failed!
+"`。
+
+### 判讀與其界限
+
+**讀出來的**：Realtek 自己為這顆 SoC 寫的 bootcode，在 40 KiB 程式碼裡一條都沒用；
+廠商的 `busybox` 也沒有。`boa` 用到 2018–2019 之間某一刻，然後停止。
+
+**沒有建立的**：矽片是否實作這四條。這裡沒有任何一個數字量自裝置。
+一個避開某條指令的二進位，是關於**編譯它的 toolchain** 的證據，不是關於**執行它的硬體**。
+
+背景（已查證）：MIPS Technologies 對 Lexra 的專利訴訟標的是美國專利 4,814,976，
+涵蓋的正是這四條指令；Lexra 的核心實作 MIPS I 唯獨不含它們。專利原屬 Silicon Graphics。
+1998 年先有一次**商標**訴訟，和解條件是 Lexra 必須明白聲明其產品不實作非對齊載入／儲存。
+
+### `DAY-ZERO` 2a 的預測錯在哪
+
+它預期分界是「裸機 vs userspace」。量到的分界是「`boa` vs 其他所有東西」，
+而且在 2019 年關閉。因此 2a 交給 R2 的後續問題變成一個更窄也更好的問題：
+**`boa` 的建置方式有什麼不同，以及 2019 年改了什麼。**
+
 ### 下一步
 
-`DAY-ZERO` 第 2a 項。第 1 項已於本次建立 manifest 時一併關閉；
-第 3 項的其餘部分（submodule 釘 `4d3ff26`、`fetch-sources.sh`、`README.md` 第一屏）仍開著。
+`DAY-ZERO` 第 2b 項（快取模型，F49）。2a 已經先給了它兩個資料點：
+`stage2` 程式碼區沒有任何 `cache` 指令，而 `mtc0`/`mfc0` 有 82 處，
+其中 57 次是 `c0_status`、13 次是 CP0 reg 20。
+
+第 1 項已於建立 manifest 時關閉；第 3 項其餘部分（submodule 釘 `4d3ff26`、
+`fetch-sources.sh`、`README.md` 第一屏）仍開著。

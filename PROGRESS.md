@@ -14,9 +14,9 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | `S0` — safety net |
-| **Active step** | `S0a` closed 2026-08-23 **with a recorded deviation**: the DoD says restore from copy ③, the drill was run from copy ② — C-10. `S0b` waits for the first bench session |
+| **Active step** | `DAY-ZERO` item 2a closed 2026-08-23 (`notes/lwl-mystery.md`). `S0a` closed the same day **with a recorded deviation** — C-10. `S0b` waits for the first bench session |
 | **Last session** | 2026-08-23, desk only — `S0a`, then `git init`. Seven encrypted archives; restore drill from copy ② after a physical replug, five trees at zero differences; first commit `9c40aa4` pushed to a **private** `Jhongwe1/router-customFW` (`CHARTER.md`: public from v0.1, and this is S0). `LOG.md` |
-| **Next after this** | `DAY-ZERO` item 2a. Item 1 closed inside `S0a` — building the manifest *is* the verification, so they were one operation, not two. Item 3 is half done: `git init`, first commit and remote are in; the submodule pin at `4d3ff26`, `fetch-sources.sh` and the `README.md` first screen are not |
+| **Next after this** | `DAY-ZERO` item 2b (cache model, F49). Item 1 closed inside `S0a`; item 2a closed. Item 3 is half done: `git init`, first commit and a private remote are in; the submodule pin at `4d3ff26`, `fetch-sources.sh` and the `README.md` first screen are not |
 | **Blocked on** | nothing at the desk. `S0b` needs the device on the bench |
 
 **Step list for the active gate**: `plan/DAY-ZERO.md` items 0–8.
@@ -83,7 +83,7 @@ close it. **An item with no owning gate is a bug in this list.**
 | C-4 | Does the loader still offer the ESC window when the kernel region is garbage? | R8 precondition ⑤ |
 | C-5 | Which instructions does the vendor kernel emulate? (`simulate_llsc`, `math-emu`, …) | R2d |
 | C-6 | Cache management model: R3000 (`Status.IsC`) or MIPS32 (`cache` insn)? — F49 | R1d |
-| C-7 | `lwl`/`lwr` count in loader stage 2 vs `/bin/boa` — F51 | DAY-ZERO 2a |
+| C-7 | Answered at the desk, `notes/lwl-mystery.md`: stage2 0, busybox 0, boa 176 → 144 → 0 across builds from 2015 to 2020. **Residual, and it is the one that decides F34**: does the vendor kernel carry an unaligned-access emulation handler, and what changed in how `boa` was built between 2018-03-30 and 2019-03-15? | R2, then R1a on silicon |
 | C-8 | Does a watchdog reset still present the ESC window, or does bootcode take a different path? | R4 |
 | C-9 | Hazards beyond loads: stores, `mflo`/`mfhi`, `mfc0`/`mtc0` — F47, upstream open #100 | R1b |
 | C-10 | Copy ③ has never been read back. Is what sits on Google Drive what was uploaded? Copies ① and ② were verified byte for byte; ③ was not. | S0 |
@@ -97,6 +97,7 @@ that records where it was wrong is more credible than one that looks right.**
 
 | Date | What changed | Who caught it |
 |---|---|---|
+| 2026-08-23 | `DAY-ZERO` 2a predicted the split would be bare metal versus userspace: bootcode avoids the unaligned instructions, userspace takes the toolchain default and lets the kernel clean up. Measured: `busybox` is userspace on the same rootfs and has none either. The split is `boa` against everything else, and it closes in 2019. | `tools/opcount.py` over six firmware trees, `notes/lwl-mystery.md` |
 | 2026-08-23 | `DAY-ZERO` §現況 states the upstream working tree is clean. It is not: 13 modified tracked files and 2 untracked, none of them pushed. The two untracked files are unsent disclosure material; their names are deliberately not recorded in a public file, for the same reason the backup manifest was split into a K1 and a K2 side. | `git status` / `git log @{u}..`, run while enumerating what `S0a` had to cover |
 | 2026-08-23 | `S0a`'s DoD was "逐檔 `sha256sum` 相符". That check covers 6,346 of 7,770 paths and no mode bits at all, and it reports zero differences on a tree with a cleared setgid bit and a repointed symlink. Replaced by a type/mode/uid/gid/size/mtime/digest manifest (`tools/fsmanifest.py`) with one scope control and three negative controls. | `S0a` control N4 |
 | 2026-08-23 | `S0a`'s backup scope listed only `$FWRE_WORK`. Outside it were `refs/` (two datasheets that cannot be committed), `plan/` (gitignored, single copy), this repository itself (not yet under git), and `../router`'s uncommitted work. | `S0a`, listing what is irreplaceable rather than what is large |
