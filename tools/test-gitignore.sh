@@ -82,6 +82,25 @@ for f in $DROP; do
 done
 
 echo
+echo "=== a SYMLINK named src-vendor must be ignored too ==="
+# On this machine src-vendor is a symlink into ext4, not a directory: NTFS is
+# case-insensitive and the vendor kernel trees carry paths that differ only in
+# case. A .gitignore pattern ending in / matches directories only, so it would
+# have let the symlink itself be committed.
+rm -rf src-vendor
+ln -s /nonexistent/elsewhere src-vendor
+if git check-ignore -q src-vendor; then
+    printf '  ok     %s
+' "src-vendor (symlink)"
+    pass=$((pass + 1))
+else
+    printf '  FAIL   %s  <- symlink would be committed
+' "src-vendor (symlink)"
+    fail=$((fail + 1))
+fi
+rm -f src-vendor
+
+echo
 echo "=== what a first commit would actually contain ==="
 git add -A .
 git diff --cached --name-only | sort | sed 's/^/  /'

@@ -14,9 +14,9 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | `S0` — safety net |
-| **Active step** | `DAY-ZERO` item 2 closed 2026-08-23 — 2a `notes/lwl-mystery.md`, 2b `notes/cache-model.md`, 2c `docs/loader-flash-write.md`. `S0a` closed the same day **with a recorded deviation** — C-10. `S0b` waits for the first bench session |
+| **Active step** | `DAY-ZERO` item 3 — upstream pinned at `4d3ff26` and verified, `README.md` first screen written, source trees fetched. Items 0, 1, 2a, 2b, 2c closed the same day. `S0a` closed **with a recorded deviation** — C-10. `S0b` waits for the first bench session |
 | **Last session** | 2026-08-23, desk only — `S0a`, then `git init`. Seven encrypted archives; restore drill from copy ② after a physical replug, five trees at zero differences; first commit `9c40aa4` pushed to a **private** `Jhongwe1/router-customFW` (`CHARTER.md`: public from v0.1, and this is S0). `LOG.md` |
-| **Next after this** | The rest of `DAY-ZERO` item 3 — submodule pin at `4d3ff26`, `fetch-sources.sh`, `README.md` first screen. `git init`, the first commit and a private remote are already in. Items 0, 1, 2a, 2b, 2c are closed |
+| **Next after this** | `DAY-ZERO` item 4 — six questions about loader command semantics, three of which upstream has already answered. Then item 6 (build container), item 7 (`hazlint`), item 8 (`rlxprobe`). Item 5 is the only bench item in this section |
 | **Blocked on** | nothing at the desk. `S0b` needs the device on the bench |
 
 **Step list for the active gate**: `plan/DAY-ZERO.md` items 0–8.
@@ -87,6 +87,7 @@ close it. **An item with no owning gate is a bug in this list.**
 | C-8 | Does a watchdog reset still present the ESC window, or does bootcode take a different path? | R4 |
 | C-9 | Hazards beyond loads: stores, `mflo`/`mfhi`, `mfc0`/`mtc0` — F47, upstream open #100 | R1b |
 | C-10 | Copy ③ has never been read back. Is what sits on Google Drive what was uploaded? Copies ① and ② were verified byte for byte; ③ was not. | S0 |
+| C-11 | The pinned baseline `4d3ff26` exists on `origin/w08-writeup` only, not on the upstream default branch. If that branch is deleted, rebased or renamed, the pin becomes unfetchable and R9's differential argument loses its anchor. A tag would fix it permanently. | R9 |
 
 ---
 
@@ -97,6 +98,11 @@ that records where it was wrong is more credible than one that looks right.**
 
 | Date | What changed | Who caught it |
 |---|---|---|
+| 2026-08-23 | `tools/fetch-sources.sh` tested `[ -d upstream/.git ]` before checking the pinned baseline. In a submodule `.git` is a **file** holding `gitdir: ...`, so the test was false and the check — the one that catches the differential baseline having moved — silently never ran. Changed to `-e`; it now fires and passes. | the fetch reporting `skip upstream not present` about a submodule that was demonstrably present |
+| 2026-08-23 | `SOURCES.json` sends every GPL drop to `src-vendor/`, which sits on NTFS. The vendor kernel trees carry paths that differ only in case — `xt_CONNMARK.h` against `xt_connmark.h` and 29 more pairs in `wecb-vz-gpl` alone. Measured on `rtl819x-toolchain`: **254 files would have been lost silently**. `src-vendor` is now a symlink into ext4 under `$FWRE_WORK/rebuild/`, which is where `CLAUDE.md` already says binaries belong. | creating `B.h` and `b.h` on `/mnt/c` and getting one file |
+| 2026-08-23 | `CLAUDE.md` says DrvFs drops symlinks and permission bits. Measured: symlinks **survive** (`ln -s` works, `readlink` resolves); permission bits do not — everything reads back as `777`, and git responds by setting `core.fileMode=false`, so it cannot see mode changes at all. The rule is right; half its stated reason is not. | a five-line probe on `/mnt/c` |
+| 2026-08-23 | `.gitignore` had `src-vendor/` with a trailing slash, which matches directories only. Once `src-vendor` became a symlink, git wanted to commit it. Pattern corrected and `tools/test-gitignore.sh` grew a fourteenth case for exactly this. | `git status` after making the symlink |
+| 2026-08-23 | `git submodule add` recorded the upstream default branch's HEAD (`277af488`) in the index, not the pinned `4d3ff26` that was then checked out. Committing at that point would have recorded the wrong baseline — the one thing R9's credibility rests on. `git add upstream` before committing. | `git submodule status` showing a `+` prefix |
 | 2026-08-23 | `DAY-ZERO` 2c placed the `WREN` / `PP` / `RDSR` sequence inside `burn()`. It is not there: `burn()` is the image parser and dispatcher, and the SPI command layer is at `0x804055ac`–`0x80405d44`, which it reaches indirectly. The plan was off by one layer. | reading `burn()`, `docs/loader-flash-write.md` |
 | 2026-08-23 | `DAY-ZERO` 2b argued the loader must have made the I-cache see freshly written RAM, "otherwise P9-12 would not have succeeded". Measured: from `0x804004a8` the loader jumps to the KSEG1 alias of its own next instruction and runs uncached, so for its own code it did not have to. It does flush D-then-I immediately before jumping to the kernel image, so the conclusion holds — but not for the stated reason. | reading the reset path, `notes/cache-model.md` |
 | 2026-08-23 | `DAY-ZERO` 2a predicted the split would be bare metal versus userspace: bootcode avoids the unaligned instructions, userspace takes the toolchain default and lets the kernel clean up. Measured: `busybox` is userspace on the same rootfs and has none either. The split is `boa` against everything else, and it closes in 2019. | `tools/opcount.py` over six firmware trees, `notes/lwl-mystery.md` |

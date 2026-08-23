@@ -202,7 +202,10 @@ done <<< "$PLAN"
 step "upstream baseline (manual, on purpose)"
 UP_URL="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1],encoding="utf-8"))["upstream"]["url"])' "$SOURCES")"
 UP_PIN="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1],encoding="utf-8"))["upstream"]["pin"]["commit"])' "$SOURCES")"
-if [ -d "$HERE/upstream/.git" ]; then
+# -e, not -d: in a submodule .git is a FILE containing "gitdir: ...", so a -d
+# test is false and this whole check -- the one that catches the differential
+# baseline having moved -- silently never runs.
+if [ -e "$HERE/upstream/.git" ]; then
     have="$(git -C "$HERE/upstream" rev-parse HEAD)"
     if [ "$have" = "$UP_PIN" ]; then
         ok "upstream pinned at ${UP_PIN:0:12} (matches SOURCES.json)"

@@ -268,7 +268,96 @@ SPI 控制器的暫存器與命令介面拿到了，而且是**兩個來源同�
 廠商 kernel 與 WECB bootcode 都沒有 clone，是用 `gh api` 逐檔讀的 ——
 `fetch-sources.sh`（`DAY-ZERO` 第 3 項）尚未執行，`src-vendor/` 仍是空的。
 
+---
+
+## 2026-08-23 — `DAY-ZERO` 第 3 項：釘上游、抓來源、寫 README 第一屏
+
+同日，桌面工作，未接觸裝置。
+
+### 釘上游
+
+`git submodule add` 之後 `git submodule status` 前面帶一個 `+`。那不是裝飾：
+**index 裡記的是 clone 當下預設分支的 HEAD `277af488`，不是隨後 checkout 的
+`4d3ff26`。** 就那樣 commit 下去，記進版本歷史的差分基準會是錯的一個 commit ——
+而那是 R9 唯一的錨。`git add upstream` 之後 index 變成
+`160000 4d3ff26bfb8a32986d3db532ca25197ef3043fdb`，`+` 消失。
+
+驗證同時翻出一件事：`git branch -r --contains 4d3ff26` 只回報 `origin/w08-writeup`。
+**這個 pin 只活在一個分支上。** 分支被刪、被 rebase 或改名，它就抓不回來了。
+記為 C-11，修法是在上游打一個 tag。
+
+### `src-vendor/` 不能放在 `/mnt/c`
+
+`SOURCES.json` 把每個 GPL drop 的 `dest` 指到 `src-vendor/`，而 repo 在 NTFS 上。
+**廠商的 kernel 樹裡有只差大小寫的同名路徑** —— 光 `wecb-vz-gpl` 就有 30 對以上
+（`xt_CONNMARK.h` 對 `xt_connmark.h`、`ipt_ECN.c` 對 `ipt_ecn.c`、
+`Documentation/IO-mapping.txt` 對 `io-mapping.txt`…）。
+
+先量再修：在 `/mnt/c` 上 `touch B.h b.h` → **只剩 1 個檔案**；在 ext4 上 → 2 個。
+clone 完成後對 `rtl819x-toolchain` 反過來算：
+**在大小寫不敏感的檔案系統上會有 254 個檔案安靜消失。**
+
+修法是把 `src-vendor` 做成指向 `$FWRE_WORK/rebuild/src-vendor` 的 symlink ——
+那正是 `CLAUDE.md` 已經指定放二進位的地方。checkout 後複驗：
+兩個 `xt_*MARK.h` 都在，`git status` 乾淨，`core.fileMode = true`。
+
+順帶量到兩件關於 DrvFs 的事，其中一件修正了 `CLAUDE.md`：
+
+| | `CLAUDE.md` 說 | 量到 |
+|---|---|---|
+| symlink | 會掉 | **不會。** `ln -s` 成功、`readlink` 解得開 |
+| 權限位元 | 會掉 | 會，而且全部變 `777`；git 因此把 `core.fileMode` 設成 `false`，**完全看不見 mode 變化** |
+
+規則本身是對的，它給的理由有一半不對。
+
+### `.gitignore` 的斜線
+
+`src-vendor/` 結尾的斜線只匹配目錄。`src-vendor` 一變成 symlink，git 就想 commit 它。
+拿掉斜線，並在 `tools/test-gitignore.sh` 補第 14 個案例 ——
+**專門測這件剛剛咬過人的事**。14 passed, 0 failed。
+
+### 抓來源
+
+`tools/fetch-sources.sh` 跑完：兩份 datasheet 雜湊相符，四棵樹 clone 完成並記錄
+commit id 到 `src-vendor/CLONED.tsv`。全部落在 ext4，`/mnt/c` 上只有一個 symlink。
+
+### 順手把 2c 的 SPI 暫存器補成三來源
+
+裝了 `poppler-utils` 之後讀 `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` §7.4.5–7.4.9：
+`SFCR 0xB800_1200`、`SFCR2 0xB800_1204`、`SFCSR 0xB800_1208`、`SFDR 0xB800_120C`、
+`SFDR2 0xB800_1210` —— 與 GPL 原始碼、與這台自己的 loader 三者一致，
+**而且這一份是 8196E 自己的 datasheet，前兩者是 8196C／8198 世代。**
+
+datasheet 的 Table 10 給出 `SFCSR` 的完整位元佈局，與 GPL 的位移巨集**逐欄位吻合**
+（`SPI_CSB0<<31`、`LEN<<28`、`SPI_RDY<<27`、`IO_WIDTH<<25`、`CHIP_SEL<<24`、
+`CMD_BYTE<<16`）。它自己舉的例子就是 `'Read ID' is 0x9F`。
+另外註明 **`SFCSR` 與 `SFDR` 不支援 byte access** —— 那是 R5b 會踩、而且踩了不會報錯的地方。
+`docs/loader-flash-write.md` 裡我自己標的那個「單一來源」缺口因此關掉。
+
+### `fetch-sources.sh` 裡一個不會觸發的控制
+
+fetch 跑完之後結果裡有一行 `skip upstream not present` —— 而 upstream 明明在，
+而且我在啟動它之前就親眼驗過 pin。原因是腳本測 `[ -d "$HERE/upstream/.git" ]`，
+而 **submodule 的 `.git` 是一個檔案**（33 bytes，內容 `gitdir: ../.git/modules/upstream`），
+不是目錄。
+
+所以那個「差分基準有沒有被移動過」的檢查，在 upstream 是正規 submodule 的情況下
+**永遠不會執行**。它不會報錯，只會安靜地跳過，然後結尾照樣印
+`all declared sources present and verified`。
+
+改成 `-e` 之後 `--verify` 回報 `upstream pinned at 4d3ff26bfb8a (matches SOURCES.json)`
+與 `nothing was skipped`。
+
+**一個不會觸發的控制跟沒有控制的差別只在心理上** —— 這句話今天出現第二次，
+第一次是在備份的 DoD 上。
+
+### `README.md` 第一屏
+
+按 `ARTIFACTS.md` §1 的五件事寫，但 Status 一列照現實寫，不照範本寫：
+**「Nothing built, nothing flashed, zero bytes written to the device.」**
+以及一列 `Not measured`：**這個 repo 到今天為止沒有任何一個數字是在矽片上量到的。**
+
 ### 下一步
 
-`DAY-ZERO` 第 3 項的其餘部分：submodule 釘 `4d3ff26`、`fetch-sources.sh`、
-`README.md` 第一屏。第 0、1、2a、2b、2c 項已關閉。
+`DAY-ZERO` 第 4 項（loader 命令語意六題，其中三題上游已答）。
+第 5 項是這一節唯一要碰硬體的一項。

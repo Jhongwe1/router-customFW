@@ -48,8 +48,13 @@ build/
 out/
 staging/
 toolchain/
-# cloned GPL drops -- SOURCES.json says how to re-fetch each one
-src-vendor/
+# cloned GPL drops -- SOURCES.json says how to re-fetch each one.
+# No trailing slash: on this machine src-vendor is a SYMLINK into ext4, not a
+# directory, because NTFS is case-insensitive and the vendor kernel trees carry
+# paths that differ only in case (xt_CONNMARK.h vs xt_connmark.h, and 29 more).
+# A pattern ending in / matches directories only, and would have let the symlink
+# itself be committed. tools/test-gitignore.sh case 14 is that check.
+src-vendor
 linux-*/
 squashfs-root/
 *.o
