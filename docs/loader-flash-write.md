@@ -169,11 +169,93 @@ Two further things the sequence settles:
   measurement; it was the register-level specification needed to ask the
   question from code we control.
 
-**The value is still not known.** Reading it needs code running on the device.
-`v0` is a return register, so it is not readable from a fixed address unless one
-of the two callers stores it — **that has not been traced**, and it is worth ten
-minutes, because if a caller does store it then the loader's `EB` command reads
-the JEDEC ID at the next bench session with no new code and no risk at all.
+**The value is still not known.** But it is readable, and the path was traced on
+2026-08-23 — see the next section. It takes one console command and no new code.
+
+### Where the JEDEC ID ends up, and why `burn()`'s only bound is a fallback
+
+**(A, traced 2026-08-23. This closes `C-3`'s residual, and it also changes what
+§1's bounds check means on this unit.)**
+
+`ComSrlCmd_RDID()` has exactly two callers and they are adjacent, both inside
+the SPI probe at `0x80405030`:
+
+```
+80405050   jal   ComSrlCmd_RDID      ; first call -- the result is DISCARDED
+8040505c   jal   ComSrlCmd_RDID      ; second call
+80405064   srl   s1,v0,0x8           ; s1 = the 24-bit JEDEC ID
+80405074   addiu a0,v0,-10396        ; 0x8040D764 = the 32-row chip table
+80405080   lw    v0,0(v1)            ; row[0] = the stored id
+80405088   bne   v0,s1,next          ; compare, 0x20 stride, 32 rows
+804050b0   bne   s0,a1,found         ; s0 == 32 -> no row matched
+```
+
+**Neither caller stores it**, so the first reading of this — that `v0` is a
+return register and the value is therefore unreachable — was right about the
+callers and wrong about the outcome. The value is stored one level down.
+
+On a miss the loader installs a **fallback descriptor** and this unit takes that
+path, which is why the banner prints `chipName: UNKNOWN`:
+
+```
+804050b8   li    v0,31
+804050c4   li    a1,40
+804050d4   li    v0,4096             ; sector size
+804050dc   li    v0,256              ; page size
+804050e4   v0 = 0x8040ADCC           ; the name -- the string is literally "UNKNOWN"
+80405124   move  a1,s1               ; the JEDEC ID
+80405128   li    a2,22               ; *** address bits ***
+8040512c   jal   0x8040533c
+80405130   lui   a3,0x1              ; block size 0x10000
+```
+
+and the installer at `0x8040533C` writes a 72-byte record into an array based at
+`0x8040FBD4`, indexed by `chip * 72`:
+
+```
+80405374   sllv  s1,s1,a2            ; capacity = 1 << address_bits
+80405388   addiu v0,v0,-1068         ; 0x8040FBD4
+80405390   sw    a1,0(s0)            ; +0   = the JEDEC ID
+80405398   sb    v0,4(s0)            ; +4   = manufacturer byte
+804053a0   sb    v0,5(s0)            ; +5   = device byte 1
+804053a4   sb    a1,6(s0)            ; +6   = device byte 2
+804053b8   sb    s4,8(s0)            ; +8   = address bits
+804053bc   sw    s1,12(s0)           ; +12  = capacity
+804053c0   sw    s3,16(s0)           ; +16  = block size
+804053d8   sw    s3,20(s0)           ; +20  = capacity / block
+804053dc   sw    s2,24(s0)           ; +24  = sector size
+```
+
+**Two things follow, and the second one is the more important.**
+
+**One — the JEDEC ID is at a fixed address.** `0x8040FBD4 + 0` holds it, and
+`+4`/`+5`/`+6` hold the same three bytes again in a different layout. So a
+single `DW 8040FBD4 8` at the `<RealTek>` prompt reads it, with **four
+precomputed values in the same output as the control**:
+
+| offset | expected | where it comes from |
+|---|---|---|
+| `+0` | **unknown — this is the measurement** | |
+| `+12` | `0x00400000` | `1 << 22`, and 22 is the fallback's literal |
+| `+16` | `0x00010000` | `lui a3,0x1` |
+| `+20` | `0x00000040` | capacity / block |
+| `+24` | `0x00001000` | `li v0,4096` |
+
+If those four match, the fifth is trustworthy. If they do not, the address or
+the layout is misread and the ID must not be believed. `plan/` §17 listed the
+JEDEC ID as removed because R5b's MTD probe would read it; it turns out the
+console reads it first, with no driver and no risk.
+
+**Two — `burn()`'s only bounds check is this fallback constant.** §1 established
+that the single bound is the top one, `lw a3,12(s0)`, taken from the chip
+descriptor. On this unit `+12` is `1 << 22` = 4,194,304, and that number comes
+from a **hard-coded default for an unidentified chip**, not from having
+identified the part. It is correct for this device by coincidence: a 4 MiB
+default was the sane guess in 2014 and this is a 4 MiB part.
+
+**Read out of the code:** the loader never learns how big its flash is. It
+assumes. R8 must not rely on that bound, and `flashguard` has to enforce the
+`CLAUDE.md` floor itself — which §1 already said, for a different reason.
 
 ### Commands
 
