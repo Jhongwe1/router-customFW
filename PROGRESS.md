@@ -23,6 +23,31 @@ the work (house rule 6).
 On entering a gate that has no step list yet, the first session writes one here
 before doing any of it (`plan/SESSIONS.md` §0b).
 
+### The four things this file tracks, because they are not the same thing
+
+This line existed to name one of them and was read as naming all four. **Active
+step above is a bench session, which is not one of `DAY-ZERO` items 0–8** — that
+is not an error, but nothing said so.
+
+| | what it is | where it lives | answers |
+|---|---|---|---|
+| **Gates** `S0`, `R0`…`R9`, `P1`…`P4` | the fifteen milestones | the board below | *how far is the project* |
+| **`DAY-ZERO` items 0–8** | the desk step list for the gate that is active now | `plan/DAY-ZERO.md` | *what do I do next at the desk* |
+| **Runsheet sessions** `B1`, `B2` | what gets typed at the bench, one power cycle each | `RUNSHEET.md` | *what do I do next at the device* |
+| **`C-n`** | open questions that outlive one session, each owned by a gate | Carried forward, below | *what is still unanswered* |
+
+**Runsheet sessions are not plan items and never were.** They exist because
+`DAY-ZERO` items 2c and 4 produced a large number of claims read out of a flash
+dump, a datasheet and four vendors' source, and **no number in this repository
+has been measured on the device**. A session appears when enough desk claims
+have piled up to be worth one power cycle. `B1` and `B2` are the first.
+
+A `C-n` is *not* extra work appearing from nowhere either: it is the mechanism
+for **not** doing work now. When a session turns up a question it cannot close,
+the choice is to chase it (and lose the thread) or to write it down with the
+gate that owns it. The list is long because the desk work has been productive,
+and every row names where it gets settled.
+
 ---
 
 ## Gate board
