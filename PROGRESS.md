@@ -87,7 +87,6 @@ close it. **An item with no owning gate is a bug in this list.**
 | C-8 | Does a watchdog reset still present the ESC window, or does bootcode take a different path? | R4 |
 | C-9 | Hazards beyond loads: stores, `mflo`/`mfhi`, `mfc0`/`mtc0` — F47, upstream open #100 | R1b |
 | C-10 | Copy ③ has never been read back. Is what sits on Google Drive what was uploaded? Copies ① and ② were verified byte for byte; ③ was not. | S0 |
-| C-11 | The pinned baseline `4d3ff26` exists on `origin/w08-writeup` only, not on the upstream default branch. If that branch is deleted, rebased or renamed, the pin becomes unfetchable and R9's differential argument loses its anchor. A tag would fix it permanently. | R9 |
 
 ---
 
@@ -98,6 +97,7 @@ that records where it was wrong is more credible than one that looks right.**
 
 | Date | What changed | Who caught it |
 |---|---|---|
+| 2026-08-23 | C-11 closed the day it opened: the upstream repository now carries an annotated tag `rlxfw-baseline` on `4d3ff26`, so the differential baseline is reachable without any branch. `SOURCES.json` records the tag beside the commit. Also measured while doing it: `../router` gained a commit on top of `4d3ff26` during this session, and the pinned commit is still an ancestor, so the anchor held. | verifying the pin after tagging |
 | 2026-08-23 | The commit that records the pinned baseline is `dd85c37`, whose subject is about the datasheet and says nothing about it. `git add <one file>` followed by `git commit` commits the **whole index**, and `.gitmodules` and `upstream` had been staged earlier. Not rewritten: the history is pushed, and a force push to fix an attribution is the wrong risk class for the problem. `git log -- .gitmodules` finds it; this row explains it. | `git show --stat` after the fact |
 | 2026-08-23 | `tools/fetch-sources.sh` tested `[ -d upstream/.git ]` before checking the pinned baseline. In a submodule `.git` is a **file** holding `gitdir: ...`, so the test was false and the check — the one that catches the differential baseline having moved — silently never ran. Changed to `-e`; it now fires and passes. | the fetch reporting `skip upstream not present` about a submodule that was demonstrably present |
 | 2026-08-23 | `SOURCES.json` sends every GPL drop to `src-vendor/`, which sits on NTFS. The vendor kernel trees carry paths that differ only in case — `xt_CONNMARK.h` against `xt_connmark.h` and 29 more pairs in `wecb-vz-gpl` alone. Measured on `rtl819x-toolchain`: **254 files would have been lost silently**. `src-vendor` is now a symlink into ext4 under `$FWRE_WORK/rebuild/`, which is where `CLAUDE.md` already says binaries belong. | creating `B.h` and `b.h` on `/mnt/c` and getting one file |

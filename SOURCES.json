@@ -26,6 +26,7 @@
     "pin": {
       "commit": "4d3ff26bfb8a32986d3db532ca25197ef3043fdb",
       "branch_at_pin": "w08-writeup",
+      "tag": "rlxfw-baseline",
       "date": "2026-08-22",
       "subject": "A guard case that expired on the day the thing it guards started working",
       "verified_on_remote": true

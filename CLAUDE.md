@@ -58,12 +58,22 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 
 ## Environment
 
-- **The Bash tool is Git Bash, not WSL.** Dispatch the Linux side:
-  `wsl -d Ubuntu-24.04 -- bash -lc 'cd /mnt/c/Users/Key20/Desktop/router-rebuild && …'`
-  — `-lc` matters. `$VAR` is stripped and a leading `/` is MSYS-translated, so use
-  literal paths or write a script and run that.
-- **Binaries never live under `/mnt/c`.** DrvFs drops symlinks and permission bits,
-  and on this project the findings *are* filesystem metadata.
+- **The Bash tool is Git Bash, not WSL.** `-lc` mangles the command: `$VAR` is
+  stripped and a leading `/` is MSYS-translated (`bash /mnt/c/x.sh` became
+  `bash C:/Program Files/Git/mnt/c/x.sh`). **Feed the script over stdin instead** —
+  nothing in the body is touched, and shell variables work:
+
+  ```
+  wsl -d Ubuntu-24.04 -- bash -ls <<'EOF'
+  … ordinary shell, literal paths, $VAR all fine …
+  EOF
+  ```
+- **Binaries and vendor source trees never live under `/mnt/c`.** Measured
+  2026-08-23: DrvFs *keeps* symlinks, but reports every file as `777`, so git sets
+  `core.fileMode=false` and stops seeing mode changes at all; and NTFS is
+  case-insensitive, which silently drops **254 files** from the vendor kernel trees
+  (`xt_CONNMARK.h` against `xt_connmark.h`). On this project part of the finding
+  *is* filesystem metadata. `src-vendor/` is a symlink into `$FWRE_WORK/rebuild/`.
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
   the commands and read what I paste back. One power cycle is the most expensive
   unit here, so list every question before the device is plugged in.

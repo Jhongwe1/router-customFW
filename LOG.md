@@ -357,6 +357,25 @@ fetch 跑完之後結果裡有一行 `skip upstream not present` —— 而 upst
 **「Nothing built, nothing flashed, zero bytes written to the device.」**
 以及一列 `Not measured`：**這個 repo 到今天為止沒有任何一個數字是在矽片上量到的。**
 
+### 收尾：把 pin 錨死，並修掉 `CLAUDE.md` 裡被量測否證的一句
+
+上游 repo 現在帶一個 annotated tag `rlxfw-baseline` 指向 `4d3ff26`，
+遠端驗證 tag object `7c4c0537` 解到該 commit。`SOURCES.json` 的 `pin` 區塊
+增加一欄 `tag`。**差分基準不再依賴任何一個分支活著。** C-11 當天開當天關。
+
+順帶量到：`../router` 在本次 session 期間多了一個 commit `f69ef16`（19 個檔案，
+涵蓋早上點出的 13 M + 2 ??，工作區現已乾淨）。`4d3ff26` 仍是 HEAD 的祖先 ——
+歷史是加在上面而不是改寫，錨點沒事。該 commit 尚未推送。
+
+`CLAUDE.md` 改了兩處，都是今天實測的結果：
+
+1. 「DrvFs drops symlinks and permission bits」→ symlink **不會**掉，權限位元會，
+   而且真正致命的是 NTFS 大小寫不敏感會吃掉 **254 個**廠商 kernel 樹的檔案。
+   規則不變，理由換成量到的。
+2. WSL 派工方式：`-lc` 會剝掉 `$VAR` 並把開頭的 `/` 做 MSYS 轉換
+   （`bash /mnt/c/x.sh` 變成 `bash 'C:/Program Files/Git/mnt/c/x.sh'`）。
+   改成 `bash -ls` 加 stdin heredoc，body 完全不被動到 —— 本 session 全程如此。
+
 ### 下一步
 
 `DAY-ZERO` 第 4 項（loader 命令語意六題，其中三題上游已答）。
