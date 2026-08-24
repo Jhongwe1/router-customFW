@@ -19,7 +19,7 @@
 # suite	bench_total	allowed_skip_label	covers	reason
 spec-check	10	-	0	-
 test-file-modes	3	-	0	-
-test-gitignore	15	-	0	-
+test-gitignore	15	src-vendor (symlink)	1	needs a filesystem that can make symlinks; MSYS/Git Bash cannot, and until 2026-08-25 that killed the whole suite under errexit on the machine the push happens from. CI runs on Linux, so this skip should NOT appear
 test-console-capture	29	-	0	-
 verify-backup-copy	4	-	0	-
 ci-census	12	-	0	-

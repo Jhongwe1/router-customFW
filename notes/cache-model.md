@@ -121,6 +121,50 @@ particular:
   the caches at runtime with `r3k_cache_size(ST0_ISC)` — that routine is
   therefore also a ready-made measurement for R1d to reproduce bare metal.
 
+## Cache geometry — a prediction with one weak source, written before the measurement
+
+**Added 2026-08-25. Not measured, not corroborated, and the source is the weakest
+class in this project.** It is here because a number written *before* the cell
+that tests it is a refutation condition, and the same number written after it is
+a description.
+
+A third-party OpenWrt-style port for this SoC — `shibajee/linux-rtl8196e`, branch
+`RTL8196E`, `arch/mips/boot/dts/realtek/rtl8196e.dtsi`, fetched 2026-08-25 —
+carries a `cpu@0` node:
+
+```
+compatible      = "lexra,rlx4181";
+d-cache-size    = <8192>;      i-cache-size      = <16384>;
+d-cache-line-size = <16>;      i-cache-line-size = <16>;
+tlb-entries     = <32>;
+```
+
+**What this is worth, stated before anyone quotes it.** One source, third party,
+and the same file's register addresses are demonstrably placeholders: its `soc`
+node declares `ranges = <0 0xB8000000 0x1000>` — a 4 KiB window — while
+`interrupt-controller@B8003000` carries `reg = <0x0 0x100>`, which resolves to
+`0xB8000000`, and `serial@B8002000` and `serial@B8002100` carry the **same**
+`reg`. The tree does not compile: `dtc` stops at `clocks = <&cpu_clk/2>`, a
+phandle with an arithmetic operator in it. **So this file is admissible as prior
+art for driver shape and for these five integers, and for nothing addressed.**
+
+`tlb-entries = <32>` is **not** recorded as a vote: `SPEC.md` `CPU-08` already
+holds 32 as **measured on the device**, and adding a third party's guess beside a
+measurement is what the two-source rule exists to prevent.
+
+| | prediction | refuted by |
+|---|---|---|
+| I-cache | **16 KiB** | `probe1`'s `GEOM=1` walk returning any other size |
+| D-cache | **8 KiB** | the same |
+| line size, both | **16 bytes** | the same |
+| core | RLX4181 rather than RLX5281 | `probe2`'s `PRId` row `0x78` reading in the 5281 range — which would be worth more than agreement, because it refutes a Realtek datasheet and two public kernel trees at once |
+
+🔴 **`GEOM=1` does not run in `RUNSHEET.md` § Session B4** — the build is
+`GEOM=0`, and the walk writes 1 MiB of real memory at `0x80B00000` if this core
+does not implement `Status.IsC`, which is one of the things the same seating is
+there to find out. So this prediction is not tested by the next seating, and
+saying so is the point of writing it down now.
+
 **Refutation condition, for the record:** the claim "this core uses the R3000
 cache model, not the MIPS32 `cache` instruction" is refuted by finding a `cache`
 instruction (primary opcode `0x2F`) anywhere in vendor code that executes. The

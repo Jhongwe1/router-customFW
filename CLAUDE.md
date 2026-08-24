@@ -64,10 +64,17 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 
 - **`usbipd` has nothing to attach to unless a WSL process is already running.**
   Measured 2026-08-24: with the distro idle, `usbipd attach` fails with *there is
-  no WSL 2 distribution running*, and **an attachment already made drops when the
-  distro goes idle** — it died between two tool calls mid-session and took
-  `/dev/ttyUSB0` with it. Start a long-lived process first and leave it running:
-  `wsl -d Ubuntu-24.04 -- sleep 36000` in the background. **And the busid is not
+  no WSL 2 distribution running*, and 🔄 **an attachment already made can drop
+  while the distro is still running** — it died between two tool calls mid-session
+  and took `/dev/ttyUSB0` with it. **That drop was not distro idle**, which is
+  what this line said until 2026-08-25: `uptime` ran continuously through it, and
+  what left was the **CP2102**, off the Windows USB bus after **7 min 24 s of pure
+  console idle**, with `usbipd list` moving the busid out of *Connected*. Root
+  cause **undetermined**, and none of the three candidates has been ruled out:
+  usbip socket transient, USB selective suspend not waking, a loose connector.
+  Start a long-lived process first and leave it running:
+  `wsl -d Ubuntu-24.04 -- sleep 36000` in the background — **that is for the attach
+  step and is not a fix for the drop above; do not record it as one.** **And the busid is not
   stable** — the USB GbE moved `3-4` → `2-4` across one re-enumeration the same
   day, so re-read `usbipd list` every time rather than reusing the number.
 - **The Bash tool is Git Bash, not WSL.** `-lc` mangles the command: `$VAR` is

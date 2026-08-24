@@ -57,7 +57,7 @@ toolchain/
 # directory, because NTFS is case-insensitive and the vendor kernel trees carry
 # paths that differ only in case (xt_CONNMARK.h vs xt_connmark.h, and 29 more).
 # A pattern ending in / matches directories only, and would have let the symlink
-# itself be committed. tools/test-gitignore.sh case 14 is that check.
+# itself be committed. tools/test-gitignore.sh case 15 is that check.
 src-vendor
 linux-*/
 squashfs-root/

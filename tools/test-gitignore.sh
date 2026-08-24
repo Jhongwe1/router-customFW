@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Guard suite for .gitignore -- 13 cases.
+# Guard suite for .gitignore -- 15 cases, one of which skips on a filesystem
+# that cannot make symlinks.
 #
 # Why this exists rather than "just read the file"
 # ------------------------------------------------
@@ -30,6 +31,8 @@ T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 
 [ -f "$GI" ] || { echo "no .gitignore at $GI" >&2; exit 1; }
+
+skip=0
 
 # MUST be tracked. Without these, a .gitignore of `*` would score 7/7.
 KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/threat-model.md dumps/MANIFEST.json"
@@ -89,8 +92,16 @@ echo "=== a SYMLINK named src-vendor must be ignored too ==="
 # case. A .gitignore pattern ending in / matches directories only, so it would
 # have let the symlink itself be committed.
 rm -rf src-vendor
-ln -s /nonexistent/elsewhere src-vendor
-if git check-ignore -q src-vendor; then
+# MSYS/Git Bash has no symlinks: `ln -s` to a nonexistent target fails outright,
+# and with errexit that killed this script before it printed RESULT -- on the one
+# machine the push actually happens from. Skipped rather than failed, because the
+# case is about .gitignore's pattern and not about the filesystem; Linux and WSL
+# both still run it. `tools/ci-expected.tsv` carries the label.
+if ! ln -s /nonexistent/elsewhere src-vendor 2>/dev/null; then
+    printf '  skip   %-46s %s\n' "src-vendor (symlink)" \
+           "this filesystem cannot make symlinks"
+    skip=$((skip + 1))
+elif git check-ignore -q src-vendor; then
     printf '  ok     %s
 ' "src-vendor (symlink)"
     pass=$((pass + 1))
@@ -108,7 +119,7 @@ git diff --cached --name-only | sort | sed 's/^/  /'
 
 echo
 if [ "$fail" -ne 0 ]; then
-    printf 'RESULT: %d passed, \033[31m%d failed\033[0m\n' "$pass" "$fail"
+    printf 'RESULT: %d passed, \033[31m%d failed\033[0m, %d skipped\n' "$pass" "$fail" "$skip"
     exit 1
 fi
-printf 'RESULT: \033[32m%d passed, 0 failed\033[0m\n' "$pass"
+printf 'RESULT: \033[32m%d passed, 0 failed\033[0m, %d skipped\n' "$pass" "$skip"

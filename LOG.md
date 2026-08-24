@@ -3191,3 +3191,44 @@ TEMT drain → 16,777,216 次三指令迴圈 → `sw $0,0(WDTCNR)`，**報告印
 `spec-check.py` 10/10、`test-file-modes.sh`、`test-rlxprobe.sh` **66/66**、
 `test-hazlint.sh` 56/56、`ci-census --self-test` 12/12。
 `SPEC.md` `CPU-33` 補上那 32 個字的來處。
+
+### 這一段之後又動了四個地方，而它們都不在 `B4` 裡
+
+審完 B4 之後還剩四件，四件都做了。排序的依據是「它會不會讓下一個人（包括明天的我）
+拿著錯的東西行動」，不是大小。
+
+**一、廢掉的 `0x8040A5C0` 還在兩個地方讀起來像是現在式。**
+`docs/loader-command-semantics.md:956` 寫「above a 16-entry dispatch table at
+`0x8040A5C0`」，而**同一份文件的 §10 已經推翻了它**；`PROGRESS.md` 的 `R1g-0`
+也還寫著「那張表有 16 格而且不必共用 tail」。grep 的人會先碰到錯的那一個。
+兩處都標上推翻，**`R1g-0` 那句保留原文不改寫** —— 把一個寫錯的風險評估改成看起來
+很準的樣子，是另一種不誠實。
+
+**二、`CLAUDE.md` 的 usbipd 句子跟它自己的 log 矛盾。**
+§ Environment 寫附著「drops when the distro goes idle」。`LOG.md:2287` 量到的是相反：
+**WSL uptime 全程連續**，離開的是 **CP2102**，在**純空閒 7 分 24 秒**之後掉出
+Windows USB 匯流排，根因**未定**。差別不是措辭：若信了原本那句，明天在台上會拿
+`wsl -- sleep 36000` 當作修法，**而它修不到這個故障**。重寫，並且把「keep-alive 是
+給 attach 用的、不是這個的修法」寫進去。
+
+**三、決定 push 會不會漏東西的那道 guard，在 push 發生的那台機器上跑不完。**
+`tools/test-gitignore.sh` 在 Git Bash 上 `exit 1`：MSYS 建不了 symlink，`ln -s` 失敗，
+`set -o errexit` 在印出 `RESULT` 之前就中止。在 WSL 是 15/15。
+改成跟其他套件一樣的 skip 行（`tools/ci-expected.tsv` 帶 label），並且**兩種形狀都拿
+`ci-census` 驗過**：Linux 15/15 総數還是 122，MSYS 14+1 skip 也綠。順手修掉 header 的
+「13 cases」→ 15 和 `.gitignore` 註解的「case 14」→ 15。
+
+**四、`CPU-25` 的事前預測，而它是四件裡唯一我本來可能不做的。**
+第二棵 RTL8196E 樹的 `rtl8196e.dtsi` 帶 I 16 KiB／D 8 KiB／line 16／16 和
+`compatible = "lexra,rlx4181"`。**我自己抓了一次來看**，而不是拿 agent 回報的數字寫進
+一個帶 provenance 標記的表——把沒驗證過的第三方數字標成「讀」，比不記還糟。
+
+記下去的同時把它的弱點一起記：同一份檔的 `soc` 寫 `ranges = <0 0xB8000000 0x1000>`
+（4 KiB 窗）却把 `interrupt-controller@B8003000` 給 `reg = <0x0 0x100>`，
+`serial@B8002000` 跟 `serial@B8002100` 帶**同一個** `reg`，而且 `dtc` 在
+`clocks = <&cpu_clk/2>` 直接拒絕解析。**所以它只能當 driver 形狀的先前技術和這五個
+整數用，不能當任何位址的來源。** `tlb-entries = 32` **不記**：`CPU-08` 已經是
+量／量，把第三方的猜測放在一個量測旁邊，正是兩來源規則要防的事。
+
+而這個預測**下一場不會被測到**：`B4` 是 `GEOM=0`。寫在這裡的意義就是這句話——
+一個寫在量測前面的數字是否證條件，寫在後面的同一個數字是描述。

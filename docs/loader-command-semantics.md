@@ -953,8 +953,10 @@ Reading 3 has a third leg, and it is a measurement on the device rather than a
 reading of the code. **The loader carries its own exception reporter**: the
 strings `Undefined Exception happen.`, `cp0_cause=%X, cp0_epc=%X`,
 `cause by: %s`, `NOT HANDLE TRAP IN JUMP DELAY SLOT` sit at
-`0x8040A4E0`–`0x8040A5B0`, above a 16-entry dispatch table at `0x8040A5C0`
-pointing into `0x80400DA0`–`0x80401BDC`. **(A.)**
+`0x8040A4E0`–`0x8040A5B0`. 🔄 **The 16-entry table at `0x8040A5C0` above them
+is NOT the exception dispatch table** — retracted 2026-08-25, see §10; it is
+`BootStateEvent[3][8]`, the TFTP/ARP boot state machine. The real dispatch table
+is `exception_handlers[32]` at `0x8040EB40`, in BSS. **(A.)**
 
 `check_image()` necessarily runs between the loader banner and
 `Jump to image start=0x80500000...`. **Eighteen console captures of this unit,
