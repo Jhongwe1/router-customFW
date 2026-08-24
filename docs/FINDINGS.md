@@ -1,0 +1,73 @@
+# Findings
+
+**A map, not a summary.** This repository holds about 400 KB of dense technical
+prose across `PROGRESS.md`, `SPEC.md`, `RUNSHEET.md` and `LOG.md`, and without a
+layer saying *which part is worth reading* that density reads as noise. Every row
+below is one finding, ordered by **the decision it changed**, and links to the
+file that owns it. Nothing here is the owner of anything.
+
+Each row is marked: **量** measured on the device · **讀** read out of code, a
+dump or a document · **推** inferred, pending a measurement.
+
+---
+
+## It changed what a payload of mine may execute
+
+| | | |
+|---|---|---|
+| 讀 | **The general exception vector on this core is `0x80000080`, not `0x80000180`.** R3000 layout: `0x80000000` is the UTLB refill vector and the loader installs nothing there. Three sources — this unit's `trap_init`, the vendor bootcode's own comment, and `arch/rlx/kernel/traps.c` — and none says `0x180`. Corroborated by the loader returning from exceptions with `rfe`, while the `eret` encoding occurs zero times in the same file *(and that zero has a positive control: the same grep finds both `rfe`s)* | **The address `0x80000180` had reached four files.** A handler written there lands in RAM nothing reads, the payload looks installed, and the fault still hangs · [`notes/cache-model.md`](../notes/cache-model.md) |
+| 讀 | **A fault the loader does not handle hangs the board forever.** `do_reserved` at `0x80400BE8` prints twice and executes `j 0x80400C18` — a branch to itself. The exception entry has already cleared `IEc`, and the watchdog is not armed. The vendor source says so in as many words: `prom_printf("Undefined Exception happen."); for(;;); /*Just hang here.*/` | **One fault = one power cycle, and there is no spare unit.** Every payload is ordered by increasing risk and writes each result before taking the next · `PROGRESS.md` `R1-gate` |
+| 讀 | **`do_reserved` dereferences the faulting code's own `$a0`.** It is the raw vector target with no `SAVE_ALL`, and its third instruction is `lw a3,148(v0)` with `v0` = the faulting `$a0`. `rlx_cctl(0x002)` would have handed it the integer 2, so `0x96` — kuseg, TLB-mapped, and a miss goes to `0x80000000`, which the loader never populated | **Undetermined, and the sharper version was withdrawn the same day.** The escalation *"it could branch into the loader's flash-write path"* was refuted: `0x5A5AA5A5` decodes as `BLEZL` with target `0x7FFE9B58`, not a jump. `SAFE_A0` stays because it is two instructions and removes an undetermined case · [`tools/rlxprobe/cache.S`](../tools/rlxprobe/cache.S) |
+| 讀 | 🔴 **A TFTP upload named `boot.img` sets the loader's write pointer to `0x80000000`** — the name compare at `0x8040A6A8` reaches `0x80401250`, which stores `0x80000000` into both `LOADADDR` and the running write pointer at `0x8040DD10`, and `0x80401A10`'s memcpy walks up from there. It writes over the UTLB refill vector **and** over the general exception vector, destroying the loader's own exception handling mid-transfer | **`boot.img` and `nfjrom` go on the do-not-type list.** Found by the adversarial pass on the exception-path read, which had claimed nothing ever writes low RAM — a computed base its own scans admitted they could not see · `RUNSHEET.md` |
+| 讀 | **This loader was not built from either GPL drop this project holds.** The vendor's `do_reserved` is `prom_printf("Undefined Exception happen."); for(;;);` — one call, no CP0 reads. The shipped `0x80400BE8` has two `prom_printf`s, `mfc0 c0_cause`, `mfc0 c0_epc` and a `pt_regs` load; and `do_watch`, whose string is in the binary, appears in neither tree | Every *"the vendor source says why"* argument has to state which half it is leaning on. The string match is evidence of provenance; it is not evidence that the C on screen is the C that was compiled · `docs/loader-command-semantics.md` |
+| 讀 | **This core uses the R3000 cache model** — `Status.IsC`/`SwC` — **plus a Lexra CP0 register 20** carrying the invalidate and writeback commands. Two sources agree on `0x002` and `0x200`; two further commands the bootcode issues at reset have one source and no name | Decides where the handler goes, and what `R5b` and `R6` must do. The two unnamed commands are **not written** by any payload · [`notes/cache-model.md`](../notes/cache-model.md) |
+| 讀 | **The load delay slot is architecturally exposed.** Upstream's `P9-12` filled it — with the wrong instruction — and the device emitted exactly 16 bytes per iteration, one 16550 FIFO, 272 times over ten minutes | `-march=mips32` is banned; `hazlint` is a **build gate**, not a lint, and no payload exists unless it exited 0 · [`tools/hazlint`](../tools/hazlint) |
+| 讀 | **`-march=mips1` does not compile on gcc 12.4.0 without `-msoft-float`** — *"`-march=mips1` requires `-mfp32`"* | The plan's build line was unbuildable as written. `-msoft-float` rather than `-mfp32`, because this core has no FPU · `SPEC.md` `TC-06` |
+
+## It changed where a payload of mine may write
+
+| | | |
+|---|---|---|
+| 量 | **`0x81000000` is not scratch.** A live 32-byte-periodic descriptor table sits at `0x81000400` with `next = prev = &next`, and uninitialised DRAM cannot produce its own address | The runsheet's §C had argued from *"far above the loader's image"*, which excludes two known things and nothing allocated at run time. The upload address moved to `0x80A00000`, chosen by a probe rather than by an argument · `RUNSHEET.md` §C |
+| 量 | **`0x81000000` word 1 is rewritten to `0x00000144` on every boot** — three times reproduced, and word 2 survives, so it is not decay | A canary belongs at `0x80A00000`, never at `0x81000000` · `SPEC.md` `MEM-14` |
+| 量 | **This DRAM keeps its *contents* across a short power-off, not just its bias.** `0x80A00000` read back sixteen words written by hand in the previous power cycle, byte for byte. After 16 hours: zero retention | **Any "it survived a power cycle" claim must state how long the power was off.** Every result block is poisoned before it is written · `SPEC.md` `MEM-15` |
+| 量 | **`EW` rounds an unaligned address up; `EB` does not.** One loader, two write primitives, opposite handling | Every `EW` written from here on has to assume it · `SPEC.md` `LDR-08` |
+| 讀 | **`AUTOBURN`'s initialiser in the loader image is `1`.** So the loader boots with auto-burn on, and a TFTP upload that completes without `AUTOBURN 0` having been typed is written to flash | Found while precomputing bench expectations, before the first upload. `R0`'s whole zero-write claim rests on it, and it is measured at the burn path's own instruction *during* every transfer · `SPEC.md` `LDR-23` |
+
+## It changed what the bench procedure must do
+
+| | | |
+|---|---|---|
+| 量 | **The console line buffer is 128 bytes, and `readline` writes its NUL only on the CR path.** A line of exactly 128 characters is unterminated and the tokeniser scans past it into the saved registers | `C7` was about to send 173 characters, which `readline` cuts at 128 with `EW` as the command. **No command line may ever be 128** · `SPEC.md` `LDR-06b` |
+| 量 | **`DW <addr> N` prints `4 × ceil(N/4)` words and rounds *up*** | A readback shorter than the structure comes back looking complete — which would have faked exactly the failure the cell was hunting · `PROGRESS.md` Corrections |
+| 量 | **A stale neighbour entry costs the first transfer three retransmits**, and after a kernel run a stale *loader* entry broke ping outright. The loader synthesises its MAC from the IP it was given; the vendor kernel uses the real one | The host must flush the neighbour entry at **every** loader↔kernel transition. It is an `R4` requirement for unattended `bench-ci` · `RUNSHEET.md` Results |
+| 量 | **An ESC window of 45 s was too short**: the boot began 19 s after the stream stopped. The cost is wildly asymmetric — an extra ESC second is free, a missed window costs a power cycle | Standing change: `--esc 180 --seconds 200` · `PROGRESS.md` Corrections |
+| 量 | **The reset button is a GPIO on `PABCD` bit 5, active low — it is not `RESET#`.** Bit 5 goes 1→0 under the held button with `CNR` and `DIR` unchanged and no `Booting...` | Retired a planned cell before it was spent, and refuted *"this unit's loader polls only the UART"* · `SPEC.md` `BRD-05` |
+
+## It changed what an instrument may claim
+
+| | | |
+|---|---|---|
+| 量 | **A 0.26 % deviation reported as a property of the board was a property of the stopwatch.** The interval had been hand-timed over 61.842 s; a human reading a clock is good to about ±0.15 s, and ±0.15 s in 61.8 s *is* ±0.25 %. Re-measured over a 2,080-second baseline: **200.0049 MHz ± 7 ppm** | Two published numbers superseded, and the compiled-in `0x0BEBC200` turns out to be right to 24 ppm · `SPEC.md` `CLK-02` |
+| 量 | **The ESC heartbeat's achieved period is not the requested one** — 20.35 ms for a requested 20.00, and 2.32 ms for a requested 2.00. The difference is a fixed ~0.3 ms of host overhead, and the floor of the loop is 29 µs | The grid every interval is quantised to is now **measured per capture and recorded in its metadata**, with a case that proves the field is not repeating the argument back · `tools/console-capture.py` |
+| 讀 | **`hazlint`'s population control built its words with a private helper**, so it exercised a code path no scanned file ever took. It could not have caught any defect in span construction and it looked exactly like it could | Found by an adversarial review that confirmed 17 of 24 claimed properties. The suite went 42→56 with a mutation per fix · `SPEC.md` `TC-07` |
+| 讀 | **`readelf --dyn-syms` reports nothing on this unit's binaries** — they have no section headers — which is indistinguishable from clean | An acceptance condition whose check could not have failed. Replaced by a `PT_DYNAMIC`/`DT_SYMTAB` walk and `nm --undefined-only` before strip, which are different **in kind** · `notes/rootfs-census.md` |
+| 量 | **`NET-13` was withdrawn twice in one day — the finding and my correction of it.** The recorded jack order rested on labels assigned after the fact; the linear map that replaced it was checked by a cell whose expected value had been derived from the map it was supposed to test | The jack map is **undetermined**, and the deciding experiment writes the jack into the capture's filename · `SPEC.md` `NET-13` |
+
+## It changed the shape of the plan
+
+| | | |
+|---|---|---|
+| 讀 | **A gate dependency inherited from the first version was false.** Traced component by component, `R3` needs nothing from `R1`: it builds on the vendor toolchain, which is an existence proof, and the codegen safety net is independent | `R1` split into `R1-gate` and `R1-pub`. **`R3` moves from cumulative segment 61 to ≈41 with no work removed** — what moves is when you find out whether the kernel boots · `PROGRESS.md` Corrections |
+| 讀 | **Two public Linux trees exist for this SoC, one carrying a device tree for a TOTOLINK board on this exact part**, and neither was in `SOURCES.json` as a source | The response is not to cut `R5`: it gains a `driver-diff` — write blind, then diff register by register, and **send the disagreements back to the silicon to decide** · `SOURCES.json` |
+| 量 | **31 of 55 ELFs on this unit's own rootfs carry `system` or `popen`.** busybox carries neither; `dnsmasq` carries `popen` and the vendor's `udhcpd` carries `system` | Two components `R7` had named had to be replaced by ~350 lines of our own · [`notes/rootfs-census.md`](../notes/rootfs-census.md) |
+| 讀 | **A key-derivation choice had never been costed in memory.** scrypt at meaningful parameters wants 16 MiB of the 26 MiB this kernel gets, from one unauthenticated request | The rate limiter moves in front of the KDF, and the parameters are set by an anti-DoS budget · plan D8 |
+
+## It answered a question that had been open
+
+| | | |
+|---|---|---|
+| 讀 | **What copies flash `0x060010` into RAM at `0x80500000`**: `check_image()` itself, at `0x80407E44`, with the destination read *out of the flash header* — there is no `lui X,0x8050` anywhere in stage 2. **And the refutation that had been recorded against that attribution was itself wrong**: `check_image` reads `gCHKKEY_HIT` at its 17th instruction, not its first two. The block counter *is* at `0x8040DBA8`; it reads 0 because a later rootfs scan sets it to exactly zero at `0x80407FF4` and then polls ESC | It also explains something nobody had explained: `---Escape booting by user` is absent from every ESC-streamed capture because `doBooting` received `a0 = 0` and took the silent rescue path · `PROGRESS.md` `C-16` |
+| 讀 | **The 350 ms of silence after `Booting...` is stage 1 copying 20,924 bytes out of memory-mapped SPI NOR, uncached, a word at a time** — and `Booting...` is printed by **stage 1**, which means the experiment this project had written down for it pointed at the wrong binary. Decompression is eliminated **by measurement**: the same LZMA parameters took 1.013 s for the 976 KB kernel, which scales to 17–18 ms here by two independent routes | The DRAM training sweep, which the previous guess named, is ≤32 register writes · `SPEC.md` `CLK-15` |
+| 量 | **`C-8` closed on the boot text rather than on the register it was waiting for.** The loader prints `Reboot Result from Watchdog Timeout!` where a cold boot prints a single space — while `WatchDogIND` itself reads *clear* at the prompt, refuting the predicted value | A warm reset is distinguishable from a cold one with no register read at all · `SPEC.md` `CLK-13` |
+| 量 | **`0xB8000000` reads `0x8196E001`** — the SoC naming itself, while its own loader prints `chipName: UNKNOWN` | Free and unasked, during a cell about something else · `SPEC.md` `CPU-32` |

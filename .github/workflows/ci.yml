@@ -1,0 +1,188 @@
+# CI for rlxfw.
+#
+# What this is for, and what it deliberately is not
+# -------------------------------------------------
+# `README.md` says every instrument here ships with the controls that show it
+# can fail. That is an unfalsifiable sentence until something runs them, which
+# is the whole reason this file exists at all -- 33 commits and an empty
+# `git tag` is what "no external clock" looks like while it is happening.
+#
+# It is NOT a build of the firmware. There is no firmware. Every job here runs
+# instruments against committed text.
+#
+# The census job is the one that matters
+# --------------------------------------
+# A green badge over a suite that quietly shrank is exactly the failure this
+# project's own rule names: a tool reporting 0 is making a claim, and a tool that
+# cannot fail proves nothing. So every suite tees its output, and
+# `tools/ci-census.py` asserts, per suite,
+#
+#     ok + FAIL + sum(covers of every skip printed) == that suite's bench total
+#
+# against `tools/ci-expected.tsv`. A skip label that is not on the list turns the
+# build red. So does arithmetic that does not close -- which is the only thing
+# that catches a case disappearing with neither a FAIL nor a skip line, and that
+# has happened here.
+#
+# WHY THE CROSS COMPILER IS NOT INSTALLED, which looks like an omission
+# ---------------------------------------------------------------------
+# `gcc-mips-linux-gnu` would let `tools/test-rlxprobe.sh` build its payloads.
+# It would then invoke `tools/hazlint`, whose K4 population control is
+# `$FWRE_WORK/stage2.bin` -- 56 KiB of this unit's own vendor bootloader, which
+# is someone else's property and identifies one physical device, so it can never
+# be committed. hazlint exits 2 rather than report without that control, and
+# **that refusal is correct**: a checker whose population control did not run is
+# a checker nobody has shown to be looking. So installing the compiler turns 16
+# cases red for a reason that is not a defect. MEASURED 2026-08-25, on the bench
+# machine with $FWRE_WORK pointed at an empty directory: with the cross tools
+# present, `test-hazlint` is 17 ok / 14 FAIL / 8 skip and `test-rlxprobe` is
+# 20 ok / 25 FAIL. Without gcc, both skip cleanly, the census is green, and it
+# prints `NOT RUN IN THIS JOB: 101 case(s)` with every one of them named.
+#
+# That same measurement is where `tools/ci-census.py` earned its keep on its
+# first real input. It read 20 + 23 = 43 against a bench total of 45 and refused
+# the build: TWO cases had been vanishing out of `test-rlxprobe`'s A2 with
+# neither a FAIL nor a skip line, because they sat inside an `if [ -s ... ]`
+# guard. Nothing that counted skip lines could have seen it. Fixed the same
+# afternoon, and the same configuration now reads 20 + 25 = 45.
+#
+# `binutils-mips-linux-gnu` IS installed: it buys `test-opcount`'s
+# hardcoded-fixture control, which re-assembles the fixture and compares, and it
+# does not pull hazlint in.
+
+name: instruments
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  text:
+    # Everything here is a property of committed text and needs no apt at all.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # spec-check.py walks the owners named in SPEC.md, and most of them
+          # live under upstream/. Without the submodule it exits 1 on findings
+          # that are an absent checkout, not a defect in the file.
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: capture dir
+        run: mkdir -p ci-out
+
+      - name: spec-check
+        run: /usr/bin/python3 tools/spec-check.py 2>&1 | tee ci-out/spec-check.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-gitignore
+        run: bash tools/test-gitignore.sh 2>&1 | tee ci-out/test-gitignore.out; exit "${PIPESTATUS[0]}"
+
+      # Reads the git INDEX rather than the working tree, because the working
+      # tree is what DrvFs lies about on the machine this repo is developed on.
+      # A depth-1 checkout still produces a full index, so this is meaningful here.
+      - name: test-file-modes
+        run: bash tools/test-file-modes.sh 2>&1 | tee ci-out/test-file-modes.out; exit "${PIPESTATUS[0]}"
+
+      - name: ci-census self-test
+        run: /usr/bin/python3 tools/ci-census.py --self-test 2>&1 | tee ci-out/ci-census.out; exit "${PIPESTATUS[0]}"
+
+      # Two tools that do not print ok/FAIL/skip cases; they are exit-code gates
+      # and are not in the census table. Named here so the difference is on
+      # purpose rather than an omission.
+      # It takes FILES, not a directory, and it runs every pattern against a
+      # synthetic positive control before it will report on a real one.
+      #
+      # `*.log` only, and that is a scope decision recorded rather than a scan
+      # narrowed until it went green. The logs are what the DEVICE said, and
+      # they are what could carry its identity -- 0 hits over all of them.
+      # `*.meta.json` and `*.timing` are what the INSTRUMENT recorded about the
+      # host: they carry the bench's own 10.1.1.0/24 and `/home/key`, 25 hits,
+      # every one of them a property of the operator's machine and none of them
+      # of the unit. Two different questions, and only the first is this gate's.
+      - name: audit-bench-log (exit-code gate)
+        run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f -name '*.log')
+
+      - name: fetch-sources --list (offline; never fetches)
+        run: bash tools/fetch-sources.sh --list
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-out-text
+          path: ci-out/
+
+  instruments:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      # python3-serial and NOT actions/setup-python: tools/test-console-capture.sh
+      # hardcodes /usr/bin/python3, and the apt module lands exactly there.
+      # binutils only -- see the header for why gcc-mips-linux-gnu is absent.
+      - name: apt
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu
+
+      - name: capture dir
+        run: mkdir -p ci-out
+
+      # 66 s. Drives a pty, not a serial port; no device is involved.
+      - name: test-console-capture
+        run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-opcount
+        run: bash tools/test-opcount.sh 2>&1 | tee ci-out/test-opcount.out; exit "${PIPESTATUS[0]}"
+
+      # Skips cleanly with no cross compiler: one skip line standing for 45
+      # cases, which the census prints rather than hides.
+      - name: test-rlxprobe
+        run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"
+
+      # The reference set must be non-empty, and C1 flips a byte in its
+      # lexicographically first file, so that file must have a byte to flip.
+      - name: verify-backup-copy self-test
+        run: |
+          mkdir -p /tmp/refset
+          printf 'hello\n' > /tmp/refset/RESTORE.md
+          head -c 4096 /dev/urandom > /tmp/refset/a.age
+          bash tools/verify-backup-copy.sh --self-test /tmp/refset 2>&1 | tee ci-out/verify-backup-copy.out
+          exit "${PIPESTATUS[0]}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-out-instruments
+          path: ci-out/
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+      # --severity=error is green today. --severity=warning is red with six
+      # SC2034s -- `read -r` destructuring and one genuinely unused variable.
+      # Shipping a gate that is red on arrival teaches people to ignore it, so
+      # this is the level that holds, and raising it is its own commit.
+      - run: shellcheck --severity=error tools/*.sh
+
+  census:
+    # THE JOB THAT STOPS THE BADGE FROM BEING A CLAIM THAT CANNOT FAIL.
+    needs: [text, instruments]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/download-artifact@v4
+        with: { path: dl }
+      - name: merge the captures
+        run: mkdir -p ci-out && cp -v dl/*/*.out ci-out/
+      - name: census
+        run: /usr/bin/python3 tools/ci-census.py tools/ci-expected.tsv ci-out

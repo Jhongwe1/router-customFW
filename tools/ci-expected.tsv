@@ -1,0 +1,28 @@
+# tools/ci-expected.tsv -- the allow-list `tools/ci-census.py` checks a build against.
+#
+# One row per allowed skip. Tab separated:
+#
+#   suite   bench_total   allowed_skip_label   covers   reason
+#
+# `bench_total` is the number of cases the suite prints WHEN EVERYTHING IT NEEDS
+# IS PRESENT -- measured on the bench machine 2026-08-25, not read off the
+# source. `covers` is how many cases that one skip LINE stands for, and it is
+# the field that matters: on a stock runner `tools/test-hazlint.sh` prints eight
+# skip lines standing for twenty-five cases, and a census that counted lines
+# would have reported eight.
+#
+# A suite with nothing to skip gets one row with `-` and 0.
+# A suite CI does not run at all is marked `*bench-only*`, and its whole total
+# counts as not run. It is listed rather than omitted because a suite nobody
+# lists is a suite nobody misses.
+#
+# suite	bench_total	allowed_skip_label	covers	reason
+spec-check	10	-	0	-
+test-file-modes	3	-	0	-
+test-gitignore	15	-	0	-
+test-console-capture	29	-	0	-
+verify-backup-copy	4	-	0	-
+ci-census	12	-	0	-
+test-opcount	15	hardcoded fixture	1	needs binutils-mips-linux-gnu; CI installs it, so this skip should NOT appear
+test-rlxprobe	62	everything	62	needs gcc-mips-linux-gnu -- and CI deliberately does NOT install it, because with the cross compiler present the suite BUILDS and then hazlint refuses to report without its stage2.bin population control, which is correct behaviour and 16 red cases
+test-hazlint	56	*bench-only*	56	its K4 population control is $FWRE_WORK/stage2.bin -- 56 KiB of this unit's own vendor bootloader, which is someone else's property and identifies one physical device. On a runner the suite does not skip, it FAILS 14 cases, because hazlint exits 2 rather than report without that control
