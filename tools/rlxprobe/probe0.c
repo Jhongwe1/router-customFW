@@ -19,10 +19,13 @@
  *   Config  Config.M == 0 proves this is not a MIPS32 core outright. It also
  *           says whether Config1 -- cache geometry, FPU present, MMU present
  *           -- exists at all, which is CPU-25's whole route.
- *   Status  CPU-27 -- is BEV 0 at the prompt? R1d plans to install a handler
- *           at 0x80000180, and that address is only right if BEV is 0. If it
- *           is 1 the vectors are at 0xBFC00200 in boot ROM and R1d's first
- *           step changes.
+ *   Status  CPU-27 -- is BEV 0 at the prompt? R1d installs a handler at
+ *           0x80000080, and that address is only right if BEV is 0. If it is 1
+ *           the vectors are in boot ROM and R1d's first step changes.
+ *           0x80000080 and NOT 0x80000180: this is an R3000-class CP0, where
+ *           the general exception vector is at offset 0x80 and 0x00 is the UTLB
+ *           refill vector. Corrected 2026-08-25 -- notes/cache-model.md carries
+ *           the three sources and the positive control.
  *   Cause   read for its own sake, and as the thing an exception would have
  *           written. The loader's own exception reporter is still installed
  *           while this runs (CPU-26), so a fault here prints rather than
@@ -52,21 +55,6 @@
  * strong leg of "this string cannot have come from the device" is the
  * decompressed image, not the dump. */
 #define NONCE "5c1b7ea0"
-
-void rlx_puts(const char *s)
-{
-	while (*s)
-		rlx_putc(*s++);
-}
-
-void rlx_puthex32(u32 v)
-{
-	static const char digits[] = "0123456789abcdef";
-	int i;
-
-	for (i = 28; i >= 0; i -= 4)
-		rlx_putc(digits[(v >> i) & 0xf]);
-}
 
 /* One field per line, fixed shape, so `console-lint.py` reads it and a human
  * does not have to. A report a person has to parse by eye is a report that

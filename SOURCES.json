@@ -18,7 +18,6 @@
     "  later       needed at the gate named in `needed_by`",
     "  manual      cannot be scripted; a human obtains it"
   ],
-
   "upstream": {
     "role": "baseline",
     "kind": "git-submodule",
@@ -45,7 +44,6 @@
     "detail": "plan/UPSTREAM-INVENTORY.md",
     "fetch": "now"
   },
-
   "source_trees": [
     {
       "id": "rtl819x-toolchain",
@@ -148,9 +146,22 @@
       "why": "The `files` branch carries the vendor datasheets. This is where refs/*.pdf come from.",
       "needed_by": "R5, R6",
       "fetch": "now"
+    },
+    {
+      "id": "shibajee-linux-rtl8196e",
+      "role": "reference-implementation",
+      "kind": "git",
+      "url": "https://github.com/shibajee/linux-rtl8196e",
+      "clone": "--depth 1 --branch RTL8196E",
+      "dest": "src-vendor/shibajee-linux-rtl8196e",
+      "approx_size": "~1.5 GB",
+      "why": "A modern-kernel RTL8196E port carrying arch/mips/boot/dts/realtek/{rtl8196e.dtsi, rtl8196e_totolink_n100re.dts} -- a device tree for a TOTOLINK board on this SoC -- plus CPU_RLX4181 in cpu_type_enum, -march=rlx4181, R3000 cache paths, wait-instruction support, rdhwr emulation and a defconfig. It is the closest prior art to R5's drivers and DT bindings and to R10a/R10b.",
+      "consumed_as": "SECOND IMPLEMENTATION, NOT AN ANSWER. D12 source class 5: same SoC, so stronger than a sister-core document; written by someone who was also guessing, so weaker than a vendor SDK. One vote. Its use is to generate advance predictions and to fill the comparison column of docs/driver-diff.md -- R5 writes its drivers blind first, then diffs.",
+      "caveat": "Completeness is claimed by its author and its README, not established here. The first thing to do with it is read rtl8196e.dtsi's compatible strings and register addresses and check them against SPEC.md section 9 -- values already read on this unit. If they disagree, this tree may not be describing this part.",
+      "needed_by": "R5 (driver-diff), R10a, R10b",
+      "fetch": "later"
     }
   ],
-
   "documents": [
     {
       "id": "ds-rtl8196e-vex",
@@ -203,23 +214,75 @@
       "fetch": "now"
     }
   ],
-
   "reference_only": {
     "_comment": "Read, cited, never downloaded. Listed so a claim in the plan can be traced to where it came from.",
     "cve_and_advisories": [
-      {"id": "TALOS-2024-1911 / CVE-2024-21778", "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2024-1911", "about": "rtl819x Jungle SDK config-file mib_init_value_array heap overflow — TLV length from the .dat file goes straight into memcpy. Drives D8's bounded TLV reader."},
-      {"id": "TALOS-2023-1899 / CVE-2023-50381,50382,50383", "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2023-1899", "about": "boa formWsc localPin OS command injection. Same defect site as CVE-2025-3987; two CVE families for one bug."},
-      {"id": "Talos roundup, 15 vulns in this SDK", "url": "https://blog.talosintelligence.com/vulnerability-roundup-july-10-2024/", "about": "The set upstream's prior-art.md refers to as 'Talos's fifteen reports on this SDK'."},
-      {"id": "TALOS-2023-1874 / CVE-2023-34435", "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2023-1874", "about": "Arbitrary firmware update on boa formUpload, CWE-347. The image-validation half of upstream D-12 is NOT original because of this."}
+      {
+        "id": "TALOS-2024-1911 / CVE-2024-21778",
+        "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2024-1911",
+        "about": "rtl819x Jungle SDK config-file mib_init_value_array heap overflow — TLV length from the .dat file goes straight into memcpy. Drives D8's bounded TLV reader."
+      },
+      {
+        "id": "TALOS-2023-1899 / CVE-2023-50381,50382,50383",
+        "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2023-1899",
+        "about": "boa formWsc localPin OS command injection. Same defect site as CVE-2025-3987; two CVE families for one bug."
+      },
+      {
+        "id": "Talos roundup, 15 vulns in this SDK",
+        "url": "https://blog.talosintelligence.com/vulnerability-roundup-july-10-2024/",
+        "about": "The set upstream's prior-art.md refers to as 'Talos's fifteen reports on this SDK'."
+      },
+      {
+        "id": "TALOS-2023-1874 / CVE-2023-34435",
+        "url": "https://talosintelligence.com/vulnerability_reports/TALOS-2023-1874",
+        "about": "Arbitrary firmware update on boa formUpload, CWE-347. The image-validation half of upstream D-12 is NOT original because of this."
+      }
     ],
     "platform": [
-      {"url": "https://forum.openwrt.org/t/working-realtek-soc-rtl8196e-97d-97f-in-last-master/70975", "about": "ggbruno's RTL8196E/97D/97F port to OpenWrt master + Linux 4.14. What works, what does not."},
-      {"url": "https://forum.archive.openwrt.org/viewtopic.php?id=46606", "about": "The long Realtek SoC support thread. Contains the EJTAG/Lexra notes: tjtag v3.0.1 and UrJTAG needed device IDs added; eJTAG pins muxed with EPHY_LED on some parts."},
-      {"url": "https://www.mail-archive.com/openwrt-devel@lists.openwrt.org/msg10545.html", "about": "RFC: rtl8196 status — historical statement that mainline has no lexra support."},
-      {"url": "https://lkml.iu.edu/hypermail/linux/kernel/1810.0/00208.html", "about": "RFC v2: MIPS Lexra LX5280 CPU + Realtek RTL8186 SoC support. The mainline attempt."},
-      {"url": "https://www.probell.com/lexra/", "about": "Lexra history — cores execute virtually all MIPS instructions EXCEPT unaligned loads and stores. The patent story behind F34."},
-      {"url": "https://www.kernelconfig.io/config_of_flattree", "about": "CONFIG_OF_FLATTREE landed in 2.6.34; MIPS device tree in 2.6.37. Source for F20."},
-      {"url": "https://techinfodepot.shoutwiki.com/wiki/TOTOLINK_N150RT", "about": "Published spec: RTL8196C + 2 MB flash + 16 MB RAM. WRONG for this unit on all three counts — which is why a second-hand spare may genuinely be a different board."}
+      {
+        "url": "https://forum.openwrt.org/t/working-realtek-soc-rtl8196e-97d-97f-in-last-master/70975",
+        "about": "ggbruno's RTL8196E/97D/97F port to OpenWrt master + Linux 4.14. What works, what does not."
+      },
+      {
+        "url": "https://forum.archive.openwrt.org/viewtopic.php?id=46606",
+        "about": "The long Realtek SoC support thread. Contains the EJTAG/Lexra notes: tjtag v3.0.1 and UrJTAG needed device IDs added; eJTAG pins muxed with EPHY_LED on some parts."
+      },
+      {
+        "url": "https://www.mail-archive.com/openwrt-devel@lists.openwrt.org/msg10545.html",
+        "about": "RFC: rtl8196 status — historical statement that mainline has no lexra support."
+      },
+      {
+        "url": "https://lkml.iu.edu/hypermail/linux/kernel/1810.0/00208.html",
+        "about": "RFC v2: MIPS Lexra LX5280 CPU + Realtek RTL8186 SoC support. The mainline attempt."
+      },
+      {
+        "url": "https://www.probell.com/lexra/",
+        "about": "Lexra history — cores execute virtually all MIPS instructions EXCEPT unaligned loads and stores. The patent story behind F34."
+      },
+      {
+        "url": "https://www.kernelconfig.io/config_of_flattree",
+        "about": "CONFIG_OF_FLATTREE landed in 2.6.34; MIPS device tree in 2.6.37. Source for F20."
+      },
+      {
+        "url": "https://techinfodepot.shoutwiki.com/wiki/TOTOLINK_N150RT",
+        "about": "Published spec: RTL8196C + 2 MB flash + 16 MB RAM. WRONG for this unit on all three counts — which is why a second-hand spare may genuinely be a different board."
+      },
+      {
+        "url": "https://gist.github.com/hackpascal/c07dd5e3745f90b45e5ed6c1e86fde41",
+        "about": "binutils-2.24 Lexra patch. Adds six cores (lx4180, rlx4181, rlx4281, rlx5181, lx5280, rlx5281), all ISA_MIPS1; instruction masks INSN_4180=0x20000000 .. INSN_5281=0x00000040 and the RLXA/RLXB/RAD1/RAD2 groupings; 100+ Lexra-proprietary mnemonics (mta2/mfa/diva/multa/madda/msuba, lt/ltp/lwp/lhp/lbp/stp/swp, addr/subr/min/max/absr/cls/mux2, cmveqz/cmvnez, mtru/mfru/mtrk/mfrk, mflxc0/mtlxc0). Source of R1a's named Lexra ASE row (F52). NOTE: it does NOT disable lwl/lwr/swl/swr -- the assembler still accepts them. WHEN THIS IS FIRST DOWNLOADED (R2c) IT MOVES TO documents WITH A sha256."
+      },
+      {
+        "url": "https://gist.github.com/hackpascal/6d661db5ca3f4ed454c314363034a869",
+        "about": "gcc-4.8.4 Lexra patch. Maps TUNE_RLX onto TUNE_MIPS3000 (R3000 scheduling); disables lwl/lwr/swl/swr generation for Lexra targets via !TARGET_LEXRA && !TARGET_RLX on those patterns; adds -mno-bdsl (flag_fix_bdsl) forbidding loads in BRANCH delay slots -- which is NOT the load-use delay of F46, a distinction the plan must keep; gates conditional move on INSN_RLXB, which is what lets CPU-17's 18 movz/movn rule out baseline LX4180. Supplies -march=rlx5281 for D1's toolchain T-B. WHEN THIS IS FIRST DOWNLOADED (R2c) IT MOVES TO documents WITH A sha256."
+      },
+      {
+        "url": "https://github.com/shibajee/linux-rtl8196e",
+        "about": "Second RTL8196E Linux port; see source_trees/shibajee-linux-rtl8196e. Listed here too because it is cited in the plan before it is cloned."
+      },
+      {
+        "url": "https://datasheet.lcsc.com/lcsc/2410121806_Realtek-Semicon-RTL8196E-CG_C5155985.pdf",
+        "about": "A PUBLIC, redistributable RTL8196E-CG datasheet mirrored by a distributor -- not the leaked -VEx draft in refs/. Names the core RLX4181. Its value is that it can be linked from a public README where the leaked draft cannot, and that it is a second document (not the same one) on the naming question. It does not settle CPU-04: the device still says neither, and only PRId does."
+      }
     ]
   }
 }

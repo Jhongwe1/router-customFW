@@ -540,13 +540,15 @@ and `readline` itself has three exits, of which **only one writes a terminator**
 ```
 804070e8:  beq  a0,10 -> 8040719c     '
 '   returns, NO NUL
-804070f8:  j          -> 8040719c     ''   returns
+804070f8:  j          -> 8040719c     '
+'   returns
 804070fc:    sb zero,0(s0)            ...     the NUL, in the delay slot
 80407190:  sltu v0,s2,s5              count < 128 ?
 80407194:  bnez v0    -> loop         count == 128 returns, NO NUL
 ```
 
-So a line is terminated by one of two things: the `` path writing a NUL, or a
+So a line is terminated by one of two things: the `
+` path writing a NUL, or a
 **leftover zero from the caller's `memset`**. The second only exists while the
 text is **shorter** than 128.
 
@@ -978,7 +980,7 @@ because **R1a settles it in one instruction**: a bare-metal RI handler, one
 
 It also hands R1 a fact it would otherwise have discovered by surprise: **the
 stock loader has already installed exception handling of its own**, so R1d's
-"write my handler to `0x80000180` and make the I-cache see it" is replacing
+"write my handler to `0x80000080` and make the I-cache see it" is replacing
 something, not filling a vacuum. Where those vectors live and whether
 `Status.BEV` is 0 when the prompt is up has not been traced.
 
@@ -992,3 +994,90 @@ like *the operator pressed a key*, but the register addresses have not been
 confirmed against D and the argument has not been traced. **Inferred, and worth
 fifteen minutes before R8**, because a global that makes the loader declare
 every image bad is a rescue path and possibly a hazard.
+
+---
+
+## §10 — the exception path, and what a fault costs a payload
+
+**Read out of this unit's own stage 2, 2026-08-25, and put through an
+adversarial pass that broke nine of the first draft's claims.** Nothing here is
+measured on the device; the cell that would make it a measurement is
+`DW 80000080 32` at the prompt, which is read-only and costs nothing.
+
+### A fault the loader does not handle hangs the board forever
+
+`do_reserved` at **`0x80400BE8`**:
+
+```
+80400be8:  addiu sp,sp,-24          <- the FAULTING code's sp
+80400bec:  sw    ra,16(sp)
+80400bf0:  move  v0,a0              <- the FAULTING code's a0, kept as pt_regs*
+80400bf4:  mfc0  a1,c0_cause
+80400bf8:  mfc0  a2,c0_epc
+80400bfc:  lui   a0,0x8041
+80400c00:  lw    a3,148(v0)         <- dereferences that a0
+80400c04:  jal   0x8040781c         ; prom_printf "cp0_cause=%X, cp0_epc=%X, ra=%X"
+80400c0c:  lui   a0,0x8041
+80400c10:  jal   0x8040781c         ; prom_printf "Undefined Exception happen."
+80400c18:  j     0x80400c18         <- BRANCH TO ITSELF
+80400c1c:  nop
+```
+
+`0x08100306` → `imm << 2 = 0x400C18`, `(PC+4)[31:28] = 8` → `0x80400C18`, the
+address of the instruction itself. The exception entry has already pushed the
+KU/IE stack so `IEc` is 0, and the watchdog is not armed — a raw four-byte search
+for `b800311c` finds it in neither stage 1, stage 1.5 nor stage 2 outside the two
+deliberate reboots, and the control for that zero is that the same search finds
+`b8001050` and `b8001008` in stage 1.5's register table. **Nothing recovers it.
+One fault costs one power cycle.**
+
+**Neither string ends in `\n`** (NUL at `0xA52B` and `0xA547`), so what reaches
+the wire is one unterminated line followed by permanent silence. A capture tool
+that flushes on newline would show the board going quiet with no message at all.
+
+### The table this document used to name was the wrong table
+
+`0x8040A5C0` is **not** the exception dispatch table. It is
+`BootStateEvent[3][8]` — 24 function pointers, the TFTP/ARP boot state machine,
+indexed `(bootState * 8 + bootEvent)` at `0x80402108`–`0x80402130` and again at
+`0x80402310`. The identification has a control that a generic pointer table would
+not pass: the vendor source has two deliberate asymmetries between rows 1 and 2
+(`setTFTP_RRQ` ↔ `errorTFTP`), and the binary reproduces both, 24 of 24 slots.
+
+The real table is **`exception_handlers[32]` at `0x8040EB40`**, in BSS, with one
+writer (`set_except_vector` at `0x80400BD0`, no bounds check) and one reader (the
+vector itself at `0x8040055C`). After boot: `[0] = 0x80400580` (IRQ, returns via
+`rfe`), `[23] = 0x804007C0` (Watch, returns), and the other thirty =
+`0x80400BE8`. So **two ExcCodes are survivable and neither is one a probe will
+provoke** — `J <addr>` clears `IE` and zeroes `GIMR0` before entering a payload.
+
+### This loader was not built from either GPL drop this project holds
+
+The vendor's `do_reserved`, byte-identical in `saturn49-wecb` and `wecb-vz-gpl`
+at `bootcode/boot/init/irq.c:210`, is:
+
+```c
+asmlinkage void do_reserved(struct pt_regs *regs)
+{
+	int i;
+	prom_printf("Undefined Exception happen.");
+	for(;;);
+	/*Just hang here.*/
+}
+```
+
+One call, no CP0 reads. The shipped `0x80400BE8` has two `prom_printf`s, two
+`mfc0`s and a `pt_regs` load — and `do_watch`, whose string is in the binary,
+appears in neither tree. **The string match is evidence of provenance; it is not
+evidence that the C on screen is the C that was compiled**, and every argument in
+this repository of the form *"the vendor source says why"* has to say which half
+it is leaning on.
+
+### `boot.img` and `nfjrom` write from `0x80000000` upward
+
+The name compare against `0x8040A6A8` reaches `0x80401250`, which stores
+`0x80000000` into both the `LOADADDR` global (`0x8040D3A8`) and the running TFTP
+write pointer (`0x8040DD10`); `0x80401A10`'s memcpy walks up from there. So such
+an upload overwrites the UTLB refill vector **and** the general exception vector
+while it is in progress. The do-not-type list already carried both names for a
+different reason; this is the instruction-level one.

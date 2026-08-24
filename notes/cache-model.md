@@ -11,7 +11,9 @@ generation used `Status.IsC` / `Status.SwC` and byte stores instead — a
 completely different mechanism. Which one this core uses decides:
 
 - **R1d** — the bare-metal probe writes an exception handler into RAM at
-  `0x80000180` and then has to make the I-cache see it.
+  `0x80000080` and then has to make the I-cache see it. 🔴 **This line said
+  `0x80000180` until 2026-08-25, and that address is MIPS32's, not this core's.**
+  See the correction at the bottom of this file.
 - **R5b** — the MTD driver writes flash and then has to make the
   memory-mapped window agree.
 - **R6** — `dma_map_single()` is this, underneath.
@@ -128,8 +130,11 @@ and before zero padding, and is data (`notes/lwl-mystery.md`).
 
 ## What R1d should do with this
 
-1. Write the handler to `0x80000180` through **KSEG1** (`0xA0000180`), which
+1. Write the handler to `0x80000080` through **KSEG1** (`0xA0000080`), which
    sidesteps the D-cache entirely, then invalidate I-cache with CP0 20 `0x002`.
+   🔴 **And cover `0x80000000` too** — that is the UTLB refill vector on this
+   layout, the loader never populated it, and stage 1's DRAM-sizing probe left
+   `0x5A5AA5A5` sitting there.
 2. Keep the CP0 20 `0x200` D-cache flush before it as the vendor does, because
    the vendor's own comment says the two caches can hold the same address.
 3. **Both of those are single-source for the exact bit values.** Before either
@@ -137,3 +142,49 @@ and before zero padding, and is data (`notes/lwl-mystery.md`).
    and check it ran. That check is its own control — if the I-cache still holds
    the old bytes, the handler does not run and the probe hangs rather than
    lying.
+
+## Correction, 2026-08-25 — the exception vector address in this file was wrong
+
+**Read out of this unit's own stage 2, plus two independent sources.** This file
+said `0x80000180` in two places. That is the **MIPS32** general exception vector.
+This is a Lexra RLX with an R3000-class CP0, and the layout is:
+
+| | |
+|---|---|
+| `0x80000000` – `0x8000007F` | UTLB refill vector. **The loader installs nothing here** |
+| `0x80000080` – `0x800000FF` | general exception vector, 128 bytes, installed by `trap_init` |
+
+Three sources, none of which says `0x180`:
+
+- **this unit's binary** — `trap_init` at `0x8040D07C` builds the destination as
+  `8040d0d0: lui v0,0x8000` / `8040d0d4: ori t0,v0,0x80`, copies 128 bytes from
+  `0x8040054C`, then `8040d238: jal 0x80406728` (`flush_cache`);
+- **the vendor bootcode's own comment**, `bootcode/boot/init/irq.c:228` —
+  *"remember here we set BEV=0, and vector base is 80000000, offset 0x80"*, and
+  the line under it is `memcpy((void *)(KSEG0 + 0x80), &exception_matrix, 0x80);`
+- **the vendor's Linux for this core family** —
+  `linux-2.6.30/arch/rlx/kernel/traps.c:691`, `#define RLX_TRAP_VEC_BASE
+  0x80000080`, with `arch/rlx/mm/tlbex.c:109` `#define RLX_TRAP_TLB_BASE
+  0x80000000`.
+
+**Corroborated by the return instruction, with a positive control.** This loader
+leaves an exception with `rfe` (`0x42000010`) at `0x804007B0` and `0x80400970`.
+The encoding for `eret`, `0x42000018`, occurs **zero** times in the same
+disassembly — and that zero is a claim, so the same grep was run for `rfe` on
+the same file and found the two. `rfe` is R3000; `eret` is MIPS32.
+
+**Why it matters more than a typo.** A handler written to `0x80000180` lands in
+RAM nothing reads. The payload would then look installed, take a fault, and the
+loader's own `do_reserved` at `0x80400BE8` would run instead — two prints and
+`j 0x80400C18`, a branch to itself, with interrupts already off and the watchdog
+not armed. **That is a permanent hang, i.e. one power cycle, and there is no
+spare device.**
+
+**Where it was.** Seven committed sites — `notes/cache-model.md` twice,
+`docs/loader-command-semantics.md`, `LOG.md`, `PROGRESS.md` twice,
+`tools/rlxprobe/README.md` — plus `tools/rlxprobe/probe0.c` and five more in the
+gitignored planning material. 🔴 **`SPEC.md` is not one of them**: `CPU-27` is
+blank and carries no address at all. A first draft of this correction named it,
+which is how a correction pass can invent the error it is correcting. **Not measured**: everything above is read out of code. The
+cell that makes it a measurement is `DW 80000080 32` at the prompt, which is
+read-only and costs nothing.

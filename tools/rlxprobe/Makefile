@@ -2,89 +2,158 @@
 #
 # The one thing to understand about this file
 # -------------------------------------------
-# `hazlint` is a GATE, not a lint.  `probe0.bin` depends on `probe0.gate`, and
-# `probe0.gate` does not exist unless `tools/hazlint` exited 0.  There is no
+# `hazlint` is a GATE, not a lint.  `<payload>.bin` depends on `<payload>.gate`,
+# and that file does not exist unless `tools/hazlint` exited 0.  There is no
 # target that produces a runnable payload while skipping it, and `make -k` will
 # not get you one either.
 #
-# That is layer two.  Upstream's `P9-12` post-mortem ends on exactly this
-# point: adding two `nop`s made that day pass, and teaching the build to refuse
-# is what stops tomorrow's payload.  Item 7 delivered the checker; this line is
-# the half that makes it matter.
+# That is layer two.  Upstream's `P9-12` post-mortem ends on exactly this point:
+# adding two `nop`s made that day pass, and teaching the build to refuse is what
+# stops tomorrow's payload.  Item 7 delivered the checker; this line is the half
+# that makes it matter.
 #
-#   make               build, gated
-#   make gate-check    prove the gate FAILS on a planted hazard
-#   make dis           disassemble what was actually emitted
-#   make show          the numbers that go in the runsheet cell
+#   make                    build every payload, gated
+#   make P=probe1           build one
+#   make gate-check         prove the gate FAILS on a planted hazard
+#   make dis P=probe1       disassemble what was actually emitted
+#   make show P=probe1      the numbers that go in the runsheet cell
+#   make qemu P=probe1      run it under qemu-system-mips -- HARNESS ONLY
 #   make clean
 #
 # Knobs:
 #   LOADADDR=0x80500000   where the payload is linked and jumped to
 #   RESET=1               arm the watchdog when main returns (0 = spin instead)
 #   CROSS=mips-linux-gnu-
+#
+# probe1 only:
+#   RESULT_BASE=0x80A00000   the block the payload writes and `DW` reads back.
+#                            0x80A00000 and NOT 0x81000000: MEM-14 measured that
+#                            0x81000000's word 1 is rewritten to 0x00000144 on
+#                            every boot, three times reproduced, so a canary
+#                            there is destroyed by the thing it is meant to
+#                            survive.  MEM-10 measured 0x80A00000 surviving
+#                            three warm resets byte for byte.
+#   GEOM=0                   arm the cache-sizing walk.  OFF by default: while
+#                            the caches are isolated, a core that does not
+#                            implement Status.IsC writes real memory across
+#                            [GEOM_BASE, +1 MiB].  See cache.S.
+#   GEOM_BASE=0x80B00000     the window it is allowed to scribble on.  Whatever
+#                            this is set to, the runsheet reads it before and
+#                            after -- it has not been probed the way 0x80A00000
+#                            was (MEM-13).
 
 CROSS      ?= mips-linux-gnu-
 CC          = $(CROSS)gcc
 OBJCOPY     = $(CROSS)objcopy
 OBJDUMP     = $(CROSS)objdump
+NM          = $(CROSS)nm
 
 LOADADDR   ?= 0x80500000
 STACK_SIZE ?= 0x4000
 RESET      ?= 1
+RESULT_BASE?= 0x80A00000
+GEOM       ?= 0
+GEOM_BASE  ?= 0x80B00000
+# probe2 only. 0 = the vendor bootcode's own D-then-I through CCTL, which is
+# what probe1 measures; 1 = the Status.IsC/SwC path c-r3k.c uses. The default
+# is a choice this build makes on probe1's behalf and probe1 is what settles
+# it -- so it is a knob and not a constant.
+FLUSH_ISC  ?= 0
+# The 16550. These are the DEVICE's addresses and nothing but qemu-run.sh ever
+# overrides them -- see rlxdefs.h. On this part the registers are four bytes
+# apart, so LSR is THR + 0x14 and not THR + 5.
+UART_THR   ?= 0xB8002000
+UART_LSR   ?= 0xB8002014
+# The exception vectors. R3000 layout, and the default is the only one that
+# is right for this device -- see rlxdefs.h. qemu-run.sh is the only caller
+# that may change them, because qemu has no MIPS-I core.
+VEC_UTLB   ?= 0x80000000
+VEC_GENERAL?= 0x80000080
+CLEAR_BEV  ?= 0
+# qemu only: return from the handler with `eret` instead of the R3000 `jr`+`rfe`.
+RET_ERET   ?= 0
 
 HERE       := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 HAZLINT    := $(HERE)../hazlint
 BUILD      ?= $(HERE)build
+
+PAYLOADS   := probe0 probe1 probe2
 
 # -march=mips1 needs -msoft-float on gcc 12.4.0, which rejects the flag on its
 # own: "cc1: error: '-march=mips1' requires '-mfp32'".  Measured 2026-08-24;
 # SPEC.md TC-06.  -msoft-float rather than -mfp32 because this core has no FPU
 # and saying so is more honest than saying the FPU is 32-bit.
 #
-# -G0 turns off small-data addressing, which would need a $gp this payload
-# never establishes.  -mno-abicalls -fno-pic because there is no dynamic
-# loader and the image is linked at a fixed address.
+# -G0 turns off small-data addressing, which would need a $gp this payload never
+# establishes.  -mno-abicalls -fno-pic because there is no dynamic loader and
+# the image is linked at a fixed address.
 ARCH        = -march=mips1 -mabi=32 -msoft-float -EB -G0 -mno-abicalls -fno-pic
+
+DEFS        = -DRLX_RESET=$(RESET) -DRLX_GEOM=$(GEOM) \
+              -DRLX_RESULT_BASE=$(RESULT_BASE)u -DRLX_GEOM_BASE=$(GEOM_BASE)u \
+              -DRLX_FLUSH_ISC=$(FLUSH_ISC) \
+              -DRLX_UART_THR=$(UART_THR) -DRLX_UART_LSR=$(UART_LSR) \
+              -DRLX_VEC_UTLB=$(VEC_UTLB) -DRLX_VEC_GENERAL=$(VEC_GENERAL) \
+              -DRLX_CLEAR_BEV=$(CLEAR_BEV) -DRLX_RET_ERET=$(RET_ERET)
 
 CFLAGS      = $(ARCH) -O2 -std=gnu99 \
               -ffreestanding -fno-builtin -fno-stack-protector \
               -fomit-frame-pointer -fno-common \
               -Wall -Wextra -Werror -Wundef -Wshadow \
-              -DRLX_RESET=$(RESET)
-ASFLAGS     = $(ARCH) -DRLX_RESET=$(RESET) -Wa,--fatal-warnings
+              $(DEFS)
+ASFLAGS     = $(ARCH) $(DEFS) -Wa,--fatal-warnings
 # --orphan-handling=error: no section may end up in this image that the linker
 # script did not place by name.  A section nobody placed lands at an address
 # nobody chose, and `objcopy -O binary` would then either drop it or pad the
-# image out to reach it -- both silently.
+# image out to reach it -- both silently.  It is also what turns "I renamed a
+# section and forgot the script" into a build failure, which is how `.victims`
+# is kept out of `.text`'s catch-all.
 LDFLAGS     = $(ARCH) -nostdlib -nostartfiles -static \
               -Wl,--build-id=none -Wl,--nmagic -Wl,--fatal-warnings \
               -Wl,--orphan-handling=error \
               -Wl,-T,$(HERE)rlxprobe.lds \
               -Wl,--defsym,LOAD_ADDR=$(LOADADDR) \
-              -Wl,--defsym,STACK_SIZE=$(STACK_SIZE) \
-              -Wl,-Map,$(BUILD)/probe0.map
+              -Wl,--defsym,STACK_SIZE=$(STACK_SIZE)
 
-OBJS        = $(BUILD)/start.o $(BUILD)/uart.o $(BUILD)/probe0.o
+# One payload per invocation.  `all` recurses over PAYLOADS.  Two payloads do
+# not justify an $(eval) template, and a template is exactly the kind of
+# indirection that hides which flags reached which object.
+P          ?= probe0
+SRC_probe0 := start.S uart.S report.c probe0.c
+SRC_probe1 := start.S uart.S report.c cache.S victims.S probe1.c
+SRC_probe2 := start.S uart.S report.c cache.S exc.S probe2.c
+SRC        := $(SRC_$(P))
+OBJDIR     := $(BUILD)/$(P)
+OBJS       := $(patsubst %.S,$(OBJDIR)/%.o,$(filter %.S,$(SRC))) \
+              $(patsubst %.c,$(OBJDIR)/%.o,$(filter %.c,$(SRC)))
+ELF        := $(OBJDIR)/$(P).elf
+BIN        := $(OBJDIR)/$(P).bin
 
-.PHONY: all clean dis show gate-check
+.PHONY: all payload clean dis show gate-check qemu
 .DELETE_ON_ERROR:
 
-all: $(BUILD)/probe0.bin
+all:
+	@for p in $(PAYLOADS); do \
+	    echo "=== $$p ==="; \
+	    $(MAKE) --no-print-directory payload P=$$p || exit 1; \
+	 done
 
-$(BUILD):
-	@mkdir -p $(BUILD)
+payload: $(BIN)
 
-$(BUILD)/%.o: $(HERE)%.S | $(BUILD)
+$(OBJDIR):
+	@mkdir -p $(OBJDIR)
+
+$(OBJDIR)/%.o: $(HERE)%.S $(HERE)rlxdefs.h | $(OBJDIR)
 	$(CC) $(ASFLAGS) -c -o $@ $<
 
-$(BUILD)/%.o: $(HERE)%.c $(HERE)rlxprobe.h | $(BUILD)
+$(OBJDIR)/%.o: $(HERE)%.c $(HERE)rlxprobe.h $(HERE)rlxdefs.h | $(OBJDIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/probe0.elf: $(OBJS) $(HERE)rlxprobe.lds
-	$(CC) $(LDFLAGS) -o $@ $(OBJS)
+$(ELF): $(OBJS) $(HERE)rlxprobe.lds
+	$(CC) $(LDFLAGS) -Wl,-Map,$(OBJDIR)/$(P).map -o $@ $(OBJS)
 
 # THE GATE.  Nothing downstream of this exists unless hazlint exited 0.
-$(BUILD)/probe0.gate: $(BUILD)/probe0.elf $(HAZLINT)
+$(OBJDIR)/$(P).gate: $(ELF) $(HAZLINT)
 	@echo '--- gate: tools/hazlint on the linked payload ---'
 	$(HAZLINT) $<
 	@touch $@
@@ -92,21 +161,26 @@ $(BUILD)/probe0.gate: $(BUILD)/probe0.elf $(HAZLINT)
 # No --only-section here, on purpose.  A hard-coded section list is a filter
 # that drops silently; these two assertions are checks that fail loudly.
 #
-#   1. the raw image is exactly as long as the linked image (_end - LOAD_ADDR),
-#      so nothing was dropped on the way out and nothing padded it;
+#   1. the raw image is exactly as long as every section that HAS contents
+#      (_bss_start - LOAD_ADDR), so nothing was dropped on the way out and
+#      nothing padded it.  Not `_end`, which is past `.bss`: `.bss` is NOBITS
+#      and objcopy is right not to emit it, so comparing against `_end` would
+#      fail on any payload that has one -- and probe1 does;
 #   2. byte 0 of the raw image is the first instruction of _start, because the
 #      loader's `J` goes to the load address and not to an entry symbol.
-$(BUILD)/probe0.bin: $(BUILD)/probe0.gate
-	$(OBJCOPY) -O binary $(BUILD)/probe0.elf $@
-	@end=$$($(CROSS)nm $(BUILD)/probe0.elf | awk '$$3=="_end"{print $$1}'); \
-	 want=$$(( 0x$$end - $(LOADADDR) )); \
+$(BIN): $(OBJDIR)/$(P).gate
+	$(OBJCOPY) -O binary $(ELF) $@
+	@bs=$$($(NM) $(ELF) | awk '$$3=="_bss_start"{print $$1}'); \
+	 be=$$($(NM) $(ELF) | awk '$$3=="_bss_end"{print $$1}'); \
+	 want=$$(( 0x$$bs - $(LOADADDR) )); \
 	 got=$$(wc -c < $@); \
 	 if [ "$$want" != "$$got" ]; then \
-	     echo "  FAIL   raw image is $$got bytes, linked image is $$want (_end = 0x$$end)"; \
+	     echo "  FAIL   raw image is $$got bytes, the sections WITH CONTENTS are $$want (_bss_start = 0x$$bs)"; \
 	     exit 1; \
 	 fi; \
-	 echo "  ok     raw image == linked image, $$got bytes"
-	@w=$$($(OBJDUMP) -d $(BUILD)/probe0.elf \
+	 echo "  ok     raw image == every section that has contents, $$got bytes"; \
+	 echo "  ok     .bss is $$(( 0x$$be - 0x$$bs )) bytes, and start.S zeroes it"
+	@w=$$($(OBJDUMP) -d $(ELF) \
 	       | awk '/^[0-9a-f]+ <_start>:/{getline; print $$2; exit}'); \
 	 b=$$(od -An -tx1 -N4 $@ | tr -d ' \n'); \
 	 if [ "$$w" != "$$b" ]; then \
@@ -115,40 +189,62 @@ $(BUILD)/probe0.bin: $(BUILD)/probe0.gate
 	 fi; \
 	 echo "  ok     byte 0 of the image is _start's first instruction, $$b"
 	@echo
-	@$(MAKE) --no-print-directory show
+	@$(MAKE) --no-print-directory show P=$(P)
 
 # The control on the gate.  A gate that has never refused anything is a gate
 # nobody has shown to be closed.  This plants P9-12's own bug -- a `lbu`
 # followed by an `andi` on the loaded register -- and fails the build if the
 # gate lets it through.
-gate-check: | $(BUILD)
+gate-check: | $(OBJDIR)
 	@echo '--- gate-check: the build must REFUSE a planted load-use hazard ---'
-	@printf '\t.set noreorder\n\t.set nomacro\n\t.text\n\t.globl _hazard\n_hazard:\n\tlbu\t$$10,0($$9)\n\tandi\t$$10,$$10,0x60\n\tjr\t$$31\n\tnop\n' > $(BUILD)/planted.S
-	@$(CC) $(ASFLAGS) -c -o $(BUILD)/planted.o $(BUILD)/planted.S
-	@if $(HAZLINT) $(BUILD)/planted.o >$(BUILD)/planted.log 2>&1; then \
+	@printf '\t.set noreorder\n\t.set nomacro\n\t.text\n\t.globl _hazard\n_hazard:\n\tlbu\t$$10,0($$9)\n\tandi\t$$10,$$10,0x60\n\tjr\t$$31\n\tnop\n' > $(OBJDIR)/planted.S
+	@$(CC) $(ASFLAGS) -c -o $(OBJDIR)/planted.o $(OBJDIR)/planted.S
+	@if $(HAZLINT) $(OBJDIR)/planted.o >$(OBJDIR)/planted.log 2>&1; then \
 	    echo '  FAIL   the gate accepted a payload with P9-12'"'"'s own bug in it'; \
-	    sed 's/^/         /' $(BUILD)/planted.log; exit 1; \
+	    sed 's/^/         /' $(OBJDIR)/planted.log; exit 1; \
 	 else \
 	    rc=$$?; \
 	    if [ $$rc -ne 1 ]; then \
 	        echo "  FAIL   the gate exited $$rc, not 1 -- it refused for the wrong reason"; \
-	        sed 's/^/         /' $(BUILD)/planted.log; exit 1; \
+	        sed 's/^/         /' $(OBJDIR)/planted.log; exit 1; \
 	    fi; \
 	    echo '  ok     the gate refused it, exit 1:'; \
-	    grep -E 'VIOLATIONS|reads \$$' $(BUILD)/planted.log | sed 's/^/         /'; \
+	    grep -E 'VIOLATIONS|reads \$$' $(OBJDIR)/planted.log | sed 's/^/         /'; \
 	 fi
 
-dis: $(BUILD)/probe0.elf
+dis: $(ELF)
 	$(OBJDUMP) -d -m mips:3000 $< | sed -n '/Disassembly/,$$p'
 
-show: $(BUILD)/probe0.bin
-	@echo 'payload    $(BUILD)/probe0.bin'
+show: $(BIN)
+	@echo 'payload    $(BIN)'
 	@echo 'load addr  $(LOADADDR)      entry is byte 0 of the image'
-	@printf 'size       %s bytes\n' "$$(wc -c < $(BUILD)/probe0.bin)"
-	@printf 'sha256     %s\n' "$$(sha256sum $(BUILD)/probe0.bin | cut -d' ' -f1)"
+	@printf 'size       %s bytes\n' "$$(wc -c < $(BIN))"
+	@printf 'sha256     %s\n' "$$(sha256sum $(BIN) | cut -d' ' -f1)"
 	@printf 'first word %s   (must be the first instruction of _start)\n' \
-	        "$$($(OBJDUMP) -d $(BUILD)/probe0.elf | sed -n 's/^ *$(patsubst 0x%,%,$(LOADADDR)):\t\([0-9a-f]*\).*/\1/p' | head -1)"
+	        "$$($(OBJDUMP) -d $(ELF) | sed -n 's/^ *$(patsubst 0x%,%,$(LOADADDR)):\t\([0-9a-f]*\).*/\1/p' | head -1)"
 	@echo 'reset      RESET=$(RESET)   1 = arm the watchdog and hand the prompt back with no power cycle'
+ifneq ($(filter $(P),probe1 probe2),)
+	@echo 'result     RESULT_BASE=$(RESULT_BASE)   read it back with: DW $(patsubst 0x%,%,$(RESULT_BASE)) 88'
+	@printf 'victims    %s .. %s\n' \
+	        "$$($(NM) $(ELF) | awk '$$3=="rlx_victims"{print "0x"$$1}')" \
+	        "$$($(NM) $(ELF) | awk '$$3=="rlx_victims_end"{print "0x"$$1}')"
+	@echo 'geom       GEOM=$(GEOM)   base $(GEOM_BASE)   1 = ARMED, and it can write 1 MiB'
+	@echo 'uart       THR $(UART_THR)  LSR $(UART_LSR)'
+	@echo 'vectors    UTLB $(VEC_UTLB)  general $(VEC_GENERAL)   CLEAR_BEV=$(CLEAR_BEV)'
+	@if [ '$(VEC_GENERAL)' != '0x80000080' ] || [ '$(CLEAR_BEV)' != '0' ] || [ '$(RET_ERET)' != '0' ] \
+	    || [ '$(UART_THR)' != '0xB8002000' ]; then \
+	    echo; echo '  *** NOT A DEVICE BUILD ***  one of UART_THR / VEC_GENERAL /'; \
+	    echo '  CLEAR_BEV is not at its default. This image is for qemu.'; \
+	 fi
+endif
+
+# qemu validates the HARNESS and never an answer.  qemu-system-mips interlocks
+# the load delay slot and this core does not, so a payload that computes the
+# right value under qemu tells you the control flow is right and nothing about
+# the silicon.  `tools/rlxprobe/qemu-run.sh` carries the machine and the UART
+# base and the reasons for both.
+qemu: $(BIN)
+	@$(HERE)qemu-run.sh $(P) $(BIN) $(ELF)
 
 clean:
 	rm -rf $(BUILD)

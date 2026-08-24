@@ -173,14 +173,50 @@ CR = b"\r"
 # The loader's prompt, byte for byte, from every capture in bench/. It is what
 # the CR after an ESC loop is waited for; it is not a parser and nothing turns
 # on it being found -- see cr.prompt_seen in the metadata.
+def _record_esc(meta, which, requested, writes, window):
+    """Record what the ESC heartbeat ACTUALLY was, not what it was asked for.
+
+    `writes` is counted at the point of `ser.write`, so it is the number of
+    escapes that left this process; `window` is wall-clock across the loop.
+    The quotient is therefore an upper bound on the period the device saw --
+    it includes this process's own scheduling, which is exactly the term that
+    made a requested 20.00 ms come out at 20.35 (SPEC.md CLK-08).
+
+    A requested period below what the host can deliver does not fail: it comes
+    out as an achieved period visibly larger than the request, which is the
+    honest answer and is what case N16 of the self-test checks.
+    """
+    meta.setdefault("esc", {})[which] = {
+        "requested_period_s": requested,
+        "writes": writes,
+        "window_s": round(window, 6),
+        "achieved_period_s": round(window / writes, 6) if writes else None,
+    }
+
+
 PROMPT = b"<RealTek>"
 
 DEFAULT_CR_SETTLE = 2.0
 
+# How long each ESC loop waits between one ESC and the next.  This is the GRID
+# every interval measured off ESC echoes is quantised to, and it is the whole
+# reason CLK-08b could not be settled: the proportional and the fixed residual
+# hypotheses differ by about 15 ms, which is smaller than one tick of it.
+#
+# 0.02 stays the default so that every capture already taken keeps meaning what
+# it meant.  The CLK-08b cell passes --esc-period 0.002.  At 38400 8N1 an ESC
+# out plus its echo back is two characters = 521 us, so a 2 ms period leaves a
+# factor of four of headroom -- but headroom is an argument, and what goes in
+# the metadata is the period the run ACHIEVED, measured, beside the one it
+# asked for.  SPEC.md CLK-08 records the previous grid as 20.35 / 20.32 ms
+# against a requested 20.00, which is exactly why the achieved value is the one
+# worth having.
+DEFAULT_ESC_PERIOD = 0.02
+
 # Bumped when the bytes this tool WRITES to the port change. A capture is
 # evidence, and what the instrument did to produce it is part of the reading:
 # 1.1 and earlier ended an ESC loop with an ESC, 1.2 ends it with a CR.
-TOOL_VERSION = "1.2"
+TOOL_VERSION = "1.3"
 
 
 def _fail(msg: str) -> "NoReturn":  # noqa: F821
@@ -270,6 +306,14 @@ def capture(args) -> int:
         "started_wallclock": None,
         "esc_seconds": args.esc,
         "esc_after_seconds": args.esc_after,
+        "esc_period_requested_s": args.esc_period,
+        # One entry per ESC loop that ran, carrying the ACHIEVED heartbeat:
+        # writes, the window they were spread over, and the quotient.  An
+        # interval read off ESC echoes is quantised to that quotient, so a
+        # capture that does not record it leaves the reader to assume the
+        # requested value -- and the requested value has already been wrong by
+        # 1.75% (SPEC.md CLK-08: 20.35 ms achieved against 20.00 requested).
+        "esc": {},
         # One entry per ESC loop that ran. Absent means the loop did not run;
         # written=false means --no-cr. This is the record of what the
         # instrument wrote, which the .log cannot show -- the .log is what the
@@ -439,10 +483,15 @@ def capture(args) -> int:
                 # before power-on is what B1 A1 does; it is also what sets
                 # gCHKKEY_HIT, which is why B5 read 1 and not 0.
                 pending_esc = "esc"
-                esc_deadline = time.monotonic() + args.esc
+                esc_started = time.monotonic()
+                esc_deadline = esc_started + args.esc
+                esc_writes = 0
                 while time.monotonic() < esc_deadline:
                     ser.write(ESC)
-                    drain(0.02)
+                    esc_writes += 1
+                    drain(args.esc_period)
+                _record_esc(meta, "esc", args.esc_period, esc_writes,
+                            time.monotonic() - esc_started)
                 # Before --send, not after: the residue this terminates would
                 # otherwise be the front of the command line. Called whether or
                 # not --send was given: the A-catch shape is --esc with no
@@ -474,10 +523,15 @@ def capture(args) -> int:
                 # repo has nearly lost to an instrument that could not do it
                 # (``A2``, ``E5``) and the first one caught in advance.
                 pending_esc = "esc_after"
-                esc_deadline = time.monotonic() + args.esc_after
+                esc_started = time.monotonic()
+                esc_deadline = esc_started + args.esc_after
+                esc_writes = 0
                 while time.monotonic() < esc_deadline:
                     ser.write(ESC)
-                    drain(0.02)
+                    esc_writes += 1
+                    drain(args.esc_period)
+                _record_esc(meta, "esc_after", args.esc_period, esc_writes,
+                            time.monotonic() - esc_started)
                 # D1 and D4 both end here, and D2 is the command that was going
                 # to be appended to their residue. This does NOT retire
                 # flush-d1/flush-d3: RUNSHEET keeps both, with the expectation
@@ -622,6 +676,13 @@ def main() -> int:
                         "This is what D1 needs and --esc cannot give it")
     c.add_argument("--esc", type=float, default=0.0,
                    help="stream ESC for this many seconds before capturing")
+    c.add_argument("--esc-period", dest="esc_period", type=float,
+                   default=DEFAULT_ESC_PERIOD,
+                   help="seconds between one ESC and the next, in BOTH loops "
+                        f"(default {DEFAULT_ESC_PERIOD}). This is the grid any "
+                        "interval read off ESC echoes is quantised to. CLK-08b "
+                        "needs 0.002; the achieved period is measured and put "
+                        "in the metadata either way")
     c.add_argument("--send", default=None,
                    help="one command line to send verbatim, then read-only")
     c.add_argument("--no-cr", dest="no_cr", action="store_true",

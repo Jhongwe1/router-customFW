@@ -31,17 +31,43 @@ SECTIONS
 	.text : {
 		KEEP(*(.text.entry))
 		*(.text .text.* .gnu.linkonce.t.*)
+
+		/* The victims, when a payload has any.  Two things are
+		 * deliberate and neither is obvious.
+		 *
+		 * The section is called `.victims` and not `.text.victims`,
+		 * because `*(.text .text.*)` above would have swallowed that
+		 * name and scattered sixteen 1 KiB-aligned functions through
+		 * the payload's own code.
+		 *
+		 * There is no ALIGN() here.  The alignment comes from `.align
+		 * 10` inside the input section, so the linker aligns it and a
+		 * payload with NO victims gets no padding at all -- which is
+		 * what keeps probe0's image the size it was.  A script-side
+		 * ALIGN would have padded every payload to 1 KiB and, worse,
+		 * a `_victims_start = .` written before it would have recorded
+		 * the address BEFORE the padding.  `rlx_victims` is the symbol
+		 * to use: it sits after cache.S's own `.align`. */
+		KEEP(*(.victims))
 		. = ALIGN(4);
 	} :text
 
+	/* ALIGN(16), not ALIGN(4).  `.data` and `.bss` come out of the
+	 * compiler with 16-byte alignment, so a `.rodata` that ends on a
+	 * 4-byte boundary leaves a hole between the two -- and `objcopy -O
+	 * binary` does not emit a hole that belongs to no section.  The raw
+	 * image is then shorter than the linked one and the Makefile's size
+	 * assertion fires, correctly, on four bytes of nothing.  Ending
+	 * aligned to the same boundary the next section wants removes the
+	 * hole rather than teaching the check to ignore it. */
 	.rodata : {
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
-		. = ALIGN(4);
+		. = ALIGN(16);
 	} :data
 
 	.data : {
 		*(.data .data.* .gnu.linkonce.d.*)
-		. = ALIGN(4);
+		. = ALIGN(16);
 	} :data
 
 	. = ALIGN(4);

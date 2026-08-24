@@ -51,6 +51,12 @@
 #   N14 no settle budget    --seconds can zero the settle; that records
 #                           prompt_seen null, never false
 #   P10 Ctrl-C mid-ESC      an interrupted ESC loop still writes its terminator
+#   P11 --esc-period 0.002  the ESC grid actually gets ten times finer, and the
+#                           period the run ACHIEVED is in its own metadata
+#   N15 the default grid    20 ms is still 20 ms, so P11 measures the flag
+#   N16 impossible period   asking for 0.1 us reports what was achieved, not
+#                           what was asked -- the field is a measurement
+#   N17 hard-coded grid     a tool that ignores --esc-period fails P11
 #
 # P5/N9/P6/P7/N10 were added 2026-08-24 with the CR itself; P8/N11/P9/N12/N13/P10
 # came out of the adversarial review of that change the same day, and every one
@@ -645,6 +651,93 @@ if [ "$SHAPEI" = "CR" ] && [ "$IWRITTEN" = "True" ] && [ "$NINT" -gt 0 ]; then
   ok "P10 Ctrl-C inside an ESC loop still writes the terminator after $NINT ESC"
 else
   bad "P10 an interrupted ESC loop left '$SHAPEI' after $NINT ESC, cr.written=$IWRITTEN -- residue for the next cell"
+fi
+
+# --- P11 / N15 / N16 / N17  the ESC heartbeat is a measured grid ------------
+# CLK-08b is open because the two watchdog OVSEL points cannot separate a fixed
+# residual from a proportional one: the two hypotheses differ by about 15 ms and
+# the ESC-echo grid was 20 ms. SPEC.md section 17 names the fix -- a finer
+# heartbeat -- and this is the half of it that can fail.
+#
+# The thing being guarded is NOT "the constant is now 0.002". It is that the
+# period each capture achieved is written into that capture's own metadata as a
+# measurement. The previous grid was requested at 20.00 ms and came out at
+# 20.35 / 20.32 (SPEC.md CLK-08), so a reader who takes the requested value is
+# already 1.75% wrong, and at 2 ms the same relative error is what the whole
+# experiment is trying to resolve.
+esc_meta() {           # esc_meta <outprefix> <which> <key>
+  "$PY" - "$1.meta.json" "$2" "$3" <<'INNERPY'
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+print(m.get("esc", {}).get(sys.argv[2], {}).get(sys.argv[3]))
+INNERPY
+}
+
+fnum() {               # fnum <expr-in-python> -> exit 0 if true
+  "$PY" -c "import sys; sys.exit(0 if ($1) else 1)"
+}
+
+wrote_case "$TOOL" "$WORK/pf" "$WORK/pf.sent" \
+  --send 'J BFC00000' --esc-after 1.0 --esc-period 0.002 --cr-settle 0.4 --seconds 3
+read -r NFINE _ <<< "$(esc_tail_shape "$WORK/pf.sent")"
+FINEACH="$(esc_meta "$WORK/pf" esc_after achieved_period_s)"
+FINEREQ="$(esc_meta "$WORK/pf" esc_after requested_period_s)"
+
+wrote_case "$TOOL" "$WORK/pc" "$WORK/pc.sent" \
+  --send 'J BFC00000' --esc-after 1.0 --cr-settle 0.4 --seconds 3
+read -r NCOARSE _ <<< "$(esc_tail_shape "$WORK/pc.sent")"
+COARSEACH="$(esc_meta "$WORK/pc" esc_after achieved_period_s)"
+
+if [ "$FINEREQ" = "0.002" ] && [ "$NFINE" -gt 200 ] && fnum "$FINEACH < 0.006"; then
+  ok "P11 --esc-period 0.002 wrote $NFINE ESC in 1 s and records an achieved ${FINEACH}s"
+else
+  bad "P11 --esc-period 0.002 wrote $NFINE ESC, achieved=$FINEACH requested=$FINEREQ -- the knob is not reaching the loop"
+fi
+
+# The pair. Without it, P11 could pass on a tool that ignores the flag and just
+# happens to be fast, and the 10x claim would be about the host and not the
+# knob.
+if [ "$NCOARSE" -gt 20 ] && [ "$NCOARSE" -lt 80 ] \
+   && fnum "0.018 <= $COARSEACH <= 0.032" \
+   && fnum "$NFINE > 4 * $NCOARSE"; then
+  ok "N15 the default is still 20 ms ($NCOARSE ESC, achieved ${COARSEACH}s) so P11 measures the flag"
+else
+  bad "N15 default wrote $NCOARSE ESC achieved=$COARSEACH against fine $NFINE -- the two are not distinguishable"
+fi
+
+# THE SHARP ONE. A field that reported back the number it was given would pass
+# every check above. Ask for a period no host can deliver: the achieved value
+# must come out very much larger, because it is measured.
+wrote_case "$TOOL" "$WORK/pi" "$WORK/pi.sent" \
+  --send 'J BFC00000' --esc-after 0.2 --esc-period 0.0000001 --cr-settle 0.2 --seconds 2
+IMPACH="$(esc_meta "$WORK/pi" esc_after achieved_period_s)"
+IMPREQ="$(esc_meta "$WORK/pi" esc_after requested_period_s)"
+if fnum "$IMPACH > 10 * $IMPREQ" && fnum "$IMPACH > 0" ; then
+  ok "N16 an impossible ${IMPREQ}s request reports an achieved ${IMPACH}s -- the field is measured, not echoed"
+else
+  bad "N16 requested=$IMPREQ achieved=$IMPACH -- achieved_period_s is repeating the argument back"
+fi
+
+# And the mutation: a tool that hard-codes the old grid must make P11 fail.
+"$PY" - "$TOOL" "$WORK/mut4.py" <<'INNERPY'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "drain(args.esc_period)" not in src:
+    sys.exit("mutation target for N17 not found")
+open(sys.argv[2], "w", encoding="utf-8").write(
+    src.replace("drain(args.esc_period)", "drain(0.02)"))
+INNERPY
+if [ -s "$WORK/mut4.py" ]; then
+  wrote_case "$WORK/mut4.py" "$WORK/pm" "$WORK/pm.sent" \
+    --send 'J BFC00000' --esc-after 1.0 --esc-period 0.002 --cr-settle 0.4 --seconds 3
+  read -r NMUT _ <<< "$(esc_tail_shape "$WORK/pm.sent")"
+  if [ "$NMUT" -lt 200 ]; then
+    ok "N17 a tool that hard-codes 0.02 writes only $NMUT ESC under --esc-period 0.002, so P11 is testing the wiring"
+  else
+    bad "N17 the mutant still wrote $NMUT ESC -- P11 would pass on a tool that ignores the flag"
+  fi
+else
+  bad "N17 the mutant was not produced, so P11 is unguarded"
 fi
 
 echo

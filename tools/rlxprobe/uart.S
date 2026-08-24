@@ -1,3 +1,5 @@
+#include "rlxdefs.h"
+
 /* uart.S -- the parts where the instruction order is the point.
  *
  * Assembled under `.set noreorder`, `.set noat` and `.set nomacro`, so every
@@ -38,9 +40,10 @@
 	.ent	rlx_putc
 	.type	rlx_putc, @function
 rlx_putc:
-	lui	$9, 0xb800		/* t1 */
-	ori	$10, $9, 0x2014		/* t2 = LSR  */
-	ori	$9, $9, 0x2000		/* t1 = THR  */
+	lui	$9, RLX_UART_THR>>16
+	ori	$9, $9, RLX_UART_THR&0xffff	/* t1 = THR */
+	lui	$10, RLX_UART_LSR>>16
+	ori	$10, $10, RLX_UART_LSR&0xffff	/* t2 = LSR */
 	addiu	$11, $0, 6540		/* t3 = the loader's own bound */
 1:
 	lbu	$12, 0($10)		/* t4 = LSR */
@@ -144,8 +147,8 @@ rlx_mfc0_config1:
 	.ent	rlx_reset
 	.type	rlx_reset, @function
 rlx_reset:
-	lui	$8, 0xb800		/* t0 */
-	ori	$9, $8, 0x2014		/* t1 = LSR */
+	lui	$9, RLX_UART_LSR>>16
+	ori	$9, $9, RLX_UART_LSR&0xffff	/* t1 = LSR */
 	addiu	$10, $0, 6540		/* t2 */
 1:
 	lbu	$11, 0($9)		/* t3 = LSR */
