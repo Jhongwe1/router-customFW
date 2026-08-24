@@ -1,0 +1,15 @@
+{
+  "op": "put",
+  "host": "10.1.1.1",
+  "tid": 2099,
+  "filename": "image",
+  "image": "/home/key/fwre-work/rebuild/r0-vendor-kernel.bin",
+  "bytes": 987138,
+  "blocks": 1929,
+  "sha256": "396561a0565f8cf62ffd7df6b4105ae3943337ada0fdedc109eb586445a03e90",
+  "seconds": 1.522,
+  "retransmits": 0,
+  "rescue_report": "bench/2026-08-24d/G5-rescue.json",
+  "rescue_ip": "10.1.1.1",
+  "producer": "loader-tftp"
+}

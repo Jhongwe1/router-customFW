@@ -92,6 +92,68 @@ tool's own self-test on 2026-08-24, which had ``--idle 0.8`` against a played
 So for ``D1``: use ``--seconds``, not ``--idle``, and make it comfortably longer
 than the boot.  ``--idle`` is for captures that end when the device stops talking
 and where no silence is part of the answer.
+
+Every ESC loop ends with a CR, and that is the tool keeping a rule instead of
+------------------------------------------------------------------------------
+a sheet stating one
+-------------------
+``RUNSHEET.md`` seating 2 rule 2: *the trigger is any capture whose last byte
+written to the port was not a CR -- i.e. any capture that ran ``--esc`` or
+``--esc-after``.*  Until 2026-08-24 that was enforced by a **flush cell** typed
+after every such capture (``flush``, ``flush-cont``, ``flush-b7c``,
+``flush-d1``, ``flush-d3``), and the arithmetic under ``flush-d1``'s row is why
+it could not be skipped: the ESC stream leaves ``N mod 128`` bytes sitting in
+the loader's ``readline`` buffer, ``N`` is not knowable in advance, and the next
+command line is appended to that residue.  At the measured residues -- 12 after
+``A-catch``, ``985 = 7*128 + 89`` after ``B7c`` -- the next command is either
+mangled or cut at the 128-byte cliff.
+
+So the loop writes its own terminator.  After ``--esc`` and again after
+``--esc-after``, one CR, then read until the prompt it causes comes back (or
+``--cr-settle`` seconds elapse, whichever is first).  **The wait is not
+politeness**: with ``--esc`` the very next thing written is the command line,
+and the loader is not in ``readline`` while it is printing
+``Unknown command !\\r\\n<RealTek>``.
+
+Four things this does NOT do, stated here rather than discovered at the bench:
+
+* **It does not cover a USB re-enumeration.**  Rule 2 has a second half -- the
+  first command after the console adapter re-enumerates is echoed and not acted
+  on (``CONT``/``flush-cont``/``CONT2``, 2026-08-24) -- and no capture can see
+  an event that happened while it was not running.  A throwaway capture after a
+  re-attach is still required.  This removes the ESC half of the rule only.
+* **It cannot create the 128-byte case.**  ``readline`` returns unterminated
+  only when 128 non-CR bytes fill the buffer; a CR always takes the terminated
+  path, whatever the residue length.  So the CR can end a line early and can
+  never lengthen one into the cliff.
+* **The prompt it waits for may be the previous line's.**  Only bytes that
+  arrive after the CR is written are searched, but the ESC stream emits a prompt
+  of its own every 128 bytes, and one still in flight when the CR goes out is
+  indistinguishable from the CR's own reply.  The cost is that the settle ends a
+  few ms early; the CR itself has still been written.  *Inferred, pending a
+  bench capture with ``cr.prompt_seen`` beside the byte counts.*
+* **It changes the ESC accounting inside the capture's own log.**  An ``--esc``
+  capture used to partition exactly: ``echoed = 128 * n + r``, one
+  ``Unknown command !`` per completed 128-byte fill and ``r`` bytes left over --
+  the measurement ``docs/loader-command-semantics.md`` rests the 128-byte
+  finding on, ``[128*7, 12]`` and ``[128*5, 90]`` in the two ``A-catch``
+  captures.  Under 1.2 the CR terminates the leftover, so the tail of the log
+  carries one reply the *instrument* caused -- and **which reply depends on the
+  residue**: ``r > 0`` gives one more ``Unknown command !`` than completed
+  fills, while ``r == 0`` gives a **bare prompt and no ``Unknown command !``**
+  at all, because an empty line is what ``bench/2026-08-24b/flush-cont.log``
+  measured.  So the count is ``n`` or ``n + 1``, not always ``n + 1``, and
+  subtracting one unconditionally on a boundary capture yields ``n - 1`` fills
+  with a residue of ``128 + r`` -- outside ``0 <= r < 128``, which is
+  ``docs/loader-command-semantics.md``'s own refutation condition for the
+  128-byte finding, tripped on a capture where nothing was wrong.
+  ``cr.<loop>.log_offset`` in the metadata is the byte offset where the
+  instrument's own bytes begin, and ``tool_version`` is how a 1.1 capture is
+  told from a 1.2 one.
+
+``--no-cr`` turns it off, and exists so the suite's positive case is measuring
+the behaviour rather than the tool's habits -- the same reason ``--esc-after 0``
+is a case (``N6``) and not an assumption.
 """
 
 from __future__ import annotations
@@ -106,6 +168,19 @@ import time
 
 DEFAULT_BAUD = 38400
 ESC = b"\x1b"
+CR = b"\r"
+
+# The loader's prompt, byte for byte, from every capture in bench/. It is what
+# the CR after an ESC loop is waited for; it is not a parser and nothing turns
+# on it being found -- see cr.prompt_seen in the metadata.
+PROMPT = b"<RealTek>"
+
+DEFAULT_CR_SETTLE = 2.0
+
+# Bumped when the bytes this tool WRITES to the port change. A capture is
+# evidence, and what the instrument did to produce it is part of the reading:
+# 1.1 and earlier ended an ESC loop with an ESC, 1.2 ends it with a CR.
+TOOL_VERSION = "1.2"
 
 
 def _fail(msg: str) -> "NoReturn":  # noqa: F821
@@ -189,11 +264,18 @@ def capture(args) -> int:
     os.makedirs(os.path.dirname(os.path.abspath(log_path)) or ".", exist_ok=True)
 
     meta = {
+        "tool_version": TOOL_VERSION,
         "port": args.port,
         "baud": args.baud,
         "started_wallclock": None,
         "esc_seconds": args.esc,
         "esc_after_seconds": args.esc_after,
+        # One entry per ESC loop that ran. Absent means the loop did not run;
+        # written=false means --no-cr. This is the record of what the
+        # instrument wrote, which the .log cannot show -- the .log is what the
+        # device said.
+        "cr": {},
+        "cr_settle_s": args.cr_settle,
         "sent": None,
         "sent_hex": None,
         "stop_reason": None,
@@ -226,6 +308,16 @@ def capture(args) -> int:
     with open(log_path, "wb") as log, open(timing_path, "w", encoding="ascii") as timing:
         timing.write("# offset seconds -- offset is the byte count in .log BEFORE this read\n")
 
+        # The last few KiB read, so the CR's reply can be looked for without
+        # re-opening the log. Capped because a 45 s capture is not a buffer.
+        tail = bytearray()
+
+        # Which ESC loop is running and has not had its CR yet. Read by the
+        # KeyboardInterrupt handler: an interrupt inside an ESC loop would
+        # otherwise skip the terminator and leave `N mod 128` bytes in the
+        # loader's readline buffer with nothing in the metadata saying so.
+        pending_esc = None
+
         def drain(budget: float) -> None:
             """Read whatever is there for up to `budget` seconds."""
             nonlocal offset, last_byte_at
@@ -246,6 +338,99 @@ def capture(args) -> int:
                 timing.flush()
                 offset += len(chunk)
                 last_byte_at = time.monotonic()
+                tail.extend(chunk)
+                if len(tail) > 4096:
+                    del tail[:-4096]
+
+        def terminate_esc_line(which: str, on_interrupt: bool = False) -> None:
+            """End an ESC loop with a CR, and wait for the prompt it causes.
+
+            An ESC loop ends on a wall-clock deadline and writes no terminator,
+            so it leaves `N mod 128` bytes in the loader's readline buffer and
+            the next command line is appended to them. This writes the
+            terminator the loop did not, which is RUNSHEET seating 2 rule 2
+            enforced by the instrument instead of by a flush cell -- see the
+            module docstring for the two halves of that rule this does NOT
+            cover.
+
+            The wait matters for `--esc`, where the command line is the very
+            next thing written: the loader is not reading while it prints
+            `Unknown command !`, and a command line here runs to 119 characters
+            against a UART receive FIFO of *unknown* depth. *Inferred* -- this
+            project has measured no FIFO depth on this part, and the reason to
+            wait is that the depth is unknown, not that it is known to be small.
+            The refutation is cheap and belongs at the bench: send a command
+            with no settle immediately after a CR and see whether the loader
+            echoes all of it.
+            """
+            nonlocal pending_esc
+            entry = {"written": False, "prompt_seen": None, "waited_s": 0.0}
+            meta["cr"][which] = entry
+            if on_interrupt:
+                entry["on_interrupt"] = True
+            if args.no_cr:
+                entry["reason"] = "--no-cr"
+                pending_esc = None
+                return
+            # Pull whatever is already on the wire into the log FIRST, so that
+            # `tail` holds nothing stale. Without this, a `<RealTek>` sitting in
+            # the OS receive buffer when the CR goes out is read a moment later
+            # and counted as the CR's own reply -- prompt_seen true, waited_s
+            # ~0.05, and the wait recorded as having succeeded when it did not
+            # happen. The race is narrowed, not closed: a prompt still in the
+            # UART's own FIFO is indistinguishable. *Inferred.*
+            drain(0.05)
+            del tail[:]           # only what arrives AFTER the CR counts
+            # Where in the .log this instrument's own bytes start. The division
+            # of labour is "the .log is what the device said"; from here it also
+            # holds one reply the tool caused, and this is the anchor that lets
+            # a reader -- or `report`'s --to pattern -- tell them apart.
+            entry["log_offset"] = offset
+            ser.write(CR)
+            ser.flush()
+            entry["written"] = True
+            # Cleared the instant the byte is out, not at the end of the settle:
+            # from here an interrupt costs the reply, never the terminator.
+            pending_esc = None
+            if on_interrupt:
+                # The operator asked for this to stop. The CR is the half the
+                # NEXT capture depends on and it has been written; take a short
+                # drain so its reply lands in this log rather than in that one,
+                # and do not spend the full settle.
+                try:
+                    drain(0.3)
+                except KeyboardInterrupt:
+                    pass
+                entry["prompt_seen"] = PROMPT in tail
+                entry["waited_s"] = 0.3
+                return
+            budget = args.cr_settle
+            if args.seconds:
+                # Never let the settle push the capture past its own deadline.
+                budget = min(budget, max(0.0, args.seconds - (time.monotonic() - t0)))
+            entry["settle_budget_s"] = round(budget, 6)
+            if budget <= 0.0:
+                # `prompt_seen` stays None. False would mean "looked and did not
+                # see", which is the reading flush-d1 turns on; this is "never
+                # looked", and the two must not share a value. Reachable
+                # whenever --seconds is no larger than the ESC window.
+                entry["reason"] = ("no settle: --seconds left no budget after the "
+                                   "ESC loop. prompt_seen is null, not false")
+                print("console-capture: WARNING -- --seconds left no time for the CR "
+                      "settle, so nothing was waited for and prompt_seen is null. "
+                      "Give --seconds at least --cr-settle more than the ESC window.",
+                      file=sys.stderr)
+                return
+            started = time.monotonic()
+            deadline = started + budget
+            seen = False
+            while time.monotonic() < deadline:
+                drain(0.05)
+                if PROMPT in tail:
+                    seen = True
+                    break
+            entry["prompt_seen"] = seen
+            entry["waited_s"] = round(time.monotonic() - started, 6)
 
         try:
             if args.esc:
@@ -253,10 +438,17 @@ def capture(args) -> int:
                 # "Jump to image start", measured 2026-08-18. Streaming from
                 # before power-on is what B1 A1 does; it is also what sets
                 # gCHKKEY_HIT, which is why B5 read 1 and not 0.
+                pending_esc = "esc"
                 esc_deadline = time.monotonic() + args.esc
                 while time.monotonic() < esc_deadline:
                     ser.write(ESC)
                     drain(0.02)
+                # Before --send, not after: the residue this terminates would
+                # otherwise be the front of the command line. Called whether or
+                # not --send was given: the A-catch shape is --esc with no
+                # command at all, and it is the capture whose 12-byte residue
+                # cost A0's first attempt on 2026-08-24.
+                terminate_esc_line("esc")
 
             if args.send is not None:
                 # Validated by _check_send() before the port was opened.
@@ -281,10 +473,18 @@ def capture(args) -> int:
                 # function before running the cell; it is the third cell this
                 # repo has nearly lost to an instrument that could not do it
                 # (``A2``, ``E5``) and the first one caught in advance.
+                pending_esc = "esc_after"
                 esc_deadline = time.monotonic() + args.esc_after
                 while time.monotonic() < esc_deadline:
                     ser.write(ESC)
                     drain(0.02)
+                # D1 and D4 both end here, and D2 is the command that was going
+                # to be appended to their residue. This does NOT retire
+                # flush-d1/flush-d3: RUNSHEET keeps both, with the expectation
+                # inverted, because they are the only measurement of what the
+                # LOADER did with this CR -- the suite can only prove what was
+                # written to the port.
+                terminate_esc_line("esc_after")
 
             while True:
                 drain(0.05)
@@ -297,6 +497,27 @@ def capture(args) -> int:
                     break
         except KeyboardInterrupt:
             stop_reason = "interrupted"
+            if pending_esc is not None:
+                # Measured 2026-08-24 on a pty, driving this file: a D1-shaped
+                # interrupt (--send 'J BFC00000' --esc-after 20, Ctrl-C at t=5)
+                # left 245 ESC on the wire with no CR, residue 117 -- and
+                # 117 + len('DW B8003110 1') = 130 >= 128, which is the buffer
+                # cliff and not a recoverable `Unknown command !`. The metadata
+                # recorded "cr": {}, which this file defines as "the loop did
+                # not run": a 1.1 capture wearing 1.2's version number.
+                try:
+                    terminate_esc_line(pending_esc, on_interrupt=True)
+                except BaseException as e:
+                    # BaseException, not Exception: a SECOND Ctrl-C landing
+                    # inside ser.write(CR) is a KeyboardInterrupt, which is not
+                    # an Exception subclass -- it would escape this guard, escape
+                    # the handler it is already inside, and take the whole
+                    # .meta.json with it. The capture would then have a .log and
+                    # a .timing and no record of what the instrument did.
+                    meta["cr"][pending_esc] = {
+                        "written": False,
+                        "reason": f"interrupted, and the CR could not be written: {e}",
+                    }
         finally:
             ser.close()
 
@@ -403,6 +624,17 @@ def main() -> int:
                    help="stream ESC for this many seconds before capturing")
     c.add_argument("--send", default=None,
                    help="one command line to send verbatim, then read-only")
+    c.add_argument("--no-cr", dest="no_cr", action="store_true",
+                   help="do NOT write the CR that terminates an ESC loop. The "
+                        "capture then leaves N mod 128 bytes in the loader's "
+                        "readline buffer and the next command line is appended "
+                        "to them -- RUNSHEET seating 2 rule 2. Here so the "
+                        "self-test's positive case measures the behaviour")
+    c.add_argument("--cr-settle", dest="cr_settle", type=float,
+                   default=DEFAULT_CR_SETTLE,
+                   help="after that CR, read for at most this many seconds "
+                        "waiting for the prompt it causes (default "
+                        f"{DEFAULT_CR_SETTLE})")
     c.add_argument("--seconds", type=float, default=0.0, help="stop after N s")
     c.add_argument("--idle", type=float, default=0.0, help="stop after N s with no bytes")
     c.add_argument("--force", action="store_true", help="overwrite an existing capture")

@@ -1,0 +1,16 @@
+{
+  "tool_version": "1.2",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-08-24T21:38:22+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "sent": "MDIOR 2",
+  "sent_hex": "4d44494f5220320d",
+  "stop_reason": "--seconds 30.0 elapsed",
+  "bytes": 1042,
+  "duration_s": 30.096264,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

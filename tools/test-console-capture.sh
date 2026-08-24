@@ -7,8 +7,9 @@
 # writer on the master side plays a known script with known gaps, and the tool
 # reads the slave believing it is a serial port.
 #
-# Thirteen cases. Eight of them are controls whose job is to FAIL, because a
-# test suite that cannot fail proves nothing -- the same argument tools/audit-bench-log.py
+# Twenty-four cases, twenty-five results (P3 checks two things). Fourteen of
+# them are controls whose job is to FAIL, because a test suite that cannot fail
+# proves nothing -- the same argument tools/audit-bench-log.py
 # makes about its own patterns and the reason PROGRESS.md rejected hazlint's
 # original "stage 2 must report zero" control.
 #
@@ -30,6 +31,38 @@
 #                           guard is at the wrong threshold and C7b cannot run
 #   N8  non-ASCII refusal    refused by _check_send, not by a traceback out of
 #                           .encode("ascii") with the port already open
+#   P5  the ESC terminator   --esc-after leaves the port on a CR, not on an ESC
+#   N9  --no-cr can turn it off, so P5 measures the behaviour and not a habit
+#   P6  ordering             --esc's CR lands BETWEEN the last ESC and the
+#                           command line, which is the only place it helps
+#   P7  no ESC, no extra CR  a --send-only capture writes the command and
+#                           nothing else -- every C cell is one of those
+#   N10 the mutation         with the CR write removed from a copy of the tool,
+#                           P5's check must report NONE. Without this, P5 cannot
+#                           tell the patched tool from the shipped one
+#
+#   P8  no command after   --esc with no --send still ends on a CR. That is the
+#                           A-catch shape and the only --esc shape on record
+#   N11 gating the terminator on --send makes P8 fail, so P8 tests that path
+#   P9  the settle          a prompt played after the CR is seen, and the wait
+#                           ends early -- the only cases here that read .meta.json
+#   N12 and with nothing played back it runs to expiry and records false
+#   N13 a PROMPT that cannot match makes P9 fail
+#   N14 no settle budget    --seconds can zero the settle; that records
+#                           prompt_seen null, never false
+#   P10 Ctrl-C mid-ESC      an interrupted ESC loop still writes its terminator
+#
+# P5/N9/P6/P7/N10 were added 2026-08-24 with the CR itself; P8/N11/P9/N12/N13/P10
+# came out of the adversarial review of that change the same day, and every one
+# of them killed a mutant the first eighteen cases had let through -- the review
+# ran three of those mutants and got "18 passed, 0 failed" from each.
+#
+# These cases do NOT retire `flush-d1` and `flush-d3`. They prove what the tool
+# WRITES; only the board can say what the loader did with it, and RUNSHEET keeps
+# both cells with the expectation inverted (a bare prompt, not `Unknown command !`)
+# as exactly that control. The half of rule 2 about a USB re-enumeration is also
+# not covered and still needs a throwaway capture -- no capture can see an event
+# that happened while it was not running.
 #
 # P3/N6 were added 2026-08-24, the day RUNSHEET section D was stopped before it
 # ran because --esc streams before --send and D1 needs the opposite. The option
@@ -296,6 +329,322 @@ if printf '%s\n' "$OUTA" | grep -q 'is not ASCII'; then
 else
   bad "N8 a non-ASCII --send was not refused by _check_send"
   printf '%s\n' "$OUTA" | sed 's/^/        /'
+fi
+
+# --- P5 / N9 / P6 / P7 / N10  the CR that ends an ESC loop -----------------
+# RUNSHEET seating 2 rule 2: any capture whose last byte written to the port was
+# not a CR leaves `N mod 128` bytes in the loader's readline buffer, and the next
+# command line is appended to them. Until 2026-08-24 that was enforced by a flush
+# cell typed afterwards -- flush, flush-cont, flush-b7c, flush-d1, flush-d3. The
+# tool writes the terminator itself now, and these five cases are what make that
+# a property rather than a habit.
+#
+# The judgement is on what the tool WROTE, which the .log can never show: the
+# .log is what the device said, and this CR's whole point is that no device
+# needs to be there. So the pty master is recorded and read back.
+wrote_case() {         # wrote_case <tool> <outprefix> <masterdump> <tool args...>
+  local tool="$1" out="$2" dump="$3"; shift 3
+  "$PY" - "$tool" "$out" "$dump" "$@" <<'INNERPY'
+import os, pty, select, subprocess, sys, time
+
+tool, out, dump = sys.argv[1], sys.argv[2], sys.argv[3]
+extra = sys.argv[4:]
+master, slave = pty.openpty()
+name = os.ttyname(slave)
+proc = subprocess.Popen(
+    ["/usr/bin/python3", tool, "capture", "--port", name, "--out", out] + extra,
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# Read for as long as the tool runs. Nothing is ever played back: these cases
+# are about the ORDER of the bytes the tool sends, and the last one it sends has
+# to actually be the last one recorded.
+seen = bytearray()
+while proc.poll() is None:
+    r, _, _ = select.select([master], [], [], 0.05)
+    if r:
+        seen += os.read(master, 4096)
+deadline = time.monotonic() + 0.3
+while time.monotonic() < deadline:
+    r, _, _ = select.select([master], [], [], 0.05)
+    if not r:
+        break
+    seen += os.read(master, 4096)
+open(dump, "wb").write(bytes(seen))
+os.close(master); os.close(slave)
+INNERPY
+}
+
+# Classify what followed the command line: how many ESC, and whether exactly one
+# CR closed the run. Prints "<n_esc> <trailer>" where trailer is CR / NONE / MESS.
+esc_tail_shape() {     # esc_tail_shape <masterdump>
+  "$PY" - "$1" <<'INNERPY'
+import re, sys
+b = open(sys.argv[1], 'rb').read()
+i = b.find(b'J BFC00000\r')
+if i < 0:
+    print("-1 NOSEND"); raise SystemExit
+tail = b[i + 11:]
+n = tail.count(0x1b)
+if re.fullmatch(rb'\x1b+\r', tail):
+    print(f"{n} CR")
+elif re.fullmatch(rb'\x1b+', tail):
+    print(f"{n} NONE")
+else:
+    print(f"{n} MESS")
+INNERPY
+}
+
+wrote_case "$TOOL" "$WORK/cr" "$WORK/cr.sent" \
+  --send 'J BFC00000' --esc-after 1.0 --cr-settle 0.4 --seconds 3
+read -r NCR SHAPE <<< "$(esc_tail_shape "$WORK/cr.sent")"
+if [ "$SHAPE" = "CR" ] && [ "$NCR" -gt 0 ]; then
+  ok "P5 --esc-after ends with one CR after $NCR ESC -- flush-d1 is the tool's job now"
+else
+  bad "P5 --esc-after left the port on '$SHAPE' after $NCR ESC, not on a CR"
+fi
+
+wrote_case "$TOOL" "$WORK/nocr" "$WORK/nocr.sent" \
+  --send 'J BFC00000' --esc-after 1.0 --no-cr --seconds 3
+read -r NNC SHAPE0 <<< "$(esc_tail_shape "$WORK/nocr.sent")"
+if [ "$SHAPE0" = "NONE" ] && [ "$NNC" -gt 0 ]; then
+  ok "N9 --no-cr writes no terminator, so P5 measures the behaviour and not a habit"
+else
+  bad "N9 --no-cr produced '$SHAPE0' after $NNC ESC -- P5 proves nothing"
+fi
+
+# P6: --esc runs BEFORE the send, so its CR has to land between the last ESC and
+# the command line. If it landed after, the residue would still be the front of
+# the command -- which is the defect the whole section exists to remove.
+wrote_case "$TOOL" "$WORK/pre" "$WORK/pre.sent" \
+  --esc 1.0 --cr-settle 0.4 --send 'DW 8040DBC0 1' --seconds 3
+if "$PY" - "$WORK/pre.sent" <<'INNERPY'
+import re, sys
+b = open(sys.argv[1], 'rb').read()
+sys.exit(0 if re.fullmatch(rb'\x1b+\rDW 8040DBC0 1\r', b) else 1)
+INNERPY
+then
+  ok "P6 --esc puts its CR between the last ESC and the command, not after it"
+else
+  bad "P6 --esc did not terminate its ESC run before sending the command"
+  "$PY" -c "print(repr(open('$WORK/pre.sent','rb').read()[:80]))" | sed 's/^/        /'
+fi
+
+# P7: no ESC loop ran, so the only CR is the one --send has always written. A
+# tool that writes a CR unconditionally would pass P5 and P6 and be wrong about
+# every ordinary cell -- C1 through C7b, every one of them --send only.
+wrote_case "$TOOL" "$WORK/plain" "$WORK/plain.sent" --send 'DW 8040DBC0 1' --seconds 2
+if [ "$("$PY" -c "print(open('$WORK/plain.sent','rb').read() == b'DW 8040DBC0 1\r')")" = "True" ]; then
+  ok "P7 with no ESC loop the tool writes the command and nothing else"
+else
+  bad "P7 a --send-only capture wrote something other than the command line"
+  "$PY" -c "print(repr(open('$WORK/plain.sent','rb').read()[:80]))" | sed 's/^/        /'
+fi
+
+# N10: the mutation. P5 passing on the shipped tool says nothing unless it fails
+# on a tool with the write removed -- PROGRESS.md 2026-08-24, hazlint's suite
+# went 42->56 because the old one could not tell the patched tool from the
+# shipped one.
+"$PY" - "$TOOL" "$WORK/mutant.py" <<'INNERPY'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "ser.write(CR)" not in src:
+    sys.exit("mutation target 'ser.write(CR)' not found -- N10 cannot run")
+open(sys.argv[2], "w", encoding="utf-8").write(
+    src.replace("ser.write(CR)", "pass  # MUTANT: the terminator is not written", 1))
+INNERPY
+if [ -s "$WORK/mutant.py" ]; then
+  wrote_case "$WORK/mutant.py" "$WORK/mut" "$WORK/mut.sent" \
+    --send 'J BFC00000' --esc-after 1.0 --cr-settle 0.4 --seconds 3
+  read -r NMU SHAPEM <<< "$(esc_tail_shape "$WORK/mut.sent")"
+  # `!= CR` is not the assertion: NOSEND and MESS are the shapes a mutant that
+  # never RAN produces, and scoring those as a killed mutation is how a broken
+  # harness reports itself as a working control. The ESC guard is N9's.
+  if [ "$SHAPEM" = "NONE" ] && [ "$NMU" -gt 0 ]; then
+    ok "N10 removing the CR write leaves $NMU ESC and no terminator -- P5 is testing the write"
+  else
+    bad "N10 the mutant produced '$SHAPEM' after $NMU ESC; only NONE with ESC>0 means P5 discriminates"
+  fi
+else
+  bad "N10 the mutant was not produced, so P5 is unguarded"
+fi
+
+# --- P8 / N11  the shape with no command after it -------------------------
+# A-catch is `--esc 25` with NO --send, and it is the only --esc shape on record
+# (bench/2026-08-24/A-catch.meta.json and bench/2026-08-24b/A-catch.meta.json,
+# both "sent": null). It is also the capture whose 12-byte residue mangled A0's
+# first attempt. Every case above passes --send, so without this one a tool that
+# terminated only the ESC loops that precede a command would score 18/18 and
+# fail on the first cell of the next seating.
+wrote_case "$TOOL" "$WORK/bare" "$WORK/bare.sent" --esc 1.0 --cr-settle 0.4 --seconds 3
+if [ "$("$PY" -c "
+import re
+b = open(r'$WORK/bare.sent','rb').read()
+print(bool(re.fullmatch(rb'\x1b+\r', b)))")" = "True" ]; then
+  ok "P8 --esc with no --send still ends on a CR -- the A-catch shape"
+else
+  bad "P8 --esc with no --send did not terminate its ESC run"
+  "$PY" -c "print(repr(open(r'$WORK/bare.sent','rb').read()[-40:]))" | sed 's/^/        /'
+fi
+
+"$PY" - "$TOOL" "$WORK/mut2.py" <<'INNERPY'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+target = '                terminate_esc_line("esc")'
+if target not in src:
+    sys.exit("mutation target for N11 not found")
+open(sys.argv[2], "w", encoding="utf-8").write(src.replace(
+    target,
+    '                if args.send is not None:  # MUTANT\n' + target + '    ', 1))
+INNERPY
+if [ -s "$WORK/mut2.py" ]; then
+  wrote_case "$WORK/mut2.py" "$WORK/bare2" "$WORK/bare2.sent" --esc 1.0 --cr-settle 0.4 --seconds 3
+  if [ "$("$PY" -c "
+import re
+b = open(r'$WORK/bare2.sent','rb').read()
+print(bool(re.fullmatch(rb'\x1b+\r', b)))")" = "True" ]; then
+    bad "N11 a tool that terminates only ESC loops followed by a command still passed P8"
+  else
+    ok "N11 gating the terminator on --send makes P8 fail -- P8 is testing the no-command path"
+  fi
+else
+  bad "N11 the mutant was not produced, so P8 is unguarded"
+fi
+
+# --- P9 / N12 / N13  the settle, in both directions ------------------------
+# The CR write is guarded by N10. The WAIT that follows it was guarded by
+# nothing: with the budget forced to 0, with the settle loop deleted, or with
+# PROMPT changed to a literal that can never match, the suite still printed
+# "18 passed, 0 failed" -- all three measured 2026-08-24. These three cases are
+# the control, and they are the only ones here that read a .meta.json, which is
+# where everything this change records about the instrument lives.
+settle_case() {        # settle_case <tool> <outprefix> <masterdump> <play|silent> <args...>
+  local tool="$1" out="$2" dump="$3" mode="$4"; shift 4
+  "$PY" - "$tool" "$out" "$dump" "$mode" "$@" <<'INNERPY'
+import os, pty, select, subprocess, sys, time
+
+tool, out, dump, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+extra = sys.argv[5:]
+master, slave = pty.openpty()
+proc = subprocess.Popen(
+    ["/usr/bin/python3", tool, "capture", "--port", os.ttyname(slave), "--out", out] + extra,
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+seen = bytearray()
+played = False
+while proc.poll() is None:
+    r, _, _ = select.select([master], [], [], 0.05)
+    if r:
+        seen += os.read(master, 4096)
+    # ESC immediately followed by CR is the terminator's signature on the wire,
+    # and it is the only moment at which a prompt played back is answering the
+    # CR rather than one of the ESC stream's own 128-byte fills.
+    if mode == "play" and not played and b"\x1b\r" in seen:
+        os.write(master, b"\r\n<RealTek>")
+        played = True
+open(dump, "wb").write(bytes(seen))
+os.close(master); os.close(slave)
+INNERPY
+}
+
+cr_meta() {            # cr_meta <outprefix> <which> <key>
+  "$PY" - "$1.meta.json" "$2" "$3" <<'INNERPY'
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+print(m.get("cr", {}).get(sys.argv[2], {}).get(sys.argv[3]))
+INNERPY
+}
+
+settle_case "$TOOL" "$WORK/s1" "$WORK/s1.sent" play \
+  --send 'J BFC00000' --esc-after 1.0 --cr-settle 2.0 --seconds 6
+S1SEEN="$(cr_meta "$WORK/s1" esc_after prompt_seen)"
+S1WAIT="$(cr_meta "$WORK/s1" esc_after waited_s)"
+if [ "$S1SEEN" = "True" ] && "$PY" -c "import sys; sys.exit(0 if $S1WAIT < 1.0 else 1)"; then
+  ok "P9 a prompt played after the CR is seen in ${S1WAIT}s and the settle ends early"
+else
+  bad "P9 prompt_seen=$S1SEEN waited_s=$S1WAIT -- the settle did not observe the reply"
+fi
+
+settle_case "$TOOL" "$WORK/s2" "$WORK/s2.sent" silent \
+  --send 'J BFC00000' --esc-after 1.0 --cr-settle 2.0 --seconds 6
+S2SEEN="$(cr_meta "$WORK/s2" esc_after prompt_seen)"
+S2WAIT="$(cr_meta "$WORK/s2" esc_after waited_s)"
+if [ "$S2SEEN" = "False" ] && "$PY" -c "import sys; sys.exit(0 if $S2WAIT >= 1.5 else 1)"; then
+  ok "N12 with nothing played back the settle runs to expiry (${S2WAIT}s) and records false"
+else
+  bad "N12 prompt_seen=$S2SEEN waited_s=$S2WAIT -- P9 could be passing without a settle"
+fi
+
+"$PY" - "$TOOL" "$WORK/mut3.py" <<'INNERPY'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if 'PROMPT = b"<RealTek>"' not in src:
+    sys.exit("mutation target for N13 not found")
+open(sys.argv[2], "w", encoding="utf-8").write(
+    src.replace('PROMPT = b"<RealTek>"', 'PROMPT = b"<NEVER-MATCHES>"', 1))
+INNERPY
+if [ -s "$WORK/mut3.py" ]; then
+  settle_case "$WORK/mut3.py" "$WORK/s3" "$WORK/s3.sent" play \
+    --send 'J BFC00000' --esc-after 1.0 --cr-settle 2.0 --seconds 6
+  if [ "$(cr_meta "$WORK/s3" esc_after prompt_seen)" = "True" ]; then
+    bad "N13 a PROMPT that cannot match still reported prompt_seen -- P9 is not reading the port"
+  else
+    ok "N13 a PROMPT that cannot match makes P9 fail -- P9 is testing the match"
+  fi
+else
+  bad "N13 the mutant was not produced, so P9 is unguarded"
+fi
+
+# --- N14  the settle that never ran must not look like one that found nothing
+# `--seconds` clamps the settle budget, so `--esc-after 2 --seconds 2` leaves
+# zero. `prompt_seen: false` there would be indistinguishable from "waited the
+# full window and the board said nothing" -- and under the rewritten flush-d1
+# row that second reading is the operator's evidence that D1's terminator failed
+# to go out. So no-budget records null and says so. Found by the completeness
+# critic of this change's own review, 2026-08-24; unreachable from every other
+# case here, which all carry >= 2 s of headroom.
+settle_case "$TOOL" "$WORK/s4" "$WORK/s4.sent" silent   --send 'J BFC00000' --esc-after 2.0 --cr-settle 2.0 --seconds 2
+S4SEEN="$(cr_meta "$WORK/s4" esc_after prompt_seen)"
+S4W="$(cr_meta "$WORK/s4" esc_after written)"
+S4B="$(cr_meta "$WORK/s4" esc_after settle_budget_s)"
+if [ "$S4W" = "True" ] && [ "$S4SEEN" = "None" ] && [ "$S4B" = "0.0" ]; then
+  ok "N14 a zeroed settle budget records prompt_seen null, not false, and still writes the CR"
+else
+  bad "N14 written=$S4W prompt_seen=$S4SEEN budget=$S4B -- 'never looked' is being recorded as 'looked and saw nothing'"
+fi
+
+# --- P10  Ctrl-C inside an ESC loop ---------------------------------------
+# Measured 2026-08-24 on a pty against 1.2 before this case existed: an
+# interrupt inside the ESC loop skipped the terminator entirely, left 245 ESC
+# on the wire and a residue of 117 -- and 117 + len('DW B8003110 1') = 130,
+# which is the 128-byte cliff and not a recoverable `Unknown command !`. The
+# metadata recorded "cr": {}, which this tool defines as "the loop did not run",
+# so the capture was a 1.1 capture carrying 1.2's version number.
+"$PY" - "$TOOL" "$WORK/int.sent" "$WORK/int" <<'INNERPY'
+import os, pty, select, signal, subprocess, sys, time
+
+tool, dump, out = sys.argv[1], sys.argv[2], sys.argv[3]
+master, slave = pty.openpty()
+proc = subprocess.Popen(
+    ["/usr/bin/python3", tool, "capture", "--port", os.ttyname(slave), "--out", out,
+     "--send", "J BFC00000", "--esc-after", "20", "--cr-settle", "0.4", "--seconds", "45"],
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+seen = bytearray()
+t0 = time.monotonic()
+sent = False
+while proc.poll() is None:
+    r, _, _ = select.select([master], [], [], 0.05)
+    if r:
+        seen += os.read(master, 4096)
+    if not sent and time.monotonic() - t0 > 2.0:
+        proc.send_signal(signal.SIGINT)     # the operator, mid-ESC-loop
+        sent = True
+open(dump, "wb").write(bytes(seen))
+os.close(master); os.close(slave)
+INNERPY
+read -r NINT SHAPEI <<< "$(esc_tail_shape "$WORK/int.sent")"
+IWRITTEN="$(cr_meta "$WORK/int" esc_after written)"
+if [ "$SHAPEI" = "CR" ] && [ "$IWRITTEN" = "True" ] && [ "$NINT" -gt 0 ]; then
+  ok "P10 Ctrl-C inside an ESC loop still writes the terminator after $NINT ESC"
+else
+  bad "P10 an interrupted ESC loop left '$SHAPEI' after $NINT ESC, cr.written=$IWRITTEN -- residue for the next cell"
 fi
 
 echo

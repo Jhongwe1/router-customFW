@@ -1,0 +1,14 @@
+{
+  "op": "get",
+  "host": "10.1.1.1",
+  "tid": 2099,
+  "filename": "ram",
+  "output": "bench/2026-08-24d/G4-back.bin",
+  "bytes": 987138,
+  "blocks": 1929,
+  "sha256": "396561a0565f8cf62ffd7df6b4105ae3943337ada0fdedc109eb586445a03e90",
+  "seconds": 1.395,
+  "retransmits": 0,
+  "attribution": null,
+  "producer": "loader-tftp"
+}
