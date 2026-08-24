@@ -62,6 +62,14 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 
 ## Environment
 
+- **`usbipd` has nothing to attach to unless a WSL process is already running.**
+  Measured 2026-08-24: with the distro idle, `usbipd attach` fails with *there is
+  no WSL 2 distribution running*, and **an attachment already made drops when the
+  distro goes idle** — it died between two tool calls mid-session and took
+  `/dev/ttyUSB0` with it. Start a long-lived process first and leave it running:
+  `wsl -d Ubuntu-24.04 -- sleep 36000` in the background. **And the busid is not
+  stable** — the USB GbE moved `3-4` → `2-4` across one re-enumeration the same
+  day, so re-read `usbipd list` every time rather than reusing the number.
 - **The Bash tool is Git Bash, not WSL.** `-lc` mangles the command: `$VAR` is
   stripped and a leading `/` is MSYS-translated (`bash /mnt/c/x.sh` became
   `bash C:/Program Files/Git/mnt/c/x.sh`). **Feed the script over stdin instead** —
