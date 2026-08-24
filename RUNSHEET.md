@@ -599,10 +599,47 @@ simulator had approved sat an `andi` in a load delay slot. So:
 
 ## Session B4 — `R1-gate`: the cache model and the CP0 census, on silicon
 
-**Written 2026-08-25, at the desk, before any of it runs.** Two payloads, and
-`rlx_reset` means they cost **one** power cycle between them, not two. Written
-here rather than typed from memory because `RUNSHEET.md` rule 4 exists: a command
-is typed from here or from a tool, never re-stated by hand.
+**Written 2026-08-25, at the desk, before any of it runs; corrected the same
+day, before any of it ran.** Two payloads, and `rlx_reset` means they cost **one**
+power cycle between them, not two. Written here rather than typed from memory
+because `RUNSHEET.md` rule 4 exists: a command is typed from here or from a tool,
+never re-stated by hand — and the first draft of this section broke that rule in
+its two most expensive cells, `H1a` and `H2a`, which were cross-references and
+carried no command at all.
+
+> **Standing capture forms, because rule 4 means they are not recalled at the
+> bench.** From seating 2's rules 1-3 and from `D1`, which is the only cell that
+> has run this shape:
+>
+> | | |
+> |---|---|
+> | the opening catch | `python3 tools/console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/A-catch --esc 180 --seconds 200` |
+> | an ordinary read cell | `python3 tools/console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/<cell> --send '<command>' --seconds 5` |
+> | **a cell whose command resets the board** | the same, plus `--esc-after N --seconds M`. `--esc-after` streams ESC for N seconds **after** the send, which is what `--esc` cannot do and what `D1` needed |
+> | after every `--esc` / `--esc-after` capture | `… --out <dir>/flush-<what-it-follows> --send '' --seconds 2` |
+>
+> 🔴 **Every `J` in this section resets the board, and the reset lands under a
+> second after the payload's last line.** `rlx_reset` drains the UART on `TEMT`,
+> counts 16,777,216 iterations of a three-instruction loop, then writes
+> `WDTCNR = 0` at the shortest `OVSEL` — *讀*, `tools/rlxprobe/uart.S`. The ESC
+> window is ~4.9 s wide. **No hand starts a capture inside that.** ESC arriving
+> while the payload runs is harmless: `uart.S` never reads `RBR`, so the bytes sit
+> in the receive FIFO and overrun. The cost of an oversized window is log noise;
+> the cost of a missed one is a power cycle, and this project has paid it twice.
+> **`--esc-after 60 --seconds 120` is a guess and is not calibrated.** `D1`'s
+> `--esc-after 20` is the only measured number and it covers a reset that begins
+> immediately; this one begins after ~1.7 kB of report at 38400 (≈0.45 s) plus the
+> delay loop. 60 is three times 20 and costs nothing but log lines.
+>
+> `console-capture` 1.2 writes the CR that terminates an ESC loop itself
+> (`terminate_esc_line`), so a flush cell no longer *creates* the terminator — it
+> **checks** that one went out. **The other half of seating rule 2 is not covered
+> by the instrument and cannot be**: the first command after the console adapter
+> re-enumerates on the host is echoed and not acted on, signature *echo + prompt +
+> no data line*, and no capture can see an event that happened while it was not
+> running. That is what `A0` is for, and it is why `A0` runs before `H0a` —
+> **a poisoned first command and "the 32 words are not there" are the same
+> observation at the bench**, and `H0a` is what decides whether `probe2` runs.
 
 > 🔴 **What a fault costs, and it is the reason the running order is what it is.**
 > `docs/loader-command-semantics.md` §10: an exception the loader does not handle
@@ -617,35 +654,112 @@ is typed from here or from a tool, never re-stated by hand.
 > - **if the board goes silent, do not touch the power for 60 seconds.** The
 >   claim that the hang is permanent is READ, not measured, and a spontaneous
 >   recovery would refute it. Then power-cycle, ESC to the prompt, and
->   `DW 80A00000 88` — `MEM-15` says a short power-off keeps the contents.
+>   `DW 80A00000 137` — `MEM-15` says a short power-off keeps the contents.
+>   **137 and not 88**: the block is 137 words and `88` stops before the seal,
+>   which is the word that tells a completed run from a truncated one.
 
-### H0 — three reads, before anything is uploaded. Zero risk, and they turn a whole document from READ into 量
+**Running order.** `A-catch` -> `A0` -> `H0` -> `H1` -> `H2` -> `H3b` -> `H3a` ->
+`H3c`. `A0` is first because seating rule 1 says so. **`H3b` moves ahead of `H3a`
+and `H3c` and behind `H2a`**: it is four cable moves on the same link both TFTP
+uploads use, and a stale neighbour entry cost `G4-put` three retransmits and
+8.935 s (*量*, `§`Results). `H3a` and `H3c` both reset the board, so they go last.
 
 | | command | expected | what it refutes |
 |---|---|---|---|
-| **H0a** | `DW 80000080 32` | the 32 words `notes/cache-model.md` lists, of which the first 11 are live code: `401b6800 00000000 00000000 3c1a8041 275aeb40 337b007c 035bd021 8f5a0000 00000000 03400008 00000000` | 🔴 **that the general exception vector is at `0x80000080` and not at MIPS32's `0x80000180`.** Three sources agree and this is the reading that settles it. **If these words are not there, `probe2` must not be run** — its handler would go somewhere the core does not fetch from |
+| **A0** | `DW 8040DBC0 1` | 71 bytes, `8040DBC0: 8040B070 00000000 80409A9C 8040B074` — byte-identical to `bench/2026-08-24b/A0.log`, which is itself byte-identical to part one's | that the console path is the one seating 2 measured, and that DTR/RTS toggling on this 4-pin header does not disturb the board. **It is also the throwaway seating rule 2's second half requires**, spent here where nothing depends on the answer |
+
+### H0 — six reads, before anything is uploaded. Zero risk, and they turn a whole document from READ into 量
+
+| | command | expected | what it refutes |
+|---|---|---|---|
+| **H0a** | `DW 80000080 32` | the 32 words `notes/cache-model.md` lists, of which **words 0-10 are the gate**: `401b6800 00000000 00000000 3c1a8041 275aeb40 337b007c 035bd021 8f5a0000 00000000 03400008 00000000`. 🔄 **Words 11-31 are not part of the gate and are not zero.** They are the tail of the 128 bytes `trap_init` copies from `0x8040054C`: words 11-12 are padding and **word 13 (`401a6000` = `mfc0 k0,c0_status`) begins a second routine** — `exception_handlers[0]` = `0x80400580` lies at `0x8040054C + 0x34`, so words 13-31 are a verbatim, never-executed copy of the loader's IRQ entry. An operator who reads nonzero words past index 10 as a mismatch would abort `H2` for nothing | 🔴 **that the loader populated a vector at `0x80000080` and not at MIPS32's `0x80000180`.** Three sources agree and this is the reading that settles it. **If words 0-10 are not there, `probe2` must not be run** — its handler would go somewhere the core does not fetch from. ⚠️ **What it cannot settle**: which base the core actually fetches from is `Status.BEV`, no loader command reads CP0, and only `probe2` can measure it. This cell confirms the copy, not the dispatch |
+| **H0a2** 🆕 | `DW 8040054C 32` | **word for word identical to `H0a`, all 32** | 🔴 **that `trap_init`'s 128-byte copy landed intact — and it needs no predicted value at all**, so it is the only thing here that covers words 11-31, which nothing in this repository predicted until 2026-08-25. Its positive control is built in: a broken `DW`, or an address form being rewritten under it, would not produce two agreeing reads. ⚠️ `0x8040054C` is stage 2's own image **in DRAM**, not ROM — the loader runs from `0x80400000` in KSEG0 and the ROM window is `0xBFC00000` — so this is a RAM-to-RAM identity and must not later be read as agreement with flash |
+| **H0a3** 🆕 | `DW A0000080 32` | identical to `H0a` | 🔴 **that a stale D-cache line is not what `H0a` read.** `DW` forces the address into KSEG0 only when bit 31 is clear (`docs/loader-command-semantics.md` §f), so `0xA0000080` passes through uncached. A difference is worth more than the original cell, and **`probe2` must not run until it is explained** — `probe2` installs its handler through KSEG1 (`wr_unc`) and would be racing the same line |
 | **H0b** | `DW 8040EB40 32` | `[0] = 80400580`, `[23] = 804007c0`, the other thirty `= 80400be8` | that `exception_handlers[32]` is the real dispatch table, and that thirty of the thirty-two entries are the print-and-hang. **`SPEC.md` `CPU-26` named `0x8040A5C0` until today and that was the boot state machine** |
 | **H0c** | `DW 80000000 8` | undetermined. `0x5A5AA5A5` is one candidate — stage 1's DRAM-sizing probe writes it to `0xA0000000` — but stage 1 writes several patterns and which lands last was not traced | what the UTLB refill vector actually holds. It matters because a kuseg load from a faulting payload goes **here**, and the loader never populated it |
+| **H0d** 🆕 | `DW 80A00000 8`, then `DW 80A01000 8`, **before anything is uploaded** | word 0 neither `DEADC0DE` nor `524c5831`/`524c5832` in either | 🔴 **that a result block read later belongs to this seating.** `MEM-10` measured a **two-word** canary at `0x80A00000` surviving three warm resets byte for byte; **`0x80A01000` has never been read on this device at all**. Same job `G0` did for `R0`: it turns *the block is left over from the previous payload* from an inference into a comparison |
 
-**Reply sizes, from `LDR-07`'s rule** (`4 × ceil(N/4)` words, four to a line):
-`H0a` and `H0b` are 8 lines each, `H0c` is 2.
+**Reply sizes, from `LDR-07`'s rule** (address hex, **length decimal**;
+`DW <addr> N` prints `4 × ceil(N/4)` words, four to a line): `H0a`, `H0a2`, `H0a3`
+and `H0b` are **8 lines / 401 bytes** each; `H0c` and each half of `H0d` are
+**2 lines / 118 bytes**. `A0` is **71 bytes**. Byte counts by
+`docs/loader-command-semantics.md` §f's own weight formula, and a short reply is
+the completeness check — `DW` rounds the count **up**, so a length given too small
+never says so.
+
+**If `H0a` does not match, and it is not one outcome.** Written before the run
+because the decision has to be made in front of a live board. `H0b` runs
+regardless: it reads loader BSS rather than the vector page, and `.bss` is zeroed
+at boot by the loop at `0x8040046C`, so an all-zero `H0b` is distinguishable from
+every other reading.
+
+| what came back | what it means | what still runs |
+|---|---|---|
+| words 0-10 match, 11-31 differ from `H0a2` | something wrote the vector page after `trap_init` copied it | everything. `probe2` saves and restores whatever it finds; record that the page is not stable |
+| all zero, `H0b` correct | the table was filled but the 128-byte copy is not visible here | **`H2` void.** `H1` runs, but its fault containment is undetermined rather than the bounded hang `cache.S` argues for. `H3` unaffected |
+| all zero, `H0b` all zero | `trap_init` never ran; the board is not in the state this session assumes | **`H2` void**, `H1` unsafe. End the seating and take the reading home |
+| a stage-1 DRAM-sizing pattern | the residue was never overwritten, i.e. the copy did not land here — note the sheet expects that pattern at `0x80000000` (`H0c`) and calls it undetermined *there* | **`H1` and `H2` both void.** `H0c`'s own answer becomes the interesting one |
+| MIPS-I, but a different `lui`/`addiu` pair | the vector is real and the core does fetch here; `exception_handlers` is **not** at `0x8040EB40` | everything. `H0b`'s expected value and `SPEC.md` `CPU-26` are void — decode the pair at the bench and read the new address |
+| `42000018` (`eret`) anywhere in the 32 | 🔴 the R3000 reading is refuted, including `notes/cache-model.md`'s zero-`eret` control | **`probe2` must not run**: `exc.S` returns with `rfe` on a device build. `probe1` runs. **This is the most valuable outcome available this seating and it costs nothing to observe** |
+| fewer than 8 lines, or an error | this refutes `LDR-07`, which is worth more than `H0a` | everything, after the command is retyped from this sheet (rule 4) |
+
+⚠️ **`BEV=1` is not on that list, and that is deliberate.** `trap_init` copies the
+128 bytes **unconditionally** — no `BEV` test on the path (*讀*, `trap_init` at
+`0x8040D07C`) — so what is in RAM at `0x80000080` and what base the core fetches
+from are independent. Reading `0xBFC00180` would not settle it either: that window
+holds stage-1 flash bytes whichever base is live, so it is a read that cannot fail.
+`probe2` is the instrument — it reads `Status` itself and, on `BEV=1`, refuses to
+install, stamps `0xBE71BAD1` into result word 23 and resets. **So `probe2` is safe
+to launch on this question; it is the measurement.**
+
+🔴 **And `H0a` does not gate `H1`.** Not one of `probe1`'s six cells reads or
+writes an exception vector, so its result is unaffected by where the vectors are.
+What a failed `H0a` changes is `cache.S`'s containment argument — the bounded
+*two prints and a hang* becomes undetermined — so a silent board is then recorded
+as unexplained rather than as `do_reserved`. Refusing to run `probe1` on a failed
+`H0a` would spend the power cycle to avoid a risk that is bounded at the same one
+power cycle either way.
 
 ### H1 — `probe1`, the cache-model discriminator
 
-**Build line, and the `show` output must NOT print `*** NOT A DEVICE BUILD ***`:**
+**Build line. Build into an empty directory, and the `show` output must NOT
+print `*** NOT A DEVICE BUILD ***`:**
 
 ```
+rm -rf tools/rlxprobe/build/probe1
 make -C tools/rlxprobe P=probe1 payload
+make -C tools/rlxprobe P=probe1 show
 ```
 
 `LOADADDR=0x80500000`, `RESULT_BASE=0x80A00000`, `GEOM=0`. Record the `sha256`
 `make show` prints; it goes in the capture's metadata.
 
+> 🔴 **`make` does not rebuild when a knob changes, and `make show` reports
+> the knob you asked for beside the binary you already had.** 量 2026-08-25, in
+> this tree: `make -C tools/rlxprobe P=probe2 payload RESULT_BASE=0x80A01000`
+> printed **`make: Nothing to be done for 'payload'.`** — no compile, no `show`,
+> and therefore no `sha256` to record — while `build/probe2/probe2.bin` held
+> `lui *,0x80a0` ×1 and `lui *,0xa0a0` ×2 and `0x80a1`/`0xa0a1` **zero times**,
+> i.e. it was a `RESULT_BASE=0x80A00000` build. The object rules depend on the
+> sources and two headers and on nothing that carries a `-D`, and
+> `tools/test-rlxprobe.sh` builds into a fresh `BUILD=` every time, which is why
+> 62 cases have never seen it. **So: empty the build directory before every line,
+> and treat `Nothing to be done` as a hard stop.**
+>
+> ⚠️ **`GEOM=0` is what `seq=0000000d` below assumes.** `GEOM=1` arms a walk
+> that writes 1 MiB of real memory at `0x80B00000` if this core does not implement
+> `Status.IsC`, and this sheet has no before/after read of that window — so
+> `CPU-25` (cache size, line size, associativity) is **not** measured this seating.
+> `PROGRESS.md`'s `R1g-1` describes cell ⑥ as `r3k_cache_size()`; in the payload
+> that is the `XGMI`/`XGMD` extras behind `#if RLX_GEOM`, and cell 6 is
+> store-uncached + `CCTL 0x002`. The write-up owns closing that gap.
+
 | | command | expected | what it refutes |
 |---|---|---|---|
-| **H1a** | `rescue` + `put` of `probe1.bin`, exactly as `§G`'s `G2`/`G4` do it, then `DW 8040D4A0 1` | `00000000` — `AUTOBURN` off, read at the burn path's own global | that this upload could reach flash. Same control as `R0`'s |
-| **H1b** | `J 80500000` | the `*** rlxprobe P1 9d34f1c7 ***` banner, then twelve `t=…` rows, then `seq=0000000d`, `sum=…`, `end` | **that the payload ran at all.** `pc=` must begin `805` — if it begins `A05` the operator typed `J A0500000`, every cache cell is vacuous, and the payload says so in `flags` |
-| **H1c** | after the payload's own watchdog reset: ESC to the prompt, then `DW 80A00000 88` | the same twelve rows, from RAM | **that the UART report and the RAM block agree.** Two channels, because P9-12 lost its nonce to a 16-byte FIFO |
+| **H1a** 🔄 | **the two lines, not a cross-reference — and the shape is `§G`'s `G5`, not `G2`/`G4`'s.** `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o <dir>/H1-rescue.json`; then `DW 8040D4A0 1`; then `loader-tftp.py put --host 10.1.1.1 --image tools/rlxprobe/build/probe1/probe1.bin --rescue-report <dir>/H1-rescue.json --expect-load 80500000 --yes` | in the transcript, in this order: `AutoBurning=0`, `Set TFTP Load Addr 0x80500000`, `Now your Target IP is 10.1.1.1`; then word 1 = `00000000`. **If word 1 is not `00000000`, stop. Nothing is uploaded** | that this upload could reach flash — same control as `R0`'s, and read **before** the `put` as `G2` does it, because the word that matters is the one the burn path sees during the transfer. 🔴 **Why the literal lines, and it is the defect this row was:** `G2` carries `--load-addr 0x80A00000` and `G4` `--expect-load 80A00000`, which is `probe1`'s own `RESULT_BASE`. An image there plus `J 80500000` boots the vendor kernel the loader has already staged (`G1`) — loader gone, DRAM gone, one power cycle — and **`--expect-load` cannot catch it**, because `put` and `get` both serve `[0x8040D3A8]` and the flag is checked against the transcript. ⚠️ `--load-addr` is `int(s,0)`, so `0x80500000`; `--expect-load` is `int(s,16)`, so bare `80500000` |
+| **H1b** 🔄 | `console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/H1b --send 'J 80500000' --esc-after 60 --seconds 120` | the `*** rlxprobe P1 9d34f1c7 ***` banner, `rb=80A00000`, then **thirteen** `t=…` rows, then `seq=0000000d`, `sum=…`, `end` — then the payload's own watchdog reset, with the ESC stream already running across it | **that the payload ran at all.** `pc=` must begin `805` — if it begins `A05` the operator typed `J A0500000`, every cache cell is vacuous, and the payload says so in `flags`. 🔄 **Thirteen, not twelve**: twelve cell rows plus one `t=58435430` (`'XCT0'`) carrying the first read anyone has taken of CP0 register 20. `seq=0000000d` is 13 and always said so. ⚠️ **The rows come in risk order, not numeric order** — `CELLS[] = 1, 5, 4, 2, 3, 6`, two victims each — so row *n* is not cell *n*; `t=` is the label. `rb=` is the stale-build check and costs nothing |
+| **flush-h1b** 🆕 | `console-capture.py capture --port /dev/ttyUSB0 --out <dir>/flush-h1b --send '' --seconds 2` | a **bare prompt, 11 bytes, no `Unknown command !`** — `bench/2026-08-24b/flush-cont.log`'s shape | that `console-capture` 1.2's own ESC terminator went out. ≈31 bytes with `Unknown command !` means it did not, and the next command line would have been appended to the residue (`LDR-16`) |
+| **H1c** 🔄 | `DW 80A00000 137` | the same **thirteen** rows from RAM, and the seal at word 136 | **that the UART report and the RAM block agree.** Two channels, because P9-12 lost its nonce to a 16-byte FIFO. 🔴 **137, not 88.** The block is `RB_HDR 8 + RB_ROWS 16 × RB_ROWW 8 + 1` = **137 words**; `88` returns the header and ten rows, dropping cell 6's two victims, the `XCT0` row, and **the seal — the only word that separates a completed run from a truncated one**. 35 lines, 1671-byte reply; a 777-byte / 16-line reply was measured six times last seating, so no split is needed. `tools/rlxprobe/Makefile`'s `show` printed the same `88` for **both** payloads and has been corrected in the same commit as this row |
 | **H1d** | *(only if `H1b` and `H1c` disagree, or the run stopped early)* `DW 80A00000 08` | `magic=524c5831`, `nonce=9d34f1c7`, and `seq` = how many rows completed | how far it got. A poisoned block (`DEADC0DE`) means it started and got nowhere, which is a different observation from the previous run's data still being there |
 
 **The reading, written before the run.** Each row is
@@ -657,6 +771,9 @@ make -C tools/rlxprobe P=probe1 payload
 | `02` FRESH | executed the NEW constant | the treatment took — **or there was nothing to take** |
 | `03` NOSTORE | executed OLD, memory still holds OLD | the store never reached memory; a write-back D-cache is holding it |
 | `07` CORRUPT | the victim's `jr ra` is no longer `03e00008` | 🔴 **the treatment wrote memory where it was meant to write cache tags.** Measured under qemu 2026-08-25 for cell 4: `Status.IsC` did not isolate, `03e00008` became `00e00008` = `jr $7`, and without the guard the payload jumped into the weeds |
+| `04` VOIDPRIME | the prime call did not return the OLD constant | the harness is wrong, not the core — the victim never reached a known state |
+| `05` NOTVICTIM | the word at that address was not the victim's | the slot arithmetic or the load address is wrong |
+| `06` WEIRD | executed neither constant | 🔴 **the run is uninterpretable, and so is every cell around it** |
 
 **🔴 The refutation condition, and it is on cell 1.** Cell 1 stores through the
 cached window and applies **no treatment at all**. It must read `01` STALE. If it
@@ -666,6 +783,13 @@ coherent; **under any of the three the other five cells passed without being
 tested, and the gate does not close.** The two victims of a cell are 7 KiB apart
 precisely so that eviction has to explain both.
 
+🔄 **And `03` NOSTORE on cell 1 is not a pass either.** A write-back D-cache
+legitimately produces it — the store never reached memory — and it says nothing
+about the I-cache, which is the only thing cell 1 exists to test. Record it, read
+it against cell 5 (the same store through KSEG1, no treatment), and close the gate
+on the pair or not at all. `04`, `05` and `06` are the harness reporting that it
+is itself wrong; on cell 1 any of them voids the table exactly as `02` does.
+
 **Expected on the device, and it is the opposite of qemu.** qemu came back FRESH
 on cells 1 and 5 because TCG invalidates a translation block when a store lands
 on translated code. **A device run that looks like the qemu run is the run that
@@ -673,36 +797,65 @@ refutes the experiment**, not the one that confirms it.
 
 ### H2 — `probe2`, the exception handler and the CP0 census
 
-**Only if `H0a` matched and `H1` reported a treatment that works.** Build with
-that treatment:
+**Only if `H0a`'s words 0-10 matched, `H0a3` agreed with them, and `H1` reported
+a treatment that works.** 🔄 **Both variants are built at the desk, before power
+is applied, each into its own directory** — see the box under `H1` for why a
+second `make` into the same directory silently ships the first one's binary. The
+`rm -rf` names the two probe2 directories and not `build/`, because `H1a` uploads
+`build/probe1/probe1.bin` and this line runs at the desk beside it:
 
 ```
-make -C tools/rlxprobe P=probe2 payload RESULT_BASE=0x80A01000        # CCTL D-then-I, the default
-make -C tools/rlxprobe P=probe2 payload RESULT_BASE=0x80A01000 FLUSH_ISC=1   # only if H1 said IsC is the one that works
+rm -rf tools/rlxprobe/build/p2a tools/rlxprobe/build/p2b
+make -C tools/rlxprobe BUILD=build/p2a P=probe2 payload show RESULT_BASE=0x80A01000                # CCTL D-then-I, the default
+make -C tools/rlxprobe BUILD=build/p2b P=probe2 payload show RESULT_BASE=0x80A01000 FLUSH_ISC=1    # only if H1 said IsC is the one that works
 ```
+
+🔄 **`make show` echoes the variables it was passed, not the binary's own
+contents, so the check is the `sha256` against a clean build recorded here.**
+量 2026-08-25, gcc 12.4.0, `-march=mips1 -msoft-float`, all three with no
+`*** NOT A DEVICE BUILD ***` line:
+
+| build | bytes | `sha256` |
+|---|---:|---|
+| `probe1`, `RESULT_BASE=0x80A00000`, `GEOM=0` | 19,792 | `fbac7d60319aacf9e86a4a673f899eaf41d3659ad9d55417da4c4c70c6d289f6` |
+| `probe2` `p2a`, `RESULT_BASE=0x80A01000` | 6,656 | `8a15b501c160dd59c1824ab625aa1b9f2703de75d8b75f16999be378f1993c54` |
+| `probe2` `p2b`, `RESULT_BASE=0x80A01000 FLUSH_ISC=1` | 6,592 | `83806b95aa39e7f7d4e1ec2d64c4c52696c51c9a9189fc16b2d7a47d59542c2e` |
+
+**A `sha256` that is not one of these means the build did not happen**, which is
+exactly what the stale case looks like: `payload` says `Nothing to be done` while
+`show` prints the requested `RESULT_BASE` beside the old binary's hash
+(`bda8bb96f1d42d9a…`, the artefact that was in this tree until today).
+⚠️ **Do not try to read the address out of the disassembly instead.** 量: both
+`0x80A00000` and `0x80A01000` materialise through `lui …,0xa0a0`, because the
+KSEG1 alias of `0x80A01000` is `0xA0A01000`; the only difference is a following
+`addiu …,4096`. A `grep` for `0xa0a1` finds nothing on a **correct** build.
 
 `RESULT_BASE=0x80A01000` so `probe1`'s block survives at `0x80A00000` and both
-are recoverable from the same seating. **`make show` must not print
+are recoverable from the same seating. The block on the console (`rb=`) is the
+second channel that checks the right one went up. **`make show` must not print
 `*** NOT A DEVICE BUILD ***`** — that line fires if any of `UART_THR`,
-`VEC_GENERAL` or `CLEAR_BEV` is off its default, and all three exist only because
-qemu has no MIPS-I core.
+`VEC_GENERAL`, `CLEAR_BEV` **or `RET_ERET`** is off its default (four, not the
+three this sheet said), and they exist only because qemu has no MIPS-I core.
+⚠️ It does not test `VEC_UTLB` or `UART_LSR`, so a build that moved only one of
+those would pass the badge.
 
 | | command | expected | what it refutes |
 |---|---|---|---|
-| **H2a** | `put` `probe2.bin`, `J 80500000` | banner, `status=`, `vec=80000080`, `handler_words=00000016` | — |
-| **H2b** | read `status=` | 🔴 **`CPU-27`. `BEV` is bit 22.** Traced through ten writes to Status, the value at the prompt should be `1000FC01` and at payload entry `1000FC00` — but that trace is READ over an **incomplete enumeration** (27 `mtc0 …,c0_status` sites exist and ten were traced), so this cell is the measurement | if `BEV` is 1 the payload refuses to install and says so, and `R1-gate`'s stop-loss applies: the census falls back to the no-handler subset |
+| **H2a** 🔄 | **four steps, and the first exists because `H1b` reset the board.** `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o <dir>/H2-rescue.json`; then `DW 8040D4A0 1`; then `loader-tftp.py put --host 10.1.1.1 --image tools/rlxprobe/build/p2a/probe2/probe2.bin --rescue-report <dir>/H2-rescue.json --expect-load 80500000 --yes`; then `console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/H2a --send 'J 80500000' --esc-after 60 --seconds 120` | rescue transcript as `H1a`'s; then word 1 = `00000000`; then banner, **`rb=80A01000`**, `status=`, `vec=80000080`, `handler_words=00000016` | 🔴 **that the upload is running against this boot's state and not `H1a`'s.** `H1b`'s payload ends in `rlx_reset`, and a reset clears the loader's IP, its `LOADADDR` and `AUTOBURN` -- the Running order box states it and `G8b-ab` measured `00000001`. **`--max-rescue-age` cannot see it**: the bound is 3600 s and `loader-tftp.py`'s own docstring says bounding the age does not establish same-boot. The first symptom of skipping this is a transfer with nobody answering, because `rescue` is also what sends `IPCONFIG`; the flash hazard is second and needs the operator to restore the network by hand instead of by `rescue`. ⚠️ Two further barriers stand behind it and neither is a reason to skip the guard: `burn()` matches one of eight section signatures and `probe2.bin` carries none, and its length is not 4 KiB-aligned. **`rb=80A01000` is the stale-build check** -- `rb=80A00000` means the binary is the one that was already on disk, and it is about to poison `probe1`'s block |
+| **H2b** 🔄 | read `status=` | 🔴 **`CPU-27`, and it is deliberately not predicted.** `BEV` is bit 22. 🔄 **This row said `1000FC01` at the prompt, traced through ten writes to Status, and that value existed in no other file** -- while `SPEC.md` `CPU-27` is blank and `docs/loader-command-semantics.md` §9 says outright that whether `BEV` is 0 at the prompt **has not been traced**. The reading is whatever `status=` prints; **only bit 22 is load-bearing**, and any other bit differing from an expectation is an observation, not a fault | if `BEV` is 1 the payload refuses to install, stamps `0xBE71BAD1` into result word 23 and still resets -- so this cell is safe to reach -- and `R1-gate`'s stop-loss applies: the census falls back to the no-handler subset |
 | **H2c** | `break.count` / `break.cause` | `count=00000001`, and `cause`'s ExcCode field (bits 6:2) = `9` → `cause & 0x7c = 0x24` | 🔴 **the positive control on the handler.** `break` traps on every MIPS ever built, so a `count` of 0 is the instrument reporting that it is not installed, not a property of this core. If the handler did not take, the loader prints `Undefined Exception happen.` and the board hangs — an unambiguous observation |
 | **H2d** | the 256 `cp0` rows, and `traps=` / `values=` / `zeros=` | 🔴 **`PRId` is row `0x78`** (rd 15, sel 0). **The prediction, written before the run: `0x0000CD01`.** Four public sources point at the 4181 family; `52481` = `0xCD01` comes from this unit's kernel printing `%d`. **A reading in the 5281 range is worth more than one in the 4181 range** — it would refute a Realtek datasheet and two public kernel trees at once | `CPU-04`. `Config` is row `0x80`: **`Config.M == 0` proves outright that this is not a MIPS32 core** |
 | **H2e** | `count.spins` / `count.delta` | 🔴 **`delta = 00000000` is the expected answer**, because an R3000-class CP0 has no `Count`. The spin count is printed beside it so that a zero delta cannot be confused with a zero loop | `F50b`. A zero makes **`R5-0`'s SoC timer driver a prerequisite rather than a bonus**, and `R1c` loses its first timing route |
-| **H2f** | `restore.mismatch` | `00000000` | that the loader's vectors are back. **If this is non-zero, do not run anything else on this power cycle** — the loader has no exception handling until the next reset |
-| **H2g** | after the watchdog reset: `DW 80A01000 08`, then as much of the census as is worth reading | `magic=524c5832`, `nonce=3ab0e572` | the same two-channel agreement as `H1c`. The full block is 537 words; read the header and the rows the UART report flagged, not all of it |
+| **H2f** 🔄 | `restore.mismatch` | `00000000`, **and it covers the first 8 words of `0x80000080` and nothing else** | that part of the loader's general vector is back. 🔴 **This control is narrower than its name, and the name was the defect.** `probe2` writes 22 words into **both** vectors and saves 32 words of each; the check reads back **8 of those 64**, and it never reads `0x80000000` at all -- the vector `notes/cache-model.md` records the loader as never having populated, and the one a faulting kuseg load goes to. It is also `field()` only: **it is not in the result block**, so alone among the `H2` cells it has no RAM channel. The check that does cover both vectors is `H2h`, and it is free. 🔄 **The instruction to stop the seating here is withdrawn**: `RESET` defaults to 1 and `start.S` calls `rlx_reset` the instant `main` returns, so the loader never regains control before the reset and `trap_init` has re-run before anything after this is typed |
+| **H2g** 🔄 | after the watchdog reset: `DW 80A01000 24`, then as much of the census as is worth reading | `magic=524c5832`, `nonce=3ab0e572`, the eight saved vector words at 8-15, `count.spins`/`count.delta` at 16-17, and word 23 not equal to `BE71BAD1` unless the payload refused on `BEV` | the same two-channel agreement as `H1c`. 🔴 **24, not 8**: the `BEV`-refusal marker is word 23 and `count.delta` is word 17, so an 8-word read cannot separate a refusal from a completed run -- which is the branch `R1-gate`'s stop-loss turns on, and leaving it on the UART alone is what P9-12 is cited against. The full block is 537 words; read the header and the rows the UART report flagged, not all of it |
+| **H2h** 🆕 | after the reset: `DW 80000080 32`, then `DW 80000000 8` | byte-identical to `H0a` and `H0c` | 🔴 **the check `H2f` cannot make.** `H0a` and `H0c` establish the before-state at zero risk, so comparing against them after `probe2` is the only reading in this session that covers **both** vectors and all 32 words rather than 8 of 64. Two read-only commands, and the baseline is already being taken |
 
 ### H3 — the ride-alongs, which cost nothing once the board is up
 
 | | command | expected | what it refutes |
 |---|---|---|---|
-| **H3a** `C-17` | `J BFC00000`, then **immediately** `DW 81000400 16` | 🔴 **the deciding grid.** After a warm reset with no kernel run since, `0x81000400` should hold **bias garbage**, not the 32-byte-periodic structure. If the structure is there, it was not the vendor kernel that wrote it | `C-17`'s remaining half — *which execution wrote that structure*. `MEM-15` is why the question is live at all: a seconds-long power-off keeps contents, so "it was there" never meant "something just wrote it" |
-| **H3b** `NET-13` | four cable moves, one capture each, **the jack written into the `--out` filename**: `--out <dir>/E13-jack1`, `…-jack2`, `…-jack4`, `…-jack5`. Each is `DW B8003250 8` (`PSRP0`–`PSRP4`) with only that jack populated | one port's bit 4 set per capture, and **the filename is the label** | 🔴 **that the jack map is derived from anything but the filesystem.** It has gone wrong twice: once from labels assigned after the fact, once from an expected value derived from the very map the cell was testing. Jacks 1 and 5 are where the old map and the linear map disagree, so those two alone would settle it — the other two are the control |
+| **H3a** `C-17` 🔄 | `console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/H3a --send 'J BFC00000' --esc-after 20 --seconds 45`, then `flush-h3a` (`--send '' --seconds 2`), then `DW 81000400 16` | 🔴 **the deciding grid.** After a warm reset with no kernel run since, `0x81000400` should hold **bias garbage**, not the 32-byte-periodic structure. If the structure is there, it was not the vendor kernel that wrote it | `C-17`'s remaining half -- *which execution wrote that structure*. `MEM-15` is why the question is live at all: a seconds-long power-off keeps contents, so *it was there* never meant *something just wrote it*. 🔄 **immediately is withdrawn**: the capture ends on ESC and not on a CR, so seating rule 2's flush goes between -- that is the fault `D2` was lost to. ⚠️ **And this reset is redundant with `H1b`'s**: `rlx_reset` writes the same `WDTCNR = 0` this command's path does, so `H1`'s reset already produced a warm reset with no kernel run since. Kept because it is one command; it is the first thing dropped if the seating runs long. The expected value is also a weak pass -- after a long power-off `MEM-15` predicts garbage there whatever `H3a` does |
+| **H3b** `NET-13` | four cable moves, one capture each, **the jack written into the `--out` filename**: `--out <dir>/E13-jack1`, `…-jack2`, `…-jack4`, `…-jack5`. Each is `DW B8003250 8` (`PSRP0`–`PSRP4`) with only that jack populated | one port's bit 4 set per capture, and **the filename is the label** | 🔴 **that the jack map is derived from anything but the filesystem.** It has gone wrong twice: once from labels assigned after the fact, once from an expected value derived from the very map the cell was testing. Jacks 1 and 5 are where the old map and the linear map disagree, so those two alone would settle it — the other two are the control. ⚠️ 🆕 **Runs after `H2a`'s `put` and before `H3a`/`H3c`.** Both TFTP uploads go over the link these four moves disturb, and a stale neighbour entry cost `G4-put` three retransmits and 8.935 s (*量*). Flush the host's neighbour entry for `10.1.1.1` after the last move if anything else on the seating still needs the network |
 | **H3c** `CLK-08b` | re-run `D4` and `D4c` with **`--esc-period 0.002`** | the same two `OVSEL` points, on a **2.32 ms** grid instead of a 20.35 ms one — and `esc.achieved_period_s` in each capture's `.meta.json` says which grid it actually got | 🔴 **whether the watchdog's residual is fixed or proportional.** The two hypotheses differ by ~15 ms, which was smaller than one tick of the old grid. **Do not run a third `OVSEL` point** — `OVSEL=0111` predicts 286.2 ms proportional against 263.6 ms fixed, 22.6 ms apart, which the old grid could not separate either |
 
 ### What this session cannot tell you, stated before it runs
@@ -719,6 +872,22 @@ qemu has no MIPS-I core.
   delay slot and this core does not. An emulator kinder than the device certifies
   exactly the bugs the device rejects — which is how `P9-12` was certified by its
   own simulator the day before it failed on this silicon.
+- 🆕 **`CPU-25` is not measured this seating.** `GEOM=0`, so the cache-sizing
+  walk does not run, and cache size, line size and associativity stay blank. That
+  is a choice — `GEOM=1` writes 1 MiB of real memory at `0x80B00000` if this core
+  does not implement `Status.IsC`, and this sheet has no before/after read of that
+  window — but it is a choice this sheet did not previously state.
+- 🆕 **Neither channel records which build produced it.** `RLX_NONCE` is a source
+  constant, identical across every build of a payload, and `FLUSH_ISC` appears in
+  no header word, no `field()` and no banner. *Which flush this census was taken
+  under* is answered by the `sha256` recorded at build time and by nothing the
+  device sends. Keep the two `probe2` binaries in separate directories for that
+  reason alone.
+- 🆕 **Whether the loader's `J` flushes the caches is not established.** Only the
+  `J BFC00000` special case has been disassembled. It does not block this session:
+  upstream's `P9-12` ran a TFTP-delivered payload from `0x80500000` on this unit,
+  which empirically excludes the dirty-D-cache delivery failure — but that is one
+  instance and not a control.
 
 ## Results — seating 2 part three, 2026-08-24
 

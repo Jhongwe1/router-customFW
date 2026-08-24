@@ -123,6 +123,17 @@ SRC_probe0 := start.S uart.S report.c probe0.c
 SRC_probe1 := start.S uart.S report.c cache.S victims.S probe1.c
 SRC_probe2 := start.S uart.S report.c cache.S exc.S probe2.c
 SRC        := $(SRC_$(P))
+# The result block's length in words, so `show` prints a DW that reads all of it.
+# 88 was printed for BOTH payloads until 2026-08-25 and is right for neither: it
+# returns probe1's header and ten of its thirteen rows, stopping before the seal
+# -- the one word that separates a completed run from a truncated one.
+#
+# These mirror RB_WORDS in the payload sources and `tools/test-rlxprobe.sh` is
+# what keeps them honest; it recomputes both from the C and fails if they drift.
+RB_WORDS_probe0 := 0
+RB_WORDS_probe1 := 137
+RB_WORDS_probe2 := 537
+
 OBJDIR     := $(BUILD)/$(P)
 OBJS       := $(patsubst %.S,$(OBJDIR)/%.o,$(filter %.S,$(SRC))) \
               $(patsubst %.c,$(OBJDIR)/%.o,$(filter %.c,$(SRC)))
@@ -143,10 +154,26 @@ payload: $(BIN)
 $(OBJDIR):
 	@mkdir -p $(OBJDIR)
 
-$(OBJDIR)/%.o: $(HERE)%.S $(HERE)rlxdefs.h | $(OBJDIR)
+# Every knob above reaches the compiler through -D and through nothing else, so
+# without this stamp a rebuild after `RESULT_BASE=...` changed prints `Nothing to
+# be done for 'payload'` and ships the previous binary -- while `show` prints the
+# RESULT_BASE you asked for beside it.  Measured 2026-08-25, on the artefact that
+# was in this tree: a probe2 built for 0x80A00000 would have been uploaded as the
+# 0x80A01000 build and poisoned probe1's result block.  The suite never saw it
+# because every case in it builds into a fresh BUILD= directory -- a good habit
+# hiding the bug it would otherwise have caught.  R3/R4 there build twice into
+# one directory and fail without this.
+#
+# Evaluated at parse time rather than as a FORCE-driven phony target, so that
+# `.flags` stays an ordinary file prerequisite and `make -n` still reports
+# honestly about what would rebuild.
+$(shell mkdir -p $(OBJDIR); echo '$(DEFS)' | cmp -s - $(OBJDIR)/.flags \
+        || echo '$(DEFS)' > $(OBJDIR)/.flags)
+
+$(OBJDIR)/%.o: $(HERE)%.S $(HERE)rlxdefs.h $(OBJDIR)/.flags | $(OBJDIR)
 	$(CC) $(ASFLAGS) -c -o $@ $<
 
-$(OBJDIR)/%.o: $(HERE)%.c $(HERE)rlxprobe.h $(HERE)rlxdefs.h | $(OBJDIR)
+$(OBJDIR)/%.o: $(HERE)%.c $(HERE)rlxprobe.h $(HERE)rlxdefs.h $(OBJDIR)/.flags | $(OBJDIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(ELF): $(OBJS) $(HERE)rlxprobe.lds
@@ -224,7 +251,7 @@ show: $(BIN)
 	        "$$($(OBJDUMP) -d $(ELF) | sed -n 's/^ *$(patsubst 0x%,%,$(LOADADDR)):\t\([0-9a-f]*\).*/\1/p' | head -1)"
 	@echo 'reset      RESET=$(RESET)   1 = arm the watchdog and hand the prompt back with no power cycle'
 ifneq ($(filter $(P),probe1 probe2),)
-	@echo 'result     RESULT_BASE=$(RESULT_BASE)   read it back with: DW $(patsubst 0x%,%,$(RESULT_BASE)) 88'
+	@echo 'result     RESULT_BASE=$(RESULT_BASE)   read it back with: DW $(patsubst 0x%,%,$(RESULT_BASE)) $(RB_WORDS_$(P))'
 	@printf 'victims    %s .. %s\n' \
 	        "$$($(NM) $(ELF) | awk '$$3=="rlx_victims"{print "0x"$$1}')" \
 	        "$$($(NM) $(ELF) | awk '$$3=="rlx_victims_end"{print "0x"$$1}')"
@@ -234,7 +261,8 @@ ifneq ($(filter $(P),probe1 probe2),)
 	@if [ '$(VEC_GENERAL)' != '0x80000080' ] || [ '$(CLEAR_BEV)' != '0' ] || [ '$(RET_ERET)' != '0' ] \
 	    || [ '$(UART_THR)' != '0xB8002000' ]; then \
 	    echo; echo '  *** NOT A DEVICE BUILD ***  one of UART_THR / VEC_GENERAL /'; \
-	    echo '  CLEAR_BEV is not at its default. This image is for qemu.'; \
+	    echo '  CLEAR_BEV / RET_ERET is not at its default. This image is'; \
+	    echo '  for qemu.  It does not check VEC_UTLB or UART_LSR.'; \
 	 fi
 endif
 

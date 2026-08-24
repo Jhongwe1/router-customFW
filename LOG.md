@@ -3034,3 +3034,160 @@ payload 裡沒有任何東西能分開它們，所以它被寫成它自己的一
 給 `hazlint` 第二個 runner 滿足得了的母體控制。條件寫在 `PROGRESS.md` 的
 「Next after this」④，而且它自帶否證：那個合成 fixture 必須在同形狀的語料上
 重現 K4 自己的數字，否則它不是母體控制，它是一個單元測試。
+## 2026-08-25（桌面，第三段）— B4 這張表在上機前被審了一次，而它有三格各自就能花掉那一次電源循環
+
+桌面日，未接觸裝置。零 flash 位元組，零電源循環。**上機延到 2026-08-26。**
+
+這一段沒有新的裝置知識。它做的是一件更難寫進履歷的事：**把一張已經寫好、已經
+說「每個期望值都寫在前面」的表，當成別人寫的東西來讀一遍。** 結果是七個編輯、
+三個新工具檢查、和兩個「照紙上做就會發生」的失敗。
+
+### 一、`H1a` 會把 payload 上傳到它自己的結果區
+
+`H1a` 那一格寫的是「`rescue` + `put`，**exactly as `§G` 的 `G2`/`G4` do it**」。
+翻回去看 `G2`：`--load-addr 0x80A00000`。`G4`：`--expect-load 80A00000`。
+**那是 `probe1` 的 `RESULT_BASE`。** 走 `0x80500000` 的是 `G5`，不是 G2/G4。
+
+照字面做的話：image 落在 `0x80A00000`，`J 80500000` 跳進 loader 已經 staged 好的
+vendor kernel（`G1` 量過 964 KiB 早就在那裡）—— **loader 沒了、Linux 吃掉 32 MiB
+DRAM，`H1c`/`H2g` 的 RAM 通道跟著一起沒**。
+
+**而工具結構上抓不到它**：`--expect-load` 是拿 transcript 跟自己比對，
+`put` 跟 `get` 又都服務同一個全域 `[0x8040D3A8]`——`G4` 那一格自己就寫了這句話。
+
+`H1a` 和 `H2a` 是全 B4 唯一兩格**完全沒有字面命令**的格子，而 B4 的開場白引用的
+正是 rule 4：*命令從這裡打或從工具打，絕不手抄*。一個檔案可以在同一頁上引用一條
+規則並且違反它。
+
+### 二、`make` 不會因為旋鈕變了就重建，而 `make show` 會替它圓謊
+
+```
+$ make -C tools/rlxprobe P=probe2 payload RESULT_BASE=0x80A01000
+make: Nothing to be done for 'payload'.
+```
+
+而這棵樹裡的 `build/probe2/probe2.bin`（6640 bytes, `bda8bb96…`）是
+`RESULT_BASE=0x80A00000` 的建置——`lui *,0x80a0` ×1、`lui *,0xa0a0` ×2，
+`0x80a1`/`0xa0a1` 各 0。**量**。
+
+所以 `H2` 會上傳一顆把 537 個字 poison 到 `0x80A00000` 的 probe2，蓋掉 `probe1`
+的整個結果區，而 `H2g` 讀 `0x80A01000` 讀到垃圾——**UART 那一側看起來完全正常**。
+一個 build system 製造出來的雙通道不一致，要在現場、板子通電的狀態下 debug。
+
+**根因**：沒有任何一個 object 依賴任何帶 `-D` 的東西。每個旋鈕都只透過 `-D` 進
+編譯器。**`tools/test-rlxprobe.sh` 62 格從來看不到它，因為每一格都建在全新的
+`BUILD=` 目錄裡**——一個測試套件可以用一個好習慣把它要測的 bug 藏起來。
+
+修的是根因不是症狀：加一個 parse-time 的 flags stamp，每個 object 依賴它。
+然後補 `R3`–`R6` 四格，並且**驗證它們會失敗**：
+拿掉 `.flags` 依賴 → `R3`/`R4` 兩格紅（「knob change rebuilds」expected no got yes）；
+把 `RB_WORDS_probe1` 改成 88 → `R5` 紅、`R6` 不動。**兩個變異各自只打到該打的格。**
+
+### 三、B4 沒有寫任何一行 capture 指令，而它有三個 reset 邊界
+
+122 行的 `§ Session B4` 裡：`console-capture` **0** 次、`--esc` **0** 次、
+`--esc-after` **0** 次、`--seconds` **0** 次、flush 格 **0** 個、`A0` **0** 個。
+
+而 `H1b`、`H2a`、`H3a` 的命令每一個都會讓板子重開。`rlx_reset` 是
+TEMT drain → 16,777,216 次三指令迴圈 → `sw $0,0(WDTCNR)`，**報告印完不到一秒**
+就 reset；ESC 窗約 4.9 s。**沒有人的手能在那之間起一個 capture。**
+
+`D1` 那一格早就有正確的形狀（`--send 'J BFC00000' --esc-after 20 --seconds 45`），
+而兩次歷史損失有兩次是 ESC 窗。修法早就有了，**只是住在 150 行以外**。
+
+### 四、`H0a` 的期望值指向一個沒有那個值的檔案
+
+`H0a` 寫「the 32 words **`notes/cache-model.md` lists**」。那個檔案**一個十六進位
+字都沒列**。全 repo grep 那 11 個字，只有 `RUNSHEET.md:626` 一行；另外 21 個字
+**沒有任何檔案預測過**。而 `PROGRESS.md` 和 `LOG.md` 把同一個死指標各抄了一次。
+
+這正是三天前那條寫給自己的話又發生一次：**一次更正可以無中生有出一個它正在更正
+的錯誤。** 差別是這次它落在「決定 `probe2` 准不准跑」的那一格上，而三分之二
+的讀數沒有通過／不通過的標準。
+
+補法不是把 11 個字再抄一遍。是：
+
+- 從 `stage2.bin` 偏移 `0x54C` 讀出全部 32 個字，**11 個字零不符**，記進 owner
+  檔（`notes/cache-model.md`），連解碼一起；
+- 加一格 `H0a2` = `DW 8040054C 32` —— 讀那份拷貝的**來源**，必須跟 `H0a` 32 個字
+  全等。**一個不需要任何預測值的雙讀恆等式**，而且自帶正控制：`DW` 壞掉或位址被
+  改寫，兩次讀不會一致。它覆蓋的正是那 21 個沒人預測過的字。
+
+順帶知道了 word 12–31 是什麼：`trap_init` 複製 128 bytes，派送碼只佔 44，
+所以 **word 13（`401A6000` = `mfc0 k0,c0_status`）是 loader IRQ handler 的第一條
+指令**被順手拖進來的死拷貝（`0x80400580 - 0x8040054C = 0x34`）。
+一個把「前 11 個是 live code」讀成「其餘應該是 0」的操作者，會為了非零的 word 13
+放棄整個 `H2` 半場。
+
+**還有一個免費的東西**：這 11 個字自己就是一次 hazard 讀數。`mfc0` 後面兩個
+`nop`、`lw` 後面一個 `nop`——那是廠商對這顆核心 hazard 深度的信念，寫在
+**已安裝、會被執行**的那份拷貝裡，不是寫在 SDK header 裡。`hazlint` 的規則因此
+多了一個來自執行路徑的旁證。
+
+### 五、同一個缺陷類別的第二個實例，落在 stop-loss 那一格
+
+`H2b` 寫「Traced through ten writes to Status, the value at the prompt should be
+`1000FC01`」。全 repo grep `1000FC01`：**一個 hit，就是那一行**。
+而 `SPEC.md` `CPU-27` 是**留白**，`docs/loader-command-semantics.md` §9 明講
+`Status.BEV` 在 prompt 時**沒被追過**。
+
+一份 committed 的 runsheet 宣稱做過一個十處的追蹤，而兩個 owner 檔案說它沒發生。
+撤掉，改成「未預測，只有 bit 22 承重」。
+
+### 六、兩個宣稱比它們量的多的儀器
+
+- **`H2f` 的 `restore.mismatch`**：probe2 對**兩個** vector 各寫 22 字、各存還原
+  32 字；檢查讀回**64 個裡的 8 個**，而且**完全沒讀 UTLB vector**——那正是
+  `notes/cache-model.md` 記載 loader 從沒填過、`H0c` 說 faulting kuseg load 會去
+  的那一個。而且它只走 `field()`，**沒有 `rb_put`**：在一支「一個輸出通道就是
+  P9-12 等著再發生一次」的 payload 裡，唯獨這一格只有一個通道。
+  補 `H2h`：reset 之後重讀 `DW 80000080 32` + `DW 80000000 8` 跟 `H0a`/`H0c` 比對
+  ——零風險，而且基準本來就在取。
+- **`H2f` 的停機指令是錯的**：`RESET ?= 1`，`start.S` 在 `main` 一 return 就
+  `jal rlx_reset`，loader 根本沒機會在 reset 之前拿回控制權，`trap_init` 早就重跑
+  過了。照紙上寫的，操作者會為了一個不存在的理由放棄三格 ride-along。
+- **`DW 80A00000 88`**：block 是 `8 + 16×8 + 1 = 137` 字。88 字 = header + 10 行，
+  少掉 cell 6 兩格、`XCT0` 那格、和 word 136 的 **seal**——而 seal 正是「跑完
+  vs 截斷」的判別字。`Makefile` 的 `show` 印的也是同一個死的 88，**而且對
+  probe2 也印 88，它的 block 是 537**。
+
+### 七、要推之前先看了一眼 CI 的數字
+
+`.github/workflows/ci.yml` 三個地方寫 `test-rlxprobe` 的 bench 總數是 `45`，
+一個地方預測 `NOT RUN IN THIS JOB: 101 case(s)`。**量**：今天是 **66** 和 **122**，
+而 122 是拿 `tools/ci-census.py` 跑一次模擬 runner 印出來的，不是算出來的。
+
+那個 header 從 45 格長到 62 再長到 66，中間沒有人重新量過。而 `v0.0` 的 tag 就在
+那個 commit 上，**那是外部讀者唯一會打開的一個 commit**。
+這個 repo 的整個論點是「一個沒人能否證的 badge 不是證據」——那就不能推一個
+第一次 build 就會打自己臉的 workflow 檔。
+
+### 八、`R1g-3` 的完成定義其實沒滿足
+
+`R1g-3` 的 DoD 是「`check-predictions.py` 在第一個 capture 之前寫好的 block 上
+通過，像 seating 2 的 18 個 block 那樣」。`bench/2026-08-26/` 不存在，B4 的
+`PREDICTIONS-*.md` 一份都沒有，而 B4 除了 `H3b` 之外沒有指定任何 capture prefix。
+**表寫完了不等於 DoD 滿足了。**
+
+`bench/2026-08-26/PREDICTIONS-b4-block0.md` 寫掉，九格 `A-catch`/`A0`/`H0a`/
+`H0a2`/`H0a3`/`H0b`/`H0c`/`H0d-a`/`H0d-b`，四個控制項全過，九格都正確回報
+「no capture」。blocks 1–3 在現場寫，因為每一個都以前一個的讀數為條件——
+**替一個跑不了的 cell 寫 block，是讓它為錯的理由失敗。**
+
+### 這一段沒有做的事
+
+- **沒有量任何裝置上的東西。** 上面每一個數字不是讀出來的、就是在這台工作站上
+  跑出來的。
+- **沒有動 `probe1.c` / `probe2.c` 一個字。** 兩支 payload 的邏輯沒有被審——
+  審的是它們周圍的東西：runsheet、Makefile、CI 的數字。qemu 說控制流對，
+  而 qemu 對 load delay slot 是有互鎖的。
+- `CPU-25` 這一場還是量不到（`GEOM=0`）。那是個選擇：`GEOM=1` 在 `IsC` 沒實作時
+  會寫 1 MiB 真記憶體，而這張表沒有那個視窗的前後讀。現在至少寫下來了。
+- 三個新加的格（`H0a2`/`H0a3`/`H0d`）**沒有一個在裝置上跑過**。它們是零風險的
+  `DW`，但零風險不等於已驗證。
+
+### 收尾
+
+`spec-check.py` 10/10、`test-file-modes.sh`、`test-rlxprobe.sh` **66/66**、
+`test-hazlint.sh` 56/56、`ci-census --self-test` 12/12。
+`SPEC.md` `CPU-33` 補上那 32 個字的來處。

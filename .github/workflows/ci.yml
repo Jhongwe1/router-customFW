@@ -35,16 +35,25 @@
 # a checker nobody has shown to be looking. So installing the compiler turns 16
 # cases red for a reason that is not a defect. MEASURED 2026-08-25, on the bench
 # machine with $FWRE_WORK pointed at an empty directory: with the cross tools
-# present, `test-hazlint` is 17 ok / 14 FAIL / 8 skip and `test-rlxprobe` is
-# 20 ok / 25 FAIL. Without gcc, both skip cleanly, the census is green, and it
-# prints `NOT RUN IN THIS JOB: 101 case(s)` with every one of them named.
+# present, `test-hazlint` is 20 ok / 26 FAIL / 5 skip and `test-rlxprobe` is
+# 29 ok / 37 FAIL. Without gcc, both skip cleanly, the census is green, and it
+# prints `NOT RUN IN THIS JOB: 122 case(s)` with every one of them named.
+#
+# Those two pairs and that 122 were 17/14/8, 20/25 and 101 until the second
+# measurement on 2026-08-25, and every one of them was wrong in the same
+# direction: `test-rlxprobe` had grown from 45 cases to 62 and then to 66, and
+# the header was never re-measured. A workflow file whose comment predicts a
+# number its own first build contradicts is exactly the badge this project says
+# is not evidence, so the numbers here are re-measured whenever a suite grows,
+# and `tools/ci-expected.tsv` is the machine-readable copy the census checks.
 #
 # That same measurement is where `tools/ci-census.py` earned its keep on its
 # first real input. It read 20 + 23 = 43 against a bench total of 45 and refused
 # the build: TWO cases had been vanishing out of `test-rlxprobe`'s A2 with
 # neither a FAIL nor a skip line, because they sat inside an `if [ -s ... ]`
 # guard. Nothing that counted skip lines could have seen it. Fixed the same
-# afternoon, and the same configuration now reads 20 + 25 = 45.
+# afternoon, and that configuration then read 20 + 25 = 45. The suite is 66
+# cases now; the arithmetic is the point, not the total.
 #
 # `binutils-mips-linux-gnu` IS installed: it buys `test-opcount`'s
 # hardcoded-fixture control, which re-assembles the fixture and compares, and it
@@ -141,7 +150,7 @@ jobs:
       - name: test-opcount
         run: bash tools/test-opcount.sh 2>&1 | tee ci-out/test-opcount.out; exit "${PIPESTATUS[0]}"
 
-      # Skips cleanly with no cross compiler: one skip line standing for 45
+      # Skips cleanly with no cross compiler: one skip line standing for all 66
       # cases, which the census prints rather than hides.
       - name: test-rlxprobe
         run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"

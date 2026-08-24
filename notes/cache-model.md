@@ -188,3 +188,77 @@ blank and carries no address at all. A first draft of this correction named it,
 which is how a correction pass can invent the error it is correcting. **Not measured**: everything above is read out of code. The
 cell that makes it a measurement is `DW 80000080 32` at the prompt, which is
 read-only and costs nothing.
+
+## What is actually at `0x80000080`, all 32 words
+
+**Added 2026-08-25, and it is a correction to a correction.** `RUNSHEET.md`'s
+`H0a` cell cited *"the 32 words `notes/cache-model.md` lists"*. **This file listed
+none** — not 32, not one — and eleven of them existed in exactly one place in the
+repository, the runsheet row itself. That is the same failure the correction above
+records about itself: *a correction can invent the error it is correcting*. The
+expected value of the cell that decides whether `probe2` runs was pointing at a
+file that did not hold it.
+
+**Read out of this unit's own stage 2**, at file offset `0x54C`, which is the
+source `trap_init` copies 128 bytes from. Big-endian, four words to a line, the
+way `DW` prints them:
+
+```
++00  401b6800  00000000  00000000  3c1a8041
++10  275aeb40  337b007c  035bd021  8f5a0000
++20  00000000  03400008  00000000  00000000
++30  00000000  401a6000  00000000  001ad0c0
++40  07400003  03a0d821  3c1b8041  8f7bdd40
++50  03a0d021  277dff50  afba008c  afa30024
++60  afa00018  40036000  afa20020  afa300a8
++70  afa40028  40036800  afa5002c  afa300ac
+```
+
+**Words 0-10 are the dispatcher, and they are the only part of the block that
+means anything at `0x80000080`:**
+
+| off | word | | |
+|---:|---|---|---|
+| `+00` | `401b6800` | `mfc0 k1, c0_cause` | rd 13 |
+| `+04` | `00000000` | `nop` | the CP0 read hazard |
+| `+08` | `00000000` | `nop` | |
+| `+0C` | `3c1a8041` | `lui  k0, 0x8041` | |
+| `+10` | `275aeb40` | `addiu k0, k0, -5312` | → `0x8040EB40`, the table |
+| `+14` | `337b007c` | `andi k1, k1, 0x7c` | `ExcCode`, already ×4 |
+| `+18` | `035bd021` | `addu k0, k0, k1` | |
+| `+1C` | `8f5a0000` | `lw   k0, 0(k0)` | |
+| `+20` | `00000000` | `nop` | the exposed load delay slot |
+| `+24` | `03400008` | `jr   k0` | |
+| `+28` | `00000000` | `nop` | branch delay slot |
+
+**Words 11-31 are not a second vector and are not padding either.** The copy is
+128 bytes and the dispatcher is 44, so `trap_init` drags in whatever follows it:
+words 11-12 are zero, and **word 13, `401a6000` = `mfc0 k0,c0_status`, is the
+first instruction of the loader's IRQ handler** — `exception_handlers[0]` is
+`0x80400580` and `0x80400580 - 0x8040054C = 0x34`, word 13 exactly. So words 13-31
+are a verbatim copy of that handler's first nineteen instructions, sitting at
+`0x800000B4` where nothing ever executes them. `07400003 03a0d821 3c1b8041
+8f7bdd40` is its stack switch; `afba008c` onward is `SAVE_ALL`.
+
+**Why that matters at the bench**: an operator reading *"the first 11 are live
+code"* as *"and the rest should be zero"* would see nonzero words past index 10
+and abort `probe2` for nothing.
+
+**Three internal cross-checks, and none of them was constructed after the fact.**
+`+10` builds `0x8040EB40`, which is the address `RUNSHEET.md`'s `H0b` reads and
+`docs/loader-command-semantics.md` names independently; `+14`'s `0x7c` mask is
+the same field `H2c` predicts `cause & 0x7c = 0x24` for; and
+`0x8040054C + 0x10 = 0x8040055C`, which the same document already calls *the
+table's one reader*. `H0a`, `H0b` and `H2c` are three projections of one finding
+— any one of them missing means the other two need re-explaining.
+
+**And the dispatcher is itself a hazard reading.** Two `nop`s after `mfc0` and one
+after `lw`, in the copy the core actually executes: that is the vendor's own
+belief about this core's hazard depth, on the installed path rather than in an SDK
+header. It corroborates what `tools/hazlint` enforces, from a different artefact.
+
+🔴 **Still not measured.** Every word above is read out of a file. The cell
+that turns it into a measurement is `DW 80000080 32` at the prompt — and the cell
+that makes *that* checkable without trusting this list is `DW 8040054C 32`, the
+source of the copy, which must come back word for word identical. Both are
+read-only, both are in `RUNSHEET.md` § Session B4 as `H0a` and `H0a2`.

@@ -272,6 +272,33 @@ ck "RESULT_BASE=0x80B00000 -> 0xa0b0"   yes \
 ck "and 0xa0a0 is gone from that build"  no \
    "$(printf '%s\n' "$d2" | grep -q 'lui.*0xa0a0' && echo yes || echo no)"
 
+# R3 / R4: the same knob change, into the SAME build directory. Every case above
+# uses a fresh BUILD=, which is exactly why the suite never saw this: until
+# 2026-08-25 no object depended on anything carrying a -D, so a second `make`
+# with a different RESULT_BASE printed `Nothing to be done for 'payload'` and
+# left the first binary in place, while `show` printed the RESULT_BASE that had
+# been asked for beside it. The stale artefact was live in this tree.
+sha_a="$(sha256sum "$T/b6/probe1/probe1.bin" | cut -d' ' -f1)"
+make -C "$RP" BUILD="$T/b6" P=probe1 payload RESULT_BASE=0x80C00000 >/dev/null 2>&1
+sha_b="$(sha256sum "$T/b6/probe1/probe1.bin" | cut -d' ' -f1)"
+ck "a knob change rebuilds in the same dir" no \
+   "$([ "$sha_a" = "$sha_b" ] && echo yes || echo no)"
+ck "and the emitted alias moved to 0xa0c0"  yes \
+   "$($OBJDUMP -d "$T/b6/probe1/probe1.elf" | grep -q 'lui.*0xa0c0' && echo yes || echo no)"
+
+# R5 / R6: the word count `make show` prints must read the WHOLE result block.
+# It is a Makefile constant mirroring RB_WORDS in the payload source, so it is
+# recomputed here from the C rather than trusted. `88` was printed for both
+# payloads until 2026-08-25 and is right for neither: for probe1 it stops three
+# rows and the seal short, and probe2's block is 537 words.
+rbw () { sed -n "s/^#define[[:space:]]\+$2[[:space:]]\+\([0-9]\+\)u\?.*/\1/p" "$RP/$1" | head -1; }
+p1w=$(( $(rbw probe1.c RB_HDR) + $(rbw probe1.c RB_ROWS) * $(rbw probe1.c RB_ROWW) + 1 ))
+p2w=$(( $(rbw probe2.c RB_HDR) + $(rbw probe2.c RB_CELLS) * $(rbw probe2.c RB_CELLW) + 1 ))
+ck "show DW count == probe1 RB_WORDS"      "$p1w" \
+   "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe1 show 2>/dev/null | sed -n 's/^result .*DW [0-9A-Fa-f]* \([0-9]*\)$/\1/p' | head -1)"
+ck "show DW count == probe2 RB_WORDS"      "$p2w" \
+   "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe2 show 2>/dev/null | sed -n 's/^result .*DW [0-9A-Fa-f]* \([0-9]*\)$/\1/p' | head -1)"
+
 echo
 echo "=== Q1 / Q2: the 1 MiB-writing cache-sizing walk is off by default ==="
 ck "GEOM=0: rlx_r3k_size is not linked" 0 \
@@ -329,8 +356,10 @@ echo "=== D1 / D2: the build says out loud when it is not a device build ==="
 # never reads. The pair is what makes the warning a check.
 ck "a default build is quiet"             0 \
    "$(make -C "$RP" BUILD="$B" P=probe2 show 2>&1 | grep -c 'NOT A DEVICE BUILD')"
-ck "CLEAR_BEV=1 says so"                  1 \
-   "$(make -C "$RP" BUILD="$B" P=probe2 show CLEAR_BEV=1 2>&1 | grep -c 'NOT A DEVICE BUILD')"
+# D2 asks whether the line appears, not how many times: $(BIN)'s recipe ends by
+# invoking `show` itself, so any invocation that actually rebuilds prints it twice.
+ck "CLEAR_BEV=1 says so"                  yes \
+   "$(make -C "$RP" BUILD="$B" P=probe2 show CLEAR_BEV=1 2>&1 | grep -q 'NOT A DEVICE BUILD' && echo yes || echo no)"
 
 echo
 echo "=== X1: stub n really is at rlx_cp0_stubs + 12n ==="
