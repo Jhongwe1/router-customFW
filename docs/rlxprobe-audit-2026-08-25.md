@@ -326,3 +326,80 @@ entry 4 — would have been shipped untested by anything.
 the handler's words are `nop` and qemu's vector page starts as zeros — a
 "negative control" that was counting coincidences. It now counts only positions
 the install demonstrably changed.
+
+---
+
+## What the list was worth, measured on silicon — 2026-08-25b
+
+**`probe2` ran. `R1e` closed.** So this list can stop being a list of worries and
+be scored: **of the five must-fixes, which one actually changed a reading?**
+
+That is not a rhetorical question. An audit that produces five fixes and cannot
+say which of them mattered has no way to get better at auditing, and the honest
+answer here is *one of the five was load-bearing, one was used, and three were
+insurance that never fired*.
+
+| # | fix | did it fire on the device? | what it was worth |
+|---:|---|---|---|
+| **4** | **every CP0 read assumes `mfc0` writes `rt`** → read every register twice with two different primes | 🔴 **YES, and it decided the gate's headline result** | see below |
+| **3** | `p2a`/`p2b` indistinguishable → one binary, and the recipe stamped into a header word | ✅ **used** — `flags=50010002` came back **on the wire** and in block word 5, so the stale-build check had a leg that did not come out of the build directory. `rb=80a01000` in lower case was the second | it did not catch a stale build, because there was not one. It is the check that would have |
+| **1** | `rlx_do_break` has no `SAFE_A0` → the designed visible failure is silence | ❌ **did not fire.** `break.count = 1`; the handler took, so nothing faulted into `do_reserved` | insurance. `H0b` measured `exception_handlers[9] = 80400BE8` on the boot it protected, so the guard was in place and priced |
+| **2** | `install_handler` never reads the vector back → *the stores did not land* and *the core does not fetch there* are one hang | ❌ **did not fire.** `install.bad = 0` | insurance — **but its companion did work.** `ins_changed` exists because the read-back would also PASS if the loop had written nothing and the vector already held the handler. It came back **43**, and 43 was written down before the run |
+| **5** | `probe2` must not touch `Status.IsC` → `rlx_isc_inv` not linked, `RLX_ISC` per-payload with `override` | ❌ **did not fire**, and it could not have: the assertion is about the emitted image, and a device `probe2` contains **zero** `mtc0` to CP0 register 12 | the strongest kind of insurance — a claim a tool checks, not a comment |
+
+### Must-fix 4 is the one, and it is worth being precise about why
+
+The finding was that `rlx_call0` never wrote `$2`, so a trapped census row's `v`
+column carried whatever the caller left there — the running `zeros` counter, a
+steadily increasing small integer that reads like a family of related registers
+answering. The fix was `rlx_call0_primed`: put the caller's prime in `$v0` in the
+`jalr` delay slot, which cost **zero instructions** because the slot held a
+`nop`, and then read every register **twice with two different prime families**.
+
+Here is what that bought, measured:
+
+* **`nowrite = 0` across all 256 rows.** `mfc0` writes `rt` on this core, always.
+  Without the primes there is no state that could have reported otherwise.
+* Therefore **`zeros = 208` is 208 registers that genuinely read zero**, not 208
+  registers whose destination was never touched.
+* Therefore **`Count` (rd 9) reading `00000000` is a real zero**, and `F50b`
+  resolves to *`R5-0`'s SoC timer driver is a prerequisite*.
+
+**Without must-fix 4, the seating would have produced the same six hex digits and
+they would have meant nothing.** The audit's own words were that a residue
+number *"reads as its own refutation and answers `F50b` backwards"* — that is
+exactly what it prevented, and it is the only entry on this list about which that
+can be said.
+
+🆕 **And the fix grew a second leg that nobody asked for**, which is the part
+worth copying next time: a register that **changes** between the two reads
+reports itself as its own state. On the device that turned out to be `rd 1`,
+`Random`, free-running — sixteen distinct values across its eight rows, index
+field 5 … 29, all inside 0 … 31. **That is the positive control the census could
+not otherwise have had**, because *`Count` does not move* is unfalsifiable
+without a register on the same die that does. qemu's `S_MOVES` on row `0x48` is a
+control on qemu.
+
+### What this list did NOT contain, and the seating found it anyway
+
+Three defects reached the bench because nothing in this audit looked for them.
+They are recorded here so the next audit's lenses are chosen against a real
+miss-list rather than an imagined one:
+
+1. 🔴 **`§H2a`'s `--image` still pointed at `build/p2a/probe2/probe2.bin`.** That
+   file **exists**, is 6,656 bytes and is the withdrawn pre-fix payload. This
+   audit is what collapsed `p2a`/`p2b` into one binary — **and it did not grep
+   for the path it had just made obsolete.** The lens that was missing is
+   *"every string this change invalidates"*, and it is cheap.
+2. 🔴 **The hang-recovery command in `§ Session B4`'s own fault box was
+   `probe1`'s** — `DW 80A00000 137`, against `probe2`'s 817 words at
+   `0x80A01000`. Worse than useless: `MEM-15` means `probe1`'s retained block
+   would have come back **looking like a completed run**.
+3. **`0xBE71BAD1` was published in three files as `probe2`'s `BEV` refusal
+   marker and exists in no payload source.** One `grep` with a positive control
+   settles it. This audit read the payloads and never checked the numbers the
+   *documents* attributed to them.
+
+**The common shape of all three: a claim about the payload that lives outside the
+payload.** This audit read `probe1.c` and `probe2.c` line by line and checked
+nothing that pointed *at* them from elsewhere.

@@ -12,6 +12,35 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R1g-4b`, at the bench, 2026-08-25 — `R1e` closes and `R1-gate` has only its
+write-up left.** One power cycle, 23 captures, zero flash bytes, and 16 of 16
+captures written after the block that predicted them.
+
+- **The CP0 census ran on this silicon**, under an exception handler installed at
+  `0x80000080` and read back word for word before anything was allowed to fault.
+  `Status.BEV = 0` — and `break` trapping into that handler and returning is the
+  direct evidence that the core *fetches* there, rather than an inference from
+  the copy having landed. `PRId = 0x0000CD01`, predicted in writing beforehand.
+  `Count` is not implemented, so this SoC's timer driver is a prerequisite.
+  The CP0 ignores the select field. `Config.M = 0`, so it is not a MIPS32 core.
+- **`nowrite = 0` on all 256 rows is the row that makes the rest mean anything.**
+  Reading every register twice with two different primes is what separates *this
+  register reads zero* from *the instruction never wrote its destination*, and
+  without it `Count = 0` would have been ambiguous exactly where it is
+  load-bearing.
+- **`Random` (rd 1) came back moving**, sixteen distinct values inside 0…31 —
+  the positive control the census could not otherwise have had, and an
+  independent corroboration of the 32 TLB entries.
+- **Three tool defects, found by pointing the tools at the new captures.**
+  `reply-size.py check` crashed on the one input it exists to report; its
+  `UNREADABLE` branch existed, was counted, and could never print. Its suite
+  goes 12 → 21. `boot-timeline.py`'s artifact anchor assumed a one-byte prefix
+  and mis-measured a two-byte one by two orders of magnitude; 12 → 15.
+- 🔴 **A power cycle was spent on a wrong assumption and it is recorded as one.**
+  A second `J 80500000` booted the vendor kernel, because the loader re-stages
+  that address on a watchdog reset too — so a payload cannot be re-run on one
+  power cycle without re-uploading. Nothing already measured was lost.
+
 **`R1g-4b`'s desk half, 2026-08-25.** `probe2` is fixed against measured values
 rather than read ones, and the suite that would have to tell a fixed payload from
 a shipped one went from 66 cases to **106**.

@@ -315,6 +315,74 @@ every pattern is ASCII and survives the decode — but the number was. Fixed the
 same day (`newline=''` and `os.path.getsize`); **the fix has no control of its
 own yet**, which would need a fixture with a known CRLF count.
 
+## 2026-08-25b — seating 4, `R1g-4b`
+
+**One power cycle, 23 captures, four prediction blocks, zero flash bytes, and
+`R1e` closes.** The seating in which the CP0 census ran on this silicon.
+
+**Not `bench/2026-08-26/`.** That directory holds a sealed prediction file for a
+seating that happened a day early, and it is closed to captures — see
+`bench/2026-08-26/README.md`, which also carries the generalised rule the sealed
+file could not write about itself.
+
+| file(s) | cell | what it is |
+|---|---|---|
+| `PREDICTIONS-b4-block0.md` | — | written at the desk **before power**. Eight zero-risk reads. Carries the measurement that decided the seating's shape: **this DRAM's power-on bias is reproducible but not deterministic** — 4, 25 and 27 of 256 bits differ across three cold power-ons at `0x80A00000`, with a positive control (0/256, self) and a negative one (123/256, against a loader-written page) |
+| `PREDICTIONS-b4-block1,2.md` | — | written at the bench, each immediately before its own cells, because each is conditional on the block before it |
+| `PREDICTIONS-b4-block3.md` | — | 🔴 **names three cells and only one ran.** `check-predictions.py` reports `1 of 3` and that is correct: the two unrun cells were made unrunnable by the reading of the first. **Not edited** — same situation as `2026-08-24e`'s `block12` |
+| `A-catch.*` | `A-catch` | the ESC window, on a **2.32 ms** grid (`--esc-period 0.002`) rather than 20.35 ms, so the log is ~10× the usual size and that is the instrument. 🔴 **Byte 0 is not the only instrument byte this time**: the prefix is **two** bytes, `00 fc`, and `0xFC` is a framing error rather than an idle sample. Bytes 2–182 are byte-identical to `24c` and `25`; the negative control — the same slice against a warm boot — differs at +48, the `C-8` marker |
+| `A0.*` | `A0` | 71 bytes, byte-identical to `24b`, `24c` and `25`. Fourth consecutive. The throwaway seating rule 2 requires |
+| `SPI-cold.*` `SPI-warm.*` | 🆕 `CLK-15 冷暖差` | `DW B8001200 4`, the **first reading of the SPI controller window on this device**, cold and after a watchdog reset. `SFCR`/`SFCR2`/`SFCSR` byte-identical, only `SFDR` moves — **the divider hypothesis is excluded, and `SFDR` moving is what makes that mean anything** |
+| `H0a.*` `H0b.*` | `H0` | byte-identical to `2026-08-25`'s. Class (a): the loader re-makes both on every boot. Re-taken because `H0a` is the cell that forbids the payload and `H0b` is the safety net's own check |
+| `H0c.*` | `H0c` | 🔴 **32 words, not 8, and re-taken rather than carried across.** The UTLB refill vector is DRAM bias — class (c). Its words 1–7 differ from `2026-08-25`'s by **20 of 224 bits**, which is why `H2h-utlb` had to compare against *this* capture |
+| `H0d-a.*` `H0d-b.*` | `H0d` | `0x80A00000` came back **bias, not `probe1`'s block** — so `MEM-15`'s retention is gone by ~3.9 h, measured with a 548-byte chosen value rather than a two-word canary. `0x80A01000` is neither poison nor a magic |
+| `H2-rescue.json` `H2a-ab.*` `H2a-put.json` | `H2a` | `AUTOBURN 0` + `LOADADDR` + `IPCONFIG` in one transcript; then `0x8040D4A0` read **`00000000`** before the transfer; then 9,392 bytes of `probe2` over TFTP |
+| `H2a.*` | `H2a` | 🔴 **the seating.** `J 80500000`, the whole 2,909-byte report, the 39 printed census rows and the watchdog reset that follows, in one capture |
+| `flush-h2a.*` | seating rule 2 | 11 bytes, a bare prompt, no `Unknown command !` |
+| `H2g-hdr.*` `H2g.*` | `H2g` | the block from RAM. `DW 80A01000 40` then `DW 80A01000 **817**` — 817 and not 809, so all eight poison-margin words are read **and three words past the poison loop's own end**, which is the control on the poison |
+| `H2h-gen.*` `H2h-utlb.*` | `H2h` | both vectors after the run, 32 words each. `H2h-utlb` byte-identical to **this seating's** `H0c` |
+| `H2i-below.*` | 🆕 | `DW 80A00000 8`, byte-identical to `H0d-a` — `probe2` wrote nothing below its own block |
+| `H2a2.*` | 🔴 block 3 | **kept although it failed, and the failure is the record.** A second `J 80500000` to get a repeatability control on the census printed `decompressing kernel:` and booted the factory firmware to userspace. **The loader re-stages `0x80500000` on a watchdog reset too**, so the payload had been overwritten. Cost: one power cycle. What it measured is `C-16`'s copier on a warm reset, which nothing had written down |
+
+**Checked before this directory was committed**, as this file's own rule
+requires: `tools/audit-bench-log.py` over all 23 `.log` files and every
+`.meta.json` — **all eight patterns fire on the synthetic control first**, and
+every one of those files reports `0 hit(s)`.
+
+> **`H2-rescue.json` hits `private IPv4` six times, on `10.1.1`, and it is
+> committed anyway** — the same judgement, with the same reason, that
+> `bench/2026-08-24/C6-rescue.json` already carries: `10.1.1.1` is the address
+> **this session chose and typed**, and `10.1.1.2/24` is the workstation.
+> Neither is a property of the unit — the loader's own compiled-in address is
+> `192.168.1.6` (`SPEC.md` `LDR-25`), and this unit's configured addresses are
+> in `H601` and the config region, neither of which is in this repository. The
+> pattern is right to fire and the value is a statement about the experiment.
+
+### What the prediction files enforce here, and what they caught
+
+```
+python3 tools/check-predictions.py bench/2026-08-25b/PREDICTIONS-b4-block0.md
+```
+
+| file | captures it names | result |
+|---|---|---|
+| `block0` | `A-catch` `A0` `SPI-cold` `H0a` `H0b` `H0c` `H0d-a` `H0d-b` | **8 of 8 came after** |
+| `block1` | `H2a-ab` `H2a` | **2 of 2** |
+| `block2` | `flush-h2a` `H2g-hdr` `H2g` `H2h-gen` `H2h-utlb` `SPI-warm` | **6 of 6** |
+| `block3` | `H2a2` `flush-h2a2` `H2g2-hdr` | **1 of 3** — and see the row above |
+
+**16 of 16 for the cells that ran.** And `tools/reply-size.py` says every one of
+the sixteen byte counts was exact, which `check-predictions.py` structurally
+cannot: it verifies **ordering**, not arithmetic. Both of the previous seating's
+arithmetic errors were in blocks written at the bench, which is why the counts
+now come out of the tool rather than out of a person.
+
+🔴 **Five predictions of mine were refuted and all five are in the blocks,
+unedited.** `RUNSHEET.md` § Results B4 `R1g-4b` lists them. The expensive one is
+block 3's *the payload is unchanged in DRAM at `0x80500000`* — an assumption
+written as a fact, in a repository that already contained `§G1` and `§H1a`, both
+of which say otherwise.
+
 ⚠️ **`2026-08-24c` through `2026-08-24f` have no section in this file.** They were
 seating 2 part three, five power cycles and 81 captures, and they are described in
 `RUNSHEET.md` § Results — seating 2 part three instead. Noted rather than

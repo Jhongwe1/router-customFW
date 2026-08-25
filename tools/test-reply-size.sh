@@ -16,6 +16,14 @@
 #   S4  the answer it was built to get right. `DW 81000400 16` is fourteen
 #       characters and the reply is 213 bytes. A person counted fifteen on
 #       2026-08-25 and predicted 214; that is the whole reason this is a tool.
+#   S5  the UNREADABLE branch actually reaches the printer. 量 2026-08-25 at
+#       the bench: it did not. `check` over a directory of `.log` files died
+#       with `TypeError: %d format: a real number is required, not str` on the
+#       first file, because the branch that exists to report an unusable
+#       capture stored its error message in the column the printer formats
+#       with %+d. The branch existed, was tallied, and counted toward
+#       `misses` -- and could never print. Same defect class as `hazlint`
+#       1.0's K4 and `test-gitignore.sh`'s exit-1: a control that cannot fire.
 set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -70,6 +78,54 @@ ck "DW 81000400 16 -> 213"              213 \
 # probe1's block back with DW 80A00000 137 and the capture was 1,671 bytes.
 ck "DW 80A00000 137 -> 1671 (H1c, measured)" 1671 \
    "$("$PY" "$HERE/reply-size.py" predict 'DW 80A00000 137' | awk '{print $4}')"
+
+echo
+echo "=== S5: the UNREADABLE branch must PRINT, not crash ==="
+# One good capture and one file that is not JSON. The good one is what makes
+# this a control rather than a smoke test: the tool has to get past the bad
+# file and still classify the good one.
+cp "$ROOT/bench/2026-08-25b/A0.meta.json" "$T/good.meta.json"
+printf 'not json at all\n' > "$T/bad.meta.json"
+out="$("$PY" "$HERE/reply-size.py" check "$T/good.meta.json" "$T/bad.meta.json" 2>&1)"; rc=$?
+ck "it does not traceback"                0 \
+   "$(printf '%s\n' "$out" | grep -c 'Traceback')"
+ck "the bad file is reported UNREADABLE"  1 \
+   "$(printf '%s\n' "$out" | grep -c 'UNREADABLE .*bad.meta.json')"
+ck "and it counts as unexplained"         1 \
+   "$(printf '%s\n' "$out" | grep -c 'RESULT: 1 modelled, 1 unexplained')"
+ck "exit code says so"                    1 "$rc"
+# `1 modelled` and not `2`: an unreadable file was not modelled by anything.
+# The tool counted it until 2026-08-25, which inflated the population figure
+# this project quotes without ever changing a verdict.
+ck "UNREADABLE is not counted as modelled" 0 \
+   "$(printf '%s\n' "$out" | grep -c '2 modelled')"
+# The good file alone must be clean, or the rows above prove nothing about
+# which file the tool objected to.
+out="$("$PY" "$HERE/reply-size.py" check "$T/good.meta.json" 2>&1)"; rc=$?
+ck "the good file alone is clean"         0 "$rc"
+
+# The mutation: put BOTH halves back the way they were until 2026-08-25 -- the
+# message in the column the printer formats with %+d, and the printer that
+# formats it that way. Either half alone is harmless; the crash needs both,
+# which is why the mutation restores both.
+"$PY" - "$HERE/reply-size.py" "$T/mutant2.py" <<'MUT'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+a = src.replace('rows.append((p, ("%s: %s" % (type(e).__name__, e))[:34],\n'
+                '                         None, "UNREADABLE", None, None))',
+                'rows.append((p, "", None, "UNREADABLE", None, str(e)))')
+b = a.replace('d = " (%+d)" % delta if isinstance(delta, int) and delta else ""',
+              'd = "" if delta in (None, 0) else " (%+d)" % delta')
+open(sys.argv[2], "w", encoding="utf-8").write(b)
+print("both" if (a != src and b != a) else "INCOMPLETE")
+MUT
+ck "both halves of the mutation applied"  yes \
+   "$(cmp -s "$T/mutant2.py" "$HERE/reply-size.py" && echo no || echo yes)"
+out="$("$PY" "$T/mutant2.py" check "$T/good.meta.json" "$T/bad.meta.json" 2>&1)"
+ck "and the mutant tracebacks"            1 \
+   "$(printf '%s\n' "$out" | grep -c 'Traceback')"
+ck "on exactly the TypeError this repaired" 1 \
+   "$(printf '%s\n' "$out" | grep -c 'TypeError: %d format')"
 
 echo
 if [ "$fail" -ne 0 ]; then

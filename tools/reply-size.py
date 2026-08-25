@@ -275,7 +275,16 @@ def cmd_check(args):
         try:
             m = json.load(open(p, encoding="utf-8"))
         except Exception as e:                    # noqa: BLE001
-            rows.append((p, "", None, "UNREADABLE", None, str(e)))
+            # The message goes in the `sent` column, which is printed with %s.
+            # It used to go in `delta`, which is printed with %+d -- so THIS
+            # branch, the one that exists to report an unusable capture, was
+            # the one that crashed the tool with a TypeError before it could
+            # print anything.  量 2026-08-25: `reply-size.py check` over a
+            # directory of `.log` files (none of them JSON) died on the first
+            # file instead of reporting 26 UNREADABLE rows.  Same defect class
+            # as `hazlint` 1.0's K4 -- a control that could not fire.
+            rows.append((p, ("%s: %s" % (type(e).__name__, e))[:34],
+                         None, "UNREADABLE", None, None))
             tally["UNREADABLE"] = tally.get("UNREADABLE", 0) + 1
             continue
         sent = (m.get("sent") or "").strip()
@@ -295,7 +304,11 @@ def cmd_check(args):
     for p, sent, got, st, want, delta in rows:
         if st in ("OK",) and not args.all:
             continue
-        d = "" if delta in (None, 0) else " (%+d)" % delta
+        # `isinstance` and not `delta in (None, 0)`: the second half of the
+        # repair above. A row that carries anything but an int here must not be
+        # able to take the printer down -- a reporter that dies on the row it
+        # was written to report is worse than one that says nothing.
+        d = " (%+d)" % delta if isinstance(delta, int) and delta else ""
         print("  %-14s %-34s got %-6s want %-6s%s   %s" % (
             st, sent, got, "--" if want is None else want, d, p))
 
@@ -309,7 +322,15 @@ def cmd_check(args):
 
     # The population control for THIS run: a sweep that looked at nothing must
     # not report zero misses.
-    modelled = sum(v for k, v in tally.items() if k not in ("UNMODELLED", "NO-COMMAND"))
+    # UNREADABLE is excluded, and that is a correction rather than a tidy-up.
+    # A file the tool could not open was not modelled by anything -- counting it
+    # here inflated the population figure this project quotes (`121 modelled`)
+    # with captures that were never examined. 量 2026-08-25: two files in, one
+    # of them unreadable, and the tool printed `2 modelled`.
+    # The exit code was never wrong -- an UNREADABLE row is a miss and forces
+    # exit 1 either way -- so this changes the number, not the verdict.
+    modelled = sum(v for k, v in tally.items()
+                   if k not in ("UNMODELLED", "NO-COMMAND", "UNREADABLE"))
     if modelled == 0:
         print("\nRESULT: refused -- 0 modelled captures were examined, so a clean"
               " result would mean nothing")

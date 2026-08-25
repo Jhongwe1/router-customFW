@@ -169,8 +169,61 @@ Two further things the sequence settles:
   measurement; it was the register-level specification needed to ask the
   question from code we control.
 
-**The value is still not known.** But it is readable, and the path was traced on
-2026-08-23 — see the next section. It takes one console command and no new code.
+**The value is still not known**, and 🔴 **2026-08-25b tried to read it out of
+`SFDR` and that prediction was refuted** — see the reading below.
+
+### The window, read on the device for the first time — 量 2026-08-25b
+
+`DW B8001200 4`, once after a cold power-on and once after a watchdog reset
+(`bench/2026-08-25b/SPI-cold.log`, `SPI-warm.log`):
+
+```
+cold  B8001200:  3FC00000  0BA08000  D8050000  FFFF0002
+warm  B8001200:  3FC00000  0BA08000  D8050000  FFFF0000
+                 SFCR      SFCR2     SFCSR     SFDR
+```
+
+**`SFCSR = D8050000`, decoded against D table 10 above:** `SPI_CSB0` = 1 and
+`SPI_CSB1` = 1 (both chip selects inactive), `LEN` = `01` — **two bytes, not the
+reset value `11`** — `SPI_RDY` = 1 (ready), `IO_WIDTH` = `00` (serial),
+`CHIP_SEL` = 0, and `CMD_BYTE` = **`0x05`**, which is the SPI `RDSR` opcode.
+`SFCR2`'s top byte is **`0x0B`**, `Fast Read`.
+
+**So this loader does not leave the controller at reset; it leaves it configured
+for status polling**, with the memory-mapped read command set to `Fast Read`.
+That is a fact `R5b` needs and it was not in any of the three sources.
+
+🔴 **A prediction of mine was refuted here, and it is kept.** `ComSrlCmd_RDID()`
+runs twice on every boot and its last act is `lw` from `SFDR`; `SPEC.md`
+`REG-21`'s flash descriptor at `0x8040FBD4` holds `001C7016 1C701600`, the same
+three bytes two ways. So `SFDR` was predicted to still hold the JEDEC ID
+`1C 70 16`. **It reads `FFFF0002`.** Either `SFDR` does not retain across an idle
+period, or something read it since, or the last transaction was the `RDSR` that
+`CMD_BYTE` records — this reading does not separate them.
+
+✅ **What rescued the cell is that `SFDR` MOVED between cold and warm**
+(`FFFF0002` → `FFFF0000`). Without that, "the other three words are identical"
+would have been compatible with *the divider does not change* **and** with *this
+window does not reflect boot-time state at all*, and the cell could not tell them
+apart. **A ride-along whose designed positive control fails is worth exactly what
+its accidental one is worth**, and here that happened to be enough.
+
+**What it settles**: `SFCR` carries the clock divider, and it is byte-identical
+cold and warm — so **the SPI-divider hypothesis for `CLK-15`'s cold-minus-warm
+4.5 … 14.5 ms is excluded**. The next candidate is the NOR's own power-on
+wake-up, and that is a datasheet question (`tVSL`, deep-power-down recovery) for
+the EON part `REG-21` identifies, not a register read.
+
+⚠️ **`SFDR2` at `0x1210` is still unread**, and not by choice: `LDR-07` rounds
+`DW`'s word count **up** to a multiple of four, so `DW B8001200 1` through `4`
+all print the same four words. Reading the fifth needs a different start address.
+
+⚠️ **`DW` issues loads only.** On this controller a command is issued by
+**writing** `SFDR` — `sw` of `0x9F000000` in the `RDID` sequence above — so
+reading the window is not a transaction. No `EW`, no flash write.
+
+*(Below: the path as traced on 2026-08-23, before any of it was read.)*
+It takes one console command and no new code.
 
 ### Where the JEDEC ID ends up, and why `burn()`'s only bound is a fallback
 

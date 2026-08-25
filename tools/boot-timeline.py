@@ -39,7 +39,12 @@ with, and using anything else here would silently compare two quantities.
 
 WHAT THE INTERVALS ARE
 ----------------------
-    artifact    byte 0 -> byte 1, and ONLY when byte 0 is 0x00 or 0xFF.  That
+    artifact    byte 0 -> the first byte of the device's own `\r\nBooting`.
+                🔄 This read `byte 0 -> byte 1` until 2026-08-25, which is the
+                same thing ONLY when the prefix is one byte long.  It is two on
+                `bench/2026-08-25b/A-catch.log` (`00 fc`), and the old form
+                reported 4.2 ms there against 340.4 and 349.0 elsewhere.
+                `artifact_span` reports the width of a multi-byte prefix.  That
                 byte is not the device speaking: it is the receiver's first
                 sample of a line that is not yet driven, which is why two cold
                 starts give complementary extremes where a printed character
@@ -163,12 +168,52 @@ def analyse(log, anchor):
             return None, None
         return tb - ta, (ia != ib)
 
-    if raw[0] in (0x00, 0xFF) and len(raw) > 1:
-        r["artifact_byte"] = "%02X" % raw[0]
-        r["artifact"], r["artifact_exact"] = g(0, 1)
+    # THE ARTIFACT PREFIX IS NOT ALWAYS ONE BYTE, and this measured it as if it
+    # were until 2026-08-25.
+    #
+    # It used to be `g(0, 1)` -- byte 0 to byte 1 -- guarded on byte 0 being
+    # 0x00 or 0xFF. 量 `bench/2026-08-25b/A-catch.log`: the prefix is TWO bytes,
+    # `00 fc`, and the device's own `\r\nBooting` starts at index 2. So the old
+    # form measured the gap between the two artifact bytes and reported
+    # **4.2 ms** where the other two cold starts read 340.4 and 349.0 -- and the
+    # pooled line printed `spread 149.1%` with nothing saying why.
+    #
+    # 0xFC is not an idle-line sample; it is a framing error, the receiver
+    # catching a character that began before it was listening. So the prefix is
+    # defined by where the DEVICE's output starts, not by which byte values look
+    # like idle: everything before `\r\nBooting` is the instrument's.
+    #
+    # `artifact` stays anchored on byte 0 -- "the line came up" -- because that
+    # is what CLK-14's existing population was measured from, every one of which
+    # had a one-byte prefix. `artifact_span` is the new column and it is not
+    # decoration: on the only capture that has one it is 4.2 ms, which is the
+    # same order as the 4.5-14.5 ms cold-minus-warm effect CLK-15 is trying to
+    # explain. An anchor ambiguity that large is a term, not a rounding error.
+    # TWO guards, and the second one is here because removing the first broke
+    # every warm capture the moment it was tried. `\r\nBooting` is found AFTER
+    # the payload's report in an `--esc-after` capture, so "everything before
+    # it" was 2,909 bytes of `H2a`'s own output and the artifact column read
+    # 63.7 s. The prefix is only the instrument's when:
+    #   * byte 0 is an idle-line sample (0x00 or 0xFF) -- the capture was opened
+    #     before the line was driven, which is what makes this a cold start; and
+    #   * it is SHORT. At 38400 a character is 260 us, so a line coming up
+    #     mid-character yields a byte or two, not a report. Eight is generous
+    #     and it is a bound rather than a fit.
+    d0 = raw.find(b"\r\n" + BOOTING)
+    if raw[:1] and raw[0] in (0x00, 0xFF) and 0 < d0 <= 8:
+        # No separator: a multi-byte prefix must stay ONE whitespace-
+        # delimited field or every column after it shifts on that row
+        # and the table stops being parseable. Caught by this file's
+        # own suite, which tripped on it.
+        r["artifact_byte"] = raw[:d0].hex().upper()
+        r["artifact_n"] = d0
+        r["artifact"], r["artifact_exact"] = g(0, d0)
+        r["artifact_span"] = g(0, d0 - 1)[0] if d0 > 1 else None
     else:
         r["artifact_byte"] = None
         r["artifact"] = None
+        r["artifact_n"] = 0
+        r["artifact_span"] = None
 
     b0 = raw.find(BOOTING)
     a_off = b0 + ANCHORS[anchor][0]

@@ -198,9 +198,18 @@ rlx_do_break:
  *
  * -- 0x0009 being CP0 register 9, so the pair names itself in a hex dump.  If
  * neither `mfc0` writes, the caller sees exactly that pair in raw[0]/raw[1] and
- * a delta of 0x110F0000, which is not a plausible tick count and cannot be
+ * a delta of 0x10F00000, which is not a plausible tick count and cannot be
  * mistaken for one.  The caller cross-checks it against census row 0x48, which
  * is the same register through the same instruction on a different path.
+ *
+ * CORRECTED 2026-08-25 at the desk, after the seating: this comment said
+ * 0x110F0000, two digits transposed.  0xD1CE0009 - 0xC0DE0009 = 0x10F00000.
+ * It is a comment, so no emitted word changed -- but it is the number a reader
+ * checks the reading against, and a correct not-written run would have been
+ * called a mismatch by anyone who trusted it.  The device answered (B) rather
+ * than (A) on 2026-08-25 (`bench/2026-08-25b/H2a.log`: before = after = 0,
+ * `nowrite = 0` across all 256 census rows), so this branch was not exercised
+ * on silicon and the wrong constant cost nothing this time.
  *
  * THE LOOP BODY IS THREE INSTRUCTIONS AND MUST STAY THREE.  `CLK-03`'s first
  * experiment (2026-08-25, Delta = 123.7 ms) measured f/CPI against exactly this

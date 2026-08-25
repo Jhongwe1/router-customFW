@@ -756,6 +756,26 @@ void rlxprobe_main(void)
 	rb_put(H_STATUS_END, status);
 	field("status_end", status);
 
+	/* THE SEAL COVERS THE BLOCK AS IT WAS BEFORE P_SEALED WAS STAMPED, and
+	 * anyone re-summing it afterwards has to know that.
+	 *
+	 * The sum runs over words 0 .. RB_HDR+RB_CELLS*RB_CELLW-1, which
+	 * INCLUDES H_PROGRESS at word 2.  `progress(P_SEALED)` then writes word
+	 * 2 again.  So a straight re-sum of the recovered block is high by
+	 * exactly P_SEALED - P_RESTORED = 0x90 - 0x80 = 0x10, on every complete
+	 * run, and the block reads as corrupt to anyone who does not subtract
+	 * it.
+	 *
+	 * 量 2026-08-25, `bench/2026-08-25b/H2g.log`: naive re-sum 0xEC84409D
+	 * against a stored 0xEC84408D.  Re-summing with word 2 forced to
+	 * P_RESTORED gives 0xEC84408D, exact.
+	 *
+	 * Not reordered.  Sealing first and stamping progress afterwards is what
+	 * makes `progress` monotone all the way to the end -- a block whose seal
+	 * is written but whose progress says P_RESTORED is a run that died
+	 * between the two, and that is a state worth being able to see.  The fix
+	 * is this comment and the arithmetic in the runsheet, not a swap that
+	 * would make P_SEALED mean less. */
 	sum = 0u;
 	for (i = 0; i < RB_HDR + RB_CELLS * RB_CELLW; i++)
 		sum += rb_get(i);

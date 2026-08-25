@@ -61,7 +61,26 @@ ck "the other three anchors differ from C"      0 "$same"
 echo
 echo "=== B2: cold/warm comes from the loader, not from the artifact byte ==="
 base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
-ck "seven cold"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 7 cold, 7 warm, 0 unknown')"
+# 🔄 7/7 until 2026-08-25b, which added one cold boot and one warm reset.
+# Re-measured rather than loosened: a population count that is allowed to drift
+# is not a control.
+ck "eight cold, eight warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 8 cold, 8 warm, 0 unknown')"
+
+# 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
+# instrument's. Both halves have to hold or the column means something
+# different on different rows.
+ck "the two-byte prefix is reported whole" 1 \
+   "$(printf '%s\n' "$base" | grep -c '2026-08-25b .*A-catch .*cold  00FC')"
+# It used to read `g(0, 1)` = the gap BETWEEN the two artifact bytes = 4.2 ms.
+# Anything under 0.1 s here is that defect back.
+av="$(printf '%s\n' "$base" | awk '/2026-08-25b/ && /A-catch/ {print $5}')"
+ck "and its artifact interval is a boot, not 4 ms" yes \
+   "$(awk -v v="${av:-0}" 'BEGIN{print (v>0.30 && v<0.40) ? "yes" : "no"}')"
+# And the other half: a WARM capture has device output before `Booting`, so it
+# must have NO artifact column at all. Without this the same change reported
+# 63.7 s for H2a and a pooled spread of 662%.
+ck "a warm capture has no artifact byte"  0 \
+   "$(printf '%s\n' "$base" | awk '/H2a / && /warm/ {print $4}' | grep -cv -- '--')"
 # The mutation: take the one cold capture that HAS an artifact byte, strip it,
 # and the classification must stay cold. If it flips, the classifier is reading
 # the wrong evidence.

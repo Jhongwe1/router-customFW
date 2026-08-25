@@ -1039,8 +1039,15 @@ because **R1a settles it in one instruction**: a bare-metal RI handler, one
 It also hands R1 a fact it would otherwise have discovered by surprise: **the
 stock loader has already installed exception handling of its own**, so R1d's
 "write my handler to `0x80000080` and make the I-cache see it" is replacing
-something, not filling a vacuum. Where those vectors live and whether
-`Status.BEV` is 0 when the prompt is up has not been traced.
+something, not filling a vacuum. 🔴 **Both halves are measured now,
+2026-08-25b.** The vectors live at `0x80000080` in DRAM -- `trap_init` copies 128
+bytes there from `0x8040054C` on every boot, and `DW 80000080 32` reproduces it
+byte for byte on four consecutive power cycles. And **`Status.BEV = 0`**:
+`probe2` read `Status = 0x1000FC00`, and `break` trapped into a handler this
+project installed at `0x80000080` and returned (`break.count=1`, `cause=00000024`
+= ExcCode 9, `break.epc=80500270`). **That the core FETCHES there is the direct
+evidence, not an inference from the copy having landed.**
+`bench/2026-08-25b/H2a.log`; `SPEC.md` `CPU-27`.
 
 ### A hardware condition that disables image checking
 
@@ -1052,6 +1059,36 @@ like *the operator pressed a key*, but the register addresses have not been
 confirmed against D and the argument has not been traced. **Inferred, and worth
 fifteen minutes before R8**, because a global that makes the loader declare
 every image bad is a rescue path and possibly a hazard.
+
+### 🔴 The copier runs on a WARM reset too, and that is structural
+
+**量 2026-08-25b, directly, and it cost a power cycle to find out.** `C-16` asks
+what puts flash `0x060010`'s 964 KiB into RAM at `0x80500000` before any `FLR`.
+What was not established is **how often**.
+
+The reading: `probe2` was uploaded to `0x80500000` and run; it finished, armed
+the watchdog and reset; the loader came back to its prompt; and a **second**
+`J 80500000` printed `decompressing kernel:` and booted the factory firmware to
+userspace. `bench/2026-08-25b/H2a2.log`.
+
+**So the staging happens on a watchdog reset, not only on a cold power-on, and
+the payload had already been overwritten by the time the prompt returned.**
+
+Two consequences, and the second is the one that reaches a procedure:
+
+* `LDR-22`'s blank is narrower: whatever the copier is, it is on the warm-reset
+  path as well as the cold one.
+* 🔴 **A payload cannot be run twice on one power cycle at
+  `LOADADDR = 0x80500000` without re-uploading it.** Any runsheet cell that
+  says "run it again to get a repeatability control" is wrong as written. The
+  cheap fix for the next payload is a different `LOADADDR`, or a cell that reads
+  the first eight words of the jump target immediately before the `J`.
+
+⚠️ **The repository already contained enough to predict this** -- `§G1` in
+`RUNSHEET.md` exists to ask whether the image is already staged there, and
+`§H1a`'s warning says an image at the wrong address plus `J 80500000` boots the
+vendor kernel the loader has already staged. It was still assumed rather than
+read.
 
 ---
 

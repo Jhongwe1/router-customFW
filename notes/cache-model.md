@@ -138,12 +138,20 @@ all, and whether `mtc0` wrote them, needs a `Status` read-back — `probe2`.
   writes 1 MiB of real memory on a core that does not implement `Status.IsC`,
   **and cell 4 has now measured that this core is exactly that core.** Arming it
   needs a before/after read of the window it may scribble on.
-- **CP0 register 20's read side** returns `0x00000000` — the first read anyone
-  has taken. `rlx_mfc0_cctl` contains exactly one writer of `$v0`, the `mfc0`
-  itself, so *implemented and reads zero* and *destination never written* are not
-  separable by that cell. **The write side is measured**: cells 2, 3 and 6 prove
-  `mtc0 $t,$20` has an effect, which is what a write-effective command register
-  that reads back zero looks like.
+- 🔴 **CP0 register 20's read side is SETTLED, 2026-08-25b: it reads zero for
+  real.** `probe1`'s cell could not separate *implemented and reads zero* from
+  *destination never written*, because `rlx_mfc0_cctl` has exactly one writer of
+  `$v0`. `probe2`'s census reads every register **twice, with two different
+  primes** (`0xC0DE00nn` then `0xD1CE00nn`), so a non-writing `mfc0` returns its
+  own prime and gets its own state. **`nowrite` came back 0 on all 256 rows** —
+  `mfc0` always writes `rt` on this core — and row `0xa0` (rd 20) came back
+  `S_ZERO`. Both channels agree (`bench/2026-08-25b/H2a.log`, `H2g.log`).
+  **The write side was already measured**: cells 2, 3 and 6 prove `mtc0 $t,$20`
+  has an effect.
+
+  **So: CP0 register 20 is a write-only command register that reads back zero.**
+  That is the sentence `R5b`'s MTD driver needs, and it is now two measurements
+  rather than one reading plus an assumption.
 
 ## Cache geometry — a prediction with one weak source, written before the measurement
 
@@ -176,12 +184,45 @@ art for driver shape and for these five integers, and for nothing addressed.**
 holds 32 as **measured on the device**, and adding a third party's guess beside a
 measurement is what the two-source rule exists to prevent.
 
+🔴 **2026-08-25b: THE REFUTATION COLUMN BELOW IS VOID, and it is void by
+measurement rather than by neglect.** It named `probe1`'s `GEOM=1` walk. That
+walk is `r3k_cache_size()`, and the algorithm **needs cache isolation to work**:
+it isolates, writes a marker at `base` and reads it back — *which succeeds on a
+core that does not isolate, because the store and the load both went to DRAM, so
+the guard passes for the wrong reason* — then zeroes `base + k*4` for
+k = 32 … 0x40000, writes −1 at `base`, and walks upward looking for the first
+`base + k*4` that reads non-zero. **On a non-isolating core every one of those
+words was just zeroed in real DRAM and stays zero**, so the walk reaches its
+ceiling and returns `0` — which is the same value it returns for *the core does
+not answer*. `probe1` cell 4 measured on 2026-08-25 that this core does not
+isolate (`CPU-35`). **So the experiment was already dead before it was armed.**
+
+⚠️ **And the danger wording everywhere in this repository was wrong about the
+volume.** `GEOM=1` does not "write 1 MiB of real memory": loop 2 executes one
+`sw` per iteration, fourteen iterations, plus two stores at `base` — about
+**sixteen words per call**, scattered across a 1 MiB bounding box. The extent is
+1 MiB; the volume is not. The hazard that was never priced is different: unlike
+`rlx_isc_inv`, `rlx_r3k_size` is called **directly from C**, so instruction fetch
+stays cached while `Status.SwC` is set, and what fetch does under `SwC` is the
+one thing this core has no documentation for.
+
+**The other route is shut too.** `Config` (rd 16) reads `00000000` with
+`nowrite = 0` proving the destination was written, so `Config.M = 0` and **there
+is no `Config1`** to carry `IS`/`IL`/`IA` and `DS`/`DL`/`DA`.
+
+🆕 **What can still refute these three numbers**: an eviction walk that needs no
+isolation at all, using the mechanism `H1` cell 1 already proved on this die — a
+store into the instruction stream is not seen. Prime N victims at stride S,
+execute them, rewrite them, execute again; the ones that come back FRESH were
+evicted. Sweeping N gives the size, sweeping S the line size, and the pattern
+gives the associativity. That is `probe3`, and it is desk work.
+
 | | prediction | refuted by |
 |---|---|---|
-| I-cache | **16 KiB** | `probe1`'s `GEOM=1` walk returning any other size |
+| I-cache | **16 KiB** | 🔄 **a `probe3` eviction walk** (was: `probe1`'s `GEOM=1` walk, which cannot answer on this core) |
 | D-cache | **8 KiB** | the same |
 | line size, both | **16 bytes** | the same |
-| core | RLX4181 rather than RLX5281 | `probe2`'s `PRId` row `0x78` reading in the 5281 range — which would be worth more than agreement, because it refutes a Realtek datasheet and two public kernel trees at once |
+| core | RLX4181 rather than RLX5281 | 🔴 **2026-08-25b: `PRId` row `0x78` read `0x0000CD01`, and it refutes nothing here — because no source in this repository maps that value onto either model number.** The prediction and its refutation condition were both about a name, and the measurement is a value. **What would settle it is a `PRId` assignment table, not another seating.** *(Original condition:)* `probe2`'s `PRId` row `0x78` reading in the 5281 range — which would be worth more than agreement, because it refutes a Realtek datasheet and two public kernel trees at once |
 
 🔴 **`GEOM=1` does not run in `RUNSHEET.md` § Session B4** — the build is
 `GEOM=0`, and the walk writes 1 MiB of real memory at `0x80B00000` if this core
