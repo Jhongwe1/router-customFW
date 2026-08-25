@@ -10,6 +10,39 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ---
 
+## Unreleased
+
+**`R1g-4b`'s desk half, 2026-08-25.** `probe2` is fixed against measured values
+rather than read ones, and the suite that would have to tell a fixed payload from
+a shipped one went from 66 cases to **106**.
+
+- **`tools/rlxprobe/probe2`** — the five must-fix items from
+  `docs/rlxprobe-audit-2026-08-25.md`. `SAFE_A0` before the one instruction in
+  the tree guaranteed by design to fault; a 44-word read-back of the installed
+  handler, so *the stores did not land* and *the core does not fetch there* stop
+  being one hang; one binary instead of two indistinguishable ones; a primed
+  destination on every CP0 read; and **no `mtc0` to CP0 register 12 anywhere in a
+  device image**, which is what "it does not touch `Status.IsC`" looks like when
+  it is a claim about the emitted words instead of about a comment.
+- **The census reads every register twice, with two different prime families.**
+  *Not written* becomes certain rather than likely, and **a register that changes
+  between the two reads reports itself** — a second, independent route to `F50b`.
+- **Four mutations, one per must-fix, run under qemu.** One of them exists
+  because qemu cannot reach the state it tests: its `mfc0` always writes `rt`, so
+  a payload with one census stub emitting `nop` is the only way to show that
+  `S_NOWRITE` can be produced at all. The first qemu run of the fixed payload
+  found a defect in the fix.
+- **`tools/reply-size.py`** — `LDR-07`'s reply-length formula as an instrument.
+  Twelve controls; the per-family constants fitted from the captures rather than
+  counted by hand; **121 modelled, 0 unexplained** over `bench/`. The two
+  captures that never fitted have names now instead of being misses.
+- **`tools/boot-timeline.py`** — the named intervals of a boot, with the anchor
+  bytes stated. It refutes `CLK-15`'s *"cold and warm are the same"*: the two
+  populations do not overlap, and the difference survives **inside a single power
+  cycle, twice**.
+- `PROGRESS.md`'s `Est.` column is answered: 198 is not the plan's total, not its
+  desk+bench, and not any consistent subset of it. No rule reproduces it.
+
 ## v0.0 — 2026-08-25
 
 **The instruments and the record.** Fifteen tools, each with the controls that

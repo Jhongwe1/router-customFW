@@ -51,14 +51,31 @@ void rlx_cctl(u32 cmd);
 u32 rlx_mfc0_cctl(void);
 
 /* Status's write side.  Three `nop`s after the `mtc0`: the CP0 write hazard on
- * this core is C-9 and is NOT established. */
+ * this core is C-9 and is NOT established.
+ *
+ * BUILT ONLY UNDER RLX_CLEAR_BEV, which is qemu only.  probe1 cell 4 measured
+ * that Status.IsC does not isolate on this core and that its byte stores reach
+ * DRAM, so probe2 must not touch Status at all -- and compiling the only writer
+ * out of a device build is what makes that claim readable from the image
+ * instead of from this comment. */
+#if RLX_CLEAR_BEV
 void rlx_mtc0_status(u32 v);
+#endif
 
 /* c-r3k.c's r3k_flush_icache_range(), reproduced: isolate and swap the caches,
  * byte-store across the range, restore Status.  MUST be entered through KSEG1
  * -- use rlx_call2_uncached() -- because what instruction fetch does while the
- * caches are swapped is undocumented for this core. */
+ * caches are swapped is undocumented for this core.
+ *
+ * LINKED ONLY UNDER RLX_ISC, which is 1 for probe1 and 0 for everything else,
+ * set per payload in the Makefile with `override` so a command line cannot turn
+ * it on.  MEASURED 2026-08-25: on this core the byte stores reach DRAM.  It is
+ * kept because probe1 already ran it against a victim it owned and the result is
+ * a finding (`CPU-35`); it is gated because probe2 pointed it at the exception
+ * vector page, which is a range it does not own. */
+#if RLX_ISC
 void rlx_isc_inv(u32 base, u32 len);
+#endif
 
 #if RLX_GEOM
 /* c-r3k.c's r3k_cache_size(), reproduced.  Returns bytes, or 0 when the core
@@ -66,8 +83,14 @@ void rlx_isc_inv(u32 base, u32 len);
 u32 rlx_r3k_size(u32 base, u32 ca_flags);
 #endif
 
-/* Call an address and return $v0.  The `_uncached` form ORs KSEG1 in first. */
-u32 rlx_call0(u32 fn);
+/* Call an address and return $v0.  The `_uncached` form ORs KSEG1 in first.
+ *
+ * `prime` is written into $v0 in the jump's delay slot, BEFORE the callee runs.
+ * A callee that never writes $v0 therefore returns the prime, and "it answered"
+ * and "nothing wrote the destination" stop being the same observation.  That is
+ * the whole of Must-fix 4 and it costs zero instructions -- the slot held a nop.
+ * Pass a value the callee could not plausibly produce. */
+u32 rlx_call0_primed(u32 fn, u32 prime);
 u32 rlx_call2_uncached(u32 fn, u32 arg0, u32 arg1);
 
 /* --- exc.S -------------------------------------------------------------- */
@@ -88,9 +111,15 @@ extern u32 rlx_exc_rec[4];
  * control on the handler rather than a question about this core. */
 void rlx_do_break(void);
 
-/* CP0 Count read twice around `spins` iterations of a two-instruction loop.
- * Zero is a result: R3000-class CP0s have no Count. */
-u32 rlx_count_delta(u32 spins);
+/* CP0 Count read twice around `spins` iterations of a three-instruction loop,
+ * with both destinations primed first.  Returns after - before, and writes the
+ * two raw readings to raw[0] and raw[1] so that "Count did not move" and "mfc0
+ * did not write its destination" are different observations rather than the
+ * same zero.  Zero is a result here: R3000-class CP0s have no Count.
+ *
+ * `raw` must be a KSEG1 pointer -- the payload reads it straight back and this
+ * project does not read a cached alias of a word it just wrote uncached. */
+u32 rlx_count_delta(u32 spins, u32 *raw);
 
 /* 256 stubs, 3 words each, rd 0..31 x sel 0..7: stub n is at
  * `rlx_cp0_stubs + n * 12`. */
@@ -101,6 +130,11 @@ extern u32 rlx_cp0_stubs_end[];
 
 void rlx_puts(const char *s);
 void rlx_puthex32(u32 v);
+
+/* SAFE_A0's target. Defined in report.c because every payload links report.c
+ * and uart.S's CP0 readers now carry the guard -- see rlxasm.h for the hazard
+ * and report.c for why it lives there. */
+extern u32 rlx_fault_frame[64];
 
 /* --- probe0.c / probe1.c ------------------------------------------------ */
 /* One per payload, and exactly one is linked into any image. */

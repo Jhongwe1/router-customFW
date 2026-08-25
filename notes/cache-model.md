@@ -216,6 +216,18 @@ and before zero padding, and is data (`notes/lwl-mystery.md`).
    this part, so `0x200` has nothing to flush. Keeping it costs one instruction
    and stays defensible for a driver that may run on another die; **claiming it
    is required here would be wrong**, and so would claiming the vendor was.
+   🔴 **And `probe2` DROPPED it on 2026-08-25, which is a decision this file
+   owns and should state.** `probe2`'s stores go through KSEG1, so there is no
+   dirty D-line for `0x200` to write out even in principle; using `0x002` alone
+   makes `probe2` **a second, independent test of the item above** — a different
+   address range (physical 0, a page it does not own) and a different store path
+   (uncached, not cached). And the failure is decomposable, which is the part
+   worth having: `probe2` reads all 44 installed words back before it dares
+   `break`, so *the stores did not land* and *the I-cache did not see them* stop
+   being one hang. A `break` that does not return **with `install.bad = 0`** would
+   refute `CCTL 0x002` on ground `probe1` never covered.
+   **What goes into `R5b`'s MTD driver is still `0x002`**, and `0x200` in a driver
+   is belt and braces rather than a correction.
 3. **Both of those are single-source for the exact bit values.** Before either
    goes into `rlxprobe`, confirm on silicon: write a handler, take an exception,
    and check it ran.

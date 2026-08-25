@@ -97,6 +97,18 @@ tools/test-opcount.sh      15 cases. Two exist because a counter reading the wro
                            endianness, or ignoring alignment, is still a counter
 tools/test-file-modes.sh   reads the git index rather than the working tree, because the
                            working tree is what DrvFs lies about
+tools/test-rlxprobe.sh     106 cases over the bare-metal payloads. Four of them are
+                           mutations that BUILD a deliberately broken payload and run it
+                           under qemu, because a suite that cannot tell a fixed payload
+                           from a shipped one is not a suite. One of those four exists
+                           because qemu cannot reach the state it tests at all
+tools/reply-size.py        what the loader will send back, in bytes, before it sends it.
+                           Twelve controls, and the model's constants were fitted from
+                           121 captures rather than counted by hand -- which is the
+                           error it was built to remove
+tools/boot-timeline.py     the named intervals of a boot, with the anchor bytes stated.
+                           It exists because two adjacent silences of the same length is
+                           how a measurement ends up wearing another one's name
 ```
 
 **CI runs what a runner can run, and says out loud what it cannot.**

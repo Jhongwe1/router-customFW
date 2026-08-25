@@ -27,7 +27,7 @@ make clean
 ```
 
 Knobs: `LOADADDR=0x80500000`, `RESET=1`, `CROSS=mips-linux-gnu-`, and for the
-later payloads `RESULT_BASE`, `GEOM`, `GEOM_BASE`, `FLUSH_ISC`.
+later payloads `RESULT_BASE`, `GEOM`, `GEOM_BASE`. 🔄 **`FLUSH_ISC` was removed on 2026-08-25** — `probe1` cell 4 measured that `Status.IsC` does not isolate on this core and that its byte stores reach DRAM, so the knob stopped being a knob rather than gaining a danger note. What replaced it is `ISC`, which is set per payload in the `Makefile` with `override` and is 1 only for `probe1`, whose cell 4 IS that measurement.
 
 🔴 **Three more knobs exist only because qemu has no MIPS-I core**, and every one
 of them produces an image that looks right and is wrong for the device:
@@ -132,8 +132,8 @@ it lands.
 | | what it decides | state |
 |---|---|---|
 | **`probe0`** | the chain: the toolchain emits code this core runs, the entry is byte 0, `LOADADDR`/TFTP/`J` delivers, the UART talks, the board comes back. Plus `PRId`, `Config`, `Config1`, `Status`, `Cause` | written, gated, runs to its end marker under qemu. **Not yet run on the device** |
-| **`probe1`** | `R1d`. Six cells that decide **which cache-management sequence makes this core see an instruction just written into RAM** — no flush, `CCTL 0x002` alone, the vendor's `0x200`-then-`0x002`, the `Status.IsC`/`SwC` path `c-r3k.c` uses, an uncached store, and the recipe `notes/cache-model.md` recommends. Plus `CPU-25`'s geometry behind `GEOM=1` | written, gated, runs to its end marker under qemu. **Not yet run on the device** |
-| **`probe2`** | `R1e`. A handler of our own at `0x80000080` **and** `0x80000000`, a `break` positive control, then all 32 CP0 registers across all 8 select values, then `Count`/`Compare`. Restores both vectors and proves the restore | written, gated, its full 256-stub census runs under qemu. **Not yet run on the device** |
+| **`probe1`** | `R1d`. Six cells that decide **which cache-management sequence makes this core see an instruction just written into RAM** — no flush, `CCTL 0x002` alone, the vendor's `0x200`-then-`0x002`, the `Status.IsC`/`SwC` path `c-r3k.c` uses, an uncached store, and the recipe `notes/cache-model.md` recommends. Plus `CPU-25`'s geometry behind `GEOM=1` | ✅ **RAN 2026-08-25 and `R1d` closed with it.** Six cells, both victims each, `bench/2026-08-25/H1b.log`. The negative control held — cell 1 came back STALE, the **opposite** of qemu. `CCTL 0x002` alone is sufficient, the D-cache is write-through, and cell 4 measured `Status.IsC` **failing to isolate**: its byte stores reached DRAM. 🔄 The source moved on 2026-08-25 (`rlx_call0_primed`, `SAFE_A0` in `uart.S`), so **the binary that ran is the tree at commit `2db12bb`**, sha256 `fbac7d60…`, and that rebuild is checked |
+| **`probe2`** | `R1e`. A handler of our own at `0x80000080` **and** `0x80000000`, **read back through KSEG1 before anything dares fault**, a `break` positive control, then all 32 CP0 registers across all 8 select values **read TWICE with two different primes**, then `Count`/`Compare`. Restores both vectors and checks the restore in both directions | 🔄 **rewritten 2026-08-25 against `docs/rlxprobe-audit-2026-08-25.md` § Must-fix.** Written, gated, its 512-read census runs under qemu, and four mutations — one per must-fix — build deliberately broken payloads and require the checks to fire. One binary, 9,392 bytes, block `DW <base> 809`. **Not yet run on the device** |
 
 `RUNSHEET.md` § Session B4 is the sheet that runs `probe1` and `probe2`, with
 every expected value and refutation condition written before power is applied.

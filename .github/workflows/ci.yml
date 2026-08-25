@@ -36,13 +36,17 @@
 # cases red for a reason that is not a defect. MEASURED 2026-08-25, on the bench
 # machine with $FWRE_WORK pointed at an empty directory: with the cross tools
 # present, `test-hazlint` is 20 ok / 26 FAIL / 5 skip and `test-rlxprobe` is
-# 29 ok / 37 FAIL. Without gcc, both skip cleanly, the census is green, and it
-# prints `NOT RUN IN THIS JOB: 122 case(s)` with every one of them named.
+# 56 ok / 50 FAIL. Without gcc, both skip cleanly, the census is green, and it
+# prints `NOT RUN IN THIS JOB: 162 case(s)` with every one of them named.
 #
-# Those two pairs and that 122 were 17/14/8, 20/25 and 101 until the second
-# measurement on 2026-08-25, and every one of them was wrong in the same
-# direction: `test-rlxprobe` had grown from 45 cases to 62 and then to 66, and
-# the header was never re-measured. A workflow file whose comment predicts a
+# Those two pairs and that 162 were 17/14/8, 20/25 and 101, then 29/37, 20/26/5
+# and 122, and every earlier one was wrong in the same direction: `test-rlxprobe`
+# went 45 -> 62 -> 66 -> 106 cases and the header was not re-measured each time.
+# 2026-08-25, third revision: it is 106 now, `test-hazlint` is unchanged at
+# 20/26/5, and the two new text-job suites -- `test-reply-size` and
+# `test-boot-timeline`, 12 cases each -- run in CI and are not in that 162.
+#
+# A workflow file whose comment predicts a
 # number its own first build contradicts is exactly the badge this project says
 # is not evidence, so the numbers here are re-measured whenever a suite grows,
 # and `tools/ci-expected.tsv` is the machine-readable copy the census checks.
@@ -98,6 +102,16 @@ jobs:
       # A depth-1 checkout still produces a full index, so this is meaningful here.
       - name: test-file-modes
         run: bash tools/test-file-modes.sh 2>&1 | tee ci-out/test-file-modes.out; exit "${PIPESTATUS[0]}"
+
+      # Both of these read `bench/`, which is committed, and need nothing but
+      # python3. reply-size sweeps 133 capture metadata files against the
+      # loader's reply-length model; boot-timeline reads the .timing files
+      # beside them. Neither touches a device and neither needs a compiler.
+      - name: test-reply-size
+        run: bash tools/test-reply-size.sh 2>&1 | tee ci-out/test-reply-size.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-boot-timeline
+        run: bash tools/test-boot-timeline.sh 2>&1 | tee ci-out/test-boot-timeline.out; exit "${PIPESTATUS[0]}"
 
       - name: ci-census self-test
         run: /usr/bin/python3 tools/ci-census.py --self-test 2>&1 | tee ci-out/ci-census.out; exit "${PIPESTATUS[0]}"

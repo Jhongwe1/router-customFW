@@ -783,6 +783,28 @@ lost a line; short by 9, lost the prompt; off by anything else, it is not the
 reply to the command that was sent. `CONT`'s 24 bytes — 71 predicted, one line
 missing — is the case where this fired.
 
+✅ **2026-08-25: this is `tools/reply-size.py` now, and the population went from
+fifteen hand-counted cases to 121.** `reply-size.py check bench/` classifies
+every capture that carries a `sent` field and no ESC stream: **121 modelled, 0
+unexplained.** The per-family constants were FITTED from those captures rather
+than read out of the loader or counted in a terminal — `DW` 47×⌈N/4⌉ over 91
+samples, `EW`/`EB` no output over 11, `Y` 23 over 6, `PHYR` 68 over 5, and `FLR`
+79 over 6 **with no `<RealTek>` at all**, because it stops at its own Y/N prompt.
+`DB`, `J` and `MDIOR` are declared UNMODELLED with their sample counts and their
+reasons, and an unmodelled capture is never counted as a hit.
+
+🔴 **The two captures that do not match the formula each got a name instead of a
+miss.** `CONT`'s 24 bytes are `ECHO-ONLY` — the command was echoed and not acted
+on, which is `C-19`'s signature — and `A0-reopen-control`'s 44 are
+`UNKNOWN-COMMAND`. Folding either into "short" would throw away the thing a
+bench operator actually needs to know.
+
+**The reason it is a tool and not a formula in a document** is `block 3` on
+2026-08-25: predicted 214 bytes, measured 213, because `DW 81000400 16` is
+fourteen characters and a person counted fifteen. `check-predictions.py` verifies
+that a prediction file predates its capture; it does not verify the arithmetic
+inside it. `reply-size.py`'s control `C8` is that exact case.
+
 ### The reset R4 needs, and it is already a command
 
 `J BFC00000`. **(A.)**
@@ -795,8 +817,26 @@ missing — is the case where this fired.
 804092ec   j     0x804092ec        ; spin until it bites
 ```
 
-Interrupts are already masked two instructions earlier (`GIMR0 = 0`, `IE`
+Interrupts are already masked ~~two instructions earlier~~ (`GIMR0 = 0`, `IE`
 cleared), so nothing can leave that spin except the watchdog.
+
+🔄 **2026-08-25: *two instructions earlier* is wrong, and the audit was right
+to flag it.** `docs/rlxprobe-audit-2026-08-25.md` recorded this sentence as the
+reverse of what `tools/rlxprobe/uart.S` says about the same address, and left
+which one is wrong open. **Neither is wrong about behaviour.** The three
+instructions above -- `lui` / `ori` / `sw zero` -- mask nothing, which is what
+`uart.S` says and what `rlx_reset` copies. The masking is real but it is not
+local: the two `sw zero,0(0xB8003000)` sites are at **`0x804086E4` and
+`0x80408700`**, in the `J` command's own handler, roughly 2,500 bytes before this
+and in a different function. So the defect is the phrase, not the claim.
+
+🔴 **Residual, and it is the part that actually matters for a payload**:
+whether EVERY path that reaches `0x804092E8` passes through one of those two
+sites is **untraced**. This is 讀 out of the two addresses this document already
+records, not a fresh disassembly. Until it is traced, *"interrupts are off when a
+payload starts"* rests on `J <addr>`'s path and on nothing else -- which is
+exactly the leg `probe2` could check for two lines by reading bit 0 of the
+`Status` word it already has in hand, and does not.
 
 **`0xB800311C` has four sources, and one of them is behavioural:**
 

@@ -34,6 +34,7 @@
  */
 
 #include "rlxdefs.h"
+#include "rlxasm.h"
 
 	.set	noreorder
 	.set	noat
@@ -41,46 +42,10 @@
 
 	.text
 
-/* ---------------------------------------------------------------------------
- * SAFE_A0 -- put a readable, word-aligned KSEG0 address in $a0 before executing
- * anything that could fault.
- *
- * WHY, and this is not defensive programming, it is a measured hazard.
- *
- * This unit's loader handles a reserved exception with `do_reserved` at
- * 0x80400BE8, registered as the RAW vector target with no SAVE_ALL wrapper.  So
- * it runs on the faulting code's own `sp` and its own `a0`, and its third
- * instruction is
- *
- *      80400c00:  8c470094   lw   a3,148(v0)      # v0 = the faulting a0
- *
- * -- it dereferences whatever the faulting code happened to have in $a0,
- * treating it as a `pt_regs *` that nobody built.
- *
- * `rlx_cctl(0x002)` passes 0x002 in $a0.  0x002 + 148 = 0x96, which is kuseg,
- * and kuseg is TLB-mapped on this core.  The loader never executes a single TLB
- * instruction, so the TLB is in whatever state reset left it; a miss there goes
- * to the UTLB refill vector at 0x80000000, WHICH THE LOADER NEVER POPULATED.
- * What the core does next is undetermined.
- *
- * "Undetermined" is the whole claim, and the stronger version of it was
- * withdrawn the same day it was written.  An adversarial pass checked the
- * escalation -- "it could branch into the loader's flash-write path at
- * 0x804099AC" -- and refuted it: stage1's DRAM-sizing probe leaves 0x5A5AA5A5
- * at 0x80000000, and 0x5A5AA5A5 decodes as BLEZL with target 0x7FFE9B58, not a
- * J-format instruction, so it cannot reach loader code.  There is no
- * demonstrated brick path.  SAFE_A0 stays because it costs TWO INSTRUCTIONS and
- * removes an undetermined case, not because a disaster was shown.
- *
- * With a safe $a0 the same fault takes the ordinary branch: two prints and a
- * hang at 0x80400C18.  A hang costs one power cycle, which is expensive and
- * bounded.  And it is recognisable: `rlx_fault_frame` is zeroed by start.S, so
- * the loader prints `ra=0` and the operator knows the guard was in place.
- * ------------------------------------------------------------------------- */
-	.macro	SAFE_A0
-	lui	$4, %hi(rlx_fault_frame)
-	addiu	$4, $4, %lo(rlx_fault_frame)
-	.endm
+/* SAFE_A0 lives in `rlxasm.h` now, because `exc.S` needs it too -- see
+ * docs/rlxprobe-audit-2026-08-25.md Must-fix 1.  The rationale moved with the
+ * macro rather than being summarised in two places. */
+
 
 /* ---------------------------------------------------------------------------
  * void rlx_cctl(u32 cmd)
@@ -142,7 +107,19 @@ rlx_mfc0_cctl:
 
 /* ---------------------------------------------------------------------------
  * void rlx_mtc0_status(u32 v) -- the write side uart.S had no reason to have.
+ *
+ * BUILT ONLY WHEN RLX_CLEAR_BEV IS SET, WHICH IS qemu ONLY, and that is the
+ * point rather than a tidy-up.  `probe1` cell 4 measured on 2026-08-25 that
+ * `Status.IsC` does NOT isolate on this core: `rlx_isc_inv`'s `sb $0` byte
+ * stores reached DRAM and corrupted both victims (`bench/2026-08-25/H1b.log`,
+ * `07` CORRUPT, top byte of each word at stride 4).  `probe2` must therefore not
+ * touch Status at all -- and "must not" is only a claim until something can
+ * check it.  Compiling this routine out of a device build turns it into an
+ * assertion about the emitted image: **a device probe2 contains no `mtc0` to
+ * CP0 register 12**, which `tools/test-rlxprobe.sh` C1 reads out of the
+ * disassembly and C2 shows it can fail.
  * ------------------------------------------------------------------------- */
+#if RLX_CLEAR_BEV
 	.globl	rlx_mtc0_status
 	.ent	rlx_mtc0_status
 	.type	rlx_mtc0_status, @function
@@ -158,6 +135,7 @@ rlx_mtc0_status:
 	jr	$31
 	nop
 	.end	rlx_mtc0_status
+#endif /* RLX_CLEAR_BEV */
 
 /* ---------------------------------------------------------------------------
  * void rlx_isc_inv(u32 base, u32 len)
@@ -180,11 +158,23 @@ rlx_mtc0_status:
  *     I-cache; what instruction fetch does meanwhile is exactly the thing this
  *     core has no documentation for.  Fetching uncached removes the question.
  *
- * DANGER, stated because it is real: if this core does not implement IsC, the
- * byte stores are ordinary stores and they write zeros over [base, base+len).
- * probe1 points this only at the victim it is about to overwrite anyway, and
- * never at a range it does not own.
+ * DANGER -- AND IT IS NO LONGER A HYPOTHETICAL.  MEASURED 2026-08-25,
+ * `bench/2026-08-25/H1b.log` cell 4: **this core does not isolate.**  The
+ * `sb $0` stores below reached DRAM and rewrote the top byte of every fourth
+ * byte across the range -- `240222b2` -> `000222b2` on the victim and
+ * `03e00008` -> `00e00008` on the guard, on BOTH victims, 7 KiB apart.  qemu
+ * had found the same failure one day earlier and `probe1`'s `V_CORRUPT` guard
+ * is what turned it into a printed verdict instead of a jump into the weeds.
+ *
+ * So the old wording -- *"if this core does not implement IsC"* -- is settled,
+ * and what it settles is that **nothing may point this at a range it does not
+ * own.**  probe1 points it only at the victim it is about to overwrite anyway.
+ * probe2 pointed it at the exception vector page, which is a range it does not
+ * own, and that is why probe2 no longer links this routine at all: `RLX_ISC` is
+ * 1 for probe1 and 0 for everything else, set per payload in the Makefile with
+ * `override` so it cannot be turned on from a command line.
  * ------------------------------------------------------------------------- */
+#if RLX_ISC
 	.globl	rlx_isc_inv
 	.ent	rlx_isc_inv
 	.type	rlx_isc_inv, @function
@@ -218,6 +208,7 @@ rlx_isc_inv:
 	jr	$31
 	nop
 	.end	rlx_isc_inv
+#endif /* RLX_ISC */
 
 /* ---------------------------------------------------------------------------
  * u32 rlx_r3k_size(u32 base, u32 ca_flags)
@@ -319,25 +310,52 @@ rlx_r3k_size:
 #endif /* RLX_GEOM */
 
 /* ---------------------------------------------------------------------------
- * u32 rlx_call0(u32 fn)
+ * u32 rlx_call0_primed(u32 fn, u32 prime)
  * u32 rlx_call2_uncached(u32 fn, u32 arg0, u32 arg1)
  *
  * Call an address.  The second ORs KSEG1 in first, which is what makes the
  * flush routines above run with instruction fetch bypassing the caches.
+ *
+ * The first takes a PRIME because "the callee returned nothing" and "the callee
+ * returned this value" are two different observations and $v0 cannot tell them
+ * apart on its own.  See the delay slot below.
  * ------------------------------------------------------------------------- */
-	.globl	rlx_call0
-	.ent	rlx_call0
-	.type	rlx_call0, @function
-rlx_call0:
+	.globl	rlx_call0_primed
+	.ent	rlx_call0_primed
+	.type	rlx_call0_primed, @function
+rlx_call0_primed:
 	addiu	$29, $29, -8
 	sw	$31, 0($29)
 	jalr	$31, $4
-	nop				/* delay slot, filled by hand */
+	addu	$2, $5, $0		/* DELAY SLOT, AND IT IS THE FIX.
+					 *
+					 * $v0 is loaded with the caller's prime
+					 * BEFORE the callee runs, so a callee
+					 * that never writes $v0 returns the
+					 * prime rather than whatever the last
+					 * unrelated computation left there.
+					 *
+					 * docs/rlxprobe-audit-2026-08-25.md
+					 * Must-fix 4: every CP0 read in probe2
+					 * assumes `mfc0` writes `rt`, and that
+					 * assumption is what the census exists
+					 * to test.  On a trap the destination
+					 * is certainly not written -- the
+					 * handler advances EPC by 4 and touches
+					 * no GPR -- so without a prime a trapped
+					 * census row reported whatever $2 held
+					 * on entry, which was the running
+					 * `zeros` counter: a steadily increasing
+					 * small integer that reads like a family
+					 * of related registers answering.
+					 *
+					 * It costs zero instructions: this slot
+					 * held a `nop`. */
 	lw	$31, 0($29)
 	addiu	$29, $29, 8		/* does not read $31 -- see hazlint */
 	jr	$31
 	nop
-	.end	rlx_call0
+	.end	rlx_call0_primed
 
 	.globl	rlx_call2_uncached
 	.ent	rlx_call2_uncached

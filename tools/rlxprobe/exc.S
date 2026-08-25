@@ -45,6 +45,7 @@
  */
 
 #include "rlxdefs.h"
+#include "rlxasm.h"
 
 	.set	noreorder
 	.set	noat
@@ -123,33 +124,88 @@ rlx_exc_end:
  * ExcCode is 9 (Bp) by definition.
  *
  * If the handler took, `rlx_exc_rec[0]` increments, Cause's ExcCode field reads
- * 9, and this returns.  If it did not, the loader's reporter prints
- * `Undefined Exception happen.` and the board hangs -- which is an unambiguous
- * observation and not a silent wrong answer.
+ * 9, and this returns.
+ *
+ * IF IT DID NOT TAKE, THE FAILURE WAS DESIGNED TO BE VISIBLE AND WAS MEASURED
+ * TO BE SILENCE.  `docs/rlxprobe-audit-2026-08-25.md` Must-fix 1, 量 on the
+ * emitted image:
+ *
+ *      80500f40:  1480fffb   bnez a0,80500f30   # rlx_puts' loop exit test
+ *      ...                                      # nothing after this writes $a0
+ *      80501364:  0c1400b2   jal  rlx_do_break
+ *
+ * `rlx_puts` exits on the string's NUL, so it always returns with `$a0 = 0`.
+ * Without the guard below, `break` reaches the loader's dispatcher, which reads
+ * `exception_handlers[9]` -- MEASURED 2026-08-25, `bench/2026-08-25/H0b.log`, it
+ * is `0x80400BE8`, `do_reserved`, exactly as the audit assumed -- which does
+ * `move v0,a0` and then `lw a3,148(v0)` at 0x80400C00: a load from 0x00000094,
+ * kuseg, through a TLB the loader never initialises.  **The first `prom_printf`
+ * is at 0x80400C04.**  Neither line reaches the wire, and the promised
+ * `Undefined Exception happen.` is complete silence.
+ *
+ * SAFE_A0 costs two instructions and turns that back into the two prints and
+ * the hang at 0x80400C18 that the rest of this payload is designed around.
+ * `cache.S` spends thirty lines establishing this hazard and applies the macro
+ * to three routines; until 2026-08-25 the one instruction in the tree guaranteed
+ * by design to fault was the one without it, and `tools/test-rlxprobe.sh` S1
+ * scoped it out because `break` is not a CP0 instruction.  S1 now reads *every
+ * routine that contains an instruction that can fault*, and S2 is the mutation.
  * ------------------------------------------------------------------------- */
 	.globl	rlx_do_break
 	.ent	rlx_do_break
 	.type	rlx_do_break, @function
 rlx_do_break:
+	SAFE_A0				/* $a0 is a caller-saved register and this
+					 * routine takes no argument, so there is
+					 * nothing here to preserve */
 	break
 	jr	$31
 	nop				/* delay slot, filled by hand */
 	.end	rlx_do_break
 
 /* ---------------------------------------------------------------------------
- * u32 rlx_count_delta(u32 spins)
+ * u32 rlx_count_delta(u32 spins, u32 *raw)
  *
- * Read CP0 Count (register 9) twice with a counted loop between, and return the
- * difference.  F50b: an R3000-class CP0 has no Count/Compare -- they arrive with
- * R4000 -- and CPU-19 already records this core as using the R3000 cache model.
- * A zero here says the register is not implemented or is not running; a non-zero
- * says it is, and its rate over a known loop is its frequency.
+ * Read CP0 Count (register 9) twice with a counted loop between, return the
+ * difference, and write the two raw readings to raw[0] and raw[1].
  *
- * Not moved = no implementation is the reading the plan writes down, and the
- * thing it decides is whether R5-0's SoC timer driver is a prerequisite or a
- * bonus.  Zero is therefore a RESULT here, which is why the loop count is
- * returned beside it: a zero delta with a zero loop count would be an
- * instrument failure wearing a result's clothes.
+ * F50b: an R3000-class CP0 has no Count/Compare -- they arrive with R4000 -- and
+ * CPU-19 already records this core as using the R3000 cache model.  A zero here
+ * says the register is not implemented or is not running; a non-zero says it is,
+ * and its rate over a known loop is its frequency.  Not moved = no
+ * implementation is the reading the plan writes down, and the thing it decides
+ * is whether R5-0's SoC timer driver is a prerequisite or a bonus.
+ *
+ * BOTH DESTINATIONS ARE PRIMED, AND WITHOUT THAT THE ROUTINE ANSWERED F50b
+ * BACKWARDS.  `docs/rlxprobe-audit-2026-08-25.md` Must-fix 4, 量:
+ *
+ *      805002d4:  40084800   mfc0  t0,$9      # $8 was not initialised
+ *      805002f0:  400f4800   mfc0  t7,$9      # $15 is written by no instruction
+ *                                             #     anywhere in the payload
+ *
+ * If `mfc0` does not write `rt` on this core -- which is one of the three
+ * plausible behaviours and is precisely what the census exists to find out --
+ * then the old code returned (the loader's leftover $t7) - 0xA0500150, a large
+ * residue-arithmetic value, against a runsheet cell expecting 00000000.  **A
+ * result that reads as its own refutation.**
+ *
+ * Priming with ZERO would have been worse than not priming: 0 - 0 = 0, and a
+ * zero delta is the answer this cell is hunting, so the instrument's own failure
+ * would wear the result's clothes.  The two primes are therefore DIFFERENT and
+ * they are the same two families the census uses, so one convention covers both:
+ *
+ *      before <- 0xC0DE0009        after <- 0xD1CE0009
+ *
+ * -- 0x0009 being CP0 register 9, so the pair names itself in a hex dump.  If
+ * neither `mfc0` writes, the caller sees exactly that pair in raw[0]/raw[1] and
+ * a delta of 0x110F0000, which is not a plausible tick count and cannot be
+ * mistaken for one.  The caller cross-checks it against census row 0x48, which
+ * is the same register through the same instruction on a different path.
+ *
+ * THE LOOP BODY IS THREE INSTRUCTIONS AND MUST STAY THREE.  `CLK-03`'s first
+ * experiment (2026-08-25, Delta = 123.7 ms) measured f/CPI against exactly this
+ * shape; adding an instruction inside the loop would silently move a published
+ * number.
  * ------------------------------------------------------------------------- */
 	.globl	rlx_count_delta
 	.ent	rlx_count_delta
@@ -158,10 +214,25 @@ rlx_count_delta:
 	/* GPR $9 is deliberately not used: `mfc0 $8, $9` means CP0 register 9,
 	 * and a general register 9 in the same six lines is how a reader
 	 * checking this against the R3000 manual loses ten minutes. */
+	addu	$14, $4, $0		/* t6 = spins, taken out of $a0 BEFORE the
+					 * guard below overwrites it */
+	SAFE_A0				/* CP0 register 9 may not exist on this
+					 * core -- that is what this routine is
+					 * asking -- so its `mfc0` is in exactly
+					 * the class the guard is for.  The
+					 * handler is installed by the time this
+					 * runs and the `break` control has proved
+					 * it live, but "proved live" is a
+					 * property of THIS run and the guard is
+					 * two instructions. */
+	lui	$8, 0xc0de
+	ori	$8, $8, 0x0009		/* t0 = the prime for "before" */
+	lui	$15, 0xd1ce
+	ori	$15, $15, 0x0009	/* t7 = the prime for "after" */
+
 	mfc0	$8, $9			/* t0 = Count, before */
 	nop
 	nop
-	addu	$14, $4, $0		/* t6 = spins */
 1:
 	addiu	$14, $14, -1
 	bne	$14, $0, 1b
@@ -169,6 +240,8 @@ rlx_count_delta:
 	mfc0	$15, $9			/* t7 = Count, after */
 	nop
 	nop
+	sw	$8, 0($5)		/* raw[0] = before, whatever it is */
+	sw	$15, 4($5)		/* raw[1] = after */
 	subu	$2, $15, $8
 	jr	$31
 	nop

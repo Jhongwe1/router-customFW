@@ -1,4 +1,5 @@
 #include "rlxdefs.h"
+#include "rlxasm.h"
 
 /* uart.S -- the parts where the instruction order is the point.
  *
@@ -81,12 +82,25 @@ rlx_pc:
  * CP0 read hazard; how many slots this core needs is C-9 and is NOT measured.
  * `jr`+delay would have given two slots anyway -- these are written down so
  * that the spacing is a decision and not an accident of the calling sequence.
+ *
+ * SAFE_A0 SINCE 2026-08-25, and it is not belt and braces.  The audit's
+ * Must-fix 1 ends on *"widen S1 to every instruction that could fault"*, and
+ * widening the check without widening the guard would only have produced a
+ * longer list of exemptions.  Of the five readers below, CP0 register 12 is one
+ * this unit's own loader reads (`mfc0 t1,c0_status` at 0x8040040C) -- but 15,
+ * 16 and 16-select-1 are not established on this core at all, and 16-select-1
+ * is a MIPS32 encoding being executed on a MIPS-I part on purpose.  Two
+ * instructions each, and the emitted image now says that EVERY CP0 instruction
+ * outside the census stubs and the handler itself is guarded, which is a claim
+ * a scanner can check.  $a0 is caller-saved and none of these takes an
+ * argument.
  * ------------------------------------------------------------------------- */
 	.macro	CP0READ name, reg
 	.globl	\name
 	.ent	\name
 	.type	\name, @function
 \name:
+	SAFE_A0
 	mfc0	$2, $\reg
 	nop
 	nop
@@ -113,6 +127,8 @@ rlx_pc:
 	.ent	rlx_mfc0_config1
 	.type	rlx_mfc0_config1, @function
 rlx_mfc0_config1:
+	SAFE_A0				/* the one CP0 read in this file that is a
+					 * MIPS32 encoding on a MIPS-I part */
 	.word	0x40028001		/* mfc0 v0, $16, 1 */
 	nop
 	nop
@@ -134,7 +150,13 @@ rlx_mfc0_config1:
  *      CP2102's latency timer at the far end (1-16 ms typical, unmeasured
  *      here), so a counted delay follows.
  *   3. arm: the loader's own idiom, copied verbatim from 0x804092E8 --
- *      including what it does NOT do.  It masks no interrupts and it spins on
+ *      including what it does NOT do.  It masks no interrupts -- and that is a
+ *      claim about these three instructions, not about the boot path: the
+ *      loader's own `GIMR0 = 0` sites are at 0x804086E4 and 0x80408700, in the
+ *      `J` command's handler and ~2,500 bytes earlier.  An audit read this line
+ *      against `docs/loader-command-semantics.md` and flagged one of them as
+ *      wrong; the answer is that the DOCUMENT's phrase "two instructions
+ *      earlier" was, and that file now carries it.  It masks no interrupts and it spins on
  *      itself.  WDTCNR = 0 leaves WDTE != 0xA5, which ENABLES the watchdog,
  *      and OVSEL = 0000, the shortest of the ten timeouts.
  *

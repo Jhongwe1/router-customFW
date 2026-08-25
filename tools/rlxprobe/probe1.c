@@ -167,13 +167,9 @@ static u32 rb_ks0;
 static u32 rb_ks1;
 static u32 rb_seq;		/* rows fully written */
 
-/* The safe $a0 that cache.S's SAFE_A0 points at.  Global and not static because
- * cache.S references it by name; 64 words because the loader's `do_reserved`
- * reads offset 148 of whatever $a0 holds and 148 < 256.  start.S zeroes .bss,
- * so if the loader ever does print, `ra=00000000` is the signature that the
- * guard was in place and the fault took the print-and-hang branch rather than
- * the UTLB-refill branch.  See cache.S for the whole hazard. */
-u32 rlx_fault_frame[64];
+/* The safe $a0 that SAFE_A0 points at was defined here until 2026-08-25.  It is
+ * in report.c now: uart.S's CP0 readers gained the guard, and probe0 links
+ * uart.S without linking this file.  The hazard is in rlxasm.h. */
 
 static void rb_put(u32 word_index, u32 v)
 {
@@ -268,7 +264,12 @@ static void run_victim(u32 row, const struct cellspec *c, u32 member, u32 vaddr)
 	}
 
 	/* Prime: fetch the victim into the I-cache and confirm it runs. */
-	primed = rlx_call0(vaddr);
+	/* 0xFFFFFFFF is the prime: see cache.S.  It is not the victim's OLD or
+	 * NEW constant and it is not a plausible `addiu $2,$0,imm` result, so a
+	 * prime call that returned WITHOUT executing the victim now says so in
+	 * $v0 instead of returning whatever the previous computation left --
+	 * which is what V_VOIDPRIME is for.  Free: the slot held a `nop`. */
+	primed = rlx_call0_primed(vaddr, 0xFFFFFFFFu);
 	if (primed != (u32)RLX_VICTIM_OLD) {
 		rb_row(row, tag, vaddr, primed, 0u, mem_before, mem_before,
 		       *UNC(vaddr + 4u), V_VOIDPRIME);
@@ -329,7 +330,7 @@ static void run_victim(u32 row, const struct cellspec *c, u32 member, u32 vaddr)
 		return;
 	}
 
-	executed = rlx_call0(vaddr);
+	executed = rlx_call0_primed(vaddr, 0xFFFFFFFFu);
 	mem_after = *UNC(vaddr);
 
 	if (executed == (u32)RLX_VICTIM_NEW)

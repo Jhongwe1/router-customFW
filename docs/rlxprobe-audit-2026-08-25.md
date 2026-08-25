@@ -288,3 +288,41 @@ unchanged — still eight columns, still 137 words, `DW 80A00000 137` unchanged.
   payload from a shipped one was one lens's question and its findings are
   `[1-src]`. It is the same question hazlint 1.0's review answered *no* to, and
   it has not been answered here.
+
+---
+
+## What `R1g-4b` did with this list, 2026-08-25 at the desk
+
+**Every entry above is left exactly as it was written.** An audit whose findings
+get edited into their own resolutions stops being traceable to the state that
+produced them. This section is the outcome, and it is separate.
+
+| entry | what happened |
+|---|---|
+| **1** `rlx_do_break` has no `SAFE_A0` | **Fixed**, two instructions. The macro moved to a new `tools/rlxprobe/rlxasm.h` because `exc.S` needed it as well as `cache.S`, so there is one copy of the decision rather than two. `S1` was widened the way this entry asks — and widening it found four more unguarded CP0 instructions in `uart.S`, so those got the guard too, which is why `rlx_fault_frame` moved to `report.c` (probe0 links `uart.S` and neither payload). **A device `probe2` now has no unguarded faulting instruction anywhere**, and `S3` is a scan of the emitted image that says so with two named exemptions and their arguments |
+| **2** `install_handler` never reads the vector back | **Fixed.** 44 uncached read-backs after the flush, `install.bad` / `install.firstbad` reported and in the block, and the caller refuses to `break` when it fires. `install.changed` is the positive control on the comparison, because a read-back against the array that wrote it would also pass if the loop had written nothing |
+| **3** `p2a` and `p2b` are indistinguishable | **Dissolved rather than stamped.** `RLX_FLUSH_ISC` is gone; `ISC` is per payload with `override` in the `Makefile`, so `make P=probe2 ISC=1` cannot bring it back. The build stamp went in anyway — `flags` is a header word, a `field()`, and a `make show` line — because a build that cannot say what it is cannot be checked from a capture |
+| **4** every CP0 read assumes `mfc0` writes `rt` | **Fixed, and then taken one step further.** `rlx_call0` became `rlx_call0_primed`: the caller's prime goes into `$v0` in the jump's delay slot, which cost zero instructions because the slot held a `nop`. The census then reads every register **twice** with two different prime families, so `S_NOWRITE` is certain rather than likely and **a register that changes between the two reads reports itself** — `S_MOVES`, which is a second route to `F50b` that never touches `rlx_count_delta`'s arithmetic. `rlx_count_delta` primes both destinations with different constants, is bracketed by the exception counter, and reports its two raw readings; and the cross-check this entry ends on — census row `0x48` — is now made by the payload itself |
+| **5** `probe2` must not touch `Status.IsC` | **Fixed, and it is checkable from the image.** `rlx_isc_inv` is not linked and `rlx_mtc0_status` is not built, so **a device `probe2` contains no `mtc0` to CP0 register 12 at all**. `C1` reads that out of the disassembly and `C2` shows the check can fail |
+| **§5** `V_NOSTORE` conflates two states | Did not arise. Cell 1 against cell 5 measured the D-cache write-through, and the four-way table the audit put in the sheet is what made it decidable |
+| parked: `restore.mismatch` cannot fail for its own name | **Fixed here**, since it belonged to `R1g-4b`: all 64 words of both vectors, plus `restore.stillhandler` as the leg that fails in the other direction |
+| parked: `LOADADDR` is not in `DEFS` | **Fixed**, with `A3`/`A4` as the pair. It is in the rebuild stamp now |
+| parked: `GEOM=1` routes around `rlx_call2_uncached` | **Still parked**, and now with a second reason: `GEOM=1` links `rlx_r3k_size`, which sets `Status.IsC` — the bit cell 4 measured not to isolate |
+
+**The re-validation is the cost, and it is what this list actually bought.**
+`tools/test-rlxprobe.sh` went from 66 cases to **106, none failing**, and four of
+the new ones are mutations that run under qemu — one per Must-fix — because a
+suite that cannot tell a fixed payload from a shipped one is hazlint 1.0's
+finding 6 wearing a different hat.
+
+🔴 **One of those four exists because qemu cannot reach the state it tests.**
+qemu's `mfc0` always writes `rt`, so `S_NOWRITE` never occurs there; `M1` builds
+a payload with one census stub emitting `nop` instead of `mfc0` and requires that
+row to come back `S_NOWRITE`. Without it the whole prime mechanism — the fix for
+entry 4 — would have been shipped untested by anything.
+
+**And the first qemu run of the fixed payload found a defect in the fix.**
+`restore.stillhandler` read 20 on a run whose restore was perfect, because ten of
+the handler's words are `nop` and qemu's vector page starts as zeros — a
+"negative control" that was counting coincidences. It now counts only positions
+the install demonstrably changed.

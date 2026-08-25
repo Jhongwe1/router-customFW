@@ -21,13 +21,19 @@
 #   A1  the hand-written putchar still has its nop in the load delay slot
 #   A2  the entry is the first byte, at whatever LOADADDR is given
 #
+#   A3  a LOADADDR change RELINKS in a build directory that already has an
+#       image, instead of leaving one linked for the old address
+#   A4  ...and the emitted _start really moved, so A3 is not a rebuild that
+#       changed nothing
+#
 #   P2  probe1 builds and passes the same gate
 #   V1  the sixteen victims are where probe1.c computes them: 0x400 apart, and
 #       every one of them starts with the exact word the experiment patches
 #   V2  rlx_fault_frame is inside .bss with room for the offset the loader's
-#       do_reserved reads, so SAFE_A0 points somewhere real
+#       do_reserved reads, so SAFE_A0 points somewhere real -- in EVERY payload,
+#       because it moved to report.c on 2026-08-25
 #   S1  SAFE_A0 is emitted before every CP0 instruction that could fault
-#   S2  the mutation: a cache.S with SAFE_A0 removed must make S1 fail
+#   S2  the mutation: an rlxasm.h with SAFE_A0 removed must make S1 fail
 #   R1  the result block is addressed through KSEG1 as well as KSEG0
 #   R2  and RESULT_BASE reaches the emitted address, so R1 is not a constant
 #   Q1  GEOM is off by default and its 1 MiB-writing routine is not even linked
@@ -38,13 +44,40 @@
 #   H2  a device build returns from an exception with rfe -- MIPS-I -- and has
 #       no eret anywhere in it
 #   H3  RET_ERET=1 swaps them, so H2 measures the knob and not a coincidence
+#   H4  rlx_do_break loads a0 before its `break` -- the one instruction in the
+#       tree guaranteed by design to fault, and the one that had no guard
 #   D1  a default build does not print NOT A DEVICE BUILD
 #   D2  ...and a build with any qemu-only constant set does
 #   X1  stub n is at rlx_cp0_stubs + 12n and encodes the rd/sel probe2.c means
+#   F1  make show's flags word is the constant the image carries
+#   C1  a device probe2 contains NO write to CP0 Status anywhere
+#   C2  ...and a CLEAR_BEV build does, so C1 measures the gate not an absence
+#   C3  rlx_isc_inv is not linked into probe2
+#   C4  ...and IS linked into probe1, whose cell 4 measured it destroying DRAM
+#   C5  `make P=probe2 ISC=1` still produces an image without it -- `override`
+#   S3  every routine in the emitted image whose instructions can fault is
+#       either guarded or on a named exemption list with a reason
+#   S4  the mutation: the SAFE_A0-less build must make S3 fail
 #   Q1  probe1 and probe2 run to their end markers under qemu-system-mips
 #   Q2  and qemu says cell 1 is FRESH, which is the OPPOSITE of the device's
 #       expected answer -- an emulator kinder than the device certifies exactly
 #       the bugs the device rejects
+#   Q3  qemu's own Count is running, so census row 0x48 comes back S_MOVES --
+#       the two-pass census detecting a moving register, on a machine where one
+#       is known to move
+#
+# THE FOUR MUTATIONS THAT RUN UNDER qemu, one per Must-fix
+# -------------------------------------------------------
+#   M1  one census stub emits `nop` instead of `mfc0`, so its destination is
+#       provably not written -> that row MUST report S_NOWRITE. qemu cannot
+#       exercise that state on its own: its `mfc0` always writes `rt`. Must-fix 4
+#   M2  the install stores go to a scratch address -> install.bad != 0, the
+#       payload REFUSES and reaches its end marker, and `break.count` never
+#       appears. That branch used to be a hang. Must-fix 2
+#   M3  the final copy_vec_back() is removed -> both restore legs fire
+#   M5  the saved vector is taken from the handler itself, so the install
+#       changes nothing -> the vacuous-read-back WARNING fires. Without this the
+#       control that says "this check could not have failed" is itself unchecked
 #
 # A1 is not decoration. The nop at 0x80406B88 is the instruction P9-12 copied
 # out of the loader's putchar and discarded as padding, and two power cycles
@@ -166,6 +199,25 @@ else
 fi
 
 echo
+echo "=== A3 / A4: a LOADADDR change must RELINK in a directory that has a build ==="
+# LOADADDR reaches the LINKER through --defsym and nothing downstream of the
+# objects depends on it, so until 2026-08-25 a second `make` with a different
+# LOADADDR into the same directory relinked nothing and left an image for the
+# old address -- with `show` printing the address that had been asked for
+# beside it. Same defect class as the RESULT_BASE one that was live in this
+# tree, in the one knob whose drift ships an image the loader will not jump to.
+# A2 above never saw it because every case here uses a fresh BUILD=.
+rm -rf "$T/b8"
+make -C "$RP" BUILD="$T/b8" P=probe0 payload LOADADDR=0x80500000 >/dev/null 2>&1
+sha_a="$(sha256sum "$T/b8/probe0/probe0.bin" 2>/dev/null | cut -d' ' -f1)"
+make -C "$RP" BUILD="$T/b8" P=probe0 payload LOADADDR=0x81000000 >/dev/null 2>&1
+sha_b="$(sha256sum "$T/b8/probe0/probe0.bin" 2>/dev/null | cut -d' ' -f1)"
+ck "a LOADADDR change rebuilds in the same dir" no \
+   "$([ "$sha_a" = "$sha_b" ] && echo yes || echo no)"
+ck "and _start moved with it"            81000000 \
+   "$($NM "$T/b8/probe0/probe0.elf" 2>/dev/null | awk '$3=="_start"{print $1}')"
+
+echo
 echo "=== P2: probe1 builds and passes the same gate ==="
 out="$(make -C "$RP" BUILD="$B" P=probe1 payload 2>&1)"; rc=$?
 ck "make exit code"                    0 "$rc"
@@ -204,23 +256,37 @@ ck "all 16 start with addiu v0,zero,0x11a1" 0 "$bad"
 ck "the pair gap is still 7"           7 "$(sed -n 's/^#define RLX_VICTIM_PAIR_GAP\t*\([0-9]*\).*/\1/p' "$RP/rlxdefs.h")"
 
 echo
-echo "=== V2: SAFE_A0's target is inside .bss and big enough ==="
+echo "=== V2: SAFE_A0's target is inside .bss and big enough, in EVERY payload ==="
 # The loader's do_reserved reads offset 148 of the faulting $a0. If
 # rlx_fault_frame were smaller than that, or outside the image, SAFE_A0 would be
 # pointing at something no better than the integer it replaced.
-FF="$($NM "$B/probe1/probe1.elf" | awk '$3=="rlx_fault_frame"{print $1}')"
-BS="$($NM "$B/probe1/probe1.elf" | awk '$3=="_bss_start"{print $1}')"
-BE="$($NM "$B/probe1/probe1.elf" | awk '$3=="_bss_end"{print $1}')"
-ck "rlx_fault_frame is in .bss"      yes \
-   "$([ $(( 0x${FF:-0} )) -ge $(( 0x${BS:-1} )) ] && [ $(( 0x${FF:-0} + 256 )) -le $(( 0x${BE:-0} )) ] && echo yes || echo no)"
-ck "it is word aligned"                0 "$(( 0x${FF:-1} % 4 ))"
+#
+# probe0 is in this loop as of 2026-08-25: uart.S's CP0 readers carry the guard
+# now, and probe0 links uart.S. Before that the symbol was defined in probe1.c
+# and probe2.c and probe0 had none -- which is why it moved to report.c.
+for p in probe0 probe1; do
+    FF="$($NM "$B/$p/$p.elf" | awk '$3=="rlx_fault_frame"{print $1}')"
+    BS="$($NM "$B/$p/$p.elf" | awk '$3=="_bss_start"{print $1}')"
+    BE="$($NM "$B/$p/$p.elf" | awk '$3=="_bss_end"{print $1}')"
+    ck "$p: rlx_fault_frame is in .bss"  yes \
+       "$([ -n "$FF" ] && [ $(( 0x${FF:-0} )) -ge $(( 0x${BS:-1} )) ] && [ $(( 0x${FF:-0} + 256 )) -le $(( 0x${BE:-0} )) ] && echo yes || echo no)"
+    ck "$p: it is word aligned"            0 "$(( 0x${FF:-1} % 4 ))"
+done
 
 echo
 echo "=== S1: SAFE_A0 is emitted before every CP0 instruction that can fault ==="
 # A `lui a0` / `addiu a0` pair immediately before the CP0 write or read. Checked
 # in the emitted code, not in the source, because a macro that stopped expanding
 # would leave the source looking correct.
-for fn in rlx_cctl rlx_mfc0_cctl rlx_mtc0_status; do
+#
+# The list grew on 2026-08-25 and rlx_mtc0_status left it: that routine is the
+# only writer of CP0 Status in the tree and it is now compiled out of anything
+# but a CLEAR_BEV build, which is C1/C2 below. uart.S's four CP0 READERS joined
+# it, because Must-fix 1 ends on "widen this to every instruction that could
+# fault" and three of those four read registers whose existence on this core is
+# not established at all.
+for fn in rlx_cctl rlx_mfc0_cctl rlx_mfc0_status rlx_mfc0_cause \
+          rlx_mfc0_prid rlx_mfc0_config rlx_mfc0_config1; do
     body="$($OBJDUMP -d -m mips:3000 "$B/probe1/probe1.elf" | sed -n "/<$fn>:/,/^\$/p")"
     ck "$fn loads a0 before the CP0 op" 1 \
        "$(printf '%s\n' "$body" | grep -c 'lui.*a0,0x')"
@@ -230,9 +296,10 @@ echo
 echo "=== S2: the mutation -- remove SAFE_A0 and S1 must fail ==="
 # Without this, S1 could be passing on a `lui a0` that some unrelated edit put
 # there. The mutant keeps the macro defined but makes it expand to nothing.
+# It patches rlxasm.h, which is where the macro moved when exc.S needed it too.
 mkdir -p "$T/mut"
 cp "$RP"/*.c "$RP"/*.h "$RP"/*.S "$RP"/Makefile "$RP"/rlxprobe.lds "$T/mut/"
-"${PYTHON:-python3}" - "$T/mut/cache.S" <<'PY'
+"${PYTHON:-python3}" - "$T/mut/rlxasm.h" <<'PY'
 import sys
 p = sys.argv[1]
 s = open(p, encoding="utf-8").read()
@@ -244,12 +311,16 @@ PY
 rm -rf "$T/b4"
 make -C "$T/mut" BUILD="$T/b4" P=probe1 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
 mutbad=0
-for fn in rlx_cctl rlx_mfc0_cctl rlx_mtc0_status; do
+for fn in rlx_cctl rlx_mfc0_cctl rlx_mfc0_status rlx_mfc0_config1; do
     body="$($OBJDUMP -d -m mips:3000 "$T/b4/probe1/probe1.elf" 2>/dev/null | sed -n "/<$fn>:/,/^\$/p")"
     n="$(printf '%s\n' "$body" | grep -c 'lui.*a0,0x')"
     [ "$n" = "0" ] || mutbad=$((mutbad+1))
 done
-ck "the mutant has no a0 load in any of the three" 0 "$mutbad"
+ck "the mutant has no a0 load in any of the four" 0 "$mutbad"
+# And the mutant must still BUILD, or S2 would be passing because objdump found
+# nothing rather than because the guard went away.
+ck "the mutant built at all"                    yes \
+   "$([ -s "$T/b4/probe1/probe1.elf" ] && echo yes || echo no)"
 
 echo
 echo "=== R1 / R2: the result block is addressed through KSEG1, and the knob reaches it ==="
@@ -350,6 +421,140 @@ ck "and drops rfe, so H2 measures the knob" no \
    "$(printf '%s\n' "$d3" | grep -q '42000010' && echo yes || echo no)"
 
 echo
+echo "=== H4: rlx_do_break loads a0 before its break ==="
+# THE one instruction in the tree guaranteed by design to fault, and until
+# 2026-08-25 the one without the guard. Without it, `break` on the failure
+# branch reaches do_reserved with $a0 = 0 (rlx_puts always returns 0), whose
+# `lw a3,148(v0)` at 0x80400C00 is a kuseg load through an uninitialised TLB --
+# four bytes before its first prom_printf. The promised `Undefined Exception
+# happen.` was measured to be complete silence.
+body="$($OBJDUMP -d -m mips:3000 "$B/probe2/probe2.elf" | sed -n '/<rlx_do_break>:/,/^$/p')"
+ck "a0 is loaded before the break"       1 \
+   "$(printf '%s\n' "$body" | sed -n '1,/break/p' | grep -c 'lui.*a0,0x')"
+ck "and the break is still there"        1 "$(printf '%s\n' "$body" | grep -c '	break')"
+FF="$($NM "$B/probe2/probe2.elf" | awk '$3=="rlx_fault_frame"{print $1}')"
+BE="$($NM "$B/probe2/probe2.elf" | awk '$3=="_bss_end"{print $1}')"
+ck "probe2: the frame has room for offset 148" yes \
+   "$([ -n "$FF" ] && [ $(( 0x${FF:-0} + 152 )) -le $(( 0x${BE:-0} )) ] && echo yes || echo no)"
+
+echo
+echo "=== C1 / C2: a device probe2 does not write CP0 Status ANYWHERE ==="
+# probe1 cell 4 measured on 2026-08-25 that Status.IsC does not isolate on this
+# core: rlx_isc_inv's `sb $0` byte stores reached DRAM and corrupted both
+# victims. So probe2 must not touch Status -- and "must not" is a claim until
+# something reads the emitted words. `mtc0 rt,$12` is the only shape that can,
+# and the only routine in the tree that emits one is compiled out of a device
+# build together with its single call site.
+d2="$($OBJDUMP -d -m mips:3000 "$B/probe2/probe2.elf")"
+ck "writes to CP0 Status in a device build" 0 \
+   "$(printf '%s\n' "$d2" | grep -c 'mtc0.*c0_sr')"
+ck "and the CCTL writes are still there"    3 \
+   "$(printf '%s\n' "$d2" | grep -c 'mtc0.*\$20')"
+rm -rf "$T/b9"
+make -C "$RP" BUILD="$T/b9" P=probe2 payload CLEAR_BEV=1 >/dev/null 2>&1
+ck "a CLEAR_BEV build DOES write Status"  yes \
+   "$($OBJDUMP -d -m mips:3000 "$T/b9/probe2/probe2.elf" 2>/dev/null | grep -q 'mtc0.*c0_sr' && echo yes || echo no)"
+
+echo
+echo "=== C3 / C4 / C5: rlx_isc_inv is not linked into probe2, and cannot be ==="
+ck "probe2 does not link rlx_isc_inv"       0 \
+   "$($NM "$B/probe2/probe2.elf" | grep -c 'rlx_isc_inv')"
+ck "probe1 DOES, so C3 measures the gate"   1 \
+   "$($NM "$B/probe1/probe1.elf" | grep -c 'rlx_isc_inv')"
+# `override ISC := $(ISC_$(P))` in the Makefile. A command-line variable beats a
+# plain assignment; this is the case that says the override is really there.
+rm -rf "$T/b10"
+make -C "$RP" BUILD="$T/b10" P=probe2 payload ISC=1 >/dev/null 2>&1
+ck "ISC=1 on the command line changes nothing" 0 \
+   "$($NM "$T/b10/probe2/probe2.elf" 2>/dev/null | grep -c 'rlx_isc_inv')"
+
+echo
+echo "=== F1: make show's flags word is the constant the image carries ==="
+# probe2.c materialises FLAGS_W into its own code; the Makefile recomputes it
+# from the knobs. Two derivations, and this is where they have to agree -- a
+# number printed beside an image has to come from somewhere other than the image
+# or it is the image repeating itself.
+fl="$(make -C "$RP" --no-print-directory BUILD="$B" P=probe2 show 2>/dev/null \
+      | sed -n 's/^flags  *\([0-9a-f]*\) .*/\1/p' | head -1)"
+ck "make show prints a device build's flags" 50010002 "$fl"
+ck "and the image materialises its top half" yes \
+   "$(printf '%s\n' "$d2" | grep -q "0x${fl:0:4}" && echo yes || echo no)"
+
+echo
+echo "=== S3: every faulting instruction is guarded, or exempt with a reason ==="
+# S1 checks a LIST of routines. A list is only as good as whoever last added to
+# it, and the audit's Must-fix 1 exists because `break` was not on it. This
+# reads the emitted image instead: it finds every routine containing an
+# instruction that can fault and asks whether $a0 was made safe first. Anything
+# neither guarded nor on the exemption table below is a failure, so a NEW
+# routine tomorrow is caught by construction rather than by remembering.
+cat > "$T/guardscan.py" <<'PY'
+import re, sys
+payload = sys.argv[1]
+# Exempt, and every entry is an argument rather than a suppression.
+EXEMPT = {
+ ("probe1", "rlx_isc_inv"):
+   "entered with $a0 = the victim's address, already a real word-aligned KSEG0 "
+   "address; SAFE_A0 would destroy the argument the routine needs (cache.S)",
+ ("probe1", "rlx_r3k_size"):
+   "same argument, and GEOM=0 keeps it out of the image entirely",
+ ("probe2", "rlx_exc_entry"):
+   "it IS the handler -- a fault inside it cannot be caught by anything, and "
+   "its reads are CP0 13 and 14, which do_reserved itself reads",
+ ("probe2", "rlx_cp0_stubs"):
+   "entered through rlx_call0_primed with $a0 = the stub's own address, so the "
+   "property SAFE_A0 establishes already holds; and the handler that catches a "
+   "trap here was proved live by the `break` control before the census starts",
+}
+FAULTY = re.compile(r"\t(mfc0|mtc0|break|syscall|rfe)\b|\t\.word\t0x4[0-9a-f]{7}")
+GUARD = re.compile(r"\tlui\t.*a0,0x")
+cur, order, first, guard = None, [], {}, {}
+for line in sys.stdin:
+    m = re.match(r"^[0-9a-f]+ <([^>]+)>:", line)
+    if m:
+        cur = m.group(1)
+        order.append(cur)
+        continue
+    if cur is None:
+        continue
+    if cur not in first and GUARD.search(line):
+        guard[cur] = True
+    if cur not in first and FAULTY.search(line):
+        first[cur] = line.strip()
+bad = 0
+for fn in order:
+    if fn not in first:
+        continue
+    if guard.get(fn):
+        print("    guarded   %s" % fn)
+    elif (payload, fn) in EXEMPT:
+        print("    exempt    %-18s %s" % (fn, EXEMPT[(payload, fn)]))
+    else:
+        bad += 1
+        print("    UNGUARDED %-18s %s" % (fn, first[fn]))
+print("SCANNED=%d UNGUARDED=%d" % (len(first), bad))
+PY
+guardscan () { $OBJDUMP -d -m mips:3000 "$1" | "${PYTHON:-python3}" "$T/guardscan.py" "$2"; }
+for p in probe1 probe2; do
+    g="$(guardscan "$B/$p/$p.elf" "$p")"
+    printf '%s\n' "$g" | grep -E 'UNGUARDED [a-z]' | sed 's/^/  /'
+    ck "$p: unguarded faulting routines"  0 \
+       "$(printf '%s\n' "$g" | sed -n 's/^SCANNED=[0-9]* UNGUARDED=\([0-9]*\)$/\1/p')"
+    n="$(printf '%s\n' "$g" | sed -n 's/^SCANNED=\([0-9]*\) .*/\1/p')"
+    ck "$p: and it had routines to scan" yes "$([ "${n:-0}" -ge 5 ] && echo yes || echo no)"
+done
+
+echo
+echo "=== S4: the mutation -- the SAFE_A0-less build must make S3 fail ==="
+rm -rf "$T/b11"
+make -C "$T/mut" BUILD="$T/b11" P=probe2 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
+g="$(guardscan "$T/b11/probe2/probe2.elf" probe2)"
+mb="$(printf '%s\n' "$g" | sed -n 's/^SCANNED=[0-9]* UNGUARDED=\([0-9]*\)$/\1/p')"
+ck "the mutant has unguarded routines"  yes "$([ "${mb:-0}" -ge 5 ] && echo yes || echo no)"
+ck "and rlx_do_break is one of them"      1 \
+   "$(printf '%s\n' "$g" | grep -c 'UNGUARDED rlx_do_break')"
+
+echo
 echo "=== D1 / D2: the build says out loud when it is not a device build ==="
 # Three constants exist only because qemu has no MIPS-I core, and every one of
 # them would produce an image that looks right and installs a handler the device
@@ -400,9 +605,136 @@ if command -v qemu-system-mips >/dev/null 2>&1; then
     # device is expected to say. If it came back STALE the harness would be
     # broken, not the emulator interesting.
     ck "qemu says cell 1 is FRESH (vd=02), as it must" 1 \
-       "$(grep -c 't=43010000 .*vd=00000002' "$T/q-probe1.txt" 2>/dev/null || echo 0)"
+       "$(grep -c 't=43010000 .*vd=00000002' "$T/q-probe1.txt" 2>/dev/null | head -1)"
+
+    # Q3. qemu's 24Kf HAS a running Count, so the two-pass census must see rd 9
+    # sel 0 change between its two reads. This is the positive control on
+    # S_MOVES, on a machine where a moving register is known to exist -- and it
+    # is the state that answers F50b on the device without going through
+    # rlx_count_delta's arithmetic at all.
+    ck "census row 0x48 is S_MOVES under qemu" 1 \
+       "$(grep -c '^rlxprobe: cp0 00000048 .* 00000004' "$T/q-probe2.txt" 2>/dev/null | head -1)"
+    ck "and count.row48 agrees with the row"   1 \
+       "$(grep -c '^rlxprobe: count.row48=00000004' "$T/q-probe2.txt" 2>/dev/null | head -1)"
+    # The arithmetic on the census: every row lands in exactly one state.
+    tot=0
+    for f in traps values zeros nowrite moves mixed; do
+        v="$(sed -n "s/^rlxprobe: $f=\([0-9a-f]*\).*/\1/p" "$T/q-probe2.txt" 2>/dev/null | head -1)"
+        tot=$(( tot + 0x${v:-0} ))
+    done
+    ck "the six state counts sum to 256 rows" 256 "$tot"
+
+    echo
+    echo "=== M1 / M2 / M3 / M5: one mutation per Must-fix, run under qemu ==="
+    # Each mutant is a full copy of the tree with ONE change, built for qemu and
+    # run. They go in parallel because each is a fresh directory and qemu never
+    # halts by itself, so the wall clock is one timeout rather than four.
+    mkmut () {                       # mkmut <name> -> prints the tree root
+        md="$T/mut-$1"; mkdir -p "$md/src"
+        cp "$RP"/*.c "$RP"/*.h "$RP"/*.S "$RP"/Makefile "$RP"/rlxprobe.lds \
+           "$RP"/qemu-run.sh "$md/src/"
+        ln -sf "$HERE/hazlint" "$md/hazlint"     # the Makefile looks at $(HERE)../hazlint
+        echo "$md"
+    }
+    patch_mut () {                   # patch_mut <file> <python on stdin>
+        "${PYTHON:-python3}" - "$1"
+    }
+
+    m1="$(mkmut m1)"; m2="$(mkmut m2)"; m3="$(mkmut m3)"; m5="$(mkmut m5)"
+
+    # M1 -- Must-fix 4. One census stub emits `nop`, so nothing writes its
+    # destination. That row MUST come back S_NOWRITE. qemu cannot produce that
+    # state on its own: its `mfc0` always writes `rt`, so without this mutation
+    # the whole prime mechanism is untested by the harness.
+    patch_mut "$m1/src/exc.S" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\t.macro\tCP0STUB rd, sel\n\t.word\t0x40020000 | (\\rd << 11) | \\sel\n"
+new = ("\t.macro\tCP0STUB rd, sel\n\t.if (\\rd == 0) && (\\sel == 0)\n\tnop\n"
+       "\t.else\n\t.word\t0x40020000 | (\\rd << 11) | \\sel\n\t.endif\n")
+assert old in s, "CP0STUB macro not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+    # M2 -- Must-fix 2. The install stores land somewhere else, so the read-back
+    # must catch it, the payload must REFUSE, and `break` must never run. That
+    # branch used to be a hang costing one power cycle.
+    patch_mut "$m2/src/probe2.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = ("\t\twr_unc(VEC_UTLB + i * 4u, rlx_exc_entry[i]);\n"
+       "\t\twr_unc(VEC_GENERAL + i * 4u, rlx_exc_entry[i]);\n")
+new = ("\t\twr_unc(0x80B00000u + i * 4u, rlx_exc_entry[i]);\n"
+       "\t\twr_unc(0x80B00100u + i * 4u, rlx_exc_entry[i]);\n")
+assert old in s, "install store loop not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+    # M3 -- the restore. Remove the final copy_vec_back() and BOTH legs must
+    # fire: the words no longer match the saved copy, and they still hold ours.
+    patch_mut "$m3/src/probe2.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\tcopy_vec_back();\n\n\t/* Prove the restore"
+new = "\t/* MUTANT: copy_vec_back() removed. Prove the restore"
+assert old in s, "the final copy_vec_back was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+    # M5 -- the control ON the control. Save the handler's own words as the
+    # "previous" vector contents, so the install changes nothing and the
+    # read-back cannot fail. The payload must SAY the check was vacuous.
+    patch_mut "$m5/src/probe2.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+# The saved copy becomes the handler itself, so the install changes nothing and
+# the read-back cannot fail. A block-scope `extern` because the file's own
+# declaration of rlx_exc_entry comes after this function.
+old = ("\tfor (i = 0; i < VEC_WORDS; i++) {\n"
+       "\t\tsaved_vec[i] = rd_unc(VEC_UTLB + i * 4u);\n"
+       "\t\tsaved_vec[i + VEC_WORDS] = rd_unc(VEC_GENERAL + i * 4u);\n"
+       "\t}\n")
+new = ("\textern u32 rlx_exc_entry[];\n"
+       "\tfor (i = 0; i < VEC_WORDS; i++) {\n"
+       "\t\tsaved_vec[i] = rlx_exc_entry[i];\n"
+       "\t\tsaved_vec[i + VEC_WORDS] = rlx_exc_entry[i];\n"
+       "\t}\n")
+assert old in s, "copy_vec_out body not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+
+    for m in "$m1" "$m2" "$m3" "$m5"; do
+        ( QEMU_OUT="$m/out" QEMU_SECONDS=14 bash "$m/src/qemu-run.sh" probe2 \
+              >"$m/run.log" 2>&1 ) &
+    done
+    wait
+
+    ck "M1: the nopped stub reads S_NOWRITE"  1 \
+       "$(grep -c '^rlxprobe: cp0 00000000 c0de0000 d1ce0000 00000003' "$m1/out.txt" 2>/dev/null | head -1)"
+    ck "M1: and the baseline row 0 was NOT"   0 \
+       "$(grep -c '^rlxprobe: cp0 00000000 c0de0000 d1ce0000 00000003' "$T/q-probe2.txt" 2>/dev/null | head -1)"
+    ck "M2: install.bad is non-zero"        yes \
+       "$(grep -q '^rlxprobe: install.bad=00000000' "$m2/out.txt" 2>/dev/null && echo no || echo yes)"
+    ck "M2: it refuses instead of breaking"   1 \
+       "$(grep -c 'the handler is NOT at the vector' "$m2/out.txt" 2>/dev/null | head -1)"
+    ck "M2: and break.count never appears"    0 \
+       "$(grep -c 'break.count' "$m2/out.txt" 2>/dev/null | head -1)"
+    ck "M2: but it still reaches its end marker" 1 \
+       "$(grep -c 'rlxprobe: end' "$m2/out.txt" 2>/dev/null | head -1)"
+    ck "M3: restore.mismatch fires"         yes \
+       "$(grep -q '^rlxprobe: restore.mismatch=00000000' "$m3/out.txt" 2>/dev/null && echo no || echo yes)"
+    ck "M3: restore.stillhandler fires"     yes \
+       "$(grep -q '^rlxprobe: restore.stillhandler=00000000' "$m3/out.txt" 2>/dev/null && echo no || echo yes)"
+    ck "M3: and the baseline had both at 0"   2 \
+       "$(grep -c -E '^rlxprobe: restore.(mismatch|stillhandler)=00000000' "$T/q-probe2.txt" 2>/dev/null | head -1)"
+    ck "M5: the vacuous read-back is announced" 1 \
+       "$(grep -c 'install.changed=0 -- the vector' "$m5/out.txt" 2>/dev/null | head -1)"
+    ck "M5: and the baseline says nothing"      0 \
+       "$(grep -c 'install.changed=0 -- the vector' "$T/q-probe2.txt" 2>/dev/null | head -1)"
 else
     sk "qemu" "no qemu-system-mips on this machine"
+    sk "the four Must-fix mutations" "they run under qemu"
 fi
 
 echo

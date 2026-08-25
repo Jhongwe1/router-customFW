@@ -54,11 +54,6 @@ RESET      ?= 1
 RESULT_BASE?= 0x80A00000
 GEOM       ?= 0
 GEOM_BASE  ?= 0x80B00000
-# probe2 only. 0 = the vendor bootcode's own D-then-I through CCTL, which is
-# what probe1 measures; 1 = the Status.IsC/SwC path c-r3k.c uses. The default
-# is a choice this build makes on probe1's behalf and probe1 is what settles
-# it -- so it is a knob and not a constant.
-FLUSH_ISC  ?= 0
 # The 16550. These are the DEVICE's addresses and nothing but qemu-run.sh ever
 # overrides them -- see rlxdefs.h. On this part the registers are four bytes
 # apart, so LSR is THR + 0x14 and not THR + 5.
@@ -72,6 +67,26 @@ VEC_GENERAL?= 0x80000080
 CLEAR_BEV  ?= 0
 # qemu only: return from the handler with `eret` instead of the R3000 `jr`+`rfe`.
 RET_ERET   ?= 0
+
+# Whether cache.S's `rlx_isc_inv` -- the Status.IsC/SwC path -- is LINKED AT ALL.
+# Per payload, and `override` below, and that is the point rather than tidiness.
+#
+# `FLUSH_ISC` used to be an ordinary knob here. Two things happened on
+# 2026-08-25. `docs/rlxprobe-audit-2026-08-25.md` Must-fix 3 found that the two
+# probe2 images it produced were indistinguishable on every channel -- no header
+# word, no `field()`, no banner, absent from `make show`, same `rb=`, command
+# lines four characters apart. Then probe1 cell 4 MEASURED that this core does
+# not isolate and that those byte stores reach DRAM (`07` CORRUPT on both
+# victims, top byte of each word at stride 4). So the conclusion was not "stamp
+# the knob" but "the knob should stop existing".
+#
+# ISC_probe1 is 1 because probe1 cell 4 IS that measurement and its result is a
+# finding (CPU-35). Everything else is 0, and `make P=probe2 ISC=1` cannot
+# change it -- a command-line variable beats a plain assignment, which is
+# exactly what `override` is for.
+ISC_probe0 := 0
+ISC_probe1 := 1
+ISC_probe2 := 0
 
 HERE       := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 HAZLINT    := $(HERE)../hazlint
@@ -91,7 +106,7 @@ ARCH        = -march=mips1 -mabi=32 -msoft-float -EB -G0 -mno-abicalls -fno-pic
 
 DEFS        = -DRLX_RESET=$(RESET) -DRLX_GEOM=$(GEOM) \
               -DRLX_RESULT_BASE=$(RESULT_BASE)u -DRLX_GEOM_BASE=$(GEOM_BASE)u \
-              -DRLX_FLUSH_ISC=$(FLUSH_ISC) \
+              -DRLX_ISC=$(ISC) \
               -DRLX_UART_THR=$(UART_THR) -DRLX_UART_LSR=$(UART_LSR) \
               -DRLX_VEC_UTLB=$(VEC_UTLB) -DRLX_VEC_GENERAL=$(VEC_GENERAL) \
               -DRLX_CLEAR_BEV=$(CLEAR_BEV) -DRLX_RET_ERET=$(RET_ERET)
@@ -119,6 +134,7 @@ LDFLAGS     = $(ARCH) -nostdlib -nostartfiles -static \
 # not justify an $(eval) template, and a template is exactly the kind of
 # indirection that hides which flags reached which object.
 P          ?= probe0
+override ISC := $(ISC_$(P))
 SRC_probe0 := start.S uart.S report.c probe0.c
 SRC_probe1 := start.S uart.S report.c cache.S victims.S probe1.c
 SRC_probe2 := start.S uart.S report.c cache.S exc.S probe2.c
@@ -128,11 +144,25 @@ SRC        := $(SRC_$(P))
 # returns probe1's header and ten of its thirteen rows, stopping before the seal
 # -- the one word that separates a completed run from a truncated one.
 #
+# probe2 went 537 -> 809 on 2026-08-25, when the census gained its second pass:
+# 40 header words, 256 rows of three (two primed reads and a state word), and
+# the seal.
+#
 # These mirror RB_WORDS in the payload sources and `tools/test-rlxprobe.sh` is
 # what keeps them honest; it recomputes both from the C and fails if they drift.
 RB_WORDS_probe0 := 0
 RB_WORDS_probe1 := 137
-RB_WORDS_probe2 := 537
+RB_WORDS_probe2 := 809
+
+# probe2's build stamp, recomputed here from the same bit positions probe2.c's
+# FLAGS_W uses. It is a SECOND copy of that arithmetic on purpose: the payload
+# materialises the constant into its own code, `show` computes it from the
+# knobs, and `tools/test-rlxprobe.sh` F1 asserts the two agree by finding the
+# top half in the disassembly. A number printed beside an image has to have been
+# derived independently of it, or it is the image repeating itself.
+FLAGS_HEX   = $(shell printf '%08x' $$(( 0x50000000 | 0x0002 \
+                | ($(RESET) << 16) | ($(CLEAR_BEV) << 17) \
+                | ($(RET_ERET) << 18) | ($(ISC) << 19) | ($(GEOM) << 20) )))
 
 OBJDIR     := $(BUILD)/$(P)
 OBJS       := $(patsubst %.S,$(OBJDIR)/%.o,$(filter %.S,$(SRC))) \
@@ -167,8 +197,18 @@ $(OBJDIR):
 # Evaluated at parse time rather than as a FORCE-driven phony target, so that
 # `.flags` stays an ordinary file prerequisite and `make -n` still reports
 # honestly about what would rebuild.
-$(shell mkdir -p $(OBJDIR); echo '$(DEFS)' | cmp -s - $(OBJDIR)/.flags \
-        || echo '$(DEFS)' > $(OBJDIR)/.flags)
+# LOADADDR and STACK_SIZE are in the stamp although neither reaches a -D. They
+# reach the LINKER, through --defsym, and nothing downstream of $(OBJS) depends
+# on them -- so `make LOADADDR=0x81000000` in a directory that already held a
+# 0x80500000 build relinked nothing and left an image for the wrong address with
+# `show` printing the address that had been asked for beside it. That is the
+# same defect class as the RESULT_BASE one measured on 2026-08-25, in the one
+# knob whose drift ships an image linked somewhere the loader will not jump.
+# `docs/rlxprobe-audit-2026-08-25.md` parked it with the suite work; this is the
+# suite work. Objects rebuild too, which is wasteful and correct.
+$(shell mkdir -p $(OBJDIR); echo '$(DEFS) LOADADDR=$(LOADADDR) STACK_SIZE=$(STACK_SIZE)' \
+        | cmp -s - $(OBJDIR)/.flags \
+        || echo '$(DEFS) LOADADDR=$(LOADADDR) STACK_SIZE=$(STACK_SIZE)' > $(OBJDIR)/.flags)
 
 $(OBJDIR)/%.o: $(HERE)%.S $(HERE)rlxdefs.h $(OBJDIR)/.flags | $(OBJDIR)
 	$(CC) $(ASFLAGS) -c -o $@ $<
@@ -250,6 +290,11 @@ show: $(BIN)
 	@printf 'first word %s   (must be the first instruction of _start)\n' \
 	        "$$($(OBJDUMP) -d $(ELF) | sed -n 's/^ *$(patsubst 0x%,%,$(LOADADDR)):\t\([0-9a-f]*\).*/\1/p' | head -1)"
 	@echo 'reset      RESET=$(RESET)   1 = arm the watchdog and hand the prompt back with no power cycle'
+ifeq ($(P),probe2)
+	@echo 'flags      $(FLAGS_HEX)   probe2 header word 5, and the banner prints it'
+	@echo 'flush      CCTL 0x002 -- measured sufficient, R1d decision 1. Not a knob'
+	@echo 'isc        ISC=$(ISC)   1 = rlx_isc_inv is linked. probe2 must be 0'
+endif
 ifneq ($(filter $(P),probe1 probe2),)
 	@echo 'result     RESULT_BASE=$(RESULT_BASE)   read it back with: DW $(patsubst 0x%,%,$(RESULT_BASE)) $(RB_WORDS_$(P))'
 	@printf 'victims    %s .. %s\n' \
