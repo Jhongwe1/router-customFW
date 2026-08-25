@@ -442,7 +442,7 @@ checked before the board is, and each check has an expected output.
 | **P0** | `/usr/bin/python3 -c 'import serial; print(serial.__version__)'` | `3.5` | 🔴 **Measured 2026-08-24: the command this sheet names does not run in a fresh login shell.** `python3` on this host resolves to `~/.venvs/thermal/bin/python3`, which has **no** `serial` module; the apt package `python3-serial` is installed for `/usr/bin/python3`. So `python3 upstream/tools/console-dump.py …` fails with `ModuleNotFoundError` depending on invisible shell state. **Every command in this file uses `/usr/bin/python3` explicitly** |
 | **P1** | `usbipd list` on Windows, then `usbipd attach --wsl --busid <id>` for `10c4:ea60` | `/dev/ttyUSB0` exists in WSL, group `dialout` | the CP2102 is `COM3` on the Windows side and is **not** in WSL until it is attached. It is in usbipd's persisted list, so it has been bound before |
 | **P2** 🔄 | `bash tools/test-console-capture.sh` | **`25 passed, 0 failed`** *(7 when this row was written; 10 with `--esc-after`'s `P3`/`N6`; 13 with the 128-byte cliff; **25 since `console-capture.py` 1.2**)* | the timing instrument `D1` and `D4` depend on. **14 of the 24 cases are controls that must fail**; three of the original seven **did** fail on first run, which is why they are trusted. 🔴 **This row has now been stale twice** — `6c6c3b5` took the suite 7→10 and left it reading 7, and 1.2 took it 13→24 — so the number is quoted here and nowhere else, and a mismatch is the gate failing, not a rounding error. The 1.2 additions: `P5`/`N9` (an ESC loop ends on a CR / `--no-cr` turns it off), `P6` (the CR lands *between* the ESC and the command), `P7` (no ESC loop ⇒ no extra CR), `N10` (the CR write removed from a copy of the tool ⇒ `P5` must fail), `P8`/`N11` (**the `--esc`-with-no-`--send` shape, which is `A-catch`**, and the mutant that would have skipped it), `P9`/`N12`/`N13` (the settle observed in both directions, and a `PROMPT` that cannot match), `N14` (a `--seconds` that leaves no settle budget records `prompt_seen` **null**, never `false`), `P10` (**Ctrl-C inside an ESC loop still writes the terminator**). 🔴 **`P8`/`N11`, `P9`/`N12`/`N13`, `N14` and `P10` all came out of the adversarial review of 1.2 itself, and every one of them killed a mutant the first eighteen cases had let through** |
-| **P3** 🔄 | *(R0 only)* `ip -brief addr` in WSL, then **`sudo ip link set <if> up`** and **`sudo ip addr replace 10.1.1.2/24 dev <if>`** | an interface that is **not** `eth0`, and after bringing it up `ethtool <if>` reads **`Link detected: yes`** | 🔴 **2026-08-24: bringing it up is part of the check, not a later step.** `ethtool`'s `Link detected` reports the **netdev**, not the wire — on an admin-down interface it reads `no` whatever is plugged in, and `/sys/.../carrier` returns `Invalid argument` rather than the documented `1`. The board's `PSRP` register is the independent second source and it disagreed with `ethtool` for six minutes before the cause was found. **Without this the `§G` transfer fails on the host side and reads as a board fault.** | `eth0` is WSL2's NAT'd vNIC (`172.18.x`). **A TFTP reply comes from a different source port than the request went to**, and WinNAT has no conntrack helper for that, so a transfer through the NAT can hang with the board innocent. The USB GbE adapter is in usbipd's persisted list; attach it, or run `loader-tftp.py` from Windows' own Python (3.10.7, pyserial 3.5, both present) |
+| **P3** 🔄 | *(R0 only)* `ip -brief addr` in WSL, then **`sudo ip link set <if> up`** and **`sudo ip addr replace 10.1.1.2/24 dev <if>`** | an interface that is **not** `eth0`, and after bringing it up `ethtool <if>` reads **`Link detected: yes`** | 🔴 **2026-08-24: bringing it up is part of the check, not a later step.** `ethtool`'s `Link detected` reports the **netdev**, not the wire — on an admin-down interface it reads `no` whatever is plugged in, and `/sys/.../carrier` returns `Invalid argument` rather than the documented `1`. The board's `PSRP` register is the independent second source and it disagreed with `ethtool` for six minutes before the cause was found. **Without this the `§G` transfer fails on the host side and reads as a board fault.** `eth0` is WSL2's NAT'd vNIC (`172.18.x`). **A TFTP reply comes from a different source port than the request went to**, and WinNAT has no conntrack helper for that, so a transfer through the NAT can hang with the board innocent. The USB GbE adapter is in usbipd's persisted list; attach it, or run `loader-tftp.py` from Windows' own Python (3.10.7, pyserial 3.5, both present) |
 | **P4** | *(R0 only)* `sha256sum $FWRE_WORK/rebuild/r0-vendor-kernel.bin` | `396561a0565f8cf62ffd7df6b4105ae3943337ada0fdedc109eb586445a03e90` | the payload, cut from the dump at the desk. **987,138 bytes** = `0x0F1002`, the length in the image's own header |
 
 ### How seating 2 was actually driven, and the two rules that came out of it
@@ -811,7 +811,9 @@ of both vectors rather than 32 + 8.
 `trap_init`'s copy landed and it is a RAM-to-RAM identity — a property of the
 boot, already 量 on 2026-08-25 and re-derived identically every boot. `H0a3`
 (`DW A0000080 32`) is about the D-cache being coherent for this page, which
-`H1` settled as a property of the core (write-through). Both are class (a)/(b);
+`H1` settled as a property of the core — 🔄 **and the narrower form is the one
+that holds: a cached store to a line the D-cache does not hold reaches memory
+unaided (2026-08-26).** Both are class (a)/(b);
 `H0c` is class (c) and that is the whole distinction.
 
 #### Block 1 — the upload and the run
@@ -1411,11 +1413,31 @@ on a planted line.
 code. §H1 wrote that down before the seating: *a device run that looks like the
 qemu run is the run that refutes the experiment*.
 
-### `ma` on cell 1 against cell 5: the D-cache is write-through
+### `ma` on cell 1 against cell 5: a cached store reaches memory unaided
+
+🔄 **This section was headed *"the D-cache is write-through"* until 2026-08-26.
+The reading below is unchanged; what it licenses is narrower than the old
+heading said.**
 
 Both read **`240222b2`** — row 1 of §H1's four-way table. The cached store
-reached memory with no treatment applied, so **the only stale thing on this core
-is the I-cache**.
+reached memory with no treatment applied, so **the only stale thing this seating
+found on this core is the I-cache**.
+
+> 🔴 **What the pair cannot separate, 2026-08-26.** In **both** cells the store
+> landed on a word that had been **executed and never loaded** — a D-cache
+> **miss**. Under a miss, *write-through* and *write-back that does not allocate
+> on a write miss* produce the identical `ma`, and §H1's four-way table above has
+> no row for the second because it was written as a two-way question.
+> `notes/cache-model.md` carried the disjunction from day one and every
+> restatement dropped it. **And both GPL drops' `boards/rtl8196e` configs carry
+> `CONFIG_ARCH_CACHE_WBC=y`** — write-back; one vote, not two, since the drops
+> share an ancestor.
+>
+> **The consequence is a decision, not a nuance.** A descriptor ring is *load the
+> status word, then store the ownership bit* — **a write hit on a resident
+> line**, which no cell here exercised. So `R1-gate`'s decision ② is unanswered
+> in **both** directions. The cell that decides this one is `R1h`'s **cell E**:
+> store to a line the CPU has just loaded, then read it back uncached.
 
 🔴 **What that cancels.** `docs/rlxprobe-audit-2026-08-25.md` §5 carried
 `V_NOSTORE` conflating two physically different states, and its consequence: in
@@ -1427,8 +1449,10 @@ table the audit put in the sheet rather than a verdict it put in the binary.**
 
 ### `CCTL 0x002` alone is sufficient; the vendor's D-then-I is unnecessary, not wrong
 
-Cells 2, 3 and 6 all FRESH, guards intact. With the D-cache write-through there
-is nothing for `0x200` to flush. `PROGRESS.md` `R1g-1` wrote the entitled wording
+Cells 2, 3 and 6 all FRESH, guards intact. **For the store these cells make**
+there is nothing for `0x200` to write back — 🔄 **and *for the store these cells
+make* is the narrowing added 2026-08-26**: all six stores are D-cache misses, so
+this says nothing about a store that hits a resident line. `PROGRESS.md` `R1g-1` wrote the entitled wording
 before the payload existed — *"a write-through D-cache makes 2 and 3 agree, so
 the vendor's D-then-I sequence would be **unnecessary rather than wrong** — a
 result, and it has to be written as one"* — and this is that result.

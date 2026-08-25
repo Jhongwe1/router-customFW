@@ -58,7 +58,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 | measure the ISA or a CPU hazard under Linux            | the kernel emulates `ll`/`sc` and the FPU, so you would measure the kernel. Bare metal only                                 |
 | commit the datasheet, a flash dump, or a vendor binary | one is someone else's property; the others identify one physical device                                                     |
 | open `$FWRE_WORK/disclosure/`                          | unsent vulnerability reports, mode 600                                                                                      |
-| write `RLX5281`                                        | until R1 measures it: "Lexra-family core (RLX4181 or RLX5281, undetermined)"                                                |
+| write `RLX5281`                                        | 🔄 **`R1-gate` closed 2026-08-26 and did not name it.** `PRId = 0x0000CD01` is **量**; no source maps that value onto a Lexra model number, so **`RLX4181` is unwritable too**. Write: "Lexra-family core (RLX4181 or RLX5281, undetermined)". What lifts it is a `PRId` assignment table, **not** another seating |
 
 ## Environment
 

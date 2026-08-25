@@ -12,6 +12,47 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R1-gate` closes, 2026-08-26 — and the write-up refuted two things the gate had
+been standing on.** `docs/rlx-cache-and-cp0.md` is the closing statement: the four
+downstream decisions, each with the reading that decided it, and what the gate did
+not prove. Desk only, no power, zero flash bytes.
+
+- **Three of the four decisions name a measurement. The fourth names none, and
+  that is written down rather than smoothed over.** Where the MTD driver flushes
+  (`CCTL 0x002`, **instruction side only**), where the exception handler can live
+  (`0x80000080`, `BEV = 0`, `break` trapped and returned), and whether the SoC
+  timer driver is a prerequisite (it is, `Count` is not implemented) are settled.
+  **Whether the Ethernet driver's descriptor rings need an uncached window is
+  not**, and it moves to a new gate with a payload, a DoD and a stop-loss rather
+  than staying an open row on a closed gate.
+- 🔴 **"The D-cache is write-through" was a reading the measurement does not
+  carry.** Both cells that established it stored to a line the D-cache did not
+  hold — a write **miss** — and under a miss, write-through and write-back
+  without write-allocate are indistinguishable. The vendor's own board config for
+  this SoC says write-back. **A descriptor ring is a write *hit***, so the CPU→
+  memory direction is not covered for the pattern the driver will actually use.
+- 🔴 **A refutation condition this project wrote for itself is met.** *"Refuted by
+  finding a `cache` instruction anywhere in vendor code that executes"* — the scan
+  that returned zero had only ever been run on the 56 KB loader. This unit's own
+  kernel carries **37 of them**, D side only, in one span, separated from 15 data
+  false positives by three independent properties. It does not make this a MIPS32
+  core (`Config.M = 0` is measured); it means there may be a working D-cache
+  invalidate here, which is exactly what the open decision needs.
+- **Four CCTL commands have names from a source that states them, and one command
+  had no row at all.** Found in `arch/rlx/mm/cache-rlx.c` — a directory the
+  earlier conclusion never listed, in a tree this repository already cited
+  elsewhere. `0x010` and `0x020` remain unnamed in every source, and the only
+  instrument that could name them is one this project declines to run on a
+  single-device budget.
+- 🔴 **`SPEC.md`'s cache row had been outside two of its checker's checks since
+  the day it was written.** One unescaped `|` gave it eight cells in a
+  seven-column table; every check reads cells by index, so they read the wrong
+  cell and passed, and the summary reported the row as *skipped*. `spec-check.py`
+  gains **C8** — cell count must equal the header's — and a ninth mutation that
+  re-creates that exact defect. Pointing the same scan at the rest of the
+  repository found two more, both of which had been mis-rendering tables since
+  they were written.
+
 **`R1g-4b`, at the bench, 2026-08-25 — `R1e` closes and `R1-gate` has only its
 write-up left.** One power cycle, 23 captures, zero flash bytes, and 16 of 16
 captures written after the block that predicted them.

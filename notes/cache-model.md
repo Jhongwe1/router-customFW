@@ -34,12 +34,32 @@ The kernel file is `c-r3k.c`, reached through `cpu_cache_init()` under
 cache file. **So the model is the R3000 one**, and CP0 register 20 is an
 addition on top of it, not a replacement for it.
 
+> 🔴 **Correction, 2026-08-26 — the paragraph above searched the wrong
+> directory, and the conclusion it drew is narrower than it reads.**
+> These trees carry **two** architecture directories, and this SoC builds
+> `arch/rlx/`, not `arch/mips/` — a fact this repository already relied on
+> elsewhere — **in two places, both written before this paragraph**: `SPEC.md`
+> `CPU-33` cites `arch/rlx/kernel/traps.c` as one of its three sources for the
+> exception vector, and `SOURCES.json`'s `openwrt-rtk` entry says in as many
+> words *"Carries arch/rlx (the Lexra kernel architecture port)"*.
+> **`arch/rlx/mm/cache-rlx.c` exists**: *"RLX specific mmu/cache
+> code"*, Realtek, Tony Wu, 2008-12-07. So *there is no Lexra-specific cache
+> file* is false; what is true is that `arch/mips/mm/` has none.
+>
+> **What survives**: the bootcode uses CP0 20 only, and `Config.M = 0` is 量, so
+> this is not a MIPS32-class CP0. **What does not**: the *"no `cache`
+> instruction"* half — see § *The refutation condition below is met*.
+> The paragraph is left as written rather than edited to look prescient.
+
 CP0 register 20 has no meaning in MIPS-I or MIPS32 (binutils prints it as
 `c0_xcontext`, which is the MIPS64 name and cannot be what this is). Lexra
 documents a CP0 register named CCTL "used to control the instruction and data
 memories", accessed with `mtc0`/`mfc0` variants — which is the shape observed.
-**Calling this register CCTL is inference from the Lexra documentation plus the
-observed behaviour, not something either source states.**
+~~**Calling this register CCTL is inference from the Lexra documentation plus the
+observed behaviour, not something either source states.**~~
+🔴 **2026-08-26: a source states it.** `arch/rlx/mm/cache-rlx.c` calls it
+`CCTL`, names four of its commands, and gives the `mtc0`/`mfc0` idiom for two
+core families. **The name is 讀 now, not 推** — see the table below.
 
 ## What is written to CP0 register 20
 
@@ -52,18 +72,70 @@ mtc0 $8, $20      nop  nop
 mtc0 $0, $20      nop
 ```
 
-| value | meaning | sources | status |
-|---:|---|---|---|
-| `0x001` | flush D-cache | `c-r3k.c` `r3k_flush_dcache_range()`, `CONFIG_RTL865XB` path | **one source** |
-| `0x002` | **invalidate I-cache** | `c-r3k.c` `r3k_flush_icache_range()`; `stage2` `0x804066e8` | **two sources, agree** |
-| `0x200` | flush D-cache (819x variant) | `c-r3k.c`, `CONFIG_RTL8652`/`CONFIG_RTL_819X` path; `stage2` `0x804066c0` | **two sources, agree** |
-| `0x202` | `0x200 \| 0x002` — both, in one write | `stage2` `0x804004f8`, boot init | inferred from the two above |
-| `0x010` | — | `stage2` `0x80400514`, boot init only | **undetermined** |
-| `0x020` | — | `stage2` `0x804004dc`, boot init only | **undetermined** |
+🔄 **Table rewritten 2026-08-26.** Four of the values have a **name from a
+source that states it** rather than a meaning inferred from where they are used,
+and one value has been added that this file had no row for. The naming source is
+`arch/rlx/mm/cache-rlx.c`, whose header comment reads, verbatim:
 
-The two undetermined rows have exactly one source each and no name in any
-source. They are recorded here rather than guessed at. R1e or a `devmem`-class
-read is what would settle them.
+```
+ *  CCTL OP
+ *   0x1   = DInval
+ *   0x2   = IInval
+ *   0x100 = DWB
+ *   0x200 = DWB_Inval
+```
+
+| value | name | meaning | where it is issued | status |
+|---:|---|---|---|---|
+| `0x001` | `DInval` | invalidate D-cache, no writeback | `c-r3k.c` `CONFIG_RTL865XB` path; **this unit's kernel `0x8000CA24`** | 🔄 **name 讀**; value in two files of one SDK |
+| `0x002` | `IInval` | **invalidate I-cache** | `c-r3k.c` `r3k_flush_icache_range()`; `stage2` `0x80406704`; **this unit's kernel `0x8000CB34`, `0x8000CB5C`, `0x8000CCA8`** | 🔴 **name 讀; effect 量** — `probe1` cells 2/3/6, `probe2`'s handler install |
+| `0x100` 🆕 | `DWB` | write back D-cache, no invalidate | **this unit's kernel `0x8000CA94`, `0x8000CAC0`** | 🆕 **name 讀.** New row 2026-08-26 — this file had never recorded the value |
+| `0x200` | `DWB_Inval` | write back **and** invalidate D-cache | `c-r3k.c` `CONFIG_RTL8652`/`CONFIG_RTL_819X`; `stage2` `0x804066CC`; **this unit's kernel `0x8000CB50`, `0x8000CBF4`, `0x8000CCE8`** | 🔄 name 讀. ⚠️ **The old row said "flush D-cache", which does not say whether it invalidates. It does** |
+| `0x202` | `DWB_Inval \| IInval` | both, in one write | `stage2` `0x804004F8`; **this unit's kernel `0x8000225C`** | composed of two named bits now, not inferred from two uses |
+| `0x010` | — | — | `stage2` `0x80400514`; **this unit's kernel `0x800022A8`** — both at reset init only | 🔴 **still undetermined, and no source names it** |
+| `0x020` | — | — | `stage2` `0x804004DC`; **this unit's kernel `0x80002240`** — both at reset init only | 🔴 **still undetermined, and no source names it** |
+
+⚠️ **`cache-rlx.c` and `c-r3k.c` are two files, not two independent sources.**
+Both live in the same GPL drops and both drops descend from the same Realtek
+SDK. What changed is that values which had **no name in any source** now have
+one; nothing here is a second vote on a value.
+
+🔴 **The two unnamed rows: what is new, and why the residual stays open.** They
+are no longer *"the bootcode does it once"*. **This unit's own kernel issues the
+same two commands, at reset, in the same order relative to `0x202`** — so two
+independent implementations on this one device treat them as part of the reset
+sequence. That is evidence about their **place**, not about their meaning.
+
+**And the instrument that would name them is one this project declines to run.**
+Writing an unnamed command to a cache controller on a one-device budget buys
+nothing any downstream decision needs: `R5b` needs `0x002`, and `R6` needs a
+D-side invalidate whose candidates (`0x001`, `0x200`, `cache 0x11`/`0x15`) all
+have names. Both codebases issue them with cold caches at reset; a payload would
+issue them at an arbitrary point, and what makes them safe there is not
+established. **The route that stays open is a document** — a Lexra CCTL
+bit-field description, or a third SDK generation that comments them. *(The old
+line here said "R1e or a `devmem`-class read is what would settle them". `R1e`
+ran and did not: the census reads CP0 20 and reading it returns zero, which
+`CPU-39` has now measured. **A read side that is always zero cannot name a write
+side.**)*
+
+### The `cache`-instruction encoding, from the same source
+
+The same header comment gives the `cache` op field encoding, and it is what the
+adjudication in § *The refutation condition below is met* matches against:
+
+```
+ *  CACHE OP
+ *   0x10 = IInval    0x11 = DInval    0x15 = DWBInval
+ *   0x19 = DWB       0x1b = DWB_IInval
+```
+
+**讀** `cache-rlx.c` defines the D-side ops for `RLX4181`, `RLX5181`, `RLX4281`
+and `RLX5281`, and the **I-side** ops for `RLX4281`/`RLX5281` only. This unit's
+kernel contains D-side ops and **zero I-side ops**, which is the shape the
+4181/5181 side of that split produces. ⚠️ **That is the build's belief about its
+own silicon, not a measurement of the silicon**, and it is one more name-free
+input to `CPU-04` rather than an answer.
 
 ## The order matters, and the vendor says why
 
@@ -121,13 +193,51 @@ words identical, `RUNSHEET.md` § Results B4). Six cells, twelve victims:
 | | measured | what it settles |
 |---|---|---|
 | **the I-cache is real and it goes stale** | cell 1 — cached store, **no treatment** — executed the OLD constant while memory already held the NEW one, `01` STALE on **both** victims of a pair 7 KiB apart | 🔴 **the negative control.** Without it every other cell would have passed untested. And it came back the **opposite** of qemu, which reports FRESH because TCG invalidates a translation block when a store lands on translated code |
-| **the D-cache is write-through** (or does not allocate on write) | cell 1 and cell 5 — the same store through the cached and the uncached window, both `T_NONE` — agree on `ma = 240222b2` | the cached store reached memory unaided, so **the only stale thing on this core is the I-cache**, and cells 2/3/4 are not contaminated by a dirty line |
-| **`CCTL 0x002` alone is sufficient** | cells 2, 3 and 6 all `02` FRESH, guards intact | with the D-cache write-through, **`0x200` has nothing to flush**. The vendor's D-then-I sequence is **unnecessary rather than wrong** on this die — and this file may not upgrade that to *wrong* |
+| 🔄 **a cached store to a line the D-cache does not hold reaches memory unaided** — *(this row read **"the D-cache is write-through** (or does not allocate on write)"* until 2026-08-26; see the correction below the table)* | cell 1 and cell 5 — the same store through the cached and the uncached window, both `T_NONE` — agree on `ma = 240222b2`, and `ma` is an **uncached** read-back | for these six cells, nothing dirty was left behind, so cells 2/3/4 are not contaminated by a dirty line. **It does not follow that no dirty line can exist on this core** |
+| **`CCTL 0x002` alone is sufficient** | cells 2, 3 and 6 all `02` FRESH, guards intact | **for the store these cells make**, `0x200` had nothing to write back, so the vendor's D-then-I sequence is **unnecessary rather than wrong** on this die — and this file may not upgrade that to *wrong*. 🔄 **Nor to *always unnecessary***: a store that hits a line the D-cache already holds is a case no cell here exercised |
 | 🔴 **`Status.IsC` does not isolate** | cell 4 `07` CORRUPT on both victims: `240222b2 → 000222b2`, guard `03e00008 → 00e00008` — **the top byte of every word, stride 4** | `rlx_isc_inv`'s `sb $0, 0($4)` walked real DRAM. The `Status.IsC`/`SwC` path is the one `c-r3k.c` uses and the one this unit's bootcode never touches, and **it is the broken one on this part.** qemu found the same failure one day earlier; the `V_CORRUPT` guard it produced is why the payload finished instead of jumping into the weeds |
+
+🔴 **Correction, 2026-08-26 — "the D-cache is write-through" was a reading of the
+measurement, and the measurement does not carry it.**
+
+Both cells stored to a word that had been **executed** and never **loaded**, so
+the store was a D-cache **miss** in both. Under those conditions a write-through
+cache and a **write-back cache that does not allocate on a write miss** produce
+the identical `ma`. The disjunction was in this file from the day it was written
+— *"(or does not allocate on write)"* — and **every restatement downstream
+dropped the second half**: `SPEC.md` `CPU-19`, `RUNSHEET.md` § Results B4,
+`PROGRESS.md` § Now. A parenthesis is not where a load-bearing alternative
+belongs.
+
+**And a source votes the other way.** **讀**: both GPL drops carry
+`boards/rtl8196e/config.linux-2.6.30.*` with **`CONFIG_ARCH_CACHE_WBC=y`** —
+*write-back cache* — in all five board variants of each. ⚠️ **One vote, not
+two**: the drops share an ancestor. But it is a vote on the question this file
+had recorded as settled.
+
+**Why it matters, and it is not academic.** The descriptor-ring access pattern is
+*load the status word, then store the ownership bit* — **a write hit on a
+resident line**. Under write-back-no-write-allocate that store stays dirty and a
+bus master never sees it, while `probe1`'s cells would have read exactly what
+they read. **So the CPU→memory direction is not covered for the pattern `R6`
+actually uses**, and that is one half of why decision ② is 未答. The other half
+is that nothing was measured in the memory→CPU direction at all.
+`docs/rlx-cache-and-cp0.md` § ② owns the decision and lists the cells that
+settle it; cell E — *store to a line the CPU has just loaded, then read it
+uncached* — is the one that decides this row.
 
 ⚠️ **What that fourth row measures is behaviour, not bits.** Stores issued while
 `IsC` was set reached memory. Whether the two `Status` bits are implemented at
-all, and whether `mtc0` wrote them, needs a `Status` read-back — `probe2`.
+all, and whether `mtc0` wrote them, needs a `Status` read-back — ~~`probe2`~~
+🔴 **and this is a residual whose named experiment ran without it.** `probe2`
+was built, by its own audit requirement, to contain **no `mtc0` to CP0 register
+12 anywhere**, so `R1g-4b` could not have answered it. Re-pointed at `R1h`.
+🆕 **讀, 2026-08-26**: nothing on this device sets `IsC` anyway. The loader never
+touches it, and in this unit's kernel the only two `mtc0 rt,$12` sites preceded
+within seven words by a `lui rX,0x1` — `0x8002AC08` and `0x801C0750` — both
+decode as the R3000 interrupt-disable idiom `mfc0 at,$12 · ori at,at,0x1f ·
+xori at,at,0x1f · mtc0 at,$12`, with bit 16 never set. ⚠️ Seven-word window, no
+dataflow: it would miss an `ISC` constant loaded from memory.
 
 **Still not established:**
 
@@ -217,11 +327,42 @@ execute them, rewrite them, execute again; the ones that come back FRESH were
 evicted. Sweeping N gives the size, sweeping S the line size, and the pattern
 gives the associativity. That is `probe3`, and it is desk work.
 
+🔴 **2026-08-26: two of these three numbers now have a source cut from this
+unit, and they are not equally strong.** Read out of the decompressed kernel
+above:
+
+```
+8000ca18  sltiu v0,a1,0x2001      8000caac  sltiu v1,v1,0x4000
+8000cbe0  sltiu v1,v1,0x4000      8000ccd4  sltiu v1,v1,0x4000
+```
+
+Those are the *"range too big — flush the whole cache instead"* thresholds, and
+in `cache-rlx.c` they are `cpu_dcache_size` and `cpu_dcache_size * 2`. **So this
+build declares a D-cache of `0x2000` = 8 KiB.** Independently, the `cache` op
+lattice is eight ops at stride `0x10` covering exactly 128 bytes — **a 16-byte
+line.**
+
+⚠️ **Two different strengths, and they must never be quoted as one.** The
+**16-byte line is readable from the binary alone**: eight ops per 128 bytes *is*
+a line-size assumption, whatever the source says. The **8 KiB needs
+`cache-rlx.c` to interpret the constant**, so it is one step weaker. And **the
+I-cache size is not readable by this route at all** — the I side has no per-line
+op in this build, so there is no threshold constant to read. It stays 留白 with
+no source of any kind.
+
+⚠️ **And none of it is 量.** A build constant is what the vendor's kernel
+*believes* about its own silicon. It agrees with the third-party
+`rtl8196e.dtsi` — which is worth something, because those two sources have no
+common ancestor on this point — but two beliefs agreeing is still not a
+measurement. **It is a prediction with a refutation condition, and it is only
+worth writing down because it is written before the walk that tests it.**
+
 | | prediction | refuted by |
 |---|---|---|
-| I-cache | **16 KiB** | 🔄 **a `probe3` eviction walk** (was: `probe1`'s `GEOM=1` walk, which cannot answer on this core) |
-| D-cache | **8 KiB** | the same |
-| line size, both | **16 bytes** | the same |
+| I-cache | **16 KiB** — 🔄 **still one source, and it is the third-party one.** Nothing cut from this unit says anything about the I-cache size | 🔄 **a `probe3` eviction walk** (was: `probe1`'s `GEOM=1` walk, which cannot answer on this core) |
+| D-cache | **8 KiB** — 🆕 **two sources with no common ancestor on this point**: the dtsi, and `0x4000` = `cpu_dcache_size * 2` in this unit's own kernel | the same |
+| line size, D | **16 bytes** — 🆕 **the strongest of the three**: readable from this unit's kernel binary without any source to interpret it, eight `cache` ops per 128 bytes | the same |
+| line size, I | **16 bytes** — 🔄 **one source.** Split out of the row above 2026-08-26: the I side of this build has no per-line op, so the binary says nothing about it | the same |
 | core | RLX4181 rather than RLX5281 | 🔴 **2026-08-25b: `PRId` row `0x78` read `0x0000CD01`, and it refutes nothing here — because no source in this repository maps that value onto either model number.** The prediction and its refutation condition were both about a name, and the measurement is a value. **What would settle it is a `PRId` assignment table, not another seating.** *(Original condition:)* `probe2`'s `PRId` row `0x78` reading in the 5281 range — which would be worth more than agreement, because it refutes a Realtek datasheet and two public kernel trees at once |
 
 🔴 **`GEOM=1` does not run in `RUNSHEET.md` § Session B4** — the build is
@@ -236,6 +377,60 @@ instruction (primary opcode `0x2F`) anywhere in vendor code that executes. The
 scan of `stage2.bin`'s code region found none; the one whole-file hit at
 `0x8040d264` decodes as `cache 0x0,786(zero)`, sits after a function epilogue
 and before zero padding, and is data (`notes/lwl-mystery.md`).
+
+## The refutation condition above is met — 2026-08-26
+
+🔴 **The scan that returned zero was run on the loader and on nothing else.**
+`stage2.bin` is 56,592 bytes of a 4 MiB device. Re-run on **this unit's own
+kernel**, decompressed from its own flash dump, it does not return zero.
+
+**讀, artefact A**, every step reproducible and hash-anchored:
+
+```sh
+K=$FWRE_WORK/rebuild/r0-vendor-kernel.bin     # 987,138 B, sha256 396561a0…45a03e90
+tail -c +10249 "$K" > kernel.lzma             # LZMA-alone stream at offset 0x2808
+python3 -c "import lzma,sys; sys.stdout.buffer.write(
+    lzma.LZMADecompressor(format=lzma.FORMAT_ALONE).decompress(
+        open('kernel.lzma','rb').read()))" > vmlinux.bin
+# 3,374,772 B, sha256 cf0d60a8ae54352e4d7d451b08a2f5551c80d8a34bf5cced19f3440dba610ec0
+# strings: Linux version 2.6.30.9 (admin@office.hopeiot) … #1526 Wed Jan 10 2018
+```
+
+The hash of the input is the one `RUNSHEET.md` `P4` already records for the image
+`R0` booted, so the chain of custody closes against a committed record rather
+than against a filename.
+
+**52 words in the image carry primary opcode `0x2F`, and they separate into two
+populations on three independent properties at once:**
+
+| | n | addresses | `op` field | base register | offset |
+|---|--:|---|---|---|---|
+| **code** | **37** | one span, `0x8000CA40` … `0x8000CD4C` | only `{0x11, 0x15, 0x19}` — `DInval`, `DWBInval`, `DWB` | only `{v0, a0}` | only `{0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70}` |
+| **data** | **15** | scattered, all ≥ `0x802BA660` | ten different values, most undefined | — | arbitrary 16-bit values (`0xffff`, `0xae52`, `0xac42`, …) |
+
+**Controls.** The VMA base is not assumed: with file offset = VMA − `0x80000000`,
+**18,068 of 31,145 `jal` targets land on a plausible function prologue
+(58.0 %)**, against **1.7 %, 3.0 %, 2.9 % and 0.2 %** for four deliberately
+wrong bases. And the same scanner over `stage2.bin` reproduces all five known
+CCTL sites **and** the single known data false positive at `0x8040D264` — it
+finds what is there and it still finds the thing that is not code.
+
+🔴 **What this changes.**
+
+- **Not** that this is a MIPS32 core. `Config.M = 0` is 量 and settles that.
+- The sentence. **The loader uses CCTL only; this unit's kernel uses CCTL for
+  whole-cache operations and `cache` ops for ranges, on the D side only.** There
+  are **zero** I-side ops (`0x10 IInval`) in the whole image; the I side always
+  goes through `CCTL 0x002`.
+- 🔴 **There may be a working D-cache invalidate on this part**, which is exactly
+  what decision ② needs and what nothing has tested on silicon.
+
+⚠️ **讀 is not 量, and *in the binary* is not *executes*.** These routines are
+reached from `_dma_cache_wback_inv`, which the Ethernet path calls per packet,
+and this unit routes packets — **that is an argument, not a reading.** The
+measurement is one `cache 0x11` in a payload under the handler `R1g-4b` proved
+works: it retires, or it takes a Reserved Instruction exception and says so.
+Either outcome is worth having and neither costs a power cycle.
 
 ## What R1d should do with this — 🔄 done 2026-08-25, and item 3 is what changed
 
@@ -253,8 +448,10 @@ and before zero padding, and is data (`notes/lwl-mystery.md`).
    `jal`**, which is the reading that let `probe1` run at all.
 2. Keep the CP0 20 `0x200` D-cache flush before it as the vendor does, because
    the vendor's own comment says the two caches can hold the same address.
-   🔄 **Downgraded from necessary to harmless.** The D-cache is write-through on
-   this part, so `0x200` has nothing to flush. Keeping it costs one instruction
+   🔄 **Downgraded from necessary to harmless** — 🔄 **and narrowed again on
+   2026-08-26.** For the store `probe1`'s cells make, `0x200` had nothing to write
+   back; it does **not** follow that it never does, because those stores were all
+   D-cache misses. Keeping it costs one instruction
    and stays defensible for a driver that may run on another die; **claiming it
    is required here would be wrong**, and so would claiming the vendor was.
    🔴 **And `probe2` DROPPED it on 2026-08-25, which is a decision this file

@@ -28,6 +28,20 @@ What it checks, and every one of them can fail:
   C6  redaction: the patterns in audit-bench-log.py are re-run over SPEC.md and
       every hit must be on the allowlist below, with a reason.  The allowlist
       is printed on every run
+  C7  a row that carries a value names at least one source.  This is NOT the
+      two-source rule; it is the weaker property that an established value says
+      where it came from
+  C8  every row has as many cells as its own table's header.  This is the check
+      that was missing on 2026-08-26, and the defect it would have caught had
+      been in the file since CPU-19 was written: an unescaped `|` inside a
+      backticked span (`Status.IsC|SwC`) gave that row eight cells in a
+      seven-column table.  Markdown renders it wrong, and every column after
+      the break shifts by one -- so C2 read the value cell as a mark, and C4/C5
+      read the SOURCE cell as the owner, found no path in it, and counted the
+      row as "owner is a gate rather than a file".  **The row was silently
+      exempt from two checks and the summary reported it as skipped, not as
+      broken.**  A check that quietly does not check is the failure this file
+      exists to catch, so it now has one of its own
 
 What it cannot do, stated so a clean result is not read as more than it is:
 
@@ -389,6 +403,28 @@ def check(path, quiet=False):
         if (lbl, got) not in REDACTION_ALLOWLIST:
             findings.append(('C6', f'{path}:{ln}: {lbl} matched {got!r} and it is not on the allowlist'))
     stats['redaction_hits'] = len(hits)
+
+    # ---- C8: a row has as many cells as its own header ----------------------
+    # Every other check reads a cell BY INDEX.  One unescaped `|` inside a cell
+    # shifts every index after it, and the checks downstream do not fail -- they
+    # read a different cell and pass on it.  So this one runs over every table
+    # in the file, not only the definition tables, because §17 is read by C3.
+    ragged = 0
+    for t in tables:
+        n = len(t['header'])
+        for lineno, cells in t['rows']:
+            if not cells:
+                continue
+            if len(cells) != n:
+                ragged += 1
+                findings.append((
+                    'C8',
+                    f'{path}:{lineno}: {cells[0][:24]!r} has {len(cells)} cell(s) and its header '
+                    f'has {n} -- the cell count does not match its header. An unescaped `|` inside '
+                    f'a cell shifts every column after it, and the checks that read V/N/來源/擁有者 '
+                    f'by index then read the wrong cell and pass'))
+    stats['ragged'] = ragged
+    stats['tables_all'] = len(tables)
     return findings, stats
 
 
@@ -406,6 +442,8 @@ def report(path, findings, stats):
     print(f"     skipped, owner is a gate or a note rather than a file: {stats['no_owner']} "
           f"({', '.join(stats['no_owner_ids'][:8])}{' …' if stats['no_owner'] > 8 else ''})")
     print(f"     owners under plan/ (gitignored, unverifiable in a clone): {stats['plan_owned']}")
+    print(f"  C8 cell counts checked against the header in {stats['tables_all']} table(s), "
+          f"including the ones outside §1–17: {stats['ragged']} ragged")
     print(f"  C6 redaction hits: {stats['redaction_hits']}, allowlist of {len(REDACTION_ALLOWLIST)}:")
     for (lbl, got), why in REDACTION_ALLOWLIST.items():
         print(f'       {got!r} ({lbl}) -- {why}')
@@ -482,6 +520,12 @@ MUTATIONS = [
      lambda s: s.replace('## 1. 身分', '## 1. 身分\n\n00:E0:4C:11:22:33\n', 1)),
     ('M8 empty the source column under a value', 'C7', 'names no source',
      lambda s: re.sub(r'^(\| `CPU-01` \|(?:[^\n|]*\|){4})[^\n|]*\|', r'\1 — |', s, count=1, flags=re.M)),
+    # M9 is not invented.  It re-creates the exact defect that was in this file
+    # from the day CPU-19 was written until 2026-08-26: the `|` inside
+    # `Status.IsC|SwC` was never escaped, so the row had eight cells in a
+    # seven-column table and C4/C5 read its SOURCE cell as its owner.
+    ('M9 un-escape a `|` inside a cell', 'C8', 'does not match its header',
+     lambda s: s.replace(r'`Status.IsC\|SwC`', '`Status.IsC|SwC`', 1)),
 ]
 
 

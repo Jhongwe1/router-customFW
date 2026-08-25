@@ -51,6 +51,8 @@
       "kind": "git",
       "url": "https://github.com/frederic/rtl819x-toolchain",
       "clone": "--depth 1",
+      "pin": "5c9be5d943318fdb4d048ae22078129594eb5a10",
+      "pin_note": "The commit this project actually read, recorded 2026-08-26. A --depth 1 clone of a moving branch is not a citable artefact; a quotation from a file needs the revision it was quoted from.",
       "dest": "src-vendor/rtl819x-toolchain",
       "approx_size": "~700 MB",
       "why": "The only public drop whose target board IS an RTL8196E (ALFA AIP-W512). Carries linux-2.6.30, busybox-1.13, users/, romfs/, boards/rtl8196eu/, and BOTH rsdk toolchains.",
@@ -70,10 +72,11 @@
       "kind": "git",
       "url": "https://github.com/jameshilliard/WECB-VZ-GPL",
       "clone": "--depth 1",
+      "pin": "adfad80b3144c788efb636d5acfcdd6ed91b3d79",
       "dest": "src-vendor/wecb-vz-gpl",
-      "why": "The only public source for the rtl819x BOOTLOADER (rtl819x/bootcode/). Needed to read what the loader does, and for R10c if a first-stage loader is ever attempted.",
+      "why": "The only public source for the rtl819x BOOTLOADER (rtl819x/bootcode/). Needed to read what the loader does, and for R10c if a first-stage loader is ever attempted. ALSO (2026-08-26): rtl819x/boards/rtl8196e/config.linux-2.6.30.* -- the vendor's own kernel config for THIS SoC, five board variants, all carrying ARCH_CACHE_WBC=y (write-back), ARCH_CPU_RLX4181=y, ARCH_CPU_ULS=y, and LLSC/SYNC not set. It is the second copy of the same Realtek SDK config as saturn49-wecb, so the two agree by descent and are ONE vote, not two.",
       "caveat": "A different bootcode generation from this unit's 2014.04.22 v1.3. Do not assume the command set matches — the device's own `?` output (upstream notes/uart-pinout.md) is authoritative.",
-      "needed_by": "R0 (reading), R10c (writing)",
+      "needed_by": "R0 (reading), R10c (writing), R1h (the write-back vote against probe1's reading)",
       "fetch": "now"
     },
     {
@@ -82,9 +85,10 @@
       "kind": "git",
       "url": "https://github.com/Saturn49/wecb",
       "clone": "--depth 1",
+      "pin": "40e21cb7c66880172910ae00c18663ed48e0123d",
       "dest": "src-vendor/saturn49-wecb",
-      "why": "rtl819x/users/boa/apmib/apmib.{c,h} — the MIB table the device's libapmib.so is a build of. Upstream already used it to give the recovered MIB table an outside witness (SUPER_NAME=180, USER_NAME=182).",
-      "needed_by": "R2b, R7b (config store schema), D8 (CVE-2024-21778 TLV parser)",
+      "why": "rtl819x/users/boa/apmib/apmib.{c,h} — the MIB table the device's libapmib.so is a build of. Upstream already used it to give the recovered MIB table an outside witness (SUPER_NAME=180, USER_NAME=182). ALSO (2026-08-26): rtl819x/linux-2.6.30/arch/rlx/mm/cache-rlx.c -- \"RLX specific mmu/cache code\", Realtek, Tony Wu, 2008-12-07. It is the ONLY source in this project that NAMES the CP0-20 (CCTL) commands (0x1 DInval, 0x2 IInval, 0x100 DWB, 0x200 DWB_Inval) and the cache-op field encoding (0x10/0x11/0x15/0x19/0x1b). Plus boards/rtl8196e/config.linux-2.6.30.* as above.",
+      "needed_by": "R2b, R7b (config store schema), D8 (CVE-2024-21778 TLV parser), R1-gate + R1h (CCTL command names; notes/cache-model.md)",
       "fetch": "now"
     },
     {

@@ -214,9 +214,12 @@
  * is that probe1 MEASURED which flush works, so there is one binary.
  *
  * `CCTL 0x002` alone, because that is what was measured: cells 2, 3 and 6 all
- * came back FRESH, the D-cache is write-through (cell 1 against cell 5 on the
- * `ma` column, both 240222b2), and the vendor's D-then-I is therefore
- * unnecessary rather than wrong. This payload's stores go through KSEG1 anyway,
+ * came back FRESH, a cached store to a line the D-cache does not hold reaches
+ * memory unaided (cell 1 against cell 5 on the `ma` column, both 240222b2), and
+ * the vendor's D-then-I is therefore unnecessary rather than wrong here.
+ * (This comment read "the D-cache is write-through" until 2026-08-26. Both of
+ * those cells store to a line the cache does not hold, so that is one reading of
+ * the measurement and not the only one -- notes/cache-model.md.) This payload's stores go through KSEG1 anyway,
  * so there is no dirty D-line for a D-flush to write out even in principle.
  *
  * The `Status.IsC` path is not an option any more, at any setting: probe1 cell

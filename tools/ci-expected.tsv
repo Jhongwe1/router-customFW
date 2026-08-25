@@ -5,8 +5,8 @@
 #   suite   bench_total   allowed_skip_label   covers   reason
 #
 # `bench_total` is the number of cases the suite prints WHEN EVERYTHING IT NEEDS
-# IS PRESENT -- measured on the bench machine 2026-08-25, not read off the
-# source. `covers` is how many cases that one skip LINE stands for, and it is
+# IS PRESENT -- measured on the bench machine, not read off the source.
+# `covers` is how many cases that one skip LINE stands for, and it is
 # the field that matters: on a stock runner `tools/test-hazlint.sh` prints eight
 # skip lines standing for twenty-five cases, and a census that counted lines
 # would have reported eight.
@@ -16,8 +16,13 @@
 # counts as not run. It is listed rather than omitted because a suite nobody
 # lists is a suite nobody misses.
 #
+# 2026-08-26: spec-check went 10 -> 11 when it gained C8 and a ninth mutation.
+# Caught by running ci-census against a fresh spec-check.out BEFORE the push --
+# the second time a number in this repository would have been contradicted by
+# the very next build (the first was ci.yml's own header, 2026-08-25).
+#
 # suite	bench_total	allowed_skip_label	covers	reason
-spec-check	10	-	0	-
+spec-check	11	-	0	-
 test-file-modes	3	-	0	-
 test-gitignore	15	src-vendor (symlink)	1	needs a filesystem that can make symlinks; MSYS/Git Bash cannot, and until 2026-08-25 that killed the whole suite under errexit on the machine the push happens from. CI runs on Linux, so this skip should NOT appear
 test-console-capture	29	-	0	-
