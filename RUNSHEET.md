@@ -669,9 +669,16 @@ carried no command at all.
 > result. `CLK-03` has had no experiment assigned to it; this is one, and it costs
 > nothing but reading a file that is written either way.
 >
-> `console-capture` 1.2 writes the CR that terminates an ESC loop itself
-> (`terminate_esc_line`), so a flush cell no longer *creates* the terminator — it
-> **checks** that one went out. **The other half of seating rule 2 is not covered
+> `terminate_esc_line` writes the CR that terminates an ESC loop itself, so a
+> flush cell no longer *creates* the terminator — it **checks** that one went out.
+> 🔄 **It arrived in 1.2 and the tool in this tree is `1.3`** — 量 2026-08-25
+> before power, `TOOL_VERSION = "1.3"`, bumped by `4f5331e` at 02:41 the same day,
+> which added `--esc-period` and the achieved-period metadata that `H3c` reads.
+> This box, `flush-h1b`'s row and `bench/2026-08-26/PREDICTIONS-b4-block0.md` all
+> said *1.2*; the sheet is corrected, the sealed prediction file is not, and
+> `bench/2026-08-25/PREDICTIONS-b4-block0.md` carries the corrected value with the
+> reason. **A stale version number in a sheet costs one failed prediction against
+> the instrument**, which is noise in the column that has to stay signal. **The other half of seating rule 2 is not covered
 > by the instrument and cannot be**: the first command after the console adapter
 > re-enumerates on the host is echoed and not acted on, signature *echo + prompt +
 > no data line*, and no capture can see an event that happened while it was not
@@ -807,7 +814,7 @@ make -C tools/rlxprobe P=probe1 show
 |---|---|---|---|
 | **H1a** 🔄 | **the two lines, not a cross-reference — and the shape is `§G`'s `G5`, not `G2`/`G4`'s.** `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o <dir>/H1-rescue.json`; then `DW 8040D4A0 1`; then `loader-tftp.py put --host 10.1.1.1 --image tools/rlxprobe/build/probe1/probe1.bin --rescue-report <dir>/H1-rescue.json --expect-load 80500000 --yes` | in the transcript, in this order: `AutoBurning=0`, `Set TFTP Load Addr 0x80500000`, `Now your Target IP is 10.1.1.1`; then word 1 = `00000000`. **If word 1 is not `00000000`, stop. Nothing is uploaded** | that this upload could reach flash — same control as `R0`'s, and read **before** the `put` as `G2` does it, because the word that matters is the one the burn path sees during the transfer. 🔴 **Why the literal lines, and it is the defect this row was:** `G2` carries `--load-addr 0x80A00000` and `G4` `--expect-load 80A00000`, which is `probe1`'s own `RESULT_BASE`. An image there plus `J 80500000` boots the vendor kernel the loader has already staged (`G1`) — loader gone, DRAM gone, one power cycle — and **`--expect-load` cannot catch it**, because `put` and `get` both serve `[0x8040D3A8]` and the flag is checked against the transcript. ⚠️ `--load-addr` is `int(s,0)`, so `0x80500000`; `--expect-load` is `int(s,16)`, so bare `80500000` |
 | **H1b** 🔄 | `console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/H1b --send 'J 80500000' --esc-after 60 --seconds 120` | the `*** rlxprobe P1 9d34f1c7 ***` banner, **`rb=80a00000`**, then **thirteen** `t=…` rows, then `seq=0000000d`, `sum=…`, `end` — then the payload's own watchdog reset, with the ESC stream already running across it. **1,543 bytes, 0.4018 s at 38400 8N1** — the report is `104 × 13 + 32 + 144 + 15`, and a short capture is a truncated one | **that the payload ran at all.** 🔴 **The payload prints hex in LOWER case and this sheet used to be written in the loader's UPPER case** — `report.c`'s digit table is `"0123456789abcdef"`, while `DW` replies `8040DBC0:` (讀, `report.c:18`; 量, every `A0.log`). So it is `rb=80a00000`, and `pc=` must begin **`805`** — if it begins **`a05`**, lower case, the operator typed `J A0500000`. **Grepping the capture for `80A00000` returns nothing on a correct run**, and the sheet asked for exactly that grep until 2026-08-25. 🔄 **Thirteen, not twelve**: twelve cell rows plus one `t=58435430` (`'XCT0'`) carrying the first read anyone has taken of CP0 register 20. `seq=0000000d` is 13 and always said so. ⚠️ **The rows come in risk order, not numeric order** — `CELLS[] = 1, 5, 4, 2, 3, 6`, two victims each — so row *n* is not cell *n*; `t=` is the label. `rb=` is the stale-build check and costs nothing. 🆕 ⚠️ **`flags` bit 0 clear does NOT mean the cells are void, and the payload's own message says it does.** `rlxprobe: NOT IN KSEG0 -- every cache cell is void` is printed and then control branches straight back into the cell loop; every cell runs and the block seals normally. The claim is also false: the build is `-mno-abicalls -fno-pic -G0`, so `victims`, `vaddr`, the patch store and `$sp` are all **absolute KSEG0 addresses whatever the PC is** — only the payload's *own* instruction fetch changes segment, which removes the one eviction source `victims.S` admits the 7 KiB pair gap cannot exclude. **Record the reading, do not discard it** |
-| **flush-h1b** 🆕 | `console-capture.py capture --port /dev/ttyUSB0 --out <dir>/flush-h1b --send '' --seconds 2` | a **bare prompt, 11 bytes, no `Unknown command !`** — `bench/2026-08-24b/flush-cont.log`'s shape | that `console-capture` 1.2's own ESC terminator went out. ≈31 bytes with `Unknown command !` means it did not, and the next command line would have been appended to the residue (`LDR-16`) |
+| **flush-h1b** 🆕 | `console-capture.py capture --port /dev/ttyUSB0 --out <dir>/flush-h1b --send '' --seconds 2` | a **bare prompt, 11 bytes, no `Unknown command !`** — `bench/2026-08-24b/flush-cont.log`'s shape | that `console-capture`'s own ESC terminator (`terminate_esc_line`, 1.2, in a 1.3 tree) went out. ≈31 bytes with `Unknown command !` means it did not, and the next command line would have been appended to the residue (`LDR-16`) |
 | **H1c** 🔄 | `DW 80A00000 137` | the same **thirteen** rows from RAM, and the seal at word 136. 🆕 **Plus twenty-seven words of `DEADC0DE`, and they are correct**: `RB_ROWS` is 16 and only 13 are used, so words **112–135** stay poisoned, and `LDR-07`'s round-up makes `DW … 137` print **140** words, so **137–139** are poisoned too. `24 + 3 = 27`. A reader who takes poison where a row should be as a truncated run will abort `H1` for nothing | **that the UART report and the RAM block agree.** Two channels, because P9-12 lost its nonce to a 16-byte FIFO. 🔴 **137, not 88.** The block is `RB_HDR 8 + RB_ROWS 16 × RB_ROWW 8 + 1` = **137 words**; `88` returns the header and ten rows, dropping cell 6's two victims, the `XCT0` row, and **the seal — the only word that separates a completed run from a truncated one**. 35 lines, 1671-byte reply; a 777-byte / 16-line reply was measured six times last seating, so no split is needed. `tools/rlxprobe/Makefile`'s `show` printed the same `88` for **both** payloads and has been corrected in the same commit as this row |
 | **H1d** | *(only if `H1b` and `H1c` disagree, or the run stopped early)* `DW 80A00000 08` | `magic=524c5831`, `nonce=9d34f1c7`, and `seq` = how many rows completed | how far it got. A poisoned block (`DEADC0DE`) means it started and got nowhere, which is a different observation from the previous run's data still being there |
 
@@ -994,7 +1001,7 @@ those would pass the badge.
 | | command | expected | what it refutes |
 |---|---|---|---|
 | **H3a** `C-17` 🔄 | `console-capture.py capture --port /dev/ttyUSB0 --baud 38400 --out <dir>/H3a --send 'J BFC00000' --esc-after 20 --seconds 45`, then `flush-h3a` (`--send '' --seconds 2`), then `DW 81000400 16` | 🔴 **the deciding grid.** After a warm reset with no kernel run since, `0x81000400` should hold **bias garbage**, not the 32-byte-periodic structure. If the structure is there, it was not the vendor kernel that wrote it | `C-17`'s remaining half -- *which execution wrote that structure*. `MEM-15` is why the question is live at all: a seconds-long power-off keeps contents, so *it was there* never meant *something just wrote it*. 🔄 **immediately is withdrawn**: the capture ends on ESC and not on a CR, so seating rule 2's flush goes between -- that is the fault `D2` was lost to. ⚠️ **And this reset is redundant with `H1b`'s**: `rlx_reset` writes the same `WDTCNR = 0` this command's path does, so `H1`'s reset already produced a warm reset with no kernel run since. Kept because it is one command; it is the first thing dropped if the seating runs long. The expected value is also a weak pass -- after a long power-off `MEM-15` predicts garbage there whatever `H3a` does |
-| **H3b** `NET-13` | four cable moves, one capture each, **the jack written into the `--out` filename**: `--out <dir>/E13-jack1`, `…-jack2`, `…-jack4`, `…-jack5`. Each is `DW B8003250 8` (`PSRP0`–`PSRP4`) with only that jack populated | one port's bit 4 set per capture, and **the filename is the label** | 🔴 **that the jack map is derived from anything but the filesystem.** It has gone wrong twice: once from labels assigned after the fact, once from an expected value derived from the very map the cell was testing. Jacks 1 and 5 are where the old map and the linear map disagree, so those two alone would settle it — the other two are the control. ⚠️ 🔄 **Runs after `H1a`'s `put` and before `H3a`/`H3c`** — it said `H2a` while there were two uploads; `H2` is deferred to `R1g-4b` and `H1a` is now the only one. The upload goes over the link these four moves disturb, and a stale neighbour entry cost `G4-put` three retransmits and 8.935 s (*量*). Flush the host's neighbour entry for `10.1.1.1` after the last move if anything else on the seating still needs the network |
+| **H3b** `NET-13` | four cable moves, one capture each, **the jack written into the `--out` filename**: `--out <dir>/E13-jack1`, `…-jack2`, `…-jack4`, `…-jack5`. Each is 🔄 **`DW BB804128 8`** (`PSRP0`–`PSRP4`, **118 bytes**, 2 lines) with only that jack populated. 🔴 **This row said `DW B8003250 8` until 2026-08-25, and that address exists nowhere else in this repository** — `SPEC.md` `NET-10`/`NET-11`/`NET-12`, `docs/loader-phy-and-switch.md` §7, `bench/README.md`, `docs/loader-command-semantics.md`, **this file's own `E10` row**, and the eight captures of 2026-08-24 all read `0xBB804128`. **It would not have failed visibly**: `0xB8003250` is inside the SoC register window, so `DW` returns eight plausible words and four cable moves would have measured something else. Caught at the bench before it was typed; the same defect class as `43ec0e0`'s four | one port's bit 4 set per capture, and **the filename is the label** | 🔴 **that the jack map is derived from anything but the filesystem.** It has gone wrong twice: once from labels assigned after the fact, once from an expected value derived from the very map the cell was testing. Jacks 1 and 5 are where the old map and the linear map disagree, so those two alone would settle it — the other two are the control. ⚠️ 🔄 **Runs after `H1a`'s `put` and before `H3a`/`H3c`** — it said `H2a` while there were two uploads; `H2` is deferred to `R1g-4b` and `H1a` is now the only one. The upload goes over the link these four moves disturb, and a stale neighbour entry cost `G4-put` three retransmits and 8.935 s (*量*). Flush the host's neighbour entry for `10.1.1.1` after the last move if anything else on the seating still needs the network |
 | **H3c** `CLK-08b` | re-run `D4` and `D4c` with **`--esc-period 0.002`** | the same two `OVSEL` points, on a **2.32 ms** grid instead of a 20.35 ms one — and `esc.achieved_period_s` in each capture's `.meta.json` says which grid it actually got | 🔴 **whether the watchdog's residual is fixed or proportional.** The two hypotheses differ by ~15 ms, which was smaller than one tick of the old grid. **Do not run a third `OVSEL` point** — `OVSEL=0111` predicts 286.2 ms proportional against 263.6 ms fixed, 22.6 ms apart, which the old grid could not separate either |
 
 ### What this session cannot tell you, stated before it runs
@@ -1172,3 +1179,297 @@ records four paragraphs above — and the fifth cycle produced no boot capture.)
 kernel's console echoes control characters as the literal two-character sequence
 `^[` (canonical mode with `ECHOCTL`), which is how a kernel console is told from
 a loader prompt in a transcript without sending anything to it.
+
+---
+
+## Results — Session B4, `R1g-4a`, 2026-08-25
+
+**One power cycle, `bench/2026-08-25/`, 26 captures, 10 prediction blocks —
+26 of 26 captures postdate their own prediction file**, minimum margin **+7.9 s**,
+`tools/check-predictions.py` with its four controls passing on every block.
+**Zero flash bytes.** Every command sent this seating, enumerated from the
+captures' own metadata rather than from the logs: **22 `DW` reads, two `J`, two
+`EW` — and both `EW`s are `B800311C`, the watchdog register.** A scanner for
+`FLW` / `AUTOBURN 1` / `EB` / a flash-range `EW` returns 0 over all 26 and fires
+on a planted line.
+
+`H2` did not run and was never intended to: this is `R1g-4a`.
+
+### The gate closes on `R1d`, and the negative control is why it is allowed to
+
+| cell | verdict | reading |
+|---|---|---|
+| **1** — no treatment, stored **cached** | `01` STALE ×2 | 🔴 **the refutation condition holds.** `ex=000011a1` — the OLD constant executed — while `ma=240222b2`, the NEW word, is in memory. Both victims, 7 KiB apart, so eviction has to explain both |
+| **5** — no treatment, stored **uncached** | `01` STALE ×2 | same, through KSEG1 |
+| **4** — `Status.IsC`/`SwC` | 🔴 `07` CORRUPT ×2 | see below |
+| **2** — `CCTL 0x002` alone | `02` FRESH ×2 | the I-invalidate took |
+| **3** — `CCTL 0x200` then `0x002` | `02` FRESH ×2 | so did the vendor's sequence |
+| **6** — `CCTL 0x002`, stored uncached | `02` FRESH ×2 | and so did it with the store out of the way |
+
+**And it is the opposite of the qemu run**, which returned FRESH on cells 1 and
+5 because TCG invalidates a translation block when a store lands on translated
+code. §H1 wrote that down before the seating: *a device run that looks like the
+qemu run is the run that refutes the experiment*.
+
+### `ma` on cell 1 against cell 5: the D-cache is write-through
+
+Both read **`240222b2`** — row 1 of §H1's four-way table. The cached store
+reached memory with no treatment applied, so **the only stale thing on this core
+is the I-cache**.
+
+🔴 **What that cancels.** `docs/rlxprobe-audit-2026-08-25.md` §5 carried
+`V_NOSTORE` conflating two physically different states, and its consequence: in
+the write-back case **cell 2 against cell 3 would have measured the D-flush and
+not the I-invalidate**, and *"invalidating I alone is insufficient on this core"*
+would have gone into `notes/cache-model.md` and then into `R5b`'s MTD driver as
+the flush recipe. The case did not arise — **and what made it decidable was a
+table the audit put in the sheet rather than a verdict it put in the binary.**
+
+### `CCTL 0x002` alone is sufficient; the vendor's D-then-I is unnecessary, not wrong
+
+Cells 2, 3 and 6 all FRESH, guards intact. With the D-cache write-through there
+is nothing for `0x200` to flush. `PROGRESS.md` `R1g-1` wrote the entitled wording
+before the payload existed — *"a write-through D-cache makes 2 and 3 agree, so
+the vendor's D-then-I sequence would be **unnecessary rather than wrong** — a
+result, and it has to be written as one"* — and this is that result.
+
+**Decision 1 of the four this gate exists to unblock is answered: `R5b`'s MTD
+driver invalidates I through `CCTL 0x002`.** The D-flush is belt and braces on
+this die, and the write-up may not upgrade that to *wrong*.
+
+### `Status.IsC` does not isolate on this core, and it destroys memory
+
+```
+victim   240222b2 -> 000222b2        guard   03e00008 -> 00e00008
+                ^^                               ^^      the top byte of each word, stride 4
+```
+
+`cache.S`'s `rlx_isc_inv` sets `Status |= ISC|SWC`, clears `IEc`, and its only
+memory reference while isolated is `sb $0, 0($4)` walking by 4. On a core that
+isolates, those byte stores write cache tags. **Here they wrote DRAM**, and
+big-endian byte 0 is the MSB. `V_CORRUPT` on both victims; the payload survived
+and completed the remaining six cells.
+
+- qemu found this exact failure on 2026-08-25, **one day before the bench**, and
+  the guard it produced is what turned a jump into the weeds into a printed
+  verdict.
+- `PROGRESS.md`'s stop-loss anticipated the reverse — *"`mtc0 $t,$20` faults ->
+  the `Status.IsC` path becomes the only route"*. **`CCTL` works and `IsC` is the
+  broken one.**
+- It retro-justifies `GEOM=0`: `GEOM=1` writes 1 MiB at `0x80B00000` **if this
+  core does not implement `Status.IsC`**, and it does not.
+- **What is measured is behaviour, not bits.** Stores issued while `IsC` was
+  set reached memory. Whether the two `Status` bits are implemented, and whether
+  `mtc0` wrote them, needs a `Status` read-back — that is `probe2`, `R1g-4b`.
+
+### Two channels, and the block on both
+
+`H1b`'s report is **1,543 bytes**, the byte count §H1 computed as
+`32 + 144 + 13 x 104 + 15` before the run. `H1c` is **1,671 bytes / 140 words**.
+The 104 row words agree **104/104** between the UART report (lower case) and the
+RAM block (upper case), with a one-word shift as the negative control; header,
+`seq=0000000d`, `sum=914fd3ef` and the poison at words 112–135 and 137–139 all as
+written in advance.
+
+### `H0` — six reads that turned a document into a measurement
+
+| | |
+|---|---|
+| `H0a` | **32/32 words identical** to the list pre-registered at 06:09. 🔴 **The general exception vector is populated at `0x80000080`.** Three sources said so; it is now measured |
+| `H0a2` | `DW 8040054C 32` — **word for word identical to `H0a`**, so `trap_init`'s 128-byte copy landed intact, including the twenty-one words nothing in this repository had predicted. 🆕 **And `DW` does not align its start address down**: the first printed address is `8040054C`, not `80400540`. That is new about `LDR-07` and it was an open question in the block-0 file |
+| `H0a3` | `DW A0000080 32` — identical, and the first printed address is `A0000080`. **No stale D-cache line was involved**, and the vector page reads the same through the cached and uncached windows |
+| `H0b` | `[0]=80400580`, `[23]=804007C0`, **the other thirty `80400BE8`**. 🔴 **`exception_handlers[9] == 0x80400BE8` — the single load-bearing unverified link under `docs/rlxprobe-audit-2026-08-25.md` § Must-fix 1 — is measured.** The `SAFE_A0` finding on `rlx_do_break` stands at full severity and the `H2` deferral was correct |
+| `H0c` | word 0 = **`5A5AA5A5`**, opcode `010110` = 22 = `BLEZL`. **Not `j` (2), not `jal` (3)**, so `cache.S`'s no-demonstrated-brick-path argument holds by measurement. **This is the cell that permitted `probe1` to run** |
+| `H0d-a` / `H0d-b` | neither `DEADC0DE` nor `524C5831`/`524C5832`. 🆕 **And cold SDRAM here is strongly biased but not deterministic**: `0x80A00000` came back `55617135 00F73F55 11744D3C E1553515` against `G4-addr-probe`'s `55617135 0077BF55 11744D3C E1553515` — three of four words identical across a power cycle, **word 1 differing in two bits**. *The region looks like noise* is therefore not an authentication; the magic word, the nonce and the seal are |
+
+### `CLK-03` gets its first experiment, and it costs nothing
+
+`Delta = t(first byte after the reset) - t(last byte of "rlxprobe: end")` =
+**123.7 ms**, read out of `H1b.timing`, which `--esc-after 60` put in one capture.
+
+| candidate, pre-registered | predicted | verdict |
+|---|---|---|
+| 400 MHz **and** 3 cycles/iteration | 130.4 ms | **survives**, 5.1 % low, inside this instrument's demonstrated spread |
+| 400 MHz and 4 cycles | 172.3 ms | refuted, 1.39x |
+| 200 MHz and 3 cycles | 256.2 ms | refuted, 2.07x |
+
+`f/CPI = 1.408 x 10^8` iterations/s. **It measures `f/CPI`, not `f`** — 400 MHz
+with 6 cycles is indistinguishable from 200 MHz with 3 — so what survives is the
+**combination**.
+
+### `CLK-08b` closes: the watchdog residual is proportional, and the fixed model has no solution
+
+`H3c` re-ran `D4`/`D4c` on a **2.118 / 2.115 ms** achieved heartbeat instead of
+20.35 ms.
+
+```
+measured   D4 (OVSEL=1001) = 1118.133 ms      D4c (OVSEL=1000) = 557.583 ms
+ratio 2.0053                ESC echoes 528 : 262 = 2.0153, using no timestamp at all
+```
+
+With `L` the lag and `c` the offset from arming to the prompt's last byte, both
+shared by the two cells:
+
+* **fixed lag** requires `L + c = 56.243` from `D4` and `29.605` from `D4c`.
+  **No solution.**
+* **proportional** — `2^24/(A4+c) = 2^23/(A4c+c)` — has exactly one:
+  `c = 2.967 ms`, `f_wdt = 14.9650 MHz`.
+
+🔴 **`c` is not a free parameter and its physical bound is what settles this.**
+`c` spans the loader's prompt, which must be *transmitted* before its last byte
+arrives: both captures show **10 bytes** between the command echo and the first
+ESC, so **`c >= 2.604 ms`**. The solved `c = 2.967 ms` clears that bound by
+0.363 ms, which is read latency. The tidy-looking alternative
+**15.000 MHz** (`= 200.0049 x 3/40`) needs `c = 0.32 ms` and `c = 1.64 ms` —
+**two contradictory values, both below the prompt's own transmission time.**
+Excluded.
+
+| | |
+|---|---|
+| **watchdog base clock** | **14.965 MHz**, +/-0.02 from the bound on `c` |
+| prior `CLK-08b` | 14.53–15.26 MHz — narrowed about 35x, and the new value is inside it |
+| 🔴 refuted | `f_timer / 14 = 14.2861 MHz`, by **4.75 %**. The timer base is measured to +/-7 ppm, so the gap is about 6,800x its precision. **The watchdog does not count the divided timer clock** |
+| undetermined | what integer relation, if any, ties 14.965 MHz to 200.0049 MHz. `/13` = 15.385, `/14` = 14.286, `400/26` = 15.385, `400/27` = 14.815 — **none within 1 %** |
+| withdrawn | the 1.495 shortfall ratio. It was the 20.35 ms grid |
+
+### `NET-13` closes, on a map that is not either of the two that were withdrawn
+
+Both withdrawn maps were **position -> port**, and both had their positions
+assigned after the reading. This one is **silkscreen -> port**, and every point's
+label was stated by the operator *before* its own capture:
+
+| socket, as the case is printed | port | |
+|---|---|---|
+| WAN | **0** | 量 `E13-pos1-wan` |
+| LAN1 | **1** | 量 `E13-posX-lan1` — 🔴 **the socket behind the port `PORT1`'s patch list skips, named for the first time with its label fixed in advance** |
+| LAN2 | **2** | 量 `E13-posX-lan2` |
+| LAN3 | **3** | 量 `E13-posX-lan3` |
+| LAN4 | **4** | 推, by elimination from a bijection with 13 unrefuted chances. The operator declined the fifth move and the entry is marked accordingly |
+
+Every read had **exactly one** port with bit 4 set. **The position map stays
+未定** and what it now lacks is one look at the case's printing order — not a
+register read. `posX` in the filenames records exactly that gap.
+
+### Two `PSRP` findings that were not on anyone's list
+
+1. 🔴 **Speed and duplex are not gated by `LinkUp`.** A port that has negotiated
+   and then been unplugged reads `...E9` — bit 4 clear, **bits 3 and 0 still
+   reporting 100M full duplex**. The control is inside a single capture:
+   `E13-posX-lan3` shows four previously-linked ports at `E9` and `PSRP4`, the
+   only port that has never negotiated this power cycle, at `E0`. **A driver that
+   reads speed without reading bit 4 first reports a live 100M link on an empty
+   socket.**
+2. **Bit 8 read-to-clear, now on a link settling *down*.** `E13-pos1-wan` caught
+   `PSRP2` at `000011E9` immediately after its cable was pulled; `E11f-psrp2-empty`,
+   with nothing touched between, read `000010E9`. Every prior observation behind
+   `NET-11` came from a link settling **up**, where *a second real latch* and
+   *the read did not clear it* are indistinguishable. A cable pull into an empty
+   socket is the clean version of that event.
+
+Both then survived a fourth and fifth independent test: `E13-posX-lan1` and
+`E13-posX-lan3` each **derived** three of five port words in advance from them,
+and all six derived words were right.
+
+### `C-17` closes, on two reset paths
+
+`DW 81000400 16` returned bias garbage with **no word equal to its own address**,
+after `H1b`'s watchdog reset (`H3a-early`) and again, **byte for byte identical**,
+after `J BFC00000`'s ROM-vector reset (`H3a-rb`).
+
+🔴 **The strong form is available and it is not the absence.** On this power
+cycle the loader brought up `IPCONFIG` and completed a 19,792-byte TFTP transfer,
+and warm resets preserve DRAM. **If `0x81000400` were the loader's network
+descriptor pool, that transfer would have built it and it would still be there.**
+It is not. So the structure `C7-pre` measured was written by the **vendor
+kernel**, and `§G`'s move off `0x81000000` was justified.
+
+🆕 And the same comparison is a retention measurement: **sixteen words of DRAM
+power-on bias survived a ROM-vector reset byte for byte** — stronger than a
+canary, because a canary is a value someone chose.
+
+### Free controls, none of them planned
+
+* **The 128-byte console line buffer**: `A-catch` echoed `6968 = 128 x 54 + 56`
+  ESC bytes — **54 consecutive full lines, zero exceptions**, against `LDR-06b`'s
+  previous n=7. The 56-byte remainder was terminated by `console-capture`'s own
+  CR, which is `terminate_esc_line` measured on silicon rather than on a pty.
+* **`LDR-07`'s reply-size formula**: nine of nine byte counts in block 0, plus
+  71 / 1543 / 11 / 1671 / 213 / 118 in the later blocks. Every one predicted.
+* **`CLK-13`**: `Reboot Result from Watchdog Timeout!` on four more warm boots,
+  and on `H3c`'s two it discriminates — the watchdog was armed by `EW` from the
+  prompt and the loader executed nothing afterwards.
+* **`CLK-15`**: the post-`Booting` silence at 0.352 / 0.356 s, inside the
+  344.7–356.9 ms window, n=9 -> **n=11**.
+* **`NET-10`'s three invariant words** `000000E2 / 0000007A / 0000007A`: five more
+  reads, and 🆕 **the first on a different power cycle.** The previous eight were
+  all one boot, so *invariant across cable moves* and *invariant across boots*
+  were the same eight readings until today.
+
+### The first byte of a cold power-on is the instrument's, and it is a timestamp
+
+Block 0 predicted `A-catch`'s first 181 bytes byte-identical to
+`bench/2026-08-24c/A-catch.log`. **Measured: byte 0 differs — `0x00` today,
+`0xFF` on `24c` — and bytes 1–180 are identical.**
+
+That byte is not the device speaking. It is the receiver's first sample of a line
+that is not yet driven, and `0x00` and `0xFF` are the two idle polarities — which
+is why two cold starts give complementary extremes where a printed character
+would give the same one. **And it is a timestamp**: on both cold captures the
+next byte follows **0.340 / 0.349 s** later, while `H1b`'s and `H3a`'s warm resets
+show **0.001 / 0.010 s** and no artifact byte at all.
+
+🔴 **So there are two ~345 ms silences around `Booting...`, adjacent, and only one
+of them is `CLK-15`'s.** `CLK-15` owns the one **after**. The one **before** is
+cold-power-on only. `SPEC.md` `CLK-14` records *"冷上電量不到"* and also records
+that a `340 / 348 / 345 ms` family was once mislabelled and re-homed to `CLK-15`
+on 2026-08-25. **Two adjacent intervals of the same size is exactly how a number
+gets attributed to the wrong span**, and whether that re-homing sent them to the
+right one is now a desk question with all nine captures on disk. Not settled
+here.
+
+### The prediction that was too tight, twice, and the form that fixed it
+
+`Booting -> banner` was predicted as **0.577–0.590 s** and measured 0.573; then as
+**0.573–0.590** and measured 0.5712. **Both were the observed sample range
+written as if it were a bound.** Restated as a tolerance derived from `CLK-15`'s
+own recorded 3.5 % unexplained spread — **0.567–0.601 s** — `H3c`'s two boots came
+in at 0.5712 and 0.5691, inside. The range is now 0.5691–0.590 over n=10.
+
+### What did not close, and it is a decision rather than a gap
+
+* **`R1e` does not close.** `CPU-04` (`PRId`), `CPU-27` (`Status.BEV`) and `F50b`
+  live in `H2`, which is `R1g-4b`. **Do not write `RLX5281`.**
+* **`CPU-25`** — cache size, line size, associativity — stays blank. `GEOM=0`,
+  and today's cell-4 result says what `GEOM=1` would have cost.
+* **CP0 register 20's read side** is `00000000`, the first read anyone has taken.
+  `rlx_mfc0_cctl` contains exactly one writer of `$v0`, the `mfc0` itself, so
+  *implemented and zero* and *destination not written* are not separable by this
+  cell — the same limitation `§H2` states for `probe2`'s `ZERO` state. **The
+  write side is now measured**: cells 2, 3 and 6 prove `mtc0 $t,$20` has an
+  effect, so r20 is at least a write-effective command register that reads 0.
+* **Whether the core fetches from `0x80000080`** is `Status.BEV` and no loader
+  command reads CP0. `H0a` confirms the copy, not the dispatch.
+
+### Four errors of mine, kept
+
+1. 🔴 **Block 1's six member-1 victim addresses are each one slot (`0x400`) too
+   high.** The payload's twelve rows all carry `mb=240211a1`, so `V_NOTVICTIM`
+   would have caught a real mismatch and the device was right at every address.
+   **The block is not edited** — it has run, and editing it would move its mtime
+   past its captures and fail `check-predictions.py`, correctly.
+2. Block 3 predicted **214 bytes** and measured **213**: `DW 81000400 16` is 14
+   characters, not 15. The formula was right; the arithmetic was not.
+3. The first word-level comparator returned **zero words on both sides and
+   reported IDENTICAL** — a comparison that could not fail. Redone with a
+   positive control (the count must be 32) and a negative one (`H0a` against
+   `H0b` must differ).
+4. The `^[` sequences in `bench/2026-08-24d/` and `24e` were read first as an
+   archive-integrity defect — **wrong** — and then as the vendor kernel's
+   `ECHOCTL` echo, which is right and **was already recorded in this file and in
+   `LOG.md` on 2026-08-24**. Not a finding; a file this session had not read.
+
+**Both arithmetic errors are in blocks written at the bench and neither is in the
+block written at the desk.** `check-predictions.py` verifies *ordering*, not
+*arithmetic*. **The reply-size formula should be a tool before the next seating**,
+and the count it produces should go into the prediction file from the tool rather
+than from a person.

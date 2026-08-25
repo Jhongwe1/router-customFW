@@ -702,6 +702,22 @@ authority for this unit.
 - **`DW` forces the address into KSEG0** when bit 31 is clear
   (`if ((signed)src >= 0) src |= 0x80000000`) and rounds up to 4. `DB` does
   neither. So `DB` and `DW` also disagree about what an address means.
+  🆕 **Measured 2026-08-25, and it is the bit 31 = 1 half that had never been
+  exercised**: `DW A0000080 32` printed a first address of **`A0000080`** and the
+  same 32 words as `DW 80000080 32`. So the rewrite really is conditional, the
+  uncached alias really is read through KSEG1, and *the vector is not there* is
+  now distinguishable from *a stale D-cache line was handed to `DW`*
+  (`bench/2026-08-25/H0a3.log`).
+- 🆕 **`DW` does NOT align its start address down**, measured 2026-08-25.
+  `DW 8040054C 32` — the first unaligned address this project has ever given it —
+  printed `8040054C:` and then `8040055C:`, `8040056C:` …, incrementing by `0x10`
+  from wherever it was told to start. **The `4 × ceil(N/4)` round-up is on the
+  *count*, not on the *address*.** Written as an open question in that seating's
+  prediction block before the read, because every measured reply until then had
+  begun on a 16-byte boundary and the two behaviours were indistinguishable
+  (`bench/2026-08-25/H0a2.log`). ⚠️ **It is the opposite of `EW`**, which rounds
+  an unaligned address up and does not say so — one loader, two commands,
+  opposite handling, and the pair is now measured on both sides.
 - `DW` is the only one of the four that guards `argv[0]` against NULL. It prints
   `Wrong argument number!` and survives.
 

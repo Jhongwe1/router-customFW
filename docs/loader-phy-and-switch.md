@@ -496,8 +496,14 @@ ports read `0x000010E0`, bit 4 clear on every one. Without that read, a bit 4
 that is always set and a bit 4 that follows the cable produce the same five rows
 below.
 
-**The jack ↔ port map, and it is not linear.** One cable move per row; exactly
-one port with bit 4 set on each read, and a different one each time:
+**The socket ↔ port map.** One cable move per row; exactly one port with bit 4
+set on each read, and a different one each time.
+
+> 🔴 **The table below was withdrawn on 2026-08-24 and is superseded on
+> 2026-08-25. It is left standing because the *readings* in it are real — what
+> failed is the labels.** Every "RJ45, counted from the WAN side" in it was
+> assigned **after** its reading, from memory, and `SPEC.md` `NET-13` records the
+> two occasions that went wrong. **Do not take a port index from this table.**
 
 | RJ45, counted from the WAN side | register | linked in |
 |---|---|---|
@@ -507,14 +513,40 @@ one port with bit 4 set on each read, and a different one each time:
 | 4 | `PSRP4` `0xBB804138` | `E11d` |
 | 5 | **`PSRP1`** `0xBB80412C` | `E11e` |
 
-**Physical order `0, 2, 3, 4, 1`.** A driver that takes the port index from the
-jack's position on the case is right on four jacks and **wrong on exactly one** —
-and the one it is wrong on is the jack whose port `PORT1` skips (section 4). This
-is the concrete instance of a rule `RUNSHEET.md` `E12` had only stated in the
-abstract — *take the index from a register, not from a position* — except that
-the pair being confused here is silkscreen position against port index rather
-than `ExtPHYID` against port index. **Refutation:** any read with two
-ports' bit 4 set, or none, while exactly one cable is in the board.
+**Refutation, and it has still never fired:** any read with two ports' bit 4 set,
+or none, while exactly one cable is in the board. Eight reads on 2026-08-24 and
+five more on 2026-08-25 — **thirteen chances, thirteen times exactly one port.**
+The bijection between the five sockets and ports `{0,1,2,3,4}` is the part of
+this section that survived.
+
+### 🆕 The map that replaced it, 2026-08-25 — silkscreen, not position
+
+**Every point's label was stated by the operator *before* its own capture**, and
+the filenames carry it (`bench/2026-08-25/E13-pos1-wan`, `E13-posX-lan1`,
+`-lan2`, `-lan3`).
+
+| socket, as the case is printed | port | |
+|---|---|---|
+| **WAN** | **0** | 量 |
+| **LAN1** | **1** | 量 — 🔴 the socket behind the port `PORT1`'s patch list skips (section 4) |
+| **LAN2** | **2** | 量 |
+| **LAN3** | **3** | 量 |
+| **LAN4** | **4** | 推, by elimination from the bijection above |
+
+🔴 **Why this is a different map and not a correction of the old one.** The old
+one is **position → port**; this one is **silkscreen → port**. They are the same
+map only if the case is printed in ascending order from the WAN socket, **and
+that order has never been recorded in this repository.** `RUNSHEET.md` `H3b` said
+*"the jack written into the `--out` filename"* and meant position, while an
+operator at the bench reads a silkscreen label — **the ambiguity was never
+stated, and it is the same one both withdrawals came from.** Filenames now carry
+`pos<N>-<silkscreen>` so that a future reader needs neither convention nor
+memory; `posX` marks the points where the position is still unknown.
+
+**What a driver should take from this**: the port index comes from `PSRP`, and
+where a human-facing label is needed it comes from the **silkscreen** map above.
+The position map is a fact about the case drawing, it is still 未定, and what it
+needs is one look at the case — not a register read.
 
 **Bit 8 is read-to-clear — confirmed, and only because the cell had a control.**
 In order:
@@ -528,6 +560,23 @@ In order:
 3. `E11c2`, the cell built to separate the two models: read `PSRP0`, which had
    gone down at `E11c` and **whose jack was by then empty**, so no new down-event
    was physically available. Bit 8 went **1 → 0** on a single read.
+
+4. 🆕 **2026-08-25, and this is the first instance from a link settling *down*.**
+   All three observations above are up-settles, where *a second real latch* and
+   *the read did not clear it* give the identical reading. A **cable pull** is
+   the clean version: `E13-pos1-wan` caught `PSRP2` at `0x000011E9` immediately
+   after its cable was moved to the WAN socket, and `E11f-psrp2-empty`, with
+   **nothing touched between the two reads and that socket empty**, read
+   `0x000010E9`. One read, 1 → 0, and no new down-event was physically available.
+
+🆕 **And the same pair measured something nobody had claimed in either direction:
+speed and duplex are NOT gated by `LinkUp`.** `0x…E9` on an unplugged port is
+bit 4 clear with **bits 3 and 0 still set** — full duplex, 100M — i.e. the last
+negotiated result is *retained*, not cleared. The control is inside a single
+capture rather than across boots: `E13-posX-lan3` shows the four ports that have
+negotiated this power cycle at `…E9` and `PSRP4`, **the only one that never
+has**, at `…E0`. 🔴 **A driver that reads speed or duplex without reading bit 4
+first will report a live 100M full-duplex link on an empty socket.**
 
 ⇒ **Bit 8 is read-to-clear**, as **B**'s `LinkDownEventFlag` and **D**'s Table 65
 both say. `E11a2` is then explained as a **second, real autoneg latch on a link

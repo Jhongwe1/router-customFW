@@ -81,6 +81,31 @@ index 9 holds a real `Bp` handler rather than `do_reserved`, this entry's severi
 drops to *the failure is diagnosable after all*, and the fix stays worth two
 instructions.
 
+> ✅ **Measured 2026-08-25, `bench/2026-08-25/H0b.log`: `exception_handlers[9]`
+> IS `0x80400BE8`.** The whole table came back as this document assumed —
+> `[0] = 80400580`, `[23] = 804007C0`, **the other thirty `80400BE8`** — so the
+> refutation condition did not fire and **this entry keeps its severity**. A
+> `break` on the failure branch reaches `do_reserved` with `$a0 = 0`, and the
+> `lw a3,148(v0)` at `0x80400C00` is a kuseg load through an uninitialised TLB,
+> four bytes before the first `prom_printf`. **The deferral of `H2` was correct**,
+> and `SAFE_A0` before `break` is still two instructions.
+>
+> 🆕 **And the seating measured the other three inputs this list was waiting on**:
+> the vector page reads identically through KSEG0 and KSEG1 (`H0a3`), so entry 2's
+> *"the stores did not land"* half can be checked by the read-back it asks for;
+> the UTLB refill vector holds `5A5AA5A5` (`H0c`), so a kuseg fault lands on a
+> `BLEZL` and not on a jump into loader code; and `H1` settled the flush, so
+> **entry 3 is resolved by not shipping two binaries** — `probe2` is built once,
+> with `CCTL 0x002`.
+>
+> 🔴 **One item is added to this list by `R1g-4a`'s own result, and it is not in
+> the four above.** `probe1` cell 4 measured `Status.IsC` **failing to isolate on
+> this core**: its `sb $0` byte stores reached DRAM (`07` CORRUPT on both
+> victims, top byte of each word, stride 4). **`probe2` must not use the
+> `Status.IsC` path for anything** — not for `flush_for_handler()`, not anywhere —
+> and `RLX_FLUSH_ISC=1` should stop being a build option rather than stay a knob
+> nobody is allowed to turn.
+
 ### 2. `install_handler` never reads the vector back — 讀
 
 Twenty-two words go to `0x80000000` and `0x80000080` through KSEG1, then

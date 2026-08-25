@@ -278,3 +278,45 @@ and 118-byte captures have none and agree. No pattern in the tool spans a line
 ending, so this changes no hit — but **that column is not a byte count and must
 not be quoted as one.** The byte-exact claim in this file rests on `bench/**`
 being marked `-text` and on the stored-blob hash check, not on this scan.
+
+## 2026-08-25 — seating 3, `R1g-4a`
+
+**One power cycle, 26 captures, 10 prediction blocks, zero flash bytes.** The
+first seating in which code of mine executed on this core.
+
+| file(s) | cell | what it is |
+|---|---|---|
+| `PREDICTIONS-b4-block0.md` | — | 🔴 **written at the desk at 06:09 and committed in `857d790` at 06:15**, hours before power. Its capture paths say `bench/2026-08-26/` because the seating was planned for the 26th; **that file is `bench/2026-08-26/PREDICTIONS-b4-block0.md` and it is not edited.** This one re-homes it, verbatim except for the nine paths and one instrument-version correction which is marked in the file |
+| `PREDICTIONS-b4-block1,3,4,5,6,7,8,9,10.md` | — | written at the bench, each immediately before its own cells, because each is conditional on the block before it. **Block 2 does not exist**: that number belongs to `H2`, which is `R1g-4b` |
+| `A-catch.*` | `A-catch` | the ESC window. 🔴 **Byte 0 is the instrument's, not the device's** — `0x00` here, `0xFF` in `2026-08-24c`, the two idle polarities of a line that is not yet driven. Bytes 1–180 are byte-identical to `24c`. See `RUNSHEET.md` § Results B4 |
+| `A0.*` | `A0` | 71 bytes, byte-identical to `24b` and `24c`. The throwaway seating rule 2 requires, spent where nothing depends on it |
+| `H0a.*` `H0a2.*` `H0a3.*` `H0b.*` `H0c.*` `H0d-a.*` `H0d-b.*` | `H0` | seven zero-risk reads. `H0a`/`H0a2`/`H0a3` are the same 32 words three ways — the vector, its source, and its uncached alias |
+| `H1-rescue.json` `H1a-ab.*` `H1a-put.json` | `H1a` | `AUTOBURN 0` + `LOADADDR` + `IPCONFIG` in one transcript; then the word at `0x8040D4A0` read **before** the upload, because that is the word the burn path sees during it; then 19,792 bytes over TFTP |
+| `H1b.*` | `H1b` | `J 80500000`. The payload's whole report **and** the watchdog reset that follows it, in one capture — which is what makes `H1b.timing` a clock measurement as well as a transcript |
+| `flush-h1b.*` `flush-h3a.*` `flush-h3c-D4.*` `flush-h3c-D4c.*` | seating rule 2 | each **11 bytes, a bare prompt, no `Unknown command !`** — the ESC terminator went out |
+| `H1c.*` | `H1c` | the same block read back from RAM. `DW 80A00000 137`, **not 88**: 88 stops before the seal |
+| `H3a-early.*` `H3a.*` `H3a-rb.*` | `H3a` | `C-17` on two reset paths. `H3a-early` and `H3a-rb` are **byte-identical** and that is the finding |
+| `E13-pos1-wan.*` `E13-posX-lan1.*` `E13-posX-lan2.*` `E13-posX-lan3.*` | `H3b` | 🔴 **the filenames are the measurement.** `pos<N>` is the position counted from the WAN socket, `<silkscreen>` is what the case says; `posX` means the case's printing order is not yet recorded, so this capture establishes *silkscreen → port* and not *position → port*. `NET-13` went wrong twice from exactly that conflation |
+| `E11f-psrp2-empty.*` | `NET-11` | read `PSRP` again with nothing touched and one socket empty. Bit 8 goes 1 → 0, and bits 3/0 do not |
+| `H3c-D4.*` `H3c-D4c.*` | `H3c` | the same two `OVSEL` points as `2026-08-24c/D4`, on a **2.118 ms** ESC grid instead of 20.35 ms. `esc.esc_after.achieved_period_s` in the `.meta.json` is what says which grid it actually got, and it is the reason these two captures could settle what the earlier pair could not |
+
+**Checked before this directory was committed**, as this file's own rule requires:
+`tools/audit-bench-log.py` over all 26 `.log` files — 0 hits, with all eight
+patterns firing on its synthetic control first.
+
+🔴 **And that run found a defect in the tool rather than in the logs.** It printed
+a number labelled `bytes` that was the byte count **minus the number of CRLF
+pairs** — `8855 → 8797`, `5356 → 5307`, `1371 → 1360`, `10790 → 10719`, and
+`1671 → 1671` where a file happens to contain none. Cause: it read in text mode,
+so Python's universal newlines collapsed every `\r\n`. **That is the same defect
+the `.gitattributes` line `bench/** -text` exists to prevent**, applied to git and
+not to the tool living beside these files. The scan itself was never affected —
+every pattern is ASCII and survives the decode — but the number was. Fixed the
+same day (`newline=''` and `os.path.getsize`); **the fix has no control of its
+own yet**, which would need a fixture with a known CRLF count.
+
+⚠️ **`2026-08-24c` through `2026-08-24f` have no section in this file.** They were
+seating 2 part three, five power cycles and 81 captures, and they are described in
+`RUNSHEET.md` § Results — seating 2 part three instead. Noted rather than
+back-filled, because a directory index that is silently incomplete is worse than
+one that says where the gap is.

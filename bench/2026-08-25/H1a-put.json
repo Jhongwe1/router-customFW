@@ -1,0 +1,15 @@
+{
+  "op": "put",
+  "host": "10.1.1.1",
+  "tid": 2098,
+  "filename": "image",
+  "image": "tools/rlxprobe/build/probe1/probe1.bin",
+  "bytes": 19792,
+  "blocks": 39,
+  "sha256": "fbac7d60319aacf9e86a4a673f899eaf41d3659ad9d55417da4c4c70c6d289f6",
+  "seconds": 0.04,
+  "retransmits": 0,
+  "rescue_report": "bench/2026-08-25/H1-rescue.json",
+  "rescue_ip": "10.1.1.1",
+  "producer": "loader-tftp"
+}

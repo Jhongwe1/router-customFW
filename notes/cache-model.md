@@ -109,17 +109,41 @@ flush_cache();
 jump();          // jump to start
 ```
 
-## Not established
+## Measured on the device, 2026-08-25 — and one of the two mechanisms is broken
 
-Nothing here is a measurement on the device. Both sources are code. In
-particular:
+🔴 **This section used to be called "Not established" and to open with *"nothing
+here is a measurement on the device"*. That is no longer true**, and the sentence
+it made — *"that `Status.IsC` **works** on this core is read out of the kernel
+source, not observed"* — is now **refuted**. `probe1` ran from `0x80500000` on
+this unit (`bench/2026-08-25/H1b.log` and `H1c.log`, two channels, 104/104 row
+words identical, `RUNSHEET.md` § Results B4). Six cells, twelve victims:
 
-- That `Status.IsC` **works** on this core is read out of the kernel source,
-  not observed. The bootcode never uses it.
+| | measured | what it settles |
+|---|---|---|
+| **the I-cache is real and it goes stale** | cell 1 — cached store, **no treatment** — executed the OLD constant while memory already held the NEW one, `01` STALE on **both** victims of a pair 7 KiB apart | 🔴 **the negative control.** Without it every other cell would have passed untested. And it came back the **opposite** of qemu, which reports FRESH because TCG invalidates a translation block when a store lands on translated code |
+| **the D-cache is write-through** (or does not allocate on write) | cell 1 and cell 5 — the same store through the cached and the uncached window, both `T_NONE` — agree on `ma = 240222b2` | the cached store reached memory unaided, so **the only stale thing on this core is the I-cache**, and cells 2/3/4 are not contaminated by a dirty line |
+| **`CCTL 0x002` alone is sufficient** | cells 2, 3 and 6 all `02` FRESH, guards intact | with the D-cache write-through, **`0x200` has nothing to flush**. The vendor's D-then-I sequence is **unnecessary rather than wrong** on this die — and this file may not upgrade that to *wrong* |
+| 🔴 **`Status.IsC` does not isolate** | cell 4 `07` CORRUPT on both victims: `240222b2 → 000222b2`, guard `03e00008 → 00e00008` — **the top byte of every word, stride 4** | `rlx_isc_inv`'s `sb $0, 0($4)` walked real DRAM. The `Status.IsC`/`SwC` path is the one `c-r3k.c` uses and the one this unit's bootcode never touches, and **it is the broken one on this part.** qemu found the same failure one day earlier; the `V_CORRUPT` guard it produced is why the payload finished instead of jumping into the weeds |
+
+⚠️ **What that fourth row measures is behaviour, not bits.** Stores issued while
+`IsC` was set reached memory. Whether the two `Status` bits are implemented at
+all, and whether `mtc0` wrote them, needs a `Status` read-back — `probe2`.
+
+**Still not established:**
+
 - The `0x010` and `0x020` boot-init commands are unexplained.
 - Cache line size, associativity and total size are unknown. `c-r3k.c` sizes
-  the caches at runtime with `r3k_cache_size(ST0_ISC)` — that routine is
-  therefore also a ready-made measurement for R1d to reproduce bare metal.
+  the caches at runtime with `r3k_cache_size(ST0_ISC)` — 🔴 **and the seating
+  that could have run it deliberately did not**: `GEOM=0`, because that walk
+  writes 1 MiB of real memory on a core that does not implement `Status.IsC`,
+  **and cell 4 has now measured that this core is exactly that core.** Arming it
+  needs a before/after read of the window it may scribble on.
+- **CP0 register 20's read side** returns `0x00000000` — the first read anyone
+  has taken. `rlx_mfc0_cctl` contains exactly one writer of `$v0`, the `mfc0`
+  itself, so *implemented and reads zero* and *destination never written* are not
+  separable by that cell. **The write side is measured**: cells 2, 3 and 6 prove
+  `mtc0 $t,$20` has an effect, which is what a write-effective command register
+  that reads back zero looks like.
 
 ## Cache geometry — a prediction with one weak source, written before the measurement
 
@@ -172,20 +196,37 @@ scan of `stage2.bin`'s code region found none; the one whole-file hit at
 `0x8040d264` decodes as `cache 0x0,786(zero)`, sits after a function epilogue
 and before zero padding, and is data (`notes/lwl-mystery.md`).
 
-## What R1d should do with this
+## What R1d should do with this — 🔄 done 2026-08-25, and item 3 is what changed
+
+*(Kept as written, with what the seating did to each.)*
 
 1. Write the handler to `0x80000080` through **KSEG1** (`0xA0000080`), which
    sidesteps the D-cache entirely, then invalidate I-cache with CP0 20 `0x002`.
    🔴 **And cover `0x80000000` too** — that is the UTLB refill vector on this
    layout, the loader never populated it, and stage 1's DRAM-sizing probe left
    `0x5A5AA5A5` sitting there.
+   ✅ **All three parts confirmed on silicon.** `H0a`/`H0a3` read the vector page
+   identically through the cached and uncached windows, so the KSEG1 write path
+   is not racing a stale line; `CCTL 0x002` is measured sufficient; and
+   `H0c` read `5A5AA5A5` at `0x80000000` — **opcode 22, `BLEZL`, not `j` and not
+   `jal`**, which is the reading that let `probe1` run at all.
 2. Keep the CP0 20 `0x200` D-cache flush before it as the vendor does, because
    the vendor's own comment says the two caches can hold the same address.
+   🔄 **Downgraded from necessary to harmless.** The D-cache is write-through on
+   this part, so `0x200` has nothing to flush. Keeping it costs one instruction
+   and stays defensible for a driver that may run on another die; **claiming it
+   is required here would be wrong**, and so would claiming the vendor was.
 3. **Both of those are single-source for the exact bit values.** Before either
    goes into `rlxprobe`, confirm on silicon: write a handler, take an exception,
-   and check it ran. That check is its own control — if the I-cache still holds
-   the old bytes, the handler does not run and the probe hangs rather than
-   lying.
+   and check it ran.
+   🔴 **This is the item the seating changed, and not in the direction it
+   expected.** The check it describes belongs to `probe2`, which did **not** run —
+   an independent audit found four defects in it first, including that its
+   designed *visible* failure is measured to be complete silence. What ran
+   instead was `probe1`, whose cell 4 established the thing this list did not
+   think to ask: **the alternative mechanism, `Status.IsC`, destroys memory on
+   this core.** So a handler installed the way item 1 describes is the *only*
+   route here, and it is a measured route rather than a chosen one.
 
 ## Correction, 2026-08-25 — the exception vector address in this file was wrong
 

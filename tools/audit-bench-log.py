@@ -56,10 +56,23 @@ def main(paths):
     print("=== THE ACTUAL LOGS ===")
     total = 0
     for p in paths:
-        text = io.open(p, encoding='utf-8', errors='replace').read()
+        # newline='' -- WITHOUT it Python's universal newlines collapses every
+        # CRLF into one LF, and the number printed below as `bytes` comes out
+        # LOWER than the file by exactly the CRLF count.  Measured 2026-08-25 on
+        # bench/2026-08-25/: 8855 -> 8797 (58 CRLF), 5356 -> 5307 (49),
+        # 10790 -> 10719 (71), and 1671 -> 1671 where there are none.
+        #
+        # It is the same defect the `.gitattributes` line `bench/** -text` exists
+        # to prevent -- these transcripts are byte-exact and the loader's own
+        # format strings end \r\n -- applied to git and not to the tool that
+        # lives beside them.  The scan itself was never affected: every pattern
+        # here is ASCII and survives the decode.  The number was.
+        text = io.open(p, encoding='utf-8', errors='replace', newline='').read()
         hits = scan(p, text)
         total += len(hits)
-        print(f"  {os.path.basename(p):22s} {len(text):6d} bytes  {len(hits)} hit(s)")
+        nbytes = os.path.getsize(p)
+        flag = '' if len(text) == nbytes else f'  <- {len(text)} chars, non-ASCII present'
+        print(f"  {os.path.basename(p):22s} {nbytes:6d} bytes  {len(hits)} hit(s){flag}")
         for label, ln, txt in hits:
             print(f"      HIT {label} line {ln}: {txt!r}")
     print()
