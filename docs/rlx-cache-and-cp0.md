@@ -194,6 +194,49 @@ window (KSEG1), which is what the vendor's own driver does — **讀**,
 reading of what the vendor chose, not a measurement of what this core requires**,
 and the difference is the whole reason ② is still open.
 
+#### 🔄 2026-08-26: decision ② gains a SECOND candidate mechanism, and a document against its proxy
+
+**Two changes, from the LX4189 datasheet fetched that day** (`notes/cache-model.md`
+§ *The core vendor's own datasheet is in hand* owns the full reading, including
+the caveat that the LX4189 has no TLB and this die has 32 entries, so it is a
+sibling and not this part).
+
+**① The shortlist for *"what can invalidate a clean line"* was `CCTL 0x001`,
+`CCTL 0x200`, and `cache 0x11`. There is a fourth and it costs one load.**
+LX4189 § 5.2: *"perform an uncached read of the affected memory locations. If
+the location is resident in the data cache it will be invalidated."* Nothing in
+this repository had ever tested that. `probe3`'s cell `c-G` does, gated behind
+`c-A` like every other treatment — with no stale line there is nothing to
+invalidate and both outcomes read the same.
+
+If it holds, `R6` can invalidate a descriptor's line with a load through the
+KSEG1 alias, needing no `CCTL` write and no `cache` instruction — which matters
+because ⓒ may yet come back saying this core does not retire `cache` at all.
+
+**② 🔴 The proxy assumption now has a document against part of it, and this
+section's wording was weaker than the evidence.** § ② already says the
+KSEG0/KSEG1 alias *"is a model, not the thing"* and that `R6` must re-test with
+the real engine. What it did not say is that **the core vendor states the two
+differ**: § 5.1, *"Caches do not snoop the system bus"*, against § 5.2's uncached
+CPU read, which **is** handled specially. So the equivalence this section allows
+itself in the write-through branch — *"under both, a cached read after a device
+write returns fresh data"* — rests on a step the vendor's own document
+contradicts for external masters.
+
+**That is not a reason to drop the alias cells.** They measure what the CPU side
+does, which is real and is needed. It is a reason the sentence *"for `R6`'s
+purpose they are equivalent"* must keep its condition attached every time it is
+written, and `R6`'s re-test with a real engine is now **required rather than
+prudent**.
+
+**③ And cells `c-E0`/`c-E2` were broken by the same paragraph.** ① says an
+uncached read invalidates a resident line — and `c-E`'s own final step is an
+uncached load. A `c-E2` that continued from `c-E`'s state would have found no
+dirty line for its `DWB` to write back, read the first value, and recorded
+*"`CCTL 0x100` does not write back"*: **a refutation of the command manufactured
+by the running order.** Each of the three E cells runs its own whole sequence
+now. `docs/probe3-cells.md` § 1.4 ①.
+
 ### ③ `R1a`'s exception handler at `0x80000080`: yes
 
 **量, `bench/2026-08-25b/`.** `Status = status_end = 1000fc00`, **bit 22 = 0**,

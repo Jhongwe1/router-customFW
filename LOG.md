@@ -4555,3 +4555,23 @@ C 群每一格讀同一個值、每一條 `cache` 都 retire。
 修它會動到 `test-hazlint.sh` K6a/K6b/K6c 三個控制的期望數字 ——
 它們數的是 `stage2.bin` 資料區的 loose/strict 命中,而 `0x13` 的分類一改那些數字就會變。
 **那要重新量,不是重新猜。**
+
+### 收工前的自查:`SPEC.md` 不可以跑在它的擁有者檔前面
+
+按這個 repo 自己的規矩 ——「一個發現或更正先落在擁有者檔,同一個 commit 再進 `SPEC.md`」——
+今天改的列裡有三列的擁有者檔我一開始沒動:`CPU-24`／`CPU-44`／`CPU-46` 的擁有者是
+`notes/cache-model.md`,`CPU-45`／`CPU-19` 殘留的一部分是 `docs/rlx-cache-and-cp0.md` §②。
+**索引跑在擁有者前面就是那張表開始說謊的方式**,所以補上了:
+
+- `notes/cache-model.md` 新增一節,寫 LX4189 資料表對**這份檔**改了什麼 ——
+  line 大小可組態 16／32／64／128、I-cache 可 direct-mapped 或 two-way、
+  D-cache 只有 direct-mapped、LBC 有寫入緩衝區（`c-E0` 控制的就是它）,
+  以及三句關於一致性的話:uncached **讀**會作廢常駐的 line、
+  uncached **寫**對快取沒有影響、**快取不 snoop 系統匯流排**。
+  ⚠️ 而 §5.6 的 write-through／no-write-allocate **不能搬過來** ——
+  這顆的 `CCTL` 有 `DWB`／`DWBInval`,write-through 的快取不需要那兩個。
+- `docs/rlx-cache-and-cp0.md` §② 新增三段:決定②多了**第四個候選機制**（`c-G`,一個 load）;
+  🔴 **代理假設現在有一份文件反對它的一部分** —— 這一節本來只說「代理是模型不是實物」,
+  而核心廠商自己寫著外部 master **不被 snoop**、CPU 的 uncached 讀**被特別處理**,
+  所以「對 `R6` 來說它們等價」那句話**每次寫都必須把條件帶著**,
+  `R6` 用真引擎重測從「謹慎」變成「必要」;以及 `c-E0`／`c-E2` 被同一段話弄壞的那件事。

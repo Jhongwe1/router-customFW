@@ -469,6 +469,78 @@ scan of `stage2.bin`'s code region found none; the one whole-file hit at
 `0x8040d264` decodes as `cache 0x0,786(zero)`, sits after a function epilogue
 and before zero padding, and is data (`notes/lwl-mystery.md`).
 
+## 🔴 The core vendor's own datasheet is in hand — 2026-08-26, `R1h-1`
+
+`SOURCES.json`'s `ds-lexra-lx4189` entry ended *"NOT DOWNLOADED INTO `refs/`:
+cited only. If it is ever fetched it moves to `documents` WITH a sha256."* It was
+fetched (sha256 `6afb1415…`; the PDF is **not committed** — `CLAUDE.md` forbids
+it — and lives in `$FWRE_WORK/rebuild/refs-external/`). This section is what it
+changes in **this** file; `docs/probe3-cells.md` § 1.4 owns what it changes in
+the cell table.
+
+⚠️ **READ THIS BEFORE QUOTING ANY LINE BELOW.** The caveat this project already
+carried — *"LX4189 is a write-through part with no `DWB`/`DWBInval`, so the two
+CCTL maps are provably not identical"* — got harder rather than softer.
+**Table 2 lists the LX4189's entire CP0 register file: 8 `BADVADDR`, 12 `STATUS`,
+13 `CAUSE`, 14 `EPC`, 15 `PRID`, 20 `CCTL`, and nothing else. It has no TLB.**
+This die has 32 TLB entries — `CPU-08`, 量, corroborated by `probe2`'s census
+reading `Random` at 5…29 inside 0…31. **The LX4189 is a sibling and is
+demonstrably not this part.** Everything below is 讀 about a related core, from
+the core vendor, where every other source here is the integrator or a third
+party.
+
+### Cache geometry, from the vendor rather than from a build constant
+
+| | LX4189 § | what it says | what this file said before |
+|:-:|---|---|---|
+| line size | 5.1, 5.6 | configurable **16 / 32 / 64 / 128 bytes** — *"the cache obtains a cache line (4, 8, 16, or 32 words)"* | nothing; the 16 B here comes from eight `cache` ops at stride `0x10` in this unit's kernel, which is one build's belief |
+| I-cache associativity | 5.1 Table 18, 5.3 | *"Direct mapped or two-way set associative"*, with the two-way form's LRU and lock bits described | **"no source of any kind, anywhere"** — withdrawn |
+| D-cache associativity | 5.1 Table 18, Table 25 | *"Direct mapped data cache"*, and all seven configurations are direct mapped | as above |
+| D-cache write policy | 5.6 | write-through, and **no write-allocate**: *"all data writes that miss the cache are forwarded to the write buffer of the LBC, without disturbing any data currently in the cache"* | ⚠️ **does NOT transfer.** This SoC's `CCTL` has `DWB`/`DWBInval`, which a write-through cache does not need, and both GPL drops build `CONFIG_ARCH_CACHE_WBC=y` |
+| write buffer | 5.6 | there is one, in the LBC: *"Writes … may require extra time to be serviced by the LBC if its write buffer is full"* | nothing — and it is what cell `c-E0` controls for |
+
+### 🔴 Two sentences about coherence, and they are what a proxy cannot tell you
+
+LX4189 § 5.2, on alternatives to a full D-cache invalidation:
+
+> *"Another alternative, if the affected memory location has an alias in
+> uncacheable (KSEG1) space, is to simply perform an uncached read of the
+> affected memory locations. **If the location is resident in the data cache it
+> will be invalidated.** … **Note that a write to a KSEG1 address has no affect
+> on the contents of the data cache.**"*
+
+And § 5.1: *"**Caches do not snoop the system bus.**"*
+
+Three things follow and none of them was in this file:
+
+1. **An uncached READ is a per-line invalidate**, with no `CCTL` at all. If that
+   holds here, `R6` gets an invalidate primitive for the price of a load. It has
+   never been tested on this die; `probe3`'s cell `c-G` is the first attempt.
+2. **An uncached WRITE does nothing to the cache**, which is what makes the
+   KSEG0/KSEG1 alias a usable stand-in for a device write at all — and it gives
+   `c-A` an expected value where this file had none.
+3. 🔴 **The proxy and the thing differ, and the core vendor says so.** A real bus
+   master is **not snooped**; an uncached CPU read **is** handled specially. So
+   *"a real DMA write looks like an uncached CPU store from the cache's side"* is
+   not a safe assumption — it is a proxy assumption with a document against part
+   of it. `docs/rlx-cache-and-cp0.md` § ② carries what that means for `R6`.
+
+### And one datum about the core's identity that changes nothing
+
+Table 2: **`PRID` reads `0x0000c401` for the LX4189.** This unit reads
+`0x0000CD01` (量, `CPU-04`). That is the first point this project has had on the
+Lexra `PRId` map, and **it says exactly one thing: `0xCD01` is not an LX4189.**
+Nothing here maps the space between `0xC4` and `0xCD`. **`CLAUDE.md`'s ban
+stands** — a point is not an assignment table, and `RLX4181` and `RLX5281` are
+both still unwritable.
+
+*(§ 3.4.2 also gives `0x8000_0080` as the general exception vector with
+`BEV = 0` — a fourth independent source, agreeing with the three this file
+already records. Nothing changes; it is noted because the wrong address had
+reached seven committed sites as recently as 2026-08-25.)*
+
+---
+
 ## The refutation condition above is met — 2026-08-26
 
 🔴 **The scan that returned zero was run on the loader and on nothing else.**
