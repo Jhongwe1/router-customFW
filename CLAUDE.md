@@ -96,6 +96,21 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   the inner body contains the outer terminator. **Write the script to a file with
   the Write tool and run it by path** — `python3 /mnt/c/…/scratchpad/x.py` — which
   has no quoting layers at all.
+  🔄 **2026-08-27: it is not the nesting. ONE quoted heredoc from the Bash tool
+  loses a backslash level, and the note above blamed the wrong thing.** 量 with
+  `od -c`, which is the instrument to use because everything else in the path
+  re-escapes: send `re.compile(r'(?<!\\)\|')` through a single `<<'EOF'` and the
+  bytes that reach disk are `re.compile(r'(?<!\)\|')`; `printf 'a\\b'` arrives as
+  `printf 'a\b'`. It cost two `re.error: missing ), unterminated subpattern` in
+  one session, and once it went further than an error — `cat > f <<'EOF'` wrote
+  the corruption into a committed file. ⚠️ **Root cause undetermined**: the tool's
+  own command marshalling and the shell are both in the path and this measurement
+  does not separate them. **The workaround is unchanged and it is the whole
+  point** — Write the file, run it by path. 🔴 **And never `open(path, 'w')` in a
+  script that can raise before it writes**: `open()` truncates immediately, so a
+  `NameError` one line later leaves the file at zero bytes. It emptied
+  `PROGRESS.md` on 2026-08-27; `git checkout --` got it back because it was
+  committed. Build the whole string first, write to `path.tmp`, `os.replace`.
 - **Binaries and vendor source trees never live under `/mnt/c`.** Measured
   2026-08-23: DrvFs *keeps* symlinks, but reports every file as `777`, so git sets
   `core.fileMode=false` and stops seeing mode changes at all; and NTFS is
