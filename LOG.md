@@ -4575,3 +4575,328 @@ C 群每一格讀同一個值、每一條 `cache` 都 retire。
   而核心廠商自己寫著外部 master **不被 snoop**、CPU 的 uncached 讀**被特別處理**,
   所以「對 `R6` 來說它們等價」那句話**每次寫都必須把條件帶著**,
   `R6` 用真引擎重測從「謹慎」變成「必要」;以及 `c-E0`／`c-E2` 被同一段話弄壞的那件事。
+## 2026-08-27（桌面）— `R1h-1` 收尾：COP3 的標籤修好了，而修法被規格自己的一句話擋在半路
+
+**桌面，不通電，零 flash 位元組，零電源循環。** 這一段接著 2026-08-26 第四段的交接，
+過午夜開始，所以日期是新的一天而工作是同一件。`R1h` 的桌面段到此結束。
+
+### 動手前先量基線，因為今天要改的東西的價值就在「哪些數字沒動」
+
+| 開場量／讀到的東西 | 2026-08-27 |
+|---|---|
+| `hazlint --self-test` | 10 個控制全過。`K4` 1474 load／646 nop／0 violation；`K6a` 18 strict／18 loose；`K6c` 資料區 **445 loose／236 strict** |
+| `tools/test-hazlint.sh` | **56 passed, 0 failed** |
+| `stage2.bin` 的 opcode `0x13`（**讀** —— 掃一份 dump，不是量裝置） | **97 個字，code 區 0 個、資料區 97 個**。rs 直方圖：`DMF`×11、`CF`×3、`MFH`×3、`BC`×1、rs9×6、rs0a×21、`CO`×52 |
+| 這台自己的 kernel（`vmlinux-rederived.bin`，**讀**） | 四條 `mtc3` 在 **`0x8000227C`／`0x8000228C`／`0x800022D8`／`0x800022E8`**，從映像重新解出來而不是抄註記 |
+| `probe3` 重建 | sha256 `1a0725c0…`、29,088 bytes ✓；`--isa` **13 命中**（8 個 `COP1X`、5 個 `cache`） |
+
+### 一、交接寫的理由錯了兩級，而結論沒有變
+
+上一段的交接寫「`0x13` 從 MIPS-II 起才是 COP1X」。**兩半都不對。**
+
+**量**（binutils 2.42，本機，`tools/test-hazlint.sh` `E3` 把它變成會重跑的控制）：
+
+| `-march=` | `mfc3 $2,$0` | `lwxc1 $f0,$4($5)` |
+|---|---|---|
+| `mips1` | **接受** `4c020000` | 拒絕 |
+| `mips2` | **接受** `4c020000` | 拒絕 |
+| `mips3` | 拒絕 | 拒絕 |
+| `mips4` | 拒絕 | **接受** `4ca40000` |
+
+**讀**（MIPS IV Instruction Set Rev 3.2，Charles Price，1995 年 9 月，§ A 8.3.4，
+全文 967,664 bytes、sha256 `f1e212bf…`，第 7191 行）：
+
+> *"Coprocessor 3 is optional and implementation-specific in the MIPS I and
+> MIPS II architecture levels. It was removed from MIPS III and later
+> architecture levels. Note that in MIPS IV the COP3 primary opcode was reused
+> for the COP1X instruction class."*
+
+**COP3 是 MIPS I 與 MIPS II；MIPS III 拿掉它；MIPS IV 把那個 opcode 收去給 COP1X。**
+兩個來源，一個量一個讀，互相獨立而且一致。結論沒變——這顆是 MIPS-I（`Config.M = 0`，量）——
+但「MIPS-II 起」這個說法本身是那種**聽起來很精確所以會活很久**的錯誤，所以它進了更正表。
+
+⚠️ 順帶記一件文件自己的瑕疵：§ A 8.3.4 那一段的最後一句寫
+*"No standard processor from MIPS has implemented coprocessor **2**"* ——
+在一節講 coprocessor **3** 的文字裡。那是從 § A 8.3.3 複製過來沒改的句子。
+記在這裡是為了讓後面的人不會以為是本專案抄錯，而它不影響上面那三句。
+
+`SOURCES.json` 多一筆 `spec-mips-iv-rev3.2`（PDF 不進 repo，放 `$FWRE_WORK`）；
+`SPEC.md` 多一列 `TC-08`。
+
+### 二、而同一段規格擋下了原訂的修法，這是今天最重要的一件事
+
+原訂的修法是：把 rs ∈ {0,2,4,6,8}（MF/CF/MT/CT/BC）判成 COP3／MIPS-I，**不算 hit**。
+
+**不能這樣做**，理由就在剛剛引的那一句裡：*optional and implementation-specific*。
+`--isa` 這張清單問的是「**這顆不知道會不會執行的指令**」，
+而對 COP3，**架構自己拒絕回答**——它在 MIPS-I 是選配的、由實作決定的。
+所以「它是 MIPS-I」對 `addu` 是充分的，對 `mfc3` 一句話都不是。
+
+而這件事在這個專案裡不是抽象的：**`docs/probe3-cells.md` 的 否證 M 就是在問這個** ——
+*「若 `mfc3` 在 `CU3` 已設的情況下 trap，CP3 就不是從 payload 到得了的」*。
+`probe3` 帶著八條 `mfc3` 上機，就是為了量它。
+**一個把那八條清掉的分類器，會對這支 payload 存在的理由本身保持沉默。**
+
+所以：**清單上一條都沒有拿掉。** `probe3` 的 `--isa` 命中維持 **13**，
+八條現在叫 `mfc3`、等級 `MIPS-I COP3`，而且逐條印出位址與解碼：
+
+```
+      mfc3               MIPS-I COP3     8
+          0x80500fa0  4c020000  |L...|   mfc3  v0,$0
+          0x80500fac  4c020800  |L...|   mfc3  v0,$1
+          …
+          0x80500ff4  4c023800  |L.8.|   mfc3  v0,$7
+```
+
+（原本這八行印的是 `.word 0x4c020000`。`--isa` 的整個契約是
+「每一個命中都把證據印在判決旁邊，讓讀的人可以推翻它」——`.word` 推翻不了什麼。）
+
+⚠️ 三個候選裡最誘人的那個（只把 rs ∈ {0,4} 也就是 MF／MT 清掉，因為 kernel 有四條 `mtc3`）
+**在同一個理由下更糟**：kernel 給的證據是 **MT**，而還沒量的是 **MF**，
+那個切法會把證據最弱的那一半清掉。
+
+### 三、一個誤讀，三個後果，而第三個是自己冒出來的
+
+| | 哪裡 | 錯在哪 |
+|:-:|---|---|
+| ① | `isa_hit()` | 標籤 `COP1X (MIPS-IV)` |
+| ② | `reads()` | 回 `{rs, rt}` —— **那是 COP1X 的運算元模型**，`lwxc1 fd,index(base)` 確實讀兩個通用暫存器。COP3 的 rs 欄是**功能選擇碼**，`mtc3` 的 rs 是 4 **因為 4 是 MT**，舊版把那個 4 當成 `$a0` 讀 —— 所以 `lw a0` 接 `mtc3 t0,$0` 會被報成一個**整段序列裡根本沒提到 `$a0`** 的違規 |
+| ③ | `control_flow()` | 不知道 `bc3` 是分支。delay slot 裡的 load 只查得到 fall-through 一條腿。🔴 **和 `M8` 抓到的 REGIMM branch-likely 缺口同一類，而它躲過 2026-08-24 那次清查，正是因為那時候 `0x13` 被當成 COP1X —— 而 COP1X 不是分支。** 一個錯誤的分類把第二個錯誤藏了起來 |
+
+②③ 都是**收窄**：`reads()` 只會回報得更少，`control_flow()` 只會多查一條腿。
+所以兩者都不可能製造出新的 violation，而這正是它們沒被抓到的原因。
+
+`reads()` 的修法是把 `0x13` 併進 COP0/1/2 那一行（`rs ∈ {0,1,2,8}` 回 `set()`，其餘 `{rt}`），
+不是給它一個新的分支——四個 COPz 共用同一個 move 編碼，讓它們共用同一行是**能被讀出來**的正確性。
+
+### 四、我以為一個現有數字都沒動，而那是今天被否證掉的第一件事
+
+| | 修法前 | 修法後 |
+|---|---|---|
+| `stage2.bin` load／nop／violation | 1474／646／0 | **1474／646／0** |
+| probe0／1／2／3 violation | 0／0／0／0 | **0／0／0／0** |
+| `K6a` code 區 | 18 strict／18 loose | **18／18** |
+| `K6c` 資料區 loose | 445 | **445** |
+| `K6c` 資料區 strict | 236 | 🔴 **261** |
+| `probe3` `--isa` 命中 | 13 | **13** |
+| 🔴 **解壓後的 kernel，violation** | 172 | **171** |
+
+**只有一個數字動了**，而它動的方向值得寫下來：**strict 上升**。
+COP3 的 CO 形式（rs ≥ 0x10）**沒有任何欄位被架構固定成零**，
+所以 strict 沒有東西可以拿來拒絕它；舊的 COP1X funct 過濾是在拿 **MIPS-IV 的規則**
+擋字，而這顆核心沒有 MIPS-IV 可以遵守。
+
+🔴 **而「擋 44 個字」是我寫錯的數字，審查把它抓出來了。** 量，舊工具對新工具，對同樣那 97 個字：**舊 strict 收 28、擋 69**（52 個 CO 形式裡擋掉 40 個）；**新 strict 收 53、擋 44**。**44 是新規則的數字**。收支是 **CO 多收 40、rs 未定義的少收 15，淨 +25**，正好是 261 − 236 —— 而我原本那個寫法連算式都收不起來（236 + 44 = 280）。
+
+🔴 **而那最後一列是今天的對抗審查加上去的，我自己漏了它。**
+我量了 `stage2.bin` 與四支 payload 就寫下「一個數字都沒動」——
+沒量解壓後的 kernel。少掉的那一個 violation 值得整段話：
+
+```
+0x802BC490  lhu   t7,780(s2)
+0x802BC494  4df46783      <- opcode 0x13, rs = 15
+```
+
+`rs` 是 15，`$t7` 就是暫存器 15，而舊的 `reads()` 回 `{rs, rt}` ——
+**工具把一個子運算碼選擇欄當成剛被載入的暫存器，報了一個不存在的 hazard。**
+那個字在 `0x802BA660` 以上，是 `CPU-44` 記的 code／data 分界之後，**資料被當程式碼解**。
+
+所以正確的說法是：**gate 指著的檔案沒動，而這棵樹裡唯一看得見這個修法的地方，
+是那個沒有任何 gate 指著的 kernel —— 而它動的方向是拿掉一個假陽性。**
+⚠️ 它不是外人：`K9` 八個 fixture 裡有四個就是從它切出來的，
+`docs/probe3-cells.md` 用 sha256 釘著它。
+
+**一個幾乎不動任何數字的修法，是這套 suite 幾乎看不見的修法。**
+一個沒有人證明過會失敗的檢查不是檢查——所以：
+
+- **`hazlint` 10 → 12 個控制。**
+  `K6d`：資料區沒有任何 `0x13` 的字帶 MIPS-IV 等級，而且 97 個全部帶 COP3 等級。
+  `K9`：**十一個字**。八個真實存在（kernel 的四條 `mtc3`、`probe3` 的一條 `mfc3`、
+  loader 字串表裡的 `|LOAD|` 與 `|M...|`、以及 `-march=mips4` 真的產出的 `lwxc1`
+  `0x4ca40000` —— **舊標籤名字的來源，用取代它的規則去分類**），
+  三個手編：`ctc3`／`lwc3`／`swc3`，**這棵樹裡一個都沒有，所以只能手編**。
+  後面三個是審查逼出來的：它把 `COP3_MOVE` 的 `rs=6` 那一格刪掉，
+  **整套 suite 依然全綠**，而 `--isa` 從此對一條合法的 `ctc3` 沉默。
+  再加 **32 個 rs 值全掃**、兩個分類器都掃，以及 **6,656 個字掃一條不變式**：
+  **strict 的命中一定也是 loose 的命中**。`K6a`–`K6d` 都是計數，
+  而計數看不見一個字拿到錯誤的**答案** —— 只要總數不變，而那正是今天這個缺陷。
+  🔴 **`K9` 不需要 `stage2.bin`**，所以在一份乾淨的 clone 裡分類器也有一個會失敗的控制。
+  `K6c` 的兩個數字從「只斷言 loose ≠ strict」改成**釘死** —— 它原本無論怎麼改都不會紅。
+  🔄 **`K6d` 兩個分類器都要看**：第一版只讀 loose，而審查造出一個**只在 strict 下**把 52 個 `CO` 字標成 `MIPS-IV` 的變異體，整套 suite 全綠。
+- **`tools/test-hazlint.sh` 56 → 96。** `P3`（同樣三個數字從**印出來的報告**再讀一次，
+  外加「報告裡不可以有 COP1X 命中群」與「`0x8040b24c` 要印成 `bc3f`」）、
+  `E3`（上面那張 `-march` 表，變成會重跑的控制）、`M10`–`M14`。
+- **`tools/test-rlxprobe.sh` 195 → 202。** T1 多一條走 `hazlint --isa` 的指紋，
+  和原本走 `objdump` 的那條**互為獨立來源**：一個解碼、一個分類，兩個都說 8＋5 才算數。
+
+**M10–M14 各自都被要求指名它打紅了哪一個控制**，不只是「exit 2」。
+⚠️ 而我給的理由本身是錯的：原文寫「一個語法錯誤也會 exit 2」——**不會**，Python 的 `SyntaxError` 是 exit 1（量）。真正的理由是 exit 2 只說「某個控制紅了」，一個打紅**別的**控制的變異體看起來會一模一樣。M10 必須讓 `K9`／`K6d`／`K6c` 紅，
+**而且 `K6c` 要回到 1.1 量到的 `445 loose, 236 strict`**（證明這個 mutation 重現的是
+*那個*缺陷而不是隨便一個缺陷）；M11 必須讓 `K1` 紅而 `K9` 不受影響；M12 反過來。
+
+`K1` 20 → 25 案，其中三個新案是**必須不觸發**的：
+`lw t0` 接 `mfc3 t0,$0`、`lw a0` 接 `mtc3 t0,$0`、`lw t0` 接 `bc3t`。
+兩個是**必須照樣觸發**的：`mtc3`／`ctc3` 真的讀 rt。
+
+### 五、順著查出三件自己咬到的事
+
+**(a) `tools/opcount.py:44` 有一模一樣的 `0x13: ("COP1X", "MIPS-IV")`。**
+同一天、同一個誤讀，在第二支工具裡。改成 `("COP3", "MIPS-I, optional")` ——
+等級欄寫 `MIPS-I, optional` 而不是像 COP0／COP2 那樣留白，
+因為對 COP3 而言 ISA 等級**沒有**把事情講完。`test-opcount.sh` 15 案不變。
+
+**(b) 🔴 `test-hazlint.sh` 有一個案子在這台上永遠不會失敗、在 runner 上永遠不會通過，
+而它檢查的正是 gate 自己的 exit 契約。**
+
+```
+"$PY" "$HAZ" --self-test >/dev/null 2>&1
+if [ -n "$STAGE2" ]; then ck "self-test -> 0" 0 "$?"; else ck "… -> 2" 2 "$?"; fi
+```
+
+`if` 會**先執行** `[ -n "$STAGE2" ]`，所以 `$?` 讀到的是那個中括號測試的結果，
+從來不是 hazlint 的。量 2026-08-27：把這一行指向一個 `--self-test` 真的回 **2** 的 hazlint，
+它印 `ok … 0`。這台上中括號成功（`$?`＝0）所以案子恆綠，
+runner 上中括號失敗（`$?`＝1）所以案子恆紅 ——
+**而後面那一半已經被當成「環境的性質」報告了兩天。**
+修法是 `rc=$?` 放在同一行。
+
+**(c) `cells.S` 註解 6 說「`-march=mips1` 兩個 mnemonic 都拒」，而它只拒一個。**
+量（用這個 Makefile 自己的 ARCH 行：`-march=mips1 -mabi=32 -msoft-float -EB -G0
+-mno-abicalls -fno-pic`）：
+
+| | |
+|---|---|
+| `mfc3 $2,$0` | **接受** `4c020000` |
+| `mtc3 $8,$0` | **接受** `4c880000` |
+| `cfc3 $2,$0` | **接受** `4c420000` |
+| `bc3t` | **接受** `4d010003` |
+| `cache 0x11,0($4)` | **拒絕** — *"opcode not supported on this processor: mips1"* |
+
+所以組譯器從來不是 COP3 那一半的理由。
+**raw word 留著，但理由換成一個量得出來的**：同一支組譯器在 `-march=mips3`／`mips4`
+下會**拒絕** `mfc3`，因為 COP3 在 MIPS III 被拿掉、在 MIPS IV opcode 被收走 ——
+**寫 mnemonic 等於要求工具鏈跟我們對「誰擁有 opcode 0x13」意見一致**，
+而 `R2c` 的存在就是要比三條工具鏈。`.word` 沒有任何一條可以重新詮釋。
+**註解改掉、payload 一個位元組都不動**：重建後 sha256 `1a0725c0…`、29,088 bytes，量，完全相同。
+
+### 六、兩份檔案對同一個量測記了不同的數字，而錯的是沒人查的那一份
+
+`tools/ci-expected.tsv` 寫 `test-hazlint` 在 runner 上「FAILS **14** cases」；
+`.github/workflows/ci.yml` 對同一個組態寫 **26**。量 2026-08-27，HEAD 自己的那一對：
+**20 ok／26 FAIL／5 skip**。所以 tsv 是舊的，而它舊了多久沒有人知道，
+因為 `test-hazlint` 是 `*bench-only*`——**CI 刻意不跑它，所以也沒有東西會反駁它**。
+
+兩邊都重量、都帶日期：
+
+| | 量 2026-08-27 |
+|---|---|
+| `test-hazlint`（`$FWRE_WORK` 清空） | **45 ok／30 FAIL／8 個 skip 行涵蓋 21 案** = 96 ✓ |
+| `test-rlxprobe`（清空、有 cross gcc） | **101 ok／101 FAIL** = 202 ✓ |
+| census（CI 的形狀，無 cross gcc） | 綠，`NOT RUN IN THIS JOB` 162 → **298** |
+
+（26 而不是原本那 26 裡的同一批：(b) 那一個案子修好之後在 runner 上也會通過，而 `M13` 又帶進一個需要 `stage2.bin` 的斷言，兩者剛好抵銷。**這種抵銷是巧合，不是設計**，所以兩個數字都是量的、都帶日期。）
+
+### 七、開 `R2a/b/d`，而開它的第一件事是推翻 `PROGRESS` 自己的一句話
+
+§ Blocked on 在 2026-08-26 寫：可重現建置容器擋的是 `R2c`，**`R2a/b/d` 完全不需要它**。
+**不對。** `plan/router-rebuild-plan.md:1084` 那個容器的標題就是
+「**前置 —— 可重現的建置環境（1 個工作段，`R2a` 之前）**」，
+因為 `R2a` 要**用 T-vendor 重建 BusyBox 1.13.4**、`R2b` 要**分別建三個 drop 的 `boa`**。
+當初那句 narrowing 把 gate board 的「none of it needs `R1`」讀成了「不需要容器」。
+
+**但方向沒錯，只是理由要換。** 真正不需要容器的是：
+**六棵樹的兩兩相似度矩陣**與 **`R2d` 的兩條 grep**，那是這個 gate 的大半價值。
+所以 gate 從那裡開，容器變成它自己的步驟 `R2a/b/d-3`。
+
+量 2026-08-27，材料確認在磁碟上，而且和計畫的表逐一吻合：
+
+```
+526,732  n300rt-2.1.6/bin/boa      400,424  n300rt-3.4.0/bin/boa
+522,556  v2.1.2/bin/boa            404,904  v3.4.0/bin/boa
+509,632  n200re-3.2.0/bin/boa      485,012  unit-2018/bin/boa   ← 這台
+```
+
+🔴 **而開表之前先問了一個更便宜的問題，因為它會改變分母。**
+`v2.1.2` 與 `n300rt-2.1.6` 的 `busybox` **位元組數一模一樣（274,656）** ——
+若逐位元組相同，六棵樹其實只有五個獨立樣本。
+量：**不同**，十二個 binary（六 `boa` ＋ 六 `busybox`）的 sha256 全部相異。
+第一個差異在 byte 267,198，也就是 97.28 % 處。
+
+🔴 **但「第一個差異的位置」是我問錯的量，而審查量了對的那個。**
+那兩個檔**只差 8 個位元組**，而且八個都是 BusyBox banner 裡的日期數字：
+`BusyBox v1.13.4 (2015-08-11 17:26:34 CST)` 對 `(2016-05-16 12:41:50 CST)`。
+**它們有 99.997 % 相同**，不是 97.3 %；「只差在尾巴 2.7 %」在位置上為真，
+而讀起來像「2.7 % 的內容不同」，那是錯的一百倍。
+
+**這改變的是它要回答的那個問題。** `busybox` 這一側，`v2.1.2` 與 `n300rt-2.1.6`
+**是同一個 build 在不同日子重跑的結果**，不是兩個獨立樣本 —— 六棵樹裡有五個
+`busybox` 樣本，不是六個。`boa` 那一側六個大小全不同、兩兩比對沒有同尺寸的一對，
+所以 `boa` 是六個。
+⚠️ 而那一對正好給了 `R2a/b/d-0` 一個**免費的校準點**：一把尺如果不把
+99.997 % 相同的兩個檔打在最上緣，它量的不是結構相似度。
+
+容器那一步的三條路線也重量了一次：這個 distro 裡 **`docker`／`podman`／`debootstrap` 一個都沒有**，
+`PATH` 上唯一的 `docker` 是 Docker Desktop 在 `/mnt/c` 的 shim ——
+也就是 2026-08-24 量到會回 *could not be found in this WSL 2 distro* 的那一個。
+**路線①是已經被量掉的那一條**，寫進步驟表裡，免得下一段再走一次。
+
+### 八、然後把今天的 diff 送去被否證，而它扛下了十一條
+
+**五個視角**（解碼器本身／新控制發得出錯嗎／每一個數字自己重量一次／
+有沒有講超過證據／跨檔一致性），**每一條發現各配一個專責反駁者**，
+**31 個 agent、11 條存活、14 條被駁回**。存活的裡面有四條改了實質內容：
+
+1. 🔴 **「一個現有數字都沒動」是假的** —— §四已經改寫，kernel 172 → 171。
+2. 🔴 **「舊過濾擋掉 44 個字」是新規則的數字** —— §四已改，正確是 69（CO 那一段是 40）。
+3. 🔴 **`notes/cache-model.md` 的「97 個沒有一個低 11 位元為零」是假的** —— **有九個**。
+   八個是 `CO` 形式，第九個是 `0x4D000000`@`0x8040B24C`，**一個結構完整的 `bc3f`**，
+   而它就是 `hazlint` 自己 `K9` 裡那個「strict 必須接受」的 fixture。
+   **所以 `stage2.bin` 裡確實有一個字解得出合法的 COP3 指令。**
+   結論活下來了（那三個 `CF` 形式的低位元都不是零），但撐著它的前提沒有 ——
+   救回它的字是「**move**」。
+4. 🔴 **同一個誤標在隔壁的 opcode 上還活著，而那一半在 gate 裡。**
+   規格那一節的標題是 *"Coprocessor 3 — COP3 **and CP3 load/store**"*，
+   所以 `0x33`（`LWC3`）與 `0x3B`（`SWC3`）是同一件事。`ISA_OPS` 還把 `0x33` 標成
+   `('pref', 'MIPS-IV')`；`tools/opcount.py` 也是。**更嚴重的是 `reads()`**：
+   `0x32`／`0x3A`／`0x3B` 掉進 unknown-opcode 分支回 `{rs, rt}`，
+   而 `swcz` 的 `rt` 是**協處理器**暫存器不是通用暫存器 ——
+   量：舊工具對 `lw t0,0(t1)` 接 `swc3 t0,0(a0)` **報一個 violation 並 exit 1**。
+   **和 `mtc3` 那個完全同型，只是它在 gate 裡而不是在報告裡。**
+   `M14` 是它的 mutation，`K1` 20 → 28 案。
+
+還有三條是控制本身不夠：`K6d` 只看 loose（造得出一個只在 strict 下標錯的變異體）、
+`K9` 只比對助憶碼不比對等級（同上）、`COP3_MOVE` 的 `rs=6` 刪掉整套 suite 全綠。
+三個都補了，`K9` 從八案變十一案。
+
+**被駁回的十四條也值得記一句**：其中一條說 `reads()` 對未定義的 `rs` 回 `{rt}`
+是 under-report ——反駁者指出**架構上的真值是空集合**，而且 `0x10`／`0x11`／`0x12`
+本來就這樣，這個修法是把不一致拿掉。另一條說 `busybox` 的 97.3 % 寫錯了 ——
+位置上它是對的，錯的是它被拿來推出的結論，所以我改的是結論不是數字。
+
+⚠️ **審查自己也寫下了它沒看的東西**，照抄：沒有任何一件事在裝置上跑過；
+**CI 一個 hazlint case 都不跑**（`test-hazlint` 是 `*bench-only*`、`test-rlxprobe`
+在 `mips-linux-gnu-gcc` 的守門上 skip），所以上面每一個控制都只在這台機器上手動跑過；
+`COP2`（`0x12`）在規格裡是用**一模一樣的字**寫成 optional 的，而它在清單上一格都沒有 ——
+**那是一個這次沒關掉的洞，寫在 `hazlint` 的註解裡而不是假裝沒有。**
+
+### 數字
+
+`hazlint` **1.1 → 1.2**，控制 10 → **12**。
+`tools/test-hazlint.sh` **56 → 96 passed, 0 failed**。
+`tools/test-rlxprobe.sh` **195 → 202 passed, 0 failed**。
+`tools/test-opcount.sh` 15、`spec-check.py` 11 個控制、其餘七支不變，九支全綠。
+`ci-census` 對 CI 形狀的 capture 收得起來，`NOT RUN IN THIS JOB: 298`。
+`probe3` sha256 `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`，29,088 bytes，**不變**。
+
+### 動到的檔
+
+`tools/hazlint`（1.1 → 1.2）、`tools/test-hazlint.sh`、`tools/test-rlxprobe.sh`、
+`tools/opcount.py`、`tools/test-opcount.sh`、`tools/ci-census.py`、
+`tools/ci-expected.tsv`、`.github/workflows/ci.yml`、
+`tools/rlxprobe/cells.S`（只有註解，映像不變且量過）、
+`docs/probe3-cells.md`、`notes/cache-model.md`、`SOURCES.json`、
+`SPEC.md`（`CPU-44`、`TC-08` 新）、`PROGRESS.md`、`CHANGELOG.md`。
+
+**零 flash 位元組，零電源循環，零裝置讀數。** 今天沒有一件事碰到那台機器 ——
+`m-imem`／否證 M 依然開著，而這一整段工作的意義就是讓問它的那支工具
+**在問對的問題**。

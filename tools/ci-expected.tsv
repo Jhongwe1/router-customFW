@@ -16,6 +16,12 @@
 # counts as not run. It is listed rather than omitted because a suite nobody
 # lists is a suite nobody misses.
 #
+# 2026-08-27: test-hazlint 56 -> 96 and test-rlxprobe 195 -> 202, both from the
+# COP3 correction in hazlint 1.2. Note what did NOT move: no violation count on
+# any artefact in this tree changed, on either tool, before or after. The whole
+# of the delta is controls and mutations -- which is the only way a fix that
+# moves no number can be shown to have been a fix at all.
+#
 # 2026-08-26: spec-check went 10 -> 11 when it gained C8 and a ninth mutation.
 # Caught by running ci-census against a fresh spec-check.out BEFORE the push --
 # the second time a number in this repository would have been contradicted by
@@ -29,7 +35,7 @@ test-console-capture	29	-	0	-
 verify-backup-copy	4	-	0	-
 ci-census	12	-	0	-
 test-opcount	15	hardcoded fixture	1	needs binutils-mips-linux-gnu; CI installs it, so this skip should NOT appear
-test-rlxprobe	195	everything	195	needs gcc-mips-linux-gnu -- and CI deliberately does NOT install it, because with the cross compiler present the suite BUILDS and then hazlint refuses to report without its stage2.bin population control, which is correct behaviour; re-measured 2026-08-26 with $FWRE_WORK empty it is 100 ok / 95 FAIL. 106 -> 195 on 2026-08-26 when probe3 arrived: P4/T1/W1-W4/Y1-Y4, six static mutations, and Q4/Q5/Q6 plus six qemu mutations
-test-hazlint	56	*bench-only*	56	its K4 population control is $FWRE_WORK/stage2.bin -- 56 KiB of this unit's own vendor bootloader, which is someone else's property and identifies one physical device. On a runner the suite does not skip, it FAILS 14 cases, because hazlint exits 2 rather than report without that control
+test-rlxprobe	202	everything	202	needs gcc-mips-linux-gnu -- and CI deliberately does NOT install it, because with the cross compiler present the suite BUILDS and then hazlint refuses to report without its stage2.bin population control, which is correct behaviour; re-measured 2026-08-27 with $FWRE_WORK empty it is 101 ok / 101 FAIL, which closes exactly against 202. 106 -> 195 on 2026-08-26 when probe3 arrived: P4/T1/W1-W4/Y1-Y4, six static mutations, and Q4/Q5/Q6 plus six qemu mutations; 195 -> 202 on 2026-08-27 when T1 gained the hazlint --isa fingerprint beside its objdump one
+test-hazlint	96	*bench-only*	96	its K4 population control is $FWRE_WORK/stage2.bin -- 56 KiB of this unit's own vendor bootloader, which is someone else's property and identifies one physical device. On a runner the suite does not skip everything, it FAILS: 量 2026-08-27, 45 ok / 30 FAIL / 8 skip lines covering 21 cases, which closes against 96. The 14 that stood here was stale and by how much was never checked -- HEAD's own pair measured 26 the same day, and one of those 26 was a defect in this suite rather than in hazlint (see the rc=$? note at the exit-code contract). 56 -> 96 on 2026-08-27: P3, E3, M10-M14 and the K9/K6d controls behind them; M13 and M14 came out of the adversarial review of the first draft, which is also why this row was written three times in one afternoon
 test-reply-size	21	-	0	-
 test-boot-timeline	15	-	0	-

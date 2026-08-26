@@ -129,12 +129,19 @@ def census(table, capdir, only=None, check_arithmetic=True, out=sys.stdout):
         # A suite marked BENCH_ONLY is one CI is not expected to run at all, and
         # the whole of it counts as not run.  It is in the table rather than
         # left out of it because a suite nobody lists is a suite nobody misses:
-        # `tools/test-hazlint.sh` is 56 cases and its population control is a
+        # `tools/test-hazlint.sh` is 96 cases and its population control is a
         # 56 KiB vendor bootloader that may not be redistributed, so on a runner
-        # it does not skip -- it FAILS 14 cases, because hazlint refuses to
+        # it does not skip -- it FAILS 30 of them, because hazlint refuses to
         # report without that control and the refusal is correct.  Leaving it
         # out of CI is the right call; leaving it out of the ARITHMETIC is how a
         # badge becomes a claim that cannot fail.
+        #
+        # Those two numbers read 56 and 14 until 2026-08-27, and the 14 was
+        # wrong on the day it was written or soon after: HEAD's own pair
+        # measured 26.  A comment is not a control.  This one is prose about a
+        # suite this file deliberately does not run, so there is nothing here
+        # to check it -- which is the reason it now carries the date it was
+        # measured, the same rule `ci-expected.tsv` already runs on.
         if BENCH_ONLY in allowed:
             if os.path.exists(path):
                 lines.append(f"  RED   {suite}: marked {BENCH_ONLY} and yet "

@@ -126,7 +126,21 @@ fails**.  `--self-test` runs them and nothing else.
       `[0x80400000, 0x8040A000)` must give **exactly 18** hits -- `movz` x 12,
       `movn` x 6 -- at the addresses `docs/loader-command-semantics.md` §9
       lists one by one, and the data region must reproduce the two false
-      positives that document names by address.
+      positives that document names by address.  K6c pins that region's two
+      totals -- **445 loose, 261 strict** -- and K6d asserts that no word of
+      primary opcode `0x13` carries a MIPS-IV level.
+  K9  the COP3 classification, on eleven words that exist somewhere real or
+      that an assembler here will produce: the four `mtc3` in this unit's own
+      kernel, one `mfc3` out of `probe3`'s emitted image, two out of the
+      loader's string table, one genuine COP1X word from `-march=mips4`, and
+      `ctc3`/`lwc3`/`swc3` hand-encoded because no artefact in this tree
+      contains one -- which is exactly why they need a fixture.  Plus all 32 values of the `rs` field,
+      and 6,656 words swept for the invariant that makes `strict` mean
+      anything: **a strict hit is always also a loose hit**.  K6a-K6d are
+      counts, and a count cannot see a word getting the wrong ANSWER as long as
+      the total is unchanged -- which is exactly what the 2026-08-27 defect
+      was.  **This one runs without `stage2.bin`**, so a fresh clone still has
+      a control on the classifier.  98 ms for the whole self-test.
 
 Using it as a gate, which is the half that matters tomorrow
 -----------------------------------------------------------
@@ -162,6 +176,85 @@ control gaps (four).  `tools/test-hazlint.sh` grew M7-M9, U1 and U2 so that each
 fix has a mutation that fails without it -- the review's finding 6 was that the
 patched tool and the shipped tool were indistinguishable to the old suite.
 
+Version 1.2, 2026-08-27 -- primary opcode 0x13 is COP3, not COP1X
+------------------------------------------------------------------
+Three places read that opcode as COP1X and all three were wrong for this core.
+
+**What it cost the gate is one violation, and finding it took an adversarial
+reader.**  The first version of this note said no violation count on any
+artefact in this tree moved; that was measured on `stage2.bin` and the four
+payloads and not on the artefact where it is false.  On the decompressed device
+kernel (`$FWRE_WORK/rebuild/b4c-desk/vmlinux-rederived.bin`, 3,374,772 bytes)
+violations go **172 -> 171**, and the one that leaves is worth the paragraph:
+
+    0x802bc490  lhu   t7,780(s2)
+    0x802bc494  4df46783   -- opcode 0x13, rs = 15
+
+`rs` is 15, `$t7` is register 15, and the old `reads()` returned `{rs, rt}`.  So
+the tool reported a load-use hazard on the strength of reading a *sub-opcode
+selector* as the register the load had just written.  The word is at
+`0x802bc490`, above the `0x802BA660` boundary `CPU-44` records, i.e. **data
+decoded as code** -- a false positive of exactly the class the `reads()` fix
+removes, and the only place in this tree where that fix is observable at all.
+That makes the kernel the positive control on this change, and the reason
+nothing had caught the defect is not that it changed nothing: it is that the
+one artefact it changed is the one no control is pointed at.
+
+  * `isa_hit` labelled 0x13 words `COP1X (MIPS-IV)` -- all 97 of `stage2.bin`'s
+    under `--loose`, and 28 of them under `--strict`, the other 69 being
+    rejected by a **MIPS-IV funct table** this core has no MIPS-IV to obey.
+    The asymmetry matters: this file's own K6c comment says a count quoted
+    without its classifier is not a measurement, and the same goes for a label.
+  * `reads` returned `{rs, rt}`, which is COP1X's operand model -- `lwxc1
+    fd,index(base)` reads two general registers.  Under COP3 the `rs` field is
+    a function selector, so the shipped tool read `mtc3`'s selector 4 as `$a0`
+    and would have reported a hazard on `lw a0` / `mtc3 t0,$0`.  K1 x 5.
+  * `control_flow` did not know `bc3` is a branch, so a load in its delay slot
+    had its successor resolved to the fall-through alone.  K7's new case.
+    **That one survived the 2026-08-24 decoder sweep because the first one was
+    there**: COP1X is not a branch, so there was nothing to look for.
+
+`tools/test-hazlint.sh` M10-M14 undo one of these each and demand that a NAMED
+control refuse rather than merely that the tool exit 2.  Not for the reason the
+first draft of this line gave -- it said a syntax error in the mutation also
+exits 2, and 量: a Python `SyntaxError` exits **1**, so that hazard does not
+exist.  The real reason is that exit 2 says only *some* control failed, and a
+mutation that trips an unrelated one would look like a pass.  M13 is the odd
+one and it is the one worth reading: it breaks the
+strict-implies-loose invariant **outside opcode 0x13**, so every count K6a-K6d
+reads is unchanged and K9's sweep is the only thing in the tool that sees it.
+
+The ISA history, because the note that started this had it wrong by two levels
+and the wrong version is the kind that survives by sounding specific.  **COP3
+is MIPS I and MIPS II; MIPS III removed it; MIPS IV reused the opcode for
+COP1X.**  Two sources.  Measured here on binutils 2.42: `mfc3 $2,$0` assembles
+under `-march=mips1` and `-march=mips2`, is refused at `mips3` and `mips4`, and
+`lwxc1` is refused until `mips4`.  Read, MIPS IV Instruction Set Rev 3.2 (Price,
+1995) A 8.3.4: *"Coprocessor 3 is optional and implementation-specific in the
+MIPS I and MIPS II architecture levels.  It was removed from MIPS III and later
+architecture levels.  Note that in MIPS IV the COP3 primary opcode was reused
+for the COP1X instruction class."*
+
+That quotation is also why **nothing came off the watch list** -- and the
+decision is cheaper than it sounds, because `--isa` is not the gate.  量:
+`tools/rlxprobe/Makefile:301` runs `$(HAZLINT) $<` with no `--isa`, so an ISA
+hit has never failed a build.  What is at stake is what the report SAYS.  `--isa` reports
+what this core is not known to implement, and for COP3 the architecture itself
+declines to say -- optional, implementation-specific.  This unit's own kernel
+executes four `mtc3` at reset (`0x8000227C`..`0x800022E8`, CP3 `$0`/`$1`/`$4`/
+`$5` = IMEMBASE/IMEMTOP/DMEMBASE/DMEMTOP), and **the strongest form of that
+argument is behavioural rather than architectural**: those four sit before
+`trap_init`, so if CP3 were absent the first would take Coprocessor Unusable
+with no handler installed, and this unit boots to a shell.  State it in full,
+because the answer to it is narrow: the words are 讀 out of a decompressed
+image and **nothing has traced that path executing on this die** -- not the
+`mtc3`, not the `CU3` write in front of them.  A boot that reaches a shell
+constrains the path taken, and this project has not established that it is
+this one.  What settles it is `probe3`'s `m-imem`, and `probe3` emits eight
+`mfc3` to run it.  A tool that cleared those eight would be silent about the
+instruction the payload was built to ask about.  They are still hits.  They are
+hits with the right name.
+
 Usage
     tools/hazlint FILE [--base ADDR] [--range LO:HI] [--raw] [--section NAME]
                        [--survey] [--max-report N]
@@ -176,7 +269,7 @@ import os
 import struct
 import sys
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 # --------------------------------------------------------------------------
 # The instruction model
@@ -201,6 +294,10 @@ REGS = ('zero', 'at', 'v0', 'v1', 'a0', 'a1', 'a2', 'a3',
 LOADS = {0x20: 'lb', 0x21: 'lh', 0x22: 'lwl', 0x23: 'lw',
          0x24: 'lbu', 0x25: 'lhu', 0x26: 'lwr'}
 MERGING = (0x22, 0x26)          # lwl / lwr: rt is a source as well as a target
+
+# The four COPz register-move forms, by rs, for coprocessor 3.  Primary opcode
+# 0x13 is COP3 on this core and NOT COP1X; the whole argument is in isa_hit().
+COP3_MOVE = {0x00: 'mfc3', 0x02: 'cfc3', 0x04: 'mtc3', 0x06: 'ctc3'}
 
 
 def rs_of(w):
@@ -282,14 +379,22 @@ def reads(w):
         return {rs}
     if op == 0x0F:                                  # lui
         return set()
-    if op in (0x10, 0x11, 0x12):                    # COP0 COP1 COP2
+    if op in (0x10, 0x11, 0x12, 0x13):              # COP0 COP1 COP2 COP3
         # MT/CT move a general register INTO the coprocessor, so they read rt;
         # MF/CF write rt.  Any other rs -- and this loader has four words at
         # 0x80400C40..0x80400C7C with rs = 3, which no source held here names --
         # is treated as reading rt, which is the reporting direction.
+        #
+        # 0x13 joined this line on 2026-08-27.  It used to have its own case
+        # returning {rs, rt}, which is the correct model for COP1X: `lwxc1
+        # fd,index(base)` really does read two general registers.  On this core
+        # 0x13 is COP3, where the rs field is a FUNCTION SELECTOR and not a
+        # register at all -- so the old case manufactured false positives out of
+        # thin air.  `mtc3 t0,$0` is 0x4C880000, rs field 4, and the shipped
+        # tool read that 4 as `$a0`: a `lw a0` in front of any `mtc3` was a
+        # violation that does not exist.  Nothing in this tree tripped it, which
+        # is why it survived; see K1's four COP3 cases.
         return set() if rs in (0x00, 0x01, 0x02, 0x08) else {rt}
-    if op == 0x13:                                  # COP1X (MIPS-IV)
-        return {rs, rt}
     if op in MERGING:
         # `lwl`/`lwr` merge into rt, so **rt is a source as well as the
         # target**.  This file's own MERGING comment said so and this function
@@ -297,11 +402,20 @@ def reads(w):
         # all -- it could only ever fire on a case that was already invisible.
         # Found by the adversarial review, 2026-08-24.
         return {rs, rt}
-    if op in LOADS or op in (0x30, 0x31, 0x33, 0x35, 0x2F):
-        return {rs}                                 # loads, ll, pref, cache
+    if op in LOADS or op in (0x30, 0x31, 0x32, 0x33, 0x35, 0x2F):
+        return {rs}                                 # loads, ll, lwcz, cache
     if op in (0x28, 0x29, 0x2A, 0x2B, 0x2E, 0x38):  # sb sh swl sw swr sc
         return {rs, rt}
-    if op in (0x39, 0x3D):                          # swc1 sdc1
+    if op in (0x39, 0x3A, 0x3B, 0x3D):              # swc1 swc2 swc3 sdc1
+        # 0x32/0x3A/0x3B joined these two lines on 2026-08-27, and it is the
+        # SAME defect as opcode 0x13's, found one row along by the reader sent
+        # to refute the 0x13 fix.  In every `lwcz`/`swcz` the `rt` field names
+        # a COPROCESSOR register, not a general one -- so falling through to
+        # the unknown-opcode `{rs, rt}` made `lw t0` then `swc3 t0,0(a0)` a
+        # violation that does not exist.  量 2026-08-27: that pair really did
+        # exit 1 on the shipped tool.  Latent only because nothing in this tree
+        # emits one; a payload that eventually reaches CP3 through a load would
+        # have met it.
         return {rs}
     if op in (0x1C, 0x1F):                          # SPECIAL2 SPECIAL3
         return {rs, rt}
@@ -340,10 +454,20 @@ def control_flow(w, addr):
         # 2026-08-24: a load in one of their delay slots had its successor
         # resolved to the fall-through alone, which is one of the two legs.
         return ('cond', tgt)
-    if op in (0x10, 0x11, 0x12) and rs == 0x08:
-        # bc0f / bc0t / bc1f / bc1t / bc2f / bc2t.  reads() already modelled the
-        # coprocessor branches as reading no general register; this function did
-        # not know they were branches at all.
+    if op in (0x10, 0x11, 0x12, 0x13) and rs == 0x08:
+        # bc0f / bc0t / bc1f / bc1t / bc2f / bc2t -- and bc3f / bc3t, which was
+        # missing until 2026-08-27 for the same reason the four REGIMM
+        # branch-likely forms were: the opcode was modelled somewhere else in
+        # this file and not here.  A load in a `bc3` delay slot had its
+        # successor resolved to the fall-through ALONE, which is one of the two
+        # legs -- exactly the defect M8 exists to catch on the REGIMM side.
+        #
+        # This does not assert that this core HAS a CpCond3 input; `--isa`
+        # reports `bc3` as unsourced precisely because nothing here says it
+        # does.  What this line asserts is narrower and safe in the reporting
+        # direction: IF the word branches, both legs are checked.  If instead it
+        # traps, the successor is the exception vector, which this tool does not
+        # model for any instruction.
         return ('cond', tgt)
     return (None, None)
 
@@ -427,6 +551,39 @@ def text(w):
             return 'mtc0  %s,$%d' % (R[rt], rd)
         return '.word 0x%08x  (COP0 rs=%d, unnamed by any source held here)' \
             % (w, rs)
+    if op in (0x33, 0x3B):
+        # LWC3 / SWC3 on a MIPS-I core.  0x33 is PREF from MIPS IV on, which is
+        # what this rendered until 2026-08-27 -- the same reallocation as 0x13.
+        return '%-5s $%d,%d(%s)' % ('lwc3' if op == 0x33 else 'swc3',
+                                    rt, simm(w), R[rs])
+    if op == 0x13:
+        # COP3, not COP1X -- see isa_hit().  Named here because `--isa` prints
+        # this beside every hit, and `.word 0x4c020000` is not something a
+        # reader can overturn a verdict with.  These renderings agree with
+        # `mips-linux-gnu-objdump -m mips:3000`, which is where they were
+        # checked: 0x4c880000 -> `mtc3 t0,$0`, 0x4c020000 -> `mfc3 v0,$0`.
+        n = COP3_MOVE.get(rs)
+        if n:
+            # The residue is not decoration.  Three of stage2.bin's words --
+            # 0x4c4f540a and 0x4c4f4144 twice, the ASCII `LOT` and `LOAD` --
+            # render as a clean `cfc3` while `strict` refuses them for exactly
+            # these bits, and `objdump -m mips:3000` refuses them too.  A
+            # rendering that hides the reason strict said no is a rendering
+            # arguing for loose.
+            return ('%-5s %s,$%d' % (n, R[rt], rd)
+                    + ('' if (w & 0x07FF) == 0
+                       else '  [+0x%03x: not a valid encoding]' % (w & 0x07FF)))
+        if rs == 0x08:
+            n = {0x00: 'bc3f', 0x01: 'bc3t', 0x02: 'bc3fl', 0x03: 'bc3tl'} \
+                .get(rt)
+            if n:
+                return '%-5s %+d' % (n, simm(w) * 4)
+            # rs says BC and rt does not name a condition.  Saying "no MIPS-I
+            # encoding" here would be wrong about the wrong field.
+            return '.word 0x%08x  (COP3 bc3, rt=%d names no condition)' % (w, rt)
+        if rs >= 0x10:
+            return 'cop3  0x%07x   (CO, coprocessor-defined)' % (w & 0x1FFFFFF)
+        return '.word 0x%08x  (COP3 rs=%d, no MIPS-I encoding)' % (w, rs)
     return '.word 0x%08x' % w
 
 
@@ -607,12 +764,23 @@ def survey(spans):
 # ISA-level conformance -- the fourth check, kept as a subsidiary
 # --------------------------------------------------------------------------
 #
-# The watch list is "what this core is not known to implement", which is two
-# different things and both belong on it:
+# The watch list is "what this core is not known to implement", which is three
+# different things and all three belong on it:
 #
 #   * the four MIPS-I unaligned load/stores, because a Lexra core is MIPS-I
 #     MINUS those -- `C-7`/`F51` owns that question and it is still open;
-#   * everything above MIPS-I.
+#   * everything above MIPS-I;
+#   * everything in MIPS-I that MIPS-I itself declines to require, which is
+#     **coprocessor 2 and coprocessor 3**.  Added 2026-08-27; see isa_hit().
+#     The spec section quoted there is headed "Coprocessor 3 -- COP3 *and CP3
+#     load/store*", so it covers `lwc3` (0x33) and `swc3` (0x3B) as well, and
+#     both are below.  Opcode 0x33 sat in the table as `('pref', 'MIPS-IV')`
+#     until 2026-08-27 -- the identical defect to the 0x13 one, one row along,
+#     found by the reader sent to refute the 0x13 fix.
+#     ⚠️ COP2 (0x12) is NOT on the list and that is a gap this file states
+#     rather than closes: A 8.3.3 makes coprocessor 2 optional in the same
+#     words, and nothing here has looked for CP2 on this part.  It is left for
+#     a session that can put a positive control under it.
 #
 # `strict` requires the word to decode to a VALID instruction: the fields an
 # encoding fixes at zero must be zero.  `loose` looks only at opcode and funct.
@@ -630,8 +798,23 @@ ISA_OPS = {0x22: ('lwl', 'MIPS-I unaligned'), 0x26: ('lwr', 'MIPS-I unaligned'),
            0x14: ('beql', 'MIPS-II'), 0x15: ('bnel', 'MIPS-II'),
            0x16: ('blezl', 'MIPS-II'), 0x17: ('bgtzl', 'MIPS-II'),
            0x2F: ('cache', 'MIPS-II'), 0x30: ('ll', 'MIPS-II'),
-           0x38: ('sc', 'MIPS-II'), 0x33: ('pref', 'MIPS-IV'),
-           0x13: ('COP1X', 'MIPS-IV'), 0x1C: ('SPECIAL2', 'MIPS32'),
+           0x38: ('sc', 'MIPS-II'),
+           # 0x33 was ('pref', 'MIPS-IV') until 2026-08-27 and it is the same
+           # error as 0x13's, from the same reallocation: MIPS I puts LWC3
+           # here and SWC3 at 0x3B (Table A-37), MIPS III shows both as
+           # `* (was LWC3)` / `* (was SWC3)`, and MIPS IV gives 0x33 to PREF.
+           # On a MIPS-I core these are coprocessor-3 load/store, optional and
+           # implementation-specific like the rest of CP3.  量 2026-08-27:
+           # neither opcode occurs anywhere in stage2.bin or in any of the four
+           # payloads, so this row moves no count -- it is a label that would
+           # have been wrong the first time it fired.
+           0x33: ('lwc3', 'MIPS-I COP3'), 0x3B: ('swc3', 'MIPS-I COP3'),
+           0x1C: ('SPECIAL2', 'MIPS32'),
+           # 0x13 is NOT in this table.  It had the row ('COP1X', 'MIPS-IV')
+           # until 2026-08-27, which is the right answer for a MIPS-IV core and
+           # the wrong one for this one; `isa_hit` decides it by rs field before
+           # this lookup is reached, and a dead row here would be a second
+           # answer waiting for someone to read it.
            0x1F: ('SPECIAL3', 'MIPS32r2'), 0x1D: ('jalx', 'MIPS16'),
            0x11: ('COP1', 'FPU'), 0x31: ('lwc1', 'FPU'),
            0x35: ('ldc1', 'FPU'), 0x39: ('swc1', 'FPU'), 0x3D: ('sdc1', 'FPU')}
@@ -698,12 +881,52 @@ def isa_hit(w, strict):
         return None
 
     if op == 0x13:
-        if not strict:
-            return ('COP1X', 'MIPS-IV')
-        if f in (0x00, 0x01, 0x08, 0x09, 0x20, 0x21, 0x28, 0x29, 0x2C, 0x2D,
-                 0x2E, 0x2F, 0x30, 0x31, 0x38, 0x39):
-            return ('COP1X', 'MIPS-IV')
-        return None
+        # COP3, not COP1X.  Corrected 2026-08-27; see the module docstring's
+        # version note for the two sources and for what the shipped labels said.
+        #
+        # Nothing here comes OFF the watch list, and that is the decision rather
+        # than an oversight.  The reason is in the architecture, not in this
+        # part: MIPS IV Instruction Set Rev 3.2 A 8.3.4 -- "Coprocessor 3 is
+        # optional and implementation-specific in the MIPS I and MIPS II
+        # architecture levels."  So *this is MIPS-I* is not an argument that the
+        # core executes it, the way it is for `addu`.  What would take `mfc3`
+        # off this list is a measurement, and that measurement is `probe3`'s
+        # cell `m-imem` -- whose refutation condition (`docs/probe3-cells.md`
+        # 否證 M) is *if `mfc3` traps with `CU3` already set, CP3 is not
+        # reachable from a payload*.  A classifier that cleared `mfc3` today
+        # would go quiet about the exact instruction the payload exists to ask
+        # about.
+        #
+        # strict, for the forms that have fields fixed at zero:
+        #   MF/CF/MT/CT -- bits 10..0 are zero in the COPz move encoding
+        #   BC          -- rt selects bcf/bct (and the two -likely forms)
+        #   CO          -- bits 24..0 are coprocessor-defined; nothing to check,
+        #                  so a CO word is a hit under BOTH classifiers.
+        #
+        # 量 on stage2.bin's 97 data-region 0x13 words, old tool against new:
+        # the old COP1X funct table accepted 28 and rejected 69; this rule
+        # accepts 53 and rejects 44.  53 - 28 = 25, which is exactly the
+        # 236 -> 261 K6c now pins.  (The first draft of this comment said the
+        # old filter rejected 44 -- that is the NEW rule's number, and an
+        # adversarial reader caught it before the commit.)
+        if rs in COP3_MOVE:
+            if strict and (w & 0x07FF):
+                return None
+            return (COP3_MOVE[rs], 'MIPS-I COP3')
+        if rs == 0x08:
+            if strict and rt not in (0x00, 0x01, 0x02, 0x03):
+                return None
+            return ('bc3', 'MIPS-I COP3')
+        if rs >= 0x10:
+            return ('cop3', 'MIPS-I COP3')
+        # rs 1, 3, 5, 7, 9..15: MIPS-I defines no COPz sub-opcode there, so the
+        # word is not an instruction under the ISA this core implements.  Loose
+        # reads the opcode and reports it; strict wants a valid encoding and
+        # there is none, so it declines -- the same shape as COP1's `return
+        # None` for a word that is not a real FPU instruction.
+        if strict:
+            return None
+        return ('cop3.rs%d' % rs, 'COP3 undefined')
 
     if op in (0x16, 0x17) and strict and rt != 0:
         return None
@@ -961,6 +1184,72 @@ STAGE2_DATA_LL = 0x8040AB14          # c0a80001 == 192.168.0.1
 STAGE2_DATA_MOVN = [0x8040D800, 0x8040D820, 0x8040D840,
                     0x8040DB00, 0x8040DB20, 0x8040DB40]   # SPI table, 0x20 stride
 
+# K6c.  The data region's two totals, measured here 2026-08-27 on the sha256
+# above.  They are pinned for a reason that is the subject of this whole file:
+# until then K6c asserted only that the two numbers DIFFER, so a classifier
+# change could move either of them by any amount and the control would still
+# say ok.  The COP3 correction of 2026-08-27 moved `strict` 236 -> 261 and left
+# `loose` alone, and nothing in the suite would have noticed either way.
+#
+# `loose` is unchanged by that correction because every 0x13 word is still a
+# hit; `strict` rose because a `cop3` CO word has no fields fixed at zero, so
+# there is nothing to reject it on -- see isa_hit().
+STAGE2_DATA_LOOSE = 445
+STAGE2_DATA_STRICT = 261
+
+# K9.  (word, expected mnemonic, expected level, expected-under-strict, where
+# this word comes from).  A fixture for the classification of primary opcode
+# 0x13, which had the wrong ISA and the wrong name from the day it was written.
+# `None` in the strict column means strict must DECLINE the word.
+#
+# Every entry is a word that exists somewhere real: four out of this unit's own
+# decompressed kernel, one out of `probe3`'s emitted image, two out of the
+# loader's string table, and one out of `mips-linux-gnu-as -march=mips4`.
+K9_CASES = [
+    (0x4C880000, 'mtc3', 'MIPS-I COP3', 'mtc3',
+     "this unit's kernel 0x8000227C -- mtc3 t0,$0, CP3 $0 = IMEMBASE"),
+    (0x4C880800, 'mtc3', 'MIPS-I COP3', 'mtc3',
+     "this unit's kernel 0x8000228C -- mtc3 t0,$1, CP3 $1 = IMEMTOP"),
+    (0x4C882000, 'mtc3', 'MIPS-I COP3', 'mtc3',
+     "this unit's kernel 0x800022D8 -- mtc3 t0,$4, CP3 $4 = DMEMBASE"),
+    (0x4C882800, 'mtc3', 'MIPS-I COP3', 'mtc3',
+     "this unit's kernel 0x800022E8 -- mtc3 t0,$5, CP3 $5 = DMEMTOP"),
+    (0x4C020000, 'mfc3', 'MIPS-I COP3', 'mfc3',
+     "probe3 0x80500FA0 -- mfc3 v0,$0, the first of the eight stubs cell "
+     "m-imem reads the scratchpad windows with"),
+    (0x4CA40000, 'cop3.rs5', 'COP3 undefined', None,
+     "mips-linux-gnu-as -march=mips4 emits this for `lwxc1 $f0,$4($5)`. It is "
+     "a REAL COP1X instruction, and under the ISA this core implements it is "
+     "not an instruction at all -- rs 5 is not a COPz sub-opcode. The word the "
+     "old label was named after, classified by the rule that replaced it"),
+    (0x4C4F4144, 'cfc3', 'MIPS-I COP3', None,
+     "stage2.bin 0x8040B184 -- the ASCII `LOAD`. Loose reads rs 2 and calls it "
+     "cfc3; strict sees bits 10..0 = 0x144 and declines. The strict/loose gap "
+     "K6c is about, on one word"),
+    (0x4D000000, 'bc3', 'MIPS-I COP3', 'bc3',
+     "stage2.bin 0x8040B24C -- the ASCII `M\\0\\0\\0`, and the only word in the "
+     "loader whose rs field is the BC selector. 量: it is also the only one of "
+     "those 97 that decodes as a well-formed COP3 instruction at all, which is "
+     "why strict must ACCEPT it"),
+    (0x4CC80000, 'ctc3', 'MIPS-I COP3', 'ctc3',
+     "`ctc3 $8,$0` as mips-linux-gnu-as -march=mips1 encodes it. Here because "
+     "an adversarial reader deleted COP3_MOVE's rs=6 entry and the whole suite "
+     "stayed green -- --isa went silent on a valid ctc3 and nothing noticed. "
+     "No artefact in this tree contains one, which is exactly why the fixture "
+     "has to be hand-encoded rather than found"),
+    # Not opcode 0x13.  The spec section this branch rests on is headed
+    # "Coprocessor 3 -- COP3 AND CP3 load/store", and 0x33 carried the same
+    # wrong MIPS-IV label until the same reader looked one row along.
+    (0xCC820000, 'lwc3', 'MIPS-I COP3', 'lwc3',
+     "`lwc3 $2,0($4)` -- MIPS I Table A-37 row 6 column 3. MIPS IV gives this "
+     "opcode to PREF, and PREF is what ISA_OPS said until 2026-08-27. 量: "
+     "-march=mips1 REFUSES `pref` and accepts `lwc3` at the same 32 bits"),
+    (0xEC820000, 'swc3', 'MIPS-I COP3', 'swc3',
+     "`swc3 $2,0($4)` -- Table A-37 row 7 column 3; MIPS III shows it as "
+     "`* (was SWC3)`. It was on no watch list at all before 2026-08-27, and "
+     "reads() was treating its rt -- a COPROCESSOR register -- as a GPR"),
+]
+
 # K1.  (load word, following word, expect a violation, what the case is for).
 # The near-misses matter more than the hits: every one of them is a shape a
 # careless model would call a violation, or would miss.
@@ -992,6 +1281,45 @@ K1_CASES = [
      "lw t0 then lwr t0,3(t2) -- unrelated base, so the ONLY reason this is a "
      "hazard is that lwr reads rt to merge into it. Nothing exempts it: lw is "
      "not one of the pair"),
+
+    # COP3, added 2026-08-27 with the reads() correction.  Four cases and two
+    # of them must NOT fire: opcode 0x13 used to return {rs, rt}, which reads
+    # the COPz FUNCTION SELECTOR as a general register.  That is right for
+    # COP1X, where rs really is a base register, and it invents hazards here.
+    (0x8D280000, 0x4C080000, False,
+     "lw t0 then mfc3 t0,$0 -- MF moves FROM the coprocessor and WRITES rt. "
+     "The shipped tool read the rs field (0) as $zero and rt as a source, so "
+     "this was a violation that does not exist"),
+    (0x8D240000, 0x4C880000, False,
+     "lw a0 then mtc3 t0,$0 -- mtc3's rs field is 4 because 4 IS the MT "
+     "selector, and the shipped tool read that 4 as register $a0. The sharpest "
+     "of the four: nothing in the sequence mentions $a0 at all"),
+    (0x8D280000, 0x4D010000, False,
+     "lw t0 then bc3t -- a coprocessor branch reads no general register. rs is "
+     "8 because 8 is the BC selector, and 8 is also $t0"),
+    (0x8D280000, 0x4C880000, True,
+     "lw t0 then mtc3 t0,$0 -- and this one MUST still fire. MT moves a "
+     "general register INTO the coprocessor, so it reads rt, and the fix above "
+     "is a narrowing rather than an exemption for opcode 0x13"),
+    (0x8D280000, 0x4CC80000, True,
+     "lw t0 then ctc3 t0,$0 -- the other direction of the same rule, so the "
+     "narrowing is keyed on the selector and not on the mnemonic that happens "
+     "to be in the payload"),
+
+    # The coprocessor load/stores, added the same day and one row along. In
+    # every `lwcz`/`swcz` the rt field names a COPROCESSOR register; the
+    # shipped tool let 0x32/0x3A/0x3B fall through to the unknown-opcode
+    # {rs, rt} and reported the first of these as a hazard. 量: it did.
+    (0x8D280000, 0xEC880000, False,
+     "lw t0 then swc3 t0,0(a0) -- swc3's rt is CP3 register 8, not $t0. This "
+     "one exits 1 on the shipped tool, which is a build refused for a hazard "
+     "that is not there"),
+    (0x8D280000, 0xE8880000, False,
+     "lw t0 then swc2 t0,0(a0) -- same shape at coprocessor 2, and the reason "
+     "the fix is keyed on the opcode class rather than on COP3"),
+    (0x8D240000, 0xEC880000, True,
+     "lw a0 then swc3 t0,0(a0) -- and this one MUST fire: rs IS the base "
+     "register, so narrowing to {rs} is not an exemption for the opcode"),
 ]
 
 # K7.  (words, expected violations, expected unresolved, relocatable, why).
@@ -1012,6 +1340,11 @@ K7_CASES = [
      "did not recognise the four REGIMM branch-likely forms until 2026-08-24"),
     ([0x45000002, _LW_T0, _NOP, _USE_T0], 1, False, False,
      "bc1f +2 (coprocessor branch): reads() modelled it, control_flow did not"),
+    ([0x4D010002, _LW_T0, _NOP, _USE_T0], 1, False, False,
+     "bc3t +2: the same gap one coprocessor along, and it survived the "
+     "2026-08-24 sweep because opcode 0x13 was being read as COP1X, which is "
+     "not a branch at all. Without the fix the successor resolves to the "
+     "fall-through nop alone and this case reports 0"),
     ([0x03E00008, _LW_T0, _USE_T0], 0, True, False,
      "jr ra: the successor is not statically known, so it is reported "
      "unresolved rather than checked against the next word"),
@@ -1220,12 +1553,101 @@ def run_controls(stage2_path, waive_population, want_isa):
                      len(movn_hits)))
 
             rejects = not any(a in STAGE2_DATA_MOVN for a, w, m, lv in s_data)
+            counts_ok = (len(l_data) == STAGE2_DATA_LOOSE
+                         and len(s_data) == STAGE2_DATA_STRICT)
             c.add('K6c strict and loose disagree, which is the point',
-                  rejects and len(l_data) != len(s_data),
-                  'data region: %d loose, %d strict. Strict rejects the SPI '
-                  'table\'s 0x4b because its sa field is 1: %s. A count quoted '
-                  'without its classifier is not a measurement'
-                  % (len(l_data), len(s_data), 'yes' if rejects else 'NO'))
+                  rejects and len(l_data) != len(s_data) and counts_ok,
+                  'data region: %d loose, %d strict (expected %d / %d). Strict '
+                  'rejects the SPI table\'s 0x4b because its sa field is 1: %s. '
+                  'A count quoted without its classifier is not a measurement'
+                  % (len(l_data), len(s_data), STAGE2_DATA_LOOSE,
+                     STAGE2_DATA_STRICT, 'yes' if rejects else 'NO'))
+
+            # K6d.  The label, on the artefact rather than on a fixture.  The
+            # defect this replaced was invisible to every count in K6a-K6c:
+            # `COP1X (MIPS-IV)` beside 97 words on a core with no MIPS-IV.
+            # BOTH classifiers, and the second one was added after an
+            # adversarial reader showed that a mutant labelling the 52 CO words
+            # `MIPS-IV` under `strict` alone passed everything: K9 compared
+            # mnemonics, this compared loose, and the rs sweep ran loose. A
+            # level is a claim about an ISA, and it needs checking in the
+            # classifier a reader is actually shown -- which is `strict`.
+            cop1x = [a for cl in (l_data, s_data)
+                     for a, w, m, lv in cl
+                     if lv == 'MIPS-IV' and (w >> 26) == 0x13]
+            cop3 = [a for a, w, m, lv in l_data if lv.startswith('COP3')
+                    or lv == 'MIPS-I COP3']
+            c.add('K6d no 0x13 word is labelled MIPS-IV',
+                  not cop1x and len(cop3) == 97,
+                  '%d of the data region\'s opcode-0x13 words carry a MIPS-IV '
+                  'level in either classifier (must be 0); %d carry a COP3 one '
+                  'under loose (must be 97, the count '
+                  'docs/probe3-cells.md 1.2 records)'
+                  % (len(cop1x), len(cop3)))
+
+    # --- K9, the COP3 classification itself ------------------------------
+    # K6a-K6d are counts over one file.  A count cannot say WHICH answer each
+    # word got, and the 2026-08-27 defect was entirely in the answer: every
+    # count K6 had was already correct while every name beside it was wrong.
+    bad9, named_bad = [], 0
+    for w, mnem, level, smnem, why in K9_CASES:
+        got_l = isa_hit(w, False)
+        got_s = isa_hit(w, True)
+        if got_l != (mnem, level):
+            named_bad += 1
+            bad9.append('loose  0x%08x -> %r, expected %r   [%s]'
+                        % (w, got_l, (mnem, level), why))
+        elif (got_s is None) != (smnem is None) or (
+                got_s is not None and got_s != (smnem, level)):
+            # `got_s != (smnem, level)`, not `got_s[0] != smnem`: the level is
+            # half the claim, and comparing the mnemonic alone left a mutant
+            # that printed `cop3  MIPS-IV` under strict passing the whole
+            # suite -- named in the 2026-08-27 review's "what it did not
+            # cover" section, and closed here rather than filed.
+            named_bad += 1
+            bad9.append('strict 0x%08x -> %r, expected %r   [%s]'
+                        % (w, got_s, smnem and (smnem, level), why))
+    # And the rs field exhaustively, because the eight cases above touch six of
+    # its thirty-two values.  No COP3 word may come back MIPS-IV, and none may
+    # come back None under loose: `opcode 0x13 is not on the list` is the
+    # sentence this tool spent three days being wrong about.
+    for rs in range(32):
+        for f in (0x00, 0x2C):
+            w = 0x4C000000 | (rs << 21) | f
+            h = isa_hit(w, False)
+            if h is None:
+                bad9.append('loose 0x%08x (rs=%d) -> None; every COP3 word is '
+                            'on the watch list' % (w, rs))
+            elif h[1] == 'MIPS-IV':
+                bad9.append('loose 0x%08x (rs=%d) -> MIPS-IV' % (w, rs))
+    # The invariant that makes `strict` mean anything: it is a NARROWING of
+    # loose, never a different question.  If strict ever fires where loose does
+    # not, K6c's two totals are not comparable and the sentence "a count quoted
+    # without its classifier is not a measurement" has no arithmetic under it.
+    # Swept rather than argued -- 4,096 words per opcode family, and the whole
+    # primary opcode space coarsely, because the 2026-08-27 change is the first
+    # one to give an opcode a strict rule that is not a funct table.
+    swept = 0
+    for rs in range(32):
+        for rt in range(32):
+            for low in (0x000, 0x001, 0x144, 0x7FF):
+                w = 0x4C000000 | (rs << 21) | (rt << 16) | low
+                swept += 1
+                if isa_hit(w, True) is not None and isa_hit(w, False) is None:
+                    bad9.append('0x%08x fires strict and not loose' % w)
+                if not isinstance(text(w), str):
+                    bad9.append('0x%08x: text() returned a non-string' % w)
+    for op in range(64):
+        for rs in (0, 1, 2, 4, 6, 8, 0x10, 0x1F):
+            for f in (0x00, 0x0A, 0x0F, 0x2C, 0x3F):
+                w = (op << 26) | (rs << 21) | f
+                swept += 1
+                if isa_hit(w, True) is not None and isa_hit(w, False) is None:
+                    bad9.append('0x%08x fires strict and not loose' % w)
+    c.add('K9  coprocessor 3, at all three of its opcodes', not bad9,
+          '%d/%d named cases ok; %d words swept for strict-implies-loose'
+          % (len(K9_CASES) - named_bad, len(K9_CASES), swept)
+          + ('' if not bad9 else '   first miss: ' + bad9[0]))
     return c
 
 

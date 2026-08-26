@@ -155,6 +155,45 @@ reset left. ⚠️ The control on that zero is weaker than usual: the same scann
 finds the four `mtc3`s in the kernel, so it can see a real COP3 instruction — but
 that control is on a *different file*, because `stage2.bin` contains none.
 
+🆕 **讀 2026-08-27 (a re-decode of words already in the dump, not a device
+reading), and it sharpens that last sentence.** The 97 were counted by primary
+opcode alone. Decoding their `rs` field — which in the COPz encoding selects
+MF/DMF/CF/MT/DMT/CT/BC/CO and is **not** a register — gives `DMF` × 11,
+`CF` × 3, `MFH` × 3, `BC` × 1, `rs=9` × 6, `rs=0x0A` × 21, and `CO` × 52.
+**Only three carry an `rs` that MIPS-I defines as a register move** — all three
+are `CF` — and none of those three has its low 11 bits zero (`0x40A`, `0x144`,
+`0x144`), so **not one of the 97 decodes as a valid `mfc3`/`cfc3`/`mtc3`/`ctc3`**.
+The kernel's four do: `0x4C880000`, `0x4C880800`, `0x4C882000`, `0x4C882800`,
+at the four addresses above. So the separating property is *is this a
+well-formed COP3 **move***, which is stronger than the address split, and the
+scanner's positive control is a real instruction rather than a coincidence of
+opcode.
+
+🔴 **The obvious stronger claim is false and this file made it for an hour.**
+*Not one of the 97 has its low 11 bits zero* — **nine of them do**: eight `CO`
+words (`0x4F4C0000` ×3, `0x4F4B0000` ×3, `0x4F480000`, `0x4F000000`) and
+`0x4D000000` at `0x8040B24C`. That last one is a **well-formed `bc3f +0`**, so
+`stage2.bin` *does* contain a word that decodes as a valid COP3 instruction —
+and it is `tools/hazlint`'s own `K9` fixture, the one `strict` is required to
+accept. Caught by a reader sent to refute this paragraph. The conclusion above
+survives; the premise it was resting on did not, and the word that saves it is
+*move*.
+
+⚠️ **And the ISA level under which all of this is read has a caveat that has to
+travel with it.** MIPS IV Instruction Set Rev 3.2 A 8.3.4: *"Coprocessor 3 is
+optional and implementation-specific in the MIPS I and MIPS II architecture
+levels. It was removed from MIPS III and later architecture levels. Note that in
+MIPS IV the COP3 primary opcode was reused for the COP1X instruction class."*
+Two consequences, and the second is the one that keeps getting dropped:
+① reading `0x13` as COP1X is wrong here, because `Config.M = 0` is 量 and this
+is a MIPS-I part — `tools/hazlint` and `tools/opcount.py` both did it until
+2026-08-27; ② **"it is MIPS-I" is not an argument that the silicon executes it.**
+The architecture declines to require COP3 at that level. The four `mtc3` above
+run at reset before `trap_init`, where a trap would be fatal, which is the
+strongest thing on hand and is still an inference — `probe3`'s `m-imem` is what
+turns it into a measurement, and 否證 M is written for the outcome where it does
+not.
+
 🔴 **CCTL is edge-triggered on 0→1** (source 2, and the clear-then-set idiom in
 both codebases on this unit). *Writing a bit that is already 1 does nothing* — so
 **a probe that writes CCTL once and expects an effect is a tool that cannot

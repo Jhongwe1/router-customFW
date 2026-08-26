@@ -252,6 +252,29 @@
         "tools/rlxprobe/rlxdefs.h (ST0_CTRL_A / ST0_CTRL_B)",
         "SPEC.md CPU-04, CPU-19, CPU-24, CPU-25, CPU-45, CPU-46"
       ]
+    },
+    {
+      "id": "spec-mips-iv-rev3.2",
+      "role": "doc",
+      "kind": "file",
+      "url": "https://www.cs.cmu.edu/afs/cs/academic/class/15740-f97/public/doc/mips-isa.pdf",
+      "dest": "$FWRE_WORK/rebuild/refs-external/mips-iv-rev3.2.pdf",
+      "bytes": 967664,
+      "sha256": "f1e212bfeb9a4bd3e88f91c96a961c509078419eedd231664bbd3f657f58181c",
+      "kind_of_document": "architecture specification (text, extractable with pdftotext -layout)",
+      "title": "MIPS IV Instruction Set, Revision 3.2",
+      "revision": "Rev 3.2, September 1995, Charles Price, MIPS Technologies Inc.",
+      "handling": "CITE, DO NOT COMMIT -- CLAUDE.md's rule is about someone else's property, and this is. Fetched 2026-08-27 (R1h-1); it lives under $FWRE_WORK and the sha256 above pins the copy every claim here was read out of.",
+      "fetched": "2026-08-27",
+      "why": "It settles which ISA level owns primary opcode 0x13, which tools/hazlint and tools/opcount.py both had wrong, and -- more importantly -- it is the source for the sentence that stopped the fix from going too far.",
+      "supplies": {
+        "cop3_lifetime": "A 8.3.4, p. A-176, verbatim: \"Coprocessor 3 is optional and implementation-specific in the MIPS I and MIPS II architecture levels. It was removed from MIPS III and later architecture levels. Note that in MIPS IV the COP3 primary opcode was reused for the COP1X instruction class.\" TWO claims and BOTH are load-bearing: (a) 0x13 is COP3 here, not COP1X -- this core is MIPS-I, Config.M = 0 measured; (b) OPTIONAL, so being MIPS-I is not evidence the silicon executes it, which is why hazlint --isa still reports probe3's eight mfc3 and why cell m-imem exists. SPEC.md TC-08.",
+        "encoding_tables": "Table A-37 (MIPS I) and the MIPS II table both show COP3 at opcode row 2 col 3 = 0x13; the MIPS III table shows `*` annotated `(was COP3)`, with `(was LWC3)` at 0x33 and `(was SWC3)` at 0x3B; the MIPS IV table shows COP1X. The four tables are the same statement drawn four times.",
+        "second_source": "binutils 2.42, measured on this machine 2026-08-27 and re-run by tools/test-hazlint.sh E3: mips-linux-gnu-as accepts `mfc3 $2,$0` at -march=mips1 and mips2 (0x4c020000), refuses it at mips3 and mips4, and accepts `lwxc1` only from mips4 (0x4ca40000). Two sources, one read and one measured, agreeing."
+      },
+      "caveat": "The paragraph quoted above ends by repeating the last TWO sentences of A 8.3.3 verbatim -- \"No standard processor from MIPS has implemented coprocessor 2, but MIPS' semiconductor licensees may have implemented it in a product based on one of the standard MIPS processors. At this time the standard processors are: R2000, R3000, ...\" -- inside the section about coprocessor THREE. A copy-paste defect in the document, noted here so a later reader does not think this project mis-transcribed it, and corrected on 2026-08-27 from \"the last sentence\" after a reader checked it against the PDF. It does not touch the three sentences above.",
+      "also_at": "A 98,471-byte re-rendered extract of Appendix A alone (sha256 99128c1a02e3f0ab69fe76f3245bd252069e7af9f8fa1d3e6ae034118813d34d) circulates as mips-iv-encodings.pdf; it was read first and the full document above was fetched to check it. Same wording.",
+      "not_in_fetch_plan": "No `fetch` key, matching ds-lexra-lx4189: tools/fetch-sources.sh only plans entries whose dest is inside the repo, and this one lives under $FWRE_WORK because CLAUDE.md forbids committing it. So nothing re-checks the sha256 automatically -- it is pinned by this entry and by whoever reads the file next, which is stated rather than implied."
     }
   ],
   "reference_only": {

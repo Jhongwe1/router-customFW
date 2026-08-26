@@ -82,7 +82,12 @@ ck "sc   (0x38)"      1 "$(field "$T/fx.bin" 38)"
 ck "beql (0x14)"      1 "$(field "$T/fx.bin" 14)"
 ck "SPECIAL2 (0x1c)"  1 "$(field "$T/fx.bin" 1c)"
 ck "lwc1 (0x31)"      1 "$(field "$T/fx.bin" 31)"
-ck "pref (0x33)"      1 "$(field "$T/fx.bin" 33)"
+# The fixture is assembled `-march=mips32`, where these 32 bits are `pref`.
+# On this core the same word is `lwc3`, which is what opcount names it since
+# 2026-08-27 -- the histogram is keyed on the opcode, so only the label
+# moved. That the two ISAs disagree about one opcode is the point of the
+# row, not a defect in the fixture.
+ck "lwc3/pref (0x33)" 1 "$(field "$T/fx.bin" 33)"
 ck "unaligned total"  10 "$("$OPC" "$T/fx.bin" --base 0 | sed -n 's/.*swr = \([0-9]*\).*/\1/p')"
 
 echo

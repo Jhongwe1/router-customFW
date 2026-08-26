@@ -12,6 +12,98 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R1h-1`, 2026-08-26 to 2026-08-27 — `probe3` is built and runs, and finishing
+it corrected the tool that gates it.** The desk half of `R1h` closes here; the
+bench half is spent at the tail of `R3`, in the same seating, with `probe3`
+first. Desk only, no power, zero flash bytes.
+
+- **`cells.S` and `probe3.c` are new**, through the `hazlint` gate at **804
+  loads, 0 violations**, running from banner to `rlxprobe: end` under
+  `qemu-system-mips`. **The first qemu capture this repository has committed**
+  is beside it — `qemu/2026-08-26/probe3.txt`, in a directory parallel to
+  `bench/` rather than under it, because someone sweeping `bench/` for readings
+  in six months should not have to infer from a filename which ones came from an
+  emulator.
+- 🔴 **The core vendor's datasheet arrived the same day and refuted four cells.**
+  `c-E0`/`c-E2` would have refuted `CCTL 0x100` by an artefact of their own
+  running order (§5.2: an uncached read invalidates a resident line, and `c-E`
+  ends with one); cell `c-G` is new, because that same sentence is a per-line
+  invalidate primitive that costs one load and no `CCTL`; `w-line`'s void
+  threshold sat at `+192` where 128 bytes is a legal line for this family; and
+  associativity stopped being sourceless. ⚠️ **The LX4189 is provably not this
+  part** — its Table 2 lists no TLB and this die has 32 entries — so every
+  citation carries that caveat.
+- **The suite went 106 → 195 cases**, twelve mutations and a coverage table that
+  **names the cells nothing covers, and why**: on this harness most cache
+  readings are identical mutated and unmutated, and a mutation whose predicted
+  effect equals the baseline cannot fail.
+- 🔴 **Then the gate itself turned out to be reading an opcode under the wrong
+  ISA.** `tools/hazlint` called primary opcode `0x13` `COP1X (MIPS-IV)`. On a
+  MIPS-I core it is COP3 — and the note that caught it got the history wrong by
+  two levels, which is the kind of error that survives by sounding specific.
+  **Measured** on binutils 2.42: `mfc3` assembles at `-march=mips1` *and*
+  `mips2`, is refused at `mips3`; `lwxc1` waits for `mips4`. **Read**, MIPS IV
+  Instruction Set Rev 3.2 § A 8.3.4: *"Coprocessor 3 is optional and
+  implementation-specific in the MIPS I and MIPS II architecture levels. It was
+  removed from MIPS III and later architecture levels. Note that in MIPS IV the
+  COP3 primary opcode was reused for the COP1X instruction class."*
+- 🔴 **And that same sentence stopped the fix from going where it was aimed.**
+  The plan was to take the MIPS-I COP3 forms off the ISA watch list. *Optional
+  and implementation-specific* means ISA membership is not evidence that this
+  silicon executes them — and whether it does is the open cell `m-imem`, which
+  `probe3` carries eight `mfc3` to answer. **Nothing came off the list.** The
+  eight are still reported; they are reported as `mfc3` at level `MIPS-I COP3`,
+  each printed with its address and its decode instead of as `.word`.
+- **One misreading, three consequences.** The label; `reads()` returning
+  `{rs, rt}`, which is COP1X's operand model and made the COPz *function
+  selector* a general register — `mtc3`'s selector is `4`, and the tool read
+  that `4` as `$a0`; and `control_flow()` not knowing `bc3` is a branch, so a
+  load in its delay slot had its successor resolved to the fall-through alone.
+  🔴 **That third one had survived the 2026-08-24 decoder sweep precisely
+  because the first one was there**: COP1X is not a branch, so there was nothing
+  to look for.
+- 🔴 **The gate's verdict is unchanged on everything it gates** — measured
+  before and after, on `stage2.bin` (1,474 / 646 / 0) and on all four payloads.
+  **One number does move, and finding it took an adversarial reader**: the
+  decompressed device kernel goes 172 violations to 171, and the one that
+  leaves is `0x802BC490` — a `lhu t7` followed by a data word whose `rs` field
+  is 15, which the old operand model read as register `$t7`. A false positive,
+  in data decoded as code, and the only place in the tree where this fix is
+  observable at all. A fix that moves almost no number is a fix the suite
+  almost cannot see, so the deliverable is the controls: `hazlint` 10 → **12** (`K6d`; `K9`, eleven fixture words plus
+  6,656 swept for the invariant that a strict hit is always a loose hit, and
+  which **runs without `stage2.bin`**; and `K6c`'s two counts pinned rather
+  than merely asserted unequal), `test-hazlint.sh` 56 → **96**,
+  `test-rlxprobe.sh` 195 → **202**. The `--isa` count that moves is `K6c`'s
+  strict total, 236 → **261**: a COP3 `CO` word has no fields fixed at zero, so
+  the old MIPS-IV funct table was rejecting 69 of the 97 where this rule
+  rejects 44 — 40 CO words gained, 15 undefined-`rs` words lost, net +25.
+- **Three more defects fell out of the same thread.** `tools/opcount.py` carried
+  the identical bad row. A case in `test-hazlint.sh` read `[ -n "$STAGE2" ]`'s
+  exit status instead of the tool's, so **it could not fail on the bench machine
+  and could not pass anywhere else** — and it was the case checking the gate's
+  own exit-code contract. And `cells.S` justified emitting raw words by claiming
+  `-march=mips1` refuses both `mfc3` and `cache`; measured, it refuses only
+  `cache`. The comment was corrected and the payload was not touched: rebuilt,
+  the image is byte-identical.
+- **Two files disagreed about the same measurement and the wrong one was the one
+  nothing checks.** `ci-expected.tsv` said the suite fails 14 cases on a runner;
+  `ci.yml` said 26; measured on HEAD, 26. Both re-measured and dated — three
+  times in one afternoon, because each control the review added made the row
+  stale again.
+- 🔴 **The whole change was then put to five adversarial readers, each finding
+  sent to a separate agent whose job was to refute it: 11 of 25 survived.** Two
+  of the four substantive ones are above. The others: `notes/cache-model.md`
+  claimed no word of the 97 has its low 11 bits zero, and nine do — one of them
+  a well-formed `bc3f` that is `hazlint`'s own fixture, so the loader does
+  contain a valid COP3 word and the separating property is a valid COP3
+  *move*. And the identical mislabel was still alive one opcode along: `0x33`
+  is `LWC3` on MIPS-I and was `(pref', 'MIPS-IV')` in two tools, while `reads()` treated `swc3`'s
+  coprocessor register as a general one — measured, that made the shipped tool
+  refuse `lw t0` / `swc3 t0,0(a0)`, a build stopped for a hazard that is not
+  there. Three of the new controls were themselves too weak to catch a mutant
+  and were strengthened.
+
 **`R1h-0`, 2026-08-26 — `probe3`'s cell table, and writing it refuted two things
 the table was going to stand on.** `docs/probe3-cells.md`: eleven sections, every
 expected value and refutation condition written before its cell, every expected

@@ -75,12 +75,29 @@
  *    rewrites is sixteen bits of an `addiu`, which cannot introduce a hazard.
  *
  * 6. `mfc3` AND `cache` ARE EMITTED AS RAW WORDS.
- *    `-march=mips1` refuses both mnemonics.  Opcode 0x13 is COP3 on MIPS-I --
- *    this unit's own kernel contains four `mtc3` at 0x8000227C..0x800022E8 --
- *    and opcode 0x2F is the MIPS-II `cache`, whose retirement on this core is
- *    the whole of question (c).  Both are written out with their encodings
- *    derived beside them.  They are the only instructions in this payload
- *    outside MIPS-I and `tools/test-rlxprobe.sh` names every one of them.
+ *    This said "`-march=mips1` refuses both mnemonics" until 2026-08-27, and
+ *    half of it was false.  量, through this Makefile's own ARCH line
+ *    (`-march=mips1 -mabi=32 -msoft-float -EB -G0 -mno-abicalls -fno-pic`,
+ *    gcc 12.4.0 / binutils 2.42): `mfc3 $2,$0` ACCEPTED as 0x4C020000,
+ *    `mtc3 $8,$0` as 0x4C880000, `cfc3 $2,$0` as 0x4C420000, `bc3t` as
+ *    0x4D010003.  Only `cache 0x11,0($4)` is refused -- *"opcode not supported
+ *    on this processor: mips1"*.  So the assembler was never the reason for the
+ *    COP3 half, and the emitted image is unaffected either way.
+ *
+ *    The raw words STAY, with a reason that is now measured rather than
+ *    assumed.  The same assembler refuses `mfc3` at `-march=mips3` and
+ *    `-march=mips4`, because COP3 was removed at MIPS III and MIPS IV reused
+ *    the opcode for COP1X (MIPS IV Rev 3.2 A 8.3.4).  A mnemonic is therefore a
+ *    request that the toolchain agree with us about which ISA owns opcode 0x13
+ *    -- and `R2c` exists to compare three toolchains.  A `.word` cannot be
+ *    reinterpreted by any of them, and `tools/test-rlxprobe.sh` T1 checks the
+ *    emitted encodings against the image rather than trusting either.
+ *
+ *    Opcode 0x13 is COP3 on MIPS-I -- this unit's own kernel contains four
+ *    `mtc3` at 0x8000227C..0x800022E8 -- and opcode 0x2F is the MIPS-II
+ *    `cache`, whose retirement on this core is the whole of question (c).
+ *    They are the only instructions in this payload outside MIPS-I and
+ *    `tools/test-rlxprobe.sh` names every one of them.
  */
 
 #include "rlxdefs.h"
@@ -217,8 +234,18 @@ rlx_status_poke:
  *                   =  0x4C000000 | (rt << 16) | (rd << 11)
  *
  * rt = $2 gives 0x4C020000 | (rd << 11).  Opcode 0x13 is COP3 in MIPS-I; the
- * MIPS-II reallocation of that opcode to COP1X does not apply to a core
- * measured to have Config.M = 0 (量, probe2, `bench/2026-08-25b/H2a.log`).
+ * reallocation of that opcode to COP1X is **MIPS IV**, not MIPS II, and it does
+ * not apply to a core measured to have Config.M = 0 (量, probe2,
+ * `bench/2026-08-25b/H2a.log`).  Corrected 2026-08-27: MIPS IV Rev 3.2 A 8.3.4
+ * says COP3 is optional in MIPS I and MIPS II, was removed at MIPS III, and its
+ * opcode was reused at MIPS IV -- and binutils 2.42 assembles `mfc3` at mips1
+ * and mips2 and refuses it at mips3 and mips4, which is the same statement
+ * measured on a tool.
+ *
+ * ⚠️ *Optional* is load-bearing and the reason cell `m-imem` exists: MIPS-I does
+ * not require COP3, so the ISA level says nothing about whether this silicon
+ * answers these eight words.  否證 M is written for the outcome where it does
+ * not, and `tools/hazlint --isa` reports all eight for the same reason.
  *
  * Cross-checked against this unit's own kernel, which writes the same
  * coprocessor: `mtc3 t0,$0` at 0x8000227C is the MT form, rs = 4.

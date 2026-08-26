@@ -952,12 +952,28 @@ mechanisms instead:
 - 🔴 **`probe3` is the first payload that MAY contain words outside MIPS-I**, so
   its ISA check cannot be `probe1`/`probe2`'s zero. The image contains exactly
   **5 `cache` ops** (four in Group X, one inside `c-D`'s leaf) and **8 `mfc3`**,
-  and the suite names every one of them by encoding and count. ⚠️ **`hazlint
-  --isa` labels the eight `mfc3` as `COP1X (MIPS-IV)`**: opcode `0x13` is COP1X
-  from MIPS-II onward but it is **COP3 on MIPS-I**, which is what this core is
-  (`Config.M = 0`, 量) — and this unit's own kernel contains four `mtc3`. The
-  mislabel is recorded here and in `SPEC.md`; it does not affect the gate, which
-  is the load-delay check.
+  and the suite names every one of them by encoding and count. 🔄 **The label
+  defect this paragraph used to record is fixed (`hazlint` 1.2, 2026-08-27), and
+  the sentence it recorded it in was itself wrong.** It said opcode `0x13` is
+  COP1X *"from MIPS-II onward"*. It is not: 量 on binutils 2.42, `mfc3`
+  assembles under `-march=mips1` **and `-march=mips2`** and is refused at
+  `mips3`; `lwxc1` is refused until `mips4`. 讀, MIPS IV Rev 3.2 A 8.3.4 —
+  *"Coprocessor 3 is optional and implementation-specific in the MIPS I and
+  MIPS II architecture levels. It was removed from MIPS III and later
+  architecture levels. Note that in MIPS IV the COP3 primary opcode was reused
+  for the COP1X instruction class."* **COP3 is MIPS I and MIPS II; MIPS III
+  removed it; MIPS IV reused the opcode.** The conclusion is untouched — this
+  core is MIPS-I (`Config.M = 0`, 量), so `0x13` is COP3 — and the gate was
+  never affected, because the gate is the load-delay check.
+  🔴 **What the fix deliberately did NOT do is take those eight words off the
+  ISA watch list.** The same paragraph of the spec is why: at MIPS I the
+  architecture makes COP3 *optional and implementation-specific*, so *it is
+  MIPS-I* is not evidence that this silicon retires it — and **whether it does
+  is § 6's `m-imem`, 否證 M, still open**. The eight are still hits; they are
+  hits named `mfc3` at level `MIPS-I COP3`, each printed with its address and
+  its rendering. The expected fingerprint is now asserted twice by
+  `tools/test-rlxprobe.sh` T1, once through `objdump` and once through
+  `hazlint --isa`: **13 hits, 8 `mfc3` + 5 `cache`, in both classifiers.**
 
 ### 🔴 One mutation per CHECK MECHANISM, and a coverage table that names the gaps
 

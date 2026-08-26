@@ -41,7 +41,17 @@ NAMED = {
     0x08: ("addi", ""), 0x09: ("addiu", ""), 0x0A: ("slti", ""), 0x0B: ("sltiu", ""),
     0x0C: ("andi", ""), 0x0D: ("ori", ""), 0x0E: ("xori", ""), 0x0F: ("lui", ""),
     0x10: ("COP0", ""), 0x11: ("COP1/FPU", "FPU"), 0x12: ("COP2", ""),
-    0x13: ("COP1X", "MIPS-IV"),
+    # 0x13 read ("COP1X", "MIPS-IV") until 2026-08-27, which is the answer for a
+    # MIPS-IV core. This one is MIPS-I (Config.M = 0, measured), and there the
+    # opcode is COP3 -- the coprocessor this part wires its 16 KiB I-MEM and
+    # 8 KiB D-MEM window registers to. Same defect, same day, in tools/hazlint,
+    # whose version note carries the two sources; the short form is that COP3 is
+    # MIPS I and II, MIPS III removed it, MIPS IV reused the opcode.
+    #
+    # The level column says "MIPS-I, optional" rather than "" because MIPS IV
+    # Rev 3.2 A 8.3.4 calls COP3 "optional and implementation-specific" at those
+    # levels -- so unlike COP0 and COP2 a hit here is not settled by the ISA.
+    0x13: ("COP3", "MIPS-I, optional"),
     0x14: ("beql", "MIPS-II"), 0x15: ("bnel", "MIPS-II"),
     0x16: ("blezl", "MIPS-II"), 0x17: ("bgtzl", "MIPS-II"),
     0x1C: ("SPECIAL2", "MIPS32"), 0x1D: ("jalx", "MIPS16"),
@@ -52,7 +62,13 @@ NAMED = {
     0x28: ("sb", ""), 0x29: ("sh", ""), 0x2A: ("swl", "MIPS-I unaligned"),
     0x2B: ("sw", ""), 0x2E: ("swr", "MIPS-I unaligned"),
     0x2F: ("cache", "MIPS-II"),
-    0x30: ("ll", "MIPS-II"), 0x31: ("lwc1", "FPU"), 0x33: ("pref", "MIPS-IV"),
+    0x30: ("ll", "MIPS-II"), 0x31: ("lwc1", "FPU"),
+    # 0x33 read ("pref", "MIPS-IV") until 2026-08-27 and it is the SAME
+    # reallocation as 0x13's: MIPS I puts LWC3 here and SWC3 at 0x3B, MIPS
+    # III shows both as removed, MIPS IV gives 0x33 to PREF. 量 with this
+    # project's own toolchain: `-march=mips1` REFUSES `pref` and ACCEPTS
+    # `lwc3` at the same 32 bits.
+    0x33: ("lwc3", "MIPS-I, optional"), 0x3B: ("swc3", "MIPS-I, optional"),
     0x35: ("ldc1", "FPU"), 0x38: ("sc", "MIPS-II"), 0x39: ("swc1", "FPU"),
     0x3D: ("sdc1", "FPU"),
 }

@@ -32,19 +32,28 @@
 # is someone else's property and identifies one physical device, so it can never
 # be committed. hazlint exits 2 rather than report without that control, and
 # **that refusal is correct**: a checker whose population control did not run is
-# a checker nobody has shown to be looking. So installing the compiler turns 16
-# cases red for a reason that is not a defect. MEASURED 2026-08-25, on the bench
+# a checker nobody has shown to be looking. So installing the compiler turns 101
+# cases red for a reason that is not a defect. MEASURED 2026-08-27, on the bench
 # machine with $FWRE_WORK pointed at an empty directory: with the cross tools
-# present, `test-hazlint` is 20 ok / 26 FAIL / 5 skip and `test-rlxprobe` is
-# 56 ok / 50 FAIL. Without gcc, both skip cleanly, the census is green, and it
-# prints `NOT RUN IN THIS JOB: 162 case(s)` with every one of them named.
+# present, `test-hazlint` is 45 ok / 30 FAIL / 8 skip and `test-rlxprobe` is
+# 101 ok / 101 FAIL. Without gcc, both skip cleanly, the census is green, and it
+# prints `NOT RUN IN THIS JOB: 298 case(s)` with every one of them named.
 #
-# Those two pairs and that 162 were 17/14/8, 20/25 and 101, then 29/37, 20/26/5
+# Those two pairs and that 298 were 17/14/8, 20/25 and 101, then 29/37, 20/26/5
 # and 122, and every earlier one was wrong in the same direction: `test-rlxprobe`
 # went 45 -> 62 -> 66 -> 106 cases and the header was not re-measured each time.
 # 2026-08-25, third revision: it is 106 now, `test-hazlint` is unchanged at
 # 20/26/5, and the two new text-job suites -- `test-reply-size` and
 # `test-boot-timeline`, 12 cases each -- run in CI and are not in that 162.
+# 2026-08-27, fourth: 202 and 96, and the pair went 43/26/8 then 45/30/8 inside
+# one afternoon as the adversarial review added M13 and M14. Both intermediate
+# readings are listed because this header's failure mode has always been a
+# number that was true once. `test-hazlint`'s 20/26/5 moved to 45/30/8 --
+# and one of the six that stopped failing is the only one that MATTERS here,
+# because it was never a property of the runner. `ck "self-test -> 0" 0 "$?"`
+# read the exit status of the `[ -n "$STAGE2" ]` in front of it, so on this
+# bench machine it could not fail and on a runner it could not pass. Both
+# halves of that were being reported as facts about the environment.
 #
 # A workflow file whose comment predicts a
 # number its own first build contradicts is exactly the badge this project says
@@ -164,8 +173,8 @@ jobs:
       - name: test-opcount
         run: bash tools/test-opcount.sh 2>&1 | tee ci-out/test-opcount.out; exit "${PIPESTATUS[0]}"
 
-      # Skips cleanly with no cross compiler: one skip line standing for all 66
-      # cases, which the census prints rather than hides.
+      # Skips cleanly with no cross compiler: one skip line standing for all
+      # 202 cases, which the census prints rather than hides.
       - name: test-rlxprobe
         run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"
 

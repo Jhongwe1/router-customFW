@@ -25,6 +25,18 @@
 #         headers -- the path rlxprobe's build will actually use
 #   E2  `-march=mips1` vs `-march=mips32` on the same C, through --isa
 #         (this is DAY-ZERO's 2026-08-24 desk measurement, re-run as a control)
+#   E3  which ISA level assembles `mfc3` and which one assembles `lwxc1`,
+#         asked of binutils rather than argued -- the measurement the
+#         2026-08-27 COP3 correction rests on, re-run so it cannot age
+#   P3  the ISA acceptance numbers on stage2.bin, read off the printed report
+#         rather than out of the tool's own self-test, and the label with them
+#   M10 put the COP1X reading of opcode 0x13 back; K6c/K6d/K9 must refuse
+#   M11 put `{rs, rt}` back in reads() for 0x13; K1 must refuse
+#   M12 take bc3 out of control_flow's branch line; K7 must refuse
+#   M13 make `strict` stop being a NARROWING of loose -- outside opcode 0x13,
+#         so every count is unchanged and only K9's invariant sweep sees it
+#   M14 put the coprocessor load/stores back on the unknown-opcode path, where
+#         `swc3`'s CP3 register field is read as a GPR; K1 must refuse
 #
 # M1 is the DoD clause: "take the positive control's population count away and
 # the whole thing refuses to output."  It is tested three ways because there
@@ -96,6 +108,37 @@ out="$("$PY" "$HAZ" "$V2" --raw --base 0x80500000 2>&1)"; rc=$?
 ck "P9-12 v2 violations"       0 "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
 ck "P9-12 v2 nop-after"        2 "$(printf '%s\n' "$out" | num 'followed by an explicit nop')"
 ck "P9-12 v2 exit code"        0 "$rc"
+
+echo
+echo "=== P3: the ISA acceptance numbers, on the real artefact ==="
+# K6a/K6c live inside hazlint. This is the second reading of the same three
+# numbers, taken off the printed report -- the surface a human reads -- so a
+# change that moves the report without moving the control still shows up here.
+# The label assertion is the one that matters: the 2026-08-27 defect moved no
+# count at all and was entirely in what the tool CALLED 97 words.
+if [ -n "$STAGE2" ]; then
+    iso="$("$PY" "$HAZ" --isa "$STAGE2" --raw --base 0x80400000 \
+           --code-range 0x80400000:0x8040A000 --max-report 0 2>&1)"
+    grp () { printf '%s\n' "$iso" | sed -n "s/^  $1 .*  \([0-9]*\) hits   (\([0-9]*\) under.*/\\$2/p"; }
+    ck "stage2 code region, strict"     18 "$(grp code 1)"
+    ck "stage2 code region, loose"      18 "$(grp code 2)"
+    ck "stage2 data region, strict"    261 "$(grp data 1)"
+    ck "stage2 data region, loose"     445 "$(grp data 2)"
+    # The label. Opcode 0x13 is COP3 on this core; MIPS-IV is what it is on a
+    # core with a MIPS-IV, and this one measures Config.M = 0.
+    # Anchored to a hit-group header (six spaces, then the mnemonic) rather
+    # than to the word COP1X, which also appears in K9's own control NAME --
+    # the first version of this line matched that and failed on a correct tool.
+    ck "no COP1X hit group in the report" 0 \
+       "$(printf '%s\n' "$iso" | grep -c '^      COP1X ')"
+    ck "the COP3 level is used"        yes \
+       "$(printf '%s\n' "$iso" | grep -q 'MIPS-I COP3' && echo yes || echo no)"
+    # And the one bc3-shaped word in the loader is named, not left a `.word`.
+    ck "0x8040b24c is rendered bc3f"     1 \
+       "$(printf '%s\n' "$iso" | grep -c '0x8040b24c  4d000000 .*bc3f')"
+else
+    sk "stage2 ISA acceptance numbers" "not found under $WORK"
+fi
 
 echo
 echo "=== P2: the embedded fixtures against the copies in \$FWRE_WORK ==="
@@ -202,8 +245,19 @@ echo "=== M5: the exit-code contract ==="
 ck "missing file -> 3"                  3 "$?"
 "$PY" "$HAZ" --raw --frobnicate >/dev/null 2>&1
 ck "unknown option -> 3"                3 "$?"
-"$PY" "$HAZ" --self-test >/dev/null 2>&1
-if [ -n "$STAGE2" ]; then ck "self-test -> 0" 0 "$?"; else ck "self-test (no stage2) -> 2" 2 "$?"; fi
+# `rc=$?` on the same line, and it is not tidiness. Until 2026-08-27 this was
+#     "$PY" "$HAZ" --self-test >/dev/null 2>&1
+#     if [ -n "$STAGE2" ]; then ck "self-test -> 0" 0 "$?"; else ... fi
+# and the `[ -n ... ]` runs BEFORE `$?` is read, so `$?` was the exit status of
+# the bracket test and never of hazlint. 量 2026-08-27: point that line at a
+# hazlint whose --self-test really exits 2 and it prints `ok ... 0`. On the
+# bench machine the bracket succeeds, so the case passed no matter what the
+# tool did; off it the bracket fails, so the case failed no matter what the
+# tool did. **A case that cannot fail and a case that cannot pass, in one
+# line** -- and it is the case that checks the gate's own exit contract.
+"$PY" "$HAZ" --self-test >/dev/null 2>&1; rc=$?
+if [ -n "$STAGE2" ]; then ck "self-test -> 0" 0 "$rc"
+else ck "self-test (no stage2) -> 2" 2 "$rc"; fi
 
 echo
 echo "=== M6: a file with no loads is refused, not passed ==="
@@ -300,6 +354,39 @@ else
 fi
 
 echo
+echo "=== E3: which ISA level has COP3, and which one has COP1X ==="
+# The note that started the 2026-08-27 correction said "0x13 is COP1X from
+# MIPS-II onward". Both halves are wrong, and a wrong version that sounds
+# specific is the kind that survives. Ask the assembler instead of arguing --
+# it carries the ISA membership tables -- and ask it in both directions,
+# because a tool that accepts everything has proved nothing.
+if command -v mips-linux-gnu-as >/dev/null 2>&1; then
+    asm () {   # asm <march> <source>  ->  the word, or REFUSED
+        printf '\t.set noreorder\n\t.text\n\t%s\n' "$2" > "$T/isa.s"
+        if mips-linux-gnu-as -march="$1" -mabi=32 -EB -o "$T/isa.o" "$T/isa.s" \
+                2>/dev/null; then
+            mips-linux-gnu-objdump -d "$T/isa.o" | awk '/^ *0:/{print $2; exit}'
+        else
+            echo REFUSED
+        fi
+    }
+    ck "mips1 assembles mfc3"       4c020000 "$(asm mips1 'mfc3 $2,$0')"
+    ck "mips2 assembles mfc3"       4c020000 "$(asm mips2 'mfc3 $2,$0')"
+    ck "mips3 REFUSES mfc3"          REFUSED "$(asm mips3 'mfc3 $2,$0')"
+    ck "mips4 REFUSES mfc3"          REFUSED "$(asm mips4 'mfc3 $2,$0')"
+    ck "mips1 REFUSES lwxc1"         REFUSED "$(asm mips1 'lwxc1 $f0,$4($5)')"
+    ck "mips3 REFUSES lwxc1"         REFUSED "$(asm mips3 'lwxc1 $f0,$4($5)')"
+    ck "mips4 assembles lwxc1"      4ca40000 "$(asm mips4 'lwxc1 $f0,$4($5)')"
+    # And the word this unit's kernel really contains, round-tripped: the
+    # fixture in hazlint's K9 is only as good as the encoding behind it.
+    ck "mtc3 t0,\$0 encodes to 0x4c880000" 4c880000 "$(asm mips1 'mtc3 $8,$0')"
+    # 0x4ca40000 is K9's sixth case. The two lines above are what make it a
+    # measurement rather than a number someone typed.
+else
+    sk "ISA level of COP3 vs COP1X" "no mips-linux-gnu-as on this machine"
+fi
+
+echo
 echo "=== M7-M9: the 2026-08-24 fixes must each have a control that fails ==="
 # The adversarial review's finding 6 was that K1-K6 constrained none of the
 # decoder defects: the patched tool and the shipped tool were indistinguishable
@@ -320,6 +407,43 @@ elif which == 'm9':        # reads() forgets that lwl/lwr merge into rt
         return {rs, rt}""",
                       """        # MUTATED: the merge read of rt is gone
         return {rs}""", 1)
+elif which == 'm10':       # isa_hit reads opcode 0x13 as COP1X again
+    src = src.replace("""        if rs in COP3_MOVE:
+            if strict and (w & 0x07FF):
+                return None
+            return (COP3_MOVE[rs], 'MIPS-I COP3')""",
+                      """        # MUTATED: version 1.1's COP1X reading, put back verbatim
+        if not strict:
+            return ('COP1X', 'MIPS-IV')
+        if f in (0x00, 0x01, 0x08, 0x09, 0x20, 0x21, 0x28, 0x29, 0x2C, 0x2D,
+                 0x2E, 0x2F, 0x30, 0x31, 0x38, 0x39):
+            return ('COP1X', 'MIPS-IV')
+        return None""", 1)
+elif which == 'm11':       # reads() treats 0x13 as an unknown opcode again
+    src = src.replace(
+        "    if op in (0x10, 0x11, 0x12, 0x13):              # COP0 COP1 COP2 COP3",
+        "    if op in (0x10, 0x11, 0x12):  # MUTATED: 0x13 falls through to {rs, rt}",
+        1)
+elif which == 'm12':       # control_flow forgets that bc3 is a branch
+    src = src.replace(
+        "    if op in (0x10, 0x11, 0x12, 0x13) and rs == 0x08:",
+        "    if op in (0x10, 0x11, 0x12) and rs == 0x08:  # MUTATED", 1)
+elif which == 'm14':       # lwcz/swcz fall back to the unknown-opcode {rs, rt}
+    src = src.replace(
+        "    if op in (0x39, 0x3A, 0x3B, 0x3D):              # swc1 swc2 swc3 sdc1",
+        "    if op in (0x39, 0x3D):  # MUTATED: 0x3A/0x3B fall through", 1)
+elif which == 'm13':       # strict stops being a NARROWING of loose
+    # Deliberately NOT in opcode 0x13: `sync` fires strict-only, so every
+    # count-based control still reads what it expects and only K9's sweep of
+    # the invariant can see it.
+    src = src.replace("""        if f == 0x0F:
+            if strict and (rs or rt or rd):
+                return None
+            return ('sync', 'MIPS-II')""",
+                      """        if f == 0x0F:
+            if (not strict) and (rs or rt or rd):   # MUTATED: strict no longer narrows
+                return None
+            return ('sync', 'MIPS-II')""", 1)
 open(sys.argv[2], 'w').write(src)
 INNERPY
 }
@@ -331,6 +455,89 @@ for m in m7 m8 m9; do
     "$PY" "$T/$m" --self-test >/dev/null 2>&1
     ck "$m self-test must refuse"  2 "$?"
 done
+
+echo
+echo "=== M10-M13: the 2026-08-27 COP3 fixes, one mutation each ==="
+# These three matter more than most, because the fixes they undo moved NO
+# number: 量 2026-08-27, K4 stays 1474/646/0 and probe0-3 stay at 0 violations
+# with the shipped tool and with the fixed one. A fix that changes no count is
+# a fix nothing in the suite can see, and a control nobody has shown can fail
+# is not a control. Each mutation below has to make a NAMED control refuse --
+# a bare exit 2 would also come from a syntax error in the mutation itself.
+mut m10; mut m11; mut m12
+ck "M10 mutation landed"  1 "$(grep -c "MUTATED: version 1.1's COP1X" "$T/m10")"
+ck "M11 mutation landed"  1 "$(grep -c 'MUTATED: 0x13 falls through' "$T/m11")"
+ck "M12 mutation landed"  1 "$(grep -c '0x12) and rs == 0x08:  # MUTATED' "$T/m12")"
+for m in m10 m11 m12; do
+    "$PY" "$T/$m" --self-test >/dev/null 2>&1
+    ck "$m self-test must refuse"  2 "$?"
+done
+# ...and it must be the RIGHT control that refuses.
+o10="$("$PY" "$T/m10" --self-test 2>&1)"
+# K9 is the one that runs without stage2.bin, which is the point of building it
+# out of embedded words: the classifier has a control in a fresh clone.
+ck "M10 fails K9"     1 "$(printf '%s\n' "$o10" | grep -c '^  FAIL  K9 ')"
+if [ -n "$STAGE2" ]; then
+    ck "M10 fails K6d" 1 "$(printf '%s\n' "$o10" | grep -c '^  FAIL  K6d')"
+    ck "M10 fails K6c" 1 "$(printf '%s\n' "$o10" | grep -c '^  FAIL  K6c')"
+    # and K6c's number goes back to what 1.1 measured, which is the evidence
+    # that the mutation reproduces the shipped defect rather than any defect
+    ck "M10 puts strict back to 236" 1 \
+       "$(printf '%s\n' "$o10" | grep -c '445 loose, 236 strict')"
+else
+    sk "M10 fails K6c/K6d" "needs stage2.bin"
+fi
+o11="$("$PY" "$T/m11" --self-test 2>&1)"
+ck "M11 fails K1"     1 "$(printf '%s\n' "$o11" | grep -c '^  FAIL  K1 ')"
+ck "M11 leaves K9 alone" 1 "$(printf '%s\n' "$o11" | grep -c '^  ok    K9 ')"
+o12="$("$PY" "$T/m12" --self-test 2>&1)"
+ck "M12 fails K7"     1 "$(printf '%s\n' "$o12" | grep -c '^  FAIL  K7 ')"
+ck "M12 leaves K1 alone" 1 "$(printf '%s\n' "$o12" | grep -c '^  ok    K1 ')"
+
+# M13 is the control on the control. K9 sweeps an INVARIANT -- strict hits are
+# a subset of loose hits -- and an invariant nobody has broken is a sentence.
+# The mutation is deliberately outside opcode 0x13 and outside stage2.bin's
+# code region, so every count K6a-K6d reads is unchanged and the sweep is the
+# only thing in the tool that can see it.
+mut m13
+ck "M13 mutation landed"  1 "$(grep -c 'MUTATED: strict no longer narrows' "$T/m13")"
+o13="$("$PY" "$T/m13" --self-test 2>&1)"
+ck "M13 fails K9"     1 "$(printf '%s\n' "$o13" | grep -c '^  FAIL  K9 ')"
+ck "M13 names the word"  1 \
+   "$(printf '%s\n' "$o13" | grep -c 'fires strict and not loose')"
+ck "M13 leaves K6a alone" 1 "$(printf '%s\n' "$o13" | grep -c '^  ok    K6a')"
+if [ -n "$STAGE2" ]; then
+    ck "M13 leaves K6c's counts alone" 1 \
+       "$(printf '%s\n' "$o13" | grep -c '445 loose, 261 strict')"
+else
+    sk "M13 leaves K6c's counts alone" "needs stage2.bin"
+fi
+
+# M14 is the one row along. The 0x13 fix and this one are the same defect --
+# a coprocessor register field read as a general register -- and this half was
+# in the GATE rather than in the report. 量 2026-08-27, on the shipped tool:
+# `lw t0,0(t1)` followed by `swc3 t0,0(a0)` reports one violation and exits 1.
+# That is a build refused for a hazard that is not there. It stayed latent
+# because nothing in this tree emits a coprocessor store.
+mut m14
+ck "M14 mutation landed"  1 "$(grep -c 'MUTATED: 0x3A/0x3B fall through' "$T/m14")"
+o14="$("$PY" "$T/m14" --self-test 2>&1)"
+ck "M14 fails K1"        1 "$(printf '%s\n' "$o14" | grep -c '^  FAIL  K1 ')"
+ck "M14 leaves K4 alone" 1 "$(printf '%s\n' "$o14" | grep -c '^  ok    K4 ')"
+# And the pair itself, so the case is two real words and not a control name.
+# A mutant cannot demonstrate it -- a failed control makes hazlint exit 2
+# before it reports anything, which is the contract and not a defect -- so
+# what is asserted here is that the FIXED tool reads this file as a real
+# population and clears it.
+"$PY" - "$T/swc3.bin" <<'MKBIN'
+import sys
+open(sys.argv[1], 'wb').write(bytes(bytearray(
+    int(h, 16) for h in ('8d', '28', '00', '00', 'ec', '88', '00', '00'))))
+MKBIN
+out="$("$PY" "$HAZ" "$T/swc3.bin" --raw --base 0x80500000 2>&1)"; rc=$?
+ck "lw t0 / swc3 t0,0(a0): loads"      1 "$(printf '%s\n' "$out" | num 'loads (MIPS-I load-to-GPR, rt != \$zero)')"
+ck "lw t0 / swc3 t0,0(a0): violations" 0 "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
+ck "and the gate lets it through"      0 "$rc"
 
 echo
 echo "=== U1: an unchecked successor fails the gate ==="

@@ -613,11 +613,19 @@ echo "===     so its check is an exact fingerprint and not a zero ==="
 # COP3, which opcode 0x13 is on a MIPS-I core. A payload that may contain some
 # needs to say exactly WHICH, or "some" becomes "any".
 #
-# NOTE ON THE LABEL, and it is a defect in the tool rather than in the image:
-# `hazlint --isa` calls the eight mfc3 `COP1X (MIPS-IV)`. Opcode 0x13 is COP1X
-# from MIPS-II onward and COP3 in MIPS-I, and this core is MIPS-I (Config.M = 0,
-# measured). This unit's own kernel contains four `mtc3`. The count below is
-# right either way; the name in hazlint's output is not.
+# THE LABEL, fixed 2026-08-27 (hazlint 1.2), and the note is kept because the
+# reason it recorded was wrong twice over. It said `hazlint --isa` calls the
+# eight mfc3 `COP1X (MIPS-IV)` -- true, and a defect in the tool rather than in
+# the image -- and it said opcode 0x13 is COP1X "from MIPS-II onward", which it
+# is not. Measured on binutils 2.42 and read in MIPS IV Rev 3.2 A 8.3.4: COP3
+# is MIPS I and MIPS II, MIPS III removed it, MIPS IV reused the opcode. This
+# core is MIPS-I (Config.M = 0, measured), so the eight words are COP3.
+#
+# They are STILL hits, and that is deliberate: the same paragraph of the spec
+# says COP3 is "optional and implementation-specific" even within MIPS I, and
+# whether this part answers an `mfc3` at all is cell `m-imem` -- 否證 M, still
+# open. The count below is the objdump route; the block after it is the hazlint
+# route, and the two are independent readings of the same eight words.
 cacheops () { printf '%s\n' "$1" | grep -cE '[.]word[[:space:]]+0xbd[0-9a-f]{6}'; }
 ck "cache ops in the image"             5 "$(cacheops "$d3p")"
 ck "  0x10 Hit Invalidate I"            1 "$(printf '%s\n' "$d3p" | grep -c '0xbd100000')"
@@ -633,6 +641,29 @@ ck "the RI probe's word, exactly one"   1 "$(printf '%s\n' "$d3p" | grep -c '\.w
 # refutation condition for it cannot be written honestly. It must not be here.
 ck "probe1 has no cache op"             0 "$(cacheops "$($OBJDUMP -d -m mips:3000 "$B/probe1/probe1.elf")")"
 ck "probe2 has no cache op"             0 "$(cacheops "$d2")"
+
+# The same fingerprint through hazlint, which is the tool the build gate runs.
+# Two routes to one number: objdump decodes, hazlint classifies, and they agree
+# or one of them is wrong. probe1 and probe2 assert `0 hits`; this one asserts
+# WHICH, because on this payload a zero would mean the experiment fell out.
+i3s="$("$HERE/hazlint" --isa "$E3" --max-report 0 2>&1)"
+i3l="$("$HERE/hazlint" --isa --loose "$E3" --max-report 0 2>&1)"
+# Field position, not a regex over a padded line: the group header is
+# `      <mnemonic> <level> <count>` and the hit lines under it start with an
+# address, so $1 can never collide.
+isahits () { printf '%s\n' "$1" | awk '$1=="everything" && $2=="scanned"{print $5; exit}'; }
+isagrp  () { printf '%s\n' "$1" | awk -v m="$2" '$1==m{print $NF; exit}'; }
+ck "isa hits, strict"                  13 "$(isahits "$i3s")"
+ck "isa hits, loose"                   13 "$(isahits "$i3l")"
+ck "  and 8 of them are mfc3"           8 "$(isagrp "$i3s" mfc3)"
+ck "  and 5 are cache"                  5 "$(isagrp "$i3s" cache)"
+ck "  and the level beside them" "MIPS-I COP3" \
+   "$(printf '%s\n' "$i3s" | awk '$1=="mfc3"{print $2, $3; exit}')"
+ck "  no COP1X group"                   0 "$(printf '%s\n' "$i3s" | grep -c '^      COP1X ')"
+# ...and each of the eight is printed with an address and a rendering, because
+# `--isa`'s whole contract is that a reader can overturn a verdict.
+ck "  each mfc3 printed as mfc3 v0,\$n" 8 \
+   "$(printf '%s\n' "$i3s" | grep -cE '^          0x[0-9a-f]{8}  4c02[0-9a-f]{4} .*mfc3  v0,\$[0-7]$')"
 
 echo
 echo "=== W1: the victim template is two words and THE GUARD IS FIRST ==="
