@@ -20,7 +20,7 @@ looks like the device is the run to distrust.**
 | | |
 |---|---|
 | **owns** | what each `probe3` cell does, what it is expected to return on each of the two machines, what would refute it, and what it measures |
-| **does not own** | *where I am* (`PROGRESS.md`), the cache model itself (`notes/cache-model.md`), the four decisions `R1-gate` made (`docs/rlx-cache-and-cp0.md`), any number **except one** (`SPEC.md` indexes them) — 🔴 **§ 6.3's derivation of `TC0CNT`'s 14,286,057 Hz rate is owned here**, because it is derived here and `SPEC.md` `CLK-17` points back at this file for it; every other number in this file is a quotation, **and what the operator types** — that is `R1h-2`'s runsheet section, and it is a separate step on purpose |
+| **does not own** | *where I am* (`PROGRESS.md`), the cache model itself (`notes/cache-model.md`), the four decisions `R1-gate` made (`docs/rlx-cache-and-cp0.md`), any number **except one** (`SPEC.md` indexes them) — 🔴 **§ 6.3's derivation of `TC0CNT`'s 14,286,057 Hz rate is owned here**, because it is derived here and `SPEC.md` `CLK-17` points back at this file for it; every other number in this file is a quotation, **and what the operator types** — that is `R1h-2`'s runsheet section, ⏸ **deferred 2026-08-26 to `R3`'s seating preparation**, and a separate step on purpose |
 | **is not** | the payload. `R1h-1` builds that, under the `hazlint` gate, with one qemu mutation per cell |
 
 `R1h` exists to settle four things (`PROGRESS.md` § Step list): ⓐ cache size /
@@ -337,7 +337,7 @@ verdict function. A bitmap does not.
 ## 5. Group P — preflight, at the prompt, before anything is uploaded
 
 Four cells, **eight commands** (`P1` is sent twice, `P2` is four `DW`s). **No upload, no `J`, zero risk to the device, and every one of them removes an
-assumption a later cell would otherwise carry.** They belong to `R1h-2`'s
+assumption a later cell would otherwise carry.** They belong to `R1h-2`'s (⏸ now written at `R3`'s seating prep, § 10b)
 runsheet section; they are listed here because three cells below are conditional
 on them.
 
@@ -855,6 +855,53 @@ Three of them are worth naming now:
   covers the victims. **Its coverage report must say so**, or a reader takes a
   clean run as covering code the scan never saw — which is `hazlint`'s own
   finding 1 (the population control that exercised a path no scanned file took).
+
+---
+
+## 10b. 🔴 This payload sits on the shelf across two gates before it is seated
+
+**Added 2026-08-26, after the schedule was settled.** The seating is at the
+**tail of `R3`**, so `probe3` is built during `R1h-1` and run after the whole of
+`R2` and `R3`. Three things follow, and none of them is optional.
+
+**1. The binary in the tree on seating day is not to be trusted, and this project
+has already paid for that lesson.** 量: `make P=probe2 payload
+RESULT_BASE=0x80A01000` printed `Nothing to be done for 'payload'` — no compile,
+no `show`, no `sha256` — while `build/probe2/probe2.bin` in the tree was a
+`0x80A00000` build. The object rules depend on the sources and two headers and
+on **nothing that carries a `-D`**. So the seating-day procedure is:
+
+```
+rm -rf tools/rlxprobe/build/probe3
+make -C tools/rlxprobe P=probe3 payload RESULT_BASE=0x80A02000
+make -C tools/rlxprobe P=probe3 show          # record the sha256 it prints
+```
+
+and **`Nothing to be done` is a hard stop, not a convenience.** The on-the-wire
+check is `rb=80a02000` in the banner — lower case, because `report.c`'s digit
+table is `"0123456789abcdef"` while the loader's is upper. `rb=80a00000` or
+`rb=80a01000` means the binary is a `probe1`/`probe2`-based build and is about to
+poison a block that holds a measurement.
+
+**2. Every qemu column has to be closed now, not then.** The three still marked
+未定 — `m-cu3`, `s-isc`, and all of Group T — are `R1h-1`'s to measure and write
+back into this file. **A cell whose qemu column is still 未定 months later has no
+control on its own emitter, and nobody will remember why the box was empty.**
+The same goes for committing a qemu serial capture beside the eventual device
+log: there is not one in this repository today.
+
+**3. The running order is fixed by physics, not by the schedule.** `probe3` runs
+**first** in that seating. `R3`'s DoD is *my kernel boots to a shell and pings*,
+and in that state the loader is gone, the DRAM is gone, there is no `<RealTek>`
+prompt to type `J` into and no `DW` to recover the result block. **"At the tail
+of `R3`" names which seating, not the order inside it** — `PROGRESS.md`'s
+stop-loss has said `probe3` goes first since the gate opened, and the schedule
+change does not touch it.
+
+⚠️ **And Group P's preflight is cheap enough to re-run rather than trust.** `P0`,
+`P1`, `P2` and `P3` cost eight commands and no power cycle of their own; the
+readings they check (`TC0CNT` live, the arena free, the `DW` length ceiling) are
+properties of a board that will have been power-cycled many times by then.
 
 ---
 
