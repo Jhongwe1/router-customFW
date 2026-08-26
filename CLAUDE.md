@@ -87,6 +87,15 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   … ordinary shell, literal paths, $VAR all fine …
   EOF
   ```
+  🆕 **But do not nest a second heredoc inside that one.** Measured 2026-08-26,
+  three times before it was believed: a `python3 - <<'PY' … PY` inside the outer
+  heredoc **loses one level of backslash**, so `\\t` reaches Python as `\t` and
+  `"…1 \\\n"` becomes a line continuation that eats the newline. The symptoms are
+  a `SyntaxWarning: invalid escape sequence` and an `assert … in s` that fails on
+  a string you can see in the file. It also breaks the outer heredoc outright if
+  the inner body contains the outer terminator. **Write the script to a file with
+  the Write tool and run it by path** — `python3 /mnt/c/…/scratchpad/x.py` — which
+  has no quoting layers at all.
 - **Binaries and vendor source trees never live under `/mnt/c`.** Measured
   2026-08-23: DrvFs *keeps* symlinks, but reports every file as `777`, so git sets
   `core.fileMode=false` and stops seeing mode changes at all; and NTFS is
