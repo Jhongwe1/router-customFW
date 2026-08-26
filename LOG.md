@@ -4497,3 +4497,61 @@ Group V 印出它為什麼不跑。**閘門在 qemu 上是可斷言的，而快�
 `docs/probe3-cells.md`、`SOURCES.json`、
 `SPEC.md` `CPU-04`／`CPU-19` 殘留／`CPU-24` 殘留／`CPU-25`／`CPU-43`／`CPU-44`／
 `CPU-45`／`CPU-46`／`CLK-17`。
+
+### 收尾：suite 106 → 195,而 mutation 的數量不是照格子數的
+
+**一個檢查機制一個 mutation,不是一格一個。** `docs/probe3-cells.md` §10 原本寫
+「one mutation per cell」,而格子有大約四十個。真正的問題寫在同一份檔的 §6.2 裡:
+**在這個 harness 上,大多數快取讀數變不變都一樣** —— W 群每一格在 qemu 上都是 FRESH、
+C 群每一格讀同一個值、每一條 `cache` 都 retire。
+**一個預測效果等於基線的 mutation 是不會失敗的 mutation**,四十個裡有一半是那種。
+
+所以是**十二個 mutation ＋ 一張覆蓋表**,而覆蓋表最重要的一欄是
+**「沒有任何 mutation 蓋得到的格子,與理由」** —— `w-line` 的 `V0`-only 武裝、
+`w-back`/`w-back2` 的方向判別、兩支 sweep 的邊界與兩個 assoc、
+**re-arm 的 `CCTL 0x002` 那一半**（TCG 在 store 當下就作廢 translation block,
+所以拿掉 invalidate 讀數一模一樣 —— `QM2` 改成動「重寫」那一半,
+證明的是偵測器**發得出來**,不是 invalidate 是必要的）、
+三個 E 格子的寫入政策分支、`c-G`、`m-imem` 的雙 prime、`x-10` 的功能腿。
+**那些格子在裝置上各自有自己的 must-fire 控制**,寫在它們自己的格子裡。
+分工是:**qemu 檢查發射器,裝置檢查主張**,而那張表就是不讓兩者被搞混的地方。
+
+六個 mutation **不需要模擬器**（`SM1`–`SM6`），這是在沒有 qemu 的機器上還活著的那一半,
+也是**能斷言 qemu 的仁慈所遮蔽的東西**的那一半 —— `SM5`（`s-isc` 的控制位元）
+就是一個**在 qemu 上完全沒有腿**的檢查:三顆位元設不設都讀回 0。
+
+### 四個自己咬到的錯,其中一個是我今天自己種的
+
+1. 🔴 **`make P=probe0` 被我自己加的區塊碰撞守門擋掉了。** probe0 **不寫結果區塊**
+   （它的原始碼裡根本沒有 `RESULT_BASE`）,但它繼承和 probe1 同一個預設位址,
+   而只排除 `$(P)` 的檢查看到 probe0 坐在 probe1 的區塊上就拒絕編譯。
+   **一個會擋下不可能碰撞的 payload 的守門不是更嚴,是壞的。** suite 裡 probe0 的
+   每一個案例同時紅掉才看見。
+2. 🔴 **guardscan 的迴圈加了 probe3 卻沒有先建它**,掃描報 `SCANNED=0`,
+   而那是**一個不會失敗的檢查** —— 正是這個迴圈存在的理由。
+3. 🔴 **W2「cells.S 不碰堆疊」第一版用 awk 追「現在在哪個 routine 裡」,
+   結果在一個一次都沒碰堆疊的檔案上報了 298 次**:名字不在清單裡的 C 函式
+   全部算成 cells.S。改成從 `nm` 拿範圍 —— 一個 object 的 `.text` 是連續的,
+   cells.S 的第一個符號是 victim template、最後一個是 `rlx_cctl2`,兩個邊界位址**就是**那個檔。
+4. 🔴 **十七個斷言用 `$` 錨在行尾,而 capture 的每一行都以 `\r` 結尾。**
+   `report.c` 每行輸出 `\r\n`,所以 `grep '...=00000000$'` 永遠不match。
+   這個檔裡原有的 probe2 斷言全部沒有錨尾,現在知道為什麼了。
+   **順帶：`.gitattributes` 也因此多了 `qemu/** -text`** —— 第一次 `git add` 就警告
+   `CRLF will be replaced by LF`,那會從一份 125 行的 capture 裡拿掉 125 個位元組,
+   而旁邊的 `.build` 檔記著它的 sha256。`bench/` 在 2026-08-23 學過同一課。
+
+### 數字
+
+`tools/test-rlxprobe.sh` **195 passed, 0 failed**（106 → 195）。
+`ci-expected.tsv` 同步:bench total 195,`$FWRE_WORK` 清空時 **100 ok / 95 FAIL**（今天量的,
+上一個數字是 2026-08-25 的 56/50）。九支 suite 全綠,`ci-census` 的算術收得起來。
+
+### 還開著的一件事,寫清楚給下一段
+
+🔴 **`hazlint --isa` 把 opcode `0x13` 標成 `COP1X (MIPS-IV)`。**
+`0x13` 從 MIPS-II 起才是 COP1X,**在 MIPS-I 上它是 COP3** —— 而這顆是 MIPS-I
+（`Config.M = 0`,量）,這台自己的 kernel 有四條 `mtc3`,`probe3` 的映像有八條 `mfc3`。
+**標籤錯了,gate 沒錯**（gate 是 load-delay 檢查,那個是對的)。
+修它會動到 `test-hazlint.sh` K6a/K6b/K6c 三個控制的期望數字 ——
+它們數的是 `stage2.bin` 資料區的 loose/strict 命中,而 `0x13` 的分類一改那些數字就會變。
+**那要重新量,不是重新猜。**

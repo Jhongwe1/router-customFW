@@ -505,8 +505,21 @@ EXEMPT = {
    "entered through rlx_call0_primed with $a0 = the stub's own address, so the "
    "property SAFE_A0 establishes already holds; and the handler that catches a "
    "trap here was proved live by the `break` control before the census starts",
+ ("probe3", "rlx_exc_entry"):
+   "it IS the handler -- same argument as probe2's, and probe3 links the same "
+   "exc.S",
+ ("probe3", "rlx_cp0_stubs"):
+   "same argument as probe2's; probe3 links exc.S for the handler and the "
+   "`break` control and does not run the CP0 census",
+ ("probe3", "rlx_cp3_stubs"):
+   "entered through rlx_call0_primed with $a0 = the stub's own address, exactly "
+   "as the CP0 stubs are, and behind the same `break`-proved handler. A trap "
+   "here is an EXPECTED outcome of cell m-imem rather than a failure",
 }
-FAULTY = re.compile(r"\t(mfc0|mtc0|break|syscall|rfe)\b|\t\.word\t0x4[0-9a-f]{7}")
+FAULTY = re.compile(r"\t(mfc0|mtc0|mfc3|mtc3|break|syscall|rfe)\b"
+                    r"|\t\.word\t0x4[0-9a-f]{7}"        # COP0/COP3 as raw words
+                    r"|\t\.word\t0xb[cd][0-9a-f]{6}"    # MIPS-II `cache`, probe3
+                    r"|\t\.word\t0xe\b")               # SPECIAL 0x0E, cell x-ri
 GUARD = re.compile(r"\tlui\t.*a0,0x")
 cur, order, first, guard = None, [], {}, {}
 for line in sys.stdin:
@@ -535,7 +548,16 @@ for fn in order:
 print("SCANNED=%d UNGUARDED=%d" % (len(first), bad))
 PY
 guardscan () { $OBJDUMP -d -m mips:3000 "$1" | "${PYTHON:-python3}" "$T/guardscan.py" "$2"; }
-for p in probe1 probe2; do
+# probe3's own section is further down, and this loop runs before it -- so it is
+# built here. The first version of this change added probe3 to the list without
+# building it, and the scan reported SCANNED=0 on a file that did not exist:
+# a check that could not fail, which is the exact defect the loop exists to stop.
+make -C "$RP" BUILD="$B" P=probe3 payload >/dev/null 2>&1
+# probe3 is in this list since 2026-08-26. It was `probe1 probe2`, hard-coded,
+# and a payload that is not in the list is a payload this check does not look at
+# -- which for probe3 would have meant the only routines in the tree containing
+# a MIPS-II `cache` were scanned by nothing at all.
+for p in probe1 probe2 probe3; do
     g="$(guardscan "$B/$p/$p.elf" "$p")"
     printf '%s\n' "$g" | grep -E 'UNGUARDED [a-z]' | sed 's/^/  /'
     ck "$p: unguarded faulting routines"  0 \
@@ -553,6 +575,307 @@ mb="$(printf '%s\n' "$g" | sed -n 's/^SCANNED=[0-9]* UNGUARDED=\([0-9]*\)$/\1/p'
 ck "the mutant has unguarded routines"  yes "$([ "${mb:-0}" -ge 5 ] && echo yes || echo no)"
 ck "and rlx_do_break is one of them"      1 \
    "$(printf '%s\n' "$g" | grep -c 'UNGUARDED rlx_do_break')"
+
+echo
+echo "=== P4: probe3 builds, gated, and its own assertions hold ==="
+# probe3 is the R1h payload: two eviction walks, a coherence group, the first
+# `cache` instruction this project has ever executed, and a Status cell. It is
+# also the first payload that MAY legitimately contain words outside MIPS-I,
+# which is why its ISA case below is an exact list rather than a zero.
+# The guardscan loop above already built probe3 into this directory, so without
+# emptying it `make` prints `Nothing to be done` and the three build assertions
+# below grep an empty log and report 0 -- a check reading absence as failure
+# where the truth is that nothing ran. Which is the same shape as the defect
+# `docs/probe3-cells.md` sec 10b's rebuild procedure exists for.
+rm -rf "$B/probe3"
+out="$(make -C "$RP" BUILD="$B" P=probe3 payload 2>&1)"; rc=$?
+ck "make exit code"                     0 "$rc"
+ck "it actually compiled"               no \
+   "$(printf '%s\n' "$out" | grep -q 'Nothing to be done' && echo yes || echo no)"
+ck "payload exists"                   yes "$([ -s "$B/probe3/probe3.bin" ] && echo yes || echo no)"
+ck "raw image == sections with content" 1 \
+   "$(printf '%s\n' "$out" | grep -c 'ok *raw image == every section that has contents')"
+g3="$("$HERE/hazlint" "$B/probe3/probe3.elf" 2>&1)"; rc=$?
+ck "hazlint exit code"                  0 "$rc"
+ck "violations"                         0 "$(printf '%s\n' "$g3" | sed -n 's/^  VIOLATIONS *\([0-9]*\).*/\1/p')"
+# The gate is only worth quoting if it had a population to scan. probe3 is the
+# largest payload here and a scan of ~0 loads would pass for the wrong reason.
+nl3="$(printf '%s\n' "$g3" | sed -n 's/^  loads .*)  *\([0-9]*\)$/\1/p')"
+ck "and it had loads to scan"         yes "$([ "${nl3:-0}" -ge 200 ] && echo yes || echo no)"
+E3="$B/probe3/probe3.elf"
+d3p="$($OBJDUMP -d -m mips:3000 "$E3")"
+
+echo
+echo "=== T1: probe3 is the first payload that MAY hold non-MIPS-I words, ==="
+echo "===     so its check is an exact fingerprint and not a zero ==="
+# probe1 and probe2 assert zero ISA hits. probe3 cannot: executing a MIPS-II
+# `cache` IS question (c), and the scratchpad range registers are read through
+# COP3, which opcode 0x13 is on a MIPS-I core. A payload that may contain some
+# needs to say exactly WHICH, or "some" becomes "any".
+#
+# NOTE ON THE LABEL, and it is a defect in the tool rather than in the image:
+# `hazlint --isa` calls the eight mfc3 `COP1X (MIPS-IV)`. Opcode 0x13 is COP1X
+# from MIPS-II onward and COP3 in MIPS-I, and this core is MIPS-I (Config.M = 0,
+# measured). This unit's own kernel contains four `mtc3`. The count below is
+# right either way; the name in hazlint's output is not.
+cacheops () { printf '%s\n' "$1" | grep -cE '[.]word[[:space:]]+0xbd[0-9a-f]{6}'; }
+ck "cache ops in the image"             5 "$(cacheops "$d3p")"
+ck "  0x10 Hit Invalidate I"            1 "$(printf '%s\n' "$d3p" | grep -c '0xbd100000')"
+ck "  0x11 Hit Invalidate D, x-11+c-D"  2 "$(printf '%s\n' "$d3p" | grep -c '0xbd110000')"
+ck "  0x15 Hit WB Invalidate D"         1 "$(printf '%s\n' "$d3p" | grep -c '0xbd150000')"
+ck "  0x19 Hit Writeback D"             1 "$(printf '%s\n' "$d3p" | grep -c '0xbd190000')"
+ck "  0x1b is NOT in it"                0 "$(printf '%s\n' "$d3p" | grep -c '0xbd1b0000')"
+ck "mfc3 stubs, one per CP3 register"   8 "$(printf '%s\n' "$d3p" | grep -cE '[[:space:]]mfc3[[:space:]]')"
+ck "the RI probe's word, exactly one"   1 "$(printf '%s\n' "$d3p" | grep -c '\.word[[:space:]]*0xe$')"
+# `cache 0x1b` is the one op where the Lexra name (DWB_IInval) and the MIPS32
+# encoding (Hit Writeback Secondary) contradict, and the one with zero
+# occurrences in this unit's kernel -- so the binary cannot adjudicate it and a
+# refutation condition for it cannot be written honestly. It must not be here.
+ck "probe1 has no cache op"             0 "$(cacheops "$($OBJDUMP -d -m mips:3000 "$B/probe1/probe1.elf")")"
+ck "probe2 has no cache op"             0 "$(cacheops "$d2")"
+
+echo
+echo "=== W1: the victim template is two words and THE GUARD IS FIRST ==="
+# probe1's victim is three words with the patched word at +0 and the guard at
+# +4; probe3 inverts it so an 8-byte victim can sit at 8-byte stride and Group W
+# can see an 8-byte line. Every probe1 habit about `vaddr+4` being the guard is
+# wrong for probe3, and the arena is a run-time copy of THESE TWO WORDS, so if
+# they are not what cells.S assembled the walk would be jumping into whatever it
+# wrote. Read out of the emitted image rather than out of the source.
+TS="$($NM "$E3" | awk '$3=="rlx_vic_template"{print $1}')"
+TE="$($NM "$E3" | awk '$3=="rlx_vic_template_end"{print $1}')"
+ck "template is exactly 8 bytes"        8 "$(( 0x${TE:-0} - 0x${TS:-0} ))"
+tw () { $OBJDUMP -d --start-address=$(( 0x$TS + $1 )) --stop-address=$(( 0x$TS + $1 + 4 )) \
+        "$E3" | awk '/^ *[0-9a-f]+:/{print $2; exit}'; }
+ck "word 0 is jr \$31 (the guard)" 03e00008 "$(tw 0)"
+ck "word 1 is addiu v0,zero,OLD"   240211a1 "$(tw 4)"
+
+echo
+echo "=== W2: nothing in cells.S touches the stack ==="
+# docs/probe3-cells.md sec 6.5: rlx_call2_uncached spills $31 onto a KSEG0
+# stack, and `CCTL 0x001` (DInval) invalidates the whole D-cache WITHOUT writing
+# back. A routine that pushed a frame between the DWB and the DInval would have
+# its return address discarded and `jr $31` would go to an address nobody chose
+# -- the loader's permanent hang, one power cycle, no spare device.
+# The span comes from `nm`, not from a state machine over the disassembly: one
+# object's .text is contiguous, cells.S's first symbol is the victim template
+# and its last is rlx_cctl2, so the two boundary addresses ARE the file. The
+# first version of this case tried to track which routine it was inside by
+# matching names and reported 298 stack references in a file that has none --
+# every C function whose name was not in its list counted as cells.S.
+CS0="$($NM -n "$E3" | awk '$3=="rlx_vic_template"{print $1}')"
+CE0="$($NM -n "$E3" | awk '{a[NR]=$1} $3=="rlx_cctl2"{i=NR} END{print a[i+1]}')"
+ck "the cells.S span was located"       yes \
+   "$([ -n "$CS0" ] && [ -n "$CE0" ] && [ "$(( 0x$CE0 - 0x$CS0 ))" -gt 2000 ] && echo yes || echo no)"
+sp3="$($OBJDUMP -d -m mips:3000 --start-address=$(( 0x$CS0 )) --stop-address=$(( 0x$CE0 )) \
+       "$E3" | grep -cE '[^a-z]sp[,)]')"
+ck "stack references in cells.S routines" 0 "$sp3"
+# The pair: cache.S's rlx_call2_uncached DOES spill, which is what makes the
+# rule above load-bearing rather than decorative.
+ck "and rlx_call2_uncached does spill"  yes \
+   "$(printf '%s\n' "$d3p" | sed -n '/<rlx_call2_uncached>:/,/^$/p' | grep -q 'sp' && echo yes || echo no)"
+
+echo
+echo "=== W3: every write to CP0 Status is in one of three named routines ==="
+# probe2 contains NO write to CP0 12 at all, by its own audit requirement, and
+# C1/C2 assert that. probe3 MUST contain some -- Group M sets CU3 because CP3 is
+# unreachable without it, and Group S sets IsC because reading that bit is what
+# question (d2) is. So the check inverts: not "none", but "exactly these, and
+# only in these routines".
+mt12 () { printf '%s\n' "$1" | grep -cE '[[:space:]]mtc0[[:space:]]+[^,]+,(c0_sr|\$12)'; }
+ck "probe3 writes CP0 12 exactly 4 times" 4 "$(mt12 "$d3p")"
+ck "probe2 still writes it zero times"    0 "$(mt12 "$d2")"
+owners3="$(printf '%s\n' "$d3p" | awk '
+  /^[0-9a-f]+ <([^>]+)>:/ {fn=$2; gsub(/[<>:]/,"",fn)}
+  /[[:space:]]mtc0[[:space:]]+[^,]+,(c0_sr|\$12)/ {print fn}' | sort -u | tr '\n' ' ')"
+ck "and only in the three that may" \
+   "rlx_status_or rlx_status_poke rlx_status_write " "$(printf '%s' "$owners3" | tr ' ' '\n' | sort | tr '\n' ' ')"
+
+echo
+echo "=== W4: the s-isc control bits are IN the image, as one constant ==="
+# Without a control bit, "bit 16 stuck" and "Status has no write mask" are one
+# reading and the cell answers nothing. Bits 6 and 24 come from the LX4189
+# STATUS figure's written-as-zero fields; two of them, at opposite ends of the
+# register, because one cannot see a PARTIAL mask. If the constant drifts, the
+# cell silently stops being a cell.
+# gcc materialises it as `lui r,0x101` + `addiu r,r,64`, not lui+ori, and the
+# first version of this case asserted the pair it expected rather than the pair
+# the compiler emits. 0x0101 in the top half carries BOTH bit 24 and bit 16; the
+# 64 carries bit 6. Asserted as an adjacent pair so a stray `li r,64` elsewhere
+# in the image cannot stand in for it.
+ck "lui 0x101 -- bits 24 and 16"        1 \
+   "$(printf '%s\n' "$d3p" | grep -cE 'lui.*,0x101$')"
+ck "and 64 -- bit 6 -- is built too"   yes \
+   "$(printf '%s\n' "$d3p" | grep -qE '(addiu|ori).*,64$' && echo yes || echo no)"
+# The pair is three instructions apart in the emitted code, and which registers
+# gcc picks is not stable across compilers -- so the load-bearing half of this
+# check is on the WIRE, in Q5 below: the payload prints the constant it actually
+# wrote. A check that reads instruction selection is a check that breaks on a
+# toolchain upgrade and says nothing about the cell.
+
+echo
+echo "=== Y1: CP3 stub n really is at rlx_cp3_stubs + 12n ==="
+# probe3.c reaches CP3 register n as stub n at +12 bytes each and never consults
+# the linker.  mfc3 rt,rd = 0x4C000000 | (rt<<16) | (rd<<11), rt = $2.
+CS="$($NM "$E3" | awk '$3=="rlx_cp3_stubs"{print $1}')"
+CE="$($NM "$E3" | awk '$3=="rlx_cp3_stubs_end"{print $1}')"
+ck "8 stubs of 12 bytes"               96 "$(( 0x${CE:-0} - 0x${CS:-0} ))"
+badcp3=0
+for n in 0 1 4 5 7; do
+    a=$(( 0x${CS} + n * 12 ))
+    w="$($OBJDUMP -d --start-address=$a --stop-address=$(( a + 4 )) "$E3" \
+         | awk '/^ *[0-9a-f]+:/{print $2; exit}')"
+    want="$(printf '%08x' $(( 0x4C020000 | (n << 11) )))"
+    [ "$w" = "$want" ] || { badcp3=$((badcp3+1)); echo "      cp3 stub $n: $w != $want"; }
+done
+ck "stubs 0,1,4,5,7 encode mfc3 v0,\$n" 0 "$badcp3"
+
+echo
+echo "=== Y2 / Y3: the block length, and the base it is read back from ==="
+# RB_WORDS_probe3 is a Makefile constant mirroring the layout in probe3.c, and
+# `DW <base> N` is what recovers the run. Recomputed from the C rather than
+# trusted -- the same check R5/R6 make for probe1 and probe2.
+p3hdr=$(rbw probe3.c RB_HDR); p3res=$(rbw probe3.c RB_RES)
+p3rows=$(rbw probe3.c RB_ROWS); p3roww=$(rbw probe3.c RB_ROWW)
+p3bmp=$(rbw probe3.c RB_BMPW)
+p3w=$(( p3hdr + p3res + p3rows * p3roww + p3bmp + 1 ))
+ck "show DW count == probe3 RB_WORDS" "$p3w" \
+   "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>/dev/null | sed -n 's/^result .*DW [0-9A-Fa-f]* \([0-9]*\)$/\1/p' | head -1)"
+# The C carries the same arithmetic as a compile-time assertion, so a layout
+# that does not add up does not build. SM3 below is the mutation on that.
+ck "and the C says 641"                641 "$p3w"
+ck "probe3's default RESULT_BASE"  0x80A02000 \
+   "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>/dev/null | sed -n 's/^result *RESULT_BASE=\([0-9A-Fa-fx]*\) .*/\1/p' | head -1)"
+ck "and the KSEG1 alias 0xa0a2 is emitted" yes \
+   "$(printf '%s\n' "$d3p" | grep -q 'lui.*0xa0a2' && echo yes || echo no)"
+ck "a device build is quiet about not being one" 0 \
+   "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>&1 | grep -c 'NOT A DEVICE BUILD')"
+
+echo
+echo "=== Y4: the result-block collision guard REFUSES, in both directions ==="
+# Two of the three blocks hold measurements recovered from DRAM after their
+# seatings: probe1's six R1d cells at 0x80A00000 and probe2's 256-row census at
+# 0x80A01000. A payload built for the wrong base does not fail -- it runs,
+# poisons hundreds of words over somebody else's measurement, and reports a
+# perfectly well formed block of its own.
+rbguard () { make -C "$RP" BUILD="$T/bg" P="$1" payload RESULT_BASE="$2" 2>&1 \
+             | grep -c 'Refusing to build'; }
+ck "probe3 onto probe1's block"         1 "$(rbguard probe3 0x80A00000)"
+ck "probe3 onto probe2's block"         1 "$(rbguard probe3 0x80A01000)"
+ck "probe2 onto probe3's block"         1 "$(rbguard probe2 0x80A02000)"
+# The case fold, and it is not pedantry: 0x80a00000 IS 0x80A00000, and a guard
+# that caught one spelling is a guard the next person spells around by accident.
+ck "and it is case-folded"              1 "$(rbguard probe3 0x80a01000)"
+ck "its own base builds fine"           0 "$(rbguard probe3 0x80A02000)"
+# The pair: an address that is nobody's block must still be allowed, or the
+# guard is a ban rather than a guard.
+ck "an unrelated base is still allowed" 0 "$(rbguard probe3 0x80B00000)"
+
+echo
+echo "=== SM1 .. SM6: six static mutations, one per check mechanism ==="
+# Each is a full copy of the tree with ONE change, built, and inspected. They do
+# not need qemu, which makes them the half of the mutation coverage that runs on
+# a machine with no emulator -- and the half that can assert things qemu's own
+# kindness hides. `docs/probe3-cells.md` sec 10 carries the coverage table that
+# maps every cell onto the mutation covering its check, INCLUDING the cells that
+# have no assertable leg and why.
+smut () {                                  # smut <name> -> prints the tree root
+    md="$T/smut-$1"; mkdir -p "$md/src"
+    cp "$RP"/*.c "$RP"/*.h "$RP"/*.S "$RP"/Makefile "$RP"/rlxprobe.lds \
+       "$RP"/qemu-run.sh "$md/src/"
+    ln -sf "$HERE/hazlint" "$md/hazlint"
+    echo "$md"
+}
+
+# SM1 -- SAFE_A0 removed. S3's guardscan must report probe3's routines unguarded
+# too. Until 2026-08-26 that loop read `for p in probe1 probe2` and probe3 would
+# have been scanned by nothing.
+s1="$(smut sm1)"
+"${PYTHON:-python3}" - "$s1/src/rlxasm.h" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\tlui\t$4, %hi(rlx_fault_frame)\n\taddiu\t$4, $4, %lo(rlx_fault_frame)\n"
+assert old in s, "SAFE_A0 body not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, "\tnop\n", 1))
+PY
+make -C "$s1/src" BUILD="$s1/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
+gm="$(guardscan "$s1/b/probe3/probe3.elf" probe3 2>/dev/null)"
+mb="$(printf '%s\n' "$gm" | sed -n 's/^SCANNED=[0-9]* UNGUARDED=\([0-9]*\)$/\1/p')"
+ck "SM1 the SAFE_A0-less probe3 is unguarded" yes \
+   "$([ "${mb:-0}" -ge 5 ] && echo yes || echo no)"
+
+# SM2 -- one extra `cache` op. T1's fingerprint must stop matching, which is
+# what makes it a fingerprint rather than a lower bound.
+s2="$(smut sm2)"
+"${PYTHON:-python3}" - "$s2/src/cells.S" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\tCACHEOP\trlx_x_cache19, 0x19"
+assert old in s
+open(p, "w", encoding="utf-8", newline="\n").write(
+    s.replace(old, old + "\n\tCACHEOP\trlx_x_cache1b, 0x1b", 1))
+PY
+make -C "$s2/src" BUILD="$s2/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
+ck "SM2 an extra cache op is visible"    6 \
+   "$(cacheops "$($OBJDUMP -d -m mips:3000 "$s2/b/probe3/probe3.elf" 2>/dev/null)")"
+ck "SM2 and it is 0x1b, the one that must not ship" 1 \
+   "$($OBJDUMP -d -m mips:3000 "$s2/b/probe3/probe3.elf" 2>/dev/null | grep -c '0xbd1b0000')"
+
+# SM3 -- the block layout. probe3.c asserts RB_WORDS == 641 at COMPILE time with
+# a negative array bound, because a layout that does not add up must not reach a
+# `.bin` at all. The mutation moves one field and the build must FAIL.
+s3="$(smut sm3)"
+sed -i 's/^#define RB_HDR\t\t64u$/#define RB_HDR\t\t65u/' "$s3/src/probe3.c"
+make -C "$s3/src" BUILD="$s3/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
+ck "SM3 a layout that does not add up does not build" no \
+   "$([ -s "$s3/b/probe3/probe3.bin" ] && echo yes || echo no)"
+
+# SM4 -- a Status write outside the three routines that may make one. W3 counts
+# them AND names their owners; without the owner half, a fourth write inside an
+# existing routine would pass a count that had simply been updated.
+s4="$(smut sm4)"
+"${PYTHON:-python3}" - "$s4/src/cache.S" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "rlx_cctl:\n\taddu\t$8, $4, $0"
+assert old in s
+open(p, "w", encoding="utf-8", newline="\n").write(
+    s.replace(old, old + "\n\tmtc0\t$8, $12\n\tnop", 1))
+PY
+make -C "$s4/src" BUILD="$s4/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
+d4="$($OBJDUMP -d -m mips:3000 "$s4/b/probe3/probe3.elf" 2>/dev/null)"
+ck "SM4 a fifth Status write is counted"  5 "$(mt12 "$d4")"
+ck "SM4 and rlx_cctl is named as its owner" 1 \
+   "$(printf '%s\n' "$d4" | awk '
+      /^[0-9a-f]+ <([^>]+)>:/ {fn=$2; gsub(/[<>:]/,"",fn)}
+      /[[:space:]]mtc0[[:space:]]+[^,]+,(c0_sr|\$12)/ {print fn}' | grep -c '^rlx_cctl$')"
+
+# SM5 -- the s-isc control bits dropped. Under qemu all three bits read back
+# clear whether they were set or not, so this mutation HAS NO qemu LEG: the
+# emitted constant is the only place it is visible, and that is the honest
+# reason this one is static.
+# Both occurrences: the value the cell WRITES and the value it PRINTS are the
+# same expression on purpose, so that the wire and the image cannot disagree.
+# The first version of this mutation dropped only the write, and the constant
+# stayed in the image via the printed copy -- the mutation looked like it had
+# failed when what had failed was the mutation.
+s5="$(smut sm5)"
+sed -i 's/(u32)ST0_CTRL_A/0u/g; s/(u32)ST0_CTRL_B/0u/g' "$s5/src/probe3.c"
+make -C "$s5/src" BUILD="$s5/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
+ck "SM5 the control bits leave the image" no \
+   "$($OBJDUMP -d -m mips:3000 "$s5/b/probe3/probe3.elf" 2>/dev/null \
+      | grep -qE 'lui.*0x101$' && echo yes || echo no)"
+
+# SM6 -- the collision guard removed. Y4 asserts a refusal; a refusal nobody has
+# shown can be absent is a refusal nobody has shown to be doing anything.
+s6="$(smut sm6)"
+sed -i 's/^ifneq ($(RB_CLASH),)$/ifneq (,)/' "$s6/src/Makefile"
+ck "SM6 without the guard it builds onto probe1's block" 0 \
+   "$(make -C "$s6/src" BUILD="$s6/b" P=probe3 payload RESULT_BASE=0x80A00000 \
+        HAZLINT="$HERE/hazlint" 2>&1 | grep -c 'Refusing to build')"
 
 echo
 echo "=== D1 / D2: the build says out loud when it is not a device build ==="
@@ -591,7 +914,9 @@ echo "=== Q1 / Q2: both payloads reach their end marker under qemu ==="
 # worth the minute it costs because it is the only place probe1's six cells and
 # probe2's 256 stubs execute at all before a power cycle is spent on them.
 if command -v qemu-system-mips >/dev/null 2>&1; then
-    for pay in probe1 probe2; do
+    # probe3 joined this list on 2026-08-26. Same reason as the guardscan's:
+    # a payload not in the list is a payload nothing here runs.
+    for pay in probe1 probe2 probe3; do
         o="$T/q-$pay"
         if QEMU_OUT="$o" QEMU_SECONDS=30 bash "$RP/qemu-run.sh" "$pay" >"$T/q-$pay.log" 2>&1; then
             ck "$pay reaches 'rlxprobe: end' under qemu" yes yes
@@ -732,9 +1057,243 @@ PY
        "$(grep -c 'install.changed=0 -- the vector' "$m5/out.txt" 2>/dev/null | head -1)"
     ck "M5: and the baseline says nothing"      0 \
        "$(grep -c 'install.changed=0 -- the vector' "$T/q-probe2.txt" 2>/dev/null | head -1)"
+
+    echo
+    echo "=== Q4: probe3's qemu answers, and every one of them is the OPPOSITE ==="
+    echo "===     of what the device is expected to say ==="
+    # This is the whole reason a qemu pass is worth so little and so much at
+    # once. TCG invalidates a translation block when a store lands on code it
+    # has already translated, keyed on the PHYSICAL address, so both the KSEG0
+    # and the KSEG1 window behave like a machine with a coherent I-cache. It
+    # models no D-cache. It does not decode the `cache` op field at all.
+    #
+    # A qemu run that produced a boundary, a stale line, or a trap on a `cache`
+    # op would mean THE HARNESS IS BROKEN, not that qemu found something.
+    q3="$T/q-probe3.txt"
+    ck "every w.size point is all-FRESH"     7 \
+       "$(grep -cE '^rlxprobe: w\.size .* fresh=(00000020|00000040|00000080|00000100|00000200|00000400|00000800) other=00000000' "$q3" 2>/dev/null | head -1)"
+    ck "  and none of them is partly fresh"  0 \
+       "$(awk '/^rlxprobe: w\.size /{n=$4; f=$5; sub(/n=/,"",n); sub(/fresh=/,"",f); if (n != f) c++} END{print c+0}' "$q3" 2>/dev/null)"
+    ck "c-A reads the SECOND value, both members" 1 \
+       "$(grep -c '^rlxprobe: c A l1=a5a50001 .* vd=00000202' "$q3" 2>/dev/null | head -1)"
+    ck "and all four cache ops retire, n=0"  4 \
+       "$(grep -cE '^rlxprobe: x c(10|11|15|19) n=00000000 ' "$q3" 2>/dev/null | head -1)"
+    ck "no scratch word or neighbour moved"  4 \
+       "$(grep -cE '^rlxprobe: x c(10|11|15|19) .* dw=00000000' "$q3" 2>/dev/null | head -1)"
+    # 否證 (a)'s negative control -- every victim STALE at 1 KiB -- is GUARANTEED
+    # to fail under qemu, and the suite asserts it FAILS rather than asserting
+    # the device's expectation somewhere it cannot hold.
+    ck "the 1 KiB control is all-FRESH here, as it must be" 1 \
+       "$(grep -c '^rlxprobe: w.size 00000001 n=00000020 fresh=00000020' "$q3" 2>/dev/null | head -1)"
+
+    echo
+    echo "=== Q5: the three qemu columns that were 未定 until 2026-08-26 ==="
+    # docs/probe3-cells.md sec 10b: "a cell whose qemu column is still 未定 at
+    # seating time has no control on its own emitter". These are the numbers
+    # that closed them, and they are asserted here so the FILE and the EMITTER
+    # cannot drift apart while the payload sits on the shelf across two gates.
+    ck "m-cu3: CU3 does not stick on a 24Kf"   1 \
+       "$(grep -c '^rlxprobe: m.cu3.set=00000000' "$q3" 2>/dev/null | head -1)"
+    ck "s-isc: all three bits read back clear" 1 \
+       "$(grep -c '^rlxprobe: s.set=00000000' "$q3" 2>/dev/null | head -1)"
+    ck "and its verdict word says so"          1 \
+       "$(grep -c '^rlxprobe: s.vd=00000000' "$q3" 2>/dev/null | head -1)"
+    # THE CONSTANT THE CELL ACTUALLY WROTE, on the wire. Without a control
+    # bit, "bit 16 stuck" and "Status has no write mask" are one reading and
+    # the cell answers nothing; two of them, at opposite ends of the
+    # register, because one cannot see a PARTIAL mask. Bits 6 and 24 come
+    # from the LX4189 STATUS figure's written-as-zero fields. If this
+    # constant drifts the cell silently stops being a cell -- and the
+    # emitted instruction selection is not a stable place to check it,
+    # because which registers gcc picks is not stable across compilers.
+    ck "s-isc wrote IsC + both control bits"   1 \
+       "$(grep -c '^rlxprobe: s.bits=01010040' "$q3" 2>/dev/null | head -1)"
+    ck "Group T: TC0CNT reads all ones"        1 \
+       "$(grep -c '^rlxprobe: t.sep.a=ffffffff' "$q3" 2>/dev/null | head -1)"
+    # ... and the payload separates "nothing is mapped there" from "the register
+    # is frozen" and from "the load did not write its destination". Three
+    # states, and the third only exists because both reads are primed.
+    ck "and it names WHICH of the three"       1 \
+       "$(grep -c 'there is no timer at that address on this machine' "$q3" 2>/dev/null | head -1)"
+    ck "m-imem: all eight CP3 stubs trap"      1 \
+       "$(grep -c '^rlxprobe: m.traps=000000ff' "$q3" 2>/dev/null | head -1)"
+    ck "  with ExcCode 0x0B, Coprocessor Unusable" 1 \
+       "$(grep -c '^rlxprobe: m.cause=1000042c' "$q3" 2>/dev/null | head -1)"
+    # 16 non-`Bp` exceptions delivered to this handler and returned from, plus
+    # x-ri's. That is what the qemu leg of Group M actually buys: until now the
+    # only exception this handler had ever taken on any machine was `break`.
+    ck "x-ri traps with ExcCode 0x0A"          1 \
+       "$(grep -c '^rlxprobe: x ri n=00000001 cause=10000428 ' "$q3" 2>/dev/null | head -1)"
+    ck "  and the run continued past it"       1 \
+       "$(grep -c '^rlxprobe: end' "$q3" 2>/dev/null | head -1)"
+
+    echo
+    echo "=== Q6: the three self-gates fire in the direction they are written for ==="
+    # A cell that passes for the wrong reason is worse than one that does not
+    # run. Under qemu c-A is negative -- there is no D-cache to hold a stale
+    # line -- so Group V and four Group C cells MUST report void WITH A REASON
+    # rather than reporting the pass their treatment would produce anyway.
+    ck "g.ca is negative here"                 1 \
+       "$(grep -c '^rlxprobe: g.ca=00000000' "$q3" 2>/dev/null | head -1)"
+    ck "four C cells are VOID, not passes"     4 \
+       "$(grep -cE '^rlxprobe: c (F|B|C|G) VOID 00000010' "$q3" 2>/dev/null | head -1)"
+    ck "Group V does not run at all"           0 \
+       "$(grep -c '^rlxprobe: v.size ' "$q3" 2>/dev/null | head -1)"
+    ck "and it says why"                       1 \
+       "$(grep -c 'Group V VOID -- c-A negative' "$q3" 2>/dev/null | head -1)"
+    ck "the handler gate is the one that passed" 1 \
+       "$(grep -c '^rlxprobe: break.count=00000001' "$q3" 2>/dev/null | head -1)"
+    # The re-arm detector. `CCTL 0x002` plus a rewrite of the arena to OLD is
+    # what makes one arena reusable across every sweep point, and neither
+    # `w-line0` nor the 1 KiB control can detect it failing -- w-line0 never
+    # fetched anything, and a stale line left in place reads STALE, which is the
+    # 1 KiB control's own expected value. The detector is the ARMING
+    # EXECUTION'S OWN READING, and it works on both machines.
+    ck "the re-arm detector reads zero"        1 \
+       "$(grep -c '^rlxprobe: w.arm.fresh=00000000' "$q3" 2>/dev/null | head -1)"
+    ck "and w-imem says IDENTICAL is also the no-op reading" 1 \
+       "$(grep -c 'UNDETERMINED unless m-imem returned a window' "$q3" 2>/dev/null | head -1)"
+
+    echo
+    echo "=== QM1 .. QM6: six qemu mutations, one per check mechanism ==="
+    # Six here and six static above. `docs/probe3-cells.md` sec 10 carries the
+    # coverage table mapping every cell onto the mutation that covers its check,
+    # AND NAMES THE CELLS WITH NO ASSERTABLE LEG AND WHY -- because on this
+    # harness most cache readings are identical mutated and unmutated, and a
+    # mutation whose predicted effect equals the baseline cannot fail.
+    q1="$(mkmut q1)"; q2="$(mkmut q2)"; q3m="$(mkmut q3)"
+    q4="$(mkmut q4)"; q5="$(mkmut q5)"; q6="$(mkmut q6)"
+
+    # QM1 -- 否證 (c) made testable at the desk. x-11's `cache 0x11` becomes the
+    # RI encoding, which traps under qemu. What must survive is the DISCIPLINE:
+    # the cell writes its row BEFORE issuing the instruction, because a `cache`
+    # that neither retires nor traps hangs the payload and a block recovered
+    # afterwards has to say which cell it was in.
+    patch_mut "$q1/src/cells.S" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\tCACHEOP\trlx_x_cache11, 0x11"
+new = ("\t.globl\trlx_x_cache11\n\t.ent\trlx_x_cache11\nrlx_x_cache11:\n"
+       "\taddu\t$8, $4, $0\n\tSAFE_A0\n\t.word\t0x0000000E\n\tnop\n\tnop\n"
+       "\tjr\t$31\n\tnop\n\t.end\trlx_x_cache11")
+assert old in s, "the cache 0x11 CACHEOP was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+    # QM2 -- the arming-execution detector. `CCTL 0x002` plus a rewrite of the
+    # arena to OLD is the re-arm, and its detector is the arming execution's own
+    # reading: after the rewrite every victim's first execution MUST return OLD.
+    #
+    # THE MUTATION HAD TO BE THE REWRITE AND NOT THE INVALIDATE, and saying why
+    # is the point. Dropping the `CCTL 0x002` changes NOTHING under qemu -- TCG
+    # invalidates its translation blocks on the store itself, so the arming
+    # execution reads OLD either way and the mutation's predicted effect equals
+    # the baseline. `docs/probe3-cells.md` sec 10 lists that among the checks
+    # with no assertable leg. What IS assertable here is that the detector can
+    # fire at all: arm the arena with NEW instead of OLD and every arming
+    # execution must report FRESH.
+    patch_mut "$q2/src/cells.S" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\tlw\t$3, 4($10)\t\t/* template word 1 -- addiu OLD */"
+new = (old + "\n\tlui\t$3, RLX_VICTIM_WORD_NEW>>16"
+             "\n\tori\t$3, $3, RLX_VICTIM_WORD_NEW&0xffff")
+assert old in s, "the template word-1 load was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+    # QM3 -- the victim template. Every victim in the arena is a copy of two
+    # words assembled in .text; if the guard is not `jr $31` the walk jumps into
+    # whatever it wrote. The payload reads the template back through KSEG1 at
+    # run time and must REFUSE to build an arena.
+    patch_mut "$q3m/src/cells.S" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "rlx_vic_template:\n\tjr\t$31"
+assert old in s, "the template was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(
+    s.replace(old, "rlx_vic_template:\n\tjr\t$30", 1))
+PY
+    # QM4 -- the c-A gate. Force it positive and Group V runs where it must be
+    # void: every V cell then reports FRESH at every size, which is exactly
+    # indistinguishable from "there is no D-cache" and is the reading the gate
+    # exists to keep out of the block.
+    patch_mut "$q4/src/probe3.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\t\t\tg_ca = (va == CV_P0);"
+assert old in s, "the c-A gate was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(
+    s.replace(old, "\t\t\tg_ca = 1u; (void)va;", 1))
+PY
+    # QM5 -- 否證 T's own evaluation. Remove the all-ones branch and the payload
+    # reports a tick count of zero with no reason beside it, which reads as a
+    # measurement rather than as an absent register.
+    patch_mut "$q5/src/probe3.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = "\t\tif (a == 0xFFFFFFFFu && b == 0xFFFFFFFFu) {"
+assert old in s, "the all-ones branch was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(
+    s.replace(old, "\t\tif (0) {", 1))
+PY
+    # QM6 -- the pair. Every Group C cell runs on TWO targets a non-power-of-two
+    # apart, and c-A runs at two separations, so an eviction artefact shows up
+    # as the two members DISAGREEING rather than as a negative result that would
+    # void Group C and Group V together. Drop member b and the block loses the
+    # only field that could show it.
+    patch_mut "$q6/src/probe3.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8").read()
+old = ("\tvb = c_one(kind, xb, cmd1, cmd2, do_load1, drain, drain_n,\n"
+       "\t\t   &l1b, &l2b, &l3b);")
+new = "\tvb = va; l1b = l1; l2b = 0u; l3b = 0u; (void)xb;"
+assert old in s, "member b's call was not found"
+open(p, "w", encoding="utf-8", newline="\n").write(s.replace(old, new, 1))
+PY
+
+    for m in "$q1" "$q2" "$q3m" "$q4" "$q5" "$q6"; do
+        ( QEMU_OUT="$m/out" QEMU_SECONDS=30 bash "$m/src/qemu-run.sh" probe3 \
+              >"$m/run.log" 2>&1 ) &
+    done
+    wait
+
+    ck "QM1 the RI encoding traps where the cache op retired" 1 \
+       "$(grep -c '^rlxprobe: x c11 n=00000001 ' "$q1/out.txt" 2>/dev/null | head -1)"
+    ck "QM1 and the row was written BEFORE it was issued"     1 \
+       "$(grep -c '^rlxprobe: x c11 ISSUING' "$q1/out.txt" 2>/dev/null | head -1)"
+    ck "QM1 the baseline retired instead"                     1 \
+       "$(grep -c '^rlxprobe: x c11 n=00000000 ' "$q3" 2>/dev/null | head -1)"
+    ck "QM2 the arming execution reports FRESH victims"      no \
+       "$(grep -q '^rlxprobe: w.arm.fresh=00000000' "$q2/out.txt" 2>/dev/null && echo yes || echo no)"
+    ck "QM2 and the baseline reported none"                  yes \
+       "$(grep -q '^rlxprobe: w.arm.fresh=00000000' "$q3" 2>/dev/null && echo yes || echo no)"
+    ck "QM3 a bad template REFUSES to build an arena"          1 \
+       "$(grep -c 'the victim template is not what this file assembled' "$q3m/out.txt" 2>/dev/null | head -1)"
+    ck "QM3 and it stops before the first walk"                0 \
+       "$(grep -c '^rlxprobe: w.size ' "$q3m/out.txt" 2>/dev/null | head -1)"
+    ck "QM3 baseline says nothing about the template"          0 \
+       "$(grep -c 'the victim template is not what this file assembled' "$q3" 2>/dev/null | head -1)"
+    ck "QM4 Group V runs where it must be void"              yes \
+       "$([ "$(grep -c '^rlxprobe: v.size ' "$q4/out.txt" 2>/dev/null)" -ge 6 ] && echo yes || echo no)"
+    ck "QM4 and every V point reads FRESH, the exact confusion" yes \
+       "$(grep -q '^rlxprobe: v.size 00000001 .* fresh=00000040' "$q4/out.txt" 2>/dev/null && echo yes || echo no)"
+    ck "QM5 the reason disappears from the report"             0 \
+       "$(grep -c 'there is no timer at that address' "$q5/out.txt" 2>/dev/null | head -1)"
+    ck "QM5 and the zeros stay, which is the point"          yes \
+       "$(grep -q '^rlxprobe: t.cal.hi=00000000' "$q5/out.txt" 2>/dev/null && echo yes || echo no)"
+    ck "QM6 member b's measurement is gone"                    1 \
+       "$(grep -c '^rlxprobe: c A l1=a5a50001 l2=5a5a0002 l3=5a5a0002 mb=00000000 ' "$q6/out.txt" 2>/dev/null | head -1)"
+    ck "QM6 and the baseline carried it"                       1 \
+       "$(grep -c '^rlxprobe: c A l1=a5a50001 l2=5a5a0002 l3=5a5a0002 mb=5a5a0002 ' "$q3" 2>/dev/null | head -1)"
 else
     sk "qemu" "no qemu-system-mips on this machine"
     sk "the four Must-fix mutations" "they run under qemu"
+    sk "probe3 under qemu, and its six qemu mutations" "they run under qemu"
 fi
 
 echo

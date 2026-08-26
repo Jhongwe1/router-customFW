@@ -29,7 +29,7 @@ test-console-capture	29	-	0	-
 verify-backup-copy	4	-	0	-
 ci-census	12	-	0	-
 test-opcount	15	hardcoded fixture	1	needs binutils-mips-linux-gnu; CI installs it, so this skip should NOT appear
-test-rlxprobe	106	everything	106	needs gcc-mips-linux-gnu -- and CI deliberately does NOT install it, because with the cross compiler present the suite BUILDS and then hazlint refuses to report without its stage2.bin population control, which is correct behaviour; re-measured 2026-08-25 (second sitting) with $FWRE_WORK empty it is 56 ok / 50 FAIL
+test-rlxprobe	195	everything	195	needs gcc-mips-linux-gnu -- and CI deliberately does NOT install it, because with the cross compiler present the suite BUILDS and then hazlint refuses to report without its stage2.bin population control, which is correct behaviour; re-measured 2026-08-26 with $FWRE_WORK empty it is 100 ok / 95 FAIL. 106 -> 195 on 2026-08-26 when probe3 arrived: P4/T1/W1-W4/Y1-Y4, six static mutations, and Q4/Q5/Q6 plus six qemu mutations
 test-hazlint	56	*bench-only*	56	its K4 population control is $FWRE_WORK/stage2.bin -- 56 KiB of this unit's own vendor bootloader, which is someone else's property and identifies one physical device. On a runner the suite does not skip, it FAILS 14 cases, because hazlint exits 2 rather than report without that control
 test-reply-size	21	-	0	-
 test-boot-timeline	15	-	0	-

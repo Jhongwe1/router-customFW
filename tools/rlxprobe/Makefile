@@ -184,8 +184,15 @@ RB_LC_BARE   := $(patsubst 0x%,%,$(RB_LC))
 RB_LC_probe1 := 0x80a00000
 RB_LC_probe2 := 0x80a01000
 RB_LC_probe3 := 0x80a02000
-RB_CLASH     := $(filter-out $(P),$(strip \
-                  $(foreach q,probe1 probe2 probe3,$(if $(filter $(RB_LC),$(RB_LC_$(q))),$(q)))))
+#
+# probe0 IS EXEMPT AND THE FIRST VERSION OF THIS WAS NOT, which broke every
+# probe0 case in the suite at once. probe0 writes no result block -- it has no
+# RESULT_BASE in its sources at all -- but it inherits the same default address
+# as probe1, so a check that only excluded `$(P)` saw probe0 sitting on probe1's
+# block and refused to build it. A guard that stops a payload which cannot
+# collide is not a stricter guard, it is a broken one.
+RB_CLASH     := $(if $(filter probe0,$(P)),,$(filter-out $(P),$(strip \
+                  $(foreach q,probe1 probe2 probe3,$(if $(filter $(RB_LC),$(RB_LC_$(q))),$(q))))))
 ifneq ($(RB_CLASH),)
 $(error RESULT_BASE=$(RESULT_BASE) is $(RB_CLASH)'s result block and $(RB_CLASH) has a measurement in it. Refusing to build $(P) onto it)
 endif

@@ -356,7 +356,7 @@ and **the round-up is upward — a length given too small never announces itself
 |---|---|---|---|
 | one full `probe1`-shape row per victim | 104 B each — 213 KB at V=2048 | `DW … 16433`, a 5-digit length | ❌ overruns the ESC window, and is 20× past any `DW` this loader has executed |
 | 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
-| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,866 bytes / 125 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it | ✅ **every number is under something this loader has already done** |
+| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it | ✅ **every number is under something this loader has already done** |
 
 **So: four bits per victim** — the seven verdicts plus `0` = *never written*,
 which is the only lossless bitmap and the only one with a negative control inside
@@ -959,8 +959,61 @@ mechanisms instead:
   mislabel is recorded here and in `SPEC.md`; it does not affect the gate, which
   is the load-delay check.
 
-**One mutation per cell, and the mutation must make that cell's check fire.**
-Three of them are worth naming now:
+### 🔴 One mutation per CHECK MECHANISM, and a coverage table that names the gaps
+
+**Changed 2026-08-26 from *"one mutation per cell"*, and the reason is in this
+file's own § 6.2.** There are about forty cells and twelve mutations, because on
+the only harness that exists at the desk **most cache readings are identical
+mutated and unmutated** — every W cell is FRESH under qemu, every C cell reads
+the same value, every `cache` op retires. A mutation whose predicted effect
+equals the baseline **cannot fail**, and forty of those would be forty near
+duplicates of which half could not fire. Twelve mutations plus a table that says
+which cell each one covers **and which cells nothing covers, and why**, is the
+honest version. The suite went 106 → 195 cases.
+
+**Six run without an emulator at all** (`tools/test-rlxprobe.sh` `SM1`–`SM6`),
+which is the half that keeps working on a machine with no qemu, and the half
+that can assert things qemu's own kindness hides:
+
+| | mutation | what must fire | covers |
+|:-:|---|---|---|
+| `SM1` | `SAFE_A0` emits `nop` | the guardscan reports probe3's routines unguarded | every cell — the guard is what turns a fault from a hang into two prints |
+| `SM2` | one extra `cache 0x1b` | the ISA fingerprint stops matching | `x-11`, `x-10`, `x-15`, `x-19`, `c-D`, and the § 8 promise that `0x1b` never ships |
+| `SM3` | `RB_HDR` moved by one | **the build fails** — the layout assertion is at compile time | the whole block: `DW <RB> 641` reading the wrong length is a truncated capture that looks complete |
+| `SM4` | a `mtc0 $x,$12` added to `rlx_cctl` | the Status-writer count AND its owner list both change | `m-cu3`, `s-isc`, and M5's constraint that nothing else touches `Status` |
+| `SM5` | the `s-isc` control bits dropped | the constant leaves the image and the wire | `s-isc` — **and this one has NO qemu leg**, because all three bits read back clear on Malta whether they were set or not |
+| `SM6` | the `RB_CLASH` guard removed | probe3 builds onto probe1's block | the seating-day procedure in § 10b |
+
+**Six run under qemu** (`QM1`–`QM6`):
+
+| | mutation | what must fire | covers |
+|:-:|---|---|---|
+| `QM1` | `x-11`'s `cache 0x11` → the RI encoding | it traps where the baseline retired, **and the `ISSUING` line is still printed first** | 否證 ⓒ's discipline: the row is written to the block **before** the instruction is issued, because a `cache` that neither retires nor traps hangs the payload |
+| `QM2` | the arena is armed with NEW instead of OLD | every arming execution reports FRESH | the re-arm detector — the only W-group check assertable on both machines |
+| `QM3` | the victim template's guard word corrupted | the payload **refuses to build an arena** and stops before the first walk | every W and V cell: a bad template means the walk jumps into whatever it wrote |
+| `QM4` | `c-A`'s gate forced positive | Group V runs and reports FRESH at every size | the self-gate — that reading is indistinguishable from *there is no D-cache*, which is exactly what the gate keeps out of the block |
+| `QM5` | 否證 T's all-ones branch removed | the reason disappears while the zeros stay | `t-live`/`t-cal`/`t-ovh`/`t-hit`: *nothing is mapped there* stops being separable from *frozen* |
+| `QM6` | Group C's member b dropped | the `mb` field reads 0 | every C cell's pair — the eviction cross-check is a **disagreement** between two members, and nothing else could show it |
+
+**🔴 And the cells NOTHING covers, named rather than left to be discovered:**
+
+| cell / check | why no mutation can fire at the desk |
+|---|---|
+| `w-line`'s `V0`-only arming | under qemu every probe is FRESH whether or not the probes were fetched before the patch, so exec-all and exec-`V0` give the identical bitmap |
+| `w-back` / `w-back2`'s direction discriminator | the same: there is no line to fill backwards from |
+| `w-size` / `v-size`'s boundary, and both `assoc` cells | there is no boundary under qemu — every point is all-FRESH — so a mutation to the sweep changes nothing |
+| **the `CCTL 0x002` half of the re-arm** | TCG invalidates its translation blocks on the store itself, so dropping the invalidate reads identically. `QM2` mutates the **rewrite** instead and therefore proves the detector can fire, not that the invalidate is needed |
+| `c-E`/`c-E0`/`c-E2`'s write-policy branch | TCG models no D-cache, so a write hit and a write miss are one reading |
+| `c-G`'s claimed invalidator | same — and it is gated behind `c-A`, which is negative under qemu |
+| `m-imem`'s two-prime read | all eight stubs trap on Malta, so the prime states are never reached |
+| `x-10`'s functional leg | both victims are FRESH under qemu, treated or not |
+
+**Every one of those is covered on the device by its own must-fire control**,
+which is written in the cell above it. That is the division of labour: qemu
+checks the emitter, the device checks the claim, and this table is where the two
+are kept from being confused for each other.
+
+**Three mutations are worth naming in prose as well:**
 
 1. 🔴 **Substitute `0x0000000E` for `x-11`'s `cache 0x11`.** Under qemu that
    traps (量), which proves the *"write the cell result **before** issuing the
@@ -1060,7 +1113,7 @@ make -C tools/rlxprobe P=probe3 show
 | line | what it must say on 2026-08-26 | what a different value means |
 |---|---|---|
 | `make` itself | it **compiles**. `Nothing to be done for 'payload'` is a **HARD STOP** | the tree already held an image and nothing rebuilt; `show` will print the knob you asked for beside the binary you already had |
-| `sha256` | `486d75be536809dc090603a2b63e1b8c15d3fc56467cef767ea7a5134a5cfe5e` (26,624 → **29,024 bytes** as built here) | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
+| `sha256` | `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, **29,088 bytes** | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
 | `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 641` | anything else and the read-back is the wrong length or the wrong address |
 | `stale check` | `rb=80a02000` | this is the **on-the-wire** check and it is what the operator watches for in the banner |
 | `vectors` / `uart` | `general 0x80000080`, `THR 0xB8002000`, `CLEAR_BEV=0`, and **no `*** NOT A DEVICE BUILD ***` line** | a qemu image would install a handler into RAM this device never reads and then fault into the loader's permanent hang |

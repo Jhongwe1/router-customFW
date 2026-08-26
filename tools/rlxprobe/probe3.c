@@ -1882,6 +1882,12 @@ void rlxprobe_main(void)
 		   | ((ss & (u32)ST0_CTRL_B) ? 4u : 0u)
 		   | ((sr == sb) ? 0u : 0x100u);
 		res_put(R_S_VERDICT, vd);
+		/* THE CONSTANT, ON THE WIRE. Which registers gcc picks to build
+		 * 0x01010040 is not stable across compilers, so a check that
+		 * reads the instruction selection is a check that breaks on a
+		 * toolchain upgrade. This is the value the cell actually wrote. */
+		field("s.bits", (u32)ST0_ISC | (u32)ST0_CTRL_A |
+				(u32)ST0_CTRL_B);
 		field("s.before", sb);
 		field("s.set", ss);
 		field("s.restored", sr);

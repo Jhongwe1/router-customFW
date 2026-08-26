@@ -111,6 +111,7 @@ rlxprobe: x c15 ISSUING
 rlxprobe: x c15 n=00000000 cause=00000000 epc=00000000 dw=00000000
 rlxprobe: x c19 ISSUING
 rlxprobe: x c19 n=00000000 cause=00000000 epc=00000000 dw=00000000
+rlxprobe: s.bits=01010040
 rlxprobe: s.before=00000000
 rlxprobe: s.set=00000000
 rlxprobe: s.restored=00000000

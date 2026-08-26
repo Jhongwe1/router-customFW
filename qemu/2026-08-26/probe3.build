@@ -9,8 +9,8 @@ seconds     120 (nothing here halts; the run is bounded by timeout)
 ## the DEVICE build -- the image that will be uploaded
     payload    build/probe3/probe3.bin   (path elided: audit-bench-log.py refuses a home path)
     load addr  0x80500000      entry is byte 0 of the image
-    size       29024 bytes
-    sha256     486d75be536809dc090603a2b63e1b8c15d3fc56467cef767ea7a5134a5cfe5e
+    size       29088 bytes
+    sha256     1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b
     first word 3c1d8051   (must be the first instruction of _start)
     reset      RESET=1   1 = arm the watchdog and hand the prompt back with no power cycle
     flags      50010002   header word 5, and the banner prints it
@@ -40,5 +40,5 @@ seconds     120 (nothing here halts; the run is bounded by timeout)
     The banner in probe3.txt says so on its first line.
 
 ## the capture
-    probe3.txt   5866 bytes, 125 lines
-    sha256       68919ad26530fe903f169f4494730c7d46569c1692b201cf483827cb5b36da26
+    probe3.txt   5893 bytes, 126 lines
+    sha256       e6035718eca10ff77d738a80d9cc16118c50a7b92dd02d7f0646af49fb53f8e3
