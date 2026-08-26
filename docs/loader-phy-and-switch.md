@@ -178,7 +178,9 @@ the baseline grows, and it is why the 253-second fit reads +84 ppm.
 Base = f × `CDBR`(14) × `TC0DATA`(142,858), the last two read on the device in
 seating 1 and unchanged.
 
-> **Timer base clock = 200.0049 MHz ± 0.0015 MHz** (±7 ppm at a 2080-second
+> 🔴 **RENAMED 2026-08-26 — this is the *peripheral Lexra bus* clock, i.e. the divider INPUT.** The datasheet's own § 8.2.8 defines *"Base clock = System_clock (Peripheral Lexra Bus)/N"*, so *base clock* is the divider **output**, which is `CLK-17`'s 14.286057 MHz. Calling this one the timer base clock inverts a factor of 14 for the next reader.
+>
+> **Peripheral Lexra Bus clock = 200.0049 MHz ± 0.0015 MHz** (±7 ppm at a 2080-second
 > baseline); **tick = 100.0018 Hz**. The compiled-in `0x0BEBC200` = 200,000,000
 > at `0x8040DBA0` is **right to +24 ppm**, inside a normal crystal's tolerance.
 

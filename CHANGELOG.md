@@ -12,6 +12,48 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R1h-0`, 2026-08-26 — `probe3`'s cell table, and writing it refuted two things
+the table was going to stand on.** `docs/probe3-cells.md`: eleven sections, every
+expected value and refutation condition written before its cell, every expected
+value naming its capture or artefact, and *expected under qemu* kept in a
+separate column from *expected on the device* — because `probe1` cell 1 came back
+FRESH on qemu and STALE on silicon, and that opposition is the whole experiment.
+Desk only, no power, zero flash bytes.
+
+- 🔴 **The prediction and the mechanism were about different caches.** The walk's
+  mechanism — a store into the instruction stream is not seen — is measured, and
+  it measures the **I-cache**; the prediction written for it (D 8 KiB, line 16 B,
+  cut from this unit's own kernel) is about the **D-cache**. The walk as
+  described could not have refuted the prediction written for it. `probe3` now
+  carries two walks, and the D-side one is armed at run time by its own cell A.
+- 🔴 **This part has a 16 KiB local instruction scratchpad, and it is exactly the
+  size of the predicted I-cache.** Nothing in this repository had ever recorded
+  it. It was found by asking what `CCTL 0x010`/`0x020` are: they are
+  `IMEM0FILL`/`IMEM0OFF`, named by four sources of which two are independent —
+  the Lexra LX4189 datasheet, **`arch/rlx/include/asm/rlxregs.h` in the GPL drops
+  this project already held**, the RTL8196E datasheet's *"16Kbyte I-MEM, 8Kbyte
+  D-MEM"* (already quoted verbatim at `SOURCES.json:195`), and this unit's own
+  kernel programming a 16 KiB window into `CP3 $0`/`$1` and then issuing `0x010`.
+  **`CPU-24` closes; `CPU-46` is new.** The same search failure as `arch/rlx/`
+  one release earlier: the fact was in the tree and the search went elsewhere.
+- 🔴 **`CPU-25`'s source count was wrong in the direction of too few.** The
+  datasheet in `refs/` states both cache sizes on its own first page. What has no
+  source of any kind is **the associativity**, not the I-cache size. ⚠️ And the
+  datasheet documents a variant `SOURCES.json` records this unit as *not being* —
+  so the geometry is two vendor documents about two variants of a family this die
+  is measured to belong to, and still not a reading of this die.
+- **`CCTL` is edge-triggered on 0→1**, so a probe that writes it once and expects
+  an effect is a tool that cannot fail. `CLK-17` is new — the 14.286057 MHz rate
+  a timing payload actually divides by, which until now existed only inside a
+  derivation. `CLK-02`'s name is corrected against the datasheet it cites.
+- 🔴 **The table was then put to four adversarial readers and they found eight
+  blockers**, two of which would have cost the power cycle: a whole-cache
+  `DInval` that discards the return address off a KSEG0 stack, and a CP3 read
+  that would have trapped because the preceding cell restored `Status`. Also a
+  write-buffer confound that made one cell unable to fail, three line-size cells
+  with no must-fire reading, and a timer field read 16× wrong. All fixed; the
+  list is in `LOG.md`, because the record of being wrong stays in place.
+
 **`R1-gate` closes, 2026-08-26 — and the write-up refuted two things the gate had
 been standing on.** `docs/rlx-cache-and-cp0.md` is the closing statement: the four
 downstream decisions, each with the reading that decided it, and what the gate did

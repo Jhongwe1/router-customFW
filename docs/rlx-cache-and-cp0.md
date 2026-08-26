@@ -157,6 +157,34 @@ read allocation*, *the alias is snooped* and *the line was evicted* — so cell 
 needs `probe1`'s two-victims-far-apart trick as its own control, and a positive
 result in E is what makes A's negative interpretable.
 
+> 🔴 **Narrowed 2026-08-26, and the last clause above is too strong.** **E is A's
+> positive control in only one of its two branches.** If E shows a *held* store,
+> the line was resident, so read-allocate is real and A's *fresh* cannot mean *no
+> read-allocate* — with eviction excluded by the far-apart pair, it means
+> **snooped**. **If E shows write-through, it proves nothing about residency at
+> all**, and A's *fresh* stays a two-way disjunction.
+>
+> 🔴 **And in that branch the two survivors are not separable from here.** *No
+> read-allocate* and *the alias is snooped* differ only for a **real** bus master,
+> and every observation the proxy can take goes through the alias. **For `R6` they
+> are equivalent** — under both, a cached read after a device write returns fresh
+> data — *provided* a real DMA write looks like an uncached CPU store from the
+> cache's side, which is the proxy assumption and cannot be tested without the
+> engine. **`R6` re-tests it with the real engine before relying on it.** The one
+> instrument on this device that would not go through the alias is timing, and
+> `docs/probe3-cells.md` § 6.3 costs it out: `TC0CNT` at 70 ns/LSB, loop-of-N
+> only, and whether that is good enough is itself a measurement in the payload.
+>
+> **The list below also grows by three.** `probe3` adds **A′** (the same cell with
+> the middle load omitted — the negative control that says whether anything else
+> is stale), **F** (`CCTL 0x100` `DWB`, whose effect no source in this repository
+> has ever recorded, and which is simultaneously the safety precondition that
+> makes C's whole-cache invalidate lossless), and **E2** (`0x100` after E, which
+> turns E's reading into a two-legged one). And 🔴 **B, C, D and F are
+> unfalsifiable if A is negative** — with no stale line to invalidate they all
+> return *fresh* whether they work or not, so the payload records them **void with
+> the reason** rather than as passes.
+
 **Until those run, `R6` carries the conservative cost**: rings in an uncached
 window (KSEG1), which is what the vendor's own driver does — **讀**,
 `drivers/net/rtl819x/rtl865xc_swNic.h`, `UNCACHED_MALLOC(size)` is
@@ -391,7 +419,33 @@ Both are in the same GPL drops, and both drops descend from the same Realtek SDK
 What changed is that a value which had **no name in any source** now has one; it
 is not a second vote on the value.
 
-### `0x010` and `0x020` are still unnamed, and the residual is now sharper
+### ~~`0x010` and `0x020` are still unnamed~~ — 🔴 RETRACTED 2026-08-26, both are named
+
+> 🔴 **This section is wrong and is kept because the record of being wrong stays
+> in place.** `0x010` is **`IMEM0FILL`** and `0x020` is **`IMEM0OFF`**: they are
+> not cache commands at all, but the lifecycle controls of a **16 KiB local
+> instruction scratchpad** this repository had never recorded. Four sources, two
+> of them independent — the Lexra LX4189 datasheet's bit map and prose;
+> **`arch/rlx/include/asm/rlxregs.h:632-633` in all three GPL drops this project
+> already holds**; `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf`'s *"16Kbyte I-MEM,
+> 8Kbyte D-MEM"*, already quoted at `SOURCES.json:195`; and **this unit's own
+> kernel at `0x80002210`–`0x80002300`**, which programs a 16 KiB window into
+> `CP3 $0`/`$1` and then issues `0x010`. `notes/cache-model.md` owns the table
+> and the evidence.
+>
+> **Two things below were right and stay right**: that both codebases issue them
+> at reset in the same order, and that a read side which always returns zero
+> cannot name a write side. **One thing below was wrong in its premise**: the
+> declined route was declined because the commands were *unnamed*, and that is no
+> longer the case. `probe3` issues `0x020` as a control — because the I-MEM is
+> **the same size as the predicted I-cache** and nothing else can separate them —
+> and still declines `0x010`. `docs/probe3-cells.md` § 1.2 and § 8.
+>
+> **And the search failure is the same one as `arch/rlx/` above**: the naming file
+> sits in the drops beside `cache-rlx.c`, and the sentence *"the route that stays
+> open is a document"* was written while the document was on disk.
+
+*(kept as written:)*
 
 **讀.** Neither `cache-rlx.c` nor anything else names them. What is new is that
 **two independent implementations on this one unit issue them, at reset, in the
@@ -471,6 +525,23 @@ It is a **prediction with a refutation condition**, which is worth having only
 because it is written before the walk that tests it. **The I-cache size is not
 readable by this route at all** — the I side has no per-line op in this build, so
 there is no threshold constant to read.
+
+> 🔴 **2026-08-26 — and *this route* is not *any route*.** The sentence above is
+> true and the conclusion drawn from it elsewhere was not:
+> `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` gives **both** sizes on its own first
+> page — § 1, § 2 Features, and the block diagram — and `SOURCES.json:195` has
+> quoted it verbatim since the source index was written. **The I-cache size has
+> had a vendor-datasheet source in this repository all along.** ⚠️ The datasheet
+> gives **no line size and no associativity**, so 🔴 **the blank with no source of
+> any kind is the associativity**, not the I-cache size. `notes/cache-model.md`
+> owns the corrected table.
+>
+> 🔴 **And the same page names a structure that changes what a size measurement
+> means**: *"16Kbyte I-MEM, 8Kbyte D-MEM"* — local scratchpads, whose CCTL
+> lifecycle controls are the two commands this document called unnamed. **The
+> I-MEM is the same size as the predicted I-cache**, so an eviction walk cannot
+> tell them apart by size. See `notes/cache-model.md` and
+> `docs/probe3-cells.md` § 1.2.
 
 ---
 

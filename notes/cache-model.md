@@ -92,32 +92,101 @@ and one value has been added that this file had no row for. The naming source is
 | `0x100` 🆕 | `DWB` | write back D-cache, no invalidate | **this unit's kernel `0x8000CA94`, `0x8000CAC0`** | 🆕 **name 讀.** New row 2026-08-26 — this file had never recorded the value |
 | `0x200` | `DWB_Inval` | write back **and** invalidate D-cache | `c-r3k.c` `CONFIG_RTL8652`/`CONFIG_RTL_819X`; `stage2` `0x804066CC`; **this unit's kernel `0x8000CB50`, `0x8000CBF4`, `0x8000CCE8`** | 🔄 name 讀. ⚠️ **The old row said "flush D-cache", which does not say whether it invalidates. It does** |
 | `0x202` | `DWB_Inval \| IInval` | both, in one write | `stage2` `0x804004F8`; **this unit's kernel `0x8000225C`** | composed of two named bits now, not inferred from two uses |
-| `0x010` | — | — | `stage2` `0x80400514`; **this unit's kernel `0x800022A8`** — both at reset init only | 🔴 **still undetermined, and no source names it** |
-| `0x020` | — | — | `stage2` `0x804004DC`; **this unit's kernel `0x80002240`** — both at reset init only | 🔴 **still undetermined, and no source names it** |
+| `0x010` 🔄 | **`IMEM0FILL`** | **fill the local instruction scratchpad from `CP3 $0`/`$1`, stalling the core until it is done.** Not a cache command | `stage2` `0x80400514`; **this unit's kernel `0x800022A8`** — both at reset init only | 🔴 **NAMED 2026-08-26, ×4 with two independent.** See below |
+| `0x020` 🔄 | **`IMEM0OFF`** | **clear the scratchpad's valid bit**, so fetches from the IMEM region fall through to the I-cache. Not a cache command | `stage2` `0x804004DC`; **this unit's kernel `0x80002240`** — both at reset init only | 🔴 **NAMED 2026-08-26.** See below |
+| `0x040` 🆕 | `IMEM0ON` | — | issued nowhere on this unit | 讀 ×1 (`rlxregs.h`), and the sources **contradict** on this bit — see below. **未定** |
+| `0x080` 🆕 | *(contested)* | — | issued nowhere on this unit | LX4189 says `IROMOff`; `rlxregs.h` has nothing here. **未定** |
+| `0x400`/`0x800` 🆕 | `DMEM0ON` / `DMEM0OFF` | the D-side scratchpad's equivalents | issued nowhere on this unit | 讀 ×1 (`rlxregs.h`) only, absent from the LX4189 map. **Not written by anything of ours** |
 
 ⚠️ **`cache-rlx.c` and `c-r3k.c` are two files, not two independent sources.**
 Both live in the same GPL drops and both drops descend from the same Realtek
 SDK. What changed is that values which had **no name in any source** now have
 one; nothing here is a second vote on a value.
 
-🔴 **The two unnamed rows: what is new, and why the residual stays open.** They
-are no longer *"the bootcode does it once"*. **This unit's own kernel issues the
-same two commands, at reset, in the same order relative to `0x202`** — so two
-independent implementations on this one device treat them as part of the reset
-sequence. That is evidence about their **place**, not about their meaning.
+## 🔴 `0x010` and `0x020` are named — 2026-08-26, and they were never cache commands
 
-**And the instrument that would name them is one this project declines to run.**
-Writing an unnamed command to a cache controller on a one-device budget buys
-nothing any downstream decision needs: `R5b` needs `0x002`, and `R6` needs a
-D-side invalidate whose candidates (`0x001`, `0x200`, `cache 0x11`/`0x15`) all
-have names. Both codebases issue them with cold caches at reset; a payload would
-issue them at an arbitrary point, and what makes them safe there is not
-established. **The route that stays open is a document** — a Lexra CCTL
-bit-field description, or a third SDK generation that comments them. *(The old
-line here said "R1e or a `devmem`-class read is what would settle them". `R1e`
-ran and did not: the census reads CP0 20 and reading it returns zero, which
-`CPU-39` has now measured. **A read side that is always zero cannot name a write
-side.**)*
+**The route this file left open was *a document*, and the document was in the
+GPL drops this project already holds.** Same failure mode as the `arch/rlx/`
+one, one section down: the fact was in the tree and the search went elsewhere.
+
+**`0x010` is `IMEM0FILL` and `0x020` is `IMEM0OFF`** — the lifecycle controls
+for a **16 KiB local instruction scratchpad**, which is a structure nothing
+committed in this repository had ever mentioned. Four sources, two of them
+independent of each other:
+
+| | source | what it gives | class |
+|:-:|---|---|---|
+| 1 | **`arch/rlx/include/asm/rlxregs.h:630-638`**, in **all three GPL drops here** | `CCTL_IMEM0FILL 0x00000010`, `CCTL_IMEM0OFF 0x00000020`, plus `IMEM0ON 0x40`, `DMEM0ON 0x400`, `DMEM0OFF 0x800` | 讀. ⚠️ **One source, not three** — byte-identical, md5 `623d85d7d39efd1906e8b6b842e60e82`, same SDK ancestor as `cache-rlx.c` |
+| 2 | **Lexra LX4189 Data Sheet Rel 1.9 § 5.2** *"Cache Control Register: CCTL"* | the same bit positions **and the semantics in prose**: *"A transition from 0 to 1 on IMEMFill causes the LMI to initiate a series of line read operations to fill the IMEM contents… The processor stalls while the entire IMEM contents are filled"*; *"A transition from 0 to 1 on IMEMOff causes the LMI to clear its internal IMEM valid bit. Subsequent cacheable fetches from the IMEM region will be serviced by the instruction cache"* | 讀, **vendor doc, independent of 1** — Lexra is the core vendor, Realtek the integrator |
+| 3 | **`refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 p.1, § 2, block diagram** | *"a 16Kbyte I-Cache, 8Kbyte D-Cache, 16Kbyte I-MEM, and 8Kbyte D-MEM are provided"* — **the scratchpads exist on this part, with sizes** | 讀, vendor doc, **already in this repo**, already quoted verbatim at `SOURCES.json:195` |
+| 4 | 🔴 **this unit's own kernel, `0x80002210`–`0x80002300`** | the **behaviour** | 讀, on an artefact cut from this device |
+
+Source 4 is what turns a name into an explanation:
+
+```
+80002220  or    t0,t0,at          ; Status |= CU3   -- so CP3 is reachable
+80002230  mtc0  zero,$20          ; CCTL = 0        -- the 0->1 edge, deliberately
+80002240  mtc0  t0,$20            ; CCTL = 0x020    IMEM0OFF
+8000225c  mtc0  t0,$20            ; CCTL = 0x202    DWBInval | IInval
+80002278  and   t0,t0,t1          ; 0x002B8000, masked by 0x0FFFC000 (16 KiB-aligned)
+8000227c  mtc3  t0,$0             ; CP3 $0 = IMEMBASE
+80002288  addiu t0,t0,16383       ; +0x3FFF  = 16 KiB
+8000228c  mtc3  t0,$1             ; CP3 $1 = IMEMTOP
+800022a8  mtc0  t0,$20            ; CCTL = 0x010    IMEM0FILL  -- fill it
+800022d4  and   t0,t0,t1          ; 0x002C0000, masked by 0x0FFFE000 (8 KiB-aligned)
+800022d8  mtc3  t0,$4             ; CP3 $4 = DMEMBASE
+800022e4  addiu t0,t0,8191        ; +0x1FFF  =  8 KiB
+800022e8  mtc3  t0,$5             ; CP3 $5 = DMEMTOP
+```
+
+**Every element corroborates every other.** 16,384 bytes is the datasheet's
+I-MEM size; 8,192 is its D-MEM size; the CP3 register numbers are the ones the
+third-party `lxregs.h` calls `IMEMBASE`/`IMEMTOP`/`DMEMBASE`/`DMEMTOP`; the CCTL
+writes are **clear-then-set**, which is what an edge-triggered control needs and
+what source 2 says it is; and `CU3` is set immediately before the first `mtc3`.
+**The name and the behaviour explain each other.**
+
+🔴 **And the loader does none of it.** A scan of `stage2.bin` for primary opcode
+`0x13` (COP3) returns 97 words, **all data** — every one at or above
+`0x8040A5B8`, where `SPEC.md` `CPU-26` already places the loader's data region,
+and every one ASCII (`"LOT\n"`, `"NIC_"`, `"MX25"`). **Zero COP3 instructions in
+the loader's code**, so it issues `IMEM0OFF` and `IMEM0FILL` over whatever range
+reset left. ⚠️ The control on that zero is weaker than usual: the same scanner
+finds the four `mtc3`s in the kernel, so it can see a real COP3 instruction — but
+that control is on a *different file*, because `stage2.bin` contains none.
+
+🔴 **CCTL is edge-triggered on 0→1** (source 2, and the clear-then-set idiom in
+both codebases on this unit). *Writing a bit that is already 1 does nothing* — so
+**a probe that writes CCTL once and expects an effect is a tool that cannot
+fail.** `rlx_cctl` (讀, `cache.S:70-81`) already does clear / write / clear, and
+`CPU-39` measured that CP0 20 reads zero on this die, so the read-modify-write
+form the Realtek SDK uses for RLX4181 degenerates to the plain write here.
+
+⚠️ **What is NOT settled.** Bits 6–7 **contradict across sources** (LX4189:
+`IROMOn`/`IROMOff`; `rlxregs.h`: `IMEM0ON` at bit 6 and nothing at bit 7). And
+the LX4189 is a **write-through** part with no `DWB`/`DWBInval` at all, so its
+bits 8–9 are Reserved and live here: **the two maps are provably not identical.**
+`0x010` and `0x020` are the only bits every source agrees on without
+contradiction — which is exactly the pair that was asked.
+
+🔴 **The consequence, and it is first-order for `CPU-25`.** *"When IMEM is
+invalid, all cacheable fetches from the IMEM region will be serviced by the
+instruction cache"* — read the other way round, **while it is valid they are
+not.** The I-MEM is **16 KiB and the predicted I-cache is 16 KiB**, so no size
+measurement can tell them apart. `docs/probe3-cells.md` § 1.2 owns what `probe3`
+does about it: read `CP3 $0`/`$1`, and re-run the walk with `CCTL 0x020` issued.
+⚠️ One retrospective comfort and only that: `probe1` cell 2 (`CCTL 0x002`) read
+`02` FRESH ×2, and a victim inside a live IMEM should have stayed STALE — 推,
+about `probe1`'s addresses, transferring to none of `probe3`'s.
+
+*(The old text here said the two values were "still undetermined, and no source
+names them", that the deciding route was "a document", and that a payload writing
+them was declined. The document is found; the decline stood on the values being
+**unnamed** and that premise is gone. `probe3` writes `0x020` as a control and
+still declines `0x010` — for a new reason, in `docs/probe3-cells.md` § 8.
+The line before that said "R1e or a `devmem`-class read would settle them"; `R1e`
+ran and could not, because **a read side that is always zero cannot name a write
+side** — `CPU-39`.)*
 
 ### The `cache`-instruction encoding, from the same source
 
@@ -347,8 +416,28 @@ line.**
 a line-size assumption, whatever the source says. The **8 KiB needs
 `cache-rlx.c` to interpret the constant**, so it is one step weaker. And **the
 I-cache size is not readable by this route at all** — the I side has no per-line
-op in this build, so there is no threshold constant to read. It stays 留白 with
-no source of any kind.
+op in this build, so there is no threshold constant to read.
+
+🔴 **2026-08-26, second correction, and this one is the opposite direction.** The
+sentence that used to end this paragraph — *"it stays 留白 with no source of any
+kind"* — is **wrong, and it was wrong on the day it was written.**
+`refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` states the geometry on its own first
+page, in three places: § 1 *"a 16Kbyte I-Cache, 8Kbyte D-Cache, 16Kbyte I-MEM,
+and 8Kbyte D-MEM are provided"*; § 2 Features, the same words; and the block
+diagram, *"I-Cache=16kB / D-Cache=8kB"*. **`SOURCES.json:195` has quoted that
+sentence verbatim since the source index was written.** So both sizes have had a
+vendor-datasheet source in this repository all along — the same failure as
+`arch/rlx/` two sections up: **the fact was in the project and the search went
+somewhere else.**
+
+⚠️ **What the datasheet does *not* give**: no line size and no associativity. A
+grep for *"cache line"*, *"line size"*, *"associat"* over all 11,467 extracted
+lines returns only switch-MAC-table hits (*"1024 entry 4-way hash L2"*), which is
+a different structure. 🔴 **So the thing with no source of any kind, anywhere, is
+the associativity of either cache** — not the I-cache size.
+⚠️ And the datasheet is a **draft**, its part number is `RTL8196E-VE1/2/3-CG`,
+and **the `-VEx` suffix has never been verified on this unit** — identification
+rests on `0xB8000000 → 0x8196E001` (量) plus the silkscreen.
 
 ⚠️ **And none of it is 量.** A build constant is what the vendor's kernel
 *believes* about its own silicon. It agrees with the third-party
@@ -359,8 +448,10 @@ worth writing down because it is written before the walk that tests it.**
 
 | | prediction | refuted by |
 |---|---|---|
-| I-cache | **16 KiB** — 🔄 **still one source, and it is the third-party one.** Nothing cut from this unit says anything about the I-cache size | 🔄 **a `probe3` eviction walk** (was: `probe1`'s `GEOM=1` walk, which cannot answer on this core) |
-| D-cache | **8 KiB** — 🆕 **two sources with no common ancestor on this point**: the dtsi, and `0x4000` = `cpu_dcache_size * 2` in this unit's own kernel | the same |
+| I-cache | **16 KiB** — 🔄 **讀 ×2, and the stronger one is a vendor datasheet in this repo**: `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 / § 2 / block diagram, and the third-party dtsi. 🔴 **⚠️ That datasheet is the `-VE1/2/3` variant, and `SOURCES.json` records this unit as NOT being it** — embedded DRAM by MCM against this unit's external W9825G6KH (`MEM-01`, 量), and `CPU-02`'s silkscreen carries no variant suffix at all. The **public `RTL8196E-CG`** datasheet makes the same claim, so it is **two Realtek documents about two variants of a family this die is 量-confirmed to belong to** (`CPU-01`, ×3) — worth more than one document, and still not a reading of this die. *(This row said "still one source, and it is the third-party one" until 2026-08-26. It was wrong: `SOURCES.json:195` already carried the datasheet's sentence.)* | 🔄 **a `probe3` eviction walk** (was: `probe1`'s `GEOM=1` walk, which cannot answer on this core). 🔴 **And the walk cannot separate a 16 KiB I-cache from the 16 KiB I-MEM by size** — see § `0x010`/`0x020` above |
+| D-cache | **8 KiB** — 🔄 **讀 ×3 with no common ancestor**: the datasheet (⚠️ variant caveat above), `0x4000` = `cpu_dcache_size * 2` in this unit's own kernel, and the dtsi | the same |
+| associativity 🆕 | 🔴 **留白 — no source of any kind, anywhere.** Not the datasheet, not any GPL drop, not the dtsi. Split out 2026-08-26 because this, and not the I-cache size, is the blank | the pattern in `probe3`'s stride sweep. If that walk fails, this stays blank |
+| I-MEM / D-MEM 🆕 | **16 KiB / 8 KiB local scratchpads** | 讀 ×2 — the datasheet's sizes, and this unit's kernel programming `+0x3FFF` and `+0x1FFF` into `CP3 $0`/`$1` and `$4`/`$5`. **Refuted by `probe3` reading those four registers** |
 | line size, D | **16 bytes** — 🆕 **the strongest of the three**: readable from this unit's kernel binary without any source to interpret it, eight `cache` ops per 128 bytes | the same |
 | line size, I | **16 bytes** — 🔄 **one source.** Split out of the row above 2026-08-26: the I side of this build has no per-line op, so the binary says nothing about it | the same |
 | core | RLX4181 rather than RLX5281 | 🔴 **2026-08-25b: `PRId` row `0x78` read `0x0000CD01`, and it refutes nothing here — because no source in this repository maps that value onto either model number.** The prediction and its refutation condition were both about a name, and the measurement is a value. **What would settle it is a `PRId` assignment table, not another seating.** *(Original condition:)* `probe2`'s `PRId` row `0x78` reading in the 5281 range — which would be worth more than agreement, because it refutes a Realtek datasheet and two public kernel trees at once |

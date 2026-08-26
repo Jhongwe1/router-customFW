@@ -29,7 +29,7 @@ correction the file makes against itself**: MIPS I has no `cache` instruction, b
 returned zero was run on the 56 KB loader and on nothing else, and the refutation
 condition this file wrote for itself is therefore met. `Config.M = 0` is measured,
 so it is still not a MIPS32 core; what changed is the sentence. Two commands the
-bootloader issues at reset are **still** unnamed in every source, and the only
+bootloader issues at reset were unnamed in every source until 2026-08-26 — 🔴 **they are `IMEM0FILL` and `IMEM0OFF`, the lifecycle controls of a 16 KiB instruction scratchpad, and the file that names them was in the vendor tree this project already reads.** The fact was in the project and the search went elsewhere, for the second time. *(as written:)* and the only
 instrument that could name them is one this project declines to run. It also
 carries an older correction: the general exception vector here is `0x80000080`,
 not MIPS32's `0x80000180`, and the wrong address had propagated into four files.

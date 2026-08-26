@@ -1938,7 +1938,10 @@ situation as `bench/2026-08-24e`'s `block12` and is recorded the same way.
   core does not isolate, so the routine can only return `0` — which is its own
   *the core does not answer* value. **The remaining route is an eviction walk
   that needs no isolation**, using the mechanism cell 1 already proved (a store
-  into the instruction stream is not seen): prime N victims at stride S, execute,
+  into the instruction stream is not seen) — 🔴 **and 2026-08-26 corrected this
+  paragraph without moving it: that mechanism is the I side, while the prediction
+  written for the walk (D 8 KiB / line 16 B) is the D side, so `probe3` carries
+  TWO walks. `docs/probe3-cells.md` § 1.1 owns it**: prime N victims at stride S, execute,
   rewrite, execute again, and read the STALE/FRESH boundary. That is a `probe3`
   and it is desk work.
 * **`0xCD01` → a part number.** The value is measured; the mapping is not.

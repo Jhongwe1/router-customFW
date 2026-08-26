@@ -1,0 +1,879 @@
+# `probe3` — the cell table
+
+**Written 2026-08-26, desk, no power. `R1h-0`.** Every expected value and every
+refutation condition below was written **before** the cell it belongs to, and
+every expected value names the capture or the artefact it came from. That rule
+exists because this project has broken it twice — `D2c` derived an expected
+value from a stale map, and `E10d` derived one from the very map the cell was
+testing — and both times the cell could not fail.
+
+**Two columns, not one.** Every cell carries *expected under qemu* separately
+from *expected on the device*, because `probe1` cell 1 came back **`02` FRESH
+under qemu and `01` STALE on silicon** (量, `bench/2026-08-25/H1b.log:9`), and
+that opposition is the reason the experiment means anything. **A qemu run that
+looks like the device is the run to distrust.**
+
+---
+
+## 0. What this file owns, and what it does not
+
+| | |
+|---|---|
+| **owns** | what each `probe3` cell does, what it is expected to return on each of the two machines, what would refute it, and what it measures |
+| **does not own** | *where I am* (`PROGRESS.md`), the cache model itself (`notes/cache-model.md`), the four decisions `R1-gate` made (`docs/rlx-cache-and-cp0.md`), any number **except one** (`SPEC.md` indexes them) — 🔴 **§ 6.3's derivation of `TC0CNT`'s 14,286,057 Hz rate is owned here**, because it is derived here and `SPEC.md` `CLK-17` points back at this file for it; every other number in this file is a quotation, **and what the operator types** — that is `R1h-2`'s runsheet section, and it is a separate step on purpose |
+| **is not** | the payload. `R1h-1` builds that, under the `hazlint` gate, with one qemu mutation per cell |
+
+`R1h` exists to settle four things (`PROGRESS.md` § Step list): ⓐ cache size /
+line size / associativity **measured**; ⓑ does the D-cache allocate on read and
+can anything invalidate a clean line; ⓒ does this core retire the MIPS-II
+`cache` instruction; ⓓ write-through vs write-back-without-write-allocate, and
+are `Status.IsC`/`SwC` implemented as bits. Every cell below is tagged with the
+one it serves.
+
+---
+
+## 1. 🔴 Two things changed today, and both change the design
+
+### 1.1 The prediction and the mechanism were about different caches
+
+`PROGRESS.md` § Now describes ⓐ as *"the eviction walk — sweep N for the size,
+sweep S for the line size, the pattern for the associativity"*, and gives it
+*"a prediction to refute rather than a blank: D-cache 8 KiB, line 16 B, read out
+of this unit's own kernel"*.
+
+**Those are two different caches.** The mechanism the walk is built on —
+*a store written into the instruction stream is not seen* — is `probe1` cell 1
+and cell 5, and it measures the **I-cache** (量, `bench/2026-08-25/H1b.log:9-12`,
+`01` STALE on all four victims). The prediction cut from this unit's kernel —
+`sltiu … 0x4000` at `0x8000CAAC`/`0x8000CBE0`/`0x8000CCD4`, read through
+`cache-rlx.c` as `cpu_dcache_size`, and eight `cache` ops at stride `0x10` — is
+about the **D-cache** and only the D-cache (讀, `notes/cache-model.md`
+§ *Cache geometry*).
+
+So the walk as described could not have refuted the prediction that was written
+for it. `probe3` carries **two walks**: Group W on the I side, where the
+mechanism is measured, and Group V on the D side, where the prediction lives and
+the mechanism is the thing Group C is testing. **Group V is armed at run time by
+Group C's own result** — see § 7.
+
+**And while correcting that, one more correction, in the other direction.** The
+brief for this step said the I-cache size has no source at all. It has the
+*strongest* sourcing of the three numbers — see § 6.3. **What has no source of
+any kind, anywhere, is the associativity of either cache.** That is the cell
+that stays blank if its walk fails.
+
+### 1.2 🔴 There is a 16 KiB instruction scratchpad on this part, and it is exactly the size of the I-cache
+
+Nothing committed in this repository has ever mentioned it. It is a first-order
+threat to ⓐ, and it was found today by asking what `CCTL 0x010`/`0x020` are.
+
+**They are not cache commands. `0x010` is `IMEM0FILL` and `0x020` is
+`IMEM0OFF`** — the lifecycle controls for a local instruction scratchpad — and
+four sources say so, two of which are independent of each other:
+
+| | source | what it gives | class |
+|:-:|---|---|---|
+| 1 | **`arch/rlx/include/asm/rlxregs.h:630-638`**, in **all three GPL drops this project holds** | `CCTL_IMEM0FILL 0x00000010`, `CCTL_IMEM0OFF 0x00000020`, and the rest of the register: `DInval 0x1`, `IInval 0x2`, `IMEM0ON 0x40`, `DWB 0x100`, `DWBInval 0x200`, `DMEM0ON 0x400`, `DMEM0OFF 0x800` | 讀. ⚠️ **One source, not three** — the three files are byte-identical, md5 `623d85d7d39efd1906e8b6b842e60e82`, and they share the Realtek SDK ancestor `cache-rlx.c` came from |
+| 2 | **Lexra LX4189 Data Sheet Rel 1.9 § 5.2**, *"Cache Control Register: CCTL"* | the same two bit positions, plus the semantics in prose: *"A transition from 0 to 1 on IMEMFill causes the LMI to initiate a series of line read operations to fill the IMEM contents… The processor stalls while the entire IMEM contents are filled"*; *"A transition from 0 to 1 on IMEMOff causes the LMI to clear its internal IMEM valid bit. Subsequent cacheable fetches from the IMEM region will be serviced by the instruction cache"* | 讀, **vendor doc, and independent of 1** — Lexra is the core vendor, Realtek the integrator. ⚠️ LX4189 is a **write-through** part with no `DWB`/`DWBInval` bits at all, so bits 8–9 of its map are Reserved and live here: **the two maps are provably not identical**, and bits 6–7 differ between sources too. `0x010`/`0x020` are the only bits on which every source agrees without contradiction |
+| 3 | **`refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 p.1 and § 2** | *"a 16Kbyte I-Cache, 8Kbyte D-Cache, 16Kbyte I-MEM, and 8Kbyte D-MEM are provided"* — the scratchpads **exist on this family, and their sizes** | 讀, vendor doc, **already in this repo**, and already quoted verbatim in `SOURCES.json:195`. ⚠️ **but read § 1.3 before quoting it** |
+| 4 | 🔴 **this unit's own kernel, `0x80002210`–`0x80002300`** | the **behaviour**, and it matches the names exactly | 讀, on an artefact cut from this device |
+
+Source 4 is the one that turns a name into an explanation. Disassembled from
+`$FWRE_WORK/rebuild/b4c-desk/vmlinux-rederived.bin` (sha256 `cf0d60a8…`; chain of
+custody in `notes/cache-model.md`):
+
+```
+80002210  mfc0  t0,$12
+8000221c  lui   at,0x8000
+80002220  or    t0,t0,at          ; Status |= CU3  -- so CP3 is reachable
+80002224  mtc0  t0,$12
+80002230  mtc0  zero,$20          ; CCTL = 0        <- the 0->1 edge, deliberately
+8000223c  li    t0,32
+80002240  mtc0  t0,$20            ; CCTL = 0x020  IMEM0OFF
+8000224c  mtc0  zero,$20
+80002258  li    t0,514
+8000225c  mtc0  t0,$20            ; CCTL = 0x202  DWBInval | IInval
+80002268  lui   t0,0x802c
+8000226c  addiu t0,t0,-32768      ; 0x802B8000
+80002270  lui   t1,0xfff
+80002274  ori   t1,t1,0xc000      ; 0x0FFFC000   -- a 16 KiB-aligned 28-bit mask
+80002278  and   t0,t0,t1          ; 0x002B8000   -- physical
+8000227c  mtc3  t0,$0             ; CP3 $0 = IMEMBASE
+80002288  addiu t0,t0,16383       ; +0x3FFF      -- 16 KiB
+8000228c  mtc3  t0,$1             ; CP3 $1 = IMEMTOP
+80002298  mtc0  zero,$20
+800022a4  li    t0,16
+800022a8  mtc0  t0,$20            ; CCTL = 0x010  IMEM0FILL   <- fill it
+800022b4  lui   t0,0x802c         ; 0x802C0000
+800022bc  lui   t1,0x802d
+800022c0  addiu t1,t1,-16384      ; 0x802CC000
+800022c4  beq   t0,t1,0x800022f4  ; skip if the region is empty
+800022cc  lui   t1,0xfff
+800022d0  ori   t1,t1,0xe000      ; 0x0FFFE000   -- an 8 KiB-aligned mask
+800022d4  and   t0,t0,t1          ; 0x002C0000
+800022d8  mtc3  t0,$4             ; CP3 $4 = DMEMBASE
+800022e4  addiu t0,t0,8191        ; +0x1FFF      -- 8 KiB
+800022e8  mtc3  t0,$5             ; CP3 $5 = DMEMTOP
+800022f4  mtc0  zero,$20
+80002300  jr    ra
+```
+
+**Every element corroborates every other.** The first window it programs is
+**16,384 bytes**, which is the datasheet's I-MEM size; the second is **8,192
+bytes**, the datasheet's D-MEM size; the CP3 register numbers are 0/1/4/5, which
+is what the third-party `lxregs.h` names `IMEMBASE`/`IMEMTOP`/`DMEMBASE`/
+`DMEMTOP`; the CCTL writes are **clear-then-set**, which is what an
+edge-triggered control needs and what the LX4189 doc says it is; and `CU3` is set
+immediately before the first `mtc3`. `notes/cache-model.md` already records this
+same address span for the CCTL writes, and reads it as *"part of this SoC's reset
+sequence, reproduced by two codebases, and it says nothing about what they
+mean."* It says what they mean.
+
+🔴 **And the loader does not do any of it.** A scan of `stage2.bin` for primary
+opcode `0x13` (COP3) returns **97 words, all of them data**: every one is at or
+above `0x8040A5B8`, which is where `SPEC.md` `CPU-26` already places the start of
+the loader's data region (`0x8040A5C0` = `BootStateEvent[3][8]`), and every one
+decodes as ASCII (`4c4f540a` = `"LOT\n"`, `4e49435f` = `"NIC_"`, `4d583235` =
+`"MX25"`). **Zero COP3 instructions in the loader's code.** So the loader issues
+`IMEM0OFF` and `IMEM0FILL` **without programming BASE/TOP at all** — over
+whatever range reset left.
+
+⚠️ **The control on that zero is weaker than this project's usual, and saying so
+is the point.** The same scanner finds the four clean `mtc3`s in the kernel, so it
+can see a real COP3 instruction — but that control is on a *different file*.
+There is no known COP3 in `stage2.bin` for it to rediscover, because there is
+none. The zero is a zero; the instrument was demonstrated elsewhere.
+
+**🔴 Why this threatens ⓐ.** *"When IMEM is invalid, all cacheable fetches from
+the IMEM region will be serviced by the instruction cache"* (讀, LX4189 § 5.2) —
+read the other way round, **while it is valid they are not.** If `probe3`'s
+victim arena lands inside the loader-prompt IMEM window, the eviction walk
+measures a 16 KiB scratchpad and reports it as a 16 KiB I-cache. **The two are
+the same size, so no size measurement can tell them apart.** Three cells answer
+this and all three are new: Group M reads the window, Group W's `w-imem` re-runs
+the walk with the scratchpad switched off, and § 9 makes it a condition on the
+whole table.
+
+⚠️ **One retrospective comfort, and it is only that.** `probe1` cell 2 applied
+`CCTL 0x002` (`IInval`) and read `02` FRESH ×2 (量, `H1b.log:15-16`). `IInval`
+invalidates the I-cache; per the same LX4189 section `DInval` explicitly leaves
+the DMEM alone, so 推 `IInval` leaves the IMEM alone too, and a victim inside a
+live IMEM would have stayed STALE under cell 2. **So `probe1`'s victims were
+probably not in the IMEM window** — 推, about `probe1`'s addresses, and it
+transfers to none of `probe3`'s.
+
+### 1.3 ⚠️ The datasheet in `refs/` documents a variant this unit is recorded as NOT being
+
+**This qualifier applies to every expected value below that cites a Realtek
+datasheet, and it was nearly left out of this file.** `SOURCES.json`'s own entry
+for `ds-rtl8196e-vex` carries it verbatim:
+
+> *"It is the -VE1/2/3 variant, which has embedded DRAM by MCM. **THIS UNIT HAS
+> EXTERNAL SDRAM (Winbond W9825G6KH) and is therefore NOT this part.**"*
+
+That is 量 on this unit — `MEM-01`, the package silkscreen of the Winbond part.
+And `CPU-02` (量) reads the SoC's own marking as `RTL8196E · I510VG1 · GF23
+TAIWAN`, **with no variant suffix at all**, so neither datasheet's part number is
+confirmed here.
+
+**What survives, stated exactly:**
+
+- The geometry and the CPU name appear in **two different Realtek documents about
+  two different variants** — the leaked `-VE1/2/3-CG` draft in `refs/`, and the
+  **public `RTL8196E-CG`** datasheet already listed in `SOURCES.json`
+  `reference_only` for precisely this reason (*"a second document (not the same
+  one) on the naming question"*). Two documents agreeing across variants is worth
+  more than one document.
+- **Family membership is 量 and is not in doubt**: `CPU-01`, ×3 — the package, the
+  boot banner, and the bootcode's own comparison of `0xB8000000` against
+  `0x8196E000`.
+- 🔴 **It is still a statement about a family, not a measurement of this die**,
+  which is the whole reason ⓐ is a gate. The datasheet moves the geometry from
+  *one third-party vote* to *two vendor documents plus a third-party dtsi plus a
+  build constant* — **and every one of those is a belief about silicon, not a
+  reading of it.**
+
+⚠️ **And it cuts the other way for `CPU-46`.** The I-MEM/D-MEM sizes rest on the
+same two documents — but **this unit's own kernel programming `+0x3FFF` and
+`+0x1FFF` into `CP3 $0`/`$1` and `$4`/`$5` is cut from this device**, and it
+agrees with them. That is the leg that does not depend on the variant.
+
+---
+
+## 2. The instruments `probe3` stands on
+
+Everything below is reused rather than invented. Each row names the measurement
+that licenses it, so an argument about a cell can be traced to a capture in one
+step.
+
+| | instrument | what licenses it |
+|:-:|---|---|
+| **M1** | a store into the instruction stream is not seen by the I-cache | 量 `bench/2026-08-25/H1b.log:9-12` — `probe1` cell 1 (cached store) **and cell 5 (uncached store)**, `01` STALE on all four victims, `ex=000011a1` against `ma=240222b2`. 🔴 **`probe3`'s I-side cells use the uncached store**, i.e. cell 5's leg, which takes the D-cache out of the I side entirely |
+| **M2** | `CCTL 0x002` alone makes a rewritten instruction visible | 量 same captures, cells 2/3/6, `02` FRESH on six victims; re-measured 2026-08-25b by `probe2` on a **different address range and a different store path** (`install.bad=0`, `break` trapped and returned). This is `probe3`'s **re-arm** between walk steps, and it is what lets one arena be reused |
+| **M3** | an exception at `0x80000080` reaches an installed handler and returns | 量 `bench/2026-08-25b/H2a.log` — `break.count=1`, `cause=00000024` (ExcCode 9 `Bp`), `break.epc=80500270`, `install.bad=0`, `restore.mismatch=0`, `H2h-utlb` byte-identical to the same seating's `H0c` |
+| **M3′** | the handler is **ExcCode-agnostic** | 讀 `tools/rlxprobe/exc.S:68-114`: it stores `Cause`, stores `EPC`, increments a count, returns to `EPC+4` via `jr $26 / rfe`. **No test of `Cause`, no conditional branch, one control transfer.** Corroborated on the emitted `probe2` image: 22 words, zero branches. ⚠️ **The gap, stated:** no exception other than `Bp` has ever been delivered on this die under this handler. The code path is provably identical; that it *behaves* identically for ExcCode 10 is 推. Cell `x-ri` closes it |
+| **M3″** | `EPC+4` is unconditional, and wrong in a branch delay slot | 讀 `exc.S:41-44,92`. **Constraint on every `probe3` cell: no probed instruction may sit in a delay slot**, and `Cause` is recorded whole so `BD` is visible if it happens anyway |
+| **M4** | CP0 20 is a **write-only** command register that reads zero | 量 `CPU-39` — `probe1`'s `XCT0` row read `00000000`, and `probe2`'s row `0xa0` read `00000000` with `nowrite=0` across all 256 rows proving `mfc0` always writes `rt`. **Two consequences:** a `CCTL` command's effect is the only observable; and a read-modify-write of `CCTL` degenerates to a plain write on this die, so `probe1`'s clear/write/clear (讀, `cache.S:70-81`) already produces the 0→1 edge the LX4189 doc requires |
+| **M5** | `Status.IsC` does not isolate; stores issued while it is set reach DRAM | 量 `probe1` cell 4, `07` CORRUPT ×2, `240222b2 → 000222b2` and `03e00008 → 00e00008`. **Constraint: no `probe3` cell may execute a store while `IsC` is set.** Cell `s-isc` sets it with no memory reference between set and clear |
+| **M6** | the KSEG0/KSEG1 alias works for **stores that miss** and for uncached read-back | 量 `probe1` cells 1 vs 5 (`ma` identical) and every `mb`/`ma` field. ⚠️ **What is NOT established is exactly what Group C tests**: that an uncached store leaves a *resident* D-line alone |
+| **M7** | DRAM keeps its contents across the payload's own reset, and across a short power-off | 量 `MEM-10` (2-word canary, three warm resets), `MEM-15` (548-byte chosen-value block — **and it did NOT survive ~3.9 h**). **Consequence: `probe3` poisons its result block *and* initialises its arena before the first cell**, or a leftover arena reads exactly like a live one |
+| **M8** | the loader re-stages `0x80500000` on a watchdog reset | 量 `R1g-4b` — a second `J 80500000` booted the vendor kernel. **`probe3` gets its own upload** and cannot share `R3`'s |
+| **M9** | `TC0CNT` at `0xB8003108` is readable and TC0 is running at the prompt | 量 `REG-07` (one reading, `0x0010B960`, mid-count), `REG-09` (`TCCNR = 0xC0000000` → TC0En=1, TC0Mode=1), `CLK-04` (the loader's tick advances at 100.0018 Hz over a 2,080 s baseline, which requires the counter to count). ⚠️ **n=1 on the register itself** — cell `P1` closes that at the prompt for free |
+
+---
+
+## 3. The address map `probe3` uses
+
+🔴 **Only one span of DRAM on this device has positive evidence of being free at
+the loader prompt**, and it is not the largest one. `0x80A00000`–`0x80AF1002`
+held a 987,138-byte image across a complete TFTP upload **and** download,
+byte-identical, with the loader's own network stack live throughout (量, `G4`,
+2026-08-24d, sha256 `396561a0…45a03e90`). Everywhere else the case is *"nothing
+has read it"* — and `MEM-14` is this device's own counterexample: `0x81000000`
+was exactly that kind of address until three captures showed the boot path
+writes it on **every** boot.
+
+**So `probe3` stays inside the proven span.**
+
+| | window | what | evidence |
+|:-:|---|---|---|
+| | `0x80A00000`–`0x80A0027F` | `probe1`'s result block, 160 poisoned words | 量, `bench/2026-08-25/H1c.log`. **Preserved** — `probe3` must not touch it |
+| | `0x80A01000`–`0x80A01CC3` | `probe2`'s result block, 817 poisoned words | 量, `bench/2026-08-25b/H2g.log`. **Preserved** |
+| **RB** | `0x80A02000` + | 🆕 **`probe3`'s result block.** Above both, inside the proven span | a choice; refuted by cell `P3` |
+| **ARENA** | `0x80A10000`–`0x80A8FFFF`, 512 KiB | 🆕 **the victim / data arena**, runtime-generated. Big enough for a 12-count sweep at 16 KiB stride and for a 64 KiB working set | inside the proven span; `0x80A78000` is the one point inside it read directly (`G0-mid`, 16 words: no pointer, no self-reference, no period) |
+| | `0x80AF1002` | top of the proven span | 量, `G4` |
+| | `0x80B00000`–`0x80BFFFFF` | `RLX_GEOM_BASE`. **Not used** — `GEOM=1` is dead (`CPU-25`) and this window has never been read | — |
+
+**Why the arena is generated at run time.** `probe1`'s `victims.S` is 16 slots at
+`0x400` stride = 16 KiB of `.text` (讀, `rlxdefs.h:31-32`). A stride sweep to
+16 KiB × 12 counts needs 192 KiB and a 64 KiB working set needs 64 KiB;
+assembling that is a quarter-megabyte payload whose `hazlint` population is
+mostly `nop`. Generating it costs an uncached store loop plus **one
+`CCTL 0x002`** — which rests on **M2**, which is measured. The payload says so in
+its own header: *the arena's first execution is licensed by `probe1` cells
+2/3/6.*
+
+**Why the walk loops run from KSEG1.** `victims.S` already admits the one thing
+its 7 KiB pair gap cannot exclude: *"This does NOT exclude eviction by the driver
+code that runs between the two calls."* Entering the walk through
+`rlx_call2_uncached` makes the driver's own instruction fetch uncached, so **the
+only thing in the I-cache is the victims**. The build is `-mno-abicalls -fno-pic
+-G0`, so every address the loop forms is absolute whatever segment it runs in
+(讀; `RUNSHEET.md:974` already establishes this for `probe1`'s `flags` bit 0).
+
+**The victim primitive is two words, not three.**
+
+```
++0:  jr    $31                     <- the guard word; must always read 03e00008
++4:  addiu $2, $0, IMM             <- delay slot, and THE PATCHED WORD
+```
+
+`probe1`'s victim is three words with the patched word first and the guard at
+`+4`; this inverts it. The reason is resolution: **an 8-byte victim can be placed
+at 8-byte stride, so Group W can see an 8-byte line.** A 3-word victim cannot go
+below 16 bytes, and at 16 bytes *"the line is 16 B"* and *"the line is 8 B or
+4 B"* are the same reading. The guard moves to `+0` and becomes the word that
+must never change, which is strictly better than `probe1`'s: the guard is now the
+control-flow word itself.
+
+⚠️ `.set noreorder`, and the delay slot is filled by hand. `addiu` is not a load,
+so the exposed load-delay slot does not apply; `hazlint` gates the build anyway.
+
+---
+
+## 4. Encoding and budget, written before the cells
+
+**The wire is 3840 bytes/s** (38400 8N1, 10 bits/byte; 算, and it reproduces
+`H1c`'s measured 1,671 B and `H2g`'s measured 9,661 B).
+
+🔴 **`--esc-after 60` is not a cap on the report, but the report lives inside
+it.** The capture spans `J` → payload runs and reports → the payload's own
+`rlx_reset` → reboot → the ~4.9 s ESC window (`LDR-15`) → the prompt. Miss the
+ESC window and the vendor kernel boots: **one power cycle.** Arithmetic:
+`(60 − 5.616) × 3840 = 208,834` bytes of report before the window is eaten —
+⚠️ **and `5.616` is carried from the `§ B4` budget box rather than derived here;
+`LDR-15`'s ESC window is 4.886 s and the remaining 0.730 s is named nowhere in
+this repository. It is marked or it does not stand.** **At `probe1`'s 104-byte
+row shape, `104V + 191 ≤ 208,834` gives V ≤ 2,006 — a wall, not a guideline**,
+and 2,048 full rows are `104×2048 + 191 = 213,183`, an overrun of 4,349 bytes =
+**1.13 s**. *(The 191 is the banner and header; drop it and the wall moves to
+2,008. Both terms are stated so the number can be checked rather than trusted.)* The operator would not see an overrun;
+they would see the vendor kernel boot, which reads as *"the payload hung"*.
+
+🔴 **The read-back has a ceiling of evidence.** The largest `DW` ever executed on
+this device is **820 printed words / 9,661 bytes** (量, `H2g`). Above ~1,000
+words two things are untested at once: whether the loader's `DW` accepts a
+4-digit decimal length, and whether anything in its print loop caps the run.
+`reply_DW(addr,N) = len(cmd) + 2 + 47×ceil(N/4) + 9` (讀, `LDR-07`; the constants
+are fitted over 91 captures by `tools/reply-size.py`, not counted in a terminal),
+and **the round-up is upward — a length given too small never announces itself.**
+
+**The encoding, and why.**
+
+| | UART | RAM read-back | inside measured evidence? |
+|---|---|---|---|
+| one full `probe1`-shape row per victim | 104 B each — 213 KB at V=2048 | `DW … 16433`, a 5-digit length | ❌ overruns the ESC window, and is 20× past any `DW` this loader has executed |
+| 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
+| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | **2,177 B** at **V = 2,048, which is the largest single sweep point** — 75 % of `probe2`'s already-executed 2,909 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000 (`w-size` alone is ~4,000, `w-imem` repeats it, `v-size` another ~4,000). The block is **reused between sweep points**, so **§ 4 must name which points survive to the read-back**; `RB_WORDS_probe3` and the runsheet's `DW <RB> N` are computed from that number and not from 2,048, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | **`DW <RB> 433` = 5,149 B / 1.34 s** — 53 % of `H2g`'s already-executed 9,661 B | ✅ **every number is under something this loader has already done** |
+
+**So: four bits per victim** — the seven verdicts plus `0` = *never written*,
+which is the only lossless bitmap and the only one with a negative control inside
+it. Sixteen full rows carry the boundary brackets and the controls, on **both**
+channels, so `H1c`'s word-for-word cross-check survives.
+
+⚠️ **Every bitmap line — on whichever channel carries it — carries its own start index.** Without it one
+lost line silently deletes eight victims and shifts the rest; with it a truncated
+capture is recoverable. **Do not ship a bitmap line without an index.**
+
+⚠️ **And the sixteen rows are not decoration.** A bitmap cannot carry
+`mb`/`ma`/`g` — the raw before / after / guard words that let a verdict be
+**re-derived at the desk if the verdict logic is later found wrong**. `probe1`'s
+own history is exactly that: the audit found `rlx_call0` never wrote `$2`, and
+every trapped row's `v` was carrying a loop counter. Raw fields survive a bad
+verdict function. A bitmap does not.
+
+---
+
+## 5. Group P — preflight, at the prompt, before anything is uploaded
+
+Four cells, **eight commands** (`P1` is sent twice, `P2` is four `DW`s). **No upload, no `J`, zero risk to the device, and every one of them removes an
+assumption a later cell would otherwise carry.** They belong to `R1h-2`'s
+runsheet section; they are listed here because three cells below are conditional
+on them.
+
+> **Written before the cells.** `P1` is expected to show a *changed* `TC0CNT`;
+> equal readings kill Group T outright. `P2` is expected to show bias garbage
+> with no pointer, no self-reference, no period and no run of zeros; anything
+> else moves the arena. `P3` is expected to return 23,527 bytes; a
+> `Unknown command !` means the `DW` read-back must stay under 1,000 words and
+> the encoding in § 4 is the only one that fits. **`P0` must show `00000000`, or
+> nothing is uploaded at all.**
+
+| cell | command | expected on the device (and its source) | refuted by |
+|---|---|---|---|
+| **`P0`** | `DW 8040D4A0 1` — the autoburn word, read **before** the `put` | word 1 = `00000000`. 讀+量, `H1a`/`G2`; this is `R0`'s flash-write control and it is not optional | **anything else. Stop. Nothing is uploaded.** |
+| **`P1`** | `DW B8003108 1`, **twice, seconds apart** | 🔴 `LDR-07` rounds the word count up to a multiple of 4, so this one command prints **four** words — `TC0CNT`, `TC1CNT`, `TCCNR`, `TCIR`. Expect `TC0CNT` **different** between the two reads; `TC1CNT = 00000000`, `TCCNR = C0000000` **and `TCIR = 80000000`** unchanged (量, `REG-08`/`REG-09`/`REG-10`, `bench/2026-08-23/E.log:15`) — **four words come back and four are pre-registered**, or a change in the fourth passes unremarked in the cell whose whole purpose is raising `REG-07` off n = 1 | **equal `TC0CNT`** → the register is frozen, not a live mirror of the counter, and **Group T does not ship**. `TCCNR ≠ C0000000` → something writes it after `timer_init` and M9 is wrong |
+| | | ⚠️ **This is not a rate measurement and must never be written up as one.** The counter wraps every 9.9998 ms; two console reads are seconds apart, so the delta is uniform mod 142,858 and carries no rate information. At 38400 the command echo alone exceeds one wrap | |
+| **`P2`** | `DW 80A02000 16`, `DW 80A10000 16`, `DW 80A50000 16`, `DW 80A8FFC0 16` — head of the result block and head / middle / tail of the arena | high-entropy bias garbage. 量 `MEM-16`: uninitialised DRAM on this board is 89.5 % reproducible across a 16 h power-off against a **measured** null of 55.98 %, so it looks like structure and is not | 🔴 **any of: a word equal to its own address or to another address in the window** (`MEM-11`'s signature — uninitialised DRAM cannot produce its own address); **any aligned pointer-shaped word** `80xxxxxx`/`81xxxxxx`/`A0xxxxxx`/`B8xxxxxx` (`G0`'s pre-written condition, verbatim: *"any one pointer-shaped word and the address is re-picked"*); **a repeating period**; **sixteen zero bytes** (on this board zeros are not power-on bias); **any known magic** — `5A5AA5A5`, `00000144`, `DEADC0DE`, `524C5831`, `524C5832` |
+| **`P3`** | `DW 80A00000 2000` | **23,527 bytes, 6.13 s** (算, `LDR-07`; `len("DW 80A00000 2000")=16`, `+2 +47×500 +9`) | `Unknown command !` (≈44 B) or a short whole-line reply → **the loader will not take a 4-digit decimal length**, and every read-back in this payload must stay ≤ 999 words. ⚠️ This is the one preflight cell that costs real seconds; it is also the only thing standing between § 4's arithmetic and a read-back that silently truncates |
+
+---
+
+## 6. The cells
+
+Every group opens with its predictions and refutation conditions **written
+first**. Every expected value names its artefact. Where there is no source, the
+cell says **留白** and does not invent one.
+
+### 6.1 Group M — where the scratchpads are
+
+**Settles: the precondition for ⓐ.** Without it, a walk that returns 16 KiB
+cannot say which 16 KiB structure it measured.
+
+> **Written before the cells.**
+>
+> **There is no prediction for the device, and that is the finding.** The loader
+> contains **zero COP3 instructions** (§ 1.2), so at the prompt `IMEMBASE`/
+> `IMEMTOP` hold **whatever reset left**, and nothing in any source says what
+> that is. 🔴 **The kernel's values — `0x002B8000`/`0x002BBFFF` and
+> `0x002C0000`/`0x002C1FFF` — are NOT a prediction for this cell.** They are what
+> a different codebase chose after the loader had already handed over. Quoting
+> them here as an expected value would be `E10d` a third time.
+>
+> **否證 M.** If `mfc3` traps with `CU3` already set, CP3 is not reachable from a
+> payload and the scratchpad windows stay 未定 — in which case every geometry
+> number in this payload carries the I-MEM residual explicitly, and `w-imem`
+> becomes the only handle on it.
+
+| cell | what it does | expected under qemu (source) | expected on the device (source) | refuted by |
+|---|---|---|---|---|
+| **`m-cu3`** | read `Status`, `or` `0x80000000` (`CU3`), write back, three `nop`, read back, **restore immediately**. No load or store in between | 未定 — a 24Kf has `CU3` and qemu may or may not mask it. **`R1h-1` measures this under qemu and writes the number here before the seating** | bit 31 set in the read-back. 讀, this unit's kernel `0x8000221C`–`0x80002224` sets exactly this bit before its first `mtc3`, so the vendor judged it necessary in kernel mode | bit 31 clear in the read-back → `CU3` is not implemented as a bit, and `m-imem`'s result must be read as *"CP3 answered without `CU3`"* |
+| **`m-imem`** | 🔴 **set `CU3` again and hold it across the whole cell** — `m-cu3` restored `Status`, and `mfc3` with `CU3` clear traps **by construction**, which would be recorded as *CP3 unreachable* and would be an artefact of the running order. Then `mfc3` CP3 `$0`,`$1`,`$4`,`$5` (and `$2`,`$3`,`$6`,`$7`), **each read twice with two different primes**, with the `Status` read-back written to the block beside each result so that *trapped with `CU3` set* and *trapped with `CU3` clear* are separable at the desk. Restore `Status` at the end | 🔴 **traps, `Cause.ExcCode = 0x0B` (Coprocessor Unusable)** — 量(qemu) this session, the opcode sweep puts primary opcode `0x13` in the CpU set. **So the qemu run is not vacuous here: it is one of two places in this payload where the handler is exercised on a non-`Bp` exception before the device sees one** — `x-ri`'s `ExcCode = 0x0A` is the other | 留白. A base/top pair whose difference is `0x3FFF` would corroborate a 16 KiB IMEM; `0` in both would mean the window is unconfigured | **each read equal to its own prime → the destination was never written** — `F50b`'s failure, and the whole reason there are two primes; **both differing from their primes but from each other → unstable**; **both differing from their primes and equal → a value**. A trap → CP3 unreachable, see 否證 M |
+| | ⚠️ **the two-prime read is `probe2`'s rule, not caution.** `F50b` spent a seating on *"reads zero"* being indistinguishable from *"the destination was never written"*, and `rlx_call0_primed` is what separated them (量, `nowrite=0` across 256 rows) | | | |
+
+**What `m-imem` buys the rest of the payload.** The arena is generated at run
+time, so the payload can **read the windows first and place the arena outside
+them**, and record the choice in the result block. That is strictly better than
+choosing at build time and hoping.
+
+### 6.2 Group W — the I-side eviction walk
+
+**Settles ⓐ for the I side.**
+
+> **Written before the cells.**
+>
+> | | prediction | source, and its weakness |
+> |---|---|---|
+> | I-cache size | **16 KiB** | 讀 ×3, and one is a vendor doc **already in this repo**: `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 p.1 / § 2 / block diagram (*"16Kbyte I-Cache"*), already quoted at `SOURCES.json:195`; Realtek's own `arch/rlx/soc-rtl8196e/bspcpu.h`; and the third-party `rtl8196e.dtsi` (`i-cache-size = <16384>`). 🔴 **Read § 1.3 first**: that datasheet documents the `-VE1/2/3` variant, which `SOURCES.json` records this unit as **not being** (embedded DRAM by MCM vs this unit's external W9825G6KH, `MEM-01`, 量). The same claim is in the **public `RTL8196E-CG`** datasheet, a second Realtek document; family membership is 量 ×3 (`CPU-01`). **Two vendor documents about two variants of a family this die belongs to — not a reading of this die** |
+> | I line size | **16 B** | 讀 ×1, third-party only — the dtsi. 🔴 **The datasheet gives sizes and no line size**: grep for *"cache line"*, *"line size"*, *"associat"* over all 11,467 extracted lines returns only switch-MAC-table hits. And the 16 B read out of this unit's kernel is **the D side** — eight `cache` ops at stride `0x10`, and the I side of that build has no per-line op at all |
+> | associativity | 🔴 **留白 — no source of any kind, anywhere.** Not in the datasheet, not in `bspcpu.h`, not in the dtsi, not in any GPL drop. The LX4189 doc mentions *"the two set associative instruction cache"* for its `ILock` field, but that is a different core and it is not carried here | — |
+>
+> **否證 ⓐ, restated as the payload will check it.** At the smallest working set
+> — 1 KiB, smaller than any plausible cache — **every victim must come back
+> `01` STALE**. One `02` FRESH there and the walk is not measuring capacity
+> eviction: **the size number is void, not approximate.**
+>
+> 🔴 **And the positive control, which `否證 ⓐ` does not state and which
+> `CLAUDE.md` requires.** At the largest working set — 64 KiB, larger than any
+> plausible I-cache on a 4 MiB device — **most victims must come back FRESH**.
+> A walk that returns all-STALE everywhere has not proved the cache is huge; it
+> has proved it cannot evict, and *that* tool cannot fail. **Both controls are
+> checked before any boundary is reported.**
+>
+> 🔴 **The qemu column for this entire group is a constant.** 量(qemu) this
+> session: a victim executed, patched through KSEG0, re-executed reads
+> `000022b2`; patched through **KSEG1**, it also reads `000022b2`. TCG keys
+> translation-block invalidation on the **physical** address and both windows
+> unmap to the same page, so the alias buys nothing under qemu.
+> **Every W cell is FRESH under qemu at every N and every S, so there is no
+> boundary to find** — and **否證 ⓐ's negative control is *guaranteed to fail*
+> under qemu.** `R1h-1`'s harness must not assert it, or the suite goes red for
+> the right reason at the wrong time.
+
+| cell | what it does | expected under qemu | expected on the device | refuted by |
+|---|---|---|---|---|
+| **`w-line`** | in one 256 B-aligned block: execute `V0` at `+0`; then **uncached-store** NEW into **`V0`'s own patched word at `+4`** and into probe victims at `+8, +16, +24, +32, +48, +64, +96, +192`; then execute each | all FRESH (量(qemu), `smc.kseg1`) | **`+8` STALE, `+16` FRESH** → a 16-byte line. The run of STALE starting at `+8` is the fetch granularity | 🔴 **`+4` FRESH → the block is void.** `V0` was demonstrably fetched, so at any line size ≥ 4 B it MUST read STALE: it is the **must-fire** control, and without it *all FRESH* is indistinguishable from an 8-byte line, a patch that missed, and a dead re-arm. `+192` STALE → the STALE run extends past any plausible line, so this is prefetch or something else and **the line number is void**. **All FRESH (with `+4` STALE) → the line is ≤ 8 B, recorded 未定 rather than as a number** — `V0` fills `+0..+7`, so no probe lies inside its line |
+| **`w-line0`** | the same block layout in a second, distant block, with **`V0` never executed** | all FRESH | 🔴 **all FRESH.** This is the negative control: nothing was fetched, so nothing can be stale | any STALE → the patch is not landing, or the arena is contaminated, and `w-line` is void |
+| **`w-back`** | a third block with `V0` at `+136` (deliberately **not** 16 B-aligned); probes at `+112, +120, +128, +144, +152, +168` | all FRESH | 🔴 **`+128` STALE and `+144` FRESH** if the line is 16 B — i.e. the STALE set is exactly `[128,144)`, the line *containing* `+136`. **STALE extending backwards is the signature of a line fill; forward-only is prefetch**, and this cell is the only thing that separates them | STALE only forward of `+136` → `w-line`'s number is a prefetch depth, not a line size. 🔴 ⚠️ **`w-back` alone cannot separate `L = 32` from `L = 16` plus one next-line prefetch**: `+136` sits in the **lower** half of the 32 B block `[128,160)`, so both hypotheses stale exactly `[128,144+16)` and neither null fires. **`w-back2` is what separates them.** All FRESH → `L ≤ 8`, 未定 |
+| **`w-back2`** 🆕 | a fourth block with `V0` at **`+152`** — the **upper** half of a 32 B-aligned block; patch `+156` (its own word, the must-fire) and probe `+128, +136, +144, +160, +168, +176` | all FRESH | **`L = 32`** stales `[128,160)`: `+128`/`+136`/`+144` STALE, `+160`/`+168`/`+176` FRESH. **`L = 16` + one next-line prefetch** stales `[144,176)`: `+128`/`+136` FRESH, `+144`/`+160`/`+168` STALE. **The two readings are disjoint, and that is the whole cell** | any other pattern → the fill granularity is neither, and `w-line`'s number is void |
+| **`w-size`** | for W ∈ {1, 2, 4, 8, 16, 32, 64} KiB: fill the working set with victims at 32 B stride, execute all in order, uncached-patch all, execute all again, count FRESH | all FRESH at every W | **all STALE up to 16 KiB; FRESH appears at 32 KiB.** Source as above — 讀 ×3 for 16 KiB | **any FRESH at 1 KiB** → 否證 ⓐ, size void. **No FRESH at 64 KiB** → the walk cannot evict, positive control failed, size void |
+| **`w-assoc`** | 🔴 **parameters chosen at run time from `w-size`'s answer C.** For T ∈ {C/8, C/4, C/2, C} and M ∈ 1…12: M victims at stride T, execute, patch, execute. The smallest T at which a small M evicts gives the way size; K = M−1 | all FRESH | **留白 — no source.** The cell reports (T, M) and the write-up derives K | `w-size` void → `w-assoc` is not run and says so in the block. 🔴 **Two controls of its own, both free: M = 1 at every T MUST read all-STALE** (one victim cannot self-evict), **and the largest M at the smallest T MUST show FRESH.** Neither firing means (T, M) is a number with nothing behind it. **T and M are recorded as absolute byte values beside the C they were derived from**, because `w-assoc` runs on `w-size`'s *unqualified* C — if `w-imem` later differs, `w-assoc` is 未定 and its T was the scratchpad's |
+| **`w-imem`** | 🔴 `CCTL 0x020` (`IMEM0OFF`), then **`w-size` again, unchanged** | all FRESH both times | **identical to `w-size`** → **either** the arena was never in the IMEM window **or** `CCTL 0x020` did nothing. 🔴 **CP0 20 is write-only and reads zero (M4), so no cell in this payload can confirm a `CCTL` command was accepted** — *identical* is also the no-op reading. It is a pass **only** where `m-imem` returned a window and the arena is provably outside it; everywhere else it is **未定**. **If `m-imem` returned a window, one extra victim block goes INSIDE it**: that block MUST change across the `0x020` write, and without it this cell has no must-fire | 🔴 **different** → the first `w-size` was measuring the scratchpad. **That is a result, not a failure**: the difference is the IMEM geometry, and `w-imem`'s run is the I-cache one |
+
+⚠️ **`w-imem` is the one cell that writes a `CCTL` command this project had ruled
+out.** The rule was drawn because the command had **no name** (`notes/cache-model.md`:
+*"this project does not write an unnamed command to a cache controller on a
+one-device budget"*). As of § 1.2 it has one, from four sources, and it is the
+only instrument that separates a 16 KiB cache from a 16 KiB scratchpad of the
+same size. **`0x010` (`IMEM0FILL`) stays out** — it stalls the core through a
+full 16 KiB line-read burst, and nothing on this unit has issued it after the
+prompt. `IMEM0OFF` clears one valid bit; the payload ends in `rlx_reset` and the
+loader re-runs its whole reset sequence, so the restore is the reboot.
+
+⚠️ **The re-arm between every measurement point is `CCTL 0x002` (M2) plus a
+rewrite of the arena to OLD.** That is one measured instrument used many times.
+🔴 **Neither `w-line0` nor the 1 KiB control can detect a broken M2, and the
+first draft of this file said they could** — `w-line0` never fetched anything, so
+a failed invalidate leaves nothing behind; and a stale line left in place reads
+**STALE**, which is the 1 KiB control's own expected value. **The detector is
+free and it is the arming execution's own reading**: after the rewrite to OLD,
+each victim's first execution MUST return OLD, and a victim returning NEW there
+proves the invalidate did not take. **The sweep also runs ascending in W**, so a
+FRESH victim at a large point cannot contaminate a smaller one.
+
+### 6.3 Group T — the timer, and what it can and cannot buy
+
+**Settles: nothing in `R1h` by itself. It is a second, independent mechanism for
+ⓐ and ⓑ, and it is `R5-0`'s reconnaissance taken on a seating already paid for.**
+
+> **Written before the cells.**
+>
+> 🔴 **`TC0CNT`'s count field is bits 31:4, not the whole word, and every read
+> must be shifted right by 4 before it is used as a tick count.** 量, `REG-05`:
+> this unit's `TC0DATA` reads `0x0022E0A0` = `142,858 << 4`, exactly the
+> compiled-in image value, so the shift is measured on silicon rather than
+> assumed; `REG-07`'s single reading of `TC0CNT`, `0x0010B960`, is `0x0010B96` =
+> 68,502 counts. Bits 3:0 are Reserved and read zero. **A payload that subtracts
+> raw words reports ticks × 16 and a wrap 16× too late** — and every number in
+> this group would be wrong by that factor with nothing detecting it.
+>
+> **Single-access timing is impossible on this device and this is not marginal.**
+> `TC0CNT` increments at **14,286,057 Hz** — 推, from two 量 inputs and nothing
+> else: `CLK-04`'s measured tick of 100.0018 Hz × `REG-05`'s measured
+> `TC0DATA = 142,858`. One tick is **69.9983 ns**, and a DRAM access is
+> 0.43–1.43 ticks. The quantisation is the size of the quantity. **Loop-of-N
+> only.**
+>
+> 🔴 **Do not use 14.9650 MHz.** That is `CLK-08b`'s **watchdog** clock, a
+> different clock on the same die, 4.75 % away, and `CLK-08b` explicitly refuted
+> `f_timer/14` as the watchdog's rate. Using it puts a 4.75 % error into every
+> number here. 🔴 **And `SPEC.md` `CLK-02`'s name is wrong against the datasheet
+> it cites**: `CLK-02` is labelled *計時器基底時脈*, but D § 8.2.8 defines
+> *"Base clock = System_clock (Peripheral Lexra Bus)/N"* — so 200.0049 MHz is the
+> divider **input** and 14.286 MHz is the **base clock**. Whoever reads the two
+> side by side inverts a factor of 14.
+>
+> **The wrap is 142,858 ticks = 9.9998 ms, and the modulus is not a power of
+> two**, so `after − before` masked to 28 bits is wrong. `if (d < 0) d += 142858`,
+> valid for one wrap only. Every window in this payload stays under 3 ms.
+>
+> **否證 T.** `t-live` returning two equal readings kills the group. `t-cal`
+> returning 0 means TC0 stopped under the payload and every timing cell is void
+> and says so. A constant independent of the iteration count means the loop was
+> elided or the bracket is measuring only itself.
+
+| cell | what it does | expected under qemu | expected on the device (source) | refuted by |
+|---|---|---|---|---|
+| **`t-live`** | two `lw` from `0xB8003108`, both primed, **separated by a short calibrated loop of ≫ 1 tick** — back to back they may be closer than the 69.9983 ns LSB (`t-ovh` says that latency is unmeasured), and *equal* would then be the reading of a perfectly live counter | 🔴 **未定 — Malta has no timer at this address.** `R1h-1` measures what qemu returns and records it here; the harness asserts control flow only | **different values.** 量 `REG-09` (`TC0En=1`, `TC0Mode=1`) + `CLK-04` (the tick advances, which requires counting) | equal **on the separated pair** → frozen register, group void. ⚠️ **Equal on a back-to-back pair is not a refutation and does not void the group.** Second < first without a wrap → the read disturbs it (the `PSRP` bit 8 read-to-clear precedent, 量 `NET-11`) |
+| **`t-ovh`** | K back-to-back reads for **K = 1, 100, 1000, 4000**; regress. K = 1 and K = 2 differ by less than the 1-tick LSB and carry no leverage — a two-point fit plus noise | 未定 | 留白 — **no file in this repo contains a measurement of an uncached KSEG1 register-read latency.** Slope = cost per read in ticks; intercept = bracket overhead | **the K = 4000 reading failing to scale when K doubles** → the bracket is measuring itself. ⚠️ **A slope of exactly 0 cannot occur under tick quantisation and is therefore not a refutation** — the first draft of this row named it as one, which is a condition that cannot fire |
+| **`t-cal`** | bracket the existing 3-instruction loop at **two** counts, **140,800 and 70,400** — 否證 T's *constant independent of the iteration count* limb cannot be evaluated at one point, and **the ratio is what separates *the loop was elided* from *TC0 stopped***, both of which report ≈ 0 at a single count. That is `probe1`'s `GEOM` defect exactly: one number, two reasons | 未定 | **14,286 ticks.** 算 from 量 `CLK-03` (`f/CPI = 1.408e8` iter/s, n=1, `bench/2026-08-25/H1b.timing`) × 14,286,057 Hz. 10.0 % of the wrap — no wrap, comfortable | 0 → TC0 stopped under the payload. ~2× or ~0.5× → **CPI is not 3, and this cell has just separated what `CLK-03` could not** (400 MHz × 6 cycles vs 200 MHz × 3) |
+| **`t-hit`** | 🔴 **a 4 KiB working set — half the predicted D-cache — traversed 32 times at 16 B stride**, once through KSEG0 and once through KSEG1, each bracketed, with **one warming pass discarded**. **The iteration count carries N, the footprint does not**: after the warming pass every cached access is a hit, so the KSEG0 leg measures **residency** rather than miss latency. ⚠️ **A single sweep of a working set larger than the cache measures miss latency in both windows and is not a residency instrument** — 4096 loads at 32 B stride would touch 128 KiB once, i.e. 4,096 compulsory misses, and *equal* would then be the expected reading on correct silicon | 未定 | 留白. 推: the uncached loop is several times the cached one. N=4096 gives 1,760–5,850 ticks of signal against a 1-tick LSB | equal → either the timer is not counting (contradicts `t-cal`) or KSEG0 is not cached, which would refute M1 by a route with no cache cell in it |
+
+🔴 **What `t-hit` is really for, and it is the sharpest thing in this payload.**
+Cell `c-A`'s negative reading is a **disjunction**: *no read-allocate*, *the
+alias is snooped*, or *the line was evicted*. Eviction is excluded by the
+two-victims-far-apart trick. **The remaining two are not separable by any
+experiment that observes only through the alias** — see § 6.5. A *timing* signal
+observes residency without going through the alias at all, so it is the only
+route on this device that could split them. `t-hit` at 70 ns resolution over
+4096 iterations is a coarse version of that route, and whether it is good enough
+is exactly what `t-ovh` decides.
+
+### 6.4 Group H — the handler, and Group X — the `cache` instruction
+
+**Settles ⓒ, and gives `CPU-04` its first capability measurement.**
+
+> **Written before the cells.**
+>
+> 🔴 **qemu cannot answer ⓒ in either direction, and its answer will look like a
+> confirmation.** 量(qemu) this session: `cache 0x10`, `0x11`, `0x15`, `0x19`,
+> `0x1b` all retire with `n=0`, and so do **all 32 values of the op field**,
+> including ones MIPS32 leaves undefined. **qemu does not decode the op field at
+> all.** If the device also retires, the qemu run will read as agreement and will
+> be nothing of the kind.
+>
+> **The MIPS32 encoding and the Lexra names coincide on four of five** (讀(ext)
+> for the MIPS32 side, 讀 `cache-rlx.c` for the Lexra side): `0x10` = Hit
+> Invalidate I = `IInval`; `0x11` = Hit Invalidate D = `DInval`; `0x15` = Hit
+> Writeback Invalidate D = `DWBInval`; `0x19` = Hit Writeback D = `DWB`.
+> 🔴 **`0x1b` does not**: MIPS32 decodes it as Hit Writeback **Secondary**, and
+> Lexra calls it `DWB_IInval`, a composite MIPS32 has no encoding for. It is also
+> the one op with **zero occurrences** in this unit's kernel, so the binary cannot
+> adjudicate it. **`0x1b` is not in this payload** — issuing a secondary-cache op
+> on a part with no secondary cache is a cell whose refutation condition cannot be
+> written honestly today.
+>
+> **否證 ⓒ, from `PROGRESS.md`, and the payload obeys it literally:** a `cache`
+> instruction that neither retires nor traps — the payload hangs — refutes the
+> handler, not the instruction. **`probe3` writes each cell result to the block
+> BEFORE issuing the instruction**, exactly as `probe1` does.
+
+| cell | what it does | expected under qemu (source) | expected on the device (source) | refuted by |
+|---|---|---|---|---|
+| **`h-brk`** | re-run `probe2`'s `break` control after installing and reading back the handler | `count=1`, `cause` ExcCode 9 — **only with `CLEAR_BEV=1` and `RET_ERET=1`**, because qemu enters with `Status.BEV=1` (量(qemu), `status.entry=00400000`) | `count=1`, `cause=00000024`. 量 `bench/2026-08-25b/H2a.log` | `count=0` → the handler did not take and **every X and M cell is void**. This is the gate for the whole group |
+| **`x-ri`** | execute `0x0000000E` (SPECIAL, function `0x0E`) | 🔴 **traps, `ExcCode = 0x0A`.** 量(qemu) this session, two runs | 🔴 **留白, and the honesty is the point: no Lexra ISA document exists in this repository, so no encoding can be shown reserved on this core.** `refs/README.md` lists two Realtek datasheets and nothing else, and the RTL8196E one says *"Supports MIPS-1 ISA, MIPS16 ISA"* — MIPS16 needs `JALX` at opcode `0x1D`, so *"MIPS-I, therefore reserved"* is not a safe blanket. 量: **zero occurrences in `stage2.bin`**, with the scanner control being the two `rfe`s it does find | it **retires** → this core implements something there. That is a finding, and it leaves the RI path unproven — but **`h-brk` alone already licenses `x-11`**, because the handler branches on nothing (M3′) |
+| | ⚠️ **Do not use `rfe` (`0x42000010`) as the RI control.** It is RI on qemu (量) and a **valid instruction on this core** — `exc.S` builds the device return path on it and `stage2.bin` contains two. It is the **inverse** control: it must retire on the device and trap on qemu | | | |
+| | ⚠️ 量(qemu): the obvious picks do **not** trap — `0x78000000` (opcode `0x1E`), `0x00000005`, `0x70000000`, `0x7C000000` all retire, and `mfc2` gives RI rather than CpU. Anyone choosing a reserved-*looking* encoding from a table would have chosen one of these | | | |
+| **`x-11`** | write the row, then execute **one** `cache 0x11, 0(base)` with `base` pointing at a `probe3`-owned scratch word; read `exc_rec[0]`, `Cause`, `EPC`, and the scratch word and its two neighbours, before and after | **retires, `n=0`** (量(qemu)). **Vacuous** | 留白 — the disjunction is the answer. 讀: this unit's kernel holds **37** D-side `cache` ops at `0x8000CA40`–`0x8000CD4C`, so the build believes they execute; *"in the binary"* is not *"executes"* | **the scratch word or a neighbour changed** → `0x2F` decodes as something else on this core, and the cell is void for ⓒ but is itself a finding. `Cause.BD` set → M3″, the instruction was in a delay slot, cell void |
+| **`x-10`** | the same for `cache 0x10, 0(base)`, then a **functional leg that re-establishes its own baseline here**: execute two victims in one **fresh** block, patch both, treat **one** with `cache 0x10`, execute both. 🔴 **The untreated twin MUST still read STALE.** Without it, *the victim went FRESH* names six intervening stages of `CCTL 0x002`/`0x020`/`0x100`/`0x200`/`0x001` as readily as it names `cache 0x10` | retires, `n=0`. Vacuous | 留白. 讀: **zero** I-side ops in the whole kernel image, which is the shape `cache-rlx.c` produces for its RLX4181/5181 half | see `x-11`. If it retires but the victim stays STALE, it is implemented as a no-op — a third outcome neither `PROGRESS.md` nor `SPEC.md` had a slot for |
+| **`x-15`, `x-19`** | conditional: **run only if `x-11` retired**, same protocol | retire | 留白 | **see `x-11`**: the scratch word or a neighbour changed → the op decodes as something else; `Cause.BD` set → M3″, cell void. ⚠️ **Gating on `x-11` answers ⓒ for one op and reports it for a family** — qemu does not decode the op field at all, so *uniform decoding* is precisely the assumption not to make |
+
+🔴 **What `x-10` does and does not say about `CPU-04`.** `cache-rlx.c` gives the
+D-side ops to RLX4181/5181/4281/5281 and the I-side ops to **4281/5281 only**;
+this unit's kernel has zero I-side ops. So `x-10`'s outcome is a **capability**
+measurement on silicon, and it is the first one this project will have. **It
+still does not name the core.** `PRId = 0x0000CD01` is 量 and unmapped; the split
+in `cache-rlx.c` is the *build's* belief about its own silicon. `CLAUDE.md`'s ban
+stands and this cell does not lift it — see § 8.
+
+### 6.5 Group C — coherence
+
+**Settles ⓑ and ⓓ①.** The mechanism is the KSEG0/KSEG1 alias standing in for a
+bus master, and **the proxy is a model, not the thing.**
+
+> **Written before the cells.**
+>
+> | | prediction | source, and the vote on the other side |
+> |---|---|---|
+> | `c-E`: write-through or write-back | **write-back** — the cached store is held and the uncached read-back returns the OLD value | 讀 ×1: **both** GPL drops carry `CONFIG_ARCH_CACHE_WBC=y` in all five `boards/rtl8196e` variants. ⚠️ **One vote, not two** — the drops share an ancestor. 🔴 **And `probe1`'s six cells are consistent with write-through**: all six stores landed on lines the D-cache did not hold, where write-through and write-back-without-write-allocate give the identical reading. This is a genuine 50/50 with one source on each side |
+> | `c-A`: is there a stale line | 🔴 **留白.** Nothing in any source speaks to read-allocation on this core | — |
+> | `c-F`: does `CCTL 0x100` invalidate | **no** — `DWB` writes back and does not invalidate, so a stale line survives it | 讀 ×2: `cache-rlx.c`'s encoding table (`0x100 = DWB`) and `rlxregs.h:635` (`CCTL_DWB`). ⚠️ **Same SDK ancestor — one vote.** This unit's kernel issues it at `0x8000CA94`/`0x8000CAC0`; **its loader never does**, and **no source in this repository has ever recorded its effect** |
+> | `c-B`: does `CCTL 0x200` invalidate | **yes** | 讀 ×2 (`DWB_Inval`), and this unit's loader issues it at `0x804066CC` |
+> | `c-C`: does `CCTL 0x001` invalidate | **yes** | 讀 ×2 (`DInval`); this unit's kernel issues it at `0x8000CA24`, **its loader never does** |
+>
+> 🔴 **`c-E` is `c-A`'s positive control in only one of the two branches.**
+> `docs/rlx-cache-and-cp0.md` § ② carries this in its narrowed form and owns it;
+> **`PROGRESS.md`'s 否證 ⓑ still states it unconditionally and is the copy to
+> fix.** What `probe3` adds is the cell that decides which branch obtains. If `c-E` shows a held
+> store, the line was **resident**, so read-allocate is real and `c-A`'s *fresh*
+> cannot mean *no read-allocate* — it means snooped (eviction being excluded by
+> the far-apart pair). **If `c-E` shows write-through, it proves nothing about
+> residency**, and `c-A`'s *fresh* stays a two-way disjunction. § ② claims E makes
+> A interpretable full stop; that holds in the write-back branch only, and the
+> write-up must not repeat the unconditional form.
+>
+> 🔴 **And in the write-through branch the two survivors are not separable from
+> here at all.** *No read-allocate* and *the alias is snooped* differ only for a
+> **real** bus master; every observation this payload can take goes through the
+> alias. **For `R6`'s purpose they are equivalent** — under both, a cached read
+> after a device write returns fresh data — *provided* a real DMA write looks like
+> an uncached CPU store from the cache's side, which is the proxy assumption and
+> cannot be tested without the engine. **`R6` re-tests it with the real engine
+> before relying on it, and this file says so rather than letting the equivalence
+> pass as a proof.** `t-hit` is the one instrument here that does not go through
+> the alias.
+>
+> 🔴 **The qemu column for this whole group collapses to one reading.** 量(qemu)
+> this session: TCG models no D-cache; `alias.load2` returns the **second** value
+> (no stale line) and `alias.cellE` is **immediately visible** (no dirty line);
+> `mfc0`/`mtc0 $20` retire with no effect; `cache 0x11`/`0x15` are no-ops.
+> **A = A′ = B = C = D = E under qemu.** 否證 ⓑ is *inapplicable* under qemu, not
+> merely unmet.
+
+All cells use two targets in the arena, `probe1`'s trick against eviction, and a
+guard word beside each. 🔴 **The separation is stated in the payload and is
+deliberately not a power of two.** *Far apart* defeats **line sharing**; it does
+not defeat **set conflict**, which happens at multiples of (cache size / ways) —
+and both of those are exactly what Group V is there to measure, with
+associativity 留白. **`c-A` therefore runs at two different separations**, so an
+eviction artefact shows up as a disagreement between them rather than as a
+negative result that would void Group C and Group V together.
+
+| cell | what it does | expected under qemu | expected on the device | refuted by |
+|---|---|---|---|---|
+| **`c-E`** ⓓ① | uncached-store `P0`; **cached-load** X (this is the allocate); **cached-store** `P1` — a write **hit** on a resident line, the case no `probe1` cell exercised; **uncached-load** X | `P1` — "immediately visible", i.e. it always looks write-through (量(qemu)) | **`P0`** → write-back, the store is dirty in the D-cache | **`P1`** → write-through **or** the cached load never allocated (no read-allocate, so the cached store was a write **miss**) **or** the uncached load snoops. 🔴 **`P1` means write-through only if `c-A` established read-allocate positively** — write-through and write-back-without-write-allocate are exactly the pair ⓓ① exists to separate, and on a miss they give the identical reading. Otherwise `c-E` is recorded `void — residency not established`, and `CONFIG_ARCH_CACHE_WBC=y` is not refuted from a void |
+| **`c-E0`** 🆕 | 🔴 **the write-buffer control, and it runs before `c-E2`.** After `c-E` returned `P0`: N uncached reads of an unrelated address, then **uncached-load X again with no `CCTL` issued** | `P1` | **`P0`** → the line is genuinely dirty, and only now can `c-E2` attribute a change to `CCTL 0x100` | **`P1`** → `c-E`'s `P0` was a **posted cached store the uncached load overtook**, not a dirty line. The write-policy verdict is void and `c-E2` does not run — after a `DWB` and a second load the buffer has drained under both hypotheses, so **`c-E2` alone is a cell that cannot fail** |
+| **`c-E2`** | then `CCTL 0x100` (`DWB`), then uncached-load X again | `P1` (unchanged) | **`P1`** if `c-E` read `P0` → the line *was* dirty, and `CCTL 0x100`'s effect is measured for the first time anywhere | still `P0` → `0x100` does not write back, and its name is wrong on this die |
+| **`c-A0`** | 🔴 **the negative control, and it runs first.** uncached-store `P0`; **no load**; uncached-store `P1`; cached-load X | `P1` | **`P1`** | `P0` → something else is stale and **every cell in this group is void** |
+| **`c-A`** ⓑ | uncached-store `P0`; cached-load X (→ `l1`); uncached-store `P1` — the stand-in for the engine; cached-load X (→ `l2`); uncached-load X | `l2 = P1` (量(qemu), `alias.load2=aaaa0002`) | 留白. **`l2 = P0`** → a stale line exists: **the DMA-stale case reproduced with no DMA engine.** `l2 = P1` → no stale line, and the disjunction above applies | `l1 ≠ P0` → the first store did not land; the final uncached load ≠ `P1` → the second did not. Either voids the cell before its verdict is read |
+| **`c-F`** | `c-A` with `CCTL 0x100` between the store and the second load | `l2 = P1` | **`l2 = P0`** — a write-back does not invalidate, so the stale line survives | `l2 = P1` → `0x100` invalidates too, and **`c-C` loses its safety precondition** (below) |
+| **`c-B`** | `c-A` with `CCTL 0x200` | `l2 = P1` | **`l2 = P1`** — `DWB_Inval` invalidates | `l2 = P0` → `0x200` does not invalidate a clean line, and ⓑ's shortlist loses its best candidate |
+| **`c-C`** | `c-A` with `CCTL 0x001` | `l2 = P1` | **`l2 = P1`** | `l2 = P0` |
+| **`c-D`** | `c-A` with one `cache 0x11` over the line. **Conditional on `x-11` retiring** | `l2 = P1` (the op is a no-op) | **`l2 = P1`** if `x-11` retired and `0x11` really is `DInval` | `l2 = P0` → it retires and does nothing, which is `x-10`'s third outcome on the D side |
+
+🔴 **`c-B` and `c-C` are unfalsifiable if `c-A` is negative, and the payload must
+say so rather than report a pass.** With no stale line to invalidate, every
+treatment returns `l2 = P1` whether it works or not. **If `c-A` reads `l2 = P1`,
+the payload writes `c-B`/`c-C`/`c-D`/`c-F` into the block as `void — no stale
+line to act on`, and `c-E`/`c-E0`/`c-E2` as `void — residency not established`,
+and reports no verdict for any of them.** 🔴 **The dependency runs both ways and
+the first draft of this file had it one-way**: `c-E` assumes its own step 2
+allocated, and that is exactly what `c-A` measures. A cell that returns the right
+answer for the wrong reason is exactly what `R1g-1` pre-registered against.
+
+🔴 **A safety note that is also a measurement.** `CCTL 0x001` (`DInval`)
+invalidates the **whole** D-cache **without writing back**, so any dirty line the
+payload owns is lost — including its own stack, if `c-E` came back write-back.
+🔴 **The mitigation has to be INSIDE `c-C`'s own leaf routine, and the version
+of this paragraph that said otherwise would have cost the power cycle.**
+`rlx_call2_uncached` spills `$31` onto a **KSEG0** stack (讀, `cache.S:363-365`
+— `addiu $29,$29,-8 / sw $31,0($29)`; `start.S:21-24` and `rlxprobe.lds:83-87`
+put `_stack_top` past `.bss`). Under the write-back branch that spill is a dirty
+line; `DInval` discards it **without writeback**; the epilogue's `lw $31,0($29)`
+then reads pre-writeback DRAM and `jr $31` goes to a wild address — the loader's
+permanent hang, with no handler that can help.
+
+**So: `CCTL 0x100` (`DWB`) and `CCTL 0x001` (`DInval`) are two consecutive
+`mtc0`s inside one leaf routine** — no call, no return, no result-block write
+between them — with `$31` held in a register across both, entered through KSEG1,
+register-only, no stack reference at all.
+
+🔴 **`c-F` is NOT that mitigation.** It is a separate cell and `c-B` runs between
+it and `c-C` (§ 7 stage 6), so every frame pushed after `c-F` is dirty again by
+the time `c-C` fires. What `c-F` *is*, is the measurement of whether `0x100`
+writes back at all — **and if it reports that it does not, `c-C` does not run.**
+
+### 6.6 Group V — the D-side eviction walk, armed at run time
+
+**Settles ⓐ for the D side — the half that carries the prediction.**
+
+> **Written before the cells.**
+>
+> | | prediction | source, and its strength |
+> |---|---|---|
+> | D-cache size | **8 KiB** | 讀 ×3, and they do not share an ancestor on this point: `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 / § 2 / block diagram (*"8Kbyte D-Cache"*) — ⚠️ **§ 1.3**, a variant this unit is recorded as not being, corroborated by the public `-CG` datasheet; **this unit's own kernel** — `sltiu … 0x4000` at `0x8000CAAC`/`0x8000CBE0`/`0x8000CCD4` and `sltiu … 0x2001` at `0x8000CA18`, read through `cache-rlx.c` as `cpu_dcache_size` and `× 2`; the third-party dtsi |
+> | D line size | **16 B** | 🔴 **the strongest of the three, and it needs no source to interpret it**: eight `cache` ops at stride `0x10` covering exactly 128 bytes in this unit's own kernel *is* a line-size assumption whatever any document says |
+> | associativity | 🔴 **留白 — no source of any kind** | — |
+>
+> ⚠️ **All of it is what a build and a draft datasheet *believe* about this
+> silicon.** It is a prediction with a refutation condition, and it is only worth
+> writing because it is written before the walk.
+>
+> 🔴 **Group V is armed by `c-A`.** Its observation channel — *an uncached write
+> is invisible to a resident clean line* — **is** `c-A`'s positive reading. If
+> `c-A` is negative, every V cell returns FRESH at every size, which is
+> indistinguishable from *there is no D-cache*. **The payload checks `c-A` and,
+> if it is negative, writes Group V into the block as `void — c-A negative`, with
+> the reason, and does not run it.** That is the self-gating the whole running
+> order is built around.
+>
+> **否證 ⓐ (D side)** is `w-size`'s, restated: every target STALE at the smallest
+> working set, most FRESH at the largest, or the size is void rather than
+> approximate.
+
+| cell | what it does | expected under qemu | expected on the device | refuted by |
+|---|---|---|---|---|
+| **`v-line`** | cached-load the word at `+0`; **uncached-store** NEW at `+0` itself **and** at `+4, +8, +12, +16, +20, +24, +32, +64`; cached-load each | all FRESH — no D-cache modelled (量(qemu)) | **`+4, +8, +12` STALE; `+16` FRESH** → a 16-byte line. 🔴 **4-byte resolution — finer than the I side**, because a data word is 4 bytes and a victim function is 8 | 🔴 **`+0` FRESH → the block is void**: `+0` was demonstrably loaded, so it MUST read STALE — the must-fire, and Group V runs only when `c-A` was positive, so the control is already licensed. `+64` STALE → the STALE run exceeds any plausible line and the number is void |
+| **`v-size`** | for W ∈ {1, 2, 4, 8, 16, 32} KiB, **one target per 16 B — `v-line`'s predicted line, and re-derived from `v-line`'s *measured* value before the sweep runs if it differs**: cached-load the whole set, uncached-store NEW over all of it, cached-load again, count FRESH | all FRESH | **all STALE up to 8 KiB; FRESH appears at 16 KiB** | any FRESH at 1 KiB, or no FRESH at 32 KiB — same two controls as `w-size` |
+| **`v-assoc`** | as `w-assoc`, parameters from `v-size` | all FRESH | 留白 | `v-size` void |
+| **`v-dmem`** | 🔴 **placement, not a treatment.** The D-side arena is chosen at run time to sit **outside** the `DMEMBASE`/`DMEMTOP` window `m-imem` read | — | — | if `m-imem` trapped, the window is unknown and every V number carries the D-MEM residual explicitly. **There is no `DMEM0OFF` cell**: `0x800` has one source and this payload does not write a command on one source |
+
+### 6.7 Group S — is `Status.IsC` implemented as a bit
+
+**Settles ⓓ②.** `SPEC.md` `CPU-19` 殘留 named `probe2` as the experiment; `probe2`
+contains **no `mtc0` to CP0 12 anywhere**, by its own audit requirement — so that
+experiment ran and did not include this. It is re-pointed here.
+
+> **Written before the cells.** 🔴 **留白 — there is no source for the expected
+> value and the honest prediction is a disjunction.** `c-r3k.c` uses `IsC`, but
+> this SoC builds `arch/rlx/`, whose `cache-rlx.c` uses `CCTL` instead, so the
+> vendor's own usage is weak evidence at best.
+>
+> **否證 S.** What is 量 already is **behaviour**: stores issued while `IsC` was
+> set reached DRAM (`probe1` cell 4, `07` CORRUPT ×2). This cell reads the
+> **bit**. The two are different claims and the write-up may not merge them.
+
+| cell | what it does | expected under qemu | expected on the device | refuted by |
+|---|---|---|---|---|
+| **`s-isc`** | entered through KSEG1: read `Status`, `ori 0x00010000` **together with one control bit that has no defined meaning in either the R3000 or the MIPS32 `Status` map — 🔴 留白, `R1h-1` names it with its source before the seating, and it may not be `SwC` (bit 17)** — write, three `nop`, **read back**, restore, three `nop`. 🔴 **No load and no store between set and clear** — M5 | 未定. On a 24Kf bit 16 is in the MIPS32 *Impl* field and whether qemu preserves it is unmeasured. **`R1h-1` measures it and records it here before the seating** | 留白. **bit 16 set and the control bit clear** → bit 16 is decoded and non-functional (M5). 🔴 **Both set** → `Status` has no write mask at all, *bit 16 sticks* carries no information, and the cell reports **未定** — without the control bit, *storage* and *a decoded `IsC`* are the same reading. **Bit 16 clear** → not implemented, and cell 4's CORRUPT is fully explained | the restore not returning `Status` to its entry value → the cell has changed machine state it does not own, and everything after it is suspect |
+
+🔴 **`SwC` is not in this payload, and the reason is specific.** `SwC` swaps the
+I and D caches, and **what instruction fetch does while they are swapped is the
+one thing this core has no documentation for** — `cache.S` already flags it. On a
+core measured **not** to honour `IsC`, R3000 semantics cannot be used to argue
+`SwC` is safe. ⓓ② closes on `IsC` alone and says so.
+
+---
+
+## 7. Running order, and what survives a fault at each point
+
+**Risk order, not numeric order** — `probe1`'s rule, and `RUNSHEET.md:974`
+already warns that a reader who assumes otherwise misreads every row. **Every
+cell writes its result to the block before the next one starts**, and word 2 is
+`probe2`'s monotone progress marker, so a block recovered after a hang says
+where the run stopped instead of leaving it to be inferred from what is missing.
+
+| # | stage | progress | what is new here | what a fault costs |
+|--:|---|---|---|---|
+| 0 | poison the result block; **initialise the arena**; header; banner; `pc`/`rb`/`flags` stale-build checks | `0x10` | nothing — `probe1`'s opening, plus the arena (M7) | everything, and the block reads poisoned, which is a different observation from the previous run's data |
+| 1 | 🔴 **Group H** — install the handler, read all 44 words back through KSEG1, `h-brk` | `0x20` | nothing — `probe2`'s, measured end to end | 🔴 **the gate, and it moved to the front for a reason.** It used to be stage 4, which left stages 1–3 — including the `CCTL 0x020` write, the first command this project issues that its own loader does not issue after reset — running with **no handler installed**, where any fault reaches the loader's permanent hang. It costs nothing new — it is `probe2`'s, measured — so there is no reason for it to run second. `h-brk` failing voids Groups M and X, and they do not run |
+| 2 | **Group T** — `t-live`, `t-ovh`, `t-cal`, `t-hit` | `0x30` | one `lw` from a documented read-only SoC register | the timing group only. Placed first because it is the cheapest thing in the payload and, if it works, everything after it *could* carry timing |
+| 3 | **Group W** — `w-line0`, `w-line`, `w-back`, `w-back2`, `w-size`, `w-assoc` | `0x40` | nothing: uncached stores, cached fetches, `CCTL 0x002`. **Every instruction here has already executed on this silicon** | ⓐ's I side |
+| 4 | **`w-imem`** — `CCTL 0x020`, then `w-size` again | `0x50` | 🔴 the first `CCTL` command this project has written that its own loader does not issue **after** reset. Named by four sources (§ 1.2); the main W reading is already in the block | the IMEM discriminator only |
+| 5 | **Group M** — `m-cu3`, `m-imem` | `0x60` | `mtc0` to CP0 12 (`CU3`, restored immediately) and `mfc3`. **A trap here is an expected outcome, not a failure** | the scratchpad windows; every geometry number then carries the I-MEM residual explicitly |
+| 6 | **Group C** — `c-A0`, `c-A`, `c-E`, `c-E0`, `c-E2`, `c-F`, `c-B`, `c-C` | `0x70` | `CCTL 0x100` is new from our side; `0x001` is new from our side; both are named and both are issued by this unit's own kernel | ⓑ and ⓓ① |
+| 7 | **Group V** — armed iff `c-A` showed a stale line, and placed outside the D-MEM window | `0x80` | nothing beyond Group C | ⓐ's D side |
+| 8 | **Group X** — `x-ri`, `x-11`, `c-D`, `x-10` and its functional leg, then `x-15`/`x-19` if `x-11` retired | `0x90` | 🔴 **the first `cache` instruction this project has ever executed.** Everything else is already in the block | ⓒ, and nothing before it |
+| 9 | **Group S** — `s-isc` | `0xA0` | `mtc0` to CP0 12 setting a bit measured **not** to work | ⓓ②, and it is last because it has the least source support of anything here |
+| 10 | restore both vectors, read back, seal, `rlx_reset` | `0xB0` | `probe2`'s | — |
+
+**Why `c-A0` runs before `c-A`.** It is the negative control; if it fails, `c-A`
+was never worth running and the seating learns that in two loads instead of
+after a whole group.
+
+**Why Group T is first and Group S is last.** T is four loads from an address the
+loader itself reads; S writes a `Status` bit with no documentary support on a
+core already measured to mishandle it. Between those two poles the order is
+"how many instructions has this silicon already executed?"
+
+**Why `w-imem` is stage 3 and not stage 2.5.** The unqualified `w-size` reading
+must be in the block before anything touches the scratchpad state, so that a
+fault during `w-imem` costs the discriminator and not the walk.
+
+---
+
+## 8. What is deliberately not in this payload
+
+| | why |
+|---|---|
+| 🔴 **`CCTL 0x010` (`IMEM0FILL`)** | it stalls the core through a full 16 KiB line-read burst from a BASE/TOP pair this payload did not program and may not have read. **`0x020` alone gets the discriminator; `0x010` only gets the state back**, and the payload ends in `rlx_reset`, so the loader's own reset sequence is the restore |
+| **`CCTL 0x400`/`0x800` (`DMEM0ON`/`DMEM0OFF`)** | one source (`rlxregs.h`), absent from the LX4189 map entirely. **A register value does not enter code on one source.** The D-MEM is avoided by placement (`v-dmem`), not by command |
+| **`CCTL 0x040`/`0x080`** | the sources **contradict each other** on bits 6–7: the LX4189 doc says `IROMOn`/`IROMOff`, Realtek's `rlxregs.h` says `IMEM0ON` and has nothing at bit 7, and hackpascal's header defines `ILock` as `0xc0`, colliding with its own `IROM0ON`/`IROM0OFF`. Undetermined is the honest state |
+| **`cache 0x1b`** | the one op where the Lexra name (`DWB_IInval`) and the MIPS32 encoding (Hit Writeback **Secondary**) contradict, and the one with **zero** occurrences in this unit's kernel — so the binary cannot adjudicate it. A refutation condition for it cannot be written honestly today |
+| **`Status.SwC`** | § 6.7 |
+| **`rlx_r3k_size` / `GEOM=1`** | 量 dead: the algorithm needs isolation and `CPU-35` measured this core does not isolate, so it can only return `0` — which is also its *"the core does not answer"* value |
+| **`rlx_isc_inv`** | 量: its byte stores reached DRAM and corrupted both victims (`probe1` cell 4) |
+| **writing `TC1DATA`/`TCCNR`** to get an 18.79 s counter instead of a 10 ms one | it would be strictly better as an instrument, but it is a **register write** where every window in this payload already fits inside 3 ms of a 9.9998 ms wrap. Recorded as the upgrade path for `R5-0`, declined here |
+| **flash** | zero bytes. `P0` is read before the `put` and the seating stops on anything but `00000000` |
+
+---
+
+## 9. What makes the whole table void
+
+| if | then |
+|---|---|
+| `P0` ≠ `00000000` | **nothing is uploaded.** The seating ends before it starts |
+| `P1` shows an unchanged `TC0CNT` | Group T does not ship; everything else is unaffected |
+| `P2` shows structure in the arena | **the arena moves** and `P2` is re-run. `MEM-14` is the standing proof that *"nothing has read it"* is not *"nothing writes it"* |
+| `P3` refuses a 4-digit length | the read-back stays ≤ 999 words; § 4's encoding is the only one that fits and there is no fallback to rows |
+| the 1 KiB working set shows any FRESH | 否證 ⓐ. **The size is void, not approximate.** Do not round to the nearest plausible value — that is how a build constant is laundered into a measurement |
+| the 64 KiB working set shows no FRESH | the walk cannot evict. The size is void the other way, and the tool could not have failed |
+| `w-imem` differs from `w-size` | **the unqualified walk measured the scratchpad.** The `w-imem` run is the I-cache one; the difference is the I-MEM geometry, and both go in the write-up |
+| `m-imem` traps and `w-imem` also cannot be run | ⓐ's I-side numbers are recorded **with the I-MEM residual attached to every one of them**, and the 16 KiB coincidence is stated in the same sentence |
+| `h-brk` returns `count = 0` | Groups M and X do not run. The handler is not installed and a `cache` trap would reach the loader's permanent hang |
+| `c-A0` returns `P0` | Group C is void and so is Group V |
+| `c-A` returns `l2 = P1` | Group V is void with its reason in the block; `c-B`/`c-C`/`c-D`/`c-F` are recorded `void — no stale line to act on`, **not** as passes |
+| the walk returns a size that is not a power of two | record **未定** rather than the number. A non-power-of-two is the walk measuring something else |
+| 🔴 **a `CCTL` command was never decoded** | **no cell in this payload can confirm one was accepted.** CP0 20 is write-only and reads zero (M4), so any cell whose *pass* equals the no-op reading — `w-imem`'s *identical*, `c-F`'s `P0` — reports **未定**, not a verdict |
+| a victim's guard word ≠ `03e00008`, or `OLD == NEW` for any victim | that victim can never read STALE or FRESH. The block is void **and names which victims** |
+| any two of `P2`'s four windows read byte-identical | a stuck read path. Nothing else in `P2`'s list catches it, because bias garbage is *supposed* to look like structure |
+| the D-side arena's relation to `DMEMBASE`/`DMEMTOP` is unknown | every Group V number carries the D-MEM residual — 🔴 **and the 8 KiB D-MEM is exactly the size of the predicted 8 KiB D-cache, the same coincidence as the I side**, stated in the same sentence as the number |
+| two seatings and `c-A` still cannot be made to hold | `CPU-45` is **未定** and **`R6` carries the conservative cost**: rings *and* payload buffers in the uncached window, which is what the vendor's own driver does. The throughput number in `R6`'s DoD is then measured against that and compared with nothing |
+
+---
+
+## 10. What `R1h-1` has to build, and where it will be wrong
+
+**Build-system work, all of it hard-coded per payload today (讀):**
+`Makefile:87-89` needs `ISC_probe3 := 0`; `:95` `PAYLOADS += probe3`; `:138-140`
+`SRC_probe3`; `:153-155` `RB_WORDS_probe3`. `tools/test-rlxprobe.sh:538` and
+`:594` each carry their own `for p in probe1 probe2` list. `RESULT_BASE` defaults
+to `0x80A00000` (`Makefile:54`) and **`probe3` must be given `0x80A02000`
+explicitly** — and § H1's standing warning applies: **`make` does not rebuild
+when a knob changes, and `make show` prints the knob you asked for beside the
+binary you already had.** Empty the build directory before every line and treat
+`Nothing to be done` as a hard stop.
+
+**One mutation per cell, and the mutation must make that cell's check fire.**
+Three of them are worth naming now:
+
+1. 🔴 **Substitute `0x0000000E` for `x-11`'s `cache 0x11`.** Under qemu that
+   traps (量), which proves the *"write the cell result **before** issuing the
+   instruction"* discipline actually holds — without spending a device fault to
+   find out. This is 否證 ⓒ made testable at the desk.
+2. **Break the arena's `CCTL 0x002` re-arm.** 🔴 **This mutation has no qemu
+   leg** — every W cell is FRESH under qemu unmutated (§ 6.2), so the predicted
+   effect equals the baseline and the mutation cannot fail on the only harness it
+   runs on. It is asserted instead against **the arming execution's own reading**
+   (§ 6.2): a victim returning NEW where memory was just rewritten to OLD, which
+   the harness checks in the emitted block on both machines.
+3. **Emit the bitmap without its index field.** The harness must notice; a
+   truncated capture is otherwise unrecoverable and looks complete.
+
+🔴 **Where `R1h-1` will be wrong, written now.**
+
+- **qemu will disagree with the device and that is the expected case.** Every W
+  cell is FRESH under qemu, every C cell reads the same value, every `cache` op
+  retires. **A qemu run that produces a boundary, a stale line, or a trap on a
+  `cache` op means the harness is broken, not that qemu found something.**
+- 🔴 **否證 ⓐ's negative control is guaranteed to fail under qemu.** The harness
+  must not assert it there. Assert it only against a device capture.
+- 🔴 **The qemu expectations for `m-cu3`, `s-isc` and the whole of Group T are
+  未定 today.** `R1h-1` measures them under qemu and writes the numbers into this
+  file **before** the seating. A cell whose qemu column is still 未定 at seating
+  time has no control on its own emitter.
+- 🔴 **No qemu serial capture is committed anywhere in this repository.**
+  `grep -rln "rlxprobe: cell" bench/` returns nothing; `qemu-run.sh` writes to a
+  `mktemp -d`. Every *"expected under qemu"* value in this file that came from a
+  prior run survives as prose plus one CI assertion. **`R1h-1` commits the qemu
+  log beside the device log**, or this column has no artefact behind it.
+- **The victim primitive changed shape** (§ 3: two words, guard first). Every
+  `probe1` habit about `vaddr+4` being the guard is now wrong, and
+  `V_NOTVICTIM`/`V_CORRUPT` must be re-derived against the new layout rather than
+  copied.
+- **The arena is generated at run time**, so `hazlint`'s population no longer
+  covers the victims. **Its coverage report must say so**, or a reader takes a
+  clean run as covering code the scan never saw — which is `hazlint`'s own
+  finding 1 (the population control that exercised a path no scanned file took).
+
+---
+
+## 11. Where each answer lands
+
+| | question | goes to | and to |
+|:-:|---|---|---|
+| ⓐ | size / line / associativity, both caches | `SPEC.md` `CPU-25` | `notes/cache-model.md` § *Cache geometry* |
+| ⓑ | read-allocate, and what invalidates a clean line | `SPEC.md` `CPU-45` | `docs/rlx-cache-and-cp0.md` § ② — **decision ② names a measurement, or it names the next experiment. It does not name an argument** |
+| ⓒ | does the core retire `cache` | `SPEC.md` `CPU-44` | `notes/cache-model.md` |
+| ⓓ① | write-through vs write-back | `SPEC.md` `CPU-19` 殘留 | `docs/rlx-cache-and-cp0.md` § ② |
+| ⓓ② | `Status.IsC` as a bit | `SPEC.md` `CPU-19` 殘留 | — |
+| 🆕 | `CCTL 0x010`/`0x020` named; the I-MEM/D-MEM windows | `SPEC.md` `CPU-24` (closed 2026-08-26 on the desk), `CPU-24` 殘留, and `CPU-46` | `notes/cache-model.md` |
+| 🆕 | `CCTL 0x100`'s effect — **only if `c-E` read `P0` and `c-E0` held**; in the write-through branch there is no dirty line and `c-E2` cannot fail | `SPEC.md` `CPU-43`, or **未定** | — |
+| 🆕 | `TC0CNT` as an instrument; the 14.286057 MHz base clock | `SPEC.md` `CLK-17` — **the number the payload divides by must not live only inside a derivation** | `R5-0` |
+| 🆕 | `cache 0x10` as a capability, for `CPU-04` | `SPEC.md` `CPU-04` — **as a capability, not as a name.** `CLAUDE.md`'s ban stands | — |
+
+**The trap `R1g-5` walked into, restated so `R1h-4` does not repeat it:** the
+walk's number and the kernel's number are **two different claims**, and the
+write-up says so **even when they agree**. A build constant that agrees with a
+measurement is corroboration; a build constant quoted as a measurement is a
+geometry number wearing a measurement's clothes.

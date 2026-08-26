@@ -44,14 +44,24 @@
 #define ST0_BEV			0x00400000	/* boot exception vectors     */
 
 /* --- CP0 register 20, Lexra's, called CCTL by inference ------------------- */
-/* `notes/cache-model.md` holds the provenance of every one of these.  Two of
- * them have two sources that agree; two have one source and no name anywhere,
- * and this payload does not write those two. */
+/* `notes/cache-model.md` holds the provenance of every one of these.
+ * 2026-08-26: the two that used to have no name anywhere have one now, and they
+ * turned out not to be cache commands at all -- see the block below. */
 #define CCTL_DFLUSH_819X	0x200		/* two sources, agree          */
 #define CCTL_IINV		0x002		/* two sources, agree          */
 #define CCTL_DFLUSH_865XB	0x001		/* one source                  */
-#define CCTL_UNKNOWN_010	0x010		/* one source, NO NAME - unused */
-#define CCTL_UNKNOWN_020	0x020		/* one source, NO NAME - unused */
+/* 2026-08-26: NAMED, and they were never cache commands.  0x010 fills the
+ * 16 KiB local instruction scratchpad from CP3 $0/$1 and stalls the core while
+ * it does; 0x020 clears that scratchpad's valid bit so IMEM-region fetches fall
+ * through to the I-cache.  Two independent sources: the Lexra LX4189 datasheet
+ * sec 5.2, and arch/rlx/include/asm/rlxregs.h:632-633 in the GPL drops this
+ * project holds.  notes/cache-model.md owns the table.
+ *
+ * probe1 and probe2 write NEITHER.  probe3 writes 0x020 as the I-MEM
+ * discriminator -- the scratchpad is the same size as the predicted I-cache, so
+ * nothing else separates them -- and still does not write 0x010. */
+#define CCTL_IMEM0FILL		0x010		/* named 2026-08-26; not written here  */
+#define CCTL_IMEM0OFF		0x020		/* named 2026-08-26; probe3 writes this */
 
 /* --- the 16550 --------------------------------------------------------- */
 /* THE DEVICE'S ADDRESSES ARE THE DEFAULT AND THE ONLY ONES THAT MATTER.
