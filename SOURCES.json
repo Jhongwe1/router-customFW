@@ -216,6 +216,42 @@
       "why": "The sibling part. Its CPU/Features bullet on the first pages is a FOURTH independent source for F34: if it also says RLX4181, the 'C=4181 / E=5281' convention is wrong in both directions and the R1 measurement is the only thing left standing.",
       "task": "plan/DAY-ZERO.md item 6 — read one bullet with your eyes, ten seconds.",
       "fetch": "now"
+    },
+    {
+      "id": "ds-lexra-lx4189",
+      "role": "doc",
+      "kind": "file",
+      "url": "https://www.tomek.cedro.info/files/electronics/doc/lexra/lx4189-datasheet-1.9-c20081030.pdf",
+      "dest": "$FWRE_WORK/rebuild/refs-external/lx4189-1.9.pdf",
+      "bytes": 332981,
+      "sha256": "6afb141528cb10decb35670ce9cc69c6a5b4a425301f1e9f6a839d59a51502ba",
+      "kind_of_document": "core-vendor datasheet (text, extractable with pdftotext -layout)",
+      "title": "Lexra LX4189 Data Sheet, Release 1.9",
+      "revision": "Rel 1.9, 11 April 2001",
+      "marking": "Lexra Proprietary & Confidential",
+      "handling": "CITE, DO NOT COMMIT -- CLAUDE.md forbids committing a datasheet. Fetched 2026-08-26 (R1h-1); it lives under $FWRE_WORK and the sha256 above is what pins the copy any claim here was read out of.",
+      "fetched": "2026-08-26",
+      "supplies": {
+        "cctl_bitmap": "sec 5.2: bit 7 IROMOff, 6 IROMOn, 5 IMEMOff, 4 IMEMFill, 3-2 ILock, 1 IInval, 0 DInval. EDGE-TRIGGERED on 0->1. This is what names CCTL 0x010/0x020 (SPEC.md CPU-24).",
+        "status_figure": "sec 3.4.1: 31-28 CU(3:0), 27-23 zero, 22 BEV, 21-16 zero, 15-8 IM(7:0), 7-6 zero, 5-0 the KU/IE stack. 'The 0 fields are ignored on write and are 0 on read.' SOURCE FOR probe3's s-isc CONTROL BITS 6 AND 24, and it also predicts bit 16 (IsC) reading back CLEAR -- on this part IsC and SwC do not exist.",
+        "cp0_register_list": "Table 2: CP0 registers are 8 BADVADDR, 12 STATUS, 13 CAUSE, 14 EPC, 15 PRID, 20 CCTL -- AND NOTHING ELSE. NO TLB. This die has 32 TLB entries (CPU-08), so the LX4189 is a SIBLING AND DEMONSTRABLY NOT THIS PART.",
+        "prid": "Table 2: PRID reads 0x0000c401 for the LX4189. This unit reads 0x0000CD01 (CPU-04). ONE POINT on the Lexra PRId map and the first this project has had -- it says 0xCD01 is not an LX4189 and NOTHING MORE. CLAUDE.md's ban on writing RLX4181/RLX5281 stands: this is a datum, not an assignment table.",
+        "cache_geometry": "sec 5.1 Table 18: ICACHE is 'Direct mapped or two-way set associative'; DCACHE is 'Direct mapped' and Table 25 offers no other form. Line size configurable 16/32/64/128 bytes (sec 5.1) = 4/8/16/32 words (sec 5.6). Narrows probe3's associativity cells from no-source-at-all to {1,2} on the I side and direct-mapped on the D side.",
+        "coherence": "sec 5.2, and it is what refuted two probe3 cells: 'perform an uncached read of the affected memory locations. If the location is resident in the data cache it will be invalidated.' and 'Note that a write to a KSEG1 address has no affect on the contents of the data cache.' Also sec 5.1: 'Caches do not snoop the system bus.' -- which is the KSEG0/KSEG1 proxy assumption R6 has to re-test with a real engine.",
+        "write_buffer": "sec 5.6: 'Writes that are serviced by the data cache may require extra time to be serviced by the LBC if its write buffer is full.' Sources probe3's c-E0 write-buffer control.",
+        "exception_vector": "sec 3.4.2: RESET 0xbfc0_0000; other exceptions with BEV=0 go to 0x8000_0080. A FOURTH independent source for the vector, from the core vendor.",
+        "exccodes": "sec 3.4: Bp = 9, RI = 10, CpU = 11 -- the two probe3 exercises under qemu."
+      },
+      "caveats": [
+        "LX4189 IS NOT THIS CORE. It is write-through with no DWB/DWBInval, so its CCTL bits 8-9 are Reserved where this SoC's are live; and Table 2 gives it no TLB at all while this die has 32 entries (CPU-08, and Random reading 5..29 on probe2's census). Every claim taken from it is READ ABOUT A RELATED PART.",
+        "Sources CONTRADICT on CCTL bits 6-7: LX4189 IROMOn/IROMOff vs rlxregs.h's IMEM0ON at bit 6 and nothing at bit 7, vs hackpascal's ILock = 0xc0 colliding with its own IROM0ON/IROM0OFF. 0x040/0x080 stay undetermined -- SPEC.md CPU-24 residual.",
+        "IMEM/DMEM BASE and TOP are HARDWIRED CFG_ pins on the LX4189 (sec 5.4, CFG_IWBASE[31:10] / CFG_IWTOP[17:10]), not CP3 registers. This SoC's core exposes them to software -- its kernel writes CP3 $0/$1/$4/$5 -- so the CP3 numbering has ONE source (third-party lxregs.h) plus this unit's own behaviour, and the core vendor's document does NOT corroborate it."
+      ],
+      "used_by": [
+        "docs/probe3-cells.md sec 1.2, 1.4, 6.1, 6.2, 6.5, 6.6, 6.7",
+        "tools/rlxprobe/rlxdefs.h (ST0_CTRL_A / ST0_CTRL_B)",
+        "SPEC.md CPU-04, CPU-19, CPU-24, CPU-25, CPU-45, CPU-46"
+      ]
     }
   ],
   "reference_only": {
@@ -286,10 +322,6 @@
       {
         "url": "https://datasheet.lcsc.com/lcsc/2410121806_Realtek-Semicon-RTL8196E-CG_C5155985.pdf",
         "about": "A PUBLIC, redistributable RTL8196E-CG datasheet mirrored by a distributor -- not the leaked -VEx draft in refs/. Names the core RLX4181. Its value is that it can be linked from a public README where the leaked draft cannot, and that it is a second document (not the same one) on the naming question. It does not settle CPU-04: the device still says neither, and only PRId does."
-      },
-      {
-        "url": "https://www.tomek.cedro.info/files/electronics/doc/lexra/lx4189-datasheet-1.9-c20081030.pdf",
-        "about": "Lexra LX4189 Data Sheet Rel 1.9 -- the CORE VENDOR's own document, and the first source in this project for CP0 20's bit map. Sec 5.2 'Cache Control Register: CCTL' gives bit 4 IMEMFill, bit 5 IMEMOff, bit 6 IROMOn, bit 7 IROMOff, bits 3-2 ILock, bit 1 IInval, bit 0 DInval, and states the semantics in prose: the IMEM controls are EDGE-TRIGGERED on a 0->1 transition, IMEMFill stalls the processor while the local instruction memory is filled from the configured BASE/TOP, and IMEMOff clears the IMEM valid bit so that IMEM-region fetches fall through to the instruction cache. THIS IS WHAT NAMES CCTL 0x010 AND 0x020 (SPEC.md CPU-24, closed 2026-08-26), and it is INDEPENDENT of Realtek's arch/rlx/include/asm/rlxregs.h, which gives the same two bit positions -- Lexra is the core vendor, Realtek the integrator. CAVEATS, and they matter: (1) LX4189 is not this core -- it is a write-through part with no DWB/DWBInval, so its bits 8-9 are Reserved where this SoC's are live, and the two maps are provably NOT identical; (2) sources CONTRADICT on bits 6-7 (LX4189 IROMOn/IROMOff vs rlxregs.h IMEM0ON at bit 6 and nothing at bit 7), so 0x040/0x080 stay undetermined -- SPEC.md CPU-24 residual; (3) it also documents the CP3 scratchpad range registers conceptually, and states that a Coprocessor Unusable exception follows CP3 access without the coprocessor enabled, which is why this unit's own kernel sets Status.CU3 before its first mtc3. NOT DOWNLOADED INTO refs/: cited only. If it is ever fetched it moves to documents WITH a sha256."
       }
     ]
   }

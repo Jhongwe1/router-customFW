@@ -198,6 +198,48 @@ same two documents — but **this unit's own kernel programming `+0x3FFF` and
 `+0x1FFF` into `CP3 $0`/`$1` and `$4`/`$5` is cut from this device**, and it
 agrees with them. That is the leg that does not depend on the variant.
 
+### 1.4 🔴 The core vendor's datasheet is in hand now, and it refutes four things in this table
+
+**Added 2026-08-26, `R1h-1`.** § 1.2 cited *"Lexra LX4189 Data Sheet Rel 1.9
+§ 5.2"* from `SOURCES.json`'s `reference_only` list, where the entry ends
+*"NOT DOWNLOADED INTO `refs/`: cited only. If it is ever fetched it moves to
+`documents` WITH a sha256."* It was fetched. `SOURCES.json` moved it, with
+`sha256 6afb1415…`; the PDF itself is **not committed** — it is someone else's
+property and `CLAUDE.md` forbids it — and lives in `$FWRE_WORK/rebuild/
+refs-external/`.
+
+⚠️ **The standing caveat, and it got sharper.** § 1.2 already recorded that the
+LX4189 is a write-through part with no `DWB`/`DWBInval`, so its CCTL map and this
+SoC's are provably not identical. **Table 2 makes it worse and better at once:
+the LX4189's entire CP0 register list is 8, 12, 13, 14, 15, 20 — no `Index`, no
+`Random`, no `EntryHi`/`EntryLo`. IT HAS NO TLB.** This die has 32 TLB entries
+(量 `CPU-08`, corroborated by `Random` reading 5…29 inside 0…31 on `probe2`'s
+census). So the LX4189 is **a sibling and demonstrably not this part**, every
+line below is 讀 about a related core, and none of it is a reading of this
+silicon. What it *is* worth is that it comes from the **core vendor**, where
+everything else here comes from the integrator or from a third party.
+
+| | what the document says | what it changes here |
+|:-:|---|---|
+| ① | § 5.2, verbatim: *"if the affected memory location has an alias in uncacheable (KSEG1) space … perform an uncached read of the affected memory locations. **If the location is resident in the data cache it will be invalidated.**"* and *"**Note that a write to a KSEG1 address has no affect on the contents of the data cache.**"* | 🔴 **`c-E0` and `c-E2` were broken and would have refuted `CCTL 0x100` by accident.** They were written to continue from `c-E`'s state; `c-E`'s own last step is an uncached load of the target, which by ① invalidates the line — so by the time `c-E2` issued its `DWB` there would be **no dirty line left**, its `P0` reading would have been recorded as *"`0x100` does not write back"*, and that is a refutation produced by the running order. **Each of the three E cells now runs its own whole sequence.** ② also gives `c-A` its first expected value: an uncached *write* does not disturb a resident line, so **`l2 = P0`, a stale line**, 讀 ×1 |
+| ② | the same two sentences | 🆕 **cell `c-G` exists because of them.** ⓑ asks what on this core can invalidate a clean line; the core vendor's answer is *an uncached read*, with no `CCTL` at all. It costs five loads and no new instruction, and if it holds here `R6` gets a per-line invalidate primitive for the price of a load. See § 6.5 |
+| ③ | § 5.1: *"configurable for a 16, 32, 64, or 128-byte cache line size"*; § 5.6: *"the cache obtains a cache line (4, 8, 16, or 32 words)"* | 🔴 **`w-line`'s void gate was in the wrong place.** It probed to `+192` and called a STALE run reaching there *"past any plausible line"* — **128 bytes is a legal line on this family**, so that gate would have recorded a real 128-byte line as a void measurement. The probe list now runs to `+320` and the void gate is at `+256` |
+| ④ | § 5.1 Table 18: `ICACHE` is *"Direct mapped or two-way set associative"*; `DCACHE` is *"Direct mapped data cache"* and Table 25 offers no other option | 🔴 **Associativity is no longer *"留白 — no source of any kind, anywhere"*.** The I side's search space is **{1, 2}** and the D side's prediction is **direct-mapped**. `w-assoc`/`v-assoc` go from a blind sweep to a prediction with a refutation condition: **a walk that returns K = 4 refutes this bloodline** |
+
+**And two things it gives that are not corrections.**
+
+- 🔴 **`PRID` is `0x0000c401` for the LX4189** (Table 2). This unit reads
+  `PRId = 0x0000CD01` (量, `R1g-4b`). That is **one point on the Lexra `PRId`
+  map and the first this project has had** — it says `0xCD01` is not an LX4189
+  and nothing more. `CLAUDE.md`'s ban stands: **it is a datum, not the
+  assignment table**, and `RLX4181`/`RLX5281` remain unwritable.
+- § 3.4.2: *"Other exceptions, BEV = 0 → `0x8000_0080`"* — a **fourth**
+  independent source for the vector, from the core vendor, agreeing with this
+  unit's own `trap_init`, the vendor bootcode's comment, and
+  `arch/rlx/kernel/traps.c:691`. Nothing changes; it is recorded because a
+  fourth agreeing source is worth knowing about when the wrong address had
+  reached seven committed sites as recently as 2026-08-25.
+
 ---
 
 ## 2. The instruments `probe3` stands on
@@ -314,7 +356,7 @@ and **the round-up is upward — a length given too small never announces itself
 |---|---|---|---|
 | one full `probe1`-shape row per victim | 104 B each — 213 KB at V=2048 | `DW … 16433`, a 5-digit length | ❌ overruns the ESC window, and is 20× past any `DW` this loader has executed |
 | 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
-| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | **2,177 B** at **V = 2,048, which is the largest single sweep point** — 75 % of `probe2`'s already-executed 2,909 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000 (`w-size` alone is ~4,000, `w-imem` repeats it, `v-size` another ~4,000). The block is **reused between sweep points**, so **§ 4 must name which points survive to the read-back**; `RB_WORDS_probe3` and the runsheet's `DW <RB> N` are computed from that number and not from 2,048, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | **`DW <RB> 433` = 5,149 B / 1.34 s** — 53 % of `H2g`'s already-executed 9,661 B | ✅ **every number is under something this loader has already done** |
+| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,866 bytes / 125 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it | ✅ **every number is under something this loader has already done** |
 
 **So: four bits per victim** — the seven verdicts plus `0` = *never written*,
 which is the only lossless bitmap and the only one with a negative control inside
@@ -331,6 +373,20 @@ capture is recoverable. **Do not ship a bitmap line without an index.**
 own history is exactly that: the audit found `rlx_call0` never wrote `$2`, and
 every trapped row's `v` was carrying a loop counter. Raw fields survive a bad
 verdict function. A bitmap does not.
+
+🔴 **AND HERE IS WHAT THE BUILT VERSION LOSES ANYWAY, STATED RATHER THAN LEFT TO
+BE NOTICED.** The walk classifies in assembly with a full register file and has
+none left to keep `ex` — the value the victim actually returned — in. So in the
+sixteen rows **`ex` is RECONSTRUCTED from the verdict nibble** and the row says
+so; `ma` and `g` are uncached reads of DRAM taken after the pass, and DRAM does
+not move, so those two are raw. What is kept instead is the one case where the
+nibble and the value can disagree about anything: **the raw value of the first
+victim in each pass whose return matched neither constant** goes in the walk's
+control block, and a return equal to the prime gets its own verdict
+(`V_VOIDPRIME`, nibble 4) rather than being folded into *weird*. A reader who
+wants `ex` for a victim that read STALE or FRESH can compute it; a reader who
+wants it for one that read neither has it for the first such victim and a count
+for the rest.
 
 ---
 
@@ -387,8 +443,8 @@ cannot say which 16 KiB structure it measured.
 
 | cell | what it does | expected under qemu (source) | expected on the device (source) | refuted by |
 |---|---|---|---|---|
-| **`m-cu3`** | read `Status`, `or` `0x80000000` (`CU3`), write back, three `nop`, read back, **restore immediately**. No load or store in between | 未定 — a 24Kf has `CU3` and qemu may or may not mask it. **`R1h-1` measures this under qemu and writes the number here before the seating** | bit 31 set in the read-back. 讀, this unit's kernel `0x8000221C`–`0x80002224` sets exactly this bit before its first `mtc3`, so the vendor judged it necessary in kernel mode | bit 31 clear in the read-back → `CU3` is not implemented as a bit, and `m-imem`'s result must be read as *"CP3 answered without `CU3`"* |
-| **`m-imem`** | 🔴 **set `CU3` again and hold it across the whole cell** — `m-cu3` restored `Status`, and `mfc3` with `CU3` clear traps **by construction**, which would be recorded as *CP3 unreachable* and would be an artefact of the running order. Then `mfc3` CP3 `$0`,`$1`,`$4`,`$5` (and `$2`,`$3`,`$6`,`$7`), **each read twice with two different primes**, with the `Status` read-back written to the block beside each result so that *trapped with `CU3` set* and *trapped with `CU3` clear* are separable at the desk. Restore `Status` at the end | 🔴 **traps, `Cause.ExcCode = 0x0B` (Coprocessor Unusable)** — 量(qemu) this session, the opcode sweep puts primary opcode `0x13` in the CpU set. **So the qemu run is not vacuous here: it is one of two places in this payload where the handler is exercised on a non-`Bp` exception before the device sees one** — `x-ri`'s `ExcCode = 0x0A` is the other | 留白. A base/top pair whose difference is `0x3FFF` would corroborate a 16 KiB IMEM; `0` in both would mean the window is unconfigured | **each read equal to its own prime → the destination was never written** — `F50b`'s failure, and the whole reason there are two primes; **both differing from their primes but from each other → unstable**; **both differing from their primes and equal → a value**. A trap → CP3 unreachable, see 否證 M |
+| **`m-cu3`** | read `Status`, `or` `0x80000000` (`CU3`), write back, three `nop`, read back, **restore immediately**. No load or store in between | 🔴 **`before = 00000000`, `set = 00000000` — bit 31 does NOT stick.** 量(qemu) 2026-08-26, `qemu/2026-08-26/probe3.txt`. Malta's 24Kf masks `CU3` out of a `Status` write, and the same run proves the write path itself works: `CLEAR_BEV=1` cleared `BEV` through the same routine. **So qemu is a machine where a defined `Status` bit is masked, which is the positive control on this cell's mechanism** | bit 31 set in the read-back. 讀, this unit's kernel `0x8000221C`–`0x80002224` sets exactly this bit before its first `mtc3`, so the vendor judged it necessary in kernel mode; 讀 LX4189 § 3.4.1's `STATUS` figure puts `CU(3:0)` at 31–28 and § 2.4 says a Coprocessor Unusable exception follows a CP0-family access with the usability bit clear | bit 31 clear in the read-back → `CU3` is not implemented as a bit, and `m-imem`'s result must be read as *"CP3 answered without `CU3`"* |
+| **`m-imem`** | 🔴 **set `CU3` again and hold it across the whole cell** — `m-cu3` restored `Status`, and `mfc3` with `CU3` clear traps **by construction**, which would be recorded as *CP3 unreachable* and would be an artefact of the running order. Then `mfc3` CP3 `$0`,`$1`,`$4`,`$5` (and `$2`,`$3`,`$6`,`$7`), **each read twice with two different primes**, with the `Status` read-back written to the block beside each result so that *trapped with `CU3` set* and *trapped with `CU3` clear* are separable at the desk. Restore `Status` at the end | 🔴 **all eight trap, `Cause = 0x1000042C` → `ExcCode = 0x0B` (Coprocessor Unusable), `m.traps = 000000ff`.** 量(qemu) 2026-08-26. ⚠️ **And on qemu the two explanations are CONFOUNDED**: `m-cu3` measured that `CU3` cannot be set there, so *CP3 is absent* and *`CU3` is masked* produce the identical reading, and the payload prints that it cannot separate them. **What the qemu leg does buy is real: sixteen non-`Bp` exceptions delivered to this handler and returned from, before the device ever sees one** — `x-ri`'s `ExcCode = 0x0A` is the other place | 留白. A base/top pair whose difference is `0x3FFF` would corroborate a 16 KiB IMEM; `0` in both would mean the window is unconfigured. ⚠️ **The LX4189 does NOT corroborate the CP3 numbering**: its IMEM/DMEM base and top are hardwired configuration pins (`CFG_IWBASE[31:10]`, `CFG_IWTOP[17:10]`, § 5.4) with no CP3 registers at all, so this SoC's core exposes something the core vendor's document does not describe. One source (the third-party `lxregs.h`) plus this unit's own kernel behaviour | **each read equal to its own prime → the destination was never written** — `F50b`'s failure, and the whole reason there are two primes; **both differing from their primes but from each other → unstable**; **both differing from their primes and equal → a value**. A trap → CP3 unreachable, see 否證 M |
 | | ⚠️ **the two-prime read is `probe2`'s rule, not caution.** `F50b` spent a seating on *"reads zero"* being indistinguishable from *"the destination was never written"*, and `rlx_call0_primed` is what separated them (量, `nowrite=0` across 256 rows) | | | |
 
 **What `m-imem` buys the rest of the payload.** The arena is generated at run
@@ -406,7 +462,7 @@ choosing at build time and hoping.
 > |---|---|---|
 > | I-cache size | **16 KiB** | 讀 ×3, and one is a vendor doc **already in this repo**: `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 p.1 / § 2 / block diagram (*"16Kbyte I-Cache"*), already quoted at `SOURCES.json:195`; Realtek's own `arch/rlx/soc-rtl8196e/bspcpu.h`; and the third-party `rtl8196e.dtsi` (`i-cache-size = <16384>`). 🔴 **Read § 1.3 first**: that datasheet documents the `-VE1/2/3` variant, which `SOURCES.json` records this unit as **not being** (embedded DRAM by MCM vs this unit's external W9825G6KH, `MEM-01`, 量). The same claim is in the **public `RTL8196E-CG`** datasheet, a second Realtek document; family membership is 量 ×3 (`CPU-01`). **Two vendor documents about two variants of a family this die belongs to — not a reading of this die** |
 > | I line size | **16 B** | 讀 ×1, third-party only — the dtsi. 🔴 **The datasheet gives sizes and no line size**: grep for *"cache line"*, *"line size"*, *"associat"* over all 11,467 extracted lines returns only switch-MAC-table hits. And the 16 B read out of this unit's kernel is **the D side** — eight `cache` ops at stride `0x10`, and the I side of that build has no per-line op at all |
-> | associativity | 🔴 **留白 — no source of any kind, anywhere.** Not in the datasheet, not in `bspcpu.h`, not in the dtsi, not in any GPL drop. The LX4189 doc mentions *"the two set associative instruction cache"* for its `ILock` field, but that is a different core and it is not carried here | — |
+> | associativity | 🔄 **NARROWED 2026-08-26 to {1, 2}, and the *"no source of any kind, anywhere"* form is withdrawn.** LX4189 § 5.1 Table 18: the `ICACHE` LMI is *"Direct mapped or two-way set associative"*, and § 5.3 describes the two-way form's LRU and lock bits in detail. So the I side has exactly two candidates | 讀 ×1, **core vendor, and a different part** — read § 1.4 before quoting it: the LX4189 has no TLB and this die has 32 entries (量 `CPU-08`). Not in the Realtek datasheet, not in `bspcpu.h`, not in the dtsi, not in any GPL drop. **`w-assoc` returning K = 4 refutes this bloodline**, which is more than the cell could do yesterday |
 >
 > **否證 ⓐ, restated as the payload will check it.** At the smallest working set
 > — 1 KiB, smaller than any plausible cache — **every victim must come back
@@ -432,7 +488,7 @@ choosing at build time and hoping.
 
 | cell | what it does | expected under qemu | expected on the device | refuted by |
 |---|---|---|---|---|
-| **`w-line`** | in one 256 B-aligned block: execute `V0` at `+0`; then **uncached-store** NEW into **`V0`'s own patched word at `+4`** and into probe victims at `+8, +16, +24, +32, +48, +64, +96, +192`; then execute each | all FRESH (量(qemu), `smc.kseg1`) | **`+8` STALE, `+16` FRESH** → a 16-byte line. The run of STALE starting at `+8` is the fetch granularity | 🔴 **`+4` FRESH → the block is void.** `V0` was demonstrably fetched, so at any line size ≥ 4 B it MUST read STALE: it is the **must-fire** control, and without it *all FRESH* is indistinguishable from an 8-byte line, a patch that missed, and a dead re-arm. `+192` STALE → the STALE run extends past any plausible line, so this is prefetch or something else and **the line number is void**. **All FRESH (with `+4` STALE) → the line is ≤ 8 B, recorded 未定 rather than as a number** — `V0` fills `+0..+7`, so no probe lies inside its line |
+| **`w-line`** | in one 1 KiB-aligned block: execute `V0` at `+0`; then **uncached-store** NEW into **`V0`'s own patched word** and into probe victims at 🔄 **`+8, +16, +24, +32, +48, +64, +96, +128, +160, +192, +256, +320`**; then execute each | all FRESH (量(qemu) 2026-08-26, `w.line.bits=22222222`, `bits2=22222000` — thirteen probes, every one `V_FRESH`) | **`+8` STALE, `+16` FRESH** → a 16-byte line. The run of STALE starting at `+8` is the fetch granularity | 🔴 **`V0` itself FRESH → the block is void.** It was demonstrably fetched, so at any line size ≥ 4 B it MUST read STALE: it is the **must-fire** control, and without it *all FRESH* is indistinguishable from an 8-byte line, a patch that missed, and a dead re-arm. ⚠️ **Under the new two-word victim `V0`'s patched word is at `+4` and its GUARD is at `+0`** — the first draft said *"`+4` FRESH"* meaning `V0`, and that phrasing is `probe1`'s layout, which is inverted here. 🔄 **STALE reaching `+256` → void, NOT `+192`**: LX4189 § 5.1 makes **128 bytes a legal line size on this family**, so the old gate would have recorded a real 128-byte line as a void measurement. **All FRESH (with `V0` STALE) → the line is ≤ 8 B, recorded 未定 rather than as a number** — `V0` fills `+0..+7`, so no probe lies inside its line |
 | **`w-line0`** | the same block layout in a second, distant block, with **`V0` never executed** | all FRESH | 🔴 **all FRESH.** This is the negative control: nothing was fetched, so nothing can be stale | any STALE → the patch is not landing, or the arena is contaminated, and `w-line` is void |
 | **`w-back`** | a third block with `V0` at `+136` (deliberately **not** 16 B-aligned); probes at `+112, +120, +128, +144, +152, +168` | all FRESH | 🔴 **`+128` STALE and `+144` FRESH** if the line is 16 B — i.e. the STALE set is exactly `[128,144)`, the line *containing* `+136`. **STALE extending backwards is the signature of a line fill; forward-only is prefetch**, and this cell is the only thing that separates them | STALE only forward of `+136` → `w-line`'s number is a prefetch depth, not a line size. 🔴 ⚠️ **`w-back` alone cannot separate `L = 32` from `L = 16` plus one next-line prefetch**: `+136` sits in the **lower** half of the 32 B block `[128,160)`, so both hypotheses stale exactly `[128,144+16)` and neither null fires. **`w-back2` is what separates them.** All FRESH → `L ≤ 8`, 未定 |
 | **`w-back2`** 🆕 | a fourth block with `V0` at **`+152`** — the **upper** half of a 32 B-aligned block; patch `+156` (its own word, the must-fire) and probe `+128, +136, +144, +160, +168, +176` | all FRESH | **`L = 32`** stales `[128,160)`: `+128`/`+136`/`+144` STALE, `+160`/`+168`/`+176` FRESH. **`L = 16` + one next-line prefetch** stales `[144,176)`: `+128`/`+136` FRESH, `+144`/`+160`/`+168` STALE. **The two readings are disjoint, and that is the whole cell** | any other pattern → the fill granularity is neither, and `w-line`'s number is void |
@@ -502,12 +558,24 @@ FRESH victim at a large point cannot contaminate a smaller one.
 > and says so. A constant independent of the iteration count means the loop was
 > elided or the bracket is measuring only itself.
 
+> 🔴 **THE WHOLE qemu COLUMN OF THIS GROUP IS NOW ONE READING, AND IT IS NOT
+> "未定" AND NOT "FROZEN".** 量(qemu) 2026-08-26, `qemu/2026-08-26/probe3.txt`:
+> **every read of `0xB8003108` returns `FFFFFFFF`** — Malta has nothing mapped
+> there and an unmapped uncached read returns all ones. The value is neither
+> prime, so the load demonstrably *did* write its destination; the register is
+> not frozen, it is **absent**. Every bracket therefore reports `0`, and the
+> payload prints `Group T VOID -- TC0CNT reads all ones twice: there is no timer
+> at that address on this machine`. *Nothing is there* and *the register is
+> frozen* are different claims about a machine and the payload separates them.
+> **The harness may assert the self-void on qemu; it may not assert any tick
+> count there.**
+
 | cell | what it does | expected under qemu | expected on the device (source) | refuted by |
 |---|---|---|---|---|
-| **`t-live`** | two `lw` from `0xB8003108`, both primed, **separated by a short calibrated loop of ≫ 1 tick** — back to back they may be closer than the 69.9983 ns LSB (`t-ovh` says that latency is unmeasured), and *equal* would then be the reading of a perfectly live counter | 🔴 **未定 — Malta has no timer at this address.** `R1h-1` measures what qemu returns and records it here; the harness asserts control flow only | **different values.** 量 `REG-09` (`TC0En=1`, `TC0Mode=1`) + `CLK-04` (the tick advances, which requires counting) | equal **on the separated pair** → frozen register, group void. ⚠️ **Equal on a back-to-back pair is not a refutation and does not void the group.** Second < first without a wrap → the read disturbs it (the `PSRP` bit 8 read-to-clear precedent, 量 `NET-11`) |
-| **`t-ovh`** | K back-to-back reads for **K = 1, 100, 1000, 4000**; regress. K = 1 and K = 2 differ by less than the 1-tick LSB and carry no leverage — a two-point fit plus noise | 未定 | 留白 — **no file in this repo contains a measurement of an uncached KSEG1 register-read latency.** Slope = cost per read in ticks; intercept = bracket overhead | **the K = 4000 reading failing to scale when K doubles** → the bracket is measuring itself. ⚠️ **A slope of exactly 0 cannot occur under tick quantisation and is therefore not a refutation** — the first draft of this row named it as one, which is a condition that cannot fire |
-| **`t-cal`** | bracket the existing 3-instruction loop at **two** counts, **140,800 and 70,400** — 否證 T's *constant independent of the iteration count* limb cannot be evaluated at one point, and **the ratio is what separates *the loop was elided* from *TC0 stopped***, both of which report ≈ 0 at a single count. That is `probe1`'s `GEOM` defect exactly: one number, two reasons | 未定 | **14,286 ticks.** 算 from 量 `CLK-03` (`f/CPI = 1.408e8` iter/s, n=1, `bench/2026-08-25/H1b.timing`) × 14,286,057 Hz. 10.0 % of the wrap — no wrap, comfortable | 0 → TC0 stopped under the payload. ~2× or ~0.5× → **CPI is not 3, and this cell has just separated what `CLK-03` could not** (400 MHz × 6 cycles vs 200 MHz × 3) |
-| **`t-hit`** | 🔴 **a 4 KiB working set — half the predicted D-cache — traversed 32 times at 16 B stride**, once through KSEG0 and once through KSEG1, each bracketed, with **one warming pass discarded**. **The iteration count carries N, the footprint does not**: after the warming pass every cached access is a hit, so the KSEG0 leg measures **residency** rather than miss latency. ⚠️ **A single sweep of a working set larger than the cache measures miss latency in both windows and is not a residency instrument** — 4096 loads at 32 B stride would touch 128 KiB once, i.e. 4,096 compulsory misses, and *equal* would then be the expected reading on correct silicon | 未定 | 留白. 推: the uncached loop is several times the cached one. N=4096 gives 1,760–5,850 ticks of signal against a 1-tick LSB | equal → either the timer is not counting (contradicts `t-cal`) or KSEG0 is not cached, which would refute M1 by a route with no cache cell in it |
+| **`t-live`** | two `lw` from `0xB8003108`, both primed, **separated by a short calibrated loop of ≫ 1 tick** — back to back they may be closer than the 69.9983 ns LSB (`t-ovh` says that latency is unmeasured), and *equal* would then be the reading of a perfectly live counter | 🔴 **`FFFFFFFF` on both the back-to-back and the separated pair** (量(qemu)); the group self-voids and says which of the three reasons it is | **different values.** 量 `REG-09` (`TC0En=1`, `TC0Mode=1`) + `CLK-04` (the tick advances, which requires counting) | equal **on the separated pair** → frozen register, group void. ⚠️ **Equal on a back-to-back pair is not a refutation and does not void the group.** Second < first without a wrap → the read disturbs it (the `PSRP` bit 8 read-to-clear precedent, 量 `NET-11`) |
+| **`t-ovh`** | K back-to-back reads for **K = 1, 100, 1000, 4000**; regress. K = 1 and K = 2 differ by less than the 1-tick LSB and carry no leverage — a two-point fit plus noise | 🔴 **`0` at every K** (量(qemu)) — the bracket subtracts `FFFFFFFF` from `FFFFFFFF` | 留白 — **no file in this repo contains a measurement of an uncached KSEG1 register-read latency.** Slope = cost per ITERATION in ticks (one uncached read plus three ALU/branch, which is the loop the payload actually emits); intercept = bracket overhead | **the K = 4000 reading failing to scale when K doubles** → the bracket is measuring itself. ⚠️ **A slope of exactly 0 cannot occur under tick quantisation and is therefore not a refutation** — the first draft of this row named it as one, which is a condition that cannot fire |
+| **`t-cal`** | bracket the existing 3-instruction loop at **two** counts, **140,800 and 70,400** — 否證 T's *constant independent of the iteration count* limb cannot be evaluated at one point, and **the ratio is what separates *the loop was elided* from *TC0 stopped***, both of which report ≈ 0 at a single count. That is `probe1`'s `GEOM` defect exactly: one number, two reasons | 🔴 **`0` at both counts** (量(qemu)) | **14,286 ticks.** 算 from 量 `CLK-03` (`f/CPI = 1.408e8` iter/s, n=1, `bench/2026-08-25/H1b.timing`) × 14,286,057 Hz. 10.0 % of the wrap — no wrap, comfortable | 0 → TC0 stopped under the payload. ~2× or ~0.5× → **CPI is not 3, and this cell has just separated what `CLK-03` could not** (400 MHz × 6 cycles vs 200 MHz × 3) |
+| **`t-hit`** | 🔴 **a 4 KiB working set — half the predicted D-cache — traversed 32 times at 16 B stride**, once through KSEG0 and once through KSEG1, each bracketed, with **one warming pass discarded**. **The iteration count carries N, the footprint does not**: after the warming pass every cached access is a hit, so the KSEG0 leg measures **residency** rather than miss latency. ⚠️ **A single sweep of a working set larger than the cache measures miss latency in both windows and is not a residency instrument** — 4096 loads at 32 B stride would touch 128 KiB once, i.e. 4,096 compulsory misses, and *equal* would then be the expected reading on correct silicon | 🔴 **`0` for the warming pass and both legs** (量(qemu)) | 留白. 推: the uncached loop is several times the cached one. N=4096 gives 1,760–5,850 ticks of signal against a 1-tick LSB | equal → either the timer is not counting (contradicts `t-cal`) or KSEG0 is not cached, which would refute M1 by a route with no cache cell in it |
 
 🔴 **What `t-hit` is really for, and it is the sharpest thing in this payload.**
 Cell `c-A`'s negative reading is a **disjunction**: *no read-allocate*, *the
@@ -576,7 +644,7 @@ bus master, and **the proxy is a model, not the thing.**
 > | | prediction | source, and the vote on the other side |
 > |---|---|---|
 > | `c-E`: write-through or write-back | **write-back** — the cached store is held and the uncached read-back returns the OLD value | 讀 ×1: **both** GPL drops carry `CONFIG_ARCH_CACHE_WBC=y` in all five `boards/rtl8196e` variants. ⚠️ **One vote, not two** — the drops share an ancestor. 🔴 **And `probe1`'s six cells are consistent with write-through**: all six stores landed on lines the D-cache did not hold, where write-through and write-back-without-write-allocate give the identical reading. This is a genuine 50/50 with one source on each side |
-> | `c-A`: is there a stale line | 🔴 **留白.** Nothing in any source speaks to read-allocation on this core | — |
+> | `c-A`: is there a stale line | 🔄 **`l2 = P0`, a stale line — the 留白 is withdrawn 2026-08-26.** LX4189 § 5.2: *"**Note that a write to a KSEG1 address has no affect on the contents of the data cache.**"* If a resident clean line is untouched by an uncached store, the second cached load returns the OLD value | 讀 ×1, core vendor, **and a different part** — § 1.4. Nothing in any Realtek source speaks to read-allocation on this core, and the LX4189 sentence presumes the line is resident, which is what `c-A`'s own step 2 is doing |
 > | `c-F`: does `CCTL 0x100` invalidate | **no** — `DWB` writes back and does not invalidate, so a stale line survives it | 讀 ×2: `cache-rlx.c`'s encoding table (`0x100 = DWB`) and `rlxregs.h:635` (`CCTL_DWB`). ⚠️ **Same SDK ancestor — one vote.** This unit's kernel issues it at `0x8000CA94`/`0x8000CAC0`; **its loader never does**, and **no source in this repository has ever recorded its effect** |
 > | `c-B`: does `CCTL 0x200` invalidate | **yes** | 讀 ×2 (`DWB_Inval`), and this unit's loader issues it at `0x804066CC` |
 > | `c-C`: does `CCTL 0x001` invalidate | **yes** | 讀 ×2 (`DInval`); this unit's kernel issues it at `0x8000CA24`, **its loader never does** |
@@ -622,14 +690,15 @@ negative result that would void Group C and Group V together.
 | cell | what it does | expected under qemu | expected on the device | refuted by |
 |---|---|---|---|---|
 | **`c-E`** ⓓ① | uncached-store `P0`; **cached-load** X (this is the allocate); **cached-store** `P1` — a write **hit** on a resident line, the case no `probe1` cell exercised; **uncached-load** X | `P1` — "immediately visible", i.e. it always looks write-through (量(qemu)) | **`P0`** → write-back, the store is dirty in the D-cache | **`P1`** → write-through **or** the cached load never allocated (no read-allocate, so the cached store was a write **miss**) **or** the uncached load snoops. 🔴 **`P1` means write-through only if `c-A` established read-allocate positively** — write-through and write-back-without-write-allocate are exactly the pair ⓓ① exists to separate, and on a miss they give the identical reading. Otherwise `c-E` is recorded `void — residency not established`, and `CONFIG_ARCH_CACHE_WBC=y` is not refuted from a void |
-| **`c-E0`** 🆕 | 🔴 **the write-buffer control, and it runs before `c-E2`.** After `c-E` returned `P0`: N uncached reads of an unrelated address, then **uncached-load X again with no `CCTL` issued** | `P1` | **`P0`** → the line is genuinely dirty, and only now can `c-E2` attribute a change to `CCTL 0x100` | **`P1`** → `c-E`'s `P0` was a **posted cached store the uncached load overtook**, not a dirty line. The write-policy verdict is void and `c-E2` does not run — after a `DWB` and a second load the buffer has drained under both hypotheses, so **`c-E2` alone is a cell that cannot fail** |
-| **`c-E2`** | then `CCTL 0x100` (`DWB`), then uncached-load X again | `P1` (unchanged) | **`P1`** if `c-E` read `P0` → the line *was* dirty, and `CCTL 0x100`'s effect is measured for the first time anywhere | still `P0` → `0x100` does not write back, and its name is wrong on this die |
+| **`c-E0`** 🆕 | 🔴 **the write-buffer control, and it runs before `c-E2`.** 🔄 **It runs `c-E`'s WHOLE sequence again from its own uncached store — it does NOT continue from `c-E`'s state**, see § 1.4 ①. Then 64 uncached reads of an unrelated address (`TC0CNT`, whose line is nowhere near the target) before the measuring load | `P1` (量(qemu) 2026-08-26, `c E0 l3=5a5a0002`) | **`P0`** → the line is genuinely dirty, and only now can `c-E2` attribute a change to `CCTL 0x100`. The buffer this controls for is documented: LX4189 § 5.6, *"Writes that are serviced by the data cache may require extra time to be serviced by the LBC if its write buffer is full"* | **`P1`** → `c-E`'s `P0` was a **posted cached store the uncached load overtook**, not a dirty line. The write-policy verdict is void and `c-E2` does not run — after a `DWB` and a second load the buffer has drained under both hypotheses, so **`c-E2` alone is a cell that cannot fail** |
+| **`c-E2`** | 🔄 **`c-E`'s whole sequence again, self-contained**, then `CCTL 0x100` (`DWB`), then uncached-load X | `P1` (量(qemu) 2026-08-26) | **`P1`** if `c-E` read `P0` → the line *was* dirty, and `CCTL 0x100`'s effect is measured for the first time anywhere | still `P0` → `0x100` does not write back, and its name is wrong on this die. 🔴 **AND THE VERSION OF THIS CELL THAT CONTINUED FROM `c-E` WOULD HAVE REPORTED THAT FOR THE WRONG REASON**: `c-E`'s own final uncached load invalidates the line (LX4189 § 5.2), so there would be no dirty line left for the `DWB` to write back and the cell would have refuted the command by an artefact of the running order. § 1.4 ① |
 | **`c-A0`** | 🔴 **the negative control, and it runs first.** uncached-store `P0`; **no load**; uncached-store `P1`; cached-load X | `P1` | **`P1`** | `P0` → something else is stale and **every cell in this group is void** |
 | **`c-A`** ⓑ | uncached-store `P0`; cached-load X (→ `l1`); uncached-store `P1` — the stand-in for the engine; cached-load X (→ `l2`); uncached-load X | `l2 = P1` (量(qemu), `alias.load2=aaaa0002`) | 留白. **`l2 = P0`** → a stale line exists: **the DMA-stale case reproduced with no DMA engine.** `l2 = P1` → no stale line, and the disjunction above applies | `l1 ≠ P0` → the first store did not land; the final uncached load ≠ `P1` → the second did not. Either voids the cell before its verdict is read |
 | **`c-F`** | `c-A` with `CCTL 0x100` between the store and the second load | `l2 = P1` | **`l2 = P0`** — a write-back does not invalidate, so the stale line survives | `l2 = P1` → `0x100` invalidates too, and **`c-C` loses its safety precondition** (below) |
 | **`c-B`** | `c-A` with `CCTL 0x200` | `l2 = P1` | **`l2 = P1`** — `DWB_Inval` invalidates | `l2 = P0` → `0x200` does not invalidate a clean line, and ⓑ's shortlist loses its best candidate |
 | **`c-C`** | `c-A` with `CCTL 0x001` | `l2 = P1` | **`l2 = P1`** | `l2 = P0` |
 | **`c-D`** | `c-A` with one `cache 0x11` over the line. **Conditional on `x-11` retiring** | `l2 = P1` (the op is a no-op) | **`l2 = P1`** if `x-11` retired and `0x11` really is `DInval` | `l2 = P0` → it retires and does nothing, which is `x-10`'s third outcome on the D side |
+| **`c-G`** 🆕 ⓑ | 🔴 **the core vendor says an uncached READ invalidates a resident line, and nothing here had tested it.** uncached-store `P0`; cached-load X (→ `l1`, the allocate); uncached-store `P1`; **uncached-load X** (→ `l2`) — the claimed invalidator; cached-load X (→ `l3`) | `l3 = P1` (量(qemu) 2026-08-26, `c G VOID` — it is gated behind `c-A`, which is negative there, so qemu answers it in neither direction, exactly like `c-A` itself) | **`l3 = P1`** → the uncached read invalidated the line. 讀 ×1, LX4189 § 5.2: *"perform an uncached read of the affected memory locations. If the location is resident in the data cache it will be invalidated."* ⚠️ § 1.4's caveat applies in full | **`l3 = P0`** → this core does not do what the core vendor's document says its family does, and ⓑ's shortlist loses a candidate that costs one load. 🔴 **Readable only where `c-A` was positive**: with no stale line there is nothing to invalidate and both outcomes read the same, so it is gated with `c-B`/`c-C`/`c-F` |
 
 🔴 **`c-B` and `c-C` are unfalsifiable if `c-A` is negative, and the payload must
 say so rather than report a pass.** With no stale line to invalidate, every
@@ -673,7 +742,7 @@ writes back at all — **and if it reports that it does not, `c-C` does not run.
 > |---|---|---|
 > | D-cache size | **8 KiB** | 讀 ×3, and they do not share an ancestor on this point: `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` § 1 / § 2 / block diagram (*"8Kbyte D-Cache"*) — ⚠️ **§ 1.3**, a variant this unit is recorded as not being, corroborated by the public `-CG` datasheet; **this unit's own kernel** — `sltiu … 0x4000` at `0x8000CAAC`/`0x8000CBE0`/`0x8000CCD4` and `sltiu … 0x2001` at `0x8000CA18`, read through `cache-rlx.c` as `cpu_dcache_size` and `× 2`; the third-party dtsi |
 > | D line size | **16 B** | 🔴 **the strongest of the three, and it needs no source to interpret it**: eight `cache` ops at stride `0x10` covering exactly 128 bytes in this unit's own kernel *is* a line-size assumption whatever any document says |
-> | associativity | 🔴 **留白 — no source of any kind** | — |
+> | associativity | 🔄 **direct-mapped, 2026-08-26.** LX4189 § 5.1 Table 18 gives the `DCACHE` LMI exactly one form — *"Direct mapped data cache"* — and Table 25's seven configurations are all *"direct mapped"*. Unlike the I side there is no second candidate | 讀 ×1, **core vendor, and a different part** (§ 1.4: the LX4189 has no TLB and this die has 32 entries). **`v-assoc` returning K > 1 refutes this bloodline** |
 >
 > ⚠️ **All of it is what a build and a draft datasheet *believe* about this
 > silicon.** It is a prediction with a refutation condition, and it is only worth
@@ -704,10 +773,51 @@ writes back at all — **and if it reports that it does not, `c-C` does not run.
 contains **no `mtc0` to CP0 12 anywhere**, by its own audit requirement — so that
 experiment ran and did not include this. It is re-pointed here.
 
-> **Written before the cells.** 🔴 **留白 — there is no source for the expected
-> value and the honest prediction is a disjunction.** `c-r3k.c` uses `IsC`, but
-> this SoC builds `arch/rlx/`, whose `cache-rlx.c` uses `CCTL` instead, so the
-> vendor's own usage is weak evidence at best.
+> **Written before the cells.**
+>
+> 🔴 **THE CONTROL BIT IS DECIDED, AND IT IS TWO BITS: 6 AND 24.** `R1h-0` left
+> this 留白 with an instruction to name it with a source. The source turned out
+> to be the **core vendor's own document**, fetched 2026-08-26 — LX4189 Data
+> Sheet Rel 1.9 § 3.4.1, the `STATUS` register figure:
+>
+> ```
+>  31-28    27-23   22     21-16   15-8      7-6   5    4    3    2    1    0
+>  CU(3:0)    0     BEV      0     IM(7:0)    0   KUo  IEo  KUp  IEp  KUc  IEc
+> ```
+>
+> > *"The 0 fields are ignored on write and are 0 on read. It is recommended
+> > that the user explicitly write them to 0 to insure compatibility with future
+> > versions of the LX4189."*
+>
+> | bit | LX4189 | R3000 | MIPS32 |
+> |:-:|---|---|---|
+> | **6** | inside the `0` field 7–6 | **reserved** — `arch/rlx/include/asm/rlxregs.h:97` carries the comment *"bits 6 & 7 are reserved on R[23]000"*, in **Realtek's own header for this architecture port** | `SX`, which enables 64-bit **supervisor** addressing and exists only on MIPS64 |
+> | **24** | inside the `0` field 27–23 | **reserved** (the 24–23 run) | `MX`, the **DSP ASE** presence bit, a MIPS32r2 feature |
+>
+> `Config.M = 0` is 量 on this die (`probe2`, `bench/2026-08-25b/H2a.log`), so it
+> is not a MIPS32 core and neither MIPS32 field can mean anything here.
+> ⚠️ **Strictly, neither bit is *absent* from the MIPS32 figure** — both are
+> drawn there, as 64-bit and ASE fields. The honest statement is *"reserved in
+> the R3000 figure, a 64-bit/ASE field in the MIPS32 one, and inside a
+> written-as-zero field in the core vendor's own"*, and that is what the write-up
+> must say rather than the shorter claim.
+>
+> 🔴 **TWO of them rather than one, and that is not belt and braces**: a single
+> control bit cannot see a **partial** write mask. Bits 6 and 24 sit at opposite
+> ends of the register, so a mask that is not one contiguous decode shows up as
+> the two disagreeing with each other — a reading no single bit could produce.
+>
+> 🔴 **AND THE DEVICE COLUMN IS NO LONGER 留白 EITHER.** The same LX4189 figure
+> puts **bit 16 itself** inside the `0` field 21–16: on that part `IsC` and `SwC`
+> do not exist at all. So the prediction is **bit 16 reads back CLEAR**, 讀 ×1,
+> from a Lexra part. ⚠️ **The LX4189 is not this core** — its Table 2 lists CP0
+> registers 8/12/13/14/15/20 and nothing else, so it has **no TLB**, and this die
+> has 32 TLB entries (量 `CPU-08`; `Random` moved 5…29 inside 0…31). It is a
+> sibling, not this part, and one vote from a sibling is what this prediction is.
+>
+> *(Kept as written:)* `c-r3k.c` uses `IsC`, but this SoC builds `arch/rlx/`,
+> whose `cache-rlx.c` uses `CCTL` instead, so the vendor's own usage is weak
+> evidence at best.
 >
 > **否證 S.** What is 量 already is **behaviour**: stores issued while `IsC` was
 > set reached DRAM (`probe1` cell 4, `07` CORRUPT ×2). This cell reads the
@@ -715,7 +825,7 @@ experiment ran and did not include this. It is re-pointed here.
 
 | cell | what it does | expected under qemu | expected on the device | refuted by |
 |---|---|---|---|---|
-| **`s-isc`** | entered through KSEG1: read `Status`, `ori 0x00010000` **together with one control bit that has no defined meaning in either the R3000 or the MIPS32 `Status` map — 🔴 留白, `R1h-1` names it with its source before the seating, and it may not be `SwC` (bit 17)** — write, three `nop`, **read back**, restore, three `nop`. 🔴 **No load and no store between set and clear** — M5 | 未定. On a 24Kf bit 16 is in the MIPS32 *Impl* field and whether qemu preserves it is unmeasured. **`R1h-1` measures it and records it here before the seating** | 留白. **bit 16 set and the control bit clear** → bit 16 is decoded and non-functional (M5). 🔴 **Both set** → `Status` has no write mask at all, *bit 16 sticks* carries no information, and the cell reports **未定** — without the control bit, *storage* and *a decoded `IsC`* are the same reading. **Bit 16 clear** → not implemented, and cell 4's CORRUPT is fully explained | the restore not returning `Status` to its entry value → the cell has changed machine state it does not own, and everything after it is suspect |
+| **`s-isc`** | entered through KSEG1: read `Status`, set **`0x01010040`** — `IsC` (bit 16) together with the two control bits 6 and 24 — write, three `nop`, **read back**, restore, three `nop`. 🔴 **No load and no store between set and clear** — M5 | 🔴 **`before = 00000000`, `set = 00000000`, `restored = 00000000`; verdict word `0`.** 量(qemu) 2026-08-26, `qemu/2026-08-26/probe3.txt`. All three bits are masked on Malta's 24Kf, and the same run proves `Status` writes land there (`CLEAR_BEV` cleared `BEV` through the same routine). **So qemu is a worked example of a core WITH a write mask, which is the positive control on this cell's mechanism** | **bit 16 CLEAR and both control bits clear** — 讀 ×1, LX4189 § 3.4.1, and it agrees with `probe1` cell 4's behaviour. The 2×2 the payload reports: **16 set, control clear** → `IsC` is decoded and non-functional (M5). 🔴 **control bits set** → `Status` has no write mask, *bit 16 sticks* carries no information, and the cell reports **未定**. **16 clear, control clear** → not implemented as a bit, and cell 4's CORRUPT is fully explained — and `m-cu3` having stuck a bit earlier in the run is what makes that a measurement rather than *"the write did not land"*. **The two control bits disagreeing** → a partial write mask, which no single control bit could have shown | the restore not returning `Status` to its entry value → the cell has changed machine state it does not own, and everything after it is suspect |
 
 🔴 **`SwC` is not in this payload, and the reason is specific.** `SwC` swaps the
 I and D caches, and **what instruction fetch does while they are swapped is the
@@ -741,7 +851,7 @@ where the run stopped instead of leaving it to be inferred from what is missing.
 | 3 | **Group W** — `w-line0`, `w-line`, `w-back`, `w-back2`, `w-size`, `w-assoc` | `0x40` | nothing: uncached stores, cached fetches, `CCTL 0x002`. **Every instruction here has already executed on this silicon** | ⓐ's I side |
 | 4 | **`w-imem`** — `CCTL 0x020`, then `w-size` again | `0x50` | 🔴 the first `CCTL` command this project has written that its own loader does not issue **after** reset. Named by four sources (§ 1.2); the main W reading is already in the block | the IMEM discriminator only |
 | 5 | **Group M** — `m-cu3`, `m-imem` | `0x60` | `mtc0` to CP0 12 (`CU3`, restored immediately) and `mfc3`. **A trap here is an expected outcome, not a failure** | the scratchpad windows; every geometry number then carries the I-MEM residual explicitly |
-| 6 | **Group C** — `c-A0`, `c-A`, `c-E`, `c-E0`, `c-E2`, `c-F`, `c-B`, `c-C` | `0x70` | `CCTL 0x100` is new from our side; `0x001` is new from our side; both are named and both are issued by this unit's own kernel | ⓑ and ⓓ① |
+| 6 | **Group C** — `c-A0`, `c-A`, `c-A2`, `c-E`, `c-E0`, `c-E2`, `c-F`, `c-B`, `c-C`, `c-G` | `0x70` | `CCTL 0x100` is new from our side; `0x001` is new from our side; both are named and both are issued by this unit's own kernel | ⓑ and ⓓ① |
 | 7 | **Group V** — armed iff `c-A` showed a stale line, and placed outside the D-MEM window | `0x80` | nothing beyond Group C | ⓐ's D side |
 | 8 | **Group X** — `x-ri`, `x-11`, `c-D`, `x-10` and its functional leg, then `x-15`/`x-19` if `x-11` retired | `0x90` | 🔴 **the first `cache` instruction this project has ever executed.** Everything else is already in the block | ⓒ, and nothing before it |
 | 9 | **Group S** — `s-isc` | `0xA0` | `mtc0` to CP0 12 setting a bit measured **not** to work | ⓓ②, and it is last because it has the least source support of anything here |
@@ -792,7 +902,11 @@ fault during `w-imem` costs the discriminator and not the walk.
 | `m-imem` traps and `w-imem` also cannot be run | ⓐ's I-side numbers are recorded **with the I-MEM residual attached to every one of them**, and the 16 KiB coincidence is stated in the same sentence |
 | `h-brk` returns `count = 0` | Groups M and X do not run. The handler is not installed and a `cache` trap would reach the loader's permanent hang |
 | `c-A0` returns `P0` | Group C is void and so is Group V |
-| `c-A` returns `l2 = P1` | Group V is void with its reason in the block; `c-B`/`c-C`/`c-D`/`c-F` are recorded `void — no stale line to act on`, **not** as passes |
+| `c-A` returns `l2 = P1` | Group V is void with its reason in the block; `c-B`/`c-C`/`c-D`/`c-F`/**`c-G`** are recorded `void — no stale line to act on`, **not** as passes |
+| `c-A0` disagrees between its two members, or `c-A` does | 🆕 **an eviction artefact, not a coherence reading.** Every Group C cell runs on a PAIR whose separation is deliberately not a power of two, and `c-A` runs at two separations; the payload prints `c PAIR DISAGREES` and both verdicts go in the block |
+| `c-F` reports that `CCTL 0x100` does not write back | 🆕 **`c-C` DOES NOT RUN**, and that is a safety interlock rather than a data one: `CCTL 0x001` invalidates the whole D-cache without writing back, including this payload's own spilled `$31`, and the `DWB` in front of it is what makes the reload safe |
+| the separated `TC0CNT` pair reads `FFFFFFFF` twice | 🆕 **there is no timer at that address on this machine** — a third state, distinct from *frozen* and from *the load did not write its destination*, and the payload names which one it saw. 量(qemu) 2026-08-26 |
+| any arming execution returns FRESH | 🆕 **the `CCTL 0x002` re-arm did not take**, and every walk downstream of it is void. It is summed across every point into one header word, and it is the only W-group check that is assertable under qemu |
 | the walk returns a size that is not a power of two | record **未定** rather than the number. A non-power-of-two is the walk measuring something else |
 | 🔴 **a `CCTL` command was never decoded** | **no cell in this payload can confirm one was accepted.** CP0 20 is write-only and reads zero (M4), so any cell whose *pass* equals the no-op reading — `w-imem`'s *identical*, `c-F`'s `P0` — reports **未定**, not a verdict |
 | a victim's guard word ≠ `03e00008`, or `OLD == NEW` for any victim | that victim can never read STALE or FRESH. The block is void **and names which victims** |
@@ -802,17 +916,48 @@ fault during `w-imem` costs the discriminator and not the walk.
 
 ---
 
-## 10. What `R1h-1` has to build, and where it will be wrong
+## 10. What `R1h-1` had to build, and where it went wrong
 
-**Build-system work, all of it hard-coded per payload today (讀):**
-`Makefile:87-89` needs `ISC_probe3 := 0`; `:95` `PAYLOADS += probe3`; `:138-140`
-`SRC_probe3`; `:153-155` `RB_WORDS_probe3`. `tools/test-rlxprobe.sh:538` and
-`:594` each carry their own `for p in probe1 probe2` list. `RESULT_BASE` defaults
-to `0x80A00000` (`Makefile:54`) and **`probe3` must be given `0x80A02000`
-explicitly** — and § H1's standing warning applies: **`make` does not rebuild
+**✅ DONE 2026-08-26.** The list below is kept as written; what each item became
+is beside it.
+
+**Build-system work, all of it hard-coded per payload (讀):**
+`ISC_probe3 := 0`; `PAYLOADS += probe3`; `SRC_probe3`; `RB_WORDS_probe3`.
+`tools/test-rlxprobe.sh` carries two of its own `for p in probe1 probe2` lists.
+`RESULT_BASE` defaulted to `0x80A00000` and **`probe3` must be given
+`0x80A02000`** — and § H1's standing warning applies: **`make` does not rebuild
 when a knob changes, and `make show` prints the knob you asked for beside the
-binary you already had.** Empty the build directory before every line and treat
-`Nothing to be done` as a hard stop.
+binary you already had.**
+
+🔄 **The `RESULT_BASE` half was done differently and the difference is the
+point.** *"probe3 must be given `0x80A02000` explicitly"* is an instruction to a
+human, and it fails the first time the human is tired. What shipped is two
+mechanisms instead:
+
+1. **a per-payload default** — `RESULT_BASE_probe3 := 0x80A02000`, with a command
+   line still winning, so `make P=probe3 payload` alone is correct;
+2. **a parse-time refusal** — if `RESULT_BASE` names another payload's block,
+   `make` stops with
+   `RESULT_BASE=0x80A00000 is probe1's result block and probe1 has a measurement in it. Refusing to build probe3 onto it`.
+   量 2026-08-26: it fires for `0x80A00000` and for `0x80A01000`, and the case
+   fold is in it, because `0x80a00000` is the same address and a guard that
+   caught one spelling is a guard the next person spells around by accident.
+
+**Two more build-system facts that only appeared once it was built:**
+
+- 🔴 **The asm file could not be called `probe3.S`.** The Makefile maps `%.S` and
+  `%.c` onto the same `%.o`, so `probe3.S` beside `probe3.c` is one object built
+  twice, linked twice, and a page of `multiple definition of` from `ld`. It is
+  `cells.S`. Measured on the first build.
+- 🔴 **`probe3` is the first payload that MAY contain words outside MIPS-I**, so
+  its ISA check cannot be `probe1`/`probe2`'s zero. The image contains exactly
+  **5 `cache` ops** (four in Group X, one inside `c-D`'s leaf) and **8 `mfc3`**,
+  and the suite names every one of them by encoding and count. ⚠️ **`hazlint
+  --isa` labels the eight `mfc3` as `COP1X (MIPS-IV)`**: opcode `0x13` is COP1X
+  from MIPS-II onward but it is **COP3 on MIPS-I**, which is what this core is
+  (`Config.M = 0`, 量) — and this unit's own kernel contains four `mtc3`. The
+  mislabel is recorded here and in `SPEC.md`; it does not affect the gate, which
+  is the load-delay check.
 
 **One mutation per cell, and the mutation must make that cell's check fire.**
 Three of them are worth naming now:
@@ -838,23 +983,42 @@ Three of them are worth naming now:
   `cache` op means the harness is broken, not that qemu found something.**
 - 🔴 **否證 ⓐ's negative control is guaranteed to fail under qemu.** The harness
   must not assert it there. Assert it only against a device capture.
-- 🔴 **The qemu expectations for `m-cu3`, `s-isc` and the whole of Group T are
-  未定 today.** `R1h-1` measures them under qemu and writes the numbers into this
-  file **before** the seating. A cell whose qemu column is still 未定 at seating
-  time has no control on its own emitter.
-- 🔴 **No qemu serial capture is committed anywhere in this repository.**
-  `grep -rln "rlxprobe: cell" bench/` returns nothing; `qemu-run.sh` writes to a
-  `mktemp -d`. Every *"expected under qemu"* value in this file that came from a
-  prior run survives as prose plus one CI assertion. **`R1h-1` commits the qemu
-  log beside the device log**, or this column has no artefact behind it.
-- **The victim primitive changed shape** (§ 3: two words, guard first). Every
-  `probe1` habit about `vaddr+4` being the guard is now wrong, and
-  `V_NOTVICTIM`/`V_CORRUPT` must be re-derived against the new layout rather than
-  copied.
-- **The arena is generated at run time**, so `hazlint`'s population no longer
-  covers the victims. **Its coverage report must say so**, or a reader takes a
-  clean run as covering code the scan never saw — which is `hazlint`'s own
-  finding 1 (the population control that exercised a path no scanned file took).
+- ✅ **The qemu expectations for `m-cu3`, `s-isc` and the whole of Group T were
+  未定 and are now measured** — 2026-08-26, `qemu/2026-08-26/probe3.txt`. `CU3`
+  does not stick on Malta's 24Kf, `s-isc`'s three bits all read back clear, and
+  `TC0CNT` reads `FFFFFFFF` because Malta has nothing at that address. **Two of
+  those turned out to be positive controls rather than blanks**: a core with a
+  `Status` write mask is exactly what `s-isc` needs to demonstrate its own
+  mechanism on, and *nothing is mapped there* is a third state Group T's
+  refutation condition did not have and now does.
+- ✅ **No qemu serial capture was committed anywhere in this repository, and
+  now one is.** `qemu-run.sh` wrote to a `mktemp -d`; it writes to
+  `tools/rlxprobe/build/qemu/` now, which is gitignored but survives the run, and
+  `qemu/2026-08-26/probe3.txt` is the first capture this project has kept.
+  `qemu/README.md` is a directory of its own beside `bench/` **precisely so that
+  a reader sweeping for readings never has to work out which is silicon from a
+  filename**.
+- ✅ **The victim primitive changed shape** (§ 3: two words, guard first) and
+  the verdicts were re-derived rather than copied. What that produced:
+  `V_NOTVICTIM` is now **the guard read UNCACHED BEFORE the call**, so a bad
+  victim is never called at all — `probe1` could only report a corrupted victim
+  after jumping into it; `V_CORRUPT` is the same guard read **again across** the
+  call; and `V_VOIDPRIME` was added, because a victim that returns the prime
+  means the two instructions never executed and folding that into *weird* would
+  lose it. 🔴 **The correction the re-derivation actually caught is in this
+  file**: § 6.2's `w-line` row said *"`+4` FRESH → the block is void"*, which is
+  `probe1`'s layout — under the new one `+4` is the PATCHED word and `+0` is the
+  guard, so the must-fire is `V0` itself.
+- 🔄 **The arena is generated at run time — and the gate still covers its
+  words, which is better than the disclaimer this bullet asked for.** The
+  instruction pair is **assembled in `.text`** (`rlx_vic_template` in `cells.S`),
+  gated with everything else, and `rlx_w_arm` COPIES it. What `hazlint` does not
+  see is the *replication*, and a replication introduces no instruction; the
+  immediate the experiment rewrites is sixteen bits of an `addiu`, which cannot
+  introduce a hazard. That is `victims.S`'s own argument preserved rather than
+  waived. **The payload also reads the template back through KSEG1 at run time
+  and refuses to build an arena if it is not the two words this file assembled**,
+  which is the version of the check that can fail.
 
 ---
 
@@ -869,26 +1033,55 @@ has already paid for that lesson.** 量: `make P=probe2 payload
 RESULT_BASE=0x80A01000` printed `Nothing to be done for 'payload'` — no compile,
 no `show`, no `sha256` — while `build/probe2/probe2.bin` in the tree was a
 `0x80A00000` build. The object rules depend on the sources and two headers and
-on **nothing that carries a `-D`**. So the seating-day procedure is:
+on **nothing that carries a `-D`**.
 
-```
+### 🔴 THE REBUILD-ON-THE-DAY PROCEDURE
+
+**Run this before the board is powered, and read every line of the output.**
+It was run for the first time on 2026-08-26 and the numbers below are that run's.
+
+```sh
+# 1. empty the build directory.  Not `make clean` -- that removes every
+#    payload, and probe1/probe2 in the same tree are what the runsheet's
+#    earlier cells were built from.
 rm -rf tools/rlxprobe/build/probe3
+
+# 2. build.  RESULT_BASE is the per-payload default now, so it does not have
+#    to be typed -- it is typed anyway, because a procedure that relies on a
+#    default is a procedure that cannot be checked from its own transcript.
 make -C tools/rlxprobe P=probe3 payload RESULT_BASE=0x80A02000
-make -C tools/rlxprobe P=probe3 show          # record the sha256 it prints
+
+# 3. read the numbers back
+make -C tools/rlxprobe P=probe3 show
 ```
 
-and **`Nothing to be done` is a hard stop, not a convenience.** The on-the-wire
-check is `rb=80a02000` in the banner — lower case, because `report.c`'s digit
-table is `"0123456789abcdef"` while the loader's is upper. `rb=80a00000` or
-`rb=80a01000` means the binary is a `probe1`/`probe2`-based build and is about to
-poison a block that holds a measurement.
+**Five things in that output are checks, not decoration:**
 
-**2. Every qemu column has to be closed now, not then.** The three still marked
-未定 — `m-cu3`, `s-isc`, and all of Group T — are `R1h-1`'s to measure and write
-back into this file. **A cell whose qemu column is still 未定 months later has no
-control on its own emitter, and nobody will remember why the box was empty.**
-The same goes for committing a qemu serial capture beside the eventual device
-log: there is not one in this repository today.
+| line | what it must say on 2026-08-26 | what a different value means |
+|---|---|---|
+| `make` itself | it **compiles**. `Nothing to be done for 'payload'` is a **HARD STOP** | the tree already held an image and nothing rebuilt; `show` will print the knob you asked for beside the binary you already had |
+| `sha256` | `486d75be536809dc090603a2b63e1b8c15d3fc56467cef767ea7a5134a5cfe5e` (26,624 → **29,024 bytes** as built here) | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
+| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 641` | anything else and the read-back is the wrong length or the wrong address |
+| `stale check` | `rb=80a02000` | this is the **on-the-wire** check and it is what the operator watches for in the banner |
+| `vectors` / `uart` | `general 0x80000080`, `THR 0xB8002000`, `CLEAR_BEV=0`, and **no `*** NOT A DEVICE BUILD ***` line** | a qemu image would install a handler into RAM this device never reads and then fault into the loader's permanent hang |
+
+**And the on-the-wire check once it runs:** the banner must read `rb=80a02000` —
+**lower case**, because `report.c`'s digit table is `"0123456789abcdef"` while
+the loader's is upper, so `rb=80A02000` is a string a correct run never produces.
+`rb=80a00000` or `rb=80a01000` means the binary is a `probe1`/`probe2`-based
+build and is about to poison a block that holds a measurement. Since 2026-08-26
+that particular mistake cannot reach a `.bin` at all — `make` refuses at parse
+time — but the banner check costs nothing and covers the case where the image on
+the day came from somewhere other than this Makefile.
+
+**2. ✅ Every qemu column is closed.** The three that were 未定 — `m-cu3`,
+`s-isc`, and all of Group T — were measured on 2026-08-26 and are in their cells
+above. **And the first qemu serial capture this repository has ever committed is
+`qemu/2026-08-26/probe3.txt`**, with `qemu/2026-08-26/probe3.build` recording the
+host, the qemu version, the toolchain, both builds and the device image's
+`sha256`; `qemu/README.md` says what a capture in there is and what it cannot
+show. `tools/audit-bench-log.py` was run over both files — 8/8 patterns fire on
+its synthetic control, 0 hits on the capture.
 
 **3. The running order is fixed by physics, not by the schedule.** `probe3` runs
 **first** in that seating. `R3`'s DoD is *my kernel boots to a shell and pings*,
@@ -916,6 +1109,7 @@ properties of a board that will have been power-cycled many times by then.
 | ⓓ② | `Status.IsC` as a bit | `SPEC.md` `CPU-19` 殘留 | — |
 | 🆕 | `CCTL 0x010`/`0x020` named; the I-MEM/D-MEM windows | `SPEC.md` `CPU-24` (closed 2026-08-26 on the desk), `CPU-24` 殘留, and `CPU-46` | `notes/cache-model.md` |
 | 🆕 | `CCTL 0x100`'s effect — **only if `c-E` read `P0` and `c-E0` held**; in the write-through branch there is no dirty line and `c-E2` cannot fail | `SPEC.md` `CPU-43`, or **未定** | — |
+| 🆕 | **`c-G`: does an uncached READ invalidate a resident clean line** — the core vendor says its family's does, and if this one does too then `R6` has a per-line invalidate primitive that needs no `CCTL` at all | `SPEC.md` `CPU-45` | `docs/rlx-cache-and-cp0.md` § ② — it is a SECOND candidate mechanism for decision ②, and the cheapest one |
 | 🆕 | `TC0CNT` as an instrument; the 14.286057 MHz base clock | `SPEC.md` `CLK-17` — **the number the payload divides by must not live only inside a derivation** | `R5-0` |
 | 🆕 | `cache 0x10` as a capability, for `CPU-04` | `SPEC.md` `CPU-04` — **as a capability, not as a name.** `CLAUDE.md`'s ban stands | — |
 

@@ -1,0 +1,44 @@
+# probe3 under qemu-system-mips -- 2026-08-26
+
+host        Linux 6.6.87.2-microsoft-standard-WSL2
+qemu        QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+toolchain   mips-linux-gnu-gcc (Ubuntu 12.4.0-2ubuntu1~24.04) 12.4.0
+machine     -M malta -m 32 -nographic -kernel <elf> -serial file:
+seconds     120 (nothing here halts; the run is bounded by timeout)
+
+## the DEVICE build -- the image that will be uploaded
+    payload    build/probe3/probe3.bin   (path elided: audit-bench-log.py refuses a home path)
+    load addr  0x80500000      entry is byte 0 of the image
+    size       29024 bytes
+    sha256     486d75be536809dc090603a2b63e1b8c15d3fc56467cef767ea7a5134a5cfe5e
+    first word 3c1d8051   (must be the first instruction of _start)
+    reset      RESET=1   1 = arm the watchdog and hand the prompt back with no power cycle
+    flags      50010002   header word 5, and the banner prints it
+    flush      CCTL 0x002 -- measured sufficient, R1d decision 1. Not a knob
+    isc        ISC=0   1 = rlx_isc_inv is linked. probe2/probe3 must be 0
+    template   0x80500ed0 .. 0x80500ed8   the two-word victim, GUARD FIRST
+    cp3 stubs  0x80500fa0   eight, 12 bytes each
+    outside I  5 cache op(s) + 8 mfc3 -- every word in this image that
+               is not MIPS-I. tools/test-rlxprobe.sh names each one and
+               fails if the set changes -- probe1/probe2 assert zero, and
+               probe3 cannot, because executing them IS question (c).
+    stale check the banner must read  rb=80a02000  -- LOWER case, because
+               report.c s digit table is 0123456789abcdef while the loader s
+               is upper. rb=80a00000 or rb=80a01000 means this image is a
+               probe1/probe2-based build and is about to poison a measurement.
+    result     RESULT_BASE=0x80A02000   read it back with: DW 80A02000 641
+    geom       GEOM=0   base 0x80B00000   1 = ARMED, and it can write 1 MiB
+    uart       THR 0xB8002000  LSR 0xB8002014
+    vectors    UTLB 0x80000000  general 0x80000080   CLEAR_BEV=0
+
+## the qemu build -- NOT the same image
+    UART_THR=0xB80003F8 UART_LSR=0xB80003FD VEC_GENERAL=0x80000180
+    CLEAR_BEV=1 RET_ERET=1
+    Three constants change and nothing else. qemu's Malta is a 24Kf, a
+    MIPS32 part, so its general vector with BEV=0 is 0x80000180, it comes
+    out of -kernel with BEV set, and rfe is a Reserved Instruction on it.
+    The banner in probe3.txt says so on its first line.
+
+## the capture
+    probe3.txt   5866 bytes, 125 lines
+    sha256       68919ad26530fe903f169f4494730c7d46569c1692b201cf483827cb5b36da26

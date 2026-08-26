@@ -24,3 +24,13 @@
 # B.log and 47 out of E.log.  A transcript that has been normalised is not a
 # transcript.
 bench/**        -text
+
+# And qemu captures are transcripts for the same reason, 2026-08-26.
+#
+# `report.c` ends every line `\r\n`, so a serial capture out of the emulator
+# carries CR exactly as a bench log does. Measured on the first one committed:
+# `git add` warned `CRLF will be replaced by LF` on
+# `qemu/2026-08-26/probe3.txt` -- 125 lines, so 125 bytes of what the payload
+# actually put on the wire. The `.build` file beside it records the capture's
+# own sha256, and a normalised capture does not match it.
+qemu/**         -text

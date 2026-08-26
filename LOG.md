@@ -4361,3 +4361,139 @@ ping 得通」，而那個狀態下 loader 沒了、DRAM 沒了，沒有 `<RealT
 
 `PROGRESS.md`（§ Now、`R1h` 步驟表重切、§ Blocked on 收窄）、
 `docs/probe3-cells.md` §10b（新）。
+
+
+---
+
+## 2026-08-26（桌面＋儀器，第四段）— `R1h-1`：`probe3` 建成並在 qemu 上跑到底，而核心廠商的資料表否證了格子表四件事
+
+**桌面，不通電，零 flash 位元組，零電源循環。** `R1h` 的桌面段。
+
+### 動手前先做完的三件事，順序就是被指定的那個順序
+
+**③ 建置系統，而 `RESULT_BASE` 那一半刻意沒照原話做。**
+四個位置照做：`ISC_probe3 := 0`、`PAYLOADS += probe3`、`SRC_probe3`、
+`RB_WORDS_probe3`。但 `docs/probe3-cells.md` §10 原本寫的是
+「**`probe3` 必須明確給 `0x80A02000`**」—— 那是一句給人看的指示，
+而人會累。**改成兩個機制**：
+
+1. **per-payload 預設**（`RESULT_BASE_probe3 := 0x80A02000`，命令列仍然贏），
+   所以光打 `make P=probe3 payload` 就是對的；
+2. **parse-time 拒絕** —— `RESULT_BASE` 指到別的 payload 的區塊就 `$(error)`。
+   量 2026-08-26：`0x80A00000` 與 `0x80A01000` 兩個方向都會擋下來，
+   而且**帶大小寫折疊**，因為 `0x80a00000` 是同一個位址，
+   一個只認一種拼法的守門是下一個人會不小心繞過去的守門。
+
+保護的是**測量**：`0x80A00000` 是 `probe1` 六格 `R1d` 的區塊，
+`0x80A01000` 是 `probe2` 的 256 列 CP0 census，兩份都是從 DRAM 撈回來的。
+**建錯 base 的 payload 不會失敗** —— 它會跑完、蓋掉別人的量測、
+然後印出一份自己格式完全正確的區塊。
+
+**① 三個未定的 qemu 欄，全部量掉。** 量(qemu) 2026-08-26,
+`qemu/2026-08-26/probe3.txt`：
+
+| 格子 | qemu 上量到 | 而它不只是填空 |
+|---|---|---|
+| `m-cu3` | `before = 00000000`、`set = 00000000` —— **bit 31 不會黏** | 同一次跑證明 `Status` 寫得進去（`CLEAR_BEV` 就是走同一條 routine 清掉 `BEV` 的）。**qemu 是一台「有寫入遮罩」的機器**，那正是 `s-isc` 需要的正控制 |
+| `s-isc` | `set = 00000000` —— bit 16、bit 6、bit 24 三顆全部讀回為 0 | 同上 |
+| Group T | `TC0CNT` 每次讀回 **`FFFFFFFF`**，每個 bracket 都是 0 | 🔴 **那不是「凍住」。** 值不等於任一個 prime，所以 load 確實寫了目的暫存器 —— Malta 那個位址**什麼都沒有**。**否證 T 因此多了第三種狀態**，而寫格子表的時候那一種不存在 |
+
+**② 這個 repo 第一份被 commit 的 qemu capture。**
+`qemu-run.sh` 從第一天就寫進 `mktemp -d`，所以「qemu 上預期」那一欄
+一直只有散文加一條 CI 斷言撐著。現在：`qemu/` 是 `bench/` 的**平行目錄**，
+自己的 README 寫明「這不是這台裝置的量測」；預設輸出改到
+`tools/rlxprobe/build/qemu/`（gitignore 但活得過那次跑）；
+`tools/audit-bench-log.py` 掃過那兩個檔（8/8 pattern 在合成控制上發射，0 命中）。
+**`bench/` 保持只放矽片，而一個幾個月後掃 `bench/` 找讀數的人，
+不必從檔名去推哪一份是模擬器。**
+
+### 🔴 然後是今天真正的發現：LX4189 資料表被抓下來，而它否證了格子表四件事
+
+`SOURCES.json` 的 `ds-lexra-lx4189` 條目原本結尾是
+*「NOT DOWNLOADED INTO refs/: cited only. If it is ever fetched it moves to
+documents WITH a sha256.」* —— 抓下來了（sha256 `6afb1415…`，
+**PDF 不進 repo**，`CLAUDE.md` 禁止）。
+
+⚠️ **而但書比原本記的更硬**：Table 2 列出 LX4189 全部的 CP0 暫存器是
+8／12／13／14／15／20，**沒有 TLB**。這顆有 32 個 entry（`CPU-08` 量，
+`probe2` census 的 `Random` 讀 5…29 佐證）。
+**它是同廠的另一顆，而且是可證明地不是這顆。** 下面每一條都是「讀，關於一顆相關的核心」。
+
+| | 文件說什麼 | 改掉什麼 |
+|:-:|---|---|
+| ① | §5.2：*"perform an uncached read … If the location is resident in the data cache it will be invalidated"*、*"a write to a KSEG1 address has no affect on the contents of the data cache"* | 🔴 **`c-E0`／`c-E2` 是壞的，而且會誤打誤撞否證掉 `CCTL 0x100`。** `c-E` 最後一步就是 uncached load，照 ① 它會把那條 line 作廢 —— 接在後面的 `c-E2` 發 `DWB` 時髒 line 已經不在，讀回 `P0` 會被記成「`0x100` 不寫回」。**那是執行順序製造出來的否證。** 三個 E 格子改成各跑各的完整序列。同一句話也給了 `c-A` 第一個期望值：**`l2 = P0`** |
+| ② | 同上 | 🆕 **新格子 `c-G`。** ⓑ 問「這顆上有什麼能作廢一條乾淨的 line」，核心廠商的答案是 **uncached read**，不用任何 `CCTL`。五個 load、零條新指令；成立的話 `R6` 拿到一個一個 load 的 per-line 作廢原語 |
+| ③ | §5.1／§5.6：line 可組態成 16／32／64／128 位元組（4／8／16／32 words） | 🔴 **`w-line` 的 void 門檻在錯的地方。** 原本探到 `+192` 就宣告「超出任何合理的 line」—— **128 位元組在這個家族是合法的**，那個門檻會把一條真的 128 位元組 line 記成 void。探針延伸到 `+320`，門檻移到 `+256` |
+| ④ | §5.1 Table 18：`ICACHE` 是 *"Direct mapped or two-way set associative"*，`DCACHE` 只有 *"Direct mapped"* | 🔴 **關聯度不再是「任何來源都沒有，哪裡都沒有」。** I 側搜尋空間 **{1, 2}**，D 側預測 **direct-mapped**。`w-assoc`／`v-assoc` 從盲掃變成有預測可否證：**量到 K = 4 就否證這條血緣** |
+
+**兩個不是更正的東西。**
+🔴 **LX4189 的 `PRID` 是 `0x0000c401`**（Table 2）。這台讀 `0x0000CD01`。
+那是這個專案手上**第一個** Lexra `PRId` 資料點 —— 它只說 `0xCD01` 不是 LX4189，
+**一個點不是一張指派表，`CLAUDE.md` 的禁令一動也不動**。
+以及 §3.4.2：*"Other exceptions, BEV = 0 → 0x8000_0080"*，
+**第四個**互相獨立的 vector 來源，來自核心廠商。
+
+### `s-isc` 的控制位元：定案，而來源就是那張 `STATUS` 圖
+
+LX4189 §3.4.1 把 **27-23、21-16、7-6 全列為「0」欄位**，
+散文寫 *"The 0 fields are ignored on write and are 0 on read"*。
+
+**取 bit 6 與 bit 24，兩顆。** bit 6 在 LX4189 的「0」欄位 7-6 裡、
+R3000 保留（`arch/rlx/include/asm/rlxregs.h:97` 的註解逐字寫
+*"bits 6 & 7 are reserved on R[23]000"*，**Realtek 自己這個架構移植的標頭**）、
+MIPS32 的 `SX` 是 MIPS64 專用；bit 24 在「0」欄位 27-23 裡、R3000 保留、
+MIPS32 的 `MX` 是 DSP ASE 的存在位元。
+**兩顆而不是一顆，因為一顆看不到「部分遮罩」** —— 它們在暫存器兩端，
+遮罩不是一段連續解碼時，兩顆會互相不一致，而那是單一位元永遠產不出的讀數。
+
+⚠️ **也要照實說**：嚴格講**沒有任何一顆位元「在兩張圖裡都沒畫」**。
+bit 6／24 在 MIPS32 的圖上是有畫的，只是畫的是 64 位元與 ASE 欄位。
+誠實的說法是「R3000 圖裡保留、MIPS32 圖裡是 64 位元／ASE 欄位、
+核心廠商自己的圖裡是寫入被忽略的 0 欄位」，**寫作要照這句寫，不可以簡化成前一句**。
+
+🔴 **而同一張圖把 bit 16 自己也放在「0」欄位裡** —— 在那顆 Lexra 上
+`IsC`／`SwC` 根本不存在。所以裝置端的期望值也不再是留白：**bit 16 讀回為 0**。
+
+### payload 本身，以及它自己咬到的三件事
+
+`cells.S`（新，約 900 行）＋ `probe3.c`（新，約 1,300 行）。
+過 `hazlint` gate，**804 個 load、0 violation**，在 qemu 上從 banner 跑到
+`rlxprobe: end`，**5,866 位元組／125 行**。
+
+1. 🔴 **asm 檔不能叫 `probe3.S`。** Makefile 把 `%.S` 與 `%.c` 對到同一個 `%.o`，
+   所以 `probe3.S` 擺在 `probe3.c` 旁邊＝同一顆 object 被建兩次、連兩次、
+   `ld` 吐一整頁 `multiple definition of`。改名 `cells.S`。**第一次建置就量到。**
+2. 🔴 **第一版把 nibble 累加器放在 `$4`，那會在迴圈中途毀掉 `SAFE_A0` 的守門值。**
+   `SAFE_A0` 只有在值還在的時候才是守門；把迴圈計數器放進 `$4` 就是
+   把 loader 的 `do_reserved` 交給一個小整數當 `pt_regs *` ——
+   **正是這個巨集存在的理由，被安裝它的程式碼重新引入。**
+   規則寫進檔頭：**`SAFE_A0` 之後 `$4` 不再被寫。**
+3. 🔴 **`flags` 裡的「跑在 KSEG0」位元被自己的建置標記蓋掉。**
+   `FLAGS_W` 從 `0x50000000`（`'P'`）起跳，所以 bit 28 與 bit 30 每個建置都是 1，
+   而 `0x40000000` 的 KSEG0 旗標永遠讀成 set。
+   量：第一次 qemu 跑印 `flags=50070002`，
+   **那條「NOT IN KSEG0 —— 每一格快取格子都作廢」的警告根本發不出來。**
+   移到自己的標頭字 `H_KSEG0`。`FLAGS_W` 是**建置**標記，`make show` 印同一條算式，
+   一個執行期位元不該住在裡面。
+
+### 三個自我閘門，全部在 qemu 上照設計的方向發射
+
+`h-brk`（handler 沒裝起來 → Group M 與 X 不跑）、
+`c-A`（沒有 stale line → Group V 與 `c-B`/`c-C`/`c-D`/`c-F`/`c-G` **記 void 不記 pass**）、
+`c-F`（`DWB` 不寫回 → `c-C` 不跑，而那是安全互鎖不是資料互鎖）。
+量(qemu)：`g.ca=0`、`g.cf=0`，四個 C 格子印 `VOID 00000010`，
+Group V 印出它為什麼不跑。**閘門在 qemu 上是可斷言的，而快取讀數不是。**
+
+以及一個免費的檢查：**`w.arm.fresh=0`** ——
+「重新武裝之後每個 victim 的第一次執行都必須回 OLD」這條偵測器
+在 qemu 上也成立，所以「拆掉 `CCTL 0x002` 重新武裝」那個 mutation
+**在 qemu 上是斷言得了的**。§6.2 說它免費，這次證明了。
+
+### 動到的檔
+
+`tools/rlxprobe/cells.S`（新）、`tools/rlxprobe/probe3.c`（新）、
+`tools/rlxprobe/rlxdefs.h`、`tools/rlxprobe/Makefile`、`tools/rlxprobe/qemu-run.sh`、
+`qemu/README.md`（新）、`qemu/2026-08-26/`（新）、
+`docs/probe3-cells.md`、`SOURCES.json`、
+`SPEC.md` `CPU-04`／`CPU-19` 殘留／`CPU-24` 殘留／`CPU-25`／`CPU-43`／`CPU-44`／
+`CPU-45`／`CPU-46`／`CLK-17`。

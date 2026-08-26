@@ -41,7 +41,15 @@ set -o nounset
 P="${1:?usage: qemu-run.sh <payload> [bin] [elf]}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SECS="${QEMU_SECONDS:-8}"
-OUT="${QEMU_OUT:-$(mktemp -d)/$P}"
+# The capture LANDS SOMEWHERE THAT SURVIVES THE RUN.  It used to be a
+# `mktemp -d`, and the consequence was that this repository had never
+# committed a single qemu serial capture: every "expected under qemu" value
+# in `docs/probe3-cells.md` rested on prose plus one CI assertion, with no
+# artefact behind it.  `build/` is gitignored, so the default keeps the file
+# without committing it; `qemu/` at the repo root is where a capture goes
+# when it is meant to be evidence, and `qemu/README.md` says what one is and
+# what it cannot show.
+OUT="${QEMU_OUT:-$HERE/build/qemu/$P}"
 
 if ! command -v qemu-system-mips >/dev/null 2>&1; then
     echo "  skip   qemu                                       no qemu-system-mips on this machine"
@@ -75,6 +83,7 @@ timeout "$SECS" qemu-system-mips \
 rc=$?
 echo "  qemu exit $rc (124 = the timeout expired, which is expected: nothing here halts)"
 echo "  serial   $OUT.txt   $(wc -c <"$OUT.txt") bytes"
+echo "  sha256   $(sha256sum "$OUT.txt" | cut -d' ' -f1)"
 echo
 sed 's/^/  | /' "$OUT.txt"
 echo

@@ -51,9 +51,27 @@ NM          = $(CROSS)nm
 LOADADDR   ?= 0x80500000
 STACK_SIZE ?= 0x4000
 RESET      ?= 1
-RESULT_BASE?= 0x80A00000
 GEOM       ?= 0
 GEOM_BASE  ?= 0x80B00000
+
+# THE RESULT BLOCK, AND WHY THE DEFAULT IS PER PAYLOAD SINCE 2026-08-26.
+#
+# It was one global default, 0x80A00000, and `docs/probe3-cells.md` §10b says
+# probe3 "must be given 0x80A02000 explicitly".  A knob that must be typed every
+# time is a knob that will eventually not be, and what it costs here is a
+# MEASUREMENT: probe1's block at 0x80A00000 holds `R1d`'s six cells and probe2's
+# at 0x80A01000 holds the CP0 census, both recovered from DRAM by `DW` after
+# their seatings.  A probe3 built with the default would poison one of them.
+#
+# So each payload names its own, a command line still wins (`?=` plus make's
+# rule that command-line variables beat everything), and the RB_CLASH check
+# further down turns the remaining case -- an explicit value that lands on
+# another payload's block -- into a parse-time refusal rather than a comment.
+RESULT_BASE_probe0 := 0x80A00000
+RESULT_BASE_probe1 := 0x80A00000
+RESULT_BASE_probe2 := 0x80A01000
+RESULT_BASE_probe3 := 0x80A02000
+RESULT_BASE?= $(RESULT_BASE_$(P))
 # The 16550. These are the DEVICE's addresses and nothing but qemu-run.sh ever
 # overrides them -- see rlxdefs.h. On this part the registers are four bytes
 # apart, so LSR is THR + 0x14 and not THR + 5.
@@ -87,12 +105,19 @@ RET_ERET   ?= 0
 ISC_probe0 := 0
 ISC_probe1 := 1
 ISC_probe2 := 0
+# probe3 writes CP0 Status in two places and neither of them is this routine.
+# `rlx_status_or`/`rlx_status_poke` in cells.S set `CU3` (Group M) and `IsC`
+# with two control bits (Group S), each with NO memory reference inside the
+# window -- which is M5, and M5 is probe1 cell 4's `07` CORRUPT measured on both
+# victims.  `rlx_isc_inv` is the routine whose byte stores DID reach DRAM, and
+# it stays unlinked here for the same reason it is unlinked in probe2.
+ISC_probe3 := 0
 
 HERE       := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 HAZLINT    := $(HERE)../hazlint
 BUILD      ?= $(HERE)build
 
-PAYLOADS   := probe0 probe1 probe2
+PAYLOADS   := probe0 probe1 probe2 probe3
 
 # -march=mips1 needs -msoft-float on gcc 12.4.0, which rejects the flag on its
 # own: "cc1: error: '-march=mips1' requires '-mfp32'".  Measured 2026-08-24;
@@ -135,9 +160,45 @@ LDFLAGS     = $(ARCH) -nostdlib -nostartfiles -static \
 # indirection that hides which flags reached which object.
 P          ?= probe0
 override ISC := $(ISC_$(P))
+
+# THE RESULT-BLOCK COLLISION GUARD, and it refuses at PARSE TIME so no goal can
+# reach around it.
+#
+# Three payloads now write three blocks and two of them hold measurements that
+# were recovered from DRAM after their seatings: probe1's six R1d cells at
+# 0x80A00000 (`bench/2026-08-25/H1c.log`) and probe2's 256-row CP0 census at
+# 0x80A01000 (`bench/2026-08-25b/H2g.log`).  A payload built for the wrong base
+# does not fail.  It runs, poisons hundreds of words over somebody else's
+# measurement, and reports a perfectly well-formed block of its own.
+#
+# The per-payload defaults above make the common case right.  This makes the
+# remaining case -- an explicit `RESULT_BASE=` that lands on another payload's
+# block -- a refusal.  probe0 is not in the list: it writes no result block at
+# all, so it cannot collide with one.
+#
+# The `subst` chain is a case fold.  `make` has no `tolower`, and 0x80A00000 and
+# 0x80a00000 are the same address; a guard that only caught one spelling would
+# be a guard the next person spells around by accident.
+RB_LC        := $(subst A,a,$(subst B,b,$(subst C,c,$(subst D,d,$(subst E,e,$(subst F,f,$(RESULT_BASE)))))))
+RB_LC_BARE   := $(patsubst 0x%,%,$(RB_LC))
+RB_LC_probe1 := 0x80a00000
+RB_LC_probe2 := 0x80a01000
+RB_LC_probe3 := 0x80a02000
+RB_CLASH     := $(filter-out $(P),$(strip \
+                  $(foreach q,probe1 probe2 probe3,$(if $(filter $(RB_LC),$(RB_LC_$(q))),$(q)))))
+ifneq ($(RB_CLASH),)
+$(error RESULT_BASE=$(RESULT_BASE) is $(RB_CLASH)'s result block and $(RB_CLASH) has a measurement in it. Refusing to build $(P) onto it)
+endif
 SRC_probe0 := start.S uart.S report.c probe0.c
 SRC_probe1 := start.S uart.S report.c cache.S victims.S probe1.c
 SRC_probe2 := start.S uart.S report.c cache.S exc.S probe2.c
+# probe3 links exc.S for the handler and the `break` control, cache.S for
+# `rlx_cctl` / `rlx_call0_primed` / `rlx_call2_uncached`, and cells.S for
+# everything the cell table needs that neither of those already has.  It does
+# NOT link victims.S: its victim is two words and lives in a template cells.S
+# assembles, which the arena is a run-time copy of -- so the sixteen 1 KiB-
+# aligned functions probe1 carries would be 16 KiB of `.text` nothing executes.
+SRC_probe3 := start.S uart.S report.c cache.S exc.S cells.S probe3.c
 SRC        := $(SRC_$(P))
 # The result block's length in words, so `show` prints a DW that reads all of it.
 # 88 was printed for BOTH payloads until 2026-08-25 and is right for neither: it
@@ -153,6 +214,14 @@ SRC        := $(SRC_$(P))
 RB_WORDS_probe0 := 0
 RB_WORDS_probe1 := 137
 RB_WORDS_probe2 := 809
+# probe3: 64 header + 192 cell results + 16 rows x 8 + 256 bitmap words + seal.
+# The read-back is `DW 80A02000 641` = 15 + 2 + 47 x 161 + 9 = 7,593 bytes and
+# 1.98 s at 3840 B/s (LDR-07, fitted over 91 captures by tools/reply-size.py).
+# That is 79 % of the largest `DW` this loader has ever executed -- 820 words /
+# 9,661 bytes, 量 H2g -- and three digits, so it does not test whether the
+# loader accepts a four-digit decimal length.  Cell `P3` tests that separately
+# and nothing here depends on the answer.
+RB_WORDS_probe3 := 641
 
 # probe2's build stamp, recomputed here from the same bit positions probe2.c's
 # FLAGS_W uses. It is a SECOND copy of that arithmetic on purpose: the payload
@@ -290,16 +359,35 @@ show: $(BIN)
 	@printf 'first word %s   (must be the first instruction of _start)\n' \
 	        "$$($(OBJDUMP) -d $(ELF) | sed -n 's/^ *$(patsubst 0x%,%,$(LOADADDR)):\t\([0-9a-f]*\).*/\1/p' | head -1)"
 	@echo 'reset      RESET=$(RESET)   1 = arm the watchdog and hand the prompt back with no power cycle'
-ifeq ($(P),probe2)
-	@echo 'flags      $(FLAGS_HEX)   probe2 header word 5, and the banner prints it'
+ifneq ($(filter $(P),probe2 probe3),)
+	@echo 'flags      $(FLAGS_HEX)   header word 5, and the banner prints it'
 	@echo 'flush      CCTL 0x002 -- measured sufficient, R1d decision 1. Not a knob'
-	@echo 'isc        ISC=$(ISC)   1 = rlx_isc_inv is linked. probe2 must be 0'
+	@echo 'isc        ISC=$(ISC)   1 = rlx_isc_inv is linked. probe2/probe3 must be 0'
 endif
-ifneq ($(filter $(P),probe1 probe2),)
+ifeq ($(P),probe3)
+	@printf 'template   %s .. %s   the two-word victim, GUARD FIRST\n' \
+	        "$$($(NM) $(ELF) | awk '$$3=="rlx_vic_template"{print "0x"$$1}')" \
+	        "$$($(NM) $(ELF) | awk '$$3=="rlx_vic_template_end"{print "0x"$$1}')"
+	@printf 'cp3 stubs  %s   eight, 12 bytes each\n' \
+	        "$$($(NM) $(ELF) | awk '$$3=="rlx_cp3_stubs"{print "0x"$$1}')"
+	@printf 'outside I  %s cache op(s) + %s mfc3 -- every word in this image that\n' \
+	        "$$($(OBJDUMP) -d $(ELF) | grep -cE '[.]word[[:space:]]+0xbd[0-9a-f]{6}')" \
+	        "$$($(OBJDUMP) -d $(ELF) | grep -cE '[[:space:]]mfc3[[:space:]]')"
+	@echo '           is not MIPS-I. tools/test-rlxprobe.sh names each one and'
+	@echo '           fails if the set changes -- probe1/probe2 assert zero, and'
+	@echo '           probe3 cannot, because executing them IS question (c).'
+	@echo 'stale check the banner must read  rb=$(RB_LC_BARE)  -- LOWER case, because'
+	@echo '           report.c s digit table is 0123456789abcdef while the loader s'
+	@echo '           is upper. rb=80a00000 or rb=80a01000 means this image is a'
+	@echo '           probe1/probe2-based build and is about to poison a measurement.'
+endif
+ifneq ($(filter $(P),probe1 probe2 probe3),)
 	@echo 'result     RESULT_BASE=$(RESULT_BASE)   read it back with: DW $(patsubst 0x%,%,$(RESULT_BASE)) $(RB_WORDS_$(P))'
+ifneq ($(filter $(P),probe1),)
 	@printf 'victims    %s .. %s\n' \
 	        "$$($(NM) $(ELF) | awk '$$3=="rlx_victims"{print "0x"$$1}')" \
 	        "$$($(NM) $(ELF) | awk '$$3=="rlx_victims_end"{print "0x"$$1}')"
+endif
 	@echo 'geom       GEOM=$(GEOM)   base $(GEOM_BASE)   1 = ARMED, and it can write 1 MiB'
 	@echo 'uart       THR $(UART_THR)  LSR $(UART_LSR)'
 	@echo 'vectors    UTLB $(VEC_UTLB)  general $(VEC_GENERAL)   CLEAR_BEV=$(CLEAR_BEV)'
