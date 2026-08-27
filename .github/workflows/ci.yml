@@ -4,8 +4,15 @@
 # -------------------------------------------------
 # `README.md` says every instrument here ships with the controls that show it
 # can fail. That is an unfalsifiable sentence until something runs them, which
-# is the whole reason this file exists at all -- 33 commits and an empty
-# `git tag` is what "no external clock" looks like while it is happening.
+# is the whole reason this file exists at all -- a long run of commits with
+# nothing outside the repository checking them is what "no external clock" looks
+# like while it is happening.
+#
+# 2026-08-27: this line used to read "33 commits and an empty `git tag`". Both
+# halves were stale -- measured, 52 commits and one tag, `v0.0`. It is written
+# without a count now, because the sentence never needed one and a number that
+# goes wrong on the next commit is the exact failure this header spends forty
+# lines warning about further down.
 #
 # It is NOT a build of the firmware. There is no firmware. Every job here runs
 # instruments against committed text.
@@ -37,11 +44,21 @@
 # machine with $FWRE_WORK pointed at an empty directory: with the cross tools
 # present, `test-hazlint` is 45 ok / 30 FAIL / 8 skip and `test-rlxprobe` is
 # 101 ok / 101 FAIL. Without gcc, both skip cleanly, the census is green, and it
-# prints `NOT RUN IN THIS JOB: 306 case(s)` with every one of them named.
+# prints `NOT RUN IN THIS JOB: 320 case(s)` with every one of them named.
 #
 # 298 -> 306 on 2026-08-27 (second session) when `binsim` and `test-binsim`
 # arrived: binsim's twenty-three controls run here in full, and eight of
 # test-binsim's 71 stand down because they read the six vendor trees.
+#
+# 306 -> 320 on 2026-08-27 (third session), and none of the fourteen is a new
+# kind of gap: `R2a/b/d-1` replaced the plan's refuted `@floor`, the real corpus
+# stopped taking the REFUTED branch, and the fourteen cases that replaced it are
+# fourteen more readings OF THE SIX TREES -- the floor cell and its denominator,
+# the three-program population it is the top of, what a compilation-model change
+# alone costs, the named cell's rank swept over k in both directions, and the
+# two version banners that are the premise of the choice. binsim itself went
+# 23 -> 24 synthetic controls and all of them still run here; the two new ones
+# that do not (`E7`, `E8`) need the vendor trees by construction.
 #
 # THAT 101/101 WAS A NUMBER NOTHING COULD CHECK until the same afternoon.
 # `tools/test-rlxprobe.sh` re-indents `tools/hazlint`'s twelve controls into its
@@ -140,9 +157,13 @@ jobs:
       # the opposite of hazlint, whose population control is 56 KiB of this
       # unit's bootloader and which CI therefore cannot run at all. The suite
       # below additionally drives the whole --corpus path -- manifest, both
-      # matrices, the void verdict, BASE and FLOOR -- against a corpus it
-      # builds in a temp directory, so the only thing a runner does not
-      # exercise is the eight assertions about the six real trees.
+      # matrices, the void verdict, the floor verdict, BASE and FLOOR --
+      # against two corpora it builds in a temp directory, one landing on each
+      # side of the floor verdict. So the only thing a runner does not exercise
+      # is the assertions about the six real trees, and that count lives in
+      # `tools/ci-expected.tsv` rather than being written twice here: it moved
+      # 8 -> 22 on 2026-08-27 and this sentence carried the old number for one
+      # commit, which is the failure the header above spends forty lines on.
       - name: binsim self-test
         run: /usr/bin/python3 tools/binsim.py --self-test 2>&1 | tee ci-out/binsim.out; exit "${PIPESTATUS[0]}"
 

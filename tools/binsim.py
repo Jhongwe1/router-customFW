@@ -11,6 +11,10 @@ answer is that the threshold has to come out of the data rather than out of me:
     pass    binsim(rebuild, unit-2018) >= BASE
     void    the fifteen pairwise scores span < 5 percentage points
 
+The corpus refuted that `FLOOR` on `boa` and `R2a/b/d-1` replaced it with the
+same two trees read on `busybox` -- see "R2a/b/d-1 named it" below.  The cell
+lives in `tools/binsim-corpus.tsv`; nothing in this file chooses it.
+
 That last line is why the controls in this file were written before any number
 was reported.  A similarity metric is the easiest instrument in this project to
 build so that it cannot fail: almost any function of two MIPS binaries from one
@@ -137,9 +141,42 @@ between SDK generations while its content survived.  An earlier draft wrote
 refuted it.  A single blended score would have averaged 0.065 and 0.663 into a
 number describing neither, which is why the two are printed and never summed.
 
-So the corpus supplies a floor the plan did not have, and `--corpus` reports the
-plan's `FLOOR` as refuted rather than quietly using a better number: naming a
-floor is `R2a/b/d-1`'s decision, not this file's.
+So the corpus supplies a floor the plan did not have, and `--corpus` reported
+the plan's `FLOOR` as refuted rather than quietly using a better number, because
+naming a floor was `R2a/b/d-1`'s decision and not this file's.
+
+R2a/b/d-1 named it, 2026-08-27
+------------------------------
+    @floor  boa  unit-2018  busybox  unit-2018   = 0.1581
+
+**The denominator is the whole story, and the first replacement got it wrong.**
+That first attempt was `busybox unit-2018 v3.4.0` = 0.1646: the plan's own tree
+pair, read on the one program whose source is held constant across it (讀,
+`BusyBox v1.13.4` in all six trees), and 0.1646 clears `CROSS` 0.1581.  An
+adversarial review killed it the same day.  Containment divides by the SMALLER
+feature set; busybox's is 42,297 grams against boa's 28,887, a factor of 1.46,
+so the two numbers were read at different denominators.  讀 at a matched one,
+the ordering reverses:
+
+    no shared source, same model, denominator = boa/unit-2018's 28,887 grams
+      boa vs busybox 0.1581    boa vs pppd 0.1578    boa vs wscd 0.1551
+    ONE upstream source, compilation model changed, denominator 28,601 grams
+      pppd unit-2018 / v3.4.0  0.1212     <- BELOW the no-shared-source level
+
+So at this scale the corpus holds no cell above the no-shared-source level and
+below `BASE` that could serve as a floor, and the tightest correct floor IS that
+level.  `@floor` names it.  `E7` asserts it is the highest of the three at that
+denominator; `E8` measures what a model change alone costs, which is what makes
+the rule's precondition (`VOID`, not `fail`) a reading rather than an argument.
+
+    VOID   the compilation model differs -- check the container fingerprint
+    fail   score <= FLOOR = 0.1581
+    warn   FLOOR < score < BASE
+    pass   score >= BASE  = 0.9818
+
+`notes/which-drop.md` owns the reasoning, the rejected alternatives, and the
+k sweep -- 讀, the named cell is the top of its population at every k from 2 to
+14 and is overtaken at k = 1, where the reference itself flips.
 
 The three anchors that come free with the corpus
 ------------------------------------------------
@@ -166,9 +203,9 @@ The three anchors that come free with the corpus
 The controls
 ------------
 Every invocation runs `A`, `B`, `C` and `D` first and refuses to report if one
-fails.  `--self-test` runs them and nothing else; none of them needs a vendor
-binary, so a fresh clone with no `$FWRE_WORK` still has a control on every part
-of this file.
+fails.  `--self-test` runs the twenty-four of them and nothing else; none needs
+a vendor binary, so a fresh clone with no `$FWRE_WORK` still has a control on
+every part of this file.
 
   A1  the code window of a synthetic ELF is exactly the one built into it
   A2  eight malformed inputs, each refused with its own reason and none scored
@@ -200,12 +237,21 @@ of this file.
   D3  the void verdict does not fire on a corpus built to span more than 5 pp
   D4  `BASE`/`FLOOR` are read from the manifest's named cells, and a cell that
       is not in the matrix is refused rather than silently dropped
+  D5  the floor verdict follows BOTH of its arguments -- below `CROSS`, at it,
+      above it, and with `CROSS` itself moved under a fixed floor.  Until
+      `R2a/b/d-1` replaced `@floor` the REFUTED branch fired only on the real
+      six trees, so the day the corpus stopped refuting the floor that branch
+      would have had no test anywhere.  The first version of this control
+      passed the same `cross_v` three times, and a reviewer built a mutant that
+      ignored the argument entirely and passed all 24 controls and all 74
+      runner cases; `M12` is that mutant, kept.  `tools/test-binsim.sh` also
+      drives the verdict end to end on two synthetic corpora, one on each side
 
-And with `$FWRE_WORK` present, `--corpus` adds nine that need the real material:
+And with `$FWRE_WORK` present, `--corpus` adds eleven that need the real material:
 
   E0  **every sample in the corpus is the same ISA.**  The corpus's membership
       rule, enforced instead of written in a comment.  The parser already
-      refuses a little-endian or non-MIPS file -- 量 2026-08-27 on TOTOLINK
+      refuses a little-endian or non-MIPS file -- 讀 2026-08-27 on TOTOLINK
       N350RT V9.3.5u, which is a **MediaTek MT7628**, little-endian MIPS32r2:
       `ELF data 1, not MSB`, exit 2.  What that does NOT catch is a big-endian
       MIPS32r2 part, which would parse, score, and quietly move `FLOOR`
@@ -242,7 +288,23 @@ And with `$FWRE_WORK` present, `--corpus` adds nine that need the real material:
   E6b ... and no smaller k does.  Separate from `E6` because minimality is a
       claim only a corpus with enough structure can make, and asserting it
       unconditionally would turn a simpler corpus red for a property of the
-      corpus rather than of the pin
+      corpus rather than of the pin.  ⚠️ It measures the null at exactly ONE
+      value, `k - 1`; "every k below the pin is excluded" is an extrapolation
+      no control here makes
+  E7  **`FLOOR` is the highest cell of a POPULATION at one denominator**, not
+      one pair's number.  Containment divides by the smaller feature set, so a
+      cross-program score is roughly (shared compiler idiom) / |G(smaller)| and
+      is not a constant of the corpus: 讀 2026-08-27 inside `unit-2018`, 422 of
+      the 630 cross-program cells over its 36 largest programs sit above
+      0.1646, and the top of that list is two vendor tools that share their
+      source.  So the population is restricted to programs at least as large as
+      the floor's own reference, and `E7` asserts the named cell is its maximum
+  E8  **one upstream source under two compilation models lands at or below
+      `FLOOR`** -- the `@model` cell.  This is what makes the decision rule's
+      precondition a reading rather than an argument: below the floor the code
+      channel cannot tell "the same source built differently" from "a program
+      that shares no source", so a comparison across a model change is VOID and
+      not a fail
 
 `CROSS` -- `boa` against `busybox` from the *same* tree -- is **reported and not
 asserted**, and that is deliberate.  It is a property of the corpus, not of this
@@ -255,26 +317,42 @@ exists to catch.
 
 What this cannot do, so a number is not read as more than it is
 ---------------------------------------------------------------
-  * It cannot tell a toolchain difference from a config difference.  The corpus
-    confounds date, product line and SDK generation, and no function of two
-    binaries separates them -- `--corpus` says so in its own output.
+  * **One cell** cannot tell a toolchain difference from a config difference.
+    The corpus is another matter, and `R2a/b/d-1` measured it: `busybox` holds
+    one upstream source across all six trees, so its cells move only when the
+    code generator's output does, and on the 2016 -> 2018 edge they do not
+    (0.9995-0.9997) while `boa` falls to 0.877-0.895.  On that edge the two are
+    separated; across the compilation-model change they are not.
+    🔄 This bullet used to read "the corpus confounds date, product line and
+    SDK generation, and no function of two binaries separates them -- `--corpus`
+    says so in its own output".  Both halves were wrong.  **Product line is
+    crossed with the clustering, not confounded with it** -- 讀 `/etc/version`,
+    N150RT appears in all three clusters -- and `--corpus` never printed any
+    such sentence.  `notes/which-drop.md` §2 and §3 own the corrections.
   * It does not disassemble.  The window is scanned linearly at 4-byte
     alignment, so literal pools and jump tables inside the window are tokenised
     as instructions.  That is a *superset*, it is the same trade `opcount.py`
     documents, and it biases both files in a pair the same way.
+  * **Containment divides by the smaller feature set**, so a score is not
+    comparable across pairs of different sizes and a threshold read at one
+    denominator does not transfer to another.  `--corpus` prints the
+    denominator beside every named cell for that reason.
   * A high score is evidence of shared source and toolchain together.  It cannot
     attribute the share to one of them.
-  * `--corpus` reports the matrix.  Reading the clusters is `R2a/b/d-1`, and
-    this file deliberately stops before it.
+  * `--corpus` reports the matrix.  Reading the clusters is `R2a/b/d-1`,
+    `notes/which-drop.md`, and this file deliberately stops before it.
 
 Exit codes
 ----------
     0  reported, and every control held
-    1  reported, but a result is void -- the fifteen scores did not span 5 pp
+    1  reported, but a result is void -- the fifteen scores did not span 5 pp,
+       or the named FLOOR sits below CROSS
     2  refused: a control failed, or an input could not be parsed
     3  usage error
 
-Version 1.0, 2026-08-27
+Version 1.1, 2026-08-27.  The version number lives in `VERSION` below; this
+line said 1.0 for one commit after the bump, which is the reason it now says
+where the real one is.
 """
 
 import hashlib
@@ -283,12 +361,17 @@ import random
 import struct
 import sys
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # k is pinned, and E6 re-derives the pin from the corpus on every corpus run
 # rather than trusting this comment.  See "Choosing k" in the docstring.
 DEFAULT_K = 7
-SWEEP_K = (1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 16)
+# Dense from 1 to 16.  It was (1,2,3,4,5,6,7,8,10,12,16) until 2026-08-27, and
+# three committed files then said the floor verdict "holds for every k from 7 to
+# 16" -- a universal over ten values from a grid that visited five of them.  The
+# five unswept ones do hold (讀), which is why this is a gap in what was
+# checked rather than a wrong number, and a dense grid costs about a second.
+SWEEP_K = tuple(range(1, 17))
 DEFAULT_MIN_STRING = 8
 VOID_SPAN = 0.05          # the plan's five percentage points
 NULL_MAX = 0.05           # ... and what the metric's own null has to be under
@@ -1087,6 +1170,23 @@ def _corpus_controls(k):
     missing = named_cell(mw, "t1", "nope")
     c.add("D4  a named cell that is not in the matrix is refused",
           ok_named and missing is None, "t1/t2 found, t1/nope refused")
+
+    # D5 -- the floor verdict, in both directions, at the boundary, AND with
+    # cross_v varied.  The last part is the one that took a second attempt: the
+    # first version passed the same 0.1581 in all three cases, so it pinned the
+    # verdict only as a function of floor_v and a mutant that ignored cross_v
+    # and hard-coded 0.1581 passed every control and all 69 runner cases.  A
+    # control blind to one of its two arguments is the shape M9 already found
+    # once in this file.
+    d5 = [floor_verdict(0.0650, 0.1581),      # the plan's floor: refuted
+          floor_verdict(0.1581, 0.1581),      # equal: the tightest correct floor
+          floor_verdict(0.1646, 0.1581),      # above: stands
+          floor_verdict(0.1646, 0.2000),      # cross moved up under it: refuted
+          floor_verdict(0.1581, 0.0650)]      # cross moved down: stands
+    c.add("D5  the floor verdict follows BOTH of its arguments",
+          d5 == [True, False, False, True, False],
+          "0.0650/0.1581 REFUTED; equal stands; 0.1646/0.1581 stands; "
+          "0.1646/0.2000 REFUTED; 0.1581/0.0650 stands")
     return c
 
 
@@ -1202,6 +1302,100 @@ def named_cell(m, a, b):
     return m.get((a, b)) or m.get((b, a))
 
 
+def cross_population(man, loaded, spec, k):
+    """The no-shared-source level, measured at ONE denominator.
+
+    `([(containment, program, tree, shared, |G(other)|)], reference, name)`,
+    highest first.
+
+    The reference is whichever half of `spec` carries the SMALLER feature set --
+    the one that supplies containment's denominator.  The population is every
+    other program in the reference's own tree whose feature set is at least as
+    large, so that the reference keeps supplying the denominator throughout.
+    Programs smaller than the reference are excluded on purpose: they divide
+    the same few thousand grams of shared compiler idiom by a smaller number
+    and score higher for that reason alone.  量 2026-08-27 inside `unit-2018`,
+    over the 36 programs with at least 2,000 code words: 422 of the 630
+    cross-program cells sit above 0.1646, and the top of the list is
+    `sysconf`/`timelycheck` at 0.9967 -- two vendor tools that share their
+    source.  "Two different programs" is not the same claim as "two programs
+    that share no source", and only the second one is a floor.
+    """
+    pa, ta, pb, tb = spec
+    a, b = loaded[pa][0][ta], loaded[pb][0][tb]
+    if len(a.grams(k)) <= len(b.grams(k)):
+        ref, refprog, reftree = a, pa, ta
+    else:
+        ref, refprog, reftree = b, pb, tb
+    nref = len(ref.grams(k))
+    pop = []
+    for prog in man.programs():
+        if prog == refprog:
+            continue
+        samples, _ = loaded[prog]
+        if reftree not in samples:
+            continue
+        other = samples[reftree]
+        if len(other.grams(k)) < nref:
+            continue
+        m = score(ref, other, k)
+        pop.append((m[0], prog, reftree, m[4], len(other.grams(k))))
+    pop.sort(reverse=True)
+    return pop, ref, "%s/%s" % (refprog, reftree)
+
+
+def resolve_cell(man, loaded, spec, k, label):
+    """(containment, denominator) for a `@base`/`@floor` spec.
+
+    Returns the denominator -- `min(|G(A)|, |G(B)|)` -- beside the score,
+    because containment divides by the SMALLER feature set and a threshold is
+    only meaningful at the denominator of the comparison it governs.  Leaving
+    that number unprinted is how `R2a/b/d-1`'s first floor came to be compared
+    against a `CROSS` measured on a set 1.46x smaller.
+    """
+    pa, ta, pb, tb = spec
+    for prog in (pa, pb):
+        if prog not in loaded:
+            raise Refused("@%s names program %s, which is not in the corpus"
+                          % (label.lower(), prog))
+    for prog, tree in ((pa, ta), (pb, tb)):
+        if tree not in loaded[prog][0]:
+            raise Refused("@%s names %s/%s, which is not in the corpus"
+                          % (label.lower(), prog, tree))
+    a, b = loaded[pa][0][ta], loaded[pb][0][tb]
+    m = score(a, b, k)
+    return m[0], min(m[2], m[3])
+
+
+def floor_verdict(floor_v, cross_v):
+    """True when the corpus refutes the named `@floor` cell.
+
+    Refuted means the floor sits STRICTLY BELOW `CROSS` -- the highest score
+    reached by a pair that shares no source, measured at a denominator no
+    smaller than the one the floor's own comparison uses.  A floor below that
+    is satisfied by a pair with no shared source at all, so the warn band above
+    it carries no information.  That is what happened to
+    `plan/router-rebuild-plan.md:1128`'s floor: 0.0650 against 0.1581.
+
+    **Equality is not refuted, and that changed on 2026-08-27.**  The first
+    version returned `floor_v <= cross_v`, on the argument that "a floor exactly
+    at the cross-program score separates nothing from nothing".  That argument
+    is wrong: a floor AT the no-shared-source level is the tightest correct one
+    there is -- everything at or below it is reachable by an unrelated program,
+    so `fail score <= FLOOR` is exactly the claim the corpus supports.  The
+    corpus turned out to hold no cell above that level that could serve, for a
+    reason `notes/which-drop.md` §1 owns, so `@floor` names the `CROSS` cell
+    itself and equality is the normal case rather than an edge one.
+
+    This is a function and not an `if` inside `report_corpus` because the branch
+    it picks is a verdict, and a verdict nobody has seen fire is not a verdict.
+    `D5` drives it in both directions AND varies `cross_v`, on a runner with no
+    vendor byte present; `tools/test-binsim.sh` drives both ends to end on two
+    synthetic corpora built to land on either side, and `M11` inverts it.
+    """
+    return floor_v < cross_v
+
+
 def print_matrix(m, order, idx, title, out=sys.stdout):
     out.write("\n  %s\n" % title)
     w = max(len(x) for x in order)
@@ -1225,22 +1419,34 @@ class Manifest(object):
     def __init__(self, path):
         self.path = path
         self.rows = []            # (tree, date, program, relpath, bytes, sha, role)
-        self.base = None          # (program, treeA, treeB)
+        self.base = None          # (progA, treeA, progB, treeB)
         self.floor = None
+        self.model = None         # one source, two compilation models
         with open(path, encoding="utf-8") as fh:
             for lineno, raw in enumerate(fh, 1):
                 line = raw.rstrip("\n")
                 if not line.strip() or line.lstrip().startswith("#"):
                     continue
                 f = [p.strip() for p in line.split("\t") if p.strip() != ""]
-                if f[0] == "@base" or f[0] == "@floor":
-                    if len(f) != 4:
-                        raise Refused("%s:%d: @base/@floor take program, treeA, treeB"
-                                      % (path, lineno))
-                    if f[0] == "@base":
-                        self.base = (f[1], f[2], f[3])
+                if f[0] in ("@base", "@floor", "@model"):
+                    # Four fields name a cell of ONE program's matrix:
+                    #     @base   program  treeA  treeB
+                    # Five name a cell ACROSS programs, which the matrices do
+                    # not hold and which `R2a/b/d-1` needed for the floor:
+                    #     @floor  progA  treeA  progB  treeB
+                    # Both are stored as (progA, treeA, progB, treeB).
+                    if len(f) == 4:
+                        spec = (f[1], f[2], f[1], f[3])
+                    elif len(f) == 5:
+                        spec = (f[1], f[2], f[3], f[4])
                     else:
-                        self.floor = (f[1], f[2], f[3])
+                        raise Refused("%s:%d: %s takes program, treeA, treeB "
+                                      "or progA, treeA, progB, treeB"
+                                      % (path, lineno, f[0]))
+                    if spec[0] == spec[2] and spec[1] == spec[3]:
+                        raise Refused("%s:%d: %s names one binary against itself"
+                                      % (path, lineno, f[0]))
+                    setattr(self, f[0][1:], spec)
                     continue
                 if len(f) != 7:
                     raise Refused("%s:%d: need tree/date/program/relpath/bytes/sha256/role, "
@@ -1366,16 +1572,22 @@ def report_manifest(man, out=sys.stdout):
         if spec is None:
             bad.append("%s is not declared" % label)
             continue
-        prog, ta, tb = spec
-        trees = [r[0] for r in man.trees_for(prog)]
-        if prog not in progs:
-            bad.append("%s names program %s, which is not in the manifest" % (label, prog))
-        for t in (ta, tb):
-            if t not in trees:
-                bad.append("%s names tree %s, which %s does not have" % (label, t, prog))
-        if ta == tb:
-            bad.append("%s names one tree twice" % label)
-        out.write("  %-6s %s: %s vs %s\n" % (label, prog, ta, tb))
+        pa, ta, pb, tb = spec
+        for prog, tree in ((pa, ta), (pb, tb)):
+            if prog not in progs:
+                bad.append("%s names program %s, which is not in the manifest"
+                           % (label, prog))
+                continue
+            if tree not in [r[0] for r in man.trees_for(prog)]:
+                bad.append("%s names tree %s, which %s does not have"
+                           % (label, tree, prog))
+        if pa == pb and ta == tb:
+            bad.append("%s names one binary against itself" % label)
+        if pa == pb:
+            out.write("  %-6s %s: %s vs %s\n" % (label, pa, ta, tb))
+        else:
+            out.write("  %-6s %s/%s vs %s/%s  (across programs)\n"
+                      % (label, pa, ta, pb, tb))
     for tree, date, prog, rel, nbytes, sha, role in man.rows:
         if len(sha) != 64 or any(ch not in "0123456789abcdef" for ch in sha):
             bad.append("%s/%s: sha256 is not 64 hex characters" % (tree, prog))
@@ -1428,7 +1640,7 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
 
     # -- E0: one corpus, one ISA --------------------------------------------
     # The ELF parser already refuses a little-endian or non-MIPS file, so an
-    # MT7628 image cannot get in (量 2026-08-27 on TOTOLINK N350RT V9.3.5u:
+    # MT7628 image cannot get in (讀 2026-08-27 on TOTOLINK N350RT V9.3.5u:
     # `ELF data 1, not MSB`, exit 2). What it does NOT catch is a big-endian
     # MIPS32r2 part, which would parse, score, and quietly move FLOOR. The
     # corpus's membership rule is "the same ISA", and this is where it is
@@ -1489,7 +1701,7 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
     # header table is gone.
     MIN_JAL = 32
     ins, aft, mis, bad4b, na, covered = [], [], [], [], [], set()
-    total = []
+    thin, total = [], []
     for prog, (samples, order) in loaded.items():
         for tree in order:
             s = samples[tree]
@@ -1510,8 +1722,18 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
                 continue
             covered.add((prog, tree))
             ins.append(a[3])
-            if b[3] is not None:
+            # The `after` and `misaligned` figures are the negative controls'
+            # descriptive range, and a ratio over three words is not a range.
+            # 讀 2026-08-27, when pppd/v3.4.0 joined the corpus as a baseline:
+            # ONE j/jal word sits in the 4 KiB after its window, it happens to
+            # land in the executable segment, and the summary line went from
+            # "after 0.000-0.043" to "after 0.000-1.000" on a sample of one.
+            # The assertion never moved -- it is on `ins` and `mis` -- but the
+            # printed range is what a reader checks, so it is gated too.
+            if b[3] is not None and b[2] >= MIN_JAL:
                 aft.append(b[3])
+            elif b[3] is not None:
+                thin.append(b[2])
             if d[3] is not None:
                 mis.append(d[3])
             if a[3] < 0.99:
@@ -1521,9 +1743,13 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
                              % (prog, tree, d[3]))
     ec.add("E4b every j/jal in the window targets the executable segment",
            ins and not bad4b and set(total) == covered,
-           "%d file(s): in-window %.3f-%.3f, after %.3f-%.3f, misaligned %.3f-%.3f; "
-           "n/a %s; every file covered by E4 or E4b: %s"
+           "%d file(s): in-window %.3f-%.3f, after %.3f-%.3f over %d file(s) with "
+           ">= %d j/jal there%s, misaligned %.3f-%.3f; n/a %s; every file covered "
+           "by E4 or E4b: %s"
            % (len(ins), min(ins), max(ins), min(aft or [0]), max(aft or [0]),
+              len(aft), MIN_JAL,
+              (", %d file(s) too thin to summarise there (%d-%d j/jal)"
+               % (len(thin), min(thin), max(thin))) if thin else "",
               min(mis or [0]), max(mis or [0]),
               ", ".join(na) or "none", set(total) == covered)
            + ("; " + "; ".join(bad4b) if bad4b else ""))
@@ -1550,7 +1776,7 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
     # converse -- a tokeniser that collapsed its alphabet, or a k short enough to
     # saturate, would put pairs that are NOT identical at Jaccard 1.0 too.
     #
-    # Containment does saturate, and it is measured rather than argued: 量
+    # Containment does saturate, and it is measured rather than argued: 讀
     # 2026-08-27 there are 16 byte-identical pairs and **17** cells at
     # containment exactly 1.000. The extra one is busybox unit-2018 /
     # n200re-3.2.0, whose smaller 7-gram set is a strict subset of the larger --
@@ -1610,7 +1836,7 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
     # A reproducibility error needs two builds of the same source whose windows
     # are NOT identical. This corpus has such pairs on the busybox side, and
     # calling them "the same source" is 推 -- inferred from BusyBox 1.13.4's
-    # banner and a window differing by two words -- not 量. So the number below
+    # banner and a window differing by two words -- not 讀. So the number below
     # is an estimate with a stated inference in it, and it is reported that way.
     noise, noise_from = None, ""
     cands = []
@@ -1626,8 +1852,20 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
     if cands:
         cands.sort()
         noise = cands[0][0]
+        # The MINIMUM of a set, and the set has to be named. Until 2026-08-27
+        # this printed one pair and `notes/binsim.md` said "The corpus has one",
+        # which the code did not agree with: on the real corpus `cands` holds
+        # three, and the largest is 5.3x the smallest. For an error bar the
+        # minimum is the anti-conservative end, so the whole range is printed
+        # and the guard below still uses the tightest of them -- which is the
+        # harder bar for `BASE - FLOOR` to clear.
         noise_from = "%s %s/%s, jaccard %.6f" % (cands[0][1], cands[0][2],
                                                  cands[0][3], cands[0][4])
+        if len(cands) > 1:
+            noise_from += ("; the SMALLEST of %d candidate pair(s), which run "
+                           "%.2e-%.2e (%s %s/%s is the largest)"
+                           % (len(cands), cands[0][0], cands[-1][0],
+                              cands[-1][1], cands[-1][2], cands[-1][3]))
 
     # -- E5: C3/C4/C5 again, on real material rather than on a fixture -------
     # The fixture cannot reproduce the k-gram saturation that made k=4 fail, so
@@ -1701,6 +1939,47 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
               "shows k=%d sufficient but not minimal"
               % (k - 1, min(at_km1 or [0]), max(at_km1 or [0]), k))
 
+    # -- E7/E8: the floor and the precondition it implies --------------------
+    # These are computed HERE, with the other corpus controls, and not down
+    # beside the section that prints them. The first version added them after
+    # `ec.report()` had already run, so they were silently never reported --
+    # which is the same shape as E5 printing a number nobody asserted.
+    fpop, fref, frefname, fval, mval = [], None, "", None, None
+    if man.floor:
+        try:
+            fval = resolve_cell(man, loaded, man.floor, k, "floor")[0]
+            fpop, fref, frefname = cross_population(man, loaded, man.floor, k)
+        except Refused as ex:
+            ec.add("E7  FLOOR is the highest denominator-matched no-shared-source cell",
+                   False, "refused: %s" % ex)
+    if fval is not None and len(fpop) >= 2:
+        top = fpop[0]
+        ec.add("E7  FLOOR is the highest denominator-matched no-shared-source cell",
+               abs(fval - top[0]) < 1e-12,
+               "%.6f at %d grams over %d program(s): %s"
+               % (fval, len(fref.grams(k)), len(fpop),
+                  ", ".join("%s %.4f" % (p, v) for v, p, _, _, _ in fpop)))
+    elif man.floor:
+        ec.na("E7  FLOOR is the highest denominator-matched no-shared-source cell",
+              "this corpus holds %d program(s) at or above the reference's feature-set "
+              "size, so there is no population to take a maximum over" % len(fpop))
+    if man.model:
+        try:
+            mval = resolve_cell(man, loaded, man.model, k, "model")[0]
+        except Refused as ex:
+            ec.add("E8  one source under two compilation models lands at or below FLOOR",
+                   False, "refused: %s" % ex)
+    if mval is not None and fval is not None:
+        ec.add("E8  one source under two compilation models lands at or below FLOOR",
+               mval <= fval,
+               "%s %s/%s = %.4f against FLOOR %.4f -- this is what makes a model "
+               "mismatch VOID rather than a fail"
+               % (man.model[0], man.model[1], man.model[3], mval, fval))
+    else:
+        ec.na("E8  one source under two compilation models lands at or below FLOOR",
+              "the manifest names no @model pair, so this corpus cannot say what a "
+              "compilation-model change alone costs")
+
     cross = []
     if len(subjects) >= 2:
         pa, pb = subjects[0], subjects[1]
@@ -1741,10 +2020,25 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
         sm = string_matrix(samples, order)
         out.write("\n=== %s -- %d trees, %d pairwise cells (%s) ===\n"
                   % (prog, len(order), len(m), role))
-        out.write("  %-14s %10s %10s %s\n" % ("tree", "bytes", "code words", "date"))
+        out.write("  %-14s %10s %10s %10s %s\n"
+                  % ("tree", "bytes", "code words", "|G(%d)|" % k, "date"))
         for tree, date, _, _, nbytes, _, _ in man.trees_for(prog):
-            out.write("  %-14s %10d %10d %s\n"
-                      % (tree, nbytes, len(samples[tree].toks), date))
+            out.write("  %-14s %10d %10d %10d %s\n"
+                      % (tree, nbytes, len(samples[tree].toks),
+                         len(samples[tree].grams(k)), date))
+        # A `baseline` program is in the corpus to supply a denominator-matched
+        # comparand, not to be clustered. It has as few as one tree, so it has
+        # no matrix and the void verdict -- which is a statement about a
+        # SUBJECT's fifteen cells -- does not apply to it.
+        if role == "baseline":
+            out.write("  (%s is a baseline: it is scored against the FLOOR cell's\n"
+                      "  reference and is not matrixed, so the void verdict is not "
+                      "its verdict)\n" % prog)
+            if len(m) == 1:
+                cell = list(m.values())[0]
+                out.write("  its one cell: containment %.4f, jaccard %.4f\n"
+                          % (cell[0], cell[1]))
+            continue
         print_matrix(m, order, 0, "binsim -- containment of code %d-grams" % k, out)
         print_matrix(m, order, 1, "jaccard of the same sets (carries the length term)", out)
         print_matrix(sm, order, 0, "strings -- containment (config, not toolchain)", out)
@@ -1785,20 +2079,18 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
     if not man.base or not man.floor:
         out.write("  the manifest names neither; nothing to report\n")
         return max(rc, 2)
-    vals = {}
+    vals, dens = {}, {}
     for label, spec in (("BASE", man.base), ("FLOOR", man.floor)):
-        prog, ta, tb = spec
-        if prog not in loaded:
-            raise Refused("@%s names program %s, which is not in the corpus"
-                          % (label.lower(), prog))
-        samples, order = loaded[prog]
-        m = matrix(samples, order, k)
-        cell = named_cell(m, ta, tb)
-        if cell is None:
-            raise Refused("@%s names the cell %s/%s, which is not in the %s matrix"
-                          % (label.lower(), ta, tb, prog))
-        vals[label] = cell[0]
-        out.write("  %-6s binsim(%s, %s) on %s = %.4f\n" % (label, ta, tb, prog, cell[0]))
+        cell, den = resolve_cell(man, loaded, spec, k, label)
+        vals[label] = cell
+        dens[label] = den
+        pa, ta, pb, tb = spec
+        if pa == pb:
+            out.write("  %-6s binsim(%s, %s) on %s = %.4f   denominator %d grams\n"
+                      % (label, ta, tb, pa, cell, den))
+        else:
+            out.write("  %-6s binsim(%s/%s, %s/%s) = %.4f   denominator %d grams\n"
+                      % (label, pa, ta, pb, tb, cell, den))
 
     gap = vals["BASE"] - vals["FLOOR"]
     out.write("  BASE - FLOOR = %.4f (%.1f pp)\n" % (gap, gap * 100))
@@ -1821,37 +2113,121 @@ def report_corpus(man, root, k, minstr, sweep, urandom, out=sys.stdout):
                   "         pair of builds from one source whose code windows differ,\n"
                   "         and identical windows score 1.000 by arithmetic\n")
 
-    if cross:
-        out.write("\n=== CROSS -- the floor the plan does not have, and needs ===\n")
-        out.write("  Same tree, same toolchain, same libc, same day. Different program.\n")
-        for t, v in cross:
-            out.write("    %-14s %s vs %s = %.4f\n" % (t, subjects[0], subjects[1], v))
-        worst = max(v for _, v in cross)
-        out.write("  CROSS  = %.4f (the highest of them)\n" % worst)
+    # -- CROSS, at the denominator of the comparison the floor governs -------
+    pop, ref, refname = cross_population(man, loaded, man.floor, k)
+    if pop:
+        out.write("\n=== CROSS -- what a pair with NO SHARED SOURCE reaches ===\n")
+        out.write(
+            "  Containment divides by the SMALLER feature set, so this level is not a\n"
+            "  constant of the corpus: it is roughly (shared compiler idiom) over\n"
+            "  |G(smaller)|. A threshold is only meaningful at the denominator of the\n"
+            "  comparison it governs, which is why these are the pairs where the FLOOR\n"
+            "  cell's own reference binary supplies it -- everything else in the tree is\n"
+            "  smaller, and would divide the same idiom by a smaller number.\n")
+        out.write("  reference %s, %d grams\n" % (refname, len(ref.grams(k))))
+        for v, prog, tree, inter, ng in pop:
+            out.write("    vs %-10s %-14s %.4f   %5d shared   (%d grams)\n"
+                      % (prog, tree, v, inter, ng))
+        worst = pop[0][0]
+        out.write("  CROSS  = %.4f (the highest of %d, at this denominator)\n"
+                  % (worst, len(pop)))
         out.write("  FLOOR  = %.4f\n" % vals["FLOOR"])
-        if worst >= vals["FLOOR"]:
+
+        if floor_verdict(vals["FLOOR"], worst):
             out.write("""
-  REFUTED: the plan's FLOOR is below CROSS, so the rule built on it has a band
-  that carries no information. `plan/router-rebuild-plan.md:1128` reads
+  REFUTED: FLOOR is below CROSS, so the rule built on it has a band that carries
+  no information. `plan/router-rebuild-plan.md:1128` reads
 
       pass    binsim(rebuild, unit-2018) >= BASE
       warn    between FLOOR and BASE
       fail    <= FLOOR
 
   and a rebuild scoring anywhere in [%.4f, %.4f) would be "warn" while being
-  LESS like this unit's %s than this unit's own %s is. The band that carries
-  evidence starts at CROSS, not at FLOOR.
-
-  This is a result about the corpus, not a defect in the metric: FLOOR crosses
-  the PIC -> non-PIC change (SPEC.md TC-04) and CROSS does not, and dropping PIC
-  rewrites every function prologue and every call in the image. Naming a
-  replacement floor is R2a/b/d-1's decision, so this exits 1 rather than
-  quietly substituting one.
-""" % (vals["FLOOR"], worst, subjects[0], subjects[1]))
+  LESS like the reference than a program that shares no source with it is. The
+  band that carries evidence starts at CROSS, not below it. Which cell FLOOR is
+  and why is `notes/which-drop.md`'s to say, so this exits 1 rather than quietly
+  substituting a number of its own.
+""" % (vals["FLOOR"], worst))
             rc = max(rc, 1)
+        elif abs(vals["FLOOR"] - worst) < 1e-12:
+            out.write("  FLOOR is the CROSS cell itself -- the tightest floor the corpus\n"
+                      "  supports. Everything at or below it is reachable by a pair that\n"
+                      "  shares no source, so `fail score <= FLOOR` is exactly the claim\n"
+                      "  the material makes, and nothing weaker would be.\n")
         else:
-            out.write("  FLOOR is above CROSS, so it is measuring something narrower\n"
-                      "  than 'both are MIPS binaries from this vendor'.\n")
+            marg = vals["FLOOR"] - worst
+            out.write("  FLOOR is above CROSS by %.4f (%.2f pp), so it is narrower than\n"
+                      "  'both were built by this toolchain'.\n" % (marg, marg * 100))
+
+        # Now that FLOOR names the CROSS cell, the two are equal by
+        # construction at the pinned k and a "margin" says nothing. What the
+        # sweep still measures, and what it is now written to show, is whether
+        # the NAMED cell stays the top of its population as k moves: if some
+        # other program overtakes it, the named floor is below the level a
+        # pair with no shared source reaches, and the verdict fires.
+        out.write("\n  Does the named cell stay the top of that population as k moves?\n"
+                  "  If another program overtakes it, FLOOR is below the no-shared-source\n"
+                  "  level and the verdict fires. The pinned k is %d; E6/E6b are what\n"
+                  "  admit or exclude a value of k, and they are re-run above.\n" % k)
+        out.write("  %6s %10s %10s  %-18s %-10s %s\n"
+                  % ("k", "FLOOR", "CROSS", "reference", "top of pop", ""))
+        for kk in SWEEP_K:
+            try:
+                fv = resolve_cell(man, loaded, man.floor, kk, "floor")[0]
+                kpop, _, kref = cross_population(man, loaded, man.floor, kk)
+                if not kpop:
+                    # A row that vanishes silently is the failure this project
+                    # keeps finding, so say why rather than skipping.
+                    out.write("  %6d  no population: at this k nothing in the tree is "
+                              "at least as large as %s\n" % (kk, kref))
+                    continue
+                cv, cp = kpop[0][0], kpop[0][1]
+            except Refused as ex:
+                out.write("  %6d  refused: %s\n" % (kk, ex))
+                continue
+            out.write("  %6d %10.4f %10.4f  %-18s %-10s %s%s\n"
+                      % (kk, fv, cv, kref, cp,
+                         "REFUTED" if floor_verdict(fv, cv) else "stands",
+                         "" if kk >= k else "   (below the pinned k)"))
+        out.write("  The reference is whichever half of the FLOOR cell carries the\n"
+                  "  SMALLER feature set, so it can change with k -- 讀, it does at\n"
+                  "  k=16 on this corpus. A row whose reference is not the pinned k's\n"
+                  "  is answering a different question and is marked by that column.\n")
+
+    # -- the precondition the floor implies, measured rather than argued -----
+    if man.model:
+        mv, mden = resolve_cell(man, loaded, man.model, k, "model")
+        pa, ta, pb, tb = man.model
+        out.write("\n=== the compilation-model precondition ===\n")
+        out.write("  One upstream source, built under two compilation models, at a\n"
+                  "  denominator comparable to the floor's reference:\n")
+        out.write("    %s %s / %s = %.4f   denominator %d grams\n"
+                  % (pa, ta, tb, mv, mden))
+        if pop and mv <= vals["FLOOR"]:
+            out.write("  That is AT OR BELOW the floor. So at this scale the code channel\n"
+                      "  cannot tell 'the same source built differently' from 'a program\n"
+                      "  that shares no source': a comparison across a compilation-model\n"
+                      "  change is VOID, not a fail, and the container fingerprint has to\n"
+                      "  be checked before the score is read at all.\n")
+        else:
+            out.write("  That is ABOVE the floor, so a model change alone does not sink a\n"
+                      "  comparison on this corpus and the precondition below is not\n"
+                      "  derived from this reading.\n")
+        # The assertion itself is E8, registered with the other corpus controls
+        # above so that it is reported rather than added after ec.report() has
+        # already run. This block only prints what E8 checked.
+    else:
+        out.write("\n=== the compilation-model precondition ===\n")
+        out.write("  UNDETERMINED: the manifest names no `@model` pair, so this corpus\n"
+                  "  cannot say what a model change alone costs.\n")
+
+    if cross:
+        out.write("\n  For context, and NOT the number the verdict used: %s against %s\n"
+                  "  inside each tree, where each tree's own %s supplies the denominator,\n"
+                  "  runs %.4f-%.4f. So the level is a property of the corpus rather than\n"
+                  "  of one pair -- but the six values are six different denominators.\n"
+                  % (subjects[0], subjects[1], subjects[0],
+                     min(v for _, v in cross), max(v for _, v in cross)))
 
     # -- E5's numbers, printed beside the verdict they already produced ------
     if e5:

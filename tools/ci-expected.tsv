@@ -41,10 +41,41 @@
 # 71 when an adversarial review found three surviving mutants and a manifest no
 # runner could reach.
 #
+# 2026-08-27 (third session), R2a/b/d-1: binsim 23 -> 24 and test-binsim 71 -> 96.
+# The gate's step replaced the plan's refuted `@floor`, and the count is what
+# that cost. Two things drive it.
+#
+# One: the real corpus stopped taking the REFUTED branch, and that branch had
+# no fixture anywhere else -- a verdict that has stopped firing is not one that
+# has been satisfied, it is one nobody is watching. So the verdict became a
+# function (`floor_verdict`), `D5` drives it in both directions AND varies its
+# second argument, `M11` inverts it, `M12` is the mutant that ignores CROSS
+# entirely (an adversarial reviewer BUILT that one and it survived D5's first
+# version), and `X` builds a second synthetic corpus that lands on the refuted
+# side.
+#
+# Two: the step's first answer was wrong and the review caught it. `@floor` had
+# been moved to `busybox unit-2018/v3.4.0` = 0.1646, which clears CROSS 0.1581
+# -- but containment divides by the SMALLER feature set, and busybox's is 1.46x
+# boa's, so the two numbers were read at different denominators. At a matched
+# denominator the ordering reverses. The floor is now the CROSS cell itself in
+# the new five-field cross-program form, `E7` asserts it is the top of a
+# three-program population at ONE denominator, and `E8` measures what a
+# compilation-model change alone costs (`@model`, pppd 2.4.4 in two trees).
+# The corpus gained three `baseline` rows for that: 18 -> 21.
+#
+# The R section went 8 -> 22, and the shape of the new fourteen is the point:
+# two read the PREMISE of the floor choice rather than its consequence (one
+# BusyBox version and one boa version across all six trees), two pin that BASE
+# and FLOOR share a denominator, three pin the population E7 takes a maximum
+# over, two pin E8's reading, and two sweep the named cell's rank over k in
+# both directions -- it is overtaken at k=1, which is what makes the other five
+# rows mean something.
+#
 # suite	bench_total	allowed_skip_label	covers	reason
 spec-check	11	-	0	-
-binsim	23	-	0	-
-test-binsim	71	the six vendor trees	8	needs $FWRE_WORK/extracted -- six vendor firmware trees, one of which is this unit's own flash dump, so they can never be committed. Unlike test-hazlint this suite does NOT fail without them: binsim's twenty-three controls and the whole corpus path (manifest, matrices, void verdict, BASE/FLOOR) run against synthetic ELFs built by the suite, so a runner exercises everything except the eight assertions about the real six. 量 2026-08-27 with $FWRE_WORK pointed at an empty directory: 63 ok / 0 FAIL / 1 skip line covering 8, which closes against 71
+binsim	24	-	0	-
+test-binsim	96	the six vendor trees	22	needs $FWRE_WORK/extracted -- six vendor firmware trees, one of which is this unit's own flash dump, so they can never be committed. Unlike test-hazlint this suite does NOT fail without them: binsim's twenty-four controls and the whole corpus path (manifest, both matrices, the void verdict, the floor verdict, the five-field cross-program cell, BASE/FLOOR) run against synthetic ELFs built by the suite, so a runner exercises everything except the twenty-two assertions about the real six. 讀 2026-08-27 with $FWRE_WORK pointed at an empty directory: 74 ok / 0 FAIL / 1 skip line covering 22, which closes against 96
 test-file-modes	3	-	0	-
 test-gitignore	15	src-vendor (symlink)	1	needs a filesystem that can make symlinks; MSYS/Git Bash cannot, and until 2026-08-25 that killed the whole suite under errexit on the machine the push happens from. CI runs on Linux, so this skip should NOT appear
 test-console-capture	29	-	0	-

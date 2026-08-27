@@ -7,8 +7,11 @@ scope and is not touched.
 
 **This note owns the instrument.** The matrix appears here as the evidence that
 the instrument discriminates at all, which is `R2a/b/d-0`'s definition of done.
-*Reading* the matrix — which drop this firmware was built from — is
-`R2a/b/d-1`, and this note stops before it on purpose.
+*Reading* the matrix — which drop this firmware was built from, and which cell
+replaced the plan's refuted `FLOOR` — is `R2a/b/d-1`, **`notes/which-drop.md`**,
+and this note stops before it on purpose. Where a paragraph here has since been
+narrowed or refuted by that reading it is marked 🔄 and points at it rather than
+being rewritten in place.
 
 ## Why the question exists
 
@@ -37,12 +40,23 @@ where `G(X)` is the set of 64-bit FNV-1a hashes of every 7-gram of normalised
 MIPS operation tokens over `X`'s code window. Jaccard — the same intersection
 over the union — is printed beside it on every line, never instead of it.
 
-**Thirty-two controls, and every invocation runs them before it reports
-anything.** Twenty-three are synthetic and need no vendor binary at all, so a
+**Thirty-five controls, and every invocation runs them before it reports
+anything.** Twenty-four are synthetic and need no vendor binary at all, so a
 fresh clone with no `$FWRE_WORK` still has a control on every part of the file;
-nine need the real six trees. They are defined in `tools/binsim.py`'s header —
-one owner — and exercised by `tools/test-binsim.sh`, 71 cases of which 63 run on
+eleven need the real six trees. They are defined in `tools/binsim.py`'s header —
+one owner — and exercised by `tools/test-binsim.sh`, 96 cases of which 74 run on
 a stock runner. What follows quotes only the ones that decided something.
+
+🆕 **Three of them are `R2a/b/d-1`'s, and each covers something this note left
+open.** That step replaced the plan's refuted `@floor`, so the real corpus
+stopped taking the `REFUTED` branch — and that branch had no fixture anywhere
+else. So the verdict became a function; **`D5`** drives it in both directions,
+at the boundary, and with its second argument moved (an adversarial reviewer
+built a mutant that ignored that argument and passed everything, which is `M12`
+now); **`E7`** asserts the floor is the highest of a *population* at one
+denominator rather than one pair's number; **`E8`** measures what a
+compilation-model change alone costs. A verdict that has stopped firing is not
+a verdict that has been satisfied; it is a verdict nobody is watching.
 
 Four measurements forced that shape, and each is a way it could have been wrong.
 
@@ -219,6 +233,15 @@ across 2015, 2016 and 2018. That is not two instruments disagreeing; it is a
 fact about the two programs. `boa` was maintained across those years and
 `busybox` was not.
 
+🆕 **`R2a/b/d-1` turns that from two numbers into one mechanism.** The toolchain
+axis is 4+2 — `busybox` says so, and so does `G(boa_t) & G(busybox_t)` compared
+between trees, which attenuates the same-program comparison rather than being
+free of it -- `notes/which-drop.md` §3 owns that correction.
+`boa`'s extra split is `boa`'s own source revision plus a post-link strip of the
+section header table, which changes no code byte. So 2+2+2 and 4+2 are one
+partition seen through a program that changed inside the era and one that did
+not. `notes/which-drop.md` §3.
+
 ⚠️ **What that agreement is worth, stated narrowly.** These three are not
 independent *evidence*: they are three consequences of the same build changes,
 so of course they line up, and nothing here is three separate confirmations of
@@ -295,9 +318,16 @@ must exceed the noise) had its bar pinned at zero.
 Two things replace it. The falsifiable half of `E2` is now the **converse**: no
 pair whose windows *differ* may reach Jaccard 1.0 — which a collapsed tokeniser
 or a saturating `k` would break. And measuring reproducibility needs two builds
-of one source whose windows are **not** identical. The corpus has one:
-`busybox` `n300rt-2.1.6` against `unit-2018`, same BusyBox 1.13.4, windows two
-words apart, **Jaccard 0.999196**. `BASE − FLOOR` clears that by 1141×.
+of one source whose windows are **not** identical. The tightest the corpus has
+is `busybox` `n300rt-2.1.6` against `unit-2018`, same BusyBox 1.13.4, windows
+two words apart, **Jaccard 0.999196**.
+🔄 **"The corpus has one" was wrong, and the code never agreed with it.**
+`report_corpus` collects every non-identical same-program pair at Jaccard ≥ 0.99
+and takes the **minimum**; 讀, that set has **three** members and they run
+8.04e-4 to 4.28e-3 — a factor of 5.3. Taking the minimum is the anti-conservative
+end of an error bar, so the tool prints the whole range now and the guard still
+uses the tightest, which is the harder bar for `BASE − FLOOR` to clear (1025×
+against the floor `R2a/b/d-1` named).
 ⚠️ Calling those two "one source" is **推**, inferred from the banner and the
 window length; it is not 量, and the tool prints it as an estimate.
 
@@ -330,8 +360,20 @@ disagreeing. It did not.
 
 The three container groups are the three clusters, and the clustering agrees
 with two instruments that are not this one. **Which of them this firmware was
-built from is `R2a/b/d-1`**, and date, product line and SDK generation are
-confounded in this corpus in a way no function of two binaries can separate.
+built from is `R2a/b/d-1`** — `notes/which-drop.md`, done the same day.
+
+🔄 **The sentence that used to close this paragraph was wrong, and the corpus
+refutes it.** It read *"date, product line and SDK generation are confounded in
+this corpus in a way no function of two binaries can separate"*. 讀 2026-08-27
+from `/etc/version` in each tree: **product line is crossed with the clustering,
+not confounded with it.** N150RT appears in all three clusters and N300RT in
+two; two *different products* inside one cluster score 0.9863 and 0.9818, while
+two builds of *the same product* across clusters score 0.0650. The vendor's own
+version number is refuted the same way — this unit and `n300rt-2.1.6` are both
+stamped V2.1.6 and land in different clusters: their cell is 0.8951, the highest
+between-cluster cell there is, and still below the lowest within-cluster one. What remains collinear is date and SDK
+generation, which is a tautology rather than a confound. `notes/which-drop.md`
+§2 owns that reading.
 
 ## What it refuted: the plan's own `FLOOR`
 
@@ -377,9 +419,23 @@ unrelated, it is one program whose code was rewritten between SDK generations
 while its content survived. A single blended score would have averaged 0.065 and
 0.663 into a number describing neither.
 
-`tools/binsim.py --corpus` prints this as `REFUTED` and exits 1 rather than
-quietly substituting a better number, because naming a replacement floor is
+`tools/binsim.py --corpus` printed this as `REFUTED` and exited 1 rather than
+quietly substituting a better number, because naming a replacement floor was
 `R2a/b/d-1`'s decision.
+
+🆕 **`R2a/b/d-1` named it the same day, and its first answer was wrong too:**
+`@floor busybox unit-2018 v3.4.0` = 0.1646, clearing `CROSS` 0.1581 by 0.65 pp.
+An adversarial review killed it. **Containment divides by the smaller feature
+set** — busybox's is 42,297 grams against boa's 28,887 — so the two numbers were
+read at different denominators, and 讀 at a matched one the ordering reverses:
+a pair sharing its whole upstream source across the model change scores 0.1212,
+*below* the 0.1551–0.1581 a pair sharing no source reaches. The floor is now the
+`CROSS` cell itself, `@floor boa unit-2018 busybox unit-2018` = 0.1581, in a
+five-field cross-program form the manifest grew for it.
+**`notes/which-drop.md` owns the decision, the alternatives it rejected, the
+`VOID` precondition that falls out of it, and what it makes `R2a/b/d-4` do; the
+cell itself lives in `tools/binsim-corpus.tsv`.** This note stops at "the plan's
+floor was refuted", which is what it measured.
 
 ## Refutation conditions, written before the run
 
@@ -405,11 +461,24 @@ rather than assumed, and which reproduces a 2+2+2 partition that two other
 instruments already give. The plan's `FLOOR` is below the score of an unrelated
 program and cannot carry the decision rule built on it.
 
-**Not established.** Which drop built this firmware — that is `R2a/b/d-1`.
+**Not established.** Which drop built this firmware — that is `R2a/b/d-1`,
+`notes/which-drop.md`, and its answer is that a matrix over six *shipped images*
+cannot name a *source and toolchain release* at all: `TC-02` stays **推**.
 Whether a *rebuild* clears `BASE` — that is `R2a/b/d-4`, and it needs the
-container in `R2a/b/d-3` first. And nothing here separates toolchain from
-config: a high score is evidence of shared source **and** toolchain together and
-cannot attribute the share to one of them.
+container in `R2a/b/d-3` first. And nothing **in a single cell** separates
+toolchain from config: a high score is evidence of shared source **and**
+toolchain together and cannot attribute the share to one of them.
+
+🔄 **That last sentence was stated too broadly, and the corpus is what narrows
+it.** It is a property of one cell, not of the corpus. `busybox` is one upstream
+source held constant across all six trees (讀), so its cells move only when the
+toolchain does — and on the ① ↔ ② edge they do not move (0.9995–1.0000) while
+`boa` drops eleven points (0.877–0.895). On that edge the two halves *are*
+separated, and the answer is that `boa`'s source moved and the toolchain did
+not. On the ② ↔ ③ edge both move together and nothing separates them.
+`notes/which-drop.md` §3 owns that, including the third instrument it turns on —
+`G(boa_t) & G(busybox_t)`, which reads the toolchain axis without putting two
+builds of one program side by side, and gives the same 4+2 with a ninefold gap.
 
 **A caveat that belongs to the instrument.** The window is scanned linearly at
 4-byte alignment, so literal pools and jump tables inside it are tokenised as

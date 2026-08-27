@@ -12,6 +12,77 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R2a/b/d-1`, 2026-08-27 — the floor moved, and reading the matrix refuted a
+sentence this gate had been carrying since it opened.** Desk only, no power,
+zero flash bytes. `notes/which-drop.md` owns all of it.
+
+- 🔴 **`@floor` is now `boa unit-2018` against `busybox unit-2018` = 0.1581 —
+  the `CROSS` cell itself**, in a five-field cross-program form the manifest
+  grew for it. The route there matters more than the number. The step's first
+  answer was `busybox unit-2018 v3.4.0` = 0.1646, on the argument that `boa`
+  crosses a source rewrite on that step (讀: −16.5 % of its bytes,
+  `+libcjson`, `+libmtdapi`, strings 0.6629) while `busybox` does not. **The
+  adversarial review killed it on the denominator.** Containment divides by the
+  smaller feature set; busybox's is 42,297 grams against boa's 28,887, a factor
+  of 1.46, so the two numbers were read at different denominators. 讀 at a
+  matched one, the ordering reverses: a pair sharing its whole upstream source
+  across the model change scores **0.1212**, *below* the **0.1551–0.1581** a
+  pair sharing no source reaches. At this scale the corpus holds no cell above
+  the no-shared-source level and below `BASE`, so the tightest correct floor
+  **is** that level.
+- **`E7` and `E8` are what make it a reading rather than a choice.** `E7`: the
+  named cell must be the highest of every program in the reference's tree at
+  least as large as the reference — 0.1581 against `pppd` 0.1578 and `wscd`
+  0.1551. Smaller programs are excluded, and 讀 says why: inside `unit-2018`,
+  **422 of 630 cross-program cells sit above 0.1646**, topped by
+  `sysconf`/`timelycheck` at 0.9967 — two vendor tools that share their source.
+  "Two different programs" is not "two programs that share no source". `E8`
+  measures what a model change alone costs, which turns the rule's precondition
+  into a reading: **a comparison across a compilation-model change is VOID, not
+  a fail.**
+- 🔴 **`--corpus` exits 0, so the `REFUTED` branch stopped firing** — and a
+  verdict that has stopped firing is not one that has been satisfied, it is one
+  nobody is watching. The verdict became a function; `D5` drives it in both
+  directions, at the boundary, **and with its second argument moved** — a
+  reviewer built a mutant that ignored that argument and passed all 24 controls
+  and all 74 runner cases, and it is `M12` now. `M11` inverts it, and the suite
+  builds a second synthetic corpus on the refuted side. `binsim` 23 → 24
+  synthetic controls and 9 → 11 that need the trees, `test-binsim` 71 → 96
+  cases, census 306 → 320 not run in CI.
+- 🔴 **Product line is crossed with the clustering, not confounded with it**, and
+  the corpus refutes the claim on its own. The similarity partition separates
+  perfectly — lowest within-cluster cell **0.9740**, highest between-cluster
+  cell **0.8951**, no overlap over all fifteen — and 讀 `/etc/version` shows
+  product does not line up with it: N150RT appears in all three clusters, two
+  *different products* inside one cluster score 0.9863 and 0.9818, and two
+  builds of *one product* across clusters score 0.8860 and 0.0650. The high one
+  is quoted too: 0.8860 is the best case product line has anywhere here, and it
+  is still below every within-cluster cell. The vendor's version number is
+  refuted the same way — this unit and `n300rt-2.1.6` are both stamped V2.1.6
+  and land in different clusters — their cell is 0.8951, the highest
+  between-cluster cell there is and still below the lowest within-cluster one.
+  What is still collinear is date and SDK generation,
+  which is a tautology.
+- 🔴 **`busybox` is a toolchain tracer, and on one edge it separates the two
+  halves this metric is supposed to be unable to separate.** One upstream source
+  across all six trees, so its cells move only when the toolchain does: across
+  the 2016→2018 edge `busybox` is 0.9995–1.0000 while `boa` drops to
+  0.877–0.895, so **that step is `boa`'s source and not the toolchain**. The
+  sharpest cell is the deliberately different one — `n200re-3.2.0`'s `busybox`
+  has 1,869 fewer code words than this unit's and all 40,915 of its 7-grams are
+  a strict subset of this unit's 42,297. A third instrument,
+  `G(boa_t) ∩ G(busybox_t)` compared between trees, gives the same 4+2 with a
+  ninefold gap **without putting two builds of one program side by side**.
+- **This unit's nearest neighbour is `n200re-3.2.0` at 0.9818**, second 0.8951,
+  a gap of 8.67 pp — 108× the estimated reproducibility error — and the ranking
+  holds at every `k` from 2 to 16.
+- 🔴 **`TC-02` stays 推, and that is the answer rather than a deferral.** The
+  corpus is six *shipped images*; a GPL drop is a source and toolchain release,
+  and no similarity between images can name one. The gate's own refutation
+  condition did not fire (span 92.8 pp against a 5 pp bar) and the answer is
+  still undetermined, which means that condition was never the binding one. The
+  binding one is now written down. `SPEC.md` `TC-02a`, `TC-11`, `TC-12`.
+
 **`R2a/b/d-0`, 2026-08-27 — the ruler, and the corpus refuting the plan's own
 floor.** `R2b` needs a similarity metric whose thresholds come out of the data.
 `tools/binsim.py` is that metric, with **32 controls that run before any number
@@ -52,6 +123,13 @@ is reported**. Desk only, no power, zero flash bytes.
   with byte-identical code windows score exactly 1.000 on both measures.
   **Reading the matrix is `R2a/b/d-1`**, and date, product line and SDK
   generation are collinear in this corpus.
+  🔄 **Two of those three sentences were refuted the same day and are left here
+  as written.** The noise floor is not 0.0000 — those sixteen pairs are selected
+  *by* byte-equality of the window that is then scored, so 1.000 is arithmetic;
+  the estimate is **8.0e-4, 推**, and the adversarial review at the foot of this
+  entry is what caught it. And **product line is not collinear** with the
+  clustering, which `R2a/b/d-1` measured out of `/etc/version`. See the
+  `R2a/b/d-1` entry above.
 - 🔴 **And it caught a latent defect in the census.** `ci-census.py`'s case
   regexes were anchored `^\s*`, so a tool a suite *invokes* had its control
   lines counted as the outer suite's cases — with the cross compiler present

@@ -40,6 +40,17 @@
 #
 #   subject   the plan's failure condition applies -- if its pairwise scores
 #             span less than five percentage points its numbers are void
+#   baseline  a program that is in the corpus only to supply a comparand at a
+#             KNOWN denominator: it is never matrixed and the void verdict --
+#             a statement about a subject's fifteen cells -- is not its
+#             verdict. `pppd` is here in two trees because it is the corpus's
+#             only pair that holds ONE upstream source (2.4.4, 讀 from the
+#             banner in both) across the compilation-model change at a feature-
+#             set size within 1 % of this unit's boa; `wscd` is here in one
+#             tree as a third member of the no-shared-source population E7
+#             takes its maximum over. Adding them is what turned CROSS from one
+#             pair's number into a population.
+#
 #   identity  a program that is byte-identical in every tree. `bin/acltd` is
 #             one sha256 across all six -- 10,032 bytes, `.comment` `GCC: (GNU)
 #             3.2.3-1.2.11`, a prebuilt blob carried unchanged for five years
@@ -81,14 +92,53 @@
 # Recorded rather than dropped, because "we looked and it is a different part"
 # is a result, and because the model numbering does NOT imply a shared platform.
 #
-# @base and @floor name the two cells `plan/router-rebuild-plan.md:1128` defines
-# as the thresholds. They are cells of the matrix, not numbers anyone chose.
-# binsim reports the FLOOR cell as REFUTED when it lands below the score of two
-# DIFFERENT PROGRAMS from one tree, which is what it does here -- naming a
-# replacement is R2a/b/d-1's decision and not this file's.
+# @base, @floor and @model name CELLS, not numbers anyone chose. Four fields
+# name a cell of one program's matrix (program, treeA, treeB); five name a cell
+# across programs (progA, treeA, progB, treeB), which no matrix holds and which
+# R2a/b/d-1 needed. binsim reports FLOOR as REFUTED and exits 1 when it lands
+# strictly below CROSS, rather than substituting a better number.
+#
+# THE FLOOR, 2026-08-27, R2a/b/d-1. The plan's cell was `boa unit-2018 v3.4.0`
+# = 0.0650 and the corpus refuted it: below CROSS 0.1581, so "above FLOOR" was
+# satisfied by a program sharing no source at all.
+#
+# 🔴 THE FIRST REPLACEMENT WAS ALSO WRONG, and an adversarial review caught it
+# the same day. It was `busybox unit-2018 v3.4.0` = 0.1646 -- the plan's tree
+# pair read on the one program whose source is held constant across it (讀:
+# `BusyBox v1.13.4` in all six trees) -- and 0.1646 clears CROSS 0.1581. But
+# CONTAINMENT DIVIDES BY THE SMALLER FEATURE SET, and busybox's is 42,297 grams
+# against boa's 28,887, a factor of 1.46. The two numbers were read at different
+# denominators. 讀 at a matched one, the ordering reverses:
+#
+#   no shared source, same model, denominator = boa unit-2018's 28,887 grams
+#     boa vs busybox  0.1581     boa vs pppd  0.1578     boa vs wscd  0.1551
+#   ONE upstream source, compilation model changed, denominator 28,601 grams
+#     pppd unit-2018 / v3.4.0    0.1212      <- BELOW the no-shared-source level
+#
+# So at boa's scale there is no cell above the no-shared-source level and below
+# BASE that could serve as a floor. The tightest correct floor IS that level,
+# and @floor names it: `boa unit-2018` against `busybox unit-2018`, 0.1581, the
+# highest of the three at that denominator (control E7). A score at or below it
+# is reachable by a pair that shares no source, so `fail score <= FLOOR` is
+# exactly the claim the material makes and nothing weaker would be.
+#
+# @model is what makes the rule's PRECONDITION measured rather than argued
+# (control E8): with the compilation model changed, one upstream source scores
+# BELOW the floor, so a comparison across a model change is VOID and not a
+# fail. The container fingerprint has to be checked before the score is read.
+#
+# notes/which-drop.md owns all of that, including the two alternatives rejected
+# and the k sweep (讀: the named cell is the top of its population at every k
+# from 2 to 14, and is overtaken at k=1).
+#
+# BASE stayed where the plan put it, and the corpus agrees: 0.9818, this unit's
+# nearest neighbour at every k from 2 to 16, and read at the SAME denominator
+# as FLOOR -- 28,887, this unit's own boa, which is the smaller set in every
+# comparison the rule governs.
 
 @base	boa	unit-2018	n200re-3.2.0
-@floor	boa	unit-2018	v3.4.0
+@floor	boa	unit-2018	busybox	unit-2018
+@model	pppd	unit-2018	pppd	v3.4.0
 
 # tree	built	program	relpath	bytes	sha256	role
 v2.1.2	2015-08-11	boa	bin/boa	522556	ddda5a4f3c65b54b96d8cc485f617daf049ad70eab42ac57e87b4b005f17d97a	subject
@@ -109,3 +159,6 @@ unit-2018	2018-01-10	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441
 n200re-3.2.0	2018-03-30	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
 n300rt-3.4.0	2019-03-15	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
 v3.4.0	2020-10-30	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
+unit-2018	2018-01-10	pppd	bin/pppd	271616	1fb0ccabc77e0609a314beccef5b93068055079b845c877c03cfc73ff0ddff6f	baseline
+v3.4.0	2020-10-30	pppd	bin/pppd	240600	036830ab66474d93caed60368d3256cfda8f361e25402c71c2891ccb50d0f83b	baseline
+unit-2018	2018-01-10	wscd	bin/wscd	269064	b3c7964c52d39139467af8ee6e63bcfe71bc7bbb045442f0ab33f7bf5152a280	baseline
