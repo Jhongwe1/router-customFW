@@ -91,6 +91,12 @@ pairing breaks — which is what a false positive looks like.
 **Between 2018-03-30 and 2019-03-15, `boa` stopped containing these
 instructions**, and its ELF flags lost `pic` in the same step.
 
+🆕 **2026-08-27, later the same day — and `notes/which-drop.md` §3 says why this
+table gets 2+2+2 while the same metric gets 4+2 on `busybox`.** The toolchain
+axis is 4+2; `boa`'s extra split is `boa`'s own source revision plus a post-link
+strip that changes no code byte. These counts are a `boa` reading, so they carry
+the `boa` partition for the same reason.
+
 **2026-08-27 — two more instruments give this table's 2+2+2 back.** The counts
 above split the six as 176 / 144 / 0. `notes/binsim.md` gets the same split
 twice more and from different bytes: from the container format alone

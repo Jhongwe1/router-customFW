@@ -34,6 +34,29 @@ instrument that could name them is one this project declines to run. It also
 carries an older correction: the general exception vector here is `0x80000080`,
 not MIPS32's `0x80000180`, and the wrong address had propagated into four files.
 
+**[`notes/binsim.md`](notes/binsim.md)** — a structural similarity metric over
+six vendor firmware trees, with thirty-five controls that run before any number
+is reported, because almost any function of two MIPS binaries from one vendor
+returns something near 0.8 and a matrix of numbers near 0.8 reads like a result.
+`k` is 7 and not the 4 a reader would expect: a word-permutation — the identical
+instruction multiset in a destroyed order — still scores **0.4398** at k=4. The
+window cannot come from `.text`, because four of the six `boa` have no section
+header table at all. 🔴 **It refuted the threshold the plan was going to decide
+on**, and it prints `REFUTED` and exits 1 rather than substituting a better
+number.
+
+**[`notes/which-drop.md`](notes/which-drop.md)** — reading that matrix, and the
+floor that replaced the plan's. 🔴 **Its own first answer was wrong and the
+record of it is in the file**: a threshold that cleared the no-shared-source
+level only because it was read on a feature set 1.46× larger, since containment
+divides by the smaller of the two. At a matched denominator the ordering
+reverses — a pair sharing its whole upstream source across a compilation-model
+change scores *below* a pair sharing none — which is why the rule now has a
+`VOID` precondition rather than a third band. It also refutes a sentence this
+project had been carrying: **product line is crossed with the clustering, not
+confounded with it.** And it does not identify a drop: six shipped images cannot
+name a source release, so `TC-02` stays 推.
+
 **[`notes/lwl-mystery.md`](notes/lwl-mystery.md)** — MIPS Technologies sued
 Lexra over the patent covering `lwl`/`lwr`/`swl`/`swr`, and Lexra's cores
 implement MIPS I without them. This unit's `/bin/boa` contains 144. Its
