@@ -111,6 +111,19 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `NameError` one line later leaves the file at zero bytes. It emptied
   `PROGRESS.md` on 2026-08-27; `git checkout --` got it back because it was
   committed. Build the whole string first, write to `path.tmp`, `os.replace`.
+- 🆕 **Running a vendor binary is not a read-only act, and `--version` is not a
+  safe way to ask one what it is.** Measured 2026-08-28: a census that ran every
+  executable in the three rsdk `bin/` directories with `--version` deleted
+  **2,580 tracked files** from a pinned vendor clone — mostly regular files
+  under `config/uclibc/`, not the symlink farm the first write-up said —
+  rewrote four tracked files and left seventeen ignored build products — because `rsdk-linux-config`
+  is a statically linked i386 ELF that runs `make` in the tree it lives in. It
+  also wrote an `offset.tmp` into **this repository's root**, which is a place no
+  vendor-tree check watches. It was recoverable only because the trees are clones
+  pinned at known shas. **Wrap anything that executes a vendor binary in
+  `tools/vendor-tripwire.sh`, and run it from a scratch directory**, never from
+  the repo root and never from inside `src-vendor/`.
+
 - **Binaries and vendor source trees never live under `/mnt/c`.** Measured
   2026-08-23: DrvFs *keeps* symlinks, but reports every file as `777`, so git sets
   `core.fileMode=false` and stops seeing mode changes at all; and NTFS is

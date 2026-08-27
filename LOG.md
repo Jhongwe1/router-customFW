@@ -5896,3 +5896,406 @@ wrapper 要的拼法是**裸數字** `-march=4181`／`-march=5281`。全部重�
 `jalx` 不是唯一路徑的失效模式）、`tools/test-isa-probe.sh`（40 → **48**，A6 與 A4 的四個全點列，
 B 段改看 exit code）、`tools/ci-expected.tsv`、`.github/workflows/ci.yml`、
 以及上面十四條各自落地的檔。
+
+## 2026-08-28（桌面）— `R2a/b/d-3`：一次真的建置，而路上我自己把材料寫髒了
+
+**桌面，不通電，零 flash 位元組，零電源循環，零裝置讀數。** 接前一段
+（2026-08-27 第四段，`R2a/b/d-2`）。這一步進來時剩下的只有一句話：
+「`rsdk-1.5.5` 的 `as` 缺一個 i386 `libz.so.1`」。**那句話是對的，而它描述的形狀是錯的。**
+
+### 一、開場十分鐘，我的普查把 vendor tree 寫髒了
+
+第一支儀器是「對三份 rsdk 的 `bin/` 裡每一支執行檔跑 `--version`，讀 exit status，
+再看 `ldd`」。它跑完了，也答出了問題。**然後我順手查了一次 `git status`，
+`src-vendor/rtl819x-toolchain` 有 2,584 行。**
+
+`rsdk-linux-config` 不是一支印版本的程式 —— 它是一支 **statically linked i386 ELF，
+會在它所在的那棵樹裡跑 `make`**。16 秒之內：
+
+| | |
+|---|---|
+| 刪掉 | **2,580 個被追蹤的檔案**，在兩棵 1.3.6 樹的 `config/uclibc/` 底下 |
+| 改掉 | 4 個被追蹤的檔（兩棵 1.3.6 樹的 `.depend` 與 `zconf.tab.o`）|
+| 生出 | 17 個 **ignored** build product（`conf`、`conf.o`、`lex.zconf.c`、`.config`…）|
+| 還有 | 一個 `offset.tmp`，**寫在這個 repo 的根目錄**，那是 vendor tree 的檢查看不到的地方 |
+
+🔄 **第十二節的對抗審查改掉了上面第一列的一半，而那一半是我推廣出來的。** 原本寫的是「`config/uclibc/include/bits/` 底下 2,580 個被追蹤的 **symlink**」——**那不可能**：讀 index，那個目錄一棵樹只有 **93** 個被追蹤的 symlink（95 個 entry），整個 `config/uclibc` 一棵樹是 5,414 個 entry、只有 **132** 個 symlink，整份 clone 72,943 個 entry 裡也只有 972 個 symlink。**2,580 這個數字是量的，「是 symlink」「在 `bits/` 底下」是我從 2,584 行輸出的前四十行推廣出來的**，而那四十行剛好全是 `bits/` 的符號連結。實際被刪的絕大多數是一般檔案，散在 `libc/`／`libm/`／`include/`／`lib/`；**上界是 264**（兩棵樹 `config/uclibc` 底下每一個被追蹤的 symlink 加起來）。⚠️ **確切組成沒有重量**，因為重量就要再破壞一次；上面寫的是從 index 推出來的界，不是一次重跑。
+⚠️ **`make` 的目標也沒有量到。** 觀察到的是 `make: Entering directory …`；`strings` 在那支 binary 裡找不到 `make clean` 這種字面值，所以「跑的是哪一個 target」記成**未定**。
+
+**歸屬是乾淨的**：所有 mtime 都落在 `04:03:46`–`04:04:02` 這 16 秒裡，
+`git reflog` 只有一筆 clone，`.git/info/exclude` 是空的。
+還原：逐條刪掉那 17 個 ignored 路徑、`git checkout -- .`，
+之後 `git status --porcelain --ignored` **0 行**，
+`zconf.tab.o` 的 sha256 與 `git show HEAD:` 逐位元組相同，
+`bits/atomic.h` 這個 symlink 解得開。
+
+🔴 **這條規則我本來就在遵守，只是從來沒寫下來：跑一支不明的廠商 binary 不是唯讀操作。**
+現在寫下來了 —— `CLAUDE.md` § Environment，加上一支工具。
+
+### 二、`tools/vendor-tripwire.sh`（新，24 案）
+
+包住指令，前後各拍一次快照，**兩個互相獨立的偵測器**，因為單獨一個都有盲點：
+
+- **git** —— `git status --porcelain=v1 --ignored=matching`。`--ignored` 是承重的：
+  那次意外生出的 17 個檔全部被巢狀 `.gitignore` 蓋掉，**不帶 `--ignored` 的
+  `git status` 對它們回報零行**。`T6` 兩個方向都釘住這件事。
+- **mtime** —— 指令跑之前在樹外放一個 stamp，之後 `find -newer`。這抓的是 git 看不到的那種寫入：
+  那次意外也 touch 了 `lib/libc.so` 與 `libpthread.so`，**位元組沒變、mtime 變了**，
+  git 正確而無用地說它們沒被修改。
+
+退出碼把「指令壞了」與「樹壞了」分開：0 乾淨且指令成功、1 乾淨但指令失敗（`cmd-rc=` 印在判決行上）、
+2 TRIPPED、3 沒有樹可看（拒絕）、4 **跑之前就已經髒**（拒絕，而且**不跑那道指令** ——
+對著髒東西取差分是歸屬不了的）、5 TOUCHED。
+
+**它自己會怎麼失效，寫在檔頭**：它只偵測不預防；把內容與 mtime 都還原的寫入者能騙過兩個偵測器；
+它只看被宣告的那幾棵樹 —— **而那個盲點當天就發生了**，`offset.tmp` 落在 repo 根目錄，
+tripwire 不會看到。今天之後每一道會執行廠商 binary 的指令都從它底下跑。
+
+`T10` 是拿**真兇**當案例：`rsdk-linux-config --version` 必須讓它發射。它要 `--live`，
+因為那一案會弄壞再還原 2,580 個檔。今天手動跑過一次：**24/24 全綠，跑完 `--check` 四棵樹 0 行。**
+
+### 三、缺的不是一個 `as`，是整包 binutils
+
+`ldd` 只指名一個 soname，所以「缺一個 libz」是對的。**但倒下的是十七支**：
+`as`、`ld`／`xld`、`ar`、`ranlib`、`nm`、`objcopy`、`objdump`、`readelf`、`size`、
+`strings`、`strip`、`addr2line`、`c++filt`、`gprof`。
+而 `gcc`／`cpp`／`xgcc` 是**靜態連結**，所以它們照跑 ——
+🔴 **這就是舊 DoD（`rsdk-linux-gcc --version` 印得出 `4.4.5`）為什麼會亮的原因**：
+它唯一碰到的那支程式，正好在還活著的那一組裡。
+
+⚠️ **而我第一次量它的時候自己也犯了同一種錯**：`"$a" --version 2>&1 | head -3; echo rc=$?`
+讀到的是 `head` 的 exit status，所以一行 `error while loading shared libraries` 旁邊印著 `rc=0`。
+
+**兩條配方都做了，而順序是重點：先做不動系統的那一條**，這樣它的正結果不可能是系統套件造成的。
+
+| 步驟 | `mips-linux-as --version` |
+|---|---|
+| 什麼都沒做 | rc=127，`error while loading shared libraries: libz.so.1` |
+| `LD_LIBRARY_PATH=<hermetic>` | **rc=0**，`GNU assembler (GNU Binutils) 2.19.92.20091006` |
+| 把環境變數拿掉 | rc=127 —— 兩條路線之間的負控制 |
+| 裝 `lib32z1`，`env -u LD_LIBRARY_PATH` | **rc=0**，同一個 banner |
+
+`lib32z1` `1:1.3.dfsg-3.1ubuntu2.1`（deb sha256 `91ab7d60…`，57,380 bytes）是 **amd64 套件**，
+裝到 `/usr/lib32`，而那個目錄早就在 `/etc/ld.so.conf.d/zz_i386-biarch-compat.conf` 裡 ——
+**不需要 `dpkg --add-architecture i386`**，計畫書那份 Dockerfile 草稿（`zlib1g:i386`）要得比實際需要多。
+補完後 30 支裡 27 支解得開；剩下三支是 gdb／gdbtui／insight，要 `libX11`／`libncurses.so.5`／`libexpat.so.0`，
+**建置用不到，記下來是為了以後那個零讀起來是「已知且不需要」**。
+
+### 四、DoD 換掉了，換成一次真的建置
+
+舊 DoD 已經被 `-2` 證明會在沒做事的情況下亮。新的是 `tools/tc-smoke.sh`（新，31 案）的四階梯，
+**每一階分開報告，沒走到就印「沒走到」**：L1 binutils 起得來（exit status 直接讀，不經過管線）／
+L2 `.c`→`.s`→`.o`→靜態連結，然後**去讀** ELF header 是不是 32-bit MSB MIPS `EXEC`／
+L3 `arch/rlx` 用得到的九條指令（`lwl` `lwr` `swl` `swr` `mtc3`×2 `cache` `jr` `nop`）組出來，
+**把編碼讀回來比對 sha256**（`298d5f2a…`，48 bytes，三份工具鏈給出同一個）／
+L4 連結出來的程式丟進 `qemu-mips` 跑，比對它自己算出來的數。
+
+**三份工具鏈全部走到 L4。** 之上三次真的建置：
+
+| | 1.3.6-4181 | 1.5.5-5281 |
+|---|---|---|
+| 廠商自己的 `users/dhrystone`，用它自己的 Makefile | `make` rc=0，動態與靜態都連得出來，`qemu-mips` 下跑完，**每一個內部自檢值都等於它自己寫的期望常數** | 同左 |
+| `arch/rlx` 的四個 object | rc=0，4/4 | rc=0，4/4 |
+| **完整的 `vmlinux`，724 個 object** | **rc=0，3,340,287 bytes**，text 2,656,040，entry `0x80003600` | **rc=0，3,166,710 bytes**，text 2,497,352，entry `0x80003420` |
+
+**要付出什麼**：kernel 不在 vendor tree 裡建（tripwire 看著）；最小的頂層版面要重建，
+因為 `arch/rlx/bsp` 是指到 `../../../target/bsp` 的 symlink、`target` 又指到 `boards/rtl8196e`；
+`DIR_ROOT`／`DIR_LINUX`／`DIR_BOARD`／`DIR_RSDK` 要 export，因為
+`boards/rtl8196e/bsp/Makefile:10` 是 `include $(DIR_LINUX)/.config`。
+**只改了一行，而且是 host 工具的問題**：`kernel/timeconst.pl:373` 的 `defined(@val)`
+在 Perl 5.22 之後被拿掉，這台 host 跑 5.38.2。
+🔴 **交叉工具鏈一個字都不用改** —— 那就是計畫 `R-6`（「2.6.30 在現代主機上建不動」）的答案。
+
+⚠️ **我在這一段裡連犯兩個自己的錯，兩個都被輸出訊息誤導**：
+`PATH="$t/bin:$PATH" yes '' | make …` 只把 `PATH` 設給了 `yes`，
+於是報出 `rsdk-linux-gcc: not found`，看起來像工具鏈問題；
+第一次搬 kernel 只搬 `linux-2.6.30`，把那兩層 symlink 弄斷，報 `arch/rlx/bsp/Makefile: No such file`。
+
+### 五、`TC-15`：廠商自己的兩支儀器，對 load delay slot 給出同一條界線
+
+🔴 **這是這一段影響面最大的一件事，而它不是我推的，是廠商工具說的。**
+
+**編譯器。** 同一份原始碼、同樣 `-O2`、每一格都讀 exit status、輸出檔先 `rm -f`。
+語料是廠商自己的 `users/dhrystone/dhry_1.c`，數字由 `tools/hazlint` 給：
+
+| 工具鏈 | `-march` | loads | load 後補 nop | violations |
+|---|---|---:|---:|---:|
+| 1.3.6 | `4180` / `4181` / `5181` | 421 | 121（28.74 %）| **0** |
+| 1.3.6 | `5280` | 425 | 0 | **107** |
+| 1.3.6 | `5281` / `4281` | 425 | 0 | **162** |
+| 1.5.5 | `4180` / `4181` | 388 | 90（23.20 %）| **0** |
+| 1.5.5 | `5181` | 384 | 91（23.70 %）| **0** |
+| 1.5.5 | `5280` / `5281` / `4281` | 390 | 1（0.26 %）| **134** |
+
+🔴 **violations 那一欄比 nop 數利得多，而它不在這張表的第一版裡** —— 第一版是我自己的 awk 數 nop，
+換成 `hazlint` 重量之後才看見：分割線一邊全部 0，另一邊 107–162。
+
+**組譯器。** rsdk-1.5.5 的 `as` 內建 load-use 檢查器 —— binary 裡有
+`possible LOAD-USE: regno=%d`、`warn-possible-load-use`、`load_delay_nop`、`reg_needs_delay`；
+**1.3.6 的 `as` 一個字串都沒有**。餵它 `.set noreorder` 底下的 `lw $31,0($4)` 接 `jr $31`：
+`4180`／`4181`／`5181`／`mips1` **會警告**，`5280`／`5281`／`4281`／`mips2` 不會。
+
+🔄 **對抗審查：「1.3.6 沒有這個模型」是假零，而抓到它的是我沒跑的那個模式。**
+在 gas 預設的 `.set reorder` 下，**兩個世代都替 `4181` 補上那個 `nop`、都不替 `5281` 補**：
+
+| 工具鏈 | `-march` | `.set noreorder` | `.set reorder` |
+|---|---|---|---|
+| 1.3.6 | `4181` | `8c9f0000 03e00008 00000000` 不動、不出聲 | **`8c9f0000 00000000 03e00008` —— 補了** |
+| 1.3.6 | `5281` | 不動 | 不動 |
+| 1.5.5 | `4181` | 不動，**但會警告** | **補了，而警告消失** |
+| 1.5.5 | `5281` | 不動 | 不動 |
+
+**`noreorder`-only 的那個探針沒有正控制** —— 那正是「沒有檢查器」與「默默修掉」長得一模一樣的唯一模式。
+所以 `strings` 量到的是**診斷**不是模型，分割線因此站在三個讀數上；
+死掉的是「組譯器只警告不修」那一句。⚠️ **而且它在真的 build 裡碰得到**：
+`arch/rlx` 底下不是每一支 `.S` 都寫 `.set noreorder`，`asm/stackframe.h` 還直接寫 `.set reorder`。
+哪幾支、有沒有誰靠它，**沒去看**。
+
+**分割完全相同：`{4180 4181 5181 mips1}` 曝露 load delay slot，`{5280 5281 4281 mips2}` 不曝露。**
+兩支儀器、兩個工具鏈世代、一條界線，而且它落在 MIPS-I／MIPS-II 的分界上。
+⚠️ **組譯器只警告，不補 `nop`** —— 它產出的 object 裡就是 `lw ra,28(sp)` 緊接 `jr ra`。
+
+🔴 **拿錯的 rsdk 建這塊板子，代價是可以量的。** 同一份原始碼、同一份 `.config`：
+
+| object | 1.3.6-4181（`-march=4181`）| 1.5.5-5281（`-march=5281`）|
+|---|---|---|
+| `arch/rlx/kernel/traps.o` | 134 loads／30 nop（22.4 %）／**0 violations** | 150 loads／0 nop／**28 violations** |
+| `arch/rlx/mm/cache.o` | 33／14（42.4 %）／**0** | 33／0／**16** |
+| `arch/rlx/bsp/setup.o` | 7／4（57.1 %）／**0** | 6／0／**5** |
+
+**三個檔 49 條，而其中兩個是例外處理與快取管理。**
+🔴 **而真正該比的是整份映像 —— 今天從同一份原始碼建出了兩份，所以比得成。**
+三列同一支儀器，**範圍切在 MIPS16 之下**：最低的 `[MIPS16]` 符號是 `0x8016c844`（4181 那份）與
+`0x8015c200`（5281 那份），所以 `[0x80000000, 0x80158000)` 三份都是 32-bit 程式碼，
+**同一個界服務三份，而且 `hazlint` 不用任何 override 就認**：
+
+| 映像 | loads | load 後補 nop | violations |
+|---|---:|---:|---:|
+| 我建的 `vmlinux`，`-march=4181` | 61,568 | 17,423（**28.30 %**）| **4** |
+| 我建的 `vmlinux`，`-march=5281` | 65,740 | 117（**0.18 %**）| **21,185** |
+| **這台自己的 kernel** | 63,298 | 19,419（**30.68 %**）| **0** |
+
+🔄 **這張表第一版是整份映像加 `--allow-mips16`，數字是 256／36,264／168，而那個讀法壞在兩處。**
+當時給的理由是「切界的話三份切的不是同一個界」——**那是錯的**，同一個界就服務三份；
+而 `--allow-mips16` 那個模式 `hazlint` 自己叫「不是保守的答案，是沒有答案」。
+在那個模式下數到的東西大半是**資料被當成程式碼**：`vmlinux` 只有一個可執行 `PT_LOAD`，
+`__ex_table`／`.rodata`／`.data` 全在裡面。舊數字留著，因為負結果不刪。
+**切界之後這台自己的 kernel 是零。**
+
+**這台的 kernel 兩個指標同時落在 4181 那一側**：nop 率與 4181 那份差 **2.4 pp**、是 5281 那份的 **170 倍**，
+violations **是零**，而 5281 那份是 21,185。同一份原始碼、只換驅動它的 rsdk，
+而出貨映像不在任何中點附近。**推，而這是比只看 nop 率強得多的一個推。**
+
+⚠️ **不要和 `K4b` 的 128,440／40,182（31.28 %）／58 混用** —— 那又是另一個範圍。
+⚠️ **那 4 條沒有解釋**，61,568 個 load 裡的四個點位，這裡沒說它們是什麼。
+⚠️ **而被換掉的那組數字是一個方法上的警告，不只是一張過時的表**：
+168 與 256 大半是資料被當成程式碼，切界就沒了。**掃得比較寬不等於掃得比較保守。**
+⚠️ **這是讀兩個編譯器，不是讀矽片。** 矽片那一題是 `R1a`／`CPU-14`，一格都沒動。
+
+### 六、`-fuse-uls`：三份 drop 的 build system 裡一個字都沒有
+
+原本要問的是「三份 drop 各自怎麼傳這個旗標」。答案是**都沒有傳**。
+每一份 drop 裡提到 `fuse-uls` 的檔案都剛好兩個，而且兩個都在 rsdk-1.5.5 自己的 uClibc 設定裡
+（`include/bits/uClibc_config.h:179` 與 `config/uclibc/config/default:194`）。
+`-fno-use-uls` 在任何一份 drop 裡是 **0** 次。`boa` 自己的 Makefile 寫
+`export CC = rsdk-linux-gcc`、`CFLAGS = -Os -pipe`，沒有 `-march`、沒有 `-fuse-uls`。
+
+**那個零的控制**（同一組 grep、同一份語料庫）：`CPU_HAS_ULS` 48／41／41 個檔、
+`march=5281` 1141／1143／1055、`ffix-bdsl` 2／2／2。
+
+🔴 **所以開關是工具鏈不是原始碼。**`RSDK_LOGFILE` 讓 wrapper 自己說出它傳了什麼：
+1.5.5 傳 `-ffix-bdsl -fuse-uls -UCONFIG_CPU_HAS_ULS -DCONFIG_CPU_HAS_ULS -msoft-float -EB -march=5281`，
+1.3.6-4181 只傳 `-march=4181 -EB`。
+**`boa` 2019 掉到 0 因此不需要「更晚的 rsdk 表現得像更早的」** —— 換一個世代的 wrapper 就會這樣。
+
+⚠️ **而那個 `-U`／`-D` 是常數對，順序固定，三種輸入（預設／`-fuse-uls`／`-fno-use-uls`）都一樣**，
+`-D` 在後所以巨集**永遠被定義**，包括與 kernel 自己 `.config` 相反的時候。
+wrapper 顯然是想選一個，而這次量測沒有找到讓它選的那個輸入。**記成未定。**
+
+⚠️ **另一個當場撿到的陷阱**：`gcc -c foo.S` **不會**把 `-march` 帶給 `as`。
+1.3.6 上組一個含 `cache 0x11,0($4)` 的 `.S` 會得到
+`Error: opcode not supported on this processor: lx4180 (lx4180)`，
+而 `-Wa,-march=4181` 修得掉並且自己說 `Warning: A different -march was already specified`。
+所以 driver 給 `cc1` 的是設定好的 4181，給 `as` 的是它自己的預設。
+
+### 七、`TC-17`：每一份 drop 自己的 `.config` 指定了哪一條 rsdk
+
+| drop | 產生於 | 板子 | 選的 rsdk | model |
+|---|---|---|---|---|
+| `rtl819x-toolchain` | 2013-06-29 | **rtl8196e** | `rsdk-1.3.6-4181` | `RTL8196E_88E_GW` |
+| `saturn49-wecb` | 2012-08-15 | rtl8198 | `rsdk-1.3.6-5281` | `RTL8198_SPI_SQUASHFS` |
+| `wecb-vz-gpl` | 2012-08-15 | rtl8198 | `rsdk-1.3.6-5281` | `RTL8198_SPI_SQUASHFS` |
+
+控制：每一份都有三行 `CONFIG_RSDK_*`，剛好一行 `=y`。
+
+🔴 **三份沒有一份選 1.5.5，而這台的 banner 是 `4.4.5-1.5.5p2`。**
+這是矩陣做不到的鑑別器，因為它讀的是 drop 不是映像。
+⚠️ **它不指認誰建的**：`.config` 可以改。drop 做不到的是提供一份它沒有的 release，
+而三份裡沒有 1.5.5p2，也沒有任何設定成 4181 的 1.5.5 —— 而板級 config 是 `ARCH_CPU_RLX4181=y`。
+⚠️ **三份裡有兩份是 RTL8198 的 drop**，這件事以前沒有任何地方寫過。**`TC-02` 仍然是 推。**
+
+### 八、MIPS16 那個鑑別器被建置本身否證，而同一件事給了兩支工具第一個 ground truth
+
+`notes/vendor-kernel-isa.md` §4.2 寫著：「五份出貨的 `RTL8196E_*` config 沒有一個開任何 MIPS16 選項，
+而這台的 binary 有 —— 這是 drop 建不出這個映像的第二件事」。
+**拿那五份之一（`RTL8196E_88E_GW`）建出來的 `vmlinux` 裡就有 MIPS16。**
+`readelf -s` 標了 **39 個 `[MIPS16]` 符號**（`rtl8192cd_interrupt`、`swNic_receive`、`rtl_netif_rx`…），
+廠商自己的 objdump 把 `0x80006bf4` 的 `7409506d` 讀成 `jalx 802541b4 <irq_to_desc>`。
+**所以「config 沒開」不代表「建不出來」，那不是鑑別器。**就地標 🔄，不刪。
+
+🔴 **而我第一次查這件事的答案是「0 個 object 有 MIPS16」，那是個假零。**
+我拿 `readelf -h` 的 `Flags:` 去 grep `mips16` —— 而 `e_flags` **不帶這個位元**（那份 `vmlinux` 是
+`0x1001, noreorder, o32, mips1`）。MIPS16 是**逐符號**標在 `st_other` 裡的，`readelf -h` 永遠看不到。
+
+✅ **反過來，這是 `opcount --mips16` 與 `hazlint` 的 MIPS16 拒絕第一次拿到 ground truth。**
+這台的 kernel 是 stripped，能對答案的符號表根本不存在；今天建出來的 `vmlinux` 有。
+儀器說「MIPS16 reached，25 個相異目標」，符號表說「39 個符號標了 MIPS16」。
+在此之前那個宣稱站的是一次逐條裁決的反組譯加一個自洽性論證。
+
+⚠️ **MIPS16 到底從哪裡進來的，未定。** 樹裡每一個 `-mips16` 不是被註解掉就是包在
+`ifdef CONFIG_RTL865X_KERNEL_MIPS16_LAYERDRIVER` 裡，而那份 config 沒開它；樹裡也沒有任何
+被追蹤的 `.o`。能定案的量測是 `make V=1` 再 grep 真正的命令列。**記成沒去看。**
+
+### 九、`.comment`：第二次讀，而 `TC-09` 早就寫過了
+
+這一段本來要當成新發現寫進 `notes/which-drop.md`。**它不是新的** ——
+`TC-09` 2026-08-27 就記了同一件事，連 `acltd` 那個陷阱都記了。
+差點把一個已提交的發現當成新的公布，改成指標，只留下三件真的新的小事：
+戳記在 `lib/libapmib.so` 裡也在（那是廠商程式碼，所以是 build 戳記不是工具鏈戳記）；
+逐棵樹保有 section header 的 ELF 檔數是 1/55、1/62、**63/63**、**64/64**、1/50、1/50；
+⚠️ **廠商自己的 `mips-linux-readelf`（binutils 2.16.94）沒有 `-p` 這個選項**，它回一段 usage，
+於是 grep 它的輸出會把這件事記成「沒有 `.comment` section」。兩支 readelf 用 `-S` 問都說那個 section 在。
+
+### 十、工具與註冊
+
+- **`tools/vendor-tripwire.sh`（新）＋ `tools/test-vendor-tripwire.sh`（新，**32 案**）** —— 上面第二節。
+- **`tools/tc-smoke.sh`（新）＋ `tools/test-tc-smoke.sh`（新，**36 案**）** —— 四階梯，兩個控制：
+  NEG 是**編譯器必須拒絕 binutils 的 `-march` 拼法**（`lx4180`／`rlx4181`／`rlx5281`）——
+  接受就代表 `-march` 被忽略，整張表是一欄重複；POS 是階梯逐階印出來，沒走到的印 `-` 不印 `ok`。
+  suite 的七個 S 案各弄壞**一階**，並檢查它下面那階仍然 `ok`、它上面那階**不是** `ok`。
+- `tools/ci-expected.tsv` 加四列、`.github/workflows/ci.yml` 加兩步（`text` job，兩個在 runner 上都會 stand down），
+  `NOT RUN IN THIS JOB` **353 → 362**（量：runner 組態下 census 收在 **160**，加上沒有 cross gcc 時 `test-rlxprobe` 的 202）。
+
+⚠️ **寫這兩支 suite 的時候，我自己的 suite 先紅了 17 條，而 17 條全部是 suite 的解析錯誤不是工具的錯：**
+`cell()` 假設「第二行是表頭」，於是把表頭讀回來當答案；stub 的 `objcopy` 用
+`printf '\xNN'` 寫 48 bytes，而 bash 的 `printf` 碰到 NUL 會截斷，實際寫出 132 bytes。
+前者改成用**名字**找表頭，後者改成 base64。**兩個都不是被工具抓到的，是被 suite 自己抓到的。**
+
+### 十一、收工自查
+
+`spec-check.py` 9 個控制全過，`SPEC.md` 每一項檢查都過。全套（bench 組態，drop 在位）：
+`spec-check` 11、`binsim` 24、`test-binsim` 96、`test-file-modes` 3、`test-gitignore` 15、
+`test-console-capture` 29、`test-opcount` 29、`test-isa-probe` 48、`test-rlxprobe` 202、
+`test-hazlint` 109、`test-reply-size` 21、`test-boot-timeline` 15、`verify-backup-copy` 4、
+`ci-census` 14、**`test-vendor-tripwire` 32（30 ＋ 一條 skip 蓋 2）**、**`test-tc-smoke` 36** —— 全綠。
+census 兩種組態都收得起來：bench 組態 `NOT RUN 111`，runner 組態（`$FWRE_WORK` 空）**`NOT RUN 160`**。
+`shellcheck --severity=error` 對四支新檔全過。四支新檔都 `git update-index --chmod=+x`，
+**因為 `core.fileMode=false` 會把它們記成 `100644`**，而 `test-file-modes.sh` 讀的是 index ——
+所以它要在 `git add` **之後**跑，之前跑等於什麼都沒驗。
+
+### 十二、收工前的對抗審查：六個視角、43 個 agent、36 條提出、22 條存活
+
+六個視角（打掉 `TC-15` 那個頭條／打掉那次建置／把兩支新工具當程式碼讀／
+兩套 suite 擋不擋得住變異體／每一個數字獨立重量一次／有沒有講超過證據＋跨檔一致性），
+每一條發現各配一個專責反駁者，被要求**去殺掉它**。**存活率 22／36，比上一次的 27／30 低，
+而低是因為這次每一條都被真的重跑過** —— 反駁者殺掉的十四條裡，有好幾條是重跑之後發現
+提出者的推論不成立，不是提出者看錯行。
+
+🔴 **三條擋住 commit，而最重的一條是我自己把一次量測推廣過頭。**
+
+**① 那次意外的描述有一半是我推廣出來的，而它不可能對。**
+我寫的是「`config/uclibc/include/bits/` 底下 **2,580 個被追蹤的 symlink**」。
+讀 index：那個目錄一棵樹只有 **93** 個被追蹤的 symlink，整個 `config/uclibc` 是 5,414 個 entry、
+只有 **132** 個 symlink，整份 clone 72,943 個 entry 裡也只有 972 個。
+**2,580 是量的，「symlink」與「在 `bits/` 底下」是從 2,584 行輸出的前四十行推廣出來的** ——
+而那四十行剛好全是 `bits/` 的符號連結。這條在**六個已提交的檔案**裡都在，全部改掉。
+⚠️ 確切組成沒有重量，因為重量就要再破壞一次;寫成從 index 推出來的界（上界 264）。
+
+**② `R4` 那條否證條件會對著它自己要保護的證據發射。**
+我寫「除了 §6 指名的那兩個檔以外，任何 `-fuse-uls` 都推翻這個零」。
+讀者跑最明顯的那個指令會得到 **22** 而不是 2 —— 因為我用的是 `grep -rlI`，
+**而那個 `-I` 我一個字都沒寫**。多出來的二十個全部是工具鏈**執行檔**
+（`cc1`、`cc1plus`、`mips-linux-c++`、`mips-linux-cpp`），也就是那個旗標被編進編譯器裡，
+那是 §6 自己的結論、是**佐證**不是反證。條件改成只講 build input，方法寫明。
+🔴 **同一條裡還有第二個缺陷**：我拿 `ffix-bdsl` 當那個零的第三根控制，
+而它命中的是**同樣那兩個檔、同一行、同一個字串**。
+那是量測戴著控制的帽子 —— `55bc7c1` 為噪音底記過同一個缺陷，它又出現了一次。
+
+**③ 「組譯器只警告，不補 `nop`」是錯的，而抓到它的是我沒跑的那個模式。**
+我的測試檔寫死 `.set noreorder`。在 gas 預設的 `.set reorder` 下，
+**兩個世代都替 `4181` 補上那個 `nop`、都不替 `5281` 補**。
+所以「1.3.6 的 `as` 沒有這個模型」是**假零** —— `noreorder` 正是「沒有檢查器」與
+「默默修掉」長得一模一樣的唯一模式，那個探針沒有正控制。
+**方向是反的：修完之後這條線更強**，分割線站在三個讀數上而不是兩個。
+
+**④ 而審查順手把 §5 的整份映像那張表換成一張好得多的。**
+我用 `--allow-mips16` 掃整份映像，理由寫「切界的話三份切的不是同一個界」。
+**那是錯的**：最低的 `[MIPS16]` 符號是 `0x8016c844`／`0x8015c200`，
+`[0x80000000, 0x80158000)` 三份都是 32-bit 程式碼，同一個界服務三份，
+而且 `hazlint` 不用 override 就認。切界之後 —— 4181 那份 **4** 條 violation、
+5281 那份 **21,185**、**這台自己的 kernel 是 0**。
+舊的 256／36,264／168 大半是**資料被當成程式碼**（`vmlinux` 只有一個可執行 `PT_LOAD`）。
+**掃得比較寬不等於掃得比較保守**，舊數字留著。
+
+🔴 **最重的一條頭條攻擊被反駁了，而反駁者給出的論證比我原本的好。**
+提出的是：「兩支儀器不獨立，它們是同一份『每個 `-march` 對應哪個 ISA level』的兩個消費者，
+所以 `TC-15` 只是 GNU 的通則 *MIPS-I 沒有 GPR interlock* 換句話說」。
+反駁者重量之後拿出 **`-march=r3000` 對 `-march=r3900`**：兩者在他跑的每一個 opcode 探針上
+**分不出來**（都拒 `ll`、都拒 `movz`、都收 `lwc3`），卻在**兩支儀器上都落在相反的兩側**。
+所以工具裡帶的是一張**逐 CPU 的 interlock 屬性表加例外清單**，不是 ISA level 的推論；
+Realtek 把 4180／4181／5181 放在曝露那一側，是一次**指名的指派**。
+另外 `-march=4181` 組得動 `-march=mips1` 拒絕的 `ll` 與 `movz`，
+`-march=5280` 拒絕 `-march=mips2` 收的 `ll` —— **Lexra 的名字不是通用 ISA level 的別名**。
+⚠️ **但「兩份副本出自同一個廠商的一次決定」這句仍然成立**，那是 §8 本來就寫著的，
+`SPEC.md` 那一格的措辭跟著改。
+
+**⑤ 五個「不會失敗的控制」，而 `PROGRESS.md` 今天早些時候才記過同一件事四次。**
+`tc-smoke` 的 POS 控制是一句 `say` 的字串，什麼都不算；
+`noqemu` 那條路徑 exit 0 並印出「every toolchain reached L4」；
+`vendor-tripwire` 在 **git 自己失敗**的時候回報 CLEAN（兩份空快照比起來相等）；
+`--check` 模式一個案子都沒有；預設的樹搜尋一個案子都沒有。
+全部修掉並補了案子。**這是一個模式不是五次意外**：每一個都是寫成散文、從來沒被變異過的控制，
+而它們所在的工具的**量測**部分被變異得很徹底。
+
+**⑥ 而修 `noqemu` 那條的時候我當場製造了一個相反的缺陷。**
+改成 exit 4 之後，suite 的 `case "$rc"` 只有 `0) 3) 1) *)` 四個分支，於是落到 `*)` 印 FAIL ——
+舊的錯是假綠，新的錯是假紅。同一輪審查抓到的。
+
+**⑦ `test-vendor-tripwire.sh` 在 runner 上跑 0 個案子**，因為每一個 `"$ME"` 呼叫都在
+「找不到 vendor 樹就 skip」那道 guard 底下。也就是說 CI 上這一步**就算 `vendor-tripwire.sh` 被整支刪掉也會綠**。
+改成找不到就自己 `git init` 一個帶 ignore 規則的合成 subject，runner 上從 **0／32 變成 28／32**。
+`ci-expected.tsv` 那一列原本寫的理由（「沒有 `.gitignore` 的樹根本沒辦法測 T6」）是**可量的假話**。
+
+**其餘存活但沒有擋住 commit 的**，照分類記在殘留：`--quiet` 把自己的合約反過來
+（判決走 `say` 被吃掉、細節是裸 `printf` 留著）已修；`L1` 分不出十支 binutils 死掉與一支死掉
+（只有 `as` 有控制）**未修**；`hazlint` 對 ELF **默默丟掉 `--range`** 是一個獨立的工具缺陷，**未修**；
+`arch/rlx` 底下哪幾支 `.S` 在 `reorder` 模式下組譯、有沒有誰靠 gas 幫它補 `nop`，**沒去看**。
+
+### 十三、這次審查沒有看的
+
+`R2a`／`R2b` 的重建（那是 `-4`）、`notes/binsim.md` 與 `notes/cache-model.md`、
+`tools/rlxprobe/`、`upstream/`、以及 `.comment` 那一段第二次讀之後的 `TC-09` 本體。
+而就算上面每一條都修完，還有四件事仍然沒被檢查：
+**建出來的 `vmlinux` 沒有跑過**，裝置上沒有、模擬器裡也沒有；
+**`-U`／`-D` 那一對是什麼輸入在切**，未定；
+**MIPS16 到底從哪一條 `-mips16` 進來的**，未定，而能定案的量測（`make V=1` 再 grep 命令列）沒做；
+**`TC-15` 整條仍然是讀廠商的工具，不是讀矽片** —— 那是 `R1a`。
+
+### 動到的檔
+
+`notes/vendor-toolchains.md`（新，這一步的擁有者）、
+`tools/vendor-tripwire.sh`（新）、`tools/test-vendor-tripwire.sh`（新，32 案）、
+`tools/tc-smoke.sh`（新）、`tools/test-tc-smoke.sh`（新，36 案）、
+`tools/ci-expected.tsv`（四列→五列）、`.github/workflows/ci.yml`（`text` job 加兩步；353 → 362）、
+`SPEC.md`（`TC-13`–`TC-17` 新，`TC-05`／`TC-09`／§17 的 `TC-02` 材料增補）、
+`notes/vendor-kernel-isa.md`（§4.2 的 MIPS16 鑑別器被否證，就地標 🔄；§2.3 的機制補上；結尾清單第 8 條改寫）、
+`notes/which-drop.md`（`TC-17` 進來；`.comment` 那一段縮成指向 `TC-09` 的指標；「需要 `-3` 的容器」那句改掉）、
+`PROGRESS.md`（§ Now 的 gate／step／last session、步驟表 `-3` 打勾、四條 correction、四條 carried forward）、
+`CHANGELOG.md`、`README.md`、`docs/FINDINGS.md`、`CLAUDE.md`（§ Environment 加一條）、`SOURCES.json`。
+
+**對抗審查那一輪另外動到**：`tools/tc-smoke.sh`（POS 控制改成算出來的、`noqemu` 改 exit 4、
+`-march` 探針的 raw 退路）、`tools/vendor-tripwire.sh`（`snapshot()` 讀 git 的 exit status、
+`--tree` 去掉尾斜線、`--quiet` 的合約掉過來、背景寫入者那條盲點寫進檔頭）、
+`tools/test-vendor-tripwire.sh`（24 → **32**，T11／T12／T13，以及沒有 vendor 樹時自己建一個合成 subject）、
+`tools/test-tc-smoke.sh`（31 → **36**，S4 的單調性、S6 的 exit code，以及我自己修出來的那個 `4)` 分支）、
+`tools/ci-expected.tsv`、`.github/workflows/ci.yml`，以及上面每一條各自落地的檔。

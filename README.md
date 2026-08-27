@@ -29,13 +29,33 @@ converting the second.
 
 ⚠️ **The vendor toolchains were measured too, and the first answer was wrong.**
 The emission of `lwl`/`lwr` is controlled by a build flag, `-fuse-uls`, that both
-rsdk generations carry; only the default differs, and Realtek pass it explicitly
-in their own uClibc configuration. An earlier version of this paragraph reported
-that `-march` made no difference — that reading came from a sweep whose exit
-status was never checked, in which four of five points did not compile at all.
-`notes/vendor-kernel-isa.md` §2.3.
+rsdk generations carry; only the default differs. An earlier version of this
+paragraph reported that `-march` made no difference — that reading came from a
+sweep whose exit status was never checked, in which four of five points did not
+compile at all. `notes/vendor-kernel-isa.md` §2.3.
+
+🔄 **2026-08-28 narrows that further, and it is the more useful statement.**
+`-fuse-uls` is not in any of the three drops' build systems — it is **injected by
+the rsdk-1.5.5 wrapper** and by neither 1.3.6 wrapper, so the flag separates
+toolchain *generations* rather than releases.
+
+🔴 **And the same day the vendor's toolchain said something about the core that
+no binary of theirs could.** Their compiler pads load delay slots for
+`-march=4180/4181/5181` and not for `5280/5281/4281`; their 1.5.5 assembler warns
+about a load-use hazard on exactly the first set and is silent on the second;
+the 1.3.6 assembler has no such checker at all. Two independent instruments, one
+boundary, and it falls where this device's core does. **It is still a reading of
+Realtek's tools, not of the die** — but it is the first ISA-adjacent statement
+here that came from something other than counting instructions in an image.
+`notes/vendor-toolchains.md` §5.
 
 ## What is in here
+
+**[`notes/vendor-toolchains.md`](notes/vendor-toolchains.md)** 🆕 — what the three
+rsdk releases are, what their wrapper enforces and silently injects, and whether
+they can build this board. Ends with a complete `vmlinux` linked twice from the
+vendor's own source, and with the measured cost of building a 4181 kernel with a
+5281-configured toolchain.
 
 **[`notes/cache-model.md`](notes/cache-model.md)** — the R3000-class model plus a
 Lexra-defined CP0 register 20 (`CCTL`) carrying the invalidate and writeback

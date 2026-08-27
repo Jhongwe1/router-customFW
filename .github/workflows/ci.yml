@@ -45,7 +45,20 @@
 # present, `test-hazlint` is 50 ok / 30 FAIL / 11 skip (量 2026-08-28; it was
 # 45 / 30 / 8 at 96 cases) and `test-rlxprobe` is 101 ok / 101 FAIL. Without
 # gcc, both skip cleanly, the census is green, and it prints
-# `NOT RUN IN THIS JOB: 353 case(s)` with every one of them named.
+# `NOT RUN IN THIS JOB: 362 case(s)` with every one of them named.
+#
+# 353 -> 362 on 2026-08-28 (third session) when `test-vendor-tripwire` (32) and
+# `test-tc-smoke` (36) arrived. Only NINE of their 68 cases stand down here, and
+# the first draft of this comment said 32 of the tripwire's 32 did: that version
+# of the suite ran NOTHING without a vendor GPL drop, which is every runner, so
+# the step went green even if the tool had been deleted. The adversarial review
+# of the same session found it; the suite now builds its own git repository with
+# an ignore rule and runs 28 of 32 anywhere. What genuinely cannot run here is
+# T10 (needs the real rsdk-linux-config to trip the wire on) and T13 (the
+# default discovery path reads $FWRE_WORK), plus tc-smoke's five B-cases.
+# 量 in the runner configuration ($FWRE_WORK empty): the census closes at 160
+# with `test-rlxprobe` running and failing, and 160 + 202 = 362 once it skips
+# for want of a cross gcc.
 #
 # 320 -> 353 on 2026-08-28: `test-hazlint` 96 -> 109 (hazlint 1.3 refuses a range
 # containing MIPS16, which this unit's own kernel turned out to have, and the
@@ -185,6 +198,17 @@ jobs:
 
       - name: test-binsim
         run: bash tools/test-binsim.sh 2>&1 | tee ci-out/test-binsim.out; exit "${PIPESTATUS[0]}"
+
+      # Both stand down on a runner and say so. test-vendor-tripwire needs a
+      # vendor GPL drop clone to damage and restore; test-tc-smoke needs an rsdk
+      # toolchain. In both, the case that makes the skip a skip rather than a
+      # zero is the first one: with nothing to look at the tool exits 3 and
+      # prints no table, so absence can never be read as a measurement.
+      - name: test-vendor-tripwire
+        run: bash tools/test-vendor-tripwire.sh 2>&1 | tee ci-out/test-vendor-tripwire.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-tc-smoke
+        run: bash tools/test-tc-smoke.sh 2>&1 | tee ci-out/test-tc-smoke.out; exit "${PIPESTATUS[0]}"
 
       - name: ci-census self-test
         run: /usr/bin/python3 tools/ci-census.py --self-test 2>&1 | tee ci-out/ci-census.out; exit "${PIPESTATUS[0]}"

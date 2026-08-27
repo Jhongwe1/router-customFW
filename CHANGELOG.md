@@ -12,6 +12,67 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R2a/b/d-3`, 2026-08-28 — the step asked for a container, the container was
+never needed, and what it actually produced was a reason not to build this board
+with the toolchain that is on the disk.** Desk only, no power, zero flash bytes.
+`notes/vendor-toolchains.md` is the new owner.
+
+- 🔴 **A census of mine wrote into the vendor source trees.** `rsdk-linux-config`
+  answers `--version` by running `make` in the tree it lives in: **2,580 tracked
+  files** deleted (mostly regular files under `config/uclibc/`; the first
+  write-up said "symlinks under `include/bits/`" and that directory holds 93),
+  4 files rewritten, 17 ignored build products, plus an `offset.tmp` in this
+  repository's root. Restored byte-for-byte against the
+  pinned sha. **`tools/vendor-tripwire.sh`** (24 controls, one of which runs the
+  actual culprit) now wraps anything that executes a vendor binary, with two
+  independent detectors because git alone cannot see a write that produced
+  identical bytes.
+
+- **It was never one missing library for `as`.** Seventeen of rsdk-1.5.5's
+  binutils were unrunnable for one i386 `libz.so.1`; `gcc`, `cpp` and `xgcc` are
+  statically linked, which is exactly why the old DoD looked satisfied. Two
+  recipes proved, hermetic first so the second could not mask it, with a
+  negative control between them and pinned sha256s.
+
+- **The DoD is now a build.** `tools/tc-smoke.sh` (31 controls) runs a four-rung
+  ladder per toolchain and reports a rung not reached as not reached. Above it:
+  the vendor's own `users/dhrystone` built and **run** under `qemu-mips` with
+  every internal self-check matching, and a **complete `vmlinux` — 724 objects,
+  linked twice with two different toolchains**. The only thing in the way was
+  `kernel/timeconst.pl`'s `defined(@val)`, removed from Perl in 5.22. A host
+  idiom, not a compiler.
+
+- 🔴 **`TC-15`: the vendor's own compiler and assembler agree on which Lexra
+  cores expose the load delay slot.** `{4180, 4181, 5181, mips1}` pad loads with
+  `nop`; `{5280, 5281, 4281, mips2}` do not — measured two ways, across two
+  toolchain generations, one of which has no such checker at all. Building this
+  4181 board's kernel with the only rsdk-1.5.5 on hand (`-march=5281`, enforced
+  by its wrapper) puts **49 load-delay violations into three objects**, two of
+  them the exception handler and the cache management code. At whole-image scale,
+  from one source: the `-march=4181` `vmlinux` is 28.77 % padded with **256**
+  violations, the `-march=5281` one is 2.06 % padded with **36,264**, and this
+  unit's own kernel is **29.91 % padded with 168** — on the 4181 side by both
+  measures at once.
+
+- 🔴 **`TC-17`, and a discriminator retired to make room for it.** Each drop's
+  own top-level `.config` names the rsdk it is configured for, and all three name
+  a 1.3.6 while this unit's banner is `4.4.5-1.5.5p2`. The MIPS16 discriminator
+  it replaces was **refuted by the build**: a `vmlinux` from one of the five
+  shipped configs carries 39 symbols marked `[MIPS16]`.
+
+- **`-fuse-uls` is in no drop's build system.** It is injected by the rsdk-1.5.5
+  wrapper and by neither 1.3.6 wrapper, which is the whole explanation for the
+  2019 drop to zero that `notes/lwl-mystery.md` was carrying.
+
+- **`opcount --mips16` and `hazlint`'s MIPS16 refusal got their first ground
+  truth.** They have only ever run on a stripped image; the `vmlinux` built here
+  has a symbol table. The counter finds **25 distinct `jalx` targets** where the
+  symbol table marks **39 symbols `[MIPS16]`** — **consistent, not equal**, and
+  the gap is the tools' own documented blind spot: a MIPS16 routine entered
+  through `jr`/`jalr` on an odd address is never counted. The instrument is
+  confirmed as a detector and measured as an undercount, which is more than it
+  had before and less than agreement.
+
 **`R2a/b/d-2`, 2026-08-27 — the two greps landed on something, and one of the
 things they landed on was a rule this repository had written for itself.** Desk
 only, no power, zero flash bytes. `notes/vendor-kernel-isa.md` owns all of it.

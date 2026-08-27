@@ -469,6 +469,41 @@ it.
 (`CONFIG_RTL865X_KERNEL_MIPS16 is not set` in all five). A second thing the drops
 in hand cannot reproduce about this binary. `R2a`.
 
+🔄 **2026-08-28 — that last sentence is refuted, and the refutation came from
+doing the build.** `rtl819x-toolchain`'s `linux-2.6.30` was built out of tree
+with `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW` — one of those very
+five configs, `CONFIG_RTL865X_KERNEL_MIPS16 is not set` — and the resulting
+`vmlinux` **contains MIPS16**: `readelf -s` marks **39 symbols `[MIPS16]`**, and
+the vendor's own `objdump` reads `7409506d` at `0x80006bf4` as
+`jalx 802541b4 <irq_to_desc>`. The symbols are the wlan and NIC fast path
+(`rtl8192cd_interrupt`, `swNic_receive`, `rtl_netif_rx`, `validate_mpdu`, …).
+Both toolchains produce it: 25 distinct `jalx` targets from the 1.3.6 build, 24
+from the 1.5.5 build. **So the presence of MIPS16 is not a thing the drops fail
+to reproduce, and it is not a discriminator.** `IMEM0_SIZE` (§4.1) still is, and
+`notes/vendor-toolchains.md` §7 adds a third that is stronger than either.
+
+⚠️ **Where the MIPS16 comes from is undetermined.** Every `-mips16` in the
+kernel tree's Makefiles is either commented out or inside
+`ifdef CONFIG_RTL865X_KERNEL_MIPS16_LAYERDRIVER`, which that config does not set;
+there is no tracked `.o` anywhere in the tree, so it is not a prebuilt blob. The
+measurement that would settle it is a build with `V=1` and a grep of the actual
+`-mips16` command lines. Recorded as not looked for.
+
+🔴 **And the check that first said "no MIPS16 here" was a false zero of the same
+family this file keeps cataloguing.** It read `readelf -h`'s `Flags:` for the
+string `mips16` and found none — correctly, because `e_flags` does not carry it.
+MIPS16 is marked **per symbol**, in `st_other`, which `readelf -h` never shows.
+The `vmlinux` header reads `Flags: 0x1001, noreorder, o32, mips1` and the file is
+full of MIPS16 all the same.
+
+✅ **One thing this settles in the other direction.** `opcount --mips16` and
+`hazlint`'s MIPS16 refusal have until now had no ground truth to be checked
+against — this unit's kernel is stripped, so the symbol table that would confirm
+them does not exist. The `vmlinux` built here **has** one, and on it the counter
+says *MIPS16 reached, 25 distinct targets* while the symbol table says *39
+symbols marked MIPS16*. That is the first positive control either instrument has
+had on a real kernel-sized artefact.
+
 ### 4.3 What that costs, and it lands on this repo's own tools
 
 `opcount.py`'s docstring claimed a linear 4-byte scan is a **superset** of the
@@ -704,7 +739,12 @@ and this machine's own.
    inference and it is not a measurement. `R1a`.
 4. **The `PRId` table is one source in three copies and no code reads it.** §5.
 5. **The toolchain comparison used a 5281/p4 build** where this unit was built by
-   a 4181/p2. §2.3.
+   a 4181/p2. §2.3. 🔄 **2026-08-28: the mechanism behind that comparison is now
+   named and it is not the version.** `-fuse-uls` is injected by the rsdk-1.5.5
+   *wrapper* and by neither 1.3.6 wrapper, and it appears in no drop's build
+   system at all — `notes/vendor-toolchains.md` §6. So the `lwl` signal separates
+   rsdk **generations**, not releases, and the p2/p4 gap is not what that table
+   was measuring.
 6. 🔴 **`jalx` is not the only way into MIPS16, and both new instruments assume
    it is.** Bit 0 of a target address is the ISA-mode bit, so `jr`/`jalr` through
    a register holding an odd address enters MIPS16 — which is how a MIPS16
@@ -719,7 +759,12 @@ and this machine's own.
    and the score is bimodal on this artefact with an empty band there — but a
    pinned constant is not a derived one, and the 180-vs-238 difference turns on
    it. This project's own rule about region bounds, applied to a filter.
-8. **Everything in §1 and §3 is about the source Realtek released.** Two places
-   already show that the drops in hand did not build this image — `IMEM0_SIZE`
-   and MIPS16. Any source-side claim can be wrong about *this* binary in the same
-   way, and only the binary-side column rules that out.
+8. **Everything in §1 and §3 is about the source Realtek released.** 🔄
+   **2026-08-28: this item named two places showing the drops did not build this
+   image, and one of them is gone.** MIPS16 is **not** one — building one of
+   those five configs produces MIPS16 (§4.2). `IMEM0_SIZE` stands, and
+   `notes/vendor-toolchains.md` §7 adds a stronger one: each drop's own
+   top-level `.config` names the rsdk it is configured for, and all three name a
+   **1.3.6** release while this unit's banner is `4.4.5-1.5.5p2`. Any source-side
+   claim can be wrong about *this* binary in the same way, and only the
+   binary-side column rules that out.

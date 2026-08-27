@@ -56,6 +56,36 @@ dump or a document · **推** inferred, pending a measurement.
 
 ## It changed what an instrument may claim
 
+🆕 **2026-08-28 — a census that only ran `--version` was not a read-only
+operation, and nothing warned.** `rsdk-linux-config` is a statically linked i386
+ELF that runs `make` in the tree it lives in. It deleted 2,580 tracked files
+from a pinned vendor clone — **not** the symlink farm the first write-up named;
+that directory holds 93 tracked symlinks, so the characterisation was generalised
+from the first forty lines of the `git status` — and it also wrote a file into this repository's root
+— a place no vendor-tree check watches. What made it recoverable was that the
+tree is a clone at a known sha and that every mtime fell inside one 16-second
+window. `tools/vendor-tripwire.sh` exists because of it, and it detects; it
+cannot prevent.
+
+🆕 **2026-08-28 — two instruments of this project got their first ground truth,
+and they passed.** `opcount --mips16` and `hazlint`'s MIPS16 refusal have only
+ever been run on a stripped image, where the symbol table that would confirm them
+does not exist. A `vmlinux` built here from the vendor's own source has one: the
+counter says *MIPS16 reached, 25 distinct targets*, and `readelf -s` says *39
+symbols marked `[MIPS16]`*. **That is consistent and it is not agreement** — 25
+of 39, and the missing 14 are the blind spot both tools already document, a
+MIPS16 routine entered through `jr`/`jalr` on an odd address rather than through
+`jalx`. So the ground truth confirms the detector and puts a number on its
+undercount at the same time. Before this, both instruments rested on one
+adjudicated disassembly and a self-consistency argument.
+
+🆕 **2026-08-28 — a claim was refuted by doing the thing it was a claim about.**
+*"None of the five shipped configs enables MIPS16, and this binary has it"* was
+carried as evidence that the drops in hand did not build this image. Building one
+of those five configs produces MIPS16. The discriminator is gone; a stronger one
+(each drop's own `.config` names the rsdk it selects) replaced it.
+
+
 | | | |
 |---|---|---|
 | 讀 | **A row of `SPEC.md` had been outside two of its own checker's checks since the day it was written, and the checker reported it as *skipped*.** One unescaped `\|` inside a backticked span gave the row eight cells in a seven-column table. Every check reads cells **by index**, so the shift did not fail them — they read a different cell and passed on it, and C4/C5 read the *source* column as the owner, found no path, and filed the row under *owner is a gate rather than a file* | **The one row that session existed to upgrade was the one row two checks could not see.** `C8` added — a row's cell count must equal its header's — with a ninth mutation that is not invented: it re-creates that exact escape. Pointing the same scan at the rest of the repository found **two more**, both mis-rendering their tables since they were written · [`tools/spec-check.py`](../tools/spec-check.py) |

@@ -455,7 +455,68 @@ condition that is satisfied and still leaves the answer undetermined is telling
 you it was not the binding constraint; the binding one was never written down
 and is now: *a similarity matrix over shipped images cannot name a source
 release, whatever it scores.* The thing that would move `TC-02` is
-`R2a/b/d-4`, and it needs `R2a/b/d-3`'s container first.
+`R2a/b/d-4`. 🔄 **2026-08-28: this sentence used to end "and it needs
+`R2a/b/d-3`'s container first". There is no container** — the toolchains run
+natively, `-3` closed without one, and what `-4` actually needs is in
+`notes/vendor-toolchains.md` §3.
+
+### 🆕 2026-08-28 — two readings that are not similarity, and one of them is sharp
+
+Neither comes from the matrix. Both are 讀, off material that was already on
+disk, and both belong here because this file owns the which-drop question.
+`notes/vendor-toolchains.md` owns the toolchain side of them.
+
+**① Each drop ships its own top-level `.config`, and it names the rsdk that drop
+is configured to build with.**
+
+| drop | generated | board | rsdk selected | model |
+|---|---|---|---|---|
+| `rtl819x-toolchain` | 2013-06-29 | **rtl8196e** | `rsdk-1.3.6-4181` | `RTL8196E_88E_GW` |
+| `saturn49-wecb` | 2012-08-15 | rtl8198 | `rsdk-1.3.6-5281` | `RTL8198_SPI_SQUASHFS` |
+| `wecb-vz-gpl` | 2012-08-15 | rtl8198 | `rsdk-1.3.6-5281` | `RTL8198_SPI_SQUASHFS` |
+
+Control: each file carries three `CONFIG_RSDK_*` lines and exactly one is `=y`,
+so the reading is a selection and not a default.
+
+🔴 **Not one of the three selects a 1.5.5, and `TC-01`'s banner is
+`gcc version 4.4.5-1.5.5p2`.** This is a discriminator the matrix could never
+produce, because it is read off the drop rather than off an image: **the drops in
+hand, as their vendors configured them, did not build this firmware.**
+
+⚠️ **It does not name what did.** A `.config` can be changed and a build machine
+can hold a toolchain the tarball does not. What the drops cannot do is ship a
+release they do not contain, and none of them contains a 1.5.5p2, nor any 1.5.5
+configured for 4181 — which the board config (`ARCH_CPU_RLX4181=y`) requires and
+the 1.5.5 wrapper refuses. **`TC-02` stays 推.** The change is that it is now 推
+against a named and checked alternative rather than against nothing.
+
+⚠️ **Two of the three drops are RTL8198 drops.** Only `rtl819x-toolchain` targets
+this SoC. That is a limit on how much the other two can say about this unit at
+all, and it was not stated anywhere before.
+
+**② The `.comment` stamp — re-read, and it is `TC-09`'s, not this section's.**
+
+🔄 **This was re-measured on 2026-08-28 and it found nothing `TC-09` did not
+already say on 2026-08-27.** Recorded because the re-measurement happened and
+because a second pass that agrees is worth one line, not because it is new.
+`TC-09` owns it: two of six trees keep `.comment`, both carry
+`GCC: (GNU) 4.4.5-1.5.5p2`, the other four are `sstrip`ped so the answer there is
+*not looked for*, and the one file that keeps its stamp everywhere is `acltd`,
+which is byte-identical across all six and therefore discriminates nothing.
+
+Three things the second pass adds, all small:
+
+- The stamp is also in `lib/libapmib.so` in those two trees, not only in
+  `bin/boa`. `libapmib` is vendor code rather than a toolchain-shipped library,
+  so it is a build stamp rather than a toolchain stamp.
+- Per-tree counts, since the sstrip claim had none: ELF files with section
+  headers are 1/55, 1/62, **63/63**, **64/64**, 1/50, 1/50 for `unit-2018`,
+  `n200re-3.2.0`, `n300rt-2.1.6`, `v2.1.2`, `v3.4.0`, `n300rt-3.4.0`.
+- ⚠️ **A tool trap worth carrying.** The vendor's `mips-linux-readelf`
+  (binutils 2.16.94) has **no `-p` option at all** and answers with a usage
+  message; a pipeline that greps its output records that as *no `.comment`
+  section*. Both readelf agree the section exists when asked with `-S`. Use the
+  host readelf for this question.
 
 ---
 
