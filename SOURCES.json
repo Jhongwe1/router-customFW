@@ -55,10 +55,12 @@
       "pin_note": "The commit this project actually read, recorded 2026-08-26. A --depth 1 clone of a moving branch is not a citable artefact; a quotation from a file needs the revision it was quoted from.",
       "dest": "src-vendor/rtl819x-toolchain",
       "approx_size": "~700 MB",
-      "why": "The only public drop whose target board IS an RTL8196E (ALFA AIP-W512). Carries linux-2.6.30, busybox-1.13, users/, romfs/, boards/rtl8196eu/, and BOTH rsdk toolchains.",
+      "why": "The only public drop whose target board IS an RTL8196E (ALFA AIP-W512). Carries linux-2.6.30, busybox-1.13, users/, romfs/, boards/rtl8196eu/, and THREE rsdk toolchains.",
       "contains": {
         "toolchain_primary": "toolchain/rsdk-1.5.5-5281-EB-2.6.30-0.9.30.3-110714",
         "toolchain_secondary": "toolchain/rsdk-1.3.6-5281-EB-2.6.30-0.9.30",
+        "toolchain_4181": "toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30",
+        "toolchain_note": "CORRECTED 2026-08-27: this entry said BOTH toolchains and listed two; the drop carries THREE, and the one it omitted is the only one whose target core is this SoC's. It is also the one that did the work in R2a/b/d-2: its `as` supplied the per-core ISA table (tools/isa-probe.sh) and its objdump did the MIPS16 disassembly. All three run natively in the WSL distro -- no container -- which refutes the premise of step R2a/b/d-3. Measured versions: 1.3.6 pair are gcc 3.4.6-1.3.6; 1.5.5 is gcc 4.4.5-1.5.5p4, against this device's banner of 4.4.5-1.5.5p2. rsdk-1.5.5's `as` does not start: it needs an i386 libz.so.1 the distro lacks, which is why -S and objdump were used instead.",
         "kernel": "linux-2.6.30"
       },
       "matches_device": "gcc 4.4.5-1.5.5p2 / uClibc 0.9.30.3 / Linux 2.6.30.9 — every field of the device's own kernel banner. HYPOTHESIS until R2a measures it.",

@@ -53,7 +53,7 @@ Four CP0 registers come free while it is there, and three of them are blanks in
 
 | register | what it settles |
 |---|---|
-| `PRId` | `CPU-04` — RLX4181 or RLX5281. The project has written *undetermined* in every document since the beginning because `/proc/cpuinfo` printed a decimal number |
+| `PRId` | `CPU-04` — 🔄 **答案是 `RLX4181`，2026-08-27**：`0x0000CD01` 的 bits 15:8 對上 `arch/rlx/include/asm/cpu.h` 的 `PRID_IMP_RLX4181 = 0xcd00`，而 `RLX5281` 是 `0xdc01`，被排除。**這一格的值一直是量的（`0x0000CD01`，2026-08-25b），變的是名字**，而名字是**讀**的：那張表是一個來源三份逐位元組相同的副本，而且 port 裡沒有任何程式碼在讀它。原文：RLX4181 or RLX5281. The project has written *undetermined* in every document since the beginning because `/proc/cpuinfo` printed a decimal number |
 | `Config` | `Config.M == 0` proves this is not a MIPS32 core outright, and says whether `Config1` — cache geometry, FPU, MMU — exists at all (`CPU-25`). ✅ **Answered 2026-08-25b: `Config` reads `00000000` and `nowrite = 0` proves the destination WAS written, so `Config.M = 0` and there is no `Config1`. `CPU-25` cannot come out of CP0 on this part** |
 | `Status` | `CPU-27` — is `BEV` 0 at the prompt? `R1d` installs a handler at **`0x80000080`**, and that address is only right if it is. 🔴 **`0x80000080`, not `0x80000180`** — this is an R3000-class CP0, `0x80000000` is the UTLB refill vector and `0x80000080` is the general one. Corrected 2026-08-25; `notes/cache-model.md` carries the three sources |
 | `Cause` | read for its own sake, and as the thing an exception would have written |

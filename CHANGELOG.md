@@ -12,6 +12,101 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R2a/b/d-2`, 2026-08-27 — the two greps landed on something, and one of the
+things they landed on was a rule this repository had written for itself.** Desk
+only, no power, zero flash bytes. `notes/vendor-kernel-isa.md` owns all of it.
+
+- 🔴 **The plan's grep path was wrong and would have returned two false zeros.**
+  It greps `arch/mips/`; this SoC's port is **`arch/rlx/`**, a sibling tree in
+  the same drops. `arch/mips/` became the scanner's liveness control: the same
+  needles hit there, so a zero in `arch/rlx/` is an answer rather than a blind
+  spot. Which port was *built* is read out of the binary, from three literals
+  that exist only in `arch/rlx`-only files.
+
+- **What this kernel emulates**: `ll`/`sc` and `sync` (as a no-op), because
+  `ARCH_CPU_LLSC=n` and `ARCH_CPU_SYNC=n` for this board; **not** `rdhwr`, whose
+  two call sites the vendor `#if 0`'d out where mainline calls them
+  unconditionally; and 🔴 **not the FPU — there is no `math-emu` under
+  `arch/rlx` at all**, and `do_cpu` returns `SIGILL` for any coprocessor but 0.
+  Binary side agrees: zero `ll`, `sc`, `sync`, `lwc1`, `swc1` and `sdc1` in
+  2.85 MB of text — ⚠️ not *zero FPU opcodes*; that span holds one `COP1` and
+  two `ldc1`, all inside a 1 KiB non-code island, excluded by adjudication. **`CLAUDE.md`'s bench rule said the kernel emulates "`ll`/`sc` and the
+  FPU"** — half of that is wrong, the conclusion is not, and only the reason
+  moved.
+
+- 🔴 **`F49` is a third answer, not one of the plan's two.** `cpu_cache_init()`
+  calls `rlx_cache_init()` unconditionally — no `r3k`, no `r4k`, no probe. And
+  the `#ifdef` structure of `cache-rlx.c` is what *produces* the reading
+  `CPU-44` took off this unit's binary on 2026-08-26: `DCACHE_OP` is defined for
+  RLX4181 and `ICACHE_OP` only for 4281/5281, so the D side uses the `cache`
+  instruction and the I side uses CCTL. An observation became a consequence.
+
+- **`CPU-25`'s blank is filled** from `boards/rtl8196e/bsp/bspcpu.h`: I-cache
+  16 KiB, D-cache 8 KiB, both 16-byte line, no L2, 32 TLB entries. The line size
+  has a second source in this unit's own binary, and the TLB count agrees with a
+  device measurement that contains no TLB probe.
+
+- 🔴 **`CLAUDE.md`'s core-naming ban is lifted, on the condition `CLAUDE.md`
+  itself named.** `arch/rlx/include/asm/cpu.h` is a `PRId` assignment table:
+  `PRID_IMP_RLX4181 = 0xcd00` against a measured `PRId` of `0x0000CD01`. So the
+  core is **RLX4181 rev 1**, and **RLX5281 (`0xdc01`) is excluded rather than
+  unproven**. Three weaknesses travel with it and are written into the rule
+  itself: one source in three byte-identical copies, no code in the port reads
+  the table, and its own encoding breaks for two entries.
+
+- 🔴 **This unit's kernel contains MIPS16**, entered with `jalx` into and around
+  the `.iram` section that `_imem_dmem_init` loads into a 16 KiB on-chip
+  scratchpad — verified by disassembling a target with the vendor's own
+  `rsdk-1.3.6-4181` objdump and finding a complete function whose literal pool
+  holds a KSEG1 register address, against a random-bytes control that does not
+  cohere. **That breaks a superset claim two instruments here were standing
+  on**, so `opcount.py` gained a `--mips16` precondition test and `hazlint` 1.3
+  now *refuses* a range containing MIPS16. All twelve vendor userland ELF binaries
+  were re-checked by two independent tests, and `stage2.bin` — a raw image with
+  no ELF header — by the `jalx` test alone with its control fired. All clean, so
+  no number already in this repository moves.
+
+- 🔴 **`hazlint` 1.2's own note records a number the shipped tool does not
+  produce.** Running both versions out of git against the same sha256: violations
+  on the kernel go **172 → 168**, not 172 → 171, and **four** sites leave rather
+  than one. Three of the four are the `lwcz`/`swcz` half that 1.2 called
+  *latent, "because nothing in this tree emits one"* — this tree's own kernel
+  emits three.
+
+- **New instrument, `tools/isa-probe.sh`**: the vendor binutils' opcode table
+  read one instruction at a time against each of six Lexra `-march` values. It
+  measures `movz`/`movn` for `rlx4181` on a toolchain in hand — where the repo
+  previously had only the *description* of an undownloaded gcc patch saying the
+  same thing, so this is a second source and not a first — agrees
+  with the board configs on `sync`, **disagrees with them on `ll`/`sc`** — which
+  is recorded as a disagreement — and 🔴 **says nothing about ULS**, because
+  every column including `mips1` accepts `lwl`.
+
+- 🔴 **The 2018→2019 change in `boa` is a build flag, and the first answer here
+  was a false zero.** The lever is `-fuse-uls`, which **both** rsdk generations
+  carry; only the default differs, and Realtek pass it explicitly in
+  `rsdk-1.5.5`'s own uClibc configuration. The sentence this entry first
+  carried — *it is the toolchain version, not a flag, and `-march` does not move
+  it* — came from a sweep in which four of five points **did not compile**: the
+  rsdk driver answers `FATAL: -march mismatch` and exits 1 without writing the
+  output, and the exit status was never checked, so the `grep` read the previous
+  iteration's file. Retracted: *the presence of compiler-generated `lwl` dates a
+  binary's toolchain*. It dates a build flag. It does, however, remove the open
+  puzzle this entry left about `boa` going 144 → 0 in 2019.
+
+- ⚠️ **`R2a/b/d-3`'s premise is refuted and the step is not ticked.** Both 32-bit
+  rsdk toolchains run natively in this WSL distro, which is the step's own DoD
+  signal, reached by none of its three container routes. What is left is one
+  missing i386 library for `rsdk-1.5.5`'s assembler. A step whose premise was
+  refuted has not been performed.
+
+- Suites: `test-opcount` 15 → 24, `test-hazlint` 96 → 109, `test-isa-probe` new
+  at 40, and CI's `NOT RUN IN THIS JOB` 320 → 353. Three defects in this
+  session's own work were caught by this repository's own checkers: `spec-check`
+  C8 fired on an unescaped `|` inside a code span, C5 on a literal that had not
+  reached its owner file, and `ci-census` on a skip label that did not match its
+  row.
+
 **`R2a/b/d-1`, 2026-08-27 — the floor moved, and reading the matrix refuted a
 sentence this gate had been carrying since it opened.** Desk only, no power,
 zero flash bytes. `notes/which-drop.md` owns all of it.

@@ -6,7 +6,12 @@ its flash dump, and the vendor's Linux 2.6.30 tree for this SoC family.
 
 ## Why this blocks three later gates
 
-MIPS-I has no `cache` instruction; that is MIPS-II and later. The R3000
+MIPS-I has no `cache` instruction. 🔄 **This sentence read *"that is MIPS-II and
+later"* until 2026-08-28 and the level was wrong**: 量 with the vendor's own
+assembler (`tools/isa-probe.sh`), `cache` is rejected for `-march=mips1` **and**
+`-march=mips2` **and** `lx4180`, and accepted from `rlx4181` on. `CACHE` is
+MIPS-III/MIPS32, and on these cores it is an extension — which does **not** make
+this a MIPS32 core, `Config.M = 0` being 量. The R3000
 generation used `Status.IsC` / `Status.SwC` and byte stores instead — a
 completely different mechanism. Which one this core uses decides:
 
@@ -573,10 +578,92 @@ Nothing here maps the space between `0xC4` and `0xCD`. **`CLAUDE.md`'s ban
 stands** — a point is not an assignment table, and `RLX4181` and `RLX5281` are
 both still unwritable.
 
+🔄 **2026-08-27: the assignment table exists and it was in the vendor tree this
+file already reads.** `arch/rlx/include/asm/cpu.h` maps `PRID_IMP_RLX4181` to
+`0xcd00`, so `0x0000CD01` is `RLX4181` revision 1 and `RLX5281` (`0xdc01`) is
+positively excluded. The paragraph above is left as written because it was the
+right judgement on the evidence it had; what it was waiting for arrived.
+`notes/vendor-kernel-isa.md` §5 owns it, weaknesses included — the table is one
+source in three copies and no code in the port reads it.
+
 *(§ 3.4.2 also gives `0x8000_0080` as the general exception vector with
 `BEV = 0` — a fourth independent source, agreeing with the three this file
 already records. Nothing changes; it is noted because the wrong address had
 reached seven committed sites as recently as 2026-08-25.)*
+
+---
+
+## 🔴 `F49` from the source side — 2026-08-27, `R2a/b/d-2`
+
+The plan's grep for this was `r3k_cache_init|r4k_cache_init|rlx` over
+`arch/mips/mm/`. **Two things are wrong with it and both would have produced a
+zero.** The path is `arch/rlx/`, and this port has neither of those functions:
+
+```c
+/* arch/rlx/mm/cache.c:166 */
+void __cpuinit cpu_cache_init(void)
+{
+    extern void __weak rlx_cache_init(void);
+    rlx_cache_init();
+}
+```
+
+Unconditional — no probe, no branch, a third implementation in
+`arch/rlx/mm/cache-rlx.c`. The same grep over `arch/mips/mm/cache.c:161–173`
+*does* find the r3k/r4k branch, which is the scanner's liveness control: the
+needles are fine, the tree was wrong.
+
+### What this file already believed, now with the `#ifdef` that produces it
+
+`cache-rlx.c` picks its primitives from the CPU model and the cache type. For
+`CPU_RLX4181` with `CPU_HAS_WBC` and no `WBIC`, no `L2C`:
+
+| | for this part | what it explains |
+|---|---|---|
+| `CONFIG_CPU_HAS_DCACHE_OP` | **defined** — 4181/5181/4281/5281 | D side uses the `cache` instruction. 🔄 **Not "MIPS-II"** — 量 2026-08-28 with the vendor's own assembler: `cache` is rejected for `-march=mips1`, `mips2` and `lx4180`, accepted from `rlx4181` on. `CACHE` is MIPS-III/32 and here it is an extension; `Config.M = 0` still says this is not a MIPS32 core |
+| `CONFIG_CPU_HAS_ICACHE_OP` | **not defined** — 4281/5281 only | 🔴 I side uses **CCTL `0x2`**, and that is why `CPU-44`'s scan of this unit's kernel found **zero** I-side `cache` ops. It was an observation; it is now a consequence |
+| `CACHE_DCACHE_FLUSH` / `WBACK` | `0x15` `DWBInval` / `0x19` `DWB` | the two op-field values `CPU-44` read, and they collapse to `0x11` if `WBC` is off |
+| `CCTL_DCACHE_WBACK` / `FLUSH` | `0x100` / `0x200` | this file's own table |
+| unroll | `CACHE16_UNROLL8`, taken when `cpu_dcache_line != 32` | eight ops at stride `0x10` — exactly the shape in the binary |
+| `CCTL_OP` (not 4281/5281) | `mfc0 $8,$20` `ori` `xori` `mtc0 $9` `mtc0 $8` | a second file agreeing that CCTL is **0→1 edge triggered** |
+
+### Geometry, from the board rather than from a build constant
+
+`boards/rtl8196e/bsp/bspcpu.h`, byte-identical in all three drops, under
+`CONFIG_RTL_8196E` (which `boards/rtl8196e/config.in` sets `def_bool y`):
+
+```
+cpu_icache_size  16 KiB     cpu_dcache_size   8 KiB     cpu_scache_size  0
+cpu_icache_line  16         cpu_dcache_line  16         cpu_tlb_entry   32
+```
+
+**The 16-byte line now has two sources**, and the second is this unit's own
+binary: `CACHE16_UNROLL8` is only selected when the line is not 32, and that is
+the unroll `CPU-44` read. The 32 TLB entries agree with `CPU-08`, measured on
+the device by a route with no TLB probe in it.
+
+⚠️ **The header contradicts itself and it is worth recording**:
+`cpu_dcache_line_mask` is hard-coded `0xF` in both branches, so a board taking
+the 32-byte branch gets a 16-byte mask. Not this board's problem. A real defect
+in the vendor header.
+
+⚠️ **Associativity still has no source here.** The LX4189 table above says direct
+mapped; nothing in the GPL drops says anything, and the two documents are about
+different cores.
+
+### And the write policy, where the datasheet and the drops disagree
+
+The LX4189 table above records *write-through, no write-allocate*, and this file
+already noted that it does not transfer, because this SoC's `CCTL` has
+`DWB`/`DWBInval` at all. The drops make that explicit rather than implicit:
+`ARCH_CACHE_WBC=y` in `boards/rtl8196e/config.in` and `CONFIG_CPU_HAS_WBC=y` in
+all five shipped `RTL8196E_*` configs, and the four op-field constants above
+**collapse to `0x11`/`0x1` if it is off** — so the kernel's own choice of `0x15`
+and `0x19`, read out of this unit's binary, is downstream of a write-back cache.
+
+**That is still 讀, not 量.** `CPU-19`'s residual asks which policy the silicon
+implements, and a config file is the vendor's belief about their own part, not a
+measurement of it.
 
 ---
 

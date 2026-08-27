@@ -4846,7 +4846,7 @@ runner 上中括號失敗（`$?`＝1）所以案子恆紅 ——
 有沒有講超過證據／跨檔一致性），**每一條發現各配一個專責反駁者**，
 **31 個 agent、11 條存活、14 條被駁回**。存活的裡面有四條改了實質內容：
 
-1. 🔴 **「一個現有數字都沒動」是假的** —— §四已經改寫，kernel 172 → 171。
+1. 🔴 **「一個現有數字都沒動」是假的** —— §四已經改寫，kernel 172 → 171。🔄 **2026-08-27 第四段：171 這個數字也是錯的，正確是 168** —— 走掉的是四個點位不是一個，而其中三個是這個 commit 的 `lwcz`／`swcz` 那一半，也就是同一天寫成「這棵樹裡沒有東西長那樣」的那一半。見該段第六節③。
 2. 🔴 **「舊過濾擋掉 44 個字」是新規則的數字** —— §四已改，正確是 69（CO 那一段是 40）。
 3. 🔴 **`notes/cache-model.md` 的「97 個沒有一個低 11 位元為零」是假的** —— **有九個**。
    八個是 `CO` 形式，第九個是 `0x4D000000`@`0x8040B24C`，**一個結構完整的 `bc3f`**，
@@ -5576,3 +5576,323 @@ identity 錨點從另一邊講同一件事：`bin/acltd` 六棵樹同一個 sha2
 `tools/ci-expected.tsv`、`.github/workflows/ci.yml`、
 `SPEC.md`（`TC-11` 三處更正、`TC-02a` 與 `TC-12` 新）、`notes/binsim.md`（這個 diff 加了四處 🔄、三處 🆕；檔案裡另外兩處 🔄 是先前的）、
 `PROGRESS.md`、`CHANGELOG.md`。
+
+## 2026-08-27（桌面，第四段）— `R2a/b/d-2`：兩條 grep 指到的地方有東西，而其中一件事解掉了 `CLAUDE.md` 自己寫的禁令
+
+**桌面，不通電，零 flash 位元組，零電源循環，零裝置讀數。** 接著同日第三段
+（`R2a/b/d-1`）繼續。⚠️ **寫作跨過午夜到 2026-08-28**，所有量測都是 27 日取的，
+`ci-expected.tsv` 與 `ci.yml` 裡新寫的那幾個「量 2026-08-28」是 28 日重跑的收工數字。
+
+### 一、材料，以及為什麼它是兩份材料
+
+`r0-vendor-kernel.bin`（`396561a0…`，987,138 byte）在 `0x2808` 解 LZMA 得到的
+**3,374,772 bytes、`cf0d60a8…`**，banner 是
+`Linux version 2.6.30.9 (admin@office.hopeiot) (gcc version 4.4.5-1.5.5p2) #1526 Wed Jan 10 14:50:54 CST 2018`。
+另一份是三棵 GPL drop 的 `linux-2.6.30`。**兩者結論全程分開標**，因為它們兩次不一致（第七節）。
+
+**計畫的 grep 路徑是錯的，而照抄會得到兩個假的零。** `plan:415`–`433` 掃 `arch/mips/`；
+這顆 SoC 的 port 是 **`arch/rlx/`**，與 `arch/mips/` 並排在同一棵樹裡。所以每一組 needle
+都對兩邊各跑一次，`arch/mips/` 就是掃描器自己的活性控制：它在，它不是被建的那個，而同一組
+needle 在它裡面**有**命中。
+
+**哪一個 port 被建出來是讀出來的不是假設的**：三個只存在於 `arch/rlx`-only 檔案的字面值
+（`rlx timer`、`RLX LOPI`、`cpu model\t\t: %d`）都在這台的 binary 裡，而 `arch/mips` 底下一個都沒有。
+
+⚠️ **第一支拿來做這件事的儀器是空的，記在這裡因為它是空的。** 把 `arch/rlx` 與 `arch/mips`
+的 C 字串字面值各收一遍取差集，`rlx`-only 得 **0** —— `arch/rlx` 是 `arch/mips` 的分支，
+它有的字串對方幾乎都有。上面那三個是從**檔案**差集找到的，不是從字串差集。而殺掉好 needle
+的正是那支收集器自己的過濾器：丟掉含 `%` 的、丟掉含 tab 的，而 `cpu model\t\t: %d` 兩樣都占。
+
+### 二、grep ①：這台的 kernel 模擬了哪些指令
+
+`arch/rlx/kernel/traps.c:546` 的 `do_ri()`：`#ifndef CONFIG_CPU_HAS_LLSC` 下 `simulate_llsc`、
+`#ifndef CONFIG_CPU_HAS_SYNC` 下 `simulate_sync`，而 `simulate_rdhwr` 兩個呼叫點都被廠商
+`#if 0` 掉（mainline 是無條件呼叫，所以那是廠商改的）。`do_cpu` 只處理 `cpid == 0`。
+**`arch/rlx` 底下沒有 `math-emu` 目錄** —— `arch/mips/math-emu` 與 `arch/x86/math-emu` 都在，
+那是 `ls` 找對地方的控制。
+
+開關來自 `boards/rtl8196e/config.in`（三棵樹相同）：`ARCH_CPU_RLX4181=y`、`ARCH_CPU_ULS=y`、
+`ARCH_CPU_LLSC=n`、`ARCH_CPU_SYNC=n`、`ARCH_CACHE_WBC=y`，五份出貨 `.config` 全部一致。
+
+⚠️ **第一次掃這些 config 回報 `rtl8196e` 的 ULS=0，那是個檔案不存在造成的假零** ——
+那塊板子沒有 `config.linux-2.6.30`，只有五個帶後綴的變體，而 `grep -l` 對不存在的檔案
+不出聲。抓到它的是「為什麼這塊板子連 `ARCH_CPU_RLX` 那一行也沒有」。
+
+| | 這顆有嗎 | kernel 模擬嗎 | 怎麼知道的 |
+|---|---|---|---|
+| `ll`／`sc` | 否 | **是** | 讀 config；讀 binary：2.85 MB 程式區 **0** 條。`atomic.h` 的非 LLSC 路徑是關中斷，所以若是 LLSC build，`.text` 裡會有幾百條 |
+| `sync` | 否 | **是**（no-op） | 同上，`.text` 裡 **0** 條 |
+| `rdhwr` | — | **否** | 廠商 `#if 0` |
+| FPU | 無 FPU | **否** | 沒有 `math-emu`；`.text` 裡 `lwc1`／`swc1`／`sdc1` 全 0；`fpu_emulator`／`cp1emu` 字串 0 次 |
+| `lwl` 一族 | **是** | **否**，也不需要 | `unaligned.c` 反過來**用**它們；binary 有 101 組成對點位 |
+| 非對齊**位址** | — | **是** | `do_ade` → `emulate_load_store_insn`，三行 `die_if_kernel` 的字串都在 binary 裡 |
+
+🔴 **這否證了 `CLAUDE.md` 上機守則的一半**：那條寫「kernel 模擬 `ll`／`sc` 與 FPU」。
+`ll`／`sc` 對；**FPU 錯，這顆 kernel 裡根本沒有浮點模擬器**。結論（裸機才量得到 ISA）不動 ——
+單是 `simulate_llsc` 就足以讓 Linux 底下的 ISA 量測失去意義。**只有理由要縮。**
+
+⚠️ **`do_ade` 不是 `lwl` 的鑑別器**，而它是這一步最先撿到、也最先必須放下的東西：它處理的是
+Address Error，**缺**指令走的是 Reserved Instruction，落在別的地方。
+
+### 三、`C-7`／`F51`：分界不在裸機與使用者空間，也不在硬體缺不缺
+
+`tools/opcount.py --pairs`（今天新增）比對的是**慣用法**而不是 opcode：同一個 `rt`、同一個
+base、位移正好差 3、四個字以內。四個欄位同時吻合，而且**成對的定向本身是第二個讀數** ——
+大端映像必須給出大端的對，給出小端的就是掃描壞了而不是答案。
+
+| 材料 | 成對 | 定向 | 未成對 |
+|---|---:|---|---:|
+| `boa` unit-2018 程式區 —— **正控制** | **70** | BE 70 / LE 0 | 4 |
+| `busybox` unit-2018 | 0 | — | 0 |
+| `stage2.bin` 程式區 | 0 | — | 0 |
+| 3,374,772 byte 的 `/dev/urandom` —— **負控制** | **0** | — | 53,085 |
+| **這台的 kernel `.text`** | **101** | **BE 101 / LE 0** | 27 |
+| 這台的 kernel，`.text` 以上 | 0 | — | 511 |
+
+`boa` 那一列與這個 repo 既有的數字對得剛剛好：70×2＋4 = **144**。urandom 那一列是這支儀器
+能成立的理由：53,085 個半條、**0** 組，因為四個欄位在四個字窗裡碰巧全中大約是 6×10⁻⁸。
+
+那 101 組是什麼：`0x80002464` 起 `lwl t0,0(a1)` / `lwl t1,4(a1)` / `lwr t0,3(a1)` /
+`lwr t1,7(a1)` … `sw t0,0(a0)`，`a0` 目的、`a1` 來源、`a2` 計數、展開四次 —— **`memcpy`**，
+`arch/rlx/lib/memcpy.S` 的 `#ifdef CONFIG_CPU_HAS_ULS` 那一支。
+
+**推**，而這是桌面上最強的一條：這顆有這四條指令。沒有的話 `memcpy` 第一次非對齊複製就吃
+Reserved Instruction，`do_ri` 裡沒有任何 ULS 模擬，會撞上
+`die_if_kernel("Reserved instruction in kernel code")`。這台開得起來。
+⚠️ **仍然是推。`CPU-15` 只由 `R1a` 一條 `lwl` 決定。**
+
+### 四、2019 那次歸零：量在廠商工具鏈上，而它是版本而不是核心
+
+三份 rsdk 就在 `rtl819x-toolchain/toolchain/` 裡，**而且在這個 distro 裡原生就跑得起來**。
+同一份 C（packed struct 的 32-bit 存取）、同樣 `-O2`、同樣走 `-S`（讓 `as` 不在路徑上）：
+
+| 工具鏈 | gcc | `lwl`＋`lwr`＋`swl`＋`swr` |
+|---|---|---:|
+| `rsdk-1.3.6-4181-EB` | 3.4.6-1.3.6 | **0** —— 四個 `lbu` 加位移 |
+| `rsdk-1.3.6-5281-EB` | 3.4.6-1.3.6 | **0** |
+| `rsdk-1.5.5-5281-EB` | 4.4.5-1.5.5p4 | **4** |
+
+`-march` 掃 `lx4180`／`rlx4181`／`rlx5281`／`mips1`，兩邊都不動。這台 kernel 的 banner 是
+`4.4.5-1.5.5p2`。⚠️ 手上唯一的 1.5.5 是 **5281／p4**，這台是 4181／p2，沒有量到。
+⚠️ `busybox` 六棵全 0 不是反證：它的原始碼從來沒要求過一次非對齊 32-bit 存取。
+**仍未解釋的是 2019 掉到 0**，那在這個量測下需要一份**更晚**的 rsdk 表現得像更早的。
+
+### 五、grep ②：`F49`，而答案是第三個
+
+`arch/rlx/mm/cache.c:166` 的 `cpu_cache_init()` **無條件**呼叫 `rlx_cache_init()` ——
+既不是 `r3k_cache_init` 也不是 `r4k_cache_init`，而同一棵樹的 `arch/mips/mm/cache.c:161–173`
+確實有那個分支（掃描器的活性控制）。
+
+`cache-rlx.c` 對 `CPU_RLX4181` 定義 `CONFIG_CPU_HAS_DCACHE_OP`，但 `CONFIG_CPU_HAS_ICACHE_OP`
+**只給 4281/5281**。🔴 **所以 `CPU-44` 在 2026-08-26 讀到的「37 條全部 D 側、I 側全檔零條」
+不再是觀察，是那兩個 `#ifdef` 的直接後果。** op 欄只有 `0x11`／`0x15`／`0x19` 同樣對得上
+（WBC 那一支；不是 WBC 的話這四個常數會塌成 `0x11`／`0x1`）。八條 stride `0x10` 也一樣：
+`CACHE16_UNROLL8` 只在 `cpu_dcache_line != 32` 時被選。
+
+`boards/rtl8196e/bsp/bspcpu.h`（三棵樹逐位元組相同）把 `CPU-25` 的留白填上：
+**I-cache 16 KiB、D-cache 8 KiB、兩者 line 16 byte、無 L2、TLB 32 entry**。
+16 byte 那一項因此有兩個來源，第二個是這台自己的 binary；TLB 32 與 `CPU-08` 在裝置上量到的
+`Random` 範圍一致。⚠️ **標頭自己不一致**：`*_line_mask` 兩支都硬寫 `0xF`。
+⚠️ **關聯度仍然沒有來源。**
+
+### 六、三件計畫外的事，每一件都比那兩條 grep 大
+
+**① `CLAUDE.md` 指名的 `PRId` 指派表在手上的 drop 裡。**
+`arch/rlx/include/asm/cpu.h`，標頭寫明是 PRId 的值並畫出欄位：`PRID_IMP_RLX4181 0xcd00`、
+`PRID_IMP_RLX5280 0xc600`、`PRID_IMP_RLX5281 0xdc01`…。量到的 `0x0000CD01` bits 15:8 是
+`0xCD` → **`RLX4181` rev 1**，而 `RLX5281` 是 `0xDC`，**被正面排除**。
+四個旁證，其中一個不是常數而是行為：**這台 kernel 的 2.85 MB 程式區裡 `ll`／`sc`／`sync` 各 0 條**，
+那是板級 config 給 4181 的那一欄（`LLSC=n`／`SYNC=n`），不是 5281 的（`=y`／`=y`）。
+外部：第三方 port 在 RTL8196E 上印 `0000cd01 (Lexra LX4380 / RLX4181)`；LKML 的 Lexra 系列定義
+`PRID_IMP_LX5280 = 0xC600`，與同一張表的 5280 那格吻合。
+⚠️ **三個弱點一起記**：三棵樹在這個標頭上逐位元組相同（一個來源三份副本）；**沒有任何程式碼在讀這張表**；
+`0xdc01`／`0xdc02` 低位元組非零，破壞了前四格的編碼紀律。**禁令解除，弱點跟著走。**
+
+**② 這台的 kernel 裡有真正的 MIPS16 程式碼。**
+opcode `0x1d` 在讀起來像 32-bit 程式的窗口裡出現 217 次，**180 個目標落在映像內、27 個相異、三群**；
+對照組 `jal` 是 31,082/31,110、`j` 是 20,163/20,234，而 26 位元 J 欄位跨 256 MB，
+隨機資料只有 **1.26 %** 會落在這個 3.37 MB 映像裡。
+用**廠商自己的** `rsdk-1.3.6-4181` objdump `-m mips:16` 反組譯 `0x802B8118`，得到一個完整函式，
+四個內部自洽點：`bteqz` 目標正好是那個 `jr ra`、PC 相對載入指到延遲槽後那個字、那個字是 `0x802FB544`、
+下一個 literal pool 有兩個 `.bss` 位址與 **`0xB8010028`（KSEG1 暫存器）**。
+**負控制**：同一支反組譯器對 48 個隨機位元組給出 `ld`／`daddiu` 這些 MIPS64 形式與一個落在映像外的 `jal`。
+🔴 **代價落在本專案自己的工具上**：`opcount.py` 的 docstring 說線性掃描「不會漏掉指令」——
+**在 MIPS16 區段裡那是錯的**，而 `notes/lwl-mystery.md` 引用著它、`F51` 的零站在它上面。
+**十二支使用者空間 binary 與 `stage2.bin` 逐一用兩種獨立測試驗過都乾淨**
+（ELF `e_flags` 無 `0x04000000`；`jalx` 落在檔內的目標 0 個），**所以 `F51` 的數字不動** ——
+改的是那句話本身，因為一個靠運氣躲過反例的宣稱仍然是錯的宣稱。
+
+**③ `hazlint` 1.2 自己的筆記記了一個這支工具產不出來的數字。**
+1.2 寫「kernel 上 violations 從 172 → 171」。量：把兩個版本從 git 拉出來跑同一個 sha256，
+`93af331^` 給 **172**，`93af331` 給 **168**。**走掉的是四個點位不是一個**：
+
+| 點位 | load 後面那個字 | 是 1.2 的哪一半修法 |
+|---|---|---|
+| `0x802BAB68` | `eb8c2309`，opcode `0x3A` `swc2` | `lwcz`／`swcz` |
+| `0x802BB094` | `e9a467b1`，opcode `0x3A` `swc2` | `lwcz`／`swcz` |
+| `0x802BB11C` | `e9a467b1`，opcode `0x3A` `swc2` | `lwcz`／`swcz` |
+| `0x802BC490` | `4df46783`，opcode `0x13` COP3 | COP3，就是筆記描述的那一個 |
+
+所以「代價是一個 violation」對 **COP3 那一半**是對的，錯的是總數；而跟著錯的還有一句：
+1.2 把 `lwcz`／`swcz` 那一半叫做**潛伏的，「因為這棵樹裡沒有東西長那樣」**——
+**這棵樹自己的 kernel 裡就有三個，而且它們動了 gate 的答案。**
+四個點位全部在 `0x802B8000` 以上，也就是 ② 現在整段拒絕的那個區域。同一件事的兩面。
+
+### 七、drop 與 binary 不一致的兩處，交給 `R2a`
+
+- `imem-dmem.S` 在非 `RTL_819XD` 下 `IMEM0_SIZE` 是 **4096**（`addiu $8,$8,0xFFF`）；
+  這台的 binary 是 **`0x3FFF`**，也就是 16 KiB。
+- 五份出貨的 `RTL8196E_*` config **沒有一個**開任何 MIPS16 選項；這台的 binary 有 MIPS16。
+
+🔴 **`TC-02` 不動**，而這兩條是新的鑑別器：**手上這三份 drop 都建不出這個映像**。
+順帶讀到的：`toolchain/` 裡是 `rsdk-1.3.6-4181`、`rsdk-1.3.6-5281`、`rsdk-1.5.5-5281`，
+而這台的 banner 是 `1.5.5p2`；手上這份 1.5.5 是 **5281／p4**。
+
+### 八、`_imem_dmem_init`：這台自己在開機時做了什麼
+
+讀 `0x80002230`–`0x800022E8`：`mtc0 zero,$20` → `0x20`（IMEM0OFF）→ `0x202`（`DWB_Inval` 加 `IInval`）
+→ `__iram = 0x802B8000` 遮 `0x0FFFC000` 寫 `mtc3 $0`、加 `0x3FFF` 寫 `mtc3 $1`（**16 KiB**）
+→ `0x10`（IMEM0FILL）→ `__dram = 0x802C0000` 遮 `0x0FFFE000` 寫 `mtc3 $4`、加 `0x1FFF` 寫 `mtc3 $5`（**8 KiB**）。
+**這就是這個映像裡僅有的四條 `mtc3`**，與 `hazlint` 的 K9 一直用的那四條是同一組。
+`CPU-46` 對 CP3 `$0`／`$1`／`$4`／`$5` 的指派原本只有資料表，現在這台自己的 binary 也這樣說。
+🔴 而 `bspcpu.h` 寫 `cpu_imem_size 0`，這台卻填了一塊 16 KiB 的 I-MEM ——**記成不一致，不做調和**。
+`__iram` 這個字也是本次每一個區段邊界的來源：它是讀出來的，不是挑出來的。
+
+### 九、`-3` 的前提被反駁，而這一步沒有被打勾
+
+為了用廠商自己的反組譯器，跑了 `rsdk-linux-objdump`／`gcc --version`：
+**兩份 32-bit rsdk 在這個 distro 裡直接就跑得起來**（`3.4.6-1.3.6`／`4.4.5-1.5.5p4`，exit 0），
+而 `-3` 寫的 DoD 正是「`rsdk-linux-gcc --version` 印得出版本」。**那個問題答完了：不需要容器。**
+⚠️ **但沒有打勾，因為前提被推翻不等於工作被做完**：`rsdk-1.5.5` 的 `as` 起不來，
+`ldd` 指名的缺項只有一個 —— i386 的 `libz.so.1`（`/lib32/libc.so.6`、`/lib/ld-linux.so.2` 都已在）。
+`objdump` 與 `gcc -S` 不碰 `as`，所以今天用得到的路徑全通。**`-3` 從「挑三條容器路線」縮成「補一個 32-bit 相依」**，
+而它真正承重的地方是 `-4` 與 `P4a`。
+
+### 十、工具
+
+- **`tools/isa-probe.sh`（新）＋ `tools/test-isa-probe.sh`（新，40 案）**：用廠商 binutils 的 opcode 表
+  逐條組譯，做出**每個 Lexra 核心的 ISA 表**。正負控制：`addu` 八欄全過、`daddu` 八欄全擋；
+  沒有組譯器就 **exit 3 且不印表**，因為「空表」與「一整排拒絕」是兩種不同的答案。
+  它一次收緊了 `CPU-12`（`movz`／`movn` 在 `rlx4181` 接受、`mips1` 拒絕）與 `CPU-44`（`cache` 同理）；
+  `sync` 在 4181 拒絕、5281 接受，**與板級 config 完全一致**；
+  🔴 而 `ll`／`sc` **與板級 config 相衝** —— 組譯器給 `rlx4181` 接受，config 說 `LLSC=n`，
+  這台 kernel 一條都沒有。**記成衝突不做調和**（可調和的讀法是這些核心可合成，LL/SC 是實例的選項而 `-march` 描述族系，但那是推）。
+  ⚠️ **ULS 那一列什麼都沒說**：八欄全部接受 `lwl`，那張表只往下扣、從沒扣過 ULS。第三節的論證因此沒有用到它。
+  🔴 **它的預設搜尋第一版是錯的，而抓到它的是它自己的正控制**：搜到就用，於是選了 `as` 起不來的 1.5.5，
+  POS 控制回報八欄全 `.`。控制是對的，搜尋是錯的，兩個都修了，控制留著。
+- **`tools/opcount.py`**：`--pairs`（成對慣用法）、`--mips16`（前置條件測試），docstring 那句超集合宣稱改掉。
+  `--mips16` 在自己的控制沒發射時**拒絕發判決**：`boa` 用 `--base 0` 掃會得到 jalx 0 **而且** jal 0/515，
+  那是位址基底錯了不是沒有 MIPS16；`--elf` 之下同一支檔案是 jal 514/515 與同樣的 jalx 0，只有第二個是答案。
+  `test-opcount` **15 → 24**。
+- **`tools/hazlint` 1.3**：`mips16_in_spans()`、`main()` 對含 MIPS16 的範圍 exit 2（`--allow-mips16` 可覆寫）、
+  **K10** 五案控制、**K4b** 第二個母體控制（kernel `.text`，**128,440 個 load**，是 `stage2.bin` 的 **87 倍**）。
+  ⚠️ **K4b 釘的是 `0x802B8000` 那個界，不是那個零**：`0x802B4000` 之下是 127,650 個 load、**0 個 violation**，
+  但那個界是看到 violation 在哪裡之後才挑的，而這個專案自己的規矩是區段邊界要來自獨立訊號。
+  那 58 個是什麼也查清楚了：`0x802B4754`–`0x802B48E0` 與 `0x802B5410`–`0x802B5448` 一張核心指標表，
+  每個字都以 `0x80` 開頭，於是逐字解成 `lb`，每一條都「讀了前一條剛寫的暫存器」。
+  `test-hazlint` **96 → 109**（P4 六案、M15／M16）。
+  🔴 **K4b 一加進去就撞出一個既有案子的缺陷**：`M3` 用 `.*K4.*` 抓母體數字，而 K4b 也印 loads，
+  於是那個斷言開始拿兩個數字去比。suite 自己抓到的。
+- `tools/ci-expected.tsv`、`.github/workflows/ci.yml`：`NOT RUN IN THIS JOB` **320 → 353**。
+  🔴 **census 也抓到我自己的一個缺陷**：`test-isa-probe` 的 skip 標籤與 tsv 那一列對不上，報 `UNEXPECTED-SKIP`。
+
+### 十一、收工自查
+
+- `spec-check.py` 一開始紅兩條，**兩條都是它抓到我當天寫的東西**：C5 說 `CPU-15` 引的 `0x80002464`
+  不在它的擁有者檔案裡（改法是把發現寫進擁有者檔案，那本來就該做）；
+  **C8 說 `CPU-46` 有 8 格而表頭有 7** —— 我在一個 code span 裡寫了 `DWB_Inval|IInval`，
+  那正是 C8 存在要抓的那個缺陷，而它在同一個 session 裡抓到了寫它的人。
+- 全套：`spec-check` 9 控制、`binsim` 24、`test-binsim` 96、`test-file-modes` 3、`test-gitignore` 15、
+  `test-console-capture` 29、`test-opcount` **24**、`test-rlxprobe` 202、`test-hazlint` **109**、
+  `test-reply-size` 21、`test-boot-timeline` 15、`test-isa-probe` **40**、`ci-census` 14 —— 全綠。
+  runner 組態（`$FWRE_WORK` 指到空目錄）下 census 收在 151，加上沒有 cross gcc 時 `test-rlxprobe` 的 202 就是 353。
+
+### 十二、收工前的對抗審查：六個視角、37 個 agent、30 條提出、27 條存活
+
+六個視角（換名決定本身／MIPS16 的宣稱與後果／三支工具當程式碼讀／suite 擋不擋得住變異體／
+每一個數字獨立重量一次／有沒有講超過證據＋跨檔一致性），每一條發現各配一個專責反駁者，
+被要求**去殺掉它**。**存活率 27／30 高得不正常，而那本身就是這一天的評語。**
+
+🔴 **最重的一條打掉了這一段的頭條，而它就是這個 repo 反覆在防的那個失敗：一支沒有查 exit status 的掃描。**
+第四節那張「1.3.6 發 0、1.5.5 發 4、而且與 `-march` 無關」的表，`-march` 那半是**假的零**：
+`lx4180`／`rlx4181`／`rlx5281` 是 **binutils** 的拼法，rsdk 的 gcc 是一層 wrapper，對它們一律回
+
+```
+FATAL: -march mismatch. RSDK is configured for -march=4181 only
+```
+
+**exit 1 而且不寫輸出檔**，所以五個掃描點有四個根本沒編譯，`grep` 讀到的是上一輪留下的 `.s`。
+wrapper 要的拼法是**裸數字** `-march=4181`／`-march=5281`。全部重量（每一點都查 `$?`）：
+
+| 工具鏈 | gcc | 預設 | `-fuse-uls` | `-fno-use-uls` |
+|---|---|---:|---:|---:|
+| `rsdk-1.3.6-4181-EB` | 3.4.6-1.3.6 | **0** | **4** | 0 |
+| `rsdk-1.3.6-5281-EB` | 3.4.6-1.3.6 | **0** | **4** | 0 |
+| `rsdk-1.5.5-5281-EB` | 4.4.5-1.5.5p4 | **4** | **4** | 0 |
+
+🔴 **所以開關是一個旗標 `-fuse-uls`，兩代工具鏈都有，差別只在預設。**
+而且 Realtek 是**刻意打開的**不是繼承來的：`rsdk-1.5.5-5281` 自己的 uClibc 設定寫著
+`UCLIBC_EXTRA_CFLAGS="-march=5281 -EB -fuse-uls -msoft-float -ffix-bdsl"`。
+**要收回的句子是「compiler 產的 `lwl` 可以替一個 binary 的工具鏈定年」** —— 它定的是一個**建置旗標**。
+而它同時**解掉**了第四節留下的那個謎：`boa` 2019 掉到 0 不再需要「更晚的 rsdk 表現得像更早的」，
+一份不再傳 `-fuse-uls` 的 drop 就會這樣，而那是 `R2a` 現在該先去看的、也很便宜的東西。
+順帶對上了 `SOURCES.json` 早就記著的 gcc-4.8.4 Lexra patch（`!TARGET_LEXRA && !TARGET_RLX` 關掉那些 pattern）。
+
+**其餘存活的，照分類：**
+
+| | 存活的發現 | 做了什麼 |
+|:-:|---|---|
+| ① | **`opcount --mips16` 的正向判決沒有被控制擋住** —— 那個 guard 寫在 `if not inr:` 裡面，只擋零。錯的 base 於是會產出這支工具最強的宣稱 | guard 提到分支外，兩邊都擋；`P9` 釘住這個**不對稱**（前三個變異體裡第三個原本活著） |
+| ② | **`opcount` 用的是各段的凸包不是聯集** —— 兩個 PT_LOAD 之間的空隙算成 in-range，base rate 也在沒讀過的位元組上算，兩段的例子誇大 437 倍；而 `hazlint` 一直用聯集，同一個測試的兩份實作**構造上就不一致** | 改成聯集；十二支使用者空間 binary 與 kernel 的輸出逐位元組不變 |
+| ③ | 🔴 **`cache` 在兩支工具裡還標 `MIPS-II`，而推翻它的儀器是前一天自己加的** —— `isa-probe` 量到 `mips1` **與** `mips2` 都拒絕它 | 兩支工具、五份文件一起改成 `MIPS-III/32; rlx4181 ext`，並寫明**它不是 MIPS32 核心的證據**（`Config.M = 0` 是量的）。同類缺陷的第三次 |
+| ④ | 🔴 **`hazlint` 1.3 自己的 docstring 記了一個那支函式產不出來的數字**（180／三群，而 `mips16_in_spans` 回 179、根本不算群）—— **就是 §7.1 存在要抓的那個缺陷，同一天犯的** | 改成這支函式自己的數字，並指到兩支工具差的那一個字 |
+| ⑤ | **codeness 門檻 80 與窗口 64 什麼都沒釘住** —— 0 到 99 每一個 cut、4 到 512 每一個窗口都通過全部控制；`score < 99` 兩個字元就讓 kernel 命中掉到 18，而 `.iram` 從拒絕變成印出 31 個 violation | K10 加兩個稀釋 fixture 夾住 `[66, 87]`；cut 與窗口兩個方向的變異體現在都死。**釘住不等於推導出來**，寫進殘留 |
+| ⑥ | **我發布的 `md5 ceb6bf89…` 不是那個檔案的任何一種 digest** —— 那是被拿去跨樹比對的 21 行**切片**的 md5。真值 `c99116184b0e81fb987b7a7f4b4bdbba`，4,422 bytes | 改，並在原地寫明發生過什麼 |
+| ⑦ | **「四個旁證，其中兩個不是 Realtek 下游」是假的** —— ①在 drop 裡；②是 Realtek 用 Realtek 的原始碼照①的 config 建出來的，**是①在下游被看到一次，同一件事數兩遍**，而且方向上與 `TC-13` 及 `atomic.h` 相衝；③是同一份 SDK 的 fork；只有④不是，而它驗的是 `0xC6` 不是 `0xCD` | 改成「三個旁證＋一個不是旁證的一致性檢查」，並把**來源同質性**升成第四個弱點 |
+| ⑧ | **§1 表格的「這顆有嗎」欄用建置設定回答** —— 而 §6 自己說 `ll`／`sc` 那格未解決；FPU 那格更糟，證據欄整欄講的都是模擬 | `ll`／`sc` 與 FPU 都改成**未定**，並寫明 `Status.CU1` 才是決定 FPU 的東西。`sync` 留 推，因為那是兩個來源真的對上的唯一一格 |
+| ⑨ | **「`stage2.bin` 用兩種獨立測試驗過」是假的** —— 它是 raw image 沒有 ELF header，只有一種測試 | 六處一起改；`stage2` 有的是**發射了的控制**（499 個 `jal` 有 99.4 % 落在範圍內）而不是第二種測試 |
+| ⑩ | **「2.85 MB 裡零個 FPU opcode」不是儀器回的東西** —— 同一段有 1 個 `COP1`、2 個 `ldc1`，擁有者檔案寫對了（0 個 `lwc1`／`swc1`／`sdc1`）而三份索引推廣過頭 | 四處改成儀器的原話，並把「逐條裁決掉的、不是被界擋掉的」這句但書一起帶過去 |
+| ⑪ | **`SPEC.md` §17 的 `CPU-04` 那列還寫著「禁令維持不動」**，與同一個 commit 的上表直接矛盾 | 加日期化的 🔄 增補，保留原文，**標 🔄 不是 ✅**（殘留仍在） |
+| ⑫ | **`jalx` 不是進 MIPS16 的唯一路徑** —— bit 0 是 ISA-mode 位元，`jr`／`jalr` 帶奇數位址就進去了，而那正是透過函式指標或 ops struct 呼叫 MIPS16 的常態，也正是 `.iram` fast path 的長相 | 兩支工具的 docstring 寫明機制與**失效模式**，並記下這個映像裡搜過沒找到（29 個奇數位址字，全在資料裡）——**沒找到不等於沒有** |
+| ⑬ | **`README.md` 掉了三個必須帶著的弱點裡的一個**，而且它八行下面那句「這裡每一條 ISA 宣稱都還是第一種」已經不成立，這一段卻宣稱自己「把那句話收緊了」 | 補回弱點；那句站著的話直接改寫成「到 2026-08-27 為止是真的，現在有兩條是第二種，而且兩條都是推」 |
+| ⑭ | **`PROGRESS.md` 裡 172 → 171 與 172 → 168 同時活著**，而它是 `CLAUDE.md` 指名的「我在哪」唯一擁有者 | 兩處就地標記，不刪 |
+| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根本不能組譯的欄位印出認證行）；`pref`／`madd`／`rdhwr` 三列可以硬寫成 `.` 而沒有任何東西分得出「問過被拒」與「沒問」；而 B 段用真假值而不是 exit code 分支，於是把 REFUSED（exit 2）報成綠色的 skip | 加 `A6`（殺掉單一欄的 stub）、把四個全點列加進 `A4` 的 accept-list、B 段改成 `case $rc in 0|3|*)`。suite 40 → 48，那個單欄變異體現在 24 條紅 |
+
+**被駁回三條**，其中兩條記一句：說 `K4b` 的零完全靠一條為了那一個字量身訂做的規則、而且「沒有任何地方講」——
+機械上的依賴是真的，但「沒有講」在**五個已提交的地方**是假的（`embedded_in_padding` 的 docstring 含 hexdump 與失效模式、
+`notes/vendor-kernel-isa.md` 一整段 ⚠️、`SPEC.md` `CPU-48`、K10 第四案、M16）；
+而說「`-march=mips1` 讓 gcc 發 `lwl`，所以它不是 `TC-05` 的保守選擇」——現象重現得出來，
+但在 gcc-12 上**每一個**被接受的 `-march` 都發同樣四條，所以 `-march` 不是那個開關，也沒有更保守的選項。
+
+### 十三、這次審查沒有看的
+
+2018／2019 那個韌體比較除了 `-march` 掃描以外的部分、`notes/cache-model.md` 這次新增的寫入政策內容、
+`tools/rlxprobe/` 除了引用 `MIPS-II` 標籤的那兩個檔、CI workflow 本身（只看了第 54 行那個數字）、
+以及 353 這個總數是不是**該被數的東西**（它只是算得起來）。
+而就算上面每一條都修完，還有四件事仍然沒被檢查：`_codeness` 的窗口與門檻**被釘住了但仍然沒有推導**
+（180 對 238 就轉在這個沒有獨立訊號的數字上，那正是這個專案自己的區段邊界規則，套在一個濾波器上）；
+`find_pairs` 的貪婪匹配在含糊的連續段裡仍可能把位址配到錯的半邊（不影響計數與定向）；
+`mips16_in_spans` 對可重定位的 span 直接跳過，所以一個 `.o`根本沒有前置條件檢查；
+而整個 MIPS16 的案子仍然站在一次逐條裁決過的反組譯加一個自洽性論證上，**矽片上一次量測都沒有**。
+
+### 動到的檔
+
+`notes/vendor-kernel-isa.md`（新，這一步的擁有者）、
+`tools/isa-probe.sh`（新）、`tools/test-isa-probe.sh`（新）、
+`tools/opcount.py`（`--pairs`、`--mips16`、超集合宣稱的更正）、`tools/test-opcount.sh`、
+`tools/hazlint` **1.3**、`tools/test-hazlint.sh`、
+`tools/ci-expected.tsv`、`.github/workflows/ci.yml`、
+`SPEC.md`（`CPU-47`／`CPU-48` 新，九列增補）、
+`notes/lwl-mystery.md`、`notes/cache-model.md`、
+`CLAUDE.md`（核心命名禁令解除；上機守則的 FPU 那半句更正）、
+`PROGRESS.md`、`README.md`、`docs/FINDINGS.md`、`CHANGELOG.md`、
+`SOURCES.json`（工具鏈清單寫「兩份」而實際有三份，漏掉的正是 4181 那份）、
+`docs/probe3-cells.md`、`docs/loader-command-semantics.md`、`tools/rlxprobe/README.md`
+（三處還寫著「RLX4181 或 RLX5281，未定」）。
+
+**對抗審查那一輪另外動到**：`tools/opcount.py`（`--mips16` 的守衛對稱化、範圍改用聯集、
+`cache` 的 ISA level）、`tools/test-opcount.sh`（24 → **29**，P6–P9）、
+`tools/hazlint`（docstring 的數字、`cache` 的 level、K10 的兩個稀釋 fixture、
+`jalx` 不是唯一路徑的失效模式）、`tools/test-isa-probe.sh`（40 → **48**，A6 與 A4 的四個全點列，
+B 段改看 exit code）、`tools/ci-expected.tsv`、`.github/workflows/ci.yml`、
+以及上面十四條各自落地的檔。

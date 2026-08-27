@@ -112,6 +112,23 @@ fails**.  `--self-test` runs them and nothing else.
       If `stage2.bin` cannot be found, this tool REFUSES to certify anything:
       `--no-population-control` lets you look at a file anyway, but the exit
       code is then 2 whatever the file says, so no build gate can pass on it.
+  K10 **the MIPS16 precondition**, and it is a precondition on every other
+      number in this file.  Everything here reads four bytes at a time, which is
+      a superset of the instructions only where the code is 32-bit MIPS.  Five
+      cases: a `jalx` into the span must fire, the same `jalx` pointing outside
+      it must not, the same word as a `jal` must not, a `jalx` sitting in zero
+      padding must not, and `stage2.bin` must not -- the last at population
+      scale, so the detector is shown to stay quiet on 56 KiB of real code.
+  K4b **the second population control**: the LZMA-decompressed vendor kernel out
+      of this unit's own flash dump, bounded to `[0x80000000, 0x802B8000)`.
+      Expected: **128,440 loads / 40,182 followed by `nop` / 58 violations /
+      3 unresolved**, and zero MIPS16 in the span.  That is **87x** K4's load
+      count, on the only artefact in this project that is both real code and
+      this machine's own.  The upper bound is `__iram`, read out of the image at
+      `0x8000226C`, not chosen; the 58 are a table of kernel pointers, and
+      `notes/vendor-kernel-isa.md` §7.2 says why they are pinned rather than
+      bounded away.  Absent, this SKIPS and says so: K4 still ran, so it is a
+      smaller population and not none.
   K5  endianness and alignment: the K2 fixture read little-endian, and read
       from a 2-byte offset, must NOT reproduce K2's answer.  A scanner that
       ignored either would still be a scanner -- it would just be wrong.
@@ -185,7 +202,8 @@ reader.**  The first version of this note said no violation count on any
 artefact in this tree moved; that was measured on `stage2.bin` and the four
 payloads and not on the artefact where it is false.  On the decompressed device
 kernel (`$FWRE_WORK/rebuild/b4c-desk/vmlinux-rederived.bin`, 3,374,772 bytes)
-violations go **172 -> 171**, and the one that leaves is worth the paragraph:
+violations go **172 -> 171** 🔴 **(wrong; it is 172 -> 168 -- see 1.3 below)**,
+and the one that leaves is worth the paragraph:
 
     0x802bc490  lhu   t7,780(s2)
     0x802bc494  4df46783   -- opcode 0x13, rs = 15
@@ -255,11 +273,50 @@ this one.  What settles it is `probe3`'s `m-imem`, and `probe3` emits eight
 instruction the payload was built to ask about.  They are still hits.  They are
 hits with the right name.
 
+Version 1.3, 2026-08-27 -- it was reading MIPS16 as MIPS32, and 1.2's own
+note records a number this tool does not produce
+--------------------------------------------------------------------------
+Two things, and the second was found while checking the first.
+
+**1. The whole tool assumes 32-bit MIPS, and this unit's kernel is not all of
+that.**  `R2a/b/d-2` established that the vendor kernel contains MIPS16 -- two
+byte instructions, entered with `jalx`, in and around the `.iram` section that
+`arch/rlx/mm/imem-dmem.S` loads into a 16 KiB on-chip scratchpad.  A 4-byte
+aligned scan misses half of those instructions and reads the other half glued to
+a neighbour, so every number this tool has ever printed for that region is not
+conservative, it is meaningless.  `mips16_in_spans()` detects it, `main()`
+refuses (exit 2) with `--allow-mips16` as the deliberate override, and K10 is
+the five-case control.  `stage2.bin` and all twelve vendor `boa`/`busybox` are
+clean, 量 -- so the refusal fires where it should and nowhere else, which is the
+only way to tell a gate from a nuisance.  `notes/vendor-kernel-isa.md` §4.2.
+
+**2. 🔴 1.2's note says violations on the kernel go 172 -> 171.  They go
+172 -> 168.**  量 2026-08-27 by running both versions out of git against the same
+sha256: `93af331^` gives 172, `93af331` gives 168.  Four sites leave, not one:
+
+    0x802BAB68   next word eb8c2309, opcode 0x3A swc2   <- the lwcz/swcz half
+    0x802BB094   next word e9a467b1, opcode 0x3A swc2   <- the lwcz/swcz half
+    0x802BB11C   next word e9a467b1, opcode 0x3A swc2   <- the lwcz/swcz half
+    0x802BC490   next word 4df46783, opcode 0x13 COP3   <- the COP3 half
+
+So *"what it cost the gate is one violation"* is right about the COP3 fix alone,
+and the total is wrong.  One sentence more is wrong with it: 1.2 calls the
+`lwcz`/`swcz` half **latent, "only because nothing in this tree emits one"** --
+three words in this tree's own kernel are exactly that shape and they moved the
+gate's answer.  That fix was more load-bearing than its own note claimed.
+
+All four sit above `0x802B8000`, i.e. in the region point 1 now refuses outright.
+That is the same fact twice: a 4-byte scan over `.iram` was manufacturing
+findings, and the `reads()` corrections were removing them one class at a time.
+
+K4b, the kernel population control, exists so that neither of these can happen
+silently again: 128,440 loads pinned against `stage2.bin`'s 1,474.
+
 Usage
     tools/hazlint FILE [--base ADDR] [--range LO:HI] [--raw] [--section NAME]
                        [--survey] [--max-report N]
                        [--stage2 PATH] [--no-population-control]
-                       [--allow-zero-loads]
+                       [--allow-zero-loads] [--allow-mips16]
     tools/hazlint --isa FILE [--code-range LO:HI] [--loose] [--base ADDR] ...
     tools/hazlint --self-test
 """
@@ -269,7 +326,7 @@ import os
 import struct
 import sys
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 # --------------------------------------------------------------------------
 # The instruction model
@@ -797,7 +854,19 @@ ISA_OPS = {0x22: ('lwl', 'MIPS-I unaligned'), 0x26: ('lwr', 'MIPS-I unaligned'),
            0x2A: ('swl', 'MIPS-I unaligned'), 0x2E: ('swr', 'MIPS-I unaligned'),
            0x14: ('beql', 'MIPS-II'), 0x15: ('bnel', 'MIPS-II'),
            0x16: ('blezl', 'MIPS-II'), 0x17: ('bgtzl', 'MIPS-II'),
-           0x2F: ('cache', 'MIPS-II'), 0x30: ('ll', 'MIPS-II'),
+           # 0x2F read ('cache', 'MIPS-II') until 2026-08-28, and what refuted
+           # it was an instrument added the day before: 量, vendor binutils via
+           # tools/isa-probe.sh, `cache 0x11,0($4)` is REJECTED for -march=mips1
+           # AND -march=mips2 AND -march=lx4180, and ACCEPTED for rlx4181 and
+           # every later RLX. CACHE is MIPS-III/MIPS32; on these cores it is an
+           # extension. Third row this project has re-levelled the same way
+           # after 0x13 COP1X->COP3 and 0x33 pref->lwc3 -- and this one was
+           # MEASURED on 2026-08-27 and left standing until the review read the
+           # table back against the label.
+           #
+           # It is NOT evidence of a MIPS32 core: `Config.M = 0` is 量.
+           0x2F: ('cache', 'MIPS-III/32; rlx4181 ext'),
+           0x30: ('ll', 'MIPS-II'),
            0x38: ('sc', 'MIPS-II'),
            # 0x33 was ('pref', 'MIPS-IV') until 2026-08-27 and it is the same
            # error as 0x13's, from the same reallocation: MIPS I puts LWC3
@@ -1109,6 +1178,127 @@ def load_spans(b, spans):
     return live
 
 
+MIPS16_JALX = 0x1D
+_M16_COMMON = {0x00, 0x02, 0x03, 0x04, 0x05, 0x08, 0x09, 0x0C, 0x0D, 0x0E, 0x0F,
+               0x20, 0x21, 0x23, 0x24, 0x25, 0x28, 0x29, 0x2B}
+
+
+def _m16_plausible(w):
+    if w == 0:
+        return True
+    if w < 0x1000:
+        return False
+    return (w >> 26) in _M16_COMMON
+
+
+def mips16_in_spans(spans, win=64):
+    """Every `jalx` in 32-bit code whose target lands inside a scanned span.
+
+    This whole tool reads four bytes at a time, and that is only a superset of
+    the instructions where the code is 32-bit MIPS.  MIPS16 instructions are two
+    bytes: half of them are invisible to an aligned scan and the other half are
+    read glued to a neighbour.  Every number hazlint prints for such a region is
+    meaningless -- not conservative, meaningless -- so the region is refused
+    rather than annotated.
+
+    `jalx` is ONE way 32-bit code enters MIPS16.  A 26-bit J-format field ranges
+    over 256 MB, so a target landing inside the few megabytes actually being
+    scanned is not something data produces in quantity; requiring the word to sit
+    in a window that reads as 32-bit code removes the rest.
+
+    ⚠️ **It is not the only way, and this refusal will not fire on the other
+    one.**  Bit 0 of a target address is the ISA-mode bit, so `jr`/`jalr` through
+    a register holding an odd address enters MIPS16 -- the ordinary way a MIPS16
+    function reached through a pointer or an ops struct is called, and a Realtek
+    `.iram` fast path is built out of exactly those.  A region entered only that
+    way is invisible here and the tool will report on it as if it were 32-bit.
+    Searched in this unit's kernel and not found (29 words hold an odd in-image
+    address, all in data), so the reading for THIS artefact stands; not-found is
+    not absent.
+
+    量 2026-08-28, this unit's own vendor kernel, from THIS function: **179**
+    such targets, 26 distinct.  (`tools/opcount.py --mips16` reports 180 / 27 on
+    the same file and both are right -- it does not carry the padding rule below.
+    `notes/vendor-kernel-isa.md` §4.2 has the one word they differ on.  The
+    number that stood here until 2026-08-28 was opcount's, in a docstring
+    describing this function, which is the same defect the 1.3 note was written
+    to expose in 1.2.)  Disassembling one target with Realtek's own
+    `rsdk-1.3.6-4181` objdump `-m mips:16` gives a complete function whose
+    literal pool holds a KSEG1 register address.  `stage2.bin` and all twelve
+    vendor `boa`/`busybox` give zero, so this is the kernel's problem alone --
+    which is why it is a refusal and not a warning: it fires where it should and
+    nowhere else.
+
+    The codeness cut (80) and window (64 words) are **chosen, not derived**, and
+    that is the weakest thing here.  What is known: on this kernel the score is
+    bimodal, with an empty band from 73 to 85 whole-file and 87-96 inside
+    `.iram`, so any cut in [66, 87] gives the same answer -- and K10's two
+    dilution fixtures pin it to that interval so a silent change cannot pass.
+    Stated failure mode: a `jalx` sitting INSIDE MIPS16 code scores low and is
+    dropped, which loses 8 of the 19 in-range `.iram` sites; one of those eight
+    targets an entry two kept sites also call, so the refusal still fires.
+    """
+    ranges = [(sp.vaddr, sp.vaddr + 4 * len(sp.words))
+              for sp in spans if sp.words and sp.addressed]
+
+    def word_at(a):
+        for sp in spans:
+            if not sp.words or not sp.addressed:
+                continue
+            k = (a - sp.vaddr) // 4
+            if 0 <= k < len(sp.words) and sp.vaddr + 4 * k == a:
+                return sp.words[k][1]
+        return None
+
+    def embedded_in_padding(ws, i):
+        """The one false positive this detector had, and why it is excluded.
+
+        量 2026-08-27 on this unit's kernel.  The whole artefact:
+
+            8000230c  00000000
+            80002310  740008c7   <- reads as `jalx 0x8000231c`
+            80002314  00000000      ... which would be its delay slot
+            80002318  00000000      ... and this its return point
+            8000231c  00000000
+            80002320  2cca0004   <- the next real function starts here
+
+        A call whose delay slot is a nop AND whose return point is a nop, sitting
+        in the zero padding after a function, is not a call.  It is a data word
+        in a gap.  So a jalx is rejected when the word before it and both words
+        after it are zero.
+
+        The two real clusters in the same file survive it: at 0x80007274 the two
+        following words are `li a0,8` and `lw v1,12(v0)`.
+
+        Stated failure mode, because a heuristic without one is a guess: a real
+        `jalx` whose delay slot is a nop and whose return point is also a nop,
+        with a nop before it, would be missed.  Nothing in this tree is that.
+        """
+        if i == 0 or i + 2 >= len(ws):
+            return False
+        return (ws[i - 1][1] == 0 and ws[i + 1][1] == 0 and ws[i + 2][1] == 0)
+
+    hits = []
+    for sp in spans:
+        if not sp.addressed or sp.relocatable:
+            continue
+        ws = sp.words
+        for i, (addr, w) in enumerate(ws):
+            if (w >> 26) != MIPS16_JALX:
+                continue
+            lo, hi = max(0, i - win), min(len(ws), i + win)
+            if hi - lo < 8:
+                continue
+            score = sum(1 for k in range(lo, hi)
+                        if _m16_plausible(ws[k][1])) * 100 // (hi - lo)
+            if score < 80:
+                continue
+            t = (addr & 0xF0000000) | ((w & 0x03FFFFFF) << 2)
+            if any(a <= t < b for a, b in ranges) and not embedded_in_padding(ws, i):
+                hits.append((addr, t))
+    return hits
+
+
 def raw_span(b, vma, lo=0, hi=None):
     """The `--raw` span.  Every caller goes through this, K4 included.
 
@@ -1358,6 +1548,53 @@ def unhex(h):
     return bytes(bytearray(int(h[i:i + 2], 16) for i in range(0, len(h), 2)))
 
 
+# K4b.  The second population control, 87x the size of K4 and on the one
+# artefact in this project that is both real code and this machine's own: the
+# LZMA-decompressed vendor kernel out of this unit's flash dump.
+#
+# The span is 0x80000000 .. 0x802B8000 and the upper bound is NOT chosen.  It is
+# `__iram`, read out of the image itself at 0x8000226C, where
+# `arch/rlx/mm/imem-dmem.S` materialises the I-MEM window base:
+#
+#     80002268  3c08802c  lui   t0,0x802c
+#     8000226c  25088000  addiu t0,t0,-0x8000      -> 0x802B8000
+#
+# Above it lie `.iram` and `.dram`, which hold MIPS16 (see mips16_in_spans) and
+# literal pools.  Below it the range is 32-bit MIPS throughout.
+#
+# The 58 violations are pinned rather than adjudicated away, and what they are
+# is known: a table of kernel pointers at 0x802B4754-0x802B48E0 and
+# 0x802B5410-0x802B5448 whose words all begin 0x80, so each decodes as `lb` and
+# each appears to read the register the previous one wrote.  量 2026-08-27,
+# bounding at 0x802B4000 instead gives 127,650 loads and ZERO violations -- but
+# that bound was picked after seeing where the violations were, and this project
+# does not bound a region by the answer it produces.  So the honest bound is
+# pinned here and the zero is written down in notes/vendor-kernel-isa.md §7.2
+# as the adjudication it is.
+KERNEL_SHA = 'cf0d60a8ae54352e4d7d451b08a2f5551c80d8a34bf5cced19f3440dba610ec0'
+KERNEL_SIZE = 3374772
+KERNEL_VMA = 0x80000000
+KERNEL_TEXT_HI = 0x2B8000          # __iram, read out of the image
+KERNEL_LOADS = 128440
+KERNEL_NOPS = 40182
+KERNEL_VIOLATIONS = 58
+KERNEL_UNRESOLVED = 3
+
+
+def find_kernel(explicit=None):
+    cands = []
+    if explicit:
+        cands.append(explicit)
+    work = os.environ.get('FWRE_WORK', '/home/key/fwre-work')
+    cands += [os.path.join(work, 'rebuild', 'r2d', 'vmlinux.bin'),
+              os.path.join(work, 'rebuild', 'work-item4', 'vmlinux.bin'),
+              os.path.join(work, 'rebuild', 'b4c-desk', 'vmlinux-rederived.bin')]
+    for c in cands:
+        if c and os.path.isfile(c):
+            return c
+    return None
+
+
 def find_stage2(explicit):
     cands = []
     if explicit:
@@ -1473,6 +1710,107 @@ def run_controls(stage2_path, waive_population, want_isa):
               % (r.loads, r.nop_after, 100.0 * r.nop_after / max(r.loads, 1),
                  len(r.violations), STAGE2_LOADS, STAGE2_NOPS, STAGE2_VIOLATIONS)
               + ('' if sha == STAGE2_SHA else '   sha256 MISMATCH: %s' % sha))
+
+    # --- K10, the MIPS16 precondition ------------------------------------
+    # Added 2026-08-27.  Until then this tool read MIPS16 as MIPS32 on the one
+    # artefact where it matters, and reported numbers for it.  Four cases: the
+    # detector must fire on a jalx into the span, must NOT fire when the same
+    # jalx points outside it, must NOT fire when the same word is a jal, and
+    # must NOT fire on `stage2.bin` at population scale.
+    def _m16_fixture(target, opcode=MIPS16_JALX, in_padding=False, dilute=0):
+        ws = [0x25280001] * 200                       # addiu t0,t1,1
+        for k in range(20, 180, 6):
+            ws[k] = 0x0C000000 | ((k + 3) & 0x03FFFFFF)
+        ws[100] = (opcode << 26) | ((target >> 2) & 0x03FFFFFF)
+        if in_padding:
+            ws[99] = ws[101] = ws[102] = 0
+        if dilute:
+            # Replace `dilute` of the 128 words the codeness window sees around
+            # index 100 with words no MIPS32 decoder would take. 0x4Fxxxxxx is
+            # primary opcode 0x13 with a CO bit set -- outside COMMON, and not
+            # a small integer, so it is rejected by _m16_plausible on its own
+            # terms rather than by a special case.
+            put = 0
+            for k in range(36, 164):
+                if put >= dilute:
+                    break
+                if k == 100 or ws[k] != 0x25280001:
+                    continue
+                ws[k] = 0x4F000000 | k
+                put += 1
+        sp = Span(0, 4 * len(ws), PAYLOAD_VMA, 'K10')
+        sp.words = [(PAYLOAD_VMA + 4 * i, w) for i, w in enumerate(ws)]
+        return [sp]
+
+    k10 = []
+    k10.append(('jalx into the span fires',
+                len(mips16_in_spans(_m16_fixture(PAYLOAD_VMA + 0x80))) == 1))
+    k10.append(('jalx outside it does not',
+                len(mips16_in_spans(_m16_fixture(PAYLOAD_VMA + 0x40000))) == 0))
+    k10.append(('the same word as jal does not',
+                len(mips16_in_spans(_m16_fixture(PAYLOAD_VMA + 0x80, 0x03))) == 0))
+    k10.append(('a jalx sitting in zero padding does not',
+                len(mips16_in_spans(
+                    _m16_fixture(PAYLOAD_VMA + 0x80, in_padding=True))) == 0))
+    # The codeness cut is a chosen number, and until these two it was pinned by
+    # nothing: 量 2026-08-28 by the adversarial review, every cut from 0 to 99
+    # and every window from 4 to 512 passed all of K10 and the whole self-test,
+    # while `score < 99` -- two characters -- dropped the kernel's hit count
+    # 179 -> 18 and turned the `.iram` refusal into a printed report. These two
+    # bracket it: a window diluted to ~87 % plausible must still fire, one
+    # diluted to ~65 % must not. Together they pin the cut into [66, 87], which
+    # is the empty band the docstring records.
+    k10.append(('a lightly diluted window still fires',
+                len(mips16_in_spans(
+                    _m16_fixture(PAYLOAD_VMA + 0x80, dilute=16))) == 1))
+    k10.append(('a heavily diluted window does not',
+                len(mips16_in_spans(
+                    _m16_fixture(PAYLOAD_VMA + 0x80, dilute=45))) == 0))
+    if stage2_path is not None:
+        b2 = open(stage2_path, 'rb').read()
+        k10.append(('stage2.bin at population scale',
+                    len(mips16_in_spans(raw_span(b2, STAGE2_VMA))) == 0))
+    bad10 = [w for w, ok in k10 if not ok]
+    c.add('K10 MIPS16 precondition', not bad10,
+          '%d/%d ok  (%s)%s'
+          % (len(k10) - len(bad10), len(k10),
+             '; '.join(w for w, _ in k10),
+             '' if not bad10 else '   first miss: ' + bad10[0]))
+
+    # --- K4b, the second population control -------------------------------
+    kpath = find_kernel()
+    if kpath is None:
+        c.add('K4b population control  vendor kernel', True,
+              'NOT RUN -- the decompressed vendor kernel was not found under '
+              '$FWRE_WORK (%s). It is 3.3 MB carved from one physical device '
+              'and cannot be committed. K4 still ran, so this is a smaller '
+              'population, not none: the exit code is unaffected'
+              % os.environ.get('FWRE_WORK', '/home/key/fwre-work'))
+    else:
+        bk = open(kpath, 'rb').read()
+        ksha = hashlib.sha256(bk).hexdigest()
+        if ksha != KERNEL_SHA or len(bk) != KERNEL_SIZE:
+            c.add('K4b population control  vendor kernel', False,
+                  'sha256 %s / %d bytes -- expected %s / %d. A control that '
+                  'silently ran against a different file is worse than one that '
+                  'did not run' % (ksha[:16] + '...', len(bk),
+                                   KERNEL_SHA[:16] + '...', KERNEL_SIZE))
+        else:
+            ksp = raw_span(bk, KERNEL_VMA, 0, KERNEL_TEXT_HI)
+            m16 = mips16_in_spans(ksp)
+            rk = scan(ksp)
+            okk = (not m16
+                   and rk.loads == KERNEL_LOADS and rk.nop_after == KERNEL_NOPS
+                   and len(rk.violations) == KERNEL_VIOLATIONS
+                   and len(rk.unresolved) == KERNEL_UNRESOLVED)
+            c.add('K4b population control  vendor kernel', okk,
+                  '%d loads / %d nop (%.2f%%) / %d violations / %d unresolved   '
+                  'expected %d / %d / %d / %d; MIPS16 in span: %d (must be 0)'
+                  % (rk.loads, rk.nop_after,
+                     100.0 * rk.nop_after / max(rk.loads, 1),
+                     len(rk.violations), len(rk.unresolved),
+                     KERNEL_LOADS, KERNEL_NOPS, KERNEL_VIOLATIONS,
+                     KERNEL_UNRESOLVED, len(m16)))
 
     # --- K5 --------------------------------------------------------------
     swapped = b''.join(struct.pack('>I', struct.unpack_from('<I', v1, i)[0])
@@ -1792,11 +2130,12 @@ def parse_args(argv):
     a = {'path': None, 'base': 0, 'range': None, 'raw': False, 'section': None,
          'survey': False, 'max_report': 20, 'stage2': None, 'no_pop': False,
          'allow_zero': False, 'isa': False, 'loose': False, 'code_range': None,
-         'self_test': False}
+         'self_test': False, 'allow_mips16': False}
     flags = {'--self-test': 'self_test', '--isa': 'isa', '--loose': 'loose',
              '--raw': 'raw', '--survey': 'survey',
              '--no-population-control': 'no_pop',
-             '--allow-zero-loads': 'allow_zero'}
+             '--allow-zero-loads': 'allow_zero',
+             '--allow-mips16': 'allow_mips16'}
     i = 0
     while i < len(argv):
         x = argv[i]
@@ -1881,6 +2220,24 @@ def main(argv):
         spans = load_spans(b, spans)
     if not spans or not any(sp.words for sp in spans):
         die('nothing to scan')
+
+    m16 = mips16_in_spans(spans)
+    if m16 and not args['allow_mips16']:
+        print('REFUSED: this range contains MIPS16. %d jalx target(s) land '
+              'inside it,' % len(m16))
+        print('         %d distinct; first: %s'
+              % (len(set(t for _, t in m16)),
+                 ', '.join('0x%08x -> 0x%08x' % h for h in m16[:3])))
+        print('         Every number this tool produces comes from a 4-byte '
+              'scan, and MIPS16')
+        print('         instructions are two bytes: half of them would be '
+              'invisible and the')
+        print('         other half read glued to a neighbour. That is not a '
+              'conservative')
+        print('         answer, it is no answer. Bound the range to the 32-bit '
+              'part, or pass')
+        print('         --allow-mips16 if you know what you are asking for.')
+        return 2
 
     if args['isa']:
         bad = report_isa(args['path'], spans, unscanned, args)

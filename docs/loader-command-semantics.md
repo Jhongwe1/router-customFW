@@ -1032,7 +1032,7 @@ are executed on this unit's boot path and produce no exception message.
 
 This is an R1a question, not an item-4 question, and it is registered as a
 carried-forward item. It matters because it bears on the `-march` decision and
-on the Lexra-family core question (RLX4181 or RLX5281, undetermined), and
+on the Lexra core question (🔄 2026-08-27: **RLX4181**, from the `PRId` assignment table in `arch/rlx/include/asm/cpu.h`; this line read *RLX4181 or RLX5281, undetermined* until then. `movz` still matters, and now for a sharper reason: the vendor's own assembler accepts `movz`/`movn` for `rlx4181` and rejects them for `lx4180` and `mips1` — `tools/isa-probe.sh` — so the 18 in the loader are consistent with the named core and would not be with a baseline LX4180), and
 because **R1a settles it in one instruction**: a bare-metal RI handler, one
 `movz`, and a report.
 

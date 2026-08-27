@@ -233,6 +233,13 @@ everything else here comes from the integrator or from a third party.
   map and the first this project has had** — it says `0xCD01` is not an LX4189
   and nothing more. `CLAUDE.md`'s ban stands: **it is a datum, not the
   assignment table**, and `RLX4181`/`RLX5281` remain unwritable.
+  🔄 **2026-08-27: the assignment table turned up, in a GPL drop already on
+  disk.** `arch/rlx/include/asm/cpu.h` maps `PRID_IMP_RLX4181 = 0xcd00`, so
+  `0x0000CD01` is **RLX4181 rev 1** and `RLX5281` (`0xdc01`) is excluded. The
+  sentence above is left as written because it was the correct judgement on the
+  evidence it had, and because what it insisted on — a table rather than a datum
+  — is exactly what arrived. `notes/vendor-kernel-isa.md` §5 carries the three
+  weaknesses that travel with it.
 - § 3.4.2: *"Other exceptions, BEV = 0 → `0x8000_0080`"* — a **fourth**
   independent source for the vector, from the core vendor, agreeing with this
   unit's own `trap_init`, the vendor bootcode's comment, and

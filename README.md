@@ -6,18 +6,34 @@ manual, for a router whose vendor never released its source.
 
 | | |
 |---|---|
-| **Target** | TOTOLINK N150RT · RTL8196E · Lexra-family core (RLX4181 or RLX5281, undetermined) · big-endian · 4 MiB SPI NOR · 32 MiB SDRAM · one unit, no spare |
+| **Target** | TOTOLINK N150RT · RTL8196E · **Lexra RLX4181** (🆕 2026-08-27: named from a `PRId` assignment table in the vendor's own kernel source — `PRID_IMP_RLX4181 = 0xcd00` against a measured `PRId` of `0x0000CD01`; `RLX5281` is `0xdc01` and is now excluded rather than merely unproven) · big-endian · 4 MiB SPI NOR · 32 MiB SDRAM · one unit, no spare |
 | **Status** | **`v0.0` — the instruments and the record exist; the firmware does not.** No kernel of mine has been built and no byte of mine has been written to flash |
 | **Measured on the device** | The vendor's own kernel, delivered over TFTP and executed from RAM, reaching userspace and answering ping — 2026-08-24, gate `R0`. 81 captures across five power cycles, **no flash-write command issued in any of them**, and the loader head and `cr6c` image header byte-identical across three kernel executions and two uploads |
 | **What that claim does *not* say** | *"zero flash bytes written"*. The evidence reaches **512 bytes of a 4,194,304-byte part** — the two regions read back — and no instrument here can establish more than that. `PROGRESS.md`'s `R0` row carries the wording and why it changed |
 | **Measured on the core** | 🆕 **2026-08-25, gate `R1`: 19,792 bytes of my own bare-metal code executed on this silicon and reported back on two channels that agree word for word.** The cache model is no longer read: the I-cache **does** hand back stale bytes with no flush (the negative control, on both victims of a pair 7 KiB apart, and it is the *opposite* of what qemu returned); a cached store to a line the D-cache does **not** hold reaches memory unaided (🔄 **narrowed 2026-08-26 from *"the D-cache is write-through"*, which those two cells cannot distinguish from write-back-without-write-allocate**); **`CCTL 0x002` alone is sufficient** for the instruction side, so the vendor's flush-D-then-invalidate-I is unnecessary rather than wrong; and 🔴 **`Status.IsC` does not isolate on this part — its byte stores reach DRAM**, which is the path the vendor's Linux uses and this unit's own bootcode never does |
 | **Measured on the core** 🆕 | 🔴 **2026-08-25, second seating: the CP0 census ran under an exception handler of my own, installed at `0x80000080` and read back word for word before it was trusted.** `Status.BEV = 0`, so the vectors are in RAM and **the core fetches there** — `break` trapped into my handler and returned. **`PRId = 0x0000CD01`**, predicted in writing before the run. **`Count` is not implemented**, so this SoC's timer driver is a prerequisite and not a bonus. **The CP0 ignores the select field.** **CP0 register 20 reads zero for real** — the census reads every register twice with two different primes, so *reads zero* and *the destination was never written* are different observations, and `nowrite` was 0 on all 256. `Config.M = 0`, so this is not a MIPS32 core |
-| **Not measured** | 🔄 **The cache geometry, and the two routes to it are now measured shut rather than untried**: `Config` reads zero so there is no `Config1`, and the R3000 sizing walk needs cache isolation that this part does not implement, so it can only return its own *no answer* value. What is left is an eviction walk that needs no isolation. **The pipeline hazards**, which need a controlled loop and a timing harness. 🆕 🔴 **Whether a DMA write is visible to a cached CPU read** — nothing has been measured in that direction at all, and it is the one driver decision the cache gate closed without. 🆕 **Whether this silicon retires the `cache` instruction** — its own kernel contains 37, and none has been executed by anything of mine. And 🔴 **what `0x0000CD01` is the part number of** — the value is measured, the mapping to a Lexra model number is not, so **`RLX5281` stays unwritable, and so does `RLX4181`** |
+| **Not measured** | 🔄 **The cache geometry, and the two routes to it are now measured shut rather than untried**: `Config` reads zero so there is no `Config1`, and the R3000 sizing walk needs cache isolation that this part does not implement, so it can only return its own *no answer* value. What is left is an eviction walk that needs no isolation. **The pipeline hazards**, which need a controlled loop and a timing harness. 🆕 🔴 **Whether a DMA write is visible to a cached CPU read** — nothing has been measured in that direction at all, and it is the one driver decision the cache gate closed without. 🆕 **Whether this silicon retires the `cache` instruction** — its own kernel contains 37, and none has been executed by anything of mine. 🔄 ~~And **what `0x0000CD01` is the part number of**~~ — **answered 2026-08-27 and it is still not a measurement**: the mapping comes from `arch/rlx/include/asm/cpu.h`, a header the port itself never reads, byte-identical across three drops. It is corroborated by this unit's kernel *behaving* like the RLX4181 column of the board configs — zero `ll`/`sc`/`sync` in 2.85 MB of text, where RLX5281 boards build with both — which is evidence of a different kind from a constant |
 | **Baseline** | [`upstream/`](https://github.com/Jhongwe1/router-firmware-re) pinned at `4d3ff26`, read-only. The differential proof this project is built toward is only worth anything against a baseline it cannot edit |
 
 The last two rows are the ones to read. A binary that avoids an instruction is
 evidence about the toolchain that compiled it, not about the hardware that runs
 it, and every ISA claim in this repository is still of the first kind.
+
+🔄 **That was true of every ISA claim here until 2026-08-27. Two are now of the
+second kind, and both are inferred.** The core is named `RLX4181` from a `PRId`
+assignment table, and `lwl`/`lwr` are inferred present because this unit's own
+kernel uses them in `memcpy` while its `do_ri` carries no emulation for them —
+so either the core has them or the device would not boot, and it boots. Neither
+is a measurement. `R1a` is one `lwl` under a bare-metal RI handler away from
+converting the second.
+
+⚠️ **The vendor toolchains were measured too, and the first answer was wrong.**
+The emission of `lwl`/`lwr` is controlled by a build flag, `-fuse-uls`, that both
+rsdk generations carry; only the default differs, and Realtek pass it explicitly
+in their own uClibc configuration. An earlier version of this paragraph reported
+that `-march` made no difference — that reading came from a sweep whose exit
+status was never checked, in which four of five points did not compile at all.
+`notes/vendor-kernel-isa.md` §2.3.
 
 ## What is in here
 
@@ -57,12 +73,29 @@ project had been carrying: **product line is crossed with the clustering, not
 confounded with it.** And it does not identify a drop: six shipped images cannot
 name a source release, so `TC-02` stays 推.
 
+**[`notes/vendor-kernel-isa.md`](notes/vendor-kernel-isa.md)** 🆕 — what this
+unit's *own* vendor kernel uses and what it emulates, read out of the
+LZMA-decompressed image beside the three GPL drops, and kept apart from them
+throughout because they disagree twice. `ll`/`sc` and `sync` are emulated; the
+FPU is not emulated at all, which 🔴 **refutes half of the reason this project's
+own bench rule gives** for never measuring the ISA under Linux. The cache
+model is neither `r3k` nor `r4k` but a third one, and the `#ifdef` that selects
+it is why an earlier scan found 37 `cache` instructions on the D side and none
+on the I side. 🔴 **And the kernel contains MIPS16**, entered with `jalx`, which
+breaks the superset claim two of this project's instruments were standing on —
+so both were changed, after the twelve userland binaries were re-checked and
+found clean.
+
 **[`notes/lwl-mystery.md`](notes/lwl-mystery.md)** — MIPS Technologies sued
 Lexra over the patent covering `lwl`/`lwr`/`swl`/`swr`, and Lexra's cores
 implement MIPS I without them. This unit's `/bin/boa` contains 144. Its
 bootcode, written by Realtek, contains none in 40 KiB of code — and neither does
 the vendor's own `busybox`. Across six firmware builds `boa` carries 176, then
-144, then zero from 2019 onward.
+144, then zero from 2019 onward. 🔄 **2026-08-27: the discriminator this file
+named came back pointing the other way** — the vendor kernel carries no
+unaligned-instruction emulation, and its own `memcpy` uses `lwl`/`lwr`. The
+question the file was really asking turns out to be about the toolchain, and
+that half is now measured.
 
 **[`docs/loader-flash-write.md`](docs/loader-flash-write.md)** — the SPI
 controller at `0xb8001200`, its command set including `RDID`, and what the

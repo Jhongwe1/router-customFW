@@ -13,9 +13,12 @@ implemented MIPS I *except* those four. An earlier 1998 trademark suit had
 already been settled on the condition that Lexra describe its products as not
 implementing unaligned loads and stores.
 
-This board carries a Lexra-family core (RLX4181 or RLX5281, undetermined —
-`refs/README.md` records why the datasheet's own claim is contested), and this
-unit's `/bin/boa` contains 142 of those instructions by upstream's count. Either
+This board carries a **Lexra RLX4181** (🔄 2026-08-27: named from the `PRId`
+assignment table in `arch/rlx/include/asm/cpu.h`, `notes/vendor-kernel-isa.md`
+§5; until then this line read *"a Lexra-family core (RLX4181 or RLX5281,
+undetermined)"* and `refs/README.md` records why the datasheet's own claim is
+contested), and this unit's `/bin/boa` contains 142 of those instructions by
+upstream's count. Either
 the hardware has them, or something is emulating them.
 
 ## Instrument
@@ -28,12 +31,17 @@ but cannot miss an instruction. **Every count it prints is an upper bound, and
 exactly one kind of result is rigorous — a zero.** That is the result this
 question needs, which is why the cheap instrument is the right one here.
 
+🔄 **That paragraph is true only where the code is 32-bit MIPS, and it did not
+say so until 2026-08-27** — see the section below on MIPS16. Every binary in this
+file's tables was re-checked against that precondition and every one of them
+passes, so nothing here moves; the sentence is fixed anyway.
+
 `objdump -d` was tried first and is useless on these binaries: `/bin/boa` has
 had its section headers stripped, `-d` only disassembles sections, and so it
 emits no disassembly at all and reports 0 for every mnemonic. A tool that cannot
 see is still willing to report a number.
 
-Controls, `tools/test-opcount.sh`, 15 cases:
+Controls, `tools/test-opcount.sh`, 24 cases (15 until 2026-08-27, when `--pairs` and the MIPS16 precondition arrived):
 
 | | |
 |---|---|
@@ -155,17 +163,113 @@ and it closes in 2019. So the follow-up DAY-ZERO assigned to R2 — "what does t
 vendor's rsdk do with `lwl`?" — is now a narrower and better question: *what was
 different about how `boa` was built, and what changed in 2019?*
 
+## 🔴 2026-08-27, `R2a/b/d-2`: three of the four below are answered, and the
+## answer to the first one points the other way
+
+The full working is in **`notes/vendor-kernel-isa.md`**, which owns it. The part
+that belongs to this file:
+
+**1. There is no unaligned-access emulation handler, and the reason is that the
+core does not need one.** `arch/rlx/kernel/do_ri()` emulates `ll`/`sc` and
+`sync` and nothing else; `arch/mips`'s own `simulate_rdhwr` is `#if 0`'d out by
+the vendor. `do_ade` → `emulate_load_store_insn` does exist, but that is the
+Address Error path — a misaligned address given to an *aligned* instruction — and
+a *missing* instruction raises Reserved Instruction, which lands somewhere else
+entirely. Finding the AdE emulator was the first thing this step turned up and
+the first thing that had to be set aside.
+
+**And this unit's own kernel uses the four instructions.** Read, at
+`0x80002464`, which is `arch/rlx/lib/memcpy.S` under `#ifdef CONFIG_CPU_HAS_ULS`:
+
+```
+80002464  88a80000  lwl  t0,0(a1)
+80002468  88a90004  lwl  t1,4(a1)
+80002470  98a80003  lwr  t0,3(a1)
+80002474  98a90007  lwr  t1,7(a1)
+...
+8000248c  ac880000  sw   t0,0(a0)
+```
+
+101 such pairs in the kernel's `.text`, all big-endian oriented, counted by
+`tools/opcount.py --pairs` — which reconciles this file's own 144 exactly:
+`boa` gives **70 pairs plus 4 unpaired halves**. **Inferred**: the core
+implements them, because `memcpy` would otherwise take Reserved Instruction in
+kernel mode on its first unaligned copy and this device boots.
+
+**3. What the vendor toolchain emits — measured, and the first answer here was
+a false zero.** Same C file, `-O2`, `-S`:
+
+| toolchain | gcc | default | `-fuse-uls` | `-fno-use-uls` |
+|---|---|---:|---:|---:|
+| `rsdk-1.3.6-4181-EB` | 3.4.6-1.3.6 | **0** — four `lbu` and shifts | **4** | 0 |
+| `rsdk-1.3.6-5281-EB` | 3.4.6-1.3.6 | **0** | **4** | 0 |
+| `rsdk-1.5.5-5281-EB` | 4.4.5-1.5.5p4 | **4** | **4** | 0 |
+
+🔴 **The first version of this section reported a `-march` sweep, and it was a
+false zero.** `lx4180`/`rlx4181`/`rlx5281` are binutils spellings; the rsdk gcc
+driver answers `FATAL: -march mismatch` and exits 1 **without writing the output
+file**, and `$?` was not checked, so the count came off a leftover `.s`.
+Corrected 2026-08-28 with the exit status checked at every point.
+
+**So the lever is a build flag, `-fuse-uls`, which both toolchain generations
+carry — only the default differs**, and Realtek pass it explicitly in
+`rsdk-1.5.5`'s own uClibc configuration. This unit's kernel banner names
+`4.4.5-1.5.5p2`.
+
+**DAY-ZERO's follow-up question has an answer and it is not the one this file
+expected.** `boa`'s 176 and 144 are what this compiler emits with `-fuse-uls` in
+effect when the source asks for an unaligned access; `busybox`'s zero is a source
+that never asks. **And the 2019 drop to zero stops being a puzzle** — a drop that
+stops passing `-fuse-uls`, or a toolchain defaulting it off, does exactly that,
+and that is what `R2a` should look for first. ⚠️ What it costs is the instrument:
+a binary carrying compiler-generated `lwl` dates a **build flag**, not a
+toolchain.
+
+**4** is unchanged and now less likely to matter: if the core has the
+instructions, there is no trap and no cost.
+
+**2 — R1a on the device — is untouched, and it is still the only thing here that
+measures the silicon.** Everything above is read out of code.
+
+## ⚠️ A claim this file leaned on is false in one place, and the place is not here
+
+The instrument section says the linear scan *"is a superset of the instructions:
+it can count data as code but cannot miss an instruction."* That holds for 32-bit
+MIPS. **It does not hold for MIPS16**, which is two bytes per instruction — and
+this unit's vendor kernel contains MIPS16, entered with `jalx`, in and around the
+`.iram` section (`notes/vendor-kernel-isa.md` §4.2).
+
+Every binary in the table above was therefore re-checked, by two independent
+tests, before this note was allowed to keep its numbers:
+
+| | ELF `e_flags` bit `0x04000000` (`EF_MIPS_ARCH_ASE_M16`) | `jalx` targets landing inside the file |
+|---|---|---|
+| all six `boa`, all six `busybox` | clear (`0x1007` / `0x1005`) | **0** |
+| `stage2.bin` | raw image, no header | **0** |
+| this unit's kernel — the positive control | raw image, no header | **180** |
+
+The four PIC-generation `boa` each carry exactly one `jalx`-shaped word, and its
+target is outside the file: data, and the test says so rather than counting it.
+**Nothing in this file's table changes.** The sentence in `tools/opcount.py` is
+corrected rather than left standing, because a claim that survives its
+counter-example by luck is still a claim that was wrong.
+
 ## Next measurements, in the order that would settle it
 
-1. **Does the vendor kernel contain an unaligned-access emulation handler?**
-   This is the discriminator. If it does, the hardware lacks the instructions and
-   every one of `boa`'s 144 sites was a trap into the kernel. The kernel is not
-   carved yet — `extracted/*/` holds only `rootfs.squashfs` and its expansion.
-   (R2)
+1. ~~**Does the vendor kernel contain an unaligned-access emulation handler?**~~
+   ✅ **Answered 2026-08-27: no, and the core has the instructions instead.**
+   *Original text:* This is the discriminator. If it does, the hardware lacks the
+   instructions and every one of `boa`'s 144 sites was a trap into the kernel.
+   The kernel is not carved yet — `extracted/*/` holds only `rootfs.squashfs`
+   and its expansion. (R2)
 2. **R1a on the device, bare metal.** Execute one `lwl` under a Reserved
-   Instruction handler. That is the only thing here that measures the silicon.
-3. **Compile a program with unaligned struct access using the vendor rsdk and
-   count.** Settles what the vendor toolchain emits, which is the other half of
-   the 2019 change. (R2)
+   Instruction handler. That is the only thing here that measures the silicon,
+   and it is now the only thing left in this list that is not desk work.
+3. ~~**Compile a program with unaligned struct access using the vendor rsdk and
+   count.**~~ ✅ **Answered 2026-08-27, corrected 2026-08-28**, above: the lever
+   is `-fuse-uls` and both toolchain generations carry it. The `-march` half of
+   the first answer was a false zero from an unchecked exit status.
 4. If the hardware does lack them: `boa` on this unit takes a kernel trap on
-   every unaligned string access, and the cost is measurable. (P2)
+   every unaligned string access, and the cost is measurable. (P2) — **now the
+   unlikely branch**, but it stays here until `R1a` closes it, because the
+   evidence for the other branch is entirely read rather than measured.

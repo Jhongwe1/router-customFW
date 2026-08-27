@@ -86,6 +86,12 @@ for c in "$WORK/stage2.bin" "$WORK/rebuild/work-item4/stage2.bin"; do
     [ -f "$c" ] && STAGE2="$c" && break
 done
 
+KERNEL=""
+for c in "$WORK/rebuild/r2d/vmlinux.bin" "$WORK/rebuild/work-item4/vmlinux.bin" \
+         "$WORK/rebuild/b4c-desk/vmlinux-rederived.bin"; do
+    [ -f "$c" ] && KERNEL="$c" && break
+done
+
 echo "=== P1: the three acceptance numbers, on the real artefacts ==="
 if [ -n "$STAGE2" ]; then
     out="$("$PY" "$HAZ" "$STAGE2" --raw --base 0x80400000 2>&1)"; rc=$?
@@ -210,7 +216,10 @@ if [ -n "$STAGE2" ]; then
     # 1665, not 1474: `lb zero,…` and `lwr zero,…` decoded out of the loader's
     # string and table region are what the rt rule was excluding, and they are
     # the 191 words the population control is protected by.
-    got="$("$PY" "$T/m3" --self-test 2>&1 | sed -n 's/.*K4.*  \([0-9]*\) loads.*/\1/p')"
+    # Anchored on `K4  population`, not on `K4`: K4b arrived in 1.3 and prints a
+    # loads count too, so the looser pattern matched two rows and the assertion
+    # started comparing against both. Caught by this suite the hour K4b landed.
+    got="$("$PY" "$T/m3" --self-test 2>&1 | sed -n 's/.*K4  population.*  \([0-9]*\) loads.*/\1/p')"
     ck "M3 moves the population to 1665" 1665 "$got"
 else
     sk "M3 rt-rule dropped" "needs stage2.bin"
@@ -432,6 +441,13 @@ elif which == 'm14':       # lwcz/swcz fall back to the unknown-opcode {rs, rt}
     src = src.replace(
         "    if op in (0x39, 0x3A, 0x3B, 0x3D):              # swc1 swc2 swc3 sdc1",
         "    if op in (0x39, 0x3D):  # MUTATED: 0x3A/0x3B fall through", 1)
+elif which == 'm15':       # the MIPS16 detector never finds anything
+    src = src.replace("    hits = []\n    for sp in spans:\n        if not sp.addressed or sp.relocatable:",
+                      "    hits = []\n    return hits  # MUTATED: the detector is blind\n    for sp in spans:\n        if not sp.addressed or sp.relocatable:", 1)
+elif which == 'm16':       # the padding guard goes, so a data word in a gap fires
+    src = src.replace(
+        "            if any(a <= t < b for a, b in ranges) and not embedded_in_padding(ws, i):",
+        "            if any(a <= t < b for a, b in ranges):  # MUTATED: the padding guard is gone", 1)
 elif which == 'm13':       # strict stops being a NARROWING of loose
     # Deliberately NOT in opcode 0x13: `sync` fires strict-only, so every
     # count-based control still reads what it expects and only K9's sweep of
@@ -578,6 +594,57 @@ ASM
     ck "exit 1, because a successor is unknown" 1 "$rc"
 else
     sk "two-section .o" "no mips-linux-gnu-as"
+fi
+
+echo
+echo "=== P4: the MIPS16 refusal, end to end on the artefact that has it ==="
+# 1.3. Until it, hazlint scanned this file four bytes at a time and printed
+# numbers for a region that is two-byte instructions. The refusal has to fire
+# on the kernel and NOT on stage2, or it is a nuisance rather than a gate.
+if [ -n "$KERNEL" ]; then
+    out="$("$PY" "$HAZ" "$KERNEL" --raw --base 0x80000000 --max-report 0 2>&1)"; rc=$?
+    ck "whole kernel is refused"        1 "$(printf '%s\n' "$out" | grep -c 'REFUSED: this range contains MIPS16')"
+    ck "and says how many targets"      1 "$(printf '%s\n' "$out" | grep -c '179 jalx target(s) land')"
+    ck "exit 2, so no build can pass"   2 "$rc"
+    out="$("$PY" "$HAZ" "$KERNEL" --raw --base 0x80000000 --allow-mips16 --max-report 0 2>&1)"
+    ck "--allow-mips16 lets it through, and the count is 1.3's 168" \
+       168 "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
+    # The bound is __iram, read out of the image, not chosen: see K4b's comment.
+    out="$("$PY" "$HAZ" "$KERNEL" --raw --base 0x80000000 --range 0x0:0x2b8000 --max-report 0 2>&1)"
+    ck "the 32-bit span is NOT refused"  0 "$(printf '%s\n' "$out" | grep -c 'REFUSED')"
+    ck "and it is a real population"    128440 \
+       "$(printf '%s\n' "$out" | num 'loads (MIPS-I load-to-GPR, rt != \$zero)')"
+else
+    sk "P4 MIPS16 refusal (6 cases)" "the decompressed vendor kernel is not under $WORK"
+fi
+if [ -n "$STAGE2" ]; then
+    out="$("$PY" "$HAZ" "$STAGE2" --raw --base 0x80400000 2>&1)"
+    ck "stage2 is NOT refused for MIPS16" 0 "$(printf '%s\n' "$out" | grep -c 'REFUSED')"
+else
+    sk "stage2 is NOT refused for MIPS16" "not found under $WORK"
+fi
+
+echo
+echo "=== M15/M16: the MIPS16 detector, one mutation each ==="
+# M15 blinds the detector entirely; M16 removes only the padding guard, which
+# is the half that keeps it from firing on a data word in a function gap. The
+# pair matters because a detector that fires on everything and a detector that
+# fires on nothing both look like "no MIPS16 problem" from the outside.
+mut m15
+ck "M15 mutation landed"  1 "$(grep -c 'MUTATED: the detector is blind' "$T/m15")"
+o15="$("$PY" "$T/m15" --self-test 2>&1)"
+ck "M15 fails K10"        1 "$(printf '%s\n' "$o15" | grep -c '^  FAIL  K10')"
+ck "M15 leaves K1 alone"  1 "$(printf '%s\n' "$o15" | grep -c '^  ok    K1 ')"
+
+mut m16
+ck "M16 mutation landed"  1 "$(grep -c 'MUTATED: the padding guard is gone' "$T/m16")"
+o16="$("$PY" "$T/m16" --self-test 2>&1)"
+ck "M16 fails K10"        1 "$(printf '%s\n' "$o16" | grep -c '^  FAIL  K10')"
+if [ -n "$KERNEL" ]; then
+    ck "M16 also fails K4b on the real kernel" 1 \
+       "$(printf '%s\n' "$o16" | grep -c '^  FAIL  K4b')"
+else
+    sk "M16 also fails K4b" "no kernel under $WORK"
 fi
 
 echo
