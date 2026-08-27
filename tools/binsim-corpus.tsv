@@ -1,0 +1,111 @@
+# tools/binsim-corpus.tsv -- the six trees `tools/binsim.py --corpus` scores.
+#
+# The bytes never enter this repository: they are someone else's property and
+# one of the six is this unit's own flash dump. What is committed is the
+# manifest, so a run that scored a DIFFERENT file is refused instead of
+# reported. `binsim.py` checks length and sha256 in `check_integrity()` before it
+# reads a single instruction -- it did NOT until 2026-08-27, when the check ran
+# after the ELF had already been parsed and tokenised while this line said
+# otherwise. `D1` exercises that same function three ways, and
+# `tools/test-binsim.sh` drives the whole path with a corrupted manifest and with
+# a corpus file truncated in its body; the second used to crash inside `tokenize`
+# and exit 1, the code reserved for "reported, but a result is void".
+#
+# `--check-manifest` parses and validates THIS file with no vendor byte present,
+# which is how a runner reaches it at all: before that mode existed the only
+# reader was `--corpus`, and a typo in `@floor` would have surfaced on one
+# machine months later.
+#
+# Files live at   $FWRE_WORK/extracted/<tree>/squashfs-root/<relpath>
+# override with   --root DIR
+#
+# Columns, tab separated:
+#
+#   tree  built  program  relpath  bytes  sha256  role
+#
+# `built` is the timestamp in that tree's BusyBox banner -- INSIDE the image,
+# not a filesystem attribute a copy could destroy. It corroborates the mtimes,
+# though NOT to within ten minutes in all six trees as this line first claimed:
+# 量 2026-08-27 the banner-to-mtime gap runs 2m02s to 1h48m02s, and v3.4.0 is the
+# outlier at 1h48m (163 files stamped 11:43 against a 09:55:29 banner) with
+# v2.1.2 marginal at 10m04s. It is packaging lag, systematic per tree, and it
+# does not touch the date. What matters is that it is the
+# BUILD date, which is not the vendor's RELEASE date: `SPEC.md` `FW-19` and
+# `notes/lwl-mystery.md` both carry 2015-08-25 for `v2.1.2` in a column headed
+# `build`, and 2015-08-25 is upstream's release date for that firmware. The
+# image says 2015-08-11 17:26:34 CST in the banner and 2015-08-11 17:36:38 in
+# every mtime.
+#
+# `role` is what the corpus uses the program for:
+#
+#   subject   the plan's failure condition applies -- if its pairwise scores
+#             span less than five percentage points its numbers are void
+#   identity  a program that is byte-identical in every tree. `bin/acltd` is
+#             one sha256 across all six -- 10,032 bytes, `.comment` `GCC: (GNU)
+#             3.2.3-1.2.11`, a prebuilt blob carried unchanged for five years
+#             across three product lines. It is the identity anchor AND the
+#             positive control on the void verdict, whose fifteen cells span
+#             exactly zero. A verdict that never fires is not a verdict.
+#
+# It is also the trap in this corpus: `grep 'GCC: (GNU)' unit-2018/` answers
+# 3.2.3-1.2.11, and that is acltd's compiler, not this unit's. Only the two
+# 2015/2016 trees still carry a `.comment` for their own `boa`, and it reads
+# `GCC: (GNU) 4.4.5-1.5.5p2`.
+#
+# MEMBERSHIP RULE, and it is enforced by control E0 rather than left here.
+#
+# A tree belongs in this corpus only if its binaries are the SAME ISA as this
+# unit's: ELF32, big-endian (MSB), EM_MIPS, `e_flags` arch field 0 (MIPS-I).
+# E0 refuses a corpus that mixes them and names the odd one out.
+#
+# The rule exists because the question came up with a real image. 量 2026-08-27,
+# `TOTOLINK-N350RT_V9.3.5u.6466_B20250825`, a 2025 release for a TOTOLINK
+# product with a neighbouring model number:
+#
+#   container       U-Boot legacy uImage (magic 27051956), image name C8351R-6466
+#                   -- not the Realtek loader container the other six use
+#   SoC             **MediaTek MT7628**, named in the kernel image
+#   kernel          Linux 3.4.113, gcc 4.4.7, built 2025-08-25
+#   rootfs          little-endian SquashFS 4.0 (`hsqs`), xz, at offset 1,044,416
+#   /bin/busybox    ELF 32-bit **LSB**, MIPS32 rel2, e_flags 0x70001007
+#   libc            uClibc 0.9.33.2
+#   web server      lighttpd. There is no `boa` in it at all
+#
+# Against this unit: big-endian MIPS-I, e_flags 0x1007, Linux 2.6.30.9, uClibc
+# 0.9.30.3, boa. Different endianness, different ISA level, different SoC
+# vendor, different bootloader, different kernel line, different web server.
+# `binsim.py` refuses it before scoring -- `ELF data 1, not MSB (big-endian)`,
+# exit 2 -- and a seventh tree would have added nothing to a matrix about which
+# Realtek GPL drop built a Lexra-core device.
+#
+# Recorded rather than dropped, because "we looked and it is a different part"
+# is a result, and because the model numbering does NOT imply a shared platform.
+#
+# @base and @floor name the two cells `plan/router-rebuild-plan.md:1128` defines
+# as the thresholds. They are cells of the matrix, not numbers anyone chose.
+# binsim reports the FLOOR cell as REFUTED when it lands below the score of two
+# DIFFERENT PROGRAMS from one tree, which is what it does here -- naming a
+# replacement is R2a/b/d-1's decision and not this file's.
+
+@base	boa	unit-2018	n200re-3.2.0
+@floor	boa	unit-2018	v3.4.0
+
+# tree	built	program	relpath	bytes	sha256	role
+v2.1.2	2015-08-11	boa	bin/boa	522556	ddda5a4f3c65b54b96d8cc485f617daf049ad70eab42ac57e87b4b005f17d97a	subject
+n300rt-2.1.6	2016-05-16	boa	bin/boa	526732	11db88e876ae427f82e83a7ce96686808e4501b1caac5c561416d4dd318da10f	subject
+unit-2018	2018-01-10	boa	bin/boa	485012	19fe29d71aa1cc1e893627f17a0f14b03ca75f6936318df4062df4fb153909f7	subject
+n200re-3.2.0	2018-03-30	boa	bin/boa	509632	5c9eb5191a8cdd55d05393530c7ef7e7aa2c9d54966d5fb55f97ad244ced7c75	subject
+n300rt-3.4.0	2019-03-15	boa	bin/boa	400424	9ffcb3540d8aeff874ab790c09408e370fb3cbed180b347d54d083e90ca1fb52	subject
+v3.4.0	2020-10-30	boa	bin/boa	404904	2f53eeac28be0bd7ad23660834bbd249f87ec00e26cac611655143a8adb80a21	subject
+v2.1.2	2015-08-11	busybox	bin/busybox	274656	24bf1a5de1039dc54d5dcb2287f7d998ad3ab8c42480fb7492bef361822bd659	subject
+n300rt-2.1.6	2016-05-16	busybox	bin/busybox	274656	b3d3ae43202e890fa28dcf80b43c9f167c9bef0b2f41f4f95d4ff503d1d19547	subject
+unit-2018	2018-01-10	busybox	bin/busybox	273332	d5310832cbbedf42a6a38788d7b254d4ba0269236ece1693247e1fb0c8d3d516	subject
+n200re-3.2.0	2018-03-30	busybox	bin/busybox	265056	f95caafa37dd6e8964a03a24df570bf96223a844a4cfd6c72696529a7601dd34	subject
+n300rt-3.4.0	2019-03-15	busybox	bin/busybox	304208	70b353ffcc1a993089a43fac68e037e9fc635f0a68a5515d65b91f2afc4bf067	subject
+v3.4.0	2020-10-30	busybox	bin/busybox	305216	4342c6f66211e7aeb8a58cf414d9295f1db04ee20f3e7fd9483f6aaa39c87ff6	subject
+v2.1.2	2015-08-11	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
+n300rt-2.1.6	2016-05-16	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
+unit-2018	2018-01-10	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
+n200re-3.2.0	2018-03-30	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
+n300rt-3.4.0	2019-03-15	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity
+v3.4.0	2020-10-30	acltd	bin/acltd	10032	1f3cd73bed035ad5a7b1215a7a31dd43ec441231cafa05c6017fbfc2e2af2cb7	identity

@@ -37,7 +37,20 @@
 # machine with $FWRE_WORK pointed at an empty directory: with the cross tools
 # present, `test-hazlint` is 45 ok / 30 FAIL / 8 skip and `test-rlxprobe` is
 # 101 ok / 101 FAIL. Without gcc, both skip cleanly, the census is green, and it
-# prints `NOT RUN IN THIS JOB: 298 case(s)` with every one of them named.
+# prints `NOT RUN IN THIS JOB: 306 case(s)` with every one of them named.
+#
+# 298 -> 306 on 2026-08-27 (second session) when `binsim` and `test-binsim`
+# arrived: binsim's twenty-three controls run here in full, and eight of
+# test-binsim's 71 stand down because they read the six vendor trees.
+#
+# THAT 101/101 WAS A NUMBER NOTHING COULD CHECK until the same afternoon.
+# `tools/test-rlxprobe.sh` re-indents `tools/hazlint`'s twelve controls into its
+# own stdout, and `ci-census.py`'s case regexes were anchored `^\s*`, so with the
+# cross compiler present the census read that configuration as 116 ok / 107 FAIL
+# against a bench total of 202 and reported "cases went missing" -- which was
+# false, and which never fired here because this job does not install the
+# compiler. Anchored at exactly two spaces now (C11/C11b), and the census reads
+# 101 + 101 = 202 there.
 #
 # Those two pairs and that 298 were 17/14/8, 20/25 and 101, then 29/37, 20/26/5
 # and 122, and every earlier one was wrong in the same direction: `test-rlxprobe`
@@ -121,6 +134,20 @@ jobs:
 
       - name: test-boot-timeline
         run: bash tools/test-boot-timeline.sh 2>&1 | tee ci-out/test-boot-timeline.out; exit "${PIPESTATUS[0]}"
+
+      # binsim's controls need no vendor binary and no compiler: every fixture
+      # is a synthetic ELF the tool builds itself. That is deliberate and it is
+      # the opposite of hazlint, whose population control is 56 KiB of this
+      # unit's bootloader and which CI therefore cannot run at all. The suite
+      # below additionally drives the whole --corpus path -- manifest, both
+      # matrices, the void verdict, BASE and FLOOR -- against a corpus it
+      # builds in a temp directory, so the only thing a runner does not
+      # exercise is the eight assertions about the six real trees.
+      - name: binsim self-test
+        run: /usr/bin/python3 tools/binsim.py --self-test 2>&1 | tee ci-out/binsim.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-binsim
+        run: bash tools/test-binsim.sh 2>&1 | tee ci-out/test-binsim.out; exit "${PIPESTATUS[0]}"
 
       - name: ci-census self-test
         run: /usr/bin/python3 tools/ci-census.py --self-test 2>&1 | tee ci-out/ci-census.out; exit "${PIPESTATUS[0]}"

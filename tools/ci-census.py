@@ -53,15 +53,35 @@ import tempfile
 # whole bench total counts as not run.
 BENCH_ONLY = "*bench-only*"
 
-OK_RE = re.compile(r"^\s*ok\s{2,}(.*)$")
-FAIL_RE = re.compile(r"^\s*FAIL\s{2,}(.*)$")
+# EXACTLY two leading spaces, not `^\s*`.
+#
+# Every suite in this repository prints its case lines with a two-space indent,
+# measured across all twelve captures on 2026-08-27. A tool a suite INVOKES may
+# print lines of the same shape at a deeper indent -- `tools/test-rlxprobe.sh`
+# re-indents `tools/hazlint`'s twelve controls into its own stdout by twelve
+# spaces -- and `^\s*` counted those as cases of the outer suite. Measured on
+# the bench machine with the cross compiler present and $FWRE_WORK empty, that
+# read test-rlxprobe as 116 ok / 107 FAIL against a bench total of 202 and
+# turned the census red for a reason that was not a missing case.
+#
+# It never fired in CI, because CI deliberately does not install the cross
+# compiler and the suite then prints one skip line. That is what makes it worth
+# recording rather than shrugging at: the configuration `ci-expected.tsv`
+# documents in that suite's own row -- 101 ok / 101 FAIL -- was one this tool
+# could not reproduce, so the number in the table had no instrument behind it.
+# C11 is the control.
+OK_RE = re.compile(r"^ {2}ok\s{2,}(.*)$")
+FAIL_RE = re.compile(r"^ {2}FAIL\s{2,}(.*)$")
 # A skip line is `  skip   <label padded>  <reason>`.  The label is what the
 # table keys on, and it is separated from the reason by two or more spaces --
 # every suite here uses a %-Ns pad, so that separation is real and not a guess.
-SKIP_RE = re.compile(r"^\s*skip\s{2,}(\S(?:.*?\S)?)\s{2,}(.*)$")
+SKIP_RE = re.compile(r"^ {2}skip\s{2,}(\S(?:.*?\S)?)\s{2,}(.*)$")
 # ...except a skip whose reason is empty, which no suite writes today but which
 # would otherwise vanish rather than being reported as unparsable.
-SKIP_BARE_RE = re.compile(r"^\s*skip\s{2,}(\S(?:.*?\S)?)\s*$")
+SKIP_BARE_RE = re.compile(r"^ {2}skip\s{2,}(\S(?:.*?\S)?)\s*$")
+# ...and the same anchor on the unparsable check, or a nested tool's lines would
+# stop being counted and start being reported as malformed instead.
+UNPARSABLE_RE = re.compile(r"^ {2}(ok|FAIL|skip)\b")
 
 
 def load_table(path):
@@ -105,7 +125,7 @@ def parse_capture(text):
         if m:
             skips.append(m.group(1))
             continue
-        if re.match(r"^\s*(ok|FAIL|skip)\b", line):
+        if UNPARSABLE_RE.match(line):
             unparsable.append(line)
     return ok, fails, skips, unparsable
 
@@ -312,6 +332,22 @@ def self_test():
         red, _ = census(table2, cap, out=buf)
         ck("C10 *bench-only* plus a real .out -> red", red, True)
         os.remove(os.path.join(cap, "gamma.out"))
+
+        # C11 a tool a suite INVOKES prints lines of the same shape at a deeper
+        # indent, and they are not cases of the suite. `tools/test-rlxprobe.sh`
+        # re-indents hazlint's twelve controls into its stdout by twelve spaces;
+        # with `^\s*` this fixture reads 12 ok and the arithmetic goes red for a
+        # reason that is not a missing case. Both halves are asserted, because a
+        # parser that dropped BOTH indents would also pass the first half.
+        nested = ("".join(f"  ok    case {i}\n" for i in range(10))
+                  + "            ok    K4  population control  a nested tool\n"
+                  + "            FAIL  K9  and one of its controls is red\n")
+        _write(cap, "alpha.out", nested)
+        red, _ = census(table, cap, out=buf)
+        ck("C11 a nested tool's deeper-indented ok/FAIL lines are not cases", red, False)
+        ok_n, fail_n, _, unp = parse_capture(nested)
+        ck("C11b and the outer suite's own ten still are", (ok_n, fail_n, unp), (10, 0, []))
+        _write(cap, "alpha.out", clean)
 
         # C8 the table itself must refuse two different totals for one suite
         bad = _write(d, "bad.tsv", TABLE + "alpha\t11\t-\t0\t-\n")

@@ -12,6 +12,54 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R2a/b/d-0`, 2026-08-27 — the ruler, and the corpus refuting the plan's own
+floor.** `R2b` needs a similarity metric whose thresholds come out of the data.
+`tools/binsim.py` is that metric, with **32 controls that run before any number
+is reported**. Desk only, no power, zero flash bytes.
+
+- **`binsim(A,B)` is the containment of code 7-grams** over `[DT_INIT, DT_FINI)`,
+  with Jaccard printed beside it and never instead of it. The window is not
+  `.text` because **four of the six `boa` have no section header table** and
+  `objdump -d` emits nothing for them; the two that kept theirs are the
+  window's positive control, and the other eight files are covered by a decoding
+  invariant — every `j`/`jal` in the window must target the executable segment.
+  Measured 1.000 inside, 0.000–0.043 in the 4 KiB after, and 0.000–0.098 over
+  the same bytes read two bytes misaligned, which is the negative control on
+  that control.
+- 🔴 **`k` is 7 and not 4, and the rule that picked it was written first.** A
+  word-permutation of `unit-2018/bin/boa` — the identical instruction multiset
+  in a destroyed order — still scores **0.4398** at k=4. The token alphabet is
+  52 and 96,490 windows yield only 7,333 distinct 4-grams, so 4-grams are mostly
+  shared compiler idioms. `E6`/`E6b` re-derive the choice on every corpus run
+  rather than trusting the constant.
+- 🔴 **The corpus refuted `plan/router-rebuild-plan.md:1128`.** `BASE` 0.9818,
+  `FLOOR` 0.0650, and `binsim(unit-2018/boa, unit-2018/busybox)` — same tree,
+  same toolchain, **different program** — **0.1581**. `FLOOR` sits *below* the
+  cross-program floor, so the plan's warn band swallows the whole no-evidence
+  region. Mechanism named: `boa` loses `pic` in 2019 (`TC-04`), and dropping PIC
+  rewrites every prologue and every call. The tool prints `REFUTED` and exits 1
+  rather than substituting a better number.
+- **Three anchors came free with the material.** `bin/acltd` is **one sha256 in
+  all six trees** — the identity anchor *and* the positive control on the void
+  verdict, whose fifteen cells span exactly zero. The eight-byte busybox pair
+  has **byte-identical code windows**, so the code channel says 1.0000 and the
+  strings channel says 0.9972 — two channels that never disagreed would be one
+  channel counted twice. And the container format partitions the six **2+2+2**
+  with no similarity metric at all, which is the same partition
+  `notes/lwl-mystery.md` gets from unaligned instruction counts.
+- **The matrix discriminates**: `boa` spans 92.8 pp, `busybox` 83.5 pp, against
+  the plan's 5 pp void threshold. Noise floor **0.0000** — all sixteen pairs
+  with byte-identical code windows score exactly 1.000 on both measures.
+  **Reading the matrix is `R2a/b/d-1`**, and date, product line and SDK
+  generation are collinear in this corpus.
+- 🔴 **And it caught a latent defect in the census.** `ci-census.py`'s case
+  regexes were anchored `^\s*`, so a tool a suite *invokes* had its control
+  lines counted as the outer suite's cases — with the cross compiler present
+  that read `test-rlxprobe` as 116/107 against 202 and reported cases as
+  missing, which was false. It never fired in CI, so the 101/101 configuration
+  `ci-expected.tsv` documents was a number the census could not reproduce.
+  Anchored at exactly two spaces; `ci-census` 12 → 14 controls.
+
 **`R1h-1`, 2026-08-26 to 2026-08-27 — `probe3` is built and runs, and finishing
 it corrected the tool that gates it.** The desk half of `R1h` closes here; the
 bench half is spent at the tail of `R3`, in the same seating, with `probe3`

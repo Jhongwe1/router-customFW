@@ -27,13 +27,29 @@
 # the second time a number in this repository would have been contradicted by
 # the very next build (the first was ci.yml's own header, 2026-08-25).
 #
+# 2026-08-27 (second session): binsim arrives with two rows. `binsim` is the
+# tool's own --self-test, twenty-three controls, none of which needs a vendor binary
+# -- deliberately, because hazlint is *bench-only* for exactly the opposite
+# reason and that means CI runs zero hazlint cases. `test-binsim` is 71 on the
+# bench and 63 on a runner; the eight that stand down are the ones that read the
+# six vendor trees. That eight was SEVEN when this row was first written, and
+# the arithmetic here is what said so -- 48 + 7 = 55 against a bench total of 56,
+# one short, because the section it stands for had eight cases and not seven.
+# The suite was 56 then and is 65 now: `--fingerprint` turned out to have no case
+# at all (seven added), and E0 -- the corpus's one-ISA membership rule -- got two
+# more when a 2025 MediaTek image raised the question of a seventh tree; then 65 ->
+# 71 when an adversarial review found three surviving mutants and a manifest no
+# runner could reach.
+#
 # suite	bench_total	allowed_skip_label	covers	reason
 spec-check	11	-	0	-
+binsim	23	-	0	-
+test-binsim	71	the six vendor trees	8	needs $FWRE_WORK/extracted -- six vendor firmware trees, one of which is this unit's own flash dump, so they can never be committed. Unlike test-hazlint this suite does NOT fail without them: binsim's twenty-three controls and the whole corpus path (manifest, matrices, void verdict, BASE/FLOOR) run against synthetic ELFs built by the suite, so a runner exercises everything except the eight assertions about the real six. 量 2026-08-27 with $FWRE_WORK pointed at an empty directory: 63 ok / 0 FAIL / 1 skip line covering 8, which closes against 71
 test-file-modes	3	-	0	-
 test-gitignore	15	src-vendor (symlink)	1	needs a filesystem that can make symlinks; MSYS/Git Bash cannot, and until 2026-08-25 that killed the whole suite under errexit on the machine the push happens from. CI runs on Linux, so this skip should NOT appear
 test-console-capture	29	-	0	-
 verify-backup-copy	4	-	0	-
-ci-census	12	-	0	-
+ci-census	14	-	0	-
 test-opcount	15	hardcoded fixture	1	needs binutils-mips-linux-gnu; CI installs it, so this skip should NOT appear
 test-rlxprobe	202	everything	202	needs gcc-mips-linux-gnu -- and CI deliberately does NOT install it, because with the cross compiler present the suite BUILDS and then hazlint refuses to report without its stage2.bin population control, which is correct behaviour; re-measured 2026-08-27 with $FWRE_WORK empty it is 101 ok / 101 FAIL, which closes exactly against 202. 106 -> 195 on 2026-08-26 when probe3 arrived: P4/T1/W1-W4/Y1-Y4, six static mutations, and Q4/Q5/Q6 plus six qemu mutations; 195 -> 202 on 2026-08-27 when T1 gained the hazlint --isa fingerprint beside its objdump one
 test-hazlint	96	*bench-only*	96	its K4 population control is $FWRE_WORK/stage2.bin -- 56 KiB of this unit's own vendor bootloader, which is someone else's property and identifies one physical device. On a runner the suite does not skip everything, it FAILS: 量 2026-08-27, 45 ok / 30 FAIL / 8 skip lines covering 21 cases, which closes against 96. The 14 that stood here was stale and by how much was never checked -- HEAD's own pair measured 26 the same day, and one of those 26 was a defect in this suite rather than in hazlint (see the rc=$? note at the exit-code contract). 56 -> 96 on 2026-08-27: P3, E3, M10-M14 and the K9/K6d controls behind them; M13 and M14 came out of the adversarial review of the first draft, which is also why this row was written three times in one afternoon

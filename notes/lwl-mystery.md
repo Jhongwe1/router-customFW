@@ -64,9 +64,16 @@ shipped.
 
 ### `boa` across six firmware builds
 
+**Corrected 2026-08-27**: the `v2.1.2` row read `2015-08-25`, which is upstream's
+*release* date for that firmware, in a column headed *build*. The image says
+otherwise from two places that agree to within ten minutes — its BusyBox banner
+reads `(2015-08-11 17:26:34 CST)` and every binary's mtime is `2015-08-11 17:36`.
+The other five rows were already build dates. `SPEC.md` `FW-19` carried the same
+mix and is corrected in the same commit.
+
 | tree | build | `lwl` | `lwr` | `swl` | `swr` | total | ELF flags |
 |---|---|---:|---:|---:|---:|---:|---|
-| v2.1.2 | 2015-08-25 | 69 | 69 | 19 | 19 | **176** | `0x1007` … pic … mips1 |
+| v2.1.2 | 2015-08-11 | 69 | 69 | 19 | 19 | **176** | `0x1007` … pic … mips1 |
 | n300rt-2.1.6 | 2016-05-16 | 69 | 69 | 19 | 19 | **176** | `0x1007` … pic … mips1 |
 | unit-2018 | 2018-01-10 | 53 | 53 | 19 | 19 | **144** | `0x1007` … pic … mips1 |
 | n200re-3.2.0 | 2018-03-30 | 53 | 53 | 19 | 19 | **144** | `0x1007` … pic … mips1 |
@@ -83,6 +90,22 @@ pairing breaks — which is what a false positive looks like.
 
 **Between 2018-03-30 and 2019-03-15, `boa` stopped containing these
 instructions**, and its ELF flags lost `pic` in the same step.
+
+**2026-08-27 — two more instruments give this table's 2+2+2 back.** The counts
+above split the six as 176 / 144 / 0. `notes/binsim.md` gets the same split
+twice more and from different bytes: from the container format alone
+(`DT_MIPS_PLTGOT`, program-header count, `DT_NEEDED`, whether the section header
+table survived — `SPEC.md` `TC-10`), and from the structural similarity of the
+code windows (0.986 / 0.982 / 0.974 within the three groups, 0.058–0.068 across
+the `pic` boundary). Three instruments reading three different parts of the same
+files, agreeing on one partition.
+
+⚠️ **They are not three independent confirmations, and saying so would be
+wrong.** All three are downstream of the same build changes, so agreement is
+what you would expect and it is not evidence three times over. What it rules out
+is narrower, and is the thing worth having: **no single instrument's error
+accounts for the split.** A miscounted code region in *this* scan would have to
+coincide with a partition read out of ELF headers this scan never looks at.
 
 ### The three hits in `stage2.bin`, adjudicated
 
