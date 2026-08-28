@@ -12,6 +12,45 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R2a/b/d-4`, 2026-08-28 — the rebuilds got built, and the instrument they were
+to be judged by turned out to be measuring the other axis.** Desk only, no power,
+zero flash bytes. `notes/rebuild-vs-shipped.md` is the new owner.
+
+- 🔴 **One compiler flag costs more of the score than changing the program does.**
+  Single-variable by construction: `-march` alone (4181 vs 5281, one source, one
+  `.config`, one gcc) is **0.3360**; the toolchain generation alone is **0.2132**;
+  swapping Realtek's 8196E `boa` for Actiontec's fork of it, toolchain held, is
+  **0.9359**. Jaccard agrees. **So `R2b` was asking a source question of a
+  toolchain instrument**, and `TC-02` stays 推 for a harder reason than before.
+- ✅ **The `lwl` puzzle from 2019 closes.** Byte-identical source, no `.config`
+  change, only the rsdk: **0 / 0 / 26**, and 32 when the 1.5.5 code generator is
+  driven at `-march=4181`. It was the wrapper generation and nothing else.
+- 🆕 **`TC-19`, a third channel out of the same material**: twelve shipped
+  userspace binaries across six trees report **0 load-delay violations**, and the
+  positive control for that zero is in the same table — the `-march=5281`
+  rebuilds return 5,224–10,494. This unit's userspace, like its kernel, was built
+  for a core that exposes the load delay slot.
+- 🆕 **`TC-20`**: all three drops' `users/Makefile` name
+  `rsdk-1.5.5-4181-…-110225` and none of them ships it. ⚠️ The `Kconfig` that
+  looks like corroboration is **generated** by `find toolchain -type d`, so it
+  corroborates nothing.
+- ✅ **`TC-c`**: the kernel's MIPS16 comes from `__attribute__((mips16))` in
+  `8192cd_cfg.h`, which is the **default** branch on Linux with the driver built
+  in. The measurement the note had proposed — `make V=1` and grep for `-mips16` —
+  would have returned a false zero.
+- **`tools/rebuild-census.py`** (8 controls) and **`tools/test-rebuild-census.sh`**
+  (27 cases, 6 of them mutations). The tool's job is to make `binsim`, `opcount`
+  and `hazlint` read the *same* window, and to apply the decision rule
+  mechanically — including the branch where a **perfect** score with a changed
+  container is still `VOID`.
+- 🔴 **The adversarial pass changed five sentences that were already written**,
+  four of them a measured number sitting beside an unmeasured adjective. Among
+  them: "the entire program replaced" is a superset fork with 29 of 56 files
+  byte-identical; "389 objects, 0 non-MIPS" had walked one subdirectory; and the
+  crt attribution had been checked with an instrument relocations defeat, then
+  re-established with a 5-KB hello-world that reproduces the same three
+  violations with no `boa` in it.
+
 **`R2a/b/d-3`, 2026-08-28 — the step asked for a container, the container was
 never needed, and what it actually produced was a reason not to build this board
 with the toolchain that is on the disk.** Desk only, no power, zero flash bytes.

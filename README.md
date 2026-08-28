@@ -57,6 +57,21 @@ they can build this board. Ends with a complete `vmlinux` linked twice from the
 vendor's own source, and with the measured cost of building a 4181 kernel with a
 5281-configured toolchain.
 
+**[`notes/rebuild-vs-shipped.md`](notes/rebuild-vs-shipped.md)** 🆕 — the vendor's
+own `boa` and `busybox`, rebuilt ten ways and scored against the programs cut out
+of this unit's flash dump. 🔴 **It refutes the premise the step was built on.**
+Holding everything else fixed, changing `-march` alone costs containment
+**0.3360** while changing the source costs **0.9359** — so at `k=7` on this
+material the metric reads the *code generator*, and identifying a GPL drop
+through it was the wrong axis. The best cell reaches 0.8255, which is `warn`, and
+it scores *higher* against the 2015 image than against this one, so it identifies
+an era and not a build. What the four channels do answer is the toolchain: every
+one of them is consistent with a 1.5.5-generation rsdk driving a `-march` on the
+padding side, and the strongest rival was built rather than argued away and dies
+on three of them. Reconstructing a config would not have closed the gap — the
+vendor's own five configs for this SoC span 0.9347–0.9976, at most 0.065 against
+a 0.156 shortfall — and that is measured rather than assumed.
+
 **[`notes/cache-model.md`](notes/cache-model.md)** — the R3000-class model plus a
 Lexra-defined CP0 register 20 (`CCTL`) carrying the invalidate and writeback
 commands, four of which now have a name from a source that states it. 🔄 **And a
