@@ -752,15 +752,19 @@ direction: the consequence is silent and the cost is 0.69 % of `.text`.
 
 ## 8. `R3-4` part one: the configuration as a checked delta
 
-`config/rlxfw-kernel.delta` — 35 rules, each with a reason. §6 is why it is
-shaped this way; this is what it is.
+`config/rlxfw-kernel.delta` — **35 rules for `quiet` and 37 for `loud`**, each
+with a reason. §6 is why it is shaped this way; this is what it is. 🔄
+**2026-08-28/29: the two extra rows carry an `@loud` variant tag** and are
+listed in §11.6; a row with no tag is in both images. 量: `apply` with no
+`--variant`, or with `--variant quiet`, reports **14 set + 21 derive**; with
+`--variant loud`, **16 set + 21 derive**.
 
 | | |
 |---|---|
 | **baseline** | `rtl819x-toolchain @ 5c9be5d9`, `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW`, sha256 `44f781de…`, 26,548 bytes |
 | **14 `set`** | 3 rlxfw changes (`CMDLINE`, `BLK_DEV_INITRD`, `INITRAMFS_SOURCE`) + 11 pinned so `oldconfig` has nothing to ask |
 | **21 `derive`** | measured, not asserted: §6.5 |
-| **the tool** | `tools/kconfig-delta.py`, 16 controls, `apply` and `check` reading the same file |
+| **the tool** | `tools/kconfig-delta.py`, **24** controls, `apply` and `check` reading the same file. 🔄 16 → 24: six from `R3-4`'s adversarial pass, and `C23`/`C24` for the variant mechanism — **`C24` caught that the command line validated a variant name while the library function fell through in silence**, which would have built the quiet image and labelled it whatever was typed |
 
 🔴 **Three build inputs were undeclared until today, and two of them were
 invisible.**
@@ -792,7 +796,7 @@ disk. The whole difference between the two files is the build timestamp in
 
 `config/rlxfw-initramfs.tsv` — **29 entries**, every one tagged `unit` (carved
 out of this device's own flash dump) or `rlxfw` (mine), and the tag is
-**checked**, not trusted. `tools/mkinitramfs.py`, 19 controls.
+**checked**, not trusted. `tools/mkinitramfs.py`, **23** controls — 19 → 23 on 2026-08-28/29, and the four new ones are §11.7's: the ceiling was being measured on the ELF file size.
 
 🔴 **It was 31 until the adversarial pass, and the check that found the two
 wrong ones did not exist when they were written.** The tag was verified for
@@ -831,6 +835,10 @@ an error, because `gen_initramfs_list.sh` builds its dependency list with
 `while read type dir file perm` (`A6`).
 
 ### 9.1 The ceiling, measured on the built image
+
+🔄 **The table below is the `quiet` variant.** §11.6 carries both columns,
+and §11.7 is why the number in it moved without the image changing: the tool
+was measuring `os.path.getsize(vmlinux)`.
 
 | | bytes |
 |---|---:|

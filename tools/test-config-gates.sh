@@ -149,6 +149,34 @@ PY
 ck "E1 the committed delta parses: 35 rules, 14 set, 21 derived" "35 14 21" \
    "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
 
+# E1b -- the same file, per variant, and it also runs on a clean clone.  Without
+# it the variant mechanism is exercised only on kconfig-delta's own synthetic
+# C23 fixture, and the COMMITTED delta could carry a malformed `@loud` row that
+# nothing ever reads.  The three cases are a set: loud must pick the two extra
+# rows up, quiet must NOT, and a variant nobody declared must be refused rather
+# than falling through to "no variant" -- which would build the quiet image and
+# label it whatever was typed.
+cat > "$T/e1b.py" <<'PY'
+import importlib.machinery, importlib.util, sys
+ldr = importlib.machinery.SourceFileLoader("kd", sys.argv[1])
+m = importlib.util.module_from_spec(importlib.util.spec_from_loader("kd", ldr))
+ldr.exec_module(m)
+want = sys.argv[3] if len(sys.argv) > 3 else None
+try:
+    rules, _ = m.parse_delta(sys.argv[2], variant=want)
+except SystemExit as e:
+    print("REFUSED %s" % e.code)
+    raise SystemExit(0)
+sets = sum(1 for r in rules.values() if r.kind == "set")
+print("%d %d %d" % (len(rules), sets, len(rules) - sets))
+PY
+ck "E1b --variant loud: 37 rules, 16 set, 21 derived"  "37 16 21" \
+   "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
+ck "E1b --variant quiet does NOT pick them up"         "35 14 21" \
+   "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
+ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
+   "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
+
 BASE="$WORK/rebuild/src-vendor/rtl819x-toolchain/boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW"
 if [ -f "$BASE" ]; then
     # E2: the sha256 in the delta's header is the file it claims.

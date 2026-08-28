@@ -5,9 +5,10 @@ core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from four
 vendors' GPL drops and one leaked draft datasheet, because TOTOLINK never
 released source.
 
-> **This file holds only what is true today.** 🔄 **2026-08-28: a kernel of
-> mine now exists** — a linked `vmlinux`, configured and filled with an
-> initramfs, passing the load-delay gate at 0 violations. **No driver, no
+> **This file holds only what is true today.** 🔄 **2026-08-29: two kernels of
+> mine now exist** — `quiet` and `loud`, both linked, configured, filled with an
+> initramfs and carrying eleven boot marks, both passing the load-delay gate at 0
+> violations. **No driver, no
 > loadable image, nothing of mine has executed on the silicon, and not one
 > flash byte is written.** **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
@@ -58,6 +59,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 | build with `-march=mips32`                             | the load delay slot is architecturally exposed; mips32 miscompiles **silently** — no fault, no warning, just wrong values   |
 | write asm under `.set reorder`                         | you cannot know what the assembler filled in. `noreorder`, fill every delay slot yourself                                   |
 | measure the ISA or a CPU hazard under Linux            | the vendor kernel emulates `ll`/`sc` (and `sync`, as a no-op), so you would measure the kernel. Bare metal only. 🔄 **2026-08-27: the reason was half wrong and is narrowed.** This row said "and the FPU" — **there is no FPU emulator in this kernel at all**: `arch/rlx` has no `math-emu`, and `do_cpu` gives `SIGILL` for any coprocessor but 0. `simulate_llsc` alone is enough, so the rule does not move; only its reason does. `CPU-47` |
+| edit vendor source by hand, or apply a patch to `src-vendor/`             | 🆕 **2026-08-29: rlxfw patches Realtek's source for the first time, and there is exactly one way to do it.** Every inserted line is a row in `config/rlxfw-marks.tsv` with a reason, applied by `tools/rlxfw-marks.py` to a **staged** tree — the tool refuses any path under `src-vendor/`, and the anchor must occur **exactly once** or it refuses rather than picking one. Files of mine live in `config/rlxfw-src/`, mirroring the staged layout. ⚠️ **`check` reads the tree and `verify` reads the built artefact, and only the second one can catch a mark that compiled and is not in the image** — measured, on the first run |
 | commit the datasheet, a flash dump, or a vendor binary | one is someone else's property; the others identify one physical device                                                     |
 | open `$FWRE_WORK/disclosure/`                          | unsent vulnerability reports, mode 600                                                                                      |
 | ~~write `RLX5281`~~ ✅ **lifted 2026-08-27**                | 🔴 **The `PRId` assignment table this row named arrived, and it was in a GPL drop this project already had.** `arch/rlx/include/asm/cpu.h` maps `PRID_IMP_RLX4181 = 0xcd00`; `PRId = 0x0000CD01` (量) has bits 15:8 = `0xCD`, so the core is **`RLX4181`, revision 1** — and **`RLX5281` is `0xdc01`, now positively excluded rather than merely unproven**. Write `RLX4181`, marked **讀**, with `PRId` itself still 量. Three weaknesses travel with it and must not be dropped when it is quoted: the three drops are **byte-identical** in that header (one source, three copies), **no code in the port reads the table**, and its own encoding breaks for `0xdc01`/`0xdc02`. `notes/vendor-kernel-isa.md` §5. **`RLX5281` stays unwritable, for the opposite reason from before.** *(Original row: `R1-gate` closed 2026-08-26 and did not name it … what lifts it is a `PRId` assignment table, not another seating.)* |
