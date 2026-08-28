@@ -25,6 +25,95 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R3-7`, 2026-08-29 — the seating sheet becomes a card, and computing every value on it
+rather than transcribing it refuted eleven things the sheet asserted.** `RUNSHEET` §B5 gains
+the card and §B5-c1…c12; `notes/kernel-build.md` §12 is new and fills a section number that
+never existed; `SPEC.md` `LDR-38`/`LDR-39`/`TC-36`/`FW-25` are new and `LDR-26`/`TC-30` are
+corrected. **Zero flash bytes, zero power cycles, zero device readings.**
+
+### The cell that checked whether the upload landed could not fail
+
+- 🔴 **`K2`'s head read is byte-identical between my image and the staged vendor one.** 量, three
+  device captures across two power cycles — `bench/2026-08-23/B.log:16`, `2026-08-24c/G1a.log`,
+  `2026-08-24d/G5-rb1.log` — against all five `nfjrom` files this project can build: the same four
+  words, because every image in the family is linked from the same `rtkload` `start.o`. The row
+  rested on its own sentence *"my image and the staged one differ in their first 16 bytes (量 at
+  the desk)"*; that 量 was finally taken and it says the opposite.
+- **What discriminates is the `lui`/`addiu` pair at `0x80500018`**, which the linker fills with
+  `__vmlinux_end`: `26101400` = `loudm`, `2610AC00` = the `quiet` pair, `26101000` = **either**
+  `loud` **or** the staged vendor image — only the `lui` separates those two, so both words are
+  read. `0x80500000 + size` reproduces the four `nfjrom` rows exactly; the staged one is
+  `base + size − 2`, and the 2 is `LDR-18`'s checksum (`FW-12` already carried the decomposition).
+- 🔴 **The tail is the only part of the upload that admits a before/after pair.** It is 39,918
+  bytes (`quietm`) / 66,542 (`loudm`) above the staged image's end, so it can be read before the
+  transfer with nothing written and no fallback destroyed. One `DW … 8` gets a positive control
+  (the last line must **become** zero) and a negative one (the first line past `image_end` must
+  **not move**) — and the coherence control for the pair was already in the tree, unquoted:
+  `bench/2026-08-24d`'s `G5-pv1` → `put` → `G5-rb1`.
+
+### `nfjrom` does not force `0x80000000`. `boot.img` does
+
+- 🔴 **`SPEC.md` held two rows for one mechanism and they disagreed.** `LDR-26` said both names
+  force the load address; `LDR-37`, eleven rows below, and `docs/FINDINGS.md` both say `boot.img`
+  writes it. 讀 this unit's own `stage2.bin` at `0x80401208`: a `nfjrom` match sets
+  `0x8040D390 = 1` and **branches past the `boot.img` test entirely**.
+- **The correction runs toward the danger.** With `nfjrom` as the TFTP filename the loader jumps to
+  the address already set — `0x80500000`, the right one — so the accident resembles a successful
+  boot and silently costs the `J` line, the `AUTOBURN` timing and all of `K2`. ⚠️ It is
+  **distinguishable**: 量, `Jump to 0x%x` is referenced only from the auto-execute branch and
+  `---Jump to address=%X` only from the `J` handler. Disjoint.
+- ⚠️ **Two routines, opposite polarity**: `nfjrom` goes through `strstr` (match = `v0 ≠ 0`),
+  `boot.img` through `strcmp` (match = `v0 = 0`), so `boot.img` is exact-match and *containing*
+  is over-broad. And the guard is on `loader-tftp.py`'s `--filename`, not on the local path.
+- 🔴 **Provenance cuts against this project**: upstream never made the error — its own comment says
+  *"and `boot.img` **additionally** forces the load address"*. rlxfw introduced it while
+  summarising, so there is **one** independent reading, not two.
+
+### `uname` is not an applet, and the fix written for it earlier would not have worked
+
+- 量, this unit's own `busybox` under `qemu-mips-static`: `busybox uname -a` → **`uname: applet not
+  found`**. The binary lists **50** applets and `uname` is the only one of the fourteen this seating
+  needs that is absent. Both controls are in the same run.
+- 🔴 `notes/kernel-build.md` §9 records a `/bin/uname` symlink added for `K5` and then removed —
+  **three passes and none asked whether the applet exists.** `K5` reads `/proc/version`, which
+  prints `linux_banner` verbatim and carries `(user@host)` and the gcc version that `uname -a`
+  drops. `notes/rootfs-census.md` gains the applet list; `SPEC.md` `FW-25`.
+
+### Four more that only the adversarial pass found
+
+- 🔴 **The card numbered words 1-based in one row and 0-based in a stop-if three rows later**, so a
+  correctly landed `loudm` would have been aborted. Every stop-if names an **address** now. This is
+  the only item of the eleven that could have cost a power cycle.
+- 🔴 **`check-predictions.py --sweep` cannot be a CI gate: git does not store mtimes.** A step was
+  written and removed the same hour — on a fresh `git clone --depth 1` the sweep reads **128 of 156
+  cells as out of order**, 量 twice. The ordering claim is a pre-push gate on the machine that took
+  the captures and proves nothing to anyone who clones this repository, which is a harder limit than
+  the docstring's *"not a cryptographic timestamp"*.
+- 🔴 **The tool's `--self-test` printed six `ok` lines without counting what ran**, and a mutation
+  pass killed only **7 of 15** mutants — including one that made the sweep return 0 on a real
+  regression. Controls 4 → **15**, four of them driving the file as a subprocess to assert its exit
+  code, `run_controls` counting what ran. **11 of 11 killed.**
+- 🔴 **The netdev plan was made from the *vendor's* kernel.** 量 on the artefact this seating
+  uploads: **six** netdevs, not five, and the registration line calls one of them `eth5` while
+  `ifconfig -a` calls it `eth7`. Four of the five candidates are LAN, so trying two and calling D5
+  refuted would have been a false refutation on a cable in any of three jacks.
+
+### Also
+
+- `K6`/`K7` gave the board **the workstation's own address** (`10.1.1.2`, 讀 §G3) and pinged the
+  loader's. Board `10.1.1.10` → host `10.1.1.2`, and `arp` in the `tcpdump` filter, which is the
+  one word that separates *ARP never resolved* from *the driver does not transmit*.
+- `P6`/`P10`'s two vendor artefacts are **one kernel in two forms** (量: `vmlinux-rederived.bin` is
+  `r0-vendor-kernel.bin` decompressed, byte-identical), and the compressed leg cannot fail —
+  **my own uploaded `nfjrom` reads `RLXFW` 0 times too**.
+- `/proc/cpuinfo` under my kernel prints **six** fields where this unit's shipped kernel prints
+  seven: the format string `hardware watchpoint\t: %s` is in its image and occurs **zero** times in
+  either of mine. A free discriminator and a second data point of `TC-17`'s shape (`TC-36`).
+- `bench/2026-08-30b/PREDICTIONS-B5-block1.md` is written and frozen — twelve cells, `0 of 12` at
+  the desk, which is control `N2` firing on every capture that is still in the future.
+
+---
+
 **`R3-2` stages 3–6, `P2` and `P3`, 2026-08-29 — the pipeline reproduces Realtek's own `nfjrom`
 byte for byte, and the boot ladder prints at the desk.** `notes/kernel-build.md` §13, §14 and §15
 are new; §2.1, §3.3, §3.4, §5, §11.1 and §11.7 are corrected.

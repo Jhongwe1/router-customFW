@@ -86,3 +86,53 @@ surface. **75 files in this tree begin with `#!`**, and 36 of them are `.sh` —
 one of those is a place where a value from configuration reaches a shell parser.
 A firmware that reaches the same functionality with zero of them has removed a
 class, not a bug, and the count is the evidence for that sentence.
+
+## 🆕 What `busybox` here can actually do — 50 applets, and `uname` is not one
+
+**Measured 2026-08-29 (`R3-7`), and it changed a bench cell.** The table above
+counts **50 symlinks pointing at `busybox`**. Until today nobody had asked what
+the binary those symlinks point at can actually run — the symlink count and the
+applet list are two different questions, and only the second decides whether a
+command typed at the shell works.
+
+量, this unit's own `bin/busybox` (273,332 bytes, `BusyBox v1.13.4
+(2018-01-10 14:56:45 CST)`) executed under `qemu-mips-static` against its own
+extracted tree:
+
+```
+$ qemu-mips-static -L <rootfs> <rootfs>/bin/busybox uname -a
+uname: applet not found
+```
+
+**The binary lists 50 applets.** Of the fourteen `RUNSHEET` §B5 needs, `uname`
+is the only absent one; `cat`, `ifconfig`, `ping`, `ls`, `ps`, `mount`, `echo`,
+`sleep`, `mkdir`, `sh`, `ash`, `sed` and `grep` are all present.
+
+**Both controls are in the same run**, which is what makes `applet not found` a
+reading rather than a broken invocation:
+
+| | |
+|---|---|
+| negative | a name that is not an applet → `sh: definitely_not_an_applet: not found` |
+| positive | `cat` reaches the filesystem and reports `No such file or directory` |
+
+⚠️ **`qemu-mips-static -L <rootfs>` is not a sandbox**, and the first attempt
+proved it: `busybox sh -c 'uname -a'` printed the **host's** uname, because the
+shell's `PATH` search fell through to the real filesystem. That reading is an
+artefact and is excluded. The load-bearing invocation is `busybox uname -a`,
+which goes to the applet table and never touches `PATH`.
+
+⚠️ **And the first tree tried was the wrong one.** `rebuild/fakework/extracted/
+unit-2018` holds only `boa` and `busybox` under `/bin` — a partial carve — and
+its **zero** symlinks would have supported a false conclusion about the shipped
+firmware. The complete tree is `$FWRE_WORK/extracted/unit-2018/squashfs-root`:
+163 files, 88 symlinks, 51 of them under `bin`/`sbin`/`usr/bin`/`usr/sbin`.
+
+**What it changed**: `RUNSHEET` `K5` typed `uname -a` as one of D4's two
+observables. It cannot run, and **adding a `/bin/uname` symlink would not have
+fixed it** — the shell would `exec` `busybox` as `uname` and `busybox` would
+refuse. `notes/kernel-build.md` §9 records that such a symlink was added for
+`K5` and then removed, and neither step asked whether the applet exists.
+`K5` reads `/proc/version` instead, which prints `linux_banner` verbatim and
+therefore carries `(user@host)` and the gcc version that `uname -a` drops.
+`notes/kernel-build.md` §12.7, `SPEC.md` `FW-25`.
