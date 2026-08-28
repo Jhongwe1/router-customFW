@@ -583,9 +583,35 @@ Three more things this step hands `-4`:
   What makes the partition a claim is that three instruments reading different
   parts of the file agree on it, and that a fourth explanation — product line —
   was tried and refuted.
-* **Nothing here has been run against a rebuild.** Every threshold in §6 is a
-  prediction. The honest possibility is that a correct rebuild lands at 0.95 for
-  reasons that have nothing to do with the drop — a different `-O` level, a
-  different uClibc point release, a different `strip`. That would not refute the
-  identification; it would mean `BASE` is the wrong bar, and the way to find out
-  is `-4`.
+* ~~**Nothing here has been run against a rebuild.**~~ 🔴 **2026-08-28, `-4`
+  ran it, and the result is worse than the possibility this bullet allowed for.**
+  It said: *"The honest possibility is that a correct rebuild lands at 0.95 for
+  reasons that have nothing to do with the drop … it would mean `BASE` is the
+  wrong bar."* What `-4` measured is that **the channel is dominated by the
+  toolchain and barely sees the source**: on this corpus at `k=7`, changing
+  `-march` alone — one flag, one gcc, one `.config`, one source — costs
+  containment 1.0000 → **0.3360**, while replacing the entire program (Realtek's
+  8196E `boa` for Actiontec's WCB3000 `boa`, 43 translation units for 57) at a
+  fixed toolchain costs only 1.0000 → **0.9359**. Jaccard, which has no size
+  asymmetry, puts the same two at 0.2009 and 0.6371.
+  **So `R2b` as §6 framed it is asking a source question of a toolchain
+  instrument.** The best cell reaches **warn**, not pass: a build of
+  `rtl819x-toolchain`'s `boa` driven at `-march=4181` by the 1.5.5 code generator
+  scores **0.8255** against this unit's, satisfies the container precondition on
+  all four fields, and — the part that matters — scores **0.8584** against the
+  2015 image and 0.8255 against this one, i.e. it identifies the **era** and does
+  not pick this unit out of its own group. `notes/rebuild-vs-shipped.md` owns the
+  builds, the calibration and the controls.
+  ⚠️ **And §3's reading has to sit beside that number.** §3 reads `boa`'s
+  0.877–0.895 across ①↔② as *"`boa`'s source changed and the code generator's
+  output did not"*. A total source replacement is now measured at 0.9359, which
+  is **higher** than 0.877–0.895 — so whatever separates ① from ② on `boa` is
+  larger than replacing the program, and "source revision" is not on its own a
+  sufficient explanation. Not resolved here; recorded so it is not read past.
+* **Config is not the missing term, and that is measured rather than asserted.**
+  `boards/rtl8196e` ships five complete config triples for this SoC. Built from
+  one source at one toolchain, their ten pairwise scores span **0.9347–0.9976,
+  median 0.9869** — so a real config difference is worth at most ~0.065, against
+  a 0.156 gap between the best rebuild and `BASE`. **Reconstructing a config from
+  the shipped binary would buy at most 40 % of the shortfall** and would cost the
+  comparison its independence, so it was not done.

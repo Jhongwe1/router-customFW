@@ -140,6 +140,15 @@ load-delay padding; linking it under a 4181 object puts exactly the code §5
 measures as wrong for this core into every binary. **The mixture is not safe; it
 is unexamined on the axis that matters most**, and the check is one `hazlint` run
 over `mips-linux/lib/libc.a` that has not been done.
+🔄 **2026-08-28: it is no longer unexamined, and it fails.** `R2a/b/d-4` built
+the vendor's own `boa` this way — `mips-linux-xgcc` at `-march=4181` against the
+5281-built uClibc — and `hazlint` over `[DT_INIT, DT_FINI)` reports **3
+violations** against **0** for the same source built with `rsdk-1.3.6-4181`.
+量: they are at `0x004039b8`, `0x00403a04` and `0x00403a14`, and 讀 the section
+table puts all three in `.init` (`0x0040394c`, 0x78 bytes) and the first 0x44
+bytes of `.text` — **the crt prologue, i.e. the first instructions the program
+executes**. `libc.a` itself is still not scanned; what is scanned is what the
+linker actually pulled in. `notes/rebuild-vs-shipped.md` §4.
 
 ### What it injects
 
@@ -502,6 +511,27 @@ and not third.
 ⚠️ **It is a discriminator about configuration, not about capability.** A drop's
 `.config` can be changed; what it cannot do is produce a toolchain it does not
 ship, and none of the three ships a 1.5.5p2, nor any 1.5.5 configured for 4181.
+
+🆕 **2026-08-28 — and all three drops name one anyway.** 讀, `grep -rnI`
+over the three trees: every one of them carries a hand-written Makefile branch
+keyed on **`CONFIG_RSDK_rsdk-1.5.5-4181-EB-2.6.30-0.9.30.3-110225`**
+(`users/Makefile:89` / `:91` / `:90`), and three more files per drop test
+`rsdk-1.5.0-4181-EB-2.6.30-0.9.30.{2,3}` — `users/Makefile:118,121`,
+`users/rc/Makefile:4,7`, `users/auth/src/dlisten/Makefile:36,39`. **Six release
+names, none on any of the three disks.** In these drops the branches are
+unreachable: the symbols are undefined, so `ifeq (...,y)` is false and, among
+other things, the `CFLAGS += -mips16` those 1.5.0 branches carry never fires.
+
+⚠️ **The obvious corroboration is not one, and saying so is the point.** Each
+drop's `Kconfig` offers exactly the three toolchains it ships — which is worth
+nothing, because `Kconfig` is **generated**: `Makefile:108` is
+`@config/genconfig > Kconfig` and `config/genconfig:123` is
+`find toolchain -type d -name 'rsdk-*' -maxdepth 1`. It is a directory listing of
+the tarball, not a statement about what Realtek released. The Makefile branches
+are the only signal here, and what they support is **推**: *these Makefiles were
+written against an SDK line in which those releases existed.* They say nothing
+about what any of them contains, and this file does not read a version number
+out of a name.
 
 ⚠️ **Two of the three drops are for a different SoC** (RTL8198). Only
 `rtl819x-toolchain` is an RTL8196E drop, and it is the one whose `target` symlink

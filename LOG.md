@@ -6299,3 +6299,378 @@ Realtek 把 4180／4181／5181 放在曝露那一側，是一次**指名的指�
 `tools/test-vendor-tripwire.sh`（24 → **32**，T11／T12／T13，以及沒有 vendor 樹時自己建一個合成 subject）、
 `tools/test-tc-smoke.sh`（31 → **36**，S4 的單調性、S6 的 exit code，以及我自己修出來的那個 `4)` 分支）、
 `tools/ci-expected.tsv`、`.github/workflows/ci.yml`，以及上面每一條各自落地的檔。
+
+## 2026-08-28（桌面，第二段）— `R2a/b/d-4`：重建做出來了，而它推翻的是這個 gate 自己的方法
+
+**桌面，不通電，零 flash 位元組，零電源循環，零裝置讀數。** 接同日第一段（`R2a/b/d-3`）。
+這一步要回答的是「這台跑的 `boa`／`busybox` 我建不建得出來，建出來像不像」。
+**答案是：建得出來，最好的一格 0.8255 落在 warn 帶；而過程中量到的一件事，
+讓「拿這個分數去問是哪一份 drop」整件事變成問錯了軸。**
+
+### 一、`lwl` 那條兩分鐘的先做，而它要十次建置才誠實
+
+`notes/lwl-mystery.md` 的 Next measurements 第 5 條寫的是「一個 `boa` translation unit
+各過一次兩個 wrapper」。我沒有只做一個 TU —— 整支 `boa` 用三條 rsdk 各建一次，
+原始碼逐位元組相同、`.config` 相同，只有 wrapper 不同，counts 讀在同一個
+`[DT_INIT, DT_FINI)` 窗上：
+
+| 建置 | `lwl` | `lwr` | `swl` | `swr` | 合計 |
+|---|---:|---:|---:|---:|---:|
+| `rsdk-1.3.6-4181` | 0 | 0 | 0 | 0 | **0** |
+| `rsdk-1.3.6-5281` | 0 | 0 | 0 | 0 | **0** |
+| `rsdk-1.5.5-5281` | 12 | 10 | 2 | 2 | **26** |
+| 1.5.5 開 `-march=4181`（第六節） | 14 | 14 | 2 | 2 | **32** |
+
+**144-和-0 那個分裂從一份原始碼重現了，`.config` 一個字沒動。**
+2019 那個謎收掉：它是 wrapper 世代，不是 drop、也不是誰忘了傳旗標。
+
+⚠️ **三件它沒有解決的事，一件都不藏。** ① 量級差四到五倍（26–32 對出貨的 144），
+除以窗大小也差（3.9e-4 對 1.5e-3），所以重現的是**有沒有**不是**多少**——
+drop 的 `boa` 是 2013 的快照，不是同一份原始碼。② 1.5.5-5281 那一格
+**沒有配對**（12 個 `lwl` 對 10 個 `lwr`），而這份筆記一路用「配對」當作邊界抓對了的證據；
+開 4181 那一格倒是配對的。**未解釋。** ③ 這裡沒有一個數字碰過裝置。
+
+### 二、九格開出來七格，而兩格失敗是讀數不是工具壞掉
+
+三份 drop × 三條 rsdk。每一格是一個從 `src-vendor/` 拷出去的最小 SDK 頂層，
+**vendor tree 一次都沒有被建過**，每一道指令都包在 `tools/vendor-tripwire.sh` 底下、
+從 scratch 目錄跑，全部回報 `CLEAN`。
+
+|  | `1.3.6-4181` | `1.3.6-5281` | `1.5.5-5281` |
+|---|---|---|---|
+| `rtl819x-toolchain`（RTL8196E） | ✅ 506,532 | ✅ 481,332 | ✅ 363,608 |
+| `saturn49-wecb`（RTL8198） | ✅ 777,552 | ✅ 744,784 | ❌ |
+| `wecb-vz-gpl`（RTL8198） | ✅ 745,168 | ✅ 711,660 | ❌ |
+
+兩格失敗是同一行同一個診斷：`fmget.c:271: error: static declaration of
+'convert_bin_to_str' follows non-static declaration`。gcc 3.4.6 收，gcc 4.4.5 不收。
+**所以 Actiontec 那兩份 drop 的 `boa` 是 gcc-3.x 世代的原始碼。沒有去改它** ——
+改一行就補得起來，而補起來那一格就不是那份 drop 的 `boa` 了，何況原始碼那一軸
+在兩條工具鏈上已經有了。
+
+**路上兩件事值得記。**（a）兩份 Actiontec drop **不給客戶 profile 就建不起來，
+而套用 profile 的腳本兩份 drop 裡都沒有**：`do_act_build` 點名
+`do_act_prepare.sh` 與 `do_act_merge.sh`、export `ACT_MACRODEFINE` 指到
+`customers/<C>/<P>/DEFINES`，讀，**那兩支腳本一份都不在**，而整棵樹沒有別的東西讀
+`DEFINES`。我把那個對應**重建**出來（每行既當 make 變數也當 `-D`，因為
+`src/Makefile` 有 `ifdef AEI_DATACENTER`、而 `defines.h:31` 把 `AEI_WECB` 變成
+`ACTIONTEC_WCB`）——**重建的，不是讀到的。**
+（b）`busybox` 只要一個 **host** 旗標 `-fgnu89-inline`（kconfig 靠 gnu89 的
+`extern inline`），交叉工具鏈一個字不用改 —— 和 `-3` 的 `timeconst.pl` 同一個形狀：
+**擋路的永遠是 2024 年的 host，不是 2011 年的 cross compiler。**
+
+### 三、我自己的 harness 有一個假陽性，而它的形狀是這個專案最熟的那個
+
+第一版的建置腳本只 `rm -f src/boa` 與 `apmib/libapmib.so`。
+**一次用錯旗標而失敗的 run 把它的 `.o` 留在原地**，`make` 看到 `.o` 比 `.c` 新就跳過，
+下一次 run 直接把它們連進去 —— `nm fmget.o` 裡沒有 `telus_langstat`，
+因為那個 `fmget.o` 是 `-DAEI_WECB` 還不存在的時候編的。同一次還留下一份
+**host** preprocessor 產生的 `.depend`，而 `src/Makefile` 只在
+`if [ ! -e ]` 的時候重建它。
+
+`rm *.o` 也不是解法 —— `users/boa/src` 裡有三個**廠商附的預編 object**
+（`fmdomain_query.o`、`fmulinker.o`、`http_files_4181`），刪掉那一格就廢了。
+所以每一次建置都從 `src-vendor/` **重新拷一份**。
+**修好之後的正檢查**：所有 cell 底下 389 個 `.o`／`.so` 逐個 `file`，
+**0 個不是 big-endian MIPS**。
+
+⚠️ 而我差一點把這件事寫成別的東西：當時我已經在草稿上寫「這兩份 drop 的
+`users/boa` 用到一個整棵樹都沒有定義的型別，所以 GPL 釋出不完整」。
+**那句話是錯的，而抓到它的是我自己的 grep 是假陰性** ——
+`typedef[^;]*AEI_FLASH_DATA_T` 配不到跨行的 `typedef struct { … } AEI_FLASH_DATA_T;`，
+而它就在 `users/boa/apmib/apmib.h:2364`。
+
+### 四、四個通道，一個窗
+
+`tools/rebuild-census.py`（新，27 案）。它的價值不在於它跑三支工具，
+而在於它**逼三支工具讀同一批位元組**：窗是 `binsim` 的 `[DT_INIT, DT_FINI)`，
+那是被逼出來的不是挑的 —— 六棵樹有四棵連 section header table 都沒有，
+`.text` 問不到，而可執行的 `PT_LOAD` 裡有 `.rodata`，線性掃描會把它當程式碼。
+
+| | 通道 | 讀什麼 |
+|---|---|---|
+| 1 | `binsim` | 正規化運算元 token 的 7-gram containment |
+| 2 | `opcount` | `lwl`+`lwr`+`swl`+`swr` —— `-fuse-uls` 那根槓桿 |
+| 3 | `hazlint` | loads／load 後補 nop／violations —— `-march` 那根槓桿 |
+| 4 | ELF header | `e_flags`、`phnum`、`DT_NEEDED`、section table 還在不在 |
+
+它同時把 `notes/which-drop.md` §6 的判準**機械地**執行：容器指紋不同 → `VOID`
+（不是比較軟的 fail —— 在底之下這條通道分不出「同一份原始碼換編譯模型」與
+「完全沒有共用原始碼」，`binsim` 的 `E8` 量過：前者 0.1212，**低於**後者的 0.1551–0.1581）。
+
+### 五、🔴 校準：只換一個旗標值 0.3360，把整支程式換掉值 0.9359
+
+這是今天最重要的一張表，而**它沒有事先登記** —— 它是為了解釋一個我讀不懂的數字
+（0.25）才建出來的。每一格都是**構造上**的單一變因：
+
+| 只有這個不同 | containment | Jaccard | \|G\| 比 |
+|---|---:|---:|---:|
+| **只換 `-march`**（4181 對 5281），同原始碼同 `.config` 同 gcc 同 binutils | **0.3360** | 0.2009 | 1.01× |
+| **只換工具鏈世代**（都 `-march=5281`），1.3.6 對 1.5.5 | **0.2132** | 0.1149 | 1.07× |
+| **整支程式換掉**：Realtek 8196E 的 `boa`（43 個 `.c`）換成 Actiontec WCB3000 的（57 個，多 271 KB），工具鏈不動 | **0.9359** | 0.6371 | 1.40× |
+| 兩份 Actiontec drop，同一條工具鏈 | 0.9830 | 0.9202 | 1.05× |
+
+> **在這份材料上、`k=7` 這個尺度上，`binsim` 量的是 code generator。它幾乎看不到程式本身。**
+
+⚠️ 0.9359 讀在 1.40 倍的尺寸比上，而 containment 除以比較小的那個集合，
+所以小集合塞進大集合分數會偏高 —— 那是 `binsim` 自己的但書。
+但沒有這個不對稱問題的 Jaccard 也把原始碼替換（0.6371）放在 `-march` 變更（0.2009）
+的三倍之上。**方向不取決於用哪一個測度。**
+
+**機制只是數量級的一致性檢查，不是帳。** 4181 那份有 6,051 個 load 後面補 `nop`，
+5281 那份 0；`nop` 是一個 token，每插一個最多擾動 7 個 gram **位置**
+（≤ 42,357 / ~97,752，≤ 43 %），而量到的 containment 是 33.6 %——
+**比那個上界還低，所以補 `nop` 不足以解釋它**，兩個 code generator 差的不只是補丁。
+⚠️ gram 位置與相異 gram 不是同一個量。
+
+🔴 **這對 `R2b` 的意思**：計畫的前提是「`boa` 的相似度認得出 **drop**」。
+量到的是它認得出 **工具鏈**。而 `notes/which-drop.md` §3 把 `boa` 在 ①↔② 的
+0.877–0.895 讀成「原始碼改了」——現在得跟「整支程式換掉只值 0.9359」並排放，
+**0.877–0.895 比整支換掉還低**，所以那一步差的不只是原始碼版本。**沒有解決，記著。**
+
+### 六、第十格：`rsdk-1.5.5` 開 `-march=4181`，0.2522 → 0.8255
+
+四個通道全部指向一條「1.5.5 世代 ＋ 設定成 4181」的工具鏈，而三份 drop 一份都沒附。
+**但三份 drop 的 `users/Makefile` 都指名了它**（第九節）。手上的 1.5.5 wrapper 直接拒絕
+`-march=4181`，所以唯一問得到的方法是繞過 wrapper、用 `mips-linux-xgcc`，
+把 wrapper **量到**會注入的那組旗標照抄、只把 `5281` 換成 `4181`。
+**那是重建一個 1.5.5-4181 wrapper 會做的事，不是讀到一個。**
+
+**四條預測寫在腳本標頭裡、在它跑之前：**
+
+| | 預測 | 量到 | |
+|---|---|---|---|
+| P1 | `lwl+lwr+swl+swr` > 0 | **32**（14/14/2/2） | ✅ |
+| P2 | violations ≈ 0、nop 15–30 % | **3** violations、**18.85 %** | ✅ 帶但書 |
+| P3 | libgcc soname **未知**，兩個分支各自的意義都先寫出來 | **plain `libgcc_s.so.1`** | ✅ 而它殺掉我一個推論 |
+| P4 | 對 `unit-2018/boa` 明顯**高於** 0.2522；**≤ 0.2522 即否證** | **0.8255**（J 0.5889） | ✅ |
+
+**P4 是同一份原始碼、同一條工具鏈，只換一個旗標，3.3 倍。**
+
+**P3 走到我的反面，而那個紀錄留著。** 這一格跑之前，1.3.6 兩格的
+`libgcc_s_4181.so.1`／`libgcc_s_5281.so.1` 對上每一支出貨映像的 plain
+`libgcc_s.so.1`，看起來像是「真的有一條 4181-*設定*的 release」的證據。**不是**：
+讀，`rsdk-1.5.5` 樹裡**根本沒有任何 `libgcc_s_*.so.1`**，只有 `lib/libgcc_s.so.1`，
+所以在它上面開 4181 拿到 plain 名字，跟它對哪一顆核心無關。
+活下來的比較弱但仍有用：**libgcc soname 是世代鑑別器** —— 1.3.6 給後綴，1.5.5 不給，
+而六支出貨映像全部是 plain。
+
+🔴 **P2 那 3 條不是雜訊，而且是一個安全性發現。** 它們在 `0x004039b8`、`0x00403a04`、
+`0x00403a14`，讀 section table，全部落在 `.init`（`0x0040394c`，0x78 bytes）
+與 `.text` 的前 0x44 bytes —— **crt 序幕，也就是程式跑的第一批指令**。
+這一格的 crt 來自 **5281 建的** uClibc，因為 `mips-linux/lib/` 沒有 4181 版。
+`notes/vendor-toolchains.md` §2 本來把這個混用記成「不安全，而且在最要緊的那條軸上沒檢查」。
+**現在檢查了，而它失敗**；用 `rsdk-1.3.6-4181` 建同一份原始碼是 0。
+
+**而專一性沒有說一個粗心的讀法會說的話**：這一格對六棵出貨樹是
+0.8584（2015）／0.8527（2016）／**0.8255（這台）**／0.8293（2018-03）／0.0613／0.0602。
+🔴 **這台是那四棵裡最低的一棵，不是最高的。** 重建最像 2015 那一棵，
+而 drop 的 `.config` 產生於 2013-06-29 —— 本來就該這樣。
+**所以它認的是「世代」，14 倍的落差落在 pic 邊界上；它沒有把這台從自己那一群裡挑出來，
+而這裡不宣稱它有。**
+
+### 七、`R2a`：`busybox` 給同一個順序，而它的容器被我的 harness 弄髒
+
+`notes/which-drop.md` §6 說 `busybox` 是比較乾淨的那個測試（六棵樹同一版
+`BusyBox v1.13.4`，所以它只在 code generator 的輸出動的時候動），
+並預測「落不到 0.99 的高位就是工具鏈錯了」。
+
+| 建置 | code-C | 判準 |
+|---|---:|---|
+| 1.5.5 開 `-march=4181` | **0.9729** | **VOID**（下段） |
+| 1.5.5 `-march=5281` | 0.3743 | warn |
+| 1.3.6 `-march=4181` | 0.1788 | VOID |
+| 1.3.6 `-march=5281` | 0.0803 | VOID |
+
+**和 `boa` 完全同一個順序，而這一支的原始碼在整個語料庫裡是固定的。兩支程式，一個答案。**
+
+🔴 **那一格在 §6 的判準下是 VOID，而判準照寫的執行。** 它的容器差在 `phnum`（8 對 7）
+與 `DT_NEEDED`（沒有 `libgcc_s.so.1`）。⚠️ **那個差是我的 harness，不是工具鏈**：
+`busybox` 用 `$(CC)` 連結，而 wrapper 的連結階段（讀 `RSDK_LOGFILE`）會給
+`-nostdlib` 加上工具鏈自己 `lib/` 裡的 `crt1.o crti.o crtbeginS.o`，
+再加一組 `-Wl,--start-group … -lc -lgcc`，裸的 `mips-linux-xgcc` 連結重現不出來；
+加 `-shared-libgcc` 沒有用。**所以 0.9729 是報出來的、在判準下不可採**，
+而修法是讓 harness 重現那條連結線，不是把判準放寬。
+`boa` 那一格四項全對，所以可採的是它。
+
+### 八、`TC-19`：六棵樹十二支出貨 binary，全部建在曝露 load delay slot 的那一側
+
+同一批材料掉出來的第三個通道。`hazlint` 在同一個窗上：
+
+| | `boa` nop % | `busybox` nop % | violations |
+|---|---:|---:|---:|
+| `v2.1.2`／`n300rt-2.1.6`／**這台**／`n200re-3.2.0` | 19.98／20.01／**19.71**／20.00 | 26.21／26.21／**26.21**／26.48 | **八支全部 0** |
+| `n300rt-3.4.0`／`v3.4.0` | 28.71／28.54 | 27.03／27.00 | **四支全部 0** |
+
+**地面真相是我自己建的**：`-march=4181` 那一側（三個不同的原始碼）是
+20.48–21.03 %／**0 violations**；`-march=5281` 那一側是 0.00–1.83 %／
+**5,224–10,494 violations**。
+🔴 **那個零的正控制就在同一張表、同一支工具、同一個窗**，所以十二支的 0 是讀數不是瞎揀。
+**推：這台的 userspace 和它的 kernel（`TC-15`：30.68 %／0）一樣，
+是給一顆曝露 load delay slot 的核心建的。**
+⚠️ `nop` 率在「4181 側」內部散得很開（19.7–28.7 pp）——**利的是 violations 那一欄。**
+⚠️ 這是讀建出來的程式碼，不是讀矽片。
+
+### 九、`TC-20`：三份 drop 都指名一條它們都沒附的 rsdk，而 `Kconfig` 不是佐證
+
+讀，`grep -rnI` 三棵：每一份的 `users/Makefile` 都有一條手寫分支換在
+**`CONFIG_RSDK_rsdk-1.5.5-4181-EB-2.6.30-0.9.30.3-110225`**（`:89`／`:91`／`:90`），
+另外每份三個檔測 `rsdk-1.5.0-4181-EB-2.6.30-0.9.30.{2,3}`。
+**六個 release 名稱，三顆磁碟上一個都沒有。**
+
+🔴 **而我差一點把 `Kconfig` 當成佐證。** 每份 drop 的 `Kconfig` 只列它自己附的三條 ——
+看起來像是「這份 drop 只知道三條」。**不是**：`Makefile:108` 是
+`@config/genconfig > Kconfig`，`config/genconfig:123` 是
+`find toolchain -type d -name 'rsdk-*' -maxdepth 1`。**那是 tarball 的目錄列表。**
+所以有重量的只有手寫的 Makefile 分支，而它撐得起的只到**推**：
+「這些 Makefile 是對著一條存在過這些 release 的 SDK 線寫的」。
+⚠️ 把 `110225` 早於 `110714` 讀成 `p2` 早於 `p4`，是**對命名習慣的猜測**，不是讀數。
+
+### 十、`TC-c`：MIPS16 從屬性來，不是從旗標來
+
+`notes/vendor-kernel-isa.md` §4.2 把它記成「未知」，並寫下該做的量法是
+「`make V=1` 再 grep `-mips16` 的命令列」。**那個量法會給假零。**
+
+`-mips16` 從來不在任何一條命令列上。讀
+`drivers/net/wireless/rtl8192e/8192cd_cfg.h:1007-1020`：在 Linux 這一支、
+無線驅動編進核心（不是模組）的時候，`__MIPS16` 展開成
+`__attribute__((mips16))`，**是預設分支，沒有任何 Kconfig 符號管它**。
+符號側佐證：那 39 個 `[MIPS16]` 全是 8192cd／NIC 的函式，正好是 `__MIPS16` 標的那一組，
+不是 `CFLAGS_<obj>.o = -mips16` 點名的那一組。
+**零的控制**：同一條 grep 在同一棵樹裡找得到 24 條 `-mips16`（七個
+`drivers/net/rtl819x/*/Makefile`，19 活 5 註解），全部在一個沒有任何出貨 config
+定義的 `ifdef` 裡 —— 掃描器會發射，旗標只是不是機制。
+
+### 十一、控制
+
+| | | |
+|---|---|---|
+| **sstrip** | 拿最好的那一格對它自己 `rsdk-linux-sstrip` 過的版本：376,484 → 363,728 bytes，section table 沒了 | **code 通道 C = J = 1.0000**，對 `unit-2018/boa` 的分數 sstrip 前後都是 0.8255。**sstrip 這個混淆因子死了** |
+| **strings 通道，同一對** | 事先預測「會動」；量到 **1.0000** | 🔴 **預測錯了。**`DEFAULT_MIN_STRING = 8`，而 section 名字（`.text`、`.data`）比 8 短，字串掃描根本沒看到被拿掉的那張表。**是儀器的性質，不是檔案的性質** |
+| **建置決定性** | baseline 對 `-UCONFIG_IPV6`（這一格的 config 從來沒定義過那個巨集） | **3 個 byte 不同**，全部是 offset ~352,837 的數字 —— `timestamp.c` 的建置戳記 —— 而兩個通道都讀 1.0000。免費的，而且和語料庫自己的 `busybox` 錨點同一個形狀（8 個 byte，全是 banner 日期的數字）|
+| **通道 3 的零** | 需要有東西會發射 | 5281 那幾格：5,224／7,656／10,266／10,494 |
+| **交叉建置健全性** | 所有 cell 底下 389 個 `.o`／`.so` | **0 個不是 big-endian MIPS** |
+| **tripwire** | 每一次跑廠商 binary | 全部 `CLEAN` |
+
+**config 敏感度 —— 這是「反推 config 有沒有用」的答案，而它是量的。**
+`boards/rtl8196e` 附**五份完整的型號 config**，同一份原始碼、同一條工具鏈建出來：
+
+| | bytes | 對 `88E_GW` | 對這台 |
+|---|---:|---:|---:|
+| `RTL8196E_88E_GW`（drop 自己選的） | 376,484 | — | 0.8255 |
+| `RTL8196E_92C_GW` | 362,588 | 0.9856 | 0.8228 |
+| `RTL8196E_92D_GW` | 369,696 | 0.9596 | 0.8039 |
+| `RTL8196E_MP` | 345,884 | 0.9829 | 0.8295 |
+| `RTL8196E_88E_ULINKER` | 394,944 | 0.9347 | 0.7607 |
+
+**十個 config-only 的兩兩分數：0.9347–0.9976，中位數 0.9869。**
+> **一個真實的 config 差異最多值 0.065，而最好的重建距 `BASE` 還差 0.156。
+> 反推 config 最多補回四成，代價是把模型 fit 到測試集上。所以沒做。**
+
+⚠️ 先跑的是比較弱的那一版（十個巨集用 `-U` 各關一次）：七個建得起來，
+code 通道動 ≤ 0.0001，而四個「這份 config 從來沒定義過」的巨集**什麼都沒動** ——
+那是 harness 在證明它自己不會無中生有。`-U` 是**下界**（它不能從 `SOURCES` 裡
+拿掉一個 `.c`），而且十個裡有三個關掉就編不過，樣本偏向沒什麼作用的巨集。
+五份 config 那一版沒有這些問題，所以引用的是它。
+
+### 十二、工具與註冊
+
+* **`tools/rebuild-census.py`（新，1.0）** —— 四通道一個窗，`§6` 判準機械執行。
+  八個控制：`W1`／`W2`（交出去的窗與 `--base` 就是 `binsim` 的）、
+  `V1`（判準四個分支各自在邊界上）、`V2`（判準跟著**容器**那個引數走，
+  不只是分數 —— 一個滿分但容器變了的比較必須是 `VOID`）、
+  `V3`（`BASE`／`FLOOR` 讀在 manifest 現在還指的那兩格上；
+  🔴 **第一版的 `V3` 只是把它 parse 到的東西印出來然後無條件通過**，
+  那是一個不會失敗的控制，改掉了）、`C1`／`C2`、`S1`（拿掉 section table 不動 code 通道）。
+* **`tools/test-rebuild-census.sh`（新，27 案）** —— 21 個 A-case 加
+  **6 個突變**，每一個突變都被指定的那個控制抓到；`M6`（判準完全忽略它的容器引數）
+  只有 `V2` 看得見。⚠️ 而這個突變 harness 自己第一版是壞的：突變體放在 temp 目錄，
+  它自己的 `sys.path.insert(0, HERE)` 就指到那裡，於是每一個突變體都死在
+  `import binsim`、rc=1，而 harness 會把那個記成「突變被抓到」——
+  **一個因為什麼都沒跑而通過的突變測試。** 加 `PYTHONPATH` 修掉。
+* `tools/ci-expected.tsv` 加一列：`test-rebuild-census 27`，
+  一個 skip 蓋 4 案。量，把 `$FWRE_WORK` 指到空目錄：23 ok／0 FAIL／1 skip 蓋 4，對得起來。
+
+### 十三、收工自查
+
+`spec-check.py` **綠**，而它在路上抓到我三個真的錯：兩個 cell 裡有沒跳脫的 `|`
+（`\|G\|` 與 `make V=1 \| grep`，那正好是 `C8` 存在的理由 —— 沒跳脫的 `|` 會把後面每一欄
+往後推，然後讀 V／N／來源的檢查會讀到錯的格**而且通過**），
+以及 `TC-20` 的值裡有「未定」兩個字（在「符號未定義」裡面），
+`BLANK_RX` 把它讀成「這一列是留白的」而 §17 沒有欠它一個實驗。改寫，不是豁免。
+
+十六個 suite 全綠：`binsim` 24、`test-binsim` 96、`test-opcount` 29、
+`test-isa-probe` 48、`test-rlxprobe` 202、`test-hazlint` 109、`test-tc-smoke` 36、
+`test-vendor-tripwire` 30/32、`test-rebuild-census` 27、其餘照舊。
+`ci-census` **rc=0**，111 案沒跑而且每一案都被點名（109 是 bench-only 的
+`test-hazlint`，2 是 tripwire 的 `T10`）。
+⚠️ 第一次 census 是紅的，兩條都是我的 runner 的問題：`verify-backup-copy`
+我沒給它 `--self-test <dir>`，而 `test-hazlint` 是 `*bench-only*`、
+我卻把它的輸出丟進 census 目錄。**兩條都是 census 正確地說「表跟捕捉對不上」。**
+
+### 十四、收工前的對抗審查：十四條結論逐條攻擊，五條改掉
+
+**這次的方法跟上一次不同：不是找六個視角來讀，而是把每一條寫進提交檔案的句子
+拿去「量它」。** 上一次擋住 commit 的三條全部是「已經寫進提交檔案的句子」，
+而且都是同一個形狀 —— 量到的數字旁邊放了一個沒有量的形容詞。所以這一次每一條
+攻擊都是一次量測，不是一段推理。
+
+**十四條裡，八條原封不動，五條改掉，一條從斷言升級成實驗。**
+
+🔴 **A1 —— 「把整支程式換掉」是誇大的，而那是這份筆記最承重的那一列。**
+量：兩份 drop 的 `users/boa/src` 共有 **56 個同名 `.c`/`.h`——8196E 那份的每一個檔
+Actiontec 那份都有 —— 其中 29 個逐位元組相同**，Actiontec 另外多 28 個
+（`act_*.c`、`ifaddrs.c`、`md5.c`）。**那是一支程式對它自己的 superset fork，不是替換。**
+0.9359 這個數字是量的；「整支程式換掉」是我加上去的形容。方向仍然成立
+（改寫或新增一半 translation unit 的 fork 只值 0.064，一個編譯器旗標值 0.664），
+但四個地方的措辭全部改成量到的樣子。
+
+🔴 **A2 —— 「389 個 object，0 個不是 big-endian MIPS」的範圍是錯的。**
+那句寫成「所有 cell 底下」，但它只走了 `users/boa`。走**整個** `users/`：
+**1,937 個檔、1,708 個 ELF32 MSB MIPS、target 側非 MIPS 0 個**。
+另外 229 個逐類交代：**189 個是 `busybox` 每個目錄的 `built-in.o`，每一個都正好
+8 bytes —— 空的 `ar` archive，`!<arch>\n` 之後什麼都沒有**（所以那個 sweep 報
+「開了 0 個成員」是檔案的性質不是讀取器的性質）；**28 個是 `scripts/` 底下的 host
+kconfig object**，x86-64，host 工具本來就該是；**12 個是 Actiontec drop 自己附的
+`libssl`／`libcrypto` symlink**，不是我建的。
+
+🔴 **A3 —— 那三條 violation「來自 crt」的證據是錯的儀器，結論對。**
+我先去 `crti.o`／`crt1.o` 裡搜那三個字 —— 搜不到，**而且搜不到才是對的**：
+其中兩個是 `gp` 相對、offset 在連結時才定，object 裡的位元組跟映像裡的不一樣。
+真正定案的是一個**控制**：用同一條命令列建一支 **5,462 bytes 的 hello-world**，
+裡面一行 `boa` 都沒有，它報 **一模一樣的三條**——`.init` 裡的 `lw ra,28(sp)`
+加上 `.text` 開頭兩條 `lw …(gp)`（31 loads／12 nop／3 violations）。
+所以那個混用不只是把三條 violation 放進 `boa`，是放進**每一支這樣建出來的程式**。
+
+🔴 **A4 —— 「手上沒有別的組合對得上」原本只是斷言，現在把對手建出來殺掉。**
+最強的對手是 `rsdk-1.3.6-4181` 手動加 `-fuse-uls`：那是這裡唯一另一個同時拿得到
+unaligned 指令與 load-delay padding 的組合。量，同原始碼同 `.config`：
+`lwl4` = **3,798**（這台是 144）、`phnum` 7、`libgcc_s_4181.so.1`、containment 0.2462、**VOID**。
+**它死在通道 1、2、4。** 而 3,798 是最利的一刀：gcc 3.4.6 開 `-fuse-uls` 的產出率是
+出貨映像的 **26 倍**，gcc 4.4.5 是它的四分之一。
+⚠️ **通道 3 完全分不出它**（0 violations／20.93 %）—— 值得直說：
+`-march` 那個通道定的是**哪一側**，定不出**哪一個世代**；世代是通道 1、2、4 定的。
+
+🔴 **A5 —— libgcc soname 那條鑑別器要加範圍。**
+量：兩份 1.3.6 **也都**附了 plain `lib/libgcc_s.so.1`，而且兩份的
+`-print-multi-directory` 都是 `4180`。所以後綴不是 release 內容的性質 ——
+它出現是因為 wrapper 強制了一個**非預設**的 `-march`，連結因此選了非預設 multilib。
+**正確的說法是關於建置而不是關於 tarball：任何經過兩份 1.3.6 wrapper 的建置都會拿到
+後綴名，而那是這套 SDK 做得出來的全部建置。**
+
+**另外兩條加了但書而不是改結論**：config 那個 0.065 的界是量在**廠商自己五份參考
+config** 上的，TOTOLINK 的 config 不在集合裡，這裡沒有東西界定它能離多遠；
+以及「Actiontec 那兩份的 `boa` 是 gcc-3.x 世代的原始碼」——一個檔一條診斷立得住的
+只有「它在 4.4.5 下不編、在 3.4.6 下編」，「世代」是我的形容。
+
+**站住沒動的八條**：sstrip 的 C=J=1.0000（而它自己的另一半預測是錯的，早就記著）；
+十二支出貨 binary 0 violations 且正控制同表；`TC-c` 的 MIPS16 機制與它那個零的控制；
+`TC-20` 的六個名字與 `Kconfig` 是產生的這個陷阱；`R2a` 的 VOID 是我的 harness
+（加 `-shared-libgcc` 沒有用，量過）；P1／P2／P4；以及 P3 —— 那一條本來就走到我的反面，
+紀錄留著。
+
+**動到的檔**：`notes/rebuild-vs-shipped.md`（新）、`notes/lwl-mystery.md`、
+`notes/vendor-toolchains.md`、`notes/vendor-kernel-isa.md`、`notes/which-drop.md`、
+`SPEC.md`（`TC-18`／`TC-19`／`TC-20` 新增，`TC-02a`／`TC-05`／`TC-14`／`TC-17`／§17 改）、
+`PROGRESS.md`、`tools/rebuild-census.py`、`tools/test-rebuild-census.sh`、
+`tools/ci-expected.tsv`。

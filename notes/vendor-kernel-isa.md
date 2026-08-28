@@ -482,12 +482,59 @@ from the 1.5.5 build. **So the presence of MIPS16 is not a thing the drops fail
 to reproduce, and it is not a discriminator.** `IMEM0_SIZE` (§4.1) still is, and
 `notes/vendor-toolchains.md` §7 adds a third that is stronger than either.
 
-⚠️ **Where the MIPS16 comes from is undetermined.** Every `-mips16` in the
-kernel tree's Makefiles is either commented out or inside
+~~⚠️ **Where the MIPS16 comes from is undetermined.**~~ ✅ **Settled
+2026-08-28 (`TC-c`), and the measurement this paragraph proposed would have
+returned a false zero.** It said: *"Every `-mips16` in the kernel tree's
+Makefiles is either commented out or inside
 `ifdef CONFIG_RTL865X_KERNEL_MIPS16_LAYERDRIVER`, which that config does not set;
 there is no tracked `.o` anywhere in the tree, so it is not a prebuilt blob. The
 measurement that would settle it is a build with `V=1` and a grep of the actual
-`-mips16` command lines. Recorded as not looked for.
+`-mips16` command lines."*
+
+🔴 **`-mips16` is never on a command line. It is a function attribute in C.**
+讀, `drivers/net/wireless/rtl8192e/8192cd_cfg.h:1007-1020`:
+
+```c
+#undef __MIPS16
+#ifdef __ECOS
+  #ifdef RTLPKG_DEVS_ETH_RLTK_819X_USE_MIPS16
+  #define __MIPS16   __attribute__ ((mips16))
+  #else
+  #define __MIPS16
+  #endif
+#else                                     /* the Linux build takes this branch */
+  #if defined(CONFIG_WIRELESS_LAN_MODULE)
+  #define __MIPS16                        /* empty, when the driver is a module */
+  #else
+  #define __MIPS16   __attribute__ ((mips16))   /* <- built-in: the DEFAULT */
+  #endif
+#endif
+```
+
+**On Linux, with the wireless driver built in rather than as a module, `__MIPS16`
+expands to `__attribute__((mips16))` unconditionally — no Kconfig symbol gates
+it.** `8192cd_osdep.c` applies it at seven sites. That is why a build whose
+`.config` says `CONFIG_RTL865X_KERNEL_MIPS16 is not set` still produces MIPS16,
+and it is why `make V=1 | grep -- -mips16` would have found nothing and been
+read as "not there".
+
+**Corroboration from the symbols rather than from the source.** 讀 the 39
+`[MIPS16]` symbols in the `vmlinux` built here: `get_skb_priority`,
+`insert_emcontent`, `aes_fill_encheader`, `get_tx_early_info`,
+`reorder_ctrl_{pktout,consumeQ,timeout,check}`, `rtl8192cd_rx_data`,
+`release_pkthdr`, `re865x_start_xmit`, `rtk_queue_tail`, `rtk_dequeue`,
+`interrupt_dsr_rx`, `dev_alloc_skb_priv` — **all of them 8192cd/NIC**, which is
+exactly the set `__MIPS16` is applied to and not the set the
+`CFLAGS_<obj>.o = -mips16` lines name.
+
+**Control for the zero, because "no `-mips16` on any command line" is a claim.**
+The same `grep -rlI -- "-mips16"` over the same tree **does** find 24 such lines,
+in seven `drivers/net/rtl819x/*/Makefile` files — 19 active, 5 commented — all
+inside `ifdef CONFIG_RTL865X_KERNEL_MIPS16_LAYERDRIVER`, a symbol no shipped
+`RTL8196E_*` config defines; and it finds two more in each drop's
+`users/Makefile`, under the `rsdk-1.5.0-4181` branches
+(`notes/vendor-toolchains.md` §7). The scanner fires; the flag is simply not the
+mechanism.
 
 🔴 **And the check that first said "no MIPS16 here" was a false zero of the same
 family this file keeps cataloguing.** It read `readelf -h`'s `Flags:` for the

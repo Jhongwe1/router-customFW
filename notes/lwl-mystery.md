@@ -294,12 +294,32 @@ counter-example by luck is still a claim that was wrong.
    the lever is `-fuse-uls`, both toolchain generations carry it, **and no drop's
    build system passes it — the wrapper injects it**. The `-march` half of the
    first answer was a false zero from an unchecked exit status.
-5. 🆕 **The cheap thing `R2a` should do first, and it is now specific.** Build
-   one `boa` translation unit through `rsdk-1.3.6-4181`'s wrapper and through
-   `rsdk-1.5.5-5281`'s, and count. If the 2019/2020 images' zero is the wrapper
-   and nothing else, those two counts reproduce the 144-and-0 split from the same
-   source with no `.config` change at all. That is a two-minute measurement and
-   it either closes the puzzle or reopens it against something new.
+5. ~~**The cheap thing `R2a` should do first.**~~ ✅ **Answered 2026-08-28,
+   `R2a/b/d-4`: the split reproduces, from one source, with no `.config` change.**
+   Not one translation unit but the whole of `rtl819x-toolchain`'s `boa`, built
+   three times from byte-identical source under the three rsdk releases and
+   counted on the same `[DT_INIT, DT_FINI)` window:
+
+   | build | `lwl` | `lwr` | `swl` | `swr` | total |
+   |---|---:|---:|---:|---:|---:|
+   | `rsdk-1.3.6-4181` | 0 | 0 | 0 | 0 | **0** |
+   | `rsdk-1.3.6-5281` | 0 | 0 | 0 | 0 | **0** |
+   | `rsdk-1.5.5-5281` | 12 | 10 | 2 | 2 | **26** |
+   | `rsdk-1.5.5` driven at `-march=4181` (synthesised, §4 of the note below) | 14 | 14 | 2 | 2 | **32** |
+
+   **So the 2019/2020 zero needs no exotic explanation and the puzzle closes**:
+   it is which rsdk generation's wrapper drove the build, and nothing else.
+   `notes/rebuild-vs-shipped.md` owns the builds.
+
+   ⚠️ **Three things this does NOT settle, and each is a live weakness.**
+   ① The magnitude is off by a factor of four or five: 26–32 here against 144 in
+   the shipped 2018 image, and normalising by window size (3.9e-4 against 1.5e-3
+   per word) does not close it. The source is not the same source — the drop's
+   `boa` is a 2013 snapshot — so this reproduces the **presence** and not the
+   amount. ② The 1.5.5-at-5281 build's counts are **not paired** (12 `lwl`
+   against 10 `lwr`), while every shipped image is exactly paired and this file
+   uses pairing as its evidence that the bounds are right. The 4181-driven build
+   *is* paired. Unexplained. ③ Nothing here is a measurement on the device.
 4. If the hardware does lack them: `boa` on this unit takes a kernel trap on
    every unaligned string access, and the cost is measurable. (P2) — **now the
    unlikely branch**, but it stays here until `R1a` closes it, because the
