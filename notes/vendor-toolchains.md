@@ -264,13 +264,21 @@ Above the ladder, three real builds:
 |---|---|---|---|
 | `users/dhrystone`, the vendor's own package and Makefile | `make` rc=0, dynamic **and** static, runs under `qemu-mips`, **every internal self-check value matches its expected constant** | same | same |
 | `arch/rlx/{lib/memcpy,kernel/traps,mm/cache,bsp/setup}.o` | rc=0, 4/4 | *not run* | rc=0, 4/4 |
-| **complete `vmlinux`**, 724 objects | **rc=0, 3,340,287 bytes**, text 2,656,040, entry `0x80003600` | *not run* | **rc=0, 3,166,710 bytes**, text 2,497,352, entry `0x80003420` |
+| **complete `vmlinux`**, 724 objects | **rc=0, 3,340,287 bytes**, text 2,656,040, entry `0x80003600` | 🔴 **rc=0, 3,207,595 bytes**, entry `0x800035a0`, sha256 `47f03df4…` | **rc=0, 3,166,710 bytes**, text 2,497,352, entry `0x80003420` |
 
-⚠️ **The empty column is the control that was not run, and it is the interesting
-one.** `rsdk-1.3.6-5281` is the same gcc and the same binutils as the 4181
-release with a different `-march` forced by its wrapper. Building the kernel with
-it would separate *the toolchain generation* from *the `-march`* in §5's kernel
-rows, which currently vary both at once. Cheap, and not done.
+🔴 **2026-08-28, and this paragraph was wrong when it was written.** It said the
+middle column was *the control that was not run … cheap, and not done*. **The
+build existed.** `vmlinux-136-5281.elf` was linked at **05:57** that morning,
+with `ctl-clean.log`, `ctl-136-5281.log` and `ctl-vm-136-5281.log` beside it; this
+note was committed at **06:45**. The work had been done and nobody had put an
+instrument on the product. That is a different defect from not doing it, and it is
+the one worth writing down: this repository guards hard against a verdict that
+cannot fire, and this was **a reading nobody was looking at**.
+
+It is read in §5 now, and it does what this paragraph said it would: it separates
+*the toolchain generation* from *the `-march`*, which the two published rows had
+been varying together. ⚠️ **The `arch/rlx` object row above is still genuinely not
+run** in that column, and is left saying so.
 
 Both `vmlinux` are `ELF 32-bit MSB executable, MIPS, MIPS-I, statically linked`,
 `Machine: MIPS R3000`, `Flags: 0x1001, noreorder, o32, mips1`.
@@ -363,8 +371,12 @@ and that is the same false zero this repository keeps cataloguing.
 ⚠️ **And it is reachable in the real build.** Not every `.S` under `arch/rlx`
 sets `.set noreorder`, and `asm/stackframe.h` sets `.set reorder` outright, so
 some hand-written kernel assembly is assembled in the mode where gas fixes the
-hazard for you. Which files, and whether any of them relies on it, is **not
-looked at here**.
+hazard for you. ✅ **2026-08-28 — which files, and whether any of them relies on
+it, is answered** (`TC-g`, `notes/kernel-build.md` §2, which owns it): **seven of
+the seventeen do**, and the six this board actually builds carry **eleven** live
+load-use hazards without the assembler — including `genex.S`'s `lw k0,0(k0)`
+followed by `jr k0` in the general exception dispatcher. **No compiler flag
+reaches any of them.**
 
 **Net: the partition survives on three readings, not two, and the claim that dies
 is the one that said the assembler leaves the hazard in place.**
@@ -387,17 +399,20 @@ used to build a 4181 kernel**, and that is the only 1.5.5 on hand.
 ### And what it says about the image on this unit — at whole-kernel scale
 
 The three objects above are three files. The comparison that matters is whole
-images, and today produced two of them from one source. All three rows below are
-the same instrument, and the range is **bounded below the MIPS16**, which is the
+images, and **three of them now exist from one source**. All rows below are the
+same instrument, and the range is **bounded below the MIPS16**, which is the
 reading `hazlint` will certify without an override. The lowest symbol marked
-`[MIPS16]` is `0x8016c844` in the 4181 build and `0x8015c200` in the 5281 one, so
-`[0x80000000, 0x80158000)` is 32-bit code in all three artefacts and the same
-bound serves all three:
+`[MIPS16]` is `0x8016c844` in the 1.3.6-4181 build, `0x8015add8` in the
+1.3.6-5281 one and `0x8015c200` in the 1.5.5 one, so `[0x80000000, 0x80158000)`
+is 32-bit code in all four artefacts and the same bound serves all four —
+⚠️ with **11,736 bytes** of margin on the tightest of them, where it used to be
+16,896.
 
 | artefact | loads | nop after load | violations |
 |---|---:|---:|---:|
-| `vmlinux` built here, `-march=4181` | 61,568 | 17,423 (**28.30 %**) | **4** |
-| `vmlinux` built here, `-march=5281` | 65,740 | 117 (**0.18 %**) | **21,185** |
+| `vmlinux` built here, **1.3.6** at `-march=4181` | 61,568 | 17,423 (**28.30 %**) | **4** |
+| 🆕 `vmlinux` built here, **1.3.6** at `-march=5281` | 64,729 | 108 (**0.17 %**) | **20,201** |
+| `vmlinux` built here, 1.5.5 at `-march=5281` | 65,740 | 117 (**0.18 %**) | **21,185** |
 | **this unit's own decompressed kernel** | 63,298 | 19,419 (**30.68 %**) | **0** |
 
 🔄 **This table was published first over the whole image with `--allow-mips16`,
@@ -408,6 +423,29 @@ conservative answer, it is no answer*, and the reason given for using it — *"a
 bounded range would not be the same range in each"* — **is false**: one bound
 serves all three, and `hazlint` accepts it with no override at all. The bounded
 reading is sharper on every axis, and **this unit's kernel goes to zero**.
+
+🔴 **2026-08-28: with the third build read, two of the four rows differ in exactly
+one variable each, and the answer is unambiguous.**
+
+* **`-march` alone**, toolchain generation held at 1.3.6: **4 → 20,201**.
+* **generation alone**, `-march` held at 5281: **20,201 → 21,185**, +4.9 %.
+
+**So the partition is carried by `-march` and the generation contributes almost
+nothing.** ⚠️ The control is only single-variable if the `.config` did not move
+between the two builds: 量, `config-before-ctl.snapshot` and the tree's `.config`
+hold **767 symbols each and differ on none**.
+
+⚠️ **And this unit's `0` carries 2 unresolved successors**, which the first version
+of this table did not say; the same column reads 3 for the 4181 build, 29 for the
+1.3.6-5281 build and 2 for the 1.5.5 one. The claim is *zero among the
+resolvable*.
+
+⚠️ **The bound covers 56.2 % of the executable text.** The MIPS16 band
+`[0x8016c844, 0x8025ac64]` — 975,904 bytes, 40.2 % of `.text` — is not scanned at
+all, and `.init.text` and `.exit.text` sit above it and are not in these rows
+either. Widened to the first MIPS16 symbol the 4181 build reads **5** rather than
+4; `.init.text` (2,297 loads) and `.exit.text` (157) are **0**.
+`notes/kernel-build.md` §1.4 owns the coverage figures.
 
 🔴 **This unit's kernel sits on the 4181 side by both measures at once**: its nop
 rate is within 2.4 pp of the 4181 build and 170× the 5281 build's, and it carries
@@ -423,9 +461,15 @@ same kernel over a different range (bounded below `0x802B8000`) and reports
 128,440 loads / 40,182 nop (31.28 %) / 58 violations. Both are right for their
 ranges; the three rows above are comparable to each other.
 
-⚠️ **The 4 are not explained.** They are four sites in 61,568 loads and nothing
-here says what they are. The 21,185 are not explained either, beyond being what a
-toolchain that does not pad produces.
+✅ **2026-08-28 — the 4 are explained, and `TC-22` owns them**
+(`notes/kernel-build.md` §1.2): all four are a **conditional move whose
+destination is the register the load just wrote**, which `hazlint` counts as a
+read by a policy its own source states. Two of the four are on `R3`'s boot path,
+and nothing measured to run on this die — this unit's whole kernel, its `boa`,
+its `busybox`, its loader — carries the pattern at all. Whether they are real
+hazards is `TC-h`, a microarchitectural question nobody has asked this die.
+⚠️ **The 21,185 are still not explained**, beyond being what a toolchain that
+does not pad produces.
 
 ⚠️ **And the discarded whole-image numbers are a warning about method, not just a
 superseded table**: 168 for this unit's kernel and 256 for the 4181 build were
@@ -588,8 +632,13 @@ with `-S`. Use the host `readelf`.
   They are independent in implementation (a compiler scheduler and an assembler
   checker, one of which does not exist in the older generation) but not in
   provenance. A third source would have to be the die.
-- **The `vmlinux` built here has not been run**, on the device or in an
-  emulator. It links and it is the right shape; that is all.
+- 🔄 **The `vmlinux` built here has been run in an emulator, within a measured
+  ceiling, and not on the device.** `TC-23`: about a thousand instructions under
+  `qemu-system-mips -M malta`, through `head.S`, the CP0 setup and `bsp_setup`,
+  stopping in the board's switch-core probe — **and this unit's own kernel stops
+  in the same place**, so the ceiling belongs to the emulator. Nothing after that
+  point is exercised, and the emulated core has load interlocks that this one may
+  not. `notes/kernel-build.md` §5.
 - **The 4181-at-1.5.5 route in §2 mixes a 4181 object with a 5281 uClibc.** The
   one axis checked was `ll`/`sc`/`sync`. It is not a proof of safety.
 - **`tools/tc-smoke.sh` certifies that a toolchain can build, and nothing about

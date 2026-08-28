@@ -6914,6 +6914,16 @@ user-copy 是位址遮罩與迴圈測試。**一條條件搬移都沒有。**
 量，`CONFIG_CMDLINE` 是 `"console=ttyS0,38400 root=/dev/mtdblock1"`，`console_setup()` 會跑。
 （順帶掉出 `R3-4` 的第一行差異：**initramfs 開機不能留 `root=/dev/mtdblock1`**。）
 
-**動到的檔**：`notes/kernel-build.md`（新）、`RUNSHEET.md`（§ `B5` 新）、
+### 十一、收工自查的第二輪：擁有者檔案還在描述昨天
+
+commit 之後照規矩再掃一次「哪些擁有者檔案應該改而沒改」，抓到三處，而它們全部在同一個檔裡 —— `notes/vendor-toolchains.md`，也就是 `TC-15` 的**擁有者**：
+
+* §4 那張表的中間欄還寫著 *not run*，而且底下整段在講「這個控制沒跑，很便宜，沒做」。**改掉，並且把「工作做了但沒有人讀」這件事本身寫進去**，因為那是跟「沒做」不同的缺陷。
+* §5 整份映像那張表只有三列。🔴 **而我把四列的版本寫在 `notes/kernel-build.md` 裡，那是第二個擁有者** ——違反房規第 1 條。表移回 §5，`kernel-build.md` 只留下它對這個決定的意義（兩個單一變因的差值）。
+* §5 的 *「哪幾支 `.S` 靠它，這裡沒有看」* 與 §8 的 *「建出來的 `vmlinux` 沒有跑過」* 兩句話，今天都被答掉了，各自改成指向答案。§5 的 *「那 4 條沒有解釋」* 同理。
+
+⚠️ **這一輪是在 commit 之後才做的，順序錯了。** 正確的順序是自查在 commit 之前，而這次是先送出去才掃 —— 記在這裡，因為下一次會再犯的正是這一步。
+
+**動到的檔**：`notes/kernel-build.md`（新）、`notes/vendor-toolchains.md`（§4／§5／§8 更正）、`RUNSHEET.md`（§ `B5` 新）、
 `SPEC.md`（`FW-23`／`TC-21`／`TC-22`／`TC-23`／`TC-24` 新，`TC-05`／`TC-15`／`LDR-18`／`FW-12`／§17 改）、
 `PROGRESS.md`、`README.md`、`CHANGELOG.md`。

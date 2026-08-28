@@ -83,29 +83,22 @@ this section repairs.
 
 **The control is only single-variable if the `.config` did not move between the 04:44 build and the 05:57 one.** 量: `config-before-ctl.snapshot` and the tree's `.config` carry **767 symbols each and differ on none**. Same source, same configuration, one flag.
 
-Same tool, same window `[0x80000000, 0x80158000)`, same bound as the three published rows — which are reproduced here exactly, as the control on the method:
+Read with the same tool at the same bound, the three published rows reproduce
+exactly — that is the control on the method — and the new row lands where `K2`
+said it would not have to.
 
-| `vmlinux` | loads | nop after load | **violations** |
-|---|---:|---:|---:|
-| 1.3.6 at `-march=4181` | 61,568 | 17,423 (28.30 %) | **4** |
-| **1.3.6 at `-march=5281`** 🆕 | **64,729** | **108 (0.17 %)** | **20,201** |
-| 1.5.5 at `-march=5281` | 65,740 | 117 (0.18 %) | **21,185** |
-| **this unit's own kernel** | 63,298 | 19,419 (30.68 %) | **0** |
+🔴 **The table itself lives in `notes/vendor-toolchains.md` §5, which owns
+`TC-15`, and is not repeated here.** What it settles for *this decision* is the
+two single-variable deltas:
 
-Two of the four differ in exactly one variable:
+* **`-march` alone**, toolchain generation held at 1.3.6: **4 → 20,201**
+  violations.
+* **generation alone**, `-march` held at 5281: **20,201 → 21,185**, +4.9 %.
 
-* **`-march` alone**, generation held at 1.3.6: 4 → **20,201**.
-* **generation alone**, `-march` held at 5281: 20,201 → 21,185, **+4.9 %**.
-
-🔴 **So the effect is the `-march`, and the toolchain generation contributes
-almost nothing.** §5 of `notes/vendor-toolchains.md` flagged that its two rows
-varied both at once; they no longer do. `K2` is satisfied in the direction it was
-written for.
-
-⚠️ **This unit's kernel's `0` carries 2 unresolved successors**, which the
-published row did not say. The claim is *0 among the resolvable*, and the same
-column reads 3 unresolved for the 4181 build, 29 for the 1.3.6-5281 build and 2
-for the 1.5.5 one.
+**So reason 2 of Decision A is about the `-march` and not about the vintage of
+the compiler** — which matters, because Decision A picks the *older* generation
+and the shipped firmware was built by the newer one. `K2` is satisfied in the
+direction it was written for.
 
 ### 1.2 🔴 The four violations are one shape, and it is a shape with an open question behind it
 
