@@ -388,3 +388,73 @@ seating 2 part three, five power cycles and 81 captures, and they are described 
 `RUNSHEET.md` § Results — seating 2 part three instead. Noted rather than
 back-filled, because a directory index that is silently incomplete is worse than
 one that says where the gap is.
+
+## 2026-08-30b — seating 5, `R3-8a`. **The prediction, before the seating**
+
+🔴 **This directory holds one file and no captures**, and that is the point:
+`PREDICTIONS-B5-block1.md` was written and frozen at the desk on **2026-08-29**,
+the day before the seating it predicts. `bench/2026-08-26/` is the precedent for
+a prediction file that is closed to editing before its captures exist; this one
+differs from it in that the captures are still expected.
+
+**Why `2026-08-30b` and not `2026-08-30`.** One directory per power cycle, and
+power cycle 1 of this seating is `probe3` (`R1h-3`), which owns
+`bench/2026-08-30/` and its own block. This is power cycle 2 — `loudm`,
+`R3`'s D1–D5. Power cycle 3 has no directory yet **because its identity is not
+decided**: `quietm` if `L-3` reaches D4, and the plan's halving experiment (the
+vendor's kernel with my initramfs) if it does not reach D2.
+
+| | |
+|---|---|
+| **cells named** | twelve: `A-catch`, `L0-ab`, `L0-tail`, `L2a`, `L2b`, `L2c`, `L3`, `L5a`, `L5b`, `L6a`, `L6b`, `L7a` |
+| **at the desk** | `check-predictions.py` reports **`0 of 12`**, all fifteen controls green. That is control `N2` — *a predicted cell whose capture does not exist* — firing on every cell, and it is the correct answer before a seating |
+| **what the block also predicts** | what the check will say afterwards: `12 of 12` on D5, `10 of 12` with no link, `7 of 12` if the boot stops at B07 |
+| **deliberately not named** | the branch cells `L-6c`/`L-6d`/`L-7b` (the second interface) and `L-8a`/`L-8b` (the post-mortem). Naming both branches guarantees a violation whichever way the seating goes. **The cost is stated in the block**: if a branch cell runs, its ordering is unenforced — the same gap this file records for `CONT3` |
+
+**What the block is worth, and it is not that it will be right.** Four of its
+twelve cells exist because writing it refuted the seating sheet: `L2a` reads
+eight words instead of one because the first sixteen bytes of my image and of the
+staged vendor image are **byte-identical** (量, against `2026-08-23/B.log:16`,
+`2026-08-24c/G1a.log` and `2026-08-24d/G5-rb1.log`), and `L0-tail`/`L2c` are a
+before/after pair on a region 66,542 bytes above the staged image's end, which is
+the only part of the upload that can be watched **changing** without poisoning
+the fallback. `RUNSHEET.md` §B5-c1 has the measurement.
+
+## The whole record is swept now, and it was not before
+
+🆕 **2026-08-29.** `tools/check-predictions.py` gained `--sweep`. It walks
+every `PREDICTIONS-*.md` under `bench/` and checks **ordering only**:
+
+```
+38 prediction file(s), 168 cell(s): 136 ordered, 32 with no capture yet, 0 OUT OF ORDER
+```
+
+**A predicted cell with no capture is reported and is not a failure** — a
+seating that stopped early is a fact about the seating, and `2026-08-25b`'s
+`block3` is the worked example. What the sweep can go red on is a committed
+capture **older** than the prediction naming it, which is either an edited
+predictions file or a touched capture: the two failure modes of house rule 2
+that a runner can see at all. It refuses rather than reporting green if it finds
+no predictions files, and on **zero resolvable cells** — a renamed directory,
+a typo'd path or the wrong working directory, all three of which used to read
+as a clean result.
+
+🔴 **And it is NOT a CI gate, because git does not store mtimes.** A step was
+written for it and taken out the same hour: `actions/checkout` writes every
+file fresh, so on a clone the whole of this directory carries a handful of
+timestamps spanning tens of milliseconds and the sweep reads **128 of 156
+cells as out of order**. 量 twice, on two independent `git clone --depth 1`
+of this repository. **The ordering claim is a pre-push gate on the machine
+that took the captures and it proves nothing to anyone who clones this
+repository** — which is sharper, and worse, than *not a cryptographic
+timestamp*. What CI runs is the tool's fifteen controls, which build their
+own fixtures and are clone-stable. The fix that would make the sweep a CI
+gate is known: every capture already carries a committed `started_wallclock`,
+so the capture side survives a clone; the prediction side would need a
+declared timestamp inside the file, which the blocks already frozen cannot
+have. Carried forward rather than half-done.
+
+⚠️ **It says how many cells have no capture and not which.** Twelve of the 32
+are `2026-08-30b`'s; the rest are seatings that stopped, and the per-file check
+already names them. Carried forward in `PROGRESS.md` rather than fixed with a
+second way to print what `check` prints.

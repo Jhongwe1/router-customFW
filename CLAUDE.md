@@ -151,6 +151,15 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `D /tmp` — a capital `D`, so `systemd-tmpfiles-setup` **empties it at every
   start**. It is not a tmpfs; the wipe is deliberate, not a side effect. Derived
   artefacts go in `$FWRE_WORK/rebuild/`, which is where they belong anyway.
+- 🆕 **Every bench command runs `/usr/bin/python3`, never `python3`.** Measured
+  2026-08-29 (and the tool has said so since 2026-08-24, in a message nothing in
+  this file repeated): `python3` on this host resolves to
+  `~/.venvs/thermal/bin/python3`, which has **no `pyserial`**, so
+  `console-capture.py` refuses. It refuses with the reason rather than a
+  traceback, which is the only thing that made it a two-second problem instead of
+  a bench-time one. **And a 3-second capture with the board OFF is a free
+  pre-flight**: 0 bytes, and the tool splits that into three causes — the
+  adapter, the port, or the board — before a power cycle is spent.
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
   the commands and read what I paste back. One power cycle is the most expensive
   unit here, so list every question before the device is plugged in.

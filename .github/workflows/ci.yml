@@ -213,6 +213,30 @@ jobs:
       - name: test-boot-timeline
         run: bash tools/test-boot-timeline.sh 2>&1 | tee ci-out/test-boot-timeline.out; exit "${PIPESTATUS[0]}"
 
+      # 2026-08-29 (R3-7). Until today this tool was in no workflow, no
+      # expected table and no census -- measured 2026-08-25 and still true
+      # this morning, which is `a gate nobody runs` in the file whose whole
+      # subject is gates nobody runs.
+      #
+      # `--self-test` and NOT a real predictions file, and the reason is that
+      # pointing it at one could not work: bench/2026-08-25b's block3 reports
+      # `1 of 3` because two cells were made unrunnable by the reading of the
+      # first, and a block written the day BEFORE a seating reports `0 of N`
+      # until the seating happens. Both are correct results and both exit 1.
+      #
+      # FIFTEEN controls, EIGHT of which must fail, and six of the fifteen
+      # drive the file as a SUBPROCESS and assert its exit code. That is not
+      # thoroughness for its own sake: the first version had six controls, all
+      # function-level, and a mutation pass killed only 7 of 15 mutants --
+      # including one that made the sweep return 0 on a real regression, which
+      # is the entire content of a gate. 11 of 11 now.
+      # Its own case count is a count: `run_controls` prints one line per
+      # control that RAN and refuses if the set does not match, because a
+      # suite that prints a constant tuple of labels reports controls that did
+      # not execute -- measured, on this file, by deleting a control block.
+      - name: check-predictions self-test
+        run: /usr/bin/python3 tools/check-predictions.py --self-test 2>&1 | tee ci-out/check-predictions.out; exit "${PIPESTATUS[0]}"
+
       # binsim's controls need no vendor binary and no compiler: every fixture
       # is a synthetic ELF the tool builds itself. That is deliberate and it is
       # the opposite of hazlint, whose population control is 56 KiB of this
@@ -282,6 +306,26 @@ jobs:
       # of the unit. Two different questions, and only the first is this gate's.
       - name: audit-bench-log (exit-code gate)
         run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f -name '*.log')
+
+      # 🔴 `check-predictions.py --sweep bench` IS NOT HERE, and the reason is
+      # the whole point of the tool. A step was written for it on 2026-08-29
+      # and taken out the same hour, because the adversarial pass cloned this
+      # repository and ran it: **git does not store mtimes.** `checkout@v4`
+      # writes every file fresh, so bench/ arrives carrying a handful of
+      # timestamps spanning tens of milliseconds, and the sweep reads
+      # 128 of 156 cells as `capture is OLDER than the prediction`.
+      # Reproduced independently on this machine, `git clone --depth 1` of this
+      # very tree: `8 ordered, 128 OUT OF ORDER`, exit 1.
+      #
+      # So the ordering claim is a PRE-PUSH gate on the machine that took the
+      # captures, and it cannot be anything else in this form. What CI can run
+      # is the controls, above -- they build their own fixtures and are
+      # clone-stable. The fix that would make the sweep a CI gate is known and
+      # not built: every capture already carries a committed `started_wallclock`
+      # in its .meta.json, so the capture side is clone-stable; the prediction
+      # side would need a declared timestamp inside the file, which the blocks
+      # already frozen cannot have. Carried forward in PROGRESS.md rather than
+      # half-done, and the tool's docstring says the same.
 
       - name: fetch-sources --list (offline; never fetches)
         run: bash tools/fetch-sources.sh --list

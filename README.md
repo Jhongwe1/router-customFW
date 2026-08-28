@@ -257,7 +257,15 @@ tools/console-capture.py   29 cases. Four of them exist because the ESC heartbea
                            the grid every interval is quantised to, so the period each
                            capture ACHIEVED is measured and recorded, not assumed
 tools/check-predictions.py refuses to compare a prediction against a capture unless
-                           the prediction file's mtime is earlier
+                           the prediction file's mtime is earlier. Six controls, four
+                           of which must FAIL. Two of the six exist only because
+                           `--sweep` deliberately disagrees with the per-file check
+                           on one case — a predicted cell with no capture is a
+                           violation there and is not one in the sweep, and without a
+                           control pinning that they would drift into agreement
+                           unnoticed. `--sweep bench` reads the whole committed
+                           record as a CI gate — no count here, for the reason the
+                           paragraph below this list gives
 tools/test-gitignore.sh    six of its cases are positive controls, because a .gitignore
                            of a single `*` would pass every negative one
 tools/test-opcount.sh      two of its cases exist because a counter reading the wrong
@@ -308,6 +316,22 @@ and a census job fails the build if a check starts skipping for a reason that is
 not on `tools/ci-expected.tsv`. The suites it cannot run are the ones whose
 population control is a 56 KiB vendor bootloader that cannot be redistributed;
 the count is printed on every build rather than left out of the total.
+
+🆕 **2026-08-29, and the half that could not be built is the more useful
+finding.** `tools/audit-bench-log.py` scans every committed capture for anything
+that could identify this device, and runs every pattern against a synthetic
+positive control first; it is a CI gate. `tools/check-predictions.py --sweep
+bench` checks that every capture named by a prediction file is **newer** than
+the file naming it — and it **cannot** be a CI gate, because **git does not
+store mtimes**. A checkout writes every file fresh, so on a clone of this
+repository the sweep reads 128 of 156 cells as out of order; 量 twice. So *the
+expectation was written first* is verifiable **on the machine that took the
+captures and nowhere else**, which is a harder limit than the tool's own
+docstring used to state, and it is stated there now. What CI runs is that tool's
+fifteen controls — eight of which must fail, four of them driving the file as a
+subprocess after a mutation pass found that six function-level controls killed
+only 7 of 15 mutants. Both tools refuse rather than reporting green when they
+find nothing to look at.
 
 `tools/opcount.py` counts MIPS primary opcodes by linear scan rather than
 disassembly, because for an image loaded at a 4-byte aligned address the scan is

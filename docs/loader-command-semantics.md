@@ -250,10 +250,18 @@ Three things R0 needs that the help string does not say:
   against the loader's own image. `LOADADDR 80400000` would point the next TFTP
   upload at the running loader.
 - **No confirmation.** Unlike `FLR` and `FLW`, `LOADADDR` does not prompt.
-- **The upload path can overrule it.** A TFTP write whose filename is `nfjrom`
-  or `boot.img` forces the load address to `0x80000000` and arms an
-  auto-execute. **(C)** R0 must never use those two names; `loader-tftp.py`
-  already refuses them.
+- **The upload path can overrule it.** 🔄 **2026-08-29 (`R3-7`): this bullet
+  said BOTH names force the load address, and only `boot.img` does.** 讀 this
+  unit's own `stage2.bin` at `0x80401208`: the two tests are mutually exclusive
+  — a `nfjrom` match sets `0x8040D390 = 1` and **branches past the `boot.img`
+  test** — so `nfjrom` arms an auto-execute **at whatever address is already
+  set**, and `boot.img` arms one *and* writes `0x80000000` to `0x8040D3A8` and
+  to the running write pointer (`§ boot.img and nfjrom write from 0x80000000
+  upward`, below, which is the same error in its heading). ⚠️ The two names are
+  also matched by two different routines with opposite polarity: `0x80406D7C`
+  is `strstr` (containing), `0x80406C40` is `strcmp` (exact). **(C)** R0 must
+  never use either name; `loader-tftp.py` refuses them **on `--filename`**, not
+  on the local path. `notes/kernel-build.md` §12.6.
 
 ---
 
@@ -1168,7 +1176,12 @@ evidence that the C on screen is the C that was compiled**, and every argument i
 this repository of the form *"the vendor source says why"* has to say which half
 it is leaning on.
 
-### `boot.img` and `nfjrom` write from `0x80000000` upward
+### `boot.img` writes from `0x80000000` upward — 🔄 and `nfjrom` does NOT
+
+> **Heading corrected 2026-08-29 (`R3-7`).** It read *"`boot.img` and `nfjrom`
+> write from `0x80000000` upward"*, and the body below it was already evidence
+> against its own heading: it cites only `0x8040A6A8`, which is the `boot.img`
+> string. `0x8040A6A0` is `nfjrom`, and its match branches past all of this.
 
 The name compare against `0x8040A6A8` reaches `0x80401250`, which stores
 `0x80000000` into both the `LOADADDR` global (`0x8040D3A8`) and the running TFTP

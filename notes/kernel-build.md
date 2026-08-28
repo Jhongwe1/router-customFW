@@ -857,11 +857,20 @@ The other 20 are directories and symlinks: the declaration says the dump has
 those, and the tool checks that it does, but there is nothing to hash.
 
 8 dirs, 5 files, 13 symlinks, 3 device nodes. The five `rlxfw` entries are
-`/init`, `/tmp`, `/dev/console`, `/dev/null` and `/dev/tty`. **There is no symlink of
-mine left**:
-because `RUNSHEET` `K5` types `uname -a` and this unit's dump has 50 busybox
-symlinks without that being one of them. **It is declared as mine rather than
-passed off as the unit's.**
+`/init`, `/tmp`, `/dev/console`, `/dev/null` and `/dev/tty`. ~~**There is no
+symlink of mine left**: because `RUNSHEET` `K5` types `uname -a` and this unit's
+dump has 50 busybox symlinks without that being one of them. **It is declared as
+mine rather than passed off as the unit's.**~~
+
+🔴 **2026-08-29 (`R3-7`): that passage contradicts itself in three lines** —
+*there is no symlink of mine left* and *it is declared as mine* cannot both be
+true — and it is the fossil of a `/bin/uname` symlink that was added for `K5`
+and then removed. **What settles it is a measurement nobody took at the time**:
+`uname` is not an applet in this `busybox` at all (§12.7, 量 —
+`busybox uname -a` → `applet not found`, 50 applets listed), so the symlink
+would have produced `applet not found` and its removal changed nothing. What
+stands from the original: the declaration carries **no symlink of mine**, and
+the count above is unaffected. `K5`'s command is now `cat /proc/version`.
 
 **What it refuses to do**, and each is a control: a declared source that is not
 there is an error and is never replaced with something similar (`A2`); `/init`
@@ -1188,16 +1197,56 @@ about 32 ms of UART against a loader stage that already takes 348 ms (`CLK-15`).
 
 **And they are discriminators, checked rather than asserted**: 量, each of the
 eleven strings occurs **once** in my `vmlinux` and **zero** times in both
-`vmlinux-rederived.bin` (the drop's kernel) and `r0-vendor-kernel.bin` (this
+~~`vmlinux-rederived.bin` (the drop's kernel)~~ and `r0-vendor-kernel.bin` (this
 unit's own).
+
+🔴 **2026-08-29 (`R3-7`): the parenthetical is wrong and this same file already
+said so four hundred lines earlier.** §3.2's table records
+`r0-vendor-kernel.bin` decompressing to `vmlinux-rederived.bin`,
+**byte-identical** — re-measured today, LZMA-alone from file offset `0x2808`,
+3,374,772 bytes out, sha256 `cf0d60a8ae54352e…`. So **`vmlinux-rederived.bin`
+is this unit's own kernel, decompressed**, and the two files named above are one
+kernel in two forms rather than two vendor artefacts.
+
+🔴 **And the second of them cannot fail.** 量 today, `RLXFW` occurrences:
+
+| artefact | form | `RLXFW` |
+|---|---|---:|
+| my `loudm`/`quietm` `nfjrom` — **the file that is uploaded** | compressed | **0** |
+| my `vmlinux_img` / `vmlinux` | decompressed / ELF | 11 |
+| `r0-vendor-kernel.bin` | this unit, compressed | 0 |
+| `vmlinux-rederived.bin` | this unit, decompressed | 0 |
+| the drop's `nfjrom` | compressed | 0 |
+| the drop's `vmlinux_img` (2,953,660 B) | decompressed | 0 |
+
+**My own uploaded image reads 0 too**, so a `strings` sweep over a compressed
+artefact is a test that passes on everything. The informative absence is on the
+**decompressed** forms, and there the count is a genuine 0 against a genuine 11.
+`RUNSHEET` `P10`'s `--absent` set is corrected accordingly (§B5-c5): keep
+`vmlinux-rederived.bin`, add the drop's `vmlinux_img` as a real third artefact,
+and record `r0-vendor-kernel.bin`'s zero as structural.
+
+⚠️ **The anti-DoD is unaffected.** The image the loader can stage at
+`0x80500000` by accident is *this unit's own*, and it is covered. What was
+overstated is the breadth of the check, not the guard.
 
 ### 11.5 The three rungs, and a correction to the step list's own wording
 
 | rung | what is added | proves the rung | proves the PREVIOUS rung |
 |---|---|---|---|
 | **1** | kernel + initramfs, `/init` prints M4 | `RLXFW-B10` then `M4` | `RLXFW-B00` (D1/D2), `RLXFW-B07=00000000` (D3) |
-| **2** | `ifconfig eth0 10.1.1.2 up` | link up | rung 1's `M4` in the same capture |
-| **3** | `ping -c 4 10.1.1.1` | at least one reply **and** the host `tcpdump` | rung 2's `ifconfig` output |
+| **2** | 🔄 `ifconfig <if> 10.1.1.10 netmask 255.255.255.0 up` | link up | rung 1's `M4` in the same capture |
+| **3** | 🔄 `ping -c 4 10.1.1.2` | at least one reply **and** the host `tcpdump` | rung 2's `ifconfig` output |
+
+🔴 **2026-08-29 (`R3-7`): those two lines read `10.1.1.2` and `10.1.1.1` until
+today and both were wrong.** `10.1.1.2` is the **workstation's own** address
+(讀, `RUNSHEET` §G3: *"`IPCONFIG 10.1.1.1`, workstation at `10.1.1.2/24`"*), so
+rung 2 handed the board an outright conflict, and rung 3 pinged the address the
+loader had. Both halves fail, and the capture reads exactly like the definition
+of a driver that transmits and does not receive. `RUNSHEET` §B5-c4 and §B5-c10.
+⚠️ `<if>` and not `eth0`: **four of the five netdevs are LAN** and the jack↔port
+map is 未定 (`NET-13`), so the seating tries them in order rather than assuming
+— `RUNSHEET` §B5-c9.
 
 ⚠️ **Rungs 2 and 3 add no image variable at all in the current build.**
 `drivers/net/rtl819x` is already in the vendor configuration and `ping` is
@@ -1296,6 +1345,274 @@ this build ends at `0x805E5280`, above the `0x80500000` the compressed image sit
 at. By the time the kernel zeroes it the wrapper has jumped away and its bytes
 are dead — but it does mean the uploaded image is destroyed early in the boot, so
 there is no second `J` even in principle.
+
+---
+
+## 12. `R3-7`: what these images look like **on the wire**, and the head does not identify them
+
+**Written 2026-08-29 while turning `RUNSHEET` §B5 into a bench card.** ⚠️ **This
+section number was a gap** — §11.7 was followed by §13 and nothing in this
+repository ever referenced a §12. It is filled here rather than renumbered,
+because every cross-reference to §13–§16 in `PROGRESS.md`, `RUNSHEET.md` and
+`SPEC.md` would otherwise move.
+
+Everything below is 讀 or 量-on-this-desk. **Nothing was measured on the
+device**; the three device readings quoted are re-reads of committed captures.
+
+### 12.1 🔴 The head does not identify the image — 16 bytes measured on the device, 24 across the files
+
+`RUNSHEET` `K2` was built on *"my image and the staged one differ in their first
+16 bytes"*. 量:
+
+| | `0x80500000` | `0x80500004` | `0x80500008` | `0x8050000C` |
+|---|---|---|---|---|
+| **the device**, `DW 80500000`, three captures | `00000000` | `00008021` | `40906000` | `00000000` |
+| `quiet` · `quietm` · `loud` · `loudm` · the drop's | `00000000` | `00008021` | `40906000` | `00000000` |
+
+⚠️ **The device evidence is 16 bytes, not 24.** All three captures are
+`DW 80500000 1`, which `LDR-07` rounds up to one line — four words — so bytes
+16–23 have never been read on this device at all. The 24 is the desk comparison
+of five files, where the first differing byte is offset 27.
+
+The three device captures are `bench/2026-08-23/B.log:16`,
+`bench/2026-08-24c/G1a.log` and `bench/2026-08-24d/G5-rb1.log` — two power
+cycles, and all three byte-identical. **They agree because they are the same
+`rtkload` `start.o`**: every image in this family is linked from the same stub,
+and `nfjrom` is `objcopy -O binary` over it.
+
+So `DW 80500000 1` reads the same reply whether the upload landed or not. It is
+a cell that cannot fail, and it was the seating's *only* check that the right
+bytes were at the load address.
+
+### 12.2 The two words that do identify the image, and they are the linker's
+
+量: the first differing byte between any of my images and this unit's staged one
+is at **offset 27**, and the pair of words holding it is a `lui`/`addiu`:
+
+| `0x80500018` | `0x8050001C` | decodes | that image |
+|---|---|---|---|
+| `3C10805F` | `26101000` | `0x805F1000` | **the staged vendor image** — this unit's flash kernel. Its `nfjrom` is 987,136 B; the **payload** `FW-12` defines is 987,138, the extra two being `LDR-18`'s checksum |
+| `3C108060` | `2610AC00` | `0x805FAC00` | `quiet` / `quietm`, 1,027,072 |
+| `3C108060` | `26101000` | `0x80601000` | `loud`, 1,052,672 |
+| `3C108060` | `26101400` | `0x80601400` | `loudm`, 1,053,696 |
+| `3C10805D` | `26100800` | `0x805D0800` | the drop's own, 854,016 |
+
+🔴 **`0x80500000 + size` reproduces the four `nfjrom` rows exactly and the
+staged row is two bytes short — and the first version of this table said "all
+five, exactly" while the script that built it printed `NO` on that row.** 量:
+`r0-vendor-kernel.bin` is 987,138 bytes, its last two are `D6 2B`, `sum16` over
+all of it is `0x0000` and over the first 987,136 is `0x29D5`. So the staged file
+is `nfjrom` **+ the 2-byte `sum16` tail**; `__vmlinux_end` is the end of the
+`nfjrom` and the staged copy in RAM runs to `0x805F1002`. `FW-12` already
+carried the decomposition, in this same file, and §12.2 quietly used §3.1's word
+*payload* for §3.1's other number.
+
+**The honest statement**: four of four `nfjrom` files equal `base + size`; the
+staged one equals `base + size − 2`. This is `__vmlinux_end`, which
+`rtkload/ld.script.in` aligns to 1024 — so **the uploaded image carries its own
+length as an immediate, and one `DW 80500000 8` reads it back.**
+
+⚠️ Two limits, both measured rather than inferred. **`loud`'s low half equals the
+staged image's low half** (`26101000`) and only the `lui` separates them, so both
+words are required. And **`quiet` and `quietm` are indistinguishable here** —
+same size, same words; a word inside the LZMA stream (`DW 80540000 1`) is what
+separates the marked variant from the unmarked one, and there no two of the six
+images agree in any of the four words.
+
+### 12.3 The tail is sixteen zero bytes — and that is why it is the only cell that can watch a change
+
+量, the last 16 bytes of all five `nfjrom` files: **all zero**, with trailing
+zero runs of 312 / 552 / 180 / 688 / 28 bytes — **28 to 688**, and the 28 is
+only twelve bytes clear of breaking the premise the cell rests on.
+On its own *"expect zeros"* is a
+check a dead instrument passes.
+
+🔴 **But the tail is the one part of the upload that is not on top of the
+fallback.** The staged vendor image ends at `0x805F1002` — 讀 the flash header's
+`len` = `0x0F1002` (`FLM-09`) plus the inference that the loader copies exactly
+`len` bytes to `startAddr`, so **讀 + 推 and not 量**. ⚠️ **`MAP-17` is not a
+second source for it**: that row is *selected*, its own value column is `—`, and
+its bound is `0x80A00000 +` the same `0x0F1002`. Citing it was the defect §12.x
+and `RUNSHEET` §B5-c5 both name one level up. While:
+
+| | tail `DW` address | above the staged image by |
+|---|---|---:|
+| `quietm` | `0x805FABF0` | 39,918 B |
+| `loudm` | `0x806013F0` | 66,542 B |
+
+`K2` refuses to poison the region because that would destroy the fallback, and
+for the head that is right. For the tail nothing needs poisoning: **read it
+before the transfer and again after**, and `DW … 8` gets two lines in one
+command — the last line of the image, which must **change** to zeros, and the
+first line past `image_end`, which must **not change at all**. The second is a
+negative control on the transfer length and it costs nothing.
+
+⚠️ 推, and it is `RUNSHEET` `K8`: after a failed `J` the watchdog resets and the
+loader re-stages `0x80500000`, but the re-stage ends at `0x805F1002` and
+`loudm`'s `.bss` ends at `0x805F7280` (量, `readelf -S`: `0x80362000` +
+`0x295280`), so the tail should survive both. Nothing has ever read that region
+after a failed `J`.
+
+### 12.4 The ladder's byte count, validated on two captures before it was used
+
+Each mark is one literal ending `\n` and `rlxfw_puts` turns that into `\r\n`
+(讀, §11.3), so a plain mark is **11 bytes** and a valued one **20**:
+
+| | model | 量, `qemu/2026-08-29/` |
+|---|---:|---:|
+| `quietm`, B00…B07 | 8×11 + 2×9 = **106** | **106**, byte-identical |
+| `loudm`, + `[    0.000000] CPU revision is: 00018000` (42 B) | **148** | **148**, byte-identical |
+| on the device, B00…B10, B07 = `00000000` | **139** | — |
+| + M4 (`echo` 39 B, `ONLCR` 40 — 推) | **179** | — |
+
+At 38400 8N1 = 3,840 B/s that is 36.2 ms for the marks and 46.6 ms with M4.
+**A short capture is a number now**: 106 where 139 was predicted is B08–B10
+missing, not a garbled line.
+
+⚠️ **The count is a floor for `loud`/`loudm`, not a prediction.**
+`setup_early_printk()` registers between B03 and B04 (量), and the desk channel
+halts at B07 — so nothing has ever observed this kernel printing between B04 and
+B10 with `CONFIG_PRINTK=y` and real peripherals.
+
+🆕 **The two readings of `PRId` in a `loudm` capture will arrive in different
+case — 推, and the values below are the DEVICE's, which no capture holds.**
+讀: `rlxfw_puts_hex` uses `"0123456789ABCDEF"`, so B02 prints upper case;
+`arch/rlx/kernel/cpu-probe.c:39` is `printk("CPU revision is: %08x\n", …)`, so
+that line prints lower case. 量, on the only `loudm` capture that exists: **both
+print `00018000`** — qemu's 4Kc `PRId`, whose eight digits contain no letters,
+so the case difference has never been observed. On this die the same binary must
+print `0000CD01` and `0000cd01`, and the case difference then becomes free
+evidence that they are two paths rather than one string. **If they disagree in
+value, one of the two paths is wrong** — which is what the cross-check is for.
+
+### 12.5 `/proc/cpuinfo` is a third reading of `PRId`, and the shipped kernel prints one field mine does not
+
+讀 `arch/rlx/kernel/proc.c:26-35` — six `seq_printf`s, and line 29 is
+`"cpu model\t\t: %d\n"` on `cpu_data[n].processor_id`. **A decimal integer, not
+a core name.** 讀 upstream `test-ledger.md` `P5-5`, which read this same file on
+**this unit** under the **vendor's** firmware:
+
+| field | vendor kernel, 量 | mine, predicted | source |
+|---|---|---|---|
+| `system type` | `RTL819xD` | `RTL819xD` | 讀 `boards/rtl8196e/bsp/prom.c:43`, `return "RTL819xD";` |
+| `cpu model` | **`52481`** | **`52481`** | `0x0000CD01`. **A third independent reading of `CPU-04`**, in decimal, through `seq_file` and userspace |
+| `BogoMIPS` | `398.95` | `398.95` | `udelay_val`; far from it names `time_init`, not the CPU |
+| `tlb_entries` | `32` | `32` | corroborates `CPU-08` by a path with no TLB probe in it |
+| `mips16 implemented` | `yes` | `yes` | 讀 `proc.c:35` — **a hardcoded string. Not a measurement** |
+| `hardware watchpoint` | **`no`** | 🔴 **absent** | 量: the format string `hardware watchpoint\t: %s` occurs in `vmlinux-rederived.bin` and **zero** times in either of my images. The drop's `proc.c` has no such line |
+
+🔴 **The missing seventh field is a free discriminator, and it is a second data
+point of `TC-17`'s shape**: this unit's shipped kernel was not built from any of
+the three drops in hand. Its *presence* in a capture would mean the vendor
+kernel answered.
+
+And `linux_banner`, 量 on both decompressed images:
+
+```
+mine    Linux version 2.6.30.9 (key@K) (gcc version 3.4.6-1.3.6) #1 Fri Aug 28 23:37:47 CST 2026
+this unit's  Linux version 2.6.30.9 (admin@office.hopeiot) (gcc version 4.4.5-1.5.5p2 (GCC) ) #1526 Wed Jan 10 14:50:54 CST 2018
+```
+
+**`#1` against `#1526`.** The release string `2.6.30.9` is identical in both and
+is therefore not the discriminator; the version field is.
+
+### 12.6 🔴 `nfjrom` does not force `0x80000000`. `boot.img` does
+
+讀 `$FWRE_WORK/stage2.bin` at `0x80401208`, this unit's own second stage —
+a second source for what upstream's note already disassembled:
+
+```
+80401210  jal   0x80406D7C          ; against "nfjrom"   @ 0x8040A6A0
+80401218  beqz  v0, 0x8040122C      ; no match -> fall through to the boot.img test
+80401224  j     0x8040125C          ; MATCH -> skip the boot.img test entirely
+80401228  sw    v1,-0x2C70(v0)      ; 0x8040D390 = 1     execute on completion
+...
+80401234  jal   0x80406C40          ; against "boot.img" @ 0x8040A6A8
+8040124C  sw    v1,-0x2C70(v0)      ; 0x8040D390 = 1
+80401250  lui   v1,0x8000
+80401258  sw    v1,-0x2C58(v0)      ; 0x8040D3A8 = 0x80000000    boot.img ONLY
+```
+
+§13.3 said the name *"makes the loader force the load address to `0x80000000`
+and execute at the end of the transfer"*, and `SPEC.md` `LDR-26` said the same
+of both names. **Only `boot.img` writes the address.** The two tests are
+mutually exclusive — a `nfjrom` match branches past the second one — and the
+routine at `0x80406D7C` computes both lengths before walking, i.e. it is a
+substring search rather than `strcmp`.
+
+**The correction matters in the dangerous direction.** With `nfjrom` as the TFTP
+filename the loader jumps to whatever load address is set — `0x80500000`, the
+right one — so the accident *looks like a successful boot* and silently costs
+the `J` line, the `AUTOBURN` timing and the whole of `K2`. With `boot.img` it
+jumps to `0x80000000` and crashes. Those are two different accidents.
+
+⚠️ **And the guard is narrower than §13.3 implied.** `loader-tftp.py put` tests
+`--filename` — the name in the WRQ — not `--image`'s basename, which the loader
+never sees; `--filename` defaults to `image`. So *"copy the file to another
+name"* is not what protects the seating. Passing `--filename` explicitly is.
+Both are done: the two upload files are staged as
+`bench-only/b5-20260830/rlxfw-{loudm,quietm}-20260830.bin` (量, `cmp`-identical
+to the pipeline's `nfjrom`) and the card passes `--filename rlxfw-loudm`.
+
+### 12.7 🔴 `uname` is not an applet in this unit's `busybox`, and the seating asked for it three times
+
+`RUNSHEET` `K5`'s second command was `uname -a`. It is one of D4's two
+observables — *a typed command returns output* — and it cannot run.
+
+量 2026-08-29, this unit's **own** `busybox` (273,332 bytes, `BusyBox v1.13.4
+(2018-01-10 14:56:45 CST)`, carved out of its own flash dump) executed under
+`qemu-mips-static` against its own extracted rootfs:
+
+| | |
+|---|---|
+| `busybox uname -a` | 🔴 **`uname: applet not found`** |
+| applets the binary lists | **50** |
+| of the fourteen this seating needs | `uname` is the **only** absent one |
+| present | `cat` `ifconfig` `ping` `ls` `ps` `mount` `echo` `sleep` `mkdir` `sh` `ash` `sed` `grep` |
+
+**Both controls are inside the same measurement**, which is what makes the
+`applet not found` a reading rather than a broken invocation: a name that is not
+an applet returns `sh: definitely_not_an_applet: not found` (negative), and
+`cat` gets as far as opening a file and reporting `No such file or directory`
+(positive).
+
+⚠️ **`qemu-mips-static` with `-L <rootfs>` is not a sandbox**, and the first
+attempt at this measurement proved it: `busybox sh -c 'uname -a'` printed the
+**WSL host's** uname, because the shell's `PATH` search fell through to the real
+filesystem. That reading is an artefact and is excluded; the load-bearing one is
+`busybox uname -a`, which goes to the applet table and never touches `PATH`.
+⚠️ And the first tree tried was `rebuild/fakework/extracted/unit-2018`, whose
+`/bin` holds only `boa` and `busybox` — a partial carve, whose **0 symlinks**
+would have supported a conclusion about the shipped firmware that is false. The
+complete tree is `$FWRE_WORK/extracted/unit-2018/squashfs-root`: 163 files,
+88 symlinks, **51** of them in `bin`/`sbin`/`usr/bin`/`usr/sbin`.
+
+🔴 **The gap had already been found once and the fix written for it would not
+have worked.** §9 above records a `/bin/uname` symlink added *"because
+`RUNSHEET` `K5` types `uname -a` and this unit's dump has 50 busybox symlinks
+without that being one of them"*, and then removed. **Three passes — the
+runsheet cell, the symlink, its removal — and none asked whether the applet
+exists.** With the symlink in place the shell would have `exec`'d `busybox` as
+`uname`, and `busybox` would have printed `applet not found`.
+
+**The replacement is strictly better than what it replaces**, which is why this
+is a correction and not a deletion. `cat /proc/version` prints `linux_banner`
+verbatim:
+
+```
+Linux version 2.6.30.9 (key@K) (gcc version 3.4.6-1.3.6) #1 Fri Aug 28 23:37:47 CST 2026
+```
+
+`uname -a` would have dropped `(key@K)` and the gcc version — two thirds of the
+discriminator, and the two thirds the vendor image cannot fake. `cat` is an
+applet **and** is declared in `config/rlxfw-initramfs.tsv`; `/proc` is mounted
+by `/init` before it `exec`s the shell.
+
+⚠️ `bench/2026-08-30b/PREDICTIONS-B5-block1.md` §`L5b` still says `uname -a`.
+**It is not edited** — it was frozen before this was measured, and house rule 2
+is that a prediction file is not touched afterwards. The capture prefix is
+`L5b` either way, so the ordering check is unaffected; `RUNSHEET` §B5-c7 is
+where the change of command lives.
 
 ---
 
@@ -1454,6 +1771,13 @@ pipeline's output is literally that name. So the file has to be **copied to a
 different name before it is uploaded**, and `RUNSHEET` `K1` now says so —
 before 2026-08-29 that warning was about a filename nobody was going to type by
 accident, and now it is about the one the build produces.
+
+🔄 **2026-08-29, later the same day (`R3-7`): that sentence is wrong twice and
+§12.6 has the disassembly.** 讀 this unit's own `stage2.bin`: **`nfjrom` sets
+only the auto-execute flag; `boot.img` is the one that also writes
+`0x80000000`.** And the guard is on `loader-tftp.py`'s **`--filename`**, not on
+the local path — so copying the file is hygiene, and passing `--filename`
+explicitly is the control.
 
 ⚠️ **The marks make the image compress BETTER, not worse.** `quietm`'s
 `vmlinux` is 127 bytes larger than `quiet`'s and its LZMA stream is **240 bytes
@@ -1879,3 +2203,20 @@ put an unmeasured sentence next to eight measured ones.
   RTL8196E peripherals and load interlocks.** It shows the marks are reachable
   and computed. It shows nothing about whether they will reach 38400 8N1 on
   this die.
+
+* **§12.2's image-identity words are the LINKER's, not the loader's.** They say
+  what `__vmlinux_end` was when the image was built. A transfer that landed at
+  the wrong *address* would still read them correctly at whatever address it
+  landed on, and `DW` is pointed by hand. What they identify is **which image**,
+  not **where**; `--expect-load` against the loader's own echo is what covers
+  the address.
+* **§12.3's before/after pair assumes nothing else writes above `image_end`
+  between the two reads.** Nothing in the loader is known to, but nothing has
+  measured it either — the region has never been read twice in one boot.
+* **§12.5's `/proc/cpuinfo` comparison is against a reading taken through the
+  vendor's own web shell**, not through a console. The values are the kernel's
+  either way, but the path is not one this project controls, and `BogoMIPS`
+  `398.95` is a single sample with no stated repeat.
+* **§12.6 is two readings of the same disassembly**, mine and upstream's, of
+  **one** binary. It is a stronger source than one reading and it is not two
+  independent parties.

@@ -68,20 +68,51 @@ cannot be edited:
 
 ## What is not fixed, and it is bigger than this directory
 
-🔴 **Nothing automated ever runs `check-predictions.py`.** It is not in
-`.github/workflows/ci.yml`, it is not a row in `tools/ci-expected.tsv`, and
-`tools/ci-census.py` does not know it exists — 量 2026-08-25. CI runs
-`audit-bench-log.py` over `bench/**/*.log` and nothing else touches `bench/`.
+🔄 **2026-08-29 (`R3-7`): half of this is fixed and the other half turned out to
+be impossible. The original is kept below, because the reason it was wrong is
+worth more than the paragraph was.**
 
-So the tool that enforces `RUNSHEET.md` house rule 2 — *a cell whose expectation
-is written afterwards illustrates; it cannot refute* — is invoked by hand, one
-block at a time, at the bench. Eleven prediction files now exist across `bench/`
-and no single run has ever covered all of them.
+**Fixed**: `check-predictions.py --self-test` is a step in
+`.github/workflows/ci.yml`, a row in `tools/ci-expected.tsv` and a suite
+`tools/ci-census.py` closes arithmetic against. Its controls went 4 → **15**,
+eight of which must fail, four of them driving the file as a subprocess.
 
-**Wiring it in is desk work and it is not free**: a sweep over
-`bench/**/PREDICTIONS-*.md` goes red on this directory on its first run, so the
-exception has to be a row in `ci-expected.tsv` with a written reason — the shape
-that file exists for, and the shape `bench/README.md` demands when it says *a
-hit that is waved through without a written reason is a scanner that has been
-turned off one value at a time.* Cost **猜, uncalibrated: ½–1 desk segment**, and
-it reduces bench risk by zero.
+**Impossible, and it is a better finding than the fix**: a sweep over
+`bench/**/PREDICTIONS-*.md` cannot be a CI gate at all, because **git does not
+store mtimes**. `actions/checkout` writes every file fresh, so on a clone the
+whole of `bench/` carries a handful of timestamps spanning tens of milliseconds
+and the sweep reads **128 of 156 cells as *capture is OLDER than the
+prediction***. 量 twice, on two independent `git clone --depth 1` of this
+repository. So the ordering claim is a **pre-push gate on the machine that took
+the captures** and it proves nothing to anyone who clones this repository —
+which is a sharper statement than the docstring's *"not a cryptographic
+timestamp"* and it is now in the docstring too.
+
+**And this directory needs no exception row**, which the paragraph below
+predicted it would: the sweep is ordering-only, so a sealed prediction file
+whose captures do not exist reports its cells as *absent*, not as violations,
+and the tree is green. What the sweep refuses on is **zero** resolvable cells —
+a renamed directory, a typo'd path, the wrong working directory — because those
+three used to read as a clean result.
+
+⚠️ **Eleven prediction files** was true when it was written. 量 2026-08-29:
+**38**, and one run does now cover all of them — on this machine.
+
+> *(as written 2026-08-26:)* 🔴 **Nothing automated ever runs
+> `check-predictions.py`.** It is not in `.github/workflows/ci.yml`, it is not a
+> row in `tools/ci-expected.tsv`, and `tools/ci-census.py` does not know it
+> exists — 量 2026-08-25. CI runs `audit-bench-log.py` over `bench/**/*.log`
+> and nothing else touches `bench/`.
+>
+> So the tool that enforces `RUNSHEET.md` house rule 2 — *a cell whose
+> expectation is written afterwards illustrates; it cannot refute* — is invoked
+> by hand, one block at a time, at the bench. Eleven prediction files now exist
+> across `bench/` and no single run has ever covered all of them.
+>
+> **Wiring it in is desk work and it is not free**: a sweep over
+> `bench/**/PREDICTIONS-*.md` goes red on this directory on its first run, so
+> the exception has to be a row in `ci-expected.tsv` with a written reason — the
+> shape that file exists for, and the shape `bench/README.md` demands when it
+> says *a hit that is waved through without a written reason is a scanner that
+> has been turned off one value at a time.* Cost **猜, uncalibrated: ½–1 desk
+> segment**, and it reduces bench risk by zero.

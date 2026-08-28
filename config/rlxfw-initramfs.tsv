@@ -54,6 +54,16 @@ slink	/bin/mount	busybox	0777	unit	/proc and /sys
 slink	/bin/ps	busybox	0777	unit	-
 slink	/bin/ifconfig	busybox	0777	unit	rung 2
 slink	/bin/ping	busybox	0777	unit	rung 3
+# THERE IS NO /bin/uname, AND ADDING ONE WOULD NOT WORK.  Recorded here because
+# a symlink for it was added for RUNSHEET K5 and then removed, and neither step
+# wrote down why -- notes/kernel-build.md sec 9 still carries the fossil, a
+# sentence that says both "there is no symlink of mine left" and "it is declared
+# as mine".  量 2026-08-29, this unit's own busybox under qemu-mips-static:
+# `busybox uname -a` -> `uname: applet not found`.  The binary lists 50 applets
+# and uname is not one of them, so the symlink would have exec'd busybox as
+# `uname` and busybox would have refused.  K5 reads /proc/version instead, which
+# prints linux_banner verbatim and therefore carries (user@host) and the gcc
+# version that `uname -a` drops.  notes/kernel-build.md sec 12.7.
 # /bin/dmesg was here, tagged `unit`, until 2026-08-28, and the adversarial pass
 # found it. It is NOT in this unit's dump -- the dump has 50 busybox symlinks and
 # that is not one of them -- and the byte string `dmesg` does not appear in this
