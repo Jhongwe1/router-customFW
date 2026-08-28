@@ -5,12 +5,16 @@ core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from four
 vendors' GPL drops and one leaked draft datasheet, because TOTOLINK never
 released source.
 
-> **This file holds only what is true today.** 🔄 **2026-08-29: two kernels of
-> mine now exist** — `quiet` and `loud`, both linked, configured, filled with an
-> initramfs and carrying eleven boot marks, both passing the load-delay gate at 0
-> violations. **No driver, no
-> loadable image, nothing of mine has executed on the silicon, and not one
-> flash byte is written.** **Which gate that is, `PROGRESS.md` says** — this
+> **This file holds only what is true today.** 🔄 **2026-08-29, second update:
+> four LOADABLE IMAGES of mine now exist** — `quiet` and `loud`, each with and
+> without the eleven boot marks, wrapped by Realtek's own `rtkload` pipeline into
+> `nfjrom` files of 1,027,072 and 1,053,696 bytes, and that pipeline was shown
+> the same day to reproduce the vendor's own shipped `nfjrom` byte for byte. Two
+> of them have printed eight boot marks under a MIPS32 emulator with the UART
+> redirected, halting where this board's own kernel halts. **No driver, nothing
+> of mine has executed on the silicon, and not one flash byte is written.**
+> *(Until today this said "no loadable image", which stopped being true at
+> 02:20.)* **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there. Conventions for files that do not exist are not written
 > here; they go in when the file appears. Where this contradicts the repo, the
