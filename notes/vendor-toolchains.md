@@ -34,6 +34,12 @@ an agreement between two readings, not as a measurement of the die.
 > first three were in — **two whole `vmlinux` built from one source**; any of them
 > coming out equal refutes it. It is **not** refuted by the counts differing in
 > size: the claim is about the presence of padding, not its amount.
+> 🔄 **2026-08-29: a fourth corpus, and it is sharper than a rate.** `RUNSHEET`
+> `P2` re-assembles six real `arch/rlx` sources from the build's OWN recorded
+> `.o.cmd` line with `-Wa,-march=5281` appended and nothing else changed:
+> **0 load-use violations against 11**, per file 5/1/2/2/1/0. Not a nop rate — a
+> hazard count, on the objects a real kernel build produced. `notes/kernel-build.md`
+> §14.3.
 >
 > **R3a** — the derived claim, *"this unit's kernel was built on the padded side"*,
 > is refuted by its nop rate or its violation count falling between the two builds
