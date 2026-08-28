@@ -274,6 +274,15 @@ would write down *"only one drop has it"*, which is false. The BSP is in all
 three at `boards/rtl8196e/bsp/`, 12 files, byte-identical but for one `#if` in
 `setup.c`'s reboot path. `notes/kernel-build.md` §10, `TC-27`, `TC-28`.
 
+### 🆕 Carried forward out of `R3-2`/`P2`/`P3`, 2026-08-29
+
+| | what | why it is not fixed today |
+|---|---|---|
+| **`TC-n`** 🆕 | **Two of this repository's own qemu captures disagree about whether malta's ISA COM1 answers.** 量 2026-08-26 (`qemu/2026-08-26/probe3.txt`, 5,893 bytes): a payload writing `0xB80003F8` under `-kernel` is heard. 量 2026-08-29 (`deskchan.py` `C1`): a `-bios`-only stub writing the same address is not, and a poll of `0xB80003FD` reads 0 forever. **One variable differs — the entry mechanism** — and the mechanism behind it (qemu's `-kernel` bootloader initialising the GT64120's PCI/ISA decoders) is **推** | nothing in `R3` depends on it: the kernel channel uses the CBUS UART, which answers on both paths. It is carried because the ISA addresses are written in `qemu/README.md`'s own table, and a reader taking them into a `-bios` run gets silence that reads as *the code never got there* |
+| **`TC-o`** 🆕 | **`loud` flushes exactly one buffered `printk` line when the early console registers, and the rest of the log buffer does not appear.** 量: `CPU revision is:` is emitted at `cpu_probe()` (between B01 and B02) and lands in the stream after B03; the banner and everything else printed before that point never arrive | it is a fact about what the `loud` capture will look like and it is recorded as one. Explaining it means reading `console_init`'s replay path and `CON_PRINTBUFFER` in this tree, and guessing at it would put an unmeasured sentence next to eight measured ones |
+| **`lzma-24`** 🆕 | **Not excluded as the compressor, and not testable here**: it fails to start on this host (`libstdc++.so.5` absent). `lzma-26` reproduces the vendor's bytes; whether `lzma-24` would too is open | a 32-bit `libstdc++5` is an apt package and installing one to settle a question nothing depends on is not this session's work. It matters only if a future image fails to reproduce |
+| **`cr6c` for `R9`** 🆕 | The flash header the loader's `check_image()` will accept is `cr6c`, and the Makefile's own option logic writes `cr6b` for this board. `cvimg signature … cr6c` produces it | `R9` is the gate that writes flash and it owns the decision. Recorded here so it is not rediscovered at the bench |
+
 ### Refutation condition, written now
 
 **The gate.** `R3` is not closed by a shell prompt. It is closed by a capture in

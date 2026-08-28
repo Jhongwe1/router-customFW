@@ -1,0 +1,44 @@
+# quiet-uart under qemu-system-mips -- 2026-08-29, RUNSHEET P3
+
+# THE CONTROL: no marks in the image, nothing on the wire
+
+host        Linux 6.6.87.2-microsoft-standard-WSL2
+qemu        QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+tool        tools/deskchan.py 1.0   (NOT tools/rlxprobe/qemu-run.sh --
+            different entry mechanism, different CPU, different UART;
+            qemu/README.md says which is which and why it matters)
+machine     -M malta -m 128 -cpu 4Kc -bios <4-instruction stub>
+            -device loader,file=<image>,addr=0,force-raw=on
+            -serial null -serial null -serial file:   (index 2 = CBUS)
+seconds     30 (nothing here halts; the run is bounded by timeout)
+
+## the DEVICE artefact this run is about
+    vmlinux    3968113 bytes  sha256 ded501a356986274d3526fa1363895ed1e0622d41c3bf2bca88a05efb7d59b8a
+    nfjrom     1027072 bytes  sha256 09f5eea5ae1f7f5b684fbfabb79dfd6a66348f7787c82e4739c6af1a7d983007   <- what gets uploaded
+    entry      0x80003600   (kernelStartAddr, read out of the nfjrom header)
+
+## the qemu image -- NOT the same bytes
+    decompressed image 3472384 bytes  sha256 d7e705fc0c749d3944a31b73b7c89a0fe795e2e75e3a4b0c01a203f03f55b319
+    Two declared patches, and nothing else:
+      COP3 -> nop   4 word(s) -> nop: 0x8000233C(4c880000) 0x8000234C(4c880800) 0x80002398(4c882000) 0x800023A8(4c882800)
+                    qemu 4Kc raises Coprocessor Unusable on these; the
+                    channel therefore SKIPS the Lexra IMEM/DMEM setup
+      UART          prom_putchar 0x8000B080+100 -> 5 word(s): 3c02b800 x2 34462014 x1 34452008 x1 34422000 x1
+                    0xB8002000/08/14 -> 0xBF000900/10/28, malta CBUS.
+                    Five words inside prom_putchar, window from the
+                    symbol table. On the device none of this is present.
+
+## the run
+    distinct PCs translated  942   (of them KSEG0: 938)
+    translated blocks        168
+    last block               0x80006B94  bsp_machine_halt+0
+    KSEG0 reach              0x800022D0 .. 0x802B8E14
+
+## the capture
+    quiet-uart.txt   0 bytes
+    sha256       e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    EMPTY ON PURPOSE. This is C5: an image with no marks in it must
+    print nothing through the same channel. A zero-byte file is the
+    measurement, and without it the other two captures would be
+    evidence that a UART works rather than that a mark ran.
+

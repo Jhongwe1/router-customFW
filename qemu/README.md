@@ -42,6 +42,41 @@ about the silicon:
   rejects.** That is how upstream's `P9-12` was certified by its own simulator
   before it failed on this silicon.
 
+## 🆕 2026-08-29: there are now TWO channels in here, and they disagree about the UART
+
+Everything above and below was written for `tools/rlxprobe/qemu-run.sh`, which
+runs a bare-metal payload. `tools/deskchan.py` runs a **kernel image**, and it
+differs in every line that matters:
+
+| | `qemu-run.sh` (`2026-08-26/`) | `deskchan.py` (`2026-08-29/`) |
+|---|---|---|
+| entry | `-kernel <elf>` | four-instruction `-bios` stub + `-device loader,addr=0` |
+| CPU | malta's default, a **24Kf** | `-cpu 4Kc` (量: 4Kc, 24Kc and 24Kf give the same counts) |
+| memory | `-m 32` | `-m 128` |
+| UART | ISA COM1, `0xB80003F8` / `0xB80003FD`, `-serial` **0** | CBUS, `0xBF000900` / `0xBF000928`, `-serial` **2** |
+| what changes in the image | three build constants, recompiled | two patches applied to the binary: four COP3 words → `nop`, five words in `prom_putchar` |
+
+🔴 **And the UART row is a contradiction between two of this repository's own
+measurements, which is why it is written out rather than smoothed over.**
+
+* 量 2026-08-26, committed in `2026-08-26/probe3.txt`: a payload writing
+  `0xB80003F8` under `-kernel` produced **5,893 bytes**. The ISA window works.
+* 量 2026-08-29, `deskchan.py`'s `C1`: a `-bios`-only stub writing the same
+  address, with the file chardev on `-serial` 0, produced **nothing**, and a
+  poll of `0xB80003FD` read 0 forever.
+
+**One variable differs and it is the entry mechanism.** With `-kernel`, qemu's
+malta writes its own bootloader into the reset window and that code initialises
+the board before jumping; with `-bios`, the four instructions that replace it
+initialise nothing. **That the GT64120's PCI/ISA decoders are what is missing is
+推, not measured** — it is the obvious candidate and no experiment here
+separates it from the others. What IS measured is that the CBUS UART at
+`0xBF000900` answers on both paths, which is why the kernel channel uses it.
+
+**Neither capture is wrong and neither generalises.** A reader taking the UART
+addresses out of the table below and using them under `-bios` gets silence, and
+would read it as *the code never got there*.
+
 ## The build is not the same image
 
 `qemu-run.sh` rebuilds with three constants changed and nothing else:

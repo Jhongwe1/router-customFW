@@ -1659,6 +1659,18 @@ went to the CBUS UART instead — `0xBF000900` THR, `0xBF000928` LSR,
 `serial_hd(2)` — which this project's own `qemu-harness/qemu-run.sh` had
 recorded in a comment since 2026-08-25.
 
+⚠️ **And that reading contradicts one this repository already had committed.**
+`qemu/2026-08-26/probe3.txt` is 5,893 bytes produced by a payload writing
+**`0xB80003F8`** — the address that produced nothing today. Both are
+measurements and neither is wrong; **one variable differs, and it is the entry
+mechanism**: `probe3` went in through `-kernel`, where qemu's malta writes its
+own bootloader into the reset window and that code initialises the board first,
+while this channel replaces the firmware with four instructions that initialise
+nothing. **That the GT64120's PCI/ISA decoders are the specific thing missing is
+推** — it is the obvious candidate and nothing here separates it from the
+others. `qemu/README.md` now carries the pair so that neither capture is read as
+generalising over the other.
+
 ⚠️ **An unpolled first write is lost.** 量, four stubs: blind `ABCDE` → `BCDE`;
 blind `A` alone → nothing; polled `RLXFW` with no blind write → `RLXFW`,
 complete; blind `AB` + polled `CD` → `BCD`. `prom_putchar` always polls, and on

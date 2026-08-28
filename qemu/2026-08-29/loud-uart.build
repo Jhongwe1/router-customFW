@@ -1,0 +1,40 @@
+# loud-uart under qemu-system-mips -- 2026-08-29, RUNSHEET P3
+
+# no marks, and 42 bytes anyway -- which is the finding
+
+host        Linux 6.6.87.2-microsoft-standard-WSL2
+qemu        QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+tool        tools/deskchan.py 1.0   (NOT tools/rlxprobe/qemu-run.sh --
+            different entry mechanism, different CPU, different UART;
+            qemu/README.md says which is which and why it matters)
+machine     -M malta -m 128 -cpu 4Kc -bios <4-instruction stub>
+            -device loader,file=<image>,addr=0,force-raw=on
+            -serial null -serial null -serial file:   (index 2 = CBUS)
+seconds     30 (nothing here halts; the run is bounded by timeout)
+
+## the DEVICE artefact this run is about
+    vmlinux    4042261 bytes  sha256 be8499a86d91e1858ffcb7f53c609924f518dcdc603abd542754780dfa58a13f
+    nfjrom     1052672 bytes  sha256 b3a068331270ccab8fa2d44dc8922b72d5c76da6dd46ac5a5484f4708247f110   <- what gets uploaded
+    entry      0x80003600   (kernelStartAddr, read out of the nfjrom header)
+
+## the qemu image -- NOT the same bytes
+    decompressed image 3546112 bytes  sha256 fd0f963297d51956d9be282dc6493ad009136c16c90c5b6941a6554a87c052b6
+    Two declared patches, and nothing else:
+      COP3 -> nop   4 word(s) -> nop: 0x8000233C(4c880000) 0x8000234C(4c880800) 0x80002398(4c882000) 0x800023A8(4c882800)
+                    qemu 4Kc raises Coprocessor Unusable on these; the
+                    channel therefore SKIPS the Lexra IMEM/DMEM setup
+      UART          prom_putchar 0x8000B1C0+100 -> 5 word(s): 3c02b800 x2 34462014 x1 34452008 x1 34422000 x1
+                    0xB8002000/08/14 -> 0xBF000900/10/28, malta CBUS.
+                    Five words inside prom_putchar, window from the
+                    symbol table. On the device none of this is present.
+
+## the run
+    distinct PCs translated  2212   (of them KSEG0: 2208)
+    translated blocks        437
+    last block               0x80006C64  bsp_machine_halt+0
+    KSEG0 reach              0x800022D0 .. 0x802CA420
+
+## the capture
+    loud-uart.txt   42 bytes
+    sha256       c1726ab89595a5ca7158029148bf1b8c508613e3f646c39b8cdf499db6a93f80
+
