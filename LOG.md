@@ -7241,3 +7241,330 @@ scratchpad）、**B07 印 `bsp_swcore_init` 的回傳值**、B08、B09、B10。
 `config/rlxfw-src/`（新，兩個檔）、`hazlint` 1.4 → 1.5、`kconfig-delta`
 22 → 24 控制、`mkinitramfs` 19 → 23、`test-hazlint` 121 → 142、
 `test-config-gates` 34 → 45。
+
+---
+
+## 2026-08-29（桌面，第六段）— `R3-2` 第 3–6 階：管線重現廠商自己的輸出，`P2` 與 `P3` 兩筆債清掉
+
+桌面日，未接觸裝置。零 flash 位元組、零電源循環、零裝置讀數。
+
+開場兩件債（`P2`、`P3`）都是「欠著」而不是「做過但沒寫」，所以兩件都是先蓋
+儀器再讀刻度；本體是 `R3-2` 的第 3–6 階，而它的通過條件把正控制排在自己前面。
+三支新工具：`tools/hazlint-objs.py`、`tools/deskchan.py`、`tools/rtkimage.py`，
+各附一支 suite（28／18／32 案）。
+
+---
+
+### 一、`P2` —— 對 `arch/rlx` 每一個 `.o` 跑 `hazlint`
+
+**它斷言的是 `TC-21`**：`arch/rlx` 手寫組語裡十一條 live load-use hazard 是被
+組譯器的 `-march` 預設擋掉的，不是作者填的。`P1`（對 linked `vmlinux`）讀到 0，
+但那個 0 分不開「作者填了」和「gas 幫他填了」——**分得開的地方在 object 上**。
+
+**列舉本身差點是瞎的，而這是今天第一個發現。** 量：
+
+| 樹 | `find arch/rlx -name '*.o'` | `find -L` | 差的是什麼 |
+|---|---:|---:|---|
+| `quiet`／`loud` | 57 | **63** | `bsp/built-in.o`、`bsp/irq.o`、`bsp/prom.o`、`bsp/serial.o`、`bsp/setup.o`、`bsp/timer.o` |
+| `quietm`／`loudm` | 58 | **64** | 同上六個 |
+
+`arch/rlx/bsp` 是符號連結（`TC-27`／§10），`find` 不跟。那六個就是板子，而
+`bsp_swcore_init()` 的呼叫點、`RLXFW-B04`–`B07` 全在 `bsp/setup.o` 裡。
+**照直覺寫的 `P2` 會掃完架構、跳過機器，然後印 0。**
+`Q1` 因此是拒絕條件而不是資訊：掃描清單裡沒有 `bsp/setup.o` 就不報告。
+
+**掃描結果**，四棵樹十二個控制全綠：
+
+| 樹 | leaf object | loads | `load;nop` | unresolved | **violations** | 掃到的 bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| `quiet` | 59 | 1,607 | 350 | **0** | **0** | 56,472 |
+| `loud` | 59 | 1,675 | 363 | **0** | **0** | 58,344 |
+| `quietm` | 60 | 1,617 | 350 | **0** | **0** | 56,784 |
+| `loudm` | 60 | 1,685 | 363 | **0** | **0** | 58,652 |
+
+**`unresolved` 是 0，而這比看起來重要。** `.o` 沒有套用重定位，所以「load 在
+delay slot 裡、分支目標在別的段」會被記成 `unresolved` 而**不檢查** —— 那是一條
+偽陰性通道，也是 `P1` 存在的理由之一。量：這條通道在這批材料上是**空的**。
+
+**`Q5` 才是讓 0 變成量測的那一格。** 拿 build 自己記在 `.o.cmd` 裡的命令列，
+只加一個 `-Wa,-march=5281`，其他一個字都不改，重組同樣六支：
+
+| object | build 自己的 `.o` | 同一份來源，`-march=5281` |
+|---|---:|---:|
+| `kernel/entry.o` | 0 | **5** |
+| `kernel/genex.o` | 0 | **1** |
+| `lib/strlen_user.o` | 0 | **2** |
+| `lib/strnlen_user.o` | 0 | **2** |
+| `lib/strncpy_user.o` | 0 | **1** |
+| `kernel/scall32-o32.o` | 0 | **0** |
+| | | **11** |
+
+四棵樹都一樣。`scall32-o32.o` 在控制裡就是因為它必須維持 0 —— 一個每一格都
+預期會發射的控制，證明不了工具讀的是 `-march` 而不是檔名。
+⚠️ 讀那些命令列：**裡面根本沒有 `-march`**。那是 `TC-14` 直接寫在 build 自己的
+紀錄裡。
+
+**`TC-m` 順手量掉了一半。** `Q8`：26 個（有記號的樹 27 個）object 印出
+`EXCISED BY NAME`，而**沒有一個掃到的 bytes 少於它自己 `SHF_EXECINSTR` 區段的
+大小** —— 宣稱的切除確實什麼都沒切，那些 bytes 是被當 32 位元指令掃過。
+**誤差是保守方向**：能造偽陽性，不能藏真陽性。所以 `P2` 的 0 不受 `TC-m`
+削弱，而 `TC-m` 本身沒修，仍然帶著。
+
+**兩種拒絕是對的，但都要處理**：7 個 object 真的沒有 load（`head.o`、
+`imem-dmem.o` 與五支 64 位元 helper），重跑一次帶 `--allow-zero-loads`，
+而 `Q7a` 要求重跑後**仍然是 0 loads、非 0 words**；1 個 object 完全沒有程式碼
+（`init_task.o`），`Q7b` 拿區段表在**這支工具裡**再驗一次，不採信 `hazlint`
+的句子。
+
+---
+
+### 二、`P3` —— 桌面執行通道
+
+**§5 的四個數字先被重新推導，而單位是錯的。** §5 寫「KSEG0 instructions」：
+880／880／968／1,003。`-d in_asm` 是在**翻譯時**記錄的，qemu 會把同一個 block
+從不同偏移進入時重新翻譯，所以同一條指令會被列不只一次。拿 2026-08-28 那次
+留在磁碟上的四個 `.pcs` 重數：
+
+| run | 停在 | §5 印的 | 列出的 PC | **相異 PC** |
+|---|---|---:|---:|---:|
+| 這台的 kernel | COP3 `0x8000227C` → BEV | 880 | 866 | **828** |
+| 08-28 那份 build | `0x8000233C` | 880 | 880 | **843** |
+| 這台的 kernel，`nop` | `0x8031E218` `j .` | 968 | 968 | **908** |
+| 08-28 那份 build，`nop` | `0x80006B2C` | 1,003 | 1,003 | **938** |
+
+🔴 **而控制那一列的 880 在任何一份 log 裡都不存在**：`c1.pcs` 是 866 列出、
+828 相異。§5 的結論「兩份停在同一個指令類別」沒有受影響（它靠的是停止位址，
+而停止位址完全重現），但寫在它旁邊那兩個相等的數字不是量出來的。
+**兩件事都查不回去，因為當時只留了 log 沒留 qemu 命令列** —— `-cpu`（4Kc／
+24Kc／24Kf）、`-m`（128／256）、`-d`（chain／nochain）都試過，沒有一個解釋得了
+那個差。`deskchan.py` 每次把完整命令列印出來，並把 `pcs.txt` 存在 trace 旁邊。
+
+**UART 改道，以及抓到第一次嘗試的那個控制。** `prom_putchar` 寫
+`0xB8002000`，malta 那裡什麼都沒有。`--redirect-uart` 改**`prom_putchar` 裡面
+五個字，映像其他地方一個字都不動**：兩個 `lui v0,0xb800` 與三個 `ori`
+（THR／FCR／LSR）。視窗取自符號表的 `prom_putchar` 範圍 —— 這不是講究：
+`lui v0,0xb800` 是這個 port 每一個 KSEG1 暫存器存取的開頭，全映像搜尋取代會把
+每一個周邊的位址都搬走，做出一個會跑但沒有意義的映像。
+
+🔴 **第一個目標選錯了，是 `C1` 說的。** malta 的 ISA COM1 在實體
+`0x180003F8`，那個位址連 `lui` 都不用改，所以它最吸引人。量，用一支只有
+`-bios` 的 stub 盲寫兩個字元：**什麼都沒到**，而輪詢 `0xB80003FD` 永遠讀 0。
+改道因此改到 CBUS UART —— `0xBF000900` THR、`0xBF000928` LSR、`serial_hd(2)`，
+而這個 repo 自己的 `qemu-harness/qemu-run.sh` 從 2026-08-25 起就把它寫在註解裡。
+
+⚠️ **沒有輪詢的第一個寫入會掉。** 量，四支 stub：盲寫 `ABCDE` → `BCDE`；
+盲寫 `A` → 什麼都沒有；只輪詢寫 `RLXFW` → `RLXFW` 完整；盲寫 `AB` ＋ 輪詢
+`CD` → `BCD`。`prom_putchar` 一定輪詢，實際映像上第一個記號完整到達
+（`RLXFW-B00`，`R` 在）。機制未定，量到的是規則；`C0` 把它釘住。
+
+**跑出來的**（全部帶 `--nop-cop3`，聲明過：那會跳過 Lexra 的 IMEM/DMEM 設定）：
+
+| run | 相異 KSEG0 | 停在 | serial |
+|---|---:|---|---|
+| 這台的 kernel | 908 | `0x8031E218` `j .`，來自 `rtl_processBlock` | — |
+| **drop 自己的 kernel** | **938** | `0x80006B28` | — |
+| `quiet` | **938** | `bsp_machine_halt+0` `0x80006B94` | — |
+| `quietm` | 1,034 | `bsp_machine_halt` `0x80006B9C` | — |
+| `loud` | 2,207 | `bsp_machine_halt` `0x80006C64` | — |
+| `loudm` | 2,284 | `bsp_machine_halt` `0x80006C6C` | — |
+| `quiet` ＋ 改道 | 938 | 同上 | **0 bytes** |
+| `loud` ＋ 改道 | 2,208 | 同上 | 42 bytes |
+| **`quietm` ＋ 改道** | 1,035 | 同上 | **106 bytes** |
+| **`loudm` ＋ 改道** | 2,285 | 同上 | **148 bytes** |
+
+🔴 **drop 自己的 kernel 和我的 `quiet` 走到同一個 938，兩份都停在
+`bsp_machine_halt`。** 這比 §5 的控制強：§5 比的是**這台**的 kernel，那是另一棵
+樹另一份設定，908 對 938；這裡是同一份原始碼的兩條路徑，深度完全一樣，只有
+halt 的位址隨 layout 移動。
+
+**階梯在桌面上印出來了：**
+
+```
+RLXFW-B00
+RLXFW-B01
+RLXFW-B02=00018000
+RLXFW-B03
+RLXFW-B04
+RLXFW-B05
+RLXFW-B06
+RLXFW-B07=FFFFFFFF
+```
+
+* **`B07 = 0xFFFFFFFF`** —— 沒有交換器核心時 `bsp_swcore_init()` 回 −1，
+  下面四行就是 `if (ret != 0) bsp_machine_halt();`。所以上機那一張表現在**兩個
+  值都有**：`00000000` 是通過，`FFFFFFFF` 後面接沉默是交換器核心沒回應，
+  **從線上讀到的，不是從「後面什麼都沒有」推出來的**。
+* **`B02 = 0x00018000`** —— 那是 qemu 4Kc 的 `PRId`。這顆晶片上同一份 binary
+  必須印 `0000CD01`（`CPU-04`，2026-08-25b `probe2` 量的）。**常數做不到這件
+  事。** 這是在依賴它的那個電源循環之前，先把記號證明成執行期讀數。
+* B08／B09／B10 沒出現，而它們**不該**出現：通道停在 `bsp_setup()` 裡面，
+  在 `paging_init()` 之前。
+
+**控制 `C5`（先寫後跑）：沒有記號的映像走同一條通道必須什麼都不印。**
+`quiet` ＋ 改道 → **0 bytes**。`loud` ＋ 改道 → **42 bytes**，而那不是記號：
+`[    0.000000] CPU revision is: 00018000`。🔴 **所以 `loud` 在 console 交接
+之前並不安靜** —— `CONFIG_EARLY_PRINTK=y` 建出來的
+`arch/rlx/kernel/early_printk.c` 註冊了一個 `early_console`，它的 `write` 走
+`prom_putchar`；§11.1 量到是死路的是 `early_printk()` 那個**函式**（弱空樁）。
+後果三件：`loud` 的 capture 會有廠商格式的 `printk` 行夾在記號中間；其中一行是
+**同一份 capture 裡第二次讀 `PRId`**；而 `RLXFW-B09` 只有在 `quiet` 裡才是
+「從這裡開始換儀器」那條線。
+⚠️ **只有一行 buffer 出來了**：`CPU revision is:` 是在 `cpu_probe()` 印的
+（B01 與 B02 之間），卻出現在 B03 之後 —— 它被 buffer 起來、在 console 註冊時
+補印。banner 與其他更早的行**沒有**出現。未定，照實記，不猜 `CON_PRINTBUFFER`。
+
+---
+
+### 三、`R3-2` 第 3–6 階
+
+**正控制先跑，而它是 drop 自己的產物。** 拿 drop 的 `image/vmlinux.elf`
+（3,441,133）餵進 drop 自己的 `rtkload/Makefile`：
+
+| artefact | 重建的 | drop 出貨的 | |
+|---|---:|---:|---|
+| `vmlinux-stripped` | 3,001,168 `7b65fdf8d7464aad` | 同 | **相同** |
+| `vmlinux_img` | 2,953,660 `48b1a17187bcc729` | 同 | **相同** |
+| `vmlinux_img.gz` | 842,724 `7abeda46c549cf61` | *沒出貨* | — |
+| `memload-full` | 944,505 `4ebdbb3689b4e196` | 944,997 `e2f3cd1021da410d` | 差 492 |
+| **`nfjrom`** | **854,016 `5cc8d61d4b4e8914`** | **同** | **逐位元組相同** |
+| `linux.bin` | 854,034 `f612122e47e92930` | 854,034 `f6a51b3130f49182` | 差 **1 byte** |
+
+🔴 **`nfjrom` 就是上傳到 `0x80500000` 然後被跳進去的那個檔，而它逐位元組相同。**
+一次解決四件本來是假設的事：`rtkload/lzma` 在這台主機上選的是 `lzma-26`
+（LZMA 4.06 預設值），而它的輸出就是廠商的位元組 ——⚠️ **這不排除 `lzma-24`**：
+量，`lzma-24` 在這台主機上**根本跑不起來**（缺 `libstdc++.so.5`），所以它是
+**未測**而不是被排除；`cvimg vmlinuxhdr` 的 8 bytes 前綴重現；loader stub 用
+`rsdk-1.3.6-4181` 編出來的**載入位元組與廠商相同**（讀：drop 自己的頂層
+`.config` 選的就是 `rsdk-1.3.6-4181`）；而 stub 是拿 **rlxfw 的**
+`autoconf.h` 編的，位元組還是對上 —— 事前只讀到「`rtkload` 那十三個 `CONFIG_`
+符號在三份設定裡相同」，那是必要不充分，位元組相同才是充分。
+
+**`memload-full` 差的 492 bytes 全部是一條建置路徑。** 沒有任何一個 allocated
+區段的位址或大小不同；差的十二個區段全是 DWARF，十個 `.debug_info*` 各 **+43**、
+兩個 `.debug_line*` 各 +32，合 494，扣掉 2 bytes 的區段對齊。量兩邊的
+`DW_AT_comp_dir`：我的 58 個字元，廠商的 **101** —— 差正好 43，一個 translation
+unit 一次，而剛好有十個。順帶讀到廠商的 SDK 名字：
+**`rtl819x-SDK-v32_v321_v3211_322_3221`**，從 DWARF 讀的，不是從 README。
+
+🔴 **`linux.bin` 差的那一個 byte 是簽章，而 Makefile 自己的選項挑錯了那一個。**
+偏移 3，`cr6b` 對 `cr6c`；校驗尾碼 `a20a` 兩邊相同（`sum16` 只涵蓋 payload）。
+讀 `strings cvimg`：程式裡存著的簽章只有 `cs6b` 與 `cr6b`。量，直接跑：
+`cvimg linux` 寫 `cs6b`、`cvimg linux-ro` 寫 `cr6b`。
+🔴 **這一段的第一版寫「沒有任何輸入能讓它寫出 `cr6c`」，被收工前的對抗審查
+用一道指令殺掉** —— `cvimg` 自己的 usage 最後一行就寫著
+`[signature]: user-specified signature (4 characters)`，而
+`./cvimg signature nfjrom out 0x80500000 0x30000 cr6c` 產出的檔**和出貨的
+`linux.bin` 逐位元組相同**。所以管線重現的是**五個產物中的五個**，唯一沒重現的
+是 `memload-full` 的 DWARF。**縮小之後的發現**：`CV_OPTION` 因為
+`CONFIG_SQUASHFS=y` 選到 `linux-ro`，而 `linux-ro` 寫 `cr6b` ——
+**所以這份 drop 出貨的 `linux.bin` 不是用這條 Makefile 路徑配這份設定做出來的**。
+而 `cr6c` 是兩份真映像帶的：drop 自己的 `image/linux.bin`，以及**這台 flash
+`0x060000`**。讀 `rtkload/Makefile:11-19`：`CVIMG` 優先用
+`$(DIR_USERS)/boa/tools/cvimg`，而這份 drop 裡只有 fallback 那一支。
+**對 `R3` 是零成本**（RAM 路徑吃 `nfjrom`），**對 `R9` 是一個參數不是阻礙**。
+
+⚠️ **廠商自己的 build system 跑不到底。** 用 drop 自己的板子設定，最後一行是
+`cvimg flash_size_chk linux.bin`，而這份 `cvimg`（Version 1.1）沒有實作那個
+子命令：印 usage、回 1。量，直接跑那個子命令確認過，不是從 log 推的。
+`rtkimage.py` 只容忍這一種失敗，而且要求三個產物都已經在磁碟上。
+
+**四個映像**（`CONFIG_BLK_DEV_INITRD=y`，所以 make 跳過那一步，四次都回 0）：
+
+| | `vmlinux` ELF | stripped | **解壓後** | LZMA 串流 | **`nfjrom`** | `linux.bin` | `pending_len` | 天花板 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `quiet` | 3,968,113 | 3,520,352 | 3,472,384 | 1,015,496 | **1,027,072** | 1,027,090 | 1 | 66.2 % |
+| `quietm` | 3,968,240 | 3,520,376 | 3,472,384 | 1,015,256 | **1,027,072** | 1,027,090 | 1 | 66.2 % |
+| `loud` | 4,042,261 | 3,594,128 | 3,546,112 | 1,041,228 | **1,052,672** | 1,052,690 | 2 | 67.6 % |
+| `loudm` | 4,042,388 | 3,594,152 | 3,546,112 | 1,041,744 | **1,053,696** | 1,053,714 | 3 | 67.6 % |
+
+四份 `kernelStartAddr` 都是 `0x80003600`，四份都能解回自己的 `vmlinux_img`
+逐位元組相同，四份 `linux.bin` 的 `sum16` 都是 0。
+
+🔴 **`RUNSHEET` `P3` 那一列把三個東西混成一個。** 3,968,113–4,042,388 是
+`vmlinux` **ELF** 的大小；通道吃的是**解壓後**的映像（3,472,384／3,546,112）；
+**上傳並被跳進去的是 `nfjrom`，1,027,072／1,053,696** —— 大約是寫下來那個數字的
+四分之一。上機的後果是 TFTP 傳輸量與 `K2` 的 `image_end − 16`，兩個都寫錯了。
+⚠️ 而那個檔案就叫 `nfjrom`，正是 `LDR-26` 說的兩個特殊檔名之一（強制載到
+`0x80000000` 並在傳輸結束當下執行）——**上傳前一定要改名**，這條警告在
+2026-08-29 之前講的是沒人會不小心打出來的檔名，現在講的是 build 產出的那個。
+
+⚠️ **記號讓映像壓得更小，不是更大。** `quietm` 的 `vmlinux` 比 `quiet` 大 127
+bytes，LZMA 串流卻**小 240 bytes** —— 十一個共用 `RLXFW-B` 前綴的字串對 match
+finder 幾乎免費。`loudm` 的串流比 `loud` 大 516，而 `nfjrom` 整整大 1,024，
+因為 `ld.script.in` 把 `__vmlinux_start`／`__vmlinux_end` 對齊 1024。
+**兩個差都推不出來**，所以是一個映像量一次。
+
+**天花板多了一個獨立來源，而且是 Realtek 自己的。** `rtkload/Makefile:229`
+跑 `cvimg size_chk`，印 *Image decompress end addr* 與 *Available size*：
+drop 的 kernel `0x0022ee44` = 2,289,220；`quiet`／`quietm` `0x001b0400` =
+**1,770,496**；`loud`／`loudm` `0x0019e400` = **1,696,768** —— 和 §11.6 從
+program header 算出來的完全一樣，而兩條路徑沒有共用任何程式碼。這是 §11.7
+那個 495,729 bytes 更正的第二來源。
+
+---
+
+### 自己咬到自己的三件事
+
+1. **`test-rtkimage` 的 `B3` 抓到工具一個真缺陷。** 截斷的 payload 餵給
+   `lzma.LZMADecompressor` **不會丟例外** —— 它回傳解得出來的部分，沒有錯誤。
+   所以一個被截斷的映像會被讀成「比較小的映像」，而「比較小」在天花板檢查上
+   看起來是好消息。修法是兩半都要：解碼器必須說它走到串流結尾（`d.eof`），
+   而且長度要等於 LZMA 標頭宣告的值。
+2. **`hazlint-objs` 的第一版 `Q3` 一直失敗，而原因不在工具。** suite 的 stub
+   組譯器是用「原始碼裡有沒有 `nop`」決定要吐哪個 object 的，而 hazard 那份
+   fixture 結尾是 `jr $31 / nop` —— 它對兩個問題都回答 `safe`。改成看輸出檔名。
+3. **`test-hazlint-objs` 的 `M2` 第一版根本不是突變。** `TC21_EXPECT = {} or {…}`
+   在 Python 裡就是原來那個 dict。一個不會失敗的案例正要去認證那個認證其他
+   所有東西的控制。改成把 stub `gcc` 換掉，讓 `-march=5281` 那一邊也沒有 hazard。
+
+另外兩件是寫作時抓到的：`K2` 那一列我先寫了 `0x805FAB00`／`0x80601200`，
+用一支三行的算術檢查跑過才發現正確值是 `0x805FAC00`／`0x80601400`；
+`PROGRESS.md` § Now 的世代往下移時，第一版只移到 `but seven` 就停了
+（因為上一次也停在那裡），會把 2026-08-26 `probe3` 那一則**蓋掉而看不出缺口**
+—— 改成整條鏈一起移，並用一支比對腳本驗過 23 → 24 列、零錯位。
+
+### 收工前的對抗審查：我自己四條主張，兩條沒活下來
+
+一條一條攻，攻法是「什麼量測會推翻它」而不是「這句話讀起來對不對」。
+
+1. 🔴 **「這份 drop 的 `cvimg` 做不出 `cr6c`」—— 死了，而且死得比活著好。**
+   攻法：`strings` 只找得到 NUL 結尾、長度 ≥4 的 ASCII 連續段，而 `cvimg` 的
+   usage 自己就寫著 `[signature]: user-specified signature (4 characters)`。
+   量：`./cvimg signature nfjrom out 0x80500000 0x30000 cr6c` 產出的檔**和出貨的
+   `linux.bin` 逐位元組相同**。所以管線重現的是五個產物中的五個。**留下來的
+   發現縮小成「Makefile 為這塊板子挑的選項不對」**，而 `R9` 的代價從「阻礙」
+   變成「一個參數」。
+2. 🔴 **「換一支壓縮器就產不出同樣的 842,724 bytes」—— 那是論證不是量測。**
+   量：`lzma-24` 在這台主機上**跑不起來**（`libstdc++.so.5` 缺）。所以它是
+   **未測**，不是被排除。改成：這台主機走的那條分支重現了位元組。
+3. ✅ **「`nfjrom` 逐位元組相同」不是拿同一個檔和自己比 —— 而證據就在它上一列。**
+   `memload-full`（`nfjrom` 的直接上游）**是不同的**。兩條偷偷是同一個檔的管線
+   會在那裡也對上。
+4. ✅ **「`B02` 是執行期讀數」** —— 攻法：那個值會不會是編譯期就烤進去的字串？
+   量：`00018000` 與 `0000CD01` 在有記號的 `vmlinux` 裡各出現 **0** 次。印出來的
+   十六進位是跑出來的。
+5. ✅ **「控制那一列的 880 在任何一份 log 裡都不存在」** —— 原本只查了四份
+   `.pcs`。把 `r3-3` 剩下兩份 log 也數過：`a2` 是 866／828（和 `c1` 同），
+   `c0` 是失控的 9,207,619 條。**880 只出現在 `c2`，也就是「我的」那一列。**
+6. ⚠️ **「記號讓映像壓得更小是因為十一個字串共用前綴」** —— 240 bytes 是量的，
+   **理由是推的**，沒有做「拿掉一個記號」的對照。標記改掉。
+
+### 沒做的，以及為什麼
+
+- **`R1h` 的 bench 段、`TC-k`／`TC-l`／`TC-m`**：交代不要順手做。`TC-m` 只量了
+  它的**方向**（保守），沒有修。
+- **`R3-7` 的 prediction block**：那是 `R3-7` 的產出，不是今天的。今天改的是
+  `P2`／`P3`／`P4`／`M0`／`K1`／`K2` 六列，因為它們是被今天的量測改掉的。
+- **`R9` 的 `cr6c` 問題**：記下來，沒有解。解它需要決定是換一支 `cvimg`、
+  自己寫標頭，還是改簽章，而那是寫 flash 那個 gate 的決定。
+
+### 收支
+
+零 flash 位元組、零電源循環、零裝置讀數。沒有跑新的 kernel build（四棵樹是
+昨天的，用 sha256 釘住：`Q0`）；`rtkload` 建了五次（控制 ＋ 四個映像），
+qemu 跑了 19 次，`vendor-tripwire` 全 CLEAN。
+新：`tools/hazlint-objs.py`（12 控制）、`tools/rtkimage.py`（3 控制）、
+`tools/deskchan.py`（5 控制），`tools/test-hazlint-objs.sh`（28 案）、
+`tools/test-rtkimage.sh`（32 案）、`tools/test-deskchan.sh`（18 案）。
+`notes/kernel-build.md` §13／§14／§15 新，§2.1／§3.3／§3.4／§5／§11.1／§11.7
+更正；`SPEC.md` `TC-33`／`TC-34`／`TC-35` 新，`TC-21`／`TC-23`／`FW-23` 更新。

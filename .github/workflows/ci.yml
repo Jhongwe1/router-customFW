@@ -50,7 +50,7 @@
 # They need no vendor artefact. What keeps this suite bench-only is K4/K4b's
 # population fixtures and nothing else. Without gcc, both skip cleanly, the
 # census is green, and it prints
-# `NOT RUN IN THIS JOB: 406 case(s)` with every one of them named.
+# `NOT RUN IN THIS JOB: 452 case(s)` with every one of them named.
 #
 # 🔴 **2026-08-29: this number is no longer maintained here, because it was
 # wrong and nothing could say so.** It read 362 while the green run of
@@ -60,6 +60,14 @@
 # `ci-census.py` READS it and turns the build red if it disagrees (`C15`, with
 # both directions and a mutation). The value quoted above is a convenience for
 # the reader; the table is the owner.
+#
+# 406 -> 452 on 2026-08-29 (sixth session): `test-rtkimage` arrives at 32 with
+# one allowed skip covering 18 (it reads the GPL drop's own nfjrom), and
+# `test-hazlint-objs` arrives at 28 and is *bench-only* for exactly the reason
+# spelled out above -- every one of its cases drives `hazlint`. `test-deskchan`
+# arrives at 18 and adds NOTHING here: the apt line installs qemu-system-mips
+# and the suite then runs in full, because its end-to-end case assembles its
+# own twelve-instruction MIPS payload instead of borrowing a vendor one.
 #
 # 373 -> 406 on 2026-08-28/29 (fifth session): `test-hazlint` 109 -> 142 for `TC-j`.
 # The thirty-three are M17-M20 (the three mutations that recreate `TC-f` through
@@ -294,8 +302,14 @@ jobs:
       # python3-serial and NOT actions/setup-python: tools/test-console-capture.sh
       # hardcodes /usr/bin/python3, and the apt module lands exactly there.
       # binutils only -- see the header for why gcc-mips-linux-gnu is absent.
+      # qemu-system-mips is for tools/test-deskchan.sh. It is NOT the cross
+      # compiler discussed in the header: it runs images, it does not build
+      # them, so it cannot pull `tools/hazlint` and its stage2.bin control into
+      # this job. The suite's D2 case builds its own twelve-instruction MIPS
+      # image by hand, so with qemu present the whole suite runs on a stock
+      # runner with no vendor material at all.
       - name: apt
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips
 
       - name: capture dir
         run: mkdir -p ci-out
@@ -319,6 +333,20 @@ jobs:
       # 202 cases, which the census prints rather than hides.
       - name: test-rlxprobe
         run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"
+
+      # The eighteen B/M cases read the GPL drop's own nfjrom and stand down
+      # here; the fourteen that run exercise sum16, the cr6c header parser and
+      # the ELF symbol reader on fixtures this suite builds. S3a-c pin the
+      # exit contract, which is the part a runner can check and the bench
+      # usually does not.
+      - name: test-rtkimage
+        run: bash tools/test-rtkimage.sh 2>&1 | tee ci-out/test-rtkimage.out; exit "${PIPESTATUS[0]}"
+
+      # Runs in full on a runner: D2 assembles its own MIPS payload, loads it
+      # through the same -bios stub the real images use, and requires the
+      # string back out of the emulated UART. Nothing here needs a GPL drop.
+      - name: test-deskchan
+        run: bash tools/test-deskchan.sh 2>&1 | tee ci-out/test-deskchan.out; exit "${PIPESTATUS[0]}"
 
       # The reference set must be non-empty, and C1 flips a byte in its
       # lexicographically first file, so that file must have a byte to flip.

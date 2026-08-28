@@ -1,17 +1,22 @@
 # Changelog
 
-🔄 **2026-08-28: a kernel of mine exists. Nothing else does.** It is a linked
-`vmlinux` with an initramfs of this device's own userspace in it, and it passes
-the load-delay gate at 0 violations. **There is still no loadable image** — the
-`nfjrom` wrapper's stages have not been run on it — **it has never been executed
-anywhere but a MIPS32 emulator that stops at the switch probe, and not one byte
-of mine has been written to this device's flash.** What exists otherwise is the
-instruments, the record, and the first thing that ran on the silicon — the
-vendor's own kernel, delivered over the network.
+🔄 **2026-08-29: four loadable images of mine exist, and one of them has printed
+eight lines. On an emulator.** They are `nfjrom` files — 1,027,072 and 1,053,696
+bytes — built by Realtek's own wrapper pipeline, which on the same day was shown
+to reproduce the vendor's own shipped `nfjrom` byte for byte. Two of them carry
+eleven boot marks, and through a MIPS32 emulator with the UART redirected they
+print `RLXFW-B00` … `RLXFW-B07=FFFFFFFF` and then halt in the board's switch-core
+probe, exactly where this board's own kernel halts there. **Nothing of mine has
+executed on the silicon, and not one byte of mine has been written to this
+device's flash.** What exists otherwise is the instruments, the record, and the
+first thing that ran on the silicon — the vendor's own kernel, delivered over the
+network.
 
-> *Until 2026-08-28 this paragraph read: "**Nothing has been built.** There is no
-> kernel of mine, no image, and no byte of mine has been written to this device's
-> flash." The last clause is still true.*
+> *Until 2026-08-29 this paragraph read: "**There is still no loadable image** —
+> the `nfjrom` wrapper's stages have not been run on it." Until 2026-08-28 it
+> read: "**Nothing has been built.** There is no kernel of mine, no image, and no
+> byte of mine has been written to this device's flash." The last clause is
+> still true.*
 
 Tags mark where the outside world can check the work, not where a feature landed.
 `PROGRESS.md` is the only file that says where the work actually is.
@@ -19,6 +24,79 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+**`R3-2` stages 3–6, `P2` and `P3`, 2026-08-29 — the pipeline reproduces Realtek's own `nfjrom`
+byte for byte, and the boot ladder prints at the desk.** `notes/kernel-build.md` §13, §14 and §15
+are new; §2.1, §3.3, §3.4, §5, §11.1 and §11.7 are corrected.
+
+### The image: the control is the vendor's own artefact, and it holds
+
+- 🔴 **`nfjrom` rebuilt from the drop's own `vmlinux.elf` is byte-identical to the one the drop
+  ships** — 854,016 bytes, sha256 `5cc8d61d4b4e8914`. So is `vmlinux-stripped` and so is
+  `vmlinux_img`. That turns four assumptions into readings at once: which of the two shipped LZMA
+  binaries the wrapper selects, the 8-byte `cvimg vmlinuxhdr` prefix, and that the loader stub built
+  with `rsdk-1.3.6-4181` produces the same **loaded** bytes as the vendor's.
+- **`memload-full` differs by 492 bytes and every one is DWARF.** Ten `.debug_info` sections at +43
+  each — the length difference between the two `DW_AT_comp_dir` strings, 101 characters against 58 —
+  two `.debug_line` tables at +32, and 2 bytes of section alignment. No allocated section differs in
+  address or size.
+- 🔴 **`linux.bin` differs by one byte, the signature — `cr6b` against `cr6c` — and supplying the
+  right one closes it.** 量: `cvimg signature nfjrom out 0x80500000 0x30000 cr6c` produces a file
+  **byte-identical to the shipped `linux.bin`**, so the pipeline reproduces **five of five**
+  artefacts and only `memload-full`'s DWARF differs. *(The first write-up of this said the tool
+  **cannot** emit `cr6c`; the adversarial pass refuted it with one command, and the refutation is
+  the better result.)* What survives: the Makefile's own `CV_OPTION` picks `linux-ro` for this
+  board and `linux-ro` writes `cr6b`, **so the shipped `linux.bin` was not built by this Makefile
+  path with this configuration**. For `R9` that is one argument, not a blocker — the rule is not
+  to take the signature from the option logic without reading what came out.
+- **Four images end to end**: `nfjrom` 1,027,072 (`quiet`, `quietm`), 1,052,672 (`loud`), 1,053,696
+  (`loudm`), each round-tripping byte-identically, each `kernelStartAddr` `0x80003600`, 66.2 % and
+  67.6 % of the 5,242,880-byte ceiling. Realtek's own `cvimg size_chk` prints the same two margins —
+  an independent second source for the ceiling correction made on 2026-08-28.
+- 🔴 **`RUNSHEET` `P3` was conflating three sizes.** 3,968,113–4,042,388 are `vmlinux` ELF sizes; the
+  desk channel ingests the decompressed image; **what is uploaded is `nfjrom`**, about a quarter of
+  the number that was written down. And it is literally named `nfjrom`, one of the two filenames the
+  loader force-loads at `0x80000000` and auto-executes.
+
+### `P2`: `hazlint` over the objects, and `TC-21` asserted instead of assumed
+
+- **0 violations in 1,607 / 1,675 / 1,617 / 1,685 loads** across 59–60 leaf objects on the four
+  trees, with **0 unresolved successors** — the `.o` false-negative channel is empty on this material.
+- 🔴 **The control is what makes it a measurement**: the same six sources re-assembled from the
+  build's **own recorded command line** with `-Wa,-march=5281` appended carry **11**, split
+  5/1/2/2/1/0. Same sources, one token, 0 against 11.
+- 🔴 **The enumeration nearly was blind.** `find arch/rlx -name '*.o'` returns 57/58 and `find -L`
+  returns 63/64; the six it cannot see are the BSP, including the object that calls
+  `bsp_swcore_init`. The tool refuses unless `bsp/setup.o` is in the swept list.
+- **`TC-m` measured rather than argued**: 26 objects claim an excision and not one scanned fewer
+  bytes than it holds, so the error is conservative — it can manufacture a violation and cannot hide
+  one. `TC-m` is still carried, and `P2` no longer waits on it.
+
+### `P3`: the desk channel prints the boot ladder
+
+- 🔴 **`RLXFW-B00` … `RLXFW-B07=FFFFFFFF`**, eight marks in order, then `bsp_machine_halt`. So
+  `bsp_swcore_init()` returns −1 with no switch core, and the seating carries both values of `B07`
+  instead of one and a silence.
+- 🔴 **`B02` prints `00018000`** — the emulator's `PRId`, where this die must print `0000CD01`. The
+  mark is demonstrated to be a run-time read *before* the power cycle that depends on it.
+- **The control holds**: an unmarked image prints **0 bytes** through the same channel. An unmarked
+  `loud` prints 42 — the early console `CONFIG_PRINTK=y` registers — which is a finding about what
+  that capture will look like, not a mark.
+- 🔴 **§5's four instruction counts are corrected.** They are listed program counters, not
+  instructions; the distinct counts are 828 / 843 / 908 / 938, and the control's 880 is in no log.
+  Neither could be checked, because the qemu invocation had not been recorded — which is now printed
+  on every run.
+
+### New instruments
+
+- `tools/rtkimage.py` (3 controls) + `tools/test-rtkimage.sh` (32 cases)
+- `tools/hazlint-objs.py` (12 controls) + `tools/test-hazlint-objs.sh` (28 cases)
+- `tools/deskchan.py` (5 controls) + `tools/test-deskchan.sh` (18 cases)
+- Each of the three refused at least once before it reported anything: on an enumeration that could
+  not see the board, on a UART window that was not there, and on a truncated payload that decodes
+  partially without raising and would have been printed as a smaller image.
+
+---
 
 **`R3-6`, 2026-08-28/29 — the step opened by clearing three carried-forward debts, and the two that
 came with an instruction attached both had the instruction wrong.** `notes/kernel-build.md` §10 and

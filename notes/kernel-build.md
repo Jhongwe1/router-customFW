@@ -333,6 +333,13 @@ the driver hands the assembler its own default. For `rsdk-1.3.6` that default is
 assumed.** The check is one `hazlint` pass over the objects the build produced,
 and it is cheap enough to be a build step.
 
+🔄 **2026-08-29: asserted.** `tools/hazlint-objs.py`, `RUNSHEET` `P2`, on all
+four `R3` trees — **0 violations in 1,607–1,685 loads across 59–60 objects**,
+and the same six sources re-assembled from the build's own recorded command
+line with `-Wa,-march=5281` appended carry **11**, split 5/1/2/2/1/0 exactly as
+this table predicts. §14. ⚠️ And the check enumerates with `find -L`: plain
+`find` misses the six BSP objects (§10), which is where `bsp_swcore_init` is.
+
 ---
 
 ## 3. The image: what `J 80500000` actually receives
@@ -387,7 +394,7 @@ reasons §4 does not put an MTD map on the first boot.
 **Control on the locator**: the same 1024-aligned LZMA scan over `stage2.bin`,
 which has no compressed kernel in it, returns **0** candidates.
 
-### 3.3 The pipeline reproduces the vendor's own intermediates
+### 3.3 The pipeline reproduces the vendor's own intermediates — 🔄 and, since 2026-08-29, its output
 
 The drop left `rtkload/vmlinux-stripped` (3,001,168) and `rtkload/vmlinux_img`
 (2,953,660) beside the `image/vmlinux.elf` (3,441,133) they came from, so stages
@@ -399,6 +406,14 @@ The drop left `rtkload/vmlinux-stripped` (3,001,168) and `rtkload/vmlinux_img`
 
 `K4` is satisfied. My own kernel through the same two stages: 2,894,792 stripped,
 **2,846,948** as a flat image (sha256 `a469c52e…`).
+
+🔄 **2026-08-29: stages 3–6 as well, and the end of the pipeline is byte-identical.**
+`nfjrom` rebuilt from the drop's own `vmlinux.elf` is **854,016 bytes, sha256
+`5cc8d61d4b4e8914`** — the shipped file, to the byte. `memload-full` differs by
+492 bytes and every one of them is DWARF carrying a build path; `linux.bin`
+differs by **one byte**, the signature, and this drop's `cvimg` cannot produce
+the right one. §13. `K4` is now satisfied for the whole pipeline rather than
+for its first two stages, and `TC-d`'s image half is closed.
 
 ### 3.4 The ceiling, and it is arithmetic
 
@@ -415,6 +430,15 @@ decompressed image must end below the image it is being read from:
 If an initramfs ever exceeds that, the answer is
 `LOAD_START_ADDR = 0x80A00000`, which `rtkload/Makefile` already supports for
 other boards and which `G0` has already probed on this device.
+
+🔄 **2026-08-29: the arithmetic has a second source and it is Realtek's.**
+`rtkload/Makefile:229` runs `cvimg size_chk vmlinux_img $(LOAD_START_ADDR)`,
+which prints *Image decompress end addr* and *Available size*. 量 on four
+builds: `0x0022ee44` = 2,289,220 for the drop's kernel, `0x001b0400` =
+1,770,496 for `quiet`/`quietm`, `0x0019e400` = 1,696,768 for `loud`/`loudm` —
+the same numbers §11.6 computes from the program headers, by a route with no
+code in common. §13.4. **The `mine, 1.3.6@4181` row above is the pre-`R3-4`
+build and is kept as written**; the four current images are in §13.3.
 
 ---
 
@@ -523,6 +547,20 @@ path worth carrying into `R6`.
 ⚠️ **qemu's 4Kc is a MIPS32 core with load interlocks.** It cannot reproduce a
 load-delay bug, which is most of what §1 and §2 are about. *"Runs in the
 emulator"* and *"runs on this silicon"* are two claims and `R1a` has not moved.
+
+🔄 **2026-08-29: the four counts above are corrected, and the tables are kept
+as written.** They are **listed program counters**, not instructions: `-d in_asm`
+logs at translation time and qemu re-translates a block entered at a different
+offset, so the same instruction is listed more than once. Re-derived from the
+`.pcs` files this run left on disk and reproduced today: **828 / 843 / 908 /
+938 distinct**, against the 880 / 880 / 968 / 1,003 printed. 🔴 **And the
+control's 880 in the first table is in no log** — `c1.pcs` gives 866 listed and
+828 distinct; 880 is the other run's number. The conclusion *"both stop at the
+same instruction class"* is unaffected, because it rests on the stop addresses,
+which reproduce exactly. **Neither could be checked from what was kept: the
+logs were saved and the qemu invocation was not**, so `-cpu`, `-m` and `-d`
+were all tried and none of them explains the gap. `tools/deskchan.py` prints
+its full command line on every run. §15.1.
 
 ---
 
@@ -1064,6 +1102,17 @@ all** — an absent output path, not a contested base address.
 driver - version 1.6` with no banner, no command line and no memory line between
 them. The vendor ships `PRINTK` off and rlxfw inherited it (§9.2).
 
+🔄 **2026-08-29, and it does not contradict the table — it completes it.** 量
+through the desk channel with `prom_putchar` redirected (§15.5): the **`loud`
+variant with no marks in it prints `[    0.000000] CPU revision is: 00018000`**,
+41 bytes, before `bsp_setup()`. The table above is about the `early_printk()`
+*function*, which is a weak empty stub in both variants; what the `loud` build
+adds is the `early_console` that `arch/rlx/kernel/early_printk.c` **registers**,
+whose `write` goes through `prom_putchar`. So: `quiet` prints nothing at all
+without a mark (量: 0 bytes through the same channel), and `loud` has a live
+`printk` path from `setup_early_printk()` onward. `RLXFW-B09` therefore marks
+the console handover only in `quiet`.
+
 ### 11.2 🔴 And the most likely early failure is silent by construction
 
 讀 `boards/rtl8196e/bsp/setup.c:134-175`, through the real path (§10.4):
@@ -1235,6 +1284,13 @@ out, because this gate has to run where there is no toolchain. `A20`–`A23` are
 the controls, and `A20`'s fixture is built so the file size and the load extent
 **cannot** coincide.
 
+🔄 **2026-08-29: corroborated by a tool that shares no code with it.**
+`rtkload/Makefile:229` runs `cvimg size_chk`, and on `quiet`/`quietm` it prints
+*Image decompress end addr* `0x8034fc00` and *Available size* `0x001b0400` =
+**1,770,496** — the same end address and the same margin, computed inside
+Realtek's own i386 binary from the flat image rather than from the program
+headers. §13.4.
+
 ⚠️ Separately worth knowing, and **not** what the ceiling is about: `.bss` on
 this build ends at `0x805E5280`, above the `0x80500000` the compressed image sits
 at. By the time the kernel zeroes it the wrapper has jumped away and its bytes
@@ -1243,7 +1299,487 @@ there is no second `J` even in principle.
 
 ---
 
-## 12. What could still be wrong
+## 13. `R3-2` stages 3–6: the pipeline reproduces the vendor's own `nfjrom` byte for byte
+
+**The step's own DoD put the control first**, and this is the result of running
+it: with the drop's own `image/vmlinux.elf` (3,441,133 bytes) fed into the
+drop's own `rtkload/Makefile`, driven by `tools/rtkimage.py build`:
+
+| artefact | rebuilt | the drop's | |
+|---|---:|---:|---|
+| `vmlinux-stripped` | 3,001,168 `7b65fdf8d7464aad` | 3,001,168 `7b65fdf8d7464aad` | **identical** |
+| `vmlinux_img` | 2,953,660 `48b1a17187bcc729` | 2,953,660 `48b1a17187bcc729` | **identical** |
+| `vmlinux_img.gz` | 842,724 `7abeda46c549cf61` | *not shipped* | — |
+| `memload-full` | 944,505 `4ebdbb3689b4e196` | 944,997 `e2f3cd1021da410d` | differs, §13.1 |
+| **`nfjrom`** | **854,016 `5cc8d61d4b4e8914`** | **854,016 `5cc8d61d4b4e8914`** | **IDENTICAL** |
+| `linux.bin` | 854,034 `f612122e47e92930` | 854,034 `f6a51b3130f49182` | differs by **one byte** — and §13.2 closes it |
+
+🔴 **`nfjrom` is the file that is uploaded to `0x80500000` and jumped to, and it
+is byte-identical.** That settles four things at once that were open when the
+step was written:
+
+* `rtkload/lzma` is a two-branch shell script keyed on `uname -r | grep 2.4`;
+  on this host it selects **`lzma-26`** (LZMA 4.06, defaults `-a2 -d23 -fb128
+  -lc3 -lp0 -pb2 -mf bt4`), and `lzma-26`'s output is the vendor's, byte for
+  byte. ⚠️ **That does not exclude `lzma-24`**, and the first version of this
+  bullet said it did — *"a different one cannot produce the same 842,724
+  bytes"*, which is an argument and not a measurement. 量: `lzma-24` **cannot
+  be run on this host at all** (`error while loading shared libraries:
+  libstdc++.so.5`), so whether it would emit the same stream is **untested**.
+  What is measured is that the branch this host takes reproduces the bytes.
+* `cvimg vmlinuxhdr`'s 8-byte prefix (`pending_len`, `kernelStartAddr`) is
+  reproduced exactly, including `pending_len = 1`.
+* the loader stub — ten translation units compiled with `rsdk-1.3.6-4181` —
+  produces **identical loaded bytes** to the vendor's, so §1's Decision A is
+  not merely *a* toolchain that works, it is one that reproduces the drop's own
+  output. 讀 the drop's top-level `.config`: `CONFIG_RSDK_rsdk-1.3.6-4181-EB-2.6.30-0.9.30=y`.
+* the stub was compiled against **rlxfw's** `include/linux/autoconf.h`, not the
+  board template's, and the bytes still match. 讀, before the run: the thirteen
+  `CONFIG_` symbols the `rtkload` sources test are identical across the board
+  template and both rlxfw variants. That was a necessary and not a sufficient
+  check — the kernel headers those sources pull in test many more — and the
+  byte identity is what makes it sufficient.
+
+### 13.1 `memload-full` differs by 492 bytes, and all of them are a build path
+
+No allocated section differs in address or in size. Twelve sections differ and
+every one is DWARF:
+
+| | mine | the drop's | delta |
+|---|---:|---:|---:|
+| ten `.debug_info*` | — | — | **+43 each** |
+| two `.debug_line*` | — | — | +32 each |
+| sum of section deltas | | | **+494** |
+| file size | 944,505 | 944,997 | **+492** |
+
+量, `DW_AT_comp_dir` in each: mine is 58 characters, the drop's is **101** —
+`/home/<the vendor's builder>/11n/rlx/patch_area/rtl819x-SDK-v32_v321_v3211_322_3221/rtl819x/linux-2.6.30/rtkload`.
+**101 − 58 = 43**, once per translation unit, and there are exactly ten. The two
+remaining bytes are section-alignment padding. ⚠️ The step list wrote *"a build
+stamp is enough to move it, which is why the comparison is structured"* before
+any of this ran; this is that sentence with a number on it.
+
+Worth keeping for `which-drop.md`: that path names the SDK the drop came from,
+**`rtl819x-SDK-v32_v321_v3211_322_3221`**, read out of DWARF rather than out of
+a README.
+
+### 13.2 🔴 The one byte is the signature — and the Makefile's own option is what picks the wrong one
+
+量: the rebuilt `linux.bin` differs from the shipped one at **offset 3 and
+nowhere else** — `cr6b` against `cr6c`. The checksum tail is identical
+(`a20a`), which is consistent: `sum16` is taken over the payload and the
+signature is in the 16-byte header, outside it.
+
+讀 `strings rtkload/cvimg`: the only two signatures **stored in the binary**
+are `cs6b` and `cr6b`. 量, by running it: `cvimg linux` writes `cs6b`,
+`cvimg linux-ro` writes `cr6b`.
+
+🔴 **The first version of this section then said *"there is no input to this
+program that produces `cr6c`"*, and the adversarial pass killed it with one
+command.** `cvimg`'s own usage line — printed at the top of every refusal, and
+read hours before this was written — ends `[signature]: user-specified
+signature (4 characters)`. 量:
+
+```
+./cvimg signature nfjrom out.bin 0x80500000 0x30000 cr6c
+```
+
+**produces a file byte-for-byte identical to the shipped `linux.bin`.** So the
+reproduction is not three of five artefacts, it is **five of five**, and the
+only thing that does not reproduce is `memload-full`'s DWARF.
+
+**What the finding actually is, now that it is the right size:** the
+Makefile's own `CV_OPTION` selection for this board picks `linux-ro`, because
+`CONFIG_SQUASHFS=y`, and `linux-ro` writes `cr6b`. **So the `linux.bin` this
+drop ships was not produced by this Makefile path with this configuration.**
+It was produced either with `CV_OPTION=signature CV_SIGNATURE=cr6c` — the
+branch the Makefile reserves for `CONFIG_RTL_8197B_PANA`, which writes `csys`
+— or by the `cvimg` the Makefile prefers and this drop does not contain.
+
+And `cr6c` is what real images carry — two of them, independently:
+
+* the drop's own `boards/rtl8196e/image/linux.bin` (§3.1);
+* **this unit's own flash at `0x060000`** (§3.1, 987,138 bytes, `sum16` 0).
+
+讀 `rtkload/Makefile:11-19`: `CVIMG` prefers `$(DIR_USERS)/boa/tools/cvimg`,
+then `$(DIR_USERS)/goahead-2.1.1/LINUX/cvimg`, and falls back to `./cvimg` only
+if neither exists. 量: this drop contains **exactly one** `cvimg`, the fallback.
+So the drop ships a build system that calls a tool it does not ship — and the
+tool it does ship reproduces the drop's own flash header only when it is told
+the signature, which the option the Makefile picks for this board does not do.
+
+**What this costs `R3`: nothing.** The RAM path takes `nfjrom`; a `cr6c` header
+on a TFTP upload is 16 bytes of junk at `0x80500000` (`RUNSHEET` `P5`), and
+`nfjrom` is identical. **What it costs `R9`: one argument, not a blocker** —
+and the first version of this paragraph called it a blocker, which was the
+same overstatement one level up. `check_image()` on the flash path is a
+signature test plus the zero-sum rule (`C-4`); an image built the way the
+Makefile builds it for this board would fail the first half, and
+`CV_SIGNATURE=cr6c` makes it pass. **What `R9` must not do is take the
+signature from the Makefile's own option logic without reading what came out**
+— which is exactly what happened here, at the desk, where it cost nothing.
+
+### 13.3 The four images, end to end
+
+All four go through the same pipeline. `CONFIG_BLK_DEV_INITRD=y` on all of
+them, so `make` skips the `flash_size_chk` step the control tripped on, and all
+four builds return 0.
+
+| | `vmlinux` ELF | stripped | **decompressed** | LZMA stream | **`nfjrom`** | `linux.bin` | `pending_len` | ceiling |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `quiet` | 3,968,113 | 3,520,352 | 3,472,384 | 1,015,496 | **1,027,072** | 1,027,090 | 1 | 66.2 % |
+| `quietm` | 3,968,240 | 3,520,376 | 3,472,384 | 1,015,256 | **1,027,072** | 1,027,090 | 1 | 66.2 % |
+| `loud` | 4,042,261 | 3,594,128 | 3,546,112 | 1,041,228 | **1,052,672** | 1,052,690 | 2 | 67.6 % |
+| `loudm` | 4,042,388 | 3,594,152 | 3,546,112 | 1,041,744 | **1,053,696** | 1,053,714 | 3 | 67.6 % |
+
+`nfjrom` sha256: `quiet 09f5eea5ae1f7f5b`, `quietm cf8a93d73025292d`,
+`loud b3a068331270ccab`, `loudm 72928c564d903c8d`.
+`kernelStartAddr` is **`0x80003600` on all four**, and each one round-trips:
+decompressing the `nfjrom` gives back its own `vmlinux_img`, byte for byte.
+Every `linux.bin` sums to `0x0000` and carries flash offset `0x00030000`.
+
+🔴 **Three sizes, three different things, and `RUNSHEET` `P3` was conflating
+them.** The row said *"the four images this seating can draw from are 3,968,113
+/ 3,968,240 / 4,042,261 / 4,042,388"*. Those are `vmlinux` **ELF** sizes. What
+the desk channel ingests is the **decompressed** image (3,472,384 / 3,546,112);
+what is **uploaded and jumped to** is `nfjrom` — **1,027,072 / 1,053,696**,
+about a quarter of the number that was written down. The bench consequences are
+the TFTP transfer size and `K2`'s `DW` at `image_end − 16`, and both were wrong.
+
+🔴 **And the artefact is called `nfjrom`, which is one of the two filenames the
+loader treats specially.** 讀 `LDR-26`: a TFTP filename containing **`nfjrom`**
+or **`boot.img`** makes the loader force the load address to `0x80000000` and
+**execute at the end of the transfer**, with nobody at the console. The
+pipeline's output is literally that name. So the file has to be **copied to a
+different name before it is uploaded**, and `RUNSHEET` `K1` now says so —
+before 2026-08-29 that warning was about a filename nobody was going to type by
+accident, and now it is about the one the build produces.
+
+⚠️ **The marks make the image compress BETTER, not worse.** `quietm`'s
+`vmlinux` is 127 bytes larger than `quiet`'s and its LZMA stream is **240 bytes
+smaller** (量). *Eleven strings sharing the prefix `RLXFW-B` are close to free
+to a match finder* is 推 — it is the obvious explanation and it has not been
+tested against, say, removing one mark. `loudm`'s stream is 516 bytes larger than `loud`'s, and its
+`nfjrom` is a whole 1,024 bytes larger because `rtkload/ld.script.in` aligns
+`__vmlinux_start`/`__vmlinux_end` to 1024. **Neither delta is predictable from
+the ELF delta**, which is why they are measured per image and not derived.
+
+### 13.4 The vendor's own tool computes the ceiling, and it agrees
+
+`rtkload/Makefile:229` runs `cvimg size_chk vmlinux_img $(LOAD_START_ADDR)`.
+量, from each build's log:
+
+| | *Image decompress end addr* | *Available size* | this project's number |
+|---|---|---:|---:|
+| the drop's kernel | `0x802d11bc` | `0x0022ee44` = 2,289,220 | 2,289,220 (§3.4) |
+| `quiet` / `quietm` | `0x8034fc00` | `0x001b0400` = **1,770,496** | 1,770,496 (§11.6) |
+| `loud` / `loudm` | `0x80361c00` | `0x0019e400` = **1,696,768** | 1,696,768 (§11.6) |
+
+🔴 **That is an independent second source for §11.7's correction.** Until
+2026-08-28 `mkinitramfs.py` computed the margin from `os.path.getsize(vmlinux)`
+and read 75.7 % where the truth is 66.2 %, an error of 495,729 bytes. The
+replacement reads the program headers; Realtek's `cvimg` reads the flat image;
+the two agree to the byte, and they share no code.
+
+---
+
+## 14. `RUNSHEET` `P2`: `hazlint` over the objects, and `TC-21` asserted rather than assumed
+
+**Owed since `R3-4`, and owed on four trees rather than one.** `P1` runs
+`hazlint` over the linked `vmlinux` and reads 0. That is a strong statement
+about the bytes that will execute and a weak one about *why* they are safe,
+because it cannot separate two things that coincide: the author of
+`arch/rlx`'s hand-written assembly filling his delay slots, and `gas` filling
+eleven of them for him because the gcc driver handed it `lx4180` (`TC-14`,
+`TC-21`). New tool: **`tools/hazlint-objs.py`**, with `tools/test-hazlint-objs.sh`
+(28 cases).
+
+### 14.1 🔴 The enumeration is the first control, and the obvious way to write it is blind
+
+`arch/rlx/bsp` is a symlink (§10). 量 on the four trees:
+
+| | `find` | `find -L` | what only `-L` reaches |
+|---|---:|---:|---|
+| `quiet` / `loud` | 57 | **63** | `bsp/built-in.o`, `bsp/irq.o`, `bsp/prom.o`, `bsp/serial.o`, `bsp/setup.o`, `bsp/timer.o` |
+| `quietm` / `loudm` | 58 | **64** | the same six |
+
+Those six are the board. `bsp_setup()`, `bsp_serial_init()` and the call to
+`bsp_swcore_init()` whose return value `RLXFW-B07` prints are all in
+`bsp/setup.o`. **A `P2` written with plain `find` would have swept the
+architecture, skipped the machine, and reported 0.** `Q1` refuses unless
+`bsp/setup.o` is in the swept list, and `test-hazlint-objs.sh` `A2`/`M1` are
+that refusal in both directions.
+
+### 14.2 The sweep
+
+| tree | leaf objects | loads | `load;nop` | unresolved | **violations** | bytes scanned |
+|---|---:|---:|---:|---:|---:|---:|
+| `quiet` | 59 | 1,607 | 350 | **0** | **0** | 56,472 |
+| `loud` | 59 | 1,675 | 363 | **0** | **0** | 58,344 |
+| `quietm` | 60 | 1,617 | 350 | **0** | **0** | 56,784 |
+| `loudm` | 60 | 1,685 | 363 | **0** | **0** | 58,652 |
+
+The marked trees carry one extra object, `kernel/rlxfw_mark.o` (8 loads, 188
+bytes, 0 violations). `built-in.o` aggregates are reported and **not** added:
+they are a second copy of their leaves, and `arch/rlx/lib/built-in.o` is not
+even a complete one (`lib-y` goes to `lib.a`), so adding them would be wrong
+twice.
+
+**`unresolved` is 0 on all four**, and that is worth more than it looks. A `.o`
+carries no applied relocations, so a load sitting in a delay slot whose branch
+target is elsewhere would be reported as `unresolved` and *not checked* — a
+false-negative channel that `P1` exists to close. 量: the channel is **empty**
+on this material. Not one load in these 60 objects sits in a delay slot whose
+successor the tool could not resolve.
+
+### 14.3 🔴 `Q5`: the same sources at `-march=5281` carry exactly eleven
+
+A sweep that reports 0 and cannot show what a 1 looks like on the same material
+is not a measurement. The control is the build's **own recorded command line** —
+read out of kbuild's `.<name>.o.cmd`, not reconstructed — with one token
+appended, `-Wa,-march=5281`:
+
+| object | the build's own `.o` | the same source, `-Wa,-march=5281` |
+|---|---:|---:|
+| `kernel/entry.o` | 0 | **5** |
+| `kernel/genex.o` | 0 | **1** |
+| `lib/strlen_user.o` | 0 | **2** |
+| `lib/strnlen_user.o` | 0 | **2** |
+| `lib/strncpy_user.o` | 0 | **1** |
+| `kernel/scall32-o32.o` | 0 | **0** |
+| | | **11** |
+
+Identical on all four trees. It is §2's table, produced from the objects the
+build actually made rather than from a separate two-way assembly, and
+`scall32-o32.o` is in the control precisely because it must stay at 0 — a
+control whose every cell is expected to fire cannot show that the tool is
+reading the `-march` and not the filename.
+
+⚠️ 讀 the recorded command lines: **there is no `-march` anywhere in them.** That
+is `TC-14` visible in the build's own record — the driver hands `as` its own
+default, and the default is on the padded side.
+
+### 14.4 `TC-m` measured instead of argued, and it is the harmless direction
+
+`TC-m` (carried in `PROGRESS.md`): on an `ET_REL` object the MIPS16 excision is
+printed and does not happen, because the holes are computed from `st_value` —
+section-relative in a relocatable object — while the spans carry a synthetic
+base, so they never intersect.
+
+量, `Q8`: **26 objects (27 in the marked trees) print `EXCISED BY NAME`, and not
+one of them scanned fewer bytes than its `SHF_EXECINSTR` sections hold.** The
+claimed excision removed nothing, on this material, on every object that
+claimed one.
+
+🔴 **The direction matters and it is the safe one.** Those bytes were *scanned*
+as 32-bit words rather than skipped, so `TC-m` can manufacture a violation and
+cannot hide one. **A 0 from this sweep is therefore not weakened by `TC-m`**;
+a non-zero from it would have been suspect until the site was read. `TC-m` is
+not fixed here — it stays carried — but `P2` no longer waits on it.
+
+### 14.5 Two refusals that are correct and had to be handled anyway
+
+`hazlint` refuses a file with zero loads (*"that is exactly what a tool that is
+not looking reports"*) and dies on a file with no executable section. On a
+per-object sweep both are ordinary:
+
+* **7 objects really have no load** — `head.o`, `imem-dmem.o` and the five
+  64-bit helper routines. They are re-run once with `--allow-zero-loads`, and
+  `Q7a` requires the re-run to still read 0 loads on a **non-zero** number of
+  words: the flag lifts a refusal, it must not move a number.
+* **1 object holds no code at all** — `init_task.o`, whose only allocated
+  section is `.data..init_task`. `Q7b` confirms that against the section
+  headers **in this tool**, not from `hazlint`'s message, because *"there is
+  nothing to scan here"* is exactly the sentence a broken sweep would also
+  print. `M4` is the mutation that makes `Q7b` falsifiable.
+
+⚠️ `cpu-probe.o` is in the zero-load list for `quiet`/`quietm` and not for
+`loud`/`loudm`: with `CONFIG_PRINTK=y` it gains the loads behind
+`printk("CPU revision is: %08x\n", ...)`. Nothing depends on that; it is
+recorded because it is a free consistency check between the two variants.
+
+---
+
+## 15. `RUNSHEET` `P3`: the desk channel runs the boot ladder, and `B07` has a value
+
+**Not run on any of the four images before today.** The only channel run on
+disk was from 18:02 on 2026-08-28, on the pre-flag, pre-initramfs, pre-marks
+build. New tool: **`tools/deskchan.py`**, with `tools/test-deskchan.sh`
+(18 cases).
+
+### 15.1 🔴 §5's four numbers are re-derived, and the metric they were labelled with is wrong
+
+§5's table said *"KSEG0 instructions"*: control 880, mine 880, then 968 and
+1,003 with the COP3 words replaced by `nop`. 量 today, and against the four
+`.pcs` files the 2026-08-28 run left on disk:
+
+| run | entry | stops at | §5 printed | listed PCs | **distinct PCs** |
+|---|---|---|---:|---:|---:|
+| this unit's kernel | `0x80003440` | COP3 at `0x8000227C` → BEV | 880 | 866 | **828** |
+| the 2026-08-28 build | `0x80003600` | `0x8000233C` | 880 | 880 | **843** |
+| this unit's kernel, `nop` | `0x80003440` | `0x8031E218` `j .` | 968 | 968 | **908** |
+| the 2026-08-28 build, `nop` | `0x80003600` | `0x80006B2C` | 1,003 | 1,003 | **938** |
+
+Two corrections, and only one of them matters:
+
+* **the numbers are LISTED program counters, not instructions.** `-d in_asm`
+  logs at translation time, and qemu re-translates a block when it is entered
+  at a different offset, so the same instruction is listed more than once. The
+  distinct counts are 828 / 843 / 908 / 938; today's tool reproduces 828 and
+  908 exactly from the same images, on `4Kc`, `24Kc` and `24Kf` alike.
+* **the control's 880 in the first table is in no log.** `c1.pcs` — this unit's
+  kernel, unpatched, stopping at `0x8000227C` — gives 866 listed and 828
+  distinct. 880 is the *other* run's number. §5 concluded *"both stop at the
+  same instruction class"*, which is true and is supported by the stop
+  addresses; the equal counts that were printed beside it were not measured.
+
+🔴 **Neither could be checked, because the invocation was not recorded.** The
+`.log` and `.pcs` files were kept and the qemu command line was not, so
+reproducing the numbers meant guessing at `-cpu`, `-m` and `-d` flags — all
+three were tried and none of them explains the gap. `deskchan.py` prints its
+full command line on every run and writes `pcs.txt` beside the trace.
+
+### 15.2 The redirect, and the control that caught the first attempt
+
+`prom_putchar` writes UART0 at `0xB8002000`; malta has nothing there.
+`--redirect-uart` rewrites **five words inside `prom_putchar` and nothing else
+in the image** — the two `lui v0,0xb800` and the three `ori` that form THR, FCR
+and LSR — so that they point at malta's CBUS UART. The window is
+`prom_putchar`'s own extent out of the symbol table, and that is not fastidiousness:
+`lui v0,0xb800` (`0x3C02B800`) is how *every* KSEG1 register access in this
+kernel begins, and a whole-image search-and-replace would have moved the
+address of every peripheral in the port and produced an image that runs and
+means nothing.
+
+🔴 **The first target was wrong and `C1` said so.** malta's ISA COM1 at
+physical `0x180003F8` needs no change to the `lui` at all, which made it the
+attractive one. 量, with a `-bios`-only stub that writes two characters blind:
+**nothing arrives**, and a poll of `0xB80003FD` reads 0 forever. The redirect
+went to the CBUS UART instead — `0xBF000900` THR, `0xBF000928` LSR,
+`serial_hd(2)` — which this project's own `qemu-harness/qemu-run.sh` had
+recorded in a comment since 2026-08-25.
+
+⚠️ **An unpolled first write is lost.** 量, four stubs: blind `ABCDE` → `BCDE`;
+blind `A` alone → nothing; polled `RLXFW` with no blind write → `RLXFW`,
+complete; blind `AB` + polled `CD` → `BCD`. `prom_putchar` always polls, and on
+the real images the first mark arrives whole. Mechanism undetermined; `C0` pins
+the rule so that a qemu which stops doing it says so rather than quietly
+changing what a capture should look like.
+
+### 15.3 The runs
+
+All with `--nop-cop3`, which is declared: it skips the Lexra IMEM/DMEM setup,
+because qemu's 4Kc raises Coprocessor Unusable on those four opcode-`0x13`
+words. `C3` prints their addresses every run — `0x8000227C`, `0x8000228C`,
+`0x800022D8`, `0x800022E8` — and refuses if there are none.
+
+| run | distinct KSEG0 | stops at | serial |
+|---|---:|---|---|
+| this unit's kernel | 908 | `0x8031E218` `j .`, from `rtl_processBlock` | — |
+| **the drop's own kernel** | **938** | `0x80006B28` | — |
+| `quiet` | **938** | `bsp_machine_halt+0` `0x80006B94` | — |
+| `quietm` | 1,034 | `bsp_machine_halt` `0x80006B9C` | — |
+| `loud` | 2,207 | `bsp_machine_halt` `0x80006C64` | — |
+| `loudm` | 2,284 | `bsp_machine_halt` `0x80006C6C` | — |
+| `quiet` + redirect | 938 | as above | **0 bytes** |
+| `loud` + redirect | 2,208 | as above | 42 bytes |
+| **`quietm` + redirect** | 1,035 | as above | **106 bytes** |
+| **`loudm` + redirect** | 2,285 | as above | **148 bytes** |
+
+🔴 **The drop's own kernel and `quiet` reach the same 938 and both halt in
+`bsp_machine_halt`.** That is a better control than §5 had: §5 compared against
+*this unit's* kernel, which is a different tree with a different configuration,
+and got 908 against 938. Here the vendor's prebuilt `vmlinux.elf` and my build
+of the same source reach the identical depth, and only the halt address moves —
+because `CFLAGS_KERNEL=-fno-if-conversion` and the initramfs move the layout.
+
+### 15.4 🔴 The ladder prints, and `B07` has a value
+
+`quietm` through the channel:
+
+```
+RLXFW-B00
+RLXFW-B01
+RLXFW-B02=00018000
+RLXFW-B03
+RLXFW-B04
+RLXFW-B05
+RLXFW-B06
+RLXFW-B07=FFFFFFFF
+```
+
+then `bsp_machine_halt`, forever. **Eight of the eleven marks, in order, from an
+image that has never been near the device.**
+
+* **`B07 = 0xFFFFFFFF`.** `bsp_swcore_init()` returns −1 when the switch core
+  does not answer, and the next four lines are `if (ret != 0) bsp_machine_halt();`
+  — the designed, silent, unrecoverable hang §11.2 named. So the seating now
+  carries **both** values: `RLXFW-B07=00000000` is the pass, and
+  `RLXFW-B07=FFFFFFFF` followed by silence is the switch core not answering,
+  read off the wire instead of inferred from the absence of everything after it.
+* **`B02 = 0x00018000`** — and that is the point of `B02`. `0x00018000` is the
+  `PRId` of qemu's 4Kc. On this die the same binary must print `0000CD01`
+  (`CPU-04`, 量 2026-08-25b through `probe2`'s bare-metal CP0 census). **A
+  constant cannot do that.** The mark is demonstrated to be a run-time read
+  before the power cycle that depends on it, which is the strongest form the
+  discriminator ladder has.
+* **B08, B09, B10 do not appear**, and they should not: the channel halts inside
+  `bsp_setup()`, before `paging_init()`.
+
+### 15.5 The control that makes the output evidence, and the thing it found
+
+`C5`, stated before the runs: **an image with no marks in it must print
+nothing through the same channel.** 量:
+
+* `quiet` + redirect → **0 bytes**. The variant that will be uploaded second is
+  silent unless a mark runs.
+* `loud` + redirect → **42 bytes**, and they are not a mark:
+  `[    0.000000] CPU revision is: 00018000`.
+
+🔴 **So `loud` is not silent before the console handover, and §11.1 did not say
+it would be.** `CONFIG_EARLY_PRINTK=y` builds `arch/rlx/kernel/early_printk.c`,
+which registers an `early_console` whose `write` goes through `prom_putchar`;
+what §11.1 measured as a dead end is the `early_printk()` *function*, a weak
+empty stub. With `CONFIG_PRINTK=y` the console path is live. The practical
+consequences for the seating:
+
+* the `loud` capture will carry vendor-format `printk` lines interleaved with
+  the marks, and one of them is a **second reading of `PRId` in the same
+  capture** — `CPU revision is:` beside `RLXFW-B02=`, from two different call
+  sites;
+* `PRINTK_TIME` is visible and reads `0.000000` here, which is the expected
+  value before the timer interrupt starts (§11.6);
+* and `RLXFW-B09` is no longer *the* line that says which instrument the rest
+  of the capture came from — in `loud`, `printk` reaches the wire well before it.
+
+⚠️ **Only one buffered line came out.** `CPU revision is:` is emitted at
+`cpu_probe()`, between `B01` and `B02`, and it appears in the stream after
+`B03` — so it was buffered and replayed when the console registered. The kernel
+banner and everything else printed before that point did **not** appear.
+Undetermined, and recorded rather than explained: it is a fact about what the
+`loud` capture will look like, and guessing at `CON_PRINTBUFFER` here would
+put an unmeasured sentence next to eight measured ones.
+
+### 15.6 What the channel still cannot tell you
+
+* **It is not D1–D5.** qemu's 4Kc has load interlocks, no RTL8196E peripherals,
+  and a different `PRId`. `B02` printing `00018000` is the proof of that in one
+  line.
+* **It says nothing about the divisor.** `bsp_serial_init()` writes
+  `0xB8002000`, which malta does not decode, so the CBUS UART keeps its own
+  rate and `B05` arrives regardless. On the device that write is real, and
+  `B05` is the line that separates a changed line rate from a failed
+  `early_serial_setup` — the channel cannot exercise either.
+* **It does not run the Lexra IMEM/DMEM setup at all**, by construction.
+  `B06` arriving here means `_imem_dmem_init()` returned from a body that was
+  four `nop`s.
+* **The redirect is a change to the image under test.** Every instruction count
+  in §15.3 is given for the unpatched image as well, and the redirect moves it
+  by at most 1.
+
+---
+
+## 16. What could still be wrong
 
 * **§1's decision rests on four readings of one vendor's tools.** `SPEC.md` §0's
   two-source rule is not satisfied by any of them alone; what is claimed is
@@ -1314,3 +1850,20 @@ there is no second `J` even in principle.
 * **§11.7's corrected ceiling agrees with `objcopy` on THIS kernel.** Two
   routes, one artefact. A kernel whose `PT_LOAD` layout is not two contiguous
   segments would need that agreement re-established.
+
+* **§13's byte identity is one artefact, not a property of the pipeline.**
+  `nfjrom` reproduces for the drop's `vmlinux.elf`; nothing says a different
+  kernel would not expose a `cvimg` or `lzma` version difference that this one
+  happens not to reach. **And `lzma-24` is not excluded, it is unrunnable
+  here** (§13).
+* **§13's identity is not a comparison of a file with itself, and the proof of
+  that is the row above it**: `memload-full`, the immediate parent of `nfjrom`,
+  DIFFERS. Two pipelines that were secretly the same file would have matched
+  there too.
+* **§14's 0 is about `arch/rlx` plus the BSP -- 60 objects, 58,652 bytes.** The
+  linked image is 2.4 MB of `.text`. `P2` covers the hand-written assembly and
+  the board, which is where the claim lives; it is not a sweep of the kernel.
+* **§15's channel prints eight marks on a core with a different `PRId`, no
+  RTL8196E peripherals and load interlocks.** It shows the marks are reachable
+  and computed. It shows nothing about whether they will reach 38400 8N1 on
+  this die.

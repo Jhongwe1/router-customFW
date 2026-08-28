@@ -3,7 +3,18 @@
 # One row per allowed skip. Tab separated:
 #
 #
-# not-run-total: 406
+# not-run-total: 452
+#
+#   406 -> 452 on 2026-08-29 (sixth session), and it is 406 + 18 + 28:
+#   `test-rtkimage` arrives at 32 with one allowed skip covering 18 (the GPL
+#   drop), and `test-hazlint-objs` arrives at 28 and is *bench-only* for the
+#   same reason `test-hazlint` is -- every one of its cases drives `hazlint`,
+#   which refuses without `$FWRE_WORK/stage2.bin`. `test-deskchan` arrives at
+#   18 and adds NOTHING here, because CI installs `qemu-system-mips` and the
+#   suite then runs in full. ⚠️ This delta is arithmetic against the previous
+#   measured value, not a fresh runner measurement: 量 2026-08-29 covers the
+#   three new rows only (18 + 28 not run, checked with `--only`), and the 406
+#   it is added to was measured on 2026-08-28/29.
 #   The number ci-census prints as "NOT RUN IN THIS JOB", declared here so
 #   that it is CHECKED rather than restated in a comment. 2026-08-29: the
 #   green run of 2026-08-28 14:18 printed 373 while .github/workflows/ci.yml
@@ -120,3 +131,6 @@ test-config-gates	48	E5-E6 this unit's rootfs	3	E5 and E6 build the real initram
 test-reply-size	21	-	0	-
 test-boot-timeline	15	-	0	-
 test-rebuild-census	27	A7 real-material cases	4	needs $FWRE_WORK/extracted (this unit's own flash dump) and the rebuild outputs under $FWRE_WORK/rebuild/r2ab/out/bin, neither of which can be committed. The twenty-three other cases run anywhere: the tool's eight controls are built on synthetic ELFs, and six of the cases are MUTATIONS of the tool checked against those controls, so a runner still exercises the window hand-off, both boundaries of the decision rule, and the branch where a PERFECT score with a changed container must still be VOID. 量 2026-08-28 with $FWRE_WORK pointed at an empty directory: 23 ok / 0 FAIL / 1 skip line covering 4, which closes against 27
+test-rtkimage	32	the GPL drop	18	the eighteen B/M cases read the drop's own `nfjrom`, `memload-full` and `vmlinux_img` under $FWRE_WORK/rebuild/src-vendor, and a GPL drop cannot be committed. The fourteen that run anywhere are the arithmetic and the parsers: `sum16` and the bit that must move it, a hand-built `cr6c` header parsed back to the fields it was built from, `elf_symbols` on a synthetic ELF, and the exit contract -- including `check` with no `--memload`, which must refuse rather than scan for `__vmlinux_start`. 量 2026-08-29 with $FWRE_WORK pointed at an empty directory: 14 ok / 0 FAIL / 1 skip line covering 18, which closes against 32
+test-deskchan	18	-	0	needs `qemu-system-mips`, and CI installs it, so this suite runs IN FULL on a stock runner -- D2 assembles its own twelve-instruction MIPS payload, loads it through the same `-bios` stub the real images use and requires the string back out of the emulated UART, so nothing here needs a GPL drop or a cross compiler. ⚠️ Without qemu it prints eleven skip lines covering thirteen cases and stays green at 5/18, which is exactly the shape this file exists to make visible -- that is why the apt line names the package and this row's allowed skip is `-`
+test-hazlint-objs	28	*bench-only*	28	every case drives `tools/hazlint`, whose K4 population control is $FWRE_WORK/stage2.bin -- 56 KiB of this unit's own vendor bootloader, which is someone else's property and identifies one physical device. On a runner it does not skip, it FAILS, for the same reason `test-hazlint` does: 量 2026-08-29 with $FWRE_WORK pointed at an empty directory, **17 ok / 11 FAIL / 0 skip**. ⚠️ The whole 28 is counted here and that OVERSTATES what stands down: the staged-tree fixture, the synthetic big-endian MIPS objects, the stub `as`/`gcc` and all five mutations are built by the suite and would run anywhere. What keeps the row bench-only is the one artefact `hazlint` refuses to report without

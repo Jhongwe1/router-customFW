@@ -7,7 +7,7 @@ manual, for a router whose vendor never released its source.
 | | |
 |---|---|
 | **Target** | TOTOLINK N150RT · RTL8196E · **Lexra RLX4181** (🆕 2026-08-27: named from a `PRId` assignment table in the vendor's own kernel source — `PRID_IMP_RLX4181 = 0xcd00` against a measured `PRId` of `0x0000CD01`; `RLX5281` is `0xdc01` and is now excluded rather than merely unproven) · big-endian · 4 MiB SPI NOR · 32 MiB SDRAM · one unit, no spare |
-| **Status** | **`v0.0` — the instruments and the record exist; the firmware does not.** No kernel of mine has been built and no byte of mine has been written to flash |
+| **Status** | 🔄 **`v0.0` — the instruments, the record and four loadable images exist; the firmware does not.** 🆕 **2026-08-29**: a kernel of mine builds, wraps into an `nfjrom` through Realtek's own pipeline — which on the same day was shown to reproduce the vendor's own shipped `nfjrom` **byte for byte** — and, through a MIPS32 emulator with the UART redirected, prints eight boot marks before halting in the board's switch-core probe, where this board's own kernel halts too. **Nothing of mine has executed on the silicon, and no byte of mine has been written to flash.** *(Until 2026-08-29 this row read "the firmware does not [exist]. **No kernel of mine has been built**", which stopped being true on 2026-08-28 and stayed here for a day.)* |
 | **Measured on the device** | The vendor's own kernel, delivered over TFTP and executed from RAM, reaching userspace and answering ping — 2026-08-24, gate `R0`. 81 captures across five power cycles, **no flash-write command issued in any of them**, and the loader head and `cr6c` image header byte-identical across three kernel executions and two uploads |
 | **What that claim does *not* say** | *"zero flash bytes written"*. The evidence reaches **512 bytes of a 4,194,304-byte part** — the two regions read back — and no instrument here can establish more than that. `PROGRESS.md`'s `R0` row carries the wording and why it changed |
 | **Measured on the core** | 🆕 **2026-08-25, gate `R1`: 19,792 bytes of my own bare-metal code executed on this silicon and reported back on two channels that agree word for word.** The cache model is no longer read: the I-cache **does** hand back stale bytes with no flush (the negative control, on both victims of a pair 7 KiB apart, and it is the *opposite* of what qemu returned); a cached store to a line the D-cache does **not** hold reaches memory unaided (🔄 **narrowed 2026-08-26 from *"the D-cache is write-through"*, which those two cells cannot distinguish from write-back-without-write-allocate**); **`CCTL 0x002` alone is sufficient** for the instruction side, so the vendor's flush-D-then-invalidate-I is unnecessary rather than wrong; and 🔴 **`Status.IsC` does not isolate on this part — its byte stores reach DRAM**, which is the path the vendor's Linux uses and this unit's own bootcode never does |
@@ -258,17 +258,33 @@ tools/console-capture.py   29 cases. Four of them exist because the ESC heartbea
                            capture ACHIEVED is measured and recorded, not assumed
 tools/check-predictions.py refuses to compare a prediction against a capture unless
                            the prediction file's mtime is earlier
-tools/test-gitignore.sh    15 cases. Six are positive controls, because a .gitignore of
-                           a single `*` would pass every negative one
-tools/test-opcount.sh      15 cases. Two exist because a counter reading the wrong
+tools/test-gitignore.sh    six of its cases are positive controls, because a .gitignore
+                           of a single `*` would pass every negative one
+tools/test-opcount.sh      two of its cases exist because a counter reading the wrong
                            endianness, or ignoring alignment, is still a counter
 tools/test-file-modes.sh   reads the git index rather than the working tree, because the
                            working tree is what DrvFs lies about
-tools/test-rlxprobe.sh     106 cases over the bare-metal payloads. Four of them are
-                           mutations that BUILD a deliberately broken payload and run it
-                           under qemu, because a suite that cannot tell a fixed payload
-                           from a shipped one is not a suite. One of those four exists
-                           because qemu cannot reach the state it tests at all
+tools/test-rlxprobe.sh     the bare-metal payloads. Four of its cases are mutations that
+                           BUILD a deliberately broken payload and run it under qemu,
+                           because a suite that cannot tell a fixed payload from a
+                           shipped one is not a suite. One of those four exists because
+                           qemu cannot reach the state it tests at all
+tools/rtkimage.py          runs Realtek's own nfjrom pipeline and reads what it produced.
+                           Its R1 control is the drop's OWN shipped nfjrom, re-parsed on
+                           every invocation; R2 flips one bit and requires both the
+                           checksum and the payload to notice. A truncated LZMA stream
+                           decodes partially WITHOUT raising, so "smaller image" was a
+                           thing this had to be stopped from printing
+tools/hazlint-objs.py      hazlint over every object a kernel build produced under
+                           arch/rlx -- following the symlink, because plain `find` misses
+                           the six BSP objects and would sweep the architecture while
+                           skipping the machine. Its Q5 control re-assembles the same
+                           sources from the build's own recorded command line with one
+                           token changed, and requires the eleven hazards to appear
+tools/deskchan.py          runs an image under qemu and reads how far it got. C1 and C2
+                           prove the emulated UART's two addresses separately, because
+                           "the mark did not run" and "the instrument does not carry"
+                           are the two answers a silent run has to be split into
 tools/reply-size.py        what the loader will send back, in bytes, before it sends it.
                            Twelve controls, and the model's constants were fitted from
                            121 captures rather than counted by hand -- which is the
@@ -277,6 +293,14 @@ tools/boot-timeline.py     the named intervals of a boot, with the anchor bytes 
                            It exists because two adjacent silences of the same length is
                            how a measurement ends up wearing another one's name
 ```
+
+🔄 **2026-08-29: the case counts are gone from this list, and that is a repair
+rather than a tidy-up.** Three of them were stale and nothing compared them —
+`test-gitignore` read 15 against an actual **18**, `test-opcount` 15 against
+**29**, `test-rlxprobe` 106 against **202**. `tools/ci-expected.tsv` is the owner
+of every suite's bench total and `tools/ci-census.py` fails the build when one
+drifts; a second copy on this page could only ever go stale quietly, which is the
+same defect this repository has now found in four different files.
 
 **CI runs what a runner can run, and says out loud what it cannot.**
 `.github/workflows/ci.yml` executes the suites whose inputs are committed text,
