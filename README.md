@@ -51,6 +51,22 @@ here that came from something other than counting instructions in an image.
 
 ## What is in here
 
+**[`notes/kernel-build.md`](notes/kernel-build.md)** 🆕 — how rlxfw's own kernel
+is built, wrapped and reached: which toolchain (`rsdk-1.3.6-4181`, with the
+condition that would refute the choice), what the configuration may differ by,
+what the loadable image is made of, what the first boot mounts, and how far a
+kernel for this board can be run at a desk. 🔴 **Three things in it were found by
+reading material this project already had.** A control that separates `-march`
+from the toolchain generation had been *built* on 2026-08-28 and never read — the
+note that called it *not run* was committed 48 minutes later; read, it moves the
+whole-image violation count from 4 to 20,201 on the `-march` change alone and by
+4.9 % on the generation. Seven `arch/rlx` assembly files rely on the **assembler**
+to fill a load delay slot, worth twelve live hazards — five of them in the
+exception return path — and no compiler flag would fix them because there is no
+compiler in that path. And `yes '' | make oldconfig` silently turned on a CPU
+sleep option the vendor had turned off, so the kernel already on disk is not a
+build of the vendor's configuration.
+
 **[`notes/vendor-toolchains.md`](notes/vendor-toolchains.md)** 🆕 — what the three
 rsdk releases are, what their wrapper enforces and silently injects, and whether
 they can build this board. Ends with a complete `vmlinux` linked twice from the

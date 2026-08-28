@@ -12,6 +12,42 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R3` opens, 2026-08-28 — and the three findings it opens with all came out of material this repository already had.** Desk only, no power, zero flash bytes.
+`notes/kernel-build.md` is the new owner.
+
+- 🔴 **A control that had been built and never read.** `notes/vendor-toolchains.md`
+  §4 called the `rsdk-1.3.6-5281` kernel column *not run — cheap, and not done*;
+  the `vmlinux` had been linked at 05:57 that morning and the note was committed at
+  06:45. Read, with the `.config` measured identical across both builds: changing
+  **`-march` alone** moves the whole-image violation count **4 → 20,201**, changing
+  **the toolchain generation alone** moves it **20,201 → 21,185**, +4.9 %. The
+  confound that table carried is gone.
+- 🔴 **`TC-g` closes, and eleven load-use hazards in hand-written kernel assembly
+  turn out to be prevented by the assembler rather than by the author** — five in
+  the exception return path, five in the user-copy routines, and one that is
+  `lw k0,0(k0)` followed by `jr k0` in the general exception dispatcher. **No
+  compiler flag would fix them; there is no compiler in that path.** The detector's
+  own positive control caught its first version, which counted instructions where
+  the two `-march` values emit the same number of them.
+- 🔴 **The four "unexplained" violations are one shape**: a conditional move whose
+  destination is the register the load just wrote. Two are on `R3`'s boot path.
+  Across everything measured to run on this die — the whole shipped kernel, its
+  `boa`, its `busybox`, its loader — the pattern occurs **zero** times.
+- 🆕 **A desk execution channel, with its ceiling measured rather than assumed.**
+  `qemu-system-mips` runs ~1,000 instructions of this board's kernel and stops in
+  the switch-core probe — and this unit's own kernel stops in the same place, so
+  the ceiling belongs to the emulator. On the way out, qemu decodes opcode `0x13`
+  as `lwxc1`: the same MIPS-IV mislabel this project fixed in its own tool on
+  2026-08-27.
+- 🆕 **The `cr6c` image format is read end to end**, and `check_image()`'s 16-bit
+  sum rule is evaluated for the first time — zero on two independent images, and
+  `0xFFFF` when one bit is flipped.
+- 🆕 **Two decisions with refutation conditions**: the kernel is built with
+  `rsdk-1.3.6-4181` through its own wrapper, and the first boot mounts an
+  initramfs of this unit's own userspace rather than the flash rootfs.
+
+---
+
 **`R2a/b/d-4`, 2026-08-28 — the rebuilds got built, and the instrument they were
 to be judged by turned out to be measuring the other axis.** Desk only, no power,
 zero flash bytes. `notes/rebuild-vs-shipped.md` is the new owner.

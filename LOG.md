@@ -6674,3 +6674,246 @@ config** 上的，TOTOLINK 的 config 不在集合裡，這裡沒有東西界定
 `SPEC.md`（`TC-18`／`TC-19`／`TC-20` 新增，`TC-02a`／`TC-05`／`TC-14`／`TC-17`／§17 改）、
 `PROGRESS.md`、`tools/rebuild-census.py`、`tools/test-rebuild-census.sh`、
 `tools/ci-expected.tsv`。
+
+---
+
+## 2026-08-28（桌面，第三段）— `R3` 開了，而開場的三個發現全部是從已經在磁碟上的材料讀出來的
+
+**桌面，不通電，零 flash 位元組，零電源循環，零裝置讀數。** 接同日第二段（`R2a/b/d-4`）。
+`R2a/b/d` 五步全關，`R3` 開。這一段的形狀跟前幾段不一樣：**沒有一件事是「跑一次新的建置」跑出來的，
+三件都是去讀這個 repo 已經有的東西**——一個建過而沒有人讀的 `vmlinux`、
+十七支 `.S`、四條被寫成「沒有解釋」的 violation。
+
+### 一、先寫，再做，而且分開 commit
+
+`R3` 是第一個 DoD 是「裝置上會怎樣」而不是「檔案長怎樣」的 gate，所以在動任何東西之前先寫：
+
+* **DoD 拆成五條**（D1 送到並進入／D2 進入的是**我的** kernel／D3 早期 bring-up／
+  D4 打得了字的 shell／D5 雙向 ping），每一條各有觀察量與否證條件。
+* 🔴 **反-DoD 寫在最前面**：2026-08-25 `R1g-4b` 量到**第二次 `J 80500000` 開的是原廠韌體**
+  （看門狗重置後 loader 會重新 stage 那個位址），所以 banner 不是「我的 kernel 跑了」的證據。
+  每一條通過條件都帶兩個原廠映像產不出來的鑑別記號，而且它們必須**互相獨立**：
+  M1 是編譯期字串（builder／compiler／build number 三欄都不同），M2 是**只存在於我的樹裡的一行程式印出來的**。
+  M1 單獨不夠——它是常數，一份 capture 是位元組流，兩份映像都印得出常數。
+* **十二個步驟、否證條件、停損**，以及這個 gate 開場就做的兩個決定。
+
+**這一份先單獨 commit（`c24a4e3`），裡面沒有任何一個結果**，所以「寫在前面」在 git 裡查得到，
+而不是在散文裡自稱。
+
+### 二、一個建過、但沒有人讀的控制
+
+`notes/vendor-toolchains.md` §4 那張表的 `rsdk-1.3.6-5281` 欄寫著 *not run*，
+底下還有一句 *"Building the kernel with it would separate the toolchain generation from the
+`-march` … Cheap, and not done."*
+
+**它建過了。** `r2d3/build2/vmlinux-136-5281.elf`，3,207,595 bytes，entry `0x800035a0`，
+sha256 `47f03df4…`，mtime **2026-08-28 05:57**，旁邊有 `ctl-clean.log`／`ctl-136-5281.log`／
+`ctl-vm-136-5281.log`（最後一行是 `LD vmlinux` 與 `SYSMAP`）。
+而說它 *not run* 的那份筆記是同一天 **06:45** commit 的。
+
+🔴 **這跟「沒做」是不同的缺陷**：工作做了，產物在磁碟上，只是沒有人把儀器架上去。
+這個 repo 一路在防「一個不會發射的判決」，這次是「一個沒有人在看的讀數」。
+
+補上去之後，`TC-15` 整份映像那張表變成四列，而其中兩格是單一變因：
+
+| `vmlinux` | loads | load 後補 nop | **violations** |
+|---|---:|---:|---:|
+| 1.3.6 開 `-march=4181` | 61,568 | 17,423（28.30 %） | **4** |
+| **1.3.6 開 `-march=5281`** 🆕 | **64,729** | **108（0.17 %）** | **20,201** |
+| 1.5.5 開 `-march=5281` | 65,740 | 117（0.18 %） | **21,185** |
+| **這台自己的 kernel** | 63,298 | 19,419（30.68 %） | **0** |
+
+* **只換 `-march`**（世代固定在 1.3.6）：4 → **20,201**
+* **只換世代**（`-march` 固定在 5281）：20,201 → 21,185，**＋4.9 %**
+
+🔴 **所以動的是 `-march`，世代幾乎不動它。** §5 自己標的那個「兩列同時換了兩個變因」的但書，沒了。
+
+⚠️ 三個舊數字**逐格重現**（61,568／17,423／4；65,740／117／21,185；63,298／19,419／0），
+那是方法本身的控制。⚠️ 而這台那個 `0` 帶著 **2 個 unresolved successor**，原本那一列沒有講。
+
+### 三、`TC-g`：答案是一份名單，而第一版偵測器被它自己的控制擋下來
+
+問題是「`arch/rlx` 底下哪幾支 `.S` 跑在 `.set reorder`，有沒有誰靠 gas 幫它補 nop」。
+**那不是 grep 問得出來的**：`.set reorder` 有幾個不重要，重要的是**沒有 gas 的話哪一支會帶著真的 hazard**。
+
+方法：每支 `.S` 前處理一次，同一支 `as` 在 `-march=4181` 與 `-march=5281` 各組一次
+（§5 第三個讀數已經確立兩個世代的 gas 都帶 per-core 模型、而且會動手），比對送出來的指令序列，再各跑一次 `hazlint`。
+
+🔴 **第一版數指令條數，`P` 控制沒有發射。** 因為 4181 送出 `lw nop jr addu`、
+5281 送出 `lw jr addu nop`——**四條指令、一個 `nop`，兩邊一模一樣**。
+`nop` 數也一樣。**count 對這件事是瞎的，sequence 不是。** 改成比序列，`P` 有差、`N`（noreorder）沒差。
+
+| 檔 | 靠不靠 gas | 沒有它會有幾條 live hazard |
+|---|---|---:|
+| `kernel/entry.S` | **靠** | **5** |
+| `lib/strlen_user.S` | **靠** | **2** |
+| `lib/strnlen_user.S` | **靠** | **2** |
+| `kernel/genex.S` | **靠** | **1** |
+| `lib/strncpy_user.S` | **靠** | **1** |
+| `kernel/relocate_kernel.S` | 靠 | 1 ⚠️ **這塊板子沒建它**（`CONFIG_KEXEC=n`） |
+| `kernel/scall32-o32.S` | 序列有差 | 0（兩邊都 0） |
+| 其餘八支 | 不靠 | 0 |
+
+**這塊板子真的建的那六支，合計 11 條。** 而它們不是 `hazlint` 的保守，是教科書等級的：
+
+* `genex.S`：**`lw k0,0(k0)` 接 `jr k0`** —— 一般例外分派器載入向量位址、**下一條就跳過去**。
+  沒有那個 `nop`，這顆 kernel 每一次例外都會跳到 `k0` 的**上一個值**。
+* `entry.S`：`lw t0,168(sp)`／`andi t0,t0,0x8`、`lw t8,156(sp)`／`mtlo t8`、
+  `lw t8,152(sp)`／`mthi t8`、`lw a2,8(gp)`／`andi t0,a2,0xffef`（兩次）。
+* user-copy 三支：`lw v0,24(gp)`／`and v0,v0,a0`（使用者位址遮罩）、
+  `lb t0,0(v0)`／`bne t0,zero`（剛載入那個位元組的迴圈測試）。
+
+🔴 **沒有任何編譯器旗標救得了它們，因為那條路上沒有編譯器。**
+
+**免費的獨立佐證**：磁碟上那棵樹最後一次是用 1.3.6-5281 建的（第二節那個控制）。
+`hazlint` 掃它**真的產出**的 object：`entry.o` 5、`genex.o` 1、`strlen_user.o` 2、
+`strnlen_user.o` 2、`strncpy_user.o` 1 —— 逐格等於這個實驗的預測，而那個建置我沒碰過。
+
+⚠️ 而真實建置之所以安全是**附帶的**：`TC-14` 量過 `gcc -c foo.S` 不把 `-march` 傳給 `as`，
+1.3.6 的 driver 給 `as` 的預設是 `lx4180`，剛好在補 nop 那一側。**那要用一條檢查釘住。**
+
+### 四、那四條「沒有解釋」的 violation 是同一個形狀
+
+`TC-15` 寫著 *"那 4 條沒有解釋，61,568 個 load 裡的四個點位"*。量：**四條都是把剛載入的暫存器當目的地的條件搬移。**
+
+| 位址 | 指令對 | 符號 | 在 `R3` 的開機路徑上？ |
+|---|---|---|---|
+| `0x800142CC` | `lw v0` ／ `movz v0,s0,a3` | `__add_preferred_console` | **是** |
+| `0x8008F978`／`0x8008FA08` | `lw` ／ `movn` | `__blockdev_direct_IO` | 否 |
+| `0x80092DD8` | `lw a2,92(sp)` ／ `movn a2,a1,v1` | `load_elf_binary` | **是** |
+| `0x8015EFF8`（放寬界之後多的第五條） | `lw a1` ／ `movz a1,zero,a2` | `rtl8192cd_ioctl` | 否 |
+
+**`hazlint` 沒有判錯，是它自己寫明的保守策略在發射**
+（*rd is architecturally preserved rather than read, but a checker that assumed so would be assuming.*）。
+🔴 **而那個策略對不對是微架構問題**：write-enable 實作下 `rd` 不被讀、序列在任何核心上都對；
+read-select-write 實作下，條件不成立那一支會把**載入前的舊值**寫回去、蓋掉載入值——無聲、無例外。
+
+🔴 **而這顆晶片上跑過的東西，沒有一個踩過這個形狀**：這台整份 kernel（143,555 loads／3,183 個條件搬移）**0**、
+出貨 `boa`（24,879／141）**0**、出貨 `busybox`（12,605／213）**0**、loader（1,474／18）**0**。
+我建的那份是 **4**，其中兩條在開機路徑上。**所以那會是這顆矽片上第一次跑到這個形狀。**
+
+新的 carried-forward：**`TC-h`**，一對指令在裸機上就問得完，跟 `C-12` 同一份 payload。
+而 `R3` 的直接後果是：**上傳的映像必須過 `hazlint` 0 violations**，就是 `probe2`／`probe3` 過的同一道 gate。今天這份沒過。
+
+### 五、映像格式，以及一條寫下來三個月沒被算過的加總
+
+`R3` 要產出一個 `J 80500000` 收得下的東西，所以先把廠商的管線讀完：
+
+    vmlinux → strip → objcopy -Obinary → lzma → cvimg vmlinuxhdr
+            → objcopy --add-section .vmlinux → ld @ 0x80500000 → objcopy -Obinary → nfjrom
+            → cvimg linux-ro → linux.bin（加 cr6c 標頭）
+
+**`nfjrom` 才是進 RAM 被跳進去的東西；`linux.bin` 是它加一個 flash 標頭，而這個專案不寫 flash。**
+
+🔴 **`C-4` 記的那條「16 位元半字加總必須為零」，第一次被拿到映像上算**，而且是兩份互相獨立的映像：
+drop 自己的 `linux.bin`（payload 854,018）得 `0x0000`，這台 flash `0x060000`（payload 987,138）也得 `0x0000`。
+**控制**：任一份翻一個位元 → `0xFFFF`。所以 payload = `nfjrom` ＋ **2 個把加總湊成零的位元組**。
+
+自解壓外殼也拆開了（讀 `ld.script.in`／`misc.c:304-305`／`hfload.h:30`）：
+段首兩個字是 `pending_len` 與 `kernelStartAddr`，LZMA 從 +8 開始，解壓目標 `0x80000000`。
+兩份都**逐位元組**等於它們自己的參考物（drop 的 2,953,660 = `rtkload/vmlinux_img`；
+這台的 3,374,772 = `vmlinux-rederived.bin`）。**定位器的負控制**：同一條掃描在 `stage2.bin` 上回 **0** 個候選。
+
+**管線的第 1、2 階跑了，而且有廠商自己的參考物**：拿 drop 的 `image/vmlinux.elf` 走
+`strip` → `objcopy -Obinary`，出來的兩個中間物**逐位元組等於 drop 附的 `vmlinux-stripped` 與 `vmlinux_img`**。
+我的 kernel 走同兩階是 2,894,792／**2,846,948**。
+
+⚠️ **第 3–6 階（LZMA／`cvimg`／連結）還沒跑**，所以 `R3-2` 沒有打勾。
+
+**天花板是算術**：解壓目標 `0x80000000`、映像自己在 `0x80500000`，
+所以解壓後必須小於 **5,242,880** bytes。我的用掉 54.3 %，**剩 2,395,932**。
+
+### 六、桌面執行通道，以及它的天花板是量出來的
+
+`qemu-system-mips` 8.2.2 沒有 RTL8196E 機型。`-kernel` 用不了——malta 把 prom 環境寫在實體 `0x2000`，
+在映像裡面，qemu 直接拒絕。可行的是 `-bios` 裡放三條指令的跳板加 `-device loader,addr=0,force-raw=on`。
+
+🔴 **通道先用這台自己的 kernel 驗過**（那是 2026-08-24 在矽片上開起來、ping 2/2 的那一份）。
+兩份都跑 880 條 KSEG0 指令，**停在同一個指令類別上**：
+控制那一份停在 `0x8000227C`，字是 `4c880000`、**opcode `0x13`**；
+我的停在 `0x8000233C` = `_imem_dmem_init+108`，qemu 把它反組譯成 **`lwxc1`**。
+🔴 **那正是 `hazlint` 到 2026-08-27 為止帶著的同一個誤標**（opcode `0x13` 讀成 MIPS-IV COP1X）。
+**兩支互相獨立的工具犯同一個錯，而那是關於工具的證據，不是關於這顆核心的。**
+
+把那四個 COP3 字換成 `nop`（**只在通道用的副本上，聲明過**，因為那等於跳過 Lexra 的 IMEM/DMEM 設定）之後：
+我的走到 **1,003** 條、經 `bsp_setup` → `bsp_swcore_init` → **`bsp_machine_halt`** 的 `j .`；
+這台自己的走到 **968** 條、同樣停在一個 `j .`。
+🔴 **兩份都死在交換器核心探測上**，因為 malta 沒有 RTL8196E 的交換器。
+
+**所以通道的射程是量出來的**：映像格式、進入點、`head.S`、CP0 設定、早期呼叫鏈與 `bsp_setup` 驗得到；
+之後什麼都驗不到。**而在那之前的分歧歸得了我的 kernel，之後的歸不了。**
+⚠️ qemu 的 4Kc 是**有 load interlock 的 MIPS32**，重現不了 load-delay 錯誤。
+
+### 七、兩個決定，各帶否證條件
+
+**Ⓐ `R3` 用 `rsdk-1.3.6-4181`，走它自己的 wrapper**（填掉 `TC-05` 留白的那一半）：
+唯一接受 `-march=4181` 的 wrapper（而板級 config 是 `ARCH_CPU_RLX4181=y`）／
+另一條在不補 delay slot 那一側（21,185 條）／drop 自己的 `.config` 選的就是它／
+它是兩條連得出完整 `vmlinux` 的其中一條。
+
+🔴 **而不採用 1.5.5-繞-wrapper-開-4181 的理由，不是那三條 crt violation**——
+量：kernel 一個 uClibc／libgcc 符號都不連（`__ashldi3`／`__ashrdi3`／`__lshrdi3` 來自 kernel 自己的
+`arch/rlx/lib/`，Makefile 裡沒有 `-lgcc`，uClibc 符號 0 個），
+**所以那個反對意見是講 userspace 的、不適用於 kernel，決定不可以拿它辯護。**
+留下來的理由是：那組旗標是**重建的（推）**，而 `R3` 若開不起來，
+廠商自己的三元組可以把 code generator 排除在嫌疑之外，重建的工具鏈不行。
+
+**Ⓑ 第一次開機掛 initramfs，內容是這台自己的 userspace，不是 flash 上的 squashfs**：
+安全性優先（initramfs 這條路根本不會生出 MTD 分割表，而 loader 與 `H601` 兩個禁區就在錯誤分割表蓋得到的地方；
+而且 drop 的 `FLASH_OFFSET=30000` 已經量到不是這台的 `0x060000`）／
+它是廠商自己支援的路（board Makefile 的抬頭就是 *with initramfs*，`gen_init_cpio` 在樹裡）／
+它把 userspace 留成受控變因而不是拿掉／計畫的停損本來就是「換 initramfs 把變因切一半」，先做等於先站在少變因那一側。
+**尺寸**：busybox 273,332 ＋ libuClibc 205,452 ＋ libgcc_s 80,156 ＋ ld-uClibc 20,704 = **579,644**，
+headroom 的 24.2 %。⚠️ **`/dev/console` 要自己造**——解出來的 rootfs 一個裝置節點都沒有
+（⚠️ 而那個零一半是解壓的性質：非 root 的 `unsquashfs` 造不出裝置節點）。
+
+### 八、上機表寫好了，而它的 DoD 在桌面上達不到
+
+`RUNSHEET.md` § `B5`（新）：`probe3` 先跑，然後三段梯子（shell → link → ping），
+**每一段一次電源循環**（loader 會在看門狗重置時重新 stage `0x80500000`，所以一次循環跑不了兩支）。
+七項上機前的桌面檢查各帶否證條件，其中 `P1` 是 `hazlint` 0 violations——**今天這份過不了，所以那項會擋住座位**。
+
+⚠️ **`R1h-2` 的 DoD（`check-predictions.py` 通過）是 bench-time 的，桌面達不到**，`PROGRESS` 早就寫了。
+桌面能做的是把 § `B5` 與每一格的期望值寫完，而那寫完了。
+⚠️ 而 `check-predictions.py` **仍然沒有接到任何東西上**，所以上機那天要用手跑。
+
+### 九、收工自查
+
+`spec-check.py` **綠**，九個控制全部發射得出來。`test-file-modes.sh` 3 passed。
+每一道跑廠商 binary 的指令都包在 `tools/vendor-tripwire.sh` 底下、從 scratch 目錄跑，**全部 `CLEAN`**。
+**零 flash 位元組、零電源循環、零裝置讀數。**
+
+### 十、收工前的對抗審查：五條攻擊全是量測，三件改掉
+
+沿用上一段的方法——**把每一條要寫進提交檔案的句子拿去量它**。
+
+🔴 **A1（守住，而且變硬）——「第二節那個控制是單一變因」原本只是假設。**
+04:44 的 4181 建置與 05:57 的 5281 建置中間，`.config` 有沒有動？
+量：`config-before-ctl.snapshot` 與樹上的 `.config` **各 767 個符號，逐格相同**。單一變因成立。
+
+🔴 **A2（守住，而且範圍擴大而不是措辭放軟）——「這顆晶片上跑過的東西沒有一個踩過這個形狀」原本量在 56 % 的窗上。**
+那句話讀不出 56 %。重量：整份 3,374,772 bytes 的 kernel（143,555 loads／3,183 個條件搬移）**0**、
+出貨 `boa` **0**、出貨 `busybox` **0**、loader **0**。
+⚠️ 整份映像那一列把 MIPS16 帶當 4 位元組字讀，那一段的零不算數；但 32-bit 的部分還有約 18 萬個 load。
+順帶把統計講對：依 4181 那份的比率，光是出貨 kernel 期望值就是 **9.3**、`P(0) ≈ 9e-5`，
+⚠️ 而那個虛無假設把兩份不同的程式碼當成一個母體——**那是數量級陳述，不是檢定**。
+
+🔴 **A3（改掉了一個數字）——「12 條 live hazard」是錯的。**
+`relocate_kernel.S` 確實靠 gas、確實有 1 條，但 `CONFIG_KEXEC=n`，
+`relocate_kernel.o` 與 `machine_kexec.o` 都不在樹裡。**這塊板子真的建的是 11 條。**
+那一列留著並標記，不是刪掉。
+
+🔴 **A4（推變成讀）——「兩份停在同一個地方」原本是推論**，因為這台的 kernel 沒有符號表。
+量：控制那一份的停止字 `0x8000227C` = `4c880000`，**opcode `0x13`**，
+而 `[0x80002210, 0x80002310)`（這個 repo 早就記成這台的 `IMEM0FILL`／`IMEM0OFF` 序列）裡有 **4** 個這種字，和我那份同數。
+
+🔴 **A5（守住，而且把一句軟話換成硬證據）——「11 條會不會也是 `hazlint` 的 `movz` 保守？」**
+量，逐條讀指令對：`genex.S` 是 `lw k0,0(k0)`／`jr k0`，`entry.S` 是 `andi`／`mtlo`／`mthi`，
+user-copy 是位址遮罩與迴圈測試。**一條條件搬移都沒有。**
+另外 **A6**：`__add_preferred_console` 在不在開機路徑上原本是假設——
+量，`CONFIG_CMDLINE` 是 `"console=ttyS0,38400 root=/dev/mtdblock1"`，`console_setup()` 會跑。
+（順帶掉出 `R3-4` 的第一行差異：**initramfs 開機不能留 `root=/dev/mtdblock1`**。）
+
+**動到的檔**：`notes/kernel-build.md`（新）、`RUNSHEET.md`（§ `B5` 新）、
+`SPEC.md`（`FW-23`／`TC-21`／`TC-22`／`TC-23`／`TC-24` 新，`TC-05`／`TC-15`／`LDR-18`／`FW-12`／§17 改）、
+`PROGRESS.md`、`README.md`、`CHANGELOG.md`。

@@ -595,8 +595,6 @@ simulator had approved sat an `andi` in a load delay slot. So:
 
 ---
 
----
-
 ## Session B4 — `R1-gate`: the cache model and the CP0 census, on silicon
 
 **Written 2026-08-25, at the desk, before any of it runs; corrected the same
@@ -1266,6 +1264,98 @@ those would pass the badge.
   the device**, and its one load-bearing unverified link —
   `exception_handlers[9] == 0x80400BE8` — is measured by `H0b`, third cell of this
   seating.
+
+---
+
+## Session B5 — `R3`: my kernel from RAM, with `R1h`'s `probe3` first
+
+**Written 2026-08-28 at the desk, before the seating.** This section is
+`R1h-2`'s desk half and `R3-7`. `R1h`'s bench segment does not get its own power
+cycle — it rides this seating, and it runs **first**.
+
+| | |
+|---|---|
+| **Power cycles** | 🔴 **one per `J`, and that is not a choice.** 2026-08-25 `R1g-4b` measured it: the loader **re-stages `0x80500000` on a watchdog reset**, so a second `J` in the same cycle runs the *staged vendor image*, not the payload that was uploaded. Every rung below is therefore: power on → ESC → `AUTOBURN 0` → `IPCONFIG` → TFTP `put` → `J`. **One directory per power cycle** (`bench/README.md`) |
+| **Flash bytes written** | **0.** `AUTOBURN` is read at `0x8040D4A0` **before every upload**, and the read must return `00000000`. If it does not, nothing is uploaded |
+| **RAM written** | the image, at `0x80500000`. ⚠️ `probe3` writes its own block; `R1h-1`'s rebuild-on-the-day procedure runs first and `rb=80a02000` is its stale-build check |
+| **Closes** | `R3` D1–D5 (`PROGRESS.md` § Step list), and `R1h-3` |
+
+### Running order, and it does not move
+
+🔴 **`probe3` runs first, before any kernel.** `R3`'s pass state is *a kernel is
+running*, and in that state the loader is gone, DRAM is gone, there is no
+`<RealTek>` prompt to type `J` into and no `DW` to recover a result block with.
+`probe3` is the cheap one; `R3` is the one that ends a seating. If `R3` goes
+first, the seating buys one thing.
+
+    R1h-3   probe3            (power cycle 1)   -- R1h's four questions
+    R3-8a   rung 1: shell     (power cycle 2)   -- D1 D2 D3 D4
+    R3-8b   rung 2: link      (power cycle 3)   -- + drivers/net/rtl819x
+    R3-8c   rung 3: ping      (power cycle 4)   -- D5
+
+Each rung adds exactly one thing. A rung that fails is not retried with a change
+in the same seating unless the change is in the *upload*, because a change to the
+image is a desk segment and `R3-9` owns it.
+
+### 🔴 The discriminator, and every rung carries it
+
+2026-08-25 recorded a `J 80500000` that booted the **vendor** kernel. So *a
+banner appeared* is not evidence that my image ran. Two independent marks, and a
+capture without **both** is recorded as **unattributed**, never as a pass:
+
+| | mark | why it cannot be the vendor's |
+|---|---|---|
+| **M1** | `Linux version 2.6.30.9 (<user>@<host>) (gcc version 3.4.6-1.3.6) #1 <date>` | this unit's is `(admin@office.hopeiot) (gcc 4.4.5-1.5.5p2) #1526 Wed Jan 10 14:50:54 CST 2018` (`FW-03`, 量). **Three fields differ: the builder, the compiler, the build number** |
+| **M2** | a string printed by `arch/rlx/bsp/setup.c` that exists only in my tree, emitted before `start_kernel` | it is not in the shipped image; `strings` over `vmlinux-rederived.bin` is the desk check that it is absent, and it runs **before** the seating |
+
+⚠️ **M1 alone is not enough**: it is a compile-time string, and a capture is a
+byte stream that can be from either image. M2 is what makes the pair
+independent — it is emitted by code, at a point in the boot, not by a constant.
+
+### Before power is applied — the desk checks, each with its own refutation
+
+| | check | pass | what it refutes |
+|---|---|---|---|
+| **P1** | `hazlint` over the image's decompressed bytes, bounded below the first `[MIPS16]` symbol, **and** over `.init.text` and `.exit.text` | **0 violations** in all three spans | 🔴 today's build is **5** in the widened span and 0 in `.init.text` (`TC-22`). A non-zero here means `R3-4`'s config work did not land, and the seating is cancelled — this is the same gate `probe2` and `probe3` passed |
+| **P2** | `hazlint` over every `.o` the build produced under `arch/rlx` | 0 objects with violations | `TC-21`: twelve load-use hazards in hand-written assembly are prevented by the assembler's default `-march`, not by the author. **That safety is incidental and this is where it is asserted** |
+| **P3** | the desk execution channel (`TC-23`), on **this** image | reaches `bsp_setup` → `bsp_swcore_init` → `bsp_machine_halt`, ~1,000 KSEG0 instructions, same as this unit's own kernel | a fault before that point is mine and costs no power cycle. ⚠️ **Reaching it is not D1–D5**: qemu's 4Kc has load interlocks and no RTL8196E |
+| **P4** | image ceiling | decompressed image < **5,242,880** bytes | the decompressor writes to `0x80000000` and reads from `0x80500000`; over the ceiling it overwrites its own input (`FW-23`) |
+| **P5** | `sum16` over the payload | not applicable — **the RAM path takes the payload, not the file** | `LDR-18`'s checksum is `check_image()`'s, and `check_image()` is on the *flash* boot path. A `cr6c` header on a TFTP upload is 16 bytes of junk at `0x80500000` |
+| **P6** | `strings` for M2 over `vmlinux-rederived.bin` | **absent** | if the marker string happens to exist in the shipped kernel, M2 discriminates nothing and must be changed before the seating |
+| **P7** | `probe3` rebuilt on the day, `sha256` recorded, `rb=80a02000` | matches `R1h-1`'s recorded value | 量 2026-08-26: `make P=probe2 payload RESULT_BASE=0x80A01000` printed *Nothing to be done* while the binary in the tree was a `0x80A00000` build |
+
+### The cells
+
+| | command | expected | what it refutes |
+|---|---|---|---|
+| **K0** | `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o <dir>/K0-rescue.json`, then `console-capture.py … --send 'DW 8040D4A0 1'` | `AutoBurning=0`, `Set TFTP Load Addr 0x80500000`, `Now your Target IP is 10.1.1.1`; then word 1 = `00000000` | 🔴 **the guard.** One instruction at `0x80401B9C` is the burn path's own read of it. **If word 1 is not `00000000`, stop. Nothing is uploaded.** ⏱ the transcript must be fresher than `--max-rescue-age` (3600 s) and from **this** power cycle: `AUTOBURN` is RAM state and every reset puts it back to `1` |
+| **K1** | `loader-tftp.py put --host 10.1.1.1 --image <image> --rescue-report <dir>/K0-rescue.json --expect-load 80500000 --yes` | transfer completes | ⚠️ **`--load-addr` takes `0x80500000` and `--expect-load` takes `80500000`** — the opposite convention, in the same session, minutes apart (`B3` §G4). Never a filename containing `nfjrom` or `boot.img`: `LDR-26`, those two force `0x80000000` and auto-execute with nobody at the console |
+| **K2** | `DW 80500000 1` · `DW 80540000 1` · then `DW` at `image_end − 16` | the first 16 bytes of the uploaded file; a mid-image word; the tail | 🔴 **that the upload landed where it was told**, which the `put`/`get` round trip structurally cannot test — both serve `[0x8040D3A8]`. ⚠️ Unlike `B3` §G5, **the region cannot be poisoned first**: `0x80500000` already holds the loader's staged copy of the vendor image, and poisoning it would destroy the fallback. So the check is *the bytes are mine*, not *the bytes changed* — and it is only meaningful because my image and the staged one differ in their first 16 bytes (量 at the desk, before the seating, and recorded in the prediction block) |
+| **K3** | `console-capture.py capture --send 'J 80500000' --seconds 90` | `---Jump to address=80500000`, then **`decompressing kernel:`**, then `start address: 0x800036xx`, then **M1**, then **M2** | 🔴 **D1 and D2.** `decompressing kernel:` is `rtkload/hfload.c`'s own line and it proves the wrapper ran; `start address:` prints `kernelStartAddr` out of the image's own header and it must equal the entry of the `vmlinux` I built. **Silence after the jump line is two causes, not one** — jumped and silent, or never jumped |
+| **K4** | (same capture) | `MemTotal:` and a prompt | **D3 and D4.** ⚠️ a prompt that does not echo is not a shell |
+| **K5** | (same capture) type `cat /proc/cpuinfo` and `uname -a` | output returns | **D4's second half**: a shell that accepts typing. `cpuinfo` is also the free reading of what the kernel thinks the CPU is |
+| **K6** | rung 2, after `ifconfig eth0 10.1.1.2 up` | link comes up | the vendor's `drivers/net/rtl819x` under my kernel — D16's controlled variable |
+| **K7** | rung 3: `ping -c 4 10.1.1.1` from the board, **with `tcpdump -i <if> icmp` running on the host throughout** | ≥ 1 reply on the board **and** the echo requests in the host capture | 🔴 **D5, and the host capture is what makes it a measurement.** Replies with nothing in the host capture mean something else answered; requests with no replies mean the driver transmits and does not receive. `R0`'s reference is 2/2 at 3.6 ms and it was the *vendor's* driver |
+
+### What this session cannot tell you, stated before it runs
+
+* **A pass on P3 is not a pass on D1–D5.** The desk channel runs a MIPS32 4Kc
+  with load interlocks and no RTL8196E peripherals; it stops at the switch-core
+  probe, and this unit's own kernel stops there too (`TC-23`).
+* **Nothing here measures the die's load-delay behaviour.** `TC-15`, `TC-21` and
+  `TC-22` are all readings of Realtek's tools. `R1a` has not moved, and `TC-h` —
+  whether `movz`/`movn` read `rd` in the delay slot — is what would make
+  `TC-22`'s four sites real or harmless.
+* **`R3` closing is D1 through D5 in one boot.** Three of five is `R3a`, recorded
+  as such, the way `R1-gate` recorded its fourth decision as not met.
+* **The prediction block is a bench-time artefact and `check-predictions.py`
+  cannot be satisfied at the desk.** What the desk produces is
+  `bench/<date>/PREDICTIONS-B5-block1.md` — one fenced ```cells``` block naming
+  every capture prefix above — written and **not touched again**, because
+  editing it after a capture moves its mtime and the check fails, correctly.
+  ⚠️ `check-predictions.py` is still not wired to `ci.yml`, `ci-expected.tsv` or
+  `ci-census.py` (量 2026-08-25), so it is a gate nobody runs unless it is run by
+  hand at the end of the seating. **Run it by hand at the end of the seating.**
 
 ## Results — seating 2 part three, 2026-08-24
 
