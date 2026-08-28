@@ -648,6 +648,66 @@ else
 fi
 
 echo
+echo "=== N1-N4: TC-f, at the command line ==="
+# The defect was SILENCE: `--range` on an ELF was parsed and then never used,
+# so a bounded scan of a vmlinux read the whole thing and said nothing.  The
+# in-process controls K11-K15 cover the logic; these cover the contract a
+# caller actually sees, which is an exit code and a message.
+if command -v mips-linux-gnu-as >/dev/null 2>&1; then
+    out="$("$PY" "$HAZ" "$T/haz.o" --range 0:4 2>&1)"; rc=$?
+    ck "N1 --range on an ELF exits 3"            3 "$rc"
+    ck "N1 and the message names --vma-range"    yes \
+       "$(printf '%s\n' "$out" | grep -q -- '--vma-range' && echo yes || echo no)"
+    ck "N1 and it names TC-f"                    yes \
+       "$(printf '%s\n' "$out" | grep -q 'TC-f' && echo yes || echo no)"
+
+    # A window that intersects nothing must REFUSE, not report 0 violations for
+    # a file it never read -- which is what the discarded --range amounted to.
+    # (A relocatable .o has sh_addr == 0, so hazlint gives its sections a
+    # synthetic base; 0x40000000 is outside it either way.)
+    "$PY" "$HAZ" "$T/haz.o" --vma-range 0x40000000:0x40000004 >/dev/null 2>&1
+    ck "N2 --vma-range that intersects nothing -> exit 3" 3 "$?"
+else
+    sk "N1-N2 --range/--vma-range at the CLI" "no mips-linux-gnu-as on this machine"
+fi
+
+# N4: the whole point of the change, on the artefact it was made for.  A linked
+# kernel with a symbol table is scanned by SECTION and its MIPS16 functions are
+# cut out by name, so the scan covers essentially all of the executable text
+# instead of stopping below the first [MIPS16] symbol.
+VMLINUX="$(ls "$WORK"/rebuild/r2d3/build2/vmlinux-136-4181.elf 2>/dev/null | head -1)"
+if [ -n "$VMLINUX" ] && [ -f "$VMLINUX" ]; then
+    # N3: the window has to bite in BOTH directions on real addresses.  The
+    # lowest violation in this build is at 0x800142CC (量 2026-08-28), so a
+    # window ending below it must report 0 and one ending above it must report
+    # exactly 1.  A tool that discarded the bound would print 7 for both.
+    out="$("$PY" "$HAZ" "$VMLINUX" --vma-range 0x80000000:0x80014000 \
+           --max-report 0 2>&1)"
+    ck "N3 window below the first site -> 0"     0 \
+       "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
+    out="$("$PY" "$HAZ" "$VMLINUX" --vma-range 0x80000000:0x80015000 \
+           --max-report 0 2>&1)"
+    ck "N3 window just above it -> exactly 1"    1 \
+       "$(printf '%s\n' "$out" | num 'VIOLATIONS')"
+    ck "N3 and prints a coverage line"           yes \
+       "$(printf '%s\n' "$out" | grep -q '^coverage ' && echo yes || echo no)"
+
+    out="$("$PY" "$HAZ" "$VMLINUX" --max-report 0 2>&1)"; rc=$?
+    ck "N4 the linked kernel is NOT refused for MIPS16" 0 \
+       "$(printf '%s\n' "$out" | grep -c '^REFUSED: this range contains MIPS16')"
+    ck "N4 excised by name, not by bound"        1 \
+       "$(printf '%s\n' "$out" | grep -c '^EXCISED BY NAME')"
+    ck "N4 .rodata is named as not scanned"      1 \
+       "$(printf '%s\n' "$out" | grep -c '^NOT SCANNED .rodata')"
+    ck "N4 the scan is section-based, so no PF_X span" 0 \
+       "$(printf '%s\n' "$out" | grep -c 'PT_LOAD#')"
+    ck "N4 .init.text is in the scan"            1 \
+       "$(printf '%s\n' "$out" | grep -c '^scanned    .init.text')"
+else
+    sk "N4 linked-kernel coverage" "no vmlinux-136-4181.elf under $WORK"
+fi
+
+echo
 if [ "$fail" -ne 0 ]; then
     printf 'RESULT: %d passed, \033[31m%d failed\033[0m, %d skipped\n' "$pass" "$fail" "$skip"
     exit 1

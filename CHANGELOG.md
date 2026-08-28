@@ -1,9 +1,17 @@
 # Changelog
 
-**Nothing has been built.** There is no kernel of mine, no image, and no byte of
-mine has been written to this device's flash. What exists is the instruments, the
-record, and the first thing that ran on the silicon — the vendor's own kernel,
-delivered over the network.
+🔄 **2026-08-28: a kernel of mine exists. Nothing else does.** It is a linked
+`vmlinux` with an initramfs of this device's own userspace in it, and it passes
+the load-delay gate at 0 violations. **There is still no loadable image** — the
+`nfjrom` wrapper's stages have not been run on it — **it has never been executed
+anywhere but a MIPS32 emulator that stops at the switch probe, and not one byte
+of mine has been written to this device's flash.** What exists otherwise is the
+instruments, the record, and the first thing that ran on the silicon — the
+vendor's own kernel, delivered over the network.
+
+> *Until 2026-08-28 this paragraph read: "**Nothing has been built.** There is no
+> kernel of mine, no image, and no byte of mine has been written to this device's
+> flash." The last clause is still true.*
 
 Tags mark where the outside world can check the work, not where a feature landed.
 `PROGRESS.md` is the only file that says where the work actually is.
@@ -11,6 +19,72 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+**`R3-4` and `R3-5`, 2026-08-28 — both of the things this step was told to fix turned out to be
+described wrongly, and the corrections came from building the instrument rather than re-reading the
+claim.** `notes/kernel-build.md` §1.4 and §6 are rewritten with the originals quoted in place.
+
+- 🔴 **`CONFIG_ARCH_CPU_SLEEP` was never a settable line, and the vendor ships it on.**
+  `boards/rtl8196e/config.in:30` declares it `bool` with **no prompt** and `default y`, so no
+  `.config` line reaches it and the vendor's own `# ... is not set` is a dead line. `oldconfig` is
+  asked **nothing at all** on that template — `(NEW)` is 0 — and `< /dev/null` and
+  `yes '' |` produce identical output, because `conf_askvalue()` presets its buffer and ignores
+  `fgets`'s return value. And the `sleep` instruction `0x42000038` is at `0x80007EA8` in **this
+  unit's own shipped kernel**, the one measured booting on the silicon on 2026-08-24.
+- 🔴 **The four-way stdin sweep only means something because a positive control was built
+  for it.** Six promptable symbols were deleted so `oldconfig` had to ask; `yes n` then moved all
+  six while `ARCH_CPU_SLEEP` moved under none of them. All 21 derived differences were argued with
+  at once and none moved — `CONFIG_SWAP`, flipped in the same file, did.
+- 🔴 **The ban on `yes '' | make oldconfig` was inert on the vendor's template and became
+  real the moment rlxfw touched the config.** `CONFIG_BLK_DEV_INITRD=y` opens a menu and
+  produces four `(NEW)` prompts. 🔴 **And the failure it produces is not a wrong default — it
+  is a build that never ends.** `CONFIG_INITRAMFS_ROOT_UID` is an integer symbol; fed `n` it
+  fails validation and kconfig re-asks forever. 量: one such run wrote a **58 GiB** log
+  before it was killed, and it is what filled this machine's disk. That is a sharper
+  reason for the pinning than "the answer decides symbol values", and it was found by
+  the adversarial pass reading the artefact the killed run left behind. The fix is not a forbidden string: every symbol that menu offers is written
+  into the input, `(NEW)` returns to 0, and a build with no prompts cannot be changed by an answer.
+- 🔴 **`hazlint`'s coverage gap was a span, not its contents.** The 975,944-byte MIPS16 band holds
+  **15,050 bytes** of MIPS16, and 38 of those 39 functions are in `.iram`, not `.text` — **`.text`'s
+  own MIPS16 content is one function, 714 bytes, 0.029 %** — and that one function was
+  dragging the bound down 947,878 bytes. 1.4 excises MIPS16 **by name** from the symbol table.
+  Coverage 61.5 % → **99.29 %**, and two more violations of the same shape came out of the part
+  the bound had been hiding.
+- ⚠️ **And the excision buys that coverage at a price**: cutting a span in two creates a
+  seam, and 8 loads now sit at a span head with nothing before them this scan can see.
+  `hazlint` reports them as *notes — a stated limit, not a finding*. **"0 violations"
+  means 0 among the successors it can resolve, and 8 it declines to rule on.**
+- 🔴 **Removing the bound exposed two things it had been covering.** `.rodata` was inside
+  the scan (a linked kernel's one executable `PT_LOAD` covers it, and two of its words decode as
+  `jalx`), and `sys_call_table` is 2,656 bytes of function pointers declared `STT_OBJECT` and linked
+  into `.text` — the only two unresolved successors in every build measured today.
+- 🔴 **All seven violations have one cause, read out of the vendor's own tools.** gcc emits
+  `lw $2` / `j $31` / `movz $2,$6,$5` with Realtek's own marker `#RLX4181/RLX4281:conditional move`
+  — a conditional move in the branch delay slot, under `.set noreorder`. And gas could not have
+  fixed it anyway: its `.set reorder` load-delay model covers `movz`'s `rs` and `rt` and **not**
+  `rd`.
+- 🔴 **The narrowest fix is a measurement.** `CFLAGS_KERNEL=-fno-if-conversion` reaches
+  **0 violations** with no source change — 109,594 loads on the sweep build, 109,912 on the `R3` kernel, and quoting one for the other is what the first version of this line did, costing 2,597 → 31 conditional moves
+  (−98.8 %) and +16,788 bytes of `.text` (+0.69 %). `-fno-if-conversion2` removes **none**
+  further and costs 4,808 more, so it is out.
+- 🔴 **Three build inputs were undeclared and two were invisible**: a `timeconst.pl` perl
+  patch the build on disk already carried, the top-level SDK `.config` (normally written by a curses
+  program — a build input nobody else could reproduce), and the fact that **the build rewrites
+  `data_MAC_REG_88E.c` inside its own source tree**, which makes re-staging required rather than
+  tidy. Built from the pinned drop plus the declared inputs, `.text` comes out **byte-identical** to
+  the `vmlinux` already on disk; the whole difference is the build stamp.
+- **`R3-5`**: an initramfs of **29** entries, 24 of them this device's own binaries unmodified and 5
+  named as mine — 31/26/5 until the adversarial pass turned the `unit` tag check on
+  for `slink` and `dir` entries and it refused two of them, every source checked against its tag rather than trusted. Decompressed image
+  **3,472,384** bytes against the **5,242,880** ceiling, margin 1,770,496.
+- **The seating's discriminator became a four-mark ladder**, two of whose marks are computed at run
+  time and none of which costs a line of vendor source: `start address:` printed by the decompressor
+  out of my image's own header **before the kernel is entered**, and a string my `/init` prints.
+- New: `config/` (5 files), `tools/kconfig-delta.py` (22 controls), `tools/mkinitramfs.py` (19),
+  `tools/test-config-gates.sh` (34, of which 11 are mutations that each name the control that must go
+  red). `hazlint` 1.3 → 1.4, self-test 14 → 20, `test-hazlint` 109 → 121.
+- **Zero flash bytes, zero power cycles, zero device readings.**
+
 
 **`R3` opens, 2026-08-28 — and the three findings it opens with all came out of material this repository already had.** Desk only, no power, zero flash bytes.
 `notes/kernel-build.md` is the new owner.

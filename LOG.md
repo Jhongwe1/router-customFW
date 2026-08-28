@@ -6927,3 +6927,150 @@ commit 之後照規矩再掃一次「哪些擁有者檔案應該改而沒改」�
 **動到的檔**：`notes/kernel-build.md`（新）、`notes/vendor-toolchains.md`（§4／§5／§8 更正）、`RUNSHEET.md`（§ `B5` 新）、
 `SPEC.md`（`FW-23`／`TC-21`／`TC-22`／`TC-23`／`TC-24` 新，`TC-05`／`TC-15`／`LDR-18`／`FW-12`／§17 改）、
 `PROGRESS.md`、`README.md`、`CHANGELOG.md`。
+
+---
+
+## 2026-08-28（第四段）— `R3-4` + `R3-5`：兩件被交代要修的事，描述都是錯的
+
+桌面日，未通電，零 flash 位元組，零裝置讀數。順序是 `R3-4` → `R3-5`，
+**不是 step list 的編號順序**，理由寫進 `PROGRESS.md` 的新一節。
+
+### 一、`CONFIG_ARCH_CPU_SLEEP` 不是「必改的一行」，而推翻它花了三個量測
+
+交接說：`yes '' | make oldconfig` 用預設值回答新提示，把廠商關掉的
+`CONFIG_ARCH_CPU_SLEEP` 打開了，而 CPU sleep 正是會把 bring-up 變成無聲當機的
+東西。**三件事都不對，而第三件最貴。**
+
+| 量到的 | 用什麼量的 | 後果 |
+|---|---|---|
+| `oldconfig` 在這份樣板上 `(NEW)` 出現 **0** 次 | 四種 stdin 各跑一次，數 log | 21 個差異**沒有一個**是被回答的提示 |
+| `< /dev/null` 與 `yes '' \|` 的輸出符號逐行全等 | 同上 | 禁那個字串不是一道檢查 |
+| `ARCH_CPU_SLEEP` 在四種答案下都是 `y` | 同上 | 它不可設定 |
+| `boards/rtl8196e/config.in:30` 是 `bool` **無 prompt** ＋ `default y` | 讀 | 樣板裡那行 `is not set` 是**死行**，`rlxfw_defconfig` 也改不掉 |
+| `sleep` = `0x42000038`，在**這台自己的出貨 kernel** `0x80007EA8` | 組一次 ＋ 掃三份平坦映像 | **廠商就是開著出貨的**。2026-08-24 量到開機的那顆 kernel 帶著 sleep 路徑 |
+
+🔴 **而「四種 stdin 全等」這件事，單獨看什麼都不證明** —— 因為根本沒有問題被問。
+所以做了一個**正控制**：從樣板刪掉六個可提示符號（`SWAP`、`SYSCTL_SYSCALL`、
+`KALLSYMS`、`BUG`、`ELF_CORE`、`AIO`）逼 `oldconfig` 發問，然後 `yes n` 把六個
+全部移到 `n`，另外三種都留在 `y` —— **而 `ARCH_CPU_SLEEP` 在其中每一種下都還是
+`y`**。沒有那個控制，上面第二列和第三列跟一支壞掉的 harness 印出來的東西一樣。
+
+21 個 derive 差異也是這樣處理的：造一份**同時對 21 條唱反調**的 `.config`
+（18 條被丟掉的硬寫 `=y`、2 條新增的寫 `is not set`、`ARCH_CPU_SLEEP` 維持廠商的
+`is not set`），跑 `oldconfig`，**一條都沒動**；同一個檔裡的 `CONFIG_SWAP` 是負
+控制，**它動了**。
+
+🔴 **禁令在 rlxfw 動到設定的那一刻才變成真的。** 把三條 rlxfw 改動放進輸入之後
+`(NEW)` 是 **4** —— `BLK_DEV_INITRD=y` 讓一個選單可達。所以修法不是禁字串，是
+**把那個選單提供的每一個符號都寫進輸入**，11 條 pinned，`(NEW)` 回到 0。
+**一個沒有提示的建置，答案改不動它。**
+
+### 二、`hazlint` 掃不到的不是 40 % 是 0.62 %，而修好它多找到兩條 violation
+
+`TC-f` 原本寫成「`hazlint` 對 ELF 輸入會安靜丟掉 `--range`」，修法看起來是把
+`--range` 修好。**量完之後那不是修法。**
+
+那個 975,944 bytes 的 MIPS16「帶」裡面只有 **39 支函式共 15,050 bytes**
+（跨距的 1.54 %；而 39 支裡有 38 支在 `.iram` 不在 `.text`，所以 **`.text` 自己的 MIPS16 內容是一支函式、714 bytes、0.029 %**），而界是被**其中一支**拉下來的：
+`rtl_MulticastRxCheck`，714 bytes，距離下一支 MIPS16 函式 **947,878 bytes**。
+為了避開 714 個位元組，丟掉了九百多 KB 的普通 32-bit 程式碼。
+
+改成用符號表逐支切掉之後，**涵蓋率 58.8 % → 99.29 %，violations 5 → 7**，
+多出來的兩條和原本五條同一個形狀。而把界拿掉也暴露了兩件被界擋著的事：
+
+* **`.rodata` 本來在掃描範圍裡。** 連結器把唯讀 section 全放進同一個可執行
+  `PT_LOAD`，`0x80269308` 與 `0x8026DA04` 兩個字解成 `jalx 0x80000000`，觸發了
+  MIPS16 拒絕 —— 在一顆那附近根本沒有 MIPS16 的 kernel 上。改成掃**可執行
+  section**。
+* **`sys_call_table` 是 `STT_OBJECT` 卻連進 `.text`。** 2,656 bytes 的函式指標，
+  其中兩格解成「register jump 的 delay slot 裡有一條 load」—— 三次建置裡僅有的
+  那兩個 unresolved successor，全部出自這張表。
+
+還有 MIPS16 函式**之間**的填充：`interrupt_dsr_rx` 與 `interrupt_isr` 之間那 50
+bytes 解成 `lb ra,17368(at)` / `lwc3 $31,-1(ra)`，被報成一條 violation。切它的
+規則不帶門檻：**前後都是 MIPS16 函式，且中間沒有別的 `STT_FUNC` 起頭**。
+
+### 三、七條 violation 的成因是一句話，而它是從廠商自己的工具讀出來的
+
+量，`-Os -march=4181`，對 `int f(int *p,int c,int b){int v=*p; return c?v:b;}`：
+
+```
+	.set	noreorder
+	lw	$2,0($4)
+	j	$31
+	movz	$2,$6,$5		#RLX4181/RLX4281:conditional move
+```
+
+條件搬移在**分支 delay slot** 裡，讀的是兩條之前那個 `lw` 寫的 `$2`，而整段在
+`.set noreorder` 底下 —— 組譯器被明說不要碰。**那個註解是 Realtek 自己的**：
+他們改過這支 gcc 讓它替 RLX4181 產條件搬移，而他們的排程器把它排在寫它目的
+暫存器的那條 load 正後面。
+
+🔴 **而就算沒有 `noreorder`，gas 也救不了。** 量，`.set reorder` ＋
+`-march=lx4181` 四對指令：`lw`+`addu`（讀 `rs`）補 `nop`、`lw $3`+`movz $2,$3,$5`
+（讀 `rs`）補、`lw $5`+`movz`（讀 `rt`）補、**`lw $2`+`movz $2,...`（`rd`）不補**。
+**gas 的 load-delay 模型涵蓋 `movz` 的 `rs` 與 `rt`，不涵蓋 `rd`** —— 一句話解釋
+全部七條，而這和 `hazlint` 到 2026-08-27 為止的盲點是同一類，在另一支工具上、
+方向相反。
+
+**最窄的改法是量出來的**：三次建置，只差 `CFLAGS_KERNEL`，每次都重新 stage。
+`-fno-if-conversion` → **0 violations**（sweep build 109,594 個 load；`R3` kernel 是 109,912，拿一個當另一個用正是這一行第一版做的事），條件搬移 2,597 → 31
+（少 98.8 %），`.text` +16,788 bytes（+0.69 %）；再加 `-fno-if-conversion2`
+**一條都沒多拿掉**，還多花 4,808 bytes —— 所以它出局。旗標經
+`scripts/Makefile.build:118` 的 `modkern_cflags` 到達每一個 built-in object，
+**零行原始碼修改**。
+
+### 四、三個沒有被宣告的建置輸入，其中兩個是看不見的
+
+想重跑磁碟上那份建置的時候才發現：
+
+1. **`kernel/timeconst.pl`** 帶著一行 perl 5.22 修正，而 repo 一個字都沒寫。
+   沒有它建置停在 `kernel/timeconst.h` Error 255。現在是
+   `config/host-compat/` 底下一個補丁，**打不上就停建**。
+2. **頂層 SDK `.config`** —— `arch/rlx/bsp/Makefile:10` 與 `net/rtl/fastpath`
+   都 include 它，而它平常由 curses 程式 `config/mconf` 產生。
+   **一個因為某人曾經回答過一個選單才存在的建置輸入，別人重現不了。**
+   現在是 `config/rlxfw-sdk.config`，四個關鍵選擇各帶理由。
+3. **建置會寫進自己的原始碼樹。** `rtl8192cd/Makefile:163` 在 `FORCE` 下從
+   `.txt` 重生 `data_*.c`，所以 `data_MAC_REG_88E.c` 建完 7,092 bytes 而 drop
+   出貨 7,018。**每次重新 stage 是必要不是衛生。**
+
+🔴 **配方就是配方的控制**：從釘住的 drop ＋ 兩個宣告輸入 ＋ 一個宣告補丁建出來，
+`.text` 與磁碟上原本那份 **逐位元組相同**（sha256 `e40a9f36…`），兩個檔的全部
+差異就是 `Linux version` 裡的時戳。
+
+### 五、`R3-5`，以及 P6 的鑑別字串換了一個更好的答案
+
+initramfs **29** 個項目，24 個來自這台自己的 dump（579,644 bytes，未修改），
+5 個標成我的（988 bytes）—— 收工前的對抗審查把 `unit` 標籤的檢查從
+只查 `file` 擴到每一種項目，當場退掉兩個：`/bin/dmesg` 根本不在這台的 dump 裡
+（50 條 busybox 連結沒有它，而 `dmesg` 這個字串在這支 busybox 裡一次都沒有），
+`/tmp` 在 dump 裡是指向 `/var/tmp` 的**符號連結**不是目錄。cpio 未壓縮 584,704 bytes，解壓後的映像
+**3,472,384** bytes，對 5,242,880 的天花板餘 **1,770,496**（用掉 66.2 %）。
+
+`RUNSHEET` 原本的 `M2` 要一行 `arch/rlx/bsp/setup.c` 的 `printf`。
+**有一個更好的答案而且不用改任何一行廠商原始碼**：`rtkload/hfload.c:114` 印的
+`start address:` 是**在 run time 從映像自己的標頭讀出來的** `kernelStartAddr`，
+我的是 `0x80003600`、這台被 loader 重新 stage 的那份是 `0x80003440`，而它印在
+**kernel 被進入之前**。那正是原本的 `M2` 在要的東西。加上 `/init` 印的
+`RLXFW-R3-RUNG1-OK`（P6 量：這台的 kernel 兩份與 rootfs 全部 161 個檔案都是 0，
+我的是 1 —— 那個 1 是正控制），四條 marks 裡有兩條是 run-time 算出來的。
+
+### 產出
+
+`config/`（新，5 個檔）、`tools/kconfig-delta.py`（新，22 控制）、
+`tools/mkinitramfs.py`（新，19 控制）、`tools/test-config-gates.sh`（新，34 案，
+其中 11 個突變各指名一個必須變紅的控制）、`tools/hazlint` 1.3 → 1.4
+（自檢 14 → 20（乾淨 clone 上 17），`test-hazlint` 109 → 121）、`ci.yml` ＋ `ci-expected.tsv` 三個
+suite、`SPEC.md`（`TC-22` 更正、`TC-24` 全列重寫、`TC-25`／`TC-26`／`FW-24` 新、
+`TC-15 覆蓋率` 收掉、`TC-05` 加旗標）、`notes/kernel-build.md`
+（§1.4 與 §6 重寫，原文留在原地；§7–§9 新）、`RUNSHEET.md` § `B5`
+（`P1`／`P2`／`P6` 重寫，`P8`／`P9` 新，鑑別器改成四階梯）。
+
+### 沒有做的事，以及為什麼
+
+`R3-2` 的第 3–6 階（映像是從今天才定案的 kernel 建出來的，先做會做出一份要丟掉
+的產物與一組描述著沒有人會上傳的檔案的數字）、`R1h` 的 bench 段（要通電）、
+`P2`（每一個 `arch/rlx` 的 `.o` 各掃一次 —— `P1` 涵蓋同一批程式碼的連結後版本，
+但 `P2` 檢查的是 `TC-21` 那個「組譯器預設 `-march` 剛好在補 nop 那一側」的附帶
+安全還在不在，而連結後的映像回答不了那個問題。**這是欠的。**）

@@ -1297,31 +1297,47 @@ Each rung adds exactly one thing. A rung that fails is not retried with a change
 in the same seating unless the change is in the *upload*, because a change to the
 image is a desk segment and `R3-9` owns it.
 
-### 🔴 The discriminator, and every rung carries it
+### 🔴 The discriminator ladder, and every rung carries at least one rung of it
 
-2026-08-25 recorded a `J 80500000` that booted the **vendor** kernel. So *a
-banner appeared* is not evidence that my image ran. Two independent marks, and a
-capture without **both** is recorded as **unattributed**, never as a pass:
+**🔄 Rewritten 2026-08-28.** The original asked for two marks, one of
+them *"a string printed by `arch/rlx/bsp/setup.c` that exists only in my tree,
+emitted before `start_kernel`"*, and noted that M1 alone is not enough because
+it is a compile-time constant. The requirement stands. The answer is better than
+a `printf`: **two of the four marks below are computed at run time and cost no
+source change at all**, and every expected value is read off my own artefacts at
+the desk and written into the prediction block before the seating.
 
-| | mark | why it cannot be the vendor's |
-|---|---|---|
-| **M1** | `Linux version 2.6.30.9 (<user>@<host>) (gcc version 3.4.6-1.3.6) #1 <date>` | this unit's is `(admin@office.hopeiot) (gcc 4.4.5-1.5.5p2) #1526 Wed Jan 10 14:50:54 CST 2018` (`FW-03`, 量). **Three fields differ: the builder, the compiler, the build number** |
-| **M2** | a string printed by `arch/rlx/bsp/setup.c` that exists only in my tree, emitted before `start_kernel` | it is not in the shipped image; `strings` over `vmlinux-rederived.bin` is the desk check that it is absent, and it runs **before** the seating |
+2026-08-25 recorded a `J 80500000` that booted the **vendor** kernel, because the
+loader re-stages `0x80500000` on a watchdog reset. So *a banner appeared* is not
+evidence that my image ran. A capture carrying none of M0/M4 is recorded as
+**unattributed**, never as a pass.
 
-⚠️ **M1 alone is not enough**: it is a compile-time string, and a capture is a
-byte stream that can be from either image. M2 is what makes the pair
-independent — it is emitted by code, at a point in the boot, not by a constant.
+| | mark | when it appears | why the staged vendor image cannot produce it | constant or computed |
+|---|---|---|---|---|
+| **M0** | `start address: 0x80003600` | **before the kernel is entered** — `rtkload/hfload.c:114` | it is `kernelStartAddr` read out of **the image's own header** at run time. This unit's staged image holds `0x80003440` (`FW-23`, 讀). ⚠️ It does **not** discriminate against the *drop's* kernel, which is also `0x80003600` — that kernel is not on this device | **computed** |
+| ~~**M1**~~ 🔴 **CANNOT BE PRINTED** | ~~`Linux version 2.6.30.9 (key@K) …`~~ — **`CONFIG_PRINTK` is not set in this build**, so `printk()` is `static inline int __cold printk(...) { return 0; }` (`include/linux/kernel.h:271`) and every format string is dropped from the image. 量: `grep -a -c 'Kernel command line'` on my `vmlinux` is **0**; `'Linux version'` is 1 and that is `linux_banner` **as data**, which `/proc/version` reads and nothing prints. Second source, on this device: `bench/2026-08-24c/G6.log` goes straight from `start address:` to the WLAN driver line with no banner between them. **The vendor ships PRINTK off and rlxfw inherited it** | — | this unit's is `(admin@office.hopeiot) (gcc version 4.4.5-1.5.5p2) #1526 Wed Jan 10 14:50:54 CST 2018` (`FW-03`, 量). Builder, compiler and build number all differ | constant |
+| ~~**M2′**~~ 🔴 **CANNOT BE PRINTED** | ~~`Kernel command line: …`~~ — same cause as M1. Its whole "free discriminator" argument is void; removing `root=` is still right, for the safety reason alone | — | the vendor's carries `root=/dev/mtdblock1`. **Free** — the `root=` had to go for safety anyway (`TC-26`) | constant |
+| **M4** | `rlxfw: init running, RLXFW-R3-RUNG1-OK` | after `exec /init` | it is in one file in my initramfs and nowhere in this unit's dump. P6 above is the desk check, with its positive control | **computed** (a program ran) |
+
+⚠️ **M0 is what the original M2 was asking for** — a mark before
+`start_kernel` that a constant cannot fake — and it needs no line of vendor
+source changed. M4 is the one that proves userspace was reached. **M0's expected
+value moves with every build**: it is the entry point of the `vmlinux` I built,
+so it is re-read at the desk and written into the prediction block each time,
+never carried forward.
 
 ### Before power is applied — the desk checks, each with its own refutation
 
 | | check | pass | what it refutes |
 |---|---|---|---|
-| **P1** | `hazlint` over the image's decompressed bytes, bounded below the first `[MIPS16]` symbol, **and** over `.init.text` and `.exit.text` | **0 violations** in all three spans | 🔴 today's build is **5** in the widened span and 0 in `.init.text` (`TC-22`). A non-zero here means `R3-4`'s config work did not land, and the seating is cancelled — this is the same gate `probe2` and `probe3` passed |
-| **P2** | `hazlint` over every `.o` the build produced under `arch/rlx` | 0 objects with violations | `TC-21`: twelve load-use hazards in hand-written assembly are prevented by the assembler's default `-march`, not by the author. **That safety is incidental and this is where it is asserted** |
-| **P3** | the desk execution channel (`TC-23`), on **this** image | reaches `bsp_setup` → `bsp_swcore_init` → `bsp_machine_halt`, ~1,000 KSEG0 instructions, same as this unit's own kernel | a fault before that point is mine and costs no power cycle. ⚠️ **Reaching it is not D1–D5**: qemu's 4Kc has load interlocks and no RTL8196E |
+| **P1** 🔄 | `hazlint` over the **linked `vmlinux`** — not the flat image, because the ELF carries the symbol table that makes the MIPS16 and `sys_call_table` excisions possible. No `--vma-range`: it scans every executable section | **0 violations, 0 unresolved successors**, and the coverage line read rather than assumed | 🔴 **This row is rewritten and, for the first time, it passes.** 量 2026-08-28: `0 violations in 109,912 loads`, 0 unresolved, 2,546,616 bytes scanned, 18,072 bytes excised **by name** (39 MIPS16 functions, 20 inter-function gaps, `sys_call_table`). It took `CFLAGS_KERNEL=-fno-if-conversion` (`TC-25`) to get there and a fixed scanner to see it: the old bound said **5** where the honest count was **7**. ⚠️ **The 0.62 % that is still not scanned is a printed list, not a bound** — read it, do not skip past it |
+| **P2** | `hazlint` over every `.o` the build produced under `arch/rlx` | 0 objects with violations. ⚠️ **Not run 2026-08-28** — P1 covers the same code once linked, but P2 is the check that the assembler's incidental `-march` default (`TC-21`) is still in force, and a linked image cannot tell you that. It is owed | `TC-21`: **eleven** load-use hazards in hand-written assembly are prevented by the assembler's default `-march`, not by the author (twelve until the adversarial pass of 2026-08-28 removed `relocate_kernel.S`, which `CONFIG_KEXEC=n` keeps out of this build). **That safety is incidental and this is where it is asserted** |
+| **P3** ⚠️ **NOT RUN on this image** | the desk execution channel (`TC-23`), on **this** image. 🔴 The only channel run on disk is from 18:02 on 2026-08-28, on the **pre-flag, pre-initramfs** build (3,340,287 bytes); the `R3` kernel is 3,968,113 and was linked at 21:03. **The image this row names has not been through the channel**, and P1/P6/P8/P9 all carry a date while this one carried nothing | reaches `bsp_setup` → `bsp_swcore_init` → `bsp_machine_halt`, ~1,000 KSEG0 instructions, same as this unit's own kernel | a fault before that point is mine and costs no power cycle. ⚠️ **Reaching it is not D1–D5**: qemu's 4Kc has load interlocks and no RTL8196E |
 | **P4** | image ceiling | decompressed image < **5,242,880** bytes | the decompressor writes to `0x80000000` and reads from `0x80500000`; over the ceiling it overwrites its own input (`FW-23`) |
 | **P5** | `sum16` over the payload | not applicable — **the RAM path takes the payload, not the file** | `LDR-18`'s checksum is `check_image()`'s, and `check_image()` is on the *flash* boot path. A `cr6c` header on a TFTP upload is 16 bytes of junk at `0x80500000` |
-| **P6** | `strings` for M2 over `vmlinux-rederived.bin` | **absent** | if the marker string happens to exist in the shipped kernel, M2 discriminates nothing and must be changed before the seating |
+| **P6** 🔄 | `strings` for **M4** over `vmlinux-rederived.bin`, over `r0-vendor-kernel.bin`, and over all 161 files of this unit's extracted rootfs — **plus the positive control, that it IS in mine** | absent from all three, present in mine | 量 2026-08-28: **0 / 0 / 0**, and **1** in my `vmlinux`. Without the fourth number the first three are also what a broken `grep` prints |
+| **P8** 🆕 | `kconfig-delta.py check` against **the `.config` the build actually used**, not the one copied in | every difference from the vendor template is on the declared list | 量 2026-08-28: 21 derived + 14 set, 0 undeclared. `config/setconfig:344-356` runs `oldconfig` between the two files and they differ on 21 symbols, so a check that read the copied-in file would pass on a build it had never seen. Fed the copied-in file on purpose, this refuses: 35 not applied |
+| **P9** 🆕 | `mkinitramfs.py build` with `--kernel-image` | every declared source resolved, nothing substituted, and the ceiling margin printed | 量 2026-08-28: 31 entries, 26 from this unit's own dump and 5 named as mine; decompressed image **3,472,384** against the **5,242,880** ceiling, margin **1,770,496**, 66.2 % used. A declared source that is missing is refused, never replaced — which is what makes *“built from this unit's binaries”* a sentence anyone can check afterwards |
 | **P7** | `probe3` rebuilt on the day, `sha256` recorded, `rb=80a02000` | matches `R1h-1`'s recorded value | 量 2026-08-26: `make P=probe2 payload RESULT_BASE=0x80A01000` printed *Nothing to be done* while the binary in the tree was a `0x80A00000` build |
 
 ### The cells

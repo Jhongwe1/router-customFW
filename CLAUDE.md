@@ -5,11 +5,13 @@ core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from four
 vendors' GPL drops and one leaked draft datasheet, because TOTOLINK never
 released source.
 
-> **This file holds only what is true today**, and today nothing is built:
-> no kernel, no driver, no image, and not one flash byte written. **Which gate
-> that is, `PROGRESS.md` says** — this file does not restate it, because one
-> piece of state has exactly one owner and a gate id copied to a second place
-> goes stale there. Conventions for files that do not exist are not written
+> **This file holds only what is true today.** 🔄 **2026-08-28: a kernel of
+> mine now exists** — a linked `vmlinux`, configured and filled with an
+> initramfs, passing the load-delay gate at 0 violations. **No driver, no
+> loadable image, nothing of mine has executed on the silicon, and not one
+> flash byte is written.** **Which gate that is, `PROGRESS.md` says** — this
+> file does not restate it, because one piece of state has exactly one owner
+> and a gate id copied to a second place goes stale there. Conventions for files that do not exist are not written
 > here; they go in when the file appears. Where this contradicts the repo, the
 > repo wins and this file is wrong.
 

@@ -313,10 +313,15 @@ K4b, the kernel population control, exists so that neither of these can happen
 silently again: 128,440 loads pinned against `stage2.bin`'s 1,474.
 
 Usage
-    tools/hazlint FILE [--base ADDR] [--range LO:HI] [--raw] [--section NAME]
-                       [--survey] [--max-report N]
+    tools/hazlint FILE [--base ADDR] [--vma-range LO:HI] [--raw] [--section NAME]
+                       [--survey] [--max-report N] [--range LO:HI]
                        [--stage2 PATH] [--no-population-control]
                        [--allow-zero-loads] [--allow-mips16]
+                       [--no-mips16-excision]
+
+    --vma-range   a VIRTUAL-address window, on ELF and raw alike.
+    --range       a FILE-OFFSET window; raw inputs only.  Refused on an ELF,
+                  where it used to be discarded in silence (TC-f).
     tools/hazlint --isa FILE [--code-range LO:HI] [--loose] [--base ADDR] ...
     tools/hazlint --self-test
 """
@@ -326,7 +331,7 @@ import os
 import struct
 import sys
 
-VERSION = "1.3"
+VERSION = "1.4"
 
 # --------------------------------------------------------------------------
 # The instruction model
@@ -1100,7 +1105,28 @@ def elf_ranges(b, want_section=None):
         die('ELF e_machine is %d, not 8 (EM_MIPS)' % e_machine)
 
     out, unscanned = [], []
+    shoff_probe, = struct.unpack_from('>I', b, 0x20)
+    shnum_probe, = struct.unpack_from('>H', b, 0x30)
+
     if e_type in (2, 3):                       # ET_EXEC, ET_DYN
+        # A linked kernel's ONE executable PT_LOAD covers `.text` and then
+        # keeps going: on this project's own vmlinux it runs on through
+        # `__ex_table`, `.rodata` and `__param`, because the linker puts
+        # every read-only section in the same RX segment.  Scanning on that
+        # basis reads data as code, and that is not hypothetical here: 量
+        # 2026-08-28, two words in `.rodata` (0x80269308 and 0x8026DA04)
+        # decode as `jalx 0x80000000` and tripped the MIPS16 refusal on a
+        # kernel with no MIPS16 anywhere near them.  It had been invisible
+        # only because every caller bounded the scan below the first MIPS16
+        # symbol, which is inside `.text` -- so fixing TC-f is what exposed
+        # it.
+        #
+        # When the file still has section headers, the executable SECTIONS
+        # are the basis and every other allocated section is named as not
+        # scanned.  A stripped image has none and falls back to PF_X, which
+        # is the old behaviour and why the fallback stays.
+        if shoff_probe and shnum_probe and _exec_sections_exist(b):
+            return _sections(b, want_section, rel=False)
         phoff, = struct.unpack_from('>I', b, 0x1C)
         phentsize, phnum = struct.unpack_from('>HH', b, 0x2A)
         for i in range(phnum):
@@ -1111,7 +1137,8 @@ def elf_ranges(b, want_section=None):
                 continue
             if p_flags & 1:                    # PF_X
                 _check_extent(b, p_off, p_filesz, 'PT_LOAD#%d' % i)
-                out.append(Span(p_off, p_filesz, p_vaddr, 'PT_LOAD#%d' % i,
+                out.append(Span(p_off, p_filesz, p_vaddr,
+                                'PT_LOAD#%d(no-sections)' % i,
                                 head_unknown=True))
             else:
                 unscanned.append(('PT_LOAD#%d' % i, p_filesz,
@@ -1123,12 +1150,32 @@ def elf_ranges(b, want_section=None):
         return out, unscanned
 
     # ET_REL and anything else: executable sections.
+    return _sections(b, want_section, rel=(e_type == 1))
+
+
+def _exec_sections_exist(b):
+    """Does this ELF have at least one PROGBITS+EXECINSTR section?"""
+    try:
+        shoff, = struct.unpack_from('>I', b, 0x20)
+        shentsize, shnum, _ = struct.unpack_from('>HHH', b, 0x2E)
+        for i in range(shnum):
+            o = shoff + i * shentsize
+            _, sh_type, sh_flags, _, _, sh_size = struct.unpack_from(
+                '>6I', b, o)
+            if sh_type == 1 and (sh_flags & 0x4) and sh_size:
+                return True
+    except struct.error:
+        return False
+    return False
+
+
+def _sections(b, want_section, rel):
+    out, unscanned = [], []
     shoff, = struct.unpack_from('>I', b, 0x20)
     shentsize, shnum, shstrndx = struct.unpack_from('>HHH', b, 0x2E)
     if shoff == 0 or shnum == 0:
         die('this ELF has neither an executable segment nor section headers')
     stroff, = struct.unpack_from('>I', b, shoff + shstrndx * shentsize + 0x10)
-    rel = (e_type == 1)
     synth = 0
     for i in range(shnum):
         o = shoff + i * shentsize
@@ -1176,6 +1223,289 @@ def load_spans(b, spans):
             continue
         live.append(sp.load(b))
     return live
+
+
+# --------------------------------------------------------------------------
+# TC-f: the two things this tool used to get wrong about which bytes it read
+# --------------------------------------------------------------------------
+#
+# 1.  `--range` was parsed, accepted, and then used only on the non-ELF path.
+#     Point it at a `vmlinux` and the bound was discarded in silence, which is
+#     the failure this whole file exists to make impossible.  It is now
+#     `--vma-range`, it works on both paths, it means the same thing on both
+#     (a virtual-address window), and `--range` on an ELF input is refused with
+#     a message naming it rather than quietly meaning something else.
+#
+# 2.  A single MIPS16 function used to cost 40% of the coverage.  The old
+#     answer to "this range contains MIPS16" was to bound the scan below the
+#     first `[MIPS16]` symbol.  量 2026-08-28 on this project's own kernel:
+#     that bound is `0x8016C844` and it is set by ONE 714-byte function,
+#     `rtl_MulticastRxCheck`, sitting 947,878 bytes below the next one.  The
+#     39 MIPS16 functions hold **15,050 bytes between them** -- 1.54% of the
+#     span they are scattered across and 0.62% of `.text`.  So "40.2% of .text
+#     is not scanned" was a statement about a SPAN, and the content is two
+#     orders of magnitude smaller.
+#
+#     The symbol table says exactly where they are (`st_other == STO_MIPS16`),
+#     so the spans are cut around them and each excised interval is printed
+#     with its function name.  Coverage on that kernel goes 61.5% -> 99.38%,
+#     and what is left out is a list rather than a bound.
+#
+#     The `jalx` refusal below is NOT removed by this and is what keeps it
+#     honest: after excision it still fires on any `jalx` whose target lands
+#     in a span that is still being scanned -- i.e. on MIPS16 the symbol table
+#     did not declare.  A stripped image has no symbol table, so it excises
+#     nothing and behaves exactly as before.
+
+STO_MIPS16 = 0xF0
+STT_FUNC = 2
+
+
+def mips16_symbols(b, want_all=False):
+    """[(vaddr, size, name)] for every STT_FUNC symbol marked MIPS16.
+
+    With want_all, ([mips16], [every STT_FUNC]) -- the second list is what
+    `mips16_gaps` needs to prove a gap holds no other function.
+
+    Returns None -- not [] -- when the file has no symbol table at all, because
+    "no symbol table" and "a symbol table with no MIPS16 in it" must not print
+    the same thing.  A stripped image gives the first and gets no excision.
+    """
+    none = (None, None) if want_all else None
+    if b[:4] != b'\x7fELF':
+        return none
+    try:
+        shoff, = struct.unpack_from('>I', b, 0x20)
+        shentsize, shnum, shstrndx = struct.unpack_from('>HHH', b, 0x2E)
+        if shoff == 0 or shnum == 0:
+            return none
+        sh = []
+        for i in range(shnum):
+            o = shoff + i * shentsize
+            sh.append(struct.unpack_from('>10I', b, o))
+        symtabs = [s for s in sh if s[1] == 2]          # SHT_SYMTAB
+        if not symtabs:
+            return none
+        st = symtabs[0]
+        _, _, _, _, st_off, st_size, st_link, _, _, st_ent = st
+        if not st_ent or st_link >= len(sh):
+            return none
+        stroff = sh[st_link][4]
+        out, allfn = [], []
+        for i in range(st_size // st_ent):
+            o = st_off + i * st_ent
+            nm, val, size, info, other, shndx = struct.unpack_from('>IIIBBH', b, o)
+            if (info & 0xF) != STT_FUNC or size == 0:
+                continue
+            e = b.index(b'\0', stroff + nm)
+            name = b[stroff + nm:e].decode('ascii', 'replace')
+            allfn.append((val, size, name))
+            if other == STO_MIPS16:
+                out.append((val, size, name))
+        out.sort()
+        allfn.sort()
+        return (out, allfn) if want_all else out
+    except (struct.error, ValueError):
+        return none
+
+
+STT_OBJECT = 1
+
+
+def data_symbols(b):
+    """[(vaddr, size, name)] for STT_OBJECT symbols inside an executable section.
+
+    A data table declared inside `.text` is read as instructions by anything
+    that scans four bytes at a time, and the addresses it holds decode as
+    something.  量 2026-08-28 on this project's own kernel: `sys_call_table` is
+    2,656 bytes of function pointers at `0x80001640`, declared STT_OBJECT and
+    linked into `.text`, and two consecutive entries of it decoded as a register
+    jump with a load in its delay slot.  Those were the tool's only two
+    unresolved successors, and they are not code.
+
+    This is the same judgement as the MIPS16 excision and rests on the same
+    evidence: the symbol table says what the bytes are, so the tool does not
+    have to guess.  `.rodata` is already out because the scan is section-based;
+    this is the case the section flags cannot catch, because the linker put the
+    table in a section marked executable.
+
+    Returns [] rather than None when there is no symbol table -- an image with
+    no symbols gets no excision here and the unresolved successors stand,
+    which is the conservative direction.
+    """
+    if b[:4] != b'\x7fELF':
+        return []
+    try:
+        shoff, = struct.unpack_from('>I', b, 0x20)
+        shentsize, shnum, shstrndx = struct.unpack_from('>HHH', b, 0x2E)
+        if shoff == 0 or shnum == 0:
+            return []
+        sh = []
+        for i in range(shnum):
+            o = shoff + i * shentsize
+            sh.append(struct.unpack_from('>10I', b, o))
+        xsec = [x for x in sh if x[1] == 1 and (x[2] & 0x4) and x[5]]
+        symtabs = [x for x in sh if x[1] == 2]
+        if not symtabs or not xsec:
+            return []
+        st = symtabs[0]
+        _, _, _, _, st_off, st_size, st_link, _, _, st_ent = st
+        if not st_ent or st_link >= len(sh):
+            return []
+        stroff = sh[st_link][4]
+        out = []
+        for i in range(st_size // st_ent):
+            o = st_off + i * st_ent
+            nm, val, size, info, other, shndx = struct.unpack_from('>IIIBBH',
+                                                                   b, o)
+            if (info & 0xF) != STT_OBJECT or size == 0:
+                continue
+            if not any(x[3] <= val < x[3] + x[5] for x in xsec):
+                continue
+            e = b.index(b'\0', stroff + nm)
+            out.append((val, size,
+                        '<data> ' + b[stroff + nm:e].decode('ascii', 'replace')))
+        out.sort()
+        return out
+    except (struct.error, ValueError):
+        return []
+
+
+def _merge(intervals):
+    """[(lo, hi)] merged and rounded OUT to 4-byte boundaries.
+
+    Two reasons the rounding is not cosmetic.  A MIPS16 function can start or
+    end on a 2-byte boundary -- `rtl_MulticastRxCheck` ends at `0x8016CB0E` --
+    and this tool reads words at `vaddr + 4k`.  A span left starting at a
+    2-mod-4 address would have every single word it read straddle two real
+    instructions, which is the exact failure the MIPS16 refusal exists to
+    prevent, reintroduced by the fix for it.  So the hole grows outward by up
+    to 3 bytes at each end: it excises a little more than it must, never less,
+    and the bytes it gives up are counted against coverage rather than quietly
+    scanned.
+
+    They also abut and overlap once rounded, and a scanner told to skip an
+    overlapping list twice drops the wrong bytes.
+    """
+    out = []
+    for v, s, _ in sorted(intervals):
+        lo, hi = v & ~3, (v + s + 3) & ~3
+        if out and lo <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], hi)
+        else:
+            out.append([lo, hi])
+    return [(a, z) for a, z in out]
+
+
+def _cut(b, spans, holes, why, excised):
+    """Remove every [lo, hi) in `holes` from every span, by vaddr.
+
+    A span is described by (off, size, vaddr) and the three move together.  A
+    hole in the middle splits one span into two, and the tail of a split span
+    gets head_unknown=True because something -- the MIPS16 code just cut out --
+    executes immediately before its first word.
+    """
+    out = []
+    for sp in spans:
+        pieces = [(sp.off, sp.size, sp.vaddr, sp.head_unknown)]
+        for lo, hi in holes:
+            nxt = []
+            for off, size, vaddr, head in pieces:
+                end = vaddr + size
+                if hi <= vaddr or lo >= end:
+                    nxt.append((off, size, vaddr, head))
+                    continue
+                if lo > vaddr:
+                    nxt.append((off, lo - vaddr, vaddr, head))
+                if hi < end:
+                    nxt.append((off + (hi - vaddr), end - hi, hi, True))
+                excised.append((max(lo, vaddr), min(hi, end), why))
+            pieces = nxt
+        for i, (off, size, vaddr, head) in enumerate(pieces):
+            if size <= 0:
+                continue
+            name = sp.name if len(pieces) == 1 else '%s+%d' % (sp.name, i)
+            out.append(Span(off, size, vaddr, name,
+                            addressed=sp.addressed,
+                            relocatable=sp.relocatable,
+                            head_unknown=head))
+    # The pieces are new Span objects and carry no words.  The first version of
+    # this function forgot to read them and every caller got "nothing to scan".
+    return load_spans(b, out)
+
+
+def mips16_gaps(m16, allfn):
+    """The bytes BETWEEN two adjacent MIPS16 functions, when nothing else is
+    declared in between.
+
+    Excising only the function bodies leaves the inter-function padding and
+    literal pools behind, and a 4-byte scan reads them as instructions.  It is
+    not hypothetical: 量 2026-08-28, the 50 bytes between `interrupt_dsr_rx`
+    and `interrupt_isr` decoded as `lb ra,17368(at)` / `lwc3 $31,-1(ra)`
+    (words `803f43d8`, `cfffffff`) and were reported as a violation.  That is
+    the same class of mistake as reading `.rodata` as code, one scale down.
+
+    The rule carries no threshold and no tuning: a gap is excised when the
+    function before it and the function after it are BOTH MIPS16 and no other
+    STT_FUNC symbol starts inside it.  A 32-bit function sitting in such a gap
+    would have to be absent from the symbol table of a kernel that is not
+    stripped, and if one ever is, the gap is excised and named -- it is counted
+    against coverage, not silently scanned.
+    """
+    starts = set(v for v, _, _ in allfn)
+    m16set = set(v for v, _, _ in m16)
+    out = []
+    for i in range(len(m16) - 1):
+        v, sz, _ = m16[i]
+        end = v + sz
+        nxt = m16[i + 1][0]
+        if nxt <= end:
+            continue
+        if any(end <= a < nxt for a in starts if a not in m16set):
+            continue
+        out.append((end, nxt - end, '<padding after %s>' % m16[i][2]))
+    return out
+
+
+def excise_mips16(b, spans, unscanned):
+    """Cut the symbol table's MIPS16 functions, and the padding between them,
+    out of `spans`.
+
+    Returns (spans, syms, gaps); `syms` is None when there was no symbol table.
+    """
+    syms, allfn = mips16_symbols(b, want_all=True)
+    data = data_symbols(b)
+    if not syms and not data:
+        return spans, syms, []
+    gaps = mips16_gaps(syms, allfn) if syms else []
+    holes = _merge(list(syms or []) + gaps + data)
+    excised = []
+    spans = _cut(b, spans, holes, 'not 32-bit code', excised)
+    total = sum(z - a for a, z, _ in excised)
+    if excised:
+        what = []
+        if syms:
+            what.append('%d MIPS16 function(s) plus %d inter-function gap(s)'
+                        % (len(syms), len(gaps)))
+        if data:
+            what.append('%d STT_OBJECT symbol(s) linked into an executable '
+                        'section' % len(data))
+        unscanned.append(('not-32bit-code', total,
+                          '%s, all named by the symbol table and cut out by '
+                          'address; listed below' % ' and '.join(what)))
+    return spans, list(syms or []) + data, gaps
+
+
+def clip_spans(b, spans, lo, hi, unscanned):
+    """Keep only [lo, hi) of every span, by virtual address."""
+    holes = [(0, lo & ~3), ((hi + 3) & ~3, 0xFFFFFFFF)]
+    excised = []
+    out = _cut(b, spans, holes, 'outside --vma-range', excised)
+    total = sum(z - a for a, z, _ in excised)
+    if total:
+        unscanned.append(('outside-range', total,
+                          'outside --vma-range 0x%08x:0x%08x' % (lo, hi)))
+    return out
 
 
 MIPS16_JALX = 0x1D
@@ -1608,6 +1938,190 @@ def find_stage2(explicit):
     return None
 
 
+# --------------------------------------------------------------------------
+# K11-K15: the fixtures for everything TC-f changed
+# --------------------------------------------------------------------------
+#
+# Synthesised in memory rather than carried as files, for the same reason K2 and
+# K3 are hex: a control that only runs where the vendor material happens to be
+# on disk is a control that does not run in CI, and TC-f was a silent defect
+# precisely because nothing exercised the path.
+
+def _sec_hdr(name, typ, flags, addr, off, size, link=0, info=0, align=4,
+             entsize=0):
+    return struct.pack('>10I', name, typ, flags, addr, off, size, link, info,
+                       align, entsize)
+
+
+def _sym(name, value, size, info, other, shndx):
+    return struct.pack('>IIIBBH', name, value, size, info, other, shndx)
+
+
+# lw v0,0(a0) ; movz v0,v1,a1  -- a load whose result is the movz's rd.  This is
+# the exact shape of all seven sites in this project's own kernel.
+_VIOL = [0x8C820000, 0x00651017 & ~0xFF | 0x0A]   # movz v0,v1,a1 = 0x0065100A
+_VIOL[1] = 0x0065100A
+_CLEAN = [0x8C820000, 0x00000000, 0x00451021]     # lw ; nop ; addu -- no hazard
+
+
+def _mk_elf(text_words, rodata_words=(), funcs=(), text_vma=0x80000000,
+            with_sections=True, objs=()):
+    """A minimal ET_EXEC big-endian MIPS ELF.
+
+    `funcs` is [(vaddr, size, name, is_mips16)].  The single PT_LOAD is marked
+    PF_X and deliberately covers `.rodata` as well as `.text` -- that is what a
+    real linked kernel does, and K15 is the control that the section basis is
+    what actually decides which bytes get read.
+    """
+    ehsize, phentsize, shentsize = 52, 32, 40
+    text = b''.join(struct.pack('>I', w) for w in text_words)
+    rodata = b''.join(struct.pack('>I', w) for w in rodata_words)
+    ro_vma = text_vma + len(text)
+
+    names = [b'', b'.text', b'.rodata', b'.symtab', b'.strtab', b'.shstrtab']
+    shstr, shoff_name = b'', {}
+    for n in names:
+        shoff_name[n] = len(shstr)
+        shstr += n + b'\0'
+
+    strtab, stroff = b'\0', {}
+    for _, _, nm, _ in list(funcs) + [(0, 0, n, 0) for _, _, n in objs]:
+        stroff[nm] = len(strtab)
+        strtab += nm.encode('ascii') + b'\0'
+
+    symtab = _sym(0, 0, 0, 0, 0, 0)
+    for v, sz, nm, m16 in funcs:
+        symtab += _sym(stroff[nm], v, sz, (1 << 4) | STT_FUNC,
+                       STO_MIPS16 if m16 else 0, 1)
+    for v, sz, nm in objs:
+        symtab += _sym(stroff[nm], v, sz, (1 << 4) | STT_OBJECT, 0, 1)
+
+    phoff = ehsize
+    text_off = phoff + phentsize
+    ro_off = text_off + len(text)
+    sym_off = ro_off + len(rodata)
+    str_off = sym_off + len(symtab)
+    shstr_off = str_off + len(strtab)
+    shoff = shstr_off + len(shstr)
+
+    e_shnum = 6 if with_sections else 0
+    eh = (b'\x7fELF' + bytes(bytearray([1, 2, 1, 0])) + bytes(8)
+          + struct.pack('>HHI', 2, 8, 1)
+          + struct.pack('>III', text_vma, phoff, shoff if with_sections else 0)
+          + struct.pack('>I', 0x1001)
+          + struct.pack('>HHHHHH', ehsize, phentsize, 1, shentsize,
+                        e_shnum, 5 if with_sections else 0))
+    ph = struct.pack('>8I', 1, text_off, text_vma, text_vma,
+                     len(text) + len(rodata), len(text) + len(rodata), 5, 0x1000)
+    sh = (_sec_hdr(0, 0, 0, 0, 0, 0)
+          + _sec_hdr(shoff_name[b'.text'], 1, 0x6, text_vma, text_off, len(text))
+          + _sec_hdr(shoff_name[b'.rodata'], 1, 0x2, ro_vma, ro_off, len(rodata))
+          + _sec_hdr(shoff_name[b'.symtab'], 2, 0, 0, sym_off, len(symtab),
+                     link=4, entsize=16)
+          + _sec_hdr(shoff_name[b'.strtab'], 3, 0, 0, str_off, len(strtab))
+          + _sec_hdr(shoff_name[b'.shstrtab'], 3, 0, 0, shstr_off, len(shstr)))
+    out = eh + ph + text + rodata + symtab + strtab + shstr
+    if with_sections:
+        out += sh
+    return out
+
+
+def _scan_elf(b, **kw):
+    """(violations, spans) for a fixture, through the same code path a file
+    takes -- elf_ranges, the excision, then scan()."""
+    args = {'raw': False, 'section': None, 'range': None, 'vma_range': None,
+            'base': 0, 'no_excise': False}
+    args.update(kw)
+    spans, unscanned = elf_ranges(b, args['section'])
+    spans = load_spans(b, spans)
+    if args['vma_range']:
+        spans = clip_spans(b, spans, args['vma_range'][0],
+                           args['vma_range'][1], unscanned)
+    if not args['no_excise']:
+        spans, _, _ = excise_mips16(b, spans, unscanned)
+    r = scan(spans)
+    return len(r.violations), spans
+
+
+def _tcf_controls(c):
+    V, VMA = _VIOL, 0x80000000
+
+    # K11 -- the defect itself.  `--range` on an ELF used to be parsed and then
+    # discarded in silence.  It must now refuse.
+    b = _mk_elf(_CLEAN + V)
+    try:
+        a1 = parse_args(['x', '--range', '0:4'])
+        a2 = parse_args(['x', '--vma-range', '0x80000000:0x80000004'])
+        ok = (a1['range'] == (0, 4) and a1['vma_range'] is None
+              and a2['vma_range'] == (0x80000000, 0x80000004)
+              and a2['range'] is None)
+    except SystemExit:
+        ok = False
+    c.add('K11 --range and --vma-range are different options', ok,
+          'parsed into different fields; main() refuses --range on an ELF')
+
+    # K12 -- --vma-range actually clips, in both directions.
+    n_all, _ = _scan_elf(b)
+    n_in, _ = _scan_elf(b, vma_range=(VMA, VMA + 4 * len(_CLEAN + V)))
+    n_out, _ = _scan_elf(b, vma_range=(VMA, VMA + 4 * len(_CLEAN)))
+    c.add('K12 --vma-range clips an ELF, both ways',
+          n_all == 1 and n_in == 1 and n_out == 0,
+          'unbounded %d, window covering the site %d, window excluding it %d '
+          '(must be 1, 1, 0)' % (n_all, n_in, n_out))
+
+    # K13 -- a MIPS16 function's bytes are excised by name, and --no-mips16-
+    # excision puts them back.  Without the second half this control could pass
+    # on a tool that excised everything.
+    words = list(_CLEAN) + list(V)
+    m16_at = VMA + 4 * len(_CLEAN)
+    b = _mk_elf(words, funcs=[(m16_at, 8, 'm16fn', True)])
+    n_ex, _ = _scan_elf(b)
+    n_no, _ = _scan_elf(b, no_excise=True)
+    c.add('K13 a MIPS16 function is excised by name, and only it',
+          n_ex == 0 and n_no == 1,
+          'excised %d, --no-mips16-excision %d (must be 0, 1)' % (n_ex, n_no))
+
+    # K14 -- the gap rule, and the case it must NOT fire on.
+    #   layout: [m16 A][gap holding a violating pair][m16 B]
+    words = list(V) + list(V) + list(V)          # A, gap, B
+    a_at, gap_at, b_at = VMA, VMA + 8, VMA + 16
+    fx = [(a_at, 8, 'A', True), (b_at, 8, 'B', True)]
+    n_gap, _ = _scan_elf(_mk_elf(words, funcs=fx))
+    fx2 = fx + [(gap_at, 8, 'thirtytwobit', False)]
+    n_declared, _ = _scan_elf(_mk_elf(words, funcs=fx2))
+    c.add('K14 padding between two MIPS16 functions is excised -- unless a '
+          '32-bit function is declared in it',
+          n_gap == 0 and n_declared == 1,
+          'undeclared gap %d, gap holding a declared 32-bit function %d '
+          '(must be 0, 1)' % (n_gap, n_declared))
+
+    # K15 -- the section basis.  The fixture's PT_LOAD is PF_X and covers
+    # .rodata, so a segment-based scan reads the data as code.  With sections
+    # it must not; with the section headers gone it falls back and must.
+    b_sec = _mk_elf(_CLEAN, rodata_words=V)
+    b_str = _mk_elf(_CLEAN, rodata_words=V, with_sections=False)
+    n_sec, sp_sec = _scan_elf(b_sec)
+    n_str, sp_str = _scan_elf(b_str)
+    c.add('K15 a linked ELF is scanned by SECTION, not by PF_X segment',
+          n_sec == 0 and n_str == 1,
+          'with section headers %d, stripped of them %d (must be 0, 1) -- the '
+          'segment covers .rodata and the section does not' % (n_sec, n_str))
+
+    # K16 -- a data table LINKED INTO .text.  Section flags cannot catch this
+    # one: `sys_call_table` really is inside `.text` on this kernel, and two of
+    # its function pointers decoded as a register jump with a load in its
+    # delay slot.  The negative half is what stops the rule swallowing code:
+    # the same bytes declared STT_FUNC must still be scanned.
+    words = list(_CLEAN) + list(V)
+    at = VMA + 4 * len(_CLEAN)
+    n_obj, _ = _scan_elf(_mk_elf(words, objs=[(at, 8, 'a_table')]))
+    n_fn, _ = _scan_elf(_mk_elf(words, funcs=[(at, 8, 'a_function', False)]))
+    c.add('K16 an STT_OBJECT inside .text is excised; an STT_FUNC is not',
+          n_obj == 0 and n_fn == 1,
+          'declared as data %d, declared as a function %d (must be 0, 1)'
+          % (n_obj, n_fn))
+
+
 class Controls(object):
     def __init__(self):
         self.rows = []          # (name, ok, detail)
@@ -1776,6 +2290,8 @@ def run_controls(stage2_path, waive_population, want_isa):
           % (len(k10) - len(bad10), len(k10),
              '; '.join(w for w, _ in k10),
              '' if not bad10 else '   first miss: ' + bad10[0]))
+
+    _tcf_controls(c)
 
     # --- K4b, the second population control -------------------------------
     kpath = find_kernel()
@@ -2000,13 +2516,18 @@ def print_controls(c):
     print('')
 
 
-def print_spans(path, spans, unscanned):
+def print_spans(path, spans, unscanned, m16_syms=None, m16_gaps_=()):
     print('file       %s   (%d bytes)' % (path, os.path.getsize(path)))
-    for sp in spans:
+    shown = spans if len(spans) <= 6 else spans[:3] + spans[-2:]
+    for sp in shown:
         print('scanned    %-12s file[0x%x .. 0x%x)  ->  vma[0x%08x .. 0x%08x)%s'
               % (sp.name, sp.off, sp.off + sp.size, sp.vaddr,
                  sp.vaddr + sp.size,
                  '   ADDRESSES ARE SYNTHETIC' if not sp.addressed else ''))
+    if len(shown) != len(spans):
+        print('scanned    ... %d span(s) not listed; %d in total, %d bytes'
+              % (len(spans) - len(shown), len(spans),
+                 sum(sp.size for sp in spans)))
     # What was NOT looked at, printed every run.  An executable payload can hide
     # in a segment that is not marked executable, and one tiny PF_X segment is
     # enough to satisfy the loads > 0 guard while the real code goes unscanned.
@@ -2014,10 +2535,37 @@ def print_spans(path, spans, unscanned):
         print('NOT SCANNED %-11s %d bytes -- %s' % (name, size, why))
     if not unscanned:
         print('not scanned  nothing: every allocated part of this file was read')
+    # TC-f: the excised MIPS16 is a LIST, not a bound.  Printed in full, because
+    # the whole claim being made is that what is left out can be named.
+    if m16_syms:
+        print('')
+        print('EXCISED BY NAME (%d symbol%s, %d bytes) -- the symbol table '
+              'says these are not'
+              % (len(m16_syms), '' if len(m16_syms) == 1 else 's',
+                 sum(s for _, s, _ in m16_syms)))
+        print('32-bit instructions, and a 4-byte scan of them would be no '
+              'answer rather than a')
+        print('conservative one. Nothing below is covered by the verdict:')
+        for v, s, n in sorted(list(m16_syms) + list(m16_gaps_)):
+            print('   0x%08X +%-6d %s' % (v, s, n))
+        if m16_gaps_:
+            print('   -- %d of those are inter-function gaps (%d bytes): '
+                  'padding and literal'
+                  % (len(m16_gaps_), sum(s for _, s, _ in m16_gaps_)))
+            print('      pools between two MIPS16 functions, which a 4-byte '
+                  'scan reads as instructions.')
+    elif m16_syms is not None:
+        print('MIPS16 excised  none: the symbol table declares no MIPS16 '
+              'function')
+    scanned = sum(sp.size for sp in spans)
+    print('')
+    print('coverage   %d bytes scanned; %d bytes named as not scanned'
+          % (scanned, sum(sz for _, sz, _ in unscanned)))
 
 
 def report(path, spans, unscanned, r, args, sur):
-    print_spans(path, spans, unscanned)
+    print_spans(path, spans, unscanned, args.get('_m16_syms'),
+                args.get('_m16_gaps', ()))
     print('words      %d' % r.words)
     print('')
     print('  loads (MIPS-I load-to-GPR, rt != $zero)   %8d' % r.loads)
@@ -2079,7 +2627,8 @@ def report_isa(path, spans, unscanned, args):
     strict = not args['loose']
     rng = args['code_range']
     words = [w for sp in spans for w in sp.words]
-    print_spans(path, spans, unscanned)
+    print_spans(path, spans, unscanned, args.get('_m16_syms'),
+                args.get('_m16_gaps', ()))
     print('classifier %s   -- strict also requires the fields an encoding fixes '
           'at zero to BE zero; --loose reads opcode and funct only'
           % ('loose' if args['loose'] else 'strict'))
@@ -2130,12 +2679,14 @@ def parse_args(argv):
     a = {'path': None, 'base': 0, 'range': None, 'raw': False, 'section': None,
          'survey': False, 'max_report': 20, 'stage2': None, 'no_pop': False,
          'allow_zero': False, 'isa': False, 'loose': False, 'code_range': None,
-         'self_test': False, 'allow_mips16': False}
+         'self_test': False, 'allow_mips16': False, 'vma_range': None,
+         'no_excise': False}
     flags = {'--self-test': 'self_test', '--isa': 'isa', '--loose': 'loose',
              '--raw': 'raw', '--survey': 'survey',
              '--no-population-control': 'no_pop',
              '--allow-zero-loads': 'allow_zero',
-             '--allow-mips16': 'allow_mips16'}
+             '--allow-mips16': 'allow_mips16',
+             '--no-mips16-excision': 'no_excise'}
     i = 0
     while i < len(argv):
         x = argv[i]
@@ -2150,10 +2701,13 @@ def parse_args(argv):
             a['section'] = argv[i + 1]; i += 2
         elif x == '--max-report':
             a['max_report'] = int(argv[i + 1], 0); i += 2
-        elif x in ('--range', '--code-range'):
+        elif x in ('--range', '--code-range', '--vma-range'):
             lo, hi = argv[i + 1].split(':')
-            a['range' if x == '--range' else 'code_range'] = \
-                (int(lo, 0), int(hi, 0))
+            key = {'--range': 'range', '--code-range': 'code_range',
+                   '--vma-range': 'vma_range'}[x]
+            a[key] = (int(lo, 0), int(hi, 0))
+            if a[key][0] >= a[key][1]:
+                die('%s %s: the window is empty or inverted' % (x, argv[i + 1]))
             i += 2
         elif x.startswith('-'):
             die('unknown option %s' % x)
@@ -2213,13 +2767,42 @@ def main(argv):
     unscanned = []
     elf = None if args['raw'] else elf_ranges(b, args['section'])
     if elf is None:
-        lo, hi = args['range'] if args['range'] else (0, len(b))
-        spans = raw_span(b, args['base'], lo, hi)
+        if args['vma_range']:
+            lo, hi = args['vma_range']
+            base = args['base']
+            if lo < base:
+                die('--vma-range 0x%08x:0x%08x starts below --base 0x%08x. On a '
+                    'raw file the window is a VIRTUAL address range and there '
+                    'are no bytes below the base' % (lo, hi, base))
+            spans = raw_span(b, base, lo - base, min(hi - base, len(b)))
+        else:
+            lo, hi = args['range'] if args['range'] else (0, len(b))
+            spans = raw_span(b, args['base'], lo, hi)
     else:
+        if args['range']:
+            die('--range is a FILE-OFFSET window and it was silently discarded '
+                'for ELF inputs until 2026-08-28 (TC-f). Use --vma-range '
+                'LO:HI, which is a virtual-address window and works on both '
+                'kinds of input. Refusing rather than picking a meaning')
         spans, unscanned = elf
         spans = load_spans(b, spans)
+        if args['vma_range']:
+            spans = clip_spans(b, spans, args['vma_range'][0],
+                               args['vma_range'][1], unscanned)
     if not spans or not any(sp.words for sp in spans):
-        die('nothing to scan')
+        die('nothing to scan -- every span was empty or fell outside the '
+            'window. A tool that scanned nothing would report 0 violations')
+
+    # TC-f: cut the MIPS16 functions out by name before the jalx guard runs, so
+    # the guard fires only on MIPS16 the symbol table did NOT declare.
+    m16_syms = None
+    args['_m16_gaps'] = []
+    if elf is not None and not args['no_excise']:
+        spans, m16_syms, m16_gaps_ = excise_mips16(b, spans, unscanned)
+        args['_m16_gaps'] = m16_gaps_
+        if not spans or not any(sp.words for sp in spans):
+            die('nothing left to scan after the MIPS16 functions were excised')
+    args['_m16_syms'] = m16_syms
 
     m16 = mips16_in_spans(spans)
     if m16 and not args['allow_mips16']:
@@ -2234,9 +2817,23 @@ def main(argv):
               'invisible and the')
         print('         other half read glued to a neighbour. That is not a '
               'conservative')
-        print('         answer, it is no answer. Bound the range to the 32-bit '
-              'part, or pass')
-        print('         --allow-mips16 if you know what you are asking for.')
+        print('         answer, it is no answer.')
+        if m16_syms is None:
+            print('         This file has no symbol table, so nothing could be '
+                  'excised by name.')
+            print('         Scan the ELF this image came from, bound it with '
+                  '--vma-range, or pass')
+            print('         --allow-mips16 if you know what you are asking '
+                  'for.')
+        else:
+            print('         %d MIPS16 function(s) WERE excised by name and '
+                  'these targets are' % len(m16_syms))
+            print('         still inside a scanned span, so they are MIPS16 '
+                  'the symbol table did')
+            print('         not declare. That is the case this guard exists '
+                  'for. Do not pass')
+            print('         --allow-mips16 to get past it without reading '
+                  'them.')
         return 2
 
     if args['isa']:

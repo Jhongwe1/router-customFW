@@ -129,7 +129,16 @@ ck "violations"                        0 "$(printf '%s\n' "$g" | sed -n 's/^  VI
 ck "unresolved successors"             0 "$(printf '%s\n' "$g" | sed -n 's/^  successor unresolved *\([0-9]*\).*/\1/p')"
 loads="$(printf '%s\n' "$g" | sed -n 's/^  loads (MIPS-I load-to-GPR, rt != \$zero) *\([0-9]*\).*/\1/p')"
 ck "scanned a non-zero population"   yes "$([ "${loads:-0}" -gt 0 ] && echo yes || echo no)"
-ck "scanned the executable segment"    1 "$(printf '%s\n' "$g" | grep -c 'scanned    PT_LOAD')"
+# 🔄 2026-08-28: this used to assert `grep -c 'scanned    PT_LOAD'`, which is a
+# check on the span's LABEL.  hazlint 1.4 scans a linked ELF by executable
+# SECTION rather than by PF_X segment, because on a kernel the one executable
+# PT_LOAD also covers `__ex_table` and `.rodata` and the tool was reading data as
+# code.  For this payload the two are the same bytes -- 讀 `readelf -lS`: the
+# PF_X LOAD is file[0x80..0x460) and so is `.text` -- so nothing was lost and the
+# label changed.  Assert the RANGE instead, which is the claim the case was
+# making: the gate looked at the code that gets uploaded.
+ck "scanned the payload's own code range" 1 \
+   "$(printf '%s\n' "$g" | grep -c 'vma\[0x80500000 \.\. 0x805003e0)')"
 
 echo
 echo "=== G2: the gate must REFUSE a planted load-use hazard ==="

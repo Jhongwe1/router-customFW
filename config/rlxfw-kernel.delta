@@ -1,0 +1,101 @@
+# rlxfw's kernel configuration, expressed as a line-by-line delta with a reason
+# per line.  R3-4.   Checked by: tools/kconfig-delta.py check
+#
+# baseline-drop: src-vendor/rtl819x-toolchain @ 5c9be5d9
+# baseline-file: boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW
+# baseline-sha256: 44f781de0cfd2ea9e59f7e9e4e01514976c1f3ef82e423f315fc955f558a862c
+# baseline-bytes: 26548
+# oldconfig-invocation: make -C linux-2.6.30 oldconfig < /dev/null
+#
+# WHICH DROP, AND WHY THE FILE NAME IS NOT ENOUGH.  Three of the four GPL drops
+# on hand carry a file with this exact path.  量 2026-08-28: the two Actiontec
+# ones are byte-identical to each other (26,414 bytes, md5 d37bbebd...) and
+# DIFFER FROM THIS ONE on eight symbol lines -- CONFIG_RTL_ODM_WLAN_DRIVER,
+# CONFIG_RTL_ETH_PRIV_SKB_DEBUG and CONFIG_RTL_EEE_DISABLED among them.  A
+# baseline named by filename alone would be three different files.  The sha256
+# above is the baseline; nothing else is.
+#
+# HOW THE 35 LINES BELOW WERE CLASSIFIED, AND WHY IT IS A MEASUREMENT.
+# Every `derive` line claims kconfig produces that transition from the baseline
+# with no input from me.  That claim was tested rather than asserted: a .config
+# was built that ARGUES with all 21 of them at once -- asserting `=y` for the
+# eighteen kconfig drops, `is not set` for the two it adds, and keeping the
+# vendor's `is not set` for ARCH_CPU_SLEEP -- and `oldconfig` was run on it.
+# 量: the output was identical on all 21.  The negative control is in the same
+# file and is what makes that mean anything: CONFIG_SWAP was flipped in the
+# same way and DID come back changed.  A run where nothing moved and nothing
+# could have moved would have printed the same thing.
+#
+# WHY THERE ARE NO `(NEW)` PROMPTS LEFT, WHICH IS THE REAL ANSWER TO
+# `yes '' | make oldconfig`.  On the vendor's template `oldconfig` is asked
+# nothing at all -- `(NEW)` appears 0 times, and `< /dev/null`, `yes '' |`,
+# `yes n |` and `yes y |` produce .config files with 0 differing symbol lines
+# (量).  The banned string was inert.  It stopped being inert the moment rlxfw
+# set CONFIG_BLK_DEV_INITRD=y, which made a menu reachable and produced FOUR
+# `(NEW)` prompts.  Rather than rely on how stdin is connected, every symbol
+# that menu offers is written into the input .config below, so `(NEW)` is 0
+# again and no answer -- empty, n, y or EOF -- can change the result.  The
+# eleven such lines are marked `set`, because accepting a default is a choice
+# and this file is where choices are written down.
+#
+# kind	symbol	from	to	mechanism	reason
+
+# ----------------------------------------------------------------------------
+# rlxfw's own changes
+# ----------------------------------------------------------------------------
+set	CONFIG_CMDLINE	"console=ttyS0,38400 root=/dev/mtdblock1"	"console=ttyS0,38400"	-	root= is removed. 讀 init/main.c:885-891: with an accessible /init the kernel never calls prepare_namespace(), so on a SUCCESSFUL initramfs boot this string is inert -- the reason to remove it is the failing boot. If the initramfs does not unpack, prepare_namespace() runs and mounts /dev/mtdblock1, which on this device is the vendor's own flash rootfs. That is a boot that would look like a pass, which is exactly the anti-DoD PROGRESS.md records. It costs nothing and it also makes the `Kernel command line:` line a discriminator, since the vendor's carries root= and mine does not
+set	CONFIG_BLK_DEV_INITRD	n	y	-	Decision B (notes/kernel-build.md 4): the first boot mounts an initramfs built from this unit's own userspace rather than the flash rootfs. Without this the initramfs is not linked in at all and the kernel falls through to root=
+set	CONFIG_INITRAMFS_SOURCE	-	"usr/rlxfw-initramfs.spec"	-	the gen_init_cpio spec tools/mkinitramfs.py emits from config/rlxfw-initramfs.tsv. Relative to the kernel directory on purpose: an absolute path would tie the build to one scratch directory. usr/Makefile:31 falls back to `-d` -- an image holding one empty directory -- if the file is missing, so tools/rlxfw-kbuild.sh checks the path rather than trusting it
+
+# ----------------------------------------------------------------------------
+# Pinned so that oldconfig has nothing to ask.  Each value is what kconfig
+# computes; writing it here is what makes the build independent of stdin.
+# ----------------------------------------------------------------------------
+set	CONFIG_INITRAMFS_ROOT_UID	-	0	-	the image is built as root-owned; gen_init_cpio takes uid 0 from the spec's own columns as well, and these two must agree
+set	CONFIG_INITRAMFS_ROOT_GID	-	0	-	as above
+set	CONFIG_INITRAMFS_COMPRESSION_NONE	-	y	-	the cpio goes into .init.data uncompressed. 579,644 bytes of content against 2,395,932 bytes of headroom under the 5,242,880 ceiling (notes/kernel-build.md 3.4), so compression buys margin this gate does not need and adds a decompressor to rung 1's critical path. This is kconfig's default; it is written down because a default that changes silently is the thing this file exists to catch
+set	CONFIG_INITRAMFS_COMPRESSION_GZIP	-	n	-	the other three arms of the same choice, pinned with it
+set	CONFIG_INITRAMFS_COMPRESSION_BZIP2	-	n	-	as above
+set	CONFIG_INITRAMFS_COMPRESSION_LZMA	-	n	-	as above
+set	CONFIG_RD_GZIP	-	y	-	kconfig's default. It does not compress THIS image (COMPRESSION_NONE above); it is the kernel's ability to unpack a gzipped initrd handed to it by something else, and it costs DECOMPRESS_GZIP
+set	CONFIG_RD_BZIP2	-	n	-	not needed and not free
+set	CONFIG_RD_LZMA	-	n	-	not needed. Note the loader's own kernel wrapper is LZMA (notes/kernel-build.md 3.2); that decompressor is in rtkload and is a different program from this one
+set	CONFIG_DECOMPRESS_GZIP	-	y	-	lib/decompress_inflate.c, pulled in by RD_GZIP above. Not independently settable; pinned so the line does not appear as an undeclared difference
+set	CONFIG_PROBE_INITRD_HEADER	-	n	-	kconfig's default. It makes the kernel sniff an initrd header out of memory the bootloader left behind, and this gate hands the kernel nothing that way -- the image is entered at 0x80500000 by `J` with no initrd argument
+
+# ----------------------------------------------------------------------------
+# Derived by kconfig from the baseline, with no input from me.  All 21 were
+# argued with at once and none moved; CONFIG_SWAP, argued with in the same
+# file, did.
+# ----------------------------------------------------------------------------
+
+# -- promptless: the value is the default and no .config line reaches it ------
+derive	CONFIG_ARCH_CPU_SLEEP	n	y	promptless	boards/rtl8196e/config.in:30 declares it `bool` with NO prompt string and `default y`, so sym_is_changable() is false and the vendor's own `# ... is not set` in the template is a dead line. 量: it comes out y under `< /dev/null`, `yes ''`, `yes n` AND `yes y`. 🔴 And it is not a defect to fix: the sleep instruction 0x42000038 is at 0x80007EA8 in THIS UNIT'S OWN SHIPPED KERNEL and at the matching place in mine, both in cpu_idle via arch/rlx/kernel/process.c:55. The vendor ships it on. The same symbol is `default n` under boards/rtl8198, so the value is board-specific and deliberate
+derive	CONFIG_CPU_HAS_SLEEP	-	y	promptless	arch/rlx/Kconfig:83, `bool` with no prompt and `default y if ARCH_CPU_SLEEP`. It is what actually reaches the code: arch/rlx/include/asm/processor.h:31 makes __cpu_wait() emit `sleep` under it
+
+# -- selected by another symbol, so it cannot be lowered ----------------------
+derive	CONFIG_RTL_ODM_WLAN_DRIVER	-	y	selected	drivers/net/wireless/rtl8192cd/Kconfig:15 `select`s it, so kconfig forces y and never offers the prompt its own declaration at line 171 carries. ⚠️ It is ABSENT from this drop's template while the two Actiontec drops both carry `CONFIG_RTL_ODM_WLAN_DRIVER=y` -- the line was blanked in this copy, which is one of the eight ways the three templates differ
+
+# -- the prompt's `depends on` is not satisfied by this model -----------------
+# This unit IS the 88E model (CONFIG_RTL_88E_SUPPORT=y), so every symbol that
+# says `depends on RTL8192CD && !RTL_88E_SUPPORT` is unreachable.  Ten of them.
+derive	CONFIG_ANT_SWITCH	n	-	dep-unmet	rtl8192cd/Kconfig:33, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_ENABLE_EFUSE	n	-	dep-unmet	rtl8192cd/Kconfig:114, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_HIGH_POWER_EXT_PA	n	-	dep-unmet	rtl8192cd/Kconfig:23, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_MP_PSD_SUPPORT	n	-	dep-unmet	rtl8192cd/Kconfig:138, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_RTL_92D_SUPPORT	n	-	dep-unmet	rtl8192cd/Kconfig:43, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_RTL_DUAL_PCIESLOT_BIWLAN_D	n	-	dep-unmet	rtl8192cd/Kconfig:73, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_RTL_MESH_SUPPORT	n	-	dep-unmet	rtl8192cd/Kconfig:161, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_RTL_P2P_SUPPORT	n	-	dep-unmet	rtl8192cd/Kconfig:143, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_RTL_WAPI_SUPPORT	n	-	dep-unmet	rtl8192cd/Kconfig:118, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_RTL_WLAN_DOS_FILTER	n	-	dep-unmet	rtl8192cd/Kconfig:166, depends on RTL8192CD && !RTL_88E_SUPPORT
+derive	CONFIG_HIGH_POWER_EXT_LNA	n	-	dep-unmet	rtl8192cd/Kconfig:28, depends on RTL8192CD && RTL_92C_SUPPORT -- and RTL_92C_SUPPORT is absent from the built .config entirely
+derive	CONFIG_RTL_HOSTAPD_SUPPORT	n	-	dep-unmet	rtl8192cd/Kconfig:18, depends on RTL8192CD && RTL_92C_SUPPORT. It is also declared promptless in five boards' config.in, this board's included, which is why it is dropped rather than written out as n
+derive	CONFIG_PHY_EAT_40MHZ	y	-	dep-unmet	rtl8192cd/Kconfig:151, depends on !AUTO_PCIE_PHY_SCAN, and CONFIG_AUTO_PCIE_PHY_SCAN=y in the built .config. ⚠️ This is the one derived line whose baseline value is y rather than n, so it is the one where "kconfig dropped it" and "something turned it off" look most alike from a diff. It is a drop: the symbol is absent, not set to n
+
+# -- no `config` block declares it anywhere the board can reach ---------------
+derive	CONFIG_PCIE_POWER_SAVING	n	-	undeclared	no `config` declaration anywhere under the drop. A line in the template for a symbol kconfig has never heard of
+derive	CONFIG_RTL8190	n	-	undeclared	as above
+derive	CONFIG_RTL8192SE	n	-	undeclared	as above
+derive	CONFIG_RTL_8196E_ULINKER	n	-	undeclared	as above. Note the similarly named CONFIG_RTL_ULINKER below IS declared, under a different board
+derive	CONFIG_RTL_ULINKER	n	-	other-board	declared only in boards/rtl8196eu/config.in:186. arch/rlx/Kconfig:10 sources ../target/config.in and `target` is a symlink to boards/rtl8196e, so this board never sees it

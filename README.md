@@ -51,6 +51,20 @@ here that came from something other than counting instructions in an image.
 
 ## What is in here
 
+**[`config/`](config)** 🆕 — every input rlxfw's kernel build takes
+that is not the pinned vendor drop, written down instead of remembered.
+[`rlxfw-kernel.delta`](config/rlxfw-kernel.delta) is the configuration as 35
+rules with a reason each — 14 that rlxfw sets, 21 that kconfig derives, and
+the baseline named by **sha256** rather than by filename, because three of the
+four GPL drops carry a file at that exact path and two of them differ from this
+one on eight symbol lines. [`rlxfw-initramfs.tsv`](config/rlxfw-initramfs.tsv)
+is the first boot's userspace, 29 entries, 24 of them this device's own binaries
+unmodified and 5 named as mine. [`rlxfw-sdk.config`](config/rlxfw-sdk.config)
+and [`host-compat/`](config/host-compat) are the two build inputs that were
+undeclared until 2026-08-28 — one of them normally produced by a curses
+program, which is not a step anyone else can reproduce.
+
+
 **[`notes/kernel-build.md`](notes/kernel-build.md)** 🆕 — how rlxfw's own kernel
 is built, wrapped and reached: which toolchain (`rsdk-1.3.6-4181`, with the
 condition that would refute the choice), what the configuration may differ by,
@@ -61,7 +75,7 @@ from the toolchain generation had been *built* on 2026-08-28 and never read — 
 note that called it *not run* was committed 48 minutes later; read, it moves the
 whole-image violation count from 4 to 20,201 on the `-march` change alone and by
 4.9 % on the generation. Seven `arch/rlx` assembly files rely on the **assembler**
-to fill a load delay slot, worth twelve live hazards — five of them in the
+to fill a load delay slot, worth eleven live hazards — five of them in the
 exception return path — and no compiler flag would fix them because there is no
 compiler in that path. And `yes '' | make oldconfig` silently turned on a CPU
 sleep option the vendor had turned off, so the kernel already on disk is not a
@@ -201,10 +215,27 @@ controls that show it can:
 
 ```
 tools/hazlint              refuses a payload that reads a register in the load delay
-                           slot. Eight controls run before it will report, including a
+                           slot. Twenty controls run before it will report (seventeen on a clone, where the two population controls have no vendor material to read), including a
                            negative control that must produce exactly 2 violations at
                            two named addresses, and a population control over 1,474
-                           loads of vendor code. A control that fails stops the run
+                           loads of vendor code. A control that fails stops the run.
+                           1.4 stopped bounding the scan below the first MIPS16 symbol
+                           and started cutting MIPS16 out BY NAME: one 714-byte function
+                           had been costing 900 KB of coverage. Removing the bound
+                           exposed two things it was hiding -- .rodata was inside the
+                           scan, and sys_call_table is a data table linked into .text
+tools/kconfig-delta.py     answers one question: is every difference between the vendor's
+                           board template and the .config THIS BUILD USED on the declared
+                           list? Sixteen controls, and C6 is the one it exists for -- it
+                           feeds the gate the file that was copied in rather than the one
+                           the compiler saw, and must refuse. `apply` and `check` read
+                           the same delta file, so the generator and the auditor cannot
+                           drift apart and both keep passing
+tools/mkinitramfs.py       builds R3's initramfs from a declaration in which every entry
+                           names its source and is tagged `unit` or `rlxfw` -- and the
+                           tag is CHECKED against the path, not trusted. A declared
+                           source that is not there is refused, never replaced with
+                           something similar. Twelve controls
 tools/spec-check.py        eight checks over SPEC.md, and nine mutations that must
                            each produce a finding the file did not already have.
                            The eighth exists because one unescaped `|` had kept a

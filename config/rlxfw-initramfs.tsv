@@ -1,0 +1,84 @@
+# rlxfw's initramfs, declared.   R3-5.   tools/mkinitramfs.py build --decl this
+#
+# Decision B (notes/kernel-build.md 4): the first boot mounts an initramfs made
+# of THIS UNIT'S OWN userspace, so that if the shell does not come up, the shell
+# is not the new thing.  Every entry is tagged `unit` -- carved out of this
+# device's own flash dump, byte for byte unmodified -- or `rlxfw`, mine.  The
+# tool checks the tag against the source path; it does not take it on trust.
+#
+# $UNIT = $FWRE_WORK/extracted/unit-2018/squashfs-root
+# $REPO = this repository
+#
+# WHAT IS DELIBERATELY NOT HERE.  The vendor's own /init (a busybox symlink,
+# which runs /etc/inittab and brings up boa, the switch and the wireless) is
+# not used.  R3's first boot is a ladder and rung 1 is "a shell", so /init is a
+# four-line script of mine.  That is the only executable content in the image
+# that is not this unit's.
+#
+# SIZE.  The four ELF files below total 579,644 bytes (量), against 2,395,932
+# bytes of headroom under the 5,242,880 ceiling (notes/kernel-build.md 3.4).
+# The 47 busybox symlinks cost a cpio header each and no content.
+#
+# kind	path	source	mode	owner	note
+
+dir	/bin	-	0755	unit	-
+dir	/dev	-	0755	unit	-
+dir	/lib	-	0755	unit	-
+dir	/proc	-	0755	unit	the shell's own /proc/cpuinfo read at K5 needs it mounted, and mounting needs the directory
+dir	/sys	-	0755	unit	-
+dir	/tmp	-	1777	rlxfw	MINE, and the check found it: this unit's dump has /tmp as a SYMLINK to /var/tmp, not a directory. /var does not exist in this image, so the link would dangle. Declared as a directory of mine rather than passed off as the unit's
+dir	/var	-	0755	unit	-
+dir	/etc	-	0755	unit	-
+
+# --- the one file in the image that is mine, and it says so on the console ---
+file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discriminator, mounts /proc and /sys, execs a shell
+
+# --- this unit's own binaries, unmodified ---
+file	/bin/busybox	$UNIT/bin/busybox	0755	unit	273,332 bytes; NEEDED = libc.so.0, libgcc_s.so.1; interp /lib/ld-uClibc.so.0
+file	/lib/libuClibc-0.9.30.3.so	$UNIT/lib/libuClibc-0.9.30.3.so	0755	unit	the C library this busybox was linked against
+file	/lib/ld-uClibc-0.9.30.3.so	$UNIT/lib/ld-uClibc-0.9.30.3.so	0755	unit	the interpreter; without it exec fails with no message that says why
+file	/lib/libgcc_s.so.1	$UNIT/lib/libgcc_s.so.1	0755	unit	busybox's second NEEDED entry
+
+# --- the loader's search names, as the unit ships them ---
+slink	/lib/libc.so.0	libuClibc-0.9.30.3.so	0777	unit	the SONAME busybox records
+slink	/lib/ld-uClibc.so.0	ld-uClibc-0.9.30.3.so	0777	unit	the PT_INTERP string in busybox
+
+# --- busybox applets, as the unit ships them: 50 of these are symlinks in the
+#     dump and these are the ones the three rungs use ---
+slink	/bin/sh	busybox	0777	unit	rung 1
+slink	/bin/ash	busybox	0777	unit	-
+slink	/bin/cat	busybox	0777	unit	K5 reads /proc/cpuinfo
+slink	/bin/echo	busybox	0777	unit	-
+slink	/bin/ls	busybox	0777	unit	-
+slink	/bin/mount	busybox	0777	unit	/proc and /sys
+slink	/bin/ps	busybox	0777	unit	-
+slink	/bin/ifconfig	busybox	0777	unit	rung 2
+slink	/bin/ping	busybox	0777	unit	rung 3
+# /bin/dmesg was here, tagged `unit`, until 2026-08-28, and the adversarial pass
+# found it. It is NOT in this unit's dump -- the dump has 50 busybox symlinks and
+# that is not one of them -- and the byte string `dmesg` does not appear in this
+# busybox at all, so the applet is not compiled in either. It was removed rather
+# than retagged: an entry that adds nothing and was wrong about its own
+# provenance is not worth a line. It got in because the `unit` tag was checked
+# for `file` entries only, and 15 of the 31 entries were `slink`.
+slink	/bin/mkdir	busybox	0777	unit	-
+slink	/bin/sleep	busybox	0777	unit	-
+
+# --- one symlink that is MINE, and the reason it has to be ---
+# /bin/uname was here too, and the adversarial pass killed it with the same
+# instrument that killed /bin/dmesg. The note said "the applet IS in the binary
+# (量: the string is present)" -- that was a `strings` FALSE POSITIVE, and
+# `notes/rootfs-census.md` already documents the mirror of it. 量: busybox's
+# applet-name table is at file offset 266740 and holds exactly 50 names, which are
+# exactly the 50 symlinks in the dump; `uname` is not among them. The single
+# `uname` hit in the file is at offset 9040, between `unsetenv` and `getpagesize`
+# -- it is `.dynstr`, the uClibc syscall wrapper's symbol name. So `uname -a`
+# would have returned `uname: applet not found`, exit 127, and RUNSHEET K5 would
+# have read that as a shell that does not work. Removed. **K5 needs a different
+# command**, and with CONFIG_PRINTK off `cat /proc/version` is now the only place
+# the build stamp can be read at all -- that is R3-6's to settle.
+
+# --- without this, init runs with no stdio and it reads exactly like a hang ---
+nod	/dev/console	c:5:1	0600	rlxfw	init/main.c init_post() opens it; the vendor's squashfs carries 0 device nodes (量, and weakly: unsquashfs as an ordinary user cannot create them either)
+nod	/dev/null	c:1:3	0666	rlxfw	the shell redirects to it before anything else does
+nod	/dev/tty	c:5:0	0666	rlxfw	busybox's shell wants a controlling terminal for job control

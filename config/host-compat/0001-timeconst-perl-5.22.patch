@@ -1,0 +1,36 @@
+Make kernel/timeconst.pl run under perl >= 5.22.
+
+WHY THIS EXISTS AND WHY IT IS DECLARED RATHER THAN JUST APPLIED.
+The build already sitting on disk on 2026-08-28 carried this change and
+nothing in this repository named it.  A build that cannot be reproduced from
+the pinned drop plus a listed set of patches is not a build anyone can check,
+and "it works on my tree" is exactly the state R3-4 exists to end.
+
+WHAT IT CHANGES.  `defined(@array)` was deprecated in perl 5.15 and removed in
+5.22; this host runs 5.38.2, where the line is a fatal error:
+
+    Can't use 'defined(@array)' (Maybe you should just omit the defined()?)
+
+Without it the build stops at `kernel/timeconst.h` with Error 255.
+
+WHAT IT DOES NOT CHANGE.  `@val = @{$canned_values{$hz}}` assigns an empty list
+when $hz has no canned entry, and `!defined(@val)` and `!@val` are both true
+exactly then -- so the branch is taken on the same input.  The generated
+`kernel/timeconst.h` is a function of CONFIG_HZ alone.  This is a host-perl
+compatibility fix, not a change to what the kernel computes.
+
+SCOPE.  Host build tooling only.  Nothing here reaches the cross compiler, the
+target, or any byte of the image except through `timeconst.h`, whose contents
+are unchanged.
+
+--- a/kernel/timeconst.pl
++++ b/kernel/timeconst.pl
+@@ -370,7 +370,7 @@
+ 	}
+
+ 	@val = @{$canned_values{$hz}};
+-	if (!defined(@val)) {
++	if (!@val) {
+ 		@val = compute_values($hz);
+ 	}
+ 	output($hz, @val);

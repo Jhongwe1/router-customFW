@@ -205,6 +205,19 @@ jobs:
       # flash dump and the rebuild outputs, neither of which can be committed --
       # and stand down as one skip line covering 4. The six mutation cases DO run
       # here, which is the point: they are what shows the controls guard anything.
+      # R3-4's two gates.  Both are self-contained -- every control is built on
+      # synthetic .config and declaration text -- so they run here in full, and
+      # test-config-gates breaks each of them seven ways and names the control
+      # that has to go red.
+      - name: kconfig-delta
+        run: /usr/bin/python3 tools/kconfig-delta.py self-test 2>&1 | tee ci-out/kconfig-delta.out; exit "${PIPESTATUS[0]}"
+
+      - name: mkinitramfs
+        run: /usr/bin/python3 tools/mkinitramfs.py self-test 2>&1 | tee ci-out/mkinitramfs.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-config-gates
+        run: bash tools/test-config-gates.sh 2>&1 | tee ci-out/test-config-gates.out; exit "${PIPESTATUS[0]}"
+
       - name: test-rebuild-census
         run: bash tools/test-rebuild-census.sh 2>&1 | tee ci-out/test-rebuild-census.out; exit "${PIPESTATUS[0]}"
 
