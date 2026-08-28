@@ -85,11 +85,24 @@ UNPARSABLE_RE = re.compile(r"^ {2}(ok|FAIL|skip)\b")
 
 
 def load_table(path):
-    """Return {suite: (bench_total, {label: covers}, {label: reason})}."""
+    """Return {suite: (bench_total, {label: covers}, {label: reason})}, declared.
+
+    A `# not-run-total: N` header is read as DATA, not as a comment.  Before
+    2026-08-29 the expected total lived only in a prose comment in
+    `.github/workflows/ci.yml`, and nothing compared it to anything: 量, the
+    green run of 2026-08-28 14:18 printed **373** while that comment said
+    **362**, so it had been wrong by 11 for at least a day, in the file whose
+    own header spends forty lines warning about "a number that was true once".
+    A total that is checked is a total that cannot do that.
+    """
     suites = {}
+    declared_total = None
     with open(path, encoding="utf-8") as fh:
         for lineno, raw in enumerate(fh, 1):
             line = raw.rstrip("\n")
+            if line.lstrip().startswith("# not-run-total:"):
+                declared_total = int(line.split(":", 1)[1].strip())
+                continue
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
             parts = [p.strip() for p in line.split("\t") if p.strip() != ""]
@@ -107,7 +120,8 @@ def load_table(path):
             if label != "-":
                 entry[1][label] = int(covers)
                 entry[2][label] = reason
-    return {k: (v[0], v[1], v[2]) for k, v in suites.items()}
+    out = {k: (v[0], v[1], v[2]) for k, v in suites.items()}
+    return out, declared_total
 
 
 def parse_capture(text):
@@ -130,7 +144,7 @@ def parse_capture(text):
     return ok, fails, skips, unparsable
 
 
-def census(table, capdir, only=None, check_arithmetic=True, out=sys.stdout):
+def census(table, capdir, only=None, check_arithmetic=True, out=sys.stdout, declared_total=None):
     """Return (red, lines). `red` is True when the build must fail."""
     red = False
     lines = []
@@ -220,6 +234,16 @@ def census(table, capdir, only=None, check_arithmetic=True, out=sys.stdout):
     lines.append("")
     lines.append(f"  NOT RUN IN THIS JOB: {not_run} case(s), every one of them "
                  f"named above.")
+    if declared_total is not None and declared_total != not_run:
+        red = True
+        lines.append(f"  \033[31mNOT-RUN-TOTAL MISMATCH\033[0m: the table "
+                     f"declares {declared_total} and this job did not run "
+                     f"{not_run}.")
+        lines.append("  A suite grew or shrank and the total nobody checks did "
+                     "not follow. Update `# not-run-total:`")
+    elif declared_total is None:
+        lines.append("  (the table declares no `# not-run-total:`, so this "
+                     "number is not checked against anything)")
     lines.append("  A green result here means the cases that ran passed AND the "
                  "cases that did not run are the ones this repository")
     lines.append("  has already decided cannot run without a 56 KiB vendor "
@@ -263,7 +287,7 @@ def self_test():
 
     with tempfile.TemporaryDirectory() as d:
         tpath = _write(d, "t.tsv", TABLE)
-        table = load_table(tpath)
+        table, _ = load_table(tpath)
         cap = os.path.join(d, "cap")
         os.makedirs(cap)
         buf = io.StringIO()
@@ -302,6 +326,25 @@ def self_test():
            red, False)
         _write(cap, "beta.out", skipped)
 
+        # C15 the NOT-RUN total, declared in the table and CHECKED.
+        # Before 2026-08-29 this number lived only in a prose comment in
+        # ci.yml, and 量: the green run of 2026-08-28 14:18 printed 373 while
+        # that comment said 362. Nothing compared them, so it had been wrong
+        # for at least a day. Both directions are asserted here, because a
+        # check that only fires when the total is too LOW would pass on a
+        # suite that quietly shrank -- which is this tool's whole subject.
+        red, out_lines = census(table, cap, out=buf, declared_total=4)
+        ck("C15 the declared not-run total matches -> green", red, False)
+        red, out_lines = census(table, cap, out=buf, declared_total=3)
+        ck("C15 declared too LOW -> red", red, True)
+        ck("C15 and it says which two numbers disagree", True,
+           any("NOT-RUN-TOTAL MISMATCH" in ln for ln in out_lines))
+        red, _ = census(table, cap, out=buf, declared_total=99)
+        ck("C15 declared too HIGH -> red", red, True)
+        red, out_lines = census(table, cap, out=buf, declared_total=None)
+        ck("C15 no declaration -> green, and it SAYS the number is unchecked",
+           any("not checked against anything" in ln for ln in out_lines), True)
+
         # C5 a suite in the table that produced no output at all
         os.remove(os.path.join(cap, "alpha.out"))
         red, _ = census(table, cap, out=buf)
@@ -321,7 +364,7 @@ def self_test():
         # C9 a bench-only suite is counted as wholly not run, and is green
         t2 = _write(d, "t2.tsv", TABLE
                     + "gamma\t7\t*bench-only*\t7\tneeds a file that cannot be committed\n")
-        table2 = load_table(t2)
+        table2, _ = load_table(t2)
         red, out_lines = census(table2, cap, out=buf)
         ck("C9 a *bench-only* suite with no .out -> green", red, False)
         ck("C9b and its cases are in the not-run total",
@@ -378,8 +421,8 @@ def main(argv):
     if len(args) != 2:
         print(__doc__.strip(), file=sys.stderr)
         return 2
-    table = load_table(args[0])
-    red, _ = census(table, args[1], only=only)
+    table, declared = load_table(args[0])
+    red, _ = census(table, args[1], only=only, declared_total=declared)
     return 1 if red else 0
 
 

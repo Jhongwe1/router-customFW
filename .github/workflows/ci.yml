@@ -50,9 +50,18 @@
 # They need no vendor artefact. What keeps this suite bench-only is K4/K4b's
 # population fixtures and nothing else. Without gcc, both skip cleanly, the
 # census is green, and it prints
-# `NOT RUN IN THIS JOB: 395 case(s)` with every one of them named.
+# `NOT RUN IN THIS JOB: 406 case(s)` with every one of them named.
 #
-# 362 -> 395 on 2026-08-28 (fifth session): `test-hazlint` 109 -> 142 for `TC-j`.
+# 🔴 **2026-08-29: this number is no longer maintained here, because it was
+# wrong and nothing could say so.** It read 362 while the green run of
+# 2026-08-28 14:18 printed **373** -- off by 11 for at least a day, in the file
+# whose own header spends forty lines warning about a number that was true once.
+# It now lives in `tools/ci-expected.tsv` as `# not-run-total:`, where
+# `ci-census.py` READS it and turns the build red if it disagrees (`C15`, with
+# both directions and a mutation). The value quoted above is a convenience for
+# the reader; the table is the owner.
+#
+# 373 -> 406 on 2026-08-28/29 (fifth session): `test-hazlint` 109 -> 142 for `TC-j`.
 # The thirty-three are M17-M20 (the three mutations that recreate `TC-f` through
 # `main`, plus the one that proves the child guard is not itself a blind spot)
 # and the assertions that the control report now names which layer each row
