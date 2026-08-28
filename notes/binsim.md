@@ -476,6 +476,19 @@ toolchain does — and on the ① ↔ ② edge they do not move (0.9995–1.0000
 `boa` drops eleven points (0.877–0.895). On that edge the two halves *are*
 separated, and the answer is that `boa`'s source moved and the toolchain did
 not. On the ② ↔ ③ edge both move together and nothing separates them.
+
+🔴 **2026-08-28, `R2a/b/d-4`: the two halves are now separated by construction,
+and the ratio between them is the opposite of what this file assumed.** Six
+rebuilds of one program with every factor held but one — no inference from the
+corpus needed — put a **`-march` change at 0.3360** and a **source change at
+0.9359** (Jaccard 0.2009 against 0.6371). A toolchain generation change alone is
+0.2132; a real config change, over the vendor's own five configs for this SoC,
+spans 0.9347–0.9976. **So this metric is a toolchain instrument with a weak
+source channel, not the reverse**, and the sentence above — *"`boa`'s source
+moved and the toolchain did not"* — now has to explain how a source move produced
+a 0.877–0.895 drop when replacing the program outright costs 0.064.
+**Unresolved, and recorded rather than smoothed over.**
+`notes/rebuild-vs-shipped.md` §3 owns the measurement.
 `notes/which-drop.md` §3 owns that, including the third instrument it turns on —
 `G(boa_t) & G(busybox_t)`, which reads the toolchain axis without putting two
 builds of one program side by side, and gives the same 4+2 with a ninefold gap.
