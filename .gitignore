@@ -60,6 +60,19 @@ toolchain/
 # itself be committed. tools/test-gitignore.sh case 15 is that check.
 src-vendor
 linux-*/
+# ...but NOT rlxfw's own source mirror.  R3-6 ships two files of mine
+# (arch/rlx/kernel/rlxfw_mark.c and include/linux/rlxfw-mark.h) laid out
+# the way the STAGED tree is laid out, so tools/rlxfw-marks.py needs no
+# path mapping.  That layout puts them under a `linux-2.6.30/` directory,
+# which `linux-*/` above swallows -- measured 2026-08-28: `git add -A`
+# staged every other file of the session and silently left these two out,
+# which would have committed a build driver and a declaration that both
+# name sources the repository does not contain.
+# The DIRECTORY has to be un-ignored before its contents can be: git does
+# not descend into an excluded directory, so a `!.../**` on its own does
+# nothing.
+!config/rlxfw-src/linux-*/
+!config/rlxfw-src/linux-*/**
 squashfs-root/
 *.o
 *.ko

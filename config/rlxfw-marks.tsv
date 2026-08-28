@@ -1,0 +1,71 @@
+# rlxfw's boot marks, one row per line of Realtek's source that rlxfw changes.
+# R3-6.   Applied and checked by: tools/rlxfw-marks.py
+#
+# baseline-drop: src-vendor/rtl819x-toolchain @ 5c9be5d9
+# tree-root: the STAGED top, so paths cover both linux-2.6.30/ and boards/
+#
+# WHY THERE ARE ELEVEN OF THESE AND NOT ONE.
+# 量, on the built R3 vmlinux: printk is a stub, early_printk is a WEAK EMPTY
+# stub (16 bytes at 0x80013bec: sw a1,4(sp) / sw a2,8(sp) / jr ra / sw
+# a3,12(sp)), and panic_printk reaches the wire only after a console is
+# registered.  讀, this unit's own capture bench/2026-08-24c/G6.log: from
+# `start address: 0x80003440` to `Realtek WLAN driver - version 1.6` there is
+# NOTHING.  So a kernel that dies anywhere in start_kernel produces one
+# capture -- `start address:` then silence -- whatever killed it.  R3's D3
+# ("early bring-up completes") had no observable at all, and R3-8's first
+# seating would have spent a power cycle to learn nothing.
+#
+# Each row below is placed to make one suspect readable as one line.  The rule
+# for adding a row is: it must separate two causes that would otherwise share
+# a capture.  A row that only says "we got further" is not worth a line of
+# somebody else's source.
+#
+# WHAT MAKES THESE DISCRIMINATORS RATHER THAN LABELS.
+# The anti-DoD (PROGRESS.md): 2026-08-25 a second `J 80500000` booted the
+# VENDOR kernel, so a banner is not evidence.  These are constants, which is
+# the weaker form -- but `rlxfw-marks.py verify` reads the built image AND the
+# vendor's, and a constant absent from the vendor image cannot be printed by
+# it.  B02 and B07 are the stronger form on top: their values are read out of
+# this die at run time.
+#
+# COST.  38400 8N1 = 3,840 B/s. Eleven marks, mean 11 bytes -> ~32 ms of UART
+# on a boot whose loader stage alone takes 348 ms (CLK-15). Not measurable.
+#
+# id	file	position	anchor	insert	reason
+
+# ----------------------------------------------------------------------------
+# The four rows that are not marks: my file has to reach the link, and the
+# call sites need a prototype -- arch/rlx/kernel/Makefile carries
+# `EXTRA_CFLAGS += -Werror`, so an implicit declaration is a build failure.
+# The anchor for each include is a line that occurs exactly once in that file,
+# which is checked rather than assumed.
+# ----------------------------------------------------------------------------
+MK	linux-2.6.30/arch/rlx/kernel/Makefile	after	obj-$(CONFIG_EARLY_PRINTK) += early_printk.o	obj-y += rlxfw_mark.o	rlxfw_mark.c is copied in by --src and needs a Kbuild line. It is placed immediately after early_printk.o on purpose: prom_putchar, the only function rlxfw_mark calls, is built by THAT line, so the dependency is visible in the file rather than only in the #error inside it. The anchor is written with single spaces and matched normalised, because Kbuild lines are tab-aligned and this file is tab-separated
+IN1	linux-2.6.30/init/main.c	after	#include <linux/kernel_stat.h>	#include <linux/rlxfw-mark.h>	the prototype for B00, B09 and B10
+IN2	linux-2.6.30/arch/rlx/kernel/setup.c	after	#include <asm/setup.h>	#include <linux/rlxfw-mark.h>	the prototype for B01, B02, B03 and B08. This file also gets read_c0_prid() for B02, which is arch/rlx/include/asm/rlxregs.h:304 -- if it is not already reachable here the build says so rather than compiling an implicit declaration, because of -Werror
+IN3	boards/rtl8196e/bsp/setup.c	after	#include "bspchip.h"	#include <linux/rlxfw-mark.h>	the prototype for B04, B05, B06 and B07. Anchored on the board-local include rather than a linux/ one, because this file is not under arch/rlx and its include list is the board's
+
+# ----------------------------------------------------------------------------
+# Before any console exists.  This window is unreachable by CONFIG_PRINTK=y as
+# well: setup_early_printk() does not run until arch/rlx/kernel/setup.c:546.
+# ----------------------------------------------------------------------------
+B00	linux-2.6.30/init/main.c	after	page_address_init();	rlxfw_mark("B00");	the first mark, and the only claim that matters at D1/D2: the decompressor handed control over, the kernel is running C, and the UART the loader left behind still works. Placed after page_address_init() and before the printk(linux_banner) that is a stub in this configuration. Silence here with `start address:` printed means the image was entered and died before or inside start_kernel's prologue -- which RUNSHEET B03 records as TWO causes and this separates from the rest
+B01	linux-2.6.30/arch/rlx/kernel/setup.c	before	cpu_probe();	rlxfw_mark("B01");	brackets start_kernel's generic prologue -- boot_init_stack_canary, cgroup_init_early, local_irq_disable, tick_init, boot_cpu_init, page_address_init. Low suspicion (mainline generic), which is exactly why it is worth one line: if the ladder stops between B00 and B01 the fault is in code this port did not write, and that is a different day's work from a BSP fault
+B02	linux-2.6.30/arch/rlx/kernel/setup.c	after	cpu_probe();	rlxfw_markx("B02", read_c0_prid());	COMPUTED. cpu_probe() reads PRId and fills cpu_data[]; this prints the register itself. Two things at once: a hang inside cpu_probe (the CPU identification table, and arch/rlx/include/asm/cpu.h maps PRID_IMP_RLX4181 = 0xcd00) becomes readable, AND the value is a second, independent reading of CPU-04 -- 量 0x0000CD01 on 2026-08-25b through probe2's bare-metal CP0 census, which shares no code with this. The vendor image cannot fake it because it does not contain the string
+B03	linux-2.6.30/arch/rlx/kernel/setup.c	after	bsp_init();	rlxfw_mark("B03");	bsp_init() is arch/rlx/bsp/prom.c and it computes mem_size by READING THE DRAM CONFIGURATION REGISTER at BSP_MC_MTCR0 -- bank/bus-width/row/column decode, live, on a board whose DRAM this project has never configured. The plan's `memory-related` failure case starts here, not at paging_init
+
+# ----------------------------------------------------------------------------
+# Inside bsp_setup().  Three suspects in three consecutive statements, and the
+# last one ends in a bare while(1).
+# ----------------------------------------------------------------------------
+B04	boards/rtl8196e/bsp/setup.c	before	ioport_resource.start = 0x18000000;	rlxfw_mark("B04");	bsp_setup() entry. Brackets arch_mem_init's prologue, and it is the first mark in a file that is NOT under arch/rlx -- boards/rtl8196e/bsp/ is where arch/rlx/bsp points, and in two of the three drops that symlink dangles
+B05	boards/rtl8196e/bsp/setup.c	after	bsp_serial_init();	rlxfw_mark("B05");	THE DIVISOR. bsp_serial_init() runs early_serial_setup() on UART0 with s.uartclk = BSP_SYS_CLK_RATE, and prom_putchar never touches the divisor -- it inherits whatever is set. Every mark before this one rides the loader's 38400. If B00-B04 are clean and B05 is GARBAGE, the vendor's own serial init changed the line rate and nothing after it is readable at 38400; if B05 is missing entirely, early_serial_setup returned nonzero and panic()'d before any console existed to print the panic. Those are two different findings and this is the line that separates them
+B06	boards/rtl8196e/bsp/setup.c	after	_imem_dmem_init();	rlxfw_mark("B06");	CPU-46's scratchpad. _imem_dmem_init() is the CP3 sequence this repo found at 0x80002210-0x80002300 in this unit's own kernel: set CU3, write 0x020, 0x202, load base+0x3FFF into CP3 $0/$1 (16 KiB I-MEM), issue 0x010, then base+0x1FFF into $4/$5 (8 KiB D-MEM). It is Lexra-specific, it is coprocessor 3, and CLAUDE.md's rule about measuring the ISA under Linux exists because of exactly this class. A hang between B05 and B06 names it
+B07	boards/rtl8196e/bsp/setup.c	after	ret = bsp_swcore_init(version);	rlxfw_markx("B07", ret);	COMPUTED, and this is the single most valuable row in the file. The next four lines are `if (ret != 0) bsp_machine_halt();` and bsp_machine_halt() is `while(1);` -- a designed, silent, unrecoverable hang with no message anywhere. TC-23 already records the desk channel stopping at the switch-core probe, and this unit's own kernel stops there too. Printing ret turns the most likely silent death of the first boot into a number. If B07 prints a nonzero value and nothing follows, the gate has its answer in one power cycle
+
+# ----------------------------------------------------------------------------
+# After the memory map, and after the console handover.
+# ----------------------------------------------------------------------------
+B08	linux-2.6.30/arch/rlx/kernel/setup.c	after	paging_init();	rlxfw_mark("B08");	bootmem_init, sparse_init and paging_init as one bracket. They are taken together on purpose: this project has no reason yet to prefer one of the three as a suspect, and three rows where one will do is how a ladder stops being read. If the boot stops between B03 and B08 the next session splits this row, and the reason for splitting it will be a capture
+B09	linux-2.6.30/init/main.c	after	console_init();	rlxfw_mark("B09");	the handover. Everything before this reached the wire only through prom_putchar; from here the registered console is up and, in the `loud` variant, printk output starts. B09 is therefore the line that says which instrument the rest of the capture is coming from -- and if the loud variant prints B09 and then nothing while the quiet one keeps going, the fault is in the console path, which is the one area R3-6 owns
+B10	linux-2.6.30/init/main.c	before	if (ramdisk_execute_command) {	rlxfw_mark("B10");	init_post(), immediately before the branch that decides HOW userspace is reached. ramdisk_execute_command is set only when an initramfs was unpacked and /init exists (init/main.c:885-891); if it is NULL the kernel falls through to /sbin/init, /etc/init, /bin/init, /bin/sh and then panics. Decision B's refutation condition is `the initramfs fails to unpack`, and B10 followed by M4 is that condition answered, while B10 followed by silence or by a panic is it answered the other way

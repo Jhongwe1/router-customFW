@@ -17,6 +17,9 @@
 #     --target T         make target inside linux-2.6.30 (default: vmlinux)
 #     --jobs N           -j (default: nproc)
 #     --keep             do not re-stage if the cell already exists   [TESTING ONLY]
+#     --marks            apply config/rlxfw-marks.tsv to the staged tree
+#                        (R3-6's boot ladder; off by default so every
+#                        pre-R3-6 measurement stays reproducible here)
 #
 # WHY THE TREE IS RE-STAGED EVERY TIME AND NOT `rm vmlinux`.
 # `r2ab-build.sh` learned this on userspace and it is worse here: a kernel
@@ -55,6 +58,7 @@ INITRAMFS=""
 TARGET=vmlinux
 JOBS=$(nproc)
 KEEP=0
+MARKS=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --config)        CONFIG="$2"; shift 2 ;;
@@ -64,6 +68,7 @@ while [ $# -gt 0 ]; do
         --target)        TARGET="$2"; shift 2 ;;
         --jobs)          JOBS="$2"; shift 2 ;;
         --keep)          KEEP=1; shift ;;
+        --marks)         MARKS=1; shift ;;
         *) echo "unknown option $1" >&2; exit 3 ;;
     esac
 done
@@ -121,6 +126,24 @@ if [ "$KEEP" != 1 ]; then
         napplied=$((napplied+1))
     done
     echo "== $CELL: applied $napplied declared host-compat patch(es)"
+fi
+
+# --------------------------------------------------------- rlxfw's boot marks
+# R3-6.  The first lines of Realtek's source this project changes, declared one
+# row at a time in config/rlxfw-marks.tsv with a reason each.  Applied to the
+# STAGED tree, never to src-vendor (rlxfw-marks.py refuses a path under it).
+# Off by default so that every measurement made before R3-6 can still be
+# reproduced by the same driver.
+if [ "$MARKS" = 1 ]; then
+    if ! python3 "$HERE/rlxfw-marks.py" apply \
+            --decl "$REPO/config/rlxfw-marks.tsv" \
+            --tree "$top" --src "$REPO/config/rlxfw-src" > "$log.marks.log" 2>&1
+    then
+        echo "$CELL: rlxfw-marks apply FAILED" >&2
+        tail -20 "$log.marks.log" >&2
+        exit 3
+    fi
+    echo "== $CELL: applied $(grep -c '^  B\|^  MK\|^  IN' "$log.marks.log") declared boot mark row(s)"
 fi
 
 # ------------------------------------------------------------- environment

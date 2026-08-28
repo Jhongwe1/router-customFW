@@ -265,9 +265,15 @@ means 0 among the successors this scan can resolve, and 8 it declines to rule on
 
 ## 2. `TC-g` — which `arch/rlx` assembly relies on the assembler
 
-`asm/stackframe.h` sets `.set reorder` outright and seven of the seventeen `.S`
+`asm/stackframe.h` sets `.set reorder` outright and seven of the **eighteen** `.S`
 files under `arch/rlx` carry no `.set` directive at all, so they are assembled in
-gas's default reorder mode. **The question is not which files are in that mode.
+gas's default reorder mode. 🔄 **2026-08-28: seventeen was an undercount and
+the reason is §10.** `find arch/rlx -name '*.S'` does not follow `arch/rlx/bsp`,
+which is a symlink; `find -L` gives **18**. The eighteenth is
+`arch/rlx/bsp/vmlinux.lds.S`, a **linker script**, correctly outside `TC-g`'s
+scope — but it was outside it because nobody had seen it, which is a different
+thing from being excluded. **No count in the table below moves**: it is not
+assembly, gas never sees it, and it carries no `.set`. **The question is not which files are in that mode.
 It is which of them would carry a live hazard if the assembler were not fixing
 it**, and that is a measurement.
 
@@ -891,7 +897,345 @@ A capture without at least one of those pairs is *unattributed*, never a pass.
 
 ---
 
-## 10. What could still be wrong
+## 10. 🔴 `grep -r` over `arch/rlx` has never seen the BSP, and the fix prescribed for it is worse than the defect
+
+**Carried into this session as the cheap item.** `PROGRESS.md`'s carried-forward
+said: *"`grep -r` over `arch/rlx` excludes the entire BSP, because
+`arch/rlx/bsp` is a symlink and GNU `grep -r` does not follow those. Every
+conclusion this project has drawn from a `grep -r` over `arch/rlx` should be
+re-run with `-R`."*
+
+The first sentence is true. The second is true only inside `arch/rlx`, and
+applied anywhere else it fabricates findings.
+
+### 10.1 The blind spot, and the positive control that makes the sweep a measurement
+
+量, `rtl819x-toolchain/linux-2.6.30`:
+
+| | |
+|---|---:|
+| files `grep -r arch/rlx` can reach | 321 |
+| files `grep -R arch/rlx` can reach | 333 |
+| **what `-r` never sees** | **13 files, 91,549 bytes — the whole BSP** |
+
+Those 13 are `setup.c`, `prom.c`, `serial.c`, `timer.c`, `irq.c`, `pci.c`,
+`kgdb.c`, `bspchip.h`, `bspcpu.h`, `bspinit.h`, `Makefile`, `vmlinux.lds.S` and
+a `modules.order`. They are the board: the UART base, the memory sizing,
+`bsp_setup()`, and the `while(1)` at the end of it.
+
+🔴 **A sweep reporting "nothing moved" is a claim, so it needs a token that MUST
+move.** Two:
+
+| token | `-r` | `-R` |
+|---|---:|---:|
+| `bsp_swcore_init` | **0** | 1 |
+| `BSP_UART0_BASE` | **0** | 2 |
+
+### 10.2 Fifteen conclusions re-run, and not one is refuted
+
+| token | `-r` | `-R` | what rested on it |
+|---|---:|---:|---|
+| `simulate_llsc` / `simulate_sync` / `simulate_rdhwr` | 1 / 1 / 1 | 1 / 1 / 1 | `CLAUDE.md`'s bench rule |
+| `math_emu` / `fpu_emulator` / `cp1emu` | 0 / 0 / 0 | 0 / 0 / 0 | *there is no FPU emulator in this kernel* |
+| `PRID_IMP_RLX4181` / `RLX4181` | 1 / 10 | 1 / 10 | the `RLX5281` ban being lifted |
+| `r3k_cache_init` / `r4k_cache_init` | 0 / 0 | 0 / 0 | `notes/cache-model.md` |
+| `cache-rlx` / `CCTL` / `IMEM0FILL` | 2 / 3 / 1 | 2 / 3 / 1 | `CPU-20`, `CPU-24`, `CPU-43` |
+| `movz` / `movn` | 2 / 2 | 2 / 2 | §7 |
+
+**Nothing moves.** The instrument that would detect a false zero fires on its
+controls and is silent on all fifteen. The BSP contains none of those tokens —
+which is itself readable: it is board glue, not CPU code.
+
+**One enumeration does move**, and it is §2's: `find arch/rlx -name '*.S'` gives
+**17**, `find -L` gives **18**, and the eighteenth is
+`arch/rlx/bsp/vmlinux.lds.S`. It is a linker script, gas never sees it, and no
+number in §2's table changes. What changes is *why* it is not in the table.
+
+### 10.3 🔴 And `-R` everywhere is the wrong instruction, measured
+
+The primary drop carries **28 symlinked directories**, not one. Twenty-five
+resolve back inside the tree; **three point at `/var/tmp`**
+(`boards/rtl8196eu/romfs/tmp`, `boards/rtl8198/romfs/tmp`,
+`boards/rtl819xD/romfs/tmp`).
+
+量 at the drop root, excluding `.git`:
+
+| | |
+|---|---:|
+| paths `grep -r` reaches | 66,973 |
+| paths `grep -R` reaches | **79,857** |
+| **distinct real files behind the `-R` population** | **66,977** |
+
+So `-R` reports **79,857 paths for 66,977 files — a 19.2 % inflation**, because
+`users/busybox -> busybox-1.13` (2,121 files), four `mips-linux/include ->
+../include` (1,170–1,785 each) and the rest are all counted twice. A census that
+counts *files* that way is 19 % wrong in the direction that looks like more
+evidence.
+
+🔴 **And it leaves the tree.** The four real files `-r` cannot reach are
+`/var/tmp/boa-{af,dbg,emu,triage}.log` — **this project's own analysis logs from
+the `binsim` work** — which `-R` presents as vendor content, three times each.
+The positive control was planted: a file written to `/var/tmp` came back from
+`grep -R` at three paths inside the drop and from `grep -r` at none.
+
+**So the rule is not "use `-R`". It is: a recursive search is blind exactly where
+its root sits above a symlinked directory, and `-R` is safe only when nothing
+under the root leaves the tree.** Inside `arch/rlx`, `-R` is right. At a drop
+root it is wrong twice over.
+
+### 10.4 🔴 The bigger finding: `arch/rlx/bsp` DANGLES in two of the three drops
+
+`arch/rlx/bsp -> ../../../target/bsp`, and `target` is itself a symlink.
+
+| drop | `target` | `arch/rlx/bsp` resolves to | files via `-L` |
+|---|---|---|---:|
+| `rtl819x-toolchain` | tracked symlink → `boards/rtl8196e` | `boards/rtl8196e/bsp` | 13 |
+| `saturn49-wecb` | **does not exist** | **— dangling** | **0** |
+| `wecb-vz-gpl` | **does not exist** | **— dangling** | **0** |
+
+`target` is a **tracked symlink** (mode 120000) in `rtl819x-toolchain` and
+untracked in the other two; it is normally created by `config/setconfig` when a
+board is selected, so whether `arch/rlx/bsp` resolves at all is an accident of
+what each uploader committed.
+
+🔴 **The consequence is sharper than the original finding.** Re-running a BSP
+question with `-R` over `arch/rlx` across all three drops returns 13, 0, 0 — and
+a reader would record that as *"only one drop has it"*, which is false.
+**The BSP is in all three by a path that is not a symlink**:
+`boards/rtl8196e/bsp/`, 12 source files each.
+
+量 across the three: `prom.c`, `serial.c`, `bspchip.h` and `vmlinux.lds.S` are
+**byte-identical**; `setup.c` differs, on exactly one preprocessor condition in
+`shutdown_netdev()` — `#if defined(CONFIG_RTL8192CD)` against
+`#if defined(CONFIG_RTL8192CD) || defined(CONFIG_RTL8192E)`. That is the reboot
+path, not the bring-up path. The 13th file in `rtl819x-toolchain` is
+`modules.order`, a build product.
+
+**So BSP readings ARE three-source-able, and every one in §11 is taken through
+`boards/rtl8196e/bsp/`, never through `arch/rlx/bsp/`.**
+
+---
+
+## 11. `R3-6` — the boot ladder, and the console instrument it needs first
+
+**The step's brief was three rungs plus "early console settled: which of
+`earlyprintk` / the vendor's `prom_printf` / `bspchip`'s UART base is in force at
+each stage".** That had to be answered before the rungs, because the answer is
+that **none of the three is in force and this board prints nothing**.
+
+### 11.1 🔴 What can actually reach the wire, measured on the built image
+
+量 on the `R3` `vmlinux`, by symbol table and disassembly:
+
+| | address | size | binding | does it print? |
+|---|---|---:|---|---|
+| `printk` | `0x801094ec` (×3) | 20 | — | **no**. `move v0,zero / jr ra` — the `static inline` stub from `include/linux/kernel.h:271`, emitted out of line three times |
+| `early_printk` | `0x80013bec` | 16 | **WEAK** | **no**. `sw a1,4(sp) / sw a2,8(sp) / jr ra / sw a3,12(sp)` — the empty `__attribute__((weak))` body at `kernel/printk_log.c:42`, and **nothing under `arch/rlx` overrides it** |
+| `panic_printk` | `0x80015140` | 44 | GLOBAL | **yes**, via `jal vprintk` — but only once a console is registered |
+| `vprintk` | `0x80014e2c` | 788 | GLOBAL | the real one; `include/linux/kernel.h:274` declares `panic_printk` in **both** branches of `#ifdef CONFIG_PRINTK` |
+| **`prom_putchar`** | **`0x8000b080`** | **100** | **GLOBAL** | **yes, always.** `lui v0,0xb800 / ori a2,v0,0x2014 / ori a1,v0,0x2008 / sltiu v0,v1,30000` — poll `UART0_LSR`, write `UART0_THR`; KSEG1, uncached, bounded at 30,000 spins so it cannot hang |
+| `prom_putchar` | `0x8017ced8` | 100 | LOCAL | the second one, `boards/rtl8196e/bsp/setup.c:32`, `static`, no caller in the file |
+
+⚠️ **`CONFIG_EARLY_PRINTK=y` is set and is a trap.** It builds
+`arch/rlx/kernel/early_printk.c`, which supplies `prom_putchar` and registers an
+`early_console` — but the `early_printk()` *function* a caller reaches for is the
+mainline weak stub, unoverridden. Someone who saw the config symbol and wrote
+`early_printk("...")` would get a silent boot and a correct-looking `.config`.
+
+🔄 **And the risk the step list actually named is retired, measured.** The row
+feared `UART0_BASE` being redefined in `arch/rlx/bsp/setup.c:34` over
+`rtl865xc_asicregs.h:2893` — a warning in the build log. 量, both sides:
+the header is `#define UART0_BASE (SYSTEM_BASE+0x2000) /* 0xB8002000 */` and the
+BSP's is the literal `0xB8002000`. **Same address.** `arch/rlx/kernel/early_printk.c:31`
+is a third definition of the same value. So the warning is benign and it is not
+what threatened this step. What threatened it was that **there is no writer at
+all** — an absent output path, not a contested base address.
+
+**Second source, and it is this device's own capture.**
+`bench/2026-08-24c/G6.log` goes `start address: 0x80003440` → `Realtek WLAN
+driver - version 1.6` with no banner, no command line and no memory line between
+them. The vendor ships `PRINTK` off and rlxfw inherited it (§9.2).
+
+### 11.2 🔴 And the most likely early failure is silent by construction
+
+讀 `boards/rtl8196e/bsp/setup.c:134-175`, through the real path (§10.4):
+
+```c
+void __init bsp_setup(void)
+{
+    ...
+    bsp_serial_init();
+    _imem_dmem_init();
+#if defined(CONFIG_RTL_819X)
+    ret = bsp_swcore_init(version);
+    if (ret != 0)
+        bsp_machine_halt();      /* static void bsp_machine_halt(void) { while(1); } */
+#endif
+}
+```
+
+`bsp_machine_halt()` is a **bare `while(1)` with no message anywhere**. `TC-23`
+already records the desk channel stopping at the switch-core probe, and this
+unit's own kernel stopping there too. So the single most likely way `R3-8`'s
+first power cycle ends is `start address:` and then nothing, forever — with the
+return code that explains it living in a register nobody reads.
+
+### 11.3 The instrument: `rlxfw_mark`, and the two defects the tool found in it
+
+`config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c` (mine) calls
+`prom_putchar`. `<linux/rlxfw-mark.h>` supplies two macros so each mark is **one
+contiguous literal** in `.rodata`.
+
+🔴 **That last sentence is the finding of the step, and it came from the tool
+refusing.** The first version took the tag as a runtime argument
+(`rlxfw_puts("RLXFW-"); rlxfw_puts(tag);`). It compiled, it linked,
+`rlxfw-marks.py check` was green on the staged tree, and it would have printed
+the right bytes on the wire. 量: `rlxfw-marks.py verify` read the built
+`vmlinux` and found `RLXFW-B0` **zero times**, because the two literals are never
+adjacent in the image. A mark that exists only as fragments **cannot be checked
+before the power cycle**, which is the whole shape of `RUNSHEET` `P6`.
+Concatenating at the call site fixes it — and `check` would never have said so,
+because `check` reads the tree and `verify` reads the artefact.
+
+🔴 **The second defect came from the same tool on the next run.** `RLXFW-B1` was
+counted **twice**: `RLXFW-B10` contains it. Two fixes, because the ambiguity is
+not only the tool's — a human greps a capture too. The search string now carries
+the macro's terminator (`RLXFW-B01` + newline, `RLXFW-B02=`), and tags are
+zero-padded, with control `A16` refusing any tag that is a prefix of another.
+
+### 11.4 The eleven marks
+
+Declared in `config/rlxfw-marks.tsv`, one row each with the suspect it brackets.
+Applied to the **staged** tree by `tools/rlxfw-marks.py apply`; `src-vendor/` is
+never written and the tool refuses a path under it.
+
+| | where | what a gap before it means |
+|---|---|---|
+| **B00** | `init/main.c`, after `page_address_init()` | **before any console exists**, which `CONFIG_PRINTK=y` cannot reach either — `setup_early_printk()` is not until `setup.c:546`. Silence here with `start address:` printed splits `RUNSHEET` §B3's two causes |
+| **B01** | `setup.c`, before `cpu_probe()` | `start_kernel`'s generic prologue — code this port did not write |
+| **B02** | after `cpu_probe()`, **prints `PRId`** | the CPU identification table; and it is a **second, independent reading of `CPU-04`** — 量 `0x0000CD01` on 2026-08-25b through `probe2`'s bare-metal CP0 census, which shares no code with this |
+| **B03** | after `bsp_init()` | `arch/rlx/bsp/prom.c` sizing DRAM live off `BSP_MC_MTCR0`. The plan's *memory-related* case starts here, not at `paging_init` |
+| **B04** | `bsp_setup()` entry | `arch_mem_init`'s prologue |
+| **B05** | after `bsp_serial_init()` | **the divisor.** Every mark before it rides the loader's 38400, and `prom_putchar` never touches the divisor. B05 garbled after a clean B04 = the vendor's serial init changed the line rate; B05 missing entirely = `early_serial_setup` failed and `panic()`'d before a console existed to print the panic |
+| **B06** | after `_imem_dmem_init()` | `CPU-46`'s I-MEM/D-MEM CP3 sequence — Lexra-specific, coprocessor 3 |
+| **B07** | after `bsp_swcore_init()`, **prints `ret`** | §10.2's designed silent hang, turned into a number |
+| **B08** | after `paging_init()` | `bootmem_init` + `sparse_init` + `paging_init` as one bracket, deliberately: three rows where one will do is how a ladder stops being read. If the boot stops inside it, the next session splits the row, and the reason for splitting will be a capture |
+| **B09** | after `console_init()` | the handover. Before it everything came through `prom_putchar`; after it the `loud` variant's `printk` starts |
+| **B10** | `init_post()`, before `if (ramdisk_execute_command)` | **which path userspace is reached by.** Decision B's refutation condition is *the initramfs fails to unpack*, and B10-then-M4 is that answered one way, B10-then-panic the other |
+
+**Cost, 量 rather than estimated**: `vmlinux` +127 bytes; **the decompressed
+image does not move at all** — 3,472,384 both ways — because 127 bytes fits in
+existing alignment slack. `hazlint` on both marked images: **0 violations**, in
+109,922 (quiet) and 111,801 (loud) loads. Eleven marks at a mean 11 bytes is
+about 32 ms of UART against a loader stage that already takes 348 ms (`CLK-15`).
+
+**And they are discriminators, checked rather than asserted**: 量, each of the
+eleven strings occurs **once** in my `vmlinux` and **zero** times in both
+`vmlinux-rederived.bin` (the drop's kernel) and `r0-vendor-kernel.bin` (this
+unit's own).
+
+### 11.5 The three rungs, and a correction to the step list's own wording
+
+| rung | what is added | proves the rung | proves the PREVIOUS rung |
+|---|---|---|---|
+| **1** | kernel + initramfs, `/init` prints M4 | `RLXFW-B10` then `M4` | `RLXFW-B00` (D1/D2), `RLXFW-B07=00000000` (D3) |
+| **2** | `ifconfig eth0 10.1.1.2 up` | link up | rung 1's `M4` in the same capture |
+| **3** | `ping -c 4 10.1.1.1` | at least one reply **and** the host `tcpdump` | rung 2's `ifconfig` output |
+
+⚠️ **Rungs 2 and 3 add no image variable at all in the current build.**
+`drivers/net/rtl819x` is already in the vendor configuration and `ping` is
+busybox, already in the initramfs. So the three rungs are three *commands typed
+at one shell in one boot*, not three uploads — a correction to the step list's
+*"three rungs, each adding one variable"*, and it changes the running order in
+`RUNSHEET` §B5 rather than the image.
+
+### 11.6 `CONFIG_PRINTK`: decided, and it is two declared images
+
+**Decision, 2026-08-28: two variants from one declaration.** `quiet` is the
+vendor's configuration; `loud` is `quiet` plus `CONFIG_PRINTK=y` and
+`CONFIG_PRINTK_TIME=y`. Both carry the eleven marks. **The first seating uploads
+`loud`.** One delta file with a `@loud` variant column, because a second delta
+file would be a copy of all 35 rules and a copy is a second owner.
+
+🔴 **§6.6's trap fired on the first attempt**: setting `CONFIG_PRINTK=y` alone
+takes `(NEW)` from **0 to 1** — `CONFIG_PRINTK_TIME` becomes reachable. So it is
+pinned, and `(NEW)` is back to 0.
+
+**`PRINTK_TIME=y` is a measurement, not a default.** `printk_time` reads
+`cpu_clock` → `sched_clock`, and 讀 **`arch/rlx` defines no `sched_clock`** —
+zero hits — so the weak generic at `kernel/sched_clock.c:39` is used:
+`(jiffies - INITIAL_JIFFIES) * (NSEC_PER_SEC / HZ)` with `CONFIG_HZ=100`. It is
+**not** CP0 `Count`, which is not implemented on this die (`F50b`, 量
+2026-08-25b) and would have printed `0.000000` on every line. So timestamps are
+real at 10 ms, and the transition from `0.000000` to a moving value marks where
+the timer interrupt started — an observable the ladder gets for free.
+**Refuted by**: every line reading `0.000000` through to userspace, which would
+be a finding about `time_init` and not about printk.
+
+**And `CONFIG_PRINTK` was checked for the `ARCH_CPU_SLEEP` trap before it was
+written down.** 讀 `init/Kconfig:834`: `default n`, prompt gated on `EMBEDDED`,
+`depends on (!RTL_819X) || (RTL_819X && PRINTK_FUNC)`. 量 on the built config:
+`EMBEDDED=y` and `PRINTK_FUNC=y`. It **has** a prompt and is settable — unlike
+`ARCH_CPU_SLEEP`, which has the same shape, is not, and cost `R3-4` a session.
+
+| | `quiet` | `loud` | delta |
+|---|---:|---:|---:|
+| `vmlinux` | 3,968,240 | 4,042,388 | +74,148 |
+| `.text` | 2,444,036 | 2,483,308 | +39,272 |
+| `.rodata` | 109,184 | 151,024 | +41,840 |
+| **decompressed image** | **3,472,384** | **3,546,112** | **+73,728** |
+| margin under 5,242,880 | 1,770,496 | 1,696,768 | — |
+| **used** | **66.2 %** | **67.6 %** | +1.4 pp |
+| `hazlint` | 0 in 109,922 | 0 in 111,801 | — |
+
+⚠️ **The estimate written before the build was "150–300 KB" and it was wrong by
+2–4×.** The answer is 73,728. It was labelled a guess at the time; it is
+recorded because an uncalibrated guess that missed by 4× is worth what the
+measurement replacing it says it was worth, which is nothing.
+
+**What `loud` costs that is not bytes**: 38400 8N1 is 3,840 B/s, so every 4 KB
+the kernel prints is another second inside `prom_putchar`'s busy loop, and
+`bsp_swcore_init` and the WLAN driver both drive timing-sensitive hardware.
+**That is why `quiet` exists rather than being deleted**: it is the configuration
+closest to the one thing known to have booted on this silicon.
+🔴 **If `loud` reaches D5 and `quiet` does not, that difference is a finding
+about the vendor's configuration and is recorded, not averaged.**
+
+### 11.7 🔴 The ceiling was being measured on the wrong file
+
+`mkinitramfs.py --kernel-image` computed the margin from
+`os.path.getsize(vmlinux)`. That is the **ELF file size**, and on this kernel it
+is 495,729 bytes larger than the image: symbol table, string table and section
+headers, none of which is loaded. It read **75.7 % used where the truth is
+66.2 %**.
+
+The error was conservative, so nothing over-ceiling ever passed — what it would
+have caused is a **false alarm**, and the documented response to that alarm is to
+move `LOAD_START_ADDR` to `0x80A00000`: changing the boot address for a reason
+that was not real.
+
+🔴 **And `RUNSHEET` `P9` attributed 3,472,384 to this tool while this tool could
+not produce it.** That is the more expensive half — a runsheet number whose
+stated source does not compute it.
+
+Fixed to read the program headers directly: over `PT_LOAD`,
+`max(p_vaddr + p_filesz) − min(p_vaddr)`. `p_filesz` and not `p_memsz`, because
+`.bss` is not in what the decompressor writes. 量: **3,472,384, from `2 PT_LOAD,
+0x80000000-0x8034fc00`** — reproducing the `objcopy -O binary` route exactly, by
+a path with no cross toolchain in it. Read from the phdrs rather than by shelling
+out, because this gate has to run where there is no toolchain. `A20`–`A23` are
+the controls, and `A20`'s fixture is built so the file size and the load extent
+**cannot** coincide.
+
+⚠️ Separately worth knowing, and **not** what the ceiling is about: `.bss` on
+this build ends at `0x805E5280`, above the `0x80500000` the compressed image sits
+at. By the time the kernel zeroes it the wrapper has jumped away and its bytes
+are dead — but it does mean the uploaded image is destroyed early in the boot, so
+there is no second `J` even in principle.
+
+---
+
+## 12. What could still be wrong
 
 * **§1's decision rests on four readings of one vendor's tools.** `SPEC.md` §0's
   two-source rule is not satisfied by any of them alone; what is claimed is
@@ -930,3 +1274,35 @@ A capture without at least one of those pairs is *unattributed*, never a pass.
   figure with a list attached rather than a clean bill for every byte.
 * **Nothing in this file has been executed on the device.** Not one number here
   is 量 in `SPEC.md`'s sense.
+* **§10's sweep found nothing, and a sweep that finds nothing is the shape
+  this project distrusts.** Two positive controls fire on the same command
+  (`bsp_swcore_init` 0 → 1, `BSP_UART0_BASE` 0 → 2), so it can detect a false
+  zero. What it does not cover is a conclusion drawn from a `grep -r` whose
+  wording nobody wrote down: the fifteen tokens are the ones reconstructable
+  from committed text, not a proof that the list is complete.
+* **§10.4 changes what a "three-drop" BSP reading means, and the older ones
+  have not been re-audited.** Anything in this repository citing
+  `arch/rlx/bsp/...` was read through `rtl819x-toolchain`, the only drop where
+  that path resolves. The bytes are right; the corroboration such a citation
+  implies is not, until it is re-taken through `boards/rtl8196e/bsp/`.
+* **§11's eleven marks have never executed.** Every claim about what they
+  bracket is 讀 from the vendor's source plus 量 on the built image. That
+  `prom_putchar` writes a UART still at 38400 when B00 runs is 推 — the loader
+  printed at 38400 through the same registers and nothing between touches the
+  divisor, but no byte of this has left the die.
+* **`hazlint`'s controls got slower and it is a build gate.** 量: a full scan of
+  the `R3` kernel 1.51 s → 3.41 s, the self-test 0.75 s → 2.72 s, seven
+  subprocesses at about 0.28 s each. Accepted, because the alternative — running
+  the `cli` controls only under `--self-test` — puts a different control set on
+  the gate path from the self-test path, which is `TC-j` again.
+* **§11.4's cost is measured on the image, not on the boot.** +127 bytes and
+  ~32 ms of UART are arithmetic; what eleven synchronous UART writes do to a
+  timing-sensitive `bsp_swcore_init` is unknown, and the `quiet`/`loud` pair
+  does **not** separate it, because both carry the marks.
+* **§11.6 decides `CONFIG_PRINTK` on a size budget and a config reading.**
+  Neither says whether a kernel spending over a second in `prom_putchar` during
+  driver init still brings the switch core up. That is what the first seating
+  measures, and it is why `quiet` is built at all.
+* **§11.7's corrected ceiling agrees with `objcopy` on THIS kernel.** Two
+  routes, one artefact. A kernel whose `PT_LOAD` layout is not two contiguous
+  segments would need that agreement re-established.

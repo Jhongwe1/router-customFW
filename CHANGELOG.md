@@ -20,6 +20,136 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+**`R3-6`, 2026-08-28/29 — the step opened by clearing three carried-forward debts, and the two that
+came with an instruction attached both had the instruction wrong.** `notes/kernel-build.md` §10 and
+§11 are new; §2, §9.1 and §9.2 are corrected.
+
+### The `grep -r` sweep: the blind spot is real, the prescribed fix is not
+
+- 🔴 **`grep -r arch/rlx` has never seen the BSP.** 量: 321 files against `-R`'s 333 — the
+  difference is **13 files, 91,549 bytes**, which is the whole board: `setup.c`, `prom.c`,
+  `serial.c`, `irq.c`, `pci.c`, `timer.c`, `kgdb.c`, three headers, the `Makefile` and
+  `vmlinux.lds.S`.
+- **The sweep has a positive control, because a sweep reporting "nothing moved" is a claim.**
+  `bsp_swcore_init` `-r`=0 `-R`=1; `BSP_UART0_BASE` `-r`=0 `-R`=2. Both fire.
+- **Fifteen zero-claims re-run and NOT ONE is refuted** — `simulate_llsc`, `math-emu`,
+  `PRID_IMP_RLX4181`, `r3k/r4k_cache_init`, `CCTL`, `IMEM0FILL`, `movz`/`movn` and the rest.
+  The BSP contains none of those tokens, which is itself readable: it is board glue, not CPU code.
+- **One enumeration moves.** `TC-g`'s *"seventeen `.S` files under `arch/rlx`"* is **eighteen**;
+  the eighteenth is `arch/rlx/bsp/vmlinux.lds.S`, a linker script. **No count in `TC-g`'s table
+  changes** — what changes is that it is now excluded for a reason rather than unseen.
+- 🔴 **The instruction "re-run everything with `-R`" is refuted, and in the dangerous
+  direction.** The primary drop has **28 symlinked directories**, not one. At the drop root `-R`
+  reports **79,857 paths for 66,977 distinct real files — a 19.2 % inflation** — and it follows
+  three `romfs/tmp -> /var/tmp` links **out of the tree**. A canary planted in `/var/tmp` came back
+  from `grep -R` at three paths inside the drop; four of this project's own `boa` analysis logs are
+  reachable that way today and would be reported as vendor content.
+- 🔴 **`arch/rlx/bsp` DANGLES in two of the three drops.** `target` is a tracked symlink
+  (mode 120000) only in `rtl819x-toolchain`. So the prescribed `-R` re-run across three drops
+  returns 13/0/0 and reads as *"only one drop has it"*, which is false: the BSP is in all three at
+  `boards/rtl8196e/bsp/`, 12 source files, byte-identical except one `#if` in `setup.c`'s reboot
+  path. **Every BSP reading in the new sections is taken through that path, never through
+  `arch/rlx/bsp/`.**
+
+### `TC-j`: the controls now execute `main()`, and `_scan_elf` is deleted
+
+- 🔴 **`hazlint` 1.4's `K11`–`K16` called a private copy of `main()`'s pipeline** while their
+  names claimed properties of the command line. Three mutations recreating `TC-f` verbatim passed
+  all twenty controls.
+- **The fix is a subprocess, not an in-process `main()`.** `main()` runs the controls, so a control
+  calling it would recurse — and the anti-recursion guard would itself be a path no user invocation
+  takes, which is the same defect one level down. `HAZLINT_CHILD=1` suppresses only the control
+  block; `K17` is the control on that claim and `M20` is its mutation.
+- **`_scan_elf` is deleted rather than left unused**: a private copy of the pipeline still in the
+  file is one somebody will call again.
+- **All three named mutations now fail**, plus the guard one: m17 → K11, m18 → K12,
+  m19 → K13/K14/K16, m20 → K13. `test-hazlint.sh` **121 → 142**.
+- 🔴 **Moving the controls to the CLI immediately found three states `_scan_elf` accepted that
+  the real program refuses**: a window intersecting nothing (`scan([])` returned a green 0 where the
+  program dies), a fixture whose every word is excised, and a `--vma-range` that missed its own site.
+- **The control report now prints `unit` and `cli` as separate blocks** and says
+  **NO cli CONTROL RAN** if none did.
+- ⚠️ **It costs, and the number is measured rather than waved at.** `hazlint` is a BUILD GATE
+  (`tools/rlxprobe/Makefile`), and a full scan of the `R3` kernel goes **1.51 s → 3.41 s** — the
+  self-test alone 0.75 s → 2.72 s, about 0.28 s for each of the seven children. **The cheaper
+  option was to run the `cli` controls only under `--self-test`, and it is rejected**: that would
+  put a different control set on the gate path from the one on the self-test path, which is the
+  exact class of defect `TC-j` is about.
+- ⚠️ **`TC-j`'s "CI runs zero hazlint cases" is true and is not an oversight.** `K4`'s population
+  control is 56 KiB of this unit's bootloader and can never be committed, so the suite exits 1 on a
+  runner by design. 量: all seven `cli` controls pass with `$FWRE_WORK` empty.
+
+### `R3-6`: this board has no output path between kernel entry and userspace
+
+- 🔴 **`early_printk` is a WEAK EMPTY STUB and `CONFIG_EARLY_PRINTK=y` is set.** 量 on the
+  built `vmlinux`: 16 bytes at `0x80013bec`, `sw a1,4(sp) / sw a2,8(sp) / jr ra / sw a3,12(sp)` —
+  the unoverridden `__attribute__((weak))` body from `kernel/printk_log.c:42`. `printk` is three
+  20-byte `move v0,zero / jr ra` stubs. `panic_printk` is real but needs a registered console.
+  **A reader who trusted the config symbol would have got a silent boot and a correct-looking
+  `.config`.**
+- **`prom_putchar` is the instrument** — GLOBAL, 100 bytes at `0x8000b080`, polling `0xB8002014`
+  and writing `0xB8002000` uncached, with a busy loop Realtek bounds at 30,000 spins so it cannot
+  hang. It works from the first C instruction of the kernel.
+- 🔴 **And the most likely early failure is silent by construction**: `bsp_setup()` ends
+  `ret = bsp_swcore_init(version); if (ret) bsp_machine_halt();` and `bsp_machine_halt()` is a bare
+  `while(1)` with no message anywhere.
+- **Eleven boot marks**, `config/rlxfw-marks.tsv`, one row each with the suspect it brackets — B00
+  before any console exists, through B05 (the UART divisor) and B06 (the CP3 scratchpad), to B10 at
+  the `ramdisk_execute_command` branch. **B02 prints `PRId`** — a second independent reading of
+  `CPU-04`, whose 量 `0x0000CD01` came from `probe2`'s bare-metal CP0 census — and **B07 prints
+  `bsp_swcore_init`'s return value**, which is otherwise consumed by that `while(1)`.
+- 🔴 **The new tool refused twice and both refusals were real defects.** (a) With the tag passed
+  as a runtime argument the marks printed correctly and were **not contiguous in the image**;
+  `verify` read `RLXFW-B0` **zero times** while `check` on the staged tree was green — because
+  `check` reads the tree and `verify` reads the artefact. (b) `RLXFW-B1` matched `RLXFW-B10`; fixed
+  by carrying the terminator in the search string **and** by zero-padding the tags, because the same
+  ambiguity bites a human grepping a capture.
+- **Cost, 量: +127 bytes on the ELF and ZERO on the decompressed image.** `hazlint` 0 violations
+  on both variants (109,922 and 111,801 loads).
+- **`src-vendor/` is never written.** The marks are applied to the staged tree and
+  `rlxfw-marks.py` refuses any path under `src-vendor/`.
+
+### `CONFIG_PRINTK`: two declared variants from one delta file
+
+- **`quiet` is the vendor's configuration; `loud` adds `CONFIG_PRINTK=y` and
+  `CONFIG_PRINTK_TIME=y`.** One file with an `@loud` variant column — a second delta file would be
+  a copy of all 35 rules, and a copy is a second owner.
+- 🔴 **§6.6's trap fired on the first attempt**: `CONFIG_PRINTK=y` alone takes `(NEW)` from 0 to 1.
+  `PRINTK_TIME` is pinned and `(NEW)` is back to 0.
+- **`PRINTK_TIME=y` is a measurement, not a default.** `arch/rlx` defines no `sched_clock`, so
+  `printk_time` uses the jiffies generic at `kernel/sched_clock.c:39` — **not** the CP0 `Count`
+  this die does not implement, which would have printed `0.000000` on every line.
+- **Cost 量**: decompressed image **3,472,384 → 3,546,112 (+73,728, +2.1 %)**, 66.2 % → 67.6 % of
+  the ceiling. ⚠️ **The estimate written before the build was "150–300 KB" and was wrong by 2–4×.**
+
+### The ceiling was being measured on the wrong file
+
+- 🔴 **`mkinitramfs.py --kernel-image` used `os.path.getsize(vmlinux)`** — the ELF file size,
+  495,729 bytes larger than the image on this kernel. It read **75.7 % used where the truth is
+  66.2 %**. The error was conservative, so nothing over-ceiling ever passed; what it would have
+  caused is a **false alarm**, whose documented response is to move `LOAD_START_ADDR`.
+- 🔴 **And `RUNSHEET` `P9` attributed 3,472,384 to a tool that could not compute it.**
+- **Fixed to read the `PT_LOAD` program headers** (`p_filesz`, not `p_memsz` — `.bss` is not in what
+  the decompressor writes), reproducing the `objcopy -O binary` route by a path with no cross
+  toolchain in it. `A20`–`A23` are the controls; `A20`'s fixture is built so file size and load
+  extent cannot coincide.
+
+### Tools
+
+- **New**: `tools/rlxfw-marks.py` (18 controls), `config/rlxfw-marks.tsv`,
+  `config/rlxfw-src/linux-2.6.30/{arch/rlx/kernel/rlxfw_mark.c,include/linux/rlxfw-mark.h}`.
+- `tools/hazlint` 1.4 → **1.5**; self-test 20 → 21 controls, seven of them `cli`.
+- `tools/kconfig-delta.py` 22 → **24** controls (the `@variant` mechanism, and `C24` caught that the
+  CLI validated a variant name while the library function silently fell through).
+- `tools/mkinitramfs.py` 19 → **23** controls.
+- `tools/test-hazlint.sh` 121 → **142**; `tools/test-config-gates.sh` 34 → **45**.
+- `tools/rlxfw-kbuild.sh` gains `--marks`, off by default so every pre-`R3-6` measurement stays
+  reproducible by the same driver.
+
+**Zero flash bytes, zero power cycles, zero device readings.** Four kernel builds, `-j4`,
+`vendor-tripwire` CLEAN on all four.
+
+
 **`R3-4` and `R3-5`, 2026-08-28 — both of the things this step was told to fix turned out to be
 described wrongly, and the corrections came from building the instrument rather than re-reading the
 claim.** `notes/kernel-build.md` §1.4 and §6 are rewritten with the originals quoted in place.

@@ -99,3 +99,29 @@ derive	CONFIG_RTL8190	n	-	undeclared	as above
 derive	CONFIG_RTL8192SE	n	-	undeclared	as above
 derive	CONFIG_RTL_8196E_ULINKER	n	-	undeclared	as above. Note the similarly named CONFIG_RTL_ULINKER below IS declared, under a different board
 derive	CONFIG_RTL_ULINKER	n	-	other-board	declared only in boards/rtl8196eu/config.in:186. arch/rlx/Kconfig:10 sources ../target/config.in and `target` is a symlink to boards/rtl8196e, so this board never sees it
+
+# ----------------------------------------------------------------------------
+# THE `loud` VARIANT.  R3-6, 2026-08-28.
+#
+# A row whose kind carries `@loud` is in the loud image only; a row with no
+# variant is in both.  ONE file, two images -- a second delta would be a copy
+# of the 35 rules above and a copy is a second owner.
+#
+# WHY THERE ARE TWO IMAGES AT ALL.  With the vendor's configuration this board
+# prints NOTHING between kernel entry and userspace: printk is a stub,
+# early_printk is a weak empty stub, and this unit's own capture
+# (bench/2026-08-24c/G6.log) goes from `start address:` straight to the WLAN
+# driver.  `quiet` keeps that -- it is what the vendor ships and it is the
+# image whose behaviour is closest to the one thing known to boot on this
+# silicon.  `loud` turns printk on and is the one the first seating uploads.
+# If loud reaches D5 and quiet does not, that difference is a FINDING about
+# the vendor's configuration and is recorded, not averaged.
+#
+# COST, measured rather than estimated: decompressed image 3,472,384 ->
+# 3,546,112 (+73,728, +2.1 %), margin 1,770,496 -> 1,696,768, 66.2 % -> 67.6 %
+# of the 5,242,880 ceiling.  hazlint P1 on the loud image: 0 violations in
+# 111,801 loads.  The estimate written before the build was "150-300 KB" and
+# it was wrong by 2-4x, which is what an uncalibrated guess is worth here.
+# ----------------------------------------------------------------------------
+set@loud	CONFIG_PRINTK	n	y	-	the kernel's own diagnostics: Memory:, Kernel command line, driver messages and panic backtraces. 讀 init/Kconfig:834, CONFIG_PRINTK is `default n` with a prompt gated on EMBEDDED and `depends on (!RTL_819X) || (RTL_819X && PRINTK_FUNC)`. 量 on the built config: EMBEDDED=y and PRINTK_FUNC=y, so it HAS a prompt and is settable -- checked before it was written here, because CONFIG_ARCH_CPU_SLEEP was the same shape and was NOT settable and R3-4 spent a session on that. What this does not buy: it reaches nothing before init/main.c:629 console_init(), which is why six of the eleven boot marks exist
+set@loud	CONFIG_PRINTK_TIME	-	y	-	pinned so oldconfig has nothing to ask -- 量, setting PRINTK alone takes (NEW) from 0 to 1 and this is the symbol it asks about, which is section 6.6's trap firing on the first attempt. The VALUE is y and that is a measurement, not a default: printk_time reads cpu_clock -> sched_clock, and arch/rlx defines NO sched_clock (讀, zero hits), so the weak generic at kernel/sched_clock.c:39 is used -- (jiffies - INITIAL_JIFFIES) * (NSEC_PER_SEC / HZ) with CONFIG_HZ=100. It is NOT the CP0 Count register, which would have made every line read 0.000000 on this die (F50b, 量 2026-08-25b: Count is not implemented). So timestamps are real at 10 ms, and the transition from 0.000000 to a moving value marks where the timer interrupt started -- an observable the ladder gets free. REFUTED BY: every line reading 0.000000 through to userspace, which would be a finding about time_init and not about printk

@@ -226,7 +226,7 @@ tools/hazlint              refuses a payload that reads a register in the load d
                            scan, and sys_call_table is a data table linked into .text
 tools/kconfig-delta.py     answers one question: is every difference between the vendor's
                            board template and the .config THIS BUILD USED on the declared
-                           list? Sixteen controls, and C6 is the one it exists for -- it
+                           list? Twenty-four controls, and C6 is the one it exists for -- it
                            feeds the gate the file that was copied in rather than the one
                            the compiler saw, and must refuse. `apply` and `check` read
                            the same delta file, so the generator and the auditor cannot
@@ -235,7 +235,20 @@ tools/mkinitramfs.py       builds R3's initramfs from a declaration in which eve
                            names its source and is tagged `unit` or `rlxfw` -- and the
                            tag is CHECKED against the path, not trusted. A declared
                            source that is not there is refused, never replaced with
-                           something similar. Twelve controls
+                           something similar. Twenty-three controls, four of which exist
+                           because the ceiling was being measured on the ELF FILE SIZE
+                           rather than on the image the decompressor writes -- 495,729
+                           bytes out, 75.7 % reported where the truth is 66.2 %
+tools/rlxfw-marks.py       the first tool here that edits somebody else's source, and it
+                           is a TABLE rather than a patch: one row per insertion, each
+                           naming the suspect it brackets. The anchor must occur EXACTLY
+                           ONCE or it refuses. Eighteen controls, and the one that earns
+                           its keep is `verify` -- `check` reads the staged tree and
+                           answers "did the insertion happen", which a mark can pass
+                           while being absent from the image; `verify` reads the BUILT
+                           artefact and the vendor's, and refuses if `--absent` is not
+                           given, because "present in mine" alone is a label. It caught
+                           two real defects the day it was written
 tools/spec-check.py        eight checks over SPEC.md, and nine mutations that must
                            each produce a finding the file did not already have.
                            The eighth exists because one unescaped `|` had kept a

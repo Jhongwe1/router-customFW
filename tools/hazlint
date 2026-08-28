@@ -328,10 +328,16 @@ Usage
 
 import hashlib
 import os
+import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 
-VERSION = "1.4"
+VERSION = "1.5"
+
+# TC-j's guard.  Set in a child spawned by a `cli` control; see `_run_cli`.
+CHILD_ENV = 'HAZLINT_CHILD'
 
 # --------------------------------------------------------------------------
 # The instruction model
@@ -2026,86 +2032,149 @@ def _mk_elf(text_words, rodata_words=(), funcs=(), text_vma=0x80000000,
     return out
 
 
-def _scan_elf(b, **kw):
-    """(violations, spans) for a fixture, through the same code path a file
-    takes -- elf_ranges, the excision, then scan()."""
-    args = {'raw': False, 'section': None, 'range': None, 'vma_range': None,
-            'base': 0, 'no_excise': False}
-    args.update(kw)
-    spans, unscanned = elf_ranges(b, args['section'])
-    spans = load_spans(b, spans)
-    if args['vma_range']:
-        spans = clip_spans(b, spans, args['vma_range'][0],
-                           args['vma_range'][1], unscanned)
-    if not args['no_excise']:
-        spans, _, _ = excise_mips16(b, spans, unscanned)
-    r = scan(spans)
-    return len(r.violations), spans
+# `_scan_elf` was here.  It reproduced main()'s pipeline -- elf_ranges,
+# load_spans, clip_spans, excise_mips16, scan -- and K11-K16 called it.  It is
+# DELETED rather than left unused: 量 2026-08-28, three mutations of `main`
+# that recreate TC-f verbatim passed all twenty controls against it, and a
+# private copy of the pipeline that is still in the file is a private copy of
+# the pipeline somebody will call again.  The controls go through `_run_cli`.
 
 
-def _tcf_controls(c):
+def _run_cli(argv):
+    """Run THIS program as a subprocess, exactly the way a user runs it.
+
+    Returns (rc, stdout+stderr).
+
+    WHY A SUBPROCESS AND NOT A CALL TO `main()`.
+    `TC-j`, 2026-08-28: `K11`-`K16` called `_scan_elf`, a private copy of
+    `main()`'s pipeline, while their names claimed properties of the command
+    line.  量: three mutations of `main` that recreate `TC-f` verbatim -- stop
+    refusing `--range` on an ELF, parse `--vma-range` and never call
+    `clip_spans`, never call `excise_mips16` -- passed all twenty controls.
+    That is the `raw_span` defect of 1.1 recommitted on the 1.4 path.
+
+    `main()` calls `run_controls()`, so a control that called `main()` in
+    process would recurse, and the guard against that recursion would itself be
+    a code path no user invocation takes -- the same defect one level down.  A
+    subprocess with `HAZLINT_CHILD=1` suppresses ONLY the control block and
+    leaves argv parsing, `elf_ranges`, `clip_spans`, `excise_mips16`, `scan`,
+    the MIPS16 refusal and the exit contract byte for byte identical.  `K17` is
+    the control on that claim and `test-hazlint.sh` `M15` is its mutation.
+    """
+    env = dict(os.environ)
+    env[CHILD_ENV] = '1'
+    p = subprocess.run([sys.executable, os.path.abspath(__file__)] + argv,
+                       env=env, stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT)
+    return p.returncode, p.stdout.decode('utf-8', 'replace')
+
+
+def _viol_count(out):
+    """The VIOLATIONS number out of a report, or None if it is not there."""
+    for ln in out.split('\n'):
+        s = ln.strip()
+        if s.startswith('VIOLATIONS'):
+            t = s.split()
+            if len(t) >= 2 and t[1].isdigit():
+                return int(t[1])
+    return None
+
+
+def _tcf_controls(c, tmp):
     V, VMA = _VIOL, 0x80000000
 
-    # K11 -- the defect itself.  `--range` on an ELF used to be parsed and then
-    # discarded in silence.  It must now refuse.
+    def fx(name, blob, *args):
+        """Write a fixture and scan it through the real command line."""
+        p = os.path.join(tmp, name + '.elf')
+        with open(p, 'wb') as f:
+            f.write(blob)
+        rc, out = _run_cli([p] + list(args))
+        return rc, out, _viol_count(out)
+
+    # K11 -- the defect itself, asserted at the command line.  `--range` on an
+    # ELF was parsed and then discarded in silence until TC-f; it must refuse,
+    # and the refusal must name the option that replaces it.
+    _all_end = VMA + 4 * len(_CLEAN + V)
+    rc_r, out_r, _ = fx('k11', _mk_elf(_CLEAN + V), '--range', '0:4')
+    rc_v, out_v, n_v = fx('k11', _mk_elf(_CLEAN + V),
+                          '--vma-range', '0x80000000:0x%08x' % _all_end)
+    c.add('K11 --range on an ELF refuses; --vma-range does not',
+          rc_r == 3 and '--vma-range' in out_r and 'TC-f' in out_r
+          and rc_v == 1 and n_v == 1,
+          '--range rc=%d (must be 3, naming --vma-range and TC-f: %s/%s); '
+          '--vma-range rc=%d, %s violation(s) (must be 1, 1)'
+          % (rc_r, '--vma-range' in out_r, 'TC-f' in out_r, rc_v, n_v),
+          layer='cli')
+
+    # K12 -- --vma-range actually clips, in both directions, at the CLI, and
+    # the fourth cell is the one the in-process copy could not have: a window
+    # that intersects NOTHING must `die`, not report a green 0.  A tool that
+    # scanned nothing and called it clean is the whole failure class, and
+    # `_scan_elf` reached `scan([])` and returned 0 without complaint.
     b = _mk_elf(_CLEAN + V)
-    try:
-        a1 = parse_args(['x', '--range', '0:4'])
-        a2 = parse_args(['x', '--vma-range', '0x80000000:0x80000004'])
-        ok = (a1['range'] == (0, 4) and a1['vma_range'] is None
-              and a2['vma_range'] == (0x80000000, 0x80000004)
-              and a2['range'] is None)
-    except SystemExit:
-        ok = False
-    c.add('K11 --range and --vma-range are different options', ok,
-          'parsed into different fields; main() refuses --range on an ELF')
+    rc_all, _, n_all = fx('k12', b)
+    rc_in, _, n_in = fx('k12', b, '--vma-range',
+                        '0x80000000:0x%08x' % _all_end)
+    rc_out, _, n_out = fx('k12', b, '--vma-range',
+                          '0x80000000:0x%08x' % (VMA + 4 * len(_CLEAN)))
+    rc_void, out_void, _ = fx('k12', b, '--vma-range',
+                              '0x90000000:0x90000010')
+    c.add('K12 --vma-range clips at the CLI, and an empty window refuses',
+          n_all == 1 and rc_all == 1 and n_in == 1 and n_out == 0
+          and rc_out == 0 and rc_void == 3 and 'nothing to scan' in out_void,
+          'unbounded %s (rc %d), window covering the site %s, window excluding '
+          'it %s (rc %d), window intersecting nothing rc=%d and refuses: %s '
+          '(must be 1, 1, 0/0, 3+refusal)'
+          % (n_all, rc_all, n_in, n_out, rc_out, rc_void,
+             'nothing to scan' in out_void), layer='cli')
 
-    # K12 -- --vma-range actually clips, in both directions.
-    n_all, _ = _scan_elf(b)
-    n_in, _ = _scan_elf(b, vma_range=(VMA, VMA + 4 * len(_CLEAN + V)))
-    n_out, _ = _scan_elf(b, vma_range=(VMA, VMA + 4 * len(_CLEAN)))
-    c.add('K12 --vma-range clips an ELF, both ways',
-          n_all == 1 and n_in == 1 and n_out == 0,
-          'unbounded %d, window covering the site %d, window excluding it %d '
-          '(must be 1, 1, 0)' % (n_all, n_in, n_out))
-
-    # K13 -- a MIPS16 function's bytes are excised by name, and --no-mips16-
-    # excision puts them back.  Without the second half this control could pass
-    # on a tool that excised everything.
+    # K13 -- a MIPS16 function's bytes are excised by name, and
+    # --no-mips16-excision puts them back.  Without the second half this
+    # control could pass on a tool that excised everything.
     words = list(_CLEAN) + list(V)
     m16_at = VMA + 4 * len(_CLEAN)
     b = _mk_elf(words, funcs=[(m16_at, 8, 'm16fn', True)])
-    n_ex, _ = _scan_elf(b)
-    n_no, _ = _scan_elf(b, no_excise=True)
+    rc_ex, out_ex, n_ex = fx('k13', b)
+    rc_no, _, n_no = fx('k13', b, '--no-mips16-excision')
     c.add('K13 a MIPS16 function is excised by name, and only it',
-          n_ex == 0 and n_no == 1,
-          'excised %d, --no-mips16-excision %d (must be 0, 1)' % (n_ex, n_no))
+          n_ex == 0 and rc_ex == 0 and n_no == 1 and rc_no == 1
+          and 'EXCISED BY NAME' in out_ex,
+          'excised %s (rc %d, report says so: %s), --no-mips16-excision %s '
+          '(rc %d) -- must be 0/0 and 1/1'
+          % (n_ex, rc_ex, 'EXCISED BY NAME' in out_ex, n_no, rc_no),
+          layer='cli')
 
     # K14 -- the gap rule, and the case it must NOT fire on.
-    #   layout: [m16 A][gap holding a violating pair][m16 B]
-    words = list(V) + list(V) + list(V)          # A, gap, B
+    #   layout: [m16 A][gap holding a violating pair][m16 B][clean tail]
+    # The tail is not decoration.  Without it every word in the file is
+    # excised, and the real CLI then dies with "nothing left to scan after the
+    # MIPS16 functions were excised" -- exit 3, no VIOLATIONS line at all.
+    # `_scan_elf` reached `scan([])` and returned a green 0 for the same
+    # fixture: 量 2026-08-28, the first CLI run of this control.  The tail
+    # makes the file one a scan can survive, so the 0 means what it says.
+    words = list(V) + list(V) + list(V) + list(_CLEAN)   # A, gap, B, tail
     a_at, gap_at, b_at = VMA, VMA + 8, VMA + 16
-    fx = [(a_at, 8, 'A', True), (b_at, 8, 'B', True)]
-    n_gap, _ = _scan_elf(_mk_elf(words, funcs=fx))
-    fx2 = fx + [(gap_at, 8, 'thirtytwobit', False)]
-    n_declared, _ = _scan_elf(_mk_elf(words, funcs=fx2))
+    f1 = [(a_at, 8, 'A', True), (b_at, 8, 'B', True)]
+    rc_gap, _, n_gap = fx('k14a', _mk_elf(words, funcs=f1))
+    f2 = f1 + [(gap_at, 8, 'thirtytwobit', False)]
+    _, _, n_declared = fx('k14b', _mk_elf(words, funcs=f2))
     c.add('K14 padding between two MIPS16 functions is excised -- unless a '
           '32-bit function is declared in it',
-          n_gap == 0 and n_declared == 1,
-          'undeclared gap %d, gap holding a declared 32-bit function %d '
-          '(must be 0, 1)' % (n_gap, n_declared))
+          n_gap == 0 and rc_gap == 0 and n_declared == 1,
+          'undeclared gap %s (rc %d), gap holding a declared 32-bit function '
+          '%s (must be 0/0, 1)' % (n_gap, rc_gap, n_declared), layer='cli')
 
     # K15 -- the section basis.  The fixture's PT_LOAD is PF_X and covers
     # .rodata, so a segment-based scan reads the data as code.  With sections
     # it must not; with the section headers gone it falls back and must.
-    b_sec = _mk_elf(_CLEAN, rodata_words=V)
-    b_str = _mk_elf(_CLEAN, rodata_words=V, with_sections=False)
-    n_sec, sp_sec = _scan_elf(b_sec)
-    n_str, sp_str = _scan_elf(b_str)
+    _, _, n_sec = fx('k15a', _mk_elf(_CLEAN, rodata_words=V))
+    _, _, n_str = fx('k15b', _mk_elf(_CLEAN, rodata_words=V,
+                                     with_sections=False))
     c.add('K15 a linked ELF is scanned by SECTION, not by PF_X segment',
           n_sec == 0 and n_str == 1,
-          'with section headers %d, stripped of them %d (must be 0, 1) -- the '
-          'segment covers .rodata and the section does not' % (n_sec, n_str))
+          'with section headers %s, stripped of them %s (must be 0, 1) -- the '
+          'segment covers .rodata and the section does not' % (n_sec, n_str),
+          layer='cli')
 
     # K16 -- a data table LINKED INTO .text.  Section flags cannot catch this
     # one: `sys_call_table` really is inside `.text` on this kernel, and two of
@@ -2114,26 +2183,73 @@ def _tcf_controls(c):
     # the same bytes declared STT_FUNC must still be scanned.
     words = list(_CLEAN) + list(V)
     at = VMA + 4 * len(_CLEAN)
-    n_obj, _ = _scan_elf(_mk_elf(words, objs=[(at, 8, 'a_table')]))
-    n_fn, _ = _scan_elf(_mk_elf(words, funcs=[(at, 8, 'a_function', False)]))
+    _, _, n_obj = fx('k16a', _mk_elf(words, objs=[(at, 8, 'a_table')]))
+    _, _, n_fn = fx('k16b', _mk_elf(words, funcs=[(at, 8, 'a_function',
+                                                   False)]))
     c.add('K16 an STT_OBJECT inside .text is excised; an STT_FUNC is not',
           n_obj == 0 and n_fn == 1,
-          'declared as data %d, declared as a function %d (must be 0, 1)'
-          % (n_obj, n_fn))
+          'declared as data %s, declared as a function %s (must be 0, 1)'
+          % (n_obj, n_fn), layer='cli')
+
+    # K17 -- the control on the guard the other six ride on.  HAZLINT_CHILD
+    # must suppress the control block AND NOTHING ELSE.  Two halves:
+    #   (a) the suppression is VISIBLE -- a child says so and prints no `ok`
+    #       row, so a suppressed run can never be mistaken for a controlled one
+    #   (b) main()'s own refusals, which all sit downstream of the suppression,
+    #       still fire.  If the variable short-circuited more than the control
+    #       block these would go quiet, and every control above would then be
+    #       reading a tool that had stopped checking.
+    rc_s, out_s = _run_cli([os.path.join(tmp, 'k11.elf')])
+    seen = ('CONTROLS SUPPRESSED' in out_s
+            and '\n  ok ' not in out_s and 'K1  decoder' not in out_s)
+    rc_noent, out_noent = _run_cli([os.path.join(tmp, 'no-such-file')])
+    rc_opt, _ = _run_cli([os.path.join(tmp, 'k11.elf'), '--nonsense'])
+    rc_zero, _ = _run_cli([os.path.join(tmp, 'k11.elf'), '--vma-range',
+                           '0x80000000:0x80000004', '--raw', '--base',
+                           '0x80000000'])
+    c.add('K17 HAZLINT_CHILD suppresses the control block and nothing else',
+          seen and rc_noent == 3 and rc_opt == 3 and rc_zero == 2,
+          'suppression printed and no ok row: %s; missing file %d, unknown '
+          'option %d, zero loads %d (must be 3, 3, 2) -- main()\'s refusals '
+          'are downstream of the guard and still fire' % (seen, rc_noent,
+                                                          rc_opt, rc_zero),
+          layer='cli')
 
 
 class Controls(object):
     def __init__(self):
-        self.rows = []          # (name, ok, detail)
+        self.rows = []          # (name, ok, detail, layer)
         self.population_ran = False
+        self.suppressed = False
 
-    def add(self, name, ok, detail):
-        self.rows.append((name, bool(ok), detail))
+    def add(self, name, ok, detail, layer='unit'):
+        """`layer` says what a green row is evidence ABOUT, and it is printed.
+
+        TC-j, 2026-08-28: `K11`-`K16` asserted properties of the command line
+        while calling `_scan_elf`, a private copy of `main()`'s pipeline.  Three
+        mutations of `main` that recreated `TC-f` verbatim passed all twenty.
+        A report that prints twenty green rows over a scan whose bound was
+        discarded is worse than no report.  So every row now says which of two
+        things it reached:
+
+          unit -- the primitives (`scan`, the decoder, the ISA classifier).
+                  These are real controls and they say NOTHING about argv
+                  handling, the excision order, or the exit contract.
+          cli  -- the whole program, through a subprocess, exactly as a user
+                  runs it.  These are the ones that can see `main`.
+        """
+        if layer not in ('unit', 'cli'):
+            raise ValueError('layer %r' % layer)
+        self.rows.append((name, bool(ok), detail, layer))
         return ok
 
     @property
     def failed(self):
         return [r for r in self.rows if not r[1]]
+
+    @property
+    def n_cli(self):
+        return sum(1 for r in self.rows if r[3] == 'cli')
 
 
 def run_controls(stage2_path, waive_population, want_isa):
@@ -2291,7 +2407,13 @@ def run_controls(stage2_path, waive_population, want_isa):
              '; '.join(w for w, _ in k10),
              '' if not bad10 else '   first miss: ' + bad10[0]))
 
-    _tcf_controls(c)
+    # The `cli` layer.  Its fixtures have to exist as files, because the whole
+    # point is that the real command line opens them.
+    tmp = tempfile.mkdtemp(prefix='hazlint-cli-')
+    try:
+        _tcf_controls(c, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
     # --- K4b, the second population control -------------------------------
     kpath = find_kernel()
@@ -2511,8 +2633,20 @@ def run_controls(stage2_path, waive_population, want_isa):
 
 def print_controls(c):
     print('controls   (every one can fail, and the run stops if one does)')
-    for name, ok, detail in c.rows:
-        print('  %-5s %-38s %s' % ('ok' if ok else 'FAIL', name, detail))
+    for layer, banner in (
+            ('unit', 'unit -- the primitives.  These say nothing about argv, '
+                     'the excision order or the exit contract'),
+            ('cli', 'cli  -- the whole program, run as a subprocess the way '
+                    'you run it.  These are the ones that see main()')):
+        rows = [r for r in c.rows if r[3] == layer]
+        if not rows:
+            continue
+        print('  %s' % banner)
+        for name, ok, detail, _ in rows:
+            print('  %-5s %-38s %s' % ('ok' if ok else 'FAIL', name, detail))
+    if not c.n_cli:
+        print('  \033[31mNO cli CONTROL RAN\033[0m -- nothing here has executed '
+              'main(). TC-j.')
     print('')
 
 
@@ -2733,10 +2867,28 @@ def main(argv):
             'the one it was told to is the exact failure this repository keeps '
             'catching' % args['stage2'])
 
-    stage2 = find_stage2(args['stage2'])
-    c = run_controls(stage2, args['no_pop'],
-                     want_isa=args['isa'] or args['self_test'])
-    print_controls(c)
+    if os.environ.get(CHILD_ENV) == '1':
+        # TC-j.  This process was spawned by a `cli` control in a parent that
+        # is running the full suite.  Running the suite again here would
+        # recurse without bound, so the control BLOCK is skipped -- and only
+        # the block.  Everything below this point, which is the whole reason
+        # the parent spawned us, is untouched.  The suppression is printed so
+        # that a child's output can never be mistaken for a controlled run,
+        # and `K17` is the control on both halves of that sentence.
+        c = Controls()
+        c.suppressed = True
+        c.population_ran = True   # the PARENT holds K4/K4b; this is its child
+        print('CONTROLS SUPPRESSED (%s=1) -- this process is a control\'s '
+              'child.' % CHILD_ENV)
+        print('')
+        if args['self_test']:
+            die('--self-test inside a %s child would recurse. The parent runs '
+                'the suite' % CHILD_ENV)
+    else:
+        stage2 = find_stage2(args['stage2'])
+        c = run_controls(stage2, args['no_pop'],
+                         want_isa=args['isa'] or args['self_test'])
+        print_controls(c)
 
     if args['self_test']:
         nf = len(c.failed)

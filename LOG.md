@@ -7074,3 +7074,170 @@ suite、`SPEC.md`（`TC-22` 更正、`TC-24` 全列重寫、`TC-25`／`TC-26`／
 `P2`（每一個 `arch/rlx` 的 `.o` 各掃一次 —— `P1` 涵蓋同一批程式碼的連結後版本，
 但 `P2` 檢查的是 `TC-21` 那個「組譯器預設 `-march` 剛好在補 nop 那一側」的附帶
 安全還在不在，而連結後的映像回答不了那個問題。**這是欠的。**）
+
+---
+
+## 2026-08-28/29 — `R3-6`：開機階梯與 console 儀器，前面先清三筆債
+
+桌面日，不通電，零 flash 位元組，零電源循環，零裝置讀數。第五段。
+
+開場三件事有兩件**附了一條指示，而兩條指示都是錯的**。這不是巧合：交接單上
+的指示是上一段的結論，而上一段沒有時間去量它。
+
+### 一、`grep -r` 掃 `arch/rlx`：盲區是真的，處方是錯的
+
+盲區先量：`grep -r arch/rlx` 觸得到 **321** 個檔，`-R` 觸得到 **333**。差的
+**13 個檔、91,549 bytes 就是整個 BSP** —— `setup.c`、`prom.c`、`serial.c`、
+`irq.c`、`pci.c`、`timer.c`、`kgdb.c`、三個 `.h`、`Makefile`、
+`vmlinux.lds.S`、`modules.order`。那正好是這塊板子本身：UART base、記憶體
+大小推算、`bsp_setup()`，還有它結尾那個 `while(1)`。
+
+**正控制先建**，因為一個回報「什麼都沒動」的掃描是在做宣稱：
+`bsp_swcore_init` `-r`=0 `-R`=1，`BSP_UART0_BASE` `-r`=0 `-R`=2。兩個都發射。
+
+**然後十五條零宣稱逐條重跑，一條都沒被推翻。** `simulate_llsc`／
+`simulate_sync`／`simulate_rdhwr`、`math_emu`／`fpu_emulator`／`cp1emu`、
+`PRID_IMP_RLX4181`／`RLX4181`、`r3k_cache_init`／`r4k_cache_init`、
+`cache-rlx`／`CCTL`／`IMEM0FILL`、`movz`／`movn` —— `-r` 和 `-R` 完全一樣。
+BSP 裡一個這種 token 都沒有，而那本身是可讀的：它是板子的膠水，不是 CPU 的碼。
+
+**只有一個列舉動了**：`TC-g` 寫的「`arch/rlx` 底下十七支 `.S`」，`find -L` 是
+**十八**支，第十八支是 `arch/rlx/bsp/vmlinux.lds.S`。它是 linker script，gas
+根本看不到它，`TC-g` 的表一個數字都不動 —— **動的是「它為什麼不在表裡」**。
+原本是沒被看見，現在是被排除，而那是兩件事。
+
+🔴 **而處方本身是錯的，錯的方向還是危險的那一邊。**「凡是 `grep -r` 掃過的都
+改用 `-R` 重跑」在 `arch/rlx` 裡對，離開它就會製造假發現。這份 drop 有 **28 個
+符號連結目錄**不是一個；在 drop 根目錄下 `-r` 觸得到 66,973 條路徑、`-R` 觸得
+到 **79,857** 條，而背後只有 **66,977 個相異實體檔** —— **19.2 % 的膨脹**
+（`users/busybox` 2,121 個檔、四個 `mips-linux/include` 各 1,170–1,785 個檔，
+全部被數兩次）。**而且它會離開這棵樹**：三個 `romfs/tmp -> /var/tmp`，
+`-r` 唯一觸不到的四個實體檔是 `/var/tmp/boa-{af,dbg,emu,triage}.log` ——
+**這個專案自己 `binsim` 那一段的分析輸出**，`-R` 把它們當廠商內容報三次。
+正控制是**種進去的**：往 `/var/tmp` 寫一個 canary，`grep -R` 在 drop 裡的三個
+路徑報到它，`grep -r` 零次。
+
+🔴 **然後撞到一個比原本那條大的東西。** `arch/rlx/bsp -> ../../../target/bsp`，
+而 `target` 自己也是符號連結。`rtl819x-toolchain` 的 `target` 是**被追蹤的
+symlink**（mode 120000）指向 `boards/rtl8196e`；另外兩份 drop **根本沒有
+`target`**，兩份的 `arch/rlx/bsp` 都是**懸空連結**。所以照處方拿 `-R` 對三份
+drop 重跑一個 BSP 問題，會得到 13／0／0，而讀者會寫下「只有一份 drop 有」——
+那是假的。**BSP 三份都有**，走 `boards/rtl8196e/bsp/`，各 12 個原始檔，
+`prom.c`／`serial.c`／`bspchip.h`／`vmlinux.lds.S` 三份逐位元組相同，
+`setup.c` 差一個 `#if`，而且是在重開機路徑上不是 bring-up 路徑上。
+
+**所以規則不是「用 `-R`」，是**：遞迴搜尋的盲區正好在它的根位於某個符號連結
+目錄之上的地方，而 `-R` 只在根底下沒有東西離開這棵樹時才安全。
+
+### 二、`TC-j`：控制要跑的是 `main()`，不是 `main()` 的副本
+
+`hazlint` 1.4 的 `K11`–`K16` 呼叫 `_scan_elf` —— 一份 `main()` 管線的私有
+複製品 —— 而它們的名字宣稱的是命令列的性質。三個把 `TC-f` 原樣放回去的突變
+全部通過二十個控制。
+
+修法**不是**在行程內呼叫 `main()`：那會無限遞迴，而防遞迴的那個保護本身就會
+是一條沒有任何使用者呼叫走過的路 —— **同一個缺陷往下一層**。改成
+**spawn 真正的子行程**，`HAZLINT_CHILD=1` 只壓掉控制區塊，其餘的 argv 解析、
+`elf_ranges`、`clip_spans`、`excise_mips16`、`scan`、MIPS16 拒絕、離開碼，
+一個位元組都不動。`K17` 是對這個保護本身的控制，`M20` 是它的突變。
+
+`_scan_elf` **刪掉**而不是留著不用：一份還在檔案裡的管線副本，就是一份還會有
+人去呼叫的管線副本。
+
+**改完之後三個突變全部被抓到**：m17（`--range` 不再拒絕）殺 K11、m18
+（`--vma-range` 解析了但不裁切）殺 K12、m19（切除從不執行）殺 K13／K14／K16，
+外加 m20（保護做了不只壓控制區塊）殺 K13。`test-hazlint` **121 → 142**。
+
+🔴 **而把它們搬到 CLI 上，當場就找出三個 `_scan_elf` 會接受、而真正的程式會
+拒絕的狀態**：一個什麼都不交集的窗（`_scan_elf` 走到 `scan([])` 回傳綠色的
+0，真程式 die）、一個每個字都被切掉的 fixture、一個沒蓋到自己那個點位的
+`--vma-range`。三個都是我寫控制時的期望值錯了，而那正是這次改動的價值。
+
+⚠️ `TC-j` 說「CI 跑零個 hazlint case」，那是真的，但**不是疏漏**：`K4` 的
+母體控制是 56 KiB 這台自己的 bootloader，永遠不能 commit，所以這支 suite 在
+runner 上是**設計上**會 exit 1。量：**七個 `cli` 控制在 `$FWRE_WORK` 空的
+情況下全部通過** —— `TC-j` 講的那一塊，正好是到哪裡都跑得起來的那一塊。
+
+### 三、`CONFIG_PRINTK`：兩個宣告過的變體
+
+決定：`quiet`（廠商設定）與 `loud`（`+CONFIG_PRINTK=y +CONFIG_PRINTK_TIME=y`），
+**同一份 delta 檔用 `@loud` 變體欄**，不開第二個檔 —— 第二個檔就是 35 條規則
+的副本，而副本就是第二個擁有者。第一次上機傳 `loud`。
+
+🔴 **§6.6 的陷阱第一次嘗試就發射**：只設 `CONFIG_PRINTK=y`，`(NEW)` 從 0 變 1。
+釘死 `PRINTK_TIME`，回到 0。
+
+**而 `PRINTK_TIME` 的值是量出來的**：`printk_time` 讀 `cpu_clock` →
+`sched_clock`，而 `arch/rlx` **沒有定義 `sched_clock`**（零命中），所以走
+`kernel/sched_clock.c:39` 的 weak generic —— jiffies 基準，`HZ=100`。
+**不是** CP0 `Count`（`F50b`，這顆沒實作），否則每一行都會印 `0.000000`。
+所以時間戳是真的，而且 `0.000000` 轉成會動的那一刻標出 timer 中斷開始的位置。
+
+**而且先檢查了 `ARCH_CPU_SLEEP` 那個陷阱**：`CONFIG_PRINTK` 是 `default n`、
+prompt 掛在 `EMBEDDED` 上；量：`EMBEDDED=y`、`PRINTK_FUNC=y`，所以它**有**
+prompt、設得動。上一段就是在這個形狀上花掉一整段。
+
+代價量出來：解壓後 3,472,384 → 3,546,112（**+73,728，+2.1 %**），
+66.2 % → 67.6 %，`hazlint` 兩邊都 0。⚠️ **建置前寫下的估計是「150–300 KB」，
+錯了 2–4 倍。**
+
+### 四、`R3-6` 本體：這塊板子根本沒有輸出路徑
+
+step list 問「哪一個 console 在每一階生效」。答案是**一個都沒有**。
+
+量在建好的 `vmlinux` 上：`printk` 是三個 20-byte 的 stub；
+🔴 **`early_printk` 是一個 WEAK 的空函式**，`0x80013bec`，16 bytes，
+`sw a1,4(sp) / sw a2,8(sp) / jr ra / sw a3,12(sp)` —— `arch/rlx` 底下沒有任何
+東西覆寫它，**而 `CONFIG_EARLY_PRINTK=y` 是有設的**。那是一個看起來可用的
+陷阱：照著設定寫 `early_printk("...")` 會得到一次安靜的開機和一份看起來正確的
+`.config`。`panic_printk` 是真的，但要等 console 註冊。
+
+**唯一從第一條 C 指令起就能用的是 `prom_putchar`** —— GLOBAL、100 bytes 在
+`0x8000b080`、直接輪詢 `0xB8002014` 寫 `0xB8002000`、KSEG1 未快取、
+**廠商自己把忙迴圈綁在 30,000 次所以它掛不住**。
+
+**而最可能的早期失敗是設計上就靜音的**：`bsp_setup()` 結尾是
+`ret = bsp_swcore_init(version); if (ret) bsp_machine_halt();`，
+而 `bsp_machine_halt()` 是**裸的 `while(1)`，沒有任何訊息**。
+
+十一個記號，一個框一個嫌疑犯：B00（任何 console 之前）、B01、**B02 印
+`PRId`**、B03（`bsp_init` 現場算 DRAM）、B04、**B05（分頻器）**、B06（CP3
+scratchpad）、**B07 印 `bsp_swcore_init` 的回傳值**、B08、B09、B10。
+
+🔴 **新工具拒絕了兩次，兩次都是真的缺陷。** 第一次：記號本來把 tag 當執行期
+參數傳，於是 `"RLXFW-"` 和 `"B0"` 是兩個字面值，**映像裡從來沒有連續的
+`RLXFW-B0`** —— 印出來會對，但**上機前查不到**，而 `RUNSHEET` `P6` 的整個形狀
+就是「上機前查」。`check`（讀樹）是綠的，`verify`（讀產物）才抓到。
+第二次：`RLXFW-B1` 被數到**兩次**，因為 `RLXFW-B10` 包含它 —— 而這個歧義不只
+是工具的，人 grep 擷取檔也會中。兩邊都修：搜尋字串帶終止符，tag 補零，
+`A16` 拒絕任何是另一個 tag 前綴的 tag。
+
+代價：`vmlinux` +127 bytes，**解壓後的映像一個位元組都沒動**（127 bytes 落在
+既有對齊空隙裡）。`hazlint` 兩份都 0 violations。
+
+🔴 **順手撞到天花板一直量在錯的檔案上**：`mkinitramfs.py --kernel-image` 用
+`os.path.getsize(vmlinux)`，那是 ELF 檔案大小，比映像大 495,729 bytes，
+報 75.7 % 而真值是 66.2 %。錯的方向是保守的，但它會造成的是**假警報**，而假
+警報的既定處置是把 `LOAD_START_ADDR` 搬到 `0x80A00000`。**更貴的一半是
+`RUNSHEET` `P9` 把 3,472,384 掛在這支工具名下，而這支工具算不出那個數。**
+改成讀 `PT_LOAD` program header，量出 3,472,384，與 `objcopy -O binary` 那條
+路線吻合，而中間沒有交叉工具鏈。
+
+### 沒做的，以及為什麼
+
+- **`R3-2` 的第 3–6 階、`R1h` 的 bench 段**：交代不要順手做。
+- **`TC-k`／`TC-l`／`TC-m`**：仍然欠著。三個都是 `hazlint` 的規則要換一個
+  來源或一條界，而挑哪一個需要量測，今天的三件事沒有一件會給出那個量測。
+- **`P2`**（對 `arch/rlx` 每個 `.o` 跑 `hazlint`）：仍然欠著，而且**現在欠的
+  是四棵樹不是一棵**。
+- **`P3`**（桌面執行通道）：四個映像**一個都沒跑過**。而它現在比昨天值錢，
+  因為那個通道停的地方正好是 `B07` 的位置。
+
+### 收支
+
+零 flash 位元組、零電源循環、零裝置讀數。建置四次（quiet／loud × 有記號／
+無記號），每次 `-j4`，`vendor-tripwire` 四次全 CLEAN。
+`tools/rlxfw-marks.py`（新，18 控制）、`config/rlxfw-marks.tsv`（新）、
+`config/rlxfw-src/`（新，兩個檔）、`hazlint` 1.4 → 1.5、`kconfig-delta`
+22 → 24 控制、`mkinitramfs` 19 → 23、`test-hazlint` 121 → 142、
+`test-config-gates` 34 → 45。

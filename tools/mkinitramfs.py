@@ -39,6 +39,7 @@ import os
 import posixpath
 import re
 import stat
+import struct
 import sys
 
 VERSION = "1.0"
@@ -348,6 +349,70 @@ def write_atomic(path, text):
     os.replace(tmp, path)
 
 
+def loaded_extent(path):
+    """(bytes, how) -- how far the DECOMPRESSED image reaches, not the file size.
+
+    🔴 Until 2026-08-28 this was `os.path.getsize(vmlinux)`, and that is the
+    wrong number by 495,729 bytes on this kernel: an ELF carries a symbol
+    table, a string table and section headers, and none of them is loaded.
+    量: the file is 3,968,113 and the image the decompressor writes is
+    3,472,384 -- 75.7 % of the ceiling reported where the truth is 66.2 %.
+
+    The error was CONSERVATIVE, so nothing over-ceiling ever got through; what
+    it would have caused is a false alarm, and the documented response to a
+    false alarm here is to move LOAD_START_ADDR -- a change to the boot address
+    for a reason that was not real.  And `RUNSHEET` P9 attributed 3,472,384 to
+    this tool while this tool could not produce it, which is the more
+    expensive half: a number in a runsheet whose stated source does not
+    compute it.
+
+    The right measurement is what `objcopy -O binary` emits: over the PT_LOAD
+    segments, `max(p_vaddr + p_filesz) - min(p_vaddr)`.  `p_filesz` and not
+    `p_memsz`, because `.bss` is NOT in the payload the decompressor writes --
+    the kernel zeroes it afterwards.  (It is worth knowing separately that
+    `.bss` on this build ends at 0x805E5280, above the 0x80500000 the
+    compressed image sits at; that is fine, because by then the wrapper has
+    jumped away and its bytes are dead.  It is a different question from this
+    one and it is not what the ceiling is about.)
+
+    Read from the program headers directly rather than by shelling out to
+    objcopy: this check has to run where there is no cross toolchain.
+    """
+    with open(path, "rb") as f:
+        b = f.read()
+    if b[:4] != b"\x7fELF":
+        # A flat binary is already the image.  Not an error: `R3-2`'s pipeline
+        # produces one and pointing this at it must give the same answer.
+        return len(b), "flat file"
+    if b[4:6] != b"\x01\x02":
+        die("--kernel-image %s: not a 32-bit big-endian ELF (this board is "
+            "both, and guessing would give a number that looks fine)" % path)
+    if len(b) < 52:
+        die("--kernel-image %s: %d bytes, shorter than an ELF header" % (path,
+                                                                         len(b)))
+    phoff, = struct.unpack_from(">I", b, 28)
+    phentsize, phnum = struct.unpack_from(">HH", b, 42)
+    # A truncated program header table has to be an error and not a traceback:
+    # the caller is a gate, and a gate that crashes is a gate whose answer
+    # nobody records.  Found by A22's fixture, 2026-08-28.
+    if phentsize < 32 or phoff + phnum * phentsize > len(b):
+        die("--kernel-image %s: program header table (phoff %d, %d x %d) runs "
+            "past the end of a %d-byte file"
+            % (path, phoff, phnum, phentsize, len(b)))
+    lo, hi = None, None
+    for i in range(phnum):
+        o = phoff + i * phentsize
+        p_type, p_off, p_vaddr, _, p_filesz = struct.unpack_from(">5I", b, o)
+        if p_type != 1 or p_filesz == 0:        # PT_LOAD, non-empty
+            continue
+        lo = p_vaddr if lo is None else min(lo, p_vaddr)
+        hi = p_vaddr + p_filesz if hi is None else max(hi, p_vaddr + p_filesz)
+    if lo is None:
+        die("--kernel-image %s: no non-empty PT_LOAD. An image with nothing "
+            "to load would measure 0 and pass any ceiling" % path)
+    return hi - lo, "%d PT_LOAD, 0x%08x-0x%08x" % (phnum, lo, hi)
+
+
 def cmd_build(a):
     decl = a["decl"]
     entries = parse_decl(decl)
@@ -392,10 +457,11 @@ def cmd_build(a):
     if img:
         if not os.path.isfile(img):
             die("--kernel-image %s: no such file" % img)
-        n = os.path.getsize(img)
+        n, how = loaded_extent(img)
         margin = ceiling - n
-        print("ceiling     decompressed image %d bytes, ceiling %d, margin %d "
-              "(%.1f%% used)" % (n, ceiling, margin, 100.0 * n / ceiling))
+        print("ceiling     decompressed image %d bytes (%s), ceiling %d, "
+              "margin %d (%.1f%% used)"
+              % (n, how, ceiling, margin, 100.0 * n / ceiling))
         if margin < 0:
             print("REFUSED: over the ceiling. The decompressor reads from "
                   "0x80500000 and writes to 0x80000000; this image would "
@@ -686,6 +752,63 @@ def run_controls():
         c.add("A19 a slink whose target is not in the image is refused",
               err is not None and "puts in the image" in err,
               (err or "did not refuse")[:70])
+
+        # --- A20-A22: the ceiling measures the IMAGE, not the FILE --------
+        # 🔴 Until 2026-08-28 this was os.path.getsize(vmlinux). 量 on the R3
+        # kernel: the file is 3,968,113 and the image is 3,472,384, so the
+        # ceiling read 75.7 % used where the truth was 66.2 %. The fixture
+        # below is built so the two numbers CANNOT coincide -- 0x200 bytes of
+        # PT_LOAD inside a file padded well past it -- because a control on a
+        # fixture where file size and load extent agree could not have failed.
+        eh = (b"\x7fELF" + bytes(bytearray([1, 2, 1, 0])) + bytes(8)
+              + struct.pack(">HHI", 2, 8, 1)
+              + struct.pack(">III", 0x80000000, 52, 0)
+              + struct.pack(">I", 0)
+              + struct.pack(">HHHHHH", 52, 32, 1, 40, 0, 0))
+        ph = struct.pack(">8I", 1, 84, 0x80000000, 0x80000000,
+                         0x200, 0x400, 5, 0x1000)
+        blob = eh + ph + b"\0" * 0x200 + b"\xAA" * 0x4000   # padding after
+        p_elf = os.path.join(d, "fx.elf")
+        open(p_elf, "wb").write(blob)
+        n, how = loaded_extent(p_elf)
+        c.add("A20 the ceiling reads PT_LOAD p_filesz, not the file size",
+              n == 0x200 and os.path.getsize(p_elf) > 0x4000,
+              "extent %d (%s) against a %d-byte file -- must be 512"
+              % (n, how, os.path.getsize(p_elf)))
+
+        # A21 -- p_filesz and not p_memsz.  .bss is not in what the
+        # decompressor writes; the fixture's memsz is deliberately 0x400.
+        c.add("A21 and p_filesz, not p_memsz -- .bss is not in the payload",
+              n == 0x200, "memsz is 0x400 in the fixture, extent read %d" % n)
+
+        # A22 -- a flat file is already the image, and an ELF with nothing
+        # loadable is an error rather than a very small image that passes.
+        p_flat = os.path.join(d, "fx.bin")
+        open(p_flat, "wb").write(b"\xAA" * 1234)
+        nf, howf = loaded_extent(p_flat)
+        bad = eh[:40] + struct.pack(">HHHHHH", 52, 32, 0, 40, 0, 0)
+        p_bad = os.path.join(d, "fx-noload.elf")
+        open(p_bad, "wb").write(bad + b"\0" * 64)
+        try:
+            loaded_extent(p_bad)
+            ok22 = False
+        except (Refused, SystemExit):
+            ok22 = True
+        # A23 -- and a truncated program header table refuses rather than
+        # raising struct.error.  A gate that crashes is a gate whose answer
+        # nobody writes down; A22's first fixture found this by accident.
+        p_trunc = os.path.join(d, "fx-trunc.elf")
+        open(p_trunc, "wb").write(blob[:60])
+        try:
+            loaded_extent(p_trunc)
+            ok23 = False
+        except (Refused, SystemExit):
+            ok23 = True
+        c.add("A22 a flat file measures itself; an ELF with no PT_LOAD refuses",
+              nf == 1234 and howf == "flat file" and ok22,
+              "flat %d (%s), no-PT_LOAD refused %s" % (nf, howf, ok22))
+        c.add("A23 a truncated program header table refuses, not tracebacks",
+              ok23, "refused %s" % ok23)
     return c
 
 

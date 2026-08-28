@@ -42,10 +42,25 @@
 # a checker nobody has shown to be looking. So installing the compiler turns 101
 # cases red for a reason that is not a defect. MEASURED 2026-08-27, on the bench
 # machine with $FWRE_WORK pointed at an empty directory: with the cross tools
-# present, `test-hazlint` is 50 ok / 30 FAIL / 11 skip (量 2026-08-28; it was
-# 45 / 30 / 8 at 96 cases) and `test-rlxprobe` is 101 ok / 101 FAIL. Without
-# gcc, both skip cleanly, the census is green, and it prints
-# `NOT RUN IN THIS JOB: 362 case(s)` with every one of them named.
+# present, `test-hazlint` is 73 ok / 32 FAIL / 12 skip covering 37 (量 2026-08-28,
+# fifth segment, at 142 cases; it was 50 / 30 / 11 at 109 and 45 / 30 / 8 at 96)
+# and `test-rlxprobe` is 101 ok / 101 FAIL. What is worth reading twice: all
+# SEVEN of hazlint 1.5's `cli` controls -- the ones TC-j was about, which drive
+# the real command line as a subprocess -- pass HERE, with $FWRE_WORK empty.
+# They need no vendor artefact. What keeps this suite bench-only is K4/K4b's
+# population fixtures and nothing else. Without gcc, both skip cleanly, the
+# census is green, and it prints
+# `NOT RUN IN THIS JOB: 395 case(s)` with every one of them named.
+#
+# 362 -> 395 on 2026-08-28 (fifth session): `test-hazlint` 109 -> 142 for `TC-j`.
+# The thirty-three are M17-M20 (the three mutations that recreate `TC-f` through
+# `main`, plus the one that proves the child guard is not itself a blind spot)
+# and the assertions that the control report now names which layer each row
+# reached. ⚠️ **The whole 142 is counted here and that OVERSTATES what stands
+# down**: 量, all seven `cli` controls and every M17-M20 case run on a runner.
+# The row is a whole-suite exemption because K4 fails without `stage2.bin` and a
+# suite that exits 1 cannot be in this job at all -- not because these cases
+# need anything. Splitting the row is the honest fix and it is not done here.
 #
 # 353 -> 362 on 2026-08-28 (third session) when `test-vendor-tripwire` (32) and
 # `test-tc-smoke` (36) arrived. Only NINE of their 68 cases stand down here, and

@@ -460,6 +460,24 @@ elif which == 'm13':       # strict stops being a NARROWING of loose
             if (not strict) and (rs or rt or rd):   # MUTATED: strict no longer narrows
                 return None
             return ('sync', 'MIPS-II')""", 1)
+elif which == 'm17':       # TC-j (a): --range on an ELF is parsed and discarded
+    src = src.replace("        if args['range']:",
+                      "        if False:  # MUTATED m17: TC-f, put back verbatim", 1)
+elif which == 'm18':       # TC-j (b): --vma-range is parsed and never clips
+    src = src.replace(
+        "            spans = clip_spans(b, spans, args['vma_range'][0],",
+        "            _ = clip_spans(b, spans, args['vma_range'][0],  # MUTATED m18", 1)
+elif which == 'm19':       # TC-j (c): the MIPS16 excision never runs
+    src = src.replace("    if elf is not None and not args['no_excise']:",
+                      "    if False:  # MUTATED m19: the excision never runs", 1)
+elif which == 'm20':       # TC-j (d): the CHILD guard does more than suppress
+    # The control on the guard the six `cli` controls ride on.  If a change
+    # inside the HAZLINT_CHILD branch were invisible to the suite, the guard
+    # would be a blind spot of exactly the shape TC-j is about.
+    src = src.replace(
+        "        c.population_ran = True   # the PARENT holds K4/K4b; this is its child",
+        "        c.population_ran = True\n"
+        "        args['no_excise'] = True  # MUTATED m20: the guard is not inert", 1)
 open(sys.argv[2], 'w').write(src)
 INNERPY
 }
@@ -646,6 +664,59 @@ if [ -n "$KERNEL" ]; then
 else
     sk "M16 also fails K4b" "no kernel under $WORK"
 fi
+
+echo
+echo "=== M17-M20: TC-j -- the controls must execute main(), not a copy of it ==="
+# 量 2026-08-28, before the fix: hazlint 1.4's K11-K16 called `_scan_elf`, a
+# private reimplementation of main()'s pipeline, and ALL THREE of the
+# mutations below -- each one recreating TC-f verbatim -- passed all twenty
+# controls.  `ci-expected.tsv` recorded that CI ran zero hazlint cases, so
+# nothing anywhere would have caught them.  1.5 deletes `_scan_elf` and drives
+# K11-K17 through a real subprocess.  These four are what makes that claim
+# falsifiable, and M20 is the control on the guard the other six ride on.
+for m in m17 m18 m19 m20; do mut $m; done
+ck "M17 mutation landed"  1 "$(grep -c 'MUTATED m17' "$T/m17")"
+ck "M18 mutation landed"  1 "$(grep -c 'MUTATED m18' "$T/m18")"
+ck "M19 mutation landed"  1 "$(grep -c 'MUTATED m19' "$T/m19")"
+ck "M20 mutation landed"  1 "$(grep -c 'MUTATED m20' "$T/m20")"
+
+o17="$("$PY" "$T/m17" --self-test 2>&1)"
+ck "M17 fails K11"           1 "$(printf '%s\n' "$o17" | grep -c '^  FAIL  K11')"
+ck "M17 leaves K1 alone"     1 "$(printf '%s\n' "$o17" | grep -c '^  ok    K1 ')"
+
+o18="$("$PY" "$T/m18" --self-test 2>&1)"
+ck "M18 fails K12"           1 "$(printf '%s\n' "$o18" | grep -c '^  FAIL  K12')"
+ck "M18 leaves K11 alone"    1 "$(printf '%s\n' "$o18" | grep -c '^  ok    K11')"
+
+o19="$("$PY" "$T/m19" --self-test 2>&1)"
+ck "M19 fails K13"           1 "$(printf '%s\n' "$o19" | grep -c '^  FAIL  K13')"
+ck "M19 fails K14"           1 "$(printf '%s\n' "$o19" | grep -c '^  FAIL  K14')"
+ck "M19 fails K16"           1 "$(printf '%s\n' "$o19" | grep -c '^  FAIL  K16')"
+
+o20="$("$PY" "$T/m20" --self-test 2>&1)"
+ck "M20 the guard is not a blind spot" 1 \
+   "$(printf '%s\n' "$o20" | grep -c '^  FAIL  K13')"
+
+for m in m17 m18 m19 m20; do
+    "$PY" "$T/$m" --self-test >/dev/null 2>&1
+    ck "$m self-test must refuse"  2 "$?"
+done
+
+# And the report must SAY which layer each control reached.  A green block
+# that does not distinguish `unit` from `cli` is what let TC-j stand.
+oc="$("$PY" "$HAZ" --self-test 2>&1)"
+ck "the report names the unit layer"  1 \
+   "$(printf '%s\n' "$oc" | grep -c '^  unit -- the primitives')"
+ck "the report names the cli layer"   1 \
+   "$(printf '%s\n' "$oc" | grep -c '^  cli  -- the whole program')"
+ck "seven controls reach main()"      7 \
+   "$(printf '%s\n' "$oc" | sed -n '/^  cli  --/,$p' | grep -c '^  ok    K1[1-7]')"
+
+# A child says so, and it says so where a reader will see it.
+ck "a child prints its suppression"   1 \
+   "$(HAZLINT_CHILD=1 "$PY" "$HAZ" --self-test 2>&1 | grep -c 'would recurse')"
+ck "a child refuses --self-test"      3 \
+   "$(HAZLINT_CHILD=1 "$PY" "$HAZ" --self-test >/dev/null 2>&1; echo $?)"
 
 echo
 echo "=== N1-N4: TC-f, at the command line ==="

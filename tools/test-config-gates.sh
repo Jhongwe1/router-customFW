@@ -48,7 +48,7 @@ sk () { printf '  skip   %-52s %s\n' "$1" "$2"; skip=$((skip+1)); }
 echo "=== S1: both tools pass their own controls, unmutated ==="
 o="$("$PY" "$KD" self-test 2>&1)"; rc=$?
 ck "kconfig-delta self-test exit 0"        0 "$rc"
-ck "kconfig-delta 22 controls"             1 "$(printf '%s\n' "$o" | grep -c '22 passed, 0 failed')"
+ck "kconfig-delta 24 controls"             1 "$(printf '%s\n' "$o" | grep -c '24 passed, 0 failed')"
 o="$("$PY" "$MK" self-test 2>&1)"; rc=$?
 ck "mkinitramfs self-test exit 0"          0 "$rc"
 ck "mkinitramfs A2 present"                1 "$(printf '%s\n' "$o" | grep -c 'A2 ')"
@@ -187,6 +187,54 @@ if [ -d "$UNIT" ]; then
 else
     sk "E5-E6 this unit's rootfs" "no extracted tree under $WORK"
 fi
+
+echo
+echo "=== S3/G1-G4: rlxfw-marks, R3-6's source gate ==="
+# This is the first tool in the repository that edits somebody else's source.
+# It runs on any machine: the controls build their own tree and their own
+# fixtures, so nothing here needs a vendor drop.
+RM="$HERE/rlxfw-marks.py"
+o="$("$PY" "$RM" self-test 2>&1)"
+ck "S3 rlxfw-marks self-test exit 0"       0 "$?"
+ck "S3 rlxfw-marks 18 controls"            1 "$(printf '%s\n' "$o" | grep -c '18 passed, 0 failed')"
+
+mutrm () { sed "$2" "$RM" > "$T/$1"; }
+
+# G1 -- an ambiguous anchor must not be resolved by taking the first.  This is
+# the difference between this file and a .patch, so it is the mutation that
+# matters most.
+mutrm g1 's|^    if len(hits) > 1:|    if False:  # MUTATED: pick the first of several|'
+ck "G1 mutation landed" 1 "$(grep -c 'MUTATED: pick the first' "$T/g1")"
+"$PY" "$T/g1" self-test >/dev/null 2>&1
+ck "G1 an ambiguous anchor resolved silently -> refuse" 2 "$?"
+
+# G2 -- the search string must carry its terminator.  Without it RLXFW-B01
+# matches RLXFW-B010 and a ladder is unreadable; 量 2026-08-28, RLXFW-B1
+# matched RLXFW-B10 on the first real verify.
+mutrm g2 's|return PREFIX + self.tag + ("=" if self.computed else "\\n")|return PREFIX + self.tag  # MUTATED: no terminator|'
+ck "G2 mutation landed" 1 "$(grep -c 'MUTATED: no terminator' "$T/g2")"
+"$PY" "$T/g2" self-test >/dev/null 2>&1
+ck "G2 a search string without its terminator -> refuse" 2 "$?"
+
+# G3 -- verify's second half. A mark present in MY image and also in the
+# vendor's is not a discriminator, and the anti-DoD is the record of what
+# believing one costs.
+mutrm g3 's|^        outs = \[(a, _count(a, s)) for a in absent\]|        outs = [(a, 0) for a in absent]  # MUTATED: the vendor image is not read|'
+ck "G3 mutation landed" 1 "$(grep -c 'MUTATED: the vendor image is not read' "$T/g3")"
+"$PY" "$T/g3" self-test >/dev/null 2>&1
+ck "G3 verify that never reads the vendor image -> refuse" 2 "$?"
+
+# G4 -- and the REAL declaration parses, with the count pinned.  A tool whose
+# controls pass on synthetic fixtures while the committed file is malformed is
+# the shape E6 pins one file along.
+o="$("$PY" "$RM" verify --decl "$REPO/config/rlxfw-marks.tsv" \
+     --image "$REPO/config/rlxfw-marks.tsv" 2>&1)"
+ck "G4 the real declaration parses"        1 \
+   "$(printf '%s\n' "$o" | grep -c 'RLXFW-B00')"
+ck "G4 and it declares eleven marks"      11 \
+   "$(printf '%s\n' "$o" | grep -c '^  B[0-9]')"
+ck "G4 verify with no --absent is refused"  1 \
+   "$(printf '%s\n' "$o" | grep -c 'no --absent file given')"
 
 echo
 if [ "$fail" -ne 0 ]; then

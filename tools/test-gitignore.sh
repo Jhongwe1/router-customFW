@@ -113,6 +113,51 @@ fi
 rm -f src-vendor
 
 echo
+echo "=== rlxfw's own source mirror is NOT swallowed by linux-*/ ==="
+# 2026-08-28: `linux-*/` is there to keep vendor kernel trees out, and it also
+# matched config/rlxfw-src/linux-2.6.30/ -- rlxfw's own two files, laid out the
+# way the staged tree is laid out so tools/rlxfw-marks.py needs no path mapping.
+# MEASURED: `git add -A` staged every other file of that session and left these
+# two out in silence, which would have committed a build driver and a
+# declaration that both name sources the repository does not contain.
+#
+# Both halves are asserted, because the negation only works if the DIRECTORY is
+# un-ignored first: git does not descend into an excluded directory, so a
+# `!.../**` on its own does nothing and this case would pass on a .gitignore
+# that still drops the files.
+for f in config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c \
+         config/rlxfw-src/linux-2.6.30/include/linux/rlxfw-mark.h; do
+    # This suite runs inside a throwaway repository, so the paths are created
+    # here rather than read out of the real tree: what is under test is the
+    # PATTERN, and a case that depended on the real files existing would go red
+    # for the wrong reason the day one of them is renamed.
+    mkdir -p "$(dirname "$f")"
+    : > "$f"
+    if git check-ignore -q "$f"; then
+        printf '  FAIL   %-46s %s\n' "$(basename "$f")" \
+               "<- ignored; it would be missing from the commit"
+        fail=$((fail + 1))
+    else
+        printf '  ok     %-46s %s\n' "$(basename "$f")" "tracked"
+        pass=$((pass + 1))
+    fi
+done
+
+# And the negative control: a vendor tree at the same depth must STILL be
+# ignored, or the fix above turned the rule off rather than narrowing it.
+mkdir -p .gitignore-probe/linux-2.6.30/arch
+: > .gitignore-probe/linux-2.6.30/arch/probe.c
+if git check-ignore -q .gitignore-probe/linux-2.6.30/arch/probe.c; then
+    printf '  ok     %-46s %s\n' "linux-*/ still ignores a vendor tree" "ignored"
+    pass=$((pass + 1))
+else
+    printf '  FAIL   %-46s %s\n' "linux-*/ still ignores a vendor tree" \
+           "<- the negation widened the rule instead of narrowing it"
+    fail=$((fail + 1))
+fi
+rm -rf .gitignore-probe
+
+echo
 echo "=== what a first commit would actually contain ==="
 git add -A .
 git diff --cached --name-only | sort | sed 's/^/  /'

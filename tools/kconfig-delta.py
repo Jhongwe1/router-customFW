@@ -74,6 +74,8 @@ ABSENT = "-"
 
 # A mechanism is a closed vocabulary on purpose.  "because kconfig does that" is
 # not a reason, and a free-text field would accept it.
+VARIANTS = ("quiet", "loud")
+
 MECHANISMS = {
     "promptless":  "declared with no prompt string, so its value is its default "
                    "and no .config line can change it",
@@ -169,7 +171,7 @@ class Rule(object):
         self.seen = False
 
 
-def parse_delta(path, text=None):
+def parse_delta(path, text=None, variant=None):
     """(rules_by_symbol, headers).
 
     Tab-separated, because two of the values this file has to carry are kernel
@@ -182,6 +184,14 @@ def parse_delta(path, text=None):
     file with a typo that silently dropped a rule would turn this gate off for
     exactly the symbol somebody cared enough about to write down.
     """
+    # Validated HERE and not only in parse_args.  C24 caught that gap: the
+    # command line refused `--variant quiett` while a programmatic caller got
+    # a silent fall-through to "no variant", which builds the quiet image and
+    # labels it whatever was asked for.
+    if variant is not None and variant not in VARIANTS:
+        die("%s: variant %r is not one of: %s. It is NOT ignored -- falling "
+            "through would apply the common rows only and call the result by "
+            "the name that was typed" % (path, variant, ", ".join(VARIANTS)))
     if text is None:
         with open(path, encoding="utf-8", errors="replace") as f:
             text = f.read()
@@ -201,8 +211,23 @@ def parse_delta(path, text=None):
                 "(kind, symbol, from, to, mechanism, reason). Line was: %r"
                 % (path, lineno, len(f), ln[:120]))
         kind, sym, frm, to, tag, reason = f
+        # A kind may carry a VARIANT: `set@loud`.  R3-6 builds two images from
+        # one declaration -- `quiet`, which is the vendor's configuration, and
+        # `loud`, which is quiet plus CONFIG_PRINTK.  The alternative was a
+        # second delta file, and that is two owners of one table: 35 rules
+        # copied, and the copy going stale is the failure this whole file
+        # exists to prevent.  A row with no variant is in every image.
+        vname = None
+        if "@" in kind:
+            kind, vname = kind.split("@", 1)
+            if vname not in VARIANTS:
+                die("%s:%d: variant %r is not one of: %s"
+                    % (path, lineno, vname, ", ".join(sorted(VARIANTS))))
         if kind not in ("derive", "set"):
             die("%s:%d: kind %r is not 'derive' or 'set'" % (path, lineno, kind))
+        if vname is not None and vname != variant:
+            continue          # a row for the other image
+
         if not sym.startswith("CONFIG_"):
             die("%s:%d: %r does not look like a symbol" % (path, lineno, sym))
         if kind == "derive" and tag not in MECHANISMS:
@@ -218,7 +243,9 @@ def parse_delta(path, text=None):
             die("%s:%d: %s already has a rule at line %d. Two rules for one "
                 "symbol means one of them is never checked"
                 % (path, lineno, sym, rules[sym].lineno))
-        rules[sym] = Rule(kind, sym, frm, to, tag, reason, lineno)
+        r = Rule(kind, sym, frm, to, tag, reason, lineno)
+        r.variant = vname
+        rules[sym] = r
     return rules, headers
 
 
@@ -270,10 +297,10 @@ def check_baseline_identity(path, headers):
 
 
 def check(baseline, delta, built, base_text=None, delta_text=None,
-          built_text=None):
+          built_text=None, variant=None):
     a = parse_config(baseline, base_text)
     b = parse_config(built, built_text)
-    rules, headers = parse_delta(delta, delta_text)
+    rules, headers = parse_delta(delta, delta_text, variant=variant)
     r = Result()
     for sym, frm, to in diff_configs(a, b):
         rule = rules.get(sym)
@@ -583,6 +610,35 @@ def run_controls():
           d_.get("CONFIG_B") == "n",
           "confdata.c:221 is `strncmp(p, \"is not set\", 10)`, unanchored")
 
+    # --- C23/C24: the variant mechanism (R3-6) ----------------------------
+    # One delta file, two images.  The failure this guards is the one that
+    # made variants worth building at all: a second delta file would be a copy
+    # of every rule, and a copy goes stale.  What replaces that risk is this
+    # one -- a row silently landing in the wrong image.
+    dv = ("# kind\tsymbol\tfrom\tto\tmechanism\treason\n"
+          "set\tCONFIG_BOTH\tn\ty\t-\tin every image\n"
+          "set@loud\tCONFIG_ONLYLOUD\tn\ty\t-\tloud only\n")
+    rq, _ = parse_delta("<v>", dv, variant="quiet")
+    rl, _ = parse_delta("<v>", dv, variant="loud")
+    rn, _ = parse_delta("<v>", dv, variant=None)
+    c.add("C23 a variant row is in that image and in no other",
+          set(rq) == {"CONFIG_BOTH"} and set(rn) == {"CONFIG_BOTH"}
+          and set(rl) == {"CONFIG_BOTH", "CONFIG_ONLYLOUD"},
+          "quiet %s, loud %s, no variant %s"
+          % (sorted(rq), sorted(rl), sorted(rn)))
+
+    # C24 -- and a variant nobody declared is an error.  Falling through to
+    # "no variant" would build the quiet image and label it whatever was
+    # typed, which is the shape of every mislabelled artefact in this repo's
+    # correction log.
+    try:
+        parse_delta("<v>", dv, variant="quiett")
+        ok24, why24 = False, "accepted an undeclared variant"
+    except (Refused, SystemExit) as e:
+        ok24, why24 = True, "refused (%s)" % (getattr(e, "code", e) or "raise")
+    c.add("C24 an undeclared variant is an error, not a fall-through",
+          ok24, why24)
+
     # C16 -- the only control that leaves this process, and the reason it can:
     # `main` checks the three paths exist BEFORE it runs the controls, so this
     # child refuses without running controls of its own and cannot recurse.
@@ -632,7 +688,7 @@ def cmd_apply(args):
     applying them here would hide the case where it stops doing so.
     """
     a = parse_config(args["baseline"])
-    rules, _ = parse_delta(args["delta"])
+    rules, _ = parse_delta(args["delta"], variant=args.get("variant"))
     sets = {s: r for s, r in rules.items() if r.kind == "set"}
     for sym, r in sets.items():
         cur = a.get(sym, ABSENT)
@@ -687,7 +743,7 @@ def cmd_explain(args):
     b = parse_config(args["built"])
     rules = {}
     if args["delta"]:
-        rules, _ = parse_delta(args["delta"])
+        rules, _ = parse_delta(args["delta"], variant=args.get("variant"))
     print("# starting point for a delta file -- every mechanism and reason "
           "below is a placeholder")
     for sym, frm, to in diff_configs(a, b):
@@ -704,17 +760,25 @@ def parse_args(argv):
     if not argv:
         die("no command. One of: apply, check, explain, self-test")
     cmd, rest = argv[0], argv[1:]
-    a = {"baseline": None, "delta": None, "built": None, "out": None}
+    a = {"baseline": None, "delta": None, "built": None, "out": None,
+         "variant": None}
     i = 0
     while i < len(rest):
         x = rest[i]
-        if x in ("--baseline", "--delta", "--built", "--out"):
+        if x in ("--baseline", "--delta", "--built", "--out", "--variant"):
             if i + 1 >= len(rest):
                 die("%s needs a value" % x)
             a[x[2:]] = rest[i + 1]
             i += 2
         else:
             die("unknown option %s" % x)
+    # A variant that is not in the vocabulary must be an error and never a
+    # silent fall-through to "no variant": `--variant loudd` would otherwise
+    # build the quiet image and call it loud.
+    if a["variant"] is not None and a["variant"] not in VARIANTS:
+        die("--variant %r is not one of: %s. It is NOT ignored: a typo here "
+            "would build the other image and label it this one"
+            % (a["variant"], ", ".join(sorted(VARIANTS))))
     return cmd, a
 
 
@@ -771,7 +835,7 @@ def main(argv):
 
     _, headers0 = parse_delta(a["delta"])
     check_baseline_identity(a["baseline"], headers0)
-    r, headers, na, nb = check(a["baseline"], a["delta"], a["built"])
+    r, headers, na, nb = check(a["baseline"], a["delta"], a["built"], variant=a.get("variant"))
     print_report(r, headers, na, nb, a["baseline"], a["built"], a["delta"])
     return 1 if r.failed else 0
 
