@@ -199,6 +199,15 @@ jobs:
       - name: test-binsim
         run: bash tools/test-binsim.sh 2>&1 | tee ci-out/test-binsim.out; exit "${PIPESTATUS[0]}"
 
+      # rebuild-census composes binsim, opcount and hazlint onto ONE window, so
+      # it needs no apt: everything it imports is in this tree and its eight
+      # controls run on synthetic ELFs. Four cases need $FWRE_WORK -- this unit's
+      # flash dump and the rebuild outputs, neither of which can be committed --
+      # and stand down as one skip line covering 4. The six mutation cases DO run
+      # here, which is the point: they are what shows the controls guard anything.
+      - name: test-rebuild-census
+        run: bash tools/test-rebuild-census.sh 2>&1 | tee ci-out/test-rebuild-census.out; exit "${PIPESTATUS[0]}"
+
       # Both stand down on a runner and say so. test-vendor-tripwire needs a
       # vendor GPL drop clone to damage and restore; test-tc-smoke needs an rsdk
       # toolchain. In both, the case that makes the skip a skip rather than a
