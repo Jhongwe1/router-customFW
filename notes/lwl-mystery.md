@@ -216,6 +216,30 @@ carry — only the default differs**, and Realtek pass it explicitly in
 `rsdk-1.5.5`'s own uClibc configuration. This unit's kernel banner names
 `4.4.5-1.5.5p2`.
 
+🔄 **2026-08-28 narrows that to something sharper, and it removes the last piece
+of hand-waving from the 2019 puzzle.** The flag is **not in any of the three
+drops' build systems at all.** 讀, `grep -rlI` over each drop: exactly two files
+mention `fuse-uls` and both are inside rsdk-1.5.5's own uClibc configuration;
+`-fno-use-uls` appears **zero** times anywhere; `boa`'s own Makefile sets
+`CFLAGS = -Os -pipe` and no `-march` and no `-fuse-uls`; the kernel's Makefiles
+mention neither. Control for that zero, same grep same corpus: `CPU_HAS_ULS`
+hits 48/41/41 files and `march=5281` hits 1141/1143/1055.
+⚠️ The `-I` is load-bearing — without it the count is 22, and the twenty extras
+are the compiler binaries (`cc1`, `cc1plus`, `mips-linux-c++`, `mips-linux-cpp`)
+carrying the flag compiled in, which is confirming rather than refuting.
+
+🔴 **It is injected by the `rsdk-linux-gcc` wrapper**, and `RSDK_LOGFILE` makes
+the wrapper say so itself: rsdk-1.5.5 hands `mips-linux-xgcc` the line
+`-ffix-bdsl -fuse-uls -UCONFIG_CPU_HAS_ULS -DCONFIG_CPU_HAS_ULS -msoft-float -EB
+-march=5281`, while rsdk-1.3.6-4181 hands it only `-march=4181 -EB`.
+
+**So the sentence to carry is neither "a drop stopped passing it" nor "a
+toolchain defaulted it off" — it is that the flag never travelled with the
+source in the first place.** `lwl` from a compiler dates **which rsdk generation
+drove the build**, and that is coarser than a version and more useful than a
+flag, because the wrapper is the thing a build cannot opt out of.
+`notes/vendor-toolchains.md` §6 owns the measurement.
+
 **DAY-ZERO's follow-up question has an answer and it is not the one this file
 expected.** `boa`'s 176 and 144 are what this compiler emits with `-fuse-uls` in
 effect when the source asks for an unaligned access; `busybox`'s zero is a source
@@ -266,9 +290,16 @@ counter-example by luck is still a claim that was wrong.
    Instruction handler. That is the only thing here that measures the silicon,
    and it is now the only thing left in this list that is not desk work.
 3. ~~**Compile a program with unaligned struct access using the vendor rsdk and
-   count.**~~ ✅ **Answered 2026-08-27, corrected 2026-08-28**, above: the lever
-   is `-fuse-uls` and both toolchain generations carry it. The `-march` half of
-   the first answer was a false zero from an unchecked exit status.
+   count.**~~ ✅ **Answered 2026-08-27, corrected twice on 2026-08-28**, above:
+   the lever is `-fuse-uls`, both toolchain generations carry it, **and no drop's
+   build system passes it — the wrapper injects it**. The `-march` half of the
+   first answer was a false zero from an unchecked exit status.
+5. 🆕 **The cheap thing `R2a` should do first, and it is now specific.** Build
+   one `boa` translation unit through `rsdk-1.3.6-4181`'s wrapper and through
+   `rsdk-1.5.5-5281`'s, and count. If the 2019/2020 images' zero is the wrapper
+   and nothing else, those two counts reproduce the 144-and-0 split from the same
+   source with no `.config` change at all. That is a two-minute measurement and
+   it either closes the puzzle or reopens it against something new.
 4. If the hardware does lack them: `boa` on this unit takes a kernel trap on
    every unaligned string access, and the cost is measurable. (P2) — **now the
    unlikely branch**, but it stays here until `R1a` closes it, because the
