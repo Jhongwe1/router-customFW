@@ -17,7 +17,10 @@ released source.
 > 🔴 **No flash-write command was issued, and that is NOT the same sentence as
 > "not one flash byte is written"** — `RUNSHEET` `G8b` forbids the second without a
 > full re-dump, and this seating ran no `FLR` bracket, so the flash-byte count is
-> **unmeasured**. There is still no driver of mine —
+> **unmeasured**. 🆕 **The next seating's card carries the bracket** —
+> `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8, three regions over two power
+> cycles, **768 of 4,194,304 bytes**. It does not make the sentence sayable; it
+> makes 0.018 % of it a reading. There is still no driver of mine —
 > the ping went out through the vendor's `rtl819x`, which is in the vendor's own
 > configuration. *(Until today this said "nothing of mine has executed on the
 > silicon", which stopped being true at 23:09; the sentence before that said "no
@@ -67,7 +70,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 |                                                        |                                                                                                                             |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | write flash                                            | mainline is zero-write through R9. A write needs my explicit yes                                                            |
-| touch `0x000000–0x005FFF` or `0x006000–0x007FFF`       | loader — bricked is unrecoverable, there is no spare. `H601` — this unit's MAC and radio calibration, not restored by reset |
+| touch `0x000000–0x005FFF` or `0x006000–0x007FFF`       | loader — bricked is unrecoverable, there is no spare. `H601` — this unit's MAC and radio calibration, not restored by reset. 🔴 **2026-08-30: nothing has ever CHECKED the second one.** 量: `RUNSHEET` §B3's `G8a`/`G8b` flash bracket samples 256 of the loader region's 24,576 bytes, 256 bytes of the `cr6c` header — which no rule forbids writing — and **0 of `H601`'s 8,192**. Six days of write-ups called those *"the two regions that would change"*, and neither of them was the one that cannot change back. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 adds it; its capture may not enter this repository and **not even its sha256 may** (with the window otherwise known, a digest is a 2^24 search for the MAC), which `tools/flashwin.py` enforces rather than remembers |
 | build with `-march=mips32`                             | the load delay slot is architecturally exposed; mips32 miscompiles **silently** — no fault, no warning, just wrong values   |
 | write asm under `.set reorder`                         | you cannot know what the assembler filled in. `noreorder`, fill every delay slot yourself                                   |
 | measure the ISA or a CPU hazard under Linux            | the vendor kernel emulates `ll`/`sc` (and `sync`, as a no-op), so you would measure the kernel. Bare metal only. 🔄 **2026-08-27: the reason was half wrong and is narrowed.** This row said "and the FPU" — **there is no FPU emulator in this kernel at all**: `arch/rlx` has no `math-emu`, and `do_cpu` gives `SIGILL` for any coprocessor but 0. `simulate_llsc` alone is enough, so the rule does not move; only its reason does. `CPU-47` |
@@ -176,18 +179,22 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   a bench-time one. **And a 3-second capture with the board OFF is a free
   pre-flight**: 0 bytes, and the tool splits that into three causes — the
   adapter, the port, or the board — before a power cycle is spent.
-- 🆕 **`console-capture.py capture` with neither `--seconds` nor `--idle` never
-  returns.** Measured 2026-08-29: both default to `0.0` and the read loop breaks
-  on neither, so `timeout -s TERM 8` gives `rc=124`. A kill loses **`.meta.json`**
-  — the `.log` and `.timing` survive, flushed per chunk — and the recovery is
-  where a reading dies, because the tool correctly refuses to overwrite an
-  existing `.log` and the way past that refusal is `--force`, which on a
-  power-on catch replaces a cold capture with a warm one. **Every capture command
-  carries a terminator**, and a card that omits one is a card nobody has run:
-  ten committed `A-catch` captures passed a terminator while **14 of §B5's 15
-  capture rows omit it**. ⚠️ **And that census is an inference, not a reading**:
-  the metadata records `esc_seconds` and `cr_settle_s` but **neither `seconds` nor
-  `idle`**, so it can only ever prove the flag *was* passed.
+- ✅ **`console-capture.py` refuses a capture with neither `--seconds` nor
+  `--idle`, and records both in its metadata — fixed 2026-08-30.** *(Until then
+  such a capture never returned: both default to `0.0` and the read loop broke on
+  neither, so `timeout -s TERM 8` gave `rc=124`. A SIGTERM kill loses
+  `.meta.json`; the `.log` and `.timing` survive, flushed per chunk.)*
+  **Every capture command still carries a terminator** — the guard makes that a
+  refusal rather than a habit, and §B5's card now carries one on all fifteen of
+  its capture rows. 🔴 **Where the guard sits was measured, and the obvious
+  placement is wrong**: it goes after `_check_send` and before the port is
+  opened. Of the four terminator-less invocations in
+  `tools/test-console-capture.sh` only **one** changes (`P4`, the 127-character
+  line, the only one whose assertion is that the run reaches the port); the other
+  three are refused inside `_check_send` first. `N21` pins both sides with one
+  command. ⚠️ **`tool_version` deliberately did not move**: it owns *what the
+  instrument wrote to the port*, and nothing new goes on the wire — the
+  **presence** of the `seconds` key is what dates a capture instead.
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
   the commands and read what I paste back. One power cycle is the most expensive
   unit here, so list every question before the device is plugged in.

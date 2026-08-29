@@ -136,3 +136,48 @@ refuse. `notes/kernel-build.md` §9 records that such a symlink was added for
 `K5` reads `/proc/version` instead, which prints `linux_banner` verbatim and
 therefore carries `(user@host)` and the gcc version that `uname -a` drops.
 `notes/kernel-build.md` §12.7, `SPEC.md` `FW-25`.
+
+## 🆕 …and none of the fifty can digest a stream, which is what decides the flash question
+
+**Measured 2026-08-30 (`R3-8b`), and it closed a question rather than opening
+one.** The section above asked what this `busybox` can run because a bench cell
+depended on it. This one asks the same question for a different reason: whether
+the flash can be read from **userspace**, as a second path beside the loader's
+`FLR`.
+
+`RUNSHEET` §B3's `G8b` row says *"zero flash bytes written"* needs a full
+re-dump hashed against `FLS-14`, and on the loader's wire that is **6,300.1 s** —
+量, the dump's own metadata. From a shell it would be one line:
+
+```
+dd if=/dev/mtd0 bs=64k | md5sum
+```
+
+**Neither half of that exists here.** 量, two ways that do not share a code path:
+
+| route | result |
+|---|---|
+| every symlink in the extracted tree pointing at `busybox` | **exactly 50**, and the names are `ash bunzip2 bzcat cat chpasswd cp cut date echo expr false free getty grep halt head hostname ifconfig init ip kill killall klogd ln login ls mkdir mount nice nslookup ping ping6 poweroff ps reboot renice rm route sed sh sleep syslogd tail telnetd tr traceroute true umount uptime wc` |
+| the applet-name table in the binary itself, at **file offset 266740** | the same names, and **`dd`, `md5sum`, `od`, `hexdump`, `cmp`, `cksum`, `sum`, `sha1sum` are none of them** |
+
+⚠️ **`mknod` is the `uname` trap again, and it caught me once today.** A
+`strings` grep over the whole binary returns `mknod`; the applet table and the
+symlink set both say it is absent. That is the same false positive this file
+already documents for `uname`, produced by the same lazy instrument — **the
+binary containing a byte string is not the binary implementing an applet.** The
+load-bearing measurement is the pair above, and `strings` is not part of it.
+
+**What that costs, precisely.** `config/rlxfw-initramfs.tsv` declares three
+device nodes and no `/dev/mtd*`; adding one is a single declared line and is
+free. What is not free is the digest: a content check needs a binary that is
+**not this unit's**, and Decision B's third leg is *the contents are this unit's
+own binaries, unmodified — if the shell does not come up, the shell is not the
+new thing* (`notes/kernel-build.md` §4).
+
+🔴 **So the second path is not blocked by the device node, which is what it
+looks like. It is blocked by the applet table.** And the node alone still buys
+something, because **`wc` IS on the list**: `wc -c < /dev/mtd0` is a
+**readability and size** reading through my own MTD stack — it says the
+partition opens and reads to EOF at the length the map declares — and it is not
+a content check and must not be quoted as one. `R3-9` owns the step;
+`SPEC.md` `FW-26` owns the number.

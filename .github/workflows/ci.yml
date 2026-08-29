@@ -61,6 +61,14 @@
 # both directions and a mutation). The value quoted above is a convenience for
 # the reader; the table is the owner.
 #
+# 452 -> 455 on 2026-08-30 (ninth session): `flashwin` arrives at 13 with one
+# allowed skip covering 3 -- R1-R3 render two committed captures out of this
+# unit's own 4 MiB flash dump, which can never be committed. Its ten synthetic
+# controls, including the publication guard driven as a subprocess in all three
+# directions, run here. `test-console-capture` went 29 -> 40 and
+# `test-gitignore` 18 -> 21 in the same session and moved this number by ZERO,
+# which is the property worth having in a case.
+#
 # 406 -> 452 on 2026-08-29 (sixth session): `test-rtkimage` arrives at 32 with
 # one allowed skip covering 18 (it reads the GPL drop's own nfjrom), and
 # `test-hazlint-objs` arrives at 28 and is *bench-only* for exactly the reason
@@ -255,6 +263,23 @@ jobs:
       # A control that has not been shown able to fail is not a control.
       - name: rbcheck mutation suite
         run: /usr/bin/python3 tools/test-rbcheck.py 2>&1 | tee ci-out/test-rbcheck.out; exit "${PIPESTATUS[0]}"
+
+      # flashwin renders the loader's `DW` reply for a window of flash out of a
+      # dump, so that the ONE region the G8a/G8b bracket cannot cmp against a
+      # committed capture -- H601, whose bytes are this unit's MAC and radio
+      # calibration -- still has an expectation computed before the seating.
+      #
+      # 🔴 What runs HERE is the part that matters to a reader: the publication
+      # guard, driven as a subprocess in all three directions, including that a
+      # forbidden window may not be written inside this repository and that it
+      # writes NO digest (a hash over a window whose only unknown is 24 bits of
+      # MAC is a 2^24 search). R1-R3 need the 4 MiB dump and stand down as one
+      # skip line covering 3 -- and the tool's whole argument is that a reader
+      # who cannot see the H601 rendering can see that the same renderer
+      # reproduces two captures they CAN see, bench/2026-08-24d/G8a-rd{0,6}.log,
+      # byte for byte.
+      - name: flashwin self-test
+        run: /usr/bin/python3 tools/flashwin.py --self-test 2>&1 | tee ci-out/flashwin.out; exit "${PIPESTATUS[0]}"
 
       # binsim's controls need no vendor binary and no compiler: every fixture
       # is a synthetic ELF the tool builds itself. That is deliberate and it is

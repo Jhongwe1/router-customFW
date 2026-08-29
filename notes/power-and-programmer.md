@@ -95,7 +95,7 @@ that matters is the first half of it.
 
 ### Measured 2026-08-24: the button is a GPIO on `PABCD` bit 5, not `RESET#`
 
-`bench/2026-08-24b/B7a`, `B7b`, `B7c`, one boot, zero flash bytes. Register
+`bench/2026-08-24b/B7a`, `B7b`, `B7c`, one boot, 🔄 no flash-write command issued *(was “zero flash bytes”; no `FLR` bracket ran)*. Register
 names are from the datasheet, §8.3 (`SPEC.md` `MAP-09`); the values are from the
 device. `DW B8003500 1` prints w1 = `PABCD_CNR`, w3 = `PABCD_DIR`, w4 =
 `PABCD_DAT`:

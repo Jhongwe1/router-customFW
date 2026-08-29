@@ -63,7 +63,7 @@ the stored `E.log`) confirming the comparison can tell two files apart.
 
 ## 2026-08-23
 
-First silicon. One power cycle, zero flash bytes written.
+First silicon. One power cycle, 🔄 **no flash-write command issued** *(this read “zero flash bytes written” until 2026-08-30 — see § “zero flash bytes” below; no `FLR` bracket ran)*.
 
 | file | section | what it covers |
 |---|---|---|
@@ -82,7 +82,7 @@ is the comparison in the meantime.
 
 ## 2026-08-24 — seating 2, part one
 
-One power cycle, **zero flash bytes**, about twenty minutes. Every cell went
+One power cycle, 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket)*, about twenty minutes. Every cell went
 through `tools/console-capture.py`, one byte-exact timestamped capture per cell
 (`.log` + `.timing` + `.meta.json`), so **nothing in this directory is a hand
 transcription** — the caveat the 2026-08-23 section had to make about `B.log`
@@ -138,7 +138,7 @@ reason is a scanner that has been turned off one value at a time.
 ## 2026-08-24b — seating 2, part two
 
 One power cycle (`A-catch` opened at 03:32:42, `CONT3` landed at 04:53:45 on the
-same boot), **zero flash bytes**, **33 captures** — 30 cells and three flushes.
+same boot), 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket)*, **33 captures** — 30 cells and three flushes.
 Every cell went through `tools/console-capture.py`, one byte-exact timestamped
 capture per cell (`.log` + `.timing` + `.meta.json`), so **nothing in this
 directory is a hand transcription** either. Nothing here was typed into a
@@ -281,7 +281,7 @@ being marked `-text` and on the stored-blob hash check, not on this scan.
 
 ## 2026-08-25 — seating 3, `R1g-4a`
 
-**One power cycle, 26 captures, 10 prediction blocks, zero flash bytes.** The
+**One power cycle, 26 captures, 10 prediction blocks,** 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket)*. The
 first seating in which code of mine executed on this core.
 
 | file(s) | cell | what it is |
@@ -317,8 +317,7 @@ own yet**, which would need a fixture with a known CRLF count.
 
 ## 2026-08-25b — seating 4, `R1g-4b`
 
-**One power cycle, 23 captures, four prediction blocks, zero flash bytes, and
-`R1e` closes.** The seating in which the CP0 census ran on this silicon.
+**One power cycle, 23 captures, four prediction blocks,** 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket)*, **and `R1e` closes.** The seating in which the CP0 census ran on this silicon.
 
 **Not `bench/2026-08-26/`.** That directory holds a sealed prediction file for a
 seating that happened a day early, and it is closed to captures — see
@@ -509,8 +508,12 @@ the seating ran on the **evening of 2026-08-29**. The names do not move: renamin
 would break a frozen file and a committed card to fix a label.
 
 **26 captures across two power cycles, and no flash-write command issued** — ⚠️ **not the same as "zero flash bytes", which needs the `FLR` bracket this seating did not run.** Both blocks pass
-their own gate — **13 of 13** and **12 of 12** — and `--sweep bench` now reads
-**39 files, 181 cells, 161 ordered, 0 out of order**.
+their own gate — **13 of 13** and **12 of 12** — and `--sweep bench` read
+**39 files, 181 cells, 161 ordered, 0 out of order** on the night. 🔄 **量
+2026-08-30, after block 2 landed: 40 files, 212 cells, 161 ordered, 51 with no
+capture yet, 0 out of order** — the 31 new cells are all "no capture yet", which
+is the correct state for a block written before its seating. *(This line kept the
+night's numbers in the present tense while the line above it was being rewritten.)*
 
 ### `2026-08-30` — power cycle 1, `probe3`, `R1h-3`
 
@@ -623,3 +626,94 @@ two-directional capture. It weakens the *subsidiary* claim that nothing left the
 board on `eth1`–`eth3`. The fix for next time is one flag: keep stderr, or run
 `tcpdump -w` per interface so an empty capture is a well-formed pcap with a
 header rather than a zero-length file.
+
+---
+
+## 🔴 "zero flash bytes" — the sentence this file used five times and is not entitled to
+
+**2026-08-30, at the desk.** `RUNSHEET` §B3's `G8b` row states the rule: two
+256-byte `FLR`+`DW` reads entitle a write-up to *"the loader head and the `cr6c`
+header are unchanged"* — **not** *"zero flash bytes written"*, which needs a full
+re-dump hashed against `FLS-14` and costs the 6,300.1 s that dump's own metadata
+records.
+
+量, this file, before the correction below: the phrase stood in **five**
+per-seating headings, and **not one of those five seatings ran an `FLR` bracket**.
+
+| heading | seating | `FLR` bracket | what it is entitled to |
+|---|---|---|---|
+| `2026-08-23` | first silicon | none | *no flash-write command issued* |
+| `2026-08-24` | seating 2, part one | none | as above |
+| `2026-08-24b` | seating 2, part two | none | as above |
+| `2026-08-25` | seating 3, `R1g-4a` | none | as above |
+| `2026-08-25b` | seating 4, `R1g-4b` | none | as above |
+
+🔴 **And the seating that DOES hold the bracket has no heading in this
+file at all.** 量 2026-08-30: `bench/` holds fourteen directories and this file
+has a section for nine of them. The five with none are **`2026-08-24c`,
+`2026-08-24d`, `2026-08-24e`, `2026-08-24f`** — the whole of `R0`, which is
+where `G8-pre`, `G8a` and `G8b` live and therefore the only flash evidence this
+project has — and `2026-08-26`, which carries its own `README.md` and is the
+one legitimate absence.
+
+So the index of *what each directory holds* skips the four directories a reader
+chasing the flash question would go to first, while five headings it does carry
+overstate what their own seatings measured. **Both halves of that are this
+file's job.** The headings are corrected below with the originals kept; writing
+the four `R0` sections is not done today and is carried in `PROGRESS.md` rather
+than half-done — they are 60 captures across thirteen prediction blocks and
+they deserve a session, not a paragraph.
+
+**What `R0` is entitled to**, so that the gap does not also lose the finding:
+`G8-pre` → `G8a` → `G8b` read `0x000000` and `0x060000` three times
+across two power cycles, and 量 2026-08-30 all three rounds are byte-identical at
+both addresses — **512 of 4,194,304 bytes unchanged across three kernel
+executions and two uploads.** That is the strongest flash statement this project
+has, and it is 0.012 % of the part.
+| `2026-08-30` / `30b` | already corrected | none | already corrected on the day |
+
+**The headings are corrected in place below, with the original kept.** The rule
+is not that a desk day may not say it — a session with the board unplugged
+genuinely writes zero flash bytes and says so in `LOG.md` all the time. The rule
+bites when **a seating happened**: then *"zero"* is a count, and a count needs a
+reading.
+
+🔴 **And the bracket that does exist has never sampled the region that cannot be
+undone.** `G8a`/`G8b` read `0x000000` (256 of the loader region's 24,576 bytes)
+and `0x060000` (the `cr6c` header, which no rule forbids writing). **`H601` at
+`0x006000`–`0x007FFF` — this unit's MAC and radio calibration, *"not restored by
+reset"* — is 0 of 8,192.** `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 adds
+it as a third region.
+
+## 2026-08-30c and 2026-08-30d — seating 6's cards, written before it
+
+**Written 2026-08-30 at the desk, before power.** One block covers both
+directories — `bench/2026-08-30c/PREDICTIONS-B5-block2.md`, **31 cells**, frozen,
+`0 of 31` at the desk — because the flash bracket is one experiment whose two
+halves cannot share a power cycle.
+
+| | |
+|---|---|
+| **`2026-08-30c`** | power cycle 3: `quietm`, the `FLR` bracket's first round, and 🎬 the artefact. Prefix `V-*` |
+| **`2026-08-30d`** | power cycle 4: the bracket's second round and nothing else. Prefix `Z-*`. No upload, no `J`, no network — about ninety seconds |
+
+**`V` and `Z`, and `Y` was deliberately skipped**: `Y` is the literal string typed
+at the `FLR` confirmation prompt, and a cell named `Y-…` beside a `--send 'Y'` is
+a reading waiting to be misfiled. The confirmations are `V-yes0`, `V-yes6`,
+`V-yesh`.
+
+🔴 **Two captures in this seating will not be in this directory, and that is a
+first.** `V-rdh` and `Z-rdh` are `DW` reads of `H601`, so their bytes are this
+unit's MAC and radio calibration. They go to
+`$FWRE_WORK/rebuild/bench-only/b5-20260830c/`, **and not even their sha256 is
+published** — a digest over a 256-byte window whose only unknown is 24 bits of
+MAC is a 2^24 search. What is committed is the verdict and the *control*:
+`tools/flashwin.py`'s `R1`/`R2` require the same renderer that computed their
+expectation to reproduce `bench/2026-08-24d/G8a-rd0.log` and `G8a-rd6.log` byte
+for byte, which it does.
+
+⚠️ **The cost, stated rather than hidden**: `check-predictions.py` resolves a
+cell to `<prefix>.log`, so those two sit outside the ordering discipline
+entirely. That is the same hole this file already records for `CONT3` and for
+`L6c-up`, but with a reason that will never be fixable rather than one that
+could.

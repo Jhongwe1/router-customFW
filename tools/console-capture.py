@@ -216,6 +216,14 @@ DEFAULT_ESC_PERIOD = 0.02
 # Bumped when the bytes this tool WRITES to the port change. A capture is
 # evidence, and what the instrument did to produce it is part of the reading:
 # 1.1 and earlier ended an ESC loop with an ESC, 1.2 ends it with a CR.
+#
+# 🔴 NOT bumped on 2026-08-30, when the metadata gained `seconds` and `idle` and
+# capture() gained a refusal for having neither. Nothing new goes out on the
+# wire, and this field owns exactly one fact -- what the instrument WROTE. A
+# reader who saw 1.3 -> 1.4 would go looking for a wire difference that is not
+# there, which is worse than the schema identifying itself: the PRESENCE of the
+# `seconds` key is what says a capture records its own terminator, and its
+# absence dates the capture to before 2026-08-30. Two facts, two markers.
 TOOL_VERSION = "1.3"
 
 
@@ -275,8 +283,58 @@ def _check_send(value):
     return value
 
 
+def _check_terminator(args) -> None:
+    """Refuse a capture that has no way to end.
+
+    ``--seconds`` and ``--idle`` both default to 0.0 and the final read loop
+    breaks on neither, so a capture given neither NEVER RETURNS.  Measured
+    2026-08-29 at the desk, before power: ``timeout -s TERM 8`` on a board-off
+    port gives rc=124.  Fourteen of the fifteen ``console-capture.py`` rows on
+    RUNSHEET B5's card were written without one, so the first person to follow
+    that card literally is the person this refusal exists for.
+
+    ZERO IS NOT A TERMINATOR and the test is `<= 0` rather than falsiness:
+    ``--seconds 0`` is exactly the default, and a run that passes it has asked
+    for the same never-returning loop in longhand.
+
+    WHERE THIS SITS, AND IT IS NOT A STYLE CHOICE.  It runs AFTER
+    ``_check_send`` and BEFORE the port is opened.
+
+    * After ``_check_send``, because N4/N7/N8 pass ``--port /dev/null`` and
+      expect that function's refusals.  Put in front of them and all three go
+      red for the wrong reason.
+    * Before the port, for the reason ``_check_send``'s own docstring gives: a
+      tool that opens the port and then decides to refuse has already
+      interacted with the device it was refusing to interact with.
+
+    量 2026-08-30, all four terminator-less invocations in
+    tools/test-console-capture.sh: only ONE of them changes, and it is P4 at
+    :315 -- the 127-character line, the only one of the four whose assertion is
+    that the run reaches the port.  N4 (:196), N7 (:307) and N8 (:332) are
+    refused inside ``_check_send`` and never get here.  P4 now carries its own
+    terminator, and N20 is the sandwich that pins this function's position from
+    both sides with one command.
+    """
+    if args.seconds <= 0 and args.idle <= 0:
+        _fail(
+            "capture needs a terminator: pass --seconds N or --idle N (or both).\n"
+            "  Both default to 0.0 and the read loop breaks on neither, so this\n"
+            "  command would not return -- measured 2026-08-29, rc=124 under\n"
+            "  `timeout -s TERM 8`. A SIGTERM kill loses the .meta.json (the\n"
+            "  .log and .timing survive; they are flushed per chunk).\n"
+            "  Sizing: the loader's DW replies come back at a marginal\n"
+            "  3,458-3,497 B/s (SPEC.md LDR-40), so a 71-byte reply needs 0.02 s\n"
+            "  and a 23,527-byte one 6.8 s. The committed cards use --seconds 4\n"
+            "  for 71 bytes, 6 for 118, 15 for a shell command and 45-90 for a\n"
+            "  boot. --idle N ends on N seconds of silence instead, which is\n"
+            "  wrong for a boot: this kernel is silent for whole seconds\n"
+            "  between marks."
+        )
+
+
 def capture(args) -> int:
     _check_send(args.send)
+    _check_terminator(args)
     try:
         import serial  # type: ignore
     except ImportError:
@@ -320,6 +378,19 @@ def capture(args) -> int:
         # device said.
         "cr": {},
         "cr_settle_s": args.cr_settle,
+        # THE TERMINATOR THE RUN WAS GIVEN, both halves, always.  Until
+        # 2026-08-30 this dict recorded esc_seconds, esc_after_seconds,
+        # esc_period_requested_s and cr_settle_s -- and NEITHER of the two
+        # values that decide when the capture stops.  A census of "did every
+        # A-catch pass --seconds?" therefore had to be read out of the
+        # stop_reason string, which is one-directional: it can prove a flag WAS
+        # passed and can never prove it was not.  That was the larger of the two
+        # defects bench/2026-08-30/CORRECTIONS-block0.md found, and this is it.
+        # 0.0 means "not given", which _check_terminator now refuses for both at
+        # once -- so a capture with both zero cannot exist from this version on,
+        # and one that does is pre-2026-08-30.
+        "seconds": args.seconds,
+        "idle": args.idle,
         "sent": None,
         "sent_hex": None,
         "stop_reason": None,
@@ -696,8 +767,17 @@ def main() -> int:
                    help="after that CR, read for at most this many seconds "
                         "waiting for the prompt it causes (default "
                         f"{DEFAULT_CR_SETTLE})")
-    c.add_argument("--seconds", type=float, default=0.0, help="stop after N s")
-    c.add_argument("--idle", type=float, default=0.0, help="stop after N s with no bytes")
+    # REQUIRED AS A PAIR, not individually: at least one of the two must be
+    # positive or capture() refuses before the port is opened. They stay
+    # `default=0.0` rather than `required=True` so that either one alone
+    # satisfies the guard, and so that 0.0 keeps meaning "not given" in the
+    # metadata of every capture already taken.
+    c.add_argument("--seconds", type=float, default=0.0,
+                   help="stop after N s. REQUIRED unless --idle is given")
+    c.add_argument("--idle", type=float, default=0.0,
+                   help="stop after N s with no bytes. REQUIRED unless --seconds "
+                        "is given. Wrong for a boot: this kernel is silent for "
+                        "whole seconds between marks")
     c.add_argument("--force", action="store_true", help="overwrite an existing capture")
     c.set_defaults(func=capture)
 

@@ -2323,3 +2323,151 @@ boot was not there**, which matters more than the conclusion it does not change.
   failure: that message is about the legacy initrd mechanism, while this image
   carries its rootfs in `.init.ramfs`, which `populate_rootfs` unpacked — the
   shell it produced is the proof.
+
+---
+
+## 17. `R3-8b`: what `quietm` will print, and every term of the count is measured
+
+**Written 2026-08-30 at the desk, before power cycle 3.** `L-3` reached D4, so
+`RUNSHEET` §B5's own table selects `quietm` for the next cycle. This section is
+what that image can and cannot put on the wire; the card and the cell-by-cell
+predictions are `bench/2026-08-30c/PREDICTIONS-B5-block2.md`.
+
+### 17.1 It is a one-variable experiment, and that is 量 rather than intent
+
+量, `diff` of the two `.config` files the two images were built from
+(`$FWRE_WORK/rebuild/r3-6/quiet.config` against `loud.config`): **two lines**.
+
+```
+226c226,227
+< # CONFIG_PRINTK is not set
+---
+> CONFIG_PRINTK=y
+> CONFIG_PRINTK_TIME=y
+```
+
+Same tree, same toolchain, same 15 declared mark rows, same initramfs spec, same
+`CFLAGS_KERNEL=-fno-if-conversion` — read out of `quietm-build.txt` and
+`loudm-build.txt` side by side. So a difference on the wire is attributable to
+`CONFIG_PRINTK` and to nothing else that this build system can see.
+
+### 17.2 The 401 bytes, term by term
+
+Every term is 量, read out of `bench/2026-08-30b/L3.log` — the *same* kernel with
+those two symbols on:
+
+| | bytes | measured how |
+|---|---:|---|
+| `J 80500000` echo, the four `rtkload` lines, `start address: 0x80003600` | **169** | the byte slice from the file's start to the end of that line |
+| eleven marks, `RLXFW-B00`…`RLXFW-B10` | **139** | nine plain × 11 + two valued × 20 |
+| M4, `rlxfw: init running, RLXFW-R3-RUNG1-OK\r\n` | **40** | |
+| `/bin/sh: can't access tty; job control turned off\r\n` | **51** | |
+| `# ` | **2** | |
+| **total** | **401** | |
+
+**And the number it cannot be is measured in the same file**: `loudm` put
+**6,459** bytes through that window, and the entire 6,058-byte difference is
+**105 `printk` lines**. 量. The two are impossible to confuse, which is what
+makes a single byte count a usable discriminator.
+
+### 17.3 🆕 How long the boot actually takes, and it is not the number the card was sized against
+
+量, `bench/2026-08-30b/L3.timing` against the offsets in `L3.log`:
+
+| | t from `J` |
+|---|---:|
+| `start address: 0x80003600` | 1.137 s |
+| `RLXFW-B00` | 1.157 s |
+| `RLXFW-B07` | 1.195 s |
+| `RLXFW-B10` | 8.925 s |
+| the shell prompt | **8.98 s** |
+
+🔴 **§B5's card sized `L-3`'s 90-second window against 26.05 s** — this unit's
+*vendor* kernel. ⚠️ **That number is in `bench/2026-08-24c/G6.timing`, not in
+`G6.meta.json`**, whose `duration_s` is the capture window, `60.076457`.
+`RUNSHEET` §B5-c12 corrected exactly this citation once already, and both
+`SPEC.md` `FW-27` and this paragraph reproduced the corrected-away form on the
+day they were written. My kernel is **2.9× faster to
+a shell**, so 90 s was 10× rather than 3.5×. `quietm` prints 6,058 fewer bytes,
+which at the 38400 line rate of 3,840 B/s is 1.58 s less, so **≈ 7.4 s (推)**.
+⚠️ **3,840 is the line rate and this repo has measured the only wire rate it
+has to be lower** — `LDR-40`, 3,458–3,497 B/s marginal for the *loader's* `DW`.
+That measurement is of a different transmitter (the loader's reply path, not the
+kernel's `prom_putchar` busy loop) so it does not transfer, but at 3,594 B/s the
+same arithmetic gives 7.30 s and the window is unaffected either way and the block's window is
+45 s — 6.1× the prediction and still 1.7× the vendor kernel's own figure, which
+is the number to be safe against if the ladder stalls somewhere no channel has
+reached.
+
+### 17.4 What survives `CONFIG_PRINTK=n`, read out of the tree and out of the artefact
+
+| | | source |
+|---|---|---|
+| the eleven marks | **arrive** | `rlxfw_puts` → `prom_putchar`; no console and no `printk` in the path (讀) |
+| `[    0.000000] CPU revision is: 0000cd01` | **absent** | it is `arch/rlx/kernel/cpu-probe.c:39`'s `printk` (讀). 量 on the desk channel: `quietm` emits **106** bytes where `loudm` emits **148**, and 148 − 106 = 42 is exactly that line |
+| the 105 `printk` lines between B04 and B10 | **absent** | |
+| the console, and therefore userspace | **arrives** | 讀 `kernel/printk.c`: the `#ifdef CONFIG_PRINTK` spans `:132`–`:539`, while `console_setup()` is at `:802` and `register_console()` at `:1123` — **outside it**. So `console=ttyS0,38400` is still parsed and `/dev/console` still binds |
+| 🔴 a **panic**, if it panics | **arrives** | 讀 `kernel/panic.c:27`, `#define printk panic_printk` under `CONFIG_PANIC_PRINTK`; 讀 `init/Kconfig:843`, that symbol is `bool` with **no prompt** and `default y`, so it is not settable and is `=y` in both configs (量). 量 on the built `vmlinux`: `panic_printk` is a **GLOBAL FUNC in `quietm`'s symbol table** and `<0>Kernel panic - not syncing: %s` occurs **once**, while the global `printk` is gone (only three file-local ones remain) |
+
+🔴 **That last row is what makes silence mean something.** In `quietm`, silence
+after a mark is a **hang**, not a panic that was suppressed.
+⚠️ And the chain's last link is 推: no channel has ever made this build panic, so
+*the panic path reaches the UART* has not been observed anywhere.
+
+### 17.5 The addresses that moved with the image
+
+量, on `rlxfw-quietm-20260830.bin` itself (1,027,072 bytes, sha256
+`cf8a93d73025292d…`):
+
+| | `loudm` | `quietm` |
+|---|---|---|
+| `image_end` | `0x80601400` | **`0x805FAC00`** |
+| the tail read, `image_end − 0x10` | `0x806013F0` | **`0x805FABF0`** |
+| word at file `0x18` / `0x1C` | `3C108060` / `26101400` | `3C108060` / **`2610AC00`** |
+| the variant word at `0x80540000` | `CEC3FFD9 …` | **`AFBD0BEE AE8D991B A39DEE9F 2A62E61B`** |
+| trailing zero run | 688 B | **552 B** |
+| clearance above the staged vendor image's end (`0x805F1002`, `MAP-17`) | 66,542 B | **39,918 B** |
+| the build stamp | `#1 Fri Aug 28 23:37:47 CST 2026` | **`#1 Fri Aug 28 23:39:33 CST 2026`** |
+
+The build stamp has two sources that are not each other: `RUNSHEET` §B5's
+power-cycle-3 table, and 量 — `strings` on the `quietm` `vmlinux` (3,968,240
+bytes, sha256 `dd0c1190f3646561…`, the output `quietm-build.txt` records) finds
+`#1 Fri Aug 28 23:39:33 CST 2026` **once**, beside `linux_proc_banner`'s
+`%s version %s (key@K) (gcc version 3.4.6-1.3.6) %s`.
+
+### 17.6 🔴 What `quietm` takes away, and it is not only noise
+
+**The netdev registration lines are `printk`.** Under `loudm` the
+netdev↔switch-port binding was 讀 straight off `L3.log:99-104`; under `quietm`
+those lines do not exist. On power cycle 3 the binding is **推**, carried over
+from cycle 2, and the only in-band evidence is `ifconfig -a`'s MAC list — where
+the last octet names the netdev — plus the host's `tcpdump -e` source MAC. That
+is why `-e` is not optional on this cycle.
+
+The same applies to the MTD partition table: `Creating 2 MTD partitions on
+"flash_bank_1"` and the two ranges are `printk`, so **the map that made
+Decision B's safety leg false is invisible on this boot**. It is still created;
+`bench/2026-08-30b/L3.log` is the reading and it is not repeated here.
+
+### 17.7 🔴 Why the flash cannot be cross-read from userspace on this image
+
+The `FLR` bracket reads flash through the **loader**. A second, independent path
+exists in principle — my own MTD stack, from the shell — and it is not available,
+for two measured reasons rather than out of caution:
+
+1. 量, this unit's own `busybox`, by two routes that share no code — every
+   symlink in the extracted tree pointing at it (**exactly 50**) and the
+   applet-name table in the binary itself: **`dd`, `md5sum`, `od`, `hexdump`,
+   `cmp`, `cksum`, `sum` and `sha1sum` are none of them.** There is nothing in
+   this device's userspace that can digest a stream. `notes/rootfs-census.md`
+   owns the census and records that `mknod` is the `uname` false positive again
+   — `strings` finds it, the applet table does not.
+2. 讀 `config/rlxfw-initramfs.tsv`: **three** device nodes are declared —
+   `/dev/console`, `/dev/null`, `/dev/tty` — and no `/dev/mtd*`.
+
+The node is one declared line and costs nothing. **The digest is the problem**: a
+content check needs a binary that is not this unit's, and Decision B's third leg
+is *the contents are this unit's own binaries, unmodified; if the shell does not
+come up, the shell is not the new thing*. What the node alone buys is
+`wc -c < /dev/mtd0` — `wc` **is** an applet — which is a **readability and size**
+reading through my own driver and not a content one. `R3-9` owns it.

@@ -7,11 +7,18 @@
 # writer on the master side plays a known script with known gaps, and the tool
 # reads the slave believing it is a serial port.
 #
-# Twenty-four cases, twenty-five results (P3 checks two things). Fourteen of
-# them are controls whose job is to FAIL, because a test suite that cannot fail
-# proves nothing -- the same argument tools/audit-bench-log.py
+# Thirty-nine cases, FORTY results (P3 checks two things). Twenty-four of them
+# are controls whose job is to FAIL -- the tool must refuse, or a mutant of it
+# must break a case above -- because a test suite that cannot fail proves
+# nothing: the same argument tools/audit-bench-log.py
 # makes about its own patterns and the reason PROGRESS.md rejected hazlint's
 # original "stage 2 must report zero" control.
+#
+# 🔴 That count has been wrong before and this line is re-measured rather than
+# incremented: it read "twenty-four cases, twenty-five results" while the suite
+# printed 29, for at least the three sessions between P8's arrival and
+# 2026-08-30. `tools/ci-expected.tsv` is what CHECKS the number; this comment is
+# a convenience and has no gate behind it.
 #
 #   P1  byte-exactness      log identical to the played script, CRs and all
 #   P2  interval            a 1.50 s gap is reported as 1.50 s, not as 0
@@ -57,6 +64,24 @@
 #   N16 impossible period   asking for 0.1 us reports what was achieved, not
 #                           what was asked -- the field is a measurement
 #   N17 hard-coded grid     a tool that ignores --esc-period fails P11
+#
+#   N18 no terminator       neither --seconds nor --idle must be REFUSED: both
+#                           default to 0.0 and the read loop breaks on neither,
+#                           so the command never returns (rc=124, 2026-08-29)
+#   N19 and before the port  the refusal must not carry `cannot open`
+#   P12 --seconds alone     satisfies the guard and reaches the port
+#   P13 --idle alone        satisfies it too -- a guard on --seconds only would
+#                           refuse RUNSHEET D1, whose quantity IS a silence
+#   N20 zero in longhand    --seconds 0 --idle 0 is the default, not a terminator
+#   P14 the metadata        records `seconds` and `idle`, which until today it
+#                           did not -- so a census of what was passed was an
+#                           inference off stop_reason and one-directional
+#   N21 the sandwich        a 127-char --send with no terminator gets the
+#                           TERMINATOR refusal: after _check_send, before the port
+#   N22 and they move       a second run with different values moves both fields
+#   P15 report is exempt    the guard is capture()'s; a guard in main() breaks it
+#   N23 guard mutation      with the condition dead, N18's command reaches the port
+#   N24 field mutation      with the two fields hardcoded, P14 and N22 go red
 #
 # P5/N9/P6/P7/N10 were added 2026-08-24 with the CR itself; P8/N11/P9/N12/N13/P10
 # came out of the adversarial review of that change the same day, and every one
@@ -312,7 +337,15 @@ else
     printf '%s\n' "$OUT128" | sed 's/^/        /'
   fi
 
-  OUT127="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/k" --send "$L127" 2>&1)"
+  # --seconds 1 is here from 2026-08-30 and it is not decoration. P4's subject
+  # is the 127-character boundary and its assertion is that the run REACHES the
+  # port; capture() now refuses a run with no terminator before the port is
+  # opened, so without this flag P4 would go red for a reason that has nothing
+  # to do with the cliff. 量 that day: of the four terminator-less invocations
+  # in this file, this is the ONLY one that changes -- N4, N7 and N8 are refused
+  # inside _check_send, which runs first. N21 below is the case that pins that
+  # ordering from both sides.
+  OUT127="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/k" --send "$L127" --seconds 1 2>&1)"
   if printf '%s\n' "$OUT127" | grep -q 'console line buffer is'; then
     bad "P4 a 127-character --send was refused -- the guard is at the wrong threshold and C7b cannot run"
   elif printf '%s\n' "$OUT127" | grep -q 'cannot open'; then
@@ -738,6 +771,176 @@ if [ -s "$WORK/mut4.py" ]; then
   fi
 else
   bad "N17 the mutant was not produced, so P11 is unguarded"
+fi
+
+# --- N18..N24 / P12..P15  the terminator, and where its guard sits -----------
+# A capture given neither --seconds nor --idle NEVER RETURNS: both default to
+# 0.0 and the final read loop breaks on neither. 量 2026-08-29, rc=124 under
+# `timeout -s TERM 8`. Fourteen of the fifteen console-capture rows on RUNSHEET
+# B5's card were written without one, so the first person to follow that card
+# literally is the person the refusal exists for.
+#
+# WHY THE GUARD'S POSITION IS ITSELF A CASE. It has to sit after _check_send
+# (whose three refusals N4/N7/N8 assert, all with --port /dev/null) and before
+# the port is opened (for the reason _check_send exists at all: a tool that
+# opens the port and then refuses has already touched the device). N21 is the
+# sandwich that pins both sides with one command.
+
+OUTNT="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/nt" 2>&1)"
+if printf '%s\n' "$OUTNT" | grep -q 'needs a terminator'; then
+  ok "N18 a capture with neither --seconds nor --idle is refused"
+else
+  bad "N18 a capture with no terminator was NOT refused -- it would not have returned"
+  printf '%s\n' "$OUTNT" | sed 's/^/        /'
+fi
+
+# The port must not have been touched. --port /dev/null cannot be opened, so
+# `cannot open` in the output is proof the guard ran too late.
+if printf '%s\n' "$OUTNT" | grep -q 'cannot open'; then
+  bad "N19 the no-terminator refusal came AFTER the port was opened"
+  printf '%s\n' "$OUTNT" | sed 's/^/        /'
+else
+  ok "N19 the refusal happens before the port is opened -- no 'cannot open' in it"
+fi
+
+OUTS="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/ts" --seconds 1 2>&1)"
+if printf '%s\n' "$OUTS" | grep -q 'cannot open'; then
+  ok "P12 --seconds alone satisfies the guard and the run reaches the port"
+else
+  bad "P12 --seconds alone did not get past the terminator guard"
+  printf '%s\n' "$OUTS" | sed 's/^/        /'
+fi
+
+# P13 is not a duplicate of P12. A guard written `if args.seconds <= 0` alone
+# passes P12 and refuses every --idle capture -- including RUNSHEET D1, whose
+# measured quantity IS a silence.
+OUTI="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/ti" --idle 1 2>&1)"
+if printf '%s\n' "$OUTI" | grep -q 'cannot open'; then
+  ok "P13 --idle alone satisfies the guard too, so the guard is on the pair"
+else
+  bad "P13 --idle alone was refused -- the guard is on --seconds only"
+  printf '%s\n' "$OUTI" | sed 's/^/        /'
+fi
+
+# Zero is the default. A run that passes it in longhand has asked for the same
+# loop that does not return, and `if not args.seconds and not args.idle` would
+# catch this one while `if args.seconds is None` would not.
+OUTZ="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/tz" --seconds 0 --idle 0 2>&1)"
+if printf '%s\n' "$OUTZ" | grep -q 'needs a terminator'; then
+  ok "N20 an explicit --seconds 0 --idle 0 is still refused -- zero is not a terminator"
+else
+  bad "N20 --seconds 0 --idle 0 was accepted; that is the never-returning loop in longhand"
+  printf '%s\n' "$OUTZ" | sed 's/^/        /'
+fi
+
+# THE SANDWICH. One command pins the guard between the two things it must sit
+# between: the reply must be the TERMINATOR refusal, which means the 127-byte
+# line already passed _check_send (or it would say `console line buffer is`)
+# and the port was never opened (or it would say `cannot open`).
+if [ ${#L127} -eq 127 ]; then
+  OUTSW="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/sw" --send "$L127" 2>&1)"
+  if printf '%s\n' "$OUTSW" | grep -q 'needs a terminator' \
+     && ! printf '%s\n' "$OUTSW" | grep -q 'console line buffer is' \
+     && ! printf '%s\n' "$OUTSW" | grep -q 'cannot open'; then
+    ok "N21 a 127-char --send with no terminator hits the terminator guard -- after _check_send, before the port"
+  else
+    bad "N21 the guard is not between _check_send and the port"
+    printf '%s\n' "$OUTSW" | sed 's/^/        /'
+  fi
+else
+  bad "N21 L127 is ${#L127} characters, so the sandwich cannot be built"
+fi
+
+# The metadata half, and it is the LARGER of the two defects
+# bench/2026-08-30/CORRECTIONS-block0.md found: until 2026-08-30 the .meta.json
+# recorded esc_seconds, esc_after_seconds, esc_period_requested_s and
+# cr_settle_s and NEITHER terminator, so a census of what was passed had to be
+# inferred from the stop_reason string -- which can prove a flag WAS given and
+# can never prove it was not.
+term_meta() {          # term_meta <outprefix> <key>
+  "$PY" - "$1.meta.json" "$2" <<'INNERPY'
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+print(m.get(sys.argv[2], "ABSENT"))
+INNERPY
+}
+
+wrote_case "$TOOL" "$WORK/tm1" "$WORK/tm1.sent" --send 'DW 8040DBC0 1' --seconds 2
+TM1S="$(term_meta "$WORK/tm1" seconds)"
+TM1I="$(term_meta "$WORK/tm1" idle)"
+if [ "$TM1S" = "2.0" ] && [ "$TM1I" = "0.0" ]; then
+  ok "P14 the metadata records the terminator it was given (seconds=$TM1S idle=$TM1I)"
+else
+  bad "P14 metadata seconds=$TM1S idle=$TM1I, wanted 2.0 and 0.0"
+fi
+
+# A field that reported a constant would pass P14. Vary BOTH, in opposite
+# directions, and require both to move -- the same argument N16 makes about
+# achieved_period_s.
+wrote_case "$TOOL" "$WORK/tm2" "$WORK/tm2.sent" --send 'DW 8040DBC0 1' --seconds 3 --idle 1.5
+TM2S="$(term_meta "$WORK/tm2" seconds)"
+TM2I="$(term_meta "$WORK/tm2" idle)"
+if [ "$TM2S" = "3.0" ] && [ "$TM2I" = "1.5" ] && [ "$TM2S" != "$TM1S" ] && [ "$TM2I" != "$TM1I" ]; then
+  ok "N22 both fields move with the arguments ($TM1S/$TM1I -> $TM2S/$TM2I), so they are recorded and not constant"
+else
+  bad "N22 seconds=$TM2S idle=$TM2I against P14's $TM1S/$TM1I -- at least one field is a constant"
+fi
+
+# The guard is capture()'s. `report` reads a capture off disk and has no port,
+# no loop and nothing to terminate; a guard installed in main() would refuse it.
+if "$PY" "$TOOL" report "$WORK/tm1" --from 'DW' --to 'DW' >/dev/null 2>&1; then
+  ok "P15 report takes no terminator and is not refused -- the guard is capture()'s alone"
+else
+  RP="$("$PY" "$TOOL" report "$WORK/tm1" --from 'DW' --to 'DW' 2>&1)"
+  if printf '%s\n' "$RP" | grep -q 'needs a terminator'; then
+    bad "P15 report was refused by the terminator guard -- it is installed too high"
+  else
+    ok "P15 report takes no terminator and is not refused -- the guard is capture()'s alone"
+  fi
+fi
+
+# And the two mutations. Without these, N18 and P14 are assertions about a tool
+# nobody has shown can fail them.
+"$PY" - "$TOOL" "$WORK/mut5.py" <<'INNERPY'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+target = "    if args.seconds <= 0 and args.idle <= 0:"
+if target not in src:
+    sys.exit("mutation target for N23 not found")
+open(sys.argv[2], "w", encoding="utf-8").write(
+    src.replace(target, "    if False:"))
+INNERPY
+if [ -s "$WORK/mut5.py" ]; then
+  OUTM5="$("$PY" "$WORK/mut5.py" capture --port /dev/null --out "$WORK/m5" 2>&1)"
+  if printf '%s\n' "$OUTM5" | grep -q 'needs a terminator'; then
+    bad "N23 the mutant still refused -- N18 is not testing this guard"
+  else
+    ok "N23 with the guard disabled the same command runs on to the port, so N18 is testing the guard"
+  fi
+else
+  bad "N23 the mutant was not produced, so N18 is unguarded"
+fi
+
+"$PY" - "$TOOL" "$WORK/mut6.py" <<'INNERPY'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+target = '        "seconds": args.seconds,\n        "idle": args.idle,'
+if target not in src:
+    sys.exit("mutation target for N24 not found")
+open(sys.argv[2], "w", encoding="utf-8").write(
+    src.replace(target, '        "seconds": 0.0,\n        "idle": 0.0,'))
+INNERPY
+if [ -s "$WORK/mut6.py" ]; then
+  wrote_case "$WORK/mut6.py" "$WORK/m6" "$WORK/m6.sent" --send 'DW 8040DBC0 1' --seconds 3 --idle 1.5
+  M6S="$(term_meta "$WORK/m6" seconds)"
+  M6I="$(term_meta "$WORK/m6" idle)"
+  if [ "$M6S" = "3.0" ] || [ "$M6I" = "1.5" ]; then
+    bad "N24 the hardcoding mutant still reported seconds=$M6S idle=$M6I -- P14/N22 would pass on it"
+  else
+    ok "N24 a tool that hardcodes the fields reports $M6S/$M6I, so P14 and N22 are reading the arguments"
+  fi
+else
+  bad "N24 the mutant was not produced, so P14 and N22 are unguarded"
 fi
 
 echo

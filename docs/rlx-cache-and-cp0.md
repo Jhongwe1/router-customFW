@@ -3,7 +3,7 @@
 **`R1-gate`'s closing statement.** The gate is `R1d` — the cache-management
 model, on silicon — and `R1e` — the CP0 census. Both ran: `R1g-4a` on
 2026-08-25 (`bench/2026-08-25/`) and `R1g-4b` on 2026-08-25b
-(`bench/2026-08-25b/`), one power cycle each, zero flash bytes.
+(`bench/2026-08-25b/`), one power cycle each, 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket ran)* — § the closing note at the end of this file already said so and this line did not.
 
 **Every statement below carries a mark**: **量** measured on this device ·
 **讀** read out of code, a dump or a document · **推** inferred, pending a

@@ -21,7 +21,7 @@ Console: CP2102, **38400 8N1**. Read the log with `console-lint.py`, not by eye.
 
 ---
 
-## Session B1 — console validation, one power cycle, zero flash bytes
+## Session B1 — console validation, one power cycle, no flash-write command issued
 
 **What it is for.** Everything in this repository so far was read out of the
 dump, the vendor GPL sources or the datasheet. **No number in `rlxfw` has been
@@ -522,12 +522,12 @@ nil: both end in a watchdog reset, which is the point of both.
 
 ---
 
-## Session B3 — R0: the vendor kernel booted from RAM, zero flash bytes
+## Session B3 — R0: the vendor kernel booted from RAM, and the loader head and `cr6c` header are unchanged
 
 **This is the active gate.** Everything below is read out of this unit's own
 loader or measured on it, and the mechanism has been done once on this physical
 device — upstream's `P9-12`, 2026-08-21: `J 80500000` into a 156-byte image the
-device had never seen, zero flash bytes, `AutoBurning=0` echoed in the same boot.
+device had never seen, 🔄 **512 bytes of a 4,194,304-byte part measured unchanged** across three kernel executions and two uploads — which is what `G8-pre`/`G8a`/`G8b` bought and is `G8b`'s own wording — with `AutoBurning=0` echoed in the same boot. *(This read “zero flash bytes”, the sentence `G8b` forbids, fifty lines above the row that forbids it.)*
 **What is new here is the payload: 987,138 bytes instead of 156, and a real entry
 point instead of a marker loop.**
 
@@ -592,6 +592,16 @@ simulator had approved sat an `andi` in a load delay slot. So:
   they say is bounded: **512 bytes of a 4 MiB part**, at two addresses chosen
   because they are the two that would change. `G8b`'s row carries the wording
   that is entitled to.
+  🔴 🆕 **2026-08-30: "the two that would change" left out the one that cannot be
+  changed back.** 讀 `CLAUDE.md`: the two forbidden regions are the loader at
+  `0x000000`–`0x005FFF` and **`H601` at `0x006000`–`0x007FFF`**, *"this unit's MAC
+  and radio calibration, not restored by reset"*. This bracket samples **256 of
+  the loader's 24,576 bytes, 0 of `H601`'s 8,192**, and 256 bytes of the `cr6c`
+  header — which no rule forbids writing at all. So the region with the only
+  unrecoverable failure mode has never been in the bracket, and nobody wrote that
+  down for six days. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8.2 adds it as
+  a third region; §8.3 is why its capture cannot be committed and
+  `tools/flashwin.py` is where its expectation comes from.
 
 ---
 
@@ -1276,7 +1286,7 @@ cycle — it rides this seating, and it runs **first**.
 | | |
 |---|---|
 | **Power cycles** | 🔴 **one per `J`, and that is not a choice.** 2026-08-25 `R1g-4b` measured it: the loader **re-stages `0x80500000` on a watchdog reset**, so a second `J` in the same cycle runs the *staged vendor image*, not the payload that was uploaded. Every rung below is therefore: power on → ESC → `AUTOBURN 0` → `IPCONFIG` → TFTP `put` → `J`. **One directory per power cycle** (`bench/README.md`) |
-| **Flash bytes written** | **0.** `AUTOBURN` is read at `0x8040D4A0` **before every upload**, and the read must return `00000000`. If it does not, nothing is uploaded |
+| **Flash bytes written** | 🔴 🔄 **UNMEASURED, and this row said `0` until 2026-08-30.** `AUTOBURN` is read at `0x8040D4A0` **before every upload** and must return `00000000`, or nothing is uploaded — that is a **guard**, and §B3's `G8a`/`G8b` are the **evidence**. This card carried no `FLR` bracket at all, so seating 5 issued no flash-write command and **counted no flash bytes**. `G8b`'s own row spells out the difference: two 256-byte reads entitle you to *"the loader head and the `cr6c` header are unchanged"*, and *"zero flash bytes written"* needs a full re-dump hashed against `FLS-14`. *(Original: **"0.** `AUTOBURN` is read … If it does not, nothing is uploaded"* — the forbidden sentence, in the header of the card that would be read at the bench, and yesterday's four-item adversarial pass walked past it.)* Power cycle 3's block carries the bracket: `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 |
 | **RAM written** | the image, at `0x80500000`. ⚠️ `probe3` writes its own block; `R1h-1`'s rebuild-on-the-day procedure runs first and `rb=80a02000` is its stale-build check |
 | **Closes** | `R3` D1–D5 (`PROGRESS.md` § Step list), and `R1h-3` |
 
@@ -1349,24 +1359,24 @@ Its §1 carries that mapping and nothing else does.
 
 | # | typed / run | expect | bytes | 🔴 stop if |
 |---|---|---|---:|---|
-| **L-A** | power on with `console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-08-30b/A-catch --esc 25 --esc-period 0.002` | the ESC window, then `<RealTek>` | — | no prompt → power off. That is the seating |
+| **L-A** | power on with `console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-08-30b/A-catch --esc 25 --esc-period 0.002 --seconds 40` | the ESC window, then `<RealTek>` | — | no prompt → power off. That is the seating |
 | **L-0r** | `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o bench/2026-08-30b/L0-rescue.json` | `AutoBurning=0` · `Set TFTP Load Addr 0x80500000` · `Now your Target IP is 10.1.1.1`, in that order | — | any of the three absent |
-| **L-0ab** | `--send 'DW 8040D4A0 1' --out …/L0-ab` | the word **at `0x8040D4A0`** = **`00000000`** | **71** | ≠ `00000000` → **STOP. Nothing is uploaded** |
-| **L-0t** 🆕 | `--send 'DW 806013F0 8' --out …/L0-tail` | two lines of DRAM. **Record both.** Line 1 must **not** be sixteen zero bytes | **118** | line 1 already all-zero → `L-2c`'s first half is void this seating; say so and carry on. `L-2a` still discriminates |
+| **L-0ab** | `--send 'DW 8040D4A0 1' --out …/L0-ab --seconds 4` | the word **at `0x8040D4A0`** = **`00000000`** | **71** | ≠ `00000000` → **STOP. Nothing is uploaded** |
+| **L-0t** 🆕 | `--send 'DW 806013F0 8' --out …/L0-tail --seconds 6` | two lines of DRAM. **Record both.** Line 1 must **not** be sixteen zero bytes | **118** | line 1 already all-zero → `L-2c`'s first half is void this seating; say so and carry on. `L-2a` still discriminates |
 | **L-1** | `loader-tftp.py put --host 10.1.1.1 --image $FWRE_WORK/rebuild/bench-only/b5-20260830/rlxfw-loudm-20260830.bin --filename rlxfw-loudm --rescue-report bench/2026-08-30b/L0-rescue.json --expect-load 80500000 --yes` | **1,053,696** bytes accepted | — | any refusal → read it. **Never `--allow-autoexec`** |
-| **L-2a** 🔄 | `--send 'DW 80500000 8' --out …/L2a` | `80500000: 00000000 00008021 40906000 00000000` · `80500010: 00000000 00000000 3C108060 26101400` | **118** | 🔴 **the word at `0x8050001C` ≠ `26101400`, or the word at `0x80500018` ≠ `3C108060`** → the wrong image is at `0x80500000`. Decode it with the table in §B5-c1. ⚠️ **Addresses, not word numbers** — §B5-c8 |
-| **L-2b** | `--send 'DW 80540000 1' --out …/L2b` | `80540000: CEC3FFD9 C013013E CE652208 749F1E48` | **71** | ≠ → not `loudm`, whatever `L-2a` said |
-| **L-2c** 🆕 | `--send 'DW 806013F0 8' --out …/L2c` | line 1 = **sixteen zero bytes**; line 2 **byte-identical to `L-0t`'s line 2** | **118** | line 1 ≠ 0 → short transfer. line 2 moved → the write ran past `image_end` |
+| **L-2a** 🔄 | `--send 'DW 80500000 8' --out …/L2a --seconds 6` | `80500000: 00000000 00008021 40906000 00000000` · `80500010: 00000000 00000000 3C108060 26101400` | **118** | 🔴 **the word at `0x8050001C` ≠ `26101400`, or the word at `0x80500018` ≠ `3C108060`** → the wrong image is at `0x80500000`. Decode it with the table in §B5-c1. ⚠️ **Addresses, not word numbers** — §B5-c8 |
+| **L-2b** | `--send 'DW 80540000 1' --out …/L2b --seconds 4` | `80540000: CEC3FFD9 C013013E CE652208 749F1E48` | **71** | ≠ → not `loudm`, whatever `L-2a` said |
+| **L-2c** 🆕 | `--send 'DW 806013F0 8' --out …/L2c --seconds 6` | line 1 = **sixteen zero bytes**; line 2 **byte-identical to `L-0t`'s line 2** | **118** | line 1 ≠ 0 → short transfer. line 2 moved → the write ran past `image_end` |
 | **L-3** | `--send 'J 80500000' --seconds 90 --out …/L3` | the byte sequence in §B5-c3, then a prompt | — | see §B5-c3's four failure shapes |
-| **L-5a** | `--send 'cat /proc/cpuinfo' --out …/L5a` | output returns, and `cpu model` names the core | — | prompt that does not echo is **not** a shell |
-| **L-5b** 🔴 | 🔄 **`--send 'cat /proc/version' --out …/L5b`.** *(Original: `uname -a` — and it CANNOT RUN, §B5-c7.)* | `Linux version 2.6.30.9 (key@K) (gcc version 3.4.6-1.3.6) #1 Fri Aug 28 23:37:47 CST 2026` | — | a vendor build stamp (`admin@office.hopeiot`, `#1526`, 2018) → **unattributed**, not a pass |
-| **L-6a** 🔄 | `--send 'ifconfig -a' --out …/L6a` | 🔴 **SIX**: `eth0` `eth1` `eth2` `eth3` `eth4` **and `eth7`** | — | fewer than six → `bsp_swcore_init` succeeded and the netdevs did not. *(This row said `eth0`…`eth4`, from `G6.log` — which is the VENDOR's kernel. §B5-c9)* |
-| **L-6b** | `--send 'ifconfig eth0 10.1.1.10 netmask 255.255.255.0 up' --out …/L6b` | no error | — | — |
+| **L-5a** | `--send 'cat /proc/cpuinfo' --out …/L5a --seconds 15` | output returns, and `cpu model` names the core | — | prompt that does not echo is **not** a shell |
+| **L-5b** 🔴 | 🔄 **`--send 'cat /proc/version' --out …/L5b --seconds 15`.** *(Original: `uname -a` — and it CANNOT RUN, §B5-c7.)* | `Linux version 2.6.30.9 (key@K) (gcc version 3.4.6-1.3.6) #1 Fri Aug 28 23:37:47 CST 2026` | — | a vendor build stamp (`admin@office.hopeiot`, `#1526`, 2018) → **unattributed**, not a pass |
+| **L-6a** 🔄 | `--send 'ifconfig -a' --out …/L6a --seconds 15` | 🔴 **SIX**: `eth0` `eth1` `eth2` `eth3` `eth4` **and `eth7`** | — | fewer than six → `bsp_swcore_init` succeeded and the netdevs did not. *(This row said `eth0`…`eth4`, from `G6.log` — which is the VENDOR's kernel. §B5-c9)* |
+| **L-6b** | `--send 'ifconfig eth0 10.1.1.10 netmask 255.255.255.0 up' --out …/L6b --seconds 10` | no error | — | — |
 | **host** | `ip neigh flush dev <if>` then `tcpdump -i <if> -n -e 'icmp or arp'` **running throughout** | — | — | 🔄 the flush clears the loader's synthesised `56:0a:01:01:01:e8` for `10.1.1.1`; **that entry is not on the path this ping takes**, so it is hygiene here rather than the fix it was in `G7`. §B5-c10 |
-| **L-7a** | `--send 'ping -c 4 10.1.1.2' --out …/L7a` | ≥ 1 reply **and** request+reply in the host capture | — | ARP requests and no ARP replies in the host capture = the host, not the driver |
-| **L-6c** 🔄 | *only if the previous ping got nothing*: `--send 'ifconfig <prev> down'` then `--send 'ifconfig <next> 10.1.1.10 netmask 255.255.255.0 up'`, and ping again. 🔴 **The order is `eth0`, `eth1`, `eth2`, `eth3`, `eth4`** — captures `…/L6c`, `…/L6d`, … | no error | — | 🔴 **four of the five are LAN** (vid 9, ports `0x10`/`0x8`/`0x4`/`0x2`) and `eth1` is the WAN (讀, `RTL_DRV_WAN0_NETIF_NAME "eth1"`). Trying two of five and calling it refuted is what §B5-c9 corrects. One interface up at a time |
-| **L-7b** 🔄 | `--send 'ping -c 4 10.1.1.2' --out …/L7b` (and `…/L7c`, … per interface) | as `L-7a` | — | 🔄 **all five silent → D5 is refuted.** *(This row said "both interfaces", which would have refuted D5 on a cable in any of three LAN jacks.)* D1–D4 stand on their own either way |
-| **L-8** 🆕 | *only after a `J` that did not reach D4*: `--send 'DW 80500000 8' --out …/L8a` and `--send 'DW 806013F0 8' --out …/L8b` | `L8a`'s word **at `0x8050001C`** back to **`26101000`** with `0x80500018` = `3C10805F` (the loader re-staged) while `L8b` line 1 is **still zero** | 118 each | three outcomes, not two — §B5-c6 |
+| **L-7a** | `--send 'ping -c 4 10.1.1.2' --out …/L7a --seconds 20` | ≥ 1 reply **and** request+reply in the host capture | — | ARP requests and no ARP replies in the host capture = the host, not the driver |
+| **L-6c** 🔄 | *only if the previous ping got nothing*: `--send 'ifconfig <prev> down' --seconds 6` then `--send 'ifconfig <next> 10.1.1.10 netmask 255.255.255.0 up' --seconds 8`, and ping again. 🔴 **The order is `eth0`, `eth1`, `eth2`, `eth3`, `eth4`** — captures `…/L6c`, `…/L6d`, … | no error | — | 🔴 **four of the five are LAN** (vid 9, ports `0x10`/`0x8`/`0x4`/`0x2`) and `eth1` is the WAN (讀, `RTL_DRV_WAN0_NETIF_NAME "eth1"`). Trying two of five and calling it refuted is what §B5-c9 corrects. One interface up at a time |
+| **L-7b** 🔄 | `--send 'ping -c 4 10.1.1.2' --out …/L7b --seconds 20` (and `…/L7c`, … per interface) | as `L-7a` | — | 🔄 **all five silent → D5 is refuted.** *(This row said "both interfaces", which would have refuted D5 on a cable in any of three LAN jacks.)* D1–D4 stand on their own either way |
+| **L-8** 🆕 | *only after a `J` that did not reach D4*: `--send 'DW 80500000 8' --out …/L8a --seconds 6` and `--send 'DW 806013F0 8' --out …/L8b --seconds 6` | `L8a`'s word **at `0x8050001C`** back to **`26101000`** with `0x80500018` = `3C10805F` (the loader re-staged) while `L8b` line 1 is **still zero** | 118 each | three outcomes, not two — §B5-c6 |
 
 **`L-*` are the `K0`–`K8` cells below, applied to this power cycle**, and the
 letter is there so power cycle 3's captures cannot be confused with these:
@@ -1375,11 +1385,24 @@ letter is there so power cycle 3's captures cannot be confused with these:
 `L-8` = `K8`. The `K` rows carry the reasoning; this card carries the typing.
 
 ⏱ **The reference for `L-3`**: this unit's own kernel, from `J` to its last byte,
-took **26.05 s and 1,789 bytes** (量, `bench/2026-08-24c/G6.meta.json`,
+took **26.05 s and 1,789 bytes** (量, `bench/2026-08-24c/G6.timing`'s last row — 🔄 *this said `G6.meta.json` until 2026-08-30, which is the citation §B5-c12 below already corrected once; `duration_s` there is the 60 s window*,
 `--seconds 60`). `--seconds 90` is 3.5× that, and `loudm` prints more than the
 vendor kernel does, not less.
 
 #### Power cycle 3 — and what it is spent on is decided by `L-3`, not by this card
+
+🆕 **2026-08-30: `L-3` reached D4, so the first row below is the one that
+applies, and the block for it exists** —
+`bench/2026-08-30c/PREDICTIONS-B5-block2.md`, thirty-one cells, frozen, `0 of 31`
+at the desk. **Its §0 IS the card for cycles 3 and 4**, the same way block 0's §0
+is the card for cycle 1: §B5's own card stops at power cycle 2. Prefixes `V-*`
+and `Z-*`, and §1 of that block says why they are new letters.
+
+🔴 **It is TWO power cycles and this table only ever imagined one.** Cycle 4 is
+nine cells and no upload: it is the second half of the `FLR` bracket, which
+cannot share a cycle with the first (`FLR` writes the TFTP length global, so no
+transfer may follow it; and after `J` there is no loader to type `FLR` into).
+`R3-8b` is cycle 3 and `R3-10` is cycle 4 — `PROGRESS.md` owns the step ids.
 
 | `L-3` reached | cycle 3 is | why |
 |---|---|---|
@@ -1916,6 +1939,58 @@ to be re-run and probably amended. Changing an instrument between its desk
 validation and the bench is the shape `P7` exists to prevent. **Carried
 forward**, and `bench/2026-08-30/CORRECTIONS-block0.md` §1 owns the measurement.
 
+#### §B5-c14 — 🆕 the instrument was fixed, the card was fixed, and the count in `c13` above is wrong
+
+**2026-08-30, the desk segment after the seating.** `c13`'s last paragraph says
+the fix *"belongs in the instrument and was deliberately not made today"*,
+because changing the one tool the whole seating runs through between its desk
+validation and the bench is the shape `P7` exists to prevent. **The seating
+ended, so that reason expired.** Both halves are done:
+
+* `console-capture.py` **refuses** when neither `--seconds` nor `--idle` is
+  given, and the refusal names both flags and the sizing rate.
+* the `.meta.json` records **`seconds` and `idle`**, which it did not — so the
+  census of what a capture was given stops being an inference off `stop_reason`.
+* `tools/test-console-capture.sh` goes **29 → 40**, and **seven** of the eleven
+  new cases are controls — the `N`-labelled ones, which is the count the suite's
+  own header uses (17 → 24). *(An earlier draft of this line said nine, counting
+  `P13` and `P15` as controls because they exist to kill a specific mutant; one
+  session, two definitions.)*
+
+🔴 **`c13`'s counts are wrong and the corrected ones are in
+`bench/2026-08-30/CORRECTIONS-block0.md` §*Corrections to this file*: this card
+is 18 rows, of which 15 are `console-capture.py` invocations, and 14 of the 15
+carried no terminator** — not *twelve of thirteen*. The three that are not
+captures are `L-0r` (`console-dump.py`), `L-1` (`loader-tftp.py`) and `host`
+(`tcpdump`).
+
+🔴 **And `c13`'s remediation table above is missing three rows.** It assigns
+nothing to `L-6c` and nothing to `L-8`, and it folds `L-7b` into a line that
+*"fixes a row it did not count as defective"*. **All fifteen rows now carry a
+number in the table above**, and the three the table never had are:
+
+| row | added | why that number |
+|---|---|---|
+| `L-6c` | `--seconds 6` (`down`) and `--seconds 8` (`up`) | 量, what was actually run: `L6c`/`L6d`/`L6e`/`L6f` are 22-byte replies at 6 s and `L6c-up`…`L6f-up` are 52-byte replies at 8 s |
+| `L-7b` | `--seconds 20` | the same as `L-7a`; it was covered only by a sentence, not by a row |
+| `L-8a` / `L-8b` | `--seconds 6` each | 118-byte replies, block 0's equivalents. Never assigned, never run |
+
+⚠️ **Where the guard sits is itself a measurement, and the obvious placement is
+wrong.** 量 2026-08-30: this file holds **four** capture invocations with no
+terminator (`:196`, `:307`, `:315`, `:332`) and all four pass `--port /dev/null`
+expecting a refusal — but only **ONE** of them changes, because `_check_send`
+runs first and refuses the other three itself. The one is `P4`, the
+127-character line, whose assertion is that the run *reaches* the port. It now
+carries `--seconds 1`, and `N21` is the case that pins the guard's position from
+both sides with one command: a 127-character `--send` with no terminator must
+produce the **terminator** refusal — not `console line buffer is` (which would
+mean the guard is too early) and not `cannot open` (too late).
+
+⚠️ **Nothing else in this repository invokes `console-capture.py capture` as a
+subprocess** (量, `grep` over `tools/` and `docs/`), so the refusal cannot break
+`loader-tftp.py` or `console-dump.py` at the bench. That was checked before the
+guard was written, not after.
+
 ---
 
 ### Running order, and it does not move
@@ -2259,7 +2334,7 @@ a loader prompt in a transcript without sending anything to it.
 26 of 26 captures postdate their own prediction file**, minimum margin **+7.9 s**,
 `tools/check-predictions.py` with its controls passing on every block — four
 when that sentence was written, fifteen since 2026-08-29.
-**Zero flash bytes.** Every command sent this seating, enumerated from the
+🔄 **No flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket ran)***.** Every command sent this seating, enumerated from the
 captures' own metadata rather than from the logs: **22 `DW` reads, two `J`, two
 `EW` — and both `EW`s are `B800311C`, the watchdog register.** A scanner for
 `FLW` / `AUTOBURN 1` / `EB` / a flash-range `EW` returns 0 over all 26 and fires
@@ -2572,7 +2647,7 @@ than from a person.
 
 ## Results — Session B4, `R1g-4b`, 2026-08-25b
 
-**One power cycle, 23 captures, four prediction blocks, zero flash bytes,
+**One power cycle, 23 captures, four prediction blocks,** 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket ran)***,
 `R1e` closes.** `bench/2026-08-25b/`. Every command came from
 § *Running order — `R1g-4b`* or from a tool; nothing was typed from memory.
 

@@ -11,15 +11,27 @@ power cycle before it, a bare-metal payload of mine measured this die's
 instruction cache by experiment — **16 KiB, 16-byte lines, two-way** — with the
 controls that would have voided the number firing in both directions.
 
-**Not one byte of mine has been written to this device's flash**, and there is
-still no driver of mine: the ping went out through the vendor's own network
-driver, in the vendor's own configuration.
+🔴 **No flash-write command of mine has ever been issued** — and as of
+2026-08-30 this paragraph no longer says the other thing, because the other thing
+was never measured. *(It read: "**Not one byte of mine has been written to this
+device's flash**", in the most-read paragraph in the repository, while
+`RUNSHEET` §B3's `G8b` row has said since 2026-08-24 that such a sentence needs a
+full re-dump hashed against `FLS-14`.)* What IS measured is 512 bytes of a
+4,194,304-byte part, unchanged across three kernel executions and two uploads on
+2026-08-24 — and the seating that booted my own kernel ran no such bracket at
+all, so it holds **less** flash evidence than that one did. The bracket that
+closes it is on the next seating's card and reaches 768 bytes: 0.018 %.
+
+And there is still no driver of mine: the ping went out through the vendor's own
+network driver, in the vendor's own configuration.
 
 > *Until 2026-08-29 23:09 this paragraph read: "**Nothing of mine has executed on
 > the silicon**, and not one byte of mine has been written to this device's
 > flash." Earlier the same day it read "**There is still no loadable image**",
 > and until 2026-08-28 "**Nothing has been built.**" The flash clause has
-> survived all four rewrites and is the one that matters.*
+> survived all four rewrites and is the one that matters.* 🔴 **And on
+> 2026-08-30 it turned out to be the one sentence in it that had never been
+> measured** — surviving four rewrites is not the same as being checked once.
 
 Tags mark where the outside world can check the work, not where a feature landed.
 `PROGRESS.md` is the only file that says where the work actually is.
@@ -27,6 +39,112 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+🔴 **2026-08-30 — desk, no power: the next seating's two cards, and the flash
+question stops being one this project can only argue about.**
+`bench/2026-08-30c/PREDICTIONS-B5-block2.md` is 31 cells across **two** power
+cycles — `quietm` plus the first round of an `FLR` bracket, then a ninety-second
+cycle that is nothing but the second round. `0 of 31` at the desk, which is the
+correct answer before a seating.
+
+### The sentence this repository forbids was in the card's own header, and in this file's first paragraph
+
+`RUNSHEET` §B3's `G8b` row has said since 2026-08-24 that two 256-byte flash
+reads entitle a write-up to *"the loader head and the `cr6c` header are
+unchanged"* and **not** to *"zero flash bytes written"*. §B5's card header said
+`Flash bytes written: 0.` `bench/README.md` said it in **five** per-seating
+headings, and 量 — **not one of those five seatings ran an `FLR` bracket.** This
+file's opening paragraph said *"not one byte of mine has been written to this
+device's flash"*, in the most-read place in the repository. All of them are
+corrected in place with the originals kept.
+
+🔴 **And `H601` — the one region a wrong write cannot be undone in — has never
+been in the bracket at all.** 量: `G8a`/`G8b` sample 256 of the loader region's
+24,576 bytes, 256 bytes of the `cr6c` header (which no rule forbids writing), and
+**0 of `H601`'s 8,192**. Six days of write-ups said *"the two regions that would
+change"* and neither of them was the one that cannot change back.
+
+### `tools/flashwin.py` — an instrument for a reading that can never be published
+
+`H601`'s bytes are this unit's MAC and radio calibration, so its capture cannot
+be committed and **not even its sha256 can**: with the rest of a 256-byte window
+known, a digest is a 2^24 search for the address. So the expectation is computed
+at the desk from this unit's own 4 MiB dump, and **the control is what is
+public**: the same renderer must reproduce `bench/2026-08-24d/G8a-rd0.log` and
+`G8a-rd6.log` byte for byte. 量 — both do, 777 bytes each, and the two committed
+dumps are byte-identical over all 4,194,304 bytes. Thirteen controls; ten of
+them, including the publication guard driven as a subprocess in all three
+directions, run on a stock runner.
+
+### `console-capture.py` refuses a capture that cannot end, and records what ended it
+
+Both halves of the defect found before power on 2026-08-29 are closed. 🔴 **Where
+the guard sits was measured and the obvious answer is wrong**: of the four
+terminator-less invocations in the suite, only **one** reaches it — the other
+three are refused by `_check_send` first — so `P4` gains `--seconds 1` and `N21`
+is the sandwich that pins the guard's position from both sides with one command.
+`test-console-capture` 29 → **40**, nine of the eleven new cases controls.
+`TOOL_VERSION` deliberately did not move: it owns what went out on the wire, and
+the presence of the `seconds` key is what dates a capture instead.
+
+### Three counts that were wrong, and a directory nothing ignored
+
+- **The `A-catch` census's population is a filename.** 量: eleven files match,
+  one of them is not a `console-capture.py` output at all (no `.meta.json`; an
+  interactive transcript), and two more predate `tool_version`. The last two
+  write-ups said nine and eight.
+- **`bench/README.md` has nine sections for fourteen directories**, and the five
+  with none include the whole of `R0` — where the only flash evidence lives.
+- **`PROGRESS.md`'s § Now recorded the eighth segment twice**, and the copy that
+  was dropped still pointed at *"the Active step row"* for its details.
+- **`ci-out/` had never been in `.gitignore`**, and the pre-push census
+  `CLAUDE.md` mandates is what creates it. `test-gitignore` 18 → **21**, because
+  one ignore line is not one claim.
+
+🔴 **And that pre-push census immediately earned its keep**: `flashwin`'s skip
+label did not match the table, `ci-census` read `UNEXPECTED-SKIP` and
+`10+0+0 != 13`, and the build would have gone red for the third time in three
+sessions. Fixed before the push; the census closes at **455**.
+
+`SPEC.md` `FLS-14` gains its reproducibility and its cross-path agreement;
+`FW-26` (this unit's busybox has no applet that can digest a stream, so the flash
+cannot be cross-read from its own userspace) and `FW-27` (**my kernel reaches a
+shell in 8.98 s, 2.9× faster than this unit's own**) are new.
+`notes/kernel-build.md` §17 owns what `quietm` can and cannot print — including
+that a **panic is still visible with `CONFIG_PRINTK=n`**, 量 in the built
+`vmlinux`'s symbol table, so silence there is a hang rather than a suppressed
+panic.
+
+### The adversarial pass, and the instrument half of it is the expensive one
+
+Three hostile readers. The card gave up sixteen items, two of which would have
+cost bench time: **`$FWRE_WORK` is empty in every shell on this host**, so the
+card's `--out $FWRE_WORK/…` expanded to `/rebuild/…` and produced an uncaught
+`PermissionError` *after* the `H601` read had been spent (every path on the card
+is literal now); and **§7.3 printed the sentence `SPEC.md` `LDR-39` explicitly
+rejects** — *"exactly 1,027,072 bytes and not one more"* — where the pair
+actually brackets `[n, n+16)`. A third put `MAP-17` and the mark 量 on a value
+this repository has twice written up as being neither.
+
+🔴 **And the mutation pass is the one that changed the most.** It ran **45
+mutants against the two instruments and 24 survived**; three of them printed this
+unit's MAC — the rendering written to stdout on the refusal path, the withheld
+digest printed beside the word *withheld*, and the dump never opened at all. The
+common cause was one sentence: every case that could leak used **one argument
+triple against an all-zero dump**, and `R1`/`R2` called the renderer in process,
+so nothing between *open the file* and *format the words* had a control over it.
+`flashwin`'s self-test is rebuilt — 13 → **19**, every leak-capable case drives
+the real command line and asserts stdout is **empty**, `R1`/`R2` go through
+`--out` and `cmp` — and **22 of 22 of the surviving mutants are now killed**.
+`console-capture`'s equivalent nine are carried forward rather than half-fixed:
+the sharpest is that the guard can be waived by any flag its four cases leave at
+default, and `--esc 25` is `A-catch`'s own shape.
+
+**Zero flash bytes, zero power cycles, zero device readings — and today that
+sentence is legitimate, because the board was never plugged in.** That is the
+distinction the rest of this entry is about.
+
+---
 
 **`R1h-3` + `R3-8a`, 2026-08-29 — the first seating of `R3`. `probe3` measured the
 I-cache, then a kernel of mine booted to a shell and pinged.** Two power cycles, 26
@@ -1001,7 +1119,7 @@ not prove. Desk only, no power, zero flash bytes.
   they were written.
 
 **`R1g-4b`, at the bench, 2026-08-25 — `R1e` closes and `R1-gate` has only its
-write-up left.** One power cycle, 23 captures, zero flash bytes, and 16 of 16
+write-up left.** One power cycle, 23 captures, 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket ran)*, and 16 of 16
 captures written after the block that predicted them.
 
 - **The CP0 census ran on this silicon**, under an exception handler installed at

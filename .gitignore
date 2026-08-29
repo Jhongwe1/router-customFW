@@ -108,3 +108,14 @@ venv/
 *.swp
 .DS_Store
 Thumbs.db
+
+# ---------------------------------------------------------------------------
+# CI capture directory
+# ---------------------------------------------------------------------------
+# `.github/workflows/ci.yml` tees every suite's stdout into `ci-out/` so that
+# `tools/ci-census.py` can do arithmetic on it, and the pre-push rule in
+# CLAUDE.md is to rebuild it LOCALLY and run the census before pushing -- which
+# is what caught the census mismatch on 2026-08-30. On a runner the directory is
+# an artefact and vanishes; here it stays behind, 25 files of build output that
+# `git add -A` would happily commit. Nothing ignored it until 2026-08-30.
+ci-out/

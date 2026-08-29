@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Guard suite for .gitignore -- 15 cases, one of which skips on a filesystem
+# Guard suite for .gitignore -- 21 cases, one of which skips on a filesystem
 # that cannot make symlinks.
+#
+# 18 -> 21 on 2026-08-30: `ci-out/` had never been ignored, and the pre-push
+# step CLAUDE.md mandates -- rebuild it locally, run the census -- is what
+# creates it. Three cases, because one line is not one claim: the directory
+# itself, a file inside it, and `ci-out.md` NOT ignored, which is what tells a
+# trailing-slash pattern from a bare prefix.
 #
 # Why this exists rather than "just read the file"
 # ------------------------------------------------
@@ -35,7 +41,7 @@ trap 'rm -rf "$T"' EXIT
 skip=0
 
 # MUST be tracked. Without these, a .gitignore of `*` would score 7/7.
-KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/threat-model.md dumps/MANIFEST.json"
+KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/threat-model.md dumps/MANIFEST.json ci-out.md"
 
 # MUST be ignored, one per reason:
 #   plan/     planning material, may address the author directly
@@ -45,7 +51,8 @@ KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/threat-
 #   build/    build output
 #   dumps/    per-unit artefacts -- MACs and radio calibration
 #   *.img *.squashfs  images anywhere
-DROP="plan/router-rebuild-plan.md study/20260823-study.md refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf src-vendor/x.c build/vmlinux dumps/flash.bin work.img rootfs.squashfs"
+#   ci-out/   the CI capture directory, which the pre-push census creates here
+DROP="plan/router-rebuild-plan.md study/20260823-study.md refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf src-vendor/x.c build/vmlinux dumps/flash.bin work.img rootfs.squashfs ci-out/spec-check.out ci-out/deeper/x.out"
 
 cd "$T"
 cp "$GI" .gitignore

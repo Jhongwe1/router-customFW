@@ -253,9 +253,31 @@ tools/spec-check.py        eight checks over SPEC.md, and nine mutations that mu
                            each produce a finding the file did not already have.
                            The eighth exists because one unescaped `|` had kept a
                            row outside two of the other checks since it was written
-tools/console-capture.py   29 cases. Four of them exist because the ESC heartbeat is
+tools/console-capture.py   39 cases, 40 results (P3 checks two things). Four of them
+                           exist because the ESC heartbeat is
                            the grid every interval is quantised to, so the period each
-                           capture ACHIEVED is measured and recorded, not assumed
+                           capture ACHIEVED is measured and recorded, not assumed.
+                           Eleven more arrived on 2026-08-30 with the terminator
+                           guard, and one of them is the shape worth copying: N21
+                           sends a 127-character line with NO terminator and
+                           requires the terminator refusal -- not the length one
+                           and not the port one -- which pins the guard between
+                           the two things it has to sit between, from one command
+tools/flashwin.py          13 cases, and it exists for a region whose reading can
+                           never be published. It renders the loader's `DW` reply
+                           for a window of flash out of this unit's own dump, so
+                           that H601 -- the MAC and radio calibration, the one
+                           region a wrong write cannot be undone in -- has an
+                           expectation computed before the seating. Its control is
+                           the argument: R1/R2 require the same renderer to
+                           reproduce two captures taken off the device on
+                           2026-08-24, byte for byte, so a reader who cannot see
+                           the withheld rendering can see that the instrument that
+                           produced it reproduces two readings they can. C6/C7/C8
+                           drive the publication guard as a subprocess in all three
+                           directions, including that no digest is printed for such
+                           a window: with the rest of the 256 bytes known, a hash
+                           is a 2^24 search for the address
 tools/check-predictions.py refuses to compare a prediction against a capture unless
                            the prediction file's mtime is earlier. Six controls, four
                            of which must FAIL. Two of the six exist only because

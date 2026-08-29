@@ -908,7 +908,7 @@ fault during `w-imem` costs the discriminator and not the walk.
 | **`rlx_r3k_size` / `GEOM=1`** | 量 dead: the algorithm needs isolation and `CPU-35` measured this core does not isolate, so it can only return `0` — which is also its *"the core does not answer"* value |
 | **`rlx_isc_inv`** | 量: its byte stores reached DRAM and corrupted both victims (`probe1` cell 4) |
 | **writing `TC1DATA`/`TCCNR`** to get an 18.79 s counter instead of a 10 ms one | it would be strictly better as an instrument, but it is a **register write** where every window in this payload already fits inside 3 ms of a 9.9998 ms wrap. Recorded as the upgrade path for `R5-0`, declined here |
-| **flash** | zero bytes. `P0` is read before the `put` and the seating stops on anything but `00000000` |
+| **flash** | 🔄 **no flash-write command, and the byte count is not this payload's to claim.** `P0` reads `AUTOBURN` before the `put` and the seating stops on anything but `00000000`, and every `--send` this payload's cells issue is a `DW`, a `J` or an `EW` into RAM — that is a **guard**. *(This row read “zero bytes” until 2026-08-30, which is the sentence `RUNSHEET` §B3's `G8b` forbids without a full re-dump hashed against `FLS-14`.)* The **evidence** is an `FLR` bracket, and `probe3`'s seating ran none; `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 is where one is |
 
 ---
 

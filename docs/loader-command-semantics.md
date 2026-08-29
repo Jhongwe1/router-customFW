@@ -647,8 +647,32 @@ destination writes a flash region over whatever is there, including the loader's
 own `.data` at `0x8040D000`+. The `(Y)es` prompt is the only thing between a
 typo and that.
 
-**Two operating consequences, desk-verified 2026-08-24b, neither yet run on the
-device.**
+🔄 **Two operating consequences, desk-verified 2026-08-24b** — *(this said
+"neither yet run on the device" and that stopped being true the same week; it was
+still saying it on 2026-08-30)*. **Both have now run, six times each**: `G8-pre`
+(`bench/2026-08-24c`), `G8a` (`24d`) and `G8b` (`24f`), two regions apiece. 量
+2026-08-30, the sizes and the content, over all six triples:
+
+| | reply | bytes | sha256 |
+|---|---|---:|---|
+| `FLR 80A00000 000000 100` | echo · `Flash read from 00000000 to 80A00000 with 00000100 bytes` · `(Y)es , (N)o ? --> ` and **no prompt** | **104** | `21ab700d4bcdd5ca…` |
+| `FLR 80A00100 060000 100` | as above, `from 00060000 to 80A00100` | **104** | `f8e5766ad59dcccc…` |
+| `Y` | `Flash Read Successed!` then `<RealTek>` | **35** | `bc888217ef1f26b9…` |
+| `DW 80A00000 64` | 16 lines | **777** | `cea9a0f1eeaaa884…` |
+| `DW 80A00100 64` | 16 lines | **777** | `8c9949bcd28ff86a…` |
+
+🔴 **All three rounds are byte-identical at both addresses** — across two power
+cycles and three kernel executions — and `tools/reply-size.py` predicts 104, 35
+and 777 from its own model, fitted separately. **The `FLR` reply is the one shape
+in this file with no `<RealTek>` at the end**, because the loader is waiting on a
+second line; a capture that ends in a prompt is a capture where the confirmation
+already went out.
+
+⚠️ **And the destination is what the operator gets wrong, not the source.** A
+mistyped first argument writes 256 bytes of flash over whatever is in RAM there,
+and the echo above is the only place all three arguments are visible before `Y`
+is typed. **Read the echo, then confirm** — and note that the command that would
+undo it, a re-upload, is exactly the one an `FLR` has just made unavailable.
 
 - **One `FLR` read costs three captures.** The confirmation at `0x80409B18`
   prints `(Y)es , (N)o ? --> ` and takes `Y` or `y` on a second line (read out of
