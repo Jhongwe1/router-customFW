@@ -813,6 +813,41 @@ fourteen characters and a person counted fifteen. `check-predictions.py` verifie
 that a prediction file predates its capture; it does not verify the arithmetic
 inside it. `reply-size.py`'s control `C8` is that exact case.
 
+### 🆕 How fast `DW` sends it — 3,594–3,726 B/s, and it is not the line rate
+
+**量 2026-08-29**, off the committed `.timing` files, measured from the first
+read to the last read of one contiguous reply. `reply-size.py` says how many
+bytes a command returns and says nothing about how long they take; every
+`--seconds` on a runsheet card is a bet on the second number, and until now that
+bet was placed against the 3,840 B/s line rate of 38400 8N1.
+
+| capture | sent | bytes | window | B/s | % of line rate |
+|---|---|---:|---:|---:|---:|
+| `bench/2026-08-25b/H2g` | `DW 80A01000 817` | 9,660 | 2.688 s | **3,594** | 93.6 % |
+| `bench/2026-08-25/H1c` | `DW 80A00000 137` | 1,667 | 0.447 s | **3,726** | 97.0 % |
+
+**n = 2**, and the two disagree by 3.5 %, which is the fixed cost of the first
+line amortised over different reply lengths — the longer reply is the *slower*
+one, so this is not a per-byte overhead. **Size a `--seconds` against 3,594.**
+
+⚠️ **One capture was excluded and the exclusion is a judgement, so it is
+stated.** `bench/2026-08-24b/B7c` holds 1,272 bytes over a 20 s window for
+`DW B8003500 1`, whose reply is 71 bytes; the rest is an ESC window's echoes, so
+those bytes are not one contiguous reply and a rate computed over them (64 B/s)
+is a rate of nothing. A scan that drops its outlier silently is a scan that can
+be tuned to agree with whatever was wanted.
+
+🔴 **This is the loader's print loop and it does not transfer to a payload.**
+`docs/probe3-cells.md` §4 computes its ESC-window budget at 3,840 B/s for the
+*payload's* own UART writes, which do not go through this code at all. The two
+numbers describe different senders and must not be substituted for each other.
+
+⚠️ **`console-capture.py` has no early stop unless `--idle` is given**, so
+`--seconds` is a fixed window in both directions: too small truncates, and a
+truncated reply and a refused command look different — a refusal is
+`Unknown command !` (≈44 B) arriving at once followed by a prompt, a truncation
+stops mid-line with no prompt.
+
 ### The reset R4 needs, and it is already a command
 
 `J BFC00000`. **(A.)**

@@ -365,6 +365,23 @@ and **the round-up is upward — a length given too small never announces itself
 | 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
 | 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it | ✅ **every number is under something this loader has already done** |
 
+🆕 **2026-08-29, `R1h-3`: `LDR-07`'s round-up hands back the over-run control
+for free, and this section did not know it.** The block is `RB_WORDS = 641`
+words and the payload poisons `RB_POISON_W = 641 + 8 = 649` of them, the margin
+existing *"so a run that wrote PAST its own block shows data where poison was
+predicted"* (讀, `probe3.c:107`). **`DW 80A02000 641` prints `4 × ceil(641/4)` =
+644 words**, so `w641`, `w642` and `w643` — three of the eight margin words —
+come back on the last reply line, at `0x80A02A04`/`08`/`0C`, beside the seal at
+`0x80A02A00`. **The margin check therefore needs no second command**, and its
+expected value is `DEADC0DE` three times. Reading the remaining five costs one
+`DW 80A02A04 8` (118 B) and is worth sending only if those three are not poison.
+⚠️ **`DEADC0DE` is also on `P2`'s refutation list** as a known magic, so the same
+constant is the arena's *negative* control before the run and the block's
+*positive* control after it — and from the second seating onward a `DEADC0DE` in
+`P2` stops being unambiguous, because a previous run's block surviving the
+power-off (M7) reads identically. `bench/2026-08-30/PREDICTIONS-B5-block0.md`
+§12 carries the reasoning and the three-way seal check that goes with it.
+
 **So: four bits per victim** — the seven verdicts plus `0` = *never written*,
 which is the only lossless bitmap and the only one with a negative control inside
 it. Sixteen full rows carry the boundary brackets and the controls, on **both**

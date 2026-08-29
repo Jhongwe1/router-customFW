@@ -389,6 +389,47 @@ seating 2 part three, five power cycles and 81 captures, and they are described 
 back-filled, because a directory index that is silently incomplete is worse than
 one that says where the gap is.
 
+## 2026-08-30 — seating 5, power cycle 1, `R1h-3`. **The prediction, before the seating**
+
+🔴 **One file, no captures**, like `2026-08-30b` beside it:
+`PREDICTIONS-B5-block0.md`, written and frozen at the desk on **2026-08-29**.
+This is `probe3` — `R1h`'s bench half, riding `R3`'s seating and running
+**first** within it, because `R3`'s pass state is *a kernel is running* and in
+that state there is no `<RealTek>` prompt to type `J` into and no `DW` to
+recover a result block with.
+
+🔴 **This block is also the CARD.** `RUNSHEET` §B5's card says of power cycle 1
+*"`R1h-3` owns it; it is not on this card"*, so §0 of the block is the only
+place the typed lines exist. Two files are read at the bench on this seating.
+Its rows are prefixed `Q-*` because `P0`…`Pn` already means three different
+things in this repository — the host preflight, `R3`'s desk checks, and
+`probe3`'s own at-the-prompt group — and §1 of the block is the only place that
+collision is written down.
+
+| | |
+|---|---|
+| **cells named** | thirteen: `A-catch`, `Q0-ab`, `Q1-tc`, `Q1-tc2`, `Q2-rbhead`, `Q2-arena0`, `Q2-arena1`, `Q2-arena2`, `Q3-len`, `Q0-ab2`, `Q4-head`, `QJ`, `Q5-rb` |
+| **at the desk** | `check-predictions.py` reports **`0 of 13`**, all fifteen controls green — control `N2` firing on every cell, which is the correct answer before a seating |
+| **deliberately not named** | `Q5-margin` (the rest of the poison margin, only if the free three come back non-poison) and `Q6-post` (a post-mortem `DW` after a silent `J`) |
+| **desk work already spent** | `P7`, the rebuild-on-the-day: `probe3` rebuilt 2026-08-29, sha256 `1a0725c0…`, 29,088 bytes — **byte-identical to the value `R1h-1` recorded on 2026-08-26**, `hazlint` 0 violations in 804 loads |
+
+**What writing it produced, beyond the block.** Three things, each landing in an
+owner file rather than here: the loader's **`DW` emission rate** measured for the
+first time (`SPEC.md` `LDR-40`, 3,594–3,726 B/s, n=2 — every `--seconds` on
+every card had been sized against the 3,840 line rate); `LDR-07`'s round-up
+handing back **three poison-margin words for free** on `DW 80A02000 641`, so the
+over-run control costs no command (`docs/probe3-cells.md` §4); and the scope of
+§B5-c1 — *the head does not discriminate* is about `nfjrom` files, and a flat
+`rlxprobe` payload's head **does**, by the same linker-constant mechanism
+(`RUNSHEET` §B5-c1).
+
+⚠️ **And re-measuring `A-catch` over all nine captures in this directory tree
+reproduced a correction the repository had already made.** §B5-c12 records it:
+seven complete 181-byte slices, one hash, and `2026-08-24e` is a **118-byte
+truncation whose bytes are a byte-identical prefix** — not a warm-boot control.
+**The cell has no demonstrated negative**, and block 0 says so rather than
+repeating block 1's framing.
+
 ## 2026-08-30b — seating 5, `R3-8a`. **The prediction, before the seating**
 
 🔴 **This directory holds one file and no captures**, and that is the point:

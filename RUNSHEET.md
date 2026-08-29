@@ -1335,6 +1335,16 @@ sha256sum $FWRE_WORK/rebuild/bench-only/b5-20260830/*.bin
 It runs **first** and it has its own prediction block. `bench/2026-08-30/`.
 The only thing §B5 asserts about it is the ordering, and the reason is below.
 
+🆕 **2026-08-29: that block exists, and its §0 IS the card for this power
+cycle** — `bench/2026-08-30/PREDICTIONS-B5-block0.md`, thirteen cells, frozen,
+`0 of 13` at the desk. **Two files are read at the bench on this seating, not
+one**, and that is a consequence of *"it is not on this card"* rather than a
+contradiction of it: §B5's card starts at power cycle 2. The block's rows are
+prefixed `Q-*` because `P0`…`Pn` already means three different things in this
+repository — the host preflight at `§P` above, `R3`'s desk checks at `§K`
+below, and `probe3`'s own at-the-prompt group in `docs/probe3-cells.md` §5.
+Its §1 carries that mapping and nothing else does.
+
 #### Power cycle 2 — `loudm`. `bench/2026-08-30b/`
 
 | # | typed / run | expect | bytes | 🔴 stop if |
@@ -1407,6 +1417,20 @@ built, and of the drop's own: **the same four words.** They are the `rtkload`
 stub's own prologue, and every image in this family is linked from the same
 `start.o`. A single `DW 80500000 1` therefore reads the same reply whether the
 upload landed or not — it is a cell that cannot fail.
+
+⚠️ 🆕 **2026-08-29: the corpus this holds over is `nfjrom` files, and the
+sentence above must not be quoted outside it.** Every image in that family
+shares `rtkload`'s `start.o`; a **flat `rlxprobe` payload** does not, and its
+first word is the first instruction of `_start`. 量 on the three payloads in the
+tree: `probe1` `3C1D8051`, `probe2` `3C1D8050`, `probe3` `3C1D8051` against the
+staged image's `00000000` — **the head discriminates there, by the same
+mechanism that makes it useless here.** The word at `0x8050000C` carries
+`_bss_start` = `0x80500000 + size`, exactly as `0x8050001C` carries
+`__vmlinux_end` for an `nfjrom`: one linker constant, two linkers.
+`bench/2026-08-30/PREDICTIONS-B5-block0.md` §9 has the two-level decode and the
+size table. **Applying this row to `probe3` would delete that seating's only
+upload check**, which is why the scope is written down rather than left to be
+inferred from the word *nfjrom* appearing in the paragraph.
 
 🔴 **Where they do differ is byte offset 27**, and the two words that carry it
 are a `lui`/`addiu` pair the linker fills with `__vmlinux_end`:
