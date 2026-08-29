@@ -80,6 +80,14 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   console idle**, with `usbipd list` moving the busid out of *Connected*. Root
   cause **undetermined**, and none of the three candidates has been ruled out:
   usbip socket transient, USB selective suspend not waking, a loose connector.
+  🆕 **2026-08-29: that signature is not specific, 量.** A deliberate
+  `usbipd detach` takes the busid out of *Connected* too — for about a second,
+  while Windows re-enumerates the device — so a `usbipd list` run immediately
+  after a detach reads **exactly** like the drop. **Re-read before concluding
+  anything from one listing.** The same day the CP2102 was also absent from
+  *Connected* on **first insertion**, with no COM port on the Windows side at
+  all, and returned only after a re-seat: consistent with the loose connector
+  and separating nothing, so the three candidates stand.
   Start a long-lived process first and leave it running:
   `wsl -d Ubuntu-24.04 -- sleep 36000` in the background — **that is for the attach
   step and is not a fix for the drop above; do not record it as one.** **And the busid is not
