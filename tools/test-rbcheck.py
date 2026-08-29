@@ -81,7 +81,13 @@ def main():
             r = subprocess.run([sys.executable, tgt, "--self-test"],
                                capture_output=True, text=True, cwd=work)
             killed = r.returncode != 0
-            print(f"  {'KILLED ' if killed else 'SURVIVED'}  {name}   rc={r.returncode}")
+            # `  ok  ` / `  FAIL  ` is the shape `tools/ci-census.py` parses
+            # (OK_RE / FAIL_RE, two spaces then the word then two more). A
+            # suite that prints its own vocabulary is a suite the census reads
+            # as zero cases -- measured 2026-08-30, this file printed
+            # KILLED/SURVIVED and CI reported `ran 0/9`.
+            print(f"  {'ok  ' if killed else 'FAIL'}  {name}   "
+                  f"rc={r.returncode} ({'killed' if killed else 'SURVIVED'})")
             if not killed:
                 survived.append(name)
         finally:
