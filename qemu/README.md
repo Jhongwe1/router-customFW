@@ -41,6 +41,27 @@ about the silicon:
 - **An emulator kinder than the device certifies exactly the bugs the device
   rejects.** That is how upstream's `P9-12` was certified by its own simulator
   before it failed on this silicon.
+- 🔴 **2026-08-29, THREE more, and they are now measured against the silicon
+  rather than predicted.** `probe3` ran on the device
+  (`bench/2026-08-30/QJ.log`) after running here (`qemu/2026-08-26/probe3.txt`),
+  so every one of these is a paired reading of one binary on two machines:
+  - **CP3.** Here, all eight `mfc3` stubs **trap** with `m.cause=1000042C`
+    (ExcCode 0x0B, CpU). On the device **none of them traps** — `m.traps=0`,
+    `m.cause` still poison — and `CU3` sticks (`1000fc00` → `9000fc00`).
+    ⚠️ **The payload itself printed that it could not separate the two
+    explanations here**, and it was right to: the emulator's answer was an
+    artefact of Malta's coprocessor map, not a fact about Lexra.
+  - **The timer.** Here, every read of `0xB8003108` is `FFFFFFFF` and the payload
+    prints `Group T VOID -- there is no timer at that address on this machine`.
+    On the device the counter is live and the calibration bracket scales
+    (`hi/lo = 2.0003`). **The payload separating *nothing is there* from *the
+    register is frozen* is what made the qemu run interpretable at all.**
+  - **The I-side walk.** Here, all FRESH at every working set — TCG keys TB
+    invalidation on the physical address, so the KSEG1 alias buys nothing. On the
+    device the walk produced a capacity-eviction curve with both of its controls
+    firing, and that curve is the entire content of `CPU-25`.
+  **None of the three could have been obtained here, and in all three the
+  emulator's answer had the shape of a real reading.**
 
 ## 🆕 2026-08-29: there are now TWO channels in here, and they disagree about the UART
 
