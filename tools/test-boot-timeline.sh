@@ -62,9 +62,16 @@ echo
 echo "=== B2: cold/warm comes from the loader, not from the artifact byte ==="
 base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # 🔄 7/7 until 2026-08-25b, which added one cold boot and one warm reset.
+# 🔄 8/8 until 2026-08-30 (seating 5), which added THREE events from two
+# directories -- and they were isolated before this number was touched:
+# `2026-08-30/A-catch` and `2026-08-30b/A-catch` are the two power-ons (cold),
+# and `2026-08-30/QJ` is warm because `probe3` ends by arming the watchdog and
+# handing the prompt back, so its capture holds a second `Booting...`.
+# 量: the same tree with those two directories removed still reports 8 cold,
+# 8 warm, so the delta is exactly +2 cold / +1 warm and nothing reclassified.
 # Re-measured rather than loosened: a population count that is allowed to drift
 # is not a control.
-ck "eight cold, eight warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 8 cold, 8 warm, 0 unknown')"
+ck "ten cold, nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 10 cold, 9 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
