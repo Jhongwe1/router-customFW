@@ -176,8 +176,22 @@ new thing* (`notes/kernel-build.md` §4).
 
 🔴 **So the second path is not blocked by the device node, which is what it
 looks like. It is blocked by the applet table.** And the node alone still buys
-something, because **`wc` IS on the list**: `wc -c < /dev/mtd0` is a
-**readability and size** reading through my own MTD stack — it says the
-partition opens and reads to EOF at the length the map declares — and it is not
-a content check and must not be quoted as one. `R3-9` owns the step;
-`SPEC.md` `FW-26` owns the number.
+something, because **`wc` IS on the list**: it is a **readability and size**
+reading through my own MTD stack — it says the partition opens and reads to EOF
+at the length the map declares — and it is not a content check and must not be
+quoted as one.
+
+🔴 **But the command is NOT `wc -c < /dev/mtd0`, and this paragraph said it was
+until 2026-08-30.** 量, two routes with a positive control on each: 讀 both
+built `.config`s carry `# CONFIG_MTD_CHAR is not set` (control: nine other
+`^CONFIG_MTD` lines in the same file), and 量 both `System.map`s hold **zero**
+mtdchar symbols against **six** mtdblock/mtdcore ones. Major 90 has no chrdev in
+either image, so `/dev/mtd0` opens `ENODEV`. What exists is `CONFIG_MTD_BLOCK=y`
+→ `/dev/mtdblock<N>` at **b 31 N** (讀 `drivers/mtd/mtdblock.c`:
+`.major = 31, .part_bits = 0`), and `/proc/mtd`, which reads **zero flash
+bytes**. `config/rlxfw-initramfs.tsv` declares **`/dev/mtdblock1`** and
+deliberately not `mtdblock0`: mtd0 is `0x000000`–`0x130000`, which contains the
+loader and `H601`, `mtdblock` has a write path, and mode `0400` is not a control
+because root ignores DAC. *(Original: "`wc -c < /dev/mtd0` is a readability and
+size reading through my own MTD stack".)* `R3-9` owns the step; `SPEC.md`
+`FW-26` owns the applet census and `FW-28`/`FW-29` the map.

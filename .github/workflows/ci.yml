@@ -406,6 +406,20 @@ jobs:
       - name: test-console-capture
         run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
 
+      # ~6 min, and it is the step that stops the one above from being a claim
+      # that cannot fail: 量 2026-08-30, test-console-capture reported 40/40
+      # while TEN mutations of the terminator guard it had just gained were
+      # alive. Each mutant runs the WHOLE suite, because "the committed cases
+      # catch it" is the claim and a fast proxy for the suite would be a
+      # different one. --jobs 8 because the cases are sleep-bound (ptys and
+      # played gaps) rather than CPU-bound, so they parallelise past the core
+      # count. If the UNMUTATED baseline is not green it REFUSES rather than
+      # reporting a clean sweep -- on a loaded runner that is the correct
+      # failure and it is diagnosable, because the refusal prints the suite's
+      # own tail.
+      - name: test-console-capture-mutants
+        run: /usr/bin/python3 tools/test-console-capture-mutants.py --jobs 8 2>&1 | tee ci-out/test-console-capture-mutants.out; exit "${PIPESTATUS[0]}"
+
       - name: test-opcount
         run: bash tools/test-opcount.sh 2>&1 | tee ci-out/test-opcount.out; exit "${PIPESTATUS[0]}"
 

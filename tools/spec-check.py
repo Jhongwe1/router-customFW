@@ -43,6 +43,41 @@ What it checks, and every one of them can fail:
       broken.**  A check that quietly does not check is the failure this file
       exists to catch, so it now has one of its own
 
+C8 IS NOT ABOUT SPEC.md ANY MORE.  From 2026-08-30 it runs over every tracked
+`.md` outside `upstream/` -- 71 files as this is written -- because how this
+repository's prose renders is not a property of one file.  The table, row and
+span counts are NOT repeated here: the tool prints them on every run and they
+move on every commit (614 -> 623 tables inside the session that wrote this),
+which is exactly the number-that-was-true-once failure this repository keeps
+catching.  量 the first time it ran that way: EIGHT ragged rows, and the census
+that preceded it had said six, because it had looked at three files.  Three more
+shapes came with it, and each was found by turning the previous one on:
+
+  C8b a row split over more than one PHYSICAL line, which GFM does not have.  A
+      literal newline inside a code span ends the row there and renders the rest
+      as a paragraph -- and every checker in this repository walked lines
+      beginning with a pipe, so the continuation was invisible AND every row
+      below it in the same table was dropped from the count.  Two instances.
+  C8c a `|`-line that belongs to NO table.  C8 cannot see this by construction:
+      C8 walks tables, and a stranded row is in none.  量: NINE rows of
+      docs/FINDINGS.md -- the page a reader is pointed at, including the three
+      newest findings, about the flash bracket and `H601` -- plus one of
+      bench/README.md.  This is the same defect PROGRESS.md records against
+      SPEC.md on 2026-08-27, found then by an adversarial pass and now by a
+      checker.
+  C9  a code span whose whole content is whitespace.  `\r` and `\n` typed as
+      real characters degrade to exactly this, and the rendering shows nothing.
+      FOUR instances, and one of them made a READING wrong rather than only a
+      rendering: docs/loader-command-semantics.md annotated both exits of
+      readline's three-way branch with the same empty character, so the sentence
+      "only one writes a terminator" named neither.  Settled by disassembling
+      $FWRE_WORK/stage2.bin.  🔴 The fourth is the carried-forward row that
+      DESCRIBES the defect, in PROGRESS.md, and it was found only when the
+      finished checker was run over `git archive HEAD` at the end of the session
+      -- the count assembled one file at a time, in the order the defects
+      surfaced, said three.  Whole reading over that tree: C8 8, C8b 2, C8c 10,
+      C9 4 -- 24 defects in six files.
+
 What it cannot do, stated so a clean result is not read as more than it is:
 
   * It cannot check a value against the device.  Only the bench does that.
@@ -52,6 +87,29 @@ What it cannot do, stated so a clean result is not read as more than it is:
   * `plan/` is not in a clone, so owners there are unverifiable off this machine.
   * Nothing here checks that a row's source count matches its marks.  That is
     the two-source rule, it is enforced by hand, and it is not automated here.
+  * C8's trailing-pipe rule is STRICTER than GFM, deliberately.  `| a | b` with
+    no trailing pipe is legal markdown.  量 2026-08-30 over `git archive HEAD`
+    with this parser: **every** row ends with `|` on its LAST physical line --
+    the two C8b rows broke it on their FIRST, and that break IS the split, which
+    is why enforcing the convention is the only thing that makes a raw newline
+    inside a cell visible.  A clone that adopts the loose form would see false
+    findings here.  (An earlier draft of this line said "3,570 of 3,572 carried
+    one", which counts the wrong line of a split row.)
+  * The sweep needs `git ls-files`.  Without git it has no population, and `T7`
+    turns that into a refusal rather than a clean report over nothing.
+  * `fence_mask` masks FENCED code blocks and not INDENTED ones (four spaces).
+    An indented block holding an odd number of backticks could therefore pair a
+    span across it and give C9 a false positive.  量 2026-08-30: zero such
+    findings over the whole repository, so this is a stated limit and not an
+    observed defect -- indented blocks here hold assembly and shell, not prose
+    with backticks.  Handling them properly needs list-context awareness, which
+    is a markdown parser, and that is more than this check is worth.
+  * C8c reports a `|`-line whose table has no recognised header+separator pair.
+    A table written with a separator that has no leading pipe (`--- | ---`)
+    would make its header AND every row an orphan -- ten findings for one
+    formatting choice, not ten defects.  The message says what it is looking
+    for, and the repository uses the leading-pipe form throughout (量: zero
+    orphans after today's ten were fixed).
 
 Usage:
     python3 tools/spec-check.py [SPEC.md]
@@ -134,27 +192,286 @@ def clean_header(cell):
     return cell.replace('*', '').replace('`', '').strip()
 
 
-def parse(path):
-    """Return (tables, lines).  A table is a dict with section, header, rows."""
-    lines = io.open(path, encoding='utf-8').read().split('\n')
+# A fenced code block is not markdown.  This matters the moment C8 stops being
+# about SPEC.md: `docs/`, `notes/` and this repository's READMEs all print
+# example tables inside fences, and counting their rows would make the check
+# fire on text that never renders as a table.
+#
+# 🔴 The obvious implementation has a false positive, and it was measured before
+# this was written: a throwaway checker used on 2026-08-30 read an INLINE
+# triple-backtick span at the start of an indented line as an unclosed fence and
+# swallowed the rest of a file.  A fence opener's info string may not itself
+# contain a backtick (CommonMark 4.5), and requiring that is what separates the
+# two.  `T6` is the case.
+FENCE_RX = re.compile(r'^(\s{0,3})(`{3,}|~{3,})(.*)$')
+
+
+def fence_mask(lines):
+    """True for every line that is inside (or is) a fenced code block.
+
+    Indentation of four or more spaces is not a fence at all -- that is an
+    indented code block, and its content is not scanned for tables either, but
+    it does not open a state that swallows what follows.
+    """
+    mask = [False] * len(lines)
+    marker = None
+    for i, ln in enumerate(lines):
+        m = FENCE_RX.match(ln)
+        if marker is None:
+            if m and (m.group(2)[0] == '~' or '`' not in m.group(3)):
+                marker, mask[i] = m.group(2), True
+            continue
+        mask[i] = True
+        if (m and m.group(2)[0] == marker[0]
+                and len(m.group(2)) >= len(marker) and not m.group(3).strip()):
+            marker = None
+    return mask
+
+
+def table_rows(lines, mask, start):
+    """Rows of the table whose header is at `start`, and the ragged/truncated
+    findings that reading them produced.
+
+    A ROW IS ONE LINE.  GFM has no continuation syntax, so a literal newline
+    inside a cell -- most often inside a code span -- ends the row where the
+    newline is and the remainder renders as a paragraph.  Every checker in this
+    repository walked lines beginning with a pipe, so those continuation lines
+    were invisible AND every row below them in the same table was dropped from
+    the count: 量 2026-08-30, `RUNSHEET.md`'s `C7` row spans three physical
+    lines because a code span holds a literal CR, and `PROGRESS.md:520` spans
+    two.  This function reports the split (`C8b`) and then REJOINS the row so
+    the rest of the table is still checked, which is the half that matters --
+    a checker blinded from the first defect to the end of the table would have
+    reported the file clean below it.
+
+    The trailing pipe is a house rule, and it is stricter than GFM: `| a | b`
+    with no trailing pipe is legal markdown.  量 2026-08-30 over the 71
+    tracked `.md` files with this parser: EVERY row ends with `|` on its LAST
+    physical line, and the two defective ones broke it on their FIRST -- which
+    is the split itself.  Enforcing the convention is the only thing that makes
+    a raw newline inside a cell visible at all.
+    """
+    rows, notes, j = [], [], start
+    while j < len(lines) and lines[j].startswith('|') and not mask[j]:
+        line, first, span = lines[j], j, 1
+        while not line.rstrip().endswith('|'):
+            # Look for the rest of the logical row.  A blank line, a line that
+            # starts a new block, or twenty lines of searching all mean the row
+            # has no end and the table stops here.
+            k = j + span
+            if (k >= len(lines) or not lines[k].strip() or span > 20
+                    or mask[k]):
+                notes.append(('C8b', first + 1, span,
+                              'the row does not end with `|` and no continuation '
+                              'line does either'))
+                line = None
+                break
+            line += '\n' + lines[k]
+            span += 1
+            if lines[k].rstrip().endswith('|'):
+                notes.append(('C8b', first + 1, span,
+                              'a raw newline inside a cell splits this row over '
+                              '%d physical lines; GFM ends the row at the first '
+                              'one and renders the rest as a paragraph' % span))
+                break
+        if line is None:
+            j += span
+            break
+        rows.append((first + 1, split_cells(line.replace('\n', ' ')), span))
+        j = first + span
+    return rows, notes, j
+
+
+def parse(path, text=None):
+    """Return (tables, lines).  A table is a dict with section, header, rows.
+
+    `rows` are `(lineno, cells, span)`; `span` is 1 for every well-formed row.
+    Each table also carries `used`, the physical line indices it consumed, which
+    is what `C8c` needs to find a `|`-line belonging to no table at all.
+    """
+    if text is None:
+        text = io.open(path, encoding='utf-8').read()
+    lines = text.split('\n')
+    mask = fence_mask(lines)
     tables, section, i = [], None, 0
     while i < len(lines):
         m = re.match(r'^## (\d+)\.', lines[i])
         if m:
             section = int(m.group(1))
-        if (lines[i].startswith('|') and i + 1 < len(lines)
+        if (lines[i].startswith('|') and not mask[i] and i + 1 < len(lines)
                 and re.match(r'^\|[\s:|-]+\|\s*$', lines[i + 1])):
             header = [clean_header(c) for c in split_cells(lines[i])]
-            rows, j = [], i + 2
-            while j < len(lines) and lines[j].startswith('|'):
-                rows.append((j + 1, split_cells(lines[j])))
-                j += 1
+            rows, notes, j = table_rows(lines, mask, i + 2)
             tables.append({'section': section, 'header': header,
-                           'rows': rows, 'line': i + 1})
+                           'rows': rows, 'notes': notes, 'line': i + 1,
+                           'used': set(range(i, j)),
+                           'header_ok': lines[i].rstrip().endswith('|')})
             i = j
             continue
         i += 1
     return tables, lines
+
+
+def orphan_rows(lines, mask, tables):
+    """C8c: a line that looks like a table row and belongs to no table.
+
+    This is not hypothetical and it is not new.  量 2026-08-27, recorded in
+    `PROGRESS.md`: a single blank line put three fresh `SPEC.md` rows below the
+    end of §14's table, so they formed a `|`-line fragment with no header,
+    `spec-check.py` never parsed them, and it reported green -- those three rows
+    carried no duplicate-id, no owner-exists and no cell-count check at all
+    while the tool run before every commit said everything was fine.
+
+    C8 cannot see it by construction: C8 walks TABLES, and a fragment is
+    precisely a row that is in none.  A reader sees the difference immediately
+    -- an orphan renders as a paragraph full of pipes -- which is why this is a
+    checker rather than a habit.
+    """
+    used = set()
+    for t in tables:
+        used |= t['used']
+    return [i for i, ln in enumerate(lines)
+            if ln.startswith('|') and not mask[i] and i not in used]
+
+
+def table_findings(path, tables, lines=None, mask=None):
+    """C8/C8b/C8c for one file's tables.  One implementation, two callers: the
+    SPEC.md report and the repository-wide sweep.  Two copies of a rule is how
+    `hazlint`'s `_scan_elf` came to accept states the real program refused."""
+    out = []
+    if lines is not None and mask is not None:
+        for i in orphan_rows(lines, mask, tables):
+            out.append((
+                'C8c',
+                f'{path}:{i + 1}: {lines[i][:36]!r} starts with `|` and belongs '
+                f'to no table -- there is no header above it, so it renders as a '
+                f'paragraph of pipes and every check that reads a cell by index '
+                f'skips it entirely'))
+    for t in tables:
+        n = len(t['header'])
+        if not t['header_ok']:
+            out.append(('C8b', f"{path}:{t['line']}: the header row does not end "
+                               f"with `|`"))
+        for lineno, span, msg in [(a, b, c) for _, a, b, c in t['notes']]:
+            out.append(('C8b', f'{path}:{lineno}: {msg}'))
+        for lineno, cells, _span in t['rows']:
+            if not cells:
+                continue
+            if len(cells) != n:
+                out.append((
+                    'C8',
+                    f'{path}:{lineno}: {cells[0][:24]!r} has {len(cells)} cell(s) '
+                    f'and its header has {n} -- the cell count does not match its '
+                    f'header. An unescaped `|` inside a cell shifts every column '
+                    f'after it, and the checks that read V/N/來源/擁有者 by index '
+                    f'then read the wrong cell and pass'))
+    return out
+
+
+# C9.  A code span whose content is only whitespace.
+#
+# This is the SAME defect as C8b seen one level down, and it is the one C8b
+# cannot reach: `\r` and `\n` typed as real characters become a span holding a
+# line break, and outside a table nothing renders differently enough to notice.
+# 量 2026-08-30, before this existed: FOUR instances in the repository (the
+# count read three until the finished checker was run over the tree at HEAD),
+# and one
+# of them --  docs/loader-command-semantics.md's readline listing -- annotated
+# BOTH exits of a three-way branch with the same empty character, so the
+# sentence "only one writes a terminator" named neither.  It was settled by
+# disassembling $FWRE_WORK/stage2.bin at 0x804070e4: `li v0,10` / `beq` is the
+# LF exit and returns with no NUL, `li v0,13` / `bne` / `j` puts `sb zero,0(s0)`
+# in the jump's delay slot, so CR is the one that writes it.  SPEC.md LDR-06d
+# already said so; this file's own listing did not.
+#
+# CommonMark 6.1: a backtick run of length N opens a span closed by the next run
+# of EXACTLY length N, and an unmatched run is literal text.  Pairing that way
+# rather than counting backticks per line is what separates this from two
+# ADJACENT spans across a line break (`SPEC.md` then `CPU-19`), which is
+# ordinary and which a per-line parity test reports thirteen times.
+TICKS_RX = re.compile(r'`+')
+
+
+def code_spans(text):
+    """(start, end, content) for every CLOSED code span in `text`."""
+    runs = [(m.start(), m.end() - m.start()) for m in TICKS_RX.finditer(text)]
+    i = 0
+    while i < len(runs):
+        pos, n = runs[i]
+        j = i + 1
+        while j < len(runs) and runs[j][1] != n:
+            j += 1
+        if j >= len(runs):
+            i += 1
+            continue
+        yield pos, runs[j][0] + n, text[pos + n:runs[j][0]]
+        i = j + 1
+
+
+def span_findings(path, lines, mask):
+    """C9 for one file, plus how many spans were looked at.
+
+    The count is returned because a checker that reports zero over an empty
+    population is the failure this repository keeps catching, and `T8` asserts
+    the population is large.
+    """
+    prose = '\n'.join('' if mask[i] else ln for i, ln in enumerate(lines))
+    out, total = [], 0
+    for a, _b, content in code_spans(prose):
+        total += 1
+        if content != '' and content.strip() == '':
+            ln = prose.count('\n', 0, a) + 1
+            out.append(('C9', f'{path}:{ln}: a code span whose whole content is '
+                              f'{content!r} -- an escape typed as a real '
+                              f'character. `\\r` and `\\n` degrade to exactly '
+                              f'this and the rendering shows nothing'))
+    return out, total
+
+
+def table_scope(root=ROOT):
+    """Every tracked `.md`, which is the honest population for a rule about how
+    this repository's prose renders.
+
+    A DECLARED list was the alternative and it is the worse one: a file added
+    without a line in it is silently exempt, and "a check that quietly does not
+    check" is the failure this file exists to catch.  `upstream/` is a submodule
+    and a gitlink, so `git ls-files` never descends into it; `plan/` is
+    gitignored and is not tracked.  Both facts are asserted by `T7` rather than
+    assumed.
+    """
+    try:
+        out = subprocess.run(['git', '-C', root, 'ls-files', '*.md'],
+                             capture_output=True, text=True, encoding='utf-8',
+                             timeout=30)
+        paths = [p for p in out.stdout.split('\n') if p.strip()]
+    except (OSError, subprocess.SubprocessError):
+        paths = []
+    return sorted(p for p in paths if not p.startswith('upstream/'))
+
+
+def check_tables(paths, root=ROOT):
+    """The repository-wide sweep: C8/C8b over tables, C9 over every code span.
+    Returns (findings, stats)."""
+    findings = []
+    stats = {'files': 0, 'tables': 0, 'rows': 0, 'spans': 0, 'unreadable': []}
+    for rel in paths:
+        full = os.path.join(root, rel)
+        try:
+            text = io.open(full, encoding='utf-8').read()
+        except OSError:
+            stats['unreadable'].append(rel)
+            continue
+        lines = text.split('\n')
+        tables, _ = parse(full, text=text)
+        stats['files'] += 1
+        stats['tables'] += len(tables)
+        stats['rows'] += sum(len(t['rows']) for t in tables)
+        m = fence_mask(lines)
+        findings += table_findings(rel, tables, lines, m)
+        sf, nspans = span_findings(rel, lines, fence_mask(lines))
+        stats['spans'] += nspans
+        findings += sf
+    return findings, stats
 
 
 def col(table, *names):
@@ -255,7 +572,7 @@ def check(path, quiet=False):
     # ---- C1: ids well formed and unique -------------------------------------
     seen, rows = {}, []
     for t in defs:
-        for lineno, cells in t['rows']:
+        for lineno, cells, _span in t['rows']:
             if not cells:
                 continue
             m = ID_RX.match(cells[0])
@@ -293,7 +610,7 @@ def check(path, quiet=False):
     # ---- C3: blanks <-> section 17 -----------------------------------------
     listed = set()
     for t in idx17:
-        for lineno, cells in t['rows']:
+        for lineno, cells, _span in t['rows']:
             if cells:
                 m = ID_RX.match(cells[0])
                 if m:
@@ -404,26 +721,20 @@ def check(path, quiet=False):
             findings.append(('C6', f'{path}:{ln}: {lbl} matched {got!r} and it is not on the allowlist'))
     stats['redaction_hits'] = len(hits)
 
-    # ---- C8: a row has as many cells as its own header ----------------------
+    # ---- C8/C8b: a row has as many cells as its own header, on one line -----
     # Every other check reads a cell BY INDEX.  One unescaped `|` inside a cell
     # shifts every index after it, and the checks downstream do not fail -- they
     # read a different cell and pass on it.  So this one runs over every table
     # in the file, not only the definition tables, because §17 is read by C3.
-    ragged = 0
-    for t in tables:
-        n = len(t['header'])
-        for lineno, cells in t['rows']:
-            if not cells:
-                continue
-            if len(cells) != n:
-                ragged += 1
-                findings.append((
-                    'C8',
-                    f'{path}:{lineno}: {cells[0][:24]!r} has {len(cells)} cell(s) and its header '
-                    f'has {n} -- the cell count does not match its header. An unescaped `|` inside '
-                    f'a cell shifts every column after it, and the checks that read V/N/來源/擁有者 '
-                    f'by index then read the wrong cell and pass'))
-    stats['ragged'] = ragged
+    #
+    # The rule itself lives in `table_findings()`, because since 2026-08-30 it
+    # is not a rule about SPEC.md: `check_tables()` runs the same function over
+    # every tracked `.md`.  Two copies of a rule is how `hazlint`'s `_scan_elf`
+    # came to accept states the real program refused.
+    t8 = table_findings(path, tables, lines, fence_mask(lines))
+    findings += t8
+    stats['ragged'] = sum(1 for c, _ in t8 if c == 'C8')
+    stats['split'] = sum(1 for c, _ in t8 if c == 'C8b')
     stats['tables_all'] = len(tables)
     return findings, stats
 
@@ -443,7 +754,8 @@ def report(path, findings, stats):
           f"({', '.join(stats['no_owner_ids'][:8])}{' …' if stats['no_owner'] > 8 else ''})")
     print(f"     owners under plan/ (gitignored, unverifiable in a clone): {stats['plan_owned']}")
     print(f"  C8 cell counts checked against the header in {stats['tables_all']} table(s), "
-          f"including the ones outside §1–17: {stats['ragged']} ragged")
+          f"including the ones outside §1–17: {stats['ragged']} ragged, "
+          f"{stats['split']} split over more than one line")
     print(f"  C6 redaction hits: {stats['redaction_hits']}, allowlist of {len(REDACTION_ALLOWLIST)}:")
     for (lbl, got), why in REDACTION_ALLOWLIST.items():
         print(f'       {got!r} ({lbl}) -- {why}')
@@ -584,6 +896,202 @@ def controls(path, verbose=True):
     return fail
 
 
+# ---------------------------------------------------------------------------
+# The table sweep's own controls.  These do NOT mutate a committed file: the
+# subject is a fixture built here, because the rule is now about seventy-one
+# files and mutating one of them would tie the control to whatever that file
+# happens to contain today.  `T1` is the positive one and it is the reason the
+# other four mean anything -- a checker that fires on everything passes every
+# mutation.
+# ---------------------------------------------------------------------------
+FIXTURE = '''# fixture
+
+An ordinary table, well formed.
+
+| id | what | note |
+|---|---|---|
+| `A-01` | a value with an escaped pipe `a\\|b` inside a code span | fine |
+| `A-02` | plain | fine |
+
+A fenced block whose content is NOT markdown.  The table inside it is ragged on
+purpose: if the fence mask ever stops working, this is what says so.
+
+```
+| id | what |
+|---|---|
+| this row | has | three cells against two |
+```
+
+An INLINE triple-backtick span at the start of an indented line, which a naive
+fence detector reads as an unclosed fence and then swallows the rest of the
+file with:
+
+    ```x``` and more text on the same line
+
+| id | what |
+|---|---|
+| `B-01` | still parsed, because the line above is not a fence |
+
+Two ADJACENT code spans across a line break are ordinary and must not be a
+finding: `SPEC.md`
+`CPU-19` is one reference followed by another, and a per-line backtick-parity
+test reports thirteen of these in this repository.
+'''
+
+TABLE_MUTATIONS = [
+    ('T2 un-escape a `|` inside a code span', 'C8', 'does not match its header',
+     lambda s: s.replace(r'`a\|b`', '`a|b`', 1), 1),
+    ('T3 split one row over two physical lines', 'C8b', 'raw newline inside a cell',
+     lambda s: s.replace('| `A-02` | plain | fine |',
+                         '| `A-02` | pl\nain | fine |', 1), 1),
+    ('T4 delete a cell, so the row has FEWER than its header', 'C8',
+     'does not match its header',
+     lambda s: s.replace('| `A-02` | plain | fine |', '| `A-02` | plain |', 1), 1),
+    ('T6 a ragged row after an inline ``` span is still seen', 'C8',
+     'does not match its header',
+     lambda s: s.replace('| `B-01` | still parsed, because the line above is not a fence |',
+                         '| `B-01` | still parsed | and ragged |', 1), 1),
+    # T8 is C9's, and it is deliberately in PROSE rather than in a cell: this is
+    # the shape C8b cannot see, and the one that made a reading wrong in
+    # docs/loader-command-semantics.md rather than only a rendering.
+    ('T8 an escape typed as a real newline, in prose', 'C9',
+     'whole content is', lambda s: s + "\nthe `\n` path writes a NUL\n", 1),
+    # T10 is C8c's.  One blank line inside a table strands every row below it,
+    # and C8 cannot see that by construction: C8 walks tables, and a stranded
+    # row is in none.  量 2026-08-30 the first time this ran: NINE rows of
+    # docs/FINDINGS.md and one of bench/README.md were outside their tables.
+    ('T10 a blank line strands the row below it', 'C8c',
+     'belongs to no table',
+     lambda s: s.replace('| `A-02` | plain | fine |',
+                         '\n| `A-02` | plain | fine |', 1), 1),
+]
+
+
+def table_controls(verbose=True):
+    """Five controls on the sweep, and the first one is the positive."""
+    fail = ok = 0
+    if verbose:
+        print('=== TABLE SWEEP CONTROLS: a fixture, and mutations of it ===')
+
+    def findings_for(text, mask_on=True):
+        real = globals()['fence_mask']
+        if not mask_on:
+            globals()['fence_mask'] = lambda lines: [False] * len(lines)
+        try:
+            lines = text.split('\n')
+            tables, _ = parse('fixture.md', text=text)
+            out = table_findings('fixture.md', tables, lines, fence_mask(lines))
+            sf, _n = span_findings('fixture.md', lines, fence_mask(lines))
+            return out + sf
+        finally:
+            globals()['fence_mask'] = real
+
+    base = findings_for(FIXTURE)
+    if base:
+        print(f'  FAIL  {"T1 the clean fixture produces no finding":52s} '
+              f'{len(base)} finding(s): {base[0][1][:90]}')
+        fail += 1
+    else:
+        print(f'  ok    {"T1 the clean fixture produces no finding":52s} '
+              f'0 findings, so T2-T6 are not passing on a checker that always fires')
+        ok += 1
+
+    for label, want, want_msg, mutate, n_want in TABLE_MUTATIONS:
+        mutated = mutate(FIXTURE)
+        if mutated == FIXTURE:
+            print(f'  FAIL  {label:52s} the mutation did not change the fixture')
+            fail += 1
+            continue
+        got = findings_for(mutated)
+        hit = [m for c, m in got if c == want and want_msg in m]
+        if len(hit) == n_want and len(got) == n_want:
+            print(f'  ok    {label:52s} caught by {want}: …{want_msg}…')
+            ok += 1
+        else:
+            codes = sorted({c for c, _ in got})
+            print(f'  FAIL  {label:52s} wanted {n_want} {want} finding(s) saying '
+                  f'{want_msg!r}, got {len(got)} {codes}')
+            for c, m in got[:3]:
+                print(f'          [{c}] {m[:110]}')
+            fail += 1
+
+    # T5 is a control on a control: with the fence mask off, the CLEAN fixture
+    # must stop being clean.  Without it, T1 passes on a checker that skips
+    # everything and the fence rule is untested in the direction that matters.
+    off = findings_for(FIXTURE, mask_on=False)
+    if off:
+        print(f'  ok    {"T5 with the fence mask off the fixture goes red":52s} '
+              f'{len(off)} finding(s), so T1 is not clean by skipping everything')
+        ok += 1
+    else:
+        print(f'  FAIL  {"T5 with the fence mask off the fixture goes red":52s} '
+              f'still clean -- the sweep may be reading no tables at all')
+        fail += 1
+
+    # T9 is C9's negative: the repaired form of T8's line must produce nothing.
+    # Without it, `C9` could be firing on every code span and T8 would not know.
+    repaired = findings_for(FIXTURE + "\nthe `\\r` path writes a NUL\n")
+    if repaired:
+        print(f'  FAIL  {"T9 the repaired escape is not a finding":52s} '
+              f'{len(repaired)}: {repaired[0][1][:80]}')
+        fail += 1
+    else:
+        print(f'  ok    {"T9 the repaired escape is not a finding":52s} '
+              f'`\\r` written as an escape is clean, so C9 is not firing on '
+              f'every span')
+        ok += 1
+
+    # T7 is about the POPULATION.  A sweep whose file list is empty reports zero
+    # findings and is green, which is the "a tool reporting 0 is making a claim"
+    # failure this repository keeps catching.
+    scope = table_scope()
+    dirs = {os.path.dirname(p) for p in scope}
+    why = None
+    if len(scope) < 10:
+        why = f'only {len(scope)} file(s) -- git ls-files returned nothing usable'
+    elif 'SPEC.md' not in scope:
+        why = 'SPEC.md is not in it'
+    elif len(dirs) < 2:
+        why = f'every file is in one directory ({dirs})'
+    elif any(p.startswith('upstream/') for p in scope):
+        why = 'it descends into upstream/, which is a pinned submodule'
+    if why:
+        print(f'  FAIL  {"T7 the sweep has a population":52s} {why}')
+        fail += 1
+    else:
+        print(f'  ok    {"T7 the sweep has a population":52s} '
+              f'{len(scope)} tracked .md in {len(dirs)} directories, SPEC.md among '
+              f'them, none under upstream/')
+        ok += 1
+
+    if verbose:
+        print()
+        if fail:
+            print(f'  {ok} table controls held, \033[31m{fail} did not\033[0m')
+        else:
+            print(f'  ok  all {ok} table controls held\n')
+    return fail
+
+
+def report_tables(findings, stats):
+    print('=== every tracked .md — C8/C8b/C8c/C9 ===')
+    print(f"  {stats['rows']} table row(s) in {stats['tables']} table(s), and "
+          f"{stats['spans']} code span(s), across {stats['files']} file(s)")
+    if stats['unreadable']:
+        print(f"  🔴 {len(stats['unreadable'])} file(s) could not be read: "
+              f"{', '.join(stats['unreadable'][:5])}")
+    print()
+    if not findings:
+        print('  ok  no ragged row, no row split over more than one line, no '
+              'row stranded outside its table, and no code span whose content '
+              'is only whitespace')
+        return 0
+    for c, msg in sorted(findings):
+        print(f'  FAIL [{c}] {msg}')
+    print(f'\n  {len(findings)} finding(s)')
+    return 1
+
+
 def main(argv):
     args = [a for a in argv if not a.startswith('--')]
     path = os.path.join(ROOT, args[0]) if args else os.path.join(ROOT, 'SPEC.md')
@@ -592,6 +1100,7 @@ def main(argv):
         return 2
 
     failed = controls(path)
+    failed += table_controls()
     if failed:
         print('  REFUSING to report on the file: a check that cannot fail would '
               'report it clean whatever it says')
@@ -600,7 +1109,14 @@ def main(argv):
         return 0
 
     findings, stats = check(path)
-    return report(path, findings, stats)
+    rc = report(path, findings, stats)
+
+    # The sweep is a second report, not a second tool.  It runs over every
+    # tracked `.md` INCLUDING the one above, so a ragged row in SPEC.md appears
+    # twice -- deliberately: the file-specific report is what an author of
+    # SPEC.md reads, and the sweep is what says the rule holds everywhere.
+    tf, ts = check_tables(table_scope())
+    return rc | report_tables(tf, ts)
 
 
 if __name__ == '__main__':

@@ -44,8 +44,27 @@ sha256sum /home/key/fwre-work/rebuild/bench-only/b5-20260830/rlxfw-quietm-202608
   cf8a93d73025292ddc61f28c7172ad00985efad8569bdfbcae69def3a10dfb8a
 
 /usr/bin/python3 tools/flashwin.py --self-test
-  13 passed, 0 failed
+  19 passed, 0 failed
 ```
+
+🔴 **That number was `13` on this card until 2026-08-30 and the tool printed
+`19`.** `flashwin` was rewritten from 13 controls to 19 in the **same session
+that wrote this card** — an adversarial pass ran 45 mutants against the first
+self-test and 24 survived, three of them printing this unit's MAC — and nothing
+re-read the pre-flight afterwards. A stale expectation on the FIRST line of a
+pre-flight is the one place a mismatch reads as *wrong version, stop*. 量
+2026-08-30 on this host, with the dump present: `19 passed, 0 failed`. **On a
+machine without `$FWRE_WORK/dumps/` it is `16 passed, 0 failed` and one skip
+line covering 3 (16 + 3 = 19)** — `R1`/`R2`/`R3` read this unit's own 4 MiB flash, which can
+never be committed. Either line is correct; `13` is not.
+
+⚠️ **The initramfs declaration moved today and this artefact does not carry the
+change.** `config/rlxfw-initramfs.tsv` gained `nod /dev/mtdblock1 b:31:1 0400`
+(`R3-9`, `SPEC.md` `FW-28`–`FW-30`). It is in **no** built image, and
+specifically not in `rlxfw-quietm-20260830.bin`. **The sha256 above is the
+authority for this seating**; the node lands on the next build, and that build
+moves `V-0t`/`V-2c`, whose `0x805FABF0` is derived from *this* image's
+`image_end`.
 
 🔴 **Every path on this card is literal, and `$FWRE_WORK` appears nowhere
 in a typed line.** 量 2026-08-30, in this host's login shell and in an

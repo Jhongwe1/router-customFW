@@ -5856,7 +5856,7 @@ wrapper 要的拼法是**裸數字** `-march=4181`／`-march=5281`。全部重�
 | ⑫ | **`jalx` 不是進 MIPS16 的唯一路徑** —— bit 0 是 ISA-mode 位元，`jr`／`jalr` 帶奇數位址就進去了，而那正是透過函式指標或 ops struct 呼叫 MIPS16 的常態，也正是 `.iram` fast path 的長相 | 兩支工具的 docstring 寫明機制與**失效模式**，並記下這個映像裡搜過沒找到（29 個奇數位址字，全在資料裡）——**沒找到不等於沒有** |
 | ⑬ | **`README.md` 掉了三個必須帶著的弱點裡的一個**，而且它八行下面那句「這裡每一條 ISA 宣稱都還是第一種」已經不成立，這一段卻宣稱自己「把那句話收緊了」 | 補回弱點；那句站著的話直接改寫成「到 2026-08-27 為止是真的，現在有兩條是第二種，而且兩條都是推」 |
 | ⑭ | **`PROGRESS.md` 裡 172 → 171 與 172 → 168 同時活著**，而它是 `CLAUDE.md` 指名的「我在哪」唯一擁有者 | 兩處就地標記，不刪 |
-| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根本不能組譯的欄位印出認證行）；`pref`／`madd`／`rdhwr` 三列可以硬寫成 `.` 而沒有任何東西分得出「問過被拒」與「沒問」；而 B 段用真假值而不是 exit code 分支，於是把 REFUSED（exit 2）報成綠色的 skip | 加 `A6`（殺掉單一欄的 stub）、把四個全點列加進 `A4` 的 accept-list、B 段改成 `case $rc in 0|3|*)`。suite 40 → 48，那個單欄變異體現在 24 條紅 |
+| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根本不能組譯的欄位印出認證行）；`pref`／`madd`／`rdhwr` 三列可以硬寫成 `.` 而沒有任何東西分得出「問過被拒」與「沒問」；而 B 段用真假值而不是 exit code 分支，於是把 REFUSED（exit 2）報成綠色的 skip | 加 `A6`（殺掉單一欄的 stub）、把四個全點列加進 `A4` 的 accept-list、B 段改成 `case $rc in 0\|3\|*)`。suite 40 → 48，那個單欄變異體現在 24 條紅 |
 
 **被駁回三條**，其中兩條記一句：說 `K4b` 的零完全靠一條為了那一個字量身訂做的規則、而且「沒有任何地方講」——
 機械上的依賴是真的，但「沒有講」在**五個已提交的地方**是假的（`embedded_in_padding` 的 docstring 含 hexdump 與失效模式、
@@ -8763,3 +8763,225 @@ fixture，加一個把跳脫拿掉的變異。記成 carried-forward。
 `test-console-capture` 40/40、本機 `ci-census` 綠並在 455 收斂。
 `bench/2026-08-30c/PREDICTIONS-B5-block2.md` 桌面跑 **`0 of 31`**，
 15/15 控制綠 —— 那是上機之前的正確答案。
+
+## 2026-08-30（桌面，第十一段）—— 四十格全綠、十個變異活著；`C8` 一般化；以及 `R3-9` 的節點在寫下去之前被自己否證
+
+**桌面，不通電。零 flash 位元組、零電源循環、零裝置讀數 —— 這句話今天成立，
+因為機器沒通電。**
+
+**產出**：`tools/test-console-capture-mutants.py`（新，25 個變異）、
+`test-console-capture.sh` 40 → 46、`tools/spec-check.py` 11 → 23（`C8` 一般化，
+新增 `C8b`／`C8c`／`C9`）、`bench/README.md` 的 `R0` 四節、
+`config/rlxfw-initramfs.tsv` 的 MTD 節點、`SPEC.md` `FW-11` 收窄與
+`FW-28`／`FW-29`／`FW-30` 新列、`notes/kernel-build.md` §17.7a、
+`notes/rootfs-census.md`、`docs/loader-command-semantics.md`、
+`RUNSHEET` §B5-c15、`bench/2026-08-30c` 卡片的 pre-flight 更正、
+`docs/FINDINGS.md` 四列、`README.md`、`PROGRESS.md`、`ci.yml`、`ci-expected.tsv`。
+
+### 0. 昨天收工那句「`test-console-capture` 40/40」是真的，而且不夠
+
+昨天的收工清單寫著 `test-console-capture` 40/40 綠。今天對那個守衛跑 **25 個變異**，
+**十個活著**。
+
+四個類別，而四十格一格都只看得見「個例」、看不見「類」：
+
+| 類 | 變異 | 為什麼四十格看不見 |
+|---|---|---|
+| **WAIVER** | 守衛前面插 `if args.esc > 0: return` | `N18`–`N21` 四格全部把 `--esc`／`--esc-after`／`--no-cr`／`--force`／`--baud`／`--cr-settle`／`--esc-period` 留在預設值。**而 `--esc 25` 正是 `A-catch` 自己的形狀** —— 那個變異在 pty 上用 `--esc 1` 加無終止條件，量到 `rc=124`、`.log` 寫出來了、`.meta.json` 掉了：守衛當初就是為這個加的 |
+| **CONTRACT** | `_fail` 改成 `SystemExit(0)`；以及把拒絕印到 stdout | **四十格沒有一格斷言退出碼**，所以卡片寫 `cmd \|\| abort` 會把拒絕讀成成功；**也沒有一格看 stdout**，所以卡片寫 `cmd > log` 會把拒絕吞進 log。第二個連昨晚的普查都沒有 |
+| **MESSAGE** | 拒絕訊息改成指名 `--timeout` | 一段子字串就過 |
+| **POSITION** | 守衛移到覆寫拒絕下面 | 兩個都是開埠前的拒絕，上面沒有一格分得出先後 —— 而順序對操作者有差：被告知 `exists` 就會加 `--force`，然後撞上守衛存在的那個不會返回的迴圈 |
+
+**修法是六格，不是三行**，而其中兩格是關於守衛的**位置**：
+
+* `N25`／`N26` 把 WAIVER 這一**類**分成兩半 —— `N25` 單獨打 `--esc`（有名字的那個），
+  `N26` 把另外六個非預設旗標塞進**一道命令**，所以任何單一旗標的 waiver 都會紅。
+* `N27` 一格同時斷言 `rc != 0` **與 stdout 為空** —— 同一個契約的兩面。
+* `N28` 要求拒絕訊息的**第一行**同時指名兩個旗標。
+  🔴 **第一版寫成 grep 整段訊息，而 `--timeout` 那個變異活了下來**：訊息有十四行，
+  它的計時段落本來就寫著 `--seconds 4` 和 `--idle N`，所以對這麼長的訊息做子字串測試
+  幾乎是不可否證的。操作者會重打的是第一行，所以第一行才是契約。
+* `N29` 送 **128** 字元且無終止條件，要求**長度**拒絕。
+  🔴 **這才是 `N21` 只是看起來有做的那件事** —— `N21` 送 127 字元，那是 `_check_send`
+  **接受**的長度，所以守衛在不在 `_check_send` 上面 `N21` 都會過；那一側一直是靠
+  `N4`／`N7`／`N8` 剛好都沒帶終止條件撐著，是**碰巧**而不是斷言。
+  （carried-forward 那一列自己寫過這句話，今天量到它是對的。）
+* `N30` 先把三個輸出檔建好，要求**終止條件**的拒絕排在覆寫拒絕前面。
+
+### 1. 而「十個活著」不再是一句沒人重跑的話
+
+`tools/test-console-capture-mutants.py`，形狀抄 `tools/test-rbcheck.py`：
+
+* 25 個變異，錨點**必須恰好出現一次**，否則報成 **SURVIVOR 而不是跳過** ——
+  一個默默什麼都沒改的變異套件，正是這個 repo 一直在抓的「回報 0 的工具在做主張」。
+* 每一個變異跑**整套** `test-console-capture.sh`，不是快速子集：要證的主張就是
+  「那些已提交的格子抓得到它」，用代理套件就是另一個主張。
+* **未變異的基線不綠就直接拒絕**，因為那樣每一個變異都會「殺掉」一套本來就紅的套件。
+* 印 `  ok  `／`  FAIL  `，那是 `ci-census.py` 讀的詞彙 —— 昨天 `test-rbcheck.py`
+  印 `KILLED`／`SURVIVED`，CI 讀成 `ran 0/9`。
+* 8 路平行（格子是睡眠密集不是 CPU 密集），量到 25 個變異對 85 s 基線約 **6 分鐘**。進 CI。
+
+**收工時 25/25 全殺。**
+
+### 2. `spec-check` 的 `C8` 一般化，而一般化本身找出三個新形狀
+
+`C8` 本來只看 `SPEC.md`。指向**全部 71 個追蹤中的 `.md`**（620 張表、~3,600 列、
+~43,000 個 code span）之後，第一次跑就是 **8 列壞掉，而先前的普查說 6** ——
+因為那次普查只看 `PROGRESS`／`RUNSHEET`／`LOG` 三個檔，`notes/` 從來沒看過
+（漏掉的兩列是 `LOG.md:5859` 與 `notes/binsim.md:537`）。
+
+**而三個新形狀是把上一個打開之後才看得到的：**
+
+* **`C8b` 一列跨多個實體行。** GFM 沒有續行語法，code span 裡一個真的換行就在那裡把
+  列切斷。這裡每一支檢查器都走「以 `\|` 開頭的行」，所以續行看不見 ——
+  **而且同一張表底下的每一列都跟著從計數裡消失**。兩個實例
+  （`RUNSHEET` `C7` 跨三行、`PROGRESS:520` 跨兩行）。新的 `C8b` 報出來之後**把列接回去**，
+  所以表格下半段還是有被檢查，那才是重點。
+* **`C8c` 一個不屬於任何表的 `\|` 行。** `C8` 結構上看不到它 —— `C8` 走表，而孤兒不在任何表裡。
+  量：**`docs/FINDINGS.md` 九列**，被一個空行趕出表外，其中包含最新那三條
+  （flash bracket 沒取樣 `H601`、這台的 dump 能重現兩份擷取、這台 busybox 沒有摘要 applet）。
+  **那是給讀者看的那一頁，而那九列在上面是一堆豎線組成的段落。**
+  加上 `bench/README.md` 一列。這正是 `2026-08-27` 對 `SPEC.md` 記過的同一個缺陷 ——
+  那次是對抗審查找到的，這次是檢查器找到的。
+* **`C9` 內容只有空白的 code span。** `\r` 和 `\n` 打成真的字元就會退化成這個，而排版上完全看不出來。
+  **四個**實例，**其中一個讓讀數是錯的而不只是排版**：
+  `docs/loader-command-semantics.md` 把 `readline` 三個出口裡的**兩個**標成同一個空字元，
+  所以「只有一個寫終止符」這句話**兩個都沒指到**。
+
+**那一條是今天唯一動到「讀出來的東西」的更正，而它是量出來的**：把
+`$FWRE_WORK/stage2.bin` 在 `0x804070e4` 反組譯 ——
+
+```
+804070e4:  li   v0,10          `\n`
+804070e8:  beq  a0,v0 -> 8040719c     LF 這條回去，不寫 NUL
+804070ec:  li   v0,13          `\r`   （分支延遲槽）
+804070f0:  bne  a0,v0 -> 80407100
+804070f8:  j          -> 8040719c
+804070fc:    sb zero,0(s0)     NUL 在 jump 的延遲槽裡 —— CR 這條
+```
+
+所以 NUL 是 **CR** 那條寫的、**LF** 那條不寫。`SPEC.md` `LDR-06d` 本來就寫對，
+是這份 doc 自己的清單沒寫對。清單補上那兩道讓 `0x804070f8` 成為 CR 路徑的指令，
+因為沒有它們那個標註是斷言而不是讀數。
+
+十列全部修掉（八列 ragged、兩列跨行、十個孤兒、四個空 span），`spec-check` **11 → 23**。
+🔴 **而新的檢查器上線第一件事就是抓到我自己剛寫的 `Active step` 那一列** ——
+我在裡面寫 `` `\|` 行 `` 時放了一個沒跳脫的豎線。
+
+⚠️ **`C8` 的「列尾必須是 `\|`」比 GFM 嚴**：`\| a \| b` 沒有結尾豎線在 markdown 裡是合法的。
+量：3,572 列裡 3,570 列本來就有，而沒有的那兩列正是 `C8b` 的缺陷本身。
+寫在工具的「它做不到什麼」那一段裡。
+
+### 3. `R3-9` 的 `nod /dev/mtd0` 在寫下去之前就被自己的量測否證了
+
+`R3-9`、`notes/kernel-build.md` §17.7、`notes/rootfs-census.md` 三處都寫著要宣告
+`/dev/mtd0` 然後跑 `wc -c < /dev/mtd0`。**寫那一行之前先量：**
+
+| 路線 | 讀數 | 同一道命令裡的控制 |
+|---|---|---|
+| 讀 `r3-4/out/{quietm,loudm}.config-built` | **兩個映像都是 `# CONFIG_MTD_CHAR is not set`** | 同一個 grep 在同一個檔案找到 **9** 行其他 `^CONFIG_MTD` |
+| 量 兩份 `System.map` | mtdchar 專屬符號 **0** 個 | 同一道命令數到 **6** 個 mtdblock／mtdcore 符號 |
+
+major 90 沒有註冊 chrdev，所以那個節點會是 `ENODEV`。**一個全部價值就是一個數字的步驟，
+會把一格上機時間花在一則錯誤訊息上。**
+
+🔴 **而顯而易見的替代 `/dev/mtdblock0` 是這個專案最不該建的那一個節點。**
+`CONFIG_MTD_BLOCK=y`，讀 `drivers/mtd/mtdblock.c` `.major = 31, .part_bits = 0`，
+所以 `mtdblock<N>` 是 `b 31 N`。而 `mtd0` 是 `boot+cfg+linux`，`0x000000`–`0x130000`
+（量 `bench/2026-08-30b/L3.log:113`）—— **`CLAUDE.md` 禁寫的兩塊區域都在裡面**。
+`mtdblock` 有寫入路徑（`mtdblock_writesect`，整個 erase block 的 read-modify-erase-write），
+**而 `0400` 不是控制**：root 不受 DAC 約束，互動 shell 上 `echo x > /dev/mtdblock0`
+離 offset 0 的 erase 只差一個手誤，而這台沒有備品。
+
+宣告的是 **`nod /dev/mtdblock1 b:31:1 0400`**：同一條
+`mtdblock_readsect` → `part_read` → `rtl819x_flash` 讀路徑，所以買到同一個讀數，
+而**禁寫區上零個可寫節點**。**控制是「沒有那個節點」，不是模式位元。**
+
+買到的兩個讀數：`cat /proc/mtd`（`mtd_read_proc` 在兩份 map 裡，**讀零個 flash 位元組**）
+與 `wc -c < /dev/mtdblock1` = **2,949,120**。⚠️ **第一版寫成 2,818,048，是減法錯**
+（那是 `0x2B0000`），**被第二個來源抓到** —— 讀 `rtl819x_flash.c` 配這次建置自己的
+`CONFIG_RTL_ROOT_IMAGE_OFFSET=0x130000` 與 `WINDOW_SIZE 0x400000`。
+這一列自己就是兩來源規則的正控制。
+
+順帶把 `SPEC.md` `FW-11` 收窄：「`/dev/mtdblock0` 是整顆」在原始碼裡**確實存在**
+（有一張單一分割的 `rtl8196_parts1[]`，`size = CONFIG_RTL_FLASH_SIZE-0`），
+但這片板子的組態不走那一支。⚠️ **原廠自己那顆 kernel 的分割表未量** ——
+`upstream/dumps/uart-boot.log` 一行 MTD 都沒印，控制是同一份 log 有 69 行其他輸出。
+
+🔴 **這一行走在所有已建映像前面**，而且**特別不在 `rlxfw-quietm-20260830.bin` 裡** ——
+那正是 `bench/2026-08-30c` 要上傳的那顆。重建會移動卡片 `V-0t`／`V-2c` 的
+`0x805FABF0` 推導，所以今天不重建；卡片的 pre-flight sha256 才是那次上機的權威。
+`CONFIG_MTD_CHAR=y` 加 `/dev/mtd0ro`（`c 90 1`，讀 `mtdchar.c` 的 `mtd_open`
+**由 kernel 強制**唯讀：`if ((f_mode & FMODE_WRITE) && (minor & 1)) return -EACCES`）
+是長期正解，記成 carried-forward，連同它的成本。
+
+### 4. `bench/README.md` 的 `R0` 四節，而寫的時候量到延後那段自己猜的數是錯的
+
+`bench/` 十四個目錄，索引有九節。缺的五個是 `R0` 全部四個
+（`2026-08-24c`／`d`／`e`／`f`）加上 `2026-08-26`（它有自己的 `README.md`，唯一合理的缺席）。
+**而 `R0` 正是這個專案唯一有 flash 證據的地方。**
+
+延後那段自己寫「60 個擷取、13 個預測 block」。量：**81 個擷取、18 份預測檔**
+（block 0–13，加上 `0b`／`3b`／`3c`／`9b` 四個補充）。
+
+**而更值得改的是這一句**：那段說 `G8-pre` → `G8a` → `G8b` 之間有「**三次** kernel 執行」。
+量：**只有兩次有擷取**（`G6`、`G7`）。第三次是 `24e` 那個電源循環 ——
+而 `bench/2026-08-24e/A-catch.log` 停在 loader banner（ESC 跑了 45 s，開機在 t=64.2 s
+才開始，擷取到 banner 就到期了），**之後 loader 做了什麼沒有任何東西記錄**。
+那是**推**，有根據但不是量。表格裡三列各自標了 mark。
+
+三輪括號本身重新量過：六份擷取都是 **777 bytes**，兩個位址三輪都逐位元組相同 ——
+**4,194,304 裡的 512 位元組，0.012 %**。
+
+### 5. 卡片自己的 pre-flight 過期了
+
+`bench/2026-08-30c/PREDICTIONS-B5-block2.md` §0 要 `flashwin.py --self-test` 印
+**`13 passed, 0 failed`**。量：它印 **`19`**。
+
+`flashwin` 是在**寫那張卡片的同一段**裡從 13 個控制改成 19 的
+（對抗審查跑 45 個變異、24 個活著、其中三個會印出這台的 MAC），而沒有人回頭讀 pre-flight。
+**pre-flight 第一行的期望值對不上，是最容易被讀成「版本錯了，停」的位置** ——
+而那是操作者在通電前、板子在手上時跑的。
+
+兩個數都量過寫進卡片：有 dump 是 `19`，沒有 dump 是 `16` 加一條 cover 3 的 skip（16 + 3 = 19）。
+🔴 **而 `ci-expected.tsv` 自己那一列的敘述還寫著改版前的「10 ok … closes against 13」**，
+旁邊的閘欄位早就是 19 了 —— 一列的全部工作就是承載那個數字，而它承載的是舊的。
+
+### 6. 環境：兩個舊坑，一個新的自我否證
+
+* **heredoc 掉一層反斜線，今天又踩了一次。** `re.compile(r'(?<!\\)\|')` 送過去變成
+  `(?<!\)\|`，直接 `re.error: missing ), unterminated subpattern`。
+  `CLAUDE.md` 寫著解法是「用 Write 寫檔、用路徑跑」，照做就沒事。
+* **`bash -lc` 會把開頭的 `/` 做 MSYS 轉換。** `bash -lc '/usr/bin/python3 …'`
+  變成 `C:/Program Files/Git/usr/bin/python3`。開頭不是 `/` 的（`cd … && …`）沒事。
+  🆕 **同一個機制還會展開單引號裡的 `$?`** —— 我用 `echo "rc=$?"` 記變異套件的退出碼，
+  記到的是**外層 Git Bash** 的 `$?`（0），害我以為套件回報失敗卻 exit 0。
+  直接量一次就分開了：存活的變異 `rc=1`，被殺的 `rc=0`。**套件沒事，記錄的方式有事。**
+* 🔴 **而我自己的進度檢查是一個「回報 0 的工具沒有正控制」的實例**：
+  `tail -6 file 2>/dev/null || echo "still running"` —— 檔案不存在時 `tail` 失敗，
+  印出 "still running"，而實際上那個 `nohup` 的背景工作在 WSL 命令結束時就死了。
+  「還在跑」和「從來沒開始」被同一個輸出蓋掉。改成先測 `-f` 再 `pgrep -c`。
+
+### 7. 收工前的閘
+
+`spec-check` **23/23**（9 個 `SPEC.md` 變異 ＋ 10 個 fixture 控制，`T1` 是正控制、
+`T5` 是 `T1` 的控制、`T7` 對空母體直接拒絕），全 repo 掃描 **0 findings**
+（量，收工時：3,640 列 / 623 張表 / 43,607 個 code span / 71 個檔）、
+`test-console-capture` **46/46**、`test-console-capture-mutants` **25/25 全殺**（362 s）、
+`test-config-gates` 48/48、`mkinitramfs self-test` 23/23、`rbcheck` 16/16、
+`test-rbcheck` 9 個變異全殺、`flashwin` 19/19、`ci-census --self-test` 19/19、
+`test-file-modes` 3/3（47 個記錄為可執行）、`test-gitignore` 21/21、
+`check-predictions --sweep bench` 40 檔 / 212 格 / **0 失序**、
+`shellcheck --severity=error tools/*.sh` 乾淨、
+`audit-bench-log` 對 `docs/FINDINGS.md` 的命中數**沒有增加**（新那一列本來寫
+「calibration」，改寫成不含那個詞而意思更準）。
+
+🔴 **而本機的 `ci-census` 全表跑出 `NOT-RUN-TOTAL MISMATCH`（宣告 455、本機沒跑 172），
+那不是缺陷，是這台不是 runner。** 這台有 `mips-linux-gnu-gcc` 也有 `$FWRE_WORK`，
+所以 `test-rlxprobe` 在這裡跑滿 202、`test-rtkimage` 跑滿 32，而在 runner 上它們會 skip。
+**該檢查的是「我今天動到的三個套件對那個總數的貢獻是不是 0」**，而那是量出來的：
+`--only spec-check,test-console-capture,test-console-capture-mutants` →
+23/23、46/46、25/25，**三個都 `not run 0`**；把 `$FWRE_WORK` 指到空目錄再跑一次，
+`spec-check` 仍是 23 ok / 0 skip、`test-console-capture` 仍是 46 ok / 0 skip；
+讀原始碼，那三支裡 `FWRE_WORK` 只出現在 `spec-check.py` 的兩行**註解**裡。
+所以 `# not-run-total: 455` **不動**。

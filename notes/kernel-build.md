@@ -2462,12 +2462,69 @@ for two measured reasons rather than out of caution:
    this device's userspace that can digest a stream. `notes/rootfs-census.md`
    owns the census and records that `mknod` is the `uname` false positive again
    — `strings` finds it, the applet table does not.
-2. 讀 `config/rlxfw-initramfs.tsv`: **three** device nodes are declared —
-   `/dev/console`, `/dev/null`, `/dev/tty` — and no `/dev/mtd*`.
+2. 讀 `config/rlxfw-initramfs.tsv`: **three** device nodes were declared —
+   `/dev/console`, `/dev/null`, `/dev/tty` — and no `/dev/mtd*`. A fourth was
+   added 2026-08-30 and it is **not** the one this section asked for.
 
 The node is one declared line and costs nothing. **The digest is the problem**: a
 content check needs a binary that is not this unit's, and Decision B's third leg
 is *the contents are this unit's own binaries, unmodified; if the shell does not
-come up, the shell is not the new thing*. What the node alone buys is
-`wc -c < /dev/mtd0` — `wc` **is** an applet — which is a **readability and size**
-reading through my own driver and not a content one. `R3-9` owns it.
+come up, the shell is not the new thing*. What the node alone buys is a
+**readability and size** reading through my own driver and not a content one.
+`R3-9` owns it.
+
+### 17.7a 🔴 The node this section named cannot exist, and the obvious substitute is the dangerous one
+
+**量 2026-08-30 at the desk, before the line was written**, two routes with a
+positive control on each:
+
+| route | reading | its control, in the same command |
+|---|---|---|
+| 讀 `r3-4/out/{quietm,loudm}.config-built` | `# CONFIG_MTD_CHAR is not set`, **both** images | the same grep finds **9** other `^CONFIG_MTD` lines in the same file |
+| 量 both `System.map`s | **0** mtdchar-only symbols (`mtd_open`, `init_mtdchar`, `mtd_ioctl`, `mtd_lseek`, `mtdchar_notify_*`) | **6** mtdblock/mtdcore symbols (`init_mtdblock`, `mtdblock_readsect`, `mtd_read_proc`, `add_mtd_partitions`, `register_mtd_blktrans`, `mtdblock_open`) |
+
+So major 90 has no registered chrdev and `wc -c < /dev/mtd0` would read
+`No such device`. **A step whose whole purchase was one number would have spent
+a bench cell on an error message.**
+
+🔴 **And `/dev/mtdblock0` — the obvious substitution — is the one node this
+project must not create.** `CONFIG_MTD_BLOCK=y`, and 讀 `drivers/mtd/mtdblock.c`
+`.major = 31, .part_bits = 0`, so `mtdblock<N>` is `b 31 N`. mtd0 is
+`boot+cfg+linux`, `0x000000`–`0x130000` (量 `bench/2026-08-30b/L3.log:113`),
+**which contains both regions `CLAUDE.md` forbids writing** — the loader and
+`H601`. `mtdblock` has a write path (`mtdblock_writesect`, a read-modify-erase-
+write of a whole erase block), and **mode `0400` is not a control**: root ignores
+DAC, so on an interactive shell `echo x > /dev/mtdblock0` is one typo from an
+erase-block write at offset 0 on a device with no spare.
+
+**`/dev/mtdblock1` buys the same reading and leaves no writable node over either
+forbidden region.** It runs the identical `mtdblock_readsect` → `part_read` →
+`rtl819x_flash` path, so it exercises the same driver; the control is the
+**absence** of a node, not the mode bits. Two agreeing sources for its size:
+
+* 量 `bench/2026-08-30b/L3.log:114` — `0x000000000130000-0x000000400000 : "root fs"`
+* 讀 `drivers/mtd/maps/rtl819x_flash.c` with this build's own
+  `CONFIG_RTL_ROOT_IMAGE_OFFSET=0x130000`, `WINDOW_SIZE 0x400000`,
+  `CONFIG_RTL_FLASH_DUAL_IMAGE_ENABLE` and `CONFIG_RTL_TWO_SPI_FLASH_ENABLE`
+  both unset — `size = WINDOW_SIZE - CONFIG_RTL_ROOT_IMAGE_OFFSET = 0x2D0000`
+
+`0x400000 − 0x130000 = 0x2D0000 = **2,949,120**. ⚠️ The first draft of the
+declaration wrote **2,818,048**, which is `0x2B0000` and a subtraction error; the
+second source is what caught it, which is the argument for having one.
+
+**Cells, and both are cheap**: `cat /proc/mtd` first — it prints the map from my
+own driver and reads **zero flash bytes** (`mtd_read_proc` is in both
+`System.map`s) — then `wc -c < /dev/mtdblock1`, which must print `2949120`.
+**Refuted by** any other number, by `No such device` (the block driver did not
+register), or by a hang (the SPI read path does not complete).
+
+🔴 **The declaration is AHEAD of every artefact that exists.** The node is in no
+built image on 2026-08-30, and specifically not in `rlxfw-quietm-20260830.bin`,
+which `bench/2026-08-30c/PREDICTIONS-B5-block2.md` uploads — that card's `V-0t`
+and `V-2c` read `0x805FABF0` because they know where **that** image's
+`image_end` sits, so the rebuild that lands this node moves them. Turning
+`CONFIG_MTD_CHAR=y` on and declaring `/dev/mtd0ro` (`c 90 1`, where 讀
+`mtdchar.c`'s `mtd_open` **enforces** read-only: `if ((f_mode & FMODE_WRITE) &&
+(minor & 1)) return -EACCES`) is strictly better than any mode bit and is the
+right long-term answer; it costs a kernel rebuild and is carried forward rather
+than taken between a card's desk validation and its seating.

@@ -546,17 +546,17 @@ next command removes `r`.
 and `readline` itself has three exits, of which **only one writes a terminator**:
 
 ```
-804070e8:  beq  a0,10 -> 8040719c     '
-'   returns, NO NUL
-804070f8:  j          -> 8040719c     '
-'   returns
+804070e4:  li   v0,10                 `\n`
+804070e8:  beq  a0,v0 -> 8040719c     `\n`   returns, NO NUL
+804070ec:  li   v0,13                 `\r`   -- the branch's delay slot
+804070f0:  bne  a0,v0 -> 80407100            not CR: on to the rest
+804070f8:  j          -> 8040719c     `\r`   returns
 804070fc:    sb zero,0(s0)            ...     the NUL, in the delay slot
 80407190:  sltu v0,s2,s5              count < 128 ?
 80407194:  bnez v0    -> loop         count == 128 returns, NO NUL
 ```
 
-So a line is terminated by one of two things: the `
-` path writing a NUL, or a
+So a line is terminated by one of two things: the `\r` path writing a NUL, or a
 **leftover zero from the caller's `memset`**. The second only exists while the
 text is **shorter** than 128.
 

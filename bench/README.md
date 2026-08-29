@@ -279,6 +279,125 @@ ending, so this changes no hit — but **that column is not a byte count and mus
 not be quoted as one.** The byte-exact claim in this file rests on `bench/**`
 being marked `-text` and on the stored-blob hash check, not on this scan.
 
+## 🆕 `R0` — the four directories this index skipped, and the only flash evidence here
+
+**Written 2026-08-30 at the desk**, filling the gap the section further down
+names: `bench/` held fourteen directories and this file had a section for nine of
+them. The five with none were the whole of `R0` — `2026-08-24c`, `24d`, `24e`,
+`24f` — and `2026-08-26`, which carries its own `README.md` and is the one
+legitimate absence.
+
+量 while writing them, because the paragraph that deferred the work guessed:
+these four hold **81 captures across 18 prediction files** (blocks 0–13, with
+`0b`, `3b`, `3c`, `9b` as lettered supplements), not *"60 captures across
+thirteen prediction blocks"*. The old sentence is kept below rather than edited
+away.
+
+**Why a reader chasing the flash question comes here.** `G8-pre` → `G8a` →
+`G8b` is the only `FLR` bracket this project has ever run. 量 2026-08-30, all
+six captures are **777 bytes** and byte-identical across the three rounds at both
+addresses:
+
+```
+cmp bench/2026-08-24c/G8pre-rd0.log bench/2026-08-24d/G8a-rd0.log   # identical
+cmp bench/2026-08-24d/G8a-rd0.log   bench/2026-08-24f/G8b-rd0.log   # identical
+cmp bench/2026-08-24c/G8pre-rd6.log bench/2026-08-24d/G8a-rd6.log   # identical
+cmp bench/2026-08-24d/G8a-rd6.log   bench/2026-08-24f/G8b-rd6.log   # identical
+```
+
+That is **512 of 4,194,304 bytes — 0.012 %** — unchanged across the span. What
+ran inside the span is worth stating exactly, because the sentence further down
+says *"three kernel executions"* and only two of them are captured:
+
+| | what | mark |
+|---|---|---|
+| `G6` | the vendor kernel from RAM, from bytes the loader staged itself. `bench/2026-08-24c/G6.log` | 量 |
+| `G7` | the same kernel from RAM, from bytes delivered over TFTP. `bench/2026-08-24d/G7.log`, **byte-identical to `G6.log`** as a whole file, 1,789 bytes | 量 |
+| the `24e` cycle | 🔴 **not captured.** `bench/2026-08-24e/A-catch.log` ends **at the loader banner** — the capture expired there. Nothing recorded what the loader did next, and the loader's own default is to boot flash. That a third kernel ran is *推*, well founded and not measured | 推 |
+
+**And the bracket has never sampled the region that cannot be undone.** `0x000000`
+covers 256 of the loader region's 24,576 bytes; `0x060000` is the `cr6c` header,
+which no rule forbids writing. `H601` at `0x006000`–`0x007FFF` is **0 of 8,192**.
+`bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 adds it.
+
+### `2026-08-24c` — seating 2 part three, and `R0` opens
+
+**One power cycle, 46 captures, 10 prediction blocks** (`0`, `0b`, `1`, `2`, `3`,
+`3b`, `3c`, `4`, `5`, `6`), 13,715 bytes of `.log`. No flash-write command
+issued; the `FLR` bracket's **first** round is here, so this is the one directory
+of the four whose flash side is a baseline rather than a comparison.
+
+| file(s) | cell | what it is |
+|---|---|---|
+| `PREDICTIONS-block0.md` … `block6.md` | — | ten blocks, each written before its own cells. `0b`, `3b` and `3c` are supplements written at the bench when the block before them decided their content — the numbering is deliberate and `block2` here is **not** the `block2` of `2026-08-25` |
+| `A-catch.*` | `A-catch` | the ESC window. 🔴 **Byte 0 is the instrument's, not the device's** — `0xFF` here against `0x00` in `2026-08-25`, the two idle polarities of a line that is not yet driven. Bytes 1–180 are byte-identical across the two |
+| `A0.*` | `A0` | the throwaway capture seating rule 2 requires, spent where nothing depends on it |
+| `B7-cold.*` | `B7` | the reset-button GPIO read on a **cold** boot, against `2026-08-24b`'s warm reads |
+| `D0a.*` `D0a2.*` `D0b.*` `D0-rb1.*` `D0-rb2.*` `D0a2-rb.*` | `D0` | the two canaries and their **readbacks**. 40 / 40 / 71 / 71 bytes. The readbacks are the cell that closed the hole `§D` had: a canary nobody read back is a canary nobody armed |
+| `D1.*` | `D1` | `J BFC00000`, the warm reset. 1,363 bytes, `cr.esc_after.prompt_seen: true`; the jump→banner interval is **0.592 s** and is **not** the watchdog timeout |
+| `D2.*` `D2b.*` `D2c.*` `D2d.*` `D2e.*` `D2f.*` `D2g.*` | `D2` | `WDTCNR` twice = `A5000000`, bit 20 **clear** — which refutes `D2`'s own predicted `A5100000`. `0x81000000` word 1 comes back `00000144` on **every** boot, and the `0x80A00000` canary survives **three** warm resets byte-exact. That pair is what gave `C-8` a discriminator that does not depend on a register |
+| `D4.*` `D4c.*` | `D4` | the watchdog fired twice on purpose. **1122.5–1149.9 ms** at `OVSEL=1001` and **549.6–577.4 ms** at `OVSEL=1000` — `CLK-08`, and the divided/undivided choice is not in doubt |
+| `flush-d1.*` `flush-d3.*` `flush-d4c.*` | seating rule 2 | each **11 bytes, a bare prompt, no `Unknown command !`** — the ESC terminator went out. 量 2026-08-30: all three have `sent: ""` and `--seconds 2.0 elapsed` in their metadata, so they are flushes and not cells. ⚠️ **`flush-d3` is named for a cell that is not in this directory** — `D3` was retired by `C-14`, and what the flush followed is not recorded |
+| `E10c.*` `E10d.*` | `E10` | `PSRP0`–`PSRP4` with cables moved, against `2026-08-24b`'s no-cable negative control |
+| `F1.*` `F2.*` | `F1` / `F2` | the MDIO sweep. `F1` is the **risk** cell — `phy_read()`'s wait on `MDCIOSR` bit 31 has no timeout and no iteration bound, so an unpopulated address could have hung the loader. It returned, 87 bytes. `F2` is **32 `PhyID` rows** in a 1,042-byte capture — 量 2026-08-30 the FILE is 34 lines, the extra two being the `MDIOR 2` echo and the trailing prompt, so *"32 lines"* is the table and not the file — addresses `0x00`–`0x04` → `0x001c` and `0x05`–`0x1f` → `0x0000` |
+| `G0-head.*` `G0-mid.*` `G0-tail.*` | `G0` | 48 words at the head, middle and tail of the upload arena: no aligned pointer, no self-reference, no period. 🔴 **The test only means this after a *long* power-off** — `MEM-15` |
+| `G1a.*` `G1b.*` `G1c.*` | `G1` | is the image already in RAM before anything is uploaded? All three match the payload file |
+| `G8pre-flr0.*` `G8pre-rd0.*` `G8pre-y0.*` `G8pre-flr6.*` `G8pre-rd6.*` `G8pre-y6.*` | `G8-pre` | 🔴 **the flash baseline, taken before any kernel of this section runs.** Two 256-byte windows through `FLR`+`DW`, 128 words, all matching the 2026-08-16 dump. Added because `§G` had no baseline at all |
+| `G6.*` | `G6` | the vendor kernel booted from RAM, from bytes the **loader** staged. 62 lines compared against `uart-boot.log` from `decompressing kernel:` onward, 62 identical |
+| `X1.*` `X1b.*` `X1c.*` `X2.*` `X3.*` `X4.*` `X4b.*` | `C-17` | what writes the 32-byte-periodic structure at `0x81000400`. 🔴 **`X1c` is byte-identical to `X1b`, and `X1b` did not contain the structure** — which is what refutes link-up as the writer |
+
+### `2026-08-24d` — seating 2 part four: the transport, and `R0` closes
+
+**One power cycle, 24 captures, 6 prediction blocks** (`7`, `8`, `9`, `9b`, `10`,
+`11`), 8,807 bytes of `.log` plus five JSON transfer reports and one 987,138-byte
+readback that is **not** committed as a blob. No flash-write command issued; the
+bracket's **second** round is here.
+
+| file(s) | cell | what it is |
+|---|---|---|
+| `PREDICTIONS-block7.md` … `block11.md` | — | six blocks. `9b` was written at the bench, before relying on the poison `9` had just written — *verify the control before you trust the control* |
+| `A-catch.*` `A0.*` | rules 1–2 | the ESC window and the throwaway |
+| `G2-rb.*` `G2-rescue.json` | `G2` | `AutoBurning=0` · `Set TFTP Load Addr 0x80a00000` · `Now your Target IP is 10.1.1.1`, then `0x8040D4A0` read back as **`00000000`** — the burn guard, read at the one instruction that matters |
+| `G4-put.json` `G4-get.json` — and `G4-back.bin`, which is **not in a clone** | `G4` | **987,138 bytes up in 1,929 blocks, back down, `cmp` byte-identical**, sha256 `396561a0…45a03e90`. The transport proved without executing anything. ⚠️ 量 2026-08-30: `G4-back.bin` is 987,138 bytes on this machine and is **untracked** — a reader of this repository has the two JSON reports and the hash, and not the blob |
+| `G5-poison1..3.*` `G5-pv1..3.*` `G5-put.json` `G5-rescue.json` `G5-rb1..3.*` | `G5` | `5A5A5A5A` written at three points, **read back to confirm the poison took** (`pv`), then the upload, then the dump's own bytes read back at all three (`rb`). 🔴 **The `pv` triple is the cell that makes `rb` mean something**: `G1` had already shown the correct bytes were there, so without the poison a passing readback proves nothing |
+| `G8a-ab.*` `G8a-flr0.*` `G8a-rd0.*` `G8a-y0.*` `G8a-flr6.*` `G8a-rd6.*` `G8a-y6.*` | `G8a` | the bracket's second round, taken **after `G6` and both uploads and before `G7`**. `AUTOBURN` `00000000`; both windows byte-identical to `G8-pre` |
+| `G7.*` | `G7` | the vendor kernel from RAM, from bytes delivered over **TFTP**. 🔴 **`G7.log` is byte-identical to `G6.log` as a whole file** — 1,789 bytes, sha256 `2f921f75…0712070`. Stating that as a line count understated it. **`R0` closes here** |
+| `G0-head-24d.*` `X1-24d.*` `X1-post.*` `X3-24d.*` | `C-17`, `MEM-15` | the arena and the `0x81000400` structure re-read after a **seconds-long** power-off, against `24c`'s reads after a 16 h 23 m one. This pair is `MEM-15`: this DRAM retains **content**, not merely bias |
+
+### `2026-08-24e` — one capture, and it is the record of a failure
+
+**One power cycle, one capture, one prediction block.** `block12` planned ten
+cells; **nine of them never ran**, and `A-catch.log` is why.
+
+| file(s) | cell | what it is |
+|---|---|---|
+| `PREDICTIONS-block13.md`'s subject | — | `block12` is kept **unedited**, with five cells that have no capture. `check-predictions.py --sweep` reports those as *no capture yet* and that is not a failure: a seating that stopped early is a fact about the seating |
+| `A-catch.*` | `A-catch` | 🔴 **4,542 bytes, and the last four lines are `Booting...` / `chipName: UNKNOWN` / `ramSize: 32M` / the banner.** The ESC stream ran 45 s; the boot began at **t = 64.2 s**, nineteen seconds after it stopped, and the capture expired at the banner. **The first capture in this project that shows what a missed ESC window looks like from inside**, which is why it is committed rather than deleted |
+
+**What it cost and what it changed.** One power cycle, and a standing change to
+every ESC cell: **`--esc 180 --seconds 200`**. The asymmetry is the argument — an
+extra ESC second is free (~50 bytes/s into a buffer the loader empties every 128
+bytes) while a missed window costs the most expensive unit at this bench. Byte 0
+of this capture is `0x5E`, `^`, not the raw `0x1B` of `24c`: the caret pairs are
+a Linux tty's `echoctl`, which is *推* and is the open question the
+`^[`-attribution row in `PROGRESS.md` carries.
+
+### `2026-08-24f` — seating 2 part five: `G8b`, with a window that cannot be missed
+
+**One power cycle, 10 captures, 1 prediction block** (`13`), 14,010 bytes of
+`.log` — of which 11,823 are `A-catch2` alone, which is what a 180-second ESC
+window costs and it is the whole point. No flash-write command issued; the
+bracket's **third** round is here.
+
+| file(s) | cell | what it is |
+|---|---|---|
+| `PREDICTIONS-block13.md` | — | supersedes `2026-08-24e`'s `block12`. It opens with a two-row table of the day's two missed catches and their **different** causes, because one was an instruction to the operator and the other was a window sized for a laboratory |
+| `A-catch2.*` | `A-catch` | 11,823 bytes, ending `Unknown command !` / `<RealTek>` — the prompt, caught. The name carries the `2` because `24e`'s `A-catch` is the one that failed and both names had to survive |
+| `A0.*` | `A0` | the throwaway |
+| `G8b-ab.*` | `G8b` | `AUTOBURN` read before anything else, as every `J` and every bracket in this project is preceded by |
+| `G8b-flr0.*` `G8b-rd0.*` `G8b-y0.*` `G8b-flr6.*` `G8b-rd6.*` `G8b-y6.*` | `G8b` | the bracket's third round, **after `G7`'s power cycle**. Both windows byte-identical to `G8a`'s and to `G8-pre`'s |
+| `X1-24f.*` | `C-17` | the `0x81000400` structure after another short power-off — the third reading of `MEM-15` |
+
 ## 2026-08-25 — seating 3, `R1g-4a`
 
 **One power cycle, 26 captures, 10 prediction blocks,** 🔄 **no flash-write command issued** *(was “zero flash bytes”; no `FLR` bracket)*. The
@@ -647,6 +766,7 @@ per-seating headings, and **not one of those five seatings ran an `FLR` bracket*
 | `2026-08-24b` | seating 2, part two | none | as above |
 | `2026-08-25` | seating 3, `R1g-4a` | none | as above |
 | `2026-08-25b` | seating 4, `R1g-4b` | none | as above |
+| `2026-08-30` / `30b` | already corrected | none | already corrected on the day |
 
 🔴 **And the seating that DOES hold the bracket has no heading in this
 file at all.** 量 2026-08-30: `bench/` holds fourteen directories and this file
@@ -659,18 +779,29 @@ one legitimate absence.
 So the index of *what each directory holds* skips the four directories a reader
 chasing the flash question would go to first, while five headings it does carry
 overstate what their own seatings measured. **Both halves of that are this
-file's job.** The headings are corrected below with the originals kept; writing
-the four `R0` sections is not done today and is carried in `PROGRESS.md` rather
-than half-done — they are 60 captures across thirteen prediction blocks and
-they deserve a session, not a paragraph.
+file's job.** ✅ **Both are done: the headings were corrected on 2026-08-30 with
+the originals kept, and the four `R0` sections were written the same day** — see
+*"`R0` — the four directories this index skipped"* above. 🔴 **Two numbers in
+the paragraph this replaces were guesses and both were wrong**: 量 while writing
+the sections, the four hold **81 captures across 18 prediction files**, not *"60
+captures across thirteen prediction blocks"*. *(Original: "The headings are
+corrected below with the originals kept; writing the four `R0` sections is not
+done today and is carried in `PROGRESS.md` rather than half-done — they are 60
+captures across thirteen prediction blocks and they deserve a session, not a
+paragraph.")*
 
 **What `R0` is entitled to**, so that the gap does not also lose the finding:
 `G8-pre` → `G8a` → `G8b` read `0x000000` and `0x060000` three times
-across two power cycles, and 量 2026-08-30 all three rounds are byte-identical at
-both addresses — **512 of 4,194,304 bytes unchanged across three kernel
-executions and two uploads.** That is the strongest flash statement this project
-has, and it is 0.012 % of the part.
-| `2026-08-30` / `30b` | already corrected | none | already corrected on the day |
+across three power cycles, and 量 2026-08-30 all three rounds are byte-identical
+at both addresses — **512 of 4,194,304 bytes unchanged** across the span. That
+is the strongest flash statement this project has, and it is 0.012 % of the part.
+🔴 **What ran inside the span is TWO captured kernel executions and one
+inferred**, not three measured: `G6` and `G7` are captures; the `24e` cycle's
+boot is *推*, because `bench/2026-08-24e/A-catch.log` expires at the loader
+banner and nothing recorded what the loader did next. *(This paragraph said
+"across two power cycles" and "three kernel executions" until 2026-08-30; the
+first was a miscount of the three directories the rounds live in and the second
+promoted an inference. The R0 section above carries the per-round table.)*
 
 **The headings are corrected in place below, with the original kept.** The rule
 is not that a desk day may not say it — a session with the board unplugged

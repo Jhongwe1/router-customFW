@@ -92,3 +92,42 @@ slink	/bin/sleep	busybox	0777	unit	-
 nod	/dev/console	c:5:1	0600	rlxfw	init/main.c init_post() opens it; the vendor's squashfs carries 0 device nodes (量, and weakly: unsquashfs as an ordinary user cannot create them either)
 nod	/dev/null	c:1:3	0666	rlxfw	the shell redirects to it before anything else does
 nod	/dev/tty	c:5:0	0666	rlxfw	busybox's shell wants a controlling terminal for job control
+
+# --- R3-9's second path to the flash, and it is NOT /dev/mtd0 ----------------
+# 🔴 THE STEP ASKED FOR `/dev/mtd0` AND THAT CANNOT WORK ON THIS KERNEL. 量
+# 2026-08-30, two routes with a control on each: 讀 both built .configs say
+# `# CONFIG_MTD_CHAR is not set` (control: 9 other ^CONFIG_MTD lines in the same
+# file), and 量 both System.maps hold ZERO mtdchar symbols against SIX
+# mtdblock/mtdcore ones. Major 90 has no chrdev here, so `/dev/mtd0` opens
+# ENODEV and `wc -c < /dev/mtd0` reads a refusal, not a size.
+#
+# 🔴 AND `/dev/mtdblock0` IS NOT THE SUBSTITUTION EITHER. mtd0 is
+# `boot+cfg+linux` 0x000000-0x130000 (讀 bench/2026-08-30b/L3.log:113), which
+# contains BOTH regions CLAUDE.md forbids writing. mtdblock has a write path,
+# and 0400 is not a control -- root ignores DAC, so `echo x > /dev/mtdblock0`
+# is one typo from an erase-block write at offset 0 on a device with no spare.
+# mtd1 runs the identical mtdblock_readsect -> part_read -> rtl819x_flash read
+# path, so it buys the same reading and leaves no writable node over the loader
+# or H601. THE CONTROL IS THE ABSENCE OF A NODE, NOT THE MODE BITS.
+#
+# What it buys: `wc -c < /dev/mtdblock1` -> **2949120** (量 L3.log:114, and 讀
+# rtl819x_flash.c with CONFIG_RTL_ROOT_IMAGE_OFFSET=0x130000 and WINDOW_SIZE
+# 0x400000: 0x400000-0x130000 = 0x2D0000. Two sources; the first draft of
+# this line said 2818048, which is 0x2B0000 and is a subtraction error), a readability-and-size reading through MY OWN MTD stack.
+# NOT a content check: 量, this unit's busybox has none of dd/md5sum/od/hexdump/
+# cmp/cksum/sum/sha1sum among its fifty applets, and a foreign binary would
+# break Decision B's third leg. `cat /proc/mtd` is the free companion and reads
+# ZERO flash bytes -- it prints the map from my own driver (mtd_read_proc IS in
+# both System.maps).
+#
+# Refuted by: `wc` printing anything but 2949120; `No such device` (the block
+# driver did not register); or a hang (the SPI read path does not complete).
+#
+# 🔴 THIS LINE IS AHEAD OF EVERY BUILT ARTEFACT. It is in no image that exists
+# on 2026-08-30, and specifically NOT in
+# `rlxfw-quietm-20260830.bin`, which is what
+# `bench/2026-08-30c/PREDICTIONS-B5-block2.md` uploads. That card's `V-0t` and
+# `V-2c` read `0x805FABF0` because they know where THAT image's `image_end`
+# sits, so a rebuild moves them. The card's own pre-flight sha256 is the
+# authority for that seating; this node lands on the build after it.
+nod	/dev/mtdblock1	b:31:1	0400	rlxfw	R3-9: `wc -c < /dev/mtdblock1` = 2949120 through my own MTD stack. NOT mtd0/mtdblock0 -- that partition holds the loader and H601 and mtdblock can write. CONFIG_MTD_CHAR is not set, so /dev/mtd0 would be ENODEV

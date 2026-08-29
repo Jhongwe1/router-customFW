@@ -7,7 +7,7 @@
 # writer on the master side plays a known script with known gaps, and the tool
 # reads the slave believing it is a serial port.
 #
-# Thirty-nine cases, FORTY results (P3 checks two things). Twenty-four of them
+# Forty-five cases, FORTY-SIX results (P3 checks two things). Thirty of them
 # are controls whose job is to FAIL -- the tool must refuse, or a mutant of it
 # must break a case above -- because a test suite that cannot fail proves
 # nothing: the same argument tools/audit-bench-log.py
@@ -19,6 +19,11 @@
 # printed 29, for at least the three sessions between P8's arrival and
 # 2026-08-30. `tools/ci-expected.tsv` is what CHECKS the number; this comment is
 # a convenience and has no gate behind it.
+#
+# 🔴 AND FORTY GREEN RESULTS WERE NOT ENOUGH. 量 2026-08-30 with
+# tools/test-console-capture-mutants.py: 25 mutants of the terminator guard,
+# TEN alive against the forty. N25-N30 close the four classes they fell into;
+# the mutant runner is what says so and what will say so again.
 #
 #   P1  byte-exactness      log identical to the played script, CRs and all
 #   P2  interval            a 1.50 s gap is reported as 1.50 s, not as 0
@@ -83,6 +88,21 @@
 #   N23 guard mutation      with the condition dead, N18's command reaches the port
 #   N24 field mutation      with the two fields hardcoded, P14 and N22 go red
 #
+#   N25 the --esc waiver    --esc 1 with no terminator must STILL be refused.
+#                           A-catch's own shape, and the mutant that reproduced
+#                           the never-returning capture on a pty
+#   N26 the other waivers   six more non-default flags in one command, so no
+#                           flag the guard has no business reading waives it
+#   N27 the contract        a refusal exits non-zero AND writes nothing to
+#                           stdout. Neither was asserted anywhere before
+#   N28 the message         it names BOTH flags that satisfy it, so a mutant
+#                           naming a flag that does not exist goes red
+#   N29 the upper side      a 128-char --send with no terminator gets the
+#                           LENGTH refusal -- _check_send first, by assertion
+#                           rather than by N4/N7/N8 happening to have none
+#   N30 the lower side      with the .log/.timing/.meta.json already present,
+#                           the TERMINATOR refusal still comes first
+#
 # P5/N9/P6/P7/N10 were added 2026-08-24 with the CR itself; P8/N11/P9/N12/N13/P10
 # came out of the adversarial review of that change the same day, and every one
 # of them killed a mutant the first eighteen cases had let through -- the review
@@ -110,7 +130,17 @@ set -u
 
 PY=/usr/bin/python3
 HERE="$(cd "$(dirname "$0")" && pwd)"
-TOOL="$HERE/console-capture.py"
+# The tool under test.  `CC_TOOL` exists so tools/test-console-capture-mutants.py
+# can point this suite at a MUTANT of console-capture.py and require it to go
+# red -- the claim "these forty-odd cases pin the terminator guard" is otherwise
+# a sentence nobody has shown can fail.  Unset, it is the shipped tool, so an
+# ordinary run and a CI run are unaffected.  It is deliberately NOT a positional
+# argument: an operator at the bench types this file's name and nothing else.
+TOOL="${CC_TOOL:-$HERE/console-capture.py}"
+if [ ! -f "$TOOL" ]; then
+  echo "console-capture self-test: no such tool: $TOOL" >&2
+  exit 2
+fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -941,6 +971,129 @@ if [ -s "$WORK/mut6.py" ]; then
   fi
 else
   bad "N24 the mutant was not produced, so P14 and N22 are unguarded"
+fi
+
+# --- N25..N30  the guard's CONTRACT, not just its condition ------------------
+# 量 2026-08-30, tools/test-console-capture-mutants.py against the forty cases
+# above: 24 mutations, TEN alive. They fall into four classes and none of the
+# forty could see a class, only instances of one:
+#
+#   WAIVER   an early `return` on a flag the guard has no business reading.
+#            Every one of N18-N21 leaves --esc, --esc-after, --no-cr, --force,
+#            --baud, --cr-settle and --esc-period at their defaults, so
+#            `if args.esc > 0: return` in front of the guard passes all forty --
+#            and `--esc 25` is A-catch's own shape. 量 on a pty, that mutant
+#            with `--esc 1` and no terminator: rc=124 after 8 s, .log written,
+#            .meta.json lost. The failure the guard was added for, back.
+#   CONTRACT what a refusal IS. Not one of the forty asserted an exit code, so
+#            `_fail` raising SystemExit(0) was green -- and a card written
+#            `cmd || abort` would read a refusal as a success. Nor did any of
+#            them look at stdout, so a refusal printed there instead of stderr
+#            was green too, and a card that redirects would have captured it.
+#   MESSAGE  one substring. A refusal naming a flag that does not exist passed.
+#   POSITION the guard moved BELOW the overwrite refusal passed, which also
+#            inverts which error the operator sees first.
+#
+# The cases below close all four. They are deliberately NOT more in-suite
+# mutations: tools/test-console-capture-mutants.py owns "does this suite catch
+# mutant X" and runs all 25 against the whole file. N23/N24 predate it and stay,
+# because they keep this suite self-contained where the mutant runner is not run.
+
+# The refusal contract in one place -- the same shape as flashwin's `refused()`,
+# which was rebuilt around it on 2026-08-30 after three mutants that PRINTED
+# this unit's MAC and then refused passed every check it had. stdout and stderr
+# are captured SEPARATELY, which is the whole point: `2>&1` is what let E2 live.
+cc_refuse() {          # cc_refuse <capture args...>  -> RC, ROUT, RERR
+  RC=0
+  ROUT="$("$PY" "$TOOL" capture "$@" 2>"$WORK/cc.err")" || RC=$?
+  RERR="$(cat "$WORK/cc.err")"
+}
+
+# N25 and N26 partition the waiver class: N25 is --esc alone, because that is
+# A-catch's shape and the one measured to reproduce the never-returning capture;
+# N26 is every OTHER non-terminator flag at a non-default value, in one command,
+# so a waiver on any of them goes red.
+cc_refuse --port /dev/null --out "$WORK/wv1" --esc 1
+if printf '%s' "$RERR" | grep -q 'needs a terminator' \
+   && ! printf '%s' "$RERR" | grep -q 'cannot open'; then
+  ok "N25 --esc 1 with no terminator is still refused -- the guard is not waived by A-catch's own flag"
+else
+  bad "N25 --esc 1 with no terminator was not refused by the guard (rc=$RC)"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+fi
+
+cc_refuse --port /dev/null --out "$WORK/wv2" --esc-after 1 --esc-period 0.002 \
+          --no-cr --cr-settle 0.5 --baud 115200 --force --send 'DW 8040DBC0 1'
+if printf '%s' "$RERR" | grep -q 'needs a terminator' \
+   && ! printf '%s' "$RERR" | grep -q 'cannot open'; then
+  ok "N26 six other non-default flags with no terminator are still refused -- no flag waives the guard"
+else
+  bad "N26 a non-terminator flag waived the guard (rc=$RC)"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+fi
+
+# N27 is the exit code AND stdout, on N18's own command. Two assertions, one
+# case, because they are one contract: a refusal that exits 0 and a refusal that
+# prints to stdout are the same mistake seen from two sides -- the caller cannot
+# tell it happened.
+cc_refuse --port /dev/null --out "$WORK/rc1"
+if [ "$RC" -ne 0 ] && [ -z "$ROUT" ]; then
+  ok "N27 a refusal exits $RC and writes nothing to stdout -- \`cmd || abort\` sees it, \`cmd > log\` does not swallow it"
+else
+  bad "N27 refusal contract: rc=$RC (want != 0), ${#ROUT} byte(s) on stdout (want 0)"
+  [ -n "$ROUT" ] && printf '%s\n' "$ROUT" | sed 's/^/        stdout: /' | head -2
+fi
+
+# N28 is the message, and the assertion is on the FIRST LINE only.
+#
+# 🔴 That is not fussiness, it is a measurement. The first version of this case
+# grepped the whole refusal for both flag names and the M1 mutant -- which
+# rewrites the imperative line to name `--timeout`, a flag that does not exist
+# -- SURVIVED it: the message is fourteen lines long and its sizing paragraph
+# says `--seconds 4` and `--idle N ends on N seconds of silence`, so both names
+# are still in there. A substring test over a message that long is very nearly
+# unfalsifiable. What an operator retypes is line one, so line one is the
+# contract.
+RERR1="$(printf '%s\n' "$RERR" | head -1)"
+if printf '%s' "$RERR1" | grep -q -- '--seconds' \
+   && printf '%s' "$RERR1" | grep -q -- '--idle'; then
+  ok "N28 the refusal's FIRST LINE names both flags that satisfy it, so what an operator retypes exists"
+else
+  bad "N28 the first line of the refusal does not name both --seconds and --idle"
+  printf '%s\n' "$RERR1" | sed 's/^/        /'
+fi
+
+# N29 pins the guard's UPPER side directly, which N21 does not. N21 sends a
+# 127-character line -- one _check_send accepts -- so it passes whether or not
+# the guard sits above it. This one sends 128, which _check_send must refuse
+# FIRST: with the guard moved above it the reply becomes the terminator refusal
+# and this case goes red. Until today that side was held only by N4/N7/N8
+# happening to have no terminator, which is coverage by accident.
+if [ ${#L128} -eq 128 ]; then
+  cc_refuse --port /dev/null --out "$WORK/ord" --send "$L128"
+  if printf '%s' "$RERR" | grep -q 'console line buffer is' \
+     && ! printf '%s' "$RERR" | grep -q 'needs a terminator'; then
+    ok "N29 a 128-char --send with no terminator gets the LENGTH refusal -- _check_send runs first, by assertion"
+  else
+    bad "N29 the terminator guard is above _check_send"
+    printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+  fi
+else
+  bad "N29 L128 is ${#L128} characters, so the ordering cannot be pinned"
+fi
+
+# N30 pins the LOWER side against the overwrite refusal. Both are refusals
+# before the port, so nothing above notices which comes first -- and the order
+# matters to the operator: told `exists`, they pass --force and hit the
+# never-returning loop the guard exists for.
+: > "$WORK/ovw.log"; : > "$WORK/ovw.timing"; : > "$WORK/ovw.meta.json"
+cc_refuse --port /dev/null --out "$WORK/ovw"
+if printf '%s' "$RERR" | grep -q 'needs a terminator' \
+   && ! printf '%s' "$RERR" | grep -q 'Refusing to overwrite'; then
+  ok "N30 with the output files already present the TERMINATOR refusal still comes first"
+else
+  bad "N30 the overwrite refusal is above the terminator guard -- the operator is told the wrong thing"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
 fi
 
 echo

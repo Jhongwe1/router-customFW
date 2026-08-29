@@ -249,21 +249,53 @@ tools/rlxfw-marks.py       the first tool here that edits somebody else's source
                            artefact and the vendor's, and refuses if `--absent` is not
                            given, because "present in mine" alone is a label. It caught
                            two real defects the day it was written
-tools/spec-check.py        eight checks over SPEC.md, and nine mutations that must
-                           each produce a finding the file did not already have.
-                           The eighth exists because one unescaped `|` had kept a
-                           row outside two of the other checks since it was written
-tools/console-capture.py   39 cases, 40 results (P3 checks two things). Four of them
+tools/spec-check.py        eleven checks and nineteen controls. C1-C7 are about
+                           SPEC.md; C8/C8b/C8c/C9 are about how EVERY tracked
+                           `.md` renders -- 71 files, 620 tables, ~43,000 code
+                           spans -- because that is not a property of one file.
+                           C8 exists because one unescaped `|` had kept a row
+                           outside two of the other checks since it was written;
+                           generalising it on 2026-08-30 found eight ragged rows
+                           where the census behind it had said six, and exposed
+                           three shapes it could not see: a row split over more
+                           than one physical line, a `|`-line belonging to no
+                           table (nine of them on the findings page, stranded by
+                           one blank line), and a code span whose whole content
+                           is whitespace -- one of which had made a READING
+                           wrong, not a rendering. Nine mutations of SPEC.md and
+                           ten controls on a fixture built in the process, of
+                           which T1 is positive and T5 is a control on T1
+tools/console-capture.py   45 cases, 46 results (P3 checks two things). Four of them
                            exist because the ESC heartbeat is
                            the grid every interval is quantised to, so the period each
                            capture ACHIEVED is measured and recorded, not assumed.
                            Eleven more arrived on 2026-08-30 with the terminator
-                           guard, and one of them is the shape worth copying: N21
-                           sends a 127-character line with NO terminator and
-                           requires the terminator refusal -- not the length one
-                           and not the port one -- which pins the guard between
-                           the two things it has to sit between, from one command
-tools/flashwin.py          13 cases, and it exists for a region whose reading can
+                           guard -- and then six more, because a mutation pass
+                           over 25 edits of that guard found TEN of them alive
+                           against all forty. The class the forty could not see:
+                           a waiver on any flag the cases leave at default, and
+                           `--esc 25` is A-catch's own shape.
+                           🔴 This entry used to end "N21 ... pins the guard
+                           between the two things it has to sit between, from one
+                           command". It does not. N21 sends 127 characters, a
+                           length `_check_send` ACCEPTS, so it passes whether or
+                           not the guard sits above it; that side was held only
+                           by three other cases happening to carry no terminator.
+                           N29 sends 128 and requires the LENGTH refusal, which
+                           is the assertion the sentence claimed
+tools/test-console-capture-mutants.py
+                           25 mutations of that guard, each run against the WHOLE
+                           suite above, because "the committed cases catch it" is
+                           the claim and a fast proxy for the suite would be a
+                           different one. Anchors must occur EXACTLY ONCE and a
+                           moved anchor is reported as a SURVIVOR rather than
+                           skipped; it refuses outright if the unmutated baseline
+                           is not green, since every mutation would then "kill" on
+                           a suite that was already red. It exists because "ten
+                           survived" was a sentence in LOG.md that nothing re-ran
+tools/flashwin.py          19 cases (16 on a machine without this unit's dump,
+                           plus one skip covering 3), and it exists for a
+                           region whose reading can
                            never be published. It renders the loader's `DW` reply
                            for a window of flash out of this unit's own dump, so
                            that H601 -- the MAC and radio calibration, the one

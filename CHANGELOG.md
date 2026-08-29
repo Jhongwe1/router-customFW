@@ -40,6 +40,102 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-08-30 — desk, no power: forty green cases, and ten mutants of the
+guard they had just been written for were alive.**
+`tools/console-capture.py` — the one instrument every capture at the bench runs
+through — gained a refusal for a capture with no terminator, and its suite went
+29 → 40, all green. A mutation pass over **25** edits of that guard killed
+fifteen of them. The ten survivors fall into four classes, and not one of the
+forty cases could see a *class* — only an instance of one:
+
+* a **waiver**: an early `return` on any flag the cases leave at default.
+  `if args.esc > 0: return` in front of the guard passes all forty — and
+  `--esc 25` is the shape of the capture this project takes at the start of every
+  seating. Measured on a pty, that mutant with no terminator does not return:
+  killed after 8 s, log written, metadata lost. Which is the failure the guard
+  was added for, back.
+* the **contract**: not one of the forty asserted an exit code, so a refusal that
+  exits *successfully* was green — and a card written `cmd || abort` would read
+  it as a success. None of them looked at stdout either, so a refusal printed
+  there instead of on stderr was green too, and a card written `cmd > log` would
+  have swallowed it into the log.
+* the **message**: checked by one substring, so a refusal naming a flag that does
+  not exist passed.
+* the **position**: the guard moved below the overwrite refusal passed, which
+  also inverts which error an operator sees first — told the file exists, they
+  pass `--force` and hit the loop that does not return.
+
+Six new cases close all four, 40 → **46**. One of them corrected a claim this
+repository had been making about itself: the case that supposedly pinned the
+guard's position *"from one command"* sends a 127-character line, a length the
+validator **accepts**, so it passed whether or not the guard sat in the right
+place. That side had been held by three other cases happening to carry no
+terminator — coverage by accident. And *"ten survived"* is no longer a sentence
+in a log that nothing re-runs: the 25 mutants are a committed suite that runs the
+whole file per mutant, refuses if the unmutated baseline is not green, and
+reports a mutation whose anchor has moved as a **survivor** rather than skipping
+it. 25 of 25 killed.
+
+### A checker that was about one file, pointed at all seventy-one
+
+`spec-check`'s cell-count check had been about `SPEC.md`. Pointed at every
+tracked `.md` — 71 files, 620 tables, ~43,000 code spans — its first run found
+**eight** broken rows where the census behind it had said six; that census had
+looked at three files. Generalising it exposed three shapes it could not see at
+all, each found by turning the previous one on:
+
+* a row split over more than one physical line. Markdown has no continuation
+  syntax, so a literal newline inside a code span ends the row there — and every
+  checker here walked lines beginning with a pipe, so the continuation was
+  invisible **and every row below it in the same table vanished from the count**.
+* a pipe-line belonging to no table, which the cell-count check cannot see by
+  construction, since it walks tables and a stranded row is in none. **Nine rows
+  of the findings page** — the page a reader is pointed at, including its three
+  newest entries — were stranded by a single blank line and rendering as
+  paragraphs full of pipes. The same defect was recorded against `SPEC.md` three
+  days earlier and found then by a human review; this time a checker found it.
+* a code span whose whole content is whitespace, which is what `\r` and `\n`
+  become when typed as real characters.
+
+**One of those three had made a reading wrong, not a rendering.**
+`docs/loader-command-semantics.md` annotated **both** exits of the loader's
+line-reader with the same empty character, so its own sentence *"only one writes
+a terminator"* named neither. Settled by disassembling this unit's loader: the
+NUL sits in the delay slot of the carriage-return path's jump, and the line-feed
+path returns without one. All ten defects fixed; the checker caught the entry
+written about it, on the way in.
+
+### The device node this project was about to declare cannot exist
+
+`R3-9` planned a second path to the flash — a device node, and a size read
+through this project's own MTD stack. Measured before the line was written, by
+two routes with a positive control on each: the character-device driver is not
+compiled into either built image, so the node would open `No such device`. **And
+the obvious substitution is the one node this project must not create**: it
+addresses the flash partition that contains the bootloader and the per-unit
+region a factory reset does not restore, the block driver has a write path, and
+a read-only mode bit is not a control because root ignores it. The node declared
+instead addresses the other partition, runs the identical read path, buys the
+identical reading, and leaves **no writable node over either region that cannot
+be undone**. The control is the absence of a node, not the mode bits.
+
+The size it predicts was wrong in its first draft by a subtraction error, and the
+second source is what caught it — which is what the two-source rule is for.
+
+### And a card's pre-flight had gone stale under it
+
+The next seating's card asks the operator to run one tool before power and
+expects `13 passed`. That tool was rewritten to print `19` **in the same session
+that wrote the card**, and nothing re-read the pre-flight. A stale expectation on
+the first line of a pre-flight is the one place a mismatch reads as *wrong
+version, stop* — with the board in the operator's hand. Corrected, with both
+numbers measured. `bench/README.md` also gained sections for the four
+directories the index had skipped, which is where the only flash evidence this
+project has lives; writing them found that the paragraph deferring the work had
+guessed two numbers wrong, and that of the *"three kernel executions"* the flash
+bracket spans, **only two are captures** — the third is an inference, and the
+capture that would have held it expires at the bootloader banner.
+
 🔴 **2026-08-30 — desk, no power: the next seating's two cards, and the flash
 question stops being one this project can only argue about.**
 `bench/2026-08-30c/PREDICTIONS-B5-block2.md` is 31 cells across **two** power
