@@ -1,0 +1,125 @@
+J 80500000
+---Jump to address=80500000
+decompressing kernel:
+Uncompressing Linux... done, booting the kernel.
+done decompressing kernel.
+start address: 0x80003600
+RLXFW-B00
+RLXFW-B01
+RLXFW-B02=0000CD01
+RLXFW-B03
+[    0.000000] CPU revision is: 0000cd01
+RLXFW-B04
+RLXFW-B05
+RLXFW-B06
+RLXFW-B07=00000000
+[    0.000000] Determined physical RAM map:
+[    0.000000]  memory: 02000000 @ 00000000 (usable)
+[    0.000000] Initrd not found or empty - disabling initrd
+[    0.000000] Zone PFN ranges:
+[    0.000000]   Normal   0x00000000 -> 0x00002000
+[    0.000000] Movable zone start PFN for each node
+[    0.000000] early_node_map[1] active PFN ranges
+[    0.000000]     0: 0x00000000 -> 0x00002000
+RLXFW-B08
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 8128
+[    0.000000] Kernel command line: console=ttyS0,38400
+[    0.000000] icache: 16kB/16B, dcache: 8kB/16B, scache: 0kB/0B
+[    0.000000] NR_IRQS:48
+[    0.000000] PID hash table entries: 128 (order: 7, 512 bytes)
+[    0.000000] console handover: boot [early0] -> real [ttyS0]
+RLXFW-B09
+[    0.020000] Dentry cache hash table entries: 4096 (order: 2, 16384 bytes)
+[    0.030000] Inode-cache hash table entries: 2048 (order: 1, 8192 bytes)
+[    0.050000] Memory: 26368k/32768k available (2425k kernel code, 6400k reserved, 352k data, 684k init, 0k highmem)
+[    0.060000] Calibrating delay loop... 398.95 BogoMIPS (lpj=1994752)
+[    0.280000] Mount-cache hash table entries: 512
+[    0.290000] net_namespace: 524 bytes
+[    0.300000] NET: Registered protocol family 16
+[    0.310000] bio: create slab <bio-0> at 0
+[    0.320000] NET: Registered protocol family 2
+[    0.330000] IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+[    0.340000] TCP established hash table entries: 1024 (order: 1, 8192 bytes)
+[    0.350000] TCP bind hash table entries: 1024 (order: 0, 4096 bytes)
+[    0.360000] TCP: Hash tables configured (established 1024 bind 1024)
+[    0.370000] TCP reno registered
+[    0.380000] NET: Registered protocol family 1
+[    0.410000] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+[    0.420000] msgmni has been set to 51
+[    0.430000] io scheduler noop registered
+[    0.440000] io scheduler cfq registered (default)
+[    0.850000] Realtek GPIO Driver for Flash Reload Default
+[    0.860000] Serial: 8250/16550 driver, 1 ports, IRQ sharing disabled
+[    0.870000] serial8250: ttyS0 at MMIO 0x18002000 (irq = 8) is a 16550A
+[    0.880000] PPP generic driver version 2.4.2
+[    0.890000] MPPE/MPPC encryption/compression module registered
+[    0.900000] NET: Registered protocol family 24
+[    0.910000] Realtek WLAN driver driver version 1.6 (2012-12-04)
+[    0.920000] =====>>INSIDE rtl8192cd_init_one <<=====
+[    0.930000] PCIE reset (0) 
+[    1.940000] Do MDIO_RESET
+[    2.960000] 98 - 25MHz Clock Source
+[    4.980000] Find Port=0 Device:Vender ID=817910ec
+[    5.490000] vendor_deivce_id=817910ec
+[    5.550000] =====>>EXIT rtl8192cd_init_one <<=====
+[    5.560000] <rtl8192cd_init_one>LZQ: GPIO_PIN_CTRL[0x44] 
+[    5.570000] <rtl8192cd_init_one>LZQ: before read tmpReg[0xe] 
+[    5.580000] <rtl8192cd_init_one>LZQ: after read tmpReg[0xe] 
+[    5.590000] =====>>INSIDE rtl8192cd_init_one <<=====
+[    5.600000] =====>>EXIT rtl8192cd_init_one <<=====
+[    5.610000] <rtl8192cd_init_one>LZQ: GPIO_PIN_CTRL[0x44] 
+[    5.620000] <rtl8192cd_init_one>LZQ: before read tmpReg[0xe] 
+[    5.630000] <rtl8192cd_init_one>LZQ: after read tmpReg[0xe] 
+[    5.640000] =====>>INSIDE rtl8192cd_init_one <<=====
+[    5.650000] =====>>EXIT rtl8192cd_init_one <<=====
+[    5.660000] <rtl8192cd_init_one>LZQ: GPIO_PIN_CTRL[0x44] 
+[    5.670000] <rtl8192cd_init_one>LZQ: before read tmpReg[0xe] 
+[    5.680000] <rtl8192cd_init_one>LZQ: after read tmpReg[0xe] 
+[    5.690000] =====>>INSIDE rtl8192cd_init_one <<=====
+[    5.700000] =====>>EXIT rtl8192cd_init_one <<=====
+[    5.710000] <rtl8192cd_init_one>LZQ: GPIO_PIN_CTRL[0x44] 
+[    5.720000] <rtl8192cd_init_one>LZQ: before read tmpReg[0xe] 
+[    5.730000] <rtl8192cd_init_one>LZQ: after read tmpReg[0xe] 
+[    5.740000] =====>>INSIDE rtl8192cd_init_one <<=====
+[    5.750000] =====>>EXIT rtl8192cd_init_one <<=====
+[    5.760000] <rtl8192cd_init_one>LZQ: GPIO_PIN_CTRL[0x44] 
+[    5.770000] <rtl8192cd_init_one>LZQ: before read tmpReg[0xe] 
+[    5.780000] <rtl8192cd_init_one>LZQ: after read tmpReg[0xe] 
+[    5.790000] =====>>INSIDE rtl8192cd_init_one <<=====
+[    5.800000] =====>>EXIT rtl8192cd_init_one <<=====
+[    5.810000] <rtl8192cd_init_one>LZQ: GPIO_PIN_CTRL[0x44] 
+[    5.820000] <rtl8192cd_init_one>LZQ: before read tmpReg[0xe] 
+[    5.830000] <rtl8192cd_init_one>LZQ: after read tmpReg[0xe] 
+[    5.840000] 
+[    5.840000] 
+[    5.840000] 
+[    5.840000] Probing RTL8186 10/100 NIC-kenel stack size order[3]...
+[    6.500000] chip name: 8196C, chip revid: 0
+[    6.510000] NOT YET
+[    6.530000] eth0 added. vid=9 Member port 0x1...
+[    6.540000] eth1 added. vid=8 Member port 0x10...
+[    6.550000] eth2 added. vid=9 Member port 0x2...
+[    6.560000] eth3 added. vid=9 Member port 0x4...
+[    6.570000] eth4 added. vid=9 Member port 0x8...
+[    6.580000] eth5 added. vid=9 Member port 0x0...
+[    6.600000] [peth0] added, mapping to [eth1]...
+[    6.610000] SPI INIT
+[    6.620000]  ------------------------- Force into Single IO Mode ------------------------ 
+[    6.630000] |No chipID  Sft chipSize blkSize secSize pageSize sdCk opCk      chipName    |
+[    6.640000] | 0 1c7016h  0h  400000h  10000h   1000h     100h   40    0           UNKNOWN|
+[    6.650000]  ---------------------------------------------------------------------------- 
+[    6.660000] SPI flash(UNKNOWN) was found at CS0, size 0x400000
+[    6.670000] Creating 2 MTD partitions on "flash_bank_1":
+[    6.680000] 0x000000000000-0x000000130000 : "boot+cfg+linux"
+[    6.690000] 0x000000130000-0x000000400000 : "root fs"
+[    6.700000] nf_conntrack version 0.5.0 (512 buckets, 2048 max)
+[    6.710000] ip_tables: (C) 2000-2006 Netfilter Core Team
+[    6.720000] TCP cubic registered
+[    6.730000] NET: Registered protocol family 17
+[    6.750000] Netlink[Kernel] create socket for igmp ok.
+[    6.760000] Realtek FastPath:v1.03
+[    6.770000] Freeing unused kernel memory: 684k freed
+RLXFW-B10
+rlxfw: init running, RLXFW-R3-RUNG1-OK
+/bin/sh: can't access tty; job control turned off
+# 

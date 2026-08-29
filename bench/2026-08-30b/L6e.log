@@ -1,0 +1,2 @@
+ifconfig eth2 down
+# 

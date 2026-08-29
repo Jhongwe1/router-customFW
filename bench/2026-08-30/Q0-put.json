@@ -1,0 +1,15 @@
+{
+  "op": "put",
+  "host": "10.1.1.1",
+  "tid": 2098,
+  "filename": "probe3",
+  "image": "tools/rlxprobe/build/probe3/probe3.bin",
+  "bytes": 29088,
+  "blocks": 57,
+  "sha256": "1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b",
+  "seconds": 0.058,
+  "retransmits": 0,
+  "rescue_report": "bench/2026-08-30/Q0-rescue.json",
+  "rescue_ip": "10.1.1.1",
+  "producer": "loader-tftp"
+}

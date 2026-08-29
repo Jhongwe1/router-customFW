@@ -1,22 +1,25 @@
 # Changelog
 
-🔄 **2026-08-29: four loadable images of mine exist, and one of them has printed
-eight lines. On an emulator.** They are `nfjrom` files — 1,027,072 and 1,053,696
-bytes — built by Realtek's own wrapper pipeline, which on the same day was shown
-to reproduce the vendor's own shipped `nfjrom` byte for byte. Two of them carry
-eleven boot marks, and through a MIPS32 emulator with the UART redirected they
-print `RLXFW-B00` … `RLXFW-B07=FFFFFFFF` and then halt in the board's switch-core
-probe, exactly where this board's own kernel halts there. **Nothing of mine has
-executed on the silicon, and not one byte of mine has been written to this
-device's flash.** What exists otherwise is the instruments, the record, and the
-first thing that ran on the silicon — the vendor's own kernel, delivered over the
-network.
+🔴 **2026-08-29, later the same day: a kernel of mine boots on the device, to a
+shell that answers, and pings.** `loudm` — 1,053,696 bytes, built by Realtek's
+own wrapper pipeline, which the same day was shown to reproduce the vendor's own
+shipped `nfjrom` byte for byte — was delivered to RAM over TFTP and entered from
+the loader prompt. It printed all eleven of its boot marks, reached a shell that
+returns output from a typed command, and exchanged four ICMP echoes with the
+workstation, with the host's own packet capture holding both directions. On the
+power cycle before it, a bare-metal payload of mine measured this die's
+instruction cache by experiment — **16 KiB, 16-byte lines, two-way** — with the
+controls that would have voided the number firing in both directions.
 
-> *Until 2026-08-29 this paragraph read: "**There is still no loadable image** —
-> the `nfjrom` wrapper's stages have not been run on it." Until 2026-08-28 it
-> read: "**Nothing has been built.** There is no kernel of mine, no image, and no
-> byte of mine has been written to this device's flash." The last clause is
-> still true.*
+**Not one byte of mine has been written to this device's flash**, and there is
+still no driver of mine: the ping went out through the vendor's own network
+driver, in the vendor's own configuration.
+
+> *Until 2026-08-29 23:09 this paragraph read: "**Nothing of mine has executed on
+> the silicon**, and not one byte of mine has been written to this device's
+> flash." Earlier the same day it read "**There is still no loadable image**",
+> and until 2026-08-28 "**Nothing has been built.**" The flash clause has
+> survived all four rewrites and is the one that matters.*
 
 Tags mark where the outside world can check the work, not where a feature landed.
 `PROGRESS.md` is the only file that says where the work actually is.
@@ -24,6 +27,88 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+**`R1h-3` + `R3-8a`, 2026-08-29 — the first seating of `R3`. `probe3` measured the
+I-cache, then a kernel of mine booted to a shell and pinged.** Two power cycles, 26
+captured cells, and **no flash-write command issued** — 🔴 **which is not the same
+as "zero flash bytes", a sentence `RUNSHEET`'s own `G8b` row forbids without a full
+re-dump, and this seating ran no `FLR` bracket at all.** The flash-byte count is
+**unmeasured**. Both prediction blocks pass their own gate — `13 of 13`
+and `12 of 12` — and `--sweep bench` reads 39 files, 181 cells, 161 ordered, 0 out of order.
+`SPEC.md` `CPU-25`/`CPU-44`/`CPU-45`/`CPU-19`/`CPU-46`/`LDR-40`/`NET-13`/`REG-07`/`TC-36`
+move and `LDR-41` is new; `tools/rbcheck.py` is new.
+
+### All five of `R3`'s DoD rows are met, and the anti-DoD fired positively
+
+- 🔴 **D1–D5.** `loudm` entered at `0x80500000`, printed all eleven boot marks and M4,
+  reached a shell that returns output from a typed command, and got 4/4 ICMP replies with
+  the host's own capture holding request **and** reply.
+- 🔴 **The anti-DoD is satisfied by three independent discriminators, not by absence.**
+  `PROGRESS.md` has said since the gate opened that a banner proves nothing, because the
+  loader re-stages `0x80500000` on a watchdog reset. What fired: the entry address out of
+  the image's own header (`start address: 0x80003600`; the vendor's staged image is
+  `0x80003440`), a string that exists only in my tree (`RLXFW-B00`), and my build stamp
+  (`Linux version 2.6.30.9 (key@K) … #1 Fri Aug 28 23:37:47 CST 2026`).
+- **`PRId` was read three times through three paths in one seating** — `RLXFW-B02=0000CD01`
+  upper case, `CPU revision is: 0000cd01` lower case, and `/proc/cpuinfo`'s
+  `cpu model : 52481` in decimal. Three formatters, one register.
+
+### The cache geometry is a measurement now, and the kernel's own number is not
+
+- 🔴 **16 KiB, 16-byte lines, 2-way, 512 sets**, and **both** of 否證 ⓐ's controls fired:
+  every victim STALE at 1/2/4/8 KiB (the walk cannot evict below the cache) and every victim
+  FRESH at 32/64 KiB (it can evict at all). The 16 KiB point reproduced inside the seating.
+  The three numbers are one structure — `T = 8192` is exactly a two-way 16 KiB cache's way
+  size — rather than three quotable readings.
+- 🔴 **The kernel's `icache: 16kB/16B, dcache: 8kB/16B` line is a printed build constant.**
+  Every value is a `#define` in `arch/rlx/bsp/bspcpu.h:12-22`, used in `#if` preprocessor
+  conditionals elsewhere in the same file. **This is the trap `R1h-4`'s DoD names by name.**
+  They agree, and that is corroboration rather than one number — and the same line carries
+  `dcache: 8kB`, for which no measurement exists at all, because Group V never ran.
+
+### Two answers the emulator would have given backwards
+
+- 🔴 **CP3 is reachable on this die**: all eight `mfc3` stubs executed, `m.traps=00000000`,
+  `m.cause` still poison. On qemu all eight trap. No reading equals its own prime and
+  `v1 == v2` for all eight, which is the pair of failures the two primes exist to separate.
+- 🔴 **This core retires the `cache` instruction** — four ops, no traps — **while `x ri`
+  traps in the same run under the same handler**. Without that control, *no trap* and *the
+  handler is broken* would be one observation. ⚠️ Retires is not invalidates:
+  `x.c10.treated` and `x.c10.twin` are both 1.
+
+### What the seating found wrong with its own instructions
+
+- 🔴 **`console-capture.py` with neither `--seconds` nor `--idle` never returns** — both
+  default to `0.0` and the read loop breaks on neither (`rc=124` under `timeout -s TERM 8`).
+  **Twelve of `RUNSHEET` §B5's thirteen card rows omit it**, and block 0 omits it on `Q-A`,
+  while all eight committed `A-catch` captures passed it. Found at the desk, before power.
+- 🔴 **Block 0's cross-check table pairs `tmpl` with the wrong word.** The UART prints the
+  guard word and the block's word 19 holds the template address; the guard word is at word
+  20. With that corrected the two channels agree **25 of 25**. The mechanical check that was
+  run — *every header word is written somewhere* — cannot catch a UART line and a block word
+  sharing a name while carrying different quantities.
+- 🔴 **`G0`'s pointer-shape refutation fires on noise**: 63.6 % on 64 words of random data as
+  quoted verbatim, 22.2 % under the *aligned* reading. First run was this seating.
+- 🔴 **Decision B's stated premise is false, and it is a safety statement.** *"An initramfs
+  boot never instantiates an MTD partition map"* — this boot created two, and the first spans
+  `0x000000–0x130000`, which **contains both regions `CLAUDE.md` forbids**. Nothing was
+  written; the decision stands on its other three legs; the margin it claimed was not there.
+- **`A-catch`'s `^[` prefix rule watches for the wrong bytes.** The loader echoes raw `0x1B`
+  (量 twice, 81,457 and 117 bytes); `^[` is a Linux tty. The rule would not have fired on the
+  case it names, and corrected it says *which* of the two was answering.
+
+### What did not close, said plainly
+
+- **ⓑ / `CPU-45`.** `c-A` came back negative and the payload's own interlock voided Group V.
+  That is a pre-written branch behaving correctly, not a failure; the stop-loss allows a
+  second seating and this was the first.
+- **`w-imem`.** `m-imem` returned a base and **no top**, so a base is not a window and the
+  16 KiB still cannot be separated from the 16 KiB scratchpad **by size**. Associativity is
+  not exposed to that confound, because a scratchpad has no sets.
+- **`quietm`.** Power cycle 3 was not spent. `L-3` reaching D4 selects it, and its prediction
+  block is deliberately unwritten — writing predictions for an experiment whose contents a
+  result decides is writing a prediction that cannot be refuted.
+
 
 **`R3-7`, 2026-08-29 — the seating sheet becomes a card, and computing every value on it
 rather than transcribing it refuted eleven things the sheet asserted.** `RUNSHEET` §B5 gains

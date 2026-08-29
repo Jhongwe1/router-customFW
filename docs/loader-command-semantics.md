@@ -1224,3 +1224,71 @@ write pointer (`0x8040DD10`); `0x80401A10`'s memcpy walks up from there. So such
 an upload overwrites the UTLB refill vector **and** the general exception vector
 while it is in progress. The do-not-type list already carried both names for a
 different reason; this is the instruction-level one.
+
+---
+
+## `DW` takes a four-digit length — 2026-08-29, `LDR-41`
+
+量, `bench/2026-08-30/Q3-len.log`. `DW 80A00000 2000` returned **23,527 bytes in
+500 complete reply lines, ending in a prompt, with no `Unknown command !`**. The
+loader parses a 4-digit decimal length.
+
+**This is the largest `DW` this device has executed** — 2.4× the previous
+record (820 words / 9,661 bytes, `H2g`, 2026-08-25b).
+
+🔴 **The refutation condition was written before the cell ran and it did not
+fire.** The two failure shapes are different and the card named both: a refusal
+is `Unknown command !`, about 44 bytes, arriving at once and followed by a
+prompt; a `--seconds` truncation stops **mid-line with no prompt**. Neither is
+what came back — 500 whole lines and a prompt.
+
+⚠️ **Nothing in that seating depended on the answer.** `DW 80A02000 641` is three
+digits, and `probe3.c`'s compile-time assertion, the `Makefile`'s
+`RB_WORDS_probe3` comment and `docs/probe3-cells.md` §4 all say so
+independently. The cell is reconnaissance for `R5-0`, bought on a seating
+already paid for and placed last among the preflight cells so a failure would
+have cost nothing that mattered.
+
+`reply-size.py` predicted **23,527** exactly (`16 + 2 + 47×500 + 9`), which is
+the model's first use at this scale.
+
+## 🔄 `LDR-40`: 3,512–3,726 B/s at n=3 — and the marginal rate, 3,458–3,497 B/s,
+## is the one to size a window against
+
+`Q-3` is also a third point for the `DW` reply rate, at 14× the span of the
+first two.
+
+| capture | sent | bytes | window | B/s |
+|---|---|---:|---:|---:|
+| `H1c` | `DW 80A00000 137` | 1,667 | 0.447 s | 3,726 |
+| `H2g` | `DW 80A01000 817` | 9,660 | 2.688 s | 3,594 |
+| **`Q-3`** | `DW 80A00000 2000` | **23,523** | **6.697 s** | **3,512** |
+
+So the range is **3,512–3,726 B/s**, not 3,594–3,726.
+
+🔴 **And the reason previously given for the trend is impossible.** §f recorded
+*the longer reply is the slower one, so it is the first line's fixed cost rather
+than a per-byte overhead*. A fixed startup cost is `T = F + N/r`; its rate
+`N/(F + N/r)` **increases** toward `r` as `N` grows. It cannot produce a rate
+that falls with length. Whatever is happening, a fixed first-line cost is not it.
+
+**What fits is a measurement artefact, and it is in the instrument rather than
+the loader.** Fitting `T = a + b·N` across the three points gives a **negative
+intercept**, −0.03 to −0.11 s depending on which pair is used. A negative
+intercept means the measured window is systematically *shorter* than the
+transmission — which is what happens when the clock starts at the **first
+recorded read** rather than at the first byte: `console-capture.py` drains on a
+50 ms grid (`drain(0.05)`), so on a short reply a larger fraction has already
+arrived before timing begins.
+
+**The marginal (slope) rate is 3,458–3,497 B/s, and that is the number to size a
+`--seconds` window against** — the observed whole-reply rates are biased upward,
+most for the shortest replies, which is the wrong direction for a safety margin.
+
+⚠️ Every margin on the 2026-08-29 card was still comfortable: `Q-3` finished in
+6.71 s of a 15 s window (2.24×), `Q-5` in 1.98 s of 15 s (7.6×).
+
+⚠️ **Still not the payload's rate.** This is the loader's own print loop and it
+includes per-line formatting. `docs/probe3-cells.md` §4's wall is about the
+*payload* writing the UART directly. Carrying either number across that boundary
+is importing a measurement out of the conditions it was taken in.

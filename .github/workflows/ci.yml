@@ -237,6 +237,25 @@ jobs:
       - name: check-predictions self-test
         run: /usr/bin/python3 tools/check-predictions.py --self-test 2>&1 | tee ci-out/check-predictions.out; exit "${PIPESTATUS[0]}"
 
+      # rbcheck's ten controls run off two captures committed in this
+      # repository -- bench/2026-08-25b/H2g.log and H2a.log -- so unlike
+      # hazlint, whose population control is 56 KiB of this unit's bootloader
+      # and can never be committed, every one of them runs on a stock runner.
+      # Six of the ten must FAIL for a pass to mean anything: a checksum
+      # comparison that has not been shown able to fail is not a checksum
+      # comparison, and C9 is the row that fails if the seal correction ever
+      # becomes a no-op.
+      - name: rbcheck self-test
+        run: /usr/bin/python3 tools/rbcheck.py --self-test 2>&1 | tee ci-out/rbcheck.out; exit "${PIPESTATUS[0]}"
+
+      # 🔴 The self-test above reported 10/10 while FOUR mutations lived, two of
+      # them deleting the two comparisons the tool exists to make. An
+      # adversarial pass found them. This suite is the answer: it mutates
+      # rbcheck.py -- and, for M20, probe3.c -- and demands the suite notice.
+      # A control that has not been shown able to fail is not a control.
+      - name: rbcheck mutation suite
+        run: /usr/bin/python3 tools/test-rbcheck.py 2>&1 | tee ci-out/test-rbcheck.out; exit "${PIPESTATUS[0]}"
+
       # binsim's controls need no vendor binary and no compiler: every fixture
       # is a synthetic ELF the tool builds itself. That is deliberate and it is
       # the opposite of hazlint, whose population control is 56 KiB of this

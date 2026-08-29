@@ -499,3 +499,127 @@ have. Carried forward rather than half-done.
 are `2026-08-30b`'s; the rest are seatings that stopped, and the per-file check
 already names them. Carried forward in `PROGRESS.md` rather than fixed with a
 second way to print what `check` prints.
+
+---
+
+## 🔴 2026-08-30 and 2026-08-30b — what the seating produced. Written after it
+
+Both directories were named for the seating their cards were written for, and
+the seating ran on the **evening of 2026-08-29**. The names do not move: renaming
+would break a frozen file and a committed card to fix a label.
+
+**26 captures across two power cycles, and no flash-write command issued** — ⚠️ **not the same as "zero flash bytes", which needs the `FLR` bracket this seating did not run.** Both blocks pass
+their own gate — **13 of 13** and **12 of 12** — and `--sweep bench` now reads
+**39 files, 181 cells, 161 ordered, 0 out of order**.
+
+### `2026-08-30` — power cycle 1, `probe3`, `R1h-3`
+
+| file | what it is |
+|---|---|
+| `A-catch` | the cold power-on. Prefix **0 bytes**, and the 181-byte slice hashes `f5287ff9…` — the eighth agreeing capture |
+| `Q0-rescue.json` | the rescue transcript. Not a capture; it has no `.log` |
+| `Q0-ab`, `Q0-ab2` | `AUTOBURN` at both ends of the preflight, `00000000` both times |
+| `Q1-tc`, `Q1-tc2` | `TC0CNT` twice, seconds apart. Different — the counter is live |
+| `Q2-rbhead`, `Q2-arena0/1/2` | four DRAM windows, power-on bias |
+| `Q3-len` | `DW 80A00000 2000` — 23,527 bytes, the largest `DW` this device has run |
+| `Q0-put.json` | the TFTP transcript. **Not on the card**: `--report` was added so the transfer has a committed record. Additive, local, and it changes nothing on the wire |
+| `Q4-head` | the image head, byte-identical to the prediction |
+| `QJ` | the run. 38,295 bytes, of which 5,642 is the report and the rest the post-reset ESC storm |
+| `Q5-rb` | the result block, 7,593 bytes / 161 lines |
+| `CORRECTIONS-block0.md` | 🔴 **what the frozen block got wrong.** The block is not edited; this is the file its own second paragraph asks for |
+
+### `2026-08-30b` — power cycle 2, `loudm`, `R3-8a`
+
+| file | what it is |
+|---|---|
+| `A-catch` | power cycle 2's catch. Prefix is **117 raw `0x1B`** — cycle 1's loader still answering, and the negative control the `^[` question lacked |
+| `L0-rescue.json`, `L1-put.json` | rescue and TFTP transcripts |
+| `L0-ab` | `AUTOBURN` = `00000000` |
+| `L0-tail`, `L2c` | 🔴 **the before/after pair at `0x806013F0`**, and it is the best upload check this project has built — line 1 goes to sixteen zero bytes (reached `image_end`), line 2 stays byte-identical (did not run past) |
+| `L2a`, `L2b` | the head, and the variant discriminator at `0x80540000` |
+| `L3` | **the boot.** 6,459 bytes, eleven marks, M4, a shell prompt |
+| `L5a`, `L5b` | `/proc/cpuinfo` and `/proc/version` — D4, and the build-stamp discriminator |
+| `L6a`, `L6b` | six netdevs; `eth0` brought up |
+| `L7a` | ping on `eth0` — 0 received, **and nothing at all in the host capture** |
+| `L6c`…`L6f`, `L6c-up`… | the interface sweep, one up at a time, `eth1` → `eth4` |
+| `L7b`, `L7c`, `L7d` | `eth1`, `eth2`, `eth3` — all silent |
+| `L7e` | 🔴 **`eth4`. 4/4, 0 % loss**, with the host capture holding request and reply |
+
+⚠️ **`L6c-up`, `L6d-up`, `L6e-up`, `L6f-up` are cells nobody predicted.** The card
+writes `L-6c` as *"`ifconfig <prev> down` then `ifconfig <next> … up`"* — two
+commands, one row. Each is a `console-capture.py` invocation, so each is a
+`.log`, and the second needed a name. **`--sweep` walks predictions to captures
+and never the other way**, so these are outside the ordering discipline; that
+gap is the one already recorded for `CONT3`.
+
+⚠️ **Twelve of §B5's thirteen card rows carry no `--seconds`, and the tool has no
+default.** What was actually typed is in `RUNSHEET` §B5-c13, row by row, because
+a card whose typed lines differ from what was typed is worse than no card.
+
+### The redaction audit on these two directories
+
+`audit-bench-log.py` reports **53 hits** across the 26 captures, and every one
+was reviewed before the commit. It is advisory (exit 0) and it should stay
+advisory, because both classes below are legitimate.
+
+**`10.1.1.x` — 45 hits.** The bench-side private network the operator chose:
+`10.1.1.1` is the address `IPCONFIG` gives the loader, `10.1.1.2` the
+workstation, `10.1.1.10` the board under Linux. None is this unit's
+configuration; the loader's own compiled-in TFTP address is `192.168.1.6` and is
+already on `spec-check`'s allowlist for the same reason.
+
+🔴 **MAC addresses — 8 hits, and this one needed a measurement rather than an
+argument.** `L6a.log` prints `00:12:34:56:78:90`…`:94`, `:97` for the netdevs and
+**`00:E0:4C:81:86:86` / `00:E0:4C:81:96:96` for `wlan0` / `pwlan0`** — a Realtek
+OUI, which is exactly the shape of a real radio address, and `CLAUDE.md` forbids
+committing anything that identifies this physical unit. `H601` at flash
+`0x006000` holds this unit's MAC and radio calibration.
+
+量: **all four are compiled into the `vmlinux` this seating uploaded**, as
+literal bytes — `00:E0:4C:81:86:86` at file offset `0x288cc0`,
+`00:E0:4C:81:96:96` at `0x288e04`, `00:12:34:56:78:90` at `0x2b5d64`,
+`00:12:34:56:78:94` at `0x2b5e14`. They are SDK defaults in a GPL source tree
+anyone can build, not values read from flash.
+
+**And the mechanism agrees**: this boot mounted **my** initramfs, so none of the
+vendor's init scripts — the things that normally read `H601` and program the
+interfaces — ever ran. The board came up on the driver's built-in defaults,
+which is also why the Ethernet MACs are the obvious `00:12:34:56:78:9x`
+placeholder series.
+
+⚠️ **This clearance does not transfer to a flash-root boot.** The moment the
+vendor's userspace runs, the interfaces get their real addresses from `H601`,
+and a capture of `ifconfig` from that boot **would** identify the unit. The
+check is *are these bytes in the image I built*, and it has to be re-run, not
+remembered.
+
+### 🔴 The host-side captures, and what three of them do NOT prove
+
+`L7a-host.txt` … `L7e-host.txt` are the workstation's `tcpdump -e -n 'icmp or
+arp'` output for each interface tried, committed because `R3`'s **D5 requires
+the host-side capture**, not only the board's own reply count, and
+`PROGRESS.md`'s `R3-10` row says it is committed beside the board-side log.
+
+`L7e-host.txt` (eth4) is 1,804 bytes and holds the whole exchange: the board's
+ARP request, the workstation's reply, four ICMP echo request/reply pairs, and a
+closing ARP from the workstation. **That is D5.**
+
+🔴 **`L7b`/`L7c`/`L7d`-`host.txt` are one byte each — a newline — and that is
+NOT evidence of silence.** A one-byte file looks identical whether `tcpdump`
+captured nothing or `tcpdump` never ran. Their stderr went to `/dev/null`, so
+nothing distinguishes the two. **This project does not accept a tool reporting
+zero without a positive control, and here the control is missing for exactly
+those three.**
+
+**What IS evidenced**: `L7a-host.err` is committed and holds tcpdump's own
+summary — `0 packets captured / 0 packets received by filter / 0 packets dropped
+by kernel` — so `eth0`'s silence is a reading. And `L7e` proves the harness
+captures when there is something to capture. For `eth1`, `eth2` and `eth3` the
+evidence is **the board side alone**: `L7b`/`L7c`/`L7d.log` each report
+`4 packets transmitted, 0 packets received, 100% packet loss`.
+
+⚠️ **This does not weaken D5**, which is met on `eth4` with a complete
+two-directional capture. It weakens the *subsidiary* claim that nothing left the
+board on `eth1`–`eth3`. The fix for next time is one flag: keep stderr, or run
+`tcpdump -w` per interface so an empty capture is a well-formed pcap with a
+header rather than a zero-length file.

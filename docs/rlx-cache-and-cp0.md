@@ -635,3 +635,224 @@ are load-bearing:
 **The VMA base is the fourth control** and it is the one that could most easily
 have been assumed: `jal` targets land on plausible prologues at 58.0 % under
 base `0x80000000` and at 0.2–3.0 % under four deliberately wrong bases.
+
+---
+
+## 🔴 On silicon — 2026-08-29, `R1h-3`'s seating, `bench/2026-08-30/`
+
+**`probe3` ran on the device.** Power cycle 1 of seating 5; thirteen cells,
+`check-predictions` **13 of 13**, and no flash-write command issued (⚠️ not the
+same as zero flash bytes — no `FLR` bracket ran, so the count is unmeasured). The
+report is
+`bench/2026-08-30/QJ.log` (5,642 bytes to `rlxprobe: end`) and the block was
+recovered with one `DW` into `bench/2026-08-30/Q5-rb.log`.
+
+**The two channels agree**, and that is now a tool rather than an eyeball:
+`tools/rbcheck.py` reports the UART's `sum=`, the seal word `w640` and
+`sum(w0…w639) − 0x10` all equal to **`C93E60B5`**, with three margin words at
+`DEADC0DE` and ten controls green. The 25 field-to-word pairings in
+`PREDICTIONS-B5-block0.md` §12 agree **25 of 25** once one pairing in that table
+is corrected — see the correction file.
+
+### ⓐ — geometry. Answered, by experiment, for the first time
+
+| | reading | what makes it a reading |
+|---|---|---|
+| **size** | **16 KiB** | working set 1/2/4/8 KiB → `fresh=0` at every point; 16 KiB → 20 of 512; 32 KiB → 1024 of 1024; 64 KiB → 2048 of 2048 |
+| **line** | **16 B** | `w.line.bits=11222222` against `L_LINE[]` (`probe3.c:378`): offsets `0` and `8` STALE, `16` FRESH |
+| **associativity** | **2-way** (量). ⚠️ **512 sets is 推** | `w.assoc.tm=00002003` → `(T, M) = (8192, 3)`, and it is the *argmin over T* that discriminates — see below. The set count divides by a line size neither this cell nor `w.size` can see |
+
+**否證 ⓐ's own controls both fired, in both directions.** The negative
+control — *every victim must come back STALE at a working-set size no cache
+could evict from* — holds at 1, 2, 4 and 8 KiB. The other side, *the walk must
+be able to evict at all*, holds at 32 and 64 KiB with every victim FRESH. A
+walk that could only do one of those would have produced a number that is void
+rather than approximate. It also **reproduces inside the seating**:
+`bmp.rerun.fresh` re-ran the 16 KiB point and returned **20** again.
+
+🔴 **The argument for two-way is the argmin over `T`, and it is written out here
+because the first version of this section gave a circular one.** What I wrote
+was *"T = 8,192 is exactly the way size of a two-way 16 KiB cache — which is
+exactly the T the search settled on"*. That is a consistency check dressed as a
+derivation: it assumes the size and the ways to explain a number it then offers
+as evidence for them. **`M = 3` alone does not imply two ways** — it is equally
+"two ways in one set" or "one way in two sets", so direct-mapped at half the way
+size gives `M = 3` too.
+
+What discriminates is *which* `T` minimises `M`. `probe3.c:1371-1404` searches
+`t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
+
+| hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |
+|---|---:|---:|---:|---|
+| 8 KiB, 2-way | **3** | 3 | — | (4096, 3) |
+| 16 KiB, **1-way** | 5 | 3 | **2** | (16384, 2) |
+| **16 KiB, 2-way** | 5 | **3** | 3 | **(8192, 3)** ✅ |
+| 16 KiB, 4-way | **5** | 5 | — | (4096, 5) |
+| 32 KiB, 2-way | — | 5 | **3** | (16384, 3) |
+
+**`(8192, 3)` is unique to 16 KiB two-way.** `w.assoc.capped=00000000` says
+`T = 16384` really was tried and really did not yield `M = 2`, so the
+direct-mapped row is excluded by a reading rather than by assumption.
+
+🔴 **And the four zero rows are themselves the two-way signature.** The one
+cached function that must execute between patch and exec is
+`rlx_call2_uncached`'s wrapper — `probe3.map` puts it at `0x805001dc`, physical
+`0x005001e0`, which is **set 30** under 16 KiB/2-way/16 B. Under direct mapping
+that line would evict its victim at *every* working set, so `w.size` would read
+non-zero at 1, 2, 4 and 8 KiB. It reads zero at all four. Under two-way the
+pollution can only bite once the victims already fill both ways — i.e. only at
+16 KiB. **量: the first FRESH victim in the boundary rerun is `k=15` at
+`0x80A301E0`, which is also set 30.** One in ~128 by chance.
+
+
+### 🔴 And the kernel's number is a build constant, which is why it is written down separately
+
+The `loud` boot on power cycle 2 prints:
+
+```
+[    0.000000] icache: 16kB/16B, dcache: 8kB/16B, scache: 0kB/0B
+```
+
+It agrees with the walk. **It is not a measurement.** 讀,
+`arch/rlx/bsp/bspcpu.h:12-22`:
+
+```c
+#define cpu_scache_size     0
+#define cpu_dcache_size     ( 8 << 10)
+#define cpu_icache_size     (16 << 10)
+#ifdef CONFIG_RTL_8196E
+#define cpu_dcache_line     16
+#define cpu_icache_line     16
+```
+
+`cache-rlx.c:378` prints those macros. They are used in `#if` **preprocessor**
+conditionals elsewhere in the same file (`:99`, `:438`, `:649`), which is proof
+they are compile-time constants and not variables a probe could fill.
+
+**So there is one measurement and one constant, and they corroborate each
+other.** `R1h-4`'s DoD asks for exactly this distinction *even when they agree*,
+and the reason is visible in the same line: `dcache: 8kB` is the same kind of
+constant, and **this seating has no D-side measurement at all** — Group V never
+ran. Recording the printed line as *the geometry* would have laundered an
+unmeasured 8 KiB in beside a measured 16 KiB.
+
+⚠️ **What the size measurement still cannot do** is separate a 16 KiB I-cache
+from the 16 KiB instruction scratchpad (`CPU-46`), because they are the same
+size. `w-imem` is the cell for that and it stays 未定: `w.imem.differs=00000000`
+and the payload printed `IDENTICAL -- and that is also the no-op reading`,
+because CP0 20 is write-only (M4) so nothing here confirms the `CCTL 0x020` was
+accepted.
+
+### ⓑ — decision ② is still 未答, and this time the instrument said so itself
+
+`c-A0`, the negative control, returned **`P1`** — correct, and it runs first
+precisely so that a negative `c-A` cannot be confused with a dead cell. Then:
+
+```
+c A0 l1=ffffffff l2=5a5a0002 l3=5a5a0002
+c A  l1=a5a50001 l2=5a5a0002 l3=5a5a0002
+```
+
+**`c-A` is negative**: `l2` is `P1`, not `P0`. There is no stale line to act on,
+so the payload's own interlock fired —
+
+```
+Group V VOID -- c-A negative, so every V cell would read FRESH at every size
+and that is indistinguishable from having no D-cache
+```
+
+— and `c-B`, `c-C`, `c-D`, `c-F`, `c-G` are all recorded `VOID`, with
+`g.ca=00000000`. That is the branch `PREDICTIONS-B5-block0.md` §10 wrote in
+advance, and the cells voided are exactly the ones it named.
+
+🔴 **`c-E` ran and its result does not count**, by this project's own rule
+written before the seating: with `c-A` negative, residency was never
+established, so `c-E`/`c-E0`/`c-E2` are `void — residency not established`
+rather than a write-policy verdict. `c E l2=00000000` is **not** evidence of
+write-through here.
+
+**Decision ② therefore names its next experiment rather than an argument**, which
+is what `R1h-4`'s DoD requires of it: the stop-loss allows two seatings before
+`CPU-45` is recorded 未定, and this was the first. What the seating adds is that
+the *proxy* is now known to behave — the aliasing path produced a clean
+`P1`/`P1` pair with the negative control firing — so the next attempt is about
+making a line resident, not about whether the cell can read.
+
+### ⓒ — answered, positively, with the positive control that makes it mean something
+
+```
+x ri  ISSUING → n=00000001 cause=00000028 epc=80501874
+x c11 ISSUING → n=00000000
+x c10 ISSUING → n=00000000
+x c15 ISSUING → n=00000000
+x c19 ISSUING → n=00000000
+```
+
+**This core retires the `cache` instruction.** Four op values, none traps. And
+the reading is licensed by the reserved-instruction control in the *same* run
+under the *same* handler: `x ri` traps with `cause=00000028` → ExcCode 10 (RI).
+Without that row, "no trap" and "the handler is broken" would be the same
+observation. `install.bad=00000000` and `restore.mismatch=00000000` say the
+handler was installed and gave the machine back unchanged.
+
+⚠️ **Retiring is not doing.** `x.c10.treated=00000001` **and**
+`x.c10.twin=00000001`: the untreated twin moved too, so the six intervening
+`CCTL` stages explain the treated victim's FRESH as readily as `cache 0x10`
+does. `probe3-cells.md` §6.4 pre-registered this and it is the reading that
+stands. **`CPU-44` closes on *retires*; it does not close on *invalidates*.**
+
+The stop-loss row *"`cache 0x11` traps → this unit's own kernel becomes a puzzle
+worth its own row"* does **not** fire: the 37 D-side `cache` ops in the shipped
+kernel are instructions this silicon will execute.
+
+### ⓓ — `Status.IsC` and the two control bits, and the refutation did not fire
+
+```
+s.bits=01010040   s.before=1000fc00   s.set=1000fc00   s.restored=1000fc00
+restore.mismatch=00000000   status_end=1000fc00
+```
+
+`s.bits` is `ST0_ISC | ST0_CTRL_A | ST0_CTRL_B` as the cell actually wrote it —
+bits **16**, **24** and **6**. After the attempted set, `Status` is bit-for-bit
+what it was: **none of the three sticks.**
+
+🔴 **The reason this carries information is that the refutation condition did not
+fire.** Block0's rule: *control bits set → `Status` has no write mask, so "bit
+16 does not stick" carries nothing, and the cell reports 未定*. Both control
+bits read back clear, so the cell is not in that state. This is consistent with
+LX4189 §3.4.1 putting all three inside a written-as-zero field (讀 ×1), and it
+is now 量 on this die.
+
+`status_end` equalling the entry value closes the other risk this cell carries:
+it did not change state it does not own, so nothing after it is suspect.
+
+⚠️ **The other half of `CPU-19` 殘留 — write-through versus write-back without
+write-allocate — did not move**, and it could not have: it depends on `c-E`,
+which is void for the reason above.
+
+### One result in the other direction: CP3 is reachable on this silicon
+
+Not predicted this way, and it is the sharpest disagreement with the desk
+channel in the whole seating. On qemu all eight `mfc3` stubs trapped
+(`m.cause=1000042C`, ExcCode 0x0B, CpU). On the device:
+
+```
+m.cu3.before=1000fc00   m.cu3.set=9000fc00      → CU3 (bit 31) sticks
+m.traps=00000000        m.cause=deadc0de        → no stub trapped; the field was never written
+m.cp3 0 v1=20000000 v2=20000000                 → r0
+m.cp3 4 v1=20000000 v2=20000000                 → r4
+m.cp3 1,2,3,5,6,7  v1=00000000 v2=00000000
+```
+
+The two primes are `0xC0DE0300|i` and `0xD1CE0300|i` (讀, `probe3.c:1497-1503`).
+**No reading equals its own prime and `v1 == v2` for all eight** — so the
+destination register was written and the value is stable, which is the pair of
+failures the two primes exist to separate (`F50b`). `CU3` sticking is the
+predicted half: this unit's own kernel sets exactly that bit at `0x8000221C`
+before its first `mtc3`.
+
+⚠️ **A base is not a window.** `m.imembase=20000000` and `m.dmembase=20000000`
+with **both tops reading `00000000`**. Block0 asked for a base/top pair
+differing by `0x3FFF` before `m-imem` could be called a window, and that is not
+what came back. `w-imem` stays 未定 on the condition block0 set, and the
+scratchpad's extent is unmeasured.

@@ -5,16 +5,24 @@ core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from four
 vendors' GPL drops and one leaked draft datasheet, because TOTOLINK never
 released source.
 
-> **This file holds only what is true today.** 🔄 **2026-08-29, second update:
-> four LOADABLE IMAGES of mine now exist** — `quiet` and `loud`, each with and
-> without the eleven boot marks, wrapped by Realtek's own `rtkload` pipeline into
-> `nfjrom` files of 1,027,072 and 1,053,696 bytes, and that pipeline was shown
-> the same day to reproduce the vendor's own shipped `nfjrom` byte for byte. Two
-> of them have printed eight boot marks under a MIPS32 emulator with the UART
-> redirected, halting where this board's own kernel halts. **No driver, nothing
-> of mine has executed on the silicon, and not one flash byte is written.**
-> *(Until today this said "no loadable image", which stopped being true at
-> 02:20.)* **Which gate that is, `PROGRESS.md` says** — this
+> **This file holds only what is true today.** 🔄 **2026-08-29, third update:
+> MY KERNEL BOOTED ON THE SILICON.** `loudm` — 1,053,696 bytes, the `rtkload`
+> pipeline's own `nfjrom` renamed — went to `0x80500000` over TFTP and was
+> entered with `J`. It printed all eleven boot marks, reached a shell that
+> **returns output from a typed command**, and pinged the workstation with the
+> host's own capture holding both directions. `probe3` ran on the power cycle
+> before it and measured this die's I-cache by experiment — **16 KiB, 16-byte
+> lines, 2-way** — with both of its refutation controls firing, and found that
+> **CP3 is reachable on this part** where the emulator says every `mfc3` traps.
+> 🔴 **No flash-write command was issued, and that is NOT the same sentence as
+> "not one flash byte is written"** — `RUNSHEET` `G8b` forbids the second without a
+> full re-dump, and this seating ran no `FLR` bracket, so the flash-byte count is
+> **unmeasured**. There is still no driver of mine —
+> the ping went out through the vendor's `rtl819x`, which is in the vendor's own
+> configuration. *(Until today this said "nothing of mine has executed on the
+> silicon", which stopped being true at 23:09; the sentence before that said "no
+> loadable image", and that stopped being true at 02:20 the same day.)*
+> **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there. Conventions for files that do not exist are not written
 > here; they go in when the file appears. Where this contradicts the repo, the
@@ -168,6 +176,18 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   a bench-time one. **And a 3-second capture with the board OFF is a free
   pre-flight**: 0 bytes, and the tool splits that into three causes — the
   adapter, the port, or the board — before a power cycle is spent.
+- 🆕 **`console-capture.py capture` with neither `--seconds` nor `--idle` never
+  returns.** Measured 2026-08-29: both default to `0.0` and the read loop breaks
+  on neither, so `timeout -s TERM 8` gives `rc=124`. A kill loses **`.meta.json`**
+  — the `.log` and `.timing` survive, flushed per chunk — and the recovery is
+  where a reading dies, because the tool correctly refuses to overwrite an
+  existing `.log` and the way past that refusal is `--force`, which on a
+  power-on catch replaces a cold capture with a warm one. **Every capture command
+  carries a terminator**, and a card that omits one is a card nobody has run:
+  ten committed `A-catch` captures passed a terminator while **14 of §B5's 15
+  capture rows omit it**. ⚠️ **And that census is an inference, not a reading**:
+  the metadata records `esc_seconds` and `cr_settle_s` but **neither `seconds` nor
+  `idle`**, so it can only ever prove the flag *was* passed.
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
   the commands and read what I paste back. One power cycle is the most expensive
   unit here, so list every question before the device is plugged in.

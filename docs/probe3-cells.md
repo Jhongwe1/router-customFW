@@ -1211,3 +1211,155 @@ walk's number and the kernel's number are **two different claims**, and the
 write-up says so **even when they agree**. A build constant that agrees with a
 measurement is corroboration; a build constant quoted as a measurement is a
 geometry number wearing a measurement's clothes.
+
+---
+
+## 🔴 Ran — 2026-08-29, `bench/2026-08-30/`. Every cell's outcome
+
+`probe3` executed on the silicon on power cycle 1 of seating 5. Report:
+`QJ.log`, 5,642 bytes to `rlxprobe: end`, then the payload's own watchdog reset
+and a prompt. Block recovered with one `DW` into `Q5-rb.log`, 7,593 bytes / 161
+lines. **`cells.run=0000000e` (14), `cells.void=00000008` (8)** — 22 accounted
+for, which is the arithmetic that says nothing was silently skipped.
+
+**Two channels, mechanically.** `tools/rbcheck.py` (new, ten controls): the
+UART's `sum=`, the seal word `w640`, and `sum(w0…w639) − 0x10` are all
+**`C93E60B5`**; the three free margin words are `DEADC0DE`; and the 25
+field-to-word pairings of §12 agree **25 of 25** after one pairing in that table
+is corrected. See `bench/2026-08-30/CORRECTIONS-block0.md` §3.
+
+### Group P — preflight
+
+| cell | reading | verdict |
+|---|---|---|
+| `P0` ×2 | `8040D4A0` = `00000000` before and after six commands | gate open, bracket holds |
+| `P1` | `001BD530` then `000425D0`; `TC1CNT=0`, `TCCNR=C0000000`, `TCIR=80000000` | live on the first pair; all four pre-registered values matched |
+| `P2` | four windows, 16 distinct words each, 46.1–54.1 % ones, **0 of 16 equal between any pair** | no shape fired; bias garbage |
+| `P3` | 23,527 B, 500 lines, prompt, no `Unknown command !` | the loader takes a 4-digit length — `LDR-41` |
+
+⚠️ **§5's pointer-shape refutation is not usable as written.** Two of the 64
+arena words carry a listed prefix (`81xxxxxx`) and neither is 4-byte aligned.
+On uniform random words the loose form — `G0`'s verbatim *"any one
+pointer-shaped word and the address is re-picked"* — fires with probability
+**63.6 %** on 64 words, and the aligned form at **22.2 %**. It needs a rate, not
+a presence test. The shape with real power was *any two windows byte-identical*,
+which is a stuck read path and nothing else on the list catches it.
+
+### Group T — the timer. Ships
+
+`g.timer=00000001`. `t.cal.hi=00003af2` (15,090) and `t.cal.lo=00001d78`
+(7,544): **hi/lo = 2.0003**, so the bracket scales and does not measure itself.
+The predicted values were ≈14,286 and ≈7,143 (算 from `CLK-03` × the tick rate);
+the measured pair is **5.6 % high**, which is inside neither of the two
+refutation bands (*≈0* → TC0 stopped; *~2× or ~0.5×* → CPI is not 3). So CPI = 3
+is corroborated to within 5.6 % and this cell has separated what `CLK-03` could
+not.
+
+### Group W — the I-side walk. 16 KiB, 16 B, 2-way
+
+Full working in `notes/cache-model.md`. Both of 否證 ⓐ's controls fired, in both
+directions, and the 16 KiB point reproduced (`bmp.rerun.fresh=00000014`).
+`w-line0`, the no-fetch negative control, read all-FRESH as required.
+
+`w-imem` is **未定**: `w.imem.differs=00000000`, and §6.1's own warning is the
+reason — CP0 20 is write-only (M4), so *identical* is also the no-op reading,
+and `m-imem` returned a base without a top.
+
+### Group M — CP3 is reachable, and this is the sharpest qemu disagreement of the seating
+
+`m.traps=00000000`. **All eight `mfc3` stubs executed**; on qemu all eight
+trapped (`m.cause=1000042C`). `m.cause` is still `deadc0de` — never written —
+which corroborates zero traps from a second direction.
+
+`CU3` sticks: `m.cu3.before=1000fc00` → `m.cu3.set=9000fc00`, the predicted half.
+**No reading equals its own prime and `v1 == v2` for all eight** (primes
+`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1497-1503`) — so the destination
+was written and the value is stable, which is exactly the pair of failures the
+two primes exist to separate. r0 and r4 read `20000000`; the rest read `0`.
+
+⚠️ **A base is not a window.** Both tops read `00000000`, so §6.1's condition for
+calling `m-imem` answered is not met and the scratchpad's extent is unmeasured.
+
+### Group C — `c-A` negative, and the interlock did its job
+
+`c-A0` (negative control, and it runs first for exactly this reason) returned
+`P1`. `c-A` returned `l2 = P1` — no stale line. The payload printed
+`Group V VOID -- c-A negative`, and `c-B`/`c-C`/`c-D`/`c-F`/`c-G` are all `VOID`
+with `g.ca=00000000`.
+
+🔴 **`c-E` ran and does not count.** §6.5's rule, written before the seating:
+with `c-A` negative, residency was never established, so `c-E`/`c-E0`/`c-E2` are
+*void — residency not established*. `c E l2=00000000` is **not** a write-policy
+verdict. ⓑ is unanswered and the stop-loss allows a second seating.
+
+### Group X — retires, with the control that makes that mean something
+
+`x c11`, `x c10`, `x c15`, `x c19`: all `n=00000000`. `x ri`: **traps**,
+`cause=00000028` (ExcCode 10, RI), `epc=80501874`. Same handler, same run — so
+*no trap* is a reading and not a broken handler.
+
+⚠️ §6.4's pre-registered caveat is the one that stands: `x.c10.treated=00000001`
+**and** `x.c10.twin=00000001`. The untreated twin moved too, so the six
+intervening `CCTL` stages explain the treated victim as readily as `cache 0x10`
+does. **`CPU-44` closes on *retires*, not on *invalidates*.**
+
+### Group S — none of the three bits sticks, and the refutation did not fire
+
+`s.bits=01010040` (bits 16, 24, 6 — the value the cell actually wrote, not one
+reconstructed from the instruction selection). `s.before = s.set = s.restored =
+1000fc00`, `restore.mismatch=00000000`, `status_end=1000fc00`.
+
+🔴 The reading carries information **because §6.7's refutation did not fire**:
+both control bits also read back clear, so this is not the *"`Status` has no
+write mask"* state in which *bit 16 does not stick* would be uninformative.
+Consistent with LX4189 §3.4.1's written-as-zero field, and now 量 on this die.
+
+### The header, and the four rows where it was wrong
+
+Predicted and matched: `pc=80502c74`, `flags=50010002`, `rb=80a02000` (lower
+case), `status=1000fc00`, `arena=80a10000`, `kseg0=00000001`,
+`handler_words=00000016`, `install.bad=00000000`, `break.count=00000001`,
+`break.cause=00000024`, and no `CLEAR_BEV` warning.
+
+Wrong, and both are in `CORRECTIONS-block0.md`: `break.epc` came out
+**`80500270`**, which the block predicted it would *not* be, and
+`install.changed` came out **`0000002b`** — the value withdrawn the day before
+for a reason that was itself correct.
+
+### 🔴 The retained bitmap does not survive to the read-back, and the block's header says it does
+
+Found by an adversarial pass on 2026-08-30, 量 on `bench/2026-08-30/Q5-rb.log`.
+
+`probe3.c:1324-1329` states the design: *"THE RETAINED BITMAP. One sweep point
+survives to the read-back … the BOUNDARY point, because its PATTERN is what
+carries associativity and aliasing."* `probe3.c:85-90` builds a self-check on
+it — *"so the desk can compare the count the payload thought it wrote against
+the length it actually read."*
+
+**It does not survive.** `bmp_clear()` is called at `:1385` inside the `w-assoc`
+search loop and again at `:1667` and `:1808`, all **after** the boundary rerun at
+`:1336`. The last writer is `x-c10`'s two-victim walk.
+
+量, the block's bitmap region (`w384`, `H_LAYOUT_BMP` → `0x80A02600`):
+
+```
+80A02600:  11000000  00000000  00000000  00000000
+80A02610 .. 80A029FC: all zero
+```
+
+Two `V_STALE` nibbles and 510 `V_NEVER`, against a header that still advertises
+`bmp.point=57000010` (the 16 KiB point) and `bmp.count=00000200` (512). A reader
+parsing the block by its own header gets 510 never-written victims and a computed
+FRESH count of **0**, against `bmp.rerun.fresh=20`.
+
+**Nothing published is falsified.** `bmp.rerun.fresh` and `bmp.firstbad` are
+computed at `:1341-1345`, before the clobber, and the sum, the seal and both
+channels are unaffected. What is lost is the *pattern* — which is the only
+evidence that could have shown the 20 FRESH victims arriving in pairs
+`{k, k+256}`, the direct fingerprint of two ways sharing a set, instead of
+leaving direct-mapped to be excluded by inference.
+
+`tools/rbcheck.py` now **reports** the discrepancy (advertised victims against
+nibbles written) and deliberately does not fail on it: the block is sound
+everywhere else, and refusing it over a stale region would be the wrong verdict.
+Fixing the payload is a `probe3` change and is carried forward.

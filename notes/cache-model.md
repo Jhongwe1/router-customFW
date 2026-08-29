@@ -886,3 +886,137 @@ that turns it into a measurement is `DW 80000080 32` at the prompt — and the c
 that makes *that* checkable without trusting this list is `DW 8040054C 32`, the
 source of the copy, which must come back word for word identical. Both are
 read-only, both are in `RUNSHEET.md` § Session B4 as `H0a` and `H0a2`.
+
+---
+
+## 🔴 The geometry is measured — 2026-08-29, on silicon
+
+This file has carried the geometry as *"a prediction with one weak source"* and
+then as *"from the board rather than from a build constant"* — both readings of
+`bspcpu.h`. `probe3`'s I-side eviction walk ran on the device on 2026-08-29
+(`bench/2026-08-30/QJ.log`), and the numbers are now measurements.
+
+| | measured | previously | agreement |
+|---|---|---|---|
+| I-cache size | **16 KiB** | 16 KiB (讀, `bspcpu.h:14`) | yes |
+| I-cache line | **16 B** | 16 B (讀, `bspcpu.h:19`, under `CONFIG_RTL_8196E`) | yes |
+| associativity | **2-way** (量); **512 sets** is 推 | LX4189 says *"direct mapped **or** two-way set associative"* — a sister core's document, and a **disjunction** | ⚠️ a disjunction over {1, 2} is **not** a second vote for 2: it excludes 4- and 8-way and nothing more |
+| D-cache | **not measured** | 8 KiB / 16 B (讀, `bspcpu.h:13`) | **no measurement exists** |
+
+### The walk, and both of its controls
+
+```
+w.size 00000001 n=00000020 fresh=00000000      1 KiB, 32 victims
+w.size 00000002 n=00000040 fresh=00000000      2 KiB
+w.size 00000004 n=00000080 fresh=00000000      4 KiB
+w.size 00000008 n=00000100 fresh=00000000      8 KiB
+w.size 00000010 n=00000200 fresh=00000014     16 KiB, 20 of 512
+w.size 00000020 n=00000400 fresh=00000400     32 KiB, all
+w.size 00000040 n=00000800 fresh=00000800     64 KiB, all
+```
+
+**否證 ⓐ is satisfied in both directions.** Its written negative control — *every
+victim must come back STALE at a working-set size no cache could evict from* —
+holds at 1, 2, 4 and 8 KiB. Its other side — the walk must be **able** to evict,
+or a small number is the tool failing rather than the cache filling — holds at
+32 and 64 KiB with every victim FRESH. A walk that satisfied only one of those
+would have produced a number that is **void, not approximate**, which is what
+this file's refutation condition says.
+
+**It also reproduces inside the seating**: `bmp.rerun.fresh=00000014` re-ran the
+16 KiB point and returned the same 20.
+
+⚠️ **FRESH appears one step earlier than the block predicted.** The prediction was
+*all STALE up to 16 KiB, FRESH at 32 KiB*. What happened is 20 of 512 at 16 KiB
+— 3.9 %. 🔴 **The first version of this paragraph explained that as "a working
+set that exactly fills the cache", and that is false.** `W_STRIDE` is 32
+(`probe3.c:358`) over a 16-byte line, so the walk touches only **even sets: 256
+of 512, two victims each** — it fills half the sets in both ways, not the cache.
+The correct reading is the payload's own footprint colliding once both ways are
+occupied, and §*the argument for two-way* below turns that into a positive
+prediction that the data confirms. An 8 KiB cache is excluded on the numbers
+rather than on the story: it would give **512 of 512** at a 16 KiB working set,
+not 20.
+
+### Line size, and it is read off victim offsets rather than assumed
+
+`w.line.bits=11222222` and `w.line.bits2=22222000`, against
+`L_LINE[] = {13, 0, 8, 16, 24, 32, 48, 64, 96, 128, 160, 192, 256, 320}`
+(`probe3.c:378`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
+(`probe3.c:287-294`):
+
+* offset **0** — STALE
+* offset **8** — STALE
+* offset **16** — FRESH, and every offset above it
+
+**The fetched line covers 0 and 8 and not 16: a 16-byte line.**
+
+`w.line0`, the no-fetch negative control, read `22222222` — all FRESH. Without
+it, *all FRESH* at every offset would be indistinguishable from a patch that
+never landed.
+
+### Associativity — and the argument below replaces a circular one
+
+`w.assoc.tm=00002003` packs `(best_t & 0xFFFFFF00) | (best_m & 0xFF)`
+(`probe3.c:1404`), so **T = 8,192 and M = 3**, with
+`w.assoc.capped=00000000` — the search was not clipped by its own bound.
+
+🔴 **The argument for two-way is the argmin over `T`, and it is written out here
+because the first version of this section gave a circular one.** What I wrote
+was *"T = 8,192 is exactly the way size of a two-way 16 KiB cache — which is
+exactly the T the search settled on"*. That is a consistency check dressed as a
+derivation: it assumes the size and the ways to explain a number it then offers
+as evidence for them. **`M = 3` alone does not imply two ways** — it is equally
+"two ways in one set" or "one way in two sets", so direct-mapped at half the way
+size gives `M = 3` too.
+
+What discriminates is *which* `T` minimises `M`. `probe3.c:1371-1404` searches
+`t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
+
+| hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |
+|---|---:|---:|---:|---|
+| 8 KiB, 2-way | **3** | 3 | — | (4096, 3) |
+| 16 KiB, **1-way** | 5 | 3 | **2** | (16384, 2) |
+| **16 KiB, 2-way** | 5 | **3** | 3 | **(8192, 3)** ✅ |
+| 16 KiB, 4-way | **5** | 5 | — | (4096, 5) |
+| 32 KiB, 2-way | — | 5 | **3** | (16384, 3) |
+
+**`(8192, 3)` is unique to 16 KiB two-way.** `w.assoc.capped=00000000` says
+`T = 16384` really was tried and really did not yield `M = 2`, so the
+direct-mapped row is excluded by a reading rather than by assumption.
+
+🔴 **And the four zero rows are themselves the two-way signature.** The one
+cached function that must execute between patch and exec is
+`rlx_call2_uncached`'s wrapper — `probe3.map` puts it at `0x805001dc`, physical
+`0x005001e0`, which is **set 30** under 16 KiB/2-way/16 B. Under direct mapping
+that line would evict its victim at *every* working set, so `w.size` would read
+non-zero at 1, 2, 4 and 8 KiB. It reads zero at all four. Under two-way the
+pollution can only bite once the victims already fill both ways — i.e. only at
+16 KiB. **量: the first FRESH victim in the boundary rerun is `k=15` at
+`0x80A301E0`, which is also set 30.** One in ~128 by chance.
+
+
+### 🔴 What the kernel prints is a build constant, and this file is where that has to be said
+
+The `loud` boot prints
+`icache: 16kB/16B, dcache: 8kB/16B, scache: 0kB/0B`. 讀,
+`arch/rlx/bsp/bspcpu.h:12-22` — every one of those numbers is a `#define`, and
+`cache-rlx.c:378` only prints them. They are used in `#if` **preprocessor**
+conditionals at `:99`, `:438` and `:649` in that same file, which is proof they
+are compile-time constants rather than variables a probe could have filled.
+
+**So there is exactly one measurement and one constant, and they corroborate.**
+`R1h-4`'s DoD asks for that distinction *even when the numbers agree*, and the
+same line shows why: `dcache: 8kB` is the same kind of constant, and **no D-side
+measurement was taken** — Group V was voided by `c-A` coming back negative.
+Reporting the printed line as *the geometry* would put an unmeasured 8 KiB
+beside a measured 16 KiB in one sentence.
+
+⚠️ **The size measurement still cannot separate the I-cache from the 16 KiB
+instruction scratchpad** (`CPU-46`) — they are the same size, which this file has
+recorded as a hazard since 2026-08-26. `w-imem` is the cell for it and it stays
+未定: `w.imem.differs=00000000`, and the payload printed
+`IDENTICAL -- and that is also the no-op reading` because CP0 20 is write-only
+(M4), so nothing confirms the `CCTL 0x020` was accepted. **The associativity is
+not exposed to that confound** — a scratchpad has no sets — which is the one
+part of the geometry the scratchpad cannot be masquerading as.

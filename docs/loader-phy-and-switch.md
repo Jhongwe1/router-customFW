@@ -660,3 +660,41 @@ The procedure is `RUNSHEET.md` session B2. This is the prediction list.
 PHY identifier *is*. No source predicts it, so the first reading of it has no
 control except its own internal agreement across four addresses. It is a
 measurement, not a confirmation, and B2's results table says so.
+
+---
+
+## 🔴 A second build reports the switch MIRRORED — 2026-08-30
+
+Everything in §7's table above is the **vendor kernel's** numbering, measured on
+this unit, and it stays. What is new is that it is not the only numbering this
+silicon reports.
+
+量, `bench/2026-08-30b/L3.log:99-104` — a kernel built in this project from the
+GPL drop, booted on the same board the same evening:
+
+| netdev | vendor (`upstream/dumps/uart-boot.log`) | rlxfw (`L3.log`) |
+|---|---|---|
+| `eth0` | `0x10` | **`0x1`** |
+| `eth1` (WAN, vid 8) | `0x1` | **`0x10`** |
+| `eth2` | `0x8` | **`0x2`** |
+| `eth3` | `0x4` | `0x4` |
+| `eth4` | `0x2` | **`0x8`** |
+
+As bit indices: **`rlxfw = 4 − vendor`** for all five, a 5-bit reversal whose
+fixed point is `eth3` at bit 2. `RTL_WANPORT_MASK` is defined as `0x10` in one
+`#ifdef` branch and `0x01` in another (讀, `rtl865x_netif.h:400`, `:411`), which
+is where the two builds diverge.
+
+**Why this file has to carry it**: a member-port bit indexes a physical switch
+port, and the hardware fixes that. So the netdev↔jack binding is **not** a
+property of the board — it is a property of the build. `NET-04`, `NET-13` and
+anything derived from §7 are the *vendor's* binding, and `R5`/`R6` will be
+writing against **this project's** kernel.
+
+⚠️ **The safe way to name a jack is by port number.** 2026-08-29's `L-6c`…`L-6f`
+sweep found the cable on **switch port 3** — which this project's kernel calls
+`eth4` and the vendor's calls `eth2`. Written as a port it agrees with `NET-04`;
+written as a netdev name it is true for exactly one of the two kernels.
+
+⚠️ **Which of the two numberings matches the silk-screen labels is undetermined**
+and neither log can settle it: both are the driver's own table, not the PCB.

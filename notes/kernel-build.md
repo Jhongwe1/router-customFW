@@ -2220,3 +2220,106 @@ put an unmeasured sentence next to eight measured ones.
 * **§12.6 is two readings of the same disassembly**, mine and upstream's, of
   **one** binary. It is a stronger source than one reading and it is not two
   independent parties.
+
+---
+
+## 🔴 §16 — it booted. 2026-08-29, `bench/2026-08-30b/`, power cycle 2
+
+`rlxfw-loudm-20260830.bin` — 1,053,696 bytes, sha256 `72928c56…`, the pipeline's
+own `nfjrom` renamed — was uploaded to `0x80500000` over TFTP (2,059 blocks,
+1.64 s) and entered with `J 80500000`. **It reached a shell and pinged.** All
+five of `R3`'s DoD rows are met; `RUNSHEET` § Results — Session B5 owns the
+row-by-row statement.
+
+**The upload verified before the jump, and the tail check is the good one.**
+`L-0t` read `806013F0` before the transfer and `L-2c` read it after: line 1 went
+from DRAM bias to **sixteen zero bytes** (the write reached `image_end`) while
+line 2 stayed **byte-identical** (it did not run past). One command carrying a
+positive and a negative control, which is what §B5-c1 rebuilt the cell into once
+the head was measured not to discriminate between `nfjrom` files.
+`L-2a` matched both predicted lines, `0x8050001C` = `26101400` giving
+`__vmlinux_end` = `0x80500000 + 1,053,696`; `L-2b` at `0x80540000` confirmed it
+was `loudm` and not `quietm`.
+
+### The mark ladder, and the byte model held
+
+All eleven marks arrived in order, then M4:
+
+```
+RLXFW-B00 … B03, [    0.000000] CPU revision is: 0000cd01, B04 … B10,
+rlxfw: init running, RLXFW-R3-RUNG1-OK
+```
+
+* **`RLXFW-B00`** is D2 — the first C instruction of this kernel reaching the
+  UART, and a string absent from both vendor artefacts.
+* **`RLXFW-B05` clean after a clean B04** — `bsp_serial_init()` did **not**
+  change the line rate. That was §12's open risk (`B05` exists to make it one
+  readable line) and it is closed in the good direction.
+* **`RLXFW-B06`** — `_imem_dmem_init()`, the Lexra CP3 scratchpad sequence,
+  returned. The desk channel skipped this body with `--nop-cop3`, so this is the
+  first time it has executed anywhere. It is consistent with `probe3`'s
+  independent finding the same evening that CP3 is reachable on this die.
+* **`RLXFW-B07=00000000`** is D3 — the switch core answered and
+  `bsp_machine_halt()`'s bare `while(1)` did not fire. The desk channel printed
+  `FFFFFFFF` here because malta has no RTL8196E switch core.
+
+**`PRId` is read three times through three paths in one seating**:
+`RLXFW-B02=0000CD01` (upper case, `rlxfw_puts_hex`), `CPU revision is: 0000cd01`
+(lower case, `cpu-probe.c:39`), and `/proc/cpuinfo`'s `cpu model : 52481` —
+`0xCD01` in decimal. Three formatters, one register; the case and radix
+differences are free proof they are three paths rather than one value copied.
+
+⚠️ **`TC-o` reproduced on the device**: exactly one buffered `printk` line was
+replayed when the early console registered — `CPU revision is:` — landing after
+B03, as the desk channel measured. Not more. `TC-o` is answered in the measured
+direction and its mechanism is still not explained.
+
+### 🔴 Decision B's stated premise is false, and it is a safety statement
+
+`PROGRESS.md`'s Decision B argues for initramfs with *"An initramfs boot **never
+instantiates an MTD partition map**"*, and the danger it names is that a wrong
+map covers the two regions `CLAUDE.md` forbids. 量, `L3.log`:
+
+```
+[    6.660000] SPI flash(UNKNOWN) was found at CS0, size 0x400000
+[    6.670000] Creating 2 MTD partitions on "flash_bank_1":
+[    6.680000] 0x000000000000-0x000000130000 : "boot+cfg+linux"
+[    6.690000] 0x000000130000-0x000000400000 : "root fs"
+```
+
+**A partition map was instantiated, and its first partition spans
+`0x000000–0x130000`, which contains both forbidden regions** —
+`0x000000–0x005FFF` (the loader) and `0x006000–0x007FFF` (`H601`).
+
+**Nothing was written**: `AUTOBURN` read `00000000` before every upload, the
+payload issues no burn command, and no flash-write command appears in any of the
+35 sent lines. ⚠️ **The flash-byte count is UNMEASURED** — no `FLR` bracket ran. The
+map existing is not a write. But the reason Decision B was chosen is now known
+to be false, and it has to stand on its other three legs — which it does, and
+they were always the stronger ones (the drop's `FLASH_OFFSET` is not this unit's
+layout; initramfs is the vendor's own supported path; userspace stays a
+controlled variable). **The margin this project believed it had on the first RAM
+boot was not there**, which matters more than the conclusion it does not change.
+
+### Two smaller things the boot log settled
+
+* **Six netdevs, and §B5-c9 named them exactly**: `eth0`…`eth4` and `eth7`.
+  🔴 **The mechanism for the `eth5`/`eth7` disagreement is one line**:
+  `rtl_nic.c:6479` prints the **array index `i`**, not `dev->name`, and index 5
+  is the only entry the driver renames — `memcpy(dev->name, vlanconfig[i].ifname, 5)`
+  guarded on `RTL_DRV_LAN_P7_NETIF_NAME`, which `rtl865x_netif.h:370` defines as
+  `"eth7"`. **That matters more than a footnote**: it proves index ≠ name is not
+  guaranteed, so the mask→netdev binding is 量 for the *masks* and 讀 for the
+  *binding* — the boot log's `ethN` does not name a netdev at all. The binding is
+  closed by the MAC tie in `L6a.log` and by `vlanconfig[]`, not by the boot line.
+* 🔴 **I first wrote that the recorded port masks were wrong. They were not,
+  and the sentence was false in both halves.** 量,
+  `upstream/dumps/uart-boot.log`: the vendor firmware on this unit reports
+  `eth0=0x10`, `eth1=0x1` (vid 8, WAN), `eth2=0x8`, `eth3=0x4`, `eth4=0x2`.
+  The old record matched it exactly and excluded the WAN correctly; the mask
+  I accused it of omitting, `0x1`, **is** the WAN's.
+  🔴 **The two builds enumerate the switch MIRRORED, and that is the finding.** 量, side by side — `upstream/dumps/uart-boot.log`'s vendor boot against `bench/2026-08-30b/L3.log`: vendor `eth0=0x10 eth1=0x1(vid 8) eth2=0x8 eth3=0x4 eth4=0x2`, mine `eth0=0x1 eth1=0x10(vid 8) eth2=0x2 eth3=0x4 eth4=0x8`. As bit indices that is **`mine = 4 − vendor`** for every one of the five — a 5-bit reversal, with `eth3` at bit 2 as the fixed midpoint. **A member-port bit indexes a physical switch port, which the hardware fixes**, so the netdev↔jack binding differs between the two builds and a driver written against `NET-04` would drive the wrong jacks under my kernel. `RTL_WANPORT_MASK` has both `0x10` and `0x01` variants under different `#ifdef`s (讀, `rtl865x_netif.h:400`, `:411`), which is where the difference enters.
+* `Initrd not found or empty - disabling initrd` appears and is **not** a
+  failure: that message is about the legacy initrd mechanism, while this image
+  carries its rootfs in `.init.ramfs`, which `populate_rootfs` unpacked — the
+  shell it produced is the proof.

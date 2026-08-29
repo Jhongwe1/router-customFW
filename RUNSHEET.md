@@ -1864,6 +1864,58 @@ makes it fire is a check this project does not accept**, and the honest position
 is that the 181-byte slice is a strong consistency reading with **no
 demonstrated failure mode** until a capture that differs exists.
 
+#### §B5-c13 — 🔴 twelve of this card's thirteen rows have no terminator, and `console-capture.py` has no default for one
+
+**Found 2026-08-29 at the desk, before power, by reading the tool's `argparse`
+rather than the card.** `L-A` is written out in full —
+`console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-08-30b/A-catch
+--esc 25 --esc-period 0.002` — and it carries **no `--seconds` and no
+`--idle`**. So do `L-0ab`, `L-0t`, `L-2a`, `L-2b`, `L-2c`, `L-5a`, `L-5b`,
+`L-6a`, `L-6b`, `L-7a` and both halves of `L-8`. **`L-3` is the only row on this
+card that carries one**, and it is the only row whose window anyone had to think
+about.
+
+量, `tools/console-capture.py:699-700`: `--seconds` and `--idle` both default to
+`0.0`. The capture's final loop (`:543-551`) breaks on **neither**, so the
+command does not return. 量: `timeout -s TERM 8` on a board-off port gives
+`rc=124` — it had to be killed.
+
+**What a kill costs is `.meta.json`**, written only at the end (`:578-583`); the
+`.log` and `.timing` survive, flushed per chunk (`:380-382`). So the boot bytes
+are not lost. **The path that could cost a reading is the recovery**: the tool
+refuses to overwrite an existing `.log` (`:296-297`), and the way past that
+refusal is `--force` — which on `L-A` would replace a cold-boot capture with a
+warm one.
+
+量 over all eight committed `A-catch` captures: **every one passed `--seconds`**
+(`esc 25 → 40`, `esc 45 → 65`, `esc 180 → 200`). **This is a defect of the card,
+not of practice** — nobody has ever run these commands as written, and a first
+reader following the card literally is the person it would catch.
+
+**What was run on 2026-08-29**, and it is recorded here because a card whose
+typed lines differ from what was typed is worse than no card:
+
+| row | added | why that number |
+|---|---|---|
+| `L-A` | `--seconds 40` | `bench/2026-08-24`'s precedent for a 25 s ESC window |
+| `L-0ab`, `L-2b` | `--seconds 4` | 71-byte replies; block 0's equivalents |
+| `L-0t`, `L-2a`, `L-2c` | `--seconds 6` | 118-byte replies; block 0's equivalents |
+| `L-5a`, `L-5b`, `L-6a` | `--seconds 15` | shell output, length not predictable |
+| `L-6b` | `--seconds 10` | one command, no output expected |
+| `L-7a` and the `L-7b…e` sweep | `--seconds 20` | `ping -c 4` is ~3 s of pings plus the summary |
+
+⚠️ **The `DW` rows' numbers transfer from block 0 legitimately** — same loader,
+same command shape, same byte counts — and every one of them completed inside
+its window. The shell rows' numbers are mine, chosen at the bench, and they are
+marked as such rather than presented as derived.
+
+🔴 **The fix belongs in the instrument and was deliberately not made today.** A
+refusal when neither terminator is given is three lines, but it changes the one
+tool the entire seating runs through, and `test-console-capture.sh` would have
+to be re-run and probably amended. Changing an instrument between its desk
+validation and the bench is the shape `P7` exists to prevent. **Carried
+forward**, and `bench/2026-08-30/CORRECTIONS-block0.md` §1 owns the measurement.
+
 ---
 
 ### Running order, and it does not move
@@ -2773,3 +2825,172 @@ situation as `bench/2026-08-24e`'s `block12` and is recorded the same way.
   It did not read `Status` as the loader sees it at the prompt, and no loader
   command can. `IEc = 0` is therefore a property of the payload's context, not of
   the prompt.
+
+---
+
+## Results — Session B5, seating 5, 2026-08-29. `R1h-3` and `R3-8a`
+
+**Two power cycles, 26 captured cells, and no flash-write command issued.** 🔴 **That is deliberately not the sentence "zero flash bytes", and §B3's `G8b` row is why**: that wording *"needs a full re-dump hashed against `FLS-14`"*, and **this seating ran no `FLR` bracket at all** — so it holds *less* flash evidence than `R0` did, on the night this project's own MTD stack came up. The flash-byte count is **unmeasured**. What is measured: all 35 `--send` fields and the four JSON transcripts are `DW` reads, two `J`s, and userspace `cat`/`ifconfig`/`ping` — no `EW`, `EB`, `FLW` or burn; `AUTOBURN` read `00000000` before both uploads; the TFTP target was `LOADADDR 80500000`, which is RAM. `bench/2026-08-30/`
+is power cycle 1 (`probe3`) and `bench/2026-08-30b/` is power cycle 2 (`loudm`).
+Both prediction blocks pass their own gate: **13 of 13** and **12 of 12**, and
+`--sweep bench` reads **39 files, 181 cells, 161 ordered, 0 out of order**.
+
+🔴 **`R3`'s DoD is met on all five rows.** That is the headline and the rest of
+this section is what it cost and what it did not buy.
+
+| | claim | the reading |
+|:-:|---|---|
+| **D1** | delivered and entered | `---Jump to address=80500000` → `decompressing kernel:` |
+| **D2** | **my** kernel, not the staged vendor image | `start address: 0x80003600` (`FW-23` says the vendor's is `0x80003440`), `RLXFW-B00`, and `L-5b` = `Linux version 2.6.30.9 (key@K) (gcc version 3.4.6-1.3.6) #1 Fri Aug 28 23:37:47 CST 2026` |
+| **D3** | early bring-up completes | `RLXFW-B07=00000000` — the switch core answered and `bsp_machine_halt()`'s `while(1)` did not fire |
+| **D4** | a typed command returns output | `L-5a` and `L-5b` both returned |
+| **D5** | pings, both directions | `L-7e` 4/4, and the host capture holds the ARP request, the ARP reply, the echo request and the echo reply |
+
+**The anti-DoD is satisfied positively, not by absence.** `PROGRESS.md` has said
+since the gate opened that a banner is not evidence, because the loader
+re-stages `0x80500000` on a watchdog reset. Three independent discriminators
+fired: the entry address in the image's own header (`0x80003600`), a string that
+exists only in my tree (`RLXFW-B00`), and my build stamp with my user and host.
+
+### Power cycle 1 — `probe3`, and every stop-if held
+
+Card: `bench/2026-08-30/PREDICTIONS-B5-block0.md` §0, because §B5's own card
+says of this cycle *"it is not on this card"*. Corrections in
+`bench/2026-08-30/CORRECTIONS-block0.md`.
+
+`Q-0ab` and `Q-0ab2` both read `00000000` — the bracket over six preflight
+commands that the second read was added to produce. `Q-4` matched byte for
+byte, and it is the only upload check block 0 has: `0x8050000C` = `250871A0`
+gives `_bss_start` = `0x80500000 + 29,088`, and `_bss_end − _bss_start` = 752 =
+the `.bss` the build printed.
+
+**`Q-3` answers its reconnaissance question positively**: `DW 80A00000 2000`
+returned **23,527 bytes in 500 complete lines with a prompt and no `Unknown
+command !`** — the loader accepts a **4-digit decimal length**. That is bought
+for `R5-0` on a seating already paid for, at 2.4× the largest `DW` this device
+had ever executed (820 words / 9,661 bytes, `H2g`).
+
+`SPEC.md`: `CPU-25`, `CPU-44`, `CPU-46`, `LDR-40`, `LDR-41`, `REG-07`;
+`docs/rlx-cache-and-cp0.md` owns the ⓐⓑⓒⓓ readings.
+
+### Power cycle 2 — `loudm`, and the tail check is the best upload verification this project has built
+
+`L-0t` before the transfer read `806013F0: 35B75318 75B56574 91A15717 71114C57`;
+`L-2c` after it read **sixteen zero bytes** on that line with line 2
+**byte-identical**. One command, a positive control (the write reached
+`image_end`) and a negative control (it did not run past) — which is what
+§B5-c1 rebuilt this cell to be after the head was measured not to discriminate
+for `nfjrom` files.
+
+`L-2b` at `0x80540000` = `CEC3FFD9 C013013E CE652208 749F1E48`: it is `loudm`
+and not `quietm`, which is the only cell that can tell the marked pair apart.
+
+**All eleven boot marks arrived, in order, plus M4**, and the byte model
+predicted them: a plain mark is 11 bytes, a valued mark 20.
+
+```
+RLXFW-B00 … RLXFW-B03
+[    0.000000] CPU revision is: 0000cd01
+RLXFW-B04 … RLXFW-B10
+rlxfw: init running, RLXFW-R3-RUNG1-OK
+/bin/sh: can't access tty; job control turned off
+#
+```
+
+🔴 **`PRId` is read three times in one seating, through three paths.**
+`RLXFW-B02=0000CD01` (upper case, `rlxfw_puts_hex`), `CPU revision is: 0000cd01`
+(lower case, `cpu-probe.c:39`'s `printk`), and `L-5a`'s `cpu model : 52481` —
+which is `0xCD01` in decimal. Three formatters, one register, and the case and
+radix differences are free proof they are three paths rather than one value
+copied.
+
+⚠️ **`TC-o` is answered in the measured direction**: exactly one buffered
+`printk` line was replayed when the early console registered — `CPU revision
+is:` — and it lands after B03, as the desk channel measured. Not more.
+
+**`TC-36` fires on the device.** `L-5a` returns six fields and **no `hardware
+watchpoint`** — the seventh field this unit's shipped kernel prints and no build
+from these drops can.
+
+### 🔴 D5 took five interfaces, and trying two would have refuted it
+
+`L-7a` on `eth0`: 4 transmitted, 0 received, and the host capture holds nothing
+— evidenced, because `L7a-host.err` keeps tcpdump's own
+`0 packets captured / 0 packets received by filter`. Then `eth1`, `eth2`,
+`eth3`: 0 received on the board side. ⚠️ **Their host-side files are one byte
+each and their stderr was discarded, so those three are evidenced by the board
+alone** — `bench/README.md` owns that limitation. `eth4`:
+
+```
+64 bytes from 10.1.1.2: seq=0 ttl=64 time=10.000 ms   (×4, 0% packet loss)
+00:12:34:56:78:94 > ff:ff:ff:ff:ff:ff  ARP Request who-has 10.1.1.2 tell 10.1.1.10
+fc:19:28:61:84:c9 > 00:12:34:56:78:94  ARP Reply 10.1.1.2 is-at fc:19:28:61:84:c9
+10.1.1.10 > 10.1.1.2: ICMP echo request, id 30, seq 0
+10.1.1.2 > 10.1.1.10: ICMP echo reply
+```
+
+**§B5-c9's correction is what saved this row.** The card as first written tried
+two interfaces; four of the five are LAN, so a cable in the wrong LAN jack would
+have produced *"D5 refuted"* from a working driver. The carried-forward item
+*"the socket"* is answered: **the cable is on `eth4`**, `vid=9`, Member port
+`0x8` — and the host's own capture names it, because the source MAC's last octet
+(`94`) identifies the netdev without the board being asked.
+
+**`L-6a` confirms §B5-c9 exactly: six ethN — `eth0`…`eth4` and `eth7`**, MACs
+`…:90`…`…:94` and `…:97`.
+
+🔴 **And the port map recorded in `PROGRESS.md`'s carried-forward row is wrong.**
+量, the boot log's own registration lines: `eth0` port `0x1`, `eth2` `0x2`,
+`eth3` `0x4`, `eth4` `0x8`, and **`0x10` is `eth1`** (`vid=8`, the WAN). The row
+recorded the four LAN ports as `0x10/0x8/0x4/0x2` — it included the WAN's mask
+and omitted `0x1`. `NET-13`.
+
+⚠️ **The driver's registration message and the netdev name disagree**: the boot
+log says `eth5 added. vid=9 Member port 0x0` where `ifconfig -a` shows `eth7`.
+The `ifconfig` name is the one the cells use. Not chased further.
+
+### 🔴 Decision B's stated premise is refuted, and it is a safety statement
+
+`PROGRESS.md`'s Decision B argues for initramfs over flash-root with: *"An
+initramfs boot **never instantiates an MTD partition map**. The flash-root route
+needs me to author one, and the two regions `CLAUDE.md` forbids … are inside the
+part a wrong map covers."*
+
+量, `bench/2026-08-30b/L3.log`:
+
+```
+[    6.660000] SPI flash(UNKNOWN) was found at CS0, size 0x400000
+[    6.670000] Creating 2 MTD partitions on "flash_bank_1":
+[    6.680000] 0x000000000000-0x000000130000 : "boot+cfg+linux"
+[    6.690000] 0x000000130000-0x000000400000 : "root fs"
+```
+
+**This boot did instantiate a partition map**, and its first partition spans
+`0x000000–0x130000`, which **contains both regions `CLAUDE.md` forbids** —
+`0x000000–0x005FFF` (the loader) and `0x006000–0x007FFF` (`H601`).
+
+**No flash-write command was issued.** The map existing is not a write, `AUTOBURN`
+read `00000000` before every upload, and all 35 sent lines are reads, jumps or
+userspace commands. 🔴 **But the flash-byte count is UNMEASURED** — no `FLR`
+bracket ran — and *"nothing was written"* would be an unmeasured claim propping
+up the very paragraph that just admitted a safety argument was false. That is the
+worst place in this file for one. But
+the *reason* Decision B was chosen is now known to be false, and the decision has
+to stand on its other three legs — which it does, and they are the stronger ones
+(the drop's `FLASH_OFFSET` is not this unit's layout; initramfs is the vendor's
+own supported path; userspace stays a controlled variable). **The safety margin
+this project thought it had on the first RAM boot was not there**, and that is
+worth more than the conclusion it does not change.
+
+### What this seating did not answer
+
+* **ⓑ / `CPU-45`.** `c-A` came back negative, Group V voided by the payload's own
+  interlock. The stop-loss allows two seatings; this was one.
+* **The D-cache geometry.** `dcache: 8kB/16B` is a `bspcpu.h` constant with no
+  measurement behind it, and none was taken.
+* **`w-imem`.** `m-imem` returned a base (`20000000`) and **no top**, so block 0's
+  condition for reading `w.imem.differs=00000000` as anything is not met.
+* **Whether `cache 0x10` invalidates.** It retires. `x.c10.twin=00000001` says the
+  untreated victim moved too.
+* **`quietm`.** Power cycle 3 was not spent; `L-3` reaching D4 selects it, and its
+  block is deliberately unwritten.
