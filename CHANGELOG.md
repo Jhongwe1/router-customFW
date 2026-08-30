@@ -39,6 +39,75 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-08-31 — desk, no power: the instrument that drove the flash bracket
+had only ever been shown to refuse a CORRECT echo.**
+
+The `FLR` command's first typed argument is the RAM destination and the loader
+echoes `from <source> to <destination>` — the other order — so a card that swaps
+them reads plausibly both ways. `RUNSHEET` §B3 makes *read the echo before typing
+`Y`* a rule, and seating 7 turned it into a shell script. 量: that script
+compared the flash source as typed, six hex digits, against the loader's echo,
+zero-padded to eight; it rejected a correct echo, sent `N`, and got `Abort!`.
+The failure was safe. **Nothing had ever shown it would refuse a WRONG echo,
+which is the only reason it exists.**
+
+`tools/flrbracket.py` is that rule as an instrument: a pure
+`classify(reply, src, dst, nbytes, sent)` returning `PROCEED` / `ABORT` /
+`REFUSE` — three outcomes and not two, because *the loader did not ask* must
+send nothing and *the loader asked about something else* must send `N`. Its
+corpus is hardware: the nine `FLR` echoes, eight replies to `Y` and one to `N`
+that seating 7 recorded.
+
+Three things it does that the script did not, each measured off that corpus
+rather than reasoned: it compares the **length** field, which is the third typed
+argument and went unchecked; it parses all three fields as **exactly eight hex
+digits** and compares integers, which kills zero-padding, hex case and the
+extra-digit boundary in one move; and it requires the echo to occur **exactly
+once** after the operator's own typed line is stripped, because the first line of
+a capture is the operator's bytes coming back and a classifier that searches it
+reads its own input as the loader's confirmation — the defect class of
+`d008372`, one tool over.
+
+🔴 **The containment rule that a card template kept getting wrong is now
+enforced by the tool, and the line is drawn at content rather than at mention.**
+An `FLR` echo holds addresses and no flash bytes; the pre-read and the read-back
+hold 256 each, and on 2026-08-31 the pre-read held this unit's MAC while the
+card's own hypothesis said it would hold garbage. `run` refuses, before it opens
+the port, to write either inside this repository for an `H601`-overlapping
+window. Without `--go` it is a dry run that prints every `console-capture.py`
+command it would issue, so the bracket can be rehearsed at the desk for no power
+cycle — and 量, that rehearsal reproduces seating 7's own commands verbatim.
+
+**50 controls, then 41 mutants.** `B0` is the first
+case and is not a mutant — the unmutated tool must be green through the same
+temp root or the run refuses to report kills — and every row names the case it
+must turn red, counting as a kill only if that case failed. Both controls exist
+because a pass over `flashwin` reported 8 of 8 killed with every kill invalid.
+Of the three survivors, one was a real gap (`classify_abort` tests two strings
+and only one had a case), one was **a control of the tool's own that could not
+fail** (it searched stderr for `pre-read`, which the refusal's own explanatory
+paragraph contains), and one was a defect in the mutant itself, reported as
+`WRONG-CASE` rather than counted. 🔴 **Then an adversarial pass ran against it and found THIRTEEN live mutants and four controls that could not fail**, which is why the final numbers are 50 and 41 rather than 30 and 24. Two were safety defects in the tool: **the containment guard reasoned about `--src` while the pre-read's content is decided by `--dst`** -- so a non-forbidden window read into a RAM address an earlier cycle used for `H601` had a pre-read full of this unit's MAC and the guard never looked, which is the 2026-08-31 incident with the roles swapped -- and **`--bytes 0` walked straight past the containment test**, because `overlaps_forbidden` is half-open and `end > lo` is false for a zero-length window on the `H601` base. Both reproduced on the tool with `rc=0`. Four more were the four WIRE CONSTANTS: every negative fixture built its string out of the constant it was testing, so `CONFIRM = "(Y)es"`, `PROMPT = "<Real"`, `SUCCESS = "Successed"` and `ABORTED_MSG = "Abort"` all survived -- the `d008372` defect class inside the file written to prevent it. And **`P2` was a strict duplicate of `P1`'s first row**, unable to fail unless `P1` also did, while its comment claimed to test something `classify` cannot express.
+
+🔴 **And `FW-34`'s open half is settled at the desk — the candidate `SPEC.md`
+§17 named is the one that is wrong.** §17 said the byte-versus-word question was
+worth a factor of 4 and was settleable from two disassemblies. It was, and it is
+worth a factor of **1**: stage 1's copy loop at `0xBFC001BC` reads a 32-bit word
+at a time, and so does the kernel's `memcpy`, eight of them per 32 bytes. What
+replaces it was not on the list. **≤9×**: stage 1's loop executes at
+`0xBFC001D0` — KSEG1, uncached by architecture — so its eight instruction
+fetches per iteration are themselves reads of the SPI device it is copying from,
+9 uncached word reads per 4 bytes against the kernel's 1. **4×**: stage 1 writes
+`SFCR` zero times in 4,848 bytes while stage 2 writes it twice, so stage 1 runs
+at the reset default `SPI_CLK_DIV = 111B` (DIV 16) and everything after runs at
+the `001B` (DIV 4) that `REG-13` measured. 🟢 The same disassembly re-derives
+**20,924** from two immediates, which is the first time this repository can show
+where that number comes from rather than quote it. The product over-predicts the
+measurement by 2.1–2.3×, and that gap is a term the model does not have: the
+measured figure is `busybox wc`'s end-to-end rate and the model is of the bus
+alone. One unknown is left — whether the window prefetches a sequential fetch
+stream — and it has a cell that costs no power cycle.
+
 🔴 **2026-08-31 — seating 7, two power cycles: the flash bracket got its
 first negative control, and the card was refuted three times by being run.**
 

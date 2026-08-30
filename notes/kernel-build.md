@@ -3321,7 +3321,7 @@ finishes, so the gap **is** the read:
 **~16×**. The terminators (45 s / 100 s, set at ~2× the estimate) were therefore
 over-provisioned by an order of magnitude. Harmless, and now a 量.
 
-⚠️ **Why the two differ is undetermined** and `SPEC.md` §17 owns it. Both are
+⚠️ 🔄 **Why the two differ was undetermined when this section was written, and §19.7 answers it the same day** — the first candidate below is **refuted** (both paths read a 32-bit word at a time), and what replaces it is instruction-fetch amplification and the SPI clock divider. The paragraph is left as written because it is the record of what was known at the moment §19.4 was written; read §19.7 for the answer. *(As written:)* Both are
 uncached: `map->virt` is `0xbd000000`, KSEG1 (讀 `:107-109`), and stage 1 is the
 loader's own uncached copy. Candidates: byte-at-a-time versus `memcpy_fromio`'s
 word-at-a-time (a factor of 4, not 16); different bus or clock state at the two
@@ -3375,3 +3375,276 @@ pre-reads came back byte-identical to the flash expectations before any `FLR`
 ran, while addresses nobody had written were still garbage. It voided cycle 6's
 bracket, it cost `X-ab` its claim to prove a cold boot, and it was caught by the
 pre-read control on the first occasion that control existed.
+
+### 19.7 🔴 `FW-34`'s open half, settled at the desk — and the candidate `SPEC.md` §17 named is the one that is wrong
+
+§19.4 left *why the kernel's path is ~16× the loader's stage 1* undetermined,
+with three candidates. §17 said the first was **settleable at the desk from the
+two disassemblies and needs no power cycle**. It was. **It is also refuted**,
+and the two terms that replace it were not on the list.
+
+**Materials**: `mips-linux-gnu-objdump` (Ubuntu binutils 2.42 — *not* a vendor
+binary, so no `vendor-tripwire.sh` wrapper is owed), `quietmc.vmlinux.elf` (the
+image that booted on 2026-08-31), and flash `0x000000`–`0x0012F0` cut out of
+`$FWRE_WORK/dumps/flash-n150rt-console-2.bin` and disassembled at VMA
+`0xBFC00000`. Working files under `$FWRE_WORK/rebuild/bench-only/fw34-desk/`.
+
+#### 19.7.1 讀 — the access width is the SAME on both sides. The candidate is dead.
+
+**Stage 1's copy loop**, at `0xBFC001BC`:
+
+```
+bfc001bc:  lui   k0,0xbfc0
+bfc001c0:  addiu k0,k0,1264      ; src = 0xBFC004F0
+bfc001c4:  lui   k1,0xbfc0
+bfc001c8:  addiu k1,k1,22188     ; end = 0xBFC056AC
+bfc001cc:  lui   t1,0x8010       ; dst = 0x80100000
+bfc001d0:  lw    t0,0(k0)        ; <-- one 32-bit load
+bfc001d4:  nop                   ;     Lexra load delay slot, filled by hand
+bfc001d8:  sw    t0,0(t1)
+bfc001dc:  nop
+bfc001e0:  addiu t1,t1,4
+bfc001e4:  addiu k0,k0,4
+bfc001e8:  bne   k1,k0,0xbfc001d0
+bfc001ec:  nop                   ;     branch delay slot
+bfc001f0:  lui   k0,0x8010
+bfc001f4:  jr    k0              ;     into stage 2
+```
+
+🟢 **`22188 - 1264 = 20,924`.** The number `CLK-15` and `docs/FINDINGS.md` have
+carried is re-derived here from two immediates in the instruction stream, which
+is the first time this repository can show where it comes from rather than
+quote it.
+
+**The kernel side.** `inline_map_copy_from` (讀 `include/linux/mtd/map.h:410`)
+takes the `else` branch because `spi_map[]` sets no `cached` field (讀
+`drivers/mtd/maps/rtl819x_flash.c:107-119`), so it is `memcpy_fromio`, which on
+this arch is plain `memcpy` (讀 `arch/rlx/include/asm/io.h:468`). 量 in
+`quietmc.vmlinux.elf`: `memcpy` = `0x80002720`, and its aligned fast path at
+`0x80002750` is **eight `lw` and eight `sw` per 32 bytes**, unrolled.
+
+| | stage 1 | kernel `memcpy` |
+|---|---|---|
+| load width | `lw` — 32 bit | `lw` — 32 bit |
+| loads per iteration | 1 | 8 |
+| bytes per iteration | 4 | 32 |
+
+> **Both paths read the flash a 32-bit word at a time. The byte-versus-word
+> candidate — the only one §17 said the desk could settle, and the one worth a
+> factor of 4 — is refuted, and it is worth a factor of 1.**
+
+#### 19.7.2 讀 — where the loop *executes* is worth 9×, and it was not a candidate
+
+Stage 1's loop runs at `0xBFC001D0`. **That is KSEG1, which is uncached by
+architecture** — the same fact `FW-34` already uses about `map->virt =
+0xbd000000`. So every instruction fetch of that loop is itself an uncached read
+of the SPI device the loop is reading:
+
+* **stage 1**: 8 instruction words + 1 data word = **9 SPI word reads per 4
+  bytes copied**
+* **kernel**: the loop body is ~21 instructions in KSEG0 kernel text and the
+  I-cache is 16 KiB with 16-byte lines (`CPU-25`, 量 by experiment 2026-08-29),
+  so after the first of 38,912 iterations every fetch is a hit — **1 SPI word
+  read per 4 bytes copied**
+
+**9×**, and it is a property of *where the code lives*, not of the copy.
+
+⚠️ **The ceiling, not the value.** This assumes the memory-mapped window serves
+each fetch as its own transaction. If it prefetches a sequential instruction
+stream the amplification is smaller, and nothing here measures that. §19.7.4's
+cell is what would.
+
+#### 19.7.3 D + 量 + 讀 — the SPI clock divider is worth 4×, and stage 1 runs at the reset default
+
+讀, over all 4,848 bytes of stage 1: **`0xB8001200` (`SFCR`) is written zero
+times.** 讀, `$FWRE_WORK/stage2-vma.dis`: stage 2 writes it **twice**, at
+`0x804055F8` and `0x80405900`. So stage 1 copies at whatever the SPI controller
+holds out of reset, and everything after stage 2 runs at what stage 2 set.
+
+| source | says |
+|---|---|
+| **D** — `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` §7.4.5 table 8 | `SFCR[31:29] = SPI_CLK_DIV`, `SPI Clock = DRAM Clock / SPI_CLK_DIV`, `111B` → DIV 16, `001B` → DIV 4, **Default `111B`** |
+| **A** — `drivers/mtd/chips/rtl819x/spi_common.h:87` | `SFCR_SPI_CLK_DIV(val) ((val) << 29)` — the same field at the same place |
+| **量** — `REG-13`, 2026-08-25b, `DW B8001200 4` at the loader prompt | `SFCR = 0x3FC00000` → bits 31:29 = `001` → **DIV 4**, cold and warm alike |
+
+**Reset DIV 16 → running DIV 4 = a 4× faster SPI bit clock**, and stage 1 is on
+the wrong side of it.
+
+⚠️ **Two weaknesses travel with this and must not be dropped when it is
+quoted.** ① The **reset default has exactly one kind of source**: the
+datasheets. `RTL8196C-GR_Datasheet_0.7.pdf` carries the same table with the same
+`111B`, but that is one vendor's document family and not an independent
+measurement — the same "one source, three copies" shape as the `RLX4181` `PRId`
+table. **Nothing in this project has ever read `SFCR` before stage 2 runs**, and
+there is no console at that point to read it with. ② The driver's own
+`SFCR_SPI_CLK_DIV((ui-2)/2)` maps `ui = 16` to `7 = 111B`, which **agrees** with
+the table — but that is a consistency check on the *encoding*, not evidence
+about the *default*, and it is the same class of double-counting the `CPU-04`
+row had to strike out.
+
+#### 19.7.4 The arithmetic, what it over-predicts, and the free cell that decides it
+
+| term | factor | strength |
+|---|---:|---|
+| access width | **1×** | 讀 ×2 — **refuted** |
+| SPI clock divider (DIV 16 → DIV 4) | **4×** | D + A + 量, with §19.7.3's two caveats |
+| instruction-fetch amplification (KSEG1 loop → I-cache-resident loop) | **≤9×** | 讀 ×2, ceiling |
+| **product** | **≤36×** | |
+| **measured (§19.4)** | **~16×** | 量, n=4 |
+
+🔴 **§19.7.5 ① corrects the outcome table below: the cell reads out the PRODUCT of the two factors and cannot separate them, and ⑤ says the 2.1–2.3× is a lower bound. Read that section before quoting this one.**
+
+**The model over-predicts by 2.1–2.3×**, and per-read that reads:
+
+* stage 1: `20,924 / 4 = 5,231` iterations × 9 = **47,079 SPI word reads** in
+  351.9 ms (`CLK-15` cold mean) → **7.47 µs per SPI word read at DIV 16**
+* at DIV 4, if the transfer is clock-bound → **1.87 µs**
+* so the kernel's SPI reads alone predict **4 B / 1.87 µs ≈ 2,140 KB/s**
+* §19.4 measured **918.6–1,012.4 KB/s**
+
+🔴 **That gap is not a defect in the model; it is a term the model does not
+have.** §19.4's figure is the wire-silent gap of `busybox wc -lc < /dev/mtd0ro`
+— an **end-to-end userspace rate** covering `mtd_read`'s chunking, `part_read`,
+`copy_to_user`, busybox's `read()` loop and its newline scan over 4,194,304
+bytes. The model is of the SPI bus alone. A factor of ~2 of software on top of
+the bus is ordinary; what would be alarming is if there were none.
+
+> **The prediction, and it costs no power cycle.** Stage 2's own `FLR` executes
+> **from DRAM** (no amplification) at **DIV 4** (no divider penalty) with **no
+> Linux software path**. So it should run at the bus rate:
+>
+> **`FLR 80C00000 100000 100000`** — 1 MiB of the rootfs region into RAM at
+> `0x80C00000` — timed from the wire-silent gap in its `.timing`.
+>
+> | outcome | what it says |
+> |---|---|
+> | **≈ 0.49 s (≈2,140 KB/s)** | the model holds; the 2.1–2.3× is Linux's software path |
+> | **≈ 1.0 s (≈1,000 KB/s)** | the amplification term is wrong — the window prefetches, and the kernel already runs at the bus rate |
+> | **≥ 2 s** | the divider term is wrong, and the reset default is not what the datasheet says |
+>
+> ⚠️ It must not run before a `put` in the same power cycle (`FLR` writes the
+> TFTP length global) and `0x80C00000`–`0x80D00000` is chosen to miss the
+> bracket's own `0x80A00xxx` destinations. Flash `0x100000`–`0x200000` contains
+> **no `H601`**, so nothing about this cell is a forbidden window.
+
+**What `SPEC.md` §17 keeps.** The open question narrows from *why is it 16×* to
+**one** unknown with a written experiment: whether the memory-mapped window
+prefetches a sequential fetch stream, which is the difference between the 9×
+ceiling and whatever the cell above returns.
+
+#### 19.7.5 🔴 What an adversarial pass found in §19.7.1-§19.7.4, the same day
+
+§19.7.1-§19.7.4 stay as written. Six of the findings below change what those
+sections are entitled to claim and one of them makes a table in §19.7.4 wrong;
+two are new desk measurements that close gaps the pass named.
+
+**① The cell in §19.7.4 measures a PRODUCT, and its three-row table decomposes
+it into two factors with no basis. 🔴 That table is wrong.**
+
+Write the model out. With `t(DIV16)` the per-SPI-word time during stage 1,
+`A` the amplification and `D` the divider ratio, the proposed `FLR` runs from
+DRAM (its own amplification is 1 by construction) at DIV 4, so its rate is
+`59,460 x D x A` B/s. **The cell reads out `D x A` and nothing else.** Row 1 is
+`D x A = 36`, row 2 is `17`, row 3 is `<= 8`. `D = 4, A = 2.1` -- which is
+§19.7.2's own written caveat, a window that prefetches most of a sequential
+fetch stream -- lands in row 3 and the table would read it as *"the divider term
+is wrong"*. **The three outcomes are one number read three ways.**
+
+What the cell is actually entitled to say:
+
+| outcome | what it establishes |
+|---|---|
+| `~0.49 s` (`D x A ~ 36`) | both terms are at full strength; the 2.1-2.3x over-prediction is Linux's software path and nothing else |
+| `~1.0 s` (`D x A ~ 17`) | the product is about half the model. **Which factor moved is NOT determined** -- prefetch halving `A`, or a reset default of DIV 8 rather than 16, fit equally |
+| anything else | the framework is wrong, not one term of it (see ② ) |
+
+**② Row 3's band was unreachable under the note's own model.** `>= 2 s` for
+1 MiB is `<= 524 KB/s`, and §19.4 measured **918.6-1012.4 KB/s** on the same
+bus *through* `mtd_read`'s chunking, `part_read`, `copy_to_user` and a newline
+scan over 4,194,304 bytes. A bare `FLR` from DRAM at DIV 4 cannot be slower than
+the same bus reached through all of that -- unless stage 2's `FLR` handler is
+not a word copy through the memory-mapped window at all. So a `>= 2 s` reading
+is evidence about **the handler**, and it refutes the framework rather than the
+divider.
+
+**③ Which makes one thing a precondition rather than an assumption, and it is
+free.** §19.7.4 asserts *"it should run at the bus rate"* about a routine
+nobody has disassembled. `$FWRE_WORK/stage2-vma.dis` is on disk. **Read the
+`FLR` handler before spending the cell**: whether it is a `lw`/`sw` loop through
+`0xBD000000` or programmed I/O through `SFDR` decides whether the cell measures
+the bus at all.
+
+**④ The `<= 9x` ceiling has the sign backwards on the kernel side.**
+§19.7.2 treats prefetch as shrinking stage 1's amplification only. But the
+kernel's `memcpy` fast path is **eight sequential `lw` over 32 bytes**; a window
+that buffers a line serves seven of those eight from the buffer, so the kernel's
+per-4-byte cost falls too. Stage 1's stream cannot benefit the same way -- its
+eight fetches sit at one fixed 32-byte block while its data pointer advances,
+and the two addresses evict each other every iteration unless the window holds
+two buffers. **Under the prefetch hypothesis both terms move**, and the `1` on
+the kernel side is not a floor.
+
+**⑤ "Over-predicts by 2.1-2.3x" is a LOWER BOUND presented as a value.**
+351.9 ms is `CLK-15`, which owns *the silence after `Booting...`* and not *the
+copy loop*. §19.4's own third candidate is *"`CLK-15`'s 350 ms containing more
+than the copy"*, and §19.7.4 consumed the whole of it as 47,079 SPI reads
+without repeating that. The residue is small -- `CLK-15` prices the DRAM
+read-window training and the BSS clear at a few ms each and eliminates
+decompression by measurement -- but it is **one-directional**: anything in the
+351.9 ms that is not SPI makes `t(DIV16)` smaller, the DIV-4 prediction faster,
+and the over-prediction larger. §19.7.4 also quotes the mean and not the
+published `348.0-356.9 ms`.
+
+**⑥ `0x80C00000` is justified in the shape `MAP-16` records as refuted.**
+`MAP-16`: *"the original argument only excluded two known things ... it did not
+exclude anything the loader allocates at runtime. Part one wrote onto a live
+structure and nothing broke -- that was luck, not design."* §19.7.4's
+justification is *"chosen to miss the bracket's own `0x80A00xxx` destinations"*
+-- one known thing, and one that was never binding. `0x80C00000`-`0x80D00000`
+has no `MAP-` row, and `MAP-17`'s measured-safe band is `0x80A00000`-
+`0x80AF1002`, which this lies entirely outside; the write is **1 MiB, 4,096x the
+256-byte windows** the project's address-selection evidence covers.
+
+> **So the cell gains a `G0`-shaped precondition, written before it runs**:
+> `DW 80C00000 16`, `DW 80C80000 16`, `DW 80CFFFF0 16` **before** the `FLR`.
+> **Refutation condition: any pointer-shaped word (`0x8xxxxxxx`, `0xBxxxxxxx`)
+> in any of the three, and the destination is re-chosen rather than argued
+> about.** That is verbatim what `MEM-13` did for `MAP-17`.
+
+**⑦ Two things the pass established that make the cell better, not worse.**
+The eight recorded replies to `Y` are each a 256-byte `FLR` executed by stage 2
+from DRAM at DIV 4. From their `.timing` files -- offsets and timestamps only --
+31-34 bytes over a 0.009-0.010 s span with a maximum read-to-read gap of
+**1.0-1.8 ms**, while 32 bytes at 38400 8N1 is 8.3 ms of pure line time: the
+transfer plus the loader's per-`FLR` fixed cost is buried inside the serial
+timing. **That bounds the fixed overhead at `<= ~1.1 ms`, 0.22 % of the
+predicted 0.49 s** -- so the bands are not confounded by it, and it is also why
+the cell must be 1 MiB: 256 bytes at any of the three candidate rates is
+0.12-0.54 ms, under the instrument floor.
+
+**⑧ The timeline in §19.7.3 had a gap, and closing it is one more
+disassembly.** §19.7.1's loop copies 20,924 bytes to `0x80100000` and jumps
+there; §19.7.3 reads the two `SFCR` writes out of `stage2-vma.dis`, built at VMA
+`0x80400000`, at offsets `0x55F8` and `0x5900` -- **both beyond the 20,924 bytes
+stage 1 copies**. So a stage sits between them and the divider was unknown
+across it.
+
+🟢 **量, the same desk session**: flash `0x0004F0`-`0x0056AC` disassembled at
+`0x80100000` (it starts `j 0x80100050`, sets a stack at `0x801051B8+0x1000` and
+calls `0x801000A0`) writes `0xB8001200` **zero times**, and it is the stage that
+loads stage 2 (`lui s3,0x8040` at `0x801001C0`). **So the reset default holds
+across the whole path from reset to stage 2's first write**, which is what
+§19.7.3 needed and did not have.
+
+**⑨ The region and the falsifier for the zero-writes claim.**
+§19.7.3 says *"over all 4,848 bytes of stage 1"*. The copy source starts at
+`0xBFC004F0`, so stage 1's **code** ends before byte 1,264 and 3,584 of the
+4,848 are the payload it copies; scanning a superset is the conservative
+direction and the claim survives, but the region that matters is the ~`0x1F8`
+bytes before the `jr`. **What was scanned**: the disassembly text for
+`ori <r>,<r>,0x1200` and for the literal `0xb8001200`. **What would falsify it,
+and what was NOT scanned**: any store whose effective address resolves to
+`SFCR` without that literal appearing -- `lui 0xB800` plus `sw rt,0x1200(rs)`, a
+base loaded from a data word, an `ori`/`addiu` chain -- and the KSEG0 alias
+`0x98001200` of the same physical register. **Named here rather than claimed
+away.**

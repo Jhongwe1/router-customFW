@@ -284,6 +284,45 @@ jobs:
       - name: flashwin self-test
         run: /usr/bin/python3 tools/flashwin.py --self-test 2>&1 | tee ci-out/flashwin.out; exit "${PIPESTATUS[0]}"
 
+      # flrbracket reads the loader's `FLR` echo by machine before the operator
+      # types `Y`. `FLR`'s first typed argument is the RAM DESTINATION and the
+      # loader echoes `from <source> to <destination>` -- the other order -- so
+      # a card that swaps them reads plausibly both ways. RUNSHEET §B3 makes
+      # *read the echo first* a rule; this is the rule as an instrument.
+      #
+      # 🔴 It exists because the instrument it replaces was never shown to work
+      # in the direction that matters. 量 2026-08-31 (seating 7): the shell
+      # script that drove the bracket compared the flash source as TYPED (six
+      # hex digits) against the loader's echo (zero-padded to eight), rejected
+      # a CORRECT echo and sent `N`. Safe, and beside the point -- nothing had
+      # ever shown it would refuse a WRONG echo.
+      #
+      # The corpus is nine real FLR echoes plus the eight `Y` replies and the
+      # one `N` reply from that seating, so the P cases are hardware and only
+      # the N cases are synthetic. Seven of the 50 drive the containment guard as
+      # a subprocess: the two DW captures of an H601 window -- pre-read
+      # included -- may not be written inside this repository, which is the
+      # carried-forward row that a card template cannot close. Needs nothing
+      # but git.
+      - name: flrbracket self-test
+        run: /usr/bin/python3 tools/flrbracket.py --self-test 2>&1 | tee ci-out/flrbracket.out; exit "${PIPESTATUS[0]}"
+
+      # 🔴 And the mutation suite for it, in the same commit, because the tool
+      # above is green on all 50 of its controls and this repository has
+      # measured five times over what that is worth (spec-check 15/3 live,
+      # console-capture 40/10, leakscan 17/8, flashwin 13/24).
+      #
+      # B0 is the FIRST case and it is not a mutant: the unmutated tool must be
+      # green through the same temp root or the run refuses to report kills.
+      # That is the fix for the flashwin pass which reported 8 of 8 killed with
+      # every kill invalid. Every row also names the case it must turn red and
+      # counts as a kill only if THAT case failed -- `rc != 0` alone is what
+      # made those kills invalid. 量, the mutation suite's first run:
+      # 19 of the 22 that existed then, three alive, and one of the
+      # three was a control of the tool's own that could not fail.
+      - name: test-flrbracket-mutants
+        run: /usr/bin/python3 tools/test-flrbracket-mutants.py --jobs 8 2>&1 | tee ci-out/test-flrbracket-mutants.out; exit "${PIPESTATUS[0]}"
+
       # binsim's controls need no vendor binary and no compiler: every fixture
       # is a synthetic ELF the tool builds itself. That is deliberate and it is
       # the opposite of hazlint, whose population control is 56 KiB of this

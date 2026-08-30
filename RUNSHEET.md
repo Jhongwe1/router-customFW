@@ -2125,6 +2125,26 @@ was ever wrong, so the gate has never been shown able to refuse. **It is a habit
 turned into a check and it is not yet an instrument**, and this row says so
 rather than letting the next card inherit it as one.
 
+> ✅ **2026-08-31, sixteenth session: it is an instrument now, and the next card
+> uses it instead of a `grep -Fq`.** `tools/flrbracket.py` — `classify(reply,
+> src, dst, nbytes, sent)` returning `PROCEED` / `ABORT` / `REFUSE`, 50 controls
+> over the nine real echoes seating 7 recorded, and 41 mutants behind those.
+> 🔴 **The negative control this paragraph says was missing is now twelve of the
+> 50 cases**, and one of them, `M2` in the mutation suite, is seating 7's own
+> defect put back in a line: comparing the six-digit source as typed against
+> the loader's eight-digit echo, which aborted a correct read.
+> **The card's row is now `flrbracket run --stem W --suffix 0 --dst … --src …
+> --bytes 100 --echo-dir … --dw-dir …`, and without `--go` it is a dry run that
+> prints every `console-capture.py` command it would issue** — so the whole
+> bracket can be rehearsed at the desk the day before, for no power cycle.
+> ⚠️ **`--dw-dir` is separate from `--echo-dir` because the tool refuses**: an
+> `FLR` echo holds addresses and no flash bytes, but the pre-read and the
+> read-back hold 256 each, and for a window overlapping `H601` the tool will
+> not let the read-back land inside this repository — and it will not let the
+> **pre-read** land there for ANY window, because a pre-read is a `DW` of the RAM
+> destination and `MEM-17` measured DRAM keeping the previous cycle's `FLR`
+> output across a power cycle.
+
 ---
 
 ### Running order, and it does not move

@@ -293,7 +293,7 @@ tools/test-console-capture-mutants.py
                            is not green, since every mutation would then "kill" on
                            a suite that was already red. It exists because "ten
                            survived" was a sentence in LOG.md that nothing re-ran
-tools/flashwin.py          19 cases (16 on a machine without this unit's dump,
+tools/flashwin.py          27 cases (24 on a machine without this unit's dump,
                            plus one skip covering 3), and it exists for a
                            region whose reading can
                            never be published. It renders the loader's `DW` reply
@@ -320,6 +320,29 @@ tools/check-predictions.py refuses to compare a prediction against a capture unl
                            unnoticed. `--sweep bench` reads the whole committed
                            record as a CI gate — no count here, for the reason the
                            paragraph below this list gives
+tools/flrbracket.py        50 controls, and its corpus is hardware: the nine `FLR`
+                           echoes, eight replies to `Y` and one to `N` that seating 7
+                           recorded. It answers one question -- should the operator
+                           type `Y` -- with three outcomes rather than two, because
+                           *the loader did not ask* must send nothing and *the loader
+                           asked about something else* must send `N`. It exists
+                           because the script that drove seating 7's bracket had been
+                           shown to refuse a CORRECT echo and never to refuse a wrong
+                           one. Seven of the 50 drive the containment guard as a
+                           subprocess: the read-back of an `H601` window may not be
+                           written inside this repository, and the PRE-READ may not be
+                           written there for ANY window -- its content is decided by
+                           --dst's history, and MEM-17 measured DRAM keeping a
+                           previous cycle's FLR output across a power cycle, and `G3` is the control that says that is a
+                           guard rather than a blanket refusal
+tools/test-flrbracket-mutants.py
+                           41 mutants plus `B0`, and `B0` is first and is not a
+                           mutant: the unmutated tool must be green through the same
+                           temp root or the run refuses to report kills. Every row
+                           also NAMES the case it must turn red and is a kill only if
+                           that case failed. Both controls exist because a pass over
+                           `flashwin` reported 8 of 8 killed and every kill was
+                           invalid
 tools/test-gitignore.sh    six of its cases are positive controls, because a .gitignore
                            of a single `*` would pass every negative one
 tools/test-opcount.sh      two of its cases exist because a counter reading the wrong

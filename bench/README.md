@@ -904,6 +904,8 @@ behind.
 | **`2026-08-31`** | power cycle 5: `quietmc`, the `FLR` bracket **with a negative control for the first time**, and the MTD path. Prefixes `W-*` and `M-*` |
 | **`2026-08-31b`** | power cycle 6: the same image again — the `FW-32 殘留` null — plus a re-sited bracket and two safety cells. Prefixes `X-*` and `X2-*` |
 
+🆕 **2026-08-31, desk: eighteen of these captures are now a test corpus as well as a record.** `tools/flrbracket.py`'s controls read the nine `*-flr*.log` echoes, the eight `*-yes*.log` replies and `W-no.log` — `P1` requires all nine to classify `PROCEED` against their own three numbers, `Q2` re-derives those numbers from each capture's own `.meta.json` rather than trusting a table, and `P2` is a regression on the defect `CORRECTIONS-block3.md` §9 records: `W-flr0a` is the echo the previous instrument wrongly aborted, and it is committed for that reason. 🔴 **So these files are load-bearing for CI now**: deleting or rewriting one turns `flrbracket --self-test` red, which is the intended behaviour and not a fragility — a corpus that can go missing without anything noticing is the population control this repository keeps writing.
+
 **Five prediction files, and four of them were written at the bench.** That is
 not untidiness: three of the four exist because the card was refuted while it
 was being run, and a recovery cell without a prediction written first is not a
