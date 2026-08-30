@@ -135,6 +135,21 @@ copying them, and never prints what matched. Only its self-test is in CI: turnin
 the verdict into a gate needs an allowlist entry per surviving hit, and
 allowlisting a possible real leak to get a green build is the wrong order.
 
+🔴 **And CI went red on the suite this session added, on a class the machine
+the push happens from cannot see.** `ci-census` counts a printed `skip` only
+when its label appears in `tools/ci-expected.tsv`'s allowed-skip column; the
+column said `C1 the GPL drop` while the suite prints `C1 the declared flags
+reach the build`, so the case vanished with neither a FAIL nor a skip line and
+the build died on arithmetic that never named the label. On this machine
+`$FWRE_WORK` holds the GPL drop, so that case **runs**, prints no skip line,
+and its label is never compared — the suite was **9/9 green here while CI was
+red**. That is the **second consecutive day** CI has caught something the local
+pre-push procedure could not, and the third distinct blindness recorded in that
+procedure this week. The fix is a case rather than care: `C7` reads the table,
+which is the only check that works in both configurations, and the label is now
+one shell variable used three times. Verified in the configuration that failed —
+the step the first pass skipped.
+
 🔴 **2026-08-30 — desk, no power: forty green cases, and ten mutants of the
 guard they had just been written for were alive.**
 `tools/console-capture.py` — the one instrument every capture at the bench runs

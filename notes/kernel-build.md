@@ -3116,3 +3116,47 @@ entries (量: 31). Three owner files still described the pre-rebuild state and
 each got a forward pointer rather than a rewrite: `notes/rootfs-census.md`,
 `RUNSHEET.md` twice, and `docs/FINDINGS.md` — the last of which is a page a
 reader is pointed at.
+### 18.9 🔴 CI went red on the suite this session added, and the bench could not have caught it
+
+**量 2026-08-30, run 33310864156.** `lint`, `text` and `instruments` all passed.
+The **census** job failed:
+
+```
+RED   test-kbuild-cflags   ran 8/9  failed 0  not run 0
+      UNEXPECTED-SKIP 'C1 the declared flags reach the build'
+      CENSUS-MISMATCH 8+0+0 != 9 -- cases went missing with neither a FAIL nor a skip line
+→     NOT-RUN-TOTAL MISMATCH: the table declares 456 and this job did not run 455
+```
+
+**Mechanism.** 讀 `ci-census.py:201-205`: a printed `skip` line is counted only
+when its **label** — `SKIP_RE`'s first field — appears in the allowed-skip column
+of `tools/ci-expected.tsv`. The suite prints
+`C1 the declared flags reach the build`; the row I wrote said `C1 the GPL drop`.
+A label that does not match is not a skip, so the case simply vanishes, and the
+build fails on arithmetic that never names the label. The `not-run-total` failure
+underneath it is the same one case: 455 + 1 = 456.
+
+🔴 **The pre-push census on this machine is structurally blind to that class,
+and this is the second consecutive day CI has caught something the local
+procedure could not.** On the bench `$FWRE_WORK` holds the GPL drop, so `C1`
+**runs**; no skip line is printed; no label is ever compared. The suite was
+**9/9 green here** at the moment CI went red. *(Yesterday it was a hardcoded
+population count in `test-boot-timeline`'s `B2`; §18.8 records a third blindness
+in the same procedure — `--only` asserting a runner's `not-run-total`.)*
+
+**The fix is a case, not care.** `C7` reads `tools/ci-expected.tsv` and asserts
+its allowed-skip column equals the label this suite prints — the only check that
+works in **both** configurations, and it needs no vendor material. The label is
+now a shell variable used three times (the case, the skip, the assertion), so
+the two spellings cannot drift apart again. 9 → 10.
+
+**Verified in the configuration that failed**, which is the part the first pass
+skipped: the suite run with `$FWRE_WORK` pointed at an empty directory prints
+`9 passed, 0 failed, 1 skipped`, and `ci-census` over that output reports
+`ok test-kbuild-cflags ran 9/10 failed 0 not run 1`.
+
+⚠️ **What this does not fix**: every other suite with an allowed skip has the
+same exposure, and only this one now reads the table. A general check would
+compare every row's skip column against the labels its suite can print, and that
+needs a way to enumerate them without running the suite in every configuration.
+Carried forward.

@@ -9523,6 +9523,27 @@ flash `0x6000` 那 4 KiB 的 sha256 前綴。**今天新增的是掃描不是缺
 性質自己的控制。🔴 **只有 `--self-test` 進 CI**：要把它變成判決，需要對每一個
 存活命中做白名單決定，而為了讓建置變綠去白名單一個可能是真洩漏的東西，順序是反的。
 
+### 6a. 🔴 push 之後 CI 紅了，而本機看不到那一類
+
+量 2026-08-30，run 33310864156。`lint`／`text`／`instruments` 三個 job 全綠，**census 紅**：
+
+```
+RED   test-kbuild-cflags   ran 8/9  failed 0  not run 0
+      UNEXPECTED-SKIP 'C1 the declared flags reach the build'
+      CENSUS-MISMATCH 8+0+0 != 9
+→     NOT-RUN-TOTAL MISMATCH: 表宣告 456，這個 job 沒跑 455
+```
+
+讀 `ci-census.py:201-205`：一行 `skip` 只有在它的**標籤**出現在 `ci-expected.tsv` 的允許欄裡才算數。套件印 `C1 the declared flags reach the build`，我寫的欄位是 `C1 the GPL drop`。不符就不是 skip，那一格直接消失，然後建置死在一個**從頭到尾沒提到標籤**的算術上。底下那個 `not-run-total` 是同一格：455 + 1 = 456。
+
+🔴 **這台機器結構上看不到它。** `$FWRE_WORK` 有 GPL drop，所以 `C1` 會**跑**，不印 skip 行，標籤從來沒被比對過 —— CI 紅的那一刻本機是 **9/9 綠**。**連續第二天 CI 抓到本機程序抓不到的東西**（昨天是 `test-boot-timeline` `B2`），而 §18.8 記的 `--only` 那件是同一個程序的第三個盲點。
+
+修法是一個案例不是小心：`C7` 去讀 `ci-expected.tsv`，比對它的允許欄等不等於這個套件印的標籤 —— **兩種組態都有效**，而且不需要任何廠商材料。標籤現在是一個 shell 變數，用在案例、skip、斷言三個地方，兩種拼法不可能再分岔。9 → 10。
+
+**而且這次在失敗的那個組態下驗證過**（上一輪跳過的正是這一步）：`$FWRE_WORK` 指到空目錄跑，印 `9 passed, 0 failed, 1 skipped`；對那份輸出跑普查得到 `ok test-kbuild-cflags ran 9/10 failed 0 not run 1`。
+
+⚠️ 沒修好的：**每一個有允許 skip 的套件都有同樣的曝險**，而現在只有這一個會去讀表。已記成 carried-forward。
+
 ### 7. 今天沒有做的，以及為什麼
 
 * **`upstream/` 那一半不是我能修的。** 它是釘住的唯讀 submodule、是另一個 repo，

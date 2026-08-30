@@ -42,6 +42,20 @@ sk () { printf '  skip   %-52s %s\n' "$1" "$2"; skip=$((skip+1)); }
 # what the first version did and what it reported 2 for.
 CF_SHA0="$(sha256sum "$CF" | cut -d' ' -f1)"
 
+# 🔴 C1's label is written ONCE and used three times: to print the case, to
+# print the skip, and to assert against `tools/ci-expected.tsv`.  It is a
+# variable because the first version spelled it one way in the suite and
+# another way in the table, and CI went red on
+# `UNEXPECTED-SKIP 'C1 the declared flags reach the build'`.
+#
+# WHY THE BENCH COULD NOT SEE THAT.  `ci-census` matches a printed skip label
+# against the table's allowed-skip column; on this machine `$FWRE_WORK` holds
+# the GPL drop, so C1 RUNS and prints no skip line at all, so the label is never
+# compared.  A pre-push census here is structurally blind to a mismatch in a
+# skip that only happens on a runner.  `C7` closes that: it reads the table.
+C1_LABEL="C1 the declared flags reach the build"
+EXPECTED_TSV="$HERE/ci-expected.tsv"
+
 # A cell name no build will ever use, so a stray stage is obvious.
 run () {  # args... -> sets $rc and $out
     out="$(bash "$K" "$@" --target none 2>&1)"; rc=$?
@@ -89,11 +103,32 @@ echo
 echo "=== C1: the declared file is what a real build uses ==="
 if [ -d "$DROP/linux-2.6.30" ]; then
     run gcf-c1 --config "$DROP/boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW"
-    ck "C1 the declared flags reach the build"  1 \
+    ck "$C1_LABEL"  1 \
        "$(printf '%s\n' "$out" | grep -c 'CFLAGS_KERNEL=\[-fno-if-conversion\]')"
     rm -rf "$WORK/rebuild/r3-4/cells/gcf-c1"
 else
-    sk "C1 the declared flags reach the build" "no GPL drop under \$FWRE_WORK"
+    sk "$C1_LABEL" "no GPL drop under \$FWRE_WORK"
+fi
+
+echo
+echo "=== C7: the skip this suite prints is the skip the census expects ==="
+# 🔴 This case exists because CI went red on
+# `UNEXPECTED-SKIP 'C1 the declared flags reach the build'` while the same
+# suite was 9/9 green here. `ci-census` counts a skip only when its printed
+# label appears in the allowed-skip column of `tools/ci-expected.tsv`; a label
+# that does not match is counted as a case that vanished, and the build fails
+# on arithmetic that never mentions the label.
+#
+# On this machine C1 RUNS -- `$FWRE_WORK` holds the GPL drop -- so no skip line
+# is printed and no label is ever compared. The bench is structurally blind to
+# this class. Reading the table is the only check that works in both
+# configurations, and it needs no vendor material.
+if [ -f "$EXPECTED_TSV" ]; then
+    tsv_skip="$(awk -F'\t' '$1 == "test-kbuild-cflags" { print $3 }' "$EXPECTED_TSV")"
+    ck "C7 ci-expected.tsv's allowed skip is this suite's label" \
+       "$C1_LABEL" "$tsv_skip"
+else
+    sk "$C1_LABEL" "no ci-expected.tsv beside this suite"
 fi
 
 echo
