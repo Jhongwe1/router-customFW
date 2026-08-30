@@ -10,10 +10,33 @@ scan that cannot fire proves nothing.
 """
 import re, sys, io, os
 
+#: 🔴 2026-08-30 (fourteenth session): `MAC, bare 12 hex` is OUI-restricted and
+#: **neither of its two OUIs is this unit's**, so the one pattern written to
+#: catch this unit's address in bare form structurally cannot.  量: the OUI at
+#: `H601+0x07` in `$FWRE_WORK/dumps/flash-n150rt-console-2.bin` matches neither
+#: alternative.  `fc1928` went in believing it was TOTOLINK's; it is Actions
+#: Microelectronics (IEEE MA-L, 2020-08-25) and it is the OUI of the
+#: WORKSTATION's USB GbE adapter, not of the device (`SPEC.md` §18).
+#:
+#: **It is not fixed by adding this unit's OUI here**, because writing that OUI
+#: into a committed file is a disclosure of half the address, and this file is
+#: committed.  The gap is closed instead by `tools/leakscan.py --attribute`,
+#: which answers "is this value this unit's?" by looking the bytes up in the
+#: reference dump rather than by recognising a prefix -- a measurement where
+#: this is a guess.  The two OUIs stay because they still earn their keep:
+#: `00e04c` is Realtek's and catches the driver defaults, `fc1928` catches the
+#: workstation adapter in bare form.
 PATTERNS = [
     ("MAC, colon form",     re.compile(r'\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b')),
     ("MAC, dash form",      re.compile(r'\b(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}\b')),
     ("MAC, bare 12 hex",    re.compile(r'\b(?:00[eE]0[4-6][cC]|[fF][cC]1928)[0-9A-Fa-f]{6}\b')),
+    # 🆕 2026-08-30.  `enx<12 hex>` is systemd's ID_NET_NAME_MAC scheme: the
+    # interface name IS the adapter's MAC, and none of the eight patterns above
+    # could see it -- `\b` does not fall between `enx` and the first hex digit,
+    # so the bare-12-hex pattern misses it by construction.  量: nine tracked
+    # files carry such a name and three files under `upstream/` do; **zero
+    # `bench/**/*.log` do**, so adding it turns the CI gate red on nothing.
+    ("MAC, enx interface",  re.compile(r'\benx[0-9a-fA-F]{12}\b')),
     ("H601 / calibration",  re.compile(r'H601|calib|rf_?cal|txpower|eeprom', re.I)),
     ("serial-ish",          re.compile(r'\bS/?N[:= ]|serial\s*(no|number|:)', re.I)),
     ("private IPv4",        re.compile(r'\b(?:10|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b')),
@@ -21,10 +44,18 @@ PATTERNS = [
     ("home path / user",    re.compile(r'/home/[a-z]+|C:\\\\Users\\\\|Key20', re.I)),
 ]
 
+#: 🔴 2026-08-30 (fourteenth session): the dash-form literal used to be a REAL
+#: address -- the workstation's USB GbE adapter, the same value `leakscan.py`
+#: classifies `HOST` -- sitting in a block whose whole premise is that it is
+#: synthetic.  It is replaced by an obviously-synthetic value on the same OUI as
+#: the colon-form line, so the pattern still fires and nothing real is here.
+#: *(Original: `"MAC FC-19-28-61-84-C9 here\n"`.)*  A control literal that is a
+#: real address is a leak in the file that exists to find leaks.
 CONTROL = (
     "banner\n"
     "hwaddr 00:E0:4C:11:22:33 here\n"
-    "MAC FC-19-28-61-84-C9 here\n"
+    "MAC 00-E0-4C-11-22-33 here\n"
+    "enx00e04c112233\n"
     "00e04c112233\n"
     "H601 region calib blob\n"
     "S/N: ABC123\n"

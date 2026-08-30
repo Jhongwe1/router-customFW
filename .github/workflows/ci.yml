@@ -351,19 +351,43 @@ jobs:
       # host: they carry the bench's own 10.1.1.0/24 and `/home/key`, 25 hits,
       # every one of them a property of the operator's machine and none of them
       # of the unit. Two different questions, and only the first is this gate's.
-      # 🔴 leakscan --self-test, and ONLY the self-test. 量 2026-08-30: the
-      # step above scans 240 files and `git ls-files` returns 795; the other
-      # 555 hold 97 identity-pattern hits, and `upstream/` -- 302 files -- is
-      # invisible to every sweep here because a submodule is one gitlink to
-      # `git ls-files`. The VERDICT run is a desk step until an allowlist
-      # decision is made per surviving hit; allowlisting a possible real leak
-      # to get a green build is the wrong order, and a gate that was narrowed
-      # until it went green is what this file spends forty lines warning about.
-      # What runs here is the six controls, including the two that make a clean
-      # result mean anything: L4 (the population is non-empty) and L5 (a
-      # finding never carries the bytes that produced it).
+      # 🔴 leakscan --self-test, and ONLY the self-test.
+      # 🔄 2026-08-30 (fourteenth session): this comment used to say `git
+      # ls-files` returns 795, that 555 files go unread and that they hold 97
+      # identity hits. All three were arithmetic on a number nobody had
+      # measured. 量, on a clean HEAD: the step above scans 240 files;
+      # `git ls-files` returns 899 lines, one of them the submodule gitlink, so
+      # 898 real files; 658 of them are never read, and `upstream/` adds 302
+      # that `git ls-files` cannot see at all because a submodule is one
+      # gitlink. 960 files unread, 145 identity hits across the three
+      # populations once `MAC, enx interface` is in the pattern list.
+      # The VERDICT run stays a desk step, and the reason is now a DECISION
+      # rather than an open question: `--attribute` needs this unit's 4 MiB
+      # dump, which can never be committed, and the one UNIT finding it reports
+      # is left in place by the owner because the device is end of life
+      # (`SPEC.md` §18). Allowlisting a hit to get a green build would be the
+      # wrong order either way.
+      # What runs here is seventeen controls -- sixteen on a runner, since L16
+      # needs the dump -- including the three that make a clean result mean
+      # anything: L4 (the population is non-empty), L5 (a finding never carries
+      # the bytes that produced it) and L9 (nor does an attribution line, and
+      # not the OUI either).
       - name: leakscan self-test
         run: /usr/bin/python3 tools/leakscan.py --self-test 2>&1 | tee ci-out/leakscan.out; exit "${PIPESTATUS[0]}"
+
+      # 🔴 The mutation suite for it, and it is here for a measured reason
+      # rather than for symmetry: `leakscan.py`'s `main()` returns on
+      # `--self-test` BEFORE the reporting loop, so no control in the step
+      # above can reach the population construction or the identity filter in
+      # the report -- the same structural hole `test-spec-check-mutants.py`
+      # exists for. 23 mutants in three phases; 20 run on a runner and the
+      # three that drive `--attribute` need the dump. 量 2026-08-30: the first
+      # run had EIGHT survivors, three of them defects in the mutants
+      # themselves and five real gaps -- including a `render` that printed the
+      # whole finding tuple, bytes included, past a control that checked two
+      # string forms of the value and not its repr.
+      - name: test-leakscan-mutants
+        run: /usr/bin/python3 tools/test-leakscan-mutants.py --jobs 8 2>&1 | tee ci-out/test-leakscan-mutants.out; exit "${PIPESTATUS[0]}"
 
       - name: audit-bench-log (exit-code gate)
         run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f -name '*.log')

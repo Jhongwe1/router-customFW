@@ -120,6 +120,67 @@ def render_dw(ram_base: int, data: bytes, cmd: str) -> bytes:
     return b"".join(out)
 
 
+DW_ECHO = re.compile(rb"^DW ([0-9A-Fa-f]{8}) (\d+)\n\r")
+DW_LINE = re.compile(rb"^([0-9A-Fa-f]{8}):((?:\t[0-9A-Fa-f]{8})+)\n\r")
+
+
+def normalise_dw(text: bytes) -> bytes:
+    """A `DW` reply reduced to its DATA, with the echo and the address column
+    removed.  Refuses anything that does not parse as one.
+
+    🔴 Why this exists, 2026-08-30 (fourteenth session).  The flash bracket
+    compares a capture against a committed one with `cmp`, byte for byte -- and
+    a `DW` reply carries the typed command and a `%08X:` address column, both
+    of which contain the RAM DESTINATION.  So two reads of the SAME flash
+    window into DIFFERENT RAM addresses do not compare equal, and the bracket's
+    second half was forced to reuse the first half's destination.
+
+    That reuse costs a control.  If the destination is the same every time,
+    *the RAM already held these bytes* is not excluded, and an `FLR` that did
+    nothing looks exactly like one that worked.  Normalising to the data lets
+    the next block read into a different address AND take a pre-read of the
+    destination first, which is the negative control this bracket has never
+    had.  `bench/README.md` records the bracket; `SPEC.md` `FLS-20` records
+    what it does and does not buy.
+
+    ⚠️ It removes the address ON PURPOSE, so it cannot see a reply that landed
+    at the wrong address.  The `FLR` echo check is what covers that, and the
+    card keeps it.
+    """
+    lines = text.split(b"\n\r")
+    if not lines or not DW_ECHO.match(text):
+        _fail("not a DW reply: no `DW <addr> <words>` echo at the start")
+    out, n = [], 0
+    for raw in lines[1:]:
+        if raw == b"<RealTek>" or raw == b"":
+            continue
+        m = DW_LINE.match(raw + b"\n\r")
+        if not m:
+            _fail(f"not a DW data line: {raw[:32]!r}")
+        words = m.group(2).split(b"\t")[1:]
+        out.append(b"\t".join(words))
+        n += len(words)
+    if not n:
+        _fail("a DW reply with no data lines is not a reading")
+    return b"\n".join(out) + b"\n"
+
+
+def cmd_normalise(args) -> int:
+    with open(args.file, "rb") as f:
+        text = f.read()
+    data = normalise_dw(text)
+    if args.out:
+        tmp = args.out + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, args.out)
+        print(f"  {args.out}  {len(data)} bytes, "
+              f"{len(data.split(chr(10).encode())) - 1} line(s)")
+        return 0
+    sys.stdout.buffer.write(data)
+    return 0
+
+
 def _repo_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -505,6 +566,64 @@ def self_test() -> int:
             bad(f"C10 lo_caught={lo_caught} hi_caught={hi_caught} -- C9 is not "
                 "testing that boundary")
 
+        # --- N1-N5 `normalise`, and every one runs without the dump --------
+        # The whole point of the subcommand is that the RAM address drops out,
+        # so the controls are about equality ACROSS addresses and inequality
+        # across windows. The committed capture is the fixture; no dump.
+        cap0 = os.path.join(root, REAL0)
+        cap6 = os.path.join(root, REAL6)
+        if not (os.path.exists(cap0) and os.path.exists(cap6)):
+            bad(f"N1-N5 {REAL0} or {REAL6} is missing -- that is a broken "
+                "reference in this repository, not an allowed skip")
+        else:
+            raw0 = open(cap0, "rb").read()
+            raw6 = open(cap6, "rb").read()
+            n0 = normalise_dw(raw0)
+            n6 = normalise_dw(raw6)
+            words0 = n0.split(b"\n")[:-1]
+            if len(words0) == 16 and all(len(w.split(b"\t")) == 4
+                                         for w in words0):
+                good(f"N1 `normalise` reduces {REAL0} to 16 lines of 4 words "
+                     f"({len(n0)} bytes from {len(raw0)})")
+            else:
+                bad(f"N1 {len(words0)} line(s), not 16 lines of 4 words")
+
+            # N2 -- THE case. Same flash bytes, a DIFFERENT RAM destination,
+            # identical normalised output. Without this the next block cannot
+            # move its destination, and without moving it there is no
+            # pre-read control.
+            data0 = b"".join(bytes.fromhex(w.decode())
+                             for line in words0 for w in line.split(b"\t"))
+            other = render_dw(0x80B50000, data0, "DW 80B50000 64")
+            if normalise_dw(other) == n0:
+                good("N2 the same window at RAM 0x80B50000 normalises "
+                     "identically to the capture taken at 0x80A00000")
+            else:
+                bad("N2 the same window at a different RAM address does NOT "
+                    "normalise equal -- the address is not being stripped")
+
+            if n0 != n6:
+                good("N3 two DIFFERENT windows do not normalise equal "
+                     "(the control on N2)")
+            else:
+                bad("N3 0x000000 and 0x060000 normalise to the same bytes")
+
+            if b":" not in n0 and b"80A00000" not in n0:
+                good("N4 the normalised output carries no address field")
+            else:
+                bad("N4 an address survived normalisation")
+
+            notdw = os.path.join(td, "notdw.txt")
+            with open(notdw, "w", encoding="utf-8") as f:
+                f.write("hello\n\rthere\n\r<RealTek>")
+            r = run("normalise", notdw)
+            why = refused(r, "a file that is not a DW reply", "not a DW reply")
+            if why:
+                bad(f"N5 {why}")
+            else:
+                good("N5 a file that is not a DW reply is refused, with the "
+                     "reason and nothing on stdout")
+
         # --- R1/R2/R3 the real material, THROUGH THE COMMAND LINE ---------
         work = os.environ.get("FWRE_WORK", "/home/key/fwre-work")
         d2p = os.path.join(work, "dumps", "flash-n150rt-console-2.bin")
@@ -580,6 +699,14 @@ def main() -> int:
                         "to be outside this repository, for a window that "
                         "overlaps a forbidden region")
     r.set_defaults(func=cmd_render)
+
+    n = sub.add_parser("normalise",
+                       help="strip a DW reply to its data, so two reads of "
+                            "one flash window into DIFFERENT RAM addresses "
+                            "compare equal")
+    n.add_argument("file", help="a DW capture")
+    n.add_argument("--out", default=None, help="write here instead of stdout")
+    n.set_defaults(func=cmd_normalise)
 
     args = ap.parse_args()
     if args.self_test:

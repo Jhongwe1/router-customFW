@@ -39,6 +39,65 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-08-30/31 — desk, no power: the instrument made a judgement, and
+the adversarial pass showed its author had the value, the vendor and two
+published counts all wrong.**
+
+Yesterday `tools/leakscan.py` reported one distinct MAC on `FC:19:28` — described
+as *TOTOLINK's OUI* — in seven files, four of them in a public repository, and
+recorded the attribution as **undetermined** because `FW-17`'s SSID correlation
+could not be run. Four measurements replace all of it:
+
+* `FC:19:28` is **Actions Microelectronics**, IEEE MA-L, registered 2020-08-25 —
+  not TOTOLINK.
+* the value is **the workstation's own USB Ethernet adapter**: byte-identical to
+  the `enx<12 hex>` interface name in nine tracked files, the source of the ICMP
+  echo **replies** 4/4 in both committed host captures and of the requests 0/4.
+* it occurs **0 times** in this unit's own 4 MiB flash dump — raw, byte-reversed
+  and as ASCII in four forms — and its three-byte OUI occurs 0 times there and 0
+  times in the vendor source.
+* 🔴 the attribution was **never undetermined**. `FW-17`'s route was
+  genuinely unavailable and it was never the only one: the arbiter is this unit's
+  own dump, and it had been on the same disk for two weeks. The failure was
+  stopping at the first check that could not be run.
+
+**The defect underneath it is not about this MAC.** The pattern written to catch
+this unit's address in bare hex is restricted to two OUIs and **neither is this
+device's**, so it cannot fire on this device in any file — and it looked like it
+was working because it fired on something else. The fix is not to add the right
+OUI, which would write half the address into a committed file and would still be
+a guess: `leakscan --attribute` asks the dump instead of the prefix.
+
+**What the dump then said.** One `UNIT` classification in the whole corpus:
+`upstream/BENCH-LOG.md:216`, six bytes that occur twice inside `H601`, labelled
+as the device's, with the workstation adapter on the line above. **45 of
+`H601`'s 146 non-zero bytes are recoverable from that public repository**; the
+WPS PIN field and the region checksum are not. 🔴 The first version of
+that coverage figure said **98.9 %** and was an artefact — `H601` is 8,046 zero
+bytes out of 8,192, and the measurement's own positive control "passed" by
+covering 8,042 bytes with an eight-byte slice.
+
+**It is left in place, as a recorded decision**: the device is end of life, out
+of service for years and reset since, and `upstream/` is a separate published
+repository whose pin is load-bearing evidence here. `SPEC.md` `FLS-22` carries
+the numbers and the reasoning is in `notes/leak-surface.md`.
+
+**Instruments.** `leakscan` 6 → 17 controls and a mutation suite of 24 in three
+phases — its first run had **eight survivors**, three of them defects in the
+mutants and five real, including a `render` that printed the whole finding tuple
+past a control that checked two string forms of the value and not its `repr`.
+`flashwin` 19 → 24: a `normalise` subcommand, because a `DW` reply carries the
+RAM destination in two places and so two reads of one flash window into different
+addresses never compared equal — which is why the bracket's second half had to
+reuse the first half's destination, and reusing it costs the control that would
+show the read wrote anything at all.
+
+**And the next seating's card is written**: 54 cells over two power cycles, with
+a pre-read of every `FLR` destination, a fourth window over the only page of
+`H601` this device has ever been seen to change, and the first device-side read
+of that region through a path the kernel refuses to open for writing.
+
+
 🔴 **2026-08-30 — desk, no power: the image that booted cannot be rebuilt from
 its own recorded configuration, and the whole difference is a compiler flag no
 committed file carries.**
@@ -120,6 +179,11 @@ that `upstream/BENCH-LOG.md` prints actual `H601` byte values and a digest over 
 CI step globs `bench/**/*.log`. The 658 tracked files it never reads — plus `upstream/`'s 302, which `git ls-files`
 cannot see at all, for 960 unread in total — hold **100**
 identity-pattern hits — 92 once the scanner's own eight control literals come out,
+🔄 **Corrected the same day (fourteenth session): both numbers are wrong.** 量 on a clean
+HEAD it is **99**, not 100, and the scanner's own literals are **10**, not 8 — `leakscan.py`'s
+own two were missed because it was written that day — so the prose figure is **89**. And
+`FC:19:28` is **Actions Microelectronics**, not TOTOLINK; the value is the workstation's USB
+adapter. `notes/leak-surface.md`, `SPEC.md` `FLS-22`.
 and 28 of them inside `bench/` itself: two in the prediction cards and 26 in the
 two host-side packet captures, which are `.txt` and so are outside a gate named
 for that directory. `upstream/` is invisible by

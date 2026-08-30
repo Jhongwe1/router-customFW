@@ -379,10 +379,19 @@ capture* overstated it and the same sentence had to be corrected in `SPEC.md`
 §18 on the same day.** 量: the gate globs `bench/**/*.log` — **240 files**,
 where `git ls-files` returns **899**. The **658** tracked files it never reads,
 plus `upstream/`'s **302** that a submodule hides from `git ls-files` entirely,
-hold **100** hits on the four patterns that can identify a unit. `tools/leakscan.py`
+hold hits on the patterns that can identify a unit. `tools/leakscan.py`
 is the instrument that says so, it never prints what matched, and only its
-self-test is a gate — the verdict needs an allowlist decision per surviving hit,
-and allowlisting a possible real leak to get a green build is the wrong order. `tools/check-predictions.py --sweep
+self-test and its mutation suite are gates. 🔄 **The count that stood here
+was 100 and it was never a reading on any commit** — 量 on a clean `HEAD` it was
+**99**, and after a ninth pattern and four more readable extensions went in it is
+**160**. 🔴 **And the finding it was reporting was the wrong value**: the MAC it
+flagged is the workstation's own USB adapter, on an OUI that belongs to Actions
+Microelectronics rather than to this device's vendor. `leakscan --attribute` answers
+*whose address is this* by looking the bytes up in this unit's own flash dump instead
+of recognising a prefix, and its answer is that exactly one hit in the corpus is this
+device's — in a public file, left in place as a recorded decision because the device
+is end of life (`SPEC.md` `FLS-22`, `notes/leak-surface.md`). The verdict run is a desk
+step: it needs the 4 MiB dump, which can never be committed. `tools/check-predictions.py --sweep
 bench` checks that every capture named by a prediction file is **newer** than
 the file naming it — and it **cannot** be a CI gate, because **git does not
 store mtimes**. A checkout writes every file fresh, so on a clone of this

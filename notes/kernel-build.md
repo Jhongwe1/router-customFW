@@ -2959,7 +2959,18 @@ the guard existed. Rebuilding them now needs `--no-cflags`, which is the point:
 the flagless build has to be asked for by name. They are kept as the evidence
 that it produces seven violations.
 
-### 18.7 🔴 The leak gate scans 240 of 898 tracked files, and a MAC on this model's OUI is in what it never reads
+### 18.7 🔄 The leak gate scans 240 of 898 tracked files — and the MAC named in this heading is NOT this model's, see the block below
+
+> 🔴 **2026-08-30, fourteenth session: this section's headline is wrong and its
+> owner has moved.** `FC:19:28` is **not this model's OUI** — it is Actions
+> Microelectronics, and the value is the **workstation's USB GbE adapter**,
+> which is in the dump **0** times. The attribution the section records as
+> *undetermined* was determinable the whole time, by a route nobody looked for:
+> the arbiter is this unit's own dump. The gap the section describes is real
+> and stands; **the finding it names is not.** The one value that genuinely is
+> this unit's is a different one, in `upstream/BENCH-LOG.md:216`.
+> **Owner: `notes/leak-surface.md`; number: `SPEC.md` `FLS-22`.** The section
+> is kept as written below, because it is the record of what was believed.
 
 **量 2026-08-30, with `tools/leakscan.py`, new in this step.** The whole of this
 repository's leak checking is one CI step — and 🔴 **none of the narrowness was a discovery. It was
@@ -3160,3 +3171,43 @@ same exposure, and only this one now reads the table. A general check would
 compare every row's skip column against the labels its suite can print, and that
 needs a way to enumerate them without running the suite in every configuration.
 Carried forward.
+
+### 18.10 🔴 The fix for §18.9 is *"point `$FWRE_WORK` at an empty directory"*, and that is a PARTIAL emulation of a runner
+
+**量 2026-08-31 (fourteenth session), and the census is what said so.** The
+procedure §18.9 leaves behind — run the suites again with `$FWRE_WORK` pointing
+at an empty directory, then census that output — was followed for the first time
+today over the *whole* table. It produced **four red lines, and three of them
+were defects in the emulation rather than in the repository**:
+
+| | what the census said | why |
+|---|---|---|
+| `test-hazlint`, `test-hazlint-objs` | *marked `*bench-only*` and yet the `.out` exists* | `.github/workflows/ci.yml` has **no step** for either. A capture for a bench-only suite is itself the defect, and the census refuses it rather than counting it — which is the check working |
+| `test-rlxprobe` | `ran 101/202 failed 101` | 🔴 **its allowed skip is keyed on `command -v mips-linux-gnu-gcc`, not on `$FWRE_WORK`**, and this bench HAS the cross compiler. So an empty `$FWRE_WORK` left it running, with its material gone. `test-opcount` keys on `mips-linux-gnu-as` the same way |
+| `test-leakscan-mutants` | `20+0+3 != 24` | the capture predated `Q1` by twenty minutes. Re-run, and the arithmetic closes |
+
+🔴 **So the procedure covers fourteen suites and misses two, and nothing said
+which.** 量: of the 16 suites that declare an allowed skip, **14 key it on
+`$FWRE_WORK`** and **2 key it on a tool being on `PATH`**. Pointing `$FWRE_WORK`
+at an empty directory emulates a runner for the first fourteen and for neither
+of the last two — and the failure is silent in the direction that matters, since
+a suite that *runs* here where it would *skip* there has its label compared by
+nobody, which is the exact class §18.9 is about.
+
+🔴 **It took THREE attempts to state the emulation correctly, and each wrong one
+was wrong in a different way.** That is the part worth keeping:
+
+| attempt | what it did | what the census said |
+|---|---|---|
+| 1 | `$FWRE_WORK` empty, every suite run | four RED. Two bench-only suites had a `.out` at all; `test-rlxprobe` ran and failed 101; `test-leakscan-mutants` predated its own newest case |
+| 2 | also filtered the cross tools out of `PATH` — **by directory** | `test-rlxprobe` and `test-opcount` exited **127**: `/usr/bin` holds `mips-linux-gnu-gcc`, so removing that directory removed **`bash`**. The census read the empty output as *0 cases, no skip line*, which is precisely the shape it exists to catch |
+| 3 | a symlink farm over every `PATH` directory minus `mips-linux-gnu-*` | green except **461 against a declared 460**, off by exactly `test-opcount`'s one skip |
+| 4 | 讀 `ci.yml`: it installs **`binutils-mips-linux-gnu`** and deliberately **not** `gcc-mips-linux-gnu` — so `mips-linux-gnu-as` IS on a runner and `mips-linux-gnu-gcc` is not | **every suite ok, and `NOT RUN IN THIS JOB: 460` against a declared 460** |
+
+**So the emulation is three conditions and one of them is a package list**:
+`$FWRE_WORK` pointing at an empty directory, the suite list `ci.yml` actually
+runs, and **the runner's exact package set** — which is read out of `ci.yml`'s
+`apt` step and is not derivable from anything else. ⚠️ Attempt 3 would have been
+recorded as *"the table is off by one"* if the reason had not been chased: a
+number this repository declares would have been changed to match a measurement
+taken in the wrong configuration.

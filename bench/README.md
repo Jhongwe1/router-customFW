@@ -844,6 +844,17 @@ entropy than the 256-byte window, so the 2^24 argument does not transfer directl
 finding is that **`tools/flashwin.py` enforces the rule on the paths it knows about, and
 the repository is larger than those paths.**
 
+🔄 **2026-08-30, fourteenth session: that paragraph was right and it was not
+specific enough.** 量, with `tools/leakscan.py --attribute`: the six bytes at
+`H601+0x07` and `H601+0x13` are printed **verbatim** at
+`upstream/BENCH-LOG.md:216`, labelled 「（裝置）」 — one line, one file, and the
+only `UNIT` classification in 145 identity hits across both repositories.
+**45 of `H601`'s 146 non-zero bytes are recoverable from the public
+repository**, `HW_WLAN0_WSC_PIN` and the region checksum are not among them, and
+the owner's decision is to leave `upstream/` alone because the device is end of
+life. `SPEC.md` `FLS-22`; the reasoning and what is still open are in
+`notes/leak-surface.md`.
+
 🔴 **Two captures in this seating will not be in this directory, and that is a
 first.** `V-rdh` and `Z-rdh` are `DW` reads of `H601`, so their bytes are this
 unit's MAC and radio calibration. They go to
