@@ -550,6 +550,24 @@ two boots can, which is to say weakly, and the row that records it must say so.
 /usr/bin/python3 tools/check-predictions.py bench/2026-08-31/PREDICTIONS-B5-block3.md
 ```
 
-**`0 of 62` before the seating, and that is the correct answer.** Four cells
-(`W-rdh`, `W-rdc`, `X-rdh`, `X-rdc`) resolve to paths outside `bench/` and are
-invisible to it; the count it reports is over the 58 it can see.
+**`0 of 54` before the seating, and that is the correct answer.** 量: it reports
+`0 of 54 captures came after the prediction, 54 did not`, which is what a block
+written before its seating must say. The four `H601` captures are not in the
+block at all (§2), so they are not among the 54.
+
+🆕 **And every number on this card was re-derived from the artefacts after it was
+written, not just when it was written.** 量 2026-08-31: **36 of 36** — the
+image's size and digest, both head words and the `image_end` they decode to, the
+tail address and the 652-byte zero run, the variant line, the nine non-zero bytes
+of the canary page and their exact offsets, all five shell-cell byte counts and
+two of their digests, the boot's 849 and its digest, both partition sizes, seven
+reply sizes through `reply-size.py`'s model, and the four expectation files'
+lengths.
+
+⚠️ **The checker that did it is a scratchpad script and is deliberately not
+committed.** It has no controls and no mutation suite, and writing a new
+instrument at the end of a long session — into the path a seating depends on —
+is the shape `P7` exists to prevent. What it bought is this paragraph: the card's
+own claim that its values are *computed rather than transcribed* is now something
+that was actually re-run, once, rather than a description of intent. Generalising
+it belongs beside `check-predictions.py` and goes in as its own step.
