@@ -1,0 +1,13 @@
+01:39:40.306691 00:12:34:56:78:94 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 10.1.1.2 tell 10.1.1.10, length 46
+01:39:40.306707 fc:19:28:61:84:c9 > 00:12:34:56:78:94, ethertype ARP (0x0806), length 42: Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+01:39:40.307563 00:12:34:56:78:94 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.10 > 10.1.1.2: ICMP echo request, id 20, seq 0, length 64
+01:39:40.307623 fc:19:28:61:84:c9 > 00:12:34:56:78:94, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.10: ICMP echo reply, id 20, seq 0, length 64
+01:39:41.278288 00:12:34:56:78:94 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.10 > 10.1.1.2: ICMP echo request, id 20, seq 1, length 64
+01:39:41.278313 fc:19:28:61:84:c9 > 00:12:34:56:78:94, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.10: ICMP echo reply, id 20, seq 1, length 64
+01:39:42.279211 00:12:34:56:78:94 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.10 > 10.1.1.2: ICMP echo request, id 20, seq 2, length 64
+01:39:42.279229 fc:19:28:61:84:c9 > 00:12:34:56:78:94, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.10: ICMP echo reply, id 20, seq 2, length 64
+01:39:43.298904 00:12:34:56:78:94 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.10 > 10.1.1.2: ICMP echo request, id 20, seq 3, length 64
+01:39:43.298927 fc:19:28:61:84:c9 > 00:12:34:56:78:94, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.10: ICMP echo reply, id 20, seq 3, length 64
+01:39:45.323691 fc:19:28:61:84:c9 > 00:12:34:56:78:94, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.10 tell 10.1.1.2, length 28
+01:39:45.325154 00:12:34:56:78:94 > fc:19:28:61:84:c9, ethertype ARP (0x0806), length 60: Reply 10.1.1.10 is-at 00:12:34:56:78:94, length 46
+

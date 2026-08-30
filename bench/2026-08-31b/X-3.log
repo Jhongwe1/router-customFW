@@ -1,0 +1,35 @@
+J 80500000
+---Jump to address=80500000
+decompressing kernel:
+Uncompressing Linux... done, booting the kernel.
+done decompressing kernel.
+start address: 0x80003600
+RLXFW-B00
+RLXFW-B01
+RLXFW-B02=0000CD01
+RLXFW-B03
+RLXFW-B04
+RLXFW-B05
+RLXFW-B06
+RLXFW-B07=00000000
+RLXFW-B08
+RLXFW-B09
+Realtek WLAN driver driver version 1.6 (2012-12-04)
+
+
+
+Probing RTL8186 10/100 NIC-kenel stack size order[3]...
+chip name: 8196C, chip revid: 0
+NOT YET
+eth0 added. vid=9 Member port 0x1...
+eth1 added. vid=8 Member port 0x10...
+eth2 added. vid=9 Member port 0x2...
+eth3 added. vid=9 Member port 0x4...
+eth4 added. vid=9 Member port 0x8...
+eth5 added. vid=9 Member port 0x0...
+[peth0] added, mapping to [eth1]...
+Realtek FastPath:v1.03
+RLXFW-B10
+rlxfw: init running, RLXFW-R3-RUNG1-OK
+/bin/sh: can't access tty; job control turned off
+# 

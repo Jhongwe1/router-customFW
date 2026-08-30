@@ -39,6 +39,68 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-08-31 — seating 7, two power cycles: the flash bracket got its
+first negative control, and the card was refuted three times by being run.**
+
+The bracket's claim has always been *these flash bytes are unchanged*, evidenced
+by a `DW` of the destination after an `FLR` matching a rendering of the
+2026-08-16 dump. **Nothing in that chain ever showed the `FLR` wrote anything** —
+an `FLR` that silently did nothing, over RAM that happened to hold the right
+bytes, produces an identical capture. Block 3 added a pre-read of every
+destination.
+
+* **Both rounds: 4 of 4 pre-reads differed, 4 of 4 read-backs matched the dump.**
+  Four windows now, the fourth being `0x006400` — the canary page `FLS-21`
+  measured moving under a `formWsc` POST. **1,024 of 4,194,304 bytes = 0.0244 %**;
+  `H601` reach 3.1 % → **6.3 %**.
+* 🟢 **One round ran after a complete rlxfw boot** — kernel, userspace,
+  4,194,304 bytes through `mtd_read`, an `EACCES` write attempt, a ping. First
+  evidence here that a full boot of this firmware leaves those windows unchanged.
+* 🔴 **And on the second round the control FIRED.** All four of cycle 6's carded
+  pre-reads came back *equal* to the flash expectations: **DRAM had retained
+  cycle 5's contents across the power cycle** (`MEM-17`). Addresses nobody had
+  written were still garbage, so it is retention, not a reset that did not
+  happen. The bracket moved to fresh addresses; `X-ab` lost its claim to prove a
+  cold boot (`REG-23`: every reset restores `AUTOBURN`, which says nothing about
+  DRAM decay); and seating 6's second half, which reused its first half's
+  destinations, now carries a **doubt — not a refutation**.
+
+**Three things the card got wrong, all found by running it.**
+
+* `M-b`/`M-c` returned `/bin/sh: wc: not found`. `wc` is one of busybox's fifty
+  applets and **not one of the image's eleven declared symlinks**. *The applet
+  table and the symlink set are different populations, and nothing compares a
+  card's typed commands against the declaration of the image it uploads.*
+  Recovered with `busybox wc` under a prediction block written first.
+* `M-d` measured **78 bytes, not 73**: the device's shell prints argv[0] as
+  `/bin/sh` where the qemu harness printed `sh`. Five characters, on every
+  shell-error cell this project will write.
+* The read rate was **~16×** the `CLK-15`-derived estimate — 0.92–1.01 MB/s
+  against 59.8 KB/s — so the terminators were an order of magnitude too generous.
+
+**What the changed cell bought.** `wc -c` was changed to `wc -lc` before the
+first capture landed, because the card's *"not a content check"* was true about
+digests and false about `wc`. It excluded a live alternative:
+`rtl8196_map_copy_from` caps a copy at 1024 bytes and returns `void`, so a short
+read reports success — **and a byte count cannot see it**. Which function is live
+is `CONFIG_MTD_COMPLEX_MAPPINGS`, unset in all 31 built configs. H1 would have
+given ≤1228 and ≤2007; **H0 came back four times** (`FW-34`).
+
+**The safety property is now measured at two points**: `Permission denied` on
+both `/dev/mtd0ro` and `/dev/mtd1ro` at zero flash bytes, and the even, writable
+minor confirmed **absent** (`FW-30`).
+
+🔴 **A containment rule was found to be conditional on its own experiment.** The
+card writes `H601` **pre-reads** under `bench/` because a pre-read is *expected*
+to be garbage; when retention made that false, two files in the repository held
+this unit's MAC. Untracked, moved, nothing in history — and the template is still
+wrong. Every `H601` capture now lands outside the repository, pre-read included.
+
+**Wire census, three tools rather than one**: 75 `console-capture` sends, 12
+rescue sends, 2 TFTP uploads — **89 operations, 0 flash-write commands**, with a
+positive control showing the matcher fires on a synthetic `FLW`. ⚠️ That is *no
+write command was issued*, which is still not *not one flash byte is written*.
+
 🔴 **2026-08-30/31 — desk, no power: the instrument made a judgement, and
 the adversarial pass showed its author had the value, the vendor and two
 published counts all wrong.**

@@ -6,8 +6,17 @@ of them are in a published file, and what was decided about each.* `SPEC.md`
 the number; this file is the reasoning and the record of being wrong.
 
 Written 2026-08-30/31 (fourteenth session — it ran past midnight), at the desk, no power. Zero flash
-bytes, zero power cycles, zero device readings — today that sentence holds
-because the machine was not plugged in.
+bytes, zero power cycles, zero device readings — that sentence held on the day
+it was written, because the machine was not plugged in.
+
+🔄 **2026-08-31, seating 7, added §5b's fourth entry — and that one WAS at the
+bench, two power cycles.** It is the first near-miss here produced by an
+instrument rather than by prose, and the reason it belongs in this file is that
+a capture, not a sentence, is what nearly carried this unit's `H601` into the
+repository. **The zero-flash-bytes sentence above is about the fourteenth
+session and is not a claim about seating 7** — that seating issued no
+flash-write command, which is a different and weaker statement, and
+`RUNSHEET.md` § Results — seating 7 owns it.
 
 ⚠️ **Nothing in this file prints a value.** Offsets, counts, classes and
 verdicts only, which is the same line `tools/flashwin.py` draws.
@@ -106,6 +115,15 @@ be argued out of a finding. `L11` and `L13` are that ordering as cases, and
 | `UNKNOWN` | 3 | globally administered, not in the dump — needs a person |
 | 🔴 `UNIT` | **1** | the six bytes exist in this unit's own flash |
 
+🔄 **Re-run 2026-08-31 after seating 7, whose 120-odd new files entered the
+population: 161 hits, and the distribution is IDENTICAL in every class.** So the
+seating's captures, five prediction blocks and nine owner-file edits contributed
+**zero** identity hits. ⚠️ That is a statement about what a text scanner can see:
+the two `H601` pre-reads that briefly sat under `bench/` were hex dumps of a `DW`
+reply, which **no pattern here matches** — they were caught by the bracket's own
+normalise comparison instead (§5b). **An unchanged count is not the same as nothing
+having happened.**
+
 **The one `UNIT` is `upstream/BENCH-LOG.md:216`** — in the dump **twice**, both
 occurrences inside `H601`, labelled 「（裝置）」 in the file. The line above it,
 `:215`, labelled 「（我們）」, is the `FC:19:28` value the thirteenth session
@@ -179,7 +197,7 @@ later reader does not read it as an oversight.
 * the rule in `SPEC.md` §18 stands for **rlxfw**: this repository is private
   today, and nothing identifying this unit goes into it regardless.
 
-## 5b. 🔴 Three near-misses in one session, all by the person writing about them
+## 5b. 🔴 Four near-misses over two sessions — three by the person writing about them, and one by an instrument doing what it was told
 
 The never-print property was nearly broken three times on 2026-08-31, and none
 of the three was broken by the tool:
@@ -190,6 +208,47 @@ of the three was broken by the tool:
 | 2 | `audit-bench-log.py`'s `CONTROL` block held a **real address** — the workstation adapter's — in a block whose stated premise is that it is synthetic | the attribution run, which classified a "synthetic" literal as `HOST` |
 | 3 | 🔴 **this file** reached for an *example* of an encoding the harvester misses and typed **two octets of this unit's own OUI** as the example | a sweep run because the sentence looked like the shape it was warning about |
 | 4 | 🔴 **and then the row above reproduced them again, while explaining them** — third revision, third instance, which is the pattern `spec-check`'s `C8` row already records for ragged tables | 🔴 **not the sweep.** The sweep searched for the **three**-byte OUI and only two had been written, so it reported 0 — *a tool reporting 0 is making a claim*, in the sweep written twenty minutes earlier to enforce exactly this |
+
+### 🔴 2026-08-31, seating 7: a fourth, and it is a different kind from the three above
+
+The three above are **prose** — a sentence that typed part of an address. This
+one is a **capture**, written by an instrument doing exactly what it was told.
+
+`bench/2026-08-31/PREDICTIONS-B5-block3.md` sends the `FLR` **pre-reads** to
+`--out bench/…`. Two of the four destinations are `H601` windows. The card puts
+them in the repository because a pre-read is *expected* to be uninitialised DRAM,
+and on cycle 5 it was.
+
+🔴 **On cycle 6 it was not.** DRAM had retained cycle 5's `FLR` results
+(`SPEC.md` `MEM-17`), so `X-ph.log` and `X-pc.log` came out byte-identical to
+this unit's `H601` — **inside the repository**.
+
+> **The containment was conditional on the experiment coming out the expected
+> way. That is not containment; it is a coincidence with a rule written on it.**
+
+| | |
+|---|---|
+| what caught it | the stop-if comparison the card *already had* — `flashwin normalise` against the expectation — which exists to decide whether the `FLR` is interpretable, **not** to decide where the file may live. It answered a leak question it was not asked |
+| what did not catch it | `tools/flashwin.py`'s publication guard (it guards what **it** prints, not where a **capture** lands), `audit-bench-log.py` (its patterns are for text renderings of an address, and a `DW` hex dump is not one), and `leakscan.py` (a desk command, not a gate) |
+| exposure | 量 `git status` **before** the move: both `??`. **Nothing entered git history**, and this repository is private. Moved to `$FWRE_WORK/rebuild/bench-only/b5-20260831/` |
+| verified after | the whole of `bench/**/*.log` normalised against both `H601` expectations: **0 files**, with a positive control — the same test **does** fire on the out-of-repo copies, so the zero is a measurement |
+
+**What follows, and it is not "be careful".** `PREDICTIONS-B5-block3d.md` writes
+every `H601` capture outside the repository, pre-read included. 🔴 **But the
+template is still wrong** — the next card will be written by copying block 3 —
+and the general fix is a rule nothing currently owns:
+
+> **A capture of a forbidden window may not be addressed to `bench/`, whatever
+> the cell expects to find there.**
+
+`flashwin.py` enforces the never-print rule *on its own output*. Nothing enforces
+*where a capture of such a window is written*, and the cell that decides is a
+`--out` path typed on a card. It is carried forward in `PROGRESS.md` under
+*the `H601` pre-read containment is wrong in the template*.
+
+⚠️ **And the count in the heading above is now four, in two sessions.** Three
+were prose and one was an instrument; **the instrument one is the one a person
+re-reading the file would not have found.**
 
 **So the discipline that works is not care.** Two of the three were caught by a
 tool and the third by running a check on a hunch. What follows from it is a

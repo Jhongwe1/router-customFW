@@ -1,0 +1,3 @@
+FLR 80A00A00 006000 100
+Flash read from 00006000 to 80A00A00 with 00000100 bytes	?
+(Y)es , (N)o ? --> 

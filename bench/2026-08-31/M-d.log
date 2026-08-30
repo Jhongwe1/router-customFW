@@ -1,0 +1,3 @@
+echo x > /dev/mtd0ro
+/bin/sh: can't create /dev/mtd0ro: Permission denied
+# 

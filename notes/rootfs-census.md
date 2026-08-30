@@ -226,6 +226,52 @@ wrapped in `tools/vendor-tripwire.sh` and run from a scratch directory
 | a redirect to a target that returns `EACCES` | `sh: can't create <path>: Permission denied` — the message `M-d` predicts, and where its 73 bytes come from |
 | the applet table, re-read | unchanged at fifty, `wc` `cat` `echo` `sh` all present, negative control `definitely_not_an_applet: applet not found` in the same run |
 
+### 🔴 2026-08-31, seating 7: BOTH rows above are true and BOTH were read too widely
+
+**① *"no field padding"* is a property of the SINGLE-field form only.** 量 the
+same day, same route, on the exact partition slices of the 2026-08-16 dump:
+
+| form | on `mtd0`'s 1,245,184 bytes | width |
+|---|---|---:|
+| `wc -c` | `1245184` | 7, bare |
+| `wc -l` | `4422` | 4, bare |
+| 🔴 `wc -lc` | `␣␣␣␣␣4422␣␣␣1245184` | **19, PADDED** |
+
+Two `%9d` fields joined by one space — confirmed on a zero-length control
+(`␣␣␣␣␣␣␣␣0␣␣␣␣␣␣␣␣␣0`, also 19). The sentence above says *no field padding*
+without qualification, and a card written on it would have predicted 33 against
+a measured 45. **The row was right about what it measured and the write-up
+generalised past it.**
+
+⚠️ **This paragraph's own measurement nearly went the same way.** The first run
+of it printed an empty string for all nine cells and the script reported that as
+a format: busybox here is dynamically linked and `qemu-mips-static` needs
+`-L <sysroot>`. It was caught because the **negative** control returned the same
+error as the positive one — *a tool reporting nothing is making a claim*.
+
+**② `wc` is on the applet list and was NOT in the image.** 量 on the silicon,
+seating 7: `wc -lc < /dev/mtd0ro` → **`/bin/sh: wc: not found`**.
+
+> The applet table and the image's symlink set are two different populations.
+
+讀 `config/rlxfw-initramfs.tsv`: eleven symlinks point at busybox — `sh ash cat
+echo ls mount ps ifconfig ping mkdir sleep` — and `wc` is not one. This census
+answers *what can this binary do*; a bench cell needs *what can this image
+invoke*, and **nothing compares a card's typed commands against the declaration
+of the image it uploads**. The reading was recovered with `busybox wc`, which
+needs only the declared `/bin/busybox` file.
+
+**③ And the `EACCES` message is right in text and wrong in prefix.** 量 on the
+device: `/bin/sh: can't create /dev/mtd0ro: Permission denied` — **78 bytes for
+the cell, not 73**. `qemu` ran busybox with argv[0] = `sh`; the device's shell
+was invoked through the `/bin/sh` symlink and prints that. **+5 characters, on
+every shell-error cell this project will ever write.**
+
+**④ The input-redirect failure is busybox's own short message, not
+`strerror`'s.** 量: `sh: can't open <path>: no such file` — *not* `No such file
+or directory`. `bench/2026-08-31b/PREDICTIONS-B5-block3e.md` is sized on it and
+`X-d2` returned **74 bytes, exact**.
+
 ⚠️ **The `EACCES` reading is from a NON-root uid.** `qemu-mips-static` runs
 under the host user, so DAC applied and a `chmod 000` file produced the refusal.
 On the device the shell is root and DAC does **not** apply — which is the whole

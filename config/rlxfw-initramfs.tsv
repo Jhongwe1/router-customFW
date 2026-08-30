@@ -135,7 +135,10 @@ nod	/dev/tty	c:5:0	0666	rlxfw	busybox's shell wants a controlling terminal for j
 # invents (notes/kernel-build.md 18.4 owns them):
 #   cat /proc/mtd        -> 0x00130000 "boot+cfg+linux", 0x002d0000 "root fs",
 #                           and it reads ZERO flash bytes
-#   wc -c < /dev/mtd0ro  -> 1245184     (0x130000)
+#   busybox wc -lc < /dev/mtd0ro -> `    4422   1245184`   (0x130000)
+#     🔄 2026-08-31: `wc` is an APPLET and not a declared symlink here, so the
+#     bare form returns `/bin/sh: wc: not found`. Measured on the silicon.
+#     `-lc` and not `-c`: a byte count cannot see a truncating copy_from.
 #   wc -c < /dev/mtd1ro  -> 2949120     (0x2D0000; 量 L3.log:114, and 讀
 #                           rtl819x_flash.c: WINDOW_SIZE 0x400000 minus
 #                           CONFIG_RTL_ROOT_IMAGE_OFFSET 0x130000. Two sources,

@@ -1,0 +1,5 @@
+cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 00130000 00001000 "boot+cfg+linux"
+mtd1: 002d0000 00001000 "root fs"
+# 

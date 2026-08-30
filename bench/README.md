@@ -896,3 +896,74 @@ one of its 2026-08-25 captures would then read as older than the prediction
 naming it. The defect is recorded here and the file is exempt, with a control
 (`T13`) that goes red if the file is ever repaired and the exemption left
 behind.
+
+## 2026-08-31 and 2026-08-31b — seating 7, `R3-9`/`R3-10b`. Two power cycles
+
+| | |
+|---|---|
+| **`2026-08-31`** | power cycle 5: `quietmc`, the `FLR` bracket **with a negative control for the first time**, and the MTD path. Prefixes `W-*` and `M-*` |
+| **`2026-08-31b`** | power cycle 6: the same image again — the `FW-32 殘留` null — plus a re-sited bracket and two safety cells. Prefixes `X-*` and `X2-*` |
+
+**Five prediction files, and four of them were written at the bench.** That is
+not untidiness: three of the four exist because the card was refuted while it
+was being run, and a recovery cell without a prediction written first is not a
+reading.
+
+| file | cells | gate | why it exists |
+|---|---|---|---|
+| `2026-08-31/PREDICTIONS-B5-block3.md` | 54 | **42 of 54** | the card, written 2026-08-30 at the desk |
+| `2026-08-31/PREDICTIONS-B5-block3b.md` | 2 | 2 of 2 | `M-b`/`M-c` died on `wc: not found`; recovered with `busybox wc` |
+| `2026-08-31b/PREDICTIONS-B5-block3c.md` | 2 | 2 of 2 | the read rate and the line counts both had n=1; repeated on cycle 6 |
+| `2026-08-31b/PREDICTIONS-B5-block3d.md` | 12 | 12 of 12 | cycle 6's bracket was void — DRAM retained cycle 5's contents — so it moved to fresh addresses |
+| `2026-08-31b/PREDICTIONS-B5-block3e.md` | 2 | 2 of 2 | the safety property had one instance; this gives it a second, and tests the absent even minor |
+
+**The twelve that did not run in block 3** are cycle 6's ten bracket cells,
+voided by their own pre-read stop-if, plus `X-ph` and `X-pc`, whose captures were
+moved out of the repository — see below. Corrections:
+`2026-08-31/CORRECTIONS-block3.md`, nine items.
+
+### 🔴 The captures that are deliberately not here, and this seating doubled them
+
+**Eight files**, in `$FWRE_WORK/rebuild/bench-only/b5-20260831/`:
+`W-rdh`, `W-rdc`, `X2-rdh`, `X2-rdc` (the `H601` read-backs, as designed) and
+🔴 `X-ph`, `X-pc` (the `H601` **pre-reads**, moved mid-seating).
+
+The last two are the finding. The card writes pre-reads under `bench/` because a
+pre-read is *expected* to be DRAM garbage — **and that expectation is the cell's
+own hypothesis.** When it failed, two files inside this repository contained this
+unit's MAC and radio calibration.
+
+> A containment rule whose correctness depends on the experiment coming out the
+> expected way is not a containment rule.
+
+量 `git status` **before** the move: both were `??`. Nothing entered history.
+`PREDICTIONS-B5-block3d.md` writes every `H601` capture outside the repository,
+pre-read included. Their ordering is therefore unenforced by
+`check-predictions.py`, which is the carried-forward row *a capture that cannot
+be committed*, now at eight files.
+
+### What this seating establishes, and the one sentence it still cannot say
+
+* 🟢 **The bracket has a negative control.** Every `FLR` destination was read
+  first; all eight pre-reads (four per round, after the re-siting) differed from
+  their expectations, so *the `FLR` wrote* is measured rather than assumed.
+* 🟢 **1,024 of 4,194,304 bytes**, four windows, byte-identical to the
+  2026-08-16 dump on both rounds — including `0x006400`, the canary page and the
+  only span this unit has ever been seen to change. `H601` reach **6.3 %**.
+* 🟢 **Block 3d's round ran AFTER a complete rlxfw boot** — kernel, userspace,
+  4 MiB through `mtd_read`, an `EACCES` write attempt, a ping. First evidence
+  here that a full boot of my firmware leaves those windows unchanged.
+* 🟢 **`W-3` and `X-3` are byte-identical to `V-3`**, 849 bytes, sha256
+  `8317e7c9…` — three boots of my kernel across two days, identical on the wire.
+* 🔴 **It still does not license "not one flash byte is written".** 1,024 bytes
+  is 0.0244 % of the part; the sentence needs a full re-dump hashed against
+  `FLS-14` (`RUNSHEET` `G8b`), and this seating ran none.
+
+### The host-side capture
+
+`2026-08-31/W7a-host.txt` — 12 packets, both directions, ARP both ways.
+`W7a-host.err` carries the adapter's `enx<12 hex>` name, as
+`2026-08-30b/L7a-host.err` and `2026-08-30c/V7a-host.err` already do. 量: that
+is the **workstation's** adapter, `HOST` class under `leakscan --attribute`, not
+this unit — the row that decided it is `SPEC.md` `FLS-22`. Unchanged practice,
+checked rather than assumed.

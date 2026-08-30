@@ -1432,7 +1432,10 @@ the same thing.
 **What is new in it, and three of the four are controls rather than readings**:
 a **pre-read of every `FLR` destination** before its `FLR` (the bracket has
 never had a negative control, so *the RAM already held these bytes* has never
-been excluded); **new RAM destinations** `0x80A00400`–`0x80A00700`, which only
+been excluded — 🔄 **2026-08-31: it has one now, it held on all eight pre-reads
+across two rounds, and on the second round it FIRED**, voiding that round's
+bracket because DRAM had retained the first round's contents. § Results,
+seating 7); **new RAM destinations** `0x80A00400`–`0x80A00700`, which only
 became possible when `flashwin normalise` arrived to strip the address column a
 `cmp` was comparing; a **fourth window at `0x006400`**, the one page of `H601`
 this device has ever been seen to change (`FLS-21`); and `M-a`–`M-d`, the first
@@ -3345,3 +3348,127 @@ index, index 5 is renamed to `eth7`. 量, `V-6a.log` lists `eth7`. Nothing is op
   `FW-32 殘留`.
 * **`R1a`, and it has not moved.** A boot that works is consistent with a load
   delay hazard that was never hit.
+
+## Results — Session B5, seating 7, 2026-08-31. `R3-9` and `R3-10b`
+
+**Two power cycles. Five prediction blocks, and four of them were written at the
+bench** — block 3 **42 of 54**, blocks 3b/3c/3d/3e **18 of 18**. The twelve that
+did not run are cycle 6's ten bracket cells, voided by their own pre-read
+stop-if, plus `X-ph`/`X-pc`, whose captures were moved out of the repository.
+`bench/2026-08-31/` (cycle 5, `W-*`/`M-*`) and `bench/2026-08-31b/` (cycle 6,
+`X-*`/`X2-*`).
+
+🔴 **No flash-write command was issued, and the flash byte count is still
+unmeasured. 1,024 of 4,194,304 bytes are a reading** — up from 768, and this
+time with a negative control under it. That is what this seating was for.
+
+### The bracket has a negative control for the first time, and it fired
+
+The claim a bracket makes is *these flash bytes are unchanged*. The evidence was
+a `DW` of the destination after an `FLR`, matching a rendering of the dump.
+**Nothing in that chain ever showed the `FLR` wrote anything** — an `FLR` that
+silently did nothing, over a destination that happened to hold the right bytes,
+produces exactly the same capture.
+
+Block 3 §3 added a pre-read of every destination. Both rounds:
+
+| round | destinations | pre-reads differ from expectation | read-backs match the 2026-08-16 dump |
+|---|---|---|---|
+| cycle 5 (`W-*`) | `0x80A00400`–`0x80A00700` | **4 of 4** | **4 of 4** |
+| cycle 6 (`X2-*`) | `0x80A00800`–`0x80A00B00` | **4 of 4** | **4 of 4** |
+
+Four windows: `0x000000` (loader head), `0x060000` (`cr6c` header), `0x006000`
+(`H601`), and 🆕 **`0x006400`** — the canary page, the only span this unit has
+ever been seen to change (`FLS-21`). `H601` reach **3.1 % → 6.3 %**.
+
+🟢 **Cycle 6's round ran AFTER a complete rlxfw boot** — kernel, userspace,
+4,194,304 bytes through `mtd_read`, an `EACCES` write attempt, a ping. First
+evidence here that a full boot of my firmware leaves those windows unchanged.
+
+🔴 **Cycle 6's carded round was VOID and that is the control working.** All four
+of its original pre-reads normalised **equal** to their expectations before any
+`FLR`: DRAM had retained cycle 5's contents (`MEM-17`). Addresses nobody had ever
+written were still garbage, so it is retention of written data, not a reset that
+did not happen. The bracket moved to fresh addresses under
+`bench/2026-08-31b/PREDICTIONS-B5-block3d.md`.
+
+⚠️ **`X-ab` is not the freshness control this sheet's cards claim.** `REG-23` is
+*every reset puts `AUTOBURN` back to `1`*, so it separates *a reset happened*
+from *no reset happened* and says nothing about DRAM decay. And it leaves a
+**doubt, not a refutation**, over seating 6's second half, which was forced to
+reuse the first half's RAM destinations.
+
+### The MTD path, and what `wc -c` could not have seen
+
+🔴 **`M-b`/`M-c` were refuted by a missing symlink.** `wc` is one of busybox's
+fifty applets and is not one of the image's eleven busybox symlinks, so the
+carded command returned `/bin/sh: wc: not found`. **The applet table and the
+image's symlink set are two different populations.** Recovered with
+`busybox wc` under block 3b.
+
+| | reply | bytes |
+|---|---|---:|
+| `M-b2` / `X-b2` — `busybox wc -lc < /dev/mtd0ro` | `␣␣␣␣␣4422␣␣␣1245184` | 53 |
+| `M-c2` / `X-c2` — `busybox wc -lc < /dev/mtd1ro` | `␣␣␣␣␣7943␣␣␣2949120` | 53 |
+
+**The whole part read through a path the kernel will not let anything write**,
+twice, and the newline counts match the dump. That excludes a live alternative:
+`rtl8196_map_copy_from` caps a copy at 1024 bytes and returns `void`, so a short
+read reports success — **and a byte count cannot see it**. `FW-34` owns the
+mechanism and the rate (**0.92–1.01 MB/s**, ~16× `CLK-15`).
+
+### The safety property, at two points
+
+| | | |
+|---|---|---|
+| `M-d` | `echo x > /dev/mtd0ro` | `Permission denied`, 78 B, **zero flash bytes** |
+| `X-d1` | `echo x > /dev/mtd1ro` | same, 78 B — the `minor & 1` rule at a second point |
+| `X-d2` | `busybox wc -c < /dev/mtd0` | `no such file`, 74 B — the even, writable minor is absent |
+
+### `FW-32 殘留`'s null
+
+`W-3` and `X-3` are **byte-identical to `V-3`** (849 bytes, sha256
+`8317e7c9…`) — three boots across two days, identical on the wire. Their boot
+spans differ by **0.038 s**, far inside the 0.250 s residual, so the residual is
+not same-session boot-to-boot noise. ⚠️ `V-3`'s span differs from today's by
+~0.25 s, so **this null bounds same-session variance only**; whether `FW-32`'s
+two images were measured in one session is not checked here.
+
+### The abort cell ran, for the wrong reason
+
+`W-flr0a` + `W-no`: my own `FLR` echo checker compared the six-digit source as
+typed against the loader's eight-digit echo, aborted a correct read and sent `N`.
+Nothing was read and nothing changed. The abort path is now exercised on real
+hardware — by accident.
+
+### The wire census, and it is three tools rather than one
+
+🔴 **A census of `console-capture`'s captures alone would look complete and would
+not be.** Three tools drove the port this seating, and only one of them writes
+`.meta.json`.
+
+| tool | sends | flash-write commands among them |
+|---|---:|---:|
+| `console-capture.py` (75 captures, `sent` field) | 75 | **0** |
+| `console-dump.py rescue` (2 transcripts, `steps`) | 12 | **0** |
+| `loader-tftp.py put` (TFTP to RAM `0x80500000`) | 2 | **0** |
+| **total** | **89** | **0** |
+
+The `console-capture` breakdown: 36 `DW`, 9 `FLR`, 8 `Y`, 5 `busybox`, 4 `cat`,
+2 `wc`, 2 `echo`, 2 `J`, 2 `ifconfig`, 1 `ping`, 1 `N`, and 3 captures with no
+`--send` at all. **9 `FLR` against 8 `Y` and 1 `N`** — the extra `FLR` is the
+one my own checker aborted.
+
+The rescue tool's twelve are `AUTOBURN`, `LOADADDR` and `IPCONFIG`, each sent
+twice because it probes the colon form first and records that it is rejected.
+**`AUTOBURN 0` turns auto-burn off**; both transcripts carry
+`AutoBurning=0` back from the device, and `loader-tftp.py` refuses to upload
+without a recent transcript saying so.
+
+🔴 **The matcher has a positive control.** It fires on a synthetic `FLW 0 0 0`
+and not on `DW 80A00400 64`, checked in the same run — otherwise the zero above
+is a tool that cannot fail.
+
+⚠️ **This still does not license "not one flash byte is written".** It shows no
+*command* that writes flash was issued. `RUNSHEET` `G8b`'s own rule is that the
+sentence needs a full re-dump hashed against `FLS-14`, and this seating ran none.

@@ -99,8 +99,8 @@ at `10.1.1.2/24`, `/usr/bin/python3` and the board-off 3-second capture — is
 | **W-5a** | `CAP OUT W-5a --send 'cat /proc/cpuinfo' --seconds 15` | byte-identical to `bench/2026-08-30c/V-5a.log`, ⚠️ **except `BogoMIPS`, re-measured every boot** | **147** | a prompt that does not echo is **not** a shell |
 | **W-5b** | `CAP OUT W-5b --send 'cat /proc/version' --seconds 15` | `… (key@K) … #1 Sun Aug 30 **18:56:00** CST 2026`, sha256 `af2981649f1eb541…` | **111** | `18:56:50` → **`loudmc` booted**. `23:39:33` → `quietm`, yesterday's image. `#1526`/`admin@office.hopeiot` → **unattributed**, not a pass |
 | **M-a** 🆕 | `CAP OUT M-a --send 'cat /proc/mtd' --seconds 12` | three lines, §7.1, sha256 `e1272b93828f3b5b…` | **126** | any other map. **Reads zero flash bytes** — `mtd_read_proc` prints the driver's own table |
-| **M-b** 🆕 | `CAP OUT M-b --send 'wc -c < /dev/mtd0ro' --seconds 45` | `1245184` | **32** | `No such file or directory` → the node is not in the image. `No such device` → no chrdev at major 90. `Permission denied` → the odd-minor rule is not what §7.2 says. A hang → the read path stalls |
-| **M-c** 🆕 | `CAP OUT M-c --send 'wc -c < /dev/mtd1ro' --seconds 100` | `2949120` | **32** | as above |
+| **M-b** 🔄🆕 | `CAP OUT M-b --send 'wc -lc < /dev/mtd0ro' --seconds 45` | `␣␣␣␣␣4422␣␣␣1245184` — two `%9d` fields joined by one space, **19 characters**, fixed width | **45** | `No such file or directory` → the node is not in the image. `No such device` → no chrdev at major 90. `Permission denied` → the odd-minor rule is not what §7.2 says. A hang → the read path stalls. 🔴 **byte count right, line count wrong → the read path truncates**, §7.2a |
+| **M-c** 🔄🆕 | `CAP OUT M-c --send 'wc -lc < /dev/mtd1ro' --seconds 100` | `␣␣␣␣␣7943␣␣␣2949120` | **45** | as above |
 | **M-d** 🔴🆕 | `CAP OUT M-d --send 'echo x > /dev/mtd0ro' --seconds 12` | `sh: can't create /dev/mtd0ro: Permission denied` | **73** | 🔴 **a SUCCESS here is a stop-if for the whole seating.** Power off and write it up. §7.3 |
 | **W-6a** | `CAP OUT W-6a --send 'ifconfig -a' --seconds 15` | byte-identical to `bench/2026-08-30c/V-6a.log` — 23 interfaces | **7,658** | fewer than six `ethN` → the netdevs did not register |
 | **W-6b** | `CAP OUT W-6b --send 'ifconfig eth4 10.1.1.10 netmask 255.255.255.0 up' --seconds 10` | no error | **52** | — |
@@ -460,25 +460,116 @@ prints `chipName: UNKNOWN`. 量 today: the kernel's table has 29 rows and no
 match either. Two independent tables, same outcome, and the device works because
 both have a sane fallback.
 
-### §7.2 `M-b` / `M-c`: what a size buys
+### §7.2 `M-b` / `M-c`: what a size buys, and 🔄 what a line count buys on top of it
 
-`wc -c` on a character device has no shortcut: 讀 `mtd_read`, every byte goes
+`wc` on a character device has no shortcut: 讀 `mtd_read`, every byte goes
 through `part_read` → `rtl819x_flash`. So the two cells together read
 **4,194,304 bytes — the whole part — through a path the kernel will not let
 anything write**, and `M-b` alone reads all 8,192 bytes of `H601`.
 
-⚠️ **It is not a content check and does not move `FLS-20`.** Nothing compares
-the bytes to anything: this userspace has no `dd`, `md5sum`, `od`, `hexdump`,
-`cmp`, `cksum`, `sum` or `sha1sum` (量, two routes, `notes/rootfs-census.md`).
-What it establishes is that the *path* works end to end over the region a wrong
-write cannot be undone in.
+🔄 **2026-08-31, before power: this paragraph was wrong and the cell is changed
+because of it.** *(It read:)* ⚠️ *"**It is not a content check and does not move
+`FLS-20`.** Nothing compares the bytes to anything: this userspace has no `dd`,
+`md5sum`, `od`, `hexdump`, `cmp`, `cksum`, `sum` or `sha1sum` (量, two routes,
+`notes/rootfs-census.md`). What it establishes is that the* path *works end to
+end over the region a wrong write cannot be undone in."*
 
-**`wc` is present** — 量 2026-08-30 under `qemu-mips-static` against this unit's
-own extracted rootfs, through `tools/vendor-tripwire.sh`: the binary's applet
-table lists 50 names and `wc` is one of them, with the negative control
-(`definitely_not_an_applet: applet not found`) in the same run. **And its output
-carries no field padding**: 量, three sizes through this exact busybox, the
-digits and nothing else. That is where the 32-byte counts come from.
+🔴 **The applet list is right and the conclusion drawn from it is not.** The
+paragraph looked for a **digest**, did not find one, and wrote the absence down
+as *no content check is possible* — while the applet already on the row counts a
+content-derived quantity. `wc -l` is the number of `0x0A` bytes in the
+partition, and it is computable at the desk from the 2026-08-16 dump. **That is
+this repository's own §1(d) failure from `notes/leak-surface.md`** — stopping at
+the first check that could not be run and recording the stop as a property of
+the world — four days after it was written down.
+
+**So the cells send `wc -lc` and not `wc -c`.** Same read, same duration, same
+power cycle; one more number. What it still does **not** do is move `FLS-20`: a
+newline count is an aggregate, not a comparison, and 4,422 is a long way from a
+hash.
+
+**`wc` is present, and the multi-field format is not what the census said** —
+量 2026-08-30 and re-measured 2026-08-31 under `qemu-mips-static -L` against
+this unit's own extracted rootfs, through `tools/vendor-tripwire.sh`, **on the
+exact partition slices of the dump**: the applet table lists 50 names and `wc`
+is one of them, negative control `definitely_not_an_applet: applet not found` in
+the same run.
+
+| form | on `mtd0`'s bytes | width |
+|---|---|---:|
+| `wc -c` | `1245184` | 7, **no padding** |
+| `wc -l` | `4422` | 4, **no padding** |
+| 🔴 `wc -lc` | `␣␣␣␣␣4422␣␣␣1245184` | **19, PADDED** |
+
+🔴 **`notes/rootfs-census.md` says *"its output has no column width"* and that
+generalises from the single-field form to the multi-field one, where it is
+false.** Two `%9d` fields joined by one space, confirmed on the zero-length
+control (`␣␣␣␣␣␣␣␣0␣␣␣␣␣␣␣␣␣0`, also 19). Had the cell been written on the
+census's sentence, its byte count would have read 33 against a measured 45.
+
+**Where 45 comes from.** The Linux-side framing is 量, fitted on two committed
+captures and exact on both: `len(cmd) + 2` (the echo's CR LF) `+ len(reply) + 2`
+`+ 2` (the `#␣` prompt, no trailing newline). `V-5b` 17+2+88+2+2 = **111** ✓;
+`V-5a` 17+2+{6 lines}+2 = **147** ✓. Here: 20 + 2 + 19 + 2 + 2 = **45**.
+⚠️ **Not `reply-size.py`'s model** — that one predicts the *loader's* replies and
+ends every family at `<RealTek>`; these four cells are past the `J` and the
+prompt is the shell's.
+
+### §7.2a 🆕 What the line count actually decides, and it is a live alternative
+
+讀 `drivers/mtd/maps/rtl819x_flash.c:62-73`:
+
+```c
+void rtl8196_map_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
+{
+	if (from>0x10000)
+	    memcpy(to, map->map_priv_1 + from, (len<=1024)?len:1024);//len);
+	else
+	    memcpy(to, map->map_priv_1 + from, (len<=4096)?len:4096);//len);
+}
+```
+
+🔴 **It is asked for `len` bytes, copies at most 1024, and returns `void`.** The
+caller is told nothing, so `mtd_read` reports `retlen = len` and hands userspace
+whatever `kmalloc` left past the cap. **A silent short read that reports
+success** — and the two cells as originally written could not have seen it,
+because `wc -c` counts what `read()` returns, not what the flash supplied.
+
+**Which one is live is decided by one config symbol, and it is measured.**
+讀 `include/linux/mtd/map.h:425-442`: with `CONFIG_MTD_COMPLEX_MAPPINGS` set,
+`map_copy_from` dispatches through the function pointer and `simple_map_init`
+assigns the accessors; **without it, `map_copy_from` is a macro to
+`inline_map_copy_from` and `simple_map_init` is a bare
+`BUG_ON(!map_bankwidth_supported(...))`** — the driver's own `copy_from` is
+never consulted at all.
+
+量 2026-08-31: **`# CONFIG_MTD_COMPLEX_MAPPINGS is not set` in all 31
+`.config-built` files on this disk**, `quietmc` — the image going up today —
+among them. 🟢 **So the truncating function is dead code in this kernel**, and
+the prediction is H0.
+
+| | `wc -l` on `mtd0` | on `mtd1` |
+|---|---:|---:|
+| **H0** — the inline copy, full length (**predicted**) | **4422** | **7943** |
+| H1 — the truncating `copy_from`, flash contribution alone | ≤ 1228 | ≤ 2007 |
+
+H1's figures are **lower bounds** at a 4,096-byte request; at `mtd_read`'s
+128 KiB ceiling they fall to 53 and 71, and slab residue adds an unknown
+non-negative amount on top. **The two hypotheses are separated by at least a
+factor of 3.6 everywhere in that range**, so one reading tells them apart — which
+is the only reason the cell is worth the characters.
+
+⚠️ **A match is weaker than it looks and the row must not be quoted without
+this.** `wc -l` is a population count: it is one number over 1.2 MB, it cannot
+place a byte, and a permutation of the partition would pass it. It separates
+*the path returns this flash* from *the path returns a quarter of this flash and
+lies about it*. It does not establish that any particular byte is unchanged, and
+`FLS-20` still belongs to the `FLR` bracket.
+
+⚠️ **And `map->virt` is `0xbd000000` — KSEG1, uncached** (讀 `:107-109`), so
+every byte really is an SPI bus transaction. That is the same class of access
+`CLK-15` timed, which is what makes the 59.8 KB/s estimate below the right order
+rather than a guess about a different mechanism.
 
 🔴 **The terminators are sized on the READ, not on the reply, and the first
 draft had them too short.** Nothing comes back on the wire until `wc` finishes,

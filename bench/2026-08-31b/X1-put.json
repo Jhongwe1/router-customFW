@@ -1,0 +1,15 @@
+{
+  "op": "put",
+  "host": "10.1.1.1",
+  "tid": 2098,
+  "filename": "rlxfw-quietmc",
+  "image": "/home/key/fwre-work/rebuild/bench-only/b5-20260831/rlxfw-quietmc-20260830.bin",
+  "bytes": 1029120,
+  "blocks": 2011,
+  "sha256": "08b088135c62cbef90a69e081dfd55381b67ab73636054ba788148cf28fb3702",
+  "seconds": 1.553,
+  "retransmits": 0,
+  "rescue_report": "bench/2026-08-31b/X0-rescue.json",
+  "rescue_ip": "10.1.1.1",
+  "producer": "loader-tftp"
+}

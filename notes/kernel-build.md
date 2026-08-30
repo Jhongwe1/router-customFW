@@ -2789,9 +2789,20 @@ image is one that is not reading the image.
 | cell | command | prediction | refuted by |
 |---|---|---|---|
 | `M-a` | `cat /proc/mtd` | two partitions, `0x00130000` and `0x002d0000`, names `boot+cfg+linux` and `root fs` | any other map. Reads **zero** flash bytes — `mtd_read_proc` prints the driver's own table |
-| `M-b` | `wc -c < /dev/mtd0ro` | **1245184** | any other number; `No such device` (no chrdev registered); `Permission denied` (the odd-minor rule is not what it says); a hang |
-| `M-c` | `wc -c < /dev/mtd1ro` | **2949120** | as above |
+| `M-b` | 🔄 **`busybox wc -lc < /dev/mtd0ro`** *(was `wc -c < /dev/mtd0ro`)* | **`␣␣␣␣␣4422␣␣␣1245184`** | any other number; `No such device` (no chrdev registered); `Permission denied` (the odd-minor rule is not what it says); a hang; 🔴 **the byte count right and the line count wrong → the read path truncates (§19.1)** |
+| `M-c` | 🔄 **`busybox wc -lc < /dev/mtd1ro`** | **`␣␣␣␣␣7943␣␣␣2949120`** | as above, against 7943 |
 | `M-d` | `echo x > /dev/mtd0ro` | **`Permission denied`** | anything else — and a **success** here is a stop-if for the whole seating |
+
+
+🔴 **2026-08-31: both corrections above are why this table exists, and both were
+found by running it.** ① **`wc` is not in the image** — it is one of busybox's
+fifty applets and not one of the eleven declared symlinks, so the bare form
+returns `/bin/sh: wc: not found`. **Use `busybox <applet>` for anything outside
+`sh ash cat echo ls mount ps ifconfig ping mkdir sleep`.** ② **`-c` alone cannot
+check content**: it counts what `read()` returns, so a silently truncating
+`copy_from` would pass it. `-lc` costs the same read and separates the two by
+≥3.6×. ⚠️ **And multi-field `wc` output is column-padded (19 chars) while the
+single-field form is not** — §19 and `notes/rootfs-census.md` own that.
 
 🟢 **`M-b` and `M-c` buy more than a size, and it is worth saying because the
 obvious reading undersells them.** `wc -c` on a character device has no shortcut:
@@ -3211,3 +3222,156 @@ runs, and **the runner's exact package set** — which is read out of `ci.yml`'s
 recorded as *"the table is off by one"* if the reason had not been chased: a
 number this repository declares would have been changed to match a measurement
 taken in the wrong configuration.
+
+## 19. `R3-9`/`R3-10b` on the silicon: the MTD path works, and the reason it could have silently not worked
+
+**量 2026-08-31, seating 7, two power cycles.** `bench/2026-08-31/` and
+`bench/2026-08-31b/`. The card is `PREDICTIONS-B5-block3.md`; what it got wrong
+is `CORRECTIONS-block3.md`; this section owns the **mechanism**.
+
+### 19.1 🔴 The alternative that had to be excluded, and `wc -c` could not have excluded it
+
+讀 `drivers/mtd/maps/rtl819x_flash.c:62-73`:
+
+```c
+void rtl8196_map_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
+{
+	if (from>0x10000)
+	    memcpy(to, map->map_priv_1 + from, (len<=1024)?len:1024);//len);
+	else
+	    memcpy(to, map->map_priv_1 + from, (len<=4096)?len:4096);//len);
+}
+```
+
+It is asked for `len`, copies at most **1024**, and returns **`void`**. The
+commented-out `//len)` on both branches says the truncation was deliberate. The
+caller cannot learn it happened: `mtd_read` sets `retlen = len` and
+`copy_to_user` hands the whole buffer up, so the bytes past the cap are
+uninitialised `kmalloc` memory presented as flash.
+
+🔴 **`wc -c` counts what `read()` returns, not what the flash supplied.** So
+`M-b`/`M-c` as originally carded — a byte count — would have returned exactly
+`1245184` and `2949120` **whether or not** this function was live. The card's
+§7.2 said the cells were "not a content check" and treated that as unavoidable
+because the image has no digest applet; it is unavoidable only if the applet on
+the row is ignored. `wc -l` is content-derived and costs nothing extra.
+
+### 19.2 Which `copy_from` is live is one config symbol, and it is not the driver's choice
+
+讀 `include/linux/mtd/map.h:425-442`:
+
+| `CONFIG_MTD_COMPLEX_MAPPINGS` | `map_copy_from(...)` | `simple_map_init(map)` |
+|---|---|---|
+| set | `(map)->copy_from(map, to, from, len)` — the function pointer | assigns the accessors |
+| **not set** | `inline_map_copy_from(map, to, from, len)` — **a macro, the pointer is never consulted** | `BUG_ON(!map_bankwidth_supported((map)->bankwidth))`, an assertion and nothing else |
+
+**So with the symbol unset, `rtl8196_map_copy_from` is dead code** — not
+overridden at runtime, but *bypassed at compile time*. `init_rtl8196_map` calls
+`simple_map_init(&spi_map[i])` at `:261` and nothing after it reassigns
+anything, which under the unset branch is a `BUG_ON` that the booting kernel
+already proved does not fire.
+
+量: **`# CONFIG_MTD_COMPLEX_MAPPINGS is not set` in all 31 `.config-built`
+files on this disk**, `quietmc` — the image seating 7 uploaded — among them.
+
+⚠️ **This is 讀 plus a config grep, and the device is the only thing that can
+turn it into 量.** Which is what §19.3 is.
+
+### 19.3 The reading, four times, across two power cycles
+
+| cell | command | reply | bytes |
+|---|---|---|---:|
+| `M-b2` | `busybox wc -lc < /dev/mtd0ro` | `␣␣␣␣␣4422␣␣␣1245184` | 53 |
+| `M-c2` | `busybox wc -lc < /dev/mtd1ro` | `␣␣␣␣␣7943␣␣␣2949120` | 53 |
+| `X-b2` | same, cycle 6 | identical | 53 |
+| `X-c2` | same, cycle 6 | identical | 53 |
+
+The expected counts were computed at the desk from
+`$FWRE_WORK/dumps/flash-n150rt-console-2.bin` (`FLS-14`, sha256 verified in the
+same script) over the two partition slices, with three controls: the dump's own
+size and hash, a hand-built slice whose newline count is known by construction,
+and the requirement that the two partitions tile all 4,194,304 bytes with no gap
+or overlap. **A second, independent implementation agreed**: this unit's own
+busybox under `qemu-mips-static -L`, run over the same slices, printed the same
+two numbers.
+
+**H1 would have given ≤1228 and ≤2007** at a 4,096-byte request, falling to 53
+and 71 at `mtd_read`'s 128 KiB ceiling, with slab residue adding an unknown
+non-negative amount. **The separation is at least 3.6× everywhere in that
+range.** H0 is what came back, four times.
+
+> The whole 4,194,304 bytes have now been read through a path the kernel will
+> not let anything write, and what came back is this unit's own flash.
+
+⚠️ **It is an aggregate, not a comparison.** A newline count places no byte and
+a permutation of the partition would pass it. `FLS-20` still belongs to the
+`FLR` bracket.
+
+### 19.4 The rate, and the estimate it refutes
+
+From the wire-silent gap in each `.timing` — nothing returns until `wc`
+finishes, so the gap **is** the read:
+
+| | `M-b2` | `X-b2` | `M-c2` | `X-c2` |
+|---|---:|---:|---:|---:|
+| gap | 1.356 s | 1.230 s | 2.959 s | 2.933 s |
+| rate | 918.6 KB/s | 1012.4 KB/s | 996.6 KB/s | 1005.6 KB/s |
+
+**≈ 0.92–1.01 MB/s**, against the card's `CLK-15`-derived **59.8 KB/s** 推 —
+**~16×**. The terminators (45 s / 100 s, set at ~2× the estimate) were therefore
+over-provisioned by an order of magnitude. Harmless, and now a 量.
+
+⚠️ **Why the two differ is undetermined** and `SPEC.md` §17 owns it. Both are
+uncached: `map->virt` is `0xbd000000`, KSEG1 (讀 `:107-109`), and stage 1 is the
+loader's own uncached copy. Candidates: byte-at-a-time versus `memcpy_fromio`'s
+word-at-a-time (a factor of 4, not 16); different bus or clock state at the two
+moments; `CLK-15`'s 350 ms containing more than the copy. **The first is
+settleable at the desk from the two disassemblies and needs no power cycle.**
+
+🔴 **And a band drawn from n=1 was refuted by n=2.**
+`PREDICTIONS-B5-block3c.md` §3 predicted 1.30–1.45 s for `mtd0` from `M-b2`
+alone; `X-b2` returned **1.230 s**. The band was written before the number was
+seen, so this is a refutation rather than a widening. The spread across four
+reads is ~10 % and the row that quotes the rate has to carry that.
+
+### 19.5 The safety property, measured at two points instead of argued at one
+
+讀 `mtdchar.c`'s `mtd_open`: `(f_mode & FMODE_WRITE) && (minor & 1)` → `-EACCES`.
+量 on the silicon:
+
+| | | |
+|---|---|---|
+| `M-d` | `echo x > /dev/mtd0ro` (`c 90 1`) | `/bin/sh: can't create /dev/mtd0ro: Permission denied`, 78 B |
+| `X-d1` | `echo x > /dev/mtd1ro` (`c 90 3`) | identical shape, 78 B |
+| `X-d2` | `busybox wc -c < /dev/mtd0` (even minor) | `/bin/sh: can't open /dev/mtd0: no such file`, 74 B |
+
+**Zero flash bytes** — `open` fails before any write is issued. One instance is
+an anecdote; `X-d1` makes it two, on the other declared node. `X-d2` closes the
+other half: the even, writable minor **is absent**, so `FW-30`'s *the
+declaration set is the whole node set* is measured.
+
+⚠️ **`FW-30`'s typo sentence is true of a read and false of a write.**
+`echo x > /dev/mtd0` would make the shell **create a regular file** — initramfs
+is writable. That reaches no flash, but it is not `No such file`, and the block
+tests the read direction deliberately for exactly that reason.
+
+⚠️ **The message text transferred from qemu; the prefix did not.** The desk
+measurement ran busybox with argv[0] = `sh`; the device's shell was invoked
+through `/bin/sh` and prints that — **+5 characters on every shell-error cell**.
+And the input-redirect failure is busybox's own short `no such file`, not
+`strerror`'s `No such file or directory`.
+
+### 19.6 🔴 What the seating found that is not about MTD at all
+
+**`wc` was on the applet list and not in the image.** The image declares eleven
+busybox symlinks and `wc` is not one, so the carded command returned
+`/bin/sh: wc: not found`. The applet census (`FW-26`) is correct; what is
+missing is that **nothing compares a card's typed commands against the
+declaration of the image that card uploads**. Same shape as the carried-forward
+row *a declaration ahead of every artefact*, one turn further on.
+
+**DRAM retained written data across a power cycle** (`MEM-17`). Cycle 6's four
+pre-reads came back byte-identical to the flash expectations before any `FLR`
+ran, while addresses nobody had written were still garbage. It voided cycle 6's
+bracket, it cost `X-ab` its claim to prove a cold boot, and it was caught by the
+pre-read control on the first occasion that control existed.

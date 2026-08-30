@@ -82,7 +82,15 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # touched was `bench/`, which is the POPULATION every census-shaped case here
 # reads. "Only the suites you changed" is the wrong rule when what changed is
 # data. Every seating moves this line.
-ck "twelve cold, nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 12 cold, 9 warm, 0 unknown')"
+# 🔄 12/9 until 2026-08-31 (seating 7), which added TWO cold power-ons and no
+# warm reset: `2026-08-31/W-A` (power cycle 5) and `2026-08-31b/X-A` (power
+# cycle 6). Same isolation check, run before this line was touched: the tree
+# with those two directories removed still reports 12 cold, 9 warm, and each
+# directory alone reports 1 cold / 0 warm -- so the delta is exactly
+# +2 cold / +0 warm and nothing reclassified. This seating ran the whole suite
+# set rather than `--only`, for the reason the paragraph above gives, and this
+# is the one case it caught.
+ck "fourteen cold, nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 14 cold, 9 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something

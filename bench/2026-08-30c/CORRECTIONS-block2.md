@@ -217,3 +217,40 @@ the submodule pinned at `4d3ff26`, and byte-identical copies sit in the sibling
 invocation reproducible — but a reader following the card at the bench has
 nothing telling them which of the two to run, and a card that names a tool it
 cannot locate is one power cycle from being a problem.
+
+## §10 🔴 2026-08-31: seating 7 puts a doubt on this block's second half
+
+**Added a day later, by the seating that came next.** Cycle 4 of this block was
+**forced to reuse cycle 3's RAM destinations** — `cmp` on a `DW` reply compares
+the echoed command and the `%08X:` address column, so a capture taken at one
+destination can only be compared with a capture taken at the same one. The block
+says so itself; `flashwin normalise` was written afterwards to lift it.
+
+量 2026-08-31, seating 7: **this DRAM retains written data across a power
+cycle.** Cycle 6's four `FLR` destinations came back byte-identical to the flash
+expectations *before any `FLR` ran*, while addresses nobody had ever written were
+still uninitialised. `SPEC.md` `MEM-17`.
+
+> **So `Z-rd0`/`Z-rd6`/`Z-rdh` could have been reading cycle 3's RAM rather than
+> the flash, and nothing in this block's captures can tell.**
+
+⚠️ **This is a doubt, not a refutation, and the distinction is the whole point.**
+
+* the `FLR` echo was read on every row and matched `from <source> to <destination>`
+* `Flash Read Successed!` came back on every one
+* the readings agreed with the 2026-08-16 dump, which is what they would do if
+  the `FLR` worked
+
+**What is missing is the negative control**, and it cannot be added
+retroactively: a pre-read has to be taken *before* the `FLR` it protects.
+Seating 7 added it — and on its second round it **fired**, which is the direct
+evidence that this failure mode is real on this board rather than theoretical.
+
+⚠️ **`Z-ab` does not close it.** `REG-23` is *every reset puts `AUTOBURN` back to
+`1`*, so `00000001` proves a reset happened and says nothing about whether DRAM
+decayed. This block's §13.2 calls `Z-ab` *"the control that makes cycle 4 a
+cycle"*; it makes it a **separate boot**, not a cold one.
+
+**What this block is still entitled to say**: the `FLR` echo was correct, the
+loader reported success, and the bytes returned match the reference dump. What it
+may **not** say unqualified is *the flash was read*, on the second round.

@@ -1,0 +1,3 @@
+busybox wc -lc < /dev/mtd1ro
+     7943   2949120
+# 
