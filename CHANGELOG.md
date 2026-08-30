@@ -178,7 +178,10 @@ Both halves of the defect found before power on 2026-08-29 are closed. 🔴 **Wh
 the guard sits was measured and the obvious answer is wrong**: of the four
 terminator-less invocations in the suite, only **one** reaches it — the other
 three are refused by `_check_send` first — so `P4` gains `--seconds 1` and `N21`
-is the sandwich that pins the guard's position from both sides with one command.
+was described as pinning the guard's position from both sides with one command.
+🔴 **It does not, and the entry above this one says so**: `N21` sends 127
+characters, a length the validator accepts, so it passes whether or not the guard
+sits in the right place. Left here as written, with the correction beside it.
 `test-console-capture` 29 → **40**, nine of the eleven new cases controls.
 `TOOL_VERSION` deliberately did not move: it owns what went out on the wire, and
 the presence of the `seconds` key is what dates a capture instead.

@@ -312,8 +312,20 @@ def _check_terminator(args) -> None:
     :315 -- the 127-character line, the only one of the four whose assertion is
     that the run reaches the port.  N4 (:196), N7 (:307) and N8 (:332) are
     refused inside ``_check_send`` and never get here.  P4 now carries its own
-    terminator, and N20 is the sandwich that pins this function's position from
-    both sides with one command.
+    terminator.
+
+    🔴 THIS PARAGRAPH USED TO END "and N20 is the sandwich that pins this
+    function's position from both sides with one command", and it was wrong
+    twice.  The case is N21, not N20; and N21 does NOT pin both sides.  It sends
+    127 characters -- a length ``_check_send`` ACCEPTS -- so it gets the
+    terminator refusal whether or not this function sits above ``_check_send``.
+    That side was held only by N4/N7/N8 happening to carry no terminator, which
+    is coverage by accident.  量 2026-08-30 with
+    tools/test-console-capture-mutants.py: the mutant that moves this call above
+    ``_check_send`` is killed by N4/N7/N8 and by **N29**, which sends 128 and
+    requires the LENGTH refusal.  N30 holds the other edge: with the output
+    files already present, the TERMINATOR refusal must still come first.
+    One edge each, by assertion.
     """
     if args.seconds <= 0 and args.idle <= 0:
         _fail(

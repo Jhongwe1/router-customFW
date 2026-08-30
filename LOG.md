@@ -8962,12 +8962,57 @@ major 90 沒有註冊 chrdev，所以那個節點會是 `ENODEV`。**一個全�
   印出 "still running"，而實際上那個 `nohup` 的背景工作在 WSL 命令結束時就死了。
   「還在跑」和「從來沒開始」被同一個輸出蓋掉。改成先測 `-f` 再 `pgrep -c`。
 
+### 8. 🔴 收工後的擁有者稽核，而它找到六個地方
+
+推上去之後才做的一件事：**照著「一個發現先落在擁有者檔案、再落在 `SPEC.md`」這條規則，
+把今天每一句話逐條對回它的擁有者。** 結果不是零。
+
+**① 那句被否證的話活在四個地方，其中兩個是工具自己。**
+
+今天證明了 `N21` **不會**把守衛的位置從兩側釘住（它送 127 字元，那是 `_check_send`
+**接受**的長度）。我在 `PROGRESS`、`RUNSHEET` §B5-c15、`README` 寫了更正 ——
+然後它還活在：
+
+| 檔案 | 原句 |
+|---|---|
+| `CLAUDE.md:194` | *「`N21` pins both sides with one command.」* —— **在那個自稱「只放今天為真的東西」的檔案裡** |
+| `tools/console-capture.py:315` | *「N20 is the sandwich that pins this function's position from both sides」* —— **而且連編號都寫錯**（是 `N21`） |
+| `tools/test-console-capture.sh` | 三處：檔頭索引、`P4` 區塊的註解、`N21` 區塊的 `# THE SANDWICH` 標題，外加那一格自己的 `ok` 訊息 |
+| `CHANGELOG.md:181` | 昨天那一則，對外的那一份 |
+
+> **教訓很具體：在「你注意到它的地方」改一句話，跟在「它住的地方」改，不是同一件事。**
+> 我改了三個敘述性的檔案，而**主張本身**還印在工具的 docstring 裡 ——
+> 下一個讀那支工具的人會相信 docstring，不會去讀 `PROGRESS`。
+
+全部改完，原句都留在旁邊。改完之後 `console-capture.py` 與 `test-console-capture.sh`
+都動過，所以**套件與 25 個變異重跑**：46/46、25/25，錨點沒有一個移位。
+
+**② `CLAUDE.md` 的 `-lc` 那條也不完整。** 它寫「`$VAR` 會被剝掉」。
+量：**`$?` 不是被剝掉，是被外層 shell 展開** ——
+`bash -lc 'cmd > f; echo "rc=$?" >> f'` 記到的是外層的狀態。
+**錯的數字比空字串更糟**，因為它讀起來像一個量測。已補進去，連同那個
+「`tail … || echo still running` 分不出『還在跑』和『從來沒開始』」的一行 shell。
+
+**③ 兩個真的缺口。**
+
+* `mtd0` 的十進位大小 **1,245,184** 在 `SPEC.md` `FW-28` 裡，**不在它的擁有者檔案裡**。
+  （`C5` 沒紅，因為同一列的 `2,949,120` 在 —— 但索引有而擁有者沒有，方向是反的。）已補。
+* **`R0` 的 flash 括號沒有 `SPEC.md` 列。** 那是這個專案唯一的 flash 證據，
+  而今天重新量過（六份擷取都 777 bytes、三輪逐位元組相同）並且**更正了它的敘述**
+  （括號裡只有兩次 kernel 執行有擷取，第三次是推）。
+  新列 **`FLS-19`**，`量`／`讀`，來源是六份擷取加 `RUNSHEET` §B3。
+
+**④ 一個方向相反的發現，值得記。** `LDR-06d` 一直是**對的**，
+而它的**擁有者檔案是錯的** —— `docs/loader-command-semantics.md` §f 把 `readline`
+兩個出口標成同一個空字元。**索引對、擁有者錯，在這個 repo 是少見的方向**，
+所以那一列加了一句話說明，並記下今天是由 `stage2.bin` 的反組譯獨立再導一次。
+
 ### 7. 收工前的閘
 
 `spec-check` **23/23**（9 個 `SPEC.md` 變異 ＋ 10 個 fixture 控制，`T1` 是正控制、
 `T5` 是 `T1` 的控制、`T7` 對空母體直接拒絕），全 repo 掃描 **0 findings**
 （量，收工時：3,640 列 / 623 張表 / 43,607 個 code span / 71 個檔）、
-`test-console-capture` **46/46**、`test-console-capture-mutants` **25/25 全殺**（362 s）、
+`test-console-capture` **46/46**、`test-console-capture-mutants` **25/25 全殺**（362 s；§8 的稽核動到兩支工具之後**重跑一次**，46/46 與 25/25 不變、錨點沒有移位）、
 `test-config-gates` 48/48、`mkinitramfs self-test` 23/23、`rbcheck` 16/16、
 `test-rbcheck` 9 個變異全殺、`flashwin` 19/19、`ci-census --self-test` 19/19、
 `test-file-modes` 3/3（47 個記錄為可執行）、`test-gitignore` 21/21、

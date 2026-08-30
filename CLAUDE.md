@@ -106,7 +106,16 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   day, so re-read `usbipd list` every time rather than reusing the number.
 - **The Bash tool is Git Bash, not WSL.** `-lc` mangles the command: `$VAR` is
   stripped and a leading `/` is MSYS-translated (`bash /mnt/c/x.sh` became
-  `bash C:/Program Files/Git/mnt/c/x.sh`). **Feed the script over stdin instead** —
+  `bash C:/Program Files/Git/mnt/c/x.sh`). 🆕 **2026-08-30: "stripped" is the
+  kind half. `$?` is EXPANDED, in the OUTER shell**, so
+  `bash -lc 'cmd > f; echo "rc=$?" >> f'` records the outer shell's status and
+  not `cmd`'s — 量, it wrote `rc=0` for a suite that had exited 1, and the
+  wrong number is worse than an empty one because it reads as a measurement.
+  It also swallowed a whole run: a `nohup … &` inside `wsl -- bash -lc` dies
+  with its parent, and a progress check written
+  `tail -6 f 2>/dev/null || echo "still running"` cannot tell *running* from
+  *never started* — that is this project's own "a tool reporting 0 is making a
+  claim", in a one-line shell check. **Feed the script over stdin instead** —
   nothing in the body is touched, and shell variables work:
 
   ```
@@ -191,8 +200,20 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   opened. Of the four terminator-less invocations in
   `tools/test-console-capture.sh` only **one** changes (`P4`, the 127-character
   line, the only one whose assertion is that the run reaches the port); the other
-  three are refused inside `_check_send` first. `N21` pins both sides with one
-  command. ⚠️ **`tool_version` deliberately did not move**: it owns *what the
+  three are refused inside `_check_send` first. 🔄 **2026-08-30, later the same
+  day: this bullet said *"`N21` pins both sides with one command"* and that is
+  false.** `N21` sends **127** characters — a length `_check_send` **accepts** —
+  so it gets the terminator refusal whether or not the guard sits above
+  `_check_send`; that side was held only by `N4`/`N7`/`N8` happening to carry no
+  terminator, which is coverage by accident. **`N29` sends 128 and requires the
+  LENGTH refusal**, and `N30` pre-creates the output files and requires the
+  TERMINATOR refusal ahead of the overwrite one — those two pin the position,
+  one edge each. Found by `tools/test-console-capture-mutants.py`: **25 mutants
+  of that guard, TEN alive against the forty cases**, in four classes the cases
+  could see only one instance of each. Suite 40 → 46, 25/25 killed.
+  🔴 **And a green suite is a claim about the suite**: the mutant runner is now
+  the thing that says the cases work, and it runs in CI.
+  ⚠️ **`tool_version` deliberately did not move**: it owns *what the
   instrument wrote to the port*, and nothing new goes on the wire — the
   **presence** of the `seconds` key is what dates a capture instead.
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write

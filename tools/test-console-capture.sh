@@ -81,8 +81,12 @@
 #   P14 the metadata        records `seconds` and `idle`, which until today it
 #                           did not -- so a census of what was passed was an
 #                           inference off stop_reason and one-directional
-#   N21 the sandwich        a 127-char --send with no terminator gets the
-#                           TERMINATOR refusal: after _check_send, before the port
+#   N21 the port side       a 127-char --send with no terminator gets the
+#                           TERMINATOR refusal, so the port was never opened.
+#                           🔴 It does NOT pin the _check_send side, although
+#                           this line said "the sandwich ... after _check_send,
+#                           before the port" until 2026-08-30: 127 is a length
+#                           _check_send ACCEPTS. N29 is that edge
 #   N22 and they move       a second run with different values moves both fields
 #   P15 report is exempt    the guard is capture()'s; a guard in main() breaks it
 #   N23 guard mutation      with the condition dead, N18's command reaches the port
@@ -373,8 +377,10 @@ else
   # opened, so without this flag P4 would go red for a reason that has nothing
   # to do with the cliff. 量 that day: of the four terminator-less invocations
   # in this file, this is the ONLY one that changes -- N4, N7 and N8 are refused
-  # inside _check_send, which runs first. N21 below is the case that pins that
-  # ordering from both sides.
+  # inside _check_send, which runs first. 🔴 N21 does NOT pin that ordering,
+  # although this comment said so until 2026-08-30: N21 sends 127 characters, a
+  # length _check_send ACCEPTS, so it passes either way. N29 sends 128 and
+  # requires the LENGTH refusal -- that is the case.
   OUT127="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/k" --send "$L127" --seconds 1 2>&1)"
   if printf '%s\n' "$OUT127" | grep -q 'console line buffer is'; then
     bad "P4 a 127-character --send was refused -- the guard is at the wrong threshold and C7b cannot run"
@@ -813,8 +819,15 @@ fi
 # WHY THE GUARD'S POSITION IS ITSELF A CASE. It has to sit after _check_send
 # (whose three refusals N4/N7/N8 assert, all with --port /dev/null) and before
 # the port is opened (for the reason _check_send exists at all: a tool that
-# opens the port and then refuses has already touched the device). N21 is the
-# sandwich that pins both sides with one command.
+# opens the port and then refuses has already touched the device).
+#
+# 🔴 THIS BLOCK SAID "N21 is the sandwich that pins both sides with one command"
+# AND THAT IS FALSE. N21 sends 127 characters -- a length _check_send ACCEPTS --
+# so it gets the terminator refusal whether or not the guard sits above
+# _check_send. N19 holds the lower edge (no `cannot open` in the refusal), N29
+# holds the upper one (128 characters must get the LENGTH refusal) and N30 holds
+# it against the overwrite check. One edge per case, by assertion rather than by
+# three other cases happening to carry no terminator.
 
 OUTNT="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/nt" 2>&1)"
 if printf '%s\n' "$OUTNT" | grep -q 'needs a terminator'; then
@@ -863,16 +876,20 @@ else
   printf '%s\n' "$OUTZ" | sed 's/^/        /'
 fi
 
-# THE SANDWICH. One command pins the guard between the two things it must sit
-# between: the reply must be the TERMINATOR refusal, which means the 127-byte
-# line already passed _check_send (or it would say `console line buffer is`)
-# and the port was never opened (or it would say `cannot open`).
+# N21. The reply must be the TERMINATOR refusal, which means the 127-byte line
+# already passed _check_send (or it would say `console line buffer is`) and the
+# port was never opened (or it would say `cannot open`).
+#
+# 🔴 THIS WAS LABELLED "THE SANDWICH" AND CLAIMED TO PIN BOTH SIDES. It pins
+# ONE: the port side. 127 characters is a length _check_send ACCEPTS, so it can
+# never produce that function's refusal and therefore cannot tell whether the
+# guard sits above it. N29 sends 128 and is the case for that edge.
 if [ ${#L127} -eq 127 ]; then
   OUTSW="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/sw" --send "$L127" 2>&1)"
   if printf '%s\n' "$OUTSW" | grep -q 'needs a terminator' \
      && ! printf '%s\n' "$OUTSW" | grep -q 'console line buffer is' \
      && ! printf '%s\n' "$OUTSW" | grep -q 'cannot open'; then
-    ok "N21 a 127-char --send with no terminator hits the terminator guard -- after _check_send, before the port"
+    ok "N21 a 127-char --send with no terminator hits the terminator guard (N29 is what pins the _check_send side; this one does not)"
   else
     bad "N21 the guard is not between _check_send and the port"
     printf '%s\n' "$OUTSW" | sed 's/^/        /'

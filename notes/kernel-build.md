@@ -2490,8 +2490,9 @@ a bench cell on an error message.**
 🔴 **And `/dev/mtdblock0` — the obvious substitution — is the one node this
 project must not create.** `CONFIG_MTD_BLOCK=y`, and 讀 `drivers/mtd/mtdblock.c`
 `.major = 31, .part_bits = 0`, so `mtdblock<N>` is `b 31 N`. mtd0 is
-`boot+cfg+linux`, `0x000000`–`0x130000` (量 `bench/2026-08-30b/L3.log:113`),
-**which contains both regions `CLAUDE.md` forbids writing** — the loader and
+`boot+cfg+linux`, `0x000000`–`0x130000` = **1,245,184 bytes** (量
+`bench/2026-08-30b/L3.log:113`), **which contains both regions `CLAUDE.md`
+forbids writing** — the loader and
 `H601`. `mtdblock` has a write path (`mtdblock_writesect`, a read-modify-erase-
 write of a whole erase block), and **mode `0400` is not a control**: root ignores
 DAC, so on an interactive shell `echo x > /dev/mtdblock0` is one typo from an
