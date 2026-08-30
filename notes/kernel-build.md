@@ -2396,6 +2396,42 @@ same arithmetic gives 7.30 s and the window is unaffected either way and the blo
 is the number to be safe against if the ladder stalls somewhere no channel has
 reached.
 
+
+#### 17.3a The landmark segmentation, and the method rather than the script
+
+量 2026-08-30 from `bench/2026-08-30c/V-3.timing` and `bench/2026-08-30b/L3.timing`.
+**Method, because the script is a scratchpad one and is not committed**: the
+`.timing` sidecar is `offset seconds` pairs where `offset` is the byte count in
+`.log` **before** that read; for a landmark at byte `b`, take the first pair
+whose `offset >= b` and subtract the first pair's time. Every figure below is
+relative to the first read.
+
+| landmark | `quietm` | `loudm` |
+|---|---:|---:|
+| `start address:` | 1.095 s | 1.137 s |
+| `RLXFW-B00` | 1.116 s | 1.144 s |
+| `RLXFW-B07` | 1.141 s | 1.182 s |
+| `RLXFW-B09` | 1.157 s | 1.418 s |
+| `RLXFW-B10` | 7.203 s | 8.912 s |
+| last byte | **7.260 s** | **8.971 s** |
+| **`B09` → `B10`** | **6.046 s** | **7.494 s** |
+
+**Ten of the eleven marks land inside 1.16 s and the whole of the rest is the
+`B09`→`B10` window**, in both builds — that window is `console_init()` returning
+through the switch-core and driver bring-up.
+
+⚠️ **`FW-27`'s `loudm` figures are ABSOLUTE capture times and these are relative
+to the first read**; the two agree only because the anchor is 12 ms, so
+*"the same script reproduces `FW-27`"* is a coincidence of magnitude rather than
+a control. Stated because `SPEC.md` carried the claim without the caveat.
+
+⚠️ **`tools/boot-timeline.py` does NOT do this** — it separates cold boots from
+warm resets and takes a directory, not a file. 量: it runs cleanly on
+`bench/2026-08-30c` and on `bench/2026-08-30b`. *(An adversarial reviewer read
+its refusal on a FILE argument as a refusal of this seating's captures; the same
+refusal fires on `bench/2026-08-24c/G6.log`, so it discriminates nothing. The
+control is what settled it.)*
+
 ### 17.4 What survives `CONFIG_PRINTK=n`, read out of the tree and out of the artefact
 
 | | | source |

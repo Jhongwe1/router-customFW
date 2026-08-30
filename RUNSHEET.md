@@ -3192,7 +3192,10 @@ seating was for.
 
 **The entitled sentence, `G8b`'s wording**: *the loader head and the `cr6c` header are
 byte-identical to the 2026-08-16 dump **and** to the 2026-08-24 captures; `H601`'s first
-256 bytes are byte-identical to the 2026-08-16 dump.* 🔴 **⚠️ NOT for `H601`, and that half of the sentence was false until the adversarial pass caught it.** 量: `FLR 80A00200 006000 100` occurs **twice in `bench/`, both tonight**, against five each for the other two windows. **There is no 2026-08-24 `H601` capture and there can never be one** — its only comparand is the 2026-08-16 dump, so its unobserved interval is **14 days, not 6**. **768 / 4,194,304 = 0.0183 %.** It is not
+256 bytes are byte-identical to the 2026-08-16 dump.* 🔴 **⚠️ NOT for `H601`, and that half of the sentence was false until the adversarial pass caught it.** 量: `FLR 80A00200 006000 100` occurs **twice in `bench/`, both tonight**, against five each for the other two windows. **There is no 2026-08-24 `H601` capture and there can never be one** — its only comparand is the 2026-08-16 dump, so its unobserved interval is **14 days, not 6**. **768 / 4,194,304 = 0.0183 %.** ⚠️ **Per region, and the loader's share is quoted here
+because every other sentence quotes only `H601`'s**: 256 of the loader region's 24,576
+bytes = **1.04 %**, 256 of `H601`'s 8,192 = **3.1 %**, and `0x060000` is a region no rule
+forbids writing at all. It is not
 *"zero flash bytes"*, it cannot see two writes that cancel, and it reads 256 of
 `H601`'s 8,192.
 
