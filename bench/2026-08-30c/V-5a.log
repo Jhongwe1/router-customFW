@@ -1,0 +1,8 @@
+cat /proc/cpuinfo
+system type		: RTL819xD
+processor		: 0
+cpu model		: 52481
+BogoMIPS		: 398.95
+tlb_entries		: 32
+mips16 implemented	: yes
+# 

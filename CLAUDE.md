@@ -17,10 +17,22 @@ released source.
 > 🔴 **No flash-write command was issued, and that is NOT the same sentence as
 > "not one flash byte is written"** — `RUNSHEET` `G8b` forbids the second without a
 > full re-dump, and this seating ran no `FLR` bracket, so the flash-byte count is
-> **unmeasured**. 🆕 **The next seating's card carries the bracket** —
-> `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8, three regions over two power
-> cycles, **768 of 4,194,304 bytes**. It does not make the sentence sayable; it
-> makes 0.018 % of it a reading. There is still no driver of mine —
+> **unmeasured**. 🔄 **2026-08-30, fourth update: that bracket RAN, both
+> halves, and it is now a reading.** *(This said “the next seating's card carries
+> the bracket”.)* Three 256-byte windows over two power cycles — the loader head,
+> the `cr6c` header, and **`H601`, which no bracket in this project had ever
+> sampled** — six reads, all byte-identical to the 2026-08-16 dump; the first two windows
+> also match the 2026-08-24 captures, and 🔴 **`H601` has none — there is no
+> 2026-08-24 capture of it, so its gap is 14 days rather than 6**, with `AUTOBURN` reading `00000001` on the second cycle so
+> the second half is an instrument's word and not the operator's. **768 of
+> 4,194,304 bytes = 0.0183 %.** It still does not make the forbidden sentence
+> sayable — it cannot see two writes that cancel, and it reads 256 of `H601`'s
+> 8,192. The same seating booted `quietm` to a shell in **7.260 s** and pinged
+> 4/4. 🔴 **It also refuted its own byte prediction**: `quietm` printed 849
+> bytes where 401 was predicted, because `CONFIG_PRINTK=n` removes `printk` and
+> **not** the vendor driver's 97 `panic_printk` call sites (`SPEC.md` `FW-31`; the same
+> evening's adversarial pass corrected that number from 274, which counted seven
+> `built-in.o` aggregations alongside the leaves inside them). There is still no driver of mine —
 > the ping went out through the vendor's `rtl819x`, which is in the vendor's own
 > configuration. *(Until today this said "nothing of mine has executed on the
 > silicon", which stopped being true at 23:09; the sentence before that said "no
@@ -70,7 +82,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
 |                                                        |                                                                                                                             |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | write flash                                            | mainline is zero-write through R9. A write needs my explicit yes                                                            |
-| touch `0x000000–0x005FFF` or `0x006000–0x007FFF`       | loader — bricked is unrecoverable, there is no spare. `H601` — this unit's MAC and radio calibration, not restored by reset. 🔴 **2026-08-30: nothing has ever CHECKED the second one.** 量: `RUNSHEET` §B3's `G8a`/`G8b` flash bracket samples 256 of the loader region's 24,576 bytes, 256 bytes of the `cr6c` header — which no rule forbids writing — and **0 of `H601`'s 8,192**. Six days of write-ups called those *"the two regions that would change"*, and neither of them was the one that cannot change back. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 adds it; its capture may not enter this repository and **not even its sha256 may** (with the window otherwise known, a digest is a 2^24 search for the MAC), which `tools/flashwin.py` enforces rather than remembers |
+| touch `0x000000–0x005FFF` or `0x006000–0x007FFF`       | loader — bricked is unrecoverable, there is no spare. `H601` — this unit's MAC and radio calibration, not restored by reset. 🔄 **2026-08-30, twice in one day — and the morning's sentence was too strong.** *(It read: “nothing has ever CHECKED the second one”.)* True of **rlxfw's own** `G8a`/`G8b` bracket; **false about the device** — `upstream/BENCH-LOG.md` holds seven baselines of `H601`'s first 4 KiB across three days, five power-ups and two flash writes, and it is the check that **caught** the 2026-08-17 write. This file's own rule is that where it contradicts the repo, the repo wins. **Evening: rlxfw's bracket now checks it too.** `bench/2026-08-30c`/`d` read `0x006000`–`0x0060FF` on both power cycles and both were byte-identical to the 2026-08-16 dump — **256 of `H601`'s 8,192 bytes, 3.1 %**, and the other 96.9 % is still unchecked. The morning's reading, which is what made that bracket exist: 量: `RUNSHEET` §B3's `G8a`/`G8b` flash bracket samples 256 of the loader region's 24,576 bytes, 256 bytes of the `cr6c` header — which no rule forbids writing — and **0 of `H601`'s 8,192**. Six days of write-ups called those *"the two regions that would change"*, and neither of them was the one that cannot change back. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 adds it; its capture may not enter this repository and **not even its sha256 may** (with the window otherwise known, a digest is a 2^24 search for the MAC), which `tools/flashwin.py` enforces rather than remembers |
 | build with `-march=mips32`                             | the load delay slot is architecturally exposed; mips32 miscompiles **silently** — no fault, no warning, just wrong values   |
 | write asm under `.set reorder`                         | you cannot know what the assembler filled in. `noreorder`, fill every delay slot yourself                                   |
 | measure the ISA or a CPU hazard under Linux            | the vendor kernel emulates `ll`/`sc` (and `sync`, as a no-op), so you would measure the kernel. Bare metal only. 🔄 **2026-08-27: the reason was half wrong and is narrowed.** This row said "and the FPU" — **there is no FPU emulator in this kernel at all**: `arch/rlx` has no `math-emu`, and `do_cpu` gives `SIGILL` for any coprocessor but 0. `simulate_llsc` alone is enough, so the rule does not move; only its reason does. `CPU-47` |

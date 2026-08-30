@@ -420,6 +420,13 @@ jobs:
       - name: test-console-capture-mutants
         run: /usr/bin/python3 tools/test-console-capture-mutants.py --jobs 8 2>&1 | tee ci-out/test-console-capture-mutants.out; exit "${PIPESTATUS[0]}"
 
+      # C10 is a checker, and a checker's controls are a claim about the
+      # controls. Twelve mutants of C10 against spec-check's own --self-test;
+      # three survived the first run and are closed by T16, T17 and a fixture
+      # fence. Synthetic throughout -- no device, no $FWRE_WORK, no pty.
+      - name: test-spec-check-mutants
+        run: /usr/bin/python3 tools/test-spec-check-mutants.py --jobs 8 2>&1 | tee ci-out/test-spec-check-mutants.out; exit "${PIPESTATUS[0]}"
+
       - name: test-opcount
         run: bash tools/test-opcount.sh 2>&1 | tee ci-out/test-opcount.out; exit "${PIPESTATUS[0]}"
 

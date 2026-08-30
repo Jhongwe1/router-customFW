@@ -833,6 +833,17 @@ at the `FLR` confirmation prompt, and a cell named `Y-…` beside a `--send 'Y'`
 a reading waiting to be misfiled. The confirmations are `V-yes0`, `V-yes6`,
 `V-yesh`.
 
+🔴 **A policy this repository enforces under `bench/` is already broken in
+`upstream/`, and it cannot be fixed by editing.** 量 2026-08-30: `upstream/BENCH-LOG.md`
+prints actual `H601` byte values at named offsets, and commits a sha256 prefix over the
+**4 KiB at flash `0x6000`** seven times — a superset of the window `FLS-20` refuses to
+publish a digest for. `upstream` is a **gitlink** pinned at `4d3ff26`, so `git ls-files`
+returns nothing under it and every sweep built on it — including `audit-bench-log.py`,
+which walks `bench/**/*.log` only — has never looked there. The 4 KiB range carries more
+entropy than the 256-byte window, so the 2^24 argument does not transfer directly; the
+finding is that **`tools/flashwin.py` enforces the rule on the paths it knows about, and
+the repository is larger than those paths.**
+
 🔴 **Two captures in this seating will not be in this directory, and that is a
 first.** `V-rdh` and `Z-rdh` are `DW` reads of `H601`, so their bytes are this
 unit's MAC and radio calibration. They go to
@@ -848,3 +859,29 @@ cell to `<prefix>.log`, so those two sit outside the ordering discipline
 entirely. That is the same hole this file already records for `CONT3` and for
 `L6c-up`, but with a reason that will never be fixable rather than one that
 could.
+
+### 🔴 Both cycles ran, 2026-08-30. `31 of 31`
+
+**21 captures in `2026-08-30c` and 10 in `2026-08-30d`**, plus `V0-rescue.json`,
+`V1-put.json` and `V7a-host.txt`/`.err`, which are not cells. Every stop-if
+stayed clear; `V-no`, `V-8a` and `V-8b` are branch cells and none of their
+branches was taken.
+
+| | |
+|---|---|
+| the bracket | all six reads matched: `V-rd0`≡`Z-rd0`≡`G8a-rd0.log`, `V-rd6`≡`Z-rd6`≡`G8a-rd6.log`, and `V-rdh`≡`Z-rdh`≡ the desk expectation. **768 / 4,194,304 = 0.0183 %** |
+| `Z-ab` | **`00000001`** (量) — it says no `AUTOBURN 0` was typed since the last **reset**. 🔴 ⚠️ **Narrowed the same evening: it does not prove a power cycle.** `EW` writes it in four bytes with no bound check and prints nothing, and a warm `J BFC00000` restores it *and* reproduces `Z-A`'s cold slice — the two routes share one blind spot. `RUNSHEET` § Results, seating 6 |
+| the one refuted cell | `V-3` is **849** bytes, not 401. Five predicted terms exact, a sixth asserted to be zero and worth 448. `CORRECTIONS-block2.md` |
+| the artefact | 🎬 shot on cycle 3, `V-3` → `V-7a` |
+
+**Corrections live in `bench/2026-08-30c/CORRECTIONS-block2.md`**, beside the
+frozen block, which is not edited.
+
+⚠️ **`bench/2026-08-25b/PREDICTIONS-b4-block2.md` carries a rendering defect that
+will not be repaired.** 量 2026-08-30 by `spec-check`'s new `C10`: one paragraph
+leaves a code span open, so the prose after it renders as code. Repairing it
+would move the file's mtime, and `check-predictions.py` reads that mtime — every
+one of its 2026-08-25 captures would then read as older than the prediction
+naming it. The defect is recorded here and the file is exempt, with a control
+(`T13`) that goes red if the file is ever repaired and the exemption left
+behind.

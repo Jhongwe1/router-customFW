@@ -2366,9 +2366,7 @@ those two symbols on:
 | **total** | **401** | |
 
 **And the number it cannot be is measured in the same file**: `loudm` put
-**6,459** bytes through that window, and the entire 6,058-byte difference is
-**105 `printk` lines**. 量. The two are impossible to confuse, which is what
-makes a single byte count a usable discriminator.
+**6,459** bytes through that window. 🔴 **2026-08-30: the difference is 5,610, not 6,058, and it is not all `printk`.** *(Original: “the entire 6,058-byte difference is **105 `printk` lines**. 量.”)* 6,058 was `6,459 − 401`, and `quietm` measured **849** — so the same 448 bytes that were missing from the prediction were counted as `printk` here too. 量 `bench/2026-08-30c/V-3.log`: the difference is `6,459 − 849` = **5,610**, and the 448 are `rtlglue_printf`, which `CONFIG_PRINTK=n` does not remove (§17.8). The two totals are still impossible to confuse, which is what makes a single byte count a usable discriminator — and that half of the sentence was the half that mattered.
 
 ### 17.3 🆕 How long the boot actually takes, and it is not the number the card was sized against
 
@@ -2388,8 +2386,7 @@ makes a single byte count a usable discriminator.
 `RUNSHEET` §B5-c12 corrected exactly this citation once already, and both
 `SPEC.md` `FW-27` and this paragraph reproduced the corrected-away form on the
 day they were written. My kernel is **2.9× faster to
-a shell**, so 90 s was 10× rather than 3.5×. `quietm` prints 6,058 fewer bytes,
-which at the 38400 line rate of 3,840 B/s is 1.58 s less, so **≈ 7.4 s (推)**.
+a shell**, so 90 s was 10× rather than 3.5×. 🔄 **2026-08-30: 量, `quietm` is 7.260 s (`bench/2026-08-30c/V-3.timing`), so the estimate was 1.9 % out — but the arithmetic that produced it was wrong.** *(Original: `quietm` prints 6,058 fewer bytes, which at the 38400 line rate of 3,840 B/s is 1.58 s less, so **≈ 7.4 s (推)**.)* It prints **5,610** fewer, which is 1.461 s of wire; the measured saving is 1.711 s, and the 0.250 s residual is **未定** with n=1 on each side (`SPEC.md` §17, `FW-32 殘留`).
 ⚠️ **3,840 is the line rate and this repo has measured the only wire rate it
 has to be lower** — `LDR-40`, 3,458–3,497 B/s marginal for the *loader's* `DW`.
 That measurement is of a different transmitter (the loader's reply path, not the
@@ -2405,8 +2402,8 @@ reached.
 |---|---|---|
 | the eleven marks | **arrive** | `rlxfw_puts` → `prom_putchar`; no console and no `printk` in the path (讀) |
 | `[    0.000000] CPU revision is: 0000cd01` | **absent** | it is `arch/rlx/kernel/cpu-probe.c:39`'s `printk` (讀). 量 on the desk channel: `quietm` emits **106** bytes where `loudm` emits **148**, and 148 − 106 = 42 is exactly that line |
-| the 105 `printk` lines between B04 and B10 | **absent** | |
-| the console, and therefore userspace | **arrives** | 讀 `kernel/printk.c`: the `#ifdef CONFIG_PRINTK` spans `:132`–`:539`, while `console_setup()` is at `:802` and `register_console()` at `:1123` — **outside it**. So `console=ttyS0,38400` is still parsed and `/dev/console` still binds |
+| the 105 `printk` lines between B04 and B10 | 🔴 **REFUTED ON THE WIRE 2026-08-30 — fifteen of them ARRIVE** | 量, `bench/2026-08-30c/V-3.log`: 448 bytes of Realtek driver output between `RLXFW-B09` and `RLXFW-B10`. They were never `printk` — they are `rtlglue_printf`, which 讀 `include/net/rtl/rtl_types.h:366` `#define`s to `panic_printk` with no Kconfig symbol in the way. §17.8 |
+| the console, and therefore userspace | **arrives** — and it did (量, `V-3.log` reaches a prompt) | 🔄 **The conclusion holds and the source was the wrong file.** *(Original: 讀 `kernel/printk.c`: the `#ifdef CONFIG_PRINTK` spans `:132`–`:539`, while `console_setup()` is at `:802` and `register_console()` at `:1123` — outside it.)* 🔴 量 2026-08-30, `kernel/Makefile:5`: `ifdef CONFIG_RTL_819X` builds **`printk_log.o` instead of `printk.o`**, and `CONFIG_RTL_819X=y` here — so **this board does not compile `kernel/printk.c` at all**. Control: in both built trees `kernel/printk.o` is absent and `kernel/printk_log.o` is present, exactly one of the two. §17.8 |
 | 🔴 a **panic**, if it panics | **arrives** | 讀 `kernel/panic.c:27`, `#define printk panic_printk` under `CONFIG_PANIC_PRINTK`; 讀 `init/Kconfig:843`, that symbol is `bool` with **no prompt** and `default y`, so it is not settable and is `=y` in both configs (量). 量 on the built `vmlinux`: `panic_printk` is a **GLOBAL FUNC in `quietm`'s symbol table** and `<0>Kernel panic - not syncing: %s` occurs **once**, while the global `printk` is gone (only three file-local ones remain) |
 
 🔴 **That last row is what makes silence mean something.** In `quietm`, silence
@@ -2426,8 +2423,10 @@ after a mark is a **hang**, not a panic that was suppressed.
 | word at file `0x18` / `0x1C` | `3C108060` / `26101400` | `3C108060` / **`2610AC00`** |
 | the variant word at `0x80540000` | `CEC3FFD9 …` | **`AFBD0BEE AE8D991B A39DEE9F 2A62E61B`** |
 | trailing zero run | 688 B | **552 B** |
-| clearance above the staged vendor image's end (`0x805F1002`, `MAP-17`) | 66,542 B | **39,918 B** |
+| clearance above the staged vendor image's end (`0x805F1002`) | 66,542 B | **39,918 B** |
 | the build stamp | `#1 Fri Aug 28 23:37:47 CST 2026` | **`#1 Fri Aug 28 23:39:33 CST 2026`** |
+
+🔴 **`MAP-17` was struck from the row above on 2026-08-30, and this is the third time that citation has had to be removed.** That row is *selected*: its own value column is `—`, so it cannot be a source for `0x805F1002`. The number is 讀 the flash header's `len` = `0x0F1002` (`FLM-09`) **plus** the inference that the loader copies exactly `len` bytes to `startAddr` — 讀 ＋ 推, and not 量. `SPEC.md` `LDR-39` owns it. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §5 caught it in the card; §12.3 and `RUNSHEET` §B5-c5 each caught it once before; **it was still here.**
 
 The build stamp has two sources that are not each other: `RUNSHEET` §B5's
 power-cycle-3 table, and 量 — `strings` on the `quietm` `vmlinux` (3,968,240
@@ -2437,17 +2436,19 @@ bytes, sha256 `dd0c1190f3646561…`, the output `quietm-build.txt` records) find
 
 ### 17.6 🔴 What `quietm` takes away, and it is not only noise
 
-**The netdev registration lines are `printk`.** Under `loudm` the
-netdev↔switch-port binding was 讀 straight off `L3.log:99-104`; under `quietm`
-those lines do not exist. On power cycle 3 the binding is **推**, carried over
-from cycle 2, and the only in-band evidence is `ifconfig -a`'s MAC list — where
-the last octet names the netdev — plus the host's `tcpdump -e` source MAC. That
-is why `-e` is not optional on this cycle.
+🔴 **REFUTED 2026-08-30, and this section held two claims that look alike and are not.**
 
-The same applies to the MTD partition table: `Creating 2 MTD partitions on
-"flash_bank_1"` and the two ranges are `printk`, so **the map that made
-Decision B's safety leg false is invisible on this boot**. It is still created;
-`bench/2026-08-30b/L3.log` is the reading and it is not repeated here.
+*(Original: “The netdev registration lines are `printk`. Under `loudm` the netdev↔switch-port binding was 讀 straight off `L3.log:99-104`; under `quietm` those lines do not exist. On power cycle 3 the binding is 推, carried over from cycle 2…”)*
+
+量, `bench/2026-08-30c/V-3.log`: **all five `ethN added. vid=… Member port …` lines are there**, and they agree with `L3.log` cell for cell — `eth0` `0x1`, `eth1` `0x10` (vid 8), `eth2` `0x2`, `eth3` `0x4`, `eth4` `0x8`. **The binding is 讀 on power cycle 3, not 推.** They are `rtlglue_printf` (`rtl_nic.c:6479`), not `printk` — and the same file prints the same sentence through `printk` at `:10515` with a `==%s(%d)` prefix, which the capture does **not** carry. §17.8.
+
+🔴 **A sixth line came with them and this paragraph called it unpredicted — while §16 of this same file, 155 lines above, already explains it.** *(It read: “A sixth line came with them and nothing predicted it: `eth5 added. vid=9 Member port 0x0`, while `V-6a`'s 23 interfaces contain no `eth5`.”)* §16: `rtl_nic.c:6479` prints the **array index**, not `dev->name`; index 5 is renamed to `eth7` via `RTL_DRV_LAN_P7_NETIF_NAME`. 量, `V-6a.log` lists **`eth7`** — the netdev is in userspace under its other name, and the capture cited as showing it missing is the capture that shows it. **A correction that re-opens a closed question is worse than no correction.**
+
+The host capture's `-e` was kept regardless and earned its place on its own: the ARP request's source MAC is `00:12:34:56:78:94`, and the last octet names `eth4` without the board being asked.
+
+🟢 **The other half of this section HELD, and the seating is what separated them.** The MTD partition table — `Creating 2 MTD partitions on "flash_bank_1"` and the two ranges — **is** `printk`: 量, those lines occur **zero** times in `V-3.log`. So the map that made Decision B's safety leg false is invisible on this boot, it is still created, and `bench/2026-08-30b/L3.log` remains the reading.
+
+🔴 **Two claims, one paragraph, one mechanism assumed for both, and only one of them was true.** The reason the netdev half was wrong is that nobody asked *which* printing function — `printk` was assumed because the lines look like kernel log lines. §17.8 is the answer that was missing.
 
 ### 17.7 🔴 Why the flash cannot be cross-read from userspace on this image
 
@@ -2509,9 +2510,13 @@ forbidden region.** It runs the identical `mtdblock_readsect` → `part_read` �
   `CONFIG_RTL_FLASH_DUAL_IMAGE_ENABLE` and `CONFIG_RTL_TWO_SPI_FLASH_ENABLE`
   both unset — `size = WINDOW_SIZE - CONFIG_RTL_ROOT_IMAGE_OFFSET = 0x2D0000`
 
-`0x400000 − 0x130000 = 0x2D0000 = **2,949,120**. ⚠️ The first draft of the
+`0x400000 − 0x130000 = 0x2D0000` = **2,949,120**. ⚠️ The first draft of the
 declaration wrote **2,818,048**, which is `0x2B0000` and a subtraction error; the
 second source is what caught it, which is the argument for having one.
+🔴 **The opening backtick of that first span was unclosed until 2026-08-30**, so the
+whole sentence rendered as one code span and `0x2B0000` — the number it is about —
+rendered as prose. Neither `C8b` (tables only) nor `C9` (whitespace-only spans) can
+see it; `C10` is the check that now does.
 
 **Cells, and both are cheap**: `cat /proc/mtd` first — it prints the map from my
 own driver and reads **zero flash bytes** (`mtd_read_proc` is in both
@@ -2529,3 +2534,88 @@ and `V-2c` read `0x805FABF0` because they know where **that** image's
 (minor & 1)) return -EACCES`) is strictly better than any mode bit and is the
 right long-term answer; it costs a kernel rebuild and is carried forward rather
 than taken between a card's desk validation and its seating.
+
+### 17.8 🔴 `CONFIG_PRINTK=n` does not make this kernel quiet, and the reason is in the vendor's own headers
+
+**Measured on the wire before it was read out of the tree.** `quietm` was built
+with `# CONFIG_PRINTK is not set` and it printed 849 bytes where the prediction
+said 401 — 448 of them fifteen lines of Realtek driver output between
+`RLXFW-B09` and `RLXFW-B10`.
+
+**The chain, one link at a time:**
+
+| | link | how |
+|---|---|---|
+| 1 | `drivers/net/rtl819x/rtl_nic.c:6213`, `:6479` and `AsicDriver/rtl865x_asicL2.c:4381` emit these lines with **`rtlglue_printf`** | 讀 |
+| 2 | `include/net/rtl/rtl_types.h:366` — `#define rtlglue_printf panic_printk`, inside `#if defined(__linux__) && defined(__KERNEL__)`. **No Kconfig symbol gates it** | 讀 |
+| 3 | `include/linux/kernel.h:271-276` — with `CONFIG_PRINTK` unset, `printk` becomes `static inline int __cold printk(const char *s, ...) { return 0; }` while **`panic_printk` is still declared `asmlinkage`**, in the `#else` branch, deliberately | 讀 |
+| 4 | `kernel/printk_log.c:668` — `panic_printk`'s body is `vprintk(fmt, args)`, under `#if defined(CONFIG_PANIC_PRINTK)`, which `init/Kconfig:843` gives no prompt and `default y` | 讀 |
+| 5 | `kernel/Makefile:5` — `ifdef CONFIG_RTL_819X` puts **`printk_log.o`** in `obj-y` **in place of `printk.o`** | 讀 ⚠️ *(this row said 量; a Makefile is code, and the 量 belongs to the control below it, which reads the built tree)* |
+| 6 | `quietm`'s `System.map`: `panic_printk` **`T` at `0x80015204`**, `vprintk` **`T` at `0x80014ef0`**, `printk` three **`t`** stubs | 量 |
+
+**Controls, because five of those six are readings of source:**
+
+* In both built trees `kernel/printk.o` is **absent** and `kernel/printk_log.o`
+  is **present** — exactly one of the two, which is what makes step 5 a
+  measurement of this build rather than of the Makefile.
+* `rtl_nic.c:6213`'s format string opens `"\n\n\n"` and the capture carries
+  exactly three blank lines before that line.
+* `rtl_nic.c` prints the **same sentence twice**: `:6479` via `rtlglue_printf`
+  and `:10515` via `printk` with a `==%s(%d)` prefix. The capture carries the
+  first and not the second — a discriminator inside one file.
+
+#### 🔴 The number that answers this is 97, and 274 was published for about an hour
+
+量 2026-08-30, relocations naming each symbol across the built objects:
+
+| population | `quietm` (`PRINTK=n`) | `loudm` (`PRINTK=y`) | |
+|---|---:|---:|---|
+| whole tree → `panic_printk` | 1,594 | 719 | 🔴 **moves — unusable** |
+| whole tree → `printk` | 0 | 6,407 | |
+| `drivers/net/rtl819x/**/*.o` → `panic_printk` | 274 | 274 | 🔴 **a glob artefact** |
+| the same, **excluding `built-in.o`** | **97** | **97** | ✅ the call-site count |
+| `drivers/net/rtl819x` → `printk` (leaves) | **0** | 998 | ✅ the discriminator |
+
+🔴 **This section caught one bad population and published another in the same table, and the adversarial pass caught the second.** *(It read: "The number that answers this is 274.")* `drivers/net/rtl819x/**/*.o` matches **28** objects, **seven of which are `built-in.o`** — `ld -r` aggregations of the leaves beside them — so a call site is counted two or three times. 量: all `*.o` = 274, excluding `built-in.o` = **97**, and the top-level `built-in.o` **alone** = 97, so `97 + 97 + 40 + 40 = 274`. **97 is the call-site count**; the leaves are `rtl865x_proc_debug.o` 41, `rtl865x_asicCom.o` 25, `rtl865x_asicL2.o` 11, `rtl_nic.o` 11, `rtl865xc_swNic.o` 5, `96E/rtl865x_asicBasic.o` 4.
+
+🔴 **And the same contamination is in the whole-tree number twice over**: at the tree root sits `vmlinux.o`, a whole-image aggregate a `-name '*.o'` glob counts as a leaf even after `built-in.o` is excluded (270 quiet / 145 loud). The obvious summary — *"1,594 call sites survive `CONFIG_PRINTK=n"`* — is a count of a **moving, multiply-counted** population and must not be quoted. The tree redefines both
+names in **both directions** in at least eight files:
+`drivers/net/wireless/rtl8192e/8192cd.h:140` is `#define panic_printk printk`
+and `8192cd_mp.c:65` is `#define printk panic_printk`. On
+`drivers/net/rtl819x` — the driver that actually printed — the count is
+identical in both builds and the `printk` column is what moves.
+
+🟢 **The control that makes "identical" mean mechanism rather than coincidence was missing and is now here**: **22 of those 28 objects are byte-different** between the two builds (`cmp` per file), and across exactly that material `panic_printk` holds at 97 per file while `printk` goes **998 → 0**. A count that does not move across binaries that genuinely differ, beside one that collapses, is a mechanism.
+
+🔴 **And the divergence in the whole-tree figure has a location**: it is *entirely* in `drivers/net/wireless/rtl8192cd/`, Δ 250 — `rtl8192cd.o` 127/2, `8192cd_mp.o` 64/2, `8192cd_ioctl.o` 45/0, `8192cd_proc.o` 7/0, `8192cd_sme.o` 5/0, `8192cd_hw.o` 4/0, `8192cd_osdep.o` 2/0. Every other object in the tree is identical. That is `8192cd.h:136` in action, and it is a finding rather than noise: **the quiet config moves 250 WLAN call sites onto the ungated path.**
+
+#### What this changes
+
+🔴 **`CONFIG_PRINTK` is a variable over the function `printk()`, not over
+console output.** §17.1 calls `quiet`/`loud` a one-variable experiment and that
+is still true of the *symbols*; what was wrong is the assumption about what the
+variable controls. `TC-31` and `SPEC.md` `FW-31` carry the corrected statement.
+
+🟢 **And §17.4's key sentence gets stronger rather than weaker.** *"In
+`quietm`, silence after a mark is a hang, not a suppressed panic"* now rests on
+more than the panic path: **97 `panic_printk` call sites in the driver directory are
+compiled in and `CONFIG_PRINTK=n` removes none of them**. ⚠️ *(This read "are also live …
+so silence is the absence of all of them", which is an absence treated as evidence: 量 says
+seven of the 97 fired on this boot, and nothing has shown the other 90 can reach the UART on
+this build.)* What silence after a mark rules out is the seven that did fire, and the panic
+path. ⚠️ The last link is still
+推 — no channel has made this build panic, so *the panic path reaches the UART*
+remains unobserved — but the driver half of it was observed tonight.
+
+⚠️ **What this does not say.** It does not say `quietm` prints everything
+`loudm` prints: 5,610 bytes did not arrive, and those are `printk`. It does not
+identify which of the 97 sites can fire on a boot — and 量, the fifteen lines that came out
+are **seven** call sites, not fifteen (`rtl_nic.c:6479` is one call in a six-iteration loop
+and `:6213` is one format string worth four lines, three of them blank). **A call-site count
+is not a line count**, and this section used them interchangeably until the adversarial pass.
+⚠️ **Two of the fifteen are not in this directory and not `rtlglue_printf` at all** —
+`drivers/net/wireless/rtl8192cd/8192cd_osdep.c:6978` and
+`net/rtl/fastpath/fastpath_common.c:1643` are direct `panic_printk` calls, 77 bytes, 17 % of
+the 448. And it says nothing about `panic_printk`'s behaviour
+before `console_init()`, which is `TC-29`'s question and is unchanged.
+

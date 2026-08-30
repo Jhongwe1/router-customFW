@@ -600,6 +600,10 @@ simulator had approved sat an `andi` in a load delay slot. So:
   down for six days. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8.2 adds it as
   a third region; §8.3 is why its capture cannot be committed and
   `tools/flashwin.py` is where its expectation comes from.
+  🟢 **2026-08-30 evening: it ran, both halves, and all three regions matched.**
+  So *“0 of `H601`'s 8,192”* above is about `G8a`/`G8b` and stays true of that
+  bracket; seating 6's reaches **768 bytes of 4,194,304** and does include `H601`.
+  § Results — seating 6.
 
 ---
 
@@ -2056,6 +2060,36 @@ does not carry it.** `nod /dev/mtdblock1 b:31:1 0400` was declared for `R3-9`
 the node lands on the next build, and that build moves `V-0t`/`V-2c`, whose
 `0x805FABF0` is derived from *this* image's `image_end`.
 
+#### §B5-c16 — 🔴 the card names two tools it does not locate, and two deviations that were run
+
+**2026-08-30, after seating 6.** The seating ran cleanly, and three things about
+the *card* came out of it that the card cannot record because it is frozen.
+
+🔴 **`console-dump.py` and `loader-tftp.py` are written with no path, and they
+are not under `tools/`.** 量 2026-08-30: they are in **`upstream/tools/`**, the
+submodule pinned at `4d3ff26`, and byte-identical copies sit in the sibling
+`router` checkout — `cmp` returns equal on both files. This seating ran the
+pinned ones, which is what makes the invocation reproducible. **A card that names
+a tool an operator cannot locate is one power cycle from a problem**, and the
+next card writes the path.
+
+⚠️ **Deviation 1, deliberate: `V-1` was given `--report bench/2026-08-30c/V1-put.json`.**
+The card's row does not carry it, but the block's own §2 lists *"the
+`loader-tftp.py` `put` transcript"* among the artefacts this seating produces —
+so the flag makes §2 true rather than adding anything. Nothing on the wire
+changed.
+
+⚠️ **Deviation 2, deliberate: each `Y` was gated on `grep -Fq` of the exact
+expected echo** rather than on the operator reading it. The card's stop-if is
+*read the echo before typing `Y`*; this is the same test made mechanical. It
+printed `GATE PASS` with the matched string on all six, and a mismatch would
+have sent nothing rather than `N`. 🔴 **It has no negative control** — no echo
+was ever wrong, so the gate has never been shown able to refuse. **It is a habit
+turned into a check and it is not yet an instrument**, and this row says so
+rather than letting the next card inherit it as one.
+
+---
+
 ### Running order, and it does not move
 
 🔴 **`probe3` runs first, before any kernel.** `R3`'s pass state is *a kernel is
@@ -2933,7 +2967,7 @@ situation as `bench/2026-08-24e`'s `block12` and is recorded the same way.
 | | |
 |---|---|
 | `tools/reply-size.py` | 🔴 **`check` crashed on an unreadable `.meta.json`** — `TypeError: %d format: a real number is required, not str`. The `UNREADABLE` branch existed, was tallied and counted toward `misses`, and **could never print**, because it stored its error message in the column the printer formats with `%+d`. Same defect class as `hazlint` 1.0's `K4`. Fixed, with `S5`: 12 cases → **21**, including a mutation that restores both halves and demands the traceback come back. 🆕 And `UNREADABLE` no longer counts toward `modelled`, which had inflated the population figure this project quotes |
-| `tools/boot-timeline.py` | 🔴 **the artifact anchor was `byte 0 → byte 1`**, which is right only for a one-byte prefix. On tonight's two-byte prefix it measured the gap **between the two artifact bytes** and reported **4.2 ms** where the other cold starts read 340.4 and 349.0 — pooled spread **149.1 %**, with nothing saying why. Now `byte 0 → the device's own `\r\nBooting``, guarded on byte 0 being an idle sample **and** the prefix being ≤ 8 bytes, because removing the first guard made a warm capture's whole 2,909-byte report the "prefix" and printed 63.7 s. Pooled artifact spread **149.1 % → 2.5 %**. 12 cases → **15** |
+| `tools/boot-timeline.py` | 🔴 **the artifact anchor was `byte 0 → byte 1`**, which is right only for a one-byte prefix. On tonight's two-byte prefix it measured the gap **between the two artifact bytes** and reported **4.2 ms** where the other cold starts read 340.4 and 349.0 — pooled spread **149.1 %**, with nothing saying why. Now `byte 0` → the device's own `\r\nBooting`, guarded on byte 0 being an idle sample **and** the prefix being ≤ 8 bytes, because removing the first guard made a warm capture's whole 2,909-byte report the "prefix" and printed 63.7 s. Pooled artifact spread **149.1 % → 2.5 %**. 12 cases → **15** |
 | `tools/rlxprobe/exc.S` | the comment said a non-writing `mfc0` pair gives `0x110F0000`; `0xD1CE0009 − 0xC0DE0009 = 0x10F00000`, two digits transposed. A comment, so no emitted word changed — **but it is the number a reader checks the reading against**, and a correct not-written run would have been called a mismatch. The device answered `S_ZERO` rather than `S_NOWRITE`, so the branch was never exercised and the wrong constant cost nothing this time |
 
 ### What this seating did not answer
@@ -3132,3 +3166,142 @@ worth more than the conclusion it does not change.
   untreated victim moved too.
 * **`quietm`.** Power cycle 3 was not spent; `L-3` reaching D4 selects it, and its
   block is deliberately unwritten.
+
+
+---
+
+## Results — Session B5, seating 6, 2026-08-30. `R3-8b` and `R3-10`
+
+**Two power cycles, 31 predicted cells, `31 of 31 captures came after the
+prediction, 0 did not`.** Every stop-if on both cards stayed clear; the `V-no`
+abort branch did not run because no `FLR` echo was ever wrong, and `V-8a`/`V-8b`
+did not run because `J` reached D4. `bench/2026-08-30c/` (cycle 3, `V-*`) and
+`bench/2026-08-30d/` (cycle 4, `Z-*`).
+
+🔴 **No flash-write command was issued, and the flash byte count is still
+unmeasured — but 768 of 4,194,304 bytes are now a reading.** That is what this
+seating was for.
+
+### The flash bracket closes, and `H601` is in it for the first time
+
+| region | flash | `V-*` (before `J`) | `Z-*` (after `quietm` ran) |
+|---|---|---|---|
+| loader head | `0x000000`–`0x0000FF` | 🟢 byte-identical to `bench/2026-08-24d/G8a-rd0.log`, `cea9a0f1eeaaa884…` | 🟢 identical to both |
+| `cr6c` header | `0x060000`–`0x0600FF` | 🟢 byte-identical to `G8a-rd6.log`, `8c9949bcd28ff86a…` | 🟢 identical to both |
+| 🔴 **`H601`** | `0x006000`–`0x0060FF` | 🟢 identical to the desk expectation | 🟢 identical to `V-rdh` **and** to the expectation |
+
+**The entitled sentence, `G8b`'s wording**: *the loader head and the `cr6c` header are
+byte-identical to the 2026-08-16 dump **and** to the 2026-08-24 captures; `H601`'s first
+256 bytes are byte-identical to the 2026-08-16 dump.* 🔴 **⚠️ NOT for `H601`, and that half of the sentence was false until the adversarial pass caught it.** 量: `FLR 80A00200 006000 100` occurs **twice in `bench/`, both tonight**, against five each for the other two windows. **There is no 2026-08-24 `H601` capture and there can never be one** — its only comparand is the 2026-08-16 dump, so its unobserved interval is **14 days, not 6**. **768 / 4,194,304 = 0.0183 %.** It is not
+*"zero flash bytes"*, it cannot see two writes that cancel, and it reads 256 of
+`H601`'s 8,192.
+
+🔴 **`Z-ab` read `00000001`**, so the second half is a second observation by
+instrument rather than by the operator's word that the power was cycled; 🔴 **⚠️ Narrowed the same evening: `Z-ab` proves a *reset*, not a *power cycle*, and it is operator-writable.** `0x8040D4A0` is `AUTOBURN`; 讀 `docs/loader-command-semantics.md`, `EW <addr> <value>` writes four bytes with **no bound check and no console output at all**, so `EW 8040D4A0 1` produces this reading with no power cycle and no trace. 量: no `EW`, `EB`, `AUTOBURN` or `FLW` appears in any of the 31 captures — **but that is the operator's own capture set vouching for the operator**, which is the circularity the cell was meant to escape. And `J BFC00000` resets the board with the ESC window intact, so a warm reset restores `AUTOBURN` **and** produces `Z-A`'s cold slice: the two routes share the blind spot and are not independent with respect to the failure that matters. What `Z-ab` does establish is that no `AUTOBURN 0` was typed since the last reset. `WDTCNR` bit 20 is the observable that would separate the two and it is unmeasured.
+
+`Z-A`'s 181-byte cold slice says the same by an independent route. `V-rdh` and
+`Z-rdh` are outside this repository and **no digest of either is published**;
+what is committed is the verdict and `flashwin`'s `R1`/`R2`, which require the
+same renderer to reproduce the two committed 2026-08-24 captures byte for byte.
+
+
+### 🔴 The H601 window is the wrong 256 bytes, and this repository already held the proof
+
+**量 2026-08-30, after the seating, offsets only — no byte value of `H601`
+appears here or anywhere in this repository.** Comparing
+`$FWRE_WORK/dumps/w06-S3-fired.bin` (2026-08-17) against
+`flash-n150rt-console-2.bin`:
+
+| | |
+|---|---|
+| loader `0x000000`–`0x005FFF` | **0** differing bytes |
+| `H601` `0x006000`–`0x007FFF` | **9** differing bytes, `0x00648A`–`0x006493` |
+| page / sector touched | `0x006400` / `0x006000` |
+| **inside the bracket window `0x006000`–`0x0060FF`** | **0** |
+| `w06-S4-final.bin` (seven minutes later) | **0** — it was reverted |
+
+`upstream/BENCH-LOG.md` names the mechanism: a `formWsc` POST wrote
+`HW_WLAN0_WSC_PIN` at `0x648a`, the device recomputed its region checksum at
+`0x006493`, and the write happened **three times** before being reverted byte by
+byte. That log's own conclusion is the sentence to keep: *"我今早才蓋好一個
+『白名單讓 `H601` 搆不到』的寫入工具 —— 保護的是工具，不是裝置"*.
+
+🔴 **So the one region a wrong write cannot be undone in has already been
+written on this unit, and tonight's bracket samples the 256 bytes with the
+lowest observed propensity to change.** The only span this project has ever seen
+move is `0x38A` bytes above the window.
+
+**The fix is one more triple on the next card, about fifteen seconds of wire
+time and no extra power cycle**: `FLR 80A00300 006400 100`. That window holds
+both the field that is known to move and the device-maintained checksum beside
+it — a canary rather than a quiet page. It does not replace `0x006000`; it is a
+third `H601` window, and the reach becomes 512 of `H601`'s 8,192 (6.3 %).
+
+⚠️ **And the bracket has no negative control on its destination.** Neither cycle
+reads `0x80A00000`/`0x80A00100`/`0x80A00200` **before** its `FLR`, so nothing in
+the capture set excludes *the `DW` printed RAM that already held those bytes*.
+The mitigating argument is real — fresh boot, `quietm` ran Linux for about seven
+minutes in between, and `0x80A00000` is 10 MiB into DRAM — but it is an
+inference where this project's rules ask for a control. 🔴 **And the control is
+blocked by the verification method**: byte-identity is taken over the whole log,
+which includes the typed line and the `80A000xx:` address column, so cycle 4 is
+*forced* to reuse cycle 3's RAM addresses. Comparing only the hex payload
+columns would free the destination and make a stale-RAM reading impossible by
+construction. One capture, no power cycle.
+
+🟢 **One control the card did not have and the adversarial pass added for
+free**: `V-rd0`, `V-rd6` and `V-rdh` are pairwise **different**, which rules out
+all three `FLR`s having landed on one window and the bracket having compared a
+region to itself three times.
+
+### `V-3`: D1–D4, and the byte count is refuted
+
+**849 bytes, not the predicted 401** — and the five predicted terms were each
+exactly right (169 + 139 + 40 + 51 + 2). The sixth term was asserted to be zero
+and is **448 bytes**: fifteen lines of Realtek driver output between
+`RLXFW-B09` and `RLXFW-B10`, which are **`rtlglue_printf` and were never
+`printk`**. 讀 `include/net/rtl/rtl_types.h:366`, `#define rtlglue_printf
+panic_printk`, with no Kconfig symbol in the way; 讀 `kernel/Makefile:5`, this
+board builds `printk_log.o` **instead of** `printk.o` — and 量 on the built trees,
+`printk.o` is absent and `printk_log.o` present in both, exactly one of the two. `SPEC.md` `FW-31`,
+`notes/kernel-build.md` §17.8, `bench/2026-08-30c/CORRECTIONS-block2.md` §1–§6.
+
+**`J` to prompt: 7.260 s** against the block's ≈ 7.4 s 推 (`FW-32`). Ten of the
+eleven marks land inside 1.16 s; 6.05 s of the 7.26 is the `B09`→`B10` window,
+the same shape `loudm` shows.
+
+### The cells that were byte-identical to a prediction written before power
+
+`V-A` and `Z-A` (the 181-byte slice, `f5287ff9…`), `V-0ab` (`00000000`, and
+identical to `H2a-ab` and `L0-ab`), `V-2a`, `V-2b`, `V-2c`'s pair, `V-rd0`,
+`V-rd6`, `V-2d`, `V-5a` (147 B, and `BogoMIPS` had a licence to move and did
+not), **`V-5b` (111 B, sha256 `ef82d7ec…`, a hash constructed at the desk by
+substituting three characters)**, `V-6a` (7,658 B), `V-6b` (52 B), `V-7a`
+(420 B, 4/4, 0 % loss). The host capture holds ARP request, ARP reply and four
+echo request/reply pairs, with `-e` naming `00:12:34:56:78:94` = `eth4`.
+
+### 🔴 The port map is 讀 on this cycle, and the card said it could not be
+
+`bench/2026-08-30c/PREDICTIONS-B5-block2.md` §11.2 wrote that `quietm` would not
+print the netdev registration lines, so the binding would be **推**. It printed
+them, they agree with `L3.log` cell for cell, and the binding is a **reading**.
+🔴 **A sixth line came with them and this row called it unpredicted. It was already
+answered in this file** — § Results, seating 5, records the same `eth5`/`eth7` disagreement
+and `notes/kernel-build.md` §16 gives the mechanism: `rtl_nic.c:6479` prints the array
+index, index 5 is renamed to `eth7`. 量, `V-6a.log` lists `eth7`. Nothing is open.
+
+### What this seating did not answer
+
+* **The flash byte count.** 0.0183 % of the part is read. The other 99.98 % is
+  unmeasured and stays unmeasured.
+* **`H601` whole.** 256 of 8,192 bytes. A write to `0x006100`–`0x007FFF` is
+  invisible to this bracket.
+* **A second path to the flash.** The MTD node `R3-9` declared is in no built
+  image, so `wc -c < /dev/mtdblock1` did not run and cannot have.
+* **Which of the driver's 97 `panic_printk` call sites can fire on a boot.** Fifteen
+  lines came out; the rest are conditional and none of them was provoked.
+* **The 0.250 s that the byte count does not explain** between `loudm`'s 8.971 s
+  and `quietm`'s 7.260 s. Two candidates, n=1 each, `SPEC.md` §17's
+  `FW-32 殘留`.
+* **`R1a`, and it has not moved.** A boot that works is consistent with a load
+  delay hazard that was never hit.

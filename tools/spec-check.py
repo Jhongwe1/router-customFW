@@ -65,6 +65,16 @@ shapes came with it, and each was found by turning the previous one on:
       bench/README.md.  This is the same defect PROGRESS.md records against
       SPEC.md on 2026-08-27, found then by an adversarial pass and now by a
       checker.
+  C10 a paragraph whose backtick RUNS cannot pair, so a span is left open and
+      swallows the prose after it.  C9 pairs runs across the whole FILE, which
+      makes an unmatched run invisible until later text happens to supply a
+      partner -- it is order dependent, and 量 2026-08-30 that is exactly what
+      hid three of these.  A blank line ends a code span (CommonMark), so the
+      paragraph is the local, order-independent unit.  Found: notes/kernel-build.md
+      rendering a whole sentence as code while `0x2B0000` -- the number the
+      sentence is about -- rendered as prose, and RUNSHEET.md's `byte 0` line
+      closing with a run of two.
+
   C9  a code span whose whole content is whitespace.  `\r` and `\n` typed as
       real characters degrade to exactly this, and the rendering shows nothing.
       FOUR instances, and one of them made a READING wrong rather than only a
@@ -449,11 +459,130 @@ def table_scope(root=ROOT):
     return sorted(p for p in paths if not p.startswith('upstream/'))
 
 
+# C10.  A paragraph whose backtick runs cannot pair.
+#
+# C9 pairs runs over the whole file, so an unmatched run is silently absorbed by
+# whatever comes next and only becomes visible when the file grows.  量
+# 2026-08-30: three instances in this repository, and the one in
+# notes/kernel-build.md had been committed for a day while C8/C8b/C8c/C9 all
+# passed over it.  A blank line ends a code span, so parity INSIDE one paragraph
+# is the test that does not depend on the rest of the file.
+#
+# Run LENGTH, not backtick count.  A per-line count reports thirteen ordinary
+# adjacent-span pairs in this repository, which is why this is not that test.
+# 🔴 The comment here used to offer `x``y` as the worked example and that was
+# wrong -- measured against markdown-it-py, it does NOT fire and renders as one
+# span whose CONTENT is x``y.  The real example is RUNSHEET.md's `byte 0` line,
+# where a run of two closed a run of one.
+#
+# 🔴 WHAT THIS DOES NOT DO, measured 2026-08-30 by an adversarial pass with a
+# real CommonMark oracle, and stated here because the checker's own message used
+# to overstate it:
+#
+#   * An unclosed run is LITERAL TEXT, not an open span.  Nothing is swallowed
+#     unless a paragraph has three or more runs and the pairing SHIFTS -- which
+#     is the notes/kernel-build.md instance, and is not what T11/T16 plant.
+#   * The paragraph is not the rendering unit.  CommonMark ends an inline
+#     context at ATX headings (4.2), thematic breaks (4.1), list items (5.2)
+#     and `>`-only lines in a block quote; GFM splits a table row on pipes
+#     BEFORE inline parsing.  C10 pairs across all of those.  量: 930 of 5,079
+#     tick-carrying blocks in this tree (18 %) hold more than one inline
+#     context and 624 hold a table row -- REALISED false negatives today: 0,
+#     against a render oracle over every tracked file.
+#   * A backslash-escaped backtick (2.4) is counted as a delimiter, so a
+#     paragraph containing one can fire.  量: zero such backticks in the tree
+#     today, so the exposure is latent.  Same for backticks inside an HTML
+#     comment, an indented code block or an autolink.
+#
+# So C10 is a HEURISTIC whose result is currently correct and whose mechanism is
+# narrower than the defect.  It stays because it found three real instances that
+# every other check walked past; it is documented rather than trusted.
+
+# The one file this cannot be applied to, with the reason.  T13 asserts the
+# exemption is LOAD-BEARING -- if the file is ever repaired, T13 goes red and
+# the entry has to come out, rather than sitting here forever unread.
+C10_EXEMPT = {
+    'bench/2026-08-25b/PREDICTIONS-b4-block2.md':
+        'frozen prediction block: check-predictions.py reads its mtime, so '
+        'editing it would make its 2026-08-25 captures read as older than the '
+        'prediction naming them. The defect is real and is recorded in '
+        'bench/README.md rather than repaired',
+}
+
+
+def paragraph_blocks(lines, mask):
+    """(start_line, text) for each blank-line-separated block, fences masked."""
+    cur, start = [], 1
+    for i, ln in enumerate(lines, 1):
+        if mask[i - 1]:
+            if cur:
+                yield start, '\n'.join(cur)
+                cur = []
+            continue
+        if not ln.strip():
+            if cur:
+                yield start, '\n'.join(cur)
+                cur = []
+            continue
+        if not cur:
+            start = i
+        cur.append(ln)
+    if cur:
+        yield start, '\n'.join(cur)
+
+
+def _runs_unpairable(text):
+    """True if some backtick run in `text` can never close."""
+    runs, i = [], 0
+    while i < len(text):
+        if text[i] == '`':
+            j = i
+            while j < len(text) and text[j] == '`':
+                j += 1
+            runs.append(j - i)
+            i = j
+        else:
+            i += 1
+    # No `used` bookkeeping: `k = m + 1` already resumes after the closer,
+    # which is CommonMark's own rule.  An earlier version carried a `used`
+    # array and an adversarial pass showed deleting it changed nothing -- dead
+    # code in a checker is a place a reader looks for meaning and finds none.
+    k = 0
+    while k < len(runs):
+        m = k + 1
+        while m < len(runs) and runs[m] != runs[k]:
+            m += 1
+        if m >= len(runs):
+            return True
+        k = m + 1
+    return False
+
+
+def paragraph_findings(path, lines, mask, honour_exempt=True):
+    """C10 for one file, plus how many paragraphs were looked at."""
+    out, total = [], 0
+    exempt = honour_exempt and path in C10_EXEMPT
+    for start, text in paragraph_blocks(lines, mask):
+        total += 1
+        if '`' not in text:
+            continue
+        if _runs_unpairable(text):
+            if exempt:
+                continue
+            first = text.split('\n')[0][:110]
+            out.append(('C10', f'{path}:{start}: a backtick run in this '
+                               f'paragraph can never close, so it renders as a '
+                               f'literal backtick -- and if the paragraph has '
+                               f'another run, the pairing SHIFTS and a span '
+                               f'swallows prose: {first!r}'))
+    return out, total
+
+
 def check_tables(paths, root=ROOT):
     """The repository-wide sweep: C8/C8b over tables, C9 over every code span.
     Returns (findings, stats)."""
     findings = []
-    stats = {'files': 0, 'tables': 0, 'rows': 0, 'spans': 0, 'unreadable': []}
+    stats = {'files': 0, 'tables': 0, 'rows': 0, 'spans': 0, 'paragraphs': 0, 'unreadable': []}
     for rel in paths:
         full = os.path.join(root, rel)
         try:
@@ -471,6 +600,9 @@ def check_tables(paths, root=ROOT):
         sf, nspans = span_findings(rel, lines, fence_mask(lines))
         stats['spans'] += nspans
         findings += sf
+        pf, npara = paragraph_findings(rel, lines, m)
+        stats['paragraphs'] += npara
+        findings += pf
     return findings, stats
 
 
@@ -936,6 +1068,17 @@ Two ADJACENT code spans across a line break are ordinary and must not be a
 finding: `SPEC.md`
 `CPU-19` is one reference followed by another, and a per-line backtick-parity
 test reports thirteen of these in this repository.
+
+A paragraph whose runs DO pair, including a doubled run that has its partner:
+``a`b`` and `plain` and ``c`` are all closed.
+
+A fenced block whose content holds an unpairable RUN OF THREE. With the mask working this
+is invisible and T1 stays clean; with the mask off, C10 reports it, which is
+what stops a mutant that scans fences as prose from passing everything.
+
+```
+this line has ``` in the middle, which the fence markers cannot absorb
+```
 '''
 
 TABLE_MUTATIONS = [
@@ -964,6 +1107,27 @@ TABLE_MUTATIONS = [
      'belongs to no table',
      lambda s: s.replace('| `A-02` | plain | fine |',
                          '\n| `A-02` | plain | fine |', 1), 1),
+    # T11 is C10's.  An opening backtick with no closer -- the shape that had
+    # been committed in notes/kernel-build.md for a day while every other check
+    # passed over it, because C9 pairs runs across the whole FILE and this one
+    # found a partner further down.
+    ('T11 an opening backtick that never closes', 'C10',
+     'can never close', lambda s: s + "\nthe `0x2D0000 = 2,949,120 value.\n", 1),
+    # T14 pins RUN LENGTH against backtick COUNT.  `x`` leaves the count EVEN,
+    # so a parity implementation passes T11 and misses this -- and this is the
+    # real shape found in RUNSHEET.md on 2026-08-30, where `byte 0 → the
+    # device's own `\r\nBooting`` closed with a run of two and left the middle
+    # span rendering as prose.
+    ('T14 a doubled closing run, so the COUNT is even', 'C10',
+     'can never close',
+     lambda s: s + "\nnow `byte 0 and the device's own `marker``, guarded.\n", 1),
+    # T15 pins the PARAGRAPH boundary.  Two unclosed runs of the same length,
+    # one per paragraph: correct code reports two, an implementation that pairs
+    # across the whole file reports none.  That is C9's order-dependence, which
+    # is the defect C10 was added for.
+    ('T15 two paragraphs, one unclosed run each', 'C10',
+     'can never close',
+     lambda s: s + "\nfirst `unclosed here.\n\nsecond `unclosed here.\n", 2),
 ]
 
 
@@ -982,7 +1146,8 @@ def table_controls(verbose=True):
             tables, _ = parse('fixture.md', text=text)
             out = table_findings('fixture.md', tables, lines, fence_mask(lines))
             sf, _n = span_findings('fixture.md', lines, fence_mask(lines))
-            return out + sf
+            pf, _p = paragraph_findings('fixture.md', lines, fence_mask(lines))
+            return out + sf + pf
         finally:
             globals()['fence_mask'] = real
 
@@ -1041,6 +1206,79 @@ def table_controls(verbose=True):
               f'every span')
         ok += 1
 
+    # T12 is C10's negative: the repaired form must be clean.  Without it C10
+    # could be firing on every paragraph and T11 would not know.
+    rep10 = findings_for(FIXTURE + "\nthe `0x2D0000` = 2,949,120 value.\n")
+    if rep10:
+        print(f'  FAIL  {"T12 the closed span is not a finding":52s} '
+              f'{len(rep10)}: {rep10[0][1][:80]}')
+        fail += 1
+    else:
+        print(f'  ok    {"T12 the closed span is not a finding":52s} '
+              f'a paragraph whose runs pair is clean, so C10 is not firing on '
+              f'every paragraph')
+        ok += 1
+
+    # T13 is a control on the EXEMPTION.  An exemption nobody checks is a
+    # permanent hole; this asserts each entry is still load-bearing, so a file
+    # that gets repaired forces its entry out instead of hiding a later defect.
+    stale = []
+    for rel in sorted(C10_EXEMPT):
+        full = os.path.join(ROOT, rel)
+        try:
+            lines = io.open(full, encoding='utf-8').read().split('\n')
+        except OSError:
+            stale.append((rel, 'unreadable'))
+            continue
+        got, _n = paragraph_findings(rel, lines, fence_mask(lines),
+                                     honour_exempt=False)
+        if not got:
+            stale.append((rel, 'no longer has an unpairable paragraph'))
+    if stale:
+        for rel, why in stale:
+            print(f'  FAIL  {"T13 every C10 exemption is load-bearing":52s} '
+                  f'{rel}: {why} -- remove the entry')
+        fail += 1
+    else:
+        print(f'  ok    {"T13 every C10 exemption is load-bearing":52s} '
+              f'{len(C10_EXEMPT)} entry/entries, each still firing without it')
+        ok += 1
+
+    # T16 is N6's.  Every other C10 control appends text ending in a newline,
+    # and a trailing newline flushes the block through the blank-line branch --
+    # so the trailing `if cur:` in paragraph_blocks was never exercised and a
+    # mutant deleting it passed all fifteen. A file whose last line has no
+    # newline is ordinary, and this is the only control that reaches it.
+    nonl = findings_for(FIXTURE + "\ntrailing `unclosed with no final newline.")
+    hit16 = [m for c, m in nonl if c == 'C10' and 'can never close' in m]
+    if len(hit16) == 1:
+        print(f'  ok    {"T16 a defect in a file with no trailing newline":52s} '
+              f'caught by C10, so paragraph_blocks yields its last block')
+        ok += 1
+    else:
+        print(f'  FAIL  {"T16 a defect in a file with no trailing newline":52s} '
+              f'wanted 1 C10 finding, got {len(hit16)} -- the final paragraph '
+              f'may never be yielded')
+        fail += 1
+
+    # T17 is N12's.  Nothing asserted the LINE a C10 finding names, so an
+    # off-by-one passed every control. The expected line is COMPUTED from the
+    # fixture rather than hardcoded, so an edit to the fixture cannot make this
+    # control quietly stale.
+    lead = FIXTURE + "\n"
+    planted = lead + "the `0x2D0000 = 2,949,120 value.\n"
+    want_line = lead.count("\n") + 1
+    got17 = [m for c, m in findings_for(planted) if c == 'C10']
+    if len(got17) == 1 and f'fixture.md:{want_line}:' in got17[0]:
+        print(f'  ok    {"T17 the finding names the paragraph\'s first line":52s} '
+              f'line {want_line}, computed from the fixture rather than hardcoded')
+        ok += 1
+    else:
+        print(f'  FAIL  {"T17 the finding names the paragraph\'s first line":52s} '
+              f'wanted 1 finding naming line {want_line}, got '
+              f'{[m[:60] for m in got17]}')
+        fail += 1
+
     # T7 is about the POPULATION.  A sweep whose file list is empty reports zero
     # findings and is green, which is the "a tool reporting 0 is making a claim"
     # failure this repository keeps catching.
@@ -1074,17 +1312,21 @@ def table_controls(verbose=True):
 
 
 def report_tables(findings, stats):
-    print('=== every tracked .md — C8/C8b/C8c/C9 ===')
-    print(f"  {stats['rows']} table row(s) in {stats['tables']} table(s), and "
-          f"{stats['spans']} code span(s), across {stats['files']} file(s)")
+    print('=== every tracked .md — C8/C8b/C8c/C9/C10 ===')
+    print(f"  {stats['rows']} table row(s) in {stats['tables']} table(s), "
+          f"{stats['spans']} code span(s) and {stats['paragraphs']} "
+          f"paragraph(s), across {stats['files']} file(s)")
+    if C10_EXEMPT:
+        print(f"  ⚠️  {len(C10_EXEMPT)} file(s) exempt from C10, each with a "
+              f"reason and a control (T13): {', '.join(sorted(C10_EXEMPT))}")
     if stats['unreadable']:
         print(f"  🔴 {len(stats['unreadable'])} file(s) could not be read: "
               f"{', '.join(stats['unreadable'][:5])}")
     print()
     if not findings:
         print('  ok  no ragged row, no row split over more than one line, no '
-              'row stranded outside its table, and no code span whose content '
-              'is only whitespace')
+              'row stranded outside its table, no code span whose content '
+              'is only whitespace, and no paragraph leaving a span open')
         return 0
     for c, msg in sorted(findings):
         print(f'  FAIL [{c}] {msg}')

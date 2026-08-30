@@ -67,11 +67,46 @@ dump or a document · **推** inferred, pending a measurement.
 | 量 | **An ESC window of 45 s was too short**: the boot began 19 s after the stream stopped. The cost is wildly asymmetric — an extra ESC second is free, a missed window costs a power cycle | Standing change: `--esc 180 --seconds 200` · `PROGRESS.md` Corrections |
 | 量 | **The reset button is a GPIO on `PABCD` bit 5, active low — it is not `RESET#`.** Bit 5 goes 1→0 under the held button with `CNR` and `DIR` unchanged and no `Booting...` | Retired a planned cell before it was spent, and refuted *"this unit's loader polls only the UART"* · `SPEC.md` `BRD-05` |
 | ✅ 🔴 量 | **`console-capture.py capture` with neither `--seconds` nor `--idle` never returns** — **and as of 2026-08-30 it refuses instead, and records both terminators in its metadata.** Both default to `0.0` and the read loop breaks on neither; `timeout -s TERM 8` gives `rc=124`. A kill loses `.meta.json`; the `.log` and `.timing` survive, flushed per chunk. 量 2026-08-29 at the desk, before power | **14 of `RUNSHEET` §B5's 15 capture rows omit it, and block 0 omits it on `Q-A`** -- while all ten committed `A-catch` captures passed one. ⚠️ That census is an inference from `stop_reason`, because the metadata records neither `seconds` nor `idle` -- which is the larger defect. A card nobody has run literally is a card that has not been checked. 🔄 **The severity was inverted and is corrected**: 量 on a pty, `SIGINT` writes a complete `.meta.json` and only `SIGTERM` loses it, so a bench operator pressing Ctrl-C loses nothing and `--force` is never the correct recovery — the overwrite refusal is the safety feature, not the obstacle. ✅ **Closed 2026-08-30**: the guard sits after `_check_send` and before the port is opened (量: of this suite's four terminator-less invocations only `P4` reaches it), `seconds` and `idle` are in the metadata, `test-console-capture.sh` is 29 → **40**, and §B5's card carries a terminator on all fifteen capture rows · `tools/console-capture.py`, `RUNSHEET` §B5-c14 |
-| 🔴 量 | **The `G8a`/`G8b` flash bracket has never sampled `H601`.** It reads 256 of the loader region's 24,576 bytes and 256 bytes of the `cr6c` header — a region no rule forbids writing — and **0 of `H601`'s 8,192**. `H601` is the one region `CLAUDE.md` calls *not restored by reset*, and `bench/2026-08-30b/L3.log` is why it stopped being theoretical: this project's own kernel instantiated an MTD partition `0x000000`–`0x130000`, which contains it | **Six days of write-ups said “the two regions that would change” and neither of them was the one that cannot change back.** The bracket gains a third region, its expectation is computed from the 2026-08-16 dump rather than from a capture that can never exist, and the reach is stated every time it is quoted: **768 bytes of 4,194,304 = 0.018 %** · [`bench/2026-08-30c/PREDICTIONS-B5-block2.md`](../bench/2026-08-30c/PREDICTIONS-B5-block2.md) §8, [`tools/flashwin.py`](../tools/flashwin.py) |
+| 🔴 量 | 🟢 **2026-08-30: it has now — `V-rdh` ≡ `Z-rdh` ≡ the desk expectation, byte for byte, on both power cycles. 256 of 8,192 bytes, so the region is 3.1 % read and the other 96.9 % is still not.** *(As written that morning:)* **The `G8a`/`G8b` flash bracket has never sampled `H601`.** It reads 256 of the loader region's 24,576 bytes and 256 bytes of the `cr6c` header — a region no rule forbids writing — and **0 of `H601`'s 8,192**. `H601` is the one region `CLAUDE.md` calls *not restored by reset*, and `bench/2026-08-30b/L3.log` is why it stopped being theoretical: this project's own kernel instantiated an MTD partition `0x000000`–`0x130000`, which contains it | **Six days of write-ups said “the two regions that would change” and neither of them was the one that cannot change back.** The bracket gains a third region, its expectation is computed from the 2026-08-16 dump rather than from a capture that can never exist, and the reach is stated every time it is quoted: **768 bytes of 4,194,304 = 0.018 %** · [`bench/2026-08-30c/PREDICTIONS-B5-block2.md`](../bench/2026-08-30c/PREDICTIONS-B5-block2.md) §8, [`tools/flashwin.py`](../tools/flashwin.py) |
 | 🔴 量 | **This unit's own flash dump renders two captures taken off the device eight days later, byte for byte.** The 2026-08-16 dump (`FLS-14`, 4,194,304 B, 6,300.1 s) at `0x000000` and `0x060000`, rendered in the loader's own `DW` format, reproduces `bench/2026-08-24d/G8a-rd0.log` and `G8a-rd6.log` exactly — 777 bytes each, through a **different read path** (`console-dump.py`'s chunked `FLR`+`DB` against a hand-typed `FLR`+`DW`). And the two committed dumps are byte-identical over all 4,194,304 bytes | **It is what lets a region with no committable capture still have a falsifiable expectation.** The control is public even when the reading is not: a reader who cannot see the `H601` rendering can see that the renderer which produced it reproduces two readings they can · [`SPEC.md` `FLS-14`](../SPEC.md), [`tools/flashwin.py`](../tools/flashwin.py) |
 | 🔴 量 | **This unit's busybox has no applet that can digest a stream**, so the flash cannot be cross-read from its own userspace. Fifty applets, and `dd`, `md5sum`, `od`, `hexdump`, `cmp`, `cksum`, `sum` and `sha1sum` are none of them; `config/rlxfw-initramfs.tsv` declares three device nodes and no `/dev/mtd*` | **The full re-dump `G8b` says “zero flash bytes” needs costs 105 minutes on the loader's wire and would cost seconds as `dd if=/dev/mtd0 \| md5sum` from a shell.** What blocks it is the applet table, not the device node — and putting a foreign binary in the image breaks Decision B's *this unit's own binaries, unmodified*. `wc` **is** on the table, so a node alone still buys a readability reading · [`SPEC.md` `FW-26`](../SPEC.md), [`notes/kernel-build.md`](../notes/kernel-build.md) §17.7 |
 
 ## It changed what an instrument may claim
+
+🆕 **2026-08-30 — `CONFIG_PRINTK=n` does not make this kernel quiet, and the
+prediction that said it would was refuted on the wire.** `quietm` was built with
+`# CONFIG_PRINTK is not set` and printed **849** bytes where the block predicted
+**401**. All five predicted terms were exactly right; the sixth was asserted to
+be zero and is **448 bytes** — fifteen lines of Realtek driver output. They are
+`rtlglue_printf`, which `include/net/rtl/rtl_types.h:366` `#define`s to
+`panic_printk` with **no Kconfig symbol in the way**, and `panic_printk` is
+declared `asmlinkage` in the `#else` branch of `CONFIG_PRINTK` on purpose. 量
+`kernel/Makefile:5`: this board builds `printk_log.o` **instead of** `printk.o`,
+so the file the prediction reasoned from — `kernel/printk.c` — **is not compiled
+here at all**. 🔴 **The quotable number is 97, and 274 was published for about an hour before the same evening's adversarial pass caught it** — `drivers/net/rtl819x/**/*.o` matches 28 objects of which **seven are `built-in.o`**, so 量 all `*.o` = 274, excluding `built-in.o` = **97**, and the top-level `built-in.o` alone = 97. 97 is the call-site count, identical in both builds, and what makes that identity mechanism is that **22 of the 28 objects are byte-different** while `printk` goes 998 → 0 over the same material. ⚠️ Thirteen of the fifteen lines are `rtlglue_printf`; two are direct `panic_printk` from outside that directory. The
+whole-tree figure moves 719 → 1,594 between them because the tree redefines both
+names in both directions in at least eight files, and a count of a moving
+population is not a reading. `SPEC.md` `FW-31`, `notes/kernel-build.md` §17.8.
+
+🆕 **2026-08-30 — a code span left open by an unmatched backtick had been
+committed for a day, and no check here could see it.** `C8b` walks table rows,
+`C9` walks code spans and only fires on whitespace-only content — and `C9` pairs
+backtick runs across the **whole file**, so an unmatched run is invisible until
+later text happens to supply a partner. 量: three instances. In
+`notes/kernel-build.md` a whole sentence rendered as code while `0x2B0000` — the
+number the sentence is about — rendered as prose; in `RUNSHEET.md` a span closed
+with a run of **two**, which leaves the backtick **count** even so a parity test
+misses it. `C10` is the check, the paragraph is its unit because a blank line
+ends a span, and it pairs by run **length**. 🔴 **Its first version passed all
+fifteen controls and three of twelve mutants survived** —
+`tools/test-spec-check-mutants.py` — so `T16`, `T17` and a fixture fence — ⚠️ *(this named `T14` too; `T14` is the doubled-closer case and it kills `N4`, not one of the three survivors)* —
+exist because a mutation pass demanded them, not because they were foreseen.
+⚠️ The third instance is in a **frozen prediction block** and is deliberately
+**not repaired**: `check-predictions.py` reads its mtime, so editing it would
+make its 2026-08-25 captures read as older than the prediction naming them. The
+exemption carries its reason and a control (`T13`) asserting it is still
+load-bearing.
+
 
 🆕 **2026-08-28 — a census that only ran `--version` was not a read-only
 operation, and nothing warned.** `rsdk-linux-config` is a statically linked i386

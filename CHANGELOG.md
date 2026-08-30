@@ -19,8 +19,7 @@ device's flash**", in the most-read paragraph in the repository, while
 full re-dump hashed against `FLS-14`.)* What IS measured is 512 bytes of a
 4,194,304-byte part, unchanged across three kernel executions and two uploads on
 2026-08-24 — and the seating that booted my own kernel ran no such bracket at
-all, so it holds **less** flash evidence than that one did. The bracket that
-closes it is on the next seating's card and reaches 768 bytes: 0.018 %.
+all, so it holds **less** flash evidence than that one did. 🟢 **2026-08-30: that bracket ran, both halves, and it is now a reading.** Three 256-byte windows over two power cycles — the loader head, the `cr6c` header, and **`H601`, this unit's MAC and radio calibration, which no bracket in this project had ever sampled** — all six reads byte-identical to the 2026-08-16 dump, and the first two windows also to the 2026-08-24 captures — 🔴 **`H601` has no 2026-08-24 comparand and never will, so its unobserved interval is 14 days, not 6** — with `AUTOBURN` read back as `00000001` on the second cycle so that the second half is a second observation rather than the operator's word for having cycled the power. **768 bytes of 4,194,304: 0.0183 %.** It is still not *"no byte was written"* — it cannot see two writes that cancel, and it reads 256 of `H601`'s 8,192. `H601`'s two captures are not in this repository and **not even their sha256 is published**, because a digest over a window whose only unknown is 24 bits of MAC is a 2^24 search; what is published is the verdict and the control that the same renderer reproduces two committed captures byte for byte.
 
 And there is still no driver of mine: the ping went out through the vendor's own
 network driver, in the vendor's own configuration.
