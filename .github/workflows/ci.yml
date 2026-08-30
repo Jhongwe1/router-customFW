@@ -423,7 +423,9 @@ jobs:
       # C10 is a checker, and a checker's controls are a claim about the
       # controls. Twelve mutants of C10 against spec-check's own --self-test;
       # three survived the first run and are closed by T16, T17 and a fixture
-      # fence. Synthetic throughout -- no device, no $FWRE_WORK, no pty.
+      # fence; an adversarial pass then found that --self-test returns before
+      # check_tables() is called at all, so phase 2 plants real defects in a
+      # tracked file and runs the whole tool. 17 mutants. Synthetic throughout -- no device, no $FWRE_WORK, no pty.
       - name: test-spec-check-mutants
         run: /usr/bin/python3 tools/test-spec-check-mutants.py --jobs 8 2>&1 | tee ci-out/test-spec-check-mutants.out; exit "${PIPESTATUS[0]}"
 
