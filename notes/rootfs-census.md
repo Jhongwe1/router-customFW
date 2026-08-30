@@ -209,3 +209,27 @@ applet census is unchanged and still decides the rest — `mknod` is not among
 the fifty, so the declared node set is the only one this image can ever hold.
 `notes/kernel-build.md` §18.3. `R3-9` owns the step; `SPEC.md`
 `FW-26` owns the applet census and `FW-28`/`FW-29`/`FW-30` the map.
+
+🆕 **2026-08-31: `wc` being ON the list was never the whole question, and the
+other half is now measured too.** A cell that predicts a byte count needs the
+applet's **output format**, not just its presence, and this file had the first
+without the second — so the card's byte counts would have been a guess dressed
+as a prediction.
+
+量, this unit's own `bin/busybox` (`BusyBox v1.13.4`) under `qemu-mips-static`,
+wrapped in `tools/vendor-tripwire.sh` and run from a scratch directory
+(`CLAUDE.md`: running a vendor binary is not a read-only act):
+
+| | |
+|---|---|
+| `wc -c` on three sizes through stdin | prints the digits and **nothing else** — no field padding, no leading spaces. 1,245,184 / 2,949,120 / 0, all bare |
+| a redirect to a target that returns `EACCES` | `sh: can't create <path>: Permission denied` — the message `M-d` predicts, and where its 73 bytes come from |
+| the applet table, re-read | unchanged at fifty, `wc` `cat` `echo` `sh` all present, negative control `definitely_not_an_applet: applet not found` in the same run |
+
+⚠️ **The `EACCES` reading is from a NON-root uid.** `qemu-mips-static` runs
+under the host user, so DAC applied and a `chmod 000` file produced the refusal.
+On the device the shell is root and DAC does **not** apply — which is the whole
+point of `M-d`: the refusal there comes from `mtd_open`'s `minor & 1` test in
+the kernel, not from a mode bit. The message text is what transfers; the reason
+it fires is a different one and `bench/2026-08-31/PREDICTIONS-B5-block3.md`
+§7.3 says so.

@@ -280,6 +280,16 @@
     }
   ],
   "reference_only": {
+    "registries": [
+      {
+        "id": "IEEE MA-L assignment for FC:19:28",
+        "url": "https://maclookup.app/macaddress/fc1928",
+        "about": "Actions Microelectronics, Shenzhen. MA-L, registered 2020-08-25, updated 2024-08-13. Cited because SPEC.md §18 and notes/leak-surface.md rest on it: the thirteenth session called FC:19:28 TOTOLINK's OUI and built a leak finding on that, and it is the OUI of the workstation's USB GbE adapter instead. 🔴 THIS IS A THIRD-PARTY MIRROR of the IEEE registry, not the registry itself. The authoritative source is https://standards-oui.ieee.org/oui/oui.txt and this claim has n=1 against a mirror. Re-checking it against the IEEE file is one download and has NOT been done.",
+        "role": "reference",
+        "fetch": "manual",
+        "used_by": ["SPEC.md §18", "notes/leak-surface.md §1", "tools/audit-bench-log.py PATTERNS", "docs/FINDINGS.md"]
+      }
+    ],
     "_comment": "Read, cited, never downloaded. Listed so a claim in the plan can be traced to where it came from.",
     "cve_and_advisories": [
       {
