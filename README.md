@@ -384,7 +384,7 @@ is the instrument that says so, it never prints what matched, and only its
 self-test and its mutation suite are gates. 🔄 **The count that stood here
 was 100 and it was never a reading on any commit** — 量 on a clean `HEAD` it was
 **99**, and after a ninth pattern and four more readable extensions went in it is
-**160**. 🔴 **And the finding it was reporting was the wrong value**: the MAC it
+**161**. 🔴 **And the finding it was reporting was the wrong value**: the MAC it
 flagged is the workstation's own USB adapter, on an OUI that belongs to Actions
 Microelectronics rather than to this device's vendor. `leakscan --attribute` answers
 *whose address is this* by looking the bytes up in this unit's own flash dump instead

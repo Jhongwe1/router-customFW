@@ -94,15 +94,15 @@ inferences. A measurement that loses to an inference is a classifier that can
 be argued out of a finding. `L11` and `L13` are that ordering as cases, and
 `C2`/`C3` are the mutants that invert it.
 
-**量 2026-08-31, whole corpus, taken after the session's last edit** — the population includes this session's own files, and it read 145 before `tools/test-leakscan-mutants.py` and this note were in it:
+**量 2026-08-31, whole corpus, taken after the session's last edit** — the population includes this session's own files, and it read 145, then 160, then 161 as this session's own files entered the population:
 
 | class | hits | what it means |
 |---|---:|---|
-| `HOST` | 91 | equals an `enx<12hex>` name in the corpus — the workstation's adapter |
+| `HOST` | 81 | equals an `enx<12hex>` name in the corpus — the workstation's adapter |
 | `SYNTH` | 35 | locally administered, and not in the dump |
 | `NOVALUE` | 15 | the pattern matched a phrase (`S/N:`), not an address |
 | `TRIVIAL` | 5 | all-zero or broadcast |
-| `CONTROL` | 10 | a scanner literal in this repository's own tools |
+| `CONTROL` | 21 | a scanner literal in this repository's own tools |
 | `UNKNOWN` | 3 | globally administered, not in the dump — needs a person |
 | 🔴 `UNIT` | **1** | the six bytes exist in this unit's own flash |
 

@@ -286,10 +286,21 @@ def enx_names(root, pops):
 
     systemd's ID_NET_NAME_MAC puts the adapter's own MAC in the interface name,
     so the name IS the value and no separate source is needed to say that a
-    matched address belongs to the workstation rather than to the device."""
+    matched address belongs to the workstation rather than to the device.
+
+    🔴 **Harvested from everything EXCEPT this repository's own scanners.** 量
+    2026-08-31: `tools/test-leakscan-mutants.py` plants a synthetic
+    `enx040506070803` in its fixture, and with the scanners in the population
+    that literal put itself into `hostnames` and then classified ITSELF `HOST` —
+    a value calling itself the workstation's adapter on its own authority. The
+    real names live in `LOG.md`, `PROGRESS.md`, `RUNSHEET.md` and the bench
+    cards, so excluding the scanners costs nothing and removes the circle.
+    """
     got = set()
     for _name, paths, _why in pops:
         for rel in paths:
+            if rel in SCANNER_FILES:
+                continue
             if os.path.splitext(rel)[1].lower() not in TEXTY:
                 continue
             text = read_text(root, rel)
