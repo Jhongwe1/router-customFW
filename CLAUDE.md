@@ -241,6 +241,8 @@ artefact it was measured on, stop. No résumé bullets, no "this proves I can X"
 English, except the working log and `SPEC.md`. Commit messages say *why* — the
 diff says what.
 
+🔴 **And `ci-census --only <the suites you touched>` is the wrong rule when what you touched is `bench/`.** 量 2026-08-30: a seating that adds two captures moves the population every census-shaped case reads, and `tools/test-boot-timeline.sh`'s `B2` — a hardcoded `N cold, M warm` — went red on GitHub twice while the local `--only` run was green. **A seating changes data, and data is what those cases assert on.** After a seating, run every suite that can run on this host, not only the ones whose code changed.
+
 **Before you stop**: update `PROGRESS.md` § Now, and append a dated entry to
 `LOG.md` (create it on the first session) — **including desk-only days**, because
 a desk-only day is exactly when the next bench visit's plan changes. **If the

@@ -71,7 +71,18 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # 8 warm, so the delta is exactly +2 cold / +1 warm and nothing reclassified.
 # Re-measured rather than loosened: a population count that is allowed to drift
 # is not a control.
-ck "ten cold, nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 10 cold, 9 warm, 0 unknown')"
+# 🔄 10/9 until 2026-08-30 (seating 6), which added TWO cold power-ons and no
+# warm reset: `2026-08-30c/V-A` (power cycle 3) and `2026-08-30d/Z-A` (power
+# cycle 4). Same isolation check: the tree with those two directories removed
+# still reports 10 cold, 9 warm, and each directory alone reports 1 cold /
+# 0 warm -- so the delta is exactly +2 cold / +0 warm and nothing reclassified.
+# 🔴 This is the assertion that broke CI on 2026-08-30, and the reason is worth
+# more than the number: the session ran `ci-census --only <the suites it
+# touched>` before pushing, and it had touched `tools/` -- but what it ALSO
+# touched was `bench/`, which is the POPULATION every census-shaped case here
+# reads. "Only the suites you changed" is the wrong rule when what changed is
+# data. Every seating moves this line.
+ck "twelve cold, nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 12 cold, 9 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
