@@ -136,7 +136,16 @@ only the **146 non-zero** bytes — the only ones that carry information about
 this unit.
 
 **33 of 146 recoverable and placeable; 12 more (the MAC's two copies)
-recoverable with an ambiguous position; 45 / 146 = 30.8 %.** Not recoverable:
+recoverable with an ambiguous position; 45 / 146 = 30.8 %.**
+
+⚠️ **That is a LOWER bound and the write-up must not quote it as a figure.** The
+harvester decodes three encodings — colon-separated MAC, space-separated hex
+pairs, and contiguous hex runs of eight or more. A byte written in decimal, with
+dots, as `0x11, 0x22, …`, or split across a line break is not harvested, and
+neither is anything inside the 26 files no text scanner can read. So the true
+figure is **at least** 30.8 %, and nothing here bounds it from above.
+
+Not recoverable **by this harvester**:
 `0x006004`–`0x006039`, `0x00603E`–`0x006042`, `0x00607B`–`0x0060A7`, and —
 worth naming — `0x00648A`–`0x006491` (`HW_WLAN0_WSC_PIN`) and `0x006493` (the
 region checksum the device recomputes), which are exactly the bytes `FLS-21`
@@ -169,6 +178,35 @@ later reader does not read it as an oversight.
   `tools/test-leakscan-mutants.py` (23 mutants, 20 on a runner).
 * the rule in `SPEC.md` §18 stands for **rlxfw**: this repository is private
   today, and nothing identifying this unit goes into it regardless.
+
+## 5b. 🔴 Three near-misses in one session, all by the person writing about them
+
+The never-print property was nearly broken three times on 2026-08-31, and none
+of the three was broken by the tool:
+
+| | what happened | what caught it |
+|---|---|---|
+| 1 | a throwaway probe echoed its own **lookup strings** while masking only the file lines it printed, and put a 3-byte OUI into a transcript | nothing. It was noticed by reading the output. `L9` is the control that now exists for it |
+| 2 | `audit-bench-log.py`'s `CONTROL` block held a **real address** — the workstation adapter's — in a block whose stated premise is that it is synthetic | the attribution run, which classified a "synthetic" literal as `HOST` |
+| 3 | 🔴 **this file** reached for an *example* of an encoding the harvester misses and typed **two octets of this unit's own OUI** as the example | a sweep run because the sentence looked like the shape it was warning about |
+| 4 | 🔴 **and then the row above reproduced them again, while explaining them** — third revision, third instance, which is the pattern `spec-check`'s `C8` row already records for ragged tables | 🔴 **not the sweep.** The sweep searched for the **three**-byte OUI and only two had been written, so it reported 0 — *a tool reporting 0 is making a claim*, in the sweep written twenty minutes earlier to enforce exactly this |
+
+**So the discipline that works is not care.** Two of the three were caught by a
+tool and the third by running a check on a hunch. What follows from it is a
+standing sweep, and it is cheap:
+
+> 量 2026-08-31, after the last edit of the session: this repository's own
+> tracked files carry **no prefix of two bytes or more** of the address at
+> `H601+0x07`, in **any of eight encodings** — colon, bare, `0x`-prefixed and
+> space-separated, upper and lower case. **0 hits.**
+>
+> 🔴 The first version of this sweep searched for the three-byte OUI only, and
+> reported 0 while two octets of it were sitting in the paragraph above it.
+> **Prefix length is the parameter, and pinning it at three was the defect.**
+
+⚠️ **That is the OUI only, and the OUI is the half an attacker already has.**
+The full six bytes are covered by `--attribute`, whose answer is the one `UNIT`
+in §3 and it is not in this repository.
 
 ## 6. What is still open
 

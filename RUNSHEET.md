@@ -1412,6 +1412,33 @@ transfer may follow it; and after `J` there is no loader to type `FLR` into).
 | **D2 but not D4** | `quietm` as above | the ladder located it; `quietm` says whether the location moves without printk |
 | **not D2** | 🔴 **the halving experiment** — the vendor's kernel with **my** initramfs — not `quietm` | at that point the question is *my kernel or my image*, and `quietm` answers neither. `PROGRESS.md` § Stop-loss |
 
+#### 🆕 Power cycles 5 and 6 — `quietmc`, and this table does not own them either
+
+**2026-08-31: the block exists** — `bench/2026-08-31/PREDICTIONS-B5-block3.md`,
+**54 cells**, frozen, `0 of 54` at the desk. **Its §0 IS the card for cycles 5
+and 6**, the same way block 2's §0 is the card for cycles 3 and 4 and block 0's
+is for cycle 1. §B5's own card stops at power cycle 2, and each block since has
+carried its own. Prefixes `W-*`, `X-*` and `M-*`; §1 of that block says why `Y`
+and `Z` are skipped.
+
+🔴 **The two cycles are deliberately IDENTICAL up to the shell prompt**, which
+is the opposite of block 2's shape: cycle 4 there was nine cells and no upload,
+because it only had to close the bracket. Cycle 6 here uploads and `J`s again,
+because it is also the **null** for `SPEC.md` `FW-32 殘留` — a residual of
+0.250 s that has n=1 on each side and therefore no measure of boot-to-boot
+variance. A cycle that did less before the `J` would not be a second sample of
+the same thing.
+
+**What is new in it, and three of the four are controls rather than readings**:
+a **pre-read of every `FLR` destination** before its `FLR` (the bracket has
+never had a negative control, so *the RAM already held these bytes* has never
+been excluded); **new RAM destinations** `0x80A00400`–`0x80A00700`, which only
+became possible when `flashwin normalise` arrived to strip the address column a
+`cmp` was comparing; a **fourth window at `0x006400`**, the one page of `H601`
+this device has ever been seen to change (`FLS-21`); and `M-a`–`M-d`, the first
+device-side read of that region through a path the kernel refuses to open for
+writing.
+
 ---
 
 ### 🔴 What writing the card refuted, 2026-08-29. Eleven items, each measured before it was written

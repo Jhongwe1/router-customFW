@@ -624,6 +624,50 @@ def self_test() -> int:
                 good("N5 a file that is not a DW reply is refused, with the "
                      "reason and nothing on stdout")
 
+            # 🔴 N6/N7/N8 exist because an adversarial pass over `normalise`
+            # ran eight mutants against N1-N5 and THREE survived. (The pass
+            # itself had to be rerun: the first attempt reported 8 of 8 killed,
+            # every one "killed by C7b,C7c", and 量 the UNMUTATED file through
+            # that same symlinked temp root was already 22/24 -- C7b/C7c resolve
+            # the repository root with `realpath`, which a symlink farm sends
+            # back to the real tree. Every kill was invalid.)
+            badline = os.path.join(td, "badline.txt")
+            with open(badline, "wb") as f:
+                f.write(b"DW 80A00000 4\n\rnot a data line\n\r<RealTek>")
+            r = run("normalise", badline)
+            why = refused(r, "a valid echo with a malformed data line",
+                          "not a DW data line")
+            if why:
+                bad(f"N6 {why}")
+            else:
+                good("N6 a valid DW echo with a malformed data line is refused "
+                     "-- N5 only covers a missing echo")
+
+            nodata = os.path.join(td, "nodata.txt")
+            with open(nodata, "wb") as f:
+                f.write(b"DW 80A00000 4\n\r<RealTek>")
+            r = run("normalise", nodata)
+            why = refused(r, "a DW reply with no data lines", "no data lines")
+            if why:
+                bad(f"N7 {why}")
+            else:
+                good("N7 a DW reply carrying no data at all is refused rather "
+                     "than normalised to nothing")
+
+            # N8 -- ORDER is part of the reading. Without this, a normaliser
+            # that sorted the words would make two different windows with the
+            # same multiset compare equal, and N3 could not see it because its
+            # two windows differ in content as well as in order.
+            swapped = bytearray(data0)
+            swapped[0:4], swapped[4:8] = data0[4:8], data0[0:4]
+            other2 = render_dw(0x80A00000, bytes(swapped), "DW 80A00000 64")
+            if normalise_dw(other2) != n0:
+                good("N8 swapping two words changes the normalised output, so "
+                     "word order is part of the reading")
+            else:
+                bad("N8 a window with two words swapped normalises equal -- "
+                    "order is being discarded")
+
         # --- R1/R2/R3 the real material, THROUGH THE COMMAND LINE ---------
         work = os.environ.get("FWRE_WORK", "/home/key/fwre-work")
         d2p = os.path.join(work, "dumps", "flash-n150rt-console-2.bin")

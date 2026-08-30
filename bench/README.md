@@ -848,7 +848,7 @@ the repository is larger than those paths.**
 specific enough.** 量, with `tools/leakscan.py --attribute`: the six bytes at
 `H601+0x07` and `H601+0x13` are printed **verbatim** at
 `upstream/BENCH-LOG.md:216`, labelled 「（裝置）」 — one line, one file, and the
-only `UNIT` classification in 145 identity hits across both repositories.
+only `UNIT` classification in 161 identity hits across both repositories.
 **45 of `H601`'s 146 non-zero bytes are recoverable from the public
 repository**, `HW_WLAN0_WSC_PIN` and the region checksum are not among them, and
 the owner's decision is to leave `upstream/` alone because the device is end of

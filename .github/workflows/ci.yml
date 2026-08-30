@@ -359,8 +359,11 @@ jobs:
       # `git ls-files` returns 899 lines, one of them the submodule gitlink, so
       # 898 real files; 658 of them are never read, and `upstream/` adds 302
       # that `git ls-files` cannot see at all because a submodule is one
-      # gitlink. 960 files unread, 145 identity hits across the three
-      # populations once `MAC, enx interface` is in the pattern list.
+      # gitlink. 960 files unread, and 161 identity hits across the three
+      # populations once `MAC, enx interface` is in the pattern list and the four
+      # text extensions it used to call unreadable are in TEXTY. The count is
+      # taken after the session's last edit, because the session's own files are
+      # in the population -- it read 145, then 160, then 161.
       # The VERDICT run stays a desk step, and the reason is now a DECISION
       # rather than an open question: `--attribute` needs this unit's 4 MiB
       # dump, which can never be committed, and the one UNIT finding it reports

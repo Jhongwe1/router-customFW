@@ -21,7 +21,7 @@ are controls rather than readings:
 | | |
 |---|---|
 | a **pre-read** of every `FLR` destination, before the `FLR` | the bracket has never had a negative control. Without one, *the RAM already held these bytes* is not excluded and an `FLR` that did nothing looks exactly like one that worked |
-| **new RAM destinations**, `0x80A00400`–`0x80A00700` | block 2's second half was forced to reuse block 2's first-half addresses, because `cmp` on a `DW` reply compares the typed line and the `%08X:` column, both of which carry the destination. `flashwin normalise` (new today, `N1`–`N5`) strips both, so the destination is free to move — and moving it is what makes a match mean the flash rather than the RAM |
+| **new RAM destinations**, `0x80A00400`–`0x80A00700` | block 2's second half was forced to reuse block 2's first-half addresses, because `cmp` on a `DW` reply compares the typed line and the `%08X:` column, both of which carry the destination. `flashwin normalise` (new today, `N1`–`N8`) strips both, so the destination is free to move — and moving it is what makes a match mean the flash rather than the RAM |
 | a **fourth window**, `0x006400` | `FLS-21`: the only span of `H601` this device has ever been seen to change is `0x00648A`–`0x006493`, and it is `0x38A` bytes **above** the window the bracket chose. `H601` reach 3.1 % → 6.3 % |
 | `M-a`–`M-d`, the MTD path | the first device-side read of the region a wrong write cannot be undone in, through a path the kernel will not let anything write. `M-d` is the positive control on that safety property and it costs **zero flash bytes**, because `open` fails before any write is issued |
 
@@ -44,16 +44,17 @@ sha256sum /home/key/fwre-work/rebuild/bench-only/b5-20260831/rlxfw-quietmc-20260
   08b088135c62cbef90a69e081dfd55381b67ab73636054ba788148cf28fb3702
 
 /usr/bin/python3 tools/flashwin.py --self-test
-  24 passed, 0 failed
+  27 passed, 0 failed
 
 ls /home/key/fwre-work/rebuild/bench-only/b5-20260831/expect-*.txt
   expect-000000.txt  expect-060000.txt  expect-h601-6000.txt  expect-h601-6400.txt
 ```
 
-⚠️ **`24` and not `19`.** `flashwin` gained the `normalise` subcommand and five
-controls in the session that wrote this card. On a machine without
-`$FWRE_WORK/dumps/` it is **`21 passed, 0 failed`** and one skip line covering 3
-(21 + 3 = 24) — `R1`/`R2`/`R3` read this unit's own 4 MiB flash, which can never
+⚠️ **`27` and not `19`.** `flashwin` gained the `normalise` subcommand and
+**eight** controls in the session that wrote this card -- five written with it and
+three more added when an adversarial pass over eight mutants left three alive.
+On a machine without `$FWRE_WORK/dumps/` it is **`24 passed, 0 failed`** and one
+skip line covering 3 (24 + 3 = 27) — `R1`/`R2`/`R3` read this unit's own 4 MiB flash, which can never
 be committed. Either line is correct. The third command is not ceremony: two of
 the four expectation files are `H601` windows that this repository may not hold,
 so a missing one is found here rather than after an `FLR` has been spent.
@@ -98,8 +99,8 @@ at `10.1.1.2/24`, `/usr/bin/python3` and the board-off 3-second capture — is
 | **W-5a** | `CAP OUT W-5a --send 'cat /proc/cpuinfo' --seconds 15` | byte-identical to `bench/2026-08-30c/V-5a.log`, ⚠️ **except `BogoMIPS`, re-measured every boot** | **147** | a prompt that does not echo is **not** a shell |
 | **W-5b** | `CAP OUT W-5b --send 'cat /proc/version' --seconds 15` | `… (key@K) … #1 Sun Aug 30 **18:56:00** CST 2026`, sha256 `af2981649f1eb541…` | **111** | `18:56:50` → **`loudmc` booted**. `23:39:33` → `quietm`, yesterday's image. `#1526`/`admin@office.hopeiot` → **unattributed**, not a pass |
 | **M-a** 🆕 | `CAP OUT M-a --send 'cat /proc/mtd' --seconds 12` | three lines, §7.1, sha256 `e1272b93828f3b5b…` | **126** | any other map. **Reads zero flash bytes** — `mtd_read_proc` prints the driver's own table |
-| **M-b** 🆕 | `CAP OUT M-b --send 'wc -c < /dev/mtd0ro' --seconds 25` | `1245184` | **32** | `No such file or directory` → the node is not in the image. `No such device` → no chrdev at major 90. `Permission denied` → the odd-minor rule is not what §7.2 says. A hang → the read path stalls |
-| **M-c** 🆕 | `CAP OUT M-c --send 'wc -c < /dev/mtd1ro' --seconds 40` | `2949120` | **32** | as above |
+| **M-b** 🆕 | `CAP OUT M-b --send 'wc -c < /dev/mtd0ro' --seconds 45` | `1245184` | **32** | `No such file or directory` → the node is not in the image. `No such device` → no chrdev at major 90. `Permission denied` → the odd-minor rule is not what §7.2 says. A hang → the read path stalls |
+| **M-c** 🆕 | `CAP OUT M-c --send 'wc -c < /dev/mtd1ro' --seconds 100` | `2949120` | **32** | as above |
 | **M-d** 🔴🆕 | `CAP OUT M-d --send 'echo x > /dev/mtd0ro' --seconds 12` | `sh: can't create /dev/mtd0ro: Permission denied` | **73** | 🔴 **a SUCCESS here is a stop-if for the whole seating.** Power off and write it up. §7.3 |
 | **W-6a** | `CAP OUT W-6a --send 'ifconfig -a' --seconds 15` | byte-identical to `bench/2026-08-30c/V-6a.log` — 23 interfaces | **7,658** | fewer than six `ethN` → the netdevs did not register |
 | **W-6b** | `CAP OUT W-6b --send 'ifconfig eth4 10.1.1.10 netmask 255.255.255.0 up' --seconds 10` | no error | **52** | — |
@@ -232,7 +233,7 @@ destination. That forced cycle 4 to reuse cycle 3's addresses, and with the
 address pinned there was nowhere to put a pre-read that could be compared
 against anything.
 
-`flashwin normalise` (new 2026-08-30, `N1`–`N5`) reduces a `DW` reply to its
+`flashwin normalise` (new 2026-08-30, `N1`–`N8`) reduces a `DW` reply to its
 data. `N2` is the case that matters: the same flash window rendered at RAM
 `0x80B50000` normalises **identically** to the capture taken at `0x80A00000`.
 `N3` is its control: two different windows do not.
@@ -479,10 +480,26 @@ table lists 50 names and `wc` is one of them, with the negative control
 carries no field padding**: 量, three sizes through this exact busybox, the
 digits and nothing else. That is where the 32-byte counts come from.
 
-**The 25 s and 40 s terminators** are sized on the read, not the reply: 1.25 MB
-and 2.95 MB through `rtl819x_flash` at SPI speed, with nothing on the wire until
-it finishes. If either returns nothing in the window, that is a hang and it is
-the stop-if.
+🔴 **The terminators are sized on the READ, not on the reply, and the first
+draft had them too short.** Nothing comes back on the wire until `wc` finishes,
+so `--seconds` has to cover the whole SPI read. The only measured rate this
+project has for memory-mapped SPI on this part is stage 1's: **20,924 bytes in
+350 ms** (`CLK-15`, n=7, cold 348.0–356.9 ms) = **≈ 59.8 KB/s**, uncached and a
+word at a time. At that rate:
+
+| cell | bytes | at 59.8 KB/s | terminator |
+|---|---:|---:|---:|
+| `M-b` | 1,245,184 | **20.8 s** | **45 s** |
+| `M-c` | 2,949,120 | **49.3 s** | **100 s** |
+
+🔴 The first draft carried **25 s and 40 s**, and 40 s is *below* the
+estimate for `M-c` — a terminator that expires mid-read truncates the capture
+and the cell reads as a hang, which is the one outcome the row calls a stop-if.
+⚠️ **The rate is 推 for this path, not 量**: stage 1 is the loader's own
+uncached word-at-a-time copy and `mtd_read` → `part_read` → `rtl819x_flash` is
+not the same code. It could be several times faster. The terminators are set at
+roughly 2× the estimate for that reason, and `M-b` finishing well inside 45 s is
+itself the first measurement of this path's rate.
 
 ### §7.3 `M-d`: the positive control on the safety property, at zero cost
 
