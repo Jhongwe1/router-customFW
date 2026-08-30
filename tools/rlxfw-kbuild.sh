@@ -17,6 +17,9 @@
 #     --target T         make target inside linux-2.6.30 (default: vmlinux)
 #     --jobs N           -j (default: nproc)
 #     --keep             do not re-stage if the cell already exists   [TESTING ONLY]
+#     --no-cflags        build with an EMPTY CFLAGS_KERNEL, deliberately.
+#                        Without it the flags come from config/rlxfw-cflags
+#                        and an empty flag set is REFUSED -- see below.
 #     --marks            apply config/rlxfw-marks.tsv to the staged tree
 #                        (R3-6's boot ladder; off by default so every
 #                        pre-R3-6 measurement stays reproducible here)
@@ -59,19 +62,69 @@ TARGET=vmlinux
 JOBS=$(nproc)
 KEEP=0
 MARKS=0
+NOCFLAGS=0
+CFLAGS_GIVEN=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --config)        CONFIG="$2"; shift 2 ;;
         --oldconfig)     OLDCONFIG="$2"; shift 2 ;;
-        --cflags-kernel) CFLAGS_KERNEL="$2"; shift 2 ;;
+        --cflags-kernel) CFLAGS_KERNEL="$2"; CFLAGS_GIVEN=1; shift 2 ;;
         --initramfs)     INITRAMFS="$2"; shift 2 ;;
         --target)        TARGET="$2"; shift 2 ;;
         --jobs)          JOBS="$2"; shift 2 ;;
         --keep)          KEEP=1; shift ;;
         --marks)         MARKS=1; shift ;;
+        --no-cflags)     NOCFLAGS=1; shift ;;
         *) echo "unknown option $1" >&2; exit 3 ;;
     esac
 done
+
+# --------------------------------------------------- CFLAGS_KERNEL, declared
+# 🔴 R3-9, 2026-08-30.  `quietm` -- the image that booted -- could not be
+# rebuilt from its own recorded configuration, and the whole difference was
+# `-fno-if-conversion` (SPEC.md TC-25), which takes hazlint from SEVEN load-use
+# violations to ZERO.  It reached the 2026-08-28 build as a flag typed at a
+# shell: no committed file carried it and this script did not record it either.
+# 量 the same day: the flagless rebuild has 7 violations and every gate in the
+# repository stayed green.
+#
+# So the flags are a declared input now, an empty set has to be ASKED for, and
+# the effective value is written beside <cell>.config-built.
+#
+# THE GUARD IS HERE, above the stage, on purpose.  Below it a refusal costs a
+# 480 MB copy before it fires, and a refusal nobody can afford to test is one
+# nobody tests.
+CFLAGS_FILE="$REPO/config/rlxfw-cflags"
+# 🔴 The first version of this guard tested `[ -n "$CFLAGS_KERNEL" ]`, so
+# `--cflags-kernel ""` fell through to the declared file and was accepted -- the
+# one request the file exists to refuse. Found by its own C2 control on the
+# first run. It is the same distinction console-capture's N20 pins: a flag GIVEN
+# with an empty value is not the flag being absent.
+if [ "$CFLAGS_GIVEN" = 1 ]; then
+    [ -n "$CFLAGS_KERNEL" ] || {
+        echo "$CELL: --cflags-kernel was given an EMPTY value. If an empty" >&2
+        echo "  CFLAGS_KERNEL is what you want, say --no-cflags: it is the" >&2
+        echo "  same build and a different sentence in the log." >&2
+        exit 3; }
+    CFLAGS_SRC="--cflags-kernel"
+elif [ "$NOCFLAGS" = 1 ]; then
+    CFLAGS_SRC="--no-cflags (deliberately empty)"
+else
+    [ -f "$CFLAGS_FILE" ] || {
+        echo "$CELL: no $CFLAGS_FILE, no --cflags-kernel and no --no-cflags." >&2
+        echo "  An image built with an empty CFLAGS_KERNEL has SEVEN load-use" >&2
+        echo "  violations in it (量 2026-08-30) and looks identical to a good" >&2
+        echo "  one everywhere except hazlint. Ask for it, or declare it." >&2
+        exit 3; }
+    CFLAGS_KERNEL="$(sed -e 's/#.*//' "$CFLAGS_FILE" | tr '\n' ' ' \
+                     | tr -s ' ' | sed -e 's/^ //' -e 's/ $//')"
+    CFLAGS_SRC="$CFLAGS_FILE"
+    [ -n "$CFLAGS_KERNEL" ] || {
+        echo "$CELL: $CFLAGS_FILE declares no flags. That is not the same" >&2
+        echo "  request as --no-cflags, and it is refused rather than guessed." >&2
+        exit 3; }
+fi
+echo "== $CELL: CFLAGS_KERNEL=[$CFLAGS_KERNEL]  <- $CFLAGS_SRC"
 
 cell="$R/cells/$CELL"
 top="$cell/top"
@@ -191,6 +244,15 @@ if [ -n "$INITRAMFS" ]; then
         exit 3
     fi
     echo "== $CELL: initramfs spec <- $INITRAMFS ($(grep -c . "$INITRAMFS") entries)"
+    # R3-9, 2026-08-30.  The build records the .config it used and, until now,
+    # nothing about the initramfs -- so an image could be built from a spec that
+    # no file in the repository still describes and nothing could say so.  The
+    # spec and its digest go beside <cell>.config-built, which is what lets
+    # `mkinitramfs verify` distinguish "this image is stale" from "the
+    # declaration changed after it was built".
+    cp "$INITRAMFS" "$log.initramfs.spec"
+    sha256sum "$INITRAMFS" | cut -d" " -f1 > "$log.initramfs.spec.sha256"
+    echo "== $CELL: spec sha256 $(cut -c1-16 < "$log.initramfs.spec.sha256")"
 fi
 
 cd "$scratch" || exit 3
@@ -220,6 +282,9 @@ case "$OLDCONFIG" in
     *) echo "unknown --oldconfig $OLDCONFIG" >&2; exit 3 ;;
 esac
 [ -f "$DIR_LINUX/.config" ] && cp "$DIR_LINUX/.config" "$log.config-built"
+# The build records what it COMPILED with, not only what it configured
+# with. Until 2026-08-30 the second was recorded and the first was not.
+printf '%s\n' "$CFLAGS_KERNEL" > "$log.cflags"
 
 # ------------------------------------------------------------------ build
 if [ "$TARGET" = "none" ]; then

@@ -39,6 +39,102 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-08-30 — desk, no power: the image that booted cannot be rebuilt from
+its own recorded configuration, and the whole difference is a compiler flag no
+committed file carries.**
+
+The session set out to land three queued items on one kernel rebuild. It landed
+them, and on the way it found that `quietm` — the image that ran on this silicon
+on 2026-08-29, and that three `SPEC.md` rows are measured on — comes out
+**16,780 bytes of `.text` smaller** when rebuilt today from its own
+`.config-installed`, byte for byte, on the same host.
+
+Everything that could have explained it was measured and did not: the pinned
+drop is at `HEAD 5c9be5d9` with a clean worktree, **zero** ignored files and one
+reflog entry from the clone; the two `.config-built` files differ on **zero**
+lines; the compiled-file lists differ on **zero** lines (599 each); the marks log
+differs on **zero** lines; and the symbol sets are identical in both directions.
+A build at `-j4` and one at `-j8` produce the same `.text` to the byte, so the
+`-j` race that this tree's header-rewriting Makefile invites is excluded rather
+than assumed.
+
+The difference is `-fno-if-conversion`, found by diffing the `.cmd` files kbuild
+writes per object — all **746** of them, of which **588** differ and every one
+differs in exactly that one way and in no other. That is `SPEC.md` `TC-25`: the flag that takes `hazlint` from
+**seven load-use violations to zero** by removing 98.8 % of this gcc's
+conditional moves — the codegen safety net Decision A's refutation condition
+names. It reached the 2026-08-28 build as a flag typed at a shell. Three
+committed files declare 36 kconfig symbols, 31 image entries and 15 source
+insertions, each with a reason; this one was in none of them, and the build
+driver recorded the `.config` it configured with and nothing about what it
+compiled with.
+
+**So a rebuild that followed every committed file in this repository produced a
+kernel with seven load-use violations in it, and every gate here stayed green.**
+Measured: `hazlint` on that build reports 7, every one a `movz` reading the
+register a `lw` two instructions earlier writes.
+
+`config/rlxfw-cflags` declares it now, `tools/rlxfw-kbuild.sh` reads it **before
+the tree is staged** and refuses when no flag set is in force, `--no-cflags` is
+the only way to ask for an empty one, and the effective value is written beside
+`<cell>.config-built`. Where the guard sits is part of the claim: four of
+`tools/test-kbuild-cflags.sh`'s five cases need no vendor material because a
+refusal that costs a 480 MB copy first is a refusal nobody exercises. 🔴 The
+first version of the guard could not tell `--cflags-kernel ""` from the flag
+being absent, so the one request the file exists to refuse fell through to the
+declaration — caught by the guard's own `C2` on its first run, and it is the same
+distinction `console-capture`'s `N20` pins one tool over.
+
+**What the rebuild was for, and it all landed.** `CONFIG_MTD_CHAR=y`, with
+`(NEW)` predicted at 0 and measured at 0, one differing symbol line, and the
+artefact control firing: five mtdchar symbols where there were none, against six
+mtdblock symbols that did not move. The image now declares **only odd MTD
+minors** — `/dev/mtd0ro` and `/dev/mtd1ro` — so there is no node in it through
+which the kernel would let anything write flash, and `/dev/mtdblock1` is
+withdrawn. That was an argument in a comment until today; it is a check now
+(`mkinitramfs` `A24`/`A25`/`A26`, with two mutations in `test-config-gates`), and
+its control is complete rather than partial: `mknod` is not among this
+`busybox`'s fifty applets, so the declared set is the only set of device nodes
+this image can ever hold.
+
+`mkinitramfs verify` reads the **artefact**: the `.init.ramfs` section out of the
+built `vmlinux`, the newc cpio parsed, every entry compared to the declaration by
+path, kind, mode and dev numbers. 🔴 The obvious implementation is wrong and it
+was measured rather than feared — the first `070701` in `quietm.vmlinux.elf` is
+363,784 bytes *before* `.init.ramfs`, inside the kernel's own string data, right
+next to `no cpio magic`. 🔴 And its negative control refuted the prediction
+written for it: the 2026-08-28 image fails with **two** missing nodes, not the
+three predicted, because removing a node from a declaration produces no
+difference in an artefact that never had it. A change to the document counted as
+a difference in the image — which is the confusion the tool exists to stop.
+
+The `.text` of the corrected build was predicted at **2,449,180** by adding three
+separately measured deltas and came out **2,449,212** — 32 bytes, 0.001 %. The
+prediction beside it was refuted in its second half: a bound on bytes was carried
+into a bound on a percentage whose denominator it never named.
+
+🔴 **And the leak gate scans 240 of the 898 files this repository tracks** — which
+`bench/README.md` had already said, earlier the same day, along with the fact
+that `upstream/BENCH-LOG.md` prints actual `H601` byte values and a digest over the
+4 KiB at flash `0x6000`. What is new is the scan run over the gap, not the gap. The
+CI step globs `bench/**/*.log`. The 658 tracked files it never reads — plus `upstream/`'s 302, which `git ls-files`
+cannot see at all, for 960 unread in total — hold **100**
+identity-pattern hits — 92 once the scanner's own eight control literals come out,
+and 28 of them inside `bench/` itself: two in the prediction cards and 26 in the
+two host-side packet captures, which are `.txt` and so are outside a gate named
+for that directory. `upstream/` is invisible by
+construction: it is a submodule, `git ls-files` returns one line for it, and
+every sweep built on that has read **zero** of its 302 files. 量, counts only,
+with no value printed anywhere: exactly one MAC on this model's vendor OUI exists
+in the corpus, in seven files, four of them in a repository that is public — while
+`SPEC.md` §18's first sentence is that nothing identifying this unit is here.
+Whether that address is this unit's is **undetermined**: the check that would
+settle it needs a default-SSID string, and there are zero of them in either
+repository. `tools/leakscan.py` is new, imports the existing patterns rather than
+copying them, and never prints what matched. Only its self-test is in CI: turning
+the verdict into a gate needs an allowlist entry per surviving hit, and
+allowlisting a possible real leak to get a green build is the wrong order.
+
 🔴 **2026-08-30 — desk, no power: forty green cases, and ten mutants of the
 guard they had just been written for were alive.**
 `tools/console-capture.py` — the one instrument every capture at the bench runs

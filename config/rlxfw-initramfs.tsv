@@ -17,7 +17,12 @@
 #
 # SIZE.  The four ELF files below total 579,644 bytes (量), against 2,395,932
 # bytes of headroom under the 5,242,880 ceiling (notes/kernel-build.md 3.4).
-# The 47 busybox symlinks cost a cpio header each and no content.
+# 🔴 The line here said "The 47 busybox symlinks" and 量 2026-08-30 there are
+# THIRTEEN `slink` rows, ELEVEN of them pointing at busybox (the other two are
+# the loader's search names for uClibc). 47 is the count of NOTHING in this
+# file; the dump has 50 busybox symlinks and this image carries 11 of them.
+# A symlink costs a cpio header and no content either way, which is why the
+# wrong number changed no downstream figure and sat here undisturbed.
 #
 # kind	path	source	mode	owner	note
 
@@ -93,41 +98,61 @@ nod	/dev/console	c:5:1	0600	rlxfw	init/main.c init_post() opens it; the vendor's
 nod	/dev/null	c:1:3	0666	rlxfw	the shell redirects to it before anything else does
 nod	/dev/tty	c:5:0	0666	rlxfw	busybox's shell wants a controlling terminal for job control
 
-# --- R3-9's second path to the flash, and it is NOT /dev/mtd0 ----------------
-# 🔴 THE STEP ASKED FOR `/dev/mtd0` AND THAT CANNOT WORK ON THIS KERNEL. 量
-# 2026-08-30, two routes with a control on each: 讀 both built .configs say
-# `# CONFIG_MTD_CHAR is not set` (control: 9 other ^CONFIG_MTD lines in the same
-# file), and 量 both System.maps hold ZERO mtdchar symbols against SIX
-# mtdblock/mtdcore ones. Major 90 has no chrdev here, so `/dev/mtd0` opens
-# ENODEV and `wc -c < /dev/mtd0` reads a refusal, not a size.
+# --- R3-9's second path to the flash: TWO read-only char nodes ---------------
+# 🔄 2026-08-30, the rebuild. This block replaced a single `nod /dev/mtdblock1`
+# row. That row was the best answer available WHILE CONFIG_MTD_CHAR WAS OFF, and
+# the rebuild turned it on, so the row is withdrawn rather than corrected. The
+# original reasoning is kept in notes/kernel-build.md 17.7a, which is where it
+# was made.
 #
-# 🔴 AND `/dev/mtdblock0` IS NOT THE SUBSTITUTION EITHER. mtd0 is
-# `boot+cfg+linux` 0x000000-0x130000 (讀 bench/2026-08-30b/L3.log:113), which
-# contains BOTH regions CLAUDE.md forbids writing. mtdblock has a write path,
-# and 0400 is not a control -- root ignores DAC, so `echo x > /dev/mtdblock0`
-# is one typo from an erase-block write at offset 0 on a device with no spare.
-# mtd1 runs the identical mtdblock_readsect -> part_read -> rtl819x_flash read
-# path, so it buys the same reading and leaves no writable node over the loader
-# or H601. THE CONTROL IS THE ABSENCE OF A NODE, NOT THE MODE BITS.
+# 讀 drivers/mtd/mtdchar.c mtd_open -- TWO refusals, and only the second depends
+# on anything being configured right:
+#   (a) if ((f_mode & FMODE_WRITE) && (minor & 1)) return -EACCES;
+#   (b) if ((f_mode & FMODE_WRITE) && !(mtd->flags & MTD_WRITEABLE)) return -EACCES;
+# (a) is unconditional and is stronger than a mode bit, because root ignores DAC.
+# 讀 include/linux/mtd/mtd.h:21, MTD_CHAR_MAJOR is 90; the char minor is
+# (mtd number << 1) and an ODD minor is the read-only alias. So mtd0ro = c 90 1
+# and mtd1ro = c 90 3.
 #
-# What it buys: `wc -c < /dev/mtdblock1` -> **2949120** (量 L3.log:114, and 讀
-# rtl819x_flash.c with CONFIG_RTL_ROOT_IMAGE_OFFSET=0x130000 and WINDOW_SIZE
-# 0x400000: 0x400000-0x130000 = 0x2D0000. Two sources; the first draft of
-# this line said 2818048, which is 0x2B0000 and is a subtraction error), a readability-and-size reading through MY OWN MTD stack.
-# NOT a content check: 量, this unit's busybox has none of dd/md5sum/od/hexdump/
-# cmp/cksum/sum/sha1sum among its fifty applets, and a foreign binary would
-# break Decision B's third leg. `cat /proc/mtd` is the free companion and reads
-# ZERO flash bytes -- it prints the map from my own driver (mtd_read_proc IS in
-# both System.maps).
+# WHY mtdblock1 IS GONE. Its stated purchase was "a readability and size reading
+# through my own MTD stack" -- `wc -c` printing 2949120. /dev/mtd1ro buys the
+# same number over the same partition through mtd_read -> part_read ->
+# rtl819x_flash, and leaves NO WRITABLE FLASH NODE IN THE IMAGE AT ALL. What is
+# given up is the block layer (mtdblock_readsect, the blktrans request queue),
+# which no step of R3 exercises and which R5b will want; it comes back in the
+# build that needs it.
 #
-# Refuted by: `wc` printing anything but 2949120; `No such device` (the block
-# driver did not register); or a hang (the SPI read path does not complete).
+# 🟢 AND THE CONTROL IS NOW COMPLETE RATHER THAN ARGUED. 17.7a's sentence was
+# "the control is the absence of a node, not the mode bits", and an absence is
+# only a control if nothing can create one. 量, notes/rootfs-census.md: `mknod`
+# is NOT among this busybox's fifty applets -- by the applet-name table in the
+# binary, not by `strings`, which is the false positive that file documents
+# twice. So the declared set is the complete set of device nodes this image can
+# ever hold, and a mistyped `/dev/mtd0` at the shell is `No such file or
+# directory` rather than a writable handle on the loader.
 #
-# 🔴 THIS LINE IS AHEAD OF EVERY BUILT ARTEFACT. It is in no image that exists
-# on 2026-08-30, and specifically NOT in
-# `rlxfw-quietm-20260830.bin`, which is what
-# `bench/2026-08-30c/PREDICTIONS-B5-block2.md` uploads. That card's `V-0t` and
-# `V-2c` read `0x805FABF0` because they know where THAT image's `image_end`
-# sits, so a rebuild moves them. The card's own pre-flight sha256 is the
-# authority for that seating; this node lands on the build after it.
-nod	/dev/mtdblock1	b:31:1	0400	rlxfw	R3-9: `wc -c < /dev/mtdblock1` = 2949120 through my own MTD stack. NOT mtd0/mtdblock0 -- that partition holds the loader and H601 and mtdblock can write. CONFIG_MTD_CHAR is not set, so /dev/mtd0 would be ENODEV
+# PREDICTIONS for the next seating, written now so the card copies rather than
+# invents (notes/kernel-build.md 18.4 owns them):
+#   cat /proc/mtd        -> 0x00130000 "boot+cfg+linux", 0x002d0000 "root fs",
+#                           and it reads ZERO flash bytes
+#   wc -c < /dev/mtd0ro  -> 1245184     (0x130000)
+#   wc -c < /dev/mtd1ro  -> 2949120     (0x2D0000; 量 L3.log:114, and 讀
+#                           rtl819x_flash.c: WINDOW_SIZE 0x400000 minus
+#                           CONFIG_RTL_ROOT_IMAGE_OFFSET 0x130000. Two sources,
+#                           because the first draft of the old row said 2818048,
+#                           which is 0x2B0000 and a subtraction error)
+#   echo x > /dev/mtd0ro -> `Permission denied`  <- the positive control on the
+#                           safety property itself. It costs no flash bytes: the
+#                           open fails before any write is issued. A SUCCESS
+#                           here is a stop-if for the whole seating.
+# 讀 mtd_read: `if (*ppos + count > mtd->size) count = mtd->size - *ppos;` then
+# `if (!count) return 0;` -- a clean EOF, which is why `wc -c` terminates on a
+# character device at all.
+#
+# NOT A CONTENT CHECK, and G8b's forbidden sentence stays forbidden. 量, two
+# routes: this userspace has no dd/md5sum/od/hexdump/cmp/cksum/sum/sha1sum among
+# its fifty applets, so nothing here reads a byte of H601 and compares it to
+# anything. What these two nodes buy is size, readability, and a path over the
+# forbidden region that is provably unable to write it.
+nod	/dev/mtd0ro	c:90:1	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), over mtd0 = loader + H601. `wc -c` = 1245184. `echo x >` must be EACCES -- that is the control, and it writes nothing
+nod	/dev/mtd1ro	c:90:3	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), over mtd1 = the vendor rootfs. `wc -c` = 2949120, the reading the withdrawn /dev/mtdblock1 row was for, with no writable node left behind

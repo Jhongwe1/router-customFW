@@ -41,7 +41,12 @@ trap 'rm -rf "$T"' EXIT
 skip=0
 
 # MUST be tracked. Without these, a .gitignore of `*` would score 7/7.
-KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/threat-model.md dumps/MANIFEST.json ci-out.md"
+# 🔴 `docs/threat-model.md` was in this list until 2026-08-30 and there is no
+# such file: 量, `git ls-files docs/` returns seven names and that is not one
+# of them. The case still passed, because these are fixture paths created in
+# a throwaway repository -- which is exactly why a name that does not exist
+# could sit here. Replaced with a `docs/` file that does.
+KEEP="SOURCES.json .gitignore refs/README.md tools/fetch-sources.sh docs/FINDINGS.md dumps/MANIFEST.json ci-out.md"
 
 # MUST be ignored, one per reason:
 #   plan/     planning material, may address the author directly

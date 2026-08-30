@@ -2060,6 +2060,13 @@ does not carry it.** `nod /dev/mtdblock1 b:31:1 0400` was declared for `R3-9`
 the node lands on the next build, and that build moves `V-0t`/`V-2c`, whose
 `0x805FABF0` is derived from *this* image's `image_end`.
 
+🔄 **2026-08-30, after the seating: that build happened, and the line that
+moved is not the line this note names.** `nod /dev/mtdblock1` is **withdrawn**;
+the image declares `/dev/mtd0ro` and `/dev/mtd1ro` instead, both odd minors, so
+nothing in it can write flash. The artefact for the next card is
+`rlxfw-quietmc-20260830.bin`, 1,029,120 bytes, sha256 `08b088135c62cbef…`,
+and `V-0t`/`V-2c` must be recomputed against it (`SPEC.md` `FW-33`).
+
 #### §B5-c16 — 🔴 the card names two tools it does not locate, and two deviations that were run
 
 **2026-08-30, after seating 6.** The seating ran cleanly, and three things about
@@ -3300,7 +3307,10 @@ index, index 5 is renamed to `eth7`. 量, `V-6a.log` lists `eth7`. Nothing is op
 * **`H601` whole.** 256 of 8,192 bytes. A write to `0x006100`–`0x007FFF` is
   invisible to this bracket.
 * **A second path to the flash.** The MTD node `R3-9` declared is in no built
-  image, so `wc -c < /dev/mtdblock1` did not run and cannot have.
+  image, so `wc -c < /dev/mtdblock1` did not run and cannot have. 🔄 **2026-08-30:
+  the node that lands is not that one** — `CONFIG_MTD_CHAR=y` and the image
+  declares `/dev/mtd0ro`/`/dev/mtd1ro`, odd minors the kernel will not open for
+  writing (`SPEC.md` `FW-29`/`FW-30`, cells in `notes/kernel-build.md` §18.4).
 * **Which of the driver's 97 `panic_printk` call sites can fire on a boot.** Fifteen
   lines came out; the rest are conditional and none of them was provoked.
 * **The 0.250 s that the byte count does not explain** between `loudm`'s 8.971 s

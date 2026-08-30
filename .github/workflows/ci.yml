@@ -208,6 +208,9 @@ jobs:
       # Reads the git INDEX rather than the working tree, because the working
       # tree is what DrvFs lies about on the machine this repo is developed on.
       # A depth-1 checkout still produces a full index, so this is meaningful here.
+      - name: test-kbuild-cflags
+        run: bash tools/test-kbuild-cflags.sh 2>&1 | tee ci-out/test-kbuild-cflags.out; exit "${PIPESTATUS[0]}"
+
       - name: test-file-modes
         run: bash tools/test-file-modes.sh 2>&1 | tee ci-out/test-file-modes.out; exit "${PIPESTATUS[0]}"
 
@@ -348,6 +351,20 @@ jobs:
       # host: they carry the bench's own 10.1.1.0/24 and `/home/key`, 25 hits,
       # every one of them a property of the operator's machine and none of them
       # of the unit. Two different questions, and only the first is this gate's.
+      # 🔴 leakscan --self-test, and ONLY the self-test. 量 2026-08-30: the
+      # step above scans 240 files and `git ls-files` returns 795; the other
+      # 555 hold 97 identity-pattern hits, and `upstream/` -- 302 files -- is
+      # invisible to every sweep here because a submodule is one gitlink to
+      # `git ls-files`. The VERDICT run is a desk step until an allowlist
+      # decision is made per surviving hit; allowlisting a possible real leak
+      # to get a green build is the wrong order, and a gate that was narrowed
+      # until it went green is what this file spends forty lines warning about.
+      # What runs here is the six controls, including the two that make a clean
+      # result mean anything: L4 (the population is non-empty) and L5 (a
+      # finding never carries the bytes that produced it).
+      - name: leakscan self-test
+        run: /usr/bin/python3 tools/leakscan.py --self-test 2>&1 | tee ci-out/leakscan.out; exit "${PIPESTATUS[0]}"
+
       - name: audit-bench-log (exit-code gate)
         run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f -name '*.log')
 

@@ -193,5 +193,19 @@ bytes**. `config/rlxfw-initramfs.tsv` declares **`/dev/mtdblock1`** and
 deliberately not `mtdblock0`: mtd0 is `0x000000`–`0x130000`, which contains the
 loader and `H601`, `mtdblock` has a write path, and mode `0400` is not a control
 because root ignores DAC. *(Original: "`wc -c < /dev/mtd0` is a readability and
-size reading through my own MTD stack".)* `R3-9` owns the step; `SPEC.md`
-`FW-26` owns the applet census and `FW-28`/`FW-29` the map.
+size reading through my own MTD stack".)*
+
+🔄 **2026-08-30, the rebuild: the premise of the paragraph above is no longer
+the state of the build, and the command is neither of the two it names.**
+`CONFIG_MTD_CHAR=y` went in (`SPEC.md` `FW-29`), so major 90 has a chrdev and
+the image declares **`/dev/mtd0ro` `c 90 1`** and **`/dev/mtd1ro` `c 90 3`** —
+ODD minors, which 讀 `mtd_open` cannot be opened for writing **by the
+kernel**. `/dev/mtdblock1` is **withdrawn**: `mtd1ro` buys the identical
+reading (`wc -c` → 2,949,120) and leaves no writable flash node in the image
+at all. This paragraph's own sentence — *the control is the absence of a
+node* — is what decided it, and it is now enforced by `mkinitramfs`
+(`A24`/`A25`/`A26`) rather than argued. 量 for this file's own subject: the
+applet census is unchanged and still decides the rest — `mknod` is not among
+the fifty, so the declared node set is the only one this image can ever hold.
+`notes/kernel-build.md` §18.3. `R3-9` owns the step; `SPEC.md`
+`FW-26` owns the applet census and `FW-28`/`FW-29`/`FW-30` the map.

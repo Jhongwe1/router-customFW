@@ -1,0 +1,44 @@
+# rlxfw's kernel CFLAGS_KERNEL, declared.   R3-9, 2026-08-30.
+#
+# WHY THIS FILE EXISTS, and it is a defect report rather than a preference.
+# 量 2026-08-30: `quietm` -- the image that booted on the silicon on 2026-08-29
+# and that SPEC.md FW-27, FW-31 and FW-32 are measured on -- could not be
+# rebuilt from its own recorded configuration.  Same pinned drop, same
+# .config-built to the line, same 599 translation units, same symbol set, and
+# `.text` 2,444,228 against 2,427,448.  The entire difference was ONE compiler
+# flag, found by diffing kbuild's own `.sched.o.cmd` files word by word.
+#
+# The flag is `-fno-if-conversion` and it is SPEC.md TC-25: it takes `hazlint`
+# from SEVEN load-use violations to ZERO by removing 98.8 % of this gcc's
+# conditional moves (2,597 -> 31), at a cost of +0.69 % of .text.  It is the
+# codegen safety net that Decision A's refutation condition names
+# (notes/kernel-build.md 1 and 7).
+#
+# It reached the 2026-08-28 build as `--cflags-kernel` typed at a shell.  Three
+# committed files declare 36 kconfig symbols, 31 image entries and 15 source
+# insertions, each with a reason; the flag that decides whether this kernel
+# contains a load-use hazard was in none of them, and `rlxfw-kbuild.sh` did not
+# record it either.  A rebuild that followed every committed file produced an
+# image with SEVEN violations in it and every gate in this repository stayed
+# green (量 2026-08-30: `hazlint` on the flagless `rep8` build, 7 violations,
+# every one a `movz` reading the register a `lw` two instructions earlier
+# writes).
+#
+# HOW IT REACHES EVERY OBJECT.  讀 scripts/Makefile.build:118 -- CFLAGS_KERNEL
+# is consumed as `modkern_cflags` and lands LAST in `c_flags` for non-module
+# objects.  The alternative (arch/rlx/Makefile's `cflags-y`) means editing a
+# vendor file, which CLAUDE.md forbids outside config/rlxfw-marks.tsv.
+#
+# HOW TO BUILD WITHOUT IT.  `rlxfw-kbuild.sh --no-cflags`, which is deliberate,
+# says so in its name, and is what TC-25's own flag sweep needs.  An EMPTY
+# `--cflags-kernel` is refused instead of silently accepted: "no flags" has to
+# be asked for, never arrived at.
+#
+# ⚠️ WHAT THIS FLAG DOES NOT DO.  It removes the SITES; it does not answer
+# whether they were hazards.  That is TC-h.  If `movz` turns out to be
+# write-enable on this core, the 0.69 % is spent for nothing -- and finding that
+# out is worth more than the bytes.
+#
+# One flag per line.  Comments and blank lines are ignored.
+
+-fno-if-conversion

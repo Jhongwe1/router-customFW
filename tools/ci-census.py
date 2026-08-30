@@ -351,6 +351,17 @@ def self_test():
         ck("C5 a suite in the table with no .out -> red, not silently absent", red, True)
         _write(cap, "alpha.out", clean)
 
+        # C16 -- the not-run-total check must not fire under --only, and
+        # must still fire without it.  Both directions, because a fix that
+        # disabled the check outright would pass the first half alone.
+        red, out_lines = census(table, cap, only={"alpha"},
+                                out=buf, declared_total=None)
+        ck("C16 --only: no NOT-RUN-TOTAL line at all",
+           any("NOT-RUN-TOTAL" in ln for ln in out_lines), False)
+        red, out_lines = census(table, cap, out=buf, declared_total=99)
+        ck("C16 and without --only it still fires",
+           any("NOT-RUN-TOTAL MISMATCH" in ln for ln in out_lines), True)
+
         # C6 --only naming a suite the table does not have
         red, _ = census(table, cap, only={"alpha", "gamma"}, out=buf)
         ck("C6 --only names a suite the table does not carry -> red", red, True)
@@ -422,7 +433,15 @@ def main(argv):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     table, declared = load_table(args[0])
-    red, _ = census(table, args[1], only=only, declared_total=declared)
+    # 🔴 The not-run-total check belongs to a WHOLE-TABLE census and to
+    # nothing else.  量 2026-08-30: `CLAUDE.md`'s own pre-push step is
+    # `--only <the suites you touched>`, and on the machine the push happens
+    # from -- which has $FWRE_WORK and so runs everything -- that command
+    # could never go green, because `not-run-total` describes a RUNNER.
+    # A documented procedure that cannot pass is one nobody follows, or one
+    # whose red everybody learns to read past.  `C16` is the control.
+    red, _ = census(table, args[1], only=only,
+                    declared_total=None if only else declared)
     return 1 if red else 0
 
 

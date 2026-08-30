@@ -42,7 +42,7 @@ import stat
 import struct
 import sys
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 # `notes/kernel-build.md` §3.4: the image is entered at 0x80500000 and
 # decompresses to 0x80000000, so the decompressed image must end below its own
@@ -266,7 +266,73 @@ def resolve(entries, unit, repo, decl_path):
         e.resolved = src
         e.size = os.path.getsize(src)
         e.digest = sha256(src)
+    check_no_writable_flash_node(entries, decl_path)
     return entries
+
+
+# --------------------------------------------------------------------------
+# The flash-write node ban.  R3-9, 2026-08-30.
+#
+# `CLAUDE.md`'s Never table forbids writing 0x000000-0x005FFF (the loader) and
+# 0x006000-0x007FFF (H601) on a device with no spare.  Until today the thing
+# keeping a writable node out of the image was an ARGUMENT in a comment --
+# notes/kernel-build.md 17.7a reasons its way from /dev/mtdblock0 to
+# /dev/mtdblock1 and ends "the control is the absence of a node, not the mode
+# bits".  An argument in a comment is not a check.  This is the check.
+#
+#   讀 drivers/mtd/mtdblock.c: `.major = 31, .part_bits = 0`, and
+#   mtdblock_writesect is a read-modify-erase-write of a whole erase block.  So
+#   EVERY major-31 node is writable by root, whatever its mode -- root ignores
+#   DAC, which is why 0400 was never the control.
+#   讀 drivers/mtd/mtdchar.c mtd_open:
+#   `if ((file->f_mode & FMODE_WRITE) && (minor & 1)) return -EACCES;`
+#   so a major-90 node is read-only BY THE KERNEL if its minor is ODD, and is
+#   not if it is even.
+#   讀 include/linux/mtd/mtd.h:21 -- `#define MTD_CHAR_MAJOR 90`.
+#
+# THE RULE: no declared node may be one the kernel would let anything write to
+# flash through.  It keys on the dev numbers, never on the path -- a node named
+# /dev/harmless with b:31:0 is the same node.
+#
+# THERE IS DELIBERATELY NO ALLOWLIST.  An escape hatch written before anything
+# needs one is an escape hatch that gets used; the build that genuinely needs a
+# writable node edits this predicate with a reason, which is a diff a reviewer
+# sees.  R5b will want the mtdblock read path back and that is the moment.
+MTD_BLOCK_MAJOR = 31
+MTD_CHAR_MAJOR = 90
+
+
+def check_no_writable_flash_node(entries, decl_path):
+    """Refuse any device node the kernel would permit a write to flash through.
+
+    Called from the END of resolve(), which is ONE call site on purpose.  The
+    control path (_try) and the real path (cmd_build) both go through resolve;
+    a check added to cmd_build alone would be exercised by nothing, which is
+    `TC-j`'s defect (a private copy of the pipeline that the controls drove
+    while the real command line took another route).
+    """
+    for e in entries:
+        if e.kind != "nod":
+            continue
+        kind, maj, mnr = e.source.split(":")
+        maj, mnr = int(maj), int(mnr)
+        if maj == MTD_BLOCK_MAJOR:
+            die("%s:%d: %s is %s -- major %d is mtdblock, and 讀 "
+                "drivers/mtd/mtdblock.c mtdblock_writesect is a whole-erase-block "
+                "read-modify-erase-write, so root can write flash through ANY "
+                "node with this major whatever its mode. On this device mtd0 "
+                "spans 0x000000-0x130000 and contains both regions CLAUDE.md "
+                "forbids. No mode bit is a control here; the absence of the "
+                "node is"
+                % (decl_path, e.lineno, e.path, e.source, maj))
+        if maj == MTD_CHAR_MAJOR and mnr % 2 == 0:
+            die("%s:%d: %s is %s -- major %d is mtdchar and minor %d is EVEN. "
+                "讀 drivers/mtd/mtdchar.c mtd_open: the read-only refusal is "
+                "`(f_mode & FMODE_WRITE) && (minor & 1)`, so only an ODD minor "
+                "cannot be opened for writing. Declare /dev/mtd%dro as c:%d:%d "
+                "instead, which is the same device read-only BY THE KERNEL"
+                % (decl_path, e.lineno, e.path, e.source, maj, mnr,
+                   mnr // 2, maj, mnr + 1))
 
 
 def check_required(entries, decl_path):
@@ -412,6 +478,228 @@ def loaded_extent(path):
             "to load would measure 0 and pass any ceiling" % path)
     return hi - lo, "%d PT_LOAD, 0x%08x-0x%08x" % (phnum, lo, hi)
 
+
+# ==========================================================================
+# `verify` -- the declaration checked against the ARTEFACT.   R3-9, 2026-08-30.
+#
+# WHY IT EXISTS.  `build` reads config/rlxfw-initramfs.tsv and writes a spec;
+# nothing then read the image.  On 2026-08-30 the declaration carried a device
+# node that was in no built kernel, and PROGRESS.md recorded that as a row
+# nothing could check -- "a declaration ahead of every artefact".  A document
+# that describes something that does not exist is worse than no document,
+# because it reads as current.  This is `rlxfw-marks.py`'s own `check` / `verify`
+# split, which was measured on its first run: only the one that reads the built
+# artefact can catch a change that compiled and is not in the image.
+#
+# 🔴 WHERE THE ARCHIVE IS, AND THE TRAP THAT IS NOT HYPOTHETICAL.  With
+# CONFIG_INITRAMFS_COMPRESSION_NONE the cpio is linked into the ELF section
+# `.init.ramfs`.  The obvious alternative -- scan the file for the newc magic
+# `070701` -- reads the WRONG BYTES on this kernel, and that is 量 rather than a
+# worry: in r3-4/out/quietm.vmlinux.elf the first occurrence of `070701` is at
+# file offset 2,556,664, inside the kernel's own string data (the next bytes are
+# `no cpio magic`, init/initramfs.c's error message), while `.init.ramfs` starts
+# at 2,920,448.  A magic-scanning verifier parses the kernel's diagnostics.
+# `V6` is that measurement turned into a case.
+#
+# WHAT IT DOES NOT DO.  It does not check file CONTENT.  The manifest already
+# carries a sha256 per source file and `build` computes it; re-hashing the bytes
+# out of the archive would be a second owner of the same claim.  What is checked
+# here is the SHAPE the kernel will see: which paths exist, what kind each one
+# is, its permission bits, and -- the reason this exists at all -- a device
+# node's major and minor.
+
+CPIO_MAGIC = b"070701"
+CPIO_TRAILER = "TRAILER!!!"
+
+#: cpio mode type bits against this declaration's `kind` column.
+S_IFMT = 0o170000
+KIND_IFMT = {"dir": 0o040000, "file": 0o100000,
+             "slink": 0o120000, "nod-c": 0o020000, "nod-b": 0o060000}
+
+
+def elf_section(path, want):
+    """Return (offset, size) of a named section, or None.
+
+    Both endiannesses are read rather than assuming big-endian MIPS: the
+    controls build their fixtures on this host and a decoder that only works on
+    one byte order would pass every synthetic case and fail on nothing.
+    """
+    with open(path, "rb") as fh:
+        blob = fh.read()
+    if blob[:4] != b"\x7fELF":
+        die("%s is not an ELF file" % path)
+    if blob[4] != 1:
+        die("%s is not ELFCLASS32; this kernel is 32-bit" % path)
+    end = ">" if blob[5] == 2 else "<"
+    if len(blob) < 0x34:
+        die("%s: truncated ELF header" % path)
+    e_shoff, = struct.unpack_from(end + "I", blob, 0x20)
+    e_shentsize, e_shnum, e_shstrndx = struct.unpack_from(end + "HHH", blob, 0x2E)
+    if e_shoff == 0 or e_shnum == 0:
+        die("%s has no section header table, so `.init.ramfs` cannot be "
+            "located. A stripped image is not what this checks" % path)
+    if e_shstrndx >= e_shnum:
+        die("%s: e_shstrndx %d is past e_shnum %d" % (path, e_shstrndx, e_shnum))
+
+    def sh(i):
+        off = e_shoff + i * e_shentsize
+        if off + 40 > len(blob):
+            die("%s: section header %d is past EOF" % (path, i))
+        return struct.unpack_from(end + "10I", blob, off)
+
+    str_off = sh(e_shstrndx)[4]
+    found = None
+    for i in range(e_shnum):
+        name, _typ, _fl, _addr, offset, size = sh(i)[:6]
+        s = blob[str_off + name:str_off + name + 64]
+        nm = s.split(b"\0")[0].decode("utf-8", "replace")
+        if nm == want:
+            if offset + size > len(blob):
+                die("%s: section %s runs past EOF" % (path, want))
+            found = (offset, size)
+    return found, blob
+
+
+def parse_cpio(blob, start, size, where):
+    """Parse a newc archive into [(name, mode, size, rdevmajor, rdevminor)]."""
+    out = []
+    pos = start
+    limit = start + size
+    while True:
+        if pos + 110 > limit:
+            die("%s: ran off the end of the section at %d with no %s entry"
+                % (where, pos, CPIO_TRAILER))
+        hdr = blob[pos:pos + 110]
+        if hdr[:6] != CPIO_MAGIC:
+            die("%s: no newc magic at offset %d (found %r). The archive is not "
+                "where this expects it, or the image is compressed -- 讀 "
+                "CONFIG_INITRAMFS_COMPRESSION_NONE" % (where, pos, hdr[:6]))
+        try:
+            f = [int(hdr[6 + 8 * k:6 + 8 * (k + 1)], 16) for k in range(13)]
+        except ValueError:
+            die("%s: malformed newc header at offset %d" % (where, pos))
+        mode, fsize, rmaj, rmin, nsize = f[1], f[6], f[9], f[10], f[11]
+        if nsize == 0 or pos + 110 + nsize > limit:
+            die("%s: name size %d at offset %d is out of range"
+                % (where, nsize, pos))
+        name = blob[pos + 110:pos + 110 + nsize - 1].decode("utf-8", "replace")
+        if name == CPIO_TRAILER:
+            return out
+        out.append((name, mode, fsize, rmaj, rmin))
+        pos += 110 + nsize
+        pos += (-pos) % 4
+        pos += fsize
+        pos += (-pos) % 4
+
+
+def declared_shape(entries):
+    """{path: (ifmt, perm, rdevmajor, rdevminor)} from the declaration."""
+    shape = {}
+    for e in entries:
+        if e.kind == "nod":
+            t, maj, mnr = e.source.split(":")
+            ifmt = KIND_IFMT["nod-" + t]
+            dev = (int(maj), int(mnr))
+        else:
+            ifmt = KIND_IFMT[e.kind]
+            dev = (0, 0)
+        shape[e.path] = (ifmt, int(e.mode, 8), dev[0], dev[1])
+    return shape
+
+
+def cmd_verify(a):
+    decl = a["decl"]
+    entries = parse_decl(decl)
+    check_required(entries, decl)
+    resolve(entries, a["unit"], a["repo"], decl)
+
+    print("mkinitramfs %s   verify" % VERSION)
+    print("declaration %s   (%d entries)" % (decl, len(entries)))
+    print("image       %s" % a["image"])
+
+    # --- the declaration as it stands, against the spec the build consumed ---
+    # A mismatch below has two repairs and they are opposite: rebuild, or revert
+    # the declaration.  Nothing can tell them apart from a difference alone.
+    if a["built_spec"]:
+        want = emit_spec(entries)
+        with open(a["built_spec"], "r", encoding="utf-8") as fh:
+            got = fh.read()
+        if want != got:
+            print("")
+            print("REFUSED: the declaration has CHANGED since this image was "
+                  "built.")
+            print("  built from %s" % a["built_spec"])
+            print("  the declaration now emits a different spec, so a difference "
+                  "below would be the declaration's and not the image's.")
+            print("  Rebuild, or revert the declaration. This is not a verdict "
+                  "on the image.")
+            return 2
+        print("built-spec  %s (identical to what this declaration emits)"
+              % a["built_spec"])
+
+    sec, blob = elf_section(a["image"], ".init.ramfs")
+    if sec is None:
+        die("%s has no `.init.ramfs` section. That is a finding rather than a "
+            "missing file: 讀 usr/Makefile:31, CONFIG_INITRAMFS_SOURCE=\"\" "
+            "builds an image holding ONE EMPTY DIRECTORY, and "
+            "CONFIG_BLK_DEV_INITRD=n links no archive at all. Either way the "
+            "boot falls through to prepare_namespace()" % a["image"])
+    off, size = sec
+    got = parse_cpio(blob, off, size, a["image"])
+    print("archive     .init.ramfs at file offset %d, %d bytes, %d entries"
+          % (off, size, len(got)))
+    print("")
+
+    want = declared_shape(entries)
+    have = {}
+    for name, mode, _fsize, rmaj, rmin in got:
+        have[name] = (mode & S_IFMT, mode & 0o7777, rmaj, rmin)
+
+    bad = []
+    for path in sorted(set(want) | set(have)):
+        w, h = want.get(path), have.get(path)
+        if w is None:
+            bad.append(("UNEXPECTED", path,
+                        "in the image, in no declaration row"))
+        elif h is None:
+            bad.append(("MISSING", path,
+                        "declared, and not in the image"))
+        elif w != h:
+            what = []
+            if w[0] != h[0]:
+                what.append("type %o vs %o" % (w[0], h[0]))
+            if w[1] != h[1]:
+                what.append("mode %04o vs %04o" % (w[1], h[1]))
+            if (w[2], w[3]) != (h[2], h[3]):
+                what.append("dev %d:%d vs %d:%d" % (w[2], w[3], h[2], h[3]))
+            bad.append(("DIFFERS", path, "declared " + ", ".join(what)
+                        + "  (declared vs image)"))
+
+    nod = [p for p in sorted(have) if have[p][0] in (0o020000, 0o060000)]
+    print("device nodes in the image (%d):" % len(nod))
+    for p in nod:
+        ifmt, perm, maj, mnr = have[p]
+        writable = ("b" if ifmt == 0o060000 else "c", maj, mnr)
+        note = ""
+        if writable[0] == "b" and maj == MTD_BLOCK_MAJOR:
+            note = "  🔴 mtdblock -- root can write flash through this"
+        elif writable[0] == "c" and maj == MTD_CHAR_MAJOR:
+            note = ("  read-only BY THE KERNEL (odd minor)" if mnr % 2
+                    else "  🔴 mtdchar EVEN minor -- writable")
+        print("  %-24s %s %d:%d  %04o%s"
+              % (p, writable[0], maj, mnr, perm, note))
+    print("")
+
+    if not bad:
+        print("\033[32mOK\033[0m  %d entries, and every one matches the "
+              "declaration in kind, mode and dev" % len(got))
+        return 0
+    for kind, path, why in bad:
+        print("  %-11s %-30s %s" % (kind, path, why))
+    print("")
+    print("\033[31mFAILED\033[0m  %d difference(s) between %s and %s"
+          % (len(bad), decl, a["image"]))
+    return 1
 
 def cmd_build(a):
     decl = a["decl"]
@@ -809,12 +1097,50 @@ def run_controls():
               "flat %d (%s), no-PT_LOAD refused %s" % (nf, howf, ok22))
         c.add("A23 a truncated program header table refuses, not tracebacks",
               ok23, "refused %s" % ok23)
+        # --- A24-A26: the flash-write node ban -----------------------------
+        # A24 -- it fires.  All three of these were reachable declarations:
+        # mtdblock0 is the one 17.7a talked itself out of, mtdblock1 is the one
+        # that was IN THIS FILE until today, and c:90:0 is the even mtdchar
+        # minor that looks like the node the step originally asked for.
+        bads = [
+            ("mtdblock0", "nod\t/dev/mtdblock0\tb:31:0\t0400\trlxfw\tx\n"),
+            ("mtdblock1", "nod\t/dev/mtdblock1\tb:31:1\t0400\trlxfw\tx\n"),
+            ("mtd0 even", "nod\t/dev/mtd0\tc:90:0\t0400\trlxfw\tx\n"),
+        ]
+        missed = [w for w, t in bads if _try(good + t, unit, repo)[0] is None]
+        c.add("A24 a node the kernel would let root write flash through",
+              not missed,
+              "3/3 refused" if not missed else "accepted: " + ", ".join(missed))
+
+        # A25 -- and it does NOT fire on the two nodes this image needs, which
+        # is what stops A24 being passed by a ban that refuses everything.
+        oks = [
+            ("mtd0ro", "nod\t/dev/mtd0ro\tc:90:1\t0400\trlxfw\tx\n"),
+            ("mtd1ro", "nod\t/dev/mtd1ro\tc:90:3\t0400\trlxfw\tx\n"),
+        ]
+        wrong = [w for w, t in oks if _try(good + t, unit, repo)[0] is not None]
+        c.add("A25 …and an ODD mtdchar minor is accepted (control on A24)",
+              not wrong,
+              "2/2 accepted" if not wrong else "refused: " + ", ".join(wrong))
+
+        # A26 -- the rule reads the dev numbers, not the path.  A15's defect
+        # one level up: a nod's major/minor were once passed through as text,
+        # and a ban keyed on the NAME would pass A24 and A25 both.
+        err_name, _ = _try(
+            good + "nod\t/dev/harmless\tb:31:9\t0400\trlxfw\tx\n", unit, repo)
+        err_high, _ = _try(
+            good + "nod\t/dev/mtd9ro\tc:90:19\t0400\trlxfw\tx\n", unit, repo)
+        c.add("A26 the ban keys on major/minor, never on the path",
+              err_name is not None and err_high is None,
+              "b:31:9 named /dev/harmless refused=%s; c:90:19 accepted=%s"
+              % (err_name is not None, err_high is None))
+
     return c
 
 
 def main(argv):
     if not argv:
-        die("no command. One of: build, self-test")
+        die("no command. One of: build, verify, self-test")
     cmd, rest = argv[0], argv[1:]
 
     if cmd == "self-test":
@@ -834,6 +1160,32 @@ def main(argv):
         print("RESULT: \033[32m%d passed, 0 failed\033[0m, %d skipped"
               % (len(c.rows) - ns, ns))
         return 0
+
+    if cmd == "verify":
+        a = {"decl": None, "unit": None, "repo": None, "image": None,
+             "built_spec": None}
+        i = 0
+        while i < len(rest):
+            x = rest[i]
+            if x in ("--decl", "--unit", "--repo", "--image", "--built-spec"):
+                if i + 1 >= len(rest):
+                    die("%s needs a value" % x)
+                a[x[2:].replace("-", "_")] = rest[i + 1]
+                i += 2
+            else:
+                die("unknown option %s" % x)
+        for k in ("decl", "unit", "repo", "image"):
+            if not a[k]:
+                die("verify needs --%s" % k)
+        for k in ("decl", "image"):
+            if not os.path.isfile(a[k]):
+                die("--%s %s: no such file" % (k, a[k]))
+        c = run_controls()
+        if c.failed:
+            print("REFUSED: %d control(s) failed; nothing is reported about an "
+                  "image until the tool itself is trusted." % len(c.failed))
+            return 2
+        return cmd_verify(a)
 
     if cmd != "build":
         die("unknown command %r" % cmd)

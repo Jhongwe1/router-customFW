@@ -129,6 +129,33 @@ o="$("$PY" "$T/m5" self-test 2>&1)"
 ck "M5 fails A11"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  A11 ')"
 
 echo
+echo "=== M6-M7: the flash-write node ban, and why A26 is not redundant ==="
+# The ban is the only thing standing between an edit to
+# config/rlxfw-initramfs.tsv and a node root can write flash through on a
+# device with no spare.  Two mutations, because a ban has two ways to be wrong:
+# not running at all, and running on the wrong evidence.
+
+# M6 -- the call site.  A guard that is never called looks exactly like one
+# that never fires, which is this repository's own "a tool reporting 0 is
+# making a claim".
+mutmk m6 's|^    check_no_writable_flash_node(entries, decl_path)|    pass  # MUTATED: the flash-write node ban is never called|'
+ck "M6 mutation landed"   1 "$(grep -c 'MUTATED: the flash-write node ban is never called' "$T/m6")"
+o="$("$PY" "$T/m6" self-test 2>&1)"
+ck "M6 fails A24"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  A24 ')"
+
+# M7 -- the ban keys on the PATH instead of the major.  This is the subtle one:
+# all three of A24's declarations are still refused (two by name, the third by
+# the even-minor clause), so A24 stays GREEN and only A26 goes red.  That is
+# the whole reason A26 exists, and without this mutation nothing says so.
+# It is also the defect A15 found one level up -- a nod's major and minor were
+# passed through as text until 2026-08-28.
+mutmk m7 's|^        if maj == MTD_BLOCK_MAJOR:|        if e.path.startswith("/dev/mtdblock"):  # MUTATED: the ban keys on the path|'
+ck "M7 mutation landed"   1 "$(grep -c 'MUTATED: the ban keys on the path' "$T/m7")"
+o="$("$PY" "$T/m7" self-test 2>&1)"
+ck "M7 fails A26"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  A26 ')"
+ck "M7 leaves A24 GREEN"  1 "$(printf '%s\n' "$o" | grep -c '^  ok    A24 ')"
+
+echo
 echo "=== E1-E4: on this repository's own declaration files ==="
 DELTA="$REPO/config/rlxfw-kernel.delta"
 DECL="$REPO/config/rlxfw-initramfs.tsv"
@@ -146,7 +173,7 @@ rules, headers = m.parse_delta(sys.argv[2])
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1 the committed delta parses: 35 rules, 14 set, 21 derived" "35 14 21" \
+ck "E1 the committed delta parses: 36 rules, 15 set, 21 derived" "36 15 21" \
    "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
 
 # E1b -- the same file, per variant, and it also runs on a clean clone.  Without
@@ -170,9 +197,9 @@ except SystemExit as e:
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1b --variant loud: 37 rules, 16 set, 21 derived"  "37 16 21" \
+ck "E1b --variant loud: 38 rules, 17 set, 21 derived"  "38 17 21" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
-ck "E1b --variant quiet does NOT pick them up"         "35 14 21" \
+ck "E1b --variant quiet does NOT pick them up"         "36 15 21" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"

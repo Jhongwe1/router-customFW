@@ -374,7 +374,15 @@ the count is printed on every build rather than left out of the total.
 🆕 **2026-08-29, and the half that could not be built is the more useful
 finding.** `tools/audit-bench-log.py` scans every committed capture for anything
 that could identify this device, and runs every pattern against a synthetic
-positive control first; it is a CI gate. `tools/check-predictions.py --sweep
+positive control first; it is a CI gate. 🔴 **2026-08-30: *every committed
+capture* overstated it and the same sentence had to be corrected in `SPEC.md`
+§18 on the same day.** 量: the gate globs `bench/**/*.log` — **240 files**,
+where `git ls-files` returns **899**. The **658** tracked files it never reads,
+plus `upstream/`'s **302** that a submodule hides from `git ls-files` entirely,
+hold **100** hits on the four patterns that can identify a unit. `tools/leakscan.py`
+is the instrument that says so, it never prints what matched, and only its
+self-test is a gate — the verdict needs an allowlist decision per surviving hit,
+and allowlisting a possible real leak to get a green build is the wrong order. `tools/check-predictions.py --sweep
 bench` checks that every capture named by a prediction file is **newer** than
 the file naming it — and it **cannot** be a CI gate, because **git does not
 store mtimes**. A checkout writes every file fresh, so on a clone of this

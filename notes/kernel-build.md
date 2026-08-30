@@ -790,7 +790,9 @@ direction: the consequence is silent and the cost is 0.69 % of `.text`.
 
 ## 8. `R3-4` part one: the configuration as a checked delta
 
-`config/rlxfw-kernel.delta` — **35 rules for `quiet` and 37 for `loud`**, each
+`config/rlxfw-kernel.delta` — 🔄 **36 rules for `quiet` and 38 for `loud`** as
+of 2026-08-30 (`CONFIG_MTD_CHAR`, §18.2); **35 and 37** when this paragraph was
+written — each
 with a reason. §6 is why it is shaped this way; this is what it is. 🔄
 **2026-08-28/29: the two extra rows carry an `@loud` variant tag** and are
 listed in §11.6; a row with no tag is in both images. 量: `apply` with no
@@ -1261,7 +1263,9 @@ at one shell in one boot*, not three uploads — a correction to the step list's
 vendor's configuration; `loud` is `quiet` plus `CONFIG_PRINTK=y` and
 `CONFIG_PRINTK_TIME=y`. Both carry the eleven marks. **The first seating uploads
 `loud`.** One delta file with a `@loud` variant column, because a second delta
-file would be a copy of all 35 rules and a copy is a second owner.
+file would be a copy of all the rules and a copy is a second owner. *(The count
+was written here as 35 and is 36 since 2026-08-30; it is removed rather than
+updated, because this sentence never needed one.)*
 
 🔴 **§6.6's trap fired on the first attempt**: setting `CONFIG_PRINTK=y` alone
 takes `(NEW)` from **0 to 1** — `CONFIG_PRINTK_TIME` becomes reachable. So it is
@@ -1737,6 +1741,11 @@ signature from the Makefile's own option logic without reading what came out**
 — which is exactly what happened here, at the desk, where it cost nothing.
 
 ### 13.3 The four images, end to end
+
+🔄 **2026-08-30: there are six. `quietmc` and `loudmc` are in §18.6 and not
+here**, because this section is `R3-2`'s control — the pipeline reproducing the
+vendor's own `nfjrom` byte for byte — and adding rows to its table would make
+the control read as a list.
 
 All four go through the same pipeline. `CONFIG_BLK_DEV_INITRD=y` on all of
 them, so `make` skips the `flash_size_chk` step the control tripped on, and all
@@ -2655,3 +2664,455 @@ is not a line count**, and this section used them interchangeably until the adve
 the 448. And it says nothing about `panic_printk`'s behaviour
 before `console_init()`, which is `TC-29`'s question and is unchanged.
 
+
+---
+
+## 18. `R3-9`'s rebuild: a flash path the kernel will not let anything write
+
+**Written 2026-08-30 18:29, at the desk, BEFORE the build was started.** The
+ordering evidence for this section is the commit and this file's mtime, and it
+is deliberately not `check-predictions.py` — that tool resolves a cell to
+`bench/<prefix>.log` and cannot see a desk build. Said here rather than left
+implied, because an ordering discipline that quietly does not apply is the shape
+this repository keeps catching itself in.
+
+### 18.1 Why a rebuild, and why today rather than any other day
+
+Three rows had been carried forward waiting for a kernel build, and one of them
+is a contradiction rather than a want: `config/rlxfw-initramfs.tsv` declares a
+device node that is **in no built image**. A declaration ahead of every artefact
+is a document that describes something that does not exist.
+
+The scheduling argument is the one that decided the day. A rebuild moves
+`image_end`, so it invalidates the `V-0t`/`V-2c` addresses on any prediction
+card that is pinned to an image's sha256. `bench/2026-08-30c/PREDICTIONS-B5-block2.md`
+is **spent** — it ran on 2026-08-30 — and the next card is not written. So today
+is the one day on which a rebuild costs no rewritten card, and building after the
+next card is written would cost exactly one.
+
+⚠️ **The old artefacts are not disturbed, and that was checked rather than
+assumed.** 量: `tools/rlxfw-kbuild.sh` writes `$R/out/<cell>.{config-built,
+config-installed,oldconfig.log,build.log,System.map,vmlinux.elf}` and stages
+into `$R/cells/<cell>`, both keyed on the cell name. New cell names leave
+`quietm`'s and `loudm`'s outputs where `FW-27`, `FW-31` and `FW-32` point.
+量: 915 G free on this host, and one cell is about 475 MB.
+
+### 18.2 The one config change, and the prediction that it asks kconfig nothing
+
+`CONFIG_MTD_CHAR=y`.
+
+| | | |
+|---|---|---|
+| 讀 | `drivers/mtd/Kconfig:175` | `tristate "Direct char device access to MTD devices"`, with **no** `depends on` line of its own |
+| 量 | the whole drop | `depends on MTD_CHAR` — **0** hits; `select MTD_CHAR` — **0** hits |
+| 讀 | `drivers/mtd/Makefile:18` | `obj-$(CONFIG_MTD_CHAR) += mtdchar.o` is the symbol's only consumer |
+| 讀 | `include/linux/mtd/mtd.h:21` | `#define MTD_CHAR_MAJOR 90` |
+
+**`P18-1`, and it is §6.6's trap asked in advance:** `(NEW)` stays at **0** in
+both `oldconfig` logs. Setting `CONFIG_PRINTK` alone took `(NEW)` from 0 to 1
+because it made `CONFIG_PRINTK_TIME` reachable; the four readings above are the
+reason to expect nothing of that shape here. **Refuted by** any `(NEW)` line in
+either `<cell>.oldconfig.log`, in which case the symbol it names is pinned in
+the delta the same way `PRINTK_TIME` was.
+
+**`P18-2`:** exactly **one** symbol line differs between `quietm.config-built`
+(2026-08-28) and the new quiet cell's — `# CONFIG_MTD_CHAR is not set` becoming
+`CONFIG_MTD_CHAR=y`. **Refuted by** a second differing line.
+
+**`P18-3`, the positive control that the change reached the artefact rather than
+the tree:** §17.7a measured **0** mtdchar-only symbols in both `System.map`s,
+against 6 mtdblock/mtdcore symbols in the same command. The new maps must carry
+`mtd_open`, `mtd_read`, `mtd_lseek`, `mtd_ioctl` and `init_mtdchar`. **Refuted
+by** any of them still absent — which would mean the config moved and the build
+did not. This is `rlxfw-marks.py`'s own distinction between `check` and
+`verify`: only the second reads the built artefact.
+
+**`P18-4`:** the decompressed image grows by **fewer than 65,536 bytes**, so the
+ceiling stays under 68 % of 5,242,880. ⚠️ **The point estimate inside that bound
+is a guess and is labelled one** — the last estimate of this shape (`CONFIG_PRINTK`,
+"150–300 KB") was wrong by 2–4×, which is why the claim written down is a bound
+and not a figure. Measured values go in §18.6 beside `quietm`'s 3,472,384 and
+`loudm`'s 3,546,112.
+
+### 18.3 🔴 The node set: odd minors only, and `/dev/mtdblock1` is withdrawn
+
+**Two enforcements, and only one of them depends on anything being configured
+correctly.** 讀 `drivers/mtd/mtdchar.c`, `mtd_open`:
+
+* `if ((file->f_mode & FMODE_WRITE) && (minor & 1)) return -EACCES;` — an **odd**
+  minor cannot be opened for writing, unconditionally, by the kernel.
+* `if ((file->f_mode & FMODE_WRITE) && !(mtd->flags & MTD_WRITEABLE)) ...` — the
+  second test, which depends on how the partition was registered.
+
+The first is stronger than any mode bit, because root ignores DAC. So the five
+nodes this image declares are:
+
+| node | dev | what it reads | writable? |
+|---|---|---|---|
+| `/dev/console` | `c 5 1` | — | — |
+| `/dev/null` | `c 1 3` | — | — |
+| `/dev/tty` | `c 5 0` | — | — |
+| **`/dev/mtd0ro`** | `c 90 1` | `mtd0`, `0x000000`–`0x130000` — the loader **and** `H601` | **no**, `minor & 1` |
+| **`/dev/mtd1ro`** | `c 90 3` | `mtd1`, `0x130000`–`0x400000`, the vendor rootfs | **no**, `minor & 1` |
+
+🔴 **`nod /dev/mtdblock1 b:31:1` is withdrawn, and the reason is that it was the
+best answer available while `CONFIG_MTD_CHAR` was off.** §17.7a chose it over
+`/dev/mtdblock0` because `mtdblock` has a write path and mtd0 holds the two
+regions `CLAUDE.md` forbids; its stated purchase was *a readability and size
+reading through my own MTD stack*, `wc -c` printing 2,949,120. `/dev/mtd1ro`
+buys that same reading over the same partition through `mtd_read` → `part_read`
+→ `rtl819x_flash`, and leaves **no writable flash node in the image at all**.
+What withdrawing it costs is the block layer — `mtdblock_readsect` and the
+blktrans request queue — which no step of `R3` exercises and which `R5b` will
+want. It comes back in the build that needs it, declared then.
+
+🟢 **And the control is now complete rather than argued.** §17.7a's sentence was
+*the control is the absence of a node, not the mode bits*, and absence is only a
+control if nothing can create one. 量, `notes/rootfs-census.md`: `mknod` is **not**
+among this `busybox`'s fifty applets — by the applet-name table in the binary,
+not by `strings`, which is the false positive that file already documents twice.
+So the declared set is the complete set of device nodes this image can ever hold,
+and a mistyped `/dev/mtd0` at the shell is `No such file or directory` rather
+than a writable handle on the loader.
+
+**`P18-5`, and its negative control is free.** The cpio inside the new `vmlinux`
+holds exactly the declared set: five device nodes, `/dev/mtdblock1` absent,
+`/dev/mtd0ro` `c 90 1` and `/dev/mtd1ro` `c 90 3` present. This is checked by
+`mkinitramfs verify`, new in this step, which reads the built artefact and not
+the tree. **Refuted by** any difference. The negative control is the same command
+against `r3-4/out/quietm.vmlinux.elf` from 2026-08-28: it must **fail**, and it
+must name exactly the three differences above — a verifier that passes on the old
+image is one that is not reading the image.
+
+### 18.4 What the bench cells will be, written now so the card copies rather than invents
+
+| cell | command | prediction | refuted by |
+|---|---|---|---|
+| `M-a` | `cat /proc/mtd` | two partitions, `0x00130000` and `0x002d0000`, names `boot+cfg+linux` and `root fs` | any other map. Reads **zero** flash bytes — `mtd_read_proc` prints the driver's own table |
+| `M-b` | `wc -c < /dev/mtd0ro` | **1245184** | any other number; `No such device` (no chrdev registered); `Permission denied` (the odd-minor rule is not what it says); a hang |
+| `M-c` | `wc -c < /dev/mtd1ro` | **2949120** | as above |
+| `M-d` | `echo x > /dev/mtd0ro` | **`Permission denied`** | anything else — and a **success** here is a stop-if for the whole seating |
+
+🟢 **`M-b` and `M-c` buy more than a size, and it is worth saying because the
+obvious reading undersells them.** `wc -c` on a character device has no shortcut:
+讀 `mtd_read`, every byte is read through `part_read` → `rtl819x_flash`. So the
+two cells together read **4,194,304 bytes — the whole part — through a path the
+kernel will not let anything write**, and `M-b` alone reads all 8,192 bytes of
+`H601`. ⚠️ **That is not a content check and does not move `FLS-20`'s 0.0183 %**:
+nothing compares the bytes to anything, because this userspace has no digest
+applet. What it does establish is that the *path* works end to end over the
+region a wrong write cannot be undone in — which is the prerequisite for any
+future full read, and it costs two typed commands.
+
+`M-d` is the positive control on the safety property itself, it costs no flash
+bytes because the `open` fails before any write is issued, and it is the only
+one of the four that can fail in the direction that matters. 讀 `mtd_read`:
+`if (*ppos + count > mtd->size) count = mtd->size - *ppos;` then
+`if (!count) return 0;` — a clean EOF, which is why `wc -c` terminates on a
+character device at all.
+
+⚠️ **None of this is a content check, and the sentence `G8b` forbids is still
+forbidden.** This userspace has no `dd`, `md5sum`, `od`, `hexdump`, `cmp`,
+`cksum`, `sum` or `sha1sum` (量, two routes, `notes/rootfs-census.md`), so
+nothing here reads a byte of `H601` and compares it to anything. What the two
+nodes buy is size, readability, and a path over the forbidden region that is
+provably unable to write it.
+
+⚠️ **One source in three copies.** 量 2026-08-30: `mtdchar.c` is byte-identical
+across the three GPL drops that carry it, md5 `83d6fc7bbec987be1cbca27d8bc006bd`
+— the same weakness that travels with the `PRId` assignment table. The
+enforcement is read, not measured, until `M-d` runs on the silicon.
+
+### 18.5 🔴 The rebuild reproduced nothing, and the reason is a flag no committed file carries
+
+**量 2026-08-30, and it was found by a size that made no sense rather than by a
+check.** The first pass of this rebuild produced a `quietmc` whose `.text` was
+**11,836 bytes SMALLER** than `quietm`'s, with `+12 / −0` symbols. Adding a
+driver does not shrink `.text`, and both variants moved the same way, so the
+config was not the cause.
+
+**The ladder, each rung its own build:**
+
+| | build | `.config` | `-j` | `.text` | verdict |
+|---|---|---|---|---:|---|
+| 1 | `quietm` | quiet | 8 | 2,444,228 | 2026-08-28, the image that BOOTED |
+| 2 | `quietmc` | quiet + `MTD_CHAR` | 4 | 2,432,392 | today, first pass |
+| 3 | `rep8` | **`quietm.config-installed`, byte for byte** | 8 | **2,427,448** | today |
+| 4 | `rep4` | the same file | 4 | **2,427,448** | today |
+
+Rungs 3 and 4 are identical, so **`-j` is not the variable** — which had to be
+excluded, because this build's Makefile rewrites its own headers before
+compiling and a `-j` race was the obvious suspect. What is left is that
+**`quietm` cannot be rebuilt today from its own recorded configuration**: same
+pinned drop (`HEAD 5c9be5d9`, worktree clean, **0** ignored files, one reflog
+entry from the clone), same `.config-built` (**0** differing lines), same 599
+translation units (**0** differing lines in the compiled-file list), same marks
+(**0** differing lines), and the same symbol set — 量, `quietm`-only **0**,
+`rep8`-only **0**.
+
+🔴 **The whole difference is one compiler flag, and it is in the `.cmd` files
+kbuild writes per object.** 🔄 **This paragraph first said so from THREE files
+and the adversarial pass made it a census.** 量: all **746** `.cmd` files in the
+two trees compared word by word with the cell name normalised — **588 differ,
+and there is exactly ONE difference shape across every one of them**: `quietm`
+carries `-fno-if-conversion` and `rep8` does not. Nothing else differs anywhere
+in the build's own record of what it compiled. *(As written: `kernel/.sched.o.cmd`,
+`mm/page_alloc.o` and `net/ipv4/tcp.o` — three samples used to support a sentence
+with the word "whole" in it.)*
+
+⚠️ **One difference between `quietm` and `rep8` that is NOT the flag, stated so
+the pair is not read as tighter than it is**: `rep8` was built with TODAY's
+initramfs spec, 31 entries against `quietm`'s 29. That lands in `.init.ramfs`
+and in nothing this section measures — `.text` and the `.cmd` files are both
+upstream of it.
+
+🔴 **That is not any flag. It is `SPEC.md` `TC-25`** — the one that takes
+`hazlint` from **7 load-use violations to 0**, by removing 98.8 % of the
+compiler's conditional moves (2,597 → 31) at a cost of +0.69 % of `.text`.
+§7.1 is the section about it: this gcc emits `movz` into a branch delay slot,
+under `.set noreorder`, reading a register a `lw` two instructions earlier
+writes. It is the codegen safety net Decision A's refutation condition names.
+
+🔴 **And it lives nowhere except the operator's command line.**
+`config/rlxfw-kernel.delta` declares 36 kconfig symbols with a reason each;
+`config/rlxfw-initramfs.tsv` declares 31 image entries with an owner each;
+`config/rlxfw-marks.tsv` declares 15 source insertions with a reason each. The
+flag that decides whether this kernel has a load-use hazard in it is in none of
+them — it reached the 2026-08-28 build as `--cflags-kernel` typed at a shell,
+and `rlxfw-kbuild.sh` does not record it either: the build writes
+`<cell>.config-built` and nothing about `CFLAGS_KERNEL`. **A rebuild that
+followed every committed file produced an image without it, and every gate in
+this repository stayed green.**
+
+⚠️ **This says nothing about the image that booted.** `quietm` and `loudm` were
+built WITH the flag — that is what the `.cmd` files say — and `RUNSHEET` `P1`
+measured `hazlint` 0 on both. What is refuted is *reproducibility*: until today
+the recipe for those two images was not written down anywhere, so a reader with
+this repository could not have rebuilt them, and neither could I.
+
+**`P18-7`, written before it was measured:**
+
+* `hazlint` over `rep8.vmlinux.elf` (today, no flag) reports **7** violations.
+  **Refuted by** 0, or by any other count — `TC-25`'s fA cell reported 7 and
+  this is the same configuration one flag short.
+* `hazlint` over the corrected `quietmc` reports **0**.
+* the corrected `quietmc`'s `.text` is **2,449,180** — 推, and it is arithmetic
+  on two measured deltas rather than a reading: 2,427,448 (`rep8`)
+  + 16,788 (`TC-25`'s measured cost) + 4,944 (mtdchar, measured above as
+  2,432,392 − 2,427,448). **Refuted by** anything outside ±0.1 %, which would
+  mean the two deltas are not additive and would need its own explanation.
+
+### 18.6 The readings, and the one prediction that was wrong in its second half
+
+**量 2026-08-30, second pass, with `config/rlxfw-cflags` in place.**
+
+| | `quietm` 08-28 | `quietmc` today | `loudm` 08-28 | `loudmc` today |
+|---|---:|---:|---:|---:|
+| `.text` | 2,444,228 | **2,449,212** | 2,483,500 | **2,488,484** |
+| `vmlinux` ELF | 3,968,240 | 3,968,635 | 4,042,388 | 4,075,551 |
+| decompressed | 3,472,384 | **3,472,384** | 3,546,112 | **3,578,880** |
+| of the 5,242,880 ceiling | 66.23 % | **66.23 %** | 67.63 % | **68.26 %** |
+| `nfjrom` | 1,027,072 | **1,029,120** | 1,053,696 | **1,054,720** |
+| `hazlint` | 0 | **0 in 110,141 loads** | 0 | **0 in 112,021 loads** |
+| `CFLAGS_KERNEL` recorded | — | `-fno-if-conversion` | — | `-fno-if-conversion` |
+
+**`P18-1` held** — `(NEW)` is 0 in both `oldconfig` logs. **`P18-2` held** — one
+symbol line differs from the 2026-08-28 builds and it is `CONFIG_MTD_CHAR`.
+**`P18-3` held** — the five mtdchar symbols are present where §17.7a measured
+zero, and 17.7a's own control (six mtdblock/mtdcore symbols) is unmoved; the
+whole symbol delta is **+12 / −0** and all twelve are mtdchar's. 🟢 **And one
+of the twelve is better evidence than the other eleven**: `__initcall_init_mtdchar6`
+is in the map, which says the registration is wired into the init sequence at
+level 6 rather than merely compiled. `register_chrdev(MTD_CHAR_MAJOR, "mtd",
+&mtd_fops)` is the line it will run (讀 `mtdchar.c:832`), and until it does,
+major 90 has no driver — which is exactly the `ENODEV` §17.7a measured.
+
+🟢 **`P18-7`'s third clause is the tightest prediction this project has made.**
+`.text` was predicted at **2,449,180** by adding two separately measured deltas
+— 2,427,448 (`rep8`, no flag, no mtdchar) + 16,788 (`TC-25`'s cost) + 4,944
+(mtdchar, from the flagless pair) — and measured **2,449,212**: **+32 bytes,
+0.001 %**. The two deltas are additive, which was the thing being asserted.
+
+🔴 **`P18-4` is refuted in its second half, and the fault is a "so".** It read
+*the decompressed image grows by fewer than 65,536 bytes, so the ceiling stays
+under 68 %.* The first half holds — `quietmc` grows by **0** and `loudmc` by
+**32,768**. The second does not: `loudmc` is at **68.26 %**. The percentage was
+derived from `quiet`'s baseline and applied to both variants, and the two have
+different baselines. A bound on bytes does not carry to a bound on a ratio whose
+denominator this sentence never named.
+
+🔴 **And `P18-5`'s negative control was predicted at the wrong number, by this
+section's author, in the direction the tool exists to prevent.** §18.3 said the
+old image must fail *and name exactly the three differences*. It names **two**:
+`MISSING /dev/mtd0ro` and `MISSING /dev/mtd1ro`. `/dev/mtdblock1` was never in
+**any** image, so removing it from the declaration produces no difference against
+`quietm` at all. **A change to the declaration was counted as a difference in
+the artefact** — which is the exact confusion `verify` was written to stop.
+*(Kept as written above; the count there is wrong and this is the correction.)*
+
+**What `verify` reports on the two new images**: `OK 31 entries`, five device
+nodes, `/dev/mtd0ro` and `/dev/mtd1ro` both `c 90:odd`, and no major-31 node
+anywhere. On `quietm` it reports `FAILED 2 difference(s)`.
+
+⚠️ **`rep8` and `rep4` carry no `<cell>.cflags`**, because they were built before
+the guard existed. Rebuilding them now needs `--no-cflags`, which is the point:
+the flagless build has to be asked for by name. They are kept as the evidence
+that it produces seven violations.
+
+### 18.7 🔴 The leak gate scans 240 of 898 tracked files, and a MAC on this model's OUI is in what it never reads
+
+**量 2026-08-30, with `tools/leakscan.py`, new in this step.** The whole of this
+repository's leak checking is one CI step — and 🔴 **none of the narrowness was a discovery. It was
+written down twice before this session, once of them EARLIER THE SAME DAY, and
+the second time with the consequence spelled out.**
+
+* 讀 `bench/2026-08-26/README.md:104`: *"CI runs `audit-bench-log.py` over
+  `bench/**/*.log` and nothing else touches `bench/`."* A clause in a note about
+  a different tool.
+* 🔴 讀 `bench/README.md`, 2026-08-30, earlier the same day: *"`upstream` is a
+  **gitlink** pinned at `4d3ff26`, so `git ls-files` returns nothing under it and
+  every sweep built on it — including `audit-bench-log.py`, which walks
+  `bench/**/*.log` only — has never looked there"* — and it says what is there:
+  `upstream/BENCH-LOG.md` **prints actual `H601` byte values at named offsets**
+  and commits a sha256 prefix over the **4 KiB at flash `0x6000`** seven times,
+  a superset of the window `FLS-20` refuses to publish a digest for. Its own
+  conclusion: *"`flashwin.py` enforces the rule on the paths it knows about, and
+  the repository is larger than those paths."*
+
+**So the finding below is not that the gap exists.** What is new is the scan
+actually run over it, the identity/topic split that makes a count mean
+something, the one-value / seven-files census, the **658 tracked files** nobody
+reads — which neither earlier note mentions — the **28 hits inside `bench/`
+itself**, and an instrument that can be re-run. The gate:
+
+```
+audit-bench-log.py $(find bench -type f -name '*.log')
+```
+
+That is **240 files**. 🔄 **The first draft of this paragraph said `git ls-files`
+returns 795 and that 555 go unread; both were arithmetic on a number I had not
+measured — the same class as the `45` two paragraphs down.** 量: `git ls-files`
+returns **899**, of which one is the submodule gitlink, so **898** real files;
+**658** of them are never read, and `upstream/` adds **302** that `git ls-files`
+cannot see at all. **960 files go unread.** The gap is not a corner:
+
+| population | files | scanned | identity-pattern hits | why nothing had scanned it |
+|---|---:|---:|---:|---|
+| `bench/**/*.md` | 45 | 45 | **2** | in the directory the gate is named for; the gate globs `*.log` |
+| tracked, not `bench/*.log` | 613 | 599 | **46** | `SPEC.md`, `PROGRESS.md`, `LOG.md`, `RUNSHEET.md`, `notes/`, `docs/` |
+| `upstream/` | 302 | 276 | **52** | a submodule: `git ls-files upstream` returns **one** line, the gitlink |
+
+🔴 **The gate scans what an instrument wrote and not what a person typed, and a
+person is the one who can mistype a MAC into prose.** It also misses
+`bench/**/*.txt`: the two host-side `tcpdump` captures from the ping cells,
+`V7a-host.txt` and `L7e-host.txt`, are in `bench/` and are not `.log`, so the
+gate named for that directory has never read either one. **量: 28 of the identity
+hits are inside `bench/` — 2 in the `.md` cards (`PREDICTIONS-B5-block1.md` and
+`bench/README.md`) and 26 in those two `.txt` files, 13 each.**
+
+**Raw hits are 2,349 and that number is useless, which is why the tool does not
+stop there.** `audit-bench-log.py`'s patterns were written for a device log,
+where the string `calib` in the bytes means calibration data; in prose those
+words are the subject matter — this project writes `H601` in every other
+paragraph. Four of the eight patterns can identify one physical unit
+(`MAC, colon form`, `MAC, dash form`, `MAC, bare 12 hex`, `serial-ish`) and
+`leakscan.py` splits them out. **100 identity hits, against 2,252 topic hits** — 🔄 **and that first number moved during the session, from 97, because the session's own edits are IN the population.** It is taken at the end, after the last file was written, which is the discipline `PROGRESS.md`'s carried-forward header records having got wrong twice. ⚠️ **Eight of the 100 are `tools/audit-bench-log.py`'s own control string and allowlist literals** — synthetic data belonging to the scanner, and a reading of *this repository's prose* should quote **92**.
+
+🔴 **The one that matters, and it is stated at the strength the evidence
+supports.** 量, distinct values, counted across both repositories' text with no
+value printed anywhere: **exactly one** MAC on **`FC:19:28`** — TOTOLINK's OUI —
+exists in the corpus, and it appears in **seven files, four of them in
+`upstream/`**, which is a **public** repository. 🔄 *(This said SIX. The walk
+that produced it skipped every directory named `study` — right for rlxfw's
+own, which is gitignored and unpublished, and wrong for `upstream/study/`,
+which is in the public repository.)* `SPEC.md`'s own opening says
+*MAC、序號、射頻校正、WPS PIN —— 完全不在這裡*.
+
+⚠️ **推, and the check that would settle it is not available.** `FW-17` (讀)
+says this model's default SSID is `TOTOLINK N150RT` plus the MAC's last six hex
+digits, so an SSID of that shape would decide whether this value is this unit's
+or a documentation example. 量: **zero** strings of that shape exist in either
+repository, so the correlation could not be run and the attribution is
+**undetermined**. What is *not* undetermined is that a full six-octet address on
+this model's vendor OUI is in a file this repository says holds no MAC.
+
+⚠️ **And 26 of `upstream/`'s 302 files cannot be read by any text scanner** — 22
+`.jpg`, 2 `.png`, one undecodable `.log`, one `.pyc`. They are reported NOT
+SCANNED rather than counted clean, which is `L6`.
+
+🔴 **The first draft of this paragraph went on to say that nothing records how
+those images were handled, and the owner audit refuted it the same evening.**
+讀 `upstream/notes/img/README.md`: an inventory table, one row per image, with a
+`Redacted` column, under the rule *"Redact **before** `git add`. A redaction
+applied after a push is not a redaction."* — and it names both unit-identifying
+labels and says the serial QR is the more dangerous because it decodes
+automatically and survives downscaling. 量: **24 image files, 24 inventory rows,
+0 missing either way.** What stands is `L6` — this instrument cannot read them —
+and not any claim about whether they were handled.
+
+**Why `leakscan.py` never prints what matched.** The question is whether a MAC is
+in a published file; answering it by printing the MAC answers it in the worst
+possible way. `flashwin.py` draws the same line — verdict published, digest
+refused. `L5` is the control on it: a synthetic file containing a distinctive
+address must produce a finding whose rendered output does not contain it.
+
+🔴 **It is NOT wired into CI as a verdict today, on purpose.** Turning it into a
+gate needs an allowlist decision per surviving hit — the workstation's own MAC in
+the host captures, the tool's own control literals, and the `FC:19:28` value
+above — and allowlisting a possible real leak to get a green build is the wrong
+order. What CI gets today is `leakscan.py --self-test`: six controls, including
+the two that make a clean result mean anything (`L4`, the population is
+non-empty; `L5`, a finding carries no bytes). The verdict run is a desk step
+until the allowlist is decided.
+### 18.8 What the owner audit found, and it fired six times
+
+**The audit has two halves now**: grep for sentences already known to be wrong,
+and — new this session — take every carried-forward row *opened today* back to
+the repository and check it is not a question already answered. The second half
+exists because 2026-08-30's seating invented one in four files at once.
+
+| | what | verdict |
+|---|---|---|
+| 1 | *"the whole difference is `-fno-if-conversion`"*, asserted from **three** `.cmd` files | **survives, and gets stronger**: all 746 compared, 588 differ, exactly ONE difference shape |
+| 2 | *"45 identity hits are inside `bench/`"* | 🔴 **wrong** — 45 is the FILE count of `bench/**/*.md`. The hit count is **28** |
+| 3 | *"`git ls-files` returns 795, so 555 go unread"* | 🔴 **wrong, and never measured** — 899 lines, 898 files, **658** unread plus `upstream/`'s 302 |
+| 4 | *"nothing records which images `redact-photo.py` was run on"* | 🔴 **an invented question**: `upstream/notes/img/README.md` is a per-image inventory with a `Redacted` column. 量: 24 images, 24 rows, 0 missing either way. Row **withdrawn** |
+| 5 | the `upstream/` blind spot presented as a discovery, in six files | 🔴 **it was written down twice before, once EARLIER THE SAME DAY.** `bench/README.md` names the gitlink, says `audit-bench-log.py` *"has never looked there"*, and records that `upstream/BENCH-LOG.md` prints actual `H601` byte values and a sha256 over the 4 KiB at flash `0x6000`, seven times. **What is new today is the scan, not the gap** — and that is now what the six files say |
+| 6 | `tools/test-gitignore.sh`'s positive-control list names `docs/threat-model.md` | 🔴 **no such file.** 量: `git ls-files docs/` returns seven names and that is not one. The case passed anyway, because these are fixture paths created in a throwaway repository — which is exactly why a name that does not exist could sit in a list whose whole job is to name files that must survive. Swapped for `docs/FINDINGS.md` |
+
+**Two and three are the same defect**: a number derived from another number that
+was itself never measured, then repeated in five files. Both were caught by
+computing them at the end rather than by reading what had been written.
+
+🔴 **Four and five are also the same defect, and it is the one the second half of
+the audit was added for**: writing up a gap without asking the repository whether
+it already knew. Four invented a question that was answered; five re-announced a
+finding the repository had made the same morning. **Two sessions running, and
+this is the first in which the check existed** — 2026-08-30's seating invented
+`eth5` in four files at once and nothing caught it until the adversarial pass.
+
+⚠️ **And one insertion defect, twice in one session, in the same file class**:
+new table rows anchored on the NEXT heading rather than on the LAST ROW, which
+leaves the blank line that separated them and strands every row above it. `C8c`
+caught both — in `PROGRESS.md` and then in `docs/FINDINGS.md`, whose own newest
+row at the time was *"Nine rows of this page were rendering as paragraphs"*.
+
+🔴 **And the audit found one thing that is not about today's work at all.**
+`CLAUDE.md`'s pre-push step is `ci-census --only <the suites you touched>` — and
+量, on the machine the push happens from, that command **could never go green**:
+`--only` restricts the table but not the `not-run-total` assertion, and
+`not-run-total` is a **runner**-configuration number, while this host has
+`$FWRE_WORK` and runs everything. A documented procedure that cannot pass is one
+nobody follows, or one whose red everybody learns to read past. `ci-census.py`
+now passes `declared_total` only for a whole-table census, and `C16` asserts both
+directions — because a fix that disabled the check outright would pass the first
+half alone. 19 → 21.
+
+**Two stale counts in files this session touched**, both corrected in place with
+the original quoted: `config/rlxfw-initramfs.tsv`'s own header said *"The 47
+busybox symlinks"* (量: 13 `slink` rows, 11 pointing at busybox — 47 is the count
+of nothing in that file), and `SPEC.md` `FW-24` said the declaration holds 29
+entries (量: 31). Three owner files still described the pre-rebuild state and
+each got a forward pointer rather than a rewrite: `notes/rootfs-census.md`,
+`RUNSHEET.md` twice, and `docs/FINDINGS.md` — the last of which is a page a
+reader is pointed at.
