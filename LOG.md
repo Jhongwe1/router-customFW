@@ -10488,7 +10488,7 @@ DRAM 快)、`g_timer` 閘的全 poison／混合 poison 兩格,加 `C30` —— *
 `0x80507230` 推到 `0x80507B30`)。⚠️ **它抓不到截斷**,寫在卡片上:head 法講的是「哪一顆映像」,
 `loader-tftp.py` 自己回報的位元組數才是講「多少」。
 
-⚠️ **卡片上刻意寫著 `cardcheck commands` 在這裡跑不了**:它讀的是 initramfs 的宣告,而 `probe3`
+🟢 **而「上機前一天先跑 dry run」那一條,今天就跑掉了,因為它不需要板子** —— 沒有 `--go` 的時候 `flrbracket run` 只印它會送什麼、**根本不開埠**。四個視窗全部 `rc=0`,圍堵確認:`h`／`c` 的回讀與**每一個**前讀都落在 repo 外,echo 落在 `bench/` 內(位址不含 flash 位元組)。它同時點出一組卡片 §2 沒列的格 —— `K-no*`,錯 echo 時送的 `N`;不列是對的,它們只在分支上跑。 ⚠️ **卡片上刻意寫著 `cardcheck commands` 在這裡跑不了**:它讀的是 initramfs 的宣告,而 `probe3`
 是裸機 payload,沒有檔案系統也沒有 applet。**一張安靜地跳過它宣稱會做的檢查的卡片,就是
 `flashwin` 那個教訓的形狀。**
 

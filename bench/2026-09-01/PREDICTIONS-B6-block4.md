@@ -53,6 +53,22 @@ inside this repository, and the pre-read anywhere inside it at all whatever the
 window is. Those refusals are what the `h` and `c` rows below depend on, and a
 refusal discovered at the bench costs a power cycle.
 
+🟢 **量 2026-09-01, all four windows, `rc=0` each — and it needed no board,
+which is the point: without `--go` the tool prints what it would send and never
+opens the port, so this is desk work and not something to carry to the bench.**
+What it confirmed, per window:
+
+| | `0` / `6` | `h` / `c` |
+|---|---|---|
+| pre-read | `…/b6-20260901/K-p0`, `K-p6` — **outside** | `K-ph`, `K-pc` — **outside** |
+| `FLR` echo | `bench/2026-09-01/K-flr0`, `K-flr6` | `bench/2026-09-01/K-flrh`, `K-flrc` — **inside, and correctly**: an echo holds addresses and no flash bytes |
+| read-back | `bench/2026-09-01/K-rd0`, `K-rd6` | `…/b6-20260901/K-rdh`, `K-rdc` — **outside** |
+
+🆕 **It also named a cell this card's § 2 does not list**: `K-no0`/`K-no6`/
+`K-noh`/`K-noc`, the `N` the tool sends on a wrong echo. They are **not** in the
+`cells` fence for the same reason block 3's `W-no` was not — they run only on a
+branch, and a predicted cell that never ran is not a pass.
+
 ### Before power — at the desk, and it is four commands
 
 ```
