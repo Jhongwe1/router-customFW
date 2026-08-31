@@ -5,6 +5,10 @@
 # tree-root: the STAGED top, so paths cover both linux-2.6.30/ and boards/
 #
 # WHY THERE ARE ELEVEN OF THESE AND NOT ONE.
+# 🔄 2026-09-01: the LADDER is still eleven and this paragraph is about the
+# ladder.  The file declares TWELVE marks -- `ID0` is the twelfth and it is an
+# identity string, not a rung; it separates no two suspects and the rule below
+# for adding a row does not apply to it.  See its own block at the end.
 # 量, on the built R3 vmlinux: printk is a stub, early_printk is a WEAK EMPTY
 # stub (16 bytes at 0x80013bec: sw a1,4(sp) / sw a2,8(sp) / jr ra / sw
 # a3,12(sp)), and panic_printk reaches the wire only after a console is

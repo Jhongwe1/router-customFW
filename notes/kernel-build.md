@@ -1173,6 +1173,8 @@ zero-padded, with control `A16` refusing any tag that is a prefix of another.
 
 ### 11.4 The eleven marks
 
+🔄 **2026-09-01: eleven is still the LADDER's count, and `config/rlxfw-marks.tsv` now declares TWELVE.** The twelfth is `ID0`, an identity string added when `P4a` froze the build stamp; it is not a rung and nothing in this section covers it. `SPEC.md` `TC-39` owns it, and `notes/reproducible-build.md` §5 is where it comes from.
+
 Declared in `config/rlxfw-marks.tsv`, one row each with the suspect it brackets.
 Applied to the **staged** tree by `tools/rlxfw-marks.py apply`; `src-vendor/` is
 never written and the tool refuses a path under it.
