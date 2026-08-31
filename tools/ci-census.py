@@ -121,6 +121,39 @@ def load_table(path):
                 entry[1][label] = int(covers)
                 entry[2][label] = reason
     out = {k: (v[0], v[1], v[2]) for k, v in suites.items()}
+
+    # 🔴 C17/C18 -- THE TABLE'S OWN ARITHMETIC, checked before any capture is
+    # read.  量 2026-08-31, CI run 33365083894: `test-rlxprobe`'s total was
+    # raised 202 -> 206 and its `everything` row's COVERS column was left at
+    # 202, so the census reported `0+0+202 != 206` on the runner and the
+    # not-run-total came out 4 short.  **The bench cannot see that class**: on
+    # this machine the suite RUNS, prints no skip line, and the covers column is
+    # never used -- the same blindness `test-kbuild-cflags`' C1 has.  These two
+    # checks read only the table, so they fire in every configuration.
+    #
+    # ⚠️ **A SUITE'S SKIP ROWS ARE ALTERNATIVES, NOT ADDITIVE**, and the first
+    # version of this check summed them.  量 2026-08-31, on the first run of
+    # C19: `test-vendor-tripwire` declares `the vendor trees` covering all 32,
+    # `T10 the incident's own binary` covering 2 and `T13 default discovery`
+    # covering 2 -- 36 against a total of 32.  Nothing is wrong with it.  Which
+    # rows fire depends on the CONFIGURATION: with no vendor drop at all the
+    # first one stands the whole suite down; on a runner that has the drops but
+    # no `--live`, the other two fire and cover 4.  So the sum is not a quantity
+    # this table ever claims.  **Per row is what is checkable.**
+    for suite, (total, labels, _reasons) in out.items():
+        for label, covers in labels.items():
+            if covers > total:
+                raise SystemExit(
+                    f"{path}: {suite}'s skip `{label}` covers {covers} case(s) "
+                    f"out of a total of {total} -- one skip cannot stand down "
+                    f"more cases than the suite has")
+        if "everything" in labels and labels["everything"] != total:
+            raise SystemExit(
+                f"{path}: {suite}'s allowed skip is `everything` but it covers "
+                f"{labels['everything']} of {total} case(s). Those two numbers "
+                f"move together by definition, and on a machine where the suite "
+                f"RUNS nothing compares them -- which is how 2026-08-31 pushed "
+                f"a table that was 4 short.")
     return out, declared_total
 
 
@@ -410,6 +443,81 @@ def self_test():
             ck("C8 two bench totals for one suite -> refused", False, True)
         except SystemExit:
             ck("C8 two bench totals for one suite -> refused", True, True)
+
+        # 🔴 C17/C18 -- the table's OWN arithmetic, and both exist because of
+        # CI run 33365083894.  `test-rlxprobe`'s total went 202 -> 206 and its
+        # `everything` row's covers column stayed at 202; the census went red on
+        # the runner and the bench could not see it, because on a machine where
+        # the suite RUNS the covers column is never read.  These two need no
+        # capture at all -- they read the table -- so they fire everywhere.
+        b2 = _write(d, "bad2.tsv",
+                    "# suite\tbench_total\tallowed_skip_label\tcovers\treason\n"
+                    "delta\t10\teverything\t7\tthe whole suite stands down\n")
+        try:
+            load_table(b2)
+            ck("C17 `everything` covering fewer than the total -> refused",
+               False, True)
+        except SystemExit:
+            ck("C17 `everything` covering fewer than the total -> refused",
+               True, True)
+
+        # C17b the positive control: `everything` that DOES cover the total must
+        # be accepted, or C17 would be satisfied by refusing every table.
+        g2 = _write(d, "good2.tsv",
+                    "# suite\tbench_total\tallowed_skip_label\tcovers\treason\n"
+                    "delta\t10\teverything\t10\tthe whole suite stands down\n")
+        try:
+            load_table(g2)
+            ck("C17b and `everything` covering all of them is accepted",
+               True, True)
+        except SystemExit:
+            ck("C17b and `everything` covering all of them is accepted",
+               False, True)
+
+        # C18 ONE skip row may not cover more cases than the suite has.
+        # 🔴 The first version of this SUMMED a suite's rows, and C19 refuted it
+        # on its first run: `test-vendor-tripwire` legitimately declares three
+        # ALTERNATIVE skips -- 32 + 2 + 2 = 36 against a total of 32 -- because
+        # which one fires depends on the configuration. Per row is checkable;
+        # the sum is not a quantity this table ever claims. C18b is that shape.
+        b3 = _write(d, "bad3.tsv",
+                    "# suite\tbench_total\tallowed_skip_label\tcovers\treason\n"
+                    "eps\t10\tfirst\t11\t-\n")
+        try:
+            load_table(b3)
+            ck("C18 one skip covering more than the suite has -> refused",
+               False, True)
+        except SystemExit:
+            ck("C18 one skip covering more than the suite has -> refused",
+               True, True)
+
+        # C18b its positive control, and it is the shape C18's first version
+        # got wrong: two ALTERNATIVE skips that sum past the total are fine.
+        g3 = _write(d, "good3.tsv",
+                    "# suite\tbench_total\tallowed_skip_label\tcovers\treason\n"
+                    "eps\t10\tfirst\t10\t-\n"
+                    "eps\t10\tsecond\t3\t-\n")
+        try:
+            load_table(g3)
+            ck("C18b alternative skips summing past the total are accepted",
+               True, True)
+        except SystemExit:
+            ck("C18b alternative skips summing past the total are accepted",
+               False, True)
+
+        # C19 🔴 THE REAL TABLE, not a fixture. C17/C18 above prove the checks
+        # work; this one puts `tools/ci-expected.tsv` itself through them, which
+        # is the thing that was actually wrong on 2026-08-31.
+        real = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "ci-expected.tsv")
+        try:
+            load_table(real)
+            ck("C19 the repository's own ci-expected.tsv passes both",
+               True, True)
+        except SystemExit as e:
+            print(f"        {e}")
+            ck("C19 the repository's own ci-expected.tsv passes both",
+               False, True)
 
     print()
     print(f"  {passed} passed, {failed} failed")
