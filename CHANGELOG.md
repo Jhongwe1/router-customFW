@@ -155,6 +155,44 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+*(nothing yet)*
+
+---
+
+## v0.2 — 2026-09-01
+
+**Contents, against `plan/CHARTER.md` §88:** `R3` — a kernel of mine boots this
+device to a shell and pings, with a 60-second take — plus `P4a`, the
+reproducible build.
+
+🎬 **The take:** https://youtu.be/7UjzFiAmzVs — seven committed serial captures replayed at
+true wire speed, ending with the *vendor's* firmware booting on the same board
+as a control. It is a replay and not a recording, and it says so.
+
+🔴 **What this release does NOT establish is a document, not a caveat:**
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md). There is no driver of mine, no
+userspace of mine, the flash bracket reaches 0.0244 % of the part so *no flash
+byte was written* remains unsayable, and `P4a` closes at one machine.
+
+⚠️ **`v0.1` was never tagged, so this release spans `v0.0` → `v0.2`.** Its
+contents — `R0`, `rlxprobe` executing on the silicon, `R1-gate` — completed on
+2026-08-26; the owner's ruling on 2026-09-01 is that tagging it is not urgent.
+Nothing below is claimed as v0.1's.
+
+**How to check the two headline claims without the hardware:**
+
+```
+git clone --recurse-submodules <this repo> && cd router-rebuild
+/usr/bin/python3 tools/replay-capture.py reel config/r3-11-reel.tsv   # the take, from its sources
+/usr/bin/python3 tools/repdiff.py --self-test                          # 16 controls
+/usr/bin/python3 tools/spec-check.py                                   # every number in SPEC.md, checked
+```
+
+The build itself needs a GPL drop that cannot be committed; `SOURCES.json` says
+which one and where it came from.
+
+---
+
 ### 2026-09-01 — `P4a`: the same tree now builds twice to the same sha256, and the tension that opened the gate was one fourteenth of the problem
 
 🟢 **A reproducible kernel build.** Two builds of the declared recipe, 44

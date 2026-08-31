@@ -11771,3 +11771,56 @@ EMPTY=$(mktemp -d); export FWRE_WORK="$EMPTY"
   新增 `repdiff` 16 與 `test-repdiff-mutants` 13;**`not-run-total` 477 不動**,
   因為兩支新套件都不需要 `$FWRE_WORK`、不需要交叉工具。
 * `$FWRE_WORK/rebuild`:13 G → 建了七棵 → **清掉六棵之後 14 G**,留 `p4a3`。
+
+---
+
+### 十五、收工之後:影片來了,`v0.2` 的 release 備好了,而 tag 沒有推
+
+**擁有者錄完影片並給了連結:`https://youtu.be/7UjzFiAmzVs`。**
+
+**先驗它,而且是用一個真的會失敗的方式。** YouTube 的網頁是 script 渲染的,
+直接抓只拿到頁尾的版權連結,什麼都看不到。改抓 **oEmbed 端點**
+(`/oembed?url=…&format=json`),它不需要 script,而且對 private 或已刪除的影片會回錯誤 ——
+所以它**能**失敗。回來的是:`title` = `v0.2-v`、`author_name` = `wei`、
+`author_url` = `@wei-8`、有 thumbnail。**影片存在且可達。**
+
+🔴 **而 oEmbed 對「公開」和「不公開」回一樣的東西,分不出來。**
+`plan/ARTIFACTS.md` §2 要的是**不公開**(unlisted),而**那一半我從這裡驗不到**,
+所以它記成「擁有者要確認的」而不是「已確認」。
+
+**放進兩個地方,而放的方式是重點。** `README.md` 的第一屏與 `CHANGELOG.md` 的
+v0.2 段落都帶連結,而**兩處都在同一句話裡說它是重播不是錄影** ——
+七段已提交擷取、逐位元組來自 `bench/`、產生它的指令寫在旁邊。
+🟢 **並且把「最後一段是對照組」寫進去**:同一塊板子上原廠韌體開機,
+標頭是 `start address: 0x80003440` 而第一段是 `0x80003600`。
+**觀眾的第一個反問在成品裡面被回答,而不是在成品旁邊用文字回答。**
+🔴 **不寫那句話的話,那個連結就是一個這個 repo 的證據撐不起來的宣稱。**
+
+**🆕 `docs/KNOWN-ISSUES.md`,而它是 `CHARTER.md` §110 規矩 2 從來沒有被滿足過的那一半。**
+六節、26 列:沒有我的驅動、沒有我的 userspace、flash 括號只到 0.0244 %、
+`P4a` 只關在 Level 1(`(key@K)` 來自 `whoami`/`hostname`)、
+`R3` 的 D3 觀測值本來就不存在、reel 實跑 62.2 秒對規格的 60、
+歷史上四個紅 commit、Release clock 兩個擁有者六列不一致、
+`study/` gitignored、以及四件從來沒量過的事。
+**每一列都寫「不成立的是什麼」與「哪一個 gate 會改變它」。**
+
+**`CHANGELOG.md` 切出 `## v0.2 — 2026-09-01`**,而它**沒有**造一個 v0.1 段落 ——
+擁有者裁決 v0.1 的 tag 不急,所以這個 release 跨 `v0.0` → `v0.2`,而 CHANGELOG 直接說出來,
+不去發明一個邊界。
+
+**擁有者的第二個裁決:`study/` 先維持 gitignored,之後要改再改。**
+⚠️ **那決定掉的是可見度那一半,不是另一半** —— 四則 weekly-results 仍然欠著,
+而規矩 3 的運作條款(連續兩則的「沒有證明什麼」相同 → 那就是下一個 gate)
+在只有一則的時候還是跑不動。
+
+🔴 **`P4b-gate` 因此沒有關。** 四條 DoD 裡三條當天達成(`D1` 對已釋出的版本、`D3`、`D4`),
+**`D2` 沒有**。**一個 DoD 有一列沒達成的 gate 就是沒關的 gate**,這一列不把
+「擁有者裁決可以先不做」寫成「做完了」。
+
+🔴 **而 tag 沒有推。** 擁有者在同一則訊息裡寫了「幫我放 readme 然後 tag v0.2 release」
+和「tag 等我說」。**tag 是對外可見且實務上不可逆的動作**,而我不去判斷後面那句是不是
+被前面那句取消掉了 —— 全部備好,指令寫出來,等一句話。
+
+**收工前的閘門:** `flashwin scan --sweep . --exclude upstream` **1,391 檔 CLEAN**
+(比上一輪多一檔,就是新增的 `KNOWN-ISSUES.md`);`leakscan` 沒有點名任何新檔或改過的檔;
+`spec-check`、`test-gitignore`、`test-file-modes` 全綠。
