@@ -3583,7 +3583,7 @@ carries the design.
 
 ### Deviation 5 — the off durations for cycles 9 and 10 were not recorded
 
-The card carries a line for it and it was used for cycle 8 (≈ 17.6 h, the first
+The card carries a line for it and it was used for cycle 8 (**63,787 s = 17.72 h**, the first
 upper bound `MEM-17` has ever had). The two cycles added during the seating were
 run without it, so their durations are bounds that overlap — which is the exact
 defect `MEM-17` exists to record, repeated by the person recording it.
@@ -3606,8 +3606,8 @@ for. ⚠️ It also reports *the run wrote past its own block* for two decayed
 poison words, which is a cause it is not entitled to assert once the magic is
 unrecognised.
 
-🔴 **This retracts the seating's own 推.** Three points — `0–7.3 min → 0 bits`,
-`0.7–2.8 min with a vendor boot → 1 bit`, `35.1 min → 598 bits` — put duration
+🔴 **This retracts the seating's own 推.** Three points — `0–7.2 min → 0 bits`,
+`0–7.4 min with a vendor boot → 1 bit`, `35.1 min → 598 bits` — put duration
 three orders of magnitude ahead of anything thermal, so the single bit needs no
 vendor-firmware explanation. **Where the knee is was not measured, and the two
 short intervals' bounds still overlap**, so even the duration story cannot be

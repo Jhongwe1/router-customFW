@@ -120,11 +120,11 @@ auto-boot, and **that** is what DRAM retained there.
 
 🔴 **The 17.6-hour arm, which is the first upper bound this row has ever had.**
 Power off ≈ 2026-08-31 02:00 (owner's reading), power on 19:43:07 (first byte
-3.282 s into `K-A`, started 19:43:03.922) — **≈ 63,400 s ≈ 17.6 h**.
+3.282 s into `K-A`, started 19:43:03.922) — **≈ **63,787 s = 17.72 h****.
 `K-guard600` / `K-guard700`: **0 of 64** words retained at each. So:
 
 > **retention ≥ one power cycle of ~1–2 min with a vendor boot inside it, and
-> < ~17.6 h.** Neither end was bounded before today.
+> < 17.72 h.** Neither end was bounded before today.
 
 ## §7 🔴 The read-back's three channels do not all agree, and the experiment that separates the causes is written HERE, before it runs
 
@@ -450,11 +450,23 @@ capture may not wear the `K-` prefix. **23 of 25 cells ran.**
 __:__:__  seconds off: ____`, and I used it for cycle 8 and not for the two
 cycles I added myself.**
 
+🔴 **The three numbers in this table were WRONG until 21:30, and the root cause
+of all three is one thing: I derived the bounds from when a chat message went
+out, and a chat message is not in the record.** Re-derived from the captures'
+own `started_wallclock` + `duration_s`, which is what this repository holds:
+the last **proof** the board was powered on cycle 8 is `K-J` ending at
+**19:53:52** (not a message at 19:58:30), and on cycle 9 it is `K2-yesc` ending
+at **20:16:40**. The upper arm was arithmetic: 19:43:07.2 − 02:00:00 is
+**63,787 s = 17.72 h**, not 63,400 s. ⚠️ **The correction makes the overlap
+worse, not better** — cycle 8 → 9 widens from *0.7–2.8 min* to **0–7.4 min**,
+which is the same bound as cycle 9 → 10's **0–7.2 min**, so the two intervals
+are now indistinguishable rather than merely overlapping.
+
 | cycle | power off | power on | off duration |
 |---|---|---|---|
-| 8 | ≈ **02:00** (owner's reading) | **19:43:07.2** | **≈ 63,400 s ≈ 17.6 h** |
-| 9 | **not recorded**, bounded (19:58:30, 20:01:16) | **20:01:16.3** | 0.7–2.8 min |
-| 10 | **not recorded**, bounded (20:16:30, 20:23:50) | **20:23:50.0** | 0–7.3 min |
+| 8 | ≈ **02:00** (owner's reading) | **19:43:07.2** | **≈ **63,787 s = 17.72 h**** |
+| 9 | **not recorded**, bounded (19:53:52, 20:01:16) | **20:01:16.3** | 0–7.4 min |
+| 10 | **not recorded**, bounded (20:16:40, 20:23:50) | **20:23:50.0** | 0–7.2 min |
 | off | **20:29** (owner's reading) | — | — |
 
 **The two bounds overlap, so duration is NOT controlled between § 11's two
@@ -524,8 +536,8 @@ storing a logical 1 as charge. Roughly uniform across the block (50–70 bits pe
 
 | off duration | vendor-firmware boot inside it | bits changed of 22,976 |
 |---|---|---:|
-| 0 – 7.3 min (cycle 9 → 10) | no | **0** |
-| 0.7 – 2.8 min (cycle 8 → 9) | **yes** | **1** |
+| 0 – 7.2 min (cycle 9 → 10) | no | **0** |
+| 0 – 7.4 min (cycle 8 → 9) | **yes** | **1** |
 | **35.1 min** (cycle 10 → 11) | no | **598** |
 
 **Duration is the dominant term by three orders of magnitude, and one bit at
@@ -540,7 +552,7 @@ next seating's first `DW` gives an overnight point for free; a 10-minute point
 costs a power cycle and was deliberately not spent tonight.
 
 🔴 **And the ordering is still not established**: cycle 9 → 10's bound
-(0 – 7.3 min, 0 bits) and cycle 8 → 9's (0.7 – 2.8 min, 1 bit) **overlap**, so
+(0 – 7.2 min, 0 bits) and cycle 8 → 9's (0 – 7.4 min, 1 bit) **overlap**, so
 even the duration story cannot be checked against them. That is § 14's defect
 doing its damage, one section later.
 
@@ -572,7 +584,7 @@ rule does not.
 this seating's four colds are power-ons after an off of **minutes** — ~1–2,
 0–7 and 35.1 — where every cold before them was a seating's first power-on,
 hours or days after the last. 🔴 **There is no monotone relation either**: the
-fastest cold in the whole population is `K-A` at **325.9 ms** after **17.6 h**
+fastest cold in the whole population is `K-A` at **325.9 ms** after **17.72 h**
 off, and the slowest of this seating's is `K4-A` at **355.4 ms** after
 **35.1 min**. **This is not a clean refutation; it is a variable nobody had
 separated**, and both `SPEC.md` rows now say so.
