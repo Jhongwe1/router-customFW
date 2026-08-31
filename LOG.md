@@ -11943,3 +11943,48 @@ git add -A && /usr/bin/python3 tools/spec-check.py && git commit …
 今天用過 `--limit 3`、`--limit 8`、`--limit 15`,三次都當成了全部。
 **要總數就問總數 —— 而 `gh run list --json conclusion --jq '.[].conclusion' | sort | uniq -c`
 是一道指令。**
+
+---
+
+### 十九、`v0.2` tag 了、release 了,而它是這個 repo 的第一次 release
+
+**擁有者說「tag 推」與「影片是公開」。兩件都執行,而順序是有理由的。**
+
+**先改樹再 tag。** `REL-1` 那一列寫著「公開／不公開從這裡驗不到,是擁有者要確認的」——
+擁有者確認了,那句話就過期了。**tag 指到的樹應該是對的**,所以先 commit `6cb9bf3`
+把裁決寫進去,再把 tag 指到它。
+
+⚠️ **公開跟 `plan/ARTIFACTS.md` §2 寫的「設不公開連結」不同,而那是裁決不是疏漏。**
+`plan/` 是擁有者的檔案,擁有者可以推翻它;要緊的是那個偏離**被寫下來**而不是被吸收掉。
+🟢 **而公開與不公開的風險是一樣的,理由不是「應該沒差」是量過**:
+`flashwin scan` 對七段全部 CLEAN(每段 113 個 16 位元組探針),MAC 形狀掃描全部 0,
+而**那個檢查是在錄影之前跑的**。安全靠的是那個檢查,不是可見度設定。
+順帶查過:`README.md` 與 `CHANGELOG.md` **都沒有**宣稱可見度,所以兩個都沒過期。
+
+**Tag:** `git tag -a v0.2` 指到 `6cb9bf3`,註解訊息含影片連結、
+「它是重播不是錄影」、以及 `docs/KNOWN-ISSUES.md` 的指標。
+遠端確認:`refs/tags/v0.2^{}` = `6cb9bf3a5c2f64b8…`。
+
+🔴 **然後發現一件 `REL-0` 沒說的事:`gh release list` 是空的。**
+`v0.0` 在 2026-08-25 tag 過而**從來沒有發過 release**。
+所以 `CHARTER.md` §110 規矩 2(每個版本發一次 release,附 CHANGELOG 與已知問題)
+**從這個專案的第一個 tag 起就沒有被滿足過** —— 那比 `REL-0` 記的「沒有 gate 擁有」更寬。
+**`v0.2` 是這個 repo 的第一次 release。**
+⚠️ 要不要補一個回溯的 `v0.0` release 是擁有者的決定,這裡不做。
+
+**Release:** <https://github.com/Jhongwe1/router-customFW/releases/tag/v0.2>
+
+**記帳,而記在哪一欄是有講究的。** Release clock 的 `Contents` 欄是**錯的**
+(它從來沒寫過 `P4a`),而 `Shipped` 欄**是這張表唯一真正屬於這個檔案的欄** ——
+所以 `Shipped` 填 `2026-09-01`,而 `Contents` 留著錯的並標出來。
+**一個有兩個擁有者的表,只能改屬於自己的那一欄。**
+
+🔄 **`REL-2` 因此變成一個比較弱、也比較顯眼的問題**:`v0.1` 現在是**兩個 tag 之間的洞**
+而不是缺頭 —— `git tag` 讀出來是 `v0.0`、`v0.2`。
+CHANGELOG 說這次 release 跨 `v0.0` → `v0.2`,所以沒有任何東西宣稱 v0.1 的內容
+是以 v0.1 的名義出貨的。
+
+🟢 **`P4b-gate` 的 ② 現在是真的完成了**,而不是只完成一半:
+`CHANGELOG` 的 v0.2 段落、`docs/KNOWN-ISSUES.md`、**以及 release 本身**。
+🔴 **但 gate 仍然沒關** —— `D2`(weekly-results)還是沒達成,而那是擁有者裁決先不做的那一半
+加上四則還沒寫的那一半。

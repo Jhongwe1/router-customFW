@@ -18,7 +18,7 @@ re-stages the vendor kernel on a watchdog reset, so *a banner appeared* is not
 evidence that my image ran. The viewer's first objection is answered inside the
 artefact rather than in prose beside it.
 
-**What this release does not establish: [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md).**
+**Release: [`v0.2`](https://github.com/Jhongwe1/router-customFW/releases/tag/v0.2) · what it does not establish: [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md).**
 
 | | |
 |---|---|
