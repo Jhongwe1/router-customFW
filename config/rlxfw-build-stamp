@@ -1,0 +1,56 @@
+# rlxfw's declared build stamp.   P4a, 2026-09-01.
+#
+# WHY THIS FILE EXISTS, and it is a defect report rather than a preference.
+# 量 2026-09-01: two builds of the SAME tree, from the SAME .config file, the
+# same initramfs spec and the same marks, 49 seconds apart, produce different
+# `vmlinux` sha256.  84 of 3,935,472 bytes differ; ZERO of them are in `.text`.
+# Six are the kernel's build timestamp -- `linux_banner` in `.rodata` and the
+# `version` field of `init_uts_ns` in `.data`, which are two copies of the one
+# `UTS_VERSION` string that `scripts/mkcompile_h` writes from `date` when
+# KBUILD_BUILD_TIMESTAMP is unset (讀, mkcompile_h:38).  The other 78 are
+# `usr/gen_init_cpio`'s clock; `host-compat/0002` is that half.
+#
+# WHAT THE VALUE IS.  A Unix epoch, decimal, one line.  Everything else is a
+# comment.  `tools/rlxfw-kbuild.sh` turns it into both of the things a build
+# needs from it, so they cannot drift apart:
+#
+#     KBUILD_BUILD_TIMESTAMP   LC_ALL=C TZ=UTC date -u -d @<epoch>
+#     RLXFW_CPIO_MTIME         <epoch>
+#
+# LC_ALL and TZ are pinned in the driver rather than inherited.  A stamp that
+# reads `CST` on this machine and `UTC` on another is not a declaration, and
+# the whole reason this file exists is that a build input living outside a
+# committed file is a build nobody can check.
+#
+# WHY MIDNIGHT UTC, AND WHY THAT IS NOT LAZINESS.  The value below renders as
+#
+#     Tue Sep  1 00:00:00 UTC 2026
+#
+# A reader who sees exactly 00:00:00 UTC in a banner knows immediately that it
+# is DECLARED and not a build moment.  A stamp that looks like a plausible
+# working hour would read as a measurement, and this project's rule is that a
+# number which reads as a measurement and is not one is worse than no number.
+#
+# 🔴 WHAT FREEZING THIS COSTS, because it is not free.  `PROGRESS.md`'s
+# anti-DoD names three strings the vendor image cannot produce, and one of them
+# is this build stamp: `(key@K) ... #1 Fri Aug 28 23:37:47 CST 2026`.  Freezing
+# the time half does NOT delete that leg -- `(key@K)` is inside it and no
+# vendor image carries it -- but it removes the leg's second role: telling
+# WHICH of my builds is running, from the console, on the board.  That role
+# moves to `ID0` in `config/rlxfw-marks.tsv`, which is a board-side string
+# derived from the recipe rather than from the clock.  Nothing else in the
+# image distinguished one of my builds from another: `RLXFW-B00`..`B10` are
+# constants and `start address: 0x80003600` is a property of the link.
+#
+# WHEN TO CHANGE IT.  Deliberately, in a commit that says why.  ⚠️ Two
+# different source trees stamped with the same value are NOT distinguished by
+# the banner -- that is what `ID0` is for, and `ID0` needs no remembering
+# because it is computed from the declaration files themselves.
+#
+# HOW TO BUILD WITHOUT IT.  `rlxfw-kbuild.sh --no-stamp`, which is deliberate,
+# says so in its name, and prints that the build is not reproducible.  A stamp
+# file that declares no epoch is REFUSED rather than silently treated as
+# --no-stamp: "use the clock" has to be asked for, never arrived at.  That is
+# the shape `config/rlxfw-cflags` already uses and the reason is the same.
+
+1788220800

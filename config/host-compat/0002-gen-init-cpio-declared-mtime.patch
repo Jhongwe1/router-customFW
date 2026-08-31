@@ -1,0 +1,70 @@
+Take gen_init_cpio's mtime from a declaration instead of from the clock.
+
+WHY THIS EXISTS.  P4a, 2026-09-01.  量 the same day: two builds of the SAME
+tree from the SAME .config, 49 seconds apart, differ in 84 of 3,935,472 bytes,
+and **78 of those 84 are this program's output**.  `gen_init_cpio` stamps every
+directory, symlink and device node with `time(NULL)` at the moment it runs
+(three call sites, usr/gen_init_cpio.c:105 cpio_mkslink, :153 cpio_mkgeneric,
+:241 cpio_mknod) and every regular file with the SOURCE file's `st_mtime`
+(:344 cpio_mkfile).  The declaration this project builds from has 13 slinks,
+8 dirs, 5 nods and 5 files; 13+8+5 = 26 entries moved between the two builds,
+at 3 bytes each = 78, and the arithmetic closes against the measurement.
+
+WHAT IT CHANGES.  One helper and one macro, and one field in cpio_mkfile.
+`RLXFW_CPIO_MTIME` in the environment, a decimal Unix epoch, becomes every
+entry's mtime.  With the variable unset the program behaves exactly as
+Realtek shipped it -- `time(0)` for the three generated kinds and, for regular
+files, `rlxfw_cpio_mtime()` which falls through to the same `time(0)`.
+⚠️ That last part is a DIFFERENCE from stock even when the variable is unset:
+a regular file's mtime becomes the build clock rather than the source file's.
+It is deliberate.  A source file's mtime is not part of any declaration in this
+repository, and on a fresh clone it is the checkout time -- so leaving it in
+place would have left a reproducibility hazard that this project cannot see
+from one machine.
+
+WHY THE MACRO IS SAFE HERE.  `#define time(x)` is function-like, so it expands
+only where `time` is followed by `(`.  讀 the whole file: `time(` occurs at
+exactly three places, all of them `time(NULL)`, all of them the call this
+patch is about; `time_t` is a different token and is not touched.  The helper
+is defined on the line BEFORE the macro, so its own `time(0)` is not expanded.
+`getenv` and `strtoul` come from <stdlib.h> and `time` from <time.h>, both of
+which this file already includes.
+
+SCOPE.  A host program.  `usr/gen_init_cpio` is built with the HOST compiler
+and never runs on the target, so nothing here reaches the cross compiler or
+any instruction in the image.  🔴 It DOES change bytes of the image, which is
+the point and which is where it differs from 0001: the 31 cpio headers
+embedded in `.init.ramfs` carry different mtime fields.  Nothing in the kernel
+reads them except to set the unpacked file's timestamp.
+
+WHY IT IS HERE AND NOT IN config/rlxfw-marks.tsv.  That file's parser refuses
+any insert that is not `rlxfw_mark("TAG");`, `rlxfw_markx("TAG", expr);`,
+`obj-y += NAME.o` or the mark header include -- *"an arbitrary statement here
+would be a patch with no reviewer"*.  The refusal is right and this is a patch.
+⚠️ It does mean this directory's NAME is now narrower than its contents: this
+change is about build determinism, not about host compatibility.
+`tools/rlxfw-kbuild.sh`'s own comment already describes the directory as
+holding *"every source change to the vendor tree"*, which is the accurate
+scope.  A rename to `config/vendor-patches/` is carried forward rather than
+done here; it touches nine references across six files and belongs on its own.
+
+--- a/usr/gen_init_cpio.c
++++ b/usr/gen_init_cpio.c
+@@ -22,6 +22,8 @@
+ 
+ static unsigned int offset;
+ static unsigned int ino = 721;
++static time_t rlxfw_cpio_mtime(void) { const char *e = getenv("RLXFW_CPIO_MTIME"); return (e && *e) ? (time_t)strtoul(e, (char **)0, 10) : time(0); }
++#define time(x) rlxfw_cpio_mtime()
+ 
+ struct file_handler {
+ 	const char *type;
+@@ -341,7 +343,7 @@
+ 			(long) uid,		/* uid */
+ 			(long) gid,		/* gid */
+ 			nlinks,			/* nlink */
+-			(long) buf.st_mtime,	/* mtime */
++			(long) rlxfw_cpio_mtime(),	/* mtime */
+ 			size,			/* filesize */
+ 			3,			/* major */
+ 			1,			/* minor */

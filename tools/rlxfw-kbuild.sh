@@ -23,6 +23,10 @@
 #     --marks            apply config/rlxfw-marks.tsv to the staged tree
 #                        (R3-6's boot ladder; off by default so every
 #                        pre-R3-6 measurement stays reproducible here)
+#     --no-stamp         build with the WALL CLOCK, deliberately.  Without it
+#                        the stamp comes from config/rlxfw-build-stamp and a
+#                        declaration with no epoch is REFUSED -- see below.
+#                        A --no-stamp build is not reproducible and says so.
 #
 # WHY THE TREE IS RE-STAGED EVERY TIME AND NOT `rm vmlinux`.
 # `r2ab-build.sh` learned this on userspace and it is worse here: a kernel
@@ -64,6 +68,7 @@ KEEP=0
 MARKS=0
 NOCFLAGS=0
 CFLAGS_GIVEN=0
+NOSTAMP=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --config)        CONFIG="$2"; shift 2 ;;
@@ -75,6 +80,7 @@ while [ $# -gt 0 ]; do
         --keep)          KEEP=1; shift ;;
         --marks)         MARKS=1; shift ;;
         --no-cflags)     NOCFLAGS=1; shift ;;
+        --no-stamp)      NOSTAMP=1; shift ;;
         *) echo "unknown option $1" >&2; exit 3 ;;
     esac
 done
@@ -125,6 +131,51 @@ else
         exit 3; }
 fi
 echo "== $CELL: CFLAGS_KERNEL=[$CFLAGS_KERNEL]  <- $CFLAGS_SRC"
+
+# ------------------------------------------------- the build stamp, declared
+# P4a, 2026-09-01.  Same shape as the CFLAGS block above and for the same
+# reason: 量 the same day, two builds of one tree 49 s apart differ in 84 of
+# 3,935,472 bytes, and every one of those bytes is a clock reading.  Six are
+# the kernel's own UTS_VERSION and 78 are gen_init_cpio's; one declared epoch
+# settles both, which is why they are read from ONE file here rather than set
+# in two places.
+#
+# The RENDERING is done here and not in the declaration.  `date` output carries
+# a timezone name and a locale, so the same epoch reads `CST` on this machine
+# and `UTC` on another; pinning LC_ALL and TZ is what makes the stamp a
+# property of the declaration instead of a property of the desk.
+STAMP_FILE="$REPO/config/rlxfw-build-stamp"
+STAMP_EPOCH=""
+if [ "$NOSTAMP" = 1 ]; then
+    STAMP_SRC="--no-stamp (the wall clock, deliberately)"
+else
+    [ -f "$STAMP_FILE" ] || {
+        echo "$CELL: no $STAMP_FILE and no --no-stamp." >&2
+        echo "  Without a declared stamp this build embeds the wall clock in" >&2
+        echo "  84 bytes (量 2026-09-01) and two builds of one tree do not" >&2
+        echo "  match. Ask for the clock, or declare an epoch." >&2
+        exit 3; }
+    STAMP_EPOCH="$(sed -e 's/#.*//' "$STAMP_FILE" | tr -d ' \t' \
+                   | grep -xE '[0-9]+' | head -1)"
+    [ -n "$STAMP_EPOCH" ] || {
+        echo "$CELL: $STAMP_FILE declares no epoch. That is not the same" >&2
+        echo "  request as --no-stamp, and it is refused rather than guessed." >&2
+        exit 3; }
+    STAMP_SRC="$STAMP_FILE"
+fi
+
+# ------------------------------------------------------ the recipe's identity
+# What `ID0` prints on the console, and it is derived rather than typed.  The
+# anti-DoD's build-stamp leg loses its "WHICH of my builds" role the moment the
+# stamp is frozen; this replaces it with a string computed from the declaration
+# files themselves, so it moves when the recipe moves and needs no remembering.
+#
+# Paths are hashed RELATIVE to the repository root.  `sha256sum` prints the
+# path beside the digest, and an absolute path would make the id a function of
+# where the clone happens to live.
+RECIPE_ID="$(cd "$REPO" && find config -type f -print0 | LC_ALL=C sort -z \
+             | xargs -0 sha256sum | sha256sum | cut -c1-8)"
+echo "== $CELL: stamp=$STAMP_EPOCH recipe=$RECIPE_ID  <- $STAMP_SRC"
 
 cell="$R/cells/$CELL"
 top="$cell/top"
@@ -209,6 +260,15 @@ export DIR_IMAGE="$DIR_ROOT/target/image"
 export DIR_LINUX="$DIR_ROOT/linux-2.6.30"
 export PATH="$DIR_RSDK/bin:$PATH"
 export CROSS_COMPILE=rsdk-linux-
+if [ -n "$STAMP_EPOCH" ]; then
+    # 讀 scripts/mkcompile_h:38 -- KBUILD_BUILD_TIMESTAMP replaces `date`.
+    # host-compat/0002 -- RLXFW_CPIO_MTIME replaces gen_init_cpio's time(NULL).
+    export KBUILD_BUILD_TIMESTAMP="$(LC_ALL=C TZ=UTC date -u -d "@$STAMP_EPOCH")"
+    export RLXFW_CPIO_MTIME="$STAMP_EPOCH"
+    echo "== $CELL: KBUILD_BUILD_TIMESTAMP=[$KBUILD_BUILD_TIMESTAMP]"
+else
+    echo "== $CELL: NO declared stamp -- this build is NOT reproducible"
+fi
 [ -x "$DIR_RSDK/bin/rsdk-linux-gcc" ] || {
     echo "no rsdk-linux-gcc under $DIR_RSDK" >&2; exit 3; }
 
@@ -293,6 +353,11 @@ if [ "$TARGET" = "none" ]; then
 fi
 set -- make -C "$DIR_LINUX" -j"$JOBS" "$TARGET"
 [ -n "$CFLAGS_KERNEL" ] && set -- "$@" "CFLAGS_KERNEL=$CFLAGS_KERNEL"
+# 讀 Makefile:572 -- KCPPFLAGS is appended to KBUILD_CPPFLAGS, so this reaches
+# every C object.  `ID0` in config/rlxfw-marks.tsv is the only consumer, and a
+# --marks build without this define does not compile: a build failure rather
+# than an image whose identity string is wrong.
+set -- "$@" "KCPPFLAGS=-DRLXFW_SRC_ID=0x$RECIPE_ID"
 echo "== $CELL: $*"
 run build "$@" < /dev/null
 rc=$?
