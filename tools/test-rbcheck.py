@@ -114,6 +114,33 @@ MUT = [
     ("M32 window-faster-than-DRAM accepted                  (kills C29)",
      '            if 0 < g["dram.str"] != 0xFFFFFFFF and 0 < g["win.str"] < g["dram.str"]:',
      "            if False:"),
+
+    # M35..M40 -- the PAIRING analysis, 2026-08-31 (nineteenth session).
+    # 🔴 M36 is the one that matters most: without the population control an
+    # all-FRESH region reports PURE PAIRING, which is a verdict read off a
+    # region that says nothing -- and every other pairing case stays green
+    # while it does, because none of them is single-valued.
+    ("M35 the pairing period hardcoded to 256               (kills C38)",
+     "            period = kept // 2", "            period = 256"),
+    ("M36 the all-FRESH population control removed          (kills C36)",
+     "            if period == 0 or not pos or len(pos) == kept:",
+     "            if period == 0 or not pos:"),
+    ("M37 pairs counted from both ends, so each one twice   (kills C33)",
+     "                pairs = sorted(k for k in pos\n"
+     "                               if k < period and k + period in s)",
+     "                pairs = sorted(k for k in pos\n"
+     "                               if k + period in s or k - period in s)"),
+    ("M38 the pairing pass counts any written nibble        (kills C22)",
+     "                    if nib == 2:                       # V_FRESH, see fresh()",
+     "                    if nib:                            # V_FRESH, see fresh()"),
+    ("M39 the unpaired list never populated                 (kills C35)",
+     "                alone = sorted(k for k in pos\n"
+     "                               if (k < period and k + period not in s)\n"
+     "                               or (k >= period and k - period not in s))",
+     "                alone = []"),
+    ("M40 the pairing pass replaced by an empty result      (kills C33)",
+     "            pos = fresh_positions(o_bmpk, o_seal, kept)",
+     "            pos = []"),
 ]
 
 

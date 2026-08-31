@@ -401,6 +401,25 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
                         n += 1
             return n
 
+        def fresh_positions(lo, hi, limit=None):
+            """The victim INDICES whose nibble is FRESH, ascending.
+
+            `fresh()` answers *how many*; § 6.2a (2)'s prediction is about
+            WHERE, and the two hypotheses give the same count.  Deliberately a
+            second pass rather than folded into `fresh()`, so that an indexing
+            defect in either one makes the two disagree out loud below.
+            """
+            out, seen = [], 0
+            for w in range(lo, min(hi, count)):
+                for sh in range(28, -1, -4):
+                    if limit is not None and seen >= limit:
+                        return out
+                    nib = (b[w] >> sh) & 0xF
+                    if nib == 2:                       # V_FRESH, see fresh()
+                        out.append(seen)
+                    seen += 1
+            return out
+
         if not (0 < o_bmp < o_seal <= count):
             report(f"  bitmap      header layout words are "
                    f"{o_bmp}/{o_bmpk}/{o_seal} against a {count}-word block "
@@ -439,6 +458,52 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
                     f"victims, more than the {said} the payload counted over "
                     f"all {adv} -- arithmetically impossible")
 
+            # 🔴 § 6.2a (2) -- the PATTERN, which is the half no count can
+            # carry.  At the boundary point the victims are 32 B apart, so the
+            # set index advances by TWO per victim: under two-way (512 sets)
+            # victims k and k + kept/2 share a set; under direct-mapped (1,024
+            # sets) no two of the kept victims ever do.  **The two hypotheses
+            # predict the same COUNT and different POSITIONS**, which is why
+            # `bmp.rerun.fresh` alone never separated them.
+            pos = fresh_positions(o_bmpk, o_seal, kept)
+            if len(pos) != got:
+                fails.append(
+                    f"the pairing pass found {len(pos)} FRESH where the "
+                    f"counting pass found {got} over the same region -- two "
+                    f"passes over one region disagree, so one of them indexes "
+                    f"wrong and neither reading is usable")
+            period = kept // 2
+            if period == 0 or not pos or len(pos) == kept:
+                # 🔴 THE POPULATION CONTROL, and it lives inside the tool
+                # because a region that is entirely FRESH pairs every k with
+                # k+period trivially.  A PURE PAIRING verdict off such a region
+                # is a verdict from a region that says nothing -- this
+                # repository's "a tool reporting 0 is making a claim", with the
+                # sign reversed.
+                report(f"  pairing     no verdict -- {len(pos)} FRESH of "
+                       f"{kept} victim(s): single-valued, or no period. Any "
+                       f"pattern claim off this region is vacuous")
+            else:
+                s = set(pos)
+                pairs = sorted(k for k in pos
+                               if k < period and k + period in s)
+                alone = sorted(k for k in pos
+                               if (k < period and k + period not in s)
+                               or (k >= period and k - period not in s))
+                if len(pairs) * 2 == len(pos) and not alone:
+                    verdict = ("PURE PAIRING -- two-way. Direct-mapped is "
+                               "refuted by the pattern")
+                elif not pairs:
+                    verdict = ("ALL SINGLETONS -- direct-mapped by the "
+                               "pattern. It must agree with w.assoc.mt, and "
+                               "this tool does not check that")
+                else:
+                    verdict = ("MIXED -- § 6.2a: the pairing model is WRONG, "
+                               "and the M(T) ladder is the only route left")
+                report(f"  pairing     {len(pos)} FRESH over {kept} "
+                       f"victim(s), period {period}: {len(pairs)} pair(s), "
+                       f"{len(alone)} unpaired -- {verdict}")
+
     m = margin(words, base, count, poison_words)
     if not m:
         report("  margin      none in this reply -- the over-run control "
@@ -475,6 +540,12 @@ P2_BASE, P2_WORDS, P2_SEAL = 0x80A01000, 809, 0xEC84408D
 #: because every other control runs on one capture of one payload.
 P3RB = "bench/2026-08-30/Q5-rb.log"
 P3QJ = "bench/2026-08-30/QJ.log"
+# 🔴 The 718-word block C39 reads.  `K2b-rb` and not `K2-rb`: the latter is the
+# copy that sat in DRAM through a vendor-firmware boot and carries a flipped
+# bit at w126 (`bench/2026-08-31c/CORRECTIONS-block4.md` § 7).  Both give the
+# same pairing, which is itself the finding -- but a control anchors on the
+# block whose three channels agree.
+PAIRRB = "bench/2026-08-31c/K2b-rb.log"
 
 #: where the ladders actually live.  C10 re-reads these rather than trusting
 #: the copy above.
@@ -732,7 +803,7 @@ def run_controls():
     # capture -- a control rewritten to match new code stops being evidence
     # about the old capture.
     def synth707(kept, said, fresh_nibbles, adv=512, stale_nibbles=0,
-                 beyond=(), n_res=194, gf=None):
+                 beyond=(), n_res=194, gf=None, fresh_at=None):
         """A well-formed probe3 block with a retained region.
 
         `stale_nibbles` are laid down AFTER the FRESH ones so the two kinds
@@ -762,9 +833,17 @@ def run_controls():
         w[52], w[53], w[54] = kept, o_bmpk, said
         for k, v in (gf or {}).items():   # Group F, by result index
             w[64 + k] = v
-        for i in range(fresh_nibbles):    # V_FRESH = 2, packed 8 per word
+        # `fresh_at` places the FRESH victims at EXPLICIT indices.
+        # Without it they are the first `fresh_nibbles`, which is contiguous
+        # and therefore all-singletons under every period -- correct for the
+        # counting controls C17..C23 and useless for the pattern ones.
+        at = list(range(fresh_nibbles)) if fresh_at is None else list(fresh_at)
+        for i in at:                      # V_FRESH = 2, packed 8 per word
             w[o_bmpk + i // 8] |= 2 << (28 - 4 * (i % 8))
+        atset = set(at)
         for i in range(fresh_nibbles, fresh_nibbles + stale_nibbles):
+            if i in atset:                # never lay STALE over a FRESH victim
+                continue
             w[o_bmpk + i // 8] |= 1 << (28 - 4 * (i % 8))   # V_STALE
         for i in beyond:                  # FRESH past H_BMP_KEPT: not evidence
             w[o_bmpk + i // 8] |= 2 << (28 - 4 * (i % 8))
@@ -850,6 +929,82 @@ def run_controls():
     row("C23", "the recount stops at H_BMP_KEPT", not f,
         f"20 FRESH inside 256 kept, 20 more beyond it, payload said 20; "
         f"{len(f)} failure(s)")
+
+    # C33..C39 -- 🔴 THE PAIRING PATTERN, 2026-08-31 (nineteenth session).
+    # `bmp.rerun.fresh` is the SAME number under both hypotheses, so the count
+    # never separated them; § 6.2a (2) predicts the positions.  C33..C38 are
+    # synthetic; C39 is the capture the finding was actually taken from, and
+    # it is the regression test on the reading rather than on the code.
+    def pairline(**kw):
+        """-> (failures, the `pairing` report line) for a synthesised block."""
+        n_res = kw.get("n_res", 194)
+        cap = []
+        f = check_block(synth707(**kw), 0x80A02000,
+                        64 + n_res + 128 + 256 + 64 + 1,
+                        expect_magic=0x524C5833, report=cap.append)
+        return f, next((x for x in cap if x.startswith("  pairing")), "")
+
+    f, line = pairline(kept=512, said=20, fresh_nibbles=20,
+                       fresh_at=list(range(10)) + list(range(256, 266)))
+    row("C33", "10 pairs {k, k+256} read as PURE PAIRING",
+        not f and "10 pair(s), 0 unpaired" in line and "PURE PAIRING" in line,
+        line.strip() or "no pairing line")
+
+    f, line = pairline(kept=512, said=20, fresh_nibbles=20)
+    row("C34", "20 contiguous FRESH read as ALL SINGLETONS",
+        not f and "0 pair(s), 20 unpaired" in line and "SINGLETONS" in line,
+        line.strip() or "no pairing line")
+
+    # C35 -- 🔴 the outcome § 6.2a says refutes the model, and it must be
+    # SAYABLE.  Without this case, a tool that only ever emits the two clean
+    # verdicts would look identical to one that can report the third.
+    f, line = pairline(kept=512, said=3, fresh_nibbles=3, fresh_at=[0, 1, 256])
+    row("C35", "some paired and some not is reported as MIXED",
+        not f and "1 pair(s), 1 unpaired" in line and "MIXED" in line,
+        line.strip() or "no pairing line")
+
+    # C36 -- 🔴 THE POPULATION CONTROL.  An all-FRESH region pairs every k with
+    # k+period trivially, so PURE PAIRING off it is a verdict from a region
+    # that says nothing.  This is the case that a tool without the control
+    # passes while being wrong.
+    f, line = pairline(kept=512, said=512, fresh_nibbles=512)
+    row("C36", "an all-FRESH region gets NO verdict, not PURE PAIRING",
+        "no verdict" in line and "PAIRING" not in line,
+        line.strip() or "no pairing line")
+
+    f, line = pairline(kept=512, said=0, fresh_nibbles=0, stale_nibbles=512)
+    row("C37", "a region with no FRESH at all gets NO verdict",
+        "no verdict" in line and "0 FRESH" in line,
+        line.strip() or "no pairing line")
+
+    # C38 -- 🔴 THE PERIOD IS kept/2 AND NOT THE NUMBER 256.  A boundary point
+    # of 256 victims pairs at 128; a tool with 256 written into it finds no
+    # pair at all and reports ALL SINGLETONS, which is a different answer to
+    # the same question.
+    f, line = pairline(kept=256, said=4, fresh_nibbles=4, adv=256,
+                       fresh_at=[0, 1, 128, 129])
+    row("C38", "the pairing period is kept/2, not a hardcoded 256",
+        not f and "period 128" in line and "2 pair(s), 0 unpaired" in line,
+        line.strip() or "no pairing line")
+
+    # C39 -- 🔴 THE READING ITSELF, on the committed capture it came from.
+    # 量 2026-08-31, power cycle 9: 20 FRESH at
+    # {15,16, 231..238, 271,272, 487..494} -- ten {k, k+256} pairs and no
+    # singleton.  If this row ever goes red, either the capture moved or the
+    # analysis behind `CPU-25`'s second route did.
+    try:
+        pw = parse_words(_read(PAIRRB))
+        cap = []
+        f = check_block(pw, 0x80A02000, 718, expect_magic=0x524C5833,
+                        report=cap.append)
+        line = next((x for x in cap if x.startswith("  pairing")), "")
+        row("C39", "the committed 2026-08-31 capture reads 10 pairs, 0 alone",
+            not f and "10 pair(s), 0 unpaired" in line
+            and "PURE PAIRING" in line,
+            line.strip() or "no pairing line")
+    except (OSError, Refuse) as e:
+        row("C39", "the committed 2026-08-31 capture reads 10 pairs, 0 alone",
+            False, f"{e}")
 
     # C24..C30 -- Group F, 2026-08-31.  Synthetic, and for the same reason
     # C17..C23 are: the 718-word payload has never been seated.  A clean leg
