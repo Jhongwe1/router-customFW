@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Does rlxfw-kbuild.sh's CFLAGS_KERNEL guard actually gate?   R3-9, 2026-08-30.
+# Do rlxfw-kbuild.sh's DECLARED-INPUT guards actually gate?
+#   R3-9, 2026-08-30 (CFLAGS_KERNEL) and P4a, 2026-09-01 (the build stamp).
+#
+# ⚠️ The file's NAME says cflags and its contents are wider now. Renaming
+# it would move this suite's row in ci-expected.tsv AND its allowed-skip label
+# in ci.yml, and an allowed-skip label edited in one place and not the other is
+# exactly what put CI red on 2026-08-31 (run 33410057391, three commits). The
+# rename is carried forward next to the config/host-compat one, which has the
+# same shape and the same reason for not being done in the same session as the
+# change that widened it.
 #
 # WHY IT EXISTS.  量 2026-08-30: `quietm` -- the image that booted on the
 # silicon -- could not be rebuilt from its own recorded configuration.  Same
@@ -98,6 +107,95 @@ ck "C6 --no-cflags is accepted by the guard"  1 \
    "$(printf '%s\n' "$out" | grep -c 'deliberately empty')"
 ck "C6 and it did NOT read the declaration"   0 \
    "$(printf '%s\n' "$out" | grep -c 'rlxfw-cflags')"
+
+echo
+echo "=== the build stamp, P4a 2026-09-01: same guard shape, same reasons ==="
+# 量 2026-09-01: two builds of one tree 49 s apart differ in 84 of 3,935,472
+# bytes, all of them clock readings -- 6 the kernel's UTS_VERSION and 78
+# gen_init_cpio's.  config/rlxfw-build-stamp declares one epoch for both.  These
+# run through --dry-run, which exits 0 above the stage, so none of them pays for
+# a 480 MB copy.
+SF="$REPO/config/rlxfw-build-stamp"
+SF_SHA0="$(sha256sum "$SF" | cut -d' ' -f1)"
+
+# S1 -- the declaration missing is a REFUSAL, not a silent fall-back to the
+# clock.  Same distinction as C4: the difference between an unreproducible
+# build and a reproducible one has to be asked for by name.
+mv "$SF" "$SF.s1"
+run gcf-s1 --dry-run
+mv "$SF.s1" "$SF"
+ck "S1 no stamp declaration -> refuse"         3 "$rc"
+ck "S1 and it names --no-stamp"                1 \
+   "$(printf '%s\n' "$out" | grep -c -- '--no-stamp')"
+
+# S2 -- comments only is refused too, and refused with a DIFFERENT sentence
+# from S1: "declares no epoch" is not "there is no file".
+cp "$SF" "$SF.s2"
+printf '# only a comment\n\n' > "$SF"
+run gcf-s2 --dry-run
+cp "$SF.s2" "$SF"; rm -f "$SF.s2"
+ck "S2 a comments-only declaration -> refuse"  3 "$rc"
+ck "S2 and it says that is not --no-stamp"     1 \
+   "$(printf '%s\n' "$out" | grep -c 'not the same')"
+
+# S3 -- --no-stamp is ACCEPTED, which is what stops S1/S2 being passed by a
+# guard that refuses everything, and it leaves the stamp EMPTY rather than
+# quietly substituting one.
+run gcf-s3 --no-stamp --dry-run
+ck "S3 --no-stamp is accepted"                 0 "$rc"
+ck "S3 and it says the clock is deliberate"    1 \
+   "$(printf '%s\n' "$out" | grep -c 'wall clock, deliberately')"
+ck "S3 and the stamp is empty, not substituted" 1 \
+   "$(printf '%s\n' "$out" | grep -c 'stamp= \[\]')"
+
+# S4 -- the declared epoch is read.
+run gcf-s4 --dry-run
+ck "S4 the declared epoch is read"             1 \
+   "$(printf '%s\n' "$out" | grep -c 'stamp=1788220800')"
+
+# 🔴 S5. THE FIRST VERSION OF THIS CASE COULD NOT FAIL, and it was caught by
+# measuring the two variables it varied rather than by running it.  It compared
+# the driver under TZ=Asia/Taipei against TZ=UTC and asserted they matched.
+# 量 2026-09-01:
+#
+#   date    -d @1788220800  ->  Tue Sep  1 08:00:00 CST 2026
+#   date -u -d @1788220800  ->  Tue Sep  1 00:00:00 UTC 2026
+#   TZ=Asia/Taipei date -u  ->  Tue Sep  1 00:00:00 UTC 2026   <- TZ does nothing
+#   LC_ALL=zh_TW.UTF-8      ->  identical; `locale -a` on this host is C,
+#                               C.utf8 and POSIX and nothing else
+#
+# So `-u` is what makes the rendering timezone-independent, `TZ=UTC` in the
+# driver is belt-and-braces on top of it, and the locale cannot be varied here
+# at all.  A case that varies two things neither of which can move the output
+# is green for the same reason an empty probe list is green.
+#
+# S5a is the real one: the stamp the driver prints must be the UTC rendering
+# and must NOT be the local one.  Drop `-u` from the driver and it goes red.
+E=1788220800
+LOCAL_RENDER="$(date -d "@$E")"
+UTC_RENDER="$(date -u -d "@$E")"
+run gcf-s5 --dry-run
+DRIVER_RENDER="$(printf '%s\n' "$out" | sed -n 's/.*stamp=[0-9]* \[\([^]]*\)\].*/\1/p')"
+ck "S5a the driver renders the UTC form"       "$UTC_RENDER" "$DRIVER_RENDER"
+if [ "$LOCAL_RENDER" = "$UTC_RENDER" ]; then
+    sk "S5b and NOT the local form" "this host's TZ is UTC, so the two are the same string"
+else
+    ck "S5b and NOT the local form"             0 \
+       "$(printf '%s\n' "$DRIVER_RENDER" | grep -cxF "$LOCAL_RENDER")"
+fi
+
+# 🔴 S5c is a SOURCE assertion and is weaker than the two above, and that is
+# stated rather than hidden.  `date`'s default format comes from the locale's
+# D_T_FMT, so LC_ALL=C is load-bearing on a host that has another locale
+# installed -- and this host has none, so no run-time case here can distinguish
+# a driver that pins it from one that does not.  This is what is left.
+ck "S5c the driver pins LC_ALL and TZ in the rendering" 1 \
+   "$(grep -c 'LC_ALL=C TZ=UTC date -u -d' "$K")"
+
+# S6 -- S1 and S2 move and rewrite the declaration.  Byte for byte at the end,
+# for the reason C4/C5's digest check already gives.
+ck "S6 the stamp declaration is byte-identical" "$SF_SHA0" \
+   "$(sha256sum "$SF" | cut -d' ' -f1)"
 
 echo
 echo "=== C1: the declared file is what a real build uses ==="

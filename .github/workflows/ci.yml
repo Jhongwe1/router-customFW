@@ -335,6 +335,16 @@ jobs:
       # three was a control of the tool's own that could not fail.
       - name: test-flrbracket-mutants
         run: /usr/bin/python3 tools/test-flrbracket-mutants.py --jobs 8 2>&1 | tee ci-out/test-flrbracket-mutants.out; exit "${PIPESTATUS[0]}"
+
+      # repdiff answers the question sha256sum cannot: WHICH bytes differ
+      # between two builds of one tree, and in which section and symbol.  Its
+      # controls build ELF32 big-endian images in memory, so nothing here needs
+      # $FWRE_WORK, a cross toolchain or a 4 MB build product.
+      - name: repdiff self-test
+        run: /usr/bin/python3 tools/repdiff.py --self-test 2>&1 | tee ci-out/repdiff.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-repdiff-mutants
+        run: /usr/bin/python3 tools/test-repdiff-mutants.py 2>&1 | tee ci-out/test-repdiff-mutants.out; exit "${PIPESTATUS[0]}"
       # cardcheck reads a bench card the way the DEVICE will. It exists because
       # seating 7 typed `wc -lc < /dev/mtd0ro` and got `wc: not found`: `wc` is
       # one of this busybox's fifty applets and is NOT one of the eleven busybox

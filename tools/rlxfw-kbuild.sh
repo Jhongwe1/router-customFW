@@ -27,6 +27,9 @@
 #                        the stamp comes from config/rlxfw-build-stamp and a
 #                        declaration with no epoch is REFUSED -- see below.
 #                        A --no-stamp build is not reproducible and says so.
+#     --dry-run          print the declared inputs -- flags, stamp, recipe id
+#                        -- and exit 0 BEFORE staging anything.  Every guard
+#                        above the stage is testable through it.
 #
 # WHY THE TREE IS RE-STAGED EVERY TIME AND NOT `rm vmlinux`.
 # `r2ab-build.sh` learned this on userspace and it is worse here: a kernel
@@ -69,6 +72,7 @@ MARKS=0
 NOCFLAGS=0
 CFLAGS_GIVEN=0
 NOSTAMP=0
+DRYRUN=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --config)        CONFIG="$2"; shift 2 ;;
@@ -81,6 +85,7 @@ while [ $# -gt 0 ]; do
         --marks)         MARKS=1; shift ;;
         --no-cflags)     NOCFLAGS=1; shift ;;
         --no-stamp)      NOSTAMP=1; shift ;;
+        --dry-run)       DRYRUN=1; shift ;;
         *) echo "unknown option $1" >&2; exit 3 ;;
     esac
 done
@@ -175,7 +180,25 @@ fi
 # where the clone happens to live.
 RECIPE_ID="$(cd "$REPO" && find config -type f -print0 | LC_ALL=C sort -z \
              | xargs -0 sha256sum | sha256sum | cut -c1-8)"
-echo "== $CELL: stamp=$STAMP_EPOCH recipe=$RECIPE_ID  <- $STAMP_SRC"
+
+# 🔴 THE RENDERING HAPPENS HERE, ABOVE THE STAGE, AND THE PLACEMENT IS PART OF
+# THE CLAIM.  It sat in the environment block until 2026-09-01, which is after
+# a 480 MB tree copy -- so the one line that makes this stamp machine-
+# independent could not be checked without paying for a stage, and it had no
+# test at all.  Same lesson as console-capture's terminator guard: a refusal,
+# or a claim, that costs a copy is one nobody exercises.
+STAMP_RENDERED=""
+[ -n "$STAMP_EPOCH" ] && \
+    STAMP_RENDERED="$(LC_ALL=C TZ=UTC date -u -d "@$STAMP_EPOCH")"
+echo "== $CELL: stamp=$STAMP_EPOCH [$STAMP_RENDERED] recipe=$RECIPE_ID  <- $STAMP_SRC"
+
+# --dry-run answers "what would this build be" without copying anything.  It
+# exists so every guard above it is testable for free, and it is the only exit
+# in this script that reports success without producing an image.
+if [ "$DRYRUN" = 1 ]; then
+    echo "== $CELL: --dry-run, nothing staged and nothing built"
+    exit 0
+fi
 
 cell="$R/cells/$CELL"
 top="$cell/top"
@@ -247,7 +270,18 @@ if [ "$MARKS" = 1 ]; then
         tail -20 "$log.marks.log" >&2
         exit 3
     fi
-    echo "== $CELL: applied $(grep -c '^  B\|^  MK\|^  IN' "$log.marks.log") declared boot mark row(s)"
+    # 🔴 This counted `^  B\|^  MK\|^  IN` until 2026-09-01, which made this
+    # line a SECOND owner of a number rlxfw-marks.py already prints -- and
+    # `ID0` matches none of the three, so it would have reported 15 while 16
+    # rows were applied. Read the tool's own RESULT, and refuse rather than
+    # print an empty count: a blank where a number belongs reads as zero.
+    napplied="$(sed -e 's/\x1b\[[0-9;]*m//g' "$log.marks.log" \
+                | sed -n 's/^RESULT: \([0-9][0-9]*\) mark(s) applied.*/\1/p')"
+    [ -n "$napplied" ] || {
+        echo "$CELL: rlxfw-marks printed no RESULT count" >&2
+        tail -5 "$log.marks.log" >&2
+        exit 3; }
+    echo "== $CELL: applied $napplied declared row(s) from config/rlxfw-marks.tsv"
 fi
 
 # ------------------------------------------------------------- environment
@@ -263,7 +297,7 @@ export CROSS_COMPILE=rsdk-linux-
 if [ -n "$STAMP_EPOCH" ]; then
     # 讀 scripts/mkcompile_h:38 -- KBUILD_BUILD_TIMESTAMP replaces `date`.
     # host-compat/0002 -- RLXFW_CPIO_MTIME replaces gen_init_cpio's time(NULL).
-    export KBUILD_BUILD_TIMESTAMP="$(LC_ALL=C TZ=UTC date -u -d "@$STAMP_EPOCH")"
+    export KBUILD_BUILD_TIMESTAMP="$STAMP_RENDERED"
     export RLXFW_CPIO_MTIME="$STAMP_EPOCH"
     echo "== $CELL: KBUILD_BUILD_TIMESTAMP=[$KBUILD_BUILD_TIMESTAMP]"
 else

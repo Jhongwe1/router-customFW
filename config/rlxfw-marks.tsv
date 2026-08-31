@@ -69,3 +69,50 @@ B07	boards/rtl8196e/bsp/setup.c	after	ret = bsp_swcore_init(version);	rlxfw_mark
 B08	linux-2.6.30/arch/rlx/kernel/setup.c	after	paging_init();	rlxfw_mark("B08");	bootmem_init, sparse_init and paging_init as one bracket. They are taken together on purpose: this project has no reason yet to prefer one of the three as a suspect, and three rows where one will do is how a ladder stops being read. If the boot stops between B03 and B08 the next session splits this row, and the reason for splitting it will be a capture
 B09	linux-2.6.30/init/main.c	after	console_init();	rlxfw_mark("B09");	the handover. Everything before this reached the wire only through prom_putchar; from here the registered console is up and, in the `loud` variant, printk output starts. B09 is therefore the line that says which instrument the rest of the capture is coming from -- and if the loud variant prints B09 and then nothing while the quiet one keeps going, the fault is in the console path, which is the one area R3-6 owns
 B10	linux-2.6.30/init/main.c	before	if (ramdisk_execute_command) {	rlxfw_mark("B10");	init_post(), immediately before the branch that decides HOW userspace is reached. ramdisk_execute_command is set only when an initramfs was unpacked and /init exists (init/main.c:885-891); if it is NULL the kernel falls through to /sbin/init, /etc/init, /bin/init, /bin/sh and then panics. Decision B's refutation condition is `the initramfs fails to unpack`, and B10 followed by M4 is that condition answered, while B10 followed by silence or by a panic is it answered the other way
+
+# ----------------------------------------------------------------------------
+# 🆕 P4a, 2026-09-01.  ONE ROW THAT IS NOT A LADDER MARK, AND THE FILE'S OWN
+# RULE FOR ADDING A ROW DOES NOT APPLY TO IT.
+#
+# The rule above -- *a row must separate two causes that would otherwise share
+# a capture* -- is about the boot ladder, and ID0 separates nothing.  It exists
+# because P4a froze the build stamp.
+#
+# 量 2026-09-01: two builds of one tree, 49 s apart, differed in 84 of
+# 3,935,472 bytes and every one of them was a clock reading.  Six were the
+# kernel's UTS_VERSION, which PROGRESS.md's anti-DoD names as one of the three
+# strings the vendor image cannot produce: `(key@K) ... #1 Fri Aug 28 23:37:47
+# CST 2026`.  Freezing the clock does not delete that leg -- `(key@K)` is
+# inside it -- but it removes the leg's SECOND role: saying which of my builds
+# is running, read off the console, on the board.
+#
+# 🔴 Nothing else in the image had that role.  B00..B10 are constants and
+# `start address: 0x80003600` is a property of the link, so both are the same
+# for every build of mine.  Before this row, a frozen stamp would have left the
+# board unable to distinguish today's image from last week's -- and 2026-08-25
+# is the record of what that costs: a second `J 80500000` booted the VENDOR
+# kernel and the banner looked like a pass.
+#
+# WHAT THE VALUE IS.  `RLXFW_SRC_ID`, defined by tools/rlxfw-kbuild.sh as
+# KCPPFLAGS, is the first 8 hex of a sha256 over every file under config/,
+# hashed with paths RELATIVE to the repository root.  So it is a function of
+# the declaration and of nothing else: it moves when the recipe moves, it is
+# the same on any machine, and it needs no remembering -- which is the one
+# thing config/rlxfw-build-stamp does need.
+#
+# ⚠️ WEAKER THAN B02/B07 AND THE SAME KIND AS B00..B10.  It is compiled in, not
+# read off this die at run time.  What makes it a discriminator is
+# `rlxfw-marks.py verify`: present exactly once in my image, absent from the
+# vendor's.
+#
+# ⚠️ IT MOVES A MEASURED NUMBER.  The ladder was eleven marks and 139 bytes on
+# the wire (量 2026-08-30, bench/2026-08-30b block 1).  A build carrying this
+# row prints a twelfth line, `RLXFW-ID0=XXXXXXXX`, so SPEC.md FW-32's 849 bytes
+# describes `quietm`, which does not have it, and the NEXT image's byte count
+# is a new measurement rather than that one.
+#
+# ⚠️ A --marks BUILD WITHOUT -DRLXFW_SRC_ID DOES NOT COMPILE.  That is the
+# intended failure: a build failure rather than an image whose identity string
+# is wrong.  The driver always passes it.
+# ----------------------------------------------------------------------------
+ID0	linux-2.6.30/init/main.c	after	printk(KERN_NOTICE "%s", linux_banner);	rlxfw_markx("ID0", RLXFW_SRC_ID);	IDENTITY, not a ladder step. The recipe's own sha256, printed on the board immediately after the banner it is there to make up for -- a reader sees the frozen stamp and the thing that identifies the build on consecutive lines. Anchored on the banner printk because it occurs exactly once in main.c and because B00's anchor is one line above it, so the ladder still opens with B00.

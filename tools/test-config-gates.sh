@@ -286,8 +286,17 @@ o="$("$PY" "$RM" verify --decl "$REPO/config/rlxfw-marks.tsv" \
      --image "$REPO/config/rlxfw-marks.tsv" 2>&1)"
 ck "G4 the real declaration parses"        1 \
    "$(printf '%s\n' "$o" | grep -c 'RLXFW-B00')"
-ck "G4 and it declares eleven marks"      11 \
+ck "G4 and it declares eleven LADDER marks" 11 \
    "$(printf '%s\n' "$o" | grep -c '^  B[0-9]')"
+# 🔴 The line above pinned `^  B[0-9]` and called it "eleven marks". On
+# 2026-09-01 `ID0` was added and that assertion stayed green while the file
+# declared TWELVE -- a gate reading a pattern narrower than the claim it makes.
+# The ladder count is still worth pinning on its own, so it stays; these two
+# are what make a new mark row impossible to land unnoticed.
+ck "G4a and one identity mark"             1 \
+   "$(printf '%s\n' "$o" | grep -c '^  ID[0-9]')"
+ck "G4b and TWELVE marks in total"        12 \
+   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]{2} ')"
 ck "G4 verify with no --absent is refused"  1 \
    "$(printf '%s\n' "$o" | grep -c 'no --absent file given')"
 
