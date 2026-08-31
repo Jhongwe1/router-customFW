@@ -172,17 +172,28 @@ ck "S4 the declared epoch is read"             1 \
 # S5a is the real one: the stamp the driver prints must be the UTC rendering
 # and must NOT be the local one.  Drop `-u` from the driver and it goes red.
 E=1788220800
-LOCAL_RENDER="$(date -d "@$E")"
 UTC_RENDER="$(date -u -d "@$E")"
 run gcf-s5 --dry-run
 DRIVER_RENDER="$(printf '%s\n' "$out" | sed -n 's/.*stamp=[0-9]* \[\([^]]*\)\].*/\1/p')"
 ck "S5a the driver renders the UTC form"       "$UTC_RENDER" "$DRIVER_RENDER"
-if [ "$LOCAL_RENDER" = "$UTC_RENDER" ]; then
-    sk "S5b and NOT the local form" "this host's TZ is UTC, so the two are the same string"
-else
-    ck "S5b and NOT the local form"             0 \
-       "$(printf '%s\n' "$DRIVER_RENDER" | grep -cxF "$LOCAL_RENDER")"
-fi
+
+# 🔴 S5b's FIRST version skipped when the host's own TZ was already UTC, and
+# that is how CI went red on run 33424495422: on this desk TZ is +0800 so the
+# case RAN and printed no skip line, so its label was never compared against
+# ci-expected.tsv -- structurally the same blindness that put three commits red
+# on 2026-08-31, one tool over. A case that only runs where it was written is
+# worse than no case.
+#
+# So it does not depend on the host's zone at all: it runs the DRIVER under a
+# pinned non-UTC zone and requires the same string out. If the driver stopped
+# pinning TZ *and* stopped passing -u, this goes red on any host, UTC included.
+# ⚠️ Nothing can distinguish losing ONLY `-u` from losing only `TZ=UTC`,
+# because either one alone still produces UTC. They are belt-and-braces by
+# design, S5c is the assertion that both are present, and saying which case
+# covers which half is the point of writing all three down.
+o_tz="$(TZ=Asia/Taipei LC_ALL=C bash "$K" gcf-s5b --dry-run --target none 2>&1 \
+        | sed -n 's/.*stamp=[0-9]* \[\([^]]*\)\].*/\1/p')"
+ck "S5b a non-UTC TZ does not move the rendering" "$UTC_RENDER" "$o_tz"
 
 # 🔴 S5c is a SOURCE assertion and is weaker than the two above, and that is
 # stated rather than hidden.  `date`'s default format comes from the locale's

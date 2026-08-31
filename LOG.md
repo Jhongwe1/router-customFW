@@ -11706,7 +11706,60 @@ Windows Terminal 與錄影軟體的設定;以及**做錯過的地方**(錄影中
 
 ---
 
-### 十三、收工清單
+### 十三、CI 紅了一次,而它紅在這台機器結構上看不到的那一類 —— 第三次
+
+**push 之後照擁有者說的用 `gh` 盯著,而它抓到了。** run `33424495422`,
+`instruments`／`text`／`lint` 三個 job 全綠,**`census` 紅:**
+
+```
+RED  test-kbuild-cflags  ran 20/22  failed 0  not run 1
+     UNEXPECTED-SKIP 'S5b and NOT the local form'
+     CENSUS-MISMATCH 20+0+1 != 22
+```
+
+🔴 **原因:我今天新加的 `S5b` 在 runner 上會印一行 skip,而那個標籤沒有在
+`ci-expected.tsv` 裡宣告過。** 它的第一版寫成:
+
+```
+if [ "$LOCAL_RENDER" = "$UTC_RENDER" ]; then sk "S5b ..." ; else ck "S5b ..." ; fi
+```
+
+**而 runner 的 `TZ` 就是 UTC**,所以兩邊相同、走 `sk`。
+**在這台桌子上 `TZ` 是 `+0800`,兩邊不同,所以它 `ck`、不印 skip、標籤永遠不會被比對。**
+
+⚠️ **這是同一個形狀的第三次**:`test-kbuild-cflags` `C1`(run 33310864156)、
+`flashwin`(run 33410057391,三個 commit 紅)、現在是這一個。
+前兩次的差異是 `$FWRE_WORK` 在不在;這一次是**時區**。
+**共同點不是那個變數是什麼,是「這台機器上那一格會跑,所以它不印 skip」。**
+
+🟢 **修法不是去宣告那個 skip,是讓那一格在任何主機上都會跑。**
+新的 `S5b` 不看主機的時區:它**把驅動放進一個釘死的非 UTC 時區裡跑**,
+要求印出來的字串仍然是 UTC 那一版。量,兩種 `TZ` 下都是 **22 passed / 0 failed / 0 skipped**。
+
+⚠️ **而 `S5b` 和 `S5a` 都分不出「只掉了 `-u`」和「只掉了 `TZ=UTC`」**,
+因為任何一個單獨留著都還是 UTC。**那兩個 pin 是設計上的雙保險**,
+`S5c` 是斷言兩個都在的那一格,而把「哪一格蓋哪一半」寫下來就是寫三格的意義。
+
+🟢 **而這一次順手做了一件應該變成慣例的事:用空的 `$FWRE_WORK` 在本機模擬 runner。**
+
+```
+EMPTY=$(mktemp -d); export FWRE_WORK="$EMPTY"
+… 跑套件,輸出丟進 ci-out-runner/ …
+/usr/bin/python3 tools/ci-census.py tools/ci-expected.tsv ci-out-runner --only …
+```
+
+八個套件全綠,`test-kbuild-cflags` 21/22 加一個**宣告過的** skip。
+**這是這台機器唯一能看見那一類的方式**,而它花不到一分鐘。
+⚠️ 它只涵蓋 `$FWRE_WORK` 那一維;這一次紅的是時區那一維,所以它**不是**完整的解 ——
+完整的解是那一格不要有分支。
+
+**⚠️ 而這裡有一件不是缺陷但要說**:這一次 push 一次推了四個 commit,
+所以 GitHub 只對 HEAD 跑了一次 —— 中間三個 commit **沒有 run**,那和「紅」不同,
+但也不是「綠」。歷史上紅的仍然是四個。
+
+---
+
+### 十四、收工清單
 
 * `tools/spec-check.py`:八個控制全過,4,220 個表格列／738 個表格／82 個檔,C11 35 個參照。
 * `tools/test-config-gates.sh` **55/0**(53 → 55,`G4a`／`G4b`)。
