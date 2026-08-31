@@ -1281,7 +1281,7 @@ is `Unknown command !`, about 44 bytes, arriving at once and followed by a
 prompt; a `--seconds` truncation stops **mid-line with no prompt**. Neither is
 what came back — 500 whole lines and a prompt.
 
-⚠️ **Nothing in that seating depended on the answer.** `DW 80A02000 707` is three 🔄 *(641 when this was written; the block grew on 2026-08-31 and the claim survives, because 707 is three digits too)* — the original sentence said `DW 80A02000 641` is three
+⚠️ **Nothing in that seating depended on the answer.** `DW 80A02000 718` is three 🔄 *(641 when this was written; the block grew on 2026-08-31 to 707 and again on 2026-09-01 to 718, and the claim survives both times, because 707 and 718 are three digits too)* — the original sentence said `DW 80A02000 641` is three
 digits, and `probe3.c`'s compile-time assertion, the `Makefile`'s
 `RB_WORDS_probe3` comment and `docs/probe3-cells.md` §4 all say so
 independently. The cell is reconnaissance for `R5-0`, bought on a seating

@@ -103,7 +103,7 @@
 #define RB_POISON	0xDEADC0DEu
 
 #define RB_HDR		64u
-#define RB_RES		194u
+#define RB_RES		205u
 #define RB_ROWS		16u
 #define RB_ROWW		8u
 #define RB_BMPW		256u
@@ -137,7 +137,18 @@
  * compile-time half of the same check: a layout that does not add up does not
  * build.  (C99 has no _Static_assert; a negative array bound is the portable
  * form and it has been the portable form for thirty years.) */
-typedef char rb_layout_adds_up[(RB_WORDS == 707u) ? 1 : -1];
+typedef char rb_layout_adds_up[(RB_WORDS == 718u) ? 1 : -1];
+
+/* 🔴 AND THE POISON MARGIN MUST SURVIVE THE READ-BACK, which until now was
+ * arithmetic luck rather than a checked property.  `DW base n` prints
+ * 4*ceil(n/4) words (LDR-07), so `DW 80A02000 RB_WORDS` returns at least one
+ * word PAST the seal only when RB_WORDS is not a multiple of four -- and w[the
+ * first one past] is where a payload that wrote beyond its own block writes
+ * first, because the overrun goes UPWARD from the seal.  641 returned three
+ * such words and 707 returned one; both were the remainder falling out that
+ * way, and the Makefile comment says so.  718 returns two, and this line is
+ * what stops a future layout from silently returning none. */
+typedef char rb_readback_shows_poison[(RB_WORDS % 4u != 0u) ? 1 : -1];
 
 #define UNC(a)		((volatile u32 *)((a) | KSEG1_BIT))
 
@@ -186,13 +197,31 @@ typedef char rb_layout_adds_up[(RB_WORDS == 707u) ? 1 : -1];
 #define H_CELLS_VOID	45u
 #define H_UART_ROWS	46u
 #define H_SEAL_KIND	47u	/* 1 = the sum excludes H_PROGRESS's final value */
-/* 🔴 48 AND 49 ARE APPENDED RATHER THAN INSERTED beside 42/43, and that is the
- * whole reason they are here and not there: 44..47 are occupied, and shifting
- * them would move four header words that `tools/rbcheck.py` and every committed
- * capture of a probe3 block read by index.  A layout that renumbers is a layout
- * whose old readings cannot be compared word for word. */
-#define H_BMP_KEPT	48u	/* nibbles actually copied into O_BMPK           */
-#define H_LAYOUT_BMPK	49u	/* the fifth offset                              */
+/* 🔴 52, 53 AND 54 ARE APPENDED RATHER THAN INSERTED beside 42/43, and that is
+ * the whole reason they are here and not there: shifting 44..47 would move four
+ * header words that `tools/rbcheck.py` and every committed capture of a probe3
+ * block read by index.  A layout that renumbers is a layout whose old readings
+ * cannot be compared word for word.
+ *
+ * 🔴 THEY WERE 48, 49 AND 50 FOR ONE DAY AND ALL THREE COLLIDED, 量 2026-09-01.
+ * The 2026-08-31 version of this comment reasoned *"44..47 are occupied"* and
+ * stopped counting there -- 48..51 were already `H_KSEG0`, `H_G_TIMER`,
+ * `H_T_SEP_A` and `H_T_SEP_B`, defined twenty lines further down beside Group
+ * T rather than in this block.  The reasoning was right and the census was
+ * short, which is why the fix is a CENSUS (`tools/test-rlxprobe.sh` Y2c) and
+ * not a better comment.
+ *
+ * What it would have cost, and the order is what makes it bad: stage 0 writes
+ * `H_LAYOUT_BMPK`; stage 2's Group T then overwrites w49 with `g_timer`, so
+ * `rbcheck` would have read the retained region's OFFSET as 0 or 1 and
+ * recounted the header; stage 3's Group W then overwrites w48 and w50, taking
+ * `H_KSEG0` and HALF of the separated pair with them -- w51 survives, so
+ * `t.sep` would have come back as one number of two and looked like a reading.
+ * Nothing had been seated on the 707-word layout, so no capture is affected;
+ * the three that move are the three that have never been on silicon, which is
+ * the same rule this comment states above. */
+#define H_BMP_KEPT	52u	/* nibbles actually copied into O_BMPK           */
+#define H_LAYOUT_BMPK	53u	/* the fifth offset                              */
 /* 🔴 THE RERUN'S OWN FRESH COUNT, AND UNTIL 2026-08-31 IT WAS ONLY EVER SPOKEN.
  * `field("bmp.rerun.fresh", nf)` puts it on the UART and nothing put it in the
  * block, so a desk holding only the `DW` read-back could recount the region and
@@ -200,7 +229,7 @@ typedef char rb_layout_adds_up[(RB_WORDS == 707u) ? 1 : -1];
  * and the desk's recount are two numbers over one region computed by different
  * code at different times -- which is the only thing that can catch a snapshot
  * taken at the wrong moment. */
-#define H_BMP_FRESH	50u
+#define H_BMP_FRESH	54u
 /* 🔴 A WORD OF ITS OWN, AND THE FIRST DRAFT PUT IT IN `H_FLAGS`, WHERE IT WAS
  * INVISIBLE.  `FLAGS_W` starts at 0x50000000 -- 'P' -- so bits 28 and 30 are
  * already set in every build, and a *running in KSEG0* flag at 0x40000000 could
@@ -227,6 +256,11 @@ typedef char rb_layout_adds_up[(RB_WORDS == 707u) ? 1 : -1];
 #define P_WALK_D	0x80u
 #define P_CACHEOP	0x90u
 #define P_ISC		0xA0u
+/* Group F.  APPENDED between P_ISC and P_RESTORED rather than renumbering, for
+ * the reason header words 52..54 carry -- and the line is BARE because
+ * rbcheck's C10 re-reads this ladder out of this file with a regex anchored at
+ * end of line, which is what caught a trailing comment here on the first run. */
+#define P_FLASHWIN	0xA8u
 #define P_RESTORED	0xB0u
 #define P_SEALED	0xC0u
 
@@ -339,7 +373,34 @@ typedef char rb_layout_adds_up[(RB_WORDS == 707u) ? 1 : -1];
 				 * `w.assoc.capped` counts these; this says
 				 * WHERE, because a count cannot.             */
 
-typedef char res_area_is_full[(R_W_ASSOC_MTCAP + 1u == RB_RES) ? 1 : -1];
+/* --- Group F -- the memory-mapped SPI window, 2026-09-01 ------------------ */
+/* APPENDED at 194, and for the third time the reason is the one the header
+ * words carry: every committed capture of a probe3 block is read BY INDEX, and
+ * a layout that renumbers is a layout whose old readings cannot be compared
+ * word for word.  `docs/probe3-cells.md` § 6.8. */
+#define R_F_SFCR	194u	/* SFCR as THIS run sees it.  The divider is what
+				 * turns ticks into SPI clocks and it was
+				 * carried from REG-13's day until now      */
+#define R_F_WIN_SEQ	195u	/* ticks, 1024 loads, stride 4    at F_WIN   */
+#define R_F_WIN_STR	196u	/* ticks, 1024 loads, stride 1024 at F_WIN   */
+#define R_F_BOOT_SEQ	197u	/* the same two, at the boot window          */
+#define R_F_BOOT_STR	198u
+#define R_F_DRAM_SEQ	199u	/* the same two, uncached DRAM: the control  */
+#define R_F_DRAM_STR	200u
+#define R_F_WIN_SEQ2	201u	/* R_F_WIN_SEQ again, run LAST -- if this and
+				 * 195 disagree, no ratio in the group is
+				 * worth reading                            */
+#define R_F_ALIAS	202u	/* mismatching pairs of the first 16 words,
+				 * F_WIN against F_BOOT.  A COUNT: no flash
+				 * content enters the block                 */
+#define R_F_LIVE	203u	/* (win << 8) | boot: of words 1..15, how many
+				 * differ from word 0.  A floating bus gives
+				 * 0 and flash code gives most of 15         */
+#define R_F_FAULTS	204u	/* rlx_exc_rec[0] across the whole group.  The
+				 * handler's own time is INSIDE the brackets,
+				 * so a non-zero here voids every tick above */
+
+typedef char res_area_is_full[(R_F_FAULTS + 1u == RB_RES) ? 1 : -1];
 
 /* --- verdict nibbles, shared with cells.S -------------------------------- */
 #define V_NEVER		0x0u
@@ -406,6 +467,23 @@ typedef char res_area_is_full[(R_W_ASSOC_MTCAP + 1u == RB_RES) ? 1 : -1];
  * So `c-A` runs at TWO separations and an eviction artefact shows up as a
  * disagreement between them rather than as a negative result that would void
  * Group C and Group V together. */
+/* --- Group F's three address spaces --------------------------------------- */
+/* F_DRAM is the I-side sweep's arena, read back through KSEG1 and therefore
+ * uncached.  It is reused rather than given its own span because Group F runs
+ * LAST: `w-size`'s results are in the block before F_DRAM is touched, so the
+ * only thing this can damage is a measurement that has already been taken. */
+#define F_WIN		((u32)RLX_F_WIN)
+#define F_BOOT		((u32)RLX_F_BOOT)
+#define F_DRAM		(ARENA + 0x20000u)
+#define F_COUNT		1024u	/* per leg.  At the no-buffer band that is
+				 * ~1.5 ms, 15 % of the 9.9998 ms wrap      */
+#define F_WARM		64u	/* the discarded pass, and it runs on F_DRAM
+				 * for EVERY leg so the loop is warm and no
+				 * window buffer is pre-loaded by us        */
+#define F_STRIDE_SEQ	4u
+#define F_STRIDE_STR	1024u
+#define F_PROBE		16u	/* words compared by f-alias / f-live       */
+
 #define COH_SEP1	0x1400u		/*  5 KiB */
 #define COH_SEP2	0x2C00u		/* 11 KiB */
 
@@ -475,6 +553,7 @@ u32  rlx_status_poke(u32 orbits, u32 *out_ks1);
 u32  rlx_lw_unc_primed(u32 addr, u32 prime);
 u32  rlx_tc_spin(u32 spins, u32 *raw_ks1);
 u32  rlx_tc_reads(u32 k, u32 *raw_ks1);
+u32  rlx_tc_stride(u32 base, u32 stride, u32 count, u32 *raw_ks1);
 u32  rlx_tc_walk(u32 base, u32 passes, u32 *raw_ks1);
 void rlx_w_arm(u32 ctl_ks1, u32 list_ks1);
 void rlx_w_patch(u32 ctl_ks1, u32 list_ks1);
@@ -978,6 +1057,20 @@ static u32 tc_ticks(u32 before, u32 after)
 	a = after >> 4;
 	b = before >> 4;
 	return (a >= b) ? (a - b) : (a + TC_WRAP - b);
+}
+
+/* One Group F leg: a discarded warming pass so the loop's own instructions are
+ * in the I-cache before the bracket, then the timed pass.  🔴 THE WARM-UP RUNS
+ * ON DRAM AND NEVER ON THE LEG'S OWN BASE -- warming on the window would leave
+ * its first accesses sitting in whatever buffer the cell exists to detect, and
+ * the cell would then measure its own warm-up. */
+static u32 f_leg(u32 base, u32 stride)
+{
+	u32 raw = (u32)&tc_raw[0] | (u32)KSEG1_BIT;
+
+	(void)rlx_tc_stride(F_DRAM | (u32)KSEG1_BIT, stride, F_WARM, (u32 *)raw);
+	(void)rlx_tc_stride(base, stride, F_COUNT, (u32 *)raw);
+	return tc_ticks(rd_unc((u32)&tc_raw[0]), rd_unc((u32)&tc_raw[1]));
 }
 
 static u32 tc_bracket(u32 (*fn)(u32, u32 *), u32 arg)
@@ -2043,7 +2136,106 @@ void rlxprobe_main(void)
 	}
 	progress(P_ISC);
 
-	/* --- 10. restore, seal, hand the board back ---------------------- */
+	/* --- 10. Group F -- the memory-mapped SPI window ------------------ */
+	/* LAST, because it is the first time this payload reads an address
+	 * space outside DRAM and the SoC register block, and § 7's order is by
+	 * that question and no other.  Everything Groups H..S measured is in
+	 * the block before this starts, so a fault -- or a bus that never
+	 * answers -- costs this group and nothing before it. */
+	{
+		u32 fb = exc_rec(0u);
+		u32 w0, b0, ne = 0u, wv = 0u, bv = 0u, fi;
+		u32 sfcr, ws, wt, bs, bt, ds, dt, w2, fflt;
+
+		sfcr = rlx_lw_unc_primed((u32)RLX_SFCR, 0xC0DE7901u);
+		res_put(R_F_SFCR, sfcr);
+
+		/* f-alias and f-live, and they are the LIVENESS CONTROL: two
+		 * independent address decodes returning sixteen identical
+		 * non-trivial words is a property no floating bus produces.
+		 * Only the COUNTS enter the block -- no flash content does,
+		 * and that is a rule rather than an accident. */
+		w0 = rd_unc(F_WIN);
+		b0 = rd_unc(F_BOOT);
+		for (fi = 0u; fi < F_PROBE; fi++) {
+			u32 wk = rd_unc(F_WIN + fi * 4u);
+			u32 bk = rd_unc(F_BOOT + fi * 4u);
+
+			if (wk != bk)
+				ne++;
+			if (fi != 0u) {
+				if (wk != w0)
+					wv++;
+				if (bk != b0)
+					bv++;
+			}
+		}
+		res_put(R_F_ALIAS, ne);
+		res_put(R_F_LIVE, (wv << 8) | bv);
+
+		/* 🔴 THE TIMING LEGS ARE GATED ON GROUP T, and they were not
+		 * until the qemu run of 2026-09-01 showed what that costs.
+		 * Malta has no timer at `TC0CNT`, so `g_timer` is 0 there and
+		 * every bracket returned a delta of two identical all-ones
+		 * reads: SEVEN legs of `00000000`, which is a number and not a
+		 * refusal.  Group V is gated on `c-A` and Groups M and X on
+		 * `h-brk`; a timing group with no gate was this payload
+		 * disagreeing with its own design.
+		 *
+		 * When the gate is shut the seven words are LEFT AS POISON --
+		 * that is stage 0's own convention for *this cell did not
+		 * run*, and it is what `rbcheck` reads.  `f-alias` and
+		 * `f-live` above do not need the timer and still run. */
+		if (g_timer) {
+			ws = f_leg(F_WIN,  F_STRIDE_SEQ);
+			wt = f_leg(F_WIN,  F_STRIDE_STR);
+			bs = f_leg(F_BOOT, F_STRIDE_SEQ);
+			bt = f_leg(F_BOOT, F_STRIDE_STR);
+			ds = f_leg(F_DRAM | (u32)KSEG1_BIT, F_STRIDE_SEQ);
+			dt = f_leg(F_DRAM | (u32)KSEG1_BIT, F_STRIDE_STR);
+			w2 = f_leg(F_WIN,  F_STRIDE_SEQ);
+
+			res_put(R_F_WIN_SEQ,  ws);
+			res_put(R_F_WIN_STR,  wt);
+			res_put(R_F_BOOT_SEQ, bs);
+			res_put(R_F_BOOT_STR, bt);
+			res_put(R_F_DRAM_SEQ, ds);
+			res_put(R_F_DRAM_STR, dt);
+			res_put(R_F_WIN_SEQ2, w2);
+		} else {
+			ws = wt = bs = bt = ds = dt = w2 = RB_POISON;
+			cells_void++;
+			rlx_puts("rlxprobe: Group F timing VOID -- Group T did "
+				 "not ship, so a tick is not a unit on this "
+				 "machine. f-alias and f-live still ran\r\n");
+		}
+		fflt = exc_rec(0u) - fb;
+		res_put(R_F_FAULTS,   fflt);
+
+		/* The UART prints the SAME values the block holds, out of one
+		 * local each.  A second read of the block would make a
+		 * transcription defect invisible, which is the shape
+		 * `H_BMP_FRESH` was added to close one region over. */
+		field("f.sfcr", sfcr);
+		field("f.alias", ne);
+		field("f.live", (wv << 8) | bv);
+		field("f.win.seq", ws);
+		field("f.win.str", wt);
+		field("f.boot.seq", bs);
+		field("f.boot.str", bt);
+		field("f.dram.seq", ds);
+		field("f.dram.str", dt);
+		field("f.win.seq2", w2);
+		field("f.faults", fflt);
+		if (fflt != 0u)
+			rlx_puts("rlxprobe: Group F FAULTED -- every tick in "
+				 "this group includes handler time and is "
+				 "VOID\r\n");
+		cells_run++;
+	}
+	progress(P_FLASHWIN);
+
+	/* --- 11. restore, seal, hand the board back ---------------------- */
 	copy_vec_back();
 
 	sum = 0u;

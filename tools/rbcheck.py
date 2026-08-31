@@ -41,17 +41,32 @@ Modes
 
 The controls run first on every invocation and the tool refuses to report on a
 file if one of them fails, because a checksum comparison that has not been
-shown able to fail is not a checksum comparison.  🔄 **Twenty-one of them since
-2026-08-31** -- the prose here and the row in ``tools/ci-expected.tsv`` both
-still said *ten* while the count column said sixteen.  C1..C16 run off captures
-committed in this repository -- no ``$FWRE_WORK``, no device -- so they run on
-a runner, which ``hazlint``'s population control cannot; C17..C21 run on a
-block this file synthesises, and that is stated in the code beside them because
-**they show the check works, not that any payload does.**
+shown able to fail is not a checksum comparison.  🔄 **Thirty-one of them since
+2026-09-01** -- the prose here and the row in ``tools/ci-expected.tsv`` both
+still said *ten* while the count column said sixteen, once.  C1..C16 run off
+captures committed in this repository -- no ``$FWRE_WORK``, no device -- so
+they run on a runner, which ``hazlint``'s population control cannot; C17..C30
+run on a block this file synthesises, and that is stated in the code beside
+them because **they show the check works, not that any payload does.**
 
-⚠️ ``--words`` is the payload's ``RB_WORDS`` and it MOVED: probe3's block is
-**707** words since 2026-08-31 (a retained bitmap region and Group W's ``M(T)``
-ladder) and was 641 before it.  Both parse -- the layout is read out of the
+Group F, and the line this tool does NOT cross
+----------------------------------------------
+`docs/probe3-cells.md` § 6.8.3 writes six refutation conditions for the flash
+window group.  **Four of them are checked here and two deliberately are not**,
+and the line is INTERNAL CONTRADICTION against PREDICTION:
+
+* ``f.faults``, ``f.live``, the ``f.win.seq``/``f.win.seq2`` pair and the
+  window-against-DRAM ordering make the block's own tick words **not mean what
+  they say**.  No card, no prediction and no knowledge of the device is needed
+  to see it, so this tool sees it.
+* ``f.alias`` and ``f.sfcr`` are predictions **about the device**.  They belong
+  on the card and to ``check-predictions.py``.  Asserting them here would make
+  this file a second owner of a finding, which house rule 1 forbids.
+
+⚠️ ``--words`` is the payload's ``RB_WORDS`` and it MOVED TWICE: probe3's
+block is **718** words since 2026-09-01 (Group F, the memory-mapped SPI
+window), was 707 from 2026-08-31 (a retained bitmap region and Group W's
+``M(T)`` ladder) and 641 before that.  Both parse -- the layout is read out of the
 block's own ``H_LAYOUT_*`` header words rather than out of a table here -- but
 passing the wrong ``--words`` reads the seal at the wrong offset, which is what
 control C2 exists for.
@@ -96,7 +111,8 @@ PROGRESS = {
         0x10: "P_HEADER", 0x20: "P_HANDLER", 0x30: "P_TIMER",
         0x40: "P_WALK_I", 0x50: "P_IMEM_OFF", 0x60: "P_SCRATCH",
         0x70: "P_COHERE", 0x80: "P_WALK_D", 0x90: "P_CACHEOP",
-        0xA0: "P_ISC", 0xB0: "P_RESTORED", 0xC0: "P_SEALED",
+        0xA0: "P_ISC", 0xA8: "P_FLASHWIN", 0xB0: "P_RESTORED",
+        0xC0: "P_SEALED",
     },
 }
 
@@ -258,6 +274,13 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
     # refusing a whole block over a region that is a scratchpad by design would
     # be the wrong verdict.
     #
+    # 🔴 THE THREE INDICES BELOW MOVED ON 2026-09-01, from 48/49/50 to 52/53/54,
+    # because all three collided with `H_KSEG0`, `H_G_TIMER` and `H_T_SEP_A` --
+    # words Group T writes AFTER the header is laid down.  No committed capture
+    # is affected: the 707-word layout was never seated.  probe3.c's own comment
+    # beside `H_BMP_KEPT` carries the whole finding, and `test-rlxprobe.sh` Y2c
+    # is the census that would have caught it.
+    #
     # `O_BMPK` is the RETAINED COPY and it IS checkable, because the payload
     # now writes its own FRESH count beside it (`H_BMP_FRESH`).  Two numbers
     # over one region, computed by different code at different times.
@@ -267,8 +290,92 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
     # tool raised IndexError on it rather than reporting, which is the failure
     # mode where an instrument that cannot fail is indistinguishable from one
     # that passed.
+    # --- Group F, 2026-09-01.  `docs/probe3-cells.md` § 6.8.
+    #
+    # PRESENCE IS DECIDED BY THE BLOCK, NOT BY ITS LENGTH.  `RB_RES` is not a
+    # header word, but `H_LAYOUT_ROWS - H_LAYOUT_RES` is exactly it, so a 641-
+    # or 707-word capture reports 192 or 194 and is skipped -- and the skip is
+    # PRINTED.  A length test would have read Group F's slots out of the row
+    # area of every older block and failed them all.
     if magic == 0x524C5833 and count > 50:
-        o_bmp, o_bmpk, o_seal = b[42], b[49], b[43]
+        o_res, o_rows = b[40], b[41]
+        n_res = o_rows - o_res if o_rows > o_res else 0
+        if n_res < 205:
+            report(f"  group F     not in this block: the header says "
+                   f"{n_res} result words, and Group F starts at 194")
+        else:
+            g = {k: b[o_res + v] for k, v in (
+                ("sfcr", 194), ("win.seq", 195), ("win.str", 196),
+                ("boot.seq", 197), ("boot.str", 198), ("dram.seq", 199),
+                ("dram.str", 200), ("win.seq2", 201), ("alias", 202),
+                ("live", 203), ("faults", 204))}
+            report("  group F     " + "  ".join(
+                f"{k}={g[k]:08X}" for k in
+                ("win.seq", "win.str", "dram.str", "win.seq2", "faults")))
+
+            # 🔴 ALL SEVEN POISON IS A REFUSAL, NOT A READING, and a MIX is
+            # a defect.  probe3 leaves the timing legs at stage 0's poison
+            # when `g_timer` is 0 -- the payload's own *this cell did not run*
+            # -- so reading them as ticks would report seven findings about a
+            # group that correctly declined to run.  Some poison and some not
+            # is neither, and it is the only one of the three that is a bug.
+            legs = ("win.seq", "win.str", "boot.seq", "boot.str",
+                    "dram.seq", "dram.str", "win.seq2")
+            npois = sum(1 for k in legs if g[k] == POISON)
+            if npois == len(legs):
+                report("  group F     timing VOID -- all seven legs are "
+                       "poison, which is the payload declining because Group "
+                       "T did not ship. f.alias and f.live still stand")
+                legs = ()
+            elif npois:
+                fails.append(
+                    f"Group F has {npois} of {len(legs)} timing legs poisoned "
+                    f"and the rest written -- the gate is all-or-nothing, so "
+                    f"a mix means a leg did not reach its res_put")
+            for k in legs:
+                if g[k] == 0xFFFFFFFF:
+                    fails.append(
+                        f"Group F leg {k} is FFFFFFFF -- tc_ticks' sentinel "
+                        f"for a bracket whose destination register was never "
+                        f"written, so the leg has no reading at all")
+                elif g[k] == 0:
+                    fails.append(
+                        f"Group F leg {k} is zero ticks -- the counter did "
+                        f"not move across 1,024 loads, which no band in "
+                        f"§ 6.8.2 allows")
+
+            if g["faults"] != 0:
+                fails.append(
+                    f"Group F took {g['faults']} fault(s) -- the handler's "
+                    f"own time is INSIDE every bracket, so every tick in the "
+                    f"group is void rather than merely suspect")
+
+            win_live, boot_live = (g["live"] >> 8) & 0xFF, g["live"] & 0xFF
+            if win_live == 0 or boot_live == 0:
+                fails.append(
+                    f"Group F f.live is {g['live']:08X} -- win={win_live} "
+                    f"boot={boot_live} of 15 words differing from word 0, and "
+                    f"a zero means that window returned sixteen identical "
+                    f"words: a floating bus, not flash")
+
+            s1, s2 = g["win.seq"], g["win.seq2"]
+            if s1 not in (0, 0xFFFFFFFF) and s2 not in (0, 0xFFFFFFFF):
+                d = s2 - s1 if s2 > s1 else s1 - s2
+                if d * 10 > s1:
+                    fails.append(
+                        f"Group F is not repeatable: f.win.seq {s1} against "
+                        f"f.win.seq2 {s2}, {100.0 * d / s1:.1f} % apart over "
+                        f"one run. No ratio computed from it is worth reading")
+
+            if 0 < g["dram.str"] != 0xFFFFFFFF and 0 < g["win.str"] < g["dram.str"]:
+                fails.append(
+                    f"Group F: f.win.str {g['win.str']} < f.dram.str "
+                    f"{g['dram.str']} -- the SPI window read FASTER than "
+                    f"uncached DRAM, which nothing in § 6.8.2's model allows. "
+                    f"The framework is wrong, not one term")
+
+    if magic == 0x524C5833 and count > 50:
+        o_bmp, o_bmpk, o_seal = b[42], b[53], b[43]
         adv, point = b[23], b[22]
 
         def nibbles(lo, hi, limit=None):
@@ -310,7 +417,7 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
                        f"Reported, not failed: the sum and both channels are "
                        f"unaffected")
         else:
-            kept, said = b[48], b[50]
+            kept, said = b[52], b[54]
             nib = nibbles(o_bmp, o_bmpk)
             report(f"  scratchpad  {nib} nibble(s) at w{o_bmp} -- the LAST "
                    f"cell to use it, not the boundary point. Never failed")
@@ -625,22 +732,36 @@ def run_controls():
     # capture -- a control rewritten to match new code stops being evidence
     # about the old capture.
     def synth707(kept, said, fresh_nibbles, adv=512, stale_nibbles=0,
-                 beyond=()):
-        """A well-formed 707-word probe3 block with a retained region.
+                 beyond=(), n_res=194, gf=None):
+        """A well-formed probe3 block with a retained region.
 
         `stale_nibbles` are laid down AFTER the FRESH ones so the two kinds
         occupy different victims.  They exist because without them every
         non-zero nibble in the region is FRESH, and a recount that counted
         *any written nibble* would agree with one that counted FRESH -- the
         two are only distinguishable on a region holding both.
+
+        `n_res` is the RESULT-AREA size, and it is a parameter rather than a
+        constant because the point of C30 is that ONE synthesiser produces
+        both layouts: 194 is the 707-word block that Group F is absent from and
+        205 is the 718-word block it is present in.  The offsets below are
+        computed from it exactly as probe3.c computes them, which is also what
+        makes the header's layout words honest here.
         """
-        o_bmp, o_bmpk, o_seal, n = 386, 642, 706, 707
+        o_rows = 64 + n_res
+        o_bmp = o_rows + 16 * 8
+        o_bmpk = o_bmp + 256
+        o_seal = o_bmpk + 64
+        n = o_seal + 1
         w = [0] * n
         w[0] = 0x524C5833
         w[2] = 0xC0                       # P_SEALED
         w[22], w[23] = 0x57004000, adv    # H_BMP_POINT / H_BMP_COUNT
+        w[40], w[41] = 64, o_rows         # H_LAYOUT_RES / H_LAYOUT_ROWS
         w[42], w[43] = o_bmp, o_seal
-        w[48], w[49], w[50] = kept, o_bmpk, said
+        w[52], w[53], w[54] = kept, o_bmpk, said
+        for k, v in (gf or {}).items():   # Group F, by result index
+            w[64 + k] = v
         for i in range(fresh_nibbles):    # V_FRESH = 2, packed 8 per word
             w[o_bmpk + i // 8] |= 2 << (28 - 4 * (i % 8))
         for i in range(fresh_nibbles, fresh_nibbles + stale_nibbles):
@@ -656,10 +777,24 @@ def run_controls():
             d[0x80A02000 + 4 * i] = POISON
         return d
 
+    # 🔴 C17 ASSERTS THE BRANCH WAS ENTERED, NOT ONLY THAT NOTHING FAILED, and
+    # it did not until 2026-09-01.  量, by `test-rbcheck.py`'s W0 -- which
+    # requires a mutation to turn the case it NAMES red: M24 (the layout
+    # hardcoded back to the 641-word offsets) and M26 (the branch skipped for
+    # short blocks) both push the tool into the `elif` above, the
+    # pre-2026-08-31 one-region path, which REPORTS and never fails.  `not f`
+    # was therefore true and C17 stayed green while the retained region was not
+    # looked at at all.  A positive control that passes when the check does not
+    # run is the failure this repository keeps catching, in the one place it is
+    # least visible: the case whose job is to be green.
+    cap = []
     f = check_block(synth707(512, 20, 20), 0x80A02000, 707,
-                    expect_magic=0x524C5833, report=_quiet)
-    row("C17", "a consistent retained region passes", not f,
-        f"kept 512 of 512, 20 FRESH, payload said 20; {len(f)} failure(s)")
+                    expect_magic=0x524C5833, report=cap.append)
+    entered = any("retained  " in x for x in cap)
+    row("C17", "a consistent retained region passes, and was ENTERED",
+        not f and entered,
+        f"kept 512 of 512, 20 FRESH, payload said 20; {len(f)} failure(s), "
+        f"retained line {'present' if entered else 'ABSENT -- the branch never ran'}")
 
     f = check_block(synth707(512, 20, 19), 0x80A02000, 707,
                     expect_magic=0x524C5833, report=_quiet)
@@ -715,6 +850,92 @@ def run_controls():
     row("C23", "the recount stops at H_BMP_KEPT", not f,
         f"20 FRESH inside 256 kept, 20 more beyond it, payload said 20; "
         f"{len(f)} failure(s)")
+
+    # C24..C30 -- Group F, 2026-09-01.  Synthetic, and for the same reason
+    # C17..C23 are: the 718-word payload has never been seated.  A clean leg
+    # set is 20,000-ish ticks; the numbers below are shapes, not predictions --
+    # § 6.8.2 owns the bands and this file owns none of them.
+    GF_OK = {194: 0x3FC00000, 195: 9000, 196: 21000, 197: 9100, 198: 21100,
+             199: 2000, 200: 3000, 201: 9050, 202: 0, 203: 0x0F0F, 204: 0}
+
+    def gfsynth(over=None):
+        """The clean leg set with `over` applied.  A dict rather than keyword
+        arguments because the keys are RESULT INDICES, and an index is not an
+        identifier -- writing them as names here would be a second copy of the
+        layout in a file whose whole point is reading the layout out of the
+        block."""
+        d = dict(GF_OK)
+        d.update(over or {})
+        return synth707(512, 20, 20, n_res=205, gf=d)
+
+    f = check_block(gfsynth(), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C24", "a consistent Group F passes", not f,
+        f"718-word block, seven legs, 0 faults; {len(f)} failure(s)")
+
+    f = check_block(gfsynth({204: 1}), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C25", "a fault inside Group F voids the group",
+        any("void rather than merely suspect" in x for x in f),
+        f"f.faults=1; {len(f)} failure(s)")
+
+    f = check_block(gfsynth({197: 0xFFFFFFFF}), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C26", "tc_ticks' never-written sentinel on a leg FAILS",
+        any("FFFFFFFF" in x and "boot.seq" in x for x in f),
+        f"f.boot.seq=FFFFFFFF; {len(f)} failure(s)")
+
+    f = check_block(gfsynth({203: 0x0F00}), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C27", "a window that returned sixteen identical words FAILS",
+        any("floating bus" in x for x in f),
+        f"f.live=00000F00, boot byte zero; {len(f)} failure(s)")
+
+    f = check_block(gfsynth({201: 10500}), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C28", "f.win.seq2 more than 10 % from f.win.seq FAILS",
+        any("not repeatable" in x for x in f),
+        f"9000 against 10500, 16.7 % apart; {len(f)} failure(s)")
+
+    # 🔴 C28b is C28's other edge.  One case at a boundary passes whether the
+    # comparison is `>` or `>=`, and `console-capture`'s guard cost ten live
+    # mutants to that exact shape.  9,000 -> 9,890 is 9.9 % and must be clean.
+    f = check_block(gfsynth({201: 9890}), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C28b", "9.9 % apart is still accepted", not f,
+        f"9000 against 9890; {len(f)} failure(s)")
+
+    f = check_block(gfsynth({196: 2500}), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C29", "a window faster than uncached DRAM FAILS",
+        any("FASTER than" in x for x in f),
+        f"f.win.str 2500 against f.dram.str 3000; {len(f)} failure(s)")
+
+    POIS = 0xDEADC0DE
+    allp = {k: POIS for k in range(195, 202)}
+    f = check_block(gfsynth(allp), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C31", "all seven legs poisoned is a REFUSAL, not seven findings",
+        not f, f"the g_timer gate shut; {len(f)} failure(s)")
+
+    mix = dict(allp)
+    del mix[199]
+    f = check_block(gfsynth(mix), 0x80A02000, 718,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C32", "SOME legs poisoned and some written FAILS",
+        any("all-or-nothing" in x for x in f),
+        f"six of seven poisoned; {len(f)} failure(s)")
+
+    # 🔴 C30 IS THE POPULATION CONTROL FOR C24..C29, and it is the one that
+    # would have caught a length test.  The SAME synthesiser at n_res=194 --
+    # the 707-word layout -- carries Group F's numbers in its ROW area, and
+    # every check above must decline to run rather than read them.  Without
+    # it, C25..C29 pass on a tool that fails every block it is handed.
+    f = check_block(synth707(512, 20, 20, n_res=194, gf={204: 1}),
+                    0x80A02000, 707, expect_magic=0x524C5833, report=_quiet)
+    row("C30", "a 707-word block declines Group F rather than reading it",
+        not f, f"n_res=194 with a fault word planted in the row area; "
+               f"{len(f)} failure(s)")
 
     print()
     return 0 if ok else 1

@@ -390,6 +390,12 @@ jobs:
       - name: mkinitramfs
         run: /usr/bin/python3 tools/mkinitramfs.py self-test 2>&1 | tee ci-out/mkinitramfs.out; exit "${PIPESTATUS[0]}"
 
+      # 🔴 The suite that says mkinitramfs's controls work, and it could
+      # not exist until `cmd_verify` had any. Needs no device, no
+      # $FWRE_WORK and no cross tools; it builds its own ELF and cpio.
+      - name: test-mkinitramfs-mutants
+        run: /usr/bin/python3 tools/test-mkinitramfs-mutants.py 2>&1 | tee ci-out/test-mkinitramfs-mutants.out; exit "${PIPESTATUS[0]}"
+
       - name: test-config-gates
         run: bash tools/test-config-gates.sh 2>&1 | tee ci-out/test-config-gates.out; exit "${PIPESTATUS[0]}"
 

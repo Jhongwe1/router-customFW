@@ -443,6 +443,74 @@ rlx_tc_walk:
 	.end	rlx_tc_walk
 
 /* ---------------------------------------------------------------------------
+ * u32 rlx_tc_stride(u32 base, u32 stride, u32 count, u32 *raw_ks1) -- Group F.
+ *
+ * `count` loads from `base + (off & RLX_F_SPAN_MASK)`, `off` advancing by
+ * `stride`, bracketed by two reads of TC0CNT.  `base` is a whole address, so
+ * the caller passes the flash window, the boot window or a KSEG1 DRAM alias
+ * and NOTHING ELSE about the leg differs -- which is what makes the DRAM leg a
+ * control on the loop rather than a second experiment.
+ *
+ * 🔴 NOT A GENERALISATION OF rlx_tc_walk, AND THAT IS THE POINT.  rlx_tc_walk's
+ * inner body is what `t-hit` was measured against and its numbers are in a
+ * committed block; putting a stride register inside it would silently move a
+ * published reading.  This file's own header makes that argument about
+ * rlx_tc_spin's three-instruction body.  It is the same argument one routine
+ * over, and the cost is a duplicated bracket.
+ *
+ * THE MASK IS WHY THE FOOTPRINT IS BOUNDED.  Every leg touches the same 64 KiB
+ * whatever its stride, so the two windows are read identically and neither is
+ * walked past an extent this project has measured.  `docs/probe3-cells.md`
+ * § 6.8.3 records what a buffer THAT LARGE would do to the reading, which is
+ * the one hypothesis the mask cannot separate.
+ *
+ * THE PROBED LOAD IS THE FIRST INSTRUCTION OF THE BODY AND NEVER A DELAY-SLOT
+ * FILLER: exc.S adds 4 to EPC unconditionally, which is wrong in a delay slot,
+ * and this is the first routine here whose load can genuinely fault -- the
+ * window may not be decoded at the loader prompt at all.  Five instructions
+ * separate the load from its own next issue and nothing reads $3, so there is
+ * no load-use hazard for `hazlint` to find and none for the Lexra's exposed
+ * load delay to expose.
+ * ------------------------------------------------------------------------- */
+	.globl	rlx_tc_stride
+	.ent	rlx_tc_stride
+	.type	rlx_tc_stride, @function
+rlx_tc_stride:
+	addu	$14, $4, $0		/* t6 = base,  out of a0 before SAFE_A0 */
+	addu	$13, $5, $0		/* t5 = stride */
+	addu	$25, $6, $0		/* t9 = count  */
+	addu	$24, $7, $0		/* t8 = raw, KSEG1 */
+	SAFE_A0
+	lui	$15, RLX_F_SPAN_MASK>>16
+	ori	$15, $15, RLX_F_SPAN_MASK&0xffff
+	lui	$9, RLX_TC0CNT>>16
+	ori	$9, $9, RLX_TC0CNT&0xffff
+	lui	$8, 0xc0de
+	ori	$8, $8, 0x7900		/* prime for "before" */
+	lui	$10, 0xd1ce
+	ori	$10, $10, 0x7900	/* prime for "after"  */
+	addu	$12, $0, $0		/* off = 0 */
+	addu	$11, $14, $0		/* p = base */
+	lw	$8, 0($9)
+	nop				/* LOAD DELAY SLOT */
+1:
+	lw	$3, 0($11)
+	addu	$12, $12, $13		/* off += stride -- does not read $3 */
+	and	$12, $12, $15		/* off &= the span mask */
+	addu	$11, $14, $12		/* p = base + off */
+	addiu	$25, $25, -1
+	bne	$25, $0, 1b
+	nop				/* delay slot, filled by hand */
+	lw	$10, 0($9)
+	nop				/* LOAD DELAY SLOT */
+	sw	$8, 0($24)
+	sw	$10, 4($24)
+	subu	$2, $10, $8
+	jr	$31
+	nop
+	.end	rlx_tc_stride
+
+/* ---------------------------------------------------------------------------
  * Groups W and V -- the two eviction walks.
  *
  * THE CONTROL BLOCK, in words, and every access to it goes through KSEG1:

@@ -202,7 +202,7 @@ not.
 🔴 **CCTL is edge-triggered on 0→1** (source 2, and the clear-then-set idiom in
 both codebases on this unit). *Writing a bit that is already 1 does nothing* — so
 **a probe that writes CCTL once and expects an effect is a tool that cannot
-fail.** `rlx_cctl` (讀, `cache.S:70-81`) already does clear / write / clear, and
+fail.** `rlx_cctl` (讀, `cache.S:70-81 (rlx_cctl:)`) already does clear / write / clear, and
 `CPU-39` measured that CP0 20 reads zero on this die, so the read-modify-write
 form the Realtek SDK uses for RLX4181 degenerates to the plain write here.
 
@@ -930,7 +930,7 @@ this file's refutation condition says.
 *all STALE up to 16 KiB, FRESH at 32 KiB*. What happened is 20 of 512 at 16 KiB
 — 3.9 %. 🔴 **The first version of this paragraph explained that as "a working
 set that exactly fills the cache", and that is false.** `W_STRIDE` is 32
-(`probe3.c:415`) over a 16-byte line, so the walk touches only **even sets: 256
+(`probe3.c:493 (#define W_STRIDE 32u)`) over a 16-byte line, so the walk touches only **even sets: 256
 of 512, two victims each** — it fills half the sets in both ways, not the cache.
 The correct reading is the payload's own footprint colliding once both ways are
 occupied, and §*the argument for two-way* below turns that into a positive
@@ -942,8 +942,8 @@ not 20.
 
 `w.line.bits=11222222` and `w.line.bits2=22222000`, against
 `L_LINE[] = {13, 0, 8, 16, 24, 32, 48, 64, 96, 128, 160, 192, 256, 320}`
-(`probe3.c:435`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
-(`probe3.c:345-352`):
+(`probe3.c:513 (static const u32 L_LINE[])`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
+(`probe3.c:406-413 (#define V_NEVER 0x0u)`):
 
 * offset **0** — STALE
 * offset **8** — STALE
@@ -958,7 +958,7 @@ never landed.
 ### Associativity — and the argument below replaces a circular one
 
 `w.assoc.tm=00002003` packs `(best_t & 0xFFFFFF00) | (best_m & 0xFF)`
-(`probe3.c:1533`), so **T = 8,192 and M = 3**, with
+(`probe3.c:1626 (best_t & 0xFFFFFF00u)`), so **T = 8,192 and M = 3**, with
 `w.assoc.capped=00000000` — the search was not clipped by its own bound.
 
 🔴 **The argument for two-way is the argmin over `T`, and it is written out here
@@ -982,7 +982,7 @@ exclusion becomes checkable from the block. ⚠️ **And only ONE of the four by
 carries it** — at `C/8`, `C/4` and `C/2` both geometries predict the same M
 (9, 5, 3); they part only at `T = C`. `docs/probe3-cells.md` §6.2a has the
 predictions and the refutation conditions.
- `probe3.c:1485-1549` searches
+ `probe3.c:1578-1642 (c_size = (boundary != 0xFFFFFFFFu))` searches
 `t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
 
 | hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |

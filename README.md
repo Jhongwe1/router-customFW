@@ -235,10 +235,26 @@ tools/mkinitramfs.py       builds R3's initramfs from a declaration in which eve
                            names its source and is tagged `unit` or `rlxfw` -- and the
                            tag is CHECKED against the path, not trusted. A declared
                            source that is not there is refused, never replaced with
-                           something similar. Twenty-three controls, four of which exist
+                           something similar. THIRTY-FOUR controls, four of which exist
                            because the ceiling was being measured on the ELF FILE SIZE
                            rather than on the image the decompressor writes -- 495,729
-                           bytes out, 75.7 % reported where the truth is 66.2 %
+                           bytes out, 75.7 % reported where the truth is 66.2 % -- and
+                           EIGHT of which arrived on 2026-09-01 as the first this
+                           tool's `verify` subcommand has ever had. Every one of the
+                           other twenty-six is about the DECLARATION; `verify` is the
+                           half that reads the built artefact, and it is the only one
+                           that can catch a mark that compiled and is not in the image
+tools/test-mkinitramfs-mutants.py
+                           10 mutants, baseline first, and it is the answer to a debt
+                           this repository carried for five sessions. It could not be
+                           written earlier: with no control touching `verify`, every
+                           mutation of it would have survived and said nothing. Two
+                           rows found defects in the CONTROLS rather than in the tool
+                           -- one case asserted `"dev" in <output>` where `dev` also
+                           occurs in a heading three lines above, so deleting the
+                           whole device-number comparison left it green; another named
+                           a case that cannot see it, and the label followed the
+                           measurement rather than the intent
 tools/rlxfw-marks.py       the first tool here that edits somebody else's source, and it
                            is a TABLE rather than a patch: one row per insertion, each
                            naming the suspect it brackets. The anchor must occur EXACTLY
@@ -249,7 +265,7 @@ tools/rlxfw-marks.py       the first tool here that edits somebody else's source
                            artefact and the vendor's, and refuses if `--absent` is not
                            given, because "present in mine" alone is a label. It caught
                            two real defects the day it was written
-tools/spec-check.py        eleven checks and nineteen controls. C1-C7 are about
+tools/spec-check.py        TWELVE checks and forty case lines. C1-C7 are about
                            SPEC.md; C8/C8b/C8c/C9 are about how EVERY tracked
                            `.md` renders -- 71 files, 620 tables, ~43,000 code
                            spans -- because that is not a property of one file.
@@ -264,7 +280,22 @@ tools/spec-check.py        eleven checks and nineteen controls. C1-C7 are about
                            is whitespace -- one of which had made a READING
                            wrong, not a rendering. Nine mutations of SPEC.md and
                            ten controls on a fixture built in the process, of
-                           which T1 is positive and T5 is a control on T1
+                           which T1 is positive and T5 is a control on T1.
+                           C11 (2026-09-01) is the twelfth: a reference to a line
+                           of a payload source must carry a TOKEN from that line,
+                           and the token must still be within three lines of the
+                           number. It exists because editing `probe3.c` had
+                           invalidated fourteen such references at once and an
+                           owner audit, not a check, is what found them -- the
+                           line still exists, so `does this line exist` passes.
+                           Ten more case lines, of which T20a and T20b are ONE
+                           EDGE EACH of the tolerance (a single case at a
+                           boundary passes whether the comparison is `<` or
+                           `<=`) and T21/T22 are population controls on the real
+                           tree. It went red twice on the day it was written:
+                           on this format's own exemplar from the day before,
+                           and on the sixteen references the next payload edit
+                           moved
 tools/console-capture.py   45 cases, 46 results (P3 checks two things). Four of them
                            exist because the ESC heartbeat is
                            the grid every interval is quantised to, so the period each

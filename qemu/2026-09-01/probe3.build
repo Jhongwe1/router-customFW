@@ -1,0 +1,94 @@
+# probe3 under qemu-system-mips -- 2026-09-01
+
+host        Linux 6.6.87.2-microsoft-standard-WSL2
+qemu        QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+toolchain   mips-linux-gnu-gcc (Ubuntu 12.4.0-2ubuntu1~24.04) 12.4.0
+machine     -M malta -m 32 -nographic -kernel <elf> -serial file:
+seconds     120 (nothing here halts; the run is bounded by timeout)
+
+# WHY THERE IS A THIRD ONE OF THESE.  The 2026-08-26 record describes a
+# 29,088-byte payload at RB_WORDS = 641 and the 2026-08-31 one a 29,680-byte
+# payload at 707.  The eighteenth session added Group F -- the memory-mapped SPI
+# window, docs/probe3-cells.md § 6.8 -- so neither describes the image and
+# neither capture came from this payload.  All three records are kept, which is
+# what the rebuild-on-the-day table in docs/probe3-cells.md means by a moved
+# sha256.
+
+## the DEVICE build -- the image that will be uploaded
+    payload    build/probe3/probe3.bin
+    load addr  0x80500000      entry is byte 0 of the image
+    size       31536 bytes
+    sha256     fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e
+    first word 3c1d8051   (must be the first instruction of _start)
+    reset      RESET=1   1 = arm the watchdog and hand the prompt back with no power cycle
+    flags      50010002   header word 5, and the banner prints it
+    flush      CCTL 0x002 -- measured sufficient, R1d decision 1. Not a knob
+    isc        ISC=0   1 = rlx_isc_inv is linked. probe2/probe3 must be 0
+    template   0x80500ed0 .. 0x80500ed8   the two-word victim, GUARD FIRST
+    cp3 stubs  0x80500fa0   eight, 12 bytes each
+    outside I  5 cache op(s) + 8 mfc3 -- every word in this image that
+               is not MIPS-I. tools/test-rlxprobe.sh names each one and
+               fails if the set changes -- probe1/probe2 assert zero, and
+               probe3 cannot, because executing them IS question (c).
+    stale check the banner must read  rb=80a02000  -- LOWER case, because
+               report.c s digit table is 0123456789abcdef while the loader s
+               is upper. rb=80a00000 or rb=80a01000 means this image is a
+               probe1/probe2-based build and is about to poison a measurement.
+    result     RESULT_BASE=0x80A02000   read it back with: DW 80A02000 718
+    geom       GEOM=0   base 0x80B00000   1 = ARMED, and it can write 1 MiB
+    uart       THR 0xB8002000  LSR 0xB8002014
+    vectors    UTLB 0x80000000  general 0x80000080   CLEAR_BEV=0
+    hazlint    0 violations in 946 loads (874 at RB_WORDS = 707, 804 at 641)
+    bss        _bss_start 0x80507B30  _bss_end 0x80507E20  _stack_top 0x8050BE20
+               -- the card reads the first two back with `DW 8050000C 1`, which
+               LDR-07 rounds up to four words, so one command carries both.
+
+## the qemu build -- NOT the same image
+    UART_THR=0xB80003F8 UART_LSR=0xB80003FD VEC_GENERAL=0x80000180
+    CLEAR_BEV=1 RET_ERET=1
+    Unchanged from 2026-08-26: three constants differ and nothing else.
+
+## what this run is evidence FOR, and it is narrow
+    Control flow only -- qemu interlocks the load delay slot and this core
+    does not.  What it shows about Group F is exactly two things, and the
+    second one is the more valuable:
+
+      f.alias=00000002         the two windows were both READ and compared
+      f.live=0000000f          🔴 THE WIN BYTE IS ZERO.  Malta has no flash at
+                               0x1D000000, so 0xBD000000 returned sixteen
+                               identical words -- a floating bus -- and that is
+                               precisely the refutation condition § 6.8.3
+                               writes for a dead window.  IT FIRED, in the only
+                               environment that can drive it.  The boot byte is
+                               15: Malta DOES have something at 0x1FC00000.
+      f.sfcr=ffffffff          no SPI controller at 0xB8001200 either
+      f.win.seq .. f.win.seq2  all deadc0de -- see below
+      f.faults=00000000        nothing trapped; the reads returned garbage
+                               rather than raising, which is Malta's behaviour
+                               for unassigned memory and not the device's
+      rb.words=000002ce        718
+      cells.run=0000000f       15, one more than the 707-word payload
+
+## 🔴 the gate this run found, and it is why the seven legs are poison
+    The FIRST build of Group F ran its seven timing legs unconditionally, and
+    under qemu they all returned 00000000 -- Malta has no TC0CNT, both bracket
+    reads come back all-ones, and the difference of two equal numbers is zero.
+    SEVEN ZEROS IS A NUMBER, NOT A REFUSAL, and Group T had already declared
+    itself VOID two stages earlier.
+
+    Group V is gated on `c-A` and Groups M and X on `h-brk`; a timing group with
+    no gate was this payload disagreeing with its own design.  `if (g_timer)`
+    now guards the legs and leaves them at stage 0's poison -- the payload's own
+    representation of *this cell did not run* -- and the UART says so:
+
+      rlxprobe: Group F timing VOID -- Group T did not ship, so a tick is not
+      a unit on this machine. f-alias and f-live still ran
+
+    tools/rbcheck.py C31 accepts all seven poisoned as a refusal and C32 fails a
+    MIX of poisoned and written legs, because a mix is the only one of the three
+    that is a bug.
+
+## what it is NOT evidence for
+    Every band in § 6.8.2 is about SPI clocks on this silicon.  qemu has no SPI
+    controller, no flash window and no timer, so this run cannot narrow FW-34 by
+    one bit.  It says the code executes and the gate works.

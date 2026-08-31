@@ -221,27 +221,34 @@ SRC        := $(SRC_$(P))
 RB_WORDS_probe0 := 0
 RB_WORDS_probe1 := 137
 RB_WORDS_probe2 := 809
-# probe3: 64 header + 194 cell results + 16 rows x 8 + 256 scratchpad bitmap
+# probe3: 64 header + 205 cell results + 16 rows x 8 + 256 scratchpad bitmap
 # words + 64 RETAINED bitmap words + seal.
 # 🔄 2026-08-31: 641 -> 707.  The retained bitmap got its own region (the block
 # advertised a pattern the shared scratchpad no longer held) and Group W's M(T)
 # ladder took two result words.
-# The read-back is `DW 80A02000 707` = 15 + 2 + 47 x 177 + 9 = 8,345 bytes and
-# 2.17 s at 3840 B/s (LDR-07, fitted over 91 captures by tools/reply-size.py) --
-# 0.19 s more than the 641-word block.
-# That is 86 % of the largest `DW` this loader has ever executed -- 820 words /
+# 🔄 2026-09-01: 707 -> 718.  Group F -- the memory-mapped SPI window --
+# took eleven, and it is the only instrument that can answer `FW-34`'s last row
+# now that `LDR-42` has shown no loader command reads through that window.
+# The read-back is `DW 80A02000 718` = 15 + 2 + 47 x 180 + 9 = 8,486 bytes and
+# 2.21 s at 3840 B/s (LDR-07, fitted over 91 captures by tools/reply-size.py) --
+# 0.04 s more than the 707-word block and 0.23 s more than the 641-word one.
+# That is 88 % of the largest `DW` this loader has ever executed -- 820 words /
 # 9,661 bytes, 量 H2g -- and three digits, so it does not test whether the
 # loader accepts a four-digit decimal length.  Cell `P3` tests that separately
 # and nothing here depends on the answer.
 #
-# ⚠️ THE OVER-RUN MARGIN DROPPED FROM THREE VISIBLE WORDS TO ONE, and that is
-# recorded rather than repaired.  `DW` rounds up to a multiple of four, so 641
-# returned 644 and w641..w643 of the poison margin came back free; 707 returns
-# 708 and only w707 does.  The control is unweakened: a payload that writes past
-# its own block writes UPWARD from the seal, so w707 is the first word it
-# reaches, and the three-word version was luck of 641 mod 4 rather than design.
-# RB_POISON_W is still RB_WORDS + 8 and a longer explicit `DW` reads the rest.
-RB_WORDS_probe3 := 707
+# ⚠️ THE OVER-RUN MARGIN IS TWO VISIBLE WORDS, AND IT IS NO LONGER LUCK.
+# `DW` rounds up to a multiple of four, so 641 returned 644 and w641..w643 of
+# the poison margin came back free; 707 returned 708 and only w707 did; 718
+# returns 720 and w718..w719 do.  Each of those was the remainder falling out
+# that way -- so probe3.c now carries `rb_layout_adds_up`'s sibling,
+# `rb_readback_shows_poison`, which refuses to BUILD a layout whose word count
+# is a multiple of four and would therefore return no poison word at all.  The
+# control itself is unweakened either way: a payload that writes past its own
+# block writes UPWARD from the seal, so the first poison word is the first one
+# it reaches.  RB_POISON_W is still RB_WORDS + 8 and a longer explicit `DW`
+# reads the rest.
+RB_WORDS_probe3 := 718
 
 # probe2's build stamp, recomputed here from the same bit positions probe2.c's
 # FLAGS_W uses. It is a SECOND copy of that arithmetic on purpose: the payload

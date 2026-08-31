@@ -39,6 +39,56 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-09-01 — desk, no power: the cell `FW-34` lost yesterday was rebuilt as
+a payload group, and the three header words added the day before were all
+sitting on top of something.**
+
+`LDR-42` closed the loader route to `FW-34`'s last question, so the instrument
+had to be `probe3`. Group F is eleven result words: `f-sfcr`, `f-alias`,
+`f-live`, and seven timed legs over **three** address spaces — `0xBD000000`,
+`0xBFC00000` and uncached DRAM. The third space is the correction to
+`notes/kernel-build.md` §20.6's design, and it is where the claim actually
+lives: §19.7.2's ≤9× is about stage 1 executing at `0xBFC001D0`, a **different
+physical decode** from the window §20.6 proposed to time, and nothing in this
+project had ever compared them. **The answer is asymmetric and `SPEC.md` §17
+says so**: a strided-to-sequential ratio ≤1.15 closes the row, ≥1.8 only
+narrows it, because Group F times data-side `lw` and the amplification is
+instruction-fetch side. `RB_WORDS` 707 → 718; `P7` re-run at 31,536 bytes,
+`hazlint` 0 violations in 946 loads.
+
+🔴 **Two of the three things checked before adding it refuted its premises.**
+The block layout was not reserved — a compile-time assertion says the result
+area is exactly full — and `SPEC.md`'s `FLS-11` and `MAP-12` both marked
+`0xBD000000` **量** while citing the loader printing `offset
+0x003f0000<0xbd3f0000>`. §20's `lui` census had already measured that `0xbd00`
+occurs exactly once in the loader and it is that `printf`'s argument, so the
+device emitted a compile-time constant. **Nothing here has read that window
+outside Linux**, which is what `f-alias` and `f-live` are: the assumption turned
+into two cells that can fail. Both rows corrected; the real 量 is the kernel's
+4,194,304 bytes of 2026-08-31.
+
+🔴 **`H_BMP_KEPT`, `H_LAYOUT_BMPK` and `H_BMP_FRESH` — the three header words
+2026-08-31 appended at 48, 49 and 50 — were ALL already taken**, by `H_KSEG0`,
+`H_G_TIMER` and `H_T_SEP_A`, defined twenty lines further down beside Group T.
+The comment that placed them reasoned *"44..47 are occupied"* and the census
+stopped at 47. A collision is silent: both defines compile, both `rb_put`s run,
+the later stage wins. Stage 2 would have overwritten the retained region's
+offset with `g_timer`, so `rbcheck` would have recounted the header; stage 3
+would have taken `H_KSEG0` and **half** of the separated pair — `H_T_SEP_B` at
+51 does not collide, so `t.sep` would have come back as one number of two and
+**read like a measurement**. The three that move are the three never seated.
+The fix is a census (`test-rlxprobe.sh` `Y2c`), not a better comment.
+
+🆕 **A source line number now carries a token, and `spec-check` `C11` checks
+it.** Thirty-two references converted; the checker went red twice on the day it
+was written — first on the format's own exemplar from the day before, then on
+the sixteen references Group F's edit moved, each finding naming the new line.
+
+🆕 **`mkinitramfs verify` has controls for the first time**, `V1`..`V8`, and the
+mutation suite this repository had owed for five sessions follows from them: it
+could not be written before, because every one of the twenty-six existing
+controls was about the declaration and `cmd_verify` had none.
+
 🔴 **2026-08-31, later the same day — desk, no power: a cell that was scheduled
 for the next seating was withdrawn by its own precondition.**
 

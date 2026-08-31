@@ -132,9 +132,17 @@ MUT = [
 
 # ---- phase 2: mutations the --self-test criterion cannot reach ----------
 WIRE = "        pf, npara = paragraph_findings(rel, lines, m)"
-REPORT = ("              'is only whitespace, and no paragraph leaving a span open')\n"
-          "        return 0\n"
-          "    for c, msg in sorted(findings):")
+# 🔴 P2 IS ANCHORED ON A FUNCTION SIGNATURE, AND IT TOOK TWO TRIES TO GET
+# THERE.  量 2026-09-01, both reported by the harness rather than found by eye:
+#   * it was the SUMMARY STRING report_tables prints, and that string moves
+#     whenever a check joins the sweep -- `C11` extended it and P2 came back
+#     `[NOT APPLIED: anchor occurs 0 time(s)]`, reported as a SURVIVOR;
+#   * the obvious repair -- the two structural lines under the summary --
+#     occurs TWICE, because `report` and `report_tables` have byte-identical
+#     tails, so it came back `[NOT APPLIED: anchor occurs 2 time(s)]`.
+# The signature is unique and it is what the mutation means: this function
+# never sees a C10 finding.
+REPORT = "def report_tables(findings, stats):"
 EXEMPT2 = "    exempt = honour_exempt and path in C10_EXEMPT"
 ROWSKIP = "        if '`' not in text:"
 RUNSCAN = "            runs.append(j - i)"
@@ -143,10 +151,8 @@ MUT2 = [
     ("P1", "check_tables never collects the C10 findings",
      [(WIRE, "        pf, npara = paragraph_findings(rel, lines, m)\n        pf = []")]),
     ("P2", "report_tables drops every C10 finding",
-     [(REPORT, "              'is only whitespace, and no paragraph leaving a span open')\n"
-               "        return 0\n"
-               "    findings = [f for f in findings if f[0] != 'C10']\n"
-               "    for c, msg in sorted(findings):")]),
+     [(REPORT, "def report_tables(findings, stats):\n"
+               "    findings = [f for f in findings if f[0] != 'C10']")]),
     ("P3", "the exemption is keyed on a path prefix, not the dict",
      [(EXEMPT2, EXEMPT2 + "\n    exempt = honour_exempt and path.startswith('bench/')")]),
     ("P4", "a paragraph holding a table row is skipped",

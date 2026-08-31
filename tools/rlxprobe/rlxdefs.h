@@ -154,6 +154,38 @@
  * the same die, 4.75 % away, and CLK-08b is the row that refuted f_timer/14. */
 #define RLX_TC0CNT		0xB8003108
 
+/* --- the memory-mapped SPI window and the controller's clock register ---
+ * Group F, 2026-09-01.  `docs/probe3-cells.md` § 6.8.
+ *
+ * 🔴 THE TWO WINDOW BASES ARE NOT THE SAME DECODE AND THE PAYLOAD MAY NOT
+ * ASSUME THEY ALIAS.  RLX_F_WIN is physical 0x1D000000 and RLX_F_BOOT is
+ * 0x1FC00000; the second is where this SoC fetches its reset vector and where
+ * the loader's stage 1 executes from (讀, § 19.7.2), and NOTHING in this
+ * project has ever compared them.  `f-alias` is that comparison; every other
+ * cell in the group reports per window.
+ *
+ * ⚠️ AND NOTHING HAS READ RLX_F_WIN OUTSIDE LINUX.  SPEC.md's FLS-11 and
+ * MAP-12 mark the value 量 and cite the loader printing
+ * `offset 0x003f0000<0xbd3f0000>` -- but § 20's lui census found `0xbd00`
+ * exactly ONCE in the loader and it is that printf's argument, so what the
+ * device emitted is a compile-time constant.  The real measurement is the
+ * kernel's, 2026-08-31: 4,194,304 bytes through map->virt = 0xbd000000.  At
+ * the loader prompt the window is UNDEMONSTRATED, which is what `f-live` is.
+ *
+ * RLX_SFCR is 量 REG-13: 0x3FC00000 at the prompt, cold and warm alike, so
+ * SPI_CLK_DIV = 001B = DIV 4 -- written by stage 2, which writes this register
+ * twice, and NOT by stage 1, which writes it zero times in 4,848 bytes.
+ *
+ * RLX_F_SPAN_MASK bounds every Group F leg to the same 64 KiB whatever its
+ * stride.  It is a mask and not a length because the loop can then apply it in
+ * one instruction, and it is 64 KiB because RLX_F_BOOT's decode SIZE is
+ * measured nowhere in this project -- a leg that walked a megabyte of it would
+ * be reading addresses nothing has shown exist. */
+#define RLX_F_WIN		0xBD000000
+#define RLX_F_BOOT		0xBFC00000
+#define RLX_SFCR		0xB8001200
+#define RLX_F_SPAN_MASK		0x0000FFFF
+
 /* --- the 16550 --------------------------------------------------------- */
 /* THE DEVICE'S ADDRESSES ARE THE DEFAULT AND THE ONLY ONES THAT MATTER.
  * They are knobs for exactly one reason: qemu-system-mips has no 16550 at

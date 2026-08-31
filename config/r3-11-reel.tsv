@@ -25,6 +25,15 @@
 # is not sixty seconds.  The number to change is the pause column, not the
 # captures -- padding a reel with dead terminal is worse than a short one,
 # and the capture durations are the device's, not a choice.
+#
+# 🔄 2026-09-01: THE PAUSES ARE NOT BEING PADDED, and the reason is not
+# reluctance.  Six segments to 60 s is 8 s of dead terminal each, and the
+# sentence above already says why that is the wrong repair.  The other
+# repair is MORE CAPTURE, and seating 8 is about to produce it: probe3's
+# own boot, its UART report and the 718-word read-back.  Setting this
+# column now would be setting it against a reel that is about to grow, so
+# it is set at R3-11 with that material in hand.  PROGRESS.md's R3-11 row
+# carries the decision; this comment is the pointer, not a second owner.
 
 bench/2026-08-31/W-3	D1-D4  my kernel boots from RAM to a shell	2.0
 bench/2026-08-31/W-5b	D2  and the build stamp is mine, not the vendor's	2.0

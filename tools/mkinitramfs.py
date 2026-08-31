@@ -809,6 +809,114 @@ class Controls(object):
         return [r for r in self.rows if r[1] is None]
 
 
+# --- the `verify` fixture ---------------------------------------------------
+# 🔴 EVERY CONTROL ABOVE THIS POINT IS ABOUT THE DECLARATION, and until
+# 2026-09-01 that was the whole suite.  `cmd_verify` -- the half `CLAUDE.md`
+# names as *the only one that can catch a mark that compiled and is not in the
+# image* -- had NONE, and that is why the mutation suite this repository owed
+# for five sessions could not be written: there was nothing to mutate against.
+#
+# The fixture is an ELF32 carrying a `.init.ramfs` newc archive, built here
+# rather than taken from a build, so these run anywhere git does.  Both writers
+# are deliberately independent of anything `build` uses: a fixture emitted by
+# the code under test would agree with it however wrong both were.
+
+def _cpio_newc(items):
+    """items: [(name, mode, data, rdevmajor, rdevminor)] -> a newc archive.
+
+    ⚠️ The padding is relative to the START OF THE ARCHIVE, and `parse_cpio`
+    pads relative to the ABSOLUTE file offset -- so the caller must place the
+    section on a four-byte boundary or the two disagree.  `_elf_with_section`
+    does; this comment is here because nothing else would say so.
+    """
+    out = b""
+    ino = 1
+    for name, mode, data, rmaj, rmin in list(items) + [(CPIO_TRAILER, 0, b"", 0, 0)]:
+        nb = name.encode() + b"\0"
+        f = [ino, mode, 0, 0, 1, 0, len(data), 0, 0, rmaj, rmin, len(nb), 0]
+        out += CPIO_MAGIC + b"".join(b"%08X" % v for v in f) + nb
+        out += b"\0" * ((-len(out)) % 4)
+        out += data
+        out += b"\0" * ((-len(out)) % 4)
+        ino += 1
+    return out
+
+
+def _elf_with_section(path, secname, payload, big=True):
+    """Write an ELF32 whose section header table names `secname`."""
+    end = ">" if big else "<"
+    names = b"\0" + secname.encode() + b"\0" + b".shstrtab\0"
+    off_payload = 52
+    off_names = off_payload + len(payload)
+    off_names += (-off_names) % 4
+    off_sh = off_names + len(names)
+    off_sh += (-off_sh) % 4
+
+    eh = bytearray(52)
+    eh[0:4] = b"\x7fELF"
+    eh[4] = 1                                   # ELFCLASS32
+    eh[5] = 2 if big else 1
+    eh[6] = 1
+    struct.pack_into(end + "HHI", eh, 16, 2, 8, 1)          # ET_EXEC, EM_MIPS
+    struct.pack_into(end + "III", eh, 24, 0, 0, off_sh)     # entry, phoff, shoff
+    struct.pack_into(end + "IHHHHHH", eh, 36,
+                     0, 52, 32, 0, 40, 3, 2)                # flags..shstrndx
+
+    def shdr(name, typ, off, size, align):
+        return struct.pack(end + "10I", name, typ, 0, 0, off, size, 0, 0,
+                           align, 0)
+
+    blob = bytes(eh) + payload
+    blob += b"\0" * (off_names - len(blob))
+    blob += names
+    blob += b"\0" * (off_sh - len(blob))
+    blob += shdr(0, 0, 0, 0, 0)                             # SHT_NULL
+    blob += shdr(1, 1, off_payload, len(payload), 4)        # secname, PROGBITS
+    blob += shdr(1 + len(secname) + 1, 3, off_names, len(names), 1)
+    with open(path, "wb") as fh:
+        fh.write(blob)
+    return path
+
+
+#: What the fixture declaration and its archive agree on when nothing is
+#: planted.  The modes are the ones GOOD declares, so `declared_shape` and this
+#: must match entry for entry.
+_VFIX = [
+    ("/bin", 0o040755, b"", 0, 0),
+    ("/dev", 0o040755, b"", 0, 0),
+    ("/bin/busybox", 0o100755, b"\x7fELFbusybox", 0, 0),
+    ("/bin/sh", 0o120777, b"busybox", 0, 0),
+    ("/dev/console", 0o020600, b"", 5, 1),
+    ("/init", 0o100755, b"#!/bin/sh\n", 0, 0),
+]
+
+
+def _verify_run(d, items, decl_text=None, built_spec=None, secname=".init.ramfs"):
+    """Run cmd_verify over a synthesised image.  -> (rc, stdout, refusal)."""
+    import contextlib
+    import io as _io
+    global _RAISE
+    unit = os.path.join(d, "unit")
+    repo = os.path.join(d, "repo")
+    decl = os.path.join(d, "decl.tsv")
+    with open(decl, "w", encoding="utf-8") as fh:
+        fh.write(decl_text if decl_text is not None else GOOD)
+    img = _elf_with_section(os.path.join(d, "fx.elf"), secname,
+                            _cpio_newc(items))
+    a = {"decl": decl, "unit": unit, "repo": repo, "image": img,
+         "built_spec": built_spec}
+    buf = _io.StringIO()
+    _RAISE = True
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = cmd_verify(a)
+        return rc, buf.getvalue(), None
+    except Refused as ex:
+        return None, buf.getvalue(), str(ex)
+    finally:
+        _RAISE = False
+
+
 def _try(decl_text, unit, repo):
     global _RAISE
     _RAISE = True
@@ -1134,6 +1242,80 @@ def run_controls():
               err_name is not None and err_high is None,
               "b:31:9 named /dev/harmless refused=%s; c:90:19 accepted=%s"
               % (err_name is not None, err_high is None))
+
+        # --- V1..V8: `cmd_verify`, which had no controls at all -------------
+        # Every case drives the WHOLE subcommand over a synthesised image, so
+        # what is asserted is the verdict and not a helper's return value.
+        vok, vout, _ = _verify_run(d, _VFIX)
+        c.add("V1  a clean image verifies, and it is the positive control",
+              vok == 0 and "every one matches" in vout,
+              "rc=%s" % vok)
+
+        miss = [x for x in _VFIX if x[0] != "/bin/sh"]
+        vrc, vout, _ = _verify_run(d, miss)
+        c.add("V2  a declared entry absent from the image is MISSING",
+              vrc == 1 and "MISSING" in vout and "/bin/sh" in vout,
+              "rc=%s" % vrc)
+
+        extra = _VFIX + [("/bin/telnetd", 0o100755, b"x", 0, 0)]
+        vrc, vout, _ = _verify_run(d, extra)
+        c.add("V3  an entry in the image and in no row is UNEXPECTED",
+              vrc == 1 and "UNEXPECTED" in vout and "/bin/telnetd" in vout,
+              "rc=%s" % vrc)
+
+        wrongmode = [(n_, 0o100777 if n_ == "/init" else m, dd, rj, rn)
+                     for n_, m, dd, rj, rn in _VFIX]
+        vrc, vout, _ = _verify_run(d, wrongmode)
+        c.add("V4  a mode that differs from the declaration is DIFFERS",
+              vrc == 1 and "DIFFERS" in vout and "mode" in vout,
+              "rc=%s" % vrc)
+
+        # V5 -- the dev numbers, which are the ones a wrong image would use to
+        # hand root a writable flash node.  A24-A26 ban that in the
+        # DECLARATION; nothing had ever checked the IMAGE.
+        wrongdev = [(n_, m, dd, (31 if n_ == "/dev/console" else rj),
+                     (9 if n_ == "/dev/console" else rn))
+                    for n_, m, dd, rj, rn in _VFIX]
+        vrc, vout, _ = _verify_run(d, wrongdev)
+        # 🔴 THE ASSERTION NAMES THE NUMBERS, and the first version did not.
+        # It read `"dev" in vout`, and `dev` occurs three lines above in
+        # *device nodes in the image* -- so `M4`, which deletes the dev
+        # comparison entirely, left this case GREEN.  The outer `w != h` still
+        # fires, so the finding is still REPORTED; what the mutation removes is
+        # the REASON, and only a case that reads the reason can see that.
+        c.add("V5  a dev major/minor that differs is DIFFERS, WITH the numbers",
+              vrc == 1 and "DIFFERS" in vout and "dev 5:1 vs 31:9" in vout,
+              "rc=%s" % vrc)
+
+        # V6 -- the image the kernel builds when CONFIG_INITRAMFS_SOURCE="" is
+        # an image with no section, and that is a finding rather than a missing
+        # file.  The refusal must SAY so.
+        _vrc, _vout, vref = _verify_run(d, _VFIX, secname=".notramfs")
+        c.add("V6  an image with no `.init.ramfs` refuses, and names why",
+              vref is not None and "CONFIG_INITRAMFS_SOURCE" in vref,
+              (vref or "no refusal")[:46])
+
+        # V7 -- the built-spec drift refusal.  Without it a difference below
+        # would be the declaration's and not the image's, and the two repairs
+        # are opposite.
+        bs = os.path.join(d, "stale.spec")
+        with open(bs, "w", encoding="utf-8") as fh:
+            fh.write("dir /bin 0755 0 0\n")
+        vrc, vout, _ = _verify_run(d, _VFIX, built_spec=bs)
+        c.add("V7  a declaration that changed since the build REFUSES",
+              vrc == 2 and "has CHANGED since this image was built" in vout,
+              "rc=%s" % vrc)
+
+        # V8 -- the control on V7: the SAME check must accept the spec this
+        # declaration actually emits, or V7 passes on a checker that refuses
+        # everything.
+        bs2 = os.path.join(d, "fresh.spec")
+        with open(bs2, "w", encoding="utf-8") as fh:
+            fh.write(emit_spec(_try(GOOD, unit, repo)[1]))
+        vrc, vout, _ = _verify_run(d, _VFIX, built_spec=bs2)
+        c.add("V8  …and accepts the spec it does emit (control on V7)",
+              vrc == 0 and "identical to what this declaration emits" in vout,
+              "rc=%s" % vrc)
 
     return c
 

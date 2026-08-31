@@ -260,9 +260,9 @@ step.
 | **M1** | a store into the instruction stream is not seen by the I-cache | 量 `bench/2026-08-25/H1b.log:9-12` — `probe1` cell 1 (cached store) **and cell 5 (uncached store)**, `01` STALE on all four victims, `ex=000011a1` against `ma=240222b2`. 🔴 **`probe3`'s I-side cells use the uncached store**, i.e. cell 5's leg, which takes the D-cache out of the I side entirely |
 | **M2** | `CCTL 0x002` alone makes a rewritten instruction visible | 量 same captures, cells 2/3/6, `02` FRESH on six victims; re-measured 2026-08-25b by `probe2` on a **different address range and a different store path** (`install.bad=0`, `break` trapped and returned). This is `probe3`'s **re-arm** between walk steps, and it is what lets one arena be reused |
 | **M3** | an exception at `0x80000080` reaches an installed handler and returns | 量 `bench/2026-08-25b/H2a.log` — `break.count=1`, `cause=00000024` (ExcCode 9 `Bp`), `break.epc=80500270`, `install.bad=0`, `restore.mismatch=0`, `H2h-utlb` byte-identical to the same seating's `H0c` |
-| **M3′** | the handler is **ExcCode-agnostic** | 讀 `tools/rlxprobe/exc.S:68-114`: it stores `Cause`, stores `EPC`, increments a count, returns to `EPC+4` via `jr $26 / rfe`. **No test of `Cause`, no conditional branch, one control transfer.** Corroborated on the emitted `probe2` image: 22 words, zero branches. ⚠️ **The gap, stated:** no exception other than `Bp` has ever been delivered on this die under this handler. The code path is provably identical; that it *behaves* identically for ExcCode 10 is 推. Cell `x-ri` closes it |
-| **M3″** | `EPC+4` is unconditional, and wrong in a branch delay slot | 讀 `exc.S:41-44,92`. **Constraint on every `probe3` cell: no probed instruction may sit in a delay slot**, and `Cause` is recorded whole so `BD` is visible if it happens anyway |
-| **M4** | CP0 20 is a **write-only** command register that reads zero | 量 `CPU-39` — `probe1`'s `XCT0` row read `00000000`, and `probe2`'s row `0xa0` read `00000000` with `nowrite=0` across all 256 rows proving `mfc0` always writes `rt`. **Two consequences:** a `CCTL` command's effect is the only observable; and a read-modify-write of `CCTL` degenerates to a plain write on this die, so `probe1`'s clear/write/clear (讀, `cache.S:70-81`) already produces the 0→1 edge the LX4189 doc requires |
+| **M3′** | the handler is **ExcCode-agnostic** | 讀 `tools/rlxprobe/exc.S:68-114 (rlx_exc_entry:)`: it stores `Cause`, stores `EPC`, increments a count, returns to `EPC+4` via `jr $26 / rfe`. **No test of `Cause`, no conditional branch, one control transfer.** Corroborated on the emitted `probe2` image: 22 words, zero branches. ⚠️ **The gap, stated:** no exception other than `Bp` has ever been delivered on this die under this handler. The code path is provably identical; that it *behaves* identically for ExcCode 10 is 推. Cell `x-ri` closes it |
+| **M3″** | `EPC+4` is unconditional, and wrong in a branch delay slot | 讀 `exc.S:41-44 (It adds 4 to EPC unconditionally)` and `exc.S:92 (addiu $26, $26, 4)`. **Constraint on every `probe3` cell: no probed instruction may sit in a delay slot**, and `Cause` is recorded whole so `BD` is visible if it happens anyway |
+| **M4** | CP0 20 is a **write-only** command register that reads zero | 量 `CPU-39` — `probe1`'s `XCT0` row read `00000000`, and `probe2`'s row `0xa0` read `00000000` with `nowrite=0` across all 256 rows proving `mfc0` always writes `rt`. **Two consequences:** a `CCTL` command's effect is the only observable; and a read-modify-write of `CCTL` degenerates to a plain write on this die, so `probe1`'s clear/write/clear (讀, `cache.S:70-81 (rlx_cctl:)`) already produces the 0→1 edge the LX4189 doc requires |
 | **M5** | `Status.IsC` does not isolate; stores issued while it is set reach DRAM | 量 `probe1` cell 4, `07` CORRUPT ×2, `240222b2 → 000222b2` and `03e00008 → 00e00008`. **Constraint: no `probe3` cell may execute a store while `IsC` is set.** Cell `s-isc` sets it with no memory reference between set and clear |
 | **M6** | the KSEG0/KSEG1 alias works for **stores that miss** and for uncached read-back | 量 `probe1` cells 1 vs 5 (`ma` identical) and every `mb`/`ma` field. ⚠️ **What is NOT established is exactly what Group C tests**: that an uncached store leaves a *resident* D-line alone |
 | **M7** | DRAM keeps its contents across the payload's own reset, and across a short power-off | 量 `MEM-10` (2-word canary, three warm resets), `MEM-15` (548-byte chosen-value block — **and it did NOT survive ~3.9 h**). **Consequence: `probe3` poisons its result block *and* initialises its arena before the first cell**, or a leftover arena reads exactly like a live one |
@@ -282,7 +282,21 @@ has read it"* — and `MEM-14` is this device's own counterexample: `0x81000000`
 was exactly that kind of address until three captures showed the boot path
 writes it on **every** boot.
 
-**So `probe3` stays inside the proven span.**
+**So `probe3` stays inside the proven span** — 🔄 **and since 2026-09-01
+that sentence needs its qualifier, because Group F reads two addresses that are
+not DRAM at all.**
+
+| | |
+|---|---|
+| **every WRITE this payload makes** | is inside `0x80A00000`–`0x80AF1002`, and that is unchanged. The arena, the result block and the poison margin are the whole list |
+| **every DRAM READ** | likewise |
+| 🆕 **Group F's reads** | `0xBD000000` and `0xBFC00000` — two windows onto the SPI flash, outside DRAM and outside the proven span, and **reading is not writing**. § 6.8 owns them, § 6.8.0 records that nothing here has read either of them outside Linux, and `f-alias`/`f-live` are that assumption turned into two cells that can fail |
+
+⚠️ **The distinction is load-bearing and it is why this row is a row.** `MAP-17`'s
+band is about *what may be written without destroying something*; a load cannot
+destroy anything, and the risk it carries is different in kind — a bus that
+never answers, which is what the exception handler and the running order at § 7
+are for.
 
 | | window | what | evidence |
 |:-:|---|---|---|
@@ -294,7 +308,7 @@ writes it on **every** boot.
 | | `0x80B00000`–`0x80BFFFFF` | `RLX_GEOM_BASE`. **Not used** — `GEOM=1` is dead (`CPU-25`) and this window has never been read | — |
 
 **Why the arena is generated at run time.** `probe1`'s `victims.S` is 16 slots at
-`0x400` stride = 16 KiB of `.text` (讀, `rlxdefs.h:31-32`). A stride sweep to
+`0x400` stride = 16 KiB of `.text` (讀, `rlxdefs.h:31-32 (#define RLX_VICTIM_STRIDE 0x400)`). A stride sweep to
 16 KiB × 12 counts needs 192 KiB and a 64 KiB working set needs 64 KiB;
 assembling that is a quarter-megabyte payload whose `hazlint` population is
 mostly `nop`. Generating it costs an uncached store loop plus **one
@@ -363,13 +377,13 @@ and **the round-up is upward — a length given too small never announces itself
 |---|---|---|---|
 | one full `probe1`-shape row per victim | 104 B each — 213 KB at V=2048 | `DW … 16433`, a 5-digit length | ❌ overruns the ESC window, and is 20× past any `DW` this loader has executed |
 | 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
-| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it. 🔄 **2026-08-31 (seventeenth session): 641 → 707, `DW 80A02000 707` = 8,345 B / 2.17 s, 86 % of `H2g`.** The block is now 64 header + **194** cell results + 16 × 8 rows + 256 **scratchpad** bitmap words + **64 retained** bitmap words + the seal. Two changes, and the second is the one this row's own sentence about *"which point survives to the read-back"* required: `O_BMPK` is a region with **one writer**, `O_BMP` stays the scratchpad seven cells share, and Group W's `M(T)` ladder took the two new result words. The three mirrors are unchanged in kind — `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS`, the compile-time assertion — and `tools/test-rlxprobe.sh` recomputes the total from the C, now including `RB_BMPKW` | ✅ **every number is under something this loader has already done** |
+| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it. 🔄 **2026-08-31 (seventeenth session): 641 → 707, `DW 80A02000 707` = 8,345 B / 2.17 s, 86 % of `H2g`.** 🔄 **2026-09-01 (eighteenth): 707 → 718, `DW 80A02000 718` = 8,486 B / 2.21 s, 88 % of `H2g`** — Group F took eleven result words.** The block is now 64 header + **194** cell results + 16 × 8 rows + 256 **scratchpad** bitmap words + **64 retained** bitmap words + the seal. Two changes, and the second is the one this row's own sentence about *"which point survives to the read-back"* required: `O_BMPK` is a region with **one writer**, `O_BMP` stays the scratchpad seven cells share, and Group W's `M(T)` ladder took the two new result words. The three mirrors are unchanged in kind — `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS`, the compile-time assertion — and `tools/test-rlxprobe.sh` recomputes the total from the C, now including `RB_BMPKW` | ✅ **every number is under something this loader has already done** |
 
 🆕 **2026-08-29, `R1h-3`: `LDR-07`'s round-up hands back the over-run control
 for free, and this section did not know it.** The block is `RB_WORDS = 641`
 words and the payload poisons `RB_POISON_W = 641 + 8 = 649` of them, the margin
 existing *"so a run that wrote PAST its own block shows data where poison was
-predicted"* (讀, `probe3.c:131`). **`DW 80A02000 641` prints `4 × ceil(641/4)` =
+predicted"* (讀, `probe3.c:131 (#define RB_POISON_W (RB_WORDS + 8u))`). **`DW 80A02000 641` prints `4 × ceil(641/4)` =
 644 words**, so `w641`, `w642` and `w643` — three of the eight margin words —
 come back on the last reply line, at `0x80A02A04`/`08`/`0C`, beside the seal at
 `0x80A02A00`. **The margin check therefore needs no second command**, and its
@@ -383,9 +397,18 @@ power-off (M7) reads identically. `bench/2026-08-30/PREDICTIONS-B5-block0.md`
 §12 carries the reasoning and the three-way seal check that goes with it.
 🔄 **2026-08-31: the layout moved and the free margin shrank from three words to
 one. The paragraph above is left as written because it is what the 641-word
-block did.** `RB_WORDS` is **707**, `RB_POISON_W` is 715, and `DW 80A02000 707`
-prints `4 × ceil(707/4)` = **708** words — so only `w707`, at `0x80A02B0C`,
-comes back beside the seal at `0x80A02B08`.
+block did.** `RB_WORDS` is **718**, `RB_POISON_W` is 726, and `DW 80A02000 718`
+prints `4 × ceil(718/4)` = **720** words — so `w718` at `0x80A02B38` and `w719`
+at `0x80A02B3C` come back beside the seal at `0x80A02B34`. *(707 returned one
+such word and 641 returned three; each was the remainder falling out that way.)*
+
+🆕 **And that stopped being luck on 2026-09-01.** `probe3.c` carries
+`rb_readback_shows_poison`, a compile-time assertion that **refuses to build a
+layout whose `RB_WORDS` is a multiple of four** — such a block returns no poison
+word at all and the over-run control stops existing without saying so.
+`tools/test-rlxprobe.sh` `SM3b` is the mutation that proves it fires (asserting
+on the assertion's NAME, since `SM3` already shows a bad layout does not build)
+and `SM3c` is its population control.
 
 🔴 **That is not a weakened control, and the reason is worth stating rather than
 assumed.** A payload that writes past its own block writes **upward from the
@@ -667,6 +690,13 @@ read-back. `hazlint` **0 violations in 874 loads** (804 before). Nothing on the
 wire changes shape; no cell was added, removed or reordered; `flags` and the
 `.bss` size are unmoved.
 
+⚠️ **Those are the two instruments' own numbers and they are left as written.**
+The payload moved again on 2026-09-01 — Group F, § 6.8 — so the *image* is now
+`RB_WORDS` **718**, `DW 80A02000 718`, 8,486 bytes, `hazlint` **0 violations in
+946 loads**. This paragraph says what the retained bitmap and the `M(T)` ladder
+cost, which is a different question from what the payload weighs today, and
+overwriting it would lose the first to answer the second.
+
 
 ⚠️ **The re-arm between every measurement point is `CCTL 0x002` (M2) plus a
 rewrite of the arena to OLD.** That is one measured instrument used many times.
@@ -877,8 +907,8 @@ invalidates the **whole** D-cache **without writing back**, so any dirty line th
 payload owns is lost — including its own stack, if `c-E` came back write-back.
 🔴 **The mitigation has to be INSIDE `c-C`'s own leaf routine, and the version
 of this paragraph that said otherwise would have cost the power cycle.**
-`rlx_call2_uncached` spills `$31` onto a **KSEG0** stack (讀, `cache.S:363-365`
-— `addiu $29,$29,-8 / sw $31,0($29)`; `start.S:21-24` and `rlxprobe.lds:83-87`
+`rlx_call2_uncached` spills `$31` onto a **KSEG0** stack (讀, `cache.S:363-365 (rlx_call2_uncached:)`
+— `addiu $29,$29,-8 / sw $31,0($29)`; `start.S:21-24 (lui $29, %hi(_stack_top))` and `rlxprobe.lds:83-87 (The stack lives above .bss)`
 put `_stack_top` past `.bss`). Under the write-back branch that spill is a dirty
 line; `DInval` discards it **without writeback**; the epilogue's `lw $31,0($29)`
 then reads pre-writeback DRAM and `jr $31` goes to a wild address — the loader's
@@ -995,6 +1025,209 @@ one thing this core has no documentation for** — `cache.S` already flags it. O
 core measured **not** to honour `IsC`, R3000 semantics cannot be used to argue
 `SwC` is safe. ⓓ② closes on `IsC` alone and says so.
 
+### 6.8 🆕 2026-09-01 — Group F, the memory-mapped SPI window, and it is the only instrument that can close `FW-34`
+
+**Why it is in this payload rather than at the loader prompt.** `SPEC.md` §17's
+remaining `FW-34` row asks whether the memory-mapped window prefetches a
+sequential fetch stream. The seventeenth session withdrew the `FLR` cell that
+was booked for it, and it did so on the strength of a disassembly rather than a
+preference: `LDR-42` — the loader's `FLR` reads through `SFDR` programmed I/O
+and its only mention of `0xBD000000` is a `printf` argument, so **no loader
+command can measure the window at all**. `notes/kernel-build.md` §20.6 names
+what is left: a bare-metal payload with a calibrated timer, and this project
+has exactly one.
+
+#### 6.8.0 🔴 What this repository does NOT already know, which is the reason for two of the four cells
+
+**Nothing here has ever read through `0xBD000000` outside Linux.** `FLS-11` and
+`MAP-12` both mark the value **量**, and the evidence both of them cite is the
+loader printing `offset 0x003f0000<0xbd3f0000>` in its `FLW` message. §20's
+`lui` census is what makes that citation fail: `0xbd00` occurs **exactly once**
+in the whole loader and it is that `printf` argument, so what the device
+emitted is a compile-time constant of the loader's, not a read. It is the same
+shape as `icache: 16kB/16B` in `CPU-25` — a build constant wearing a
+measurement's clothes — and the real 量 arrived on 2026-08-31 from somewhere
+else entirely: `FW-34`'s four `busybox wc -lc` runs took 4,194,304 bytes
+through `map->virt = 0xbd000000`, under Linux. **Both rows are corrected in the
+same commit as this section.**
+
+So this group may not assume the window is decoded at the loader prompt, and
+`f-alias` and `f-live` are that assumption turned into two cells that can fail.
+
+**And `0xBFC00000` is a second window, not the same one.** §19.7.2's ≤9× rests
+on the sentence *"every instruction fetch of that loop is itself an uncached
+read of the SPI device the loop is reading"* — stage 1 executes at
+`0xBFC001D0`. That is a different physical decode (`0x1FC00000`) from
+`0xBD000000` (`0x1D000000`), and **no cell in this repository has ever compared
+them**. Timing only `0xBD000000` would leave *the two windows behave alike* in
+the load-bearing position, unmeasured. Group F times both.
+
+#### 6.8.1 The cells
+
+Four cells, one new assembly primitive, **no command issued to the SPI
+controller** — every access is a load, and `SFCR`/`SFCSR`/`SFDR` are never
+written.
+
+| cell | what it does | why it is not the obvious thing |
+|---|---|---|
+| **`f-sfcr`** | one uncached `lw` of `SFCR` (`0xB8001200`) | the divider is what turns ticks into SPI clocks, and until now the model carried `REG-13`'s **`0x3FC00000`** from a reading taken at the prompt on another day. This measures it **inside the run whose ticks it explains** |
+| **`f-alias`** | the first 16 words of `0xBD000000` against the first 16 of `0xBFC00000`, pairwise | **the liveness control that needs no committed flash byte.** Two independent address decodes returning sixteen identical non-trivial words is a property no floating bus produces, and only the COUNT of mismatches enters the block — no flash content does |
+| **`f-live`** | of words 1…15 at each window, how many differ from word 0 | separates *dead, and it reads as a constant* from *live*. A count of shape, not a copy of content |
+| **`f-time`** | `rlx_tc_stride` over three address spaces × two strides, plus the first leg repeated last | the ratio is clock-independent and the absolute rate is clock-dependent; **neither alone is worth the words** and § 6.8.3 says why |
+
+**`f-time`'s six legs, and they differ only in `base` and `stride`.** N = 1,024
+loads each; the address advances by `stride` and is masked to a **64 KiB**
+span, so the footprint is bounded whatever the stride is and both windows are
+touched identically.
+
+| leg | base | stride | span |
+|---|---|---:|---|
+| `f.win.seq` | `0xBD000000` | 4 | 4 KiB |
+| `f.win.str` | `0xBD000000` | 1,024 | 64 KiB, 64 addresses, 16 revisits |
+| `f.boot.seq` | `0xBFC00000` | 4 | 4 KiB |
+| `f.boot.str` | `0xBFC00000` | 1,024 | 64 KiB |
+| `f.dram.seq` | `ARENA + 0x20000`, KSEG1 | 4 | 4 KiB |
+| `f.dram.str` | `ARENA + 0x20000`, KSEG1 | 1,024 | 64 KiB |
+| `f.win.seq2` | `0xBD000000` | 4 | the FIRST leg again, run LAST |
+
+🔴 **The DRAM legs are not decoration and they are not a floor.** They are the
+same loop over memory whose behaviour is known, so they bound the loop's own
+contribution — and, more importantly, **a strided DRAM read crosses SDRAM rows
+and is expected to be slower than a sequential one on its own account**. That
+confound is the whole reason the verdict below is a ratio of ratios rather than
+a ratio.
+
+#### 6.8.2 PREDICTED, written before the seating
+
+推, every term named. Tick = **69.9983 ns** (`CLK-17`). SPI clock =
+`CLK-02`'s **200.0049 MHz** ÷ `REG-13`'s DIV **4** = 50.0012 MHz, so one SPI
+clock is 20.00 ns. A `Fast Read` re-issued per word is `cmd(8) + addr(24) +
+dummy(8) + data(32)` = **72 clocks = 1.440 µs = 20.57 ticks**; held open, 32
+clocks = **9.14 ticks**. The loop is six instructions, so at `CLK-01`'s 400 MHz
+with CPI 1–3 it adds **0.21–0.64 ticks** per access — a minority term in every
+band, which is why the CPI ambiguity does not have to be resolved first.
+
+> **PREDICTED `f.win.str` ≈ 21,300–21,700 ticks** (1.49–1.52 ms), because a
+> 1,024-byte stride defeats any buffer this controller plausibly has.
+> **`f.win.seq` is the reading.** If it lands in the same band the window
+> serves every access as its own transaction; at ≈ 9,800 it holds the read
+> open; at ≈ 5,900–6,800 it buffers 16 B; at ≈ 3,100–4,500, 32 B.
+>
+> **PREDICTED `f.sfcr = 3FC00000`** (量 `REG-13`, at the prompt).
+> **PREDICTED `f.alias = 00000000`** — the two windows are the same flash.
+> **PREDICTED `f.live` both bytes ≥ 10** — flash offset 0 is loader code, and
+> `nop` being `0x00000000` is exactly why the cell counts *differs from word 0*
+> rather than *is not zero*.
+> **PREDICTED `f.faults = 00000000`.**
+
+**THE VERDICT, as bands on `R = f.win.str / f.win.seq`, written first:**
+
+| `R` | what it establishes |
+|---|---|
+| **≤ 1.15** | **no buffering.** `FW-34`'s last row CLOSES: §19.7.2's ≤9× is 9× |
+| **1.15 – 1.8** | indeterminate, and it is reported as that |
+| **≥ 1.8** | the window buffers; implied burst ≈ **4 R bytes**, rounded to a power of two. `FW-34` NARROWS and does not close — see § 6.8.3 |
+
+**And the control on the verdict**: `f.dram.str / f.dram.seq` must be
+**strictly less** than `R`. If the DRAM ratio is as large, the difference
+belongs to the loop or to SDRAM row misses and this cell says nothing about the
+window at all.
+
+**The absolute cross-check, which is a second question the same six words
+answer.** `f.win.str / 1024`:
+
+| ticks/access | what it establishes |
+|---:|---|
+| **20.6 ± 15 %** | 72 clocks at DIV 4 **and** the datasheet's *DRAM Clock* is `CLK-02`'s 200 MHz. §20.5 says nothing in this repository has ever asserted that identification; this is the first thing that tests it. Three facts at once — the cell does not separate them |
+| **≈ 82** | DIV 16, the reset default, is still in force when `probe3` runs |
+| **≈ 9** | the STRIDED leg is buffered too: the 64 KiB mask is inside the buffer and `R` is void, not small |
+| anything else | not attributable |
+
+⚠️ **This does not replace §20.5's `FLR` cell and must not be written up as
+doing so.** `LDR-42` is that `FLR` reads through `SFDR` and this group reads
+through the memory-mapped window: **two ports of one controller**. A `20.6`
+here constrains §20.5's bands; it does not measure them.
+
+#### 6.8.3 🔴 REFUTATION, and the asymmetry that has to be written into the answer
+
+**Six conditions, each naming an outcome that would prove this wrong:**
+
+1. **`f.faults ≠ 0`** — a load in this group trapped, and the handler's own time
+   is inside the bracket. **Every tick in the group is void**, not merely
+   suspect.
+2. **`f.alias ≠ 0`** — the two windows are not one view. §19.7.2's *"the same
+   SPI device the loop is reading"* loses its basis, and it is then `f.boot.*`
+   and not `f.win.*` that bounds the ≤9×.
+3. **either byte of `f.live` = 0** — that window returned sixteen identical
+   words. A floating bus, not flash; every tick for that window describes a
+   dead decode.
+4. **`|f.win.seq2 − f.win.seq| > 10 % of f.win.seq`** — the instrument is not
+   repeatable across the group it sits at the end of, and no ratio computed
+   from it is worth reading.
+5. **`f.win.str < f.dram.str`** — the window is faster than uncached DRAM,
+   which nothing in this model allows. The framework is wrong, not one term.
+6. **`f.sfcr ≠ 3FC00000`** — the divider is not what `REG-13` read at the
+   prompt. The absolute table above has to be recomputed before any of it is
+   quoted, and `f.sfcr` is what it is recomputed from.
+7. 🔴 **any leg below `f.dram.str`, or a `f.win.str` under ~5,000 ticks** — a
+   reading that has WRAPPED aliases to a small number, and every ratio computed
+   from it is then arithmetic on a number that is not a duration.
+
+🔴 **THE WRAP MARGIN, and Group F is the first cell in this payload that does
+not fit inside the window § 6.3's own comment describes.** `TC0CNT` wraps every
+**142,858 ticks = 9.9998 ms**, `tc_ticks` is valid for **one wrap only**, and
+the file's timer comment says *"every window in this payload stays under 3 ms"*.
+Group F's predicted band is 1.5 ms — but the worst case this model ALLOWS is
+DIV 16 (the reset default, if something has written `SFCR` back) at 82.3
+ticks/access, which is **84,275 ticks = 5.9 ms**: safe, at **59 %** of one wrap,
+and a margin of 1.7× rather than 3×.
+
+**What that costs and what it does not.** It does not move any band: 5.9 ms is
+inside one wrap and `tc_ticks` handles it. What it costs is the head-room the
+rest of the payload has, so **`f.sfcr` is read FIRST in the group and is the
+thing to read first at the desk**: `3FC00000` says DIV 4 and the 1.5 ms band
+applies. If a future `F_COUNT` is raised, the arithmetic above is what has to be
+redone, and `1024 × 82.3 = 84,275` is the number to redo it from.
+
+🔴 **THE ASYMMETRY, and `SPEC.md` §17's row must be written this way.** This
+group times **data-side `lw`**. §19.7.2's amplification is **instruction-fetch
+side**. The two meet because stage 1 executes in KSEG1, so its fetches are
+single-word uncached bus reads exactly like these loads — but *exactly like* is
+an argument, not a measurement, and the conclusion inherits the difference:
+
+* **`R ≤ 1.15` CLOSES `FW-34`.** Nothing is buffered for a single-word read
+  from this window, and an uncached instruction fetch is one.
+* **`R ≥ 1.8` only NARROWS it.** The window buffers data reads; whether the
+  instruction-fetch stream is served the same burst is not measured here, and
+  the honest statement is a smaller upper bound with the mechanism named.
+
+⚠️ **What this cannot see**, stated rather than left to be discovered:
+
+* A buffer of **64 KiB or more** would be inside the mask and both legs would
+  be fast. That is what the `≈ 9` row of the absolute table is for; an SPI
+  window with a 64 KiB buffer on a part whose D-cache is 8 KiB is implausible,
+  and *implausible* is the strength of the claim.
+* The **first** access of each leg is a miss under every hypothesis and is
+  inside the bracket. At N = 1,024 it is ≤ 0.1 % of any band and no band is
+  narrower than 30 %.
+* It says nothing about **writes**. `R5b` goes through `SFDR`; see §20.5.
+
+#### 6.8.4 Where it runs, and what a fault there costs
+
+**Stage 10, after Group S and before the restore** — `progress` `0xA8`,
+appended between `P_ISC` (`0xA0`) and `P_RESTORED` (`0xB0`) rather than
+renumbering, for the same reason header words 52, 53 and 54 were appended: a block
+whose progress marks were renumbered cannot be compared to an older one.
+
+It is last because it is **the first time this payload reads an address space
+outside DRAM and the SoC register block**, and § 7's order is by that question
+and no other. Everything Groups H through S measured is already in the block
+when it starts, so a fault — or a bus that never answers — costs this group and
+nothing before it. The handler installed at stage 1 is what makes a fault a
+recorded outcome instead of the loader's permanent hang, and **no load in this
+group sits in a branch delay slot**, which is `exc.S:41-44 (It adds 4 to EPC
+unconditionally)`'s standing constraint.
+
 ---
 
 ## 7. Running order, and what survives a fault at each point
@@ -1017,7 +1250,8 @@ where the run stopped instead of leaving it to be inferred from what is missing.
 | 7 | **Group V** — armed iff `c-A` showed a stale line, and placed outside the D-MEM window | `0x80` | nothing beyond Group C | ⓐ's D side |
 | 8 | **Group X** — `x-ri`, `x-11`, `c-D`, `x-10` and its functional leg, then `x-15`/`x-19` if `x-11` retired | `0x90` | 🔴 **the first `cache` instruction this project has ever executed.** Everything else is already in the block | ⓒ, and nothing before it |
 | 9 | **Group S** — `s-isc` | `0xA0` | `mtc0` to CP0 12 setting a bit measured **not** to work | ⓓ②, and it is last because it has the least source support of anything here |
-| 10 | restore both vectors, read back, seal, `rlx_reset` | `0xB0` | `probe2`'s | — |
+| 10 | 🆕 **Group F** — `f-sfcr`, `f-alias`, `f-live`, then `f-time`'s seven legs | `0xA8` | 🔴 **the first time this payload reads an address space outside DRAM and the SoC register block.** Two windows onto the SPI flash, and nothing here has read either of them outside Linux — `FLS-11`'s `量` cites a `printf` argument, § 6.8.0. The reads are loads; no command is issued to the controller and `SFCR`/`SFCSR`/`SFDR` are never written | `FW-34`'s last row, and nothing before it. It is last for the reason this column asks about: everything Groups H…S measured is in the block when it starts, so a fault — or a bus that never answers — costs this group alone. **The timing legs are gated on Group T** and stay at stage 0's poison when it did not ship |
+| 11 | restore both vectors, read back, seal, `rlx_reset` | `0xB0` | `probe2`'s | — |
 
 **Why `c-A0` runs before `c-A`.** It is the negative control; if it fails, `c-A`
 was never worth running and the seating learns that in two loads instead of
@@ -1046,7 +1280,7 @@ fault during `w-imem` costs the discriminator and not the walk.
 | **`rlx_r3k_size` / `GEOM=1`** | 量 dead: the algorithm needs isolation and `CPU-35` measured this core does not isolate, so it can only return `0` — which is also its *"the core does not answer"* value |
 | **`rlx_isc_inv`** | 量: its byte stores reached DRAM and corrupted both victims (`probe1` cell 4) |
 | **writing `TC1DATA`/`TCCNR`** to get an 18.79 s counter instead of a 10 ms one | it would be strictly better as an instrument, but it is a **register write** where every window in this payload already fits inside 3 ms of a 9.9998 ms wrap. Recorded as the upgrade path for `R5-0`, declined here |
-| **flash** | 🔄 **no flash-write command, and the byte count is not this payload's to claim.** `P0` reads `AUTOBURN` before the `put` and the seating stops on anything but `00000000`, and every `--send` this payload's cells issue is a `DW`, a `J` or an `EW` into RAM — that is a **guard**. *(This row read “zero bytes” until 2026-08-30, which is the sentence `RUNSHEET` §B3's `G8b` forbids without a full re-dump hashed against `FLS-14`.)* The **evidence** is an `FLR` bracket, and `probe3`'s seating ran none; `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 is where one is |
+| **flash** | 🆕 **2026-09-01: this payload now READS flash, and the row says so before it says anything else.** Group F issues uncached `lw` from `0xBD000000` and `0xBFC00000` — loads, and nothing else: no command reaches the SPI controller, and `SFCR`/`SFCSR`/`SFDR` are never written. § 6.8. 🔄 **no flash-write command, and the byte count is not this payload's to claim.** `P0` reads `AUTOBURN` before the `put` and the seating stops on anything but `00000000`, and every `--send` this payload's cells issue is a `DW`, a `J` or an `EW` into RAM — that is a **guard**. *(This row read “zero bytes” until 2026-08-30, which is the sentence `RUNSHEET` §B3's `G8b` forbids without a full re-dump hashed against `FLS-14`.)* The **evidence** is an `FLR` bracket, and `probe3`'s seating ran none; `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 is where one is |
 
 ---
 
@@ -1056,7 +1290,7 @@ fault during `w-imem` costs the discriminator and not the walk.
 |---|---|
 | `P0` ≠ `00000000` | **nothing is uploaded.** The seating ends before it starts |
 | `P1` shows an unchanged `TC0CNT` | Group T does not ship; everything else is unaffected |
-| `P2` shows structure in the arena | **the arena moves** and `P2` is re-run. `MEM-14` is the standing proof that *"nothing has read it"* is not *"nothing writes it"* |
+| `P2` shows structure in the arena | **the arena moves** and `P2` is re-run. `MEM-14` is the standing proof that *"nothing has read it"* is not *"nothing writes it"*. 🆕 **2026-09-01: `524C5833` AT THE BLOCK BASE IS NOT ON THE LIST ABOVE AND THE OMISSION IS DELIBERATE.** `probe1`'s or `probe2`'s magic in `probe3`'s space means the block overlaps theirs, and both of those hold measurements recovered from DRAM — that is the failure. `probe3`'s **own** magic at `0x80A02000` means the previous `probe3` run's block is still in DRAM, and after `MEM-17` (量 2026-08-31: DRAM keeps written data across a power cycle) that is a **reading**, not a fault: stage 0 poisons the whole block before the first cell, so the run continues. Record the header words and carry on. ⚠️ In the ARENA the same word would still be a failure, because nothing writes `probe3`'s magic there |
 | `P3` refuses a 4-digit length | the read-back stays ≤ 999 words; § 4's encoding is the only one that fits and there is no fallback to rows |
 | the 1 KiB working set shows any FRESH | 否證 ⓐ. **The size is void, not approximate.** Do not round to the nearest plausible value — that is how a build constant is laundered into a measurement |
 | the 64 KiB working set shows no FRESH | the walk cannot evict. The size is void the other way, and the tool could not have failed |
@@ -1291,8 +1525,8 @@ make -C tools/rlxprobe P=probe3 show
 | line | what it must say on 2026-08-26 | what a different value means |
 |---|---|---|
 | `make` itself | it **compiles**. `Nothing to be done for 'payload'` is a **HARD STOP** | the tree already held an image and nothing rebuilt; `show` will print the knob you asked for beside the binary you already had |
-| `sha256` | 🔄 **`6f78727507bb0364734534e90f5c223515f55277ae5970c1c3bc64ca68b3233c`, 29,680 bytes, since 2026-08-31** — the retained bitmap region and the `M(T)` ladder. *(It was `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, 29,088 bytes, from 2026-08-26 to 2026-08-30, and byte-identical across three rebuilds in that window.)* | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
-| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 707` *(641 before 2026-08-31)* | anything else and the read-back is the wrong length or the wrong address |
+| `sha256` | 🔄 **`fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e`, 31,536 bytes, since 2026-09-01** — Group F. *(It was `6f78727507bb0364…` / 29,680 from 2026-08-31)* — the retained bitmap region and the `M(T)` ladder. *(It was `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, 29,088 bytes, from 2026-08-26 to 2026-08-30, and byte-identical across three rebuilds in that window.)* | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
+| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 718` *(707 from 2026-08-31, 641 before that)* | anything else and the read-back is the wrong length or the wrong address |
 | `stale check` | `rb=80a02000` | this is the **on-the-wire** check and it is what the operator watches for in the banner |
 | `vectors` / `uart` | `general 0x80000080`, `THR 0xB8002000`, `CLEAR_BEV=0`, and **no `*** NOT A DEVICE BUILD ***` line** | a qemu image would install a handler into RAM this device never reads and then fault into the loader's permanent hang |
 
@@ -1411,7 +1645,7 @@ which corroborates zero traps from a second direction.
 
 `CU3` sticks: `m.cu3.before=1000fc00` → `m.cu3.set=9000fc00`, the predicted half.
 **No reading equals its own prime and `v1 == v2` for all eight** (primes
-`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1641-1665`) — so the destination
+`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1734-1758 (v1 = rlx_call0_primed)`) — so the destination
 was written and the value is stable, which is exactly the pair of failures the
 two primes exist to separate. r0 and r4 read `20000000`; the rest read `0`.
 
@@ -1468,9 +1702,9 @@ for a reason that was itself correct.
 
 Found by an adversarial pass on 2026-08-30, 量 on `bench/2026-08-30/Q5-rb.log`.
 
-`probe3.c:1383-1396` states the design: *"THE RETAINED BITMAP. One sweep point
+`probe3.c:1476-1489 (THE RETAINED BITMAP)` states the design: *"THE RETAINED BITMAP. One sweep point
 survives to the read-back … the BOUNDARY point, because its PATTERN is what
-carries associativity and aliasing."* `probe3.c:85-90` builds a self-check on
+carries associativity and aliasing."* `probe3.c:85-90 (THE BITMAP HOLDS ONE SWEEP POINT)` builds a self-check on
 it — *"so the desk can compare the count the payload thought it wrote against
 the length it actually read."*
 

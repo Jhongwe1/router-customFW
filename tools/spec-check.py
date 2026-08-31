@@ -31,6 +31,13 @@ What it checks, and every one of them can fail:
   C7  a row that carries a value names at least one source.  This is NOT the
       two-source rule; it is the weaker property that an established value says
       where it came from
+  C11 a reference to a line of a payload source carries a TOKEN from that
+      line, and the token is still within a few lines of the number.  A line
+      number is the one kind of citation in this repository that goes wrong
+      SILENTLY: the line still exists, so "does this line exist" passes, and
+      nothing compares the line to what the citing sentence says is there.
+      量 2026-08-31: editing `probe3.c` invalidated fourteen references at
+      once and the owner audit, not a checker, is what found them
   C8  every row has as many cells as its own table's header.  This is the check
       that was missing on 2026-08-26, and the defect it would have caught had
       been in the file since CPU-19 was written: an unescaped `|` inside a
@@ -438,6 +445,127 @@ def span_findings(path, lines, mask):
     return out, total
 
 
+# --- C11.  A source line number is a reference that rots ------------------
+#
+# THE FIX IS A FORMAT, NOT A CHECKER ON THE OLD FORMAT, and the reason is that
+# the old format carries nothing to check against.  A reference now reads
+#
+#     `probe3.c:1533 (best_t & 0xFFFFFF00u)`
+#
+# and the token is the durable half: when the payload is edited the line moves,
+# this goes red, and the number is re-derived by searching for the token.
+#
+# ⚠️ WHAT THIS DOES NOT DO, stated rather than left to be found:
+#   * It anchors the START of a range.  `probe3.c:1383-1396` whose END drifts
+#     while its start does not is a defect C11 cannot see.
+#   * The token is matched WHITESPACE-NORMALISED, because a reflowed tab is not
+#     reference rot.  A token that differs from its line only in whitespace
+#     therefore passes, which is the intent.
+#   * It says nothing about whether the SENTENCE is still true.  It says the
+#     citation still points at the construct it named.
+#
+# The population is `tools/rlxprobe/` -- the payload sources, which this
+# repository edits.  References into `src-vendor/` and `upstream/` are pinned
+# at a sha and do not rot; that is why they are not here, and T21 asserts the
+# population this DOES cover is not empty.
+SRCREF_DIR = os.path.join('tools', 'rlxprobe')
+SRCREF_TOL = 3
+SRCREF_RX = re.compile(r'^(?:tools/rlxprobe/)?([A-Za-z0-9_][A-Za-z0-9_.\-]*'
+                       r'\.(?:c|h|S|lds)):(\d+)(?:-(\d+))?(.*)$', re.S)
+
+# Exempt, each with a reason, and T22 asserts the exemption is LOAD-BEARING --
+# if these files ever stop holding a reference, the entry has to come out
+# rather than sit here forever unread.
+SRCREF_EXEMPT = {
+    'bench/': 'frozen prediction blocks and their corrections: captures have '
+              'landed against these numbers, and a record silently updated to '
+              'match today\'s source stops being a record',
+    'study/': 'dated study notes, same reason',
+    'LOG.md': 'the working log is a record of what was true on a date',
+    'CHANGELOG.md': 'a record',
+    'docs/rlxprobe-audit-2026-08-25.md':
+        'a DATED audit.  量 2026-08-31: two of its three references have '
+        'ALREADY rotted -- probe2.c:273 is now a blank line and probe1.c:299 '
+        'a fragment of a comment -- and what it cited was correct on '
+        '2026-08-25.  Repairing them would destroy the record rather than fix '
+        'it, which is the same call the seventeenth session made when it '
+        'reverted its own over-reach into a frozen block',
+}
+
+
+def srcref_exempt(rel):
+    for pre in SRCREF_EXEMPT:
+        if rel == pre or rel.startswith(pre):
+            return pre
+    return None
+
+
+def srcref_sources(root=ROOT):
+    """basename -> lines, for every payload source.  A dict rather than a
+    directory read at match time, so the controls can inject a fixture."""
+    out = {}
+    d = os.path.join(root, SRCREF_DIR)
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return out
+    for n in sorted(names):
+        if not n.endswith(('.c', '.h', '.S', '.lds')):
+            continue
+        try:
+            out[n] = io.open(os.path.join(d, n), encoding='utf-8').read().split('\n')
+        except OSError:
+            continue
+    return out
+
+
+def _norm(s):
+    return ' '.join(s.split())
+
+
+def srcref_findings(path, lines, mask, sources):
+    """C11 for one file.  Returns (findings, how many references were in scope).
+
+    The count is returned for the same reason span_findings returns one: a
+    checker reporting zero over an empty population is the failure this file
+    exists to catch.
+    """
+    prose = '\n'.join('' if mask[i] else ln for i, ln in enumerate(lines))
+    out, n = [], 0
+    for a, _b, content in code_spans(prose):
+        m = SRCREF_RX.match(content)
+        if not m:
+            continue
+        name, start, _end, tail = m.group(1), int(m.group(2)), m.group(3), m.group(4)
+        if name not in sources:
+            continue                      # not a payload source: not in scope
+        n += 1
+        ln = prose.count('\n', 0, a) + 1
+        if not (tail.startswith(' (') and tail.endswith(')') and len(tail) > 3):
+            out.append(('C11', f'{path}:{ln}: `{content}` carries no token. '
+                               f'A bare line number rots silently; write '
+                               f'`{name}:{start} (a short token from that line)`'))
+            continue
+        tok = tail[2:-1]
+        if '|' in tok or '`' in tok:
+            out.append(('C11', f'{path}:{ln}: `{content}` has a token holding '
+                               f'| or a backtick, which breaks the row or the '
+                               f'span it sits in'))
+            continue
+        src = sources[name]
+        lo, hi = max(1, start - SRCREF_TOL), min(len(src), start + SRCREF_TOL)
+        want = _norm(tok)
+        if any(want in _norm(src[k - 1]) for k in range(lo, hi + 1)):
+            continue
+        where = [k for k, s in enumerate(src, 1) if want in _norm(s)]
+        at = (f'it is at {name}:{where[0]}' if len(where) == 1 else
+              f'it is at {name}:{where[:4]}' if where else
+              f'it is nowhere in {name}')
+        out.append(('C11', f'{path}:{ln}: `{content}` -- the token is not '
+                           f'within {SRCREF_TOL} lines of {start}; {at}'))
+    return out, n
+
+
 def table_scope(root=ROOT):
     """Every tracked `.md`, which is the honest population for a rule about how
     this repository's prose renders.
@@ -582,7 +710,9 @@ def check_tables(paths, root=ROOT):
     """The repository-wide sweep: C8/C8b over tables, C9 over every code span.
     Returns (findings, stats)."""
     findings = []
-    stats = {'files': 0, 'tables': 0, 'rows': 0, 'spans': 0, 'paragraphs': 0, 'unreadable': []}
+    stats = {'files': 0, 'tables': 0, 'rows': 0, 'spans': 0, 'paragraphs': 0,
+             'srcrefs': 0, 'srcrefs_exempt': 0, 'unreadable': []}
+    sources = srcref_sources(root)
     for rel in paths:
         full = os.path.join(root, rel)
         try:
@@ -603,6 +733,14 @@ def check_tables(paths, root=ROOT):
         pf, npara = paragraph_findings(rel, lines, m)
         stats['paragraphs'] += npara
         findings += pf
+        # C11 counts its population on EVERY file and checks it on the live
+        # ones, so the exempt count is a measurement rather than a silence.
+        rf, nref = srcref_findings(rel, lines, m, sources)
+        if srcref_exempt(rel):
+            stats['srcrefs_exempt'] += nref
+        else:
+            stats['srcrefs'] += nref
+            findings += rf
     return findings, stats
 
 
@@ -1131,6 +1269,94 @@ TABLE_MUTATIONS = [
 ]
 
 
+SRCREF_FIXTURE_SRC = {'fix.c': [
+    'line one',                                    # 1
+    'static const u32 L_FIX[] = { 1u, 2u };',      # 2
+    'line three',                                  # 3
+    'line four',                                   # 4
+    'line five',                                   # 5
+    'line six',                                    # 6
+    'far away marker',                             # 7
+]}
+
+# Every case names the ONE thing it pins.  T20a/T20b are a pair on purpose:
+# one edge each of SRCREF_TOL, because a single case at the boundary passes
+# whether the comparison is `<` or `<=`.
+SRCREF_CASES = [
+    ('T17 a reference whose token is on its line is clean',
+     'a `fix.c:2 (static const u32 L_FIX[])` reference', 0, ''),
+    ('T18 a bare line number is caught',
+     'a `fix.c:2` reference', 1, 'carries no token'),
+    ('T19 a token that is elsewhere in the file is caught',
+     'a `fix.c:2 (far away marker)` reference', 1, 'it is at fix.c:7'),
+    ('T19b a token that is nowhere is caught',
+     'a `fix.c:2 (no such text)` reference', 1, 'it is nowhere in fix.c'),
+    ('T20a a token exactly SRCREF_TOL lines away still passes',
+     'a `fix.c:5 (static const u32 L_FIX[])` reference', 0, ''),
+    ('T20b a token one line PAST SRCREF_TOL is caught',
+     'a `fix.c:6 (static const u32 L_FIX[])` reference', 1, 'not within 3'),
+    ('T20c a token with a pipe is caught before it breaks a row',
+     'a `fix.c:2 (L_FIX[] = { 1u| 2u })` reference', 1, 'holding'),
+    ('T23 a reference to a file that is not a payload source is out of scope',
+     'a `rtl819x_flash.c:62-73` reference', 0, ''),
+]
+
+
+def srcref_controls(verbose=True):
+    """C11's controls: a fixture source, and one case per failure mode.
+
+    The fixture SOURCE is injected rather than read from tools/rlxprobe/, so
+    these cases do not go red the next time the payload is edited -- which is
+    the very event C11 exists to catch, and a control that fires on it would be
+    a control that cannot be trusted on the day it matters.
+    """
+    fail = ok = 0
+    if verbose:
+        print('=== C11 CONTROLS: a fixture source, and one case per failure ===')
+    for label, body, n_want, want_msg in SRCREF_CASES:
+        lines = ['# fixture', '', body, '']
+        got, n_scope = srcref_findings('fixture.md', lines,
+                                       [False] * len(lines), SRCREF_FIXTURE_SRC)
+        hit = [m for c, m in got if c == 'C11' and want_msg in m]
+        okrow = (len(got) == n_want and (n_want == 0 or len(hit) == n_want))
+        if okrow:
+            print(f'  ok    {label:58s} '
+                  + (f'0 findings, {n_scope} in scope' if n_want == 0
+                     else f'caught: …{want_msg}…'))
+            ok += 1
+        else:
+            print(f'  FAIL  {label:58s} wanted {n_want} finding(s) saying '
+                  f'{want_msg!r}, got {len(got)}')
+            for _c, m in got[:2]:
+                print(f'          {m[:120]}')
+            fail += 1
+
+    # T21 and T22 are population controls on the REAL tree, not the fixture.
+    # T21: the checker is looking at something.  T22: the exemption is
+    # load-bearing rather than a list nobody reads.
+    _f, st = check_tables(table_scope())
+    if st['srcrefs'] > 0:
+        print(f'  ok    {"T21 the live population is not empty":58s} '
+              f'{st["srcrefs"]} reference(s) checked, so T17 is not clean by '
+              f'looking at nothing')
+        ok += 1
+    else:
+        print(f'  FAIL  {"T21 the live population is not empty":58s} '
+              f'0 references in scope -- C11 is passing vacuously')
+        fail += 1
+    if st['srcrefs_exempt'] > 0:
+        print(f'  ok    {"T22 the exemption is load-bearing":58s} '
+              f'{st["srcrefs_exempt"]} reference(s) sit in record files')
+        ok += 1
+    else:
+        print(f'  FAIL  {"T22 the exemption is load-bearing":58s} '
+              f'no reference is exempt -- SRCREF_EXEMPT is dead and must go')
+        fail += 1
+
+    print(f'  {ok} passed, {fail} failed')
+    return fail
+
+
 def table_controls(verbose=True):
     """Five controls on the sweep, and the first one is the positive."""
     fail = ok = 0
@@ -1316,6 +1542,9 @@ def report_tables(findings, stats):
     print(f"  {stats['rows']} table row(s) in {stats['tables']} table(s), "
           f"{stats['spans']} code span(s) and {stats['paragraphs']} "
           f"paragraph(s), across {stats['files']} file(s)")
+    print(f"  C11: {stats['srcrefs']} payload-source reference(s) checked, "
+          f"{stats['srcrefs_exempt']} in record files (exempt, reasons in "
+          f"SRCREF_EXEMPT)")
     if C10_EXEMPT:
         print(f"  ⚠️  {len(C10_EXEMPT)} file(s) exempt from C10, each with a "
               f"reason and a control (T13): {', '.join(sorted(C10_EXEMPT))}")
@@ -1326,7 +1555,8 @@ def report_tables(findings, stats):
     if not findings:
         print('  ok  no ragged row, no row split over more than one line, no '
               'row stranded outside its table, no code span whose content '
-              'is only whitespace, and no paragraph leaving a span open')
+              'is only whitespace, no paragraph leaving a span open, and '
+              'every payload-source reference still finds its token')
         return 0
     for c, msg in sorted(findings):
         print(f'  FAIL [{c}] {msg}')
@@ -1343,6 +1573,7 @@ def main(argv):
 
     failed = controls(path)
     failed += table_controls()
+    failed += srcref_controls()
     if failed:
         print('  REFUSING to report on the file: a check that cannot fail would '
               'report it clean whatever it says')

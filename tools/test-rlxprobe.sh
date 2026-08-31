@@ -784,7 +784,75 @@ ck "show DW count == probe3 RB_WORDS" "$p3w" \
    "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>/dev/null | sed -n 's/^result .*DW [0-9A-Fa-f]* \([0-9]*\)$/\1/p' | head -1)"
 # The C carries the same arithmetic as a compile-time assertion, so a layout
 # that does not add up does not build. SM3 below is the mutation on that.
-ck "and the C says 707"                707 "$p3w"
+ck "and the C says 718"                718 "$p3w"
+echo
+echo "=== Y2c: two defines may not name the same word ==="
+# 🔴 量 2026-09-01, AND IT HAD BEEN COMMITTED FOR A DAY.  The three header words
+# the retained bitmap added on 2026-08-31 were 48, 49 and 50, and ALL THREE were
+# already taken -- `H_KSEG0`, `H_G_TIMER` and `H_T_SEP_A`, defined twenty lines
+# further down beside Group T rather than beside the other layout words.  The
+# comment that placed them reasoned *"44..47 are occupied"* and the census
+# stopped at 47.
+#
+# A COLLISION IS SILENT.  Both defines compile, both `rb_put()` calls run, and
+# the later stage wins -- so the word that is read back means whichever cell ran
+# last, and the desk has no way to tell.  Here it would have been worse than
+# losing a word: `H_T_SEP_B` at 51 does NOT collide, so the separated pair would
+# have come back as one number of two and READ LIKE A MEASUREMENT.
+#
+# The fix is this census, not a better comment.  `_STRIDE` is excluded with a
+# reason: a stride is a step and not an index -- `R_X_STRIDE` is 3 and
+# `R_M_STATUS` is 3, and they are not the same kind of 3.
+idxdup () {                      # idxdup <file> <prefix> -> "" or "n:A/B ..."
+    "${PYTHON:-python3}" - "$1" "$2" <<'PY'
+import re, sys, collections
+t = open(sys.argv[1], encoding="latin-1").read()
+d = collections.defaultdict(list)
+pat = r"^#define[ \t]+(" + sys.argv[2] + r"[A-Z0-9_]+)[ \t]+(0x[0-9A-Fa-f]+|[0-9]+)u?\b"
+for m in re.finditer(pat, t, re.M):
+    if m.group(1).endswith("_STRIDE"):
+        continue
+    d[int(m.group(2), 0)].append(m.group(1))
+print(" ".join("%d:%s" % (k, "/".join(sorted(v)))
+               for k, v in sorted(d.items()) if len(v) > 1))
+PY
+}
+idxn () {                        # idxn <file> <prefix> -> how many were parsed
+    "${PYTHON:-python3}" - "$1" "$2" <<'PY'
+import re, sys
+t = open(sys.argv[1], encoding="latin-1").read()
+pat = r"^#define[ \t]+(" + sys.argv[2] + r"[A-Z0-9_]+)[ \t]+(0x[0-9A-Fa-f]+|[0-9]+)u?\b"
+print(len(re.findall(pat, t, re.M)))
+PY
+}
+ck "Y2c probe3 header words are unique" "" "$(idxdup "$RP/probe3.c" H_)"
+ck "Y2c probe3 result words are unique" "" "$(idxdup "$RP/probe3.c" R_)"
+ck "Y2c probe3 progress marks are unique" "" "$(idxdup "$RP/probe3.c" P_)"
+ck "Y2c probe2 header words are unique" "" "$(idxdup "$RP/probe2.c" H_)"
+# The population control.  An empty census reports "no duplicates" for a regex
+# that matches nothing, which is this repository's own *a tool reporting 0 is
+# making a claim* in four lines of shell.
+ck "Y2c and the census is not empty" yes \
+   "$([ "$(idxn "$RP/probe3.c" H_)" -ge 40 ] && [ "$(idxn "$RP/probe3.c" R_)" -ge 40 ] \
+      && echo yes || echo no)"
+# The mutation: put H_BMP_KEPT back where it was on 2026-08-31 and the census
+# must name the exact pair.  Asserting the PAIR rather than "non-empty" is what
+# stops this passing on a census that reports every word as a duplicate.
+#
+# 🔴 AND THE ROW ABOVE IT IS THE ONE THAT EARNED ITS PLACE.  The first version
+# of this used `smut`, which is defined 600 lines FURTHER DOWN -- so `$s7` was
+# empty, the `sed` edited nothing, the census correctly found no duplicate, and
+# the case went red for a reason that had nothing to do with the census.  A
+# mutation that did not apply and a checker that cannot see one are the same
+# output, so the mutation now has to PROVE it changed the file first.
+y2cm="$T/y2c-probe3.c"
+cp "$RP/probe3.c" "$y2cm"
+sed -i 's/^#define H_BMP_KEPT\t52u/#define H_BMP_KEPT\t48u/' "$y2cm"
+ck "Y2c the mutation actually changed the file" no \
+   "$(cmp -s "$RP/probe3.c" "$y2cm" && echo yes || echo no)"
+ck "Y2c the 2026-08-31 collision put back is caught" "48:H_BMP_KEPT/H_KSEG0" \
+   "$(idxdup "$y2cm" H_)"
+
 # 🆕 Y2b -- the RETAINED bitmap region is not the scratchpad. Two regions with
 # one name was the 2026-08-30 defect; a suite that only recomputes a total would
 # pass with RB_BMPKW folded back into RB_BMPW. This asserts they are separate
@@ -879,7 +947,7 @@ ck "SM2 an extra cache op is visible"    6 \
 ck "SM2 and it is 0x1b, the one that must not ship" 1 \
    "$($OBJDUMP -d -m mips:3000 "$s2/b/probe3/probe3.elf" 2>/dev/null | grep -c '0xbd1b0000')"
 
-# SM3 -- the block layout. probe3.c asserts RB_WORDS == 641 at COMPILE time with
+# SM3 -- the block layout. probe3.c asserts RB_WORDS == 718 at COMPILE time with
 # a negative array bound, because a layout that does not add up must not reach a
 # `.bin` at all. The mutation moves one field and the build must FAIL.
 s3="$(smut sm3)"
@@ -887,6 +955,31 @@ sed -i 's/^#define RB_HDR\t\t64u$/#define RB_HDR\t\t65u/' "$s3/src/probe3.c"
 make -C "$s3/src" BUILD="$s3/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/null 2>&1
 ck "SM3 a layout that does not add up does not build" no \
    "$([ -s "$s3/b/probe3/probe3.bin" ] && echo yes || echo no)"
+
+# SM3b -- 🆕 2026-09-01, THE OTHER COMPILE-TIME ASSERTION.  `DW` rounds a word
+# count UP to a multiple of four (LDR-07), so a block whose RB_WORDS IS a
+# multiple of four returns NO poison word and the over-run control silently
+# stops existing.  641, 707 and 718 each happened to leave one; probe3.c now
+# carries `rb_readback_shows_poison` so that it is a property instead of a
+# remainder.  The mutation takes RB_BMPKW to 66 -- RB_WORDS 720 -- AND moves
+# `rb_layout_adds_up` to match, so the only assertion left that CAN fire is the
+# new one.  🔴 The case then asserts on that assertion's NAME: SM3 already shows
+# that a bad layout does not build, and a case that could not tell the two
+# apart would pass on either and cover neither.
+s3b="$(smut sm3b)"
+sed -i 's/^#define RB_BMPKW	64u$/#define RB_BMPKW	66u/' "$s3b/src/probe3.c"
+sed -i 's/(RB_WORDS == 718u)/(RB_WORDS == 720u)/' "$s3b/src/probe3.c"
+make -C "$s3b/src" BUILD="$s3b/b" P=probe3 payload HAZLINT="$HERE/hazlint"      >"$s3b/out" 2>&1
+ck "SM3b a word count divisible by four does not build" no    "$([ -s "$s3b/b/probe3/probe3.bin" ] && echo yes || echo no)"
+ck "SM3b and it is the poison-margin assertion that fires" yes    "$(grep -q 'rb_readback_shows_poison' "$s3b/out" && echo yes || echo no)"
+# SM3c is SM3b's population control: the SAME two edits with the count left at
+# 719 -- not divisible by four -- must BUILD.  Without it, SM3b passes on a
+# tree that cannot build at all.
+s3c="$(smut sm3c)"
+sed -i 's/^#define RB_BMPKW	64u$/#define RB_BMPKW	65u/' "$s3c/src/probe3.c"
+sed -i 's/(RB_WORDS == 718u)/(RB_WORDS == 719u)/' "$s3c/src/probe3.c"
+make -C "$s3c/src" BUILD="$s3c/b" P=probe3 payload HAZLINT="$HERE/hazlint"      >/dev/null 2>&1
+ck "SM3c and a count of 719 still builds" yes    "$([ -s "$s3c/b/probe3/probe3.bin" ] && echo yes || echo no)"
 
 # SM4 -- a Status write outside the three routines that may make one. W3 counts
 # them AND names their owners; without the owner half, a fourth write inside an
