@@ -2227,6 +2227,27 @@ change is in the *upload*, because a change to the image is a desk segment and
 
 ### 🔴 The discriminator ladder, and every rung carries at least one rung of it
 
+🆕 **2026-09-01 (`P4a`): AN IMAGE BUILT FROM THE RECIPE AS IT STANDS TODAY
+PRINTS A TWELFTH LINE, AND THE CELLS BELOW DO NOT EXPECT IT.** `ID0` was added
+to `config/rlxfw-marks.tsv` because freezing the build stamp cost the anti-DoD
+its *which of my builds* half; it emits `RLXFW-ID0=XXXXXXXX` immediately after
+the banner, so the wire order becomes `RLXFW-B00`, `RLXFW-ID0=…`, `RLXFW-B01`…
+
+⚠️ **The cells below are NOT edited for it, deliberately.** They record a card
+that was written against `quietm`/`loudm` — images built on 2026-08-28 and
+2026-08-30, which do not carry `ID0` — and the byte counts beside them
+(`36.2 ms`, `139 bytes`, `849 bytes`) were measured on those images. Rewriting
+them would put today's expectation on yesterday's measurement. **The next card
+is written fresh and has to carry the twelfth rung**; `SPEC.md` `TC-39` is the
+owner of what `ID0` is and `TC-30` records that the ladder itself is still
+eleven.
+
+🔴 **And the value is not predictable from this file.** `RLXFW_SRC_ID` is a
+sha256 over `config/`, so it moves whenever any declaration does — including a
+comment. The card must read it from the build that produced the image it
+uploads (`rlxfw-kbuild.sh` prints `recipe=` before it stages), never from a
+number written here.
+
 **🔄 Rewritten 2026-08-28.** The original asked for two marks, one of
 them *"a string printed by `arch/rlx/bsp/setup.c` that exists only in my tree,
 emitted before `start_kernel`"*, and noted that M1 alone is not enough because
