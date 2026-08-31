@@ -4104,6 +4104,8 @@ stamp. It is not five rows averaged across four seatings.
 | `R3-10` | power cycle 4, the second half of the `FLR` bracket | 2026-08-30 |
 | `R3-11` | **this section, and the reel** | 2026-08-31 |
 
+🔴 **And three of those markers were STALE in `PROGRESS.md`'s own step list when this table was written, which is why the table was checked against the evidence rather than copied from the markers.** `R3-0` and `R3-1` carried no ✅ and `R3-9` still carried 🔄 while its own cell read *DONE 2026-08-31*. `R3-1` is the one worth naming, because the gate board's 2026-08-29 sentence *十二步走了六步* counts six that do NOT include it: its three DoD clauses are answered by `SPEC.md` `TC-21` (the per-file list, not an adjective), `TC-22` (each of the four unexplained violations given a verdict — all one shape, a conditional move whose destination is the just-loaded register, each with its address) and `notes/vendor-toolchains.md`'s three-column `hazlint` table. **The markers were corrected in the same commit as this section**; the count did not move.
+
 **Twelve of twelve.** Budget was **12 段, 猜, uncalibrated**; actual is counted
 in `LOG.md` by the gate board's own definition and recorded there, not here.
 
