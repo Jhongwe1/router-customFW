@@ -49,8 +49,8 @@ measurement.
 | | |
 |---|---|
 | 🔴 **`R3`'s D3 had no observable.** | The written criterion for *early bring-up completes* was the string `MemTotal:`, which **this kernel never prints in any configuration** — it is a `/proc/meminfo` field, not a boot message. The row passed on a substitute (the eleven boot marks, which are discriminators checked in the image before the seating). A DoD whose observable does not exist is a defect in the DoD and is recorded as one. |
-| ⚠️ **`R3-2`'s `TC-d` half stayed half-done for one step** and is carried as a debt in the running-order note rather than counted as a pass. |
-| ⚠️ **`R1h`'s decision ② is still `R1-gate`'s**, answered on the D side by a bare-metal payload and not by the gate that owned it. |
+| ⚠️ **`R3-2`'s `TC-d` half stayed half-done for one step.** | It is carried as a debt in the running-order note rather than counted as a pass. |
+| ⚠️ **`R1h`'s decision ② is still `R1-gate`'s.** | It was answered on the D side by a bare-metal payload, and not by the gate that owned it. |
 
 ---
 
@@ -68,7 +68,7 @@ measurement.
 
 | | |
 |---|---|
-| 🔴 **Four commits in this repository's history are red in CI, from two causes.** | 量 2026-09-01 by reading the runs rather than the summaries: `95895e1`, `5b66938` and `3a10e0c` share one cause (an allowed-skip label edited in the table and not in the tool); `2266324` is a second (a blank line inside a markdown table row). Both are fixed, and `HEAD` is green. ⚠️ Three commits pushed in one batch on 2026-09-01 have **no run at all**, which is not the same as green. |
+| 🔴 **17 of this repository's 59 CI runs are red, and until 2026-09-01 nobody had counted them.** | 量 2026-09-01, `gh run list --limit 200`: **59 runs — 41 success, 17 failure, 1 in flight.** The failures span 2026-08-28 to 2026-09-01. ⚠️ **Every previous statement in this repository about its own CI history was made from the last few rows of `gh run list` and was wrong**: the twentieth session wrote *three red commits, one cause*, and the twenty-first corrected it to *four* and then to *five*, each time from a window rather than from the history. 🔴 **Four of the seventeen are diagnosed in this repository** — three share an allowed-skip label edited in the table and not in the tool (`95895e1`, `5b66938`, `3a10e0c`), one is a blank line inside a markdown table row (`2266324`) — plus `2026e8e` (a case that skips on a runner and runs here) and `09e1a23` (two one-cell rows in a two-column table, pushed after a green local gate because `spec-check` sweeps *tracked* files and the file was untracked). **The other eleven have never been looked at**, and saying so is the point of this row. |
 | 🔴 **Three CI failures now share one shape: a case that RUNS on the author's machine prints no skip line, so its label is never compared against the expected-skip table.** | The variable is different every time — `$FWRE_WORK` twice, the **timezone** once — so a rule about any one of them does not close the class. Two partial answers are in place: a case with no branch cannot print an undeclared skip, and a runner can be simulated locally with an empty `$FWRE_WORK`. Neither is complete. `PROGRESS.md` `CI-1`. |
 | 🔴 **Version → contents has two owners and they disagree on six of six shared rows.** | `plan/CHARTER.md` §88 is authoritative and is **gitignored**, so a public reader cannot follow a pointer to it; `PROGRESS.md`'s Release clock restates it and is stale. This file and `CHANGELOG.md` now own the contents of the versions that have actually been released; the map of *future* versions still has the defect. `P4b-gate` ① owns it. |
 | ⚠️ **`v0.1` was never tagged.** | Its contents (`R0`, `rlxprobe` executing on the silicon, `R1-gate`) completed 2026-08-26. Owner's ruling 2026-09-01: not urgent. This release therefore spans `v0.0` → `v0.2`. |
