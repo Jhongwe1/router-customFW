@@ -982,6 +982,18 @@ exclusion becomes checkable from the block. ⚠️ **And only ONE of the four by
 carries it** — at `C/8`, `C/4` and `C/2` both geometries predict the same M
 (9, 5, 3); they part only at `T = C`. `docs/probe3-cells.md` §6.2a has the
 predictions and the refutation conditions.
+
+🟢 **2026-08-31 (seating 8) — it ran, and the block now carries TWO routes.**
+`w.assoc.mt = 09 05 03 03`: the three shared bytes came back shared and the one
+that discriminates came back `03` against direct-mapped's `02`. **And the
+retained bitmap gives an independent second route that is a shape rather than a
+count** — the FRESH victims at the boundary point are ten `{k, k+256}` pairs
+with zero singletons, which two-way predicts and direct-mapped does not, *while
+both predict the same 20*. ⚠️ **Neither makes this section more certain**, for
+the reason two paragraphs above; both make it checkable. `tools/rbcheck.py`
+`C33`…`C39` own the judgement, `C36` is the population control that refuses a
+verdict from a single-valued region, and `docs/rlx-cache-and-cp0.md` § ⓓ is the
+owner of the write-up.
  `probe3.c:1582-1646 (c_size = (boundary != 0xFFFFFFFFu))` searches
 `t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
 
