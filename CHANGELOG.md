@@ -155,6 +155,66 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### 2026-09-01 — `P4a`: the same tree now builds twice to the same sha256, and the tension that opened the gate was one fourteenth of the problem
+
+🟢 **A reproducible kernel build.** Two builds of the declared recipe, 44
+seconds apart, produce the same `vmlinux` byte for byte —
+`c956c5b754374843…`, `cmp` rc=0 — and a second pair does it again after a
+declared row changed. Before today the same tree built twice gave two hashes.
+
+🔴 **The 84 differing bytes were two causes, not one, and the smaller cause was
+the only one anybody had been arguing about.** Freezing the kernel's build
+timestamp is the standard fix for this and it accounts for **6 of 84 bytes**.
+The other **78** are `usr/gen_init_cpio` stamping every directory, symlink and
+device node with `time(NULL)`; the count is derivable from the vendor's own
+source (three `time(NULL)` sites against a declaration of 13 symlinks, 8
+directories and 5 nodes = 26 entries × 3 bytes) and it matches the measurement.
+**Zero** differing bytes were in `.text`.
+
+Both fixes are declarations rather than habits: `config/rlxfw-build-stamp`
+holds one Unix epoch, and the build driver renders it into
+`KBUILD_BUILD_TIMESTAMP` under `LC_ALL=C TZ=UTC` and passes the same epoch to
+`gen_init_cpio`, so the two cannot drift apart. Midnight UTC is deliberate — a
+banner reading `00:00:00 UTC` announces itself as declared rather than
+imitating a build moment.
+
+**The positive control ran twice and a second control predicted no change.**
+One byte of a string literal moves the hash; one byte inside a comment does
+not. That is the predicted answer and it refutes the gate's own wording:
+*changing one source byte changes it* needs *that reaches the image*, and the
+defect is recorded rather than quietly repaired.
+
+**A fourth discriminator, because freezing the clock cost one.** The build
+stamp was one of three strings the vendor image cannot produce, and freezing it
+kept the *not the vendor's* half — `(key@K)` is inside the named string — while
+removing the *which of my builds* half. Nothing else in the image had that role.
+`RLXFW-ID0` now carries it: a hash of the declaration files themselves, so it
+moves when the recipe moves and needs no remembering. Checked, not asserted —
+all twelve marks present once in the image and absent from the vendor's.
+
+⚠️ **The gate closes at one machine.** This drop's `mkcompile_h` has no
+`KBUILD_BUILD_USER` or `KBUILD_BUILD_HOST` and takes `(key@K)` from `whoami`
+and `hostname`, so a third party rebuilding the published recipe still gets a
+different hash. Five other candidates for that were read or measured away —
+the compiler string carries no build path, and the image holds no absolute path
+from the build tree — leaving one open item rather than a list.
+
+**New instruments.** `tools/repdiff.py` maps the differing bytes of two builds
+onto sections and symbols, which `sha256sum` cannot; 16 controls on ELF images
+it builds in memory, plus 12 mutants. The mutant suite killed 8 of 12 on its
+first run and every survivor was real: two controls were raising instead of
+reporting, one fixture was refused by an earlier check than the one under test,
+and one mutant was equivalent.
+
+🔴 **Two gates were found measuring a model rather than an artefact.** A suite
+asserted *eleven marks* through a pattern that a twelfth mark did not match, so
+it stayed green while the file declared twelve. And the reel's 60-second
+ceiling is checked against computed capture-plus-pause while a stopwatch reads
+**62.2 s** — measured three times, and decomposed to 2,339 sleep calls in one
+segment. The sentence was corrected; the reel was not, because fitting the
+pause column to a ceiling is what that file's own rule forbids.
+
+
 ### 2026-08-31 — seating 8: the memory-mapped SPI window does not buffer, and the cache is two-way by a second route
 
 🔴 **`FW-34`'s last row is closed by measurement.** A bare-metal payload timed

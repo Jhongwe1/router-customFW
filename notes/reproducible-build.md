@@ -244,3 +244,116 @@ qualifier *that reaches the image* or the gate is asserting something false.
 ⚠️ **`PC-2`'s answer is expected to INVERT once `ID0` lands**, because `ID0` is
 computed from the declaration files as bytes, comments included. That inversion
 is itself a check on `ID0`.
+
+### 5.1 🟢 量 2026-09-01 — `PC-1`, `PC-2`, and the inversion `ID0` predicts
+
+```
+PC-1  one byte of "0123456789ABCDEF"   predicted DIFFERS    measured DIFFERS
+      913448f0c344aa6af735538c57caafafc17b26b5308c029f7bfd3b545753be22
+PC-2  one byte inside a comment        predicted IDENTICAL  measured IDENTICAL
+      c956c5b7543748439c5b8ea3238cccaa2cff52e0dd80d575274a01304454b97a
+```
+
+`rlxfw_mark.c` was restored and its sha256 checked byte for byte afterwards; a
+control that leaves the tree dirty has bought its answer with a defect.
+⚠️ **`PC-2` is also a third build of the same declaration**, in a third cell,
+from a source file whose bytes were different — and it produced the same image.
+
+**With `ID0` in** (`config/rlxfw-marks.tsv`, recipe id `9c7217ac`):
+
+```
+p4a3  4fc20ce49f68a6c59183c978080c54dc89c6c433e935ecfc89358a30cd08586a
+p4a4  4fc20ce49f68a6c59183c978080c54dc89c6c433e935ecfc89358a30cd08586a
+```
+
+identical to each other and different from the pre-`ID0` pair, which is the
+gate's positive control arriving a second time from a change of one declared
+row. **And `PC-2` inverts, exactly as §5 predicted**: with `ID0` in, the same
+comment byte moves the recipe id `9c7217ac` → `cf4efeac` and the image to
+`a4480a625d026c85…`. The inversion is the check on `ID0` — it says the id is
+computed from the declaration's bytes and not from something narrower.
+
+**`ID0` is a discriminator by the same test as the ladder**, not by assertion:
+`rlxfw-marks.py verify` against `p4a3` with the vendor's `ctl-vendor/vmlinux`
+as `--absent` reports *all 12 mark(s) present once in the image and absent from
+1 vendor artefact(s)*. ⚠️ It is a **constant**, the same weaker kind as
+`B00`..`B10`; `B02` and `B07` are the stronger kind, read off this die at run
+time. What makes it worth having is not strength but *variance*: it is the only
+board-side string in the image that differs between two builds of mine.
+
+### 5.2 讀 + 量 — every cpio entry now carries the declared epoch
+
+量 on `p4a3`, reading the `mtime` field of every `070701` header in the image
+(field 6, characters 47–54 of the 110-byte ASCII header):
+
+```
+     31  6A961580      = 1788220800, the declared epoch
+      1  00000000      the TRAILER, which gen_init_cpio hardcodes to 0 (:84)
+     32  headers total
+```
+
+So all **31** declared entries carry it, the five `file` rows included.
+🔴 **Those five were the ones that had not moved between `rep8` and `rep4`, and
+that was reproducibility by accident**: `cpio_mkfile` took the SOURCE file's
+`st_mtime`, and those sources sit in `$FWRE_WORK` and had not been rebuilt. On
+a fresh clone `/init` comes from `config/rlxfw-init.sh`, whose mtime is the
+checkout time. Hunk 2 of `host-compat/0002` is that half, and it is the one
+piece of Level 2 that this session closed.
+
+---
+
+## 6. `P4a`'s residual — Level 2, and what of it is already measured away
+
+**The gate closes at Level 1 by the owner's decision (§3.2). This is what Level
+2 would still need, with what has been measured rather than assumed.**
+
+| # | hazard | status |
+|---|---|---|
+| L2-1 | **`(key@K)`** — `mkcompile_h` writes `LINUX_COMPILE_BY`/`_HOST` from `` `whoami` ``/`` `hostname` `` and this drop has no `KBUILD_BUILD_USER`/`_HOST` | 🔴 **OPEN, and it is the whole of Level 2 on its own.** A third party gets a different banner and therefore a different sha256. The fix is a mark on `mkcompile_h` declaring both, which is a vendor-source change and needs its own reason |
+| L2-2 | `LINUX_COMPILER` from `` `$CC -v \| tail -n 1` `` — on many toolchains this is a full configure line carrying the compiler's own build paths | 🟢 **measured away**: 讀 `include/linux/compile.h` in the built cell, it is `"gcc version 3.4.6-1.3.6"` and nothing else. Stable for anyone using the same pinned rsdk tarball |
+| L2-3 | the build tree's absolute path reaching the image (`__FILE__`, `-g`, `.comment`) | 🟢 **measured away**: 量 on `p4a3`, `/home/key` **0** hits, `r3-4` **0**, `cells/` **0** |
+| L2-4 | the initramfs source files' own mtimes | 🟢 **closed today**, §5.2 |
+| L2-5 | `LC_ALL` changing `date`'s rendering | ⚠️ **untestable on this host**: `locale -a` returns `C`, `C.utf8`, `POSIX` and nothing else, so no run-time case here can distinguish a driver that pins it from one that does not. The driver pins it and `S5c` asserts on the source text, which is weaker and says so |
+| L2-6 | `#1` from `.version`, which kbuild increments per link | ⚠️ **unmeasured, and bounded**: every cell is re-staged, so `.version` starts absent and reaches 1. `rlxfw-kbuild.sh --keep` would break it, and `--keep` is already marked `[TESTING ONLY]` |
+| L2-7 | filesystem `readdir` order reaching link order | ⚠️ **unmeasured.** The initramfs is ordered by `config/rlxfw-initramfs.tsv`, so it is not a hazard there; kbuild's own object order is `Makefile`-driven, which is a reading not yet taken |
+
+🔴 **So Level 2 is one open item and two unmeasured ones, not the open-ended
+list it looked like this morning.** That is a result of §3.2 rather than a plan:
+five of the seven rows were settled by reading or measuring, and the one that
+matters is the one the tension never mentioned.
+
+---
+
+## 7. `P4a`'s closing conditions, read one at a time
+
+**Gate-board DoD**, verbatim: *reproducible build: same tree built twice → same
+image sha256, with the positive control that changing one source byte changes
+it.*
+
+| | | verdict |
+|---|---|---|
+| same tree built twice → same sha256 | `p4a1`/`p4a2` (`c956c5b7…`) and `p4a3`/`p4a4` (`4fc20ce4…`), two independent pairs, plus `p4apc2` as a third build of the first | 🟢 **met** |
+| the positive control | `PC-1`: one byte of a string literal moves the sha256. And a second time from a declared row: adding `ID0` moved `c956c5b7…` → `4fc20ce4…` | 🟢 **met, twice** |
+| ⚠️ the DoD's own wording | *"changing one source byte"* is false as written — `PC-2` changed a comment byte and the image did not move. It needs *that reaches the image*, and `ID0` widens what reaches the image to the declaration's own bytes | 🔴 **recorded as a defect in the DoD, not repaired silently** |
+
+**Refutation condition, written at §2.2 and §4 before the results**: `P1`
+(nothing in `.text`) held, `P2` was refuted and its refutation is §3, `P3` held.
+`P21-2`'s two clauses both held. `P21-3`'s two controls both held, including the
+one that predicted *no change*.
+
+**What `P4a` did NOT establish**, listed because the gate closes anyway:
+
+* **Level 2 is open** — §6 `L2-1`. Nobody but this workstation can reproduce
+  `4fc20ce4…`, and `study/20260831-study7.md` gives the gate's purpose as
+  「二進位檔真的來自我發布的原始碼」, which is Level 2's sentence and not
+  Level 1's.
+* **Two builds, one machine, one afternoon.** Nothing here says the build is
+  reproducible next month, on another kernel version of WSL, or after a
+  `src-vendor` re-clone. The pinned drop's sha is what stands behind that and it
+  is not the same claim.
+* **`ID0` has never been read off the board.** It is checked in the image by
+  `rlxfw-marks.py verify`; no seating has printed it. The next one will, and
+  until then its value on the wire is 推.
+* **The `.text` of `p4a3` is not the `.text` of the image that booted.**
+  `quietm` (2026-08-28) and `loudm` are what `SPEC.md` `FW-27`/`FW-31`/`FW-32`
+  are measured on. This gate did not rebuild those and does not claim to.

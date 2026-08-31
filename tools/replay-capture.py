@@ -565,9 +565,23 @@ def reel_budget(tsv):
 
     This exists so the reel's running time is a number the tool re-derives
     from the captures rather than a number written in a comment.  ⚠️ It is
-    the sum of the captures' own durations plus the pauses; it is not what a
-    stopwatch on the recording will read, because a terminal's own scroll is
-    not in it.
+    the sum of the captures' own durations plus the pauses, and it is NOT what
+    a stopwatch on the recording reads.
+
+    🔴 The reason given here until 2026-09-01 was "a terminal's own scroll",
+    and 量 that is not the dominant term.  Three end-to-end runs of the real
+    reel measured 62.246 / 62.235 / 62.310 s against a computed 59.749 s, and
+    the 2.5 s decomposes as ~0.065-0.14 s of fixed cost per segment plus
+    **1.461 s in `K-J` alone**: 2,339 timing records, each one a `time.sleep`
+    that is only guaranteed to sleep AT LEAST as long as asked, at ~0.62 ms
+    apiece.  So the gap grows with the number of RECORDS, not with the number
+    of bytes or the duration -- which is why a 33 s segment costs twenty times
+    what a 7 s one does.
+
+    ⚠️ `R16` asserts on this number and a stopwatch measures the other one.
+    That is a gate reading the model rather than the artefact, it is recorded
+    in `config/r3-11-reel.tsv` rather than papered over, and nothing here
+    trims the pause column to make the two agree.
     """
     segs = []
     for prefix, title, pause in read_reel(tsv):

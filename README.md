@@ -526,8 +526,9 @@ R1-gate   cache model + CP0 census         closed 2026-08-26
 R2a/b/d   which GPL drop this was built from   closed 2026-08-28
 R1h       cache geometry, D-side coherence, `cache` retirement   closed 2026-08-29
 R3        my kernel boots to a shell and pings  closed 2026-08-31
+P4a       reproducible build: same tree twice -> same image sha256  closed 2026-09-01
+P4b-gate  the part of the release process that blocks tagging v0.2
 R4        edit -> result in under 90 s
-P4a       reproducible build: same tree twice -> same image sha256
 R5        six drivers in tree, each diffed against two public ports
 R1-pub    ISA / hazard / Lexra-ASE table   runs alongside R5
 R6        my Ethernet driver

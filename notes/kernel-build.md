@@ -2895,6 +2895,8 @@ and `rlxfw-kbuild.sh` does not record it either: the build writes
 followed every committed file produced an image without it, and every gate in
 this repository stayed green.**
 
+🔄 **2026-09-01: this section is where `P4a` starts and it is NOT where `P4a` lives.** `notes/reproducible-build.md` owns the gate; this section keeps what it measured. Two things it said were narrowed there: the flag was the whole difference between `quietm` and `rep8`, and it is **not** the whole of reproducibility — `rep8` against `rep4`, which this section used only to exclude `-j`, differ in 84 bytes for two further reasons. And §11.4's *eleven marks* is still the ladder's count while `config/rlxfw-marks.tsv` now declares **twelve**: `ID0` is an identity string, not a ladder step.
+
 ⚠️ **This says nothing about the image that booted.** `quietm` and `loudm` were
 built WITH the flag — that is what the `.cmd` files say — and `RUNSHEET` `P1`
 measured `hazlint` 0 on both. What is refuted is *reproducibility*: until today

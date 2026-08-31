@@ -25,8 +25,30 @@
 #   pause     2.0 + 2.5 + 2.0 + 2.0 + 2.5 + 2.0 + 2.0               = 15.000 s
 #   TOTAL                                                            = 59.749 s
 #
-# `plan/ARTIFACTS.md` §2 asks for a v0.2 take of **60 s**.  This is 0.25 s
-# under it, and `R16` is the case that will go red if a future edit crosses it.
+# `plan/ARTIFACTS.md` §2 asks for a v0.2 take of **60 s**, and `R16` is the
+# case that will go red if a future edit takes the COMPUTED total over it.
+#
+# 🔴 2026-09-01 (twenty-first): THIS PARAGRAPH USED TO SAY *"This is 0.25 s
+# under it"*, and that was a claim about a stopwatch made from a number the
+# tool's own docstring disclaims.  量, `reel` run three times end to end:
+#
+#     62.246  62.235  62.310 s      (range 0.075 s, so the number is stable)
+#     computed 59.749 s   ceiling 60.0 s
+#
+# The artefact is ~2.5 s OVER the ceiling and the gate could not see it,
+# because `R16` asserts on capture+pause and a stopwatch measures the replay.
+# Where the 2.5 s goes, measured per segment: ~0.065-0.14 s of fixed cost per
+# segment, and **1.461 s in `K-J` alone**, which has 2,339 timing records and
+# pays ~0.62 ms of `sleep` granularity on each one.
+#
+# 🔴 THE PAUSE COLUMN IS NOT BEING CUT TO FIT.  That is this file's own rule,
+# three paragraphs down, and trimming 2.0 -> 1.5 to reach a number is exactly
+# what it forbids.  What changes is the sentence, not the reel.
+#
+# ⚠️ One measurement in that run was nearly written up as a finding and was
+# not: `X-b2` came back 0.967 s over its own capture on a single run, which
+# looked like a real anomaly at 19 records.  Five runs put the minimum at
+# 0.065 s.  n = 1 is not a measurement.
 #
 # 🔴 THE PAUSE COLUMN IS SET FROM LEGIBILITY AND THEN CHECKED AGAINST THE
 # CEILING, NOT FITTED TO IT.  The pause is the gap AFTER a segment -- 讀,
