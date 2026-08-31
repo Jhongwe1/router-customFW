@@ -54,6 +54,8 @@ Usage
 -----
     flashwin.py render --dump <file> --at 0x000000 --ram 0x80A00000
     flashwin.py render --dump <file> --at 0x006000 --ram 0x80A00200 --out <path>
+    flashwin.py scan bench/2026-08-31c/K-P3.log --dump <file>
+    flashwin.py scan --sweep bench --dump <file>
     flashwin.py --self-test
 
 A window overlapping a ``FORBIDDEN`` region may not be printed and may not be
@@ -250,6 +252,221 @@ def cmd_render(args) -> int:
           file=sys.stderr)
     return 0
 
+
+
+# --------------------------------------------------------------------------
+# scan -- does a capture that is ALREADY COMMITTED contain forbidden content
+# --------------------------------------------------------------------------
+#
+# 🔴 THE THIRD CONTAINMENT SHAPE, and neither of the first two reaches it.
+# `render`'s guard governs what may be PRINTED and where a rendering may be
+# WRITTEN.  `flrbracket run`'s guard governs where a BRACKET's read-back and
+# pre-read may land.  Both act at the moment a file is produced.  Nothing
+# asked the other question: *is there forbidden content in a file this
+# repository has already committed?*
+#
+# The incident that names it, 量 2026-08-31 (seating 8): `K-P3` is
+# `DW 80A00000 2000` -- a 32 KiB read of RAM -- and it spans `0x80A00600` and
+# `0x80A00700`, the two destinations the `H601` windows are read into.  Its
+# output lands in `bench/`.  It was safe because `K-guard600`/`K-guard700`
+# read `0/64` retained words, which is to say **because the experiment came
+# out the expected way**.  `CLAUDE.md` already records that a containment rule
+# whose correctness depends on an experiment's outcome is not a containment
+# rule; this is that sentence with an instrument behind it.
+#
+# WHAT IT DOES AND DOES NOT DETECT, stated before it is used
+# ----------------------------------------------------------
+# It detects a contiguous run of **>= 16 bytes** of a `FORBIDDEN` region --
+# any 16 bytes, at any offset, no alignment condition -- provided those 16
+# bytes carry at least `SCAN_MIN_DISTINCT` distinct byte values.  Raw bytes
+# and hexadecimal text both, through one matcher on two channels:
+#
+#   RAW  the file's own bytes -- a binary that should never have been
+#        committed.
+#   HEX  every maximal run of hexadecimal digits in the file, with any token
+#        immediately followed by `:` DROPPED (that is a `DW` reply's address
+#        column, and leaving it in would break the byte stream every 16
+#        bytes), concatenated and decoded.  This is the channel that sees a
+#        `DW` capture, and it does not care how the words are grouped.
+#
+# ⚠️ What it does NOT see, and each of these is a real gap:
+#   * a run shorter than 16 bytes -- INCLUDING A BARE SIX-BYTE MAC.  That is
+#     `tools/leakscan.py`'s shape: it knows the patterns an address takes and
+#     this tool knows only *these bytes came from that window*.  The two are
+#     complements and neither subsumes the other.
+#   * a byte-swapped or little-endian rendering.  The loader prints
+#     big-endian, which is the flash's own order, so the channel that matters
+#     here is covered; a capture from some other instrument may not be.
+#   * anything under a compression or an encoding that is not plain hex.
+#   * a region not in `FORBIDDEN`.  `FORBIDDEN` is `H601` alone, deliberately:
+#     the loader region's bytes are the vendor's code and are already
+#     committed in `bench/2026-08-24d/G8a-rd0.log`.
+#
+# THE PROBE SET IS EVERY WINDOW, NOT EVERY SIXTEENTH, AND THAT IS AFFORDABLE
+# FOR A MEASURED REASON.  The first version searched for the region's 16-byte
+# windows at ALIGNED offsets, which buys a guarantee with a caveat in it (any
+# run of >= 31 bytes contains a whole aligned window; a run of 16..30 may be
+# missed).  量 2026-08-31: at a 16-byte window and a 4-distinct-value floor,
+# taking EVERY offset costs **113 distinct needles**, which is FEWER than the
+# 512 aligned ones -- because 98.22 % of `H601` is a single repeated byte
+# value and the whole region holds only 40 distinct values at all.  So the
+# caveat is dropped rather than documented.
+#
+# THE ENTROPY FILTER IS ON THE REFERENCE SIDE, not on the capture's.  A window
+# of the region holding fewer than `SCAN_MIN_DISTINCT` distinct byte values is
+# NOT searched for: finding sixteen identical bytes in a capture says nothing
+# about this device, and a filter applied to the capture instead would be
+# deciding what to report after seeing the match.  量 at a 16-byte window:
+# >= 3 distinct gives 136 needles, >= 4 gives 113, >= 5 gives 93.  **4 is a
+# choice, 推**, and the sweep below is what says it does not fire on the
+# record as it stands.
+SCAN_WINDOW = 16
+SCAN_MIN_DISTINCT = 4
+
+HEXRUN = re.compile(rb"[0-9A-Fa-f]+")
+
+
+def hex_stream(text: bytes) -> bytes:
+    """The capture's hexadecimal, decoded, with `DW` address columns dropped.
+
+    A token is an address column when the character after it is `:`.  That is
+    read off the one format this repository has: `%08X:` then tab-separated
+    `%08X` words (`render_dw` above, and `docs/loader-command-semantics.md`).
+    """
+    out = bytearray()
+    for m in HEXRUN.finditer(text):
+        end = m.end()
+        if end < len(text) and text[end:end + 1] == b":":
+            continue
+        tok = m.group(0)
+        if len(tok) < 4 or len(tok) % 2:
+            continue
+        out += bytes.fromhex(tok.decode("ascii"))
+    return bytes(out)
+
+
+def scan_probes(dump: bytes, regions):
+    """-> [(needle, flash_offset)] -- the aligned windows worth searching for.
+
+    Refuses an empty result: a probe list that is empty makes every scan
+    report CLEAN, which is this repository's "a tool reporting 0 is making a
+    claim" in one line.
+    """
+    probes, seen = [], set()
+    for lo, hi, _why in regions:
+        for at in range(lo, hi - SCAN_WINDOW + 1):
+            w = dump[at:at + SCAN_WINDOW]
+            if (len(w) == SCAN_WINDOW and len(set(w)) >= SCAN_MIN_DISTINCT
+                    and w not in seen):
+                seen.add(w)
+                probes.append((w, at))
+    if not probes:
+        _fail("no probe survived the entropy filter -- every window of every "
+              "forbidden region is a repeated byte, or the dump is wrong. A "
+              "scan with no probes reports CLEAN on everything")
+    return probes
+
+
+def scan_bytes(data: bytes, probes):
+    """-> [(channel_offset, flash_offset, run_len)], never any content.
+
+    Overlapping probe matches are merged into one interval, so a 256-byte
+    copy is reported as ONE finding rather than as the ~113 overlapping
+    needles that found it.  The flash offset kept is the lowest of the
+    merged set, which is where the run starts in the region.
+    """
+    hits = []
+    for needle, at in probes:
+        start = 0
+        while True:
+            i = data.find(needle, start)
+            if i < 0:
+                break
+            hits.append((i, at))
+            start = i + 1
+    if not hits:
+        return []
+    hits.sort()
+    runs = []
+    beg, end, flash = hits[0][0], hits[0][0] + SCAN_WINDOW, hits[0][1]
+    for i, at in hits[1:]:
+        if i <= end:                      # overlapping or touching
+            end = max(end, i + SCAN_WINDOW)
+            flash = min(flash, at)
+        else:
+            runs.append((beg, flash, end - beg))
+            beg, end, flash = i, i + SCAN_WINDOW, at
+    runs.append((beg, flash, end - beg))
+    return runs
+
+
+def scan_capture(blob: bytes, probes):
+    """-> [(channel, channel_offset, flash_offset, run_len)]."""
+    found = []
+    for channel, data in (("raw", blob), ("hex", hex_stream(blob))):
+        for off, at, n in scan_bytes(data, probes):
+            found.append((channel, off, at, n))
+    return found
+
+
+def cmd_scan(args) -> int:
+    with open(args.dump, "rb") as f:
+        dump = f.read()
+    probes = scan_probes(dump, FORBIDDEN)
+
+    if args.sweep:
+        # 🔴 `upstream/` IS NOT EXCLUDED BY DEFAULT, and the first version of
+        # this walk excluded it.  量 2026-08-31, the run that made the point:
+        # with it excluded the sweep of this whole repository was CLEAN, and
+        # with it included there is one hit -- `upstream/BENCH-LOG.md`, sixteen
+        # bytes of `H601` as a hexdump line, in a PUBLIC repository, which
+        # neither `leakscan` nor `audit-bench-log` names (both look for the
+        # text SHAPES an address takes, and a hexdump of flash has none).  A
+        # default that hides the only finding the tool has ever made is not a
+        # default.  `--exclude` is how a sweep declines a tree, so the decision
+        # is on the command line where a reader can see it.  `.git` is skipped
+        # because its objects are zlib-compressed and no verbatim run survives
+        # in them; that is a cost argument, not a containment one.
+        skip = set(args.exclude or ())
+        paths = []
+        for root, dirs, files in os.walk(args.sweep):
+            dirs[:] = [d for d in dirs if d != ".git" and d not in skip]
+            for name in sorted(files):
+                paths.append(os.path.join(root, name))
+        if not paths:
+            _fail(f"--sweep {args.sweep} walked zero files -- a sweep of an "
+                  f"empty population reports CLEAN and means nothing")
+    else:
+        if not args.file:
+            _fail("scan needs a FILE or --sweep DIR")
+        paths = [args.file]
+
+    nhit = 0
+    for p in paths:
+        try:
+            with open(p, "rb") as f:
+                blob = f.read()
+        except OSError as e:
+            print(f"  SKIP  {p}  {e}")
+            continue
+        for channel, off, at, n in scan_capture(blob, probes):
+            nhit += 1
+            # The verdict carries WHERE, never WHAT: the flash offsets are
+            # public (CLAUDE.md names the region) and the capture offset is a
+            # position in a file the reader already has. No byte of the window
+            # and no digest of it is printed -- see cmd_render on why a digest
+            # over this window is a 2^24 search for the MAC.
+            print(f"  \033[31mHIT\033[0m   {p}  {channel} channel, "
+                  f"offset {off} .. {off + n - 1}, {n} byte(s) of flash "
+                  f"0x{at:06X}")
+    print(f"  {len(paths)} file(s) scanned, {len(probes)} distinct probe(s) "
+          f"of {SCAN_WINDOW} bytes ({SCAN_MIN_DISTINCT}+ distinct values)")
+    if nhit:
+        print(f"  \033[31m{nhit} HIT(S)\033[0m -- a committed file holds "
+              f"content from a region that may not be published")
+        return 1
+    print("  CLEAN")
+    return 0
 
 # --------------------------------------------------------------------------
 # self-test
@@ -668,6 +885,187 @@ def self_test() -> int:
                 bad("N8 a window with two words swapped normalises equal -- "
                     "order is being discarded")
 
+
+        # ------------------------------------------------------------------
+        # S1..S9 -- `scan`.  A capture that is ALREADY COMMITTED.
+        # ------------------------------------------------------------------
+        # 🔴 S4 and S6 are the reason S2 means anything.  A scanner whose
+        # probe set is empty reports CLEAN on every input, exits 0, and looks
+        # exactly like a scanner that works -- this repository's own "a tool
+        # reporting 0 is making a claim", in the one place where a false CLEAN
+        # is a published MAC.
+        REG = [(0x100, 0x200, "synthetic forbidden region")]
+        # A synthetic dump: 0x000-0x0FF and 0x200+ are one repeated byte, and
+        # the "region" 0x100-0x1FF holds content.  Its second half is a single
+        # repeated byte so that the entropy filter has something to reject
+        # INSIDE the region, which is what S4 needs.
+        sdump = bytearray(b"\xAA" * 0x400)
+        content = bytes((i * 37 + 11) & 0xFF for i in range(0x80))
+        sdump[0x100:0x180] = content
+        sdump = bytes(sdump)
+        sprobes = scan_probes(sdump, REG)
+
+        n_expect = sum(
+            1 for at in range(0x100, 0x200 - SCAN_WINDOW + 1)
+            if len(set(sdump[at:at + SCAN_WINDOW])) >= SCAN_MIN_DISTINCT)
+        if sprobes and len(sprobes) == n_expect and n_expect < 0x100:
+            good(f"S1 the probe set is the region's windows that survive the "
+                 f"entropy filter: {len(sprobes)} of {0x200 - 0x100 - SCAN_WINDOW + 1}")
+        else:
+            bad(f"S1 {len(sprobes)} probe(s), expected {n_expect}")
+
+        # S2 POSITIVE -- exactly SCAN_WINDOW bytes of the region, buried in
+        # filler that is NOT from the region.
+        filler = bytes((i * 5 + 3) & 0xFF for i in range(64))
+        cap = filler + sdump[0x110:0x110 + SCAN_WINDOW] + filler
+        f2 = scan_capture(cap, sprobes)
+        if (len(f2) == 1 and f2[0][0] == "raw" and f2[0][1] == 64
+                and f2[0][2] == 0x110 and f2[0][3] == SCAN_WINDOW):
+            good(f"S2 POSITIVE: {SCAN_WINDOW} bytes of the region are found, "
+                 f"at the right capture offset and the right flash offset")
+        else:
+            bad(f"S2 {f2}")
+
+        # S2b THE SAME WINDOW TWICE.  🔴 Not a hypothetical: `K-P3` is one
+        # `DW` spanning BOTH `H601` RAM destinations, so the shape this
+        # subcommand was written for is a capture holding the window more than
+        # once.  量: a matcher that stopped at the first occurrence of each
+        # needle survived every other case here.
+        cap2 = (filler + sdump[0x110:0x110 + SCAN_WINDOW]
+                + filler + sdump[0x110:0x110 + SCAN_WINDOW] + filler)
+        f2b = scan_capture(cap2, sprobes)
+        if len(f2b) == 2 and all(x[3] == SCAN_WINDOW for x in f2b):
+            good("S2b the SAME window occurring twice is reported twice, not "
+                 "once -- the shape K-P3 has")
+        else:
+            bad(f"S2b {len(f2b)} finding(s), wanted 2: {f2b}")
+
+        # S3 NEGATIVE -- the same length of bytes from OUTSIDE the region.
+        f3 = scan_capture(filler + sdump[0x000:0x000 + 64] + filler, sprobes)
+        if not f3:
+            good("S3 NEGATIVE: a capture of bytes from outside the region is "
+                 "CLEAN, so S2 is not matching on length or on filler")
+        else:
+            bad(f"S3 {f3}")
+
+        # S4 the entropy filter, and it is the control on S2.  The region's
+        # own second half is one repeated byte; a capture of it must be CLEAN
+        # even though those bytes ARE inside the forbidden region.
+        f4 = scan_capture(filler + sdump[0x190:0x1A0] + filler, sprobes)
+        if not f4:
+            good("S4 a stretch of one repeated byte INSIDE the region is not "
+                 "a hit -- the filter is on the reference side")
+        else:
+            bad(f"S4 a low-entropy window matched: {f4}")
+
+        # S5 the HEX channel, and the address column.  The same 16 bytes
+        # rendered as a `DW` reply must hit; a file whose only hexadecimal is
+        # `DW` ADDRESS COLUMNS must not.
+        dw = render_dw(0x80A00000, sdump[0x100:0x180], "DW 80A00000 32")
+        f5 = scan_capture(dw, sprobes)
+        addr_only = b"".join(b"%08X:\n\r" % (0x80A00000 + 16 * k)
+                             for k in range(16))
+        f5b = scan_capture(addr_only, sprobes)
+        # 🔴 THE LENGTH IS THE ASSERTION, not the fact of a hit.  A `DW`
+        # rendering of 128 contiguous region bytes must come back as ONE run
+        # of 128.  If the address column were left in the hex stream, each
+        # 16-byte line would still match on its own and the fact of a hit
+        # would be unchanged -- eight runs of 16 instead of one of 128, and a
+        # window straddling a line boundary lost entirely.  量: a mutation
+        # deleting the address-column rule survived the weaker form.
+        if (len(f5) == 1 and f5[0][0] == "hex" and f5[0][3] == 0x80
+                and not f5b):
+            good("S5 a `DW` rendering of 128 region bytes is ONE run of 128 "
+                 "in the HEX channel, so the address column is out of the "
+                 "stream; address columns alone are CLEAN")
+        elif not f5:
+            bad("S5 a `DW` rendering of the window was NOT found -- the hex "
+                "channel or the address-column rule is wrong")
+        else:
+            bad(f"S5 hits={f5} (wanted one run of 128) address-only={f5b}")
+
+        # S5b THE `xxd` SHAPE -- four-hex groups, not eight.  🔴 This is not
+        # a hypothetical format: the only hit this subcommand has ever made on
+        # real material is `upstream/BENCH-LOG.md` line 2557, which is exactly
+        # this, and a `hex_stream` that only accepted eight-digit tokens would
+        # have reported that file CLEAN.
+        w = sdump[0x100:0x120]
+        xxd = b"".join(
+            b"%08x: " % (0x6000 + 16 * k)
+            + b" ".join(b"%04x" % int.from_bytes(w[16 * k + 2 * j:
+                                                   16 * k + 2 * j + 2], "big")
+                        for j in range(8))
+            + b"  ................\n"
+            for k in range(2))
+        f5c = scan_capture(xxd, sprobes)
+        if f5c and all(c == "hex" for c, _, _, _ in f5c):
+            good("S5b the HEX channel finds the window in an `xxd`-style dump "
+                 "with FOUR-digit groups, which is the shape of the one real "
+                 "finding this subcommand has made")
+        else:
+            bad(f"S5b an xxd-style rendering was not found: {f5c}")
+
+        # S6 REFUSAL -- a region with no window above the floor must REFUSE,
+        # not report CLEAN.  This is S1's failure mode as an exit code.
+        flat = bytes(b"\xAA" * 0x400)
+        # Through the library rather than the CLI: the CLI's region list is
+        # `FORBIDDEN`, and this case is about an arbitrary region.
+        try:
+            scan_probes(flat, REG)
+            bad("S6 a region with no window above the entropy floor did NOT "
+                "refuse -- every scan would report CLEAN")
+        except SystemExit:
+            good("S6 a region with no window above the entropy floor REFUSES "
+                 "rather than reporting CLEAN on everything")
+
+        # S7 the verdict carries no bytes.  Through the command line, on a
+        # file that HITS, asserting on stdout: no 64-hex digest, and none of
+        # the region's own probe bytes in any of the three renderings a
+        # careless implementation would use.
+        hitfile = os.path.join(td, "hits.bin")
+        dumpfile = os.path.join(td, "sdump.bin")
+        # `FORBIDDEN` is H601, so S7 drives the REAL region offsets on a
+        # SYNTHETIC dump: the same code path end to end, and nothing of this
+        # device is on disk for the case to leak even if it fails.
+        real = bytearray(b"\xAA" * 0x8000)
+        real[0x6000:0x6080] = content
+        with open(dumpfile, "wb") as f:
+            f.write(bytes(real))
+        with open(hitfile, "wb") as f:
+            f.write(filler + bytes(real[0x6000:0x6080]) + filler)
+        r7 = run("scan", hitfile, "--dump", dumpfile)
+        leaked = []
+        blob7 = bytes(real[0x6000:0x6010])
+        for rendering in (blob7,
+                          blob7.hex().encode(),
+                          blob7.hex().upper().encode(),
+                          b"".join(b"%02X " % b for b in blob7)):
+            if rendering in r7.stdout.encode("utf-8", "replace"):
+                leaked.append(rendering[:12])
+        if r7.returncode != 1:
+            bad(f"S7 a hitting file exited {r7.returncode}, wanted 1")
+        elif "HIT" not in r7.stdout:
+            bad("S7 no HIT was printed for a file that contains the window")
+        elif leaked:
+            bad(f"S7 the verdict PRINTED window bytes: {leaked}")
+        elif HEX64.search(r7.stdout):
+            bad("S7 a 64-hex digest was printed -- a digest over this window "
+                "is a 2^24 search for the MAC")
+        else:
+            good("S7 a HIT prints where and how many, and no byte of the "
+                 "window in any of four renderings, and no digest")
+
+        # S8 the sweep's population control.
+        emptydir = os.path.join(td, "emptysweep")
+        os.makedirs(emptydir, exist_ok=True)
+        e8 = refused(run("scan", "--sweep", emptydir, "--dump", dumpfile),
+                     "a sweep of an empty directory", "walked zero files")
+        if e8:
+            bad(f"S8 {e8}")
+        else:
+            good("S8 a sweep that walks zero files REFUSES rather than "
+                 "reporting CLEAN")
+
         # --- R1/R2/R3 the real material, THROUGH THE COMMAND LINE ---------
         work = os.environ.get("FWRE_WORK", "/home/key/fwre-work")
         d2p = os.path.join(work, "dumps", "flash-n150rt-console-2.bin")
@@ -683,12 +1081,13 @@ def self_test() -> int:
             bad(f"R1-R2 {REAL0} or {REAL6} is missing from this repository -- "
                 "that is not an allowed skip, it is a broken reference")
         elif not have_dumps:
-            skips.append(("this unit's flash dump", 3))
+            skips.append(("this unit's flash dump", 6))
             print("  skip   %-52s %s" % (
                 "this unit's flash dump",
-                "R1-R3 need $FWRE_WORK/dumps/flash-n150rt-console-{1,2}.bin -- "
+                "R1-R3 and S9a-S9c need "
+                "$FWRE_WORK/dumps/flash-n150rt-console-{1,2}.bin -- "
                 "4 MiB of this unit's own flash, which can never be committed "
-                "(covers 3)"))
+                "(covers 6)"))
         else:
             with open(d1p, "rb") as f:
                 d1 = f.read()
@@ -715,6 +1114,47 @@ def self_test() -> int:
                     good(f"{label} `render --at {flash:#08x}` reproduces "
                          f"{os.path.relpath(real, root)} byte for byte "
                          f"({len(want)} bytes), through the command line")
+
+            # --- S9a/S9b/S9c -- `scan` on real material --------------------
+            # 🔴 The positive control is the one that cannot be synthesised:
+            # a rendering of the REAL H601 window, written outside the
+            # repository, must HIT.  S9b is its negative (a region no rule
+            # forbids) and S9c is the file the whole subcommand exists for.
+            h601 = os.path.join(td, "s9-h601.txt")
+            r = run("render", "--dump", d2p, "--at", "0x6000",
+                    "--ram", "0x80A00200", "--out", h601)
+            r9a = run("scan", h601, "--dump", d2p)
+            if r.returncode != 0:
+                bad(f"S9a the render for the control exited {r.returncode}")
+            elif r9a.returncode != 1 or "HIT" not in r9a.stdout:
+                bad("S9a a rendering of the REAL H601 window was NOT flagged "
+                    "-- the scan reports CLEAN on the thing it exists for")
+            else:
+                good("S9a POSITIVE, real material: a rendering of the real "
+                     "H601 window HITS")
+            try:
+                os.unlink(h601)
+            except OSError:
+                pass
+
+            r9b = run("scan", os.path.join(root, REAL0), "--dump", d2p)
+            if r9b.returncode == 0 and "CLEAN" in r9b.stdout:
+                good(f"S9b NEGATIVE, real material: {REAL0} -- a committed "
+                     f"capture of flash 0x000000 -- is CLEAN")
+            else:
+                bad(f"S9b {REAL0} was flagged (rc={r9b.returncode})")
+
+            kp3 = os.path.join(root, "bench/2026-08-31c/K-P3.log")
+            if not os.path.exists(kp3):
+                bad("S9c bench/2026-08-31c/K-P3.log is missing -- that is a "
+                    "broken reference, not an allowed skip")
+            else:
+                r9c = run("scan", kp3, "--dump", d2p)
+                if r9c.returncode == 0 and "CLEAN" in r9c.stdout:
+                    good("S9c the incident file -- K-P3, a 32 KiB DW spanning "
+                         "both H601 destinations -- is CLEAN by machine")
+                else:
+                    bad(f"S9c K-P3 was flagged (rc={r9c.returncode})")
 
     print()
     if skips:
@@ -743,6 +1183,21 @@ def main() -> int:
                         "to be outside this repository, for a window that "
                         "overlaps a forbidden region")
     r.set_defaults(func=cmd_render)
+
+    sc = sub.add_parser("scan",
+                        help="does an ALREADY COMMITTED capture contain "
+                             "content from a forbidden flash region")
+    sc.add_argument("file", nargs="?", help="a capture to scan")
+    sc.add_argument("--dump", required=True,
+                    help="the reference flash dump the regions are read from")
+    sc.add_argument("--sweep", default=None,
+                    help="walk this directory instead of scanning one file")
+    sc.add_argument("--exclude", action="append", default=None,
+                    metavar="NAME",
+                    help="directory name to skip during --sweep; repeatable. "
+                         "`.git` is always skipped (compressed objects). "
+                         "Nothing else is, on purpose -- see cmd_scan")
+    sc.set_defaults(func=cmd_scan)
 
     n = sub.add_parser("normalise",
                        help="strip a DW reply to its data, so two reads of "

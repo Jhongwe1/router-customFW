@@ -597,3 +597,74 @@ fastest cold in the whole population is `K-A` at **325.9 ms** after **17.72 h**
 off, and the slowest of this seating's is `K4-A` at **355.4 ms** after
 **35.1 min**. **This is not a clean refutation; it is a variable nobody had
 separated**, and both `SPEC.md` rows now say so.
+
+---
+
+## §18 What the twentieth session did with this block's own findings
+
+**2026-08-31, desk, no power.** This block is frozen; the corrections it needs
+land here. Three of them are closed today and one is designed rather than run.
+
+### §18.1 🟢 § 13.1's rewrite is DONE, and it is one guard with two branches
+
+`docs/probe3-cells.md` § 6.8.2 carried *"`f.dram.str / f.dram.seq` must be
+**strictly less** than `R`"*, which § 13.1 measured as **1.3046 against
+1.0000** — unsatisfiable on the branch that closes `FW-34`. It is now
+conditioned, and the two branches want **opposite** senses:
+
+| branch | the failure it guards | the control |
+|---|---|---|
+| `R ≥ 1.8` | a large `R` that belongs to the LOOP | `D` strictly **less** than `R` |
+| `R ≤ 1.15` | the instrument cannot see a stride difference AT ALL | `D` strictly **greater** than `R`, and `D ≥ 1.15` |
+| 1.15–1.8 | — | neither: a control on a verdict that is not issued buys nothing |
+
+⚠️ `D ≥ 1.15` is **推**, chosen, and the reasoning is only that a control has to
+exclude the band it controls. The next payload to run Group F is the first for
+which it is a prediction rather than a description.
+
+### §18.2 🟢 § 6.8.3's condition (7) is rescoped, and the write-up's claim is corrected
+
+*"any leg below `f.dram.str`"* → **"any WINDOW OR BOOT leg below
+`f.dram.str`"**. `f.dram.seq` (1,799) is below `f.dram.str` (2,347) **by
+construction**, so the condition as written fired on its own control on every
+run that behaved. 🔴 **So the seating's write-up sentence *"(1)–(7) all pass"*
+is wrong and the correct one is *"(1)–(6) pass and (7) fired on its own
+control"*.** Both mis-scopings were written before the seating; neither is a
+measurement that went wrong.
+
+### §18.3 🟢 § 4's containment hole has an instrument
+
+`K-P3` — the 32 KiB `DW` spanning both `H601` RAM destinations, output under
+`bench/` — is now **CLEAN by machine**, not by a check written by hand at the
+bench. `tools/flashwin.py scan`, `S9c`. The whole record: `--sweep bench`,
+1,130 files, CLEAN; `--sweep . --exclude upstream`, **1,381** files, CLEAN. ⚠️ Without the exclusion — which is the DEFAULT — `--sweep .` reads **1,683** files and reports **1 HIT**, in `upstream/`, and 1,381 + 302 = 1,683 so the partition closes exactly. 🔴 An earlier draft of this paragraph said *1,378, CLEAN* for the default sweep, which was wrong twice: counted before this session's own new files existed, and describing a run under the old default this same session removed.
+🔴 **And the same instrument found one hit in `upstream/`** —
+`BENCH-LOG.md:2557`, sixteen bytes of `H601` as a hexdump, which neither
+`leakscan` nor `audit-bench-log` names. `notes/leak-surface.md` § 7 owns it;
+the owner decision (`FLS-22`, `upstream/` unchanged) does not move.
+
+### §18.4 § 16's knee is DESIGNED and not run, and it is not free
+
+§ 16 leaves `MEM-17` with `≤7.3 min → 0`, `0–7.4 min → 1` and
+`35.1 min → 598`, with **the two short bounds overlapping**, so not even an
+ordering is established. The experiment that fills it:
+
+* four points, **t = 2 / 5 / 10 / 20 minutes**, each one power cycle, **no
+  upload and no `J`** — seal, power off, power on, `DW 80A02000 718`;
+* both ends of every interval timed **from `console-capture`'s own
+  `.meta.json` `started_wallclock`**, never from when a chat message went out.
+  That is § 14's lesson and it is the one thing this block already got wrong;
+* 🔴 **the positive control**: before each point, read the block and confirm the
+  seal is `524C5833`. Without it *decayed* and *never sealed this round* are
+  the same reading;
+* 🔴 **the refutation conditions, written now**: ① the four counts are **not
+  monotonically non-decreasing** → *duration dominates* is refuted and a
+  thermal term comes back; ② `t = 2` returns **0 bits** → the single `w126` bit
+  at ~2 minutes is not a duration effect and § 16's conclusion is withdrawn;
+  ③ any point whose magic `rbcheck` refuses to judge counts as *≥ some large
+  value*, not as a reading.
+
+⚠️ **Cost, stated because the last one was called free**: four power cycles,
+and `t = 20` alone is twenty minutes of desk waiting. The free half — the block
+still sitting at `0x80A02000` — buys **one** point, not four.
+

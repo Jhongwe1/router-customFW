@@ -3969,3 +3969,189 @@ guard *"`f.dram.str / f.dram.seq` must be strictly less than `R`"* measured
 row.** `docs/probe3-cells.md`'s Ran section owns the rewrite it needs; recorded
 here because § 19.7's conclusion now rests on a verdict whose written control
 did not hold.
+
+---
+
+## 21. `R3-11`: the artefact, the write-up, and `R3`'s closing conditions read one by one
+
+**2026-08-31, twentieth session, desk, no power.** `R3-11` is the twelfth and
+last step of `R3`. It produces two things: the v0.2 artefact `plan/ARTIFACTS.md`
+§2 asks for, and this section — the comparison of what `R3` said it would
+establish against what it did.
+
+### 21.1 The artefact is a REEL, and the number that was wrong was wrong by being short
+
+The v0.2 take is not a screen recording of a session. It is
+`tools/replay-capture.py reel config/r3-11-reel.tsv` — committed captures
+replayed into a terminal at their own wire speed, in an order that is data.
+🟢 **The property that buys**: a stranger who clones this repository runs one
+command and gets the same bytes, and the `.log` remains the artefact rather
+than a video file becoming one.
+
+🔴 **Every number below is the tool's, not this paragraph's.**
+`replay-capture reel <tsv> --budget` prints them and `--self-test` `R15`–`R18`
+assert them; until today **nothing read that file at all**, and its running
+time lived in a comment inside it and in a sentence in `PROGRESS.md`.
+
+| | segment | capture | pause |
+|---|---|---:|---:|
+| 1 | `bench/2026-08-31/W-3` — D1–D4, my kernel from RAM to a shell | 7.021 | 2.0 |
+| 2 | `bench/2026-08-31/W-5b` — D2, the build stamp is mine | 0.062 | 2.5 |
+| 3 | `bench/2026-08-31/M-a` — D4, a typed command returns output | 0.063 | 2.0 |
+| 4 | `bench/2026-08-31b/X-b2` — 4 MiB through my MTD path | 1.268 | 2.0 |
+| 5 | `bench/2026-08-31/M-d` — and it cannot be written through it | 0.048 | 2.5 |
+| 6 | `bench/2026-08-31/W-7a` — D5, it pings, 4 of 4 | 3.099 | 2.0 |
+| 7 | `bench/2026-08-31c/K-J` — **the control** | 33.188 | 2.0 |
+| | | **44.749** | **15.000** |
+
+**TOTAL 59.749 s**, against `plan/ARTIFACTS.md` §2's **60 s**. `R16` is the
+case that fires if an edit crosses it — 🔴 **and that is the direction nothing
+was watching**, because the row that had been wrong all week was wrong by being
+*short* (24 s against a spec of 60), and the repair proposed for a short reel
+is always *more capture* and never *more pause*.
+
+### 21.2 Segment 7 is a control, and it is the anti-DoD happening on video
+
+`PROGRESS.md`'s anti-DoD paragraph says a banner is not evidence that my kernel
+ran, **because this loader re-stages `0x80500000` from flash on a watchdog
+reset** — 2026-08-25, `R1g-4b`, where a second `J 80500000` booted the vendor's
+kernel. `bench/2026-08-31c/K-J` is that trap happening, in one capture:
+
+* `t = 0 … 2.4 s`, offsets 0–6049: `J 80500000`, then `probe3` runs and prints
+  its whole UART report, ending `rlxprobe: end`.
+* `t = 2.5 … 33.188 s`, offsets 6066–8002: `Reboot Result from Watchdog
+  Timeout!`, `Jump to image start=0x80500000...`, and **the board's own vendor
+  firmware boots end to end** — `start address: 0x80003440` where segment 1
+  shows `0x80003600`, `Realtek WLAN driver - version 1.6 (2013-02-21)` where
+  segment 1 shows `(2012-12-04)`, `init started: BusyBox v1.13.4 (2018-01-10
+  14:56:45 CST)`, `boa: starting server pid=350, port 80`.
+
+So a viewer's first objection to segments 1–6 — *how do I know that is not the
+stock firmware* — is answered inside the artefact rather than in prose beside
+it, with the discriminators visible in both directions.
+
+🔴 **68 % of that segment's 33 s is inter-line gap, and that is NOT the dead
+terminal `config/r3-11-reel.tsv` forbids.** The gaps are the vendor firmware's
+own: 5.019 s decompressing, 4.400 s in the WLAN driver, 3.416 s after BusyBox's
+init line. 量, and the comparison that settles it is segment 1, which is **96 %
+gap** and which nobody calls padded. Dead terminal is time the *card* bought
+with `--seconds`; this is time the *device* spent.
+
+⚠️ **And a claim this segment does NOT support**: `quietm` reaches a shell in
+7.02 s and the vendor firmware takes ~33 s to finish its init, and those are not
+comparable. Mine is a kernel plus a small initramfs reaching `/bin/sh`; the
+vendor's brings up wifi, a bridge, DHCP, NTP, UPnP and an httpd. The reel shows
+both and the title says neither is faster.
+
+### 21.3 What went in, what did not, and why — because the material was named before it was chosen
+
+The nineteenth session's carried-forward names four pieces of seating-8
+material for this reel. Two of them went in, inside one capture, because a reel
+row is one whole capture by construction:
+
+| material | in | why |
+|---|:-:|---|
+| `probe3`'s execution | ✅ | `K-J`, `t = 0…2.4 s` |
+| its UART report | ✅ | the same 2.4 s |
+| a full vendor-firmware boot | ✅ | `K-J`, `t = 2.5…33.2 s` |
+| the 718-word read-back | ❌ | `K2b-rb` is 8,486 bytes of hexadecimal in 2.316 s and its claim — *the block was sealed, read back, and `rbcheck` judged it* — is **not visible in the pixels**. It belongs in a write-up where it can be checked. It would also have put the reel at 64.1 s |
+
+⚠️ **`bench/2026-08-31c/K-A` is not material and that is not a judgement call**:
+25.065 s of `console-capture --esc 25` spamming ESC at the loader, `<RealTek>`
+`Unknown command !` about 130 times. The last ~50 s of `K2-J` is the same
+(`--esc-after 60`). **`K-J` is the only clean capture of `probe3`'s report in
+this seating**, and what follows it in that file is the vendor boot — the two
+cannot be separated.
+
+🟢 **Checked before it went in**: `grep -aoE '([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'`
+over `K-J.log` returns nothing, and `flashwin scan` (new today) returns CLEAN.
+A vendor firmware boot printing this unit's MAC into a video would be a leak
+the reel's own reproducibility makes permanent.
+
+### 21.4 `R3`'s DoD, read one row at a time
+
+The gate's own decomposition, written 2026-08-28 **before** any of it was
+attempted, and each row read against the capture that tested it.
+
+| | claim | met | the capture, and the discriminator |
+|:-:|---|:-:|---|
+| **D1** | the image is delivered and entered | 🟢 | `---Jump to address=80500000` followed by output that is not the loader's — `bench/2026-08-31/W-3.log`, and 34 further times across seatings 5–8 |
+| **D2** | the decompressor runs and **my** kernel is entered | 🟢 | `Linux version 2.6.30.9 (key@K) (gcc version 3.4.6-1.3.6) #1 Sun Aug 30 18:56:00 CST 2026` — 量, `W-5b.log`, and that stamp is `quietmc`'s build minute, not `loudm`'s — 🔴 **and the anti-DoD is satisfied POSITIVELY, not by absence**: three strings the vendor image cannot produce appear together — the header's own `start address: 0x80003600` (the vendor's staged image says `0x80003440`), `RLXFW-B00`…`B10` plus `RLXFW-R3-RUNG1-OK`, twelve marks that exist only in my tree, and that build stamp. `W-3.log`, `W-5b.log` |
+| **D3** | early bring-up completes | 🟢 | the console echoes and userspace is reached. ⚠️ **The row's own written observable was `MemTotal:` and that string is not printed by any configuration of this kernel** — recorded as a defect in the DoD rather than as a miss (§16, `R3-6`'s corrections) |
+| **D4** | userspace is reached and the shell accepts typing | 🟢 | `bench/2026-08-31/M-a.log`: a typed command returns output. Also `M-b2`/`M-c2`/`M-d` and the seating-7 `X-*` set |
+| **D5** | it pings | 🟢 | `bench/2026-08-31/W-7a.log`, 4 of 4 from the board, **and** the host's own capture holds both the echo requests and the replies |
+
+**Five of five.** 🔴 **And the sentence `R3`'s refutation condition asks for is
+narrower than that**: *D1 through D5 all hold **in one boot**, with the
+discriminator present*. They do — `bench/2026-08-31/W-3` → `W-5b` → `M-a` →
+`M-d` → `W-7a` are one power cycle of `quietm`, in order, and `W-5b` carries the
+stamp. It is not five rows averaged across four seatings.
+
+### 21.5 The twelve steps
+
+| step | | closed |
+|---|---|---|
+| `R3-0` | the step list, the DoD decomposition, decisions A and B | 2026-08-28, before any measurement |
+| `R3-1` | `TC-g` and the four unexplained violations | 2026-08-28 |
+| `R3-2` | `TC-d` part one — the loadable image, against the vendor's own `nfjrom` | 2026-08-29 |
+| `R3-3` | `TC-d` part two — the desk execution channel | 2026-08-29 |
+| `R3-4` | `rlxfw_defconfig` as an enumerated diff, plus the drift check | 2026-08-28, **and refuted by its own step** |
+| `R3-5` | the initramfs from this unit's own rootfs, with a manifest | 2026-08-28 |
+| `R3-6` | the boot ladder and the console instrument | 2026-08-28/29 |
+| `R3-7` | the seating sheet and the prediction blocks | 2026-08-29 |
+| `R3-8` | the first seating: `R3-8a` power cycle 2, `R3-8b` power cycle 3 | 2026-08-29 / 2026-08-30 |
+| `R3-9` | the iteration — whatever the first seating refuted | desk half 2026-08-30/31, bench half 2026-08-31 (seating 8) |
+| `R3-10` | power cycle 4, the second half of the `FLR` bracket | 2026-08-30 |
+| `R3-11` | **this section, and the reel** | 2026-08-31 |
+
+**Twelve of twelve.** Budget was **12 段, 猜, uncalibrated**; actual is counted
+in `LOG.md` by the gate board's own definition and recorded there, not here.
+
+### 21.6 The refutation condition, the two decisions, and the stop-loss
+
+**The gate's refutation condition**, verbatim: *"`R3` is not closed by a shell
+prompt. It is closed by a capture in which D1 through D5 all hold in one boot
+and the discriminator string that only my tree emits is present. Three of five
+is `R3a`, recorded as such."* — **met**, §21.4.
+
+**Decision A** (rlxfw's kernel is built with `rsdk-1.3.6-4181`) is refuted by
+any of: that toolchain failing to build an object of the `R3` configuration; the
+four unexplained violations in the 4181 `vmlinux` turning out to be **compiler
+output on an executed path**; or a boot failure whose signature is a load-use
+hazard at a compiler-generated site. 🟢 **None fired.** Nine trees built with
+it; `RUNSHEET` `P2` and today's residual sweep report **0 violations across
+eight object trees** and `Q5` shows the same six sources at `-march=5281` carry
+**11**; no boot in seatings 5–8 stopped at a hazard site.
+
+**Decision B** (the initramfs is built from this unit's own extracted rootfs) is
+refuted by the initramfs failing to unpack, by `arch/rlx` needing a source change
+to support it, or by the decompressed image exceeding 5,242,880 bytes at
+`LOAD_START_ADDR = 0x80500000`. 🟢 **None fired**; `/bin/sh` came up on every
+boot and the ceiling was never approached.
+
+**The stop-loss**, four clauses, and **not one of them was reached**: no run of
+five boot attempts failed to reach D2 (the halving experiment was never needed);
+D4 was reached on the **first** seating, not the second; **no capture shows a
+flash-write path taken** — 35 `--send`s in seating 5 were `DW` reads, two `J`s
+and userspace commands, `AUTOBURN` read `00000000` before every `J`; and `R3-3`
+cost one desk segment, as budgeted.
+
+### 21.7 🔴 What `R3` did NOT establish, listed because the gate closes anyway
+
+* **`G8b`'s sentence is still unsayable.** No flash-write command was issued in
+  any seating of this gate, and *that is not the same sentence as "not one flash
+  byte is written"*. The `FLR` bracket reaches **1,024 of 4,194,304 bytes =
+  0.0244 %** and `H601` **512 of 8,192 = 6.3 %**; it cannot see two writes that
+  cancel, nor any write outside four 256-byte windows. No full re-dump ran.
+  `SPEC.md` `FLS-20`.
+* **There is still no driver of mine.** D5's ping went out through the vendor's
+  `rtl819x`, which is in the vendor's own configuration. `R6` is the gate that
+  changes that sentence, and `R3` must not be written up as though it had.
+* **D3's written observable was wrong** and the row passed on a substitute
+  (§21.4). A DoD whose observable does not exist is a defect in the DoD, and it
+  is recorded rather than quietly repaired.
+* **`R3-2`'s `TC-d` half stayed half-done for one step** and is recorded as a
+  debt in the running-order note, not as a pass.
+* **`R1h`'s decision ② is still `R1-gate`'s**, answered on the D side by
+  `probe3` and not by this gate.
+

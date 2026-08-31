@@ -5,8 +5,26 @@ Baseline first, every row names the control it must turn red, and an anchor that
 does not occur exactly once is a SURVIVOR rather than a skip.  The reasons are
 `tools/flashwin.py`'s invalid 8/8 pass and `tools/test-rbcheck.py`'s M25, which
 survived five controls because none of them exercised the branch it changed.
+
+The three rows that are not mutations:
+
+  B0  the unmutated tool must pass IN THE TEMP TREE, not only at the real
+      root.  This suite reported 14/14 to a tree where nothing could pass, on
+      2026-08-31, because `tools/ci-expected.tsv` was not copied into it.
+
+  A0  every anchor must occur exactly once.  Checked per row rather than up
+      front here, and an ambiguous anchor is a SURVIVOR, never a skip.
+
+  W0  🔴 ADDED 2026-08-31 (twentieth), and it was missing from the file whose
+      own header names the defect it prevents.  Until today `rc != 0` alone
+      counted as a kill -- so a mutation that crashed the tool before it
+      reached its controls, or that turned some OTHER control red, was
+      indistinguishable from one that broke the control it names.  A kill now
+      requires the NAMED case to be red; anything else prints WRONG-CASE and
+      is a survivor.
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -81,17 +99,43 @@ MUT = [
     ("M14 a malformed field count accepted                  (kills R10)",
      "            if len(parts) != 2:",
      "            if False:"),
+
+    # --- M15..M19 -- the reel, added 2026-08-31 (twentieth) with R15..R18 ---
+    ("M15 the reel total drops the pause term                (kills R16)",
+     "    return segs, cap, pau, cap + pau",
+     "    return segs, cap, pau, cap"),
+    # M16 -- one row is still a reel to R15 and to R16 (both stay consistent
+    # with what they read), and only the population control can see it.
+    ("M16 read_reel stops after the first row                (kills R17)",
+     "            rows.append((p[0], p[1], float(p[2]) if len(p) > 2 else 1.5))",
+     "            rows.append((p[0], p[1], float(p[2]) if len(p) > 2 else 1.5))\n"
+     "            break"),
+    ("M17 the empty-reel refusal deleted                     (kills R17b)",
+     '    if not rows:\n        raise Refuse(f"{tsv} has no segments")',
+     '    if False:\n        raise Refuse(f"{tsv} has no segments")'),
+    ("M18 the `must be under bench/` guard deleted           (kills R18)",
+     '            if not p[0].startswith("bench/"):',
+     "            if False:"),
+    # M19 -- 🔴 the mutation R15b was written for.  A budget that skips a
+    # segment it cannot open reports a shorter reel and a clean run, and every
+    # other control here reads the REAL reel, in which nothing is missing.
+    ("M19 a segment that cannot be opened is skipped         (kills R15b)",
+     "        recs, blob = convert(os.path.join(ROOT, prefix))",
+     "        try:\n"
+     "            recs, blob = convert(os.path.join(ROOT, prefix))\n"
+     "        except Refuse:\n"
+     "            continue"),
 ]
 
 
 def run(path, cwd):
     r = subprocess.run([sys.executable, path, "--self-test"],
                        capture_output=True, text=True, cwd=cwd)
-    return r.returncode
+    return r.returncode, r.stdout
 
 
 def main():
-    base = run(SRC, ROOT)
+    base, _ = run(SRC, ROOT)
     if base != 0:
         sys.exit(f"REFUSING: the unmutated controls already fail (rc={base}); "
                  f"every kill below would be invalid")
@@ -120,11 +164,15 @@ def main():
             # it was written.
             shutil.copy(os.path.join(ROOT, "tools/ci-expected.tsv"),
                         os.path.join(work, "tools/ci-expected.tsv"))
+            # And `config/`, for the same reason: R15..R18 read
+            # `config/r3-11-reel.tsv` through ROOT, which is this temp tree.
+            shutil.copytree(os.path.join(ROOT, "config"),
+                            os.path.join(work, "config"), symlinks=True)
             tgt = os.path.join(work, "tools/replay-capture.py")
             # B0-IN-TREE, see the paragraph above: the unmutated tool must pass
             # HERE, not only at the real root.
             shutil.copy(SRC, tgt)
-            if run(tgt, work) != 0:
+            if run(tgt, work)[0] != 0:
                 sys.exit(f"REFUSING at {name}: the UNMUTATED tool fails in the "
                          f"temp tree, so every kill would be invalid")
             n = src.count(old)
@@ -133,8 +181,26 @@ def main():
                 print(f"  FAIL  {name}   ANCHOR x{n} (not applied)")
                 continue
             open(tgt, "w", encoding="utf-8").write(src.replace(old, new, 1))
-            rc = run(tgt, work)
+            rc, out = run(tgt, work)
             killed = rc != 0
+            # 🔴 W0, added 2026-08-31 (twentieth).  Until today `rc != 0` alone
+            # was a kill here -- which is exactly the shape this file's own
+            # header calls out as `flashwin`'s invalid 8/8 pass, applied to
+            # itself.  A mutation that makes the tool crash before it reaches
+            # its controls exits non-zero too, and so does one that turns some
+            # OTHER control red.  A kill counts only if the case the row NAMES
+            # went red; anything else is reported WRONG-CASE, which is a
+            # survivor with a different name.
+            wrong = ""
+            want = re.search(r"\(kills (R[0-9]+[a-z]?)\)", name)
+            if killed and want and not equivalent:
+                tag = want.group(1)
+                if not re.search(r"^  FAIL  +" + tag + r"\b", out, re.M):
+                    red = sorted(set(re.findall(r"^  FAIL  +(R[0-9]+[a-z]?)\b",
+                                                out, re.M)))
+                    killed = False
+                    wrong = (f"  WRONG-CASE: wanted {tag} red, red were "
+                             f"{red or 'none -- it did not reach the controls'}")
             if equivalent:
                 # An equivalent mutant must SURVIVE.  If it starts being killed
                 # the proof above has stopped holding, and that is a finding.
@@ -146,9 +212,9 @@ def main():
                     survived.append(name + "  [equivalence proof is stale]")
                 continue
             print(f"  {'ok  ' if killed else 'FAIL'}  {name}   "
-                  f"rc={rc} ({'killed' if killed else 'SURVIVED'})")
+                  f"rc={rc} ({'killed' if killed else 'SURVIVED'}){wrong}")
             if not killed:
-                survived.append(name)
+                survived.append(name + wrong)
         finally:
             shutil.rmtree(d, ignore_errors=True)
 

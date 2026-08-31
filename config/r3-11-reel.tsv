@@ -6,38 +6,111 @@
 # a recording, it is REPRODUCIBLE: every byte comes from a committed capture and
 # anyone who clones this repository can re-run the same command.
 #
-# 🔴 EVERY SEGMENT IS A COMMITTED CAPTURE FROM SEATING 7 (2026-08-31), and the
-# reel may not contain anything else.  A reel that mixed a re-enactment in with
-# real captures would be a recording again, and the whole reason this file
-# exists is that it cannot.
+# 🔴 EVERY SEGMENT IS A COMMITTED CAPTURE, and the reel may not contain
+# anything else.  A reel that mixed a re-enactment in with real captures would
+# be a recording again, and the whole reason this file exists is that it cannot.
 #
-# The order is R3's own DoD, D1 through D5, because that is the claim the
-# artefact is evidence for -- not because it is the prettiest order.
+# `tools/replay-capture.py reel <this file> --budget` prints the arithmetic
+# below without playing anything, and `--self-test` `R15`/`R16`/`R17` assert it.
+# The numbers in this comment are therefore a RESTATEMENT of something the tool
+# re-derives, not the only place they live.
 #
 # prefix<TAB>title<TAB>pause-seconds
 #
-# ⚠️ The running time is the sum of the captures' own durations plus the pauses;
-# `replay-capture verify <prefix>` prints each one.
+# ---------------------------------------------------------------------------
+# 量 2026-08-31 (TWENTIETH session), every segment through
+# `replay-capture verify`:
 #
-# 量 2026-08-31, every segment verified: 7.021 + 0.062 + 0.063 + 1.268 +
-# 0.048 + 3.099 = **11.56 s of capture** plus 12.5 s of pauses = **~24 s**.
-# 🔴 PROGRESS.md calls this *the 60-second artefact* and at these pauses it
-# is not sixty seconds.  The number to change is the pause column, not the
-# captures -- padding a reel with dead terminal is worse than a short one,
-# and the capture durations are the device's, not a choice.
+#   capture   7.021 + 0.062 + 0.063 + 1.268 + 0.048 + 3.099 + 33.188 = 44.749 s
+#   pause     2.0 + 2.5 + 2.0 + 2.0 + 2.5 + 2.0 + 2.0               = 15.000 s
+#   TOTAL                                                            = 59.749 s
 #
-# 🔄 2026-08-31: THE PAUSES ARE NOT BEING PADDED, and the reason is not
-# reluctance.  Six segments to 60 s is 8 s of dead terminal each, and the
-# sentence above already says why that is the wrong repair.  The other
-# repair is MORE CAPTURE, and seating 8 is about to produce it: probe3's
-# own boot, its UART report and the 718-word read-back.  Setting this
-# column now would be setting it against a reel that is about to grow, so
-# it is set at R3-11 with that material in hand.  PROGRESS.md's R3-11 row
-# carries the decision; this comment is the pointer, not a second owner.
+# `plan/ARTIFACTS.md` §2 asks for a v0.2 take of **60 s**.  This is 0.25 s
+# under it, and `R16` is the case that will go red if a future edit crosses it.
+#
+# 🔴 THE PAUSE COLUMN IS SET FROM LEGIBILITY AND THEN CHECKED AGAINST THE
+# CEILING, NOT FITTED TO IT.  The pause is the gap AFTER a segment -- 讀,
+# `reel()` prints the title, plays, then sleeps -- so it is reading time for
+# what just appeared.  2.0 s everywhere; 2.5 s on the two segments whose whole
+# content arrives in under a tenth of a second and has to be read rather than
+# watched (`W-5b`, 111 bytes in 0.062 s, and `M-d`, 78 bytes in 0.048 s).
+# `W-5b` went 2.0 -> 2.5 today for that reason and no other: it is the single
+# frame carrying the discriminator, and a viewer who cannot read it has watched
+# a router with a light on.
+#
+# ---------------------------------------------------------------------------
+# 🔄 2026-08-31 (twentieth): THE SHORTFALL IS CLOSED, AND IT WAS CLOSED WITH
+# CAPTURE RATHER THAN WITH PAUSE.  This file used to say:
+#
+#   "量 2026-08-31, every segment verified: 7.021 + 0.062 + 0.063 + 1.268 +
+#    0.048 + 3.099 = 11.56 s of capture plus 12.5 s of pauses = ~24 s.
+#    PROGRESS.md calls this *the 60-second artefact* and at these pauses it is
+#    not sixty seconds.  The number to change is the pause column, not the
+#    captures -- padding a reel with dead terminal is worse than a short one."
+#
+# and then, later the same day:
+#
+#   "THE PAUSES ARE NOT BEING PADDED ... The other repair is MORE CAPTURE, and
+#    seating 8 is about to produce it: probe3's own boot, its UART report and
+#    the 718-word read-back.  Setting this column now would be setting it
+#    against a reel that is about to grow, so it is set at R3-11 with that
+#    material in hand."
+#
+# The material arrived and ONE capture of it is in the reel.  Which one, and
+# why the other three are not, is the part worth writing down:
+#
+#   `bench/2026-08-31c/K-J`  IN.  33.188 s.  It is `probe3`'s execution and its
+#       whole UART report (offsets 0..6049, `J 80500000` to `rlxprobe: end`,
+#       t=0..~2.4 s) AND THEN, in the same capture, the watchdog firing, the
+#       loader re-staging `0x80500000` **from flash**, and the board's own
+#       vendor firmware booting end to end (t=2.5..33.188).  ⚠️ It is in the
+#       reel as a CONTROL, not as a result: `PROGRESS.md`'s anti-DoD says a
+#       banner is not evidence that my kernel ran, because this loader
+#       re-stages on a watchdog reset -- and this segment is that trap
+#       happening, on video, with `start address: 0x80003440` where segment 1
+#       shows `0x80003600`.  A viewer's first objection to segments 1-6 is
+#       answered inside the artefact instead of in prose beside it.
+#       🔴 68 % of its 33 s is inter-line gap, and that is NOT the dead
+#       terminal this file forbids: the gaps are the vendor firmware's own
+#       (5.019 s decompressing, 4.400 s in the WLAN driver, 3.416 s after
+#       BusyBox's init line).  量, and the comparison that settles it is
+#       `W-3`, which is 96 % gap and which nobody calls padded.
+#       🟢 Checked before it went in: `grep -aoE '([0-9A-Fa-f]{2}[:-]){5}
+#       [0-9A-Fa-f]{2}'` over `K-J.log` returns NOTHING, so the vendor's boot
+#       is not printing this unit's MAC into a video.
+#
+#   `bench/2026-08-31c/K2b-rb`  OUT.  2.316 s.  The 718-word result block read
+#       back out of DRAM.  It is 8,486 bytes of hexadecimal scrolling past in
+#       2.3 s and its claim -- *the block was sealed, read back, and `rbcheck`
+#       judged it* -- is not visible in the pixels.  That claim belongs in the
+#       write-up, where it can be checked.  Adding it would also have put the
+#       reel at 64.1 s, over §2's 60.
+#
+#   `bench/2026-08-31c/K-A`  OUT, and it is not a judgement call.  25.065 s of
+#       which essentially all is `console-capture --esc 25` spamming ESC at the
+#       loader: `<RealTek>` `Unknown command !` repeated ~130 times.  Not
+#       material.  Same for the last ~50 s of `K2-J` (`--esc-after 60`).
+#
+#   `bench/2026-08-31c/K3-rb` / `K4-rb`  OUT.  They are `MEM-17`'s retention
+#       readings and they look identical to `K2b-rb` on screen; what separates
+#       them is a bit-for-bit comparison, which is a table, not a shot.
+#
+# ⚠️ So `probe3`'s run and its UART report ARE in the reel and the 718-word
+# read-back is NOT, where the sentence above proposed all three.  The two that
+# went in went in inside one capture, because they cannot be separated -- a
+# reel row is one whole capture, by construction.
+#
+# ---------------------------------------------------------------------------
+# The order is R3's own DoD, D1 through D5, and then the control -- claim
+# first, then the thing that says the claim is not the vendor's.  🔴 That
+# order is deliberate in one more way: a viewer who stops at 20 s has seen
+# D1-D5 complete.  Opening with the vendor's 33 s would have shown a viewer who
+# stops early nothing but Realtek's boot.
 
 bench/2026-08-31/W-3	D1-D4  my kernel boots from RAM to a shell	2.0
-bench/2026-08-31/W-5b	D2  and the build stamp is mine, not the vendor's	2.0
+bench/2026-08-31/W-5b	D2  and the build stamp is mine, not the vendor's	2.5
 bench/2026-08-31/M-a	D4  a typed command returns output	2.0
 bench/2026-08-31b/X-b2	the whole 4 MiB read back through my MTD path	2.0
 bench/2026-08-31/M-d	and the flash cannot be written through it	2.5
 bench/2026-08-31/W-7a	D5  it pings, 4 of 4	2.0
+bench/2026-08-31c/K-J	CONTROL  probe3 reports, the watchdog fires, and the VENDOR's own firmware boots	2.0

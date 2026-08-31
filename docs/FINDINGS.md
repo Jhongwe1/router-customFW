@@ -77,6 +77,72 @@ dump or a document · **推** inferred, pending a measurement.
 
 ## It changed what an instrument may claim
 
+🆕 **2026-08-31 — a third containment shape, and it found something on its first sweep.** `flashwin render` governs what may be *printed*;
+`flrbracket run` governs where a *bracket's* read-back may land; both act
+when a file is produced. **`flashwin scan` asks whether a file this
+repository has ALREADY COMMITTED holds forbidden content** — by the bytes,
+not by the text shapes an address takes, with the probe set cut from the
+reference dump at **every** offset and filtered on the REFERENCE side.
+量: that costs **113 needles**, fewer than an aligned scheme, because
+`H601` is **98.22 %** one repeated byte value and holds **40** distinct
+values in 8,192 — a measurement that removed a caveat from the guarantee
+rather than documenting it. 🟢 rlxfw's own tree is CLEAN over **1,381**
+files, `K-P3` included. 🔴 The default sweep, which does **not** exclude
+`upstream/`, reads 1,683 and reports **1 HIT**: `BENCH-LOG.md:2557`,
+sixteen bytes of `H601` as an `xxd` line, in a public repository.
+⚠️ **Neither existing tool identifies it as forbidden CONTENT** —
+`leakscan` does not name that line at all, and `audit-bench-log` names it
+only on the topic keyword `H601` (the flash bytes at that offset ARE the
+ASCII `H`,`6`,`0`,`1`), among 183 hits, exiting 0. It does **not** move
+`FLS-22`'s owner decision. 🔴 **And it changed the tool's default**: the
+first walk excluded `upstream/`, which hid the only finding the tool has
+ever made. 量 · owner `notes/leak-surface.md` § 7
+
+🆕 **2026-08-31 — a mutation harness counted five kills that turned no case
+red, and the file that taught this repository what an invalid kill looks like
+had no suite of its own.** 量: `test-replay-capture-mutants` scored a kill on
+`rc != 0` alone, and adding `W0` (*a kill counts only if the case the row NAMES
+went red*) showed **five of its fourteen rows** turning **no** case red — each
+replaced a `Refuse` with an `IndexError` or a `FileNotFoundError`, the controls
+caught only `Refuse`, and the whole self-test died on a traceback before
+printing anything. 🔴 **The repair is the controls, not the labels**: every
+control now reports rather than raising, keeping the message assertion that
+separates a refusal (which names its reason) from a crash (which does not).
+The same day `tools/test-flashwin-mutants.py` arrived — the suite `flashwin`
+never had, though three other files cite its 2026-08-30 invalid 8-of-8 pass as
+the reason they carry a baseline — and it went red on its first run in three
+places, all three real: a matcher stopping at the first occurrence of each
+needle (no control had the same window twice, which is `K-P3`'s exact shape), a
+`DW` address-column rule no case could see (`S5` asserted only THAT a hit
+happened), and a row naming `C9` where the measurement says `C10`. 量 · owner
+`tools/test-replay-capture-mutants.py`, `tools/test-flashwin-mutants.py`
+
+🆕 **2026-08-31 — *the fifth tree* was three claims and each was narrower than
+the last.** `RUNSHEET` `P2` sweeps `hazlint` over every `arch/rlx` object a
+build produced. `PROGRESS.md` recorded a residual as *one* uncovered tree
+needing a 480 MB re-stage first. 量: **eight trees are on disk with their
+objects** (no rebuild), **four** were uncovered rather than one, and then —
+hashing every `arch/rlx` object per tree — **two of the four are byte-identical
+to trees `P2` had already swept**, so exactly **one** new object set arrived and
+`-j4`/`-j8` is deterministic over `arch/rlx`. 🟢 The chain also reaches the
+silicon with no vendor binary executed: the swept tree's `vmlinux` `cmp`s equal
+to the image build's input, and that build's `nfjrom` `cmp`s equal to the image
+seating 7 uploaded — the link `Q0` never covered. 量 · owner `SPEC.md` `TC-21`
+
+🆕 **2026-08-31 — a gate that only runs before a push had been red for two
+sessions, and reverting a file's content does not revert its mtime.**
+`check-predictions.py --sweep bench` returned **13 OUT OF ORDER**, all from one
+frozen prediction block whose content is git-clean at `68b0bec` (2026-08-29
+18:58) and whose mtime was **2026-08-31 14:17:46** — the eighteenth session's
+line-number rewrite touching it and then `git checkout --`-ing it back. The
+sweep cannot be in CI (**git stores no mtimes**; a fresh clone reads 128 of 156
+cells as out of order), so it is a pre-push gate on one machine, and two
+sessions closed without running it. The instance was repaired from
+`git log --format=%aI` — a stronger record than the mtime it replaced, not a
+forged one — and the class is carried forward. 量 · owner `PROGRESS.md`
+carried-forward
+
+
 🆕 **2026-08-30 — `CONFIG_PRINTK=n` does not make this kernel quiet, and the
 prediction that said it would was refuted on the wire.** `quietm` was built with
 `# CONFIG_PRINTK is not set` and printed **849** bytes where the block predicted

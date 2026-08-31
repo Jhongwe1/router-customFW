@@ -48,6 +48,7 @@ Run:  /usr/bin/python3 tools/replay-capture.py --self-test
       /usr/bin/python3 tools/replay-capture.py verify bench/2026-08-31/W-3
       /usr/bin/python3 tools/replay-capture.py play  bench/2026-08-31/W-3 [--speed 1.0]
       /usr/bin/python3 tools/replay-capture.py reel  config/r3-11-reel.tsv
+      /usr/bin/python3 tools/replay-capture.py reel  config/r3-11-reel.tsv --budget
 
 Exit codes:  0 ok · 1 a check failed · 2 refused before doing anything
 """
@@ -81,6 +82,16 @@ TYPESCRIPT_HEADER = (
 # exactly that here.  量 by counting distinct suite names in the allowed-skip
 # column: 21 rows, 17 suites (three of them declare more than one skip).
 SKIP_LABEL = "R12 the round trip through scriptreplay"
+
+# 🔴 `plan/ARTIFACTS.md` §2 asks for a **v0.2 短版, 60 s, no narration**.  That
+# is a CEILING on a viewer's attention and not a floor the artefact has to
+# reach -- `PROGRESS.md`'s `R3-11` row says so, and it says it because the
+# repair for a short reel is more capture and never more dead terminal.  `R16`
+# is the case that fires when an edit crosses the ceiling, which is the
+# direction nothing was watching.  `plan/` is gitignored, so the number is
+# copied here with its source named rather than read from it.
+REEL_CEILING_S = 60.0
+REEL = "config/r3-11-reel.tsv"
 
 
 class Refuse(Exception):
@@ -225,34 +236,59 @@ def run_controls():
         print()
         return 1
 
-    recs, blob = convert(W3)
-    row("R1", "the records account for every byte of the .log",
-        sum(c for _, c in recs) == len(blob),
-        f"{len(recs)} record(s), {sum(c for _, c in recs)} of {len(blob)} bytes")
+    # 🔴 EVERY CONTROL BELOW REPORTS RATHER THAN RAISING, and that changed on
+    # 2026-08-31 (twentieth) because the mutation suite's new `W0` measured
+    # what the old shape was worth.  Five of the fourteen mutations then in
+    # `test-replay-capture-mutants.py` were counted as kills on `rc != 0`
+    # alone, and every one of the five turned NO case red: they replaced a
+    # `Refuse` with an IndexError or a FileNotFoundError, the `except Refuse`
+    # did not catch it, and the whole self-test died on a traceback before it
+    # printed anything.  A suite that dies tells you about one problem; one
+    # that reports tells you about all of them, and only the second can say
+    # WHICH control failed.  `except Exception` with the message assertion
+    # kept is what makes the difference -- a wrong exception type fails the
+    # needle and the case goes red under its own name.
+    def broke(e):
+        return f"{type(e).__name__}: {e}"[:66]
 
-    row("R2", "one record per .timing line",
-        len(recs) == len(read_timing(W3 + ".timing")),
-        f"{len(recs)}")
-
-    tim = read_timing(W3 + ".timing")
-    row("R3", "the delays sum to the last timestamp",
-        abs(sum(d for d, _ in recs) - tim[-1][1]) < 1e-6,
-        f"sum {sum(d for d, _ in recs):.6f} s, last stamp {tim[-1][1]:.6f} s")
+    try:
+        recs, blob = convert(W3)
+        tim = read_timing(W3 + ".timing")
+        row("R1", "the records account for every byte of the .log",
+            sum(c for _, c in recs) == len(blob),
+            f"{len(recs)} record(s), {sum(c for _, c in recs)} of "
+            f"{len(blob)} bytes")
+        row("R2", "one record per .timing line", len(recs) == len(tim),
+            f"{len(recs)}")
+        row("R3", "the delays sum to the last timestamp",
+            abs(sum(d for d, _ in recs) - tim[-1][1]) < 1e-6,
+            f"sum {sum(d for d, _ in recs):.6f} s, "
+            f"last stamp {tim[-1][1]:.6f} s")
+    except Exception as e:                                  # noqa: BLE001
+        for tag, name in (("R1", "the records account for every byte of the .log"),
+                          ("R2", "one record per .timing line"),
+                          ("R3", "the delays sum to the last timestamp")):
+            row(tag, name, False, f"reading W-3 raised {broke(e)}")
 
     # R4 -- 🔴 THE CROSS-VALIDATION, and it is the reason these three captures
     # were chosen.  Identical data, different timing: both halves are asserted,
     # because a tool that ignored its timing input would pass the first half
     # and a tool that corrupted its data would pass the second.
-    blobs, tims = [], []
-    for p in (W3, X3, V3):
-        r, b = convert(p)
-        blobs.append(hashlib.sha256(b).hexdigest())
-        tims.append(tuple(round(d, 6) for d, _ in r))
-    row("R4a", "three independent captures give IDENTICAL data",
-        len(set(blobs)) == 1, f"sha256 {blobs[0][:16]}… x3")
-    row("R4b", "and DIFFERENT timing", len(set(tims)) == 3,
-        f"{len(set(tims))} distinct delay sequence(s) over "
-        f"{[len(t) for t in tims]} record(s)")
+    try:
+        blobs, tims = [], []
+        for p in (W3, X3, V3):
+            r, b = convert(p)
+            blobs.append(hashlib.sha256(b).hexdigest())
+            tims.append(tuple(round(d, 6) for d, _ in r))
+        row("R4a", "three independent captures give IDENTICAL data",
+            len(set(blobs)) == 1, f"sha256 {blobs[0][:16]}… x3")
+        row("R4b", "and DIFFERENT timing", len(set(tims)) == 3,
+            f"{len(set(tims))} distinct delay sequence(s) over "
+            f"{[len(t) for t in tims]} record(s)")
+    except Exception as e:                                  # noqa: BLE001
+        row("R4a", "three independent captures give IDENTICAL data", False,
+            f"raised {broke(e)}")
+        row("R4b", "and DIFFERENT timing", False, "not reached")
 
     # R5..R8 -- the refusals.  Each is a file this control writes.
     with tempfile.TemporaryDirectory() as d:
@@ -286,8 +322,14 @@ def run_controls():
             try:
                 convert(p)
                 row(tag, name, False, "it was accepted")
-            except Refuse as e:
-                row(tag, name, needle in str(e), str(e)[:46])
+            except Exception as e:                          # noqa: BLE001
+                # NOT `except Refuse`.  A mutation that turns this refusal
+                # into an IndexError or a FileNotFoundError must make THIS
+                # case red rather than kill the whole run -- see the W0
+                # paragraph above R1.  The needle is what separates the two:
+                # a refusal names its reason and a crash does not.
+                row(tag, name, needle in str(e),
+                    str(e)[:46] if isinstance(e, Refuse) else broke(e))
 
         # R11 -- a MISSING sidecar refuses rather than replaying the .log at
         # full speed, which would look like a successful replay of a boot that
@@ -297,9 +339,10 @@ def run_controls():
         try:
             convert(p)
             row("R11", "a .log with no .timing is refused", False, "accepted")
-        except Refuse as e:
+        except Exception as e:                              # noqa: BLE001
             row("R11", "a .log with no .timing is refused",
-                "does not exist" in str(e), str(e)[:46])
+                "does not exist" in str(e),
+                str(e)[:46] if isinstance(e, Refuse) else broke(e))
 
         # R12 -- 🔴 THE END-TO-END CONTROL, through scriptreplay itself.
         # Everything above checks this tool's arithmetic against this tool's
@@ -348,6 +391,93 @@ def run_controls():
         f"prints {SKIP_LABEL!r}; table says {want_lbl!r}"
         if found else "no `replay-capture` row in ci-expected.tsv")
 
+    # --- R15..R18 -- the reel itself -------------------------------------
+    # 🔴 Until 2026-08-31 (twentieth) NOTHING read `config/r3-11-reel.tsv`.
+    # Its running time lived in a comment inside it and in a sentence in
+    # `PROGRESS.md`, and a renamed capture would have been found by the
+    # recorder rather than by a suite.  These six are the fix.  R15b is the
+    # NEGATIVE side of R15 and R17/R17b are population controls, and both
+    # exist because R15 and R16 pass on a one-row file of valid segments --
+    # 量, by writing the mutations first: M16, M17 and M19 are killed by
+    # nothing else.
+    with tempfile.TemporaryDirectory() as d:
+        def mkreel(name, text):
+            q = os.path.join(d, name)
+            with open(q, "w", encoding="utf-8") as f:
+                f.write(text)
+            return os.path.relpath(q, ROOT)
+
+        try:
+            segs, cap, pau, total = reel_budget(REEL)
+            row("R15", "every segment of the reel exists and converts", True,
+                f"{len(segs)} segment(s), "
+                f"{sum(s[4] for s in segs)} byte(s), {cap:.3f} s of capture")
+        except Exception as e:                              # noqa: BLE001
+            segs = None
+            row("R15", "every segment of the reel exists and converts", False,
+                broke(e))
+
+        # R15b -- 🔴 THE NEGATIVE SIDE OF R15, and without it R15 cannot be
+        # killed by any mutation: its fixture is the real reel, every segment
+        # of which exists, so a `reel_budget` that silently SKIPPED a missing
+        # segment would leave R15 green.  量, writing the mutation first.
+        gone = mkreel("gone.tsv",
+                      "bench/2026-08-31/W-3\treal\t1.0\n"
+                      "bench/2026-08-31/NO-SUCH-CAPTURE\tmissing\t1.0\n")
+        try:
+            reel_budget(gone)
+            row("R15b", "a reel naming a capture that does not exist is refused",
+                False, "accepted -- a missing segment was skipped silently")
+        except Exception as e:                              # noqa: BLE001
+            row("R15b", "a reel naming a capture that does not exist is refused",
+                "does not exist" in str(e),
+                str(e)[:46] if isinstance(e, Refuse) else broke(e))
+
+        if segs is None:
+            row("R16", "the reel's total is capture+pause and is under the "
+                "ceiling", False, "not reached")
+            row("R17", "POPULATION: more than one segment, none repeated",
+                False, "not reached")
+        else:
+            # R16 -- recomputed here from the rows rather than trusted, so a
+            # `reel_budget` that dropped a term is visible.
+            want_pau = sum(q for _, _, q in read_reel(REEL))
+            want_cap = sum(sum(x for x, _ in convert(os.path.join(ROOT, t[0]))[0])
+                           for t in segs)
+            row("R16",
+                "the reel's total is capture+pause and is under the ceiling",
+                abs(total - (want_cap + want_pau)) < 1e-6
+                and total <= REEL_CEILING_S,
+                f"{cap:.3f} + {pau:.1f} = {total:.3f} s "
+                f"(ceiling {REEL_CEILING_S:.0f} s, ARTIFACTS §2)")
+            pref = [t[0] for t in segs]
+            row("R17", "POPULATION: more than one segment, none repeated",
+                len(segs) > 1 and len(set(pref)) == len(pref),
+                f"{len(segs)} row(s), {len(set(pref))} distinct prefix(es)")
+
+        empty = mkreel("empty.tsv", "# only a comment\n\n")
+        try:
+            read_reel(empty)
+            row("R17b", "a reel with no segments is refused", False,
+                "accepted")
+        except Exception as e:                              # noqa: BLE001
+            row("R17b", "a reel with no segments is refused",
+                "no segments" in str(e),
+                str(e)[:46] if isinstance(e, Refuse) else broke(e))
+
+        # R18 -- the rule the reel file states in its first paragraph, and
+        # which nothing enforced: a segment must be a committed capture.
+        outside = mkreel("outside.tsv",
+                         "/home/key/fwre-work/x\ttitle\t1.0\n")
+        try:
+            read_reel(outside)
+            row("R18", "a segment outside bench/ is refused", False,
+                "accepted -- a reel could name a file no cloner has")
+        except Exception as e:                              # noqa: BLE001
+            row("R18", "a segment outside bench/ is refused",
+                "not under `bench/`" in str(e),
+                str(e)[:46] if isinstance(e, Refuse) else broke(e))
+
     print()
     return 0 if ok else 1
 
@@ -383,6 +513,8 @@ def main(argv):
         if sub == "play":
             return play(target, speed, outdir)
         if sub == "reel":
+            if "--budget" in argv:
+                return print_budget(target)
             return reel(target, speed, outdir)
     except Refuse as e:
         sys.stderr.write(f"REFUSED: {e}\n")
@@ -391,15 +523,20 @@ def main(argv):
     return 2
 
 
-def reel(tsv, speed=1.0, outdir=None):
-    """Play a sequence of captures with titles, from a TSV.
+def read_reel(tsv):
+    """-> [(prefix, title, pause)], refusing anything it cannot parse.
 
     The reel's CONTENT is data, not code: one row per segment,
-    `prefix <TAB> title <TAB> pause-seconds`.  A screen recorder pointed at the
-    terminal while this runs produces the artefact, and the artefact is then
-    reproducible from the repository by re-running this one command.
+    `prefix <TAB> title <TAB> pause-seconds`.
+
+    🔴 A segment must be a path under `bench/`, and that is enforced here
+    rather than remembered.  `config/r3-11-reel.tsv`'s first rule is *every
+    segment is a committed capture*, and the whole claim the artefact makes
+    over a screen recording is that anyone who clones this repository can
+    re-run the same command and get the same bytes.  A row naming a file under
+    `$FWRE_WORK` would play perfectly on this machine and on no other, and the
+    failure would be invisible until someone else tried.
     """
-    import time
     rows = []
     with open(os.path.join(ROOT, tsv), encoding="utf-8") as f:
         for line in f:
@@ -409,13 +546,65 @@ def reel(tsv, speed=1.0, outdir=None):
             p = line.split("\t")
             if len(p) < 2:
                 raise Refuse(f"{tsv}: want prefix<TAB>title[<TAB>pause]: {line}")
+            if not p[0].startswith("bench/"):
+                raise Refuse(f"{tsv}: segment {p[0]!r} is not under `bench/`, "
+                             f"so it is not a committed capture -- a reel that "
+                             f"names one plays on this machine and on no other")
             rows.append((p[0], p[1], float(p[2]) if len(p) > 2 else 1.5))
     if not rows:
         raise Refuse(f"{tsv} has no segments")
-    missing = [r[0] for r in rows if not os.path.exists(
-        os.path.join(ROOT, r[0] + ".log"))]
-    if missing:
-        raise Refuse(f"{tsv} names captures that do not exist: {missing}")
+    return rows
+
+
+def reel_budget(tsv):
+    """-> (segments, capture_s, pause_s, total_s).
+
+    Every segment is CONVERTED, not merely stat()ed: a `.timing` that
+    disagrees with its `.log` is the one class the reel cannot recover from
+    once the recorder is running, and `convert` is what sees it.
+
+    This exists so the reel's running time is a number the tool re-derives
+    from the captures rather than a number written in a comment.  ⚠️ It is
+    the sum of the captures' own durations plus the pauses; it is not what a
+    stopwatch on the recording will read, because a terminal's own scroll is
+    not in it.
+    """
+    segs = []
+    for prefix, title, pause in read_reel(tsv):
+        recs, blob = convert(os.path.join(ROOT, prefix))
+        segs.append((prefix, title, pause, sum(d for d, _ in recs),
+                     len(blob), len(recs)))
+    cap = sum(s[3] for s in segs)
+    pau = sum(s[2] for s in segs)
+    return segs, cap, pau, cap + pau
+
+
+def print_budget(tsv):
+    segs, cap, pau, total = reel_budget(tsv)
+    print(f"  {tsv}")
+    print(f"  {'segment':<28} {'bytes':>7} {'capture':>9} {'pause':>7}")
+    for prefix, _title, pause, dur, nb, _n in segs:
+        print(f"  {prefix:<28} {nb:>7} {dur:>9.3f} {pause:>7.1f}")
+    print(f"  {'':<28} {'':>7} {'-' * 9} {'-' * 7}")
+    print(f"  {len(segs)} segment(s){'':<16} {'':>7} {cap:>9.3f} {pau:>7.1f}")
+    print(f"  TOTAL {total:.3f} s   (ceiling {REEL_CEILING_S:.0f} s, "
+          f"plan/ARTIFACTS.md §2's v0.2 take)")
+    return 0 if total <= REEL_CEILING_S else 1
+
+
+def reel(tsv, speed=1.0, outdir=None):
+    """Play a sequence of captures with titles, from a TSV.
+
+    A screen recorder pointed at the terminal while this runs produces the
+    artefact, and the artefact is then reproducible from the repository by
+    re-running this one command.
+    """
+    import time
+    rows = read_reel(tsv)
+    # Convert every segment BEFORE the first one plays.  A reel that stops
+    # half way is a take that has to be re-shot, and the recorder is already
+    # running by then.
+    reel_budget(tsv)
     for prefix, title, pause in rows:
         sys.stdout.write(f"\n\033[1;36m── {title}\033[0m\n")
         sys.stdout.write(f"\033[2m   {prefix}.log\033[0m\n\n")

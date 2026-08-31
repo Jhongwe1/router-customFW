@@ -276,3 +276,103 @@ in §3 and it is not in this repository.
 | `serial-ish` has no arbiter | 13 `NOVALUE` hits match a phrase, not a value, so `--attribute` cannot classify them. `upstream/BENCH-LOG.md:248` records that this model's `UDN`/`serialNumber` are template constants, identical on every unit — 讀, not 量, and not re-checked here |
 | the dump is one source | Two full dumps exist and 量 they are byte-identical over all 4,194,304 bytes, but they were taken on the same day by the same tool. A value absent from *the dump* is not a value absent from *the device* |
 | `FORBIDDEN` is copied, not derived | `flashwin.py`'s own docstring says it: its forbidden-region list is a hardcoded copy of `CLAUDE.md`'s, and nothing checks the two against each other. Adding a third region to one and not the other is a silent gap |
+
+---
+
+## 7. 🔴 A third instrument, a third shape, and it found a line the other two are blind to
+
+**2026-08-31, twentieth session, desk.** `tools/flashwin.py scan` — new today,
+`SPEC.md` `FLS-22` carries the summary, this section carries the reasoning.
+
+### 7.1 Why a third shape exists at all
+
+Three questions, and until today only two of them had an instrument:
+
+| | question | tool | acts |
+|---|---|---|---|
+| 1 | may these bytes be **printed**, and where may a rendering be **written**? | `flashwin render` | when a file is produced |
+| 2 | where may a **bracket's** read-back and pre-read land? | `flrbracket run` | when a file is produced |
+| 3 | **does a file this repository has ALREADY COMMITTED hold forbidden content?** | — | — |
+
+The incident that names the third, 量 2026-08-31 (seating 8): `K-P3` is
+`DW 80A00000 2000` — a 32 KiB read of RAM — and it spans `0x80A00600` and
+`0x80A00700`, the two destinations the `H601` windows are read into. Its output
+lands in `bench/`. It was safe **because the experiment came out the expected
+way**: `K-guard600`/`K-guard700` read `0/64` retained words. `CLAUDE.md`
+already says a containment rule whose correctness depends on an experiment's
+outcome is not a containment rule. This is that sentence with an instrument
+behind it.
+
+### 7.2 How it asks, and why the probe set is 113 and not 8,177
+
+It does not look for the SHAPES an address takes — that is §3's classifier and
+this one knows nothing about MACs. It asks *are these bytes here*, and the
+bytes come from the reference dump:
+
+* the forbidden region is cut into **16-byte windows at every offset**, not
+  every sixteenth. That drops the alignment caveat from the guarantee entirely;
+* a window with fewer than **4 distinct byte values** is **not searched for** —
+  the filter is on the REFERENCE side, so it is not a decision made after
+  seeing a match. Finding sixteen identical bytes in a file says nothing about
+  this device;
+* 量: `H601` is **98.22 %** one repeated byte value and holds **40** distinct
+  values in 8,192 bytes, so every-offset costs **113 distinct needles**, which
+  is FEWER than the 512 aligned ones would have been. The affordability is a
+  property of the region, measured, not an optimisation;
+* two channels through one matcher: the file's **raw bytes**, and its
+  **hexadecimal decoded** — every maximal hex run, with any token followed by
+  `:` dropped, because that is a `DW` reply's or a hexdump's address column and
+  leaving it in breaks the byte stream every 16 bytes.
+
+### 7.3 What it found, and it is not what the sweep was expected to find
+
+🟢 **rlxfw's own tree is CLEAN.** `--sweep . --exclude upstream` over **1,381** files: no hit. Without the exclusion — which is the default, and this session is why — `--sweep .` reads **1,683** files and reports **1 HIT**, the one below. 🔴 **量, and the numbers here are the SECOND reading**: the first said *1,378 files, CLEAN* for `--sweep .`, and that was wrong twice — it was counted before this session's own new files existed, and it described a run under the OLD default, which excluded `upstream/`; this same session removed that default. As shipped: **`--sweep . --exclude upstream` = 1,381 files, CLEAN** (rlxfw's own tree) and **`--sweep .` = 1,683 files, 1 HIT** (1,381 + 302 = 1,683, so the partition is exact).
+`--sweep bench` over **1,130**: no hit, `K-P3` included — so the check that was
+made by hand at the bench on 2026-08-31 is now made by machine, and `S9c` is
+that case.
+
+🔴 **`upstream/BENCH-LOG.md` line 2557 is 16 bytes of `H601` at flash
+`0x006000`, in a public repository**, as an `xxd`-style hexdump line — eight-hex
+offset, then eight four-hex groups, then an ASCII gutter. Located without
+printing a byte of it: the hit is at offset 1165 of the hex channel, which maps
+to file bytes 163,238–163,275.
+
+⚠️ **Neither existing tool identifies that line as carrying forbidden
+CONTENT, and the two of them fail differently.** `leakscan` names twenty-one lines of that file (`:215`, `:216`, `:1848`, `:1931`, `:2042`–`:2044`, `:2057`, `:5186`, `:5196`–`:5197`, `:5329`–`:5330` and six `enx` lines) and **2557 is not among them** — it looks for the text shapes an address takes, and a hexdump of flash bytes has none.
+
+⚠️ **And the two-tool claim was checked for one and ASSUMED for the other.** 量: `leakscan` does not name line 2557 at all (it names twenty-one other lines of that file). **`audit-bench-log.py` DOES name it** — on its *topic* keyword `'H601'`, and the reason is worth the sentence: the flash bytes at `0x006000` **are the ASCII characters `H`,`6`,`0`,`1`** — the region's own name, written into the flash — so the hexdump's ASCII gutter spells it. It is one of **183** hits that tool reports on that file and it **exits 0**, so it is not a gate that fails. **The accurate claim is narrower**: neither existing tool identifies that line as carrying forbidden CONTENT. One does not see it; the other touches it on a word.
+
+### 7.4 What it changes and what it does not
+
+**It does not change §5's decision.** `upstream/` stays as it is. The reason is
+unchanged (this unit is EOL, years unused, and reset does not restore `H601` so
+the value has not moved) and this line adds no exposure the decision did not
+already cover: the same file publishes the MAC in colon form on twenty-one
+other lines, which §4 counted and §5 decided about.
+
+**What it does change** is one sentence. *"Nothing checks whether a committed
+capture already contains forbidden content"* — the carried-forward row from
+seating 8 — is **false for rlxfw's own tree as of today**, with a number:
+1,381 files (excluding `upstream/`), CLEAN, and a positive control that a
+rendering of the real window HITS.
+
+🔴 **And it changed the tool's own default.** The first version of the walk
+excluded `upstream/`. With it excluded the sweep of this repository is CLEAN;
+with it included there is one hit. **A default that hides the only finding the
+tool has ever made is not a default** — the exclusion is now `--exclude`, on
+the command line where a reader can see it.
+
+### 7.5 ⚠️ What it cannot see, and each is a real gap
+
+* **a run shorter than 16 bytes, including a bare six-byte MAC.** That is §3's
+  shape. The two instruments are complements and **neither subsumes the
+  other** — this one found a line `leakscan` cannot see, and `leakscan` finds
+  values that never appear as sixteen contiguous bytes of flash.
+* **a byte-swapped or little-endian rendering.** The loader prints big-endian,
+  which is the flash's own order, so the channel that matters here is covered;
+  a capture from another instrument may not be.
+* **anything inside the 98.22 %** of the region that is one repeated byte —
+  by construction, and that content identifies nothing.
+* **anything compressed or encoded other than plain hex**, `.git`'s objects
+  included, which is why `.git` is skipped rather than scanned.
+

@@ -284,6 +284,19 @@ jobs:
       - name: flashwin self-test
         run: /usr/bin/python3 tools/flashwin.py --self-test 2>&1 | tee ci-out/flashwin.out; exit "${PIPESTATUS[0]}"
 
+      # And the mutation suite flashwin never had. It is the tool three other
+      # files in tools/ cite as the reason THEIR suite has a baseline case --
+      # 2026-08-30, 8 of 8 killed with every kill invalid, because the harness
+      # symlinked the repository root and _inside_repo resolves with realpath.
+      # Both passes over it were run in a scratch directory and neither was
+      # committed. This one is, with B0/A0/W0, and it went red on its first run
+      # in three places: a matcher that stopped at the first occurrence of each
+      # needle (the K-P3 shape is the same window at TWO destinations), an
+      # address-column rule no case could see, and a row whose named case was
+      # C9 where the measurement says C10.
+      - name: flashwin mutation suite
+        run: /usr/bin/python3 tools/test-flashwin-mutants.py 2>&1 | tee ci-out/test-flashwin-mutants.out; exit "${PIPESTATUS[0]}"
+
       # flrbracket reads the loader's `FLR` echo by machine before the operator
       # types `Y`. `FLR`'s first typed argument is the RAM DESTINATION and the
       # loader echoes `from <source> to <destination>` -- the other order -- so

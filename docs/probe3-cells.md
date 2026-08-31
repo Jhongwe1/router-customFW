@@ -1128,10 +1128,37 @@ band, which is why the CPI ambiguity does not have to be resolved first.
 | **1.15 – 1.8** | indeterminate, and it is reported as that |
 | **≥ 1.8** | the window buffers; implied burst ≈ **4 R bytes**, rounded to a power of two. `FW-34` NARROWS and does not close — see § 6.8.3 |
 
-**And the control on the verdict**: `f.dram.str / f.dram.seq` must be
-**strictly less** than `R`. If the DRAM ratio is as large, the difference
-belongs to the loop or to SDRAM row misses and this cell says nothing about the
-window at all.
+**And the control on the verdict** 🔄 **REWRITTEN 2026-08-31 (twentieth
+session), because the form below was written before the seating and fired on
+the branch it was supposed to guard.** *(As written, and it stays written:
+"`f.dram.str / f.dram.seq` must be **strictly less** than `R`. If the DRAM
+ratio is as large, the difference belongs to the loop or to SDRAM row misses
+and this cell says nothing about the window at all.")* 量 2026-08-31:
+**1.3046 against 1.0000**, which is *greater*. No ratio is below 1.0 unless the
+strided leg is faster than the sequential one, so **that guard is
+unsatisfiable for every run that lands in the `≤ 1.15` band** — and the `≤
+1.15` band is the one that closes `FW-34`.
+
+🔴 **It is one guard with two branches and OPPOSITE senses, and which branch
+you are on decides which failure it is guarding against.** Let
+`D = f.dram.str / f.dram.seq`, the same loop over memory whose behaviour is
+known.
+
+| branch | the failure mode it guards | the control | why that sense |
+|---|---|---|---|
+| **`R ≥ 1.8`** | *a large `R` that belongs to the LOOP*, not to the window — a strided access is slower for reasons the window has nothing to do with (SDRAM row misses, the mask's own arithmetic) | **`D` must be strictly less than `R`** | if memory shows the same stride effect, the window's `R` is not evidence about the window |
+| **`R ≤ 1.15`** | *a small `R` because the instrument cannot see a stride difference AT ALL* — a loop that reported 1.0000 on everything would report it here too | **`D` must be strictly GREATER than `R`, and by a stated margin: `D ≥ 1.15`** | the same loop, the same `N`, the same 64 KiB mask, on memory that IS stride-sensitive, must produce a ratio outside the band — otherwise `1.0000` is the tool's number and not the window's |
+| **1.15 – 1.8** | indeterminate anyway | neither | a control on a verdict that is not being issued buys nothing |
+
+⚠️ **The `R ≤ 1.15` row is a sensitivity control and it was arrived at DURING
+the seating rather than written first**, which is why it is written here now
+and marked as such: on 2026-08-31 `D = 1.3046` satisfies it with margin, but a
+control that is derived after the reading it rescues is worth less than one
+that was in the block, and the honest record is that this branch had none.
+🔴 **And `D ≥ 1.15` is a THRESHOLD I chose, not a measurement**: 推, the
+reasoning is only that a control has to exclude the band it is controlling.
+The next payload that runs Group F is the first one for which it is a
+prediction.
 
 **The absolute cross-check, which is a second question the same six words
 answer.** `f.win.str / 1024`:
@@ -1169,9 +1196,25 @@ here constrains §20.5's bands; it does not measure them.
 6. **`f.sfcr ≠ 3FC00000`** — the divider is not what `REG-13` read at the
    prompt. The absolute table above has to be recomputed before any of it is
    quoted, and `f.sfcr` is what it is recomputed from.
-7. 🔴 **any leg below `f.dram.str`, or a `f.win.str` under ~5,000 ticks** — a
-   reading that has WRAPPED aliases to a small number, and every ratio computed
-   from it is then arithmetic on a number that is not a duration.
+7. 🔴 **any WINDOW OR BOOT leg below `f.dram.str`, or an `f.win.str` under
+   ~5,000 ticks** — a reading that has WRAPPED aliases to a small number, and
+   every ratio computed from it is then arithmetic on a number that is not a
+   duration. 🔄 **REWRITTEN 2026-08-31 (twentieth); as written it said *any
+   leg*, and *any* includes the DRAM legs.** `f.dram.seq` is **1,799** against
+   `f.dram.str`'s **2,347** — a sequential DRAM read is below a strided one
+   **by construction**, since crossing SDRAM rows is exactly what the strided
+   leg pays extra for, and that is the same sentence § 6.8.2 uses to justify
+   having the DRAM legs at all. So the condition as written **fires on its own
+   control, on every run that behaves**. 量 2026-08-31, and it fired. The four
+   legs it means are `f.win.seq`, `f.win.str`, `f.boot.seq`, `f.boot.str`; on
+   those it passes with room, the smallest being `f.boot.seq` at 30,353.
+
+⚠️ **Two of the seven conditions above were mis-scoped in the same way and both
+were written before the seating** — this one and § 6.8.2's control. Neither is
+a measurement that went wrong; both are guards whose quantifier was wider than
+their subject. The write-up of the seating claimed *"(1)–(7) all pass"* and the
+correct sentence is **(1)–(6) pass and (7) fired on its own control**;
+`bench/2026-08-31c/CORRECTIONS-block4.md` § 17 owns that correction.
 
 🔴 **THE WRAP MARGIN, and Group F is the first cell in this payload that does
 not fit inside the window § 6.3's own comment describes.** `TC0CNT` wraps every

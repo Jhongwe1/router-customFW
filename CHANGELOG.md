@@ -1,5 +1,120 @@
 # Changelog
 
+🟢 **2026-08-31, twentieth session, desk: `R3` CLOSES** — twelve steps of
+twelve, and D1 through D5 all holding **in one boot** with the discriminator
+present, which is what the gate's own refutation condition asked for rather
+than five rows averaged across four seatings. Both decisions' refutation
+conditions unfired; all four stop-loss clauses unreached, and two of them
+because the work was DONE rather than avoided (D4 was reached on the first
+seating where the clause allowed two). 🔴 **The write-up carries a section on
+what the gate did NOT establish and the gate closes anyway**: the `FLR`
+bracket reaches **0.0244 %** of the part so `G8b`'s sentence is still
+unsayable; **there is still no driver of mine** — D5's ping went out through
+the vendor's `rtl819x`, in the vendor's own configuration; and D3's own written
+observable, `MemTotal:`, is a string this kernel never prints in any
+configuration, so that row passed on a substitute and is recorded as a defect
+in the DoD. `notes/kernel-build.md` §21.
+
+🎬 **The v0.2 artefact is a REEL, not a recording, and the shortfall closed
+with CAPTURE.** `config/r3-11-reel.tsv` goes six segments to seven:
+**44.749 s of capture + 15.000 s of pause = 59.749 s**, under
+`plan/ARTIFACTS.md` §2's 60 s. 🔴 **The pause column was not padded** — the
+file's own rule is that padding a reel with dead terminal is worse than a short
+one. The seventh segment is `bench/2026-08-31c/K-J` and it is in the reel as a
+**CONTROL**: `probe3`'s run and its whole UART report (t=0…2.4 s) and then, in
+the same capture, the watchdog firing, the loader re-staging `0x80500000`
+**from flash**, and the board's own vendor firmware booting end to end —
+`start address: 0x80003440` against segment 1's `0x80003600`. That is this
+project's anti-DoD happening on video, so a viewer's first objection is
+answered inside the artefact. ⚠️ 68 % of that segment is inter-line gap and it
+is the DEVICE's time, not a card's `--seconds`: segment 1 is 96 % gap.
+🟢 **And those numbers stopped being a comment**: until today **nothing read
+`config/r3-11-reel.tsv` at all**, and `replay-capture` now derives the budget
+(`reel … --budget`) with six new controls asserting it, including `R18`, which
+enforces the file's own first rule — every segment is a committed capture under
+`bench/` — and `R15b`, without which no mutation could kill `R15` at all.
+
+🔴 **`W0` arrived in a mutation harness and found five invalid kills in the
+same run.** `test-replay-capture-mutants` counted any non-zero exit as a kill;
+five of its fourteen rows (`M1`, `M2`, `M9`, `M10`, `M13`) turned **no case
+red** — each replaced a `Refuse` with an `IndexError` or a `FileNotFoundError`,
+the controls caught only `Refuse`, and the whole self-test died on a traceback
+before printing anything. **The repair is the controls, not the labels**: every
+control now reports rather than raising, keeping the message assertion that
+separates a refusal (which names its reason) from a crash (which does not).
+19 rows, 18 killed with the named case red, 1 equivalent surviving as proved.
+
+🔴 **A third containment shape, and it found something on its first sweep.**
+`flashwin scan` asks what neither `render` nor `flrbracket run` asks: *does a
+file this repository has ALREADY COMMITTED hold forbidden content?* It does not
+look for the text shapes an address takes — that is `leakscan`'s question — it
+looks for the bytes, cut from the reference dump into 16-byte windows at
+**every** offset, filtered on the REFERENCE side to windows carrying ≥ 4
+distinct values. 量: that costs **113 needles**, fewer than an aligned scheme,
+because `H601` is **98.22 %** one repeated byte and holds **40** distinct
+values in 8,192 — so the measurement removed the alignment caveat from the
+guarantee instead of documenting it. 🟢 **rlxfw's own tree is CLEAN**: `--sweep . --exclude upstream`, **1,381** files, `K-P3` included, so the check that was written by hand at the bench is now a case (`S9c`). ⚠️ Without the exclusion — the DEFAULT — `--sweep .` reads **1,683** files and reports **1 HIT**; 1,381 + 302 = 1,683. 🔴 **`upstream/BENCH-LOG.md` line 2557 is not**: sixteen
+bytes of `H601` at flash `0x006000`, as an `xxd` line, in a public repository —
+and **neither existing tool identifies it as forbidden CONTENT** — `leakscan` does not name that line at all (a hexdump of flash carries no colon-form MAC), and `audit-bench-log` names it only on the topic keyword `H601`, which appears there because the flash bytes at `0x006000` ARE the ASCII `H`,`6`,`0`,`1`, among 183 hits it reports on that file while exiting 0. ⚠️ **That second half was checked after the first draft asserted it**, and the draft was wrong. It does not move `FLS-22`'s
+decision (that file already publishes the MAC in colon form on twenty-one other
+lines); it moves one sentence about what is checked. 🔴 **And it changed the
+tool's default**: the first walk excluded `upstream/`, which hid the only
+finding the tool has ever made — **a default that hides that is not a
+default** — so the exclusion is `--exclude`, on the command line.
+`tools/test-flashwin-mutants.py` arrives with it: the suite `flashwin` never
+had, three survivors on its first run, all three real.
+
+🔴 **`P2`'s residual closed, and both clauses of the sentence naming it were
+false.** *"五棵樹一棵都不在磁碟上，要先重建"* — eight trees were on disk with
+their objects and **no rebuild ran**; *"the fifth tree"* — **four** trees built
+2026-08-30 were uncovered, not one. All four swept, 0 violations. 🔴 **And
+*four new trees* is too wide as well**: hashing every `arch/rlx` object of each
+tree, `quietmc` ≡ `quietm` and `loudmc` ≡ `loudm` **byte for byte**, so those
+two are replications; `rep4` ≡ `rep8` and differ from the rest, so **one** new
+object set arrived and `-j4`/`-j8` is deterministic over `arch/rlx`.
+🟢 **The chain reaches the silicon with no vendor binary executed**: the swept
+tree's `vmlinux` `cmp`s equal to the image build's input, and that build's
+`nfjrom` `cmp`s equal to the image seating 7 uploaded — the link `Q0` never
+covered.
+
+🔴 **`check-predictions --sweep bench` had been RED since the eighteenth
+session and nothing said so.** 13 cells, all from one **frozen** prediction
+block whose content is git-clean at `68b0bec` and whose mtime was the
+eighteenth session's revert: **reverting content does not revert mtime**. The
+instance is repaired from `git log --format=%aI` — a stronger record than the
+mtime it replaced, not a forged one — and the sweep reads 275 ordered, 0 out of
+order. **The class is carried forward**: `--sweep` cannot be in CI (git stores
+no mtimes; a clone reads 128 of 156 cells as out of order), so it is a pre-push
+gate on one machine, and the repair is a diagnosis line rather than a pass.
+
+🔄 **Two refutation conditions were mis-scoped and both are fixed in place.**
+§ 6.8.2's DRAM control is now one guard with two branches and **opposite
+senses** (`R ≥ 1.8` wants the DRAM ratio below `R`; `R ≤ 1.15` wants it above,
+and `D ≥ 1.15`, which is 推 and says so). § 6.8.3's condition (7) becomes *any
+window or boot leg* — as written it said *any leg*, and a sequential DRAM read
+is below a strided one by construction, so it fired on its own control every
+time. 🔴 **The seating's write-up sentence *"(1)–(7) all pass"* is corrected to
+*"(1)–(6) pass and (7) fired on its own control"*.**
+
+⚠️ **`MEM-17`'s knee is DESIGNED and not run**, with its positive control and
+three refutation conditions written first — and with the cost stated: **four
+power cycles**, where the previous entry called the next reading free. The free
+half buys one point.
+
+🔴 **Two mistakes of my own, both caught before the commit.** The write-up's
+first draft quoted `loudm`'s build stamp for a capture that carries
+`quietmc`'s — caught by re-reading every quoted string against its named
+capture, and **nothing in this repository checks a quotation in prose against
+the file it names**. And the session-ladder shift was written to replace the
+oldest row with an HTML comment, which would have split a markdown table in two
+and stranded every row after it — the shape `spec-check` `C8c` exists for; the
+ladder grows by one instead.
+
+`replay-capture` 17 → 23 · `test-replay-capture-mutants` 14 → 19 ·
+`flashwin` 27 → 40 · `test-flashwin-mutants` 19 (new) ·
+`not-run-total` 474 → **477**, and the +3 is all `flashwin`'s allowed skip
+going 3 → 6, measured by hiding `$FWRE_WORK` rather than by addition.
+
 🔴 **2026-08-29, later the same day: a kernel of mine boots on the device, to a
 shell that answers, and pings.** `loudm` — 1,053,696 bytes, built by Realtek's
 own wrapper pipeline, which the same day was shown to reproduce the vendor's own
