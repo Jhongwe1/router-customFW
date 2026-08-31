@@ -11255,6 +11255,25 @@ RED   flashwin   ran 34/40   UNEXPECTED-SKIP "this unit's flash dump"
 **allowed-skip 標籤自檢 4／17 → 5／17** —— 而推動它的是 CI 紅燈,不是計畫;
 一個小時前這一段才把它記成「沒有動」。
 
+🔴 **而「這一段 CI 綠」這句話對中間三個 commit 是假的,所以不這樣寫。**
+量,`gh run list`:
+
+```
+33411764834  success   18c586a  CI went red on a class this machine cannot see…
+33410742695  failure   3a10e0c  Three markers in the step list…
+33410324636  failure   5b66938  The fourth number this session quoted…
+33410057391  failure   95895e1  The reel was short because it was missing capture…
+```
+
+**三個中間 commit 是紅的**,而且是**同一個**原因:標籤漂移在第一個 commit 就進去了,
+後面兩個 commit 沒有碰到它,所以照樣紅。正確的說法是
+**「HEAD 綠,而歷史上有三個紅的 commit,原因單一且已修」**,不是「CI 綠」。
+
+🟢 **HEAD 的數字是從真 artifact 讀的不是從摘要**(`gh run view 33411764834 --log`):
+`flashwin` 35/41 not run 6、`test-flashwin-mutants` 20/20、`replay-capture` 23/23、
+`test-replay-capture-mutants` 19/19、`spec-check` 40/40,
+**`NOT RUN IN THIS JOB: 477`** —— 與宣告的 `not-run-total: 477` 相符,沒有 mismatch 行。
+
 **擁有者檔**:`config/r3-11-reel.tsv`、`tools/replay-capture.py`、
 `tools/test-replay-capture-mutants.py`、`tools/flashwin.py`、
 `tools/test-flashwin-mutants.py`(新)、`tools/ci-expected.tsv`、
