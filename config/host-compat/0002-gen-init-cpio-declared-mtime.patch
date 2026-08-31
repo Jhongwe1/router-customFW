@@ -1,7 +1,7 @@
 Take gen_init_cpio's mtime from a declaration instead of from the clock.
 
 WHY THIS EXISTS.  P4a, 2026-09-01.  量 the same day: two builds of the SAME
-tree from the SAME .config, 49 seconds apart, differ in 84 of 3,935,472 bytes,
+tree from the SAME .config, run back to back, differ in 84 of 3,935,472 bytes,
 and **78 of those 84 are this program's output**.  `gen_init_cpio` stamps every
 directory, symlink and device node with `time(NULL)` at the moment it runs
 (three call sites, usr/gen_init_cpio.c:105 cpio_mkslink, :153 cpio_mkgeneric,

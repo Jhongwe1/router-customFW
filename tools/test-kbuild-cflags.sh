@@ -110,7 +110,7 @@ ck "C6 and it did NOT read the declaration"   0 \
 
 echo
 echo "=== the build stamp, P4a 2026-09-01: same guard shape, same reasons ==="
-# 量 2026-09-01: two builds of one tree 49 s apart differ in 84 of 3,935,472
+# 量 2026-09-01: two back-to-back builds of one tree differ in 84 of 3,935,472
 # bytes, all of them clock readings -- 6 the kernel's UTS_VERSION and 78
 # gen_init_cpio's.  config/rlxfw-build-stamp declares one epoch for both.  These
 # run through --dry-run, which exits 0 above the stage, so none of them pays for

@@ -29,9 +29,16 @@ and the other is not, and the gate's DoD is one sentence covering both.**
 🔴 **So `P4a`'s positive claim is refuted before the gate opens, on the artefact
 that matters** — the kernel is what v0.2 ships and what a GPL reader would try
 to rebuild. The `rlxprobe` row is real and it is four gates early, but it is a
-120 KB bare-metal object built by a Makefile of mine with a modern host
-toolchain; it does not carry the vendor tree's 599 translation units, its
-generated headers, or its 2009 kbuild.
+bare-metal payload of a few tens of kilobytes, built by a Makefile of mine
+with a modern host toolchain; it does not carry the vendor tree's 599
+translation units, its generated headers, or its 2009 kbuild.
+🔴 *(This said “a **120 KB** bare-metal object” until the adversarial
+pass on 2026-09-01. **120 KB was measured nowhere; it was invented while the
+sentence was being written.** 量 the same day, the probe images on disk are
+**29,088 / 29,680 / 31,536** bytes. The sentence's claim does not depend on
+the size at all, which is exactly why a wrong number could sit inside it
+without anything catching it — no checker in this repository can see this
+class, and it is the fourth instance of it today.)*
 
 ⚠️ **`-j` is excluded as the variable and that had to be done first**, because
 this build's Makefile rewrites its own headers before compiling and a `-j` race
@@ -108,8 +115,14 @@ report a difference count in the **hundreds of thousands** and must place some
 of it in `.text`. **Negative control**: `rep8` against itself must report **0**.
 
 ⚠️ **What this experiment cannot decide, whatever it returns.** It compares two
-builds **49 seconds apart on one machine with one tree staged from one pinned
-drop**. It says nothing about a different host, a different `$PWD`, a different
+builds **run back to back on one machine, from one tree staged from one pinned
+drop**. 🔴 *(This said “49 seconds apart” until the adversarial pass on
+2026-09-01. **49 s is `rep4`'s cell DURATION, not a gap between anything** —
+讀 `determinism.log`, the two cells START 40 s apart, the two images' kernel
+stamps are 48 s apart and their cpio stamps 33 s. The number arrived from this
+session's opening brief and was copied into six committed files before anyone
+re-derived it, which is the same class as the 120 KB above and the fifth
+instance of it today.)* It says nothing about a different host, a different `$PWD`, a different
 user, a different filesystem order, or a different day — and three of those are
 known kbuild reproducibility hazards in 2009-era trees. A green result here
 narrows `P4a`'s first cell and does not close the gate.
@@ -273,6 +286,30 @@ comment byte moves the recipe id `9c7217ac` → `cf4efeac` and the image to
 `a4480a625d026c85…`. The inversion is the check on `ID0` — it says the id is
 computed from the declaration's bytes and not from something narrower.
 
+### 5.3 🔴 Every hash above belongs to a recipe id, and the adversarial pass proved it by moving one
+
+**量 2026-09-01, at the end of the session:** the corrections in §5.4 edited
+`config/rlxfw-build-stamp` and `config/host-compat/0002-…patch` — **comment text
+in both, not one byte of behaviour** — and the recipe id moved
+**`9c7217ac` → `cc33bfc9`**. So the image `4fc20ce4…` is no longer what a build
+of this tree produces, and that is **the design working rather than a defect**:
+`ID0`'s whole job is to be a function of the declaration's bytes.
+
+**Therefore every hash in this file is quoted with its recipe id and must stay
+that way**: `c956c5b754374843…` is pre-`ID0`; `4fc20ce49f68a6c5…` is recipe
+`9c7217ac`. A reader who rebuilds at a different recipe id and gets a different
+hash has reproduced the build correctly.
+
+🔴 **The trade-off this exposes, stated rather than discovered later.** `ID0`
+hashes the declaration files as **bytes**, comments included. That is the cheap
+implementation — no parser, and a comment in a committed declaration genuinely
+is part of the committed recipe — and the cost is real: **a typo fix in a
+comment produces a different image**, so two images cannot be compared across a
+documentation-only commit. The alternative (hash the declarations' *meaning*)
+needs a parser per file format, and a parser is a second thing that can be
+wrong about what the recipe is. **The byte version stays**, and this paragraph
+is the reason it was chosen rather than arrived at.
+
 **`ID0` is a discriminator by the same test as the ladder**, not by assertion:
 `rlxfw-marks.py verify` against `p4a3` with the vendor's `ctl-vendor/vmlinux`
 as `--absent` reports *all 12 mark(s) present once in the image and absent from
@@ -357,3 +394,12 @@ one that predicted *no change*.
 * **The `.text` of `p4a3` is not the `.text` of the image that booted.**
   `quietm` (2026-08-28) and `loudm` are what `SPEC.md` `FW-27`/`FW-31`/`FW-32`
   are measured on. This gate did not rebuild those and does not claim to.
+
+### 5.4 The two numbers the adversarial pass took out of this file
+
+**Both were found by re-deriving a figure against the source it names, and neither could have been found by a checker in this repository.**
+
+* **`120 KB`** for `rlxprobe` (§1) — measured nowhere, invented while the sentence was being written. The probe images on disk are 29,088 / 29,680 / 31,536 bytes.
+* **`49 seconds apart`** for `rep8`/`rep4` — **49 s is `rep4`'s cell duration, not a gap between anything.** 讀 `determinism.log`: the two cells start **40 s** apart, their kernel stamps end up **48 s** apart and their cpio stamps **33 s**. It arrived in this session's opening brief and was copied into **six** committed files — `config/rlxfw-build-stamp`, `config/host-compat/0002-…patch`, `docs/FINDINGS.md`, this file, `tools/rlxfw-kbuild.sh` and `tools/test-kbuild-cflags.sh` — before it was re-derived. All six now say *back to back*.
+
+⚠️ **Three commit messages already pushed still carry `49 s`** (`3825411`, `b5eedc3`, `2026e8e`). Commit messages are immutable history; the correction lives here and in the commit that made it.

@@ -2,8 +2,9 @@
 #
 # WHY THIS FILE EXISTS, and it is a defect report rather than a preference.
 # 量 2026-09-01: two builds of the SAME tree, from the SAME .config file, the
-# same initramfs spec and the same marks, 49 seconds apart, produce different
-# `vmlinux` sha256.  84 of 3,935,472 bytes differ; ZERO of them are in `.text`.
+# same initramfs spec and the same marks, run back to back (讀
+# `r3-9/determinism.log`: cells starting 40 s apart, whose kernel stamps end up
+# 48 s apart and whose cpio stamps 33 s), produce different `vmlinux` sha256.  84 of 3,935,472 bytes differ; ZERO of them are in `.text`.
 # Six are the kernel's build timestamp -- `linux_banner` in `.rodata` and the
 # `version` field of `init_uts_ns` in `.data`, which are two copies of the one
 # `UTS_VERSION` string that `scripts/mkcompile_h` writes from `date` when

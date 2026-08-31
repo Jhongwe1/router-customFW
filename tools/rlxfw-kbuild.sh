@@ -139,7 +139,7 @@ echo "== $CELL: CFLAGS_KERNEL=[$CFLAGS_KERNEL]  <- $CFLAGS_SRC"
 
 # ------------------------------------------------- the build stamp, declared
 # P4a, 2026-09-01.  Same shape as the CFLAGS block above and for the same
-# reason: 量 the same day, two builds of one tree 49 s apart differ in 84 of
+# reason: 量 the same day, two back-to-back builds of one tree differ in 84 of
 # 3,935,472 bytes, and every one of those bytes is a clock reading.  Six are
 # the kernel's own UTS_VERSION and 78 are gen_init_cpio's; one declared epoch
 # settles both, which is why they are read from ONE file here rather than set
