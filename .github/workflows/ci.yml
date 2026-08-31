@@ -322,6 +322,39 @@ jobs:
       # three was a control of the tool's own that could not fail.
       - name: test-flrbracket-mutants
         run: /usr/bin/python3 tools/test-flrbracket-mutants.py --jobs 8 2>&1 | tee ci-out/test-flrbracket-mutants.out; exit "${PIPESTATUS[0]}"
+      # cardcheck reads a bench card the way the DEVICE will. It exists because
+      # seating 7 typed `wc -lc < /dev/mtd0ro` and got `wc: not found`: `wc` is
+      # one of this busybox's fifty applets and is NOT one of the eleven busybox
+      # symlinks the image declares. `FW-26` answers *what can this binary do*;
+      # a cell needs *what can this image invoke*, and nothing compared the two.
+      # Its A11 control runs the whole committed block-3 card and requires
+      # exactly the two cells that failed at the bench -- so a regression is a
+      # red case and not a paragraph. Needs no $FWRE_WORK and no device: the
+      # declaration and every card are committed.
+      - name: cardcheck self-test
+        run: /usr/bin/python3 tools/cardcheck.py --self-test 2>&1 | tee ci-out/cardcheck.out; exit "${PIPESTATUS[0]}"
+
+      # And the mutation suite, because 26 green controls is a claim about the
+      # controls. Two of these survived their first run -- a redirection target
+      # read as a command, and `nod` entries folded into the invocable set --
+      # and neither was visible to any of the 23 cases that existed then.
+      - name: cardcheck mutation suite
+        run: /usr/bin/python3 tools/test-cardcheck-mutants.py 2>&1 | tee ci-out/test-cardcheck-mutants.out; exit "${PIPESTATUS[0]}"
+      # replay-capture turns a committed .log + .timing back into the terminal
+      # it came from, so R3-11's artefact is DERIVED from evidence rather than
+      # recorded beside it. Its R4 is the reason it is worth a suite: W-3, X-3
+      # and V-3 are byte-identical across two power cycles and two days, so
+      # three independent captures must give identical data and different
+      # timing, and both halves are asserted. R12 hands the result to
+      # scriptreplay(1) itself; if util-linux is absent that one case SKIPS
+      # under the label ci-expected.tsv allows, and R14 checks the label.
+      - name: replay-capture self-test
+        run: /usr/bin/python3 tools/replay-capture.py --self-test 2>&1 | tee ci-out/replay-capture.out; exit "${PIPESTATUS[0]}"
+
+      - name: replay-capture mutation suite
+        run: /usr/bin/python3 tools/test-replay-capture-mutants.py 2>&1 | tee ci-out/test-replay-capture-mutants.out; exit "${PIPESTATUS[0]}"
+
+
 
       # binsim's controls need no vendor binary and no compiler: every fixture
       # is a synthetic ELF the tool builds itself. That is deliberate and it is

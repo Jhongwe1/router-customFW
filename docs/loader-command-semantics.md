@@ -640,6 +640,21 @@ Three `strtoul(_,_,16)`, **no bound check on any of them**, then:
 80409a44   jal   0x80404F38        ; flash_read(dst_RAM, src_flash, len)
 ```
 
+🆕 **2026-08-31: the traversal continues past that last line, and the answer is
+not the one the reader of this file would guess.** `0x80404F38` dispatches
+through a `.bss` function pointer at `0x8040FC10` — `+0x3C` of a 72-byte-per-
+entry chip table at `0x8040FBD4` — which all **three** registration sites fill
+with the same `0x804065DC`, so the read method is not chip-dependent. That shim
+supplies the `Fast Read` opcode `0x0B000000` and calls the engine at
+`0x80405F70`, whose data loop is **fifteen instructions per four bytes, `lw`
+from `0xB800120C` (`SFDR`), four `sb` to unpack**. 🔴 **`FLR` reads by
+programmed I/O and never touches the memory-mapped window at `0xBD000000`** —
+讀, a census of every `lui` immediate in `stage2-vma.dis`: the window base
+occurs **exactly once**, at `0x80409BC4`, as a `printf` argument inside `FLW`
+(positive control on the census: `0xb800` **115** times, `0xbfc0` twice).
+**Owner of the full chain and of what it refutes: `notes/kernel-build.md` §20;
+index row `SPEC.md` `LDR-42`.**
+
 **`FLR`'s first argument is the RAM destination** — the printf at `0x80409A18`
 takes `argv[1]` first (`Flash read from %X to %X with %X bytes`), which is a
 third source for the argument order and the one that needs no device. A mistyped
@@ -1266,7 +1281,7 @@ is `Unknown command !`, about 44 bytes, arriving at once and followed by a
 prompt; a `--seconds` truncation stops **mid-line with no prompt**. Neither is
 what came back — 500 whole lines and a prompt.
 
-⚠️ **Nothing in that seating depended on the answer.** `DW 80A02000 641` is three
+⚠️ **Nothing in that seating depended on the answer.** `DW 80A02000 707` is three 🔄 *(641 when this was written; the block grew on 2026-08-31 and the claim survives, because 707 is three digits too)* — the original sentence said `DW 80A02000 641` is three
 digits, and `probe3.c`'s compile-time assertion, the `Makefile`'s
 `RB_WORDS_probe3` comment and `docs/probe3-cells.md` §4 all say so
 independently. The cell is reconnaissance for `R5-0`, bought on a seating

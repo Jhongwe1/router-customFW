@@ -343,6 +343,44 @@ tools/test-flrbracket-mutants.py
                            that case failed. Both controls exist because a pass over
                            `flashwin` reported 8 of 8 killed and every kill was
                            invalid
+tools/cardcheck.py         27 controls, and it reads a card the way the DEVICE will.
+                           `commands` checks every command a card types against what
+                           the image DECLARES it can invoke; `numbers` re-derives every
+                           number a card states from the artefact it names. It exists
+                           because seating 7 typed `wc -lc < /dev/mtd0ro` and got
+                           `wc: not found` — `wc` is one of this busybox's fifty
+                           applets and is not one of the eleven symlinks the image
+                           declares, and those are two populations nothing compared.
+                           `A11` runs the whole committed block-3 card and requires
+                           exactly the two cells that failed at the bench. `numbers`
+                           REFUSES a card with no ```cardnum fence rather than
+                           reporting `0 of 0`, which is why the five frozen blocks
+                           come back refused and that is the correct output
+tools/test-cardcheck-mutants.py
+                           18 mutants, baseline first. Two survived the 23 controls
+                           that existed when they were written, and neither was
+                           visible to any card in the corpus — one of them exposed a
+                           real defect, that `/proc` and `/sys` belong to the kernel
+                           and were being reported as undeclared
+tools/replay-capture.py    17 controls, and it turns a committed `.log` + `.timing`
+                           back into the terminal it came from - so R3-11's
+                           artefact is DERIVED from evidence rather than recorded
+                           beside it, and anyone with a clone can re-run it.
+                           `R4` is why it is worth a suite: `W-3`, `X-3` and `V-3`
+                           are byte-identical across two power cycles and two
+                           days, so three independent captures must give identical
+                           data and different timing - 248 / 256 / 264 records -
+                           and both halves are asserted. `R12` hands the result to
+                           `scriptreplay(1)` itself and compares byte for byte;
+                           `R13` is its negative, because without a header line
+                           `scriptreplay` silently eats the first ten bytes
+tools/test-replay-capture-mutants.py
+                           13 killed and one declared EQUIVALENT with a proof -
+                           the byte-count reconciliation cannot fire, because the
+                           three checks before it make the counts telescope. An
+                           equivalent row is still run and is required to SURVIVE,
+                           so an edit that makes the check reachable turns it red
+                           in the other direction
 tools/test-gitignore.sh    six of its cases are positive controls, because a .gitignore
                            of a single `*` would pass every negative one
 tools/test-opcount.sh      two of its cases exist because a counter reading the wrong

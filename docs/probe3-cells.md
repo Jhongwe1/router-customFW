@@ -363,13 +363,13 @@ and **the round-up is upward — a length given too small never announces itself
 |---|---|---|---|
 | one full `probe1`-shape row per victim | 104 B each — 213 KB at V=2048 | `DW … 16433`, a 5-digit length | ❌ overruns the ESC window, and is 20× past any `DW` this loader has executed |
 | 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
-| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it | ✅ **every number is under something this loader has already done** |
+| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it. 🔄 **2026-08-31 (seventeenth session): 641 → 707, `DW 80A02000 707` = 8,345 B / 2.17 s, 86 % of `H2g`.** The block is now 64 header + **194** cell results + 16 × 8 rows + 256 **scratchpad** bitmap words + **64 retained** bitmap words + the seal. Two changes, and the second is the one this row's own sentence about *"which point survives to the read-back"* required: `O_BMPK` is a region with **one writer**, `O_BMP` stays the scratchpad seven cells share, and Group W's `M(T)` ladder took the two new result words. The three mirrors are unchanged in kind — `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS`, the compile-time assertion — and `tools/test-rlxprobe.sh` recomputes the total from the C, now including `RB_BMPKW` | ✅ **every number is under something this loader has already done** |
 
 🆕 **2026-08-29, `R1h-3`: `LDR-07`'s round-up hands back the over-run control
 for free, and this section did not know it.** The block is `RB_WORDS = 641`
 words and the payload poisons `RB_POISON_W = 641 + 8 = 649` of them, the margin
 existing *"so a run that wrote PAST its own block shows data where poison was
-predicted"* (讀, `probe3.c:107`). **`DW 80A02000 641` prints `4 × ceil(641/4)` =
+predicted"* (讀, `probe3.c:131`). **`DW 80A02000 641` prints `4 × ceil(641/4)` =
 644 words**, so `w641`, `w642` and `w643` — three of the eight margin words —
 come back on the last reply line, at `0x80A02A04`/`08`/`0C`, beside the seal at
 `0x80A02A00`. **The margin check therefore needs no second command**, and its
@@ -381,6 +381,27 @@ constant is the arena's *negative* control before the run and the block's
 `P2` stops being unambiguous, because a previous run's block surviving the
 power-off (M7) reads identically. `bench/2026-08-30/PREDICTIONS-B5-block0.md`
 §12 carries the reasoning and the three-way seal check that goes with it.
+🔄 **2026-08-31: the layout moved and the free margin shrank from three words to
+one. The paragraph above is left as written because it is what the 641-word
+block did.** `RB_WORDS` is **707**, `RB_POISON_W` is 715, and `DW 80A02000 707`
+prints `4 × ceil(707/4)` = **708** words — so only `w707`, at `0x80A02B0C`,
+comes back beside the seal at `0x80A02B08`.
+
+🔴 **That is not a weakened control, and the reason is worth stating rather than
+assumed.** A payload that writes past its own block writes **upward from the
+seal**, so `w707` is the *first* word any over-run reaches; `w708`–`w710` could
+only add evidence about an over-run of two words or more, which `w707` has
+already caught. The three-word version was `641 mod 4 == 1` and nothing had
+chosen it. Reading the remaining seven still costs one `DW 80A02B0C 8`.
+
+⚠️ **What this does cost is a check on the reply's own length.** Three poison
+words at a known offset made the last reply line self-identifying; one does not.
+The compensation is that `tools/rbcheck.py` now parses `H_LAYOUT_RES/ROWS/BMP/
+BMPK/SEAL` **out of the block** instead of hardcoding 384 and 640, so a capture
+of either layout is readable without the tool being told which it is — and
+`C2`, the control that fires when `--words` reads the seal at the wrong offset,
+is what catches the case this margin used to.
+
 
 **So: four bits per victim** — the seven verdicts plus `0` = *never written*,
 which is the only lossless bitmap and the only one with a negative control inside
@@ -517,7 +538,7 @@ choosing at build time and hoping.
 | **`w-back`** | a third block with `V0` at `+136` (deliberately **not** 16 B-aligned); probes at `+112, +120, +128, +144, +152, +168` | all FRESH | 🔴 **`+128` STALE and `+144` FRESH** if the line is 16 B — i.e. the STALE set is exactly `[128,144)`, the line *containing* `+136`. **STALE extending backwards is the signature of a line fill; forward-only is prefetch**, and this cell is the only thing that separates them | STALE only forward of `+136` → `w-line`'s number is a prefetch depth, not a line size. 🔴 ⚠️ **`w-back` alone cannot separate `L = 32` from `L = 16` plus one next-line prefetch**: `+136` sits in the **lower** half of the 32 B block `[128,160)`, so both hypotheses stale exactly `[128,144+16)` and neither null fires. **`w-back2` is what separates them.** All FRESH → `L ≤ 8`, 未定 |
 | **`w-back2`** 🆕 | a fourth block with `V0` at **`+152`** — the **upper** half of a 32 B-aligned block; patch `+156` (its own word, the must-fire) and probe `+128, +136, +144, +160, +168, +176` | all FRESH | **`L = 32`** stales `[128,160)`: `+128`/`+136`/`+144` STALE, `+160`/`+168`/`+176` FRESH. **`L = 16` + one next-line prefetch** stales `[144,176)`: `+128`/`+136` FRESH, `+144`/`+160`/`+168` STALE. **The two readings are disjoint, and that is the whole cell** | any other pattern → the fill granularity is neither, and `w-line`'s number is void |
 | **`w-size`** | for W ∈ {1, 2, 4, 8, 16, 32, 64} KiB: fill the working set with victims at 32 B stride, execute all in order, uncached-patch all, execute all again, count FRESH | all FRESH at every W | **all STALE up to 16 KiB; FRESH appears at 32 KiB.** Source as above — 讀 ×3 for 16 KiB | **any FRESH at 1 KiB** → 否證 ⓐ, size void. **No FRESH at 64 KiB** → the walk cannot evict, positive control failed, size void |
-| **`w-assoc`** | 🔴 **parameters chosen at run time from `w-size`'s answer C.** For T ∈ {C/8, C/4, C/2, C} and M ∈ 1…12: M victims at stride T, execute, patch, execute. The smallest T at which a small M evicts gives the way size; K = M−1 | all FRESH | **留白 — no source.** The cell reports (T, M) and the write-up derives K | `w-size` void → `w-assoc` is not run and says so in the block. 🔴 **Two controls of its own, both free: M = 1 at every T MUST read all-STALE** (one victim cannot self-evict), **and the largest M at the smallest T MUST show FRESH.** Neither firing means (T, M) is a number with nothing behind it. **T and M are recorded as absolute byte values beside the C they were derived from**, because `w-assoc` runs on `w-size`'s *unqualified* C — if `w-imem` later differs, `w-assoc` is 未定 and its T was the scratchpad's |
+| **`w-assoc`** | 🔴 **parameters chosen at run time from `w-size`'s answer C.** For T ∈ {C/8, C/4, C/2, C} and M ∈ 1…12: M victims at stride T, execute, patch, execute. The smallest T at which a small M evicts gives the way size; K = M−1 | all FRESH | **留白 — no source.** The cell reports (T, M) and the write-up derives K 🔄 **2026-08-31: it reports the whole ladder, not just the argmin** — `w.assoc.mt`, one byte per stride, plus `w.assoc.mtcap`. §6.2a has the predictions and the reason only ONE of the four bytes discriminates | `w-size` void → `w-assoc` is not run and says so in the block. 🔴 **Two controls of its own, both free: M = 1 at every T MUST read all-STALE** (one victim cannot self-evict), **and the largest M at the smallest T MUST show FRESH.** Neither firing means (T, M) is a number with nothing behind it. **T and M are recorded as absolute byte values beside the C they were derived from**, because `w-assoc` runs on `w-size`'s *unqualified* C — if `w-imem` later differs, `w-assoc` is 未定 and its T was the scratchpad's |
 | **`w-imem`** | 🔴 `CCTL 0x020` (`IMEM0OFF`), then **`w-size` again, unchanged** | all FRESH both times | **identical to `w-size`** → **either** the arena was never in the IMEM window **or** `CCTL 0x020` did nothing. 🔴 **CP0 20 is write-only and reads zero (M4), so no cell in this payload can confirm a `CCTL` command was accepted** — *identical* is also the no-op reading. It is a pass **only** where `m-imem` returned a window and the arena is provably outside it; everywhere else it is **未定**. **If `m-imem` returned a window, one extra victim block goes INSIDE it**: that block MUST change across the `0x020` write, and without it this cell has no must-fire | 🔴 **different** → the first `w-size` was measuring the scratchpad. **That is a result, not a failure**: the difference is the IMEM geometry, and `w-imem`'s run is the I-cache one |
 
 ⚠️ **`w-imem` is the one cell that writes a `CCTL` command this project had ruled
@@ -529,6 +550,123 @@ same size. **`0x010` (`IMEM0FILL`) stays out** — it stalls the core through a
 full 16 KiB line-read burst, and nothing on this unit has issued it after the
 prompt. `IMEM0OFF` clears one valid bit; the payload ends in `rlx_reset` and the
 loader re-runs its whole reset sequence, so the restore is the reboot.
+
+#### 6.2a 🆕 2026-08-31 — what Group W reports that it did not, and the predictions, written before the seating
+
+Two instruments, both from `R3-9`'s carried-forward rows. **Neither adds a cell**
+— they change what the two cells that already ran are able to *say*.
+
+##### ① The `M(T)` ladder, `w.assoc.mt`
+
+`w-assoc` swept four strides and reported only the winner. The other three
+readings were discarded, and a stride at which **nothing in 1…12 evicted** left
+no trace at all — *nothing evicted* and *this stride was never swept* were the
+same observation, which is this file's own *a tool reporting 0 is making a
+claim* in a search loop. One word now carries all four, one byte each, MSB
+first: `0` = swept and nothing evicted, `1`…`12` = the smallest M that did,
+`0xFE` = stride below the minimum, `0xFF` = not reached because the `M = 1`
+control aborted the sweep. `w.assoc.mtcap` carries, per stride, the M at which
+the arena refused — `w.assoc.capped` counts those and a count cannot say where.
+
+🔴 **The reason this is worth two words is that the winner does not
+discriminate and one loser does.** 讀, for `C` = 16 KiB with 16-byte lines,
+comparing two-way (512 sets) against direct-mapped (1,024 sets):
+
+| stride | set advance, 2-way | set advance, DM | M, 2-way | M, DM |
+|---|---:|---:|:-:|:-:|
+| `C/8` = 2,048 | 128 of 512 | 128 of 1,024 | **9** | **9** |
+| `C/4` = 4,096 | 256 of 512 | 256 of 1,024 | **5** | **5** |
+| `C/2` = 8,192 | 512 ≡ 0 | 512 of 1,024 | **3** | **3** |
+| `C` = 16,384 | 1,024 ≡ 0 | 1,024 ≡ 0 | **3** | **2** |
+
+> **PREDICTED: `w.assoc.mt = 09 05 03 03`.** Direct-mapped predicts
+> `09 05 03 02`. **One byte carries the whole difference** and the other three
+> are shared — so the ladder is one discriminator reported four ways, not four
+> pieces of evidence, and a write-up that counts it as four is wrong.
+>
+> 🔴 **AND THIS DERIVATION IS NOT NEW HERE — `docs/rlx-cache-and-cp0.md` § *the
+> argument for two-way* has had it since 2026-08-29, and the two agree.** That
+> file tabulates M at 4096 / 8192 / 16384 for FIVE hypotheses — 8 KiB 2-way,
+> 16 KiB 1-way, 16 KiB 2-way, 16 KiB 4-way, 32 KiB 2-way — and reads
+> `(8192, 3)` as unique to 16 KiB two-way; the rows above reproduce its 2-way
+> `5, 3, 3` and its direct-mapped `5, 3, 2` independently, and add the `C/8`
+> column it does not carry. **So what `w.assoc.mt` changes is not the argument
+> but where it lives**: the argument was reconstructed at the desk from a single
+> reported argmin, and the ladder puts the evidence for it in the block. Quote
+> that file for the hypothesis space; quote this section for what the payload
+> now emits.
+
+>
+> **PREDICTED: `w.assoc.mtcap = 00 00 00 00`.** `A_ASSOC_SPAN` is `0x38000` =
+> 229,376 B and the largest request is 12 × 16,384 = 196,608 B, so the arena
+> refuses nothing. 量 2026-08-29 `w.assoc.capped=00000000` agrees, and the two
+> are computed by different code from the same span.
+>
+> **REFUTATION.** Any byte outside {2, 3, 5, 9, 0xFE} at its own stride, or a
+> ladder that is not monotonically non-increasing in T, and the eviction model
+> behind `CPU-25` is wrong rather than the associativity. A `0` at `C/2` or `C`
+> would mean 12 victims all mapping to one set evicted nothing — which refutes
+> the whole walk, not the geometry.
+
+⚠️ **What the ladder does NOT do: it is not new evidence.** 量 2026-08-29
+already reported `w.assoc.tm = (8192, 3)`, and the search keeps the *strictly
+smaller* M, so a direct-mapped part would have reported `(16384, 2)`. **The
+2026-08-29 reading already excluded direct-mapped.** What it did not do is let a
+reader see that: the exclusion ran on an argument about the search's
+tie-breaking, and the block held nothing to check it against. The ladder makes
+the same exclusion readable. **`CPU-25` does not become more certain; it becomes
+checkable**, and the difference is stated because inflating one into the other
+is exactly the move this file exists to prevent.
+
+##### ② The retained bitmap, `O_BMPK`
+
+The block advertised the boundary point's *pattern* as surviving to the
+read-back. It did not — § *The retained bitmap does not survive to the
+read-back* below has the measurement. The scratchpad has seven users and the
+last of them wins. `O_BMPK` is a 64-word copy taken the instant the boundary
+point's own counts are computed, and `H_BMP_KEPT` says how much of the point it
+holds.
+
+🔴 **What the pattern buys, and it is the second route to the same answer.**
+At the boundary point the victims are 32 B apart, so the set index advances by
+**two** per victim. Under two-way (512 sets) victims **k and k+256 share a
+set**; under direct-mapped (1,024 sets) every victim of the 512 has its own set
+and no two ever share.
+
+> **PREDICTED, two-way**: the FRESH victims arrive in `{k, k+256}` **pairs**.
+> When something outside the sweep (the walk's own instruction fetches) occupies
+> a third line in set *s*, both victims of that set thrash and both miss on the
+> re-execution. 量 2026-08-29 `bmp.rerun.fresh = 20` — so **ten pairs**.
+>
+> **PREDICTED, direct-mapped**: the same 20 FRESH arrive as **isolated
+> singletons**, because a conflict in one victim's set says nothing about the
+> victim 256 away.
+>
+> **REFUTATION, and it is the reason this is worth a region.** 20 FRESH split as
+> 10 pairs versus 20 singletons is a difference no summary count can show, and
+> the two hypotheses give the *same* count. **If the FRESH victims are neither
+> — some paired, some not — the pairing model is wrong and the ladder above is
+> the only route left.** An odd `bmp.rerun.fresh` refutes pure pairing
+> immediately; 20 is even, which is a necessary condition the 2026-08-29 run
+> already passes and nothing noticed.
+
+⚠️ **`bmp.kept` is capped at 512 nibbles and the cap is not free of assumption.**
+It is exactly `bnd_count` at the 16 KiB boundary 量 2026-08-29, two pairing
+periods under the two-way hypothesis and one under direct-mapped. A boundary
+above 16 KiB truncates — and a boundary above 16 KiB has already refuted
+`CPU-25`'s size, so the truncation only bites in a run whose headline has
+changed. **`tools/rbcheck.py` C17…C23 check the region against
+`H_BMP_FRESH`**, which is the payload's own count of the same victims: two
+numbers over one region, computed by different code at different times, which
+is the only thing that can catch a snapshot taken at the wrong moment.
+
+##### What both cost
+
+**`RB_WORDS` 641 → 707**, `DW 80A02000 707`, 8,345 bytes, **+0.19 s** on the
+read-back. `hazlint` **0 violations in 874 loads** (804 before). Nothing on the
+wire changes shape; no cell was added, removed or reordered; `flags` and the
+`.bss` size are unmoved.
+
 
 ⚠️ **The re-arm between every measurement point is `CCTL 0x002` (M2) plus a
 rewrite of the arena to OLD.** That is one measured instrument used many times.
@@ -1019,7 +1157,7 @@ that can assert things qemu's own kindness hides:
 |:-:|---|---|---|
 | `SM1` | `SAFE_A0` emits `nop` | the guardscan reports probe3's routines unguarded | every cell — the guard is what turns a fault from a hang into two prints |
 | `SM2` | one extra `cache 0x1b` | the ISA fingerprint stops matching | `x-11`, `x-10`, `x-15`, `x-19`, `c-D`, and the § 8 promise that `0x1b` never ships |
-| `SM3` | `RB_HDR` moved by one | **the build fails** — the layout assertion is at compile time | the whole block: `DW <RB> 641` reading the wrong length is a truncated capture that looks complete |
+| `SM3` | `RB_HDR` moved by one | **the build fails** — the layout assertion is at compile time | the whole block: `DW <RB> 707` reading the wrong length is a truncated capture that looks complete |
 | `SM4` | a `mtc0 $x,$12` added to `rlx_cctl` | the Status-writer count AND its owner list both change | `m-cu3`, `s-isc`, and M5's constraint that nothing else touches `Status` |
 | `SM5` | the `s-isc` control bits dropped | the constant leaves the image and the wire | `s-isc` — **and this one has NO qemu leg**, because all three bits read back clear on Malta whether they were set or not |
 | `SM6` | the `RB_CLASH` guard removed | probe3 builds onto probe1's block | the seating-day procedure in § 10b |
@@ -1153,8 +1291,8 @@ make -C tools/rlxprobe P=probe3 show
 | line | what it must say on 2026-08-26 | what a different value means |
 |---|---|---|
 | `make` itself | it **compiles**. `Nothing to be done for 'payload'` is a **HARD STOP** | the tree already held an image and nothing rebuilt; `show` will print the knob you asked for beside the binary you already had |
-| `sha256` | `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, **29,088 bytes** | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
-| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 641` | anything else and the read-back is the wrong length or the wrong address |
+| `sha256` | 🔄 **`6f78727507bb0364734534e90f5c223515f55277ae5970c1c3bc64ca68b3233c`, 29,680 bytes, since 2026-08-31** — the retained bitmap region and the `M(T)` ladder. *(It was `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, 29,088 bytes, from 2026-08-26 to 2026-08-30, and byte-identical across three rebuilds in that window.)* | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
+| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 707` *(641 before 2026-08-31)* | anything else and the read-back is the wrong length or the wrong address |
 | `stale check` | `rb=80a02000` | this is the **on-the-wire** check and it is what the operator watches for in the banner |
 | `vectors` / `uart` | `general 0x80000080`, `THR 0xB8002000`, `CLEAR_BEV=0`, and **no `*** NOT A DEVICE BUILD ***` line** | a qemu image would install a handler into RAM this device never reads and then fault into the loader's permanent hang |
 
@@ -1273,7 +1411,7 @@ which corroborates zero traps from a second direction.
 
 `CU3` sticks: `m.cu3.before=1000fc00` → `m.cu3.set=9000fc00`, the predicted half.
 **No reading equals its own prime and `v1 == v2` for all eight** (primes
-`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1497-1503`) — so the destination
+`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1641-1665`) — so the destination
 was written and the value is stable, which is exactly the pair of failures the
 two primes exist to separate. r0 and r4 read `20000000`; the rest read `0`.
 
@@ -1330,7 +1468,7 @@ for a reason that was itself correct.
 
 Found by an adversarial pass on 2026-08-30, 量 on `bench/2026-08-30/Q5-rb.log`.
 
-`probe3.c:1324-1329` states the design: *"THE RETAINED BITMAP. One sweep point
+`probe3.c:1383-1396` states the design: *"THE RETAINED BITMAP. One sweep point
 survives to the read-back … the BOUNDARY point, because its PATTERN is what
 carries associativity and aliasing."* `probe3.c:85-90` builds a self-check on
 it — *"so the desk can compare the count the payload thought it wrote against
@@ -1363,3 +1501,23 @@ leaving direct-mapped to be excluded by inference.
 nibbles written) and deliberately does not fail on it: the block is sound
 everywhere else, and refusing it over a stale region would be the wrong verdict.
 Fixing the payload is a `probe3` change and is carried forward.
+✅ **FIXED 2026-08-31 (seventeenth session), and by a second region rather than
+by moving the rerun.** `O_BMPK` is 64 words between the scratchpad and the seal,
+written once, immediately after `bmp.rerun.fresh` and `bmp.firstbad` are
+computed and before anything else can touch `O_BMP`. **The other candidate —
+move the boundary rerun below the last `bmp_clear()` — was rejected on a
+measurement-shaped argument**: the rerun is only meaningful in the cache state
+the `w-size` sweep leaves behind, and `w-assoc`, Group C, Group V and Group X
+all run between here and there. Moving it would have produced a region that
+survived and a number that meant something else.
+
+**What went with it**, because a region nobody checks is not better than a
+region nobody reads: `H_BMP_KEPT` (how much of the point the copy holds) and
+`H_BMP_FRESH` — the payload's own FRESH count, which until today existed **only
+on the UART**, so a desk holding just the `DW` read-back could recount the
+region and had nothing to compare the recount against. `tools/rbcheck.py` C17…C23
+are that comparison; C22 and C23 exist because the mutations were written first
+and **M25 survived C17…C21** — the truncation limit could be deleted with every
+control still green, since every one of those regions has its FRESH nibbles
+inside `kept`.
+

@@ -125,6 +125,23 @@ pushed — the same scan `bench/` gets, with the same eight patterns and the sam
 synthetic positive control, because *"it is only an emulator log"* is not a
 reason to skip the check that decides whether a file identifies this unit.
 
+🆕 **2026-08-31: `2026-08-31/` is the third directory here, and it exists because
+the payload MOVED.** `probe3`'s block went 641 → 707 words (a retained bitmap
+region of its own, and Group W's `M(T)` ladder), so `2026-08-26/probe3.build`
+now describes an image nobody will upload and the capture beside it came from a
+different binary — which is exactly what the rebuild-on-the-day table in
+`docs/probe3-cells.md` says a moved `sha256` means. **Both are kept**; the older
+one is the record of what `R1h-1` ran.
+
+🔴 **And the narrow thing this run is evidence FOR is worth stating, because it
+is not "the payload works".** It is that the two new code paths EXECUTE:
+`bmp.kept=00000020` (the snapshot ran) and `w.assoc.mt=01ffffff` — where the
+leading `0x01` is the `M = 1` control **firing correctly**, because qemu's TCG
+invalidates a translation block on a store, so here one victim really does
+self-evict. **That is the branch the seventeenth session restructured, and qemu
+is the only environment that drives it.** On silicon it must NOT fire; if it
+does, `w.assoc.tm` reads `000000ff` and every associativity cell is void.
+
 Captures are committed **only when they are evidence for a written expectation**.
 `qemu-run.sh`'s default output goes to `tools/rlxprobe/build/qemu/`, which is
 gitignored; putting one here is a deliberate act.

@@ -221,14 +221,27 @@ SRC        := $(SRC_$(P))
 RB_WORDS_probe0 := 0
 RB_WORDS_probe1 := 137
 RB_WORDS_probe2 := 809
-# probe3: 64 header + 192 cell results + 16 rows x 8 + 256 bitmap words + seal.
-# The read-back is `DW 80A02000 641` = 15 + 2 + 47 x 161 + 9 = 7,593 bytes and
-# 1.98 s at 3840 B/s (LDR-07, fitted over 91 captures by tools/reply-size.py).
-# That is 79 % of the largest `DW` this loader has ever executed -- 820 words /
+# probe3: 64 header + 194 cell results + 16 rows x 8 + 256 scratchpad bitmap
+# words + 64 RETAINED bitmap words + seal.
+# 🔄 2026-08-31: 641 -> 707.  The retained bitmap got its own region (the block
+# advertised a pattern the shared scratchpad no longer held) and Group W's M(T)
+# ladder took two result words.
+# The read-back is `DW 80A02000 707` = 15 + 2 + 47 x 177 + 9 = 8,345 bytes and
+# 2.17 s at 3840 B/s (LDR-07, fitted over 91 captures by tools/reply-size.py) --
+# 0.19 s more than the 641-word block.
+# That is 86 % of the largest `DW` this loader has ever executed -- 820 words /
 # 9,661 bytes, 量 H2g -- and three digits, so it does not test whether the
 # loader accepts a four-digit decimal length.  Cell `P3` tests that separately
 # and nothing here depends on the answer.
-RB_WORDS_probe3 := 641
+#
+# ⚠️ THE OVER-RUN MARGIN DROPPED FROM THREE VISIBLE WORDS TO ONE, and that is
+# recorded rather than repaired.  `DW` rounds up to a multiple of four, so 641
+# returned 644 and w641..w643 of the poison margin came back free; 707 returns
+# 708 and only w707 does.  The control is unweakened: a payload that writes past
+# its own block writes UPWARD from the seal, so w707 is the first word it
+# reaches, and the three-word version was luck of 641 mod 4 rather than design.
+# RB_POISON_W is still RB_WORDS + 8 and a longer explicit `DW` reads the rest.
+RB_WORDS_probe3 := 707
 
 # probe2's build stamp, recomputed here from the same bit positions probe2.c's
 # FLAGS_W uses. It is a SECOND copy of that arithmetic on purpose: the payload

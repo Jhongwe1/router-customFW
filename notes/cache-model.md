@@ -930,7 +930,7 @@ this file's refutation condition says.
 *all STALE up to 16 KiB, FRESH at 32 KiB*. What happened is 20 of 512 at 16 KiB
 — 3.9 %. 🔴 **The first version of this paragraph explained that as "a working
 set that exactly fills the cache", and that is false.** `W_STRIDE` is 32
-(`probe3.c:358`) over a 16-byte line, so the walk touches only **even sets: 256
+(`probe3.c:415`) over a 16-byte line, so the walk touches only **even sets: 256
 of 512, two victims each** — it fills half the sets in both ways, not the cache.
 The correct reading is the payload's own footprint colliding once both ways are
 occupied, and §*the argument for two-way* below turns that into a positive
@@ -942,8 +942,8 @@ not 20.
 
 `w.line.bits=11222222` and `w.line.bits2=22222000`, against
 `L_LINE[] = {13, 0, 8, 16, 24, 32, 48, 64, 96, 128, 160, 192, 256, 320}`
-(`probe3.c:378`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
-(`probe3.c:287-294`):
+(`probe3.c:435`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
+(`probe3.c:345-352`):
 
 * offset **0** — STALE
 * offset **8** — STALE
@@ -958,7 +958,7 @@ never landed.
 ### Associativity — and the argument below replaces a circular one
 
 `w.assoc.tm=00002003` packs `(best_t & 0xFFFFFF00) | (best_m & 0xFF)`
-(`probe3.c:1404`), so **T = 8,192 and M = 3**, with
+(`probe3.c:1533`), so **T = 8,192 and M = 3**, with
 `w.assoc.capped=00000000` — the search was not clipped by its own bound.
 
 🔴 **The argument for two-way is the argmin over `T`, and it is written out here
@@ -970,7 +970,19 @@ as evidence for them. **`M = 3` alone does not imply two ways** — it is equall
 "two ways in one set" or "one way in two sets", so direct-mapped at half the way
 size gives `M = 3` too.
 
-What discriminates is *which* `T` minimises `M`. `probe3.c:1371-1404` searches
+What discriminates is *which* `T` minimises `M`.
+
+🟢 **2026-08-31: and from the next seating the block will CARRY that, instead of
+the argument having to be reconstructed here.** `w.assoc.mt` reports the whole
+`M(T)` ladder — one byte per stride — so a reader can see the argmin rather than
+be told it. 🔴 **It does not make this section more certain, and writing it up
+that way would be wrong**: the 2026-08-29 reading already excluded
+direct-mapped, for exactly the reason given below. What changes is that the
+exclusion becomes checkable from the block. ⚠️ **And only ONE of the four bytes
+carries it** — at `C/8`, `C/4` and `C/2` both geometries predict the same M
+(9, 5, 3); they part only at `T = C`. `docs/probe3-cells.md` §6.2a has the
+predictions and the refutation conditions.
+ `probe3.c:1485-1549` searches
 `t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
 
 | hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |

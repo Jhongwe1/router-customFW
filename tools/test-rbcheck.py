@@ -37,6 +37,31 @@ MUT = [
     ("M19 the missing-word refusal deleted",
      "        if a not in words:", "        if False and a not in words:"),
     ("M20 SOURCE DRIFT: probe3's ladder changed in the .c only", None, None),
+
+    # M21..M26 -- the RETAINED bitmap branch, 2026-08-31.  Every row names the
+    # control it must turn red, which is this repository's standard since the
+    # flashwin pass reported 8/8 with every kill invalid.
+    ("M21 the recount-vs-payload-count comparison deleted   (kills C18)",
+     "            elif kept == adv and got != said:",
+     "            elif False:"),
+    ("M22 FRESH counted as any written nibble               (kills C22)",
+     "                    if ((b[w] >> sh) & 0xF) == 2:      # V_FRESH",
+     "                    if ((b[w] >> sh) & 0xF) != 0:      # V_FRESH"),
+    ("M23 the kept-exceeds-count refusal deleted            (kills C19)",
+     "            if kept > adv:", "            if False:"),
+    ("M24 the layout hardcoded back to the 641-word offsets (kills C17)",
+     "        o_bmp, o_bmpk, o_seal = b[42], b[49], b[43]",
+     "        o_bmp, o_bmpk, o_seal = 384, 640, 640"),
+    ("M25 the truncation limit ignored in the recount       (kills C23)",
+     "                    if limit is not None and seen >= limit:\n"
+     "                        return n\n"
+     "                    seen += 1\n"
+     "                    if ((b[w] >> sh) & 0xF) == 2:      # V_FRESH",
+     "                    seen += 1\n"
+     "                    if ((b[w] >> sh) & 0xF) == 2:      # V_FRESH"),
+    ("M26 the whole retained branch skipped for short blocks (kills C17)",
+     "    if magic == 0x524C5833 and count > 50:",
+     "    if magic == 0x524C5833 and count > 5000:"),
 ]
 
 

@@ -529,14 +529,14 @@ collision is written down.
 | **cells named** | thirteen: `A-catch`, `Q0-ab`, `Q1-tc`, `Q1-tc2`, `Q2-rbhead`, `Q2-arena0`, `Q2-arena1`, `Q2-arena2`, `Q3-len`, `Q0-ab2`, `Q4-head`, `QJ`, `Q5-rb` |
 | **at the desk** | `check-predictions.py` reports **`0 of 13`**, all fifteen controls green — control `N2` firing on every cell, which is the correct answer before a seating |
 | **deliberately not named** | `Q5-margin` (the rest of the poison margin, only if the free three come back non-poison) and `Q6-post` (a post-mortem `DW` after a silent `J`) |
-| **desk work already spent** | `P7`, the rebuild-on-the-day: `probe3` rebuilt 2026-08-29, sha256 `1a0725c0…`, 29,088 bytes — **byte-identical to the value `R1h-1` recorded on 2026-08-26**, `hazlint` 0 violations in 804 loads |
+| **desk work already spent** | 🔄 **`P7` re-run 2026-08-31 (seventeenth session) and the artefact MOVED, deliberately**: sha256 `6f787275…`, **29,680 bytes**, `hazlint` **0 violations in 874 loads**, `DW 80A02000 707`. The retained bitmap got its own region and Group W gained the `M(T)` ladder. *(It was sha256 `1a0725c0…`, 29,088 bytes, 804 loads — byte-identical to `R1h-1`'s 2026-08-26 value across three rebuilds. A `P7` whose sha256 is unchanged is the normal reading; this one changed because the payload did, and the previous value is kept so the two can be told apart.)* |
 
 **What writing it produced, beyond the block.** Three things, each landing in an
 owner file rather than here: the loader's **`DW` emission rate** measured for the
 first time (`SPEC.md` `LDR-40`, 3,594–3,726 B/s, n=2 — every `--seconds` on
 every card had been sized against the 3,840 line rate); `LDR-07`'s round-up
 handing back **three poison-margin words for free** on `DW 80A02000 641`, so the
-over-run control costs no command (`docs/probe3-cells.md` §4); and the scope of
+over-run control costs no command (`docs/probe3-cells.md` §4) — 🔄 **one word since 2026-08-31, not three, and the control is unweakened**: the block is 707 words so `DW 80A02000 707` prints 708, and an over-run writes upward from the seal, so the single margin word is the first one it reaches; and the scope of
 §B5-c1 — *the head does not discriminate* is about `nfjrom` files, and a flat
 `rlxprobe` payload's head **does**, by the same linker-constant mechanism
 (`RUNSHEET` §B5-c1).

@@ -778,12 +778,28 @@ echo "=== Y2 / Y3: the block length, and the base it is read back from ==="
 p3hdr=$(rbw probe3.c RB_HDR); p3res=$(rbw probe3.c RB_RES)
 p3rows=$(rbw probe3.c RB_ROWS); p3roww=$(rbw probe3.c RB_ROWW)
 p3bmp=$(rbw probe3.c RB_BMPW)
-p3w=$(( p3hdr + p3res + p3rows * p3roww + p3bmp + 1 ))
+p3bmpk=$(rbw probe3.c RB_BMPKW)
+p3w=$(( p3hdr + p3res + p3rows * p3roww + p3bmp + p3bmpk + 1 ))
 ck "show DW count == probe3 RB_WORDS" "$p3w" \
    "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>/dev/null | sed -n 's/^result .*DW [0-9A-Fa-f]* \([0-9]*\)$/\1/p' | head -1)"
 # The C carries the same arithmetic as a compile-time assertion, so a layout
 # that does not add up does not build. SM3 below is the mutation on that.
-ck "and the C says 641"                641 "$p3w"
+ck "and the C says 707"                707 "$p3w"
+# 🆕 Y2b -- the RETAINED bitmap region is not the scratchpad. Two regions with
+# one name was the 2026-08-30 defect; a suite that only recomputes a total would
+# pass with RB_BMPKW folded back into RB_BMPW. This asserts they are separate
+# fields AND that the retained one is big enough for the boundary point the
+# 2026-08-29 seating actually found: 16 KiB / W_STRIDE = 512 victims.
+ck "RB_BMPKW is its own field"         64 "$p3bmpk"
+ck "and it holds >= 512 nibbles"       yes \
+   "$([ $(( p3bmpk * 8 )) -ge 512 ] && echo yes || echo no)"
+# The ORDER, not just the total: a suite that only recomputes RB_WORDS passes
+# with the two regions swapped, and the seal must stay last because the sum is
+# taken over w0..w_seal-1.  Compared as strings so a reordering is visible.
+ck "O_BMPK is anchored on O_BMP"      "(O_BMP + RB_BMPW)" \
+   "$(sed -n 's/^#define O_BMPK[[:space:]]*//p' "$RP/probe3.c")"
+ck "and O_SEAL follows O_BMPK"        "(O_BMPK + RB_BMPKW)" \
+   "$(sed -n 's/^#define O_SEAL[[:space:]]*//p' "$RP/probe3.c")"
 ck "probe3's default RESULT_BASE"  0x80A02000 \
    "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>/dev/null | sed -n 's/^result *RESULT_BASE=\([0-9A-Fa-fx]*\) .*/\1/p' | head -1)"
 ck "and the KSEG1 alias 0xa0a2 is emitted" yes \

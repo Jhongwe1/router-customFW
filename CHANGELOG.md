@@ -39,6 +39,70 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+🔴 **2026-08-31, later the same day — desk, no power: a cell that was scheduled
+for the next seating was withdrawn by its own precondition.**
+
+`SPEC.md` §17 had one open question left in `FW-34` — whether the memory-mapped
+SPI window prefetches a sequential instruction-fetch stream — and one cell
+booked to decide it: `FLR 80C00000 100000 100000`, timed from the wire-silent
+gap. An adversarial pass the day before had written *read the `FLR` handler
+before spending the cell* into `notes/kernel-build.md` §19.7.5 as a
+**precondition rather than an assumption**. Reading it took twenty minutes and
+killed the cell.
+
+The loader's `FLR` reaches flash through five links, all of them in the image:
+`0x80409A44` → `0x80404F38`, which dispatches through a `.bss` function pointer
+at `0x8040FC10` — `+0x3C` of a 72-byte-per-entry chip table whose **three**
+registration sites all install the same `0x804065DC` → which supplies the SPI
+`Fast Read` opcode `0x0B000000` → to the engine at `0x80405F70`, whose data loop
+at `0x80406008` is **fifteen instructions per four bytes: one `lw` from
+`0xB800120C` — `SFDR` — and four `sb` to unpack it.** It is programmed I/O. 讀,
+a census of every `lui` immediate in stage 2: the window base `0xbd00` occurs
+**exactly once**, inside `FLW`, as a `printf` argument. A number measured on the
+`SFDR` port says nothing about the window, so no band the cell could have
+returned would have answered the question it was booked for. Withdrawn rather
+than re-banded, and the timing itself handed to `R5b`, whose flash writes go
+through the same port.
+
+🟢 **`R3-9`'s last two instruments went in on one rebuild, and both change what
+`probe3` is able to SAY rather than what it does.** The retained bitmap got its
+own region — the block had advertised a pattern the shared scratchpad no longer
+held, because six other cells clear it afterwards — and Group W's associativity
+search now reports the whole `M(T)` ladder instead of its winner. ⚠️ **Neither
+makes `CPU-25` more certain, and the entry that claimed they did would be
+wrong**: the 2026-08-29 reading already excluded a direct-mapped cache, because
+the search keeps the strictly smaller M. What the ladder adds is that a reader
+can check that, against an argument about tie-breaking the block held no
+evidence for. `RB_WORDS` 641 → 707; `P7` re-run at 29,680 bytes, `hazlint` 0
+violations in 874 loads.
+
+🔴 **And `P7`'s own numbers were stale for an hour, inside the session that ran
+it.** `probe3.c` was edited after the rebuild, so the recorded sha256 described
+an image nobody would upload — the exact shape `P7` exists to prevent. The thing
+that caught it was writing `qemu/2026-08-31/probe3.build`, which recomputes the
+figures rather than transcribing them.
+
+🟢 **Two new instruments, and between them they close four carried-forward
+rows.** `tools/cardcheck.py` reads a bench card the way the device will: its
+`commands` half checks every typed command against what the image declares it
+can invoke — the gap that cost two cells at the bench when `wc` turned out to be
+an applet of this busybox and not one of the eleven symlinks in the image — and
+its `numbers` half re-derives a card's stated values from the artefacts it
+names. `tools/replay-capture.py` turns a committed `.log` and `.timing` back
+into the terminal they came from, so `R3-11`'s artefact is derived from evidence
+rather than recorded beside it.
+
+🔴 **The most useful finding of the day came from a mutation suite reporting
+that everything was killed.** `test-replay-capture-mutants` said 14 of 14 — on a
+temp tree missing a file one control reads, so the unmutated tool was already
+red there and **every kill was invalid**. That is `tools/flashwin.py`'s defect,
+one tool later, inside a file written to prevent it. The only row that could see
+it was one declared EQUIVALENT with a proof and therefore **required to
+survive**: a list of kills looks the same whether the harness works or refuses
+everything, and stops looking the same as soon as something has to live. Both
+new harnesses now run the unmutated tool inside the temp tree before judging any
+mutation.
+
 🔴 **2026-08-31 — desk, no power: the instrument that drove the flash bracket
 had only ever been shown to refuse a CORRECT echo.**
 

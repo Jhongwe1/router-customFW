@@ -1,0 +1,34 @@
+# config/r3-11-reel.tsv -- what R3-11's artefact shows, as DATA.
+#
+# `tools/replay-capture.py reel config/r3-11-reel.tsv` replays these captures
+# into a terminal at true wire speed, in order, with a title before each.  Point
+# a screen recorder at the terminal and the artefact is finished -- and, unlike
+# a recording, it is REPRODUCIBLE: every byte comes from a committed capture and
+# anyone who clones this repository can re-run the same command.
+#
+# 🔴 EVERY SEGMENT IS A COMMITTED CAPTURE FROM SEATING 7 (2026-08-31), and the
+# reel may not contain anything else.  A reel that mixed a re-enactment in with
+# real captures would be a recording again, and the whole reason this file
+# exists is that it cannot.
+#
+# The order is R3's own DoD, D1 through D5, because that is the claim the
+# artefact is evidence for -- not because it is the prettiest order.
+#
+# prefix<TAB>title<TAB>pause-seconds
+#
+# ⚠️ The running time is the sum of the captures' own durations plus the pauses;
+# `replay-capture verify <prefix>` prints each one.
+#
+# 量 2026-08-31, every segment verified: 7.021 + 0.062 + 0.063 + 1.268 +
+# 0.048 + 3.099 = **11.56 s of capture** plus 12.5 s of pauses = **~24 s**.
+# 🔴 PROGRESS.md calls this *the 60-second artefact* and at these pauses it
+# is not sixty seconds.  The number to change is the pause column, not the
+# captures -- padding a reel with dead terminal is worse than a short one,
+# and the capture durations are the device's, not a choice.
+
+bench/2026-08-31/W-3	D1-D4  my kernel boots from RAM to a shell	2.0
+bench/2026-08-31/W-5b	D2  and the build stamp is mine, not the vendor's	2.0
+bench/2026-08-31/M-a	D4  a typed command returns output	2.0
+bench/2026-08-31b/X-b2	the whole 4 MiB read back through my MTD path	2.0
+bench/2026-08-31/M-d	and the flash cannot be written through it	2.5
+bench/2026-08-31/W-7a	D5  it pings, 4 of 4	2.0

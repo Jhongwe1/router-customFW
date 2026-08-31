@@ -1,0 +1,129 @@
+rlxprobe: WARNING RLX_CLEAR_BEV=1 -- this is a qemu build
+
+*** rlxprobe P3 7e41c9d0 ***
+rlxprobe: pc=80502ca8
+rlxprobe: rb=80a02000
+rlxprobe: flags=50070002
+rlxprobe: status=00000000
+rlxprobe: arena=80a10000
+rlxprobe: tmpl=03e00008
+rlxprobe: kseg0=00000001
+rlxprobe: handler_words=00000019
+rlxprobe: install.changed=0000001e
+rlxprobe: install.bad=00000000
+rlxprobe: break.count=00000001
+rlxprobe: break.cause=00000424
+rlxprobe: break.epc=8050029c
+rlxprobe: t.live=ffffffff
+rlxprobe: t.live2=ffffffff
+rlxprobe: t.sep.a=ffffffff
+rlxprobe: t.sep.b=ffffffff
+rlxprobe: t.tccnr=ffffffff
+rlxprobe: t.cal.hi=00000000
+rlxprobe: t.cal.lo=00000000
+rlxprobe: t.ovh.1=00000000
+rlxprobe: t.ovh.4k=00000000
+rlxprobe: t.hit.warm=00000000
+rlxprobe: t.hit.ks0=00000000
+rlxprobe: t.hit.ks1=00000000
+rlxprobe: Group T VOID -- TC0CNT reads all ones twice: there is no timer at that address on this machine
+rlxprobe: g.timer=00000000
+rlxprobe: w.line0.fresh=0000000d
+rlxprobe: w.line0.bits=22222222
+rlxprobe: w.line.fresh=0000000d
+rlxprobe: w.line.bits=22222222
+rlxprobe: w.line.bits2=22222000
+rlxprobe: t=574c0000 v=80a10000 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: t=574c0101 v=80a10008 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: w.back.bits=22222222
+rlxprobe: w.back.bits2=22220000
+rlxprobe: t=57424000 v=80a20080 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: w.back2.bits=22222222
+rlxprobe: w.back2.bits2=20000000
+rlxprobe: t=57423200 v=80a28080 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: w.size 00000001 n=00000020 fresh=00000020 other=00000000
+rlxprobe: w.size 00000002 n=00000040 fresh=00000040 other=00000000
+rlxprobe: w.size 00000004 n=00000080 fresh=00000080 other=00000000
+rlxprobe: w.size 00000008 n=00000100 fresh=00000100 other=00000000
+rlxprobe: w.size 00000010 n=00000200 fresh=00000200 other=00000000
+rlxprobe: w.size 00000020 n=00000400 fresh=00000400 other=00000000
+rlxprobe: w.size 00000040 n=00000800 fresh=00000800 other=00000000
+rlxprobe: w.arm.fresh=00000000
+rlxprobe: bmp.point=57000001
+rlxprobe: bmp.count=00000020
+rlxprobe: bmp.rerun.fresh=00000020
+rlxprobe: bmp.firstbad=ffffffff
+rlxprobe: bmp.kept=00000020
+rlxprobe: t=57530001 v=80a30000 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: t=57530002 v=80a30000 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: w.assoc.tm=000000ff
+rlxprobe: w.assoc.capped=00000000
+rlxprobe: w.assoc.mt=01ffffff
+rlxprobe: w.assoc.mtcap=00000000
+rlxprobe: t=57415353 v=00000000 pr=000000ff ex=00000000 mb=00000400 ma=00000000 g=01ffffff vd=00000bad
+rlxprobe: w.imem 00000001 fresh=00000020 other=00000000
+rlxprobe: w.imem 00000002 fresh=00000040 other=00000000
+rlxprobe: w.imem 00000004 fresh=00000080 other=00000000
+rlxprobe: w.imem 00000008 fresh=00000100 other=00000000
+rlxprobe: w.imem 00000010 fresh=00000200 other=00000000
+rlxprobe: w.imem 00000020 fresh=00000400 other=00000000
+rlxprobe: w.imem 00000040 fresh=00000800 other=00000000
+rlxprobe: w.imem.differs=00000000
+rlxprobe: w-imem IDENTICAL -- and that is also the no-op reading. UNDETERMINED unless m-imem returned a window.
+rlxprobe: m.cu3.before=00000000
+rlxprobe: m.cu3.set=00000000
+rlxprobe: m.cp3 00000000 v1=c0de0300 v2=d1ce0300 trap=00000001
+rlxprobe: m.cp3 00000001 v1=c0de0301 v2=d1ce0301 trap=00000001
+rlxprobe: m.cp3 00000002 v1=c0de0302 v2=d1ce0302 trap=00000001
+rlxprobe: m.cp3 00000003 v1=c0de0303 v2=d1ce0303 trap=00000001
+rlxprobe: m.cp3 00000004 v1=c0de0304 v2=d1ce0304 trap=00000001
+rlxprobe: m.cp3 00000005 v1=c0de0305 v2=d1ce0305 trap=00000001
+rlxprobe: m.cp3 00000006 v1=c0de0306 v2=d1ce0306 trap=00000001
+rlxprobe: m.cp3 00000007 v1=c0de0307 v2=d1ce0307 trap=00000001
+rlxprobe: m.traps=000000ff
+rlxprobe: m.cause=1000042c
+rlxprobe: m.imembase=00000000
+rlxprobe: m.imemtop=00000000
+rlxprobe: m.dmembase=00000000
+rlxprobe: m.dmemtop=00000000
+rlxprobe: m-imem trapped with CU3 NOT set -- *CP3 unreachable* is not separable from *CU3 is not implemented as a bit* here
+rlxprobe: c A0 l1=ffffffff l2=5a5a0002 l3=5a5a0002 mb=5a5a0002 vd=00000202
+rlxprobe: c A l1=a5a50001 l2=5a5a0002 l3=5a5a0002 mb=5a5a0002 vd=00000202
+rlxprobe: c A2 l1=a5a50001 l2=5a5a0002 l3=5a5a0002 mb=5a5a0002 vd=00000202
+rlxprobe: c E l1=a5a50001 l2=00000000 l3=5a5a0002 mb=5a5a0002 vd=00000202
+rlxprobe: c E0 l1=a5a50001 l2=00000000 l3=5a5a0002 mb=5a5a0002 vd=00000202
+rlxprobe: c E2 l1=a5a50001 l2=00000000 l3=5a5a0002 mb=5a5a0002 vd=00000202
+rlxprobe: c F VOID 00000010
+rlxprobe: c B VOID 00000010
+rlxprobe: c C VOID 00000010
+rlxprobe: c G VOID 00000010
+rlxprobe: g.ca=00000000
+rlxprobe: g.cf=00000000
+rlxprobe: Group V VOID -- c-A negative, so every V cell would read FRESH at every size and that is indistinguishable from having no D-cache
+rlxprobe: x ri ISSUING
+rlxprobe: x ri n=00000001 cause=10000428 epc=805018a4 dw=00000000
+rlxprobe: x c11 ISSUING
+rlxprobe: x c11 n=00000000 cause=00000000 epc=00000000 dw=00000000
+rlxprobe: x c10 ISSUING
+rlxprobe: x c10 n=00000000 cause=00000000 epc=00000000 dw=00000000
+rlxprobe: x.c10.treated=00000002
+rlxprobe: x.c10.twin=00000002
+rlxprobe: t=58313000 v=80a18400 pr=ffffffff ex=000022b2 mb=240211a1 ma=240222b2 g=03e00008 vd=00000002
+rlxprobe: c D VOID 00000010
+rlxprobe: x c15 ISSUING
+rlxprobe: x c15 n=00000000 cause=00000000 epc=00000000 dw=00000000
+rlxprobe: x c19 ISSUING
+rlxprobe: x c19 n=00000000 cause=00000000 epc=00000000 dw=00000000
+rlxprobe: s.bits=01010040
+rlxprobe: s.before=00000000
+rlxprobe: s.set=00000000
+rlxprobe: s.restored=00000000
+rlxprobe: s.vd=00000000
+rlxprobe: restore.mismatch=00000000
+rlxprobe: restore.stillhandler=00000000
+rlxprobe: status_end=00000000
+rlxprobe: cells.run=0000000e
+rlxprobe: cells.void=00000008
+rlxprobe: sum=7483ed97
+rlxprobe: rb.words=000002c3
+rlxprobe: end

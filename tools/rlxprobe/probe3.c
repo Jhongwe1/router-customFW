@@ -88,22 +88,46 @@
  * `H_BMP_POINT`, and `H_BMP_COUNT` is that point's own victim count -- so the
  * desk can compare the count the payload thought it wrote against the length it
  * actually read.
+ *
+ * 🔴 AND SINCE 2026-08-31 THERE ARE TWO BITMAP REGIONS, because the paragraph
+ * above described a property the block did not have.  `O_BMP` is the SCRATCHPAD
+ * -- seven cells clear it and read it back in place -- and `O_BMPK` is the
+ * RETAINED COPY of the boundary point, taken the instant that point's own
+ * counts are computed.  `H_BMP_COUNT` is what the payload swept; `H_BMP_KEPT`
+ * is how much of it the copy holds.  A reader that parses `O_BMP` for a pattern
+ * is reading the last cell to touch the scratchpad, which is what the
+ * 2026-08-30 adversarial pass found it doing.
  */
 #define RB_MAGIC	0x524C5833u	/* 'RLX3' */
 #define RB_VERSION	0x00050001u
 #define RB_POISON	0xDEADC0DEu
 
 #define RB_HDR		64u
-#define RB_RES		192u
+#define RB_RES		194u
 #define RB_ROWS		16u
 #define RB_ROWW		8u
 #define RB_BMPW		256u
+/* 🔴 THE RETAINED BITMAP GETS ITS OWN REGION, 2026-08-31.  `O_BMP` is a shared
+ * SCRATCHPAD -- w-line0, w-line, w-back, w-back2, the boundary rerun, v-line
+ * and x-c10 each clear it and read it back immediately -- and the header
+ * advertised the boundary point's pattern as surviving to the read-back when
+ * the last writer was x-c10's two victims (量 2026-08-30 on
+ * `bench/2026-08-30/Q5-rb.log`: two nibbles and 510 V_NEVER against a
+ * `bmp.count` of 512).  512 nibbles rather than the scratchpad's 2,048: it is
+ * exactly `bnd_count` at the measured 16 KiB boundary, and it is TWO pairing
+ * periods under the two-way hypothesis (set advance is 2 victims, 512 sets, so
+ * victims k and k+256 share a set) and ONE under direct-mapped (1,024 sets,
+ * period 512).  A boundary above 16 KiB truncates and `H_BMP_KEPT` says so --
+ * and that world has already refuted `CPU-25`'s 16 KiB, so the truncation only
+ * bites where the headline has changed. */
+#define RB_BMPKW	64u
 
 #define O_RES		RB_HDR
 #define O_ROWS		(O_RES + RB_RES)
 #define O_BMP		(O_ROWS + RB_ROWS * RB_ROWW)
-#define O_SEAL		(O_BMP + RB_BMPW)
-#define RB_WORDS	(O_SEAL + 1u)		/* 641 -- mirrored in the Makefile */
+#define O_BMPK		(O_BMP + RB_BMPW)
+#define O_SEAL		(O_BMPK + RB_BMPKW)
+#define RB_WORDS	(O_SEAL + 1u)		/* 707 -- mirrored in the Makefile */
 #define RB_POISON_W	(RB_WORDS + 8u)		/* a margin, so a run that wrote
 						 * PAST its own block shows data
 						 * where poison was predicted */
@@ -113,7 +137,7 @@
  * compile-time half of the same check: a layout that does not add up does not
  * build.  (C99 has no _Static_assert; a negative array bound is the portable
  * form and it has been the portable form for thirty years.) */
-typedef char rb_layout_adds_up[(RB_WORDS == 641u) ? 1 : -1];
+typedef char rb_layout_adds_up[(RB_WORDS == 707u) ? 1 : -1];
 
 #define UNC(a)		((volatile u32 *)((a) | KSEG1_BIT))
 
@@ -154,14 +178,29 @@ typedef char rb_layout_adds_up[(RB_WORDS == 641u) ? 1 : -1];
 #define H_G_X11		30u
 #define H_ROWS_USED	31u
 #define H_SAVED0	32u	/* 32..39: the general vector's first eight words */
-#define H_LAYOUT_RES	40u	/* the four offsets, so the desk can parse the   */
-#define H_LAYOUT_ROWS	41u	/* block from the block rather than from this   */
-#define H_LAYOUT_BMP	42u	/* file                                          */
+#define H_LAYOUT_RES	40u	/* the offsets, so the desk can parse the block  */
+#define H_LAYOUT_ROWS	41u	/* from the block rather than from this file --  */
+#define H_LAYOUT_BMP	42u	/* FIVE of them since 2026-08-31, see 49         */
 #define H_LAYOUT_SEAL	43u
 #define H_CELLS_RUN	44u
 #define H_CELLS_VOID	45u
 #define H_UART_ROWS	46u
 #define H_SEAL_KIND	47u	/* 1 = the sum excludes H_PROGRESS's final value */
+/* 🔴 48 AND 49 ARE APPENDED RATHER THAN INSERTED beside 42/43, and that is the
+ * whole reason they are here and not there: 44..47 are occupied, and shifting
+ * them would move four header words that `tools/rbcheck.py` and every committed
+ * capture of a probe3 block read by index.  A layout that renumbers is a layout
+ * whose old readings cannot be compared word for word. */
+#define H_BMP_KEPT	48u	/* nibbles actually copied into O_BMPK           */
+#define H_LAYOUT_BMPK	49u	/* the fifth offset                              */
+/* 🔴 THE RERUN'S OWN FRESH COUNT, AND UNTIL 2026-08-31 IT WAS ONLY EVER SPOKEN.
+ * `field("bmp.rerun.fresh", nf)` puts it on the UART and nothing put it in the
+ * block, so a desk holding only the `DW` read-back could recount the region and
+ * had nothing to compare the recount against.  With both, the payload's count
+ * and the desk's recount are two numbers over one region computed by different
+ * code at different times -- which is the only thing that can catch a snapshot
+ * taken at the wrong moment. */
+#define H_BMP_FRESH	50u
 /* 🔴 A WORD OF ITS OWN, AND THE FIRST DRAFT PUT IT IN `H_FLAGS`, WHERE IT WAS
  * INVISIBLE.  `FLAGS_W` starts at 0x50000000 -- 'P' -- so bits 28 and 30 are
  * already set in every build, and a *running in KSEG0* flag at 0x40000000 could
@@ -282,7 +321,25 @@ typedef char rb_layout_adds_up[(RB_WORDS == 641u) ? 1 : -1];
 #define R_S_REST	190u
 #define R_S_VERDICT	191u
 
-typedef char res_area_is_full[(R_S_VERDICT + 1u == RB_RES) ? 1 : -1];
+/* Group W again -- 2 words, 2026-08-31.  🔴 APPENDED, NOT INSERTED AT 84, and
+ * the reason is the same one the header words carry: R_W_ASSOC owns 81..83 with
+ * R_V_LINE at 84, so making Group W contiguous would shift Group V, C, X and S
+ * down by two and no word of the 2026-08-29 block could be compared to this one
+ * by index.  Out of group order on purpose; the comment is the price. */
+#define R_W_ASSOC_MT	192u	/* M(T) for T = C/8, C/4, C/2, C -- one byte
+				 * each, MSB first.  0 = swept and NOTHING in
+				 * 1..12 evicted (a recorded value, because the
+				 * loop used to fall through in silence);
+				 * 1..12 = the smallest M that evicted;
+				 * 0xFE = T below the minimum stride, not run;
+				 * 0xFF = not reached, the M=1 control aborted
+				 * the sweep.                                 */
+#define R_W_ASSOC_MTCAP	193u	/* per T, the M at which m*T first exceeded
+				 * A_ASSOC_SPAN; 0 = the arena never refused.
+				 * `w.assoc.capped` counts these; this says
+				 * WHERE, because a count cannot.             */
+
+typedef char res_area_is_full[(R_W_ASSOC_MTCAP + 1u == RB_RES) ? 1 : -1];
 
 /* --- verdict nibbles, shared with cells.S -------------------------------- */
 #define V_NEVER		0x0u
@@ -999,6 +1056,7 @@ void rlxprobe_main(void)
 	u32 pc, flags, status, i, j, words, sum;
 	u32 nf, no, first_bad;
 	u32 boundary, bnd_count, cap = 0u;
+	u32 bmp_kept = 0u;
 	u32 c_size, t, m, k;
 	u32 imem_base = 0u, imem_top = 0u, dmem_base = 0u, dmem_top = 0u;
 	u32 m_traps = 0u;
@@ -1050,6 +1108,7 @@ void rlxprobe_main(void)
 	rb_put(H_LAYOUT_RES, O_RES);
 	rb_put(H_LAYOUT_ROWS, O_ROWS);
 	rb_put(H_LAYOUT_BMP, O_BMP);
+	rb_put(H_LAYOUT_BMPK, O_BMPK);
 	rb_put(H_LAYOUT_SEAL, O_SEAL);
 	rb_put(H_SEAL_KIND, 1u);
 	progress(P_HEADER);
@@ -1326,7 +1385,15 @@ void rlxprobe_main(void)
 	 * associativity and aliasing, and the largest point otherwise.  It is a
 	 * SECOND RUN of that point -- the sweep above ran with no bitmap -- and
 	 * both runs' counts are in the block, so a disagreement between them is
-	 * itself visible rather than silently resolved. */
+	 * itself visible rather than silently resolved.
+	 *
+	 * 🔴 UNTIL 2026-08-31 THAT FIRST SENTENCE WAS FALSE, and it is quoted
+	 * above rather than rewritten because it is what the block advertised.
+	 * `bmp_clear()` runs again inside the w-assoc search and twice more in
+	 * Groups V and X, all AFTER this point, so what reached the read-back
+	 * was x-c10's two victims.  量 2026-08-30, `bench/2026-08-30/Q5-rb.log`.
+	 * The snapshot below is what makes the sentence true; `O_BMPK` is the
+	 * region and it has exactly one writer. */
 	{
 		u32 pt = (boundary != 0xFFFFFFFFu) ? boundary : (W_POINTS - 1u);
 
@@ -1343,6 +1410,32 @@ void rlxprobe_main(void)
 		field("bmp.rerun.fresh", nf);
 		first_bad = bmp_first_bad(bnd_count);
 		field("bmp.firstbad", first_bad);
+
+		/* 🔴 THE SNAPSHOT.  Everything above this line reads the LIVE
+		 * scratchpad and is unaffected by the defect; the copy is what
+		 * makes the PATTERN survive, and the pattern is the only thing
+		 * that can show the FRESH victims arriving in {k, k+256} pairs
+		 * -- two ways sharing a set, read directly instead of
+		 * direct-mapped being excluded by inference.
+		 *
+		 * ⚠️ A COPY AND NOT A MOVE, deliberately.  The other candidate
+		 * was to run the boundary point again after the last
+		 * `bmp_clear()`; that is wrong, because this rerun is only
+		 * meaningful in the cache state the w-size sweep leaves behind
+		 * and every cell between here and there disturbs it.  The
+		 * scratchpad keeps its seven users and the retained region has
+		 * one writer.
+		 *
+		 * THE WHOLE REGION IS WRITTEN, not `kept` words of it: a
+		 * partly-copied region would leave RB_POISON in its tail, and
+		 * poison in a bitmap decodes as a nibble like any other. */
+		bmp_kept = (bnd_count < RB_BMPKW * 8u) ? bnd_count
+						       : RB_BMPKW * 8u;
+		for (k = 0; k < RB_BMPKW; k++)
+			rb_put(O_BMPK + k, rb_get(O_BMP + k));
+		rb_put(H_BMP_KEPT, bmp_kept);
+		rb_put(H_BMP_FRESH, nf);
+		field("bmp.kept", bmp_kept);
 
 		/* 否證 ⓐ and its positive control, as the payload checks them:
 		 * every victim STALE at the smallest working set, MOST victims
@@ -1366,20 +1459,52 @@ void rlxprobe_main(void)
 	 *
 	 * ⚠️ THE CAP IS REPORTED.  With T = C and C large, twelve victims do not
 	 * fit in the 256 KiB the assoc arena has; the payload records how many M
-	 * it could reach, because a silent truncation reads as coverage. */
+	 * it could reach, because a silent truncation reads as coverage.
+	 *
+	 * 🔴 AND SINCE 2026-08-31 THE WHOLE LADDER IS REPORTED, not just its
+	 * winner, for two reasons that are not the same reason.
+	 *
+	 * ① A SILENT ZERO.  The inner loop used to fall through when no M in
+	 * 1..12 evicted at some T, leaving nothing in the block to say that T
+	 * had been swept at all.  *Nothing evicted* and *this T was skipped* were
+	 * the same observation.  `R_W_ASSOC_MT` gives each T a byte and 0 is a
+	 * recorded value.
+	 *
+	 * ② THE WINNER DOES NOT DISCRIMINATE AND ONE LOSER DOES.  讀, for
+	 * C = 16 KiB with 16-byte lines: at T = C/8, C/4 and C/2 a two-way cache
+	 * (512 sets) and a direct-mapped one (1,024 sets) predict the SAME
+	 * smallest M -- 9, 5, 3 -- because at those strides both wrap onto a
+	 * handful of sets.  They part only at T = C, where the stride maps every
+	 * victim to one set: two-way needs M = 3, direct-mapped needs M = 2.
+	 * `w.assoc.tm` reporting (8192, 3) already excluded direct-mapped -- a
+	 * direct-mapped part would have reported (16384, 2), since 2 < 3 wins --
+	 * but it excluded it by an argument about the search's tie-breaking that
+	 * nothing in the block let a reader check.  The ladder lets them check.
+	 * PREDICTED: `mt = 09 05 03 03` two-way, `09 05 03 02` direct-mapped,
+	 * and ONE byte carries the whole difference. */
 	c_size = (boundary != 0xFFFFFFFFu) ? (W_KIB[boundary] * 1024u) : 0u;
 	res_put(R_W_ASSOC + 0u, c_size);
 	if (c_size >= 1024u) {
 		u32 best_t = 0u, best_m = 0u;
+		u32 mt = 0u, mtcap = 0u, sweep_dead = 0u;
 
 		cap = 0u;
 		for (j = 0; j < 4u; j++) {
-			t = c_size >> (3u - j);		/* C/8, C/4, C/2, C */
-			if (t < 64u)
+			u32 m_found = 0u, m_cap = 0u;
+
+			if (sweep_dead) {
+				mt |= 0xFFu << (24u - j * 8u);
 				continue;
+			}
+			t = c_size >> (3u - j);		/* C/8, C/4, C/2, C */
+			if (t < 64u) {
+				mt |= 0xFEu << (24u - j * 8u);
+				continue;
+			}
 			for (m = 1u; m <= 12u; m++) {
 				if (m * t > A_ASSOC_SPAN) {
 					cap++;
+					m_cap = m;
 					break;
 				}
 				bmp_clear();
@@ -1389,10 +1514,12 @@ void rlxprobe_main(void)
 					/* one victim cannot self-evict */
 					best_t = 0u;
 					best_m = 0xFFu;
-					j = 4u;
+					m_found = 1u;
+					sweep_dead = 1u;
 					break;
 				}
 				if (nf != 0u) {
+					m_found = m;
 					if (best_t == 0u || m < best_m) {
 						best_t = t;
 						best_m = m;
@@ -1400,17 +1527,34 @@ void rlxprobe_main(void)
 					break;
 				}
 			}
+			mt |= (m_found & 0xFFu) << (24u - j * 8u);
+			mtcap |= (m_cap & 0xFFu) << (24u - j * 8u);
 		}
 		res_put(R_W_ASSOC + 1u, (best_t & 0xFFFFFF00u) | (best_m & 0xFFu));
 		res_put(R_W_ASSOC + 2u, cap);
+		res_put(R_W_ASSOC_MT, mt);
+		res_put(R_W_ASSOC_MTCAP, mtcap);
 		field("w.assoc.tm", rb_get(O_RES + R_W_ASSOC + 1u));
 		field("w.assoc.capped", cap);
+		field("w.assoc.mt", mt);
+		field("w.assoc.mtcap", mtcap);
+		/* `mt` rides the row's `guard` slot so the ladder reaches the
+		 * UART channel too.  The DoD is that the two channels agree,
+		 * and a value that exists only in the block cannot be part of
+		 * that agreement. */
 		rb_row(0x57415353u, best_t, best_m,
 		       (best_m > 1u && best_m != 0xFFu) ? (best_m - 1u) : 0u,
-		       c_size, cap, 0u, (best_m == 0xFFu) ? 0xBADu : 0u);
+		       c_size, cap, mt, (best_m == 0xFFu) ? 0xBADu : 0u);
 	} else {
 		res_put(R_W_ASSOC + 1u, 0u);
 		res_put(R_W_ASSOC + 2u, 0xFFFFFFFFu);
+		/* 🔴 THESE TWO MUST BE WRITTEN, not left poisoned.  The ladder
+		 * is read a byte at a time, and `RB_POISON` decodes as
+		 * M = 0xDE, 0xAD, 0xC0, 0xDE -- four plausible-looking
+		 * not-a-value bytes where the encoding has a spelling for
+		 * *not reached* already. */
+		res_put(R_W_ASSOC_MT, 0xFFFFFFFFu);
+		res_put(R_W_ASSOC_MTCAP, 0u);
 		rlx_puts("rlxprobe: w.assoc NOT RUN -- w-size is void\r\n");
 		cells_void++;
 	}

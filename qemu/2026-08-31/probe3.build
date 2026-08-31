@@ -1,0 +1,68 @@
+# probe3 under qemu-system-mips -- 2026-08-31
+
+host        Linux 6.6.87.2-microsoft-standard-WSL2
+qemu        QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+toolchain   mips-linux-gnu-gcc (Ubuntu 12.4.0-2ubuntu1~24.04) 12.4.0
+machine     -M malta -m 32 -nographic -kernel <elf> -serial file:
+seconds     120 (nothing here halts; the run is bounded by timeout)
+
+# WHY THERE IS A SECOND ONE OF THESE.  The 2026-08-26 record describes a
+# 29,088-byte payload with RB_WORDS = 641.  The seventeenth session gave the
+# retained bitmap its own region and Group W an M(T) ladder, so that record no
+# longer describes the image and its capture came from a different payload --
+# which is exactly what the rebuild-on-the-day table in docs/probe3-cells.md
+# says a moved sha256 means.  Both records are kept.
+
+## the DEVICE build -- the image that will be uploaded
+    payload    build/probe3/probe3.bin
+    load addr  0x80500000      entry is byte 0 of the image
+    size       29680 bytes
+    sha256     6f78727507bb0364734534e90f5c223515f55277ae5970c1c3bc64ca68b3233c
+    first word 3c1d8051   (must be the first instruction of _start)
+    reset      RESET=1   1 = arm the watchdog and hand the prompt back with no power cycle
+    flags      50010002   header word 5, and the banner prints it
+    flush      CCTL 0x002 -- measured sufficient, R1d decision 1. Not a knob
+    isc        ISC=0   1 = rlx_isc_inv is linked. probe2/probe3 must be 0
+    template   0x80500ed0 .. 0x80500ed8   the two-word victim, GUARD FIRST
+    cp3 stubs  0x80500fa0   eight, 12 bytes each
+    outside I  5 cache op(s) + 8 mfc3 -- every word in this image that
+               is not MIPS-I. tools/test-rlxprobe.sh names each one and
+               fails if the set changes -- probe1/probe2 assert zero, and
+               probe3 cannot, because executing them IS question (c).
+    stale check the banner must read  rb=80a02000  -- LOWER case, because
+               report.c s digit table is 0123456789abcdef while the loader s
+               is upper. rb=80a00000 or rb=80a01000 means this image is a
+               probe1/probe2-based build and is about to poison a measurement.
+    result     RESULT_BASE=0x80A02000   read it back with: DW 80A02000 707
+    geom       GEOM=0   base 0x80B00000   1 = ARMED, and it can write 1 MiB
+    uart       THR 0xB8002000  LSR 0xB8002014
+    vectors    UTLB 0x80000000  general 0x80000080   CLEAR_BEV=0
+    hazlint    0 violations in 874 loads (804 at RB_WORDS = 641)
+
+## the qemu build -- NOT the same image
+    UART_THR=0xB80003F8 UART_LSR=0xB80003FD VEC_GENERAL=0x80000180
+    CLEAR_BEV=1 RET_ERET=1
+    Unchanged from 2026-08-26: three constants differ and nothing else.
+
+## what this run is evidence FOR, and it is narrow
+    Control flow only -- qemu interlocks the load delay slot and this core
+    does not.  What it does show is that the two new code paths EXECUTE:
+      bmp.kept=00000020        the snapshot ran and copied 32 nibbles
+      bmp.rerun.fresh=00000020 and H_BMP_FRESH now carries it in the BLOCK
+      w.assoc.mt=01ffffff      the M(T) ladder ran and the byte layout is the
+                               designed one: 0x01 at T=C/8 is the M=1 control
+                               FIRING -- qemu's TCG invalidates a translation
+                               block on a store, so one victim really does
+                               self-evict here -- and 0xFF for the three
+                               strides the abort never reached.
+      rb.words=000002c3        707
+    The M=1 abort is the branch the seventeenth session restructured, and qemu
+    is the only environment that drives it.  On silicon it must NOT fire; if it
+    does, w.assoc.tm reads 000000ff and every associativity cell is void.
+
+## the capture
+    probe3.txt   5987 bytes, 129 lines
+    sha256       4f0a6172a44a8273aa2f6c6675ac5b81c0552b0b495f99a45cdea6a3cd8203b0
+    NOTE the block nonce is in the banner and is NOT stable across runs, so
+    this sha256 identifies THIS capture and is not a build reproducibility
+    check.  The image's sha256 above is the one that is.

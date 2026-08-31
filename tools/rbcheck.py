@@ -41,12 +41,23 @@ Modes
 
 The controls run first on every invocation and the tool refuses to report on a
 file if one of them fails, because a checksum comparison that has not been
-shown able to fail is not a checksum comparison.  All ten run off captures
+shown able to fail is not a checksum comparison.  🔄 **Twenty-one of them since
+2026-08-31** -- the prose here and the row in ``tools/ci-expected.tsv`` both
+still said *ten* while the count column said sixteen.  C1..C16 run off captures
 committed in this repository -- no ``$FWRE_WORK``, no device -- so they run on
-a runner, which ``hazlint``'s population control cannot.
+a runner, which ``hazlint``'s population control cannot; C17..C21 run on a
+block this file synthesises, and that is stated in the code beside them because
+**they show the check works, not that any payload does.**
+
+⚠️ ``--words`` is the payload's ``RB_WORDS`` and it MOVED: probe3's block is
+**707** words since 2026-08-31 (a retained bitmap region and Group W's ``M(T)``
+ladder) and was 641 before it.  Both parse -- the layout is read out of the
+block's own ``H_LAYOUT_*`` header words rather than out of a table here -- but
+passing the wrong ``--words`` reads the seal at the wrong offset, which is what
+control C2 exists for.
 
 Run:  python3 tools/rbcheck.py bench/<dir>/<cell>.log --base 0x80A02000 \\
-          --words 641 --uart bench/<dir>/<runcell>.log
+          --words 707 --uart bench/<dir>/<runcell>.log
       python3 tools/rbcheck.py --self-test
 """
 
@@ -232,28 +243,94 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
             fails.append(f"UART sum {uart_sum:08X} != seal {seal:08X} "
                          f"-- channels (1) and (2) disagree")
 
-    # The retained bitmap.  `probe3.c:1324-1329` says the boundary point's
-    # pattern "survives to the read-back"; 量 2026-08-30, it does not --
-    # `bmp_clear()` runs again at :1385, :1667 and :1808, all AFTER the boundary
-    # rerun at :1336.  This is REPORTED and is not a failure: the sum, the seal
-    # and both channels are unaffected, and refusing the whole block over a
-    # stale region would be the wrong verdict.  It exists so the discrepancy is
-    # visible instead of being reconstructed by a reader who trusts the header.
-    if magic == 0x524C5833 and count >= 640:
-        adv = b[23]                       # H_BMP_COUNT
-        nib = 0
-        for w in range(384, 640):
-            v = b[w]
-            for sh in range(28, -1, -4):
-                if (v >> sh) & 0xF:
-                    nib += 1
-        report(f"  bitmap      header advertises {adv} victim(s) at "
-               f"{b[22]:08X}; {nib} nibble(s) written")
-        if adv and nib < adv:
-            report(f"              ⚠️ {adv - nib} short -- the region was "
-                   f"overwritten after the point that filled it "
-                   f"(probe3.c:1385/1667/1808 vs :1336). Reported, not failed: "
-                   f"the sum and both channels are unaffected")
+    # The bitmap regions.  🔄 2026-08-31: there are TWO, and this reads the
+    # offsets OUT OF THE BLOCK rather than out of a table here.  The header has
+    # carried them since the layout was written -- `H_LAYOUT_*`, "so the desk
+    # can parse the block from the block rather than from this file" -- and this
+    # tool hardcoded 384/640 anyway, which is why it needed editing when the
+    # layout moved.  A capture is now readable whatever its layout, and the
+    # 641-word blocks already committed still parse.
+    #
+    # `O_BMP` is the SCRATCHPAD: seven cells clear it and read it back in
+    # place, so what survives to a read-back is the last of them (x-c10's two
+    # victims, 量 2026-08-30 on bench/2026-08-30/Q5-rb.log).  That is reported,
+    # never failed -- the sum, the seal and both channels are unaffected, and
+    # refusing a whole block over a region that is a scratchpad by design would
+    # be the wrong verdict.
+    #
+    # `O_BMPK` is the RETAINED COPY and it IS checkable, because the payload
+    # now writes its own FRESH count beside it (`H_BMP_FRESH`).  Two numbers
+    # over one region, computed by different code at different times.
+    # `count > H_BMP_FRESH` because the layout words live in the header and a
+    # block shorter than the header has none of them.  C14's synthetic block is
+    # 32 words and carries probe3's magic on purpose; without this guard the
+    # tool raised IndexError on it rather than reporting, which is the failure
+    # mode where an instrument that cannot fail is indistinguishable from one
+    # that passed.
+    if magic == 0x524C5833 and count > 50:
+        o_bmp, o_bmpk, o_seal = b[42], b[49], b[43]
+        adv, point = b[23], b[22]
+
+        def nibbles(lo, hi, limit=None):
+            """FRESH-or-STALE nibbles in [lo, hi), first `limit` if given."""
+            n, seen = 0, 0
+            for w in range(lo, min(hi, count)):
+                for sh in range(28, -1, -4):
+                    if limit is not None and seen >= limit:
+                        return n
+                    seen += 1
+                    if (b[w] >> sh) & 0xF:
+                        n += 1
+            return n
+
+        def fresh(lo, hi, limit=None):
+            n, seen = 0, 0
+            for w in range(lo, min(hi, count)):
+                for sh in range(28, -1, -4):
+                    if limit is not None and seen >= limit:
+                        return n
+                    seen += 1
+                    if ((b[w] >> sh) & 0xF) == 2:      # V_FRESH
+                        n += 1
+            return n
+
+        if not (0 < o_bmp < o_seal <= count):
+            report(f"  bitmap      header layout words are "
+                   f"{o_bmp}/{o_bmpk}/{o_seal} against a {count}-word block "
+                   f"-- not parsed")
+        elif o_bmpk == POISON or not (o_bmp < o_bmpk < o_seal):
+            # A pre-2026-08-31 block: one region, and the defect it carries.
+            nib = nibbles(o_bmp, o_seal)
+            report(f"  bitmap      one region (pre-2026-08-31 layout); header "
+                   f"advertises {adv} victim(s) at {point:08X}; "
+                   f"{nib} nibble(s) written")
+            if adv and nib < adv:
+                report(f"              ⚠️ {adv - nib} short -- the scratchpad "
+                       f"was overwritten after the point that filled it. "
+                       f"Reported, not failed: the sum and both channels are "
+                       f"unaffected")
+        else:
+            kept, said = b[48], b[50]
+            nib = nibbles(o_bmp, o_bmpk)
+            report(f"  scratchpad  {nib} nibble(s) at w{o_bmp} -- the LAST "
+                   f"cell to use it, not the boundary point. Never failed")
+            got = fresh(o_bmpk, o_seal, kept)
+            report(f"  retained    {kept} of {adv} victim(s) at {point:08X} "
+                   f"copied to w{o_bmpk}; {got} FRESH, payload said {said}")
+            if kept > adv:
+                fails.append(
+                    f"H_BMP_KEPT {kept} exceeds H_BMP_COUNT {adv} -- the "
+                    f"snapshot claims more victims than the point swept")
+            elif kept == adv and got != said:
+                fails.append(
+                    f"retained region holds {got} FRESH where the payload "
+                    f"counted {said} over the same victims -- the snapshot "
+                    f"was not taken at the point whose count is in the header")
+            elif kept < adv and got > said:
+                fails.append(
+                    f"retained region holds {got} FRESH over its first {kept} "
+                    f"victims, more than the {said} the payload counted over "
+                    f"all {adv} -- arithmetically impossible")
 
     m = margin(words, base, count, poison_words)
     if not m:
@@ -539,6 +616,105 @@ def run_controls():
     except (OSError, Refuse) as e:
         row("C16", "probe3's own on-device block agrees on three channels",
             False, f"{e}")
+
+    # C17..C20 -- the RETAINED bitmap region, 2026-08-31.  🔴 There is no
+    # capture of a 707-word block yet, and there will not be one until the next
+    # seating, so these run on a synthesised block.  That is stated rather than
+    # hidden: they show the CHECK works, not that the payload does.  C16 is the
+    # one that runs on silicon and it is deliberately left on the 641-word
+    # capture -- a control rewritten to match new code stops being evidence
+    # about the old capture.
+    def synth707(kept, said, fresh_nibbles, adv=512, stale_nibbles=0,
+                 beyond=()):
+        """A well-formed 707-word probe3 block with a retained region.
+
+        `stale_nibbles` are laid down AFTER the FRESH ones so the two kinds
+        occupy different victims.  They exist because without them every
+        non-zero nibble in the region is FRESH, and a recount that counted
+        *any written nibble* would agree with one that counted FRESH -- the
+        two are only distinguishable on a region holding both.
+        """
+        o_bmp, o_bmpk, o_seal, n = 386, 642, 706, 707
+        w = [0] * n
+        w[0] = 0x524C5833
+        w[2] = 0xC0                       # P_SEALED
+        w[22], w[23] = 0x57004000, adv    # H_BMP_POINT / H_BMP_COUNT
+        w[42], w[43] = o_bmp, o_seal
+        w[48], w[49], w[50] = kept, o_bmpk, said
+        for i in range(fresh_nibbles):    # V_FRESH = 2, packed 8 per word
+            w[o_bmpk + i // 8] |= 2 << (28 - 4 * (i % 8))
+        for i in range(fresh_nibbles, fresh_nibbles + stale_nibbles):
+            w[o_bmpk + i // 8] |= 1 << (28 - 4 * (i % 8))   # V_STALE
+        for i in beyond:                  # FRESH past H_BMP_KEPT: not evidence
+            w[o_bmpk + i // 8] |= 2 << (28 - 4 * (i % 8))
+        tot = 0
+        for i in range(n - 1):
+            tot = (tot + w[i]) & MASK
+        w[n - 1] = (tot - 0x10) & MASK
+        d = {0x80A02000 + 4 * i: w[i] for i in range(n)}
+        for i in range(n, n + 8):         # the poison margin
+            d[0x80A02000 + 4 * i] = POISON
+        return d
+
+    f = check_block(synth707(512, 20, 20), 0x80A02000, 707,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C17", "a consistent retained region passes", not f,
+        f"kept 512 of 512, 20 FRESH, payload said 20; {len(f)} failure(s)")
+
+    f = check_block(synth707(512, 20, 19), 0x80A02000, 707,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C18", "a recount that differs from the payload's count FAILS",
+        any("not taken at the point" in x for x in f),
+        f"19 FRESH against a payload count of 20; {len(f)} failure(s)")
+
+    f = check_block(synth707(600, 20, 20), 0x80A02000, 707,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C19", "H_BMP_KEPT above H_BMP_COUNT FAILS",
+        any("exceeds H_BMP_COUNT" in x for x in f),
+        f"kept 600 of 512; {len(f)} failure(s)")
+
+    f = check_block(synth707(256, 20, 21), 0x80A02000, 707,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C20", "more FRESH in a truncated copy than in the whole point FAILS",
+        any("arithmetically impossible" in x for x in f),
+        f"21 FRESH over the first 256 of 512 against a total of 20; "
+        f"{len(f)} failure(s)")
+
+    # C21 -- the population control for C17..C20.  Each of those asserts on a
+    # substring, and a substring that no code path can emit makes a control
+    # that cannot fail.  This one says the truncated-but-consistent case is
+    # accepted, so C20's refusal is about the arithmetic and not about `kept`
+    # being less than `adv`.
+    f = check_block(synth707(256, 20, 12), 0x80A02000, 707,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C21", "a truncated copy that is arithmetically possible passes",
+        not f, f"12 FRESH over the first 256 of 512, total 20; "
+               f"{len(f)} failure(s)")
+
+    # C22 -- 🔴 THE ONE THAT SEPARATES *FRESH* FROM *WRITTEN*.  C17..C21 all run
+    # on regions whose only non-zero nibbles are FRESH, so a recount that
+    # counted every written nibble would agree with them everywhere and no
+    # control could tell.  Found by asking what a mutation of `fresh()` would
+    # break, before writing the mutation.  492 STALE beside 20 FRESH: a recount
+    # that ignores the verdict reads 512 against a payload count of 20.
+    f = check_block(synth707(512, 20, 20, stale_nibbles=492), 0x80A02000, 707,
+                    expect_magic=0x524C5833, report=_quiet)
+    row("C22", "STALE nibbles are not counted as FRESH", not f,
+        f"492 STALE beside 20 FRESH, payload said 20; {len(f)} failure(s)")
+
+    # C23 -- 🔴 THE RECOUNT STOPS AT H_BMP_KEPT.  The region is a fixed 64 words
+    # whatever the boundary point's size, so when the point is smaller than 512
+    # victims the nibbles past `kept` belong to nothing -- normally V_NEVER,
+    # but a snapshot taken at the wrong moment or a partial copy puts a previous
+    # point's verdicts there.  Reading them is reading leftovers.
+    # ⚠️ Written because M25 SURVIVED against C17..C22: every one of those has
+    # its FRESH nibbles inside `kept`, so removing the limit changed no answer
+    # and a control that cannot see a mutation is not covering it.
+    f = check_block(synth707(256, 20, 20, adv=256, beyond=range(300, 320)),
+                    0x80A02000, 707, expect_magic=0x524C5833, report=_quiet)
+    row("C23", "the recount stops at H_BMP_KEPT", not f,
+        f"20 FRESH inside 256 kept, 20 more beyond it, payload said 20; "
+        f"{len(f)} failure(s)")
 
     print()
     return 0 if ok else 1

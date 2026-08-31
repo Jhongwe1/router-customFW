@@ -3494,6 +3494,17 @@ row had to strike out.
 
 🔴 **§19.7.5 ① corrects the outcome table below: the cell reads out the PRODUCT of the two factors and cannot separate them, and ⑤ says the 2.1–2.3× is a lower bound. Read that section before quoting this one.**
 
+🔴 **AND AS OF 2026-08-31 THE CELL BELOW IS WITHDRAWN ENTIRELY — §20 SUPERSEDES
+THIS SUBSECTION.** §19.7.5 ③ made *read the `FLR` handler first* a precondition;
+it was read, and the handler reaches flash by **programmed I/O through `SFDR`**,
+not through the memory-mapped window. So the sentence this subsection rests on —
+*"it should run at the bus rate"* — is false in its third clause, and no band
+the cell returns can say anything about that window's prefetch behaviour.
+**Everything below stands as the record of what was predicted; nothing below
+should be taken to the bench.** The replacement measures the SPI controller
+rather than the window, and belongs to `R5b`: §20.5.
+
+
 **The model over-predicts by 2.1–2.3×**, and per-read that reads:
 
 * stage 1: `20,924 / 4 = 5,231` iterations × 9 = **47,079 SPI word reads** in
@@ -3648,3 +3659,258 @@ and what was NOT scanned**: any store whose effective address resolves to
 base loaded from a data word, an `ori`/`addiu` chain -- and the KSEG0 alias
 `0x98001200` of the same physical register. **Named here rather than claimed
 away.**
+
+## 20. 🔴 `FW-34`'s free cell is withdrawn: the loader's `FLR` does not read through the memory-mapped window
+
+§19.7.5 ③ made one thing a precondition rather than an assumption — *read the
+`FLR` handler before spending the cell; whether it is a `lw`/`sw` loop through
+`0xBD000000` or programmed I/O through `SFDR` decides whether the cell measures
+the bus at all.* **It is programmed I/O through `SFDR`, and the cell as written
+in §19.7.4 is withdrawn.**
+
+**Materials**: `$FWRE_WORK/stage2-vma.dis` (56,592 bytes of `stage2.bin`
+disassembled flat at VMA `0x80400000`) and `stage2.bin` itself. No vendor binary
+was executed, so no `vendor-tripwire.sh` wrapper is owed. Working files under
+`$FWRE_WORK/rebuild/bench-only/fw34-flrhandler/`.
+
+### 20.1 What this repository already held, so that none of it is claimed as new
+
+`docs/loader-command-semantics.md` §f already owns the `FLR` handler and goes as
+far as its call into the flash driver:
+
+* the handler is `0x804099AC`; three `strtoul(_,_,16)` with **no bound check**;
+* **the first typed argument is the RAM destination**, and the echo prints the
+  flash source first — the fact `tools/flrbracket.py` exists for;
+* `0x80409A04` stores the length into `0x8040DD28`, the TFTP length global,
+  which is why no `put` or `get` may follow an `FLR`;
+* the confirmation is `0x80409B18`, and `Y`/`y` only;
+* `0x80409A44` is `jal 0x80404F38`, labelled there `flash_read(dst, src, len)`.
+
+**That file stops at that call. Everything below it is what §19.7.5 ③ asked for
+and is new here.** ⚠️ The owner audit of the fifteenth session was caught twice
+inventing a question the repository had already answered; this paragraph exists
+so that this section cannot be read as a third instance.
+
+### 20.2 讀 — the chain from `FLR` to the wire, five links, all in the image
+
+| | address | what it is |
+|---|---|---|
+| 1 | `0x80409A44` | `FLR`'s handler calls `0x80404F38(dst, src, len)` |
+| 2 | `0x80404F38` | moves `a0` (RAM dst) to `a3`, sets `a0 = 0`, and calls **through a function pointer at `0x8040FC10`** — so the call is `fp(0, src, len, dst)` |
+| 3 | `0x8040FC10` | is `chip[0] + 0x3C` of a 72-byte-per-entry table based at `0x8040FBD4`. **`0x8040FBD4` is past `stage2.bin`'s last byte (`0x8040DD10`)**, so the table is `.bss` and filled at run time |
+| 4 | `0x8040533C` | the registration function; `+0x38` gets a hardcoded `0x80406444`, and **`+0x3C` gets the caller's ninth argument** |
+| 5 | `0x8040512C`, `0x804051E0`, `0x8040525C` | its **three** call sites — one per chip family — and **all three pass the same `0x804065DC`** at `32(sp)`. So the read method is not chip-dependent |
+
+`0x804065DC` is a six-instruction shim. It supplies four stack arguments and
+tail-calls the engine:
+
+```
+804065e4:  lui   v0,0xb00        ; 0x0B000000 -- the SPI `Fast Read` opcode
+804065e8:  sw    v0,16(sp)       ;   arg5
+804065ec:  li    v0,1
+804065f0:  sw    v0,20(sp)       ;   arg6 = 1
+804065f4:  sw    zero,24(sp)     ;   arg7 = 0
+804065f8:  sw    v0,28(sp)       ;   arg8 = 1
+804065fc:  jal   0x80405f70      ; the engine
+80406600:  andi  a0,a0,0xff      ;   (delay slot) chip index
+```
+
+🟢 **`0x0B` is the second appearance of this byte in this project and the first
+one predicted it.** `REG-13` (量 2026-08-25b, `DW B8001200 4`) read
+`SFCR2`'s top byte as `0x0B` and wrote *`Fast Read`* beside it from the
+datasheet. Here the same opcode is a compile-time immediate in the code that
+issues the command. **A register reading and an instruction immediate, two
+sources, no shared path.**
+
+### 20.3 讀 — the data loop, and it never touches `0xBD000000`
+
+`0x80405F70` issues the command through `0x80405CBC`, which busy-waits on
+`SFCSR` bit 27 (`SPI_RDY`, `0x08000000` — the bit `REG-13` decoded as set) and
+then writes the command word to `SFDR`. The data then comes back through the
+same register:
+
+```
+80406000:  lui   v0,0xb800
+80406004:  ori   a1,v0,0x120c    ; a1 = 0xB800120C  == SFDR, set ONCE
+80406008:  lw    v0,0(a1)        ; <-- loop head: one 32-bit pop from SFDR
+8040600c:  nop
+80406010:  sw    v0,24(sp)
+80406014:  move  v1,v0
+80406018:  srl   v0,v0,0x18
+8040601c:  sb    v0,0(s0)        ; big-endian unpack, byte 0
+80406020:  srl   v0,v1,0x10
+80406024:  sb    v0,1(s0)
+80406028:  srl   v0,v1,0x8
+8040602c:  sb    v0,2(s0)
+80406030:  sb    v1,3(s0)
+80406034:  addiu a2,a2,1
+80406038:  sltu  v0,a2,a0        ; a0 = len >> 2
+8040603c:  bnez  v0,0x80406008
+80406040:  addiu s0,s0,4
+```
+
+**Fifteen instructions per four bytes**, a tail path at `0x80406044` for the
+`len & 3` remainder, and a final call to `0x80405868` — 讀 that it is called
+with `a1 = a2 = 0` once the loop ends; what it writes is not traced here, and
+nothing below depends on it.
+
+Three readings that matter, all 讀:
+
+1. **The window base is not in this path.** 讀, a census of every `lui`
+   immediate in the file: `lui <reg>,0xbd00` occurs **exactly once**, at
+   `0x80409BC4`, and it is inside the **`FLW`** handler computing
+   `offset + 0xBD000000` as a `printf` argument for `Write 0x%x Bytes to SPI
+   flash#%d, offset 0x%x<0x%x>, …`. **The loader uses the window base for
+   display and never for a load.**
+   ⚠️ **The positive control on that census, because a `0` is a claim**: the
+   same one-line method over the same file finds `lui …,0xb800` **115** times
+   and `lui …,0xbfc0` twice. The search works; the window is absent.
+   ⚠️ **The census is written against the mnemonic and its immediate for a
+   reason.** A bare text search for `bd00` over the same file returns dozens of
+   hits and **every one of them is `$sp`** — register 29 encodes as `bd`, so
+   `lw sp,140(sp)` is `8fbd008c` and `addiu sp,sp,40` is `27bd0028`. On a flat
+   binary disassembly the operand column and the hex column are the same
+   grep-space, and this is the shape that puts a false zero *or* a false
+   positive into a census.
+   🔴 **AND HERE IS WHAT THE CENSUS DOES NOT COVER, named rather than claimed
+   away** — the same treatment §19.7.5 ⑨ gave the `SFCR` zero-writes claim.
+   **What was scanned**: the `lui` mnemonic and its immediate. **What would
+   falsify the claim and was NOT scanned**: any construction of a
+   `0xBD??????` address that never materialises `0xbd00` as a `lui` immediate
+   — `lui 0xbcff` plus an `addiu 0x10000`, a base loaded from a data word, an
+   `ori`/`addu` chain, or the KSEG0 alias `0x9D000000` of the same window.
+   Two things make the residual small rather than absent: the read path was
+   followed instruction by instruction from `0x80409A44` to the loop and it
+   contains no such chain, and the loop's base register is loaded once, at
+   `0x80406004`, from a `lui`/`ori` pair naming `SFDR`. **So the census is
+   corroboration and the traversal is the evidence**, which is the opposite of
+   how the first draft of this section read.
+
+2. **There is no polling inside the loop.** `a1` is loaded once at `0x80406004`
+   and the loop body contains no access to `SFCSR` (`0x1208`). Whatever paces
+   the transfer is on the controller's side of the bus, not in the code.
+3. **The loop executes from `0x80406008` — stage 2, in KSEG0 DRAM, cached.** So
+   §19.7.2's instruction-fetch amplification is `1` here by construction. That
+   part of §19.7.4's premise survives; nothing else does.
+
+### 20.4 🔴 What this refutes, and it is §19.7.4's own sentence
+
+> §19.7.4: *"Stage 2's own `FLR` executes **from DRAM** (no amplification) at
+> **DIV 4** (no divider penalty) with **no Linux software path**. So it should
+> run at the bus rate."*
+
+**The first clause is true, the second is true, the third is false, and the
+conclusion does not follow.** `FLR` has a software path of its own — fifteen
+instructions and four byte-stores per word — and, decisively, **it reads through
+a different port of the SPI controller than the thing it was going to be
+compared against.** The kernel's `mtd_read` and stage 1's copy loop both read
+the memory-mapped window; `FLR` pops a FIFO register. A number measured on one
+says nothing about prefetch behaviour in the other.
+
+**So `FLR 80C00000 100000 100000` cannot answer `FW-34`'s remaining question,
+and the cell is withdrawn rather than re-banded.** §19.7.5 ① had already found
+that its three-outcome table read one number three ways; ② had found one band
+unreachable. This is the third and it is the one that removes the cell: the two
+earlier findings would have been repaired by re-writing the table.
+
+⚠️ **What survives from §19.7.5 and is not withdrawn**: ⑦'s bound of `≤ ~1.1 ms`
+on the loader's per-`FLR` fixed cost, ⑧'s finding that the intermediate stage
+also writes `SFCR` zero times, and ⑨'s named falsifier for the zero-writes
+claim. None of them depends on which port the read uses.
+
+### 20.5 The cell that replaces it, and it measures something this project needs
+
+The `FLR` timing is still worth one reading — but for the SPI **controller**,
+not for the window, and it is worth writing down because the flash-write work
+(`R5b`) goes through this same `SFDR` port.
+
+**The model, 推, with every term named.** After one command the loop pops a
+32-bit word per iteration with no polling, so the pacing is either
+
+* **streaming** — the controller keeps the `Fast Read` open and clocks 32 bits
+  per word: **32 SPI clocks/word**; or
+* **per-word re-issue** — it repeats `cmd(8) + addr(24) + dummy(8) + data(32)`:
+  **72 SPI clocks/word**.
+
+`REG-13` 量 `SFCR = 0x3FC00000` at the prompt, cold and warm alike, so
+`SPI_CLK_DIV = 001B` = **DIV 4** during `FLR` — this is the one place in this
+project where the divider is *measured* rather than defaulted. ⚠️ **The
+datasheet's formula is `SPI Clock = DRAM Clock / SPI_CLK_DIV`, and nothing in
+this repository has ever asserted that the "DRAM Clock" is `CLK-02`'s measured
+200.0049 MHz.** That identification is carried silently by §19.7.3's 4×. **The
+cell below is the first thing that would test it.**
+
+At 200 MHz / 4 = 50 MHz: 32 clocks = **640 ns/word**, 72 clocks = **1,440
+ns/word**. The loop's own cost is **37.5–112.5 ns/word** (15 instructions;
+`CLK-01`'s 400 MHz with CPI between 1 and 3, because `CLK-03` measures `f/CPI`
+and not `f` and says so). It is a minority term in every band, which is why the
+CPI ambiguity does not have to be resolved first.
+
+> **The cell.** `FLR 80A90000 100000 40000` — **256 KiB** of flash
+> `0x100000`–`0x140000` into RAM `0x80A90000`, timed from the wire-silent gap
+> between the echo of `Y` and `Flash Read Successed!`, exactly as §19.7.5 ⑦
+> measured the 256-byte reads. 65,536 words.
+>
+> | outcome | what it establishes |
+> |---|---|
+> | **42–49 ms** | streaming, DIV 4, and the datasheet's *DRAM Clock* is `CLK-02`'s 200 MHz. All three at once — the cell does not separate them |
+> | **94–102 ms** | the controller re-issues the command per word. `R5b` inherits that number |
+> | **≥ 150 ms** | the divider is not DIV 4 during `FLR`, or the clock is not 200 MHz, or the loop stalls beyond this model. **Not attributable** |
+> | **≤ 25 ms** | the SPI clock is *faster* than DIV-4-of-200 MHz — the identification of *DRAM Clock* with `CLK-02` is wrong upward |
+>
+> **Refutation condition for the whole framework, written first**: any reading
+> below the loop's own floor of **2.5–7.4 ms** means the transfer is not
+> word-at-a-time through this loop, and the disassembly above is wrong about
+> which code ran.
+
+**Three things about the destination, and they are the reason it is not
+`0x80C00000`.**
+
+1. §19.7.5 ⑥ objected that `0x80C00000` sits outside `MAP-17`'s measured-safe
+   band and that a 1 MiB write is 4,096× the evidence base. **`0x80A90000` +
+   256 KiB = `0x80AD0000` lies entirely inside `MAP-17`'s `0x80A00000`–
+   `0x80AF1002`.** The objection is answered by construction rather than by a
+   new argument, and ⑥'s `G0`-shaped head/middle/tail pre-read becomes a
+   confirmation of an existing band instead of a new safety case. **It is still
+   run**, and its refutation condition is `MEM-13`'s verbatim: any
+   pointer-shaped word and the address is re-chosen.
+2. **`0x80A90000` is exactly `probe3`'s `ARENA_END`.** 讀 `probe3.c:375-376`:
+   `ARENA = 0x80A10000`, `ARENA_END = 0x80A90000`. So the read cannot land in
+   the arena — which matters because `MEM-17` (量 2026-08-31) is that **DRAM
+   keeps a previous cycle's `FLR` output across a power cycle**, and a
+   `probe3` arena pre-loaded with flash bytes would make `V_NEVER` mean two
+   things. The destination is chosen against a measurement, not against a map.
+3. **256 KiB is what fits, and it is also enough.** `0x80AF1002 − 0x80A90000`
+   is 397 KiB, so 256 KiB is the largest power of two inside the band; and at
+   the fastest band it is 42 ms against ⑦'s `≤ ~1.1 ms` fixed cost — **38×
+   the instrument's own floor**, with the bands themselves ≥45 ms apart. The
+   1 MiB of §19.7.4 was sized against a model that no longer applies.
+
+⚠️ **Ordering, unchanged and still binding**: `FLR` writes the TFTP length
+global, so this cell must come **after** any `put` on its power cycle and no
+`put`/`get` may follow it. `J` needs no TFTP global, so `put` → cell → `J` is
+legal on one cycle; whether it is *wise* to put an unrehearsed 256 KiB transfer
+in front of a seating is a different question and belongs on the card.
+
+### 20.6 What `FW-34` keeps, and the only instrument that could close it
+
+`SPEC.md` §17's remaining `FW-34` row asks whether the memory-mapped window
+prefetches a sequential fetch stream. **Nothing at the loader prompt can answer
+it, and that is now 讀 rather than an omission**: the loader has exactly one
+instruction that names the window and it is a `printf` argument. The two agents
+in this project that read through the window are stage 1 (no console, no timer
+the console can read) and the kernel (whose figure §19.4 already has, with a
+whole userspace path folded into it).
+
+**The third is a bare-metal payload, and this project has one.** `probe3` ships
+a calibrated `TC0` (`CLK-17`, 69.9983 ns/tick; Group T's `t.cal` hi/lo ratio
+came out 2.0003, so the bracket scales) and already executes uncached KSEG1
+loads. A cell that times N sequential `lw` from `0xBD000000` against N strided
+`lw` — stride chosen past any plausible buffer — reads the amplification
+directly, with the same loop over uncached DRAM as the negative control that
+says the difference belongs to the window rather than to the loop.
+
+**That is a `probe3` change, and it is recorded here rather than started here.**
+It would ride the same rebuild as the retained bitmap and the `M(T)` table,
+which is the only reason it is worth raising now instead of after the seating.
+
