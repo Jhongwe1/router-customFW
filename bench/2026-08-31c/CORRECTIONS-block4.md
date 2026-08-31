@@ -395,6 +395,15 @@ passes with **zero** of its 10 % tolerance used. (7) passes for every window
 leg — the smallest is 30,353 against `f.dram.str`'s 2,347, and none is near
 the ~5,000 wrap floor.
 
+🔴 **And (7) is mis-scoped in the same way § 13.1's control is** — found by an
+adversarial read *after* the push, which is later than it should have been.
+It says *any leg below `f.dram.str`*, and `f.dram.seq` is 1,799 against 2,347:
+**the sequential DRAM leg is below the strided one by construction**, so
+condition 7 fires on its own control on every run that behaves. It means *any
+window or boot leg*. **Two of § 6.8.3's seven conditions are scope errors**,
+both written before the seating, and `docs/probe3-cells.md`'s Ran section had
+said *(1)–(7) all pass* — an over-claim, now corrected there.
+
 ### 🔴 §13.1 The control on the verdict, as written, CANNOT BE SATISFIED in the branch that closes the row
 
 § 6.8.2: *"`f.dram.str / f.dram.seq` must be **strictly less** than `R`."*

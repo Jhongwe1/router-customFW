@@ -1796,9 +1796,20 @@ is a floating bus. And `f.boot.*` matches `f.win.*` value for value — the firs
 time `0x1FC00000` and `0x1D000000` have been compared in this repository, which
 § 19.7.2's `≤9×` had been resting on unmeasured.
 
-**Refutation conditions (1)–(7) all pass**, and (4) passes with **zero** of its
+**Refutation conditions (1)–(6) pass**, and (4) passes with **zero** of its
 10 % tolerance used: two runs of the same leg, eighteen minutes and one payload
 re-upload apart, returned the same 30,354.
+
+🔴 **(7) needs the same fix as § 6.8.2's control, and for the same reason: it is
+scoped to *any* leg when it means the window's.** It reads *any leg below
+`f.dram.str`, or an `f.win.str` under ~5,000 ticks*, and `f.dram.seq` is 1,799
+against `f.dram.str`'s 2,347 — **the sequential DRAM leg is below the strided
+one by construction**, since crossing SDRAM rows is what the strided leg costs
+extra for. So condition 7 as written fires on its own control every time. What
+it means is *any window or boot leg*, and on those it passes with room: the
+smallest is `f.boot.seq` at 30,353 against 2,347, and none is near the ~5,000
+wrap floor. **Two of § 6.8.3's seven conditions are mis-scoped in the same
+way**, both written before the seating, and both are one carried-forward row.
 
 #### 🔴 § 6.8.2's control cannot be satisfied in the branch that closes the row, and this section is where that is fixed
 
