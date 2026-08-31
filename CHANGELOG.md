@@ -39,6 +39,50 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### 2026-08-31 — seating 8: the memory-mapped SPI window does not buffer, and the cache is two-way by a second route
+
+🔴 **`FW-34`'s last row is closed by measurement.** A bare-metal payload timed
+1,024 uncached loads through `0xBD000000` at stride 4 and at stride 1,024 and
+got the **same number both times** — 30,354 ticks, a ratio of 1.0000. The window
+serves a single-word read as its own transaction, so the instruction-fetch
+amplification that explains the loader's slow copy is the 9× the model bounds it
+at and not less. The same six words compared `0xBFC00000` against `0xBD000000`
+for the first time in this project and found them alike.
+
+🟢 **The instruction cache is two-way by a route that is a shape, not a count.**
+At the eviction walk's boundary point the victims that miss on re-execution
+arrive as **ten `{k, k+256}` pairs with no singleton** — which is what a
+512-set, two-way cache predicts and what a 1,024-set direct-mapped one does not,
+*while both predict the same number of them*. A separate ladder over four
+strides agrees, and its one discriminating byte reads `03` against
+direct-mapped's `02`.
+
+🔴 **A bit of DRAM changed while the board was off, and the block's own checksum
+is what caught it** — the first thing that checksum has ever caught. A result
+block that survived a watchdog reset, a complete vendor-firmware boot and a
+power cycle came back with one bit set that was clear when it was sealed; a
+second block, read across a clean power cycle minutes after being sealed, came
+back **bit-exact over 22,976 bits**.
+
+🟢 **A fourth power cycle measured why, and refuted the session's own
+explanation for it.** Thirty-five minutes off, both ends timed: **598 of 22,976
+bits changed, 2.603 %**, in both directions at nearly equal rates, with the
+block's magic number decaying along with everything else. Retention on this part
+falls off steeply with time, so a single bit after two minutes needs no thermal
+story — and the thermal story this session had written an hour earlier is
+retracted in place rather than deleted.
+
+⚠️ **Three defects in the seating's own card were found, two of them before the
+board was powered**: a directory named for a day the seating did not happen on,
+an image the card told the operator to upload that had never been copied into
+place, and a `J` row that had lost the ESC-after-jump that hands the loader
+prompt back. The third cost a power cycle.
+
+⚠️ **The flash sentence has not moved.** 1,024 of 4,194,304 bytes were read and
+matched, on both sides of an observed two-minute run of the vendor firmware. It
+is 0.0244 % of the part and no full re-dump was taken.
+
+
 🔴 **2026-08-31 — desk, no power: the cell `FW-34` lost in the SESSION BEFORE THIS ONE -- the same day, three
 segments in -- was rebuilt as
 a payload group, and the three header words added in that same session were all

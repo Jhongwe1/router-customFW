@@ -901,7 +901,37 @@ behind.
 
 | | |
 |---|---|
-| **`2026-08-31`** | `probe3` at 718 words: the `M(T)` ladder, the retained bitmap and **Group F**, the memory-mapped SPI window. The `FLR` bracket rides the same cycle, driven by `tools/flrbracket.py run` rather than by eye. Prefix `K-*` |
+| **`2026-08-31c`** | `probe3` at 718 words: the `M(T)` ladder, the retained bitmap and **Group F**, the memory-mapped SPI window. The `FLR` bracket rides the same cycle, driven by `tools/flrbracket.py run` rather than by eye. Prefixes `K-*` (cycle 8), `K2-*` (cycle 9), `K2b-*` (its second payload run) and `K3-*` (cycle 10) |
+
+🔴 **This row said `2026-08-31` until the seating, and that is seating 7's
+directory.** The card was written into `bench/2026-09-01/` — a prediction of the
+seating day — while this file had already been corrected to the day the card was
+*written*. Both were wrong in different directions; the directory was renamed to
+`2026-08-31c` before power and before the first capture landed, and every
+`--out` on the card with it.
+
+🔴 **FOUR power cycles, for a card that asked for one.** Cycle 8 reached
+`rlxprobe: end` but the card's `K-J` row had dropped block 0's `--esc-after`, so
+the watchdog reset auto-booted the vendor firmware and `K-rb`/`K-rbp` could not
+run — they are `check-predictions` FAILs and they are supposed to be. Cycle 9
+recovered the block **and** re-ran the payload so a freshly sealed block could
+be compared against the retained one. Cycle 10 read the block again after a
+clean power cycle and cost no upload and no `J`.
+
+🟢 **What came out of it**: `FW-34`'s last row closed at `R = 1.0000`; the
+`M(T)` ladder `09 05 03 03`; the retained bitmap's **ten `{k, k+256}` pairs and
+zero singletons**; `MEM-17` bounded at both ends for the first time; and **one
+retained-DRAM bit, caught by the block's own seal** — the first thing that seal
+has ever caught. `CORRECTIONS-block4.md` in that directory is the owner.
+
+🔴 **A fourth power cycle, and it refuted the seating's own explanation of its
+own finding.** 35.1 minutes off with both ends timed and no vendor firmware:
+**598 of 22,976 bits changed, 2.603 %**, the block's magic decaying with
+everything else and `rbcheck` correctly refusing to judge it. Retention on this
+part falls off steeply with time, so one bit after two minutes is the weakest
+cell in the array rather than anything thermal — and the thermal reading, an
+hour old, is retracted in place. ⚠️ **The reference for a future interval is
+`K4-rb.log`, not `K2b-rb.log`**: the block is already 2.6 % gone.
 
 🆕 **`PREDICTIONS-B6-block4.md` is the first card in this project that a machine
 read before the board was plugged in.** `cardcheck numbers` re-derived **13 of

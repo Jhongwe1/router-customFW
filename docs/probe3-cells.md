@@ -1755,3 +1755,170 @@ and **M25 survived C17…C21** — the truncation limit could be deleted with ev
 control still green, since every one of those regions has its FRESH nibbles
 inside `kept`.
 
+
+---
+
+## 🔴 Ran — 2026-08-31 (seating 8), `bench/2026-08-31c/`. The 718-word block, and Group F's first execution on silicon
+
+**The card asked for one power cycle and the seating spent four.** Cycle 8 ran
+the card to `rlxprobe: end`; the read-back could not be taken there, because
+that card's `K-J` row dropped block 0's `--esc-after` and the loader auto-booted
+the vendor firmware after the watchdog reset. Cycle 9 recovered it, and the
+payload was re-uploaded and re-run **on that same cycle**, so that a block
+sealed minutes earlier could be compared word for word against the one that had
+sat through the vendor boot. Cycle 10 was spent on a retention experiment that
+cost no upload and no `J`, and **cycle 11 on the same experiment at a longer,
+timed interval — which refuted the explanation cycle 10 had been written up
+with.**
+`bench/2026-08-31c/CORRECTIONS-block4.md` owns the deviations; this section
+owns the **cells**.
+
+### Group F — the four cells of § 6.8, and the verdict is the band that closes `FW-34`
+
+```
+f.sfcr = 3fc00000   f.alias = 00000000   f.live = 00000f0f   f.faults = 00000000
+f.win.seq  30354    f.win.str  30354  ->  R      = 1.0000
+f.boot.seq 30353    f.boot.str 30354  ->  R_boot = 1.0000
+f.dram.seq  1799    f.dram.str  2347  ->  R_dram = 1.3046
+f.win.seq2 30354    seq2 - seq = 0        (§ 6.8.3 (4) allows 10 %)
+```
+
+**`R = 1.0000` → the `≤ 1.15` band → the window does not buffer a single-word
+read → `FW-34`'s last row CLOSES**, and § 6.8.3's asymmetry is satisfied in the
+direction that closes it: an uncached instruction fetch *is* a single-word read
+from this window.
+
+🟢 **`f-alias` and `f-live` did the job § 6.8.0 built them for.** Nothing here
+had ever read through `0xBD000000` outside Linux; `f.alias = 0` says the two
+decodes return the same sixteen words, `f.live = 0f0f` says fifteen of the
+fifteen non-zero-offset words differ from word 0 at **each** window, so neither
+is a floating bus. And `f.boot.*` matches `f.win.*` value for value — the first
+time `0x1FC00000` and `0x1D000000` have been compared in this repository, which
+§ 19.7.2's `≤9×` had been resting on unmeasured.
+
+**Refutation conditions (1)–(7) all pass**, and (4) passes with **zero** of its
+10 % tolerance used: two runs of the same leg, eighteen minutes and one payload
+re-upload apart, returned the same 30,354.
+
+#### 🔴 § 6.8.2's control cannot be satisfied in the branch that closes the row, and this section is where that is fixed
+
+*"`f.dram.str / f.dram.seq` must be **strictly less** than `R`"* — measured
+**1.3046 against 1.0000**, which is *greater*. **No ratio is below 1.0 unless
+the strided leg is faster than the sequential one, so the guard is
+unsatisfiable for every run that closes `FW-34`.** It was written before the
+seating, so it counts as a refutation condition that fired.
+
+**What the DRAM legs actually established**, and it is worth keeping: the same
+loop, the same N, the same 64 KiB mask produced a **1.30** stride effect on
+DRAM. So the instrument is demonstrably stride-sensitive and `1.0000` on the
+window is not *the tool cannot see a difference*. ⚠️ **That is a sensitivity
+control and it is not the control § 6.8.2 asked for**, and it was arrived at
+during the seating rather than written first.
+
+> **The rewrite this needs, stated rather than done in the same breath as the
+> reading it would rescue:** the guard belongs on the `R ≥ 1.8` branch, where
+> the failure mode is *a large `R` that belongs to the loop*. On the `R ≤ 1.15`
+> branch the question is the opposite one — *can this loop show a stride
+> difference at all* — and the DRAM ratio being **greater** than `R` is what
+> answers it. One guard, two branches, opposite senses. Until § 6.8.2 says so,
+> this section is the only place that does.
+
+#### 🔴 The absolute cross-check is *not attributable*, and § 6.8.2's band is refuted
+
+`f.win.str / 1024` = **29.64 ticks** = 2.075 µs = **103.7 SPI clocks** at DIV 4
+/ 50.0 MHz. § 6.8.2's three rows are 20.6 ± 15 % (17.5–23.7), ≈ 82 and ≈ 9. It
+is in none of them.
+
+* **PREDICTED 21,300–21,700 ticks (1.49–1.52 ms). MEASURED 30,354 = 2.125 ms.
+  REFUTED.** The band was written before the number and did not contain it.
+* Therefore *72 clocks · DIV 4 · the datasheet's `DRAM Clock` is `CLK-02`'s
+  200 MHz* — the three-way identification `notes/kernel-build.md` § 20.5 says
+  nothing here had ever tested — comes back **undetermined**, not confirmed.
+* 推, named: 103.7 rather than 72 clocks is ≈1.44×. Per-transaction CS
+  turnaround, more dummy cycles than the datasheet's `Fast Read`, and a `DRAM
+  Clock` that is not 200 MHz are all consistent with it, and nothing in this
+  cell separates them.
+* ⚠️ **None of it touches `R`.** A ratio of two legs of one loop is
+  clock-independent.
+
+### § 6.2a ① — the `M(T)` ladder: `w.assoc.mt = 09 05 03 03`
+
+**Predicted `09 05 03 03` for two-way and `09 05 03 02` for direct-mapped.**
+The three shared bytes came back shared and **the one discriminating byte came
+back `03`**. `w.assoc.mtcap = 00000000` as predicted (`A_ASSOC_SPAN` refuses
+nothing), `w.assoc.tm = 00002003` = (8192, 3) and `w.assoc.capped = 00000000`,
+both agreeing with 量 2026-08-29 by different code over the same span.
+
+### § 6.2a ② — the retained bitmap: 10 pairs, 0 singletons
+
+20 FRESH, 492 STALE, **0 other**. The FRESH victims are
+
+```
+{15, 16, 231..238, 271, 272, 487..494}
+```
+
+— **ten `{k, k+256}` pairs and not one singleton**. 15↔271, 16↔272, 231↔487 …
+238↔494.
+
+**The two hypotheses predict the same count**, which is the whole reason this
+region exists: `bmp.rerun.fresh = 20` is what a direct-mapped part would have
+reported too, as twenty isolated singletons. `bmp.kept = 00000200` = 512 as
+predicted, `bmp.firstbad = ffffffff`.
+
+🟢 **Confirmed on two independent runs**: `K2-rb` (the block that sat through
+the vendor boot) and `K2b-rb` (sealed minutes before it was read) give the
+**identical FRESH set**.
+
+🔴 **And the judgement is `tools/rbcheck.py`'s now, not a scratchpad
+script's.** `C33`…`C39`, with `C36` the population control — an all-FRESH
+region pairs every `k` with `k+period` trivially, so a verdict off one is a
+verdict from a region that says nothing — and `C39` running on this capture.
+Mutants `M35`…`M40`. **A headline that only a throwaway script can re-derive is
+not a finding this repository is entitled to quote**, and until this session
+that is what this one was.
+
+### The cells that replicate, and one that does not move at all
+
+| | |
+|---|---|
+| Group T | `g.timer = 1`; `t.cal.hi/lo` = 15,090 / 7,544 = **2.0003**, the same four digits as 量 2026-08-29 against a predicted 2 |
+| Group M | `m.cp3` eight stubs, **`trap = 0` on every one**; `m.traps = 0`. CP3 is reachable on this part, as 2026-08-29 |
+| Group C | `c-A` negative again, so **Group V is VOID** by its own interlock and the D-side geometry stays a build constant |
+| Group X | `x ri` traps with `cause = 0x28` (ExcCode 10, RI) and `c11`/`c10`/`c15`/`c19` retire, `n = 0` |
+| Group S | `s.before = s.set = s.restored = 1000fc00` — none of the three bits sticks |
+| the header | `cells.run = 15`, `cells.void = 8`, `rb.words = 0x2CE` = **718**, `progress = 0xC0` = `P_SEALED` |
+| the margin | `w718`–`w725` **eight `DEADC0DE`**: the payload wrote nothing past its own block |
+
+### 🔴 What the seal caught, and it is the first time it has caught anything
+
+`K2-rb` — read on cycle 9 out of DRAM that had held the block through a
+watchdog reset, a full vendor-firmware boot and ~2 minutes of that firmware
+running, then a power cycle — disagrees with its own seal by **exactly
+`0x00010000`**. `K2b-rb`, sealed minutes before it was read, agrees on all
+three channels.
+
+Word for word, 18 of 718 differ and all but three carry a UART name whose value
+changed between the runs; two more differ by **+1,017,152** against
+`t.sep.a`/`t.sep.b`'s **+1,017,184**, so they are timing words with no UART
+name. **That leaves `w126` at `0x80A021F8`: `00010400` against `00000400`, one
+bit, bit 16** — result index 62, `R_W_SIZE + 10`, the `n_fresh` of the `w-size`
+sweep's 32 KiB point, whose true value is 1,024 and whose point is saturated.
+It is a geometry result and not a timing one, so it cannot legitimately differ
+between two runs, and it did not: both produced `00000400`.
+
+⚠️ Ruled out by measurement, not by argument: not a capture defect (`K2-rb` and
+`K2-rbp` agree over 720 addresses) and not a stuck cell (the same address reads
+`00000400` in four later captures). 🔴 **And a sum catches the NET** — two
+cancelling flips are invisible to it, and only the word-for-word comparison
+bounds that, over the ~700 words that are not timing readings.
+
+🔴 **And a fourth power cycle, ninety minutes later, put that one bit in
+scale.** 35.1 minutes off with both ends timed and no vendor firmware:
+**598 of 22,976 bits changed, 2.603 %**, the magic itself decaying to
+`564C5033`. Duration dominates by three orders of magnitude, so the single bit
+at ~2 minutes is the weakest cell in this array and not a thermal effect —
+which is what the write-up of it said an hour earlier, and that sentence is
+retracted in `bench/2026-08-31c/CORRECTIONS-block4.md` § 16.
+🟢 **`rbcheck` refused to judge the decayed block** rather than reporting on
+it, because its magic no longer names a payload — the first finding is that,
+and it is the right one.

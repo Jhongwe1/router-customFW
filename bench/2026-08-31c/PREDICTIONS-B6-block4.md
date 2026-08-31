@@ -20,6 +20,22 @@ renamed before the first capture lands**, and every `--out` on this card with
 it. Stating it because a date in a path reads like a fact, and this one is a
 guess.
 
+🔴 **2026-08-31 19:31 — that prediction is REFUTED, and in the direction the
+paragraph above did not name.** It named the *slip*; what happened is the
+opposite. The seating is **the same evening the card was written**: 量, `date`
+on the Windows host and in the distro, both `2026-08-31`. The rule the
+paragraph states does not move — a `bench/` directory carries the day its
+captures were taken — so the directory was renamed **`bench/2026-09-01/` →
+`bench/2026-08-31c/`**, and the out-of-repo staging directory
+**`b6-20260901` → `b6-20260831c`** with it, **before power and before the
+first capture landed**. Every `--out`, every `--echo-dir` / `--dw-dir` /
+`--pre-dir`, and the `cells` fence in § 2 moved in the same edit; the sentence
+above keeps the old name because that is what was predicted. **The dry run in
+the next section was RE-RUN against the new paths** rather than argued to
+transfer — it costs no board. ⚠️ **`check-predictions` still reads `0 of 25`
+after this edit**, and that is the thing that says the edit landed before a
+capture rather than after one.
+
 **What block 4 carries that block 3 could not.** Five things, and three of them
 are instruments rather than readings:
 
@@ -51,8 +67,8 @@ against the loader's *marginal* reply rate, **3,458–3,497 B/s** (`SPEC.md`
 
 /usr/bin/python3 tools/flrbracket.py run --port /dev/ttyUSB0 \
     --stem K --suffix 0 --dst 80A00400 --src 000000 --bytes 100 \
-    --echo-dir bench/2026-09-01 --dw-dir bench/2026-09-01 \
-    --pre-dir /home/key/fwre-work/rebuild/bench-only/b6-20260901
+    --echo-dir bench/2026-08-31c --dw-dir bench/2026-08-31c \
+    --pre-dir /home/key/fwre-work/rebuild/bench-only/b6-20260831c
   (no --go: it must print what it would send and exit without opening the port)
 ```
 
@@ -69,9 +85,9 @@ What it confirmed, per window:
 
 | | `0` / `6` | `h` / `c` |
 |---|---|---|
-| pre-read | `…/b6-20260901/K-p0`, `K-p6` — **outside** | `K-ph`, `K-pc` — **outside** |
-| `FLR` echo | `bench/2026-09-01/K-flr0`, `K-flr6` | `bench/2026-09-01/K-flrh`, `K-flrc` — **inside, and correctly**: an echo holds addresses and no flash bytes |
-| read-back | `bench/2026-09-01/K-rd0`, `K-rd6` | `…/b6-20260901/K-rdh`, `K-rdc` — **outside** |
+| pre-read | `…/b6-20260831c/K-p0`, `K-p6` — **outside** | `K-ph`, `K-pc` — **outside** |
+| `FLR` echo | `bench/2026-08-31c/K-flr0`, `K-flr6` | `bench/2026-08-31c/K-flrh`, `K-flrc` — **inside, and correctly**: an echo holds addresses and no flash bytes |
+| read-back | `bench/2026-08-31c/K-rd0`, `K-rd6` | `…/b6-20260831c/K-rdh`, `K-rdc` — **outside** |
 
 🆕 **It also named a cell this card's § 2 does not list**: `K-no0`/`K-no6`/
 `K-noh`/`K-noc`, the `N` the tool sends on a wrong echo. They are **not** in the
@@ -87,12 +103,24 @@ sha256sum tools/rlxprobe/build/probe3/probe3.bin
 stat -c %s tools/rlxprobe/build/probe3/probe3.bin
   31536
 
-/usr/bin/python3 tools/cardcheck.py numbers bench/2026-09-01/PREDICTIONS-B6-block4.md
+sha256sum /home/key/fwre-work/rebuild/bench-only/b6-20260831c/probe3.bin
+  fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e
+
+/usr/bin/python3 tools/cardcheck.py numbers bench/2026-08-31c/PREDICTIONS-B6-block4.md
   every row re-derived, 0 mismatched
 
-/usr/bin/python3 tools/check-predictions.py bench/2026-09-01/PREDICTIONS-B6-block4.md
+/usr/bin/python3 tools/check-predictions.py bench/2026-08-31c/PREDICTIONS-B6-block4.md
   0 of N captures came after the prediction   <- the correct answer before power
 ```
+
+🔴 **The third command is new on 2026-08-31 and it is here because its
+absence bit.** The other four check the artefact the *build* produced;
+**none of them checks the file `K-1` actually uploads**, and at 19:30 that file
+did not exist — the staging directory was made at 18:14 and `probe3` was
+rebuilt at 18:47, so nothing ever copied it in. It would have failed **after**
+`K-A` through `K-P3`, with the board powered and the cycle half spent. It is
+also a row in § 9's fence, so `cardcheck numbers` re-derives it rather than the
+operator reading two digests side by side.
 
 ⚠️ **`cardcheck commands` is NOT on this list, and the reason is that it cannot
 run here.** It reads `config/rlxfw-initramfs.tsv` — the declaration of an
@@ -118,15 +146,15 @@ its own row says the duration was not recorded, so it has **no bound in either
 direction**. `K-p*` below reads the same addresses on the other side of this
 number. It costs no power cycle and no `FLR`.
 
-### Power cycle 8 — `probe3`, the bracket, and the read-back. `bench/2026-09-01/`
+### Power cycle 8 — `probe3`, the bracket, and the read-back. `bench/2026-08-31c/`
 
 `CAP` = `/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0`.
-`OUT X` = `--out bench/2026-09-01/X` — **one token**, not two.
+`OUT X` = `--out bench/2026-08-31c/X` — **one token**, not two.
 
 | # | typed / run | expect | bytes | 🔴 stop if |
 |---|---|---|---:|---|
 | **K-A** | `CAP OUT K-A --esc 25 --esc-period 0.002 --seconds 40` | the ESC window, then `<RealTek>`; the 181-byte cold slice | — | no prompt → power off. That is the seating |
-| **K-0r** | `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o bench/2026-09-01/K0-rescue.json` | `AutoBurning=0` · `Set TFTP Load Addr 0x80500000` · `Now your Target IP is 10.1.1.1`, in that order | — | any of the three absent |
+| **K-0r** | `console-dump.py rescue --at-prompt --ip 10.1.1.1 --load-addr 0x80500000 -o bench/2026-08-31c/K0-rescue.json` | `AutoBurning=0` · `Set TFTP Load Addr 0x80500000` · `Now your Target IP is 10.1.1.1`, in that order | — | any of the three absent |
 | **K-P0** | `CAP OUT K-P0 --send 'DW 8040D4A0 1' --seconds 4` | the word at `0x8040D4A0` = **`00000000`** | **71** | ≠ `00000000` → **STOP. Nothing is uploaded.** This is `R0`'s flash-write control and it is not optional |
 | **K-P1a** | `CAP OUT K-P1a --send 'DW B8003108 1' --seconds 4` | four words — `TC0CNT`, `TC1CNT` = `00000000`, `TCCNR` = `C0000000`, `TCIR` = `80000000` | **71** | `TCCNR ≠ C0000000` → something writes it after `timer_init` and `M9` is wrong |
 | **K-P1b** | `CAP OUT K-P1b --send 'DW B8003108 1' --seconds 4` | as `K-P1a` but with a **different** `TC0CNT` | **71** | 🔴 `TC0CNT` equal to `K-P1a`'s → the register is frozen and **Group T does not ship**. `probe3` still runs; Group F's timing legs come back as poison and § 6.8 says so |
@@ -136,12 +164,12 @@ number. It costs no power cycle and no `FLR`.
 | **K-P2d** | `CAP OUT K-P2d --send 'DW 80A8FFC0 16' --seconds 5` | as `K-P2b`, the tail of the arena | **213** | as above |
 | **K-P3** | `CAP OUT K-P3 --send 'DW 80A00000 2000' --seconds 20` | **23,527 bytes**, ≈6.13 s of reply | **23527** | `Unknown command !` (≈44 B) or a short whole-line reply → the loader will not take a four-digit decimal length. **The read-back below is 718 and three digits, so this seating is unaffected either way** — the cell is `P3`'s and it costs no cycle |
 | **K-p0** | *(inside `K-P3`)* | the pre-`FLR` state of `0x80A00400`–`0x80A00700`, free, because `K-P3` spans them | — | — |
-| **K-1** | `loader-tftp.py put --host 10.1.1.1 --image /home/key/fwre-work/rebuild/bench-only/b6-20260901/probe3.bin --filename probe3 --rescue-report bench/2026-09-01/K0-rescue.json --expect-load 80500000 --yes` | **31,536** bytes accepted | — | any refusal → read it. **Never `--allow-autoexec`** |
+| **K-1** | `loader-tftp.py put --host 10.1.1.1 --image /home/key/fwre-work/rebuild/bench-only/b6-20260831c/probe3.bin --filename probe3 --rescue-report bench/2026-08-31c/K0-rescue.json --expect-load 80500000 --yes` | **31,536** bytes accepted | — | any refusal → read it. **Never `--allow-autoexec`** |
 | **K-2a** | `CAP OUT K-2a --send 'DW 80500000 8' --seconds 6` | `80500000: 3C1D8051 27BDBE20 3C088050 25087B30` · `80500010: 3C098050 25297E20 11090004 00000000` | **118** | any word differs → the wrong image, or a short transfer. § 4 decodes every one |
 | **K-2b** 🔴 | `CAP OUT K-2b --send 'DW 8050000C 1' --seconds 4` | `8050000C: 25087B30 3C098050 25297E20 11090004` | **71** | ≠ → **STOP, do not `J`.** § 4.2: this is the head method and the two symbols it carries |
-| **K-flr0 / K-yes0 / K-rd0** | `flrbracket.py run --port /dev/ttyUSB0 --stem K --suffix 0 --dst 80A00400 --src 000000 --bytes 100 --echo-dir bench/2026-09-01 --dw-dir bench/2026-09-01 --pre-dir /home/key/fwre-work/rebuild/bench-only/b6-20260901 --go` | **exit 0**, and `K-rd0.log` normalises equal to `bench/2026-08-24d/G8a-rd0.log` | 104 / 35 / **777** | 🔴 **exit 3/4/5/6 → read § 5.2's table before typing anything.** Exit 4 means the tool sent `N` and the loader confirmed the abort; the window was NOT read and that is the tool working |
+| **K-flr0 / K-yes0 / K-rd0** | `flrbracket.py run --port /dev/ttyUSB0 --stem K --suffix 0 --dst 80A00400 --src 000000 --bytes 100 --echo-dir bench/2026-08-31c --dw-dir bench/2026-08-31c --pre-dir /home/key/fwre-work/rebuild/bench-only/b6-20260831c --go` | **exit 0**, and `K-rd0.log` normalises equal to `bench/2026-08-24d/G8a-rd0.log` | 104 / 35 / **777** | 🔴 **exit 3/4/5/6 → read § 5.2's table before typing anything.** Exit 4 means the tool sent `N` and the loader confirmed the abort; the window was NOT read and that is the tool working |
 | **K-flr6 / K-yes6 / K-rd6** | as above, `--suffix 6 --dst 80A00500 --src 060000` | `K-rd6` normalises equal to `bench/2026-08-24d/G8a-rd6.log` | 104 / 35 / **777** | as above |
-| **K-flrh / K-yesh / K-rdh** 🔴 | as above, `--suffix h --dst 80A00600 --src 006000`, **`--dw-dir /home/key/fwre-work/rebuild/bench-only/b6-20260901`** | `K-rdh` normalises equal to `expect-h601-6000.txt` | 104 / 35 / **777** | 🔴 **`--dw-dir` is NOT under `bench/`.** These bytes are this unit's MAC and radio calibration. The tool refuses before opening the port if it is |
+| **K-flrh / K-yesh / K-rdh** 🔴 | as above, `--suffix h --dst 80A00600 --src 006000`, **`--dw-dir /home/key/fwre-work/rebuild/bench-only/b6-20260831c`** | `K-rdh` normalises equal to `expect-h601-6000.txt` | 104 / 35 / **777** | 🔴 **`--dw-dir` is NOT under `bench/`.** These bytes are this unit's MAC and radio calibration. The tool refuses before opening the port if it is |
 | **K-flrc / K-yesc / K-rdc** 🔴 | as above, `--suffix c --dst 80A00700 --src 006400`, **`--dw-dir` outside the repo** | `K-rdc` normalises equal to `expect-h601-6400.txt` | 104 / 35 / **777** | 🔴 **the canary page.** A difference here is a **finding, not a failure** — it is the page `FLS-21` saw move. Record it, do not `J`, and stop |
 | **K-2d** | `CAP OUT K-2d --send 'DW 80500000 8' --seconds 6` | **byte-identical to `K-2a`** | **118** | changed → the `FLR` block reached the payload's head. Do not `J`. ⚠️ **32 bytes of 31,536 — this cannot find an arbitrary clobber** |
 | — | — | — | — | — |
@@ -169,31 +197,31 @@ captures back to predictions has to be able to tell them apart.
 ## §2 Cells, in order
 
 ```cells
-bench/2026-09-01/K-A
-bench/2026-09-01/K-P0
-bench/2026-09-01/K-P1a
-bench/2026-09-01/K-P1b
-bench/2026-09-01/K-P2a
-bench/2026-09-01/K-P2b
-bench/2026-09-01/K-P2c
-bench/2026-09-01/K-P2d
-bench/2026-09-01/K-P3
-bench/2026-09-01/K-2a
-bench/2026-09-01/K-2b
-bench/2026-09-01/K-flr0
-bench/2026-09-01/K-yes0
-bench/2026-09-01/K-rd0
-bench/2026-09-01/K-flr6
-bench/2026-09-01/K-yes6
-bench/2026-09-01/K-rd6
-bench/2026-09-01/K-flrh
-bench/2026-09-01/K-yesh
-bench/2026-09-01/K-flrc
-bench/2026-09-01/K-yesc
-bench/2026-09-01/K-2d
-bench/2026-09-01/K-J
-bench/2026-09-01/K-rb
-bench/2026-09-01/K-rbp
+bench/2026-08-31c/K-A
+bench/2026-08-31c/K-P0
+bench/2026-08-31c/K-P1a
+bench/2026-08-31c/K-P1b
+bench/2026-08-31c/K-P2a
+bench/2026-08-31c/K-P2b
+bench/2026-08-31c/K-P2c
+bench/2026-08-31c/K-P2d
+bench/2026-08-31c/K-P3
+bench/2026-08-31c/K-2a
+bench/2026-08-31c/K-2b
+bench/2026-08-31c/K-flr0
+bench/2026-08-31c/K-yes0
+bench/2026-08-31c/K-rd0
+bench/2026-08-31c/K-flr6
+bench/2026-08-31c/K-yes6
+bench/2026-08-31c/K-rd6
+bench/2026-08-31c/K-flrh
+bench/2026-08-31c/K-yesh
+bench/2026-08-31c/K-flrc
+bench/2026-08-31c/K-yesc
+bench/2026-08-31c/K-2d
+bench/2026-08-31c/K-J
+bench/2026-08-31c/K-rb
+bench/2026-08-31c/K-rbp
 ```
 
 🔴 **`K-rdh` and `K-rdc` are NOT in this list and that is the containment rule,
@@ -505,6 +533,7 @@ Everything Groups H…S measured is in the block before it starts.
 ```cardnum
 probe3.bytes	31536	size tools/rlxprobe/build/probe3/probe3.bin
 probe3.sha256	fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e	sha256 tools/rlxprobe/build/probe3/probe3.bin
+probe3.staged.sha256	fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e	sha256 /home/key/fwre-work/rebuild/bench-only/b6-20260831c/probe3.bin
 probe3.w0	3C1D8051	word32 tools/rlxprobe/build/probe3/probe3.bin 0x00
 probe3.w1	27BDBE20	word32 tools/rlxprobe/build/probe3/probe3.bin 0x04
 probe3.w2	3C088050	word32 tools/rlxprobe/build/probe3/probe3.bin 0x08
@@ -537,8 +566,8 @@ the cell does not depend on the estimate being right.
 ## §10 The check
 
 ```
-/usr/bin/python3 tools/cardcheck.py numbers bench/2026-09-01/PREDICTIONS-B6-block4.md
-/usr/bin/python3 tools/check-predictions.py bench/2026-09-01/PREDICTIONS-B6-block4.md
+/usr/bin/python3 tools/cardcheck.py numbers bench/2026-08-31c/PREDICTIONS-B6-block4.md
+/usr/bin/python3 tools/check-predictions.py bench/2026-08-31c/PREDICTIONS-B6-block4.md
 ```
 
 **`0 of 25` before the seating, and that is the correct answer.** A block written

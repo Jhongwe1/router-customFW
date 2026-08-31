@@ -1414,7 +1414,10 @@ transfer may follow it; and after `J` there is no loader to type `FLR` into).
 
 #### 🆕 Power cycle 8 — `probe3`, and it is the last cycle `R3` needs
 
-**2026-08-31: the block exists** — `bench/2026-09-01/PREDICTIONS-B6-block4.md`,
+**2026-08-31: the block exists** — `bench/2026-08-31c/PREDICTIONS-B6-block4.md`,
+*(written into `bench/2026-09-01/`, which was a PREDICTION of the seating day;
+renamed before power when the seating landed the same evening — § Results,
+seating 8, Deviation 1)*
 **25 cells**, `0 of 25` at the desk. **Its §0 IS the card for cycle 8**, the same
 way each block since block 0 has carried its own; §B5's own card stops at power
 cycle 2. Prefix `K-*`, and §1 of that block says why `N` and `Y` are skipped
@@ -3516,3 +3519,99 @@ is a tool that cannot fail.
 ⚠️ **This still does not license "not one flash byte is written".** It shows no
 *command* that writes flash was issued. `RUNSHEET` `G8b`'s own rule is that the
 sentence needs a full re-dump hashed against `FLS-14`, and this seating ran none.
+
+
+## Results — Session B6, seating 8, 2026-08-31. `R3-9`, `bench/2026-08-31c/`
+
+**Four power cycles for a one-cycle card, and only ONE of the three extra ones
+is the card's fault.** Cycle 9 is (Deviation 3); cycle 10 separated three
+hypotheses about a bit that had no business changing; cycle 11 measured the
+term that then refuted the seating's own explanation of it. **Nothing here is
+the board's fault.** `bench/2026-08-31c/CORRECTIONS-block4.md`
+is the owner of every deviation; this section is the sheet's index into it.
+
+| | |
+|---|---|
+| **cells** | 23 of 25 ran on cycle 8. `K-rb` and `K-rbp` did not, and they are `check-predictions` FAILs on purpose — see Deviation 3 |
+| **flash** | eight `FLR` windows over two rounds, all `rc=0` through `tools/flrbracket.py run`; 1,024 distinct bytes = **0.0244 %**, `H601` 512 of 8,192 = **6.3 %**. Every read-back byte-identical to the 2026-08-16 dump; every pre-read different from its own read-back |
+| **new** | `FW-34`'s last row CLOSED (`R = 1.0000`); the `M(T)` ladder `09 05 03 03`; the retained bitmap **10 pairs, 0 singletons**; `MEM-17` bounded at both ends for the first time; **a single retained-DRAM bit flip, caught by the block's own seal** |
+| **not run** | no full re-dump, so `G8b`'s forbidden sentence is no closer — and this seating had the **vendor firmware running on the part for ~2 minutes** |
+
+### Deviation 1 — the directory was renamed before power, because the card's date was a prediction
+
+`bench/2026-09-01/` → `bench/2026-08-31c/`, 40 occurrences on the card and 6 of
+the staging directory, with `check-predictions` still reading `0 of 25`
+afterwards. The card names the *slip* direction; what happened is the seating
+landing the same evening the card was written. ⚠️ It also resolves a collision
+`bench/README.md` was already carrying: that file's seating-8 row said
+`2026-08-31`, which is seating 7's directory.
+
+### Deviation 2 — the card named a file to upload that did not exist
+
+`K-1`'s image was not in the staging directory. Found by the desk checks at
+19:33, **before power**, and fixed at the hole: a fifth before-power command
+and a `probe3.staged.sha256` row in the card's `cardnum` fence, so
+`cardcheck numbers` re-derives it. 13 of 13 → 14 of 14.
+
+### Deviation 3 — 🔴 `K-J` dropped `--esc-after`, and it is a regression from block 0
+
+Block 0's `Q-J` reads `--send 'J 80500000' --esc-after 60 --esc-period 0.002
+--seconds 120` and its expectation ends *"then a reboot into the ESC storm and a
+prompt"*. Block 4 kept the consequence — *"`RESET=1` … hands it back with no
+power cycle"* — and dropped the mechanism, because block 4 was copied from
+block 3, a kernel-boot card where ESC after `J` is exactly what must not be
+sent. **The watchdog reset auto-booted the vendor firmware and the read-back was
+lost.** 量 on cycle 9 with `--esc-after 60`: 39,183 bytes, `rlxprobe: end`, zero
+vendor-boot strings, the log ending at `<RealTek>`.
+
+🔴 **The next card that runs a payload copies this row and not block 4's.**
+
+### Deviation 4 — 🔴 `K-P3` lands inside the repository and spans two `H601` destinations
+
+`DW 80A00000 2000` covers `0x80A00600` and `0x80A00700`, which cycle 5 filled
+with `H601` content and which `MEM-17` says DRAM can keep. Two extra cells
+(`K-guard600`, `K-guard700`) were run **outside** the repository first and read
+`0/64` against the expectation, so the capture was safe — and it was checked
+afterwards as well: `K-P3.log` contains **none** of the expectation's values, in
+any position, for any of the four destinations.
+
+🔴 **The experiment coming out the expected way is what made it safe, not the
+card.** `flashwin` governs what may be *printed* and `flrbracket` governs where a
+*bracket* capture may land; **nothing governs whether an arbitrary committed
+capture already contains forbidden content**. `PROGRESS.md`'s carried-forward
+carries the design.
+
+### Deviation 5 — the off durations for cycles 9 and 10 were not recorded
+
+The card carries a line for it and it was used for cycle 8 (≈ 17.6 h, the first
+upper bound `MEM-17` has ever had). The two cycles added during the seating were
+run without it, so their durations are bounds that overlap — which is the exact
+defect `MEM-17` exists to record, repeated by the person recording it.
+
+### Deviation 6 — 🔴 power cycle 11, and it refuted the seating's own explanation of its own finding
+
+**Both ends timed**: off **20:29**, on **21:04:07.2** = **2,107 s = 35.1
+minutes**, no upload and no `J`. `DW 80A02000 718` twice.
+
+```
+K4-rb vs K4-rb2 (one power-up)     :   0 of 718 words differ
+K2b-rb vs K4-rb (35.1 min, clean)  : 411 of 718 words differ
+598 of 22,976 bits = 2.603 %   (500 up, 98 down; 2.63 % of the zero-bits,
+                                2.46 % of the one-bits)
+```
+
+The block's own magic decayed to `564C5033`, and **`rbcheck` refused to judge
+it** — its first finding is that the magic names no payload it has a ladder
+for. ⚠️ It also reports *the run wrote past its own block* for two decayed
+poison words, which is a cause it is not entitled to assert once the magic is
+unrecognised.
+
+🔴 **This retracts the seating's own 推.** Three points — `0–7.3 min → 0 bits`,
+`0.7–2.8 min with a vendor boot → 1 bit`, `35.1 min → 598 bits` — put duration
+three orders of magnitude ahead of anything thermal, so the single bit needs no
+vendor-firmware explanation. **Where the knee is was not measured, and the two
+short intervals' bounds still overlap**, so even the duration story cannot be
+ordered against them.
+
+⚠️ **The reference for the next interval is now `K4-rb.log`**, not
+`K2b-rb.log`: the block is already 2.6 % decayed.

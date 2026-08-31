@@ -50,6 +50,33 @@ released source.
 > configuration. *(Until today this said "nothing of mine has executed on the
 > silicon", which stopped being true at 23:09; the sentence before that said "no
 > loadable image", and that stopped being true at 02:20 the same day.)*
+> 🔄 **2026-08-31, SIXTH update — seating 8, four power cycles, and the two
+> biggest results of `R3` came out of the last thing it still needed power
+> for.** 🟢 **`FW-34`'s last row is CLOSED by measurement**: `probe3`'s Group F
+> timed 1,024 uncached loads through `0xBD000000` at stride 4 and at stride
+> 1,024 and got **the same number both times** — 30,354 ticks, `R = 1.0000` —
+> so the memory-mapped SPI window serves a single-word read as its own
+> transaction and the instruction-fetch amplification is the `9×` the model
+> bounds it at. The same six words compared `0xBFC00000` against `0xBD000000`
+> for the first time in this project. 🟢 **The I-cache is two-way by a SECOND
+> route, and it is a shape rather than a count**: at the eviction walk's
+> boundary point the victims that miss on re-execution arrive as **ten
+> `{k, k+256}` pairs with no singleton**, which two-way predicts and
+> direct-mapped does not, *while both predict the same number of them*.
+> 🔴 **A bit of DRAM changed while the board was off and the block's own seal
+> caught it** — the first thing that seal has ever caught — **and a fourth
+> power cycle then refuted this session's own explanation of it**: 35.1 minutes
+> off, both ends timed, **598 of 22,976 bits = 2.603 %**, so retention falls off
+> steeply with time and one bit after two minutes needs no thermal story. The
+> thermal story is retracted in place. 🔴 **The flash sentence has not moved**:
+> the bracket ran twice on one seating, `1,024` bytes = **0.0244 %**, all
+> byte-identical — **and for the first time with an observed vendor-firmware
+> boot bracketed between the two rounds** — but no full re-dump ran and the
+> vendor firmware executed on this part for ~2 minutes. ⚠️ **Three defects in
+> the seating's own card**, two caught before power: a directory named for a day
+> the seating did not happen on, an image the card told the operator to upload
+> that was never staged, and a `J` row that had lost the ESC-after-jump that
+> hands the loader prompt back — the third cost a power cycle.
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there. Conventions for files that do not exist are not written

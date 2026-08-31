@@ -857,3 +857,38 @@ with **both tops reading `00000000`**. Block0 asked for a base/top pair
 differing by `0x3FFF` before `m-imem` could be called a window, and that is not
 what came back. `w-imem` stays 未定 on the condition block0 set, and the
 scratchpad's extent is unmeasured.
+
+
+### ⓓ — 🆕 2026-08-31 (seating 8): the associativity has a SECOND route, and it is a shape rather than a count
+
+*"The argument for two-way"* above tabulates `M` at 4096 / 8192 / 16384 for five
+hypotheses and reads `(8192, 3)` as unique to 16 KiB two-way. That argument was
+reconstructed at the desk from a single reported argmin. **Two things in the
+block now carry it**, and `bench/2026-08-31c/K2b-rb.log` is the capture.
+
+**① The `M(T)` ladder.** `w.assoc.mt = 09 05 03 03`. At `C/8`, `C/4` and `C/2`
+two-way and direct-mapped give the *same* minimum `M`; **only `T = C`
+separates them** — two-way needs 3, direct-mapped needs 2 — and that byte came
+back `03`. One discriminator reported four ways, not four pieces of evidence.
+
+**② The retained bitmap's pattern**, and this one is independent of the ladder.
+At the boundary point the victims are 32 B apart, so the set index advances by
+two per victim: under two-way (512 sets) victims `k` and `k+256` share a set;
+under direct-mapped (1,024 sets) no two of the 512 ever do. Measured: 20 FRESH
+at `{15, 16, 231..238, 271, 272, 487..494}` — **ten `{k, k+256}` pairs, zero
+singletons**.
+
+🔴 **The two hypotheses predict the same COUNT.** `bmp.rerun.fresh = 20` is what
+a direct-mapped part would have reported as well, as twenty isolated
+singletons; the positions are the whole of the difference, which is why a
+summary counter could never have settled it. The region's population control is
+that it also holds 492 STALE nibbles — a single-valued region would pair
+trivially and say nothing.
+
+⚠️ **`CPU-25` does not become more certain, and this section must not be quoted
+as saying it does.** 量 2026-08-29's `w.assoc.tm = (8192, 3)` already excluded
+direct-mapped: the search keeps the strictly smaller `M`, so a direct-mapped
+part would have reported `(16384, 2)`. **What changed is that a reader can now
+check the exclusion in the block, twice, instead of following an argument about
+a search's tie-breaking.** `tools/rbcheck.py` `C33`…`C39` own the judgement and
+`C36` is the control that stops it being read off a vacuous region.

@@ -3925,3 +3925,47 @@ behave alike* in the load-bearing position and unmeasured. `f-alias` is that
 comparison, and it costs no committed flash byte: only the count of mismatching
 word pairs enters the block.
 
+
+### 20.7 🟢 2026-08-31 (seating 8) — `FW-34`'s last row is closed, by the instrument § 20.6 named, and two things travel with the closure
+
+`probe3` Group F ran on the silicon. **`f.win.seq = f.win.str = 30,354` ticks,
+so `R = 1.0000`** — the `R ≤ 1.15` band. The memory-mapped window does not
+buffer a single-word read; an uncached instruction fetch is a single-word read;
+so § 19.7.2's `≤9×` is **`9×`**, and the decomposition of the ~16× is
+
+```
+access width  1x   (refuted at the desk 2026-08-31: both paths use lw)
+SPI divider   4x   (stage 1 runs on the reset default DIV 16; it never writes SFCR)
+fetch amp     9x   (stage 1's loop executes at 0xBFC001D0, KSEG1, uncached)
+              ---
+              36x  upper bound, against a MEASURED ~16x
+```
+
+⚠️ **The 2.1–2.3× gap is unchanged and it is still the term the model does not
+have**: § 19.4's figure is `busybox wc -lc`'s end-to-end user-space rate and the
+model prices only the SPI bus. Closing `FW-34`'s last row does not close that
+gap, and this paragraph exists so the two are not read as one.
+
+🟢 **§ 20.6's *"only instrument that could close it"* was right, and it did more
+than that row asked.** `f.alias = 0` and `f.boot.seq/str = 30,353/30,354`
+compare `0xBFC00000` against `0xBD000000` **for the first time in this
+repository** — § 19.7.2's `≤9×` rests on stage 1 executing at `0xBFC001D0`,
+which is a different decode (`0x1FC00000`) from the window § 20 spent its whole
+length on, and nothing had ever shown the two behave alike.
+
+🔴 **§ 20.5's absolute cell comes back undetermined rather than confirmed.**
+`f.win.str / 1024` = **29.64 ticks** = 103.7 SPI clocks at DIV 4 / 50.0 MHz,
+against a predicted 72 clocks = 20.57 ticks. It is outside all three rows of
+§ 6.8.2's absolute table, so *72 clocks · DIV 4 · the datasheet's `DRAM Clock`
+is `CLK-02`'s 200 MHz* — the identification § 20.5 records as never having been
+asserted here — **is not established by this reading**. ⚠️ It does not touch
+`R`: a ratio of two legs of one loop is clock-independent. And it does not
+touch § 20.5's `FLR` cell, which measures the **`SFDR` port** and not this one:
+`LDR-42`, two ports of one controller.
+
+🔴 **A control that fired, and it is § 6.8.2's rather than the device's.** The
+guard *"`f.dram.str / f.dram.seq` must be strictly less than `R`"* measured
+1.3046 against 1.0000. **It is unsatisfiable on the branch that closes this
+row.** `docs/probe3-cells.md`'s Ran section owns the rewrite it needs; recorded
+here because § 19.7's conclusion now rests on a verdict whose written control
+did not hold.

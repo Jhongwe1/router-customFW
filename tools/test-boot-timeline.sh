@@ -90,7 +90,22 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # +2 cold / +0 warm and nothing reclassified. This seating ran the whole suite
 # set rather than `--only`, for the reason the paragraph above gives, and this
 # is the one case it caught.
-ck "fourteen cold, nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 14 cold, 9 warm, 0 unknown')"
+# 🔄 14/9 -> 18/11 on 2026-08-31 (seating 8, `bench/2026-08-31c`), which is FOUR
+# cold power-ons and TWO warm resets: `K-A`, `K2-A`, `K3-A`, `K4-A`, and the
+# watchdog reboots inside `K-J` and `K2-J`. Isolation check, run before this
+# line was touched: every bench directory EXCEPT `2026-08-31c` still reports
+# 14 cold, 9 warm, and `2026-08-31c` alone reports 4 cold / 2 warm -- so the
+# delta is exactly +4/+2 and nothing was reclassified. It went red here again,
+# which is twice in two seatings, and both times the whole-suite rule is what
+# caught it.
+# 🔴 AND THE POPULATION CHANGED IN A WAY A COUNT CANNOT SHOW. Three of these
+# four colds are power-ons after an off of MINUTES (~1-2, 0-7, 35.1); every
+# cold before them was the first power-on of a seating, hours or days after the
+# last. `SPEC.md`'s `CLK-15 cold/warm` row rested on the two ranges being
+# DISJOINT, and after this seating they overlap. This case asserts the count;
+# nothing here asserts the ranges, and that is stated so the green is not read
+# as covering them.
+ck "eighteen cold, eleven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 18 cold, 11 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
