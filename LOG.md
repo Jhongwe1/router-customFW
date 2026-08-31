@@ -11274,6 +11274,33 @@ RED   flashwin   ran 34/40   UNEXPECTED-SKIP "this unit's flash dump"
 `test-replay-capture-mutants` 19/19、`spec-check` 40/40,
 **`NOT RUN IN THIS JOB: 477`** —— 與宣告的 `not-run-total: 477` 相符,沒有 mismatch 行。
 
+---
+
+### 十一、第五個錯,而這一個**是檢查器抓到的** —— 而且是我今天才寫進 study 的那一類
+
+在 `PROGRESS.md` 的 § Next after this 那一列裡插一段文字的時候,我在**表格列中間**
+放了一個空行。markdown 的表格遇到空行就結束,結果:
+
+```
+FAIL [C8b] PROGRESS.md:54: the row does not end with `|` and no continuation line does either
+FAIL [C8c] PROGRESS.md:57: '| **Blocked on** | …' starts with `|` and belongs to no table
+```
+
+**一列被切成兩半,而它後面的 `| **Blocked on** |` 整列變成孤兒。**
+
+🔴 **這正是今天稍早我在 session 階梯那裡差點犯、而且已經寫進 study §10.2 的同一類。**
+那一次是在動手前重讀腳本抓到的;這一次我沒重讀,直接犯了。
+
+**差別在於這一次是 `spec-check` 的 `C8b`／`C8c` 抓到的** —— 前面四個錯沒有任何檢查器
+抓得到(它們是散文裡的引用),而這一個有。**這是「有檢查器」跟「沒檢查器」的差別
+第一次在同一天內兩邊都出現。**
+
+⚠️ **而它已經被 push 出去了**,因為那一串收工命令寫成
+`... ; echo "spec-check rc=$?" ; git commit ... && git push`,
+`echo` 把退出碼吃掉,`&&` 沒有擋住。**`CLAUDE.md` 記過這一條**(`$?` 在外層 shell 展開),
+而我這次是自己把它變成一個吃掉退出碼的管線。**收工命令串裡不要在閘門跟 commit 之間
+放任何會改 `$?` 的東西。** 修在下一個 commit。
+
 **擁有者檔**:`config/r3-11-reel.tsv`、`tools/replay-capture.py`、
 `tools/test-replay-capture-mutants.py`、`tools/flashwin.py`、
 `tools/test-flashwin-mutants.py`(新)、`tools/ci-expected.tsv`、
