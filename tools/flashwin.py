@@ -75,6 +75,17 @@ import tempfile
 
 TOOL_VERSION = "1.0"
 
+# 🔴 THE SKIP LABEL IS ONE VARIABLE USED THREE TIMES: printed by the skip
+# line, printed again in the summary, and checked by `Q1` against
+# `tools/ci-expected.tsv`, which is what `tools/ci-census.py` reads on the
+# runner.  量, CI run 33410057391: this session edited the table's column
+# and left the two string literals here alone, and the suite was 40/40
+# GREEN on the bench while CI went red on `UNEXPECTED-SKIP`.  **The bench
+# cannot see that class** -- with `$FWRE_WORK` present the cases RUN, no
+# skip line is printed, and no label is ever compared.  Third time in this
+# repository: `test-kbuild-cflags` C1, `leakscan` Q1, `replay-capture` R14.
+SKIP_LABEL = "this unit's flash dump"
+
 # Copied from CLAUDE.md's "Never" table. `H601` is the one that cannot be
 # published; the loader region is forbidden to WRITE but its bytes are the
 # vendor's code and are already committed in bench/2026-08-24d/G8a-rd0.log, so
@@ -1081,9 +1092,9 @@ def self_test() -> int:
             bad(f"R1-R2 {REAL0} or {REAL6} is missing from this repository -- "
                 "that is not an allowed skip, it is a broken reference")
         elif not have_dumps:
-            skips.append(("this unit's flash dump", 6))
+            skips.append((SKIP_LABEL, 6))
             print("  skip   %-52s %s" % (
-                "this unit's flash dump",
+                SKIP_LABEL,
                 "R1-R3 and S9a-S9c need "
                 "$FWRE_WORK/dumps/flash-n150rt-console-{1,2}.bin -- "
                 "4 MiB of this unit's own flash, which can never be committed "
@@ -1155,6 +1166,29 @@ def self_test() -> int:
                          "both H601 destinations -- is CLEAN by machine")
                 else:
                     bad(f"S9c K-P3 was flagged (rc={r9c.returncode})")
+
+    # --- Q1 -- the label this suite PRINTS must be the one the table
+    # allows.  It reads `tools/ci-expected.tsv` and so it runs on a bench
+    # WITH the dump (where nothing else compares the label) and on a runner
+    # without it.  That is the whole point: the configuration that can see
+    # the drift is not the one the push happens from.
+    tsv = os.path.join(_repo_root(), "tools", "ci-expected.tsv")
+    want, found = None, False
+    try:
+        with open(tsv, encoding="utf-8") as fh:
+            for line in fh:
+                c = line.rstrip("\n").split("\t")
+                if c and c[0] == "flashwin" and len(c) > 2 and c[2] != "-":
+                    found, want = True, c[2]
+    except OSError as e:
+        want = f"<{e}>"
+    if found and want == SKIP_LABEL:
+        good(f"Q1 the printed skip label is the one ci-expected allows  "
+             f"({SKIP_LABEL!r})")
+    else:
+        bad(f"Q1 this suite prints {SKIP_LABEL!r}; ci-expected.tsv says "
+            f"{want!r} -- ci-census counts a skip only on an exact match, "
+            f"and a bench with the dump never compares them")
 
     print()
     if skips:

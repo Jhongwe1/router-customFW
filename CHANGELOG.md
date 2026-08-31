@@ -109,8 +109,10 @@ oldest row with an HTML comment, which would have split a markdown table in two
 and stranded every row after it — the shape `spec-check` `C8c` exists for; the
 ladder grows by one instead.
 
+🔴 **AND CI CAUGHT ONE THIS SESSION COULD NOT**: run 33410057391 went red on `UNEXPECTED-SKIP "this unit's flash dump"` while `flashwin` was 40/40 GREEN on the bench. The allowed-skip COLUMN was edited here and the two string literals in the tool were not, and `ci-census` counts a skip only on an exact match. **The bench cannot see that class** -- with `$FWRE_WORK` present those six cases RUN, no skip line prints, and no label is ever compared. Third time in this repository (`test-kbuild-cflags` C1 on run 33310864156, `leakscan` Q1, `replay-capture` R14) and the repair is theirs: `SKIP_LABEL` is one variable used three times, `Q1` reads the table and so runs in BOTH configurations, and `MQ1` is the mutation that says `Q1` works. ⚠️ **`MQ1` can only express the drift in one direction** -- the tool moving -- and the direction that happened was the table moving, which no mutation of the tool can reach. **The allowed-skip label self-check goes 4/17 -> 5/17**, a carried-forward row this session had recorded as unmoved an hour earlier. 🔴 And `B0` refused the mutation run while `MQ1` was being added, because `Q1` reads `ci-expected.tsv` through the repository root and the harness did not copy it into the temp tree -- the same defect `test-replay-capture-mutants` records one tool over, caught by the control that exists for it.
+
 `replay-capture` 17 → 23 · `test-replay-capture-mutants` 14 → 19 ·
-`flashwin` 27 → 40 · `test-flashwin-mutants` 19 (new) ·
+`flashwin` 27 → **41** · `test-flashwin-mutants` **20** (new) ·
 `not-run-total` 474 → **477**, and the +3 is all `flashwin`'s allowed skip
 going 3 → 6, measured by hiding `$FWRE_WORK` rather than by addition.
 

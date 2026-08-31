@@ -16,7 +16,8 @@ like is the one with no suite of its own.
 WHAT THIS COVERS AND WHAT IT DOES NOT, stated rather than implied
 -----------------------------------------------------------------
 `MS1`..`MS12` mutate **`scan`**, which is new on 2026-08-31 and is the reason
-this file exists now.  `MR1`..`MR5` mutate the highest-stakes parts of the
+this file exists now.  `MQ1` is the skip-label control CI forced on 2026-08-31.
+`MR1`..`MR5` mutate the highest-stakes parts of the
 older half -- the publication guard in `render`, its two interval bounds, and
 the ordering property in `normalise` -- and they are **five rows, not a
 pass**.  ⚠️ **`render`'s
@@ -133,7 +134,19 @@ MUT = [
      "        if not paths:\n            _fail(",
      "        if False:\n            _fail("),
 
-    # ---- render / normalise: four rows, not a pass ----------------------
+    # ---- the skip label, and CI is why this row exists -------------------
+    # 🔴 CI run 33410057391 went red on UNEXPECTED-SKIP while this suite
+    # was 40/40 green on the bench, because the table's allowed-skip column
+    # and the tool's printed label had drifted apart. Q1 is the fix; MQ1 is
+    # what says Q1 works. ⚠️ A mutation can only express the drift in one
+    # direction -- the TOOL moving -- and the direction that actually
+    # happened was the TABLE moving, which no mutation of this file can
+    # reach. Q1 catches both because it compares them; MQ1 shows it does.
+    ("MQ1  the printed skip label drifts from the table   (kills Q1)",
+     'SKIP_LABEL = "this unit\'s flash dump"',
+     'SKIP_LABEL = "this unit\'s flash dump (drifted)"'),
+
+    # ---- render / normalise: five rows, not a pass ----------------------
     ("MR1  the publication guard deleted                    (kills C6)",
      "    hit = overlaps_forbidden(args.at, args.bytes)",
      "    hit = None"),
@@ -165,6 +178,13 @@ def make_tree(d):
     on the UNMUTATED file and every kill invalid."""
     work = os.path.join(d, "router-rebuild")
     os.makedirs(os.path.join(work, "tools"))
+    # 🔴 `ci-expected.tsv` MUST be here: `Q1` reads it through the repository
+    # root, which is this temp tree.  Leaving it out makes the UNMUTATED tool
+    # red and every kill free -- B0 refused on exactly that while MQ1 was
+    # being added, and `test-replay-capture-mutants.py` records the same
+    # defect one tool over.
+    shutil.copy(os.path.join(ROOT, "tools/ci-expected.tsv"),
+                os.path.join(work, "tools/ci-expected.tsv"))
     for rel in FIXTURES:
         dst = os.path.join(work, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
