@@ -1,6 +1,6 @@
 # PREDICTIONS — Session B6, `R3-9`, block 4: `probe3` on the silicon, and the first card this project has run a machine over before power
 
-**Written at the desk on 2026-09-01, before power.** Every value below was
+**Written at the desk on 2026-08-31, before power.** Every value below was
 measured on this host today or read out of a capture already committed, and none
 of it is conditional on a reading taken at the bench.
 
@@ -10,6 +10,15 @@ file — `CORRECTIONS-block4.md`, beside this one.
 
 **One power cycle.** `probe3` is the last thing in `R3` that needs one, and the
 `FLR` bracket rides it because the bracket costs no cycle of its own.
+
+⚠️ **This card was written on 2026-08-31 and the directory is named
+`2026-09-01`, which is a PREDICTION of the seating day rather than a record of
+anything.** A `bench/` directory carries the day its captures were taken —
+block 3's card was written on 2026-08-30 into `bench/2026-08-31/`, and that
+seating did happen on 2026-08-31. **If this one slips, the directory is
+renamed before the first capture lands**, and every `--out` on this card with
+it. Stating it because a date in a path reads like a fact, and this one is a
+guess.
 
 **What block 4 carries that block 3 could not.** Five things, and three of them
 are instruments rather than readings:
@@ -53,7 +62,7 @@ inside this repository, and the pre-read anywhere inside it at all whatever the
 window is. Those refusals are what the `h` and `c` rows below depend on, and a
 refusal discovered at the bench costs a power cycle.
 
-🟢 **量 2026-09-01, all four windows, `rc=0` each — and it needed no board,
+🟢 **量 2026-08-31, all four windows, `rc=0` each — and it needed no board,
 which is the point: without `--go` the tool prints what it would send and never
 opens the port, so this is desk work and not something to carry to the bench.**
 What it confirmed, per window:
@@ -229,7 +238,7 @@ Group T shipped (`t.cal` hi/lo came out **2.0003** against a predicted 2).
 
 🆕 **What changed is the consequence.** Group F's seven timing legs are now
 **gated on Group T** (`probe3.c`, `if (g_timer)`), so a frozen counter leaves
-them at stage 0's poison rather than at a number. 量 (qemu) 2026-09-01: Malta
+them at stage 0's poison rather than at a number. 量 (qemu) 2026-08-31: Malta
 has no timer at `0xB8003108`, `g_timer` came back 0, and all seven legs read
 `deadc0de` while `f.alias` and `f.live` still ran. **The emulator is the worked
 example of this branch and it is the only environment that drives it.**
@@ -263,7 +272,7 @@ distinguish it.
 **The head carries what the tail was for.** `0x8050000C` and `0x80500014` are
 the two halves of the linker's `.bss` extent, materialised into `addiu`
 immediates by the assembler. **They move on every build that changes the size of
-anything** — 量 2026-09-01: Group F took `_bss_start` from `0x80507230` to
+anything** — 量 2026-08-31: Group F took `_bss_start` from `0x80507230` to
 `0x80507B30` — so a stale image is caught by the same word that proves the
 transfer's head landed.
 
@@ -519,7 +528,7 @@ nothing here can compute them: `31,536` appears twice (once as `probe3.bytes`,
 once in `K-1`'s expectation) and the second is a transcription; the **181-byte
 cold slice** is `bench/2026-08-30`'s reading, not this session's artefact; and
 the `≈7,000` for `K-J` is **推**, labelled as one: 量 **6,439 bytes** of UART
-under qemu this session (`qemu/2026-09-01/probe3.txt`, prefixes stripped), and
+under qemu this session (`qemu/2026-08-31b/probe3.txt`, prefixes stripped), and
 the device run is longer because Group V is void under qemu and will run on
 silicon. `docs/probe3-cells.md` §4's own estimate is ≈7 KB / 1.9 s and this
 agrees with it. **The `--seconds 90` terminator is ~4× that at 3,840 B/s**, so

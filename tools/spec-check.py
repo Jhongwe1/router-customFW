@@ -476,11 +476,17 @@ SRCREF_RX = re.compile(r'^(?:tools/rlxprobe/)?([A-Za-z0-9_][A-Za-z0-9_.\-]*'
 # Exempt, each with a reason, and T22 asserts the exemption is LOAD-BEARING --
 # if these files ever stop holding a reference, the entry has to come out
 # rather than sit here forever unread.
+#
+# 🔴 `study/` IS NOT ON THIS LIST AND THAT IS NOT AN OVERSIGHT.  It is
+# gitignored (`.gitignore:17`), so `table_scope()` -- which is `git ls-files`
+# -- never yields it and the sweep cannot reach it in the first place.  An
+# entry for it would be a row that can never fire, which is the shape T22
+# exists to keep out of this dict; 量 2026-08-31, the first version of this
+# dict had one.
 SRCREF_EXEMPT = {
     'bench/': 'frozen prediction blocks and their corrections: captures have '
               'landed against these numbers, and a record silently updated to '
               'match today\'s source stops being a record',
-    'study/': 'dated study notes, same reason',
     'LOG.md': 'the working log is a record of what was true on a date',
     'CHANGELOG.md': 'a record',
     'docs/rlxprobe-audit-2026-08-25.md':

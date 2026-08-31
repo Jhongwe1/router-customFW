@@ -1,4 +1,4 @@
-# probe3 under qemu-system-mips -- 2026-09-01
+# probe3 under qemu-system-mips -- 2026-08-31
 
 host        Linux 6.6.87.2-microsoft-standard-WSL2
 qemu        QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)

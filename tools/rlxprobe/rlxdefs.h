@@ -155,7 +155,7 @@
 #define RLX_TC0CNT		0xB8003108
 
 /* --- the memory-mapped SPI window and the controller's clock register ---
- * Group F, 2026-09-01.  `docs/probe3-cells.md` § 6.8.
+ * Group F, 2026-08-31.  `docs/probe3-cells.md` § 6.8.
  *
  * 🔴 THE TWO WINDOW BASES ARE NOT THE SAME DECODE AND THE PAYLOAD MAY NOT
  * ASSUME THEY ALIAS.  RLX_F_WIN is physical 0x1D000000 and RLX_F_BOOT is

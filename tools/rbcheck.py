@@ -42,7 +42,7 @@ Modes
 The controls run first on every invocation and the tool refuses to report on a
 file if one of them fails, because a checksum comparison that has not been
 shown able to fail is not a checksum comparison.  🔄 **Thirty-one of them since
-2026-09-01** -- the prose here and the row in ``tools/ci-expected.tsv`` both
+2026-08-31** -- the prose here and the row in ``tools/ci-expected.tsv`` both
 still said *ten* while the count column said sixteen, once.  C1..C16 run off
 captures committed in this repository -- no ``$FWRE_WORK``, no device -- so
 they run on a runner, which ``hazlint``'s population control cannot; C17..C30
@@ -64,7 +64,7 @@ and the line is INTERNAL CONTRADICTION against PREDICTION:
   this file a second owner of a finding, which house rule 1 forbids.
 
 ⚠️ ``--words`` is the payload's ``RB_WORDS`` and it MOVED TWICE: probe3's
-block is **718** words since 2026-09-01 (Group F, the memory-mapped SPI
+block is **718** words since 2026-08-31 (Group F, the memory-mapped SPI
 window), was 707 from 2026-08-31 (a retained bitmap region and Group W's
 ``M(T)`` ladder) and 641 before that.  Both parse -- the layout is read out of the
 block's own ``H_LAYOUT_*`` header words rather than out of a table here -- but
@@ -274,7 +274,7 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
     # refusing a whole block over a region that is a scratchpad by design would
     # be the wrong verdict.
     #
-    # 🔴 THE THREE INDICES BELOW MOVED ON 2026-09-01, from 48/49/50 to 52/53/54,
+    # 🔴 THE THREE INDICES BELOW MOVED ON 2026-08-31, from 48/49/50 to 52/53/54,
     # because all three collided with `H_KSEG0`, `H_G_TIMER` and `H_T_SEP_A` --
     # words Group T writes AFTER the header is laid down.  No committed capture
     # is affected: the 707-word layout was never seated.  probe3.c's own comment
@@ -290,7 +290,7 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
     # tool raised IndexError on it rather than reporting, which is the failure
     # mode where an instrument that cannot fail is indistinguishable from one
     # that passed.
-    # --- Group F, 2026-09-01.  `docs/probe3-cells.md` § 6.8.
+    # --- Group F, 2026-08-31.  `docs/probe3-cells.md` § 6.8.
     #
     # PRESENCE IS DECIDED BY THE BLOCK, NOT BY ITS LENGTH.  `RB_RES` is not a
     # header word, but `H_LAYOUT_ROWS - H_LAYOUT_RES` is exactly it, so a 641-
@@ -778,7 +778,7 @@ def run_controls():
         return d
 
     # 🔴 C17 ASSERTS THE BRANCH WAS ENTERED, NOT ONLY THAT NOTHING FAILED, and
-    # it did not until 2026-09-01.  量, by `test-rbcheck.py`'s W0 -- which
+    # it did not until 2026-08-31.  量, by `test-rbcheck.py`'s W0 -- which
     # requires a mutation to turn the case it NAMES red: M24 (the layout
     # hardcoded back to the 641-word offsets) and M26 (the branch skipped for
     # short blocks) both push the tool into the `elif` above, the
@@ -851,7 +851,7 @@ def run_controls():
         f"20 FRESH inside 256 kept, 20 more beyond it, payload said 20; "
         f"{len(f)} failure(s)")
 
-    # C24..C30 -- Group F, 2026-09-01.  Synthetic, and for the same reason
+    # C24..C30 -- Group F, 2026-08-31.  Synthetic, and for the same reason
     # C17..C23 are: the 718-word payload has never been seated.  A clean leg
     # set is 20,000-ish ticks; the numbers below are shapes, not predictions --
     # § 6.8.2 owns the bands and this file owns none of them.

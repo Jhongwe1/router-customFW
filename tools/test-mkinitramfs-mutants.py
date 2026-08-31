@@ -11,7 +11,7 @@ about the DECLARATION -- `parse_decl`, `check_required`, `resolve`, `emit_spec`
 -- and `cmd_verify`, the half `CLAUDE.md` names as *the only one that can catch
 a mark that compiled and is not in the image*, had **none**.  Mutating it would
 have produced twenty-six survivors and said nothing.  `V1`..`V8` are that half's
-first controls (2026-09-01) and this file is what says they work.
+first controls (2026-08-31) and this file is what says they work.
 
 The three rows that are not mutations, and each of them cost this repository a
 session to learn:
@@ -23,11 +23,11 @@ session to learn:
   A0  EVERY ANCHOR MUST OCCUR EXACTLY ONCE.  `str.replace(old, new, 1)` takes
       the first match, so an anchor that becomes ambiguous silently starts
       mutating somewhere else and still exits non-zero -- still reading as
-      *killed*.  量 2026-09-01 in `test-rbcheck.py`, the same day.
+      *killed*.  量 2026-08-31 in `test-rbcheck.py`, the same day.
 
   W0  A KILL IS ONLY VALID IF IT TURNED THE NAMED CASE RED.  A mutation that
       makes the tool crash before it reaches its controls exits non-zero too.
-      量 2026-09-01, again in `test-rbcheck.py`: two of its rows named a case
+      量 2026-08-31, again in `test-rbcheck.py`: two of its rows named a case
       that stayed GREEN, and the repair was the control rather than the label.
 
 Run:  /usr/bin/python3 tools/test-mkinitramfs-mutants.py

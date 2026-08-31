@@ -529,14 +529,14 @@ collision is written down.
 | **cells named** | thirteen: `A-catch`, `Q0-ab`, `Q1-tc`, `Q1-tc2`, `Q2-rbhead`, `Q2-arena0`, `Q2-arena1`, `Q2-arena2`, `Q3-len`, `Q0-ab2`, `Q4-head`, `QJ`, `Q5-rb` |
 | **at the desk** | `check-predictions.py` reports **`0 of 13`**, all fifteen controls green — control `N2` firing on every cell, which is the correct answer before a seating |
 | **deliberately not named** | `Q5-margin` (the rest of the poison margin, only if the free three come back non-poison) and `Q6-post` (a post-mortem `DW` after a silent `J`) |
-| **desk work already spent** | 🔄 **`P7` re-run 2026-09-01 (eighteenth session) and the artefact MOVED AGAIN, deliberately**: sha256 `fc7b21d4…`, **31,536 bytes**, `hazlint` **0 violations in 946 loads**, `DW 80A02000 718` — Group F, the memory-mapped SPI window, took eleven result words. *(2026-08-31 was sha256 `6f787275…`, 29,680 bytes, 874 loads, `DW … 707`.)* The retained bitmap got its own region and Group W gained the `M(T)` ladder. *(It was sha256 `1a0725c0…`, 29,088 bytes, 804 loads — byte-identical to `R1h-1`'s 2026-08-26 value across three rebuilds. A `P7` whose sha256 is unchanged is the normal reading; this one changed because the payload did, and the previous value is kept so the two can be told apart.)* |
+| **desk work already spent** | 🔄 **`P7` re-run 2026-08-31 (eighteenth session) and the artefact MOVED AGAIN, deliberately**: sha256 `fc7b21d4…`, **31,536 bytes**, `hazlint` **0 violations in 946 loads**, `DW 80A02000 718` — Group F, the memory-mapped SPI window, took eleven result words. *(2026-08-31 was sha256 `6f787275…`, 29,680 bytes, 874 loads, `DW … 707`.)* The retained bitmap got its own region and Group W gained the `M(T)` ladder. *(It was sha256 `1a0725c0…`, 29,088 bytes, 804 loads — byte-identical to `R1h-1`'s 2026-08-26 value across three rebuilds. A `P7` whose sha256 is unchanged is the normal reading; this one changed because the payload did, and the previous value is kept so the two can be told apart.)* |
 
 **What writing it produced, beyond the block.** Three things, each landing in an
 owner file rather than here: the loader's **`DW` emission rate** measured for the
 first time (`SPEC.md` `LDR-40`, 3,594–3,726 B/s, n=2 — every `--seconds` on
 every card had been sized against the 3,840 line rate); `LDR-07`'s round-up
 handing back **three poison-margin words for free** on `DW 80A02000 641`, so the
-over-run control costs no command (`docs/probe3-cells.md` §4) — 🔄 **two words since 2026-09-01 — one from 2026-08-31 and three before that — and the control is unweakened in every case**: the block is 718 words so `DW 80A02000 718` prints 720, and an over-run writes upward from the seal, so the first margin word is the first one it reaches. 🆕 **And it stopped being a remainder**: `probe3.c`'s `rb_readback_shows_poison` refuses to build a layout whose word count is a multiple of four, because such a block returns no margin word at all; and the scope of
+over-run control costs no command (`docs/probe3-cells.md` §4) — 🔄 **two words since 2026-08-31 — one from 2026-08-31 and three before that — and the control is unweakened in every case**: the block is 718 words so `DW 80A02000 718` prints 720, and an over-run writes upward from the seal, so the first margin word is the first one it reaches. 🆕 **And it stopped being a remainder**: `probe3.c`'s `rb_readback_shows_poison` refuses to build a layout whose word count is a multiple of four, because such a block returns no margin word at all; and the scope of
 §B5-c1 — *the head does not discriminate* is about `nfjrom` files, and a flat
 `rlxprobe` payload's head **does**, by the same linker-constant mechanism
 (`RUNSHEET` §B5-c1).
@@ -897,11 +897,11 @@ naming it. The defect is recorded here and the file is exempt, with a control
 (`T13`) that goes red if the file is ever repaired and the exemption left
 behind.
 
-## 2026-09-01 — seating 8, `R3-9`. One power cycle, and the card was read by a machine first
+## 2026-08-31 — seating 8, `R3-9`. One power cycle, and the card was read by a machine first
 
 | | |
 |---|---|
-| **`2026-09-01`** | `probe3` at 718 words: the `M(T)` ladder, the retained bitmap and **Group F**, the memory-mapped SPI window. The `FLR` bracket rides the same cycle, driven by `tools/flrbracket.py run` rather than by eye. Prefix `K-*` |
+| **`2026-08-31`** | `probe3` at 718 words: the `M(T)` ladder, the retained bitmap and **Group F**, the memory-mapped SPI window. The `FLR` bracket rides the same cycle, driven by `tools/flrbracket.py run` rather than by eye. Prefix `K-*` |
 
 🆕 **`PREDICTIONS-B6-block4.md` is the first card in this project that a machine
 read before the board was plugged in.** `cardcheck numbers` re-derived **13 of

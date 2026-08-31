@@ -203,8 +203,12 @@ typedef char rb_readback_shows_poison[(RB_WORDS % 4u != 0u) ? 1 : -1];
  * block read by index.  A layout that renumbers is a layout whose old readings
  * cannot be compared word for word.
  *
- * 🔴 THEY WERE 48, 49 AND 50 FOR ONE DAY AND ALL THREE COLLIDED, 量 2026-09-01.
- * The 2026-08-31 version of this comment reasoned *"44..47 are occupied"* and
+ * 🔴 THEY WERE 48, 49 AND 50 FOR ONE SESSION AND ALL THREE COLLIDED, 量
+ * 2026-08-31.  ⚠️ THE SESSION THAT ADDED THEM WAS THE SAME DAY -- the
+ * seventeenth and the eighteenth are two segments of 2026-08-31 -- so nothing
+ * here may say *yesterday*, and the window in which the collision existed is
+ * measured in hours rather than in days.  The SEVENTEENTH session's version
+ * of this comment reasoned *"44..47 are occupied"* and
  * stopped counting there -- 48..51 were already `H_KSEG0`, `H_G_TIMER`,
  * `H_T_SEP_A` and `H_T_SEP_B`, defined twenty lines further down beside Group
  * T rather than in this block.  The reasoning was right and the census was
@@ -373,7 +377,7 @@ typedef char rb_readback_shows_poison[(RB_WORDS % 4u != 0u) ? 1 : -1];
 				 * `w.assoc.capped` counts these; this says
 				 * WHERE, because a count cannot.             */
 
-/* --- Group F -- the memory-mapped SPI window, 2026-09-01 ------------------ */
+/* --- Group F -- the memory-mapped SPI window, 2026-08-31 ------------------ */
 /* APPENDED at 194, and for the third time the reason is the one the header
  * words carry: every committed capture of a probe3 block is read BY INDEX, and
  * a layout that renumbers is a layout whose old readings cannot be compared
@@ -2174,7 +2178,7 @@ void rlxprobe_main(void)
 		res_put(R_F_LIVE, (wv << 8) | bv);
 
 		/* 🔴 THE TIMING LEGS ARE GATED ON GROUP T, and they were not
-		 * until the qemu run of 2026-09-01 showed what that costs.
+		 * until the qemu run of 2026-08-31 showed what that costs.
 		 * Malta has no timer at `TC0CNT`, so `g_timer` is 0 there and
 		 * every bracket returned a delta of two identical all-ones
 		 * reads: SEVEN legs of `00000000`, which is a number and not a

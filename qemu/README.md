@@ -125,11 +125,11 @@ pushed — the same scan `bench/` gets, with the same eight patterns and the sam
 synthetic positive control, because *"it is only an emulator log"* is not a
 reason to skip the check that decides whether a file identifies this unit.
 
-🆕 **2026-09-01: `2026-09-01/` is the FOURTH directory, and the run found a defect in the payload rather than confirming one.** Group F — the memory-mapped SPI window, `docs/probe3-cells.md` § 6.8 — took `probe3` to 718 words and 31,536 bytes, so `2026-08-31/probe3.build` joins `2026-08-26/` in describing an image nobody will upload.
+🆕 **2026-08-31: `2026-08-31/` is the FOURTH directory, and the run found a defect in the payload rather than confirming one.** Group F — the memory-mapped SPI window, `docs/probe3-cells.md` § 6.8 — took `probe3` to 718 words and 31,536 bytes, so `2026-08-31/probe3.build` joins `2026-08-26/` in describing an image nobody will upload.
 
 🔴 **What the run is evidence for, and it is the sharper kind: a refutation condition firing where it should.** Malta has no flash at `0x1D000000`, so `0xBD000000` returned sixteen identical words and `f.live`'s window byte came back **`0`** — which is exactly the *floating bus, not flash* condition § 6.8.3 writes. **The emulator is the worked example of a dead window**, and it is the only environment that can drive that branch, in the same way it is the only one that can fire the `M = 1` control below.
 
-🔴 **And it found a coupling the desk had missed.** The first build ran Group F's seven timing legs unconditionally; Malta has no `TC0CNT`, so both bracket reads came back all-ones and every leg reported `00000000`. **Seven zeros is a number, not a refusal**, and Group T had already declared itself VOID two stages earlier. Group V is gated on `c-A` and Groups M and X on `h-brk`; a timing group with no gate was the payload disagreeing with its own design. `if (g_timer)` now leaves the legs at stage 0's poison, and `2026-09-01/probe3.build` records the whole thing.
+🔴 **And it found a coupling the desk had missed.** The first build ran Group F's seven timing legs unconditionally; Malta has no `TC0CNT`, so both bracket reads came back all-ones and every leg reported `00000000`. **Seven zeros is a number, not a refusal**, and Group T had already declared itself VOID two stages earlier. Group V is gated on `c-A` and Groups M and X on `h-brk`; a timing group with no gate was the payload disagreeing with its own design. `if (g_timer)` now leaves the legs at stage 0's poison, and `2026-08-31/probe3.build` records the whole thing.
 
 🆕 **2026-08-31: `2026-08-31/` is the third directory here, and it exists because
 the payload MOVED.** `probe3`'s block went 641 → 707 words (a retained bitmap

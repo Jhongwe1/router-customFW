@@ -811,7 +811,7 @@ class Controls(object):
 
 # --- the `verify` fixture ---------------------------------------------------
 # 🔴 EVERY CONTROL ABOVE THIS POINT IS ABOUT THE DECLARATION, and until
-# 2026-09-01 that was the whole suite.  `cmd_verify` -- the half `CLAUDE.md`
+# 2026-08-31 that was the whole suite.  `cmd_verify` -- the half `CLAUDE.md`
 # names as *the only one that can catch a mark that compiled and is not in the
 # image* -- had NONE, and that is why the mutation suite this repository owed
 # for five sessions could not be written: there was nothing to mutate against.

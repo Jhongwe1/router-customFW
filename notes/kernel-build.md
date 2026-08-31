@@ -3874,7 +3874,7 @@ CPI ambiguity does not have to be resolved first.
    confirmation of an existing band instead of a new safety case. **It is still
    run**, and its refutation condition is `MEM-13`'s verbatim: any
    pointer-shaped word and the address is re-chosen.
-2. **`0x80A90000` is exactly `probe3`'s `ARENA_END`.** 讀 `probe3.c:436-437 (#define ARENA 0x80A10000u)`:
+2. **`0x80A90000` is exactly `probe3`'s `ARENA_END`.** 讀 `probe3.c:440-441 (#define ARENA 0x80A10000u)`:
    `ARENA = 0x80A10000`, `ARENA_END = 0x80A90000`. So the read cannot land in
    the arena — which matters because `MEM-17` (量 2026-08-31) is that **DRAM
    keeps a previous cycle's `FLR` output across a power cycle**, and a
@@ -3914,7 +3914,7 @@ says the difference belongs to the window rather than to the loop.
 It would ride the same rebuild as the retained bitmap and the `M(T)` table,
 which is the only reason it is worth raising now instead of after the seating.
 
-🔄 **2026-09-01: it was started, and it grew a third address space on the way.**
+🔄 **2026-08-31: it was started, and it grew a third address space on the way.**
 `probe3` Group F, eleven result words, `docs/probe3-cells.md` § 6.8. The
 paragraph above names `0xBD000000` and uncached DRAM; what it does not name is
 **`0xBFC00000`**, and that is where § 19.7.2's ≤9× actually lives — stage 1's

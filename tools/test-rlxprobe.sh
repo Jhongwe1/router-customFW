@@ -787,7 +787,7 @@ ck "show DW count == probe3 RB_WORDS" "$p3w" \
 ck "and the C says 718"                718 "$p3w"
 echo
 echo "=== Y2c: two defines may not name the same word ==="
-# 🔴 量 2026-09-01, AND IT HAD BEEN COMMITTED FOR A DAY.  The three header words
+# 🔴 量 2026-08-31, AND IT HAD BEEN COMMITTED FOR A DAY.  The three header words
 # the retained bitmap added on 2026-08-31 were 48, 49 and 50, and ALL THREE were
 # already taken -- `H_KSEG0`, `H_G_TIMER` and `H_T_SEP_A`, defined twenty lines
 # further down beside Group T rather than beside the other layout words.  The
@@ -956,7 +956,7 @@ make -C "$s3/src" BUILD="$s3/b" P=probe3 payload HAZLINT="$HERE/hazlint" >/dev/n
 ck "SM3 a layout that does not add up does not build" no \
    "$([ -s "$s3/b/probe3/probe3.bin" ] && echo yes || echo no)"
 
-# SM3b -- 🆕 2026-09-01, THE OTHER COMPILE-TIME ASSERTION.  `DW` rounds a word
+# SM3b -- 🆕 2026-08-31, THE OTHER COMPILE-TIME ASSERTION.  `DW` rounds a word
 # count UP to a multiple of four (LDR-07), so a block whose RB_WORDS IS a
 # multiple of four returns NO poison word and the over-run control silently
 # stops existing.  641, 707 and 718 each happened to leave one; probe3.c now

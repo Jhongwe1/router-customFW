@@ -6,7 +6,7 @@ survives is a control that does not work, which is the finding an adversarial
 pass returned against the first version of this suite: it reported 10/10 while
 four mutations lived, two of them deleting exactly what the tool advertises.
 
-Two rows here are not mutations, and both were added on 2026-09-01 because the
+Two rows here are not mutations, and both were added on 2026-08-31 because the
 suite reported 15/15 while one of the fifteen was killing the wrong thing:
 
   B0  THE UNMUTATED TOOL MUST PASS IN THE TEMP TREE.  A tree that is missing a
@@ -26,7 +26,7 @@ suite reported 15/15 while one of the fifteen was killing the wrong thing:
 
   A0  EVERY ANCHOR MUST OCCUR EXACTLY ONCE.  `str.replace(old, new, 1)` takes
       the FIRST match, so an anchor that becomes ambiguous silently starts
-      mutating a different place.  量 2026-09-01: Group F gave rbcheck.py a
+      mutating a different place.  量 2026-08-31: Group F gave rbcheck.py a
       second `if magic == 0x524C5833 and count > 50:` and M26 -- written for
       the retained-bitmap branch -- began mutating Group F's guard instead.  It
       still exited non-zero, so it still read as *killed*, and nothing could
@@ -92,7 +92,7 @@ MUT = [
      "        o_bmp, o_bmpk, o_seal = b[42], b[53], b[43]",
      "    if magic == 0x524C5833 and count > 5000:\n"
      "        o_bmp, o_bmpk, o_seal = b[42], b[53], b[43]"),
-    # M27..M32 -- Group F, 2026-09-01.  Every row names the control it must turn
+    # M27..M32 -- Group F, 2026-08-31.  Every row names the control it must turn
     # red, which is this repository's standard.  🔴 M31 is the one that is not
     # about a check at all: it is about the GATE, and C30 is the only case that
     # can see it -- every other Group F case runs on a 718-word block where the

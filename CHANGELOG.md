@@ -39,8 +39,9 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
-🔴 **2026-09-01 — desk, no power: the cell `FW-34` lost yesterday was rebuilt as
-a payload group, and the three header words added the day before were all
+🔴 **2026-08-31 — desk, no power: the cell `FW-34` lost in the SESSION BEFORE THIS ONE -- the same day, three
+segments in -- was rebuilt as
+a payload group, and the three header words added in that same session were all
 sitting on top of something.**
 
 `LDR-42` closed the loader route to `FW-34`'s last question, so the instrument
@@ -81,7 +82,7 @@ The fix is a census (`test-rlxprobe.sh` `Y2c`), not a better comment.
 
 🆕 **A source line number now carries a token, and `spec-check` `C11` checks
 it.** Thirty-two references converted; the checker went red twice on the day it
-was written — first on the format's own exemplar from the day before, then on
+was written — first on the format's own exemplar from the session before, then on
 the sixteen references Group F's edit moved, each finding naming the new line.
 
 🆕 **`mkinitramfs verify` has controls for the first time**, `V1`..`V8`, and the

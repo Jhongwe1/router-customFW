@@ -133,7 +133,7 @@ MUT = [
 # ---- phase 2: mutations the --self-test criterion cannot reach ----------
 WIRE = "        pf, npara = paragraph_findings(rel, lines, m)"
 # 🔴 P2 IS ANCHORED ON A FUNCTION SIGNATURE, AND IT TOOK TWO TRIES TO GET
-# THERE.  量 2026-09-01, both reported by the harness rather than found by eye:
+# THERE.  量 2026-08-31, both reported by the harness rather than found by eye:
 #   * it was the SUMMARY STRING report_tables prints, and that string moves
 #     whenever a check joins the sweep -- `C11` extended it and P2 came back
 #     `[NOT APPLIED: anchor occurs 0 time(s)]`, reported as a SURVIVOR;

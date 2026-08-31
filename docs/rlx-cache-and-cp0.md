@@ -659,7 +659,7 @@ is corrected — see the correction file.
 | | reading | what makes it a reading |
 |---|---|---|
 | **size** | **16 KiB** | working set 1/2/4/8 KiB → `fresh=0` at every point; 16 KiB → 20 of 512; 32 KiB → 1024 of 1024; 64 KiB → 2048 of 2048 |
-| **line** | **16 B** | `w.line.bits=11222222` against `L_LINE[]` (`probe3.c:513 (static const u32 L_LINE[])`): offsets `0` and `8` STALE, `16` FRESH |
+| **line** | **16 B** | `w.line.bits=11222222` against `L_LINE[]` (`probe3.c:517 (static const u32 L_LINE[])`): offsets `0` and `8` STALE, `16` FRESH |
 | **associativity** | **2-way** (量). ⚠️ **512 sets is 推** | `w.assoc.tm=00002003` → `(T, M) = (8192, 3)`, and it is the *argmin over T* that discriminates — see below. The set count divides by a line size neither this cell nor `w.size` can see |
 
 **否證 ⓐ's own controls both fired, in both directions.** The negative
@@ -679,7 +679,7 @@ as evidence for them. **`M = 3` alone does not imply two ways** — it is equall
 "two ways in one set" or "one way in two sets", so direct-mapped at half the way
 size gives `M = 3` too.
 
-What discriminates is *which* `T` minimises `M`. `probe3.c:1578-1642 (c_size = (boundary != 0xFFFFFFFFu))` searches
+What discriminates is *which* `T` minimises `M`. `probe3.c:1582-1646 (c_size = (boundary != 0xFFFFFFFFu))` searches
 `t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
 
 | hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |
@@ -845,7 +845,7 @@ m.cp3 4 v1=20000000 v2=20000000                 → r4
 m.cp3 1,2,3,5,6,7  v1=00000000 v2=00000000
 ```
 
-The two primes are `0xC0DE0300|i` and `0xD1CE0300|i` (讀, `probe3.c:1734-1758 (v1 = rlx_call0_primed)`).
+The two primes are `0xC0DE0300|i` and `0xD1CE0300|i` (讀, `probe3.c:1738-1762 (v1 = rlx_call0_primed)`).
 **No reading equals its own prime and `v1 == v2` for all eight** — so the
 destination register was written and the value is stable, which is the pair of
 failures the two primes exist to separate (`F50b`). `CU3` sticking is the

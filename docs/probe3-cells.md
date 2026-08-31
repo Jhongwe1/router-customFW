@@ -282,7 +282,7 @@ has read it"* — and `MEM-14` is this device's own counterexample: `0x81000000`
 was exactly that kind of address until three captures showed the boot path
 writes it on **every** boot.
 
-**So `probe3` stays inside the proven span** — 🔄 **and since 2026-09-01
+**So `probe3` stays inside the proven span** — 🔄 **and since 2026-08-31
 that sentence needs its qualifier, because Group F reads two addresses that are
 not DRAM at all.**
 
@@ -377,7 +377,7 @@ and **the round-up is upward — a length given too small never announces itself
 |---|---|---|---|
 | one full `probe1`-shape row per victim | 104 B each — 213 KB at V=2048 | `DW … 16433`, a 5-digit length | ❌ overruns the ESC window, and is 20× past any `DW` this loader has executed |
 | 1-bit STALE/FRESH bitmap | 0.34 B/victim with line framing | tiny | ❌ **and it is worse than cheap.** `probe1` defines **seven** verdicts, and cell 4 came back `07` CORRUPT on both victims — the entire evidence that `Status.IsC` does not isolate. A 1-bit map would have scored those two as a cache result |
-| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it. 🔄 **2026-08-31 (seventeenth session): 641 → 707, `DW 80A02000 707` = 8,345 B / 2.17 s, 86 % of `H2g`.** 🔄 **2026-09-01 (eighteenth): 707 → 718, `DW 80A02000 718` = 8,486 B / 2.21 s, 88 % of `H2g`** — Group F took eleven result words.** The block is now 64 header + **194** cell results + 16 × 8 rows + 256 **scratchpad** bitmap words + **64 retained** bitmap words + the seal. Two changes, and the second is the one this row's own sentence about *"which point survives to the read-back"* required: `O_BMPK` is a region with **one writer**, `O_BMP` stays the scratchpad seven cells share, and Group W's `M(T)` ladder took the two new result words. The three mirrors are unchanged in kind — `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS`, the compile-time assertion — and `tools/test-rlxprobe.sh` recomputes the total from the C, now including `RB_BMPKW` | ✅ **every number is under something this loader has already done** |
+| 🔴 **nibble bitmap in RAM + summary on UART + 16 named full rows on both channels** | 🔄 **BUILT AND MEASURED 2026-08-26: 5,893 bytes / 126 lines under qemu** (量, `qemu/2026-08-26/probe3.txt`, sha256 `e6035718…`, and the `.build` file beside it records both), against the 2,177 B this row estimated before the payload existed. The estimate was low because it counted 16 rows plus a banner and no per-point summary; the payload emits one line per sweep point across three sweeps, one per CP3 register, and one per Group C cell. **The device run will be LONGER** — Group V is void under qemu and will run on silicon — 推 ≈ 7 KB / 1.9 s. Both are far under § 4's own wall of 208,834 B. 🔴 **V is NOT the payload's total.** Summed over § 6 the victim *instances* are well over 12,000. The block is **reused between sweep points**, so **which point survives to the read-back is a decision**: it is the **boundary point** — the first with any FRESH, whose PATTERN is what carries associativity and aliasing — and the largest point if there is no boundary. It is written by a **second, single-point run**, so both runs' counts are in the block and a disagreement between them is visible rather than silently resolved. `H_BMP_POINT` and `H_BMP_COUNT` name it, and **the payload writes its own surviving-victim count into the header** so the desk can compare it against the length it actually read | 🔄 **`DW 80A02000 641` = 7,593 B / 1.98 s** — 79 % of `H2g`'s already-executed 9,661 B, and three digits, so it does not depend on the untested question of whether the loader takes a four-digit length. **433 was this row's estimate before the cells were laid out**; the block is 64 header + 192 cell results + 16 × 8 rows + 256 bitmap words + the seal, and `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS` and a compile-time assertion in `probe3.c` all carry it. 🔄 **2026-08-31 (seventeenth session): 641 → 707, `DW 80A02000 707` = 8,345 B / 2.17 s, 86 % of `H2g`.** 🔄 **2026-08-31 (eighteenth): 707 → 718, `DW 80A02000 718` = 8,486 B / 2.21 s, 88 % of `H2g`** — Group F took eleven result words.** The block is now 64 header + **194** cell results + 16 × 8 rows + 256 **scratchpad** bitmap words + **64 retained** bitmap words + the seal. Two changes, and the second is the one this row's own sentence about *"which point survives to the read-back"* required: `O_BMPK` is a region with **one writer**, `O_BMP` stays the scratchpad seven cells share, and Group W's `M(T)` ladder took the two new result words. The three mirrors are unchanged in kind — `Makefile`'s `RB_WORDS_probe3`, `probe3.c`'s `RB_WORDS`, the compile-time assertion — and `tools/test-rlxprobe.sh` recomputes the total from the C, now including `RB_BMPKW` | ✅ **every number is under something this loader has already done** |
 
 🆕 **2026-08-29, `R1h-3`: `LDR-07`'s round-up hands back the over-run control
 for free, and this section did not know it.** The block is `RB_WORDS = 641`
@@ -402,7 +402,7 @@ prints `4 × ceil(718/4)` = **720** words — so `w718` at `0x80A02B38` and `w71
 at `0x80A02B3C` come back beside the seal at `0x80A02B34`. *(707 returned one
 such word and 641 returned three; each was the remainder falling out that way.)*
 
-🆕 **And that stopped being luck on 2026-09-01.** `probe3.c` carries
+🆕 **And that stopped being luck on 2026-08-31.** `probe3.c` carries
 `rb_readback_shows_poison`, a compile-time assertion that **refuses to build a
 layout whose `RB_WORDS` is a multiple of four** — such a block returns no poison
 word at all and the over-run control stops existing without saying so.
@@ -691,7 +691,7 @@ wire changes shape; no cell was added, removed or reordered; `flags` and the
 `.bss` size are unmoved.
 
 ⚠️ **Those are the two instruments' own numbers and they are left as written.**
-The payload moved again on 2026-09-01 — Group F, § 6.8 — so the *image* is now
+The payload moved again on 2026-08-31 — Group F, § 6.8 — so the *image* is now
 `RB_WORDS` **718**, `DW 80A02000 718`, 8,486 bytes, `hazlint` **0 violations in
 946 loads**. This paragraph says what the retained bitmap and the `M(T)` ladder
 cost, which is a different question from what the payload weighs today, and
@@ -1025,7 +1025,7 @@ one thing this core has no documentation for** — `cache.S` already flags it. O
 core measured **not** to honour `IsC`, R3000 semantics cannot be used to argue
 `SwC` is safe. ⓓ② closes on `IsC` alone and says so.
 
-### 6.8 🆕 2026-09-01 — Group F, the memory-mapped SPI window, and it is the only instrument that can close `FW-34`
+### 6.8 🆕 2026-08-31 — Group F, the memory-mapped SPI window, and it is the only instrument that can close `FW-34`
 
 **Why it is in this payload rather than at the loader prompt.** `SPEC.md` §17's
 remaining `FW-34` row asks whether the memory-mapped window prefetches a
@@ -1280,7 +1280,7 @@ fault during `w-imem` costs the discriminator and not the walk.
 | **`rlx_r3k_size` / `GEOM=1`** | 量 dead: the algorithm needs isolation and `CPU-35` measured this core does not isolate, so it can only return `0` — which is also its *"the core does not answer"* value |
 | **`rlx_isc_inv`** | 量: its byte stores reached DRAM and corrupted both victims (`probe1` cell 4) |
 | **writing `TC1DATA`/`TCCNR`** to get an 18.79 s counter instead of a 10 ms one | it would be strictly better as an instrument, but it is a **register write** where every window in this payload already fits inside 3 ms of a 9.9998 ms wrap. Recorded as the upgrade path for `R5-0`, declined here |
-| **flash** | 🆕 **2026-09-01: this payload now READS flash, and the row says so before it says anything else.** Group F issues uncached `lw` from `0xBD000000` and `0xBFC00000` — loads, and nothing else: no command reaches the SPI controller, and `SFCR`/`SFCSR`/`SFDR` are never written. § 6.8. 🔄 **no flash-write command, and the byte count is not this payload's to claim.** `P0` reads `AUTOBURN` before the `put` and the seating stops on anything but `00000000`, and every `--send` this payload's cells issue is a `DW`, a `J` or an `EW` into RAM — that is a **guard**. *(This row read “zero bytes” until 2026-08-30, which is the sentence `RUNSHEET` §B3's `G8b` forbids without a full re-dump hashed against `FLS-14`.)* The **evidence** is an `FLR` bracket, and `probe3`'s seating ran none; `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 is where one is |
+| **flash** | 🆕 **2026-08-31: this payload now READS flash, and the row says so before it says anything else.** Group F issues uncached `lw` from `0xBD000000` and `0xBFC00000` — loads, and nothing else: no command reaches the SPI controller, and `SFCR`/`SFCSR`/`SFDR` are never written. § 6.8. 🔄 **no flash-write command, and the byte count is not this payload's to claim.** `P0` reads `AUTOBURN` before the `put` and the seating stops on anything but `00000000`, and every `--send` this payload's cells issue is a `DW`, a `J` or an `EW` into RAM — that is a **guard**. *(This row read “zero bytes” until 2026-08-30, which is the sentence `RUNSHEET` §B3's `G8b` forbids without a full re-dump hashed against `FLS-14`.)* The **evidence** is an `FLR` bracket, and `probe3`'s seating ran none; `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 is where one is |
 
 ---
 
@@ -1290,7 +1290,7 @@ fault during `w-imem` costs the discriminator and not the walk.
 |---|---|
 | `P0` ≠ `00000000` | **nothing is uploaded.** The seating ends before it starts |
 | `P1` shows an unchanged `TC0CNT` | Group T does not ship; everything else is unaffected |
-| `P2` shows structure in the arena | **the arena moves** and `P2` is re-run. `MEM-14` is the standing proof that *"nothing has read it"* is not *"nothing writes it"*. 🆕 **2026-09-01: `524C5833` AT THE BLOCK BASE IS NOT ON THE LIST ABOVE AND THE OMISSION IS DELIBERATE.** `probe1`'s or `probe2`'s magic in `probe3`'s space means the block overlaps theirs, and both of those hold measurements recovered from DRAM — that is the failure. `probe3`'s **own** magic at `0x80A02000` means the previous `probe3` run's block is still in DRAM, and after `MEM-17` (量 2026-08-31: DRAM keeps written data across a power cycle) that is a **reading**, not a fault: stage 0 poisons the whole block before the first cell, so the run continues. Record the header words and carry on. ⚠️ In the ARENA the same word would still be a failure, because nothing writes `probe3`'s magic there |
+| `P2` shows structure in the arena | **the arena moves** and `P2` is re-run. `MEM-14` is the standing proof that *"nothing has read it"* is not *"nothing writes it"*. 🆕 **2026-08-31: `524C5833` AT THE BLOCK BASE IS NOT ON THE LIST ABOVE AND THE OMISSION IS DELIBERATE.** `probe1`'s or `probe2`'s magic in `probe3`'s space means the block overlaps theirs, and both of those hold measurements recovered from DRAM — that is the failure. `probe3`'s **own** magic at `0x80A02000` means the previous `probe3` run's block is still in DRAM, and after `MEM-17` (量 2026-08-31: DRAM keeps written data across a power cycle) that is a **reading**, not a fault: stage 0 poisons the whole block before the first cell, so the run continues. Record the header words and carry on. ⚠️ In the ARENA the same word would still be a failure, because nothing writes `probe3`'s magic there |
 | `P3` refuses a 4-digit length | the read-back stays ≤ 999 words; § 4's encoding is the only one that fits and there is no fallback to rows |
 | the 1 KiB working set shows any FRESH | 否證 ⓐ. **The size is void, not approximate.** Do not round to the nearest plausible value — that is how a build constant is laundered into a measurement |
 | the 64 KiB working set shows no FRESH | the walk cannot evict. The size is void the other way, and the tool could not have failed |
@@ -1525,7 +1525,7 @@ make -C tools/rlxprobe P=probe3 show
 | line | what it must say on 2026-08-26 | what a different value means |
 |---|---|---|
 | `make` itself | it **compiles**. `Nothing to be done for 'payload'` is a **HARD STOP** | the tree already held an image and nothing rebuilt; `show` will print the knob you asked for beside the binary you already had |
-| `sha256` | 🔄 **`fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e`, 31,536 bytes, since 2026-09-01** — Group F. *(It was `6f78727507bb0364…` / 29,680 from 2026-08-31)* — the retained bitmap region and the `M(T)` ladder. *(It was `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, 29,088 bytes, from 2026-08-26 to 2026-08-30, and byte-identical across three rebuilds in that window.)* | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
+| `sha256` | 🔄 **`fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e`, 31,536 bytes, since 2026-08-31** — Group F. *(It was `6f78727507bb0364…` / 29,680 from 2026-08-31)* — the retained bitmap region and the `M(T)` ladder. *(It was `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, 29,088 bytes, from 2026-08-26 to 2026-08-30, and byte-identical across three rebuilds in that window.)* | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
 | `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 718` *(707 from 2026-08-31, 641 before that)* | anything else and the read-back is the wrong length or the wrong address |
 | `stale check` | `rb=80a02000` | this is the **on-the-wire** check and it is what the operator watches for in the banner |
 | `vectors` / `uart` | `general 0x80000080`, `THR 0xB8002000`, `CLEAR_BEV=0`, and **no `*** NOT A DEVICE BUILD ***` line** | a qemu image would install a handler into RAM this device never reads and then fault into the loader's permanent hang |
@@ -1645,7 +1645,7 @@ which corroborates zero traps from a second direction.
 
 `CU3` sticks: `m.cu3.before=1000fc00` → `m.cu3.set=9000fc00`, the predicted half.
 **No reading equals its own prime and `v1 == v2` for all eight** (primes
-`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1734-1758 (v1 = rlx_call0_primed)`) — so the destination
+`0xC0DE0300|i` and `0xD1CE0300|i`, 讀 `probe3.c:1738-1762 (v1 = rlx_call0_primed)`) — so the destination
 was written and the value is stable, which is exactly the pair of failures the
 two primes exist to separate. r0 and r4 read `20000000`; the rest read `0`.
 
@@ -1702,7 +1702,7 @@ for a reason that was itself correct.
 
 Found by an adversarial pass on 2026-08-30, 量 on `bench/2026-08-30/Q5-rb.log`.
 
-`probe3.c:1476-1489 (THE RETAINED BITMAP)` states the design: *"THE RETAINED BITMAP. One sweep point
+`probe3.c:1480-1493 (THE RETAINED BITMAP)` states the design: *"THE RETAINED BITMAP. One sweep point
 survives to the read-back … the BOUNDARY point, because its PATTERN is what
 carries associativity and aliasing."* `probe3.c:85-90 (THE BITMAP HOLDS ONE SWEEP POINT)` builds a self-check on
 it — *"so the desk can compare the count the payload thought it wrote against

@@ -239,7 +239,7 @@ tools/mkinitramfs.py       builds R3's initramfs from a declaration in which eve
                            because the ceiling was being measured on the ELF FILE SIZE
                            rather than on the image the decompressor writes -- 495,729
                            bytes out, 75.7 % reported where the truth is 66.2 % -- and
-                           EIGHT of which arrived on 2026-09-01 as the first this
+                           EIGHT of which arrived on 2026-08-31 as the first this
                            tool's `verify` subcommand has ever had. Every one of the
                            other twenty-six is about the DECLARATION; `verify` is the
                            half that reads the built artefact, and it is the only one
@@ -281,7 +281,7 @@ tools/spec-check.py        TWELVE checks and forty case lines. C1-C7 are about
                            wrong, not a rendering. Nine mutations of SPEC.md and
                            ten controls on a fixture built in the process, of
                            which T1 is positive and T5 is a control on T1.
-                           C11 (2026-09-01) is the twelfth: a reference to a line
+                           C11 (2026-08-31) is the twelfth: a reference to a line
                            of a payload source must carry a TOKEN from that line,
                            and the token must still be within three lines of the
                            number. It exists because editing `probe3.c` had

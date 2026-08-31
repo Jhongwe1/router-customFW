@@ -26,7 +26,7 @@
 # captures -- padding a reel with dead terminal is worse than a short one,
 # and the capture durations are the device's, not a choice.
 #
-# 🔄 2026-09-01: THE PAUSES ARE NOT BEING PADDED, and the reason is not
+# 🔄 2026-08-31: THE PAUSES ARE NOT BEING PADDED, and the reason is not
 # reluctance.  Six segments to 60 s is 8 s of dead terminal each, and the
 # sentence above already says why that is the wrong repair.  The other
 # repair is MORE CAPTURE, and seating 8 is about to produce it: probe3's

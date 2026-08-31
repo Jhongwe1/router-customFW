@@ -226,7 +226,7 @@ RB_WORDS_probe2 := 809
 # 🔄 2026-08-31: 641 -> 707.  The retained bitmap got its own region (the block
 # advertised a pattern the shared scratchpad no longer held) and Group W's M(T)
 # ladder took two result words.
-# 🔄 2026-09-01: 707 -> 718.  Group F -- the memory-mapped SPI window --
+# 🔄 2026-08-31: 707 -> 718.  Group F -- the memory-mapped SPI window --
 # took eleven, and it is the only instrument that can answer `FW-34`'s last row
 # now that `LDR-42` has shown no loader command reads through that window.
 # The read-back is `DW 80A02000 718` = 15 + 2 + 47 x 180 + 9 = 8,486 bytes and
