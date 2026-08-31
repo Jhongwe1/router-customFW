@@ -338,17 +338,17 @@ printing a byte of it: the hit is at offset 1165 of the hex channel, which maps
 to file bytes 163,238–163,275.
 
 ⚠️ **Neither existing tool identifies that line as carrying forbidden
-CONTENT, and the two of them fail differently.** `leakscan` names twenty-one lines of that file (`:215`, `:216`, `:1848`, `:1931`, `:2042`–`:2044`, `:2057`, `:5186`, `:5196`–`:5197`, `:5329`–`:5330` and six `enx` lines) and **2557 is not among them** — it looks for the text shapes an address takes, and a hexdump of flash bytes has none.
+CONTENT, and the two of them fail differently.** `leakscan` names **22 hit rows over 18 distinct lines** of that file (`:215`, `:216`, `:248`, `:1848`, `:1931`, `:2042`–`:2044`, `:2057`, `:2656`, `:3309`, `:3312`, `:5181`, `:5186`, `:5196`–`:5197`, `:5329`–`:5330`) and **2557 is not among them** ⚠️ **The count was 21 for about an hour**, because it was taken off a listing that had been piped through `head`; re-derived by `sort -u`. **Third number this session quoted from a partial view rather than re-derived**, and the third caught by going back to the source rather than by a checker. — it looks for the text shapes an address takes, and a hexdump of flash bytes has none.
 
-⚠️ **And the two-tool claim was checked for one and ASSUMED for the other.** 量: `leakscan` does not name line 2557 at all (it names twenty-one other lines of that file). **`audit-bench-log.py` DOES name it** — on its *topic* keyword `'H601'`, and the reason is worth the sentence: the flash bytes at `0x006000` **are the ASCII characters `H`,`6`,`0`,`1`** — the region's own name, written into the flash — so the hexdump's ASCII gutter spells it. It is one of **183** hits that tool reports on that file and it **exits 0**, so it is not a gate that fails. **The accurate claim is narrower**: neither existing tool identifies that line as carrying forbidden CONTENT. One does not see it; the other touches it on a word.
+⚠️ **And the two-tool claim was checked for one and ASSUMED for the other.** 量: `leakscan` does not name line 2557 at all (it names **22 hit rows over 18 distinct lines** of that file (`:215`, `:216`, `:248`, `:1848`, `:1931`, `:2042`–`:2044`, `:2057`, `:2656`, `:3309`, `:3312`, `:5181`, `:5186`, `:5196`–`:5197`, `:5329`–`:5330`)). **`audit-bench-log.py` DOES name it** — on its *topic* keyword `'H601'`, and the reason is worth the sentence: the flash bytes at `0x006000` **are the ASCII characters `H`,`6`,`0`,`1`** — the region's own name, written into the flash — so the hexdump's ASCII gutter spells it. It is one of **183** hits that tool reports on that file and it **exits 0**, so it is not a gate that fails. **The accurate claim is narrower**: neither existing tool identifies that line as carrying forbidden CONTENT. One does not see it; the other touches it on a word.
 
 ### 7.4 What it changes and what it does not
 
 **It does not change §5's decision.** `upstream/` stays as it is. The reason is
 unchanged (this unit is EOL, years unused, and reset does not restore `H601` so
 the value has not moved) and this line adds no exposure the decision did not
-already cover: the same file publishes the MAC in colon form on twenty-one
-other lines, which §4 counted and §5 decided about.
+already cover: the same file publishes the MAC in colon form on other lines
+that `leakscan` already named, which §4 counted and §5 decided about.
 
 **What it does change** is one sentence. *"Nothing checks whether a committed
 capture already contains forbidden content"* — the carried-forward row from

@@ -56,8 +56,7 @@ values in 8,192 — so the measurement removed the alignment caveat from the
 guarantee instead of documenting it. 🟢 **rlxfw's own tree is CLEAN**: `--sweep . --exclude upstream`, **1,381** files, `K-P3` included, so the check that was written by hand at the bench is now a case (`S9c`). ⚠️ Without the exclusion — the DEFAULT — `--sweep .` reads **1,683** files and reports **1 HIT**; 1,381 + 302 = 1,683. 🔴 **`upstream/BENCH-LOG.md` line 2557 is not**: sixteen
 bytes of `H601` at flash `0x006000`, as an `xxd` line, in a public repository —
 and **neither existing tool identifies it as forbidden CONTENT** — `leakscan` does not name that line at all (a hexdump of flash carries no colon-form MAC), and `audit-bench-log` names it only on the topic keyword `H601`, which appears there because the flash bytes at `0x006000` ARE the ASCII `H`,`6`,`0`,`1`, among 183 hits it reports on that file while exiting 0. ⚠️ **That second half was checked after the first draft asserted it**, and the draft was wrong. It does not move `FLS-22`'s
-decision (that file already publishes the MAC in colon form on twenty-one other
-lines); it moves one sentence about what is checked. 🔴 **And it changed the
+decision (that file already publishes the MAC in colon form on other lines `leakscan` already named); it moves one sentence about what is checked. 🔴 **And it changed the
 tool's default**: the first walk excluded `upstream/`, which hid the only
 finding the tool has ever made — **a default that hides that is not a
 default** — so the exclusion is `--exclude`, on the command line.

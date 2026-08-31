@@ -91,8 +91,7 @@ files, `K-P3` included. 🔴 The default sweep, which does **not** exclude
 `upstream/`, reads 1,683 and reports **1 HIT**: `BENCH-LOG.md:2557`,
 sixteen bytes of `H601` as an `xxd` line, in a public repository.
 ⚠️ **Neither existing tool identifies it as forbidden CONTENT** —
-`leakscan` does not name that line at all, and `audit-bench-log` names it
-only on the topic keyword `H601` (the flash bytes at that offset ARE the
+`leakscan` does not name that line at all (it names **22 hit rows over 18 distinct lines** of that file (`:215`, `:216`, `:248`, `:1848`, `:1931`, `:2042`–`:2044`, `:2057`, `:2656`, `:3309`, `:3312`, `:5181`, `:5186`, `:5196`–`:5197`, `:5329`–`:5330`)), and `audit-bench-log` names it only on the topic keyword `H601` (the flash bytes at that offset ARE the
 ASCII `H`,`6`,`0`,`1`), among 183 hits, exiting 0. It does **not** move
 `FLS-22`'s owner decision. 🔴 **And it changed the tool's default**: the
 first walk excluded `upstream/`, which hid the only finding the tool has
