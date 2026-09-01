@@ -375,6 +375,17 @@ jobs:
       # the single largest recorded source of CI failure here.
       - name: xcheck sweep
         run: /usr/bin/python3 tools/xcheck.py sweep 2>&1 | tee ci-out/xcheck-sweep.out; exit "${PIPESTATUS[0]}"
+
+      # looprun is R4-3's D3: the whole edit->result iteration as one command.
+      # Its assertion is DERIVED, not typed -- `rlxfw-kbuild.sh` computes
+      # RLXFW_SRC_ID as a sha256 over config/, `ID0` prints it on the board, and
+      # the run requires the console to say the id the build just computed. So a
+      # stale image, the vendor's firmware, and the loader's own re-staging of
+      # flash after a watchdog reset are all red for the same reason.
+      # `--self-test` drives `--mode replay`: no build, no port, no board, every
+      # fixture a string in the file.
+      - name: looprun self-test
+        run: /usr/bin/python3 tools/looprun.py --self-test 2>&1 | tee ci-out/looprun.out; exit "${PIPESTATUS[0]}"
       # cardcheck reads a bench card the way the DEVICE will. It exists because
       # seating 7 typed `wc -lc < /dev/mtd0ro` and got `wc: not found`: `wc` is
       # one of this busybox's fifty applets and is NOT one of the eleven busybox
