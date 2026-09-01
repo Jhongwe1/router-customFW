@@ -1,0 +1,20 @@
+{
+  "tool_version": "1.3",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-01T21:25:09+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 6.0,
+  "idle": 2.0,
+  "sent": "DW 8040D4A0 1",
+  "sent_hex": "445720383034304434413020310d",
+  "stop_reason": "--idle 2.0 with no bytes",
+  "bytes": 71,
+  "duration_s": 2.1294,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

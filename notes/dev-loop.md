@@ -361,6 +361,81 @@ not an efficient seating — it is one whose card asked for longer holds.
 `console-capture.py` already has `--idle`. No bench card uses it for the boot
 capture. That is `R4-3`'s cheapest single item.
 
+#### 🟢 2026-09-01, seating 9: a card used it, and the threshold had to be measured
+
+`bench/2026-09-01/PREDICTIONS-B7-block6.md` is the first card in this project
+whose every row carries `--idle`. `T-3` — the same `J 80500000` boot as `V-3`,
+`W-3` and `X-3` — held **15.2 s** instead of 45.1 s and came back
+**byte-identical** to `X-3.log`, all 849 bytes. So `--idle` does not truncate
+the boot text, which is the thing this section said the first seating using it
+would have to show.
+
+🔴 **But the number that was obvious would have destroyed the capture.** 量 at
+the desk, before power, over every committed capture that carries a boot:
+
+| population | n | largest silence inside the wanted region |
+|---|---:|---:|
+| cold power-up to `<RealTek>` | 14 | 1.644 s, at byte ≈118, right after the `---RealTek(RTL8196E)` banner |
+| watchdog-reset boot to `<RealTek>` | 5 | 1.565 s, the same gap |
+| **`quietm`/`quietmc` to a shell** | 3 | 🔴 **4.576 s, at byte 350 of 849** |
+| a one-line `DW` reply | 3 | 0.015 s |
+
+An `--idle 3` — the value the first two rows justify — cuts `T-3` at byte 350
+and loses **497 of its 849 bytes**, and the log then looks like a boot that
+stopped rather than an instrument that gave up. **The threshold is a property
+of the cell shape, not of the tool**: this card used 2 / 3 / 8 / 3, each with a
+`--seconds` ceiling behind it, because `--idle` cannot end a capture that is
+still receiving bytes and the one failure a seating can actually produce — a
+missed ESC window, after which the vendor firmware talks for two minutes — is
+exactly that case.
+
+🔴 **And the 37.8 s does not all come back.** `V-3`, `W-3` and `X-3` stream no
+ESC at all (`esc: {}` in all three `.meta.json`), which is why `--idle` fixes
+them outright. On every cell that has to catch an ESC window the hold is
+dominated by `--esc-after`, a fixed loop that runs to its deadline whatever the
+board does. Seating 9's twenty reset cells went from a 45 s recipe to **13.1 s**
+each — real, and smaller than this section implied.
+
+### 6.5 🔴 `CLK-18`'s two groups were this file's instrument, not the board
+
+`SPEC.md` `CLK-18` is computed by `tools/looptime.py to-prompt`, and §6.1 above
+is its owner. 量 2026-09-01, seating 9, at the desk:
+
+**Six of fifteen cold captures open on a byte the board did not send.** At
+power-on the serial line is not yet driven and the receiver samples it once:
+`bench/2026-08-24c/A-catch` starts `FF`, `2026-08-25` and `2026-08-30c/V-A`
+start `00`, `2026-08-25b` starts `00 FC`, `2026-08-31/W-A` and
+`2026-08-31c/K-A` start `00 FF`. That byte precedes the board's own `Booting`
+by **0.321–0.350 s**; the other nine captures start within 0.002 s of it.
+
+`looptime.to_prompt` set `first_byte = rows[0][1]` — the first read, whatever
+it carried — so those six were measured from the line moving and the other nine
+from the CPU printing.
+
+| origin | n | min | max | range | largest gap |
+|---|---:|---:|---:|---:|---:|
+| `rows[0]` → `<RealTek>` | 15 | 2.171 | 2.636 | 0.465 | **0.165** |
+| `Booting` → `<RealTek>` | 15 | 2.095 | 2.315 | **0.220** | **0.075** |
+
+🟢 **The second source was already in this repository and already right.**
+`tools/boot-timeline.py`'s `artifact` column is defined as *byte 0 → the first
+byte of the device's own `\r\nBooting`*, and its header has recorded since
+2026-08-25 that the prefix is not always one byte. Over the same six captures
+it reads **0.3203 .. 0.3495, mean 0.3418, n=6** — the same interval `looptime`
+was silently including.
+
+**So two committed instruments read one artefact and disagreed, and `SPEC.md`
+cited the one without the model.** `looptime` now reports both and reports the
+CPU-relative one as **absent** rather than defaulted when `Booting` is not
+there (`P7`, `N11`, `N10`, `A2`; 22 → 26 controls, mutants 20/20). The class —
+nothing checks that two tools agree about one file — is `TOOL-1`.
+
+⚠️ **An independent population agrees with the corrected reading.** Seating 9's
+twenty-one warm boots, all inside one power cycle, are 2.104–2.365 s from
+`Booting` with a largest gap of 0.053 s: unimodal, and overlapping the cold
+range, which is what `CLK-15`'s measured cold/warm difference of +4.5 and
++14.5 ms predicts.
+
 ---
 
 ## 7. The two totals, against the two numbers already in `SPEC.md`

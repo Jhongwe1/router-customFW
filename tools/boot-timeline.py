@@ -99,6 +99,13 @@ import sys
 BOOTING = b"Booting..."
 CHIPNAME = b"chipName"
 BANNER = b"---RealTek(RTL8196E)"
+# Every line the loader prints on the way up.  Used ONLY to tell a boot
+# capture that could not be placed from a `DW` reply that was never a boot.
+# 量 2026-09-01: testing only for `chipName`/BANNER missed `Y0-A`, whose
+# first bytes are `P0phymode=` because the capture opened after both had
+# gone past -- the detector missed the case it was written for.
+BOOT_TEXT = (CHIPNAME, BANNER, b"ramSize:", b"P0phymode=",
+             b"---Ethernet init Okay!")
 RAMSIZE = b"ramSize: 32M"
 WATCHDOG = b"Reboot Result from Watchdog Timeout!"
 
@@ -295,8 +302,41 @@ def main():
                 k, ANCHORS[k][1], len(pop[k]), min(pop[k]), max(pop[k])))
         return 0
 
-    rows = [x for x in (analyse(l, args.anchor) for l in logs) if x]
+    raw_rows = [(l, analyse(l, args.anchor)) for l in logs]
+    rows = [x for _, x in raw_rows if x]
     good = [r for r in rows if "error" not in r]
+    # 🔴 A capture that never became a row is invisible to `unknown`, which
+    # counts rows whose CLASS could not be decided.  量 2026-09-01:
+    # `bench/2026-09-01/Y0-A` -- a capture that opened mid-boot, so it holds no
+    # `Booting` -- was dropped here and the summary still read `0 unknown`.
+    # Naming them is the difference between a population and whatever survived
+    # the filter.
+    unread = [l for l, x in raw_rows if x is None]
+    errored = [(r.get("name", "?"), r["error"]) for r in rows if "error" in r]
+    # Two populations, and only one of them is a defect.  A `DW` reply has no
+    # boot text at all and is correctly not a row; a capture that HAS boot text
+    # and no `Booting` anchor is a boot this tool could not place, and that is
+    # the one a reader needs named.  量 2026-09-01: 343 of the former, 1 of the
+    # latter (`Y0-A`, opened after the board had started printing).
+    orphan_boots = []
+    for l in unread:
+        try:
+            with open(l, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            orphan_boots.append((l, "unreadable"))
+            continue
+        if BOOTING not in raw and any(m in raw for m in BOOT_TEXT):
+            orphan_boots.append((l, "boot text but no `Booting` anchor -- the "
+                                    "capture opened after the board started"))
+    if unread or errored:
+        print("NOT CLASSIFIED: %d capture(s) produced no row; %d of them hold "
+              "boot text" % (len(unread), len(orphan_boots)))
+        for l, why in orphan_boots:
+            print("    %s -- %s" % (l, why))
+        for n, e in errored:
+            print("    %s -- %s" % (n, e))
+        print()
     if not good:
         print("REFUSING: no capture with boot text and a .timing under %s"
               % " ".join(args.path), file=sys.stderr)

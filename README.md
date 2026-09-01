@@ -413,11 +413,12 @@ tools/replay-capture.py    17 controls, and it turns a committed `.log` + `.timi
                            back into the terminal it came from - so R3-11's
                            artefact is DERIVED from evidence rather than recorded
                            beside it, and anyone with a clone can re-run it.
-                           `R4` is why it is worth a suite: `W-3`, `X-3` and `V-3`
-                           are byte-identical across two power cycles and two
-                           days, so three independent captures must give identical
-                           data and different timing - 248 / 256 / 264 records -
-                           and both halves are asserted. `R12` hands the result to
+                           `R4` is why it is worth a suite: `W-3`, `X-3`, `V-3`
+                           and `T-3` are byte-identical across three power cycles
+                           and three days, so four independent captures must give
+                           identical data and different timing - 248 / 256 / 259 /
+                           264 records - and both halves are asserted. `T-3` is
+                           the one reached with the power switch never touched. `R12` hands the result to
                            `scriptreplay(1)` itself and compares byte for byte;
                            `R13` is its negative, because without a header line
                            `scriptreplay` silently eats the first ten bytes

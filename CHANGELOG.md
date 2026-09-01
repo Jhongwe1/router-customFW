@@ -1,5 +1,52 @@
 # Changelog
 
+🟢 **2026-09-01, twenty-fourth session, seating 9: `R4-2`** — the development
+loop closes without the power switch. `J BFC00000` is a reset on this silicon,
+**21 times out of 21**, each one carrying `C-8`'s discriminator where a cold
+boot prints a single space — and that cold boot is **this seating's own**
+`Y-A`, so the negative control is not borrowed from an earlier visit. Zero
+failures in 20 consecutive gives a 95 % upper bound of **13.9 %** on the
+per-reset failure rate, which refutes a reset that fails often and **does not**
+make the loop reliable; the sentence that would needs several hundred and no
+seating holds that.
+
+🟢 **And the whole of `edit → result` ran with nothing touched**: `T-rz` reset
+the board after four `FLR`s, the rescue came back, TFTP took **1,029,120 bytes
+in 1.54 s**, and `J 80500000` reached a shell whose log is **byte-identical to
+`bench/2026-08-31b/X-3.log`** — 849 bytes, the fourth instance of that hash.
+It also answers a question the loader's own semantics raised: an `FLR` writes
+the TFTP length global and no `put` may follow it, **but a watchdog reset
+clears it**, so a flash bracket and an upload fit in one power cycle.
+
+🟢 **The `FLR` bracket now covers a scripted reset.** Four windows, 1,024
+bytes, all byte-identical to the 2026-08-16 dump after twenty resets — with
+four RAM destinations no `FLR` in this project had used, so `MEM-17`'s
+retention path could not pre-fill them with the answer. All four pre-reads
+differ, so *the `FLR` wrote* is measured. 🔴 **0.0244 % of the part, and the
+forbidden sentence has not moved.**
+
+🔴 **A frozen card's abort condition fired on a healthy board.** `Y-ab`
+predicted `AUTOBURN` = `00000000`; the board said `00000001`, which `REG-23`
+and `RUNSHEET` `B6` both record 量 as the power-on default. Every `00000000`
+here is read after a rescue sent `AUTOBURN 0` — a step that card does not have,
+because it uploads nothing. **The expectation was inherited without its
+precondition, and the card written the same evening repeated it.** `CARD-1`.
+
+🔴 **`CLK-18`'s unexplained 165 ms split was the instrument, and a second tool
+in this repository already had the number.** The carried-forward hypothesis is
+refuted — all fourteen captures are cold. Six of fifteen open on a power-on
+line-transition byte 0.321–0.350 s ahead of `Booting`, and `looptime` started
+its clock there; measured from `Booting` the range is 0.220 s with no gap, and
+21 warm boots in one power cycle agree. **`boot-timeline`'s `artifact` column
+has measured that interval since 2026-08-25.** Two committed instruments
+disagreed about one artefact and nothing checks that class — `TOOL-1`.
+
+Both tools gained a control for a silent drop: `looptime` 22 → **26** (the
+CPU-relative interval is **absent**, never defaulted, when `Booting` is not
+there) and `boot-timeline` 15 → **19** (a capture that produced no row is
+named). 🔴 **The second fix's first detector missed its own motivating case**
+and found two other partial boots instead, which is how the miss was found.
+
 🟢 **2026-09-01, twenty-third session, desk: `R4-0` and `R4-1`** — the
 development loop is measured, stage by stage, with machine time and human time
 in different columns. 🔴 **The predictions were committed BEFORE the

@@ -31,6 +31,7 @@ measurement.
 
 | | |
 |---|---|
+| 🟢 **2026-09-01: the bracket now also says a scripted reset writes nothing to those windows, and that is a sentence `R4`'s unattended loop leans on.** | Seating 9 ran the four windows after one cold boot and **twenty watchdog resets**, with four RAM destinations no `FLR` in this project had ever used — so `MEM-17`'s retention path could not pre-fill them with the answer, which is what voided seating 8's cycle 6. Fourteen comparisons, all as predicted: four read-backs equal to the reference, four pre-reads differing, two positive controls. 🔴 **The percentage did not move: still 0.0244 %, still 6.3 % of `H601`, still no full re-dump.** |
 | 🔴 **"No flash-write command was issued" is not "not one flash byte is written".** | `RUNSHEET` `G8b` forbids the second without a full re-dump hashed against `FLS-14`, and no seating has run one. What exists is a bracket: four 256-byte windows read back before and after, over two power cycles. |
 | 量 **The bracket reaches 1,024 of 4,194,304 bytes — 0.0244 %.** | All byte-identical to the 2026-08-16 reference dump. It **cannot** see a write outside those four windows, and it cannot see two writes that cancel. |
 | 量 **`H601` — this unit's MAC and radio calibration, the region a wrong write cannot be undone in — is covered to 512 of 8,192 bytes: 6.3 %.** | The other 93.7 % is unchecked. This region is why the project is zero-write through `R9`. |

@@ -1,0 +1,35 @@
+{
+  "tool_version": "1.3",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-01T21:15:32+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 12.0,
+  "esc_period_requested_s": 0.002,
+  "esc": {
+    "esc_after": {
+      "requested_period_s": 0.002,
+      "writes": 5645,
+      "window_s": 12.000987,
+      "achieved_period_s": 0.002126
+    }
+  },
+  "cr": {
+    "esc_after": {
+      "written": true,
+      "prompt_seen": true,
+      "waited_s": 0.05027,
+      "log_offset": 6055,
+      "settle_budget_s": 2.0
+    }
+  },
+  "cr_settle_s": 2.0,
+  "seconds": 30.0,
+  "idle": 3.0,
+  "sent": "J BFC00000",
+  "sent_hex": "4a2042464330303030300d",
+  "stop_reason": "--idle 3.0 with no bytes",
+  "bytes": 6086,
+  "duration_s": 15.131339,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

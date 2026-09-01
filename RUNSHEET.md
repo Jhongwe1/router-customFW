@@ -3636,3 +3636,69 @@ ordered against them.
 
 ⚠️ **The reference for the next interval is now `K4-rb.log`**, not
 `K2b-rb.log`: the block is already 2.6 % decayed.
+
+
+---
+
+## Results — Session B7, seating 9, 2026-09-01. `R4-2`, `bench/2026-09-01/`
+
+**Two power cycles. Zero flash-write commands** — the four `FLR`s are reads.
+Cards: `PREDICTIONS-B7-block5.md` (frozen 2026-09-01, 24 cells, no command
+rows) and `PREDICTIONS-B7-block6.md` (frozen the same evening, the operator's
+card for the whole seating plus 18 cells of its own).
+**42 of 42 cells landed after their prediction**; `check-predictions --sweep`
+reports 0 out of order over 48 files and 351 cells.
+
+### Power cycle 1 — void, and it cost almost nothing because it was first
+
+`Y0-A` only. The capture had not reached the port when power was applied: its
+first byte is at `t = 1.093 s` and is `P0phymode=`, so `ramSize: 32M` — the
+line `C-8`'s cold/warm discriminator sits on — was never recorded. Kept under a
+name that is no block's cell. `CORRECTIONS-block6.md` §1 carries the
+`superseded-by:` line.
+
+### Power cycle 2 — everything
+
+| cell | sent | read | verdict |
+|---|---|---|---|
+| `Y-A` | — (`--esc 25`, power applied on a signal) | `ramSize: 32M` then `\n\r` **space** `\n\r---RealTek(` | 🟢 the cold discriminator, this seating's own negative control |
+| `Y-ab` | `DW 8040D4A0 1` | **`00000001`** | 🔴 abort fired; the **card** is wrong — `REG-23`, `RUNSHEET` `B6` |
+| `Y-wd0` | `DW B800311C 1` | `A5000000` | 🟢 `WDTE` = `0xA5` stopped, bit 20 clear |
+| `Y-j1` | `J BFC00000` | echo · `Booting...` · **`Reboot Result from Watchdog Timeout!`** · `<RealTek>` | 🟢 all three refutation directions silent |
+| `Y-wd1` | `DW B800311C 1` | `A5000000` | 🔴 `WatchDogIND` does not survive → **未定** |
+| `Y-r02`…`Y-r20` | `J BFC00000` ×19 | discriminator + prompt, every one | 🟢 **19/19**; with `Y-j1`, 20 consecutive |
+| `T-flr0/6/h/c` | four `FLR` windows, 256 B each | four read-backs byte-identical to the 2026-08-16 dump | 🟢 **14/14 comparisons** |
+| `T-p0/6/h/c` | pre-reads, outside the repository | all four **DIFFER** from the expectation | 🟢 the negative control fires — *the `FLR` wrote* is measured |
+| `T-rz` | `J BFC00000` | discriminator + prompt, **after four `FLR`s** | 🟢 21st reset |
+| `T-0r` | rescue | `AutoBurning=0` · `Set TFTP Load Addr 0x80500000` · `Now your Target IP is 10.1.1.1` | 🟢 in that order |
+| `T-ab` | `DW 8040D4A0 1` | **`00000000`** | 🟢 the guard, in the position that protects the upload |
+| `T-0t` | `DW 805FB3F0 8` | `3E02B722 …` — **not** zeros | 🟢 the short-transfer control is live |
+| `T-1` | `loader-tftp.py put` | **1,029,120 bytes in 2,011 blocks, 1.54 s** | 🟢 a reset clears the `FLR`-written TFTP length global |
+| `T-2a` | `DW 80500000 8` | `… 3C108060 2610B400` | 🟢 my image, over the vendor's freshly re-staged one |
+| `T-2b` | `DW 80540000 1` | `162DC569 E3ADCA96 CDB49F15 69045643` | 🟢 `quietmc`, not `quietm` |
+| `T-2c` | `DW 805FB3F0 8` | line 1 sixteen zero bytes, line 2 identical to `T-0t` | 🟢 complete transfer, no overrun |
+| `T-3` | `J 80500000` | **849 bytes, byte-identical to `bench/2026-08-31b/X-3.log`** | 🟢 4th instance, and the first reached with no physical contact |
+| `T-5b` | `cat /proc/version` | byte-identical to `bench/2026-08-31/W-5b.log` | 🟢 `(key@K) … Aug 30 18:56:00` — mine |
+
+### The three numbers this seating adds
+
+* **21/21 scripted resets.** Zero failures in 20 consecutive → 95 % upper bound
+  **13.9 %** on the per-reset failure rate. **Not** "the loop is reliable".
+* **`entry` = 1.7–2.8 ms, n=21, mean 2.4 ms** (`boot-timeline`). Consistent
+  with the derived 2.184 ms and refuting the 1118 ms rival by ~400×, **but not
+  separable from one read period** — `--esc-period 0.002` forces a 2.088–2.126 ms
+  read cadence. `ESC-1`.
+* **1,024 flash bytes unchanged after 20 resets** = 0.0244 %. `H601` reach
+  unchanged at 6.3 %. **No full re-dump ran**; `G8b`'s sentence stays forbidden.
+
+### What the terminators cost, against the old recipe
+
+| cell shape | old | this seating |
+|---|---:|---:|
+| a reset | `--seconds 45` | **13.1 s** (`--esc-after 10 --idle 3 --seconds 25`) |
+| the image boot | `--seconds 45` | **15.2 s** (`--idle 8 --seconds 45`) |
+| a one-line `DW` | `--seconds 4`–`6` | **2.1 s** (`--idle 2`) |
+
+🔴 **`--idle 3` on the boot cell would have truncated it at byte 350** and lost
+497 of 849 bytes. The threshold is per cell shape and it was measured, not
+chosen. `notes/dev-loop.md` §6.4.

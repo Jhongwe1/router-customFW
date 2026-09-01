@@ -105,7 +105,14 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # DISJOINT, and after this seating they overlap. This case asserts the count;
 # nothing here asserts the ranges, and that is stated so the green is not read
 # as covering them.
-ck "eighteen cold, eleven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 18 cold, 11 warm, 0 unknown')"
+# 🔄 18/11 -> 19/32 on 2026-09-01 (seating 9, `bench/2026-09-01`), which is
+# ONE cold power-on and TWENTY-ONE warm resets: `Y-A`, then `Y-j1`,
+# `Y-r02`..`Y-r20` and `T-rz`. Isolation check, run before this line was
+# touched: every bench directory EXCEPT `2026-09-01` still reports 18 cold,
+# 11 warm, and `2026-09-01` alone reports 1 cold / 21 warm -- so the delta is
+# exactly +1/+21 and nothing was reclassified. Third seating in a row that
+# turned this case red, and all three times the run-every-suite rule caught it.
+ck "nineteen cold, thirty-two warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 19 cold, 32 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -153,8 +160,41 @@ ck "H1b has no entry value"  1 \
    "$(printf '%s\n' "$base" | awk '$1=="H1b"{print ($NF=="--") ? 1 : 0}')"
 ck "H3a, which sent J BFC00000, has one" 1 \
    "$(printf '%s\n' "$base" | awk '$1=="H3a"{print ($NF=="--") ? 0 : 1}')"
-ck "entry population is six warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=6')"
+# 🔄 6 -> 27 with seating 9's twenty-one resets. The seating's own twenty-one
+# are 0.0017 .. 0.0028 s, mean 0.0024, spread 43.7 % -- five times tighter than
+# the six that preceded them (0.0021 .. 0.0211, spread 211 %), because they are
+# twenty-one repetitions of one command inside one power cycle.
+ck "entry population is twenty-seven warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=27')"
+
+echo
+echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
+# 量 2026-09-01: `bench/2026-09-01/Y0-A` has a .log and a .timing, sits in a
+# directory the tool was pointed at, never became a row, and the summary still
+# read `0 unknown` -- because `unknown` counts rows whose CLASS is undecided and
+# a capture that never became a row is invisible to it. Two directions, because
+# naming all 343 non-boot captures would be as useless as naming none.
+mkdir -p "$T/orphan"
+# a boot capture that opened after the board started: boot text, no `Booting`
+printf 'P0phymode=01, embedded phy\r\n---Ethernet init Okay!\r\n<RealTek>' \
+    > "$T/orphan/late-A.log"
+printf '# offset seconds\n0 1.000\n1 1.001\n' > "$T/orphan/late-A.timing"
+# a DW reply, which is correctly not a boot and must NOT be named
+printf 'DW 80500000 1\r\n80500000:\t00000000\r\n<RealTek>' \
+    > "$T/orphan/dw.log"
+printf '# offset seconds\n0 1.000\n1 1.001\n' > "$T/orphan/dw.timing"
+orph="$("$PY" "$BT" "$T/orphan" 2>&1)"
+ck "a boot with no Booting anchor is named"   1 \
+   "$(printf '%s\n' "$orph" | grep -c 'late-A.log -- boot text but no')"
+ck "a DW reply is counted and NOT named"      0 \
+   "$(printf '%s\n' "$orph" | grep -c 'dw.log --')"
+ck "and both are in the count"                1 \
+   "$(printf '%s\n' "$orph" | grep -c 'NOT CLASSIFIED: 2 capture(s)')"
+# 🔴 the detector's first version tested only for `chipName` / the banner and
+# missed `Y0-A`, whose first bytes are `P0phymode=` -- it did not fire on the
+# case it was written for. This asserts the widened set on that exact shape.
+ck "the real Y0-A is among them"              1 \
+   "$("$PY" "$BT" bench 2>&1 | grep -c '2026-09-01/Y0-A.log -- boot text')"
 
 echo
 echo "=== B4: pointed at nothing, it must refuse ==="

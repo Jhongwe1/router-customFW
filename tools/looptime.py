@@ -117,11 +117,19 @@ import json
 import os
 import subprocess
 import sys
+import re
 import tempfile
 from datetime import datetime
 
 VERSION = '1.0'
 DEFAULT_MARKER = '<RealTek>'
+# The first thing the CPU prints.  `rows[0]` is the first thing the LINE
+# carries, and on a power-up those are not the same event: 量 2026-09-01 over
+# fifteen cold captures, six open on a line-transition byte (0x00 / 0xFC /
+# 0xFF) that precedes `Booting` by 0.321-0.350 s.  Counting that byte as *the
+# line came up* is what put five of them into `CLK-18`'s high group and made a
+# 0.165 s split that is not in the board.
+BOOT_MARKER = 'Booting'
 IDENTITY_TOL = 1e-6
 # The width of `started_wallclock`'s truncation, in seconds.  Not a tolerance:
 # `strftime("%S")` drops the fraction, so the true start is somewhere in
@@ -325,7 +333,7 @@ def at_offset(rows, off):
     return best
 
 
-def to_prompt(prefix, marker):
+def to_prompt(prefix, marker, boot_marker=BOOT_MARKER):
     log = prefix + '.log'
     if not os.path.isfile(log):
         raise Refused('%s: no .log' % log)
@@ -340,6 +348,18 @@ def to_prompt(prefix, marker):
         t = at_offset(rows, idx)
         out['open_to_marker'] = t
         out['first_to_marker'] = t - first_byte
+        # The same interval measured from the CPU rather than from the line.
+        # ABSENT rather than defaulted when `Booting` is not there: falling
+        # back to `first_to_marker` would make the two agree exactly when the
+        # correction matters least, and nothing downstream could tell which
+        # one it had.
+        bidx = blob.find(boot_marker.encode('utf-8', 'replace'))
+        out['boot_found'] = 0 <= bidx <= idx
+        out['boot_offset'] = bidx
+        if out['boot_found']:
+            tb = at_offset(rows, bidx)
+            out['boot_to_marker'] = t - tb
+            out['lead_to_boot'] = tb - first_byte
     return out
 
 
@@ -411,8 +431,8 @@ def report_seating(d, top, each=False):
     return 1 if neg else 0
 
 
-def report_prompt(prefix, marker):
-    r = to_prompt(prefix, marker)
+def report_prompt(prefix, marker, boot_marker=BOOT_MARKER):
+    r = to_prompt(prefix, marker, boot_marker)
     # The PREFIX AS GIVEN, not its basename: nine seatings hold a capture
     # called `A-catch`, and a column of nine identical names is a table nobody
     # can read a number out of.
@@ -422,6 +442,13 @@ def report_prompt(prefix, marker):
     print('%-34s open->first %7.3f s   first->%s %7.3f s   open->%s %7.3f s'
           % (prefix, r['open_to_first'], marker, r['first_to_marker'],
              marker, r['open_to_marker']))
+    if r.get('boot_found'):
+        print('%-34s   %s->%s %7.3f s   (lead %.3f s before %s)'
+              % ('', boot_marker, marker, r['boot_to_marker'],
+                 r['lead_to_boot'], boot_marker))
+    else:
+        print('%-34s   %r is not in this capture before the marker -- the '
+              'CPU-relative interval is NOT reported' % ('', boot_marker))
     return 0
 
 
@@ -646,6 +673,58 @@ def selftest():
             assert abs(r['first_to_marker'] - 7.0) < 1e-9, r
     case('P5', 'to-prompt splits open->first byte from first byte->prompt', p5)
 
+    # -- P7 the power-on glitch byte, which is what `CLK-18`'s two groups were.
+    # 量 2026-09-01: six of fifteen cold captures open on one line-transition
+    # byte 0.321-0.350 s before `Booting`.  This is that shape, with the lead
+    # made exactly 0.350 s so the two intervals must differ by it.
+    def p6():
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'cap')
+            with open(p + '.log', 'wb') as f:
+                f.write(b'\x00\r\nBooting...\r\n---RealTek---\r\n<RealTek>')
+            with open(p + '.timing', 'w', encoding='utf-8') as f:
+                # byte 0 is the glitch; `Booting` starts at offset 3.
+                f.write('# offset seconds\n0 1.000\n1 1.350\n30 3.500\n')
+            r = to_prompt(p, DEFAULT_MARKER)
+            assert r['boot_found'], r
+            assert abs(r['first_to_marker'] - 2.5) < 1e-9, r
+            assert abs(r['boot_to_marker'] - 2.15) < 1e-9, r
+            assert abs(r['lead_to_boot'] - 0.35) < 1e-9, r
+            assert abs((r['first_to_marker'] - r['boot_to_marker'])
+                       - r['lead_to_boot']) < 1e-9, r
+    case('P7', 'a power-on glitch byte moves first->prompt and leaves '
+               'Booting->prompt alone', p6)
+
+    # -- N11 no `Booting`: the CPU-relative interval is ABSENT, not defaulted.
+    def n9():
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'cap')
+            with open(p + '.log', 'wb') as f:
+                f.write(b'J 80500000\r\nsomething else\r\n<RealTek>')
+            with open(p + '.timing', 'w', encoding='utf-8') as f:
+                f.write('# offset seconds\n0 1.000\n1 1.010\n29 3.000\n')
+            r = to_prompt(p, DEFAULT_MARKER)
+            assert r['found'], r
+            assert r['boot_found'] is False, r
+            assert 'boot_to_marker' not in r, r
+    case('N11', 'with no `Booting` the CPU-relative interval is absent, not '
+               'silently equal to the other one', n9)
+
+    # -- N10 `Booting` AFTER the marker is not an origin either: a warm capture
+    # whose prompt precedes the reset would otherwise report a negative
+    # interval as a number.
+    def n10():
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'cap')
+            with open(p + '.log', 'wb') as f:
+                f.write(b'<RealTek>J BFC00000\r\nBooting...\r\n')
+            with open(p + '.timing', 'w', encoding='utf-8') as f:
+                f.write('# offset seconds\n0 1.000\n1 1.010\n35 3.000\n')
+            r = to_prompt(p, DEFAULT_MARKER)
+            assert r['found'] and r['offset'] == 0, r
+            assert r['boot_found'] is False, r
+    case('N10', '`Booting` after the marker is not taken as the origin', n10)
+
     # -- N8 a marker that is not there exits 1 and says so -----------------
     def n8():
         with tempfile.TemporaryDirectory() as d:
@@ -723,6 +802,21 @@ def selftest():
             IDENTITY_TOL = keep
     case('A1', 'the identity check is reachable, not decoration', a1)
 
+    # -- A2 the case ids are unique.  Written 2026-09-01 after this edit gave
+    # `P6` and `N9` a second occupant each: a duplicated id means a red line
+    # cannot be mapped back to the case that produced it, and every count this
+    # repository keeps of "n controls" is then a count of runs and not of
+    # cases.  It reads the source rather than the run, so it sees a case that
+    # is registered and never reached.
+    def a2():
+        with open(os.path.abspath(__file__), encoding='utf-8') as fh:
+            src = fh.read()
+        ids = re.findall(r"^    case\('([A-Za-z0-9]+)'", src, re.M)
+        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        assert not dupes, 'duplicate case id(s): %s' % dupes
+        assert len(ids) >= 25, ids
+    case('A2', 'every case id in this file is unique', a2)
+
     print('looptime %s -- self-test' % VERSION)
     for cid, what in ok:
         print('  ok    %-4s %s' % (cid, what))
@@ -746,6 +840,9 @@ def main(argv):
     ap.add_argument('--top', type=int, default=5,
                     help='how many of the largest gaps to name (default 5)')
     ap.add_argument('--marker', default=DEFAULT_MARKER)
+    ap.add_argument('--from-marker', dest='boot_marker',
+                    default=BOOT_MARKER,
+                    help='the CPU-relative origin for to-prompt (default %r)' % BOOT_MARKER)
     ap.add_argument('--each', action='store_true',
                     help='one row per capture, on the seating\'s own clock')
     ap.add_argument('--self-test', action='store_true')
@@ -763,7 +860,8 @@ def main(argv):
             if a.mode == 'seating':
                 worst = max(worst, report_seating(p, a.top, a.each))
             else:
-                worst = max(worst, report_prompt(p, a.marker))
+                worst = max(worst, report_prompt(p, a.marker,
+                                                 a.boot_marker))
     except Refused as e:
         sys.stderr.write('looptime: %s\n' % e)
         return 2
