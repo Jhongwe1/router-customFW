@@ -92,6 +92,13 @@ measurement.
   vendor kernel contains 37 of them, D side only; none has been executed by
   anything of this project's.
 * **The pipeline hazards**, which need a controlled loop and a timing harness.
+* **How long the watchdog actually takes to fire.** `SPEC.md` `CLK-08` has been
+  an empty cell since the seating of 2026-08-24, where the cell that would have
+  filled it did not run. It stopped being merely open on 2026-09-01: `R4`'s
+  scripted reset is built on a watchdog timeout, and **a reset whose duration
+  nobody has measured cannot be put in an automated loop** — the loop would have
+  to guess how long to wait, and a guess that is sometimes too short reads as a
+  board that did not come back.
 * **`RLXFW-ID0`, the build-identity string added on 2026-09-01, has never been
   read off the board.** It is checked in the image — present once in mine,
   absent from the vendor's — and its behaviour on the wire is 推 until a
