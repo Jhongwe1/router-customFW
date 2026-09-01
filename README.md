@@ -81,6 +81,16 @@ undeclared until 2026-08-28 — one of them normally produced by a curses
 program, which is not a step anyone else can reproduce.
 
 
+**[`notes/incremental-build.md`](notes/incremental-build.md)** 🆕 — why a
+`make` with nothing touched rebuilt all 599 objects, and what it cost to find
+out. The answer is not the one the question was opened on: a patch written for
+the stated cause froze both suspect timestamps and the rebuild stayed at 599.
+kbuild's own `V=2` names the real one — 597 of the 599 `CC` lines say
+`- due to command line change`, and the two strings being compared are
+byte-identical until make truncates one of them at a bare `#`. 🔴 It also
+carries what the fix does **not** buy: zero on this project's default path,
+because a freshly staged tree has no object files to keep.
+
 **[`notes/kernel-build.md`](notes/kernel-build.md)** 🆕 — how rlxfw's own kernel
 is built, wrapped and reached: which toolchain (`rsdk-1.3.6-4181`, with the
 condition that would refute the choice), what the configuration may differ by,

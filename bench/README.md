@@ -793,8 +793,17 @@ paragraph.")*
 **What `R0` is entitled to**, so that the gap does not also lose the finding:
 `G8-pre` → `G8a` → `G8b` read `0x000000` and `0x060000` three times
 across three power cycles, and 量 2026-08-30 all three rounds are byte-identical
-at both addresses — **512 of 4,194,304 bytes unchanged** across the span. That
-is the strongest flash statement this project has, and it is 0.012 % of the part.
+at both addresses — **512 of 4,194,304 bytes unchanged** across the span, which
+is 0.012 % of the part. 🔄 **2026-09-02: this read *the strongest flash
+statement this project has*, and it stopped being that on 2026-08-31.** Seating
+8's bracket reads **four** windows rather than two — adding `H601` and the
+canary page at `0x006400` — for **1,024 bytes = 0.0244 %**, with every
+destination read *before* its `FLR` so that *the `FLR` wrote* is measured rather
+than assumed; seating 9 repeated it after twenty scripted resets. The reading
+above is unchanged and still correct as history. **What was wrong was the
+superlative**, which is a claim about this repository's own state kept in a
+second place — `CNT-1`'s class, and it sat here for two days because nothing
+re-derives a word like *strongest*.
 🔴 **What ran inside the span is TWO captured kernel executions and one
 inferred**, not three measured: `G6` and `G7` are captures; the `24e` cycle's
 boot is *推*, because `bench/2026-08-24e/A-catch.log` expires at the loader
@@ -1019,3 +1028,80 @@ be committed*, now at eight files.
 is the **workstation's** adapter, `HOST` class under `leakscan --attribute`, not
 this unit — the row that decided it is `SPEC.md` `FLS-22`. Unchanged practice,
 checked rather than assumed.
+
+---
+
+## 2026-09-01 — seating 9, `R4-2`. Two power cycles
+
+⚠️ **This section was written on 2026-09-02, a day after the seating, by the
+audit that also added `2026-09-02` below.** It is late, and saying so is the
+point: this file indexes every directory under `bench/`, and a seating that
+lands without a row here is invisible to anyone reading the map rather than the
+log. 量 at the time of writing: **19** directories on disk, **two** with no
+entry, and both are fixed in this commit.
+
+| | |
+|---|---|
+| **`2026-09-01`** | 🟢 **The loop closed without the power switch.** Power cycle 1 holds exactly one capture, `Y0-A`, and it is **void** — the capture opened 1.093 s after the board started talking, so the `ramSize:` line is not in it, and a cold-boot reading that is missing its own discriminator is not a reading. It was retaken on power cycle 2 rather than reasoned around, which is the cheapest moment that mistake can be caught. Power cycle 2 holds everything else: `Y-*` for block 5 and `T-*` for block 6, **43 `.log` files in total** |
+
+**What it establishes.** `J BFC00000` **is** a reset on this silicon, **21 out
+of 21** — the command echo, `Booting...`, then `C-8`'s discriminator
+`Reboot Result from Watchdog Timeout!` where a cold boot prints one space, then
+a reachable prompt. Twenty consecutive successes give a 95 % upper bound of
+**13.9 %** on the per-reset failure rate, and that is not the same sentence as
+*the loop is reliable*: the second needs hundreds and one seating cannot hold
+them.
+
+`T-rz` through `T-3` is a whole `edit → result` with nothing physical touched —
+reset, rescue, **1,029,120 bytes** of TFTP in 1.54 s, `J 80500000`, a shell
+whose log is **byte-identical to `bench/2026-08-31b/X-3.log`**, 849 bytes. It
+also answers what the loader's own semantics raised: an `FLR` writes the TFTP
+length global so no `put` may follow it, and a watchdog reset clears it.
+
+🔴 **Zero flash-write commands**: all four `FLR`s are reads. Four windows,
+**1,024 bytes of 4,194,304 = 0.0244 %**, all byte-identical to the 2026-08-16
+dump after twenty resets, with four RAM destinations no `FLR` here had used so
+`MEM-17`'s retention path could not pre-fill them, and all four pre-reads
+differing. **The forbidden sentence did not move.**
+
+🔴 **Two things went wrong and both are recorded rather than tidied.** `Y-ab`
+predicted `AUTOBURN` = `00000000` and the board answered `00000001`, which is
+the power-on default (`REG-23`) — the expectation had been inherited from a card
+that ran a rescue first, and block 5 has no rescue. `Y-wd0`/`Y-wd1` both read
+`A5000000`, so `WatchDogIND` is recorded 未定 and `C-8`'s string is the only
+observable left.
+
+| file | cells | why it exists |
+|---|---:|---|
+| `2026-09-01/PREDICTIONS-B7-block5.md` | 24 | 🔴 the first card in this project with **no command rows at all** — it names what goes on the wire and not the instrument, the output path or the terminator |
+| `2026-09-01/PREDICTIONS-B7-block6.md` | 18 | the operator's card: block 5's cells turned into lines to type, plus 18 of its own. The first card here whose every row carries `--idle` |
+| `2026-09-01/CORRECTIONS-block6.md` | — | one item, and it carries this project's first `superseded-by:` line — `Y0-A` → `Y-A`, in the format `PRED-1` asks for. ⚠️ No tool reads that line yet |
+
+`T0-rescue.json` is the rescue report `loader-tftp.py put` was given, so the
+upload's load address was checked against a recorded reading rather than typed.
+
+---
+
+## 2026-09-02 — the card for the next seating, written before power
+
+| | |
+|---|---|
+| **`2026-09-02`** | **A card and nothing else yet.** `PREDICTIONS-B8-block7.md`, **9 cells**, `LP-*`. No capture has landed against it, so `check-predictions` reads 0 of 9 here, which is what an un-run seating looks like and not a failure |
+
+**What it is for.** Three things. ① `R4-3`'s `D3` on real silicon:
+`tools/looprun.py` asserts that the console printed **the recipe id the build
+computed** — `RLXFW-ID0=B1434383` — which nobody types at the bench. ②
+`ESC-1`: two reset cells at `--esc-period 0.0005`, where seating 9's twenty-one
+resets ran at `0.002` and could not separate `entry` from one read period. ③
+`CARD-1`: every row carries a **precondition**, and `LP-ab`/`LP-ab2` are the
+same command with different expectations so that the column is load-bearing
+rather than decorative.
+
+🔴 **This block runs no `FLR`.** The flash bracket therefore stays at
+**0.0244 %** and the forbidden sentence is exactly as unsayable afterwards.
+Written down so that a seating with no bracket is a recorded decision.
+
+⚠️ **`looprun --mode bench` has never run against a board.** Its 26 controls are
+all synthetic, so the card's hand-typed column is complete rather than a
+summary: a tool's first seating is not the place to have only one way to get the
+reading.
