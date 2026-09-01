@@ -299,11 +299,16 @@ under 0.02 s, so their first byte is not the line coming up and their second
 interval is not the board booting. `2026-08-24e`'s `A-catch` never reaches a
 prompt at all — that is the seating that stopped.
 
-⚠️ **The 14 fall in two groups** — eight at 2.176–2.417 and six at
-2.582–2.636 — and 量 the metadata: it follows neither the ESC period (`0.002`
-and `0.02` both appear in each group) nor the tool version. A 300 ms
-separation is an order of magnitude larger than `CLK-15`'s cold-versus-warm
-effect. **Unexplained, and recorded as a cell rather than a footnote.**
+⚠️ **The 14 fall in two groups — NINE at 2.176–2.417 and FIVE at
+2.582–2.636**, separated by 0.165 s with nothing between them, and 量 the
+metadata: the split follows neither the ESC period (`0.002` and `0.02` both
+appear in each group) nor the tool version. The full spread is 0.460 s, 21 %
+of the smallest value, where `CLK-15`'s cold-versus-warm effect measured
+within one power cycle is +4.5 ms and +14.5 ms — an order of magnitude
+smaller. **Unexplained, and recorded as a cell rather than a footnote.**
+*(This read "eight … and six … a 300 ms separation" until the numbers were
+re-derived from the fourteen values: it is nine and five, and the separation
+between the groups is 165 ms.)*
 
 ### 6.2 S5, S7 — upload and boot
 
