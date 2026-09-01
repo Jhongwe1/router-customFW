@@ -212,7 +212,10 @@ recipe line make decides to run. One run answers it:
 
 `arg-check` compares the command saved in `.<target>.o.cmd` with the one make
 computes now. 量 on `init/main.o`, both strings extracted and compared word by
-word: **byte-identical, 1,132 characters, zero differing words.**
+word: **byte-identical, 1,132 bytes, zero differing words.** (1,132 is with the
+trailing newline both extractions kept; the table below counts the same line
+without it, which is why it reads 1,131. Two measurements of one line, and
+naming that here rather than letting a reader find two numbers for one thing.)
 
 What differs is what make *loads*:
 
@@ -225,6 +228,16 @@ What differs is what make *loads*:
 `-D"KBUILD_STR(s)=` — **a bare `#` in a makefile starts a comment**. So
 `arg-check` compares a truncated string against a whole one, can never match,
 and every object rebuilds forever.
+
+🟢 **And the two exceptions are the two that survive the fix**, which is
+the closure that makes this more than a plausible story. Re-deriving the V=2 log
+one line at a time: of its **599** `CC` lines, **597** say `command line change`
+and exactly **two** name a real prerequisite —
+`drivers/net/wireless/rtl8192cd/8192cd_hw.o`, naming all ten `data_*.c` files
+Realtek regenerates every build, and `init/version.o`, naming
+`include/linux/compile.h`. Those are precisely the two objects a no-op `make`
+still compiles after the fix (§5.6). **The 597 that had a spurious reason stop;
+the 2 that had a real one continue.** Nothing was tuned to make that come out.
 
 ### 5.3 Whose bug it is, and the fix is mainline's own again
 
@@ -421,3 +434,32 @@ count went down"* looks like a regression and is the opposite.
 * ⚠️ **`init/version.o`'s self-perturbation is not chased.** It is what makes
   the floor 2 instead of 0, and removing it means changing what the banner
   says, which is `P4a`'s territory and not this file's.
+
+### 6.1 ⚠️ How far this generalises, and it is 推 rather than 量
+
+Nothing above is specific to Realtek: the two files involved are byte-identical
+to mainline v2.6.30, and the failing escape is in `scripts/Kbuild.include`,
+which every kernel of that era ships. **So the inference is that any kernel old
+enough to carry the `$(subst \#,\\\#,…)` form of `make-cmd`, built with a make
+new enough to treat `\#` the way 4.3 does, loses `arg-check` entirely and rebuilds
+everything on every invocation.** That would be a large class of embedded vendor
+trees.
+
+🔴 **It is an inference and this file does not measure it.** What is measured is
+one tree and one make: `linux-2.6.30` as three GPL drops ship it, under GNU Make
+4.3 on WSL2 Ubuntu 24.04. Three things would each falsify or bound the
+generalisation and none has been done here:
+
+* **which make version changed the behaviour.** §5.3 says explicitly that this
+  is not established. A second make — 3.81, 4.0, 4.2 — on the same tree would
+  bound it, and it costs one `apt` and one no-op build;
+* **when mainline replaced `make-cmd`.** The `$(pound)` form is in current
+  mainline; the commit that introduced it, and therefore which kernels are
+  already safe, was not looked up;
+* **whether `-D"KBUILD_STR(s)=…"` is the only source of a bare `#`.** It is the
+  one this tree hits. A command line carrying a `#` for any other reason would
+  fail the same way, and no census of that was taken.
+
+It is written down because *"this is probably not just us"* is a useful thing
+for a reader to know and a dangerous thing to state as a finding. **The claim
+this file makes is about this tree.**
