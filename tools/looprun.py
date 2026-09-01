@@ -364,6 +364,17 @@ def selftest(out=sys.stdout):
        verdict(good.replace("RLXFW-ID0=b1434383\r\n", ""), "b1434383"))
     ck("N4", "🔴 a STALE image: every mark right, the id from another build",
        (True, True, False, True), verdict(good, "d31f60bd"))
+    # 🔴 The board prints UPPER case -- `rlxfw_puts_hex`'s own contract is
+    # "eight upper-case hex digits" -- and the fixture above is lower case, so
+    # until this case existed the suite exercised a form the device never
+    # sends. The comparison folds case; that is now asserted rather than
+    # assumed.
+    ck("N4b", "🔴 the board's UPPER-case form is accepted",
+       (True, True, True, True),
+       verdict(good.replace("RLXFW-ID0=b1434383", "RLXFW-ID0=B1434383"), "b1434383"))
+    ck("N4c", "and upper case does not make a WRONG id match",
+       (True, True, False, True),
+       verdict(good.replace("RLXFW-ID0=b1434383", "RLXFW-ID0=B1434383"), "d31f60bd"))
     ck("N5", "no prompt trips A4 and only A4", (True, True, True, False),
        verdict(good.rsplit("\r\n", 1)[0], "b1434383"))
     ck("N6", "the build printed no recipe: A3 fails rather than passing",
