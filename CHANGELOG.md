@@ -1,5 +1,69 @@
 # Changelog
 
+🟢 **2026-09-01, twenty-third session, desk: `R4-0` and `R4-1`** — the
+development loop is measured, stage by stage, with machine time and human time
+in different columns. 🔴 **The predictions were committed BEFORE the
+measurement and that commit holds no numbers** (`c90cdc8`): `check-predictions.py`
+proves that ordering for bench captures by mtime and cannot do it for desk
+timings, so git's own history is the substitute a reader can check.
+
+**The machine pipeline is 50.4–71.0 s** — build 38–58, image assembly 3.6–4.1,
+TFTP 1.5–1.6, `J` to a shell 7.260 — so `D4`'s 90 s is met with 19–40 s of
+margin and the gate's stop-loss clause for the opposite outcome does not fire.
+🟢 **NFS root leaves this gate**: it removes an upload worth 2.2–3.3 % of that
+total and **0 %** for a kernel change, and `R5` is six kernel drivers.
+
+🔴 **Four of the eight predictions were refuted and two of them were this
+project's own beliefs.** The 480 MB re-stage that another committed file calls
+the loop's structural cost is **1.4–2.1 s warm, 3–4 % of the build**. Image
+assembly is 3.6–4.1 s where 5–25 was predicted.
+
+🔴 **`--keep`'s tension is closed from both ends, and neither end is where the
+gate expected it.** It buys about **5 %**, because `make vmlinux` recompiles
+all **599** objects with nothing touched, twice in a row — measured, and with
+no `.config` re-install either. And it refuses to run with `--marks` at all.
+Its reproducibility cost is now a number: **2 bytes of 3,968,240**, the `#1`
+against `#3` in `linux_banner` and `init_uts_ns`, which closes `P4a`'s `L2-6`.
+**The real target is named instead**: `include/linux/bounds.h` and
+`include/asm-rlx/asm-offsets.h` are rewritten with byte-identical content and a
+fresh mtime on every make, and 580 of 731 `.cmd` files name one of them.
+
+- `tools/looptime.py` (22 controls) + `tools/test-looptime-mutants.py` (20
+  mutants + `B0`), both wired into CI. 🔴 **The mutation pass found three live
+  on the first run and each named a different kind of defect**: a shim no test
+  could reach (deleted, not tested), a constant no input can constrain (the
+  identity is algebraic — recorded as a limitation beside the row rather than
+  swapped for a mutant that dies), and one genuinely missing case. **`B0` also
+  fired for real**: the unmutated tool was red through the harness, and the run
+  refused to report 20 kills against a suite that was already failing.
+- 🔴 **The overlap every seating appeared to have is the instrument's own
+  rounding, and the bound is derived rather than chosen.**
+  `console-capture.py:431` writes `started_wallclock` through `strftime`, so it
+  is truncated to the second while `duration_s` keeps microseconds; a pair can
+  be shown to overlap only below −1 s, and 量 over `bench/`, more than a
+  hundred negative gaps sit at about −0.09 s and not one is below −1.
+- **`bench/2026-09-01/PREDICTIONS-B7-block5.md`** — `R4-1`, frozen, 24 cells,
+  `0 of 24` at the desk, both directions written. `N = 20` **with what 20
+  proves written beside it**: a 95 % upper bound of 13.9 % on the per-reset
+  failure rate, which refutes a reset that fails often and does not make the
+  loop reliable. 🔴 The directory is named for the day the block was **frozen**,
+  not the day the seating happens, and it does not move afterwards — renaming a
+  frozen block destroys the only evidence that the prediction came first.
+- 🔴 **`CI-1`'s recorded repair is corrected**: `FWRE_WORK=$(mktemp -d)` is not
+  a runner. 量, same commit, same suite — `test-rlxprobe` is 114 passed / 102
+  failed with it set to an empty directory and **216 passed / 0 failed** with
+  it unset.
+- **The `check-predictions --sweep` diagnostic owed since the eighteenth
+  session**: the 34 cells with no capture are **three** causes, not one — 9 a
+  seating that never happened, 11 seatings that stopped, and 14 rounds voided
+  at the bench and re-run under a new prefix. The tool reports all three with
+  one sentence and the third is not "a seating that stopped".
+- `PROGRESS.md`'s session ladder goes **38 rows to 3**, the other 35 moved
+  verbatim with their labels frozen (`LADDER-1` closes). The recurring cost was
+  the labels, not the rows.
+- **No retrospective `v0.0` release**, by the owner's decision; the rule is
+  followed from `v0.3`. 量: `gh release list` returns one row.
+
 🟢 **2026-08-31, twentieth session, desk: `R3` CLOSES** — twelve steps of
 twelve, and D1 through D5 all holding **in one boot** with the discriminator
 present, which is what the gate's own refutation condition asked for rather

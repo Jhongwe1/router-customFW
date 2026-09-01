@@ -351,7 +351,7 @@ piece of Level 2 that this session closed.
 | L2-3 | the build tree's absolute path reaching the image (`__FILE__`, `-g`, `.comment`) | 🟢 **measured away**: 量 on `p4a3`, `/home/key` **0** hits, `r3-4` **0**, `cells/` **0** |
 | L2-4 | the initramfs source files' own mtimes | 🟢 **closed today**, §5.2 |
 | L2-5 | `LC_ALL` changing `date`'s rendering | ⚠️ **untestable on this host**: `locale -a` returns `C`, `C.utf8`, `POSIX` and nothing else, so no run-time case here can distinguish a driver that pins it from one that does not. The driver pins it and `S5c` asserts on the source text, which is weaker and says so |
-| L2-6 | `#1` from `.version`, which kbuild increments per link | ⚠️ **unmeasured, and bounded**: every cell is re-staged, so `.version` starts absent and reaches 1. `rlxfw-kbuild.sh --keep` would break it, and `--keep` is already marked `[TESTING ONLY]` |
+| L2-6 | `#1` from `.version`, which kbuild increments per link | 🟢 **MEASURED 2026-09-01 (`R4-0`, twenty-third segment), and it costs two bytes.** A fresh cell links once and `.version` reads **1**; the same tree after two `--keep` builds reads **3**. `repdiff` between the two `vmlinux`: **2 differing bytes of 3,968,240 (0.000050 %)**, at `linux_banner+0x3a` in `.rodata` and `init_uts_ns+0xc8` in `.data`, both the digit of `#1` against `#3`. So the row's claim is unchanged — `--keep` does break byte-identity — and its **cost is now a number rather than a worry**, which is what `R4-3` needed in order to decide against it. ⚠️ The bound *"starts absent and reaches 1"* held: every measurement in this file was taken on a re-staged cell. `notes/dev-loop.md` §5.1 |
 | L2-7 | filesystem `readdir` order reaching link order | ⚠️ **unmeasured.** The initramfs is ordered by `config/rlxfw-initramfs.tsv`, so it is not a hazard there; kbuild's own object order is `Makefile`-driven, which is a reading not yet taken |
 
 🔴 **So Level 2 is one open item, one untestable here, and two unmeasured ones,
@@ -364,7 +364,7 @@ rows were settled* and it said *one open item and two unmeasured ones*. Both
 halves were wrong and they were wrong in the same place.** 量, reading the
 status column of the table above one row at a time: 🔴 open **1** (`L2-1`),
 🟢 settled **3** (`L2-2`, `L2-3`, `L2-4`), ⚠️ untestable on this host **1**
-(`L2-5`), ⚠️ unmeasured **2** (`L2-6`, `L2-7`) — seven, and the decomposition
+(`L2-5`), ⚠️ unmeasured **1** (`L2-7`) 🔄 **2026-09-01: `L2-6` moved out of this count when `R4-0` measured it, so the number here is 1 and was 2** — seven, and the decomposition
 in the first half left `L2-5` with no category at all, which is what let the
 second half count it as settled. **Neither number was ever recomputed against
 the table it summarises**; the correction came from a reader re-deriving it, not

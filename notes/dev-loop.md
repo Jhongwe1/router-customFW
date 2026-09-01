@@ -127,3 +127,321 @@ everything nobody named:
    outlier rather than silently averaged in;
 3. it sees only captures. A command that produced no capture, and the whole of
    S4, are outside it.
+
+---
+
+## 4. The desk half, measured 2026-09-01
+
+Host: 8 cores, WSL2 Ubuntu 24.04, `/usr/bin/python3` 3.12.3. Recipe: `--config
+r3-4/out/quietm.config-installed --initramfs r3-9/…/rlxfw-initramfs.spec
+--marks`, `CFLAGS_KERNEL=-fno-if-conversion` from `config/rlxfw-cflags`, stamp
+`1788220800`, recipe id `d31f60bd`, 16 mark rows, 2 host-compat patches. Raw
+log: `$FWRE_WORK/rebuild/r4-0/desk.log`.
+
+Every boundary below is the driver's own stdout, timestamped as each line
+arrived. The driver was not modified.
+
+| cell | `-j` | stage copy | declarations | `oldconfig` | `make` | total |
+|---|---:|---:|---:|---:|---:|---:|
+| `j4a` | 4 | **6.634** cold | 0.169 | 8.367 | 33.445 | **49.538** |
+| `j8a` | 8 | 1.356 | 0.175 | 7.754 | 34.456 | **44.754** |
+| `j4b` | 4 | 2.132 | 0.260 | 10.380 | 43.502 | **58.045** |
+| `j8b` | 8 | 1.474 | 0.188 | 8.192 | 25.649 | **36.543** |
+
+*`total` is measured outside the driver and exceeds the sum of the phases by
+0.7–0.9 s, which is `bash` starting and the driver reading its two declaration
+files before it prints anything. Named rather than distributed.*
+
+**All four produced `vmlinux` sha256 `6268def94281659a`** — byte-identical at
+two different `-j` settings, which is a fifth and sixth replication of `P4a`'s
+Level-1 claim and the first with the declared stamp and `ID0` in place.
+
+Three more machine stages, same session:
+
+| stage | n | measured |
+|---|---:|---|
+| `rtkimage.py build` (S3) | 2 | **3.551 / 4.131 s** |
+| `mkinitramfs build` (userspace iterations only) | 1 | **0.159 s** |
+| `vendor-tripwire.sh -- true`, the envelope every `run` pays | 3 | **2.583 / 2.613 / 2.772 s** |
+
+The tripwire is paid twice per build — once around `oldconfig`, once around
+`make` — so **about 5.2 s of every build total is the tripwire**, and the
+`oldconfig` and `make` columns above each contain one of them.
+
+### 4.1 🔴 The 480 MB re-stage costs 1.4–2.1 s, and this project has been treating it as the reason the loop is slow
+
+`study/20260828-study5.md` records the re-stage as the loop's structural cost.
+量: **1.356 / 1.474 / 2.132 s warm**, which is **3–4 %** of the build. `j4a`'s
+6.634 s is the one cold-cache reading — WSL had been up 27 seconds — and it is
+the only value that lands in `P2`'s predicted 5–15 s band.
+
+**`P2` is refuted.** The re-stage is not the cost. It is also the only thing
+`--keep` actually skips.
+
+---
+
+## 5. 🔴 `--keep` cannot buy what `R4-3` was braced to fight over, and the reason is that this tree has no incremental build at all
+
+The gate's stop-loss says `--keep` may not be turned on to hit a number. It was
+written expecting a large speedup with a large reproducibility cost. Both
+halves are now measured and both are small.
+
+| run | elapsed | `make` phase | `CC` lines |
+|---|---:|---:|---:|
+| `j4a`, fresh stage | 49.538 | 33.445 | 599 |
+| `j4a --keep`, **nothing changed** | 39.638 | 33.868 | 599 |
+| `j4a --keep`, one `.c` touched | 38.618 | 33.871 | 599 |
+| bare `make vmlinux`, nothing touched, no `.config` re-install | 30.881 | — | 599 |
+| the same, immediately again | 30.738 | — | 599 |
+| the same after `cp .config` | 34.403 | — | 599 |
+
+**A `make vmlinux` with nothing touched recompiles all 599 objects, twice in a
+row.** So `--keep` skips the stage copy and the patch and mark steps and
+nothing else: **1.5–2.4 s of a 50 s build, about 5 %**.
+
+And it cannot be used with today's recipe at all. `--keep --marks` **refuses**,
+in 0.236 s, before any copy:
+
+```
+j4a: rlxfw-marks apply FAILED
+rlxfw-marks: MK: obj-y += rlxfw_mark.o is already in
+  linux-2.6.30/arch/rlx/kernel/Makefile. This tree is not clean; re-stage it
+```
+
+讀 `rlxfw-kbuild.sh` before running it: the marks block is guarded by `$MARKS`
+and not by `$KEEP`. The refusal is the mark tool's once-only anchor rule doing
+exactly what it exists for.
+
+### 5.1 🟢 And `P4a`'s `L2-6` closes, at two bytes
+
+`notes/reproducible-build.md` `L2-6` carried *"unmeasured, and bounded"* for
+`.version`. 量: a fresh cell links once and `.version` reads **1**; the same
+tree after two `--keep` builds reads **3**. `repdiff` between the two images:
+
+```
+differing bytes: 2 of 3968240  (0.000050 %)
+  0x2701fe  .rodata  linux_banner+0x3a   #1 -> #3
+  0x299438  .data    init_uts_ns+0xc8    #1 -> #3
+```
+
+So `--keep` does break byte-identity, it breaks it in exactly two bytes, and
+the mechanism is a monotonic link counter no third party can reproduce without
+knowing how many times the tree was linked. **The claim is unchanged; what
+changed is that its cost is a number instead of a worry.**
+
+### 5.2 What actually forces the rebuild, and it is not the `.config`
+
+量, a no-op `make init/main.o` rewrites eight files. Two of them are kernel
+headers, and both come back with the same digest:
+
+| file | sha256 pass 1 | sha256 pass 2 | mtime |
+|---|---|---|---|
+| `include/asm-rlx/asm-offsets.h` | `f7575686e3719433` | `f7575686e3719433` | moves |
+| `include/linux/bounds.h` | `bd0652b2b7b1a641` | `bd0652b2b7b1a641` | moves |
+
+**Byte-identical content, new mtime, every time.** 讀 the dependency lists
+kbuild itself wrote: `linux/bounds.h` is named in **566 of 731** `.*.o.cmd`
+files and `asm-offsets.h` in **17**; **580 of 731** name at least one. The two
+files that always move are prerequisites of four objects in five.
+
+讀 this tree's top-level `Kbuild`:
+
+```
+always  := $(bounds-file)
+kernel/bounds.s: kernel/bounds.c FORCE
+        $(call if_changed_dep,cc_s_c)
+$(obj)/$(bounds-file): kernel/bounds.s Kbuild
+        $(call cmd,bounds)          # cmd, not filechk and not if_changed
+```
+
+`$(call cmd,…)` is an unconditional redirect, and the comment two lines above
+it in the vendor's own file says why it is there: *"We use internal kbuild
+rules to avoid the 'is up to date' message from make."*
+
+⚠️ **Whether that rule is Realtek's or mainline 2.6.30's is undetermined
+here.** The four GPL drops hold exactly one `linux-2.6.30` between them and no
+mainline tree is on disk, so there is nothing to compare against. One mainline
+2.6.30 `Kbuild` settles it.
+
+🟢 **This is `R4-3`'s target and it is now a named one**: a `config/host-compat/`
+patch giving those two rules a content check would turn a 31 s full rebuild
+into a link. It is not attempted here, and the saving is **not estimated** —
+it is whatever a real incremental link costs on this tree, which nobody has
+measured because none has ever completed.
+
+---
+
+## 6. The bench half, read out of the captures
+
+Nothing was re-run; a power cycle is the most expensive unit this project has.
+Every number names its capture. Produced by `tools/looptime.py`, which arrived
+with this step.
+
+### 6.1 S4 — power to a typeable prompt
+
+`looptime to-prompt` splits the capture at the first byte the board drove. The
+capture is opened before the power goes on, so *open to first byte* is the
+operator's hand and *first byte to `<RealTek>`* is the board.
+
+| | n | measured |
+|---|---:|---|
+| open to first byte (the operator) | 14 | **1.683 – 36.399 s** |
+| first byte to `<RealTek>` (the board) | 14 | **2.176 – 2.636 s**, median **2.308 s** |
+
+Three captures are excluded and the reason is in the numbers: the `A-catch` of
+`2026-08-24d`, `2026-08-24f` and `2026-08-30b` each show *open to first byte*
+under 0.02 s, so their first byte is not the line coming up and their second
+interval is not the board booting. `2026-08-24e`'s `A-catch` never reaches a
+prompt at all — that is the seating that stopped.
+
+⚠️ **The 14 fall in two groups** — eight at 2.176–2.417 and six at
+2.582–2.636 — and 量 the metadata: it follows neither the ESC period (`0.002`
+and `0.02` both appear in each group) nor the tool version. A 300 ms
+separation is an order of magnitude larger than `CLK-15`'s cold-versus-warm
+effect. **Unexplained, and recorded as a cell rather than a footnote.**
+
+### 6.2 S5, S7 — upload and boot
+
+| | n | measured | source |
+|---|---:|---|---|
+| TFTP put, about 1 MB | 4 | **1.545 / 1.553 / 1.595 / 1.639 s** | `bench/*/[LVWX]1-put.json` |
+| TFTP put, 19–29 KB payload | 2 | 0.040 / 0.058 s | `H1a-put.json`, `Q0-put.json` |
+| `J` to shell prompt, `quietm` | 1 | **7.260 s** | `SPEC.md` `FW-32` |
+
+### 6.3 The seating, end to end
+
+| seating | captures | span | instrument held | dead | median gap | largest gap |
+|---|---:|---:|---:|---:|---:|---:|
+| `2026-08-24b` | 33 | 4868.1 | 200.8 | 4667.3 (95.9 %) | 107.9 | 981.9 |
+| `2026-08-24c` | 46 | 2841.1 | 475.2 | 2365.8 (83.3 %) | 0.9 | 319.9 |
+| `2026-08-25` | 26 | 3084.1 | 552.1 | 2532.0 (82.1 %) | 17.9 | 988.9 |
+| `2026-08-30` | 13 | 842.1 | 397.1 | 445.0 (52.8 %) | 7.4 | 140.9 |
+| `2026-08-30b` | 24 | 607.1 | 369.1 | 238.0 (39.2 %) | 0.9 | 67.9 |
+| `2026-08-30c` | 21 | 1110.1 | 238.7 | 871.4 (78.5 %) | 12.4 | 580.9 |
+| `2026-08-31` | 35 | 1149.1 | 598.2 | 550.9 (47.9 %) | 0.9 | 103.9 |
+| `2026-08-31b` | 27 | 900.1 | 383.5 | 516.6 (57.4 %) | 0.4 | 229.9 |
+| `2026-08-31c` | 49 | 4963.1 | 733.4 | 4229.7 (85.2 %) | 6.9 | 2307.9 |
+
+Two directories refuse rather than report: `bench/2026-08-23` holds four `.log`
+files and no `.meta.json` at all — first silicon, before the format — and
+`bench/2026-08-26` holds a prediction block and no capture, the seating that
+never happened.
+
+🔴 **`P6b` is refuted, and by more than a margin.** It predicted dead time
+above 2× the instrument time. Six of fourteen seatings are above it and eight
+are below, including three of the last four. **The seatings got faster**: the
+first carded one is 95.9 % dead and the three most recent are 39–57 %.
+
+🔴 **`P6a` is refuted, and how it was written is the more useful finding.** Its
+claim — a bimodal distribution with more than 70 % of the dead time in fewer
+than 30 % of the gaps — holds in three of fourteen seatings. Its stated
+refutation condition, *max ÷ median below 10*, fires in **one**. **So the claim
+can fail while the condition written to refute it does not.** A refutation
+condition has to be the negation of the claim; this one was a different
+statement about the same data, and it would have let a false prediction stand.
+
+### 6.4 🔴 The instrument column is not productive time, and reading it as such would have inverted the conclusion
+
+A capture holds the port for the `--seconds` the card asked for, not for as
+long as the board needed. `W-3`, `X-3` and `V-3` each hold **45.1 s** for a
+boot that reaches a shell in **7.260 s**. So **37.8 s of every image iteration
+is a timeout somebody typed**, and a seating with a high *instrument* share is
+not an efficient seating — it is one whose card asked for longer holds.
+
+`console-capture.py` already has `--idle`. No bench card uses it for the boot
+capture. That is `R4-3`'s cheapest single item.
+
+---
+
+## 7. The two totals, against the two numbers already in `SPEC.md`
+
+The step's DoD says the sum is **compared** against the published 49 s and
+7.260 s rather than replacing them, and it does not replace them: 49 s is
+`rep4`'s cell duration and is still true of `rep4`; `FW-32`'s 7.260 s is used
+here as a term.
+
+**The machine pipeline, `-j4`, `quietm`:**
+
+| stage | seconds |
+|---|---|
+| S2 stage + build | 38 – 58 |
+| S3 image assembly | 3.6 – 4.1 |
+| S5 TFTP upload | 1.5 – 1.6 |
+| S7 `J` to shell | 7.260 |
+| **total** | **50.4 – 71.0 s** |
+
+Using only the two cells run under the prediction, 61.9 – 71.0 s; widening to
+every `-j4` cell built with today's recipe — those two plus `p4a1` at 44 s and
+`p4a2` at 38 s, read out of `p4a-run1.log` **after** §2 was committed — gives
+the 50.4 s floor.
+
+🟢 **`D4`'s 90 s is met by the machine pipeline, with 19–40 s of margin.** The
+gate's second stop-loss clause — *if `R4-0` shows the machine stages alone
+exceed 90 s* — does not fire, and `D4` does not need renegotiating.
+
+🔴 **And the margin is not comfort.** The build is **75–82 %** of that total,
+it is a full 599-object rebuild every time (§5.2), and this host's run-to-run
+spread on one configuration is **38–58 s, a factor of 1.5**. Any change worth
+less than about 20 s cannot be shown on this machine with n = 2 — which is why
+`-j8` is recorded below as *not established* rather than as a 24 % saving.
+
+**The turnaround** is a different quantity and S8 dominates it. The most recent
+full-image seating, `bench/2026-08-31`, spans **1149 s** for one upload, one
+boot and twelve userspace commands, of which the machine pipeline is about
+67 s. **The loop as served is roughly 17× the loop as computed.**
+
+---
+
+## 8. Predictions, scored
+
+| id | claim | verdict |
+|---|---|---|
+| P1 | build 45–60 s at `-j4` | **holds** on the two cells run under it (49.5, 58.0); **fails** when widened to the four `-j4` cells of this recipe (38, 44, 49.5, 58.0). The band was too narrow and the population was fixed before it was known |
+| P2 | stage copy 5–15 s and under 30 % | 🔴 **refuted**. 1.4–2.1 s warm, 3–4 % |
+| P3 | `-j8` cuts 15–32 % | ⚠️ **not established**. The medians differ by 24 %, and the within-configuration spread (1.5×) is larger than the effect. `j8a`'s `make` phase is *longer* than `j4a`'s |
+| P4 | image assembly 5–25 s | 🔴 **refuted**. 3.55 / 4.13 s |
+| P5 | machine pipeline 65–95 s | **holds** at the median, 66.5 s; its floor is exceeded by the wider population |
+| P6a | bimodal gaps, over 70 % of dead time in under 30 % of gaps | 🔴 **refuted** — and its refutation condition did not fire, which is a defect in the prediction rather than in the data |
+| P6b | dead time over 2× instrument time | 🔴 **refuted**. 6 of 14 seatings |
+| P7 | the upload is under 3 % of the machine total, 0 % for a kernel change | **holds** on its refutation condition, over 10 %; the point value is 2.2–3.3 % |
+| P8 | the build is more than 60 % of the machine pipeline | **holds**. 75–82 % — the step list's own stated risk, confirmed |
+
+Three held, four refuted, one not established, one split.
+
+---
+
+## 9. What this decides, and what it leaves open
+
+**Decided:**
+
+1. 🟢 **NFS root leaves this gate.** It removes the TFTP upload, which is
+   **2.2–3.3 %** of the machine pipeline, and it removes **none** of it for a
+   kernel change — and `R5`, the gate `R4` exists to serve, is six kernel
+   drivers. `PROGRESS.md`'s `R4` section asked for this decision to be visible
+   if it went this way. It went this way.
+2. 🟢 **`D4` stands as written.** 50–71 s against 90 s.
+3. 🟢 **The `--keep` tension closes without turning `--keep` on.** It buys
+   about 5 %, refuses to run with `--marks` at all, and its reproducibility
+   cost is exactly two bytes. `R4-3` inherits §5.2 instead, which is a bigger
+   prize and does not touch `P4a`'s claim.
+
+**Left open, each with the experiment that would close it:**
+
+* 🔴 the full rebuild, §5.2. One `config/host-compat/` patch; the saving is
+  unmeasured, because no incremental link has ever completed on this tree.
+* ⚠️ whether the `cmd,bounds` rule is Realtek's or mainline's. One mainline
+  2.6.30 `Kbuild`.
+* ⚠️ the 300 ms two-group split in power-to-prompt, §6.1. Apply `C-8`'s
+  cold-versus-warm discriminator to the fourteen captures.
+* ⚠️ the capture holds, §6.4. `--idle` on the boot capture; one seating to
+  confirm it does not truncate the boot text.
+* 🔴 `started_wallclock` is written by `strftime` and truncated to the second
+  while `duration_s` keeps microseconds. Every gap in §6.3 carries ±1 s, and
+  two captures taken in the same second cannot be ordered by it — which
+  matters to `check-predictions.py`, whose own docstring proposes that field
+  as the clone-stable ordering signal it does not yet have.
+
+**Not established and deliberately not chased:** `-j8`. Four of four `-j8`
+cells across three sessions sit below all four `-j4` cells, which is
+suggestive; today's data cannot separate them, and a gate that claimed 24 % on
+that evidence would be reporting the host's variance as a result.

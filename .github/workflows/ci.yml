@@ -345,6 +345,17 @@ jobs:
 
       - name: test-repdiff-mutants
         run: /usr/bin/python3 tools/test-repdiff-mutants.py 2>&1 | tee ci-out/test-repdiff-mutants.out; exit "${PIPESTATUS[0]}"
+
+      # looptime is R4-0's instrument.  It answers the two terms of the
+      # development loop nobody had measured: the dead time between captures
+      # in a seating, and power-on to a typeable prompt split at the first
+      # byte the board drove.  Its fixtures are built in a TemporaryDirectory,
+      # so it needs no capture, no device and no $FWRE_WORK.
+      - name: looptime self-test
+        run: /usr/bin/python3 tools/looptime.py --self-test 2>&1 | tee ci-out/looptime.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-looptime-mutants
+        run: /usr/bin/python3 tools/test-looptime-mutants.py 2>&1 | tee ci-out/test-looptime-mutants.out; exit "${PIPESTATUS[0]}"
       # cardcheck reads a bench card the way the DEVICE will. It exists because
       # seating 7 typed `wc -lc < /dev/mtd0ro` and got `wc: not found`: `wc` is
       # one of this busybox's fifty applets and is NOT one of the eleven busybox
