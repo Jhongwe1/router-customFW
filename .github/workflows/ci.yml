@@ -356,6 +356,25 @@ jobs:
 
       - name: test-looptime-mutants
         run: /usr/bin/python3 tools/test-looptime-mutants.py 2>&1 | tee ci-out/test-looptime-mutants.out; exit "${PIPESTATUS[0]}"
+
+      # xcheck is TOOL-1's instrument, and it is the first thing here that
+      # compares two SUITES' subjects rather than one tool against itself.
+      # looptime and boot-timeline both parse a capture's `.timing`, both map a
+      # byte offset to a time, and both publish an interval anchored two bytes
+      # apart; on 2026-09-01 they disagreed about the third and `SPEC.md`
+      # `CLK-18` cited the wrong one.  Nothing asserted that two tools reading
+      # one file agree, and `ci-census` counts cases per suite and never across
+      # suites.  The self-test's fixtures are synthetic; the sweep reads the
+      # committed captures under `bench/`, which every clone has.
+      - name: xcheck self-test
+        run: /usr/bin/python3 tools/xcheck.py --self-test 2>&1 | tee ci-out/xcheck.out; exit "${PIPESTATUS[0]}"
+
+      # 🔴 The sweep prints ONE `ok` line whatever the corpus size, on purpose.
+      # `test-boot-timeline`'s `B2` hardcoded a population and went red on three
+      # consecutive seatings; a census row that moves when a capture is added is
+      # the single largest recorded source of CI failure here.
+      - name: xcheck sweep
+        run: /usr/bin/python3 tools/xcheck.py sweep 2>&1 | tee ci-out/xcheck-sweep.out; exit "${PIPESTATUS[0]}"
       # cardcheck reads a bench card the way the DEVICE will. It exists because
       # seating 7 typed `wc -lc < /dev/mtd0ro` and got `wc: not found`: `wc` is
       # one of this busybox's fifty applets and is NOT one of the eleven busybox
