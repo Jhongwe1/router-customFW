@@ -170,7 +170,12 @@ The tripwire is paid twice per build — once around `oldconfig`, once around
 
 ### 4.1 🔴 The 480 MB re-stage costs 1.4–2.1 s, and this project has been treating it as the reason the loop is slow
 
-`study/20260828-study5.md` records the re-stage as the loop's structural cost.
+This project has treated the re-stage as the loop's structural
+cost. ⚠️ **The sentence that says so is in a gitignored study file, so a public
+reader cannot check it** — what a public reader can check is
+`tools/rlxfw-kbuild.sh`'s own header, which explains at length why the tree is
+re-staged every time and **never says what it costs**. That absence is the
+gap this measurement fills.
 量: **1.356 / 1.474 / 2.132 s warm**, which is **3–4 %** of the build. `j4a`'s
 6.634 s is the one cold-cache reading — WSL had been up 27 seconds — and it is
 the only value that lands in `P2`'s predicted 5–15 s band.
