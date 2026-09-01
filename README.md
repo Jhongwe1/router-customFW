@@ -462,6 +462,12 @@ tools/reply-size.py        what the loader will send back, in bytes, before it s
 tools/boot-timeline.py     the named intervals of a boot, with the anchor bytes stated.
                            It exists because two adjacent silences of the same length is
                            how a measurement ends up wearing another one's name
+tools/looptime.py          the wall clock of a development loop, out of its own artefacts.
+                           Every capture already carried started_wallclock, duration_s and
+                           a .timing; nothing had joined them, so the dead time in a
+                           seating and the interval from power to a typeable prompt had
+                           never been read.  Its overlap bound is DERIVED -- the wall
+                           clock is truncated to the second and the duration is not
 ```
 
 🔄 **2026-08-29: the case counts are gone from this list, and that is a repair
