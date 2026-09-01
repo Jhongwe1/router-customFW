@@ -74,7 +74,9 @@ Run:  tools/looprun.py --mode plan   --cell L1
       tools/looprun.py --mode replay --cell L1 --replay-boot bench/2026-08-31b/X-3
       tools/looprun.py --mode desk   --cell L1 --replay-boot bench/2026-08-31b/X-3 \\
                        --config ... --initramfs ... --image ...
-      tools/looprun.py --mode bench  --cell L1 --out-dir bench/2026-09-02
+      tools/looprun.py --mode bench  --cell LP --out-dir bench/2026-09-02 \\
+                       --skip S2,S3 --recipe-override b1434383 \\
+                       --image <the image the card names>
       tools/looprun.py --self-test
 
 Exit codes:  0 the loop closed and every assertion held · 1 an assertion failed
@@ -136,8 +138,11 @@ def build_plan(a):
             note="prints `recipe=<8 hex>`; S8 requires the board to print it back"),
         dict(id="S3", name="assemble", kind="desk", argv=[
             "/usr/bin/python3", os.path.join("tools", "rtkimage.py"), "build",
-            "--kernel", a.vmlinux or "<S2's vmlinux>", "--out", a.image],
-            note="the uploadable image"),
+            "--cell", a.cell_top, "--vmlinux", a.vmlinux or
+            os.path.join(a.cell_top, "linux-2.6.30", "vmlinux"),
+            "--label", a.label, "--work", a.work],
+            note="rtkload's own nfjrom is the uploadable image; "
+                 "S6 sends <work>/<label>/kroot/rtkload/nfjrom"),
         dict(id="S4", name="reset", kind="bench", argv=cap + [
             "--out", out + "-rz", "--send", "J " + RESET_TARGET,
             "--esc-after", "10", "--esc-period", "0.002",
@@ -243,15 +248,24 @@ def run_stage(s, cwd, dry, log):
 
 def loop_once(a, out=sys.stdout):
     plan = build_plan(a)
-    timings, recipe = [], None
+    skip = set(x.strip() for x in (getattr(a, "skip", "") or "").split(",") if x.strip())
+    bad = skip - {st["id"] for st in plan}
+    if bad:
+        raise Refused("--skip names no such stage: %s" % ", ".join(sorted(bad)))
+    if "S2" in skip and not getattr(a, "recipe_override", None):
+        raise Refused("--skip S2 removes the only thing that computes the recipe id, "
+                      "so A3 would have nothing to require. Pass --recipe-override "
+                      "with the id the staged image was built from, or do not skip S2")
+    timings, recipe = [], getattr(a, "recipe_override", None) if "S2" in skip else None
     results = []
 
     for s in plan:
         if s["id"] == "S8":
             break
-        if a.mode == "replay" or (s["kind"] == "bench" and a.mode == "desk"):
-            print("  %-3s %-9s SKIPPED (mode=%s)" % (s["id"], s["name"], a.mode),
-                  file=out)
+        if (a.mode == "replay" or (s["kind"] == "bench" and a.mode == "desk")
+                or s["id"] in skip):
+            why = "--skip" if s["id"] in skip else "mode=" + a.mode
+            print("  %-3s %-9s SKIPPED (%s)" % (s["id"], s["name"], why), file=out)
             timings.append((s["id"], None))
             continue
         if a.control == "build-fail" and s["id"] == "S2":
@@ -398,7 +412,8 @@ def selftest(out=sys.stdout):
     class A:
         cell = "L1"; out_dir = "bench/2026-09-02"; port = DEFAULT_PORT
         host = DEFAULT_HOST; config = "cfg"; initramfs = "spec"; jobs = 4
-        image = "img.bin"; vmlinux = None
+        image = "img.bin"; vmlinux = None; cell_top = "top"
+        label = "rlxfw"; work = "work"
     plan = build_plan(A)
     # 🔴 Seven and four, both re-derived after this case failed on 8 and 3.
     # S1 -- the edit -- is not in the plan because no instrument here can time
@@ -416,6 +431,32 @@ def selftest(out=sys.stdout):
     ck("R5", "the reset targets BFC00000 and the boot 80500000", True,
        ("J " + RESET_TARGET) in joined and ("J " + LOAD_ADDR) in joined)
 
+    # 🔴 R6 exists because the first version of this file rendered S3 as
+    # `rtkimage.py build --kernel X --out Y` and that program has neither
+    # flag -- it takes --cell/--vmlinux/--label/--work.  `cardcheck commands`
+    # asks whether a CARD's commands are invocable and nothing asked it of
+    # the tool that renders them, while `--mode plan` is supposed to BE the
+    # card's command column.  A plan whose commands do not run is worse than
+    # no plan: it reads as checked.
+    unknown = []
+    for st in plan:
+        if not st["argv"]:
+            continue
+        prog = next((x for x in st["argv"] if x.startswith("tools/")
+                     or x.startswith("tools\\")), None)
+        if not prog:
+            continue
+        src = os.path.join(ROOT, prog)
+        if not os.path.isfile(src):
+            unknown.append((st["id"], prog, "no such file"))
+            continue
+        body = open(src, encoding="utf-8", errors="replace").read()
+        for tok in st["argv"]:
+            if tok.startswith("--") and tok not in body:
+                unknown.append((st["id"], prog, tok))
+    ck("R6", "🔴 every flag the plan renders exists in the tool it is given to",
+       [], unknown)
+
     # ---- M: the controls the gate asks for, end to end through loop_once
     with tempfile.TemporaryDirectory() as d:
         pre = os.path.join(d, "cap")
@@ -424,7 +465,8 @@ def selftest(out=sys.stdout):
         class B:
             cell = "L1"; out_dir = None; port = DEFAULT_PORT; host = DEFAULT_HOST
             config = "cfg"; initramfs = "spec"; jobs = 4; image = "img.bin"
-            vmlinux = None; mode = "replay"; replay_boot = pre
+            vmlinux = None; cell_top = "top"; label = "rlxfw"; work = "work"
+            mode = "replay"; replay_boot = pre; skip = ""
             recipe_override = "b1434383"; control = None
         devnull = open(os.devnull, "w")
         ck("M0", "🔴 unmutated, mode=replay: the loop reports 0", 0,
@@ -446,6 +488,26 @@ def selftest(out=sys.stdout):
         ck("M4", "no --replay-boot is REFUSED, not vacuously green",
            "refused", got)
 
+        B.replay_boot = pre
+        B.skip = "S9"
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except Refused:
+            got = "refused"
+        ck("M5", "--skip naming a stage that does not exist is refused",
+           "refused", got)
+
+        B.skip = "S2"
+        B.recipe_override = None
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except Refused:
+            got = "refused"
+        ck("M6", "🔴 --skip S2 without --recipe-override is refused",
+           "refused", got)
+        B.skip = ""
+        B.recipe_override = "b1434383"
+
     print("", file=out)
     print("RESULT: %d passed, %d failed" % (passed, failed), file=out)
     return 0 if failed == 0 else 1
@@ -465,10 +527,16 @@ def main():
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--image", default="")
     ap.add_argument("--vmlinux", default=None)
+    ap.add_argument("--cell-top", default="<S2's staged tree>",
+                    help="the staged tree rtkimage builds against")
+    ap.add_argument("--label", default="rlxfw")
+    ap.add_argument("--work", default="<rtkimage work dir>")
     ap.add_argument("--replay-boot", default=None,
                     help="mode=desk: a committed capture PREFIX to assert over")
     ap.add_argument("--recipe-override", default=None,
                     help="mode=desk: the id S8 should require, when S2 did not run")
+    ap.add_argument("--skip", default="",
+                    help="comma-separated stage ids not to run, e.g. S2,S3 when the\nimage is already staged. Skipping S2 REQUIRES --recipe-override")
     ap.add_argument("--control", default=None,
                     choices=["wrong-id", "truncate-boot", "build-fail"],
                     help="deliberately break one input; the run must go red")

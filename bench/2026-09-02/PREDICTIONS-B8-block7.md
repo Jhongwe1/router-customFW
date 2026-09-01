@@ -112,9 +112,20 @@ and the runner's plan come from one list. Run it either way:
 
 ```
 tools/looprun.py --mode bench --cell LP --out-dir bench/2026-09-02 \
+    --skip S2,S3 --recipe-override b1434383 \
     --image $FWRE_WORK/rebuild/bench-only/lp-20260902/rlxfw-lp-20260902.bin \
     --iterations 1
 ```
+
+🔴 **`--skip S2,S3` is deliberate and it is not laziness.** The image is
+already staged and its sha256 is in §2; rebuilding it here would spend 40 s of
+the scarcest resource this project has and would add a failure mode to a run
+that is supposed to be unattended. `--skip S2` removes the only thing that
+computes the recipe id, so the tool **refuses** unless `--recipe-override`
+supplies it — otherwise `A3` would fail for a reason that looks exactly like a
+stale image, which is the one thing that assertion exists to tell apart.
+⚠️ **The card's own §3 rows are the fallback and they are complete**: the
+hand-typed column runs the same four wire commands without the tool.
 
 ⚠️ **`--mode bench` has never run against a board.** Its assertions, its abort
 conditions and its refusals have 23 controls behind them and every one of those
