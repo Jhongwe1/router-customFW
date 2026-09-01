@@ -92,13 +92,17 @@ measurement.
   vendor kernel contains 37 of them, D side only; none has been executed by
   anything of this project's.
 * **The pipeline hazards**, which need a controlled loop and a timing harness.
-* **How long the watchdog actually takes to fire.** `SPEC.md` `CLK-08` has been
-  an empty cell since the seating of 2026-08-24, where the cell that would have
-  filled it did not run. It stopped being merely open on 2026-09-01: `R4`'s
-  scripted reset is built on a watchdog timeout, and **a reset whose duration
-  nobody has measured cannot be put in an automated loop** — the loop would have
-  to guess how long to wait, and a guess that is sometimes too short reads as a
-  board that did not come back.
+* **How long the watchdog takes to fire at its SHORTEST setting.**
+  ⚠️ **This bullet replaces one added and withdrawn on the same day, and the
+  withdrawn one was false.** It read *`CLK-08` has been an empty cell since
+  2026-08-24*. 量: `CLK-08` was measured — **1118.133 ms** at `OVSEL=1001` and
+  **557.583 ms** at `OVSEL=1000`, `bench/2026-08-25/H3c-D4.timing`. The false
+  claim came from `SPEC.md` §17's residual row for the same id, whose prose still
+  said *empty*; a search for `WDT`/`watchdog` in ASCII matched that row and not
+  the measured one, which records the fact in Chinese. **What is genuinely
+  unmeasured is narrower**: both measured points are high `OVSEL` settings, while
+  `J BFC00000` writes `WDTCNR = 0` — the **lowest** setting, 推 2.184 ms by
+  halving, never observed. `R4` predicts it and then measures it.
 * **`RLXFW-ID0`, the build-identity string added on 2026-09-01, has never been
   read off the board.** It is checked in the image — present once in mine,
   absent from the vendor's — and its behaviour on the wire is 推 until a
