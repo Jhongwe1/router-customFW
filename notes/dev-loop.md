@@ -138,6 +138,12 @@ r3-4/out/quietm.config-installed --initramfs r3-9/…/rlxfw-initramfs.spec
 `1788220800`, recipe id `d31f60bd`, 16 mark rows, 2 host-compat patches. Raw
 log: `$FWRE_WORK/rebuild/r4-0/desk.log`.
 
+⚠️ **Both of the last two are readings dated 2026-09-01 and neither is current.**
+`R4-3` added `host-compat/0003` and `0004` on 2026-09-02, so a build from this
+repository now applies **4** patches and the recipe id is **`b1434383`**. The
+numbers above are not corrected, because they describe what THIS measurement
+ran with; a recipe id that moved is exactly what `ID0` exists to report.
+
 Every boundary below is the driver's own stdout, timestamped as each line
 arrived. The driver was not modified.
 
@@ -231,7 +237,10 @@ differing bytes: 2 of 3968240  (0.000050 %)
 
 So `--keep` does break byte-identity, it breaks it in exactly two bytes, and
 the mechanism is a monotonic link counter no third party can reproduce without
-knowing how many times the tree was linked. **The claim is unchanged; what
+knowing how many times the tree was linked. 🔄 **2026-09-02: two bytes is the
+cost while the counter keeps its width.** 量, `#9` against `#10`: **56** bytes,
+because the decimal rendering grows a digit and shifts the rest of
+`UTS_VERSION` in both of its copies. `notes/incremental-build.md` §5.5. **The claim is unchanged; what
 changed is that its cost is a number instead of a worry.**
 
 ### 5.2 What actually forces the rebuild, and it is not the `.config`
@@ -273,6 +282,20 @@ patch giving those two rules a content check would turn a 31 s full rebuild
 into a link. It is not attempted here, and the saving is **not estimated** —
 it is whatever a real incremental link costs on this tree, which nobody has
 measured because none has ever completed.
+
+🔴 **2026-09-02 (`R4-3`): the measurement above stands and the arrow drawn from
+it was wrong.** The two headers *are* rewritten every build with identical
+content — that is reproduced — but they are **not** what forces the 599-object
+rebuild. 量: with a `filechk` patch applied to a staged tree, both mtimes stop
+moving and the rebuild is **still 599**. kbuild's own `V=2` reason macro says
+`597 - due to command line change`; the cause is `arg-check` comparing a
+`.cmd` line that make **truncates at a bare `#`** when it loads it, 1,131 bytes
+on disk against 1,023 in memory. The header rewrite was downstream of the same
+cause: once `arg-check` works, `kernel/bounds.s` is no longer regenerated and
+the rule never runs. `notes/incremental-build.md` §5 owns the whole of it, and
+§5.7 owns the one case where the `filechk` patch is still worth having
+(573 `CC` → 3). ⚠️ **`bounds.h` in 566 of 731 and `580 of 731` above are still
+correct counts of the dependency graph**; what changed is what they explain.
 
 ---
 
@@ -514,10 +537,19 @@ Three held, four refuted, one not established, one split.
 
 **Left open, each with the experiment that would close it:**
 
-* 🔴 the full rebuild, §5.2. One `config/host-compat/` patch; the saving is
-  unmeasured, because no incremental link has ever completed on this tree.
-* ⚠️ whether the `cmd,bounds` rule is Realtek's or mainline's. One mainline
-  2.6.30 `Kbuild`.
+* 🟢 ~~the full rebuild, §5.2. One `config/host-compat/` patch; the saving is
+  unmeasured, because no incremental link has ever completed on this tree.~~
+  **CLOSED 2026-09-02, `notes/incremental-build.md`, and the diagnosis in §5.2
+  was wrong.** It took two patches, and the one that mattered was not the one
+  this bullet names: a no-op `make vmlinux` goes **599 `CC` / 28.0–32.1 s → 2
+  `CC` / 6.9–10.3 s**. 🔴 **And it buys exactly zero on this loop's default
+  path**, because a fresh stage has no object files to keep.
+* 🟢 ~~whether the `cmd,bounds` rule is Realtek's or mainline's. One mainline
+  2.6.30 `Kbuild`.~~ **CLOSED 2026-09-02: mainline's, byte-identical** —
+  `Kbuild` is sha256 `c1065aab0da23578` in mainline v2.6.30 and in all three
+  `linux-2.6.30` trees on disk. So are `scripts/Kbuild.include` and
+  `kernel/bounds.c`. The control is the top-level `Makefile`, which the same
+  comparison reports as 159 changed lines.
 * ⚠️ the 300 ms two-group split in power-to-prompt, §6.1. Apply `C-8`'s
   cold-versus-warm discriminator to the fourteen captures.
 * ⚠️ the capture holds, §6.4. `--idle` on the boot capture; one seating to

@@ -105,6 +105,12 @@ the same two rules, using a macro this tree already ships.
 
 ## 3. What the patch does
 
+🔴 **This section was written before §5 and it describes a patch aimed at the
+wrong cause.** It is kept as written. §5.1 is where `P2` refutes it, §5.2–§5.3
+are the cause it missed and the patch that fixes it
+(`0004-kbuild-make-cmd-pound.patch`), and §5.7 is the measurement that kept
+this one anyway, for a reason that has nothing to do with why it was written.
+
 `config/host-compat/0003-kbuild-filechk-generated-headers.patch`, applied by
 `tools/rlxfw-kbuild.sh` like the other two, failing the build if it does not
 apply.
@@ -162,3 +168,256 @@ stop-loss forbids. What that leaves is a measured number and a decision to put
 in front of the owner, not a faster default arrived at quietly.
 
 ---
+
+## 5. Measured, 2026-09-02
+
+One staged tree, `i1`, `R4-0`'s recipe (`--config quietm.config-installed
+--initramfs r3-9/initramfs/rlxfw-initramfs.spec --marks -j4`,
+`CFLAGS_KERNEL=-fno-if-conversion`, stamp `1788220800`, 16 mark rows).  The
+patch is applied and reverted **in the middle of the sequence, to that same
+tree**, so nothing else can differ between a before and an after.  Raw log:
+`$FWRE_WORK/rebuild/r4-3/exp.log`, `exp2.log`, `exp3.log`.
+
+The full build reproduced `j4a`'s `vmlinux` sha256 **`6268def94281659a`** — a
+seventh replication of `P4a`'s Level-1 claim, on a different day.
+
+### 5.1 The predictions, scored
+
+| # | prediction | outcome |
+|---|---|---|
+| **P1** | negative control: 599 `CC`, both mtimes move, same sha | 🟢 **held.** 599 `CC`, both `1788293473 → 1788293500`, `bd0652b2b7b1a641` and `f7575686e3719433` unchanged |
+| **P2** | after the patch, 0 `CC` and neither mtime moves | 🔴 **REFUTED.** Neither mtime moved and `CHK` went 4 → 6 — the patch did exactly what it says — and the rebuild was **still 599 `CC`** |
+| **P2′** | the first post-patch make still rebuilds everything | 🔴 **refuted in the other direction.** The mtimes froze on the *first* post-patch make, not the second |
+| **P3** | 猜 2–8 s | not reached: the no-op make was 31.2 / 32.1 s, because P2 failed |
+| **P4** | touching one `.c` gives 1 `CC` | 🔴 **REFUTED.** 599, the same as touching nothing |
+| **P5** | correctness: only `.version`'s two bytes | 🟢 **held**, three times: `B→C`, `C→E` and `A→E` each differ in exactly 2 of 3,968,240 bytes, `linux_banner+0x3a` and `init_uts_ns+0xc8` |
+| **P8** | the default path saves exactly zero | 🟢 holds, and §6 is what it costs |
+
+🔴 **So `LOOP-1`'s stated cause is refuted.** The two generated headers are not
+what forces the rebuild. `notes/dev-loop.md` §5.2 measured a real thing — they
+*are* rewritten every build with identical content — and drew the wrong arrow
+from it.
+
+### 5.2 What the cause is, and kbuild says it in its own words
+
+`scripts/Kbuild.include:232` defines a `why` macro that `V=2` appends to every
+recipe line make decides to run. One run answers it:
+
+```
+597  - due to command line change
+ 88  - due to: <prereq list>
+  1  - due to vmlinux.o not in $(targets)
+  1  - due to target is PHONY
+```
+
+`arg-check` compares the command saved in `.<target>.o.cmd` with the one make
+computes now. 量 on `init/main.o`, both strings extracted and compared word by
+word: **byte-identical, 1,132 characters, zero differing words.**
+
+What differs is what make *loads*:
+
+| | bytes | bare `#` |
+|---|---:|---:|
+| the `cmd_init/main.o :=` line as it sits on disk | 1,131 | 1 |
+| the value make holds after `include`-ing that file | **1,023** | **0** |
+
+108 characters are discarded on every read, and the cut is at
+`-D"KBUILD_STR(s)=` — **a bare `#` in a makefile starts a comment**. So
+`arg-check` compares a truncated string against a whole one, can never match,
+and every object rebuilds forever.
+
+### 5.3 Whose bug it is, and the fix is mainline's own again
+
+`scripts/Makefile.lib:139` writes `-D"KBUILD_STR(s)=\#s"`; make unescapes it,
+so the *value* carries a real `#`. `scripts/Kbuild.include:184` is supposed to
+put the escape back before `fixdep` writes it out:
+
+```make
+make-cmd = $(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
+```
+
+量 under **GNU Make 4.3**, on a value carrying one bare `#`:
+
+| form | result | bare `#` | `\#` |
+|---|---|---:|---:|
+| `pound := \#` | `#` | — | — |
+| 2.6.30's `$(subst \#,\\\#,…)` | unchanged | **1** | **0** |
+| mainline's `$(subst $(pound),$$(pound),…)` | `…=$(pound)s…` | **0** | — |
+
+**The escape is a no-op.** `scripts/basic/fixdep.c:140` then writes the command
+verbatim — `printf("cmd_%s := %s\n\n", target, cmdline)`, no escaping anywhere
+in that program — and the bare `#` lands in the `.cmd` file.
+
+🔴 **Neither file is Realtek's.** 量: `scripts/Makefile.lib` is
+`710bda1b500884db` here and in mainline v2.6.30; `scripts/Kbuild.include` is
+`da1c432cee107043` in both. **This is a 2009 kernel meeting a 2020 make**, and
+it is the same class as `host-compat/0001` (perl 5.22 removed
+`defined(@array)`) rather than anything a vendor did. The control is §2's:
+the same comparison reports the top-level `Makefile` as 159 changed lines.
+
+⚠️ **This is not a claim about GNU Make's history.** What is measured is what
+make 4.3 does; when the behaviour changed, and whether 3.81 did something else,
+is not established here and nothing below depends on it.
+
+### 5.4 The second prediction block, scored
+
+Written before the run, in `inc-exp2.sh`'s header:
+
+| # | prediction | outcome |
+|---|---|---|
+| **P12a** | the `#` fix ALONE gives a no-op `CC` count strictly between 0 and 599; 猜 near 580 | 🔴 **refuted, and in the good direction.** **2**, not ~580. So the header rewrite was a *symptom of the same cause*, not a second cause: with `arg-check` working, `kernel/bounds.s` is no longer regenerated, so `bounds.h`'s rule never runs |
+| **P12b** | both patches give 0 `CC` | 🔴 refuted at the letter, held in substance: **2**, and identical to P12a — `0003` adds nothing to this case |
+| **P13** | the `.cmd` holds `$(pound)` and no bare `#`, and what make loads matches | 🟢 **held.** Before: raw 1,131 / loaded 1,023 / 1 bare `#` / no `$(pound)`. After: raw 1,138 / loaded 1,130 / **0** bare `#` / **1** `$(pound)`. The 7-byte growth is `$(pound)` replacing one character, exactly |
+| **P14** | 猜 3–10 s | 🟢 **6.887 / 7.205 / 8.277 s** on the reused tree, 9.274 / 10.320 on a fresh one |
+| **P15** | touching `init/main.c` gives 1 `CC` | ⚠️ **3**, and the two extras are named in §5.6 |
+| **P16** | the incremental image differs only in `.version`'s two bytes | ⚠️ **54 bytes**, and §5.5 is why that is still `.version` and why the published bound needed correcting |
+
+### 5.5 🔴 `L2-6`'s "two bytes" is the cost of a digit, not of the counter
+
+`notes/reproducible-build.md` `L2-6` and `notes/dev-loop.md` §5.1 both record
+`--keep`'s reproducibility cost as **two bytes**, measured on `#1` against
+`#3`. 量 today, a ladder of consecutive links from one tree:
+
+| pair | `.version` | differing bytes | sections |
+|---|---|---:|---|
+| `F1 → G1` | `#7 → #8` | 2 | `.data` `.rodata` |
+| `G1 → F2` | `#8 → #9` | 2 | `.data` `.rodata` |
+| **`F2 → G2`** | **`#9 → #10`** | **56** | `.data` `.rodata` **`.symtab`** |
+| `G2 → G2b` | `#10 → #11` | 2 | `.data` `.rodata` |
+| `A → H` | `#1 → #12` | 54 | `.data` `.rodata` `.symtab` |
+
+**Two bytes is right only while the decimal rendering keeps its width.** The
+counter is printed into `UTS_VERSION`, which sits in `linux_banner` and in
+`init_uts_ns`; when it grows a digit the rest of both strings shifts, and one
+`.symtab` byte moves with it. Nothing here is codegen — but *"the cost is two
+bytes"* is a sentence that stops being true at the tenth link, and it was
+published as if it were a bound.
+
+### 5.6 What a no-op make still does, and why the floor is not zero
+
+After both patches, a no-op `make vmlinux` is **2 `CC`, 8 `LD`, 6.9–10.3 s**,
+and it is stable across repeats. The two objects are named:
+
+* `init/version.o` — 🔴 **the build perturbs itself.** Every link bumps
+  `.version`; `scripts/mkcompile_h` writes it into `include/linux/compile.h`,
+  which it *does* content-check — and the content changed, so it updates;
+  `version.o` includes it, so the next make recompiles it and relinks, which
+  bumps `.version` again. The loop is a fixed point at one object, and no
+  amount of dependency fixing removes it.
+* `drivers/net/wireless/rtl8192cd/8192cd_hw.o` — its source `#include`s ten
+  `data_*.c` files that Realtek's own makefile regenerates on every build
+  (`data_MAC_REG_88E.c`, `data_PHY_REG_1T_88E.c`, and eight more). This one is
+  the vendor's, and it costs one object.
+
+The eight `LD` lines are the built-in.o chain those two force, up to `vmlinux`.
+
+### 5.7 🟢 So `0003` is kept, and the measurement is what kept it
+
+With `arg-check` fixed, `0003` is worth nothing on a no-op make — P12a and
+P12b are both 2. It was very nearly dropped on that. 量, one tree, one
+variable:
+
+| trigger | with `0003` | without `0003` |
+|---|---|---|
+| `touch kernel/bounds.c`, then make | **3 `CC`, 6.9 s** | **573 `CC`, 26.3 s** |
+| reverting `0003` (which touches `Kbuild`) | — | 572 `CC`, 26.5 s |
+
+`kernel/bounds.s` is regenerated whenever `kernel/bounds.c` or one of the four
+headers it includes changes, or whenever the top-level `Kbuild` is touched, and
+`$(call cmd,bounds)` then rewrites `bounds.h` unconditionally with identical
+content, taking 572 objects with it. **`0003`'s value is not the no-op case; it
+is that one edit to a core header costs 3 compilations instead of 573.**
+`R5` is six kernel drivers, so that trigger is not hypothetical.
+
+### 5.8 The product is unchanged, and the four bytes that move are the recipe id
+
+量, a fresh stage with `0004` declared against `vmlinux.A` built without it,
+both at `.version = 1`:
+
+```
+differing bytes: 4 of 3968240  (0.000101 %)
+1 run(s)
+--- 0x2af5e6..0x2af5ef  4 byte(s)  sec=.init.text  sym=start_kernel+0x7e
+```
+
+That is `RLXFW_SRC_ID`'s `lui`/`ori` immediate pair. It moved because
+`rlxfw-kbuild.sh` computes `RECIPE_ID` as a sha256 over every file under
+`config/` and `config/` gained a file: `d31f60bd → c601eacf`. **Every other
+byte of 3,968,240 is identical** — the patch changes when kbuild re-runs a
+command, never what the command is.
+
+⚠️ **Two committed lines name `d31f60bd` and stay true**: `notes/dev-loop.md`
+§4 and `SPEC.md` `TC-40` both date it to 2026-09-01 and describe that
+measurement's recipe. A build after this commit has a different id, which is
+what `ID0` exists to say.
+
+### 5.9 The commit gate: the unmodified driver, a fresh stage, both patches
+
+Everything above was measured by applying and reverting patches inside one
+staged tree, which is the right shape for a causal claim and the wrong shape
+for *"is this safe to commit"*. So the last run is the ordinary driver, from
+the real repository, with both patches sitting in `config/host-compat/` where
+`rlxfw-kbuild.sh` finds them — and a patch that does not apply **stops the
+build**, which is what makes this a gate rather than a report.
+
+| # | prediction | 量 |
+|---|---|---|
+| **V1** | the driver reports 4 declared patches and exits 0 | 🟢 `applied 4 declared host-compat patch(es)`, rc=0, 36.36 s, recipe `d31f60bd → b1434383` |
+| **V2** | the full build is 594 `CC`, not 599 | 🟢 **594**, and the only object compiled twice is `init/version.o` — the five `init/` duplicates are gone |
+| **V3** | the image differs from `vmlinux.A` in only the `RLXFW_SRC_ID` immediate | 🟢 **4 bytes of 3,968,240, one run, `.init.text`, `start_kernel+0x7e`** |
+| **V4** | a no-op make in the fresh tree: 2 `CC`, under 12 s | 🟢 **2 `CC`, 8 `LD`, 7.192 / 8.475 s** |
+| **V5** | `touch kernel/bounds.c` gives 3 `CC`, because `0003` is in | 🟢 **3** — `kernel/bounds.s`, `8192cd_hw.o`, `init/version.o` — 6.889 s |
+
+⚠️ `CHK` reads **6** on a full build and **4** on a no-op, which is the two new
+`filechk` rules not running at all when their `.s` prerequisite has not moved.
+That is the intended behaviour and it is worth naming, because *"the check
+count went down"* looks like a regression and is the opposite.
+
+---
+
+## 6. What this decides, and what it does not
+
+**Decided:**
+
+1. 🟢 **The full rebuild has one root cause and it is a two-line fix.** A no-op
+   `make vmlinux` goes **599 `CC` / 28.0–32.1 s → 2 `CC` / 6.9–10.3 s**, and a
+   *full* build goes 599 → 594, because the broken comparison was compiling
+   five `init/` objects a second time inside every build.
+2. 🟢 **It changes nothing about the product**, 4 bytes of recipe id excepted,
+   and those are by design.
+3. 🟢 **`LOOP-1`'s diagnosis is refuted and replaced.** The header rewrite was
+   downstream of the same cause. `0003` is kept for a different, measured
+   reason (§5.7).
+4. 🔴 **`L2-6`'s two-byte bound is corrected** to *two bytes while the digit
+   count holds, 54–56 across a digit boundary.*
+
+**Not decided, and the first one is the whole point:**
+
+* 🔴 **This buys nothing on the loop's default path, and the reason is
+  structural.** `rlxfw-kbuild.sh` re-stages 480 MB for every build; a fresh
+  stage has no object files, so every object is compiled whatever kbuild
+  decides. The saving is only reachable on a **reused** tree, which is
+  `--keep`, which `R4`'s stop-loss fences off — *"`--keep` may not be turned on
+  to hit a number"*. **It is not turned on here.** What this file establishes
+  is the number a decision would be made against, and the decision is the
+  owner's:
+
+  | | fresh stage every build (today) | reused tree |
+  |---|---|---|
+  | `make` phase, no-op | 28.0–32.1 s | **6.9–10.3 s** |
+  | reproducible byte-for-byte | 🟢 yes, 7 replications | 🔴 no — `.version`, 2 bytes, 54–56 across a digit |
+  | `--marks` usable | 🟢 yes | 🔴 **refused** — `rlxfw-marks.py` will not re-apply to an unclean tree |
+
+  ⚠️ The third row is the one that matters and it is not a preference: today's
+  recipe *cannot* run on a reused tree at all. Any adoption needs
+  `rlxfw-marks.py` to gain an idempotent path first, and that is not this
+  step's work.
+
+* ⚠️ **What an incremental build of a REAL edit costs is still not measured.**
+  Touching a file is not editing it; every number above is a no-op or a
+  `touch`. The first honest reading of *edit → result* on a reused tree comes
+  from `tools/looprun.py`, not from here.
+* ⚠️ **`8192cd_hw.o`'s per-build recompilation is not chased.** One object.
+* ⚠️ **`init/version.o`'s self-perturbation is not chased.** It is what makes
+  the floor 2 instead of 0, and removing it means changing what the banner
+  says, which is `P4a`'s territory and not this file's.

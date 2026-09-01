@@ -1,0 +1,105 @@
+Make kbuild's command-line comparison survive GNU Make 4.x.
+
+WHY THIS EXISTS.  R4-3, 2026-09-02.  量: on this host every `make vmlinux`
+recompiles all 599 objects, twice in a row, with nothing touched -- and 597 of
+them say so in kbuild's own words.  With `V=2`, `scripts/Kbuild.include`'s `why`
+macro prints the reason per target:
+
+    597  - due to command line change
+     88  - due to: <prereq list>
+      1  - due to vmlinux.o not in $(targets)
+      1  - due to target is PHONY
+
+`arg-check` compares the command saved in `.<target>.o.cmd` against the one make
+computes now.  量 on `init/main.o`: the two strings are BYTE-IDENTICAL, 1,132
+characters, zero differing words.  What differs is what make LOADS.  The saved
+line is 1,131 characters and holds exactly one `#`; the value make ends up with
+after including that file is **1,023 characters and holds none** -- truncated at
+`-D"KBUILD_STR(s)=`, because a bare `#` in a makefile starts a comment.  108
+characters of every object's recorded command line are silently discarded on
+every read, so `arg-check` can never match and every object rebuilds forever.
+
+WHERE THE `#` COMES FROM, AND WHOSE FAULT IT IS.  `scripts/Makefile.lib:139`
+puts `-D"KBUILD_STR(s)=\#s"` into `c_flags`; make unescapes it, so the VALUE
+holds a real `#`.  `scripts/Kbuild.include:184` is supposed to re-escape it
+before `fixdep` writes it out:
+
+    make-cmd = $(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
+
+量 under GNU Make 4.3, on a value carrying one bare `#`: that `subst` leaves it
+**unchanged** -- 1 bare `#` in, 1 bare `#` out, 0 backslash-hashes.  It is a
+no-op.  `scripts/basic/fixdep.c:140` then writes the command verbatim
+(`printf("cmd_%s := %s\n\n", target, cmdline)`, no escaping anywhere in that
+program), and the `#` reaches the `.cmd` file bare.
+
+🔴 **Neither file is Realtek's.**  量: this drop's `scripts/Makefile.lib` is
+sha256 `710bda1b500884db` and mainline v2.6.30's is the same; `Kbuild.include`
+is `da1c432cee107043` in both.  This is a 2009 kernel meeting a 2020 make, and
+it is the same class as `0001` -- a host tool moved and the tree did not.  The
+control that says the comparison method works at all is the top-level
+`Makefile`, which the same method reports as 159 changed lines.
+
+WHAT IT CHANGES.  Two lines, and both are mainline's own later fix.  A `pound`
+variable holding a literal `#`, and a `make-cmd` that substitutes it for the
+text `$(pound)` -- so what lands in the `.cmd` file is a variable REFERENCE that
+make re-expands on load, never a character that ends the line.  Current mainline
+carries exactly this:
+
+    pound := \#
+    make-cmd = $(call escsq,$(subst $(pound),$$(pound),$(subst $$,$$$$,$(cmd_$(1)))))
+
+量 that `pound := \#` is one character under make 4.3, and that the new form
+yields `$(pound)` and zero bare hashes where the old form yields a bare hash.
+
+WHAT IT DOES NOT CHANGE.  Not one byte of the product.  量: a fresh stage with
+this patch declared differs from one without it in **4 bytes of 3,968,240**, in
+one run, in `.init.text` inside `start_kernel+0x7e` -- the `RLXFW_SRC_ID`
+immediate, which moved because `RECIPE_ID` is a sha256 over `config/` and
+`config/` gained this file.  That is the recipe-id mechanism working, not a
+codegen difference.  Every other byte is identical.
+
+WHAT IT BUYS, MEASURED.  A no-op `make vmlinux` on a reused tree:
+
+    before   599 CC, 78 LD, 28.0-32.1 s
+    after      2 CC,  8 LD,  6.9-10.3 s
+
+and a full build drops 599 -> 594 CC, because the broken comparison was also
+compiling five `init/` objects a SECOND time inside every single build
+(`calibrate.o`, `do_mounts.o`, `do_mounts_initrd.o`, `initramfs.o`, `main.o`).
+
+⚠️ WHAT IT DOES NOT BUY, and this is the half that decides how it may be used.
+On the loop's DEFAULT path the saving is **exactly zero**: `rlxfw-kbuild.sh`
+re-stages the tree for every build, and a fresh stage has no object files to
+keep.  This patch only pays on a tree that is reused, which is `--keep`, which
+`R4`'s stop-loss fences off.  See `notes/incremental-build.md` §6.
+
+⚠️ THE FLOOR IS NOT ZERO, and the reason is a counter the build keeps about
+itself.  The two objects a no-op still compiles are `init/version.o` -- because
+linking bumps `.version`, which rewrites `include/linux/compile.h`, which
+forces `version.o` on the next make, which forces a relink -- and
+`drivers/net/wireless/rtl8192cd/8192cd_hw.o`, whose source `#include`s ten
+`data_*.c` files that Realtek's makefile regenerates every build.  Neither is
+this patch's to fix.
+
+SCOPE.  Host build tooling only.  It changes when kbuild decides to re-run a
+command, never what the command is.
+
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -4,6 +4,7 @@
+ # Convenient variables
+ comma   := ,
+ squote  := '
++pound   := \#
+ empty   :=
+ space   := $(empty) $(empty)
+ 
+@@ -181,7 +182,7 @@
+ # >$< substitution to preserve $ when reloading .cmd file
+ # note: when using inline perl scripts [perl -e '...$$t=1;...']
+ # in $(cmd_xxx) double $$ your perl vars
+-make-cmd = $(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
++make-cmd = $(subst $(pound),$$(pound),$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
+ 
+ # Find any prerequisites that is newer than target or that does not exist.
+ # PHONY targets skipped in both cases.
