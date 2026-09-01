@@ -268,6 +268,23 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   ⚠️ **`tool_version` deliberately did not move**: it owns *what the
   instrument wrote to the port*, and nothing new goes on the wire — the
   **presence** of the `seconds` key is what dates a capture instead.
+- 🆕 **PowerShell has its own three traps, all measured 2026-09-01, and two of
+  them make a check silently useless rather than noisy.** ① `Get-Date -Format`
+  eats format letters **inside literal text**: `"Windows: yyyy-MM-dd"` printed
+  `Win1ow20:` because `d` and `s` are specifiers. ② `<long command> |
+  Select-Object -Last N` **buffers the whole pipeline** — a 25-minute suite
+  showed nothing until it ended, so there is no progress to watch; run it in the
+  background, or let it write files and read those. ③ `wsl -- bash -c "…$?…"`
+  dies with *unexpected EOF* on nested quotes. **Same fix as the Bash tool's:
+  write the script to a file and run it by path** — `wsl -d Ubuntu-24.04 --
+  bash /mnt/c/…/x.sh`.
+- 🆕 **Reading a suite's output files is a measurement, so it needs a control —
+  and freshness is NOT completion.** 量 2026-09-01: `ci-out/` holds the previous
+  run's `.out` files, so a summary that just reads them scores stale results as
+  new (an mtime cut caught exactly one, and it was the one that would have been
+  misread). Then the mtime cut passed a file that was **still being written** —
+  3,645 bytes, `RESULT:` absent; 5,968 bytes forty seconds later. **Wait for the
+  process's exit code; the output file is not the instrument.**
 - Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
   the commands and read what I paste back. One power cycle is the most expensive
   unit here, so list every question before the device is plugged in.
