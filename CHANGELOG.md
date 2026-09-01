@@ -7,7 +7,7 @@ measurement and that commit holds no numbers** (`c90cdc8`): `check-predictions.p
 proves that ordering for bench captures by mtime and cannot do it for desk
 timings, so git's own history is the substitute a reader can check.
 
-**The machine pipeline is 50.4–71.0 s** — build 38–58, image assembly 3.6–4.1,
+**The machine pipeline is 50.4–71.1 s** — build 38–58, image assembly 3.6–4.1,
 TFTP 1.5–1.6, `J` to a shell 7.260 — so `D4`'s 90 s is met with 19–40 s of
 margin and the gate's stop-loss clause for the opposite outcome does not fire.
 🟢 **NFS root leaves this gate**: it removes an upload worth 2.2–3.3 % of that

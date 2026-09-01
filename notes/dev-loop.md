@@ -202,7 +202,7 @@ halves are now measured and both are small.
 
 **A `make vmlinux` with nothing touched recompiles all 599 objects, twice in a
 row.** So `--keep` skips the stage copy and the patch and mark steps and
-nothing else: **1.5–2.4 s of a 50 s build, about 5 %**.
+nothing else: **1.5–2.4 s, which is 3–5 %** — 2.4/49.5 = 4.8 % and 1.5/58.0 = 2.6 %.
 
 And it cannot be used with today's recipe at all. `--keep --marks` **refuses**,
 in 0.236 s, before any copy:
@@ -373,9 +373,11 @@ here as a term.
 | S3 image assembly | 3.6 – 4.1 |
 | S5 TFTP upload | 1.5 – 1.6 |
 | S7 `J` to shell | 7.260 |
-| **total** | **50.4 – 71.0 s** |
+| **total** | **50.4 – 71.1 s** |
 
-Using only the two cells run under the prediction, 61.9 – 71.0 s; widening to
+The bounds are summed from the **unrounded** values — 38 + 3.551 + 1.545 + 7.260 = 50.356 and 58.045 + 4.131 + 1.639 + 7.260 = 71.075 — because summing the rounded column above would give 71.0, and rounding then adding is not the same operation as adding then rounding.
+
+Using only the two cells run under the prediction, 61.9 – 71.1 s; widening to
 every `-j4` cell built with today's recipe — those two plus `p4a1` at 44 s and
 `p4a2` at 38 s, read out of `p4a-run1.log` **after** §2 was committed — gives
 the 50.4 s floor.
@@ -393,7 +395,7 @@ less than about 20 s cannot be shown on this machine with n = 2 — which is why
 **The turnaround** is a different quantity and S8 dominates it. The most recent
 full-image seating, `bench/2026-08-31`, spans **1149 s** for one upload, one
 boot and twelve userspace commands, of which the machine pipeline is about
-67 s. **The loop as served is roughly 17× the loop as computed.**
+50–71 s. **The loop as served is 16–23× the loop as computed** — 1149.1 ÷ 71.075 = 16.2 and 1149.1 ÷ 50.356 = 22.8. A single ratio would be one number dividing a range 1.5× wide, and would hide the spread that §7 has just finished making the point of.
 
 ---
 
@@ -426,7 +428,7 @@ Three held, four refuted, one not established, one split.
    if it went this way. It went this way.
 2. 🟢 **`D4` stands as written.** 50–71 s against 90 s.
 3. 🟢 **The `--keep` tension closes without turning `--keep` on.** It buys
-   about 5 %, refuses to run with `--marks` at all, and its reproducibility
+   3–5 %, refuses to run with `--marks` at all, and its reproducibility
    cost is exactly two bytes. `R4-3` inherits §5.2 instead, which is a bigger
    prize and does not touch `P4a`'s claim.
 
