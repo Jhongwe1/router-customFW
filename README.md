@@ -562,5 +562,37 @@ neither of this project's two routine audits looks at this file. The closure
 DATES stay, because a date something closed is a historical fact and not a
 statement about where the work is now.
 
-`PROGRESS.md` is the only file that says where the work actually is.
+### Which gates make which version
+
+**This table is the owner of version → contents.** Until 2026-09-01 that state
+lived in two places — the project's planning material, which is not committed,
+and a table in `PROGRESS.md` — and 量, they disagreed on **six of six** shared
+rows and on four of the six week estimates beside them. A public reader could
+follow neither, because the authoritative one was invisible. So it moved here,
+and the other two now point at it.
+
+| version | the gates that define it |
+|---|---|
+| `v0.0` | the instruments and the desk analysis |
+| `v0.1` | `R0` + `rlxprobe` executing on the silicon + `R1-gate` |
+| `v0.2` | `R3`, with a 60-second take + `P4a` |
+| `v0.3` | `R4` + `R5` |
+| `v0.4` | `R1-pub` + `P1` |
+| `v0.5` | `R6` + `P2` |
+| `v0.6` | `R7` |
+| `v1.0` | `R8` + `R9` + `P3` + `P4b` |
+
+⚠️ **These are the gates a version is *defined* by, not everything that landed
+in it.** `v0.1` was never tagged, so the `v0.2` release spans `v0.0` → `v0.2`
+and contains `R2a/b/d` and `R1h` as well; `CHANGELOG.md` is where what a
+release actually shipped is written down.
+
+⚠️ **No dates here.** Week targets are planning estimates about one person's
+availability, they are uncalibrated, and this repository's own gate board
+already carries the argument for keeping estimates out of a file that records
+what has been done. They stay in the planning material.
+
+`PROGRESS.md` is the only file that says where the work actually is, and its
+Release clock is the only place that says which of these versions have shipped.
 `CHANGELOG.md` says what each tag contains.
+`docs/GATE-RESULTS.md` says, per gate, what it established and what it did not.

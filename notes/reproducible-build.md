@@ -354,10 +354,23 @@ piece of Level 2 that this session closed.
 | L2-6 | `#1` from `.version`, which kbuild increments per link | ⚠️ **unmeasured, and bounded**: every cell is re-staged, so `.version` starts absent and reaches 1. `rlxfw-kbuild.sh --keep` would break it, and `--keep` is already marked `[TESTING ONLY]` |
 | L2-7 | filesystem `readdir` order reaching link order | ⚠️ **unmeasured.** The initramfs is ordered by `config/rlxfw-initramfs.tsv`, so it is not a hazard there; kbuild's own object order is `Makefile`-driven, which is a reading not yet taken |
 
-🔴 **So Level 2 is one open item and two unmeasured ones, not the open-ended
-list it looked like this morning.** That is a result of §3.2 rather than a plan:
-five of the seven rows were settled by reading or measuring, and the one that
-matters is the one the tension never mentioned.
+🔴 **So Level 2 is one open item, one untestable here, and two unmeasured ones,
+not the open-ended list it looked like this morning.** That is a result of §3.2
+rather than a plan: **three** of the seven rows were settled by reading or
+measuring, and the one that matters is the one the tension never mentioned.
+
+🔄 **2026-09-01, twenty-second segment: this paragraph said *five of the seven
+rows were settled* and it said *one open item and two unmeasured ones*. Both
+halves were wrong and they were wrong in the same place.** 量, reading the
+status column of the table above one row at a time: 🔴 open **1** (`L2-1`),
+🟢 settled **3** (`L2-2`, `L2-3`, `L2-4`), ⚠️ untestable on this host **1**
+(`L2-5`), ⚠️ unmeasured **2** (`L2-6`, `L2-7`) — seven, and the decomposition
+in the first half left `L2-5` with no category at all, which is what let the
+second half count it as settled. **Neither number was ever recomputed against
+the table it summarises**; the correction came from a reader re-deriving it, not
+from a checker, and no checker in this repository can see this class. The same
+morning found three more instances of it (`PROGRESS.md`'s `P4b-3`,
+`docs/KNOWN-ISSUES.md`'s CI row and its copy of this sentence).
 
 ---
 

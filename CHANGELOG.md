@@ -161,9 +161,12 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## v0.2 — 2026-09-01
 
-**Contents, against `plan/CHARTER.md` §88:** `R3` — a kernel of mine boots this
-device to a shell and pings, with a 60-second take — plus `P4a`, the
-reproducible build.
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R3` — a kernel of mine boots this device to a shell and pings, with a
+60-second take — plus `P4a`, the reproducible build.
+*(🔄 2026-09-01: this line pointed at `plan/CHARTER.md` §88, which is gitignored
+— a pointer no reader of this release could follow. The owner of version →
+contents moved to `README.md` in the same session.)*
 
 🎬 **The take:** https://youtu.be/7UjzFiAmzVs — seven committed serial captures replayed at
 true wire speed, ending with the *vendor's* firmware booting on the same board
