@@ -295,10 +295,21 @@ tools/test-mkinitramfs-mutants.py
                            whole device-number comparison left it green; another named
                            a case that cannot see it, and the label followed the
                            measurement rather than the intent
-tools/rlxfw-marks.py       the first tool here that edits somebody else's source, and it
-                           is a TABLE rather than a patch: one row per insertion, each
+tools/rlxfw-marks.py       one of the two tools that edit somebody else's source --
+                           rlxfw-kbuild.sh applies config/host-compat/ with patch -p1,
+                           and 0001 predates this one by a day -- and the one that is a
+                           TABLE rather than a patch: one row per insertion, each
                            naming the suspect it brackets. The anchor must occur EXACTLY
-                           ONCE or it refuses. Eighteen controls, and the one that earns
+                           ONCE or it refuses. (This entry said "the first tool" and
+                           "eighteen controls"; both were stale, and the superlative
+                           sweep on 2026-09-02 is what re-derived them.)
+                           A STAGED TREE HAS THREE STATES, not two, and the third is
+                           the one that matters: clean applies, fully-marked is a no-op
+                           under --if-needed, and PARTIALLY marked is REFUSED -- because
+                           a tree with some marks present builds, and what it builds is
+                           not what the table describes. A20 requires plain `apply` to
+                           still refuse a marked tree, so A4 is bypassed only when asked.
+                           32 controls, and the one that earns
                            its keep is `verify` -- `check` reads the staged tree and
                            answers "did the insertion happen", which a mark can pass
                            while being absent from the image; `verify` reads the BUILT
@@ -395,6 +406,36 @@ tools/xcheck.py            asks whether two committed instruments agree about on
                            early, which is correct only on sorted input -- and C4 is
                            their negative control, so it is not merely trigger-happy
 
+tools/ledgerscan.py        R5's blind-write ledger is COMPUTED, not written. It
+                           re-derives every path-shaped citation of an external
+                           implementation source out of 1,443 tracked files plus
+                           upstream's 302 (walked -- git ls-files cannot see inside a
+                           submodule), assigns each a driver domain, and `check`
+                           requires docs/blind-write-ledger.md to declare every
+                           in-scope one. Writing about a new vendor file in LOG.md --
+                           which is how reading gets recorded here -- makes it red
+                           until the ledger says what was taken.
+                           IT EXISTS BECAUSE A ZERO WAS READ AS AN ABSENCE:
+                           `grep -ril rlx-time` returns 0 files, and the sentence about
+                           to be written from that 0 was "this repository has never read
+                           the vendor's timer". The grep was RIGHT -- arch/rlx/kernel
+                           carries both rlx-time.c and rlx-cevt.c, and this repository
+                           has never cited the first. The INFERENCE was wrong: it cites
+                           rlx-cevt.c to the line in vendor-kernel-isa.md:33. Zero
+                           citations is not zero reading, and a zero on one spelling
+                           says nothing about another.
+                           P1 is that citation, chosen as the positive control because
+                           it is the one that was nearly missed. P15 makes each of the
+                           four EMPTY domains fire on a synthetic tree, because a zero
+                           from a rule that cannot fire says nothing -- and P15b's own
+                           first version was wrong in the instructive direction: it
+                           claimed those domains are empty on the real tree, which is
+                           the LEDGER's claim, and it went red on this repository's own
+                           prose naming a path as an example. The prose was not
+                           rewritten to make it green. 71 controls, and `check` also
+                           has a negative control on real material: removing one row
+                           from the committed ledger must name the path it lost.
+
 tools/looprun.py           two of its nine stages exist only to make it safe to run
                            with nobody watching: S5b reads the loader's burn flag back
                            out of memory before any upload -- the echo the transfer
@@ -466,7 +507,7 @@ tools/test-cardcheck-mutants.py
                            visible to any card in the corpus — one of them exposed a
                            real defect, that `/proc` and `/sys` belong to the kernel
                            and were being reported as undeclared
-tools/replay-capture.py    17 controls, and it turns a committed `.log` + `.timing`
+tools/replay-capture.py    23 controls, and it turns a committed `.log` + `.timing`
                            back into the terminal it came from - so R3-11's
                            artefact is DERIVED from evidence rather than recorded
                            beside it, and anyone with a clone can re-run it.

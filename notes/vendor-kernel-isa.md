@@ -34,6 +34,15 @@ anywhere under `arch/mips`:
 | `RLX LOPI` | `arch/rlx/kernel/irq_vec.c:36` | yes |
 | `cpu model\t\t: %d` | `arch/rlx/kernel/proc.c:29` — `arch/mips/kernel/proc.c:40` prints `%s V%d.%d` instead | yes |
 
+🆕 **2026-09-02: `arch/rlx/kernel/` carries `rlx-time.c` AS WELL AS
+`rlx-cevt.c`**, and the row above is unaffected — `rlx-cevt.c` is still a file
+`arch/mips` does not have, which is all the discriminator needs. It is noted
+because a reader will ask why the timer literal was taken from the second file
+and not the first, and because a `grep -ril rlx-time` over *this repository*
+returns **0 files**: nothing here has ever cited `rlx-time.c`. 量, directory
+listing, no file opened; `docs/blind-write-ledger.md` § 4.3 owns what that
+absence does and does not mean.
+
 ⚠️ **A first attempt at this was a null instrument and is recorded because it
 was.** Harvesting every C string literal from `arch/rlx` and from `arch/mips` and
 taking the set difference gives **0** rlx-only literals: `arch/rlx` is a fork of

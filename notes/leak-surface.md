@@ -376,3 +376,36 @@ the command line where a reader can see it.
 * **anything compressed or encoded other than plain hex**, `.git`'s objects
   included, which is why `.git` is skipped rather than scanned.
 
+
+---
+
+## 🆕 2026-09-02: a second scanner hit the `CONTROL` problem, and answered it differently
+
+This file's `CONTROL` class — *a scanner literal in this repository's own
+tools*, 21 hits — exists because a scanner's own test data looks exactly like
+the thing it hunts. `tools/ledgerscan.py` (`R5-0`) walked into the same wall
+from the other side, and the two answers are worth putting beside each other
+because **the difference is not style, it is what the two tools are for**.
+
+| | `leakscan` | `ledgerscan` |
+|---|---|---|
+| what it hunts | values that identify this unit | citations of external source files |
+| its own test data | literals that look like those values | **paths, some of them invented** |
+| the answer | **classify** as `CONTROL` and report it | **exclude**, via `FIXTURE_PATHS` |
+| why that answer | a hit is a finding to be judged, and hiding one is the failure mode | the ledger would have to **declare files that do not exist** |
+
+🔴 **The distinction `ledgerscan` had to draw, and it is finer than "written by
+me".** `tools/ci-expected.tsv` names `drivers/input/keyboard/gpio_keys.c` as an
+*example* while describing a classifier bug. That file is **real**. It is not
+excluded — it is declared in the ledger as `origin: none`, a citation that is
+not a reading, with a constraint on the exemption. Only **invented** paths are
+excluded, and `P18d` re-checks that they are still invented by looking for them
+in the built drop.
+
+⚠️ So the rule is: **fixture, not example**. A scanner may hide its own
+invented data; it may not hide a real thing it happened to mention. Getting
+that backwards would let any finding be renamed into silence.
+
+⚠️ And the cheap fix was available in both cases and is wrong in both: rewrite
+the prose so the scanner has nothing to see. That makes a checker green by
+editing text, which is the failure this whole file is about.

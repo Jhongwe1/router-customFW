@@ -1,5 +1,56 @@
 # Changelog
 
+🟢 **2026-09-02, twenty-seventh session, desk: `R5-0`** — the blind-write
+ledger, and it is **computed** rather than written.
+`docs/blind-write-ledger.md` records what this repository had read of each
+external implementation before the first driver exists, **twenty-seven**
+in-scope paths judged one at a time; `tools/ledgerscan.py` (**71** controls)
+re-derives the citation set from the tracked tree plus `upstream/`'s 302, and
+`ledgerscan check` goes red when the tree cites a path the ledger does not
+declare.
+
+🔴 **It is a tool because a hand-typed grep nearly put a false sentence in
+it, and the first account of *why* was wrong too.** `grep -ril rlx-time`
+returns **0 files** here — and 量 (directory listing, nothing opened)
+`arch/rlx/kernel/` carries **both** `rlx-time.c` and `rlx-cevt.c`, so the
+needle named a real file and **0 was correct**. What was wrong was the
+inference: this repository cites `rlx-cevt.c` **to the line**
+(`notes/vendor-kernel-isa.md:33`), and that citation is the tool's positive
+control. **Zero citations is not zero reading, and a zero on one spelling says
+nothing about another.**
+
+**The verdict is split rather than single**: `gpio`, `wdt` and `led` have
+**zero** cited implementations and `keys` one that is an example rather than a
+reading; `timer` has a string literal of the vendor's plus generic Linux, and
+the divisor semantics a diff would be worth having on (`CLK-06`) are **推** and
+unread; 🔴 `spi_mtd` has **11 paths**, three of them read on the decision
+layer, so `R5-5`'s vendor side is spent. ⚠️ **Path counts are quoted and
+citation counts are not**: the second grows every time anything is written
+about a path already declared, and it grew by half between this ledger's draft
+and its commit with no new reading at all.
+
+🔄 **`R5`'s `D3` is restated into two layers scored separately** — fact
+(addresses; agreement is guaranteed by the parts being the same part) and
+decision (divisor semantics, wrap handling, interrupt number, init order). The
+objection is recorded with the change, and the test that settles it is that
+**the new `D3` is easier to fail**.
+
+🔴 **`INC-1` measured: one real edit on a reused tree costs a full build** —
+592 `CC` / 32.58 s against **3 `CC` / 11.75 s** for the same edit where
+`RECIPE_ID` does not move. The cause is this project's own identity string
+reaching every C object's command line. `--id-scope main` confines it to the
+one object that uses it: **4 `CC` / 12.53 s**, with two fresh stages producing
+a byte-identical `vmlinux`.
+
+🔴 **And an incremental build never reproduces its own product**: `.version` is
+a build counter, `11 → 12 → 13` across two no-ops. Every reproducibility claim
+here is a fresh-stage claim.
+
+🔴 **`tools/rlxfw-marks.py` had no CI step at all** — one of the two tools that
+edit Realtek's source, and the one whose every inserted line is a declared row
+with a reason — and `ci-census` cannot see that class, because its population
+is the table a missing suite would have to be in.
+
 🟢 **2026-09-01, twenty-fourth session, seating 9: `R4-2`** — the development
 loop closes without the power switch. `J BFC00000` is a reset on this silicon,
 **21 times out of 21**, each one carrying `C-8`'s discriminator where a cold

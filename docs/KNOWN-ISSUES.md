@@ -86,6 +86,18 @@ measurement.
 
 ## What has never been measured at all
 
+🔄 **2026-09-02 (`R5-0`), two rows leave this section and one arrives.**
+*Leaving*: the incremental cost of a real edit on a reused tree — **592 `CC` /
+32.58 s**, against 3 `CC` for the same edit with `RECIPE_ID` held (`SPEC.md`
+`TC-45`); and whether confining `-DRLXFW_SRC_ID` moves the product — it does
+not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
+*Arriving*: 🔴 **whether the public RTL8196E ports derive from the vendor's
+`arch/rlx`.** `docs/blind-write-ledger.md` § 6 — it decides whether reading the
+vendor's MTD map cost `R5-5`'s independence, it cannot be settled before
+cloning, and cloning is the act the ledger dates. `R5-9` carries it as an
+ordering constraint: the derivation check runs **before** any register map is
+read.
+
 * **Whether a DMA write is visible to a cached CPU read.** Nothing has been
   measured in that direction, and it is the one driver decision the cache gate
   closed without.
