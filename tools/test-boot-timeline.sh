@@ -173,8 +173,18 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # are 0.0017 .. 0.0028 s, mean 0.0024, spread 43.7 % -- five times tighter than
 # the six that preceded them (0.0021 .. 0.0211, spread 211 %), because they are
 # twenty-one repetitions of one command inside one power cycle.
-ck "entry population is twenty-seven warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=27')"
+# 🔄 27 -> 30 on 2026-09-02 (seating 10): three more warm resets carry an
+# `entry` -- LP-e5 and LP-e5b at `--esc-period 0.0005` and LP-rz, which is
+# `looprun`'s own S4, at 0.002. Isolation: everything except bench/2026-09-02
+# still reports n=27, and 2026-09-02 alone reports n=3.
+# 🟢 And those three are the TIGHTEST sub-population in the corpus --
+# 0.0023 .. 0.0024, spread 5.1 % -- because they are one command at two
+# cadences 3.2x apart inside one power cycle, which is what separated `entry`
+# from the instrument's own read floor. The pooled spread went 499.9 % ->
+# 520.9 %, and that is the OLD outlier (0.0211, H3a) dominating a wider n,
+# not this seating adding scatter.
+ck "entry population is thirty warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=30')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
