@@ -4161,3 +4161,44 @@ cost one desk segment, as budgeted.
 * **`R1h`'s decision ② is still `R1-gate`'s**, answered on the D side by
   `probe3` and not by this gate.
 
+
+---
+
+## 22. The `ID0`-carrying image on the silicon, 2026-09-02 — and the byte count is a whole line
+
+`FW-32` in `SPEC.md` had predicted this reading rather than held it: its own row
+says the 849-byte figure describes `quietm`, that `quietm` has no `ID0`, and
+that *any image built with today's recipe prints one more line, so the next
+image's byte count is a new measurement and not this one*. Seating 10 took it.
+
+**量**, `bench/2026-09-02/LP-boot.log`: **869 bytes**, image `lp-20260902`,
+`vmlinux` sha256-16 `c788348d7b7f9886`, recipe `b1434383`.
+
+🟢 **And the difference is a whole line, not a byte count that happens to
+match.** The control worth having is the stronger form, so it was taken:
+
+```
+RLXFW-ID0=B1434383\r\n      18 visible characters + CRLF = 20 bytes
+869 - 20 = 849
+```
+
+Removing exactly that one physical line from `LP-boot.log` leaves 849 bytes that
+are **byte-identical to `bench/2026-08-31b/X-3.log`** — the `quietm` boot of the
+previous seating. So the two images differ, on the wire, in one line and nothing
+else.
+
+⚠️ *(The first draft of the `SPEC.md` row said the 20 bytes were "19 visible
+characters plus a CR/LF counting difference". That is a miscount reconciled by a
+vague clause. It was replaced by the measurement above, which needs no clause.)*
+
+### 22.1 ⚠️ The time is not comparable to `FW-32`'s 7.260 s, and the reason is the terminator
+
+`LP-boot` was terminated by `--idle 8`, so its capture is **15.189 s** long and
+its last byte lands at about **7.19 s**. `FW-32`'s 7.260 s is `quietm`, a
+different build. **Two different images, 71 ms apart, n = 1 each** — that is not
+a difference this project can attribute, and no equality is claimed here.
+
+What the `--idle 8` does establish is the terminator's cost rather than the
+boot's: 8 of those 15.189 s are the capture waiting for a silence that had
+already happened. `TERM-1` owns that, and `notes/dev-loop.md` §10.2 has the
+decomposition across all four capture stages.
