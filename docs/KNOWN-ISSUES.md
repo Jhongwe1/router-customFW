@@ -114,10 +114,23 @@ measurement.
   unmeasured is narrower**: both measured points are high `OVSEL` settings, while
   `J BFC00000` writes `WDTCNR = 0` — the **lowest** setting, 推 2.184 ms by
   halving, never observed. `R4` predicts it and then measures it.
-* **`RLXFW-ID0`, the build-identity string added on 2026-09-01, has never been
-  read off the board.** It is checked in the image — present once in mine,
-  absent from the vendor's — and its behaviour on the wire is 推 until a
-  seating prints it.
+* ~~**`RLXFW-ID0`, the build-identity string added on 2026-09-01, has never
+  been read off the board.**~~ 🟢 **CLOSED 2026-09-02, seating 10.** The board
+  printed `RLXFW-ID0=B1434383` and `looprun`'s `A3` compared it against the id
+  the build had just computed: *board printed b1434383, build computed
+  b1434383*. **Nobody typed that value at any point** — it is a sha256 over
+  `config/`, compiled in, printed by the kernel, and read back by the tool.
+  It was checked twice on the day: once inside the bench run, and once by a
+  desk run whose build started at 12:29 asserting over the capture the board
+  produced at 12:15. `bench/2026-09-02/LP-boot.log`, `docs/GATE-RESULTS.md`
+  `R4` claim 1.
+* 🔴 **`R4`'s loop has never run `S2` to `S7` in one invocation, so its 73.88 s
+  is a sum of two runs.** The bench half skipped the build; the desk half
+  skipped the board. The one stage untested in a single command is *upload
+  the image the loop just assembled*, and it needs a power cycle. `SEAM-1`.
+* 🔴 **`looprun --iterations` above 1 is refused, because the loop cannot
+  repeat.** `S4` is a loader command and iteration 1 ends with the loader
+  gone. A loop that runs once is what exists; `R5` is six drivers. `LOOP-3`.
 
 
 ---

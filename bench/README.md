@@ -1082,26 +1082,48 @@ upload's load address was checked against a recorded reading rather than typed.
 
 ---
 
-## 2026-09-02 — the card for the next seating, written before power
+## 2026-09-02 — seating 10, `R4-3`/`R4-4`. One power cycle, and the card was amended twice before it
+
+*(This section replaced one written the night before, headed "the card for the
+next seating, written before power". That version said "a card and nothing else
+yet" and "26 controls, all synthetic"; both stopped being true at 12:15. The
+replacement is here rather than beside it because this file indexes **what is on
+disk**, and what is on disk changed.)*
 
 | | |
 |---|---|
-| **`2026-09-02`** | **A card and nothing else yet.** `PREDICTIONS-B8-block7.md`, **9 cells**, `LP-*`. No capture has landed against it, so `check-predictions` reads 0 of 9 here, which is what an un-run seating looks like and not a failure |
+| **`2026-09-02`** | 🟢 **The loop ran against the board and reported a number.** One power cycle, **12:13:16 → 12:16:26**. Ten captures, one rescue transcript, the card, and `CORRECTIONS-block7.md`. Nine cells predicted, **eight captured**; the ninth, `LP-3`, was served by `looprun`'s `S7` as `LP-boot` — same wire command, same predictions, asserted by the tool instead of by eye, and the `superseded-by:` block naming it is in the corrections file |
 
-**What it is for.** Three things. ① `R4-3`'s `D3` on real silicon:
-`tools/looprun.py` asserts that the console printed **the recipe id the build
-computed** — `RLXFW-ID0=B1434383` — which nobody types at the bench. ②
-`ESC-1`: two reset cells at `--esc-period 0.0005`, where seating 9's twenty-one
-resets ran at `0.002` and could not separate `entry` from one read period. ③
-`CARD-1`: every row carries a **precondition**, and `LP-ab`/`LP-ab2` are the
-same command with different expectations so that the column is load-bearing
-rather than decorative.
+**What it establishes.** `tools/looprun.py --mode bench` ran the whole iteration
+as one process — reset, rescue, burn-flag read-back, upload, staged-head
+read-back, boot, assert — with **no operator gap between any two stages**, and
+printed **34.74 s of machine time** and seven assertions. The one that carries
+the weight is `A3`: **the board printed the id the build computed**,
+`b1434383`, a sha256 over `config/` that nobody typed at any point. All seven
+predictions `Q1`–`Q7` hit.
 
-🔴 **This block runs no `FLR`.** The flash bracket therefore stays at
-**0.0244 %** and the forbidden sentence is exactly as unsayable afterwards.
-Written down so that a seating with no bracket is a recorded decision.
+🔴 **The card was amended twice, both before power and both logged in the card's
+own text.** The first fixed a control count that was one commit stale. The
+second added two stages to the tool, and it is the more important one: the audit
+that wrote it found `--mode bench` going **rescue → upload with the loader's
+echo as its only evidence**, and `C-6` is the measurement that says an echo and
+the word at `0x8040D4A0` are two different sources. `RUNSHEET` `G2`/`H1a` make
+that read-back mandatory before a `put`. `S5b` is it, and `S6b` — requiring what
+is at `0x80500000` to be the file just sent, derived from that file — is the
+second.
 
-⚠️ **`looprun --mode bench` has never run against a board.** Its 26 controls are
-all synthetic, so the card's hand-typed column is complete rather than a
-summary: a tool's first seating is not the place to have only one way to get the
-reading.
+🟢 **And the seating reproduced `C-6` inside its own rescue transcript**, which
+is why `LP-rescue.json` is worth reading: `AUTOBURN: 0` returns
+`Unknown command !` and `AUTOBURN 0` returns `AutoBurning=0`, for all three
+commands, on this board, today.
+
+🔴 **Zero flash-write commands, and no `FLR` at all** — decided in the card
+before power rather than omitted, so the bracket stands exactly where it was:
+**1,024 bytes of 4,194,304 = 0.0244 %**, and *not one flash byte is written*
+remains unsayable. `LP-ab2` read the burn flag as `00000000` before the only
+upload, and `LP-ab` read the power-on `00000001` before any rescue — the two
+readings that make `CARD-1`'s precondition column load-bearing.
+
+**Checked before commit**: `audit-bench-log` over all ten logs, **0 hits**;
+`flashwin scan --sweep` over the directory, 32 files, **CLEAN**; `leakscan` on
+the card, byte-identical hit counts before and after both amendments.

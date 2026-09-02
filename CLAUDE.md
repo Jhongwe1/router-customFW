@@ -77,9 +77,29 @@ released source.
 > the seating did not happen on, an image the card told the operator to upload
 > that was never staged, and a `J` row that had lost the ESC-after-jump that
 > hands the loader prompt back — the third cost a power cycle.
+> 🔄 **2026-09-02, seventh update: an `edit → result`
+> iteration ran as ONE COMMAND against the silicon and reported a
+> number.** `looprun --mode bench` drove reset → rescue → burn-flag
+> read-back → upload → staged-head read-back → boot → assert with **no
+> operator gap between any two stages**, and printed **34.74 s** and seven
+> assertions. The one that matters is that **the board printed the id the
+> build computed** — `RLXFW-ID0=B1434383`, a sha256 over `config/`,
+> compiled in and compared by the tool, **typed by nobody**. 🔴 **And the
+> audit run in the hour before power found three defects in that tool, two
+> of them safety**: it uploaded with the loader's *echo* as its only
+> evidence that the burn flag was off (and `C-6`, 量 2026-08-24, is
+> the measurement that says an echo and the word at `0x8040D4A0` are two
+> sources); it jumped to `0x80500000` without checking
+> what was there, on a board whose reset re-stages that address from flash;
+> and 🔴 **`S3` had never been connected to `S2` at all**, so the
+> `--skip S2,S3` the card called a convenience was the only thing that made
+> the tool runnable. **Zero flash-write commands and no `FLR`**, decided
+> before power, so the bracket stands at **1,024 of 4,194,304 = 0.0244 %**
+> and *not one flash byte is written* is exactly as unsayable as it was.
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
-> and a gate id copied to a second place goes stale there. Conventions for files that do not exist are not written
+> and a gate id copied to a second place goes stale there.
+> Conventions for files that do not exist are not written
 > here; they go in when the file appears. Where this contradicts the repo, the
 > repo wins and this file is wrong.
 
@@ -240,6 +260,16 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   a bench-time one. **And a 3-second capture with the board OFF is a free
   pre-flight**: 0 bytes, and the tool splits that into three causes — the
   adapter, the port, or the board — before a power cycle is spent.
+  🔄 **2026-09-02: the resolution above is true in a LOGIN shell and not
+  otherwise, which makes the trap intermittent rather than constant — and
+  an intermittent trap is the worse kind.** 量, with the control run beside
+  it: `wsl -- bash -lc 'command -v python3'` gives
+  `/home/key/.venvs/thermal/bin/python3`, while `wsl -- bash -c` and
+  `wsl -- bash <script>` both give `/usr/bin/python3`, because the venv
+  reaches `PATH` through a login profile. **So a script that works when run
+  one way breaks when run the other, and neither run tells you which you
+  got.** The rule does not move: write `/usr/bin/python3` and the question
+  never arises.
 - ✅ **`console-capture.py` refuses a capture with neither `--seconds` nor
   `--idle`, and records both in its metadata — fixed 2026-08-30.** *(Until then
   such a capture never returned: both default to `0.0` and the read loop broke on

@@ -3702,3 +3702,46 @@ name that is no block's cell. `CORRECTIONS-block6.md` §1 carries the
 🔴 **`--idle 3` on the boot cell would have truncated it at byte 350** and lost
 497 of 849 bytes. The threshold is per cell shape and it was measured, not
 chosen. `notes/dev-loop.md` §6.4.
+
+---
+
+## Results — Session B8, seating 10, 2026-09-02. `R4-3`, `bench/2026-09-02/`
+
+**One power cycle, 12:13:16 to 12:16:26. Zero flash-write commands, and no `FLR`
+at all** — decided in the card before power, so the bracket stands at **1,024 of
+4,194,304 = 0.0244 %**. Card: `PREDICTIONS-B8-block7.md`, 9 cells, **amended
+twice before power and both amendments logged in the card's own text**.
+**Eight of nine cells landed**; `LP-3` was served by `looprun`'s `S7` as
+`LP-boot`, with the `superseded-by:` block in `CORRECTIONS-block7.md` section 1.
+
+🔴 **The card's hand-typed column ran `LP-A` through `LP-e5b`, and then
+`tools/looprun.py --mode bench` ran `S4`-`S7` as one process.** That is the
+first time a Results table here describes stages this project did not type.
+
+| cell | sent | read | verdict |
+|---|---|---|---|
+| `LP-A` | — (`--esc 25`, power applied on a signal) | `ramSize: 32M` then a single **space**, then `---RealTek(` | 🟢 the cold discriminator; the capture opened before the board spoke, which seating 9's `Y0-A` did not |
+| `LP-ab` | `DW 8040D4A0 1` | **`00000001`** | 🟢 `Q1`. The power-on default, `REG-23` — **the reading block 5's card predicted wrongly**, and the precondition column is why this card predicted it correctly |
+| `LP-wd` | `DW B800311C 1` | `A5000000` | 🟢 `Q6`. `WDTCNR`'s reset value; `CLK-11`'s reading that the loader never writes it is not contradicted |
+| `LP-e5` | `J BFC00000`, `--esc-period 0.0005` | discriminator + prompt; achieved cadence **0.666 ms**, `entry` **2.3 ms** | 🟢 `Q4` |
+| `LP-e5b` | the same | achieved **0.664 ms**, `entry` **2.4 ms** | 🟢 `Q4`/`Q5`. **n = 2, because n = 1 measures nothing** |
+| `LP-rz` (`S4`) | `J BFC00000`, `--esc-period 0.002` | discriminator + prompt; achieved **2.156 ms**, `entry` **2.3 ms** | 🟢 the coarse-grid control **in the same power cycle** — the ruler changed 3.2x and the number did not |
+| `LP-rescue.json` (`S5`) | `AUTOBURN`/`LOADADDR`/`IPCONFIG`, both forms each | colon form gives `Unknown command !`; space form gives the three acknowledgements | 🟢 **`C-6` reproduced on this board today**, all three commands |
+| `LP-ab2` (`S5b`) | `DW 8040D4A0 1` | **`00000000`** | 🟢 `Q2`. 🔴 **The guard `G2`/`H1a` require before a `put`, and it did not exist in the tool that morning** |
+| `LP-2a` (`S6b`) | `DW 80500000 8` | `...3C108060 2610AC00` | 🟢 eight words, compared against the file `S6` sent, **derived from it and not typed**. `2610B400` would have been `quietmc` |
+| `LP-boot` (`S7`) | `J 80500000` | eleven marks in order, **`RLXFW-ID0=B1434383`**, a shell | 🟢 `Q3`/`Q7`. **869 bytes**, and minus the one `ID0` line it is **byte-identical to `bench/2026-08-31b/X-3.log`** |
+| `LP-5b` | `cat /proc/version` | `(key@K)` and `#1 Tue Sep  1 00:00:00 UTC 2026` | 🟢 the **declared** stamp, not the vendor's and not a wall clock |
+
+**`RESULT: the loop closed, 7 assertion(s) held, 34.74 s of machine time`.**
+Stage seconds: `S4` 13.21 · `S5` 0.23 · `S5b` 2.20 · `S6` 1.62 · `S6b` 2.20 ·
+`S7` 15.27.
+
+🔴 **About 24.4 s of that 34.74 is terminator budget rather than board** — every
+capture stage carries one because `console-capture.py` refuses to run without
+it, and the budgets were chosen as measured worst cases plus margin. The board's
+own contribution is about **10.3 s**. `TERM-1`.
+
+⚠️ **What this seating did not do**: run `S2` and `S3` against the board. It
+used `--skip S2,S3` against an image staged the night before, and 量 the same
+day — that skip was **necessary, not chosen**, because nothing carried `S2`'s
+staged tree into `S3` until it was fixed that afternoon. `SEAM-1`.

@@ -266,6 +266,28 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### `R4` — edit to result, closed 2026-09-02
+
+One `edit -> result` iteration runs as a single command and reports a number.
+**73.88 s against a 90 s target**, and the entry that records it says in the
+same breath that this is a sum of two runs rather than one measured total:
+the bench half (34.74 s) skipped the build, the desk half (39.14 s) skipped
+the board.
+
+* A reset without touching the power: `J BFC00000`, 21 of 21 on 2026-09-01
+  and three more inside the loop tool on 2026-09-02.
+* The loop's assertion is **derived from the build and never typed** — the
+  board must print the sha256 of `config/` that the build just computed.
+* `tools/looprun.py`, 45 controls. Two of them are guards found by audit an
+  hour before the tool's first run against hardware: a read-back of the
+  loader's burn flag before any upload, and a read-back of what is at the
+  load address before the jump.
+* 🔴 What it does not do: iterate. `--iterations` above 1 is refused rather
+  than dishonoured. See `docs/KNOWN-ISSUES.md`.
+
+**Zero flash-write commands. The flash bracket did not move: 1,024 of
+4,194,304 bytes = 0.0244 %.**
+
 *(nothing yet)*
 
 ---

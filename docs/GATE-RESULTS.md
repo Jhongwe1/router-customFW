@@ -490,12 +490,182 @@ opening tension was about is six of them. 量, `tools/repdiff.py` (16 controls,
 
 ---
 
-## The operating clause, run for the first time
+## 2026-09-01 — `P4b-gate` (the part of the release process that blocked tagging)
+
+*(Written 2026-09-02. 🔴 **This entry is late, and the reason is the first thing
+it has to say: `P4b-2` created this ledger with five entries, and the gate that
+did it was closing that same day and did not put itself in.** `D2`'s own
+property is *one entry per closed gate*; the only exclusions this file documents
+are `S0` and `R0`, on a hindsight-contamination argument that does not apply
+here — one day, and no gate has closed in between. So this is an omission that
+was found by reading, not a decision that was made. It is placed in close order,
+before `R4`, so the operating clause below reads the sequence it would have read
+had the entry existed on the day.)*
+
+### One line
+
+Four obligations that `CHARTER.md` §110 imposes and no gate on the board owned
+now have a committed owner each — and the gate that gave them owners did not
+give the *rule* one.
+
+### Three claims that stand
+
+**① Version → contents has exactly one committed owner, and the repair found a
+second copy nobody had flagged. 量.**
+
+* `README.md` § *Which gates make which version* is the owner. `PROGRESS.md`'s
+  Release clock dropped `Contents` **and** `Target`; `plan/CHARTER.md` dropped
+  its 內容 column; `CHANGELOG.md`'s `v0.2` section stopped opening with a
+  pointer into a gitignored file that was shipped inside a public release.
+* 🔴 `Target` was never this file's quantity either — it carries CHARTER's own
+  `×1.8` multiplier and agreed with §88 on **two of six** rows.
+
+**② This ledger exists and is readable from the public repository — and the step
+row's claim about it was false. 量.**
+
+* `docs/GATE-RESULTS.md`, committed, English, one entry per closed gate.
+* 🔴 The row asserted that all four owed entries already had their *what it did
+  not establish* written. Two did (`notes/kernel-build.md` §21.7 for `R3`,
+  `notes/reproducible-build.md` §7 for `P4a`). **`R2a/b/d` and `R1h` had
+  none** — what they had was four *What could still be wrong* sections, and
+  *doubt about a claim already made* is not *a list of what was never
+  established*. Those two entries were derived, not copied.
+* 🔴 `D2` named a **path** (`study/weekly-results.md`) and the property it
+  wanted was unreachable there, because `study/` is gitignored and the owner
+  ruled it stays that way. Recorded as a defect in the DoD's wording, the way
+  `R3`'s `D3` was.
+
+**③ A released version now says what it contains and what it does not
+establish, and the release itself exists. 量.**
+
+* `CHANGELOG.md` has a `v0.2` section carved out of `Unreleased`;
+  `docs/KNOWN-ISSUES.md` is the list §110 rule 2 asks for; and the release is
+  published, which had never been done for **any** version.
+* 🔴 That row carried a count of `KNOWN-ISSUES.md` **three times and was wrong
+  twice after the first correction** — 25 → 25 → 26 → 27 → 28 across one
+  session's commits. The count was **deleted** rather than corrected a third
+  time: the step is *a known-issues list exists*, and how many rows it has
+  carries no weight in that sentence, which is exactly why nobody re-derived it.
+
+### What `P4b-gate` did not establish
+
+* 🔴 **That the obligations have an owner in the way that lasts.** Four *items*
+  got owners. `CHARTER.md` §110's **rules 2 and 3** are still owned by no gate
+  on the board, and `P4b` — the gate whose name they carry — sits at v1.0. The
+  carried-forward table's own heading says an item with no owning gate is a bug
+  in that table; the same is true of a rule, and nothing here fixed it.
+* 🔴 **It wrote this file and left itself out of it**, which is the same class
+  of defect one level up: a ledger whose completeness property is stated in its
+  own DoD, and no checker for it. Found 2026-09-02 by reading, not by a tool.
+* **`v0.1` was never tagged** (`REL-2`), so `D3`'s *a section per released
+  version* is satisfied and *per version* is not. The release spans
+  `v0.0` → `v0.2` and says so rather than inventing a boundary.
+* **`REEL-1` is open**: the take measures 62.2 s against its own 60 s spec.
+  **`IMG-1` has no owning gate at all.**
+* **Tagging is not in this gate.** The owner's ruling stands: it waits for their
+  word and for the take to be shot. So *the part that blocked tagging* is done
+  and the tag is not.
+
+---
+
+## 2026-09-02 — `R4` (edit → result, and a reset without the power switch)
+
+### One line
+
+One `edit → result` iteration now runs as a single command that reports a
+number — **73.88 s against a 90 s DoD** — and the audit that made it safe to run
+unattended found that until that morning the tool could not chain its own two
+desk stages at all.
+
+### Three claims that stand
+
+**① The loop's assertion is derived from the build and never typed, and it was
+checked against silicon twice on the same day. 量.**
+
+* `rlxfw-kbuild.sh` computes `RLXFW_SRC_ID` as a sha256 over `config/`, the
+  compile carries it, `ID0` prints it, and `S8` requires the board to have
+  printed the id the build computed. `A3`, 12:15: *board printed b1434383,
+  build computed b1434383*.
+* The second check is the stronger one: at 12:29 a **fresh build from the
+  working tree** computed `b1434383` and `S8` asserted it against the capture
+  the **board** produced at 12:15. Two numbers, one from a build minutes old and
+  one from silicon, and nobody typed either.
+* 🟢 This closes `P4a`'s residual *`ID0` has never been read off the board*.
+* The negative side is positive rather than absent: a stale image, the vendor's
+  firmware, and the loader's own re-staging of `0x80500000` from flash after a
+  watchdog reset all fail `A3`, and `N4`/`N7` are those cases in the suite.
+
+**② The scripted reset is a loop stage now, and its cost is measured. 量.**
+
+* `R4-2` ran 21 resets in a row on 2026-09-01; three more ran inside the tool on
+  2026-09-02, all showing `C-8`'s discriminator, all returning a prompt.
+* The machine cost of replacing a human power cycle with a stage is **13.21 s**,
+  and that is why this gate's total is *larger* than `R4-0`'s pipeline: `R4-0`
+  did not count the reset, because it was a hand.
+* 🟢 **`entry` was separated from the instrument for the first time.** It is the
+  largest gap between two reads that returned data, so its floor is one read
+  period; at a 2.1 ms cadence its 2.4 ms was 1.1 read periods and unreadable.
+  At a **3.2× finer** cadence (0.666 ms achieved) it reads **2.3 / 2.4 ms** —
+  unchanged — and a coarse-grid reset in the **same power cycle** reads 2.3.
+  The ruler got finer and the number did not move.
+
+**③ The two guards that make it safe to run unattended were found by audit an
+hour before power, and both fired on the board. 量.**
+
+* `S5b` reads the burn flag back out of `0x8040D4A0` between the rescue and the
+  upload. `RUNSHEET` `G2`/`H1a` make that mandatory before a `put`; the tool
+  went rescue → upload with the loader's **echo** as its only evidence, and
+  `C-6` is the measurement that says an echo and that word are two sources.
+  **This seating reproduced `C-6` in its own rescue transcript**: `AUTOBURN: 0`
+  → `Unknown command !`, `AUTOBURN 0` → `AutoBurning=0`, for all three commands.
+* `S6b` reads back what is at `0x80500000` and requires it to be the file `S6`
+  sent, **derived from that file and never typed**.
+* `--skip S5b` is refused, because a guard a flag can switch off is not a guard;
+  `--skip S6b` is allowed, because that one protects the seating and not the
+  device, and the asymmetry is written down.
+* 🔴 The suite's own positive control caught a bug in the new parser on its
+  first run — the console sends CRLF, `$` under `re.M` sits behind the `\r`,
+  and every *negative* control passed while the parse returned nothing.
+
+### What `R4` did not establish
+
+* 🔴 **No single invocation has run `S2` → `S7`.** The bench half ran with
+  `--skip S2,S3`; the desk half ran with the bench stages skipped. **73.88 s is
+  a sum of two runs, not a measured total**, and the entry says so wherever the
+  number appears.
+* 🔴 **The image the loop builds has never been uploaded by the loop.** `S8`
+  read a capture of an image built the previous night from the same `config/`.
+  That is the one stage still untested in one command, and it needs the board.
+* 🔴 **`--iterations` cannot repeat, and now refuses rather than pretending.**
+  `S4` is a loader command and iteration 1 ends with the loader gone; it would
+  have died earlier still on an existing output file. **A loop that runs once is
+  not a loop**, and `R5` is six drivers.
+* 🔴 **Seventy per cent of the bench half is terminator budget and no one has
+  measured what it should be.** ≈24.4 s of 34.74. 推 that it can be cut; the
+  experiment is to read the largest inter-byte silence out of the boot captures
+  this project already holds, and it was not done.
+* 🔴 **`--skip S2,S3` was necessary, not chosen, and nothing knew.** Until
+  2026-09-02 `--cell-top` defaulted to a literal placeholder and `S3` exited 1
+  against it. It survived 26 controls because every one of them either skipped
+  both stages or ran in replay. A defect that only the *unskipped* path can show
+  is invisible to a suite that never takes it.
+* ⚠️ **One person, one host, two runs.** Nothing here is a claim about n, about
+  another machine, or about the loop next month.
+* **NFS root left this gate**, on `R4-0`'s measurement that it removes 2.2–3.3 %
+  of the machine pipeline and none of it for a kernel change. The gate asked for
+  that decision to be visible if it went that way.
+
+---
+
+## The operating clause, re-run at seven entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
 
-With five entries there are four consecutive pairs:
+*(Run for the first time at five entries on 2026-09-01. Re-run 2026-09-02 with
+`P4b-gate` inserted in close order and `R4` appended, which changes the pair set
+rather than adding to it: the old `P4a` → *(end)* boundary is now two more
+pairs, and `P4a`'s neighbour on the right changed.)*
 
 | pair | shared? |
 |---|---|
@@ -503,29 +673,42 @@ With five entries there are four consecutive pairs:
 | `R2a/b/d` → `R1h` | no |
 | `R1h` → `R3` | **yes — decision ② / `CPU-45`.** `R1h` carries it as 未定 after the first of two allowed seatings; `R3` carries it as still `R1-gate`'s |
 | `R3` → `P4a` | no |
+| `P4a` → `P4b-gate` 🆕 | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
+| `P4b-gate` → `R4` 🆕 | no |
 
-🔴 **So the clause names `CPU-45` — whether a cached read sees a write the CPU
-did not make, and whether any command invalidates a clean line — as the next
-gate. That is not what the plan says next.** The plan's next gate is `R4`
-(turnaround time). This entry does not move the gate board; which gate opens is
-the owner's decision. What the ledger owes is the sentence, and here it is.
+🔴 **Two new entries and no new firing.** The clause still names exactly one
+thing — `CPU-45` — and it names it from the same pair it named it from at five
+entries. Written down because the opposite would have been the suspicious
+result: a rule that fires more often simply because the ledger got longer is
+measuring length, not repetition.
 
-⚠️ **Two caveats travel with that firing, and both weaken it.**
+🔴 **And at seven entries the clause's own reach became visible, which it was
+not at five.** There *is* a residual that repeats — **a DoD that named an
+artefact instead of the property it wanted** — and the clause cannot see it:
 
-1. **Four of the five entries were written in one sitting on 2026-09-01**, by
-   which time all five gates had closed. The *contents* are not invented — the
-   `R1h` claim is `CPU-45`'s own recorded state dated 2026-08-29, and the `R3`
-   claim is `notes/kernel-build.md` §21.7, written on the day `R3` closed — but
-   the act of *selecting* which residuals to list happened today, and a
-   selection made with hindsight is not the same instrument as one made blind.
-   This is the same contamination the omission of `S0` and `R0` at the top of
-   this file was reasoned about, and it applies here at lower strength rather
-   than not at all.
-2. **`CPU-45` already has an owning gate and an allowed second seating.** Its
-   stop-loss permits two, and one has been spent. So the clause is not
-   discovering an orphan; it is saying the queue is in a different order than
-   the plan has it. That is a weaker statement than the rule sounds like it
-   makes, and it is written down at its real strength.
+* `R3`'s `D3` named the string `MemTotal:`, which this kernel never prints.
+* `P4b-gate`'s `D2` named the path `study/weekly-results.md`, which is
+  gitignored by a ruling the same gate made.
+
+Those are the same defect and they are **two apart**, with `P4a` between them.
+The rule says *consecutive*, so it does not fire, and this entry does not
+pretend it did. ⚠️ Whether the rule should read *within any three consecutive*
+is a change to the rule, and changing a rule because it failed to produce the
+answer you had already reached is exactly how such a rule stops being an
+instrument. Recorded, not applied.
+
+⚠️ **Both caveats from the first run still travel with `CPU-45`'s firing**, and
+one of them is now weaker in a way worth stating: four of the first five entries
+were written in one sitting with hindsight, and `P4b-gate`'s — written a day
+late, but before any gate closed after it — is the sixth. `R4`'s was written on
+the day `R4` closed, from readings taken that morning, which is the first entry
+in this file with no hindsight in it at all.
+
+🟢 **One thing this run does settle**: `P4a`'s residual *`ID0` has never been
+read off the board* is closed by `R4`'s seating, so it cannot repeat forward. A
+residual that a later gate closes is removed from the clause's input by being
+closed, not by being edited out — `P4a`'s entry keeps its wording and `R4`'s
+says which line it closes.
 
 ---
 

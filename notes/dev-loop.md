@@ -564,3 +564,125 @@ Three held, four refuted, one not established, one split.
 cells across three sessions sit below all four `-j4` cells, which is
 suggestive; today's data cannot separate them, and a gate that claimed 24 % on
 that evidence would be reporting the host's variance as a result.
+
+---
+
+## 10. 🟢 2026-09-02, seating 10: the loop measured itself, and the number is not the one this file predicted
+
+`R4-0` measured the loop by reading captures and driver logs afterwards. This
+section is different in kind: **`tools/looprun.py` timed its own subprocesses
+while running them**, so the stage column below is the instrument's, not a
+reconstruction. Both runs are on this host, on the same day, with the same
+recipe.
+
+### 10.1 The two halves, each measured, and they were not one run
+
+| | stage | seconds | what it is |
+|---|---|---:|---|
+| desk | `S2` build | **35.96** | full 594-object build from `config/`, `-j4`, `--marks` |
+| desk | `S3` assemble | **3.19** | `rtkimage build`, from the tree `S2` staged |
+| | **desk half** | **39.14** | |
+| bench | `S4` reset | **13.21** | `J BFC00000`, `--esc-after 10 --idle 3` |
+| bench | `S5` rescue | **0.23** | `AUTOBURN 0`, `LOADADDR`, `IPCONFIG` |
+| bench | `S5b` burn flag | **2.20** | `DW 8040D4A0 1`, `--idle 2` |
+| bench | `S6` upload | **1.62** | 1,027,072 bytes over TFTP |
+| bench | `S6b` staged head | **2.20** | `DW 80500000 8`, `--idle 2` |
+| bench | `S7` boot | **15.27** | `J 80500000`, `--idle 8` |
+| | **bench half** | **34.74** | |
+| | **sum** | **73.88** | |
+
+🔴 **73.88 s is a SUM OF TWO RUNS, not a measured total**, and the difference
+matters: no single invocation has yet gone `S2` → `S7`, because the bench half
+ran with `--skip S2,S3` against an image staged the night before. §10.3 says
+why that skip was not optional.
+
+🟢 **`D4` is met**: 73.88 s against 90, **16.1 s of margin**.
+
+⚠️ **And it is LARGER than §7's 50.4–71.1 s, which is the honest direction.**
+§7's pipeline counted `S2 + S3 + upload + boot`. It did not count the reset,
+because in the loop as it existed on 2026-09-01 the reset was **a human
+reaching for the power switch** and therefore not machine time at all. `R4-2`
+made it a script and this seating made it a stage, and the machine cost of
+that trade is **13.21 s**. A number that got bigger because the loop got more
+automatic is not a regression, and reporting it as one would be.
+
+### 10.2 🔴 Seventy per cent of the bench half is terminator budget, not board
+
+Every capture stage carries a terminator, because `console-capture.py` refuses
+to run without one. Those terminators are **deliberate waits**, and they are
+most of the bench half:
+
+| stage | budget | duration | board time |
+|---|---:|---:|---:|
+| `S4` | `--esc-after 10` + `--idle 3` | 13.138 | ≈ 0.6 (the warm boot itself) |
+| `S5b` | `--idle 2` | 2.131 | ≈ 0.13 |
+| `S6b` | `--idle 2` | 2.126 | ≈ 0.13 |
+| `S7` | `--idle 8` | 15.189 | **7.19** |
+
+**≈ 24.4 s of 34.74 is budget — 70 %.** The board's own contribution to the
+bench half is about **10.3 s**, of which the boot is 7.19.
+
+⚠️ **推, and it needs an experiment rather than a patch.** Tightening these is
+the obvious saving and it is also the one change that turns *a boot that
+paused* into *a boot that died*: block 7's card justifies `--idle 8` from a
+**4.576 s** measured silence at byte 350 of the `quietm` log, so the budget is
+not padding, it is a measured worst case plus margin. The experiment is to
+measure the largest inter-byte silence over the boot captures this project
+already holds, and set each `--idle` from that distribution rather than from
+one instance. **Not done today.**
+
+### 10.3 🔴 `--skip S2,S3` was not a convenience, and that is a finding about this file's own subject
+
+Block 7's card gives a reason for `--skip S2,S3` — the image is staged, and
+rebuilding at the bench would spend 40 s of the scarcest resource here. That
+reason is true and it is not why the flag was needed.
+
+量 2026-09-02, by running `--mode desk --skip S2` and watching it stop:
+`S3` assembles from the tree `S2` stages, and **nothing carried the path
+between them**. `--cell-top` defaulted to the literal string
+`<S2's staged tree>`, `rtkimage build --cell '<S2's staged tree>'` exits 1, and
+so **`--mode bench` without `--skip S2,S3` could not have run at all**.
+
+A loop that cannot chain its own two desk stages is the central defect of a
+gate about loops, and it survived 26 controls because every one of them either
+skipped both stages or ran in `--mode replay`. The fix reads the path out of
+the driver's own `make -C <tree>/linux-2.6.30` line; `C11` is that extraction
+and `C12` requires a driver run without the line to raise at `S2` rather than
+let `S3` assemble from somewhere else.
+
+### 10.4 🟢 What the end-to-end desk run establishes, and what it does not
+
+After the fix, one command ran `S2` → `S3` → `S8`:
+
+```
+S2  build     rc=0   35.96 s
+    recipe=b1434383  <- S8 will require the board to print this
+    staged tree=/home/key/fwre-work/rebuild/r3-4/cells/r44a/top  <- S3 assembles from this
+S3  assemble  rc=0    3.19 s
+...
+ok   A3 the id the build computed   board printed b1434383, build computed b1434383
+```
+
+**Establishes**: a build started from the working tree at 12:29 computes the
+same `RLXFW_SRC_ID` that the silicon printed at 12:15, and neither number was
+typed by anyone. That is the whole claim `RLXFW_SRC_ID` exists to make, and it
+is now made across a build and a boot rather than inside one run.
+
+🔴 **Does not establish**: that the freshly built image boots. `S8` read a
+capture of an image built the night before from the same `config/`. The stage
+still untested in one command is *upload the image `S3` just assembled*, and
+that needs the board.
+
+### 10.5 The served loop, and it moved by 6×
+
+`looptime seating` over `bench/2026-09-02`: **span 190.1 s**, instrument 94.4 s
+(49.6 %), dead 95.8 s (50.4 %), and **all four gaps above 7.9 s sit between
+hand-typed cells** — 32.8 s, 24.9 s, 21.9 s, 13.9 s. Inside `looprun` the six
+bench stages have no operator gap at all, because they are one process.
+
+§7 read the most recent full-image seating, `bench/2026-08-31`, at **1149 s**.
+⚠️ **Those two spans are not the same workload** — that seating ran twelve
+userspace commands and this one ran one — so *6×* is a description of two
+seatings and not a controlled comparison. What *is* controlled: the four stages
+`S4`–`S7`, which on every previous seating had an operator gap between each,
+ran here with none.
