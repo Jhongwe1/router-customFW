@@ -139,6 +139,20 @@ DW_LINE_RX = re.compile(
 BOOT_MARKS = ["RLXFW-B%02d" % n for n in range(11)]
 ID0_RX = re.compile(r"RLXFW-ID0=([0-9A-Fa-f]{8})")
 RECIPE_RX = re.compile(r"recipe=([0-9a-f]{8})")
+# 🔴 S3 assembles from the tree S2 stages, and until 2026-09-02 nothing carried
+# the path between them: `--cell-top` defaulted to the literal placeholder
+# below and S3 ran `rtkimage build --cell '<S2's staged tree>'`, which exits 1.
+# So `--skip S2,S3` was not a convenience on block 7's card -- it was the only
+# way this tool could run, and neither the tool nor the card said so.  The
+# driver names the tree in its own `make -C` line; that is the link.
+PLACEHOLDER_TOP = "<S2's staged tree>"
+CELLTOP_RX = re.compile(r"make -C (\S+)/linux-2\.6\.30\b")
+# 🔴 And this one is worse than an exit 1, because it SUCCEEDS: `<rtkimage work
+# dir>` is a legal directory name on Linux, so S3 run from the repository root
+# with the default would create it there.  CLAUDE.md already records that shape
+# once -- a vendor binary writing `offset.tmp` into this repository's root,
+# "a place no vendor-tree check watches".
+PLACEHOLDER_WORK = "<rtkimage work dir>"
 
 
 class Refused(Exception):
@@ -375,6 +389,24 @@ def loop_once(a, out=sys.stdout):
                       "upload. A guard that a flag can switch off is not a "
                       "guard, and this one stands between an upload that lands "
                       "in RAM and one written to the only unit there is")
+    # 🔴 S3's input is S2's output, and if S2 is not going to run then nobody
+    # computes it.  Refusing here beats letting S3 exit 1 against a placeholder,
+    # which is what happened until 2026-09-02 and which reads like a broken
+    # rtkimage rather than a missing argument.
+    if ("S2" in skip and "S3" not in skip and a.mode in ("desk", "bench")
+            and getattr(a, "cell_top", PLACEHOLDER_TOP) == PLACEHOLDER_TOP):
+        raise Refused("--skip S2 with no --cell-top: S3 assembles the image out "
+                      "of the tree S2 stages, and with S2 skipped nothing "
+                      "computes that path -- S3 would run against the literal "
+                      "placeholder %r and exit 1. Pass --cell-top <tree>, or "
+                      "skip S3 as well" % PLACEHOLDER_TOP)
+    if ("S3" not in skip and a.mode in ("desk", "bench")
+            and getattr(a, "work", PLACEHOLDER_WORK) == PLACEHOLDER_WORK):
+        raise Refused("no --work: S3 would be handed the literal %r, which is a "
+                      "legal directory name -- so rtkimage would CREATE it, in "
+                      "whatever directory this was run from. A default that "
+                      "succeeds in the wrong place is worse than one that "
+                      "fails" % PLACEHOLDER_WORK)
     if "S2" in skip and not getattr(a, "recipe_override", None):
         raise Refused("--skip S2 removes the only thing that computes the recipe id, "
                       "so A3 would have nothing to require. Pass --recipe-override "
@@ -406,6 +438,24 @@ def loop_once(a, out=sys.stdout):
             recipe = m.group(1)
             print("      recipe=%s  <- S8 will require the board to print this"
                   % recipe, file=out)
+            # Chain the staged tree into S3.  Derived from the driver's own
+            # `make -C` line, never guessed: if it is not there, S3 has no
+            # input and saying so beats assembling from somewhere else.
+            t = CELLTOP_RX.search(txt)
+            if not t:
+                raise StageFailed(
+                    "S2", "the driver printed no `make -C <tree>/linux-2.6.30` "
+                          "line, so there is nothing to tell S3 which tree to "
+                          "assemble from and it would fall back to the "
+                          "placeholder")
+            top = t.group(1)
+            if a.cell_top == PLACEHOLDER_TOP:
+                for st in plan:
+                    if st["id"] == "S3" and st["argv"]:
+                        st["argv"] = [x.replace(PLACEHOLDER_TOP, top)
+                                      for x in st["argv"]]
+                print("      staged tree=%s  <- S3 assembles from this" % top,
+                      file=out)
         if s["id"] in ("S4", "S5b", "S6b"):
             stem = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
             suffix, check = {
@@ -722,6 +772,71 @@ def selftest(out=sys.stdout):
         ck("M8b", "and --iterations 1, the only honest value, still runs", 0,
            rc_of(["--iterations", "1"]))
 
+        # ---- M9: S3's input is S2's output.  Until 2026-09-02 nothing carried
+        # it, and S3 exited 1 against a placeholder -- which looks like a broken
+        # rtkimage and not a missing argument.  --mode desk runs S3 for real, so
+        # this is the mode that can see it.
+        B.mode = "desk"
+        B.skip = "S2"
+        # 🔴 The fixture has to carry the PLACEHOLDER, not a real path: with
+        # `cell_top = "top"` this case never reaches the branch it is named
+        # after, and the first run of M9 proved that by failing at S3 instead
+        # of being refused.
+        B.cell_top = PLACEHOLDER_TOP
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except Refused:
+            got = "refused"
+        except StageFailed:
+            got = "StageFailed -- S3 ran against the placeholder"
+        ck("M9", "🔴 --skip S2 with no --cell-top is REFUSED, not left to fail "
+                 "at S3", "refused", got)
+        B.skip = "S2,S3"
+        try:
+            rc9 = loop_once(B, out=devnull); got = "rc=%d" % rc9
+        except Refused:
+            got = "refused"
+        ck("M9b", "and --skip S2,S3 -- block 7's own invocation, placeholder "
+                  "and all -- is not refused", "rc=0", got)
+
+        # ---- M10: the OTHER placeholder, and it is worse because it succeeds.
+        # `<rtkimage work dir>` is a legal directory name, so the default does
+        # not fail -- it creates that directory wherever the run started.
+        B.skip = ""
+        B.work = PLACEHOLDER_WORK
+        B.cell_top = "top"
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except (Refused, StageFailed) as exc:
+            got = "refused" if isinstance(exc, Refused) else "StageFailed"
+        ck("M10", "🔴 the --work placeholder is REFUSED before S3 can create a "
+                  "directory named after it", "refused", got)
+        B.work = "work"
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except Refused:
+            got = "refused"
+        except StageFailed:
+            got = "StageFailed"
+        ck("M10b", "and a real --work is not refused (it reaches S2/S3)",
+           "StageFailed", got)
+        B.mode = "replay"
+        B.skip = ""
+        B.cell_top = "top"
+        B.work = "work"
+
+    # ---- C11/C12: the chaining itself, on the driver's real output shape
+    real = ("== i3: applied 16 declared row(s) from config/rlxfw-marks.tsv\n"
+            "== i3: make -C /home/key/fwre-work/rebuild/r3-4/cells/i3/top/"
+            "linux-2.6.30 -j4 vmlinux CFLAGS_KERNEL=-fno-if-conversion\n"
+            "== OUTPUT 3968240 bytes  sha256 c788348d7b7f9886\n")
+    mt = CELLTOP_RX.search(real)
+    ck("C11", "the staged tree is read out of the driver's own `make -C` line",
+       "/home/key/fwre-work/rebuild/r3-4/cells/i3/top", mt.group(1) if mt else None)
+    ck("C12", "🔴 and a driver run that printed no such line yields nothing, so "
+              "S2 raises rather than S3 assembling from somewhere else",
+       None, CELLTOP_RX.search(real.replace("make -C", "MAKE -c")))
+
     print("", file=out)
     print("RESULT: %d passed, %d failed" % (passed, failed), file=out)
     return 0 if failed == 0 else 1
@@ -741,10 +856,10 @@ def main():
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--image", default="")
     ap.add_argument("--vmlinux", default=None)
-    ap.add_argument("--cell-top", default="<S2's staged tree>",
+    ap.add_argument("--cell-top", default=PLACEHOLDER_TOP,
                     help="the staged tree rtkimage builds against")
     ap.add_argument("--label", default="rlxfw")
-    ap.add_argument("--work", default="<rtkimage work dir>")
+    ap.add_argument("--work", default=PLACEHOLDER_WORK)
     ap.add_argument("--replay-boot", default=None,
                     help="mode=desk: a committed capture PREFIX to assert over")
     ap.add_argument("--recipe-override", default=None,
