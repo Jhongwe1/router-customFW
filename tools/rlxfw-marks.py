@@ -244,7 +244,59 @@ def _indent(s):
     return s[:len(s) - len(s.lstrip())]
 
 
-def apply_marks(decl, tree, src, quiet=False):
+def _copy_if_different(s, d):
+    """-> True when the file was written.
+
+    Not `shutil.copyfile` unconditionally: kbuild triggers on mtime, so
+    re-copying an identical file forces its object to rebuild and puts a floor
+    under every incremental measurement. `INC-1` is a measurement of that
+    floor, so the instrument must not create one.
+    """
+    if os.path.isfile(d):
+        with open(s, "rb") as a, open(d, "rb") as b:
+            if a.read() == b.read():
+                return False
+    shutil.copyfile(s, d)
+    return True
+
+
+def tree_mark_state(decl, tree):
+    """-> ('clean' | 'applied' | 'partial', rows, detail)
+
+    The three states a staged tree can be in, and the reason there are three
+    rather than two:
+
+    * ``clean``   -- every declared insert occurs **zero** times. `apply` runs.
+    * ``applied`` -- every declared insert occurs **exactly once, at its
+      anchor**. `apply --if-needed` is a no-op and exits 0.
+    * ``partial`` -- anything else: some present and some not, one present
+      twice, one present at the wrong place. 🔴 **This is the state `A4`
+      exists to refuse and `--if-needed` must not launder.** A partially
+      marked tree builds, and what it builds is not what the declaration
+      describes -- a doubled mark reads in a capture as a boot loop.
+    """
+    rows, _ = parse_decl(decl)
+    counts = {}
+    for r in rows:
+        p = os.path.join(tree, r.file)
+        if not os.path.isfile(p):
+            return "partial", rows, "%s: no such file under %s" % (r.file, tree)
+        with io.open(p, encoding="utf-8", errors="surrogateescape") as f:
+            lines = f.read().split("\n")
+        counts[r.id] = sum(1 for ln in lines if norm(ln) == norm(r.insert))
+    if all(n == 0 for n in counts.values()):
+        return "clean", rows, ""
+    _, bad = check_marks(decl, tree)
+    if not bad:
+        return "applied", rows, ""
+    present = [i for i, n in counts.items() if n]
+    return ("partial", rows,
+            "%d of %d insert(s) present (%s); %s"
+            % (len(present), len(rows), ", ".join(sorted(present)),
+               "; ".join("%s: %s" % (r.id, why) for r, why in bad[:3])))
+
+
+def apply_marks(decl, tree, src, quiet=False, if_needed=False):
     rows, _ = parse_decl(decl)
 
     real = os.path.realpath(tree)
@@ -268,8 +320,28 @@ def apply_marks(decl, tree, src, quiet=False):
     if not staged:
         die("--src %s is empty. The marks call rlxfw_mark(), which lives in a "
             "file of mine; without it the tree does not link" % src)
-    for rel, s, d in staged:
-        shutil.copyfile(s, d)
+    copied = [rel for rel, s, d in staged if _copy_if_different(s, d)]
+
+    # --if-needed: the idempotent path, and it refuses the middle state.
+    # It runs AFTER --src is staged, because a tree can be correctly marked
+    # and still be missing a file of mine that changed.
+    if if_needed:
+        state, rows, detail = tree_mark_state(decl, tree)
+        if state == "applied":
+            if not quiet:
+                print("rlxfw-marks %s" % VERSION)
+                print("tree        %s" % tree)
+                print("  already   %d mark(s) present at their anchors; "
+                      "nothing inserted" % len(rows))
+                for rel in copied:
+                    print("  restaged  %s (content differed)" % rel)
+            return rows
+        if state == "partial":
+            die("this tree is PARTIALLY marked and --if-needed will not "
+                "repair it: %s. A tree in this state builds, and what it "
+                "builds is not what %s describes. Re-stage it."
+                % (detail, decl))
+        # state == "clean": fall through and apply
 
     done = 0
     for r in rows:
@@ -297,7 +369,8 @@ def apply_marks(decl, tree, src, quiet=False):
         print("declaration %s   (%d mark(s))" % (decl, len(rows)))
         print("tree        %s" % tree)
         for rel, _, _ in staged:
-            print("  staged    %s" % rel)
+            print("  staged    %s%s"
+                  % (rel, "" if rel in copied else "  (unchanged, not rewritten)"))
         for r in rows:
             print("  %-4s %-34s %s %s" % (r.id, r.file, r.position, r.anchor))
     return rows
@@ -574,6 +647,132 @@ def self_test():
         ck("A17 the search string carries the macro's terminator",
            rr[0].string == "RLXFW-B01\n" and rr[1].string == "RLXFW-B02=",
            "%r / %r" % (rr[0].string, rr[1].string))
+
+        # ------------------------------------------------------------------
+        # A18-A24 -- the idempotent path (`INC-1`, R5-0, 2026-09-02).
+        #
+        # It exists because `INC-1` cannot be measured without it: the cost of
+        # one real edit on a REUSED tree is unmeasured, every number so far is
+        # a no-op or a `touch`, and A4 refuses to run twice on one tree at
+        # all.  The whole difficulty is that the fix must not become "already
+        # there, call it success" -- that would delete A4, and A4 is guarding
+        # a doubled mark, which reads in a capture as a boot loop.
+        # ------------------------------------------------------------------
+        d18 = os.path.join(tmp, "d18")
+        io.open(d18, "w").write(_decl(
+            ("X1", "sub/a.c", "after", "one();", 'rlxfw_mark("B01");', "r"),
+            ("X2", "sub/a.c", "after", "two();", 'rlxfw_mark("B02");', "r")))
+
+        # A18 -- a clean tree is `clean`, and --if-needed applies to it.
+        fresh()
+        st, _rw, _d = tree_mark_state(d18, tree)
+        ck("A18 a clean tree reads as clean", st == "clean", st)
+        apply_marks(d18, tree, src, quiet=True, if_needed=True)
+        _r, bad = check_marks(d18, tree)
+        ck("A18b --if-needed applies to a clean tree", not bad, str(bad))
+
+        # A19 -- and the SECOND call is a no-op rather than a refusal or a
+        # doubled insert.  This is the whole point.
+        st, _rw, _d = tree_mark_state(d18, tree)
+        ck("A19 a marked tree reads as applied", st == "applied", st)
+        apply_marks(d18, tree, src, quiet=True, if_needed=True)
+        with io.open(os.path.join(tree, "sub", "a.c"),
+                     encoding="utf-8", errors="surrogateescape") as f:
+            body = f.read()
+        ck("A19b --if-needed does not insert twice",
+           body.count('rlxfw_mark("B01");') == 1,
+           "%d occurrence(s)" % body.count('rlxfw_mark("B01");'))
+
+        # A20 -- WITHOUT --if-needed the same tree is still refused. A4 is not
+        # weakened by the new path; it is bypassed only when asked.
+        ok, why = refuses(apply_marks, d18, tree, src, quiet=True)
+        ck("A20 plain apply on a marked tree still refuses", ok, why)
+
+        # A21 -- 🔴 the middle state.  One mark present, one not: --if-needed
+        # must REFUSE, because neither applying nor skipping is right.
+        lines = body.split("\n")
+        lines = [ln for ln in lines if 'rlxfw_mark("B02");' not in ln]
+        with io.open(os.path.join(tree, "sub", "a.c"), "w",
+                     encoding="utf-8", errors="surrogateescape",
+                     newline="") as f:
+            f.write("\n".join(lines))
+        st, _rw, det = tree_mark_state(d18, tree)
+        ck("A21 a half-marked tree reads as partial", st == "partial", st)
+        ok, why = refuses(apply_marks, d18, tree, src, quiet=True,
+                          if_needed=True)
+        ck("A21b --if-needed REFUSES a partial tree", ok, why)
+
+        # A22 -- a DOUBLED mark is partial too, not applied. This is the state
+        # A4 was written for, reached from the other direction.
+        fresh()
+        apply_marks(d18, tree, src, quiet=True)
+        p22 = os.path.join(tree, "sub", "a.c")
+        with io.open(p22, encoding="utf-8", errors="surrogateescape") as f:
+            t22 = f.read()
+        t22 = t22.replace('rlxfw_mark("B01");',
+                          'rlxfw_mark("B01");\n    rlxfw_mark("B01");', 1)
+        with io.open(p22, "w", encoding="utf-8", errors="surrogateescape",
+                     newline="") as f:
+            f.write(t22)
+        st, _rw, _d = tree_mark_state(d18, tree)
+        ck("A22 a doubled mark reads as partial, never applied",
+           st == "partial", st)
+        ok, why = refuses(apply_marks, d18, tree, src, quiet=True,
+                          if_needed=True)
+        ck("A22b --if-needed refuses it", ok, why)
+
+        # A23 -- _copy_if_different does not rewrite an identical file. kbuild
+        # triggers on mtime, so a tool that re-copies unconditionally puts a
+        # floor under every incremental measurement -- and INC-1 is a
+        # measurement of that floor.
+        s23 = os.path.join(src, "mine.c")
+        d23 = os.path.join(tree, "mine.c")
+        shutil.copyfile(s23, d23)
+        before = os.stat(d23).st_mtime_ns
+        os.utime(d23, ns=(before - 10 ** 9, before - 10 ** 9))
+        stamp = os.stat(d23).st_mtime_ns
+        wrote = _copy_if_different(s23, d23)
+        ck("A23 an identical file is not rewritten",
+           wrote is False and os.stat(d23).st_mtime_ns == stamp,
+           "wrote=%s mtime moved=%s"
+           % (wrote, os.stat(d23).st_mtime_ns != stamp))
+
+        # A24 -- the positive control on A23: a CHANGED file is written. A
+        # copier that never writes would pass A23.
+        with io.open(s23, "w") as f:
+            f.write("void rlxfw_mark(const char *s){(void)s;/*v2*/}\n")
+        wrote = _copy_if_different(s23, d23)
+        with io.open(d23) as f:
+            got = f.read()
+        ck("A24 a changed file IS written",
+           wrote is True and "v2" in got, "wrote=%s content=%r" % (wrote, got))
+
+        # A25 -- the RESULT line says which of the two things happened, and
+        # BOTH forms are readable by the one pattern in rlxfw-kbuild.sh. The
+        # driver parses this line and exits 3 on an empty count, so a message
+        # that got more honest must not break its reader.
+        import io as _io25
+        import contextlib
+        kb_rx = re.compile(
+            r"^RESULT: (\d+) mark\(s\) (.*) and read back", re.M)
+        fresh()
+        got = []
+        for _ in range(2):
+            buf = _io25.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc25 = main(["apply", "--decl", d18, "--tree", tree,
+                             "--src", src, "--if-needed"])
+            plain = re.sub(r"\x1b\[[0-9;]*m", "", buf.getvalue())
+            m25 = kb_rx.search(plain)
+            got.append((rc25, m25.group(1) if m25 else None,
+                        m25.group(2) if m25 else None))
+        ck("A25 first --if-needed run reports `applied`",
+           got[0] == (0, "2", "applied"), str(got[0]))
+        ck("A25b second reports `already present`, same count",
+           got[1] == (0, "2", "already present"), str(got[1]))
+        ck("A25c the driver's pattern reads a count from BOTH",
+           got[0][1] == got[1][1] == "2",
+           "an empty count makes rlxfw-kbuild.sh exit 3")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -600,11 +799,14 @@ def main(argv):
         return 3
     cmd, argv = argv[0], argv[1:]
     a = {"decl": None, "tree": None, "src": None, "image": None, "absent": []}
+    if_needed = False
     i = 0
     while i < len(argv):
         x = argv[i]
         if x == "--absent":
             a["absent"].append(argv[i + 1]); i += 2
+        elif x == "--if-needed":
+            if_needed = True; i += 1
         elif x.startswith("--") and x[2:] in a:
             a[x[2:]] = argv[i + 1]; i += 2
         else:
@@ -617,7 +819,14 @@ def main(argv):
         for k in ("decl", "tree", "src"):
             if not a[k]:
                 die("apply needs --%s" % k)
-        apply_marks(a["decl"], a["tree"], a["src"])
+        # The state is read BEFORE the call, so the RESULT line can say what
+        # actually happened. A line reading `applied` after a run that
+        # inserted nothing is the kind of second-hand number this repository
+        # keeps finding in its own prose.
+        pre = None
+        if if_needed:
+            pre, _rw, _d = tree_mark_state(a["decl"], a["tree"])
+        apply_marks(a["decl"], a["tree"], a["src"], if_needed=if_needed)
         rows, bad = check_marks(a["decl"], a["tree"])
         if bad:
             for r, why in bad:
@@ -625,8 +834,9 @@ def main(argv):
             print("REFUSED: apply ran and check does not agree with it")
             return 2
         print("")
-        print("RESULT: \033[32m%d mark(s) applied and read back\033[0m"
-              % len(rows))
+        verb = "already present" if pre == "applied" else "applied"
+        print("RESULT: \033[32m%d mark(s) %s and read back\033[0m"
+              % (len(rows), verb))
         return 0
 
     if cmd == "check":
