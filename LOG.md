@@ -14205,6 +14205,46 @@ else's source」,而且「Eighteen controls」。兩個都錯。** `config/host-
 
 ---
 
+### 十二之二、全套 sweep 的讀數,以及唯一那個紅
+
+**52 步、1,813.2 秒、1 紅** —— 用 PyYAML 逐 step 取 `run:` 值**原封**交給 `bash -c`,
+不重建命令(`CLAUDE.md` 記過重建會炸,而且會印出 46 個跟真的失敗長得一樣的 FAIL)。
+
+🔴 **唯一的紅是 `census`,而它是這台桌子的性質不是缺陷** ——
+`test-hazlint`(142)與 `test-hazlint-objs`(28)在 `ci-expected.tsv` 宣告 `*bench-only*`,
+因為它們的母體是 `$FWRE_WORK/stage2.bin`,那是這台裝置的 vendor bootloader、不能提交。
+**而這張桌子有那個檔**,所以它們會跑、會產生 `.out`,`ci-census` 的 `C10`
+(「宣告 bench-only 卻有輸出 → 紅」)就發射,`NOT-RUN-TOTAL MISMATCH`(478 對 2)
+是同一個原因的下游。`CLAUDE.md` 已經記過:**本地 sweep 不能拿 census 當仲裁。**
+
+**最花時間的五支佔 77%**,而四支是 mutation suite:
+
+| 秒 | |
+|---:|---|
+| 375.7 | `test-console-capture-mutants` |
+| 301.1 | `rbcheck` mutation suite |
+| 289.6 | `test-rlxprobe`(6 個平行 `qemu-system-mips`) |
+| 199.5 | `replay-capture` mutation suite |
+| 174.5 | `cardcheck` mutation suite |
+
+⚠️ **這一輪是第二輪,第一輪作廢了,而那是流程錯誤不是工具問題**:我在它跑的時候
+持續改它會讀的檔案(`spec-check` 是第 1 步,而我之後改了十幾個 `.md`)。
+第一輪跑到 47/52 被停掉。**誠實的處理是重跑一輪乾淨的,而不是拿部分有效的結果去 commit。**
+
+🔴 **而 CI 上會不會綠,有一件本地量不到的事,今天特地繞路量了它。**
+`not-run-total` 從 **477 改成 478**,依據是 `ledgerscan` 的 `P18d` 在 CI 上會 skip
+(它需要 GPL drop)。**但這張桌子有 drop,所以 `P18d` 會跑、不印 skip、label 永遠不被比對** ——
+那正是 `test-kbuild-cflags` 的 `C1` 在 run `33310864156` 紅掉的那一類。
+所以改用 `ast` 解析 `ledgerscan.py`,把 `P18d` 會印的那一行跟表上宣告的字串逐字比:
+**一字不差,而且符合 `ci-census` 的 `SKIP_BARE_RE`。**
+⚠️ 第一版的檢查腳本自己壞了 —— 它用 `find(")")` 找 print 的結尾,被
+`(needs the GPL drop)` 裡的 `)` 截斷,報出一個假的 MISMATCH。**一個解析自己出錯的檢查器。**
+
+**七個 commit,`69ececf..5404c10`,已 push。CI run `33657418793` 已啟動 ——
+結果留給下一段開場讀,那是這一段刻意留下的第一件事。**
+
+---
+
 ### 十三、留下來沒做的
 
 * 🔴 **flash 括號沒有前進,仍是 1,024／4,194,304 = 0.0244 %。** 今天沒上機,
