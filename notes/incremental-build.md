@@ -597,6 +597,12 @@ same commit or it does not arrive — the same condition `P4a`'s `L2-6` put on
   wall-clock number here is a lower bound.
 * ⚠️ **One file, in `arch/rlx/kernel/`.** A driver under `drivers/` sits one
   `built-in.o` aggregation deeper. Same order of magnitude, 推, not measured.
+  🔄 **2026-09-03: that file now exists** —
+  `config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`, `R5-1` —
+  **and the measurement still has not been taken.** `R5-1` ran fresh stages
+  only (593 / 595 / 596 / 597 `CC`); no `--keep` incremental cycle was run on
+  it, so this row stays 推 with its subject now available rather than
+  hypothetical. `INC-2`'s `--id-scope main` is what would make it cheap.
 * 🔴 **`.version` means an incremental build is never reproducible**, whatever
   the scope. Every reproducibility claim in `notes/reproducible-build.md` is a
   fresh-stage claim and stays one.

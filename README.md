@@ -74,11 +74,22 @@ rules with a reason each — 14 that rlxfw sets, 21 that kconfig derives, and
 the baseline named by **sha256** rather than by filename, because three of the
 four GPL drops carry a file at that exact path and two of them differ from this
 one on eight symbol lines. [`rlxfw-initramfs.tsv`](config/rlxfw-initramfs.tsv)
-is the first boot's userspace, 29 entries, 24 of them this device's own binaries
-unmodified and 5 named as mine. [`rlxfw-sdk.config`](config/rlxfw-sdk.config)
+is the first boot's userspace, **31 entries, 24 of them this device's own
+binaries unmodified and 7 named as mine** — re-derived 2026-09-03 from
+`mkinitramfs build`'s own output, which is where those numbers come from;
+this paragraph had carried 29 and 5. [`rlxfw-sdk.config`](config/rlxfw-sdk.config)
 and [`host-compat/`](config/host-compat) are the two build inputs that were
 undeclared until 2026-08-28 — one of them normally produced by a curses
 program, which is not a step anyone else can reproduce.
+[`rlxfw-marks.tsv`](config/rlxfw-marks.tsv) is **every line rlxfw inserts into
+Realtek's source**, one row each with a reason, applied by
+`tools/rlxfw-marks.py` to a staged copy and never to the pinned clones; the
+files rlxfw adds outright live in `config/rlxfw-src/`, mirroring the staged
+layout. Since 2026-09-03 that is where the first driver lives —
+`drivers/clocksource/rtl819x-timer.c`, a clocksource on the SoC's Timer 1,
+written without reading anyone else's implementation of it
+([`docs/blind-write-ledger.md`](docs/blind-write-ledger.md) is the record of
+what *was* read, frozen before it existed).
 
 
 **[`notes/incremental-build.md`](notes/incremental-build.md)** 🆕 — why a

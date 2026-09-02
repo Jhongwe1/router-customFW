@@ -347,7 +347,14 @@ def scan_topics(root, paths):
 # --------------------------------------------------------------------------
 
 # A ledger row declares one path.  The path is the first code span on a table
-# row; anything else on the row is prose for a human.
+# row; anything else AFTER THAT CELL is prose for a human.
+#
+# 🔴 The regex requires the code span to be the WHOLE first cell -- `| `p` |`
+# and not `| `p` 🆕 |`.  量 2026-09-03: a row written the second way is not
+# counted as a declaration and `check` stays red naming the path it just
+# declared, which reads as the tool being wrong.  It is not silent -- the red
+# names the file -- but the docstring said "anything else on the row", which
+# is one word too wide and cost a round trip.
 LEDGER_PATH_RX = re.compile(r"^\|\s*`([^`]+)`\s*\|")
 
 

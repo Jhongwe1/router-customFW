@@ -120,3 +120,34 @@ B10	linux-2.6.30/init/main.c	before	if (ramdisk_execute_command) {	rlxfw_mark("B
 # is wrong.  The driver always passes it.
 # ----------------------------------------------------------------------------
 ID0	linux-2.6.30/init/main.c	after	printk(KERN_NOTICE "%s", linux_banner);	rlxfw_markx("ID0", RLXFW_SRC_ID);	IDENTITY, not a ladder step. The recipe's own sha256, printed on the board immediately after the banner it is there to make up for -- a reader sees the frozen stamp and the thing that identifies the build on consecutive lines. Anchored on the banner printk because it occurs exactly once in main.c and because B00's anchor is one line above it, so the ladder still opens with B00.
+# ----------------------------------------------------------------------------
+# R5-1, 2026-09-03.  THE SECOND KBUILD ROW, AND THE FIRST ONE FOR A DRIVER.
+#
+# MK reaches arch/rlx/kernel/Makefile because rlxfw_mark.c has to be linked.
+# This one reaches drivers/clocksource/Makefile for the same structural
+# reason and nothing else: config/rlxfw-src/ carries a file of mine and a
+# staged copy that no Makefile names is a file that does not build.
+#
+# THE FILE'S OWN RULE FOR ADDING A ROW DOES NOT APPLY, the same way it does
+# not apply to ID0.  That rule -- a row must separate two causes that would
+# otherwise share a capture -- is about the boot ladder.  This row separates
+# nothing; it is a build line.
+#
+# WHY drivers/clocksource/ AND NOT arch/rlx/kernel/.
+# It is where a clocksource lives in a mainline tree, which is what this
+# gate's D1 asks for ("accepted upstream-style"), and it keeps my file out of
+# the directory that holds the vendor's rlx-cevt.c and rlx-time.c -- the two
+# files docs/blind-write-ledger.md 4.3 records as unread.
+#
+# 讀 drivers/Makefile:100 -- `obj-$(CONFIG_GENERIC_TIME) += clocksource/`, and
+# CONFIG_GENERIC_TIME=y in the baseline board template (line 138), so the
+# directory is descended into.  If that symbol ever goes away this row still
+# applies cleanly and the object is silently not built, which `rlxfw-marks.py
+# verify` catches and `check` does not -- the check/verify split this file's
+# header already describes.
+#
+# THE ANCHOR is the last line of a five-line Makefile, all five of the form
+# obj-$(CONFIG_...).  It occurs exactly once, which rlxfw-marks.py requires
+# rather than assumes.
+# ----------------------------------------------------------------------------
+MK2	linux-2.6.30/drivers/clocksource/Makefile	after	obj-$(CONFIG_SH_TIMER_CMT) += sh_cmt.o	obj-y += rtl819x-timer.o	rtl819x-timer.c is copied in by --src and needs a Kbuild line. obj-y and not obj-$(CONFIG_...) on purpose: a new Kconfig symbol would have to be declared in config/rlxfw-kernel.delta as well, and a driver that is in the tree but not in the image is the state `rlxfw-marks.py verify` exists to catch. R5-2's reading is what decides whether this becomes a symbol. The anchor is written with single spaces and matched normalised, because Kbuild lines are tab-aligned and this file is tab-separated

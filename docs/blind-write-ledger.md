@@ -251,12 +251,35 @@ read.
 recorded exposure to the board file that would initialise them. `driver-diff`
 carries that sentence rather than omitting it.
 
-### 4.3 🟢 `R5-1` timer — 3 paths, and the contamination is nil where it matters
+### 4.3 🟢 `R5-1` timer — 9 rows, 8 of them in the scan's `timer` domain, and the contamination is nil where it matters
+
+🔄 **2026-09-03, `R5-1`: five paths added, and they were added because
+`ledgerscan check` went RED and named them.** That is the join in § 2 doing
+the only job it has: the driver was written, `check` was run, and it refused
+to stay green until this section said what had been taken. Four are generic
+Linux — the clocksource subsystem's interface and core, and the two files
+that decide how long this kernel thinks a jiffy is. 🔴 **The fifth is the
+vendor's**, `arch/rlx/include/asm/timex.h`, and it is one constant that
+describes a PC rather than this SoC.
+
+⚠️ **One of the nine rows below is declared here and is NOT in scope.**
+量: `ledgerscan scan --domain timer` counts **8**, and
+`include/linux/jiffies.h` is not one of them — the domain rules put it
+out-of-scope. It is declared anyway. That is § 2.1's direction of error on
+purpose: this file **over-reports** contact, because its job is to constrain
+a later claim, and a path the scan would not have asked for is exactly the
+kind that a reader should be able to see rather than take on trust.
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
 | `arch/rlx/kernel/rlx-cevt.c` | line | vendor | 🟢 **the string literal `"rlx timer"` and the two lines it is on (`:139,226`) — nothing else.** The context is `notes/vendor-kernel-isa.md`'s proof that *this unit runs `arch/rlx` and not `arch/mips`*, which needed three literals unique to files that exist only under `arch/rlx`. **No register, no sequence, no divisor, no interrupt number** |
 | `kernel/sched_clock.c` | line | **generic** | `:39`, the weak generic `(jiffies - INITIAL_JIFFIES) * (NSEC_PER_SEC / HZ)`, read to establish that `arch/rlx` defines no `sched_clock` (zero hits) and that `printk_time` therefore has 10 ms resolution. **Generic Linux — every port in existence uses this file** |
+| `include/linux/clocksource.h` | name | **generic** | 🆕 2026-09-03, `R5-1`: the `struct clocksource` field list, `clocksource_hz2mult()`, `CLOCKSOURCE_MASK()`, the `read(struct clocksource *)` signature, and the rating band comment (*1–99 unfit for real use*). **The subsystem's interface**, which a clocksource for any part must be written against. It says nothing about this SoC |
+| `include/linux/jiffies.h` | name | **generic** | 🆕 2026-09-03, `R5-1`: `LATCH`, `ACTHZ`, `SH_DIV`, `NSEC_PER_JIFFY` and `TICK_NSEC` — read to check, rather than assume, that this build treats one jiffy as exactly 10,000,000 ns. It does, and the check is `notes/timer-driver.md` § 5.1.1. **Generic Linux** |
+| `kernel/time/jiffies.c` | name | **generic** | 🆕 2026-09-03, `R5-1`: `clocksource_jiffies`'s **rating 1** and its `mult`/`shift`, which is the number `L2-e`'s choice of rating 0 is measured against. **Generic Linux** |
+| `arch/rlx/include/asm/timex.h` | line | 🔴 **vendor** | 🆕 2026-09-03, `R5-1`: `:21`, one constant — `CLOCK_TICK_RATE = 1193182`. 🟢 **It is the i8253 PIT frequency of an IBM PC and describes no part of this SoC**, so what it costs on the decision layer is nil; what it bought is § 5.1.1's table, which says the jiffy length is exact at `HZ=100` and off by tens of ppm at every other `HZ` this port offers. **No register, no sequence, no divisor, no interrupt number** |
+| `kernel/time/timekeeping.c` | name | 🟡 **none — a correction** | 🆕 2026-09-03, and it is this ledger's **second** `origin: none` row. `notes/timer-driver.md:41` names this file *inside a note saying it was never opened*: a draft sentence cited it from memory as the place `(now - cycle_last) & mask` is performed, `ledgerscan check` went RED, and the sentence was rewritten to cite `include/linux/clocksource.h`'s `@mask` documentation — which is what was actually read. **Nothing was taken from this file.** The location is about the instrument, not about the device, which is the constraint § 4.1 puts on this category |
+| `kernel/time/clocksource.c` | name | **generic** | 🆕 2026-09-03, `R5-1`: `clocksource_enqueue()`, `select_clocksource()`, `clocksource_register()`, `clocksource_unregister()` — read to settle **one decision**, `L2-e`: whether a rating below `clocksource_jiffies`' 1 keeps a source out of the selection, and which way a tie breaks. Generic Linux, identical in every 2.6.30 tree. 🔴 **It touches the decision layer even so**, because a second implementation's rating choice would be reading the same code; `notes/timer-driver.md` `L2-e` cites it by name rather than presenting that choice as arrived at alone |
 
 🔴 **And a file that is NOT cited, listed here because its absence from the
 scan is the ledger's claim and a reader should be able to see what was
@@ -289,6 +312,34 @@ inference from *"15 would give 213.7 MHz, and nobody clocks a part at that"*.
 That is a decision, it is unresolved, and it is a register-semantics question a
 second implementation can disagree with me about. **It is `driver-diff`'s best
 row and it exists because the timer was not read.**
+
+> 🔴 **2026-09-03, `R5-1`: the paragraph above is wrong, and it is kept
+> because being wrong in a stated way is what this file is for.** `CLK-06`
+> is **not** unresolved. D § 8.2.8 Table 26 states it: *"Assume
+> DivFactor=N, Base clock = System_clock (Peripheral Lexra Bus)/N"* — the
+> field holds `N` — and *"Both values 0x0000 and 0x0001 disable the clock"*
+> excludes the `N−1` reading, under which `0x0000` would mean divide-by-one
+> rather than *disable*.
+>
+> **No new source was read to find that.** `SPEC.md` `CLK-02` has cited that
+> exact sentence since 2026-08-26, and used it only to answer a *naming*
+> question — which end of the divider the words *base clock* mean. It never
+> travelled to the row that depends on it. Same shape as `CPU-27`: one fact,
+> one owner, and it never reached the second file.
+>
+> **What it costs this document.** `CLK-06` moves from **L2 decision** to
+> **L1 fact** (§ 5), and L1 agreement between implementations is guaranteed
+> by the parts being the same part — so *the diff's best row* is not this
+> one. `SPEC.md` `CLK-06`'s name mark moves 推 → 讀 with the 213.7 MHz
+> derivation kept as its second source.
+>
+> 🟢 **L2 is not left empty, and the replacement rows are named rather than
+> asserted**: `notes/timer-driver.md` § 3 carries ten, of which the ones a
+> second implementation can genuinely differ on are the wrap handling for a
+> non-power-of-two modulus (`L2-b`), `mult`/`shift` (`L2-d`), rating and
+> coexistence (`L2-e`), when the hardware is written at all (`L2-f`), and
+> which registers are written (`L2-g`). **This correction makes `D3` harder
+> to pass, not easier** — which is the same test § 5 applies to itself.
 
 ### 4.4 🟡 `R5-10` interrupt map — 2 paths
 
@@ -446,9 +497,10 @@ written down in advance and by naming what it may look at.
 
 ## 8. The reading, in one table
 
-量 2026-09-02, `ledgerscan scan`, re-derived at commit. Population: **1,445**
+量 2026-09-03, `ledgerscan scan`, re-derived at commit. Population: **1,447**
 tracked files (excluding `upstream/`) and 302 in `upstream/` — both of which
 grow with this repository and are quoted for scale, not as findings.
+*(1,445 and 302 at `R5-0`, 2026-09-02.)*
 
 **Paths only.** Citation counts are deliberately absent; see the note in § 4.
 
@@ -458,12 +510,12 @@ grow with this repository and are quoted for scale, not as findings.
 | `wdt` | **0** | `R5-6` | 🟢 blind of any implementation |
 | `led` | **0** | `R5-7` | 🟢 blind of any implementation |
 | `keys` | 1 | `R5-8` | 🟢 blind — the one citation is `origin: none`, an example inside this tool's own census row (§ 4.1) |
-| `timer` | 3 | `R5-1` | 🟢 one string literal of the vendor's, plus generic Linux, plus `rlx-time.c` with **zero** citations until this file named it (§ 4.3). `CLK-06` is 推 and unread — the diff's best row |
+| `timer` | 🔄 **8** | `R5-1` | 🟢 one string literal of the vendor's, plus `rlx-time.c` with **zero** citations until this file named it, plus **five** generic-Linux paths and **one more of the vendor's** — 2026-09-03 added the clocksource subsystem's header and core, the two files that fix the jiffy length, and `arch/rlx/include/asm/timex.h`, whose single constant is a PC's timer chip (§ 4.3). 🔴 **`CLK-06` is no longer the diff's best row**: D Table 26 states the divisor semantics, so it is L1. The replacement L2 rows are `notes/timer-driver.md` § 3 |
 | `dt` | 2 | `D2` | 🟢 one `cpu@0` node, plus the board `.dts` by name only; the register addresses in the `.dtsi` are placeholders, recorded 2026-08-25 |
 | `irq` | 2 | `R5-10` | 🟡 two string literals; one is the loader's, not Linux's |
 | `bsp` | 8 | all six | 🔴 cross-domain exposure; `bsp_setup():134-175` counts as fully read |
 | `spi_mtd` | 11 | `R5-5` | 🔴 the vendor side is spent, three findings on the decision layer |
-| **in scope** | **27** | | `ledgerscan check` requires every one to have a row above |
+| **in scope** | 🔄 **32** | | `ledgerscan check` requires every one to have a row above, and on 2026-09-03 it went RED **three** times — 29 found against 27 declared; again after the jiffy check read three more; and 🔴 **once on a file that was never opened**, named from memory inside an edit whose purpose was to make a claim narrower (§ 4.3, the `timekeeping.c` row). **33 are declared**: the extra is `include/linux/jiffies.h`, which the scan classes out-of-scope and which is declared anyway |
 | `out-of-scope` | 68 | — | generic kernel; no peripheral register map passes through them |
 
 **Committed before any driver source exists.** `git log --diff-filter=A` over

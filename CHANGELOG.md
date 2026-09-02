@@ -1,5 +1,55 @@
 # Changelog
 
+🟢 **2026-09-03, twenty-eighth session, desk: `R5-1`** — the first driver,
+written blind. `config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`
+is a Linux clocksource on the SoC's **Timer/Counter 1**, registered at rating
+**0** so it coexists with whatever the vendor's kernel already has, and it
+**writes no register at boot**: arming is `echo arm > /proc/rtl819x-timer`, and
+`disarm` puts the control word back. One row (`MK2`) in
+`config/rlxfw-marks.tsv` links it; nothing else in the vendor tree is touched.
+
+**量, this host**: 596 `CC` and **0 compiler diagnostics** on this file under
+`-Wall -Wstrict-prototypes -Wdeclaration-after-statement -Wundef`; `hazlint`
+**0 violations in 100 loads** with `K2`, `K4` and `K4b` all firing; the linked
+`vmlinux` **0 in 110,241**. The single-variable control — the same `.config`
+and initramfs spec with the driver and `MK2` removed — is 595 `CC`.
+
+🔴 **The ELF grew 797 bytes and that is not what the driver costs.** Section
+offsets in this link are page-aligned and `.text` has ~73 KiB of slack, so the
+loadable content is **3,960 bytes plus 64 of BSS**. And `size -A` reports
+`__param` growing 3,424 bytes for a driver with no module parameter — 量,
+`__start___param … __stop___param` is **700 bytes in both builds**, and the
+3,424 is padding to the next 4 KiB boundary.
+
+🔴 **Two of this gate's premises were narrowed by reading the datasheet, which
+is the specification and not anybody's implementation.** ① `GIMR`/`GISR` give
+the two timers **separate** bits — 8 for TC0, 9 for TC1 (D Table 14/15) — so a
+TC1 timeout cannot reach the vendor's tick handler through the bit the vendor
+uses, and the mask for it reads **0** on this die. The driver reads `GIMR`
+anyway and refuses to arm with `-EPERM` while bit 9 is set, because that
+reading was taken at the loader prompt and not under Linux. ② **`CLK-06` is not
+an unresolved decision**: D § 8.2.8 Table 26 states the divisor semantics
+outright, and this repository has cited that exact sentence since 2026-08-26
+for a *naming* question without it ever reaching the row that depends on it.
+
+🔄 **So `docs/blind-write-ledger.md` is corrected in place**: `CLK-06` is an
+**L1 fact**, not the diff's best L2 row. The protected layer keeps five rows a
+second implementation can genuinely differ on — wrap handling for a
+non-power-of-two modulus, `mult`/`shift`, rating and coexistence, when the
+hardware is written, and which registers are written at all
+(`notes/timer-driver.md` § 3). The ledger also gains two generic-Linux paths,
+and it gained them because **`ledgerscan check` went red and named them**.
+
+**`R5-2`'s reading is designed with its refutations written first**
+(`notes/timer-driver.md` § 5): nine cells, and a prediction of **+17.99 ppm**
+between the kernel's clock and this driver's, derived from two measured
+constants alone. Coming out at 0 means the vendor registered a real
+clocksource; below it means lost ticks (167 ppm each); above it means gained
+ones (1,064 ppm each).
+
+⚠️ **Nothing here has executed.** Compiled, linked, scanned, found in the
+image — not run.
+
 🟢 **2026-09-02, twenty-seventh session, desk: `R5-0`** — the blind-write
 ledger, and it is **computed** rather than written.
 `docs/blind-write-ledger.md` records what this repository had read of each
