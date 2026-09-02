@@ -249,9 +249,22 @@ echo "=== S3/G1-G4: rlxfw-marks, R3-6's source gate ==="
 # It runs on any machine: the controls build their own tree and their own
 # fixtures, so nothing here needs a vendor drop.
 RM="$HERE/rlxfw-marks.py"
-o="$("$PY" "$RM" self-test 2>&1)"
-ck "S3 rlxfw-marks self-test exit 0"       0 "$?"
-ck "S3 rlxfw-marks 18 controls"            1 "$(printf '%s\n' "$o" | grep -c '18 passed, 0 failed')"
+# 🔴 The control count is NOT written here any more.  It was, as `18`, and it
+# went stale the hour R5-0 added eleven controls -- while README.md carried the
+# same 18 in a second place and neither was compared to the tool.  That is this
+# repository's own recurring defect (looprun's 23-against-26, leak-surface's
+# three file counts): a number kept in a second place.
+# `tools/ci-expected.tsv` is the owner, because `ci-census` re-derives it from
+# the run and goes red when the table and the output disagree.
+RM_N="$(awk -F'\t' '$1=="rlxfw-marks"{print $2}' "$HERE/ci-expected.tsv")"
+o="$("$PY" "$RM" self-test 2>&1)"; rm_rc=$?
+ck "S3 rlxfw-marks self-test exit 0"       0 "$rm_rc"
+# Without this, an empty RM_N would make the grep below match nothing and the
+# case would report a failure whose real cause is a missing table row.
+ck "S3 ci-expected.tsv declares a count"   1 \
+   "$([ -n "$RM_N" ] && echo 1 || echo 0)"
+ck "S3 all $RM_N declared controls pass"   1 \
+   "$(printf '%s\n' "$o" | grep -c "$RM_N passed, 0 failed")"
 
 mutrm () { sed "$2" "$RM" > "$T/$1"; }
 

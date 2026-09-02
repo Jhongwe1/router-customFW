@@ -477,6 +477,31 @@ jobs:
       - name: test-tc-smoke
         run: bash tools/test-tc-smoke.sh 2>&1 | tee ci-out/test-tc-smoke.out; exit "${PIPESTATUS[0]}"
 
+      # 🔴 rlxfw-marks had NO CI step at all until 2026-09-02 (R5-0), and
+      # nothing could have said so: `ci-census` compares ci-expected.tsv
+      # against what ran, so a tool that was never in the table is invisible
+      # to it. It is one of the TWO tools that edit Realtek's source (the other
+      # is rlxfw-kbuild.sh, which applies config/host-compat/ with patch -p1),
+      # and the one whose every inserted line is a declared row with a reason.
+      # Its 32 controls had never run on a runner.
+      - name: rlxfw-marks self-test
+        run: /usr/bin/python3 tools/rlxfw-marks.py self-test 2>&1 | tee ci-out/rlxfw-marks.out; exit "${PIPESTATUS[0]}"
+
+      # R5-0's blind-write ledger. The self-test is the instrument's controls;
+      # `check` is the join between the ledger and the tree, and it is the one
+      # that goes red as R5 proceeds -- writing about a new vendor file in
+      # LOG.md makes it fail until the ledger says what was taken.
+      - name: ledgerscan self-test
+        run: /usr/bin/python3 tools/ledgerscan.py --self-test 2>&1 | tee ci-out/ledgerscan.out; exit "${PIPESTATUS[0]}"
+
+      - name: ledgerscan check (exit-code gate)
+        run: /usr/bin/python3 tools/ledgerscan.py check
+
+      # Stands down on a runner (src-vendor/ is a symlink into $FWRE_WORK) and
+      # prints the skip rather than passing silently.
+      - name: ledgerscan quarantine (exit-code gate)
+        run: /usr/bin/python3 tools/ledgerscan.py quarantine
+
       - name: ci-census self-test
         run: /usr/bin/python3 tools/ci-census.py --self-test 2>&1 | tee ci-out/ci-census.out; exit "${PIPESTATUS[0]}"
 
