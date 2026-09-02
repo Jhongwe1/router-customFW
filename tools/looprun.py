@@ -705,6 +705,23 @@ def selftest(out=sys.stdout):
         B.skip = ""
         B.recipe_override = "b1434383"
 
+        # ---- M8: --iterations is checked in main(), not in loop_once, so the
+        # only control that can reach it drives the program.  Two runs, one
+        # flag apart, and the second is the negative control: a refusal that
+        # fired on every invocation would pass M8 and prove nothing.
+        base = [sys.executable, os.path.join(ROOT, "tools", "looprun.py"),
+                "--mode", "replay", "--replay-boot", pre,
+                "--recipe-override", "b1434383"]
+
+        def rc_of(extra):
+            return subprocess.run(base + extra, cwd=ROOT, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL,
+                                  stdin=subprocess.DEVNULL).returncode
+        ck("M8", "🔴 --iterations 2 is REFUSED (exit 2), not accepted and then "
+                 "failed on a filename", 2, rc_of(["--iterations", "2"]))
+        ck("M8b", "and --iterations 1, the only honest value, still runs", 0,
+           rc_of(["--iterations", "1"]))
+
     print("", file=out)
     print("RESULT: %d passed, %d failed" % (passed, failed), file=out)
     return 0 if failed == 0 else 1
@@ -753,6 +770,26 @@ def main():
             return 0
         if a.iterations < 1:
             raise Refused("--iterations must be at least 1")
+        # 🔴 讀 2026-09-02, at the bench, settled without spending the live
+        # board.  S4 is `J BFC00000`, a LOADER command, and iteration 1 ends
+        # with Linux running and the loader gone -- so iteration 2 sends a
+        # loader command to a busybox shell.  It fails earlier and worse than
+        # that: every capture stage renders --out from --cell with no iteration
+        # index and console-capture.py refuses to overwrite, so iteration 2
+        # dies on *the output file exists*, before it reaches the reason that
+        # matters.  A run that fails on a filename teaches nothing about the
+        # loop.  Refusing is honest; accepting a number this cannot honour is
+        # the same defect as a plan rendering flags a tool does not have.
+        if a.iterations > 1:
+            raise Refused(
+                "--iterations %d: this loop cannot repeat yet and will not "
+                "pretend to. S4 is `J %s`, a LOADER command, and iteration 1 "
+                "ends with the kernel running and the loader gone; and every "
+                "capture stage renders --out from --cell with no iteration "
+                "index, so iteration 2 would die on an existing output file "
+                "before it reached that. Making it iterate needs a way back "
+                "from Linux to the loader and per-iteration names, which is a "
+                "design decision and not a flag" % (a.iterations, RESET_TARGET))
         t0 = time.monotonic()
         worst = 0
         for n in range(1, a.iterations + 1):
