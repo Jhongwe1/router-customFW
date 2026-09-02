@@ -395,13 +395,20 @@ tools/xcheck.py            asks whether two committed instruments agree about on
                            early, which is correct only on sorted input -- and C4 is
                            their negative control, so it is not merely trigger-happy
 
-tools/looprun.py           runs the whole edit->result iteration and asserts something
+tools/looprun.py           two of its nine stages exist only to make it safe to run
+                           with nobody watching: S5b reads the loader's burn flag back
+                           out of memory before any upload -- the echo the transfer
+                           tool checks is a different source, C-6 -- and S6b requires
+                           what is at the load address to be the file it just sent,
+                           derived from that file rather than typed. `--skip S5b` is
+                           refused: a guard a flag can switch off is not a guard.
+                           It runs the whole edit->result iteration and asserts something
                            NOBODY TYPED: the build computes RLXFW_SRC_ID as a sha256 over
                            config/, the kernel prints it on the console, and the run
                            requires the board to say the id the build just produced. A
                            stale image, the vendor's firmware, and the loader's own
                            re-staging of 0x80500000 from flash after a watchdog reset are
-                           then all red for the same reason. 23 controls, and N1..N7 each
+                           then all red for the same reason. 45 controls, and N1..N7 each
                            require exactly ONE of the four assertions to fail: a control
                            set where one broken input trips every check cannot say which
                            check is load-bearing. Its first run found two defects in
