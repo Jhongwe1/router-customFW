@@ -46,7 +46,9 @@ THE STAGES, AND WHICH NEED THE BOARD
     S3  assemble   tools/rtkimage.py build                   desk
     S4  reset      console-capture --send 'J BFC00000'       bench
     S5  rescue     upstream/tools/console-dump.py rescue     bench
+    S5b burnflag   console-capture --send 'DW 8040D4A0 1'   bench
     S6  upload     upstream/tools/loader-tftp.py put         bench
+    S6b staged     console-capture --send 'DW 80500000 8'    bench
     S7  boot       console-capture --send 'J 80500000'       bench
     S8  assert     over S7's capture                         desk
 
@@ -65,6 +67,19 @@ ABORT CONDITIONS, WRITTEN HERE BECAUSE UNATTENDED MEANS NOBODY IS WATCHING
   or the reset did not happen, and **nothing is uploaded** -- the alternative to
   "my image is at 0x80500000" is the vendor's, freshly staged there by the
   loader on that same reset;
+* 🔴 S5b must read `00000000` back out of `0x8040D4A0`, or **nothing is
+  uploaded**.  `loader-tftp.py` already refuses a rescue report that does not
+  echo `AutoBurning=0`; `C-6` is why that is not the same source as the word
+  itself, and `RUNSHEET` `G2`/`H1a` make the read-back mandatory before a `put`.
+  `--skip S5b` is REFUSED: a guard a flag can switch off is not a guard.  The
+  absent case -- no read-back line at all -- fails, because silence is not a
+  zero;
+* 🔴 S6b must read back, out of 0x80500000, the head of the file S6 just sent
+  -- derived from that file, never typed.  S4's reset re-stages 0x80500000 from
+  flash, so a failed upload leaves the VENDOR's image there and `J 80500000`
+  boots it; S8 would catch that afterwards, and this catches it before the
+  power cycle is spent.  It is skippable where S5b is not, and the difference is
+  deliberate: this one guards the seating, S5b guards the device;
 * `--iterations` and `--budget-seconds` both bound the run, and a failing
   iteration stops the rest rather than being averaged into a green summary;
 * 🔴 no stage here may write flash. `S6` is `loader-tftp put`, which lands in
@@ -103,6 +118,23 @@ RESET_TARGET = "BFC00000"
 # and a single space on a cold one.  SPEC.md C-8, 量 2026-08-24.
 WATCHDOG_MARK = "Reboot Result from Watchdog Timeout!"
 PROMPT = "<RealTek>"
+# 🔴 `AUTOBURN` is a RAM variable in the loader, written at 0x8040D4A0 and read
+# at exactly one instruction, 0x80401B9C, on the path that decides whether a
+# completed upload is BURNED.  `RUNSHEET` `G2`/`H1a`: read it before the `put`
+# and stop if it is not zero.  `loader-tftp.py` already refuses a rescue report
+# that does not echo `AutoBurning=0` -- but `C-6`, 量 2026-08-24, is the reason
+# an echo is not the same source as this word: `AUTOBURN: 0` returns
+# `Unknown command !`, which in a flow with no read-back is indistinguishable
+# from success.  The echo is the loader saying what it thinks it did.
+AUTOBURN_ADDR = "8040D4A0"
+AUTOBURN_RX = re.compile(r"8040D4A0:\s*([0-9A-Fa-f]{8})", re.I)
+#: one `DW` output line: an address label, then one or more big-endian words.
+#: 🔴 The trailing `\r?` is load-bearing and the self-test's positive control is
+#: what found it missing: the console sends CRLF, so `$` under re.M sits behind
+#: a `\r` and the whole parse returns nothing.  Every NEGATIVE control still
+#: passed with it broken -- they were failing for the wrong reason.
+DW_LINE_RX = re.compile(
+    r"^[ \t]*([0-9A-Fa-f]{8}):[ \t]*((?:[0-9A-Fa-f]{8}[ \t]*)+)\r?$", re.M)
 # The eleven boot marks config/rlxfw-marks.tsv declares, in order.
 BOOT_MARKS = ["RLXFW-B%02d" % n for n in range(11)]
 ID0_RX = re.compile(r"RLXFW-ID0=([0-9A-Fa-f]{8})")
@@ -154,6 +186,11 @@ def build_plan(a):
             "--load-addr", "0x" + LOAD_ADDR,
             "-o", out + "-rescue.json"],
             note="AutoBurning=0, then the load address, then the target IP"),
+        dict(id="S5b", name="burnflag", kind="bench", argv=cap + [
+            "--out", out + "-ab2", "--send", "DW " + AUTOBURN_ADDR + " 1",
+            "--idle", "2", "--seconds", "6"],
+            note="ABORT unless word 1 is 00000000. The rescue's echo and this "
+                 "word are two sources and C-6 measured them disagreeing"),
         dict(id="S6", name="upload", kind="bench", argv=[
             "/usr/bin/python3", os.path.join("upstream", "tools", "loader-tftp.py"),
             "put", "--host", a.host, "--image", a.image,
@@ -161,6 +198,12 @@ def build_plan(a):
             "--rescue-report", out + "-rescue.json",
             "--expect-load", LOAD_ADDR, "--yes"],
             note="lands in RAM. --allow-autoexec is never passed and cannot be"),
+        dict(id="S6b", name="staged", kind="bench", argv=cap + [
+            "--out", out + "-2a", "--send", "DW " + LOAD_ADDR + " 8",
+            "--idle", "2", "--seconds", "8"],
+            note="ABORT unless the head words ARE the image S6 sent -- derived "
+                 "from the file, not typed. S4's reset re-staged 0x80500000 "
+                 "from flash, so the alternative is a real image"),
         dict(id="S7", name="boot", kind="bench", argv=cap + [
             "--out", out + "-boot", "--send", "J " + LOAD_ADDR,
             "--idle", "8", "--seconds", "45"],
@@ -232,6 +275,80 @@ def assert_reset(text):
              "present" if ok else "ABSENT -- the reset did not happen")]
 
 
+def assert_autoburn(text):
+    """The burn flag read out of memory, rather than believed from an echo.
+
+    🔴 The absent case is a FAILURE and not a skip.  A `DW` that produced no
+    read-back line means the read did not happen, and this project's own rule is
+    that a tool reporting nothing is making a claim: silence is not a zero.
+    """
+    rid = "A0b AUTOBURN read back at 0x%s" % AUTOBURN_ADDR
+    m = AUTOBURN_RX.search(text)
+    if not m:
+        return [(False, rid, "NO READ-BACK LINE -- the read did not happen, "
+                             "and silence is not a zero")]
+    word = m.group(1).upper()
+    ok = word == "00000000"
+    return [(ok, rid, "00000000 -- the word the burn path reads is zero" if ok
+             else "%s -- NOT zero. Nothing is uploaded" % word)]
+
+
+def dw_words(text, base):
+    """-> the words a `DW` printed, in address order, starting at `base`.
+
+    Address-keyed rather than positional, so a capture that lost a line stops
+    the run short instead of silently shifting every word by four bytes.
+    """
+    got = {}
+    for m in DW_LINE_RX.finditer(text):
+        addr = int(m.group(1), 16)
+        for i, w in enumerate(m.group(2).split()):
+            got[addr + 4 * i] = w.upper()
+    out, k = [], int(base, 16)
+    while k in got:
+        out.append(got[k])
+        k += 4
+    return out
+
+
+def assert_staged(text, image, n=8):
+    """What is at 0x80500000 is the image S6 just sent.
+
+    🔴 The expectation is DERIVED from the file that was uploaded, never typed.
+    The card's own version of this cell names one word, `0x8050001C`, and names
+    the previous image's value beside it so the reading is a contrast; here the
+    whole head is compared and the contrast is automatic -- whatever else is at
+    that address, it is not this file.
+    """
+    rid = "A0c the words at 0x%s are the image S6 sent" % LOAD_ADDR
+    try:
+        with open(image, "rb") as fh:
+            raw = fh.read(4 * n)
+    except OSError as e:
+        return [(False, rid, "cannot read the image, so there is no expectation "
+                             "to compare against: %s" % e)]
+    want = ["%08X" % int.from_bytes(raw[i * 4:i * 4 + 4], "big")
+            for i in range(len(raw) // 4)]
+    if not want:
+        return [(False, rid, "the image is empty; nothing to derive")]
+    got = dw_words(text, LOAD_ADDR)
+    if not got:
+        return [(False, rid, "NO READ-BACK -- the DW printed nothing at 0x%s, "
+                             "and silence is not a match" % LOAD_ADDR)]
+    if len(got) < len(want):
+        return [(False, rid, "read %d word(s) where the image gives %d -- the "
+                             "capture is short, not a match" % (len(got), len(want)))]
+    diffs = [i for i in range(len(want)) if got[i] != want[i]]
+    if diffs:
+        i = diffs[0]
+        return [(False, rid, "%d of %d words differ, first at 0x%X: board %s, "
+                             "image %s -- NOT the image just uploaded"
+                 % (len(diffs), len(want), int(LOAD_ADDR, 16) + 4 * i,
+                    got[i], want[i]))]
+    return [(True, rid, "%d words, every one derived from the image rather than "
+                        "typed" % len(want))]
+
+
 # ----------------------------------------------------------------- runner
 def run_stage(s, cwd, dry, log):
     t0 = time.monotonic()
@@ -252,6 +369,12 @@ def loop_once(a, out=sys.stdout):
     bad = skip - {st["id"] for st in plan}
     if bad:
         raise Refused("--skip names no such stage: %s" % ", ".join(sorted(bad)))
+    if "S5b" in skip:
+        raise Refused("--skip S5b removes the read-back of the loader's burn "
+                      "flag, which RUNSHEET G2/H1a make mandatory before an "
+                      "upload. A guard that a flag can switch off is not a "
+                      "guard, and this one stands between an upload that lands "
+                      "in RAM and one written to the only unit there is")
     if "S2" in skip and not getattr(a, "recipe_override", None):
         raise Refused("--skip S2 removes the only thing that computes the recipe id, "
                       "so A3 would have nothing to require. Pass --recipe-override "
@@ -283,14 +406,19 @@ def loop_once(a, out=sys.stdout):
             recipe = m.group(1)
             print("      recipe=%s  <- S8 will require the board to print this"
                   % recipe, file=out)
-        if s["id"] == "S4":
-            path = (os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell) + "-rz.log"
-            rtext = open(path, encoding="utf-8", errors="replace").read() \
-                if os.path.exists(path) else ""
-            for ok, rid, detail in assert_reset(rtext):
+        if s["id"] in ("S4", "S5b", "S6b"):
+            stem = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
+            suffix, check = {
+                "S4": ("-rz.log", assert_reset),
+                "S5b": ("-ab2.log", assert_autoburn),
+                "S6b": ("-2a.log", lambda t: assert_staged(t, a.image)),
+            }[s["id"]]
+            ctext = open(stem + suffix, encoding="utf-8", errors="replace").read() \
+                if os.path.exists(stem + suffix) else ""
+            for ok, rid, detail in check(ctext):
                 results.append((ok, rid, detail))
                 if not ok:
-                    raise StageFailed("S4", detail)
+                    raise StageFailed(s["id"], detail)
 
     # ---- S8
     if a.mode in ("desk", "replay"):
@@ -408,6 +536,49 @@ def selftest(out=sys.stdout):
     ck("C2", "a COLD boot's single space is not the discriminator",
        [False], [ok for ok, _i, _d in assert_reset("ramSize: 32M\r\n \r\n")])
 
+    # ---- C3..C5 on the burn flag.  Three outcomes and not two, because the
+    # third -- no read-back line at all -- is the one a missing capture, a dead
+    # port or a `DW` the loader did not understand all produce, and it must not
+    # be quiet.
+    def ab(t):
+        return [ok for ok, _i, _d in assert_autoburn(t)]
+    ck("C3", "the burn flag read back as zero passes", [True],
+       ab("DW 8040D4A0 1\r\n8040D4A0:\t00000000\r\n<RealTek>"))
+    ck("C4", "🔴 00000001 -- the power-on default -- FAILS before the upload",
+       [False], ab("DW 8040D4A0 1\r\n8040D4A0:\t00000001\r\n<RealTek>"))
+    ck("C5", "🔴 no read-back line at all FAILS: silence is not a zero",
+       [False], ab("DW 8040D4A0 1\r\nUnknown command !\r\n<RealTek>"))
+
+    # ---- C6..C9 on what is staged at 0x80500000.  The image is synthetic and
+    # built here, so these run on a CI box with no $FWRE_WORK -- and the
+    # expectation is derived from the bytes on both sides, which is the whole
+    # claim this assertion makes.
+    with tempfile.TemporaryDirectory() as d:
+        img = os.path.join(d, "synthetic.bin")
+        head = bytes(range(32))          # 00010203 04050607 ... 1C1D1E1F
+        open(img, "wb").write(head + b"\xaa" * 64)
+        real = ("DW 80500000 8\r\n"
+                "80500000:\t00010203\t04050607\t08090A0B\t0C0D0E0F\r\n"
+                "80500010:\t10111213\t14151617\t18191A1B\t1C1D1E1F\r\n<RealTek>")
+        other = real.replace("1C1D1E1F", "2610B400")     # a different image
+        short = ("DW 80500000 8\r\n"
+                 "80500000:\t00010203\t04050607\t08090A0B\t0C0D0E0F\r\n<RealTek>")
+
+        def st(t, i=img):
+            return [ok for ok, _i, _d in assert_staged(t, i)]
+        ck("C6", "the staged head matches the image byte for byte", [True], st(real))
+        ck("C7", "🔴 one word different -- another image at that address -- FAILS",
+           [False], st(other))
+        ck("C8", "🔴 a capture that lost a line FAILS rather than matching four "
+                 "of eight", [False], st(short))
+        ck("C9", "🔴 an unreadable image FAILS: no file, no expectation, and "
+                 "that is not a pass", [False], st(real, os.path.join(d, "gone")))
+        # C10 is C6's negative control on the PARSER: the same words under a
+        # different address label must not satisfy a read at 0x80500000.
+        ck("C10", "🔴 the right words at the WRONG address do not match", [False],
+           st(real.replace("80500000:", "80A00000:").replace("80500010:",
+                                                             "80A00010:")))
+
     # ---- the plan renders, and it renders the same list the runner walks
     class A:
         cell = "L1"; out_dir = "bench/2026-09-02"; port = DEFAULT_PORT
@@ -419,9 +590,17 @@ def selftest(out=sys.stdout):
     # S1 -- the edit -- is not in the plan because no instrument here can time
     # it, and S4/S5/S6/S7 all need the board; the docstring's own stage table
     # is what these two numbers are checked against.
-    ck("R1", "the plan has all seven stages", 7, len(plan))
-    ck("R2", "four of them need the board", 4,
+    ck("R1", "the plan has all nine stages", 9, len(plan))
+    ck("R2", "six of them need the board", 6,
        sum(1 for s in plan if s["kind"] == "bench"))
+    # 🔴 Order is the whole point of both guards: the burn flag has to be read
+    # AFTER the rescue that clears it and BEFORE the upload it guards, and the
+    # staged head AFTER the upload and BEFORE the jump.  A stage list that holds
+    # all five and orders them wrongly reads as checked and is not.
+    ids = [s["id"] for s in plan]
+    ck("R2b", "🔴 the two guards each sit between the stages they guard", True,
+       ids.index("S5") < ids.index("S5b") < ids.index("S6") < ids.index("S6b")
+       < ids.index("S7"))
     joined = " ".join(" ".join(s["argv"] or []) for s in plan)
     ck("R3", "🔴 no stage can pass --allow-autoexec", False,
        "--allow-autoexec" in joined)
@@ -505,6 +684,24 @@ def selftest(out=sys.stdout):
             got = "refused"
         ck("M6", "🔴 --skip S2 without --recipe-override is refused",
            "refused", got)
+
+        B.skip = "S5b"
+        B.recipe_override = "b1434383"
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except Refused:
+            got = "refused"
+        ck("M7", "🔴 --skip S5b is refused: a guard behind a flag is not a guard",
+           "refused", got)
+        # M7b is M7's negative control.  A refusal that fires on every --skip
+        # would pass M7 while proving nothing, so one skip that IS allowed has
+        # to go through the same path and come out the other side.
+        B.skip = "S3"
+        try:
+            rc7 = loop_once(B, out=devnull); got = "rc=%d" % rc7
+        except Refused:
+            got = "refused"
+        ck("M7b", "and --skip S3, which IS allowed, is not refused", "rc=0", got)
         B.skip = ""
         B.recipe_override = "b1434383"
 

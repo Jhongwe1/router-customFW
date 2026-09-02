@@ -25,6 +25,44 @@ Two things, and **neither is an expectation** — no cell, no `Q*`, no number in
   NIC down — which fails on the host side and reads as a board fault
   (`RUNSHEET` `P3`).
 
+🔴 **Second amendment, 2026-09-02 12:2x, still before power: `looprun` gained
+two stages, and the reason is a hole this card's own §3 was already covering by
+hand.** Reading the runner's plan against §3 row by row — which is what §4
+claims the two share — showed `--mode bench` going **rescue → upload with the
+loader's echo as its only evidence**, and `C-6` (量 2026-08-24) is exactly the
+measurement that says the echo and the word at `0x8040D4A0` are two sources:
+`AUTOBURN: 0` returns `Unknown command !`, and in a flow with no read-back that
+is indistinguishable from success. `RUNSHEET` `G2`/`H1a` make the read-back
+mandatory **before** a `put`. So:
+
+* **`S5b`** reads `DW 8040D4A0 1` between the rescue and the upload and aborts
+  unless it is `00000000`. `--skip S5b` is **refused** — a guard a flag can
+  switch off is not a guard — and *no read-back line at all* fails, because
+  silence is not a zero. It writes `LP-ab2`, which is **this card's own cell**.
+* **`S6b`** reads `DW 80500000 8` between the upload and the jump and requires
+  the head words to be the file `S6` sent, **derived from that file and never
+  typed**. It writes `LP-2a`, also this card's cell. It guards the seating
+  rather than the device and is skippable; `S5b` is not, and the difference is
+  deliberate.
+
+量 after the change: **37 controls, 0 failed** (was 26). `C6` — the positive
+control on the new `DW` parser — went **red on its first run**, because the
+console sends CRLF and `$` under `re.M` sits behind the `\r`; every negative
+control passed while the parse returned nothing, which is a harness that kills
+everything wearing the face of one that works. Separately validated against the
+**17** committed captures that read `0x8040D4A0`: 12 pass, 5 fail on the
+post-reset `00000001`, so both outcomes come from this device rather than from a
+fixture.
+
+⚠️ **What this changes about §4 below**, and it is a correction to that section
+rather than to a cell: `--mode bench` no longer renders *"`S4`–`S7` as the same
+four commands"*. It renders **six** bench stages, and the file names differ from
+the hand column's for two of them — `S4` writes `LP-rz` where the hand row is
+`LP-e5`, and `S7` writes `LP-boot` where the hand row is `LP-3`. `S5b` and `S6b`
+write `LP-ab2` and `LP-2a`, which **are** the hand rows' names. **No expectation
+moves**: `S7`'s assertions are `LP-3`'s prediction verbatim — eleven marks in
+order, `RLXFW-ID0=B1434383`, a prompt — made by the tool instead of by eye.
+
 **One power cycle.** Cells are `LP-*` — a stem no directory under `bench/` uses,
 and not `Y` or `N`, which are the literal characters typed at the `FLR`
 confirmation prompt.
@@ -123,9 +161,10 @@ exactly like a boot that died.
 
 ## 4. What `looprun` does with the same cells, and why both are here
 
-`tools/looprun.py --mode plan` renders `S4`–`S7` as the same four commands
-`LP-e5`, `LP-0r`, `LP-1` and `LP-3` above, because the card's command column
-and the runner's plan come from one list. Run it either way:
+`tools/looprun.py --mode plan` renders the bench half of this card, because the
+card's command column and the runner's plan come from one list. *(Read with the
+second amendment above: six bench stages, not four, and two of the six write
+file names that differ from the hand column's.)* Run it either way:
 
 ```
 tools/looprun.py --mode bench --cell LP --out-dir bench/2026-09-02 \
@@ -145,10 +184,13 @@ stale image, which is the one thing that assertion exists to tell apart.
 hand-typed column runs the same four wire commands without the tool.
 
 ⚠️ **`--mode bench` has never run against a board.** Its assertions, its abort
-conditions and its refusals have **26** controls behind them — the number
+conditions and its refusals have **37** controls behind them — the number
 `tools/looprun.py --self-test` prints and the number `tools/ci-expected.tsv`
 declares, re-derived rather than copied — and every one of those is
-synthetic. **If it misbehaves, the cells above are the fallback and they are
+synthetic. *(23 when this card was written, 26 after `2a379ed`, 37 after the
+second amendment above; the fixtures for the two new guards are synthetic
+because they must run in CI with no `$FWRE_WORK`, and the separate validation
+against 17 committed captures is not.)* **If it misbehaves, the cells above are the fallback and they are
 typed by hand** — that is why both are on this card and why the hand-typed
 column is complete rather than a summary. A tool's first seating is not the
 place to have only one way to get the reading.
