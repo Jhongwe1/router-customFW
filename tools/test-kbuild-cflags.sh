@@ -108,6 +108,29 @@ ck "C6 --no-cflags is accepted by the guard"  1 \
 ck "C6 and it did NOT read the declaration"   0 \
    "$(printf '%s\n' "$out" | grep -c 'rlxfw-cflags')"
 
+# C8 -- --id-scope, R5-0 2026-09-02.  It is here rather than beside the flag
+# because the property being tested is the one this file exists for: a refusal
+# must fire ABOVE the stage.  The flag's first version validated its value in
+# the `case` beside the make invocation, so `--id-scope typo` would have
+# staged 480 MB, run oldconfig and built 592 objects before saying the word was
+# wrong -- and rlxfw-kbuild.sh's own comment says why that is the wrong place.
+run gcf-c8 --id-scope typo
+ck "C8 an unknown --id-scope is refused"      3 "$rc"
+ck "C8 and it names the two allowed values"   1 \
+   "$(printf '%s\n' "$out" | grep -c 'global|main')"
+# The one that makes it a guard ABOVE the stage rather than a message: the
+# refusal must arrive before the CFLAGS declaration is even read, which is the
+# first thing below it.
+ck "C8 and it fires before the cflags block"  0 \
+   "$(printf '%s\n' "$out" | grep -c 'CFLAGS_KERNEL=')"
+# C8b -- the negative control.  A guard that refuses every value would pass
+# C8, so an ALLOWED value must get past it; --dry-run stops before staging so
+# this costs nothing and needs no drop.
+run gcf-c8b --id-scope main --dry-run
+ck "C8b an allowed --id-scope is accepted"    0 "$rc"
+ck "C8b and it reached the dry-run report"    1 \
+   "$(printf '%s\n' "$out" | grep -c 'nothing staged and nothing built')"
+
 echo
 echo "=== the build stamp, P4a 2026-09-01: same guard shape, same reasons ==="
 # 量 2026-09-01: two back-to-back builds of one tree differ in 84 of 3,935,472

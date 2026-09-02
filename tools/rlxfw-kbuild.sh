@@ -20,6 +20,10 @@
 #     --no-cflags        build with an EMPTY CFLAGS_KERNEL, deliberately.
 #                        Without it the flags come from config/rlxfw-cflags
 #                        and an empty flag set is REFUSED -- see below.
+#     --id-scope S       where -DRLXFW_SRC_ID goes: `global` (every C
+#                        object, the default and what every measurement so
+#                        far used) or `main` (init/main.o alone, where the
+#                        only consumer is).  See INC-1 by line 412.
 #     --marks            apply config/rlxfw-marks.tsv to the staged tree
 #                        (R3-6's boot ladder; off by default so every
 #                        pre-R3-6 measurement stays reproducible here)
@@ -69,6 +73,7 @@ TARGET=vmlinux
 JOBS=$(nproc)
 KEEP=0
 MARKS=0
+ID_SCOPE=global
 NOCFLAGS=0
 CFLAGS_GIVEN=0
 NOSTAMP=0
@@ -83,6 +88,7 @@ while [ $# -gt 0 ]; do
         --jobs)          JOBS="$2"; shift 2 ;;
         --keep)          KEEP=1; shift ;;
         --marks)         MARKS=1; shift ;;
+        --id-scope)      ID_SCOPE=$2; shift 2 ;;
         --no-cflags)     NOCFLAGS=1; shift ;;
         --no-stamp)      NOSTAMP=1; shift ;;
         --dry-run)       DRYRUN=1; shift ;;
@@ -105,6 +111,22 @@ done
 # THE GUARD IS HERE, above the stage, on purpose.  Below it a refusal costs a
 # 480 MB copy before it fires, and a refusal nobody can afford to test is one
 # nobody tests.
+
+# 🔴 --id-scope is validated HERE for exactly that reason, and its first
+# version was not: the `case` that rejects an unknown value sat beside the make
+# invocation, so `--id-scope typo` would have staged 480 MB, run oldconfig and
+# built 592 objects before saying the word was wrong.  Found on 2026-09-02 by
+# reading this file's own comment above, in the same session that added the
+# flag.
+case "$ID_SCOPE" in
+    global|main) ;;
+    *) echo "$CELL: unknown --id-scope '$ID_SCOPE' (global|main)" >&2
+       echo "  global -- -DRLXFW_SRC_ID on every C object (the default, and" >&2
+       echo "            what every measurement so far was taken under)" >&2
+       echo "  main   -- on init/main.o alone, where the only consumer is" >&2
+       exit 3 ;;
+esac
+
 CFLAGS_FILE="$REPO/config/rlxfw-cflags"
 # 🔴 The first version of this guard tested `[ -n "$CFLAGS_KERNEL" ]`, so
 # `--cflags-kernel ""` fell through to the declared file and was accepted -- the
@@ -262,9 +284,19 @@ fi
 # Off by default so that every measurement made before R3-6 can still be
 # reproduced by the same driver.
 if [ "$MARKS" = 1 ]; then
+    # 🔴 --keep + --marks could not run at all until 2026-09-02 (R5-0), and
+    # the failure did not read as a refusal: `apply` walks into A4 ("already
+    # in this file; this tree is not clean") and the driver reports
+    # `rlxfw-marks apply FAILED`. That combination is what INC-1 has to
+    # measure, so --keep now asks for the idempotent path. It is NOT passed
+    # on a fresh stage: a freshly staged tree must be clean, and a tool that
+    # tolerates a dirty one there would hide a bad drop.
+    MARKS_IF_NEEDED=""
+    [ "$KEEP" = 1 ] && MARKS_IF_NEEDED="--if-needed"
     if ! python3 "$HERE/rlxfw-marks.py" apply \
             --decl "$REPO/config/rlxfw-marks.tsv" \
-            --tree "$top" --src "$REPO/config/rlxfw-src" > "$log.marks.log" 2>&1
+            --tree "$top" --src "$REPO/config/rlxfw-src" $MARKS_IF_NEEDED \
+            > "$log.marks.log" 2>&1
     then
         echo "$CELL: rlxfw-marks apply FAILED" >&2
         tail -20 "$log.marks.log" >&2
@@ -275,13 +307,21 @@ if [ "$MARKS" = 1 ]; then
     # `ID0` matches none of the three, so it would have reported 15 while 16
     # rows were applied. Read the tool's own RESULT, and refuse rather than
     # print an empty count: a blank where a number belongs reads as zero.
-    napplied="$(sed -e 's/\x1b\[[0-9;]*m//g' "$log.marks.log" \
-                | sed -n 's/^RESULT: \([0-9][0-9]*\) mark(s) applied.*/\1/p')"
+    # 🔄 The pattern matched `mark(s) applied` until 2026-09-02. With
+    # --if-needed the tool correctly says `already present` when it inserted
+    # nothing, and the narrower pattern would have left $napplied empty and
+    # killed the build -- a message getting MORE honest must not break its
+    # reader.  The verb is captured too, so this line reports what happened
+    # rather than always saying "applied".
+    nline="$(sed -e 's/\x1b\[[0-9;]*m//g' "$log.marks.log" \
+             | sed -n 's/^RESULT: \([0-9][0-9]*\) mark(s) \(.*\) and read back.*/\1 \2/p')"
+    napplied="${nline%% *}"
+    nverb="${nline#* }"
     [ -n "$napplied" ] || {
         echo "$CELL: rlxfw-marks printed no RESULT count" >&2
         tail -5 "$log.marks.log" >&2
         exit 3; }
-    echo "== $CELL: applied $napplied declared row(s) from config/rlxfw-marks.tsv"
+    echo "== $CELL: $napplied declared row(s) from config/rlxfw-marks.tsv $nverb"
 fi
 
 # ------------------------------------------------------------- environment
@@ -391,7 +431,26 @@ set -- make -C "$DIR_LINUX" -j"$JOBS" "$TARGET"
 # every C object.  `ID0` in config/rlxfw-marks.tsv is the only consumer, and a
 # --marks build without this define does not compile: a build failure rather
 # than an image whose identity string is wrong.
-set -- "$@" "KCPPFLAGS=-DRLXFW_SRC_ID=0x$RECIPE_ID"
+#
+# 🔴 AND REACHING EVERY OBJECT IS WHAT MAKES AN INCREMENTAL R5 ITERATION COST
+# A FULL BUILD.  量 2026-09-02 (INC-1, R5-0): editing one file under
+# config/rlxfw-src/ moves RECIPE_ID, which moves 592 command lines, and
+# kbuild's arg-check -- working since 0004 -- rebuilds all of them: 592 CC /
+# 32.58 s against 3 CC / 11.75 s for the SAME edit made where RECIPE_ID does
+# not move.  The identity string, not the build system, is the cost.
+#
+# --id-scope main passes it to init/main.o alone, which is where the sole
+# consumer lives (grep over the staged tree: one hit, init/main.c:576).
+# `global` stays the default because it is what every measurement so far was
+# taken under; changing a default silently is how a reproducibility claim
+# stops meaning anything.
+# The value was validated above the stage; this dispatch is total by
+# construction and does not repeat the refusal -- a second copy of the allowed
+# set is a second owner of it.
+case "$ID_SCOPE" in
+    global) set -- "$@" "KCPPFLAGS=-DRLXFW_SRC_ID=0x$RECIPE_ID" ;;
+    main)   set -- "$@" "CFLAGS_main.o=-DRLXFW_SRC_ID=0x$RECIPE_ID" ;;
+esac
 echo "== $CELL: $*"
 run build "$@" < /dev/null
 rc=$?
