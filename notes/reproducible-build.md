@@ -416,3 +416,26 @@ one that predicted *no change*.
 * **`49 seconds apart`** for `rep8`/`rep4` — **49 s is `rep4`'s cell duration, not a gap between anything.** 讀 `determinism.log`: the two cells start **40 s** apart, their kernel stamps end up **48 s** apart and their cpio stamps **33 s**. It arrived in this session's opening brief and was copied into **six** committed files — `config/rlxfw-build-stamp`, `config/host-compat/0002-…patch`, `docs/FINDINGS.md`, this file, `tools/rlxfw-kbuild.sh` and `tools/test-kbuild-cflags.sh` — before it was re-derived. All six now say *back to back*.
 
 ⚠️ **Three commit messages already pushed still carry `49 s`** (`3825411`, `b5eedc3`, `2026e8e`). Commit messages are immutable history; the correction lives here and in the commit that made it.
+
+---
+
+## 8. 🔴 A limit measured 2026-09-02 (`INC-1`/`INC-2`): every claim in this file is a FRESH-STAGE claim
+
+量 while measuring incremental builds: **a no-op incremental build does not
+reproduce its own product.** `linux-2.6.30/.version` is a build counter
+incremented at each link, and it reaches the image through `UTS_VERSION`'s
+`#N`. Two consecutive `--keep` builds, 2 `CC` each, same declared stamp, same
+`RECIPE_ID`, same `--id-scope`: `.version` went `11 → 12 → 13` and the
+`vmlinux` sha differed both times.
+
+**Nothing above is affected**, and the reason is worth stating rather than
+assuming: `P4a`'s readings are all taken from **fresh stages**, where
+`.version` is absent and starts at 1 — and 量 the same day, two fresh stages
+differing only in `--id-scope` produced a byte-identical `vmlinux`
+(`04545dd254a1b136…`), which is a *new* positive control on that.
+
+🔴 **The line to keep**: `--keep` is `[TESTING ONLY]` in
+`tools/rlxfw-kbuild.sh` and this is one more reason. A reproducibility
+comparison across two incremental builds compares two build counters and
+reports a false difference; nobody has made that mistake here yet, and this
+paragraph is so that it stays that way. `notes/incremental-build.md` § 7.3.

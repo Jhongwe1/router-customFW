@@ -463,3 +463,140 @@ generalisation and none has been done here:
 It is written down because *"this is probably not just us"* is a useful thing
 for a reader to know and a dangerous thing to state as a finding. **The claim
 this file makes is about this tree.**
+
+---
+
+## 7. 🔴 `INC-1`, measured 2026-09-02 (`R5-0`): one real edit costs a full build, and the cause is this project's own identity string
+
+§ 5 and § 6 measured no-ops and `touch`es. `INC-1` was carried forward because
+**the cost of one REAL edit on a reused tree had never been measured**, and
+`R5` is ~24 segments of exactly that edit.
+
+Two things had to exist before it could be run at all:
+
+* **`rlxfw-marks.py --if-needed`.** `A4` refuses a second `apply` on one tree,
+  because applying twice emits the mark twice and a doubled mark reads in a
+  capture as a boot loop. So `--keep --marks` could not run. The fix is
+  **three states rather than two** — `clean` applies, fully-`applied` is a
+  no-op, and 🔴 **`partial` is refused**, which is the state `A4` was guarding
+  and the one an "already there, call it success" patch would have laundered.
+  `A18`–`A22` are those states; `A20` requires the plain `apply` to *still*
+  refuse, so `A4` is bypassed only when asked.
+* **`_copy_if_different`.** `apply` used to `shutil.copyfile` my sources
+  unconditionally. kbuild triggers on mtime, so that puts a floor under every
+  incremental measurement — and `INC-1` is a measurement of that floor.
+  `A23`/`A24` are the two halves.
+
+### 7.1 The hypothesis, written before the run
+
+`R5`'s drivers live under `config/rlxfw-src/`. `RECIPE_ID` is a sha256 over
+**every file under `config/`**, and `rlxfw-kbuild.sh` passes it as
+`KCPPFLAGS=-DRLXFW_SRC_ID=0x<id>`, which `Makefile:572` appends to
+`KBUILD_CPPFLAGS` — so it reaches **every C object's command line**. Since
+`0004` fixed the truncated `.cmd` files, kbuild's arg-check works.
+
+> **H1** — editing a driver source rebuilds **all** objects, because
+> `RECIPE_ID` moved and every command line moved with it.
+> **H0** (null) — only the edited object rebuilds, ~3 `CC`.
+> **Refutation of the run itself**: `S1`, a no-op on the reused tree, must
+> reproduce § 5's known **2 `CC`**. If it does not, the tree is not in the
+> state the earlier numbers were taken in and nothing below is comparable.
+
+### 7.2 The reading
+
+量 2026-09-02, cell `inc1`, `-j4`, this host.
+
+| | what | s | `CC` | `LD` | `RECIPE_ID` |
+|---|---|---:|---:|---:|---|
+| `S0` | fresh stage + full build, `--marks` | 42.56 | 592 | 118 | `6664f2f5` |
+| `S1` | `--keep --marks`, nothing changed | 11.98 | **2** | 8 | `6664f2f5` |
+| `S2` | **edit `config/rlxfw-src/…/rlxfw_mark.c`**, `--keep --marks` | **32.58** | **592** | 77 | **`449cd25e`** |
+| `S3` | revert `config/`, `--keep --marks` | 40.90 | 592 | 77 | `6664f2f5` |
+| `S4` | **edit the STAGED copy**, `--keep`, no `--marks` | **11.75** | **3** | 9 | `6664f2f5` |
+| `S5` | `--keep`, no `--marks`, nothing changed | 11.69 | 2 | 8 | `6664f2f5` |
+
+🟢 **The refutation held**: `S1` is 2 `CC`, exactly § 5.6's floor.
+
+🔴 **H1 holds and H0 is refuted.** `S2` rebuilds **592 objects — the whole
+tree** — for a one-line edit.
+
+🟢 **And `S2` against `S4` is the isolation, single-variable**: the *same
+edit*, made where `RECIPE_ID` does not move, is **3 `CC` / 11.75 s**. The
+factor between them is **197× in objects and 2.8× in wall-clock**, and it is
+entirely `RECIPE_ID`.
+
+**So `--keep` buys nothing for an `R5` iteration, and the reason is not the
+build system — it is this project's own identity string.** `notes/dev-loop.md`
+§ 5 said *"this tree has no incremental build at all"*; that was right about
+the cause it named and it was not the whole cause.
+
+### 7.3 `INC-2`: confining the define, and the product it must not move
+
+The staged tree has **exactly one** consumer of the macro —
+`init/main.c:576`, the `ID0` row of `config/rlxfw-marks.tsv` — so the define
+does not need to be global. `--id-scope main` passes it as `CFLAGS_main.o`.
+`global` stays the default, because it is what every measurement so far was
+taken under.
+
+Predictions, written before the run: `P1` the first `main`-scope build rebuilds
+everything (a settling run, not a reading); `P2` a no-op after it is 2 `CC`;
+`P3` a real edit is a handful; 🔴 `P4` **`vmlinux` is byte-identical between the
+two scopes**, refuted by any difference — which would mean something here
+compiles differently depending on whether the macro is *defined*; `P5` the
+`RLXFW-ID0=` string survives.
+
+| | s | `CC` | note |
+|---|---:|---:|---|
+| `T0` `--id-scope main`, first | 34.94 | 591 | settling, as `P1` predicted |
+| `T1` no-op | 14.66 | **2** | `P2` 🟢 |
+| `T2` **edit `config/`** | **12.53** | **4** | `P3` 🟢 — against 592 / 32.58 s |
+| `T3` revert | 12.03 | 4 | |
+
+🟢 **`P3` holds: the same real edit is 4 `CC` / 12.53 s under `--id-scope
+main`.** The four are `init/main.o` (the moved define), `rlxfw_mark.o` (the
+edit), and the two of § 5.6's floor.
+
+🔴 **`P4` was refuted, and the refutation was the experiment's fault, not the
+flag's.** It compared two *incremental* builds — and 量: an incremental build
+does not reproduce its own product either. `T1`, a **2 `CC` no-op** at the same
+recipe and the same scope, produced a different `vmlinux` from the build before
+it.
+
+**Cause, then measured rather than assumed**: `linux-2.6.30/.version` is a
+build counter incremented at each link and reaching the image through
+`UTS_VERSION`'s `#N`. 量: `11 → 12 → 13` across two no-op builds, images
+differing each time.
+
+### 7.4 `P4` restated, and the answer
+
+Two **fresh stages** of the same recipe, one per scope. Both start with
+`.version` absent, so the counter is equal and the comparison is
+single-variable.
+
+| | `CC` | `.version` | `RECIPE_ID` | sha256 of `vmlinux` |
+|---|---:|---:|---|---|
+| `--id-scope global` | 592 | 1 | `b1434383` | `04545dd254a1b136…` |
+| `--id-scope main` | 592 | 1 | `b1434383` | `04545dd254a1b136…` |
+
+🟢 **Byte-identical.** The 591 objects that lose the `-D` never referenced it,
+and `P5` holds — `rlxfw-marks verify` reads `RLXFW-ID0=` present once in mine.
+
+⚠️ **`--id-scope main` is not turned on by default and no gate uses it yet.**
+`looprun`'s `S2` re-stages, where the scope changes nothing; the win is in the
+**desk** iteration, which is where `R5` will live. Turning it on is `INC-2`,
+carried forward, and it arrives with a fresh-stage product comparison in the
+same commit or it does not arrive — the same condition `P4a`'s `L2-6` put on
+`--keep`.
+
+### 7.5 What this section does not establish
+
+* ⚠️ **The stimulus was an added comment line.** kbuild triggers on mtime and
+  on the command line and reads no file contents, so a comment and a real
+  statement are the same stimulus *to it* — the `CC` counts carry over. The
+  **seconds** do not: a real edit gives the compiler more to do, so every
+  wall-clock number here is a lower bound.
+* ⚠️ **One file, in `arch/rlx/kernel/`.** A driver under `drivers/` sits one
+  `built-in.o` aggregation deeper. Same order of magnitude, 推, not measured.
+* 🔴 **`.version` means an incremental build is never reproducible**, whatever
+  the scope. Every reproducibility claim in `notes/reproducible-build.md` is a
+  fresh-stage claim and stays one.
