@@ -686,3 +686,34 @@ userspace commands and this one ran one — so *6×* is a description of two
 seatings and not a controlled comparison. What *is* controlled: the four stages
 `S4`–`S7`, which on every previous seating had an operator gap between each,
 ran here with none.
+
+### 10.6 🔄 2026-09-02, `R5-0`: the seam's cost was mis-counted, and it is closed as a decision
+
+§ 10.3 established that `--skip S2,S3` was **necessary** rather than
+convenient, and § 10.1 that `73.88 s` is a sum of two runs. `SEAM-1` carried
+the remedy — one `--mode bench` with no skip — with the cost written as
+*"about 36 s of bench time"*.
+
+🔴 **That cost was counted in the wrong unit.** `CLAUDE.md`: *one power cycle
+is the most expensive unit here.* Three readings, all from the source and none
+of them costing power:
+
+1. `--mode plan`'s nine stages: `S2` and `S3` are **desk** and they run
+   **before** `S4`, which is `J BFC00000`.
+2. `loop_once` is sequential and any stage with `rc != 0` raises
+   `StageFailed` immediately — so **a failed `S2` means `S4` never runs and
+   the board is never touched.** `--control build-fail` already exercises it.
+3. `R4-2` measured the scripted reset 21/21 without the power switch.
+
+**So a no-skip run needs no additional power cycle.** It rides the opening
+cold boot of the next seating; what it costs is **39.15 s** of board idle
+(`S2` 35.96 + `S3` 3.19) and one failure mode that consumes no power cycle.
+
+**Decision: `R5`'s first bench iteration runs without `--skip S2,S3`.**
+
+⚠️ **`--id-scope main` does not help here.** `S2` re-stages, so there are no
+objects to keep and `INC-2`'s win is entirely on the desk side
+(`notes/incremental-build.md` § 7.4).
+
+🔴 **A decision is not a reading.** What is closed is *whether to*; `SEAM-1`'s
+measurement waits for the seating, and its card carries the row.
