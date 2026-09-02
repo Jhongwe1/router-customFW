@@ -112,7 +112,16 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # 11 warm, and `2026-09-01` alone reports 1 cold / 21 warm -- so the delta is
 # exactly +1/+21 and nothing was reclassified. Third seating in a row that
 # turned this case red, and all three times the run-every-suite rule caught it.
-ck "nineteen cold, thirty-two warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 19 cold, 32 warm, 0 unknown')"
+# 🔄 19/32 -> 20/35 on 2026-09-02 (seating 10, `bench/2026-09-02`), which is
+# ONE cold power-on and THREE warm resets: `LP-A`, then `LP-e5`, `LP-e5b` and
+# `LP-rz` -- the last of those being `looprun`'s own S4, so a stage this
+# project did not type by hand is now in this population. Isolation check, run
+# before this line was touched: the 394 logs OUTSIDE `2026-09-02` still report
+# 19 cold, 32 warm, and `2026-09-02` alone reports 1 cold / 3 warm -- so the
+# delta is exactly +1/+3 and nothing was reclassified. Fourth seating in a row
+# that turned this case red, and all four times it was the run-every-suite
+# rule that caught it rather than a `--only` run.
+ck "twenty cold, thirty-five warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 20 cold, 35 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
