@@ -92,8 +92,9 @@ released source.
 > sources); it jumped to `0x80500000` without checking
 > what was there, on a board whose reset re-stages that address from flash;
 > and 🔴 **`S3` had never been connected to `S2` at all**, so the
-> `--skip S2,S3` the card called a convenience was the only thing that made
-> the tool runnable. **Zero flash-write commands and no `FLR`**, decided
+> `--skip S2,S3` the card called a convenience was **necessary** rather than
+> chosen — an explicit `--cell-top` would have worked too, and nobody knew
+> there was anything to pass. **Zero flash-write commands and no `FLR`**, decided
 > before power, so the bracket stands at **1,024 of 4,194,304 = 0.0244 %**
 > and *not one flash byte is written* is exactly as unsayable as it was.
 > **Which gate that is, `PROGRESS.md` says** — this

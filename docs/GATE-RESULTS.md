@@ -701,8 +701,11 @@ instrument. Recorded, not applied.
 one of them is now weaker in a way worth stating: four of the first five entries
 were written in one sitting with hindsight, and `P4b-gate`'s — written a day
 late, but before any gate closed after it — is the sixth. `R4`'s was written on
-the day `R4` closed, from readings taken that morning, which is the first entry
-in this file with no hindsight in it at all.
+the day `R4` closed, from readings taken that morning. ⚠️ **That is not a claim
+to be the first such entry** — `P4a`'s was also written on the day `P4a`
+closed. The difference is only that `P4a`'s was written in a sitting that was
+simultaneously backfilling four others, which is a statement about the
+*selection* of residuals and not about their dates.
 
 🟢 **One thing this run does settle**: `P4a`'s residual *`ID0` has never been
 read off the board* is closed by `R4`'s seating, so it cannot repeat forward. A

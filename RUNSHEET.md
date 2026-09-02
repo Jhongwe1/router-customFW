@@ -3715,8 +3715,11 @@ twice before power and both amendments logged in the card's own text**.
 `LP-boot`, with the `superseded-by:` block in `CORRECTIONS-block7.md` section 1.
 
 🔴 **The card's hand-typed column ran `LP-A` through `LP-e5b`, and then
-`tools/looprun.py --mode bench` ran `S4`-`S7` as one process.** That is the
-first time a Results table here describes stages this project did not type.
+`tools/looprun.py --mode bench` ran `S4`-`S7` as one process.** ⚠️ Not the
+first stages here that were not typed one at a time — `console-dump.py
+rescue` has sent three commands per invocation since seating 2 — but the
+first time **one process ran a whole sequence without handing control back
+to the operator between stages**, which is the property `D3` is about.
 
 | cell | sent | read | verdict |
 |---|---|---|---|

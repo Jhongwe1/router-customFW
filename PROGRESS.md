@@ -215,9 +215,11 @@ made. The `D4` renegotiation clause never fired.
 suspected**: `--iterations > 1` is now **refused** — `S4` is a loader command
 and iteration 1 ends with the loader gone — so *a loop that runs once* is what
 exists, and `R5` is six drivers; and **70 % of the bench half is terminator
-budget**, which is the largest single saving available and needs the
-largest-inter-byte-silence distribution measured out of the captures this
-project already holds, not a guess.
+budget**, which is the largest single block of the BENCH half — ⚠️ **not of
+the loop**, because the build is 35.96 s and larger, and the build side has
+already been examined by `R4-0` and `notes/incremental-build.md`. Cutting it
+needs the largest-inter-byte-silence distribution measured out of the
+captures this project already holds, not a guess.
 
 ---
 
