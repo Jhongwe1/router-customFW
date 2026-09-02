@@ -9,6 +9,22 @@ taken at the bench.
 mtime and `tools/check-predictions.py` fails, correctly. Corrections go in
 `CORRECTIONS-block7.md`, beside this one.
 
+🔄 **Amended 2026-09-02 11:58, before power and before any capture exists.**
+Two things, and **neither is an expectation** — no cell, no `Q*`, no number in
+`cardnum` moves:
+
+* §4 said `--mode bench` has **23** controls behind it. 量 today:
+  `tools/looprun.py --self-test` reports **26 passed, 0 failed**, and
+  `tools/ci-expected.tsv:230` has declared 26 since it was written. The count
+  went 21 → 23 → 26 across `72cb9fa` → `76bbd79` → `2a379ed`, and the prose
+  written **after** `2a379ed` still said 23 — the same requote-instead-of-
+  re-derive defect this card's §0 exists for, one commit later.
+* §2 had no pointer to the host preflight. Blocks 3 and 4 both carry one
+  sentence saying it is `RUNSHEET` §B5's and is not restated; this card dropped
+  it, and an operator reading only this card would reach `LP-1` with the host
+  NIC down — which fails on the host side and reads as a board fault
+  (`RUNSHEET` `P3`).
+
 **One power cycle.** Cells are `LP-*` — a stem no directory under `bench/` uses,
 and not `Y` or `N`, which are the literal characters typed at the `FLR`
 confirmation prompt.
@@ -74,6 +90,7 @@ a recorded decision rather than an omission.
 | its source | `vmlinux` sha256-16 `c788348d7b7f9886`, cell `i3`, recipe `b1434383`, 4 host-compat patches, 16 mark rows, `.version` = 1 |
 | `CAP` | `/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0` |
 | `OUT` | `--out bench/2026-09-02/` |
+| host preflight | the long-lived WSL process, re-reading **both** busids, the NIC at `10.1.1.2/24`, `/usr/bin/python3` — `RUNSHEET` §B5's and **not restated here**. One owner. Without the NIC, `LP-1` fails on the host side and reads as a board fault |
 | pre-flight | a 3 s capture with the board **off**: 0 bytes, which separates the adapter, the port and the board before a power cycle is spent |
 
 ---
@@ -128,8 +145,10 @@ stale image, which is the one thing that assertion exists to tell apart.
 hand-typed column runs the same four wire commands without the tool.
 
 ⚠️ **`--mode bench` has never run against a board.** Its assertions, its abort
-conditions and its refusals have 23 controls behind them and every one of those
-is synthetic. **If it misbehaves, the cells above are the fallback and they are
+conditions and its refusals have **26** controls behind them — the number
+`tools/looprun.py --self-test` prints and the number `tools/ci-expected.tsv`
+declares, re-derived rather than copied — and every one of those is
+synthetic. **If it misbehaves, the cells above are the fallback and they are
 typed by hand** — that is why both are on this card and why the hand-typed
 column is complete rather than a summary. A tool's first seating is not the
 place to have only one way to get the reading.
