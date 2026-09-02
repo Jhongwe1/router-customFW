@@ -16,9 +16,23 @@ in the vendor tree is touched.
 
 The sentence: **no implementation of this timer was read to write it.** What
 that is worth rests on `docs/blind-write-ledger.md` § 4.3, frozen and committed
-**before** this file existed, and the ordering is checkable with
-`git log --diff-filter=A -- config/rlxfw-src/`. Today's reads are added to that
-file, not recorded here.
+**before** this file existed. 量 2026-09-03:
+
+```
+git log --diff-filter=A -- docs/blind-write-ledger.md
+  aa89317  2026-09-03   (the ledger)
+git log --diff-filter=A -- config/rlxfw-src/linux-2.6.30/drivers/
+  bfd624c  2026-09-03   (this driver)
+```
+
+⚠️ **The command has to name the driver path, and the ledger's own § 8 says
+`config/rlxfw-src/` instead — which is one directory too wide.** That
+directory already held `rlxfw_mark.c` and `rlxfw-mark.h` from **2026-08-29**,
+months of segments before the ledger; run as written, the check shows a file
+of mine added *before* it and looks like a failure. Those two are the boot
+ladder, not a driver, and the claim is about drivers. **The claim holds; the
+command that checks it is narrowed here.** Today's reads are added to the
+ledger, not recorded in this file.
 
 ---
 
