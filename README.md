@@ -419,9 +419,11 @@ tools/xcheck.py            asks whether two committed instruments agree about on
 
 tools/ledgerscan.py        R5's blind-write ledger is COMPUTED, not written. It
                            re-derives every path-shaped citation of an external
-                           implementation source out of 1,443 tracked files plus
+                           implementation source out of every tracked file plus
                            upstream's 302 (walked -- git ls-files cannot see inside a
-                           submodule), assigns each a driver domain, and `check`
+                           submodule; 1,447 tracked on 2026-09-03, and the count moves
+                           with the repository, so the tool prints it rather than this
+                           page fixing it), assigns each a driver domain, and `check`
                            requires docs/blind-write-ledger.md to declare every
                            in-scope one. Writing about a new vendor file in LOG.md --
                            which is how reading gets recorded here -- makes it red

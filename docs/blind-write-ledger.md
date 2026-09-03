@@ -16,8 +16,11 @@ different way — see § 2.
 
 ## 0. What this ledger claims, and the three things it does not
 
-**Claims.** For each of the twenty-seven external implementation sources this
-repository cites, in scope for one of `R5`'s six drivers: which tree it belongs
+**Claims.** For each of the **thirty-two** external implementation sources this
+repository cites, in scope for one of `R5`'s six drivers *(twenty-seven when
+this file was written at `R5-0`; `R5-1` added five and the number moves every
+time this repository cites a source it had not cited before — which is exactly
+the event this file exists to catch)*: which tree it belongs
 to, how deep the contact went, what was taken, and whether what was taken lands
 on the layer `driver-diff` compares.
 
@@ -108,7 +111,7 @@ is the one that was nearly missed.
 
 | | who | what |
 |---|---|---|
-| **completeness** | `tools/ledgerscan.py scan` | every path-shaped citation of an external source, in `git ls-files` (1,445 at commit; the number grows with the repository) and in `upstream/` (302, walked — `git ls-files` cannot see inside a submodule) |
+| **completeness** | `tools/ledgerscan.py scan` | every path-shaped citation of an external source, in `git ls-files` (**1,447** on 2026-09-03, 1,445 at `R5-0`; the number grows with the repository, and `ledgerscan scan` prints it rather than this table fixing it) and in `upstream/` (302, walked — `git ls-files` cannot see inside a submodule) |
 | **domain** | the tool | which of `R5`'s drivers a path could belong to. Over-inclusive by design: `dt` and `bsp` are cross-domain, because a device tree and a board file each describe every peripheral |
 | **origin** | the tool's path rules, restated per row below | *generic Linux* / *vendor Realtek* / *third-party port*. **Only the last two can cost independence** |
 | **depth** | the tool | `name` (a path appears) or `line` (a line number travels with it) |
@@ -170,8 +173,9 @@ shell history. It is a boundary with a date, not a proof of abstinence.
 
 ## 4. What was read, by driver
 
-**Twenty-seven in-scope paths.** `out-of-scope` (68 paths) is listed by
-`ledgerscan scan` and is not reproduced here: those are generic kernel files —
+**Thirty-two in-scope paths** *(twenty-seven at `R5-0`)*. `out-of-scope`
+(**71** paths, 68 at `R5-0`) is listed by `ledgerscan scan` and is not
+reproduced here: those are generic kernel files —
 `init/main.c`, `kernel/bounds.c`, `arch/rlx/kernel/traps.c` — that no
 peripheral driver's register map passes through.
 
