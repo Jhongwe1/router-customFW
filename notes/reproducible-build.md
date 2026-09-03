@@ -210,6 +210,21 @@ epoch; `tools/rlxfw-kbuild.sh` renders it into `KBUILD_BUILD_TIMESTAMP` under
 cannot drift apart.
 
 * **P1** two builds of the declared recipe, minutes apart, are **byte-identical**.
+  🟢 **Extended 2026-09-04 (`R5-10`), and this is the strongest
+  reproducibility datum this project has**: `rlxfw-r51-20260903.bin` —
+  the image that **executed on the silicon** in seating 11 — was rebuilt
+  **byte for byte** on the following day, in a different cell, from a fresh
+  480 MB stage, with its inputs recovered from `<cell>.config-installed` and
+  `<cell>.initramfs.spec` rather than retyped: `39abf11c2d6fd0ce…`,
+  1,030,144 bytes, `cmp` rc=0, `vmlinux` `2b0d1618…` identical underneath.
+  A second desk run the same hour repeated it, so **n = 3 across two cell
+  names and two days**. `notes/dev-loop.md` § 11.2.
+  🔴 **What it does not close.** The inputs live in `$FWRE_WORK`, which
+  no clone has and which the next build of the same cell name overwrites, so
+  this is a property of one workstation's disk and not yet of this
+  repository — `CFG-1`. And `.config-built` is **not** an identity: two
+  builds with byte-identical images have different `config-built` digests,
+  because kconfig writes a wall-clock comment on line 4.
 * **P2** the banner reads `#1 Tue Sep 1 00:00:00 UTC 2026` and every cpio mtime
   field reads `6A961580` (= 1788220800).
 

@@ -181,7 +181,18 @@ different bits from the bit 8 pair the vendor's tick uses. 量 `SPEC.md`
 cannot be delivered.
 
 ⚠️ **What that does not settle**: `REG-01` was read at the **loader prompt**,
-and what Linux leaves in `GIMR` has never been read. 量 2026-09-03, by sweep:
+and what Linux leaves in `GIMR` has never been read.
+
+> 🔄 **2026-09-04: that last clause expired on 2026-09-03 and the
+> segment that expired it did not notice.** Seating 11 read `GIMR` under
+> Linux in all fourteen dumps: **`00209100`**, bit 9 clear. `R5-10` then
+> decoded it bit for bit against `arch/rlx/bsp/bspchip.h` and the built
+> `.config` — `TC0_IE \| UART0_IE \| SW_IE \| PCIE_IE`, with every absent
+> OR-in's symbol absent (`SPEC.md` `REG-01`, `docs/interrupt-map.md` § 4.1).
+> The `-EPERM` refusal is unchanged and is still the right design; what
+> changed is that the value it guards against is now known.
+> 🔴 And § 9 is what to read about H2 itself: the pending bit did not
+> latch because **`TCIR` bit 30 was clear too**, not because of this mask. 量 2026-09-03, by sweep:
 every `GIMR` reading in this repository — `RUNSHEET` `E3`, `C5`, `E5`,
 `bench/2026-08-23/E.log` and `C5-picocom.log` — is at the prompt, and no
 capture holds a `DW B8003000` taken after a `J`. So the driver does not
@@ -378,7 +389,7 @@ with a stopwatch.
 🔴 **2026-09-03, seating 11: the two constants in the paragraph above are the
 LOADER's, and Linux does not use them.** 量, `TM-1`: `CDBR` reads `03E80000`
 (divisor **1000**, not 14) and `TC0DATA` reads `00007D00` (**2,000** ≪ 4, not
-142,858 ≪ 4). Both give 100 Hz; the vendor's `rlx-time.c` reprograms the
+142,858 ≪ 4). Both give 100 Hz; the vendor's ~~`rlx-time.c`~~ **`arch/rlx/bsp/timer.c`** (🔄 2026-09-04, § 9.6) reprograms the
 divider at boot. So the reference is a continuous **200.005 kHz** counter and
 one count is **0.083 ppm over 60 s** — still 2,000× finer than the ±50 ppm the
 step asks for, and 2,008× finer than the 10 ms grid this section exists to
@@ -569,7 +580,7 @@ address two bytes off a real one; four bytes into a function) both **0**.
 `docs/blind-write-ledger.md` § 4.3 as one. 🟢 **The order limits the damage**:
 the driver was written, built, linked and pinned into the staged image *before*
 this scan ran, so nothing in it can have been shaped by the result. And it is an
-**absence** — `arch/rlx/kernel/rlx-time.c` still has zero citations.
+**absence** — `arch/rlx/kernel/rlx-time.c` still has zero citations. 🔄 **2026-09-04: no longer.** `R5-10` opened it, and `docs/blind-write-ledger.md` § 4.3's row moves from *none — nothing taken* to **line**. The sentence above is kept because the scan it describes was run before that, and its value is entirely in its date.
 
 ⚠️ **What it does not say.** It says nothing about *how* the vendor keeps time.
 `clocksource_jiffies` being the only registered source means the kernel's
@@ -649,7 +660,7 @@ Linux  :  200.0049 MHz / 1000 =    200,005 Hz ;  /   2,000 = 100.0 Hz
 
 **Two different divider/reload pairs, the same 100 Hz tick.** `cdbr_at_init` and
 `tc0data_at_init` already hold the Linux values, so the reprogramming happened
-before `rtl819x_timer_init` ran: it is `arch/rlx/kernel/rlx-time.c`'s, not this
+before `rtl819x_timer_init` ran: it is ~~`arch/rlx/kernel/rlx-time.c`~~ **`arch/rlx/bsp/timer.c`**'s (🔄 2026-09-04, § 9.6), not this
 driver's. 🟢 **A fact about a vendor file this project has still never opened**,
 which is what the cell was written to buy — and it turned out to be a *change*
 rather than the match the card predicted.
@@ -727,6 +738,14 @@ cannot verify the interrupt path by watching a latch first and arming second;
 it must set `GIMR.TC1IE` with a handler already installed. There is no
 intermediate step, and the driver was designed as though there were.
 
+> 🔴 **CORRECTED 2026-09-04, § 9 — the observation stands, the cause named
+> above does not, and this paragraph's conclusion is withdrawn.** Two enables
+> were clear at once (`TCIR` bit 30 and `GIMR` bit 9) and the reading cannot
+> separate them; `RUNSHEET` `C5` (量 2026-08-24) shows a `GISR` pending bit
+> latching **while masked in `GIMR`** on this die, which argues the cause is
+> `TCIR.TC1IE = 0` — a bit `rtl819x_tc1_arm()` never writes. The paragraph is
+> kept verbatim because a negative result stays in place; § 9 is what to read.
+
 Consequence: `Q11` — whether `TC1IP` is write-1-to-clear — is **void**, because
 a bit that never latched cannot be shown to clear. It is still the **only**
 test this project has of that D Table 25 claim, and `rtl819x_tc1_disarm()`'s
@@ -769,3 +788,118 @@ false as stated** — it can equally mean `cat` made a different number of kerne
 calls. The check found something real; it is not the thing it was advertised to
 find. `arm` zeroing the counters is confirmed both ways (讀 `:385-388`; 量,
 `TM-5b-arm` reads 1 after a run that had reached 11).
+
+---
+
+## 9. 🔴 2026-09-04 (`R5-10`, desk): § 8.4's finding is right and its cause is wrong, and the correction gives `R5-3` back its safe step
+
+§ 8.4 concluded, from seating 11:
+
+> *So the masked-observation strategy does not work on this part. `R5-3` cannot
+> verify the interrupt path by watching a latch first and arming second; it must
+> set `GIMR.TC1IE` with a handler already installed. There is no intermediate
+> step, and the driver was designed as though there were.*
+
+**The observation stands. The attribution does not, and the last sentence is
+exactly backwards: the driver was designed as though the intermediate step
+existed, and it does — the driver just never took it.**
+
+### 9.1 Two enables were clear at once
+
+量, `TM-5b2`, unchanged for the whole 703.46 s arm:
+
+```
+tcir = 80000000    ->  TC0IE=1  TC1IE=0  TC0IP=0  TC1IP=0     (D Table 25; bspchip.h)
+gimr = 00209100    ->  bit 9 TC1_IE = 0
+```
+
+`TCIR` bit 30 is the **timer block's own** interrupt enable. `GIMR` bit 9 is the
+**global controller's** mask, one layer downstream. § 8.4 named only the second
+one. **The experiment cannot separate them**, because both were 0.
+
+### 9.2 🟢 The repository already held the reading that decides it, and it is fourteen days older
+
+`RUNSHEET` `C5`, 量 seating 1, **2026-08-24**: `GIMR` bit 8 (`TC0_IE`) was
+cleared **by hand**, a tick elapsed, and `GISR` moved
+`88000004` → **`88000104`** → `88000004`. Bit 8 of `GISR` is `TC0_IP`.
+
+**On this die, masking a source in `GIMR` does not stop its pending bit from
+latching in `GISR`.** It stops delivery; the latch happens anyway, and
+re-enabling the mask let the vendor's handler run and ack it. `C5`'s own
+write-up already says so — *"with `TCIE` masked the interrupt could not be taken
+so it latched"* — and it is one bit along from the question.
+
+So `GIMR` bit 9 being clear is **not** a sufficient explanation for `GISR` bit 9
+and `TCIR` bit 28 both reading 0 across a full `2^27` period. The remaining
+clear gate is `TCIR.TC1IE`.
+
+### 9.3 🔴 The driver arms a counter and does not arm an interrupt
+
+讀, `rtl819x-timer.c`. `rtl819x_tc1_arm()` writes `TCCNR` bits 29/28 and
+`TC1DATA`. **It never writes `TCIR` bit 30.** The only `TCIR` write in the file
+is in `disarm`, and it deliberately *preserves* the IE bits:
+
+```c
+ir = rtl819x_tc_rd(RTL819X_TCIR);
+rtl819x_tc_wr(RTL819X_TCIR, (ir & RTL819X_TCIR_IE_BITS) | RTL819X_TCIR_TC1IP);
+```
+
+`RTL819X_TCIR_TC1IE (1u << 30)` is defined, and used only inside that mask. The
+file's own header comment asserts *"`TCIR`'s `TC1IP` (bit 28) latches on a TC1
+timeout"* — **推**, never checked, and that assumption is what seating 11
+refuted. § 4's hazard analysis is not refuted; its precondition was never met.
+
+### 9.4 What `R5-3` should do instead, and why it is cheaper than § 8.4 implied
+
+`docs/interrupt-map.md` § 3.3 carries the four cells. The one that matters:
+
+**`I2` — set `TCIR` bit 30 alone, leave `GIMR` bit 9 clear, install no handler.**
+Wait one TC1 period, then read `TCIR` and `GISR`.
+
+* 🟢 **Zero risk by construction**, and it is `C5` that says so rather than an
+  argument: with `GIMR` bit 9 clear, nothing can be delivered.
+* `tcir_tc1ip = 1` and `gisr_tc1ip = 1` → § 9.2 is confirmed, the masked-
+  observation strategy is back, and **`Q11` becomes testable again** (write 1 to
+  bit 28, read it back) — this project's only test of D Table 25's single-source
+  write-1-to-clear claim.
+* both still 0 → § 9.2 is wrong too, and the block needs something this project
+  has not identified. **That is the informative outcome and it is worth the
+  cell.**
+
+⚠️ **Shorten `TC1DATA` for this cell.** At the Linux rate one period is
+**671.07 s** (`CLK-22`); `2^27` was chosen for the clocksource's wrap margin,
+not for an interrupt test.
+
+### 9.5 🔴 And when the interrupt is finally armed, the driver must not write `GIMR` itself
+
+讀, `arch/rlx/bsp/irq.c` — `bsp_ictl_irq_mask`/`unmask` are
+`REG32(BSP_GIMR) &= ~(1 << (irq - 16))` and `|= (1 << (irq - 16))`. TC1's Linux
+IRQ is **25** (`BSP_TC1_IRQ = BSP_IRQ_ICTL_BASE + 9`), so bit 9 **already has an
+owner**: the `irq_chip` `bsp_ictl_irq_init` registers, with `handle_level_irq`.
+
+A driver that writes the bit directly is a second writer of a register whose
+owner does an unlocked read-modify-write. **`I4` is `request_irq(25, …)` and
+nothing else.** `PROGRESS.md`'s `TMR-2` says *"必須在 handler 已裝好的前提下直接
+寫 `GIMR` bit 9"* — the *handler first* half is right; the *write it directly*
+half is the part to drop.
+
+🟢 **And no vendor patch is needed**: `bsp_ictl_irq_dispatch` already carries
+`else if (pending & BSP_TC1_IP) do_IRQ(BSP_TC1_IRQ);`.
+
+### 9.6 § 8.1's "a vendor file this project has never opened" named the wrong file
+
+`CORRECTIONS-block8.md` § 9 ④ and § 8.1 both point at
+`arch/rlx/kernel/rlx-time.c`. 讀 2026-09-04: that file is a **111-line shim**
+whose `time_init()` is three lines and calls `bsp_timer_init()`. The
+reprogramming lives in **`arch/rlx/bsp/timer.c`**, and it recomputes both
+registers exactly — `CDBR = 1000 << 16` and, on the `BSP_REVR`-selected 8196E
+arm, `TC0DATA = ((200000000/1000)/100) << 4`. `docs/interrupt-map.md` § 3.5
+carries the four-register comparison; all four match the device.
+
+🔴 **The reason neither file was opened is a `grep -r`**, and the interval is
+**2026-08-23 → 2026-09-04, 12 days** — the drop's own mtimes and `CLONED.tsv`
+date the clone, and this is the first reading of either file:
+`arch/rlx/bsp` is a symlink and GNU `grep -r` does not follow one, so every
+sweep of `arch/rlx` in this project has been blind to the 13 files that are the
+board. `notes/kernel-build.md` § 10 already carried that for `find`;
+`docs/interrupt-map.md` § 6.1 records the new instance.

@@ -264,6 +264,72 @@ else
 fi
 
 echo
+echo "=== C8-C11: the build manifest (RECIPE-1, 2026-09-04) ==="
+# WHY.  RLXFW-ID0 is a digest over config/ and NOTHING else, so `--config` and
+# `--initramfs` -- the two inputs that decide what the image IS -- are outside
+# it.  量 2026-09-04: `r51quiet` and `r51loud` both compile 229d2983 from
+# different .config files and produce different vmlinux.  write_manifest is the
+# provenance record that closes that; `looprun --image-sha256` is the gate.
+#
+# The function is EXTRACTED and sourced rather than exercised through a build,
+# because a build is 35 s and a guard that costs 35 s is a guard nobody runs --
+# the same reason C2-C6 above sit above the stage.
+MTMP="$(mktemp -d)"
+sed -n '/^write_manifest() {/,/^}$/p' "$K" > "$MTMP/fn.sh"
+ck "C8 write_manifest is extractable as one function" \
+   "1" "$(grep -c '^}$' "$MTMP/fn.sh")"
+
+printf 'INSTALLED-BYTES\n'  > "$MTMP/c.config-installed"
+printf 'BUILT-BYTES-DIFFER\n' > "$MTMP/c.config-built"
+printf 'spec\n'             > "$MTMP/c.initramfs.spec"
+printf 'aaaa\n'             > "$MTMP/c.initramfs.spec.sha256"
+printf 'ELF\n'              > "$MTMP/vm"
+run_manifest () {           # run_manifest -> writes $MTMP/c.manifest
+    (
+        # shellcheck disable=SC1090
+        log="$MTMP/c"; CELL=cell; RECIPE_ID=deadbeef
+        CONFIG="${1:-/some/path}"; INITRAMFS="${2:-}"
+        CFLAGS_KERNEL=-fno-if-conversion; ID_SCOPE=global; OLDCONFIG=devnull
+        TARGET=vmlinux; JOBS=4; KEEP=0; STAMP_EPOCH=1788220800
+        N_PATCHES="${3:-4}"; N_MARKS="${4:-17}"; DROP=/x/rtl819x-toolchain
+        . "$MTMP/fn.sh"
+        write_manifest "$MTMP/vm" > /dev/null
+    )
+}
+field () { awk -F'\t' -v k="$1" '$1 == k { print $2 }' "$MTMP/c.manifest"; }
+
+run_manifest
+INST_SHA="$(sha256sum "$MTMP/c.config-installed" | cut -d' ' -f1)"
+BUILT_SHA="$(sha256sum "$MTMP/c.config-built" | cut -d' ' -f1)"
+ck "C9 config_sha256 is the digest of config-INSTALLED" \
+   "$INST_SHA" "$(field config_sha256)"
+# 🔴 C10 is the case this whole block exists for.  量 2026-09-04: two builds
+# whose images are BYTE-IDENTICAL have different `.config-built` digests,
+# because kconfig writes a wall-clock comment on line 4.  A manifest keyed on
+# the post-oldconfig file would report every rebuild as a different recipe.
+ck "C10 and NOT of config-built, which carries a wall-clock comment" \
+   "differ" "$( [ "$(field config_sha256)" = "$BUILT_SHA" ] && echo same || echo differ )"
+
+# C11: the positive control.  A digest that never moves is not a digest.
+printf 'INSTALLED-BYTES-CHANGED\n' > "$MTMP/c.config-installed"
+run_manifest
+ck "C11 one byte of the installed .config moves the digest" \
+   "moved" "$( [ "$(field config_sha256)" = "$INST_SHA" ] && echo same || echo moved )"
+
+# C12: `napplied` had TWO writers in this driver -- the host-compat loop and the
+# marks block -- and the second shadowed the first.  Nothing read it until the
+# manifest did.  Distinct values in, distinct values out.
+run_manifest /p "" 3 11
+ck "C12 host_compat_patches and marks are separate counters" \
+   "3/11" "$(field host_compat_patches)/$(field marks)"
+ck "C13 no --initramfs records a dash, not an empty field" \
+   "-/-" "$(field initramfs_sha256)/$(field initramfs_source)"
+run_manifest /p "$MTMP/c.initramfs.spec" 3 11
+ck "C14 and with one, the digest comes from the driver's own .sha256 file" \
+   "aaaa" "$(field initramfs_sha256)"
+rm -rf "$MTMP"
+
+echo
 echo "=== the declaration is back, byte for byte ==="
 ck "the file under test is unmodified" "$CF_SHA0" "$(sha256sum "$CF" | cut -d' ' -f1)"
 

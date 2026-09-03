@@ -386,8 +386,14 @@ tools/test-console-capture-mutants.py
                            is not green, since every mutation would then "kill" on
                            a suite that was already red. It exists because "ten
                            survived" was a sentence in LOG.md that nothing re-ran
-tools/flashwin.py          27 cases (24 on a machine without this unit's dump,
-                           plus one skip covering 3), and it exists for a
+tools/flashwin.py          41 cases (35 on a machine without this unit's dump,
+                           plus one skip covering 6), and it exists for a
+                           🔴 (this line read `27 cases ... covering 3` until
+                           2026-09-04 -- both halves were the pre-`scan` numbers,
+                           stale since 2026-08-31. It is a live CI-4 instance:
+                           nothing compares this file's control numbers to the
+                           tools, and a complete enumeration of owner files is
+                           what found it, not a diff.)
                            region whose reading can
                            never be published. It renders the loader's `DW` reply
                            for a window of flash out of this unit's own dump, so
@@ -462,11 +468,22 @@ tools/looprun.py           two of its nine stages exist only to make it safe to 
                            requires the board to say the id the build just produced. A
                            stale image, the vendor's firmware, and the loader's own
                            re-staging of 0x80500000 from flash after a watchdog reset are
-                           then all red for the same reason. 45 controls, and N1..N7 each
+                           then all red for the same reason. 55 controls, and N1..N7 each
                            require exactly ONE of the four assertions to fail: a control
                            set where one broken input trips every check cannot say which
                            check is load-bearing. Its first run found two defects in
-                           itself and two wrong counts in its own docstring
+                           itself and two wrong counts in its own docstring.
+                           Ten arrived on 2026-09-04 and they are two guards on
+                           `--image`, the one bench input that had none: it is read
+                           by S6/S6b, which sit AFTER the reset, the rescue and the
+                           burn-flag read-back, so a bad value used to be found with
+                           four stages of a power cycle already spent. The existence
+                           guard is keyed on the STAGES that read the file and not on
+                           the mode -- M11b/M11c are the two edges where it must stay
+                           silent -- and `--image-sha256` is the identity pin, because
+                           RLXFW_SRC_ID is a digest over config/ ONLY and two images
+                           built from one frozen config/ compile the same id (量:
+                           r51quiet and r51loud, both 229d2983, different vmlinux)
 
 tools/check-predictions.py refuses to compare a prediction against a capture unless
                            the prediction file's mtime is earlier. Six controls, four

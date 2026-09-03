@@ -31,7 +31,7 @@ loader :  200.0049 MHz / 14   = 14,286,057 Hz ;  14,286,057 / 142,858 = 100.0 Hz
 Linux  :  200.0049 MHz / 1000 =    200,005 Hz ;     200,005 /   2,000 = 100.0 Hz
 ```
 
-**So the vendor's `arch/rlx/kernel/rlx-time.c` reprograms the divider at boot**,
+**So the vendor's `arch/rlx/kernel/rlx-time.c` reprograms the divider at boot**, 🔴 **CORRECTED 2026-09-04 (`R5-10`): the writes are in `arch/rlx/bsp/timer.c`, not here.** `rlx-time.c` is a 111-line MontaVista shim whose `time_init()` calls `bsp_timer_init()`; `bsp/timer.c` is where `CDBR` and `TC0DATA` are written, and all four registers recompute exactly (`docs/interrupt-map.md` § 3.5). It stayed unread because `arch/rlx/bsp` is a symlink and `grep -r` does not follow one.
 and `Q2` bought exactly what it was written to buy — a finding about a file this
 project has still never opened. `cdbr_at_init` and `tc0data_at_init` both already
 read the Linux values, so the change happened before `rtl819x_timer_init` ran and
@@ -232,6 +232,18 @@ answered the first time.
 **Finding: `TC1IP` does not latch in `TCIR` while `TC1IE` is clear in `GIMR` on
 this die.**
 
+> 🔴 **2026-09-04 (`R5-10`): the observation holds and this sentence's cause is
+> withdrawn.** `TCIR` read `80000000` for the whole arm, i.e. **bit 30 `TC1IE`
+> — the timer block's own interrupt enable — was clear too**, and
+> `rtl819x_tc1_arm()` never writes it. Two enables, one reading, no separation.
+> `RUNSHEET` `C5` (量 2026-08-24) shows `GISR` bit 8 latching **while `GIMR`
+> bit 8 was masked by hand** on this die, so a `GIMR` mask does not suppress a
+> pending bit here and cannot be the cause. **The masked-observation strategy is
+> therefore not refuted**, and `R5-3` gets an intermediate step back:
+> `notes/timer-driver.md` § 9, `docs/interrupt-map.md` § 3.2–3.3. Corrected
+> here rather than rewritten above, because a capture's corrections file records
+> what was concluded as well as what is true.
+
 🔴 **The consequence is larger than the reading.** `notes/timer-driver.md` § 4
 builds the driver's whole safety argument on observing the pending bit with the
 interrupt masked. **That strategy does not work on this part.** `R5-3` cannot
@@ -335,6 +347,14 @@ discrimination among its three candidates.
 4. **`arch/rlx/kernel/rlx-time.c` is still unopened**, and `Q2` is the closest
    this project has come to reading it without reading it — closer than the card
    expected, because the answer turned out to be a change rather than a match.
+   > 🔴 **2026-09-04: opened, and it is the wrong file.** `rlx-time.c` is a
+   > 111-line shim whose `time_init()` calls `bsp_timer_init()`; the writes are
+   > in **`arch/rlx/bsp/timer.c`**, and they recompute `CDBR = 03E80000` and
+   > `TC0DATA = 00007D00` exactly, with a runtime `BSP_REVR` test selecting the
+   > `<< 4` this device holds. **It stayed unopened from the drop's clone on 2026-08-23 to 2026-09-04 — 12
+   > days — because
+   > `arch/rlx/bsp` is a symlink and `grep -r` does not follow one.**
+   > `docs/interrupt-map.md` § 3.5 and § 6.1.
 5. **One `read_proc` call is unexplained** (§ 6).
 6. **`CPU-45` did not run**, and it was not a scheduling choice: no probe3
    payload has been staged since `bench-only/b6-20260831c` (2026-08-31),

@@ -39,7 +39,7 @@ anywhere under `arch/mips`:
 `arch/mips` does not have, which is all the discriminator needs. It is noted
 because a reader will ask why the timer literal was taken from the second file
 and not the first, and because a `grep -ril rlx-time` over *this repository*
-returns **0 files**: nothing here has ever cited `rlx-time.c`. 量, directory
+returns **0 files**: nothing here has ever cited `rlx-time.c`. 🔄 **2026-09-04: that stopped being true**, and the file turned out to be a shim — `docs/blind-write-ledger.md` § 4.3. The 2026-09-02 reading is kept as written; it is a dated measurement, not a standing claim. 量, directory
 listing, no file opened; `docs/blind-write-ledger.md` § 4.3 owns what that
 absence does and does not mean.
 

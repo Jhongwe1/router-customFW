@@ -20,7 +20,7 @@ absolute 200.005 kHz stays 推.
 before that arithmetic was used.** Under Linux `CDBR` reads `03E80000` (divisor
 **1000**) and `TC0DATA` reads `00007D00` (reload **2,000**), where the loader
 left divisor 14 and reload 142,858 — **the same 100 Hz by two different
-routes**. The vendor's `arch/rlx/kernel/rlx-time.c` does that at boot, and it is
+routes**. The vendor's `arch/rlx/kernel/rlx-time.c` does that at boot, and it is 🔴 **CORRECTED 2026-09-04 (`R5-10`): the writes are in `arch/rlx/bsp/timer.c`, not here.** `rlx-time.c` is a 111-line MontaVista shim whose `time_init()` calls `bsp_timer_init()`; `bsp/timer.c` is where `CDBR` and `TC0DATA` are written, and all four registers recompute exactly (`docs/interrupt-map.md` § 3.5). It stayed unread because `arch/rlx/bsp` is a symlink and `grep -r` does not follow one.
 still an unopened file. The card's § 4.2 hardcodes `× 142858`; using it would
 have "refuted" the headline by 71.4× with the hardware innocent. **The block was
 run as three commands split at the card's own two decision points, so the
@@ -420,6 +420,99 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+### `R5-10` — `docs/interrupt-map.md`, and a reading from 2026-08-24 that overturned a conclusion from 2026-09-03
+
+`docs/interrupt-map.md` is new: § A is the arming sequence `R5-3` needs, § B is
+the routing map `R5-11`'s successor gate needs, and the two are labelled because
+they want different things. Desk only; **zero flash-write commands, zero `FLR`,
+the bracket stands at 1,024 of 4,194,304 = 0.0244 %.**
+
+🔴 **`TMR-2`'s attribution is withdrawn and the observation is kept.** Seating
+11 read `tcir = 80000000` for the whole 703.46 s arm — so **`TCIR` bit 30
+`TC1IE`, the timer block's own interrupt enable, was clear as well as `GIMR`
+bit 9**, and `rtl819x_tc1_arm()` never writes it. Two enables, one reading, no
+separation. `RUNSHEET` `C5` (量 seating 1, **2026-08-24**) settles it: `GIMR`
+bit 8 cleared by hand, `GISR` moves `88000004` → `88000104` → `88000004`, so on
+this die **a `GIMR` mask stops delivery and not latching**. 🟢 The masked-
+observation strategy is therefore not refuted, and `R5-3` gets a zero-risk
+intermediate cell back — set `TCIR` bit 30 alone, and `Q11` (D Table 25's
+single-source write-1-to-clear claim) becomes testable again.
+
+🔴 **TC1 and TC0 do not share a route.** TC1 is **IRQ 25** on the ICTL domain
+(`GIMR` bit 9 → `IRR1` bits 7:4 → CPU `IP2`); TC0 is IRQ 13 on the LOPI domain,
+whose mask is **`ESTATUS[23:16]`**, a different register file reached by
+`mflxc0`/`mtlxc0`. `SPEC.md` `IRQ-04` named four layers and one wrong register;
+there are **seven**, and `IRQ-05`/`IRQ-06`/`IRQ-07` are new rows.
+🟢 `GIMR` bit 9 **already has an owner** (`bsp_ictl_irq_unmask` for IRQ 25), and
+the vendor dispatcher already carries a TC1 branch, so `R5-3` calls
+`request_irq(25, …)` and needs no vendor patch.
+
+🟢 **Four registers derived from vendor source now match the device exactly** —
+`CDBR`, `TC0DATA`, `TCCNR` and `TCIR` after init — and `gimr = 00209100` decodes
+bit-for-bit in both directions against `bspchip.h` and the built `.config`. The
+`<< 4` this device holds is a **runtime** `BSP_REVR` branch, and the reading that
+selects it (`0x8196E001`, `REG-29`) has been in this repository since
+2026-08-24. `arch/rlx/kernel/rlx-time.c` was named as the unopened file; it is a
+111-line shim and the writes are in `arch/rlx/bsp/timer.c`.
+
+🔴 **`grep -r` over the vendor tree misses the entire BSP, and this session drew
+the opposite conclusion from it before catching itself.** `arch/rlx/bsp` is a
+symlink; `grep -r` finds **0** writers of `REG32(BSP_IRR` and `grep -R` finds
+**four**. 321 files against 334. `notes/kernel-build.md` § 10 already carried
+this **for `find`**; the instrument that bit was `grep`, in a session that had
+read that section. → `GREP-1`.
+
+### `SEAM-1` executed, and a booted image was rebuilt byte for byte
+
+`looprun --mode desk` ran `S2`→`S3` for the first time: the staged tree is read
+out of the driver's own `make -C` line and `rtkimage` assembles from it, with
+`PLACEHOLDER_TOP` never reached. **39.26 s against § 10.6's predicted 39.15 s.**
+
+🟢🟢 **And the rebuilt `nfjrom` is byte-identical to `rlxfw-r51-20260903.bin`** —
+`39abf11c2d6fd0ce…`, 1,030,144 bytes, `cmp` rc=0, with `vmlinux` identical
+underneath. **n = 3**, across two cell names and two days, from inputs recovered
+from the build record rather than retyped. It is the first time an image that
+has executed on this device has been rebuilt from its own record.
+
+⚠️ `.config-built` differs between those builds — line 4, kconfig's wall-clock
+comment — while the images do not. **So `config-built` is not an identity for a
+build**, and that decides what a manifest may digest.
+
+### `LOOP-4` and `RECIPE-1` closed: two guards on `--image`, and a provenance record
+
+🔴 **The counterexample this repository had been citing for `RECIPE-1` was
+false.** `r51a` compiles `RLXFW_SRC_ID=0x078bb2b4` and `r51quiet` `0x229d2983` —
+the id **would** have told that pair apart. The real collision is **`r51quiet`
+against `r51loud`**: same `229d2983`, different `.config-installed`, different
+`vmlinux`. The conclusion stands; the instance was wrong. ⚠️ And *"the argv is
+not recoverable"* is true of the **path** and false of the **content** — the
+driver has recorded `<cell>.config-installed` and `<cell>.initramfs.spec` all
+along.
+
+* **`looprun --image-sha256`** is the gate. `S6b`'s `assert_staged` is a
+  discriminator, but it derives its expectation *from* the file `--image` names,
+  so it says *the board holds this file*, not *the board holds the image the
+  card names*. It is the only check that runs before the port opens.
+* **The existence guard** (`LOOP-4`) is keyed on the **stages** that read the
+  file, not on the mode: `M11`/`M11b`/`M11c`, one edge each. A guard that fires
+  where there is nothing to guard teaches its reader to silence it.
+* **`M14`** pins which refusal wins when `--skip S5b` and a bad `--image` are
+  both wrong: the safety one.
+* **`rlxfw-kbuild.sh` writes `<log>.manifest`** and `looprun`'s `S2` copies it
+  beside the run's captures, so a seating commits it. It digests
+  `config-installed` and **never** `config-built` (`test-kbuild-cflags` `C10`,
+  with `C11` as its positive control). ⚠️ `napplied` had two writers in the
+  driver and the manifest was the first reader of it; `C12` pins the split.
+
+Suites: `looprun` 45 → **55**, `test-kbuild-cflags` 27 → **34**.
+
+⚠️ **67 derived figures in `docs/interrupt-map.md` are re-computed by a script
+from the captures and the headers**, and its first run reported
+`BSP_SYS_CLK_RATE` as 33,860,000 — a regex matching a **commented-out** define
+inside an `#ifdef` arm the build does not take. The parser now strips comments,
+keeps every surviving definition and refuses an ambiguous name.
+
 
 ### `R5-2`'s bench card — written 2026-09-03, and writing it refuted two of its own methods
 

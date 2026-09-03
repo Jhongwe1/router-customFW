@@ -99,6 +99,13 @@ cloning, and cloning is the act the ledger dates. `R5-9` carries it as an
 ordering constraint: the derivation check runs **before** any register map is
 read.
 
+* 🆕 **Whether an interrupt of mine can be delivered at all.** `GIMR`
+  has been read in every dump of seating 11 and **written in none**; no
+  handler of mine has ever run. `docs/interrupt-map.md` § 3.1 lists seven
+  gates and marks the state of each — two of them (`Status.IM2`,
+  `Status.IE`) have **never been read on this device at all**, and the
+  routing registers `IRR0`/`IRR2`/`IRR3` have never been read either, in
+  any state. `R5-3` owns it; the first cell costs nothing and is designed.
 * **Whether a DMA write is visible to a cached CPU read.** Nothing has been
   measured in that direction, and it is the one driver decision the cache gate
   closed without.

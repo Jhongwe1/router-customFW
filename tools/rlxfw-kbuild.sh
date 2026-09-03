@@ -78,6 +78,13 @@ NOCFLAGS=0
 CFLAGS_GIVEN=0
 NOSTAMP=0
 DRYRUN=0
+# 🔴 `napplied` has TWO writers -- the host-compat loop and the marks block --
+# and the second silently shadows the first.  Nothing read it after the fact
+# until the manifest below did, so it was harmless and invisible; the manifest
+# is the first reader and it would have recorded the marks count under the
+# patch count's name.  量 2026-09-04.  Separate names, same printed lines.
+N_PATCHES=0
+N_MARKS=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --config)        CONFIG="$2"; shift 2 ;;
@@ -275,6 +282,7 @@ if [ "$KEEP" != 1 ]; then
         napplied=$((napplied+1))
     done
     echo "== $CELL: applied $napplied declared host-compat patch(es)"
+    N_PATCHES=$napplied
 fi
 
 # --------------------------------------------------------- rlxfw's boot marks
@@ -322,6 +330,7 @@ if [ "$MARKS" = 1 ]; then
         tail -5 "$log.marks.log" >&2
         exit 3; }
     echo "== $CELL: $napplied declared row(s) from config/rlxfw-marks.tsv $nverb"
+    N_MARKS=$napplied
 fi
 
 # ------------------------------------------------------------- environment
@@ -399,6 +408,56 @@ run() {          # run() <logsuffix> <cmd...>
     return $rc
 }
 
+# ------------------------------------------------------------- the manifest
+# RECIPE-1, 2026-09-04.  `RLXFW-ID0` is a digest over `config/` and NOTHING
+# ELSE, so two images built from one frozen `config/` with different `--config`
+# print the same id.  量 the same day: `r51quiet` and `r51loud`, both
+# `229d2983`, `.config-installed` e6cdc47d… against a49c254d…, `vmlinux`
+# 2b0d1618… against 271ad13e….  (The pair this repository named until today
+# was `r51a`/`r51quiet`, and that pair does NOT collide -- `r51a` compiled
+# `078bb2b4`.)
+#
+# This file is the PROVENANCE record: what content went in.  It is not the
+# gate -- `looprun --image-sha256` is, because a gate has to run on the desk
+# beside the image about to be uploaded, and this file lives wherever the
+# build happened.
+#
+# 🔴 `config_sha256` digests `<cell>.config-installed`, the file that was
+# COPIED IN, and never `<cell>.config-built`.  量 2026-09-04: two builds whose
+# images are byte-identical have different `config-built` digests, because
+# kconfig writes a wall-clock comment on line 4.  A manifest keyed on the
+# post-oldconfig file would report every rebuild as a different recipe.
+write_manifest() {          # write_manifest <vmlinux path>
+    local vm="$1" m="$log.manifest"
+    {
+        printf 'rlxfw-build-manifest\t1\n'
+        printf 'cell\t%s\n'             "$CELL"
+        printf 'recipe_id\t%s\n'        "$RECIPE_ID"
+        printf 'config_sha256\t%s\n'    "$(sha256sum "$log.config-installed" | cut -d' ' -f1)"
+        printf 'config_source\t%s\n'    "${CONFIG:-board-template}"
+        if [ -n "$INITRAMFS" ]; then
+            printf 'initramfs_sha256\t%s\n'  "$(cat "$log.initramfs.spec.sha256")"
+            printf 'initramfs_source\t%s\n'  "$INITRAMFS"
+        else
+            printf 'initramfs_sha256\t-\n'
+            printf 'initramfs_source\t-\n'
+        fi
+        printf 'cflags_kernel\t%s\n'    "$CFLAGS_KERNEL"
+        printf 'id_scope\t%s\n'         "$ID_SCOPE"
+        printf 'oldconfig\t%s\n'        "$OLDCONFIG"
+        printf 'target\t%s\n'           "$TARGET"
+        printf 'jobs\t%s\n'             "$JOBS"
+        printf 'keep\t%s\n'             "$KEEP"
+        printf 'stamp_epoch\t%s\n'      "${STAMP_EPOCH:--}"
+        printf 'host_compat_patches\t%s\n' "$N_PATCHES"
+        printf 'marks\t%s\n'            "$N_MARKS"
+        printf 'drop\t%s\n'             "$(basename "$DROP")"
+        printf 'vmlinux_sha256\t%s\n'   "$(sha256sum "$vm" | cut -d' ' -f1)"
+        printf 'vmlinux_bytes\t%s\n'    "$(stat -c %s "$vm")"
+    } > "$m"
+    echo "== $CELL: manifest -> $m"
+}
+
 # ------------------------------------------------------------- oldconfig
 case "$OLDCONFIG" in
     none) echo "== $CELL: oldconfig SKIPPED" ;;
@@ -460,6 +519,7 @@ if [ -f "$out" ]; then
     cp "$out" "$log.vmlinux.elf"
     cp "$DIR_LINUX/System.map" "$log.System.map" 2>/dev/null
     echo "== OUTPUT $(stat -c %s "$out") bytes  sha256 $(sha256sum "$out" | cut -c1-16)"
+    write_manifest "$out"
 else
     echo "== NO vmlinux"
     [ "$rc" -eq 0 ] && rc=9

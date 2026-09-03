@@ -980,6 +980,27 @@ Those 13 are `setup.c`, `prom.c`, `serial.c`, `timer.c`, `irq.c`, `pci.c`,
 a `modules.order`. They are the board: the UART base, the memory sizing,
 `bsp_setup()`, and the `while(1)` at the end of it.
 
+⚠️ **2026-09-04: `333 − 321 = 12` and the list has 13, and both numbers are
+right.** Re-measured while `R5-10` was reading those files: `find -L` reaches
+**334**, `grep -Rl ''` reaches **333**, and the missing one is
+`bsp/modules.order`, which is **zero bytes** — `grep -l ''` cannot list a file
+with no lines. The table above measures **grep**, which is what this section is
+about, and the prose measures the **filesystem**. Written down so the pair is
+not later "corrected" into agreement; it is this section's own subject —
+*a tool reporting a count is making a claim* — one layer in.
+
+🔴 **2026-09-04, a new instance in a different instrument, and it flipped a
+conclusion before it was written down.** `R5-10` ran
+`grep -rn 'REG32(BSP_IRR' <whole tree>`, got **0**, and drafted *"the RLX port
+never programs the interrupt routing"*. `grep -R` finds **four** writes, in
+`arch/rlx/bsp/irq.c:222-225`, and the truth is the opposite: `bsp_irq_init()`
+writes all four `IRR` registers on every boot. The same sweep hid
+`arch/rlx/bsp/timer.c`, which is where `CDBR` and `TC0DATA` are reprogrammed —
+the file `CORRECTIONS-block8.md` § 9 ④ recorded as *never opened* while
+pointing at `arch/rlx/kernel/rlx-time.c`, which is a shim.
+**This section covered `find`; the instrument that bit was `grep`, in a session
+that had already read this section.** `docs/interrupt-map.md` § 6.1.
+
 🔴 **A sweep reporting "nothing moved" is a claim, so it needs a token that MUST
 move.** Two:
 

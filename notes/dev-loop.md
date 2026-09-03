@@ -717,3 +717,135 @@ objects to keep and `INC-2`'s win is entirely on the desk side
 
 🔴 **A decision is not a reading.** What is closed is *whether to*; `SEAM-1`'s
 measurement waits for the seating, and its card carries the row.
+
+---
+
+## 11. 🆕 2026-09-04 (`SEAM-1`, thirty-first segment): the seam executed, and the run doubles as a reproduction experiment
+
+`SEAM-1` was decided on 2026-09-02 (§ 10.6) and executed on 2026-09-03 —
+**but not the way the decision reads.** Seating 11 ran
+`--skip S2,S3 --recipe-override 229d2983 --image <the pinned file>`, for a
+reason measured an hour before power (`CORRECTIONS-block8.md` D1). So the one
+thing `SEAM-1` was opened to measure — **whether `S2`'s output reaches `S3`
+without a human carrying the path** — had still never run. `--mode desk` runs
+exactly those two stages and no bench stage, so it costs no power cycle.
+
+### 11.1 Predictions, written 2026-09-04 01:49, before the run
+
+| id | prediction | refuted by |
+|---|---|---|
+| **`S-1`** | `--mode desk` completes `S2` and `S3` with `rc = 0`, and prints `staged tree=<path>  <- S3 assembles from this` — i.e. `CELLTOP_RX` matches the driver's own `make -C` line and `S3` never sees `PLACEHOLDER_TOP` | `S3` exiting 1 against the literal `<S2's staged tree>`; `S2` printing no `make -C … /linux-2.6.30` line; any `rc != 0` |
+| **`S-2`** | `S2` prints `recipe=229d2983` | any other id. `config/` has not moved since `bfd624ca1` (2026-09-03 03:12), and the driver's formula recomputed over that commit gives `229d2983` |
+| **`S-3`** | **The rebuilt `nfjrom` is byte-identical to `rlxfw-r51-20260903.bin`** — sha256 `39abf11c2d6fd0ce…`, 1,030,144 bytes — when `S2` is given the `.config` and initramfs spec that build recorded (`r3-4/out/r51quiet.config-{installed}`, `.initramfs.spec`) | one differing byte. This is the first time an image that has executed on the silicon is rebuilt from its own recorded inputs |
+| **`S-4`** | `S8`, replaying seating 11's `SM-boot.log`, passes its id assertion | a FAIL on `A3`. ⚠️ **This one is weak by construction and is written down as weak**: both sides are `229d2983`, so it tests that the plumbing carries the id, not that the id discriminates. `RECIPE-1` is the row that says why |
+
+🟢 **`S-3`'s control already exists and was not run for it.** A byte-identical
+result is only informative if a *different* `.config` would have produced a
+different image — otherwise the build might be ignoring `--config` entirely.
+量 2026-09-04, from artefacts already on disk: `r51quiet` and `r51loud` were
+built **at the same recipe id `229d2983`** with different `.config-installed`
+(`e6cdc47d…` vs `a49c254d…`) and produced different `vmlinux`
+(`2b0d1618…` vs `271ad13e…`). So `--config` reaches the image, measured, and
+`S-3` has power.
+
+### 11.2 🟢 量 2026-09-04 01:50 — all four hold, and `S-3` is the first of its kind here
+
+```
+S2  build     rc=0   36.32 s      recipe=229d2983
+      staged tree=/home/key/fwre-work/rebuild/r3-4/cells/s31seam/top  <- S3 assembles from this
+S3  assemble  rc=0    2.93 s
+S4..S7        SKIPPED (mode=desk)
+ok A1 the eleven boot marks     ok A2 in declaration order
+ok A3 board printed 229d2983, build computed 229d2983
+ok A4 a reachable prompt
+MACHINE TOTAL: 39.26 s      RESULT: the loop closed, 4 assertion(s) held
+```
+
+| id | outcome | |
+|---|---|---|
+| **`S-1`** | 🟢 **HOLDS** | The seam ran. `CELLTOP_RX` matched the driver's own `make -C` line, `S3` never saw `PLACEHOLDER_TOP`, and `rtkimage` assembled from the tree `rlxfw-kbuild.sh` had just staged. **First execution; `SEAM-1` is now a reading and not only a decision** |
+| **`S-2`** | 🟢 HOLDS | `recipe=229d2983` |
+| **`S-3`** | 🟢🟢 **HOLDS — byte-identical** | `nfjrom` sha256 `39abf11c2d6fd0ce…`, 1,030,144 bytes, `cmp` rc=0 against `rlxfw-r51-20260903.bin`. The layer below is identical too: `kroot/vmlinux` = `2b0d1618d9946cc6…` = `r51quiet.vmlinux.elf` |
+| **`S-4`** | 🟢 HOLDS (weak, as declared) | `A3` passed with both sides `229d2983` |
+
+**`S-3` is the first time an image that has executed on this device has been
+rebuilt, byte for byte, from its own recorded inputs.** `notes/reproducible-build.md`
+§ 4.1 measured two builds of one declaration agreeing minutes apart; this is a
+**different day, a different cell name, a fresh 480 MB stage, and inputs
+recovered from the record rather than retyped**.
+
+🟢 **And it ran a third time.** The second desk run (`s31man`, 01:52, added for
+the manifest below) produced the same `39abf11c…` from the same declared inputs
+— n = 3 across two cell names and two days.
+
+### 11.3 ⚠️ `.config-built` differs while the image does not, and that decides what a manifest may digest
+
+量: `r51quiet.config-built` against `s31seam.config-built` differ in **two
+lines** — line 4, `# Thu Sep  3 02:00:50 2026` against
+`# Fri Sep  4 01:50:43 2026`. `kconfig` writes a wall-clock comment. The
+`.config-installed` files are byte-identical and so are the images.
+
+🔴 **So `<cell>.config-built` is not an identity for a build**, and anything that
+digests it reports every rebuild as a different recipe. `<cell>.config-installed`
+is the file that was copied in, and it is the one to digest — which is what
+`rlxfw-kbuild.sh`'s manifest does, with `test-kbuild-cflags` `C10` as the case
+that says so.
+
+### 11.4 The cost, against § 10.6's estimate
+
+| | `S2` | `S3` | total |
+|---|---:|---:|---:|
+| § 10.6 predicted (2026-09-02) | 35.96 | 3.19 | **39.15 s** |
+| 量 run 1 (`s31seam`) | 36.32 | 2.93 | **39.26 s** |
+| 量 run 2 (`s31man`) | 35.22 | 2.71 | **37.94 s** |
+
+Mean 38.60 s against 39.15 predicted, **−1.4 %**. ⚠️ **The three columns are three measurements, not an addition** — looprun sums before it rounds, so 36.32 + 2.93 = 39.25 against a printed 39.26. Only the prediction row adds exactly, because it was written by adding. The decision `SEAM-1` was
+closed on — *the unskipped run rides the seating's opening cold boot and costs
+no power cycle* — is priced correctly.
+
+⚠️ **Disk: 482 MB for the cell plus 18 MB for the work dir, twice.**
+`$FWRE_WORK/rebuild` reads **16,614 MiB = 16.22 GiB** afterwards.
+🔴 **Do not quote `du -sh` for this.** It prints `17G` for 16.22 GiB — a
+ceiling, not a round — and the session opened by quoting its `16G` for a
+smaller tree, so *16 G → 17 G* reads as a gigabyte of growth where the real
+growth is the two stages' ~1.0 GB. `du -sm` is the number.
+
+### 11.5 🆕 `LOOP-4` and `RECIPE-1`: two guards on `--image`, and where they sit
+
+`loop_once` now runs an **image pre-flight before any stage**, and the placement
+is the claim: `--image` is read by `S6` and `S6b`, which sit after the reset, the
+rescue and the burn-flag read-back, so an unusable value used to be found with
+four stages of a power cycle already spent.
+
+* **The existence guard** (`LOOP-4`) refuses an empty, missing, unreadable or
+  zero-byte `--image` — **but only when a stage that reads it is going to run**.
+  Keyed on `IMAGE_STAGES − skip` and `mode == bench`, not on the mode alone:
+  `--mode desk` never opens the file, and a guard that fires where there is
+  nothing to guard teaches its reader to pass it something to shut it up.
+  `M11`/`M11b`/`M11c`, one edge each.
+* **The identity pin** (`RECIPE-1`) is `--image-sha256`. `A3` compares the id
+  the board printed against the id the build computed, and `RECIPE_ID` is a
+  digest over `config/` **only** — 量 2026-09-04, `r51quiet` and `r51loud` both
+  compile `229d2983` from different `.config` files. `S6b`'s `assert_staged` is
+  a discriminator, but it derives its expectation **from the file `--image`
+  names**, so it says *the board holds this file*, not *the board holds the
+  image the card names*. Pinning the file closes exactly that gap, and it is the
+  only check that runs before the port opens. `M12`/`M12b`/`M12c`, and `M13`
+  refuses a pin in a mode that reads no image.
+* **`M14` pins which refusal wins** when `--skip S5b` and a bad `--image` are
+  both wrong: the **safety** one, because it stands between an upload in RAM and
+  one written to the only unit there is. Nothing else in the suite says so.
+
+**`S2` now also carries the provenance record forward.** `rlxfw-kbuild.sh`
+writes `<log>.manifest` — recipe id, the sha256 of the `.config` it installed and
+of the initramfs spec, cflags, id-scope, oldconfig, target, jobs, keep, stamp
+epoch, patch and mark counts, drop, and the vmlinux digest — and `looprun` copies
+it beside the run's own captures, so a **seating commits it** instead of leaving
+it in `$FWRE_WORK` where the next build of the same cell name overwrites it.
+`C13`/`C14` are the same shape as `C11`/`C12`: the path is read out of the
+driver's own `manifest -> <path>` line, and a run that printed no such line
+raises at `S2` rather than leaving no provenance.
+
+⚠️ **The manifest is not the gate and this note does not let it become one.** It
+records what went in, where the build happened. `--image-sha256` is what runs on
+the desk beside the file about to be uploaded.

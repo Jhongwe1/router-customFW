@@ -108,6 +108,20 @@ true at once:
 | 3 | `TCCNR`/`TCIR` armed | `timer_init` at `0x80408F20`, reached via `0x80406780` | armed |
 | 4 | `GIMR` bit 8 | **`doBooting()` writes `GIMR = 0` at `0x804086E4` and `0x80408700`, on both of its paths** | 🔴 **measured 2026-08-23: `GIMR` reads `0x00008100` at the prompt — bit 8 is already `1`, and bit 15 (`SWIE`) with it.** `doBooting()`'s zero is not the last write before the prompt; something in the network init or the command-loop entry re-enables both. **This row said "cleared" and it is wrong.** It makes the position safer rather than less safe, and it voids `RUNSHEET.md` `E5`, whose whole design was a bit predicted to flip |
 
+🔴 **2026-09-04 (`R5-10`): this table is correct for the LOADER and for
+TC0, and it is neither complete nor right for anything under Linux.** Three
+things it cannot say, all 讀 from `arch/rlx`: the SoC has **three** interrupt
+domains and the middle one — LOPI, which the vendor's own system tick uses —
+is masked in **`ESTATUS[23:16]`**, a different register file reached by
+`mflxc0`/`mtlxc0`, not in `Status.IM`; layer 3 folds two independent bits
+together, because `TCIR` carries the interrupt **enable** as well as the
+pending flag and for TC1 the counter enable (`TCCNR` bit 29) and the
+interrupt enable (`TCIR` bit 30) are separate; and TC1 does not use bit 8 —
+it is `GIMR` bit 9, routed through `IRR1` and cascaded on CPU `IP2`.
+**The seven-layer version is `docs/interrupt-map.md` § 3.1**, and `SPEC.md`
+`IRQ-04` carries the same correction. This table stays because it is what
+the loader does and the loader is what `B2` runs against.
+
 Layer 4 is the one `phy_read` repairs itself. That is not a guess about intent:
 the loader's own network init runs *after* `GIMR = 0`, so any `phy_read` on that
 path would hang without it.

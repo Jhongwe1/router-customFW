@@ -98,10 +98,12 @@ Exit codes:  0 the loop closed and every assertion held · 1 an assertion failed
              or a stage errored · 2 refused before doing anything
 """
 import argparse
+import hashlib
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -153,10 +155,26 @@ CELLTOP_RX = re.compile(r"make -C (\S+)/linux-2\.6\.30\b")
 # once -- a vendor binary writing `offset.tmp` into this repository's root,
 # "a place no vendor-tree check watches".
 PLACEHOLDER_WORK = "<rtkimage work dir>"
+# RECIPE-1.  The driver writes one provenance record per build -- the digests
+# of the .config it actually installed and of the initramfs spec, neither of
+# which is inside RECIPE_ID.  It lands in $FWRE_WORK, which no seating commits;
+# copying it beside the run's own captures is what makes it survive.
+MANIFEST_RX = re.compile(r"^== \S+: manifest -> (\S+)$", re.M)
+#: the stages that read `--image`.  S6 uploads it; S6b's `assert_staged`
+#: derives its expectation FROM it.  Anything else never opens the file.
+IMAGE_STAGES = ("S6", "S6b")
 
 
 class Refused(Exception):
     pass
+
+
+def sha256_of(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 class StageFailed(Exception):
@@ -411,6 +429,67 @@ def loop_once(a, out=sys.stdout):
         raise Refused("--skip S2 removes the only thing that computes the recipe id, "
                       "so A3 would have nothing to require. Pass --recipe-override "
                       "with the id the staged image was built from, or do not skip S2")
+
+    # ---------------------------------------------------- the image pre-flight
+    # 🔴 LOOP-4, 量 2026-09-03: of the three bench inputs, `--image` was the
+    # only one with no guard -- and it is consumed by S6, which runs AFTER the
+    # reset, the rescue and the burn-flag read-back.  A bad path is therefore
+    # discovered with four stages of a power cycle already spent.  Both checks
+    # below run before the loop starts, which is the same placement rule
+    # console-capture's terminator guard was measured into.
+    #
+    # 🔴 And the scope is the STAGES, not the mode.  S6 uploads the file and
+    # S6b derives its expectation from it; every other stage never opens it.
+    # A guard keyed on `--mode bench` alone would refuse `--mode desk`, where
+    # `--image` is genuinely unused, and a guard that fires where there is
+    # nothing to guard trains its reader to pass it something to shut it up.
+    uses_image = (a.mode == "bench"
+                  and bool(set(IMAGE_STAGES) - skip))
+    img = getattr(a, "image", "") or ""
+    want = (getattr(a, "image_sha256", None) or "").strip().lower()
+    if uses_image:
+        if not img:
+            raise Refused(
+                "no --image: %s consume it and its default is the empty "
+                "string, so `loader-tftp.py put --image ''` would be reached "
+                "with S4, S5 and S5b of a power cycle already spent. S3 writes "
+                "<work>/<label>/kroot/rtkload/nfjrom and nothing carries that "
+                "path here" % "/".join(IMAGE_STAGES))
+        if not os.path.isfile(img):
+            raise Refused("--image %r is not a regular file" % img)
+        try:
+            with open(img, "rb") as fh:
+                fh.read(1)
+        except OSError as exc:
+            raise Refused("--image %r cannot be read: %s" % (img, exc))
+        if os.path.getsize(img) == 0:
+            raise Refused("--image %r is zero bytes" % img)
+    # 🔴 RECIPE-1: `RLXFW-ID0` is a digest over `config/` and nothing else, so
+    # A3 cannot tell two images built from one frozen `config/` apart -- 量
+    # 2026-09-04, `r51quiet` and `r51loud` both compile 229d2983.  S6b's
+    # `assert_staged` IS a discriminator, but it derives its expectation from
+    # the file `--image` names, so it says "the board holds THIS file", not
+    # "the board holds the image the card names".  Pinning the file closes
+    # exactly that gap, and it is the one check that runs before the port opens.
+    if want:
+        if not uses_image:
+            raise Refused(
+                "--image-sha256 with no stage that reads --image (mode=%s, "
+                "skip=%s): a pin on a file nobody opens asserts nothing, and a "
+                "check that cannot fail is the shape this repository refuses "
+                "on principle" % (a.mode, ",".join(sorted(skip)) or "-"))
+        if len(want) != 64 or any(c not in "0123456789abcdef" for c in want):
+            raise Refused("--image-sha256 %r is not 64 hex digits" % want)
+        got = sha256_of(img)
+        if got != want:
+            raise Refused(
+                "--image %s does not match --image-sha256:\n"
+                "        want %s\n        got  %s\n"
+                "      The card names one file; this is a different one. "
+                "RLXFW-ID0 would not have caught it -- it is a digest over "
+                "config/ only." % (img, want, got))
+        print("  pre  image     sha256 %s  <- matches the pin" % got, file=out)
+
     timings, recipe = [], getattr(a, "recipe_override", None) if "S2" in skip else None
     results = []
 
@@ -456,6 +535,28 @@ def loop_once(a, out=sys.stdout):
                                       for x in st["argv"]]
                 print("      staged tree=%s  <- S3 assembles from this" % top,
                       file=out)
+            # RECIPE-1.  The provenance record the driver just wrote lives in
+            # $FWRE_WORK/rebuild/r3-4/out/<cell>.manifest, which the next build
+            # of the same cell name overwrites and which no seating commits.
+            # Copying it beside this run's own captures is what makes it
+            # durable.  Refusing when it is absent follows `make -C` above: a
+            # run that produced no provenance is a run that cannot be audited,
+            # and finding that out at S2 costs a desk build, not a power cycle.
+            mm = MANIFEST_RX.search(txt)
+            if not mm:
+                raise StageFailed(
+                    "S2", "the driver printed no `manifest -> <path>` line, so "
+                          "this build left no record of the .config and "
+                          "initramfs spec it used -- and neither of those is "
+                          "inside RECIPE_ID")
+            stem = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
+            try:
+                shutil.copyfile(mm.group(1), stem + ".manifest")
+            except OSError as exc:
+                raise StageFailed("S2", "manifest %s could not be copied: %s"
+                                  % (mm.group(1), exc))
+            print("      manifest=%s  -> %s.manifest" % (mm.group(1), stem),
+                  file=out)
         if s["id"] in ("S4", "S5b", "S6b"):
             stem = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
             suffix, check = {
@@ -825,6 +926,74 @@ def selftest(out=sys.stdout):
         B.cell_top = "top"
         B.work = "work"
 
+        # ---- M11: LOOP-4.  `--image` is read by S6/S6b, which sit AFTER the
+        # reset, the rescue and the burn-flag read-back, so an unusable value
+        # is found with four stages of a power cycle already spent.  The three
+        # cases pin the guard's SCOPE, one edge each: it must fire where the
+        # file is read, and stay silent in both places where it is not.
+        def outcome(**kw):
+            for k, v in kw.items():
+                setattr(B, k, v)
+            try:
+                rc = loop_once(B, out=devnull)
+                return "rc=%d" % rc
+            except Refused:
+                return "refused"
+            except StageFailed as exc:
+                return "StageFailed@" + exc.sid
+
+        ck("M11", "🔴 --mode bench with no --image is REFUSED before any stage "
+                  "runs, not at S6 with the power cycle spent",
+           "refused", outcome(mode="bench", image="", skip="", image_sha256=None))
+        ck("M11b", "and --mode desk with no --image is NOT refused -- desk "
+                   "skips S6/S6b, so there is nothing to guard",
+           "StageFailed@S2", outcome(mode="desk", image=""))
+        ck("M11c", "and --mode bench --skip S6,S6b is NOT refused either: the "
+                   "guard keys on the stages that read the file, not the mode "
+                   "-- and S2 failing first is why the board is never touched",
+           "StageFailed@S2", outcome(mode="bench", skip="S6,S6b", image=""))
+
+        # ---- M12: RECIPE-1.  A3 compares the id the board printed against the
+        # id the build computed, and RECIPE_ID is a digest over config/ ONLY --
+        # 量 2026-09-04, r51quiet and r51loud both compile 229d2983 from
+        # different .config files.  S6b's assert_staged derives its expectation
+        # from the file --image names, so it cannot notice that the file is the
+        # wrong one.  Pinning the file is the only check that can, and it is
+        # the only one that runs before the port opens.
+        realimg = os.path.join(d, "image.bin")
+        open(realimg, "wb").write(b"\x3c\x10\x80\x60" * 64)
+        good_sha = sha256_of(realimg)
+        bad_sha = "0" * 64
+        ck("M12", "🔴 a wrong --image-sha256 is REFUSED before any stage",
+           "refused", outcome(mode="bench", skip="", image=realimg,
+                              image_sha256=bad_sha))
+        ck("M12b", "and the right one is not -- the run proceeds to S2",
+           "StageFailed@S2", outcome(image_sha256=good_sha))
+        ck("M12c", "a malformed --image-sha256 is refused rather than compared "
+                   "and silently never equal",
+           "refused", outcome(image_sha256="deadbeef"))
+        ck("M13", "🔴 --image-sha256 where NOTHING reads --image is REFUSED: a "
+                  "pin on a file nobody opens is a check that cannot fail",
+           "refused", outcome(mode="desk", image_sha256=good_sha))
+
+        # ---- M14: which refusal wins.  `--skip S5b` removes the burn-flag
+        # read-back and `--image ''` wastes a power cycle; both are wrong at
+        # once here.  The SAFETY refusal has to be the one reported, because it
+        # is the one standing between an upload in RAM and one written to the
+        # only unit there is.  Nothing but this case pins the order.
+        B.mode = "bench"; B.image = ""; B.image_sha256 = None
+        B.skip = "S5b"
+        try:
+            loop_once(B, out=devnull); got = "no refusal"
+        except Refused as exc:
+            got = "S5b" if "S5b" in str(exc) else "image"
+        except StageFailed:
+            got = "StageFailed"
+        ck("M14", "🔴 with --skip S5b AND a bad --image, the S5b safety refusal "
+                  "is the one reported", "S5b", got)
+
+        B.mode = "replay"; B.skip = ""; B.image = "img.bin"; B.image_sha256 = None
+
     # ---- C11/C12: the chaining itself, on the driver's real output shape
     real = ("== i3: applied 16 declared row(s) from config/rlxfw-marks.tsv\n"
             "== i3: make -C /home/key/fwre-work/rebuild/r3-4/cells/i3/top/"
@@ -836,6 +1005,17 @@ def selftest(out=sys.stdout):
     ck("C12", "🔴 and a driver run that printed no such line yields nothing, so "
               "S2 raises rather than S3 assembling from somewhere else",
        None, CELLTOP_RX.search(real.replace("make -C", "MAKE -c")))
+
+    # C13/C14: the manifest line, same shape as C11/C12 and for the same
+    # reason -- the path is read out of the driver's own output, never guessed.
+    real2 = real + "== i3: manifest -> /home/key/fwre-work/rebuild/r3-4/out/i3.manifest\n"
+    m13 = MANIFEST_RX.search(real2)
+    ck("C13", "the provenance record's path is read out of the driver's own "
+              "`manifest ->` line", "/home/key/fwre-work/rebuild/r3-4/out/i3.manifest",
+       m13.group(1) if m13 else None)
+    ck("C14", "🔴 and a driver run that printed no such line yields nothing, so "
+              "S2 raises rather than the build leaving no provenance",
+       None, MANIFEST_RX.search(real))
 
     print("", file=out)
     print("RESULT: %d passed, %d failed" % (passed, failed), file=out)
@@ -855,6 +1035,10 @@ def main():
     ap.add_argument("--initramfs", default="")
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--image", default="")
+    ap.add_argument("--image-sha256", default=None,
+                    help="the sha256 the card names for --image. RLXFW-ID0 is "
+                         "a digest over config/ only, so it cannot tell two "
+                         "images built from one frozen config/ apart; this can")
     ap.add_argument("--vmlinux", default=None)
     ap.add_argument("--cell-top", default=PLACEHOLDER_TOP,
                     help="the staged tree rtkimage builds against")
