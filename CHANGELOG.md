@@ -1,5 +1,59 @@
 # Changelog
 
+🟢 **2026-09-03, thirtieth session, seating 11: `R5-2`** — the timer driver
+ran on the silicon. One power cycle, 21:15–21:55, fourteen captures, **zero
+flash-write commands and zero `FLR`**, so the flash bracket is untouched at
+1,024 of 4,194,304 = **0.0244 %**.
+
+🟢🟢 **The headline is a ratio with no residual.**
+`ΔTC1 / ΔTC0_total = 1` over **three intervals, integer-exact**, where
+`ΔTC0_total = Δjiffies × (tc0data >> 4) + Δ(tc0cnt >> 4)`. The longest is
+**703.46 s / 140,693,532 counts and crosses one 2²⁷ wrap**, so the wrap-recovery
+arithmetic is exercised rather than asserted at zero. Both counters are sampled
+in one `spin_lock_irqsave`, so it establishes in a single reading that TC1 and
+TC0 divide the same `CDBR`, that `TC0CNT` is value-in-bits-31:4, and that the
+vendor's tick loses no jiffies over 140.7 M counts. ⚠️ **It is a ratio and not
+a frequency** — `wall`, `jiffies` and TC1 all descend from one divider, so the
+absolute 200.005 kHz stays 推.
+
+🔴 **The first cell refuted a prediction, and it broke the card's own arithmetic
+before that arithmetic was used.** Under Linux `CDBR` reads `03E80000` (divisor
+**1000**) and `TC0DATA` reads `00007D00` (reload **2,000**), where the loader
+left divisor 14 and reload 142,858 — **the same 100 Hz by two different
+routes**. The vendor's `arch/rlx/kernel/rlx-time.c` does that at boot, and it is
+still an unopened file. The card's § 4.2 hardcodes `× 142858`; using it would
+have "refuted" the headline by 71.4× with the hardware innocent. **The block was
+run as three commands split at the card's own two decision points, so the
+correction landed before the measuring cell rather than after it.**
+
+🔴 **A negative result that changes the next step.** `TC1IP` does **not** latch
+in `TCIR` while `TC1IE` is clear in `GIMR` — 量 across a full 2²⁷ period with
+the positive control (`tc1_cycles` dropping from 31.99 M to 6.48 M) proving the
+period elapsed. `notes/timer-driver.md` § 4 builds the driver's safety argument
+on observing that bit with the interrupt masked; **that strategy does not work
+on this part**, so `R5-3` must set `GIMR` bit 9 with a handler already
+installed. `Q11` — the only test this project has of D Table 25's
+write-1-to-clear claim — is void as a consequence.
+
+🔴 **Two defects in the driver's software counter extension, one predicted and
+one not.** The predicted one is wrap aliasing, confirmed at 703 s rather than
+the 30 s the desk analysis put it at: true gap 140,693,532, reported
+6,475,672 (that value mod 2²⁷), `trusted` still 1. The unpredicted one is
+worse: 讀 `:476-477`, `rtl819x_ext_advance()`'s only call site is inside the
+`/proc` read handler, so **the extension is a sum over the intervals somebody
+happened to read it in** — 462 s with no reader left it 92,362,366 counts
+behind, `trusted` still 1.
+
+🔴 **And a claim about identity was narrowed before power.** `RECIPE_ID` is a
+digest over `config/` **only**, so the `RLXFW-ID0` the board prints cannot
+distinguish the pinned image from a differently-configured sibling built from
+the same frozen `config/` — and `r51a`/`r51quiet` are exactly that pair. The
+seating ran with `--image` on the pinned file so that `looprun`'s `S6b`
+read-back became the discriminator the id is not. `PROGRESS.md` `RECIPE-1`.
+
+Full cell-by-cell verdict, four deviations and every correction to the frozen
+card: `bench/2026-09-03/CORRECTIONS-block8.md`.
+
 🟢 **2026-09-03, twenty-eighth session, desk: `R5-1`** — the first driver,
 written blind. `config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`
 is a Linux clocksource on the SoC's **Timer/Counter 1**, registered at rating
@@ -371,7 +425,11 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 The card for the two-clocksource reading exists and is frozen:
 `bench/2026-09-03/PREDICTIONS-B9-block8.md`, nine cells over ten captures.
-**It has not run**; the board has not been powered for it.
+~~**It has not run**; the board has not been powered for it.~~ 🔄 **It ran the
+same evening — seating 11, 2026-09-03 21:15–21:55 — so that sentence held for
+about seven hours.** The entry below is kept as written because it is the
+record of what the card claimed before it was tested; the outcome is the entry
+at the top of this file and in `bench/2026-09-03/CORRECTIONS-block8.md`.
 
 🔴 **Two defects in the reading's design, both found before power and neither
 by reading anything new** — the design's own constants put back through the

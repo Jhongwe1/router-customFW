@@ -97,6 +97,30 @@ released source.
 > there was anything to pass. **Zero flash-write commands and no `FLR`**, decided
 > before power, so the bracket stands at **1,024 of 4,194,304 = 0.0244 %**
 > and *not one flash byte is written* is exactly as unsayable as it was.
+> 🔄 **2026-09-03, EIGHTH update — seating 11, and a sentence in the fifth
+> update above expired.** 🟢 **A driver of mine drove a peripheral.**
+> `rtl819x-timer` programmed `TC1DATA` and `TCCNR` on the silicon, registered a
+> clocksource the kernel listed as `rtl819x-tc1`, was read fourteen times and
+> unwound both writes on disarm — twice, the second after a **703-second** arm.
+> *(§ 5 above says "There is still no driver of mine"; that stopped being true
+> at 21:20. What is still true is narrower and is kept in
+> `docs/KNOWN-ISSUES.md`: nothing of mine has driven a peripheral the system
+> DEPENDS on — the timer ran at rating 0 so the kernel would not switch to it,
+> and `GIMR` bit 9 was read and never written, so no interrupt of mine was ever
+> delivered.)* 🟢 **The headline is a ratio with no residual**:
+> `ΔTC1 / ΔTC0_total = 1` over three intervals, **integer-exact**, the longest
+> 703.46 s / 140,693,532 counts and crossing one 2²⁷ wrap. 🔴 **And the first
+> cell refuted a prediction in a way that broke the card's own arithmetic
+> before it was used**: under Linux `CDBR` divides by **1000** and `TC0DATA`
+> reloads at **2,000**, where the loader left 14 and 142,858 — **the same
+> 100 Hz by two different routes**, done by a vendor file still unopened. The
+> card hardcoded the loader's constant; using it would have "refuted" the
+> headline by 71.4× with the hardware innocent. **It was caught because the
+> block ran as three commands split at the card's own decision points.**
+> 🔴 **The most valuable result is negative**: `TC1IP` does not latch while
+> `TC1IE` is clear, so the driver's whole masked-observation safety strategy
+> does not work on this part and `R5-3` must arm the interrupt for real.
+> **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.

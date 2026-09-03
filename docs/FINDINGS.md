@@ -127,10 +127,26 @@ kernel's clock. 量: with `clocksource_jiffies` selected that clock advances on
 a **10 ms grid**, which is **166.7 ppm** over 60 s — nine times the 17.99 ppm
 the cell was predicting. **Nothing about the cell looked wrong**: it named a
 tolerance, an interval and a prediction, and printed nine decimal places. What
-changed: every comparison now goes against `jiffies × 142858 + (tc0cnt >> 4)`,
-a continuous 14.29 MHz reference at 0.0012 ppm per count that the driver was
-already printing, and the 18 ppm becomes arithmetic over two measured constants
-rather than a quantity to chase.
+changed: every comparison now goes against `jiffies × (tc0data >> 4) +
+(tc0cnt >> 4)`, a continuous reference the driver was already printing, and the
+grid stops being the limit.
+
+🔴 **2026-09-03, seating 11 — and the sentence above used to name the constant
+instead of the field, which is the same defect one level down.** *(It read
+"every comparison now goes against `jiffies × 142858 + (tc0cnt >> 4)`, a
+continuous 14.29 MHz reference at 0.0012 ppm per count … and the 18 ppm becomes
+arithmetic over two measured constants".)* 量, `TM-1`, the first reading of
+these registers under a kernel: `CDBR` is `03E80000` (divisor **1000**) and
+`TC0DATA` is `00007D00` (reload **2,000**), not the loader's 14 and 142,858 —
+the vendor's `rlx-time.c` reprograms the divider at boot and both give 100 Hz.
+So the reference is **200.005 kHz at 0.083 ppm per count**, and the `+17.99 ppm`
+figure was arithmetic over **two constants that belonged to the loader**. The
+method survives untouched — 0.083 ppm is still 2,000× finer than the ±50 ppm
+`D4` asks for — and only the numbers move. **The lesson is the one this entry
+was already about**: a criterion can be unmeasurable without looking it, and so
+can a constant be stale without looking it. Reading the reload out of each dump
+is what makes it neither. `notes/timer-driver.md` § 8.1,
+`bench/2026-09-03/CORRECTIONS-block8.md` § 1.
 
 🆕 **2026-09-03 — a checker that is green over the wrong axis.**
 `ledgerscan check` joins the set of cited paths against the set of declared

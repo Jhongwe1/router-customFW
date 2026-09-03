@@ -373,9 +373,29 @@ TC0_total = jiffies × 142858 + (tc0cnt >> 4)
 is a continuous 14.29 MHz reference — **one count is 0.0012 ppm over 60 s** —
 and `ΔTC1 / ΔTC0_total = 1` becomes the measurement. `+17.99 ppm` is then an
 arithmetic consequence of `14286057 / (100 × 142858)`, not a quantity to chase
-with a stopwatch. ⚠️ **The `>> 4` is the driver's reading of D Table 22 and not
-the datasheet's words**; the card's `Q3` tests it, and it is the only test of
-that shift this project has.
+with a stopwatch.
+
+🔴 **2026-09-03, seating 11: the two constants in the paragraph above are the
+LOADER's, and Linux does not use them.** 量, `TM-1`: `CDBR` reads `03E80000`
+(divisor **1000**, not 14) and `TC0DATA` reads `00007D00` (**2,000** ≪ 4, not
+142,858 ≪ 4). Both give 100 Hz; the vendor's `rlx-time.c` reprograms the
+divider at boot. So the reference is a continuous **200.005 kHz** counter and
+one count is **0.083 ppm over 60 s** — still 2,000× finer than the ±50 ppm the
+step asks for, and 2,008× finer than the 10 ms grid this section exists to
+remove, so the *method* survives unchanged and only its numbers move. The
+`+17.99 ppm` figure is void: it was `14286057 / (100 × 142858) − 1`, and both
+of those constants belonged to the loader.
+`bench/2026-09-03/CORRECTIONS-block8.md` § 1.
+
+⚠️ **The `>> 4` is 量 and this line used to say it was not.** *(It read: "the
+`>> 4` is the driver's reading of D Table 22 and not the datasheet's words; the
+card's `Q3` tests it, and it is the only test of that shift this project has".)*
+Both halves were already false when written — `REG-05`'s `0x0022E0A0`,
+`REG-07`'s low nibble and `probe3`'s Group T all carry the shift, at the loader
+prompt or from bare metal — and seating 11 settled it on a third route:
+`ΔTC1 = Δjiffies × (tc0data ≫ 4) + Δ(tc0cnt ≫ 4)` held with **residual exactly
+zero** over three intervals, the longest 140,693,532 counts. An integer-exact
+identity over 1.4 × 10⁸ counts is not a shift being assumed.
 
 ### 5.3 🔴 `E8` is the cell with the most information in it
 
@@ -562,9 +582,15 @@ nothing about that half. It is a fact about registration, not about
 
 ## 7. 🔴 What this step did not establish
 
-1. **Nothing here has executed.** Every statement about behaviour in § 5 is a
-   prediction. The driver has been compiled, linked, scanned and found in the
-   image; it has not run.
+1. ~~**Nothing here has executed.**~~ 🟢 **Stopped being true 2026-09-03 at
+   21:20** — the driver ran on the silicon, registered a clocksource, armed
+   TC1, was read fourteen times and disarmed twice. § 8 is the reading.
+   *(This item read: "Every statement about behaviour in § 5 is a prediction.
+   The driver has been compiled, linked, scanned and found in the image; it has
+   not run.")* **What it correctly warned about did not survive contact**: two
+   of § 5's constants were the loader's and Linux does not use them (§ 5.2.1's
+   red block), and § 4's masked-observation safety strategy turns out not to
+   work on this part (§ 8.4).
 2. **`rlxfw-marks verify` does not cover this driver.** It reads *mark* rows,
    and `MK2` is a build row with no string of its own. A whole file of mine can
    now reach the image and `verify` is silent about it — the gap is real, it is
@@ -593,3 +619,153 @@ nothing about that half. It is a fact about registration, not about
    because the binding's `reg` should name what the driver actually claims, and
    `R5-2` may still move that — the driver reads two blocks (`0xB8003100` and
    `0xB8003000`) and writes inside one of them.
+
+---
+
+## 8. 🆕 `R5-2`, seating 11 (2026-09-03): the driver on the silicon
+
+One power cycle, 21:15 → 21:55. Fourteen captures under `bench/2026-09-03/`,
+ten of them the frozen card's `TM-1`…`TM-8`. Zero flash-write commands, zero
+`FLR`; the bracket is untouched at 1,024 of 4,194,304 = 0.0244 %. The full
+cell-by-cell verdict, the deviations and the corrections to the card are in
+`bench/2026-09-03/CORRECTIONS-block8.md`; this section holds what the driver
+itself learned.
+
+### 8.1 🔴 Linux does not run this timer block at the rate the loader left it at
+
+量, `TM-1`, the first reading of these registers under a kernel rather than at
+the loader prompt:
+
+| | loader (`REG-05`/`REG-11`) | under Linux |
+|---|---|---|
+| `CDBR` | `0x000E0000` — divisor 14 | 🔴 **`0x03E80000` — divisor 1000** |
+| `TC0DATA` | `0x0022E0A0` = 142,858 ≪ 4 | 🔴 **`0x00007D00` = 2,000 ≪ 4** |
+| `TCCNR` `TCIR` `TC1DATA` | `C0000000` `80000000` `00000000` | identical |
+
+```
+loader :  200.0049 MHz / 14   = 14,286,057 Hz ;  / 142,858 = 100.0 Hz
+Linux  :  200.0049 MHz / 1000 =    200,005 Hz ;  /   2,000 = 100.0 Hz
+```
+
+**Two different divider/reload pairs, the same 100 Hz tick.** `cdbr_at_init` and
+`tc0data_at_init` already hold the Linux values, so the reprogramming happened
+before `rtl819x_timer_init` ran: it is `arch/rlx/kernel/rlx-time.c`'s, not this
+driver's. 🟢 **A fact about a vendor file this project has still never opened**,
+which is what the cell was written to buy — and it turned out to be a *change*
+rather than the match the card predicted.
+
+⚠️ **The driver's `hz_assumed` is therefore wrong by 71.43×** and prints
+`14286057` in every dump. It is not used in any arithmetic this project quotes
+— every result below is a ratio — but `R5-3` must derive it from `CDBR` and
+`TC0DATA` at init rather than compiling it in.
+
+### 8.2 🟢 The measurement: ΔTC1 / ΔTC0_total = 1, residual exactly zero, three intervals
+
+```
+interval           Δjiffies   ΔTC0_total          ΔTC1     residual
+TM-6 d1 → d2          3,003    6,007,208     6,007,208         0
+TM-6 d2 → d3          3,004    6,007,994     6,007,994         0
+TM-5b-arm → TM-5b2   70,346  140,693,532   140,693,532         0
+```
+
+with `ΔTC0_total = Δjiffies × (tc0data >> 4) + Δ(tc0cnt >> 4)`. The third
+interval is 703.46 s and **crosses one 2^27 wrap**, so the wrap-recovery
+arithmetic is exercised (`n_wraps = 1`) rather than only asserted at zero.
+
+Both counters are sampled inside one `spin_lock_irqsave` (`:471-489`), so the
+match is between two hardware registers at one instant. It establishes in a
+single reading: TC1 and TC0 divide the same `CDBR`; `TC0CNT` is
+value-in-bits-31:4; `TC0DATA >> 4` is the reload; and the vendor's tick loses no
+jiffies over 140.7 M counts.
+
+⚠️ **A ratio, not a frequency.** `wall` derives from `jiffies`, `jiffies` from
+TC0, TC0 shares the divider with TC1. What is 量 is *TC1 advances exactly 2,000
+counts per jiffy*. **200.005 kHz stays 推**, from `CLK-02` ÷ 1000. The only
+independent time base on hand — the host `.timing` — disagreed with itself by
+17× its own resolution floor between two identical 30 s intervals
+(`CORRECTIONS-block8.md` § 4.1), so it bounds the absolute rate and does not
+measure it.
+
+### 8.3 🟢 Registration, coexistence and teardown all behaved
+
+* `TM-2a`/`TM-2b` before arming: **`jiffies`** and nothing else — § 6.4's desk
+  clocksource census confirmed on the device.
+* `TM-3`: `state=armed`, `last_verdict=0`, `tccnr` `C0000000` → **`F0000000`**,
+  i.e. exactly bits 29/28 added, and `tccnr_after_arm` agrees.
+  `TC1DATA` reads `0x80000000` = 2^27 << 4 — **so `TCnDATA` is
+  value-in-bits-31:4 for TC1 as well**, a register this project had never
+  written before.
+* `TM-4a`: **`jiffies rtl819x-tc1`** — the driver registered.
+  `TM-4b`: **`jiffies`** — rating 0 kept it out, so `L2-e`'s enqueue analysis
+  holds and the comparison was never contaminated by the kernel switching to
+  the source under test.
+* `TM-7` and `TM-5c`: `tccnr` returns to `tccnr_at_init` = `C0000000`, twice —
+  the second after a **703-second** arm. **The driver can undo its own write.**
+* `TM-8` and `TM-5d`: `rtl819x-tc1` gone from `available_clocksource`, twice —
+  `clocksource_unregister` takes.
+* `tc0_undisturbed=1` in every one of the fourteen dumps.
+
+### 8.4 🔴 The finding that changes `R5-3`: TC1IP does not latch while TC1IE is clear
+
+§ 4 of this note builds the driver's safety argument on being able to watch
+`TCIR`'s pending bit with `GIMR` bit 9 masked. 量, and the reading is
+decisive because it has the control the first attempt lacked:
+
+```
+armed   wall = 1010.48   tc1_cycles =     1,861
+read    wall = 1713.94   tc1_cycles = 6,477,665   <- below its own prior 31.99 M
+delta = 703.46 s = 140,693,532 counts = one full 2^27 period plus 6.48 M
+tcir_tc1ip = 0    gisr_tc1ip = 0    gimr_tc1ie = 0 throughout
+```
+
+`tc1_cycles` reading 6.48 M **is** the proof the period elapsed — without it a
+zero is ambiguous, which is why the card's own `TM-5` (`sleep 10`, 1.5 % of a
+period at the corrected rate) could not answer this.
+
+🔴 **So the masked-observation strategy does not work on this part.** `R5-3`
+cannot verify the interrupt path by watching a latch first and arming second;
+it must set `GIMR.TC1IE` with a handler already installed. There is no
+intermediate step, and the driver was designed as though there were.
+
+Consequence: `Q11` — whether `TC1IP` is write-1-to-clear — is **void**, because
+a bit that never latched cannot be shown to clear. It is still the **only**
+test this project has of that D Table 25 claim, and `rtl819x_tc1_disarm()`'s
+`TCIR` write (`:433-437`) still rests on one source.
+
+### 8.5 🔴 Two defects in tc1_ext, and only one of them was predicted
+
+**(a) wrap aliasing — predicted in § 5.2.1, confirmed at 703 s rather than 30 s.**
+`TM-5b-arm` → `TM-5b2`: true gap 140,693,532 counts, `tc1_ext_gap_max` reads
+**6,475,672** = that value mod 2^27, and `tc1_ext_trusted` reads **1**. One
+entire period — 134,217,728 counts — lost, with the flag asserting trust.
+§ 5.2.1's mechanism is exactly right; only its threshold moved by the same
+71.43×.
+
+**(b) read-driven accumulation — not predicted, and arguably worse.**
+`TM-5c`, after 462 s in which nothing read `/proc`: `tc1_cycles = 98,840,142`
+against `tc1_ext = 6,477,776`, a deficit of 92,362,366, `gap_max` unchanged,
+`trusted = 1`. 讀, `:476-477` — the only call site of `rtl819x_ext_advance()`
+is inside `rtl819x_tc_read_proc` and guarded by `rtl819x_tc1_armed`. **So
+`tc1_ext` is a sum over the intervals somebody happened to read `/proc` in, not
+an extension of the counter**; with no reader it silently stops, and
+`tc1_ext_trusted` — only `reads > 0 && gap < (MASK >> 1)` — still says 1.
+
+`R5-3` owns both: advance from something guaranteed to run once per period, and
+make the trust flag refuse when `Δjiffies × TICK_NSEC` implies more than one.
+
+### 8.6 🔴 tc1_ext_reads counts kernel calls, not user reads — and not even a fixed number of them
+
+量, the printed sequence over eight dumps: `1, 3, 5, 7, 9, 11` then, after a
+re-arm, `1, 3, 4`. **`+2` per `cat`.** 讀, `:487` — `reads` is snapshotted after
+the advance, and `cat` reads a 2.6 `read_proc` file **twice** (the second call
+returns 0 for EOF). Modelling `cat` as exactly two calls reproduces every cell
+except `TM-7`, which is **one higher than the model**; `TM-5c`, the other
+`disarm ; cat`, matches exactly. One extra `read_proc` call therefore occurred
+while armed, between `TM-6`'s third dump and `TM-7`'s disarm, and its **cause is
+undetermined**.
+
+🔴 **The card's claim that a different number means an unissued `/proc` read is
+false as stated** — it can equally mean `cat` made a different number of kernel
+calls. The check found something real; it is not the thing it was advertised to
+find. `arm` zeroing the counters is confirmed both ways (讀 `:385-388`; 量,
+`TM-5b-arm` reads 1 after a run that had reached 11).

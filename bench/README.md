@@ -1130,9 +1130,26 @@ the card, byte-identical hit counts before and after both amendments.
 
 ---
 
-## 2026-09-03 — `R5-2`'s card, written before the seating. **One file, no captures**
+## 2026-09-03 — `R5-2`'s card, and then the seating it predicts, on the same calendar day
 
-🔴 **This directory holds one file and no captures**, and that is the point.
+🔄 **This heading and the paragraph under it were written when the directory
+held one file and no captures, and both expired the same evening.** They are
+kept because *"one file and no captures"* was a load-bearing statement while it
+was true — it is what `check-predictions` reports for a card whose seating has
+not happened, and the directory existing in that state is what proves the
+prediction preceded the reading. **As of 2026-09-03 it holds 62 files**, 量 rather than
+estimated: two `.md` (the frozen card and `CORRECTIONS-block8.md`) and **21
+capture prefixes** — **6 `SM-*`** (`looprun`'s bench stages: `SM-A` the ESC
+catch, then `-rz`, `-rescue`, `-ab2`, `-2a`, `-boot`) and **15 `TM-*`** (the
+card's **10** cells `TM-1`…`TM-8`, plus **5** for the `TM-5b` recovery:
+`-5b-arm`, `-5b`, `-5b2`, `-5c`, `-5d`). `check-predictions` now reports **10 of
+10 ordered**. ⚠️ `TM-5b` is a **two**-file prefix, not three — it has no
+`.meta.json`, because the CP2102 dropped mid-capture and the process never
+reached its own footer. That absence is the record of the drop and is why the
+pair is committed.
+
+*(As written, before the seating:)* 🔴 **This directory holds one file and no
+captures**, and that is the point.
 `PREDICTIONS-B9-block8.md` was written and frozen at the desk on **2026-09-03**;
 the seating it predicts **has not been scheduled**. `bench/2026-08-30b/` is the
 precedent — a prediction closed to editing before its captures exist — and this
@@ -1149,7 +1166,7 @@ moving off it to save one rename would move three readers of that population.
 
 | | |
 |---|---|
-| **`2026-09-03`** | **`R5-2`, the two-clocksource reading.** Nine cells `E1`–`E9` over **ten captures** (`TM-*`, a stem no other directory uses), eleven predictions `Q1`–`Q11`. `cardcheck commands` 10/10 clean, `cardcheck numbers` **8 of 8 re-derived**. The block runs **LAST** on whatever seating carries it — after `SEAM-1`, `GR-1` and `CPU-45` — because the arm's worst case is the board wedging *after* a shell, which costs the remainder of the seating, and putting it last makes that remainder empty |
+| **`2026-09-03`** | **`R5-2`, the two-clocksource reading.** Nine cells `E1`–`E9` over **ten captures** (`TM-*`, a stem no other directory uses), eleven predictions `Q1`–`Q11`. `cardcheck commands` 10/10 clean, `cardcheck numbers` **8 of 8 re-derived**. The block runs **LAST** on whatever seating carries it — after `SEAM-1`, `GR-1` and `CPU-45` — because the arm's worst case is the board wedging *after* a shell, which costs the remainder of the seating, and putting it last makes that remainder empty. 🔄 **Seating 11 ran the same evening, and two of those three did not.** `SEAM-1`'s bench half ran (7/7, 34.94 s) but **skipped**, for a reason measured before power (`RECIPE_ID` covers `config/` only, so the printed id cannot discriminate the pinned image — `PROGRESS.md` `RECIPE-1`); `GR-1` needs a scheduling decision, not power; and 🔴 **`CPU-45` could not run at all** — no `probe3` payload has been staged since `bench-only/b6-20260831c` and the residual needs a variant that makes a cache line resident, which does not exist. **So the block ran last out of two, not four**, and the wedge argument was never tested. It also did not wedge: `tc0_undisturbed=1` in all fourteen dumps. Outcome: 🟢 `Q1` `Q3` `Q4` `Q6` `Q7` `Q8` hold, `Q6` at **0.000 ppm over three intervals**; 🔴 `Q2` `Q5` `Q9` refuted as written, `Q10` answered negative, `Q11` void. `CORRECTIONS-block8.md` |
 
 🔴 **This block issues no `FLR`, no `EW`, no `EB`, no `FLW`, no burn and no
 upload.** It adds **zero** bytes to the flash bracket, which stands at
@@ -1173,13 +1190,25 @@ were found by putting `notes/timer-driver.md` § 5's own constants back through
   paper. `SPEC.md` `CLK-22`, `PROGRESS.md` `TMR-1`.
 * `E8` could not have resolved its own **+17.99 ppm** headline: the kernel's
   clock advances on a **10 ms grid**, which is **166.7 ppm** over 60 s. Every
-  comparison now goes against `jiffies × 142858 + (tc0cnt >> 4)`, a continuous
-  14.29 MHz reference at **0.0012 ppm** per count that the driver was already
-  printing.
+  comparison now goes against `jiffies × (tc0data >> 4) + (tc0cnt >> 4)`, a
+  continuous reference the driver was already printing.
+
+🔴 **2026-09-03, seating 11 — both bullets are kept as written and both need a
+correction, and the correction is one number applied twice.** *(The second
+bullet read "`jiffies × 142858 + (tc0cnt >> 4)`, a continuous 14.29 MHz
+reference at 0.0012 ppm per count".)* 量, `TM-1`: under Linux `CDBR` is
+`03E80000` (divisor 1000) and `TC0DATA` is `00007D00` (reload 2,000), not the
+loader's 14 and 142,858. So **one TC1 period is 671.07 s, not 9.395016 s**, and
+the reference is **200.005 kHz at 0.083 ppm per count**. The first bullet's
+30 s/60 s aliasing therefore did **not** occur — but the same failure did, at
+703 s: true gap 140,693,532 counts, `tc1_ext_gap_max` **6,475,672** (that value
+mod 2²⁷), `trusted` **1**. **Mechanism right, threshold wrong by the same
+71.43×.** `bench/2026-09-03/CORRECTIONS-block8.md` § 1 and § 3.
 
 **Checked before commit**: `cardcheck commands` and `numbers`;
-`check-predictions` reports **10 of 10 cells with no capture**, which is the
-correct output for a card whose seating has not happened; `flashwin scan
+`check-predictions` reported **10 of 10 cells with no capture**, which was the
+correct output for a card whose seating had not happened — 🔄 **and as of
+2026-09-03 it is 10 of 10 ordered**, the seating having run; `flashwin scan
 --sweep . --exclude upstream` over the whole tree, **1,602 files, CLEAN**;
 `spec-check`, `ledgerscan check`, `test-file-modes` green.
 ⚠️ **`audit-bench-log` is not listed** — it scans `.log` files and there are

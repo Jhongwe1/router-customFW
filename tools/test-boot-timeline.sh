@@ -121,7 +121,19 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # delta is exactly +1/+3 and nothing was reclassified. Fourth seating in a row
 # that turned this case red, and all four times it was the run-every-suite
 # rule that caught it rather than a `--only` run.
-ck "twenty cold, thirty-five warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 20 cold, 35 warm, 0 unknown')"
+# 🔄 20/35 -> 21/36 on 2026-09-03 (seating 11, `bench/2026-09-03`), which is
+# ONE cold power-on and ONE warm reset: `SM-A`, the ESC catch that opened the
+# seating, and `SM-rz`, `looprun`'s own S4. Isolation check, run before this
+# line was touched: every directory EXCEPT `2026-09-03` still reports 20 cold,
+# 35 warm, and `2026-09-03` alone reports 1 cold / 1 warm -- so the delta is
+# exactly +1/+1 and nothing was reclassified. Fifth seating in a row that
+# turned this case red.
+# ⚠️ The other EIGHTEEN captures of that seating produce no row, and the tool
+# says so itself: `NOT CLASSIFIED: 18 capture(s) produced no row; 0 of them
+# hold boot text`. They are shell captures taken at a prompt after S7, so
+# having no boot line is correct rather than a miss -- and the `0 of them hold
+# boot text` half is what makes that a reading instead of an assumption.
+ck "twenty-one cold, thirty-six warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 21 cold, 36 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -183,8 +195,15 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # from the instrument's own read floor. The pooled spread went 499.9 % ->
 # 520.9 %, and that is the OLD outlier (0.0211, H3a) dominating a wider n,
 # not this seating adding scatter.
-ck "entry population is thirty warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=30')"
+# 🔄 30 -> 31 on 2026-09-03 (seating 11): `SM-rz`, `looprun`'s own S4, the one
+# warm reset of that seating, `entry` 0.0024. It lands inside the tight
+# sub-population above (0.0023..0.0024) and not near the outlier, so the pooled
+# spread moving 520.9 % -> 527.1 % is the OLD 0.0211 (H3a) dominating a wider n
+# again, not this seating adding scatter -- the same reading as the line above,
+# and it is restated because a spread that grows while every new point is
+# central is the shape a reader would otherwise misread.
+ck "entry population is thirty-one warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=31')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
