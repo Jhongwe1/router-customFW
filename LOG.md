@@ -15374,3 +15374,24 @@ dump 與 `TM-7` 的 disarm 之間，**原因未定**，寫下來而不是解釋�
 1.7–2.8 ms 內）。
 🟢 **而工具自己說了另外十八格的事**：`NOT CLASSIFIED: 18 capture(s) produced no row;
 **0 of them hold boot text**` —— 後半句才讓「沒有列」變成讀數而不是假設。
+
+### 十二、稽核跑了五遍換五種方法，而第五遍抓到的是第一遍的方法本身有洞
+
+五種方法與各自抓到的東西：
+
+| 方法 | 抓到 |
+|---|---|
+| ① **完整列舉**候選擁有者檔案，再用今天移動的**數字**去掃全 repo | `docs/FINDINGS.md` 與 `bench/README.md` 兩處把 loader 的常數當成現在進行式的做法在寫 |
+| ② 讀「描述未來狀態」的句子（關鍵字 `R5-2`／卡片／seating） | `docs/KNOWN-ISSUES.md` 的「Nothing of mine has driven a peripheral」「It has not executed」「inert until `R5-2`」三句、`bench/README.md` 的「One file, no captures」、`CHANGELOG.md` 的「It has not run」 |
+| ③ 任何「第一次／唯一一次 X」的句子，寫下前 `git grep` 全 repo | 兩個宣稱**通過**查證（`CDBR` 在 Linux 下確實是第一次讀、`TC1DATA` 確實從沒被寫過），而查證過程順帶找出 `docs/probe3-cells.md` §8 那一列 —— 它評估過寫 `TC1DATA` 然後婉拒，並記成「`R5-0` 的升級路徑」，**那條路今晚被走了** |
+| ④ 把每一句更正過的話再 grep 一次 | `SPEC.md` `CLK-20` 最後一句仍用現在式寫著 `TC0_total = jiffies × 142858`，而那是**活的宣稱**不是引述 |
+| ⑤ 把今晚寫進檔案的每一個導出數字用程式從擷取重算 | 23 個裡 22 個對；錯的那個是 **9,331 ppm** —— 我拿兩個**已經四捨五入過的**頻率去算，正確值是 9,331.8，應寫 **9,332**。四個檔案裡都錯 |
+
+🔴 **而第五遍還抓到第一遍的方法本身有洞。** `PROGRESS.md` 的 `Next after this`
+整列過期（它還寫著「下一個桌面段做 `R5-2` 的卡片」與「`MARK-1` 排在 seating 之後」），
+而方法②的 grep **沒有看到它**，因為我在那條 grep 裡把「我這一段編輯過的檔案」濾掉了 ——
+理由是「我編輯過就等於看過」。**但我只編輯了那些檔案裡的特定幾列。**
+
+**排除自己動過的檔案，和「跟上一段比對」是同一個錯誤，只是往上一層。**
+兩者都假設「我知道哪裡會變」，而整個完整列舉的重點就是不做那個假設。
+下一次的 sweep 不排除任何檔案。
