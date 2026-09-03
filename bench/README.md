@@ -1127,3 +1127,60 @@ readings that make `CARD-1`'s precondition column load-bearing.
 **Checked before commit**: `audit-bench-log` over all ten logs, **0 hits**;
 `flashwin scan --sweep` over the directory, 32 files, **CLEAN**; `leakscan` on
 the card, byte-identical hit counts before and after both amendments.
+
+---
+
+## 2026-09-03 — `R5-2`'s card, written before the seating. **One file, no captures**
+
+🔴 **This directory holds one file and no captures**, and that is the point.
+`PREDICTIONS-B9-block8.md` was written and frozen at the desk on **2026-09-03**;
+the seating it predicts **has not been scheduled**. `bench/2026-08-30b/` is the
+precedent — a prediction closed to editing before its captures exist — and this
+one differs from it in a way that matters: **there, the seating was the next
+day and the directory name was known; here it is not.**
+
+⚠️ **So the directory name is itself a prediction.** If the seating lands on
+another day the directory is renamed **before power**, and the rename is a
+recorded deviation — seating 8's Deviation 1, walked once, cost known. The
+alternative considered and rejected was a date-free name (`bench/r52-timer/`):
+this file, `tools/boot-timeline.py` and `tools/test-boot-timeline.sh` `B2` all
+read the one-directory-per-power-cycle, named-for-the-date population, and
+moving off it to save one rename would move three readers of that population.
+
+| | |
+|---|---|
+| **`2026-09-03`** | **`R5-2`, the two-clocksource reading.** Nine cells `E1`–`E9` over **ten captures** (`TM-*`, a stem no other directory uses), eleven predictions `Q1`–`Q11`. `cardcheck commands` 10/10 clean, `cardcheck numbers` **8 of 8 re-derived**. The block runs **LAST** on whatever seating carries it — after `SEAM-1`, `GR-1` and `CPU-45` — because the arm's worst case is the board wedging *after* a shell, which costs the remainder of the seating, and putting it last makes that remainder empty |
+
+🔴 **This block issues no `FLR`, no `EW`, no `EB`, no `FLW`, no burn and no
+upload.** It adds **zero** bytes to the flash bracket, which stands at
+**1,024 of 4,194,304 = 0.0244 %**, and *not one flash byte is written* is
+exactly as unsayable after this seating as before it. It follows that the
+`FLR` pre-read containment rule is not inherited by this card: there is no
+`FLR` row to attach it to. 🆕 **And as of today a card that goes around
+`flrbracket run` is caught at the desk** — `tools/cardcheck.py` `A19`–`A21`
+and `B10`, 量 on their first run: 50 cards swept, 2 type `FLR` through
+`--send`, both frozen and both named, list exact.
+
+🔴 **Writing the card refuted two of its own methods before power**, and both
+were found by putting `notes/timer-driver.md` § 5's own constants back through
+§ 5's own model rather than by reading anything new:
+
+* `E7` may not quote `tc1_ext` at this block's spacing — past one period
+  (**9.395016 s**) the masked difference **aliases back into the trusted band**,
+  so a 60 s gap loses six wraps and `tc1_ext_trusted` still reads **1**. The
+  card quotes `tc1_cycles` and unwraps outside the kernel, and **predicts the
+  false `1` as `Q5`** so the defect is confirmed on silicon rather than on
+  paper. `SPEC.md` `CLK-22`, `PROGRESS.md` `TMR-1`.
+* `E8` could not have resolved its own **+17.99 ppm** headline: the kernel's
+  clock advances on a **10 ms grid**, which is **166.7 ppm** over 60 s. Every
+  comparison now goes against `jiffies × 142858 + (tc0cnt >> 4)`, a continuous
+  14.29 MHz reference at **0.0012 ppm** per count that the driver was already
+  printing.
+
+**Checked before commit**: `cardcheck commands` and `numbers`;
+`check-predictions` reports **10 of 10 cells with no capture**, which is the
+correct output for a card whose seating has not happened; `flashwin scan
+--sweep . --exclude upstream` over the whole tree, **1,602 files, CLEAN**;
+`spec-check`, `ledgerscan check`, `test-file-modes` green.
+⚠️ **`audit-bench-log` is not listed** — it scans `.log` files and there are
+none here yet. It runs when the captures land, before they are committed.
