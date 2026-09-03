@@ -487,7 +487,16 @@ written down in advance and by naming what it may look at.
    reports it separately. Two paths are cited only there —
    `arch/mips/kernel/unaligned.c`, `kernel/sysctl.c` — and both are
    out-of-scope.
-6. ⚠️ **It says nothing about the toolchain or the datasheets.** Reading
+6. 🔴 **A ranking in this file goes stale silently, and one already did.**
+   § 4.3 called `CLK-06` *the diff's best row*. That is not a fact about a
+   source, it is a **comparison among rows**, and it can be falsified by
+   anything that changes any other row — here, by reading one page of a
+   datasheet this repository had already cited. It survived exactly one
+   segment. **The rule from here: this file records what was read and what was
+   taken from it, and does not rank rows against each other.** A row that
+   deserves emphasis gets it from the experiment that would settle it, which
+   is checkable, rather than from a superlative, which is not.
+7. ⚠️ **It says nothing about the toolchain or the datasheets.** Reading
    `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` is not contamination — a datasheet
    is the *specification*, and two implementations reading the same
    specification are still two implementations. That is an argument, not a

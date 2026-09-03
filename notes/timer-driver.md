@@ -228,6 +228,27 @@ arming would make the rating irrelevant and select it the moment it registers.
 **Prerequisite** — none of this needs a power cycle of its own. It rides the
 next seating's boot, and the whole block is `cat` and one `echo`.
 
+🔴 **And it goes LAST on that seating's card. This is the decision, and the
+reason is that it converts the failure's cost to zero.**
+
+The arm's worst case is not a brick and not a flash byte: it is the board
+wedging *after* a shell that has already been reached, which costs **the
+remainder of the seating**. That quantity is under the card's control. Put the
+timer block after `SEAM-1`'s `--mode bench` run, after `GR-1`, and after
+whatever `CPU-45` work the seating carries, and the remainder is empty — a
+wedge then costs the reset that ends the seating anyway.
+
+⚠️ **The alternative that was rejected, and why.** Stopping after `E6` — arm,
+wait one period, read `TCIR`, disarm, and skip the 60-second comparison —
+saves 60 s of board time and **buys no safety at all**: by the time `E6` has
+returned, every register this driver writes has been written and every hazard
+has either fired or not. `E7`/`E8` are `cat`s. **A precaution that costs
+information and removes no risk is not a precaution.**
+
+⚠️ **The other alternative — read-only, no arm — fails the step.** `R5-2`'s
+`D4` is a frequency within ±50 ppm; `E1`–`E3` cannot produce a frequency. It
+would leave `R5-3` with nothing new to be safe on.
+
 ### 5.1 The arithmetic, before any measurement
 
 Let `B` be the true rate of the timer block's base clock. Then:
