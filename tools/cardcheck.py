@@ -127,6 +127,42 @@ LOADER_VERBS = {
 # commands.  Classifying them as shell words would report `Y: not in image`.
 CONFIRM = {"Y", "y", "N", "n"}
 
+# 🔴 THE `FLR` BYPASS, and it is a residual this project wrote down and then
+# left a sentence guarding.
+#
+# `PROGRESS.md`'s *the `H601` pre-read containment is wrong in the template* row
+# closed 2026-08-31 by building an enforcer -- `tools/flrbracket.py run` refuses,
+# before it opens the port, to write an `H601`-overlapping read-back inside this
+# repository, and a pre-read anywhere inside it for ANY window.  The same row
+# states its own residual in the same breath:
+#
+#     "the enforcement only reaches a card that goes through `flrbracket run`.
+#      A card calling `console-capture.py` directly still bypasses it --
+#      RUNSHEET.md's seating-6 Deviation 2 now says the next card uses the
+#      tool, and that sentence is the whole of what stands between the
+#      template and a repeat."
+#
+# This is that sentence turned into a case.  A card that types `FLR` inside a
+# `--send` is calling `console-capture.py` directly, which is precisely the
+# bypass, and the incident it reproduces is real: 2026-08-31, two files inside
+# this repository held this unit's MAC because a card wrote `H601` pre-reads
+# under `bench/` on the assumption they would be garbage.
+#
+# ⚠️ Two committed cards do exactly that and BOTH ARE FROZEN -- captures have
+# landed against them, so they cannot be edited and their rows are history
+# rather than a plan.  They are named one by one and not excused by a date
+# rule, because a date rule would also excuse a NEW card written with an old
+# date, and because a list that is checked in both directions (B10) cannot
+# quietly grow into a blanket.
+FLR_LEGACY_CARDS = {
+    # 2026-08-30, seating 6.  `V-flr0` / `V-flr6` / `V-flrh` -- the first
+    # bracket, written before `flrbracket.py` existed at all.
+    "bench/2026-08-30c/PREDICTIONS-B5-block2.md",
+    # 2026-08-31, seating 7.  `W-flr*` plus the pre-reads whose `--out` under
+    # `bench/` is the incident this check exists for.
+    "bench/2026-08-31/PREDICTIONS-B5-block3.md",
+}
+
 # ⚠️ 推, NOT 量.  These are ash builtins in busybox generally; this project has
 # never enumerated the builtin table of THIS binary, and `FW-26`'s applet census
 # is a different population (that is the whole point of this tool).  So a word
@@ -233,8 +269,13 @@ def redirect_targets(cmd):
     return out
 
 
-def classify_command(cmd, names, paths):
-    """-> (kind, [issue, ...]).  kind is LOADER / CONFIRM / SHELL / EMPTY."""
+def classify_command(cmd, names, paths, allow_flr=False):
+    """-> (kind, [issue, ...]).  kind is LOADER / CONFIRM / SHELL / EMPTY.
+
+    `allow_flr` excuses the one loader verb that carries a containment rule.
+    It is passed per CARD, never per command, so a card cannot silence the
+    check for one row and keep it for another.
+    """
     cmd = cmd.strip()
     if not cmd:
         return "EMPTY", []
@@ -242,6 +283,18 @@ def classify_command(cmd, names, paths):
         return "CONFIRM", []
     first = cmd.split()[0]
     if first in LOADER_VERBS:
+        # 🔴 `FLR` and nothing else.  `DW`, `EW`, `J` and the rest read or write
+        # nothing that lands in a file, so a blanket rule over LOADER_VERBS
+        # would be noise -- and A21 is the control that says this one is a
+        # guard rather than a blanket.
+        if first == "FLR" and not allow_flr:
+            return "LOADER", [
+                "FLR: typed through `--send`, which calls console-capture.py "
+                "directly and BYPASSES tools/flrbracket.py run -- the only "
+                "thing that refuses to write a bracket's pre-read, or an "
+                "H601-overlapping read-back, inside this repository. Use "
+                "`flrbracket run` with --echo-dir and --dw-dir, or add this "
+                "card to FLR_LEGACY_CARDS with the reason"]
         return "LOADER", []
 
     issues = []
@@ -320,9 +373,14 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
             if ln and not ln.startswith("#"):
                 absent.add(ln.split()[0])
 
+    # Per CARD, not per row: a frozen card cannot be edited, so its `FLR` rows
+    # are excused wholesale or not at all.  Normalised because a caller may
+    # hand us either separator.
+    legacy_flr = card_rel.replace("\\", "/") in FLR_LEGACY_CARDS
+
     bad, intentional, kinds = 0, 0, {}
     for cid, cmd in pairs:
-        kind, issues = classify_command(cmd, names, paths)
+        kind, issues = classify_command(cmd, names, paths, allow_flr=legacy_flr)
         kinds[kind] = kinds.get(kind, 0) + 1
         if not issues:
             continue
@@ -729,6 +787,54 @@ def run_controls():
         except Refuse as e:
             row("A18", "an empty declaration is refused",
                 "ZERO entries" in str(e), str(e)[:48])
+
+    # ----------------------------------------------------------------- A19-A21
+    # 🔴 The `FLR` bypass.  See FLR_LEGACY_CARDS' comment: this is a sentence in
+    # `PROGRESS.md` turned into a case, and the sentence was the only thing
+    # standing between the card template and a repeat of the 2026-08-31
+    # incident, in which two files inside this repository held this unit's MAC.
+    _, iss = classify_command("FLR 80A00400 000000 100", names, paths)
+    row("A19", "an `FLR` typed through --send is REPORTED",
+        len(iss) == 1 and "flrbracket" in iss[0],
+        f"{len(iss)} issue(s): {iss[0][:44] if iss else '-'}")
+
+    _, iss = classify_command("FLR 80A00400 000000 100", names, paths,
+                              allow_flr=True)
+    row("A20", "and a FROZEN card on the legacy list is excused",
+        not iss, f"{len(iss)} issue(s) with allow_flr=True")
+
+    # 🔴 THE CONTROL THAT SAYS IT IS A GUARD AND NOT A BLANKET.  Without this,
+    # a future edit that flagged every LOADER verb would pass A19 and A20 and
+    # make the tool useless on every card that reads a register.
+    other = [c for c in ("DW 8040D4A0 1", "J 80500000", "EW B800311C A5000000",
+                         "AUTOBURN 0", "LOADADDR 80500000")
+             if classify_command(c, names, paths)[1]]
+    row("A21", "and no OTHER loader verb is touched by it",
+        not other, f"{len(other)} of 5 flagged" + (f": {other}" if other else ""))
+
+    # ------------------------------------------------------------------- B10
+    # 🔴 THE CORPUS SWEEP, IN BOTH DIRECTIONS.  Forwards: no card outside the
+    # list may type `FLR`.  Backwards: no card ON the list may have stopped
+    # typing it -- an allow-list that keeps entries it no longer needs stops
+    # being an allow-list and becomes a blanket, one card at a time, with
+    # nothing reporting the drift.
+    flr_users, stale = set(), set()
+    for c in cards:
+        try:
+            t = _read(c).decode("utf-8", "replace")
+        except OSError:
+            continue
+        if any(cmd.split() and cmd.split()[0] == "FLR"
+               for _cid, cmd in sends_with_cells(t)):
+            flr_users.add(c)
+    offenders = sorted(flr_users - FLR_LEGACY_CARDS)
+    stale = sorted(FLR_LEGACY_CARDS - flr_users)
+    row("B10", "every card typing `FLR` directly is a named frozen one",
+        not offenders and not stale,
+        f"{len(cards)} swept, {len(flr_users)} type FLR; "
+        + (f"NEW offender(s): {offenders}" if offenders else "")
+        + (f"STALE list entr(y/ies): {stale}" if stale else "")
+        + ("list exact" if not offenders and not stale else ""))
 
     print()
     return 0 if ok else 1

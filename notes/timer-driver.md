@@ -322,7 +322,65 @@ comes from here.
 | **E8** | the same two samples, kernel side | `(Δwall_kernel / Δtc1_seconds) − 1` = **+17.99 ppm ± the sampling noise** | three named alternatives, below |
 | **E9** | `echo disarm > /proc/rtl819x-timer`, then `cat` | `0`; `tccnr` back to `C0000000`; `rtl819x-tc1` gone from `available_clocksource` | `tccnr` not returning to its `at_init` value — the driver cannot undo its own write, and that is worth knowing before `R5-3` |
 
+### 5.2.1 🔴 **2026-09-03, writing `R5-2`'s card: two rows of that table are wrong, and both were found by putting this note's own constants back through this note's own model**
+
+**The rows above are kept as written.** What follows replaces `E7`'s and `E8`'s
+*method*; neither cell's question moves, and `bench/2026-09-03/PREDICTIONS-B9-block8.md`
+is the card that carries the corrected form.
+
+**① `E7` may not quote `tc1_ext` at a 30 s or 60 s spacing — and
+`tc1_ext_trusted` reports `1` on exactly the gaps where it is wrong.**
+`rtl819x_ext_advance()` recovers `d = (now − last) & MASK`, which is the true
+gap only while the gap is under one period (**134,217,728 counts = 9.395016 s**).
+`tc1_ext_trusted` is `gap < (MASK >> 1)` = **4.697508 s**. 量:
+
+| gap | true counts | wraps | the `d` computed | `trusted` |
+|---:|---:|---:|---:|---:|
+| 4.0 s | 57,144,228 | 0 | 57,144,228 | 1 — correct |
+| 9.0 s | 128,574,513 | 0 | 128,574,513 | **0** — correct refusal |
+| **30.0 s** | 428,581,710 | **3** | **25,928,526** | 🔴 **1 — FALSE** |
+| **60.0 s** | 857,163,420 | **6** | **51,857,052** | 🔴 **1 — FALSE** |
+
+Past one period the residue **aliases back into the trusted band**, so the flag
+is not merely uninformative there — it asserts trust over data that has lost
+whole wraps. `E7` as written asked for `tc1_ext_trusted=1` *and* for
+`tc1_ext_gap_max` to be *"a few million counts for a sub-second turnaround"*,
+and those two sentences cannot both describe a 60-second cell.
+**The card quotes `tc1_cycles` and recovers the wrap count outside the kernel
+from `jiffies`**, which § 5.4's last stop-if already sanctioned as the fallback;
+what changed is that it is now the planned route. The driver-side fix — refuse
+when `Δjiffies × TICK_NSEC` implies more than one period — belongs to `R5-3`,
+because `config/` is frozen for the staged image (§ 6.2).
+
+**② `E8` could not have resolved its own headline.** `CONFIG_GENERIC_TIME=y`
+and `clocksource_jiffies` selected means `getnstimeofday()` changes only when
+`jiffies` does, so **`wall` advances on a 10 ms grid** whatever its nine printed
+decimals suggest. 量, a 10 ms endpoint error as ppm: **333.3** at 30 s,
+**166.7** at 60 s, 16.7 at 600 s, 5.6 at 1800 s. The signal is **17.99 ppm**, so
+at 60 s the grid is **nine times** the thing being measured, and § 5.3's three
+branches are not three outcomes of one cell — they need three different
+baselines. 🟢 **§ 5.3's second bullet is the one that survives at 60 s**: one
+lost tick is 167 ppm, which *is* the grid, so a 60 s pair is a one-lost-tick
+detector at the edge of its resolution and is not an 18 ppm measurement.
+
+🟢 **The grid is removable and the remover was already being printed.**
+`TC0CNT` is the tick's own phase, so
+
+```
+TC0_total = jiffies × 142858 + (tc0cnt >> 4)
+```
+
+is a continuous 14.29 MHz reference — **one count is 0.0012 ppm over 60 s** —
+and `ΔTC1 / ΔTC0_total = 1` becomes the measurement. `+17.99 ppm` is then an
+arithmetic consequence of `14286057 / (100 × 142858)`, not a quantity to chase
+with a stopwatch. ⚠️ **The `>> 4` is the driver's reading of D Table 22 and not
+the datasheet's words**; the card's `Q3` tests it, and it is the only test of
+that shift this project has.
+
 ### 5.3 🔴 `E8` is the cell with the most information in it
+
+🔄 **Read with § 5.2.1 ②: the first bullet below was answered at the desk on
+2026-09-03 and the second is the one a 60 s baseline can see.**
 
 The three ways it can come out other than `+18 ppm`, each with its own meaning:
 
@@ -331,6 +389,17 @@ The three ways it can come out other than `+18 ppm`, each with its own meaning:
   names it. **That is the vendor's timer answering a question about itself
   without this project reading its source**, and it is the single most
   valuable byproduct of the cell.
+
+  > 🔴 **2026-09-03: this branch is EXCLUDED at the desk, and the value the
+  > sentence above claims for it is therefore spent.** § 6.4: exactly two
+  > `struct clocksource`s exist in the linked image and neither is the
+  > vendor's. The bench can now only *refute* the desk scan here, which is a
+  > smaller thing than discovering the vendor's clocksource would have been.
+  > **The trade is recorded rather than presented as a gain**: what was bought
+  > is that `E8` stops being a three-way branch and becomes a prediction with a
+  > refutation condition, and that a wrong headline was found before a power
+  > cycle was spent on it. `docs/blind-write-ledger.md` § 4.3 carries the cost
+  > on the ledger side.
 * **below +18 ppm** → **ticks are being lost.** One lost tick in a 60 s window
   is 10 ms / 60 s = **167 ppm**, nine times the whole signal, so this is a very
   sensitive lost-tick detector and it has never been pointed at this board.
@@ -444,6 +513,48 @@ statement about compression.**
   `rtl819x_tc_write_proc`, `rtl819x_tc1_clocksource`, `rtl819x_timer_init` and
   `__initcall_rtl819x_timer_init3` — the last of which is the initcall level,
   read out of the artefact rather than assumed from the source.
+
+### 6.4 🆕 **2026-09-03, later the same day (twenty-ninth segment, `R5-2`'s card): the clocksource census, and the control that caught the scanner**
+
+量 on the `vmlinux` `rlxfw-r51-20260903.bin` was cut from, sha256-16
+`2b0d1618d9946cc6`. No vendor binary was executed and no vendor source was
+opened: the ELF's single `PT_LOAD` is read straight out of the file and MIPS-I
+instruction encodings are matched as 32-bit big-endian words.
+
+**Exactly two `struct clocksource`s are registered in this image, and neither is
+the vendor's:**
+
+| route | result |
+|---|---|
+| direct transfers to `clocksource_register` (`T` @ `80035700`) | **2** — `j` from `init_jiffies_clocksource+0x4` (a tail call) and `jal` from `rtl819x_tc_write_proc+0x27c` |
+| `lui`/`addiu` and `lui`/`ori` pairs materialising its address | **0** — nothing can reach it with `jalr` |
+| `.config` | `# CONFIG_MODULES is not set` — nothing registers one later |
+
+🔴 **The first version of the scan counted `jal` only, found 1, and its designed
+positive control did not fire.** `init_jiffies_clocksource` provably calls
+`clocksource_register` — generic Linux — so the scanner had to be wrong, and it
+was: `return clocksource_register(&clocksource_jiffies);` is a **tail call** and
+gcc emits `j`. `panic` (45) and `schedule` (72) fired throughout, which is what
+made *the control* the suspect rather than the tool.
+
+🔴 **And the indirect scan's first three controls were all silent for a second
+reason**: `panic`, `do_timer` and `clocksource_get_next` simply never have their
+addresses taken, so *that* scan could not fail either. Replaced with three that
+must fire by construction — `rtl819x_tc_read_proc` (2),
+`rtl819x_tc_write_proc` (1) and `rtl819x_tc1_clocksource` (3), all stored into a
+`proc_dir_entry` or read at run time by my own code. Two negative controls (an
+address two bytes off a real one; four bytes into a function) both **0**.
+
+⚠️ **What it cost.** It is a reading of the vendor's compiled code and it goes in
+`docs/blind-write-ledger.md` § 4.3 as one. 🟢 **The order limits the damage**:
+the driver was written, built, linked and pinned into the staged image *before*
+this scan ran, so nothing in it can have been shaped by the result. And it is an
+**absence** — `arch/rlx/kernel/rlx-time.c` still has zero citations.
+
+⚠️ **What it does not say.** It says nothing about *how* the vendor keeps time;
+`clocksource_jiffies` being the only registered source means the tick drives
+everything, which is a fact about registration and not about `rlx-time.c`'s
+contents.
 
 ---
 

@@ -501,7 +501,7 @@ tools/test-flrbracket-mutants.py
                            that case failed. Both controls exist because a pass over
                            `flashwin` reported 8 of 8 killed and every kill was
                            invalid
-tools/cardcheck.py         27 controls, and it reads a card the way the DEVICE will.
+tools/cardcheck.py         31 controls, and it reads a card the way the DEVICE will.
                            `commands` checks every command a card types against what
                            the image DECLARES it can invoke; `numbers` re-derives every
                            number a card states from the artefact it names. It exists
@@ -515,11 +515,16 @@ tools/cardcheck.py         27 controls, and it reads a card the way the DEVICE w
                            reporting `0 of 0`, which is why the five frozen blocks
                            come back refused and that is the correct output
 tools/test-cardcheck-mutants.py
-                           18 mutants, baseline first. Two survived the 23 controls
+                           22 mutants, baseline first. Two survived the 23 controls
                            that existed when they were written, and neither was
                            visible to any card in the corpus — one of them exposed a
                            real defect, that `/proc` and `/sys` belong to the kernel
-                           and were being reported as undeclared
+                           and were being reported as undeclared. Four arrived
+                           2026-09-03 with the `FLR`-bypass guard, and a fifth
+                           mutation was re-anchored: adding that guard moved the
+                           lines `M6` matched, and the suite reported `ANCHOR x0`
+                           and FAILED rather than passing — which is how the edit
+                           was noticed
 tools/replay-capture.py    23 controls, and it turns a committed `.log` + `.timing`
                            back into the terminal it came from - so R3-11's
                            artefact is DERIVED from evidence rather than recorded

@@ -280,7 +280,7 @@ kind that a reader should be able to see rather than take on trust.
 | `kernel/sched_clock.c` | line | **generic** | `:39`, the weak generic `(jiffies - INITIAL_JIFFIES) * (NSEC_PER_SEC / HZ)`, read to establish that `arch/rlx` defines no `sched_clock` (zero hits) and that `printk_time` therefore has 10 ms resolution. **Generic Linux — every port in existence uses this file** |
 | `include/linux/clocksource.h` | name | **generic** | 🆕 2026-09-03, `R5-1`: the `struct clocksource` field list, `clocksource_hz2mult()`, `CLOCKSOURCE_MASK()`, the `read(struct clocksource *)` signature, and the rating band comment (*1–99 unfit for real use*). **The subsystem's interface**, which a clocksource for any part must be written against. It says nothing about this SoC |
 | `include/linux/jiffies.h` | name | **generic** | 🆕 2026-09-03, `R5-1`: `LATCH`, `ACTHZ`, `SH_DIV`, `NSEC_PER_JIFFY` and `TICK_NSEC` — read to check, rather than assume, that this build treats one jiffy as exactly 10,000,000 ns. It does, and the check is `notes/timer-driver.md` § 5.1.1. **Generic Linux** |
-| `kernel/time/jiffies.c` | name | **generic** | 🆕 2026-09-03, `R5-1`: `clocksource_jiffies`'s **rating 1** and its `mult`/`shift`, which is the number `L2-e`'s choice of rating 0 is measured against. **Generic Linux** |
+| `kernel/time/jiffies.c` | 🔄 **line** | **generic** | 🆕 2026-09-03, `R5-1`: `clocksource_jiffies`'s **rating 1** and its `mult`/`shift`, which is the number `L2-e`'s choice of rating 0 is measured against. **Generic Linux.** 🔄 **Depth corrected 2026-09-03 (`R5-2`), and by the scan rather than by a re-read**: this row said `name`, and `ledgerscan scan --domain timer` reports **`line`** because `notes/timer-driver.md:273` cites `kernel/time/jiffies.c:37`. ⚠️ **`ledgerscan check` did not and cannot catch that** — it compares the set of cited paths against the set of declared paths and never looks at the depth column, so a row can be under-declared in depth and stay green. § 7 ⑧ |
 | `arch/rlx/include/asm/timex.h` | line | 🔴 **vendor** | 🆕 2026-09-03, `R5-1`: `:21`, one constant — `CLOCK_TICK_RATE = 1193182`. 🟢 **It is the i8253 PIT frequency of an IBM PC and describes no part of this SoC**, so what it costs on the decision layer is nil; what it bought is § 5.1.1's table, which says the jiffy length is exact at `HZ=100` and off by tens of ppm at every other `HZ` this port offers. **No register, no sequence, no divisor, no interrupt number** |
 | `kernel/time/timekeeping.c` | name | 🟡 **none — a correction** | 🆕 2026-09-03, and it is this ledger's **second** `origin: none` row. `notes/timer-driver.md:41` names this file *inside a note saying it was never opened*: a draft sentence cited it from memory as the place `(now - cycle_last) & mask` is performed, `ledgerscan check` went RED, and the sentence was rewritten to cite `include/linux/clocksource.h`'s `@mask` documentation — which is what was actually read. **Nothing was taken from this file.** The location is about the instrument, not about the device, which is the constraint § 4.1 puts on this category |
 | `kernel/time/clocksource.c` | name | **generic** | 🆕 2026-09-03, `R5-1`: `clocksource_enqueue()`, `select_clocksource()`, `clocksource_register()`, `clocksource_unregister()` — read to settle **one decision**, `L2-e`: whether a rating below `clocksource_jiffies`' 1 keeps a source out of the selection, and which way a tie breaks. Generic Linux, identical in every 2.6.30 tree. 🔴 **It touches the decision layer even so**, because a second implementation's rating choice would be reading the same code; `notes/timer-driver.md` `L2-e` cites it by name rather than presenting that choice as arrived at alone |
@@ -291,7 +291,7 @@ absent:**
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
-| `arch/rlx/kernel/rlx-time.c` | **none — zero citations** | vendor | **Nothing.** It exists (量 2026-09-02, directory listing, no file opened) and this repository has never cited it, in any spelling. 🔴 It is listed because § 1's first account of the grep was that this file did not exist; it does. `ledgerscan` cannot report a file nobody has mentioned, so this row is written by hand and is exactly the § 0 ① limit made visible |
+| `arch/rlx/kernel/rlx-time.c` | **none — nothing taken** | vendor | **Nothing.** It exists (量 2026-09-02, directory listing, no file opened). 🔴 It is listed because § 1's first account of the grep was that this file did not exist; it does. `ledgerscan` cannot report a file nobody has mentioned, so this row is written by hand and is exactly the § 0 ① limit made visible. 🔄 **2026-09-03 (`R5-2`): the depth used to read *"zero citations"*, and that is now false as a count and was always the wrong measurement.** `ledgerscan scan --domain timer` reports **6 citations across 4 files** — this row, the driver's own comments, `notes/timer-driver.md` and the `R5-2` card — every one of which is *this project saying it did not open the file*. **The claim is that nothing was TAKEN, and a mention is not a taking**; the count was never the evidence and citing it invited exactly the confusion it now causes |
 
 ⚠️ `arch/rlx/kernel/rlx-csrc.c` — the *clocksource* half, guessed from
 `cevt` — **does not exist** in the built drop. So whatever the vendor does for
@@ -344,6 +344,42 @@ row and it exists because the timer was not read.**
 > coexistence (`L2-e`), when the hardware is written at all (`L2-f`), and
 > which registers are written (`L2-g`). **This correction makes `D3` harder
 > to pass, not easier** — which is the same test § 5 applies to itself.
+
+#### 4.3.1 🔴 **2026-09-03, `R5-2`'s card: a reading of the vendor's code that is not a reading of a source file, and this ledger had no shape for it**
+
+量, on `vmlinux` sha256-16 `2b0d1618d9946cc6` — **my own build**, the one
+`rlxfw-r51-20260903.bin` was cut from — plus its `System.map` and its `.config`.
+No vendor binary was executed and no vendor source file was opened. What was
+counted: direct `jal`/`j` transfers to `clocksource_register`, and `lui`/`addiu`
+and `lui`/`ori` pairs materialising its address. Result: **exactly two
+clocksources are registered in the image — `clocksource_jiffies` and mine — and
+the vendor registers none.** `notes/timer-driver.md` § 6.4 carries the controls.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| *(no source path)* — the vendor's `arch/rlx` **object code**, as linked into my own `vmlinux` | **artefact** | 🔴 **vendor, by absence** | 🆕 2026-09-03, `R5-2`: **one bit of information — that no code under `arch/rlx` calls `clocksource_register`.** No register, no sequence, no divisor, no interrupt number, no file opened. It is an *absence*, and it was obtained by counting instruction encodings in a binary I produced |
+
+🔴 **Why it is declared even though `ledgerscan` cannot see it.** The scan reads
+prose for path citations; this reading cites no path, so it is invisible to the
+tool by construction — the § 0 ① limit, in a new shape. Declaring it is § 2.1's
+direction of error on purpose: this file **over-reports** contact.
+
+🟢 **What keeps it off the decision layer, and it is an order rather than an
+argument.** `R5-1`'s driver was written, compiled, linked and pinned into the
+staged image on 2026-09-03 **before** this scan ran. A reading taken after the
+artefact is frozen cannot have shaped it, and the artefact's sha256 is the
+witness. **That protection does not extend to `R5-3`**, which is not yet
+written: from here on, *the vendor registers no clocksource* is something this
+project knows, and a coexistence decision in `R5-3` that leans on it is leaning
+on the vendor's code. `R5-3`'s rating decision must say so in place.
+
+⚠️ **The general rule this row adds, because a second instance is likely.**
+A *binary* of mine that contains the vendor's compiled code is a source of
+findings about the vendor, and the three earlier categories in this file —
+`line`, `name`, `none` — all assume a file was opened. **`artefact` is the fourth
+depth**, and its test is the same as the others': what was taken, and could it
+have shaped a decision. It is not a loophole; a disassembly of the vendor's
+timer routine would be a `line` reading whatever file it was printed from.
 
 ### 4.4 🟡 `R5-10` interrupt map — 2 paths
 
@@ -500,7 +536,24 @@ written down in advance and by naming what it may look at.
    taken from it, and does not rank rows against each other.** A row that
    deserves emphasis gets it from the experiment that would settle it, which
    is checkable, rather than from a superlative, which is not.
-7. ⚠️ **It says nothing about the toolchain or the datasheets.** Reading
+7. 🔴 **A binary of mine carries the vendor's compiled code, and until
+   2026-09-03 this file had no shape for a finding taken out of one.** § 4.3.1
+   is the first: *no code under `arch/rlx` calls `clocksource_register`*, read
+   by counting instruction encodings in my own `vmlinux`. `ledgerscan` cites
+   paths and this reading cites none, **so the tool is structurally blind to
+   this whole category** — every such row will be written by hand or not at all.
+   The `artefact` depth is defined in § 4.3.1 and its test is unchanged: what
+   was taken, and could it have shaped a decision.
+8. 🔴 **`ledgerscan check` compares SETS OF PATHS and never the depth column, so
+   a row can be under-declared and stay green.** 量 2026-09-03: `check` reported
+   *ok* over 32 in-scope paths while `kernel/time/jiffies.c` was declared `name`
+   and `scan` had it as `line` (`notes/timer-driver.md:273` cites `:37`). The
+   depth is what distinguishes *saw the interface* from *read the code*, which
+   is the distinction the whole file exists to make, and **the only thing
+   checking it is a human reading two outputs side by side**. Fixed in the row;
+   the checker is not fixed, and the next under-declared depth will be found the
+   same way or not at all.
+9. ⚠️ **It says nothing about the toolchain or the datasheets.** Reading
    `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` is not contamination — a datasheet
    is the *specification*, and two implementations reading the same
    specification are still two implementations. That is an argument, not a
@@ -523,7 +576,7 @@ grow with this repository and are quoted for scale, not as findings.
 | `wdt` | **0** | `R5-6` | 🟢 blind of any implementation |
 | `led` | **0** | `R5-7` | 🟢 blind of any implementation |
 | `keys` | 1 | `R5-8` | 🟢 blind — the one citation is `origin: none`, an example inside this tool's own census row (§ 4.1) |
-| `timer` | 🔄 **8** | `R5-1` | 🟢 one string literal of the vendor's, plus `rlx-time.c` with **zero** citations until this file named it, plus **five** generic-Linux paths and **one more of the vendor's** — 2026-09-03 added the clocksource subsystem's header and core, the two files that fix the jiffy length, and `arch/rlx/include/asm/timex.h`, whose single constant is a PC's timer chip (§ 4.3). 🔴 **`CLK-06` is no longer the diff's best row**: D Table 26 states the divisor semantics, so it is L1. The replacement L2 rows are `notes/timer-driver.md` § 3 |
+| `timer` | 🔄 **8** paths **+ 1 `artefact`** | `R5-1`, `R5-2` | 🟢 one string literal of the vendor's, plus `rlx-time.c` with **zero** citations until this file named it, plus **five** generic-Linux paths and **one more of the vendor's** — 2026-09-03 added the clocksource subsystem's header and core, the two files that fix the jiffy length, and `arch/rlx/include/asm/timex.h`, whose single constant is a PC's timer chip (§ 4.3). 🔴 **`CLK-06` is no longer the diff's best row**: D Table 26 states the divisor semantics, so it is L1. The replacement L2 rows are `notes/timer-driver.md` § 3. 🔴 **And the `+1` is not a path**: § 4.3.1, one bit taken out of the vendor's *object* code in my own `vmlinux` — no code under `arch/rlx` calls `clocksource_register` — which `ledgerscan` is structurally blind to (§ 7 ⑦) |
 | `dt` | 2 | `D2` | 🟢 one `cpu@0` node, plus the board `.dts` by name only; the register addresses in the `.dtsi` are placeholders, recorded 2026-08-25 |
 | `irq` | 2 | `R5-10` | 🟡 two string literals; one is the loader's, not Linux's |
 | `bsp` | 8 | all six | 🔴 cross-domain exposure; `bsp_setup():134-175` counts as fully read |

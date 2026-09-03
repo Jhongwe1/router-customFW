@@ -44,9 +44,34 @@ MUT = [
      '        if re.match(r"^\\d*[<>]{1,2}$", w):          # a free redirection\n'
      "            i += 1"),
 
+    # 🔴 M6's anchor was `if first in LOADER_VERBS:` immediately followed by
+    # `return "LOADER", []`, and 2026-09-03 put the FLR guard between them, so
+    # the anchor stopped occurring.  The suite reported `ANCHOR x0 (not
+    # applied)` and FAILED rather than passing -- which is the behaviour that
+    # made the edit visible.  Re-anchored on the two lines above the branch,
+    # which do not move when a branch body grows.
     ("M6  loader verbs looked up as shell names             (kills A7)",
-     '    if first in LOADER_VERBS:\n        return "LOADER", []',
-     '    if False:\n        return "LOADER", []'),
+     '    first = cmd.split()[0]\n    if first in LOADER_VERBS:',
+     '    first = cmd.split()[0]\n    if False:'),
+
+    # ------------------------------------------------------------ the FLR guard
+    ("M19 the FLR bypass issue is not reported              (kills A19)",
+     '        if first == "FLR" and not allow_flr:',
+     '        if False and not allow_flr:'),
+
+    ("M20 the guard becomes a blanket over every loader verb (kills A21)",
+     '        if first == "FLR" and not allow_flr:',
+     '        if first != "" and not allow_flr:'),
+
+    # B10 is checked in BOTH directions, so it needs one mutant per direction.
+    ("M21 a card that no longer types FLR stays on the list  (kills B10)",
+     '    "bench/2026-08-30c/PREDICTIONS-B5-block2.md",',
+     '    "bench/2026-08-30c/PREDICTIONS-B5-block2.md",\n'
+     '    "bench/2026-09-02/PREDICTIONS-B8-block7.md",'),
+
+    ("M22 a card that DOES type FLR is dropped from the list (kills B10, A11)",
+     '    "bench/2026-08-31/PREDICTIONS-B5-block3.md",',
+     '    "bench/2026-08-31/PREDICTIONS-B5-block3-NOTHING.md",'),
 
     ("M7  MDIOR removed from the verb list                  (kills B2)",
      '"PHYR", "PHYW", "MDIOR", "MDIOW",',

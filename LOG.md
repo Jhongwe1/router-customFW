@@ -14722,3 +14722,174 @@ every／exactly」之類的字，逐行重新導出。`notes/timer-driver.md` �
   `drivers/`）與 `MARK-1`（`rlxfw-marks verify` 看不到 build 列帶進來的整個檔案）。
   **兩件都是「一個回報 0 的工具在做宣稱」的同一類，而且每加一支驅動就多一份。**
 * `CI-5`：CI 的 wall-clock 不是 suite 成本，量到 `apt` 24 s → 650 s。
+
+---
+
+## 2026-09-03（四，同日第二段）— 第二十九段，桌面，不通電，`R5-2` 的上機卡片：寫卡片這件事在通電之前否掉了它自己頭號預測的方法，兩次
+
+桌面日，未接觸裝置。**零 flash 位元組、零電源循環、零裝置讀數 —— 今天這句話成立，因為機器沒通電。**
+
+開場三邊量日期：Windows `2026-09-03 13:45:33 +08:00`、Git Bash 同值、WSL
+`13:45:41 +0800`。第二十八段是同一個日曆日的 01:10，所以這是**同一天的第二段**，
+而不是新的一天。
+
+🔴 **開場第二件事就更正了一個前提：未 push 的是 4 個 commit，不是 5 個。**
+`git fetch` 之後 `origin/main` 是 `e423ebf`（*The sweep reading…*），
+`git rev-list --left-right --count origin/main...HEAD` 回 `0 4`。這一段依決定
+不在中途推，收工時一次推。
+
+### 產物
+
+`bench/2026-09-03/PREDICTIONS-B9-block8.md` —— 九格 `E1`–`E9`、十次擷取、
+`TM-*` 前綴（`bench/` 下沒有任何目錄用過這個字首，量）。
+`cardcheck commands` **10 條全 SHELL、0 問題**；`cardcheck numbers`
+**8／8 重新導出**。
+
+⚠️ 目錄名是一個預測。下一次 seating 的日期未知，卡片寫在 2026-09-03 就放
+`bench/2026-09-03/`；若 seating 落在別天，通電前改名並記成一條 deviation —— 那是
+seating 8 的 Deviation 1，走過一次，代價已知。被評估後放棄的替代方案是不帶日期的
+目錄名：`bench/README.md`、`tools/boot-timeline.py` 與
+`tools/test-boot-timeline.sh` 的 `B2` 全都讀「一個目錄一次電源循環、以日期命名」
+這個母體，為了省一次改名而動它，會同時動到那個母體的三個讀者。
+
+### 🔴 兩個缺陷，兩個都是把 §5 自己的常數放回 §5 自己的模型裡算出來的
+
+**① `tc1_ext` 在這一塊的取樣間隔上不能引用，而驅動自己的 `tc1_ext_trusted`
+會謊報 `1`。** `rtl819x_ext_advance()` 算 `d = (now − last) & MASK`，只在間隔小於
+一個週期時才是真的；週期是 `2^27` counts = **9.395016 s**，旗標的門檻是半個週期
+= **4.697508 s**。量（把卡片自己的間隔放進那個表達式）：
+
+| 間隔 | 真實 counts | 圈數 | 驅動算出的 `d` | `tc1_ext_trusted` |
+|---:|---:|---:|---:|---:|
+| 4.0 s | 57,144,228 | 0 | 57,144,228 | 1 —— 正確 |
+| 9.0 s | 128,574,513 | 0 | 128,574,513 | **0** —— 正確地拒絕 |
+| **30.0 s** | 428,581,710 | **3** | **25,928,526** | 🔴 **1 —— 假的** |
+| **60.0 s** | 857,163,420 | **6** | **51,857,052** | 🔴 **1 —— 假的** |
+
+**超過一個週期之後餘數 alias 回可信帶內，所以那個旗標不是「在那裡沒用」，
+它會對掉了整圈的資料宣稱可信。** §5.2 的 `E7` 同時要求 `tc1_ext_trusted=1` 與
+「sub-second turnaround 的 gap」，那兩句話不可能同時描述一格 60 秒的 cell。
+卡片改成引用 `tc1_cycles`、在核心外用 `jiffies` 還原圈數（安全係數約 470 倍），
+並把「`trusted` 會讀 1 而且是假的」寫成預測 `Q5`，所以這個缺陷會在矽片上被確認
+而不是只停在紙上。修法屬於 `R5-3`（`TMR-1`、`SPEC.md` `CLK-22`）。
+
+**② `E8` 原本的方法量不到自己的頭號預測。** `CONFIG_GENERIC_TIME=y` 而選中的是
+`clocksource_jiffies`（見下），所以 `getnstimeofday()` 只在 `jiffies` 變時才變 ——
+**核心報出來的時間走 10 ms 的格子**，不論它印了幾位小數。量，10 ms 端點誤差換成
+ppm：30 s 是 **333.3**、60 s 是 **166.7**、600 s 是 16.7、1800 s 是 5.6。訊號是
+**17.99 ppm**，所以 60 s 的一對取樣**差九倍**量不到它；§5.3 的三支不是一格的三種
+結果，它們需要三種不同的基線。
+
+🟢 **把格子拿掉的東西，驅動本來就在印。** `TC0CNT` 是那個 tick 自己的相位：
+
+```
+TC0_total = jiffies × 142858 + (tc0cnt >> 4)
+```
+
+是一個連續的 14.29 MHz 參考 —— **一個 count 在 60 s 上是 0.0012 ppm** —— 而
+`ΔTC1 / ΔTC0_total = 1` 就是那個量測。`+17.99 ppm` 從此是
+`14286057 / (100 × 142858)` 的算術結果，不是要拿碼錶追的量。
+⚠️ `>> 4` 是驅動對 D Table 22 的讀法而不是資料表的字，卡片的 `Q3`
+（`tc0cnt & 0x0F == 0` 且 `tc0cnt >> 4 < 0x22E0A`）是這個專案唯一一次測它。
+
+### 🟢 `E8` 的「≈0 ppm」那一支在桌面上被排除了，而那是花掉的價值不是賺到的
+
+§5.3 稱 `E8` 讀到 ≈0 ppm 是「這一格最值錢的副產物」——它會表示廠商註冊了真的
+clocksource，而且是在沒讀廠商原始碼的情況下知道的。
+
+量 2026-09-03，在**我自己建的** `vmlinux`（sha256-16 `2b0d1618d9946cc6`）上，
+**沒有執行任何 vendor binary、沒有打開任何 vendor 原始碼**：ELF 的單一 `PT_LOAD`
+直接從檔案讀出來，MIPS-I 指令編碼當成 32 位元大端字比對。
+
+| 路徑 | 結果 |
+|---|---|
+| 到 `clocksource_register`（`T` @ `80035700`）的直接轉移 | **2** —— `init_jiffies_clocksource+0x4` 的 `j`（尾呼叫）與 `rtl819x_tc_write_proc+0x27c` 的 `jal` |
+| 具體化它的位址的 `lui`/`addiu`、`lui`/`ori` 對 | **0** —— 沒有東西能 `jalr` 到它 |
+| `.config` | `# CONFIG_MODULES is not set` |
+
+**所以這顆映像裡剛好兩個 clocksource，廠商註冊 0 個**（`SPEC.md` `CLK-21`）。
+
+🔴 **而正控制第一次沒發射，那正是它抓到的東西。** v1 只數 `jal`，回報 1，
+設計好的正控制 `init_jiffies_clocksource`（generic Linux，一定會呼叫
+`clocksource_register`）**沒有發射**，而 `panic`(45)、`schedule`(72) 有 ——
+所以嫌疑犯是**控制**不是工具：`return clocksource_register(&clocksource_jiffies);`
+是**尾呼叫**，gcc 發 `j` 不是 `jal`。
+🔴 **間接掃描的前三個正控制也全是 0，理由不同**：`panic`、`do_timer`、
+`clocksource_get_next` 的位址**根本沒被取過**，所以那次掃描一樣不可能失敗。換成
+一定會發射的三個 —— `rtl819x_tc_read_proc`(2)、`rtl819x_tc_write_proc`(1)、
+`rtl819x_tc1_clocksource`(3)，全部由我自己的 `rtl819x_timer_init` 在執行期存進
+`proc_dir_entry`；兩個負控制（離真位址 2 個位元組、進入函式 4 個位元組）都是 0。
+
+⚠️ **代價**：這是一次對廠商**編譯後**程式碼的讀取，記進
+`docs/blind-write-ledger.md` **§4.3.1**，那是這個帳本的第四種深度 `artefact`
+（前三種 `line`／`name`／`none` 都假設打開過一個檔案）。
+🟢 **限制傷害的是順序而不是論證**：驅動在這次掃描之前就已經寫完、編譯、連結、
+釘進 `rlxfw-r51-20260903.bin`，映像的 sha256 是證人。**而這個保護不延伸到
+`R5-3`** —— 從今天起「廠商沒註冊 clocksource」是這個專案知道的事，`R5-3` 的
+rating 決定如果靠它，就是靠廠商的程式碼，那一列必須就地說出來。
+
+### 🆕 「樣板還在錯」那條殘留變成檢查器了
+
+`PROGRESS.md` 那條 `H601` 前讀圍堵的列在 2026-08-31 就關了，**用的是造一個
+enforcer 而不是改樣板**，而它在同一句話裡寫下自己的殘留：*「執行只到達走
+`flrbracket run` 的卡片。直接呼叫 `console-capture.py` 的卡片仍然繞得過去 ——
+而那句話就是樣板與重演之間的全部。」*
+
+今天把那句話變成案例。`tools/cardcheck.py`：
+
+* **`A19`** —— `FLR` 寫在 `--send` 裡就是那個繞道，回報。
+* **`A20`** —— 兩張**具名**的凍結卡片放行：`bench/2026-08-30c/PREDICTIONS-B5-block2.md`
+  與 `bench/2026-08-31/PREDICTIONS-B5-block3.md`。**一張一張列名，不用日期規則**
+  —— 日期規則會連帶放行一張用舊日期寫的新卡片。
+* **`A21`** —— 「這是守衛不是毯子」的控制：`DW`／`J`／`EW`／`AUTOBURN`／`LOADADDR`
+  五個 loader verb 一個都不能被碰。沒有它，一個把所有 loader verb 都標記的改動會
+  同時通過 `A19` 與 `A20`。
+* **`B10`** —— 語料庫**雙向**掃描。正向：清單外的卡片不得打 `FLR`；反向：清單上的
+  卡片不得已經不打 `FLR` 了。**反向擋的是清單一張一張靜靜長成毯子而沒有東西回報。**
+  量，第一次跑：**50 張卡、2 張用 `FLR`、清單剛好**。
+
+控制 **27 → 31**；變異 **18 → 22，22／22 全殺**。
+🔴 **而 `M6` 的 anchor 被我這次編輯打斷時，是變異器自己 FAIL（`ANCHOR x0`）而不是
+靜靜通過** —— 那次 FAIL 就是我發現要重新 anchor 的方式。
+`tools/ci-expected.tsv` 與 `README.md` 的兩個宣告數同一個 commit 更新（`CI-4` 那一類）。
+
+### 🔴 帳本被自己的掃描抓出兩處不精確
+
+* `kernel/time/jiffies.c` 宣告深度 **`name`**，而 `scan --domain timer` 報
+  **`line`** —— `notes/timer-driver.md:273` 引的是 `kernel/time/jiffies.c:37`。
+  **而 `ledgerscan check` 比對的是路徑集合，從不看深度欄**，所以少宣告深度可以
+  一路綠。列已就地更正，**檢查器沒有修**（`LEDGER-2`，`docs/blind-write-ledger.md`
+  §7 ⑧）。⚠️ 修法不是把 `scan` 的深度硬塞給 `check`：`scan` 的深度是全 repo 觀察到
+  的最大值，帳本的深度是「這一列說它拿了什麼」，要做的是不一致時**報告**而不是判定。
+* `arch/rlx/kernel/rlx-time.c` 那一列的深度寫「zero citations」，現在數字上是假的
+  —— `scan` 報 **6 次引用、4 個檔**，而那四個檔每一個都是這個專案在說「我沒打開它」。
+  **主張本來就該是「什麼都沒拿」，而提及不是拿；引用數從來不是證據**，寫進去反而
+  招來它現在造成的混淆。
+
+### ⚠️ `config/` 一個字都沒動，而那是量出來的不是記得的
+
+`RECIPE_ID` 是 `config/` 的 sha256（`tools/rlxfw-kbuild.sh:203`）。用同一條指令
+重新導出：**15 個檔，`229d2983`**，與 `notes/timer-driver.md` §6.2 記的相同，
+所以 `rlxfw-r51-20260903.bin`（**1,030,144** bytes，sha256
+`39abf11c2d6fd0ce…`）沒有失效，板子必須印 `RLXFW-ID0=229D2983`。
+
+### 順手量到的、與卡片相關的三件事
+
+* `.config`（就是這顆映像建出來的那一份）：`CONFIG_SYSFS=y`、`CONFIG_PROC_FS=y`、
+  `CONFIG_HZ=100`、`CONFIG_HZ_100=y`、`CONFIG_GENERIC_TIME=y`、
+  `# CONFIG_PRINTK is not set`。`E3`／`E5`／`E9` 讀 sysfs 是可行的，
+  `init_clocksource_sysfs` 是 initcall level **6**、驅動是 **3**，所以驅動先註冊、
+  介面後建立。
+* `console-capture.py` 的 128 位元組行懸崖：兩條 sysfs 路徑合起來是 **141** 字元，
+  所以 `E3`／`E5`／`E9` 各拆成兩次擷取。最長的一行是 `TM-6` 的 **97** 字元。
+* `echo $?` **不能用**：`cardcheck` 的 `B9` 拒絕任何 `--send` 裡的 `$`，那是
+  tokeniser 自己的前置條件。**驅動印 `last_verdict` 正是為了這個** —— 它自己的
+  errno 紀錄，而且比 shell 的退出碼更好，因為它會留在事後拍的擷取裡。
+
+### 今天沒有做到的
+
+* **一個字都還沒在矽片上跑過。** 九格全部是預測。
+* **`E8` 的「≈0」那一支的桌面答案沒有第二個來源** —— 它是一次掃描、一個工具、
+  一顆我自己建的 ELF。控制有，但獨立的第二條路徑沒有。
+* **`ledgerscan` 的深度檢查沒有修**，只更正了那一列。
+* **`R5-2` 的 seating 沒有排期**，所以目錄名仍然是一個預測。
