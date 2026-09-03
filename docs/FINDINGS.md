@@ -107,6 +107,54 @@ dump or a document · **推** inferred, pending a measurement.
 
 ## It changed what an instrument may claim
 
+🆕 **2026-09-03 — a trust flag that reports trusted on data it cannot
+vouch for, and it is mine.** `rtl819x-timer`'s `tc1_ext_trusted` is
+`gap < (MASK >> 1)`, which is correct **inside its domain** — sampling gaps
+under half a counter period — and nothing enforces that domain. 量: past one
+period the masked difference **aliases back into the trusted band**, so a 30 s
+gap loses 3 wraps and a 60 s gap loses 6, and the flag reads `1` for both.
+**A flag that is silent outside its domain is useless; a flag that says
+*trusted* outside it is worse than none**, because a reader who checked it has
+done the right thing and still been told the wrong answer. What changed: `R5-2`'s
+card does not quote `tc1_ext` at all, and it **predicts the false `1`** so the
+defect is confirmed on the silicon instead of staying an argument. `SPEC.md`
+`CLK-22`; the driver fix is `R5-3`'s.
+
+🆕 **2026-09-03 — and a resolution floor makes a criterion unmeasurable
+without making it look unmeasurable.** `R5-2`'s `D4` asks for ±50 ppm and the
+cell that was going to produce it compared two 60-second samples of the
+kernel's clock. 量: with `clocksource_jiffies` selected that clock advances on
+a **10 ms grid**, which is **166.7 ppm** over 60 s — nine times the 17.99 ppm
+the cell was predicting. **Nothing about the cell looked wrong**: it named a
+tolerance, an interval and a prediction, and printed nine decimal places. What
+changed: every comparison now goes against `jiffies × 142858 + (tc0cnt >> 4)`,
+a continuous 14.29 MHz reference at 0.0012 ppm per count that the driver was
+already printing, and the 18 ppm becomes arithmetic over two measured constants
+rather than a quantity to chase.
+
+🆕 **2026-09-03 — a checker that is green over the wrong axis.**
+`ledgerscan check` joins the set of cited paths against the set of declared
+paths and **never reads the depth column**. 量: it reported *ok* over 32 paths
+while `kernel/time/jiffies.c` was declared `name` and the scan read it `line`.
+Depth is what separates *saw the interface* from *read the code* — the
+distinction the ledger exists to make — so the gate was green over everything
+except the thing that matters. ⚠️ **The obvious repair is wrong**: `scan`'s
+depth is the maximum observed anywhere in the repository and the ledger's is
+what a row says it took, so a mismatch has to be **reported**, not **decided**.
+`PROGRESS.md` `LEDGER-2`.
+
+🆕 **2026-09-03 — and twice in one afternoon a scan could not have failed.**
+The clocksource census counted `jal` only and its positive control
+(`init_jiffies_clocksource`, which provably calls `clocksource_register`) did
+not fire — because `return f(x);` is a **tail call** and gcc emits `j`. The
+indirect-reachability scan then reported 0 with **all three** of its positive
+controls also at 0, because `panic`, `do_timer` and `clocksource_get_next`
+simply never have their addresses taken. **The first was caught by having two
+other controls that did fire; the second by noticing that all three read the
+same.** What changed: a control is now chosen for *having the property the scan
+looks for*, not for being an important symbol — the replacements are three of
+my own driver's symbols that a `proc_dir_entry` store guarantees will appear.
+
 🆕 **2026-08-31 — a third containment shape, and it found something on its first sweep.** `flashwin render` governs what may be *printed*;
 `flrbracket run` governs where a *bracket's* read-back may land; both act
 when a file is produced. **`flashwin scan` asks whether a file this

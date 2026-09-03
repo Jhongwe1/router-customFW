@@ -111,7 +111,7 @@ is the one that was nearly missed.
 
 | | who | what |
 |---|---|---|
-| **completeness** | `tools/ledgerscan.py scan` | every path-shaped citation of an external source, in `git ls-files` (**1,447** on 2026-09-03, 1,445 at `R5-0`; the number grows with the repository, and `ledgerscan scan` prints it rather than this table fixing it) and in `upstream/` (302, walked — `git ls-files` cannot see inside a submodule) |
+| **completeness** | `tools/ledgerscan.py scan` | every path-shaped citation of an external source, in `git ls-files` (**1,448** on 2026-09-03 after `R5-2`, **1,447** earlier the same day at `R5-1`, 1,445 at `R5-0`; the number grows with the repository, and `ledgerscan scan` prints it rather than this table fixing it) and in `upstream/` (302, walked — `git ls-files` cannot see inside a submodule) |
 | **domain** | the tool | which of `R5`'s drivers a path could belong to. Over-inclusive by design: `dt` and `bsp` are cross-domain, because a device tree and a board file each describe every peripheral |
 | **origin** | the tool's path rules, restated per row below | *generic Linux* / *vendor Realtek* / *third-party port*. **Only the last two can cost independence** |
 | **depth** | the tool | `name` (a path appears) or `line` (a line number travels with it) |
@@ -563,10 +563,20 @@ written down in advance and by naming what it may look at.
 
 ## 8. The reading, in one table
 
-量 2026-09-03, `ledgerscan scan`, re-derived at commit. Population: **1,447**
+量 2026-09-03, `ledgerscan scan`, re-derived at commit. Population: 🔄 **1,448**
 tracked files (excluding `upstream/`) and 302 in `upstream/` — both of which
 grow with this repository and are quoted for scale, not as findings.
-*(1,445 and 302 at `R5-0`, 2026-09-02.)*
+*(1,445 and 302 at `R5-0`, 2026-09-02; **1,447** at `R5-1`, earlier on
+2026-09-03.)*
+
+🔄 **The `R5-1` → `R5-2` move is one file — this gate's own card — and it was
+found by re-deriving rather than noticed**: the segment that wrote the card left
+**1,447** standing in two places while the tool printed 1,448, which is `CNT-1`'s
+class inside the file whose whole job is to be re-derivable. ⚠️ **A third number
+is also correct and is not this one**: `git ls-files | grep -v '^upstream/'`
+returns **1,449**, because the `upstream` submodule's own gitlink entry has no
+trailing slash and survives that filter. `ledgerscan` drops it; the two numbers
+differ by exactly that entry, and neither is wrong.
 
 **Paths only.** Citation counts are deliberately absent; see the note in § 4.
 

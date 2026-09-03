@@ -2171,6 +2171,17 @@ rather than letting the next card inherit it as one.
 > **pre-read** land there for ANY window, because a pre-read is a `DW` of the RAM
 > destination and `MEM-17` measured DRAM keeping the previous cycle's `FLR`
 > output across a power cycle.
+>
+> ✅ **2026-09-03: and a card that goes around the tool is now caught at the
+> desk rather than trusted not to exist.** The paragraph above protects a card
+> that *uses* `flrbracket run`; a card that types `FLR` inside a
+> `console-capture.py --send` reaches the port without any of it, and until
+> today the only thing preventing that was this sentence. `tools/cardcheck.py`
+> `A19` reports it, `A20` excuses the two frozen cards **by name**, `A21` is the
+> control that it is a guard and not a blanket, and `B10` sweeps the corpus in
+> **both** directions. 量: 50 cards, 2 type `FLR`, list exact. **Write a new
+> card's bracket rows as `flrbracket run`; `cardcheck commands` is what says so
+> before power.**
 
 ---
 

@@ -33,7 +33,9 @@ its stated residual — *the enforcement only reaches a card that goes through
 `flrbracket run`* — and as of today `tools/cardcheck.py` `A19`–`A21` and `B10`
 enforce that residual instead of a sentence doing it: an `FLR` typed through
 `--send` is reported, the two frozen cards that do so are named one by one, and
-`B10` checks that list in **both** directions so it cannot grow into a blanket.
+`B10` checks that list in **both** directions, so it cannot grow into a blanket
+**unreported** — a deliberate entry is still a deliberate entry, and the check
+makes it one somebody has to write down rather than one that accretes.
 
 **One power cycle, and it is not this block's** — the seating's, shared with
 `SEAM-1`, `GR-1` and whatever `CPU-45` work it carries. Cells are `TM-*`, a stem
@@ -118,11 +120,16 @@ a 100 Hz one. One count is **0.0012 ppm over 60 s**. Every comparison this block
 makes is against `TC0_total`, and the +17.99 ppm then falls out of two measured
 constants rather than being chased with a stopwatch.
 
-⚠️ **`>> 4` is the driver's assumption about `TC0CNT`, not the datasheet's**, and
-this block tests it — see `E1`'s third prediction. `rtl819x_tc1_cycles()` shifts
-`TC1CNT` right by `RTL819X_TC_VALUE_SHIFT = 4`; the `/proc` dump prints `tc0cnt`
-**raw**, unshifted, so the reader does the shift and can see whether it was the
-right one.
+⚠️ **`>> 4` is 量 on this die and is NOT an assumption**, and the first draft of
+this section said it was. `REG-05`: `TC0DATA` reads `0x0022E0A0` = `142,858 << 4`,
+exactly the compiled-in image value. `REG-07`: `TC0CNT` reads `0x0010B960`, bits
+3:0 zero. And `probe3`'s Group T has already **run on the silicon** doing the
+`>> 4` — `docs/probe3-cells.md` § *Written before the cells*, `tools/rlxprobe/cells.S:312`,
+`tools/rlxprobe/probe3.c:1043`. 🟢 **What `E1`'s third prediction adds is a
+cross-check on new ground, not a first test**: every reading above was taken at
+the loader prompt or by a bare-metal payload, and this is the first one under
+Linux at a shell. The `/proc` dump prints `tc0cnt` **raw**, unshifted, so the
+reader does the shift and can see it.
 
 ---
 
@@ -138,7 +145,8 @@ reading the vendor's source.
 | route | what was counted | result |
 |---|---|---|
 | direct transfers to `clocksource_register` (`T` @ `80035700`) | the `jal` and the `j` encodings of that target, over the single `PT_LOAD` | **2**: `j` from `init_jiffies_clocksource+0x4` (a tail call) and `jal` from `rtl819x_tc_write_proc+0x27c` (mine) |
-| indirect reachability | `lui`/`addiu` and `lui`/`ori` pairs materialising `clocksource_register`'s address | **0** — nothing can `jalr` to it |
+| indirect reachability, route 1 | `lui`/`addiu` and `lui`/`ori` pairs materialising `clocksource_register`'s address | **0** |
+| indirect reachability, route 2 🆕 | the literal big-endian word `80035700` anywhere in the `PT_LOAD` — which is how a function pointer held in **data** would look, and route 1 cannot see one | **0** — so nothing can `jalr` to it by either shape |
 | a module registering one later | `.config` | `# CONFIG_MODULES is not set` |
 
 **Controls, because a scan reporting a number is making a claim.** The first
@@ -256,9 +264,12 @@ initramfs's.
 
 ⚠️ **`echo $?` is deliberately NOT used**, and § 5.2's `E4` writes it. `B9`
 refuses any `$` in a committed card's `--send`, because that is the tokeniser's
-own precondition. **The driver prints `last_verdict` for exactly this reason** —
-its own record of the errno, which is strictly better than the shell's, because
-it survives into a capture taken afterwards.
+own precondition. 🟢 **`last_verdict` is what makes that a non-problem, and the
+driver does not print it for this reason** — its own comment gives the reason,
+*so a refusal is legible both from the shell's exit status and from a capture
+taken afterwards*, written before this card existed. It is better than `$?` here
+because it survives into a capture, and that is a property this card gets rather
+than a motive it can claim.
 
 量: every typed line above is under the 128-byte cliff — longest is `TM-6` at
 **97** characters, then the two `sysfs` reads at 70 and 68.
@@ -274,9 +285,16 @@ n_wraps     = round( (ΔTC0_total − ((tc1_cycles_j − tc1_cycles_i) mod 2²�
 ΔTC1        = n_wraps × 2²⁷ + ((tc1_cycles_j − tc1_cycles_i) mod 2²⁷)
 ```
 
-* **`n_wraps` is safe by a factor of ~470.** Over 30 s it is 3, and the estimate
-  would have to be wrong by half a period — 4.7 s in 30 — to round to the wrong
-  integer. `Δjiffies` is exact and `CLK-17` is ±7 ppm.
+* **`n_wraps` is safe, and the margin is quoted for the WORSE of the two routes
+  on purpose.** It has to be wrong by half a period — **67,108,863 counts =
+  4,697.5 ms** — to round to the wrong integer. Unwrapping from `Δjiffies`
+  alone puts one jiffy of quantisation on the estimate, so the margin is
+  `4,697.5 ms / 10 ms` = **469.8×**. The formula above uses `ΔTC0_total`, which
+  has no 10 ms grid at all: there the error is a TC1-versus-TC0 rate
+  difference, and even an absurd **100 ppm** one leaves **1,566×** at 30 s and
+  **783×** at 60 s. 🔴 **The ~470 is therefore a lower bound and is stated as
+  the one to rely on**, because it holds even if `tc0cnt` turns out not to be
+  value-in-bits-31:4 and `Q3` fails.
 * **`ΔTC1 / ΔTC0_total` is the measurement** (`E7`). Both counters are read in
   the same `spin_lock_irqsave`, a few hundred nanoseconds apart, and the skew is
   the same at both endpoints, so it cancels.
@@ -301,7 +319,7 @@ difference, but its *jitter* does not, and the two intervals are what show it.
 |---|---|---|
 | **`Q1`** | `TM-1` prints **37** lines and `gimr_tc1ie=0` | `gimr_tc1ie=1` → Linux unmasked TC1's interrupt. A finding about the vendor's setup obtained without reading it, and the block stops |
 | **`Q2`** | `TM-1`'s `tccnr`/`tcir`/`cdbr`/`tc0data`/`tc1data` equal `SPEC.md` `REG-05`…`REG-11` | a difference → **Linux leaves the block in a different state from the loader**, which is a finding about `arch/rlx/kernel/rlx-time.c` obtained without opening it. Those five values were read at the **loader prompt**; this is the first reading of them under a kernel |
-| **`Q3`** | `tc0cnt & 0x0F == 0` and `tc0cnt >> 4 < 0x22E0A` in every dump | either failing → `TC0CNT` is **not** value-in-bits-31:4, D Table 22 is being read the wrong way, and § 4.2's `>> 4` is wrong. **This is the only test in this project of that shift** |
+| **`Q3`** | `tc0cnt & 0x0F == 0` and `tc0cnt >> 4 < 0x22E0A` in every dump | either failing → `TC0CNT` is **not** value-in-bits-31:4 and § 4.2's `>> 4` is wrong. ⚠️ **This is a cross-check, not a first test**: `REG-05`, `REG-07` and `probe3`'s Group T already carry the shift, all at the loader prompt or from bare metal. **What is new is the state** — first reading of it under Linux, at a shell — and it costs nothing because the field is in every dump anyway |
 | **`Q4`** | `TM-2a` and `TM-2b` both read exactly **`jiffies`** | any other name in `available` → a clocksource § 1's scan says does not exist. That refutes the desk scan, and `TM-2b` names the winner |
 | **`Q5`** | 🔴 `TM-6` reports `tc1_ext_trusted=1` **and it is FALSE** — `tc1_ext_gap_max` lands near **25,928,526**, three wraps short of the true 428,581,710 | `tc1_ext_gap_max` above 67,108,863 with `trusted=0`, which would mean the gap did not alias. Either way `tc1_ext` is not quoted; § 0.1 |
 | **`Q6`** | **`ΔTC1 / ΔTC0_total` = 1.000000 ± 50 ppm**, and in fact within a few ppm | outside ±50 ppm → **TC1 does not divide the same `CDBR` as TC0**, which is § 2's one 讀-only assumption about this driver's rate. That is a finding about the hardware, not about the driver |
@@ -312,11 +330,18 @@ difference, but its *jitter* does not, and the two intervals are what show it.
 
 🔴 **`Q6` is the cell the whole block exists for**, and it is the one that
 cannot be satisfied by accident: `ΔTC0_total` is built from the vendor's tick and
-`ΔTC1` from a counter the vendor does not use, and nothing but a shared divider
-makes them equal.
+`ΔTC1` from a counter the vendor does not use. ⚠️ **Strictly, a shared divider is
+not the only thing that would make them equal** — two independent sources of the
+same frequency would too — but D § 8.2 says one `CDBR` feeds both timers *and*
+the watchdog, and this part has one crystal, so the alternative is not a
+hypothesis anyone is holding.
 
-⚠️ **`Q8` is the only cell here that can find a defect in something other than
-this driver**, and it is free — it is the same three dumps read a second way.
+⚠️ **`Q8` is the cheapest cell that can find a defect in something other than
+this driver** — it is the same three dumps read a second way — but it is not the
+only one, and the first draft of this line said it was. `Q2` finds a difference
+between what Linux leaves in the block and what the loader left; `Q4` can refute
+§ 1's desk scan; `Q10` reads whether the hardware latches `TC1IP` while `TC1IE`
+is clear. **Four of the ten cells look outward, and only `Q8` does it for free.**
 
 ---
 
@@ -349,8 +374,11 @@ this driver**, and it is free — it is the same three dumps read a second way.
    the first irreversible-feeling one of the gate.
 2. **It does not measure the crystal.** `Q6` compares two counters that share
    one base clock, so it tests the *model* — TC0's period, `HZ`, no lost ticks,
-   both timers on one divider — and not the oscillator. `CLK-02`'s ±7 ppm is
-   still the only reading of that.
+   both timers on one divider — and not the oscillator. ⚠️ **And `CLK-02` is not
+   the *only* reading of that**, which the first draft of this line said:
+   `CLK-04`'s 100.0018 Hz tick is a second one, 量 over three baselines
+   (567 s, 1,513 s, 2,080 s) that do not share endpoints. `CLK-02` is the
+   tightest, at ±7 ppm.
 3. **It does not exercise the interrupt.** `GIMR` is read and never written, so
    TC1's timeout is never delivered. `Q10` reads a latch, not a handler.
 4. **`arch/rlx/kernel/rlx-time.c` is still unopened**, and `Q2` is the closest

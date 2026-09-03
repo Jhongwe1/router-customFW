@@ -551,10 +551,12 @@ the driver was written, built, linked and pinned into the staged image *before*
 this scan ran, so nothing in it can have been shaped by the result. And it is an
 **absence** — `arch/rlx/kernel/rlx-time.c` still has zero citations.
 
-⚠️ **What it does not say.** It says nothing about *how* the vendor keeps time;
-`clocksource_jiffies` being the only registered source means the tick drives
-everything, which is a fact about registration and not about `rlx-time.c`'s
-contents.
+⚠️ **What it does not say.** It says nothing about *how* the vendor keeps time.
+`clocksource_jiffies` being the only registered source means the kernel's
+**time-of-day** is derived from the tick — not that the tick *is* everything;
+`arch/rlx` still owns the clockevent that produces it, and this scan says
+nothing about that half. It is a fact about registration, not about
+`rlx-time.c`'s contents.
 
 ---
 

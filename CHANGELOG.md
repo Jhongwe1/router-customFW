@@ -367,6 +367,53 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### `R5-2`'s bench card — written 2026-09-03, and writing it refuted two of its own methods
+
+The card for the two-clocksource reading exists and is frozen:
+`bench/2026-09-03/PREDICTIONS-B9-block8.md`, nine cells over ten captures.
+**It has not run**; the board has not been powered for it.
+
+🔴 **Two defects in the reading's design, both found before power and neither
+by reading anything new** — the design's own constants put back through the
+design's own model:
+
+* **`tc1_ext_trusted` reports `1` on gaps where the unwrap is wrong.** The
+  masked difference aliases back into the trusted band past one counter period
+  (9.395016 s): 量, a 30 s gap loses **3** wraps and a 60 s gap **6**, and the
+  flag says trusted for both. So the flag is not merely uninformative there —
+  it asserts trust over data that has lost whole wraps. The card quotes
+  `tc1_cycles` and unwraps outside the kernel; the driver fix is `R5-3`'s,
+  because `config/` is the source of `RECIPE_ID` and touching it invalidates
+  the staged image.
+* **The kernel's clock is on a 10 ms grid**, so a 60 s pair resolves 166.7 ppm
+  against a 17.99 ppm signal. `TC0CNT` is the tick's own phase and was already
+  being printed, so `jiffies × 142858 + (tc0cnt >> 4)` is a continuous
+  14.29 MHz reference at **0.0012 ppm** per count.
+
+🟢 **Exactly two clocksources exist in the staged image and the vendor
+registers none** — 量 on my own `vmlinux`, no vendor binary executed and no
+vendor source opened. Recorded as a **cost**: it spends the branch the card
+called its most valuable byproduct. It is a reading of the vendor's compiled
+code and goes on `docs/blind-write-ledger.md` under a new `artefact` depth;
+what limits it is that the driver was frozen into the image before the scan.
+
+### `cardcheck` gains the `FLR`-bypass guard — 27 → 31 controls
+
+`PROGRESS.md`'s `H601` pre-read containment row closed on 2026-08-31 by
+building an enforcer, and named its own residual in the same sentence: the
+enforcement reaches only a card that goes through `flrbracket run`. An `FLR`
+typed inside a `console-capture.py --send` bypasses it, and until today the
+only thing preventing that was that sentence.
+
+* **`A19`** reports it. **`A20`** excuses the two frozen cards that do it,
+  named one at a time rather than by a date rule. **`A21`** is the control
+  that says it is a guard and not a blanket. **`B10`** sweeps the corpus in
+  **both** directions, so an allow-list cannot accrete unreported — 量:
+  50 cards, 2 type `FLR`, list exact.
+* Mutants **18 → 22**, 22/22 killed. 🔴 `M6`'s anchor was broken by the new
+  branch and the suite **failed** rather than reporting a pass, which is how
+  the re-anchor got written.
+
 ### `R4` — edit to result, closed 2026-09-02
 
 One `edit -> result` iteration runs as a single command and reports a number.
