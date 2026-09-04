@@ -254,6 +254,25 @@ jobs:
       - name: check-predictions self-test
         run: /usr/bin/python3 tools/check-predictions.py --self-test 2>&1 | tee ci-out/check-predictions.out; exit "${PIPESTATUS[0]}"
 
+      # tcheck reads an rtl819x-timer /proc dump out of a console capture and
+      # recomputes what the driver says it derived.  Its fourteen controls run
+      # against captures committed here -- bench/2026-09-03/TM-1.log for the
+      # version-1.0 shape and six of bench/2026-09-04/* for version 2.0 -- so
+      # nothing outside the repository is needed and there is no allowed skip.
+      # 🔴 Three of the controls exist because this tool was WRONG about a
+      # real dump before they were written (T6, T7, T8), and two more exist
+      # because the mutation suite below showed they were passing for the
+      # wrong reason (T5, T9).
+      - name: tcheck self-test
+        run: /usr/bin/python3 tools/tcheck.py --self-test 2>&1 | tee ci-out/tcheck.out; exit "${PIPESTATUS[0]}"
+
+      # And the claim that those controls bite: nine mutants of tcheck.py,
+      # each breaking one thing the self-test says it checks, each of which
+      # must turn it red.  A green control set is a claim about the control
+      # set; this is the thing that makes it a measurement.
+      - name: test-tcheck
+        run: /usr/bin/python3 tools/test-tcheck.py 2>&1 | tee ci-out/test-tcheck.out; exit "${PIPESTATUS[0]}"
+
       # rbcheck's ten controls run off two captures committed in this
       # repository -- bench/2026-08-25b/H2g.log and H2a.log -- so unlike
       # hazlint, whose population control is 56 KiB of this unit's bootloader

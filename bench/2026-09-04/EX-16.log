@@ -1,0 +1,3 @@
+echo period 12 > /proc/rtl819x-timer ; echo arm > /proc/rtl819x-timer ; echo a
+rmirq > /proc/rtl819x-timer
+# 

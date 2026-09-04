@@ -1028,3 +1028,133 @@ whose correctness depends on the experiment behaving.
 3. **Nothing here has run on the silicon.** Every number in § 10.1–§ 10.3 is a
    desk derivation from committed captures and vendor source. The card is
    `bench/2026-09-04/PREDICTIONS-B10-block9.md`.
+
+---
+
+## 11. 🆕 2026-09-04 (`R5-3a`, seating 12): version 2.0 on the silicon, and the gate nobody had been looking at
+
+**One power cycle, 13:55:58 → 14:27:39** — 量, the first and last captures'
+own `started_wallclock`. Nine card cells, twenty off-card `EX-*` cells, 35
+captures. Zero `FLR`, zero flash-write command; the bracket is unchanged at
+1,024 / 4,194,304 = **0.0244 %**.
+
+§ 10.6's third item — *"Nothing here has run on the silicon"* — expired at
+14:00. The first two survive and § 11.6 says why.
+
+### 11.1 🟢 Every prediction in § 10.1–§ 10.3 landed, and the derivations were recomputed rather than compared
+
+`TI-0`, the idle dump, 67 `key=value` lines where version 1.0 printed 37:
+
+```
+hz_tick=200000  hz_cdbr=200000  hz_agree=1  hz_used=200000
+shift=19        mult=2621440000
+irr0=22222222   irr1=C222FA2D   irr2=2EB29F22   irr3=22222022
+irr1_tc0_rs=13  irr1_tc1_rs=2
+status=10000401 status_im2=1    status_bev=0    status_iec=1
+```
+
+`tools/tcheck.py` recomputes `hz_tick`, `hz_cdbr`, `shift`, `mult`,
+`period_cycles`, `period_jiffies` and `ext_interval_j` **from the other fields
+of the same dump** and every one agrees, on all eighteen dumps. § 10.1's
+`shift = 19` / `mult = 2,621,440,000` is not a transcription: the search runs
+again from `hz_used`, and `(10⁹ ≪ 19) / 200,000` is **exact**, so floor and the
+kernel's rounding cannot differ — the tool says which, because agreement by
+luck and agreement by identity read the same.
+
+🟢 **`arm_delta_100us` read 20** at every armed dump — 100 µs × 200,005 Hz =
+20.0005 counts. § 10.2's third route to the rate, and the tightest of the three.
+
+### 11.2 🔴 `TI-3` read `TC1IP = 0` after SIXTEEN full periods, and the timer block is innocent
+
+量: 8,714 jiffies since `arm` = 87.14 s, `tc1_ext` = 17,431,137 against
+`Δjiffies × hz_used` = 17,428,000 (0.018 %), which is **16.62 periods** of
+1,048,576 counts. `tcir = C0000000` — `TC1IE` set, `TC1IP` clear. `gisr`
+byte-identical to `TI-0`'s.
+
+讀 `arch/rlx/bsp/timer.c:43-46`: `bsp_timer_ack()` is
+`REG32(BSP_TCIR) |= BSP_TC0IP;` — a **read-modify-write on a register whose
+`IP` bits are write-1-to-clear** — called from `rlx_timer_interrupt()` on every
+100 Hz tick. **It clears every pending bit in `TCIR`, including one belonging
+to a driver it has never heard of.**
+
+So `TI-3` measured a duty cycle:
+
+| period | one period | `TC1IP` set for | read |
+|---|---|---|---|
+| 2²⁰ | 5,242.88 ms | 10/5242.88 = **0.19 %** | `TI-3`: **0** |
+| 2⁸ | 1.28 ms | (10−1.28)/10 = **87.20 %** | `EX-2`, `EX-3`: **1** |
+
+**Both percentages were written before the cells ran.** At period 8 `tcir` went
+`C0000000` → **`D0000000`** and `gisr` `88000004` → **`88000204`**, with `GIMR`
+bit 9 clear throughout — so § 4's masked-observation strategy is confirmed on a
+second occasion after `RUNSHEET` `C5`, and on a different bit.
+
+⚠️ This is a race the driver cannot win by locking: it takes
+`rtl819x_tc_lock`, `bsp_timer_ack()` takes nothing. The failure mode is bounded
+rather than removed — a lost ack leaves `TC1IP` set, the ISR's read-back sees
+it, `irq_stuck` rises and `disable_irq_nosync()` fires. 量 `irq_stuck = 0` over
+119,818 interrupts: an upper bound, not an absence.
+
+### 11.3 🟢 `ackip` proves write-1-to-clear, and `reqirq` delivers
+
+`TI-4`: `ackip_before = 1`, `ackip_after = 0`, `ack_proven = 1` — both reads
+inside one `spin_lock_irqsave`, either side of the write. D Table 25's claim is
+no longer single-source. ⚠️ n = 1 still: the flag is sticky, so the two later
+`reqirq`s did not re-prove it.
+
+`TI-5`: `gimr` `00209100` → `00209300`. **This driver never writes `GIMR`** —
+`request_irq` asks the irqchip and `bsp_ictl_irq_unmask` does it, which is what
+§ 9.5 required. `irq_count = 8` between `reqirq` returning and the `cat`, which
+is 10.2 ms at 781.25 Hz: the shell's own latency, measured by the counter.
+
+`TI-6`: `/proc/interrupts` grows `25:  29602  ICTL  rtl819x-timer`. The driver's
+own counter reads 29,592 in the same capture — **a difference of 10**, exactly
+the 12.8 ms between two `cat`s at that rate. At period 12 the same pair reads
+113,223 and 113,223, because 12.8 ms at 48.83 Hz is 0.6. **The disagreement
+between the two counters is itself a rate measurement.**
+
+### 11.4 🟢 The rate: three points, two periods, and a slope
+
+`tools/tcheck.py rate`, which refuses any pair whose `period_cycles` differ:
+
+| pair | period | predicted /jiffy | measured /jiffy | error |
+|---|---|---|---|---|
+| `TI-5`→`TI-6` | 256 | 7.812500 | **7.814052** | 0.0199 % |
+| `EX-5`→`EX-6` | 4096 | 0.488281 | **0.488766** | 0.0994 % |
+| `EX-17`→`EX-18` | 4096 (NIC up, 4 pings) | 0.488281 | **0.488382** | 0.0206 % |
+
+Predicted is `hz_used / period_cycles / hz_kernel`, three integers the driver
+reports and none truncated — deliberately **not** `period_jiffies`, which is an
+integer jiffy count and reads 0 for any period under 10 ms.
+
+🟢 **Measured ratio 15.9873 against a predicted 16.0000, 0.079 %.** A source
+that were not this timer would not shrink 16× when this timer's period grew
+16×. That is what makes the second period a slope rather than a second point.
+
+### 11.5 🟢 Teardown, three times, from a live interrupt twice
+
+`TI-7`, `EX-7`, `EX-19` — every one returns `tccnr`, `tcir` **and** `gimr` to
+their `_at_init` values, with `irq_requested = 0` and `tc1ie_ours = 0`. The
+`/proc/interrupts` line 25 is **absent** afterwards: `EX-0` before, present at
+`TI-6`/`EX-6`, absent at `EX-19` — three states, so the line is this driver's
+and not something found already installed.
+
+Final: `irq_count` **119,818**, `irq_spurious` **0**, `irq_stuck` **0**,
+`tc0_undisturbed` **1**.
+
+### 11.6 What seating 12 did NOT establish
+
+1. **No clockevent, no rating change.** `rating` read **0** in all eighteen
+   dumps and the time base was `jiffies` throughout, deliberately. `R5-3b`.
+2. **`ESTATUS` is still unread.** § 10.6's second item stands verbatim.
+3. **The rate is a ratio, not a frequency.** `jiffies` ← TC0 ← the same `CDBR`
+   as TC1. Same limitation as `CLK-22`.
+4. **`ack_proven` is n = 1.**
+5. **`tc1_ext_trusted` reads 0 at period 8, and that is the guard working**, not
+   a defect: a 255-count mask sampled every 10 ms aliases by construction and
+   the driver says so. At periods 12 and 20 it reads 1.
+6. **A defect found and not fixed**: after `disarm`, `period_jiffies` keeps the
+   value the last `arm` computed while `mask_bits` has already moved — 量,
+   `EX-1` shows `mask_bits = 8` beside `period_jiffies = 524`. A `/proc` field
+   describing a configuration the driver is no longer in. It changes no
+   behaviour (`arm()` recomputes) and it is `R5-3b`'s to clear.

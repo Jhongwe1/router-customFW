@@ -1,5 +1,84 @@
 # Changelog
 
+🟢🟢 **2026-09-04, thirty-third session, seating 12: `R5-3a`'s bench half** —
+**an interrupt of mine was delivered on the silicon, 119,818 times.** One power
+cycle, 13:55:58–14:27:39, 35 captures, **zero flash-write commands and zero
+`FLR`**, so the bracket is untouched at 1,024 of 4,194,304 = **0.0244 %**.
+
+🟢 **The line is mine, and the evidence is three states rather than a count.**
+`/proc/interrupts` had **no line 25** before `reqirq` (`EX-0`), a line
+`25: … ICTL rtl819x-timer` during (`TI-6`, 29,602), and **no line 25** again
+after `free_irq` (`EX-19`). `irq_spurious` **0** and `irq_stuck` **0**
+throughout; three complete unwinds return `TCCNR`, `TCIR` **and** `GIMR` to
+their init values, two of them from a live interrupt. **This driver never
+writes `GIMR`** — `request_irq` asks the irqchip and `bsp_ictl_irq_unmask`
+does it, 量 `00209100` → `00209300` and back.
+
+🟢 **It arrives at the rate the driver programmed, and that is a slope.**
+`Δirq_count / Δjiffies` against `hz_used / period_cycles / hz_kernel`:
+**0.0199 %** at period 2⁸, **0.0994 %** at 2¹², and **0.0206 %** at 2¹² with
+the NIC up and four pings in flight. **The measured ratio between the two
+periods is 15.9873 against a predicted 16.0000** — a source that were not this
+timer would not shrink 16× when this timer's period grew 16×.
+
+🔴 **The card's decision cell returned the row the card had assigned to "the
+timer block needs something not identified", and the assignment was wrong.**
+`TI-3` read `TC1IP = 0` after **16.62 full TC1 periods** with `TC1IE` set.
+讀 `arch/rlx/bsp/timer.c:43-46`: the vendor's tick ack is
+`REG32(BSP_TCIR) \|= BSP_TC0IP;` — a **read-modify-write on a register whose
+`IP` bits are write-1-to-clear** — called 100 times a second, so it clears
+every pending bit in `TCIR` including one belonging to a driver it has never
+heard of. **A `TCIR` pending bit on this part therefore has a lifetime of at
+most one 10 ms tick, which bounds every single-sample reading of that register
+this project has taken.** The duty cycle was written down before the cells ran
+— **0.19 %** at 2²⁰ and **87.20 %** at 2⁸ — and at 2⁸ both `tcir_tc1ip` and
+`gisr_tc1ip` read 1 with `GIMR` bit 9 still clear, which confirms the
+masked-observation strategy a second time after `RUNSHEET` `C5`.
+⚠️ **`bsp_timer_ack()` was already in `docs/blind-write-ledger.md`, entered one
+segment earlier.** What was new is the consequence, and nothing in the tree had
+drawn it: **a ledger row that records a write without its effect is a reading
+banked and not spent.**
+
+🟢 **Three single-source claims became measurements**: D Table 25's
+write-1-to-clear (`ackip_before=1` → `ackip_after=0`, both inside one
+`spin_lock_irqsave`); `IRQ-07`'s `_RS` encoding (`irr1_tc0_rs = 13` against
+`/proc/interrupts`' `13: RLX LOPI rlx timer` — two subsystems, one capture);
+and `REG-03`, which goes from n = 1 to n = 2 with `IRR0`/`IRR2`/`IRR3` read on
+this die for the first time in either state. **All seven gates of
+`docs/interrupt-map.md` § 3.1 are now 量.**
+
+🔴 **An inference of mine was refuted mid-seating by the same register.**
+`EX-0`'s `2: 0 RLX cascade` was read as "no ICTL interrupt has ever been
+delivered"; after 29,602 of them the cascade still reads 0, because a chained
+cascade does not increment its own count. The narrow claim — no line 25
+beforehand — survives and is what the headline uses.
+
+⚠️ **A deviation, recorded rather than hidden.** `TI-4`…`TI-7` ran with their
+precondition established at period 2⁸ by three off-card cells rather than by
+`TI-3` at 2²⁰. It is visible in the data as well as in the write-up: the
+per-cell table shows `mask_bits = 8` on those rows and 20 on the ones before.
+
+🆕 **`tools/tcheck.py`** (14 controls) and **`tools/test-tcheck.py`** (9
+mutants, all killed). Three of the controls exist because the tool was wrong
+about a real dump before they were written — it reported the *driver* red for a
+field the driver only computes inside `arm()`. Two more exist because the
+mutation suite showed them passing for the wrong reason. **And one control was
+itself wrong and refused to pass**: it asserted the clocksource mask and
+`mask_bits` disagree somewhere in range, and they cannot — `mult ≤ 2³²−1`
+always binds first while mask < 2³¹.
+
+🔴 **`README.md`'s tool census was stale before this session touched it.**
+Re-derived: 86 files, 37 programs, 21 described. `tools/ledgerscan.py` landed on
+2026-09-03 and the paragraph above the list did not move. **Re-deriving catches
+the session before last's omission; incrementing carries it forward.**
+
+⚠️ **What this did not do.** No clockevent and no rating change — `rating` read
+**0** in all eighteen dumps and the time base was `jiffies` throughout, which
+is `R5-3b`. `ESTATUS` is still unread. `ack_proven` is n = 1. The rate is a
+ratio between two dividers fed by one crystal, not an absolute frequency. And a
+single first open of `eth4` does not receive packets — measured, cause
+unisolated, carried forward.
+
 🟢 **2026-09-03, thirtieth session, seating 11: `R5-2`** — the timer driver
 ran on the silicon. One power cycle, 21:15–21:55, fourteen captures, **zero
 flash-write commands and zero `FLR`**, so the flash bracket is untouched at
@@ -27,7 +106,7 @@ run as three commands split at the card's own two decision points, so the
 correction landed before the measuring cell rather than after it.**
 
 🔴 **A negative result that changes the next step.** `TC1IP` does **not** latch
-in `TCIR` while `TC1IE` is clear in `GIMR` 🔄 **— ATTRIBUTION CORRECTED 2026-09-04 (`R5-10`), and this entry was missed when the rest were fixed. `TCIR` bit 30 (the timer block's own enable) was clear too and `rtl819x_tc1_arm()` never writes it; `RUNSHEET` `C5` shows a `GIMR` mask does not stop the latch on this die. The observation stands, the cause named below does not, `Q11` is testable again, and `R5-3a`'s `armirq` is what tests it —** — 量 across a full 2²⁷ period with
+in `TCIR` while `TC1IE` is clear in `GIMR` 🔄 **— ATTRIBUTION CORRECTED 2026-09-04 (`R5-10`), and this entry was missed when the rest were fixed. `TCIR` bit 30 (the timer block's own enable) was clear too and `rtl819x_tc1_arm()` never writes it; `RUNSHEET` `C5` shows a `GIMR` mask does not stop the latch on this die. The observation stands, the cause named below does not, ~~`Q11` is testable again~~ 🟢 **`Q11` is ANSWERED, 2026-09-04 seating 12: `armirq` set the bit, `TC1IP` latched, and `ackip` watched it go 1 → 0 inside one lock** —** — 量 across a full 2²⁷ period with
 the positive control (`tc1_cycles` dropping from 31.99 M to 6.48 M) proving the
 period elapsed. `notes/timer-driver.md` § 4 builds the driver's safety argument
 on observing that bit with the interrupt masked; **that strategy does not work

@@ -128,12 +128,25 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # 35 warm, and `2026-09-03` alone reports 1 cold / 1 warm -- so the delta is
 # exactly +1/+1 and nothing was reclassified. Fifth seating in a row that
 # turned this case red.
+# 🔄 21/36 -> 22/37 on 2026-09-04 (seating 12, `bench/2026-09-04`), which is
+# ONE cold power-on and ONE warm reset: `SM-A`, the ESC catch that opened the
+# seating, and `SM-rz`, `looprun`'s own S4.  Isolation check, run before this
+# line was touched: every directory EXCEPT `2026-09-04` still reports 21 cold,
+# 36 warm, and `2026-09-04` alone reports 1 cold / 1 warm -- so the delta is
+# exactly +1/+1 and nothing was reclassified.  Sixth seating in a row that
+# turned this case red.
+# 🔴 A SECOND `looprun` ran on the same seating and produced NO row, which is
+# the right answer rather than a miss: `SN-rz` sent `J BFC00000` while the
+# board was in Linux, where `J` is not a command, so no reset happened and no
+# boot text exists to classify.  `looprun`'s own S4 assertion caught it and
+# stopped before the rescue stage -- and the tool agrees, because the seating
+# reports `33 capture(s) produced no row; 0 of them hold boot text`.
 # ⚠️ The other EIGHTEEN captures of that seating produce no row, and the tool
 # says so itself: `NOT CLASSIFIED: 18 capture(s) produced no row; 0 of them
 # hold boot text`. They are shell captures taken at a prompt after S7, so
 # having no boot line is correct rather than a miss -- and the `0 of them hold
 # boot text` half is what makes that a reading instead of an assumption.
-ck "twenty-one cold, thirty-six warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 21 cold, 36 warm, 0 unknown')"
+ck "twenty-two cold, thirty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 22 cold, 37 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -202,8 +215,19 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # again, not this seating adding scatter -- the same reading as the line above,
 # and it is restated because a spread that grows while every new point is
 # central is the shape a reader would otherwise misread.
-ck "entry population is thirty-one warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=31')"
+# 🔄 31 -> 32 on 2026-09-04 (seating 12): `SM-rz`, `looprun`'s own S4 again,
+# the one warm reset of that seating, `entry` **0.0020**. It lands inside the
+# tight sub-population (0.0017..0.0024) and not near the 0.0211 outlier, so
+# the pooled spread moving 527.1 % -> 534.9 % is again the OLD 0.0211 (H3a)
+# dominating a wider n. Third seating in a row where the spread grows while
+# every new point is central -- restated because that is the shape a reader
+# would otherwise misread as this seating adding scatter.
+# ⚠️ The seating's SECOND `looprun` (`SN-rz`) is NOT in this population and
+# must not be: its `J BFC00000` went to a Linux shell, no reset happened, and
+# no boot text exists. It contributes to `NOT CLASSIFIED` instead, where the
+# tool's `0 of them hold boot text` half is what makes that a reading.
+ck "entry population is thirty-two warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=32')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="

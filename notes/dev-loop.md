@@ -849,3 +849,58 @@ raises at `S2` rather than leaving no provenance.
 ⚠️ **The manifest is not the gate and this note does not let it become one.** It
 records what went in, where the build happened. `--image-sha256` is what runs on
 the desk beside the file about to be uploaded.
+
+
+---
+
+## 12. 🆕 2026-09-04 (seating 12): a third machine total, and the first time `S4`'s assertion stopped a run
+
+**35.08 s**, `--skip S2,S3`, seven assertions. The three points, same skip set,
+three seatings:
+
+| seating | date | machine total |
+|---|---|---|
+| 10 | 2026-09-02 | 34.74 s |
+| 11 | 2026-09-03 | 34.94 s |
+| 12 | 2026-09-04 | **35.08 s** |
+
+Spread **0.34 s over three seatings**, 1.0 % of the total. § 10's reading that
+the loop is dominated by fixed terminator budget rather than by the board is
+unchanged by a third point that moves 0.14 s.
+
+### 12.1 🟢 `S4`'s assertion fired for real, and what it stopped is worth more than the stage it skipped
+
+The seating ran `looprun` a **second** time, to get a fresh boot for an
+unrelated question. By then the board was in Linux, not at the loader prompt,
+and `J BFC00000` is a loader command — in a shell it is `J: not found`.
+
+```
+looprun: STOPPED at S4 -- ABSENT -- the reset did not happen
+  S4  reset     rc=0   13.26 s
+```
+
+🔴 **`rc=0` and the assertion caught it anyway.** The stage's own exit status
+says nothing here: `console-capture.py` sent a line and read a reply, which is
+success as far as it is concerned. What failed is the *content* — no
+`Reboot Result from Watchdog Timeout!` — and `S4` is written to abort on that
+rather than on the return code.
+
+**What it prevented, stated as the counterfactual:** `S5` would have driven
+`console-dump.py rescue --at-prompt` into a Linux shell, `S6` would have
+attempted a TFTP transfer against a board with no loader listening, and `S7`
+would have typed `J 80500000` — a jump to an address whose contents nothing had
+checked — into a shell. 量: this is the first time that assertion has fired on
+a real run; `git grep` finds `ABSENT -- the reset did not happen` only in
+`looprun.py` itself and in this seating's output.
+
+⚠️ **And it is why `SN-rz` is not in `test-boot-timeline`'s warm population.**
+The capture holds no boot text at all, so the tool reports it under
+`NOT CLASSIFIED` with its own `0 of them hold boot text` — which is what makes
+"the reset did not happen" a reading rather than an assumption.
+
+### 12.2 The question that second run was for, and what it cost to not answer
+
+`eth4` did not receive packets on its first open (`RUNSHEET` § D5, this
+seating's addition). Isolating that needs a boot with nothing else done first,
+and a boot needs the loader, and the loader needs a power cycle. **None was
+spent**; it is carried forward.

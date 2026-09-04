@@ -24,6 +24,14 @@ is already in the kernel.** Writing a driver as though there were one gate — a
 `GIMR` bit — is how `rtl819x-timer` came to arm a counter for 703 seconds
 without arming an interrupt.
 
+🟢 **2026-09-04, seating 12: all seven are now 量 and an interrupt crossed
+them** — 119,818 of them, `irq_spurious` 0, `irq_stuck` 0, at a rate matching
+`hz_used / period_cycles / hz_kernel` to 0.02 % at two periods 16× apart.
+🔴 **And the sentence needs one clause it did not have: an eighth thing bounds
+what you can SEE, without bounding delivery.** The vendor's tick handler does a
+read-modify-write on `TCIR`, whose `IP` bits are write-1-to-clear, so every
+pending flag in that register has a lifetime of at most one tick — § 3.6.
+
 ⚠️ **Three files for TC1, four for the SoC.** TC1 uses the timer block
 (`TCCNR`/`TC1DATA`/`TCIR`), the interrupt controller (`GIMR`/`IRR1`) and CP0
 (`Status`). The **fourth** is `lxc0` — `ESTATUS`, reached by `mflxc0` — and it
@@ -134,23 +142,32 @@ TC1's Linux IRQ is **25** — `BSP_TC1_IRQ = BSP_IRQ_ICTL_BASE + 9` (讀), so TC
 is an **ICTL** source and TC0 is a **LOPI** source (`BSP_TC0_IRQ = 13`). The
 two timers in one register block do not share a route.
 
-| # | gate | register · bit | who owns it | seating 11 | 量 from |
-|---:|---|---|---|---|---|
-| **L1** | counter enabled | `TCCNR` 29 `TC1En` + 28 `TC1Mode` | `rtl819x-timer` | 🟢 **set** (`C0000000` → `F0000000`) | `TM-3` |
-| **L2** | period loaded | `TC1DATA` 31:4 | `rtl819x-timer` | 🟢 `80000000` = 2²⁷ ≪ 4 | `TM-3` |
-| **L3** | **timer-block interrupt enable** | **`TCIR` 30 `TC1IE`** | 🔴 **nobody** | 🔴 **CLEAR** — `TCIR` read `80000000` for all 703 s | `TM-5b2` |
-| **L4** | controller mask | `GIMR` 9 `TC1_IE` | `bsp_ictl_irq_unmask` for IRQ 25 | 🔴 clear (`gimr = 00209100`) | `TM-5b2` |
-| **L5** | routing | `IRR1` 7:4 `TC1_RS` | `bsp_irq_init` | **未讀 under Linux** | — |
-| **L6** | cascade line | `Status.IM2` (`Status` bit 10) | `rlx_cpu_irq_init` + `setup_irq(BSP_ICTL_IRQ)` | 未讀 | — |
-| **L7** | global enable | `Status.IEc`, `Status.BEV` | the kernel | 推 — the vendor tick runs, so they are right | — |
+| # | gate | register · bit | who owns it | seating 11 | 🆕 **seating 12** | 量 from |
+|---:|---|---|---|---|---|---|
+| **L1** | counter enabled | `TCCNR` 29 `TC1En` + 28 `TC1Mode` | `rtl819x-timer` | 🟢 **set** (`C0000000` → `F0000000`) | 🟢 same, three times | `TI-1`, `EX-2`, `EX-5` |
+| **L2** | period loaded | `TC1DATA` 31:4 | `rtl819x-timer` | 🟢 `80000000` = 2²⁷ ≪ 4 | 🟢 `00001000` and `00010000` — `(mask+1) ≪ 4` at **two** periods | `TI-6`, `EX-18` |
+| **L3** | **timer-block interrupt enable** | **`TCIR` 30 `TC1IE`** | 🔴 **nobody** | 🔴 **CLEAR** — `TCIR` read `80000000` for all 703 s | 🟢 **`armirq` writes it**: `80000000` → `C0000000`, `tc1ie_ours=1` | `TI-2` |
+| **L4** | controller mask | `GIMR` 9 `TC1_IE` | `bsp_ictl_irq_unmask` for IRQ 25 | 🔴 clear (`gimr = 00209100`) | 🟢 `00209100` → `00209300` on `request_irq` and **back down** on `free_irq`, three times each | `TI-5`, `TI-7` |
+| **L5** | routing | `IRR1` 7:4 `TC1_RS` | `bsp_irq_init` | **未讀 under Linux** | 🟢 `irr1 = C222FA2D`, `irr1_tc1_rs = 2` | `TI-0` |
+| **L6** | cascade line | `Status.IM2` (`Status` bit 10) | `rlx_cpu_irq_init` + `setup_irq(BSP_ICTL_IRQ)` | 未讀 | 🟢 `status = 10000401`, `im2 = 1` | `TI-0` |
+| **L7** | global enable | `Status.IEc`, `Status.BEV` | the kernel | 推 — the vendor tick runs, so they are right | 🟢 `iec = 1`, `bev = 0` — 量 rather than 推 | `TI-0` |
 
-🆕 **2026-09-04 (`R5-3a`): `L5`, `L6` and `L7` all become readable on the next
-seating, and none of them needed a new instrument.** The driver's `/proc` file
-now carries `irr0`–`irr3` (the same register block it already mapped) and
-`Status`, so one `cat` fills the last three rows of this table. The predictions
-are § 4.3's for `L5` and `status_im2=1` for `L6` (讀
+🟢 **2026-09-04, seating 12: every row of this table is now 量, and an
+interrupt crossed all seven.** `irq_count` **119,818**, `irq_spurious` **0**,
+`irq_stuck` **0**, across three arm→deliver→disarm cycles at two periods;
+`/proc/interrupts` grew a line `25: … ICTL rtl819x-timer` that `EX-0` had
+measured absent beforehand and `EX-19` measured absent again after `free_irq`.
+`bench/2026-09-04/CORRECTIONS-block9.md` § 4 and § 6.
+
+🔴 **And the table is not the whole story, because an eighth thing sits beside
+it that is not a gate to delivery.** § 3.6.
+
+*(This paragraph read: "`L5`, `L6` and `L7` all become readable on the next
+seating, and none of them needed a new instrument … the predictions are § 4.3's
+for `L5` and `status_im2=1` for `L6`". All three were read and all three
+matched; kept here as the record of a prediction rather than rewritten.)* 讀
 `arch/rlx/kernel/irq_cpu.c:44`: `setup_irq(BSP_ICTL_IRQ)` with
-`BSP_ICTL_IRQ = 2` calls `set_c0_status(0x100 << 2)` = bit 10).
+`BSP_ICTL_IRQ = 2` calls `set_c0_status(0x100 << 2)` = bit 10.
 
 🔴 **`L7` is written `Status.IEc` and not `Status.IE`.** 讀
 `arch/rlx/include/asm/rlxregs.h`: this core has the MIPS-I three-deep
@@ -348,6 +365,57 @@ there is no live race with an armed TC1 — but any code path that re-runs
 
 ---
 
+### 3.6 🔴 `bsp_timer_ack()` is a read-modify-write on a write-1-to-clear register, and it erases `TC1IP` a hundred times a second
+
+🆕 **2026-09-04, seating 12.** § 3.5 above watches the two `=` assignments in
+`bsp_timer_init` because they run once. The `|=` that runs **every tick** is in
+the same file, four lines up, and nothing in this repository had drawn its
+consequence.
+
+讀 `arch/rlx/bsp/timer.c:43-46`, called from `rlx_timer_interrupt()`
+(`arch/rlx/kernel/rlx-cevt.c:217`, comment *"Ack the RTC interrupt"*), which is
+the handler behind `13: RLX LOPI rlx timer` — 量 8,824 ticks at `EX-0` and
+162,380 at `EX-19`, so it runs at `HZ` = 100:
+
+```c
+void inline bsp_timer_ack(void)
+{
+    REG32(BSP_TCIR) |= BSP_TC0IP;
+}
+```
+
+`|=` reads the whole word, ORs in bit 29, and writes the whole word back.
+`TCIR`'s `IP` bits are **write-1-to-clear**, so every bit the read found set is
+written back as a 1 — **and cleared**. The vendor acks TC0's pending flag and
+collaterally acks TC1's, which belongs to a driver it has never heard of.
+
+**The bit still latches; only its lifetime is bounded.** Delivery happens at
+the latch, so this does not block an interrupt — 量, 119,818 of them. What it
+bounds is *observation*: a `/proc` read catches `TC1IP` set with probability
+
+```
+period 2^20 :  5,242.88 ms  ->  10 / 5242.88          = 0.19 %
+period 2^8  :      1.28 ms  ->  (10 - 1.28) / 10      = 87.20 %
+```
+
+Both numbers were written before the cells ran. `TI-3` at 2²⁰ read `0`; `EX-2`
+and `EX-3` at 2⁸ read `1`, with `gisr_tc1ip` following it.
+
+🔴 **What this costs anyone reading `TCIR` on this part.** A single sample of
+`TC0IP` or `TC1IP` under Linux is a sample of a flag with a ≤ 10 ms lifetime,
+whatever set it. Neither `SPEC.md` `REG-10` nor `notes/timer-driver.md` § 8.4
+said so, and both were written from readings taken at exactly that sample rate.
+
+⚠️ **It is also a race the driver cannot win by locking.** `rtl819x-timer`
+takes `rtl819x_tc_lock` around its own `TCIR` writes; `bsp_timer_ack()` takes
+nothing. A collision loses whichever write landed first. The failure mode is
+bounded rather than eliminated: a lost ack leaves `TC1IP` set, the ISR's own
+read-back sees it, `irq_stuck` rises and `disable_irq_nosync()` fires — 量,
+`irq_stuck = 0` over 119,818 interrupts, so the collision did not happen at a
+rate this seating could see, and that is a bound and not an absence.
+
+---
+
 ## B. What `R6` needs
 
 ### 4.1 `GIMR` / `GISR`, the full bit map
@@ -414,7 +482,35 @@ BSP silently disables one ICTL source on every boot; if it means *CPU IRQ 0*,
 it routes it somewhere nothing handles. **Undetermined**, and it is a defect in
 the vendor's macro rather than a question about the silicon.
 
-### 4.3 🔴 The routing has never been read under Linux, and the two states disagree completely
+### 4.3 🟢 The routing HAS now been read under Linux, and the two states disagree completely — every word as predicted
+
+🆕 **2026-09-04, seating 12: this section's prediction ran and every word of it
+landed.** `TI-L` at the loader prompt and `TI-0` under Linux, on the same power
+cycle 90 seconds apart:
+
+| | loader (`TI-L`, `DW B8003008 4`) | Linux (`TI-0`, the driver's `/proc`) | predicted below |
+|---|---|---|---|
+| `IRR0` | `00000000` | **`22222222`** | `22222222` ✓ |
+| `IRR1` | **`30050004`** | **`C222FA2D`** | `C222FA2D` ✓ |
+| `IRR2` | `00000000` | **`2EB29F22`** | `2EB29F22` ✓ |
+| `IRR3` | `00000000` | **`22222022`** | `22222022` ✓ |
+
+`IRR0`, `IRR2` and `IRR3` had **never been read on this die in either state**.
+`IRR1`'s loader value reproduces `SPEC.md` `REG-03` byte for byte eleven days
+later, taking it from n = 1 to n = 2.
+
+🟢 **And the `_RS` encoding below is no longer 未定.** `irr1_tc0_rs = 13`, and
+`EX-0`'s `/proc/interrupts` — a different file, produced by a different
+subsystem, in the same seating — lists the vendor's tick as
+**`13:  RLX LOPI  rlx timer`**. **The field is the destination IRQ line**, by
+two independent sources. `irr1_tc1_rs = 2` = `BSP_IRQ_CASCADE`, and TC1 duly
+arrived as ICTL IRQ 25 (`TI-5`/`TI-6`). ⚠️ **The loader's `4` still fits
+neither reading and nothing here touched it.**
+`bench/2026-09-04/CORRECTIONS-block9.md` § 7.
+
+*(The heading read "The routing has never been read under Linux" and the
+prediction below is kept verbatim as the record of a prediction, not rewritten
+into a description of the answer.)*
 
 `SPEC.md` `REG-03` holds one reading of `IRR1`, **at the loader prompt**:
 `0x30050004`. Nibble by nibble, low to high:
@@ -473,18 +569,34 @@ commented out.
 
 ## 5. What this file does not establish
 
-1. **No interrupt of mine has ever been delivered.** `GIMR` was read in all
-   fourteen dumps of seating 11 and written in none.
-2. **`IRR0`–`IRR3` have never been read under Linux**, and `IRR0`/`IRR2`/`IRR3`
-   have never been read at all. § 4.3 is a prediction.
-3. **`Status`/`ESTATUS` have never been read on this device.** `L6` and `L7` in
-   § 3.1 are 推 from the fact that the vendor tick runs.
-4. **The `_RS` encoding is 未定** (§ 4.3).
-5. **`IRR3` bits 11:8** are written as zero by a macro that skips them, and what
-   sits in that field is unknown (§ 4.2).
-6. **§ 3.2's correction is an argument from a second reading, not a new
-   measurement.** It rests on `RUNSHEET` `C5` being about the same latch
-   mechanism one bit along. `I2` is what turns it into a measurement.
+🔴 **2026-09-04, seating 12: FIVE of these seven expired, and they are struck
+through rather than deleted — a list of what a document does not establish is
+only worth having if you can see what it used to say.**
+
+1. ~~**No interrupt of mine has ever been delivered.**~~ 🟢 **119,818 of them**,
+   `irq_spurious` 0, `irq_stuck` 0. `GIMR` is still never written by this
+   driver — `request_irq` asks the irqchip.
+2. ~~**`IRR0`–`IRR3` have never been read under Linux.**~~ 🟢 All four read in
+   **both** states on one power cycle: `00000000 30050004 00000000 00000000`
+   at the prompt, `22222222 C222FA2D 2EB29F22 22222022` under Linux. § 4.3.
+3. ~~**`Status`/`ESTATUS` have never been read.**~~ ⚠️ **Half of this stands.**
+   `Status` is 量 — `10000401`, so `IM2` 1, `BEV` 0, `IEc` 1 — and `L6`/`L7`
+   are no longer 推. **`ESTATUS` is still unread**, and it is on the LOPI path
+   where the vendor's own tick runs.
+4. ~~**The `_RS` encoding is 未定.**~~ 🟢 **It is the destination IRQ line**,
+   by two independent sources in one capture: `irr1_tc0_rs = 13` and
+   `/proc/interrupts`' `13: RLX LOPI rlx timer`. ⚠️ **The loader's `4` in the
+   same field still fits neither reading** — `SPEC.md` `IRQ-07 殘留`.
+5. **`IRR3` bits 11:8** are written as zero by a macro that skips them, and
+   what sits in that field is unknown (§ 4.2). ⚠️ **Unchanged, and the device
+   reading does not change it**: `irr3` reads `22222022`, so those bits are 0
+   — which is what the macro wrote. The reading confirms the write, not the
+   meaning.
+6. ~~**§ 3.2's correction is an argument from a second reading.**~~ 🟢 `TI-2`
+   set `TCIR` bit 30 and `TI-3`/`EX-2` watched the consequence, so it is a
+   measurement now. 🔴 **And it needed a correction of its own**: at the
+   card's period the flag is erased by the vendor's tick before it can be
+   read, which is § 3.6 and which nothing in this list anticipated.
 7. **The `lxc0` register file has never been probed**, and `LXCP0_CCTL $20` —
    a cache-control register reached the same way — is a separate thread from
    the CP3 `CCTL` this project has already used.

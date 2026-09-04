@@ -251,13 +251,21 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather
-than counted by eye.** 量 2026-09-02, over `git ls-files tools/` (83 files),
-taking those whose first two bytes are `#!` and excluding `tools/test-*`:
-**35** programs, of which **19 are described below and 16 are not** —
-`audit-bench-log`, `binsim`, `ci-census`, `fetch-sources`, `fsmanifest`,
-`isa-probe`, `leakscan`, `opcount`, `rbcheck`, `rebuild-census`, `repdiff`,
-`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, `vendor-tripwire` and
-`verify-backup-copy`. Each has its own controls and `tools/ci-expected.tsv` is
+than counted by eye.** 🔄 **量 2026-09-04**, over `git ls-files tools/`
+(**86** files), taking those whose first two bytes are `#!` and excluding
+`tools/test-*`: **37** programs, of which **21 are described below and 16 are
+not** — `audit-bench-log`, `binsim`, `ci-census`, `fetch-sources`,
+`fsmanifest`, `isa-probe`, `leakscan`, `opcount`, `rbcheck`,
+`rebuild-census`, `repdiff`, `rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`,
+`vendor-tripwire` and `verify-backup-copy`.
+🔴 **The previous numbers — 83 files, 35 programs, 19 described — were stale
+before this session touched anything, and re-deriving is what showed it.**
+`tools/ledgerscan.py` landed on 2026-09-03 (`aa89317`) and was described in
+the block below without the paragraph above it moving. So the +2 in this
+line is `ledgerscan` (already described, 19 → 20) and `tcheck` (new today,
+20 → 21); the +3 in files is those two plus `test-tcheck.py`. **A count that
+is re-derived catches the session before last's omission; a count that is
+incremented would have carried it forward.** Each has its own controls and `tools/ci-expected.tsv` is
 the census; this list is prose and it has been behind for several sessions.
 🔴 **The first version of this paragraph said 25 and 7**, which were
 taken off a list written by hand rather than derived — `CNT-1`'s class, inside
@@ -495,6 +503,21 @@ tools/check-predictions.py refuses to compare a prediction against a capture unl
                            unnoticed. `--sweep bench` reads the whole committed
                            record as a CI gate — no count here, for the reason the
                            paragraph below this list gives
+tools/tcheck.py            reads an `rtl819x-timer` `/proc` dump out of a console
+                           capture and RECOMPUTES the fields the driver says it
+                           derived, rather than transcribing them. 14 controls,
+                           9 mutants; the fixtures are captures committed here, so
+                           it needs nothing outside the repository. 🔴 Three of
+                           the controls exist because this tool was wrong about a
+                           real dump before they were written — it reported the
+                           DRIVER red on an idle dump for a field the driver only
+                           computes inside `arm()`. Two more exist because
+                           `test-tcheck` showed them passing for the wrong reason:
+                           one guard was being satisfied by a different guard, and
+                           one control passed against a hardcoded constant.
+                           `rate` refuses a pair of dumps whose `period_cycles`
+                           differ, because such a pair spans a re-arm and would be
+                           scored against one of the two periods silently
 tools/flrbracket.py        50 controls, and its corpus is hardware: the nine `FLR`
                            echoes, eight replies to `Y` and one to `N` that seating 7
                            recorded. It answers one question -- should the operator

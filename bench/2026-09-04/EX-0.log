@@ -1,0 +1,16 @@
+cat /proc/interrupts
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:       1305        RLX LOPI  serial (0x20)
+ 13:       8824        RLX LOPI  rlx timer (0x620)
+
+ER0:          0
+ER1:          0
+ER2:          0
+
+ SW:          0
+ TX:          0
+ RX:          0
+LNK:          0
+ERR:          0
+# 

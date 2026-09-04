@@ -130,8 +130,42 @@ released source.
 > strategy is intact; nothing had ever set the bit that makes a pending flag happen.**
 > 🟢 **2026-09-04 (`R5-3a`): the driver now sets it** — `armirq` writes `TCIR`
 > bit 30 alone with `GIMR` bit 9 still clear, which is zero-risk BY MEASUREMENT
-> rather than by argument, and `Q11` is testable again. `R5-3` is split into `R5-3a`
-> (that path) and `R5-3b` (clockevent); which gate is active, `PROGRESS.md` says.
+> rather than by argument, and ~~`Q11` is testable again~~. `R5-3` is split into
+> `R5-3a` (that path) and `R5-3b` (clockevent); which gate is active,
+> `PROGRESS.md` says.
+> 🔄 **2026-09-04, NINTH update — seating 12, one power cycle, and `Q11` is not
+> testable, it is ANSWERED.** 🟢 **An interrupt of mine was delivered, 119,818
+> times**, `irq_spurious` **0**, `irq_stuck` **0**, across three
+> arm→deliver→disarm cycles at two periods — and the strongest evidence that
+> the line is mine is not the count but a three-state reading: `/proc/interrupts`
+> had **no line 25** before `reqirq` (`EX-0`), a line `25: … ICTL rtl819x-timer`
+> during, and **no line 25** again after `free_irq` (`EX-19`).
+> 🟢 **It arrives at the rate the driver programmed, and that is a slope rather
+> than a point**: `Δirq_count / Δjiffies` against
+> `hz_used / period_cycles / hz_kernel` is 0.0199 % at period 2⁸ and 0.0994 % at
+> 2¹², with the measured ratio between them **15.9873 against a predicted 16**.
+> A third point, taken with the NIC up and four pings in flight, reads 0.0206 %.
+> 🔴 **And the card's own decision cell came out `0|0`, which the card assigned
+> to "the timer block needs something not identified" — the assignment was
+> wrong and the reading was right.** TC1 had wrapped **16.62 times** with
+> `TC1IE` set and `TC1IP` still read 0, because the VENDOR's tick handler does
+> `REG32(BSP_TCIR) |= BSP_TC0IP` — a read-modify-write on a register whose `IP`
+> bits are write-1-to-clear — a hundred times a second, and it clears every
+> pending bit in that register including one belonging to a driver it has never
+> heard of. **So a `TCIR` pending bit on this part has a lifetime of at most one
+> 10 ms tick, which bounds every single-sample reading of that register this
+> project has ever taken.** The duty cycle was written down before the cells
+> ran — **0.19 %** at 2²⁰ and **87.20 %** at 2⁸ — and shortening the period to
+> 2⁸ made `tcir_tc1ip` and `gisr_tc1ip` both read 1 with `GIMR` bit 9 still
+> clear, which also confirms the masked-observation strategy a second time.
+> `SPEC.md` `IRQ-08`/`IRQ-09`, `docs/interrupt-map.md` § 3.6.
+> 🔴 **One inference of mine was refuted mid-seating by the same register**: I
+> read `2: 0 RLX cascade` as "no ICTL interrupt has ever been delivered", and
+> after 29,602 of them the cascade still read 0 — a chained cascade does not
+> increment its own count. The narrow claim (no line 25 beforehand) survives.
+> ⚠️ **What is still true and narrower**: nothing of mine drives a peripheral
+> the system *depends on*. `rating` read **0** in all eighteen dumps and the
+> time base was `jiffies` throughout, deliberately — that is `R5-3b`.
 > **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner

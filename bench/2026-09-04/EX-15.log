@@ -1,0 +1,35 @@
+ping -c 4 10.1.1.2 ; ifconfig eth4 ; cat /proc/interrupts
+PING 10.1.1.2 (10.1.1.2): 56 data bytes
+64 bytes from 10.1.1.2: seq=0 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=1 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=2 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=3 ttl=64 time=10.000 ms
+
+--- 10.1.1.2 ping statistics ---
+4 packets transmitted, 4 packets received, 0% packet loss
+round-trip min/avg/max = 10.000/10.000/10.000 ms
+eth4      Link encap:Ethernet  HWaddr 00:12:34:56:78:94  
+          inet addr:10.1.1.10  Bcast:10.1.1.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:5 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:11 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:472 (472.0 B)  TX bytes:856 (856.0 B)
+          Interrupt:12 
+
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:      37622        RLX LOPI  serial (0x20)
+ 12:         25        RLX LOPI  eth4 (0x20)
+ 13:     143625        RLX LOPI  rlx timer (0x620)
+
+ER0:          0
+ER1:          0
+ER2:          0
+
+ SW:         25
+ TX:         17
+ RX:          5
+LNK:          3
+ERR:         25
+# 

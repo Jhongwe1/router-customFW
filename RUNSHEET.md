@@ -3227,6 +3227,28 @@ have produced *"D5 refuted"* from a working driver. The carried-forward item
 **`L-6a` confirms §B5-c9 exactly: six ethN — `eth0`…`eth4` and `eth7`**, MACs
 `…:90`…`…:94` and `…:97`.
 
+🔴 **2026-09-04, seating 12: a SINGLE first open of `eth4` does not
+receive, and D5's own five-interface ladder is what hid it.** `EX-9`
+brought up `eth4` alone at `10.1.1.10`; `EX-10` pinged and got nothing.
+The host capture holds six ARP requests from `00:12:34:56:78:94` and six
+replies from the workstation 20 µs later — **the board transmits,
+the host answers, the board does not receive**. `EX-11`: `TX packets:6
+RX packets:0`, driver counters `SW:6 TX:6 RX:0 LNK:0 ERR:6`. **`LNK: 0` is
+the reading** — no link event had ever reached the driver. After `eth0`
+was brought up and down and `eth4` re-opened, `EX-15` read `LNK: 3`,
+`RX packets:5`, **4/4 and 0 % packet loss**, with the host capture holding
+four ICMP request/reply pairs *and* an ARP request from the host that the
+board answered — RX working independently of anything the board
+initiated. ⚠️ **Two variables moved together and this data cannot
+separate them**: `eth4` was re-opened, and `eth0` was opened and closed in
+between. 🔴 **It is not a regression and it is not the interrupt
+work**: `EX-7` measured `gimr = gimr_at_init` before the NIC was opened at
+all, and `EX-11` measured the NIC's own interrupt as `12: RLX LOPI eth4`
+— a LOPI line that never passes through the controller seating 12
+touched. **Carried forward**: what makes the difference is unidentified,
+and isolating it costs one power cycle.
+`bench/2026-09-04/CORRECTIONS-block9.md` § 10.
+
 🔴 **And the port map recorded in `PROGRESS.md`'s carried-forward row is wrong.**
 量, the boot log's own registration lines: `eth0` port `0x1`, `eth2` `0x2`,
 `eth3` `0x4`, `eth4` `0x8`, and **`0x10` is `eth1`** (`vid=8`, the WAN). The row
