@@ -67,6 +67,18 @@ itself wrong and refused to pass**: it asserted the clocksource mask and
 `mask_bits` disagree somewhere in range, and they cannot — `mult ≤ 2³²−1`
 always binds first while mask < 2³¹.
 
+🔴 **CI caught a case count the desk structurally cannot check, and it is the
+fourth precedent in `ci-expected.tsv` for one shape.** `test-tcheck` prints one
+line per mutant **plus the baseline check**, and the row was written from
+`len(MUTANTS)`: `CENSUS-MISMATCH 10+0+0 != 9`. The census job's first step
+downloads per-job artifacts that do not exist on a workstation, so `census`
+never runs there and no total is ever compared. Repaired the way this table's
+own precedents were — a case (`C1`) that reads the table itself, so it runs in
+both configurations — and verified in both directions: declared 11 it exits 0,
+declared 9 it exits 1. **And the summary line was fixed with it**: it printed
+"9/9 mutants killed" while `C1` was red one line above, and a summary that
+disagrees with the lines above it is worse than no summary.
+
 🔴 **`README.md`'s tool census was stale before this session touched it.**
 Re-derived: 86 files, 37 programs, 21 described. `tools/ledgerscan.py` landed on
 2026-09-03 and the paragraph above the list did not move. **Re-deriving catches

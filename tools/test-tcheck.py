@@ -87,7 +87,40 @@ def main():
             alive.append(name)
             print(f"  FAIL  {name}  --  SURVIVED; {catcher} is decorative")
 
-    print(f"\nRESULT: {killed}/{len(MUTANTS)} mutants killed")
+    # 🔴 C1 -- this suite prints one line per mutant PLUS the baseline PLUS this
+    # case, and `ci-expected.tsv` has to carry that total.  It went red in CI
+    # run 33849822488 with `CENSUS-MISMATCH 10+0+0 != 9`, because the row was
+    # written from `len(MUTANTS)` and the baseline line was forgotten.
+    #
+    # THE DESK CANNOT SEE THAT CLASS: the census job's first step downloads the
+    # per-job artifacts, which do not exist on a workstation, so `census` never
+    # runs there and no total is ever compared.  Same shape as this table's own
+    # precedents -- test-kbuild-cflags C1, leakscan Q1, replay-capture R14 --
+    # and the repair is theirs: a case that reads the table itself, so it runs
+    # in both configurations.
+    expect = len(MUTANTS) + 2
+    declared = None
+    tsv = os.path.join(REPO, "tools", "ci-expected.tsv")
+    with open(tsv, encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("test-tcheck\t"):
+                declared = int(line.split("\t")[1])
+                break
+    ok = declared == expect
+    print(f"  {'ok  ' if ok else 'FAIL'}  C1  ci-expected.tsv declares this "
+          f"suite's case count  --  declares {declared}, prints {expect} "
+          f"({len(MUTANTS)} mutants + baseline + this case)")
+    if not ok:
+        alive.append("C1 the declared case count")
+
+    # The summary has to carry BOTH halves.  Its first version printed
+    # "9/9 mutants killed" while C1 was red one line above it, which reads
+    # green -- and a summary that disagrees with the lines above it is worse
+    # than no summary.
+    extra = [a for a in alive if a.startswith("C1")]
+    print(f"\nRESULT: {killed}/{len(MUTANTS)} mutants killed"
+          + (f", and {len(extra)} other check(s) FAILED" if extra else
+             ", every other check held"))
     return 1 if alive else 0
 
 
