@@ -196,9 +196,16 @@ def build_plan(a):
            "capture", "--port", a.port]
     plan = [
         dict(id="S2", name="build", kind="desk", argv=[
-            "bash", os.path.join("tools", "rlxfw-kbuild.sh"), a.cell,
-            "--config", a.config, "--initramfs", a.initramfs,
-            "--marks", "--jobs", str(a.jobs)],
+            "bash", os.path.join("tools", "rlxfw-kbuild.sh"), a.cell]
+            # CFG-1, 2026-09-04: rlxfw-kbuild.sh now takes EITHER a --config
+            # path or a --variant to derive one from config/rlxfw-kernel.delta,
+            # and refuses both or neither.  Passing `--config ""` used to mean
+            # "fall through to the bare board template", which is the silent
+            # default CFG-1 removed.
+            + (["--config", a.config] if a.config
+               else ["--variant", a.variant])
+            + ["--initramfs", a.initramfs,
+               "--marks", "--jobs", str(a.jobs)],
             note="prints `recipe=<8 hex>`; S8 requires the board to print it back"),
         dict(id="S3", name="assemble", kind="desk", argv=[
             "/usr/bin/python3", os.path.join("tools", "rtkimage.py"), "build",
@@ -734,6 +741,7 @@ def selftest(out=sys.stdout):
     class A:
         cell = "L1"; out_dir = "bench/2026-09-02"; port = DEFAULT_PORT
         host = DEFAULT_HOST; config = "cfg"; initramfs = "spec"; jobs = 4
+        variant = "quiet"
         image = "img.bin"; vmlinux = None; cell_top = "top"
         label = "rlxfw"; work = "work"
     plan = build_plan(A)
@@ -1032,6 +1040,9 @@ def main():
     ap.add_argument("--port", default=DEFAULT_PORT)
     ap.add_argument("--host", default=DEFAULT_HOST)
     ap.add_argument("--config", default="")
+    ap.add_argument("--variant", default="quiet",
+                    help="CFG-1: the config/rlxfw-kernel.delta variant to "
+                         "derive .config from when --config is not given")
     ap.add_argument("--initramfs", default="")
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--image", default="")

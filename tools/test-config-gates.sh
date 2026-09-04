@@ -295,8 +295,16 @@ ck "G3 verify that never reads the vendor image -> refuse" 2 "$?"
 # G4 -- and the REAL declaration parses, with the count pinned.  A tool whose
 # controls pass on synthetic fixtures while the committed file is malformed is
 # the shape E6 pins one file along.
+# 🔄 2026-09-04 (R5-3a): --map is passed because MARK-1's `sym:`
+# witness makes a verify with no System.map a REFUSAL rather than a skip --
+# a skip would print a green result over a check that did not run.  Without
+# it these five cases got exit 3 and empty output, and every grep below read
+# 0.  The tsv is handed to --map for the same reason it is handed to --image:
+# this case is about the DECLARATION parsing and the number of marks it
+# declares, not about an artefact.
 o="$("$PY" "$RM" verify --decl "$REPO/config/rlxfw-marks.tsv" \
-     --image "$REPO/config/rlxfw-marks.tsv" 2>&1)"
+     --image "$REPO/config/rlxfw-marks.tsv" \
+     --map "$REPO/config/rlxfw-marks.tsv" 2>&1)"
 ck "G4 the real declaration parses"        1 \
    "$(printf '%s\n' "$o" | grep -c 'RLXFW-B00')"
 ck "G4 and it declares eleven LADDER marks" 11 \
@@ -308,8 +316,18 @@ ck "G4 and it declares eleven LADDER marks" 11 \
 # are what make a new mark row impossible to land unnoticed.
 ck "G4a and one identity mark"             1 \
    "$(printf '%s\n' "$o" | grep -c '^  ID[0-9]')"
+# 🔄 2026-09-04 (R5-3a): anchored on `RLXFW-`, because the pattern was wider
+# than the claim AGAIN -- MARK-1's witness block prints `  MK2  str: ...` and
+# `MK2` matched `^  [A-Z][A-Z0-9]{2} `, so this read 13. That is the same defect
+# the comment above records about `^  B[0-9]` and `ID0`, one row down.
 ck "G4b and TWELVE marks in total"        12 \
-   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]{2} ')"
+   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]{2} +RLXFW-')"
+# G4c -- and the witnesses are COUNTED rather than merely excluded. A block that
+# is only ever filtered out of an assertion is a block nothing checks.
+ck "G4c and TWO build-row witnesses"       2 \
+   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
+ck "G4c and one of each kind"              1 \
+   "$(printf '%s\n' "$o" | grep -c 'sym: rlxfw_puts')"
 ck "G4 verify with no --absent is refused"  1 \
    "$(printf '%s\n' "$o" | grep -c 'no --absent file given')"
 

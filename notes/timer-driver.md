@@ -755,7 +755,7 @@ test this project has of that D Table 25 claim, and `rtl819x_tc1_disarm()`'s
 
 **(a) wrap aliasing — predicted in § 5.2.1, confirmed at 703 s rather than 30 s.**
 `TM-5b-arm` → `TM-5b2`: true gap 140,693,532 counts, `tc1_ext_gap_max` reads
-**6,475,672** = that value mod 2^27, and `tc1_ext_trusted` reads **1**. One
+**6,475,672** ~~= that value mod 2^27~~, and `tc1_ext_trusted` reads **1**. 🔴 量 2026-09-04 (`R5-3a`, recomputed from the captures by program rather than re-read): **6,475,672 is NOT 140,693,532 mod 2²⁷ — that is 6,475,804, a difference of 132.** What is exact is the wrapped TC1 delta between the two reads, `(6,477,665 − 1,861) & MASK` = **6,475,804**, and `tc1_ext` accumulated exactly that. **So the aliasing is exact and what was lost is precisely one period, 134,217,728 counts**, with `tc1_ext_trusted` reading 1. `tc1_ext_gap_max = 6,475,672` is the LARGEST SINGLE inter-read gap, not the span: `tc1_ext_reads` goes 1 → 3 across that arm, so two advances happened and they sum to 6,475,804, the other being 132. One
 entire period — 134,217,728 counts — lost, with the flag asserting trust.
 § 5.2.1's mechanism is exactly right; only its threshold moved by the same
 71.43×.
@@ -903,3 +903,128 @@ date the clone, and this is the first reading of either file:
 sweep of `arch/rlx` in this project has been blind to the 13 files that are the
 board. `notes/kernel-build.md` § 10 already carried that for `find`;
 `docs/interrupt-map.md` § 6.1 records the new instance.
+
+---
+
+## 10. 🆕 2026-09-04 (`R5-3a`, desk, no power): version 2.0 — the interrupt path, and three defects the desk found before the bench could
+
+`R5-10` moved `R5-3` twice and this segment is the desk half of what it moved to.
+Four things were forced by a reading rather than chosen, and the order matters
+because each was a precondition for the next.
+
+### 10.1 🔴 Fixing `hz_assumed` alone would have shipped a WORSE number than the bug
+
+`CLK-22` says the compiled `RTL819X_TC_HZ = 14,286,057` is the loader's rate and
+the Linux rate is 200,000 — a factor of 71.43. The obvious fix is to derive the
+rate at init and print it. **That fix, alone, is wrong**, and the reason is not
+visible from the driver at all.
+
+量 at the desk, re-deriving `clocksource_hz2mult()`'s integer arithmetic
+(`scratchpad/multshift.py`, and the tool is a script rather than a paragraph
+because this is exactly the class of thing a paragraph gets wrong):
+
+| `hz` | `shift` | exact mult | as `u32` | ns per count implied |
+|---:|---:|---:|---:|---:|
+| 14,286,057 | 24 | 1,174,376,947 | 1,174,376,947 | 69.998 ✅ |
+| **200,000** | **24** | **83,886,080,000** | **2,281,701,376** | **136.000** ❌ (true: 5,000) |
+
+讀 `include/linux/clocksource.h:253-266`: `clocksource_hz2mult` computes in
+`u64` and returns `(u32)tmp`. **The overflow is a cast. There is no diagnostic.**
+And 讀 the same file at `:317-322`, `cyc2ns()` is
+`((u64)cycles * cs->mult) >> cs->shift` returned as `s64`, so there is a second
+bound on `mask × mult`.
+
+🔴 **2.6.30 has no `clocks_calc_mult_shift()`** — the helper that does this
+search in later kernels. 讀, the whole header: `clocksource_hz2mult` is the only
+thing there. So the driver searches for its own shift, from 31 downwards, taking
+the largest that satisfies both bounds and keeps `mult ≥ 2²⁰` (which bounds the
+conversion's own rounding error at about 1 ppm). At `hz = 200,000` and
+`mask = 2²⁷−1` that is **shift 19, mult 2,621,440,000 — exact**, because
+`10⁹ / 200,000 = 5,000` is an integer and the rounding term contributes nothing.
+
+⚠️ **The search runs against the LARGEST mask the driver can be set to**, not
+the current one. `period` can shrink the mask later; a smaller mask only relaxes
+the `mask × mult` bound, so a shift chosen at the maximum stays valid for every
+period, and one chosen at the current period would not survive being widened.
+
+### 10.2 The rate is derived TWO ways, and they are different quantities
+
+```
+hz_tick = (TC0DATA >> 4) × HZ           = 2000 × 100   = 200,000
+hz_cdbr = BSP_SYS_CLK_RATE / (CDBR>>16) = 200e6 / 1000 = 200,000
+```
+
+The first descends from the kernel's own tick and needs **no clock constant at
+all**; the second descends from the crystal and needs the 200 MHz figure
+(讀 `bspchip.h`, 量 `CLK-02` to ±7 ppm). `hz_used` is the first, because `R5-2`
+measured `ΔTC1 = Δjiffies × (TC0DATA >> 4)` with residual **exactly zero** over
+three intervals — that identity is what `hz_tick` encodes. `hz_agree` is the
+comparison, made by the driver rather than by a reader; a disagreement is a
+finding about the SoC's dividers and not about this file.
+
+🟢 **And a third route was already in the record and nobody read it as one.**
+`arm_delta_100us` is a `udelay(100)` bracket over the counter. Seating 11 read
+**21**. At the loader rate that predicts 1,429; at 200,005 Hz it predicts
+**20.0**. The block-8 card's band was 1300…1600 and the field read 21 — so that
+number was a measurement of the true rate, sitting in a committed capture,
+while the same seating's `hz_assumed` line said something 71× different.
+
+### 10.3 `TMR-1`'s two fixes, and why the broken number is KEPT beside the fixed one
+
+**Aliasing.** `tc1_ext_trusted` was `gap_max < (MASK >> 1)` on a gap already
+reduced mod the period. 量 `TM-5b2`: a real gap of 140,693,532 counts reported
+as **6,475,804** — exactly that value mod 2²⁷, and exactly what `tc1_ext` accumulated — and trusted. ⚠️ The field that reads 6,475,672 is `tc1_ext_gap_max`, the largest SINGLE inter-read gap of the two that happened, and this note said *that* was the aliased value until it was recomputed. The fix records
+`jiffies` at each advance and tests `Δjiffies < period_jiffies`. That is the
+owner's stated rule (`Δjiffies × TICK_NSEC` against one period in ns) **with
+both sides divided by `TICK_NSEC`**: the same inequality, no 64-bit multiply,
+and `period_jiffies` is printed so a reader can redo it.
+
+🔴 **`tc1_ext_gap_max` in counts is still printed, and still aliases.** The pair
+is what makes the defect legible: `(6,475,804 counts, 70,346 jiffies)` says *a
+whole period was lost* on its face, and either number alone does not. Removing
+the broken one would delete the evidence along with the bug.
+
+**Reader-driven accumulation.** `rtl819x_ext_advance()`'s only call site was
+inside the `/proc` read, so `tc1_ext` was *the sum of the intervals somebody
+looked at* — 量 `TM-5c`: 462 s with no reader, 92,362,366 counts behind, still
+trusted. A `timer_list` at **a quarter of a period** now drives it (derived at
+arm from `hz_used` and `period_bits`, not a constant), and the interrupt handler
+advances it too once one is installed.
+
+⚠️ **Its blind spot, stated:** that timer is driven by the vendor's TC0 tick, so
+if the tick dies the extension stops **and** `jiffies` stops, which makes
+`Δjiffies` read 0 and look trustworthy. Bounded rather than closed: a board
+whose tick has stopped is not running, and `tc1_cycles` is read from the
+hardware on every dump, so `tc1_cycles` vs `tc1_ext` still exposes it.
+
+### 10.4 🔴 A defect found by reading, in a path no reading could have reached
+
+`arm()`'s `clocksource_register()` failure branch cleared `armed` and **left TC1
+counting**. `disarm` then returned `-EINVAL` because `armed` was 0, so nothing
+in the driver could stop it — an unreachable state created by the one path that
+is supposed to be the safe failure.
+
+**It has never been reached**: `clocksource_register` returned 0 on the silicon
+(量 seating 11), which is exactly why no reading would have found it. Version
+2.0 puts `TCCNR` back and stops the extension timer on that path.
+
+### 10.5 The four verbs, and where the stop-if lives
+
+`docs/interrupt-map.md` § 3.3.1 carries the design. The one sentence worth
+repeating here: **`reqirq` refuses unless the driver has itself watched `ackip`
+take `TC1IP` from 1 to 0**, because 讀 `arch/rlx/bsp/irq.c` the ICTL chip's
+`.mask_ack` masks and does not ack the device, and 讀 `kernel/irq/chip.c`
+`handle_level_irq()` unmasks after the handler unless `IRQ_DISABLED` — so a
+handler that cannot clear the pending bit re-triggers forever. The card cannot
+hold that rule, because a rule a human checks off a 38400-baud capture is a rule
+whose correctness depends on the experiment behaving.
+
+### 10.6 What version 2.0 does NOT do
+
+1. **No clockevent, no rating change.** The system time base is still `jiffies`.
+   That is `R5-3b`.
+2. **`ESTATUS` is still unread.** `Status` becomes readable; the LOPI mask lives
+   in the `lxc0` file reached by `mflxc0`, and TC0 runs there.
+3. **Nothing here has run on the silicon.** Every number in § 10.1–§ 10.3 is a
+   desk derivation from committed captures and vendor source. The card is
+   `bench/2026-09-04/PREDICTIONS-B10-block9.md`.

@@ -69,6 +69,12 @@
 # `test-gitignore` 18 -> 21 in the same session and moved this number by ZERO,
 # which is the property worth having in a case.
 #
+# 478 -> 491 on 2026-09-04 (thirty-second session, `R5-3a`):
+# `test-hazlint-objs` goes 28 -> 41 -- `--also DIR` puts `drivers/` in the
+# sweep, because every one of R5's six drivers is under it and P2 would
+# otherwise report 0 violations over a population containing no driver of
+# mine (HAZ-1). The whole row is *bench-only*, so all thirteen land here.
+#
 # 406 -> 452 on 2026-08-29 (sixth session): `test-rtkimage` arrives at 32 with
 # one allowed skip covering 18 (it reads the GPL drop's own nfjrom), and
 # `test-hazlint-objs` arrives at 28 and is *bench-only* for exactly the reason

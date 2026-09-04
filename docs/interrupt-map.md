@@ -142,7 +142,27 @@ two timers in one register block do not share a route.
 | **L4** | controller mask | `GIMR` 9 `TC1_IE` | `bsp_ictl_irq_unmask` for IRQ 25 | 🔴 clear (`gimr = 00209100`) | `TM-5b2` |
 | **L5** | routing | `IRR1` 7:4 `TC1_RS` | `bsp_irq_init` | **未讀 under Linux** | — |
 | **L6** | cascade line | `Status.IM2` (`Status` bit 10) | `rlx_cpu_irq_init` + `setup_irq(BSP_ICTL_IRQ)` | 未讀 | — |
-| **L7** | global enable | `Status.IE`, `Status.BEV` | the kernel | 推 — the vendor tick runs, so they are right | — |
+| **L7** | global enable | `Status.IEc`, `Status.BEV` | the kernel | 推 — the vendor tick runs, so they are right | — |
+
+🆕 **2026-09-04 (`R5-3a`): `L5`, `L6` and `L7` all become readable on the next
+seating, and none of them needed a new instrument.** The driver's `/proc` file
+now carries `irr0`–`irr3` (the same register block it already mapped) and
+`Status`, so one `cat` fills the last three rows of this table. The predictions
+are § 4.3's for `L5` and `status_im2=1` for `L6` (讀
+`arch/rlx/kernel/irq_cpu.c:44`: `setup_irq(BSP_ICTL_IRQ)` with
+`BSP_ICTL_IRQ = 2` calls `set_c0_status(0x100 << 2)` = bit 10).
+
+🔴 **`L7` is written `Status.IEc` and not `Status.IE`.** 讀
+`arch/rlx/include/asm/rlxregs.h`: this core has the MIPS-I three-deep
+interrupt-enable stack — `ST0_IEC` (bit 0), `ST0_IEP` (bit 2), `ST0_IEO`
+(bit 4) — and **no single `ST0_IE` is defined at all**. That agrees with
+`SOURCES.json`'s binutils note that every Lexra core is `ISA_MIPS1`, and it is
+a second instance of § 1.1's lesson: a MIPS32 name carried over to this part is
+a name that may not exist here.
+
+⚠️ **`Status` must be read OUTSIDE a `spin_lock_irqsave`**, or `IEc` reads 0
+always and the measurement is a constant. `IM2` and `BEV` are unaffected; only
+one of the three bits needed the care.
 
 ### 3.2 🔴 `TMR-2`'s attribution is wrong, and correcting it gives `R5-3` back the step it was told it had lost
 
@@ -201,6 +221,45 @@ rest of a seating and not the step before it.
 ⚠️ **`I2`'s wait is ≥ 671.07 s** at the Linux rate (`CLK-22`), not 9.4 s. Shorten
 it by loading a small `TC1DATA` for this cell — the period is the driver's to
 choose and `2²⁷` was picked for the clocksource, not for this.
+
+### 3.3.1 🆕 2026-09-04 (`R5-3a`): the four cells are implemented, and `I4`'s stop-if is enforced by the driver rather than by the card
+
+`rtl819x-timer` **2.0** gives each gate its own `/proc` verb — `armirq`,
+`ackip`, `reqirq`, `freeirq`, plus `period <bits>` for the wait above (`2²⁰` =
+**5.24 s** at 200 kHz). One verb per gate is the § 3.3 design and not an
+interface preference: folding `armirq` into `arm` would merge `I1` and `I2`, and
+`I1`'s refutation condition is *anything different from seating 11* — which is
+untestable if the thing being used as the control has changed.
+
+🔴 **`reqirq` refuses with `-EPERM` unless the driver has itself watched `ackip`
+take `TC1IP` from 1 to 0.** The reason is mechanical. 讀 `arch/rlx/bsp/irq.c`:
+the ICTL `irq_chip`'s `.mask_ack` is `bsp_ictl_irq_mask`, which **masks and does
+not ack the device**. 讀 `kernel/irq/chip.c` `handle_level_irq()`: after the
+handler returns it unmasks unless `desc->status & IRQ_DISABLED`. So a handler
+that cannot clear `TC1IP` re-triggers immediately and the board is gone.
+
+**A stop-if on the bench card would be a rule whose correctness depends on the
+experiment coming out the expected way**, and this repository has already ruled
+that shape out once — `CLAUDE.md`'s `H601` pre-read row, where a containment
+rule held only while the experiment behaved. The precondition is therefore
+checked by the thing that would be destroyed.
+
+🟢 **And the handler carries the same guard at run time**: clear `TC1IP`, read
+it back, and if the bit is still set call `disable_irq_nosync()` — which sets
+exactly the flag `handle_level_irq()` consults. An interrupt storm becomes
+`irq_stuck=1` in `/proc`.
+
+⚠️ **What neither guard does**, written here rather than discovered later: it
+cannot save a handler that *hangs*; it cannot act before the first delivery, so
+if merely unmasking wedges the part the guard never runs; and one `ackip` is
+**n = 1** about a write-1-to-clear claim that has one source.
+
+🟢 **`I2`'s wait also became free of an assumption.** The driver's `/proc` now
+carries `irr0`–`irr3` and `Status`, so § 4.3's prediction and § 3.1's `L5`/`L6`
+rows are readable in the same dump — 量 2026-09-04,
+`config/rlxfw-initramfs.tsv`: this image carries **eleven** busybox symlinks and
+`devmem` is not one of them, so **there was no other way to read them** and the
+alternative was not a worse command, it was no command.
 
 ### 3.4 🔴 `R5-3` must not write `GIMR` bit 9 itself
 

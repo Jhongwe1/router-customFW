@@ -2,7 +2,11 @@
 # Stage a kernel tree from src-vendor and build it.   R3-4's build driver.
 #
 #   rlxfw-kbuild.sh <cellname> [options]
-#     --config FILE      .config to install (default: the board template)
+#     --config FILE      .config to install VERBATIM.  Without it the
+#                        .config is DERIVED from the board template plus
+#                        config/rlxfw-kernel.delta -- see CFG-1 below.
+#     --variant V        quiet | loud, the delta's two variants.  Required
+#                        when deriving; refused together with --config.
 #     --oldconfig MODE   how `make oldconfig` gets its stdin:
 #                          none      -- do not run oldconfig at all
 #                          devnull   -- < /dev/null            (default)
@@ -61,11 +65,16 @@ R="$FWRE_WORK/rebuild/r3-4"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${RLXFW_REPO:-$(cd "$HERE/.." && pwd)}"
 TRIPWIRE="$HERE/vendor-tripwire.sh"
+# CLAUDE.md: every bench command runs /usr/bin/python3 and never `python3`.
+# 量 2026-09-02: `python3` resolves to ~/.venvs/thermal in a LOGIN shell and
+# to /usr/bin elsewhere, so the same script works one way and not the other.
+PY=${RLXFW_PYTHON:-/usr/bin/python3}
 RSDK="toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30"
 
 CELL=${1:?usage: rlxfw-kbuild.sh <cellname> [options]}
 shift
 CONFIG=""
+VARIANT=""
 OLDCONFIG=devnull
 CFLAGS_KERNEL=""
 INITRAMFS=""
@@ -88,6 +97,7 @@ N_MARKS=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --config)        CONFIG="$2"; shift 2 ;;
+        --variant)       VARIANT="$2"; shift 2 ;;
         --oldconfig)     OLDCONFIG="$2"; shift 2 ;;
         --cflags-kernel) CFLAGS_KERNEL="$2"; CFLAGS_GIVEN=1; shift 2 ;;
         --initramfs)     INITRAMFS="$2"; shift 2 ;;
@@ -197,6 +207,48 @@ else
         exit 3; }
     STAMP_SRC="$STAMP_FILE"
 fi
+# 🔴 CFG-1's guard sits ABOVE THE STAGE and BELOW the two guards above it,
+# and both halves of that are deliberate.
+#
+# Above the stage, for the reason the CFLAGS paragraph gives: lower down a
+# refusal costs a 480 MB copy before it fires.  The .config is not written
+# until much later, but WHICH SOURCE it comes from is decided by these
+# lines and can be decided now, so --dry-run exercises them.
+#
+# 🔴 Below the cflags and stamp guards because it was first written above
+# them, and 量: that made THIRTEEN cases of test-kbuild-cflags fail --
+# every one named for a refusal this guard had started preempting
+# (`C2 and it names --no-cflags in the refusal`, `S1 and it names
+# --no-stamp`, ...).  A case that no longer reaches the guard it is named
+# for has stopped testing what it says, and a new guard must not quietly
+# take that over.  There is a reason beyond not breaking them: those two
+# are about a DECLARED INPUT being missing or empty, which is a defect in
+# the declaration; this one is about the CALLER not choosing between two
+# variants the declaration offers.  The declaration is checked first.
+if [ -n "$CONFIG" ] && [ -n "$VARIANT" ]; then
+    echo "$CELL: --config and --variant are two sources for one file." >&2
+    echo "  --config FILE takes the file as given; --variant derives it from" >&2
+    echo "  the board template plus config/rlxfw-kernel.delta. Pick one." >&2
+    exit 3
+fi
+if [ -z "$CONFIG" ] && [ -z "$VARIANT" ]; then
+    echo "$CELL: no --config and no --variant." >&2
+    echo "  With no --config the .config is DERIVED from the board template" >&2
+    echo "  plus config/rlxfw-kernel.delta (CFG-1), and that delta declares" >&2
+    echo "  two variants. Pass --variant quiet or --variant loud." >&2
+    echo "  There is no default: they differ by CONFIG_PRINTK, so a silent" >&2
+    echo "  choice between them is a silent choice of which image booted." >&2
+    exit 3
+fi
+case "${VARIANT:-quiet}" in
+    quiet|loud) ;;
+    *) echo "$CELL: unknown --variant '$VARIANT' (quiet|loud)" >&2
+       echo "  These are config/rlxfw-kernel.delta's own two names; " >&2
+       echo "  kconfig-delta.py refuses an undeclared one rather than" >&2
+       echo "  falling through to 'no variant', and so does this." >&2
+       exit 3 ;;
+esac
+
 
 # ------------------------------------------------------ the recipe's identity
 # What `ID0` prints on the console, and it is derived rather than typed.  The
@@ -301,7 +353,7 @@ if [ "$MARKS" = 1 ]; then
     # tolerates a dirty one there would hide a bad drop.
     MARKS_IF_NEEDED=""
     [ "$KEEP" = 1 ] && MARKS_IF_NEEDED="--if-needed"
-    if ! python3 "$HERE/rlxfw-marks.py" apply \
+    if ! "$PY" "$HERE/rlxfw-marks.py" apply \
             --decl "$REPO/config/rlxfw-marks.tsv" \
             --tree "$top" --src "$REPO/config/rlxfw-src" $MARKS_IF_NEEDED \
             > "$log.marks.log" 2>&1
@@ -356,12 +408,50 @@ fi
     echo "no rsdk-linux-gcc under $DIR_RSDK" >&2; exit 3; }
 
 # ---------------------------------------------------------------- .config
+#
+# 🔄 CFG-1, 2026-09-04.  The default used to be the BARE board template, and
+# that made a build's identity depend on whether the caller remembered to pass
+# --config.  It is now the template with config/rlxfw-kernel.delta APPLIED --
+# which is what every rlxfw image has actually been built from.
+#
+# WHY DERIVE RATHER THAN COMMIT THE RESOLVED FILE.  CFG-1 was opened saying
+# "commit r51quiet.config-installed into config/".  That would make the
+# repository hold two owners of one piece of state: the delta (a declaration,
+# 35 rules with a reason each, against a baseline pinned by sha256) and a
+# 26,931-byte artefact derived from it.  House rule 1 says one owner.
+#
+# 量 2026-09-04, before this was written: `kconfig-delta.py apply` on the
+# pinned baseline (44f781de..., 26,548 bytes) produces a file BYTE-IDENTICAL
+# to r51quiet.config-installed -- sha256 e6cdc47d9343001d..., 26,931 bytes,
+# 15 set rules applied and 21 derive rules left to kconfig.  So the resolved
+# config is a function of things already committed, and the fix is to compute
+# it rather than to store it.
+#
+# ⚠️ THIS IS A BEHAVIOUR CHANGE AND IT IS MEASURED, NOT ASSUMED.  A plain
+# invocation with no --config used to build 15 CONFIG symbols differently:
+# BLK_DEV_INITRD, INITRAMFS_SOURCE/_ROOT_UID/_ROOT_GID/_COMPRESSION_{NONE,GZIP,
+# BZIP2,LZMA}, MTD_CHAR, CMDLINE, DECOMPRESS_GZIP, PROBE_INITRD_HEADER,
+# RD_GZIP, RD_BZIP2, RD_LZMA -- every one of them a row in the delta.  So the
+# change makes the default agree with the declaration; it introduces no
+# difference the declaration does not already carry.
+#
+# --variant is REQUIRED when deriving, and is refused when --config is given.
+# The delta declares `quiet` and `loud`, and today no row is tagged @quiet --
+# so omitting the flag and passing `quiet` produce the same bytes, and a
+# default would be right by coincidence.  kconfig-delta's own C24 refuses a
+# variant nobody declared for exactly this reason one layer down.
 if [ -n "$CONFIG" ]; then
     cp "$CONFIG" "$DIR_LINUX/.config" || exit 3
     echo "== $CELL: .config <- $CONFIG"
 else
-    cp "$TEMPLATE" "$DIR_LINUX/.config" || exit 3
-    echo "== $CELL: .config <- board template"
+    "$PY" "$REPO/tools/kconfig-delta.py" apply \
+        --baseline "$TEMPLATE" \
+        --delta "$REPO/config/rlxfw-kernel.delta" \
+        --variant "$VARIANT" \
+        --out "$DIR_LINUX/.config" || {
+        echo "$CELL: kconfig-delta apply FAILED" >&2; exit 3; }
+    echo "== $CELL: .config <- board template + config/rlxfw-kernel.delta" \
+         "[$VARIANT]"
 fi
 cp "$DIR_LINUX/.config" "$log.config-installed"
 

@@ -73,10 +73,27 @@ What this tool CANNOT tell you, printed with every run
 
 Usage
     hazlint-objs.py --tree <staged top>            # the dir holding linux-2.6.30/
+                    [--also DIR]...                # HAZ-1; repeatable, relative
+                                                   # to linux-2.6.30/
                     [--label NAME] [--jobs N]
                     [--hazlint PATH] [--out FILE]
                     [--expect-vmlinux SHA256]
                     [--no-arch-control]            # skip Q5. Says so, loudly.
+
+`--also` and why a sweep's own population is a claim  (HAZ-1)
+-------------------------------------------------------------
+The population above is `arch/rlx`, and every one of `R5`'s six drivers is
+under `drivers/`.  量 2026-09-03: `R5-1` produced
+`drivers/clocksource/rtl819x-timer.o`, and this tool could not see it -- so
+`P2` would have reported **0 violations over a population containing no
+driver of mine**, and that 0 reads to a later reader as *the drivers were
+swept too*.  `--also drivers/clocksource` puts the directory in.
+
+`Q1b` is its positive control and it is one row per `--also`: the directory
+must ADD objects, measured as the count with it against the count without.
+A `--also` naming a directory that contributes nothing REFUSES, because a
+green sweep over a population that silently excludes what the caller named is
+the failure this option exists to remove -- not a smaller version of it.
 
 Exit
     0  every object clean and every control fired
@@ -239,22 +256,50 @@ def sweep(hazlint, objs, jobs):
     return rows
 
 
-def enumerate_objs(kdir):
-    """Every .o under arch/rlx, FOLLOWING symlinks, plus the plain-find list
-    so the difference can be printed rather than assumed."""
-    def find(follow):
+def enumerate_objs(kdir, also=()):
+    """Every .o under arch/rlx and under each `also` directory, FOLLOWING
+    symlinks, plus the plain-find list so the difference can be printed rather
+    than assumed.
+
+    `also` is `HAZ-1`.  The population was `arch/rlx` alone, and `R5`'s six
+    drivers are all under `drivers/` -- so `P2` would have reported 0
+    violations over a population containing no driver, and that 0 reads like
+    "the drivers were swept too".  量 2026-09-03: `R5-1`'s product is
+    `drivers/clocksource/rtl819x-timer.o`, which this function could not see.
+
+    The per-directory counts are returned so `Q1b` can require that each
+    `--also` actually ADDED objects: a directory that contributes nothing is
+    refused rather than swept past, because a sweep that silently covers less
+    than its caller asked for is the defect this argument exists to close.
+    """
+    pre = os.path.join(kdir, '')
+    rel = lambda p: p[len(pre):] if p.startswith(pre) else p
+
+    def find(root, follow):
         cmd = ['find']
         if follow:
             cmd.append('-L')
-        cmd += [os.path.join(kdir, 'arch/rlx'), '-name', '*.o']
+        cmd += [root, '-name', '*.o']
         out = subprocess.run(cmd, stdout=subprocess.PIPE,
                              stderr=subprocess.DEVNULL).stdout.decode()
         return sorted(x for x in out.split('\n') if x)
-    plain, deref = find(False), find(True)
-    pre = os.path.join(kdir, '')
-    rel = lambda p: p[len(pre):] if p.startswith(pre) else p
+
+    roots = [('arch/rlx', os.path.join(kdir, 'arch/rlx'))]
+    for d in also:
+        roots.append((d, os.path.join(kdir, d)))
+
+    plain, deref, per_root, seen = [], [], [], set()
+    for name, root in roots:
+        p, d = find(root, False), find(root, True)
+        plain += p
+        added = [x for x in d if rel(x) not in seen]
+        seen.update(rel(x) for x in added)
+        deref += added
+        per_root.append((name, root, len(added), os.path.isdir(root)))
+
+    deref = sorted(set(deref))
     return ([(p, rel(p)) for p in deref], set(rel(p) for p in plain),
-            set(rel(p) for p in deref))
+            set(rel(p) for p in deref), per_root)
 
 
 # --------------------------------------------------------------------------
@@ -337,12 +382,16 @@ def rebuild_with_march(kdir, rel_o, march, out_o, env):
 
 def parse_args(argv):
     a = {'tree': None, 'label': None, 'jobs': 4, 'hazlint': None, 'out': None,
-         'arch_control': True, 'expect_vmlinux': None}
+         'arch_control': True, 'expect_vmlinux': None, 'also': []}
     i = 0
     while i < len(argv):
         x = argv[i]
         if x == '--tree':
             a['tree'] = argv[i + 1]; i += 2
+        elif x == '--also':
+            # Repeatable, and relative to linux-2.6.30/ so it reads the same
+            # way `arch/rlx` does in this file's own prose.
+            a['also'].append(argv[i + 1].strip('/')); i += 2
         elif x == '--label':
             a['label'] = argv[i + 1]; i += 2
         elif x == '--jobs':
@@ -378,6 +427,8 @@ def main(argv):
     print('')
     print('tree       %s' % top)
     print('label      %s' % label)
+    print('population arch/rlx%s'
+          % ''.join(' + ' + d for d in args['also']))
 
     if not os.path.isdir(kdir):
         die('%s: no linux-2.6.30 under the tree' % kdir)
@@ -412,7 +463,7 @@ def main(argv):
                           'vmlinux on disk is %s' % (vmsha[:16] or '(absent)')))
 
     # ---------------------------------------------------------------- Q1/Q2
-    objs, plain, deref = enumerate_objs(kdir)
+    objs, plain, deref, per_root = enumerate_objs(kdir, args['also'])
     blind = sorted(deref - plain)
     ck('Q1', 'the sweep enters arch/rlx/bsp (notes/kernel-build.md §10)',
        any(r.endswith('arch/rlx/bsp/setup.o') for _, r in objs),
@@ -421,6 +472,26 @@ def main(argv):
           ', '.join(b.replace('arch/rlx/', '') for b in blind) or 'none'))
     ck('Q2', 'there is something to sweep', len(objs) > 0,
        '%d object(s)' % len(objs))
+
+    # Q1b -- HAZ-1's positive control, one row per --also.  The claim an
+    # `--also` makes is "this directory is in the population"; the reading that
+    # settles it is that DROPPING it lowers the count.  A directory that adds
+    # nothing is refused, because a green sweep over a population that quietly
+    # excludes the thing you named is exactly the state HAZ-1 was opened on.
+    base_n = per_root[0][2]
+    for name, root, added, exists in per_root[1:]:
+        ck('Q1b:%s' % name, 'the --also directory ADDS objects to the sweep',
+           exists and added > 0,
+           'arch/rlx alone=%d, +%s=%d (%s%s)'
+           % (base_n, name, base_n + added,
+              '' if exists else 'NO SUCH DIRECTORY under linux-2.6.30/; ',
+              '%+d' % added))
+        base_n += added
+    if not args['also']:
+        ctl.append(('Q1b', 'the --also directory ADDS objects to the sweep',
+                    None, 'no --also given -- the population is arch/rlx '
+                          'alone, which contains none of R5\'s drivers '
+                          '(HAZ-1)'))
     if failed:
         print_controls(ctl)
         print('REFUSED: %d control(s) failed before the tree was read.'
@@ -642,7 +713,7 @@ def main(argv):
                 'controls   (every one can fail, and the run stops if one does)']
         for cid, what, ok, detail in ctl:
             mark = 'ok   ' if ok else ('SKIP ' if ok is None else 'FAIL ')
-            head.append('  %s %-3s %-58s %s' % (mark, cid, what, detail))
+            head.append('  %s %-22s %-58s %s' % (mark, cid, what, detail))
         body = '\n'.join(head) + re.sub(r'\033\[[0-9;]*m', '', out) + '\n'
         with open(args['out'] + '.tmp', 'w', encoding='utf-8') as fh:
             fh.write(body)
@@ -655,7 +726,7 @@ def print_controls(ctl):
     print('controls   (every one can fail, and the run stops if one does)')
     for cid, what, ok, detail in ctl:
         mark = 'ok   ' if ok else ('SKIP ' if ok is None else 'FAIL ')
-        print('  %s %-3s %-58s %s' % (mark, cid, what, detail))
+        print('  %s %-22s %-58s %s' % (mark, cid, what, detail))
 
 
 if __name__ == '__main__':

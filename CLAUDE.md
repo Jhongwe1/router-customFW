@@ -118,8 +118,20 @@ released source.
 > headline by 71.4× with the hardware innocent. **It was caught because the
 > block ran as three commands split at the card's own decision points.**
 > 🔴 **The most valuable result is negative**: `TC1IP` does not latch while
-> `TC1IE` is clear, so the driver's whole masked-observation safety strategy
-> does not work on this part and `R5-3` must arm the interrupt for real.
+> `TC1IE` is clear ~~, so the driver's whole masked-observation safety strategy
+> does not work on this part and `R5-3` must arm the interrupt for real~~.
+> 🔄 **2026-09-04, and this correction is one segment late: the observation
+> stands, the attribution was retracted by `R5-10` on 2026-09-04 and this line
+> was not one of the places that got fixed.** `TCIR` read `80000000` for the whole
+> 703 s arm, so **bit 30 — the timer block's OWN interrupt enable — was clear
+> too**, and `rtl819x_tc1_arm()` never writes it. `RUNSHEET` `C5` (量 2026-08-24,
+> fourteen days older than the question) shows a `GISR` pending bit latching
+> **while masked in `GIMR`**, so the mask is not the cause. **The masked-observation
+> strategy is intact; nothing had ever set the bit that makes a pending flag happen.**
+> 🟢 **2026-09-04 (`R5-3a`): the driver now sets it** — `armirq` writes `TCIR`
+> bit 30 alone with `GIMR` bit 9 still clear, which is zero-risk BY MEASUREMENT
+> rather than by argument, and `Q11` is testable again. `R5-3` is split into `R5-3a`
+> (that path) and `R5-3b` (clockevent); which gate is active, `PROGRESS.md` says.
 > **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
@@ -352,7 +364,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   this way and the second time the census caught it. **A sweep that selects
   `run:` LINES cannot see a `run:` BLOCK**; either parse the YAML or let the
   census be the arbiter, and never read a sweep's own count as coverage.
-  🔴 **2026-09-02: and `ci-census` cannot be that arbiter ON THIS HOST, which is the half the sentence above still got wrong.** 量, running every `run:` step here: 47 of 49 suites green, and the two reds are the census **working**. `test-hazlint` (142 cases) and `test-hazlint-objs` (28) are declared `*bench-only*` in `ci-expected.tsv` because their `K4` population control is `$FWRE_WORK/stage2.bin` — 56 KiB of this unit's vendor bootloader, which may not be committed. `ci-census`'s own `C10` requires *`*bench-only*` plus a real `.out` → red*. **This desk has that file, so they run, so their `.out` exists, so red.** Those two are 170 of the declared `# not-run-total: 478` *(477 when this line was written; 量 2026-09-03 against the tsv and against CI run 33747027566's census, which printed the same 478)*, so the total collapses to **2** here and the mismatch check fires too. ⚠️ **And the total is not recomputable from the table**: `ci-census`'s own docstring says a suite's skip rows are *alternatives, not additive* — which fire depends on configuration — so summing the covers column gives 517, not 478, and that is the table being right rather than wrong. **So: run every suite here and read the per-suite lines; let the census on GitHub decide the census.** A local sweep that ends in two reds every time trains a reader to ignore reds, which is the failure this whole paragraph exists to prevent.
+  🔴 **2026-09-02: and `ci-census` cannot be that arbiter ON THIS HOST, which is the half the sentence above still got wrong.** 量, running every `run:` step here: 47 of 49 suites green, and the two reds are the census **working**. `test-hazlint` (142 cases) and `test-hazlint-objs` (**41** as of 2026-09-04; 28 when this line was written) are declared `*bench-only*` in `ci-expected.tsv` because their `K4` population control is `$FWRE_WORK/stage2.bin` — 56 KiB of this unit's vendor bootloader, which may not be committed. `ci-census`'s own `C10` requires *`*bench-only*` plus a real `.out` → red*. **This desk has that file, so they run, so their `.out` exists, so red.** Those two are **183** of the declared `# not-run-total: 491` *(477 when this line was written, then 478; 量 2026-09-03 against the tsv and against CI run 33747027566's census, which printed the same 478; **491 from 2026-09-04**, `R5-3a`, when `test-hazlint-objs` went 28 → 41 and the whole row is bench-only)*, so the total collapses to **2** here and the mismatch check fires too. ⚠️ **And the total is not recomputable from the table**: `ci-census`'s own docstring says a suite's skip rows are *alternatives, not additive* — which fire depends on configuration — so summing the covers column gives 517, not 478, and that is the table being right rather than wrong. **So: run every suite here and read the per-suite lines; let the census on GitHub decide the census.** A local sweep that ends in two reds every time trains a reader to ignore reds, which is the failure this whole paragraph exists to prevent.
 - 🆕 **Reading a suite's output files is a measurement, so it needs a control —
   and freshness is NOT completion.** 量 2026-09-01: `ci-out/` holds the previous
   run's `.out` files, so a summary that just reads them scores stale results as

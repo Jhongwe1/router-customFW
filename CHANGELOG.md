@@ -27,7 +27,7 @@ run as three commands split at the card's own two decision points, so the
 correction landed before the measuring cell rather than after it.**
 
 🔴 **A negative result that changes the next step.** `TC1IP` does **not** latch
-in `TCIR` while `TC1IE` is clear in `GIMR` — 量 across a full 2²⁷ period with
+in `TCIR` while `TC1IE` is clear in `GIMR` 🔄 **— ATTRIBUTION CORRECTED 2026-09-04 (`R5-10`), and this entry was missed when the rest were fixed. `TCIR` bit 30 (the timer block's own enable) was clear too and `rtl819x_tc1_arm()` never writes it; `RUNSHEET` `C5` shows a `GIMR` mask does not stop the latch on this die. The observation stands, the cause named below does not, `Q11` is testable again, and `R5-3a`'s `armirq` is what tests it —** — 量 across a full 2²⁷ period with
 the positive control (`tc1_cycles` dropping from 31.99 M to 6.48 M) proving the
 period elapsed. `notes/timer-driver.md` § 4 builds the driver's safety argument
 on observing that bit with the interrupt masked; **that strategy does not work
@@ -38,7 +38,7 @@ write-1-to-clear claim — is void as a consequence.
 🔴 **Two defects in the driver's software counter extension, one predicted and
 one not.** The predicted one is wrap aliasing, confirmed at 703 s rather than
 the 30 s the desk analysis put it at: true gap 140,693,532, reported
-6,475,672 (that value mod 2²⁷), `trusted` still 1. The unpredicted one is
+6,475,672 🔄 **— corrected 2026-09-04: the aliased value is 6,475,804, which is what `tc1_ext` accumulated; 6,475,672 is the largest single inter-read gap of the two that happened —**, `trusted` still 1. The unpredicted one is
 worse: 讀 `:476-477`, `rtl819x_ext_advance()`'s only call site is inside the
 `/proc` read handler, so **the extension is a sum over the intervals somebody
 happened to read it in** — 462 s with no reader left it 92,362,366 counts

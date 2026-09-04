@@ -35,7 +35,7 @@ second `J 80500000` booted the vendor kernel and the banner looked like a pass.
 Usage
     tools/rlxfw-marks.py apply    --decl F --tree DIR --src DIR
     tools/rlxfw-marks.py check    --decl F --tree DIR
-    tools/rlxfw-marks.py verify   --decl F --image F [--absent F]...
+    tools/rlxfw-marks.py verify   --decl F --image F [--absent F]... [--map F]
     tools/rlxfw-marks.py self-test
 """
 
@@ -49,7 +49,34 @@ import tempfile
 VERSION = "1.0"
 
 POSITIONS = ("before", "after")
-COLS = ("id", "file", "position", "anchor", "insert", "reason")
+COLS = ("id", "file", "position", "anchor", "insert", "witness", "reason")
+
+# MARK-1.  A `witness` is what a BUILD row leaves in the artefact.
+#
+# 量 2026-09-03: `verify`'s sentence -- *present exactly once in mine, absent
+# from the vendor's* -- covered 12 marks and NOT the 642-line driver that `MK2`
+# brings in, because an `obj-y +=` line has no string of its own.  A row that
+# links a whole file into the image was the one row `verify` said nothing
+# about, and `check` cannot help: `check` reads the TREE, so it only ever says
+# the Makefile line is there.  A driver that compiles and is not linked is
+# green under both.
+#
+# TWO FORMS, and the second exists because a measurement forced it:
+#
+#   str:<literal>   the bytes must be in the image at least once, and in none
+#                   of the --absent artefacts.  The same test a mark gets.
+#   sym:<name>      the symbol must be in System.map (--map).
+#
+# 🔴 A string-only column would not have worked, and finding out why is the
+# reason the column is typed.  `rlxfw_mark.c` -- the file `MK` links -- holds
+# NO string literal unique to it.  Its only literal is the hex table
+# "0123456789ABCDEF", which lib/vsnprintf.c's own table contains as a prefix,
+# so it is in the vendor's image too.  The obvious substitute, `RLXFW-`, is
+# emitted by the CALL SITES in init/main.c and setup.c, not by this file: it
+# would be present in an image where rlxfw_mark.o failed to link, which makes
+# it a FALSE witness rather than a weak one.  So `MK` gets a symbol and `MK2`
+# gets a string, and neither is a stand-in for the other.
+WITNESS_KINDS = ("str", "sym")
 
 # What a mark string looks like in the emitted image.  `rlxfw_mark("B0")`
 # becomes the bytes `RLXFW-` + `B0`; `rlxfw_markx("B2", x)` becomes
@@ -84,11 +111,40 @@ class Row(object):
     def __init__(self, d, lineno):
         self.__dict__.update(d)
         self.lineno = lineno
+        self.wkind = self.wval = None
+        w = self.witness.strip()
+        if w:
+            if ":" not in w:
+                die("%s:%d: witness %r has no kind. Write `str:<literal>` or "
+                    "`sym:<name>`" % (self.file, lineno, w))
+            k, v = w.split(":", 1)
+            if k not in WITNESS_KINDS:
+                die("%s:%d: witness kind %r is not one of: %s"
+                    % (self.file, lineno, k, ", ".join(WITNESS_KINDS)))
+            if not v:
+                die("%s:%d: witness %r has an empty value" % (self.file,
+                                                              lineno, w))
+            self.wkind, self.wval = k, v
         m = CALL_RE.match(self.insert)
         if not m:
             if OBJ_RE.match(self.insert) or self.insert == INCLUDE:
                 self.kind = "build"
                 self.computed, self.tag, self.expr = False, None, None
+                # An `obj-y +=` row links a FILE into the image, and that file
+                # is what nothing checked. The include rows link nothing, so
+                # they must NOT carry one -- a witness there would be a claim
+                # about somebody else's object.
+                links_a_file = bool(OBJ_RE.match(self.insert))
+                if links_a_file and not self.wkind:
+                    die("%s:%d: %s links a file into the image and declares "
+                        "no witness. `verify` would then say nothing at all "
+                        "about that file -- which is the state MARK-1 records"
+                        % (self.file, lineno, self.id))
+                if not links_a_file and self.wkind:
+                    die("%s:%d: %s inserts an #include, which links nothing, "
+                        "so a witness here would be a claim about an object "
+                        "this row does not bring in"
+                        % (self.file, lineno, self.id))
                 return
             die("%s:%d: insert %r is not one of the three shapes this file "
                 "allows: `rlxfw_mark(\"TAG\");`, `rlxfw_markx(\"TAG\", expr);`, "
@@ -100,6 +156,10 @@ class Row(object):
         self.computed = bool(m.group(1))
         self.tag = m.group(2)
         self.expr = m.group(3)
+        if self.wkind:
+            die("%s:%d: %s is a mark, and a mark's witness is its own string. "
+                "A second declaration here would be a second owner of one "
+                "check" % (self.file, lineno, self.id))
         if self.computed and not self.expr:
             die("%s:%d: rlxfw_markx needs a value expression" % (self.file,
                                                                  lineno))
@@ -413,15 +473,36 @@ def _count(path, needle):
     return n
 
 
-def verify_marks(decl, image, absent):
+def _symbols(path):
+    """The symbol names in a System.map, as a set.
+
+    `nm`-style: `<addr> <type> <name>`.  Only the third field is taken, so a
+    symbol whose NAME contains another symbol's name cannot match by accident
+    -- which is the same collision `_no_prefix` exists for one layer up.
+    """
+    out = set()
+    with io.open(path, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            p = ln.split()
+            if len(p) >= 3:
+                out.add(p[2])
+    return out
+
+
+def verify_marks(decl, image, absent, mapfile=None):
     """Every mark string is in the image once, and in none of `absent`.
 
     The second half is what makes a mark a discriminator rather than a label.
     `RUNSHEET` P6 is this shape and it is why it carries FOUR numbers: without
     the positive one, the three zeros are also what a broken grep prints.
+
+    MARK-1: build rows that link a file carry a `witness` and it is checked
+    here too -- a `str:` against the same image and the same `absent` list, a
+    `sym:` against `mapfile`.
     """
     rows, _ = parse_decl(decl)
     marks = [r for r in rows if r.kind == "mark"]
+    wits = [r for r in rows if r.wkind]
     if not marks:
         die("%s declares no mark, only build rows. `verify` would then read an "
             "image and check nothing" % decl)
@@ -431,7 +512,66 @@ def verify_marks(decl, image, absent):
         got = _count(image, s)
         outs = [(a, _count(a, s)) for a in absent]
         res.append((r, got, outs))
-    return marks, res
+
+    # 🔴 An `--absent` artefact that carries TWO OR MORE distinct declared mark
+    # strings is one of MY images, and using it as the negative control is a
+    # category error rather than a failing check.
+    #
+    # 量 2026-09-04, the first real run of the witness column: `--absent
+    # r51a.vmlinux.elf` was passed, and every one of the twelve marks and the
+    # `MK2` witness went red -- correctly, because that file is a build of this
+    # declaration from the day before.  Thirteen rows said *not a
+    # discriminator* and the tool had no way to say *you handed me your own
+    # image*.
+    #
+    # 🔴 THE THRESHOLD IS TWO, AND THE FIRST DRAFT'S ONE WAS WRONG.  That
+    # version refused any artefact containing `RLXFW-` at all, and it broke
+    # `A11` -- the control that checks `verify` fails when a mark turns up in
+    # the vendor's image, which needs exactly one contaminating hit to exist.
+    # **One mark in a foreign artefact is a FINDING and A11 is what tests it;
+    # two or more distinct ones is a build of this declaration.**  A vendor
+    # image containing one of my strings by accident is conceivable; one
+    # containing twelve is not.
+    #
+    # ⚠️ Keying on `RLXFW-ID0=` alone was considered and rejected: it is
+    # present in every CURRENT build of mine and absent from a vendor's, which
+    # is exactly the shape wanted -- but it under-detects a build of mine from
+    # before that row existed, and `quietm.vmlinux.elf` (2026-08-28) is
+    # measurably such a file.
+    for path in absent:
+        hits = [r.tag for r in marks
+                if _count(path, r.string.encode("ascii"))]
+        if len(hits) >= 2:
+            die("--absent %s contains %d of this declaration's %d mark "
+                "strings (%s), so it is a build of THIS declaration. A "
+                "negative control has to be an artefact that is not one of "
+                "mine -- the vendor's vmlinux, or a build from before the row "
+                "existed. Every row would go red and none of the reds would "
+                "be about the image under test"
+                % (path, len(hits), len(marks), ", ".join(hits[:5])))
+
+    # 🔴 A `sym:` witness with no --map is a REFUSAL, not a skip.  A skip would
+    # print a green RESULT over a check that did not run, which is the exact
+    # shape of the hole MARK-1 opened on.
+    if any(r.wkind == "sym" for r in wits) and not mapfile:
+        die("%s declares %d sym: witness(es) and no --map was given. Skipping "
+            "them would print a green result over a check that did not run"
+            % (decl, sum(1 for r in wits if r.wkind == "sym")))
+    syms = _symbols(mapfile) if mapfile else set()
+
+    wres = []
+    for r in wits:
+        if r.wkind == "str":
+            s = r.wval.encode("ascii")
+            got = _count(image, s)
+            outs = [(a, _count(a, s)) for a in absent]
+            ok = got >= 1 and not any(n for _, n in outs)
+        else:
+            got = 1 if r.wval in syms else 0
+            outs = []
+            ok = bool(got)
+        wres.append((r, got, outs, ok))
+    return marks, res, wres
 
 
 # --------------------------------------------------------------------------
@@ -439,11 +579,20 @@ def verify_marks(decl, image, absent):
 # --------------------------------------------------------------------------
 
 _C_FILE = "int f(void)\n{\n\tint ret = 0;\n\n\tone();\n\ttwo();\n\treturn ret;\n}\n"
-_HDR = "# id\tfile\tposition\tanchor\tinsert\treason\n"
+_HDR = "# id\tfile\tposition\tanchor\tinsert\twitness\treason\n"
 
 
 def _decl(*rows):
-    return _HDR + "".join("\t".join(r) + "\n" for r in rows)
+    """A 6-tuple is padded with an EMPTY witness, so the twenty existing
+    cases keep their meaning without twenty edits; a 7-tuple carries one.
+    W8 is what says the file itself still requires seven fields."""
+    out = []
+    for r in rows:
+        r = tuple(r)
+        if len(r) == 6:
+            r = r[:5] + ("",) + r[5:]
+        out.append("\t".join(r) + "\n")
+    return _HDR + "".join(out)
 
 
 def self_test():
@@ -576,7 +725,7 @@ def self_test():
         theirs = os.path.join(tmp, "theirs.bin")
         open(mine, "wb").write(b"..RLXFW-B0\n\0..")
         open(theirs, "wb").write(b"..nothing here..")
-        _, res = verify_marks(d, mine, [theirs])
+        _, res, _w = verify_marks(d, mine, [theirs])
         r0, got, outs = res[0]
         ck("A10 verify: present in mine, absent from theirs",
            got == 1 and outs[0][1] == 0, "mine %d, theirs %d" % (got,
@@ -584,14 +733,154 @@ def self_test():
 
         # A11 -- and it fails both ways round.
         open(theirs, "wb").write(b"..RLXFW-B0\n..")
-        _, res = verify_marks(d, mine, [theirs])
+        _, res, _w = verify_marks(d, mine, [theirs])
         contaminated = res[0][2][0][1]
         open(mine, "wb").write(b"..nothing..")
-        _, res = verify_marks(d, mine, [theirs])
+        _, res, _w = verify_marks(d, mine, [theirs])
         ck("A11 verify fails when the mark is in the vendor image, and when "
            "it is missing from mine",
            contaminated == 1 and res[0][1] == 0,
            "vendor hit %d, mine %d" % (contaminated, res[0][1]))
+
+        # ---------------------------------------------------------- MARK-1
+        # W1..W8.  A build row that LINKS A FILE has to say what that file
+        # leaves behind, and `verify` has to check it.  量 2026-09-03: before
+        # this column, `verify`'s sentence covered 12 marks and said nothing
+        # at all about the 642-line driver `MK2` brings in.
+        mkrow = ("MK9", "sub/Makefile", "after", "obj-y += x.o",
+                 "obj-y += drv.o", "str:mydriver-name", "links a driver")
+        markrow = ("B0", "sub/a.c", "after", "one();",
+                   'rlxfw_mark("B0");', "", "r")
+        d20 = os.path.join(tmp, "d20")
+        io.open(d20, "w").write(_decl(markrow, mkrow))
+        rr, _ = parse_decl(d20)
+        ck("W1  a build row's witness parses",
+           rr[1].wkind == "str" and rr[1].wval == "mydriver-name",
+           "%s:%s" % (rr[1].wkind, rr[1].wval))
+
+        # W2 -- THE ROW THAT MARK-1 IS ABOUT.  An obj-y row with no witness
+        # is refused, because that is exactly the state `verify` was silent
+        # about, and a silence is what this column removes.
+        d21 = os.path.join(tmp, "d21")
+        io.open(d21, "w").write(_decl(markrow, mkrow[:5] + ("", mkrow[6])))
+        ok, why = refuses(parse_decl, d21)
+        ck("W2  an obj-y row with NO witness is refused", ok, why)
+
+        # W3 -- and an #include row must NOT have one: it links no object, so
+        # a witness there would be a claim about somebody else's file.
+        d22 = os.path.join(tmp, "d22")
+        io.open(d22, "w").write(_decl(markrow,
+            ("IN9", "sub/a.c", "after", "one();",
+             "#include <linux/rlxfw-mark.h>", "sym:whatever", "r")))
+        ok, why = refuses(parse_decl, d22)
+        ck("W3  an #include row with a witness is refused", ok, why)
+
+        # W4 -- nor may a MARK carry one; its witness is its own string, and
+        # a second declaration would be a second owner of one check.
+        d23 = os.path.join(tmp, "d23")
+        io.open(d23, "w").write(_decl(
+            ("B0", "sub/a.c", "after", "one();", 'rlxfw_mark("B0");',
+             "str:anything", "r")))
+        ok, why = refuses(parse_decl, d23)
+        ck("W4  a mark row with a witness is refused", ok, why)
+
+        # W5 -- an unknown witness kind, and a witness with no kind at all.
+        for sfx, bad_w, what in (("a", "nope:x", "unknown kind"),
+                                 ("b", "bare", "no kind"),
+                                 ("c", "str:", "empty value")):
+            dd = os.path.join(tmp, "d24" + sfx)
+            io.open(dd, "w").write(_decl(markrow, mkrow[:5] + (bad_w,
+                                                               mkrow[6])))
+            ok, why = refuses(parse_decl, dd)
+            ck("W5%s witness %-8s (%s) is refused" % (sfx, bad_w, what),
+               ok, why)
+
+        # W6 -- verify CHECKS a str: witness, both ways, on the same two
+        # artefacts the marks are checked on.  The negative half is the point:
+        # a witness present in the vendor's image proves nothing about mine.
+        open(mine, "wb").write(b"..RLXFW-B0\n..mydriver-name..")
+        open(theirs, "wb").write(b"..nothing here..")
+        _m, _r, w = verify_marks(d20, mine, [theirs])
+        ck("W6  verify: a str: witness present in mine, absent from theirs",
+           len(w) == 1 and w[0][3] is True, str([(x[1], x[3]) for x in w]))
+        open(theirs, "wb").write(b"..mydriver-name..")
+        _m, _r, w2 = verify_marks(d20, mine, [theirs])
+        open(mine, "wb").write(b"..RLXFW-B0\n..")
+        _m, _r, w3 = verify_marks(d20, mine, [theirs])
+        ck("W6b and it fails when the witness is in the vendor's image, "
+           "and when it is missing from mine",
+           w2[0][3] is False and w3[0][3] is False,
+           "contaminated %s, missing %s" % (w2[0][3], w3[0][3]))
+
+        # W7 -- a sym: witness is read from System.map, and 🔴 a sym: witness
+        # with NO --map is a REFUSAL.  Skipping it would print a green result
+        # over a check that did not run, which is the hole this column closes
+        # written one level up.
+        symrow = ("MK8", "sub/Makefile", "after", "obj-y += y.o",
+                  "obj-y += sym.o", "sym:my_symbol", "links a file")
+        d26 = os.path.join(tmp, "d26")
+        io.open(d26, "w").write(_decl(markrow, symrow))
+        mp = os.path.join(tmp, "System.map")
+        io.open(mp, "w").write("80000000 T my_symbol\n80000010 t other\n")
+        open(mine, "wb").write(b"..RLXFW-B0\n..")
+        _m, _r, w = verify_marks(d26, mine, [theirs], mp)
+        ck("W7  verify: a sym: witness found in System.map",
+           w[0][3] is True, str(w[0][:3]))
+        io.open(mp, "w").write("80000000 T something_else\n")
+        _m, _r, w = verify_marks(d26, mine, [theirs], mp)
+        ck("W7b and absent from it is a failure", w[0][3] is False,
+           str(w[0][:3]))
+        ok, why = refuses(verify_marks, d26, mine, [theirs])
+        ck("W7c a sym: witness with no --map REFUSES rather than skipping",
+           ok, why)
+
+        # W7d -- a System.map name is matched as a whole FIELD, not as a
+        # substring, so `my_symbol` does not match `my_symbol_extra`.  Same
+        # collision _no_prefix exists for one layer up.
+        io.open(mp, "w").write("80000000 T my_symbol_extra\n")
+        _m, _r, w = verify_marks(d26, mine, [theirs], mp)
+        ck("W7d a longer symbol containing the witness does not match",
+           w[0][3] is False, str(w[0][:3]))
+
+        # W9 -- an --absent artefact carrying TWO OR MORE of this declaration's
+        # marks is one of mine and is refused as a control.
+        # 量 2026-09-04: the first real run of this column was given one of my
+        # own builds as the negative control, and thirteen rows went red for a
+        # reason that had nothing to do with the image under test.
+        #
+        # 🔴 W9c is the case the first draft of this guard BROKE.  It refused
+        # on one hit, which is exactly what A11 needs to exist -- so the guard
+        # and an older control were making incompatible claims about the same
+        # file, and only running both found it.
+        d29 = os.path.join(tmp, "d29")
+        io.open(d29, "w").write(_decl(
+            ("B0", "sub/a.c", "after", "one();", 'rlxfw_mark("B0");', "r"),
+            ("B1", "sub/b.c", "after", "two();", 'rlxfw_mark("B1");', "r")))
+        open(mine, "wb").write(b"..RLXFW-B0\n..RLXFW-B1\n..")
+        open(theirs, "wb").write(b"..RLXFW-B0\n..RLXFW-B1\n..")
+        ok, why = refuses(verify_marks, d29, mine, [theirs])
+        ck("W9  an --absent artefact with TWO of my marks is refused", ok, why)
+        open(theirs, "wb").write(b"..RLXFW-B0\n..")
+        _m, res9, _w = verify_marks(d29, mine, [theirs])
+        ck("W9b ONE mark in a foreign artefact is a FINDING, not a refusal -- "
+           "it is reported and A11 is what tests it",
+           res9[0][2][0][1] == 1 and res9[1][2][0][1] == 0,
+           str([(r.tag, o) for r, _g, o in res9]))
+        open(mine, "wb").write(b"..RLXFW-B0\n..mydriver-name..")
+        open(theirs, "wb").write(b"..a vendor image..")
+        _m, _r, w = verify_marks(d20, mine, [theirs])
+        ck("W9c and a clean one is accepted", w[0][3] is True, str(w[0][:3]))
+
+        # W8 -- the column count is fixed at seven.  A six-field row is an
+        # error and NOT a row with an empty witness: a dropped tab would
+        # otherwise merge `witness` into `reason` silently, which is the shape
+        # this file's own header warns about.
+        d27 = os.path.join(tmp, "d27")
+        io.open(d27, "w").write(
+            "# id\tfile\tposition\tanchor\tinsert\twitness\treason\n"
+            "B0\tsub/a.c\tafter\tone();\trlxfw_mark(\"B0\");\tr\n")
+        ok, why = refuses(parse_decl, d27)
+        ck("W8  a six-field row is an error, not an empty witness", ok, why)
 
         # A12 -- apply refuses to write into the pinned clones.
         fake = os.path.join(tmp, "src-vendor", "drop")
@@ -798,7 +1087,8 @@ def main(argv):
         sys.stderr.write(__doc__)
         return 3
     cmd, argv = argv[0], argv[1:]
-    a = {"decl": None, "tree": None, "src": None, "image": None, "absent": []}
+    a = {"decl": None, "tree": None, "src": None, "image": None,
+         "map": None, "absent": []}
     if_needed = False
     i = 0
     while i < len(argv):
@@ -861,9 +1151,12 @@ def main(argv):
     if cmd == "verify":
         if not a["decl"] or not a["image"]:
             die("verify needs --decl and --image")
-        rows, res = verify_marks(a["decl"], a["image"], a["absent"])
+        rows, res, wres = verify_marks(a["decl"], a["image"], a["absent"],
+                                       a["map"])
         print("rlxfw-marks %s" % VERSION)
         print("image       %s" % a["image"])
+        if a["map"]:
+            print("map         %s" % a["map"])
         if not a["absent"]:
             print("  \033[31mno --absent file given\033[0m -- then `present in "
                   "mine` is a label, not a discriminator")
@@ -875,13 +1168,30 @@ def main(argv):
                 bad += 1
             shown = r.string.replace("\n", "\\n")
             print("  %-4s %-14s mine:%d %s%s" % (r.id, shown, got, o, m))
+        # MARK-1's rows, printed apart: a witness is a different claim from a
+        # mark (a whole file reached the image, not a line printed on the
+        # wire) and merging the two counts would hide which kind failed.
+        wbad = 0
+        if wres:
+            print("")
+            print("witnesses   (MARK-1: what a build row leaves in the "
+                  "artefact)")
+            for r, got, outs, ok in wres:
+                o = " ".join("%s:%d" % (os.path.basename(f), n)
+                             for f, n in outs)
+                if not ok:
+                    wbad += 1
+                print("  %-4s %-4s %-22s mine:%d %s%s"
+                      % (r.id, r.wkind + ":", r.wval, got, o,
+                         "" if ok else "  <- must be >=1 here and 0 there"))
         print("")
-        if bad or not a["absent"]:
-            print("RESULT: \033[31m%d mark(s) not a discriminator\033[0m" % bad)
+        if bad or wbad or not a["absent"]:
+            print("RESULT: \033[31m%d mark(s) and %d witness(es) not a "
+                  "discriminator\033[0m" % (bad, wbad))
             return 1
-        print("RESULT: \033[32mall %d mark(s) present once in the image and "
-              "absent from %d vendor artefact(s)\033[0m"
-              % (len(rows), len(a["absent"])))
+        print("RESULT: \033[32mall %d mark(s) present once in the image, %d "
+              "witness(es) present, and absent from %d vendor artefact(s)"
+              "\033[0m" % (len(rows), len(wres), len(a["absent"])))
         return 0
 
     die("unknown command %r" % cmd)

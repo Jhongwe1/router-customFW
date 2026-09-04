@@ -1201,7 +1201,7 @@ reference at 0.0012 ppm per count".)* 量, `TM-1`: under Linux `CDBR` is
 loader's 14 and 142,858. So **one TC1 period is 671.07 s, not 9.395016 s**, and
 the reference is **200.005 kHz at 0.083 ppm per count**. The first bullet's
 30 s/60 s aliasing therefore did **not** occur — but the same failure did, at
-703 s: true gap 140,693,532 counts, `tc1_ext_gap_max` **6,475,672** (that value
+703 s: true gap 140,693,532 counts, whose alias is **6,475,804** and which `tc1_ext` accumulated exactly; `tc1_ext_gap_max` reads **6,475,672**, the largest single inter-read gap of two, ~~(that value
 mod 2²⁷), `trusted` **1**. **Mechanism right, threshold wrong by the same
 71.43×.** `bench/2026-09-03/CORRECTIONS-block8.md` § 1 and § 3.
 

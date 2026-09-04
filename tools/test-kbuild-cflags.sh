@@ -126,7 +126,7 @@ ck "C8 and it fires before the cflags block"  0 \
 # C8b -- the negative control.  A guard that refuses every value would pass
 # C8, so an ALLOWED value must get past it; --dry-run stops before staging so
 # this costs nothing and needs no drop.
-run gcf-c8b --id-scope main --dry-run
+run gcf-c8b --id-scope main --variant quiet --dry-run
 ck "C8b an allowed --id-scope is accepted"    0 "$rc"
 ck "C8b and it reached the dry-run report"    1 \
    "$(printf '%s\n' "$out" | grep -c 'nothing staged and nothing built')"
@@ -164,7 +164,7 @@ ck "S2 and it says that is not --no-stamp"     1 \
 # S3 -- --no-stamp is ACCEPTED, which is what stops S1/S2 being passed by a
 # guard that refuses everything, and it leaves the stamp EMPTY rather than
 # quietly substituting one.
-run gcf-s3 --no-stamp --dry-run
+run gcf-s3 --no-stamp --variant quiet --dry-run
 ck "S3 --no-stamp is accepted"                 0 "$rc"
 ck "S3 and it says the clock is deliberate"    1 \
    "$(printf '%s\n' "$out" | grep -c 'wall clock, deliberately')"
@@ -172,7 +172,7 @@ ck "S3 and the stamp is empty, not substituted" 1 \
    "$(printf '%s\n' "$out" | grep -c 'stamp= \[\]')"
 
 # S4 -- the declared epoch is read.
-run gcf-s4 --dry-run
+run gcf-s4 --variant quiet --dry-run
 ck "S4 the declared epoch is read"             1 \
    "$(printf '%s\n' "$out" | grep -c 'stamp=1788220800')"
 
@@ -196,7 +196,7 @@ ck "S4 the declared epoch is read"             1 \
 # and must NOT be the local one.  Drop `-u` from the driver and it goes red.
 E=1788220800
 UTC_RENDER="$(date -u -d "@$E")"
-run gcf-s5 --dry-run
+run gcf-s5 --variant quiet --dry-run
 DRIVER_RENDER="$(printf '%s\n' "$out" | sed -n 's/.*stamp=[0-9]* \[\([^]]*\)\].*/\1/p')"
 ck "S5a the driver renders the UTC form"       "$UTC_RENDER" "$DRIVER_RENDER"
 
@@ -214,7 +214,7 @@ ck "S5a the driver renders the UTC form"       "$UTC_RENDER" "$DRIVER_RENDER"
 # because either one alone still produces UTC. They are belt-and-braces by
 # design, S5c is the assertion that both are present, and saying which case
 # covers which half is the point of writing all three down.
-o_tz="$(TZ=Asia/Taipei LC_ALL=C bash "$K" gcf-s5b --dry-run --target none 2>&1 \
+o_tz="$(TZ=Asia/Taipei LC_ALL=C bash "$K" gcf-s5b --variant quiet --dry-run --target none 2>&1 \
         | sed -n 's/.*stamp=[0-9]* \[\([^]]*\)\].*/\1/p')"
 ck "S5b a non-UTC TZ does not move the rendering" "$UTC_RENDER" "$o_tz"
 
@@ -332,6 +332,43 @@ rm -rf "$MTMP"
 echo
 echo "=== the declaration is back, byte for byte ==="
 ck "the file under test is unmodified" "$CF_SHA0" "$(sha256sum "$CF" | cut -d' ' -f1)"
+# ---------------------------------------------------------------- CFG-1
+# V1..V5 -- the guard that made the five edits above necessary.
+#
+# Until 2026-09-04 a run with no --config silently used the BARE board
+# template, and 量 that is 15 CONFIG symbols away from what every rlxfw image
+# has actually been built from -- BLK_DEV_INITRD, INITRAMFS_*, MTD_CHAR,
+# CMDLINE among them, every one of them a row in config/rlxfw-kernel.delta.
+# So the .config is DERIVED now, and the variant has to be chosen.
+#
+# 🔴 There is no default. The delta declares `quiet` and `loud`, and today NO
+# row is tagged @quiet -- so omitting the flag and passing `quiet` produce the
+# same bytes, and a default would be right by coincidence. kconfig-delta's own
+# C24 refuses an undeclared variant one layer down for the same reason.
+run gcf-v1 --dry-run
+ck "V1 neither --config nor --variant is REFUSED"   3 "$rc"
+ck "V1b and it names both flags"                    1 \
+   "$(printf '%s\n' "$out" | grep -c 'no --config and no --variant')"
+
+run gcf-v2 --config /dev/null --variant quiet --dry-run
+ck "V2 --config AND --variant is REFUSED"           3 "$rc"
+ck "V2b and it says why: two sources for one file"  1 \
+   "$(printf '%s\n' "$out" | grep -c 'two sources for one file')"
+
+run gcf-v3 --variant quiett --dry-run
+ck "V3 an undeclared variant is REFUSED"            3 "$rc"
+ck "V3b and it names the two that are declared"     1 \
+   "$(printf '%s\n' "$out" | grep -c "unknown --variant 'quiett'")"
+
+# V4/V5 -- the negative controls. A guard that refused everything would pass
+# V1..V3 and prove nothing, so BOTH accepted forms must get through.
+run gcf-v4 --variant quiet --dry-run
+ck "V4 --variant quiet is accepted"                 0 "$rc"
+run gcf-v5 --variant loud --dry-run
+ck "V5 --variant loud is accepted too"              0 "$rc"
+run gcf-v6 --config /dev/null --dry-run
+ck "V6 --config alone is accepted"                  0 "$rc"
+
 
 echo
 if [ "$fail" -ne 0 ]; then

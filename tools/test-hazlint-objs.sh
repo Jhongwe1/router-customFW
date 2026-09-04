@@ -254,6 +254,47 @@ run "$T/tree" "$HAZ"
 ck  "A9  Q5 runs against the stub toolchain: exit" 0 "$RC"
 ckin "A9b and reads 11, which is TC-21's number" "= 11 (TC-21 says 11)" "$T/out"
 
+# ------------------------------------------------------- A10..A14  HAZ-1, --also
+# The population is a claim.  Before --also existed, a sweep of arch/rlx over a
+# tree carrying a driver under drivers/ reported 0 violations and never opened
+# it -- which is what HAZ-1 records and what A11 pins by making that driver a
+# HAZARD.  A10 is the negative half: without --also the hazard is invisible and
+# the tool exits 0.
+mktree "$T/drv" 1
+mkdir -p "$T/drv/linux-2.6.30/drivers/clocksource"
+"$PY" "$T/mkobj.py" hazard "$T/drv/linux-2.6.30/drivers/clocksource/rtl819x-timer.o"
+
+run "$T/drv" "$HAZ" --no-arch-control
+ck   "A10 a driver hazard under drivers/ is INVISIBLE without --also" 0 "$RC"
+cknot "A10b and the object is not in the sweep" "rtl819x-timer.o" "$T/out"
+ckin "A10c Q1b says the population is arch/rlx alone" "no --also given" "$T/out"
+
+run "$T/drv" "$HAZ" --no-arch-control --also drivers/clocksource
+ck   "A11 --also drivers/clocksource: the same hazard is FOUND" 1 "$RC"
+ckin "A11b and the object is named" "rtl819x-timer.o" "$T/out"
+ckin "A11c and the header says what was swept" "population arch/rlx + drivers/clocksource" "$T/out"
+
+# A12 -- the positive control.  A --also that adds nothing must refuse, not
+# sweep past: a green run over a population that silently excludes what the
+# caller named is the state --also exists to remove.
+run "$T/drv" "$HAZ" --no-arch-control --also drivers/spi
+ck   "A12 --also naming a directory that is not there: REFUSES" 2 "$RC"
+ckin "A12b and it is Q1b" "FAIL  Q1b:drivers/spi" "$T/out"
+cknot "A12c and reports nothing about the tree" "TOTAL (leaf objects only)" "$T/out"
+
+# A13 -- a directory that EXISTS and holds no object is the same refusal, and
+# it is a different code path from A12 (isdir true, added zero).
+mkdir -p "$T/drv/linux-2.6.30/drivers/empty"
+run "$T/drv" "$HAZ" --no-arch-control --also drivers/empty
+ck   "A13 --also on an existing but empty directory: REFUSES" 2 "$RC"
+ckin "A13b and it is Q1b" "FAIL  Q1b:drivers/empty" "$T/out"
+
+# A14 -- and naming arch/rlx again adds nothing, so it refuses too.  This is
+# the case that keeps Q1b from being satisfiable by a redundant argument.
+run "$T/tree" "$HAZ" --no-arch-control --also arch/rlx
+ck   "A14 --also arch/rlx (already swept) adds nothing: REFUSES" 2 "$RC"
+ckin "A14b and it is Q1b" "FAIL  Q1b:arch/rlx" "$T/out"
+
 # ---------------------------------------------------------------- mutations
 mut () {   # mut <name> <sed-expr>
     cp "$TOOL" "$T/mut.py"

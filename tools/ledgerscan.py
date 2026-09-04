@@ -357,6 +357,13 @@ def scan_topics(root, paths):
 # is one word too wide and cost a round trip.
 LEDGER_PATH_RX = re.compile(r"^\|\s*`([^`]+)`\s*\|")
 
+# The depth vocabulary, deepest last.  `scan` computes `line` or `name` from
+# whether any citation carried a line number; the ledger may also say `none`,
+# which `scan` has no way to produce -- a path nobody cites is a path the scan
+# never sees.
+DEPTHS = ("none", "name", "line")
+DEPTH_RANK = {"none": 0, "name": 1, "line": 2}
+
 
 def ledger_paths(root, rel=LEDGER):
     """The paths the ledger declares.
@@ -367,17 +374,60 @@ def ledger_paths(root, rel=LEDGER):
     count, so `gpio` in a summary row is not read as a declaration of a file
     called gpio. P16 is the control.
     """
+    d = ledger_rows(root, rel)
+    return None if d is None else set(d)
+
+
+def _depth_word(row):
+    """The depth word in a ledger row, or None.  Split out so P19e can test the
+    extraction without building a repository around it.
+
+    🔴 LEFT TO RIGHT, and that is the whole of it.  The first draft iterated the
+    DEPTHS vocabulary and returned the first member present, which is a
+    different function -- and the real ledger refuted it on the first run:
+    `arch/rlx/kernel/rlx-time.c`'s cell reads `🔴 **line** (was **none —
+    nothing taken**)`, so the vocabulary order returned `none`, the row's
+    struck-through HISTORY, and reported a row that had just been corrected.
+    The current claim is written first and the history follows it, so position
+    is the rule.  P19f is that cell, verbatim.
+    """
+    cells = row.split("|")
+    if len(cells) <= 2:
+        return None
+    m = re.search(r"(?<![a-z])(%s)(?![a-z])" % "|".join(DEPTHS),
+                  cells[2].lower())
+    return m.group(1) if m else None
+
+
+def ledger_rows(root, rel=LEDGER):
+    """-> {path: declared depth or None}.  LEDGER-2.
+
+    The second cell of a row is the depth the ledger CLAIMS for that path.  It
+    is prose, not a token -- rows carry `line`, `name`, `none`, and decorated
+    forms like `🔴 **line**` -- so the word is extracted rather than matched
+    whole, and a cell holding none of the three words yields None (unknown)
+    rather than a guess.
+    """
     txt = read_text(root, rel)
     if not txt:
         return None
-    out = set()
+    out = {}
     for line in txt.splitlines():
         m = LEDGER_PATH_RX.match(line)
         if not m:
             continue
         span = m.group(1).strip()
-        if PATH_RX.fullmatch(span):
-            out.add(strip_tree_prefix(span))
+        if not PATH_RX.fullmatch(span):
+            continue
+        # cells[0] is empty (the leading pipe), cells[1] is the path.
+        depth = _depth_word(line)
+        p = strip_tree_prefix(span)
+        # A path declared twice keeps the DEEPER claim: two rows for one file
+        # is two sections having read it, and the ledger's depth for the file
+        # is the most that was taken.
+        if p in out and DEPTH_RANK.get(out[p], -1) >= DEPTH_RANK.get(depth, -1):
+            continue
+        out[p] = depth
     return out
 
 
@@ -493,18 +543,46 @@ def render_check(root, out=sys.stdout):
     seen = set(mine) | set(ups)
     in_scope = {p for p in seen if domain_of(p) in IN_SCOPE}
 
-    declared = ledger_paths(root)
-    if declared is None:
+    rows = ledger_rows(root)
+    if rows is None:
         print("RED  %s does not exist. The ledger is the deliverable of R5-0 "
               "and check has nothing to compare against." % LEDGER, file=out)
         return 2
+    declared = set(rows)
 
     missing = sorted(in_scope - declared)
     stale = sorted(declared - seen)
 
+    # LEDGER-2.  Until 2026-09-04 this function compared PATH SETS and never
+    # looked at the depth column, so a row could under-declare what it took and
+    # the gate stayed green -- 量 2026-09-03: `check` said ok on 32 in-scope
+    # paths while `scan --domain timer` read `kernel/time/jiffies.c` as `line`
+    # against a row declaring `name`.  Depth is the boundary between *saw the
+    # interface* and *read the code*, which is the whole reason the ledger
+    # exists.
+    #
+    # 🔴 It REPORTS and does not JUDGE, and that is not timidity.  The two
+    # numbers are not the same quantity: `scan`'s depth is the deepest
+    # citation anywhere in the repository, the ledger's is what a particular
+    # section says IT took.  They coincide usually, not by definition -- a row
+    # may honestly say `name` about its own reading of a file another section
+    # later quoted by line.  Equality is therefore evidence, not a rule, and a
+    # rule built on it would make the ledger's rows follow the scanner instead
+    # of the reader.
+    obs = {}
+    for p in sorted(declared & seen):
+        cites = (mine.get(p) or []) + (ups.get(p) or [])
+        obs[p] = "line" if any(c.with_lineno for c in cites) else "name"
+    shallow = [(p, rows[p], obs[p]) for p in sorted(obs)
+               if rows[p] is not None
+               and DEPTH_RANK[obs[p]] > DEPTH_RANK[rows[p]]]
+    nodepth = [p for p in sorted(declared) if rows[p] is None]
+
     print("ledgerscan check", file=out)
     print("  in-scope paths found : %d" % len(in_scope), file=out)
     print("  paths declared       : %d" % len(declared), file=out)
+    print("  depth compared on    : %d (declared and cited)" % len(obs),
+          file=out)
 
     rc = 0
     if missing:
@@ -525,6 +603,26 @@ def render_check(root, out=sys.stdout):
               "-- a ledger is append-only and a removed citation does not "
               "unread the file:" % len(stale), file=out)
         for p in stale:
+            print("       %s" % p, file=out)
+    if shallow:
+        print(file=out)
+        print("⚠️  LEDGER-2: %d row(s) declare LESS depth than the repository "
+              "shows. Reported, not judged -- read the row and decide, "
+              "because the scan's depth is the deepest citation anywhere and "
+              "the row's is what that section took:" % len(shallow), file=out)
+        for p, decl, got in shallow:
+            cites = (mine.get(p) or []) + (ups.get(p) or [])
+            ex = next((c for c in cites if c.with_lineno), None)
+            print("       %-50s  ledger=%-4s  scan=%-4s  %s"
+                  % (p, decl, got,
+                     ("e.g. %s:%d" % (ex.citing, ex.line)) if ex else ""),
+                  file=out)
+    if nodepth:
+        print(file=out)
+        print("⚠️  %d declared row(s) whose depth cell names none of %s, so "
+              "the comparison above skipped them:"
+              % (len(nodepth), "/".join(DEPTHS)), file=out)
+        for p in nodepth:
             print("       %s" % p, file=out)
     if rc == 0:
         print(file=out)
@@ -668,9 +766,9 @@ def self_test():
     # path it names is the one removed.  A checker that cannot fail is not a
     # checker.
     with tempfile.TemporaryDirectory() as tmp:
-        led = ("# ledger\n\n| path | domain | what was taken |\n"
-               "|---|---|---|\n"
-               "| `arch/rlx/kernel/rlx-cevt.c` | timer | the string only |\n")
+        led = ("# ledger\n\n| path | depth | origin | what was taken |\n"
+               "|---|---|---|---|\n"
+               "| `arch/rlx/kernel/rlx-cevt.c` | line | vendor | the string only |\n")
         r = _tmp_root(tmp, {
             "notes/x.md": "`arch/rlx/kernel/rlx-cevt.c:139` and "
                           "`drivers/mtd/maps/rtl819x_flash.c:62-73`\n",
@@ -688,10 +786,10 @@ def self_test():
 
     # ---- P8: the negative on P7.  With the row added, the same tree is green.
     with tempfile.TemporaryDirectory() as tmp:
-        led = ("# ledger\n\n| path | domain | what was taken |\n"
-               "|---|---|---|\n"
-               "| `arch/rlx/kernel/rlx-cevt.c` | timer | the string only |\n"
-               "| `drivers/mtd/maps/rtl819x_flash.c` | spi_mtd | lines 62-73 |\n")
+        led = ("# ledger\n\n| path | depth | origin | what was taken |\n"
+               "|---|---|---|---|\n"
+               "| `arch/rlx/kernel/rlx-cevt.c` | line | vendor | the string only |\n"
+               "| `drivers/mtd/maps/rtl819x_flash.c` | line | vendor | lines 62-73 |\n")
         r = _tmp_root(tmp, {
             "notes/x.md": "`arch/rlx/kernel/rlx-cevt.c:139` and "
                           "`drivers/mtd/maps/rtl819x_flash.c:62-73`\n",
@@ -701,6 +799,91 @@ def self_test():
         buf = io.StringIO()
         rc = render_check(r, out=buf)
         ck("P8  check is green once the row is added", rc == 0, buf.getvalue())
+
+    # ---- P19: LEDGER-2.  `check` compared PATH SETS and never read the depth
+    # column, so a row could under-declare what it took and stay green -- 量
+    # 2026-09-03 on the real ledger, `kernel/time/jiffies.c` declared `name`
+    # while the tree cited it by line.  The report fires and the exit code does
+    # NOT move, and both halves are controls: a report nothing prints is not a
+    # check, and a judgement built on this comparison would make the ledger's
+    # rows follow the scanner instead of the reader.
+    for decl, want_report, cid in (("name", True, "P19a"),
+                                   ("line", False, "P19b")):
+        with tempfile.TemporaryDirectory() as tmp:
+            led = ("# ledger\n\n| path | depth | origin | what was taken |\n"
+                   "|---|---|---|---|\n"
+                   "| `arch/rlx/kernel/rlx-cevt.c` | %s | vendor | x |\n"
+                   % decl)
+            r = _tmp_root(tmp, {
+                "notes/x.md": "`arch/rlx/kernel/rlx-cevt.c:139`\n",
+                LEDGER: led,
+            })
+            import io as _io
+            buf = _io.StringIO()
+            rc = render_check(r, out=buf)
+            txt = buf.getvalue()
+            got = "LEDGER-2" in txt
+            ck("%s a row declaring %-4s against a cited line number: "
+               "report %s" % (cid, decl, "fires" if want_report else "silent"),
+               got is want_report, txt)
+            ck("%sx and the exit code is unmoved either way" % cid, rc == 0,
+               "rc=%d" % rc)
+
+    # ---- P19c: OVER-declaration is not the defect and must not be reported.
+    # A row may honestly say `line` about its own reading while the repository
+    # happens to cite the file only by name; the ledger's depth is what that
+    # section took, not what the scanner can see.
+    with tempfile.TemporaryDirectory() as tmp:
+        led = ("# ledger\n\n| path | depth | origin | what was taken |\n"
+               "|---|---|---|---|\n"
+               "| `arch/rlx/kernel/rlx-cevt.c` | line | vendor | read in full |\n")
+        r = _tmp_root(tmp, {
+            "notes/x.md": "`arch/rlx/kernel/rlx-cevt.c` was opened\n",
+            LEDGER: led,
+        })
+        import io as _io
+        buf = _io.StringIO()
+        rc = render_check(r, out=buf)
+        ck("P19c over-declaration (ledger=line, scan=name) is NOT reported",
+           "LEDGER-2" not in buf.getvalue() and rc == 0, buf.getvalue())
+
+    # ---- P19d: a depth cell naming none of the three words is reported as
+    # skipped rather than guessed at.  The alternative -- defaulting to `name`
+    # -- would manufacture a LEDGER-2 hit out of a formatting choice.
+    with tempfile.TemporaryDirectory() as tmp:
+        led = ("# ledger\n\n| path | depth | origin | what was taken |\n"
+               "|---|---|---|---|\n"
+               "| `arch/rlx/kernel/rlx-cevt.c` | ??? | vendor | x |\n")
+        r = _tmp_root(tmp, {
+            "notes/x.md": "`arch/rlx/kernel/rlx-cevt.c:139`\n",
+            LEDGER: led,
+        })
+        import io as _io
+        buf = _io.StringIO()
+        rc = render_check(r, out=buf)
+        txt = buf.getvalue()
+        ck("P19d an unreadable depth cell is skipped and SAID to be skipped",
+           "names none of" in txt and "LEDGER-2" not in txt and rc == 0, txt)
+
+    # ---- P19e: the decoration the real ledger actually uses.  Its rows carry
+    # `🔴 **line**`, not a bare word, so a matcher that required the whole cell
+    # to equal the token would read every emphasised row as unknown.
+    ck("P19e a decorated depth cell is read",
+       _depth_word("| `a/b.c` | \U0001f534 **line** | vendor | x |") == "line",
+       _depth_word("| `a/b.c` | \U0001f534 **line** | vendor | x |"))
+
+    # ---- P19f: the cell that refuted the first draft, verbatim from the real
+    # ledger.  A cell carrying a corrected depth AND the depth it replaced must
+    # read as the correction; a vocabulary-ordered match returned `none` here
+    # and reported a row that had just been fixed.
+    _real = ("| `arch/rlx/kernel/rlx-time.c` | \U0001f534 **line** "
+             "(was **none — nothing taken**) | vendor | opened in full |")
+    ck("P19f a cell holding `line (was none)` reads as line, not none",
+       _depth_word(_real) == "line", _depth_word(_real))
+    ck("P19g and the reverse spelling still reads left to right",
+       _depth_word("| `a/b.c` | **none** (was **line**) | vendor | x |")
+       == "none",
+       _depth_word("| `a/b.c` | **none** (was **line**) | vendor | x |"))
 
     # ---- P9: a missing ledger is red, and it is a different red from P7 --
     # nothing to compare against, not a gap in the comparison.
