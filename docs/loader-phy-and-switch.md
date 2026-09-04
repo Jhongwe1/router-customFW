@@ -118,6 +118,13 @@ together, because `TCIR` carries the interrupt **enable** as well as the
 pending flag and for TC1 the counter enable (`TCCNR` bit 29) and the
 interrupt enable (`TCIR` bit 30) are separate; and TC1 does not use bit 8 —
 it is `GIMR` bit 9, routed through `IRR1` and cascaded on CPU `IP2`.
+
+🟢 **2026-09-04, seating 12: all three clauses of that last sentence are
+now 量.** `GIMR` bit 9 moved `00209100` → `00209300` on `request_irq` and back
+on `free_irq`, three times each; `IRR1` read `C222FA2D` under Linux with
+`irr1_tc1_rs = 2` (`BSP_IRQ_CASCADE`); and `Status.IM2` read 1
+(`status = 10000401`). It was written here as an inference from source and it
+came out exactly. `SPEC.md` `IRQ-08`, `docs/interrupt-map.md` § 3.1.
 **The seven-layer version is `docs/interrupt-map.md` § 3.1**, and `SPEC.md`
 `IRQ-04` carries the same correction. This table stays because it is what
 the loader does and the loader is what `B2` runs against.

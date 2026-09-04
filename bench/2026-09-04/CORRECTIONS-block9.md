@@ -219,7 +219,7 @@ predicts 0. **量: `irq_spurious = 0` at every one of the eighteen dumps, over
 | `gimr` vs `gimr_at_init` | `00209100` = | = | = |
 | `irq_requested` / `tc1ie_ours` | 0 / 0 | 0 / 0 | 0 / 0 |
 
-Three complete unwinds, two of them from a **live** interrupt. Final counters:
+Three complete unwinds, two of them from a **live** interrupt. ⚠️ 量, and stated because the phrasing is easy to read one way too many: there were **four** arm/disarm cycles on this seating and **three** of them delivered — the first, at period 2²⁰, armed a counter and never installed a handler, which is `TI-1`…`TI-3` and is the whole point of § 1. Final counters:
 `irq_count` **119,818**, `irq_spurious` **0**, `irq_stuck` **0**,
 `tc0_undisturbed` **1** — the vendor's tick was never disturbed, across the
 whole seating.
