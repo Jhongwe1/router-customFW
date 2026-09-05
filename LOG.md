@@ -16342,3 +16342,245 @@ artifact,那在工作站上不存在,所以 `merge the captures` 先掛、`censu
 ⚠️ **一個既有的裝飾性缺陷,記下不動**:`PROGRESS.md` 封存區的標籤有重複
 (1353/1354 都叫 `but two`、1355/1356 都叫 `but three`),各自帶段號所以還能辨識。
 改它會動到二十幾列而且不改變任何事實,留給有理由碰那一區的那一段。
+
+
+---
+
+## 2026-09-06（六，起於 09-05 23:39，跨午夜）— 第三十四段，桌面，不通電，`R5-3b` 的桌面半：一個硬體上的互斥，和一個會讓 DoD 變成同義反覆的量測死角
+
+零 flash 寫入命令、零 `FLR`、零電源循環。括號不動：**1,024 / 4,194,304 = 0.0244 %**。
+
+### 〇、日期，以及為什麼這一段要寫它
+
+開場三邊量到 **2026-09-05 23:39**（Windows 23:39:51、Git Bash 23:39:47、WSL 23:39:58，
+都是 UTC+8）。**再 21 分鐘就跨日。** 這個專案在第八段踩過「目錄名寫成不是那天」的缺陷，
+所以每一個帶日期的產物在命名的當下重量一次：`bench/2026-09-06/`、
+`rlxfw-r53b1-20260906.bin`、本條目，全部量在 **00:21**。
+
+### 一、CI：三份 run 逐 job 逐 step 拆開，`CI-5` 從 n=5 變 n=8
+
+| run | 結論 | `instruments` exec−apt | `apt` |
+|---|---|---|---|
+| `33849822488` `bd9fecd` | 🔴 `census` job 紅（step 5 `census`），另三 job 綠 | 532 s | 17 s |
+| `33850869313` `a734ba8` | 綠 ×4 | 529 s | 41 s |
+| `33851834530` `e204c32` | 綠 ×4 | 532 s | 20 s |
+
+`CI-5` 的母體 536／537／533／533／523 加上 **532／529／532**：全距仍是 **14 s**
+（523–537）≈ **±1.3 %**，**緊度沒有變**。而 `apt` 自己在這三次是 17／41／20，
+lint 那一側 5／5／22 —— 變異仍然全在 `apt`。
+
+⚠️ **`apt` 的辨識用「步名等於 `apt` 或以 `Run sudo apt-get` 開頭」**，腳本裡有四個斷言
+當正控制，其中兩個就是拒絕 `c-apt-ure` 這種子字串。第三十三段踩過這個。
+
+🟢 **順帶一個要解釋才敢用的巧合**：三份 `gh run view --json` 的輸出**都是 13,918 bytes**。
+md5 不同，所以確實是三份不同的檔；同樣大小的原因是 `displayTitle` 被 `gh` 截成固定寬度
+（結尾 `…`），其餘欄位長度本來就一樣。**一個沒有機制的巧合就是一個沒查完的錯誤。**
+
+### 二、🔴 這一段最重要的一件：TC1 不能同時當 clocksource 與 clockevent
+
+一個 reload 暫存器，兩個互斥的需求：
+
+* clocksource 要**2 的冪**週期 —— 每一個 clocksource 核心都算 `(now - last) & mask`，
+  而那只有在硬體週期等於 `mask + 1` 時才精確；
+* 100 Hz 的 clockevent 要 `hz_used / HZ` = **2,000** counts。
+
+`2000 = 2⁴ × 125`，**沒有任何 ≥ 2⁸ 的 2 冪整除它**（2⁸ 是這支驅動自己的下限）。
+所以驅動 3.0 是 `mode cs` 與 `mode ce` 兩個互斥模式，`arm()` 在兩者下寫不同的 `TC1DATA`。
+
+🟢 **而 clockevent 的 reload 不是新常數**：`hz_used` 是 `(TC0DATA >> 4) × HZ`，
+所以 `hz_used / HZ` 就是 `TC0DATA >> 4` = 2,000 —— `TC1DATA` 寫 `0x00007D00`，
+**與 `TC0DATA` 逐位元組相同**。`CLK-19` 的 `N` 對 `N+1` 對兩個計時器一模一樣，相消。
+
+🔴 **標準的兩全解法被這個 repo 自己的讀數否掉。** 軟體延伸的 clocksource（ISR 每次加一個
+週期）只有一個競態 —— wrap 與 ISR 之間 `read()` 會倒退 —— 而標準修法是問硬體「有沒有一個
+wrap 還沒處理」。**在這顆晶片上那個問題問不出來**：`IRQ-09`，`TCIR` 裡任何 pending 位元的
+壽命上限是一個 10 ms tick。那個測試會**大部分時候對**，而一個大部分時候對的 clocksource
+會把一個倒退步交給時間核心，它的無號 `(now - last) & mask` 把它變成幾乎整個 mask 的跳躍。
+**是被否證，不是被略過**，寫進 `SPEC.md` `CLK-25` 與 `notes/timer-driver.md` §12.2。
+
+### 三、🔴 第二重要的一件是寫卡片時才浮出來的：DoD 差點是同義反覆
+
+我的 tick 是 100 Hz。廠商的 tick 是 100 Hz。接管之後 `/proc/interrupts` 的 **25 號線與
+13 號線都以每秒 100 前進，兩個都對得上 `Δjiffies`** —— 所以「25 號線 ≈ Δjiffies」證明不了
+任何事，一張引用它的卡片是在引用一句恆真句。
+
+**這是在寫卡片第 4 節、把預期值一格一格填進去的時候發現的**，不是在寫驅動的時候。
+
+解法是加一個版本 2.0 不需要的動詞：**`cereload <counts>`**，在接管**之後**改變週期。
+把週期加倍，核心每秒只拿到 50 個中斷卻仍然相信 `HZ = 100`，於是**每一個核心時鐘都走一半
+速，而核心裡沒有任何東西能察覺**。兩個參考，都不是核心自己的時鐘：
+
+* **板子上**：`ce_cycles` 每次遞送累加 `reload`，也就是真實的 TC1 counts，所以
+  `Δce_cycles / hz_used` 是**真實**秒數，而 `Δwall` 是**核心**秒數。比值就是誤差。
+* **板子外**：擷取的 `.timing`。⚠️ `R5-2` 量過那個參考自己和自己差到它自己底線的 17 倍 ——
+  在 ppm 上沒用，而這個效應是 **2 倍**。
+
+🔴 **而 `cevt` 在 live reload 與 `HZ` 蘊含的值不同時拒絕（`-ERANGE`）**，所以順序是程式碼
+定的而不是卡片定的：先用對的速率接管，再故意弄錯，再改回來。
+
+### 四、接管本身：四條從 tick 核心讀出來的規則
+
+讀 `kernel/time/tick-common.c` 與 `kernel/time/clockevents.c`，出自建這顆映像的那份 drop：
+
+1. `tick_check_new_device()`：`if (curdev->rating >= newdev->rating) goto out_bc;`
+   而廠商是 **100**（讀 `arch/rlx/kernel/rlx-cevt.c:234`）。**必須嚴格贏過。**
+2. 「偏好 oneshot」那一段**只會擋**，從不提拔。而 量 這顆映像的 `.config`：
+   `CONFIG_TICK_ONESHOT` 根本不存在、`CONFIG_NO_HZ` 與 `CONFIG_HIGH_RES_TIMERS` 都是 n
+   —— **tick 核心進不了 oneshot**。
+3. `tick_setup_device()` 把**舊**裝置的 `event_handler` 設成 `clockevents_handle_noop`。
+   所以廠商的 TC0 中斷照樣每秒 100 次抵達、照樣餵硬體看門狗（`CONFIG_RTL_WTDOG=y`）、
+   照樣跑 `bsp_timer_ack()`，而**不再推進 `jiffies`**。沒有東西重複計數，也沒有東西停下來。
+4. `clockevents_exchange_device()` 先 shutdown 再由 `tick_setup_periodic()` 啟動，
+   所以 `set_mode` 的順序是 **SHUTDOWN 然後 PERIODIC**。一個把 SHUTDOWN 當真的驅動會在
+   接管中途把自己的 tick 來源關掉。
+
+🟢 **第 4 條決定了 `set_mode` 的形狀**：SHUTDOWN 什麼都不做，PERIODIC **驗證**而不是寫。
+不對稱是刻意的：「中斷來了跑一個 noop」的失效是時鐘變慢，「中斷沒來」的失效是要按電源。
+
+### 五、🟢 兩個獨立的接管證據，其中一個沒有人能打字產生
+
+`ce_handler` 印的是 `clock_event_device.event_handler`。對上這顆映像自己的 `System.map`：
+
+```
+80036d50 T clockevents_handle_noop      <- 接管前
+80036fc4 T tick_handle_periodic         <- 接管後
+```
+
+這是 `RLXFW-ID0` 那個形狀套在第二個量上：建置算出來、板子印出來、映像裡沒有別的路徑能產生。
+**那一對才是讀數，任何一半都不是** —— `CE-0` 會在同一次開機、用同一條程式碼路徑印出前一個。
+
+而負控制是一個 **rating 99** 的第二裝置：`curdev->rating >= newdev->rating` 被規定要拒絕它，
+所以 `ce_probe_mode_calls=0` 是 `ce_mode_calls=2` 的另一臂。⚠️ 它**不測** `>=` 這個邊界本身
+（99 嚴格小於 100，等於 100 這個平手從不註冊）—— 一個要靠讀對一個比較運算子的控制比較弱。
+
+### 六、桌面閘門抓到的四件，全部在通電之前
+
+1. 🔴 **`cardcheck commands` 抓到兩格 `--send` 超過 128 bytes**（`P2-1` 175、`P2-2` 165），
+   `console-capture.py` 會拒絕，兩格都會在板子旁邊死掉。**同時抓到我在同一張卡片上寫的
+   「最長是 `NB-2` 的 104」是假的。**
+2. 🔴 **我為此加的檢查列自己壞了第二個檢查器。** 我加了一列
+   `count <card> --send '[^']{128,}'` 來把長度宣稱變成機器檢查 —— 而 `cardcheck commands`
+   找格子用的 regex 是 `--send\s+'([^']*)'`，於是它把我那一列讀成一條要在板子上跑的指令 `[^`。
+   改寫成 `-{2}send`（`re` 意義相同、字面上不含 `--send`）。**一個對另一個檢查器可見的檢查器
+   是一個母體錯誤**，和 `CLAUDE.md` 的 `c-apt-ure` 同一個形狀。
+3. 🔴 **`ledgerscan check` 抓到三個這一段引用而帳本沒有的路徑**：
+   `kernel/time/tick-common.c`、`kernel/time/clockevents.c`、
+   `arch/rlx/include/asm/irq_regs.h`。補成 §4.8。
+4. 🔴 **而我補的三列用了一個帳本詞彙表裡沒有的深度 `full`，它又抓一次。**
+   讀 `tools/ledgerscan.py:364`，`DEPTHS = ("none", "name", "line")`。改成 `line`。
+   ⚠️ **而這件事本身是一個發現**：`rlx-cevt.c` 這一段從**兩個字串字面量**變成**全部 244 行**，
+   而那一格讀 `line` 之前、讀 `line` 之後 —— 檢查器看不到這個帳本對那個檔記錄過的最大單一
+   變化；而且無法辨識的深度是**跳過**不是**判錯**，一列寫 `ful1` 會靜靜通過。
+   開成 `LEDGER-3`。
+
+### 七、🔴 一個我自己提的警報，查到底之後是假的，而它值得寫下來
+
+`tick_periodic()` 每一個 tick 都呼叫 `update_process_times(user_mode(get_irq_regs()))`。
+量：`set_irq_regs()` 在整個 `arch/rlx` **一次都沒有被呼叫**（`find -L` 273 個檔，
+`bsp_irq_dispatch` 當正控制、一個不可能存在的 token 當負控制）。**如果 `get_irq_regs()` 回
+NULL，接管之後每 10 ms oops 一次。**
+
+🟢 讀 `arch/rlx/include/asm/irq_regs.h`：它定義 `ARCH_HAS_OWN_IRQ_REGS`，
+`get_irq_regs()` 回傳 `current_thread_info()->regs`，而 `arch/rlx/kernel/genex.S:84-85` 的
+`LONG_S sp, TI_REGS($28)` 在例外進入時填它 —— MIPS 的經典路線。**grep 問錯了問題**，
+而 `ARCH_HAS_OWN_IRQ_REGS` 這個字就是答案。
+
+### 八、🆕 一個真的危險，量到它在這塊板子上不發射
+
+讀 `arch/rlx/bsp/irq.c`：`bsp_ictl_irq_dispatch()` 是一條 `else if` 鏈，
+**一次只送一個來源**，而且 `BSP_UART0_IP`（bit 12）與 `BSP_UART1_IP`（bit 13）排在
+`BSP_TC1_IP`（bit 9）**前面**。而 `gimr_at_init = 0x00209100` 的 **bit 12 是設著的**。
+表面上那是系統 tick 的餓死路徑。
+
+🟢 **量 seating 12 `EX-19`：不會發射。** 主控台的 **41,824** 次中斷是
+`8: RLX LOPI serial` —— 走 LOPI 向量而不是這條鏈 —— 而 `gisr = 88000004` 的 bit 12 是清的。
+⚠️ **那是關於這塊板子組態的量測，不是關於程式碼的性質**：`bspchip.h` 裡
+`BSP_UART0_RS` 是 `BSP_IRQ_CASCADE` 而 `BSP_UART0_IRQ` 是 **8**（一個 LOPI 號碼），
+廠商自己的標頭在這件事上互相矛盾。
+
+### 九、建置與釘住，三顆映像，而只有第三顆是卡片指的那顆
+
+| id | 內容 | `RECIPE_ID` |
+|---|---|---|
+| 1 | 3.0，沒有 `cereload` | `93434ca3` |
+| 2 | 加了 `cereload`，但 `period_jiffies` 還是陳舊的 | `a63f318c` |
+| 3 | **卡片指的那顆** | **`93e1c9c7`** |
+
+映像 `rlxfw-r53b1-20260906.bin`，**1,033,216 bytes**，sha256
+`e160089ae8ea59523c97af289887e0dd12286cc1fcc2ead5875d5fa5afb671b3`；
+`vmlinux` 3,975,506 bytes、sha256 `e9fcf3d52767c32e…`。
+⚠️ **三顆映像都是 1,033,216 bytes** —— 檔案大小不是身分，sha256 才是。
+
+第三顆之所以存在，是因為 `notes/timer-driver.md` §11.6 ⑥ 把一個缺陷**指名**給這一步：
+`disarm` 之後 `period_jiffies` 停在上次 `arm` 的值而 `mask_bits` 已經動了（量 `EX-1`，
+`mask_bits = 8` 旁邊是 `period_jiffies = 524`）。現在由 `rtl819x_derive_period()` 一個擁有者
+從五條路徑推導。🟢 **而修法讓第二個欄位變得可讀**：在 `mask_bits = 8` 上正確值是 **0**
+（`256 × 100 / 200000` 截斷），那正是 `tc1_ext_trusted` 在那裡讀 0 的原因 —— §11.6 ⑤
+記錄了那個守衛在動作，比欄位跟上它早一段。
+
+**三道桌面閘門**：`rlxfw-marks verify` 12 個 mark 各一次、廠商映像 0、2 個 witness；
+`hazlint-objs --also drivers/clocksource` **0 violations / 1,986 loads / 61 leaf objects**，
+`Q5` 有發射（同一批原始碼在 `-march=5281` 下 11 個）；建置日誌裡指向 `rtl819x-timer.c` 的
+診斷 **0**，而正控制是第 441 行的 `CC drivers/clocksource/rtl819x-timer.o`。
+
+⚠️ **`MK2` 的 witness 計數從 1 變 2**，原因是這一段自己的編輯：負控制裝置叫
+`"rtl819x-tc1-probe"`，**包含**witness 字串 `rtl819x-tc1`。讀
+`tools/rlxfw-marks.py:568`，`str:` witness 的通過條件是 `got >= 1`，所以這是照規則通過
+而不是僥倖 —— 但一個拿它跟 seating 12 對照的讀者會看到一個沒有解釋的 2。
+
+### 十、卡片
+
+`bench/2026-09-06/PREDICTIONS-B11-block10.md`，**32 格**、**三次電源循環**。
+`cardcheck numbers` **17／17 重新導出**、`cardcheck commands` **34 條 0 問題**
+（1 LOADER、33 SHELL）、`check-predictions` **`0 of 32`**（上機前的正確答案）。
+
+三次電源循環各有一個只有它能做的理由，而不是「小心一點」：
+
+| | |
+|---|---|
+| PC1 | `NET-14` 必須冷開機且 `eth0` 全程不碰；也是第一次接管，`CE-7` 之後的每一格都在風險裡 |
+| PC2 | 接管**之後**的長時間量測，它必須跑在一次「已知接管會成功」的開機上 |
+| PC3 | 重現 —— **n=1 的接管不是結果** |
+
+🔴 **而恢復路徑不是 `R4` 的腳本重置。** `PROGRESS.md` 的 `R5-3b` 那一列原本寫
+「`The rescue path is R4's scripted reset`」，而 `J BFC00000` 是 **loader** 指令 ——
+Linux 卡死時沒有 loader 提示字元。**代價是使用者按電源**，就地更正。
+
+
+### 十一、稽核,六遍,每遍換方法,而只有第三、第五、第六遍抓到真的錯
+
+| 遍 | 方法 | 抓到 |
+|---|---|---|
+| ① | `git diff --name-only` 對上我自己列的擁有者清單 | 九件全到。`study/` 不出現是**對的** —— `REL-3` 裁定它 gitignored |
+| ② | **完整列舉**擁有者檔,包括我沒動的那些 | `docs/FINDINGS.md` 該有三列而沒有(這一段有三件夠格的發現);`R5-3b` 這個步驟 id 在七個檔裡被引用而它剛被拆掉 —— 查完之後**不動**:`R5-3b` 仍然是這一對的名字,和 `R5-3` 對 `R5-3a`／`R5-3b` 同一個既有慣例 |
+| ③ | 任何「第一次／唯一一次」寫下前 `git grep` 全 repo | 🔴 **抓到一句超額宣稱**:我在兩個檔寫「這是這個專案第一次能用因果證明時間基準是我的」,而**那一格還沒跑**。這一段一次電都沒通,存在的是一個驅動動詞和一張卡片上的兩格。兩處改掉 |
+| ④ | **重新導出**每一個數,不是重讀句子 | 十一項全部相符(驅動 2,384 行、13 個動詞、卡片 32 格／17 列、`rlx-cevt.c` 244 行與 `:234`／`:140`／`:159`、`irq_regs.h` 21 行、`arch/rlx` 273 檔、`genex.S:85`);`period_jiffies` 四個組態、`CI-5` 八點 **±1.32 %** |
+| ⑤ | 專讀**描述未來狀態**的句子 | 🔴 `notes/timer-driver.md` §12 通篇沒有一句說「3.0 一個字都還沒在矽片上跑過」,而 §12.5 用完成式寫一個預測(「the board prints」)。兩處都補 |
+| ⑥ | `git log -S` 驗第 ⑤ 遍**新寫進去的**那句話 | 🔴 **它自己帶了一個錯的日期。** 我寫「`RLXFW-ID0` 2026-08-31 寫進去、兩段之後才印在板子上」,量:`b5eedc3` 是 **2026-09-01**,而第一次印出是 **2026-09-02**(`bench/2026-09-02/LP-boot.log:8`)—— **一天,不是兩段**。一個修正引入的錯誤,只有針對修正本身再跑一遍才抓得到 |
+
+🔴 **而流程本身錯了一次,是第二十九段記錄過的同一個。** `CLAUDE.md` 寫著
+「sweep 跑時不准改樹」,而我在 sweep 跑到第 18／60 步的時候還在編輯五個檔
+(`notes/timer-driver.md`、`docs/FINDINGS.md`、`PROGRESS.md`、`study/`)。
+**那次 sweep 作廢**,砍掉,把樹改完之後重跑 —— 和第二十九段的處置一樣。
+*「對一棵會動的樹做 sweep 量不到任何連貫的東西」* 這句話是那一段寫的,而寫它的人是我。
+
+🔴 **第七遍:sweep 跑完之後去查那兩條紅的「固定原因」,而 `CLAUDE.md` 寫的原因是假的。**
+`CLAUDE.md` 把這台桌面的兩條紅歸給 `test-hazlint` 與 `test-hazlint-objs`:
+*「這台桌面有那個檔,所以它們會跑,所以它們的 `.out` 存在,所以紅」*。
+量,三種方式:`grep -nE '^\s+run:.*hazlint' .github/workflows/ci.yml` 回 **0**;
+`git log -S'test-hazlint.sh' -- .github/workflows/ci.yml` **全歷史是空的**,
+所以那種步驟從來沒有存在過;而 `tools/ci-expected.tsv:142` 自己就寫著
+*「CI runs zero hazlint cases」*。**一個 `ci.yml` 的 sweep 在任何主機上都叫不到它們**,
+所以有沒有 `stage2.bin` 不決定這件事。
+🟢 **真正的原因是第一條造成第二條**:`merge the captures` 死在
+`cp: cannot stat 'dl/*/*.out'`(桌面沒有 GitHub artifact 的下載目錄),
+`census` 因此印 `NOT-RUN-TOTAL MISMATCH: declares 491 and this job did not run 2`。
+⚠️ **那一段的結論沒有動** —— 在這裡跑完整套、讀逐套件的行,讓 GitHub 上的 census
+當仲裁者。動的只有理由,而理由本來就是這個 repo 要求可追的那一半。
+
+⚠️ **順帶一個數對不上,查完是我的資料舊了而不是工具錯了。** 這一段開場拿到的數是
+「桌面全套 sweep 56 綠 2 紅」,也就是 58 步;而我的 sweep 解 `ci.yml` 解出 **60** 步。
+量,逐 job:`text` **45** ＋ `instruments` **11** ＋ `lint` **2** ＋ `census` **2** = 60,
+而工作樹與 HEAD 的 `ci.yml` 逐步相同(我沒有動 CI)。差的 2 是兩個 `apt` 步 ——
+**`CI-5` 那條規矩說的正是不要把它們算進任何合計**,而一個把它們排除掉的計數
+自然會少 2。兩個數都對,母體不同。
