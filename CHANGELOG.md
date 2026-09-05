@@ -512,6 +512,56 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### `R5-3b-1` — the system tick handed over from `/proc`, and a timer channel that cannot be two clocks
+
+`rtl819x-timer` goes 2.0 → **3.0**: two mutually exclusive modes, a
+`clock_event_device` at a rating above the vendor's, a second one at 99 as the
+negative control, and `cereload`. Desk only; **zero flash-write commands, zero
+`FLR`, the bracket stands at 1,024 of 4,194,304 = 0.0244 %.** Nothing in 3.0
+has executed.
+
+🔴 **`CLK-25`: TC1 cannot be the clocksource and the clockevent at once, and it
+is arithmetic rather than a trade-off.** A clocksource needs a power-of-two
+period, because every core computes `(now - last) & mask` and that is exact only
+when the hardware period is `mask + 1`; a 100 Hz clockevent needs
+`hz_used / HZ` = **2,000** counts, and `2000 = 2⁴ × 125` is divisible by no
+power of two at or above this driver's `2^8` floor. 🟢 The clockevent's reload
+is not a new constant — `hz_used` is `(TC0DATA >> 4) × HZ`, so `TC1DATA` is
+written `0x00007D00`, byte-identical to the vendor's `TC0DATA`.
+
+🔴 **The textbook escape is refuted by a reading this repository already had.**
+A software-extended clocksource needs to ask the hardware whether a wrap is
+pending; `IRQ-09` measured that any pending bit in `TCIR` lives at most one
+10 ms tick, because the vendor's tick ack is a read-modify-write on a
+write-1-to-clear register. It would be right *most* of the time, and a
+clocksource that is right most of the time hands the timekeeping core a
+backwards step its unsigned arithmetic turns into a jump of nearly the whole
+mask.
+
+🔴 **The bench card exposed a tautology in the obvious DoD.** My tick and the
+vendor's are both 100 Hz, and 讀 `tick_setup_device()`, the vendor's interrupt
+keeps arriving after the handover with its handler replaced by
+`clockevents_handle_noop` — so `Δ(line 25) ≈ Δjiffies` and
+`Δ(line 13) ≈ Δjiffies` are the same sentence. `cereload` makes the
+demonstration causal: double the period and the kernel's clock halves, against
+two references that are not the kernel's clock.
+
+🟢 **`IRQ-11`**: the rating to beat is **100** (讀 `arch/rlx/kernel/rlx-cevt.c:234`)
+and it must be beaten strictly; the ICTL dispatcher is an `else if` chain that
+puts UART0 (bit 12, unmasked) ahead of TC1 (bit 9), and 量 seating 12 that path
+does not fire on this board because the console's 41,824 interrupts arrive on
+the LOPI vector as `8: RLX LOPI serial`.
+
+✅ `TMR-1` and `CFG-2` close. 🆕 `LEDGER-3` opens: the ledger's depth vocabulary
+has no word for *the whole file*, and an unrecognised depth is skipped rather
+than failed.
+
+🔴 **`CLAUDE.md`'s account of the desk sweep's two reds is corrected.** It named
+`test-hazlint`/`test-hazlint-objs`; 量 three ways, `ci.yml` has never had a
+`run:` step invoking either, and `tools/ci-expected.tsv:142` says *"CI runs zero
+hazlint cases"*. The reds are `census/merge the captures` and the `census` that
+depends on it.
+
 ### `R5-10` — `docs/interrupt-map.md`, and a reading from 2026-08-24 that overturned a conclusion from 2026-09-03
 
 `docs/interrupt-map.md` is new: § A is the arming sequence `R5-3` needs, § B is

@@ -3247,6 +3247,15 @@ all, and `EX-11` measured the NIC's own interrupt as `12: RLX LOPI eth4`
 — a LOPI line that never passes through the controller seating 12
 touched. **Carried forward**: what makes the difference is unidentified,
 and isolating it costs one power cycle.
+🟢 **2026-09-06: that power cycle is scheduled, and it is the only one
+that can carry it.** `bench/2026-09-06/PREDICTIONS-B11-block10.md`
+cells `NB-0`/`NB-1`/`NB-2` are the FIRST batch after PC1's cold boot,
+with `eth0` never touched: `NB-1` reproduces the failure, `NB-2` only
+downs and re-ups `eth4` and pings. **Both outcomes are the isolation** —
+4/4 says re-opening `eth4` alone is sufficient and `eth0` is excluded;
+still 0 says seating 12's recovery needed the `eth0` leg. ⚠️ It has to
+be first: a warm boot carries the previous boot's interface state, which
+is the confound.
 `bench/2026-09-04/CORRECTIONS-block9.md` § 10.
 
 🔴 **And the port map recorded in `PROGRESS.md`'s carried-forward row is wrong.**

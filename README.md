@@ -86,8 +86,14 @@ Realtek's source**, one row each with a reason, applied by
 `tools/rlxfw-marks.py` to a staged copy and never to the pinned clones; the
 files rlxfw adds outright live in `config/rlxfw-src/`, mirroring the staged
 layout. Since 2026-09-03 that is where the first driver lives —
-`drivers/clocksource/rtl819x-timer.c`, a clocksource on the SoC's Timer 1,
-written without reading anyone else's implementation of it
+`drivers/clocksource/rtl819x-timer.c`, on the SoC's Timer 1 — 🔄 **as of
+3.0 (2026-09-06) a clocksource **or** a clockevent, in two exclusive
+modes, because TC1 has one reload register and the two jobs want
+different values in it**: `(now - last) & mask` is exact only for a
+power-of-two period, a 100 Hz tick needs 2,000 counts, and no power of
+two at or above the driver's floor divides 2,000
+([`SPEC.md`](SPEC.md) `CLK-25`) — written without reading anyone else's
+implementation of it
 ([`docs/blind-write-ledger.md`](docs/blind-write-ledger.md) is the record of
 what *was* read, frozen before it existed).
 

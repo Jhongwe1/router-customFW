@@ -126,7 +126,12 @@ gap loses 3 wraps and a 60 s gap loses 6, and the flag reads `1` for both.
 done the right thing and still been told the wrong answer. What changed: `R5-2`'s
 card does not quote `tc1_ext` at all, and it **predicts the false `1`** so the
 defect is confirmed on the silicon instead of staying an argument. `SPEC.md`
-`CLK-22`; the driver fix is `R5-3`'s.
+`CLK-22`; ~~the driver fix is `R5-3`'s~~ 🟢 **the fix shipped in 2.0 and ran
+on the silicon in seating 12** — `tc1_ext_trusted` is decided in **jiffies**
+now, which this driver never reduces, and 量 it reports **0** at period 8
+(`gap_max_j = 1` against `period_jiffies = 0`, i.e. a 255-count mask sampled
+every 10 ms cannot be trusted **and the flag says so**) and **1** at periods
+12 and 20. `PROGRESS.md` `TMR-1` closed 2026-09-06.
 
 🆕 **2026-09-03 — and a resolution floor makes a criterion unmeasurable
 without making it look unmeasurable.** `R5-2`'s `D4` asks for ±50 ppm and the

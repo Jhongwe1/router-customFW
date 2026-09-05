@@ -1213,3 +1213,67 @@ correct output for a card whose seating had not happened — 🔄 **and as of
 `spec-check`, `ledgerscan check`, `test-file-modes` green.
 ⚠️ **`audit-bench-log` is not listed** — it scans `.log` files and there are
 none here yet. It runs when the captures land, before they are committed.
+
+
+## 2026-09-04 — seating 12, `R5-3a`'s bench half: the first interrupt of this project, and a decision cell whose reading was right and whose assignment was wrong
+
+⚠️ **This entry was written on 2026-09-06, two segments late.** The directory
+landed with the seating; nothing added a heading here, and neither the segment
+that created it nor the one after it noticed. It is written from the artefacts
+rather than from memory, and the census below is 量.
+
+**108 files**: two `.md` (the frozen card `PREDICTIONS-B10-block9.md` and
+`CORRECTIONS-block9.md`) and **35 capture prefixes** — **9 `TI-*`** (the card's
+own cells `TI-L`, `TI-0`…`TI-7`), **20 `EX-*`** (off-card, added beside the
+frozen card rather than into it), **5 `SM-*`** and **1 `SN-*`** (`looprun`'s
+bench stages).
+
+🟢 **What it holds that nothing else does**: the first interrupt this project
+has had delivered — **119,818** of them, `irq_spurious` **0**, `irq_stuck`
+**0** — and the three-state ownership reading that `/proc/interrupts` carried
+**no line 25** at `EX-0`, `25: … ICTL rtl819x-timer` during, and no line 25
+again at `EX-19` after `free_irq`.
+
+🔴 **And the cell the card called its decision cell returned the outcome the
+card had assigned to the wrong cause.** `TI-3` read `TC1IP = 0` after TC1 had
+wrapped 16.62 times with `TC1IE` set; the timer block is innocent, and the
+vendor's `bsp_timer_ack()` — a read-modify-write on a write-1-to-clear
+register, a hundred times a second — is what erases it. `SPEC.md` `IRQ-09`.
+
+## 2026-09-06 — `R5-3b-1`'s card: the tick handed over from `/proc`, and a demonstration that is causal rather than correlational
+
+🔴 **This directory holds one file and no captures**, and as with
+`bench/2026-09-03/` that is the point: `PREDICTIONS-B11-block10.md` was written
+and frozen at the desk on **2026-09-06** and the seating it predicts **has not
+happened**. `check-predictions` reports **0 of 32** — the correct output for a
+card whose cells have not run.
+
+**32 cells over three power cycles**, and each cycle has something only it can
+do: PC1 is the only one that can isolate `NET-14` (it needs a cold boot with
+`eth0` never touched) and is the first handover; PC2 is the long measurement on
+a boot already known to have survived one; PC3 is the repeat, because `n = 1`
+is not a result.
+
+🟢 **The reading it is built around comes out of the build and not out of a
+sentence**: `ce_handler` must read `80036D50` (`clockevents_handle_noop`)
+before the handover and `80036FC4` (`tick_handle_periodic`) after, both
+resolved from this image's own `System.map` by `cardcheck numbers`. The
+negative control is a second `clock_event_device` at rating **99**, which
+`tick_check_new_device()`'s `curdev->rating >= newdev->rating` is required to
+decline against the vendor's 100.
+
+🔴 **And the obvious evidence would have been a tautology.** Both my tick and
+the vendor's run at 100 Hz and the vendor's interrupt keeps arriving after the
+handover, so `Δ(line 25) ≈ Δjiffies` and `Δ(line 13) ≈ Δjiffies` say the same
+thing. `cereload` is the answer: double my period and the kernel's clock halves,
+measured against `ce_cycles` on the board and the capture's `.timing` off it.
+
+**Checked before commit**: `cardcheck commands` **34 commands, 0 problems** and
+`numbers` **17 of 17 re-derived**; `check-predictions` **0 of 32**;
+`flashwin scan --sweep . --exclude upstream` over the whole tree, **1,783
+files, CLEAN**; `spec-check`, `ledgerscan check`, `test-file-modes` green; and
+a full local sweep of all 60 `run:` steps in `ci.yml` — **58 ok, 2 RED,
+1,478 s**, both reds structural (`census/merge the captures` cannot download a
+GitHub artifact at the desk, and `census` then cannot close its total).
+⚠️ **`audit-bench-log` is not listed** — it scans `.log` files and there are
+none here yet.
