@@ -416,6 +416,71 @@ rate this seating could see, and that is a bound and not an absence.
 
 ---
 
+### 3.7 🆕 2026-09-06 (`R5-3b-1`, desk): the dispatcher is an `else if` chain, and the tick's competitors are ahead of it
+
+讀 `arch/rlx/bsp/irq.c`. `bsp_ictl_irq_dispatch()` does **not** loop over the
+pending mask; it dispatches **one** source per exception, in a fixed order:
+
+```c
+pending = REG32(BSP_GIMR) & REG32(BSP_GISR);
+if      (pending & BSP_UART0_IP)      do_IRQ(BSP_UART0_IRQ);   /* bit 12 */
+else if (pending & BSP_UART1_IP)      do_IRQ(BSP_UART1_IRQ);   /* bit 13 */
+else if (pending & BSP_TC1_IP)        do_IRQ(BSP_TC1_IRQ);     /* bit  9 */
+...
+else { REG32(BSP_GIMR) &= (~pending); printk(...); spurious_interrupt(...); }
+```
+
+Two consequences, and they matter to a clockevent in a way they did not matter
+to `R5-3a`'s counting handler:
+
+1. **UART0 and UART1 are ahead of TC1**, and `gimr_at_init = 0x00209100` has
+   **bit 12 set**. On its face that is a starvation path for the system tick.
+2. **The `else` branch MASKS an unrecognised pending bit in `GIMR`
+   permanently.** TC1 is recognised, so this does not touch it; it is recorded
+   because it bounds what the chain can dispatch at all.
+
+🟢 **量 seating 12, `EX-19`: (1) does not fire on this board.** The console's
+**41,824** interrupts arrived as `8: RLX LOPI serial` — down the LOPI vector,
+not through this chain — and `gisr` read `88000004` with bit 12 clear. The
+ICTL's UART0 position is unmasked and unused.
+
+⚠️ **That is a measurement about this board's configuration, not a property of
+the code**, and `bspchip.h` shows the vendor contemplated the other routing:
+`BSP_UART0_RS` is `BSP_IRQ_CASCADE` while `BSP_UART0_IRQ` is **8**, a LOPI
+number. The two disagree in the vendor's own header.
+
+### 3.7.1 🔴 A false alarm this session raised and then closed, kept because the alarm was mine
+
+`tick_periodic()` calls `update_process_times(user_mode(get_irq_regs()))` on
+every tick, so a `get_irq_regs()` returning NULL would oops once per 10 ms the
+moment the tick becomes mine. 量: `set_irq_regs()` is called **nowhere** in
+`arch/rlx` — `find -L … | xargs grep` over 273 files, with
+`bsp_irq_dispatch` as the positive control and a token that cannot exist as the
+negative one.
+
+🟢 **The port does not need it.** 讀 `arch/rlx/include/asm/irq_regs.h`: it
+defines `ARCH_HAS_OWN_IRQ_REGS` and `get_irq_regs()` returns
+`current_thread_info()->regs`, which `arch/rlx/kernel/genex.S:84-85` fills with
+`LONG_S sp, TI_REGS($28)` on exception entry — the classic MIPS route. The
+grep was asking the wrong question, and `ARCH_HAS_OWN_IRQ_REGS` is the word
+that says so.
+
+### 3.7.2 What `R5-3b` needs from this file that `R5-3a` did not
+
+| | |
+|---|---|
+| the tick device's rating to beat | **100**, 讀 `arch/rlx/kernel/rlx-cevt.c:234` |
+| the vendor's feature word | `CLOCK_EVT_FEAT_PERIODIC` **alone**, line 140 — so it has no oneshot for the core to prefer |
+| what the vendor's `set_mode` does on `CLOCK_EVT_MODE_UNUSED` | **nothing**; it is an empty stub, so the exchange cannot disturb TC0 |
+| what the vendor's ISR keeps doing afterwards | pets the hardware watchdog (`0xB800311C \|= 1<<23`, `CONFIG_RTL_WTDOG=y`) and runs `bsp_timer_ack()` — so `IRQ-09` survives the handover unchanged |
+
+🔴 **The last row is why a dead clockevent does not reset the board.** The
+watchdog keeps being petted by an interrupt that is still arriving; only a
+livelock that stops TC0's handler too would trip it. `notes/timer-driver.md`
+§ 12.8 carries the recovery path, and it is a power cycle.
+
+---
+
 ## B. What `R6` needs
 
 ### 4.1 `GIMR` / `GISR`, the full bit map

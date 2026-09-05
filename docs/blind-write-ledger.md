@@ -99,6 +99,11 @@ and it is the inference this whole ledger has to defend against:
 > **Zero citations is not zero reading, and a zero on one spelling says nothing
 > about another.**
 
+🔄 **2026-09-06: the sentence below is history.** § 4.3's row for this file
+now reads `full`, and `R5-3b-1` is the segment that opened it. The paragraph
+is kept because it is what bounded the claim for version 1.0's source, which
+is the version `git log` can still date.
+
 What this repository *has* cited is `arch/rlx/kernel/rlx-cevt.c`, **to the
 line** (`notes/vendor-kernel-isa.md:33`, `:139,226`). `CLAUDE.md`: *a tool
 reporting `0` is making a claim; every sweep needs a positive control.*
@@ -290,7 +295,7 @@ kind that a reader should be able to see rather than take on trust.
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
-| `arch/rlx/kernel/rlx-cevt.c` | line | vendor | 🟢 **the string literal `"rlx timer"` and the two lines it is on (`:139,226`) — nothing else.** The context is `notes/vendor-kernel-isa.md`'s proof that *this unit runs `arch/rlx` and not `arch/mips`*, which needed three literals unique to files that exist only under `arch/rlx`. **No register, no sequence, no divisor, no interrupt number** |
+| `arch/rlx/kernel/rlx-cevt.c` | **line** (unchanged as a WORD — § 4.8.1) | vendor | 🆕 **2026-09-06 (`R5-3b-1`): OPENED IN FULL, 244 lines, and everything in `rtl819x-timer` 3.0 was written after it.** What was taken is stated so a reader of `docs/driver-diff.md` can discount it: **the rating `100`** (`:234`) and **`.features = CLOCK_EVT_FEAT_PERIODIC` alone** (`:140`) — both facts about what this driver must *coexist with*, not about how to drive TC1 — plus `set_mode`/`set_next_event` being empty stubs (`:122`–`:132`), which is what makes the exchange safe, and the watchdog pet at `:159`. 🟢 **What was NOT taken, and could not be**: the vendor's clockevent programs **no timer register at all**. There is no reload sequence in it to copy. The register writes are in `arch/rlx/bsp/timer.c` (§ 4.2, read 2026-09-04) and this driver does not repeat them. ⚠️ **The blind claim for the TIMER now has three dates and they are not the same claim**: version 1.0 (2026-09-03) was written with this file cited at two string literals only; version 2.0 (2026-09-04) after `bsp/timer.c` and `rlx-time.c`; version 3.0 (2026-09-06) after this one. `git log` can check each, and this comment cannot. ⟶ 🟢 **the string literal `"rlx timer"` and the two lines it is on (`:139,226`) — nothing else.** The context is `notes/vendor-kernel-isa.md`'s proof that *this unit runs `arch/rlx` and not `arch/mips`*, which needed three literals unique to files that exist only under `arch/rlx`. **No register, no sequence, no divisor, no interrupt number** |
 | `kernel/sched_clock.c` | line | **generic** | `:39`, the weak generic `(jiffies - INITIAL_JIFFIES) * (NSEC_PER_SEC / HZ)`, read to establish that `arch/rlx` defines no `sched_clock` (zero hits) and that `printk_time` therefore has 10 ms resolution. **Generic Linux — every port in existence uses this file** |
 | `include/linux/clocksource.h` | 🔄 **line** (was **name**) | **generic** | 🆕 2026-09-03, `R5-1`: the `struct clocksource` field list, `clocksource_hz2mult()`, `CLOCKSOURCE_MASK()`, the `read(struct clocksource *)` signature, and the rating band comment (*1–99 unfit for real use*). **The subsystem's interface**, which a clocksource for any part must be written against. It says nothing about this SoC. 🆕 **2026-09-04, `R5-3a`: a second and deeper visit, and the depth moved with it.** `clocksource_hz2mult()` `:253-266` **in full** — the `u64 tmp` and the `(u32)` cast that truncates without a diagnostic — and `cyc2ns()` `:317-322`, `((u64)cycles * cs->mult) >> cs->shift` returned as `s64`. Those two bodies are where `CLK-24`'s two overflow bounds come from. 🔴 **And the ABSENCE of `clocks_calc_mult_shift()` from this file is itself the finding**: the driver has to search for its own shift because a kernel of this vintage has no helper for it |
 | `include/linux/jiffies.h` | 🔄 **line** (was **name**) | **generic** | 🆕 2026-09-03, `R5-1`: `LATCH`, `ACTHZ`, `SH_DIV`, `NSEC_PER_JIFFY` and `TICK_NSEC` — read to check, rather than assume, that this build treats one jiffy as exactly 10,000,000 ns. It does, and the check is `notes/timer-driver.md` § 5.1.1. **Generic Linux**. 🔴 **2026-09-04, `R5-3a`: the depth was wrong and `ledgerscan check` found it on the first run it could.** `LOG.md:14391` cites this file as `:43,54,58` — three line numbers — and the extract above names five macros, which is a reading of the code and not of a name. **The row was written by hand and no checker compared it to anything until `LEDGER-2` shipped**; that is the whole content of that carried-forward row, arriving as its own first result |
@@ -436,6 +441,46 @@ declared in § 4.2 and § 4.4; nothing new of the vendor's was opened today.
 | path | depth | origin | what was taken |
 |---|---|---|---|
 | `drivers/net/wireless/rtl8192cd/romeperf.c` | name | vendor | 🆕 **2026-09-04, `R5-3a`: the PATH appeared in a `grep -Rn` result and the file was not opened.** It answered one question — whether a driver in this tree includes `asm/rlxregs.h` — and nothing else. 🔴 It is a **wireless** file and `R5` writes no wireless driver, so the contamination it could cause is nil; it is here because a ledger that only records the contacts that matter is a ledger whose omissions cannot be audited |
+
+### 4.8 🆕 `R5-3b-1` clockevent — 3 paths, two generic and one the port's own, and the checker is what found them
+
+**`ledgerscan check` reported all three as cited-and-undeclared** on the run
+that closed this segment, before any of them reached a commit. They are the
+files version 3.0's design decisions are read out of.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `kernel/time/tick-common.c` | **line** | **generic** | 🆕 **2026-09-06, `R5-3b-1`, and it decides the whole step.** `tick_check_new_device()`: `if ((curdev->features & CLOCK_EVT_FEAT_ONESHOT) && !(newdev->features & CLOCK_EVT_FEAT_ONESHOT)) goto out_bc;` then `if (curdev->rating >= newdev->rating) goto out_bc;` — **so the vendor's 100 must be beaten strictly, and the oneshot test only blocks, never promotes.** `tick_setup_device()`: `td->evtdev->event_handler = clockevents_handle_noop;` on the OLD device — which is why the vendor's TC0 interrupt keeps arriving and stops advancing `jiffies`. `tick_setup_periodic()`: `CLOCK_EVT_FEAT_PERIODIC` → `clockevents_set_mode(dev, CLOCK_EVT_MODE_PERIODIC)`, and the `else` branch's `for (;;)` around `clockevents_program_event()` — which is why `set_next_event` returns 0 rather than an error. `tick_periodic()`: `do_timer(1)` and `update_process_times(user_mode(get_irq_regs()))`. Generic Linux, unmodified |
+| `kernel/time/clockevents.c` | **line** | **generic** | 🆕 **2026-09-06, `R5-3b-1`.** `clockevents_register_device()` — its two `BUG_ON`s, which 量 compile to nothing here because `CONFIG_BUG` is not set, so this driver's own `-EBUSY` is the only thing between a second `cevt` and a corrupted list. `clockevents_exchange_device()` — `set_mode(old, UNUSED)` then `clockevents_shutdown(new)`, which is why `set_mode` is called SHUTDOWN-then-PERIODIC and why SHUTDOWN must not stop the counter. `clockevents_set_mode()`'s `if (dev->mode != mode)` guard. `clockevents_handle_noop`, used by name as this driver's initial `event_handler`. Generic Linux |
+| `arch/rlx/include/asm/irq_regs.h` | **line** | vendor | 🆕 **2026-09-06, `R5-3b-1`, 21 lines, and what it settled is a NON-question.** `#define ARCH_HAS_OWN_IRQ_REGS` and `get_irq_regs()` returning `current_thread_info()->regs`. Opened because `set_irq_regs()` is called nowhere in `arch/rlx` and `tick_periodic()` dereferences `get_irq_regs()` on every tick — so the alarm was that the handover would oops. **Nothing was taken into the driver**: it holds no register, no sequence and no number, and the file's whole content is the classic MIPS route that `arch/rlx/kernel/genex.S:84-85` fills. Declared at `full` because it was read in full, and § 2.1's direction of error is to over-report |
+
+#### 4.8.1 🔴 The depth vocabulary cannot say what changed about `rlx-cevt.c`, and that is a hole in `LEDGER-2`'s fix
+
+讀 `tools/ledgerscan.py:364`: `DEPTHS = ("none", "name", "line")`, deepest last.
+There is no word for *the whole file*.
+
+So this segment's reading of `arch/rlx/kernel/rlx-cevt.c` — from **two string
+literals** (`:139`, `:226`, taken for an `arch/rlx`-vs-`arch/mips` proof) to
+**all 244 lines** — leaves the machine-readable cell reading `line` before and
+`line` after. 🔴 **`ledgerscan check` cannot see the largest single change this
+ledger has recorded for that file.** The prose says it; nothing checks the
+prose.
+
+⚠️ **And the first draft of § 4.8 wrote `full` in all three new rows.** The
+checker reported them, which is `LEDGER-2`'s fix working — but it reported them
+as *unrecognised*, not as *wrong*, and an unrecognised depth is skipped rather
+than failed. A row that declared `ful1` would be skipped the same way.
+**`LEDGER-3` is that pair of gaps**, and it is carried forward rather than
+fixed here: adding a fourth depth word moves `scan`'s own computation
+(`ledgerscan.py:505` derives `line` or `name` from whether a citation carries a
+line number, and nothing can derive *whole file* from a citation), so it is a
+design change to the tool and not a table edit.
+
+⚠️ **`arch/rlx/kernel/genex.S` is cited beside it and is NOT declared**, because
+the citation is to two lines quoted out of `ledgerscan`'s own report of
+`TI_REGS` stores rather than to a reading of the file — no instruction sequence
+was followed and no register meaning taken. **If a later step opens it, the row
+belongs in § 4.2.**
 
 ### 4.5 🔴 `R5-5` SPI + MTD — 11 paths — **the diff's vendor side is spent**
 

@@ -1157,4 +1157,297 @@ Final: `irq_count` **119,818**, `irq_spurious` **0**, `irq_stuck` **0**,
    value the last `arm` computed while `mask_bits` has already moved — 量,
    `EX-1` shows `mask_bits = 8` beside `period_jiffies = 524`. A `/proc` field
    describing a configuration the driver is no longer in. It changes no
-   behaviour (`arm()` recomputes) and it is `R5-3b`'s to clear.
+   behaviour (`arm()` recomputes) and it is `R5-3b`'s to clear. 🟢 **Cleared
+   2026-09-06 in version 3.0** — one owner, `rtl819x_derive_period()`, called
+   from five paths; § 12.10 ①. **This line is not rewritten**: what seating 12
+   did not establish is a record, and the pointer is added beside it.
+
+---
+
+## 12. 🆕 2026-09-06 (`R5-3b-1`, desk, no power): version 3.0 — the clockevent, and the hardware fact that makes it a MODE
+
+**Thirty-fourth segment.** Zero flash-write commands, zero `FLR`, the bracket
+unchanged at 1,024 / 4,194,304 = 0.0244 %.
+
+🔴 **NOTHING IN VERSION 3.0 HAS EXECUTED.** Every 🟢 below is a design or a
+reading of source; the mode split, the two clock_event_devices, `cereload`,
+the pre-check and every `/proc` field they add exist in an image that has not
+been uploaded. The block that runs them is
+`bench/2026-09-06/PREDICTIONS-B11-block10.md` and it has not run. Where this
+section says *the board prints* or *the core calls*, read *is predicted to*. The segment began at 23:39 on
+2026-09-05 and crossed midnight; every dated artefact below carries 09-06
+because the date was re-measured on all three clocks before anything was named.
+
+### 12.1 🔴 TC1 cannot be a clocksource and a clockevent at the same time, and the reason is arithmetic
+
+One reload register, two jobs that want different values in it:
+
+| | wants | because |
+|---|---|---|
+| clocksource | a **power-of-two** period | every clocksource core computes `(now - last) & mask`, and that is exact only when the hardware period is `mask + 1` |
+| clockevent at `HZ` | `hz_used / HZ` = **2,000** counts | that is what makes the tick 100 Hz |
+
+`2,000 = 2^4 × 125`. No power of two at or above this driver's floor of `2^8`
+divides it, so the two requirements have no common solution. **`mode cs` and
+`mode ce` are that fact made typeable**, and `arm()` writes a different
+`TC1DATA` under each.
+
+⚠️ **The clockevent's reload is not a new constant.** `hz_used` is
+`(TC0DATA >> 4) × HZ`, so `hz_used / HZ` is `TC0DATA >> 4` — **the vendor's own
+reload, 2,000, `REG-05`**. `TC1DATA` in clockevent mode is written
+`0x00007D00`, byte-identical to `TC0DATA`. Whatever `CLK-19`'s `N`-vs-`N+1`
+question turns out to be, it applies to both timers identically and cancels.
+
+### 12.2 🔴 The obvious escape is closed by a measurement this project already owned
+
+The standard way to keep both is a software-extended clocksource: the tick ISR
+adds one period to a 64-bit accumulator and `read()` returns
+`accumulator + counter`. It has exactly one race — between the counter wrapping
+and the ISR running, `read()` goes **backwards** by up to one period — and the
+standard fix is to ask the hardware whether a wrap is pending and add a period
+if it is.
+
+**On this part that question cannot be asked.** `SPEC.md` `IRQ-09`, 量 seating
+12: the vendor's `bsp_timer_ack()` is `REG32(BSP_TCIR) |= BSP_TC0IP`, a
+read-modify-write on a register whose `IP` bits are write-1-to-clear, called a
+hundred times a second, so **any pending bit in `TCIR` has a lifetime of at
+most one 10 ms tick**. A wrap-pending test built on `TC1IP` would be right most
+of the time — and a clocksource that is right most of the time hands the
+timekeeping core a backwards step that its unsigned `(now - last) & mask` turns
+into a jump of nearly the whole mask.
+
+🟢 **So the escape is REFUTED rather than skipped**, and what refutes it is a
+reading of this die rather than a preference. Recorded here because the next
+person to look at this driver will have the same idea.
+
+### 12.3 The four facts read out of the tick core, and what each one decides
+
+讀 `kernel/time/tick-common.c` and `kernel/time/clockevents.c` in the drop this
+image is built from — not from memory, and the file is
+`src-vendor/rtl819x-toolchain/linux-2.6.30/`:
+
+1. **`tick_check_new_device()` keeps the incumbent unless
+   `curdev->rating >= newdev->rating` is false.** 讀
+   `arch/rlx/kernel/rlx-cevt.c:234`, the vendor's device is rating **100**. So
+   the rating has to be beaten **strictly**, and a rating of 99 is declined by
+   arithmetic rather than by an operator. That is what makes the negative
+   control free.
+2. **The "prefer one shot capable devices" test only BLOCKS**: it rejects a
+   non-oneshot `newdev` when `curdev` already has oneshot. It never promotes.
+   So advertising `CLOCK_EVT_FEAT_ONESHOT` would buy nothing even if it were
+   safe — and 量, `CONFIG_TICK_ONESHOT` is absent from this build's `.config`
+   and `CONFIG_NO_HZ`/`CONFIG_HIGH_RES_TIMERS` are both `n`, so the tick core
+   cannot enter oneshot mode at all.
+3. **`tick_setup_device()` sets the OLD device's `event_handler` to
+   `clockevents_handle_noop`.** So after the handover the vendor's TC0
+   interrupt still fires at 100 Hz, still runs its own ISR — which still pets
+   the hardware watchdog (`CONFIG_RTL_WTDOG=y`, 讀 `rlx-cevt.c:159`) and still
+   runs `bsp_timer_ack()` — and no longer advances `jiffies`. **Nothing
+   double-counts and nothing stops.**
+4. **`clockevents_exchange_device()` shuts the new device down, then
+   `tick_setup_periodic()` starts it.** Two `set_mode` calls in this order:
+   SHUTDOWN, then PERIODIC. A driver that honoured SHUTDOWN by stopping its
+   counter would switch its own tick source off one statement before the core
+   turned it on.
+
+🔴 **Consequence for `set_mode`, and it is the asymmetry that decides the
+design**: SHUTDOWN does nothing, and PERIODIC **verifies** rather than writes.
+`arm()` already programmed the hardware and `cevt` refuses unless a read-back
+agrees, so a write here means the hardware moved in between — counted as
+`ce_hw_bad`. The failure mode of *an interrupt arrives and runs a noop* is a
+slow clock; the failure mode of *no interrupt arrives* is a board that has to
+be power-cycled. The design chooses the first.
+
+### 12.4 🟢 The negative control, and why an argument was not enough
+
+`ce_mode` reading `CLOCK_EVT_MODE_PERIODIC` after `cevt` is the evidence the
+handover happened. **On its own that is an argument from source**: the field is
+written only by `clockevents_set_mode()`, which is called only from the two
+places above.
+
+The probe device turns it into a measurement. It is identical in every respect
+except a rating of **99**, so the core is *required* to decline it, and the
+same fields read on the same silicon in the same seating come back
+`ce_probe_mode = -1` and `ce_probe_mode_calls = 0`. Without that arm, a reading
+of `2` has no negative control. It costs one `/proc` write and carries no risk,
+and it shares `set_mode` with the real device — so a surprise selection would
+leave a running tick and a raised counter rather than a dead board.
+
+⚠️ **What it does not test** is the `>=` boundary itself. 99 is strictly below
+100; a tie at exactly 100 is never registered by this driver. A control that
+depended on reading one comparison operator correctly would be the weaker one.
+
+### 12.5 🟢 The second witness comes out of the build, and nobody can type it
+
+`ce_handler` prints `clock_event_device.event_handler` as eight hex digits.
+Against this image's own `System.map`:
+
+```
+80036d50 T clockevents_handle_noop      <- before the handover
+80036fc4 T tick_handle_periodic         <- after it
+```
+
+This is the `RLXFW-ID0` pattern applied to a second quantity: a value the build
+computes, the board **is predicted to** print, and nothing in the image can
+produce by another route. **The pair would be the reading, not either half** —
+`CE-0` prints the first address from the same code path on the same boot.
+
+⚠️ **And `RLXFW-ID0` itself is the precedent for being careful here.** 量, by
+`git log -S` rather than from memory: the `ID0` row entered
+`config/rlxfw-marks.tsv` on **2026-09-01** (`b5eedc3`) and the board first
+printed it on **2026-09-02** (`bench/2026-09-02/LP-boot.log:8`,
+`RLXFW-ID0=B1434383`) — **one day, not two segments**, which is what the
+first draft of this paragraph said. `SPEC.md` `TC-39` carried *`ID0` 沒有在
+板子上印過* in between, and that is the sentence `ce_handler` needs today.
+
+### 12.6 🔴 `Δjiffies == Δ(line 25)` is a tautology, and `cereload` is the answer
+
+My tick is 100 Hz. The vendor's is 100 Hz. After the handover **both**
+`/proc/interrupts` lines advance at ≈ 100 per second and both match
+`Δjiffies` — so the obvious reading proves nothing, and a card that quoted it
+would be quoting a tautology. **This was found while drafting the bench card
+and it is why version 3.0 has a verb version 2.0 did not need.**
+
+`cereload <counts>` changes the live period **after** the handover. Double it
+and the kernel gets 50 interrupts a second while still believing `HZ = 100`, so
+every kernel clock runs at half speed and nothing in the kernel can notice.
+Two references, neither of them the kernel's own clock:
+
+* **on the board**: `ce_cycles` accumulates `reload` per delivered interrupt,
+  i.e. real TC1 counts, so `Δce_cycles / hz_used` is elapsed **real** seconds
+  while `Δwall` is elapsed **kernel** seconds. Their ratio is the error.
+* **off the board**: the capture's `.timing`, host-side. ⚠️ `R5-2` measured
+  that reference disagreeing with itself by 17× its own floor — useless at ppm,
+  and this effect is **2×**.
+
+🔴 **`cevt` refuses with `-ERANGE` while the live reload differs from the one
+`HZ` implies**, so the order is fixed by the code and not by the card: hand the
+tick over at the right rate, then make it wrong on purpose, then put it back.
+
+### 12.7 The pre-check, and where it lives
+
+`cevt` refuses unless the driver has itself watched its interrupt arrive at the
+rate the kernel's tick needs — `irq_count` advancing 1:1 with `jiffies` over at
+least 300 jiffies since `reqirq`, within 1 %. The window costs nothing: it is
+whatever time passes between `reqirq` and `cevt`.
+
+**1 % is not a guess.** 量 seating 12 (`SPEC.md` `IRQ-08`): the delivery rate
+was within 0.0199 % and 0.0994 % of the programmed rate at two periods 16×
+apart, and 0.0206 % with the NIC up and four pings in flight. A hundred times
+the worst of those refuses on a fault and not on jitter.
+
+⚠️ **What it cannot do**, written here because a guard whose limits are not
+written down gets trusted past them: it measures TC1 delivery *while the vendor
+still drives `jiffies`*, so it cannot see a failure that only appears once
+`jiffies` depends on TC1 — a handler deadlocking against a lock `tick_periodic`
+takes, for instance. Nothing at the desk can see that either.
+
+### 12.8 🔴 The handover is one-way inside a boot, and `disarm` says so
+
+讀 `kernel/time/`: `tick_cpu_device` is a static per-cpu variable,
+`tick_device_lock` a static spinlock, neither exported, and `clockevents.c` has
+no unregister. So once either `clock_event_device` is registered, `disarm`
+returns **`-EBUSY`** — stopping TC1 under a registered device would stop the
+system tick with nothing able to restart it, from a `/proc` write by a process
+that would then never run again.
+
+The probe is included in that refusal even though the core declined it: it
+points at the same hardware, and a rule that depended on the core having
+declined it would be a rule whose correctness depends on the experiment coming
+out the expected way. **This repository has ruled that shape out once already**
+(`CLAUDE.md`, the `H601` pre-read containment).
+
+🔴 **And `R4`'s scripted reset cannot recover a wedge here**: `J BFC00000` is a
+*loader* command and there is no loader prompt under Linux. Recovery is a power
+cycle. That is why block 10 is three power cycles.
+
+### 12.9 The ISR, and the one behaviour that changes
+
+In clockevent mode the ISR no longer returns `IRQ_NONE` when `TCIR`'s `TC1IP`
+is clear on entry. 讀 `arch/rlx/bsp/irq.c`: `bsp_ictl_irq_dispatch()` reaches
+`do_IRQ(BSP_TC1_IRQ)` only when `GIMR & GISR` has bit 9 set, so **the
+dispatcher has already proved the interrupt is TC1's** and the `TCIR` read is a
+second, weaker witness. Under `IRQ-09` that witness can be erased by the
+vendor's ack, and dropping a system tick to honour it would be a bug.
+
+🆕 **`irq_preacked` is that rate, and it is a number this project has never
+had.** In clocksource mode the old behaviour is kept *exactly*, because cell
+`I1`'s refutation condition is "anything different from seating 11" and a
+control that has moved is not a control.
+
+🔴 **The storm guard is kept even though it now stops the system clock.** A
+storm on line 25 with the tick on it is a livelocked board that also stops the
+clock — and it stops the vendor's TC0 handler too, which is what pets the
+hardware watchdog. A stopped clock leaves a board that can be read; a livelock
+leaves one that resets itself. Neither is good and the first is better.
+
+### 12.10 Three defects fixed, and one of them was assigned to this step by name
+
+1. **§ 11.6 item 6**: after `disarm`, `period_jiffies` kept the value the last
+   `arm` computed while `mask_bits` had already moved — 量 `EX-1`,
+   `mask_bits = 8` beside `period_jiffies = 524`. Version 3.0 has one owner for
+   the derivation, `rtl819x_derive_period()`, called from `arm`, `period`,
+   `mode`, `cereload` and `init`. 🟢 **And the fix makes a second field
+   legible**: at `mask_bits = 8` the correct value is **0**
+   (`256 × 100 / 200000` truncates), which is exactly why `tc1_ext_trusted`
+   reads 0 there — § 11.6 item 5 recorded that guard firing before the field
+   followed it.
+2. **`CFG-2`**: the driver's own comment said *"What is NOT established is what
+   Linux leaves in `GIMR`"*, and seating 12 established it
+   (`gimr_at_init = 00209100`, `00209300` after `request_irq`). It could not be
+   changed in that segment because `RECIPE_ID` is a digest of `config/` and one
+   character would have detached the pinned image from its record. This segment
+   rebuilds anyway, so it is fixed here — with the decode, and with the
+   `bsp_ictl_irq_dispatch()` consequence § 12.11 draws from bit 12.
+3. **`TMR-1` closes.** Both of its fixes ran on silicon in seating 12:
+   `tc1_ext_ticks = 8350` (the kernel timer drove the extension with no reader)
+   and `tc1_ext_trusted` reading 0 at period 8 and 1 at periods 12 and 20 (the
+   jiffies-based test). The row stayed open because nothing had executed; it
+   has.
+
+### 12.11 🆕 Two source readings that came out of writing this, and one of them is a hazard that does not fire
+
+讀 `arch/rlx/bsp/irq.c`, `bsp_ictl_irq_dispatch()` is an **`else if` chain**
+that dispatches ONE source per exception and tests `BSP_UART0_IP` (bit 12) and
+`BSP_UART1_IP` (bit 13) **before** `BSP_TC1_IP` (bit 9). And
+`gimr_at_init = 0x00209100` has **bit 12 set**. On its face that is a
+starvation path for the system tick.
+
+🟢 **量 seating 12, `EX-19`: it does not fire on this board.** The console's
+41,824 interrupts arrived as `8: RLX LOPI serial` — down the LOPI vector, not
+through this chain — and `gisr` read `88000004`, bit 12 clear. The ICTL's
+UART0 position is unmasked and unused.
+
+⚠️ **That is a measurement about this board's configuration, not a property of
+the code.** Anything that routes UART0 to the cascade (`BSP_UART0_RS` is
+`BSP_IRQ_CASCADE` in `bspchip.h`, so the vendor contemplated it) puts a
+higher-priority source in front of the tick.
+
+🔴 **The second reading is a false alarm resolved, and it is worth the
+paragraph because the alarm was mine.** `set_irq_regs()` is called **nowhere**
+in `arch/rlx`, and `tick_periodic()` calls
+`update_process_times(user_mode(get_irq_regs()))` on every tick. 讀
+`arch/rlx/include/asm/irq_regs.h`: the port defines `ARCH_HAS_OWN_IRQ_REGS` and
+`get_irq_regs()` returns `current_thread_info()->regs`, which
+`arch/rlx/kernel/genex.S:84-85` fills with `LONG_S sp, TI_REGS($28)` on
+exception entry. **So it is valid on the ICTL path**, and the grep that found
+zero callers was asking the wrong question.
+
+### 12.12 What version 3.0 does NOT do
+
+1. **It does not arm at boot.** Every handover in block 10 is from a `/proc`
+   write on a board that already reached a shell. `R5-3b`'s DoD — ten boots
+   with my timer as the system time base — is `R5-3b-2`, it needs a different
+   image, and building that image before the `/proc` route has ever run would
+   be building on an assumption.
+2. **It does not register a clocksource in clockevent mode**, and every
+   `tc1_ext_*` line reads 0 there. § 12.1 is the reason; the zeros are not a
+   defect and `mode=ce` on the line above them says so.
+3. **`set_next_event` is a stub that returns 0 and counts the call.** 讀
+   `tick_setup_periodic()`: a device *without* `CLOCK_EVT_FEAT_PERIODIC` is
+   driven by `for (;;) { if (!clockevents_program_event(...)) return; ... }`
+   with interrupts disabled, so a `set_next_event` that always fails spins
+   forever. Returning 0 makes that loop return after one pass. Both outcomes
+   are wrong; one can be read afterwards, and `ce_next_calls` must be 0.
+4. **`ESTATUS` is still unread.** § 10.6's second item stands verbatim, for the
+   third segment running.
