@@ -92,7 +92,7 @@ modes, because TC1 has one reload register and the two jobs want
 different values in it**: `(now - last) & mask` is exact only for a
 power-of-two period, a 100 Hz tick needs 2,000 counts, and no power of
 two at or above the driver's floor divides 2,000
-([`SPEC.md`](SPEC.md) `CLK-25`) — written without reading anyone else's
+([`SPEC.md`](SPEC.md) `CLK-25`) — 🟢 **on 2026-09-06 the clockevent half took over the system tick on the silicon, three times on three cold boots, and the proof is causal rather than correlational: change its reload and the kernel's clock changes with it, 1× to 10×, every ratio landing to four decimals** ([`SPEC.md`](SPEC.md) `CLK-26`) — written without reading anyone else's
 implementation of it
 ([`docs/blind-write-ledger.md`](docs/blind-write-ledger.md) is the record of
 what *was* read, frozen before it existed).

@@ -1451,3 +1451,165 @@ zero callers was asking the wrong question.
    are wrong; one can be read afterwards, and `ce_next_calls` must be 0.
 4. **`ESTATUS` is still unread.** § 10.6's second item stands verbatim, for the
    third segment running.
+
+---
+
+## 13. 🆕 2026-09-06 (`R5-3b-1`, seating 13): version 3.0 on the silicon — the tick is mine, and the proof is causal
+
+Three power cycles, 59 captures, `check-predictions` **32 of 32**. Zero
+flash-write commands, zero `FLR`. `bench/2026-09-06/CORRECTIONS-block10.md`
+is the record; this section is what the driver learned.
+
+### 13.1 🟢 Every prediction in § 12.3–§ 12.7 landed, three times
+
+| | `CE-*` (PC1) | `P2-*` (PC2) | `P3-*` (PC3) |
+|---|---|---|---|
+| `ce_registered` / `ce_live` | 1 / 1 | 1 / 1 | 1 / 1 |
+| **`ce_mode`** | 2 | 2 | 2 |
+| **`ce_mode_calls`** | **2** | **2** | **2** |
+| `ce_handler` before → after | `80036D50` → `80036FC4` | same | same |
+| `ce_hw_bad` / `ce_next_calls` / `ce_badmode` | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| `ce_check_dj` / `ce_check_dc` | 11119 / 11119 | 7827 / 7828 | 8836 / 8836 |
+| negative control `ce_probe_mode_calls` | 0 | 0 | 0 |
+
+`ce_mode_calls = 2` is the one worth pausing on. § 12.3 read
+`clockevents_exchange_device()` and `tick_setup_periodic()` out of the 2.6.30
+source **before the board was powered** and predicted SHUTDOWN then PERIODIC —
+two calls, not one. A driver that had guessed 1 would have read this as a
+defect; the source said 2 and the board printed 2.
+
+`ce_check_dc` and `ce_check_dj` differ by **1 count on PC2 and by 0 on the
+other two**, against a tolerance of `RTL819X_CE_TOL_PERMILLE = 10`. The
+pre-check is not close to its limit and the one-count spread is the jiffy
+quantisation, not drift.
+
+### 13.2 🟢 `cereload` — the witness that does not ask the kernel about itself
+
+§ 12.6 argued that `Δjiffies == Δ(line 25)` is a tautology and that `cereload`
+is the answer. It is, and it is a slope rather than a point:
+
+| cell | `reload` | Δwall (kernel s) | Δjiffies | Δ`ce_cycles` | **ratio** |
+|---|---|---|---|---|---|
+| `CE-7`→`CE-8` | 2000 | 46.57 | 4,657 | 9,314,000 | **1.0000** |
+| `CE-9` | 4000 | 5.02 | 502 | 2,008,000 | **2.0000** |
+| `CE-10` | 2000 | 5.03 | 503 | 1,006,000 | **1.0000** |
+| `P2-8` | 8000 | 5.01 | 501 | 4,008,000 | **4.0000** |
+| `P2-9` | 2000 | 5.03 | 503 | 1,006,000 | **1.0000** |
+| `P3-6` | 20000 | 5.01 | 501 | 10,020,000 | **10.0000** |
+
+`ratio = Δce_cycles / hz_used / Δwall`, i.e. real seconds over kernel seconds.
+At `reload = 20000` the shell still answered a `cat` after a `sleep 5` that
+took **50 real seconds**, which is the whole demonstration in one sentence:
+every kernel timeout ran ten times slow and nothing in the kernel could tell.
+
+⚠️ **No row is worth quoting alone.** `Δwall` is quantised at one jiffy
+(`CLK-20`/`CLK-21`), so each row carries ±1 % at these lengths. **Four distinct
+reloads (2000, 4000, 8000, 20000) over six rows**, spanning 1× to 10×, is what
+makes it a measurement.
+
+🟢 **`TC1DATA` followed on every armed dump**, `tc1data = period_cycles << 4`:
+`256 → 00001000`, `2000 → 00007D00`, `4000 → 0000FA00`, `8000 → 0001F400`,
+`20000 → 0004E200`. `TM-3` (seating 11) established that field shape from one
+point; this is five, and `CE-0` is the control that does *not* satisfy it —
+`state=idle`, `tc1data=00000000`, the register as init left it.
+
+### 13.3 🟢 The reading that is not in the driver's design and is the best one it produced
+
+§ 12.6's tautology has a limit the section did not notice: it is only a
+tautology **while both timers run at the same rate**. `P3-6` leaves the board
+with my tick at 10 Hz and the vendor's TC0 untouched at 100 Hz, so one extra
+cell breaks it for free.
+
+`P3-7` — `cat /proc/interrupts ; cat /proc/rtl819x-timer ; sleep 3 ;` the same
+two again — over **30.10 real seconds**:
+
+```
+Δ line 13  (vendor rlx timer)  = 3,009    99.97 Hz
+Δ line 25  (rtl819x-timer)     =   301    10.00 Hz
+Δ jiffies                      =   301
+Δ wall                         =  3.01 kernel s
+line13 / line25                = 9.9967      jiffies − line25 = 0
+```
+
+**The vendor's timer interrupt was delivered 3,009 times and the kernel counted
+301 jiffies.** § 12.3's second row said the vendor's TC0 keeps firing, keeps
+petting the watchdog and stops advancing `jiffies`; this is that sentence with
+numbers on both halves, and it needs no address and no question put to the tick
+core.
+
+### 13.4 🟢 Zero lost ticks, which is what § 12.9's ISR was built to make measurable
+
+`P2-5` → `P2-6`, 258.53 s under my tick:
+
+```
+Δjiffies                     = 25,853
+Δirq_count                   = 25,853
+Δce_cycles / reload          = 25,853        (51,706,000 / 2000)
+lost ticks                   = 0
+```
+
+The card wrote 推 0 with *"refuted by any non-zero value, which would be the
+first measurement of interrupt loss on this part"*. `IRQ-09`'s hazard — the
+vendor's `REG32(BSP_TCIR) |= BSP_TC0IP` clearing a pending bit that is not its
+own, a hundred times a second — produced nothing measurable over 25,853
+periods. ⚠️ That is a **bound over 258.53 s**, not an absence.
+
+**`irq_preacked` stayed 0 everywhere**, including under traffic (`P2-7b`,
+`CE-12`). § 5.2 of the card predicted *either* ≈ 0 *or* ≈ `irq_count` and said
+a value between them would refute the fixed-phase model of § 5.1. It is 0, so
+the model survives — ⚠️ *survives* is not *confirmed*, because only the middle
+would have refuted it.
+
+### 13.5 🟢 The guards, and what a zero is worth here
+
+Across all 59 captures: `irq_spurious` **max 0**, `irq_stuck` **max 0**,
+`ce_badmode` **max 0**, `ce_hw_bad` **max 0**, `ce_next_calls` **max 0**,
+`irq_preacked` **max 0**; `tc0_undisturbed` **min 1**.
+
+🔴 **`CE-11` is the one cell whose success would have been the bad outcome.**
+`disarm` under a registered clockevent returned **`last_verdict=-16`
+(`-EBUSY`)** with `state=armed` and `ce_live=1` still set. § 12.8 argued the
+handover is one-way inside a boot because `tick_cpu_device` is a static
+per-cpu variable, `tick_device_lock` is static, neither is exported, and
+`clockevents.c` has no unregister. **The refusal is the deliverable**, and it
+is what kept the board answering after every handover.
+
+### 13.6 🔴 Two defects in the driver's *presentation* that the seating exposed
+
+Neither is a defect in what the driver does; both are in what a card can read
+out of it.
+
+1. **A cell that types only `echo` verbs produces no dump.** `P2-1a`,
+   `P2-2a`, `P3-1a`, `P3-2a` are 110–111 bytes: the echoed command line and a
+   prompt. Their expectations were readable only in the cell that followed.
+   **A `/proc` write verb returns nothing on success by design** — that is
+   correct for a write interface — so the fix belongs to the card template,
+   not to the driver: any split cell must end in a `cat`.
+2. **`irq_count` is cumulative and a card that predicts a count must name the
+   interval.** `CE-3`/`CE-4` split `reqirq` from the `sleep`, so the interval
+   between their dumps is 11.69 s (99.91 Hz over 1,168 interrupts), while
+   `P2-3`/`P3-3` do both in one cell and read **803** twice — the card's own
+   number. The driver is identical in all three.
+
+### 13.7 What version 3.0 still does NOT do
+
+§ 12.12's four items stand, and the first is now the *only* thing between this
+driver and `R5-3b`'s DoD:
+
+1. **It does not arm at boot.** Every handover here came from a `/proc` write
+   on a board that had already reached a shell. `R5-3b-2`.
+2. **No clocksource in clockevent mode.** `rating` read **0** in every dump of
+   the seating and `tc1_ext_*` read 0 throughout.
+3. **`set_next_event` is still a stub**, and `ce_next_calls` read 0 three
+   times, which is what says the periodic path was taken and the stub was
+   never entered.
+4. **`ESTATUS` is still unread**, for the fourth segment running.
+
+And two the seating adds:
+
+5. **The longest window is 258.53 s.** A handover that survives four minutes
+   and fails at forty is not excluded by anything here.
+6. **The `>=` boundary is untested.** The negative control runs rating 99
+   against the vendor's 100 — decided by arithmetic rather than by reading one
+   comparison operator correctly, which was deliberate (§ 12.4) — so a tie at
+   exactly 100 was never registered.

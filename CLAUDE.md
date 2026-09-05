@@ -167,6 +167,54 @@ released source.
 > the system *depends on*. `rating` read **0** in all eighteen dumps and the
 > time base was `jiffies` throughout, deliberately — that is `R5-3b`.
 > **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
+> 🔄 **2026-09-06, TENTH update — seating 13, three power cycles, and the
+> sentence two paragraphs above expired at 03:11.** 🟢 **The system tick is
+> mine.** `R5-3b-1` registered a `clock_event_device` at rating 300 and the
+> tick core exchanged the devices on **three independent cold boots** —
+> `ce_registered=1`, `ce_live=1`, **`ce_mode=2`**, **`ce_mode_calls=2`**
+> (SHUTDOWN then PERIODIC, which `clockevents_exchange_device()` and
+> `tick_setup_periodic()` were read to predict *before the board was
+> powered*), and `ce_handler` moving from **`80036D50`**
+> (`clockevents_handle_noop`) to **`80036FC4`** (`tick_handle_periodic`), both
+> resolved from this image's own `System.map` by `cardcheck numbers` and typed
+> by nobody. *(§ 9 above says "nothing of mine drives a peripheral the system
+> DEPENDS on — `rating` read 0 in all eighteen dumps and the time base was
+> `jiffies` throughout"; the clocksource half of that is still exactly true
+> and `rating` read 0 again in every dump of this seating, but the tick is a
+> clockevent and it is now mine.)*
+> 🟢 **And it is caused, not asserted.** `cereload` changes TC1's reload and
+> the kernel's clock follows: six rows, four distinct reloads, **1× to 10×**,
+> ratios `1.0000 / 2.0000 / 1.0000 / 4.0000 / 1.0000 / 10.0000`, each landing
+> on its prediction to four decimals. At 20000 the shell answered a `cat`
+> after a `sleep 5` that took **50 real seconds**, and nothing in the kernel
+> could notice. 🟢 **Zero lost ticks** over 258.53 s: `Δjiffies`,
+> `Δirq_count` and `Δce_cycles / reload` are **25,853** three ways.
+> 🟢 **The best reading was not on the card and cost 90 seconds.** The card
+> correctly refused to quote `Δjiffies == Δ(line 25)` as evidence, because
+> both timers run at 100 Hz — but `P3-6` leaves mine at 10 Hz and the
+> vendor's untouched, so `P3-7` could take the two apart: over **30.10 real
+> seconds the vendor's line 13 advanced 3,009, my line 25 advanced 301, and
+> `jiffies` advanced 301.** Residual **0**, no address quoted, no question put
+> to the tick core.
+> 🔴 **Six defects in the seating's own card, all with captures**: a predicted
+> line 12 that cannot exist before `ndo_open`; `NET-14` not reproducing;
+> an `≈800` whose interval was 11.69 s and not 8 s (`P2-3`/`P3-3`, same work
+> in one cell, read **803** twice); four cells that type only `echo` and carry
+> expectations they cannot show; a `ping` cell whose interface no cell on that
+> cycle brings up; and **PC3 entirely outside the `cells` fence, so
+> `32 of 32` is not "the whole seating was checked"**.
+> 🔴 **Two findings with reach beyond the block.** This image's `ping`
+> **ignores `-c`** — five requests including `busybox ping` directly, all four
+> packets — so every `ping -c 4` in this repository has been getting the
+> default rather than what it asked for. And **`NET-14` was an id collision**:
+> `SPEC.md` `NET-14` is the MII register row, while the `eth4` carried-forward
+> item had used the same id since 2026-09-04, **and that device measurement
+> was not in `SPEC.md` at all**. It is `NET-25` now.
+> ⚠️ **What is still true and narrower again**: the dependence is created by a
+> `/proc` write **after userspace exists**. All three boots came up on the
+> vendor's tick and were handed over by hand; arming at boot is `R5-3b-2`,
+> which needs a different image because `RECIPE_ID` is a digest over `config/`.
+> **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.

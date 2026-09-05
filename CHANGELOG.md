@@ -1,5 +1,68 @@
 # Changelog
 
+🟢🟢 **2026-09-06, thirty-fifth session, seating 13: `R5-3b-1`** — **the system
+tick is mine, on three independent cold boots, and the proof is causal.** Three
+power cycles, 02:45–03:55, **59 captures**, `check-predictions` **32 of 32**,
+**zero flash-write commands and zero `FLR`**, so the bracket is untouched at
+1,024 of 4,194,304 = **0.0244 %**.
+
+🟢 **The handover, three times.** `CE-7`, `P2-5`, `P3-5`: `ce_registered=1`,
+`ce_live=1`, `ce_mode=2` and **`ce_mode_calls=2`** — SHUTDOWN then PERIODIC,
+which `clockevents_exchange_device()` and `tick_setup_periodic()` were read to
+predict **before the board was powered**. `ce_handler` moves from **`80036D50`**
+(`clockevents_handle_noop`) to **`80036FC4`** (`tick_handle_periodic`), both
+addresses resolved from this image's own `System.map` by `cardcheck numbers`
+and typed by nobody. **The pair is the reading, not either half**: the same
+code path prints the other address on the same boot.
+
+🟢 **The negative control declined three times.** A second `clock_event_device`
+at rating **99** was registered on every cycle and the tick core never called
+its `set_mode` — `ce_probe_registered=1`, `ce_probe_mode_calls=0`. So when 300
+succeeds, the difference is that number.
+
+🟢 **The causal test is a slope with no residual.** `cereload` changes TC1's
+reload; `Δce_cycles / hz_used` is real seconds and `Δwall` is kernel seconds,
+and their ratio is the error the kernel cannot see. Six rows, four distinct
+reloads (2000, 4000, 8000, 20000), 1× to 10×: **1.0000 / 2.0000 / 1.0000 / 4.0000 / 1.0000 / 10.0000**,
+every one landing on its prediction to four decimal places. At `reload = 20000`
+the shell answered a `cat` after a `sleep 5` that took **50 real seconds**.
+
+🟢 **Zero lost ticks**: 258.53 s, `Δjiffies` = `Δirq_count` =
+`Δce_cycles / reload` = **25,853, 25,853, 25,853**.
+
+🟢 **And the strongest reading is not on the card.** The card correctly refused
+to quote `Δjiffies == Δ(line 25)`, because both timers run at 100 Hz and the
+vendor's keeps firing after the handover. `P3-6` removes that for free — at
+10 Hz mine and 100 Hz the vendor's — so one extra cell, `P3-7`, 90 s: over
+**30.10 real seconds the vendor's line 13 advanced 3,009 and my line 25
+advanced 301, and `jiffies` advanced 301.** The two lines are no longer the
+same number and `jiffies` follows mine with residual **0**.
+
+🔴 **Six defects in the seating's own card, every one with a capture behind
+it** (`bench/2026-09-06/CORRECTIONS-block10.md` § 3): a predicted line 12 that
+cannot exist before `ndo_open`; `NET-14` not reproducing (4/4 on the first open
+of `eth4`); an `≈ 800` prediction whose interval was 11.69 s and not 8 s —
+`P2-3` and `P3-3` put the same work in one cell and read **803** twice; four
+cells that type only `echo` verbs and carry expectations they cannot show; a
+`ping` cell whose interface no cell on that cycle brings up, run as written
+first so the defect is measured; and **PC3 entirely outside the card's own
+`cells` fence, so `32 of 32` is not "the whole seating was checked"**.
+
+🔴 **Two findings with reach beyond the block.** This image's `ping` **ignores
+`-c`** and always sends four packets — five requests, including `busybox ping`
+directly, all four (`SPEC.md` `NET-26`). And `NET-14` was an **id collision**:
+`SPEC.md` `NET-14` is the MII register row from seating 2, while the `eth4`
+carried-forward item had used the same id since 2026-09-04 — and that device
+measurement **was not in `SPEC.md` at all**. It is now `NET-25`, with its gap
+in § 17 and its owning gate named.
+
+⚠️ **What this is not.** It is not `R5-3b`'s DoD: every handover came from a
+`/proc` write on a board that had already reached a shell, and arming at boot
+is `R5-3b-2`. `rating` read **0** in every dump, so the clocksource side is
+untouched. The longest window is **258.53 s**. And the flash sentence has not
+moved: no `FLR`, no full re-dump, *not one flash byte is written* remains
+exactly as unsayable as before.
+
 🟢🟢 **2026-09-04, thirty-third session, seating 12: `R5-3a`'s bench half** —
 **an interrupt of mine was delivered on the silicon, 119,818 times.** One power
 cycle, 13:55:58–14:27:39, 35 captures, **zero flash-write commands and zero

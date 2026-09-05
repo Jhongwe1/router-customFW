@@ -1277,3 +1277,122 @@ a full local sweep of all 60 `run:` steps in `ci.yml` — **58 ok, 2 RED,
 GitHub artifact at the desk, and `census` then cannot close its total).
 ⚠️ **`audit-bench-log` is not listed** — it scans `.log` files and there are
 none here yet.
+
+### 🔴 The seating ran the same night. Three power cycles, 59 captures, `32 of 32`
+
+The section above was written at the desk on 2026-09-06 at 00:46 and says *"the
+seating it predicts **has not happened**"*. It happened at **02:45–03:55 the
+same calendar day**, in the thirty-fifth segment — the second segment dated
+2026-09-06, because the thirty-fourth began at 23:39 on 09-05 and crossed
+midnight.
+
+`bench/2026-09-06/CORRECTIONS-block10.md` is the record; this is the index.
+
+| | |
+|---|---|
+| power cycles | **3** — `SP-*` (PC1), `SQ-*` (PC2), `SR-*` (PC3) |
+| captures | **59** `.log`, plus three host-side `tcpdump` text captures |
+| `check-predictions` | **32 of 32** ⚠️ and that is PC1 + PC2 only — see below |
+| flash | **zero write commands, zero `FLR`**; the bracket is unchanged at 0.0244 % |
+| `RLXFW-ID0` | `93e1c9c7`, computed by the build and printed by the board, **three times** |
+| `looprun` machine total | **21.77 / 21.68 / 21.71 s** — range 0.09 s, 0.41 % |
+
+🟢 **The handover happened three times and the negative control declined three
+times.** `CE-7`, `P2-5`, `P3-5`: `ce_mode=2`, `ce_mode_calls=2`,
+`ce_handler` `80036D50` → `80036FC4`. `CE-5`, `P2-4`, `P3-4`:
+`ce_probe_registered=1` with `ce_probe_mode_calls=0` — the core took the
+rating-99 device and never called it.
+
+🟢 **The causal test is a slope**: six rows, four distinct reloads
+(2000, 4000, 8000, 20000), 1× to 10×,
+every ratio landing on its prediction to four decimal places
+(`1.0000 / 2.0000 / 1.0000 / 4.0000 / 1.0000 / 10.0000`).
+
+🟢 **And one cell that is not on the card is the strongest reading of the
+seating.** The section above says the obvious evidence would be a tautology,
+and it is right — but `P3-6` leaves the board with my tick at 10 Hz and the
+vendor's TC0 untouched at 100 Hz, which breaks the tautology for free. `P3-7`,
+90 s, taken before power-off: over **30.10 real seconds** the vendor's line 13
+advanced **3,009** and my line 25 advanced **301**, and `jiffies` advanced
+**301**. The two lines are no longer the same number and `jiffies` follows
+mine with zero residual.
+
+#### 🔴 Six defects in the card, every one with a capture behind it
+
+Listed here because the card is frozen; the reasoning is in
+`CORRECTIONS-block10.md` § 3.
+
+1. **`NB-0` predicted a line 12 that cannot exist yet.** `/proc/interrupts`
+   read `2/8/13`. A line appears at `request_irq`, which the NIC does at
+   `ndo_open`; `ifconfig`'s `Interrupt:12` is `dev->irq`, set at probe.
+   `CE-4` — after `eth4` came up — shows line 12, so the refutation carries
+   its own positive control.
+2. **`NET-14` did not reproduce.** First open of `eth4` on a cold boot with
+   `eth0` never touched: **4/4, 0 % loss**. The card's own stop-if said to
+   record and go on. *(That id has since been corrected: the finding is
+   `SPEC.md` **`NET-25`**, because `NET-14` was already taken by the MII
+   register row — see below.)*
+3. **`CE-4`'s `≈ 800` was not comparable**, because `CE-3` and `CE-4` are two
+   cells and the interval between their dumps is 11.69 s, not 8. `P2-3` and
+   `P3-3` put the same work in ONE cell and both read **803**.
+4. **`P2-1a` / `P2-2a` / `P3-1a` / `P3-2a` carry expectations they cannot
+   show** — they type only `echo` verbs, so their captures are 110–111 bytes
+   with no dump in them.
+5. **`P2-7` names a precondition no cell on PC2 establishes.** Run exactly as
+   written it answered `ping: sendto: Network is unreachable`, because § 4.2
+   spends `NET-14`'s cells and nothing brings `eth4` up. Run as written first,
+   *then* fixed, so the defect is measured rather than argued.
+6. **PC3 is outside the card's own `cells` fence.** The fence lists 32 entries,
+   all PC1 and PC2; `P3-L` and `P3-6` have literal commands and are not in it,
+   and `P3-0`…`P3-5` have no literal command at all. Found at the desk before
+   power by generating the commands from the card and sweeping **in both
+   directions** — 34 emitted against 32 declared. **So `32 of 32` does not mean
+   the whole seating was checked**, and this row says so rather than leaving a
+   reader to assume it.
+
+#### 🔴 Two findings with reach beyond this block
+
+* **`ping -c` does nothing on this image.** `-c 4`, `-c 20`, `-c 2`, `-c 7`,
+  `-c20` and an explicit `busybox ping -c 3` all send exactly **four** packets,
+  with the command line echoed intact every time. It invalidates nothing —
+  four replies is four replies — but every `ping -c 4` in this repository got
+  four by default rather than by request, and **a card cannot ask this image
+  for another count**. `SPEC.md` `NET-26`.
+* **An id collision, found while writing this up.** `SPEC.md` `NET-14` is the
+  MII register row (seating 2, 2026-08-24); the carried-forward `eth4` item in
+  `PROGRESS.md` had also been called `NET-14` since 2026-09-04. Two findings,
+  one id, and the eth4 one **was not in `SPEC.md` at all** — a device
+  measurement that never reached the index. It is now `NET-25` there, and the
+  carried-forward row points at it.
+
+#### The host captures, and why they were written outside the repository first
+
+`SP-host.txt`, `SQ-host.txt`, `SR-host.txt` are `tcpdump -e -n 'icmp or arp'`
+on `enxfc19286184c9`, one per power cycle. They were written to a scratch
+directory and moved in **only after their MAC survey was read**: the board's
+`eth4` is `00:12:34:56:78:94` and the loader's synthesised address is
+`56:0a:01:01:01:e8`, neither of which is `H601`'s. **A containment rule whose
+correctness depends on the experiment coming out the expected way is not a
+containment rule** (this file's own 2026-08-31 lesson), so the order was
+capture → read → decide, not decide → capture.
+
+🟢 That survey also turned a *read* claim into a *measured* one: `RUNSHEET`
+§ G3 says the loader *"synthesises its MAC from that address"*, and
+`56:0a:01:01:01:e8` carries `0a:01:01:01` = **10.1.1.1** in bytes 2–5. Nothing
+had ever checked it.
+
+⚠️ And the board's own ping RTT is quantisation, not latency: `CE-12` prints
+`time=10.000 ms` four times while `SP-host.txt` timestamps a request and its
+reply **20 µs** apart.
+
+#### 🔴 A procedural finding, with a control
+
+`SP-A` (PC1) holds the full stage-1 banner. `SQ-A` (PC2) holds none of it —
+the operator reached the power switch before the capture opened the port, so
+the banner went nowhere. The cold boot is still attested by the capture's own
+shape: `SQ-A` begins with `---Escape booting by user` at **t = 0.004 s** and
+then holds `Unknown command !` about 1,700 times, and a board already at
+`<RealTek>` cannot produce the first line. For PC3 the operator was asked to
+**wait ten seconds after replying** before touching power, and `SR-A` holds the
+banner again. **Three cycles, one variable, and the outcome followed it** — so
+this is a finding with a control and not an apology.

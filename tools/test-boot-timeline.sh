@@ -146,7 +146,27 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # hold boot text`. They are shell captures taken at a prompt after S7, so
 # having no boot line is correct rather than a miss -- and the `0 of them hold
 # boot text` half is what makes that a reading instead of an assumption.
-ck "twenty-two cold, thirty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 22 cold, 37 warm, 0 unknown')"
+# 🔄 22/37 -> 24/37 on 2026-09-06 (seating 13, `bench/2026-09-06`), which is
+# THREE power-ons and NO warm reset -- `looprun` ran with `--skip S2,S3,S4` on
+# every cycle, so its own S4 (`J BFC00000`) never fired and this is the first
+# seating since 2026-09-02 to add no warm row at all. Isolation check, run
+# before this line was touched: every directory EXCEPT `2026-09-06` still
+# reports 22 cold, 37 warm, and `2026-09-06` alone reports 2 cold / 0 warm --
+# so the delta is exactly +2/+0 and nothing was reclassified. Seventh seating
+# in a row that turned this case red, and the seventh time it was the
+# run-every-suite rule rather than a `--only` run that caught it.
+# 🔴 THREE POWER-ONS AND TWO COLD ROWS, and the missing one is a reading rather
+# than a miss. `SQ-A` is the second cycle's ESC catch and the operator reached
+# the power switch before the capture opened the port, so stage-1's banner went
+# to a port nobody was listening on. The tool does not drop it -- it names it:
+# `bench/2026-09-06/SQ-A.log -- boot text but no `Booting` anchor -- the
+# capture opened after the board started`, and it is the `1 of them hold boot
+# text` in that seating's NOT CLASSIFIED line. **So this classifier, which
+# knows nothing about the seating's procedure, independently measured the same
+# operator error that `bench/2026-09-06/CORRECTIONS-block10.md` § 3.7 argues
+# from the capture's shape.** The fix (wait ten seconds after replying, before
+# touching power) has its own control: `SR-A`, taken with it, classifies cold.
+ck "twenty-four cold, thirty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 24 cold, 37 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something

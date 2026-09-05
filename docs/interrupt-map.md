@@ -742,3 +742,56 @@ expect; `P1`–`P3` are the three cases that pin it, and `P3` asserts from the
 built `.config` that `CONFIG_FPGA_PLATFORM` is unset so the `#else` arm is the
 live one. **A checker that reads a header with a regex is a header parser, and
 a header parser that does not know about `#if` is wrong by default.**
+
+
+---
+
+## 7. 🆕 2026-09-06 (seating 13): the two timer interrupts, measured at different rates
+
+§ 3.6 records that the vendor's `bsp_timer_ack()` erases `TC1IP` a hundred
+times a second, which bounds what a single sample of `TCIR` can mean. This
+section records the complementary fact, which is about **delivery** rather
+than about visibility, and which needed the clockevent to exist before it
+could be taken.
+
+After `R5-3b-1`'s handover both timer interrupts are live at once and they are
+**independent**:
+
+| line | source | who acks it | what it advances |
+|---|---|---|---|
+| **13** | TC0, the vendor's, `RLX LOPI` | `bsp_timer_ack()` every tick | nothing, once the handover has happened — `tick_setup_device()` sets the old device's `event_handler` to `clockevents_handle_noop` |
+| **25** | TC1, mine, `ICTL` → `IRR1` → CPU `IP2` | `rtl819x_tc1_isr()`, write-1-to-clear on bit 28 | **`jiffies`** |
+
+🔴 **While both run at 100 Hz nothing here is measurable**, and the block 10
+card said so before it ran: `Δjiffies`, `Δ(line 13)` and `Δ(line 25)` are the
+same number and quoting any of them is quoting a tautology. 量 `CE-4`→`CE-8`:
+**14,607 / 14,608 / 14,607**.
+
+🟢 **`cereload` separates them.** With `ce_reload = 20000` my tick is 10 Hz and
+TC0 is untouched. 量 `P3-7`, over **30.10 real seconds** (derived from
+`Δce_cycles / hz_used`, not from the kernel's own clock):
+
+```
+Δ line 13 = 3,009     99.97 Hz    the vendor's, unchanged
+Δ line 25 =   301     10.00 Hz    mine, at the rate I programmed
+Δ jiffies =   301                 follows mine, residual 0
+Δ wall    =  3.01 kernel s   vs   30.10 real s
+```
+
+**The vendor's timer interrupt was delivered 3,009 times in that window and the
+kernel counted 301 jiffies.** That is the clearest statement this project has
+that the system tick comes from `rtl819x-timer`, and unlike § 3.3's gate
+readings it does not ask the kernel about its own state.
+
+⚠️ **What it does not say.** It does not measure TC0's *rate* independently —
+99.97 Hz is `Δ(line 13)` divided by a real-time figure derived from **my**
+counter, so it is one clock measured against another and not a frequency
+standard. What is independent is the **ratio**: 9.9967 against a programmed
+10, and `Δjiffies − Δ(line 25) = 0`.
+
+🟢 **Zero lost ticks over a longer window.** 量 `P2-5`→`P2-6`, 258.53 s at
+`reload = 2000`: `Δjiffies`, `Δirq_count` and `Δce_cycles / reload` are all
+**25,853**. § 3.6's hazard — a lost ack under the vendor's read-modify-write —
+would appear here as a shortfall in `Δjiffies` against the periods TC1 actually
+completed, and over 25,853 periods it produced none. ⚠️ That is a **bound at
+258.53 s**, not an absence.
