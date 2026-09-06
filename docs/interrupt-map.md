@@ -134,7 +134,22 @@ title says *"`IRR1`–`IRR3`"*; there are **four**.
 
 ---
 
-## A. What `R5-3` needs
+## A. What `R5-3` needed — 🟢 **all of it, and the section is answered in place**
+
+🔄 **2026-09-06 (seating 14): the heading said *needs* and `R5-3` is finished.**
+It was split into `R5-3a` (the interrupt path, closed 2026-09-04),
+`R5-3b-1` (the `/proc`-driven handover, closed 2026-09-06 03:11) and
+`R5-3b-2` (arming at boot, closed 2026-09-06 14:48). Every row below is
+left exactly as written and answered where it stands — the 未讀 cells now
+carry 🟢 readings, § 3.2 carries a retraction, and § 3.3.1 carries the
+implementation note. **Nothing here is open**; § 8 is what this file
+gained today, and `B. What R6 needs` is the section that still describes
+future work.
+
+⚠️ This correction is a heading, not a finding, and it is recorded because
+a reader scanning headings would have read *needs* as open work. It was
+found by the audit pass that reads rows describing a FUTURE state and
+asks whether that state has arrived.
 
 ### 3.1 The gates a TC1 interrupt crosses, and the state each was in during seating 11
 
