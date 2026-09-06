@@ -1,64 +1,74 @@
 # ci-suite-cost.tsv -- one row per CI run, written by tools/citime.py.
 #
-# suite_cost_s = instr_s - instr_apt_s, and it is the ONLY column PROGRESS.md's
-# CI-5 quotes.  instr_s contains the package install and must never be quoted
-# on its own; lint_apt_s is here because a run's apt is NOT the instruments
-# job's apt, and writing the two side by side without saying which is which is
-# the mistake this file exists to make impossible.
+# suite_cost_s = instr_s - instr_apt_s.  instr_s contains the package install
+# and must never be quoted on its own; lint_apt_s is here because a run's apt
+# is NOT the instruments job's apt, and writing the two side by side without
+# saying which is which is the mistake this file exists to make impossible.
+#
+# big3_s is the sum of the three instruments steps that carry 94.4 % of the
+# cost, and it is what PROGRESS.md's CI-5 quotes.  suite_cost_s is the coarse
+# sieve: 量 2026-09-07, twelve short steps carry 5.6 % of the cost and 53 % of
+# suite_cost's band width, so its outer edge is mostly integer-second
+# quantisation.  "-" means this run's CI shape has no BIG3 step at all; a run
+# with SOME of them is refused by A6 rather than written down short.
 #
 # Regenerate a row:  tools/citime.py record <run-id>
 # Recompute the band: tools/citime.py stats
 # Find missing runs:  tools/citime.py check --last 40
 #
-run_id	created_utc	sha7	jobs	text_s	lint_s	lint_apt_s	instr_s	instr_apt_s	suite_cost_s	census_s
-33437095351	2026-08-31T20:38:00Z	6cb9bf3	census,instruments,lint,text	100	17	7	575	27	548	4
-33437098797	2026-08-31T20:38:02Z	6cb9bf3	census,instruments,lint,text	94	14	7	573	34	539	4
-33437391458	2026-08-31T20:41:21Z	04dc0ef	census,instruments,lint,text	79	15	7	605	56	549	5
-33438446165	2026-08-31T20:53:21Z	83446d4	census,instruments,lint,text	98	27	19	570	22	548	5
-33473573696	2026-09-01T05:25:58Z	2a54adc	census,instruments,lint,text	95	15	6	560	24	536	4
-33474304283	2026-09-01T05:37:21Z	5bcb847	census,instruments,lint,text	83	12	6	576	49	527	5
-33475126114	2026-09-01T05:50:06Z	0fc20c9	census,instruments,lint,text	97	19	12	573	24	549	5
-33476972111	2026-09-01T06:17:25Z	19c2891	census,instruments,lint,text	98	18	9	607	57	550	6
-33478891274	2026-09-01T06:44:11Z	55604a3	census,instruments,lint,text	72	15	8	579	30	549	6
-33479732868	2026-09-01T06:55:40Z	8bec9d3	census,instruments,lint,text	95	19	11	563	26	537	5
-33503986403	2026-09-01T11:44:03Z	7e3af99	census,instruments,lint,text	106	16	7	575	37	538	6
-33504088555	2026-09-01T11:45:16Z	833dc8a	census,instruments,lint,text	113	16	8	565	18	547	6
-33504400831	2026-09-01T11:48:55Z	406e10a	census,instruments,lint,text	107	15	7	572	21	551	7
-33504562289	2026-09-01T11:50:47Z	b3d6c15	census,instruments,lint,text	107	17	9	582	48	534	4
-33504664772	2026-09-01T11:52:02Z	f9ae13c	census,instruments,lint,text	108	15	7	576	25	551	7
-33506211477	2026-09-01T12:10:05Z	988035d	census,instruments,lint,text	107	15	7	564	17	547	5
-33519565710	2026-09-01T14:27:11Z	24f5e26	census,instruments,lint,text	81	15	9	548	19	529	4
-33520813472	2026-09-01T14:39:10Z	1ccebb0	census,instruments,lint,text	91	17	9	593	62	531	5
-33561566808	2026-09-01T21:31:49Z	28ab9d2	census,instruments,lint,text	114	14	7	556	21	535	3
-33572556647	2026-09-01T23:47:22Z	f6233da	census,instruments,lint,text	110	16	8	546	16	530	5
-33595236873	2026-09-02T05:34:41Z	69ececf	census,instruments,lint,text	111	15	6	556	24	532	2
-33657418793	2026-09-02T16:50:52Z	5404c10	census,instruments,lint,text	115	14	7	558	24	534	5
-33657603686	2026-09-02T16:52:40Z	e423ebf	census,instruments,lint,text	118	15	6	1180	650	530	6
-33747027566	2026-09-03T10:56:56Z	fa36fc1	census,instruments,lint,text	114	14	6	562	29	533	4
-33749622915	2026-09-03T11:25:42Z	cb784dc	census,instruments,lint,text	116	16	8	558	35	523	3
-33750178383	2026-09-03T11:31:50Z	595b77c	census,instruments,lint,text	114	16	6	543	19	524	3
-33750781225	2026-09-03T11:38:23Z	d8e84a4	census,instruments,lint,text	116	16	6	551	27	524	5
-33753925594	2026-09-03T12:12:48Z	6e355ed	census,instruments,lint,text	126	13	7	557	25	532	3
-33782423011	2026-09-03T17:04:47Z	9dab609	census,instruments,lint,text	98	14	6	551	18	533	3
-33782757551	2026-09-03T17:08:11Z	484b11d	census,instruments,lint,text	114	15	6	548	17	531	4
-33797046480	2026-09-03T19:32:41Z	73646a1	census,instruments,lint,text	120	16	7	549	18	531	5
-33840963068	2026-09-04T05:34:01Z	b36a1dd	census,instruments,lint,text	118	12	6	552	18	534	4
-33841052671	2026-09-04T05:35:25Z	9d894cc	census,instruments,lint,text	118	14	6	550	18	532	5
-33850869313	2026-09-04T07:54:16Z	a734ba8	census,instruments,lint,text	125	12	5	570	41	529	4
-33851834530	2026-09-04T08:06:32Z	e204c32	census,instruments,lint,text	122	31	22	552	20	532	3
-33982353474	2026-09-05T17:53:26Z	d74fe86	census,instruments,lint,text	121	14	6	550	17	533	4
-33983447073	2026-09-05T18:14:44Z	91a5ac8	census,instruments,lint,text	123	13	7	549	17	532	5
-34004986845	2026-09-06T01:51:56Z	762e9c6	census,instruments,lint,text	134	12	6	560	30	530	5
-34013708455	2026-09-06T05:19:49Z	67bb237	census,instruments,lint,text	109	15	6	544	19	525	4
-34020901033	2026-09-06T08:05:44Z	0cd91bf	census,instruments,lint,text	141	14	6	550	16	534	4
-34021008582	2026-09-06T08:08:03Z	6d3204d	census,instruments,lint,text	142	14	6	549	16	533	5
-34021165444	2026-09-06T08:11:27Z	472d70f	census,instruments,lint,text	142	13	6	551	17	534	5
-34021286020	2026-09-06T08:14:09Z	670f29b	census,instruments,lint,text	92	15	8	567	31	536	5
-34021447809	2026-09-06T08:17:40Z	b6bf68f	census,instruments,lint,text	141	13	5	554	19	535	3
-34028209788	2026-09-06T10:43:28Z	e4e7fd4	census,instruments,lint,text	140	13	6	560	25	535	6
-34028703137	2026-09-06T10:54:15Z	7223d46	census,instruments,lint,text	143	14	6	548	21	527	3
-34031008830	2026-09-06T11:42:20Z	56dfe66	census,instruments,lint,text	143	14	6	552	18	534	4
-34031168702	2026-09-06T11:45:47Z	704b38e	census,instruments,lint,text	144	14	6	557	22	535	4
-34031232174	2026-09-06T11:47:10Z	1a975a4	census,instruments,lint,text	106	13	5	560	29	531	4
-34041174474	2026-09-06T15:04:52Z	45f151f	census,instruments,lint,text	151	16	7	559	21	538	6
-34043834567	2026-09-06T15:55:47Z	adbf9c9	census,instruments,lint,text	146	14	6	582	50	532	5
+run_id	created_utc	sha7	jobs	text_s	lint_s	lint_apt_s	instr_s	instr_apt_s	suite_cost_s	big3_s	census_s
+33437095351	2026-08-31T20:38:00Z	6cb9bf3	census,instruments,lint,text	100	17	7	575	27	548	505	4
+33437098797	2026-08-31T20:38:02Z	6cb9bf3	census,instruments,lint,text	94	14	7	573	34	539	500	4
+33437391458	2026-08-31T20:41:21Z	04dc0ef	census,instruments,lint,text	79	15	7	605	56	549	507	5
+33438446165	2026-08-31T20:53:21Z	83446d4	census,instruments,lint,text	98	27	19	570	22	548	506	5
+33473573696	2026-09-01T05:25:58Z	2a54adc	census,instruments,lint,text	95	15	6	560	24	536	500	4
+33474304283	2026-09-01T05:37:21Z	5bcb847	census,instruments,lint,text	83	12	6	576	49	527	497	5
+33475126114	2026-09-01T05:50:06Z	0fc20c9	census,instruments,lint,text	97	19	12	573	24	549	507	5
+33476972111	2026-09-01T06:17:25Z	19c2891	census,instruments,lint,text	98	18	9	607	57	550	507	6
+33478891274	2026-09-01T06:44:11Z	55604a3	census,instruments,lint,text	72	15	8	579	30	549	507	6
+33479732868	2026-09-01T06:55:40Z	8bec9d3	census,instruments,lint,text	95	19	11	563	26	537	501	5
+33503986403	2026-09-01T11:44:03Z	7e3af99	census,instruments,lint,text	106	16	7	575	37	538	501	6
+33504088555	2026-09-01T11:45:16Z	833dc8a	census,instruments,lint,text	113	16	8	565	18	547	505	6
+33504400831	2026-09-01T11:48:55Z	406e10a	census,instruments,lint,text	107	15	7	572	21	551	506	7
+33504562289	2026-09-01T11:50:47Z	b3d6c15	census,instruments,lint,text	107	17	9	582	48	534	499	4
+33504664772	2026-09-01T11:52:02Z	f9ae13c	census,instruments,lint,text	108	15	7	576	25	551	507	7
+33506211477	2026-09-01T12:10:05Z	988035d	census,instruments,lint,text	107	15	7	564	17	547	506	5
+33519565710	2026-09-01T14:27:11Z	24f5e26	census,instruments,lint,text	81	15	9	548	19	529	502	4
+33520813472	2026-09-01T14:39:10Z	1ccebb0	census,instruments,lint,text	91	17	9	593	62	531	502	5
+33561566808	2026-09-01T21:31:49Z	28ab9d2	census,instruments,lint,text	114	14	7	556	21	535	503	3
+33572556647	2026-09-01T23:47:22Z	f6233da	census,instruments,lint,text	110	16	8	546	16	530	503	5
+33595236873	2026-09-02T05:34:41Z	69ececf	census,instruments,lint,text	111	15	6	556	24	532	502	2
+33657418793	2026-09-02T16:50:52Z	5404c10	census,instruments,lint,text	115	14	7	558	24	534	502	5
+33657603686	2026-09-02T16:52:40Z	e423ebf	census,instruments,lint,text	118	15	6	1180	650	530	502	6
+33747027566	2026-09-03T10:56:56Z	fa36fc1	census,instruments,lint,text	114	14	6	562	29	533	504	4
+33749622915	2026-09-03T11:25:42Z	cb784dc	census,instruments,lint,text	116	16	8	558	35	523	499	3
+33750178383	2026-09-03T11:31:50Z	595b77c	census,instruments,lint,text	114	16	6	543	19	524	497	3
+33750781225	2026-09-03T11:38:23Z	d8e84a4	census,instruments,lint,text	116	16	6	551	27	524	497	5
+33753925594	2026-09-03T12:12:48Z	6e355ed	census,instruments,lint,text	126	13	7	557	25	532	502	3
+33782423011	2026-09-03T17:04:47Z	9dab609	census,instruments,lint,text	98	14	6	551	18	533	504	3
+33782757551	2026-09-03T17:08:11Z	484b11d	census,instruments,lint,text	114	15	6	548	17	531	502	4
+33797046480	2026-09-03T19:32:41Z	73646a1	census,instruments,lint,text	120	16	7	549	18	531	502	5
+33840963068	2026-09-04T05:34:01Z	b36a1dd	census,instruments,lint,text	118	12	6	552	18	534	504	4
+33841052671	2026-09-04T05:35:25Z	9d894cc	census,instruments,lint,text	118	14	6	550	18	532	502	5
+33850869313	2026-09-04T07:54:16Z	a734ba8	census,instruments,lint,text	125	12	5	570	41	529	499	4
+33851834530	2026-09-04T08:06:32Z	e204c32	census,instruments,lint,text	122	31	22	552	20	532	502	3
+33982353474	2026-09-05T17:53:26Z	d74fe86	census,instruments,lint,text	121	14	6	550	17	533	502	4
+33983447073	2026-09-05T18:14:44Z	91a5ac8	census,instruments,lint,text	123	13	7	549	17	532	503	5
+34004986845	2026-09-06T01:51:56Z	762e9c6	census,instruments,lint,text	134	12	6	560	30	530	501	5
+34013708455	2026-09-06T05:19:49Z	67bb237	census,instruments,lint,text	109	15	6	544	19	525	499	4
+34020901033	2026-09-06T08:05:44Z	0cd91bf	census,instruments,lint,text	141	14	6	550	16	534	503	4
+34021008582	2026-09-06T08:08:03Z	6d3204d	census,instruments,lint,text	142	14	6	549	16	533	502	5
+34021165444	2026-09-06T08:11:27Z	472d70f	census,instruments,lint,text	142	13	6	551	17	534	503	5
+34021286020	2026-09-06T08:14:09Z	670f29b	census,instruments,lint,text	92	15	8	567	31	536	502	5
+34021447809	2026-09-06T08:17:40Z	b6bf68f	census,instruments,lint,text	141	13	5	554	19	535	503	3
+34028209788	2026-09-06T10:43:28Z	e4e7fd4	census,instruments,lint,text	140	13	6	560	25	535	503	6
+34028703137	2026-09-06T10:54:15Z	7223d46	census,instruments,lint,text	143	14	6	548	21	527	498	3
+34031008830	2026-09-06T11:42:20Z	56dfe66	census,instruments,lint,text	143	14	6	552	18	534	502	4
+34031168702	2026-09-06T11:45:47Z	704b38e	census,instruments,lint,text	144	14	6	557	22	535	504	4
+34031232174	2026-09-06T11:47:10Z	1a975a4	census,instruments,lint,text	106	13	5	560	29	531	501	4
+34041174474	2026-09-06T15:04:52Z	45f151f	census,instruments,lint,text	151	16	7	559	21	538	503	6
+34043834567	2026-09-06T15:55:47Z	adbf9c9	census,instruments,lint,text	146	14	6	582	50	532	499	5
+34050588023	2026-09-06T18:05:04Z	b8bfbc7	census,instruments,lint,text	151	14	5	563	29	534	501	3
+34050871155	2026-09-06T18:10:30Z	598e421	census,instruments,lint,text	148	13	6	556	17	539	504	4
+34051113209	2026-09-06T18:15:08Z	3e88e13	census,instruments,lint,text	147	13	6	554	17	537	504	6
+34052273693	2026-09-06T18:36:45Z	aa033ca	census,instruments,lint,text	149	12	6	548	19	529	500	4
