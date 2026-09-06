@@ -17362,3 +17362,87 @@ spec 與 `ea6ee537` 那顆（開機十一次的那顆）**逐位元組相同**�
 反斜線，3.12 才允許），要走 WSL。⚠️ 這一段自己踩了兩次 CLAUDE.md 已經寫過的陷阱：
 Bash 工具把 `/mnt/c/...` 翻成 `C:/Program Files/Git/mnt/c/...` **而那條管線還是 exit
 0**；以及一個 `python -c` 的正規表示式掉了一層反斜線。兩次都改成「寫成檔案、用路徑跑」。
+
+### 收工的三個掃描，以及一個是我自己的紅
+
+🟢 **桌面全套 sweep：61 步（60 ＋ 這一段加的 `citime self-test`）、1,734.9 s。**
+用 PyYAML 解 `ci.yml`、把每個 `run:` 的值**逐字**交給 `bash -c` —— 用 grep 選
+`run:` **行**看不到 `run:` **區塊**，而 `verify-backup-copy` 就是被那樣漏掉兩次的
+（這次它在第 57 步，跑了）。
+
+🔴 **三條紅，而第三條是我自己的回歸，不是結構性的。**
+`text / test-config-gates` **54 passed / 4 failed** —— 四個都是被釘住的計數，
+而四個都是我這一段刻意動 `config/` 造成的：delta 36→39 條（set 15→16、
+derive 21→23），`--variant loud` 38→41，以及 `G4c` 的 build-row 見證 2→3。
+**這正是那支 suite 存在的理由** —— 它把 `config/` 的形狀釘住，讓改動是刻意的
+而不是意外的。四個期望值就地更新，每一個都帶理由。
+🟢 **而 `G4b` 的「十二個 mark」沒有動，那才是這一對裡值錢的一半**：build row
+不是 boot mark，如果加一列讓兩個計數同時動，就代表 `RLXFW-` 那個 anchor 又變寬了
+—— 而那正是 2026-09-04 在 `G4b` 上留下的註解記錄過的事。
+
+🔴 **然後 census 抓到第二件事，而它是這個 repo 自己的規則從反方向出現：**
+修好之後我先讀 `ci-out/test-config-gates.out`，它仍然是紅的 —— 因為那份 `.out`
+是 sweep 跑到它、它還在失敗的時候寫下的。**「新鮮不等於完成」的另一面是「舊檔不等
+於現況」**，而 census 是那個抓到它的東西。重跑那一支之後：`ok test-config-gates
+ran 58/58 failed 0`，`ok citime ran 9/9 failed 0 not run 0`。
+⚠️ **剩下兩條紅是已知的結構性紅**（`test-hazlint`／`test-hazlint-objs` 宣告
+`*bench-only*` 而這張桌子有 `stage2.bin`，以及隨之而來的 `NOT-RUN-TOTAL
+MISMATCH: declares 491 and this job did not run 2`），`not-run-total` **沒有
+動**，因為 `citime` 的 9 格全部可以在任何地方跑。
+
+🟢 **`flashwin scan`，排在最後，因為它的母體包含這一段自己的產出**：rlxfw 自己的樹
+**CLEAN，2,221 個檔案**、113 個 16-byte 探針。**正控制**（不加 `--exclude
+upstream`）：**2,523 檔、1 HIT** —— `upstream/BENCH-LOG.md` offset 1165..1180，
+`0x006000` 的 16 個位元組，那個釘住的、已知的那一個。**所以上面那個 CLEAN 是一個
+讀數，不是一支掃不到東西的掃描。**
+
+### 逐一問過 36 個活擁有者，而抓到真錯的是「讀那些描述狀態的標題」
+
+母體先講清楚：`git ls-files '*.md'` 扣掉 `upstream/` 與 `bench/` = **36** 個。
+四個過期的宣稱，四個都不是重讀自己找到的：
+
+🔴 **① 一個標題**。`docs/blind-write-ledger.md` §4.1 的標題寫著
+「`R5-4` GPIO … — **zero**」，而 `R5-4` 今天下午讓它過期。**就地更正並註明日期
+而不是刪掉**，因為那句話的日期就是它的全部價值；`wdt` 與 `led` 沒有動，仍然是零。
+② 同一個檔的 in-scope 計數寫 **32**，量到的是 **50 找到／54 宣告**
+（out-of-scope 71→75，母體 1,448→**2,054**）。
+③ `CLAUDE.md` 寫 host-compat 有**四**個補丁、「兩個名字合、兩個不合」——
+現在是**五**個、**兩合三不合**，而旁邊那個 594 物件的數字是四個補丁時量的、
+沒有重量，這一列現在自己講。
+④ `CLAUDE.md` 的 sweep 寫 **60** 步 —— **61**，而讓它過期的是這一段自己
+在同一天稍早加的那一步。
+
+🟢 **另外兩個擁有者是這一段賺到的，不是修的**：`RUNSHEET.md` 的卡片生命週期從
+「兩條」變三條（新的第三條是「卡片在 seating 排定前寫，它的目錄名字是一個**預測**」），
+`docs/FINDINGS.md` 加兩列。
+⚠️ **沒動的檔也有理由**：`CHANGELOG.md` 這一段沒有切 release；
+`docs/GATE-RESULTS.md` 只收 gate 關閉，`R5` 沒關；`docs/KNOWN-ISSUES.md`
+的「從來沒量過」那一節不加 GPIO 那一列，因為它已經在 `PROGRESS.md` 的
+carried-forward 裡，而一個狀態放兩個地方就是兩個擁有者；
+`notes/incremental-build.md:378` 的「4 declared patches」是一列**有日期的實驗結果**
+（`V1`，recipe `d31f60bd → b1434383`），是歷史不是現行宣稱，不動。
+
+### 這一段自己的 CI
+
+四個 commit、**一次 push**，所以是**一個** run：**`34027603554`**（`47dfb2a`）。
+⚠️ 這一列不寫死「這一段有 N 個 run」—— 規矩是記下已知的 run id 與導出方法，
+數量交給下一段點清。導出方法是 `tools/citime.py record <run-id>`，
+而 `tools/citime.py check --last N` 會點名 GitHub 上沒有列的 run。
+
+🔴 **這一段自己的 CI 紅了，而紅的是我自己把自己的修正推翻。**
+run `34027603554`（`47dfb2a`）：`lint` 綠、`instruments` 綠、`text` **在第 7 步
+`test-file-modes` 失敗** —— `FAIL not-executable tools/citime.py`。
+`census` 因為 `needs: [text, instruments]` 被跳過。
+
+這一段**已經修過一次**：`citime.py` 被 `git add` 記成 `100644`，我用
+`git update-index --chmod=+x` 改成 `100755`，`test-file-modes` 也綠了。
+**然後為了把四個 commit 拆開，我跑了 `git reset -q`** —— 那把 index 連同那次
+`--chmod=+x` 一起退掉，接著 `git add` 在 `core.fileMode=false` 底下又抓回舊模式。
+`CLAUDE.md` 寫過這個陷阱（「DrvFs 把每個檔報成 777，git 於是設 `core.fileMode=false`
+並從此看不見模式變更」），而這一次是**同一個檔案踩兩次，第二次是我自己造成的**。
+
+⚠️ **而本機的證據為什麼沒有攔下它，這件事比錯誤本身值得寫**：sweep 的第 5 步
+`test-file-modes` 是綠的 —— 但 sweep 跑在 `git reset` **之前**，index 那時還是
+`100755`。**一個在正確狀態下取得的綠結果，不能拿來證明它之後的樹。**
+這正是這一段稍早在 `test-config-gates` 的 `.out` 上碰到的同一件事，從另一個方向
+出現：舊的通過紀錄和舊的失敗紀錄一樣沒有現時效力。
