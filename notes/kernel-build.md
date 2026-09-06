@@ -798,6 +798,13 @@ with a reason. §6 is why it is shaped this way; this is what it is. 🔄
 listed in §11.6; a row with no tag is in both images. 量: `apply` with no
 `--variant`, or with `--variant quiet`, reports **14 set + 21 derive**; with
 `--variant loud`, **16 set + 21 derive**.
+🔄 **Those two are older than the 36/38 above** — 15 set + 21 derive is 36,
+so the 14 is the pre-`CONFIG_MTD_CHAR` figure, and the line carried no date to
+say so. 量 **2026-09-06 (`R5-4`)**, with `config/host-compat/0005` and the three
+rows that came with it: **41 rows in the file**, of which `apply` reports **16 set
++ 23 derive** for `quiet` (39) and **18 set + 23 derive** for `loud` (41).
+`tools/test-config-gates.sh` `E1`/`E1b` pin all three, which is why this paragraph
+is not their owner and should not read as though it were.
 
 | | |
 |---|---|
