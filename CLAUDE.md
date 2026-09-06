@@ -266,6 +266,49 @@ released source.
 > mechanism in `IRQ-13` is **not isolated**: the driver works around it rather
 > than explaining it. **Zero flash-write commands, zero `FLR`, bracket unchanged
 > at 0.0244 %.**
+> 🔄 **2026-09-06, TWELFTH update — seating 15, one power cycle, and the two
+> best results came from the card being WRONG.** 🟢 **A `gpio_chip` of mine is
+> on `PABCD`**: `RLXFW-G0`…`G6` on ten boots, `G1=FFFFFFDF` and `G2=FF000000`
+> as negative controls, **`G4=00000000`** from `gpiochip_add()`, ten boot
+> captures **byte-identical at 1,184 bytes against a prediction of 1,184**, ten
+> `/proc` dumps agreeing in **27 of 27 fields**, `n_writes` **0** throughout,
+> and the write guard refusing on the die at two layers with `-EPERM` and
+> `-ENODEV`. 🟢 **`REG-35` goes 讀 → 量**: live `cnr FFFFFF8B` / `dir
+> FF000040`, the two values inferred at the desk from the vendor driver's
+> compiled form, and the initcall order (`subsys` 4 before `device` 6) is
+> **observed in every capture** rather than derived from `System.map`.
+> 🔴 **Two card predictions were refuted and both were chased to a cause.**
+> `claim` was refused by gpiolib with **`EBUSY`** — measured, by routing the
+> write through `cat` so `strerror` printed it — because `tryout 5` had already
+> auto-requested line 5 through 2.6.30's `gpio_ensure_requested()`; **the
+> card's own arithmetic contained that subtraction and nobody finished it.**
+> And the `dat` XOR is `00000060`, not `00000020`, on both boots.
+> 🟢 **Chasing that second one produced the largest result of the seating, and
+> it was not on the card.** The vendor's whole reset-button path, read out of
+> this image's compiled code with no `.c` opened: `rtl_gpio_timer` re-arms at
+> `jiffies + 100` — **one second at `HZ = 100`** — blinks bit 6 on the hold
+> counter's parity (**the 2 s alternation measured from the other side**), and
+> on release does nothing under 2 s, **SIGTERM to PID 1 at 2–4 s** (which this
+> image's PID 1 ignores — `FW-37`, the same reason `busybox reboot` without
+> `-f` does not reset the board), and at **≥ 5 s writes ASCII `'1'` into
+> `default_flag`**, whose only readers here are two `/proc` handlers.
+> **Predicted before the press, then measured**: `/proc/load_default` read `0`,
+> then **`1`**. `SPEC.md` `FW-40`. 🔴 **This says nothing about the LOADER** —
+> where the card drew its line — and no `FLR` ran, so the flash sentence has
+> not moved. 🔴 **The card's own `cells` fence is malformed and `0 of 5` was
+> on screen before power**, shaped exactly like the correct `0 of 32`; the
+> fence is **not** repaired (that would destroy 32 captures' mtime evidence)
+> and `check-predictions` gained `N8`/`N9` instead, written after measuring
+> the corpus — **54 cards with a usable fence, exactly one breaks either rule**.
+> 🔴 **`busybox ash` puts a refused write's payload on the console minus its
+> last character**, five lengths, negative control, located to ash by sending
+> the same failing write through `cat`; so a mark the board printed can be
+> absent from a `grep` (`FW-41`). ⚠️ **What is still narrower**: nothing
+> depends on this chip — no consumer is bound, `ALLOW_OUT_MASK` is 0, `.to_irq`
+> is NULL — and **which of `PABCD`'s four ports bit 5 belongs to is still
+> unmeasured**, which is exactly the claim a seating full of `PABCD` readings
+> looks like it closed. **Zero flash-write commands, zero `FLR`, bracket
+> unchanged at 0.0244 %.**
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.

@@ -1,5 +1,81 @@
 # Changelog
 
+🟢🟢 **2026-09-06, thirty-eighth session, seating 15: `R5-4`** — **a
+`gpio_chip` of mine on `PABCD`, ten boots, and the vendor's reset-button path
+read out of compiled code and then closed on the die.** **One power cycle**,
+nine `busybox reboot -f` warm resets, **zero flash-write commands and zero
+`FLR`**, so the bracket is untouched at 1,024 of 4,194,304 = **0.0244 %**.
+
+🟢 **Ten boots, and everything identical.** `RLXFW-G0`…`G6` on every one:
+`G1=FFFFFFDF` and `G2=FF000000` are **negative controls** — nothing between the
+loader and `subsys_initcall` may move them — then `G3=0000003C`,
+**`G4=00000000`** (`gpiochip_add()` returned 0), `G5=00000001`. The ten boot
+captures are **byte-identical**, **1,184 bytes** each, against a prediction of
+**1,184** derived before power from the mark strings (1,069 + 115). The ten
+`/proc` dumps agree in **27 of 27 fields** and `n_writes` is **0** in every dump
+of the seating.
+
+🟢 **`REG-35` goes 讀 → 量, and it is a disassembly of the vendor's driver
+confirmed on silicon.** Live `cnr` reads **`FFFFFF8B`** and `dir` reads
+**`FF000040`** — exactly `0xFFFFFFDF & ~0x74` and `0xFF000000 | 0x40`, the two
+values inferred at the desk from `rtl_gpio_init`'s compiled form. **And the
+initcall order is observed rather than derived**: `G0`…`G6` appear before the
+vendor's `Probing RTL8186` in every capture.
+
+🟢 **The write guard refuses on the die at two layers with two errnos.**
+`tryout 5` → `-EPERM` from `.direction_output`; `tryout 12` → `-ENODEV` from
+`.request`; all three register XORs `00000000` in both.
+
+🔴 **Two predictions were refuted, and chasing the second one produced the
+largest result of the seating.** The `dat` XOR across a button press is
+`00000060`, not the predicted `00000020`, on both boots that ran the triple —
+because bit 6 is an output the vendor drives. **The first explanation of that
+was wrong and the same instruments refuted it**: with the button released, 27
+samples over 13 s are all `0000007C`; held, 12 samples at 1 s alternate
+`5C 1C 5C 1C 5C 1C 5C 1C 5C 1C 5C 1C`, six and six.
+
+🟢 **So the vendor's whole button path was read out of this image's own
+compiled code — no `.c` opened — and then closed on the board.**
+`rtl_gpio_timer` re-arms with `mod_timer(&t, jiffies + 100)`, one second at
+`HZ = 100`, and blinks bit 6 on the hold counter's parity. On release: under
+2 s, nothing; **2–4 s, SIGTERM to PID 1** — which this image's PID 1 ignores,
+the same `FW-37` that makes `busybox reboot` without `-f` not reset the board;
+**5 s or more, ASCII `'1'` into `default_flag`**, whose only readers in this
+image are two `/proc` handlers. **Predicted before the press, then measured:**
+`/proc/load_default` read `0`, then **`1`** after a timed hold. `SPEC.md`
+`FW-40`.
+
+🔴 **What that does NOT do is move the flash sentence.** It is about Linux; the
+card drew its line at the **loader**, and that question is untouched. No `FLR`
+bracket ran, so *not one flash byte is written* is exactly as unsayable as it
+was.
+
+🔴 **The card's own `cells` fence is malformed, and the evidence was on screen
+before the board was powered.** It holds eight bare names per line where
+`check-predictions` wants one path per line, so the desk check read `0 of 5` —
+the same shape as the correct `0 of 32`, and that number went into the freezing
+commit's message as a pass. **The fence is not repaired**, because repairing it
+would destroy 32 captures' mtime evidence; the ordering lives in git. **The
+instrument changed instead**: `N8` and `N9` refuse a fence entry containing
+whitespace or lacking a directory separator, written after measuring the whole
+corpus — **54 cards with a usable fence, exactly one breaks either rule, and it
+is that one**.
+
+🔴 **`busybox ash` puts a refused write's payload on the console, minus its last
+character, and it reads like board output.** Five lengths and a negative
+control (`lock`, a verb that succeeds, leaks nothing); located to ash rather
+than to the driver or the kernel by routing the same failing write through
+`cat`, which prints `cat: write error: …` and no payload. **Every `--send`
+capture in this repository where an `echo … > file` failed carries one.**
+`SPEC.md` `FW-41`.
+
+⚠️ **What this does not establish, all of it written on the card before it
+ran**: which of `PABCD`'s four ports bit 5 belongs to; whether bits 2, 4 and 6
+are usable; any output (`ALLOW_OUT_MASK` is 0); any GPIO interrupt (`.to_irq`
+is NULL); and **nothing depends on this chip** — no consumer is bound to it.
+
+---
+
 🟢🟢 **2026-09-06, thirty-sixth session, seating 14: `R5-3b-2`** — **the system
 tick is armed from inside the kernel, and it is this driver's before
 `/sbin/init` is executed.** **One power cycle** for the whole seating, twelve
