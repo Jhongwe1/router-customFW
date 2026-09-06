@@ -904,3 +904,63 @@ The capture holds no boot text at all, so the tool reports it under
 seating's addition). Isolating that needs a boot with nothing else done first,
 and a boot needs the loader, and the loader needs a power cycle. **None was
 spent**; it is carried forward.
+
+---
+
+## 13. 🆕 2026-09-06 (seating 13): three machine totals in one seating, and a second skip set that makes them incomparable to the first
+
+**21.77 / 21.68 / 21.71 s**, `--skip S2,S3,S4`, six assertions each, three
+power cycles. Spread **0.09 s**, **0.41 %** of the total — the tightest three
+points this file holds.
+
+🔴 **They do not join § 12's population, and saying why is the point of this
+section.** Seatings 10–12 ran `--skip S2,S3`, so `S4` — `J BFC00000`, the
+watchdog reset that returns the board to the loader prompt — was inside every
+one of those totals. Seating 13 skipped it on all three cycles.
+
+| seating | date | skip set | machine total |
+|---|---|---|---|
+| 10 | 2026-09-02 | `S2,S3` | 34.74 s |
+| 11 | 2026-09-03 | `S2,S3` | 34.94 s |
+| 12 | 2026-09-04 | `S2,S3` | 35.08 s |
+| **13** | **2026-09-06** | **`S2,S3,S4`** | **21.77 / 21.68 / 21.71 s** |
+
+⚠️ **The obvious subtraction cannot be done, because this repository has never
+recorded a SUCCESSFUL `S4`'s duration.** The one `S4` timing in § 12 —
+**13.26 s** — is the run that ABORTED, where `J BFC00000` went into a Linux
+shell and the assertion stopped it. That number is a failed stage's cost and
+using it to explain a 13.3 s gap would be quoting a number for a thing it does
+not measure. **What would make the two populations comparable is one recorded
+successful `S4`**, and `looprun` already prints per-stage seconds, so it costs
+nothing but remembering to keep the line.
+
+推, and marked as inference: the gap is consistent with `S4`'s own ceiling —
+its capture is `--esc-after 10 --esc-period 0.002 --idle 3 --seconds 25`, so it
+cannot cost more than 25 s — but *consistent with a ceiling* is not a
+measurement.
+
+### 13.1 🔴 Why `S4` was skipped, and it is not the same reason `S2,S3` are
+
+§ 10.3 records that `--skip S2,S3` was **necessary** rather than convenient:
+`S3` assembles from the tree `S2` stages, and with `S2` skipped nothing
+computes that path. `S4` is different — nothing forbids it, and `loop_once`'s
+guards do not mention it.
+
+**The reason is experimental rather than mechanical.** Block 10's PC1 requires
+a *cold* boot, because `NET-14` — the phenomenon whose cause is **not
+isolated** — is defined as the first open of `eth4` after power is applied. A
+cold ESC catch already leaves the board at the loader prompt, so `S4` would be
+a second `J` in the same power cycle, and `RUNSHEET.md` line 1290 records that
+the loader re-stages `0x80500000` from flash on a watchdog reset.
+
+🔴 **The decisive consideration is confounding.** If a watchdog reset sits in
+the path and `NET-14` does not reproduce, the seating cannot separate *the
+reset fixed it* from *it was never deterministic*. That variable was removable
+for free, so it was removed. `NET-14` did not reproduce (`SPEC.md` `NET-25`),
+and because `S4` was absent the reading is one-variable.
+
+⚠️ **A cost this bought, stated rather than hidden**: `tools/boot-timeline.py`
+now records **+2 cold / +0 warm** for this seating, the first since 2026-09-02
+with no warm row at all, because `S4` is where `looprun`'s own warm resets come
+from. The warm population stopped growing, and `test-boot-timeline.sh` `B2`
+carries that as a reading rather than as a gap.

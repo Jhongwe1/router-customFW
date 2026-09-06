@@ -409,3 +409,42 @@ that backwards would let any finding be renamed into silence.
 ⚠️ And the cheap fix was available in both cases and is wrong in both: rewrite
 the prose so the scanner has nothing to see. That makes a checker green by
 editing text, which is the failure this whole file is about.
+
+---
+
+## 🆕 2026-09-06 (seating 13): the first time the rule was applied BEFORE the experiment rather than after an incident
+
+§ 5b lists four near-misses. This is not a fifth — nothing was nearly leaked —
+and it is recorded because the difference is the whole point of that section.
+
+Seating 13 took three host-side captures, `tcpdump -e -n 'icmp or arp'` on
+`enxfc19286184c9`, one per power cycle. An Ethernet frame carries MAC
+addresses, and `H601` — the region this repository may not publish — is where
+this unit's MAC lives. **Whether those captures could enter the repository was
+therefore not knowable until they had been read.**
+
+`CLAUDE.md`'s own 2026-08-31 lesson is that *a containment rule whose
+correctness depends on the experiment coming out the expected way is not a
+containment rule*. So the order was:
+
+1. `tcpdump` wrote to a scratch directory **outside the repository**;
+2. the MAC survey was read: `00:12:34:56:78:94` (the board's `eth4`),
+   `fc:19:28:61:84:c9` (the host's USB GbE), `56:0a:01:01:01:e8`,
+   `ff:ff:ff:ff:ff:ff`;
+3. **then** the decision to move them under `bench/2026-09-06/`.
+
+None is `H601`'s. `flashwin scan --dump <reference> --sweep . --exclude
+upstream` over the resulting tree: **1,968 files, CLEAN** — and its positive
+control, the same scan without the exclusion, still returns the one known
+`HIT` at `upstream/BENCH-LOG.md` offset 1165..1180, so the CLEAN is a reading
+rather than a scanner that cannot fire.
+
+🟢 **A second, unplanned result of the same survey.** `56:0a:01:01:01:e8`
+carries `0a:01:01:01` = **10.1.1.1** in bytes 2–5. `RUNSHEET` § G3 says the
+loader *"synthesises its MAC from that address"*, and until this survey that
+sentence was 讀 with nothing behind it. It is 量 now.
+
+⚠️ **What this does not establish.** The board ran *my* firmware, whose
+interfaces carry the vendor-default `00:12:34:56:78:9x` pattern. Nothing here
+says what a host capture of the **vendor** firmware would contain, and § 6's
+open rows are unchanged.

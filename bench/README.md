@@ -1365,6 +1365,27 @@ Listed here because the card is frozen; the reasoning is in
   measurement that never reached the index. It is now `NET-25` there, and the
   carried-forward row points at it.
 
+#### Checked before this commit
+
+`cardcheck commands` **34, 0 problems** and `numbers` **17 of 17 re-derived**;
+`check-predictions` **32 of 32** (PC1 + PC2 — PC3 is not in the fence, above);
+`spec-check` **0 findings** with its own 26 controls green; `ledgerscan check`
+clean over 49 compared citations; `test-file-modes` **3 passed**; a full local
+sweep of all **60** `run:` steps in `ci.yml` — **58 ok, 2 RED, 1,613 s**, both
+reds structural (`census/merge the captures` cannot download a GitHub artifact
+at the desk, and `census` then cannot close its total). ⚠️ `test-boot-timeline`
+was the third red on the first sweep and is fixed rather than excused — `B2`'s
+population moved and § above records what it measured.
+
+🔴 **`flashwin scan` had NOT been run when the seating's captures were first
+committed, and that is recorded rather than quietly repaired.** The tool asks
+whether a file this repository has **already committed** holds forbidden
+content, by the bytes. 量 after the fact: `--sweep . --exclude upstream`,
+**1,968 files, CLEAN** (1,783 last segment; the difference is this seating's
+185 new files). Its positive control — the same scan without the exclusion —
+still returns the one known `HIT` at `upstream/BENCH-LOG.md` offset
+1165..1180, so the CLEAN is a reading and not a scanner that cannot fire.
+
 #### The host captures, and why they were written outside the repository first
 
 `SP-host.txt`, `SQ-host.txt`, `SR-host.txt` are `tcpdump -e -n 'icmp or arp'`

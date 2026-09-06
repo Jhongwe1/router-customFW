@@ -279,3 +279,41 @@ point of `M-d`: the refusal there comes from `mtd_open`'s `minor & 1` test in
 the kernel, not from a mode bit. The message text is what transfers; the reason
 it fires is a different one and `bench/2026-08-31/PREDICTIONS-B5-block3.md`
 §7.3 says so.
+
+---
+
+## 🆕 2026-09-06 (seating 13): `ping` ignores `-c`, and it always sends four
+
+The section above asks *what can this binary run*. This one asks a narrower
+question about one applet, and the answer changes what a bench card may ask
+for.
+
+`bench/2026-09-06/P2-7b` typed `ping -c 20 10.1.1.2` and the board sent four
+packets. Five requests were then put to it across three cells:
+
+| capture | asked | transmitted |
+|---|---|---|
+| `NB-1`, `CE-12` | `-c 4` | 4 |
+| `P2-7b` | `-c 20` | 4 |
+| `P2-7c` | `-c 2`, then `-c 7` | 4, 4 |
+| `P2-7d` | `-c20` (attached form), then `busybox ping -c 3` | 4, 4 |
+
+The echoed command line is intact in every capture, so the shell received what
+was typed; the spaced and attached option forms behave the same; and invoking
+`busybox ping` directly rather than through the symlink behaves the same.
+
+**量: this image's `ping` ignores `-c` and always sends exactly four packets.**
+
+⚠️ **What it does and does not do to the record.** It invalidates nothing —
+four replies is four replies, and `R3`'s D5 got what it needed. What it removes
+is a degree of freedom nobody knew was missing: **every `ping -c N` in this
+repository has been getting the default rather than the request**, and a card
+cannot ask this image for a count other than 4.
+
+🔴 **The mechanism is undetermined and the first place to look is this file's
+own subject.** `config/rlxfw-initramfs.tsv` declares which file provides
+`ping`; `mkinitramfs verify` reads what the built image actually contains. The
+busybox here is this unit's own `bin/busybox`, `BusyBox v1.13.4`, 273,332
+bytes — a vendor binary, so if the count is patched in, `config/host-compat/`'s
+rule applies and it may only be changed on a staged tree. `SPEC.md` `NET-26`
+carries the reading and §17 carries the gap.

@@ -16855,5 +16855,41 @@ bench/2026-09-06/SQ-A.log -- boot text but no `Booting` anchor
 | `CHANGELOG.md` | 新條目 |
 | `CLAUDE.md` | 第十次更新 |
 | `tools/test-boot-timeline.sh` | `B2` 的 cold/warm 母體 22/37 → 24/37,delta ＋隔離檢查寫在註解裡 |
-| `study/20260906-study2.md` | 新檔 |
+| `docs/FINDINGS.md` | 七列:四列在「改變了上機流程必須做什麼」,三列在「改變了這個 repo 怎麼檢查自己」 |
+| `notes/dev-loop.md` | §13,三個機器時間 ＋ **兩個 skip set 不可比**,以及跳過 `S4` 的實驗理由 |
+| `notes/rootfs-census.md` | `ping` 忽略 `-c`,五個要求全送 4,含 `busybox ping` 直接呼叫 |
+| `notes/leak-surface.md` | 主機端擷取的圍堵順序:先寫到 repo 外、讀完 MAC 再決定 |
 | `LOG.md` | 本條目 |
+| `study/20260906-study2.md` | 新檔(gitignored,不進版本庫) |
+
+**17 個 tracked 擁有者檔 ＋ 1 個 gitignored 的 study,加 183 個擷取檔。**
+
+### 十一之一、🔴 這張表的最後四列是 commit **之後**才補上的,而那是一次真正的稽核發現
+
+`2c09b22` 推出去之前我跑了七遍稽核,而其中的「完整列舉」那一遍只列舉了
+**未追蹤檔的對帳**(184 = 59×3 ＋ 3 ＋ 3 ＋ 1),**沒有列舉「每一個擁有者檔該不該改」**。
+兩件事名字都叫列舉,母體不同。
+
+正確的做法是列出 `git ls-files '*.md'` 扣掉 `upstream/` 的全部 **100** 個檔
+(活的擁有者 39 個),對**每一個**問「這次 seating 有沒有產出它擁有的事實」。
+那一遍找到五個漏:
+
+| 漏 | 為什麼它是漏 |
+|---|---|
+| `SPEC.md` `REG-03` | `P3-L` 把 `IRR1` 的 loader 讀數從 **n=2 推到 n=3**,而 `CLAUDE.md` 寫著「產出、改變或推翻一個數字,`SPEC.md` 在同一個 commit 裡改」 |
+| `docs/FINDINGS.md` | 它是缺陷的地圖,而這次有六個卡片缺陷 ＋ 一個 id 衝突 ＋ 一個 `ping` 發現 |
+| `notes/dev-loop.md` | 它擁有 `looprun` 的機器時間,而這次三個新點**用了一個新的 skip set** |
+| `notes/rootfs-census.md` | 它擁有「這顆 busybox 到底能做什麼」,而 `ping -c` 正是那個問題 |
+| `notes/leak-surface.md` | 它擁有洩漏面的推理,而主機端擷取的圍堵順序正是它的題目 |
+
+🔴 **而還有一件不是文件的**:上一段的收工紀錄寫著跑了
+`flashwin scan --sweep . --exclude upstream`,**而我這一段沒有跑過** ——
+第一次嘗試因為缺 `--dump` 失敗,然後就去做別的事了。sweep 裡的
+`flashwin self-test` 與變異套件是**工具自己的測試**,不是對這棵樹的掃描。
+補跑:**1,968 檔,CLEAN**(上一段 1,783,差值就是今晚新增的 185 個檔),
+而它的正控制 —— 同一支掃描器不加 `--exclude` —— 仍然回報那個已知的
+`HIT ./upstream/BENCH-LOG.md offset 1165..1180`,所以 CLEAN 是讀數而不是啞掉的工具。
+
+**教訓:「我列舉過了」要問的是列舉了哪個母體。** 一個對未追蹤檔對帳的列舉
+和一個對擁有者檔提問的列舉,名字一樣、答案不一樣,而只有後者會發現
+「某個檔該改而沒改」。
