@@ -1,0 +1,115 @@
+Let `arch/rlx` offer gpiolib, so a `gpio_chip` can be registered at all.
+
+WHY THIS EXISTS.  `R5-4` writes `rtl819x-gpio` as a real `struct gpio_chip`.
+On this tree it could not be built, and that is a measurement rather than a
+reading of the Kconfig files:
+
+  `drivers/gpio/Kconfig:27` -- `menuconfig GPIOLIB` -- carries
+  `depends on ARCH_WANT_OPTIONAL_GPIOLIB || ARCH_REQUIRE_GPIOLIB`.  Both of
+  those are declared in that same file (lines 5 and 15) as promptless bools
+  meant to be `select`ed by an architecture.  `arch/rlx/Kconfig` selects
+  neither.  `arch/mips/Kconfig` and `arch/x86/Kconfig` -- both present in this
+  drop -- do.
+
+量 2026-09-06, thirty-seventh segment, cell `r54gate`, `--target none` so
+nothing was compiled.  The `.config` of `ea6ee537` (the image that booted
+eleven times that day) had three lines appended and `make oldconfig
+< /dev/null` was run on a freshly staged tree:
+
+    CONFIG_GPIOLIB=y                      -> dropped, absent from the output
+    CONFIG_GENERIC_GPIO=y                 -> dropped
+    CONFIG_ARCH_WANT_OPTIONAL_GPIOLIB=y   -> dropped
+
+THE CONTROL IS WHAT MAKES THAT MEAN ANYTHING.  A run in which the appended
+lines never reached `oldconfig` at all -- wrong path, wrong tree, a copy that
+did not happen -- prints exactly the same three results.  So a fourth line was
+edited in the same file in the same run, and it had to come out CHANGED:
+`# CONFIG_SWAP is not set` was flipped to `CONFIG_SWAP=y`, whose prompt is
+satisfied by `CONFIG_MMU=y` and `CONFIG_BLOCK=y` in that same file.  量: it
+survived.  The whole diff between input and output is five lines -- the three
+drops, and the two halves of the `.config`'s own datestamp.
+
+量 `K6`, cell `r54gate2`, the same procedure with this patch applied: all
+three lines now SURVIVE -- `CONFIG_GPIOLIB=y`, and with it
+`CONFIG_GENERIC_GPIO=y` (gpiolib `select`s it) and
+`CONFIG_ARCH_WANT_OPTIONAL_GPIOLIB=y`.
+
+WHY `OPTIONAL` AND NOT `REQUIRE`.  `ARCH_REQUIRE_GPIOLIB` `select`s `GPIOLIB`,
+which would turn gpiolib on for every build of this arch whether or not
+anything asked.  `ARCH_WANT_OPTIONAL_GPIOLIB` only makes the menu entry
+reachable and leaves it off.  So this patch on its own changes nothing that is
+built -- and the first draft of this paragraph said that on one line of
+evidence and was wrong about the line.
+
+量 `K7`, cell `r54gate3`, this patch applied and the GPIO lines NOT in the
+input `.config`.  The prediction was that the output would gain the single
+line `# CONFIG_GPIOLIB is not set`.  🔴 **It gains TWO**: kconfig also writes
+out the symbol this patch selects.  The whole diff against the input is four
+lines -- the two halves of the datestamp, plus
+
+    CONFIG_ARCH_WANT_OPTIONAL_GPIOLIB=y
+    # CONFIG_GPIOLIB is not set
+
+So the claim has to be carried by the second line meaning nothing to a build,
+which is a different measurement and was taken rather than assumed.  量 over
+the staged tree: `CONFIG_ARCH_WANT_OPTIONAL_GPIOLIB` appears in **0**
+`Makefile`/`Kbuild` files and **0** `.c`/`.h` files; its only occurrences
+anywhere are its own declaration, the `depends on` line in the same file, and
+`arch/x86/Kconfig:29`.  The positive control is the same two greps for
+`CONFIG_GPIOLIB`, which return **1** and **10** -- so the greps can find a
+consumer, and for this symbol there is none.
+
+What turns gpiolib on is `config/rlxfw-kernel.delta`, in a separate line with
+its own reason, and that line can be removed without touching this file.
+
+WHOSE CHANGE IT IS.  The mechanism is mainline's own and this patch is its
+documented use.  `drivers/gpio/Kconfig:5-14`, verbatim in this drop:
+
+    config ARCH_WANT_OPTIONAL_GPIOLIB
+        bool
+        help
+          Select this config option from the architecture Kconfig, if
+          it is possible to use gpiolib on the architecture, but let the
+          user decide whether to actually build it or not.
+
+Nothing is introduced.  One `select` is added beside the `select EMBEDDED`
+that is already there, on `config MIPS` -- `arch/rlx`'s arch-wide `default y`
+symbol.
+
+🔴 **THE PRECEDENT IS x86, NOT mips, and the first draft of this file said
+mips.**  量, every Kconfig reference in this drop:
+`arch/x86/Kconfig:29` is the ONLY `select ARCH_WANT_OPTIONAL_GPIOLIB` in the
+tree, and it is arch-wide.  `arch/mips/Kconfig` selects the other symbol,
+`ARCH_REQUIRE_GPIOLIB`, and does it **per board** (lines 601 and 884), with
+four more boards selecting `GENERIC_GPIO` directly and supplying their own
+`gpio_*` bodies.  x86's shape is the one this patch copies, and it is the
+right one here for a stated reason rather than by convenience: the claim being
+made is about the ARCHITECTURE -- `arch/rlx` has the header and the
+`#ifdef CONFIG_GPIOLIB` branch, so gpiolib is possible on it -- and not about
+what this one board needs.  Whether the RTL8196E board turns it on is the
+`.config`'s business.
+
+WHAT THIS PATCH DOES NOT ESTABLISH.  That a gpiochip will link.
+`arch/rlx/include/asm/mach-generic/gpio.h:16-17` declares `gpio_to_irq()` and
+`irq_to_gpio()` **outside** the `CONFIG_GPIOLIB` guard, and `arch/rlx` defines
+neither.  Nothing in the built set is known to call them; if something does,
+the failure is at link time and loud.  That is `R5-4`'s risk to carry, not
+this patch's to fix.
+
+THE DIRECTORY NAME IS NOW WRONG FOR THREE OF ITS FIVE FILES.  `0001` (perl
+5.22) and `0004` (GNU Make 4.3's `\#`) are host compatibility in the strict
+sense.  `0002`, `0003` and this one are not: they are declared source changes
+to the vendor tree, which is what `tools/rlxfw-kbuild.sh:321-324` already
+calls this directory in its own comment.  The rename is carried forward in
+`PROGRESS.md` rather than done in the segment that widened it again.
+
+--- a/arch/rlx/Kconfig
++++ b/arch/rlx/Kconfig
+@@ -13,6 +13,7 @@
+     bool
+     default y
+     select EMBEDDED
++    select ARCH_WANT_OPTIONAL_GPIOLIB
+ 
+ config TRAD_SIGNALS
+     bool

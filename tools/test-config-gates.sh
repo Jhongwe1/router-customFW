@@ -173,7 +173,14 @@ rules, headers = m.parse_delta(sys.argv[2])
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1 the committed delta parses: 36 rules, 15 set, 21 derived" "36 15 21" \
+# 🔄 2026-09-06 (`R5-4`): 36 -> 39 rules, 15 -> 16 set, 21 -> 23
+# derived.  ONE `set` (CONFIG_GPIOLIB, which SPEC.md FW-38 measured to be
+# unreachable on arch/rlx without config/host-compat/0005) and TWO `derive`
+# rows for what kconfig then does on its own -- ARCH_WANT_OPTIONAL_GPIOLIB,
+# selected by that patch, and GENERIC_GPIO, which GPIOLIB selects.  The two
+# derived rows exist because the delta has to explain every line that moves;
+# without them `kconfig-delta check` reports them as undeclared.
+ck "E1 the committed delta parses: 39 rules, 16 set, 23 derived" "39 16 23" \
    "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
 
 # E1b -- the same file, per variant, and it also runs on a clean clone.  Without
@@ -197,9 +204,9 @@ except SystemExit as e:
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1b --variant loud: 38 rules, 17 set, 21 derived"  "38 17 21" \
+ck "E1b --variant loud: 41 rules, 18 set, 23 derived"  "41 18 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
-ck "E1b --variant quiet does NOT pick them up"         "36 15 21" \
+ck "E1b --variant quiet does NOT pick them up"         "39 16 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
@@ -324,7 +331,13 @@ ck "G4b and TWELVE marks in total"        12 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]{2} +RLXFW-')"
 # G4c -- and the witnesses are COUNTED rather than merely excluded. A block that
 # is only ever filtered out of an assertion is a block nothing checks.
-ck "G4c and TWO build-row witnesses"       2 \
+# 🔄 2026-09-06 (`R5-4`): 2 -> 3.  `MK3` links rtl819x-gpio.o into
+# drivers/gpio/, and its witness is the chip label `rtl819x-pabcd`.
+# 🟢 G4b above stays at TWELVE, and that is the half of this pair that
+# matters: a build row is not a boot mark, and if adding one had moved both
+# counts the `RLXFW-` anchor would have gone wide again -- which is exactly
+# what the 2026-09-04 comment on G4b records happening.
+ck "G4c and THREE build-row witnesses"     3 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
 ck "G4c and one of each kind"              1 \
    "$(printf '%s\n' "$o" | grep -c 'sym: rlxfw_puts')"

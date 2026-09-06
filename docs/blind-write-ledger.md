@@ -178,8 +178,10 @@ shell history. It is a boundary with a date, not a proof of abstinence.
 
 ## 4. What was read, by driver
 
-**Thirty-two in-scope paths** *(twenty-seven at `R5-0`)*. `out-of-scope`
-(**71** paths, 68 at `R5-0`) is listed by `ledgerscan scan` and is not
+🔄 **Fifty in-scope paths** *(32 at `R5-3b-1`, twenty-seven at `R5-0`)* — 量
+2026-09-06, `ledgerscan scan`, and **54 are declared**, because § 2.1's stated
+direction of error is to over-report. `out-of-scope` (🔄 **75** paths, 71
+before, 68 at `R5-0`) is listed by `ledgerscan scan` and is not
 reproduced here: those are generic kernel files —
 `init/main.c`, `kernel/bounds.c`, `arch/rlx/kernel/traps.c` — that no
 peripheral driver's register map passes through.
@@ -198,10 +200,20 @@ the path counts stay. This is the same lesson `notes/leak-surface.md` records
 twice about its own three file counts: quote the split and the verdict, not the
 total.
 
-### 4.1 🟢 `R5-4` GPIO, `R5-6` watchdog, `R5-7` LEDs — **zero**; `R5-8` gpio-keys — one, and it is not a reading
+### 4.1 🔄 `R5-6` watchdog, `R5-7` LEDs — **zero**; `R5-8` gpio-keys — one, and it is not a reading; 🔴 **`R5-4` GPIO left this section on 2026-09-06**
 
-**No path in the `gpio`, `wdt` or `led` domains is cited anywhere in this
+**No path in the `wdt` or `led` domains is cited anywhere in this
 repository or in `upstream/`.**
+
+🔴 **This read `gpio`, `wdt` or `led` until 2026-09-06, and the
+sentence is corrected rather than deleted because its date was the whole
+value of it.** `R5-4` ran that day and § 4.9 is what replaced it:
+eleven framework paths — `gpio_chip` cannot be written without knowing what
+a `gpio_chip` is — plus **one `artefact` reading of the VENDOR's**
+`drivers/char/rtl_gpio.c`, which is the expensive one because it carries
+register addresses and bit numbers. 🟢 **`wdt` and `led` are
+untouched and still zero**, and `R5-4` spent nothing of any THIRD-PARTY
+port: `ggbruno/openwrt` is still not fetched.
 
 🔴 **`keys` has exactly one, and it is this ledger's first
 `origin: none` row — a citation that is not a reading at all:**
@@ -482,6 +494,82 @@ the citation is to two lines quoted out of `ledgerscan`'s own report of
 was followed and no register meaning taken. **If a later step opens it, the row
 belongs in § 4.2.**
 
+### 4.9 🆕 `R5-4` GPIO — 11 paths **+ 1 `artefact`**, and the artefact is the expensive one
+
+🔴 **This section is why § 4.1's "zero" and § 8's `gpio` row moved, and the
+move happened in one segment.** Before 2026-09-06 the `gpio` domain was the
+cleanest blind-write claim in the gate: no third-party RTL8196E GPIO driver
+cloned, opened or read, and `ggbruno/openwrt` — the port whose author claims
+gpio works — not even fetched. **That part is unchanged.** What changed is that
+writing a `gpio_chip` at all required reading the framework, and that answering
+one safety question required reading the vendor's own GPIO driver *as compiled
+code*.
+
+**The source of `rtl819x-gpio.c` predates every row below** — `git log` on
+`config/rlxfw-src/linux-2.6.30/drivers/gpio/rtl819x-gpio.c` against this
+file's commit is the check, and it is the same argument § 4.3 makes for the
+timer's version 1.0. Anything added to that driver from here on is **not**
+blind, and `docs/driver-diff.md`'s gpio section must say so rather than
+inherit the word.
+
+#### The framework, which cannot be avoided
+
+A `gpio_chip` cannot be written without knowing what a `gpio_chip` is. Every
+one of these is mainline Linux and none of them says which register drives
+which pin on this die, which is the layer `driver-diff` compares.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `include/asm-generic/gpio.h` | **line** | **generic** | `struct gpio_chip`'s member list — and one member decided the driver's shape: `.set` returns **void**, so a refusal inside it cannot reach the caller as an errno. Also `gpiochip_add()`'s prototype and `ARCH_NR_GPIOS = 256` |
+| `drivers/gpio/gpiolib.c` | **line** | **generic** | which ops the framework dispatches to, which is what makes `.request` the right place for the policy: `:804` `gpio_request()` calls `chip->request`, `:994` `gpio_direction_output()` calls `chip->direction_output`, and 🔴 `:967` fails early unless **both** `.set` and `.direction_output` exist — so omitting `.set` to make writing impossible is not available, and `:1065` `__gpio_set_value()` dispatches with no NULL check, which would be an oops rather than a refusal. Also `:1155`'s `gpio_to_irq()` call and the `#ifdef CONFIG_DEBUG_FS` at `:1133` that compiles it out |
+| `drivers/gpio/Kconfig` | **line** | **generic** | `:27` `menuconfig GPIOLIB`'s `depends on`, the two `ARCH_*_GPIOLIB` declarations at `:5`/`:15`, and `:31`'s `select GENERIC_GPIO`. This is what `FW-38` measured and what `config/host-compat/0005` acts on |
+| `drivers/gpio/Makefile` | **name** | **generic** | the `obj-$(CONFIG_GPIOLIB) += gpiolib.o` line, used only as the `MK3` anchor |
+| `drivers/Makefile` | **line** | **generic** | `:8` `obj-y += gpio/` — an unconditional descent, which is why `MK3` can be `obj-y` and why removing `CONFIG_GPIOLIB=y` fails at link instead of silently shipping no driver |
+| `drivers/Kconfig` | **line** | **generic** | `:55` `source "drivers/gpio/Kconfig"` — asked because a `menuconfig` that is never sourced would have made `FW-38`'s whole question moot |
+| `drivers/input/keyboard/Kconfig` | **line** | **generic** | `:292-294` `KEYBOARD_GPIO` `depends on GENERIC_GPIO`. Read to decide `R5-4`'s shape, not `R5-8`'s: it is what makes the gpiolib route forced rather than preferred |
+| `drivers/leds/Kconfig` | **line** | **generic** | `:121-123` `LEDS_GPIO` `depends on LEDS_CLASS && GENERIC_GPIO`, for the same reason |
+| `arch/rlx/include/asm/mach-generic/gpio.h` | **full** | vendor | **21 lines, and it decided the route.** Under `CONFIG_GPIOLIB` it aliases three `gpio_*` to `__gpio_*`; the `#else` branch declares **six** `gpio_*` functions the arch must define and `arch/rlx` defines none — so "no gpiolib" is not the cheap option it looks like. 🔴 `:16-17` declare `gpio_to_irq()`/`irq_to_gpio()` **outside** both branches, unaliased and undefined here, which is the link hazard recorded in the driver's header |
+| `arch/rlx/include/asm/gpio.h` | **full** | vendor | 6 lines, `#include <gpio.h>`. Read to confirm the mach- header above is the one that is reached |
+| `arch/rlx/Kconfig` | **line** | vendor | `:12-15` `config MIPS` with its `select EMBEDDED` — the site `0005` patches — and `:275` `config GENERIC_GPIO`, a promptless `bool` nothing in the arch selects |
+
+⚠️ **`arch/mips/Kconfig` and `arch/x86/Kconfig` were also read**, one line each
+(`:601`/`:884` and `:29`), to settle which of the two `ARCH_*_GPIOLIB` symbols
+is the precedent. They are declared here rather than as rows because they are
+other architectures' code that this build never compiles; the reading is in
+`config/host-compat/0005`'s preamble, and 🔴 **it corrected a claim that file's
+first draft made from a partial view** — a `grep -l` that matched *either*
+symbol was read as "both arches select the optional one", and only x86 does.
+
+#### The artefact, and it is a reading of the vendor's GPIO driver
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/char/rtl_gpio.c` | **`artefact`** | vendor | 🔴 **The `.c` was never opened. Its compiled form was.** Disassembly of this project's own `vmlinux` (cell `r54b`) with a distribution `objdump`: `rtl_gpio_init` at `0x802B1670` writes `0xB8000040`, then `PABCD_CNR &= ~0x74`, then `PABCD_DIR &= ~0x04 / ~0x10 / ~0x20`, then `PABCD_DIR \|= 0x40`. `SPEC.md` `REG-35` owns the reading; `System.map` supplies the initcall levels (mine 4, the vendor's 6) |
+
+🔴 **This is the most expensive single reading in this ledger for its size, and
+the reason is what it contains.** § 4.3.1's `artefact` precedent — the
+`clocksource_register` transfer count — took a *negative* fact about the
+vendor's compiled code. **This one takes register addresses and bit numbers,
+which is exactly the layer `driver-diff` scores.** So the honest accounting is:
+
+* the driver was written and **compiled** before this reading, and the image's
+  sha256 is the witness — the same ordering argument § 4.3 uses;
+* 🔴 **`RTL819X_GPIO_KNOWN_MASK` was deliberately NOT widened** from `BIT(5)`
+  to the `0x74` this reading implies. Taking the vendor's bit numbers into the
+  driver is precisely what would spend the diff. The bench card predicts the
+  post-boot register values from this reading and lets **the board** be the
+  arbiter, which keeps the driver blind and uses the artefact only as a source
+  of predictions;
+* the question it was asked to answer was a **safety** question — *does
+  anything else write the block this driver reads* — and the answer is yes,
+  at `device_initcall`, after this driver's `subsys_initcall`. There was no
+  cheaper instrument: nothing in `SPEC.md` recorded that a vendor GPIO driver
+  existed at all until the build log printed `CC drivers/char/rtl_gpio.o`.
+
+⚠️ **`ledgerscan` is structurally blind to this row**, the same way it is to
+§ 4.3.1's: the path is never cited as a source file, so the scan cannot find
+it. It is declared by hand, and § 7 ⑦ already carries that hole.
+
 ### 4.5 🔴 `R5-5` SPI + MTD — 11 paths — **the diff's vendor side is spent**
 
 | path | depth | origin | what was taken |
@@ -652,7 +740,7 @@ written down in advance and by naming what it may look at.
 
 ## 8. The reading, in one table
 
-量 2026-09-03, `ledgerscan scan`, re-derived at commit. Population: 🔄 **1,448**
+🔄 量 2026-09-06 (`R5-4`), `ledgerscan scan`, re-derived at commit. Population: 🔄 **2,054**
 tracked files (excluding `upstream/`) and 302 in `upstream/` — both of which
 grow with this repository and are quoted for scale, not as findings.
 *(1,445 and 302 at `R5-0`, 2026-09-02; **1,447** at `R5-1`, earlier on
@@ -671,7 +759,7 @@ differ by exactly that entry, and neither is wrong.
 
 | domain | paths | for | verdict |
 |---|---:|---|---|
-| `gpio` | **0** | `R5-4` | 🟢 blind of any implementation |
+| `gpio` | 🔄 **11** paths **+ 1 `artefact`** | `R5-4` | 🟡 **blind of any third-party implementation, and no longer blind of the vendor's.** Eight of the eleven are generic Linux framework plumbing that says nothing about this die; three are `arch/rlx`'s own gpio headers and Kconfig. 🔴 The `+1` is `drivers/char/rtl_gpio.c` read as OBJECT code (§ 4.9), and unlike § 4.3.1's it carries register addresses and bit numbers — the layer the diff scores. The driver source predates it and `KNOWN_MASK` was not widened to match |
 | `wdt` | **0** | `R5-6` | 🟢 blind of any implementation |
 | `led` | **0** | `R5-7` | 🟢 blind of any implementation |
 | `keys` | 1 | `R5-8` | 🟢 blind — the one citation is `origin: none`, an example inside this tool's own census row (§ 4.1) |
@@ -680,7 +768,7 @@ differ by exactly that entry, and neither is wrong.
 | `irq` | 2 | `R5-10` | 🟡 two string literals; one is the loader's, not Linux's |
 | `bsp` | 8 | all six | 🔴 cross-domain exposure; `bsp_setup():134-175` counts as fully read |
 | `spi_mtd` | 11 | `R5-5` | 🔴 the vendor side is spent, three findings on the decision layer |
-| **in scope** | 🔄 **32** | | `ledgerscan check` requires every one to have a row above, and on 2026-09-03 it went RED **three** times — 29 found against 27 declared; again after the jiffy check read three more; and 🔴 **once on a file that was never opened**, named from memory inside an edit whose purpose was to make a claim narrower (§ 4.3, the `timekeeping.c` row). **33 are declared**: the extra is `include/linux/jiffies.h`, which the scan classes out-of-scope and which is declared anyway |
+| **in scope** | 🔄 **50** *(32 at `R5-3b-1`)* | | `ledgerscan check` requires every one to have a row above, and on 2026-09-03 it went RED **three** times — 29 found against 27 declared; again after the jiffy check read three more; and 🔴 **once on a file that was never opened**, named from memory inside an edit whose purpose was to make a claim narrower (§ 4.3, the `timekeeping.c` row). **33 are declared**: the extra is `include/linux/jiffies.h`, which the scan classes out-of-scope and which is declared anyway |
 | `out-of-scope` | 68 | — | generic kernel; no peripheral register map passes through them |
 
 **Committed before any driver source exists.** `git log --diff-filter=A` over
