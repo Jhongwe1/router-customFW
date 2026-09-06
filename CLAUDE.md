@@ -396,6 +396,14 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `bash -lc 'cmd > f; echo "rc=$?" >> f'` records the outer shell's status and
   not `cmd`'s — 量, it wrote `rc=0` for a suite that had exited 1, and the
   wrong number is worse than an empty one because it reads as a measurement.
+  🔴 **2026-09-06 (seating 15): it did the worst version of this — it made a
+  VERIFICATION GATE read green, and the green was pushed.** `spec-check` was run
+  as `… > f 2>&1; echo "EXIT CODE: $?"`, printed **`EXIT CODE: 0`**, and was
+  believed; the tool was exiting **1** on a real `C5` finding, which CI then
+  caught. ⚠️ **The same run also shows the second half of the trap**: reading
+  `spec-check | tail -2` shows the *table sweep's* ok line while the file's own
+  findings sit above it, so **a tail is not a verdict**. Both halves have one
+  fix: put the command in a script file, run it by path, and read `rc=$?` there.
   It also swallowed a whole run: a `nohup … &` inside `wsl -- bash -lc` dies
   with its parent, and a progress check written
   `tail -6 f 2>/dev/null || echo "still running"` cannot tell *running* from

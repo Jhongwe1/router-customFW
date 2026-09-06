@@ -17750,6 +17750,22 @@ must fail — six of the fifteen drive this file as a subprocess」，實際是*
 3. **`docs/blind-write-ledger.md`** 的 `gpiolib.c` 我一度重複宣告了一次——
    它早就在 `line` 深度宣告過，比我要加的 `artefact` 更深。刪掉重複，改去補既有那一列。
 
+4. 🔴 **而收工本身出了一個缺陷，是這一段最值得寫下來的一個，因為它讓一個
+   驗證閘門變成假綠、而且那個綠被推上去了。** 我用
+   `spec-check > f 2>&1; echo "EXIT CODE: $?"` 讀退出碼，印出 **`EXIT CODE: 0`**，
+   就相信了。**`$?` 在外層 shell 被展開**（`CLAUDE.md` 寫過的陷阱，這一段第三次踩），
+   而 `spec-check` 實際上回 **1**。⚠️ **同一次還暴露了這個陷阱的另一半**：
+   我一直用 `spec-check | tail -2` 看結果，而那顯示的是**表格 sweep** 那一段的 ok，
+   檔案自己的 findings 在它上面——**tail 不是判決**。
+   🟢 **抓到它的是 CI**：`34040804067` 的 `text` job 紅，紅在 `spec-check`。
+   真正的缺陷是 `FW-42` 的擁有者欄指向 `bench/2026-09-06c/CORRECTIONS-block12.md`，
+   而 `C5` 會把那一列的字面值（`273,332`）追進它指名的擁有者裡——
+   那個數字住在 `notes/rootfs-census.md`，而那才是 busybox 普查的擁有者。
+   **兩件事一起修**：擁有者欄改對，而所有閘門改成用**腳本檔裡的 `rc=$?`** 讀，
+   八支全部回 0。
+   ⚠️ **這一條沒有讓那次 push 變成錯誤**——它讓那次 push 成為**這個 repo 裡
+   CI 抓到本機漏掉的東西的第一個實例**，而本機漏掉它是因為我讀了輸出的一部分。
+
 ---
 
 ### 九、沒建立的，一條都不要漏
