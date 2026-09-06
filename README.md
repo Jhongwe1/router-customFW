@@ -341,7 +341,7 @@ tools/rlxfw-marks.py       one of the two tools that edit somebody else's source
                            artefact and the vendor's, and refuses if `--absent` is not
                            given, because "present in mine" alone is a label. It caught
                            two real defects the day it was written
-tools/spec-check.py        TWELVE checks and forty case lines. C1-C7 are about
+tools/spec-check.py        THIRTEEN checks and fifty case lines. C1-C7 are about
                            SPEC.md; C8/C8b/C8c/C9 are about how EVERY tracked
                            `.md` renders -- 71 files, 620 tables, ~43,000 code
                            spans -- because that is not a property of one file.

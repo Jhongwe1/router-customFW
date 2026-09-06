@@ -79,8 +79,25 @@ Every one of these is a claim the tool would otherwise be making silently.
   A4  the set of job names is recorded per row, and `stats` refuses to pool
       rows whose job sets differ.  A series that silently spans two CI shapes
       is not one population.
-  A5  a job whose conclusion is not `success` refuses the row.  A failed job
-      stopped early, so its duration is not a cost.
+  A5  a job whose conclusion is not `success` refuses the ROW -- the whole
+      row, not that job's column.
+
+      🔴 *This read "a failed job stopped early, so its duration is not a
+      cost" until 2026-09-07, and that sentence describes a case A5 is not
+      deciding.*  量, on `34040804067`, by a `jq` re-derivation that does not
+      share this file's code: the job that failed is `text`, `census` was
+      **skipped**, and `instruments` ran 16 of 16 steps to success with its
+      own `exec - apt` a complete **535** -- inside the band, and discarded.
+      Nothing there stopped early.  The row is refused because **a row is a
+      unit**: `text_s` and `census_s` would otherwise carry a truncated
+      duration in a column that reads as a duration, which is the `exec`
+      mistake this file was written to end.
+
+      The behaviour is deliberately unchanged.  Relaxing A5 to admit a red
+      run's `instruments` needs a per-cell validity marker, which is a larger
+      format change than one data point is worth.  ⚠️  **Whether excluding
+      red runs biases the band is NOT answered**: the one exclusion measured
+      sat inside the band, n=1.
 """
 
 import argparse
