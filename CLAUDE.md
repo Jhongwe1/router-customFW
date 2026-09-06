@@ -491,6 +491,18 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   one way breaks when run the other, and neither run tells you which you
   got.** The rule does not move: write `/usr/bin/python3` and the question
   never arises.
+- 🆕 **`gh` exists only on the Windows side and `jq` only inside WSL, so no
+  single shell can run both — and a tool that needs one runs where that one
+  is.** 量 2026-09-07: `tools/citime.py` shells out to `gh`, so running it
+  under WSL dies with `FileNotFoundError: [Errno 2] No such file or directory:
+  'gh'`; it runs under `C:\Program Files\Python310\python.exe`. The reverse
+  holds for anything wanting real `jq` (WSL has 1.7; `gh --jq` is a reduced
+  builtin that rejects `\(...)` interpolation). 🟢 **That split is what makes
+  a `citime` cross-check genuinely independent** — the `gh` JSON is produced on
+  one side and the arithmetic redone by `jq` on the other, sharing no code and
+  not even a language. ⚠️ **This was true on every previous segment and was
+  written down nowhere**, which is why it cost two failed invocations before
+  being noticed.
 - ✅ **`console-capture.py` refuses a capture with neither `--seconds` nor
   `--idle`, and records both in its metadata — fixed 2026-08-30.** *(Until then
   such a capture never returned: both default to `0.0` and the read loop broke on
