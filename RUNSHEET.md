@@ -3790,3 +3790,56 @@ own contribution is about **10.3 s**. `TERM-1`.
 used `--skip S2,S3` against an image staged the night before, and 量 the same
 day — that skip was **necessary, not chosen**, because nothing carried `S2`'s
 staged tree into `S3` until it was fixed that afternoon. `SEAM-1`.
+
+---
+
+## Two rules about the card's lifecycle, 2026-09-06 (seating 14)
+
+Neither is about the board. Both cost something in seating 14 and neither had a
+home in this repository before this section.
+
+### 1. 🔴 Run `spec-check` on a card BEFORE freezing it
+
+Block 11's card was committed at 14:25 and the board was powered at 14:28. At
+15:05 `spec-check`'s `C8` reported eight ragged rows in it: three table headers
+declared one column more than their rows carried. `C8` is not cosmetic — its
+own message says an off-by-one column makes every checker that reads a field
+**by index** read the wrong cell and pass.
+
+Fixing it meant editing a frozen card, which was declared
+(`bench/2026-09-06b/CORRECTIONS-block11.md` § 6) and confined to three headers,
+6 insertions and 6 deletions.
+
+🔴 **And the fix cost something the decision under-weighted.**
+`tools/check-predictions.py` decides *"the predictions were written first"* by
+**mtime**: every capture must be newer than the predictions file. Editing the
+card at 15:05 made it newer than the six `K1`/`K2` captures taken at
+14:28–14:43, so they now read `capture is OLDER than the prediction`.
+
+**The mtime is not faked back.** `touch`-ing the card to 14:25 would make the
+checker pass by falsifying a timestamp, which is the opposite of what the check
+is for. What survives is in git: `e0c0508`'s author date is 14:25:56 and every
+capture in that directory is 14:28 or later.
+
+⚠️ **`check-predictions` and `spec-check` disagree about what "frozen" means** —
+one wants the card immutable in *time*, the other wants it correct in *syntax*
+— and nothing here had noticed. `spec-check` takes two seconds. **Run it before
+the commit that freezes the card**, and the two never have to be traded off.
+
+### 2. 🔴 One cell name per image
+
+`tools/rlxfw-kbuild.sh` writes its artefacts to `$R/out/<cell>.*`. Seating 14
+rebuilt mid-seating (driver 4.0 → 4.1) with the same cell name `r53b2`, and
+**the first image's `vmlinux.elf`, `System.map`, manifest and build log were
+overwritten**. The `.bin` survived only because `rtkimage` was pointed at a
+different dated work directory.
+
+The card that names the first image therefore has two `cardnum` rows that can
+never re-derive again — `cardcheck numbers` reads **23 of 28** on it — and the
+disassembly evidence taken before the rebuild is now unreproducible.
+
+⚠️ **A second rule falls out of the same failure**: a frozen card's `cardnum`
+rows may only name **frozen** artefacts. Three of block 11's five broken rows
+point at `config/rlxfw-src/…/rtl819x-timer.c`, a live source file, and would
+have gone red on the next edit whatever it was. **A row that must eventually go
+red teaches the reader to skip the report.**
