@@ -166,7 +166,21 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # operator error that `bench/2026-09-06/CORRECTIONS-block10.md` § 3.7 argues
 # from the capture's shape.** The fix (wait ten seconds after replying, before
 # touching power) has its own control: `SR-A`, taken with it, classifies cold.
-ck "twenty-four cold, thirty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 24 cold, 37 warm, 0 unknown')"
+# 🔄 24/37 -> 26/48 on 2026-09-06 (seating 14, `bench/2026-09-06b`), and this is
+# the biggest single-seating delta the case has ever taken: TWO power-ons and
+# ELEVEN warm resets. The warm ones are new in kind as well as in number -- they
+# are not `looprun`'s `S4`, which was skipped on all twelve runs, but
+# `busybox reboot -f` typed into the shell of the boot before (`SPEC.md`
+# `FW-37`), which is what let one power press carry twelve boots. Isolation
+# check, run before this line was touched: every directory EXCEPT
+# `2026-09-06b` still reports 24 cold, 37 warm, and `2026-09-06b` alone reports
+# 2 cold / 11 warm -- so the delta is exactly +2/+11 and nothing was
+# reclassified. Eighth seating in a row that turned this case red, and the
+# eighth time the run-every-suite rule rather than a `--only` run caught it.
+# 🟢 And this seating gives the case something none of the seven before it did:
+# a cold row and eleven warm rows from the SAME power cycle --
+# `cold - max(warm) = +0.0101 s`, the largest warm population since 2026-09-01.
+ck "twenty-six cold, forty-eight warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 26 cold, 48 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something

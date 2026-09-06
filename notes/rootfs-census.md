@@ -158,6 +158,7 @@ dd if=/dev/mtd0 bs=64k | md5sum
 | route | result |
 |---|---|
 | every symlink in the extracted tree pointing at `busybox` | **exactly 50**, and the names are `ash bunzip2 bzcat cat chpasswd cp cut date echo expr false free getty grep halt head hostname ifconfig init ip kill killall klogd ln login ls mkdir mount nice nslookup ping ping6 poweroff ps reboot renice rm route sed sh sleep syslogd tail telnetd tr traceroute true umount uptime wc` |
+| 🆕 **what rlxfw's own image declares, which is a DIFFERENT population** | **eleven**: `sh ash cat echo ls mount ps ifconfig ping mkdir sleep` (`config/rlxfw-initramfs.tsv`). 🔴 **`reboot` is not among them, and the applet is still reachable as `busybox reboot`** — that gap is exactly what `tools/cardcheck.py commands` exists for. 🔴 **And 量 2026-09-06 (seating 14), the applet being reachable is not the end of it**: `busybox reboot` **does not reset this board**, because busybox's default `reboot` signals PID 1 and this image's PID 1 is `config/rlxfw-init.sh`, a shell script that ignores it. The vendor's rootfs runs busybox `init` there, which does not. **`busybox reboot -f` skips the hand-off and works**, 2.407 s to the loader prompt. `SPEC.md` `FW-37` |
 | the applet-name table in the binary itself, at **file offset 266740** | the same names, and **`dd`, `md5sum`, `od`, `hexdump`, `cmp`, `cksum`, `sum`, `sha1sum` are none of them** |
 
 ⚠️ **`mknod` is the `uname` trap again, and it caught me once today.** A

@@ -75,6 +75,25 @@
  *      step cheap -- that R5-3b-1's three cold boots are evidence about
  *      the code this version runs.
  *
+ * WHAT VERSION 4.1 CHANGED, AND THE BOARD IS WHY
+ * (2026-09-06, seating 14, between K2 and M1):
+ *
+ *   1. The late half re-bases the pre-check window instead of inheriting
+ *      the one that starts at reqirq.  4.0's window spans the vendor's
+ *      NIC initialisation, which 量 costs 11 of 585 interrupts -- 1.88 %
+ *      against a 1 % tolerance -- so 4.0 refused its own handover on
+ *      both boots it was given, with ce_check_dc/dj identical to the
+ *      interrupt on a cold boot and a warm one.
+ *   2. TA6 now prints that shortfall instead of the wait. The wait is
+ *      ~300 on every boot and says nothing; the shortfall is a
+ *      measurement of the vendor's driver that nothing else produces.
+ *   3. Three attempts, and boot_ce_tries says how many were used.
+ *   4. 🔴 THE TOLERANCE DID NOT MOVE. 1 % refused a state in which the
+ *      system clock would have run 1.88 % slow through boot, with
+ *      nothing in the kernel able to notice -- which is exactly what
+ *      R5-3b-1's `cereload` rows demonstrated. Widening it would have
+ *      been fixing the instrument to agree with the experiment.
+ *
  * WHY TIMER/COUNTER 1 AND NOT 0.
  * TC0 is the vendor's system tick and this driver never writes it.  TC0 is
  * also unusable as a clocksource on its own: SPEC.md CLK-17 records that it
@@ -703,6 +722,28 @@
 #define RTL819X_BOOT_ACK_US	500
 #define RTL819X_BOOT_WAIT_MAX_J	(RTL819X_CE_MIN_J + 200)
 
+/*
+ * 4.1, and this constant exists because of a measurement rather than a
+ * worry.  量 seating 14, K1 (cold boot) and K2 (warm boot, byte-identical
+ * fields): ce_check_dj = 585, ce_check_dc = 574.  Over the span from
+ * reqirq at arch_initcall to the pre-check at late_initcall -- which is
+ * exactly the vendor's NIC driver initialisation -- TC1 delivered 574 of
+ * the 585 interrupts a 100 Hz source owes.  ELEVEN SHORT, 1.88 %, against
+ * a 1 % tolerance, and the handover was refused with -ETIME on both boots.
+ *
+ * 🟢 The same boot at the shell, K1-P -> K1-Q over 14,385 jiffies:
+ * Djiffies 14,385 against Dirq_count 14,384 -- ONE short, 0.0070 % -- and
+ * the tick was still the vendor's there, so those two numbers are
+ * independent sources and not one identity written twice.
+ *
+ * So: the loss is confined to the driver-init phase, and the window the
+ * pre-check judges on has to be taken in the state the tick will run in.
+ * The late half re-bases and waits there.  Three attempts, because a
+ * window that lands on a level-7 initcall doing something long should
+ * cost 3 s and not the boot.
+ */
+#define RTL819X_BOOT_CE_TRIES	3
+
 /* The stages, as printed by RLXFW-TA<n> and read back from /proc.  They
  * are numbered rather than named because the mark is the primary reader
  * and it has eight hex digits, not a string. */
@@ -745,7 +786,7 @@
 #define RTL819X_MODE_CE		1	/* clockevent:  hz_used / HZ period */
 
 #define RTL819X_PROC_NAME	"rtl819x-timer"
-#define RTL819X_TC_VERSION	"4.0"
+#define RTL819X_TC_VERSION	"4.1"
 
 /* ------------------------------------------------------------------------
  * State
@@ -845,6 +886,12 @@ static u32 rtl819x_boot_ack_tries;	/* ackip calls until 1 -> 0 was seen */
 static u32 rtl819x_boot_wait_j;		/* jiffies spent waiting at S6 */
 static u32 rtl819x_boot_j_early;	/* jiffies at arch_initcall */
 static u32 rtl819x_boot_j_late;		/* jiffies at late_initcall */
+/* 4.1.  The driver-init phase, kept as a reading instead of being the
+ * reason the handover fails.  Every boot now reports how many TC1
+ * interrupts the vendor's own initialisation costs. */
+static u32 rtl819x_boot_pre_dj;		/* jiffies  reqirq -> late_initcall */
+static u32 rtl819x_boot_pre_dc;		/* TC1 IRQs over the same span */
+static u32 rtl819x_boot_ce_tries;	/* re-based windows the pre-check took */
 static u32 rtl819x_ce_check_dc;		/* the pre-check's two numbers, kept */
 static u32 rtl819x_ce_check_dj;
 
@@ -2209,6 +2256,13 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 			 rtl819x_boot_ack_tries);
 	len += scnprintf(page + len, PAGE_SIZE - len, "boot_wait_j=%u\n",
 			 rtl819x_boot_wait_j);
+	/* 4.1.  The driver-init phase, as its own reading. */
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_pre_dj=%u\n",
+			 rtl819x_boot_pre_dj);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_pre_dc=%u\n",
+			 rtl819x_boot_pre_dc);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_ce_tries=%u\n",
+			 rtl819x_boot_ce_tries);
 	len += scnprintf(page + len, PAGE_SIZE - len, "boot_j_early=%u\n",
 			 rtl819x_boot_j_early);
 	len += scnprintf(page + len, PAGE_SIZE - len, "boot_j_late=%u\n",
@@ -2454,8 +2508,9 @@ fail:
  */
 static int __init rtl819x_boot_arm_late(void)
 {
+	unsigned long flags;
 	u64 j0;
-	int rc;
+	int rc, i;
 
 	rtl819x_boot_j_late = (u32)get_jiffies_64();
 	rlxfw_markx("TA5", rtl819x_boot_j_late);
@@ -2468,19 +2523,58 @@ static int __init rtl819x_boot_arm_late(void)
 		return 0;
 	}
 
-	/* S6 -- whatever is left of the pre-check window.  The ceiling is not
-	 * decoration: this loop's exit condition is jiffies advancing, and if
-	 * the thing that advances jiffies has stopped, an uncapped loop here
-	 * would hang the boot in the one place with no way to say so. */
+	/*
+	 * S6.  🔄 4.1: the window is taken HERE, and the old one is kept as a
+	 * reading.  See RTL819X_BOOT_CE_TRIES for the two measurements that
+	 * forced this; in one line, the span this function used to judge on is
+	 * the vendor's NIC initialisation and it costs 11 of 585 interrupts,
+	 * while the steady state costs 1 of 14,385.
+	 *
+	 * TA6 is the SHORTFALL over the driver-init phase and no longer the
+	 * wait, because the wait is now ~300 on every boot and says nothing,
+	 * while the shortfall is a different number every board could give.
+	 * The wait and the attempt count are in /proc, and a hang inside the
+	 * loop is still located by TA6 printing and TA7 not.
+	 */
 	rtl819x_boot_stage = RTL819X_BOOT_S_WAIT;
+	rtl819x_boot_pre_dj = (u32)(get_jiffies_64() - rtl819x_ce_base_j);
+	rtl819x_boot_pre_dc = rtl819x_irq_count - rtl819x_ce_base_irq;
+	rlxfw_markx("TA6", rtl819x_boot_pre_dj - rtl819x_boot_pre_dc);
+
 	j0 = get_jiffies_64();
-	while (get_jiffies_64() - rtl819x_ce_base_j < RTL819X_CE_MIN_J) {
-		if (get_jiffies_64() - j0 > RTL819X_BOOT_WAIT_MAX_J)
+	for (i = 0; i < RTL819X_BOOT_CE_TRIES; i++) {
+		u64 w0;
+
+		rtl819x_boot_ce_tries = (u32)(i + 1);
+
+		/* Re-base under the lock: rtl819x_irq_count is the ISR's and the
+		 * two fields have to be taken as one pair, or the first window
+		 * starts with a count that is already one interrupt stale. */
+		spin_lock_irqsave(&rtl819x_tc_lock, flags);
+		rtl819x_ce_base_j = get_jiffies_64();
+		rtl819x_ce_base_irq = rtl819x_irq_count;
+		spin_unlock_irqrestore(&rtl819x_tc_lock, flags);
+
+		/* The ceiling is not decoration: this loop's exit condition is
+		 * jiffies advancing, and if the thing that advances jiffies has
+		 * stopped, an uncapped loop here would hang the boot in the one
+		 * place with no way to say so. */
+		w0 = get_jiffies_64();
+		while (get_jiffies_64() - rtl819x_ce_base_j < RTL819X_CE_MIN_J) {
+			if (get_jiffies_64() - w0 > RTL819X_BOOT_WAIT_MAX_J)
+				break;
+			msleep(20);
+		}
+
+		/* 🔴 The verdict is NOT marked here, and that is deliberate.
+		 * rtl819x_tc1_cevt_register() runs this same pre-check under its
+		 * own lock, so a failure surfaces as TA7's errno -- one mark,
+		 * one meaning.  A mark here would print -ETIME twice for one
+		 * refusal and read as two. */
+		if (rtl819x_ce_precheck() == 0)
 			break;
-		msleep(20);
 	}
 	rtl819x_boot_wait_j = (u32)(get_jiffies_64() - j0);
-	rlxfw_markx("TA6", rtl819x_boot_wait_j);
 
 	/* S7 -- the negative control, and it is not optional.  A rating of 300
 	 * winning means nothing unless a rating of 99 on the same hardware,

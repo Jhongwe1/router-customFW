@@ -1,5 +1,76 @@
 # Changelog
 
+🟢🟢 **2026-09-06, thirty-sixth session, seating 14: `R5-3b-2`** — **the system
+tick is armed from inside the kernel, and it is this driver's before
+`/sbin/init` is executed.** **One power cycle** for the whole seating, twelve
+boots, 14:28–15:32, **zero flash-write commands and zero `FLR`**, so the
+bracket is untouched at 1,024 of 4,194,304 = **0.0244 %**.
+
+🟢 **Ten boots, and every field identical.** `M1`…`M10`, image `ea6ee537`,
+driver **4.1**: `boot_done=1`, `boot_rc=0`, `boot_stage=9`, `ce_live=1`,
+`ce_mode=2`, `ce_mode_calls=2`, `ce_handler` `80036D50` → **`80036FC4`**, the
+rating-99 negative control registered and **never called**,
+`irq_spurious`/`irq_stuck`/`ce_hw_bad`/`ce_badmode` all **0**, boot capture
+**1,069 bytes** every time. An **eleventh** boot from a cold power-on is
+byte-identical in every field — including the driver-init shortfall — and is
+the control, not one of the ten.
+
+🟢 **"Before userspace" is proved by an ORDER, not by a field.** `RLXFW-TA8`,
+printed the instant `clockevents_register_device()` returned, precedes
+`RLXFW-B10`, which sits immediately before `init_post()`'s branch into
+`/sbin/init` — in the same capture, on all eleven, byte 887 against 925. 讀
+`init/main.c`: `do_basic_setup()` completes every initcall level first. **No
+address quoted, nothing asked of the tick core about itself, no shell needed.**
+
+🔴 **The most useful reading is a refusal.** Version **4.0** refused its own
+handover on both boots it was given — `RLXFW-TA7=FFFFFFC2`, `-ETIME` — with
+`ce_check_dj=585` / `dc=574` **byte-identical on a cold boot and a warm one**.
+Its pre-check window spanned the vendor's NIC driver initialisation, over which
+TC1 delivers **574 of 585** interrupts: 11 short, **1.88 %**, against a 1 %
+tolerance. The same boot at a shell loses **1 in 14,385** (0.0070 %), and there
+the tick was still the vendor's, so those two counts are independent sources.
+**The tolerance was not widened; the window was moved to `late_initcall`.**
+Widening it would have been repairing the instrument to agree with the
+experiment, and what the 1 % refused was a boot whose clock ran 1.88 % slow
+with nothing in the kernel able to notice.
+
+🟢 **Zero lost ticks, twice, and the longer one is on the cold boot**:
+`M10-P` → `M10-L`, **263.73 s**, all three of `Δjiffies`, `Δirq_count` and
+`Δce_cycles ÷ 2000` = **26,373**; and `M11-P` → `M11-L`, **654.76 s**, all
+three = **65,476**. Both residuals **0** in both windows. The vendor's line 13
+minus this driver's line 25 stays at **34** across the longer one, so the gap
+does not grow. And the
+cost of the fix closes against its own design: `S7`'s duration goes
+**15.17 s → 18.14 s** (n=2, n=11), **+2.97 s**, against `RTL819X_CE_MIN_J` =
+300 jiffies = **3.00 s**.
+
+🟢 **`busybox reboot` does not reset this board; `busybox reboot -f` does** —
+the default signals PID 1, and this image's PID 1 is a shell script. 2.407 s
+from the command to the loader prompt, **with this driver's clockevent driving
+the tick**. That is why twelve boots cost one power press.
+
+🔴 **Two instruments of this session produced false findings and controls
+caught both before power.** `awk` parses an address like `8001e714` as
+scientific notation, so a numeric symbol lookup made every such address equal;
+and a `.timing` row is written **before** its chunk, so a byte's arrival is the
+last row with `offset <= b` and not the first with `offset >= b` — the draft
+reported a 0.67 s "difference between images" that was one read of latency
+across a 0.63 s silence. `notes/kernel-build.md` § 17.3a documented the wrong
+rule, and **its published numbers were then audited and are right**, because
+every landmark fell on a read boundary.
+
+🔴 **And the frozen card was edited once, declared.** `spec-check`'s `C8` found
+three table headers declaring one column more than their rows carried. Only the
+headers changed — 6 insertions, 6 deletions, no prediction text — and
+`bench/2026-09-06b/CORRECTIONS-block11.md` § 6 says so. The same pass caught
+two `SPEC.md` rows of the same shape before they were committed.
+
+⚠️ **What this is not.** The **clocksource** half is untouched: `rating` read
+**0** in all eleven dumps and the system's time *source* is still `jiffies`.
+The loss mechanism is **not isolated** — the driver works around it. All ten
+DoD boots are warm resets. And the flash sentence has not moved: no `FLR`, no
+full re-dump, *not one flash byte is written* remains exactly as unsayable.
+
 🟢🟢 **2026-09-06, thirty-fifth session, seating 13: `R5-3b-1`** — **the system
 tick is mine, on three independent cold boots, and the proof is causal.** Three
 power cycles, 02:45–03:55, **59 captures**, `check-predictions` **32 of 32**,
@@ -574,6 +645,39 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+### `R5-3b-2` — armed at boot, and the version that could not do it measured the reason
+
+`rtl819x-timer` **3.0 → 4.0 → 4.1** in one day, 2,384 → 2,813 lines.
+
+**4.0** adds a sequencer, split across `arch_initcall` (arm, ackip, reqirq) and
+`late_initcall` (the pre-check window, then the registration), plus ten
+`RLXFW-TA<n>` marks that go out through `prom_putchar` — no console, no log
+buffer — so a wedged boot names the stage that did not return. **Nothing in the
+arm/ackip/register path was rewritten**, so `R5-3b-1`'s evidence carries.
+
+**4.1** re-bases the pre-check window at `late_initcall` and keeps the
+driver-init span as a reading (`boot_pre_dj`, `boot_pre_dc`, and `TA6`, which
+was the wait and is now the shortfall). Three attempts, `boot_ce_tries` says how
+many were used. Cost: **+2.98 s** of boot, measured three ways.
+
+🔴 **Considered and rejected: a runtime switch.** A magic word left in DRAM by
+the loader would have let one image both arm and not arm. `MEM-17` refutes it —
+this board's DRAM retains a previous power cycle's contents, so a stale word
+would arm a boot that asked not to be. The recovery path is cheaper anyway:
+nothing is in flash, the image is TFTP'd on every cycle, so a wedge costs
+exactly one power cycle and the previous image is the fallback.
+
+Desk-side, before power, on the built artefact rather than the tree: the ten
+mark strings present exactly once (negative control `RLXFW-TZ9` = 0, and the
+previous image has zero `RLXFW-TA`); `rtl819x_boot_arm_early` **inlined away as
+a symbol**, so the disassembly rather than `strings` is what showed the calls
+survived; and the same slice on the previous image, whose difference is exactly
+the fifteen new calls with no removals.
+
+`SPEC.md` gains `CLK-27`, `IRQ-13`, `REG-34`, `FW-35`, `FW-36`, `FW-37`.
+`docs/interrupt-map.md` § 8, `notes/timer-driver.md` § 14,
+`notes/dev-loop.md` § 14, `notes/kernel-build.md` § 17.3a (corrected).
 
 ### `R5-3b-1` — the system tick handed over from `/proc`, and a timer channel that cannot be two clocks
 

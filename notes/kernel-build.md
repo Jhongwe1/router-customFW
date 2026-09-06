@@ -2434,9 +2434,32 @@ reached.
 量 2026-08-30 from `bench/2026-08-30c/V-3.timing` and `bench/2026-08-30b/L3.timing`.
 **Method, because the script is a scratchpad one and is not committed**: the
 `.timing` sidecar is `offset seconds` pairs where `offset` is the byte count in
-`.log` **before** that read; for a landmark at byte `b`, take the first pair
-whose `offset >= b` and subtract the first pair's time. Every figure below is
-relative to the first read.
+`.log` **before** that read; for a landmark at byte `b`, take ~~the first pair
+whose `offset >= b`~~ **the LAST pair whose `offset <= b`** and subtract the
+first pair's time. Every figure below is relative to the first read.
+
+🔴 **2026-09-06 (seating 14): the rule as written above was wrong, and this
+paragraph is the correction rather than a rewrite.** 讀
+`tools/console-capture.py:462` — the row is written **before** its chunk is
+appended, so `offset seconds` means *a read finished at `seconds`, and the
+bytes it delivered begin at `offset`*. The read at row *i* therefore delivered
+bytes `[offs[i], offs[i+1])`, and a byte's arrival is the row with the largest
+`offset <= b`. `offset >= b` names the **next** read.
+
+⚠️ **Normally that is a millisecond and nobody would notice.** It is not always:
+`bench/2026-09-06/SR-boot` holds a 0.63 s silence a few bytes after `RLXFW-B09`,
+and there the two rules differ by **0.622 s**. The wrong rule produced, on the
+first draft of block 11's card, a claim that initcall levels 1–5 took 0.006 s
+and that one image's `B09 → B10` phase was 0.67 s faster than another's.
+**Both were the instrument, and both were caught before the board was powered**
+by recomputing with the other anchor.
+
+🟢 **AND THE TABLE BELOW WAS AUDITED RATHER THAN PRESUMED GUILTY.** 量
+2026-09-06, on `quietm`'s own capture, all five landmarks under **both** rules:
+they agree to **≤ 0.001 s**, because each one happens to fall on a read
+boundary. **So the method was fragile and its published numbers are right**,
+and both halves of that sentence are measurements. `SPEC.md` `FW-35` carries
+the same pair.
 
 | landmark | `quietm` | `loudm` |
 |---|---:|---:|

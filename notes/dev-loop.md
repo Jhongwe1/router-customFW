@@ -964,3 +964,78 @@ now records **+2 cold / +0 warm** for this seating, the first since 2026-09-02
 with no warm row at all, because `S4` is where `looprun`'s own warm resets come
 from. The warm population stopped growing, and `test-boot-timeline.sh` `B2`
 carries that as a reading rather than as a gap.
+
+---
+
+## 14. 🆕 2026-09-06 (seating 14): twelve machine totals on one power cycle, and the loop's own stage timing measured what a driver change cost
+
+**Twelve `looprun --mode bench --skip S2,S3,S4` runs on ONE power press.** The
+seating's other nine resets came from `busybox reboot -f` typed into the shell
+of the boot before, which is new and is what made twelve affordable.
+
+| cell | image | driver | machine total |
+|---|---|---|---|
+| `K1` (after a cold power-on) | `0a3135af` | 4.0 | 21.66 s |
+| `K2` | `0a3135af` | 4.0 | 21.52 s |
+| `M1`…`M10` | `ea6ee537` | 4.1 | 24.37 / 24.52 / 24.50 / 24.52 / 24.49 / 24.49 / 24.50 / 24.52 / 24.51 / 24.50 s |
+
+⚠️ **Those totals are `looprun`'s stdout and nothing writes them to a file** —
+the same weakness § 13 recorded. **So the one number this section actually
+rests on is re-derived from the captures' own `.meta.json` instead**, and it is
+the stage that moved.
+
+### 14.1 🟢 `S7` says what the driver change cost, and it closes against the design
+
+`duration_s` out of `bench/2026-09-06b/*-boot.meta.json`:
+
+| | n | mean | range |
+|---|---|---|---|
+| driver **4.0** (`K1`, `K2`) | 2 | 15.17 s | 15.09 – 15.24 |
+| driver **4.1** (`M1`…`M11`) | 11 | **18.14 s** | 18.08 – 18.16 |
+
+**Δ = +2.97 s**, and `RTL819X_CE_MIN_J` is **300 jiffies at 100 Hz = 3.00 s** —
+the pre-check window 4.1 re-bases and waits out at `late_initcall`. The spread
+across ten runs is **0.08 s**.
+
+🟢 **Confirmed a third way, inside the boot capture itself.** From `RLXFW-TA5`
+(the late half's entry) to `RLXFW-B10`: **0.020 / 0.021 s** on the two 4.0
+boots, **2.969 / 2.954 / 2.938 s** on 4.1. And `RLXFW-B00` → `RLXFW-B10` goes
+**5.90–5.99 s → 8.87–8.92 s**.
+
+⚠️ **The population is named because it moves the last digit.** Over
+`M1`…`M10` alone the 4.1 mean is **18.1428 s** and the delta **+2.98 s**;
+`M11`'s **18.096 s** pulls the mean to **18.1386** and the delta to
+**+2.97 s**, without widening the range. The 4.0 side is n=2 and carries no
+spread worth quoting.
+
+So the cost of arming at boot is quoted three ways — the loop's machine total,
+the boot stage's own metadata, and two marks inside the capture — and they
+agree to within 0.05 s.
+
+### 14.2 🔴 `--skip S4` again, and this time it was not a choice about confounds
+
+§ 13.1 skipped `S4` to keep `NET-25` one-variable. Here it is skipped because
+**every reset in the seating happens before `looprun` starts** — the operator's
+power press for `K1`, and `busybox reboot -f` for the other eleven. An `S4`
+inside the loop would be a second reset in the same cycle, and `RUNSHEET.md`
+records that the loader re-stages `0x80500000` from flash on a watchdog reset,
+so it would also throw away the image just to re-upload it.
+
+**So the `--skip S2,S3,S4` population grows by twelve** and stays incomparable
+to seatings 10–12's `--skip S2,S3` totals, for the reason § 13 gives.
+
+⚠️ **And this seating did NOT record a successful `S4` either**, which § 13
+named as the one thing that would make the two populations comparable. It is
+still owed, and it is now owed for a second seating running.
+
+### 14.3 What made twelve runs cost one power press
+
+量, from `bench/2026-09-06b/K1-Z2.timing`: `busybox reboot -f` reaches the
+loader's `<RealTek>` prompt in **2.407 s** — command echo at 0.005, `Booting...`
+at 0.168, `Reboot Result from Watchdog Timeout!` at 0.743, `Ethernet init Okay!`
+at 2.404. That measurement is what let the nine repeat cells use
+`--esc-after 8 --seconds 12` instead of the 150/165 a cold ESC catch needs,
+which is **23 s saved per boot**.
+
+🔴 **`busybox reboot` without `-f` does not reset this board** — it signals
+PID 1, and this image's PID 1 is a shell script. `SPEC.md` `FW-37`.

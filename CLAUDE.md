@@ -215,6 +215,57 @@ released source.
 > vendor's tick and were handed over by hand; arming at boot is `R5-3b-2`,
 > which needs a different image because `RECIPE_ID` is a digest over `config/`.
 > **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
+> 🔄 **2026-09-06, ELEVENTH update — seating 14, ONE power cycle, and the
+> sentence directly above expired at 14:48.** 🟢 **The tick is mine from boot.**
+> `R5-3b-2` arms the timer from inside the kernel — `arch_initcall` does
+> `arm`/`ackip`/`reqirq`, `late_initcall` takes the pre-check window and
+> registers the rating-300 `clock_event_device` — and the DoD's **ten boots**
+> came out identical to the field: `boot_done=1`, `boot_rc=0`, `ce_live=1`,
+> `ce_mode=2`, `ce_mode_calls=2`, `ce_handler` `80036D50` → `80036FC4`, the
+> rating-99 negative control registered and never called,
+> `irq_spurious`/`irq_stuck`/`ce_hw_bad`/`ce_badmode` all **0**, boot capture
+> **1,069 bytes** every time. An **eleventh** boot from a cold power-on is
+> byte-identical and is the control, not one of the ten.
+> 🟢 **And *before userspace* is proved by an ORDERING rather than by a field**:
+> `RLXFW-TA8` — printed the instant `clockevents_register_device()` returned —
+> precedes `RLXFW-B10`, which sits immediately before `init_post()`'s branch
+> into `/sbin/init`, in the same capture, on all eleven. Byte 887 against 925.
+> **No address quoted, nothing asked of the tick core about itself, no shell
+> required.** 🟢 Zero lost ticks over **263.73 s** (`Δjiffies` = `Δirq_count` =
+> `Δce_cycles ÷ 2000` = **26,373**) and again over **654.76 s** on the cold
+> boot (all three = **65,476**), both residuals 0 in both, and the vendor's
+> line 13 minus mine stays at **34** across the longer one.
+> 🔴 **The most valuable thing here is a REFUSAL, not the success.** Driver 4.0
+> refused its own handover on both boots it was given — `RLXFW-TA7=FFFFFFC2`,
+> `-ETIME` — with `ce_check_dj=585 / dc=574` **byte-identical on a cold boot and
+> a warm one**. Its pre-check window spanned the vendor's NIC driver
+> initialisation, over which TC1 delivers **574 of 585** interrupts: 11 short,
+> **1.88 %**, against a 1 % tolerance. The same boot at a shell loses **1 in
+> 14,385** (0.0070 %) — and there the tick was still the vendor's, so
+> `Δjiffies` and `Δirq_count` are two independent sources rather than one
+> identity. **The tolerance was not widened; the window was moved.** Widening it
+> would have been repairing the instrument to agree with the experiment, and
+> what the 1 % refused was a boot whose clock ran 1.88 % slow with nothing in
+> the kernel able to notice. `SPEC.md` `IRQ-13`.
+> 🟢 **`busybox reboot` does not reset this board and `busybox reboot -f` does**
+> — the first signals PID 1, and this image's PID 1 is a shell script — 2.407 s
+> from the command to the loader prompt, **with my clockevent driving the
+> tick**. That is why twelve boots cost one power press. `FW-37`.
+> 🔴 **Two instruments of mine produced false findings and controls caught both,
+> before power.** `awk` parses an address like `8001e714` as SCIENTIFIC NOTATION
+> (→ `inf`), so a numeric symbol lookup made every such address equal to every
+> other; and a `.timing` row is written BEFORE its chunk, so a byte's arrival is
+> the last row with `offset <= b` and not the first with `offset >= b` — the
+> draft reported a 0.67 s "difference between images" that was one read of
+> latency across a 0.63 s silence. `notes/kernel-build.md` § 17.3a documented
+> the wrong rule; **its published numbers were then audited and are right**,
+> because every landmark happened to fall on a read boundary. `FW-35`.
+> ⚠️ **What is still true and narrower again**: the **clocksource** half is
+> untouched — `rating` read **0** in all eleven dumps and the system's time
+> SOURCE is still `jiffies`; only the *tick* is this driver's. And the loss
+> mechanism in `IRQ-13` is **not isolated**: the driver works around it rather
+> than explaining it. **Zero flash-write commands, zero `FLR`, bracket unchanged
+> at 0.0244 %.**
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.

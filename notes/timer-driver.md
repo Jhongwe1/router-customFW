@@ -1613,3 +1613,147 @@ And two the seating adds:
    against the vendor's 100 — decided by arithmetic rather than by reading one
    comparison operator correctly, which was deliberate (§ 12.4) — so a tie at
    exactly 100 was never registered.
+
+---
+
+## 14. 🆕 2026-09-06 (`R5-3b-2`, seating 14): armed at boot, ten times — and the version that could not do it is the more useful half of the day
+
+Version **4.0** added a boot-time sequencer and **refused its own handover on
+both boots it was given**. Version **4.1** differs from it by about ninety
+lines, every one of them forced by a number `4.0` produced. This section is
+written in that order, because the fix is worth nothing without the reading.
+
+### 14.1 What the sequencer is, and what it deliberately is not
+
+It is a sequencer. Every hardware step is the same function the `/proc` verb
+calls, in the order the card typed by hand in seating 13 — `period 8`, `arm`,
+`armirq`, the `ackip` retry, `disarm`, `mode ce`, `arm`, `armirq`, `reqirq`,
+then the wait, `cevtprobe`, `cevt`. **Nothing in the arm/ackip/register path
+was rewritten**, so `R5-3b-1`'s three cold boots remain evidence about the code
+`4.x` runs. The only new logic is the retry, the wait and the unwind.
+
+It is split across two initcall levels:
+
+* **`arch_initcall`** (level 3), at the end of the existing `rtl819x_timer_init`
+  and **after** `create_proc_entry`, so a failure has a channel to report on;
+* **`late_initcall`** (level 7), which 讀 `init/main.c` is still guaranteed to
+  be before `init_post()` execs `/sbin/init`.
+
+Ten marks go out through `prom_putchar`, which needs no console and no log
+buffer, because `CONFIG_PRINTK` is not set and a boot that wedges has no shell
+to be asked.
+
+### 14.2 🔴 What `4.0` measured by failing, and it is the seating's most useful number
+
+`K1` (cold) and `K2` (warm), both `RLXFW-TA7=FFFFFFC2` — `-ETIME`:
+
+```
+ce_check_dj = 585    ce_check_dc = 574     boot_stage=7  boot_rc=-62
+```
+
+The pre-check's window ran from `reqirq` at `arch_initcall` to the registration
+at `late_initcall`, and **that span is exactly the vendor's NIC driver
+initialisation**: the boot capture puts `RLXFW-TA4` immediately before
+`Realtek WLAN driver …` and `RLXFW-TA5` immediately after
+`Realtek FastPath:v1.03`. Over it, TC1 delivered **574 of 585** — 11 short,
+**1.88 %**, against a 1 % tolerance.
+
+🟢 **Deterministic, not noise.** Every `_at_init`, `boot_*` and `ce_check_*`
+field was byte-identical between the cold boot and the warm one, and
+`boot_pre_dc` read **574** on all twelve boots of the seating — the two `4.0`
+boots and the ten `4.1` ones.
+
+🟢 **And the steady state loses essentially nothing**, measured where the
+comparison is between two independent sources rather than one identity:
+`K1-P` → `K1-Q`, 14,385 jiffies at the shell **with the tick still the
+vendor's**, `Δjiffies` 14,385 against `Δirq_count` 14,384 — **1 short,
+0.0070 %**. Confirmed a second way over `K1-Q` → `K1-T` by comparing the two
+lines in `/proc/interrupts`: 16,464 against 16,463.
+
+⚠️ **The mechanism is not isolated.** Two candidates and this file picks
+neither: interrupt-disabled regions inside the vendor's initialisation (a level
+flag collapses several timeouts into one delivery), and `IRQ-09`'s
+read-modify-write of `TCIR` a hundred times a second.
+
+### 14.3 The fix, and the one thing that was not allowed to move
+
+`4.1`'s late half **re-bases** `ce_base_j`/`ce_base_irq` and takes the window
+at `late_initcall`, where the system is quiet; up to `RTL819X_BOOT_CE_TRIES`
+= 3 windows, with `boot_ce_tries` reporting how many were used. The driver-init
+span is kept as a reading — `boot_pre_dj`, `boot_pre_dc`, and `RLXFW-TA6`,
+which was the wait and is now the shortfall, because the wait is 300 on every
+boot and says nothing.
+
+🔴 **`RTL819X_CE_TOL_PERMILLE` did not move.** Widening it until the
+measurement passed would have been repairing the instrument to agree with the
+experiment. What the 1 % refused was a boot in which the system clock ran
+1.88 % slow with nothing in the kernel able to notice — and `§ 13.2`'s
+`cereload` rows are this project's own demonstration that such an error is
+invisible from inside.
+
+### 14.4 🟢 Ten boots, and the proof is an ordering rather than a field
+
+`M1`…`M10`, image `ea6ee537`, driver `4.1`. Re-derived from the captures
+rather than from the terminal:
+
+| | ten boots |
+|---|---|
+| `RLXFW-TA8=00000000`, and **before `RLXFW-B10`** | 10/10 |
+| `RLXFW-TA9=00000003` (`ce_registered`\<\<1 \| `ce_live`) | 10/10 |
+| `boot_stage=9`, `boot_rc=0`, `boot_done=1`, `boot_ce_tries=1`, `boot_wait_j=300` | 10/10 |
+| `ce_mode=2`, `ce_mode_calls=2`, `ce_handler=80036FC4` | 10/10 |
+| `ce_probe_registered=1` with `ce_probe_mode_calls=0` | 10/10 |
+| `ce_check_dj=300` / `ce_check_dc=301`; `boot_pre_dc=574` | 10/10 |
+| `irq_spurious` / `irq_stuck` / `ce_hw_bad` / `ce_badmode` | all 0 |
+| boot capture **1,069 bytes**, `RLXFW-ID0=EA6EE537` | 10/10 |
+
+🟢 **The headline is that `TA8` precedes `B10` in the same capture** — byte 887
+against 925 on `M1`. 讀 `init/main.c`: `do_basic_setup()` runs every initcall
+level to completion and only then does `kernel_init` call `init_post()`. So
+*the system tick was this driver's before userspace existed* is proved by two
+marks in one capture, quoting no address, asking the tick core nothing about
+itself, and needing no shell.
+
+🟢 **Zero lost ticks on the boot-armed tick**, `M10-P` → `M10-L`, **263.73 s**:
+`Δjiffies`, `Δirq_count` and `Δce_cycles ÷ 2000` are **26,373** three ways,
+both residuals **0**. 🟢 **And again over 654.76 s on the cold boot** —
+`M11-P` → `M11-L`, all three = **65,476**, residuals 0. Over that window the
+vendor's line 13 minus this driver's line 25 stays at **34**, i.e. it does not
+grow, so the steady-state loss across those 65,476 jiffies is **zero**.
+
+### 14.4a 🟢 `M11`, an eleventh boot from a cold power-on, as the control
+
+`M1`…`M10` are all warm resets. So an eleventh was taken with the operator
+pressing power — `M11-A` holds `Booting...` and **no** watchdog line — and
+**every field is byte-identical to the ten**: all ten `RLXFW-TA` lines, 1,069
+bytes, `tccnr_at_init=C0000000`, `boot_pre_dj=584` / `boot_pre_dc=574`,
+`ce_check_dj=300` / `dc=301`, `boot_ce_tries=1`, `boot_wait_j=300`. **11 of 11
+against every clause.**
+
+🟢 The number that could most plausibly have differed is the driver-init
+shortfall, and it is **574 of 584 on the cold boot too**. `M11-N` then gives
+`NET-25`'s cold first open of `eth4` on a boot-armed tick: **4/4**, third
+consecutive non-reproduction, every RTT exactly 10.000 ms — the quantisation of
+a 100 Hz clock that is this driver's. `M11-D`: `disarm` → **-16**, the one-way
+door reached from a boot-time registration.
+
+### 14.5 What version 4.1 still does NOT do
+
+§ 12.12's list, with item 1 struck:
+
+1. ~~It does not arm at boot.~~ ✅ 2026-09-06.
+2. **No clocksource in clockevent mode.** `rating` read **0** in all ten dumps;
+   the system's *time source* is still `jiffies` and only the *tick* is this
+   driver's.
+3. **`set_next_event` is still a stub**, `ce_next_calls` 0 on all ten.
+4. **`ESTATUS` is still unread**, for the fifth segment running.
+5. **The longest window is 654.76 s** (`M11-P` → `M11-L`, on the cold boot),
+   against § 13.7's 258.53 s — a 2.5× move. A handover that survives eleven
+   minutes and fails at an hour is still not excluded.
+6. **The `>=` boundary is untested**, unchanged from § 13.7.
+7. 🆕 **The loss mechanism in § 14.2 is not isolated**, and the driver works
+   around it rather than explaining it.
+8. 🆕 **All ten DoD boots are warm resets** driven by `busybox reboot -f`;
+   the seating's one power press went to `K1`, which ran the 4.0 image. § 14.4a's
+   `M11` is the cold control and it is byte-identical, **but it is an eleventh
+   boot and not one of the ten** — this item says so rather than folding it in.

@@ -795,3 +795,90 @@ standard. What is independent is the **ratio**: 9.9967 against a programmed
 would appear here as a shortfall in `Δjiffies` against the periods TC1 actually
 completed, and over 25,853 periods it produced none. ⚠️ That is a **bound at
 258.53 s**, not an absence.
+
+---
+
+## 8. 🆕 2026-09-06 (seating 14): where TC1's interrupts go missing, and it is a phase of boot rather than a rate
+
+§ 7 bounded the loss at zero over 258.53 s **after** a handover, and § 3.6's
+hazard — the vendor's read-modify-write of `TCIR` a hundred times a second —
+was the reason to look. Seating 14 found a place where interrupts **are** lost,
+and it is not a rate.
+
+### 8.1 The reading, and why the driver produced it by refusing
+
+`rtl819x-timer` **4.0** armed TC1 and requested IRQ 25 at `arch_initcall`
+(level 3), then registered its `clock_event_device` at `late_initcall`
+(level 7). Its pre-check compares interrupts delivered against jiffies elapsed
+since `reqirq`, within 1 %, and it **refused**:
+
+```
+ce_check_dj = 585     ce_check_dc = 574      → -ETIME
+```
+
+**574 of 585, 11 short, 1.88 %.** The span is bracketed in the boot capture:
+`RLXFW-TA4` prints immediately before `Realtek WLAN driver driver version 1.6`
+and `RLXFW-TA5` immediately after `Realtek FastPath:v1.03`, so **the window is
+the vendor's NIC driver initialisation and nothing else**.
+
+🟢 **Deterministic.** `boot_pre_dc` read **574** on all twelve boots of the
+seating — the two 4.0 boots (one cold, one warm) and the ten 4.1 ones — and
+`ce_check_dj`/`dc` were byte-identical between the cold and warm 4.0 boots.
+
+### 8.2 🟢 The control, and it is the strong kind
+
+`K1-P` → `K1-Q`, **14,385 jiffies at a shell**, with the tick **still the
+vendor's**:
+
+```
+Δjiffies = 14,385      Δirq_count = 14,384      → 1 short, 0.0070 %
+```
+
+🔴 **Those two numbers are independent sources.** After a handover
+`Δjiffies` is `Δirq_count` under another name and their equality is partly by
+construction — which is § 7's own caveat, and the reason this measurement was
+taken before the handover rather than after.
+
+Confirmed a second way by comparing the two interrupt lines directly,
+`K1-Q` → `K1-T`: the vendor's line 13 advanced **16,464**, this driver's line
+25 advanced **16,463**.
+
+### 8.3 The accounting closes, with the residual named
+
+`/proc/interrupts`, line 13 (vendor) minus line 25 (this driver): **33** at
+`K1-Q`, **34** at `K1-T`, **34** at `M10-L`. Three terms:
+
+* `RLXFW-TA0` says this driver's counter starts at uptime **21** jiffies;
+* the driver-init phase costs **10–11**;
+* the steady state costs ~1 per 15,000, so ~2 by `M10-L`'s 28,136 jiffies.
+
+21 + 10 + 2 = **33** against a measured **34**.
+
+### 8.4 ⚠️ The mechanism is NOT isolated
+
+Two candidates, and this file picks neither:
+
+1. **Interrupt-disabled regions inside the vendor's initialisation.** TC1's
+   pending flag is a level, so several timeouts inside one disabled region
+   collapse into a single delivery.
+2. **§ 3.6's hazard**: `REG32(BSP_TCIR) |= BSP_TC0IP` clears every `IP` bit in
+   the register, including TC1's, a hundred times a second — so a TC1 timeout
+   that lands inside the vendor's handler window is lost.
+
+Distinguishing them needs a cell nobody has written: the first predicts losses
+correlated with long `local_irq_save` regions, the second predicts a loss rate
+that depends on the **phase** between TC0 and TC1 and would therefore drift.
+**`R6` has to touch this code anyway.**
+
+### 8.5 What the driver does about it, and what it does not
+
+`4.1` **re-bases** the pre-check window at `late_initcall` and waits `MIN_J`
+there, where the system is quiet: `ce_check_dj=300` / `dc=301`,
+`boot_ce_tries=1`, on all eleven boots. It **works around** the loss and keeps
+it as a reading (`boot_pre_dj`, `boot_pre_dc`, and `RLXFW-TA6`); it does not
+explain it.
+
+🔴 **`RTL819X_CE_TOL_PERMILLE` was not widened.** A 1.88 % clock error through
+boot is invisible from inside the kernel — `notes/timer-driver.md` § 13.2's
+`cereload` rows are this project's own demonstration of that — so the guard was
+doing exactly what it was written for.

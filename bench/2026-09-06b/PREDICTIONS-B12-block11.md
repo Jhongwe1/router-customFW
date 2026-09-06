@@ -216,8 +216,8 @@ in the same cycle and would re-stage `0x80500000` from flash again for nothing.
 
 ### 4.1 The loop, run once per boot n = 1…10
 
-| # | capture | typed | expect | 🔴 stop if |
-|---|---|---|---|---|
+| capture | typed | expect | 🔴 stop if |
+|---|---|---|---|
 | **`Kn-A`** cold | `CAP OUT Kn-A --esc 150 --esc-period 0.002 --seconds 165` | the operator presses power inside the window; the loader's banner, then `<RealTek>` | no `<RealTek>`: the ESC window was missed and the board is running the **vendor** firmware from flash. Not a fault — power-cycle and repeat the cell |
 | **`Kn-A`** warm | `CAP OUT Kn-A --send 'busybox reboot' --esc-after 20 --esc-period 0.002 --seconds 35` | the command echo, a reset, then `<RealTek>` | `busybox: applet not found` → the applet is not in this binary; every remaining boot is cold. No `<RealTek>` and no echo → the shell is gone; power-cycle |
 | **`Kn-*`** | `LOOP --cell Kn` | five stages, six assertions, `A3` requires the board to print `RLXFW-ID0=0A3135AF` | `S5b` reads anything but `00000000` at `0x8040D4A0` → **nothing is uploaded**, and that guard is not skippable. `S6b`'s head words ≠ the image → abort |
@@ -225,8 +225,8 @@ in the same cycle and would re-stage `0x80500000` from flash again for nothing.
 
 ### 4.2 `K1` only — the cold boot that everything else is measured against
 
-| # | capture | typed | expect | 🔴 stop if |
-|---|---|---|---|---|
+| capture | typed | expect | 🔴 stop if |
+|---|---|---|---|
 | **`K1-Q`** | `CAP OUT K1-Q --send 'sleep 10 ; cat /proc/rtl819x-timer ; cat /proc/interrupts' --seconds 45` | 🟢 `Δjiffies` = `Δirq_count` = `Δce_cycles ÷ 2000`, all ≈ **1000** across `K1-P`→`K1-Q`; a line **25** `ICTL rtl819x-timer`; `irq_stuck=0` | the three not agreeing → a lost tick, and §5.3 is the arithmetic |
 | **`K1-N`** | `CAP OUT K1-N --send 'ifconfig eth4 10.1.1.10 netmask 255.255.255.0 up ; ping 10.1.1.2 ; ifconfig eth4' --idle 4 --seconds 30` | 🔴 **`NET-25`'s reproduction condition**: the first open of `eth4` after power. Seating 12 lost every packet, seating 13 got 4/4. Either is a sample | — this cell cannot fail the block; it adds one point to an unisolated phenomenon |
 | **`K1-D`** | `CAP OUT K1-D --send 'echo disarm > /proc/rtl819x-timer ; cat /proc/rtl819x-timer' --idle 3 --seconds 20` | 🔴 **`last_verdict=-16`** (`-EBUSY`), `state=armed` still, `ce_live=1` — **the refusal is the deliverable**, now reached from a boot-time registration instead of a `/proc` one | `last_verdict=0` → `disarm` ran under a registered clockevent and the board is about to lose its clock. **This is the one cell whose success is the bad outcome** |
@@ -238,8 +238,8 @@ something it will not get and the number would read as if it had been chosen.
 
 ### 4.3 `K10` only — the long one, placed last on purpose
 
-| # | capture | typed | expect |
-|---|---|---|---|
+| capture | typed | expect |
+|---|---|---|
 | **`K10-L`** | `CAP OUT K10-L --send 'sleep 240 ; cat /proc/rtl819x-timer ; cat /proc/interrupts' --seconds 280` | 🟢 zero lost ticks over ~240 s: `Δjiffies` = `Δirq_count` = `Δce_cycles ÷ 2000` ≈ **24,000** against `K10-P`. Seating 13's `/proc`-route figure was 25,853 over 258.53 s |
 
 It is last so that a failure in it cannot cost the ten boots, and it is a
