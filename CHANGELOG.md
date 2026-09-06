@@ -1,5 +1,135 @@
 # Changelog
 
+🟢 **2026-09-07, fortieth session (second of the same calendar day), desk:
+`R5-5`'s DoD rewritten, and writing it found an enforcer and a committed row
+contradicting each other for fourteen days.** No power, **zero flash-write
+commands and zero `FLR`**, bracket untouched at 1,024 of 4,194,304 =
+**0.0244 %**. Date measured on three sides and all three agree: Git Bash
+`2026-09-07 02:41:33 +0800`, Windows `2026-09-07 02:41:40`, WSL
+`2026-09-07 02:41:39 +0800`. 🔴 **And the previous segment's `LOG.md` heading says `（日）`, which is wrong** —
+four independent sources say Monday (`date +%A` on both shells, PowerShell's
+`DayOfWeek`, and `cal 9 2026` putting 7 under `Mo`); 09-06 was the Sunday. The
+old heading is left as written, because correcting it in place would erase the
+fact that it was wrong.
+
+🔴 **`flashwin` refuses to print the digest `SPEC.md` has been printing since
+2026-08-24, and the question was settled by calling the enforcer rather than
+reasoning about it.** `overlaps_forbidden(0x000000, 4194304)` returns the same
+**REFUSED (`H601`)** verdict as the 256-byte `FLS-20` window, which is the
+known-fires control in the same table; `0x008000 + 4161536` and
+`0x000000 + 24576` both print. `FLS-14`'s whole-image sha256 entered `SPEC.md`
+in `f5f03c9` on 2026-08-24, and **two complete 64-hex copies are committed**
+(`LOG.md:87`, `tools/leakscan.py:137`) beside five elided ones. 🔴 **Eliding is
+not mitigation**: `FLS-14`'s 60-bit form separates 2^24 candidates with a
+false-positive probability of **2^-36**.
+
+🟢 **All three existing scanners are blind to it, and each is answering its own
+question correctly.** `flashwin scan` searches for the *bytes* of a forbidden
+window and a digest contains none — 量 today, `--sweep . --exclude upstream`
+reads **2,497 files, 113 probes, CLEAN**, with both offending files inside the
+swept set. `leakscan` searches address *shapes*; `audit-bench-log` searches
+topic keywords. Nothing asks whether a committed file holds a *digest of* a
+forbidden window. New carried-forward **`FLW-1`**, deliberately NOT built
+today: the instrument would report `LOG.md:87` on its first run and today is
+when that was adjudicated, so its positive control is fixed in advance instead.
+
+🟢 **Resolution: the rule's behaviour does not change, its scope is written
+down.** `flashwin`'s reason is a conditional — *"with the rest of the window
+known"* — and the antecedent is **true at 256 bytes** (the complement is 250
+bytes of a page that is 98.22 % one repeated value; `FLS-22` measured ≥45 of
+`H601`'s 146 non-zero bytes as publicly recoverable) and **undecided at 4 MiB,
+undecidably so with one device** (the complement is 4,186,112 bytes including
+the whole firmware region). Widening is monotone, so a 4 MiB digest is never
+*easier* to brute-force — ⚠️ which is not the same as hard. **What makes the
+committed digest safe today is `FLS-22`'s decision, not width**: the MAC is
+already public by an owner's choice, and a digest cannot publish it again.
+🔴 **That makes `FLS-14` conditional on `FLS-22` standing, and until today
+neither row named the other.** Both now do. ⚠️ Two futures reopen it —
+`upstream/` going private, and `R9` publishing enough to rebuild the firmware
+region byte-exactly. `SPEC.md` `FLS-24`, `notes/flash-digest-scope.md`.
+
+🟢 **`R5-5`'s DoD, rewritten in four rows, and it never needs that digest.**
+`D1` digests the **complement of `H601`** — `[0x000000,0x006000)` plus
+`[0x008000,0x400000)`, **4,186,112 bytes = 99.8047 %**, `sha256 a9916fd8…4ce3cba`,
+both pieces measured `overlaps_forbidden` → `False` — computed **in my own
+kernel code** (2.6.30 ships `crypto/sha256_generic.c`), so the rootfs is
+untouched, `FW-26`'s Decision B is not engaged, and the name `mtd_debug`
+disappears. `D2` states that the 8,192 excluded bytes are excluded **by rule,
+not by failure**, and keeps their verification with the `FLR` bracket, which
+compares without printing. `D3` reads the same bytes back through
+`0xBD000000` and compares **in the kernel**, printing `equal` or the first
+differing offset — a verdict rather than a digest, so it covers `H601` without
+printing any of it. 🔴 **`D3` is only evidence if the two paths differ**: the
+driver must issue real SPI transactions through `SFCSR`/`SFDR`, and if it turns
+out to be a `map` over the same window `D3` is to be **deleted, not quoted**.
+`D4` proves the write path absent **by symbol** per `FW-39`. Negative control:
+one corrupted byte must make `D3` name the offset and `D1` disagree.
+⚠️ **And the old DoD's D-cache clause is unreachable in the shipped
+configuration** — decision ① removes the write path's translation unit
+entirely, and `0xBD000000` is uncached KSEG1 (`FLS-11`); it belongs to the `=y`
+control build.
+
+🟢 **Six re-reads of the two regions that may never be written, and neither
+moved by one byte.** Found while asking the above: `$FWRE_WORK/dumps/` holds six
+`config-region-*.bin` files whose sidecars all say `"flash_offset": 0,
+"length": 65536`, so 🔴 **the name is wrong** — each spans the loader region,
+`H601`, and the first 32 KiB of firmware, and two of them are byte-identical to
+the 2026-08-16 dump's first 64 KiB, which means **two files named
+`config-region-*` hold this unit's MAC**. Against that dump, two tools agreeing:
+loader **0 ×6**, `H601` **0 ×6**, firmware head 0 / 0 / 14,068 / 14,206 / 54 /
+14,104. Every changed byte landed above `0x008000`. ⚠️ **`CLAUDE.md` records
+two upstream flash writes in this window and that count is QUOTED, not measured
+here**; what IS measured is that the firmware head takes at least three distinct
+states against the reference — 0, ~14,100, and **54** — so the 08-19 02:30 read
+had come back to within 54 bytes after differing by 14,206 the evening before.
+The region was written and then largely restored, which a count of writes hides. This is **full 8,192-byte** `H601` coverage six times, where
+`CLAUDE.md` records `upstream/BENCH-LOG.md` as holding *first 4 KiB* baselines.
+⚠️ Six readings from one instrument are not six instruments; all six predate
+rlxfw's first power-up; and it **does not** move `FLS-19`/`FLS-20`'s bracket or
+make `G8b`'s sentence sayable. `SPEC.md` `FLS-25`.
+
+🟢 **The previous segment's four CI runs are accounted, all four derived twice
+down paths that share no code.** `citime check --last 40` named three at first
+and four once the last run went green — `check` counts only *successful* runs,
+which is it being right rather than short. `gh` JSON plus WSL's real `jq` 1.7,
+with the `apt` rule retyped from the prose: **534 / 539 / 537 / 529**, identical
+to `citime record` digit for digit, intermediate terms included. `A3`'s corpus
+claim independently confirmed a third time (7 hits, 6 distinct names) and `A4`'s
+one-population claim measured (one step-name sequence across all four).
+
+🔴 **`539` fell outside `suite_cost`'s band, and the rule written last segment
+answered it on its first use.** Post-changepoint, n=35 → 39: **BIG3 stays at
+497..504 = 7 s, ±0.70 %, not one second**, while `suite_cost` moves 523..538
+(15 s, ±1.41 %) → **523..539 (16 s, ±1.51 %)**. Same four points, two columns,
+one moves and one does not.
+
+🔴 **But that rule lived only in prose — the third instance of a shape this very
+row records twice.** `citime` had no BIG3 at all. It does now: a `big3_s`
+column, **`A6`** (a *partial* BIG3 refuses the row — two of three sums smaller,
+and smaller in a cost column reads as a suite that got faster rather than one
+that stopped running; *none* writes `-`, which is `A4`'s business), and **`A7`**
+(the share is printed every run against a floor, 量 **93.5..95.4 %** over 39
+rows, pooled **94.34 %**, floor 85 % **推**). Self-test 10 → **15/15**,
+including negative control `P15`. 🟢 **Backfilling tested this file's own claim
+that the series is derived and not maintained, for the first time: the tsv was
+deleted and rebuilt from `gh` — 55 rows back, `suite_cost` identical
+digit-for-digit, 0 moved, 0 lost.**
+
+🔴 **And re-deriving caught one of last segment's own figures.** The other
+twelve steps reproduce exactly (24..35 = 11 s, ±18.64 %, 5.66 % of cost), but
+*"53 % of the width"* does not: it is `1 − 7/15`, which treats band widths as
+additive, and **7 + 11 = 18 against a `suite_cost` range of 16**. The
+defensible statement is three separate ranges, not three shares.
+
+🔴 **`spec-check` fired twice and was right both times, and one of them was a
+defect in this session's own edit.** `C3` reported `FLS-14`, `FLS-22` and
+`FLS-24` all marked open — because I had written 未定 into three rows, which is
+**three owners for one open question**. The repair is ownership, not wording:
+`FLS-24` owns it and the other two point at it. `C8` then caught the new §17 row
+carrying 3 cells against a 4-cell header. ⚠️ **And reading `spec-check` hit the
+previous segment's own trap once**: `Select-Object -Last 22` cut off the `rc=`
+line, which prints first — *a tail is not a verdict*.
+
 🟢 **2026-09-07, thirty-ninth session, desk: `CI-5`'s band decomposed, and
 three stale statements found by `git grep` rather than by re-reading.** No
 power, **zero flash-write commands and zero `FLR`**, so the bracket is

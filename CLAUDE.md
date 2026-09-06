@@ -529,6 +529,21 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   dies with *unexpected EOF* on nested quotes. **Same fix as the Bash tool's:
   write the script to a file and run it by path** — `wsl -d Ubuntu-24.04 --
   bash /mnt/c/…/x.sh`.
+- 🆕 **The `Monitor` tool's command runs in the Bash tool's shell — Git Bash —
+  so a `/mnt/c/…` path there is not a missing file, it is a DIFFERENT
+  filesystem's name for nothing.** 量 2026-09-07: a monitor watching a
+  background WSL sweep was written with the `/mnt/c/…` path its own producer
+  used. In Git Bash that path does not exist, so `grep -c` returned **0** and
+  `pgrep -f` found nothing, and the monitor's two terminal branches — *no
+  events yet* and *the process is gone* — **collapsed onto the same reading**.
+  It reported `sweep process gone, done=0/59` while the sweep was at 27/59 and
+  running. 🔴 **The coverage rule was followed and did not help**: both
+  branches were written, and both read the same unreachable path. **A watcher
+  needs a startup assertion that it can SEE its input** — `[ -f "$O" ] || {
+  echo REFUSED; exit 1; }` — because *a tool reporting 0 is making a claim*
+  applies to the watchdog too. Git Bash's form is `/c/Users/…`; WSL's is
+  `/mnt/c/Users/…`; **the producer and the watcher are in different shells and
+  need different spellings of the same file**.
 - 🆕 **A sweep that RECONSTRUCTS the command it runs will eventually run a
   broken one and report it as a broken suite.** 量 2026-09-02: a script that
   pulled each suite out of `ci.yml` with a regex stopped at the `&` of `2>&1`,
