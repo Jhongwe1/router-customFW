@@ -1,0 +1,5 @@
+echo release > /proc/rtl819x-gpio ; echo r=$? ; echo claim > /proc/rtl819x-gpi
+o ; echo c=$?
+r=0
+c=0
+# 

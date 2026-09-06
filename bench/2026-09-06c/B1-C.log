@@ -1,0 +1,2 @@
+echo claim > /proc/rtl819x-gpio ; echo sample > /proc/rtl819x-gpio
+claisampl# 

@@ -1,0 +1,3 @@
+echo lock > /proc/rtl819x-gpio ; echo rc=$?
+rc=0
+# 

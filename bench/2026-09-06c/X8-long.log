@@ -1,0 +1,3 @@
+echo abcdefghijklmnopqrstuvwxyz0123 > /proc/rtl819x-gpio ; echo rc=0
+abcdefghijklmnopqrstuvwxyz012rc=0
+# 

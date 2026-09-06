@@ -1,0 +1,3 @@
+ls /proc | busybox grep -E "load_default|rf_switch|watchdog"
+grep: invalid option -- E
+# 

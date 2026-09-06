@@ -1,0 +1,8 @@
+echo claim | cat > /proc/rtl819x-gpio ; echo claim | cat > /proc/rtl819x-gpio 
+; echo tryout 12 | cat > /proc/rtl819x-gpio
+cat: write error: Device or resource busy
+RLXFW-G-TRYRC=FFFFFFED
+RLXFW-G-TRYCNR=00000000
+RLXFW-G-TRYDIR=00000000
+RLXFW-G-TRYDAT=00000000
+# 

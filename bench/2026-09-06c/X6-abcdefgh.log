@@ -1,0 +1,3 @@
+echo abcdefgh > /proc/rtl819x-gpio ; echo rc=$?
+abcdefgrc=255
+# 

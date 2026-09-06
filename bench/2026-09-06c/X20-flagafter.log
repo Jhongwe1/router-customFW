@@ -1,0 +1,5 @@
+cat /proc/load_default ; echo -- ; cat /proc/rf_switch
+1
+--
+0
+# 

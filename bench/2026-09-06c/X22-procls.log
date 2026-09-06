@@ -1,0 +1,3 @@
+ls /proc/watchdog_reboot /proc/load_default /proc/rf_switch
+/proc/load_default     /proc/rf_switch        /proc/watchdog_reboot
+# 

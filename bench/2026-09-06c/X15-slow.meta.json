@@ -1,0 +1,20 @@
+{
+  "tool_version": "1.3",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-06T20:30:22+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 25.0,
+  "idle": 0.0,
+  "sent": "for i in 1 2 3 4 5 6 7 8 9 0 1 2; do busybox grep ^dat /proc/rtl819x-gpio; sleep 1; done",
+  "sent_hex": "666f72206920696e2031203220332034203520362037203820392030203120323b20646f2062757379626f782067726570205e646174202f70726f632f72746c383139782d6770696f3b20736c65657020313b20646f6e650d",
+  "stop_reason": "--seconds 25.0 elapsed",
+  "bytes": 263,
+  "duration_s": 25.067246,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}
