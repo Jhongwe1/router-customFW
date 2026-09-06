@@ -140,7 +140,14 @@ log: `$FWRE_WORK/rebuild/r4-0/desk.log`.
 
 ⚠️ **Both of the last two are readings dated 2026-09-01 and neither is current.**
 `R4-3` added `host-compat/0003` and `0004` on 2026-09-02, so a build from this
-repository now applies **4** patches and the recipe id is **`b1434383`**. The
+repository applied **4** patches with recipe id **`b1434383`** on that date.
+🔴 **And that correction was itself written in the present tense, so it went
+stale in turn**: `R5-4` added `host-compat/0005` on 2026-09-06 and a build from
+this repository now applies **5**. The recipe id is not quoted here at all any
+more — it is a digest over `config/`, so it moves whenever anything under that
+directory does, and a file that names one is a file that goes stale on a
+schedule nobody controls. `ID0` reports it from the board, which is the point of
+it. The
 numbers above are not corrected, because they describe what THIS measurement
 ran with; a recipe id that moved is exactly what `ID0` exists to report.
 
