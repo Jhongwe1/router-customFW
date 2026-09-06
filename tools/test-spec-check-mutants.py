@@ -91,6 +91,14 @@ NEVERCLOSE = "            return True\n        k = m + 1"
 LINENO = "            out.append(('C10', f'{path}:{start}: a backtick run in this '"
 LOOP = "    for start, text in paragraph_blocks(lines, mask):"
 
+# C12's two branches.  N13 guts the verdict; N14 guts the block selection, and
+# the case that dies under N14 is P13 -- an old OPEN block in front of a closed
+# newest one, where reading the whole row hides the finding.  P14 is its mirror
+# and is deliberately weaker: with `all()`, extra ids can only suppress a
+# finding, so no reading of the row can turn P14's ok into a fire.
+C12_FIRE = "    if all(steps[i] for i in ids):"
+C12_TAIL = "    tail = row[hits[-1].start():]"
+
 MUT = [
     # --- the check does not fire, or always fires ------------------------
     ("N1", "C10 never reports",
@@ -127,6 +135,12 @@ MUT = [
      [(FASTPATH, "        if True:\n            continue")]),
     ("N12", "the reported line number is off by one",
      [(LINENO, "            out.append(('C10', f'{path}:{start + 1}: a backtick run in this '")]),
+
+    # --- C12.  One per branch: the verdict, and the block selection. ------
+    ("N13", "C12 never fires, so a Next-after-this row pointing at closed work passes",
+     [(C12_FIRE, "    if False:")]),
+    ("N14", "C12 reads the whole row instead of its newest block",
+     [(C12_TAIL, "    tail = row")]),
 ]
 
 

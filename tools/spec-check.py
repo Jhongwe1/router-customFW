@@ -1570,6 +1570,200 @@ def report_tables(findings, stats):
     return 1
 
 
+# ---------------------------------------------------------------------------
+# C12.  PROGRESS.md's `Next after this` row must point at work that is not done.
+#
+# WHY IT EXISTS.  CLAUDE.md tells every session to read PROGRESS.md first, and
+# § Now's `Next after this` row is where a session finds out what to do next.
+# 量 2026-09-07: that row had not been revisited since the thirty-fifth segment
+# and still named `R5-3b-2`, which the thirty-sixth segment closed -- so for
+# three segments the file that owns *where am I* pointed at finished work.  The
+# four session-history rows beside it were rewritten every single segment; the
+# two rows that need a judgement were not.
+#
+# THE RULE, MEASURED BEFORE IT WAS WRITTEN.  Take the text after the LAST
+# block-opening date in the row -- a `**` immediately followed by an ISO date,
+# which is how the house style opens every 🔄 block, and which a date quoted
+# mid-sentence does not match.  Collect the step ids in that text that are rows
+# of § Step list, and report if every one of them is closed.
+#
+# 量 over the last 40 commits that touched PROGRESS.md: 25 ok, 5 whose newest
+# block names no step id at all, and 10 that fire -- and the ten are exactly two
+# windows in which the row was stale.  `04dc0ef`/`83446d4` (2026-09-01) named a
+# closed `R3-11`, which nothing in this repository had noticed until this rule
+# was run backwards over the history.  `0cd91bf`…`adbf9c9` are eight consecutive
+# commits from the thirty-sixth segment's close to the end of the thirty-eighth.
+# The transition is sharp: `67bb237` at 13:19 is ok, `0cd91bf` at 16:05 is red,
+# and `R5-3b-2` closed between them.  No other commit of the forty fires.
+#
+# 🔴 THREE RULES TRIED AND REJECTED, each because it would have reported a clean
+# 0 on the very row this exists for:
+#   * "the last step id in the row" -- the stale row's last id was `R5-3b`, which
+#     is not a § Step list row at all, so the check would have passed.
+#   * "the id after the last 下一步是" -- a correction that QUOTES the stale claim
+#     leaves the closed id last.  The repair committed on 2026-09-07 does exactly
+#     that, so this rule would have gone red on its own fix.
+#   * "the row must change every segment" -- a step that spans two segments makes
+#     that a false positive, and a check that cries wolf is not a check.
+#
+# WHAT IT DELIBERATELY DOES NOT CHECK.  `Active gate` was stale the same way and
+# gets no rule, because its enumeration of remaining steps should not exist at
+# all: § Step list owns that state, and the same table's `DAY-ZERO items` row has
+# recorded since 2026-08-25 what happens when a second owner is created.  The
+# enumeration was struck out rather than checked.
+#
+# A state of NO-STEP-ID is printed and is NOT a finding (5 of the 40).  NO-ROW
+# and NO-DATE ARE findings: in either the check has silently stopped working,
+# which is this repository's own "a tool reporting 0 is making a claim".
+
+C12_ROW = '| **Next after this** |'
+C12_DATE = re.compile(r'\*\*(20\d\d-\d\d-\d\d)')
+C12_STEP = re.compile(r'`(R\d[0-9a-zA-Z]*(?:-[0-9a-zA-Z]+)*)`')
+
+
+def progress_step_state(text):
+    """{step id: is it closed} for every § Step list row.
+
+    Read from the FIRST cell only, so a ✅ that appears in a later cell as prose
+    about some other step cannot mark this one closed."""
+    out = {}
+    for ln in text.split('\n'):
+        if not ln.startswith('| **`'):
+            continue
+        cell = ln.split('|')[1]
+        ids = C12_STEP.findall(cell)
+        if not ids:
+            continue
+        shut = '✅' in cell
+        for i in ids:
+            out[i] = out.get(i, False) or shut
+    return out
+
+
+def progress_findings(text, path='PROGRESS.md'):
+    """(findings, state, ids) for C12."""
+    row = None
+    for ln in text.split('\n'):
+        if ln.startswith(C12_ROW):
+            row = ln
+            break
+    if row is None:
+        return ([('C12', f'{path}: § Now has no `Next after this` row, so the '
+                         f'check that it points at pending work cannot run')],
+                'NO-ROW', [])
+    hits = list(C12_DATE.finditer(row))
+    if not hits:
+        return ([('C12', f'{path}: the `Next after this` row carries no dated '
+                         f'block, so its current claim cannot be located')],
+                'NO-DATE', [])
+    tail = row[hits[-1].start():]
+    steps = progress_step_state(text)
+    ids = sorted({i for i in C12_STEP.findall(tail) if i in steps})
+    if not ids:
+        return ([], 'NO-STEP-ID', [])
+    if all(steps[i] for i in ids):
+        return ([('C12', f'{path}: the newest block of `Next after this` (dated '
+                         f'{hits[-1].group(1)}) names only steps § Step list '
+                         f'marks closed -- {", ".join(ids)} -- so the row that '
+                         f'says what comes next points at finished work')],
+                'FIRE', ids)
+    return ([], 'ok', ids)
+
+
+C12_STEPS = ('| Step | | What it produces |\n'
+             '|---|---:|---|\n'
+             '| **`R9-1`** ✅ | desk | closed |\n'
+             '| **`R9-2`** ✅ | desk | closed |\n'
+             '| **`R9-3`** | desk | open |\n')
+
+_OLD = '🔄 **2026-01-01（第一段）**：下一步是 `R9-3`。'
+_NEW_SHUT = '🔄 **2026-02-02（第二段）**：下一步是 `R9-1`。'
+_NEW_OPEN = '🔄 **2026-02-02（第二段）**：下一步是 `R9-3`。'
+
+C12_CASES = [
+    ('P11 the newest block names only closed steps',
+     '| **Next after this** | ' + _NEW_SHUT + ' |', 1, 'FIRE'),
+    ('P12 the newest block names an open step',
+     '| **Next after this** | ' + _NEW_OPEN + ' |', 0, 'ok'),
+    ('P13 an old open block does not excuse a closed newest one',
+     '| **Next after this** | ' + _OLD + ' ' + _NEW_SHUT + ' |', 1, 'FIRE'),
+    ('P14 an old CLOSED block does not condemn an open newest one',
+     '| **Next after this** | ' + _NEW_SHUT.replace('2026-02-02（第二段）',
+                                                    '2026-01-01（第一段）')
+     + ' ' + _NEW_OPEN + ' |', 0, 'ok'),
+    ('P15 a QUOTED closed id beside an open one does not fire',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：「下一步是 `R9-1`」'
+     '在第一段就過期，下一步是 `R9-3`。 |', 0, 'ok'),
+    ('P16 no `Next after this` row at all', '| **Blocked on** | nothing |',
+     1, 'NO-ROW'),
+    ('P17 the row carries no dated block',
+     '| **Next after this** | 下一步是 `R9-1`。 |', 1, 'NO-DATE'),
+    ('P18 an ISO date NOT opening a block is not the anchor',
+     '| **Next after this** | ' + _NEW_OPEN + ' 量 2026-03-03，`R9-1` 收掉了。 |',
+     0, 'ok'),
+]
+
+
+def progress_controls(verbose=True):
+    """C12's controls: a fixture § Step list, one case per failure mode, and a
+    population control on the real file.
+
+    The § Step list is a FIXTURE and not the real one, so these cases do not go
+    red the next time a step closes -- which is the event C12 exists to catch,
+    and a control that fires on it could not be trusted on the day it matters.
+    """
+    fail = ok = 0
+    if verbose:
+        print('=== C12 CONTROLS: a fixture step list, and one case per failure ===')
+    for label, row, n_want, state_want in C12_CASES:
+        got, state, _ids = progress_findings(C12_STEPS + row + '\n', 'fixture.md')
+        good = (len(got) == n_want and state == state_want)
+        if good:
+            print(f'  ok    {label:58s} {state}, {len(got)} finding(s)')
+            ok += 1
+        else:
+            print(f'  FAIL  {label:58s} wanted {n_want} finding(s) and state '
+                  f'{state_want!r}, got {len(got)} and {state!r}')
+            fail += 1
+
+    # T23: the live population.  A fixture-only suite proves the rule works on
+    # data this file wrote itself; this says it reaches the real row.
+    live = os.path.join(ROOT, 'PROGRESS.md')
+    if os.path.exists(live):
+        with io.open(live, encoding='utf-8') as f:
+            _f, state, ids = progress_findings(f.read())
+        if state in ('ok', 'FIRE') and ids:
+            print(f'  ok    {"T23 the live row is reached and parsed":58s} '
+                  f'state {state}, {len(ids)} step id(s) in the newest block')
+            ok += 1
+        else:
+            print(f'  FAIL  {"T23 the live row is reached and parsed":58s} '
+                  f'state {state!r} with {len(ids)} step id(s) -- C12 is '
+                  f'passing without reading anything')
+            fail += 1
+    else:
+        print(f'  FAIL  {"T23 the live row is reached and parsed":58s} '
+              f'no PROGRESS.md at {live}')
+        fail += 1
+
+    print(f'  {ok} passed, {fail} failed')
+    return fail
+
+
+def report_progress(findings, state, ids):
+    print('=== PROGRESS.md § Now — C12 ===')
+    print(f"  newest `Next after this` block: state {state}, "
+          f"step ids in it: {', '.join(ids) if ids else '(none)'}")
+    if not findings:
+        print('  ok  the row that says what comes next names at least one step '
+              '§ Step list does not mark closed')
+        return 0
+    for c, msg in findings:
+        print(f'  FAIL [{c}] {msg}')
+    print(f'\n  {len(findings)} finding(s)')
+    return 1
+
+
 def main(argv):
     args = [a for a in argv if not a.startswith('--')]
     path = os.path.join(ROOT, args[0]) if args else os.path.join(ROOT, 'SPEC.md')
@@ -1580,6 +1774,7 @@ def main(argv):
     failed = controls(path)
     failed += table_controls()
     failed += srcref_controls()
+    failed += progress_controls()
     if failed:
         print('  REFUSING to report on the file: a check that cannot fail would '
               'report it clean whatever it says')
@@ -1595,7 +1790,12 @@ def main(argv):
     # twice -- deliberately: the file-specific report is what an author of
     # SPEC.md reads, and the sweep is what says the rule holds everywhere.
     tf, ts = check_tables(table_scope())
-    return rc | report_tables(tf, ts)
+    rc |= report_tables(tf, ts)
+    print()
+    with io.open(os.path.join(ROOT, 'PROGRESS.md'),
+                 encoding='utf-8') as f:
+        pf, pstate, pids = progress_findings(f.read())
+    return rc | report_progress(pf, pstate, pids)
 
 
 if __name__ == '__main__':
