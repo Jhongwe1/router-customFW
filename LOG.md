@@ -18195,6 +18195,33 @@ DoD 寫「`mtd_debug read` 4 MiB 對 `FLS-14` 的 sha256」。量：`mtd_debug` 
    `check-predictions --self-test` 綠。`tools/citime.py` 從 **587** 變成
    **604** 行，那是這一段自己改 docstring 的結果。
 
+10. 🔴 **擁有者要求「再確認一次該寫的都寫了」，第二輪稽核又抓到三件 ——
+    而其中一件是一個**差點做錯的修法**。**
+
+    - ① `docs/FINDINGS.md` 兩列還帶著舊的帶，其中一列寫
+      「**Band unchanged: n=33, 523..536 = 13 s, ±1.23 %**」——**現在式**，
+      而那個帶從那之後動過兩次。**修法不是把新數字抄過去**（那正是同一頁
+      另一列在講的缺陷），是**加日期＋指向擁有者**，數字原封不動。
+      `docs/FINDINGS.md` 是「a reader is pointed at」的那一頁，所以它比
+      `LOG.md` 裡的同一個數字嚴重。
+    - ② 這一段自己的**產物那一行漏掉四個檔案**（`SPEC.md` `FW-26`、
+      `README.md`、`tools/citime.py`、`CNT-1`），因為它是在那四個改動**之前**
+      寫的。一行清單只要寫在工作結束之前，就會是一個過期的計數。
+    - ③ 🟢 **本來要把 `citime` 補進 `README.md` 的工具清單，量完之後沒有補。**
+      量：非 `test-*` 的工具裡有**十個**不在清單上（`binsim.py`、`citime.py`、
+      `rbcheck.py`、`rebuild-census.py`、`repdiff.py`、`isa-probe.sh`、
+      `rlxfw-kbuild.sh`、`tc-smoke.sh`、`vendor-tripwire.sh`、
+      `verify-backup-copy.sh`）。**十個一起缺，代表那份清單是策展過的而不是
+      漏掉的** —— 而在不知道它想不想完整之前補一個進去，是把一份策展清單改成
+      一份**看起來**完整的清單。**未定的是意圖**，記在 `CI-4`，附上決定它的
+      實驗（問一句話，把答案寫進那一節開頭）。
+
+    ⚠️ 同一輪順帶確認：工作樹乾淨、沒有殘留 `.tmp`（`os.replace` 那個寫法）、
+    `tools/citime.py`／`spec-check.py`／`test-spec-check-mutants.py` 在**索引裡**
+    都是 `100755` —— 第三十八段那個「`git reset` 把 `--chmod=+x` 一起退掉」的坑
+    沒有再踩，而這一次的 `test-file-modes` 是在 `git add` **之後**跑的，
+    因為那一段的教訓正是「一個在正確狀態下取得的綠，不能拿來證明它之後的樹」。
+
 ---
 
 ### 七、沒建立的
