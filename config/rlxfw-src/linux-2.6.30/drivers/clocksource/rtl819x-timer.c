@@ -59,6 +59,22 @@
  *   5. The interrupt path exists, in four separately-typed steps.  See
  *      "THE INTERRUPT PATH" below.
  *
+ * WHAT VERSION 4.0 CHANGED
+ * (R5-3b-2, 2026-09-06; the /proc format moved again, so the version did):
+ *
+ *   1. The handover happens at boot instead of from a /proc write.  It is
+ *      a SEQUENCER and not a reimplementation: every hardware step is the
+ *      same function the verb calls, in the order the card typed on
+ *      2026-09-06.  See "ARMING AT BOOT" at rtl819x_boot_arm_early().
+ *   2. Seven boot_* lines in /proc, and ten RLXFW-TA<n> lines on the wire.
+ *      The duplication is the point: /proc needs a shell and the wire does
+ *      not, and the failure this step can produce is one that never
+ *      reaches a shell.
+ *   3. Nothing in the arm/ackip/register path changed.  A diff that
+ *      touched those would have broken the one property that makes this
+ *      step cheap -- that R5-3b-1's three cold boots are evidence about
+ *      the code this version runs.
+ *
  * WHY TIMER/COUNTER 1 AND NOT 0.
  * TC0 is the vendor's system tick and this driver never writes it.  TC0 is
  * also unusable as a clocksource on its own: SPEC.md CLK-17 records that it
@@ -75,7 +91,9 @@
  * write once and declined it, recording it as "the upgrade path for R5-0";
  * this is that path taken, with the guards that payload could not afford.
  *
- * WHY ARMING IS A WRITE TO /proc AND NOT SOMETHING init DOES.
+ * WHY ARMING WAS A WRITE TO /proc AND NOT SOMETHING init DOES
+ * (true of versions 1.0 to 3.0; 🔄 2026-09-06 version 4.0 arms at boot,
+ *  and the block at the end of this section is why that became sayable).
  * Enabling TC1 sets bits in TCCNR, which is the same register that holds
  * TC0En.  Two hazards follow and neither is settled by any source this
  * project has:
@@ -123,8 +141,40 @@
  * where a hang costs the whole power cycle -- this project's most expensive
  * unit.  Arming from userspace puts them after a shell, where the failure is
  * observed, bounded and reversible, and where GIMR can be READ first.  R5-2's
- * reading is what makes the boot-time path (R5-3) safe to write; until then
- * this file boots inert and writes nothing.
+ * reading is what makes the boot-time path (R5-3) safe to write; ~~until then
+ * this file boots inert and writes nothing~~.
+ *
+ * 🔄 2026-09-06 (R5-3b-2): THAT LAST CLAUSE EXPIRED, AND THE TWO HAZARDS
+ * ARE ANSWERED RATHER THAN ACCEPTED.  The paragraph above is kept because
+ * it was the correct decision on the evidence of the day it was written,
+ * and because what changed is the evidence and not the reasoning.
+ *
+ *   (1) is answered by a guard that has run on the silicon.  arm() does
+ *       not blind-write TCCNR: it reads the word back and compares
+ *       RTL819X_TCCNR_TC0_BITS against what it read before, restores the
+ *       old value and returns -EIO if they moved.  量 seating 13, three
+ *       cold boots: tccnr 0xF0000000 after arm against 0xC0000000 before,
+ *       i.e. exactly the TC1 bits and nothing of TC0's, and the vendor's
+ *       own tick kept advancing across the whole seating.
+ *
+ *   (2) is answered by a reading of the mask rather than by an argument
+ *       about it.  量 seating 12 (CFG-2): GIMR is 0x00209100 at
+ *       arch_initcall -- TC1's bit 9 CLEAR -- and reaches 0x00209300 only
+ *       after request_irq(25), set by bsp_ictl_irq_unmask on this
+ *       driver's behalf.  So between S1 and S4 of the sequencer a TC1
+ *       timeout raises a bit nothing is listening to, and the vendor's
+ *       tick is on bit 8 and on the LOPI serial vector, neither of which
+ *       this driver touches.
+ *
+ * 🔴 AND THE HAZARD THE PARAGRAPH ABOVE NAMED LAST -- "a hang costs the
+ * whole power cycle" -- IS NOT ANSWERED.  It is REDUCED, and the
+ * difference is worth a line.  It cannot be removed: past
+ * clockevents_register_device() this boot has no way back.  What the ten
+ * RLXFW-TA<n> marks buy is that the power cycle is not spent on silence.
+ * They go out through prom_putchar, which needs no console and no log
+ * buffer, so the last line on the wire names the stage that did not
+ * return.  A power cycle that produces a bisected failure point is a
+ * different transaction from one that produces nothing.
  *
  * WHY RATING 0.
  * 讀 kernel/time/clocksource.c: clocksource_enqueue() inserts sorted by
@@ -327,6 +377,12 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+/* R5-3b-2.  rlxfw_markx() goes straight to prom_putchar: no console, no
+ * log buffer, no lock.  It is the only way this configuration can report
+ * a boot-time step, because CONFIG_PRINTK is not set and printk() is a
+ * 20-byte stub (arch/rlx/kernel/rlxfw_mark.c carries that measurement).
+ * A boot-arm that wedges must leave a line on the wire saying where. */
+#include <linux/rlxfw-mark.h>
 #include <asm/io.h>
 #include <asm/addrspace.h>
 #include <asm/page.h>
@@ -621,6 +677,46 @@
 #define RTL819X_CE_TOL_PERMILLE	10
 
 /*
+ * R5-3b-2, arming at boot.
+ *
+ * RTL819X_BOOT_ACK_TRIES / _US: the ackip retry, and the two numbers come
+ * from a measurement rather than from taste.  IRQ-09 (量 seating 12): the
+ * vendor's tick handler does REG32(BSP_TCIR) |= BSP_TC0IP a hundred times
+ * a second, and every IP bit in that register is write-1-to-clear, so a
+ * TC1IP belonging to this driver survives at most one 10 ms tick.  At an
+ * 8-bit period TC1 wraps every 256/200,000 s = 1.28 ms, so the bit is back
+ * within 1.28 ms of any clear -- 量 seating 12 put the duty cycle at
+ * 87.20 %.  Sampling every 500 us for 64 tries covers 32 ms, which is more
+ * than three of the vendor's own tick periods.
+ *
+ * 🔴 The loop exists because ONE ackip is a coin toss and a coin toss in a
+ * boot path is a driver that arms on some boots and not others -- which is
+ * indistinguishable, from a capture, from hardware that is intermittent.
+ *
+ * RTL819X_BOOT_WAIT_MAX_J: a ceiling on the pre-check wait, so a jiffies
+ * counter that has stopped cannot hang the boot in a loop that is waiting
+ * for it to advance.  The wait is expected to be SHORT or zero: the early
+ * half runs at arch_initcall and the late half at late_initcall, and the
+ * drivers in between are what the 300 jiffies are spent on.
+ */
+#define RTL819X_BOOT_ACK_TRIES	64
+#define RTL819X_BOOT_ACK_US	500
+#define RTL819X_BOOT_WAIT_MAX_J	(RTL819X_CE_MIN_J + 200)
+
+/* The stages, as printed by RLXFW-TA<n> and read back from /proc.  They
+ * are numbered rather than named because the mark is the primary reader
+ * and it has eight hex digits, not a string. */
+#define RTL819X_BOOT_S_NONE	0	/* the sequencer never ran */
+#define RTL819X_BOOT_S_ARM8	1	/* period 8, arm, armirq   -- I1, I2 */
+#define RTL819X_BOOT_S_ACK	2	/* the ackip retry          -- I3     */
+#define RTL819X_BOOT_S_ARMCE	3	/* disarm, mode ce, arm, armirq     */
+#define RTL819X_BOOT_S_REQ	4	/* reqirq                   -- I4     */
+#define RTL819X_BOOT_S_WAIT	6	/* the rest of the pre-check window  */
+#define RTL819X_BOOT_S_PROBE	7	/* cevtprobe, the negative control   */
+#define RTL819X_BOOT_S_CEVT	8	/* cevt -- THE HANDOVER              */
+#define RTL819X_BOOT_S_DONE	9
+
+/*
  * 🆕 `cereload <counts>` -- the bounds on a DELIBERATELY WRONG tick period.
  *
  * WHY THE VERB EXISTS.  My clockevent runs at HZ and so does the vendor's, so
@@ -649,7 +745,7 @@
 #define RTL819X_MODE_CE		1	/* clockevent:  hz_used / HZ period */
 
 #define RTL819X_PROC_NAME	"rtl819x-timer"
-#define RTL819X_TC_VERSION	"3.0"
+#define RTL819X_TC_VERSION	"4.0"
 
 /* ------------------------------------------------------------------------
  * State
@@ -737,6 +833,18 @@ static u32 rtl819x_ce_hw_bad;		/* set_mode(PERIODIC) had to write */
 static u64 rtl819x_ce_cycles;		/* reload per delivered interrupt */
 static u32 rtl819x_ce_base_irq;		/* irq_count at reqirq */
 static u64 rtl819x_ce_base_j;		/* jiffies  at reqirq */
+
+/* R5-3b-2.  What the boot sequencer did, for the shell to read after the
+ * fact.  Every one of these is also on the wire as an RLXFW-TA<n> line;
+ * the duplication is deliberate, because the wire is the only reader that
+ * still works when the boot does not reach a shell. */
+static int rtl819x_boot_stage;		/* the last stage ENTERED */
+static int rtl819x_boot_rc;		/* that stage's return, 0 while ok */
+static int rtl819x_boot_done;		/* the handover completed at boot */
+static u32 rtl819x_boot_ack_tries;	/* ackip calls until 1 -> 0 was seen */
+static u32 rtl819x_boot_wait_j;		/* jiffies spent waiting at S6 */
+static u32 rtl819x_boot_j_early;	/* jiffies at arch_initcall */
+static u32 rtl819x_boot_j_late;		/* jiffies at late_initcall */
 static u32 rtl819x_ce_check_dc;		/* the pre-check's two numbers, kept */
 static u32 rtl819x_ce_check_dj;
 
@@ -2087,6 +2195,25 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	len += scnprintf(page + len, PAGE_SIZE - len, "irq_preacked=%u\n",
 			 preacked);
 
+	/* R5-3b-2.  What the boot sequencer did.  These are read outside the
+	 * lock on purpose: they are written once each, by initcalls, before
+	 * any process can open this file, so there is nothing to serialise
+	 * against and taking the lock would suggest otherwise. */
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_stage=%d\n",
+			 rtl819x_boot_stage);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_rc=%d\n",
+			 rtl819x_boot_rc);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_done=%d\n",
+			 rtl819x_boot_done);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_ack_tries=%u\n",
+			 rtl819x_boot_ack_tries);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_wait_j=%u\n",
+			 rtl819x_boot_wait_j);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_j_early=%u\n",
+			 rtl819x_boot_j_early);
+	len += scnprintf(page + len, PAGE_SIZE - len, "boot_j_late=%u\n",
+			 rtl819x_boot_j_late);
+
 	*eof = 1;
 	if (off >= len)
 		return 0;
@@ -2194,6 +2321,201 @@ static int rtl819x_tc_write_proc(struct file *file, const char __user *buffer,
 	 * refusal is legible both from the shell's exit status and from a
 	 * capture taken afterwards. */
 	return ret ? ret : (int)count;
+}
+
+/* ------------------------------------------------------------------------
+ * R5-3b-2: arming at boot.
+ *
+ * WHAT THIS IS, AND WHAT IT DELIBERATELY IS NOT.
+ * It is a sequencer.  Every hardware step below is the same function the
+ * /proc verb calls, in the same order the card ran by hand on 2026-09-06
+ * (bench/2026-09-06, cells P2-1a..P2-5 and P3-1a..P3-5, three independent
+ * cold boots).  Nothing here re-implements arm(), ackip() or the
+ * registration, because then R5-3b-1's evidence would not carry: a second
+ * implementation of a step is a second thing to be wrong about, and this step
+ * is supposed to change WHEN the handover happens and nothing else.
+ *
+ * THE ONLY NEW LOGIC IS THREE THINGS:
+ *   1. the ackip retry (see RTL819X_BOOT_ACK_TRIES for the measurement);
+ *   2. the wait for the pre-check window, which by hand was `sleep 8`;
+ *   3. the unwind, which by hand was the operator not typing the next line.
+ *
+ * WHY IT IS SPLIT ACROSS TWO INITCALL LEVELS.
+ * rtl819x_ce_precheck() needs RTL819X_CE_MIN_J = 300 jiffies = 3 s of
+ * delivered interrupts before it will let the tick be handed over.  Spending
+ * that as a busy wait inside one initcall would add 3 s to every boot for
+ * nothing.  Split, the window is spent on the drivers that run between
+ * arch_initcall and late_initcall, and the late half waits only for whatever
+ * is LEFT.  RLXFW-TA6 prints that remainder, so how long this board takes
+ * between the two levels becomes a reading rather than an assumption.
+ *
+ * WHY late_initcall AND NOT A WORKQUEUE.
+ * 讀 init/main.c: do_initcalls() runs every level to completion inside
+ * kernel_init, and only then does init_post() exec /sbin/init.  So a
+ * late_initcall is the last place that is still guaranteed to be BEFORE
+ * userspace -- which is what this step's DoD says.  A workqueue would race
+ * the first process.
+ *
+ * 🔴 WHY THERE IS NO RUNTIME SWITCH, WHICH WAS CONSIDERED AND REJECTED.
+ * A magic word left in DRAM by the loader would have let one image both arm
+ * and not arm.  MEM-17 refutes it: 量 2026-08-31, this board's DRAM retains a
+ * previous power cycle's contents, so a stale word would arm a boot that
+ * asked not to be armed -- and a switch that can be set by the previous
+ * experiment is not a switch.  The recovery path is cheaper anyway: nothing
+ * of this is in flash, the image is TFTP'd to RAM on every cycle, so a wedged
+ * boot costs exactly one power cycle and the previous image is the fallback.
+ *
+ * 🔴 WHAT A FAILURE COSTS, BY STAGE.
+ * S1..S7 are soft: the sequencer unwinds with disarm(), the vendor keeps the
+ * tick, the board boots, and /proc plus the marks say which stage and which
+ * errno.  S8 is the only hard one -- past clockevents_register_device() the
+ * tick is this driver's and a broken ISR stops jiffies with nothing able to
+ * restart it.  That is the same one-way door rtl819x_tc1_disarm() documents,
+ * arrived at from a different direction.
+ * ------------------------------------------------------------------------ */
+
+static int __init rtl819x_boot_arm_early(void)
+{
+	int rc, i;
+
+	rtl819x_boot_j_early = (u32)get_jiffies_64();
+	rlxfw_markx("TA0", rtl819x_boot_j_early);
+
+	/* S1 -- I1 and I2 at an 8-bit period.  The period is not a preference:
+	 * it is the one seating 13 proved ackip against, and RTL819X_BOOT_ACK_*
+	 * carries why a short period is what makes the proof possible at all. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_ARM8;
+	rc = rtl819x_tc1_set_period("8");
+	if (!rc)
+		rc = rtl819x_tc1_arm();
+	if (!rc)
+		rc = rtl819x_tc1_armirq();
+	rlxfw_markx("TA1", (u32)rc);
+	if (rc)
+		goto fail;
+
+	/* S2 -- I3.  ack_proven is what rtl819x_tc1_cevt_register() refuses on
+	 * with -EPERM, and it is set only on a 1 -> 0 this driver watched. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_ACK;
+	for (i = 0; i < RTL819X_BOOT_ACK_TRIES && !rtl819x_ack_proven; i++) {
+		udelay(RTL819X_BOOT_ACK_US);
+		rtl819x_tc1_ackip();
+	}
+	rtl819x_boot_ack_tries = (u32)i;
+	/* 0xFFFFFFFF and not the try count, on failure: a count that reached the
+	 * ceiling and a count that succeeded on the last try print the same
+	 * number, and those are opposite outcomes. */
+	rlxfw_markx("TA2", rtl819x_ack_proven ? (u32)i : 0xFFFFFFFFu);
+	if (!rtl819x_ack_proven) {
+		rc = -EPERM;
+		goto fail;
+	}
+
+	/* S3 -- back to the clockevent period.  disarm() first because
+	 * set_mode_verb() refuses while armed, and set_period()/mode changes
+	 * under a running counter are what that refusal exists to prevent. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_ARMCE;
+	rc = rtl819x_tc1_disarm();
+	if (!rc)
+		rc = rtl819x_tc1_set_mode_verb("ce");
+	if (!rc)
+		rc = rtl819x_tc1_arm();
+	if (!rc)
+		rc = rtl819x_tc1_armirq();
+	rlxfw_markx("TA3", (u32)rc);
+	if (rc)
+		goto fail;
+
+	/* S4 -- I4.  This is also where ce_base_j / ce_base_irq are taken, so
+	 * the pre-check window starts counting from here. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_REQ;
+	rc = rtl819x_tc1_reqirq();
+	rlxfw_markx("TA4", (u32)rc);
+	if (rc)
+		goto fail;
+
+	rtl819x_boot_rc = 0;
+	return 0;
+
+fail:
+	rtl819x_boot_rc = rc;
+	/* Leave the block as it was found.  disarm() clears TC1IE, frees the
+	 * IRQ if one was requested, stops TC1 and clears a latched TC1IP; its
+	 * own return is discarded because there is nothing further to do with
+	 * it and rtl819x_boot_rc already holds the failure that matters. */
+	rtl819x_tc1_disarm();
+	return 0;
+}
+
+/*
+ * The late half.  Returns 0 always: an initcall that returns non-zero prints
+ * nothing in this configuration and changes nothing, so the return value is
+ * not a channel.  The marks and /proc are.
+ */
+static int __init rtl819x_boot_arm_late(void)
+{
+	u64 j0;
+	int rc;
+
+	rtl819x_boot_j_late = (u32)get_jiffies_64();
+	rlxfw_markx("TA5", rtl819x_boot_j_late);
+
+	if (rtl819x_boot_stage != RTL819X_BOOT_S_REQ || rtl819x_boot_rc) {
+		/* The early half did not finish.  TA1..TA4 say which stage and
+		 * with what errno; this line says the late half saw that and
+		 * declined, rather than that it never ran. */
+		rlxfw_markx("TA6", 0xFFFFFFFFu);
+		return 0;
+	}
+
+	/* S6 -- whatever is left of the pre-check window.  The ceiling is not
+	 * decoration: this loop's exit condition is jiffies advancing, and if
+	 * the thing that advances jiffies has stopped, an uncapped loop here
+	 * would hang the boot in the one place with no way to say so. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_WAIT;
+	j0 = get_jiffies_64();
+	while (get_jiffies_64() - rtl819x_ce_base_j < RTL819X_CE_MIN_J) {
+		if (get_jiffies_64() - j0 > RTL819X_BOOT_WAIT_MAX_J)
+			break;
+		msleep(20);
+	}
+	rtl819x_boot_wait_j = (u32)(get_jiffies_64() - j0);
+	rlxfw_markx("TA6", rtl819x_boot_wait_j);
+
+	/* S7 -- the negative control, and it is not optional.  A rating of 300
+	 * winning means nothing unless a rating of 99 on the same hardware,
+	 * through the same registration call, on the same boot, loses.  量
+	 * seating 13: ce_probe_registered=1 with ce_probe_mode_calls=0, three
+	 * times.  If that stops being true this line is where it shows. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_PROBE;
+	rc = rtl819x_tc1_cevt_register(1);
+	rlxfw_markx("TA7", (u32)rc);
+	if (rc) {
+		rtl819x_boot_rc = rc;
+		return 0;
+	}
+
+	/* S8 -- the handover.  Past the call inside this, the system tick is
+	 * TC1's interrupt.  There is no way back in this boot: clockevents.c
+	 * has no unregister and tick_cpu_device is static per-cpu. */
+	rtl819x_boot_stage = RTL819X_BOOT_S_CEVT;
+	rc = rtl819x_tc1_cevt_register(0);
+	rlxfw_markx("TA8", (u32)rc);
+	if (rc) {
+		rtl819x_boot_rc = rc;
+		return 0;
+	}
+
+	rtl819x_boot_stage = RTL819X_BOOT_S_DONE;
+	rtl819x_boot_done = 1;
+	/* The last mark is not "done": it is the two flags the tick core owns,
+	 * read back.  bit1 = ce_registered (this driver set it), bit0 = ce_live
+	 * (only tick_setup_periodic -> set_mode(PERIODIC) sets it).  A 2 here
+	 * means the registration returned and the core never called back, which
+	 * is exactly the failure a bare "done" would hide. */
+	rlxfw_markx("TA9", ((u32)rtl819x_ce_registered << 1)
+			   | (u32)(rtl819x_ce_live ? 1 : 0));
+	return 0;
 }
 
 /* ------------------------------------------------------------------------
@@ -2379,6 +2701,19 @@ static int __init rtl819x_timer_init(void)
 		return -ENOMEM;
 	pde->read_proc  = rtl819x_tc_read_proc;
 	pde->write_proc = rtl819x_tc_write_proc;
+
+	/* 🔴 AFTER the /proc entry and not before it.  If arming fails, the
+	 * only thing that can say why is this file, and a sequencer that ran
+	 * before its own reporting channel existed would have to be debugged
+	 * from the marks alone.  A create_proc_entry() that failed returns
+	 * above without arming at all, which is the right order for the same
+	 * reason. */
+	rtl819x_boot_arm_early();
 	return 0;
 }
 arch_initcall(rtl819x_timer_init);
+
+/* The late half is its own initcall rather than a call from the early one:
+ * the 300-jiffy pre-check window is supposed to be spent on the drivers in
+ * between, and a call would spend it as a busy wait instead. */
+late_initcall(rtl819x_boot_arm_late);
