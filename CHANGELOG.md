@@ -1,5 +1,162 @@
 # Changelog
 
+🟢 **2026-09-07, thirty-ninth session, desk: `CI-5`'s band decomposed, and
+three stale statements found by `git grep` rather than by re-reading.** No
+power, **zero flash-write commands and zero `FLR`**, so the bracket is
+untouched at 1,024 of 4,194,304 = **0.0244 %**. Date measured on three sides
+and all three agree: Git Bash `2026-09-07 00:59:57 +0800`, Windows
+`2026-09-07 00:59:59`, WSL `2026-09-07 01:00:07 +0800` — so this is a new day
+and not a sixth segment of 2026-09-06.
+
+🟢 **The third CI run of the previous segment is accounted, and the number was
+derived twice down paths that share no code.** `citime check --last 40` named
+one missing run — `34043834567` (`adbf9c9`). `gh` dumped its JSON and real
+`jq` 1.7 did the arithmetic with the `apt` rule rewritten from scratch:
+`instruments` exec **582** − apt **50** = **532**. `citime record` printed
+`suite_cost=532 (instr 582 - apt 50; lint apt 6)` — identical digit for digit,
+intermediate terms included. The same route independently confirms `A3`'s
+corpus claim: **7 hits over 6 distinct names**, matching the six the tool
+prints after de-duplication. Band, quoted from `citime stats --since
+changepoint` rather than re-summed: **n=35, 523..538 = 15 s, midpoint 530.5,
+half-width 7.5, ±1.41 %, median 532.0**. The new point lands on the median and
+the band does not move.
+
+🔴 **`A5` fired a third time, and the independent route showed it is broader
+than the reason written beside it.** `34040804067` was refused. The job that
+failed is `text`; `census` was **skipped**; `instruments` ran **16 of 16 steps
+to success** and its own `exec − apt` is **553 − 18 = 535**, inside the band —
+a complete measurement, discarded. `A5`'s docstring says *"a failed job stopped
+early, so its duration is not a cost"*, which describes `text` and not the row.
+The row is refused because **a row is a unit**: `text_s` and `census_s` would
+otherwise hold a truncated duration in a column that reads as a duration. The
+rule is right and the sentence beside it does not describe what it does — the
+same shape as the `A3` docstring defect found the previous segment, in the same
+file. **Behaviour unchanged; only the docstring moves.** ⚠️ Whether excluding
+red runs biases the band is **not answered**: this one exclusion sat inside the
+band, n=1.
+
+🟢 **The band's width is not a property of the suites, and that is now a
+decomposition rather than a sentence.** Every step of all **51** recorded runs
+re-derived from `gh` JSON. First a control: the `instruments` job's **16 step
+names are one sequence across all 51 runs**, so `A4`'s *one population* is
+measured at step level rather than assumed. Then a third independent route to
+the band: recomputing `suite_cost` from the raw step rows gives **n=35,
+523..538 = 15 s, median 532** — digit-for-digit the tool's own. The
+decomposition: **three suites are 94.4 % of the cost with a combined spread of
+497..504 = 7 s (±0.70 %)**, while **the other twelve steps are 5.6 % of the
+cost and 53 % of the width** (24..35 = 11 s, ±18.64 %). The widest single term
+is `test-spec-check-mutants` — median 22 s, range 16..26, **45 % of itself**;
+second is `checkout`, median 4 s, range 3..8.
+
+🔴 **That step was reproduced at the desk with a LARGER absolute spread than CI
+shows, and the mechanism first proposed was refuted twice.** Same commit,
+loadavg 0.00, identical command, three runs: **36.14 / 42.04 / 48.77 s**, a
+12.63 s spread against CI's 10 s. Three controls: ① the same suite at
+`--jobs 1` gives **111.97 / 124.09 s**, the same *absolute* jitter, so it is
+not parallelism; ② the other `--jobs 8` suite, `test-console-capture-mutants`
+(370 s desk, 361 s CI), is the **tightest step in the job** at ±0.7 %, so it is
+not parallelism a second time; ③ a serial suite of comparable length,
+`test-deskchan`, repeats to **±1.75 %** here against **±2.6 %** on CI, so the
+desk is not a noisy instrument — without ③ the first two prove nothing.
+⚠️ **Mechanism 未定**, with the deciding experiment written down (n≥5 in
+shuffled order; `/tmp` accumulation already excluded — 0 leftover dirs).
+A two-runner-population hypothesis was checked far enough to note that the API
+does expose `runner_id` and the two endpoint runs differ; the desk reproduction
+makes it **unnecessary rather than refuted**, and those are not the same thing.
+🟢 **The usable output is an estimator**: quote **BIG3** (±0.70 %) and never a
+`--jobs N` step.
+
+🔴 **`PROGRESS.md` § Now was three segments stale in exactly the two rows that
+need a judgement.** The four session-history rows are rewritten every segment;
+`Active gate` and `Next after this` had not moved since the thirty-fifth, so
+the row whose whole job is to say what comes next named `R5-3b-2`, closed by
+the thirty-sixth — in the file CLAUDE.md tells every session to read first.
+`Active gate`'s enumeration of remaining steps is **struck out rather than
+updated**, because § Step list owns that state and the same table's `DAY-ZERO
+items` row has recorded since 2026-08-25 what a second owner costs.
+
+🔴 **And a count in `docs/blind-write-ledger.md` went stale in place, in the
+direction that flatters the claim.** § 4.1 still read *"These four are the
+drivers whose blind-write claim is strongest"* after `48a7a2a` moved `R5-4` out
+of that section and rewrote its header. Read as four, it awards the strongest
+independence claim to the one driver in the group carrying a vendor `artefact`
+reading of register addresses and bit numbers — **while § 8's table in the same
+file says the opposite**. Two halves of one file disagreed and the load-bearing
+half was the stale one. Replaced by the **names**, not deleted the way
+`docs/FINDINGS.md:375`'s identical phrase was, because unlike that one this
+count is not decoration. All three were found by `git grep` and `git log -S`;
+re-reading found none of them.
+
+🟢 **`spec-check` gains `C12`, and its rule was measured over forty commits
+before it was written.** `PROGRESS.md`'s `Next after this` row must name at
+least one step § Step list does not mark ✅. Replayed over the last 40 commits
+that touched the file: **25 ok, 5 with no step id in the newest block, 10
+fire** — and the ten are exactly two stale windows, including `04dc0ef` /
+`83446d4` naming a closed `R3-11` that **nothing in this repository had ever
+noticed**. The transition is sharp: `67bb237` at 13:19 ok, `0cd91bf` at 16:05
+red, `R5-3b-2` closed between them. 🔴 **Three candidate rules were rejected
+first, each because it would have reported a clean 0 on the very row** — "the
+last step id" (the stale row's last id was `R5-3b`, not a step row at all),
+"the id after the last 下一步是" (a correction that quotes the stale claim
+leaves the closed id last, which this segment's own repair does), and "the row
+must change every segment" (a two-segment step makes that a false positive).
+🔴 **`C11` was already taken** by `srcref_findings`; the draft said `C11` and
+`git grep` caught it before the commit — the `NET-14` id-collision shape,
+caught this time. Ten cases against a **fixture** step list, so they will not
+go red the next time a real step closes; `P13` pins the newest-block selection
+and `P15` is the quoted-id case. Two mutants, `N13` and `N14`, with the kill
+prediction written before the run — **`N14` can only die by `P13`, because
+under `all()` extra ids can only suppress a finding** — and the run came back
+naming `P13`. **19/19 killed.** The strongest control is not a fixture: fed
+four real commits' `PROGRESS.md`, `C12` fires on `adbf9c9`, `0cd91bf` and
+`04dc0ef`, is quiet on `67bb237`, and is quiet on the repaired tree.
+`spec-check` **50/50**, `test-spec-check-mutants` **20/20**, census green,
+`not-run-total` **491 unmoved**. ⚠️ `Active gate` deliberately gets no checker:
+the sentence it would check should not exist.
+
+🔴 **The next step is `R5-5` (`rtl819x-spi` + MTD), and one of the two
+arguments this session gave for it was false — in the direction that flattered
+its own recommendation.** The surviving argument: the ledger's § 4.5 already
+finds `R5-5`'s blind-write claim **spent** against the vendor (11 paths, three
+on the decision layer), while `R5-6`/`R5-7`/`R5-8` stand at 0/0/1, so doing
+`R5-5` now costs no independence and doing it later recovers none. The false
+one: *"the vendor's Linux read path cannot substitute because of the 1024-byte
+cap"*. `SPEC.md` `FW-34` had already settled it — without
+`CONFIG_MTD_COMPLEX_MAPPINGS`, `map_copy_from` expands as a macro and **the
+driver's function pointer is never consulted** (31 `.config-built` on disk, all
+unset), so `rtl8196_map_copy_from` is **dead code**, and all 4,194,304 bytes
+have already been read correctly through that path — four readings, two power
+cycles, newline counts matching the dump where truncation would have given
+≤1228 and ≤2007.
+
+🟢 **What survives is narrower and is a defect in `R5-5`'s own DoD.** That DoD
+says *"`mtd_debug read` of 4 MiB matching `FLS-14`'s sha256"*. 量: `mtd_debug`
+is not in `config/rlxfw-initramfs.tsv` (13 symlinks, 11 to busybox) and appears
+**nowhere in this repository**. Putting it there is a binary that is not this
+unit's — Decision B's third leg, `FW-26`. **So the blocker on the forbidden
+sentence is the digest, not the read path, and `R5-5` does not by itself move
+it.** New carried-forward **`MTD-1`**: compute the digest in kernel code of
+mine (2.6.30 ships `crypto/sha256_generic.c` and `lib/crc32.c`), which touches
+no rootfs binary — ⚠️ with one precondition nobody has computed, that a 4 MiB
+digest covers `H601` and `flashwin`'s rule forbids printing even a sha256 of
+that window, on a ground (*"with the window otherwise known a digest is a 2^24
+search"*) whose arithmetic over 4 MiB has never been done.
+
+🔴 **The write-path decision, made before the first line is written.** The
+program/erase path goes in a **separate translation unit**,
+`obj-$(CONFIG_MTD_RTL819X_WRITE) +=`, `n` in `config/` — **not** a runtime
+guard. A guard leaves the dangerous code in the image and makes the safety
+property an argument about control flow; an absent translation unit makes it a
+fact about symbols, and what is guarded here is the only bootloader on a device
+with no spare rather than `R5-4`'s GPIO pin. Proof follows `FW-39`: the
+write-path symbols absent from `System.map`/`nm vmlinux`, with the positive
+control a throwaway build at `=y` in which the same scan must hit every one.
+🔴 **And the way the naive version fails is written down first**: `FW-39` worked
+because it keyed on the address of one specific variable. An opcode-byte scan
+(`0x02` PP, `0x06` WREN, `0x20`/`0xD8` erase) **is not a discriminator** —
+those immediates are far too common, and a read-only driver stores to
+`SFCSR`/`SFDR` to issue READ. **Key on symbols, not opcodes.**
+
 🟢🟢 **2026-09-06, thirty-eighth session, seating 15: `R5-4`** — **a
 `gpio_chip` of mine on `PABCD`, ten boots, and the vendor's reset-button path
 read out of compiled code and then closed on the die.** **One power cycle**,
