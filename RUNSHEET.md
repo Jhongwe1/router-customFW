@@ -3793,7 +3793,7 @@ staged tree into `S3` until it was fixed that afternoon. `SEAM-1`.
 
 ---
 
-## Two rules about the card's lifecycle, 2026-09-06 (seating 14)
+## Three rules about the card's lifecycle, 2026-09-06
 
 Neither is about the board. Both cost something in seating 14 and neither had a
 home in this repository before this section.
@@ -3843,3 +3843,36 @@ rows may only name **frozen** artefacts. Three of block 11's five broken rows
 point at `config/rlxfw-src/…/rtl819x-timer.c`, a live source file, and would
 have gone red on the next edit whatever it was. **A row that must eventually go
 red teaches the reader to skip the report.**
+
+### 3. 🔴 A card written before its seating is SCHEDULED has a directory name that is a prediction
+
+*2026-09-06, thirty-seventh segment, and it is the general form of this
+block's defect ① rather than a new mistake.*
+
+`bench/` is **one directory per power cycle**, named for the day the cycle
+happened. Seating 14's card was written into a directory named for a day the
+seating did not happen on. The obvious reading of that is "someone typed the
+wrong date", and it is the wrong reading: **the card is written before the
+seating, so at writing time the directory name is a PREDICTION about when the
+operator will next have the board.** A prediction that nothing checks and that
+silently becomes part of forty capture paths.
+
+`R5-4`'s card (`bench/2026-09-06c/PREDICTIONS-B13-block12.md`) is written with
+the seating unscheduled, so it carries the prediction openly instead of
+pretending to know:
+
+* the directory appears in **exactly one place** in the rule (§ 4.1's `OUT`)
+  and once per line in the expansion;
+* `cardcheck numbers`'s `expansion-*` rows **count those lines by regex**, with
+  the directory inside the pattern — so a rename that misses lines makes the
+  count disagree;
+* the `cells` fence is compared against the expansion **in both directions**.
+
+🟢 **So a half-done rename is a red row, not something found at the
+bench.** The rule is: rename the directory and re-derive the fence **before**
+the freezing commit, and per rule 1 run `spec-check` before that commit too.
+
+⚠️ **What this does not fix**: nothing forces the directory's name to
+match the day the captures were actually taken. That check would have to read
+a capture's `.meta.json` `started_wallclock` and compare it with the path, and
+no tool here does.
