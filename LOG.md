@@ -18158,6 +18158,43 @@ DoD 寫「`mtd_debug read` 4 MiB 對 `FLS-14` 的 sha256」。量：`mtd_debug` 
    （`.github/workflows/ci.yml:580`，旁邊還有一句註解說明只跑自測），
    那一支今天是 17／17 綠。
 
+9. 🔴 **重新導出交辦清單裡「不要再寫錯」的那些數字時，找到一個新的錯的，
+   而它在 `CLAUDE.md` 裡。**
+
+   交辦說「`sweep 61 步 1,734.9 s` → 61 步 1,855.0 s」，把 **61** 當成正確的
+   那一半。量 2026-09-07：`.github/workflows/` **只有一個檔案**，而它有
+   **59** 個 `run:` step。四條互相獨立的算法一致：
+
+   | 算法 | 結果 |
+   |---|---:|
+   | `grep -cE '^[[:space:]]+run:' ci.yml` | 59 |
+   | `grep -cE '^ +run:' ci.yml` | 59 |
+   | `- name:` 的步驟數 | 59 |
+   | **GitHub 自己的逐 job step 清單**（16＋6＋51＋7，各扣 5 個框架 step） | **59** |
+
+   🔴 **而 `f82c704` 當下就是 59** —— 那正是 `CLAUDE.md` 說「把 60 變成 61」的
+   那一個 commit —— 所以不是後來掉了兩步。**我沒有動過 `ci.yml`**（`git log`
+   在這一段的範圍內 0 個 commit 碰它）。
+
+   ⚠️ **差在哪裡未定。** 產生 61 的那支 sweep 腳本不在這個 repo 裡，
+   `CLAUDE.md` 記的是它的**行為**不是它的原始碼，所以我判定不了它多算了什麼。
+   **決定它的實驗**：下次跑 sweep 讓它逐一印出實際叫起來的指令，與 `ci.yml`
+   對名字。
+
+   🟢 **最有價值的是這一句：`CLAUDE.md` 同一段裡就寫著會抓到它的規則** ——
+   「**never read a sweep's own count as coverage**」。而 **61 正是一支 sweep
+   自己報的數。** 規則寫下來了，套用到自己身上的那一次沒有做。
+
+   **`CLAUDE.md` 這一段沒有動它**：那個檔案自己的規則是「where this contradicts
+   the repo, the repo wins and this file is wrong」，而改它是擁有者的事。
+   量測記在 `PROGRESS.md` 的 `CNT-1`。
+
+   🟢 **同一輪重新導出的其他數字都對得上**：`check-predictions.py` **610** 行、
+   `rtl819x-gpio.c` **673** 行（未動）、`config/host-compat/` **5** 個補丁、
+   `flashwin --self-test` **41/41**、`test-boot-timeline` **19/19**、
+   `check-predictions --self-test` 綠。`tools/citime.py` 從 **587** 變成
+   **604** 行，那是這一段自己改 docstring 的結果。
+
 ---
 
 ### 七、沒建立的
