@@ -379,6 +379,16 @@ jobs:
       - name: looptime self-test
         run: /usr/bin/python3 tools/looptime.py --self-test 2>&1 | tee ci-out/looptime.out; exit "${PIPESTATUS[0]}"
 
+      # citime is CI-5's instrument, and it exists because that row's rule
+      # lived in prose and drifted from the number it governs three separate
+      # ways -- `exec` quoted with `apt` inside it, an `apt` annotation that
+      # changed population mid-series, and an `exec` that changed definition
+      # mid-series (job wall-clock for three points, sum-of-steps for the
+      # rest).  All three were found by re-deriving, none by re-reading.
+      # Its fixtures are synthetic dicts, so it touches no network and no gh.
+      - name: citime self-test
+        run: /usr/bin/python3 tools/citime.py --self-test 2>&1 | tee ci-out/citime.out; exit "${PIPESTATUS[0]}"
+
       - name: test-looptime-mutants
         run: /usr/bin/python3 tools/test-looptime-mutants.py 2>&1 | tee ci-out/test-looptime-mutants.out; exit "${PIPESTATUS[0]}"
 
