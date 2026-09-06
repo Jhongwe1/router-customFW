@@ -243,8 +243,22 @@ driver:
   **not** `RESET#`) and `REG-12` (`WDTCNR` at `0xB800311C`, reset value
   `A5000000`) are both `量`, read through `probe`/`DW` at the loader prompt.
 
-🟢 **These four are the drivers whose blind-write claim is strongest**, and the
-claim is *"no implementation of these peripherals, by anyone, has been read"*.
+🟢 **`R5-6`, `R5-7` and `R5-8` are the drivers whose blind-write claim is
+strongest**, and the claim is *"no implementation of these peripherals, by
+anyone, has been read"*.
+
+🔴 *(This read "These four" from `aa89317`, where it was correct because this
+section covered four drivers, and it was still reading it after `48a7a2a` moved
+`R5-4` out of the section on 2026-09-06: the header was rewritten and the count
+beside it was not. It is replaced by the names rather than simply deleted the
+way `docs/FINDINGS.md:375`'s "These four" was, because unlike that one this
+count is load-bearing -- read as four it awards the STRONGEST independence
+claim to the one driver in the group that has a vendor `artefact` reading
+carrying register addresses and bit numbers, and § 8's table in this same file
+says the opposite: `gpio` is 🟡 "no longer blind of the vendor's". So the two
+halves of one file disagreed, and the section was the stale half. Found
+2026-09-07 by `git log -S`, not by re-reading. § 8 owns which domains are in
+which state; this line names the drivers and states no count.)*
 
 ⚠️ Bounded by § 0 ① and by § 4.2: a board file initialises GPIOs, and
 `boards/rtl8196e/bsp/setup.c` **has** been read.
