@@ -64,10 +64,17 @@ Modes
     capture is missing or out of order.
 
 ``--self-test``
-    the controls and nothing else.  Fifteen of them, and **eight must fail** --
-    six of the fifteen drive this file as a subprocess and assert its exit
-    code, because the exit code is the entire content of a gate and calling the
+    the controls and nothing else.  **Seventeen** of them, of which **twelve
+    assert that this file reports a problem** (``N1``-``N9``, ``X2``-``X4``),
+    and **four** drive this file as a subprocess and assert its exit code,
+    because the exit code is the entire content of a gate and calling the
     functions directly cannot see it.
+
+    🔴 *Both counts here were wrong before 2026-09-06 and neither was a typo:
+    the line read "Fifteen of them, and eight must fail -- six of the fifteen
+    drive this file as a subprocess", against ten and four at the time.  They
+    were re-derived off ``LABELS`` and off the four ``_cli`` call sites rather
+    than re-read.*
 
 ``--sweep <root>``
     every ``PREDICTIONS-*.md`` under ``root``, checked for **ordering only**.
@@ -100,9 +107,48 @@ FENCE = re.compile(r"^```cells\s*$")
 ENDFENCE = re.compile(r"^```\s*$")
 
 
+def malformed_entry(s):
+    """Why *s* cannot be a capture prefix, or None if it can be one.
+
+    Both rules exist because block 12's fence broke both and the result was
+    indistinguishable from a seating that had not happened yet.  Measured
+    2026-09-06 over the whole corpus: 54 cards have a usable fence, exactly one
+    breaks either rule, and it is the broken one.
+
+    ``more than one prefix``
+        block 12 wrote eight cells on one line.  This function's callers then
+        looked for a file whose name was the whole line, found none, and
+        reported ``no capture`` -- five times, for thirty-two cells.  ``0 of 5``
+        was on screen before the board was powered and reads exactly like the
+        correct pre-seating answer, which is ``0 of 32``.
+
+    ``no directory separator``
+        every capture in this repository lives under ``bench/<dir>/``, and cell
+        paths resolve against the cwd rather than against the predictions file
+        (the module docstring's third warning).  A bare name can only resolve
+        when the tool is run from inside the capture directory.
+
+    ⚠️ **Neither rule may be "nothing resolved"**, which is the obvious third
+    check and is wrong: before a seating NOTHING resolves, and that is the
+    correct state of a freshly frozen card.  ``--sweep`` can refuse on it
+    because it reads many cards at once; the per-file check cannot.
+    """
+    if re.search(r"\s", s):
+        return "holds more than one prefix (a capture prefix cannot contain " \
+               "whitespace)"
+    if "/" not in s:
+        return "has no directory separator (a capture prefix is a path)"
+    return None
+
+
 def parse_cells(path):
-    """Return the capture prefixes named in the file's ``cells`` block."""
-    cells, inside, seen_block = [], False, False
+    """Return (prefixes, saw_a_fence, malformed) for the file's ``cells`` block.
+
+    *malformed* is a list of ``(line, why)``.  It is returned rather than raised
+    so that each caller can decide: the per-file check refuses, the sweep counts
+    the file unreadable.  A malformed entry is NOT put in *prefixes*.
+    """
+    cells, inside, seen_block, bad = [], False, False, []
     with open(path, encoding="utf-8") as fh:
         for line in fh:
             if not inside and FENCE.match(line):
@@ -114,17 +160,28 @@ def parse_cells(path):
                     continue
                 s = line.strip()
                 if s and not s.startswith("#"):
-                    cells.append(s)
-    return cells, seen_block
+                    why = malformed_entry(s)
+                    if why:
+                        bad.append((s, why))
+                    else:
+                        cells.append(s)
+    return cells, seen_block, bad
 
 
 def check(path, quiet=False):
     """Return (violations, checked) or raise ValueError for an unusable file."""
     if not os.path.exists(path):
         raise ValueError(f"{path}: no such file")
-    cells, seen_block = parse_cells(path)
+    cells, seen_block, bad = parse_cells(path)
     if not seen_block:
         raise ValueError(f"{path}: no ```cells block -- nothing to check")
+    if bad:
+        # Refusing rather than reporting.  A malformed entry counted as one
+        # absent cell prints a number that looks like the pre-seating answer.
+        first = bad[0]
+        raise ValueError(f"{path}: {len(bad)} malformed ```cells entr"
+                         f"{'y' if len(bad) == 1 else 'ies'} -- "
+                         f"{first[1]}: {first[0][:60]!r}")
     if not cells:
         # A tool that reports "0 violations" over 0 cells is making a claim it
         # cannot support.  CLAUDE.md: a tool reporting 0 needs a positive
@@ -183,13 +240,17 @@ def sweep(root, quiet=False):
                                recursive=True))
     for path in r.files:
         try:
-            cells, seen_block = parse_cells(path)
+            cells, seen_block, bad = parse_cells(path)
             tp = os.path.getmtime(path)
         except (OSError, UnicodeDecodeError) as e:
             # A predictions file this tool cannot read is a malformed record,
             # not an absent one.  UnicodeDecodeError is a ValueError, not an
             # OSError, and the first version let it out as a traceback.
             r.unreadable.append((path, f"{type(e).__name__}: {e}"))
+            continue
+        if bad:
+            r.unreadable.append((path, f"{len(bad)} malformed ```cells "
+                                       f"entries -- {bad[0][1]}"))
             continue
         if not seen_block or not cells:
             r.unreadable.append((path, "no usable ```cells block"))
@@ -241,6 +302,8 @@ LABELS = (
     "X2 CLI: a regression exits 1",
     "X3 CLI: an empty root is REFUSED (exit 2), not reported green",
     "X4 CLI: a tree where nothing resolves is REFUSED, not reported green",
+    "N8 a cells line holding two prefixes is REFUSED, not one absent cell",
+    "N9 a cells entry with no directory separator is REFUSED",
 )
 
 
@@ -325,6 +388,30 @@ def controls():
             ck(LABELS[3], False, "an empty cells block reported a clean result")
         except ValueError:
             ck(LABELS[3], True)
+
+        # N8 -- block 12's shape exactly: two prefixes on one line, and BOTH
+        # captures present.  Without the rule this reports one absent cell over
+        # a card whose captures are all there, which is what happened on
+        # 2026-09-06 and read as the correct pre-seating answer.
+        capture("n8a")
+        capture("n8b")
+        pred = block("N8.md", os.path.join(d, "n8a") + " " + os.path.join(d, "n8b"))
+        try:
+            check(pred, quiet=True)
+            ck(LABELS[15], False, "two prefixes on one line were accepted")
+        except ValueError as e:
+            ck(LABELS[15], "malformed" in str(e), str(e))
+
+        # N9 -- a bare name.  The capture EXISTS beside the predictions file, so
+        # the only thing that could make this resolve is running from inside
+        # that directory; the rule refuses instead of depending on the cwd.
+        capture("n9")
+        pred = block("N9.md", "n9")
+        try:
+            check(pred, quiet=True)
+            ck(LABELS[16], False, "a bare cell name was accepted")
+        except ValueError as e:
+            ck(LABELS[16], "separator" in str(e), str(e))
 
         # ---- the sweep -----------------------------------------------------
         # P2: one cell ran, one never did.  Green, with the absent one counted.

@@ -62,11 +62,20 @@ Every one of these is a claim the tool would otherwise be making silently.
   A2  a run in which the `apt` rule fires zero times is REPORTED, not given
       `suite_cost = exec`.  A rule that cannot fire proves nothing.
   A3  the loose rule -- substring `apt` -- is evaluated alongside the strict
-      one and its extra hits are PRINTED BY NAME.  On this repository they are
-      `capture dir`, `replay-capture self-test`, `replay-capture mutation
-      suite` and `merge the captures`: the word *capture* contains *apt*.  The
-      reason the rule is written strictly belongs in the output, where it is
-      checked, and not only in a comment.
+      one and its extra hits are PRINTED BY NAME.  On this repository there are
+      SIX and the tool prints all six: `capture dir`, `merge the captures`,
+      `replay-capture mutation suite`, `replay-capture self-test`,
+      `test-console-capture` and `test-console-capture-mutants` -- the word
+      *capture* contains *apt*.  The reason the rule is written strictly
+      belongs in the output, where it is checked, and not only in a comment.
+
+      🔴 *This paragraph said FOUR until 2026-09-06, naming the first four, and
+      the sentence began "On this repository they are".  It did not: those four
+      are the names in `_fixture_normal()` below, and the two missing ones are
+      real steps of the real `instruments` job.  The tool has printed all six
+      on every run; the docstring enumerated the fixture and called it the
+      repository.  Re-derived by running `record` against five runs and reading
+      the A3 line, which is identical on all five.*
   A4  the set of job names is recorded per row, and `stats` refuses to pool
       rows whose job sets differ.  A series that silently spans two CI shapes
       is not one population.
@@ -262,10 +271,29 @@ def band(vals):
     return lo, hi, hi - lo, mid, half, (100.0 * half / mid if mid else float("nan"))
 
 
+#: The changepoint `CI-5` sits on, and the convention for the row that lands ON
+#: it.  Both halves are here because the second one was written down nowhere and
+#: cost a disagreement inside one segment: 2026-09-06, one hand sliced with `>`
+#: and got n=32 where the owner said 29+4=33.  The permutation test that located
+#: this point put the changepoint run at the HEAD of the right segment (left
+#: n=16 mean 543.75, right n=28), so the slice is `>=`.  A boundary convention
+#: that lives in prose is the same defect as an `apt` rule that lives in prose.
+CHANGEPOINT = "2026-09-01T14:27:11Z"
+
+
 def cmd_stats(a):
     rows = read_tsv(a.tsv)
     if not rows:
         raise SystemExit("citime stats: no rows in %s" % a.tsv)
+    if a.since:
+        cut = CHANGEPOINT if a.since == "changepoint" else a.since
+        before = [r for r in rows if r["created_utc"] < cut]
+        rows = [r for r in rows if r["created_utc"] >= cut]
+        print("--since %s: %d row(s) at or after it, %d before "
+              "(the row ON the boundary is the FIRST of this segment)"
+              % (cut, len(rows), len(before)))
+        if not rows:
+            raise SystemExit("citime stats: no rows at or after %s" % cut)
     groups = {}
     for r in rows:
         groups.setdefault(r["jobs"], []).append(r)
@@ -490,6 +518,25 @@ def selftest():
         assert row["suite_cost_s"] == "534", row
     case("P9", "negative control: gutting the apt rule breaks the suite", p9)
 
+    # P10 -- the boundary convention, which is the whole reason --since exists.
+    # A row whose created_utc EQUALS the changepoint belongs to the segment
+    # that STARTS there. Nothing recorded that until 2026-09-06, and slicing it
+    # the other way gives n=32 where the owner's own figures give 33 -- inside
+    # one segment, from the same file.
+    def p10():
+        rows = [{"created_utc": "2026-09-01T14:00:00Z", "suite_cost_s": "548"},
+                {"created_utc": CHANGEPOINT,            "suite_cost_s": "529"},
+                {"created_utc": "2026-09-01T15:00:00Z", "suite_cost_s": "531"}]
+        after = [r for r in rows if r["created_utc"] >= CHANGEPOINT]
+        before = [r for r in rows if r["created_utc"] < CHANGEPOINT]
+        assert len(after) == 2, after
+        assert len(before) == 1, before
+        assert after[0]["suite_cost_s"] == "529", after
+        # and the wrong convention, stated so it cannot be re-chosen silently
+        wrong = [r for r in rows if r["created_utc"] > CHANGEPOINT]
+        assert len(wrong) == 1, wrong
+    case("P10", "the changepoint row is the FIRST of the right segment", p10)
+
     for cid, what in ok:
         print("  ok   %-4s %s" % (cid, what))
     for cid, what, why in bad:
@@ -511,6 +558,10 @@ def main():
     r.set_defaults(fn=cmd_record)
 
     s = sub.add_parser("stats", help="recompute n and the band from the tsv")
+    s.add_argument("--since", default=None,
+                   help="an ISO timestamp, or the word `changepoint` for "
+                        "CI-5's own (%s). The row ON the boundary belongs to "
+                        "the segment that STARTS there." % CHANGEPOINT)
     s.add_argument("--pool", action="store_true",
                    help="pool rows whose job sets differ (A4 says do not)")
     s.set_defaults(fn=cmd_stats)

@@ -180,7 +180,23 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # 🟢 And this seating gives the case something none of the seven before it did:
 # a cold row and eleven warm rows from the SAME power cycle --
 # `cold - max(warm) = +0.0101 s`, the largest warm population since 2026-09-01.
-ck "twenty-six cold, forty-eight warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 26 cold, 48 warm, 0 unknown')"
+# 🔄 26/48 -> 27/57 on 2026-09-06 (seating 15, `bench/2026-09-06c`): ONE power-on
+# and NINE warm resets. The warm ones are `busybox reboot -f` typed into the
+# shell of the boot before (`SPEC.md` `FW-37`) and not `looprun`'s `S4`, which
+# was skipped on all ten runs -- the same shape as seating 14, one press
+# carrying ten boots. Isolation check, run before this line was touched: every
+# directory EXCEPT `2026-09-06c` still reports 26 cold, 48 warm, and
+# `2026-09-06c` alone reports 1 cold / 9 warm -- so the delta is exactly +1/+9
+# and nothing was reclassified. NINTH seating in a row that turned this case
+# red, and the ninth time the run-every-suite rule rather than a `--only` run
+# caught it.
+# ⚠️ SEVENTY-SIX captures of that seating produce no row and the tool says so
+# itself -- `NOT CLASSIFIED: 76 capture(s) produced no row; 0 of them hold boot
+# text`. They are shell captures taken at a prompt after S7, plus twenty-four
+# `X*` cells that deviate from the card, so having no boot line is correct
+# rather than a miss; the `0 of them hold boot text` half is what makes that a
+# reading instead of an assumption.
+ck "twenty-seven cold, fifty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 27 cold, 57 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
