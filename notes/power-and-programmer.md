@@ -112,6 +112,25 @@ XOR                                                00000020   → bit 5 only
 > does nothing else to this port. `B7c.log` contains no `Booting...` and no
 > banner — the board did not reset while the button was held.
 
+🔄 **2026-09-06, seating 15: confirmed twice more, and the `XOR = 00000020`
+above does NOT carry into Linux.** The reading above is in the **loader**, where
+`PABCD_DIR` is `FF000000` and bit 6 is an input. Under Linux the vendor's
+`rtl_gpio_init` runs `DIR |= 0x40`, making bit 6 an **output it drives**, so the
+whole-word XOR across a press reads **`00000060`** — measured on two independent
+boots. Masked, `(released ^ held) & 0x20` is `00000020` on both, and the
+single-bit fields a driver of mine reports (`btn_raw`, `btn_pressed`) go
+`1 → 0 → 1` and `0 → 1 → 0` with `CNR`/`DIR` byte-identical across all six
+readings. **So this section's claim is intact and its arithmetic is
+loader-state**; `SPEC.md` `BRD-05` and `REG-37` carry the Linux form.
+
+🟢 **And the same day the vendor's own compiled code was found saying it.**
+`reset_button_pressed` at `0x800e59d8` reads `0xB800350C`, masks `0x20`, and
+returns 1 when the bit is **clear** — bit 5, active low, from an artefact this
+section never used. 🟢 **Its first instruction is a `sys_bonding_type()` check
+against 13**, which is `REG-30`'s constant from the **loader**: the same
+multiplexing decision exists in both artefacts, and neither this project nor
+that comparison knows what `sys_bonding_type()` actually is. `SPEC.md` `FW-40`.
+
 **Refuted by**, all three written down before the cell ran
 (`bench/2026-08-24b/PREDICTIONS-block2.md`): w4 bit 5 still `1` — the button is
 not on this pin and `B7a` measured something else; any *other* bit of w4 moving

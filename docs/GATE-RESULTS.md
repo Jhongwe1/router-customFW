@@ -411,6 +411,14 @@ condition fired and none of the four stop-loss lines was reached.**
 * 🔴 **There is still no driver of mine.** D5's ping went out through the
   vendor's `rtl819x`, in the vendor's own configuration. `R6` is the gate that
   changes that sentence.
+  🔄 **Expired, and the sentence beside it was imprecise when it was written.**
+  This file records what `R3` said on the day it closed and that record stands,
+  but a reader reaching it today must not carry the present tense out: a driver
+  of mine executed on the silicon on **2026-09-03** (`R5-1`, the timer) and a
+  second on **2026-09-06** (`R5-4`, a `gpio_chip`). What `R6` changes is
+  narrower than *no driver of mine* — it is the sentence about the **network**,
+  which is the one D5's ping actually rests on. The live claim, with its five
+  successive narrowings, is `docs/KNOWN-ISSUES.md`.
 * 🔴 **D3's written observable did not exist.** The criterion for *early
   bring-up completes* was the string `MemTotal:`, which this kernel never prints
   in any configuration — it is a `/proc/meminfo` field, not a boot message. The

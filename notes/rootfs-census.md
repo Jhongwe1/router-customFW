@@ -108,6 +108,30 @@ uname: applet not found
 is the only absent one; `cat`, `ifconfig`, `ping`, `ls`, `ps`, `mount`, `echo`,
 `sleep`, `mkdir`, `sh`, `ash`, `sed` and `grep` are all present.
 
+🔄 **2026-09-06: re-derived a week later, and the list is published here for
+the first time.** Same binary, same method, tripwire CLEAN on four trees:
+
+```
+ash bunzip2 bzcat cat chpasswd cp cut date echo expr false free getty grep halt head hostname ifconfig init ip kill killall klogd ln login ls mkdir mount nice nslookup ping ping6 poweroff ps reboot renice rm route sed sh sleep syslogd tail telnetd tr traceroute true umount uptime wc
+```
+
+**50, the same number, and `uname` is still not in it.** 🔴 **`dd` is not in
+it either**, which is a second source for a reading taken on the board the
+same evening — `busybox dd` answered `dd: applet not found` at a shell on the
+device (`SPEC.md` `FW-42`). 🟢 **And `grep` IS in it**, so this image's
+`grep: invalid option -- E` is a build option and not a missing applet; those
+two point at different fixes and only the list separates them.
+
+🟢 **The warning at the top of this section now has an answer, and it is the
+one that makes the warning worth keeping.** *The symlink count and the applet
+list are two different questions* — 量, they are also the same fifty: every
+one of the 50 symlinks names an applet and every one of the 50 applets has a
+symlink, `comm` both ways empty. **So on this rootfs the two questions agree,
+and the place they come apart is the IMAGE**: `config/rlxfw-initramfs.tsv`
+carries **11** of those symlinks, while the binary it links to still has all
+50 applets — which is why `busybox <name>` works on the board for commands
+that have no bare name.
+
 **Both controls are in the same run**, which is what makes `applet not found` a
 reading rather than a broken invocation:
 

@@ -4204,6 +4204,12 @@ cost one desk segment, as budgeted.
 * **There is still no driver of mine.** D5's ping went out through the vendor's
   `rtl819x`, which is in the vendor's own configuration. `R6` is the gate that
   changes that sentence, and `R3` must not be written up as though it had.
+  🔄 **2026-09-06: expired, and the second half of it was imprecise as
+  written.** The record of what `R3` did not establish stands, but the bare
+  sentence stopped being true on **2026-09-03** (`R5-1`, the timer, on the
+  silicon) and again on **2026-09-06** (`R5-4`, a `gpio_chip`). What `R6`
+  changes is the **network** sentence — the one D5's ping rests on — not
+  *no driver of mine*. Live claim: `docs/KNOWN-ISSUES.md`.
 * **D3's written observable was wrong** and the row passed on a substitute
   (§21.4). A DoD whose observable does not exist is a defect in the DoD, and it
   is recorded rather than quietly repaired.

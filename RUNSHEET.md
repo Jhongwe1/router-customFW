@@ -3795,8 +3795,15 @@ staged tree into `S3` until it was fixed that afternoon. `SEAM-1`.
 
 ## Three rules about the card's lifecycle, 2026-09-06
 
-Neither is about the board. Both cost something in seating 14 and neither had a
-home in this repository before this section.
+None of the three is about the board. All three cost something in seating 14
+and none had a home in this repository before this section.
+
+*(This paragraph read "**Neither** is about the board. **Both** cost something
+… and **neither** had a home" until 2026-09-06. The section was two rules when
+it was written and a third was added the same evening; the heading was updated
+to "Three" and the sentence under it was not — 量, found by the thirty-eighth
+segment's closeout enumeration, not by a checker. A count in a heading and a
+count in prose are two places, and one piece of state has exactly one owner.)*
 
 ### 1. 🔴 Run `spec-check` on a card BEFORE freezing it
 

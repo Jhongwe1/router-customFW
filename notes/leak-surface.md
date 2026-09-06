@@ -352,9 +352,27 @@ that `leakscan` already named, which §4 counted and §5 decided about.
 
 **What it does change** is one sentence. *"Nothing checks whether a committed
 capture already contains forbidden content"* — the carried-forward row from
-seating 8 — is **false for rlxfw's own tree as of today**, with a number:
+seating 8 — is **false for rlxfw's own tree**, with a number: 量 **2026-08-31**,
 1,381 files (excluding `upstream/`), CLEAN, and a positive control that a
 rendering of the real window HITS.
+
+🔄 **The file count moves every time a seating adds captures, and this sentence
+used to read *"as of today"* with the 2026-08-31 number under it** — a dated
+measurement wearing a present-tense claim, which is the shape that stops a
+reader re-deriving it. The CLAIM is what does not move; the population does.
+Re-derived since: **2,221** files on 2026-09-06 (thirty-seventh segment) and
+**2,491** the same evening at the close of seating 15, CLEAN both times, and the
+positive control firing both times — with `upstream/` included the sweep reads
+**2,793** files and reports the one known HIT (`upstream/BENCH-LOG.md`, offset
+1165, sixteen bytes of flash `0x006000`), so CLEAN is a reading and not a tool
+that cannot fail.
+
+⚠️ **The count moves between two runs of the same evening and that is the point
+of this paragraph rather than an error in it**: an earlier run the same hour
+read **2,490**, one fewer, because the sweep walks the working tree and a
+gitignored `study/` file had not been written yet. **Quote the tool, not this
+paragraph** — `flashwin scan --sweep . --exclude upstream` prints the count it
+actually walked.
 
 🔴 **And it changed the tool's own default.** The first version of the walk
 excluded `upstream/`. With it excluded the sweep of this repository is CLEAN;
