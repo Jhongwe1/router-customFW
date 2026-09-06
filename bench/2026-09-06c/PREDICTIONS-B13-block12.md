@@ -3,21 +3,27 @@
 **Written 2026-09-06, thirty-seventh segment, at the desk, before power.**
 `R5-4`'s bench half. The desk half is done and its artefacts are frozen (§1).
 
-🔴 **THIS CARD IS NOT FROZEN AND ITS DIRECTORY NAME IS A PREDICTION.**
-`bench/` is *one directory per power cycle*, named for the day the power cycle
-happened. This card was written on 2026-09-06 and the seating is **not
-scheduled**. Seating 14's card carried a directory named for a day the seating
-did not happen on, and that was defect ① of that block. So: if the seating is
-not on 2026-09-06, **rename this directory and re-run the expansion in §4.3
-before freezing** — the directory appears in exactly one place in §4.1 (`OUT`)
-and once per line in §4.3, and `cardcheck` compares the two, so a half-done
-rename is caught rather than typed.
+🟢 **FROZEN 2026-09-06 by the thirty-eighth segment, before power. The
+directory name was a prediction and the prediction held.** The date was
+measured on all three sides before anything else was done — Windows
+`2026-09-06 19:53:19 +08:00`, Git Bash `19:53:16 +0800`, WSL `19:53:27 +0800`
+— so `bench/2026-09-06c` names the day the power cycle happens, no rename was
+needed, and §4.3's expansion is byte-for-byte the one that was written.
 
-🔴 **And freeze order**: run `tools/spec-check.py` **before** the freezing
-commit. Seating 14 froze first, `C8` then found three header defects, and
-repairing them made six capture cells "older than the prediction" — that card's
-`check-predictions` has read `0 of 24` ever since, and the mtime evidence is not
-recoverable. Two seconds.
+Run in this order, and the order is the point: `tools/spec-check.py` green
+**before** this commit, then `cardcheck commands` **34 commands / 34 SHELL**,
+`cardcheck numbers` **14 of 14**, `check-predictions` **`0 of 5`** — which is
+the correct answer for a card whose captures do not exist yet. This paragraph
+is the last edit; every capture under this directory is newer than the file
+that predicted it.
+
+*(Until this commit these two paragraphs read “THIS CARD IS NOT FROZEN AND ITS
+DIRECTORY NAME IS A PREDICTION”, and carried the rename procedure for a seating
+that landed on a different day, plus the freeze-order rule. Neither is deleted:
+both live in `RUNSHEET.md` § “Three rules about the card's lifecycle,
+2026-09-06”, rules 1 and 3, which is their owner. What is recorded here is the
+outcome — the prediction was checked against a measurement rather than
+assumed.)*
 
 ---
 
