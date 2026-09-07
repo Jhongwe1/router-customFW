@@ -3795,10 +3795,12 @@ staged tree into `S3` until it was fixed that afternoon. `SEAM-1`.
 
 ---
 
-## Three rules about the card's lifecycle, 2026-09-06
+## Four rules about the card's lifecycle, 2026-09-06
 
-None of the three is about the board. All three cost something in seating 14
-and none had a home in this repository before this section.
+None of the four is about the board. **Three** of them cost something in
+seating 14 and none had a home in this repository before this section; the
+fourth arrived on 2026-09-07 and cost nothing only because it was caught in
+the hour before the card was frozen.
 
 *(This paragraph read "**Neither** is about the board. **Both** cost something
 … and **neither** had a home" until 2026-09-06. The section was two rules when
@@ -3885,3 +3887,49 @@ the freezing commit, and per rule 1 run `spec-check` before that commit too.
 match the day the captures were actually taken. That check would have to read
 a capture's `.meta.json` `started_wallclock` and compare it with the path, and
 no tool here does.
+
+### 4. 🔴 Re-derive `RECIPE_ID` before the freezing commit, and if it moved, rebuild
+
+*2026-09-07. The rule was discovered by the forty-first segment and written
+into the card it was discovered on; the forty-second found it had no owner
+here, and a rule that lives inside a **frozen** artefact cannot reach the next
+card.*
+
+`RECIPE_ID` is `sha256` over **every file under `config/`** — comments
+included — computed by `tools/rlxfw-kbuild.sh`, compiled into the image, and
+printed by the board as `RLXFW-ID0=`. **It is the one number on a card that the
+device itself checks**, and `looprun` compares it against the value the build
+recorded.
+
+🔴 **What happened**: `R5-5`'s image was built, staged, and its recipe written
+into the card as `e0028cc8`. A one-line **comment** was then edited in
+`config/rlxfw-src/…/rtl819x-spi.c`, and the recipe moved to `3b589390`.
+Nothing warned. The build script's own comment knows that a `config/` edit
+moves `RECIPE_ID`, but frames it as *rebuild cost* — nobody had written down
+that it also invalidates a frozen card's identity assertion.
+
+**So, before the freezing commit and before rule 1's `spec-check`:**
+
+```
+bash tools/rlxfw-kbuild.sh <cell> --variant <quiet|loud> --dry-run
+```
+
+`--dry-run` prints `recipe=<8 hex>` and **stages nothing**, so it costs no
+480 MB tree copy. Compare it with the card's §1. **If they differ the image is
+stale and must be rebuilt — the card is not edited to match.** Editing the card
+would make the board's own check pass against an image the tree can no longer
+produce, which is the one failure this number exists to prevent.
+
+🟢 **Three sources, and two of them are free**: the by-hand formula
+(`find config -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum |
+sha256sum | cut -c1-8`), the build's own `manifest.tsv` beside the image, and
+the card. 量 2026-09-07 at `R5-5`'s freeze: all three read `fce0af22`, so no
+rebuild was needed. ⚠️ Note that two `config/` files had mtimes **later** than
+the build's manifest and the id still matched — `RECIPE_ID` is content-based,
+so a touched-but-unchanged file does not move it, and an mtime comparison
+would have called for a rebuild that was not needed.
+
+⚠️ **This is still prose, and this repository's own lesson is that a rule in
+prose is not a rule.** A checker would have to know which image a card names
+and re-derive the id at commit time; it is carried forward rather than
+claimed.
