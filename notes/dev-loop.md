@@ -1046,3 +1046,55 @@ which is **23 s saved per boot**.
 
 🔴 **`busybox reboot` without `-f` does not reset this board** — it signals
 PID 1, and this image's PID 1 is a shell script. `SPEC.md` `FW-37`.
+
+---
+
+## 15. 🆕 2026-09-08 (seating 16): ten machine totals, and two defects in the loop that a seating pays for and the self-test cannot see
+
+Ten `looprun --mode bench` runs on one power cycle, `--skip S2,S3,S4`, all
+`rc=0` — the same shape as §14. What is new is the two runs **before** those
+ten, both of which failed, and neither of which was the board.
+
+### 15.1 🔴 Every gate this tool owns points at the BOARD, and none at the HOST
+
+`S6` died after a 12.11 s TFTP timeout and the tool reported
+`looprun: STOPPED at S6 -- exit 1`. The cause was on this desk: the USB GbE had
+just been attached to WSL, `10.1.1.2/24` does not survive a re-attach, and the
+interface was `DOWN` with no address. `RUNSHEET` `P3` says to bring it up and
+that half of `P3` was skipped.
+
+🔴 **The tool cannot help with this and the reason is structural.**
+`DEFAULT_HOST = "10.1.1.1"` is a constant, and there is no reachability check
+anywhere before `S6`. Every abort gate `looprun` owns is aimed at the board —
+`S5b` reads the burn flag as a word, `S6b` reads the staged head back — so a
+**host** fault is reported in the **board's** vocabulary, at the stage where a
+board fault would be most alarming.
+
+🟢 **The precondition it should have is one line, and the instrument is ARP
+rather than ICMP**: the loader answers ARP and does **not** answer ping, so
+`ping` returning 100 % loss is a pass. `ip neigh show dev <if>` reading
+`10.1.1.1 lladdr … REACHABLE` is the positive form. Carried forward as
+`looprun` 1.1.
+
+### 15.2 🔴 A failed run cannot be retried, and the obvious workaround destroys evidence
+
+The retry died at `S5b` in **0.06 s** — too fast to have opened the port.
+`console-capture.py:368` refuses to overwrite an existing capture, correctly,
+and `C1-ab2` was still on disk from the first attempt.
+
+🔴 **At a bench the natural response to that refusal is `--force`, and that is
+exactly the write the guard exists to prevent.** The stage artefacts should be
+attempt-numbered (`C1-ab2`, `C1-ab2-att2`, …) so a retry is a new file rather
+than a collision. Here the first attempt's capture was moved aside by hand to
+`C1-ab2-att1`, which preserved a real burn-flag reading (`8040D4A0: 00000000`)
+that `--force` would have destroyed.
+
+⚠️ **And the two tools in this pipeline disagree about overwriting.**
+`console-dump.py` (`S5`) silently rewrote `C1-rescue.json` on the retry;
+`console-capture.py` (`S5b`) refused. Nothing declares which is intended, and
+the difference is invisible until a run fails.
+
+🔴 **Neither defect is reachable from `--self-test`**: both need a *failed* run
+followed by a *second* run against the same `--out-dir`, and the self-test runs
+`--mode replay` once. A case that replays a stage-1 failure and then re-invokes
+is what would have caught them at the desk.
