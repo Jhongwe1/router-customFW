@@ -196,7 +196,28 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # `X*` cells that deviate from the card, so having no boot line is correct
 # rather than a miss; the `0 of them hold boot text` half is what makes that a
 # reading instead of an assumption.
-ck "twenty-seven cold, fifty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 27 cold, 57 warm, 0 unknown')"
+# 🔄 27/57 -> 28/66 on 2026-09-08 (seating 16, `bench/2026-09-08`), which is ONE
+# cold power-on and NINE warm resets -- the same +1/+9 shape as seating 15, and
+# for the same reason: `C1-A` is the ESC catch the operator powered into, and
+# `C2-A`..`C10-A` are `busybox reboot -f` typed into the shell of the boot
+# before (`SPEC.md` `FW-37`), so one press carried ten boots. `looprun`'s own
+# `S4` is absent again -- the card ran `--skip S2,S3,S4` because every reset in
+# it is a `Cn-A` cell. Isolation check, run before this line was touched: the
+# whole tree reports 28 cold / 66 warm and `2026-09-08` alone reports
+# 1 cold / 9 warm, and 27+1 = 28 with 57+9 = 66 -- so the delta is exactly
+# +1/+9 and nothing was reclassified. TENTH seating in a row that turned this
+# case red, and the tenth time the run-every-suite rule caught it.
+# 🟢 A second summary line agrees without being asked: `booting, cold n=28` and
+# `booting, warm n=66` are computed from a different code path than the C-8
+# classification line this case greps, so the count has two sources.
+# ⚠️ `entry, warm n=32` did NOT move, and that is a reading rather than an
+# oversight: this seating's warm resets are `busybox reboot -f`, not a typed
+# `J <addr>`, and `--skip S4` meant no `looprun` reset ran -- so nothing here
+# contributes an entry interval. The case below still asserts 32.
+# ⚠️ SEVENTY-SEVEN captures of this seating produce no row, `0 of them hold
+# boot text`. They are the shell captures after S7 plus the nineteen off-card
+# `BIS-*` verify rungs, the three `SEC-*` cells and `BBLIST`.
+ck "twenty-eight cold, sixty-six warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 28 cold, 66 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something

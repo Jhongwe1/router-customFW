@@ -109,6 +109,18 @@ ALLOW = [
     ("line", "Serial: 8250/16550 driver",
      "the 8250 UART driver's registration banner, matched by the pattern aimed "
      "at serial NUMBERS. Scoped to this line for the same reason"),
+    ("line", "h601_skipped",
+     "rtl819x-spi's /proc output prints the NAME of the region it refused to "
+     "hash, followed by a byte COUNT -- `h601_skipped 8192`. The count is the "
+     "whole point: it is how the driver reports that H601 stayed out of the "
+     "digest. 量 2026-09-08 (seating 16), 39 captures, two hits each. Scoped "
+     "to this line, so a line carrying H601 CONTENT still fires -- which is "
+     "the same distinction spec-check.py's REDACTION_ALLOWLIST draws for the "
+     "same two field names"),
+    ("line", "h601_hashed",
+     "the sibling field, `h601_hashed 0`. Its value being zero is the "
+     "assertion D1 rests on, so it may not be renamed to please a scanner. "
+     "Scoped to the line for the same reason as h601_skipped"),
 ]
 
 
