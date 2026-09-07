@@ -79,6 +79,16 @@ That is `leakscan.py --attribute`. The arbiter is
 unit on 2026-08-16, sha256 `a800059a…`, `SPEC.md` `FLS-14`. No belief about
 vendors enters.
 
+🔴 **2026-09-07 (fortieth segment): this file enumerates the channels it knows
+and there is one it does not, so the enumeration reads as complete and is not.**
+Every scanner here asks about BYTES or about the text SHAPES an address takes;
+none asks whether a committed file holds a **digest of** a forbidden window —
+and a digest contains neither. The line four paragraphs up prints one. **The
+finding, the adjudication and the numbers live in
+`notes/flash-digest-scope.md` and `SPEC.md` `FLS-24`; they are deliberately
+not restated here**, and the missing instrument is carried forward as `FLW-1`
+with its positive control already fixed.
+
 **A second, narrower gap, closed the same way it was found.** `enx<12 hex>` —
 the form in which the workstation's adapter appears in nine tracked files and
 three `upstream/` ones — is invisible to all eight patterns, because `\b` does
