@@ -249,7 +249,13 @@ def manifest(root):
     * **A symlink contributes its TARGET STRING, never the target's content.**
       `src-vendor` points into `$FWRE_WORK`; a verifier that followed it would
       hash 480 MB of vendor tree and would still pass if the link itself had
-      been repointed.
+      been repointed.  🔴 And a symlink to a **directory** has to be picked out
+      of `dirnames` by hand: `os.walk` classifies with `entry.is_dir()`, which
+      FOLLOWS the link, so `src-vendor` never appears in `filenames` and the
+      first version of this function omitted the repository's only symlink
+      entirely.  The self-test's C6 did not catch it because its fixture link
+      pointed at a NONEXISTENT path -- not a directory, so it landed in
+      `filenames`.  C6c is the case with the real shape.
     * **mtime is compared at 1-second granularity, and it is fatal.**
       `tools/check-predictions.py` decides "the prediction was written first"
       by mtime, so a copy that loses mtimes is not this tree.  One second
@@ -267,6 +273,15 @@ def manifest(root):
             continue
         if ".git" in dirnames:
             dirnames.remove(".git")
+        # A symlink to a DIRECTORY is in dirnames, never in filenames, because
+        # os.walk classifies with is_dir() and that follows the link.  Record
+        # it here and prune it, or the tree's only symlink is not checked.
+        for dn in list(dirnames):
+            full = os.path.join(dirpath, dn)
+            if os.path.islink(full):
+                key = os.path.relpath(full, root).replace(os.sep, "/")
+                out[key] = ("symlink", os.readlink(full), 0, 0)
+                dirnames.remove(dn)
         for fn in filenames:
             full = os.path.join(dirpath, fn)
             key = os.path.relpath(full, root).replace(os.sep, "/")
@@ -586,6 +601,30 @@ def self_test():
         ck("C6", compare(manifest(s), manifest(d)),
            "a symlink REPOINTED is caught -- a verifier that followed links "
            "would hash the same missing target twice and pass")
+
+        # 🔴 C6's fixture link points at a NONEXISTENT path, so is_dir() is
+        # false and it lands in filenames.  The repository's only symlink
+        # points at a real DIRECTORY, which lands in dirnames instead -- and
+        # the first version of manifest() therefore never fingerprinted it.
+        # C6c is that shape, and it is here because C6 passed while the tool
+        # was blind to the one link this tree actually has.
+        realdir = os.path.join(tmp, "realdir")
+        os.makedirs(os.path.join(realdir, "inner"), exist_ok=True)
+        with open(os.path.join(realdir, "inner", "deep.txt"), "w") as fh:
+            fh.write("deep\n")
+        os.symlink(realdir, os.path.join(s, "dirlink"))
+        d = fresh_copy()
+        ck("C6c0", "dirlink" in manifest(s),
+           "a symlink to a real DIRECTORY is fingerprinted at all -- os.walk "
+           "puts it in dirnames, where a filenames-only loop never sees it")
+        ck("C6c1", not any(k.startswith("dirlink/") for k in manifest(s)),
+           "...and is NOT descended into: the target's content is not hashed, "
+           "so pointing at $FWRE_WORK does not drag 480 MB into the manifest")
+        os.remove(os.path.join(d, "dirlink"))
+        os.symlink(os.path.join(tmp, "src"), os.path.join(d, "dirlink"))
+        ck("C6c", compare(manifest(s), manifest(d)),
+           "...and REPOINTING it to another real directory is caught")
+        os.remove(os.path.join(s, "dirlink"))
 
         d = fresh_copy()
         os.chmod(os.path.join(d, "a.txt"), 0o644)
