@@ -576,6 +576,87 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `run:` LINES cannot see a `run:` BLOCK**; either parse the YAML or let the
   census be the arbiter, and never read a sweep's own count as coverage.
   🔴 **2026-09-02: and `ci-census` cannot be that arbiter ON THIS HOST, which is the half the sentence above still got wrong.** 量, running every `run:` step here: 47 of 49 suites green, and the two reds are the census **working**. `test-hazlint` (142 cases) and `test-hazlint-objs` (**41** as of 2026-09-04; 28 when this line was written) are declared `*bench-only*` in `ci-expected.tsv` because their `K4` population control is `$FWRE_WORK/stage2.bin` — 56 KiB of this unit's vendor bootloader, which may not be committed. `ci-census`'s own `C10` requires *`*bench-only*` plus a real `.out` → red*. **~~This desk has that file, so they run, so their `.out` exists, so red.~~ 🔴 **2026-09-06 (thirty-fourth segment): that attribution is FALSE, and the two reds are real.** 量, three ways: `grep -nE '^\s+run:.*hazlint' .github/workflows/ci.yml` returns **0**; `git log -S'test-hazlint.sh' -- .github/workflows/ci.yml` is **empty over the whole history**, so no such step has ever existed; and `tools/ci-expected.tsv:142` states it outright — *"CI runs zero hazlint cases"*. **Nothing in a `ci.yml` sweep invokes either suite, on any host**, so having `stage2.bin` cannot make them run. 🟢 **The two reds are `census/merge the captures` and `census/census`, and the first causes the second**: 量 2026-09-06, a full sweep of all **60** `run:` steps *(🔄 **61** from the thirty-seventh segment the same day, when `citime self-test` was added)* — **58 ok, 2 RED, 1,478 s** — where `merge the captures` dies on `cp: cannot stat 'dl/*/*.out'` (the GitHub artifact download directory does not exist at the desk) and `census` then reports `NOT-RUN-TOTAL MISMATCH: declares 491 and this job did not run 2`. ⚠️ **This paragraph's CONCLUSION is untouched** — run every suite here and read the per-suite lines, let the census on GitHub decide the census; only its reason moves.** Those two are **183** of the declared `# not-run-total: 491` *(477 when this line was written, then 478; 量 2026-09-03 against the tsv and against CI run 33747027566's census, which printed the same 478; **491 from 2026-09-04**, `R5-3a`, when `test-hazlint-objs` went 28 → 41 and the whole row is bench-only)*, so the total collapses to **2** here and the mismatch check fires too. ⚠️ **And the total is not recomputable from the table**: `ci-census`'s own docstring says a suite's skip rows are *alternatives, not additive* — which fire depends on configuration — so summing the covers column gives 517, not 478, and that is the table being right rather than wrong. **So: run every suite here and read the per-suite lines; let the census on GitHub decide the census.** A local sweep that ends in two reds every time trains a reader to ignore reds, which is the failure this whole paragraph exists to prevent.
+- 🆕 **The desk sweep is `tools/desk-sweep.py`, it runs on a COPY, and the copy
+  goes on ext4. Three rules, and each one is a refusal rather than a habit.**
+  🔴 **① The step list is READ, never reconstructed.** The tool parses
+  `.github/workflows/ci.yml` with PyYAML. Everything above this bullet about
+  regexes that stop at `2>&1`, greps that cannot see a `run:` BLOCK, and the
+  two inline `- run:` steps at the `lint` job that **every desk sweep from
+  2026-08-25 to 2026-09-07 skipped** — 59 of 61, wrong by two for six weeks —
+  is the reason. Its `C2` control runs the old line-based enumerator against
+  the same fixture and requires it to come out short, so the reason is a case
+  and not a paragraph. 量 2026-09-07: **62** `run:` steps (61 plus this tool's
+  own self-test), **2** refused here because they need root, **2** expected-red
+  (`census/merge the captures`, `census/census`), **58** runnable. 🟢 **And it
+  settled the two that were invisible**: `lint/#1` is `sudo apt-get install
+  shellcheck`, refused at a desk; `lint/#2` is `shellcheck --severity=error
+  tools/*.sh`, and it is **green here, rc 0** — the first time it had ever been
+  run at this desk.
+  🔴 **② Copy to ext4 first, VERIFY the copy, sweep the copy, delete it.**
+  量 2026-09-07, the whole sweep, both arms as COPIES so the only variable is
+  the destination filesystem: **9p 1,893.4 s → ext4 1,002.7 s = 1.89×**, and
+  the sweep phase alone 1,813.0 → 957.6 s, also **1.89×**. Per suite, 57 paired
+  legs, **median 1.77×**; 13 of them within ±15 % and **7 actually slower on
+  ext4**. Verdicts are IDENTICAL on both arms — **58 ok, 2 refused, 2
+  expected-red** — which is the control that licenses the change at all: a
+  faster sweep that reached a different conclusion would be worthless.
+  🔴 **The gain is bimodal and neither half is the filesystem in general.**
+  Three mutation suites that re-exec Python hundreds of times collapse —
+  `rbcheck` **47.75×** (326.4 → 6.8 s), `cardcheck` **37.56×** (219.4 → 5.8 s),
+  `replay-capture` **33.80×** (190.8 → 5.7 s) — together **40.6 % of the 9p
+  sweep, 736.5 s → 18.3 s**. What is left on ext4 is dominated by work no
+  filesystem touches: `test-console-capture-mutants` **0.98×**,
+  `test-console-capture` **1.00×**, `test-deskchan` **1.00×**, together
+  **54.2 % of the ext4 sweep** — the first is sleep-bound by design (ptys and
+  played gaps) and the others run `qemu-system-mips` single-threaded at 100 %
+  of one core. 🔴 **So `1.89×` is the number, and it will not improve by moving
+  the tree anywhere else — including a tmpfs.**
+  🔴 **AND THE FIGURE THIS RULE WAS FIRST WRITTEN FROM DOES NOT SURVIVE, WHICH
+  IS THE MORE USEFUL RESULT.** It was `test-spec-check-mutants` at 9p
+  **44.25 / 45.10 s** against ext4 **1.52 / 1.47 s** — *29×*. 量, chasing it:
+  the **9p leg reproduces** (45.27 s here) and the **ext4 leg does not** —
+  standalone on ext4 with n=3 it is **19.42 / 23.80 / 20.29 s**, and under the
+  sweep 16.50 s, so the suite's real ratio is **2.2–2.8×**. The 1.5 s is
+  reproducible on demand and it is **a run in which the suite REFUSED**:
+  with `.git` absent `git ls-files '*.md'` returns **0** instead of 108, and
+  the suite exits **rc 1** printing *"REFUSING: the unmutated self-test already
+  fails (rc=2) -- every mutation below would 'kill' a suite that was already
+  red"* — measured, **1.36 s**. So the 29× was
+  9p-with-a-population ÷ ext4-with-no-population, two different experiments.
+  ⚠️ **This is this project's own rule arriving in the timing domain: a suite
+  that refuses is FAST, and a fast suite looks like a win.** Time a suite only
+  beside the count of what it actually ran.
+  🟢 The mechanism is unchanged and still measured: 量 on this run's own
+  source-hash phase, **1 CPU second in 36 s of wall clock with 78,549 voluntary
+  context switches and 8 non-voluntary** — the process is asleep waiting for 9p
+  replies. ⚠️ **`iowait` does not see this** (it read **0.0 %** while that was
+  happening): iowait counts block-device waits, and a 9p wait is a sleep on a
+  transport reply, accounted as *idle*. The instrument is voluntary context
+  switches, not `iowait`.
+  ⚠️ **The verify is cheap, measured rather than assumed**: hash + copy + hash
+  is **80 s of 1,893 (4.2 %)** on 9p and **45 s of 1,003 (4.5 %)** on ext4. 🔴 **The verification is not optional and it is a refusal,
+  not a warning**: the sweep reads the copy and the conclusion is about the
+  tree, so a hash list is taken on both sides and a mismatch stops the run
+  before a single suite starts. `C3` is the positive control on it — one byte
+  changed in the copy must be caught, or *"the copy IS the source"* is a line
+  that cannot fail.
+  🔴 **③ DO NOT COMMIT WHILE A SWEEP IS RUNNING, and the reason is not that a
+  commit changes content — it does not. A commit changes the POPULATION.**
+  量 2026-09-07: `spec-check` sweeps **tracked** `.md` files; a bench card was
+  committed while the desk sweep was mid-run; the card was untracked when
+  `spec-check` walked the tree and tracked immediately after, so **neither
+  state was ever swept** and its `C8` defect reached CI. A sweep certifies the
+  tree it saw. Copying first makes "the tree it saw" a thing on disk that can
+  be compared, which turns that silent hole into a stated scope limit: the tool
+  re-reads the source at the end and says out loud whether the green is about
+  the tree on disk now. ⚠️ **The copy does not protect the copy PHASE** — a
+  commit racing `cp -a` can be captured half-applied, which the fidelity check
+  refuses. The window is the first minute or two of each run.
+  ⚠️ **What it cannot do**, stated rather than left to be found: a step naming
+  an absolute path into the source reads the SOURCE, not the copy (it greps for
+  that and reports); `$FWRE_WORK` is outside the copy for both arms on purpose;
+  and **its total is not CI's wall clock** — it runs steps sequentially where CI
+  runs four jobs in parallel, so it may never be compared with `citime`'s BIG3.
 - 🆕 **Reading a suite's output files is a measurement, so it needs a control —
   and freshness is NOT completion.** 量 2026-09-01: `ci-out/` holds the previous
   run's `.out` files, so a summary that just reads them scores stale results as

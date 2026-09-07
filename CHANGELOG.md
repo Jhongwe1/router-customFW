@@ -1009,6 +1009,63 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### `desk-sweep` — the closing sweep reads its step list instead of rebuilding it, and runs on a copy it has proved is the tree
+
+Three failures in this repository's record all came from the same place: a
+sweep that reconstructed the list of CI steps rather than reading it. A regex
+that stopped at the `&` of `2>&1` ran 48 suites as `... 2>` and printed 46 FAIL
+lines indistinguishable from 46 failing suites. A grep for `run:` *lines*
+cannot see a YAML literal *block*, and dropped `verify-backup-copy` twice. And
+a selector anchored `^\s*run:` cannot match an inline `- run:`, which hid the
+whole `lint` job from every desk sweep from 2026-08-25 to 2026-09-07.
+
+`tools/desk-sweep.py` parses `.github/workflows/ci.yml` with PyYAML and hands
+each step's `run:` value to `bash -c` verbatim. Its `C2` control runs the old
+line-based enumerator against the same fixture and requires it to come out
+short, so the reason the tool exists is a case rather than a paragraph.
+
+**That settles the two steps `CNT-1` left undetermined.** `lint/#1` is
+`sudo apt-get install shellcheck` and is refused at a desk — by a rule about
+the *shape* of the command, so an apt step added tomorrow is refused without
+anyone remembering to declare it. `lint/#2` is
+`shellcheck --severity=error tools/*.sh`, and it is **green here, rc 0**
+(ShellCheck 0.9.0) — the first time it has ever run at this desk.
+
+**The sweep runs on a copy, and the copy is verified before a single suite
+starts.** This is the morning's own defect: `spec-check` reads *tracked* `.md`
+files, a bench card was committed while the sweep was mid-run, and the commit
+changed no file's content but changed which files are tracked. The card was
+untracked when the sweep walked the tree and tracked immediately after, so
+neither state was swept and its `C8` defect reached CI. A copy makes "the tree
+it saw" a thing on disk that can be compared. A mismatch is a refusal, not a
+warning; `C3` is the positive control on it.
+
+Twenty-two controls. Three of them failed on the first run and all three were
+bugs in the *cases*. A fourth defect was found by the controls after that:
+`C6` proved a repointed symlink is caught, using a link to a **nonexistent**
+path — but the repository's only symlink points at a real **directory**, which
+`os.walk` puts in `dirnames` because `is_dir()` follows links, and `src-vendor`
+was never fingerprinted at all. `C6c0`/`C6c1`/`C6c` are that shape.
+
+### `R5-5`'s bench card frozen — and seven of its eight defects were classes this repository had already recorded
+
+`bench/2026-09-07/PREDICTIONS-B14-block13.md`, 32 cells, frozen after
+`spec-check` rc 0, `cardcheck commands` 34 of 34, `cardcheck numbers` 21 of 21,
+`check-predictions` `0 of 32`, and `RECIPE_ID` re-derived to `fce0af22` from
+three sources.
+
+The two worth reading are the ones the bench would have paid for. §4.3 typed
+`echo 'verify 4096' > /proc/rtl819x-spi`; inner single quotes cannot survive a
+single-quoted `--send`, so the board would have run the **whole 4 MiB** where
+the rung asks for 4 KiB — silently, and looking like a pass. And four cells go
+silent for seconds while the driver reads 4 MiB, yet carried `--idle 3`, which
+ends a capture inside the silence. Both are now arithmetic: `cardnum`'s
+`send-inner-quote` must be 0 and `expansion-silent` must be 4.
+
+`cardcheck commands` read **`2 command(s)`** for 32 cells before §4.4 was
+written — worse than seating 14's `6 for 24`, because §4.3's `typed` column is
+not in `--send` form at all.
+
 ### `R5-3b-2` — armed at boot, and the version that could not do it measured the reason
 
 `rtl819x-timer` **3.0 → 4.0 → 4.1** in one day, 2,384 → 2,813 lines.

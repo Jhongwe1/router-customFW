@@ -302,14 +302,25 @@ def manifest(root):
     return out
 
 
-def compare(a, b, limit=12):
-    """Differences between two manifests, as human sentences."""
+def compare(a, b, limit=12, gone="missing from copy",
+            extra="present only in copy"):
+    """Differences between two manifests, as human sentences.
+
+    🔴 The wording is a PARAMETER because this function has two callers with
+    opposite meanings, and the first version wrote "copy" in both.  The
+    fidelity check compares source against copy; the drift check compares the
+    source against ITSELF at two times, and there "present only in copy" names
+    the wrong side of the comparison.  量 2026-09-07, on this tool's first real
+    run: the drift report said `present only in copy: study/20260907-study4.md`
+    about a file the SOURCE had gained while the sweep ran.  The detection was
+    right and the sentence pointed the reader backwards.
+    """
     diffs = []
     for k in sorted(set(a) | set(b)):
         if k not in b:
-            diffs.append(f"missing from copy: {k}")
+            diffs.append(f"{gone}: {k}")
         elif k not in a:
-            diffs.append(f"present only in copy: {k}")
+            diffs.append(f"{extra}: {k}")
         elif a[k] != b[k]:
             why = []
             if a[k][0] != b[k][0] or a[k][1] != b[k][1]:
@@ -429,7 +440,9 @@ def do_run(args):
 
     print("== re-fingerprinting the source")
     m_src2 = manifest(src)
-    drift = compare(m_src, m_src2)
+    drift = compare(m_src, m_src2,
+                    gone="the source LOST this file while the sweep ran",
+                    extra="the source GAINED this file while the sweep ran")
 
     # Put the outputs where the reader expects them, from the copy.
     out_src = os.path.join(dest, "ci-out")
@@ -647,6 +660,21 @@ def self_test():
            "a sub-second mtime difference is NOT caught -- deliberate: the two "
            "filesystems disagree on resolution and the ordering that matters "
            "is seconds apart")
+
+        # C14: the two callers of compare() mean opposite things, and the
+        # first version gave both of them the fidelity check's wording.
+        d = fresh_copy()
+        with open(os.path.join(d, "gained.txt"), "w") as fh:
+            fh.write("x\n")
+        fid = compare(manifest(s), manifest(d))
+        dri = compare(manifest(s), manifest(d),
+                      gone="the source LOST this file while the sweep ran",
+                      extra="the source GAINED this file while the sweep ran")
+        ck("C14", fid and dri and "copy" in fid[0] and "copy" not in dri[0]
+           and "source GAINED" in dri[0],
+           "the drift report does not borrow the fidelity check's wording -- "
+           "it compares the source with ITSELF, so 'present only in copy' "
+           "names the wrong side and was measured doing exactly that")
 
         live = os.path.join(ROOT, CI)
         if os.path.exists(live):

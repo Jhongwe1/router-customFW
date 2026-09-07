@@ -411,7 +411,8 @@ executed here, only in CI. 🔴 **This instance is harder to see than
 `CNT-1`'s first four because the number came from an INSTRUMENT rather than a
 keyboard, so it looked derived.** The fix is not a second counter: it is making
 the instrument print the total it found and compare it against a declared one.
-`量` · `PROGRESS.md` `CNT-1`, `bench/README.md`.
+🟢 **2026-09-07, the next segment: that fix landed and it is a different instrument.** `tools/desk-sweep.py` parses `ci.yml` with PyYAML instead of matching lines, and its `C2` control runs the OLD line-based enumerator against the same fixture and requires it to come out short — so the defect is a case rather than this paragraph. 量 on its first run: **62** steps (61 plus its own self-test), **2** refused because they need root, **2** expected-red at a desk, **58** runnable. 🟢 **And the sentence above about `shellcheck` expired the same hour**: `lint/#2` — `shellcheck --severity=error tools/*.sh` — was run at this desk for the first time and is **green, rc 0** (ShellCheck 0.9.0). Its sibling `lint/#1` is `sudo apt-get install shellcheck` and is refused here by a rule about the SHAPE of the command rather than by its name, so an apt step added tomorrow is refused without anyone remembering to declare it.
+`量` · `PROGRESS.md` `CNT-1`, `bench/README.md`, `CLAUDE.md` § Environment.
 
 **These are not about the device.** *(This opened "These four" until 2026-09-02, when three more arrived and made it five, then six, then seven. The number is deleted rather than corrected — it carries no weight in the sentence, which is exactly why nobody ever re-derived it; the same call `docs/KNOWN-ISSUES.md`'s row count got.)* They are about the difference between
 what this repository's files say and what its artefacts and its own history
