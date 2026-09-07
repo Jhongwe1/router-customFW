@@ -61,11 +61,33 @@ COLS = ("id", "file", "position", "anchor", "insert", "witness", "reason")
 # the Makefile line is there.  A driver that compiles and is not linked is
 # green under both.
 #
-# TWO FORMS, and the second exists because a measurement forced it:
+# THREE FORMS.  The second exists because a measurement forced it; the third
+# exists because `R5-5`'s `D4` asks this file to declare a TU that is
+# deliberately NOT in the image:
 #
 #   str:<literal>   the bytes must be in the image at least once, and in none
 #                   of the --absent artefacts.  The same test a mark gets.
 #   sym:<name>      the symbol must be in System.map (--map).
+#   absent:<name>   the symbol must NOT be in System.map (--map).  The exact
+#                   inverse of `sym:`, and it goes with the ONE conditional
+#                   Kbuild shape below.
+#
+# 🔴 WHY A THIRD KIND RATHER THAN A PATCH IN config/host-compat/.  `R5-5`'s
+# write path is a separate translation unit that the shipped image must not
+# contain, proved by symbol absence.  Its Kbuild line therefore has to be
+# `obj-$(CONFIG_MTD_RTL819X_WRITE) +=`, which `OBJ_RE` refuses, and it has no
+# `str:`/`sym:` witness to give because the object is not there to witness.
+# The alternative -- putting that line in a host-compat patch -- would make
+# that patch a SECOND OWNER of "which of my files are linked", and this file
+# is the first.  House rule 1 decides it: the vocabulary widens by one shape
+# and one witness kind, and the enforcer keeps the whole claim.
+#
+# 🔴 AND THE PAIRING IS ENFORCED IN BOTH DIRECTIONS, because the failure this
+# guards against is the two rows being swapped.  A conditional row MUST carry
+# `absent:` -- with `str:`/`sym:` it would assert the presence of a file it
+# deliberately does not link.  An unconditional `obj-y +=` row must NOT carry
+# `absent:` -- it links the file, so claiming the symbol is missing is a
+# contradiction the tsv would otherwise state in one line.
 #
 # 🔴 A string-only column would not have worked, and finding out why is the
 # reason the column is typed.  `rlxfw_mark.c` -- the file `MK` links -- holds
@@ -76,7 +98,7 @@ COLS = ("id", "file", "position", "anchor", "insert", "witness", "reason")
 # would be present in an image where rlxfw_mark.o failed to link, which makes
 # it a FALSE witness rather than a weak one.  So `MK` gets a symbol and `MK2`
 # gets a string, and neither is a stand-in for the other.
-WITNESS_KINDS = ("str", "sym")
+WITNESS_KINDS = ("str", "sym", "absent")
 
 # What a mark string looks like in the emitted image.  `rlxfw_mark("B0")`
 # becomes the bytes `RLXFW-` + `B0`; `rlxfw_markx("B2", x)` becomes
@@ -90,6 +112,21 @@ CALL_RE = re.compile(r'^rlxfw_mark(x?)\("([A-Za-z0-9_.:-]+)"(?:,\s*(.+))?\);$')
 # these two: anything else and this file would be a patch format whose reviewer
 # has to read arbitrary C.
 OBJ_RE = re.compile(r'^obj-y\s*\+=\s*[A-Za-z0-9_./-]+\.o$')
+
+# The conditional form, for a TU that is declared and deliberately NOT built.
+# The symbol is spelt out rather than allowed to be any make variable: an
+# `obj-$(FOO) +=` whose FOO is not a CONFIG_ would be a make-level switch with
+# no home in config/, and this file's whole point is that every linked object
+# has a declared reason somewhere a reviewer can find it.
+#
+# ⚠️ The symbol here is NOT declared to kconfig, and that is deliberate and
+# stronger than `=n`: an undeclared CONFIG_ expands to empty in GNU Make, so
+# no menu, no defconfig and no `oldconfig` can turn it on.  The positive
+# control is a make-level override in a DISCARDED tree --
+# `make CONFIG_MTD_RTL819X_WRITE=y` -- because `obj-$(...)` is plain Make and
+# needs no kconfig at all to fire.
+OBJ_COND_RE = re.compile(
+    r'^obj-\$\(CONFIG_[A-Z0-9_]+\)\s*\+=\s*[A-Za-z0-9_./-]+\.o$')
 
 # And the prototype, which is one exact literal rather than a pattern: the
 # call sites are under `EXTRA_CFLAGS += -Werror`, so without it they do not
@@ -127,7 +164,8 @@ class Row(object):
             self.wkind, self.wval = k, v
         m = CALL_RE.match(self.insert)
         if not m:
-            if OBJ_RE.match(self.insert) or self.insert == INCLUDE:
+            cond = bool(OBJ_COND_RE.match(self.insert))
+            if OBJ_RE.match(self.insert) or cond or self.insert == INCLUDE:
                 self.kind = "build"
                 self.computed, self.tag, self.expr = False, None, None
                 # An `obj-y +=` row links a FILE into the image, and that file
@@ -135,15 +173,27 @@ class Row(object):
                 # they must NOT carry one -- a witness there would be a claim
                 # about somebody else's object.
                 links_a_file = bool(OBJ_RE.match(self.insert))
-                if links_a_file and not self.wkind:
+                if (links_a_file or cond) and not self.wkind:
                     die("%s:%d: %s links a file into the image and declares "
                         "no witness. `verify` would then say nothing at all "
                         "about that file -- which is the state MARK-1 records"
                         % (self.file, lineno, self.id))
-                if not links_a_file and self.wkind:
+                if not (links_a_file or cond) and self.wkind:
                     die("%s:%d: %s inserts an #include, which links nothing, "
                         "so a witness here would be a claim about an object "
                         "this row does not bring in"
+                        % (self.file, lineno, self.id))
+                # The pairing, both ways round.  See the WITNESS_KINDS note.
+                if cond and self.wkind != "absent":
+                    die("%s:%d: %s is a CONDITIONAL Kbuild line, so the object "
+                        "is deliberately not in the image; its witness must be "
+                        "`absent:<symbol>`, not %r. A `str:`/`sym:` here would "
+                        "assert the presence of a file this row does not link"
+                        % (self.file, lineno, self.id, self.wkind))
+                if links_a_file and self.wkind == "absent":
+                    die("%s:%d: %s links the object unconditionally and then "
+                        "witnesses `absent:` -- one line stating both that the "
+                        "file is in the image and that its symbol is not"
                         % (self.file, lineno, self.id))
                 return
             die("%s:%d: insert %r is not one of the three shapes this file "
@@ -553,10 +603,17 @@ def verify_marks(decl, image, absent, mapfile=None):
     # 🔴 A `sym:` witness with no --map is a REFUSAL, not a skip.  A skip would
     # print a green RESULT over a check that did not run, which is the exact
     # shape of the hole MARK-1 opened on.
-    if any(r.wkind == "sym" for r in wits) and not mapfile:
-        die("%s declares %d sym: witness(es) and no --map was given. Skipping "
-            "them would print a green result over a check that did not run"
-            % (decl, sum(1 for r in wits if r.wkind == "sym")))
+    #
+    # ⚠️ `absent:` is in the same sentence and for a stronger reason.  A
+    # skipped `sym:` prints green over an unasked question; a skipped
+    # `absent:` prints green over the D4 CLAIM ITSELF -- "the write path is
+    # not in this image" -- which is exactly the assertion that must never be
+    # satisfied by not looking.
+    needs_map = [r for r in wits if r.wkind in ("sym", "absent")]
+    if needs_map and not mapfile:
+        die("%s declares %d sym:/absent: witness(es) and no --map was given. "
+            "Skipping them would print a green result over a check that did "
+            "not run" % (decl, len(needs_map)))
     syms = _symbols(mapfile) if mapfile else set()
 
     wres = []
@@ -566,10 +623,17 @@ def verify_marks(decl, image, absent, mapfile=None):
             got = _count(image, s)
             outs = [(a, _count(a, s)) for a in absent]
             ok = got >= 1 and not any(n for _, n in outs)
-        else:
+        elif r.wkind == "sym":
             got = 1 if r.wval in syms else 0
             outs = []
             ok = bool(got)
+        else:
+            # `absent:` -- the inverse.  `got` still reports what was found,
+            # so a failure says WHICH symbol turned up rather than only that
+            # the row went red.
+            got = 1 if r.wval in syms else 0
+            outs = []
+            ok = not got
         wres.append((r, got, outs, ok))
     return marks, res, wres
 
@@ -870,6 +934,72 @@ def self_test():
         open(theirs, "wb").write(b"..a vendor image..")
         _m, _r, w = verify_marks(d20, mine, [theirs])
         ck("W9c and a clean one is accepted", w[0][3] is True, str(w[0][:3]))
+
+        # ------------------------------------------------------------------
+        # W10..W14 -- the CONDITIONAL Kbuild row and its `absent:` witness.
+        # R5-5's D4 proves the flash WRITE path is not in the shipped image by
+        # symbol absence, and these are what stop that proof from being a
+        # check that cannot fail.
+        # ------------------------------------------------------------------
+        condrow = ("MK9", "sub/Makefile", "after", "obj-y += x.o",
+                   "obj-$(CONFIG_MTD_RTL819X_WRITE) += w.o",
+                   "absent:rtl819x_spi_write_page",
+                   "the write TU, declared and deliberately not built")
+
+        d30 = os.path.join(tmp, "d30")
+        io.open(d30, "w").write(_decl(markrow, condrow))
+        mp2 = os.path.join(tmp, "System.map2")
+        io.open(mp2, "w").write("80000000 T unrelated\n80000010 t other\n")
+        open(mine, "wb").write(b"..RLXFW-B0\n..")
+        open(theirs, "wb").write(b"..a vendor image..")
+        _m, _r, w = verify_marks(d30, mine, [theirs], mp2)
+        ck("W10 an absent: witness passes when the symbol is NOT in the map",
+           w[0][3] is True, str(w[0][:3]))
+
+        # 🔴 W11 IS THE POSITIVE CONTROL, and without it `absent:` is a rule
+        # that cannot fire.  The same declaration against a map that DOES
+        # carry the symbol -- which is what the `make CONFIG_...=y` control
+        # build produces -- must go red.
+        io.open(mp2, "w").write(
+            "80000000 T unrelated\n801a0000 t rtl819x_spi_write_page\n")
+        _m, _r, w = verify_marks(d30, mine, [theirs], mp2)
+        ck("W11 POSITIVE CONTROL: the same row goes RED when the symbol IS "
+           "in the map", w[0][3] is False, str(w[0][:3]))
+
+        # W12 -- and skipping it is a refusal, for a stronger reason than
+        # W7c's: a skipped absent: prints green over the D4 claim itself.
+        ok, why = refuses(verify_marks, d30, mine, [theirs])
+        ck("W12 an absent: witness with no --map REFUSES rather than skipping",
+           ok, why)
+
+        # W13/W14 -- the pairing, both ways round.  These two are what stop
+        # the conditional and unconditional rows being swapped.
+        d31 = os.path.join(tmp, "d31")
+        io.open(d31, "w").write(_decl(markrow, (
+            "MK9", "sub/Makefile", "after", "obj-y += x.o",
+            "obj-$(CONFIG_MTD_RTL819X_WRITE) += w.o",
+            "str:rtl819x-spi-write", "wrong witness kind")))
+        ok, why = refuses(parse_decl, d31)
+        ck("W13 a conditional row with a str: witness is refused", ok, why)
+
+        d32 = os.path.join(tmp, "d32")
+        io.open(d32, "w").write(_decl(markrow, (
+            "MK9", "sub/Makefile", "after", "obj-y += x.o",
+            "obj-y += w.o", "absent:rtl819x_spi_write_page",
+            "links it and then says it is not there")))
+        ok, why = refuses(parse_decl, d32)
+        ck("W14 an unconditional obj-y row with an absent: witness is refused",
+           ok, why)
+
+        # W15 -- a conditional row with NO witness is refused by the same
+        # sentence as W2's, so the two shapes share one rule rather than
+        # each having its own.
+        d33 = os.path.join(tmp, "d33")
+        io.open(d33, "w").write(_decl(markrow, (
+            "MK9", "sub/Makefile", "after", "obj-y += x.o",
+            "obj-$(CONFIG_MTD_RTL819X_WRITE) += w.o", "", "no witness")))
+        ok, why = refuses(parse_decl, d33)
+        ck("W15 a conditional row with no witness is refused", ok, why)
 
         # W8 -- the column count is fixed at seven.  A six-field row is an
         # error and NOT a row with an empty witness: a dropped tab would
@@ -1181,17 +1311,26 @@ def main(argv):
                              for f, n in outs)
                 if not ok:
                     wbad += 1
-                print("  %-4s %-4s %-22s mine:%d %s%s"
+                # The two kinds fail for OPPOSITE reasons, so one shared
+                # sentence would be wrong for half of them -- and the half it
+                # would be wrong for is D4's.
+                why = ("  <- must be 0 here: this symbol is in the map, so "
+                       "the conditional TU WAS built"
+                       if r.wkind == "absent"
+                       else "  <- must be >=1 here and 0 there")
+                print("  %-4s %-7s %-22s mine:%d %s%s"
                       % (r.id, r.wkind + ":", r.wval, got, o,
-                         "" if ok else "  <- must be >=1 here and 0 there"))
+                         "" if ok else why))
         print("")
         if bad or wbad or not a["absent"]:
             print("RESULT: \033[31m%d mark(s) and %d witness(es) not a "
                   "discriminator\033[0m" % (bad, wbad))
             return 1
+        n_abs = sum(1 for r, _, _, _ in wres if r.wkind == "absent")
         print("RESULT: \033[32mall %d mark(s) present once in the image, %d "
-              "witness(es) present, and absent from %d vendor artefact(s)"
-              "\033[0m" % (len(rows), len(wres), len(a["absent"])))
+              "witness(es) present, %d witness(es) confirmed ABSENT, and "
+              "absent from %d vendor artefact(s)\033[0m"
+              % (len(rows), len(wres) - n_abs, n_abs, len(a["absent"])))
         return 0
 
     die("unknown command %r" % cmd)

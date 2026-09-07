@@ -559,12 +559,36 @@ def run_controls():
     row("A8", "`Y` is a confirmation, not a command", k == "CONFIRM", k)
 
     # A9 -- the redirection target is checked.  `> /dev/mtd0ro` is declared;
-    # `> /dev/mtd2ro` is not, and no node of that name exists in the image.
+    # the other side of the case needs a path that is NOT declared.
+    #
+    # \U0001f534 THIS CONTROL WAS BROKEN ON 2026-09-07 BY A DECLARATION AND NOT BY
+    # A CODE CHANGE, WHICH IS THE WHOLE REASON IT NOW DERIVES ITS EXAMPLE.
+    # It hardcoded `/dev/mtd2ro` as the undeclared path, and `R5-5` declared
+    # that node in config/rlxfw-initramfs.tsv -- so the control's own example
+    # became declared and the case could no longer fire.  Nothing in this file
+    # changed that day; the population moved underneath it.  That is exactly
+    # CLAUDE.md's rule about running every suite after anything touches DATA,
+    # and it is what a local sweep caught before the push.
+    #
+    # Hardcoding a different name would be the same bug waiting for the next
+    # declaration.  The path is derived instead, and if every candidate is
+    # somehow declared the case FAILS rather than passing -- a control with no
+    # example left must not report ok.
     _, iss_ok = classify_command("echo x > /dev/mtd0ro", names, paths)
-    _, iss_no = classify_command("echo x > /dev/mtd2ro", names, paths)
-    row("A9", "an undeclared redirection target is caught",
-        not iss_ok and any("mtd2ro" in i for i in iss_no),
-        f"declared: {len(iss_ok)} issue(s); undeclared: {len(iss_no)}")
+    undeclared = next((c for c in ("/dev/rlxfw-no-such-node",
+                                   "/dev/cardcheck-a9-absent",
+                                   "/dev/zzz-not-declared")
+                       if c not in paths), None)
+    if undeclared is None:
+        row("A9", "an undeclared redirection target is caught", False,
+            "every candidate is declared -- this control has no example left")
+    else:
+        _, iss_no = classify_command(f"echo x > {undeclared}", names, paths)
+        key = os.path.basename(undeclared)
+        row("A9", "an undeclared redirection target is caught",
+            not iss_ok and any(key in i for i in iss_no),
+            f"declared: {len(iss_ok)} issue(s); undeclared {undeclared}: "
+            f"{len(iss_no)}")
 
     # A10 -- both sides of a pipe are argv[0]s.  A card that writes `cat x | wc`
     # invokes two programs and only one of them is in the image.

@@ -173,6 +173,13 @@ rules, headers = m.parse_delta(sys.argv[2])
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
+# 🔄 2026-09-07 (`R5-5`): 39 -> 40 rules, 16 -> 17 set, 23 derived
+# UNCHANGED.  ONE `set` row, CONFIG_CRYPTO_SHA256, so rtl819x-spi can compute
+# a sha256 inside the kernel.  🟢 The derived count staying at 23 is the half
+# of this that is worth an assertion: CRYPTO_SHA256 `select`s CRYPTO_HASH,
+# which the baseline already has at `=y`, so kconfig computes nothing new and
+# `(NEW)` stays 0 -- which was the prediction written into the delta row
+# BEFORE the build, and the build agreed.
 # 🔄 2026-09-06 (`R5-4`): 36 -> 39 rules, 15 -> 16 set, 21 -> 23
 # derived.  ONE `set` (CONFIG_GPIOLIB, which SPEC.md FW-38 measured to be
 # unreachable on arch/rlx without config/host-compat/0005) and TWO `derive`
@@ -180,7 +187,7 @@ PY
 # selected by that patch, and GENERIC_GPIO, which GPIOLIB selects.  The two
 # derived rows exist because the delta has to explain every line that moves;
 # without them `kconfig-delta check` reports them as undeclared.
-ck "E1 the committed delta parses: 39 rules, 16 set, 23 derived" "39 16 23" \
+ck "E1 the committed delta parses: 40 rules, 17 set, 23 derived" "40 17 23" \
    "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
 
 # E1b -- the same file, per variant, and it also runs on a clean clone.  Without
@@ -204,9 +211,9 @@ except SystemExit as e:
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1b --variant loud: 41 rules, 18 set, 23 derived"  "41 18 23" \
+ck "E1b --variant loud: 42 rules, 19 set, 23 derived"  "42 19 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
-ck "E1b --variant quiet does NOT pick them up"         "39 16 23" \
+ck "E1b --variant quiet does NOT pick them up"         "40 17 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
@@ -337,10 +344,30 @@ ck "G4b and TWELVE marks in total"        12 \
 # matters: a build row is not a boot mark, and if adding one had moved both
 # counts the `RLXFW-` anchor would have gone wide again -- which is exactly
 # what the 2026-09-04 comment on G4b records happening.
-ck "G4c and THREE build-row witnesses"     3 \
+# 🔄 2026-09-07 (`R5-5`): 3 -> 4.  `MK4` links rtl819x-spi.o into
+# drivers/mtd/devices/, and its witness is the mtd_info's name.
+#
+# 🔴 AND THE PATTERN BELOW DELIBERATELY STILL READS ONLY `str|sym`, WHICH IS
+# WHY G4d EXISTS.  `MK5` carries the third witness kind, `absent:` -- the
+# inverse of `sym:`, asserting that a symbol is NOT in System.map, which is
+# how `R5-5`'s `D4` is proved.  Left here it would be **filtered out of every
+# assertion**, which is the exact state this case's own header calls "a block
+# nothing checks".  So it is counted separately rather than folded in: the two
+# kinds make opposite claims and one number covering both could not say which
+# had moved.
+ck "G4c and FOUR present-witness build rows"  4 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
+ck "G4d and ONE absent-witness build row"     1 \
+   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
+ck "G4d and it reports the symbol as NOT found" 1 \
+   "$(printf '%s\n' "$o" | grep -cE 'absent: +rtl819x_spi_write_page +mine:0')"
+# 🔄 2026-09-07: the pattern tolerates the witness column's width.  It was
+# `'sym: rlxfw_puts'` with ONE space, and adding `absent:` widened that column
+# from 4 to 7 -- so a deliberate formatting change silently broke a checker
+# whose pattern encoded the old width.  Matching runs of spaces is the fix; a
+# checker should assert the CONTENT, not the padding.
 ck "G4c and one of each kind"              1 \
-   "$(printf '%s\n' "$o" | grep -c 'sym: rlxfw_puts')"
+   "$(printf '%s\n' "$o" | grep -cE 'sym: +rlxfw_puts')"
 ck "G4 verify with no --absent is refused"  1 \
    "$(printf '%s\n' "$o" | grep -c 'no --absent file given')"
 
