@@ -3547,6 +3547,8 @@ row had to strike out.
 | **product** | **≤36×** | |
 | **measured (§19.4)** | **~16×** | 量, n=4 |
 
+🔴 **2026-09-07: §21 withdraws this product and both of its surviving terms.** The kernel's read is not on the window and is not at DIV 4. The table above is kept as written.
+
 🔴 **§19.7.5 ① corrects the outcome table below: the cell reads out the PRODUCT of the two factors and cannot separate them, and ⑤ says the 2.1–2.3× is a lower bound. Read that section before quoting this one.**
 
 🔴 **AND AS OF 2026-08-31 THE CELL BELOW IS WITHDRAWN ENTIRELY — §20 SUPERSEDES
@@ -4026,6 +4028,111 @@ here because § 19.7's conclusion now rests on a verdict whose written control
 did not hold.
 
 ---
+
+
+## 21. 🔴 And the KERNEL's read does not go through it either — the same finding as §20, one level up
+
+**讀 2026-09-07 (`R5-5`, forty-first segment), source and artefact.**
+
+§20 withdrew a cell because the **loader's** `FLR` reads flash through `SFDR`
+programmed I/O rather than through `0xBD000000`. Today the same question was
+asked of the **kernel**, because `R5-5` needed to know which path its own
+driver would be a second opinion about. The answer is the same, and it is the
+half §19.7 was built on.
+
+### 21.1 The chain, and both of its indirect hops
+
+`spi_probe.c:101-103` — `spi_chip_setup()`, with no `#ifdef` around it:
+
+```c
+mtd->erase = mtd_spi_erase;
+mtd->read  = mtd_spi_read;
+mtd->write = mtd_spi_write;
+```
+
+and `rtl819x_flash.c` obtains that `mtd_info` from
+`do_map_probe("flash_bank_1", &spi_map[0])`, which is the name
+`spi_probe.c:70` registers the chip driver under. So the **map layer is not on
+the path at all**: `mtd->read` belongs to the chip driver.
+
+讀 the `r54` artefact (`bench-only/r54-20260906/vmlinux`, 3,978,029 bytes,
+sha256-16 `04cd5b151aae6df4`), disassembled with Ubuntu's
+`mips-linux-gnu-objdump` 2.42 — **not a vendor binary**:
+
+| at | what it does |
+|---|---|
+| `801a1928 mtd_spi_read` | `mtd->priv` (`+196`) → `map->fldrv_priv` (`+44`) → `chip_info->read` (`+16`), returns `-122` = `-EOPNOTSUPP` if NULL, else **`jalr v0`** |
+| `801a40a0 do_spi_read` | `spi_flash_info + chip*72` (`sll 3; addu; sll 3`; base `lui 0x805e; addiu -28992` = `0x805D8EC0`, matching `System.map`'s `805d8ec0 B spi_flash_info`), `+0x3C` = `pfRead`, **`jalr v1`** |
+
+For an unmatched chip id `spi_regist` installs `pfRead = SpiRead_11110B`, which
+is `ComSrlCmd_ComRead(..., SPICMD_FASTREAD, ISFAST_NO, IOWIDTH_SINGLE,
+DUMMYCOUNT_1)` → `SFDR`.
+
+### 21.2 The control, in one scan, with the counters printed side by side
+
+| scanned | count | |
+|---|---:|---|
+| `jal → rtl8196_map_copy_from` | **0** | the claim |
+| `jal → ComSrlCmd_ComRead` | 1 | control |
+| `jal → ComSrlCmd_InputCommand` | 2 | control |
+| `jal → SFCSR_CS_L` | 17 | control |
+| `.data` words equal to `801a482c` | **0** | its address is never stored, so the map's `copy_from` is not even installed |
+| `.data` words equal to `bd000000` | 2 | so the scan **can** see `.data` — `spi_map[0].phys` and `.virt` |
+
+🔴 **A trap the same scan walked into, kept because the next census will
+meet it.** `jal → mtd_spi_read` is **0** and `jal → SpiRead_11110B` is
+**0**, and both are live — they are the two `jalr`s above. **A `jal` census
+cannot see an indirect call, so a zero from one is not "dead code".**
+⚠️ `FW-39`'s technique is unaffected: it counts `sw` to an *address*.
+
+### 21.3 What §19.7 loses, and what it keeps
+
+🟢 **§19.4's `~16×` is a measurement and does not move.**
+🟢 **`FW-34`'s exclusion of `H1` survives and gets stronger**: the
+short-read function is not merely bypassed by a macro, it is never installed
+and never called.
+
+🔴 **§19.7.4's decomposition loses both surviving terms:**
+
+| term | §19.7.4 said | now |
+|---|---|---|
+| access width | 1×, refuted | unchanged |
+| SPI clock divider, DIV 16 → DIV 4 | **4×** | 🔴 **1×.** §19.7.3's last clause — *"everything after stage 2 runs at what stage 2 set"* — is false about Linux. `ComSrlCmd_RDID` writes `SFCR = 0xFFC00000` (DIV 16) and `spi_regist` calls it **twice** at `device_initcall` (`REG-38`). §19.4 measured a read taken **after** that, so both sides of the comparison are at DIV 16 |
+| instruction-fetch amplification, ≤10× | **≤9×** | 🔴 **not applicable.** It compares stage 1's KSEG1-resident loop reading *through the window* against the kernel's I-cache-resident loop — and the kernel's loop is not on the window. The two sides are different mechanisms, not the same mechanism at two amplifications |
+| **product** | **≤36×** | 🔴 **withdrawn** |
+
+**So `~16×` is unexplained again, and saying so is the correct outcome.**
+What a replacement model has to compare is *stage 1's memory-mapped copy at the
+reset default* against *the kernel's programmed-I/O loop at DIV 16*, and this
+project has measured neither side's per-byte cost in isolation.
+
+### 21.4 🔴 And it moves two `量`-marked rows that are not in §19 at all
+
+`FLS-11` and `MAP-12` both say, in as many words, that what supports their
+`量` mark is *"the kernel's 4,194,304 bytes, and that was under Linux"*,
+read *"through `map->virt = 0xbd000000`"*. **That reading is the PIO path**, so
+it is not evidence about the window.
+
+🟢 **The `量` survives, on different evidence and at a different
+width**: `probe3` Group F, seating 8, 1,024 uncached loads through
+`0xBD000000` at stride 4 and at stride 1,024, `R = 1.0000`, with `f.faults=0`,
+`f.alias=0` and `f.live=0f0f` as its refutation controls. **4,096 bytes rather
+than 4,194,304.**
+
+🔴 **And the ⚠️ note in `FLS-11` inverts.** It reads *"that
+was under Linux; this repo has never read this window at the loader prompt, so
+'it is live at the prompt' is 推"*. The truth is the other way round:
+`probe3` is a bare-metal payload entered with `J`, so **the window is measured
+bare-metal and has never been read under Linux at all.**
+
+🟢 That is exactly what `R5-5`'s `D3` would close: its MMIO pass is the
+first read of this window under Linux, and the first past a kilobyte.
+
+⚠️ **Three pieces of evidence for one unchanged value, and two of the
+three turned out not to be measurements of what the row says** — the
+loader's `FLW` `printf` (a compile-time constant, retracted 2026-08-31) and
+`FW-34`'s 4 MiB (the wrong path, retracted today). The value `0xBD000000` has
+never been in doubt; what keeps failing is the sentence about how it is known.
 
 ## 21. `R3-11`: the artefact, the write-up, and `R3`'s closing conditions read one by one
 

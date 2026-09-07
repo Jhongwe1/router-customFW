@@ -3527,6 +3527,8 @@ twice, and the newline counts match the dump. That excludes a live alternative:
 read reports success — **and a byte count cannot see it**. `FW-34` owns the
 mechanism and the rate (**0.92–1.01 MB/s**, ~16× `CLK-15`).
 
+🔴 **2026-09-07 (`R5-5`): the exclusion above survives and gets STRONGER; the mechanism it names is wrong.** `mtd->read` on this image is `mtd_spi_read` — the chip driver's programmed-I/O path — so `rtl8196_map_copy_from` is not merely bypassed by a macro, it is **never installed and never called** (`FW-43`, `notes/kernel-build.md` §21; one scan reads `jal → rtl8196_map_copy_from` **0** against `ComSrlCmd_ComRead` **1** and `SFCSR_CS_L` **17**). ⚠️ **And `FW-34`'s rate is still owned there, but its `≤36×` decomposition is withdrawn** — both surviving terms assumed the window. The two `wc -lc` readings and their newline counts are unaffected; what changes is which path they measured.
+
 ### The safety property, at two points
 
 | | | |

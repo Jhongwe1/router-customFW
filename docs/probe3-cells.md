@@ -1051,6 +1051,10 @@ else entirely: `FW-34`'s four `busybox wc -lc` runs took 4,194,304 bytes
 through `map->virt = 0xbd000000`, under Linux. **Both rows are corrected in the
 same commit as this section.**
 
+🔴 **2026-09-07 (`R5-5`): that replacement evidence has now failed the same way, and this paragraph is where it is most worth saying so.** The four `wc -lc` runs did NOT go through `map->virt`. 讀 `spi_probe.c:101-103`: the chip driver installs `mtd->read = mtd_spi_read` unconditionally, so the map layer is not on the path — `rtl8196_map_copy_from` is never installed and never called, and its address occurs **0** times in `.data` while `bd000000` occurs **2** (`FW-43`, `notes/kernel-build.md` §21). **So `FLS-11` and `MAP-12` have now cited three pieces of evidence for one unchanged value and retracted two of them**: the loader's `FLW` `printf`, and this.
+
+🟢 **What survives is the group this section introduces.** Group F's own reading — 1,024 uncached loads through `0xBD000000`, `R = 1.0000`, with `f.faults=0` / `f.alias=0` / `f.live=0f0f` — is the **only** device measurement of this window that has ever existed. ⚠️ **And it is bare metal**, entered with `J`, so the sentence in `FLS-11` about which half is 推 is exactly inverted: the window is measured at the loader prompt and has **never** been read under Linux. `R5-5`'s `D3` is the cell that would close that half.
+
 So this group may not assume the window is decoded at the loader prompt, and
 `f-alias` and `f-live` are that assumption turned into two cells that can fail.
 

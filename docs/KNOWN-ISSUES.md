@@ -87,6 +87,33 @@ measurement.
 
 ---
 
+## 🔴 The image contains a flash-write path, and it is not mine
+
+**量 2026-09-07 (`R5-5`, `FW-44`).** `CONFIG_RTL819X_SPI_FLASH=y`, and
+`spi_probe.c`'s `spi_chip_setup()` installs `mtd->write = mtd_spi_write` and
+`mtd->erase = mtd_spi_erase` unconditionally. Those reach
+`ComSrlCmd_ComWriteData`, `PageWrite_111002` and `ComSrlCmd_SE` — real page
+program and sector erase sequences on the SPI controller. They have been in
+every image this project has ever built and in the vendor's shipped one.
+
+What keeps them from being reached is the userspace surface, not their absence:
+`/dev/mtd0ro` is an odd minor and `mtdchar`'s `mtd_open` refuses it for writing
+(`:73`), and `/dev/mtdblock1` is declared `0400` in
+`config/rlxfw-initramfs.tsv`. **Those are access controls on a path that
+exists.**
+
+🟢 So the sentence `R5-5`'s `D4` earns is **rlxfw contributes no
+flash-write code to this image**. It is *not* *this image cannot write flash*,
+and no write-up may use the first to imply the second. `rtl819x-spi`'s own
+device is stricter than the vendor's partitions — `MTD_CAP_ROM` means
+`mtd_open` refuses it at `:94` on **either** minor, where `/dev/mtd0` is an even
+minor and passes `:73` — but that is a statement about `mtd2`, not about the
+image.
+
+⚠️ And `D4`'s positive control is a control **over stubs**: the write TU's two
+entry points return `-EPERM` and contain no SPI transaction, deliberately,
+because mainline is zero-write through `R9`.
+
 ## What has never been measured at all
 
 🔄 **2026-09-02 (`R5-0`), two rows leave this section and one arrives.**

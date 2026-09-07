@@ -599,11 +599,31 @@ it. It is declared by hand, and § 7 ⑦ already carries that hole.
 | `drivers/mtd/chips/rtl819x/spi_common.h` | line | **vendor** | `notes/kernel-build.md:3471` |
 | `drivers/mtd/chips/rtl819x/spi_probe.c` | line | **vendor** | `bench/2026-08-31/PREDICTIONS-B5-block3.md:448` |
 | `bootcode/boot/flash/spi_common.c` | name | **loader** | the loader's SPI, `docs/loader-flash-write.md` |
+| `drivers/mtd/chips/rtl819x/spi_probe.c` | **line** | **vendor** | 🔴 **added 2026-09-07 (`R5-5`).** `:101-103` -- `spi_chip_setup()` installs `mtd->read = mtd_spi_read`, `mtd->write`, `mtd->erase` UNCONDITIONALLY, and `:67-71` registers the chip driver as `flash_bank_1`, which is the name `rtl819x_flash.c` hands `do_map_probe`. This is the reading that showed the map layer is not on the path |
+| `drivers/mtd/chips/rtl819x/spi_flash.c` | **line** | **vendor** | 🔴 **added 2026-09-07.** `:28-34` `do_spi_read` dispatching through `spi_flash_info[chip].pfRead`; `:141-143` the three function pointers. **decision-layer** |
+| `drivers/mtd/chips/rtl819x/spi_common.c` | **line** | **vendor** | 🔴 **deepened 2026-09-07 from `name` to `line`.** `ComSrlCmd_InputCommand` (the command/address/dummy phase order), `ComSrlCmd_ComRead`, `SFCSR_CS_L`/`SFCSR_CS_H`, `spi_regist`'s UNKNOWN fallback (`SpiRead_11110B`, `PageWrite_111002`), `setFSCR`'s `#ifndef SPI_KERNEL`, and `ComSrlCmd_RDID`'s `SFCR` write. **The transaction ORDER in `rtl819x-spi.c` is this file's, and saying otherwise would be a worse driver told as a better story** |
+| `drivers/mtd/mtdchar.c` | **line** | generic | 🔄 **deepened 2026-09-07 from `name`.** `:73` odd-minor refusal, `:94` `!MTD_WRITEABLE` refusal, `:419-457` MEMERASE calling `mtd->erase` with **no NULL check**. Generic Linux, and it is what refuted this driver's first draft of layer L2 |
+| `drivers/mtd/mtdblock.c` | **line** | generic | 🔄 **deepened 2026-09-07.** `:421` `!(mtd->flags & MTD_WRITEABLE)` -> `dev->readonly = 1` |
+| `drivers/mtd/mtdcore.c` | **line** | generic | 🔄 **deepened 2026-09-07.** `add_mtd_device` `:216-246`: `BUG_ON(mtd->writesize == 0)`, first free slot, `mtd->index = i`. That is where the `mtd_index 2` prediction comes from |
+| `crypto/algapi.c` | line | generic | 🆕 **2026-09-07.** `:284-293` `crypto_wait_for_test()` -- the `NOTIFY_DONE` branch calling `crypto_alg_tested()` directly, which is why `crypto_alloc_shash` works with `CONFIG_CRYPTO_MANAGER` unset and why the driver carries its own KAT |
+| `include/crypto/hash.h` | line | generic | 🆕 **2026-09-07.** the `crypto_shash` API surface |
+| `arch/rlx/kernel/rlx-cevt.c` | line | **the port's own** | 🆕 **2026-09-07.** `:156-179` the watchdog kick and `=0` reset comment. Already in § 4.8 for `R5-3b-1`; cited here because `FW-45` is what bounds this driver's traversal |
 
 🔴 **Verdict: `R5-5` cannot be claimed as blind against the vendor.** Its
 partition layout, its map function's short-read behaviour, its virtual base and
 its `CONFIG_` branching have all been read, and three of them are decision-layer
 rather than fact-layer.
+
+🔴 **2026-09-07, when the driver was actually written, that verdict got worse
+rather than better, and the count is the honest way to say so: 11 paths → 20.**
+The transaction order, the phase lengths, the Fast Read opcode with one dummy
+byte, and the UNKNOWN-chip fallback are all the vendor's, read out of
+`spi_common.c`. **There was never a version of this driver that could have been
+written blind against the vendor**, because the vendor's code is the tree it is
+compiled into. What `driver-diff` can still score is the layer that is mine:
+the bounded spin, the save/restore/read-back guard, the endianness-independent
+byte assembly, and the three write-refusal layers — and `notes/spi-mtd-driver.md`
+§ 4 and § 5 are where those four are written down as claims a diff can test.
 
 🟢 **Nothing in this block is a third-party port**, so the *diff against
 `shibajee`/`ggbruno`* is not directly spoiled — subject to § 6, which is the
@@ -781,7 +801,7 @@ differ by exactly that entry, and neither is wrong.
 | `dt` | 2 | `D2` | 🟢 one `cpu@0` node, plus the board `.dts` by name only; the register addresses in the `.dtsi` are placeholders, recorded 2026-08-25 |
 | `irq` | 2 | `R5-10` | 🟡 two string literals; one is the loader's, not Linux's |
 | `bsp` | 8 | all six | 🔴 cross-domain exposure; `bsp_setup():134-175` counts as fully read |
-| `spi_mtd` | 11 | `R5-5` | 🔴 the vendor side is spent, three findings on the decision layer |
+| `spi_mtd` | **20** | `R5-5` | 🔴 **11 → 20 on 2026-09-07**, when the driver was written. The vendor side was already spent; the transaction order is the vendor's and the write-up says so |
 | **in scope** | 🔄 **50** *(32 at `R5-3b-1`)* | | `ledgerscan check` requires every one to have a row above, and on 2026-09-03 it went RED **three** times — 29 found against 27 declared; again after the jiffy check read three more; and 🔴 **once on a file that was never opened**, named from memory inside an edit whose purpose was to make a claim narrower (§ 4.3, the `timekeeping.c` row). **33 are declared**: the extra is `include/linux/jiffies.h`, which the scan classes out-of-scope and which is declared anyway |
 | `out-of-scope` | 68 | — | generic kernel; no peripheral register map passes through them |
 

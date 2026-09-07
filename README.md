@@ -97,6 +97,21 @@ implementation of it
 ([`docs/blind-write-ledger.md`](docs/blind-write-ledger.md) is the record of
 what *was* read, frozen before it existed).
 
+🆕 **2026-09-07 the third driver arrived and it is the first that does
+not have its peripheral to itself.** `drivers/mtd/devices/rtl819x-spi.c` is a
+read-only MTD device that reads this unit's flash by issuing real SPI
+transactions through `SFCSR`/`SFDR` — the same four registers the vendor's
+own driver drives, with write and erase and no lock, which is why every
+transaction saves those registers, forces chip-select high on every exit
+including the error paths, restores, and reads back. Two counters turn
+*nothing else touched the controller* from an assumption into a reading, and a
+`wedge` verb is what lets them fire. The flash **write** path is a separate
+translation unit whose `CONFIG_` is declared to kconfig nowhere, proved absent
+by symbol — which earns exactly one sentence, *rlxfw contributes no
+flash-write code to this image*, and not the wider one
+([`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md)). ⚠️ **Nothing of it has
+run on the silicon yet.**
+
 
 **[`notes/incremental-build.md`](notes/incremental-build.md)** 🆕 — why a
 `make` with nothing touched rebuilt all 599 objects, and what it cost to find

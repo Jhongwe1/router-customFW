@@ -128,6 +128,31 @@ dump or a document · **推** inferred, pending a measurement.
 
 ## It changed what an instrument may claim
 
+🆕 **2026-09-07 — a `jal` census cannot see an indirect call, so a
+zero from one is not "dead code".** Asked which path the kernel's MTD read
+takes, a scan of the `r54` artefact returned `jal → rtl8196_map_copy_from`
+**0** — the answer — alongside `jal → mtd_spi_read` **0** and
+`jal → SpiRead_11110B` **0**, and *those two functions are live*. Both are
+reached through function pointers. What separated the real zero from the two
+false ones was disassembling the callers, which had been done for an unrelated
+reason. ⚠️ `FW-39`'s technique is unaffected — it counts `sw` to an
+address — and saying so is part of the finding, because the two look alike.
+`讀` · `notes/spi-mtd-driver.md` §1.2.
+
+🆕 **2026-09-07 — two controls in this repository were broken by a
+DECLARATION rather than by a code change, and one of them could no longer
+fail.** `cardcheck`'s `A9` hardcoded `/dev/mtd2ro` as its example of an
+*undeclared* device node; `R5-5` declared that node, so the control's own
+example became declared and the case stopped being able to fire. Nothing in
+`cardcheck.py` changed that day. 🟢 The repair is not a different
+hardcoded name — that is the same bug waiting for the next declaration —
+but a derived one, with a refusal if every candidate is declared. `test-config-gates`
+failed the same way twice over: a hardcoded delta count, and a grep pattern
+that encoded a column width a deliberate formatting change then widened.
+**All three were found by running every suite rather than the ones whose code
+changed**, which is `CLAUDE.md`'s own rule and the second time this month it
+has paid. `量` · `tools/cardcheck.py` `A9`, `tools/test-config-gates.sh` `G4d`.
+
 🆕 **2026-09-03 — a trust flag that reports trusted on data it cannot
 vouch for, and it is mine.** `rtl819x-timer`'s `tc1_ext_trusted` is
 `gap < (MASK >> 1)`, which is correct **inside its domain** — sampling gaps
@@ -375,6 +400,19 @@ of those five configs produces MIPS16. The discriminator is gone; a stronger one
 
 ## It changed what this repository may claim about itself
 
+🆕 **2026-09-07 — the closing sweep's own step count was wrong by two,
+and had been since August.** `ci.yml` has **61** real `run:` steps. A substring
+`grep -c 'run:'` reads 62 (a comment at `:358` ends in the word); a selector
+anchored `^\s*run:` reads **59**, because `:728` and `:733` use the inline
+`- run:` form. `git log -S` dates both to `970f041`, **2026-08-25** — so every
+desk sweep this project has run has skipped them, every *"all N run: steps"*
+has been short by two, and `shellcheck --severity=error tools/*.sh` has never
+executed here, only in CI. 🔴 **This instance is harder to see than
+`CNT-1`'s first four because the number came from an INSTRUMENT rather than a
+keyboard, so it looked derived.** The fix is not a second counter: it is making
+the instrument print the total it found and compare it against a declared one.
+`量` · `PROGRESS.md` `CNT-1`, `bench/README.md`.
+
 **These are not about the device.** *(This opened "These four" until 2026-09-02, when three more arrived and made it five, then six, then seven. The number is deleted rather than corrected — it carries no weight in the sentence, which is exactly why nobody ever re-derived it; the same call `docs/KNOWN-ISSUES.md`'s row count got.)* They are about the difference between
 what this repository's files say and what its artefacts and its own history
 actually contain — and every one of them was found by re-deriving a number
@@ -418,6 +456,19 @@ rather than by a checker.
 | 讀 | **A key-derivation choice had never been costed in memory.** scrypt at meaningful parameters wants 16 MiB of the 26 MiB this kernel gets, from one unauthenticated request | The rate limiter moves in front of the KDF, and the parameters are set by an anti-DoS budget · plan D8 |
 
 ## It answered a question that had been open
+
+🆕 **2026-09-07 — which path the kernel reads flash through, and it is
+not the one four files said.** `mtd->read` on this image is `mtd_spi_read`,
+installed unconditionally by the vendor's chip driver, and it reaches `SFDR`:
+**programmed I/O, not the memory-mapped window**. The map layer is not on the
+path at all — `rtl8196_map_copy_from` is never installed and never called.
+🟢 `FW-34`'s exclusion of a silent short read survives and gets
+*stronger*; 🔴 its `4× × ≤9×` decomposition loses both terms, and
+`FLS-11` and `MAP-12` — both marked `量` — lose the evidence they name.
+What survives for those two is `probe3` Group F, which is **bare metal**, so
+`FLS-11`'s note about which half is inferred is exactly inverted: **the window
+has never been read under Linux.** `讀` · `SPEC.md` `FW-43`,
+`notes/kernel-build.md` §21.
 
 | | | |
 |---|---|---|
