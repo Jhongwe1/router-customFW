@@ -642,11 +642,37 @@ jobs:
       # this job. The suite's D2 case builds its own twelve-instruction MIPS
       # image by hand, so with qemu present the whole suite runs on a stock
       # runner with no vendor material at all.
+      # python3-yaml is here for `desk-sweep`, and it is declared rather than
+      # assumed: the runner image probably carries it, and "probably" is not a
+      # dependency. It is also why desk-sweep's self-test is in THIS job and
+      # not beside `ci-census`'s in `text`, which installs nothing.
       - name: apt
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips python3-yaml
 
       - name: capture dir
         run: mkdir -p ci-out
+
+      # desk-sweep runs every suite in THIS file at a desk, on a verified copy
+      # of the tree. Its self-test is in CI and not only at the desk because
+      # two of its fifteen controls are checks on THIS FILE and can only go
+      # stale here:
+      #   C9  the live ci.yml parses and declares >= 40 run steps -- the
+      #       population control, without which C10's silence means nothing
+      #   C10 the two `census` steps desk-sweep EXCUSES (red at a desk by
+      #       construction) still exist here by name, and its safety rule --
+      #       "no step needing root runs at a desk" -- still matches at least
+      #       one live step. Rename a step and an excuse becomes an allow-list
+      #       entry that can only grow; change how an apt step is spelled and a
+      #       dead safety rule goes on printing zero.
+      #   C10b the same rule refuses a non-zero number of steps HERE, so its
+      #       verdict on this file is not vacuous.
+      # C2 is the positive control that makes C1 mean anything: it runs the
+      # line-based enumerator every desk sweep used until today against the
+      # same fixture and requires it to come out SHORT. C3 is the positive
+      # control on the copy verifier -- one byte changed in the copy must be a
+      # refusal, or "the copy IS the source" is a line that cannot fail.
+      - name: desk-sweep self-test
+        run: /usr/bin/python3 tools/desk-sweep.py --self-test 2>&1 | tee ci-out/desk-sweep.out; exit "${PIPESTATUS[0]}"
 
       # 66 s. Drives a pty, not a serial port; no device is involved.
       - name: test-console-capture
