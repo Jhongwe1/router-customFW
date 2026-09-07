@@ -493,7 +493,7 @@ tools/ledgerscan.py        R5's blind-write ledger is COMPUTED, not written. It
                            has a negative control on real material: removing one row
                            from the committed ledger must name the path it lost.
 
-tools/looprun.py           two of its nine stages exist only to make it safe to run
+tools/looprun.py           two of its ten stages exist only to make it safe to run
                            with nobody watching: S5b reads the loader's burn flag back
                            out of memory before any upload -- the echo the transfer
                            tool checks is a different source, C-6 -- and S6b requires

@@ -705,7 +705,7 @@ the remedy — one `--mode bench` with no skip — with the cost written as
 is the most expensive unit here.* Three readings, all from the source and none
 of them costing power:
 
-1. `--mode plan`'s nine stages: `S2` and `S3` are **desk** and they run
+1. `--mode plan`'s ten stages (nine until 1.1 added `S5c`): `S2` and `S3` are **desk** and they run
    **before** `S4`, which is `J BFC00000`.
 2. `loop_once` is sequential and any stage with `rc != 0` raises
    `StageFailed` immediately — so **a failed `S2` means `S4` never runs and
