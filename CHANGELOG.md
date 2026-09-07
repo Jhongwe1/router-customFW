@@ -60,6 +60,24 @@ would have reported `ran 0/13` and `ran 0/10` with zero failures -- a census
 mismatch, discovered after a push. Running the census locally in both arms
 (dump present, dump absent) is what found it.
 
+🟢 **The CI band did not move.** The two runs `citime check` named at the start
+are recorded — `BIG3` 503 and 498, `suite_cost` 538 and 525 — and the band over
+all rows goes n=65 → **67** while staying **497..507 = 10 s, ±1.00 %, median
+502.0**. ⚠️ **Two bands are in circulation and they are not the same number**:
+the all-rows one above, and `stats --since changepoint` (n=51) at **497..504 =
+7 s, ±0.70 %**. Both have median 502.0 and both are correct; a quote of either
+has to say which, and this repository's write-ups have used each without
+saying.
+
+🔴 **And two defects while writing that down, one old and one new.** The old
+one is the Bash tool's single quoted heredoc losing a backslash level — third
+time this segment, `CLAUDE.md` documents it and the workaround is to write the
+file and run it by path. The new one is worse: the patch script and the `git
+commit` after it were **separate commands, not chained**, because the newline
+after the heredoc terminator ends the first one. **The script failed, printed
+its refusal, and the commit ran anyway** — the same shape as this file's own
+`EXIT CODE: 0` incident, where a step that failed did not stop what came next.
+
 🟢 **`FW-49`**: `\r\r\n` has two sources and only one is a wrap. 量 over all
 762 committed captures -- busybox ash's line editor wraps the **echo** at the
 terminal width (33 captures, all `len(sent) >= 80`), while the other 33

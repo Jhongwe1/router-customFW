@@ -534,6 +534,17 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   … ordinary shell, literal paths, $VAR all fine …
   EOF
   ```
+  🔴 **2026-09-08: and a heredoc terminator ENDS the command, so a `&&`
+  written after it chains nothing.** 量, on this segment's own closeout: a
+  patch script was written as `python - <<'PY' … PY` followed on the next
+  line by `git add -A && git commit …`. Those are **two commands**. The
+  script hit its own anchor check, printed a refusal and exited 1 — **and the
+  commit ran anyway**, producing a commit whose message described a change the
+  commit did not contain. That is this file's own `EXIT CODE: 0` incident with
+  the roles swapped: there a failure was reported as a success, here a failure
+  was reported correctly and nothing downstream read it. **A step whose
+  failure must stop the next one has to be on the same command line, or the
+  next one has to test for its output.**
   🆕 **But do not nest a second heredoc inside that one.** Measured 2026-08-26,
   three times before it was believed: a `python3 - <<'PY' … PY` inside the outer
   heredoc **loses one level of backslash**, so `\\t` reaches Python as `\t` and
