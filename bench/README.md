@@ -607,11 +607,17 @@ of this repository. **The ordering claim is a pre-push gate on the machine
 that took the captures and it proves nothing to anyone who clones this
 repository** — which is sharper, and worse, than *not a cryptographic
 timestamp*. What CI runs is the tool's fifteen controls, which build their
-own fixtures and are clone-stable. The fix that would make the sweep a CI
-gate is known: every capture already carries a committed `started_wallclock`,
-so the capture side survives a clone; the prediction side would need a
-declared timestamp inside the file, which the blocks already frozen cannot
-have. Carried forward rather than half-done.
+own fixtures and are clone-stable. 🔄 **2026-09-08: HALF of that fix is now
+built.** Every capture already carries a committed `started_wallclock`, so the
+capture side survives a clone — and `tools/capdate.py` uses exactly that,
+comparing it against the `bench/<date>/` directory the capture sits in, as a
+CI gate. The **prediction** side still has no committed timestamp and would
+need a declared `written:` line inside the file, which the blocks already
+frozen cannot have. So the ORDERING claim stays a pre-push gate and only the
+directory-name claim moved. 🔴 量 on `capdate`'s first sweep: 25 directories,
+762 captures, and two directories named for a day none of their captures
+happened on — `bench/2026-08-30` and `-30b`, both declared by name rather than
+renamed.
 
 ⚠️ **It says how many cells have no capture and not which.** Twelve of the 32
 are `2026-08-30b`'s; the rest are seatings that stopped, and the per-file check

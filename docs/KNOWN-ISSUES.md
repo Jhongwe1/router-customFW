@@ -40,6 +40,7 @@ measurement.
 | 🟢 **The bracket does have a negative control.** | Every destination is read **before** its `FLR`; on the round that established this, all eight pre-reads differed from the expectation, so *the `FLR` wrote* is measured rather than assumed. One earlier round was **voided** by that control when DRAM retained a previous cycle's contents across a power cycle. |
 | 🔴 **2026-09-08 (seating 16): the sentence above is now known to be FALSE for the DEVICE, and that is worse than unmeasured.** | `SPEC.md` `FLS-26`. `rtl819x-spi` digested `H601`'s complement on the silicon — `digest_bytes 4186112`, `h601_hashed 0`, over a traversal of all **4194304** bytes — and got `a1673578…100d49eb` where `FLS-24` says `a9916fd8…4ce3cba`. **The constant is not the thing that is wrong**: the same range recomputed at the desk from **both** dump files by an independent implementation gives `a9916fd8…` exactly. So flash content has moved since 2026-08-16. 🔴 **Attribution is not established and this seating could not narrow it** — it was not tonight (loader straight to my image on all ten boots, no vendor firmware, `n_writes 0` in every dump, no `FLW`/`EW`/`EB`/burn issued), and the vendor firmware *has* run on this part since the dump, but that is a hypothesis with a mechanism, not a measurement. |
 | 🟢 **And the one region that matters most is now proven intact over all of it, not sampled.** | `verify 32768` covers exactly `[0, 0x6000)` — the whole loader region, **24,576** bytes — and it is byte-identical to the 2026-08-16 dump. Every `FLR` bracket in this project combined had sampled **256** of those. The first difference is `[0x9000, 0xA000)`: **4096** bytes, exactly one erase sector, above `H601` in `mtd0`'s `"boot+cfg+linux"`. |
+| 🔄 **2026-09-08 (forty-fourth segment): the driver's limit is lifted and the coverage figures are unchanged, which is the point.** | `rtl819x-spi` 1.1 adds `verify <n> <off>` and a two-level `map` (32 x 32 = 1024), and `tools/flashmap.py` computes the expectation from the dump so every line can be carded before power. **It has read nothing**: the scope decision is that these verbs ride on `R5-6`'s image. So the row below stands in every digit. |
 | 🔴 **Coverage is still the binding limit, and it is now limited by the DRIVER rather than by the bracket.** | Proven identical **28,672** bytes (0.684 %); proven different **4096** (0.098 %); **undetermined 4,153,344 (99.02 %)**; never hashed by rule 8,192 (0.195 %). Prefix digests find the *first* difference and nothing past it, and `verify` takes a limit with **no offset** (`rtl819x-spi.c:765`). Whether anything above `0xA000` also moved cannot be settled by this image. `FLS-26` in `SPEC.md` §17 owns the way out. |
 
 ---
@@ -206,6 +207,59 @@ card inherits them.*
 | 🔴 **Every console capture line is CRLF, so a field read with `awk` is `"1\r"` and compares unequal to `"1"` — while printing as `1`.** | 量 with `od -c`: `1 \r \n`. Three gates in one seating reported STOP or VOID on cells that had **passed**, each while printing the correct value beside the wrong verdict, because a carriage return is invisible in display. **The diagnostic and the test disagreed and the diagnostic looked right.** Any helper that reads a field out of a capture must strip it, and must self-test against captures whose answers are already known before it is trusted. |
 
 ---
+
+## 🔴 A carriage return is invisible, and so is the tool you would use to see it
+
+Every console capture line ends `\r\n`. `awk`'s `$2` is therefore `"1\r"` and
+`[ "1\r" = "1" ]` is false. On 2026-09-08 that produced **three gates
+reporting STOP or VOID on cells that had passed, each while printing the
+correct value beside the wrong verdict**.
+
+⚠️ 量 2026-09-08, while building the replacement: `cat -A` **under Git Bash
+does not show the `^M` either**, because that shell translates the file on the
+way in. The tool you would reach for to make a CR visible hides it. `od -c`,
+or read the bytes in Python.
+
+`tools/capfield.py` is the shared reader, and it refuses more than it answers:
+a name that looks like a **mark** is refused with the reason rather than
+returning empty (an empty answer reads to a caller as a failed assertion); a
+field that occurs more than once is refused rather than picked (`X14-fast`'s
+`dat` occurs 15 times); and `num`/`sub` **require** `--base`, because
+`n_writes 0` is decimal and `sfcr FFC00000` is hexadecimal in the same dump
+and `FW-35` is in this repository because `awk` read `8001e714` as scientific
+notation. Its self-test runs against committed captures whose answers are
+known and every other mode refuses to answer if it fails.
+
+## 🔴 `\r\r\n` has two sources and only one of them is a wrap
+
+量 2026-09-08 over all 762 committed captures (`FW-49`). busybox ash's line
+editor wraps the **echo** of a typed line at the terminal width: 33 captures,
+one wrap each, all with `len(sent)` in 80..121. The other 33 occurrences sit
+**after** the echo and are the loader's ordinary `\r` + `\r\n` on a 10-character
+command. **A scan that counts `\r\r\n` sees 66 and conflates two mechanisms
+whose counts happen to be equal.**
+
+Output is not wrapped -- an 88-character `/proc/version` line arrives whole in
+five captures, and two loader commands of 119 and 127 characters do not wrap.
+🔴 The consequence is a band: `console-capture.py` refuses a `--send` only at
+**128** characters, so **79..127 is accepted and wrapped**, and in that band
+both "the first newline ends the command" and "grep for the whole command"
+fail.
+
+## 🔴 Two bench directories are named for a day none of their captures happened on
+
+量 2026-09-08 by `tools/capdate.py` on its first sweep. `bench/2026-08-30` and
+`bench/2026-08-30b` hold 13 and 24 captures, all taken on **2026-08-29**
+(22:59:15-23:13:02 and 23:16:42-23:26:29), and `git log --diff-filter=A` shows
+both directories were created before those captures existed. The name was a
+prediction that the seating would cross midnight; it did not. This is
+`RUNSHEET` lifecycle rule 3's own failure, seven days before that rule was
+written.
+
+They are **not renamed**: 40 and 84 references across 23 and 17 files,
+including two frozen cards and three tools. They are declared by name in
+`capdate.KNOWN_MISNAMED`, and the list is swept in both directions so an entry
+that stops applying fails rather than sitting there.
 
 ## Closed since `v0.2` was tagged
 

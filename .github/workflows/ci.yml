@@ -610,12 +610,49 @@ jobs:
       # So the ordering claim is a PRE-PUSH gate on the machine that took the
       # captures, and it cannot be anything else in this form. What CI can run
       # is the controls, above -- they build their own fixtures and are
-      # clone-stable. The fix that would make the sweep a CI gate is known and
-      # not built: every capture already carries a committed `started_wallclock`
-      # in its .meta.json, so the capture side is clone-stable; the prediction
-      # side would need a declared timestamp inside the file, which the blocks
-      # already frozen cannot have. Carried forward in PROGRESS.md rather than
-      # half-done, and the tool's docstring says the same.
+      # clone-stable. 🔄 2026-09-08: HALF of the fix named here is now built,
+      # and it is the next step down -- `capdate`. Every capture already
+      # carries a committed `started_wallclock`, so the CAPTURE side is
+      # clone-stable and that half is now a gate. The PREDICTION side still
+      # has no committed timestamp and would need a declared `written:` line
+      # inside the file, which the blocks already frozen cannot have. So the
+      # ORDERING claim stays a pre-push gate; only the directory-name claim
+      # moved. Carried forward in PROGRESS.md rather than half-done.
+
+      # 🔴 And THIS is that fix, arriving 2026-09-08. `capdate` compares each
+      # capture's committed `started_wallclock` against the `bench/<date>/`
+      # directory it sits in. That comparison is clone-stable -- the timestamp
+      # is content, not metadata -- which is exactly why it lives in its own
+      # tool rather than inside check-predictions, whose docstring says at
+      # length that it can never be a CI gate. `RUNSHEET`'s lifecycle rule 3
+      # ends with a ⚠️ naming this check as missing; three consecutive
+      # seatings hit rule 3 and a human caught all three.
+      #
+      # 量 on its first sweep of the real corpus: 25 directories, 762
+      # captures, and TWO reds that had been in the record since 2026-08-29 --
+      # bench/2026-08-30 and 2026-08-30b, whose captures were all taken on
+      # 08-29. They are declared by name in KNOWN_MISNAMED and the list is
+      # swept in both directions, so an entry that stops applying is an error
+      # rather than a comfort.
+      - name: capdate
+        run: /usr/bin/python3 tools/capdate.py bench 2>&1 | tee ci-out/capdate.out; exit "${PIPESTATUS[0]}"
+
+      # The shared field reader the four false stops of seating 16 are the
+      # specification for: strip CR, read read_proc FIELDS and never marks,
+      # refuse a field that occurs more than once, and require an explicit
+      # --base because `n_writes 0` is decimal and `sfcr FFC00000` is not.
+      # Its self-test runs against committed captures whose answers are known,
+      # so it is a real gate here and not a fixture exercise.
+      - name: capfield
+        run: /usr/bin/python3 tools/capfield.py selftest 2>&1 | tee ci-out/capfield.out; exit "${PIPESTATUS[0]}"
+
+      # The desk half of rtl819x-spi 1.1's `map`. Ten of its twelve controls
+      # are synthetic and run here; F1/F1b need this unit's dump and stand
+      # down, which is the same split flashwin has and for the same reason.
+      # It imports flashwin.overlaps_forbidden rather than restating the H601
+      # rule, and F8 is the control that says the import is load-bearing.
+      - name: flashmap
+        run: /usr/bin/python3 tools/flashmap.py controls 2>&1 | tee ci-out/flashmap.out; exit "${PIPESTATUS[0]}"
 
       - name: fetch-sources --list (offline; never fetches)
         run: bash tools/fetch-sources.sh --list

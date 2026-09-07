@@ -30,12 +30,18 @@ a forgery scenario -- it is what clone, checkout, stash pop, rebase and merge do
 routinely -- and it is why this tool is a **pre-push gate on the machine that
 took the captures** and is not, and cannot be, a CI gate in this form.
 
-The fix that would make it one is known and is not built here: every capture
-already carries a committed ``started_wallclock`` in its ``.meta.json`` (量: all
-136 resolvable cells have one), so the capture side is clone-stable.  The
-prediction side has no committed timestamp, and adding one means a declared
-``written:`` line inside the predictions file -- a change to the format that the
-blocks already frozen cannot have.  Carried forward rather than half-done.
+🔄 **2026-09-08: half of that fix is now built, and it is a different tool.**
+Every capture already carries a committed ``started_wallclock`` in its
+``.meta.json`` (量: all 136 resolvable cells have one), so the capture side is
+clone-stable -- and ``tools/capdate.py`` uses exactly that, comparing it
+against the ``bench/<date>/`` directory the capture sits in.  That check runs
+in CI, because content survives a clone.
+
+What is still not built is the other side: the **prediction** file has no
+committed timestamp, and adding one means a declared ``written:`` line inside
+it -- a change to the format that the blocks already frozen cannot have.  So
+the ORDERING claim this tool makes stays a pre-push gate, and only the
+directory-name claim moved.  Carried forward rather than half-done.
 
 So: this proves ordering to a cooperative auditor **standing at the machine the
 captures were taken on**; it proves nothing after a push, and nothing against

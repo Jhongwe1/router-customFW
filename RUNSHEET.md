@@ -3883,10 +3883,47 @@ pretending to know:
 bench.** The rule is: rename the directory and re-derive the fence **before**
 the freezing commit, and per rule 1 run `spec-check` before that commit too.
 
-⚠️ **What this does not fix**: nothing forces the directory's name to
-match the day the captures were actually taken. That check would have to read
-a capture's `.meta.json` `started_wallclock` and compare it with the path, and
-no tool here does.
+✅ **2026-09-08 (forty-fourth segment): a tool does now, and its first sweep
+of the real corpus found two directories nobody had found by reading.**
+*(This paragraph read: "⚠️ **What this does not fix**: nothing forces the
+directory's name to match the day the captures were actually taken. That check
+would have to read a capture's `.meta.json` `started_wallclock` and compare it
+with the path, and no tool here does.")*
+
+`tools/capdate.py` reads exactly that and compares it with the path. It is a
+**separate** tool from `check-predictions.py` for a stated reason:
+`started_wallclock` is committed **content** and survives a clone, where the
+mtime ordering `check-predictions` proves does not -- so this is the half of
+rule 3 that can be, and now is, a CI gate.
+
+`D1` (hard) the directory's date must be one of the dates its captures were
+actually taken on. `D2` (report) a seating that legitimately spans midnight is
+reported with the split rather than failed -- seating 16 ran 00:00:02 to
+00:32:16 and a seating that starts at 23:50 crosses. `D3` (scope) a directory
+holding captures from which not one timestamp could be read is RED, not green.
+
+🔴 **量 on the first sweep: 25 directories, 762 captures, and two reds.**
+`bench/2026-08-30` (13 captures, all taken 2026-08-29 22:59:15-23:13:02) and
+`bench/2026-08-30b` (24, all 23:16:42-23:26:29). `git log --diff-filter=A`
+shows both directories were created **before** those captures existed, so the
+name was a prediction that the seating would cross midnight -- and it did not.
+**That is this rule's own failure, seven days before the rule was written, and
+it is the earliest instance in this repository.**
+
+🔴 **They are not renamed, and the reason is measured**: `git grep` outside the
+captures themselves finds 40 references to the first across 23 files and 84 to
+the second across 17, including **two frozen cards**, `tools/rbcheck.py`,
+`tools/rlxprobe/probe3.c` and `tools/test-console-capture.sh`. Editing a frozen
+card is what rule 1 records the cost of. They are declared **by name** in
+`KNOWN_MISNAMED` with the reason, the way `flashwin`'s `A20` names its two
+frozen cards, and the list is swept in **both directions** -- an entry that
+stops applying, or that names a directory which is not there, is an error
+rather than a comfort (`C11`, `C12`).
+
+⚠️ **What this still does not fix**: it checks consistency between two things
+the operator controls. If the host clock is wrong, the tool agrees with it
+enthusiastically. And it catches the *directory* being wrong, not a *file*
+being moved into it afterwards.
 
 ### 4. 🔴 Re-derive `RECIPE_ID` before the freezing commit, and if it moved, rebuild
 
