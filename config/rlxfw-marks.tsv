@@ -152,3 +152,51 @@ ID0	linux-2.6.30/init/main.c	after	printk(KERN_NOTICE "%s", linux_banner);	rlxfw
 # ----------------------------------------------------------------------------
 MK2	linux-2.6.30/drivers/clocksource/Makefile	after	obj-$(CONFIG_SH_TIMER_CMT) += sh_cmt.o	obj-y += rtl819x-timer.o	str:rtl819x-tc1	rtl819x-timer.c is copied in by --src and needs a Kbuild line. obj-y and not obj-$(CONFIG_...) on purpose: a new Kconfig symbol would have to be declared in config/rlxfw-kernel.delta as well, and a driver that is in the tree but not in the image is the state `rlxfw-marks.py verify` exists to catch. R5-2's reading is what decides whether this becomes a symbol. The anchor is written with single spaces and matched normalised, because Kbuild lines are tab-aligned and this file is tab-separated
 MK3	linux-2.6.30/drivers/gpio/Makefile	after	obj-$(CONFIG_GPIOLIB) += gpiolib.o	obj-y += rtl819x-gpio.o	str:rtl819x-pabcd	rtl819x-gpio.c is copied in by --src and needs a Kbuild line. Same reasoning as MK2 and one addition that is specific to this driver: drivers/Makefile:8 enters drivers/gpio/ with a bare obj-y, so this object is compiled whether or not CONFIG_GPIOLIB is set -- and it calls gpiochip_add(), which only exists when gpiolib.o is built. That is deliberate. Removing CONFIG_GPIOLIB=y from config/rlxfw-kernel.delta then fails at LINK rather than quietly producing an image with no GPIO driver in it, which is the state rlxfw-marks.py verify exists to catch. The guard string is the chip label rather than the file name because the label is what reaches the image's rodata. The anchor is written with single spaces and matched normalised, as MK2's is
+
+# ----------------------------------------------------------------------------
+# R5-5, 2026-09-07.  TWO rows, and the second is a shape this file did not
+# have before today.
+#
+# THE FILE'S OWN RULE FOR ADDING A ROW DOES NOT APPLY to either, the same way
+# it does not apply to ID0, MK2 or MK3: that rule -- a row must separate two
+# causes that would otherwise share a capture -- is about the boot ladder.
+# These are build lines.
+#
+# WHY drivers/mtd/devices/ AND NOT drivers/mtd/chips/rtl819x/.
+# devices/ is where a self-contained flash device driver lives in a mainline
+# tree (m25p80.c is its neighbour), which is what this gate's "accepted
+# upstream-style" asks for, and it keeps my file out of the directory holding
+# the vendor's spi_common.c / spi_probe.c / spi_flash.c -- the three files
+# docs/blind-write-ledger.md 4.5 records as read.  讀
+# drivers/mtd/Makefile:33 -- `obj-y += chips/ lpddr/ maps/ devices/ ...` is a
+# BARE obj-y, so the directory is descended into unconditionally and needs no
+# symbol of its own.  Same shape as MK3's drivers/Makefile:8.
+#
+# THE ANCHORS.  MK4's is the last line of drivers/mtd/devices/Makefile and
+# occurs exactly once, which rlxfw-marks.py requires rather than assumes.
+#
+# 🔴 MK5's anchor is MK4's OWN INSERTED LINE, and that is the tool's doing.
+# The first draft gave both rows the same anchor -- which reads as tidy and
+# is not -- and `apply` refused before the build with "two rows at one point
+# means the order is an accident".  It is right: two Kbuild lines inserted at
+# one anchor land in whatever order the table happens to be read in, and
+# nothing declares which.  Anchoring MK5 on `obj-y += rtl819x-spi.o` makes
+# the dependency EXPLICIT: MK5 cannot apply unless MK4 already has, which is
+# the ordering the pair actually needs.
+#
+# MK4's WITNESS is the mtd name and not the file name, because the name is
+# what reaches the image's .rodata -- the same reasoning as MK3's chip label.
+#
+# 🔴 MK5 IS THE FIRST CONDITIONAL ROW IN THIS FILE, and it is what D4 is
+# proved with.  CONFIG_MTD_RTL819X_WRITE is not declared to kconfig anywhere:
+# an undeclared CONFIG_ expands to empty in GNU Make, so the object is not
+# built and no menu, defconfig or `oldconfig` can build it -- which is
+# stronger than `=n`, because `=n` is a value something could change.  Its
+# `absent:` witness makes `rlxfw-marks.py verify` assert that the symbol is
+# NOT in System.map, and the POSITIVE CONTROL is a make-level override in a
+# discarded tree (`make CONFIG_MTD_RTL819X_WRITE=y`), which makes the symbol
+# appear and this row go red.  Without that control, `absent:` would be a
+# check that cannot fire.
+# ----------------------------------------------------------------------------
+MK4	linux-2.6.30/drivers/mtd/devices/Makefile	after	obj-$(CONFIG_MTD_M25P80) += m25p80.o	obj-y += rtl819x-spi.o	str:rtl819x-spi-pio	rtl819x-spi.c is copied in by --src and needs a Kbuild line. obj-y and not obj-$(CONFIG_...) for MK2's reason: a new Kconfig symbol would have to be declared in config/rlxfw-kernel.delta too, and a driver that is in the tree but not in the image is the state rlxfw-marks.py verify exists to catch. The witness is the mtd_info's name, which reaches .rodata; the file name does not. The anchor is written with single spaces and matched normalised, because Kbuild lines are tab-aligned and this file is tab-separated
+MK5	linux-2.6.30/drivers/mtd/devices/Makefile	after	obj-y += rtl819x-spi.o	obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o	absent:rtl819x_spi_write_page	R5-5 D4. The write path's designated home, declared and deliberately NOT built. CONFIG_MTD_RTL819X_WRITE is declared to kconfig nowhere, so this expands to empty in GNU Make and the TU cannot be built by any configuration act; the control build overrides it on the make command line in a discarded tree. The witness is absent: rather than str:/sym: because the claim is that the symbol is MISSING from System.map, and rlxfw-marks.py refuses the other two kinds on a conditional row so the two cannot be swapped

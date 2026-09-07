@@ -159,3 +159,47 @@ nod	/dev/tty	c:5:0	0666	rlxfw	busybox's shell wants a controlling terminal for j
 # forbidden region that is provably unable to write it.
 nod	/dev/mtd0ro	c:90:1	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), over mtd0 = loader + H601. `wc -c` = 1245184. `echo x >` must be EACCES -- that is the control, and it writes nothing
 nod	/dev/mtd1ro	c:90:3	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), over mtd1 = the vendor rootfs. `wc -c` = 2949120, the reading the withdrawn /dev/mtdblock1 row was for, with no writable node left behind
+#
+# 🆕 2026-09-07 (`R5-5`): TWO MORE NODES, and the second one is the first
+# chance this project has ever had to see refusal (b) fire.
+#
+# Refusal (a) -- the ODD-minor rule at mtdchar.c:73 -- is already exercised by
+# `echo x > /dev/mtd0ro`.  Refusal (b) at :94, `!(mtd->flags & MTD_WRITEABLE)`,
+# has NEVER fired on this board and cannot: every partition in this image comes
+# from the vendor's map, which sets MTD_CAP_NORFLASH, so MTD_WRITEABLE is on and
+# (b) is skipped.  rtl819x-spi registers with MTD_CAP_ROM -- flags 0 -- so
+# /dev/mtd2, an EVEN minor, is the only path in this image where (b) is the
+# thing that says no.
+#
+# 🔴 AND THE EVEN-MINOR NODE WAS REFUSED, BY THIS PROJECT'S OWN TOOL,
+# BEFORE IT REACHED A BUILD.  `mkinitramfs.py` rejects any c:90:<even>:
+#   "major 90 is mtdchar and minor 4 is EVEN ... only an ODD minor cannot be
+#    opened for writing.  Declare /dev/mtd2ro as c:90:5 instead"
+# That rule encodes refusal (a) alone, which is all it CAN check: whether
+# (b) applies is a property of the driver's mtd->flags at run time, and a
+# declaration file cannot see it.  🟢 The refusal is accepted rather than
+# widened -- the guard it replaces was going to live in the CARD's shell
+# command, and a guard in a command depends on the operator running the
+# command as written, while a guard in the declaration does not.  So (b)
+# stays 讀, verified in mtdchar.c:94 and never observed firing, and it is
+# carried forward with its route: rtl819x-spi's `trywrite` verb reaches
+# layer L2 on the silicon instead, which is the layer BEHIND (b).
+#
+# What the withdrawn node would have needed, kept because it is the argument
+# the next attempt has to answer:  An even minor opened for writing is refused by (b) only if
+# the device behind it is mine.  If `mtd2` were ever a vendor partition -- a
+# third entry in rtl8196_parts1[], say -- the same `echo x > /dev/mtd2` would
+# pass (a), pass (b), and attempt a REAL FLASH WRITE.  So the cell is written
+#
+#   grep -q 'rtl819x-spi-pio' /proc/mtd && echo x > /dev/mtd2
+#
+# and the shell does the checking.  讀 rtl819x_flash.c: with CONFIG_ROOTFS_SQUASH
+# and no dual image, rtl8196_parts1[] has exactly TWO entries, so mtd2 is mine or
+# nothing -- but "or nothing" is a prediction and this is the one place where a
+# wrong prediction would be expensive rather than interesting.
+#
+# The minor arithmetic is the same as above: mtd2 = c 90 4, mtd2ro = c 90 5.
+# Mode 0400 on both, so root's ignoring of DAC is what makes the refusal a
+# KERNEL reading rather than a permission-bit one -- the same reasoning
+# /dev/mtd0ro carries.
+nod	/dev/mtd2ro	c:90:5	0400	rlxfw	R5-5: read-only by the KERNEL (odd minor) over mtd2 = rtl819x-spi's own read-only device. `wc -c` must be 4194304, which is the SAME 4 MiB /dev/mtd0ro and /dev/mtd1ro cover between them but read through MY driver's programmed-I/O path instead of the vendor's. A size that is not 4194304 means add_mtd_device took a different index and every mtd2 cell on the card is void
