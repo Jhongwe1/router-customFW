@@ -1,0 +1,45 @@
+echo verify 39936 > /proc/rtl819x-spi ; cat /proc/rtl819x-spi
+RLXFW-S-VRC=00000000
+RLXFW-S-VDIFF=00000000
+RLXFW-S-VD1=00000000
+version rtl819x-spi 1.0
+added 1
+add_rc 0
+mtd_index 2
+kat_rc 0
+wedged 0
+sfcr FFC00000
+sfcr2 0BA08000
+sfcsr C8000000
+boot_sfcr FFC00000
+boot_sfcr2 0BA08000
+boot_sfcsr C8000000
+sfcr_as_loader 0
+sfcr_as_kernel 1
+cs_idle 1
+n_xfer 4255
+n_reg_writes 51060
+n_pio_bytes 17420296
+n_mmio_bytes 13225984
+n_mtd_read 1024
+n_rdy_timeout 0
+n_state_foreign 0
+n_state_bad 1
+n_writes 0
+n_write_refused 2
+v_ran 1
+v_rc 0
+cmp_bytes 36864
+cmp_equal 1
+cmp_first_diff -1
+cmp_diff_bytes 0
+digest_bytes 28672
+complement_expected 4186112
+h601_skipped 8192
+h601_hashed 0
+corrupt_at -1
+d1_sha256 6e0b6126564e280ef58ab70be3e5b160b4f1556f7ea68f6fbf7b0ccd94a6b64d
+dmmio_sha256 6e0b6126564e280ef58ab70be3e5b160b4f1556f7ea68f6fbf7b0ccd94a6b64d
+d1_match 0
+d1_d3_agree 1
+# 

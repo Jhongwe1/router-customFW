@@ -197,3 +197,90 @@ writes landed, which no row here had.
 ⚠️ And it is **not** an answer to §3 either. That the firmware region is
 mutable on this unit does not show its state on 2026-08-16 was unguessable —
 the factory image is publicly downloadable. The antecedent stays undecided.
+
+---
+
+## 8. The digest was finally used, and it refuted — `FLS-26`
+
+*2026-09-08, seating 16. §5 wrote down the digest `R5-5` could use. This is what
+happened when `R5-5` used it.*
+
+### 8.1 The reading, and why it is not the instrument
+
+`rtl819x-spi`'s `verify` traversed all 4,194,304 bytes on the silicon and
+reported `digest_bytes 4186112`, `h601_skipped 8192`, `h601_hashed 0`, and
+
+```
+d1_sha256 a16735789a3301a1a65201b912d2c42e19f1685469bd5a0adcfa55e7100d49eb
+```
+
+against §5's `a9916fd8…4ce3cba`. Three instruments could have been lying and all
+three are closed by measurement rather than by argument:
+
+1. **The constant.** The complement was recomputed at the desk from **both**
+   dump files (`flash-n150rt-console-1.bin`, `-2.bin`), by an independent
+   implementation, over the same scope the driver uses. Both give
+   `a9916fd86adb49ff0a4f53d49bc377ca5c54321dcff02bdb55e7b4ab64ce3cba`, equal to
+   §5 and to the value compiled into `rtl819x-spi.c`.
+2. **The driver's digest engine and its scope.** `verify 4096`'s own digest is
+   `e7d529d2…9697647d`; the dump's first 4,096 bytes digest to exactly that. The
+   engine reproduces an independent implementation on real device bytes.
+3. **A digest that cannot fail.** `C1-NG` injected one changed byte at 1,048,576
+   and the 4 MiB digest moved to `1682557547a05ef1…`. And `C1-VF` and `C1-NF`
+   are two independent full traversals returning the **identical** digest, so
+   the reading is n=2.
+
+⚠️ **The `d1_match` field has no positive control here.** It read `0` in every
+cell of the seating, so nothing shows it can read `1`. The refutation rests on
+the three items above, not on that flag.
+
+### 8.2 The bisection, and the limit that comes with it
+
+`verify <n>` hashes `[0, min(n,0x6000))` and `[0x8000, n)`, rounding `n` down to
+`RTL819X_SPI_CHUNK` = 4096 (`rtl819x-spi.c:765`, `limit &= ~(CHUNK-1u)`). Nine
+rungs, each compared against the dump computed to the same scope:
+
+| `verify n` | hashed | verdict |
+|---|---|---|
+| 8192 … 24576 | 8192 … 24576 | SAME |
+| **32768** | **24576** | **SAME** — exactly `[0, 0x6000)` |
+| **36864** | **28672** | **SAME** |
+| **40960** | **32768** | **DIFFERS** |
+| 49152, 57344, 65536, all | | DIFFERS |
+
+🟢 **`verify 32768` covers the whole loader region and it is byte-identical to
+2026-08-16 over all 24,576 bytes.** §7's six re-reads and every `FLR` bracket in
+this project combined had sampled 256 of them.
+
+🔴 **The first difference is `[0x9000, 0xA000)` — 4,096 bytes, exactly one erase
+sector**, in `mtd0`'s `"boot+cfg+linux"` immediately above `H601`.
+
+🔴 **A prefix digest finds the FIRST difference and nothing past it.** Everything
+above `0xA000` is undetermined, and this image cannot narrow it: `verify` takes a
+limit and no offset, and `FW-46` measured that this image's busybox has neither
+`dd` nor `md5sum`, so there is no second path. `SPEC.md` §17 owns the exit.
+
+⚠️ **A guard earned its place here.** Nine of the finer rungs came back
+`SCOPE?` rather than a verdict, because the driver's rounding made
+`digest_bytes` disagree with what the desk had hashed. Comparing two digests over
+different byte counts would have printed a confident `DIFFER` that meant nothing.
+**The comparison refuses when the scopes differ**, and that is why the four-rung
+answer above is trustworthy.
+
+### 8.3 What this does and does not say about writes
+
+It says flash content moved between 2026-08-16 and 2026-09-08 00:15, in at least
+one erase sector, and that the loader region is not where it moved.
+
+It does **not** say who wrote it. Not tonight: the loader entered this image
+directly on all ten boots, the vendor firmware did not execute, `n_writes` read 0
+in every dump, and no `FLW`/`EW`/`EB`/burn command was issued. The vendor
+firmware *has* run on this part since the dump, and `[0x9000,0xA000)` is where a
+vendor firmware saves configuration — **that is a hypothesis with a mechanism and
+it is recorded as one, not as a reading.**
+
+🔴 **And it moves the forbidden sentence in the harder direction.** *"Not one
+flash byte is written"* was previously unmeasured; it is now **known false for the
+device** over some interval, with the write unattributed. What is measured is
+narrower and better: rlxfw's own driver counted zero writes, and the loader
+region is intact over all of it.

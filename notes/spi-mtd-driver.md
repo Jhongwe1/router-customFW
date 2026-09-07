@@ -212,6 +212,39 @@ peripherals. The general rule this project should carry: *a register value
 measured at the `<RealTek>` prompt is a measurement of the loader, and a driver
 that assumes it is also the kernel's is assuming.*
 
+### 3.1 🟢 2026-09-08, seating 16: this section stops being 讀 and becomes 量
+
+The paragraph above ended with a ⚠️ saying the live value under Linux had never
+been read on the device. That stopped being true at 00:07. Ten boots, ten reads
+of `/proc/rtl819x-spi`, and ten boot captures carrying the same values as marks:
+
+```
+sfcr   FFC00000     RLXFW-S1=FFC00000     against REG-13's loader-prompt 3FC00000
+sfcr2  0BA08000     RLXFW-S2=0BA08000
+sfcsr  C8000000     RLXFW-S3=C8000000     against D8050000
+```
+
+🔴 **Both of the card's declared coin-flips landed on the side read out of the
+vendor's *compiled* driver, against a value this project had already measured on
+this very device at the loader prompt.** That is the section's own thesis
+arriving as a result rather than as an argument.
+
+🟢 **Three things corroborate it without being asked.** The driver's own
+classification reads `sfcr_as_loader 0` / `sfcr_as_kernel 1` — arithmetic done
+in the kernel, not a comparison of mine. The boot snapshots `boot_sfcr`,
+`boot_sfcr2` and `boot_sfcsr` equal the live values, so nothing moved the
+controller between `late_initcall` and the read. And `n_state_foreign` read **0**
+across **4,115** transfers, so nothing moved it between my transactions either —
+which is the coexistence question §4 owns, answered in the affirmative for this
+seating.
+
+⚠️ **What is still not established** is the divisor's *effect*. `FFC00000` is
+`SFCR_SPI_CLK_DIV` = 16 by the vendor's own macro, and `REG-38` says the window
+leg should therefore be about 4× slower than `probe3`'s bare-metal Group F
+figure — but no cell timed the window leg separately, and `C1-SZ`'s sidecar
+cannot separate *data arrived* from *the tool began waiting* (`FW-35`). The
+divisor is 量; what it costs is still 推.
+
 ---
 
 ## 4. Coexistence: the decision, and what was rejected

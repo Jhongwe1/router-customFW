@@ -1009,6 +1009,74 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+### `R5-5` on the silicon — every field prediction hit, and the digest they were leading up to refuted itself
+
+Seating 16, one power cycle, **00:00:02 → 00:32:16** on 2026-09-08. Ten boots,
+32 carded cells, `check-predictions` **`32 of 32`**. **Zero flash-write commands
+and zero `FLR`**; `AUTOBURN` was read as a *word* at `0x8040D4A0` by `looprun`'s
+`S5b` gate eleven times and read `00000000` every time.
+
+A read-only MTD device of mine now issues real SPI transactions through
+`SFCSR`/`SFDR` on this part, sharing the controller with the vendor's driver.
+`mtd2: 00400000 00001000 "rtl819x-spi-pio"`, `4194304` bytes through
+`mtd->read`, `n_state_foreign 0` across 4,115 transfers.
+
+**Both of the card's declared coin-flips landed on the side read out of the
+vendor's compiled code, against values this project had already measured on this
+device at the loader prompt**: `SFCR` is `FFC00000` (divisor 16) and not
+`REG-13`'s `3FC00000` (divisor 4); `SFCSR` is `C8000000` and not `D8050000`.
+`REG-38` goes 讀 → 量. The driver's own arithmetic agrees unprompted —
+`sfcr_as_loader 0`, `sfcr_as_kernel 1`.
+
+Ten boot captures, **1,318 bytes each against a prediction of 1,318**, two
+distinct sha256 values, and the entire difference is one line: `RLXFW-G3`'s
+bit 6 — the bit `FW-40` records the vendor's `rtl_gpio_timer` blinking on a
+~2 s cycle, seen here from the boot snapshot rather than from the button.
+
+**`D3` holds and `D1` is refuted.** The PIO path and the memory-mapped window at
+`0xBD000000` agree over all 4,194,304 bytes — nothing had ever read that window
+under Linux before — but the digest of `H601`'s complement is
+`a1673578…100d49eb` where `FLS-24` says `a9916fd8…4ce3cba`.
+
+Three instruments could have been lying and all three are closed by measurement:
+the constant recomputes to `a9916fd8…` from **both** dump files under an
+independent implementation; the driver's own `verify 4096` digest is
+byte-identical to the dump's first 4,096 bytes; and `C1-NG` injected one changed
+byte and moved the 4 MiB digest, while `C1-VF` and `C1-NF` are two independent
+full traversals returning the same value. The `d1_match` **flag** has no positive
+control here, and that is stated rather than glossed.
+
+Nineteen off-card `verify <n>` rungs then localised it. **`verify 32768` covers
+exactly `[0, 0x6000)` — the whole loader region — and it is byte-identical to the
+2026-08-16 dump over all 24,576 bytes**, where every `FLR` bracket in this project
+combined had sampled 256. **The first difference is `[0x9000, 0xA000)`: 4,096
+bytes, exactly one erase sector.** Proven identical 28,672 bytes (0.684 %),
+proven different 4,096 (0.098 %), **undetermined 4,153,344 (99.02 %)**.
+
+**`SPEC.md` `FLS-26`.** It does not make the forbidden sentence sayable and moves
+it the harder way: *"not one flash byte is written"* was unmeasured and is now
+known **false for the device** over some interval, with the write unattributed.
+What is measured is narrower and better — this driver counted zero writes, and the
+loader region is intact over all of it.
+
+Five defects were mine, four of them false stops, none costing a power cycle.
+Four are one root cause seen four times, and the useful part is that shape.
+`RUNSHEET` `P3`'s NIC half was skipped, and `looprun` cannot catch that because
+every gate it owns points at the board and none at the host — a host fault
+reported in the board's vocabulary. A gate read a **mark** instead of a **field**,
+and `rlxfw_mark()` interleaves character-by-character with busybox ash's echo, so
+`RLXFW-S-TRYW=00000001` reached the log unreadable while `n_write_refused 2` sat
+in the same capture saying the driver was right (`FW-47`). And every capture line
+is CRLF, so `awk`'s field is `"1\r"` — three gates reported STOP or VOID on cells
+that had passed, **each while printing the correct value beside the wrong
+verdict**, because a carriage return is invisible in display. The replacement
+self-tests against captures whose answers are known and refuses to open the port
+if the comparison is broken.
+
+`FW-46`: this image's busybox has no `dd`, no `md5sum` and no `--list`, so nothing
+on the device can digest a byte — the driver's internal sha256 has no independent
+on-device second source, and every check of it is a desk comparison.
+
 ### `desk-sweep` — the closing sweep reads its step list instead of rebuilding it, and runs on a copy it has proved is the tree
 
 Three failures in this repository's record all came from the same place: a

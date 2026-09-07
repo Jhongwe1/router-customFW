@@ -1,0 +1,3 @@
+busybox --list
+--list: applet not found
+# 

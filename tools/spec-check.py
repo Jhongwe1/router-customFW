@@ -186,6 +186,10 @@ LIT_RXS = (
 REDACTION_ALLOWLIST = {
     ('H601 / calibration', 'H601'):
         'the name of a flash region, from the vendor SDK. Its CONTENTS are what is withheld',
+    ('H601 / calibration', 'h601'):
+        'as above, lower case: rtl819x-spi prints the FIELD NAMES h601_skipped and '
+        'h601_hashed, and quoting a field under a different spelling to satisfy a '
+        'checker would misreport what the driver printed',
     ('private IPv4', '192.168.1.6'):
         "the loader's compiled-in TFTP address, read out of stage2.bin. Not this unit's configuration",
     ('SSID / passphrase', 'SSID'):

@@ -1,0 +1,3 @@
+busybox wc -c < /dev/mtd2ro
+4194304
+# 

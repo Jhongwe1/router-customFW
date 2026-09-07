@@ -1,0 +1,4 @@
+busybox dd if=/dev/mtd2ro bs=4096 skip=9 count=1 | busybox md5sum
+md5sum: applet not found
+dd: applet not found
+# 
