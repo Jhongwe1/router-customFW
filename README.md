@@ -272,13 +272,22 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather
-than counted by eye.** 🔄 **量 2026-09-04**, over `git ls-files tools/`
-(**86** files), taking those whose first two bytes are `#!` and excluding
-`tools/test-*`: **37** programs, of which **21 are described below and 16 are
-not** — `audit-bench-log`, `binsim`, `ci-census`, `fetch-sources`,
-`fsmanifest`, `isa-probe`, `leakscan`, `opcount`, `rbcheck`,
-`rebuild-census`, `repdiff`, `rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`,
-`vendor-tripwire` and `verify-backup-copy`.
+than counted by eye.** 🔄 **量 2026-09-08**, over `git ls-files tools/`
+(**92** files), taking those whose first two bytes are `#!` and excluding
+`tools/test-*`: **42** programs, of which **21 are described below and 21 are
+not** — `audit-bench-log`, `binsim`, `capdate`, `capfield`, `ci-census`,
+`citime`, `desk-sweep`, `fetch-sources`, `flashmap`, `fsmanifest`,
+`isa-probe`, `leakscan`, `opcount`, `rbcheck`, `rebuild-census`, `repdiff`,
+`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, `vendor-tripwire` and
+`verify-backup-copy`.
+🔴 **And it was stale by TWO before this segment added three, which is the
+third time this paragraph has caught itself.** `citime` landed 2026-09-04 and
+`desk-sweep` 2026-09-07; both were committed, neither moved this count. The
++5 in programs is those two plus `capdate`, `capfield` and `flashmap`; the +6
+in files is those five plus `ci-suite-cost.tsv`. **A count that is re-derived
+catches the segments in between; a count that is incremented would have
+carried them forward** — which is what the paragraph below already said, about
+`ledgerscan`, and it happened again anyway.
 🔴 **The previous numbers — 83 files, 35 programs, 19 described — were stale
 before this session touched anything, and re-deriving is what showed it.**
 `tools/ledgerscan.py` landed on 2026-09-03 (`aa89317`) and was described in

@@ -1,5 +1,73 @@
 # Changelog
 
+🟢 **2026-09-08, forty-fourth segment (second of the same calendar day), desk:
+four instruments, and the two most useful results came out of captures that
+were already committed.** No power, **zero flash-write commands and zero
+`FLR`**, bracket untouched at 1,024 of 4,194,304 = **0.0244 %**. Date measured
+on three sides and all three agree: Git Bash `2026-09-08 02:07:45 +0800`,
+Windows `02:07:48`, WSL `02:07:55` -- seven minutes after the previous
+segment's last commit, so this segment shares a calendar day with seating 16
+and produces no `bench/` directory of its own.
+
+🔴 **A new checker fired on its first sweep of the real corpus, and what it
+found had been in the record for ten days.** `tools/capdate.py` compares each
+capture's committed `started_wallclock` against the `bench/<date>/` directory
+it sits in -- the check `RUNSHEET` lifecycle rule 3 names as missing.
+`bench/2026-08-30` and `2026-08-30b` hold 37 captures taken entirely on
+**2026-08-29**, in directories git shows were created before those captures
+existed. **The directory name was a prediction that the seating would cross
+midnight, and it did not.** They are declared by name rather than renamed --
+40 and 84 references, two frozen cards among them -- and the exception list is
+swept in both directions.
+
+🟢 **`FW-48` goes 推 -> 量 without a single new reading, because the objection
+against it was pointed at the wrong term.** § 8 of `notes/flash-digest-scope.md`
+recorded the PIO figure as a bounded question on the ground that a `.timing`
+row cannot separate *data arrived* from *the tool began waiting*. That is true
+of the **intercept** and says nothing about the **slope**. Nineteen rungs from
+seating 16 give `t = -2.086 ms + 3.1434 us x cmp_bytes`; the line predicts the
+4 MiB traversal at **13.18 s** and the three measured traversals are
+**13.276 / 13.325 / 13.432 s** -- a **64x** extrapolation landing within
+1.9 %. Repeatability came free from `limit &= ~(CHUNK-1)` making six rungs the
+same experiment. The PIO leg alone is **3.936 s for 4,194,304 bytes** with the
+driver's own counters bracketing it on both sides.
+
+🟢 **`rtl819x-spi` 1.1** adds `verify <n> <off>` and a two-level `map` --
+32 groups of 128 KiB, then 32 chunks of 4 KiB -- on a **second** `/proc` file.
+🔴 The shape is decided by a hard limit, not a preference: `read_proc_t`
+`sprintf`s into one 4,096-byte page with no bounds check, and 1,024 lines is
+78 KiB. **32 x 32 = 1024 exactly**, and every line can be predicted from the
+dump before the board is powered -- which a bisection's rungs cannot, and which
+is why seating 16's nineteen were off-card. `tools/flashmap.py` is the desk
+half and **imports** `flashwin.overlaps_forbidden` rather than restating the
+`H601` rule. It builds: `RECIPE_ID` `fce0af22` -> `7b6bfa83`, `vmlinux`
++33,539 bytes, `rtl819x-spi 1.1` in the image once and `1.0` zero times.
+**Nothing has run on the silicon**; the map's first reading is `R5-6`'s
+seating.
+
+🟢 **`looprun` 1.1**: an `S5c` precondition that uses **ARP, not ICMP** -- the
+loader answers ARP and does not answer ping, so 100 % packet loss is a pass
+and a `ping`-based gate would abort every healthy run -- and attempt-numbered
+stage artefacts, so a failed run is retried with `--attempt 2` instead of the
+`--force` that would destroy the previous attempt's evidence. `notes/dev-loop.md`
+§ 15 recorded that neither defect was reachable from `--self-test`; ten cases
+now reach both.
+
+🔴 **A local census run caught two defects in this segment's own tools before
+they were pushed.** `capdate` and `capfield` printed their case lines with four
+leading spaces; `tools/ci-census.py` parses `^ {2}(ok|FAIL|skip)\s{2,}`, so both
+would have reported `ran 0/13` and `ran 0/10` with zero failures -- a census
+mismatch, discovered after a push. Running the census locally in both arms
+(dump present, dump absent) is what found it.
+
+🟢 **`FW-49`**: `\r\r\n` has two sources and only one is a wrap. 量 over all
+762 committed captures -- busybox ash's line editor wraps the **echo** at the
+terminal width (33 captures, all `len(sent) >= 80`), while the other 33
+occurrences are the loader's own `\r` + `\r\n` after a 10-character command.
+Output is never wrapped: an 88-character `/proc/version` line arrives whole in
+five captures, and two loader commands of 119 and 127 characters do not wrap.
+
+
 🟢 **2026-09-07, fortieth session (second of the same calendar day), desk:
 `R5-5`'s DoD rewritten, and writing it found an enforcer and a committed row
 contradicting each other for fourteen days.** No power, **zero flash-write

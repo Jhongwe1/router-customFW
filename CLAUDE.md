@@ -341,7 +341,9 @@ released source.
 > sector.** 🔴 **Proven identical 28,672 B (0.684 %), proven different 4,096 B
 > (0.098 %), UNDETERMINED 4,153,344 B (99.02 %)** — a prefix digest finds the
 > first difference and nothing past it, and `verify` takes a limit with **no
-> offset**. 🔴 **So *"not one flash byte is written"* is no longer merely
+> offset** *(1.1 adds one and a two-level map — the fourteenth update — and
+> neither has run, so every figure in this paragraph is unchanged)*.
+> 🔴 **So *"not one flash byte is written"* is no longer merely
 > unmeasured: it is KNOWN FALSE for the DEVICE over some interval, with the
 > write unattributed** and not attributable by this seating (not tonight —
 > loader straight to my image ten times, no vendor firmware, `n_writes` 0 in
@@ -367,7 +369,65 @@ released source.
 > (`FW-48`, `FW-35`'s trap). **Zero flash-write commands, zero `FLR`, bracket
 > unchanged at 0.0244 %** — and that last number now sits beside a second
 > instrument that measures a different thing and found a difference.
-> **Which gate that is, `PROGRESS.md` says** — this
+> 🔄 **2026-09-08, FOURTEENTH update — the forty-fourth segment, desk, no
+> power, and the two best results came out of captures that were already
+> committed.** 🟢 **A checker for `RUNSHEET` lifecycle rule 3 finally exists
+> and it fired on its first sweep.** `tools/capdate.py` compares a capture's
+> committed `started_wallclock` against the `bench/<date>/` directory it sits
+> in — the check rule 3's own ⚠️ named as missing, after three consecutive
+> seatings hit it and a human caught all three. 量: **25 directories, 762
+> captures**, and **two reds that had been in the record since 2026-08-29** —
+> `bench/2026-08-30` and `-30b` hold 37 captures taken entirely on **08-29**,
+> in directories git shows were created *before* those captures existed. **The
+> directory name was a prediction that the seating would cross midnight, and
+> it did not.** Not renamed (40 and 84 references, two frozen cards among
+> them); declared by name, with the list swept in both directions.
+> 🟢 **`FW-48` goes 推 → 量 with no new reading, because the objection was
+> pointed at the wrong term.** *(The old row said a `.timing` row cannot
+> separate "data arrived" from "the tool began waiting".)* True of the
+> **intercept**; says nothing about the **slope**. Nineteen rungs give
+> `t = −2.086 ms + 3.1434 µs × cmp_bytes`, which predicts the 4 MiB traversal
+> at **13.18 s** against three measured at **13.276 / 13.325 / 13.432 s** — a
+> **64× extrapolation** landing within 1.9 %, with repeatability free from
+> `limit &= ~(CHUNK−1)` making six rungs the same experiment. 🔴 **That slope
+> is not the PIO rate**; the PIO leg alone is **3.936 s / 4,194,304 bytes =
+> 1,040.5 KiB/s**, bracketed on both sides by the driver's own counters
+> (`0/0/0` before, `1024/4194304/0` after).
+> 🟢 **`rtl819x-spi` 1.1** adds `verify <n> <off>` and a two-level `map`
+> (32 × 32 = 1024 exactly) on a **second** `/proc` file, with
+> `tools/flashmap.py` as the desk half — it **imports**
+> `flashwin.overlaps_forbidden` instead of restating the `H601` rule. 🔴 The
+> two-level shape is a hard limit, not a preference: `read_proc_t` `sprintf`s
+> into one 4,096-byte page with no bounds check and 1,024 lines is 78 KiB.
+> **The point is that every line can be predicted from the dump before the
+> board is powered**, which a bisection's rungs cannot — that is why seating
+> 16's nineteen `BIS-*` rungs were off-card. It builds (`RECIPE_ID`
+> `fce0af22` → **`7b6bfa83`**, `vmlinux` **+33,539** bytes, `1.1` in the image
+> once and `1.0` zero times) and 🔴 **nothing of it has run on the silicon** —
+> the map's first reading is `R5-6`'s seating.
+> 🟢 **`looprun` 1.1**: an `S5c` precondition using **ARP, not ICMP** (the
+> loader answers ARP and not ping, so 100 % loss is a *pass* and a ping gate
+> would abort every healthy run), and attempt-numbered artefacts so a failed
+> run is retried with `--attempt 2` rather than the `--force` that destroys
+> the previous attempt's evidence. Ten new cases reach the shape
+> `notes/dev-loop.md` § 15 said `--self-test` could not.
+> 🔴 **A local census run caught two defects in this segment's own tools
+> before they were pushed**: `capdate` and `capfield` printed case lines with
+> four leading spaces where `ci-census` parses two, so both would have read
+> `ran 0/13` and `ran 0/10` with zero failures — green tools, red census,
+> discovered after a push. 🟢 **`FW-49`**: `\r\r\n` has **two** sources and
+> only one is a wrap — ash's line editor wraps the *echo* at the terminal
+> width (33 of 713 classified captures, all `len(sent) ≥ 80`), while the other
+> 33 are the loader's own `\r` + `\r\n`; **output is never wrapped**, an
+> 88-character `/proc/version` line arriving whole in five captures.
+> ⚠️ **What is still narrower**: the scope decision this segment made is that
+> 1.1's verbs ride on `R5-6`'s image, so `FLS-26`'s **99.02 % is exactly as
+> undetermined as it was** — the instrument exists and has read nothing. And
+> 量 2026-09-08: that 99.02 % is not uniform — **180 of 1,024 chunks (17.58 %)
+> of the reference dump are entirely `0xFF`**, with a 737,280-byte blank run
+> from `0x34C000`. **Zero flash-write commands, zero `FLR`, bracket unchanged
+> at 0.0244 %.**
+> > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.
 > Conventions for files that do not exist are not written
@@ -723,6 +783,18 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   the tree on disk now. ⚠️ **The copy does not protect the copy PHASE** — a
   commit racing `cp -a` can be captured half-applied, which the fidelity check
   refuses. The window is the first minute or two of each run.
+  🔴 **2026-09-08: the rule is not "do not commit", it is "do not TOUCH the
+  tree" — and that is wider than it reads.** 量, on the forty-fourth
+  segment's own sweep: it ended `🔴 THE SOURCE MOVED WHILE THE SWEEP RAN -- 1
+  difference(s)`, and the difference was
+  `tools/__pycache__/flashmap.cpython-310.pyc`. Nothing was committed and no
+  source file was edited; a **read-only experiment** was run from the source
+  tree while waiting, and `import flashmap` wrote a `.pyc`. 🟢 **The guard
+  worked and it is worth what it cost**: the file is gitignored and no tracked
+  file moved, so the green stands — but the tool SAID so rather than leaving
+  it to be assumed, which is the difference between a scope limit and a hole.
+  **Run tools from a copy while a sweep is up, or read the notice and check
+  what moved.**
   ⚠️ **What it cannot do**, stated rather than left to be found: a step naming
   an absolute path into the source reads the SOURCE, not the copy (it greps for
   that and reports); `$FWRE_WORK` is outside the copy for both arms on purpose;
