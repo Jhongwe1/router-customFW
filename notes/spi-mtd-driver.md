@@ -484,3 +484,161 @@ explicit.
 8. **That the vendor's driver and mine agree.** They have never run against
    each other. `n_state_foreign` is the instrument that would notice, and it
    has never been read on the die.
+
+---
+
+## 9. 🆕 2026-09-08 (forty-fourth segment, desk, no power): 1.1, and the
+   shape of the answer is decided by one page of `read_proc`
+
+`FLS-26` left 4,153,344 bytes -- **99.02 %** -- undetermined, because a prefix
+digest finds the first difference and nothing past it.  1.1 is the instrument
+for the rest.  **No card is frozen and no image is staged for a seating**: the
+scope decision this segment made is that these verbs ride on `R5-6`'s image,
+because `RECIPE_ID` is a digest over `config/` and anything built today goes
+stale the moment `R5-6`'s first `.c` lands.
+
+### 9.1 🔴 A per-4-KiB list does not fit, and that is a hard limit
+
+`rtl819x_spi_read_proc` is a 2.6.30 `read_proc_t`.  It `sprintf`s into **one
+page** -- `PAGE_SIZE` = 4096 -- and sets `*eof`.  There is no bounds check
+anywhere in that interface.  The existing dump is 903 bytes, so it has never
+been near the edge; 1,024 lines of 80 characters is **78 KiB**, and a driver
+that wrote it would corrupt whatever follows the page, on a board with no
+spare.
+
+⚠️ **That is also a latent hazard in the file as it stands**: the dump grows
+by a few fields every driver revision and nothing checks it against
+`PAGE_SIZE`.  1.1 does not fix that for the existing file -- it adds nine
+fields, taking it to roughly 1,050 bytes -- and the new file is where the
+budget is enforced.  Recorded rather than quietly relied on.
+
+### 9.2 The map: two levels of 32, and why that is the whole design
+
+`32 x 32 = 1024` exactly.
+
+```
+map 0        32 digests, one per 128 KiB group   -> which group differs
+map 1 <g>    32 digests, one per 4 KiB chunk     -> which sector
+```
+
+Two commands answer the whole 4 MiB when one group differs, three when two do.
+🟢 **And every one of those lines can be written into a card before the board
+is powered**, because `tools/flashmap.py` computes all 32 group digests, and
+all 32 chunk digests of any group, from the dump at the desk.
+
+🔴 **That is the property `verify <n> <offset>` alone does not have.**  A
+bisection's rungs each depend on the previous rung's answer, so they cannot be
+carded -- which is exactly why seating 16's nineteen `BIS-*` rungs were
+off-card, and why `check-predictions` read `32 of 32` while nineteen readings
+that mattered more than most of the thirty-two were outside the fence.  The
+offset form is still added, and it is the primitive the map is built on; it is
+not the thing that closes `FLS-26`.
+
+### 9.3 What each line carries, and the one column that is not a digest
+
+```
+OOOOOO E BBBBBB <64 hex>          80 characters, fixed
+006000 1      0 SKIPPED           23 characters
+```
+
+* `OOOOOO` the offset.
+* `E` **PIO == MMIO for this entry** -- `D3`, localised.  `verify` reports one
+  verdict for the whole traversal; the map reports one per entry, so a
+  controller fault is attributable to a range instead of to the run.  A
+  verdict reveals no content, so this column covers `H601` exactly as
+  `verify`'s does.
+* `BBBBBB` the bytes that reached the digest.  **This is the scope, and the
+  desk compares it BEFORE the digest** -- `notes/flash-digest-scope.md` § 8.2
+  is why: comparing two digests over different byte counts prints a confident
+  `DIFFER` that means nothing, and nine of seating 16's finer rungs came back
+  `SCOPE?` for that reason.
+* the digest, or `SKIPPED` for an entry that hashed nothing.
+
+⚠️ 80 characters is the terminal width, and that is safe here **measured
+rather than assumed**: `FW-49` (量 2026-09-08, over 762 committed captures)
+separates the two sources of `\r\r\n` and finds that only the *echo* of a
+typed line is wrapped -- by busybox ash's line editor, 33 times, always with
+`len(sent) >= 80` -- while output is not, an 88-character `/proc/version` line
+arriving whole in five captures from five seatings.
+
+### 9.4 The `H601` guard, and it is the same one twice
+
+The map skips chunks 6 and 7 by the same arithmetic `verify` uses, counts
+`map_h601_skipped`, and asserts `map_h601_hashed == 0` -- **the digests print
+only because that count came out 0**, not because the skip was believed to be
+right.  The desk side does not restate the rule: `tools/flashmap.py`
+**imports** `flashwin.overlaps_forbidden` and puts every range that is about
+to reach a digest through it, so a divergence between the two is a refusal on
+both sides rather than a silent disagreement.  `F8` is the control that says
+the import is load-bearing.
+
+⚠️ **The residual is stated rather than left to be noticed**: a per-4-KiB
+digest is a stronger oracle than the aggregate one already committed --
+someone **holding the 2026-08-16 dump** could brute-force a small change
+inside a sector from its digest.  That is the owner of the device.  The dump
+is not committed and cannot be (`CLAUDE.md`'s Never table), so for everyone
+else these digests are a preimage problem over 4 KiB.
+
+### 9.5 🟢 The traversal is timed in the kernel, and that closes `FW-48`'s
+    objection rather than arguing with it
+
+`CORRECTIONS-block13.md` § 5 named the experiment: *"the driver can timestamp
+its own traversal against the 100 Hz clockevent and take serial timing out of
+the path entirely"*.  1.1 does it -- `v_jiffies`, `map_jiffies`, and `hz`
+beside them so nothing downstream carries a constant -- and `R5-3b-2` is what
+makes it worth doing, because the tick is this project's own clockevent.
+
+`t0` is taken **before any `goto out` can be reached**, so a run that bailed
+still says how long it had been going instead of printing an uninitialised
+number that looks like a measurement.
+
+### 9.6 量: it builds, and the code is in the image
+
+Cell `spi11`, a compile check and **not** an image for a seating.
+
+| | |
+|---|---|
+| `RECIPE_ID` | `fce0af22` -> **`7b6bfa83`** (the source edits moved it, as `config/` is what the digest covers -- three times, see below) |
+| `vmlinux` | 4,013,779 -> **4,047,318** bytes, **+33,539** |
+| `rtl819x-spi.o` | text **10,768** / data **420** / bss **1,536** = 12,724 |
+| new symbols in `System.map` | 16, including `rtl819x_spi_map_read_proc` at `801a818c` |
+| `rtl819x-spi 1.1` in `vmlinux` | **1** occurrence |
+| `rtl819x-spi 1.0` in `vmlinux` | **0** -- the negative half of the same control |
+| compiler diagnostics on this file | none |
+
+⚠️ The bss growth is `map_d[32][32]` plus the four per-entry arrays: 1,024 +
+128 + 128 + 32 = 1,312 bytes of the 1,536.
+
+🔴 **And the segment produced lifecycle rule 4's mechanism on new material,
+by tripping over it.** The first compile check read `RECIPE_ID` **`44c38c7a`**
+and `vmlinux` sha256-16 `d2d157595ec31803`.  A **comment** in this file was
+then corrected -- § 9.3's line width, which said 75 and is 80 -- and the
+second build read **`9155dad0`** with `5e40cf36e56232ca`.  A third, after § 9.7's two review defects were fixed, reads **`7b6bfa83`** with `57f1dc0110b2c294` -- and `vmlinux` is **4,047,318 bytes all three times**, while `rtl819x-spi.o`'s text moved 10,764 -> 10,768 on the third.  ⚠️ A four-byte object growth that leaves the image size unchanged is section padding absorbing it, and it is the reason the image SIZE is the weakest of the three numbers here.
+
+* `RECIPE_ID` moved, because it is a digest over **every file under
+  `config/`, comments included**.
+* `vmlinux` is **4,047,318 bytes both times** -- byte-for-byte the same size.
+* Its digest moved, which is the `-DRLXFW_SRC_ID=0x<recipe>` that the build
+  compiles in.  `notes/incremental-build.md` measured that effect at 4 bytes
+  of 3,968,240 on a same-width id, and both of these are 8 hex digits.
+
+⚠️ **A number that was published and then went stale is exactly what rule 4
+is about**, and it went stale here inside one segment from a comment.  Both
+values are kept rather than the first being quietly overwritten.
+
+⚠️ **The cost of catching it this way is rule 2's, in miniature**: the second
+build reused the cell name `spi11`, so the first build's `vmlinux`,
+`System.map` and manifest are gone and the two images can no longer be
+diffed.  Nothing evidential was lost -- `spi11` is a compile check and not an
+image any card names -- but it is the same shape as seating 14's `r53b2`.
+
+### 9.7 What 1.1 does not establish
+
+* **Nothing has run on the silicon.**  Every number in § 9.6 is a build
+  number.  The map's first reading is `R5-6`'s seating.
+* The `map` verb's own negative control (`corrupt <off>` moving exactly one
+  entry) is written and has been exercised only against the desk predictor's
+  synthetic dump (`F4`), never on the device.
+* `map_truncated` has no positive control: the budget is 3,584 bytes and the
+  largest real output is about 2,600, so nothing has ever made it fire.  A
+  case that shrinks the budget would give it one, and it is not written.

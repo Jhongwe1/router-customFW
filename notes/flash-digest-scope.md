@@ -256,9 +256,15 @@ this project combined had sampled 256 of them.
 sector**, in `mtd0`'s `"boot+cfg+linux"` immediately above `H601`.
 
 🔴 **A prefix digest finds the FIRST difference and nothing past it.** Everything
-above `0xA000` is undetermined, and this image cannot narrow it: `verify` takes a
-limit and no offset, and `FW-46` measured that this image's busybox has neither
-`dd` nor `md5sum`, so there is no second path. `SPEC.md` §17 owns the exit.
+above `0xA000` is undetermined, and **this image** cannot narrow it: `verify`
+takes a limit and no offset, and `FW-46` measured that this image's busybox has
+neither `dd` nor `md5sum`, so there is no second path. `SPEC.md` §17 owns the
+exit.
+
+🔄 **2026-09-08: the instrument that narrows it exists and has read nothing.**
+`rtl819x-spi` 1.1 adds both an offset and a two-level `map` -- § 9 -- but it
+ships in `R5-6`'s image and no power was spent this segment, so **the coverage
+arithmetic above is unchanged in every digit**.
 
 ⚠️ **A guard earned its place here.** Nine of the finer rungs came back
 `SCOPE?` rather than a verdict, because the driver's rounding made
@@ -284,3 +290,85 @@ flash byte is written"* was previously unmeasured; it is now **known false for t
 device** over some interval, with the write unattributed. What is measured is
 narrower and better: rlxfw's own driver counted zero writes, and the loader
 region is intact over all of it.
+
+---
+
+## 9. 🆕 2026-09-08 (forty-fourth segment, desk): the instrument for the
+   99.02 %, and a slope that was sitting in captures already committed
+
+### 9.1 The instrument
+
+`rtl819x-spi` 1.1 adds `verify <n> <off>` and a two-level `map`;
+`tools/flashmap.py` is the desk half.  The design and its limits belong to
+`notes/spi-mtd-driver.md` § 9 and are not restated here.  What belongs here is
+what it changes about **§ 8's coverage arithmetic**: nothing yet.  Not one
+byte of the 99.02 % has been read since § 8 was written, because this segment
+spent no power.  The instrument exists; the reading is `R5-6`'s seating.
+
+### 9.2 ⚠️ The 99.02 % is not uniform, and a reader should know that before
+    the map runs
+
+量 2026-09-08, over `flash-n150rt-console-2.bin`: **180 of 1,024 chunks
+(17.58 %) are entirely `0xFF`**, and the trailing blank run starts at
+`0x34C000` and is **737,280 bytes**.  So five of the thirty-two level-0 groups
+are wholly erased space.  A difference there would be very visible and would
+mean something quite specific -- something wrote into erased flash -- but it
+is not where a configuration write would land.
+
+### 9.3 🟢 `FW-48` goes 推 -> 量, and the new part is a slope rather than
+    new data
+
+§ 8's own closing bullet recorded the PIO figure as a *bounded question*, on
+the ground that a `.timing` row cannot separate *data arrived* from *the tool
+began waiting*.  **That objection is correct and it applies to the intercept,
+not to the slope.**  A fixed latency offset lands entirely in the intercept
+and contributes nothing to the per-byte term.
+
+So the per-byte term is what was measured, from captures already committed:
+
+| | |
+|---|---|
+| small rungs | **19**, `cmp_bytes` 8,192 .. 65,536 |
+| least squares | `t = -2.086 ms + 3.1434 us x cmp_bytes` |
+| `1/b` | **318,129 B/s = 310.7 KiB/s** of `cmp_bytes` |
+| predicted at 4,194,304 B | **13.18 s** |
+| measured, three traversals | 13.276 / 13.325 / 13.432 s |
+| measured / predicted | **1.0071 / 1.0108 / 1.0190** -- a **64x** extrapolation |
+
+⚠️ The intercept is **negative**, which is physically impossible.  It is a
+bound, not a measurement: the fixed cost (shell turnaround, the USB-serial
+latency timer, `crypto_alloc_shash`, two `kmalloc(4096)`) is smaller than one
+rung's scatter.  Said here rather than rounded to zero.
+
+🟢 **Repeatability came free**, because `limit &= ~(CHUNK-1)` makes several
+rungs the same experiment: `cmp_bytes` 32,768 **n=6, spread 6.20 %**; 36,864
+**n=4, 3.50 %**; 4,194,304 **n=3, 1.17 %**.
+
+🔴 **The slope is not the PIO rate.**  One `cmp_byte` is one PIO byte plus one
+MMIO byte plus about two hashed bytes.  The PIO leg alone was measured
+separately: `C1-SZ` (`busybox wc -c < /dev/mtd2ro`) is **3.936 s for 4,194,304
+bytes = 1,065,510 B/s = 1,040.5 KiB/s**, `wc` and `copy_to_user` included, so
+it is a **lower bound** on the PIO path's own rate.
+
+🟢 **Its positive control is in the driver's own counters and it brackets on
+both sides**: `C1-P`, the first cell after boot, reads `n_mtd_read 0`,
+`n_pio_bytes 0`, `n_mmio_bytes 0`; `C1-TW`, the next dump after `C1-SZ`, reads
+**1024 / 4194304 / 0**.  Not one byte more, and no MMIO at all.
+
+🔴 What is still not decomposed is the remaining **9.408 s** -- MMIO plus two
+sha256 plus the byte-compare -- and this measurement cannot decompose it.  The
+one that can is now compiled in (§ 9.5 of the driver note) and needs a
+seating.
+
+### 9.4 The controls on that reading, because a gap is not self-identifying
+
+* **C1** every row requires the largest gap to be the silence between the
+  echoed command and the first byte of output, with **nothing but line
+  terminators** in between.  One row was refused by it: `C1-V4`, where
+  `verify 4096` takes about 9 ms and the largest gap is therefore somewhere
+  else -- **the instrument saying it cannot measure that one** rather than
+  reporting a number.
+* **C2** every other gap in every used row is under 50 ms (n=5,506, median
+  1.0 ms), so no second silence of the same kind exists.
+* **C3** the fit uses only the small rungs.  The three 4 MiB points are
+  **predicted** by it and not fitted to it, so they can refute it.

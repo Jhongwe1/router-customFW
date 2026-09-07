@@ -1073,8 +1073,10 @@ board fault would be most alarming.
 🟢 **The precondition it should have is one line, and the instrument is ARP
 rather than ICMP**: the loader answers ARP and does **not** answer ping, so
 `ping` returning 100 % loss is a pass. `ip neigh show dev <if>` reading
-`10.1.1.1 lladdr … REACHABLE` is the positive form. Carried forward as
-`looprun` 1.1.
+`10.1.1.1 lladdr … REACHABLE` is the positive form. ✅ **Built 2026-09-08 as
+`S5c` -- § 16.1**, with `M20` as the control that makes the ARP-not-ICMP
+claim testable: a runner where `ping` returns 1 and `ip neigh` carries an
+lladdr must report a pass.
 
 ### 15.2 🔴 A failed run cannot be retried, and the obvious workaround destroys evidence
 
@@ -1098,3 +1100,71 @@ the difference is invisible until a run fails.
 followed by a *second* run against the same `--out-dir`, and the self-test runs
 `--mode replay` once. A case that replays a stage-1 failure and then re-invokes
 is what would have caught them at the desk.
+
+## 16. 🆕 2026-09-08 (forty-fourth segment, desk): `looprun` 1.1, and the
+    self-test case § 15 said could not exist
+
+§ 15 recorded two defects and closed by saying **neither is reachable from
+`--self-test`**: both need a *failed* run followed by a *second* run against
+the same `--out-dir`, and the self-test drives `--mode replay` once.  1.1 is
+those two fixes plus the case that shape requires.
+
+### 16.1 `S5c`, and the instrument is ARP because ICMP would be worse than
+     nothing
+
+A new stage sits between `S5b` and `S6` -- **before** the stage it protects,
+which is the whole point of a precondition.  It is in-process rather than one
+command, because it is three commands and a parse and rendering it as one
+would hide which half failed.
+
+```
+P-a   ip -4 route get <host>       must print a `src` address
+      one ping -c1 -W1 <host>      EXIT CODE IGNORED
+P-b   ip -4 neigh show <host> dev  must carry an lladdr, state not
+                                   FAILED/INCOMPLETE
+```
+
+🔴 **The ping's exit code is dropped deliberately and that is the finding, not
+an implementation detail.**  The loader answers ARP and does not answer ICMP,
+so 100 % packet loss is a **pass**.  A precondition built on `ping` would
+abort every healthy run.  `M20` is the control: a runner where `ping` returns
+1 and `ip neigh` shows an lladdr must report a pass.
+
+`P-a` is the half that actually failed on 2026-09-08: the USB GbE had just
+been re-attached to WSL, `10.1.1.2/24` does not survive that, and the
+interface was `DOWN` with no address.  `M21` drives it.
+
+### 16.2 Attempt-numbered artefacts, and the refusal moved to before the port
+
+`--attempt N` makes the stem `<cell>-attN` for `N > 1`.  Every stage artefact
+moves with it, `console-dump.py`'s `-rescue.json` included -- ⚠️ which is what
+makes the two tools' **disagreement about overwriting** (§ 15.2) harmless
+without changing either tool: at attempt 2 neither can reach attempt 1's
+files.
+
+🟢 **And the collision is now found before the board is touched.**  A bench run
+reads the whole artefact set up front and refuses, naming `--attempt`, instead
+of dying at `S5b` with `S4`'s reset and `S5`'s rescue already spent.  That is
+the placement rule `console-capture`'s terminator guard was measured into:
+above the port, not inside the stage.
+
+⚠️ The refusal names the flag **and** says not to reach for `--force`, because
+the file `console-capture` refuses to overwrite is the previous attempt's
+evidence, and on 2026-09-08 that was a real burn-flag reading.
+
+### 16.3 The self-test grew the shape it was missing
+
+`M15`..`M24`, ten cases.  `M16b` puts a stale `-ab2.log` in a scratch
+`--out-dir` and requires the pre-flight to see it; `M17` requires `--attempt 2`
+to clear it; `M18` requires a **skipped** stage's artefact not to count, so the
+guard's scope is the stages that will run; `M19` drives the whole thing through
+`loop_once` with a port path that cannot exist, so a broken guard fails fast
+instead of reaching a device.  `M24` asserts the ordering `S5b < S5c < S6`.
+
+🔴 **Two cases went red on the first run and both were counts, not logic**:
+`R1` ("the plan has all nine stages") and `R2` ("six of them need the board").
+A stage was added and two hardcoded numbers in the suite's own controls said
+so.  That is the right failure -- they are assertions about the plan's shape,
+and the docstring's stage table was updated in the same edit.
+
+量 after: **66 passed, 0 failed**.

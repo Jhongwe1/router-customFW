@@ -290,6 +290,10 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
+/* jiffies and HZ arrive through <linux/sched.h> in this tree, but 1.1 reads
+ * both directly and an indirect include is a dependency nobody declared. */
+#include <linux/jiffies.h>
+#include <linux/param.h>
 #include <linux/proc_fs.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -302,7 +306,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SPI_VERSION	"rtl819x-spi 1.0"
+#define RTL819X_SPI_VERSION	"rtl819x-spi 1.1"
 
 /* CKSEG1ADDR of these gives 0xB80012xx and 0xBD000000.  __raw_readl and not
  * readl: an on-chip register on this big-endian part is already in CPU
@@ -345,6 +349,47 @@
 #define RTL819X_SPI_CHUNK	4096u
 #define RTL819X_SPI_COMPLEMENT	4186112u	/* FLS-24 */
 
+/* ------------------------------------------------------------------------
+ * THE MAP, AND WHY IT IS TWO LEVELS OF 32 RATHER THAN ONE LIST OF 1,024
+ * ------------------------------------------------------------------------
+ *
+ * FLS-26, 量 2026-09-08: verify() found the first difference between this
+ * flash and the 2026-08-16 dump at [0x9000,0xA000) and could find nothing
+ * past it, because a PREFIX digest stops at the first difference.  4,153,344
+ * bytes -- 99.02 % -- are undetermined.
+ *
+ * The obvious fix is a per-4-KiB digest list.  It does not fit, and the
+ * reason is a hard limit rather than a preference: rtl819x_spi_read_proc is
+ * a 2.6.30 read_proc_t, which sprintf()s into ONE page (PAGE_SIZE = 4096)
+ * and sets *eof.  1,024 lines of ~76 characters is 78 KiB.  There is no
+ * bounds check in that interface; a driver that overran it would corrupt
+ * whatever follows the page, on a board with no spare.
+ *
+ * 32 x 32 = 1024 exactly.  So:
+ *
+ *   map 0        32 digests, one per 128 KiB group  -> which group differs
+ *   map 1 <g>    32 digests, one per 4 KiB chunk of group g -> which sector
+ *
+ * Two commands answer the whole 4 MiB when one group differs, three when
+ * two do, and EVERY one of them can be written into a card in advance
+ * because the desk computes all 32 group digests and all 32 chunk digests
+ * of any group it likes from the dump before the board is powered.  The
+ * alternative -- verify with an offset, bisecting -- cannot be carded,
+ * because each rung's address depends on the previous rung's answer.  That
+ * is exactly why seating 16's nineteen BIS rungs were off-card.
+ *
+ * Output is bounded by construction (32 lines) and by RTL819X_SPI_MAP_BUDGET
+ * at run time, and map_truncated says which.  A tool that can silently drop
+ * the tail of its own answer is a tool whose zero means nothing.
+ * ------------------------------------------------------------------------ */
+#define RTL819X_SPI_MAP_N	32u	/* entries per level, both levels */
+#define RTL819X_SPI_MAP_GROUP	(RTL819X_SPI_SIZE / RTL819X_SPI_MAP_N)
+						/* 131072 = 128 KiB */
+/* Every byte the map's own read_proc may write.  PAGE_SIZE is 4096; this
+ * leaves 512 bytes of headroom against a line format that grows.  Checked
+ * before every sprintf, not after. */
+#define RTL819X_SPI_MAP_BUDGET	3584
+
 /* 🔴 The bound the vendor's driver does not have.  A read of SFCSR is an
  * uncached KSEG1 load; FW-34 Group F measured an uncached word through the
  * flash window at 2.075 us, which is the slowest access on this bus, so
@@ -355,6 +400,7 @@
 #define RTL819X_SPI_RDY_SPINS	200000u
 
 #define RTL819X_SPI_PROC_NAME	"rtl819x-spi"
+#define RTL819X_SPI_MAP_PROC_NAME "rtl819x-spi-map"
 #define RTL819X_SPI_MTD_NAME	"rtl819x-spi-pio"
 
 /* FLS-24, re-derived 2026-09-07 from flash-n150rt-console-2.bin by two
@@ -444,6 +490,39 @@ static u8   rtl819x_spi_v_d1[32];
 static u8   rtl819x_spi_v_dmmio[32];
 static int  rtl819x_spi_v_d1_match;
 static long rtl819x_spi_corrupt_at = -1;	/* negative control */
+
+/* 1.1: the window verify() actually covered.  Before this there was only a
+ * limit, so `cmp_bytes` and the scope were the same number and a windowed
+ * run had no way to say where it had been. */
+static u32  rtl819x_spi_v_start;
+static u32  rtl819x_spi_v_len;
+
+/* 🔴 1.1: the traversal timed IN THE KERNEL, against the tick this project
+ * owns (R5-3b-2 registered the rating-300 clock_event_device, so jiffies is
+ * driven by rtl819x-timer).  FW-48 stands as a bounded question because a
+ * .timing row cannot separate *data arrived* from *the tool began waiting*
+ * -- CORRECTIONS-block13 § 5 names this exact experiment as the way out:
+ * "the driver can timestamp its own traversal against the 100 Hz clockevent
+ * and take serial timing out of the path entirely".  hz is printed beside
+ * it so the desk needs no compiled-in constant of its own. */
+static unsigned long rtl819x_spi_v_jiffies;
+static unsigned long rtl819x_spi_map_jiffies;
+
+/* map() results. */
+static int  rtl819x_spi_map_ran;
+static int  rtl819x_spi_map_rc;
+static int  rtl819x_spi_map_level = -1;
+static u32  rtl819x_spi_map_group;
+static u32  rtl819x_spi_map_unit;	/* bytes each entry covers */
+static u32  rtl819x_spi_map_hashed;	/* bytes that reached a digest */
+static u32  rtl819x_spi_map_h601_skipped;
+static u32  rtl819x_spi_map_h601_hashed;  /* MUST be 0, same guard as verify */
+static u32  rtl819x_spi_map_diff_units;	  /* entries where PIO != MMIO */
+static int  rtl819x_spi_map_truncated;
+static u8   rtl819x_spi_map_d[RTL819X_SPI_MAP_N][32];
+static u32  rtl819x_spi_map_off[RTL819X_SPI_MAP_N];
+static u32  rtl819x_spi_map_bytes[RTL819X_SPI_MAP_N];
+static u8   rtl819x_spi_map_equal[RTL819X_SPI_MAP_N];
 
 /* ------------------------------------------------------------------------
  * The transaction.
@@ -750,21 +829,41 @@ static int rtl819x_spi_kat(void)
  * D1 and D3, one traversal.
  * ------------------------------------------------------------------------ */
 
-static int rtl819x_spi_verify(u32 limit)
+/* 1.1: a WINDOW, not a limit.
+ *
+ * `verify <n>` still means [0, n) -- every reading seating 16 took keeps its
+ * meaning -- and `verify <n> <off>` means [off, off+n).  Both ends are
+ * rounded DOWN to a chunk and an unaligned or out-of-range window is refused
+ * rather than clamped: a clamp would silently hash a different scope from
+ * the one the desk computed its expectation over, and comparing two digests
+ * taken over different byte counts is the mistake the SCOPE? guard already
+ * exists to prevent (notes/flash-digest-scope.md § 8.2).
+ */
+static int rtl819x_spi_verify(u32 start, u32 len)
 {
 	struct rtl819x_spi_hash h;
 	u8 *a = NULL, *b = NULL;
-	u32 off, i;
+	u32 off, i, limit;
+	unsigned long t0;
 	int rc = 0;
 
+	/* Set before any `goto out` can be taken: the out: path reads it, and
+	 * an uninitialised t0 there would print a duration for a run that
+	 * never started -- a number that looks like a measurement. */
+	t0 = jiffies;
 	if (rtl819x_spi_kat_rc)
 		return -EPERM;		/* a digest engine that has not passed
 					 * its own vectors does not get used */
-	if (!limit || limit > RTL819X_SPI_SIZE)
-		limit = RTL819X_SPI_SIZE;
-	limit &= ~(RTL819X_SPI_CHUNK - 1u);
-	if (!limit)
+	if (!len || len > RTL819X_SPI_SIZE)
+		len = RTL819X_SPI_SIZE;
+	if (start & (RTL819X_SPI_CHUNK - 1u))
 		return -EINVAL;
+	len &= ~(RTL819X_SPI_CHUNK - 1u);
+	if (!len || start >= RTL819X_SPI_SIZE)
+		return -EINVAL;
+	if (start + len > RTL819X_SPI_SIZE)
+		return -ERANGE;		/* not clamped -- see the note above */
+	limit = start + len;
 
 	memset(&h, 0, sizeof(h));
 	h.tfm = crypto_alloc_shash("sha256", 0, 0);
@@ -789,8 +888,11 @@ static int rtl819x_spi_verify(u32 limit)
 	rtl819x_spi_v_h601_skipped = 0;
 	rtl819x_spi_v_h601_hashed = 0;
 	rtl819x_spi_v_d1_match = 0;
+	rtl819x_spi_v_start = start;
+	rtl819x_spi_v_len = len;
+	rtl819x_spi_v_jiffies = 0;
 
-	for (off = 0; off < limit; off += RTL819X_SPI_CHUNK) {
+	for (off = start; off < limit; off += RTL819X_SPI_CHUNK) {
 		int in_h601 = (off >= RTL819X_SPI_H601_LO &&
 			       off < RTL819X_SPI_H601_HI);
 
@@ -861,8 +963,153 @@ out:
 	kfree(h.d2);
 	if (h.tfm && !IS_ERR(h.tfm))
 		crypto_free_shash(h.tfm);
+	/* Taken here rather than at the successful exit, so a run that bailed
+	 * still says how long it had been going.  jiffies is unsigned and
+	 * wraps; the subtraction is correct across the wrap and the interval
+	 * measured so far is 13.4 s against a 2^32 tick wrap at 100 Hz. */
+	rtl819x_spi_v_jiffies = jiffies - t0;
 	rtl819x_spi_v_ran = 1;
 	rtl819x_spi_v_rc = rc;
+	return rc;
+}
+
+/* ------------------------------------------------------------------------
+ * map() -- 32 digests, one level at a time.  See the MAP note by the
+ * constants for why 32 x 32 and not 1,024.
+ * ------------------------------------------------------------------------ */
+
+static int rtl819x_spi_map(int level, u32 group)
+{
+	struct rtl819x_spi_hash h;
+	u8 *a = NULL, *b = NULL;
+	u32 unit, base, e, off, i;
+	unsigned long t0;
+	int rc = 0;
+
+	t0 = jiffies;			/* see verify(), same reason */
+	if (rtl819x_spi_kat_rc)
+		return -EPERM;
+	if (level == 0) {
+		unit = RTL819X_SPI_MAP_GROUP;
+		base = 0;
+		group = 0;
+	} else if (level == 1) {
+		if (group >= RTL819X_SPI_MAP_N)
+			return -EINVAL;
+		unit = RTL819X_SPI_MAP_GROUP / RTL819X_SPI_MAP_N;
+		base = group * RTL819X_SPI_MAP_GROUP;
+	} else {
+		return -EINVAL;
+	}
+
+	memset(&h, 0, sizeof(h));
+	h.tfm = crypto_alloc_shash("sha256", 0, 0);
+	if (IS_ERR(h.tfm)) {
+		rc = PTR_ERR(h.tfm);
+		h.tfm = NULL;
+		goto out;
+	}
+	a = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
+	b = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
+	if (!a || !b) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rtl819x_spi_map_level = level;
+	rtl819x_spi_map_group = group;
+	rtl819x_spi_map_unit = unit;
+	rtl819x_spi_map_hashed = 0;
+	rtl819x_spi_map_h601_skipped = 0;
+	rtl819x_spi_map_h601_hashed = 0;
+	rtl819x_spi_map_diff_units = 0;
+	rtl819x_spi_map_truncated = 0;
+	memset(rtl819x_spi_map_d, 0, sizeof(rtl819x_spi_map_d));
+
+	for (e = 0; e < RTL819X_SPI_MAP_N; e++) {
+		rtl819x_spi_map_off[e] = base + e * unit;
+		rtl819x_spi_map_bytes[e] = 0;
+		rtl819x_spi_map_equal[e] = 1;
+
+		h.d1 = rtl819x_spi_desc(h.tfm);
+		if (!h.d1) {
+			rc = -ENOMEM;
+			goto out;
+		}
+		for (off = rtl819x_spi_map_off[e];
+		     off < rtl819x_spi_map_off[e] + unit;
+		     off += RTL819X_SPI_CHUNK) {
+			int in_h601 = (off >= RTL819X_SPI_H601_LO &&
+				       off < RTL819X_SPI_H601_HI);
+
+			rc = rtl819x_spi_read_pio(off, RTL819X_SPI_CHUNK, a);
+			if (rc)
+				goto out;
+			rtl819x_spi_read_mmio(off, RTL819X_SPI_CHUNK, b);
+
+			/* The same negative control verify() uses, so one
+			 * verb moves both instruments and neither can be a
+			 * digest that cannot fail. */
+			if (rtl819x_spi_corrupt_at >= (long)off &&
+			    rtl819x_spi_corrupt_at <
+			    (long)(off + RTL819X_SPI_CHUNK))
+				a[rtl819x_spi_corrupt_at - off] ^= 0xFFu;
+
+			/* D3, per entry.  A verdict reveals no content, so it
+			 * covers H601 exactly as verify()'s does. */
+			for (i = 0; i < RTL819X_SPI_CHUNK; i++) {
+				if (a[i] != b[i]) {
+					rtl819x_spi_map_equal[e] = 0;
+					break;
+				}
+			}
+
+			if (in_h601) {
+				rtl819x_spi_map_h601_skipped +=
+					RTL819X_SPI_CHUNK;
+				continue;
+			}
+			rc = crypto_shash_update(h.d1, a, RTL819X_SPI_CHUNK);
+			if (rc)
+				goto out;
+			rtl819x_spi_map_bytes[e] += RTL819X_SPI_CHUNK;
+			rtl819x_spi_map_hashed += RTL819X_SPI_CHUNK;
+			/* The same belt-and-braces assertion verify() carries:
+			 * it can only fire if CHUNK or H601's bounds stop
+			 * being chunk-aligned, and then it fires instead of
+			 * a digest of this unit's MAC being printed. */
+			if (off + RTL819X_SPI_CHUNK > RTL819X_SPI_H601_LO &&
+			    off < RTL819X_SPI_H601_HI)
+				rtl819x_spi_map_h601_hashed +=
+					RTL819X_SPI_CHUNK;
+
+			/* Per CHUNK, matching verify().  It was per ENTRY in
+			 * the first draft, which at level 0 is once per
+			 * 128 KiB -- about 0.41 s by FW-48's slope, against
+			 * verify()'s ~13 ms.  The watchdog is petted from the
+			 * vendor's TC0 interrupt and does not depend on this,
+			 * so nothing measured says 0.41 s is unsafe; it is a
+			 * scheduling latency an order of magnitude worse than
+			 * the function next door for no reason. */
+			cond_resched();
+		}
+		rc = crypto_shash_final(h.d1, rtl819x_spi_map_d[e]);
+		kfree(h.d1);
+		h.d1 = NULL;
+		if (rc)
+			goto out;
+		if (!rtl819x_spi_map_equal[e])
+			rtl819x_spi_map_diff_units++;
+	}
+out:
+	kfree(a);
+	kfree(b);
+	kfree(h.d1);
+	if (h.tfm && !IS_ERR(h.tfm))
+		crypto_free_shash(h.tfm);
+	rtl819x_spi_map_jiffies = jiffies - t0;
+	rtl819x_spi_map_ran = 1;
+	rtl819x_spi_map_rc = rc;
 	return rc;
 }
 
@@ -1067,6 +1314,123 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 		       rtl819x_spi_v_ran && !rtl819x_spi_v_h601_hashed &&
 		       !memcmp(rtl819x_spi_v_d1, rtl819x_spi_v_dmmio, 32));
 
+	/* 1.1.  v_start/v_len say WHICH window the digests above are over --
+	 * before this, `cmp_bytes` was both the scope and the length and a
+	 * windowed run had no way to say where it had been.  v_jiffies is the
+	 * traversal timed in the kernel against this project's own tick, with
+	 * hz beside it so nothing downstream carries a constant. */
+	len += sprintf(page + len, "v_start %u\n", rtl819x_spi_v_start);
+	len += sprintf(page + len, "v_len %u\n", rtl819x_spi_v_len);
+	len += sprintf(page + len, "v_jiffies %lu\n", rtl819x_spi_v_jiffies);
+	len += sprintf(page + len, "hz %u\n", (unsigned)HZ);
+	len += sprintf(page + len, "map_ran %d\n", rtl819x_spi_map_ran);
+	len += sprintf(page + len, "map_rc %d\n", rtl819x_spi_map_rc);
+	len += sprintf(page + len, "map_level %d\n", rtl819x_spi_map_level);
+	len += sprintf(page + len, "map_group %u\n", rtl819x_spi_map_group);
+	len += sprintf(page + len, "map_jiffies %lu\n",
+		       rtl819x_spi_map_jiffies);
+
+	*eof = 1;
+	return len;
+}
+
+/* ------------------------------------------------------------------------
+ * The map's own /proc file.
+ *
+ * 🔴 A SECOND file rather than more lines in the first one, and that is a
+ * decision with a measured reason.  Every card in this project predicts the
+ * BYTE COUNT of its captures -- seating 16's ten boot captures were 1,318
+ * bytes against a prediction of 1,318 -- and every one of the seating's
+ * thirty-two cells reads /proc/rtl819x-spi.  Appending 2.5 KiB to that file
+ * would move all of them.  The map goes somewhere else, and the existing
+ * dump keeps its shape except for the nine fields above, which are declared.
+ *
+ * The budget is checked BEFORE each sprintf and map_truncated is printed
+ * either way, so a reader is never left to infer from a short answer whether
+ * the map ran out of room or the flash ran out of differences.
+ * ------------------------------------------------------------------------ */
+
+static int rtl819x_spi_map_read_proc(char *page, char **start, off_t off,
+				     int count, int *eof, void *data)
+{
+	char hx[66];
+	int len = 0;
+	u32 e;
+
+	len += sprintf(page + len, "version %s\n", RTL819X_SPI_VERSION);
+	len += sprintf(page + len, "map_ran %d\n", rtl819x_spi_map_ran);
+	len += sprintf(page + len, "map_rc %d\n", rtl819x_spi_map_rc);
+	len += sprintf(page + len, "map_level %d\n", rtl819x_spi_map_level);
+	len += sprintf(page + len, "map_group %u\n", rtl819x_spi_map_group);
+	len += sprintf(page + len, "map_unit %u\n", rtl819x_spi_map_unit);
+	len += sprintf(page + len, "map_entries %u\n", RTL819X_SPI_MAP_N);
+	len += sprintf(page + len, "map_hashed %u\n", rtl819x_spi_map_hashed);
+	len += sprintf(page + len, "map_h601_skipped %u\n",
+		       rtl819x_spi_map_h601_skipped);
+	/* THE GUARD, same one verify() carries: the digests below print only
+	 * because this is 0, and it is 0 because the arithmetic came out that
+	 * way rather than because the skip was believed to be right. */
+	len += sprintf(page + len, "map_h601_hashed %u\n",
+		       rtl819x_spi_map_h601_hashed);
+	len += sprintf(page + len, "map_diff_units %u\n",
+		       rtl819x_spi_map_diff_units);
+	len += sprintf(page + len, "map_jiffies %lu\n",
+		       rtl819x_spi_map_jiffies);
+	len += sprintf(page + len, "hz %u\n", (unsigned)HZ);
+	len += sprintf(page + len, "corrupt_at %ld\n", rtl819x_spi_corrupt_at);
+
+	if (!rtl819x_spi_map_ran || rtl819x_spi_map_rc) {
+		len += sprintf(page + len, "map_truncated 0\n");
+		len += sprintf(page + len, "# no map has completed\n");
+		*eof = 1;
+		return len;
+	}
+	if (rtl819x_spi_map_h601_hashed) {
+		len += sprintf(page + len, "map_truncated 0\n");
+		len += sprintf(page + len,
+			       "# WITHHELD map_h601_hashed=%u\n",
+			       rtl819x_spi_map_h601_hashed);
+		*eof = 1;
+		return len;
+	}
+
+	/* One line per entry: offset, PIO==MMIO, bytes hashed, digest.  Every
+	 * digest line is EXACTLY 80 characters (6+1+1+1+6+1+64) and a SKIPPED
+	 * line is 23, both fixed width, which is what lets a desk-side reader
+	 * diff two captures line for line.
+	 *
+	 * 80 is the terminal width and that is safe here, measured rather than
+	 * assumed: FW-49 (量 2026-09-08, over 762 committed captures) found
+	 * that only the ECHO of a typed line is wrapped -- by busybox ash's
+	 * line editor, 33 times, always with len(sent) >= 80 -- while OUTPUT
+	 * is not, an 88-character /proc/version line arriving whole in five
+	 * captures from five seatings.  Nothing between this sprintf and the
+	 * capture file counts columns. */
+	for (e = 0; e < RTL819X_SPI_MAP_N; e++) {
+		/* 81 = the 80-character digest line plus its newline; 96
+		 * leaves slack for a format that grows.  The first draft
+		 * wrote 80 and was off by exactly the newline. */
+		if (len + 96 > RTL819X_SPI_MAP_BUDGET) {
+			rtl819x_spi_map_truncated = 1;
+			break;
+		}
+		if (!rtl819x_spi_map_bytes[e]) {
+			len += sprintf(page + len, "%06X %d %6u SKIPPED\n",
+				       rtl819x_spi_map_off[e],
+				       rtl819x_spi_map_equal[e],
+				       rtl819x_spi_map_bytes[e]);
+			continue;
+		}
+		rtl819x_spi_hex(hx, rtl819x_spi_map_d[e]);
+		len += sprintf(page + len, "%06X %d %6u %s\n",
+			       rtl819x_spi_map_off[e],
+			       rtl819x_spi_map_equal[e],
+			       rtl819x_spi_map_bytes[e], hx);
+	}
+	len += sprintf(page + len, "map_truncated %d\n",
+		       rtl819x_spi_map_truncated);
+	len += sprintf(page + len, "map_lines %u\n", e);
+
 	*eof = 1;
 	return len;
 }
@@ -1182,19 +1546,59 @@ static int rtl819x_spi_verb_trywrite(void)
 	return ok ? 0 : -EPROTO;
 }
 
+/* `<n>` or `<n> <off>`.  Two numbers, parsed with an END POINTER rather than
+ * by splitting on a space, because simple_strtoul with a NULL end silently
+ * returns 0 for a malformed second field and 0 is a legal offset. */
 static int rtl819x_spi_verb_verify(const char *arg)
 {
-	unsigned long limit = 0;
+	unsigned long len = 0, start = 0;
+	char *end;
 	int rc;
 
-	if (*arg)
-		limit = simple_strtoul(arg, NULL, 0);
+	if (*arg) {
+		len = simple_strtoul(arg, &end, 0);
+		while (*end == ' ' || *end == '\t')
+			end++;
+		if (*end) {
+			char *end2;
+			start = simple_strtoul(end, &end2, 0);
+			if (end2 == end)
+				return -EINVAL;
+		}
+	}
 	mutex_lock(&rtl819x_spi_lock);
-	rc = rtl819x_spi_verify((u32)limit);
+	rc = rtl819x_spi_verify((u32)start, (u32)len);
 	mutex_unlock(&rtl819x_spi_lock);
 	rlxfw_markx("S-VRC", (unsigned)rc);
 	rlxfw_markx("S-VDIFF", (unsigned)rtl819x_spi_v_diff_bytes);
 	rlxfw_markx("S-VD1", (unsigned)rtl819x_spi_v_d1_match);
+	return rc;
+}
+
+/* `map <level>` or `map <level> <group>`. */
+static int rtl819x_spi_verb_map(const char *arg)
+{
+	unsigned long level, group = 0;
+	char *end;
+	int rc;
+
+	level = simple_strtoul(arg, &end, 0);
+	if (end == arg)
+		return -EINVAL;
+	while (*end == ' ' || *end == '\t')
+		end++;
+	if (*end) {
+		char *end2;
+		group = simple_strtoul(end, &end2, 0);
+		if (end2 == end)
+			return -EINVAL;
+	}
+	mutex_lock(&rtl819x_spi_lock);
+	rc = rtl819x_spi_map((int)level, (u32)group);
+	mutex_unlock(&rtl819x_spi_lock);
+	rlxfw_markx("S-MRC", (unsigned)rc);
+	rlxfw_markx("S-MDIFF", (unsigned)rtl819x_spi_map_diff_units);
+	rlxfw_markx("S-MH601", (unsigned)rtl819x_spi_map_h601_hashed);
 	return rc;
 }
 
@@ -1243,6 +1647,8 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 		ret = rtl819x_spi_verb_verify(buf + 7);
 	else if (!strncmp(buf, "corrupt ", 8))
 		ret = rtl819x_spi_verb_corrupt(buf + 8);
+	else if (!strncmp(buf, "map ", 4))
+		ret = rtl819x_spi_verb_map(buf + 4);
 	else
 		return -EINVAL;
 
@@ -1313,6 +1719,18 @@ static int __init rtl819x_spi_init(void)
 	pde->read_proc  = rtl819x_spi_read_proc;
 	pde->write_proc = rtl819x_spi_write_proc;
 	rlxfw_mark("S7");
+
+	/* 0444: every verb stays on the first file.  A second writable entry
+	 * would be a second way to reach the controller, and this driver's
+	 * whole L2 argument is that nothing issues a transaction except
+	 * through one of the verbs. */
+	pde = create_proc_entry(RTL819X_SPI_MAP_PROC_NAME, 0444, NULL);
+	if (!pde) {
+		rlxfw_mark("S8-NOMAP");
+		return 0;
+	}
+	pde->read_proc = rtl819x_spi_map_read_proc;
+	rlxfw_mark("S8");
 
 	return 0;
 }

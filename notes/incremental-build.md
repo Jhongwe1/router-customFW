@@ -353,6 +353,15 @@ differing bytes: 4 of 3968240  (0.000101 %)
 --- 0x2af5e6..0x2af5ef  4 byte(s)  sec=.init.text  sym=start_kernel+0x7e
 ```
 
+🔄 **2026-09-08: seen a second time, on a different image and by accident.**
+A **comment** in `config/rlxfw-src/…/rtl819x-spi.c` was corrected between two
+compile checks of the same cell. `RECIPE_ID` moved `44c38c7a` -> `9155dad0`,
+`vmlinux` stayed **4,047,318 bytes** — byte-for-byte the same size — and its
+sha256-16 moved `d2d157595ec31803` -> `5e40cf36e56232ca`. Same-width id, so
+the same 4 bytes, and this row's n goes 1 -> 2. ⚠️ **Those two ids are the comment experiment's, not the tree's**: a third build the same evening carried two real code edits and reads `7b6bfa83`. ⚠️ The two images were built
+into the same cell name, so they can no longer be diffed to show it directly;
+that is lifecycle rule 2 in miniature and it is recorded rather than claimed.
+
 That is `RLXFW_SRC_ID`'s `lui`/`ori` immediate pair. It moved because
 `rlxfw-kbuild.sh` computes `RECIPE_ID` as a sha256 over every file under
 `config/` and `config/` gained a file: `d31f60bd → c601eacf`. **Every other

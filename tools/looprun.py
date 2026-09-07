@@ -47,6 +47,7 @@ THE STAGES, AND WHICH NEED THE BOARD
     S4  reset      console-capture --send 'J BFC00000'       bench
     S5  rescue     upstream/tools/console-dump.py rescue     bench
     S5b burnflag   console-capture --send 'DW 8040D4A0 1'   bench
+    S5c hostlink   ip route get / ping / ip neigh  (in-process) bench
     S6  upload     upstream/tools/loader-tftp.py put         bench
     S6b staged     console-capture --send 'DW 80500000 8'    bench
     S7  boot       console-capture --send 'J 80500000'       bench
@@ -109,7 +110,7 @@ import sys
 import tempfile
 import time
 
-VERSION = "1.0"
+VERSION = "1.1"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_PORT = "/dev/ttyUSB0"
@@ -183,6 +184,128 @@ class StageFailed(Exception):
         self.sid, self.why = sid, why
 
 
+# ------------------------------------------------- where a stage's files go
+def stem(a):
+    """The prefix every stage artefact of this run is built on.
+
+    One owner.  Before 1.1 this expression was written out at four call sites
+    and the attempt suffix would have had to be added to each.
+
+    🔴 The attempt suffix is what makes a failed run retryable.  量 2026-09-08
+    (`notes/dev-loop.md` § 15.2): a retry died at `S5b` in 0.06 s -- too fast
+    to have opened the port -- because `console-capture.py:368` correctly
+    refuses to overwrite an existing capture and `C1-ab2` was still on disk
+    from the first attempt.  **At a bench the natural response to that refusal
+    is `--force`, and that is exactly the write the guard exists to prevent**:
+    the first attempt's capture held a real burn-flag reading
+    (`8040D4A0: 00000000`) that `--force` would have destroyed.
+
+    ⚠️ It also fixes the CONSEQUENCE of the two tools disagreeing about
+    overwriting -- `console-dump.py` (S5) silently rewrote `C1-rescue.json`
+    on that retry while `console-capture.py` (S5b) refused -- without changing
+    either tool: at attempt 2 they write to a different name and neither can
+    reach attempt 1's files.
+    """
+    base = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
+    n = getattr(a, "attempt", 1) or 1
+    return base if n == 1 else "%s-att%d" % (base, n)
+
+
+#: Every artefact a bench run creates, as suffixes on stem(a).  Used by the
+#: pre-flight so a collision is a refusal BEFORE the board is touched rather
+#: than a stage failure after four stages have run.
+BENCH_ARTEFACTS = {
+    "S4": ("-rz.log", "-rz.timing", "-rz.meta.json"),
+    "S5": ("-rescue.json",),
+    "S5b": ("-ab2.log", "-ab2.timing", "-ab2.meta.json"),
+    "S6b": ("-2a.log", "-2a.timing", "-2a.meta.json"),
+    "S7": ("-boot.log", "-boot.timing", "-boot.meta.json"),
+}
+
+
+def preflight_artefacts(a, skip):
+    """[] or a list of paths that already exist.
+
+    A run that is going to collide collides at the FIRST capture, which on a
+    bench is after the reset and the rescue have already been spent.  Reading
+    the whole set up front turns that into one refusal before power is
+    touched, naming the flag that resolves it.
+    """
+    clash = []
+    for sid, suffixes in sorted(BENCH_ARTEFACTS.items()):
+        if sid in skip:
+            continue
+        for suf in suffixes:
+            p = stem(a) + suf
+            if os.path.exists(p):
+                clash.append(p)
+    return clash
+
+
+# ------------------------------------------- the host side of the TFTP link
+def host_reaches_board(host, runner=None):
+    """(ok, [(ok, rid, detail)]) -- can THIS HOST reach the board's loader?
+
+    🔴 ICMP is the wrong instrument and using it would be worse than nothing:
+    the loader answers ARP and does **not** answer ping, so 100 % packet loss
+    is a PASS.  A precondition that aborted on it would abort every healthy
+    run.
+
+    量 2026-09-08 (`notes/dev-loop.md` § 15.1): `S6` died after a 12.11 s TFTP
+    timeout and `looprun` reported `STOPPED at S6`.  The cause was on this
+    desk -- the USB GbE had just been re-attached to WSL, `10.1.1.2/24` does
+    not survive that, and the interface was `DOWN` with no address.  **Every
+    abort gate this tool owns points at the BOARD** (`S5b` reads the burn flag,
+    `S6b` reads the staged head), so a host fault was reported in the board's
+    vocabulary at the stage where a board fault would be most alarming.
+
+    Two readings, and the first is the one that actually failed:
+
+      P-a  the route to <host> leaves an interface that HAS an IPv4 source
+           address.  `ip -4 route get` prints `src <addr>` only when it does.
+      P-b  the board answers ARP.  One ping is sent purely to provoke the
+           exchange and **its exit code is ignored**; the reading is taken
+           from `ip neigh`, where a usable entry carries an `lladdr` and a
+           state that is not FAILED or INCOMPLETE.
+
+    `runner` is injected so the self-test can drive both branches with no
+    network and no board.
+    """
+    if runner is None:
+        def runner(argv):
+            p = subprocess.run(argv, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True)
+            return p.returncode, p.stdout
+    out = []
+
+    rc, txt = runner(["ip", "-4", "route", "get", host])
+    dev = re.search(r"\bdev\s+(\S+)", txt or "")
+    src = re.search(r"\bsrc\s+(\d+\.\d+\.\d+\.\d+)", txt or "")
+    ok_a = rc == 0 and bool(dev) and bool(src)
+    out.append((ok_a, "P-a the host has an address on the route to " + host,
+                ("dev=%s src=%s" % (dev.group(1) if dev else "?",
+                                    src.group(1) if src else "NONE"))
+                if rc == 0 else "ip route get exited %d: %s"
+                % (rc, (txt or "").strip()[:120])))
+    if not ok_a:
+        return False, out
+
+    # Provoke the ARP exchange.  The return code is deliberately dropped: see
+    # the docstring -- the loader does not answer ICMP.
+    runner(["ping", "-c", "1", "-W", "1", host])
+
+    rc, txt = runner(["ip", "-4", "neigh", "show", host, "dev", dev.group(1)])
+    lladdr = re.search(r"\blladdr\s+([0-9a-fA-F:]{17})", txt or "")
+    state = re.search(r"\b(REACHABLE|STALE|DELAY|PROBE|PERMANENT|FAILED|"
+                      r"INCOMPLETE|NOARP)\b", txt or "")
+    ok_b = bool(lladdr) and bool(state) and state.group(1) not in (
+        "FAILED", "INCOMPLETE")
+    out.append((ok_b, "P-b the board answers ARP",
+                "%s %s" % (lladdr.group(1) if lladdr else "no lladdr",
+                           state.group(1) if state else "no state")))
+    return ok_a and ok_b, out
+
+
 # --------------------------------------------------------------- the plan
 def build_plan(a):
     """-> [ {id, name, kind, argv, note} ], the whole iteration, in order.
@@ -191,7 +314,7 @@ def build_plan(a):
     `desk` and `bench` alike.  A card that is rendered from the same list the
     runner executes cannot drift from it.
     """
-    out = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
+    out = stem(a)
     cap = ["/usr/bin/python3", os.path.join("tools", "console-capture.py"),
            "capture", "--port", a.port]
     plan = [
@@ -230,6 +353,14 @@ def build_plan(a):
             "--idle", "2", "--seconds", "6"],
             note="ABORT unless word 1 is 00000000. The rescue's echo and this "
                  "word are two sources and C-6 measured them disagreeing"),
+        dict(id="S5c", name="hostlink", kind="bench", argv=None,
+             note="HOST-side, and ARP not ICMP. `ip -4 route get %s` must "
+                  "print a src address; one `ping -c1 -W1 %s` provokes the "
+                  "exchange and ITS EXIT CODE IS IGNORED (the loader does not "
+                  "answer ICMP, so 100%% loss is a pass); `ip -4 neigh show "
+                  "%s dev <if>` must carry an lladdr. Aborts before S6 spends "
+                  "a 12 s TFTP timeout reporting a host fault in the board's "
+                  "vocabulary" % (a.host, a.host, a.host)),
         dict(id="S6", name="upload", kind="bench", argv=[
             "/usr/bin/python3", os.path.join("upstream", "tools", "loader-tftp.py"),
             "put", "--host", a.host, "--image", a.image,
@@ -437,6 +568,28 @@ def loop_once(a, out=sys.stdout):
                       "so A3 would have nothing to require. Pass --recipe-override "
                       "with the id the staged image was built from, or do not skip S2")
 
+    # ------------------------------------------------- the artefact pre-flight
+    # 🔴 量 2026-09-08 (`notes/dev-loop.md` § 15.2): a retried run died at S5b
+    # in 0.06 s because `console-capture.py` refuses to overwrite an existing
+    # capture -- correctly -- and the first attempt's file was still there.  By
+    # then S4 (a reset) and S5 (a rescue) had already run.  Reading the whole
+    # artefact set up front turns that into ONE refusal before the port is
+    # opened, and it names the flag that resolves it, so the operator's next
+    # move is `--attempt 2` rather than the `--force` the guard exists to
+    # prevent.
+    if a.mode == "bench":
+        clash = preflight_artefacts(a, skip)
+        if clash:
+            raise Refused(
+                "these files already exist, so a stage would collide with a "
+                "previous attempt after part of a power cycle had been "
+                "spent:\n        %s\n      Pass --attempt %d. Do NOT pass "
+                "--force to console-capture: the file it refuses to overwrite "
+                "is the previous attempt's evidence, and on 2026-09-08 that "
+                "was a real burn-flag reading."
+                % ("\n        ".join(clash[:6]),
+                   (getattr(a, "attempt", 1) or 1) + 1))
+
     # ---------------------------------------------------- the image pre-flight
     # 🔴 LOOP-4, 量 2026-09-03: of the three bench inputs, `--image` was the
     # only one with no guard -- and it is consumed by S6, which runs AFTER the
@@ -509,6 +662,25 @@ def loop_once(a, out=sys.stdout):
             print("  %-3s %-9s SKIPPED (%s)" % (s["id"], s["name"], why), file=out)
             timings.append((s["id"], None))
             continue
+        if s["id"] == "S5c":
+            # In-process, like S8: this is three commands and a parse, not one
+            # command, and rendering it as one would hide which half failed.
+            t0 = time.monotonic()
+            ok, rows = host_reaches_board(
+                a.host, getattr(a, "_link_runner", None))
+            dt = time.monotonic() - t0
+            timings.append((s["id"], dt))
+            print("  %-3s %-9s %-4s  %6.2f s"
+                  % (s["id"], s["name"], "ok" if ok else "FAIL", dt), file=out)
+            for rok, rid, detail in rows:
+                results.append((rok, rid, detail))
+                print("      %-4s %s -- %s"
+                      % ("ok" if rok else "FAIL", rid, detail), file=out)
+            if not ok:
+                raise StageFailed(
+                    "S5c", "the HOST cannot reach %s. This is not the board: "
+                           "%s" % (a.host, rows[-1][2] if rows else "?"))
+            continue
         if a.control == "build-fail" and s["id"] == "S2":
             s = dict(s, argv=s["argv"][:3] + ["--config", "/nonexistent/config"])
         rc, txt, dt = run_stage(s, ROOT, False, None)
@@ -556,23 +728,22 @@ def loop_once(a, out=sys.stdout):
                           "this build left no record of the .config and "
                           "initramfs spec it used -- and neither of those is "
                           "inside RECIPE_ID")
-            stem = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
             try:
-                shutil.copyfile(mm.group(1), stem + ".manifest")
+                shutil.copyfile(mm.group(1), stem(a) + ".manifest")
             except OSError as exc:
                 raise StageFailed("S2", "manifest %s could not be copied: %s"
                                   % (mm.group(1), exc))
-            print("      manifest=%s  -> %s.manifest" % (mm.group(1), stem),
-                  file=out)
+            print("      manifest=%s  -> %s.manifest"
+                  % (mm.group(1), stem(a)), file=out)
         if s["id"] in ("S4", "S5b", "S6b"):
-            stem = os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell
             suffix, check = {
                 "S4": ("-rz.log", assert_reset),
                 "S5b": ("-ab2.log", assert_autoburn),
                 "S6b": ("-2a.log", lambda t: assert_staged(t, a.image)),
             }[s["id"]]
-            ctext = open(stem + suffix, encoding="utf-8", errors="replace").read() \
-                if os.path.exists(stem + suffix) else ""
+            cpath = stem(a) + suffix
+            ctext = open(cpath, encoding="utf-8", errors="replace").read() \
+                if os.path.exists(cpath) else ""
             for ok, rid, detail in check(ctext):
                 results.append((ok, rid, detail))
                 if not ok:
@@ -588,7 +759,7 @@ def loop_once(a, out=sys.stdout):
         if a.recipe_override:
             recipe = a.recipe_override
     else:
-        bootlog = (os.path.join(a.out_dir, a.cell) if a.out_dir else a.cell) + "-boot.log"
+        bootlog = stem(a) + "-boot.log"
     if not os.path.exists(bootlog):
         raise StageFailed("S8", "no boot capture at %s" % bootlog)
     text = open(bootlog, encoding="utf-8", errors="replace").read()
@@ -749,8 +920,8 @@ def selftest(out=sys.stdout):
     # S1 -- the edit -- is not in the plan because no instrument here can time
     # it, and S4/S5/S6/S7 all need the board; the docstring's own stage table
     # is what these two numbers are checked against.
-    ck("R1", "the plan has all nine stages", 9, len(plan))
-    ck("R2", "six of them need the board", 6,
+    ck("R1", "the plan has all ten stages", 10, len(plan))
+    ck("R2", "seven of them need the board", 7,
        sum(1 for s in plan if s["kind"] == "bench"))
     # 🔴 Order is the whole point of both guards: the burn flag has to be read
     # AFTER the rescue that clears it and BEFORE the upload it guards, and the
@@ -1000,6 +1171,98 @@ def selftest(out=sys.stdout):
         ck("M14", "🔴 with --skip S5b AND a bad --image, the S5b safety refusal "
                   "is the one reported", "S5b", got)
 
+        # ---- M15-M22: looprun 1.1.  🔴 `notes/dev-loop.md` § 15 records that
+        # NEITHER of the two defects this covers is reachable from --self-test
+        # as it stood -- both need a FAILED run followed by a SECOND run
+        # against the same --out-dir, and the self-test drives --mode replay
+        # once.  These cases are that missing shape.
+
+        class A1:
+            out_dir = "bench/2026-01-01"; cell = "L1"; attempt = 1
+
+        class A2:
+            out_dir = "bench/2026-01-01"; cell = "L1"; attempt = 2
+        ck("M15", "attempt 1 keeps the plain stem, attempt 2 does not collide "
+                  "with it", ["bench/2026-01-01/L1" .replace("/", os.sep),
+                              "bench/2026-01-01/L1-att2".replace("/", os.sep)],
+           [stem(A1), stem(A2)])
+
+        with tempfile.TemporaryDirectory() as od:
+            class C:
+                out_dir = od; cell = "L1"; attempt = 1
+            ck("M16a", "a clean out-dir has nothing to collide with", [],
+               preflight_artefacts(C, set()))
+            open(os.path.join(od, "L1-ab2.log"), "w").write("x")
+            ck("M16b", "🔴 and S5b's capture left by a failed attempt IS seen, "
+                       "before the port is opened",
+               [os.path.join(od, "L1-ab2.log")],
+               preflight_artefacts(C, set()))
+            class C2:
+                out_dir = od; cell = "L1"; attempt = 2
+            ck("M17", "🔴 --attempt 2 clears it -- which is the move that "
+                      "replaces `--force` destroying the evidence", [],
+               preflight_artefacts(C2, set()))
+            ck("M18", "and a SKIPPED stage's artefact is not a collision -- "
+                      "the guard's scope is the stages that will run", [],
+               preflight_artefacts(C, {"S5b"}))
+
+            # And through loop_once, so the guard is wired and not merely
+            # written.  The port is deliberately a path that cannot exist, so
+            # a broken guard fails fast instead of reaching a real device.
+            B.mode = "bench"; B.out_dir = od; B.cell = "L1"; B.attempt = 1
+            B.skip = "S2,S3"; B.port = "/dev/rlxfw-no-such-port"
+            B.image = "img.bin"; B.image_sha256 = None
+            try:
+                loop_once(B, out=devnull)
+                got = "no refusal"
+            except Refused as exc:
+                got = "attempt" if "--attempt 2" in str(exc) else "other: %s" % exc
+            except StageFailed as exc:
+                got = "StageFailed@" + exc.sid
+            ck("M19", "🔴 and loop_once refuses on it, naming --attempt, "
+                      "BEFORE S4 resets the board", "attempt", got)
+            B.mode = "replay"; B.out_dir = None; B.attempt = 1
+            B.port = DEFAULT_PORT; B.skip = ""
+
+        # ---- the host link, ARP not ICMP.  Both branches driven with no
+        # network and no board, through the injected runner.
+        def fake(route, neigh, ping_rc=1):
+            def run(argv):
+                if argv[:3] == ["ip", "-4", "route"]:
+                    return (0, route) if route is not None else (2, "")
+                if argv[0] == "ping":
+                    return ping_rc, "100% packet loss"
+                if argv[:3] == ["ip", "-4", "neigh"]:
+                    return 0, neigh
+                return 127, ""
+            return run
+
+        good_route = "10.1.1.1 dev eth4 src 10.1.1.2 uid 1000 \n    cache \n"
+        good_neigh = "10.1.1.1 dev eth4 lladdr 00:11:22:33:44:55 REACHABLE\n"
+        ck("M20", "🔴 the ping FAILS (the loader does not answer ICMP) and the "
+                  "link is still a pass -- this is the whole reason the "
+                  "instrument is ARP", True,
+           host_reaches_board("10.1.1.1",
+                              fake(good_route, good_neigh, ping_rc=1))[0])
+        ck("M21", "🔴 P-a: an interface with no source address fails, which is "
+                  "the fault that actually happened on 2026-09-08", False,
+           host_reaches_board("10.1.1.1",
+                              fake("10.1.1.1 dev eth4 \n", good_neigh))[0])
+        ck("M22", "🔴 P-b: an ARP entry that never resolved fails", False,
+           host_reaches_board("10.1.1.1", fake(
+               good_route, "10.1.1.1 dev eth4  FAILED\n"))[0])
+        ck("M23", "and P-a alone passing is not enough to report a pass",
+           [True, False],
+           [r[0] for r in host_reaches_board("10.1.1.1", fake(
+               good_route, "10.1.1.1 dev eth4  INCOMPLETE\n"))[1]])
+
+        # S5c must sit BEFORE S6.  A precondition after the stage it protects
+        # is not a precondition.
+        pids = [s["id"] for s in build_plan(B)]
+        ck("M24", "🔴 S5c is in the plan and runs before S6", True,
+           "S5c" in pids and pids.index("S5c") < pids.index("S6")
+           and pids.index("S5b") < pids.index("S5c"))
+
         B.mode = "replay"; B.skip = ""; B.image = "img.bin"; B.image_sha256 = None
 
     # ---- C11/C12: the chaining itself, on the driver's real output shape
@@ -1037,6 +1300,10 @@ def main():
                     help="plan: print the commands and run none. replay: run no\nstage at all and assert over --replay-boot -- this is what the\nself-test drives. desk: run S2/S3 for real, replay the boot.\nbench: all of it, against a live board")
     ap.add_argument("--cell", default="L1")
     ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--attempt", type=int, default=1,
+                    help="attempt number. 1 writes <cell>-rz.log etc; N>1 "
+                         "writes <cell>-attN-rz.log, so a failed run can be "
+                         "retried without --force destroying its evidence")
     ap.add_argument("--port", default=DEFAULT_PORT)
     ap.add_argument("--host", default=DEFAULT_HOST)
     ap.add_argument("--config", default="")
