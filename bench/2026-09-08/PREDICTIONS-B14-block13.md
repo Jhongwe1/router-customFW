@@ -3,14 +3,42 @@
 **Written 2026-09-07, forty-first segment, at the desk, before power.**
 `R5-5`'s bench half. The desk half is done and its artefacts are frozen (§1).
 
-🔄 **THE DIRECTORY NAME WAS A PREDICTION AND IT WAS WRONG.** The card was
-written into `bench/2026-09-08` on the assumption that the operator would next
-have the board on the 8th. 量 2026-09-07, forty-second segment, three sides —
-Git Bash `2026-09-07 16:59:06 +0800`, Windows `16:59:11 +08:00`, WSL
-`16:59:17 +0800`, all Monday — and the seating is scheduled for **this
-evening**, so the directory is `bench/2026-09-07` and §4.4 is expanded against
-that name. `RUNSHEET.md` § "Three rules about the card's lifecycle, 2026-09-06"
-rules 1 and 3 own that procedure and it is not copied here.
+🔄 **THE DIRECTORY NAME HAS NOW BEEN A PREDICTION TWICE AND BEEN WRONG TWICE,
+AND THE SECOND TIME IS THE INTERESTING ONE.** The forty-first segment wrote the
+card into `bench/2026-09-08`, guessing the operator would next have the board on
+the 8th. The forty-second segment measured the date at 16:59 — three sides, all
+Monday the 7th — and renamed the directory to `bench/2026-09-07` on the ground
+that *"the seating is scheduled for this evening"*. **That sentence was itself a
+prediction, and it is the one that failed.** 量 2026-09-07, forty-third segment,
+three sides again — Git Bash `23:43:57 +0800`, Windows `23:44:03 +08:00`, WSL
+`23:44:17 +0800` — the board's CP2102 and NIC were attached to WSL at **23:45**,
+and the operator has asked to be consulted before power. **Sixteen minutes
+remained, and `C1-A` alone is a 165-second window that had not been
+authorised.** The directory is `bench/2026-09-08`.
+
+🔴 **What makes this a measurement rather than a third prediction is that power
+is HELD until after 00:00, deliberately.** The alternative was to start
+immediately and let the seating straddle midnight — `C1-A` on the 7th and the
+other thirty-one cells on the 8th — which produces a directory name that matches
+the first capture, looks defensible, and is wrong about thirty-one of them.
+Holding costs about twelve minutes and those twelve minutes are spent on this
+rename. **The name is now decided by the clock rather than by a guess about the
+operator.**
+
+⚠️ **This is the third seating in a row to hit rule 3, and re-reading the card
+has never once caught it.** `RUNSHEET.md` § "Four rules about the card's
+lifecycle, 2026-09-06" rules 1, 3 and 4 own the freeze procedure and it is not
+copied here — but rule 3's own ⚠️ names the missing instrument: *nothing forces
+the directory's name to match the day the captures were actually taken; that
+check would have to read a capture's `.meta.json` `started_wallclock` and compare
+it with the path, and no tool here does.* Writing that check is carried into this
+segment's desk half. **A rule whose enforcement is "somebody notices" has failed
+three times out of three at noticing early enough to be free.**
+
+*(The citation above read "Three rules about the card's lifecycle" until the
+forty-third segment. The section became four rules on 2026-09-07 — rule 4 is the
+`RECIPE_ID` re-derivation this card's own freeze order gained — and the card was
+frozen quoting the old count. It is defect 9 in §7.)*
 
 🔴 **The rename is not finished until the numbers agree.** `cardnum`'s
 `expansion-*` rows count the expansion's lines **by a regex with the directory
@@ -136,10 +164,10 @@ reading goes through the PIO path, so it cannot license the window. `FW-43`.)*
 ### 4.1 The two invocations, and the conventions
 
 `CAP` = `/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0`,
-`OUT` = `--out bench/2026-09-07/`.
+`OUT` = `--out bench/2026-09-08/`.
 
 `LOOP` = `/usr/bin/python3 tools/looprun.py --mode bench --out-dir
-bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image
+bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image
 $FWRE_WORK/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin
 --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a`
 
@@ -270,55 +298,55 @@ rediscover it.
 
 ```
 #-- boot 1, cold: the operator presses power inside this window
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-A --esc 150 --esc-period 0.002 --seconds 165
-/usr/bin/python3 tools/looprun.py --mode bench --cell C1 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-A --esc 150 --esc-period 0.002 --seconds 165
+/usr/bin/python3 tools/looprun.py --mode bench --cell C1 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
 #-- boot 1 only: the ladder, smallest act first.  Every cell that changes state ends with a `cat`, because a mark and a field are printed by two different functions (4.3a).
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-M --send 'cat /proc/mtd' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-M --send 'cat /proc/mtd' --idle 3 --seconds 20
 #-- 4 MiB through MY read path: SILENT for 4.2-4.6 s (FW-34), so --seconds ALONE.  --idle 3 would end the capture inside it.
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-SZ --send 'busybox wc -c < /dev/mtd2ro' --seconds 60
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-SZ --send 'busybox wc -c < /dev/mtd2ro' --seconds 60
 #-- the three guards, each with the cat that shows its counters
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-EA --send 'echo x > /dev/mtd2ro' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-TW --send 'echo trywrite > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-WD --send 'echo wedge > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-PR --send 'echo probe > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-EA --send 'echo x > /dev/mtd2ro' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-TW --send 'echo trywrite > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-WD --send 'echo wedge > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-PR --send 'echo probe > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
 #-- the ladder proper: 4 KiB, then 64 KiB, then 4 MiB
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-V4 --send 'echo verify 4096 > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-V64 --send 'echo verify 65536 > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 30
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-V4 --send 'echo verify 4096 > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-V64 --send 'echo verify 65536 > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --idle 3 --seconds 30
 #-- 4 MiB PIO + 4 MiB window + two sha256: ~16 s of silence, upper bound ~30 s.  --seconds ALONE, and 120 is 4x the bound.
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-VF --send 'echo verify > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --seconds 120
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-NG --send 'echo corrupt 1048576 > /proc/rtl819x-spi ; echo verify > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --seconds 120
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-NF --send 'echo corrupt off > /proc/rtl819x-spi ; echo verify > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --seconds 120
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-VF --send 'echo verify > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --seconds 120
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-NG --send 'echo corrupt 1048576 > /proc/rtl819x-spi ; echo verify > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --seconds 120
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-NF --send 'echo corrupt off > /proc/rtl819x-spi ; echo verify > /proc/rtl819x-spi ; cat /proc/rtl819x-spi' --seconds 120
 #-- the final dump: n_state_foreign is the isolation reading
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C1-F --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C1-F --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
 #-- boots 2..10: warm.  They carry only -A and -P: the ten boots are the DoD's, and what the driver DOES is exercised once, above, where the ladder can be stopped at any rung.
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C2-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C2 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C2-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C3-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C3 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C3-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C4-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C4 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C4-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C5-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C5 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C5-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C6-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C6 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C6-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C7-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C7 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C7-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C8-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C8 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C8-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C9-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C9 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C9-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C10-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
-/usr/bin/python3 tools/looprun.py --mode bench --cell C10 --out-dir bench/2026-09-07 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
-/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-07/C10-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C2-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C2 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C2-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C3-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C3 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C3-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C4-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C4 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C4-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C5-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C5 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C5-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C6-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C6 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C6-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C7-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C7 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C7-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C8-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C8 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C8-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C9-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C9 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C9-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C10-A --send 'busybox reboot -f' --esc-after 8 --esc-period 0.002 --seconds 12
+/usr/bin/python3 tools/looprun.py --mode bench --cell C10 --out-dir bench/2026-09-08 --skip S2,S3,S4 --recipe-override fce0af22 --image /home/key/fwre-work/rebuild/bench-only/r55-20260907/rlxfw-r55-20260907.bin --image-sha256 cc4e75194ff927a83e46c8b5901161f438028e12029c2c5419a15fe8f228e50a
+/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-08/C10-P --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
 ```
 
 ### 4.5 The numbers this card states, and where each is re-derived FROM
@@ -346,14 +374,14 @@ map-late-initcall	1	count /home/key/fwre-work/rebuild/bench-only/r55-20260907/Sy
 map-add-mtd-device	1	count /home/key/fwre-work/rebuild/bench-only/r55-20260907/System.map ^[0-9a-f]{8} [A-Za-z] add_mtd_device$
 map-vendor-pio	1	count /home/key/fwre-work/rebuild/bench-only/r55-20260907/System.map ^[0-9a-f]{8} [A-Za-z] mtd_spi_read$
 map-shash-final	1	count /home/key/fwre-work/rebuild/bench-only/r55-20260907/System.map ^[0-9a-f]{8} [A-Za-z] crypto_shash_final$
-expansion-captures	32	count bench/2026-09-07/PREDICTIONS-B14-block13.md ^/usr/bin/python3 tools/console-capture[.]py capture .*--out bench/2026-09-07/C[0-9]+-
-expansion-loops	10	count bench/2026-09-07/PREDICTIONS-B14-block13.md ^/usr/bin/python3 tools/looprun[.]py --mode bench --cell C[0-9]+ --out-dir
-expansion-cold	1	count bench/2026-09-07/PREDICTIONS-B14-block13.md --out bench/2026-09-07/C[0-9]+-A --esc 150
-expansion-warm	9	count bench/2026-09-07/PREDICTIONS-B14-block13.md --out bench/2026-09-07/C[0-9]+-A --send 'busybox reboot -f'
-expansion-silent	4	count bench/2026-09-07/PREDICTIONS-B14-block13.md -{2}send '[^']*' --seconds [0-9]+$
-cells-fence	32	count bench/2026-09-07/PREDICTIONS-B14-block13.md ^bench/2026-09-07/C[0-9]+-[A-Z0-9]+$
-send-over-127	0	count bench/2026-09-07/PREDICTIONS-B14-block13.md -{2}send '[^']{128,}'
-send-inner-quote	0	count bench/2026-09-07/PREDICTIONS-B14-block13.md ^/usr/bin/python3 .*-{2}send '[^']*'[^ ]
+expansion-captures	32	count bench/2026-09-08/PREDICTIONS-B14-block13.md ^/usr/bin/python3 tools/console-capture[.]py capture .*--out bench/2026-09-08/C[0-9]+-
+expansion-loops	10	count bench/2026-09-08/PREDICTIONS-B14-block13.md ^/usr/bin/python3 tools/looprun[.]py --mode bench --cell C[0-9]+ --out-dir
+expansion-cold	1	count bench/2026-09-08/PREDICTIONS-B14-block13.md --out bench/2026-09-08/C[0-9]+-A --esc 150
+expansion-warm	9	count bench/2026-09-08/PREDICTIONS-B14-block13.md --out bench/2026-09-08/C[0-9]+-A --send 'busybox reboot -f'
+expansion-silent	4	count bench/2026-09-08/PREDICTIONS-B14-block13.md -{2}send '[^']*' --seconds [0-9]+$
+cells-fence	32	count bench/2026-09-08/PREDICTIONS-B14-block13.md ^bench/2026-09-08/C[0-9]+-[A-Z0-9]+$
+send-over-127	0	count bench/2026-09-08/PREDICTIONS-B14-block13.md -{2}send '[^']{128,}'
+send-inner-quote	0	count bench/2026-09-08/PREDICTIONS-B14-block13.md ^/usr/bin/python3 .*-{2}send '[^']*'[^ ]
 ```
 
 🔴 **`expansion-silent` and `send-inner-quote` are the two rows that turn this
@@ -369,38 +397,38 @@ of their rung.
 ## 5. The fence
 
 ```cells
-bench/2026-09-07/C1-A
-bench/2026-09-07/C1-P
-bench/2026-09-07/C1-M
-bench/2026-09-07/C1-SZ
-bench/2026-09-07/C1-EA
-bench/2026-09-07/C1-TW
-bench/2026-09-07/C1-WD
-bench/2026-09-07/C1-PR
-bench/2026-09-07/C1-V4
-bench/2026-09-07/C1-V64
-bench/2026-09-07/C1-VF
-bench/2026-09-07/C1-NG
-bench/2026-09-07/C1-NF
-bench/2026-09-07/C1-F
-bench/2026-09-07/C2-A
-bench/2026-09-07/C2-P
-bench/2026-09-07/C3-A
-bench/2026-09-07/C3-P
-bench/2026-09-07/C4-A
-bench/2026-09-07/C4-P
-bench/2026-09-07/C5-A
-bench/2026-09-07/C5-P
-bench/2026-09-07/C6-A
-bench/2026-09-07/C6-P
-bench/2026-09-07/C7-A
-bench/2026-09-07/C7-P
-bench/2026-09-07/C8-A
-bench/2026-09-07/C8-P
-bench/2026-09-07/C9-A
-bench/2026-09-07/C9-P
-bench/2026-09-07/C10-A
-bench/2026-09-07/C10-P
+bench/2026-09-08/C1-A
+bench/2026-09-08/C1-P
+bench/2026-09-08/C1-M
+bench/2026-09-08/C1-SZ
+bench/2026-09-08/C1-EA
+bench/2026-09-08/C1-TW
+bench/2026-09-08/C1-WD
+bench/2026-09-08/C1-PR
+bench/2026-09-08/C1-V4
+bench/2026-09-08/C1-V64
+bench/2026-09-08/C1-VF
+bench/2026-09-08/C1-NG
+bench/2026-09-08/C1-NF
+bench/2026-09-08/C1-F
+bench/2026-09-08/C2-A
+bench/2026-09-08/C2-P
+bench/2026-09-08/C3-A
+bench/2026-09-08/C3-P
+bench/2026-09-08/C4-A
+bench/2026-09-08/C4-P
+bench/2026-09-08/C5-A
+bench/2026-09-08/C5-P
+bench/2026-09-08/C6-A
+bench/2026-09-08/C6-P
+bench/2026-09-08/C7-A
+bench/2026-09-08/C7-P
+bench/2026-09-08/C8-A
+bench/2026-09-08/C8-P
+bench/2026-09-08/C9-A
+bench/2026-09-08/C9-P
+bench/2026-09-08/C10-A
+bench/2026-09-08/C10-P
 ```
 
 **32 cells.** Boots 2–10 are warm resets and carry only `-A` and `-P`: the ten
@@ -424,26 +452,38 @@ does is exercised once, on boot 1, where the ladder can be stopped at any rung.
 
 ---
 
-## 7. 🔒 FROZEN — 2026-09-07, forty-second segment, before power
+## 7. 🔒 RE-FROZEN — 2026-09-07 late, forty-third segment, before power
 
 **This paragraph is the last edit to this file.** Every capture under
-`bench/2026-09-07/` is newer than it, which is what
+`bench/2026-09-08/` is newer than it, which is what
 `tools/check-predictions.py` reads. Corrections after this go in a new
 `CORRECTIONS-block13.md`, never in here — `RUNSHEET.md`'s lifecycle rule 1.
+
+🔄 **This is the SECOND freeze of this card and the first one's mtime evidence
+is deliberately discarded.** The forty-second segment froze it at
+`bench/2026-09-07` before power; the forty-third renamed the directory to
+`bench/2026-09-08` (§0, defect 9), and a rename touches eighty-six paths, so the
+file changed and every mtime the first freeze established is void. **Re-freezing
+is clean here for one reason and it is worth stating rather than assuming: no
+capture exists yet.** `check-predictions` reads `0 of 32`, so there is nothing
+whose "the prediction came first" evidence could be destroyed — which is exactly
+the trade lifecycle rule 1 was written about, arriving in the one configuration
+where it costs nothing. Had a single cell already run, the rename would have had
+to be abandoned or the capture re-taken.
 
 The freeze order ran in the order it is written in, and every step is a
 reading rather than a claim:
 
 | step | 量 |
 |---|---|
-| `RECIPE_ID` re-derived from the live `config/` | **`fce0af22`**, equal to §1. Three sources: the by-hand formula, the build's own `manifest.tsv`, and §1. **No rebuild needed** |
+| `RECIPE_ID` re-derived from the live `config/` | **`fce0af22`**, equal to §1, re-derived **again** at the second freeze. Four sources now: the by-hand formula, the build's own `manifest.tsv`, §1, and `--dry-run` run **twice, once per `--variant`** — which also measures that the variant does not move the recipe, since `RECIPE_ID` digests `config/` and a variant is a CLI flag. **No rebuild needed** |
 | `tools/spec-check.py` | **rc 0, 0 findings** — run FIRST, so that fixing it cannot destroy the mtime evidence the freeze creates |
-| `cardcheck commands` | **34 of 34 invocable** |
-| `cardcheck numbers` | **21 of 21 re-derived** |
-| `check-predictions` | **`0 of 32`** — the correct answer for a card whose seating has not happened |
+| `cardcheck commands` | **34 of 34 invocable**, unchanged across the rename |
+| `cardcheck numbers` | **21 of 21 re-derived** — this is the row that proves the rename is not half-done, because five of those rows carry the directory name inside their regex |
+| `check-predictions` | **`0 of 32`**, all seventeen controls green — the correct answer for a card whose seating has not happened |
 
-🔴 **Eight defects were found between writing and freezing, and only one of
-them was visible to CI.** They are listed because seven of the eight are in
+🔴 **Nine defects were found between writing and freezing, and only one of
+them was visible to CI.** They are listed because seven of the nine are in
 classes this repository had already recorded, and a card that is merely fixed
 teaches nothing:
 
@@ -470,8 +510,22 @@ teaches nothing:
    `B2-BTN2`'s rule reaching a case it was not written for.
 8. The directory name was a prediction and it was wrong; §0 has the
    measurement.
+9. 🔄 **And it was wrong a second time, by the correction to defect 8.** The
+   forty-second segment's replacement for the bad name — `bench/2026-09-07`,
+   justified by *"the seating is scheduled for this evening"* — was a fresh
+   prediction of the same shape, and the forty-third segment measured 23:44 with
+   the board not yet powered. §0 has both measurements and the reason the third
+   name is not a prediction. **Found by measuring the date, which is this
+   project's own opening move, and not by re-reading anything.** The same edit
+   caught a stale citation: this card pointed at `RUNSHEET.md` § *"Three rules
+   about the card's lifecycle"* and that section has been **four** rules since
+   2026-09-07 — the rule 4 that this card's own freeze order added.
 
-⚠️ **Seven of the eight were found by running the tools, not by re-reading the
-card**, and the eighth — the ellipsis that `cardcheck commands` reported as a
-command — was created by the paragraph written to explain defect 5. An
-illustration of a pattern the tool matches becomes an instance of it.
+⚠️ **Seven of the nine were found by running the tools, not by re-reading the
+card**; the eighth — the ellipsis that `cardcheck commands` reported as a
+command — was created by the paragraph written to explain defect 5, so an
+illustration of a pattern the tool matches becomes an instance of it; and the
+ninth was found by a clock. 🔴 **The one class no tool here covers is the one
+that has now fired twice in one day**: a prediction written *as the correction to
+a refuted prediction*, which reads as a measurement because it sits inside a 量
+paragraph. The instrument for it is named in §0 and does not exist yet.
