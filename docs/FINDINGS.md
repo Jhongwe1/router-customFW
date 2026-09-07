@@ -471,6 +471,16 @@ What survives for those two is `probe3` Group F, which is **bare metal**, so
 has never been read under Linux.** `讀` · `SPEC.md` `FW-43`,
 `notes/kernel-build.md` §21.
 
+🟢 **2026-09-08 (seating 16): that last sentence expired at 00:15, and the cell
+that expired it was the one this entry named.** `R5-5`'s `D3` read the window
+under Linux over all **4,194,304** bytes and found it byte-identical to the PIO
+path — `cmp_equal 1`, `cmp_first_diff -1`. The comparison is licensed rather
+than assumed: `C1-NG` injected one changed byte at 1,048,576 and
+`cmp_first_diff` moved exactly there. **So `FLS-11` and `MAP-12` no longer rest
+on a bare-metal reading alone; two independent paths now say the same thing.**
+`量` · `SPEC.md` `FLS-11`/`MAP-12`, `bench/2026-09-08/CORRECTIONS-block13.md`
+§3.
+
 | | | |
 |---|---|---|
 | 🟢 量 | **A whole vendor subsystem was read out of the image's own compiled code, predicted from, and then confirmed on the die — and it narrows a safety question the card had refused to answer.** A register bit moved under the operator's hand that nothing predicted, so the nine functions touching `PABCD_DAT` were located and three of them read: a one-second timer, a hold counter, a parity blink, and on release a three-way branch — SIGTERM to PID 1 at 2–4 s, and at 5 s or more ASCII `'1'` into `default_flag`, whose only readers in this image are two `/proc` handlers | **The prediction was written into the run script before the operator was asked to press**: `/proc/load_default` read `0`, then **`1`** after a timed hold. 🟢 It also restates `BRD-05` in the vendor's own code and shares `REG-30`'s constant 13 across two independent artefacts. 🔴 **It says nothing about the loader**, which is where the card drew its line, and no `FLR` ran · `SPEC.md` `FW-40` |

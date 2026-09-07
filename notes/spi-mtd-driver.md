@@ -144,6 +144,17 @@ at all.**
 MMIO pass is the first read of this window under Linux, and the first past a
 kilobyte, and it is what would close the half `FLS-11` now has backwards.
 
+🟢 **2026-09-08 (seating 16): it did, and the two paragraphs above are now
+past tense.** `C1-V4` read the window under Linux for the first time (4 KiB),
+`C1-VF` for the first time past a kilobyte, and over all **4,194,304** bytes the
+window and the PIO path are byte-identical — `cmp_equal 1`,
+`cmp_first_diff -1`, `d1_d3_agree 1`. 🔴 **The reading is licensed by a control
+that fired**: `C1-NG` corrupted one byte at 1,048,576 and `cmp_first_diff`
+landed on 1,048,576 with `cmp_equal` going 1 → 0, so `equal` is not what a
+comparator that cannot fail prints. `SPEC.md` `FLS-11`/`MAP-12` are updated;
+this section keeps its original wording because it is the argument that made
+the cell exist.
+
 ⚠️ **One unchanged value, three pieces of evidence, two retracted** —
 the loader's `FLW` `printf` (a compile-time constant, 2026-08-31) and `FW-34`'s
 4 MiB (the wrong path, today). `0xBD000000` has never been in doubt; the

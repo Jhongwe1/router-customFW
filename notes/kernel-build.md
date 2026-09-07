@@ -4125,6 +4125,15 @@ was under Linux; this repo has never read this window at the loader prompt, so
 `probe3` is a bare-metal payload entered with `J`, so **the window is measured
 bare-metal and has never been read under Linux at all.**
 
+🟢 **2026-09-08 (seating 16): `D3` ran and that sentence expired at 00:15.**
+`rtl819x-spi`'s `verify` read the window under Linux over all **4,194,304**
+bytes and it is byte-identical to the PIO path (`cmp_equal 1`,
+`cmp_first_diff -1`, `d1_d3_agree 1`), with `C1-NG`'s injected byte at
+1,048,576 moving `cmp_first_diff` exactly there so the comparator is shown to
+fail. `C1-V4` is the first read of this window under Linux, at 4 KiB, and
+`C1-VF` the first past a kilobyte. The paragraph above is left as written
+because it was right when written and is the reason the cell existed.
+
 🟢 That is exactly what `R5-5`'s `D3` would close: its MMIO pass is the
 first read of this window under Linux, and the first past a kilobyte.
 
