@@ -595,6 +595,16 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
     carries a shebang, so every tool is recorded `100755`; the fix for a drifted
     one is `git update-index --chmod=+x <path>`, and `tools/test-file-modes.sh`
     reads the **index** — the thing DrvFs cannot lie about — in both directions.
+  - 🔴 **2026-09-08: the action that RE-INTRODUCES the drift is
+    `git restore --staged .`, and nothing had written that down.** 量, on the
+    forty-fourth segment's closeout: three new tools were added and set
+    `100755` by hand; the index was then reset to split one staged change into
+    three commits; that reset made the three files **untracked again** — they
+    were not in `HEAD` — so the re-`add` was a *first* add and recorded
+    `100644`. **The mode was right, then right in a commit, then wrong**, and
+    `test-file-modes.sh` caught it after the push. Setting the bit before
+    splitting a commit is not enough: **check it again after any
+    `git restore --staged` that touches a file `HEAD` does not have.**
 - **Session working files do not go in WSL's `/tmp`.** Measured 2026-08-23: the
   distro restarts between tool calls (`uptime -s` moved forward mid-session,
   `uptime -p` read "up 0 minutes"), and `/usr/lib/tmpfiles.d/tmp.conf` carries
