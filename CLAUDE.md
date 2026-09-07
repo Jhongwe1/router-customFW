@@ -531,8 +531,9 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   ⚠️ **`tool_version` deliberately did not move**: it owns *what the
   instrument wrote to the port*, and nothing new goes on the wire — the
   **presence** of the `seconds` key is what dates a capture instead.
-- 🆕 **PowerShell has its own three traps, all measured 2026-09-01, and two of
-  them make a check silently useless rather than noisy.** ① `Get-Date -Format`
+- 🆕 **PowerShell has its own four traps, and two of them make a check silently
+  useless rather than noisy.** *(①–③ 量 2026-09-01; ④ 量 2026-09-08.)*
+  ① `Get-Date -Format`
   eats format letters **inside literal text**: `"Windows: yyyy-MM-dd"` printed
   `Win1ow20:` because `d` and `s` are specifiers. ② `<long command> |
   Select-Object -Last N` **buffers the whole pipeline** — a 25-minute suite
@@ -541,6 +542,18 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   dies with *unexpected EOF* on nested quotes. **Same fix as the Bash tool's:
   write the script to a file and run it by path** — `wsl -d Ubuntu-24.04 --
   bash /mnt/c/…/x.sh`.
+  🆕 ④ **`| Select-Object -First N` KILLS the native process when `N` is fewer
+  lines than it produces, and the exit code becomes `-1` — which the tool
+  surfaces as `255` and which is indistinguishable from a real failure.** 量,
+  the same command twice: `citime.py stats 2>&1 | Select-Object -First 3`
+  → `rc=-1`; `… | Select-Object -First 100` (its output is ~17 lines, so nothing
+  is truncated) → `rc=0`; and standalone with no pipe, `rc=0`. **The truncation
+  is the cause, not the tool.** 🔴 **It fails in the safe direction — it invents
+  a red and can never invent a green — but it is still a check reporting
+  something that is not true**, and this file's own `EXIT CODE: 0` incident is
+  the same class with the sign flipped. `-First N` is fine for reading *output*;
+  **never read `$LASTEXITCODE` through it**. Run the command bare (or redirect to
+  a file) when the exit code is the thing being measured.
 - 🆕 **The `Monitor` tool's command runs in the Bash tool's shell — Git Bash —
   so a `/mnt/c/…` path there is not a missing file, it is a DIFFERENT
   filesystem's name for nothing.** 量 2026-09-07: a monitor watching a
