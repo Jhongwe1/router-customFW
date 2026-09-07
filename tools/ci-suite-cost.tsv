@@ -72,3 +72,6 @@ run_id	created_utc	sha7	jobs	text_s	lint_s	lint_apt_s	instr_s	instr_apt_s	suite_
 34050871155	2026-09-06T18:10:30Z	598e421	census,instruments,lint,text	148	13	6	556	17	539	504	4
 34051113209	2026-09-06T18:15:08Z	3e88e13	census,instruments,lint,text	147	13	6	554	17	537	504	6
 34052273693	2026-09-06T18:36:45Z	aa033ca	census,instruments,lint,text	149	12	6	548	19	529	500	4
+34056712985	2026-09-06T20:02:00Z	7b4ddac	census,instruments,lint,text	151	17	9	564	23	541	503	5
+34056829568	2026-09-06T20:04:13Z	67a58e2	census,instruments,lint,text	146	15	7	558	27	531	500	4
+34071562665	2026-09-07T01:00:01Z	66e601a	census,instruments,lint,text	134	19	10	561	20	541	502	4

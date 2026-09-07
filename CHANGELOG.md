@@ -3136,3 +3136,69 @@ toolchain decision rests on.
 
 Every one of these is in `PROGRESS.md`'s Corrections table with the date and
 what caught it.
+
+🟢 **2026-09-07, forty-first session, desk: `R5-5`'s desk half — a
+read-only MTD driver that issues real SPI transactions, and its shape was
+decided by a measurement taken before its first line.** No power, **zero
+flash-write commands and zero `FLR`**, bracket untouched at 1,024 of 4,194,304
+= **0.0244 %**. Date measured on three sides, all agreeing at `13:10 +0800`, so
+this is the third segment of the same calendar day.
+
+🔴 **The largest result is a correction to one of this repository's own
+`量` rows, and it arrived before any driver code existed.** The Linux MTD read
+path in this image is programmed I/O through `SFCSR`/`SFDR`, **not** the
+memory-mapped window: `spi_probe.c:101-103` installs `mtd->read = mtd_spi_read`
+unconditionally, and both indirect hops were disassembled in the `r54` artefact.
+One scan printed the counters side by side — `jal → rtl8196_map_copy_from` **0**
+against `ComSrlCmd_ComRead` **1** and `SFCSR_CS_L` **17**, with
+`rtl8196_map_copy_from`'s address appearing **0** times in `.data` while
+`bd000000` appears **2**. 🟢 `FW-34`'s conclusion survives and gets
+stronger; its `4× × ≤9×` decomposition loses both terms. 🔴 **And it
+corrects the frozen DoD's `D3`, which cited the wrong half of the right row** —
+`FW-34`'s 4 MiB reading is the PIO path and cannot license the window, while its
+Group F reading (`R = 1.0000`, no buffering) is exactly what makes `D3` two
+paths rather than one path read twice.
+
+🔴 **Second reading: Linux runs the SPI bus at a quarter of the loader's
+clock.** `ComSrlCmd_RDID` writes `SFCR = 0xFFC00000` (divisor 16) and
+`spi_regist` calls it twice at `device_initcall`, where `REG-13` measured
+`0x3FC00000` (divisor 4) at the loader prompt. Census control: exactly one
+function in the whole image writes that register, and `lui …,0x3fc0` appears
+**0** times. 🟢 An inference of mine was refuted by the same artefact
+minutes after forming it — `setFSCR`'s whole body is inside `#ifndef
+SPI_KERNEL` and compiles to six instructions that write nothing. **The shape is
+the timer's first cell exactly: a register value measured at the `<RealTek>`
+prompt is a measurement of the loader.**
+
+🟢 **`D4` closed at the desk, with a control that fired.** The shipped
+`System.map` has `rtl819x_spi_write_page` **0** times and `verify` is green;
+rebuilding the same tree with `make CONFIG_MTD_RTL819X_WRITE=y` makes all three
+symbols appear and `verify` go **red**. That `CONFIG_` is declared to kconfig
+nowhere, which is stronger than `=n`. Doing it needed one enforcer change —
+`rlxfw-marks.py` gained a conditional Kbuild shape and an `absent:` witness, the
+inverse of `sym:`, with the pairing enforced in both directions; self-test 49 →
+**55**, and `W11` is the case that says the row must go red when the symbol is
+present. **A `config/host-compat/` patch was rejected**: it would have made that
+patch a second owner of *which of my files are linked*.
+
+🔴 **Three of my own defects in the driver, all found by checking rather
+than by thinking.** `crypto_shash_final` does not free the desc, so the comment
+saying it did leaked two allocations per run. The `wedge` positive control's
+first version would have written an unmeasured value into the live `SFCR` **and
+could not have detected anything** — it corrupted the saved value, and
+`release()` writes X then compares against the same X; it now corrupts only the
+read-back used in the comparison, so no wrong value reaches the silicon. And
+**layer L2 was wrong**: leaving `mtd->write`/`mtd->erase` NULL is not a refusal
+on this kernel — `mtdchar.c:457` calls `mtd->erase` with no NULL check — so the
+three layers were not independent and L3 was the only thing between a NULL and a
+dereference. They are refusing stubs now.
+
+🔴 **And `D4` earns exactly one sentence: rlxfw contributes no
+flash-write code to this image.** Not *this image cannot write flash* — the
+vendor's write path is here and always has been (`FW-44`, `docs/KNOWN-ISSUES.md`),
+kept out of reach by the userspace surface rather than by absence.
+
+⚠️ **Nothing has run on the silicon.** The card is written
+(`bench/2026-09-08`, 32 cells) and **deliberately not frozen**; its directory
+name is a prediction.
+

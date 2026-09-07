@@ -1377,6 +1377,16 @@ at the desk, and `census` then cannot close its total). ⚠️ `test-boot-timeli
 was the third red on the first sweep and is fixed rather than excused — `B2`'s
 population moved and § above records what it measured.
 
+🔴 **2026-09-07 (`R5-5`): the word "all" in that sentence was false,
+and by two.** `ci.yml` has **61** real `run:` steps, not 60: `:728` and `:733`
+use the inline `- run:` form (the shellcheck pair), and a selector anchored on
+`^\s*run:` cannot see them. 讀 `git log -S`: both have been there since
+`970f041`, **2026-08-25** — so every desk sweep this project has run has
+skipped them, and `shellcheck --severity=error tools/*.sh` has never executed
+here. The count is not corrected in place: it is what that sweep reported, and
+what was wrong was the selector rather than the arithmetic. `PROGRESS.md`'s
+`CNT-1` owns the class.
+
 🔴 **`flashwin scan` had NOT been run when the seating's captures were first
 committed, and that is recorded rather than quietly repaired.** The tool asks
 whether a file this repository has **already committed** holds forbidden
