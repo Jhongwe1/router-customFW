@@ -309,6 +309,64 @@ released source.
 > unmeasured**, which is exactly the claim a seating full of `PABCD` readings
 > looks like it closed. **Zero flash-write commands, zero `FLR`, bracket
 > unchanged at 0.0244 %.**
+> 🔄 **2026-09-08, THIRTEENTH update — seating 16, one power cycle, and the
+> experiment built to confirm a number refuted it.** 🟢 **A read-only MTD
+> device of mine issues real SPI transactions on this part**, sharing the
+> controller with the vendor's driver: `mtd2: 00400000 00001000
+> "rtl819x-spi-pio"`, `4194304` bytes through `mtd->read`, `n_state_foreign`
+> **0** across **4,115** transfers. Ten boots, **1,318 bytes each against a
+> prediction of 1,318**, `RLXFW-ID0=FCE0AF22` every time, `check-predictions`
+> **`32 of 32`**. 🟢 **Both declared coin-flips landed on the side read out of
+> the vendor's COMPILED driver, against values measured on this device at the
+> loader prompt**: `SFCR` **`FFC00000`** (÷16) not `REG-13`'s `3FC00000` (÷4),
+> `SFCSR` **`C8000000`** not `D8050000`. `REG-38` 讀 → 量. 🟢 **Ten boot
+> captures fall into TWO sha256 values and the whole difference is one bit** —
+> `RLXFW-G3` bit 6, the LED the vendor's `rtl_gpio_timer` blinks, so `FW-40` is
+> now seen from a second direction. 🔴🔴 **`D3` holds and `D1` is REFUTED.**
+> The PIO path and the memory-mapped window at `0xBD000000` agree over all
+> 4,194,304 bytes — **nothing had ever read that window under Linux before** —
+> but `H601`'s complement digests to `a1673578…100d49eb` where `FLS-24` says
+> `a9916fd8…4ce3cba`. Three ways it could have been the instrument are closed
+> by measurement: the constant recomputes to `a9916fd8…` from **both** dump
+> files under an independent implementation, the driver's own `verify 4096`
+> digest is byte-identical to the dump's first 4,096 bytes, and `C1-NG`'s
+> injected byte moved the 4 MiB digest while `C1-VF`/`C1-NF` are two
+> traversals returning the same value. ⚠️ **The `d1_match` FLAG has no positive
+> control here** — it read 0 in every cell — and the refutation rests on those
+> three, not on it. 🟢 **Nineteen off-card rungs localised it, and the safety
+> question came back right**: `verify 32768` covers exactly `[0, 0x6000)`, the
+> whole loader region, and it is byte-identical to 2026-08-16 over all
+> **24,576** bytes, where every `FLR` bracket combined had sampled **256**.
+> **The first difference is `[0x9000, 0xA000)` — 4,096 bytes, exactly one erase
+> sector.** 🔴 **Proven identical 28,672 B (0.684 %), proven different 4,096 B
+> (0.098 %), UNDETERMINED 4,153,344 B (99.02 %)** — a prefix digest finds the
+> first difference and nothing past it, and `verify` takes a limit with **no
+> offset**. 🔴 **So *"not one flash byte is written"* is no longer merely
+> unmeasured: it is KNOWN FALSE for the DEVICE over some interval, with the
+> write unattributed** and not attributable by this seating (not tonight —
+> loader straight to my image ten times, no vendor firmware, `n_writes` 0 in
+> every dump, no `FLW`/`EW`/`EB`/burn). What rlxfw can say is narrower and
+> measured: **its own driver counted zero writes, and the loader region is
+> intact over all of it.** `SPEC.md` `FLS-26`. 🔴 **Five defects were mine and
+> four were false stops, none costing a power cycle, and four are ONE root
+> cause**: every capture line is CRLF, so `awk`'s field is `"1\r"` and
+> `[ "1\r" = "1" ]` is false — **three gates reported STOP or VOID on cells that
+> had PASSED, each while printing the correct value beside the wrong verdict**,
+> because a carriage return is invisible in display. The fourth gated on a
+> **mark** rather than a **field**, and `rlxfw_mark()` interleaves
+> character-by-character with busybox ash's echo (`FW-47`, `FW-41`'s family).
+> **The replacement self-tests against captures whose answers are known and
+> refuses to open the port if its own comparison is broken.** 🔴 `FW-46`: this
+> image's busybox has **no `dd`, no `md5sum`, no `--list`**, so nothing on the
+> device can digest a byte and the driver's sha256 has no independent on-device
+> second source — `FW-26` is the same class one instance earlier, and nothing
+> here can ask *"can this image run this command"* before a card is frozen.
+> ⚠️ **What is still narrower**: `D2` is untouched (`H601`'s 8,192 bytes are
+> skipped by rule, their verification stays in the `FLR` bracket, which did not
+> run), and the PIO rate under Linux is a bounded QUESTION rather than a result
+> (`FW-48`, `FW-35`'s trap). **Zero flash-write commands, zero `FLR`, bracket
+> unchanged at 0.0244 %** — and that last number now sits beside a second
+> instrument that measures a different thing and found a difference.
 > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.
