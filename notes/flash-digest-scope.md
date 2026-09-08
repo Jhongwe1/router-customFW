@@ -372,3 +372,75 @@ seating.
   1.0 ms), so no second silence of the same kind exists.
 * **C3** the fit uses only the small rungs.  The three 4 MiB points are
   **predicted** by it and not fitted to it, so they can refute it.
+
+---
+
+## 10. 🟢🟢 2026-09-08 and 2026-09-09: the 99.02 % is read, and the ledger inverts
+
+§ 9 ended with *"not one byte of the 99.02 % has been read since § 8 was
+written"*. That stopped being true at 22:45 on 2026-09-08 and is now the
+opposite. **This section is late: seating 17 read most of it and this file did
+not move, so both readings are recorded here together.**
+
+### 10.1 The two readings
+
+| | what ran | result |
+|---|---|---|
+| seating 17, 2026-09-08 | `map 0`, twice (disarmed and armed) | 32 lines byte-identical between the two runs; `flashmap compare` **31 same, 1 DIFFER, 0 scope, 0 extra, 0 missing** |
+| seating 18, 2026-09-09 | `map 0` again, then `map 1 0` | `map 0` **byte-identical to seating 17's**; `map 1 0` gives **30 same, 2 DIFFER**, with `H601`'s two pages `SKIPPED` on both sides |
+
+### 10.2 The ledger, and it inverts
+
+`map 0`'s 31 identical groups are 31 × 131,072 = **4,063,232 bytes**. Group 0
+carries 122,880 hashed bytes (131,072 minus `H601`'s 8,192), of which `map 1 0`
+says 28 units of 4,096 match and 2 differ.
+
+| | seating 16 (bisection) | seating 18 |
+|---|---|---|
+| proven identical | 28,672 B (0.684 %) | **4,177,920 B (99.61 %)** |
+| proven different | 4,096 B (0.098 %) | **8,192 B (0.195 %)** |
+| undetermined | 4,153,344 B (**99.02 %**) | **8,192 B (0.195 %)** |
+
+⚠️ **The undetermined 8,192 B is exactly `H601`**, skipped by rule inside
+`rtl819x-spi`'s own `map` and reported as `map_h601_skipped 8192` /
+`map_h601_hashed 0` in every capture. It is undetermined *by decision*, not for
+want of an instrument.
+
+### 10.3 🔴 The differing region GREW, and that is the sharper result
+
+Seating 16's prefix bisection put the first difference in `[0x9000, 0xA000)`.
+§ 8.2 says why it could say nothing more: **a prefix digest finds the first
+difference and nothing past it.** `map 1 0` is the cell that looks past it, and
+there is a second differing unit at **`[0xD000, 0xE000)`** that nothing had ever
+seen.
+
+🔴 So `FLS-26`'s *proven different* doubles, from one erase sector to two. The
+card predicted "exactly one" and was refuted — which is the prediction doing its
+job, since the alternative was never checking.
+
+### 10.4 🟢 And the attribution bracket closed, byte-identical
+
+Seating 17's `map 0` ran at **22:45**; the vendor firmware then ran **twice**
+(~2 and ~4 minutes, two bites that were not caught); the board was powered off
+cold and back on; `r57` booted; and seating 18's `map 0` was **the first command
+of the seating**, before anything else could touch the part.
+
+```
+cmp bench/2026-09-08b/C1-M0.log bench/2026-09-09/C1-M0.log   ->  identical
+```
+
+**Byte-identical, 3,013 bytes.** So those two vendor-firmware runs wrote nothing
+to the 4,186,112 bytes this covers. The ordering is part of the claim, not a
+convenience — a `map 0` run after any other cell would prove less.
+
+### 10.5 What this still does not say
+
+* ***Proven identical* means *digests agree with the 2026-08-16 dump***. It
+  cannot see two writes that cancel, and **no `FLR` full re-dump has run**.
+* **What is IN `[0x9000,0xA000)` and `[0xD000,0xE000)` is unknown.** `map` gives
+  digests. Reading the content needs the driver to emit a hexdump of those two
+  pages, which `flashwin` permits because `0x008000+` is outside the forbidden
+  window — and that is the obvious next cell, costing no power cycle.
+* **The attribution is bounded to that one interval.** It says the two
+  vendor-firmware runs of 2026-09-08 wrote nothing; it says nothing about the
+  seating-8 run that `FLS-26` hypothesises wrote `[0x9000,0xA000)`.

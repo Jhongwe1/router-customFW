@@ -20111,3 +20111,35 @@ seating 18：**十三次全部 8**。
 ⚠️ **那是一次開機不是十三次**；更強的證據是 `C1-M0` 逐位元組相同。
 
 **零 flash 寫入命令、零 `FLR`。**
+
+### 11. 收工時帶破了,而破它的是這一段自己
+
+`citime` 的 BIG3 帶前四段沒有動過:**497..507**、中位數 502.0。這一段的 run
+(`34276448280`)是 **954**。
+
+原因可以完全列舉,而且不需要新的量測:BIG3 的三個成員裡有兩個被這一段改大了。
+
+| | 之前 | 現在 | 比 |
+|---|---|---|---|
+| `test-console-capture` 案例 | 46 | **59** | 1.283 |
+| `test-console-capture-mutants` 的 mutant | 25 | **39** | 1.560 |
+| **mutant 套件的工作量(案例 × mutant)** | 1,150 | **2,301** | **2.001** |
+
+第三個成員 `test-deskchan` 沒有變,而桌面掃描量到它是 **60.19 s**。扣掉它:
+
+```
+(954 − 60) / (502 − 60) = 2.02      預測 (2301+59)/(1150+46) = 1.973
+```
+
+**差 2.4 %。** 桌面掃描的分項與它一致:`test-console-capture` **123.65 s**、
+`test-console-capture-mutants` **773.87 s**、`test-deskchan` **60.19 s**,
+合計 957.71 對 runner 上的 954。
+
+🔴 **每一次 push 多 452 秒,而它不能被便宜化。** `test-console-capture-mutants`
+自己的 docstring 寫著 *「Mutants run against the FULL suite rather than a fast
+subset on purpose: the claim being tested is *"the committed cases catch it"*,
+and a proxy for the suite would be a different claim.」* —— 所以這是一個**決定**
+不是一個優化題,而它帶到下一段。
+
+⚠️ **而 `citime check` 現在會欠一個**:記這三筆要 commit `ci-suite-cost.tsv`,
+那又觸發一次 run,又欠一個。留一個欠著是慣例。

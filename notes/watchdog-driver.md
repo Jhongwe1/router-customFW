@@ -179,6 +179,8 @@ config decision is not tidiness; it is the precondition for `R5-6` existing.
 
 ## 3. `WDTCNR`'s encoding, and the hole in it
 
+✅ **THE HOLE IS CLOSED, 2026-09-09 — `OVSEL[2]` is bit 17 (§ 11.1).** This section is kept as written because it is the record of what could be said before the scan ran, and because § 3.3's experiment is the one that closed it — with the answer being a bit neither of its two hypotheses named. 🔴 The DRIVER still returns `-EOPNOTSUPP` for `OVSEL` 4–7 and still describes `OVSEL[2]` as undetermined: that is the driver lagging the measurement by one step, recorded in `PROGRESS.md`, and changing it is a behaviour change that needs its own card.
+
 `0xB800311C`, `SPEC.md` `MAP-08` / `REG-12`.
 
 | bits | field | how it is known |
