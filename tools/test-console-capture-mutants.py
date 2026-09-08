@@ -81,6 +81,32 @@ FAIL_PRINT = '    print(f"console-capture: {msg}", file=sys.stderr)'
 CLIFF = "    n = len(value)\n    if n >= 128:"
 WHITESPACE = "    if value != value.strip():"
 
+# --until, 2026-09-09.  Twelve more, and they are here rather than in a file of
+# their own because the question is the same one: does the committed suite tell
+# this wrong tool from the right one?  The flag has two break sites, two arming
+# decisions and three pieces of arithmetic, and every one of them can be broken
+# in a way that leaves a capture looking successful -- which is the failure mode
+# that costs a power cycle, not a red suite.
+U_ESC_BREAK = ("                    drain(args.esc_period)\n"
+               "                    if until_at is not None:")
+U_FINAL_BREAK = ('                if until_at is not None:\n'
+                 '                    stop_reason = f"--until matched at offset {until_at}"')
+U_SEARCH = "                        m = until_re.search(matchbuf)"
+U_ARM_INIT = ("        until_armed = until_re is not None and not args.esc "
+              "and args.send is None")
+U_ARM_BODY = ("            nonlocal until_armed, matchbuf_base\n"
+              "            if until_re is None:\n"
+              "                return")
+U_CALL = ("    _check_send(args.send)\n    _check_terminator(args)\n"
+          "    _check_until(args)")
+U_EMPTY = '    if args.until == "":'
+U_BASE_SET = "            matchbuf_base = offset"
+U_BASE_ADV = "                        matchbuf_base += drop"
+U_AT = "                            until_at = matchbuf_base + m.start()"
+U_META = '        "until": args.until,\n        "until_offset": None,'
+U_ENDED = '                    meta["esc"]["esc_after"]["ended_on_until"] = True'
+U_META_END = "    meta[\"until_offset\"] = until_at"
+
 # id, what it does, [(anchor, replacement), ...]
 #
 # The classes are named because a class with one member is a class nobody has
@@ -157,6 +183,59 @@ MUT = [
      [(CLIFF, "    n = len(value)\n    if n >= 129:")]),
     ("S2", "_check_send's leading-whitespace refusal deleted",
      [(WHITESPACE, "    if False:")]),
+
+    # --- UNTIL: the two break sites -------------------------------------
+    # Both of these leave a tool that still WORKS -- captures are taken, files
+    # are written, nothing errors.  What they take away is the early stop, and
+    # a card whose --esc-after was sized as a cap then runs it as a duration:
+    # the board resets after the ESC stream has ended, the loader prompt goes
+    # by uncaught, and the next thing on the console is the vendor firmware.
+    # That is a power cycle, and it is invisible to every case that does not
+    # look at where the run stopped.
+    ("U1", "the --esc-after loop no longer breaks on the pattern",
+     [(U_ESC_BREAK, "                    drain(args.esc_period)\n"
+                    "                    if False:")]),
+    ("U2", "the final read loop no longer breaks on the pattern",
+     [(U_FINAL_BREAK, '                if False:\n'
+                      '                    stop_reason = f"--until matched at offset {until_at}"')]),
+    ("U3", "--until tested AFTER --seconds, so a caught event reads as a short window",
+     [(U_FINAL_BREAK, "                if args.seconds and now - t0 >= args.seconds:\n"
+                      '                    stop_reason = f"--seconds {args.seconds} elapsed"\n'
+                      "                    break\n" + U_FINAL_BREAK)]),
+
+    # --- UNTIL: what is searched ----------------------------------------
+    ("U4", "the search is per read() chunk, so a split pattern is never seen",
+     [(U_SEARCH, "                        m = until_re.search(chunk)")]),
+    ("U5", "armed from the start, so the pre-send --esc window fires it",
+     [(U_ARM_INIT, "        until_armed = until_re is not None")]),
+    ("U6", "never armed at all",
+     [(U_ARM_BODY, "            nonlocal until_armed, matchbuf_base\n"
+                   "            if True:\n"
+                   "                return")]),
+
+    # --- UNTIL: the offset arithmetic -----------------------------------
+    # Found by auditing the cases, not by a red run: until N39/N40 existed
+    # every case armed on an empty log, so base and match position were the
+    # same number and all three of these survived.
+    ("U7", "the base is not taken at the arming point",
+     [(U_BASE_SET, "            matchbuf_base = 0")]),
+    ("U8", "the base does not advance when the window rolls",
+     [(U_BASE_ADV, "                        pass")]),
+    ("U9", "the offset is reported relative to the buffer, not to the .log",
+     [(U_AT, "                            until_at = m.start()")]),
+
+    # --- UNTIL: the refusals and the record -----------------------------
+    ("U10", "_check_until moved ABOVE the terminator guard",
+     [(U_CALL, "    _check_send(args.send)\n    _check_until(args)\n"
+               "    _check_terminator(args)")]),
+    ("U11", "the empty-pattern refusal deleted -- '' matches at offset 0 of everything",
+     [(U_EMPTY, "    if False:")]),
+    ("U12", "the metadata forgets which pattern was armed",
+     [(U_META, '        "until": None,\n        "until_offset": None,')]),
+    ("U13", "the ESC loop's early end is not recorded",
+     [(U_ENDED, "                    pass")]),
+    ("U14", "until_offset is never written back",
+     [(U_META_END, '    meta["until_offset"] = None')]),
 ]
 
 

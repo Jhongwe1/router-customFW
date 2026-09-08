@@ -224,7 +224,21 @@ DEFAULT_ESC_PERIOD = 0.02
 # there, which is worse than the schema identifying itself: the PRESENCE of the
 # `seconds` key is what says a capture records its own terminator, and its
 # absence dates the capture to before 2026-08-30. Two facts, two markers.
-TOOL_VERSION = "1.3"
+#
+# 🟢 BUMPED 1.3 -> 1.4 on 2026-09-09, when `--until` arrived, and BY THE SAME
+# RULE that held it still on 2026-08-30. `--until` can end the --esc-after loop
+# early, so a run of it writes FEWER ESC bytes to the port than its --esc-after
+# window asked for. That is a wire difference, and a wire difference is the one
+# thing this field owns. The `until` key in the metadata dates the schema; the
+# version says the wire behaviour is not the same instrument's.
+TOOL_VERSION = "1.4"
+
+# --until searches this many TRAILING bytes of what has arrived since it was
+# armed. A pattern whose MATCH spans more than this cannot be found; a pattern
+# that arrives in pieces across many read() calls can, because the buffer is
+# contiguous across them -- which is the whole reason this is not a per-chunk
+# test. 8 KiB is ~2.1 s of wire at 38400 8N1.
+_UNTIL_WINDOW = 8192
 
 
 def _fail(msg: str) -> "NoReturn":  # noqa: F821
@@ -340,13 +354,68 @@ def _check_terminator(args) -> None:
             "  for 71 bytes, 6 for 118, 15 for a shell command and 45-90 for a\n"
             "  boot. --idle N ends on N seconds of silence instead, which is\n"
             "  wrong for a boot: this kernel is silent for whole seconds\n"
-            "  between marks."
+            "  between marks.\n"
+            "  --until PATTERN does NOT satisfy this: a pattern that never\n"
+            "  arrives would leave exactly the loop described above. Pass a\n"
+            "  generous --seconds as its cap -- with --until the cap costs\n"
+            "  nothing when the pattern does arrive."
+        )
+
+
+def _check_until(args) -> None:
+    """Compile --until before the port is opened, or refuse.
+
+    WHY IT EXISTS.  Every window in seating 17's card was computed from a
+    frequency that the card's own third cell then refuted by 76x, and two of
+    that seating's three power cycles were spent on a cell whose --esc-after
+    window was shorter than the answer: the board reset with nothing streaming
+    ESC, so the loader prompt went by uncaught and the vendor firmware booted.
+    The rule written afterwards was "take three times the prediction", and that
+    rule is refuted twice over -- 76x is not covered by 3x, and FW-53's OVSEL
+    bit scan has NO prediction to multiply, because not knowing the answer is
+    what the scan is for.
+
+    量 2026-09-08, bench/2026-09-08b/R2-B8.timing: with `echo bite 8` sent and
+    Linux running, the console emits 65 bytes of command echo and then NOTHING
+    AT ALL for 41.931 s before the reset output arrives.  So --idle cannot be
+    used to wait for a bite -- the wait is pure silence and --idle stops in it.
+    Stopping on an EVENT is the only shape that works, and this is it.
+
+    WHERE THIS SITS.  After _check_terminator and before the port, and the
+    order against _check_terminator is a decision rather than an accident: a
+    run given a bad regex AND no terminator is told about the terminator,
+    because that is the defect that costs a power cycle.  Case N33 pins it.
+
+    WHAT IT DOES NOT DO.  It does not check that the pattern CAN match -- a
+    regex that is valid and wrong is still a valid regex, and the capture will
+    then run to its --seconds cap and say so in stop_reason.  That is the
+    designed failure: a reading, not a lost board.
+    """
+    if args.until is None:
+        return
+    if args.until == "":
+        _fail(
+            "--until was given an empty pattern, which matches at offset 0 of\n"
+            "  every capture -- the run would stop on the first byte that\n"
+            "  arrives. If the intent is 'no pattern', omit the flag."
+        )
+    try:
+        re.compile(args.until.encode())
+    except re.error as e:
+        _fail(
+            f"--until: bad pattern: {e}\n"
+            f"  pattern was: {args.until!r}\n"
+            "  It is a regex over BYTES, matched against what arrives after the\n"
+            "  command line goes out. Backslashes survive argv, so\n"
+            "  --until 'Reboot Result' and --until '<RealTek>' both work as\n"
+            "  written; a literal ( or [ needs escaping."
         )
 
 
 def capture(args) -> int:
     _check_send(args.send)
     _check_terminator(args)
+    _check_until(args)
     try:
         import serial  # type: ignore
     except ImportError:
@@ -403,6 +472,14 @@ def capture(args) -> int:
         # and one that does is pre-2026-08-30.
         "seconds": args.seconds,
         "idle": args.idle,
+        # THE EARLY STOP, and the offset it fired at. `until` null means the
+        # flag was not given; `until_offset` null with `until` non-null means
+        # the pattern was armed and never arrived, which is a reading and not a
+        # failure -- stop_reason then names --seconds or --idle. A census of
+        # "which cells actually saw their event?" reads until_offset, and it is
+        # two-directional in the way stop_reason alone is not.
+        "until": args.until,
+        "until_offset": None,
         "sent": None,
         "sent_hex": None,
         "stop_reason": None,
@@ -445,9 +522,32 @@ def capture(args) -> int:
         # loader's readline buffer with nothing in the metadata saying so.
         pending_esc = None
 
+        # --until's state.  `until_re` is None when the flag was not given, and
+        # then none of this costs anything.  `until_armed` is False until the
+        # command line has gone out: the pattern is looked for ONLY in what the
+        # command caused, never in the pre-send --esc window, so a card can use
+        # the same `<RealTek>` pattern for both without the ESC loop's own
+        # prompts firing it.  `matchbuf` is the rolling window and
+        # `matchbuf_base` is the absolute .log offset of its first byte, which
+        # is what turns a match position into a number a reader can find.
+        until_re = re.compile(args.until.encode()) if args.until is not None else None
+        until_armed = until_re is not None and not args.esc and args.send is None
+        until_at = None
+        matchbuf = bytearray()
+        matchbuf_base = 0
+
+        def arm_until() -> None:
+            """Start (or restart) the --until search here, at the current offset."""
+            nonlocal until_armed, matchbuf_base
+            if until_re is None:
+                return
+            del matchbuf[:]
+            matchbuf_base = offset
+            until_armed = True
+
         def drain(budget: float) -> None:
             """Read whatever is there for up to `budget` seconds."""
-            nonlocal offset, last_byte_at
+            nonlocal offset, last_byte_at, matchbuf_base, until_at
             deadline = time.monotonic() + budget
             while True:
                 remaining = deadline - time.monotonic()
@@ -468,6 +568,26 @@ def capture(args) -> int:
                 tail.extend(chunk)
                 if len(tail) > 4096:
                     del tail[:-4096]
+                if until_re is not None:
+                    # Appended even while disarmed, and thrown away by
+                    # arm_until(). Keeping the two decisions apart -- what goes
+                    # in the buffer, and whether the buffer is searched -- is
+                    # what makes the arming point a single line instead of a
+                    # condition repeated in three places.
+                    matchbuf.extend(chunk)
+                    if len(matchbuf) > _UNTIL_WINDOW:
+                        drop = len(matchbuf) - _UNTIL_WINDOW
+                        del matchbuf[:drop]
+                        matchbuf_base += drop
+                    if until_armed and until_at is None:
+                        m = until_re.search(matchbuf)
+                        if m:
+                            # RECORDED HERE, ACTED ON ELSEWHERE. This function
+                            # is called from inside terminate_esc_line's settle
+                            # too, and a break there would skip the CR's own
+                            # reply -- so the loops that honour --until read
+                            # this, and this never breaks anything itself.
+                            until_at = matchbuf_base + m.start()
 
         def terminate_esc_line(which: str, on_interrupt: bool = False) -> None:
             """End an ESC loop with a CR, and wait for the prompt it causes.
@@ -581,6 +701,13 @@ def capture(args) -> int:
                 # command at all, and it is the capture whose 12-byte residue
                 # cost A0's first attempt on 2026-08-24.
                 terminate_esc_line("esc")
+                if args.send is None:
+                    # THE ARMING POINT, when there is no command line. With one
+                    # there, the next block arms instead: --until searches only
+                    # what the COMMAND caused, so the same `<RealTek>` pattern
+                    # can be used on both kinds of cell without this loop's own
+                    # prompts -- one every 128 ESC bytes -- firing it.
+                    arm_until()
 
             if args.send is not None:
                 # Validated by _check_send() before the port was opened.
@@ -589,6 +716,13 @@ def capture(args) -> int:
                 meta["sent_hex"] = line.hex()
                 ser.write(line)
                 ser.flush()
+                # THE ARMING POINT. Note it is after the flush and not after
+                # the echo: the command's own echo is inside the search window,
+                # which is why a --until pattern must not be a substring of the
+                # command being sent. A card that writes
+                # --send 'echo bite 9 > /proc/rtl819x-wdt' --until 'bite'
+                # matches its own echo in ~20 ms. Case N36.
+                arm_until()
 
             if args.esc_after:
                 # ``--esc`` streams BEFORE the send, which is what catching a
@@ -613,8 +747,19 @@ def capture(args) -> int:
                     ser.write(ESC)
                     esc_writes += 1
                     drain(args.esc_period)
+                    if until_at is not None:
+                        # THE POINT OF THE WHOLE FLAG. The ESC stream is what
+                        # catches the loader after a reset the sent command
+                        # caused; it has now caught it, so every further ESC is
+                        # residue for terminate_esc_line to flush. Ending here
+                        # makes --esc-after a CAP rather than a duration, which
+                        # is what lets a card set it from the worst case
+                        # instead of from a prediction it does not have.
+                        break
                 _record_esc(meta, "esc_after", args.esc_period, esc_writes,
                             time.monotonic() - esc_started)
+                if until_at is not None:
+                    meta["esc"]["esc_after"]["ended_on_until"] = True
                 # D1 and D4 both end here, and D2 is the command that was going
                 # to be appended to their residue. This does NOT retire
                 # flush-d1/flush-d3: RUNSHEET keeps both, with the expectation
@@ -626,6 +771,15 @@ def capture(args) -> int:
             while True:
                 drain(0.05)
                 now = time.monotonic()
+                # --until is tested FIRST, and the order is a decision. A cell
+                # whose pattern arrived in the same 50 ms window that its
+                # --seconds cap expired in has SEEN ITS EVENT, and that is the
+                # informative reading; "--seconds elapsed" on such a capture
+                # would read as "the window was too short", which is the exact
+                # misreading this flag exists to prevent. Case N35 pins it.
+                if until_at is not None:
+                    stop_reason = f"--until matched at offset {until_at}"
+                    break
                 if args.seconds and now - t0 >= args.seconds:
                     stop_reason = f"--seconds {args.seconds} elapsed"
                     break
@@ -659,6 +813,7 @@ def capture(args) -> int:
             ser.close()
 
     meta["stop_reason"] = stop_reason
+    meta["until_offset"] = until_at
     meta["bytes"] = offset
     meta["duration_s"] = round(time.monotonic() - t0, 6)
     with open(meta_path, "w", encoding="utf-8") as m:
@@ -790,6 +945,16 @@ def main() -> int:
                    help="stop after N s with no bytes. REQUIRED unless --seconds "
                         "is given. Wrong for a boot: this kernel is silent for "
                         "whole seconds between marks")
+    c.add_argument("--until", default=None,
+                   help="regex over BYTES. Ends the --esc-after loop and the "
+                        "capture as soon as it matches, so --esc-after and "
+                        "--seconds become CAPS rather than durations and a cell "
+                        "costs the time its event actually took. Searched only "
+                        "in what arrives after the command line goes out, so it "
+                        "must not be a substring of --send's own echo. Does NOT "
+                        "satisfy the terminator rule: pass --seconds too. A "
+                        "pattern that never arrives is a reading, not a failure "
+                        "-- until_offset is null and stop_reason names the cap")
     c.add_argument("--force", action="store_true", help="overwrite an existing capture")
     c.set_defaults(func=capture)
 

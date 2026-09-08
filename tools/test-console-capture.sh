@@ -1113,6 +1113,295 @@ else
   printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
 fi
 
+# --------------------------------------------------------------------------
+# --until, 2026-09-09.  Ten cases, two of them positive because the flag has
+# TWO break sites -- the --esc-after loop and the final read loop -- and a
+# suite that exercised one would leave the other unmeasured.
+#
+# WHY THE FLAG EXISTS, so a reader of this block does not have to go looking:
+# every --esc-after window on seating 17's card was sized from a frequency the
+# card's own third cell then refuted by 76x, and two of that seating's three
+# power cycles went on a cell whose window was shorter than the answer -- the
+# board reset with nothing streaming ESC, the loader prompt went by uncaught,
+# and the vendor firmware booted.  "Take three times the prediction" does not
+# cover 76x and does not exist at all for FW-53's bit scan, where not knowing
+# the answer is the point.  量 bench/2026-09-08b/R2-B8.timing: the console is
+# SILENT for 41.931 s while a bite is pending, so --idle cannot wait for it
+# either.  Stopping on the event is the only shape left.
+# --------------------------------------------------------------------------
+
+until_case() {         # until_case <outprefix> <dump> <playspec> -- <capture args...>
+  local _out="$1" _dump="$2" _play="$3"; shift 3
+  [ "$1" = "--" ] && shift
+  "$PY" - "$TOOL" "$_out" "$_dump" "$_play" "$@" <<'INNERPY'
+import os, pty, select, subprocess, sys, time
+
+tool, out, dump, play = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+extra = sys.argv[5:]
+# playspec: "at:text|at:text|..."  text goes through unicode_escape so \r and
+# \n are writable from the shell without a second quoting layer.
+script = []
+if play and play != "-":
+    for part in play.split("|"):
+        at, _, text = part.partition(":")
+        script.append((float(at),
+                       text.encode().decode("unicode_escape").encode("latin-1")))
+script.sort()
+
+master, slave = pty.openpty()
+name = os.ttyname(slave)
+proc = subprocess.Popen(
+    ["/usr/bin/python3", tool, "capture", "--port", name, "--out", out] + extra,
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+t0 = time.monotonic()
+seen = bytearray()
+i = 0
+while proc.poll() is None:
+    r, _, _ = select.select([master], [], [], 0.02)
+    if r:
+        try:
+            seen += os.read(master, 4096)
+        except OSError:
+            break
+    now = time.monotonic() - t0
+    while i < len(script) and now >= script[i][0]:
+        try:
+            os.write(master, script[i][1])
+        except OSError:
+            pass
+        i += 1
+    if now > 60:
+        proc.kill()
+        break
+proc.wait(timeout=15)
+open(dump, "wb").write(bytes(seen))
+os.close(master); os.close(slave)
+INNERPY
+}
+
+# P16 -- the --esc-after loop ends on the pattern.  This is the site that costs
+# a power cycle when it is missing: the ESC stream is what catches the loader
+# after a reset the command caused, and once it HAS caught it every further ESC
+# is residue.  --esc-after 4, pattern played at 1.0 s.
+until_case "$WORK/u1" "$WORK/u1.sent" '1.0:---RealTek(RTL8196E)at 2014.04.22\r\n<RealTek>' -- \
+  --send 'J BFC00000' --esc-after 4 --seconds 12 --until '<RealTek>'
+U1W="$(esc_meta "$WORK/u1" esc_after window_s)"
+U1E="$(esc_meta "$WORK/u1" esc_after ended_on_until)"
+U1S="$(term_meta "$WORK/u1" stop_reason)"
+U1O="$(term_meta "$WORK/u1" until_offset)"
+if [ "$U1E" = "True" ] && fnum "$U1W < 2.5" \
+   && printf '%s' "$U1S" | grep -q -- '--until matched at offset' \
+   && [ "$U1O" != "None" ] && [ "$U1O" != "ABSENT" ]; then
+  ok "P16 --until ended the --esc-after loop at ${U1W}s of a 4 s window, offset $U1O"
+else
+  bad "P16 --esc-after did not end on the pattern (window_s=$U1W ended_on_until=$U1E offset=$U1O stop=$U1S)"
+fi
+
+# N31 -- the control.  Same play, same window, no --until: the loop must run
+# the full 4 s.  Without this, P16 cannot tell the flag from a tool that got
+# bored.
+until_case "$WORK/u2" "$WORK/u2.sent" '1.0:---RealTek(RTL8196E)at 2014.04.22\r\n<RealTek>' -- \
+  --send 'J BFC00000' --esc-after 4 --seconds 12
+U2W="$(esc_meta "$WORK/u2" esc_after window_s)"
+U2E="$(esc_meta "$WORK/u2" esc_after ended_on_until)"
+U2O="$(term_meta "$WORK/u2" until_offset)"
+if fnum "$U2W >= 3.5" && [ "$U2E" = "None" ] && [ "$U2O" = "None" ]; then
+  ok "N31 without --until the same window runs its full ${U2W}s, so P16 measures the flag"
+else
+  bad "N31 the no---until control did not run the full window (window_s=$U2W ended_on_until=$U2E offset=$U2O)"
+fi
+
+# P17 -- the second break site.  The pattern arrives AFTER the ESC window has
+# closed, so the ESC loop cannot be what stopped the run; the final read loop
+# is.  --esc-after 1, pattern at 2.5 s, cap 12 s.
+until_case "$WORK/u3" "$WORK/u3.sent" '2.5:RLXFW-B00\r\n' -- \
+  --send 'reboot -f' --esc-after 1 --cr-settle 0.4 --seconds 12 --until 'RLXFW-B00'
+U3S="$(term_meta "$WORK/u3" stop_reason)"
+U3D="$(term_meta "$WORK/u3" duration_s)"
+U3E="$(esc_meta "$WORK/u3" esc_after ended_on_until)"
+if printf '%s' "$U3S" | grep -q -- '--until matched at offset' \
+   && [ "$U3E" = "None" ] && fnum "$U3D < 6.0"; then
+  ok "P17 a pattern arriving after the ESC window stops the FINAL loop instead, at ${U3D}s of a 12 s cap"
+else
+  bad "P17 the final read loop did not stop on the pattern (stop=$U3S dur=$U3D ended_on_until=$U3E)"
+fi
+
+# N32 -- A PATTERN THAT ARRIVES IN TWO PIECES MUST STILL MATCH.  The two halves
+# are played 0.6 s apart, so they land in different read() calls and a tool
+# that tested each chunk on its own would never see `RealTek`.  This is the one
+# defect in this flag that would be invisible at the bench: the cell would just
+# run to its cap and look like a window that was too short, which is exactly
+# the reading --until exists to remove.
+until_case "$WORK/u4" "$WORK/u4.sent" '1.0:Real|1.6:Tek>\r\n' -- \
+  --send 'J BFC00000' --esc-after 6 --seconds 12 --until 'RealTek'
+U4S="$(term_meta "$WORK/u4" stop_reason)"
+U4E="$(esc_meta "$WORK/u4" esc_after ended_on_until)"
+if printf '%s' "$U4S" | grep -q -- '--until matched at offset' && [ "$U4E" = "True" ]; then
+  ok "N32 a pattern split across two read()s 0.6 s apart still matches -- the search is on the buffer, not the chunk"
+else
+  bad "N32 a split pattern was missed, so --until is testing chunks (stop=$U4S ended_on_until=$U4E)"
+fi
+
+# N33 -- ORDER against the terminator guard, and it is a decision.  A run given
+# a bad regex AND no terminator is told about the TERMINATOR, because that is
+# the defect that costs a power cycle; a bad regex costs a retype.
+cc_refuse --port /dev/null --out "$WORK/uo1" --until '('
+if printf '%s' "$RERR" | grep -q 'needs a terminator' \
+   && ! printf '%s' "$RERR" | grep -q 'bad pattern'; then
+  ok "N33 a bad --until with no terminator gets the TERMINATOR refusal -- _check_until runs after, by assertion"
+else
+  bad "N33 _check_until is above the terminator guard (rc=$RC)"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+fi
+
+# N34 -- and with a terminator present the regex IS checked, before the port.
+cc_refuse --port /dev/null --out "$WORK/uo2" --seconds 2 --until '('
+if printf '%s' "$RERR" | grep -q -- '--until: bad pattern' \
+   && ! printf '%s' "$RERR" | grep -q 'cannot open'; then
+  ok "N34 a bad --until regex is refused before the port is opened"
+else
+  bad "N34 a bad --until regex reached the port or was not refused (rc=$RC)"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+fi
+
+# N35 -- the empty pattern.  `re.compile(b"")` is VALID and matches at offset 0
+# of everything, so a capture given it would stop on the first byte that
+# arrives and report a stop_reason that reads like a successful catch.  It is
+# refused by value, not by compilation.
+cc_refuse --port /dev/null --out "$WORK/uo3" --seconds 2 --until ''
+if printf '%s' "$RERR" | grep -q 'empty pattern'; then
+  ok "N35 --until '' is refused -- a pattern that matches at offset 0 is not a terminator, it is a truncation"
+else
+  bad "N35 an empty --until pattern was accepted (rc=$RC)"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+fi
+
+# N36 -- THE FOOTGUN, MEASURED RATHER THAN DOCUMENTED.  Arming happens when the
+# command line is WRITTEN, not when its echo comes back, so a pattern that is a
+# substring of --send matches the board's own echo in milliseconds.  This case
+# asserts the hazard reproduces; it is what the --help text is quoting.
+until_case "$WORK/u5" "$WORK/u5.sent" '0.5:echo bite 9 > /proc/rtl819x-wdt\r\n' -- \
+  --send 'echo bite 9 > /proc/rtl819x-wdt' --seconds 8 --until 'bite 9'
+U5S="$(term_meta "$WORK/u5" stop_reason)"
+U5O="$(term_meta "$WORK/u5" until_offset)"
+if printf '%s' "$U5S" | grep -q -- '--until matched at offset' \
+   && [ "$U5O" != "None" ] && fnum "$U5O < 40"; then
+  ok "N36 a --until that is a substring of --send matches the board's ECHO at offset $U5O -- the hazard is real and is in --help"
+else
+  bad "N36 the echo hazard did not reproduce, so the --help text is asserting something unmeasured (stop=$U5S offset=$U5O)"
+fi
+
+# N37 -- the pre-send --esc window does NOT arm the search.  Without this, a
+# card using `<RealTek>` on a reset cell could not use --esc on the same run:
+# the ESC loop emits a prompt of its own every 128 bytes and would fire the
+# pattern before the command was ever sent.  The play here lands INSIDE the
+# --esc window and nowhere else, so a correctly armed run never matches and
+# ends on its cap.
+until_case "$WORK/u6" "$WORK/u6.sent" '0.5:<RealTek>' -- \
+  --esc 2 --send 'DW 8040DBC0 1' --cr-settle 0.4 --seconds 6 --until '<RealTek>'
+U6S="$(term_meta "$WORK/u6" stop_reason)"
+U6O="$(term_meta "$WORK/u6" until_offset)"
+U6U="$(term_meta "$WORK/u6" until)"
+if printf '%s' "$U6S" | grep -q -- '--seconds' && [ "$U6O" = "None" ] \
+   && [ "$U6U" = "<RealTek>" ]; then
+  ok "N37 a match inside the pre-send --esc window does not stop the run -- the search is armed at the command line"
+else
+  bad "N37 --until was armed during the --esc window (stop=$U6S offset=$U6O until=$U6U)"
+fi
+
+# N38 -- a pattern that never arrives is a READING, not a failure.  The capture
+# runs to its cap, stop_reason names the cap, and until_offset is null beside a
+# non-null until -- which is the two-directional record stop_reason alone
+# cannot give: "armed and did not see it" and "never armed" are different
+# facts and this is where they are told apart.
+until_case "$WORK/u7" "$WORK/u7.sent" '0.5:hello\r\n' -- \
+  --send 'DW 8040DBC0 1' --seconds 3 --until 'NEVER-ARRIVES-XYZ'
+U7S="$(term_meta "$WORK/u7" stop_reason)"
+U7O="$(term_meta "$WORK/u7" until_offset)"
+U7U="$(term_meta "$WORK/u7" until)"
+if printf '%s' "$U7S" | grep -q -- '--seconds 3.0 elapsed' && [ "$U7O" = "None" ] \
+   && [ "$U7U" = "NEVER-ARRIVES-XYZ" ]; then
+  ok "N38 an unmatched --until runs to the cap and records armed-and-unseen, which stop_reason alone cannot say"
+else
+  bad "N38 an unmatched --until did not fall through cleanly (stop=$U7S offset=$U7O until=$U7U)"
+fi
+
+# --------------------------------------------------------------------------
+# N39/N40 -- until_offset must POINT AT THE PATTERN, and the two cases exist
+# because the ten above cannot tell whether it does.
+#
+# 🔴 Found by auditing this block rather than by a red case: in every case up
+# to N38 the search is armed when the log is still empty, so the offset of a
+# match inside the rolling buffer and its offset inside the .log are the same
+# number, and an implementation that forgot the base entirely would pass all
+# ten.  The base moves for two different reasons -- it is SET at the arming
+# point, and it ADVANCES when the buffer rolls past _UNTIL_WINDOW -- so there
+# are two edges and one case each.  Both assert by reading the .log at the
+# offset the metadata gives, which is the only check that cannot be satisfied
+# by a plausible-looking number.
+# --------------------------------------------------------------------------
+
+at_offset() {          # at_offset <outprefix> <offset> <nbytes>
+  "$PY" - "$1.log" "$2" "$3" <<'INNERPY'
+import sys
+b = open(sys.argv[1], "rb").read()
+o, n = int(sys.argv[2]), int(sys.argv[3])
+sys.stdout.write(b[o:o + n].decode("latin-1"))
+INNERPY
+}
+
+# N39 -- the base is SET at the arming point.  200 bytes arrive during the
+# pre-send --esc window, so a match reported without the base would come back
+# ~200 low and land in the middle of that filler.
+until_case "$WORK/u8" "$WORK/u8.sent" \
+  "0.5:$(printf 'F%.0s' $(seq 1 200))|3.6:<RealTek>" -- \
+  --esc 2 --send 'DW 8040DBC0 1' --cr-settle 0.4 --seconds 9 --until '<RealTek>'
+U8O="$(term_meta "$WORK/u8" until_offset)"
+if [ "$U8O" != "None" ] && [ "$U8O" != "ABSENT" ] && fnum "$U8O >= 200" \
+   && [ "$(at_offset "$WORK/u8" "$U8O" 9)" = '<RealTek>' ]; then
+  ok "N39 with 200 bytes logged before arming, until_offset $U8O points at the pattern in the .log"
+else
+  bad "N39 until_offset does not carry the arming base (offset=$U8O, log there: '$(at_offset "$WORK/u8" "${U8O:-0}" 9)')"
+fi
+
+# N40 -- the base ADVANCES when the buffer rolls.  _UNTIL_WINDOW is 8192, so
+# 20,000 bytes of filler after arming force it to drop and re-base three times
+# before the pattern arrives.  A tool that never advances it reports a number
+# under 8192 and this case reads filler at that offset instead of the pattern.
+until_case "$WORK/u9" "$WORK/u9.sent" \
+  "0.6:$(printf 'F%.0s' $(seq 1 20000))|2.2:<RealTek>" -- \
+  --send 'DW 8040DBC0 1' --seconds 9 --until '<RealTek>'
+U9O="$(term_meta "$WORK/u9" until_offset)"
+if [ "$U9O" != "None" ] && [ "$U9O" != "ABSENT" ] && fnum "$U9O >= 20000" \
+   && [ "$(at_offset "$WORK/u9" "$U9O" 9)" = '<RealTek>' ]; then
+  ok "N40 after 20,000 bytes rolled the 8,192-byte window, until_offset $U9O still points at the pattern"
+else
+  bad "N40 until_offset does not advance with the rolling window (offset=$U9O, log there: '$(at_offset "$WORK/u9" "${U9O:-0}" 9)')"
+fi
+
+# N41 -- --until is tested BEFORE --seconds, and the case is deterministic
+# rather than a race.  The trick is to let --seconds expire during the ESC
+# window and its settle, so that on the FIRST iteration of the final loop both
+# conditions are already true and only the order can decide:
+#
+#   --esc-after 4 --seconds 2, pattern at 1.0 s.  The ESC loop breaks on the
+#   pattern at ~1.0 s; terminate_esc_line then gets budget = 2.0 - 1.0 and
+#   spends all of it waiting for a prompt that does not come again; the final
+#   loop is entered at ~2.05 s with until_at already set.
+#
+# Correct order says --until.  The other order says "--seconds elapsed" on a
+# capture that DID see its event, which reads as "the window was too short" --
+# the exact misreading this flag exists to remove.
+until_case "$WORK/ua" "$WORK/ua.sent" '1.0:---RealTek(RTL8196E)\r\n<RealTek>' -- \
+  --send 'J BFC00000' --esc-after 4 --seconds 2 --until '<RealTek>'
+UAS="$(term_meta "$WORK/ua" stop_reason)"
+UAD="$(term_meta "$WORK/ua" duration_s)"
+if printf '%s' "$UAS" | grep -q -- '--until matched at offset' && fnum "$UAD >= 1.9"; then
+  ok "N41 with the cap already expired on entry (${UAD}s of 2 s), stop_reason still names --until"
+else
+  bad "N41 --seconds wins over a matched --until, so a caught event reads as a short window (stop=$UAS dur=$UAD)"
+fi
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
