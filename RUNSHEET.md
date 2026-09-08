@@ -3837,6 +3837,28 @@ one wants the card immutable in *time*, the other wants it correct in *syntax*
 — and nothing here had noticed. `spec-check` takes two seconds. **Run it before
 the commit that freezes the card**, and the two never have to be traded off.
 
+🔴 **2026-09-08 (seating 17): the rule as written above is too NARROW, and CI
+found the gap rather than the rule doing it.** It names *the commit that freezes
+the card*, and that commit was clean — five gates, `spec-check` rc 0. The defect
+was in `CORRECTIONS-block14.md`, which is written **after** the seating, is not
+a card, and therefore had nothing telling anyone to check it. One unclosed
+backtick run went in, `text/spec-check` went red on GitHub, and **because
+`census` declares `needs: [text, …]` the whole census never ran** — one push,
+one layer.
+
+🟢 **The generalisation, and it costs the same two seconds**: run `spec-check`
+before **any** commit that adds or edits a tracked `.md`, not only before a
+freeze. The closeout instruction in `CLAUDE.md` already says to run it *before
+you stop*; what this segment shows is that "before you stop" is too late when
+the segment pushes more than once.
+
+⚠️ **And read the whole finding list, not the first one.** `spec-check` reported
+**three** defects — one `C10` and two `C9`s in paragraphs I had not touched.
+They were one defect: `C10`'s own message says that when a run cannot close,
+*"the pairing SHIFTS and a span swallows prose"*, so the two `C9`s were
+downstream. Closing the single run cleared all three. Several minutes were spent
+reading the two innocent lines.
+
 ### 2. 🔴 One cell name per image
 
 `tools/rlxfw-kbuild.sh` writes its artefacts to `$R/out/<cell>.*`. Seating 14
