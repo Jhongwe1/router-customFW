@@ -36,8 +36,14 @@
  *   [23]    WDTCLR     write 1 to clear the counter.  A kick.
  *                      讀 rtl865xc_asicregs.h WDTCLR (1<<23).
  *                      量 (indirectly): the vendor kicks with it 100x/s and
- *                      this board does not reset, which it would in 17.5 ms
- *                      if the write did nothing.
+ *                      this board does not reset, which it would in
+ *                      ~1,335 ms if the write did nothing.
+ *                      🔴 This row read "17.5 ms" until 2026-09-09.  The
+ *                      INFERENCE is unchanged and only slower -- 100 kicks a
+ *                      second against a 1.33 s deadline still means a dead
+ *                      WDTCLR resets the board, just 76x later -- but the
+ *                      number was CLK-08b's loader-state constant.  量
+ *                      seating 17: OVSEL 3 bites at 1,334.723 ms.
  *   [22:21] OVSEL[1:0] 讀 rtl865xc_asicregs.h OVSEL_16 (1<<21),
  *                      OVSEL_17 (2<<21), OVSEL_18 (3<<21).
  *   [20]    WDTIND     "indicate whether watchdog ever occurs".
@@ -108,7 +114,9 @@
  * 0xB800311C to its owning symbol in System.map.  NINE references, five
  * owners -- source says what could happen, the artefact says what did:
  *
- *   bsp_timer_init+0xb8      WDTCNR = 0x00600000   ARM.  OVSEL=3 = 17.5 ms.
+ *   bsp_timer_init+0xb8      WDTCNR = 0x00600000   ARM.  OVSEL=3, which is
+ *                            1,334.723 ms 量 -- this line read 17.5 ms
+ *                            until 2026-09-09.
  *   rlx_timer_interrupt+0x60 WDTCNR |= 1<<23       KICK, 100 Hz.
  *   rlx_timer_interrupt+0x4c WDTCNR = 0 ; for(;;)  is_fault reboot path.
  *   bsp_machine_restart+0xb4 WDTCNR = 0 ; for(;;)  REBOOT.
@@ -119,17 +127,42 @@
  * 🔴 THE FIRST TWO ARE THE WHOLE PROBLEM, AND THE FIRST ONE CORRECTS A
  * COMMITTED ROW.  SPEC.md FW-45 reasoned about kernel-side loop safety from
  * "CLK-08 bounds the watchdog window at about one second".  That is the
- * LOADER's OVSEL=9.  Under Linux the vendor arms OVSEL=3 -- 2^18 ticks,
- * 17.5 ms -- and kicks every 10 ms at HZ=100.  The margin is 7.5 ms, not
- * 1.1 s, and the system tolerates ZERO lost timer interrupts.
+ * LOADER's OVSEL=9.  Under Linux the vendor arms OVSEL=3 -- 2^18 ticks --
+ * and kicks every 10 ms at HZ=100.
  *
- * 🟢 That makes an old measurement mean more, not less.  rtl819x-spi's 4 MiB
- * traversal ran 13.3 s on this board across ten boots with that 17.5 ms
- * deadline live (FW-45, seating 16) -- so no interrupt-blocked window on that
- * path exceeded 17.5 ms, measured, without anyone setting out to measure it.
- * It also bounds IRQ-13's unexplained loss: whatever drops 11 of 585 TC1
- * interrupts during the vendor NIC's init cannot be producing >17.5 ms gaps
- * in TC0 delivery, or the board would have reset instead of booting.
+ * 🔴🔴 AND THIS PARAGRAPH THEN GOT ITS OWN NUMBER WRONG BY 76x, IN THE SAME
+ * DIRECTION AND FOR THE SAME REASON AS THE ROW IT WAS CORRECTING.  What it
+ * said is kept verbatim, because what it got wrong is the useful part:
+ *
+ *   "17.5 ms -- and kicks every 10 ms at HZ=100.  The margin is 7.5 ms, not
+ *    1.1 s, and the system tolerates ZERO lost timer interrupts."
+ *
+ *   "That makes an old measurement mean more, not less.  rtl819x-spi's 4 MiB
+ *    traversal ran 13.3 s on this board across ten boots with that 17.5 ms
+ *    deadline live -- so no interrupt-blocked window on that path exceeded
+ *    17.5 ms, measured, without anyone setting out to measure it.  It also
+ *    bounds IRQ-13's unexplained loss: whatever drops 11 of 585 TC1
+ *    interrupts during the vendor NIC's init cannot be producing >17.5 ms
+ *    gaps in TC0 delivery, or the board would have reset instead of booting."
+ *
+ * 量 seating 17: OVSEL 3 is 1,334.723 ms.  So
+ *
+ *   - the margin over a 10 ms tick is ~1,325 ms, not 7.5 ms, and the system
+ *     tolerates about 130 lost timer interrupts rather than zero;
+ *   - the free bound on the SPI traversal is 1,310 ms, i.e. SEVENTY-FIVE
+ *     TIMES WEAKER, which makes it worth very little;
+ *   - the IRQ-13 bound moves the same way for the same reason.
+ *
+ * The middle one is the one to watch.  "The correction makes an older
+ * measurement worth more" is the shape of sentence that gets quoted onward
+ * without being re-derived, and it WAS quoted onward -- into
+ * docs/FINDINGS.md and notes/watchdog-driver.md -- before anything
+ * re-derived it.
+ *
+ * ⚠️ THE DECISION IS UNCHANGED, and writing that out is the point.
+ * CONFIG_RTL_WTDOG=n is justified by "there is an unconditional 100 Hz kick",
+ * which is true at 17.5 ms and true at 1,334.7 ms: a watchdog that cannot
+ * bite cannot bite at either deadline.
  *
  * 🔴 AND THE VENDOR'S ARRANGEMENT MAKES A /dev/watchdog IMPOSSIBLE.  A kick
  * in the tick ISR feeds the dog whether or not userspace is alive, so a
@@ -184,7 +217,9 @@
  * the copy that is not compiled.
  *
  * WHAT IT COSTS THE DECISION: nothing.  The 100 Hz unconditional kick and the
- * 17.5 ms arm are gone, which is what a bitable watchdog needs.
+ * vendor's OVSEL=3 arm are gone, which is what a bitable watchdog needs.
+ * (This line said "the 17.5 ms arm" until 2026-09-09.  The arm is 1,334.7 ms
+ * 量 and the sentence does not depend on which.)
  * WHAT IT COSTS THE SAFETY NET: a bounded amount, and the bound is measured
  * rather than argued.  All three surviving KICKS are on the wlan bring-up
  * path, and 量 the image's own initcall table puts that path at
@@ -300,12 +335,24 @@
  * after late_initcall is 未定.  Reading more source cannot settle that; one
  * cell can:
  *
- *     stop ; kickms 3000 ; ovsel 9 ; bootguard        (hw timeout 1121 ms)
+ *     stop ; kickms 3000 ; ovsel 0 ; bootguard        (hw timeout 163.8 ms)
  *
  * The kernel timer will not come round for 3 s, so if nothing else writes
- * WDTCLR the board MUST reset at ~1.121 s.  If it does NOT, something else is
+ * WDTCLR the board MUST reset at ~0.164 s.  If it does NOT, something else is
  * kicking and the enumeration in section 3 is still incomplete.  A watchdog
  * cell in which "the board survived" is the finding.
+ *
+ * 🔴 THIS RECIPE SAID `ovsel 9` AND `1121 ms` UNTIL 2026-09-09, AND AS
+ * WRITTEN IT TESTED NOTHING.  OVSEL 9 is 83.8 s 量, so a 3 s kick period
+ * beats the hardware deadline by 28x and the board survives whether or not
+ * anything else is feeding -- a cell whose "negative" outcome is guaranteed
+ * and which therefore cannot fail.  It was carded that way and run that way;
+ * 量 seating 17, the answer came from RE-RUNNING it at OVSEL 0, where the
+ * board did reset, with wlan0 down and again with wlan0 up.  FW-51's residual
+ * closes on that re-run, not on the carded cell.  The rule this leaves behind
+ * is wider than the fix: a starvation cell needs its kick period LONGER than
+ * the hardware deadline, and after WDT-1 both numbers come from one
+ * derivation, so they cannot drift apart again without the dump saying so.
  *
  * THE LADDER, and it is designed as DIFFERENCES so every constant cancels.
  * A single absolute bite time carries an unknown offset: the UART's last byte
@@ -380,8 +427,9 @@
 #include <asm/io.h>
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
+#include <asm/div64.h>		/* WDT-1's do_div: 2^24 * 1e6 needs 64 bits */
 
-#define RTL819X_WDT_VERSION	"rtl819x-wdt 1.0"
+#define RTL819X_WDT_VERSION	"rtl819x-wdt 1.1"
 
 /* ------------------------------------------------------------------------
  * Constants.  Every one has a SPEC.md id in the header above.
@@ -413,8 +461,84 @@
 #define RTL819X_WDT_NOVSEL	10		/* 讀 CLK-07: 2^15 .. 2^24 */
 
 /* 量 CLK-08b: the watchdog's own counting frequency on this die.  Not derived
- * from the timer base -- see header section 1. */
+ * from the timer base -- see header section 1.
+ *
+ * 🔴 AND IT IS THE LOADER'S RATE, NOT LINUX'S -- 量 seating 17, wrong by 76x
+ * for the state this driver runs in.  It is NOT changed, and neither is
+ * rtl819x_wdt_steps[]: that table is what /proc prints and what a frozen card
+ * predicts against, so changing it silently would break the one field a
+ * seating can compare with a card written before power.  WDT-1 adds a DERIVED
+ * rate beside it and prints both, so a reader sees the disagreement instead of
+ * being handed a corrected number with no history. */
 #define RTL819X_WDT_HZ		14965000u
+
+/* ------------------------------------------------------------------------
+ * WDT-1.  THE COUNTING RATE, DERIVED ON THIS DIE AT init.
+ *
+ * WHY DERIVED AND NOT MEASURED AGAIN.  SPEC.md CLK-08b's residual says
+ * re-measuring a timeout only re-measures the constant it was solved from --
+ * the 9-8 difference IS where 14.965 MHz came from, so predicting it back is
+ * an identity.  A derivation out of a DIFFERENT register block is not.
+ *
+ * THE MODEL, and it is 讀 rather than 量: datasheet D 8.2 says one Clock
+ * Division Base Register "defines the base clock for counting" for the block,
+ * so TC0, TC1 and the watchdog divide the same clock.  If that holds, the
+ * watchdog's rate is the timer's, and the timer's comes out of two registers
+ * -- with no clock constant at all in one derivation and one 讀 constant in
+ * the other -- exactly as rtl819x-timer.c derives hz_tick and hz_cdbr
+ * (CLK-17, 2026-09-04).  This file RE-DERIVES rather than exporting a symbol:
+ * two drivers reaching one number through separate code is a cross-check, and
+ * a shared global is not.
+ *
+ * 🔴 THE MODEL IS ALREADY IN TROUBLE, AND THE ARITHMETIC IS HERE SO NOBODY
+ * HAS TO REDO IT.  Seating 17 timed two rungs and fit
+ * gap(OVSEL) = 2^(15+OVSEL)/f + d:
+ *
+ *      OVSEL 3    1,334.723 ms     2^18 counts
+ *      OVSEL 8   41,930.599 ms     2^23 counts
+ *      ->  f = 200,179.5 Hz, d = +25.179 ms   (residual 0, by construction)
+ *
+ * Force f to the timer's derived 200,000 Hz and those SAME two points need
+ * d = +24.003 ms and d = -12.441 ms -- an inconsistency of 36.4 ms, against an
+ * instrument floor the same two captures measure at 0.517 and 0.868 ms.  With
+ * CLK-17's 200,005 Hz it is 35.4 ms.  So the two rungs EXCLUDE "the watchdog
+ * counts at the timer's rate" by about forty times the floor, and SPEC.md's
+ * "Ratio 0.999" reads as agreement only because nobody put it through the fit.
+ *
+ * THREE HYPOTHESES, and the card decides between them:
+ *
+ *   H1  the watchdog really is ~0.09 % faster than TC0/TC1.  A finding about
+ *       the SoC -- separate divider chains off one CDBR.
+ *   H2  the HOST clock and the board differ by ~900 ppm.  That enters the fit
+ *       MULTIPLICATIVELY and is absorbed into f, and every interval this
+ *       project has read off console-capture timestamps would carry the same
+ *       scale.  The repo's tightest bound is P3-7's 3,009 vendor ticks in
+ *       30.10 host seconds = 300 +- 170 ppm, which does not settle it.
+ *   H3  one of the two rungs is wrong.
+ *
+ *   THE DISCRIMINATOR IS OVSEL 9, PREDICTED BEFORE POWER:
+ *       f = 200,000 -> 83,910.083 ms   (2^24/f = 83,886.080, d = +24.003)
+ *       f = 200,180 -> 83,836.019 ms   (2^24/f = 83,810.841, d = +25.179)
+ *   75.2 ms apart against a 0.9 ms floor.  A third point on neither refutes
+ *   the linear model itself, which is H3's shape.  H2 is separated by a cell
+ *   that needs no bite at all: two /proc reads about two minutes apart,
+ *   Djiffies * 10 ms against the host's own Dt, which resolves ~10 ppm.
+ *
+ * WHAT THIS CODE DOES NOT DO.  It feeds nothing the driver ACTS on.  量:
+ * hw_ovsel and kick_ms are module parameters and neither reads
+ * RTL819X_WDT_HZ, so WDT-1 is report-only and 1.1's behaviour is identical to
+ * 1.0's.  That is what makes the boot capture a control -- 1,424 bytes on
+ * every boot, differing from seating 17's only in RLXFW-ID0's eight
+ * characters and in RLXFW-TA5, which is already 量 to move +-1 jiffy across
+ * ten boots.
+ * ------------------------------------------------------------------------ */
+
+#define RTL819X_TC_PHYS		0x18003100	/* 0xB8003100 through KSEG1 */
+#define RTL819X_TC0DATA_OFF	0x00		/* REG-05, D Table 20 */
+#define RTL819X_CDBR_OFF	0x18		/* REG-11, D Table 26 */
+#define RTL819X_TC_VALUE_SHIFT	4		/* TC0DATA[31:4] is the reload */
+#define RTL819X_SYS_CLK_HZ	200000000u	/* 讀 BSP_SYS_CLK_RATE; 量 CLK-02 */
+#define RTL819X_WDT_HZ_TOL_SHIFT 12		/* agree to 1 part in 4,096 */
 
 #define RTL819X_WDT_PROC_NAME	"rtl819x-wdt"
 
@@ -462,9 +586,18 @@ static int hw_ovsel = 9;
 module_param(hw_ovsel, int, 0);
 MODULE_PARM_DESC(hw_ovsel, "hardware OVSEL (0-3,8,9; 4-7 refused, see file)");
 
-/* 250 ms against a 1121 ms hardware deadline is 4.48x margin, which is four
- * whole kicks.  It is expressed in ms and converted with msecs_to_jiffies so
- * a reader does not have to know HZ. */
+/* 250 ms against OVSEL 9 is 335x margin -- 量, the deadline is 83.8 s and not
+ * the 1,121 ms this comment claimed until 2026-09-09, so its figure (4.48x,
+ * "four whole kicks") was 76x pessimistic.
+ *
+ * 🔴 THE DIRECTION IS SAFE AND THE STATEMENT WAS STILL WRONG, which is why it
+ * is corrected rather than left alone: BOOTGUARD is a WEAKER guard than this
+ * driver was written believing.  A kernel that stops running the timer wheel
+ * takes 83.8 s to reset the board, not 1.12 s.  Anything wanting a fast guard
+ * has to say `ovsel 0` and mean 163.8 ms.
+ *
+ * It is expressed in ms and converted with msecs_to_jiffies so a reader does
+ * not have to know HZ. */
 static int kick_ms = 250;
 module_param(kick_ms, int, 0);
 MODULE_PARM_DESC(kick_ms, "kernel-timer kick period in ms");
@@ -524,6 +657,15 @@ static unsigned long rtl819x_wdt_open_flag;	/* bit 0, via test_and_set_bit */
 static int  rtl819x_wdt_expect_close;
 static int  rtl819x_wdt_unlocked;		/* raw/biteraw permitted */
 
+/* WDT-1.  Latched at init and never updated: a rate that moved under a running
+ * watchdog would make every /proc reading ambiguous about which one it used. */
+static u32 rtl819x_wdt_tc0data_at_init;
+static u32 rtl819x_wdt_cdbr_at_init;
+static u32 rtl819x_wdt_hz_tick;		/* (TC0DATA >> 4) * HZ -- no constant */
+static u32 rtl819x_wdt_hz_cdbr;		/* SYS_CLK / (CDBR >> 16) -- one 讀 constant */
+static u32 rtl819x_wdt_hz_derived;	/* what the derived timeouts use */
+static int rtl819x_wdt_hz_agree;	/* the two above, to 1 part in 4,096 */
+
 /* ------------------------------------------------------------------------
  * Register access.  Same reasoning as rtl819x-gpio.c and rtl819x-timer.c:
  * __raw_readl, not readl -- readl byte-swaps a little-endian device word and
@@ -542,6 +684,16 @@ static inline u32 rtl819x_wdt_rd(void)
 	return __raw_readl(rtl819x_wdt_reg());
 }
 
+/* WDT-1's READ-ONLY window on the timer block.  There is deliberately no write
+ * counterpart: rtl819x-timer.c owns those registers, this driver only needs to
+ * know what they were set to, and a watchdog driver that can write the tick's
+ * reload is a defect waiting for a card to find it.  Called once, from init,
+ * before BOOTGUARD arms. */
+static inline u32 rtl819x_wdt_tc_rd(unsigned int off)
+{
+	return __raw_readl((void __iomem *)CKSEG1ADDR(RTL819X_TC_PHYS + off));
+}
+
 /* THE ONLY WRITE HELPER IN THIS FILE, so `git grep rtl819x_wdt_wr` is the
  * auditable list docs/blind-write-ledger.md counts.  It takes a full word;
  * there is deliberately no `set bit` helper, because that is the shape
@@ -549,6 +701,64 @@ static inline u32 rtl819x_wdt_rd(void)
 static inline void rtl819x_wdt_wr(u32 v)
 {
 	__raw_writel(v, rtl819x_wdt_reg());
+}
+
+/* WDT-1: the derivation.  Two independent routes to one number, compared by
+ * the driver rather than by whoever reads the dump.
+ *
+ * 🔴 A ZERO IS NOT A RATE.  If TC0DATA reads 0 -- a block this model does not
+ * describe -- hz_derived stays 0 and every derived timeout reports 0, rather
+ * than falling back to a compiled constant that is already known to be 76x
+ * wrong.  rtl819x-timer.c makes the opposite choice for hz_used because its
+ * CLOCKSOURCE has to keep working; nothing here has to, so the honest answer
+ * is the empty one. */
+static void __init rtl819x_wdt_derive_hz(void)
+{
+	u32 div, lo, hi;
+
+	rtl819x_wdt_tc0data_at_init = rtl819x_wdt_tc_rd(RTL819X_TC0DATA_OFF);
+	rtl819x_wdt_cdbr_at_init    = rtl819x_wdt_tc_rd(RTL819X_CDBR_OFF);
+
+	rtl819x_wdt_hz_tick = (rtl819x_wdt_tc0data_at_init
+			       >> RTL819X_TC_VALUE_SHIFT) * (u32)HZ;
+	div = rtl819x_wdt_cdbr_at_init >> 16;
+	rtl819x_wdt_hz_cdbr = div ? (RTL819X_SYS_CLK_HZ / div) : 0;
+
+	/* Agreement without a division, so a zero on either side cannot trap.
+	 * Same form and same tolerance as rtl819x-timer.c's hz_agree, on
+	 * purpose: two drivers answering one question differently would be a
+	 * finding about the drivers and not about the die. */
+	lo = rtl819x_wdt_hz_tick < rtl819x_wdt_hz_cdbr
+	   ? rtl819x_wdt_hz_tick : rtl819x_wdt_hz_cdbr;
+	hi = rtl819x_wdt_hz_tick < rtl819x_wdt_hz_cdbr
+	   ? rtl819x_wdt_hz_cdbr : rtl819x_wdt_hz_tick;
+	rtl819x_wdt_hz_agree = (lo > 0
+		&& ((u64)(hi - lo) << RTL819X_WDT_HZ_TOL_SHIFT) <= (u64)lo);
+
+	rtl819x_wdt_hz_derived = rtl819x_wdt_hz_tick;
+}
+
+/* WDT-1: 2^(15+ovsel) / hz_derived, in microseconds, at run time.
+ *
+ * The compiled table is NOT rewritten -- see RTL819X_WDT_HZ.  This is a second
+ * column beside it, so /proc shows the loader-state figure and the derived one
+ * on one page and a card can predict both.  Returns 0 when the derivation
+ * failed or the OVSEL is out of range, which is the convention hw_timeout_us
+ * already uses. */
+static u32 rtl819x_wdt_derived_us(int ovsel)
+{
+	u64 n;
+
+	if (ovsel < 0 || ovsel >= RTL819X_WDT_NOVSEL)
+		return 0;
+	if (!rtl819x_wdt_hz_derived)
+		return 0;
+	/* 2^24 * 1,000,000 is 1.7e13 -- 44 bits.  The shift is on the
+	 * 1,000,000 and the type is u64 from the start, so no intermediate is
+	 * truncated to 32 bits on the way. */
+	n = (u64)1000000u << (15 + ovsel);
+	do_div(n, rtl819x_wdt_hz_derived);
+	return (u32)n;
 }
 
 /* Build a full WDTCNR from intent.  The only place a word is composed. */
@@ -943,6 +1153,20 @@ static int rtl819x_wdt_read_proc(char *page, char **start, off_t off,
 			rtl819x_wdt_ovsel < RTL819X_WDT_NOVSEL)
 		       ? rtl819x_wdt_steps[rtl819x_wdt_ovsel].usec : 0u);
 	len += sprintf(page + len, "wdt_hz %u\n", (u32)RTL819X_WDT_HZ);
+	/* WDT-1.  Seven fields; the last three are the reading.  hz_agree is the
+	 * driver comparing its own two derivations instead of leaving it to a
+	 * reader, and hw_timeout_derived_us beside hw_timeout_us puts the 76x on
+	 * one page where a card can assert both. */
+	len += sprintf(page + len, "tc0data_at_init %08X\n",
+		       rtl819x_wdt_tc0data_at_init);
+	len += sprintf(page + len, "cdbr_at_init %08X\n",
+		       rtl819x_wdt_cdbr_at_init);
+	len += sprintf(page + len, "hz_tick %u\n", rtl819x_wdt_hz_tick);
+	len += sprintf(page + len, "hz_cdbr %u\n", rtl819x_wdt_hz_cdbr);
+	len += sprintf(page + len, "hz_agree %d\n", rtl819x_wdt_hz_agree);
+	len += sprintf(page + len, "hz_derived %u\n", rtl819x_wdt_hz_derived);
+	len += sprintf(page + len, "hw_timeout_derived_us %u\n",
+		       rtl819x_wdt_derived_us(rtl819x_wdt_ovsel));
 	len += sprintf(page + len, "kick_ms %d\n", kick_ms);
 	len += sprintf(page + len, "soft_timeout %d\n", soft_timeout);
 	len += sprintf(page + len, "bootguard %d\n", bootguard);
@@ -1266,6 +1490,17 @@ static int __init rtl819x_wdt_init(void)
 	rtl819x_wdt_probe_val = rtl819x_wdt_rd();
 	rtl819x_wdt_shadow = rtl819x_wdt_probe_val;
 	rlxfw_markx("W1", rtl819x_wdt_probe_val);
+
+	/* WDT-1, and it sits HERE for two reasons.  Before BOOTGUARD arms, so a
+	 * refused arm still leaves a derivation to read; and after W1, so the
+	 * probe value -- the one field that says whether the vendor's watchdog
+	 * was compiled in -- is latched before this driver reads anything else.
+	 *
+	 * NO MARK IS EMITTED, deliberately.  This driver's behaviour does not
+	 * change, so the boot capture must not either, and 1,424 bytes across
+	 * ten boots is the control that says so.  The derivation is one /proc
+	 * read away and nothing at boot depends on it. */
+	rtl819x_wdt_derive_hz();
 
 	setup_timer(&rtl819x_wdt_timer, rtl819x_wdt_tick, 0);
 

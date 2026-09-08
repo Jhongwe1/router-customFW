@@ -20,6 +20,13 @@ and again at 21:50, three sides agreeing both times). The desk half creates no
 
 ## 1. The finding that decided the step's shape, and it corrects a committed row
 
+🔴🔴 **THIS WHOLE SECTION'S NUMBER IS WRONG BY 76×, REFUTED ON THE SILICON
+2026-09-08 — see § 10.2.** It is kept as written because what it got wrong is
+the useful part, and because § 1.2 and § 1.3 are two conclusions drawn *from*
+it that were quoted into other files before anything re-derived them. Read
+`17.5 ms` as **1,334.723 ms** throughout § 1, and `7.5 ms of margin` as
+**~1,325 ms**. The decision the section reaches does not move.
+
 🔴 **Under Linux this board runs with a 17.5 ms watchdog, kicked every 10 ms.
 Not "about one second".**
 
@@ -61,7 +68,15 @@ from *"`CLK-08` bounds the watchdog window at about one second"*. That is the
 **loader's** `OVSEL=1001`, driven at the loader prompt in the `D4`/`H3c` cells.
 It is not what Linux runs. The row's number is wrong by **64×**.
 
-### 1.2 🟢 The correction makes an old measurement mean more, not less
+### 1.2 ~~🟢 The correction makes an old measurement mean more, not less~~ 🔴 REFUTED
+
+🔴 **This subsection is wrong and it is the most-quoted thing in the file.**
+The deadline was 1,334.723 ms 量, not 17.5 ms, so the free bound below is
+**1,310 ms — seventy-five times weaker** — and a 75×-weaker bound on a 13.3 s
+traversal is worth very little. It is kept in place, unedited below this line,
+because *"the correction makes an older measurement worth more"* is exactly the
+shape of sentence that travels: it reached `docs/FINDINGS.md` and `SPEC.md`
+`FW-45` before anything re-derived it.
 
 `FW-45`'s conclusion — that `rtl819x-spi`'s 4 MiB traversal is safe because
 `cond_resched()` every 4 KiB lets the vendor's TC0 handler keep feeding — is
@@ -72,7 +87,12 @@ It is not what Linux runs. The row's number is wrong by **64×**.
 > on the whole PIO read path exceeded 17.5 ms**, over ~40 s of in-kernel
 > traversal.
 
-### 1.3 🟢 And it bounds `IRQ-13`'s unexplained loss for free
+### 1.3 ~~🟢 And it bounds `IRQ-13`'s unexplained loss for free~~ 🔴 REFUTED, same cause
+
+🔴 **Read every `17.5 ms` below as `1,310 ms`.** The second bullet does not
+survive at all: at a 1,310 ms deadline, eleven 20 ms missed ticks are nowhere
+near a bite, so *"they are **not** simple missed ticks"* is no longer supported
+by this argument. `IRQ-13`'s mechanism is unisolated exactly as it was.
 
 `IRQ-13` (2026-09-06, seating 14) records driver 4.0 refusing its own handover
 because over the vendor NIC's initialisation TC1 delivered **574 of 585**
@@ -318,8 +338,11 @@ shape: a partial view requoted instead of re-derived.
 
 ### 4.5 What the refutation costs, bounded by measurement rather than argued
 
-**The decision: nothing.** The 100 Hz unconditional kick and the 17.5 ms arm
-are gone, which is exactly what a bitable watchdog needs.
+**The decision: nothing.** The 100 Hz unconditional kick and the vendor's
+`OVSEL` 3 arm are gone, which is exactly what a bitable watchdog needs. *(This
+sentence said "the 17.5 ms arm" until 2026-09-09; the arm is 1,334.7 ms 量 and
+the decision does not depend on which — a watchdog that cannot bite cannot bite
+at either deadline.)*
 
 **The safety net: a bounded amount.** All three surviving *kicks* are on the
 wlan bring-up path, and 量 the image's own initcall table:
@@ -650,8 +673,55 @@ Linux at **200,005 Hz** — different register, different method, different
 seating. **Ratio 0.999.**
 
 So `CLK-08b`'s 14.965 MHz is a loader-state constant exactly as `CLK-17`'s
-14,286,057 Hz is, and `CLK-08b`'s open residual — *what does the watchdog
-count* — is answered: **it counts what the timer block counts.**
+14,286,057 Hz is. ~~And `CLK-08b`'s open residual — *what does the watchdog
+count* — is answered: **it counts what the timer block counts.**~~
+
+🔴🔴 **2026-09-09, DESK, NO NEW READING: THAT LAST SENTENCE IS REFUTED BY THE
+TWO ROWS DIRECTLY ABOVE IT, AND "RATIO 0.999" READS AS AGREEMENT ONLY BECAUSE
+NOBODY PUT IT THROUGH THE FIT.** The model is
+`gap(OVSEL) = 2^(15+OVSEL)/f + d` with **one** `d`. Force `f` to the timer's
+rate and the same two measured rungs demand two different offsets:
+
+| forced `f` | `d` from rung 3 | `d` from rung 8 | inconsistency |
+|---|---|---|---|
+| 200,000 Hz (`hz_tick`, derived) | +24.003 ms | −12.441 ms | **−36.444 ms** |
+| 200,005 Hz (`CLK-17`, 量) | +24.036 ms | −11.392 ms | **−35.428 ms** |
+| 200,179.5 Hz (this fit) | +25.179 ms | +25.179 ms | 0.000 ms |
+
+**The instrument floor in those same two captures is 0.517 and 0.868 ms.** So
+the two rungs exclude *"the watchdog counts at the timer's rate"* by roughly
+**forty times the floor**. A 0.09 % ratio is not agreement at this precision;
+it is a 36 ms residual with nowhere to go.
+
+**Three hypotheses, and only one of them is about the SoC.**
+
+* **`H1`** — the watchdog really counts ~0.09 % faster than TC0/TC1. Separate
+  divider chains off one `CDBR`. A finding about the part.
+* **`H2`** — the **host** clock and the board differ by ~900 ppm. This enters
+  the fit **multiplicatively** and is absorbed into `f`, and then *every*
+  interval this project has read off `console-capture` timestamps carries the
+  same scale error. The repo's tightest bound is `P3-7`'s 3,009 vendor ticks in
+  30.10 host seconds = **300 ± 170 ppm**, which does not settle it. ⚠️ Note
+  that `IRQ-13`'s *"zero lost ticks over 263.73 s"* cannot help: the 263.73 is
+  `Δjiffies × 10 ms`, so both sides of that comparison are the board's.
+* **`H3`** — one of the two rungs is wrong.
+
+**The discriminator is `OVSEL` 9, and it is written down before power:**
+
+| if `f` is | bare `2^24/f` | fitted `d` | predicted gap |
+|---|---|---|---|
+| 200,000 Hz | 83,886.080 ms | +24.003 ms | **83,910.083 ms** |
+| 200,180 Hz | 83,810.841 ms | +25.179 ms | **83,836.019 ms** |
+
+**75.2 ms apart, against a 0.9 ms floor — about 85 σ.** A third point that
+lands on neither refutes the linear model itself, which is `H3`'s shape.
+`H2` is separated by a cell that needs no bite at all: two `/proc` reads about
+two minutes apart, `Δjiffies × 10 ms` against the host's own `Δt` from the
+`.timing`, which resolves to ~10 ppm and costs nothing.
+
+*(`CLK-08b`'s residual is therefore **still open**, and it is open in a sharper
+form than before: the watchdog does not count what the timer counts, and what
+it does count is bounded to 200,180 ± the fit's own error.)*
 
 ⚠️ **`RTL819X_WDT_HZ` and the whole `usec` column of `rtl819x_wdt_steps[]` are
 therefore documented-wrong by 76× and are NOT changed yet.** The table is what
