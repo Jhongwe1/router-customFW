@@ -831,3 +831,144 @@ survived*, and the at-rest row is the control that says what the rate is.
 
 ⚠️ `jiffies` wrapped through zero inside that measurement
 (4,294,955,745 → 592, Linux's `INITIAL_JIFFIES = −300·HZ`).
+
+---
+
+## 11. Seating 18 (2026-09-09): `OVSEL[2]`, the counter that is not cleared, and a model that does not fit
+
+One power cycle, fourteen boots, **828 s** of chained cells with no operator
+gap. `check-predictions` **27 of 27**, every boot capture **1,424 bytes**, and
+the card refuted in six places — all of them in
+`bench/2026-09-09/CORRECTIONS-block15.md`, none of them by editing the card.
+
+### 11.1 🟢🟢 `OVSEL[2]` is **bit 17**, and the field is not contiguous
+
+`CLK-28` and `FW-53` both had the same residual — *where is `OVSEL[2]`* — and
+seating 17 could only say *not bit 19, not bit 20*. 量:
+
+    biteraw 0x00020000   ->  2,475.923 ms  ->  494,944 counts
+    biteraw 0x00010000   ->    153.640 ms  ->   30,713 counts
+
+**The decision does not rest on the ratio.** Both cells are `biteraw`, so both
+carry the deficit § 11.2 describes; what decides it is **uniqueness**. With the
+deficit bounded at `kick_ms × f` = `0.250 s × 199,903 Hz` = **49,976 counts**,
+a period `2^n` is admissible for a reading of `c` counts iff
+`−tol ≤ 2^n − c ≤ 49,976`. For 494,944 counts only `2^19` survives: `2^18`
+would need a negative deficit and `2^20` would need 553,632.
+
+**So that cell is `OVSEL` 4, and bit 17 is `OVSEL[2]`.** The field is
+
+| `OVSEL` bit | `WDTCNR` bit |
+|---|---|
+| 0 | 21 |
+| 1 | 22 |
+| **2** | **17** |
+| 3 | 18 |
+
+— non-contiguous, out of order, with `WDTIND` (bit 20) and bit 19 sitting
+*inside* the range and inert for the timeout. The same scan confirms
+bit 22 = `2^17` and bit 18 = `2^23`, each uniquely.
+
+### 11.2 🟢🟢 The mechanism: `bite` clears the counter and `biteraw` does not
+
+🔴 **Found because the card got a column wrong.** § 3.3 of the card tabled the
+arming words as `00000000` / `00600000` / `00040000` / `00240000`. The board
+printed **`00800000` / `00E00000` / `00840000` / `00A40000`**:
+`rtl819x_wdt_verb_bite` composes with `kick = 1`, so **every `bite` word carries
+`WDTCLR`**. `biteraw` passes the raw word through, so it does not — and the
+counter continues from wherever `BOOTGUARD`'s last kick left it.
+
+**The control is a factor of ninety**, at one period (`2^15`):
+
+| | readings | spread |
+|---|---|---|
+| **with** `WDTCLR` | 163.911, 165.367 ms — **the same word** `0x00800000`, two different boots | **1.456 ms (0.89 %)** |
+| **without** | 153.640, 21.906, 91.146 ms | **131.7 ms (148 %)** |
+
+🔴 **And that refutes `FW-53`'s conclusion.** It read *bits 19 and 20 both
+shorten the timeout below `OVSEL` 0, which no `OVSEL` reading predicts*. They
+are inert; what shortens them is the uncleared counter. **The proof is that the
+two seatings disagree** — bit 19 went 68.647 → 21.906 ms (−68.1 %), bit 20 went
+12.336 → 91.146 ms (+638.9 %). A hardware divider bit does not change value
+between seatings; a random starting count does.
+
+⚠️ **The limit this puts on the method, which the card did not know**: the
+deficit bound (49,976) **exceeds `2^15`** (32,768), so a single un-cleared
+reading cannot tell `OVSEL` 0 from `OVSEL` 1. Bits 16, 20, 21 and 23 stay
+ambiguous. `kickms 5000` before the `biteraw` fixes it for one extra command
+per cell.
+
+### 11.3 🔴 Four rungs refute the linear model, and `OVSEL` 3 is the outlier twice
+
+    OVSEL 0      163.911 ms        OVSEL 8   41,910.358 ms
+    OVSEL 3    1,340.982 ms        OVSEL 9   84,001.412 ms
+
+Least squares on `gap = 2^(15+OVSEL)/f + d` gives `f = 199,800 Hz`,
+`d = −3.591 ms` and residuals **+3.5 / +32.5 / −71.0 / +35.0 ms** — against an
+instrument whose repeatability § 11.2 measures at **1.456 ms**.
+
+The pair 0 & 8 gives `f = 200,157 Hz` and **`d = +0.20 ms`**, which is what the
+physics says it should be: the loader's 2.07 ms to first byte (`CLK-14`) minus
+`RLXFW-W-GO`'s twelve bytes draining at 38400 (−3.1 ms). Reading the other
+rungs against that pair, `OVSEL` 0, 8 and 9 land within **0.13 %** of `2^15`,
+`2^23` and `2^24` — and **`OVSEL` 3 is 2.26 % long**.
+
+🔴 **Seating 17's rung 3 is ~1.8 % long the same way.** Two seatings, same
+direction. So `CLK-08b`'s `d = +25.179 ms` is very likely not a physical offset
+at all: it is a **two-point fit absorbing rung 3's anomaly into the offset**,
+which is exactly what a two-point fit does when there are no residuals to look
+at. **`f_wdt` is therefore not a quantity this seating measured**, and
+`CLK-08b`'s residual stays open in a sharper form than before.
+
+### 11.4 🔴 The host clock hypothesis is refuted, and the correction goes the wrong way
+
+`C1-R`: one capture, two `/proc` reads 120 s apart, both timestamps in one
+`.timing`, so the ratio needs no cross-capture wall-clock.
+
+    Djiffies = 12,003  ->  board 120.030 s
+    Dt(host)                120.0882 s
+    board/host = 0.999515731  =  -484.3 ppm     (quantisation floor 83.3 ppm)
+
+The hypothesis needed **~900 ppm** in the other direction. Expressed against
+that one clock, `f_tick = 12,003 × 2,000 ÷ 120.0882 = **199,903 Hz**`, and
+seating 17's `f_wdt = 200,180 Hz` is **+0.138 %** above it — where the
+comparison against the nominal 200,000 gave +0.090 %. **The correction makes
+the discrepancy larger.**
+
+### 11.5 🟢 `WDT-1`: seven fields, seven hits
+
+`C1-P`, every one derived at the desk from the two registers `TM-1` measured on
+2026-09-03, computed on the die by a driver written blind:
+
+    tc0data_at_init 00007D00     hz_agree 1
+    cdbr_at_init 03E80000        hz_derived 200000
+    hz_tick 200000               hw_timeout_derived_us 83886080
+    hz_cdbr 200000
+
+Beside them the dump still prints `wdt_hz 14965000` and
+`hw_timeout_us 1121101` — **the 76× on one page**, which is why the table was
+not rewritten.
+
+### 11.6 🟢 The `/dev/watchdog` USER path, end to end
+
+`C5-UB` held the device open with `sleep 400 > /dev/watchdog` and the board
+reset **143.563 s** later, against 60 (`soft_timeout`) + 83.886 (the derived
+`OVSEL` 9) = 143.886 s — **−0.22 %**.
+
+🟢 **The evidence that the open reached `WDT_USER` is the bite itself.**
+`BOOTGUARD` is fed every 250 ms and can never bite, so a reset at that moment
+is the consequence of the state change, not a field read back. The `state`
+field was never looked at while the device was held.
+
+🔴 **The card's first draft used `exec 3> /dev/watchdog` and `cardcheck`
+refused it**, because `exec` is on its `ASH_BUILTINS` list and that list's own
+comment says it is 推 and that no card rests on it. Making this card the first
+thing to rest on it would have been passing a gate the wrong way.
+
+### 11.7 ⚠️ What section 10's own residual now says
+
+`CLK-08b` 殘留 — *what does the watchdog count* — is **still open**, and § 11.3
+is why: three of four rungs put it within 0.13 % of the timer's rate with a
+physically sensible offset, one is 2 % out in both seatings, and no single
+`(f, d)` describes all four. **The answer is closer and the question is
+sharper**, which is not the same as an answer.

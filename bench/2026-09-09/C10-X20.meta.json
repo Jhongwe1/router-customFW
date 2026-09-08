@@ -1,0 +1,38 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-09T03:44:14+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 300.0,
+  "esc_period_requested_s": 0.01,
+  "esc": {
+    "esc_after": {
+      "requested_period_s": 0.01,
+      "writes": 239,
+      "window_s": 2.481939,
+      "achieved_period_s": 0.010385,
+      "ended_on_until": true
+    }
+  },
+  "cr": {
+    "esc_after": {
+      "written": true,
+      "prompt_seen": true,
+      "waited_s": 0.050321,
+      "log_offset": 592,
+      "settle_budget_s": 2.0
+    }
+  },
+  "cr_settle_s": 2.0,
+  "seconds": 320.0,
+  "idle": 0.0,
+  "until": "<RealTek>",
+  "until_offset": 566,
+  "sent": "echo unlock > /proc/rtl819x-wdt ; cat /proc/rtl819x-wdt ; echo biteraw 0x00100000 > /proc/rtl819x-wdt",
+  "sent_hex": "6563686f20756e6c6f636b203e202f70726f632f72746c383139782d776474203b20636174202f70726f632f72746c383139782d776474203b206563686f20626974657261772030783030313030303030203e202f70726f632f72746c383139782d7764740d",
+  "stop_reason": "--until matched at offset 566",
+  "bytes": 623,
+  "duration_s": 2.728912,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}
