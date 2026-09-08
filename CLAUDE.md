@@ -415,7 +415,16 @@ released source.
 > before they were pushed**: `capdate` and `capfield` printed case lines with
 > four leading spaces where `ci-census` parses two, so both would have read
 > `ran 0/13` and `ran 0/10` with zero failures — green tools, red census,
-> discovered after a push. 🟢 **`FW-49`**: `\r\r\n` has **two** sources and
+> discovered after a push. 🔴 **Two OTHER defects did reach CI, and the pair
+> is a finding about CI rather than about them**: run `34156759778` went red
+> at `text/test-file-modes` (the executable bit, which CI caught before the
+> local gate did) with `census` **skipped**; the next run, with the mode
+> fixed, went red at `census` — `RED looprun ran 66/55 … CENSUS-MISMATCH
+> 66+0+0 != 55`, the exact line predicted at the desk an hour earlier; the
+> third was green. **`census` declares `needs: [text, instruments]`, so a red
+> `text` HIDES the census entirely** — the two reds are serial by
+> construction, and one push shows one layer. A green run means *this layer*
+> is clean. 🟢 **`FW-49`**: `\r\r\n` has **two** sources and
 > only one is a wrap — ash's line editor wraps the *echo* at the terminal
 > width (33 of 713 classified captures, all `len(sent) ≥ 80`), while the other
 > 33 are the loader's own `\r` + `\r\n`; **output is never wrapped**, an

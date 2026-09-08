@@ -632,6 +632,25 @@ build reused the cell name `spi11`, so the first build's `vmlinux`,
 diffed.  Nothing evidential was lost -- `spi11` is a compile check and not an
 image any card names -- but it is the same shape as seating 14's `r53b2`.
 
+### 9.6a 🔴 The next card's boot-capture prediction moves, and by exactly 10 bytes
+
+Every card in this project predicts the byte count of its boot capture, and
+seating 16's ten were **1,318 against a prediction of 1,318**.  1.1 adds one
+mark, `rlxfw_mark("S8")` after `create_proc_entry` for the map file.
+
+`rlxfw-mark.h:45`: `rlxfw_mark(tag)` is `rlxfw_puts("RLXFW-" tag "\n")`, and
+`rlxfw_puts` writes `\r` before `\n`, so a plain mark costs
+`6 + len(tag) + 2` bytes.  The existing budget re-derives from that exactly:
+`S0` 10 + `S1`..`S6` at 19 each (`RLXFW-Sn=XXXXXXXX\r\n`) + `S7` 10 = **134**,
+which is the number `LOG.md` recorded for seating 16.
+
+So this driver's contribution goes **134 -> 144** and the boot capture goes
+**1,318 -> 1,328**, before whatever `R5-6` adds on top.
+
+⚠️ `S8-NOMAP` is on the failure path and costs 16 if it ever fires; the three
+`markx` verbs `S-MRC`/`S-MDIFF`/`S-MH601` fire only when `map` is typed and are
+not in the boot budget at all.
+
 ### 9.7 What 1.1 does not establish
 
 * **Nothing has run on the silicon.**  Every number in § 9.6 is a build

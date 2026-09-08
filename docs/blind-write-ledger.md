@@ -609,6 +609,15 @@ it. It is declared by hand, and § 7 ⑦ already carries that hole.
 | `include/crypto/hash.h` | line | generic | 🆕 **2026-09-07.** the `crypto_shash` API surface |
 | `arch/rlx/kernel/rlx-cevt.c` | line | **the port's own** | 🆕 **2026-09-07.** `:156-179` the watchdog kick and `=0` reset comment. Already in § 4.8 for `R5-3b-1`; cited here because `FW-45` is what bounds this driver's traversal |
 
+🔄 **2026-09-08 (forty-fourth segment): `rtl819x-spi` 1.1 added NOTHING to this
+table, and that is a claim rather than an omission.** 1.1 adds
+`verify <n> <off>`, a two-level `map` and an in-kernel `jiffies` timestamp. The
+only files opened to write it were this driver, `tools/flashwin.py` (mine),
+this repository's own `.timing`/`.log` captures, and 2.6.30's `read_proc_t`
+interface in the tree already staged. **No vendor source and no public port was
+read**, so the 20 paths below stand unchanged at 20. Said here because a ledger
+that only ever grows is a ledger nobody would notice stopping.
+
 🔴 **Verdict: `R5-5` cannot be claimed as blind against the vendor.** Its
 partition layout, its map function's short-read behaviour, its virtual base and
 its `CONFIG_` branching have all been read, and three of them are decision-layer

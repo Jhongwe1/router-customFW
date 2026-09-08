@@ -19401,6 +19401,35 @@ chunk（17.58 %）整塊是 `0xFF`**，尾端空白段從 `0x34C000` 起、737,2
 而發現它的是「我剛改了一張 CI 照著判紅綠的表，那是一個宣稱，所以要有控制」。
 兩臂（dump 在／dump 不在）都跑過，census rc 0。
 
+### 6a. 🔴 但兩個缺陷確實跑到了 GitHub，而其中一個是我預測的紅、真的紅了
+
+**這一節推翻本段稍早的一句自我評價。** 「全部在 push 之前抓到」是假的：三次
+push 產生三個 run，前兩個是 failure。
+
+| run | 這一次修了什麼 | 結果 |
+|---|---|---|
+| `34156759778`（`a71ea16`） | — | 🔴 `text/test-file-modes` 紅（三支工具 `100644`），**`census` 被 skip** |
+| `34157163312`（`45e4eee`） | `dd4fe62` 修了執行位元 | 🔴 `text` 綠了，**輪到 `census` 紅** |
+| `34157334624`（`feadd37`） | 修了 `looprun 55 → 66` | 🟢 success |
+
+🔴 **第一個紅是 CI 比我先抓到。** 執行位元漂移是在 push 之後、我跑本機閘門時才
+發現的，而 CI 已經先報了。抓到它的兩邊都是同一支 `test-file-modes.sh`，差別只在
+誰先跑。
+
+🟢 **第二個紅是我寫下來的預測，而它逐字發生**：
+`RED   looprun   ran  66/55  failed 0  not run 0   CENSUS-MISMATCH 66+0+0 != 55`。
+我在收工稽核時用 `git grep` 找到宣告還是 55、實際 66，並寫下「這是下一次 push 的
+`CENSUS-MISMATCH`」——然後它就是。
+
+⚠️ **而兩個紅是**串聯**的，不是巧合**：`census` 這個 job 宣告 `needs: [text,
+instruments]`，所以 `text` 紅的時候 census **根本不會跑**。`ci-expected.tsv` 裡
+`looprun` 那一列自己的註解早就記過同一件事（「while `text` was red on a `C8`
+finding the census was SKIPPED and never printed its line」）。**所以第一個紅
+遮住了第二個紅，而修掉第一個才讓第二個現形** —— 一次 push 只能看到一層。
+
+**學到的**：一個 CI 綠不是「這一次沒問題」，是「這一次**目前這一層**沒問題」。
+job 之間有 `needs` 的時候，紅是分層的。
+
 ### 7. 收支
 
 | | |
