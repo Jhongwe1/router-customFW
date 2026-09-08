@@ -187,7 +187,24 @@ PY
 # selected by that patch, and GENERIC_GPIO, which GPIOLIB selects.  The two
 # derived rows exist because the delta has to explain every line that moves;
 # without them `kconfig-delta check` reports them as undeclared.
-ck "E1 the committed delta parses: 40 rules, 17 set, 23 derived" "40 17 23" \
+# 🔄 2026-09-08 (`R5-6`): 40 -> 45 rules, 17 -> 22 set, 23 derived.  FIVE
+# `set` rows and no new derived one, which is the half worth asserting.
+# CONFIG_RTL_WTDOG y -> n removes the vendor's watchdog arm and its 100 Hz
+# kick, without which a /dev/watchdog cannot bite; CONFIG_WATCHDOG n -> y makes
+# drivers/Makefile:79 descend into the directory at all; WATCHDOG_NOWAYOUT and
+# SOFT_WATCHDOG are the only two entries that menu newly offers, pinned so
+# `(NEW)` stays 0 -- ENUMERATED by parsing drivers/watchdog/Kconfig with its
+# if/endif nesting tracked, not guessed, and the build agreed.  The fifth,
+# CONFIG_GPIO_SYSFS, is a CORRECTION and not part of R5-6: 量, it had been an
+# undeclared difference in r54b, r55b and spi11 since CONFIG_GPIOLIB went in on
+# 2026-09-06, because `kconfig-delta check` is never run by rlxfw-kbuild.sh.
+# 🔴 THIS SUITE IS WHY THAT SEGMENT'S CLOSEOUT WAS INCOMPLETE.  It names the
+# suites whose CODE it touched and ran those; test-config-gates owns the two
+# files it touched most and was not among them, so four hardcoded shapes went
+# to CI unchecked.  Same shape as the `looprun 55 against 66` miss one segment
+# earlier: the suite you edited is not the same set as the suite that owns
+# what you edited.
+ck "E1 the committed delta parses: 45 rules, 22 set, 23 derived" "45 22 23" \
    "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
 
 # E1b -- the same file, per variant, and it also runs on a clean clone.  Without
@@ -211,9 +228,9 @@ except SystemExit as e:
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1b --variant loud: 42 rules, 19 set, 23 derived"  "42 19 23" \
+ck "E1b --variant loud: 47 rules, 24 set, 23 derived"  "47 24 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
-ck "E1b --variant quiet does NOT pick them up"         "40 17 23" \
+ck "E1b --variant quiet does NOT pick them up"         "45 22 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
@@ -355,7 +372,14 @@ ck "G4b and TWELVE marks in total"        12 \
 # nothing checks".  So it is counted separately rather than folded in: the two
 # kinds make opposite claims and one number covering both could not say which
 # had moved.
-ck "G4c and FOUR present-witness build rows"  4 \
+# 🔄 2026-09-08 (`R5-6`): 4 -> 5.  MK6 links drivers/watchdog/rtl819x-wdt.o
+# and its witness is `str:rtl819x-wdt`.  🔴 MK6 is the first build row whose
+# ABSENCE IS SILENT -- MK2/MK3/MK4 fail the link when their config line is
+# missing, but drivers/Makefile:79 makes the whole watchdog DIRECTORY
+# conditional, so without CONFIG_WATCHDOG=y the file is never compiled and
+# everything downstream is green.  A string witness read out of the built
+# image is the only thing here that can tell those two apart.
+ck "G4c and FIVE present-witness build rows"  5 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
 ck "G4d and ONE absent-witness build row"     1 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
