@@ -360,7 +360,7 @@ def table_findings(path, tables, lines=None, mask=None):
     SPEC.md report and the repository-wide sweep.  Two copies of a rule is how
     `hazlint`'s `_scan_elf` came to accept states the real program refused."""
     out = []
-    if lines is not None and mask is not None:
+    if lines is not None and mask is not None and path not in C8C_EXEMPT:
         for i in orphan_rows(lines, mask, tables):
             out.append((
                 'C8c',
@@ -635,6 +635,23 @@ def table_scope(root=ROOT):
 # So C10 is a HEURISTIC whose result is currently correct and whose mechanism is
 # narrower than the defect.  It stays because it found three real instances that
 # every other check walked past; it is documented rather than trusted.
+
+# C8c's exemption, and it is the same shape as C10's for the same reason.
+# T13b asserts each entry is LOAD-BEARING, so a repaired file forces its entry
+# out rather than leaving a hole nobody re-reads.
+C8C_EXEMPT = {
+    'bench/2026-09-09/PREDICTIONS-B16-block15.md':
+        'frozen prediction block: section 1 quotes the RECIPE_ID formula in '
+        'prose and the quotation wraps onto a line beginning `|`. '
+        'check-predictions.py reads this file mtime -- its own docstring says '
+        'fixing even a typo makes the check fail and that this is correct -- so '
+        'repairing it would turn its 27 of 27 into 0 of 27. '
+        'The defect is real and is recorded in the card\'s CORRECTIONS file. '
+        'It reached a frozen card because gate 2 of the freeze procedure is '
+        'spec-check, which sweeps TRACKED .md files, and the card is untracked '
+        'until the freezing commit -- so the gate could not see the file it was '
+        'gating',
+}
 
 # The one file this cannot be applied to, with the reason.  T13 asserts the
 # exemption is LOAD-BEARING -- if the file is ever repaired, T13 goes red and
@@ -1478,6 +1495,31 @@ def table_controls(verbose=True):
     else:
         print(f'  ok    {"T13 every C10 exemption is load-bearing":52s} '
               f'{len(C10_EXEMPT)} entry/entries, each still firing without it')
+        ok += 1
+
+    # T13b is T13 for C8c.  Same argument: an exemption nobody checks is a
+    # permanent hole, and a card that is ever regenerated must force its entry
+    # out instead of quietly covering a later orphan row.
+    stale8 = []
+    for rel in sorted(C8C_EXEMPT):
+        full = os.path.join(ROOT, rel)
+        try:
+            lines = io.open(full, encoding='utf-8').read().split('\n')
+        except OSError:
+            stale8.append((rel, 'unreadable'))
+            continue
+        m = fence_mask(lines)
+        tbls, _ = parse(full)
+        if not list(orphan_rows(lines, m, tbls)):
+            stale8.append((rel, 'no longer has an orphan `|`-line'))
+    if stale8:
+        for rel, why in stale8:
+            print(f'  FAIL  {"T13b every C8c exemption is load-bearing":52s} '
+                  f'{rel}: {why} -- remove the entry')
+        fail += 1
+    else:
+        print(f'  ok    {"T13b every C8c exemption is load-bearing":52s} '
+              f'{len(C8C_EXEMPT)} entry/entries, each still firing without it')
         ok += 1
 
     # T16 is N6's.  Every other C10 control appends text ending in a newline,

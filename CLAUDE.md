@@ -558,6 +558,114 @@ released source.
 > accident built the first half of `FLS-26`'s attribution bracket: the map ran
 > at 22:45, the vendor firmware after it, so **one `map 0` on the next
 > seating's first boot closes it at zero cost.**
+> 🔄 **2026-09-09, SEVENTEENTH update — seating 18, ONE power cycle against a
+> budget of one, fourteen boots, 828 s of chained cells with no operator gap,
+> and the best result is a mechanism nobody put on the card.**
+> 🟢🟢 **`OVSEL[2]` IS BIT 17, and `CLK-28`'s and `FW-53`'s residuals close
+> together.** `biteraw 0x00020000` bit at **2,475.923 ms** = 494,944 counts, and
+> with the deficit bounded at `kick_ms × f` = **49,976 counts** only `2^19` is
+> admissible — `2^18` would need a negative deficit and `2^20` would need
+> 553,632. **The field is non-contiguous and out of order**: `[0]`=bit21,
+> `[1]`=bit22, **`[2]`=bit17**, `[3]`=bit18, with bit 19 and `WDTIND` (bit 20)
+> sitting *inside* the range and inert for the timeout.
+> 🟢🟢 **That bound exists because the card got a column wrong.** § 3.3 tabled
+> the arming words without `WDTCLR`; the board printed `00800000` / `00E00000` /
+> `00840000` / `00A40000`, because `verb_bite` composes with `kick = 1`. **So
+> `bite` clears the counter and `biteraw` does not** — it continues from wherever
+> `BOOTGUARD`'s last kick left it. **The control is a factor of ninety** at one
+> period: **with** `WDTCLR`, two readings of the *same word* on two different
+> boots differ by **1.456 ms**; **without**, three readings spread **131.7 ms**.
+> 🔴 **`FW-53`'s conclusion is refuted and what refutes it is
+> non-reproducibility.** It read *bits 19 and 20 both shorten the timeout below
+> `OVSEL` 0, which no `OVSEL` reading predicts*. They are inert; the shortening
+> is the uncleared counter, and the proof is that the two seatings disagree by
+> **−68.1 %** and **+638.9 %**. A hardware divider bit does not change value
+> between seatings. ⚠️ **And the method's own limit, which the card did not
+> know**: 49,976 exceeds `2^15` (32,768), so an un-cleared reading cannot tell
+> `OVSEL` 0 from `OVSEL` 1 — bits 16, 20, 21 and 23 stay ambiguous, and
+> `kickms 5000` before the `biteraw` fixes it for one extra command.
+> 🟢🟢 **`FLS-26`'s attribution bracket closed BYTE-IDENTICAL.** `cmp` on the
+> two seatings' `C1-M0` logs: **identical**, and between them the vendor firmware
+> ran **twice** — so those two runs wrote nothing to 4,186,112 bytes. `map 1 0`
+> then found **TWO** differing units in group 0, not one: `009000` and
+> **`00D000`**, the second of which nothing had ever seen, because *a prefix
+> digest cannot look past its first difference* — which the card said in advance
+> and then predicted "exactly one" anyway. **Ledger: proven identical
+> 4,177,920 B (99.61 %), proven different 8,192 B (0.195 %), undetermined
+> 8,192 B (0.195 %) — and that is exactly `H601`.** ⚠️ *Proven identical* still
+> means *digests agree with the 2026-08-16 dump*: it cannot see two writes that
+> cancel, and **no `FLR` ran**.
+> 🔴 **Four rungs refute the linear model, and the fourteenth update's own
+> `d` is probably an artefact.** `OVSEL` 0/3/8/9 = **163.911 / 1,340.982 /
+> 41,910.358 / 84,001.412 ms**; least squares leaves residuals **+3.5 / +32.5 /
+> −71.0 / +35.0 ms** against a repeatability of **1.456 ms**. Read against the
+> 0 & 8 pair — `f = 200,157 Hz`, `d = +0.20 ms`, which is what the physics
+> predicts (`CLK-14`'s +2.07 ms minus `RLXFW-W-GO`'s 12 bytes at 38400) — rungs
+> 0, 8 and 9 land within **0.13 %** of their powers of two and **`OVSEL` 3 is
+> 2.26 % long**. Seating 17's rung 3 is ~1.8 % long the same way, so
+> `CLK-08b`'s `d = +25.179 ms` is most likely **a two-point fit absorbing that
+> anomaly into the offset** — which is what a two-point fit does when there are
+> no residuals to look at. **`f_wdt` is not a quantity either seating has
+> measured.**
+> 🔴 **The host-clock hypothesis is refuted and the correction goes the WRONG
+> WAY.** `C1-R` — one capture, two `/proc` reads 120 s apart, both timestamps in
+> one `.timing` — gives **board/host = −484.3 ppm** where the hypothesis needed
+> ~900 ppm the other way. Expressed against that one clock,
+> `f_tick = 199,903 Hz` and the watchdog's excess over the timer grows from
+> **+0.090 % to +0.138 %**.
+> 🟢 **`WDT-1`: seven `/proc` fields, seven hits**, derived on the die at `init`
+> from `TC0DATA` and `CDBR` by a driver written blind, every one predicted at the
+> desk from registers `TM-1` measured six days earlier. `wdt_hz 14965000` prints
+> beside `hz_derived 200000` — **the 76× on one page**, which is why the compiled
+> table was deliberately not rewritten.
+> 🟢 **The `/dev/watchdog` USER path ran end to end**: the board reset
+> **143.563 s** after the device was held open with `sleep 400 > /dev/watchdog`,
+> against 143.886 s predicted (**−0.22 %**) — and **the evidence that the open
+> reached `WDT_USER` is the bite itself**, because `BOOTGUARD` is fed every
+> 250 ms and cannot bite. A consequence, not a field. 🔴 The card's first draft
+> used `exec 3>` and `cardcheck` **refused** it: `exec` is on its `ASH_BUILTINS`
+> list, whose own comment says the list is 推 and that no card rests on it.
+> 🟢 **`console-capture` 1.4's `--until` worked on the silicon first try**, on
+> **23 of 27** cells. `C1-M0` returned **3,013 bytes in 13.684 s** where seating
+> 17 took **120.106 s** for the same 3,013 bytes. 🔴 **It exists because
+> seating 17's own rule does not fix what it was written for**: *take three times
+> the prediction* does not cover 76×, and `FW-53`'s bit scan has **no prediction
+> to multiply**. 量 `R2-B8.timing`: the console is silent for **41.931 s** while
+> a bite is pending, so `--idle` cannot wait for one either.
+> 🔴 **The boot-capture control FIRED.** All thirteen are **1,424 bytes** — the
+> length half holds exactly — but **three** fields differ from seating 17, not
+> two. `RLXFW-TA6`, which is `IRQ-13`'s lost-interrupt count, reads **8 on all
+> thirteen** against 11 on nine of seating 17's ten. 推, and the only candidate:
+> `vmlinux` grew 233 bytes and moved the vendor NIC init's I-cache alignment.
+> **Refuted by a third image whose size changes and whose `TA6` does not.**
+> ⚠️ **Zero flash-write commands, zero `FLR`, `n_writes 0`** — and that last one
+> was read by an **explicitly declared off-card cell**, because § 6 of the card
+> made the claim and no cell on the card tested it.
+> 🔴🔴 **THE FREEZE PROCEDURE HAS A HOLE AND THE DESK SWEEP IS WHAT FOUND IT.**
+> Gate 2 is `spec-check`, and `spec-check` sweeps **tracked** `.md` files — but a
+> card is untracked until the freezing commit, so **the gate that exists to check
+> the card cannot see the card**. 量: all five gates passed at 03:11, and the
+> sweep at 04:32 reported a `C8c` in the frozen card (§ 1 quotes the `RECIPE_ID`
+> formula in prose and the quotation wraps onto a line beginning `|`). It **must
+> not be repaired** — `check-predictions` reads the card's mtime and its own
+> docstring says fixing even a typo has to make the check fail — so it is
+> exempted **by name** in a new `C8C_EXEMPT`, mirroring `C10_EXEMPT` for
+> `bench/2026-08-25b`, with **`T13b`** as the control that re-runs the check with
+> the exemption off and goes red if the file is ever clean. `spec-check` 54 → 55
+> cases, its 21 mutants still all killed. *(The fix for the hole itself is
+> carried forward: gate 2 has to run on a tree where the card is staged.)*
+> 🔴 **And ONE unclosed backtick produced EIGHTY reported defects — the third
+> time, and the second time the message alone identified it.** A `` ` `` I left
+> off `f_tick = …` in a `SPEC.md` patch shifted the pairing for the rest of the
+> file: **79 `C9` + 1 `C10`**, all of them artefacts, all of them gone when the
+> one tick went in. `f451f1f` was 49 and `837cd22` was the second.
+> 🔴 **I also repeated this file's own `EXIT CODE: 0` incident.** Every
+> `spec-check rc=0` reported after the freeze came from
+> `bash -c '… ; echo "rc=$?"'` through the Bash tool, and the row above says
+> `$?` is expanded in the **outer** shell there — so those were not
+> measurements. The freeze-time one WAS real, because it ran inside `freeze.sh`.
+> **The rule is not "be careful with `$?`", it is "read an exit code only from
+> inside a script file", and this segment proves it by having done both.**
 > > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.
@@ -761,6 +869,21 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   one way breaks when run the other, and neither run tells you which you
   got.** The rule does not move: write `/usr/bin/python3` and the question
   never arises.
+- 🆕 **Windows-side Python is cp950 here, and it breaks in BOTH directions.**
+  量 2026-09-09, twice in one segment. ① `subprocess.run(..., text=True)`
+  decoding a tool's UTF-8 output raises `UnicodeDecodeError: 'cp950' codec can't
+  decode byte 0xe2` — a `gh run view` whose display title held an em-dash was
+  enough. ② `print()` of any emoji raises `UnicodeEncodeError`, and **that one
+  is the dangerous direction**: it fired inside a patch script that had already
+  rewritten its target in memory and had not yet written it out, so a slightly
+  different script would have left a half-applied edit. 🟢 It did not, because
+  the write is `build the whole string, write to path.tmp, os.replace` — the
+  same rule this file already carries for `open(path, 'w')`. **Pass
+  `encoding="utf-8"` to every `subprocess` capture and put
+  `sys.stdout.reconfigure(encoding="utf-8")` at the top of every script run by
+  `C:\Program Files\Python310\python.exe`.** WSL's `/usr/bin/python3` has
+  neither problem, so a script that works one side can fail the other with no
+  code difference at all.
 - 🆕 **`gh` exists only on the Windows side and `jq` only inside WSL, so no
   single shell can run both — and a tool that needs one runs where that one
   is.** 量 2026-09-07: `tools/citime.py` shells out to `gh`, so running it
