@@ -1644,6 +1644,49 @@ def progress_step_state(text):
     return out
 
 
+C12_BLOCK = re.compile(r'\U0001F504\s*\*\*')
+
+
+def c12_blocks(row):
+    """[(opening date, text)] for each dated block in a `Next after this` cell.
+
+    🔴 THE BLOCK THIS CHECK MEANS IS THE ONE WITH THE LATEST DATE, AND NOT THE
+    ONE AT EITHER END.  The first implementation took `hits[-1]` -- the last
+    dated block in the row -- and 量 2026-09-08 that has been reading the
+    OLDEST block on every commit since 2026-09-07: it reported `R5-5` while the
+    row's newest block said `R5-6`.  Taking the FIRST block is equally wrong:
+    at HEAD~40 it reads `R1h`/`R3-9` where `hits[-1]` was right.
+
+    Neither end works because the row is ordered NEITHER way.  量 on the live
+    file: 28 dated blocks, descending for the four most recent and ascending
+    for everything before them -- the convention changed mid-project and the
+    accumulated tail was never rewritten.  A position rule cannot be correct
+    against a file that keeps no position rule, so the date is the only signal
+    left.
+
+    Blocks are delimited by the `🔄` marker rather than by the dates
+    themselves, so a block that cites a second `**<date>` inside it is not
+    split in half -- which a date-delimited scan would do, and which would drop
+    step ids silently.  Any text before the first marker is its own block.
+
+    Ties take the UNION of every block sharing the maximum date: with three
+    blocks dated the same day the file genuinely does not say which is newest,
+    and guessing there would be this same mistake one layer down.
+    """
+    marks = [m.start() for m in C12_BLOCK.finditer(row)]
+    if marks:
+        spans = ([row[:marks[0]]] if marks[0] else [])
+        spans += [row[a:b] for a, b in zip(marks, marks[1:] + [len(row)])]
+    else:
+        spans = [row]
+    out = []
+    for sp in spans:
+        m = C12_DATE.search(sp)
+        if m:
+            out.append((m.group(1), sp))
+    return out
+
+
 def progress_findings(text, path='PROGRESS.md'):
     """(findings, state, ids) for C12."""
     row = None
@@ -1655,19 +1698,20 @@ def progress_findings(text, path='PROGRESS.md'):
         return ([('C12', f'{path}: § Now has no `Next after this` row, so the '
                          f'check that it points at pending work cannot run')],
                 'NO-ROW', [])
-    hits = list(C12_DATE.finditer(row))
-    if not hits:
+    blocks = c12_blocks(row)
+    if not blocks:
         return ([('C12', f'{path}: the `Next after this` row carries no dated '
                          f'block, so its current claim cannot be located')],
                 'NO-DATE', [])
-    tail = row[hits[-1].start():]
+    newest_date = max(d for d, _b in blocks)
+    tail = ' '.join(b for d, b in blocks if d == newest_date)
     steps = progress_step_state(text)
     ids = sorted({i for i in C12_STEP.findall(tail) if i in steps})
     if not ids:
         return ([], 'NO-STEP-ID', [])
     if all(steps[i] for i in ids):
         return ([('C12', f'{path}: the newest block of `Next after this` (dated '
-                         f'{hits[-1].group(1)}) names only steps § Step list '
+                         f'{newest_date}) names only steps § Step list '
                          f'marks closed -- {", ".join(ids)} -- so the row that '
                          f'says what comes next points at finished work')],
                 'FIRE', ids)
@@ -1705,6 +1749,21 @@ C12_CASES = [
     ('P18 an ISO date NOT opening a block is not the anchor',
      '| **Next after this** | ' + _NEW_OPEN + ' 量 2026-03-03，`R9-1` 收掉了。 |',
      0, 'ok'),
+
+    # 🔴 P19-P22 exist because P13/P14 were both written OLDEST-FIRST, which is
+    # the one order in which reading the last block happens to be right.  They
+    # are the same two cases with the blocks the other way round, and until
+    # 2026-09-08 the checker failed both while every control passed.
+    ('P19 newest block FIRST and closed -- position must not excuse it',
+     '| **Next after this** | ' + _NEW_SHUT + ' ' + _OLD + ' |', 1, 'FIRE'),
+    ('P20 newest block FIRST and open, older one closed',
+     '| **Next after this** | ' + _NEW_OPEN + ' '
+     + _OLD.replace('`R9-3`', '`R9-1`') + ' |', 0, 'ok'),
+    ('P21 the SAME two blocks in both orders give the SAME verdict',
+     None, 0, 'ok'),
+    ('P22 a second **date inside a block does not split it',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：見 **2026-01-01** 的'
+     '判斷，下一步是 `R9-3`。 |', 0, 'ok'),
 ]
 
 
@@ -1720,6 +1779,23 @@ def progress_controls(verbose=True):
     if verbose:
         print('=== C12 CONTROLS: a fixture step list, and one case per failure ===')
     for label, row, n_want, state_want in C12_CASES:
+        if row is None:
+            # P21: one content, two orders, one verdict.  This is the case that
+            # makes the fix a rule rather than a patch -- it fails for EITHER
+            # position rule and passes only for the date rule.
+            a = '| **Next after this** | ' + _NEW_SHUT + ' ' + _OLD + ' |'
+            b = '| **Next after this** | ' + _OLD + ' ' + _NEW_SHUT + ' |'
+            ga, sa, _ = progress_findings(C12_STEPS + a + '\n', 'fixture.md')
+            gb, sb, _ = progress_findings(C12_STEPS + b + '\n', 'fixture.md')
+            good = (sa == sb == 'FIRE' and len(ga) == len(gb) == 1)
+            if good:
+                print(f'  ok    {label:58s} both orders FIRE')
+                ok += 1
+            else:
+                print(f'  FAIL  {label:58s} prepend {sa!r}/{len(ga)} vs '
+                      f'append {sb!r}/{len(gb)} -- position still decides')
+                fail += 1
+            continue
         got, state, _ids = progress_findings(C12_STEPS + row + '\n', 'fixture.md')
         good = (len(got) == n_want and state == state_want)
         if good:

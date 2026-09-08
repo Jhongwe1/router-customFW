@@ -91,13 +91,28 @@ NEVERCLOSE = "            return True\n        k = m + 1"
 LINENO = "            out.append(('C10', f'{path}:{start}: a backtick run in this '"
 LOOP = "    for start, text in paragraph_blocks(lines, mask):"
 
-# C12's two branches.  N13 guts the verdict; N14 guts the block selection, and
-# the case that dies under N14 is P13 -- an old OPEN block in front of a closed
-# newest one, where reading the whole row hides the finding.  P14 is its mirror
-# and is deliberately weaker: with `all()`, extra ids can only suppress a
-# finding, so no reading of the row can turn P14's ok into a fire.
+# C12's branches.  N13 guts the verdict; N14/N15/N16 gut the three halves of
+# the block selection.  The case that dies under N14 is P13 -- an old OPEN
+# block in front of a closed newest one, where reading the whole row hides the
+# finding.  P14 is its mirror and is deliberately weaker: with `all()`, extra
+# ids can only suppress a finding, so no reading of the row can turn P14's ok
+# into a fire.
+#
+# 🔴 N14's ANCHOR MOVED ON 2026-09-08 AND THE HARNESS REPORTED IT AS A
+# SURVIVOR, WHICH IS THE DESIGN.  C12 used to select `row[hits[-1].start():]`
+# -- the LAST dated block -- and 量 that had been reading the OLDEST block on
+# the live file since 2026-09-07.  The fix selects by DATE, so the old anchor
+# no longer exists; a harness that skipped a missing anchor would have printed
+# 19/19 over a mutation that could not be applied.
+#
+# 🔴 N15 IS THE OLD BUG PUT BACK IN ONE LINE.  `min` instead of `max` is
+# exactly "read the oldest block", and it must die by P19 -- the case added
+# with the fix, whose newest block is FIRST.  N16 removes the block delimiter,
+# which collapses the row to one span and reproduces "read everything".
 C12_FIRE = "    if all(steps[i] for i in ids):"
-C12_TAIL = "    tail = row[hits[-1].start():]"
+C12_TAIL = "    tail = ' '.join(b for d, b in blocks if d == newest_date)"
+C12_MAX = "    newest_date = max(d for d, _b in blocks)"
+C12_SPANS = "    marks = [m.start() for m in C12_BLOCK.finditer(row)]"
 
 MUT = [
     # --- the check does not fire, or always fires ------------------------
@@ -141,6 +156,10 @@ MUT = [
      [(C12_FIRE, "    if False:")]),
     ("N14", "C12 reads the whole row instead of its newest block",
      [(C12_TAIL, "    tail = row")]),
+    ("N15", "C12 selects the OLDEST dated block -- the 2026-09-07 defect, restored",
+     [(C12_MAX, "    newest_date = min(d for d, _b in blocks)")]),
+    ("N16", "the block delimiter never matches, so the row is one span",
+     [(C12_SPANS, "    marks = []")]),
 ]
 
 
