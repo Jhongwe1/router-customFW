@@ -1,5 +1,92 @@
 # Changelog
 
+🟢 **2026-09-09, forty-seventh segment, seating 18: `R5-6`'s second bench half —
+`OVSEL[2]` found, two residuals closed, and the best result is a mechanism
+nobody put on the card.**
+**One power cycle against a budget of one**, fourteen boots, **828 s** of
+chained cells with no operator gap. **Zero flash-write commands, zero `FLR`,
+`n_writes 0`.** Date measured three ways and agreeing: Git Bash / WSL / Windows
+all `2026-09-09 02:01`. `capdate`: `OK 2026-09-09 — 78 captures, all
+2026-09-09`. `check-predictions` **27 of 27**, every boot capture **1,424
+bytes**, `RLXFW-ID0=F67EED22` on all fourteen.
+
+🔴🔴 **The entry directly below ends with a sentence this seating refutes**, and
+it needed no new reading to do it. *"`CLK-08b`'s open residual — what does the
+watchdog count — is answered: it counts what the timer block counts."* Put the
+two rungs that entry quotes through its own fit model with **one** offset and
+they do not agree: forcing `f` to 200,000 needs `d = +24.003 ms` from rung 3 and
+`−12.441 ms` from rung 8, an inconsistency of **36.4 ms** against an instrument
+floor those same captures measure at **0.517 / 0.868 ms**. "Ratio 0.999" reads
+as agreement only because nobody propagated it through the fit.
+
+🔴 **And this seating's own four rungs refute the model itself.** `OVSEL` 0 /
+3 / 8 / 9 measured **163.911 / 1,340.982 / 41,910.358 / 84,001.412 ms**; least
+squares gives residuals **+3.5 / +32.5 / −71.0 / +35.0 ms** against a
+repeatability of **1.456 ms**. Read against the 0 & 8 pair — `f = 200,157 Hz`,
+`d = +0.20 ms`, which is what the physics predicts — rungs 0, 8 and 9 land
+within **0.13 %** of `2^15`, `2^23`, `2^24`, and **`OVSEL` 3 is 2.26 % long**.
+Seating 17's rung 3 is ~1.8 % long the same way. **So `d = +25.179 ms` is very
+likely a two-point fit absorbing rung 3's anomaly**, and `f_wdt` is not a
+quantity either seating has measured.
+
+🟢🟢 **`OVSEL[2]` is bit 17**, and `CLK-28`'s and `FW-53`'s residuals close
+together. `biteraw 0x00020000` bit at **2,475.923 ms** = 494,944 counts, and
+with the deficit bounded at `kick_ms × f` = **49,976 counts** only `2^19` is
+admissible. The field is non-contiguous and out of order: `[0]`=bit21,
+`[1]`=bit22, **`[2]`=bit17**, `[3]`=bit18, with bit 19 and `WDTIND` (bit 20)
+inside the range and inert.
+
+🟢🟢 **The mechanism, and the card's own error is what exposed it.** § 3.3
+tabled the arming words without `WDTCLR`; the board printed `00800000` /
+`00E00000` / `00840000` / `00A40000`, because `verb_bite` composes with
+`kick = 1`. **So `bite` clears the counter and `biteraw` does not.** At one
+period (`2^15`): **with** `WDTCLR`, two readings of the same word on two boots
+differ by **1.456 ms**; **without**, three readings spread **131.7 ms**. **A
+factor of ninety.** 🔴 That refutes `FW-53`'s conclusion — bits 19 and 20 are
+inert, and the proof is that the two seatings disagree by **−68.1 %** and
+**+638.9 %**. ⚠️ It also bounds the method: 49,976 exceeds `2^15`, so `OVSEL` 0
+and 1 cannot be told apart by an un-cleared reading.
+
+🟢🟢 **`FLS-26`'s attribution bracket closed, byte-identical.**
+`cmp bench/2026-09-08b/C1-M0.log bench/2026-09-09/C1-M0.log` → **identical**,
+and between them the vendor firmware ran **twice**. So those two runs wrote
+nothing to 4,186,112 bytes. `map 1 0` then split group 0 and found **two**
+differing units, not one: `009000` and **`00D000`**, which nothing had seen
+because a prefix digest cannot look past its first difference. The ledger:
+**proven identical 4,177,920 B (99.61 %)**, proven different **8,192 B**,
+undetermined **8,192 B — and that is exactly `H601`**.
+
+🟢 **`WDT-1`: seven `/proc` fields, seven hits**, derived on the die at `init`
+from `TC0DATA` and `CDBR` by a driver written blind, every one predicted at the
+desk from registers `TM-1` measured on 2026-09-03. `wdt_hz 14965000` prints
+beside `hz_derived 200000`: **the 76× on one page**, which is why the compiled
+table was not rewritten.
+
+🟢 **The `/dev/watchdog` USER path runs end to end**: the board reset
+**143.563 s** after the device was held open, against 143.886 s predicted
+(**−0.22 %**), and the evidence that the open reached `WDT_USER` is **the bite
+itself** — `BOOTGUARD` is fed every 250 ms and cannot bite.
+
+🔴 **`H2` is refuted and the correction goes the wrong way.** `C1-R` measured
+the board against the host at **−484.3 ppm** where the hypothesis needed ~900 in
+the other direction; expressed against that one clock the watchdog's excess over
+the timer grows from **+0.090 % to +0.138 %**.
+
+🟢 **`console-capture` 1.4's `--until` worked on the silicon first try**, on
+23 of 27 cells. `C1-M0` returned **3,013 bytes in 13.684 s** where seating 17
+took **120.106 s** for the same 3,013 bytes. **Eleven new cases, fourteen new
+mutants, 14 killed 0 survivors** — and seven of the fourteen have exactly one
+killer, three of them cases added after auditing the first eight against the
+mutants rather than after a red run.
+
+🔴 **The boot-capture control fired.** All thirteen are **1,424 bytes** — the
+length half holds exactly — but **three** fields differ from seating 17, not
+two. `RLXFW-TA6`, which is `IRQ-13`'s lost-interrupt count, reads **8 on all
+thirteen** against 11 on nine of seating 17's ten. 推, and it is the only
+candidate: `vmlinux` grew 233 bytes and moved the vendor NIC init's I-cache
+alignment. **Refuted by a third image whose size changes and whose `TA6` does
+not.**
+
 🟢 **2026-09-08, forty-sixth segment (fourth of the same calendar day),
 seating 17: `R5-6`'s bench half — a `/dev/watchdog` of mine bites, and the
 number in the entry directly below is wrong by 76×.**
