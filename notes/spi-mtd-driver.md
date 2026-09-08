@@ -498,8 +498,42 @@ because `RECIPE_ID` is a digest over `config/` and anything built today goes
 stale the moment `R5-6`'s first `.c` lands.
 🔄 **2026-09-08: it landed, and the id is `b417a3e7`** -- cell `r56c`,
 `vmlinux` 4,049,497 bytes, carrying 1.1 and `rtl819x-wdt` together, which is
-what the scope decision above was for.  ⚠️ Still no seating and still no card,
-so 1.1's verbs remain unrun.
+what the scope decision above was for.  ~~⚠️ Still no seating and still no card,
+so 1.1's verbs remain unrun.~~
+
+🟢 **2026-09-08 evening (seating 17): `map` ran on silicon, twice, and the
+99.02 % above is now 2.93 %.**  `flashmap compare` against the desk prediction:
+**31 same, 1 DIFFER, 0 scope, 0 extra, 0 missing.**  The one group that differs
+is **group 0** (`0x000000`-`0x01FFFF`), which is exactly where seating 16's
+bisection had put the first difference (`[0x9000,0xA000)`) -- so two instruments
+sharing no code agree on where it is.
+
+**31 x 131,072 = 4,063,232 bytes are now proven byte-identical to the
+2026-08-16 dump.**  What remains undetermined is inside group 0's 122,880
+hashed bytes plus `H601`'s 8,192, which are skipped by rule (`map_h601_hashed
+0`, and `flashmap`'s `F6` refuses every reading if that is ever non-zero).
+
+Every field hit its desk prediction: `map_ran 1`, `map_rc 0`, `map_level 0`,
+`map_unit 131072`, `map_entries 32`, `map_hashed 4186112`,
+`map_h601_skipped 8192`, `map_diff_units 0`, `map_truncated 0`,
+`map_lines 32` -- and all 32 digest lines matched, including the internal shape
+no digest value can fake: **group 0 hashes 122,880 rather than 131,072**, and
+the **last five groups share one digest** because the dump's 737,280-byte
+`0xFF` run from `0x34C000` covers them whole.
+
+⚠️ **A level-0 map cannot say whether group 0 holds one difference or
+several.**  That needs `map 1 0`, which did not run.  🔴 `map_truncated`'s
+positive control still does not exist (§ 9.1's hazard) -- it read 0 both times,
+which is correct and is not evidence the flag works.
+
+🟢 **And the traversal answered a question about the WATCHDOG for free.**  The
+card ran `map 0` disarmed, then re-armed and ran the identical traversal again:
+`map_jiffies` **1280** both times, digests byte-identical, and across the armed
+run `Delta n_hw_kick` **485** against 485.7 predicted from the kick period.  So
+the kernel timer wheel ran at exactly its programmed rate through a 12.8 s
+in-kernel SPI traversal under a live hardware deadline -- which is much stronger
+than *the board survived*, and it retires the load-bearing ordering assumption
+`PROGRESS.md` `MAP-1` had carried.
 
 ### 9.1 🔴 A per-4-KiB list does not fit, and that is a hard limit
 

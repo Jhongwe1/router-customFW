@@ -99,8 +99,8 @@ what *was* read, frozen before it existed).
 
 🆕 **2026-09-08 the fourth driver arrived, and the first thing it needed was
 permission to delete somebody else's code.** `drivers/watchdog/rtl819x-wdt.c`
-is a `/dev/watchdog` on the SoC's `WDTCNR`. 🔴 The vendor arms that watchdog at
-**17.5 ms** and kicks it from the timer tick a hundred times a second, so a
+is a `/dev/watchdog` on the SoC's `WDTCNR`. 🔴 The vendor arms that watchdog and
+kicks it from the timer tick a hundred times a second, so a
 watchdog driver shipped beside it **could never bite** — which is this
 repository's own rule that a tool unable to fail proves nothing, in driver
 form. `CONFIG_RTL_WTDOG=n` is therefore the step's precondition rather than a
@@ -115,7 +115,27 @@ of them are gated on which *board* this is and the `#if` that said otherwise
 was read out of a directory that is not compiled. The cause is written down
 next to the claim it broke
 ([`notes/watchdog-driver.md`](notes/watchdog-driver.md) § 4.4).
-⚠️ **Nothing of it has run on the silicon.**
+
+🆕 **2026-09-08, the same night — it ran, it bit nine times, and it refuted the
+number in the paragraph above.** Ten boots, every boot capture **1,424 bytes**
+against a figure derived at the desk from mark shapes before the board was
+powered; `wdtcnr_at_probe A5000000`, which is one field with two possible values
+and the whole proof that deleting the vendor's code worked.
+
+🔴 **The 17.5 ms was a loader-state figure and this driver does not run at the
+loader.** Two bite settings 32× apart, each timed against a known 50 ms interval
+the driver already prints, give the watchdog's counting rate under Linux as
+**200,180 Hz** — where a measurement of a *different* register in a *different*
+seating had independently found **200,005 Hz**. Ratio 0.999. The encoding the
+paragraph above calls 17.5 ms bites at **1.33 s**: wrong by 76×, and the "about
+one second" that figure had replaced was closer.
+
+🔴 **The test the driver had written into itself to confirm that constant was
+circular**, and a residual row in `SPEC.md` had said so in advance, unread —
+the constant was originally *solved from* the very difference the test proposed
+to predict. Two files in this repository disagreed about whether an experiment
+could succeed and nothing noticed until a card had to write the prediction down.
+`bench/2026-09-08b/CORRECTIONS-block14.md`.
 
 🆕 **2026-09-07 the third driver arrived and it is the first that does
 not have its peripheral to itself.** `drivers/mtd/devices/rtl819x-spi.c` is a
