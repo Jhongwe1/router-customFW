@@ -121,6 +121,21 @@ ALLOW = [
      "the sibling field, `h601_hashed 0`. Its value being zero is the "
      "assertion D1 rests on, so it may not be renamed to please a scanner. "
      "Scoped to the line for the same reason as h601_skipped"),
+    ("line", "RLXFW-S-MH601",
+     "rtl819x-spi 1.1's boot-time MARK for the same quantity, and it is a "
+     "THIRD string carrying the region's name that the two entries above do "
+     "not cover: they are scoped to the /proc field lines, and this is a "
+     "rlxfw_markx() tag. 量 2026-09-08 (seating 17), C1-M0/C1-M1, one hit "
+     "each -- the first captures in this repository to contain it, because "
+     "1.1's map had never run on silicon before. The line is "
+     "`RLXFW-S-MH601=00000000` and that value IS map_h601_hashed: the mark "
+     "the scanner objects to is the mark reporting that H601 stayed out of "
+     "the digest. Scoped to the line, so a line carrying H601 CONTENT still "
+     "fires. ⚠️ Whether the value is zero is NOT this tool's question -- "
+     "flashmap's F6 control refuses every reading when map_h601_hashed != 0, "
+     "and flashwin scan checks the bytes; this tool checks the topic keyword "
+     "and cannot tell a field name from a calibration blob, which is why it "
+     "is allowlisted by NAME and not by pattern"),
 ]
 
 
