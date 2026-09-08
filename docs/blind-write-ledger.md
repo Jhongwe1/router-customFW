@@ -200,10 +200,17 @@ the path counts stay. This is the same lesson `notes/leak-surface.md` records
 twice about its own three file counts: quote the split and the verdict, not the
 total.
 
-### 4.1 🔄 `R5-6` watchdog, `R5-7` LEDs — **zero**; `R5-8` gpio-keys — one, and it is not a reading; 🔴 **`R5-4` GPIO left this section on 2026-09-06**
+### 4.1 🔄 `R5-7` LEDs — **zero**; `R5-8` gpio-keys — one, and it is not a reading; 🔴 **`R5-4` GPIO left this section on 2026-09-06 and `R5-6` watchdog left it on 2026-09-08**
 
-**No path in the `wdt` or `led` domains is cited anywhere in this
-repository or in `upstream/`.**
+**No path in the `led` domain is cited anywhere in this repository or in
+`upstream/`.**
+
+🔴 **`wdt` left on 2026-09-08 and it did not leave the way `gpio` did.**
+`R5-4` acquired one *artefact* reading by accident of what it needed;
+`R5-6` read the vendor's watchdog code **on purpose and in full**, because
+the step's central decision is `CONFIG_RTL_WTDOG=n` and nobody can decide
+to remove code they have not read. § 4.10 is the whole list, and the
+consequence for `D3` is stated there rather than left to be inferred.
 
 🔴 **This read `gpio`, `wdt` or `led` until 2026-09-06, and the
 sentence is corrected rather than deleted because its date was the whole
@@ -211,9 +218,11 @@ value of it.** `R5-4` ran that day and § 4.9 is what replaced it:
 eleven framework paths — `gpio_chip` cannot be written without knowing what
 a `gpio_chip` is — plus **one `artefact` reading of the VENDOR's**
 `drivers/char/rtl_gpio.c`, which is the expensive one because it carries
-register addresses and bit numbers. 🟢 **`wdt` and `led` are
-untouched and still zero**, and `R5-4` spent nothing of any THIRD-PARTY
-port: `ggbruno/openwrt` is still not fetched.
+register addresses and bit numbers. 🟢 **`led` is untouched and still
+zero**, and neither `R5-4` nor `R5-6` spent anything of any THIRD-PARTY
+port: `ggbruno/openwrt` is still not fetched, and no other RTL8196E
+watchdog implementation has been opened. *(This said "`wdt` and `led` are
+untouched and still zero" and it was true for two days.)*
 
 🔴 **`keys` has exactly one, and it is this ledger's first
 `origin: none` row — a citation that is not a reading at all:**
@@ -243,9 +252,11 @@ driver:
   **not** `RESET#`) and `REG-12` (`WDTCNR` at `0xB800311C`, reset value
   `A5000000`) are both `量`, read through `probe`/`DW` at the loader prompt.
 
-🟢 **`R5-6`, `R5-7` and `R5-8` are the drivers whose blind-write claim is
+🟢 **`R5-7` and `R5-8` are the drivers whose blind-write claim is
 strongest**, and the claim is *"no implementation of these peripherals, by
-anyone, has been read"*.
+anyone, has been read"*. 🔴 **`R5-6` no longer belongs in that sentence**,
+and its narrower claim is *"no THIRD-PARTY implementation has been read"* —
+which is still worth something and is not the same thing.
 
 🔴 *(This read "These four" from `aa89317`, where it was correct because this
 section covered four drivers, and it was still reading it after `48a7a2a` moved
@@ -290,7 +301,18 @@ timer, LED or watchdog register.
 > routing policy. The sentence is kept because it was true of the eight rows it
 > was written about; what replaces it is narrower and dated: **of the eleven,
 > none records a GPIO, LED or watchdog register, and two record timer and
-> interrupt ones.** `R5-4`, `R5-6` and `R5-7` are unaffected; `R5-1` is
+> interrupt ones.**
+>
+> 🔴 **CORRECTED AGAIN 2026-09-08, and the watchdog half is now false too —
+> made false by `R5-6` rather than found wrong.** `boards/rtl8196e/bsp/timer.c`
+> is the same file as `arch/rlx/bsp/timer.c` under its other name (`target` is
+> a symlink to `boards/rtl8196e`, the same pair as `prom.c` two rows up), and
+> the range read on 2026-09-04 stopped short of its `CONFIG_RTL_WTDOG` block.
+> That block is now read: `REG32(BSP_WDTCNR) = 0x00600000`. **Of the eleven,
+> none records a GPIO or LED register; two record timer and interrupt ones;
+> and one records a watchdog one.** § 4.10.
+>
+> `R5-4` and `R5-7` are unaffected; `R5-6` is not; `R5-1` is
 > unaffected as written (its source predates the reading by a day) and
 > `driver-diff`'s timer and interrupt sections are not. But `bsp_setup()` is where a board brings its
 peripherals up, and 42 of its lines are inside a range this ledger counts as
@@ -584,6 +606,66 @@ which is exactly the layer `driver-diff` scores.** So the honest accounting is:
 § 4.3.1's: the path is never cited as a source file, so the scan cannot find
 it. It is declared by hand, and § 7 ⑦ already carries that hole.
 
+### 4.10 🔴 `R5-6` watchdog — 7 new paths, and the vendor side is spent ON PURPOSE
+
+**2026-09-08.** Unlike § 4.9's `gpio`, nothing here was acquired by accident.
+The step's central decision is `CONFIG_RTL_WTDOG=n` — removing the vendor's
+watchdog arm and its 100 Hz kick — and **a decision to delete code is a
+decision that cannot be made blind.** The blast radius had to be enumerated
+before the switch was thrown, and enumerating it is reading it.
+
+| path | depth | origin | what was taken | layer |
+|---|---|---|---|---|
+| `include/asm-rlx/rtl865x/rtl865xc_asicregs.h` | line | vendor | `:2993-3025` — the whole watchdog field block: `WDTCNR (0x01C + TIMER_BASE)`, `WDTE_OFFSET 24`, `WDSTOP_PATTERN 0xA5`, `WDTCLR (1 << 23)`, `OVSEL_15`/`_16`/`_17`/`_18`, `WDTIND (1 << 20)`. It is the second source that pins `OVSEL[0]` at bit 21 against `CLK-08`'s two measured points | **L1 fact** |
+| `boards/rtl8196e/bsp/timer.c` | line | vendor | `:75-84`, the `CONFIG_RTL_WTDOG` block inside `bsp_timer_init()`: `REG32(BSP_WDTCNR) = 0x00600000`, and the `CONFIG_RTK_VOIP` arm that calls `bsp_enable_watchdog()` instead. 🔴 **The value is a DECISION**: OVSEL 3 = 17.5 ms, against nine other settings the hardware offers | 🔴 **L2 decision** |
+| `arch/rlx/kernel/rlx-cevt.c` | line | vendor | 🔄 already declared in the `timer` domain; the watchdog half is new. `:146-182` `rlx_timer_interrupt()`: the `WDTCNR \|= 1 << 23` kick **inside the tick ISR**, the `is_fault` branch's `WDTCNR = 0; for(;;)`, and the `CONFIG_RTK_VOIP` variant that ORs the stop pattern back in. 🔴 **Two decisions, not one**: *where* to kick from, and that the kick is a read-modify-write | 🔴 **L2 decision** |
+| `boards/rtl8196e/bsp/setup.c` | line | vendor | 🔄 already declared in § 4.2 at `:134-175`; this is `:104-118`, a different range in the same file. `bsp_machine_restart()`: `REG32(GIMR)=0`, `local_irq_disable()`, `shutdown_netdev()`, `REG32(BSP_WDTCNR) = 0`, `while(1)`, and the unreachable `back_to_prom()` after it. 🔴 **This is how `reboot` works on this board** and it is a watchdog bite at OVSEL 0 | 🔴 **L2 decision** |
+| `drivers/char/rtl_gpio.c` | line | vendor | 🔄 already declared in § 4.9 as an **artefact** (object-code) reading of the reset-button path; this is a **source** reading of a different function. `:2178-2199` `write_watchdog_reboot()` — `count < 2` → `-EFAULT`, `tmp[0] == '1'`, `local_irq_disable()`, `panic_printk("reboot...")`, `WDTCNR = 0`, `for(;;)`; and `:2611-2616`, `create_proc_entry("watchdog_reboot", 0, NULL)` | 🔴 **L2 decision** |
+| `include/linux/watchdog.h` | line | generic Linux | the userspace ABI: `WDIOC_GETSUPPORT`/`GETSTATUS`/`GETBOOTSTATUS`/`KEEPALIVE`/`SETTIMEOUT`/`GETTIMEOUT`/`GETTIMELEFT`/`SETOPTIONS`, the `WDIOF_*` capability bits, `WDIOS_DISABLECARD`, `struct watchdog_info`. **Mainline, and not an implementation of this SoC** — the same category as § 4.9's gpiolib rows | neither |
+| `include/linux/miscdevice.h` | line | generic Linux | `:15`, `WATCHDOG_MINOR 130`, and `MISC_MAJOR 10`. Two constants that decide a device node number | neither |
+
+⚠️ **Also read and NOT given rows above, because they are build plumbing rather
+than anything about this die**: `drivers/watchdog/Kconfig` (every entry and its
+`depends on`, for the `(NEW)` enumeration), `drivers/watchdog/Makefile` (the
+MIPS section, for `MK6`'s anchor), `drivers/Makefile:79`, `drivers/gpio/Kconfig:51`
+(`GPIO_SYSFS`, for a correction that is not about the watchdog at all), and
+`kernel/panic.c:98-106` / `kernel/exit.c:921-949` (where `is_fault` is stored,
+to establish what `=n` also removes). None carries a register or a peripheral
+decision. **They are listed here rather than omitted** because § 7's own warning
+is that a ledger's silence is indistinguishable from a ledger's blindness.
+
+⚠️ **And the wlan kick sites** — `drivers/net/wireless/rtl8192cd/8192cd_hw.c`,
+`8192cd_osdep.c`, `8192d_hw.c`, `Hal8192CDMOutSrc.c`, `HalDMOutSrc.c` — were
+read for their `#if` gates and nothing else. They record a watchdog *kick*,
+which is a use rather than a policy, and they are the reason § 4.4 of
+`notes/watchdog-driver.md` exists.
+
+#### 4.10.1 🔴 What this does to `D3`, said plainly
+
+`PROGRESS.md`'s refutation clause for `D3` fires **per driver**, and it fired
+for `R5-5` on exactly this ground: *"§ 4.5 records the vendor's MTD map read on
+the decision layer, so `R5-5`'s L2 rows are void unless the derivation check
+clears them"*.
+
+**The same now holds for `R5-6`**, and more sharply, because four of the seven
+rows above are L2:
+
+* `docs/driver-diff.md`'s watchdog section **may not be written as a blind
+  diff.** Its L2 rows are *informed contrast*: this driver's decisions were
+  taken **knowing** the vendor's, and in three cases were chosen to be the
+  opposite of them — kick from a kernel timer rather than the tick ISR;
+  compose a full word rather than `|=`; refuse four OVSEL settings the vendor's
+  code would happily encode.
+* 🟢 **That is not worthless, and the document must say which kind of value it
+  is.** An informed contrast with the reason for each divergence written down
+  is a legitimate engineering artefact; it is simply not *evidence of
+  independent convergence*, which is what a blind diff buys.
+* 🟢 **The L1 rows are unaffected** and were never worth much: three
+  implementations describing one piece of silicon are expected to agree.
+
+🔴 **The honest summary, and it is narrower than § 4.1's old sentence**: `R5-6`
+is blind of every third-party implementation and of nothing else.
+
 ### 4.5 🔴 `R5-5` SPI + MTD — 11 paths — **the diff's vendor side is spent**
 
 | path | depth | origin | what was taken |
@@ -803,7 +885,7 @@ differ by exactly that entry, and neither is wrong.
 | domain | paths | for | verdict |
 |---|---:|---|---|
 | `gpio` | 🔄 **11** paths **+ 1 `artefact`** | `R5-4` | 🟡 **blind of any third-party implementation, and no longer blind of the vendor's.** Eight of the eleven are generic Linux framework plumbing that says nothing about this die; three are `arch/rlx`'s own gpio headers and Kconfig. 🔴 The `+1` is `drivers/char/rtl_gpio.c` read as OBJECT code (§ 4.9), and unlike § 4.3.1's it carries register addresses and bit numbers — the layer the diff scores. The driver source predates it and `KNOWN_MASK` was not widened to match |
-| `wdt` | **0** | `R5-6` | 🟢 blind of any implementation |
+| `wdt` | 🔄 **7** | `R5-6` | 🔴 **0 → 7 on 2026-09-08, and NOT by accident.** Blind of any third-party implementation; **not** blind of the vendor's. Four of the seven are on the DECISION layer, so `driver-diff`'s watchdog section is an informed contrast and not a blind diff — § 4.10.1 says so in place. Two of the seven are the mainline `/dev/watchdog` ABI, which says nothing about this die. **A decision to delete code cannot be made blind**, and `CONFIG_RTL_WTDOG=n` is this step's central decision |
 | `led` | **0** | `R5-7` | 🟢 blind of any implementation |
 | `keys` | 1 | `R5-8` | 🟢 blind — the one citation is `origin: none`, an example inside this tool's own census row (§ 4.1) |
 | `timer` | 🔄 **8** paths **+ 1 `artefact`** | `R5-1`, `R5-2` | 🟢 one string literal of the vendor's, plus `rlx-time.c` 🔄 **read 2026-09-04 (`R5-10`), so the *zero citations* clause below is now historical** — with **zero** citations until this file named it, plus **five** generic-Linux paths and **one more of the vendor's** — 2026-09-03 added the clocksource subsystem's header and core, the two files that fix the jiffy length, and `arch/rlx/include/asm/timex.h`, whose single constant is a PC's timer chip (§ 4.3). 🔴 **`CLK-06` is no longer the diff's best row**: D Table 26 states the divisor semantics, so it is L1. The replacement L2 rows are `notes/timer-driver.md` § 3. 🔴 **And the `+1` is not a path**: § 4.3.1, one bit taken out of the vendor's *object* code in my own `vmlinux` — no code under `arch/rlx` calls `clocksource_register` — which `ledgerscan` is structurally blind to (§ 7 ⑦) |
