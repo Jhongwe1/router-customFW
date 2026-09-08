@@ -436,6 +436,59 @@ released source.
 > of the reference dump are entirely `0xFF`**, with a 737,280-byte blank run
 > from `0x34C000`. **Zero flash-write commands, zero `FLR`, bracket unchanged
 > at 0.0244 %.**
+> 🔄 **2026-09-08, FIFTEENTH update — the forty-fifth segment, third on one
+> calendar day, desk, no power, and the most valuable result is a prediction
+> this segment's own build refuted.** 🔴 **This board runs a 17.5 ms watchdog
+> under Linux, kicked every 10 ms, and § 13's `FW-45` had been reasoning from
+> "about one second".** 讀 `boards/rtl8196e/bsp/timer.c:75-84` and 量 on the
+> artefact at `bsp_timer_init+0xb8`: `WDTCNR = 0x00600000`, a **full-word**
+> store so `WDTE` goes to `0x00` rather than the `0xA5` stop pattern, and
+> `OVSEL` 3 = 2¹⁸ ÷ 14,965,000 Hz = **17,517 µs**. The margin over `HZ=100` is
+> **7.5 ms, so not one timer interrupt may be lost**. The ~1 s figure is the
+> **loader's** `OVSEL=1001`; wrong by 64×. 🟢 **The correction makes an older
+> measurement worth more**: seating 16's three 4 MiB PIO traversals ran under
+> that deadline across ten boots, so **no interrupt-blocked window on that path
+> exceeded 17.5 ms** — nobody set out to measure it. 🟢 **And
+> `bsp_machine_restart` is itself a bite** (`boards/rtl8196e/bsp/setup.c:114`,
+> in no `#if`): `WDTCNR = 0` then spin, with an unreachable `back_to_prom()`
+> after it — **there is no second reset controller on this part's software
+> path**, so every `busybox reboot -f` this project has run was a watchdog bite
+> at `OVSEL` 0 = 2,190 µs, which re-attributes `FW-37`'s 2.407 s and gives
+> `CLK-08`'s ≤2.3 ms bound a source-side prediction that fits.
+> 🔴 **A `/dev/watchdog` beside a 100 Hz unconditional kick cannot bite**, so
+> `CONFIG_RTL_WTDOG=n` is `R5-6`'s precondition and not a tidy-up; the blast
+> radius was enumerated first and `bsp_machine_restart` and
+> `/proc/watchdog_reboot` both survive it, so `reboot -f` still works and a
+> vendor "bite now" instrument remains as an independent control.
+> 🔴 **The refuted prediction**: `0xB800311C` references fell **9 → 6**, not
+> 9 → 2. Four wlan references survived because they are gated on
+> `CONFIG_RTL_8196E` — *which board this is* — and the `CONFIG_RTL_WTDOG`
+> wrappers the claim came from live in `drivers/net/wireless/rtl8192e/` while
+> the directory that **builds** is `rtl8192cd/`, **measured an hour earlier in
+> the same session**. The evidence was in that grep's own output and was read
+> past. 🟢 The cost is bounded by measurement: all three surviving kicks are
+> `__initcall_rtl8192cd_init6` against this driver's `…_init7`, so they cannot
+> feed a guard that does not exist yet. ⚠️ **`R5-6` therefore leaves the
+> blind-write ledger's § 4.1** — seven paths, four on the *decision* layer,
+> because a decision to delete code cannot be made blind — and
+> `driver-diff`'s watchdog section is an informed contrast rather than a blind
+> diff. 🔴 **Two gates that exist, work, and are on no path**:
+> `CONFIG_GPIO_SYSFS` has been an undeclared config difference since
+> 2026-09-06 in `r54b`, `r55b` and `spi11` — including the image seating 16 ran
+> — because `kconfig-delta check` is never invoked by `rlxfw-kbuild.sh`; and
+> `spec-check`'s `C12` took the **last** dated block of `Next after this`,
+> which on the live file has been the **oldest** since 2026-09-07. 🔴 The fix
+> is not "take the first" either — at `HEAD~40` that is wrong and the old rule
+> is right — because the row is ordered **neither way**, so it selects by date
+> now, and `P21` (the same blocks in both orders must give the same verdict) is
+> what makes that a rule. **Image `r56c`: `RECIPE_ID` `b417a3e7`, vmlinux
+> 4,049,497 bytes, `(NEW)` 0, `kconfig-delta check` green, `rlxfw-marks verify`
+> 12 marks and 6 witnesses with zero occurrences in the vendor image.**
+> ⚠️ **Nothing of this has run on the silicon**, `FLS-26`'s 99.02 % is
+> untouched, and the boot-capture prediction for the next card moves
+> **1,318 → 1,424** (spi 1.1's `S8` +10, the wdt's six marks +96), of which
+> **106 bytes are predicted and unmeasured**. **Zero flash-write commands,
+> zero `FLR`, bracket unchanged at 0.0244 %.**
 > > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.

@@ -496,6 +496,10 @@ for the rest.  **No card is frozen and no image is staged for a seating**: the
 scope decision this segment made is that these verbs ride on `R5-6`'s image,
 because `RECIPE_ID` is a digest over `config/` and anything built today goes
 stale the moment `R5-6`'s first `.c` lands.
+🔄 **2026-09-08: it landed, and the id is `b417a3e7`** -- cell `r56c`,
+`vmlinux` 4,049,497 bytes, carrying 1.1 and `rtl819x-wdt` together, which is
+what the scope decision above was for.  ⚠️ Still no seating and still no card,
+so 1.1's verbs remain unrun.
 
 ### 9.1 🔴 A per-4-KiB list does not fit, and that is a hard limit
 
@@ -646,6 +650,15 @@ which is the number `LOG.md` recorded for seating 16.
 
 So this driver's contribution goes **134 -> 144** and the boot capture goes
 **1,318 -> 1,328**, before whatever `R5-6` adds on top.
+
+🔄 **2026-09-08 (`R5-6`, forty-fifth segment): "whatever `R5-6` adds" is now a
+number.** `rtl819x-wdt` emits six boot marks -- `W0` bare (10), `W1`..`W4` as
+`markx` (19 each) and `W5` bare (10) -- so **96** bytes, by the same
+arithmetic this section derives.  The card's prediction is therefore
+**1,318 + 10 + 96 = 1,424**, of which **106 bytes have never been measured**:
+neither 1.1's `S8` nor any of the wdt marks has reached a console.  ⚠️ `W5`
+appears twice in the image because `RLXFW-W5-NOPROC` shares its prefix; only
+one of the two can print, and the failure-path one costs 17.
 
 ⚠️ `S8-NOMAP` is on the failure path and costs 16 if it ever fires; the three
 `markx` verbs `S-MRC`/`S-MDIFF`/`S-MH601` fire only when `map` is typed and are

@@ -171,8 +171,26 @@ read.
   said *empty*; a search for `WDT`/`watchdog` in ASCII matched that row and not
   the measured one, which records the fact in Chinese. **What is genuinely
   unmeasured is narrower**: both measured points are high `OVSEL` settings, while
-  `J BFC00000` writes `WDTCNR = 0` — the **lowest** setting, 推 2.184 ms by
-  halving, never observed. `R4` predicts it and then measures it.
+  `J BFC00000` writes `WDTCNR = 0` — the **lowest** setting, ~~推 2.184 ms by
+  halving, never observed. `R4` predicts it and then measures it.~~
+  🔴 **2026-09-08 (`R5-6`): the halving is not merely imprecise, it is
+  STRUCTURALLY INVALID at this end, and the owning gate was stale too — `R4`
+  closed on 2026-09-02.** 2.184 ms is `1118.133 ÷ 2⁹`. But `CLK-08b` solved
+  the two measured points for a common offset and got **`c` = 2.967 ms**:
+  what was measured is `2^(15+OVSEL)/f − c`, not `2^(15+OVSEL)/f`. Halving a
+  quantity that carries a constant offset scales the offset with it, and at
+  `OVSEL` 0 the offset is **larger than the number being predicted** — the
+  halved prediction of the *measured interval* is negative. The correct
+  prediction comes from the model and not from the ladder:
+  **2^15 ÷ 14,965,000 = 2,190 µs** (`CLK-28`).
+  🟢 **And it has gained two independent supports without a seating.**
+  `bsp_machine_restart` (`boards/rtl8196e/bsp/setup.c:114`, not inside any
+  `#if`) writes `WDTCNR = 0` and spins, so **every `busybox reboot -f` this
+  project has ever run was a bite at exactly this setting** — dozens of them,
+  and `FW-37` timed one end to end at 2.407 s. `CLK-08`'s own upper bound of
+  **≤2.3 ms** from `entry` sits 0.11 ms above the prediction. **`R5-6`
+  measures it directly**: the `bite 0` rung of the OVSEL ladder, one reboot,
+  no power cycle. `SPEC.md` `FW-50`, `notes/watchdog-driver.md` § 2.1.
 * ~~**`RLXFW-ID0`, the build-identity string added on 2026-09-01, has never
   been read off the board.**~~ 🟢 **CLOSED 2026-09-02, seating 10.** The board
   printed `RLXFW-ID0=B1434383` and `looprun`'s `A3` compared it against the id
