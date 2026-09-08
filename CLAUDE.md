@@ -443,12 +443,20 @@ released source.
 > "about one second".** 讀 `boards/rtl8196e/bsp/timer.c:75-84` and 量 on the
 > artefact at `bsp_timer_init+0xb8`: `WDTCNR = 0x00600000`, a **full-word**
 > store so `WDTE` goes to `0x00` rather than the `0xA5` stop pattern, and
-> `OVSEL` 3 = 2¹⁸ ÷ 14,965,000 Hz = **17,517 µs**. The margin over `HZ=100` is
-> **7.5 ms, so not one timer interrupt may be lost**. The ~1 s figure is the
-> **loader's** `OVSEL=1001`; wrong by 64×. 🟢 **The correction makes an older
+> `OVSEL` 3 = 2¹⁸ ÷ ~~14,965,000 Hz = **17,517 µs**. The margin over `HZ=100` is
+> **7.5 ms, so not one timer interrupt may be lost**~~ 🔴 **REFUTED ON THE
+> SILICON the same night — see the sixteenth update. That divisor is a
+> LOADER-state constant; under Linux the watchdog counts at 200,180 Hz and the
+> same encoding bites at 1,334.723 ms. Wrong by 76×, and the margin is ~1.3 s.**
+> The ~1 s figure is the
+> **loader's** `OVSEL=1001`; ~~wrong by 64×~~ **and it was closer than what
+> replaced it**. ~~🟢 **The correction makes an older
 > measurement worth more**: seating 16's three 4 MiB PIO traversals ran under
 > that deadline across ten boots, so **no interrupt-blocked window on that path
-> exceeded 17.5 ms** — nobody set out to measure it. 🟢 **And
+> exceeded 17.5 ms** — nobody set out to measure it.~~ 🔴 **That bound is
+> 1,310 ms, i.e. 75× weaker**; the sentence is kept struck through because
+> "the correction makes an older measurement worth more" is exactly the kind of
+> claim that gets quoted onward. 🟢 **And
 > `bsp_machine_restart` is itself a bite** (`boards/rtl8196e/bsp/setup.c:114`,
 > in no `#if`): `WDTCNR = 0` then spin, with an unreachable `back_to_prom()`
 > after it — **there is no second reset controller on this part's software
@@ -489,6 +497,67 @@ released source.
 > **1,318 → 1,424** (spi 1.1's `S8` +10, the wdt's six marks +96), of which
 > **106 bytes are predicted and unmeasured**. **Zero flash-write commands,
 > zero `FLR`, bracket unchanged at 0.0244 %.**
+> 🔄 **2026-09-08, SIXTEENTH update — seating 17, the fourth segment on one
+> calendar day, and the paragraph directly above expired at 22:45.** 🟢 **A
+> `/dev/watchdog` of mine runs on this part and bites**: ten boots, every boot
+> capture **1,424 bytes** against the 1,424 predicted above,
+> `RLXFW-ID0=B417A3E7`, `wdtcnr_at_probe` **`A5000000`** — one field with two
+> possible values, and the whole proof that `CONFIG_RTL_WTDOG=n` did what the
+> blast radius said. `TA5` read `FFFF8D38` against a written `FFFF8D37 ± 2`,
+> all ten `ovselN` rows exact **including `ovsel3 enc 00600000`, the vendor's
+> own constant computed by a driver written blind**, and `W4` read `00240000`
+> where `00A40000` was written — so **`WDTCLR` does not read back on this die**,
+> a reading nobody planned.
+> 🔴🔴 **THE HEADLINE IS THAT THE FIFTEENTH UPDATE'S OWN NUMBER IS WRONG BY
+> 76×, AND THE SAME MISTAKE HAD ALREADY BEEN MADE FIVE DAYS EARLIER ON THE
+> REGISTER NEXT DOOR.** Two rungs 32× apart, each carrying its own `mdelay(50)`
+> ruler in the same capture (floors **0.517** and **0.868 ms** — so the
+> instrument's *"1–16 ms, unmeasured on this host"* is now measured):
+> `OVSEL` 3 = **1,334.723 ms**, `OVSEL` 8 = **41,930.599 ms**. The difference
+> cancels the offset: `(2²³−2¹⁸) / 40,595.876 ms` = **`f = 200,180 Hz`**, and
+> `CLK-17` measured `TC0CNT` under Linux at **200,005 Hz** by a different method
+> on a different register in a different seating. **Ratio 0.999.** So
+> `CLK-08b`'s 14.965 MHz is a **loader-state** constant exactly as `CLK-17`'s
+> 14,286,057 Hz is — Linux reprograms `CDBR` and both slow together — and
+> `CLK-08b`'s open residual *what does the watchdog count* is **answered**: it
+> counts what the timer block counts. ⚠️ **`RTL819X_WDT_HZ` and every `usec` in
+> the driver's table are therefore documented-wrong by 76× and deliberately NOT
+> changed**: the table is what `/proc` prints and what a card predicts against.
+> 🔴 **The `9−8` test written into the driver was CIRCULAR and `SPEC.md` already
+> said so** — 14.965 MHz was solved *from* that difference, and `CLK-08b` 殘留
+> reads *"這一格不能靠再量一次逾時解決"*. **Two files in this repository
+> disagreed about whether an experiment could succeed and nothing noticed until
+> a card had to write the prediction down.**
+> 🟢 **`FW-51` 殘留 closes and the answer is the negative one**: the carded cell
+> was void (`kickms 3000` against an 83.8 s deadline tests nothing), and re-run
+> at `OVSEL` 0 the board reset **both with `wlan0` down and with it up** — so
+> nothing else writes `WDTCLR` after `late_initcall`. 🔴 **`FW-53`: neither bit
+> 19 nor bit 20 is `OVSEL[2]`** — both *shorten* the timeout below `OVSEL` 0
+> (68.647 and 12.336 ms), which no `OVSEL` reading predicts. 🟢 **`FLS-26`
+> moves for the first time**: `rtl819x-spi` 1.1's map ran twice on silicon,
+> 31 of 32 groups identical = **4,063,232 bytes proven unchanged**, the one
+> difference being group 0, where seating 16's bisection had put it.
+> 🟢 **Constraint ① became a ratio with no residual**: `Δn_hw_kick` **485**
+> against 485.7 predicted across a 12.8 s *armed* SPI traversal, with the
+> at-rest 343/14 as its control.
+> 🔴 **It cost three power cycles against a budget of one, and both extra ones
+> were the same mistake**: a cell whose payload can reset the board, given no
+> `--esc-after`. `wedge` bit once and **did not reproduce**; rung 8's window was
+> 20 s and the answer 41.9 s — *the same root cause as the headline*, since
+> every window on the card came from the constant the card's own third cell
+> refuted. The guard added after the second (prove the loader was caught before
+> handing the board to `looprun`) fired twice more. 🔴 **`OVSEL` 0 is not
+> measurable this way at all**: `prom_putchar` fills a FIFO, not the wire, so
+> the reset lands mid-drain — the ladder has **two** clean rungs, not four.
+> 🟢 **And the loader prints its own reset cause** —
+> `Reboot Result from Watchdog Timeout!` after every watchdog reset, absent
+> after every cold power-on — **which has been on disk since 2026-08-24 and
+> nothing had read it**. ⚠️ **Zero flash-write commands, zero `FLR`,
+> `n_writes 0`, bracket unchanged at 0.0244 %** — but the **vendor firmware ran
+> twice**, ~2 and ~4 minutes, because two bites were not caught. 🟢 That
+> accident built the first half of `FLS-26`'s attribution bracket: the map ran
+> at 22:45, the vendor firmware after it, so **one `map 0` on the next
+> seating's first boot closes it at zero cost.**
 > > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.
