@@ -14,7 +14,7 @@ split.
 
 ### 1.1 🟢 The headline is a rate, and it agrees with a number nobody re-measured
 
-**量: `f_wdt(Linux) = 200,180 Hz.**
+**量: `f_wdt(Linux)` = 200,180 Hz.**
 
 Two rungs, **32× apart**, each carrying its own 50 ms ruler in the same capture:
 
