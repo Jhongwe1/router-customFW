@@ -203,3 +203,9 @@ nod	/dev/mtd1ro	c:90:3	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), ove
 # KERNEL reading rather than a permission-bit one -- the same reasoning
 # /dev/mtd0ro carries.
 nod	/dev/mtd2ro	c:90:5	0400	rlxfw	R5-5: read-only by the KERNEL (odd minor) over mtd2 = rtl819x-spi's own read-only device. `wc -c` must be 4194304, which is the SAME 4 MiB /dev/mtd0ro and /dev/mtd1ro cover between them but read through MY driver's programmed-I/O path instead of the vendor's. A size that is not 4194304 means add_mtd_device took a different index and every mtd2 cell on the card is void
+
+# ----------------------------------------------------------------------------
+# R5-6, 2026-09-08.  One node, and it is the first one in this file whose
+# mere OPENING changes the hardware.
+# ----------------------------------------------------------------------------
+nod	/dev/watchdog	c:10:130	0600	rlxfw	R5-6: the miscdevice rtl819x-wdt registers. 讀 include/linux/miscdevice.h:15 WATCHDOG_MINOR = 130, and MISC_MAJOR = 10 in the same file. 0600 because the only thing that opens it is a test run as root at the shell, and a mode that let any process arm the hardware watchdog on a one-device project is a wider door than the experiment needs. ⚠ OPENING THIS NODE ARMS THE SILICON: rtl819x_wdt_open() enters WDT_USER, and closing it WITHOUT writing 'V' first leaves the userspace deadline running, after which the board resets. That is the /dev/watchdog contract and not a defect, but it means `cat /dev/watchdog` is not a free read the way /dev/mtd0ro is, and no bench cell may treat it as one. The /proc/rtl819x-wdt verbs exist so that every experiment that does not specifically need the character device can avoid this node entirely.
