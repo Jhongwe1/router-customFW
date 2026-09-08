@@ -1,0 +1,4 @@
+echo stop > /proc/rtl819x-wdt ; echo kickms 3000 > /proc/rtl819x-wdt ; echo ov
+selR 0L X>F /proc/rWtl-8W1-9KxI-wCdtK
+MS=00000BB8
+# 

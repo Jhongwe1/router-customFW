@@ -1,0 +1,48 @@
+echo unlock > /proc/rtl819x-wdt ; cat /proc/rtl819x-wdt
+version rtl819x-wdt 1.0
+state 1
+state_name BOOTGUARD
+registered 1
+misc_rc 0
+wdtcnr_at_probe A5000000
+probe_is_reset 1
+probe_is_vendor_armed 0
+wdtind_at_probe 0
+wdtcnr_live 00240000
+wdtcnr_shadow 00240000
+shadow_agrees 1
+hw_ovsel 9
+armed_ovsel 9
+hw_timeout_us 1121101
+wdt_hz 14965000
+kick_ms 250
+soft_timeout 60
+bootguard 1
+nowayout 0
+unlocked 1
+open 0
+expect_close 0
+jiffies 6502
+deadline 0
+n_hw_kick 951
+n_user_ping 0
+n_arm 2
+n_stop 1
+n_settimeout 0
+n_missed 0
+n_state_foreign 0
+n_bite 0
+n_wedge 0
+n_reject 3
+n_unclean_close 0
+ovsel0 enc 00000000 usec 2190 valid 1
+ovsel1 enc 00200000 usec 4379 valid 1
+ovsel2 enc 00400000 usec 8759 valid 1
+ovsel3 enc 00600000 usec 17517 valid 1
+ovsel4 enc 00000000 usec 35034 valid 0
+ovsel5 enc 00000000 usec 70069 valid 0
+ovsel6 enc 00000000 usec 140138 valid 0
+ovsel7 enc 00000000 usec 280275 valid 0
+ovsel8 enc 00040000 usec 560551 valid 1
+ovsel9 enc 00240000 usec 1121101 valid 1
+# 

@@ -1,0 +1,7 @@
+Jump to image start=0x80500000...
+decompressing kernel:
+Uncompressing Linux... done, booting the kernel.
+done decompressing kernel.
+start address: 0x80003440
+Realtek WLAN driver - version 1.6 (2013-02-21)(SVN:)
+Adaptivity function - version 7.1
