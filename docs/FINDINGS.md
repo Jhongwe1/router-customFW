@@ -464,6 +464,44 @@ rather than by a checker.
 
 ## It answered a question that had been open
 
+🆕 **2026-09-08 (seating 17) — what the watchdog counts, and the answer arrived
+by measuring the thing the row said measuring could not settle.** `CLK-08b`
+solved `f = 14.9650 MHz` in 2026-08-25 from two loader-prompt timeouts, and its
+own residual then said the remaining question — *what does it count* — **cannot
+be settled by measuring a timeout again, because that would only re-measure
+14.965**. True of the loader. 量 under Linux, two rungs 32× apart, each carrying
+a `mdelay(50)` ruler in the same capture (floors **0.517** and **0.868 ms**, so
+`console-capture`'s own *"1–16 ms, unmeasured on this host"* is now measured):
+`OVSEL` 3 = **1,334.723 ms**, `OVSEL` 8 = **41,930.599 ms**. The difference
+cancels the unknown offset — `(2²³−2¹⁸) / 40,595.876 ms` = **`200,180 Hz`**,
+with `d = +25.179 ms`, positive and small, which is the condition a first
+two-point attempt failed by producing `d = −188 ms`. 🟢 **`CLK-17` measured
+`TC0CNT` under Linux at 200,005 Hz — different register, different method,
+different seating. Ratio 0.999.** So the watchdog counts what the timer block
+counts, `14.965 MHz` is a **loader-state** constant exactly as `CLK-17`'s
+14,286,057 Hz is, and `SPEC.md` `FW-45` — committed six days earlier — is wrong
+by **76×** along with two sentences derived from it. 🔴 **The test the driver
+had written into itself to confirm the constant was CIRCULAR**: `14.965 MHz` was
+solved *from* the 9−8 difference, so predicting it back is an identity — and the
+residual above already said so, in a different file, unread. ⚠️ **`OVSEL` 0 is
+not measurable this way at all**: `prom_putchar` fills a UART FIFO rather than
+the wire, so the reset lands mid-drain and corrupts the marker that starts the
+interval. **Two clean rungs, not four** | `SPEC.md` `CLK-08b`/`FW-45`,
+`notes/watchdog-driver.md` § 10 |
+
+🆕 **2026-09-08 (seating 17) — whether anything else on this board feeds the
+watchdog, and the cell that was supposed to answer it tested nothing.** The card
+armed `OVSEL` 9 with a 3 s kernel timer, believing the hardware deadline was
+1.121 s; at the real **83.8 s** the timer kicks 28 times before the hardware
+could bite. 🟢 Re-run at `OVSEL` 0 (163.7 ms) against the same 3 s timer, both
+halves: `wlan0` **down** → board reset; `wlan0` **up** → board reset. **So
+nothing writes `WDTCLR` after `late_initcall`, including with the vendor's wlan
+driver brought up from userspace** — which `FW-51` 殘留 had recorded as
+未定 and unsettleable by reading source, since the call graph goes through
+function pointers. ⚠️ The void cell was found by the seating's own third cell
+refuting the constant its window was computed from | `SPEC.md` `FW-51` 殘留,
+`bench/2026-09-08b/CORRECTIONS-block14.md` § 1.7 |
+
 🆕 **2026-09-07 — which path the kernel reads flash through, and it is
 not the one four files said.** `mtd->read` on this image is `mtd_spi_read`,
 installed unconditionally by the vendor's chip driver, and it reaches `SFDR`:

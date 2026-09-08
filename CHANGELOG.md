@@ -1,5 +1,56 @@
 # Changelog
 
+🟢 **2026-09-08, forty-sixth segment (fourth of the same calendar day),
+seating 17: `R5-6`'s bench half — a `/dev/watchdog` of mine bites, and the
+number in the entry directly below is wrong by 76×.**
+**Three power cycles against a budget of one. Zero flash-write commands, zero
+`FLR`, `n_writes 0`**, bracket untouched at **0.0244 %** — but the **vendor
+firmware ran twice**, ~2 and ~4 minutes, because two bites were not caught.
+Date measured three ways and agreeing: Git Bash `21:50:42 +0800`, WSL
+`21:50:50`, Windows `21:50:51`. `capdate`: `OK 2026-09-08b — 68 captures, all
+2026-09-08`.
+
+🟢 **The driver runs.** Ten boots, **every boot capture 1,424 bytes** against a
+1,424 derived at the desk from mark shapes, `RLXFW-ID0=B417A3E7`,
+`wdtcnr_at_probe` **`A5000000`** — one field, two possible values, and the whole
+proof `CONFIG_RTL_WTDOG=n` did what the blast radius said. All ten `ovselN` rows
+exact, **including `ovsel3 enc 00600000`, the vendor's own constant, computed by
+a driver written blind**. `W4` read `00240000` where `00A40000` was written, so
+**`WDTCLR` does not read back on this die** — a reading nobody planned.
+
+🔴🔴 **`CLK-08b`'s 14.965 MHz is a LOADER-STATE constant, and the entry below
+reasoned from it as if it were universal.** Two rungs 32× apart, each with its
+own `mdelay(50)` ruler in the same capture (floors **0.517** / **0.868 ms**, so
+the instrument's *"1–16 ms, unmeasured"* is now measured): `OVSEL` 3 =
+**1,334.723 ms**, `OVSEL` 8 = **41,930.599 ms**. The difference cancels the
+offset → **`f = 200,180 Hz`**, against `CLK-17`'s independently measured Linux
+`TC0CNT` rate of **200,005 Hz**. Ratio **0.999**. So `FW-45`'s 17,517 µs is wrong
+by 76× and the margin is ~1.3 s, not 7.5 ms. `CLK-08b`'s open residual — *what
+does the watchdog count* — is answered: **it counts what the timer block
+counts.**
+
+🔴 **The test the driver had written into itself to confirm that constant was
+CIRCULAR, and `SPEC.md` already said so.** 14.965 MHz was solved *from* the 9−8
+difference, so predicting it back is an identity; `CLK-08b` 殘留 reads *"this
+row cannot be settled by measuring a timeout again"*. **Two files in this
+repository disagreed about whether an experiment could succeed, and nothing
+noticed until a card had to write the prediction down.**
+
+🟢 **`FW-51` 殘留 closes with the negative answer** — the carded cell was void
+(`kickms 3000` against an 83.8 s deadline tests nothing), and re-run at `OVSEL` 0
+the board reset with `wlan0` **down and up**, so nothing else feeds `WDTCLR`
+after `late_initcall`. 🔴 **`FW-53`: neither bit 19 nor bit 20 is `OVSEL[2]`** —
+both *shorten* the timeout below `OVSEL` 0. 🟢 **`FLS-26` moves for the first
+time**: `rtl819x-spi` 1.1's map ran on silicon, 31 of 32 groups identical =
+**4,063,232 bytes proven unchanged**.
+
+🔴 **Both extra power cycles were one mistake**: a cell whose payload can reset
+the board, given no `--esc-after`. The guard added after the second fired twice
+more. 🔴 **`OVSEL` 0 is not measurable this way at all** — `prom_putchar` fills a
+FIFO, not the wire — so the ladder has **two** clean rungs, not four.
+
+---
+
 🟢 **2026-09-08, forty-fifth segment (third of the same calendar day), desk:
 `R5-6`'s desk half — a `/dev/watchdog` on a dog somebody else was feeding.**
 No power, **zero flash-write commands and zero `FLR`**, bracket untouched at
@@ -9,8 +60,12 @@ agree: Git Bash `2026-09-08 12:18:10 +0800`, Windows `12:18:13`, WSL
 
 🔴 **The measurement that decided the step's shape, and it corrects a committed
 row by 64×.** Under Linux this board arms the watchdog at `OVSEL` 3 = 2^18
-ticks = **17,517 µs** and kicks it from the tick handler every 10 ms — margin
-7.5 ms, and **not one timer interrupt may be lost**. `SPEC.md` `FW-45` had been
+ticks = ~~**17,517 µs** and kicks it from the tick handler every 10 ms — margin
+7.5 ms, and **not one timer interrupt may be lost**~~ 🔴 **REFUTED the same
+night on the silicon — see the forty-sixth segment's entry above. The divisor
+used here is a LOADER-state constant; that encoding bites at 1,334.723 ms and
+the margin is ~1.3 s. Wrong by 76×, and the "about one second" it replaced was
+closer.** `OVSEL` 3 and the 10 ms kick are both correct; only the µs is wrong. `SPEC.md` `FW-45` had been
 reasoning from *"`CLK-08` bounds the watchdog window at about one second"*,
 which is the **loader's** `OVSEL=1001`. 🟢 The correction makes an old
 measurement mean more: seating 16's three 4 MiB traversals ran under a 17.5 ms
