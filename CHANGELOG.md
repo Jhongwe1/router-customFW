@@ -1,5 +1,80 @@
 # Changelog
 
+🟢 **2026-09-08, forty-fifth segment (third of the same calendar day), desk:
+`R5-6`'s desk half — a `/dev/watchdog` on a dog somebody else was feeding.**
+No power, **zero flash-write commands and zero `FLR`**, bracket untouched at
+1,024 of 4,194,304 = **0.0244 %**. Date measured on three sides and all three
+agree: Git Bash `2026-09-08 12:18:10 +0800`, Windows `12:18:13`, WSL
+`12:18:18` — fifteen minutes after the previous segment's last commit.
+
+🔴 **The measurement that decided the step's shape, and it corrects a committed
+row by 64×.** Under Linux this board arms the watchdog at `OVSEL` 3 = 2^18
+ticks = **17,517 µs** and kicks it from the tick handler every 10 ms — margin
+7.5 ms, and **not one timer interrupt may be lost**. `SPEC.md` `FW-45` had been
+reasoning from *"`CLK-08` bounds the watchdog window at about one second"*,
+which is the **loader's** `OVSEL=1001`. 🟢 The correction makes an old
+measurement mean more: seating 16's three 4 MiB traversals ran under a 17.5 ms
+deadline, so **no interrupt-blocked window on that PIO path exceeded 17.5 ms** —
+measured without anyone setting out to measure it.
+
+🟢 **`bsp_machine_restart` is a watchdog bite**, `boards/rtl8196e/bsp/setup.c:114`,
+not inside any `#if`: `WDTCNR = 0` then spin, with an unreachable
+`back_to_prom()` after it. So there is no second reset controller on this
+part's software path — a reboot **is** a deliberate bite at `OVSEL` 0 = 2,190 µs.
+`FW-37`'s 2.407 s is re-attributed and `CLK-08`'s ≤2.3 ms bound gains a
+source-side prediction that fits.
+
+🔴 **A watchdog beside a 100 Hz unconditional kick cannot bite**, so
+`CONFIG_RTL_WTDOG=n` is the step's precondition rather than a tidy-up. Blast
+radius enumerated first: the arm, the kick and the `is_fault` reboot go;
+`bsp_machine_restart` and `/proc/watchdog_reboot` stay, so `busybox reboot -f`
+still resets the board and a vendor "bite now" instrument survives as an
+independent control.
+
+🔴 **Seven predictions written before the build; six hit and one was refuted,
+and the refuted one is worth more.** `0xB800311C` references fell 9 → **6**,
+not 9 → 2: four wlan references survived because they are gated on
+`CONFIG_RTL_8196E` — *which board this is* — and the `CONFIG_RTL_WTDOG`
+wrappers the claim came from are in `drivers/net/wireless/rtl8192e/`, while the
+directory that **builds** is `rtl8192cd/`, measured in the same session an hour
+earlier. The evidence was in that grep's own output: `8192cd_hw.c` was not in
+the list, and the absence was the answer. 🟢 The cost is bounded by
+measurement: all three surviving kicks are `__initcall_rtl8192cd_init6`
+(level 6) against `__initcall_rtl819x_wdt_init7` (level 7), so they cannot feed
+a guard that does not exist yet.
+
+⚠️ **`R5-6` leaves the blind-write ledger's § 4.1.** Seven new paths, four on
+the **decision** layer — a decision to delete code cannot be made blind — so
+`docs/driver-diff.md`'s watchdog section is an *informed contrast*, not a blind
+diff, and § 4.10.1 says so in place. `wdt` goes 0 → 7 in § 8's table.
+
+🔴 **Two gates that exist, work, and are on no path.** `CONFIG_GPIO_SYSFS` has
+been an undeclared config difference since 2026-09-06 — `kconfig-delta check`
+REFUSES on `r54b`, `r55b` and `spi11`, including the image seating 16 ran — and
+that checker is never invoked by `rlxfw-kbuild.sh`. And `spec-check`'s `C12`
+took `row[hits[-1].start():]`, which on the live file has been the **oldest**
+block since 2026-09-07: it reported `R5-5` while the newest block said `R5-6`.
+🔴 **The fix is not "take the first block" either** — at `HEAD~40` that reads
+`R1h`/`R3-9` and `hits[-1]` is right. The row is ordered **neither way**
+(28 blocks, descending for the four most recent and ascending before them,
+because the convention changed mid-project), so it selects by **date** now.
+*(This supersedes the thirty-ninth segment's entry below, which says "`P13`
+pins the newest-block selection" and "`N14` can only die by `P13`": `P13` pins
+it only in the block order that entry's own controls happened to use.)*
+🟢 **`P21` is what makes the fix a rule** — the same two blocks in both orders
+must give the same verdict, which fails for either position rule — and `N15`,
+the old defect restored in one line, dies by five cases.
+🔴 And `R5-6` was invisible to `C12` entirely, because § Step list wrote
+`R5-5`…`R5-8` as a **range** and `progress_step_state` reads only the endpoints.
+Four rows now.
+
+**Image `r56c`**: `RECIPE_ID` `b417a3e7`, vmlinux **4,049,497** bytes,
+`(NEW)` **0** (enumerated from `drivers/watchdog/Kconfig`, not guessed),
+`kconfig-delta check` green, `rlxfw-marks verify` 12 marks and 6 witnesses with
+**zero occurrences in the vendor image**. `spec-check` **54/54**,
+`test-spec-check-mutants` **22/22**, census green, `not-run-total` **493
+unmoved**. ⚠️ Nothing of this has run on the silicon.
+
 🟢 **2026-09-08, forty-fourth segment (second of the same calendar day), desk:
 four instruments, and the two most useful results came out of captures that
 were already committed.** No power, **zero flash-write commands and zero
