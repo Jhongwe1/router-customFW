@@ -315,17 +315,46 @@
  * 1121.101 ms -- and fit gap(OVSEL) = 2^(15+OVSEL)/f + d for f and d.  Three
  * independent differences where CLK-08b had two points and one unknown, and
  * OVSEL 8 and 9 were measured through a COMPLETELY DIFFERENT PATH (the loader
- * being driven at its own prompt) as 557.583 and 1118.133 ms.  If the Linux
- * figures reproduce that pair's DIFFERENCE, 14.965 MHz is confirmed from
- * inside Linux against a number derived at the loader.  If they do not, one
- * of the two paths is wrong and the disagreement is the finding.
+ * being driven at its own prompt) as 557.583 and 1118.133 ms.
+ *
+ * 🔴 2026-09-08, seating 17.  EVERY PREDICTED NUMBER IN THE PARAGRAPH ABOVE IS
+ * WRONG BY 76x, AND THE CLAIM THAT FOLLOWED IT WAS CIRCULAR.  Both are kept
+ * here rather than deleted, because what they got wrong is the useful part.
+ *
+ *   CIRCULAR: the deleted sentence read "If the Linux figures reproduce that
+ *   pair's DIFFERENCE, 14.965 MHz is confirmed from inside Linux."  CLK-08b's
+ *   14.965 MHz was SOLVED FROM that difference -- (2^24-2^23)/(1118.133 -
+ *   557.583) ms -- so predicting it back is an identity, and SPEC.md's own
+ *   CLK-08b residual already said re-measuring a timeout only re-measures
+ *   14.965.  Two files in this repository disagreed about whether an
+ *   experiment could succeed and nobody noticed until a card had to state it.
+ *
+ *   WRONG BY 76x: 量, two rungs 32x apart, each carrying its own mdelay(50)
+ *   ruler in the same capture (floors 0.517 and 0.868 ms) --
+ *       OVSEL 3 (0x00E00000)  1,334.723 ms
+ *       OVSEL 8 (0x00840000) 41,930.599 ms
+ *   gap(8)-gap(3) = 40,595.876 ms over 2^23-2^18 counts gives
+ *       f_wdt(Linux) = 200,180 Hz,  d = +25.179 ms
+ *   and CLK-17 measured TC0CNT under Linux at 200,005 Hz by a different method
+ *   on a different register in a different seating.  Ratio 0.999.
+ *
+ *   SO 14.965 MHz IS A LOADER-STATE CONSTANT, exactly as CLK-17's 14,286,057 Hz
+ *   is: Linux reprograms CDBR and both slow together.  The constant at the top
+ *   of this file (RTL819X_WDT_HZ) is therefore RIGHT FOR THE LOADER AND WRONG
+ *   FOR THE STATE THIS DRIVER RUNS IN, and every usec in rtl819x_wdt_steps[] is
+ *   76x short.  It is NOT changed here: the table is what /proc prints and what
+ *   a card predicts, and changing it silently would break the one field a
+ *   seating can compare against a frozen card.  R5-6's second bench half
+ *   derives it at init the way rtl819x-timer's hz_used is derived (CLK-17's
+ *   2026-09-04 fix), and until then hw_timeout_us is documented-wrong.
  *
  *   NEGATIVE CONTROL, in the same cells: OVSEL 0 and 3 are the vendor's own
- *   two values.  17.517 ms must come out of a driver of mine at the same
- *   number the vendor's bsp_timer_init programmed, and 2.190 ms must match
- *   what bsp_machine_restart has been doing for every reboot in this
- *   project's history.  A ladder whose two known rungs disagreed with the
- *   two the board has been living on would refute the driver, not the clock.
+ *   two values.  🔴 量: OVSEL 3 came out at 1,334.723 ms, not 17.517 -- so the
+ *   control FIRED, and what it refuted was SPEC.md FW-45 rather than this
+ *   driver.  OVSEL 0 turned out not to be measurable by this method at all:
+ *   prom_putchar fills a UART FIFO rather than the wire, so rlxfw_puts returns
+ *   with bytes still queued and a 163.7 ms reset lands mid-drain -- the 0x8D
+ *   corrupting RLXFW-W-GO in C1-B is that.  The ladder has TWO clean rungs.
  *
  * ========================================================================
  */
@@ -1035,7 +1064,21 @@ static int rtl819x_wdt_verb_wedge(void)
 	spin_lock_irqsave(&rtl819x_wdt_lock, flags);
 	/* Stop pattern with a different OVSEL from the shadow's.  Stopped, so
 	 * this cannot start a countdown; different, so the masked comparison
-	 * must notice. */
+	 * must notice.
+	 *
+	 * 🔴 "CANNOT START A COUNTDOWN" IS AN ARGUMENT, AND ON 2026-09-08 THE
+	 * BOARD DID NOT AGREE -- ONCE.  Seating 17, cell C1-WG: the board took a
+	 * watchdog reset (the loader printed its own reset-cause line) while ash
+	 * was still ECHOING the command, at "; c" -- about 9 ms in, so this
+	 * function had not yet been entered and the write had not happened.
+	 * R2-WG re-ran the same verb on a fresh boot with the reset caught and
+	 * it did NOT bite: n_wedge advanced, n_state_foreign advanced, the board
+	 * stayed up.  So the first reset was not caused by wedge, one
+	 * observation, unexplained, not reproduced.  The comment is left as the
+	 * DESIGN INTENT it always was, with the counter-example named beside it;
+	 * what changed is that a cell typing this verb now carries --esc-after,
+	 * because a cell whose payload can reset the board and cannot catch the
+	 * loader costs a power cycle.  That is what it cost. */
 	rtl819x_wdt_wr(rtl819x_wdt_compose(0, 9, 0) ^ OVSEL_B1);
 	rtl819x_wdt_n_wedge++;
 	rtl819x_wdt_check_foreign_locked();
@@ -1184,9 +1227,30 @@ static int rtl819x_wdt_write_proc(struct file *file, const char __user *buffer,
  * not run before the timer wheel and the tick are up.  R5-3b-2 puts this
  * driver's own clockevent in at late_initcall too and prints RLXFW-TA8 when
  * clockevents_register_device() returns; the ordering between TA8 and W0 in
- * the boot capture is therefore an observable, not an assumption, and if W0
- * ever precedes TA8 the bootguard is arming against a tick that does not yet
- * exist and this initcall level is wrong.
+ * the boot capture is therefore an observable, not an assumption.
+ *
+ * 🔴 THAT OBSERVABLE FIRED AND ITS PREMISE WAS WRONG.  This paragraph used to
+ * end: "and if W0 ever precedes TA8 the bootguard is arming against a tick that
+ * does not yet exist and this initcall level is wrong."  量 on this image's own
+ * System.map, at the desk, before the board was powered: the level-7 table in
+ * link order is 802d0b98 spi -> 802d0b9c wdt -> 802d0ba0 timer, so W0 DOES
+ * precede TA8, on every boot, by construction.
+ *
+ * The conclusion does not follow, because the clause equated "TA8 has not
+ * happened" with "there is no tick".  TA8 is where MY clockevent takes over
+ * from the vendor's; the tick exists from time_init().  量, in seating 16's ten
+ * committed boot captures: TA5 - TA0 = 0xFFFF8D34 - 0xFFFF8AE5 = 591 jiffies of
+ * tick between arch_initcall and late_initcall.  The timer wheel BOOTGUARD
+ * depends on has been running 5.9 s by the time W0 prints.
+ *
+ * 🟢 AND THE ORDERING BUYS SOMETHING NOBODY DESIGNED.  Because W0..W5 run
+ * before TA5..TA9, the bootguard is armed and kicked every kick_ms THROUGH
+ * clockevents_exchange_device().  If that handover ever wedged the tick this
+ * board resets instead of hanging silently -- R5-6 is a watchdog on R5-3b, by
+ * link order, and neither driver was written knowing it.
+ *
+ * Still NOT established: that late_initcall is the BEST level, only that it is
+ * not the broken one the old clause described.
  * ------------------------------------------------------------------------ */
 
 static int __init rtl819x_wdt_init(void)

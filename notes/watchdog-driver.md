@@ -1,12 +1,20 @@
-# `rtl819x-wdt` — a `/dev/watchdog` on a 17.5 ms dog somebody else was feeding
+# `rtl819x-wdt` — a `/dev/watchdog` on a dog somebody else was feeding
 
-**`R5-6`, desk half. 2026-09-08, forty-fifth segment. No power, no flash byte,
-no `FLR`.** Owner of every finding this step produced; `SPEC.md` indexes them
-and does not restate them.
+*(This title read "on a **17.5 ms** dog" until 2026-09-08 evening. 量 on the
+silicon that night: the encoding it refers to bites at **1,334.723 ms** under
+Linux. The number is gone from the title rather than corrected in it, because a
+title is the one place a stale figure gets quoted from without being re-derived
+— § 10.)*
 
-Three segments on one calendar day (43, 44, 45 all 2026-09-08 — 量 at 12:18,
-three sides agreeing). No `bench/` directory is created here, so `RUNSHEET`
-lifecycle rule 3 has nothing to catch; the card is the next segment's.
+**`R5-6`. Desk half 2026-09-08, forty-fifth segment; bench half the same night,
+forty-sixth segment, seating 17.** Owner of every finding this step produced;
+`SPEC.md` indexes them and does not restate them.
+
+Four segments on one calendar day (43, 44, 45, 46 all 2026-09-08 — 量 at 12:18
+and again at 21:50, three sides agreeing both times). The desk half creates no
+`bench/` directory; the bench half creates `bench/2026-09-08b`, and
+`tools/capdate.py` reports it `OK — 68 capture(s), all 2026-09-08`, so
+`RUNSHEET` lifecycle rule 3's prediction came out right.
 
 ---
 
@@ -588,3 +596,168 @@ read, and the build is green with no driver in it.
 CLAUDE.md's own note says only `verify` can catch a mark that compiled and is
 not in the image; here what it catches is a whole translation unit that was
 never compiled at all.
+
+---
+
+## 10. Seating 17 — what the silicon said, and the three things it refuted
+
+**2026-09-08 evening, forty-sixth segment. Three power cycles, ten boots, nine
+watchdog resets. Zero flash-write commands, zero `FLR`, `n_writes 0`.**
+The card is `bench/2026-09-08b/PREDICTIONS-B15-block14.md` (frozen, 42 cells);
+the seating's own record is `CORRECTIONS-block14.md` beside it.
+
+### 10.1 The driver works, and the predictions that mattered were exact
+
+Ten boot captures, **every one 1,424 bytes**, a figure derived at the desk from
+the mark shapes (seating 16's measured 1,318 + `S8`'s 10 + `W0`…`W5`'s 96) with
+106 of those bytes never previously measured. `RLXFW-ID0=B417A3E7`.
+
+**`wdtcnr_at_probe A5000000`** is the whole proof that § 4's
+`CONFIG_RTL_WTDOG=n` did what the blast-radius enumeration said — one field,
+two possible values, written down before the build. `registered 1`,
+`misc_rc 0`, `state_name BOOTGUARD`, `n_arm 1`.
+
+`TA5` read **`FFFF8D38`** against a prediction of `FFFF8D37 ± 2`: the 106 new
+bytes cost 27.6 ms of UART time at 38400, which is 2.76 jiffies, and the tick
+counted 4.
+
+🟢 **`W4` is a reading nobody planned.** The driver writes `0x00A40000` (arm
+*and* `WDTCLR`) and the register reads back **`0x00240000`**, so **`WDTCLR` does
+not read back on this die.** `WDTCNR_VOLATILE_MASK` was right to ignore it, and
+now that is measured rather than assumed.
+
+All ten `ovselN` rows came out exactly as tabled, **including
+`ovsel3 enc 00600000`** — a driver written blind, decoding a split field the
+vendor never documented, computing the vendor's own constant.
+
+### 10.2 🔴 The step's own headline number was wrong by 76×
+
+§ 1 of this file is titled *"the finding that decided the step's shape"* and it
+is the 17,517 µs figure. **It is a loader-state figure and this driver does not
+run at the loader.**
+
+Two rungs 32× apart, each carrying its own `mdelay(50)` ruler in the same
+capture:
+
+| rung | encoding | silence after `RLXFW-W-GO` | ruler | floor |
+|---|---|---|---|---|
+| `bite 3` | `00E00000` | **1,334.723 ms** | 50.517 ms | **0.517 ms** |
+| `bite 8` | `00840000` | **41,930.599 ms** | 49.132 ms | **0.868 ms** |
+
+`gap(8) − gap(3) = 40,595.876 ms` over `2^23 − 2^18 = 8,126,464` counts gives
+**`f = 200,180 Hz`** with `d = +25.179 ms`. `CLK-17` measured `TC0CNT` under
+Linux at **200,005 Hz** — different register, different method, different
+seating. **Ratio 0.999.**
+
+So `CLK-08b`'s 14.965 MHz is a loader-state constant exactly as `CLK-17`'s
+14,286,057 Hz is, and `CLK-08b`'s open residual — *what does the watchdog
+count* — is answered: **it counts what the timer block counts.**
+
+⚠️ **`RTL819X_WDT_HZ` and the whole `usec` column of `rtl819x_wdt_steps[]` are
+therefore documented-wrong by 76× and are NOT changed yet.** The table is what
+`/proc` prints and what a card predicts against; changing it silently would
+break the one field a seating compares with a frozen card. Deriving it at init
+— the way `rtl819x-timer`'s `hz_used` is derived, `CLK-17`'s 2026-09-04 fix —
+is `R5-6`'s second bench half.
+
+🟢 **The direction of the error is the safe one.** `kick_ms 250` against
+`OVSEL` 9 was believed to be a 4.48× margin; it is **335×** (83.8 s).
+
+### 10.3 🟢 § 6's "am I the only feeder" cell, and the answer
+
+🔴 **The cell as written in § 6 and on the card was VOID**, and the seating's own
+third cell is what showed it: `kickms 3000` against `OVSEL` 9 is 3 s against
+**83.8 s**, so the kernel timer kicks 28 times before the hardware could bite.
+
+Re-run at `OVSEL` 0 (163.7 ms) against the same 3 s timer, both halves:
+
+* `R2-SO3`, `wlan0` **down** → board reset;
+* `R2-SO6`, after `ifconfig wlan0 up` (antenna attached) → board reset.
+
+**So nothing else on this board writes `WDTCLR` after `late_initcall`, including
+with the vendor's wlan driver brought up from userspace.** § 4.4's 未定 —
+whether `rtl8192cd_init_hw_PCI` can be re-entered from an `ifconfig up` after
+this driver has armed — is closed by experiment, which is what `kickms` exists
+for.
+
+### 10.4 🔴 § 3's hole: both candidate bits refuted
+
+`biteraw` was built to close `OVSEL[2]`'s bit-19-or-bit-20 question with a 16×
+separation. Both words are `OVSEL` 0 in every known bit plus the candidate, so
+the two predictions were **163.7 ms** (bit does nothing) and **2,619 ms** (bit
+is `OVSEL[2]`).
+
+| cell | word | ruler | silence |
+|---|---|---|---|
+| `R2-RAW19` | `00080000` | 50.370 ms | **68.647 ms** |
+| `R2-RAW20` | `00100000` | 50.719 ms | **12.336 ms** |
+
+**Neither.** And both are *shorter* than `OVSEL` 0, by factors 2.4 and 13.3 —
+an `OVSEL` bit can only lengthen a timeout. **Neither bit 19 nor bit 20 is
+`OVSEL[2]`**, the hole stays open, and the prescription is now a sweep rather
+than a guess: `biteraw` one bit at a time over bits 16…23, eight cells, eight
+boots, each window three times the value `f = 200,180 Hz` predicts
+(`SPEC.md` `FW-53` 殘留).
+
+### 10.5 🟢 Two controls that fired, and one instrument found for free
+
+**`n_state_foreign`'s positive control fired**: `R2-WG` ran `wedge` without
+resetting the board and `R2-F` reads `n_wedge 1`, `n_state_foreign 1`,
+`shadow_agrees 1`. § 5.4 says that counter cannot fire in the shipping image;
+this is the only way it is ever seen to move, and it has moved.
+
+**Three refusals, three errnos**, routed through `cat` so `strerror` prints
+instead of `FW-41`'s truncated ash echo: `EPERM` (locked), `EOPNOTSUPP` (the
+`OVSEL[2]` hole), `EINVAL` (out of range), with `n_reject` 1→2→3 and `hw_ovsel`
+unmoved at 9 throughout. That is § 3's *"distinguishable at the shell"* claim,
+tested.
+
+🟢 **And the loader prints its own reset cause.** `Reboot Result from Watchdog
+Timeout!` appears after every watchdog reset and is **absent** after every cold
+power-on. Both directions have been on disk since 2026-08-24 and nothing had
+read them. This seating: three cold power-ons, 0 lines; nine bites, 1 line each.
+It uses no timestamp, and it is what separates *"the board reset"* from *"the
+board reset because of a watchdog timeout"* for § 10.4's two cells.
+
+### 10.6 🔴 What it cost, and both extra power cycles were one mistake
+
+**A cell whose payload can reset the board, given no `--esc-after`.**
+
+* `C1-WG`: the board took a watchdog reset while ash was still echoing the
+  command, at `; c` — before the write happened. The cell had no `--esc-after`
+  because this file's own § 5 says the wedge *"cannot start a countdown"*.
+  `R2-WG` re-ran it and it did not bite. **One observation, unexplained, not
+  reproduced.**
+* `C3-B`: rung 8's window was 20 s and the answer was 41.9 s — **the same root
+  cause as § 10.2**, since every window on the card came from the constant the
+  card's own third cell refuted.
+
+Both times the loader autobooted from flash and the **vendor firmware ran**, for
+roughly two and four minutes. Seating 8 has the precedent and its bracket was
+unchanged; this is unplanned exposure and is recorded as such.
+
+🟢 **The guard added after the second one stopped it becoming a third**: after
+every bite, prove the loader was caught *before* handing the board to
+`looprun`. It fired on `C3-B` and again on `R2-WG`.
+
+🔴 **`OVSEL` 0 is not measurable by this method at all.** `prom_putchar` fills a
+UART FIFO rather than the wire, so `rlxfw_puts` returns with bytes still queued
+and a 163.7 ms reset lands mid-drain — the `0x8D` corrupting `RLXFW-W-GO` in
+`C1-B` is that. § 6's ladder has **two clean rungs, not four**.
+
+### 10.7 🟢 What the SPI driver did while the watchdog was armed
+
+Constraint ① of the card: `map 0` disarmed, then re-armed and run again.
+
+| | Δjiffies | Δ`n_hw_kick` | predicted |
+|---|---|---|---|
+| at rest | 343 | **14** | 13.72 |
+| across the **armed** 4 MiB traversal | 12,143 | **485** | 485.7 |
+
+`map_jiffies` 1,280 both times; the 32 digest lines byte-identical between the
+two runs. **The timer wheel ran at its programmed rate through a 12.8 s
+kernel-mode SPI traversal under a live deadline** — far stronger than *the board
+survived*, and the at-rest row is the control that says what the rate is.
+
+⚠️ `jiffies` wrapped through zero inside that measurement
+(4,294,955,745 → 592, Linux's `INITIAL_JIFFIES = −300·HZ`).

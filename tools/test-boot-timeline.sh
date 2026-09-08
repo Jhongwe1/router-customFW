@@ -217,7 +217,18 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # ⚠️ SEVENTY-SEVEN captures of this seating produce no row, `0 of them hold
 # boot text`. They are the shell captures after S7 plus the nineteen off-card
 # `BIS-*` verify rungs, the three `SEC-*` cells and `BBLIST`.
-ck "twenty-eight cold, sixty-six warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 28 cold, 66 warm, 0 unknown')"
+# 🔄 2026-09-08 (seating 17): 28/66 -> 31/74. ELEVENTH seating in a row to turn
+# this case red, and the eleventh time the run-every-suite rule caught it -- the
+# derive-the-suites grep cannot see this one, because nothing in the diff names
+# this file; it sweeps `bench/` as a POPULATION.
+# 🟢 The delta is a consistency check that costs nothing and was not designed:
+# +3 cold is exactly the three power cycles seating 17 spent (`C1-A`, `R1-A`,
+# `R2-A2`), and +8 warm is exactly the eight watchdog resets whose loader banner
+# was caught -- nine bites happened, and `C3-B`'s window closed before its own
+# (41.9 s) answer arrived, so it contributes no row. The classifier reaches
+# those two numbers from the loader's own reset-cause line, knowing nothing
+# about power switches or `biteraw`.
+ck "thirty-one cold, seventy-four warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 31 cold, 74 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
