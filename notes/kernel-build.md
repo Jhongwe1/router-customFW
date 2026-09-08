@@ -708,6 +708,43 @@ reason each, 21 `derive` rules with a mechanism from a closed vocabulary. It
 (`… check`), on purpose — a generator and an auditor that read different files
 can drift apart and both keep passing.
 
+### 6.7 🔴 That invariant LAPSED for two days, and the auditor that would have said so is on no path
+
+🔴 **量 2026-09-08 (`R5-6`'s segment): `(NEW)` was 1, not 0, in `r54b`, `r55b`
+and `spi11` — including the image seating 16 ran.** The prompt is
+`/sys/class/gpio/... (sysfs interface) (GPIO_SYSFS) [N/y/?]`, and `r53b2` —
+the build immediately before `R5-4` — carries **zero** `(NEW)` lines. So it
+entered on **2026-09-06** when `CONFIG_GPIOLIB=y` made `drivers/gpio/Kconfig:51`
+reachable (`depends on SYSFS && EXPERIMENTAL`, 量 both `y` here), and § 6.6's
+closing sentence — *every symbol that menu offers is written into the input* —
+stopped being true that day for the menu `GPIOLIB` opened.
+
+⚠️ **The three images are not wrong.** The value taken was `n`, which is what
+the row now declares, so no shipped behaviour changes and no measurement is
+retracted. What was wrong is that the value was decided by **how stdin happened
+to be connected** — `--oldconfig yes` answers `y` to a `[N/y/?]` — which is
+the exact accident § 6.2 spends a page establishing cannot be prevented by
+banning a string.
+
+🔴 **Nothing caught it because `kconfig-delta.py check` is not run by
+`rlxfw-kbuild.sh` and has to be typed.** The generator half runs on every
+build; the auditor half runs when somebody remembers. That is the same shape as
+`rlxfw-marks.py verify`, which `LOG.md` records as never being run
+automatically either — **two working gates, neither on any path** —
+and it is carried forward as `CFG-2`.
+
+🟢 **Repaired and re-measured the same day**: the row is declared, and `r56c`'s
+`oldconfig` log carries **0** `(NEW)` lines with `kconfig-delta check` green.
+🟢 **And the next menu was ENUMERATED rather than trusted.** `R5-6` sets
+`CONFIG_WATCHDOG=y`, which opens `drivers/watchdog/Kconfig`; before the build,
+that file was parsed with its `if`/`endif` nesting tracked and every
+`depends on` evaluated against this build's `.config`. **Exactly two** entries
+carry a prompt with all conditions met — `WATCHDOG_NOWAYOUT` and
+`SOFT_WATCHDOG` — with `CONFIG_PCI=n` and `CONFIG_USB_SUPPORT=n` keeping the
+PCI and USB sections shut. Both pinned; `(NEW)` came out 0. **An enumeration
+that came out at three would have said something; a guess that came out at two
+would not have.** `SPEC.md` `TC-47`.
+
 ---
 
 ## 7. `R3-4` part two: the narrowest change that reaches `hazlint` 0, and what it cost

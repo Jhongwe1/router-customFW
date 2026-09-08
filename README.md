@@ -97,6 +97,26 @@ implementation of it
 ([`docs/blind-write-ledger.md`](docs/blind-write-ledger.md) is the record of
 what *was* read, frozen before it existed).
 
+🆕 **2026-09-08 the fourth driver arrived, and the first thing it needed was
+permission to delete somebody else's code.** `drivers/watchdog/rtl819x-wdt.c`
+is a `/dev/watchdog` on the SoC's `WDTCNR`. 🔴 The vendor arms that watchdog at
+**17.5 ms** and kicks it from the timer tick a hundred times a second, so a
+watchdog driver shipped beside it **could never bite** — which is this
+repository's own rule that a tool unable to fail proves nothing, in driver
+form. `CONFIG_RTL_WTDOG=n` is therefore the step's precondition rather than a
+tidy-up, and the blast radius was enumerated on the built image first: every
+instruction forming the register's address, resolved to its owning function.
+🟢 That enumeration is where the segment's best finding came from, and it was
+not the one being looked for — **a reboot on this board *is* a watchdog bite**,
+`WDTCNR = 0` and spin, with the jump back to the boot ROM after it unreachable.
+🔴 And the prediction written before the build — that the references would fall
+from nine to two — **was refuted by the build**: they fell to six, because four
+of them are gated on which *board* this is and the `#if` that said otherwise
+was read out of a directory that is not compiled. The cause is written down
+next to the claim it broke
+([`notes/watchdog-driver.md`](notes/watchdog-driver.md) § 4.4).
+⚠️ **Nothing of it has run on the silicon.**
+
 🆕 **2026-09-07 the third driver arrived and it is the first that does
 not have its peripheral to itself.** `drivers/mtd/devices/rtl819x-spi.c` is a
 read-only MTD device that reads this unit's flash by issuing real SPI
