@@ -20944,8 +20944,30 @@ git 沒有那些檔案的歷史 —— **「第四十九段沒有寫」這句話
 收工日期在開場時還不是。⚠️ 這一段沒有 `bench/` 目錄,所以 `capdate` 的規則本來就
 碰不到它;寫下來是因為下一次有 `bench/` 的跨午夜段會需要同一個判斷。
 
-⚠️ **`SPEC.md` 這一段沒有改,而那是判斷不是遺漏**:這一段產生的數字全部是關於
-CI 這個儀器與現代 kernel API 的,**沒有一個是關於這台裝置的**。上一段做了同樣的
-判斷,理由相同。
+**擁有者檔案的收工稽核 —— 列舉,不是回憶。** `ls *.md docs/*.md` 加
+`git diff --name-only 8702f3d HEAD`,每一個都判一次:
+
+| 檔案 | 動了嗎 | 判斷 |
+|---|---|---|
+| `PROGRESS.md` | ✅ | § Now、`R5-12` 那一列、`CI-5`、carried-forward `CHLOG-1` |
+| `LOG.md` | ✅ | 這一則 |
+| `CLAUDE.md` | ✅ | desk-sweep 規則 **③b**(掃描涵蓋不到寫作)＋ PowerShell 第 **⑤** 個陷阱(管線的 BOM) |
+| `README.md` | ✅ | 🔴 **稽核抓到的**:它逐檔索引 `notes/`,而少了 `notes/modern-kernel-port.md` —— 那正是 `README-1` 的形狀 |
+| `docs/FINDINGS.md` | ✅ | 🔴 **稽核抓到的**:它有一節叫 *It changed how this repository checks itself*,而這一段的兩個發現屬於那裡 |
+| `docs/bringup.md` | ✅ | § 3,判準② |
+| `notes/device-tree.md` | ✅ | 普查的第二個限制 |
+| `notes/modern-kernel-port.md` | ✅ | 新檔 |
+| `tools/ci-*`、`citime.py`、`ci.yml` | ✅ | Block A |
+| `SPEC.md` | ❌ | **判斷**:這一段的數字全部關於 CI 這個儀器與現代 kernel API,**沒有一個關於這台裝置**。上一段同樣判斷、同樣理由 |
+| `CHANGELOG.md` | ❌ | **判斷**:它的角色是「一個發行版包含什麼」而不是逐段紀錄,而它底下有一個結構缺陷(十三則條目全在 `## Unreleased` 之上)—— 在那被寫清楚之前加第十四則會讓缺陷更大。`CHLOG-1` |
+| `RUNSHEET.md` | ❌ | **正確**:桌面段,沒有卡片、沒有 bench、沒有上電 |
+| `docs/GATE-RESULTS.md` | ❌ | **正確**:沒有 gate 關閉 |
+| `docs/KNOWN-ISSUES.md` | ❌ | **判斷**:它記的是「這個**發行版**沒有建立什麼」,而 `R5` 未發行;逐列查過,沒有一列被這一段變成過期 |
+| `docs/blind-write-ledger.md` | ❌ | **判斷**:它的宣告範圍是「`R5` 六支驅動的**外部實作來源**」。mainline 的通用標頭不是這顆 SoC 的驅動實作,`arch/rlx/.../rlxregs.h` 是廠商的而且我只確認路徑沒讀內容 —— 而 `ledgerscan check` **rc 0** 是同一個答案的機械形式 |
+| `docs/interrupt-map.md`、`docs/loader-*.md`、`docs/probe3-cells.md`、`docs/rlx-cache-and-cp0.md`、`docs/rlxprobe-audit-*.md` | ❌ | **正確**:這一段沒有碰中斷、loader、cache 或 probe |
+
+🔴 **而這張表是在使用者問「再確認一次」之後才做的,做完抓到三個缺口**
+(`README.md`、`docs/FINDINGS.md`、`CLAUDE.md`)。**收工前我以為都寫完了。**
+差別不在細心,在**用列舉取代回憶** —— 這正是 `memory` 裡那條稽核方法。
 
 **零 flash 寫入命令、零 `FLR`、零電源循環、不通電,括號 0.0244 %。**
