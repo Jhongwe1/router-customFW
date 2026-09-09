@@ -166,7 +166,10 @@ the conclusion below stands and its stated reason was incomplete.
 🔴 **And the limit stated below is now MEASURED, on the two drivers where
 it dominates.** 量 2026-09-09, all four compiled verbatim against 6.18.50:
 `timer` **1 fatal**, `gpio` **24**, `spi` **18**, `wdt` **6** diagnostics,
-against this table's 8 / 3 / 5 / 3. 21 of gpio's 24 are `struct gpio_chip`
+against this table's 8 / 3 / 5 / 3. 🔄 **20** of gpio's 24 are `struct gpio_chip`
+*(this line said 21 until 2026-09-10; the classification that makes the classes
+sum to 24 gives 20 + 1 `gpiochip_add` + 3 `/proc`, and it was re-derived
+independently on 2026-09-10 from a fresh round 0)*
 used as an **incomplete type** — the name is in both trees, mainline moved
 the definition into `<linux/gpio/driver.h>` — and spi's are `mtd_info has
 no member named ‘read’; did you mean ‘_read’?`, `erase_info` without
