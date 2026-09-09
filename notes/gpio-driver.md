@@ -528,8 +528,60 @@ contributes is the `gpio_chip`'s output path (§ 7), a platform device with
 `arch/rlx` registers **zero** platform devices — `platform_device_register`
 and `platform_add_devices` appear nowhere under it, and the only `platform.c`
 files in the tree belong to `arch/mips` boards. `R5-7`'s platform device is
-this project's first, and where it lives is an open item, not a decision this
-file makes.
+this project's first.
+
+### 9.1 Where it lives — decided 2026-09-10, and the decision is three measurements
+
+**`config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c`**, linked by
+one `obj-y += rlxfw-devices.o` row in `config/rlxfw-marks.tsv` against
+`arch/rlx/kernel/Makefile`.
+
+Three alternatives were on the table and the measurements pick this one:
+
+| | where | why not |
+|---|---|---|
+| **A ✅** | `arch/rlx/kernel/` | chosen |
+| B | inside `rtl819x-gpio.c` | no new file, but a GPIO **controller** instantiating its own **consumers** is a layering inversion, and it would make the LED's existence a property of the chip driver rather than of the board |
+| C | `drivers/leds/rtl819x-leds-board.c` | the path would lie: the file registers a platform device and is not an LED driver |
+
+🔴 **The first measurement is what rules out the obvious spelling of A.**
+`arch/rlx/bsp/` is where a board file belongs and **it is a symlink** —
+`docs/interrupt-map.md` § 6.1 measured it as `-> ../../../target/bsp ->
+boards/rtl8196e/bsp`, which is why a `grep -r` over `arch/rlx` once missed the
+BSP entirely and cost that session a wrong conclusion. Staging a file "into
+`arch/rlx/bsp/`" writes into the vendor's shared board tree, and
+`tools/rlxfw-marks.py` refuses any path under `src-vendor/` by construction.
+量 2026-09-10, every subdirectory of `arch/rlx`: `bsp` is the **only**
+symlink; `boot`, `configs`, `fw`, `include`, `kernel`, `lib`, `mm`,
+`oprofile` and `pci` are real.
+
+🟢 **The second is that the insert is already the file's own idiom.**
+`arch/rlx/kernel/Makefile` carries three `obj-y +=` lines of its own, and
+`obj-y += NAME.o` is one of exactly four forms `rlxfw-marks.py` will insert —
+its stated ground being that *an arbitrary statement here would be a patch
+with no reviewer*. So this needs **no** `config/host-compat/` patch, and
+`HC-1`'s directory does not grow.
+
+🟢 **The third is that no Kconfig plumbing is needed.**
+`arch/rlx/Makefile:117` reads `core-y += arch/rlx/kernel/ arch/rlx/mm/` —
+unconditional — so a file dropped there is linked into the core with no new
+symbol and no `select`.
+
+⚠️ **And one constraint that has to be written down before the first line:**
+that Makefile ends with **`EXTRA_CFLAGS += -Werror`**. Every other file of
+mine has been built under the kernel's default flags; this one is the first
+that must be warning-clean or the build stops. `notes/modern-kernel-port.md`
+§ 9.1's `C0a`/`C0b` controls exist because kbuild exits 0 and prints nothing
+for a file it declines to build — here the failure mode is the opposite and
+louder, which is the easier one to have.
+
+**Initcall level: `arch_initcall` (3).** A platform *device* must exist before
+the platform *driver* registers, and `leds-gpio`'s `gpio_led_init` is
+`device_initcall` (6). Level 3 is before every level-6 entry regardless of
+link order, so this is the one ordering in `R5-7` that does **not** rest on a
+Makefile's line numbers (§ 3.4 rests on one and then declines to). It is also
+before `rtl819x-gpio`'s own `subsys_initcall` (4), which is harmless:
+registering a platform device touches no GPIO.
 
 ---
 

@@ -21727,3 +21727,70 @@ domain 的計數沒動、沒有新檔案變成被引用、樹的形狀沒變。
 一個位元組都不用改。它現在是一個成功的 run,所以進帳:**BIG3 957**,`n` 15 →
 **16**,而 `945..960` 與 **± 0.787 %** 又一次沒有動。
 **這一段一共進帳兩列、`n` 14 → 16,帶兩次都沒動。**
+
+---
+
+### 11. 追記(同一段):platform device 住哪裡決定了,而三個量測選掉它
+
+`§6` 留的那個「唯一還沒決定的事」收掉了。**選 A**:
+`config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c`,
+用 `config/rlxfw-marks.tsv` 一行 `obj-y += rlxfw-devices.o` 對
+`arch/rlx/kernel/Makefile` 掛上,`arch_initcall`。
+
+三個候選、三個量測:
+
+| | 位置 | 為什麼不是 |
+|---|---|---|
+| **A ✅** | `arch/rlx/kernel/` | 選它 |
+| B | 塞進 `rtl819x-gpio.c` | 不開新檔,但 GPIO **控制器**去實例化自己的**消費者**是分層反轉,而且會讓那顆 LED 的存在變成晶片驅動的性質而不是板子的性質 |
+| C | `drivers/leds/rtl819x-leds-board.c` | 路徑會說謊 —— 那個檔註冊 platform device,它不是一支 LED 驅動 |
+
+🔴 **第一個量測擋掉 A 的顯而易見的寫法。** 板檔該住 `arch/rlx/bsp/`,而
+**那是一個 symlink** —— `docs/interrupt-map.md` §6.1 量過,指向
+`boards/rtl8196e/bsp`,那正是當初一次 `grep -r arch/rlx` 看不見 BSP、
+害那一場得到錯結論的原因。往「`arch/rlx/bsp/`」staging 等於寫進廠商的共用板樹,
+而 `tools/rlxfw-marks.py` 依設計拒絕 `src-vendor/` 底下的路徑。
+量 2026-09-10,`arch/rlx` 九個子目錄:**`bsp` 是唯一的 symlink**,
+`boot`／`configs`／`fw`／`include`／`kernel`／`lib`／`mm`／`oprofile`／`pci`
+九個裡其餘八個都是真目錄。
+
+🟢 **第二個:那個插入本來就是這個檔自己的慣用法。** `arch/rlx/kernel/Makefile`
+自己有三行 `obj-y +=`,而 `obj-y += NAME.o` 正是 `rlxfw-marks.py` 允許的四種
+形式之一(它自己寫的理由是**這裡放一個任意敘述等於一個沒有審查者的 patch**)。
+**所以不需要第六個 `config/host-compat/` patch,`HC-1` 的目錄不會再長。**
+
+🟢 **第三個:不需要任何 Kconfig 接線。** `arch/rlx/Makefile:117` 是
+`core-y += arch/rlx/kernel/ arch/rlx/mm/`,無條件 —— 丟進去就進核心,
+不用新符號、不用 `select`。(前後四行也讀了,為了確認 `:117` 不是條件式的。)
+
+⚠️ **而一個必須在寫第一行之前寫下來的約束**:那個 Makefile 結尾是
+**`EXTRA_CFLAGS += -Werror`**。我其他每一支驅動都在核心預設旗標下建置,
+**這是第一支必須零警告、否則建置停下來的**。
+
+**initcall 層級 `arch_initcall`(3)。** platform **device** 必須在 platform
+**driver** 註冊之前存在,而 `leds-gpio` 的 `gpio_led_init` 是
+`device_initcall`(6);層級 3 無論連結順序都在每一個層級 6 之前,
+**所以 `R5-7` 這一個順序是唯一不靠 Makefile 行號的**(§3.4 那個靠了,然後
+拒絕依賴它)。它也在 `rtl819x-gpio` 自己的 `subsys_initcall`(4)之前,
+而那無害:註冊一個 platform device 不碰 GPIO。
+
+🔴🔴 **而寫這一節讓 `ledgerscan check` 變紅,那是它在做它該做的事 —— 而紅的
+理由是這個機制的第三次,形狀又是新的。** 它抓到
+`drivers/leds/rtl819x-leds-board.c` 是「被引用但沒有宣告的 in-scope 路徑」。
+**那個檔案不存在**,我命名它是為了**否決**它(上表的 C)。
+
+帳本自己的規矩寫著:*便宜的修法 —— 把那句話改寫成不出現路徑 —— 是靠改散文讓
+檢查器變綠,而那正是這個 repo 用別的名字記錄過的失敗。帳本改成宣告那筆引用。*
+所以宣告了,而它是 `origin: none` 的**第四種形狀,也是最純的一種**:
+第一筆是一個**舉例**(那個檔存在,只是沒被打開),這一筆**不可能**是一次閱讀,
+因為檔案不存在 —— 而那是機械可查的(`src-vendor/`、`$FWRE_WORK/modern/`、
+`config/rlxfw-src/` 三棵樹都沒有它)。
+⚠️ **它同時是最容易被濫用的形狀**,因為「這個路徑是我編的」在要緊的那個方向上
+不可否證;守住它的是「一個被否決的設計選項必須看得見它是在哪一段散文裡被否決
+的」,而 §9.1 的表格就是那段散文。
+
+同一次也順手把兩個 Makefile 宣告進去(`arch/rlx/kernel/Makefile` 全讀、
+`arch/rlx/Makefile` 五行),**兩個都是廠商的**,照 §2.1「寧可多報」的方向 ——
+掃描器把它們判成 out-of-scope,我還是宣告。⚠️ 但一個 `obj-y` 清單不帶暫存器
+位址、不帶位元編號、不帶順序,所以**兩者都不落在 §5 計分的任何一層**。
+帳本:in-scope **57 → 58**,`led` domain **3 → 4**,`ledgerscan check` 回綠。
