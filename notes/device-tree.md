@@ -151,6 +151,34 @@ figure is **9**.
 🔴 **So the prediction was wrong and the plan's estimate survives the
 experiment built to refute it.** It is recorded that way round deliberately.
 
+🔴 **2026-09-09 (fiftieth segment): a SECOND limit, measured by compiling
+the driver, and it is not the one declared below.** `rtl819x-wdt`'s figure
+here is 3; the compiler names **4** APIs against 6.8. The miss is
+`setup_timer`, and the mechanism is a **name collision**: its only
+occurrence under 6.8's and 6.18's `include/` is
+`serial_8250.h:97`, `void (*setup_timer)(struct uart_8250_port *)` — a
+member of an unrelated struct. This method asks *does the identifier
+appear*, sees that line and scores the symbol as surviving. So the table
+under-counts for two separate reasons, not one; both push the same way, so
+the conclusion below stands and its stated reason was incomplete.
+`notes/modern-kernel-port.md` § 4.
+
+🔴 **And the limit stated below is now MEASURED, on the two drivers where
+it dominates.** 量 2026-09-09, all four compiled verbatim against 6.18.50:
+`timer` **1 fatal**, `gpio` **24**, `spi` **18**, `wdt` **6** diagnostics,
+against this table's 8 / 3 / 5 / 3. 21 of gpio's 24 are `struct gpio_chip`
+used as an **incomplete type** — the name is in both trees, mainline moved
+the definition into `<linux/gpio/driver.h>` — and spi's are `mtd_info has
+no member named ‘read’; did you mean ‘_read’?`, `erase_info` without
+`state` or `mtd`, `MTD_ERASE_FAILED` removed. **That is the sentence below,
+with numbers.** ⚠️ Diagnostics are not root causes; only `wdt` has a
+measured root-cause count (4, by ladder). 🔴 **And `timer` is a third
+category this table cannot express at all**: it stops at `#include
+<asm/rlxregs.h>`, a header that exists only under `arch/rlx/include/asm/`,
+and mainline has no `arch/rlx`. An identifier census cannot see an
+`#include`, and no kernel version will ever supply this one.
+`notes/modern-kernel-port.md` § 5.
+
 ⚠️ **And the limit is what carries the residual.** This method cannot see a
 symbol that still *exists* with a changed **signature**, and those are the
 expensive ones: `clocksource.read` gained a parameter, `gpio_chip`'s accessors

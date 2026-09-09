@@ -99,6 +99,51 @@ confirmed nor refuted.** The cell that settles it compiles **one** driver
 against 6.8; `rtl819x-wdt` is the candidate, because it has the smallest
 missing set and the largest expected shrink.
 
+🟢 **2026-09-09 (fiftieth segment): that cell ran, and ② is ANSWERED for
+one driver.** `rtl819x-wdt` compiles against **6.18.50** — not 6.8, which
+量 is not on kernel.org's list at all — for **`+46 / −10` lines against
+1,547 = 3.62 % of the file**, over **4 distinct APIs**, producing a
+22,696-byte `elf32-tradbigmips` object with all its symbols.
+
+🔴 **And compiling the other three refutes the generalisation, which is
+why they were compiled.** `rtl819x-wdt` was chosen for having the
+*smallest* missing set. 量, verbatim against 6.18.50 — diagnostics, not
+root causes, and only the wdt column has a measured root-cause count:
+
+| driver | lines | census (vs 6.8) | gcc diagnostics (vs 6.18.50) |
+|---|---:|---:|---:|
+| `rtl819x-timer` | 2,813 | 8 | **1, FATAL** — `asm/rlxregs.h` |
+| `rtl819x-gpio` | 673 | 3 | **24** |
+| `rtl819x-spi` | 1,738 | 5 | **18** |
+| `rtl819x-wdt` | 1,547 | 3 | **6** (4 root causes) |
+
+`gpio` and `spi` are dominated by the census's **declared** blind spot:
+21 of gpio's 24 are `struct gpio_chip` used as an incomplete type — the
+name is in both trees; mainline moved the definition to
+`<linux/gpio/driver.h>` — and spi's are `mtd_info has no member named
+‘read’; did you mean ‘_read’?`, `erase_info` without `state` or `mtd`,
+`MTD_ERASE_FAILED` gone. **`rtl819x-timer` is a third category the census
+cannot have a name for**: it stops at an `#include` of `asm/rlxregs.h`,
+which 量 exists only under `arch/rlx/include/asm/` — and mainline has no
+`arch/rlx` at all. ⚠️ **Its cost is UNMEASURED, not small**, because that
+fatal masks everything behind it. **The plan's ~0.3-segment estimate
+survives for `rtl819x-wdt` and for no other driver measured here.**
+
+🔴 **And the census under-counted this driver by one, with a mechanism it
+had not declared.** It said 3; the true figure against 6.8 is 4. The miss
+is `setup_timer`, whose only occurrence under 6.8's and 6.18's `include/`
+is `serial_8250.h:97` — `void (*setup_timer)(struct uart_8250_port *)`, a
+**member of an unrelated struct in an unrelated subsystem**. The declared
+blind spot was *name survives, signature changed*; this one is *name does
+not survive as an API at all and collides with something else*. Both
+under-count, so the direction of the paragraph above is unchanged.
+
+⚠️ **Compiling is not upstream acceptance**, which is `D1`'s bar: this
+driver is still a hand-rolled `miscdevice` on `WATCHDOG_MINOR` where a
+modern one registers a `struct watchdog_device`, and neither that nor its
+`/proc` file is a compile error. **3.62 % is the floor, not the ceiling.**
+`notes/modern-kernel-port.md` has the ladder, the controls and the diff.
+
 ---
 
 ## 4. Bring-up order on this part, and what each step cost
