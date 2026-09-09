@@ -228,7 +228,8 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # (41.9 s) answer arrived, so it contributes no row. The classifier reaches
 # those two numbers from the loader's own reset-cause line, knowing nothing
 # about power switches or `biteraw`.
-ck "thirty-two cold, one hundred warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 32 cold, 100 warm, 0 unknown')"
+# 2026-09-09, seating 19 (bench/2026-09-09b): +1 cold +8 warm -> 33/108.
+ck "thirty-three cold, one hundred and eight warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 33 cold, 108 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -308,8 +309,10 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # must not be: its `J BFC00000` went to a Linux shell, no reset happened, and
 # no boot text exists. It contributes to `NOT CLASSIFIED` instead, where the
 # tool's `0 of them hold boot text` half is what makes that a reading.
-ck "entry population is forty-five warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=45')"
+# 2026-09-09, seating 19: four more warm resets -- three `bite 3` rungs and
+# one `biteraw` -- so n=45 -> n=49.
+ck "entry population is forty-nine warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=49')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
