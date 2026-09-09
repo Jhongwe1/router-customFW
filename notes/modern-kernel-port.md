@@ -26,10 +26,18 @@ the smallest missing set.
 
 🔴 **6.8 is not on that list at all.**  The census was run against
 `linux-headers-6.8.0-139`, which is Ubuntu 24.04's GA kernel and is what this
-host has installed; upstream stopped maintaining 6.8 long before this segment.
-A claim of the form *"it builds against a modern kernel"* backed by 6.8 in
-September 2026 is a claim about a kernel nobody ships.  The target here is
-**6.18.50**, the newest longterm.
+host has installed.  🔴 **Two sentences that stood here are withdrawn as
+unmeasured**, and the second contradicted the one above it: *"upstream stopped
+maintaining 6.8 long before this segment"* — the listing says it is absent
+today and nothing here dates its removal — and *"a claim about a kernel nobody
+ships"* — Ubuntu 24.04 ships it, which is the whole reason the headers are on
+this host.
+
+What is measured is narrower and enough: **6.8 is absent from the maintained
+list, and 6.18.50 is the newest entry marked `longterm` with `iseol: false`.**
+A distribution kernel and an upstream-maintained one are different claims, and
+only the second is what *"compiles in a modern kernel tree"* is asking about.
+The target here is **6.18.50**.
 
 That choice is not free: it means the census's numbers and this compile are
 against **different trees**, and § 4 separates the two effects rather than
