@@ -153,6 +153,20 @@ flash-write code to this image*, and not the wider one
 run on the silicon yet.**
 
 
+**[`notes/modern-kernel-port.md`](notes/modern-kernel-port.md)** 🆕 — what
+it costs to take a driver written against Linux 2.6.30 and compile it against
+the current longterm kernel, measured on one driver and then on all four.
+`rtl819x-wdt` costs **`+46 / −10` lines of 1,547 — 3.62 %** over four APIs, and
+one of those four is 91 % of it. 🔴 **The other three say the first number does
+not generalise**, and the reason is that the driver measured first had been
+chosen for being the easiest: `gpio` and `spi` are dominated by names that
+still exist with a changed shape — the blind spot the identifier census
+declared and never measured — and `rtl819x-timer` does not reach an API
+diagnostic at all, because it `#include`s a header that exists only under the
+vendor's `arch/rlx`, which mainline does not have. It also carries the
+controls, without which none of it counts: a build system that declines to
+compile a file exits 0 and prints nothing, which reads exactly like success.
+
 **[`notes/incremental-build.md`](notes/incremental-build.md)** 🆕 — why a
 `make` with nothing touched rebuilt all 599 objects, and what it cost to find
 out. The answer is not the one the question was opened on: a patch written for

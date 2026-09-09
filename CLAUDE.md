@@ -950,6 +950,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   dies with *unexpected EOF* on nested quotes. **Same fix as the Bash tool's:
   write the script to a file and run it by path** — `wsl -d Ubuntu-24.04 --
   bash /mnt/c/…/x.sh`.
+  🆕 ⑤ **A native command piped into anything gets a UTF-8 BOM prepended, and a JSON parser on the other end dies on it.** 量 2026-09-09: `gh run view … --json … | python -c "json.load(sys.stdin)"` raises `json.decoder.JSONDecodeError: Unexpected UTF-8 BOM (decode using utf-8-sig)` at line 1 column 1. It is not `gh` — `gh … > file` and reading the file is clean. **Redirect to a file and read it, or use `utf-8-sig`.** Same class as ④: the pipeline, not either program, is what breaks.
   🆕 ④ **`| Select-Object -First N` KILLS the native process when `N` is fewer
   lines than it produces, and the exit code becomes `-1` — which the tool
   surfaces as `255` and which is indistinguishable from a real failure.** 量,
@@ -1061,6 +1062,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   before a single suite starts. `C3` is the positive control on it — one byte
   changed in the copy must be caught, or *"the copy IS the source"* is a line
   that cannot fail.
+  🔴 **③b AND A SWEEP CAN NEVER COVER THE SEGMENT'S OWN WRITE-UP, which is not a discipline problem but an ordering one.** 量 2026-09-09 (fiftieth segment): the full sweep ran at 23:12 and that segment's `LOG.md`, `PROGRESS.md` and one new note were written at 23:41. `ledgerscan check` was **green at the desk and red on CI**, on a path the write-up itself invented — a scratch filename quoted out of a compiler message, which a citation scanner cannot tell from a path this project has read. **The record is always written after the sweep that the record describes.** So the closeout re-runs the checks whose subject is a tracked `.md` — `spec-check`, `ledgerscan check`/`quarantine`, `xcheck sweep`, `flashwin scan` — on the final tree, and **which checks those are is decided by `git diff --name-only <last swept commit> HEAD`, not by memory**: on that segment everything changed after the sweep was `.md` except four tool and config files that were already final when it fingerprinted the tree, so the full sweep's verdict on every tool still stood and only the `.md` side needed re-running. 🔴 **And a re-sweep restricted with `--only` selected nothing** — `69 declared, 69 skipped, 0 ran` — because the step names were rebuilt out of `enumerate`'s display format, which is this file's own rule about not reconstructing commands. **A sweep that runs zero steps reports zero failures**; the tool printed `0 ran / 0 green` on the same line and reading that line is what caught it.
   🔴 **③ DO NOT COMMIT WHILE A SWEEP IS RUNNING, and the reason is not that a
   commit changes content — it does not. A commit changes the POPULATION.**
   量 2026-09-07: `spec-check` sweeps **tracked** `.md` files; a bench card was
