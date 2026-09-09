@@ -749,6 +749,40 @@ cache geometry agreed with the vendor build constants and, on 2026-08-31,
 from a third-party tree and then confirmed by measurement is the strongest form
 this contact could have taken, and it is why it was worth taking.
 
+🆕 **2026-09-09 (forty-ninth segment): `D2` was written, and this row's count
+did not move.** Six bindings and two source files landed under `dt/` —
+`notes/device-tree.md` owns them — and **no third-party file was fetched,
+opened or searched for while they were written**. The two paths above are
+still the two paths.
+
+🔴 **The one place it was tempting is recorded rather than taken.**
+`dt-validate` reports a node whose `compatible` matches no schema, so
+`lexra,rlx4181` on the `cpu@0` node had to be answered one of two ways: give
+it a binding, or declare it. It is declared, in `dt/unmatched-allow.tsv`, with
+the reason — **writing a binding for that string would turn a recorded, dated
+contact into an artefact of this project**, and a reader six months from now
+would find a `lexra,rlx4181` binding in `dt/` with nothing saying where the
+string came from. The *value* behind it is independent: 量 `PRId 0x0000CD01`
+on this die, mapped through the vendor's own `arch/rlx/include/asm/cpu.h`.
+
+🟢 **And `D2` put two decisions on the L2 layer § 5 describes, both of them
+mine and both refutable.** ① the timer's `reg` is `0x1c` and the watchdog's is
+the word above it, rather than the two nodes overlapping the documented block;
+② the timer is a **clock provider** and the watchdog takes `clocks = <&timer>`,
+rather than the watchdog reading `CDBR` out of another device as the 2.6.30
+driver does. Both are choices a second implementation can be found to have
+made differently, which is what makes them worth `R5-9`'s diff — and ② has a
+measured motive rather than an aesthetic one: `CLK-08b`'s 14,965,000 Hz
+survived into a shipped driver's table, wrong by 76×, because the rate had no
+owner.
+
+⚠️ **What § 6's ordering constraint now also covers.** When the trees are
+cloned at `R5-9`, the derivation check is still the first operation — and the
+second is that `dt/`'s `compatible` strings are compared against theirs
+**as a finding, not as a correction**. A collision or a divergence in those
+names is exactly the kind of difference the diff exists to report; silently
+renaming to match would destroy the only independent naming this project has.
+
 ---
 
 ## 5. 🔴 What `driver-diff` compares — the two layers, and why the definition moved

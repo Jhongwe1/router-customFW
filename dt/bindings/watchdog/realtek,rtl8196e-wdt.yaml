@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/watchdog/realtek,rtl8196e-wdt.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Realtek RTL8196E watchdog
+
+maintainers:
+  - Chung-Wei Lan <zwwe1f@gmail.com>
+
+description: |
+  One register, WDTCNR, at 0x1800311c -- INSIDE the block the datasheet calls
+  Timer/Counter.  This binding gives it the last word of that block and gives
+  the timer 0x00..0x1b, so the two windows are adjacent and disjoint rather
+  than overlapping.  realtek,rtl8196e-timer.yaml carries the other half.
+
+  Fields, all measured on this die unless marked:
+    * WDTE, bits 31:24 -- 0xA5 stops the counter, anything else runs it.  Reset
+      value 0xA5000000, and the vendor's bsp_timer_init writes a FULL WORD of
+      0x00600000, so WDTE goes to 0x00 rather than to the stop pattern.
+    * WDTCLR, bit 23 -- clears the counter.  🔴 It does not read back: written
+      0x00A40000, read 0x00240000.
+    * OVSEL, the timeout select, is a NON-CONTIGUOUS and OUT-OF-ORDER four-bit
+      field: [0]=bit21, [1]=bit22, [2]=bit17, [3]=bit18.  Bit 19 and WDTIND
+      (bit 20) sit inside that range and are inert for the timeout.  This is
+      the driver's business and no property here describes it; it is written
+      down so the next reader does not invent one.
+
+  🔴 `clocks` is the timer node, not an oscillator, and that is load-bearing.
+  The watchdog counts the CDBR-divided clock -- measured f = 200,180 Hz from
+  two rungs 32x apart, against 200,005 Hz measured on TC0CNT by a different
+  method in a different seating, ratio 0.999 -- and CDBR is a register inside
+  the timer.  The driver this replaces derives its rate by reading another
+  device's registers; that is what a `clocks` phandle exists to make
+  unnecessary.
+
+  ⚠️ NEVER PROBED ON HARDWARE.  See dt/README.md.
+  ⚠️ Self-contained rather than `$ref: watchdog.yaml#`: dtschema ships the core
+  schemas and not the kernel's, so that reference would not resolve in the
+  corpus tools/dtcheck.py validates against.  `timeout-sec` is declared here
+  with the meaning the common watchdog binding gives it.
+
+properties:
+  compatible:
+    const: realtek,rtl8196e-wdt
+
+  reg:
+    maxItems: 1
+    description: WDTCNR, one word.
+
+  clocks:
+    maxItems: 1
+    description: the CDBR-divided clock, provided by the timer node.
+
+  timeout-sec:
+    description: |
+      default watchdog timeout in seconds.  The hardware quantises this hard:
+      the period is a power of two over the counting clock, so the achievable
+      values on this part are 0.164 s, 1.34 s, 41.9 s and 84.0 s among others,
+      all measured.
+
+required:
+  - compatible
+  - reg
+  - clocks
+
+additionalProperties: false
+
+examples:
+  - |
+    timer: timer@18003100 {
+        compatible = "realtek,rtl8196e-timer";
+        reg = <0x18003100 0x1c>;
+        interrupts = <25>;
+        clocks = <&sysclk>;
+        #clock-cells = <0>;
+    };
+
+    sysclk: clock-200mhz {
+        compatible = "fixed-clock";
+        #clock-cells = <0>;
+        clock-frequency = <200000000>;
+    };
+
+    watchdog@1800311c {
+        compatible = "realtek,rtl8196e-wdt";
+        reg = <0x1800311c 0x4>;
+        clocks = <&timer>;
+        timeout-sec = <42>;
+    };

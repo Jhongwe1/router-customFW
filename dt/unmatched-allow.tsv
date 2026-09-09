@@ -1,0 +1,22 @@
+# dt/unmatched-allow.tsv -- every `compatible` in dt/*.dts that no schema in
+# the corpus tools/dtcheck.py runs against describes, with the reason.
+#
+# 量 2026-09-09, and it is the reason this file exists: `dt-validate` is SILENT
+# on a node whose compatible matches no schema unless it is given `-m`, and it
+# exits 0 either way.  So the default reading of a green is "every node was
+# checked", and the truth is "every node that happened to have a schema was
+# checked".  dtcheck.py passes -m and turns an undeclared unmatched compatible
+# into a finding, which makes this file the enumeration of what is NOT checked.
+#
+# A row here is a scope limit, never an excuse.  Adding one is a decision that
+# a node is described elsewhere or not yet described at all; deleting one is
+# what happens when a binding arrives.
+#
+# compatible<TAB>reason
+gpio-leds	kernel subsystem binding (Documentation/devicetree/bindings/leds/leds-gpio.yaml); not in dtschema's corpus. Validated when --extra-schema points at a kernel tree.
+gpio-keys	kernel subsystem binding (bindings/input/gpio-keys.yaml); same.
+fixed-partitions	kernel subsystem binding (bindings/mtd/partitions/fixed-partitions.yaml); same.
+fixed-clock	kernel subsystem binding (bindings/clock/fixed-clock.yaml); same.
+simple-bus	kernel subsystem binding (bindings/bus/simple-bus.yaml); same.
+realtek,rtl8196e-nor	🔴 NOT described anywhere yet. The NOR device behind the controller has no binding of its own in this project, because nothing has read a JEDEC id from it -- SPEC.md F3 has that as an open item and R5-5's driver reaches the chip through an UNKNOWN-chip fallback. A binding written before the id is read would name a part nobody has identified.
+lexra,rlx4181	🔴 The cpu node.  Two reasons it has no binding here and both are worth reading: `lexra` is NOT a registered device-tree vendor prefix, and this compatible string is the ONE contact docs/blind-write-ledger.md § 4.6 records with a third-party port (shibajee's rtl8196e.dtsi, fetched 2026-08-25 for CPU-25).  Writing a binding for it would turn a recorded, dated contact into an artefact of this project.  The VALUE is independently 量 on this die -- PRId 0x0000CD01 -> PRID_IMP_RLX4181.

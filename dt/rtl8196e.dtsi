@@ -1,0 +1,216 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
+/*
+ * Realtek RTL8196E — the SoC.
+ *
+ * 🔴 NOT PROBED ON HARDWARE, and cannot be: the kernel this project boots on
+ * this part is 2.6.30, which has no device tree.  `dt/README.md` says what is
+ * and is not claimed here.
+ *
+ * Every address and every frequency below names the SPEC.md id it came from
+ * and that id's mark.  Where two nodes describe one register block, the split
+ * is deliberate and the comment says why.
+ */
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	compatible = "realtek,rtl8196e";
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "lexra,rlx4181";
+			reg = <0>;
+
+			/* 量 CPU-14: PRId = 0x0000CD01, bits 15:8 = 0xCD, which
+			 * arch/rlx/include/asm/cpu.h maps to PRID_IMP_RLX4181,
+			 * revision 1.  RLX5281 is 0xdc01 and is positively
+			 * excluded.  The three GPL drops are byte-identical in
+			 * that header — one source, three copies — and no code
+			 * in the port reads the table (notes/vendor-kernel-isa.md
+			 * §5). */
+
+			/* 量 2026-08-31 (probe3, seating 8): 16 KiB I-cache,
+			 * 16-byte lines, 2-way, measured by experiment on this
+			 * die with both refutation controls firing, and the
+			 * two-way shape confirmed a second way at the eviction
+			 * walk's boundary (ten {k, k+256} pairs, no singleton). */
+			i-cache-size = <16384>;
+			i-cache-line-size = <16>;
+			i-cache-sets = <512>;
+
+			/* 讀, NOT 量: the D-cache geometry has never been
+			 * measured on this die.  It is the vendor build
+			 * constants' value.  probe3 measured the I-cache only. */
+			d-cache-size = <8192>;
+			d-cache-line-size = <16>;
+		};
+	};
+
+	/* 量 CLK-02: the peripheral Lexra bus clock, 200.0049 MHz ± 0.0015 MHz
+	 * (±7 ppm over a 2,080 s baseline), against the 0x0BEBC200 =
+	 * 200,000,000 compiled into the vendor image — +24 ppm.  The nominal
+	 * integer is what goes in a device tree; the measurement is what says
+	 * the nominal is right. */
+	sysclk: clock-200mhz {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <200000000>;
+		clock-output-names = "lxb";
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&intc>;
+
+		/* 讀 REG-13 / 量 REG-38: the serial flash controller.  Five
+		 * registers, SFCR SFCR2 SFCSR SFDR SFDR2, so the block is
+		 * 0x14 and not the 0x10 this project's own driver uses —
+		 * SFDR2 at 0x1210 has never been read, because the loader's
+		 * `DW` rounds up and only prints four words (SPEC.md REG-13
+		 * 殘留).  A `reg` describes the block, not the subset one
+		 * driver touches.
+		 *
+		 * 🔴 The node is named `flash-controller` and not `spi`, and
+		 * that is a measurement rather than a preference: dtc
+		 * classifies a node NAMED `spi@...` as an SPI bus by name
+		 * alone and then requires `#size-cells = <0>` on it
+		 * (`Warning (spi_bus_bridge)`, 量 on the first run of this
+		 * file).  This block is not an SPI bus in the device-tree
+		 * sense -- its child is one NOR device reached through a
+		 * fixed chip select and a 4 MiB read window, not a set of
+		 * addressable slaves.
+		 *
+		 * The second range is the memory-mapped read window, 量
+		 * FLS-11 / MAP-12, whose contents were shown byte-identical
+		 * to the PIO path over all 4,194,304 bytes on 2026-09-08
+		 * (seating 16, SPEC.md FLS-26). */
+		sfc: flash-controller@18001200 {
+			compatible = "realtek,rtl8196e-sfc";
+			reg = <0x18001200 0x14>,
+			      <0x1d000000 0x00400000>;
+			reg-names = "sfc", "map";
+			clocks = <&sysclk>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			status = "okay";
+		};
+
+		/* 量 REG-01 / REG-02: the global interrupt controller, one
+		 * 0x100 below the timer block.  GIMR is the mask and GISR the
+		 * pending word; IRR0–IRR3 are eight 4-bit destination-select
+		 * fields each and sit in the same block, so the block is 0x20.
+		 *
+		 * 🔴 There is no irqchip driver for this and there deliberately
+		 * will not be one at R5: 2.6.30 has no irq_domain, so the shape
+		 * written there would be the wrong shape.  It is R10a's.  The
+		 * node exists because a `.dts` describes hardware and because
+		 * every `interrupts` cell below needs a parent to mean
+		 * anything.  docs/interrupt-map.md owns the routing. */
+		intc: interrupt-controller@18003000 {
+			compatible = "realtek,rtl8196e-intc";
+			reg = <0x18003000 0x20>;
+			interrupt-controller;
+			#interrupt-cells = <1>;
+		};
+
+		/* 讀 REG-05..REG-11 (datasheet D §8.2, Tables 20–26) and 量 on
+		 * this die: TC0DATA 0x00, TC1DATA 0x04, TC0CNT 0x08, TC1CNT
+		 * 0x0c, TCCNR 0x10, TCIR 0x14, CDBR 0x18.
+		 *
+		 * 🔴 `reg` is 0x1c and NOT 0x20, and that is the most
+		 * load-bearing line in this file.  WDTCNR is at 0x1800311c —
+		 * INSIDE the block the datasheet calls Timer/Counter — so a
+		 * watchdog node with its own `reg` would overlap this one and
+		 * the second request_mem_region() would take -EBUSY.  The two
+		 * devices are given adjacent, disjoint windows at word
+		 * granularity: this node owns 0x00–0x1b, the watchdog owns
+		 * 0x1c–0x1f.  rtl819x-timer.c:478 names 0x1c for exactly this
+		 * reason and touches nothing in it.
+		 *
+		 * 🔴 And `#clock-cells`, which is the other half of the same
+		 * problem.  CDBR — the divider every consumer of this block
+		 * counts on — lives at 0x18, inside THIS node.  The 2.6.30
+		 * watchdog driver derives its own rate by reading TC0DATA and
+		 * CDBR directly (rtl819x-wdt.c:536-539), which works only
+		 * because that kernel has no ownership model at all.  Here the
+		 * timer is the clock provider and the watchdog asks it.  That
+		 * is not decoration: SPEC.md CLK-08b's 14.965 MHz was a
+		 * LOADER-state constant used under Linux, wrong by 76×, and it
+		 * survived into a shipped driver's table precisely because the
+		 * rate had no owner.
+		 *
+		 * interrupts: 量 IRQ-08, /proc/interrupts read `25: … ICTL
+		 * rtl819x-timer` with a three-state control (absent before
+		 * request_irq, present during, absent after free_irq).  TC0's
+		 * number is NOT declared here: the vendor's tick appears on
+		 * line 13 (量, P3-7) and nothing in this project has derived
+		 * why 13 rather than 24, so a second cell would be a guess. */
+		timer: timer@18003100 {
+			compatible = "realtek,rtl8196e-timer";
+			reg = <0x18003100 0x1c>;
+			interrupts = <25>;
+			interrupt-names = "tc1";
+			clocks = <&sysclk>;
+			#clock-cells = <0>;
+			clock-output-names = "tcbase";
+		};
+
+		/* 量 FW-52 / CLK-28: WDTCNR, one word, inside the timer block —
+		 * see the timer node above for why this is a separate node with
+		 * a disjoint `reg` rather than a child or an overlap.
+		 *
+		 * 量 2026-09-09 (seating 18): OVSEL is a NON-CONTIGUOUS and
+		 * OUT-OF-ORDER four-bit field — [0]=bit21, [1]=bit22,
+		 * [2]=bit17, [3]=bit18 — with bit 19 and WDTIND (bit 20) inert
+		 * for the timeout.  Nothing in a device tree expresses that and
+		 * nothing should; it is the driver's, and it is named here so
+		 * the next reader does not invent a `realtek,ovsel` property.
+		 *
+		 * `clocks = <&timer>` is the CDBR-divided clock: 量, the
+		 * watchdog counts what the timer block counts (f = 200,180 Hz
+		 * from two rungs 32× apart, against CLK-17's 200,005 Hz by a
+		 * different method on a different register — ratio 0.999). */
+		wdt: watchdog@1800311c {
+			compatible = "realtek,rtl8196e-wdt";
+			reg = <0x1800311c 0x4>;
+			clocks = <&timer>;
+		};
+
+		/* 量 REG-26/27/28 (MAP-09): PABCD CNR 0x00, an unnamed word at
+		 * 0x04, DIR 0x08, DAT 0x0c.  32 lines in one register set.
+		 *
+		 * 🔴 `ngpios = <32>` describes the REGISTER, not what is safe
+		 * to drive.  On this die exactly one line is known to be a
+		 * GPIO — bit 5, the reset button, because it is the only
+		 * cleared bit of CNR and the loader is what cleared it
+		 * (REG-26) — and the 2.6.30 driver's ALLOW_OUT_MASK is 0 for
+		 * that reason.  A device tree cannot carry that judgement and
+		 * must not pretend to; `gpio-line-names` below marks the two
+		 * lines this project has evidence for and leaves the rest
+		 * unnamed.
+		 *
+		 * ⚠️ WHICH of PABCD's four ports bit 5 belongs to has never
+		 * been measured.  The chip is labelled `pabcd` and the line
+		 * number is the bit position, which is what the 2.6.30 driver
+		 * does and for the same reason. */
+		gpio: gpio@18003500 {
+			compatible = "realtek,rtl8196e-gpio";
+			reg = <0x18003500 0x10>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			ngpios = <32>;
+			gpio-line-names =
+				"", "", "", "", "", "reset-button", "led2", "",
+				"", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "";
+		};
+	};
+};

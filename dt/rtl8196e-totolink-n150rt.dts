@@ -1,0 +1,133 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
+/*
+ * TOTOLINK N150RT — the board rlxfw is built for.  ONE DEVICE, NO SPARE.
+ *
+ * 🔴 NOT PROBED ON HARDWARE.  See dt/README.md.
+ *
+ * 🔴 The two read-only partitions below are not a preference.  `CLAUDE.md`'s
+ * Never table: the loader region is unrecoverable if it is destroyed — there
+ * is no spare and no external programmer — and `H601` holds THIS unit's MAC
+ * and radio calibration, which a factory reset does not restore.  Expressing
+ * that as `read-only;` in a device tree is the first time in this project the
+ * rule has had a machine-readable form.
+ */
+
+/dts-v1/;
+
+/include/ "rtl8196e.dtsi"
+
+/ {
+	compatible = "totolink,n150rt", "realtek,rtl8196e";
+	model = "TOTOLINK N150RT";
+
+	chosen {
+		/* 量 LDR-01 / CON-01: CP2102 on the header, 38400 8N1.  The
+		 * rate is what the loader comes up at and what every capture
+		 * in bench/ was taken through. */
+		bootargs = "console=ttyS0,38400 rootfstype=squashfs,jffs2";
+	};
+
+	/* 量 MEM-01: 32 MiB of DDR at 0x00000000.  The kernel this project
+	 * boots is uploaded to 0x80500000 (KSEG0 + 0x00500000) over TFTP,
+	 * which is inside this range. */
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x02000000>;
+	};
+
+	/* 量 BRD-05, 2026-08-24: the reset button is a GPIO on PABCD bit 5,
+	 * ACTIVE LOW with a pull-up — it is NOT wired to RESET#.  Pressed and
+	 * released, `DW B8003500 1` differs in exactly one bit: XOR 0x00000020.
+	 *
+	 * 量 FW-40, 2026-09-06: the vendor's own path, read out of this
+	 * image's compiled code — under 2 s nothing, 2–4 s SIGTERM to PID 1,
+	 * ≥5 s writes ASCII '1' into `default_flag`.  Predicted before the
+	 * press, then measured: /proc/load_default read 0, then 1.  `5000`
+	 * below is that threshold, and it is measured rather than chosen.
+	 *
+	 * The second cell is GPIO_ACTIVE_LOW (1); dt/README.md § 1 says why
+	 * the macro is not spelled out. */
+	keys {
+		compatible = "gpio-keys";
+
+		key-reset {
+			label = "reset";
+			linux,code = <0x198>;		/* KEY_RESTART */
+			gpios = <&gpio 5 1>;		/* GPIO_ACTIVE_LOW */
+			debounce-interval = <60>;
+		};
+	};
+
+	/* 量 BRD-13, 2026-09-09 (seating 19): PABCD bit 6 drives the SECOND of
+	 * the eight LEDs on the board, ACTIVE LOW, with the polarity measured
+	 * at both levels and the other seven LEDs as the negative control.
+	 * Before that seating no source in this repository was light —
+	 * REG-37 was a register, FW-40 a disassembly, BRD-06 said "possibly".
+	 *
+	 * 🔴 THIS LINE HAS A SECOND CONSUMER AND THAT IS NOT AN OVERSIGHT.
+	 * The vendor's `rtl_gpio_timer` blinks bit 6 on the reset-button hold
+	 * counter's parity (量 FW-40), so on the running vendor firmware two
+	 * pieces of code drive one line.  In a device tree that conflict is
+	 * visible, which is the point; on 2.6.30 it is the `-EBUSY` that
+	 * `R5-7` has to answer.
+	 *
+	 * ⚠️ And bit 6 is NOT in the 2.6.30 driver's known_mask (量 C1-G0,
+	 * 0x00000020 — bit 5 only), so that driver would refuse this consumer
+	 * at .request before ALLOW_OUT_MASK was ever consulted.  The node
+	 * describes the board; the driver is what has to change. */
+	leds {
+		compatible = "gpio-leds";
+
+		led-1 {
+			label = "n150rt:green:led2";
+			gpios = <&gpio 6 1>;		/* GPIO_ACTIVE_LOW */
+			default-state = "off";
+		};
+	};
+};
+
+&sfc {
+	/* 量 FLS-14: 4,194,304 bytes, sha256 a800059a…10f37ea.
+	 * 量 FLS-26 (2026-09-09, seating 18): 4,177,920 B proven identical to
+	 * the 2026-08-16 dump, 8,192 B proven different, 8,192 B undetermined —
+	 * and the undetermined 8,192 is exactly H601, never hashed by rule. */
+	flash@0 {
+		compatible = "realtek,rtl8196e-nor";
+		reg = <0 0x00400000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			/* 0x000000–0x005FFF.  Bricked is unrecoverable. */
+			partition@0 {
+				label = "bootloader";
+				reg = <0x000000 0x006000>;
+				read-only;
+			};
+
+			/* 0x006000–0x007FFF.  This unit's MAC and radio
+			 * calibration.  A factory reset does not restore it,
+			 * and 6.3 % of it has ever been read back by this
+			 * project's own bracket. */
+			partition@6000 {
+				label = "h601";
+				reg = <0x006000 0x002000>;
+				read-only;
+			};
+
+			/* ⚠️ 未定 — the internal structure of everything above
+			 * 0x008000 has NOT been established.  What is known:
+			 * the `cr6c` header is in here, [0x9000,0xA000) and
+			 * [0xD000,0xE000) are the two 4 KiB units that differ
+			 * from the 2026-08-16 dump (量 FLS-26), and a
+			 * 737,280-byte run from 0x34C000 is entirely 0xFF.
+			 * One partition, because three would be three guesses. */
+			partition@8000 {
+				label = "firmware";
+				reg = <0x008000 0x3f8000>;
+			};
+		};
+	};
+};
