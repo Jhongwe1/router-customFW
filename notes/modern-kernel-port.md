@@ -237,8 +237,15 @@ majority of the work.
 `rtl819x-timer` does not reach a single API diagnostic.  It stops at
 
 ```
-drivers/clocksource/rlxfw_v0_timer.c:409:10: fatal error: asm/rlxregs.h: No such file or directory
+<copy of rtl819x-timer.c>:409:10: fatal error: asm/rlxregs.h: No such file or directory
 ```
+
+*(The compiler names the throwaway filename the copy was given inside the 6.18
+tree.  It is elided here on purpose: `ledgerscan check` reads a path shaped
+like a driver tree as a CITATION that the blind-write ledger has to cover, and
+it is right to — it cannot tell a scratch copy from a path this project has
+read.  The line is `rtl819x-timer.c:409`,
+`config/rlxfw-src/linux-2.6.30/drivers/clocksource/`.)*
 
 量: that header exists only at
 `arch/rlx/include/asm/rlxregs.h` (with a copy under `arch/mips/include/asm/` in
