@@ -494,7 +494,21 @@ armed, and the second run is a result rather than a risk.
 one cell:
 
 ```
-stop ; kickms 3000 ; ovsel 9 ; bootguard        # hw timeout 1121 ms
+stop ; kickms 3000 ; ovsel 0 ; bootguard        # hw timeout 163.8 ms
+```
+
+🔴 **This recipe said `ovsel 9` and `1121 ms` until 2026-09-09, and as
+written it tested NOTHING.** `OVSEL` 9 is 83.8 s 量, so a 3 s kick period beats
+the hardware deadline by 28x and the board survives whether or not anything
+else is feeding -- a cell whose "negative" outcome is guaranteed and which
+therefore cannot fail. It was carded that way and run that way; 量 seating 17,
+the answer came from RE-RUNNING it at `OVSEL` 0. `FW-51`'s residual closes on
+that re-run and not on the carded cell. The driver header was corrected on
+2026-09-08 and **this copy was missed until the closeout sweep of 2026-09-09**,
+which is `rlxfw-requote-hazard`'s shape: one correction, two places, one
+reached.
+
+```
 ```
 
 The kernel timer will not come round for 3,000 ms. If nothing else writes
@@ -517,7 +531,7 @@ is the state in which a wlan kick could plausibly run.
 
 ## 7. What this step does not establish
 
-1. **Where `OVSEL[2]` is.** § 3.1. Four of ten settings are refused.
+1. ~~**Where `OVSEL[2]` is.** § 3.1. Four of ten settings are refused.~~ ✅ **CLOSED 2026-09-09 — it is bit 17 (§ 11.1).** 🔴 The four settings are still refused, because the DRIVER has not been changed: it lags the measurement by one step and changing it is a behaviour change that needs its own card.
 2. **Whether `WDTIND` works.** `WDIOC_GETBOOTSTATUS` returns 0 *always*, and
    that 0 is not evidence that no watchdog reset happened — it is evidence the
    bit does not read back (`REG-12` 殘留). `WDIOF_CARDRESET` is deliberately

@@ -156,7 +156,17 @@ COLUMNS = ["run_id", "created_utc", "sha7", "jobs",
 #: treats band widths as additive shares of one total.  They are not: on the
 #: post-changepoint slice the three ranges are 7, 11 and 16 seconds, and
 #: 7 + 11 = 18.  It also called `497..504` the 51-run figure when that is the
-#: post-changepoint slice; all runs pooled give `497..507`.  **Run `stats` --
+#: post-changepoint slice; all runs pooled gave `497..507`.  🔴 **And that
+#: figure died on 2026-09-09**: run 34276448280 is **954**, so pooled is now
+#: `497..954` (+-31.50 %) over 75 rows.  It is not drift -- it is this
+#: repository's own change, fully attributable: `test-console-capture` went
+#: 46 -> 59 cases and its mutant suite 25 -> 39 mutants, and that suite's work
+#: is cases x mutants, 1,150 -> 2,301, a factor of 2.001.  `test-deskchan` did
+#: not grow (60.19 s, desk sweep), and (954-60)/(502-60) = 2.02 against a
+#: predicted 1.97.  🟢 Confirmed on the wall clock by a second source that
+#: shares no code with this ledger: the run took 17m14s against the previous
+#: run's 9m38s, a difference of 456 s against this ledger's 452 s.  **Run
+#: `stats` --
 #: it prints both bands, and A7 prints the share.**
 #:
 #: 🔴 The set is HARDCODED rather than derived per run, on purpose.  A set

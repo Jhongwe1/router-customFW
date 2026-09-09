@@ -490,6 +490,12 @@ explicit.
 ## 9. 🆕 2026-09-08 (forty-fourth segment, desk, no power): 1.1, and the
    shape of the answer is decided by one page of `read_proc`
 
+🔄 **§ 10 SUPERSEDES THIS SECTION'S ARITHMETIC.** The 99.02 % below became
+2.93 % at seating 17 and is **0.195 % (8,192 bytes, exactly `H601`)** after
+seating 18's `map 1 0` -- which also found **two** differing units where this
+section's closing paragraph could only say *group 0*. Kept as written, because
+what it could and could not say is the record of what the instrument was for.
+
 `FLS-26` left 4,153,344 bytes -- **99.02 %** -- undetermined, because a prefix
 digest finds the first difference and nothing past it.  1.1 is the instrument
 for the rest.  **No card is frozen and no image is staged for a seating**: the
@@ -708,3 +714,85 @@ not in the boot budget at all.
 * `map_truncated` has no positive control: the budget is 3,584 bytes and the
   largest real output is about 2,600, so nothing has ever made it fire.  A
   case that shrinks the budget would give it one, and it is not written.
+
+---
+
+## 10. 🟢 2026-09-09 (seating 18): `map 1 0` runs, the 2.93 % becomes 0.195 %, and the level-1 answer is TWO not one
+
+§ 9 closed at *"the 99.02 % above is now 2.93 %"*. That 2.93 % is group 0's
+122,880 hashed bytes, and it is what `map 1 0` was built to split. It ran.
+
+### 10.1 The reading
+
+`flashmap compare` on `bench/2026-09-09/C1-M1.log`:
+
+```
+SKIPPED 006000  H601, by rule, on both sides
+SKIPPED 007000  H601, by rule, on both sides
+DIFFER  009000  device d41a56347970b0cb... dump c40dc4b895d7da25...
+DIFFER  00D000  device 5bbdf6f72d3a1858... dump 7f3953fc07530aac...
+30 same, 2 DIFFER, 0 scope, 0 extra, 0 missing
+```
+
+🔴 **TWO differing units, not one, and `00D000` had never been seen.** Seating
+16's prefix bisection put the *first* difference in `[0x9000,0xA000)` and — as
+§ 9 itself says — a prefix digest finds the first difference and nothing past
+it. This is the cell that looks past it. The card predicted *exactly one* and
+was refuted, which is the prediction doing its job: the alternative was never
+checking.
+
+**The ledger, from `map 0`'s 31 identical groups plus these 28 identical units:**
+
+| | seating 16 | seating 17 | seating 18 |
+|---|---|---|---|
+| proven identical | 28,672 B (0.684 %) | 4,063,232 B (96.9 %) | **4,177,920 B (99.61 %)** |
+| proven different | 4,096 B | 4,096 B | **8,192 B (0.195 %)** |
+| undetermined | 4,153,344 B (99.02 %) | 122,880 + 8,192 (2.93 % + `H601`) | **8,192 B (0.195 %)** |
+
+⚠️ **The remaining 8,192 is exactly `H601`**, and it is undetermined *by
+decision*: `map_h601_skipped 8192` / `map_h601_hashed 0` in every capture, with
+`flashmap`'s `F6` refusing every reading if that second field is ever non-zero.
+
+### 10.2 🟢 The attribution bracket, and it closed byte-identical
+
+`map 0` ran twice more — once at 22:45 on 2026-09-08 (seating 17) and once as
+**the first command of seating 18**, before anything else could touch the part.
+Between them the **vendor firmware ran twice** (~2 and ~4 minutes, two bites
+that were not caught) and the board was power-cycled cold.
+
+```
+cmp bench/2026-09-08b/C1-M0.log bench/2026-09-09/C1-M0.log   ->  identical
+```
+
+**Byte-identical, 3,013 bytes.** So those two vendor-firmware runs wrote nothing
+to the 4,186,112 bytes this driver hashes. The ordering is part of the claim,
+not a convenience: a `map 0` run after any other cell would prove less.
+
+### 10.3 🟢 `--until` and what the map cell now costs
+
+`console-capture` 1.4's `--until` ends a capture on a pattern, and
+`map_lines` is the map's own last field — unique, and not a substring of the
+command that produces it.
+
+| | seating 17 | seating 18 |
+|---|---|---|
+| bytes | 3,013 | **3,013** |
+| duration | **120.106 s** (`--seconds 120` elapsed) | **13.684 s** (`--until matched at offset 2997`) |
+
+The traversal's own counter says `map_jiffies 1280` = 12.8 s in both, so the
+107 seconds seating 17 spent were the instrument waiting, not the driver
+working. `map 1 0` costs **1.343 s**, because level 1 hashes 131,072 bytes
+rather than 4,186,112.
+
+### 10.4 ⚠️ What is still open, and it is smaller and sharper
+
+* **What is IN `[0x9000,0xA000)` and `[0xD000,0xE000)`.** `map` gives digests.
+  Reading the content needs the driver to emit a hexdump of those two pages,
+  which `flashwin` permits because `0x008000+` is outside the forbidden window.
+  Two pages, no power cycle, and it is the obvious next cell for this driver.
+* **`n_writes` was read on ONE boot, not thirteen.** `OFF-SPI` reports
+  `n_writes 0`, `n_write_refused 0`, `n_reg_writes 0`, `n_xfer 0` — but that
+  cell is off-card and after the fact. The thirteen carded boots never had the
+  counter read; the card's § 6 claimed they would and no cell tested it.
+* ***Proven identical* still means *digests agree with the 2026-08-16 dump***.
+  It cannot see two writes that cancel, and **no `FLR` full re-dump has run**.

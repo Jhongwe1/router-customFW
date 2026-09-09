@@ -6,6 +6,12 @@ Why this exists
 ``FLS-26``, 量 2026-09-08: ``verify`` found the first difference between this
 unit's flash and the 2026-08-16 dump at ``[0x9000,0xA000)`` and could find
 nothing past it, because a PREFIX digest stops at the first difference.
+🔄 **SUPERSEDED 2026-09-09: this tool read the whole of it and the
+figure is now 8,192 bytes -- 0.195 % -- which is exactly `H601`.** Seating 17's
+`map 0` left 122,880 + 8,192 undetermined; seating 18's `map 1 0` split the
+first of those into 28 identical units of 4,096 and **two** that differ,
+`009000` and `00D000`. The sentence below is what was true when this tool was
+written and is kept because it is why it exists.
 **4,153,344 bytes -- 99.02 % -- are undetermined**, and seating 16's nineteen
 bisection rungs were all off-card, because each rung's address depends on the
 previous rung's answer and a card is written before the board is powered.

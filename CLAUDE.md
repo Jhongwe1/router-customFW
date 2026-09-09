@@ -338,7 +338,8 @@ released source.
 > whole loader region, and it is byte-identical to 2026-08-16 over all
 > **24,576** bytes, where every `FLR` bracket combined had sampled **256**.
 > **The first difference is `[0x9000, 0xA000)` — 4,096 bytes, exactly one erase
-> sector.** 🔴 **Proven identical 28,672 B (0.684 %), proven different 4,096 B
+> sector.** 🔄 **The three figures in the next sentence are SUPERSEDED by the seventeenth update below — 4,177,920 / 8,192 / 8,192 — and *exactly one erase sector* was refuted with them.**
+> 🔴 **Proven identical 28,672 B (0.684 %), proven different 4,096 B
 > (0.098 %), UNDETERMINED 4,153,344 B (99.02 %)** — a prefix digest finds the
 > first difference and nothing past it, and `verify` takes a limit with **no
 > offset** *(1.1 adds one and a two-level map — the fourteenth update — and
