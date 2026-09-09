@@ -667,6 +667,16 @@ jobs:
       - name: flashmap
         run: /usr/bin/python3 tools/flashmap.py controls 2>&1 | tee ci-out/flashmap.out; exit "${PIPESTATUS[0]}"
 
+      # R5-7's desk half. It attributes register-address materialisations to
+      # `System.map` symbols WITHOUT reading what any function does, which is
+      # what keeps `docs/blind-write-ledger.md` § 4.1's `led` domain at zero
+      # while the question "how many other writers are there" gets an answer.
+      # All twenty-one controls are synthetic -- no artefact, no toolchain, no
+      # vendor material -- so it declares NO skip and the not-run-total does
+      # not move.
+      - name: regcensus
+        run: /usr/bin/python3 tools/regcensus.py --self-test 2>&1 | tee ci-out/regcensus.out; exit "${PIPESTATUS[0]}"
+
       - name: fetch-sources --list (offline; never fetches)
         run: bash tools/fetch-sources.sh --list
 
