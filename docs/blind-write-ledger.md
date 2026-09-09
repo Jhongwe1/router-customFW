@@ -218,24 +218,54 @@ value of it.** `R5-4` ran that day and § 4.9 is what replaced it:
 eleven framework paths — `gpio_chip` cannot be written without knowing what
 a `gpio_chip` is — plus **one `artefact` reading of the VENDOR's**
 `drivers/char/rtl_gpio.c`, which is the expensive one because it carries
-register addresses and bit numbers. 🟢 **`led` is untouched and still
-zero**, and neither `R5-4` nor `R5-6` spent anything of any THIRD-PARTY
-port: `ggbruno/openwrt` is still not fetched, and no other RTL8196E
+register addresses and bit numbers. ~~🟢 **`led` is untouched and still
+zero**~~ 🔴 **false from 2026-09-10 — three generic-Linux paths, listed
+above.** What is still exactly true is narrower and is the sentence that
+matters: **no implementation of this peripheral ON THIS SoC, by the vendor or
+by anyone, has been read.** And neither `R5-4` nor `R5-6` spent anything of any
+THIRD-PARTY port: `ggbruno/openwrt` is still not fetched, and no other RTL8196E
 watchdog implementation has been opened. *(This said "`wdt` and `led` are
 untouched and still zero" and it was true for two days.)*
 
-🔴 **`keys` has exactly one, and it is this ledger's first
-`origin: none` row — a citation that is not a reading at all:**
+🔴🔴 **2026-09-10 (`R5-7`'s desk half, fifty-second segment): both domains
+moved, `led` **0 → 3** and `keys` **1 → 4**, and every path is generic
+mainline Linux. The rows are below.** Nothing of the vendor's and nothing of
+any third party was read; what was needed was the shape of the two upstream
+consumers that will ride on `R5-4`'s `gpio_chip`, and whether they can.
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
-| `drivers/input/keyboard/gpio_keys.c` | name | **none — an example** | `tools/ci-expected.tsv:232`, inside this ledger's own instrument row, describing the classification bug where *keyboard* contains *board*. **Nothing was read.** The file is mainline Linux and has never been opened here |
+| `drivers/leds/leds-gpio.c` | line | **generic** | 🆕 `create_gpio_led()` in full, and every `gpio_*` call site: `gpio_request` → `gpio_cansleep` → **`gpio_direction_output(gpio, led_dat->active_low)`** → `led_classdev_register`, plus `gpio_led_set`'s `can_sleep` branch at `:59-63`. It is what says the probe's first write is the LED's OFF level and not its ON level, which is `notes/gpio-driver.md` § 7's central prediction. Mainline's generic GPIO-LED driver: no register address, no bit number, nothing about this SoC |
+| `drivers/leds/led-class.c` | line | **generic** | 🆕 `led_classdev_register()` in full — it calls `led_update_brightness()` and **not** `brightness_set`, which is what makes `n_writes == 2` at probe a prediction rather than a hope |
+| `drivers/leds/Kconfig` | line | **generic** | 🆕 `:12-16` `LEDS_CLASS`, `:121-129` `LEDS_GPIO depends on LEDS_CLASS && GENERIC_GPIO` |
+| `drivers/input/keyboard/gpio_keys.c` | 🔄 **line** | **generic** | 🔴 **This row said `name` / `origin: none` / *"Nothing was read. The file is mainline Linux and has never been opened here"* until 2026-09-10, when it was opened.** 量: six `gpio_to_irq()` call sites — `:62` (a `BUG_ON` in the ISR), `:134`, `:175`, `:199`, `:222`, `:240` — which is what turns `R5-8`'s *gpio-keys or gpio-keys-polled* from a preference into a **link error**. The original citation, `tools/ci-expected.tsv:232`, is still there and is still an example |
+| `drivers/input/keyboard/Kconfig` | line | **generic** | 🆕 `:292-302` `KEYBOARD_GPIO depends on GENERIC_GPIO` — and the help text's *"your board-specific setup logic must also provide a platform device"*, which is what `arch/rlx` has never done for anything |
+| `drivers/input/Kconfig` | line | **generic** | 🆕 `:42-48` `INPUT_POLLDEV`, the symbol that makes `R5-8`'s (b) branch possible at all |
+| `drivers/input/input-polldev.c` | name | **generic** | 🆕 presence only, by `ls`. Nothing in it has been opened |
+| `drivers/Makefile` | line | **generic** | 🆕 the four `obj-` lines that fix link order within one initcall level — `gpio/` 8, `char/` 26, `input/` 71, `leds/` 94. `notes/gpio-driver.md` § 3.4 is what needed it, and § 3.4 then declines to rest on it |
 
 ⚠️ **This is the mechanism working, on its first day, and it is written up
 rather than tidied away.** The scanner cannot tell a citation from an example.
 The cheap fix — rewrite that sentence so no path appears in it — makes a
 checker green by editing prose, which is the failure this repository has
 recorded under other names. The ledger declares the citation instead.
+
+🔴🔴 **AND THE `origin: none` ROW IS THIS LEDGER'S OWN HOLE, FOUND BY WALKING
+INTO IT.** That row asserted *"Nothing was read"* — a claim about the future
+that ages — and on 2026-09-10 it stopped being true. **No checker here could
+see it**, because `ledgerscan` scans prose for path *citations* and the path
+was already cited: the domain count did not move, the file did not become
+newly-referenced, and nothing about the tree changed shape.
+
+> **A citation scanner detects a new PATH. It cannot detect a change of
+> DEPTH**, and depth is the whole content of an `origin: none` row.
+
+`PROGRESS.md` `LEDGER-4` carries the fix, and it is narrow enough to be cheap:
+a `line`-depth reading leaves a `path:NN` signature, so **an `origin: none` or
+`depth: name` row whose file is cited anywhere in this repository *with a line
+number* is a contradiction the tool can find**. The positive control is this
+very row: the check must fire on the tree as of the commit before the depth was
+corrected, and stop firing after.
 
 🔴 **`origin: none` is an exemption and exemptions get abused, so it
 carries a constraint:** such a row must name the exact file and line, and that
@@ -253,10 +283,26 @@ driver:
   `A5000000`) are both `量`, read through `probe`/`DW` at the loader prompt.
 
 🟢 **`R5-7` and `R5-8` are the drivers whose blind-write claim is
-strongest**, and the claim is *"no implementation of these peripherals, by
-anyone, has been read"*. 🔴 **`R5-6` no longer belongs in that sentence**,
-and its narrower claim is *"no THIRD-PARTY implementation has been read"* —
-which is still worth something and is not the same thing.
+strongest**, and the claim is 🔄 **narrowed 2026-09-10** to *"no implementation
+of these peripherals **on this SoC**, by anyone, has been read"* — the seven
+paths above are mainline's own generic GPIO-LED and GPIO-key drivers, which
+carry no register address and no bit number and therefore land on neither
+layer `driver-diff` scores (§ 5). 🔴 **`R5-6` no longer belongs in that
+sentence**, and its narrower claim is *"no THIRD-PARTY implementation has been
+read"* — which is still worth something and is not the same thing.
+
+🔴 **What `R5-7` DELIBERATELY did not read, quantified, on the day it would
+have been most useful.** 量 2026-09-10 with `tools/regcensus.py` on `r57`:
+**nine** symbols in this image materialise `PABCD_DAT` (`0xB800350C`) and
+**seven have never been read**, five of them named `autoconfig_gpio_off` /
+`_on` / `_blink` / `_slow_blink` / `_init` — which read like the vendor's own
+LED API sitting on the pin `R5-7` is about to drive. Disassembling them was
+the obvious next step and it was declined: § 6's ordering principle says the
+reading is available later and the blindness is not, and
+`notes/gpio-driver.md` § 5 and § 6 carry the trade and the runtime instrument
+that replaces it. **The census itself takes no new depth** — it attributes
+addresses to `System.map` names, and those nine names are already declared in
+§ 4.9.
 
 🔴 *(This read "These four" from `aa89317`, where it was correct because this
 section covered four drivers, and it was still reading it after `48a7a2a` moved
@@ -581,7 +627,7 @@ symbol was read as "both arches select the optional one", and only x86 does.
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
-| `drivers/char/rtl_gpio.c` | **`artefact`** | vendor | 🔴 **The `.c` was never opened. Its compiled form was.** Disassembly of this project's own `vmlinux` (cell `r54b`) with a distribution `objdump`: `rtl_gpio_init` at `0x802B1670` writes `0xB8000040`, then `PABCD_CNR &= ~0x74`, then `PABCD_DIR &= ~0x04 / ~0x10 / ~0x20`, then `PABCD_DIR \|= 0x40`. `SPEC.md` `REG-35` owns the reading; `System.map` supplies the initcall levels (mine 4, the vendor's 6). 🔄 **2026-09-06, seating 15: the same file was read at the same depth again and MUCH further, because the board asked a question the desk had not.** `PABCD_DAT` bit 6 moved under the operator's hand, so the **nine** functions that materialise `0xB800350C` were located — 🔴 *this row said FOUR until the count was re-derived off the eleven `ori` sites; it had been written from five resolved addresses* — and **three of them were actually read**: `reset_button_pressed` (`0x800e59d8`), `rtl_gpio_timer` (`0x800e5c48`) and `rtl_gpio_init`. The other six (`autoconfig_gpio_init`, `_off`, `_on`, `_blink`, `_slow_blink`, `read_proc`) plus `rf_switch_read_proc` were seen and not read, and **that distinction is the whole point of this column**. What was taken is a one-second `mod_timer`, a three-way branch on the hold count (`< 2`, `2`–`4` → `kill_pid(find_vpid(1), 15, 1)`, `≥ 5` → `sb 49` into `default_flag` at `0x80296478`), the `count & 1` blink on bit 6, and the three `/proc` names read out of the ELF at `0x80276150`/`0x80276160`/`0x8027616c`. `SPEC.md` `FW-40` owns it. ⚠️ **This is the deepest read of a vendor driver this project has taken and it is still `artefact`** — no `.c`, no header, no symbol names beyond `System.map`'s. 🔴 **Two of the four functions were SEEN and not read**, and that is written down rather than left to look like coverage: `autoconfig_gpio_init` and `rf_switch_read_proc` also touch `PABCD_DAT` |
+| `drivers/char/rtl_gpio.c` | **`artefact`** | vendor | 🔴 **The `.c` was never opened. Its compiled form was.** Disassembly of this project's own `vmlinux` (cell `r54b`) with a distribution `objdump`: `rtl_gpio_init` at `0x802B1670` writes `0xB8000040`, then `PABCD_CNR &= ~0x74`, then `PABCD_DIR &= ~0x04 / ~0x10 / ~0x20`, then `PABCD_DIR \|= 0x40`. `SPEC.md` `REG-35` owns the reading; `System.map` supplies the initcall levels (mine 4, the vendor's 6). 🔄 **2026-09-06, seating 15: the same file was read at the same depth again and MUCH further, because the board asked a question the desk had not.** `PABCD_DAT` bit 6 moved under the operator's hand, so the **nine** functions that materialise `0xB800350C` were located — 🔴 *this row said FOUR until the count was re-derived off the eleven `ori` sites; it had been written from five resolved addresses* — and ~~**three of them were actually read**: `reset_button_pressed` (`0x800e59d8`), `rtl_gpio_timer` (`0x800e5c48`) and `rtl_gpio_init`~~ 🔴 **TWO of them — corrected 2026-09-10 by re-deriving the census with `tools/regcensus.py` on `r57`.** `rtl_gpio_init` **is not one of the nine**: it materialises the block base and `PABCD_DIR` and never `PABCD_DAT`, which is exactly what `REG-35`'s reading of it says (`CNR &= ~0x74`, four `DIR` operations, **no `DAT` write**). It was read, and it is not in this set. So **two read, seven unread**, and the row's own parenthetical list below — the six plus `rf_switch_read_proc` — is those seven, which means **the list was right and the count beside it was wrong**, the same shape as the *"These four"* this file corrected on 2026-09-07 and the same shape as `XNUM-1`. The other six (`autoconfig_gpio_init`, `_off`, `_on`, `_blink`, `_slow_blink`, `read_proc`) plus `rf_switch_read_proc` were seen and not read, and **that distinction is the whole point of this column**. What was taken is a one-second `mod_timer`, a three-way branch on the hold count (`< 2`, `2`–`4` → `kill_pid(find_vpid(1), 15, 1)`, `≥ 5` → `sb 49` into `default_flag` at `0x80296478`), the `count & 1` blink on bit 6, and the three `/proc` names read out of the ELF at `0x80276150`/`0x80276160`/`0x8027616c`. `SPEC.md` `FW-40` owns it. ⚠️ **This is the deepest read of a vendor driver this project has taken and it is still `artefact`** — no `.c`, no header, no symbol names beyond `System.map`'s. 🔴 **Two of the four functions were SEEN and not read**, and that is written down rather than left to look like coverage: `autoconfig_gpio_init` and `rf_switch_read_proc` also touch `PABCD_DAT` |
 
 🔴 **This is the most expensive single reading in this ledger for its size, and
 the reason is what it contains.** § 4.3.1's `artefact` precedent — the
@@ -921,14 +967,14 @@ differ by exactly that entry, and neither is wrong.
 |---|---:|---|---|
 | `gpio` | 🔄 **11** paths **+ 1 `artefact`** | `R5-4` | 🟡 **blind of any third-party implementation, and no longer blind of the vendor's.** Eight of the eleven are generic Linux framework plumbing that says nothing about this die; three are `arch/rlx`'s own gpio headers and Kconfig. 🔴 The `+1` is `drivers/char/rtl_gpio.c` read as OBJECT code (§ 4.9), and unlike § 4.3.1's it carries register addresses and bit numbers — the layer the diff scores. The driver source predates it and `KNOWN_MASK` was not widened to match |
 | `wdt` | 🔄 **7** | `R5-6` | 🔴 **0 → 7 on 2026-09-08, and NOT by accident.** Blind of any third-party implementation; **not** blind of the vendor's. Four of the seven are on the DECISION layer, so `driver-diff`'s watchdog section is an informed contrast and not a blind diff — § 4.10.1 says so in place. Two of the seven are the mainline `/dev/watchdog` ABI, which says nothing about this die. **A decision to delete code cannot be made blind**, and `CONFIG_RTL_WTDOG=n` is this step's central decision |
-| `led` | **0** | `R5-7` | 🟢 blind of any implementation |
-| `keys` | 1 | `R5-8` | 🟢 blind — the one citation is `origin: none`, an example inside this tool's own census row (§ 4.1) |
+| `led` | 🔄 **3** *(0 until 2026-09-10)* | `R5-7` | 🟢 **blind of any implementation ON THIS SoC**, by the vendor or anyone. All three are mainline's own generic LED plumbing — `leds-gpio.c`, `led-class.c`, `Kconfig` — with no register address and no bit number, so they land on neither layer § 5 scores. 🔴 **The verdict on the line above used to read "blind of any implementation" full stop, and that is what stopped being true**: `leds-gpio.c` IS an implementation, of a GPIO-connected LED in general. ⚠️ And the domain's real exposure is not in this count: `notes/gpio-driver.md` § 5 records **seven** unread vendor symbols that materialise the pin `R5-7` drives, left unread on purpose |
+| `keys` | 🔄 **4** *(1 until 2026-09-10)* | `R5-8` | 🟡 **blind of any implementation on this SoC; no longer `origin: none`.** `gpio_keys.c` went `name` → `line` on 2026-09-10 and **no checker here could see it**, because the path was already cited and only its depth moved — `LEDGER-4`. The reading is what makes `R5-8`'s branch a link error rather than a preference |
 | `timer` | 🔄 **8** paths **+ 1 `artefact`** | `R5-1`, `R5-2` | 🟢 one string literal of the vendor's, plus `rlx-time.c` 🔄 **read 2026-09-04 (`R5-10`), so the *zero citations* clause below is now historical** — with **zero** citations until this file named it, plus **five** generic-Linux paths and **one more of the vendor's** — 2026-09-03 added the clocksource subsystem's header and core, the two files that fix the jiffy length, and `arch/rlx/include/asm/timex.h`, whose single constant is a PC's timer chip (§ 4.3). 🔴 **`CLK-06` is no longer the diff's best row**: D Table 26 states the divisor semantics, so it is L1. The replacement L2 rows are `notes/timer-driver.md` § 3. 🔴 **And the `+1` is not a path**: § 4.3.1, one bit taken out of the vendor's *object* code in my own `vmlinux` — no code under `arch/rlx` calls `clocksource_register` — which `ledgerscan` is structurally blind to (§ 7 ⑦) |
 | `dt` | 2 | `D2` | 🟢 one `cpu@0` node, plus the board `.dts` by name only; the register addresses in the `.dtsi` are placeholders, recorded 2026-08-25 |
 | `irq` | 2 | `R5-10` | 🟡 two string literals; one is the loader's, not Linux's |
 | `bsp` | 8 | all six | 🔴 cross-domain exposure; `bsp_setup():134-175` counts as fully read |
 | `spi_mtd` | **20** | `R5-5` | 🔴 **11 → 20 on 2026-09-07**, when the driver was written. The vendor side was already spent; the transaction order is the vendor's and the write-up says so |
-| **in scope** | 🔄 **50** *(32 at `R5-3b-1`)* | | `ledgerscan check` requires every one to have a row above, and on 2026-09-03 it went RED **three** times — 29 found against 27 declared; again after the jiffy check read three more; and 🔴 **once on a file that was never opened**, named from memory inside an edit whose purpose was to make a claim narrower (§ 4.3, the `timekeeping.c` row). **33 are declared**: the extra is `include/linux/jiffies.h`, which the scan classes out-of-scope and which is declared anyway |
+| **in scope** | 🔄 **57** *(50 until 2026-09-10; 32 at `R5-3b-1`)* | | `ledgerscan check` requires every one to have a row above, and on 2026-09-03 it went RED **three** times — 29 found against 27 declared; again after the jiffy check read three more; and 🔴 **once on a file that was never opened**, named from memory inside an edit whose purpose was to make a claim narrower (§ 4.3, the `timekeeping.c` row). **33 are declared**: the extra is `include/linux/jiffies.h`, which the scan classes out-of-scope and which is declared anyway |
 | `out-of-scope` | 68 | — | generic kernel; no peripheral register map passes through them |
 
 **Committed before any driver source exists.** `git log --diff-filter=A` over

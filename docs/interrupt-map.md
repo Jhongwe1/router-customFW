@@ -680,6 +680,20 @@ only worth having if you can see what it used to say.**
 7. **The `lxc0` register file has never been probed**, and `LXCP0_CCTL $20` —
    a cache-control register reached the same way — is a separate thread from
    the CP3 `CCTL` this project has already used.
+8. 🆕 **2026-09-10 (`R5-8`'s desk half): there is no GPIO interrupt on this
+   part's software path, and the way that is true is worse than "unmeasured".**
+   量, a grep for `gpio_to_irq` over the whole of `arch/rlx` returns **exactly
+   one line** — `arch/rlx/include/asm/mach-generic/gpio.h:16`, a
+   **declaration**, and nothing in the tree defines it. `R5-4`'s driver header
+   already measured the consequence for `CONFIG_DEBUG_FS` (`gpiolib.c:1155` is
+   the only caller in the built set, it is compiled out, and turning DEBUG_FS
+   on breaks the link). 🔴 **The new consequence is `R5-8`'s**: upstream
+   `gpio_keys.c` calls `gpio_to_irq()` at six sites — `:62` (a `BUG_ON` inside
+   the ISR), `:134`, `:175`, `:199`, `:222`, `:240` — so **`CONFIG_KEYBOARD_GPIO=y`
+   does not fail at probe, it fails at link.** This file still has no row for a
+   GPIO interrupt line and `.to_irq` is still `NULL`; what changed is that the
+   absence now has a second, sharper witness than "nobody measured one".
+   `PROGRESS.md`'s `R5-8` row carries the decision that follows from it.
 
 ---
 
