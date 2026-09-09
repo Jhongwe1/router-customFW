@@ -845,6 +845,20 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
     `test-file-modes.sh` caught it after the push. Setting the bit before
     splitting a commit is not enough: **check it again after any
     `git restore --staged` that touches a file `HEAD` does not have.**
+  - 🔴 **2026-09-09: there is a SECOND action, and it is one that looks like
+    the safe way to split a commit.** 量, on the forty-ninth segment's
+    closeout: a new tool was staged `100755`, verified, and then committed with
+    `git commit -F - -- tools/dtcheck.py`. A **path-limited** commit re-reads
+    the working tree for those paths, and on DrvFs `core.fileMode=false` makes
+    the working-tree mode unknowable — so the commit recorded **`100644`** while
+    the index still held `100755`. The bit was right, then right in the index,
+    then wrong in the commit, and **it was pushed**. ⚠️ `test-file-modes.sh`
+    reads the INDEX, which is the thing DrvFs cannot lie about, so it was green
+    before the commit and would have been green after it: the suite is not
+    broken, its subject is one layer away from where this drift lands. What
+    caught it was reading `git status` after the push. **Either stage the mode
+    again after a path-limited commit, or do not use one — `git add -A` plus a
+    plain `git commit` records the index and has never done this.**
 - **Session working files do not go in WSL's `/tmp`.** Measured 2026-08-23: the
   distro restarts between tool calls (`uptime -s` moved forward mid-session,
   `uptime -p` read "up 0 minutes"), and `/usr/lib/tmpfiles.d/tmp.conf` carries
