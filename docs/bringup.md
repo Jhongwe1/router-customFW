@@ -118,9 +118,12 @@ root causes, and only the wdt column has a measured root-cause count:
 | `rtl819x-wdt` | 1,547 | 3 | **6** (4 root causes) |
 
 `gpio` and `spi` are dominated by the census's **declared** blind spot:
-21 of gpio's 24 are `struct gpio_chip` used as an incomplete type — the
-name is in both trees; mainline moved the definition to
-`<linux/gpio/driver.h>` — and spi's are `mtd_info has no member named
+**20** of gpio's 24 are `struct gpio_chip` used as an incomplete type —
+the name is in both trees; mainline moved the definition to
+`<linux/gpio/driver.h>` — with a 21st, `gpiochip_add`, from the same move
+and the remaining 3 from `/proc` (🔴 this read *21 … as an incomplete
+type* until every diagnostic was assigned and the classes made to sum to
+24) — and spi's are `mtd_info has no member named
 ‘read’; did you mean ‘_read’?`, `erase_info` without `state` or `mtd`,
 `MTD_ERASE_FAILED` gone. **`rtl819x-timer` is a third category the census
 cannot have a name for**: it stops at an `#include` of `asm/rlxregs.h`,

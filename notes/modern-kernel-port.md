@@ -124,8 +124,21 @@ rtl819x_wdt_tick  rtl819x_wdt_miscdev          all present
 ### The size of the port
 
 **`+46 / −10` lines against 1,547 = 3.62 % of the file, in 8 hunks, over 4
-distinct APIs.**  Of the 46 added lines, **34 are the `/proc` shim** and 6 of
-those are its comment; the other three APIs are **one line each**.
+distinct APIs.**  ⚠️ **That counts blank added and removed lines, which is
+`diff -u`'s own convention**; this port adds five blank lines and removes
+one, so a re-derivation with `grep '^+[^+]'` — a pattern that cannot match
+a line consisting of just `+` — gives **`+41 / −9` = 3.232 %** instead.
+量 both, stated here because the first re-derivation of this number used
+that pattern and disagreed with the published figure until the convention
+was the thing examined rather than the figure.  🔴 **The first draft of this sentence said *34 are the `/proc` shim … the
+other three APIs are one line each*, and both halves are wrong.**  量, by
+assigning every added line so the classes sum to 46: the shim block is
+**39** lines (6 of them its comment), and the `/proc` change costs **42**
+once its `<linux/seq_file.h>` include and its two-line `proc_create` call
+are counted with it.  That leaves **4**: `timer_setup` costs two — the call
+and the callback's signature — `timer_delete_sync` one, one blank line, and
+dropping `no_llseek` adds nothing at all.  **So one API is 91 % of the
+port**, which is a more useful thing to know than a per-API average.
 
 ---
 
@@ -221,8 +234,12 @@ diagnostics.  For the others the count below is a count of lines gcc printed.
 
 ### 🔴 `gpio` and `spi`: the census's DECLARED blind spot dominates
 
-`rtl819x-gpio`: 21 of the 24 are `struct gpio_chip` used as an **incomplete
-type** — `has no member named ‘label’`, `‘owner’`, `‘request’`, `‘free’`,
+`rtl819x-gpio`: 🔴 **the first draft of this line said *21 of the 24*, and
+量 — classifying every diagnostic so the classes have to sum to 24 — it is
+**20**, plus one `gpiochip_add` and three `/proc`.  The 21st is a different
+diagnostic arising from the same header move, which is not the same
+sentence.**  So: **20 of the 24** are `struct gpio_chip` used as an
+**incomplete type** — `has no member named ‘label’`, `‘owner’`, `‘request’`, `‘free’`,
 `‘direction_input’`, `‘get’`, `‘direction_output’`, `‘set’`, `‘to_irq’`,
 `‘base’`, `‘ngpio’`, `‘can_sleep’`, then `invalid use of undefined type` six
 times.  **The name `gpio_chip` still exists**; mainline moved its definition out
