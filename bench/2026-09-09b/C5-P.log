@@ -1,0 +1,80 @@
+cat /proc/rtl819x-gpio ; cat /proc/rtl819x-spi ; cat /proc/load_default
+version rtl819x-gpio 1.0
+added 1
+add_rc 0
+base 0
+ngpio 32
+cnr FFFFFF8B
+dir FF000040
+dat 0000007C
+boot_cnr FFFFFFDF
+boot_dir FF000000
+boot_dat 0000003C
+cnr_as_spec 0
+dir_as_spec 0
+btn_raw 1
+btn_pressed 0
+known_mask 00000020
+allow_out_mask 00000000
+unlocked -1
+n_get 0
+n_req_ok 0
+n_req_no 0
+n_dirin_ok 0
+n_dirin_no 0
+n_dirout_no 0
+n_set_no 0
+n_writes 0
+probed04 0
+val04 00000000
+version rtl819x-spi 1.1
+added 1
+add_rc 0
+mtd_index 2
+kat_rc 0
+wedged 0
+sfcr FFC00000
+sfcr2 0BA08000
+sfcsr C8000000
+boot_sfcr FFC00000
+boot_sfcr2 0BA08000
+boot_sfcsr C8000000
+sfcr_as_loader 0
+sfcr_as_kernel 1
+cs_idle 1
+n_xfer 0
+n_reg_writes 0
+n_pio_bytes 0
+n_mmio_bytes 0
+n_mtd_read 0
+n_rdy_timeout 0
+n_state_foreign 0
+n_state_bad 0
+n_writes 0
+n_write_refused 0
+v_ran 0
+v_rc 0
+cmp_bytes 0
+cmp_equal 0
+cmp_first_diff -1
+cmp_diff_bytes 0
+digest_bytes 0
+complement_expected 4186112
+h601_skipped 0
+h601_hashed 0
+corrupt_at -1
+d1_sha256 (not run)
+dmmio_sha256 (not run)
+d1_match 0
+d1_d3_agree 0
+v_start 0
+v_len 0
+v_jiffies 0
+hz 100
+map_ran 0
+map_rc 0
+map_level -1
+map_group 0
+map_jiffies 0
+0
+# 

@@ -1,0 +1,33 @@
+for i in 1 2 3; do for j in 1 2 3 4 5 6 7 8 9 0; do busybox grep -e ^dat /proc
+/rtl819x-gpio; sleep 5; done; done
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+dat 0000003C
+# 
