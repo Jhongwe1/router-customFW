@@ -336,14 +336,19 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather
-than counted by eye.** 🔄 **量 2026-09-08**, over `git ls-files tools/`
-(**92** files), taking those whose first two bytes are `#!` and excluding
-`tools/test-*`: **42** programs, of which **21 are described below and 21 are
+than counted by eye.** 🔄 **量 2026-09-10**, over `git ls-files tools/`
+(**94** files), taking those whose first two bytes are `#!` and excluding
+`tools/test-*`: **44** programs, of which **21 are described below and 23 are
 not** — `audit-bench-log`, `binsim`, `capdate`, `capfield`, `ci-census`,
-`citime`, `desk-sweep`, `fetch-sources`, `flashmap`, `fsmanifest`,
-`isa-probe`, `leakscan`, `opcount`, `rbcheck`, `rebuild-census`, `repdiff`,
-`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, `vendor-tripwire` and
-`verify-backup-copy`.
+`citime`, `desk-sweep`, **`dtcheck`**, `fetch-sources`, `flashmap`,
+`fsmanifest`, `isa-probe`, `leakscan`, `opcount`, `rbcheck`,
+`rebuild-census`, **`regcensus`**, `repdiff`, `rlxfw-kbuild`,
+`rlxprobe/qemu-run`, `tc-smoke`, `vendor-tripwire` and `verify-backup-copy`.
+🔴 **A FOURTH time, and the mechanism is now boringly reliable.** `dtcheck`
+landed on 2026-09-09 (`R5`'s `D2` instrument, 44 cases) and did not move this
+count; `regcensus` landed on 2026-09-10 with it. **The +2 in both columns is
+those two**, and only one of them is this segment's. *(量 2026-09-08 read
+**92** / **42**.)*
 🔴 **And it was stale by TWO before this segment added three, which is the
 third time this paragraph has caught itself.** `citime` landed 2026-09-04 and
 `desk-sweep` 2026-09-07; both were committed, neither moved this count. The
