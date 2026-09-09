@@ -81,8 +81,13 @@ the checker on its first run against the real tree, not by reading.**
 ## 3. What model B still owes, and its measured size
 
 `D2`'s row has four acceptance criteria. ①`dtc` compiles, ③`dt-validate`
-passes and ④*marked never probed* landed on 2026-09-09. ② — **the driver
-compiles in a modern kernel tree** — has not, and is `R5-12`.
+passes and ④*marked never probed* landed on 2026-09-09. ~~② — **the driver
+compiles in a modern kernel tree** — has not, and is `R5-12`.~~
+🟢 **② landed on 2026-09-10 and `R5-12` is closed: all four drivers compile
+clean against 6.18.50**, each through its own ladder, each producing an object.
+The rest of this section is kept as it was written, because the order in which
+its two answers arrived is the finding — read § 3a for what the second one
+changed about the first.
 
 量 2026-09-09, against `linux-headers-6.8.0-139`: across all four drivers,
 **10** identifiers are kernel API in 2.6.30 and absent from 6.8, and **7 of the
@@ -131,6 +136,44 @@ which 量 exists only under `arch/rlx/include/asm/` — and mainline has no
 `arch/rlx` at all. ⚠️ **Its cost is UNMEASURED, not small**, because that
 fatal masks everything behind it. **The plan's ~0.3-segment estimate
 survives for `rtl819x-wdt` and for no other driver measured here.**
+
+### 3a.  🟢 2026-09-10 (fifty-first segment): all four, and the counts above are floors
+
+| driver | ladder, each rung predicted before it ran | code churn | object |
+|---|---|---:|---:|
+| `rtl819x-timer` | 1 fatal → 25 → 20 → 19 → 18 → 7 → 6 → 4 → 3 → **0** | 4.19 % | 37,300 B |
+| `rtl819x-gpio` | 24 → 5 → 4 → 1 → **0** | 6.98 % | 11,512 B |
+| `rtl819x-spi` | 18 → 11 → 6 → 5 → 4 → **0** | 4.66 % | 27,572 B |
+| `rtl819x-wdt` | 6 → 5 → 4 → 3 → 4 → **0** | 2.84 % | 22,696 B |
+
+*Code churn* excludes added comment lines; the `+46 / −10 = 3.62 %` published
+above is the figure that includes them, and both are given in
+`notes/modern-kernel-port.md` § 6 because these ports are heavily commented on
+purpose.
+
+🟢 **`rtl819x-timer`'s cost is now measured and it is not the large one.**
+The `arch/rlx` coupling is **one line** and costs **zero diagnostics**:
+`<asm/mipsregs.h>` supplies all three symbols the vendor header was included
+for, because mainline still supports R3000-class parts and keeps `ST0_IEC`
+beside `ST0_IE` at the same value. ⚠️ The sentence above — *UNMEASURED, not
+small* — was correct when written and is not retroactively upgraded into
+*it was hard*.
+
+🟢 **The estimate question has a magnitude now.** Code churn across the four
+spans **2.84 %–6.98 %**, a factor of **2.46**, and `rtl819x-wdt` is indeed the
+cheapest — so the warning above was right and the spread is 2.46×, not an
+order of magnitude. ⚠️ On n = 4, churn does **not** track file size: the
+largest file is the second cheapest and the smallest is the dearest.
+
+🔴 **And the diagnostic counts in § 3's table are FLOORS, by two measured
+mechanisms.** ① gcc reports an implicitly declared function once per
+translation unit, so one diagnostic stood for two `del_timer_sync` call sites
+in `timer`; ② while a struct is an incomplete type the compiler cannot check
+the signatures of things assigned to its members, so `gpio_chip.set` changing
+from `void` to `int` in 6.15 was invisible in **all 24** of gpio's.
+Both were found by a ladder rung **missing its prediction**. So `24 / 18 / 6`
+bound the work from below, and the `8 / 3 / 5 / 3` identifier census is a floor
+on a floor. `notes/modern-kernel-port.md` § 9.4.
 
 🔴 **And the census under-counted this driver by one, with a mechanism it
 had not declared.** It said 3; the true figure against 6.8 is 4. The miss

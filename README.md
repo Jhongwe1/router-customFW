@@ -166,6 +166,16 @@ diagnostic at all, because it `#include`s a header that exists only under the
 vendor's `arch/rlx`, which mainline does not have. It also carries the
 controls, without which none of it counts: a build system that declines to
 compile a file exits 0 and prints nothing, which reads exactly like success.
+🟢 **2026-09-10: all four compile clean**, each through a ladder whose every
+rung was predicted before it ran, and the spread in code churn is
+**2.84 %–6.98 %** — a factor of 2.46, with the driver measured first indeed
+the cheapest. 🔴 **The two rungs that MISSED are worth more than the
+seventeen that hit**, because each exposed a way the diagnostic count cannot
+see work that has to be done: gcc reports an implicitly declared function once
+per translation unit, so one message stood for two call sites; and while a
+struct is an incomplete type the compiler cannot check the signatures of what
+is assigned to its members, so one API change was invisible in all 24 of
+gpio's. **Those counts are floors, not costs.**
 
 **[`notes/incremental-build.md`](notes/incremental-build.md)** 🆕 — why a
 `make` with nothing touched rebuilt all 599 objects, and what it cost to find
