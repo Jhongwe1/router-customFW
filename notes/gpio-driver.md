@@ -489,12 +489,17 @@ still happen, the other requires the zero to be capable of being non-zero.
 
 ## 9. The decision: **upstream `leds-gpio`**, not a driver of mine
 
-`PROGRESS.md`'s step list calls `R5-7` **`leds-rtl819x`**.
+`PROGRESS.md`'s step list calls `R5-7` **`leds-rtl819x`**, and so do
+`docs/bringup.md` and `notes/device-tree.md` — **six sites in three files**,
+量 by a repo-wide grep at closeout, after the first draft of this section had
+already said there were two.
 `config/rlxfw-kernel.delta:82` — written 2026-09-06, at `R5-4` — calls it
-**`LEDS_GPIO`**, and says `CONFIG_GENERIC_GPIO` *"is what `R5-7` (LEDS_GPIO)
-and `R5-8` (KEYBOARD_GPIO) both depend on"*. 🔴 **Two owner files have been
-saying different things about one step for four days.** Found by measuring,
-not by re-reading.
+**`LEDS_GPIO`**, and `docs/KNOWN-ISSUES.md` calls it `leds-gpio`, and says `CONFIG_GENERIC_GPIO` *"is what `R5-7` (LEDS_GPIO)
+and `R5-8` (KEYBOARD_GPIO) both depend on"*. 🔴 **Five owner files have been
+saying two different things about one step for four days, three against two.**
+Found by measuring, not by re-reading — and the count in the first draft of
+this paragraph was itself wrong, which is `XNUM-1` happening inside the segment
+that wrote `XNUM-1` up.
 
 量: `drivers/leds/leds-gpio.c` **is** in this drop (7,482 bytes), and
 `LEDS_GPIO` depends on `LEDS_CLASS && GENERIC_GPIO`, which the delta already

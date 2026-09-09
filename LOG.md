@@ -21659,7 +21659,47 @@ domain 的計數沒動、沒有新檔案變成被引用、樹的形狀沒變。
 
 ---
 
-### 9. 收工
+### 9. 收工稽核抓到我自己一次,而抓到它的不是重讀
+
+第 6 節上面寫著「**三個擁有者檔案,錯的是一個**」。**那句話本身是錯的。**
+
+收工前跑了一次全 repo `git grep`,對每一個這一段動過的數字或名字問「還有誰
+寫著舊的」。量,排除 `LOG.md`(它是逐日的歷史,一則過去的條目引用當時的值是
+**正確的**,不是走味的)與 `bench/` 的凍結卡片(改它們會毀掉 `check-predictions`
+的 mtime 證據):
+
+| 說什麼 | 檔案 | 站點 |
+|---|---|---:|
+| `leds-rtl819x` | `PROGRESS.md` | 3 |
+| | `docs/bringup.md` | 2 |
+| | `notes/device-tree.md` | 1 |
+| `leds-gpio`／`LEDS_GPIO` | `config/rlxfw-kernel.delta:82` | 1 |
+| | `docs/KNOWN-ISSUES.md` | 1 |
+
+**是五個檔案、三對二,不是兩個。** 六個站點全部就地更正,凍結卡片不動。
+
+🔴 **而這正是 `XNUM-1` 的形狀 —— 一個數字被更正了但沒有傳到所有寫著它的地方 ——
+發生在把 `XNUM-1` 寫進 carried-forward 的那一段身上,而且是在同一天。**
+兩天前上一段自稱「三個檔案三個都改」而實際是 5 檔 6 站點;今天我自稱「三個檔案
+一個錯」而實際是 5 檔、6 個站點要改。**同一個錯誤,同一個形狀,連數字都接近。**
+
+🟢 **而它被抓到,是因為稽核的方法是「全 repo `git grep` 每一個動過的名字」,
+不是「回想我改了什麼」。** 重讀自己找不到它 —— 我重讀了,而且寫下了那句錯的話。
+
+同一次掃描還抓到另外三個站點,都是真的走味:
+
+* `docs/FINDINGS.md:372` —— 舊的那一列還寫著 `direction_output` 是 **`0x6C`**;
+* `docs/bringup.md:207`／`:219`、`notes/device-tree.md:223` —— `leds-rtl819x`;
+* `PROGRESS.md:142` —— `R5-5` 那一列的步驟導言也寫著 `leds-rtl819x`。
+
+⚠️ **而 `SPEC.md` 的 `FW-39` 保留 `0x6C` 是對的**,因為那一列的體例是把原文留著、
+把更正接在後面 —— **負面結果留在原地,被弄錯的紀錄也留在原地。** 分辨「走味」與
+「留存的歷史」不能自動化,那是每一個命中都要人判一次的東西,而這就是為什麼
+`LEDGER-4` 的修法刻意窄:它只判一種機械可判的矛盾。
+
+---
+
+### 10. 收工
 
 **閘門**:`regcensus --self-test` **21/21**;`ci-census --self-test`
 **26 passed, 0 failed**(含 `C19`「這個 repo 自己的 `ci-expected.tsv` 兩邊都
@@ -21671,7 +21711,7 @@ domain 的計數沒動、沒有新檔案變成被引用、樹的形狀沒變。
 `R5-7`／`R5-8` 兩列)、`SPEC.md`(`FW-39` 更正、`FW-54` 新)、
 `docs/blind-write-ledger.md`(§ 4.1 七列＋深度更正、§ 4.9 數字更正、§ 8 兩列＋
 總數)、`docs/FINDINGS.md`(兩列)、`docs/KNOWN-ISSUES.md`(兩處)、
-`docs/interrupt-map.md`(§ 5 第 8 條)、`README.md`(重新導出 92/42 → 94/44,
+`docs/interrupt-map.md`(§ 5 第 8 條)、`docs/bringup.md`(兩處)、`notes/device-tree.md`(一處)、`README.md`(重新導出 92/42 → 94/44,
 **而 `dtcheck` 是 2026-09-09 落地卻沒動過那個數的第四次**)、
 `notes/gpio-driver.md`(新)、`tools/ci-expected.tsv`、`.github/workflows/ci.yml`、
 `tools/ci-suite-cost.tsv`。**`CHANGELOG.md` 刻意不動** —— `CHLOG-1` 還開著。

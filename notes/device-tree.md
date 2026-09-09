@@ -220,7 +220,8 @@ identifiers.
   `fixed-clock` and `simple-bus` are declared unmatched.
   `dtcheck --extra-schema <linux>/Documentation/devicetree/bindings` validates
   against them when a kernel tree is at hand, and **that has not been run**.
-* **`R5-7` (`leds-rtl819x`) and `R5-8` (`gpio-keys`) have no drivers**, so the
+* **`R5-7` (🔄 upstream `leds-gpio`, *not* `leds-rtl819x` — decided 2026-09-10,
+  `notes/gpio-driver.md` § 9) and `R5-8` (`gpio-keys`) have no drivers**, so the
   `leds` and `keys` nodes in the board file describe measured hardware with
   nothing bound to them. The LED node also documents a conflict rather than
   hiding it: the vendor's `rtl_gpio_timer` drives bit 6 as well, and bit 6 is

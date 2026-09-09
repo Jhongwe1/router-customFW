@@ -204,7 +204,7 @@ and `v5` put the timer back in front.
 | 1 | `rtl819x-gpio` | one line whose CNR bit the loader had already cleared | one seating; output remains refused by mask |
 | 2 | `rtl819x-spi` + MTD | a second, independent path to the same bytes — the loader's own `FLR` — to check a 4 MiB read against | two seatings |
 | 3 | `rtl819x-wdt` | the timer, and the fact that a watchdog is the one peripheral whose correct behaviour is *the board resetting* | three seatings |
-| 4 | `leds-rtl819x` | 🔴 not written. Its blocker is two masks and a second consumer, § 5 | — |
+| 4 | 🔄 upstream **`leds-gpio`** *(this said `leds-rtl819x` until 2026-09-10)* | 🔴 not written. Its blocker is two masks and a second consumer, § 5 — and the risk argument for opening them is `notes/gpio-driver.md` | — |
 | 5 | `gpio-keys` | 🔴 not written | — |
 
 🔴 **The irqchip is deliberately not in this list.** 2.6.30 has no
@@ -216,7 +216,9 @@ a timer interrupt needs — and the driver itself is `R10a`'s.
 
 ## 5. The open blocker, stated where the next reader will look
 
-`R5-7` (`leds-rtl819x`) needs **two** masks changed, not one. `known_mask` is
+`R5-7` (🔄 upstream **`leds-gpio`**, *not* `leds-rtl819x` — the step's driver
+was decided by measurement on 2026-09-10 and the reasons are in
+`notes/gpio-driver.md` § 9) needs **two** masks changed, not one. `known_mask` is
 `0x00000020` — bit 5 only — so `.request` refuses line 6 before
 `ALLOW_OUT_MASK` is ever consulted. And the vendor's `rtl_gpio_timer` writes
 bit 6 as well, so two consumers want one line.
