@@ -444,3 +444,87 @@ convenience — a `map 0` run after any other cell would prove less.
 * **The attribution is bounded to that one interval.** It says the two
   vendor-firmware runs of 2026-09-08 wrote nothing; it says nothing about the
   seating-8 run that `FLS-26` hypothesises wrote `[0x9000,0xA000)`.
+
+---
+
+## 10. 🔴 2026-09-09 (seating 19): the comparison this file's method is quoted
+   through contains the instrument's own clock, and § 8's attribution bracket
+   was closed with it
+
+### 10.1 What happened
+
+Two `map 0` logs taken twenty seconds apart on the same boot were compared with
+`cmp` over the whole file. It reported **differ**, and the differing bytes were:
+
+```
+< map_jiffies 1280
+> map_jiffies 1279
+```
+
+**One jiffy of traversal duration.** All 32 group digests, `map_diff_units 0`,
+`map_h601_skipped 8192` and `corrupt_at -1` were identical. The map log's
+`map_jiffies` field is *how long this traversal took*, and it is inside the
+region a whole-file comparison covers.
+
+### 10.2 🔴 What that does to § 8's attribution bracket
+
+`PROGRESS.md`'s seventeenth update closes `FLS-26`'s attribution across two
+vendor-firmware runs with exactly this comparison — *"`cmp` on the two seatings'
+`C1-M0` logs: **identical**"*.
+
+量 2026-09-09, over every committed `map 0` capture rather than by quoting a
+write-up:
+
+```
+  bench/2026-09-08b/C1-M0.log   (seating 17)   map_jiffies 1280
+  bench/2026-09-08b/C1-M1.log   (seating 17)   map_jiffies 1280
+  bench/2026-09-09/C1-M0.log    (seating 18)   map_jiffies 1280
+  bench/2026-09-09b/C1-M0.log   (seating 19)   map_jiffies 1280
+  bench/2026-09-09b/C1-M1.log   (seating 19)   map_jiffies 1279
+```
+
+**Four of the five read 1280, and the one that differs is seating 19's own
+second reading — twenty seconds after its first, on the same boot.** So the
+cross-seating comparison succeeded because both of its ends happened to take the
+same number of ticks, and the first pair ever to disagree was produced the
+moment anyone took two maps close together. One tick of difference and that
+bracket would have printed, in the vocabulary reserved for a flash change, that
+the flash had changed.
+
+⚠️ `notes/watchdog-driver.md` § 10 records `map_jiffies 1,280 both times` for
+seating 17's own pair. **That is a different pair from the one the bracket
+compares**, and the distinction is written down because reading it as the
+bracket's evidence is exactly the requote this measurement replaces.
+
+⚠️ **The claim itself survives.** Re-checked with the field excluded, the two
+seatings' logs still agree on every content-bearing line. What was missing is a
+stated scope, and it is stated now.
+
+### 10.3 The rule
+
+> **A comparison of two map logs excludes `map_jiffies`.** Everything else in
+> the log is content: the group rows, the skip accounting, `map_diff_units`,
+> `corrupt_at`.
+
+🔴 **And a positive control on that comparison must actually mutate a byte.**
+Seating 19's first replacement check used a `sed` pattern that matched no line,
+so zero bytes changed and the control could not fire — it said so, which is the
+only reason a comparison nobody had tested did not go on to support a
+conclusion. The working control changes **one character of one digest** and is
+caught.
+
+### 10.4 🟢 And the same seating used the bracket on an ACTION for the first time
+
+Every previous use of this digest bounds an *interval* — what happened between
+two readings. Seating 19 bounded a **deliberate act**: `C1-M0` before any press,
+`C1-M1` after a reset-button hold that crossed the vendor's factory-reset
+threshold (`/proc/load_default` moved `0` → `1` from that same press), **same
+boot, no reboot between them**, identical over all 32 group digests.
+
+> A reset-button hold that arms the factory-reset flag, under rlxfw, writes
+> nothing to 4,186,112 of the 4,194,304 bytes.
+
+⚠️ Unchanged and restated every time this is quoted: the digest cannot see two
+writes that cancel, `H601`'s 8,192 bytes are skipped by rule, and **no `FLR`
+ran**.
+

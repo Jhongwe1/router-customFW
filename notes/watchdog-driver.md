@@ -259,6 +259,63 @@ neither can be satisfied by an instrument that is simply slow. Two bites,
 
 ---
 
+
+### 3.4 🔴 2026-09-09 (seating 19): the rung this table is calibrated against
+JITTERS by 34.6 ms, and the instrument proves it inside the same captures
+
+`OVSEL` 3 run **three times in one seating**, same verb, same word, same image:
+
+```
+  cell      bite interval      in-capture 50 ms ruler
+  C1-B3        1261.205 ms            48.796 ms
+  C2-B3        1226.583 ms            47.461 ms
+  C3-B3        1258.797 ms            49.328 ms
+  ------------------------------------------------
+  max - min      34.622 ms             1.867 ms      ratio 18.54x
+```
+
+The ruler is `verb_bite`'s own `mdelay(50)`, measured from the last byte of the
+interleaved `RLXFW-W-BITE` mark to the first byte of `RLXFW-W-GO`. Its mean of
+48.5 ms sitting **below** 50 ms is correct and is itself a check: `prom_putchar`
+fills a FIFO, so the mark's last byte reaches the host after the delay has
+started, and the ruler reads `50 ms - drain` with a drain of about 1.5 ms.
+
+**So the 34.6 ms is the device, at 18.5x the instrument's own spread.**
+
+🔴 **What that costs the four-rung ladder in § 3.1.** Its least-squares
+residuals were `+3.5 / +32.5 / -71.0 / +35.0 ms`; three of the four are inside
+the jitter, so *the linear model is refuted* loses its evidence.
+⚠️ **It does not become supported** — `OVSEL` 8's `-71.0` is still twice the
+jitter — and the honest state is **undetermined**.
+
+🔴 **And the repeatability figure this driver's write-ups quote was `n = 2`.**
+Seating 18 read *two readings of the same word on two different boots differ by
+1.456 ms* and built a **90x** control on it. At `n = 3` the with-`WDTCLR` spread
+is **34.622 ms**, so the control is **3.8x**. The mechanism is untouched —
+`bite` composes with `WDTCLR` and `biteraw` does not — only the magnitude moves,
+by about 24x.
+
+🔴 **The ruler itself is not stable across seatings, and nobody had compared
+one.** Seating 18's `C2-B3`, re-measured with seating 19's code, gives
+**1341.959 ms** with a ruler of **65.846 ms** — **17.3 ms** above this seating's,
+which is 9x its within-seating spread. **Until that is explained, a cross-seating
+difference in bite timing is not attributable to the device**, and this seating's
+`bite 3` mean sitting 92.1 ms below seating 18's single reading is exactly such a
+difference.
+
+🟢 **`OVSEL[2] = bit 17` is untouched and is now confirmed a second way.** With
+`kick_ms` at the one-jiffy floor (`kickms 10`) and an explicit `kick` in the same
+cell, `biteraw 0x00020000` bit at **2519.632 ms** = 503,682 counts at
+`f_tick = 199,903 Hz`: `2^18` needs a negative deficit and `2^20` needs a 2,726 ms
+one, so **only `2^19` is admissible** — an argument that uses none of seating
+18's deficit bound. 🔴 The predicted *change* was refuted, though: `+43.709 ms`
+against a predicted `+136.8 .. +146.8 ms`, leaving a residual deficit of about
+**20,606 counts (103 ms)** that `kickms` cannot reach. 推, with the experiment:
+`verb_bite` prints its mark and runs `mdelay(50)` **before** arming, so if
+`WDTE = 0xA5` does not freeze this die's counter, that window is the floor.
+Two `biteraw` runs of one word with different mark lengths would decide it, and
+both need a driver change.
+
 ## 4. The decision: `CONFIG_RTL_WTDOG=n`, with the blast radius enumerated first
 
 | | |
@@ -841,7 +898,12 @@ Constraint ① of the card: `map 0` disarmed, then re-armed and run again.
 | across the **armed** 4 MiB traversal | 12,143 | **485** | 485.7 |
 
 `map_jiffies` 1,280 both times; the 32 digest lines byte-identical between the
-two runs. **The timer wheel ran at its programmed rate through a 12.8 s
+two runs. 🔴 **2026-09-09: that first clause is load-bearing in a place nobody
+intended.** `FLS-26`'s attribution bracket is closed by a whole-file `cmp` of two
+map logs, and `map_jiffies` is inside what `cmp` compares — so the bracket
+succeeded because these two traversals took the same number of ticks. Seating 19
+produced a one-tick difference twenty seconds apart on one boot.
+`notes/flash-digest-scope.md` § 10 owns the rule that comes out of it. **The timer wheel ran at its programmed rate through a 12.8 s
 kernel-mode SPI traversal under a live deadline** — far stronger than *the board
 survived*, and the at-rest row is the control that says what the rate is.
 
