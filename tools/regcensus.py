@@ -366,6 +366,20 @@ def controls():
         ran.append(name)
         if not cond:
             bad.append("%s FAILED: %s" % (name, msg))
+        # One line per control, two leading spaces and two more after the
+        # verdict, because tools/ci-census.py parses `^ {2}ok\s{2,}(.*)$` and
+        # `^ {2}FAIL\s{2,}(.*)$`.  A suite that prints only its own summary is
+        # counted as ZERO cases: the tool exits 0 and the build goes red with
+        # `CENSUS-MISMATCH 0+0+0 != 21`.  量 2026-09-10, CI runs 34393578330
+        # and 34393733450 -- that is exactly what this file did on the two
+        # pushes that introduced it, and the same shape cost capdate and
+        # capfield a push on 2026-09-08 with four leading spaces instead of
+        # two.  The newline collapse is not cosmetic: the census parses per
+        # LINE, so a control's message must not be able to synthesise a case
+        # line.  Every message here is a literal or a %r today; this makes
+        # that an invariant instead of a property of the current call sites.
+        print("  %-5s %-6s %s" % ("ok" if cond else "FAIL", name,
+                                  "" if cond else "-- " + " ".join(msg.split())))
 
     r = census(FIX_DIS, FIX_MAP, TARGETS, BASE_HI)
     dat = r["REG_DAT"]
