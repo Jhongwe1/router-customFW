@@ -684,7 +684,7 @@ jobs:
       # dependency. It is also why desk-sweep's self-test is in THIS job and
       # not beside `ci-census`'s in `text`, which installs nothing.
       - name: apt
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips python3-yaml
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips python3-yaml device-tree-compiler
 
       - name: capture dir
         run: mkdir -p ci-out
@@ -777,6 +777,39 @@ jobs:
           head -c 4096 /dev/urandom > /tmp/refset/a.age
           bash tools/verify-backup-copy.sh --self-test /tmp/refset 2>&1 | tee ci-out/verify-backup-copy.out
           exit "${PIPESTATUS[0]}"
+
+      # -------------------------------------------------------------------
+      # R5's D2 -- the .dts and bindings under dt/.  dtc comes from apt above;
+      # dtschema is a pip package and is installed into a venv rather than with
+      # --break-system-packages, because Ubuntu 24.04 is PEP 668 and a runner
+      # that silently falls back to the system python is a different
+      # experiment from the desk's.
+      - name: dtschema
+        run: |
+          /usr/bin/python3 -m venv /tmp/dtvenv
+          /tmp/dtvenv/bin/pip install -q dtschema
+          /tmp/dtvenv/bin/dt-validate --version
+
+      # 23 controls, and they are the reason the step below is worth reading.
+      # 量 2026-09-09: dtc, dt-doc-validate and dt-validate ALL print a real
+      # failure and exit 0, so a checker built on exit status reports a perfect
+      # green on a device tree that fails every stage. Every negative case here
+      # has a positive twin on the same stage, T3b/T4b assert the two defect
+      # classes dt-doc-validate does NOT see (so a future version that starts
+      # seeing them turns this suite red instead of quietly making dtcheck's
+      # own A2/A3 stages redundant), and T14 fails if the exit-status
+      # unreliability that justifies this whole file ever goes away.
+      - name: dtcheck self-test
+        run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py --self-test 2>&1 | tee ci-out/dtcheck-self-test.out; exit "${PIPESTATUS[0]}"
+
+      # The tree itself. --min-bindings is a population control: a glob that
+      # matched nothing must REFUSE (exit 2) rather than report a green, and
+      # the floor is raised when dt/ grows and never lowered to make a run
+      # pass. The kernel's Documentation/devicetree/bindings is NOT in the
+      # corpus here, so every compatible it would have described is enumerated
+      # by name in dt/unmatched-allow.tsv and an undeclared one is a finding.
+      - name: dtcheck
+        run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py 2>&1 | tee ci-out/dtcheck.out; exit "${PIPESTATUS[0]}"
 
       - uses: actions/upload-artifact@v4
         with:
