@@ -164,8 +164,15 @@ COLUMNS = ["run_id", "created_utc", "sha7", "jobs",
 #: is cases x mutants, 1,150 -> 2,301, a factor of 2.001.  `test-deskchan` did
 #: not grow (60.19 s, desk sweep), and (954-60)/(502-60) = 2.02 against a
 #: predicted 1.97.  🟢 Confirmed on the wall clock by a second source that
-#: shares no code with this ledger: the run took 17m14s against the previous
-#: run's 9m38s, a difference of 456 s against this ledger's 452 s.  **Run
+#: shares no code with this ledger, and the comparison is within ONE run:
+#: 34276448280 took 17m40s = 1,060 s where 34260019516 took 9m38s = 578 s,
+#: a wall difference of **482 s** against this ledger's **451 s** -- 31 s
+#: apart, **6.9 %**, and the residual is the rest of the pipeline, which was
+#: never claimed constant.  🔴 The first version of this comment said
+#: *456 s against 452 s, 0.9 %*, and that paired the WALL CLOCK of one run
+#: (34278435291) with the BIG3 of a DIFFERENT one (34276448280) because both
+#: were 'this segment's'.  A number is only ever confirmed by another number
+#: from the SAME row.  **Run
 #: `stats` --
 #: it prints both bands, and A7 prints the share.**
 #:
