@@ -21337,4 +21337,39 @@ apt 之後的 suite 側,這一次量了(634.5 s 對相鄰 run 的 775 s 且成�
 
 **列舉抓到五個缺口,重讀抓到零個。** 這一段開始時我認為要改的是四個檔案。
 
+### 11d. 推上去之後：CI 紅了，而紅的是開場那個讀數的下游
+
+🟢 **推送本身成功**（`eb9ee6c`、`edacc59`，本地與遠端同 sha），紅的是 CI。
+量，兩個 run 的簽名**完全相同**：`lint` 與 `instruments` 都死在 `apt`，
+`text` **通過**，`census` 被 skip（它 `needs: [instruments]` —— `CLAUDE.md`
+記過的「一個紅會藏住下一層」）。錯誤訊息：
+
+```
+E: Failed to fetch https://dl.google.com/linux/chrome-stable/deb/dists/stable/
+   main/binary-amd64/Packages.gz  Hash Sum mismatch
+E: Some index files failed to download.
+##[error]Process completed with exit code 100.
+```
+
+GitHub runner 映像裡**預裝的 Google Chrome apt 來源**在供應損壞的索引。
+跟這個 repo 一個位元組的關係都沒有，而**兩次獨立重現**把它從抖動分開。
+
+🟢 **`text` 通過，而那正是跑 `spec-check`／`ledgerscan`／`xcheck`／
+`citime`／`flashwin` 的 job** —— 所以這一段的**內容**在 CI 上是綠的，
+紅的是環境。
+
+🔴🔴 **而這是開場那個 2,524 s 的下游，時間序列是量到的：**
+
+| 時間 (UTC) | run | `apt` |
+|---|---|---|
+| 16:16 | 34372452520 | **2,524.0 s，成功** |
+| 16:25 / 16:27 | 34376584818 / 34376790831 | 30.0 s / 24.0 s，成功 |
+| 17:30 | 34383260255 | **失敗**，exit 100 |
+| 17:39 | 34384181651 | **失敗**，exit 100 |
+
+**逐 step 的計時在它壞掉之前 74 分鐘就看到了它。** 開場時那個讀數看起來
+只是一個極值；它實際上是一個外部來源開始壞掉的前沿。
+⚠️ **這不是一個可以在這個 repo 裡修的東西**，修法是**晚一點重跑**；
+把它寫下來是因為一個不知道原因的紅，會讓下一段去改一個沒壞的東西。
+
 **零 flash 寫入命令、零 `FLR`、零電源循環、不通電,括號仍是 0.0244 %。**
