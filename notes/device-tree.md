@@ -16,7 +16,7 @@ not two:
 | | criterion | 2026-09-09 (forty-ninth segment) |
 |---|---|---|
 | ① | `dtc` compiles the `.dts` | 🟢 done |
-| ② | **the driver compiles in a modern kernel tree** | 🔴 **not done — `R5-D2b`.** Its cost is measured in § 4 rather than estimated |
+| ② | **the driver compiles in a modern kernel tree** | 🔴 **not done — `R5-12`.** Its cost is measured in § 4 rather than estimated |
 | ③ | `dt-validate` passes | 🟢 done |
 | ④ | explicitly marked *never probed on hardware* | 🟢 `dt/README.md`, and repeated at the head of every file |
 
@@ -158,7 +158,7 @@ changed, `mtd->read` became `_read`, and the hand-rolled watchdog misc device
 is replaced by `watchdog_device`. **10 is a lower bound.** So criterion ② is
 neither confirmed nor refuted as a ~0.3-segment item, and the experiment that
 settles it is compiling **one** driver against 6.8 — the first cell of
-`R5-D2b`, and `rtl819x-wdt` is the candidate because it has the smallest
+`R5-12`, and `rtl819x-wdt` is the candidate because it has the smallest
 missing set and the largest expected shrink.
 
 🔴 **The measurement's own positive control fired once, and it saved a

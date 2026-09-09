@@ -25,7 +25,7 @@
 			compatible = "lexra,rlx4181";
 			reg = <0>;
 
-			/* 量 CPU-14: PRId = 0x0000CD01, bits 15:8 = 0xCD, which
+			/* 量 CPU-04: PRId = 0x0000CD01, bits 15:8 = 0xCD, which
 			 * arch/rlx/include/asm/cpu.h maps to PRID_IMP_RLX4181,
 			 * revision 1.  RLX5281 is 0xdc01 and is positively
 			 * excluded.  The three GPL drops are byte-identical in
@@ -162,7 +162,10 @@
 			clock-output-names = "tcbase";
 		};
 
-		/* 量 FW-52 / CLK-28: WDTCNR, one word, inside the timer block —
+		/* 量 REG-12 / CLK-28: WDTCNR, one word, inside the timer block —
+		 * (REG-12 is the register and its reset value 0xA5000000;
+		 * FW-52 is the driver that runs on it, which is a different
+		 * claim and was cited here by mistake until 2026-09-09.) —
 		 * see the timer node above for why this is a separate node with
 		 * a disjoint `reg` rather than a child or an overlap.
 		 *

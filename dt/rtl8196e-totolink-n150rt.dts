@@ -21,15 +21,36 @@
 	model = "TOTOLINK N150RT";
 
 	chosen {
-		/* 量 LDR-01 / CON-01: CP2102 on the header, 38400 8N1.  The
-		 * rate is what the loader comes up at and what every capture
-		 * in bench/ was taken through. */
-		bootargs = "console=ttyS0,38400 rootfstype=squashfs,jffs2";
+		/* 量 BRD-10: the console is 38400 8N1 at 3.3 V logic levels,
+		 * measured on both the value and the name — the narrowest
+		 * pulse is 26 µs against 38400's 26.042 µs, 0.16 % out.  It is
+		 * what the loader comes up at and what every capture under
+		 * bench/ was taken through.
+		 *
+		 * 讀 FW-04: the string below is the VENDOR image's compiled-in
+		 * command line, byte for byte, and it is quoted rather than
+		 * invented — it carries no `init=`, which is a finding of its
+		 * own.  Nothing here is rlxfw's own cmdline: this kernel takes
+		 * an initramfs and CONFIG_CMDLINE, so a `bootargs` of mine
+		 * would be a fourth thing and is not written until it is. */
+		bootargs = "console=ttyS0,38400 root=/dev/mtdblock1";
 	};
 
-	/* 量 MEM-01: 32 MiB of DDR at 0x00000000.  The kernel this project
-	 * boots is uploaded to 0x80500000 (KSEG0 + 0x00500000) over TFTP,
-	 * which is inside this range. */
+	/* 量 MEM-04: 32 MiB fitted, confirmed twice — the package (MEM-01,
+	 * Winbond W9825G6KH-6, 256 Mbit organised 16M × 16) and the loader's
+	 * own `ramSize: 32M` (MEM-05).  量 MEM-03: the bus is 16 bit.
+	 *
+	 * ⚠️ It is SDRAM, not DDR, and this comment said DDR until 2026-09-09.
+	 *
+	 * 推 for the BASE, and no row in SPEC.md owns it: physical 0 is where
+	 * every address this project has used lands — the kernel is uploaded
+	 * to 0x80500000, which is KSEG0 + 0x00500000, and runs.  That is a
+	 * derivation from a working upload, not a reading of a controller
+	 * register; MEM-08 records that the loader's SDRAM setup has never
+	 * been read out.
+	 *
+	 * ⚠️ And this is the HARDWARE, not what Linux gets: MEM-06 measured
+	 * the running vendor system seeing 26,052 kB. */
 	memory@0 {
 		device_type = "memory";
 		reg = <0x00000000 0x02000000>;
