@@ -113,6 +113,49 @@ Every one of these is a claim the tool would otherwise be making silently.
       itself is **推** (85 %, chosen with headroom), and P14 asserts it is a
       value a set can actually fall below.
 
+  A8  a partition whose `big3_s` half-width exceeds a ceiling is REFUSED.
+      A band is the claim *these rows are one population*, and a partition
+      wide enough to hold two is that claim being false.  The ceiling is
+      **推** (5 %) and the headroom is measured on BOTH sides, which `A7`'s
+      floor is not: 量 2026-09-09, the three declared partitions measure
+      0.996 / 0.699 / 0.787 % and the pooled view measures 31.778 %, so 5 % is
+      5.0x above the worst honest partition and 6.4x below the dishonest one.
+  A9  the same population is searched for the single split that best separates
+      it, and a separation above a floor is REFUSED **with the row named**.
+      A8 measures spread; A9 measures structure, and neither implies the
+      other: a partition with one wild runner is wide with no step, and a step
+      of 15 s on a 950 s base is a step inside a 1 % band.
+      🔴 **A9's limit is stated rather than tuned away.**  量 2026-09-09, on
+      everything before the second changepoint: `CHANGEPOINTS[0]` -- which a
+      permutation test located in 2026-09-06 -- ranks **1 of 71** on
+      `suite_cost_s` at **1.65 sd** and **2 of 71** on `big3_s` at **0.87 sd**,
+      while a clean partition elsewhere in the same file reaches **3.58 sd**.
+      **A9 could not have found it at any floor that does not fire on
+      everything.**  It is a coarse instrument that runs on every `stats
+      --since`, where the fine one ran once; that is the trade, and lowering
+      the floor to reach CP1 would be repairing the instrument to agree with a
+      result already held.
+
+🔴  WHY `CHANGEPOINT` BECAME `CHANGEPOINTS`, WHICH IS THIS FILE'S OWN LESSON
+----------------------------------------------------------------------------
+量 2026-09-09 (fiftieth segment).  The comment above `BIG3` records the
+2026-09-08 step in full -- `test-console-capture` 46 -> 59 cases and its mutant
+suite 25 -> 39 mutants, 1,150 -> 2,301 units of work = 2.001x, `big3_s`
+503 -> 954, confirmed against the runs' own wall clock to 6.9 %.  It was seen,
+attributed and cross-checked.  **And `CHANGEPOINT`, twenty lines below it, was
+not moved.**  So `stats --since changepoint` -- the command this file exists to
+make `CI-5` quote -- pooled a 502 population with a 954 one and printed
+`+/- 31.778 %` over n=69.  The two segments that needed the band typed
+`--since 2026-09-08T20:43:13Z` by hand instead, which is the boundary back in
+prose: exactly the state `P10` and `--since changepoint` were written to end.
+
+**A rule as a hardcoded constant drifts the same way a rule in prose does.**
+It is the fourth instance of one shape in this one file -- the `apt` rule, the
+`A3` docstring, the BIG3 rule, and now the boundary -- and the first three were
+each found by re-deriving rather than re-reading.  A8 and A9 are that
+re-derivation as code: the tool now refuses to report a band over a population
+it can see is two.
+
 ⚠️  WHAT `big3_s` DOES NOT SETTLE
 --------------------------------
 Why `test-spec-check-mutants` swings 12 s is **not answered**: 量 2026-09-07
@@ -418,7 +461,108 @@ def band(vals):
 #: this point put the changepoint run at the HEAD of the right segment (left
 #: n=16 mean 543.75, right n=28), so the slice is `>=`.  A boundary convention
 #: that lives in prose is the same defect as an `apt` rule that lives in prose.
-CHANGEPOINT = "2026-09-01T14:27:11Z"
+#: 🔄 **A tuple since 2026-09-09, and the reason is in the docstring.**  One
+#: string could not describe a series with two steps in it, and the second step
+#: sat undeclared for a day while the comment above `BIG3` described it in
+#: detail.  Oldest first.  Each entry is (timestamp, the quantity it was
+#: LOCATED on, one line of evidence) -- the middle field because
+#: `CHANGEPOINTS[0]` was located on `suite_cost_s` and is being applied to
+#: `big3_s`, a column that did not exist when it was chosen.
+CHANGEPOINTS = (
+    ("2026-09-01T14:27:11Z", "suite_cost_s",
+     "permutation test 2026-09-06; left n=16 mean 543.75, right n=28. "
+     "量 2026-09-09: on big3_s this boundary is a 1.97 s mean shift "
+     "(503.81 -> 501.84) against within-partition sd 3.49 and 1.80, so it is a "
+     "suite_cost changepoint that big3_s barely sees -- A9 ranks it 2 of 71 "
+     "at 0.87 sd and would not have found it"),
+    ("2026-09-08T20:43:13Z", "big3_s",
+     "e79ff63: test-console-capture 46->59 cases, its mutant suite 25->39 "
+     "mutants, cases x mutants 1,150 -> 2,301 = 2.001x; big3_s 503 -> 954. "
+     "量 2026-09-09: the largest adjacent jump in the whole series at 451 s "
+     "against a second-largest of 13 s (34.7x), and A9 locates this exact row "
+     "at 165.01 sd from either pooled view"),
+)
+
+#: The LATEST declared boundary -- the segment the series is currently in, and
+#: what `--since changepoint` means.  The old single-string name is kept
+#: because `P10` pins a convention about it and the convention did not change.
+CHANGEPOINT = CHANGEPOINTS[-1][0]
+
+#: `A8`'s ceiling on a partition's `big3_s` half-width, in percent.  **推**,
+#: with headroom measured on both sides -- see A8 in the module docstring.
+#: It governs `big3_s` and not `suite_cost_s`, because `suite_cost_s` is
+#: already printed under the label *coarse sieve -- do not quote as the band*
+#: and a check on a quantity nobody quotes is decoration.
+PARTITION_MAX_PCT = 5.0
+
+#: `A9`'s floor on the separation statistic, in pooled standard deviations.
+#: **推**.  量 2026-09-09: the worst declared partition reaches 0.89 sd and the
+#: weakest pooled view reaches 165.01, so 8.0 is 9.0x above one and 20.6x below
+#: the other.
+PARTITION_MIN_SEP_SD = 8.0
+
+
+def separation(vals):
+    """The single split that best separates `vals`, in pooled sd.
+
+    Returns `(statistic, index)` where `index` is the FIRST element of the
+    right segment -- `P10`'s convention, reused rather than restated.  Fewer
+    than four points returns `(0.0, None)`: a split of three is one point
+    against two, and this instrument makes no claim there.
+    """
+    n = len(vals)
+    if n < 4:
+        return 0.0, None
+    best, bi = 0.0, None
+    for k in range(2, n - 1):
+        left, right = vals[:k], vals[k:]
+        ml = sum(left) / float(len(left))
+        mr = sum(right) / float(len(right))
+        ss = (sum((v - ml) ** 2 for v in left) +
+              sum((v - mr) ** 2 for v in right))
+        sd = (ss / (n - 2)) ** 0.5
+        if sd <= 1e-9:
+            s = 0.0 if ml == mr else float("inf")
+        else:
+            s = abs(ml - mr) / sd
+        if s > best:
+            best, bi = s, k
+    return best, bi
+
+
+def audit_partition(vals, rows, quoted, indent="    ", quiet=False):
+    """A8 and A9 on one population.  Returns (rc, fired) and prints its verdict.
+
+    `quoted` is False for the bare pooled sieve, which the caller has already
+    LABELLED as not a band.  Firing there on every invocation would make a red
+    line that is always present, and this repository has measured what that
+    does to a reader: *a local sweep that ends in two reds every time trains a
+    reader to ignore reds*.  The line still prints; only the exit code is
+    withheld.
+    """
+    say = (lambda *_: None) if quiet else print
+    if len(vals) < 2:
+        say("%sA8/A9: n=%d, nothing to partition" % (indent, len(vals)))
+        return 0, False
+    lo, hi = min(vals), max(vals)
+    mid = (lo + hi) / 2.0
+    pct = (100.0 * (hi - lo) / 2.0 / mid) if mid else float("nan")
+    sep, idx = separation(vals)
+    a8 = pct > PARTITION_MAX_PCT
+    a9 = idx is not None and sep > PARTITION_MIN_SEP_SD
+    where = ""
+    if idx is not None and rows is not None and idx < len(rows):
+        where = " at %s %s" % (rows[idx]["created_utc"], rows[idx]["sha7"])
+    say("%sA8 half-width %.3f %% (ceiling %.1f) -- %s"
+        % (indent, pct, PARTITION_MAX_PCT,
+           "FIRED: this is not one population" if a8 else "ok"))
+    say("%sA9 separation %.2f sd (floor %.1f)%s -- %s"
+        % (indent, sep, PARTITION_MIN_SEP_SD, where,
+           "FIRED: declare this boundary or explain it" if a9 else "ok"))
+    fired = a8 or a9
+    if fired and not quoted:
+        say("%s   (pooled sieve: already labelled, so no exit code)" % indent)
+    return (1 if (fired and quoted) else 0), fired
 
 
 def cmd_stats(a):
@@ -426,7 +570,7 @@ def cmd_stats(a):
     if not rows:
         raise SystemExit("citime stats: no rows in %s" % a.tsv)
     if a.since:
-        cut = CHANGEPOINT if a.since == "changepoint" else a.since
+        cut = CHANGEPOINTS[-1][0] if a.since == "changepoint" else a.since
         before = [r for r in rows if r["created_utc"] < cut]
         rows = [r for r in rows if r["created_utc"] >= cut]
         print("--since %s: %d row(s) at or after it, %d before "
@@ -473,6 +617,10 @@ def cmd_stats(a):
                          "BELOW FLOOR: the reason CI-5 quotes BIG3 has expired"))
                 if not over:
                     rc = 1
+            # A8/A9.  `--since` is the caller CLAIMING a population; the bare
+            # pooled view is not, and the difference is the exit code.
+            arc, _ = audit_partition(b3, b3rows, quoted=bool(a.since))
+            rc = rc or arc
 
         # ---- suite_cost second, labelled as what it now is -----------------
         print("  suite_cost (coarse sieve -- do not quote as the band):")
@@ -493,6 +641,87 @@ def cmd_stats(a):
                   "%d*%d/(%d*%d) = %.4f -- ties only raise it, so this is a "
                   "LOWER bound on the p-value" % (n0, n0 - 1, n0 + m, n0 + m - 1, p))
     return rc
+
+
+def cmd_segments(a):
+    """Every declared partition, audited, with the pooled view as the control.
+
+    The pooled view is printed LAST and deliberately: it is the positive
+    control, and a run in which it does NOT fire is red.  A8 and A9 reporting
+    clean on three partitions is a claim, and a claim needs a case that shows
+    the instrument can still fail on this file today.
+    """
+    rows = read_tsv(a.tsv)
+    if not rows:
+        raise SystemExit("citime segments: no rows in %s" % a.tsv)
+    rows.sort(key=lambda r: r["created_utc"])
+    rows = [r for r in rows if r["big3_s"] not in ("", "-")]
+    print("quantity: big3_s   (A8 and A9 govern the column CI-5 quotes)")
+    print("declared changepoints: %d" % len(CHANGEPOINTS))
+    for i, (ts, on, why) in enumerate(CHANGEPOINTS):
+        print("  [%d] %s  located on %-13s %s" % (i, ts, on, why[:90]))
+    bounds = [c[0] for c in CHANGEPOINTS]
+    edges = [None] + bounds + [None]
+    print()
+    print("partitions (the row ON a boundary is the FIRST of its segment):")
+    a8_bad, a9_bad, empty = [], [], []
+    npart = 0
+    for i in range(len(edges) - 1):
+        a0, a1 = edges[i], edges[i + 1]
+        grp = [r for r in rows
+               if (a0 is None or r["created_utc"] >= a0)
+               and (a1 is None or r["created_utc"] < a1)]
+        label = "%s .. %s" % (a0 or "(start)", a1 or "(now)")
+        npart += 1
+        print("  %s   n=%d" % (label, len(grp)))
+        if not grp:
+            print("    EMPTY -- a declared boundary with no rows on one side "
+                  "is a boundary this file cannot support")
+            empty.append(label)
+            continue
+        vals = [int(r["big3_s"]) for r in grp]
+        lo, hi = min(vals), max(vals)
+        mid = (lo + hi) / 2.0
+        pct = (100.0 * (hi - lo) / 2.0 / mid) if mid else float("nan")
+        sep, idx = separation(vals)
+        audit_partition(vals, grp, quoted=True)
+        if pct > PARTITION_MAX_PCT:
+            a8_bad.append("%s (%.3f %%)" % (label, pct))
+        if idx is not None and sep > PARTITION_MIN_SEP_SD:
+            a9_bad.append("%s (%.2f sd at %s %s)"
+                          % (label, sep, grp[idx]["created_utc"],
+                             grp[idx]["sha7"]))
+    print()
+    print("positive control -- the whole file pooled MUST fire, or A8 and A9")
+    print("cannot fail on this corpus and the greens above prove nothing.")
+    print("every control line is prefixed, so a grep for FIRED on a green run")
+    print("lands here and knows it:")
+    vals = [int(r["big3_s"]) for r in rows]
+    _, fired = audit_partition(vals, rows, quoted=False,
+                               indent="    [control] ")
+    print()
+
+    # The three cases.  The COUNT does not move when a changepoint is
+    # declared -- one more partition is one more line above, not one more
+    # case -- so `ci-expected.tsv` does not have to be edited to declare a
+    # boundary, and a CENSUS-MISMATCH cannot become the cost of doing the
+    # right thing.
+    ok, bad = [], []
+    (ok if not (a8_bad or empty) else bad).append(
+        ("S1", "every declared partition is inside A8's ceiling (%d of %d)"
+         % (npart - len(a8_bad) - len(empty), npart),
+         "; ".join(a8_bad + ["EMPTY " + e for e in empty])))
+    (ok if not a9_bad else bad).append(
+        ("S2", "no declared partition holds a step A9 can see (%d of %d)"
+         % (npart - len(a9_bad), npart), "; ".join(a9_bad)))
+    (ok if fired else bad).append(
+        ("S3", "positive control: the pooled series fires A8 and A9", ""))
+    for cid, what, _why in ok:
+        print("  ok   %-4s %s" % (cid, what))
+    for cid, what, why in bad:
+        print("  FAIL %-4s %s -- %s" % (cid, what, why or "see above"))
+    print("RESULT: %d/%d" % (len(ok), len(ok) + len(bad)))
+    return 1 if bad else 0
 
 
 def cmd_check(a):
@@ -718,9 +947,15 @@ def selftest():
     # the other way gives n=32 where the owner's own figures give 33 -- inside
     # one segment, from the same file.
     def p10():
-        rows = [{"created_utc": "2026-09-01T14:00:00Z", "suite_cost_s": "548"},
-                {"created_utc": CHANGEPOINT,            "suite_cost_s": "529"},
-                {"created_utc": "2026-09-01T15:00:00Z", "suite_cost_s": "531"}]
+        # 🔄 The two neighbours were literals dated 2026-09-01 until
+        # 2026-09-09, so this case would have broken the moment CHANGEPOINT
+        # moved -- which is the event it exists to survive.  Derived now.
+        cp = datetime.fromisoformat(CHANGEPOINT.replace("Z", "+00:00"))
+        _e = (cp - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _l = (cp + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        rows = [{"created_utc": _e,          "suite_cost_s": "548"},
+                {"created_utc": CHANGEPOINT, "suite_cost_s": "529"},
+                {"created_utc": _l,          "suite_cost_s": "531"}]
         after = [r for r in rows if r["created_utc"] >= CHANGEPOINT]
         before = [r for r in rows if r["created_utc"] < CHANGEPOINT]
         assert len(after) == 2, after
@@ -795,6 +1030,114 @@ def selftest():
         assert row["big3_s"] == "503", row
     case("P15", "negative control: an empty BIG3 set cannot report a number", p15)
 
+    # ---- A8 / A9, added 2026-09-09 ------------------------------------
+    # A step-free series and a stepped one, both synthetic, both with answers
+    # a hand can check.  Neither reads ci-suite-cost.tsv: a case built on the
+    # corpus changes meaning as the corpus grows, which is the A3 mistake in
+    # the other direction.
+    def _flat():
+        return [954, 957, 954, 956, 953, 956, 957, 945, 958, 960, 947]
+
+    def _stepped():
+        return [502, 504, 499, 503, 502, 954, 957, 954, 956, 953]
+
+    def _rows(vals):
+        return [{"created_utc": "2026-09-0%dT00:00:0%dZ" % (1 + i // 9, i % 9),
+                 "sha7": "r%06d" % i, "big3_s": str(v)}
+                for i, v in enumerate(vals)]
+
+    # P16 -- A8 fires on a partition wide enough to hold two populations, and
+    # the ceiling is a value a real series can cross (P14's shape).
+    def p16():
+        vals = _stepped()
+        rc, fired = audit_partition(vals, _rows(vals), quoted=True, quiet=True)
+        assert fired and rc == 1, (rc, fired)
+        lo, hi = min(vals), max(vals)
+        pct = 100.0 * (hi - lo) / 2.0 / ((lo + hi) / 2.0)
+        assert pct > PARTITION_MAX_PCT, (pct, PARTITION_MAX_PCT)
+        # 🔴 The first draft of this line asserted 31.23 % and read the
+        # minimum off the series by eye as 502.  It is 499.  The case failed,
+        # the tool was right, and the number stays hand-derived rather than
+        # copied from the failure message: 229 / 728 = 31.456 %.
+        assert (lo, hi) == (499, 957), (lo, hi)
+        assert abs(pct - (100.0 * 229.0 / 728.0)) < 1e-9, pct
+        assert abs(pct - 31.456) < 0.001, pct
+        # and the VERDICT is printed, not merely returned -- the output is the
+        # product, so one case reads it.
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            audit_partition(vals, _rows(vals), quoted=True)
+        out = buf.getvalue()
+        assert "A8 half-width 31.456 %" in out, out
+        assert "FIRED: this is not one population" in out, out
+        assert "FIRED: declare this boundary or explain it" in out, out
+        assert "r000005" in out, ("A9 must name the row", out)
+    case("P16", "A8 refuses a partition that is two populations", p16)
+
+    # P17 -- the other branch, and the NEGATIVE CONTROL on the ceiling itself.
+    # A clean partition must pass; and with the ceiling at 0 the SAME rows must
+    # fail, because a ceiling nothing can cross is decoration.
+    def p17():
+        global PARTITION_MAX_PCT
+        vals = _flat()
+        rc, fired = audit_partition(vals, _rows(vals), quoted=True, quiet=True)
+        assert rc == 0 and not fired, (rc, fired)
+        keep = PARTITION_MAX_PCT
+        PARTITION_MAX_PCT = 0.0
+        try:
+            rc2, fired2 = audit_partition(vals, _rows(vals), quoted=True,
+                                          quiet=True)
+            assert rc2 == 1 and fired2, (rc2, fired2)
+        finally:
+            PARTITION_MAX_PCT = keep
+        rc3, _ = audit_partition(vals, _rows(vals), quoted=True, quiet=True)
+        assert rc3 == 0, rc3
+    case("P17", "A8 passes one population, and its ceiling can be crossed", p17)
+
+    # P18 -- A9 LOCATES the step, and the index is the FIRST row of the right
+    # segment.  Getting this off by one would name the wrong commit, which is
+    # the whole output of the check.
+    def p18():
+        vals = _stepped()
+        sep, idx = separation(vals)
+        assert idx == 5, ("want the first row of the right segment", idx)
+        assert vals[idx] == 954, vals[idx]
+        assert vals[idx - 1] == 502, vals[idx - 1]
+        assert sep > PARTITION_MIN_SEP_SD, sep
+    case("P18", "A9 names the first row of the right segment", p18)
+
+    # P19 -- NEGATIVE CONTROL on the locator.  A locator that always names a
+    # split is not a locator.  The flat series must come out below the floor,
+    # and a series of three must return no index at all rather than a guess.
+    def p19():
+        sep, idx = separation(_flat())
+        assert idx is not None, "the flat series has enough points to split"
+        assert sep < PARTITION_MIN_SEP_SD, sep
+        s2, i2 = separation([954, 957, 954])
+        assert i2 is None and s2 == 0.0, (s2, i2)
+    case("P19", "negative control: A9 finds no step in one population", p19)
+
+    # P20 -- what `--since changepoint` resolves to, stated with the wrong
+    # answer beside it, in P10's shape.  Reading the FIRST entry is the state
+    # this file was in on 2026-09-08 and it is a live mistake, not a
+    # hypothetical: it pooled n=69 and printed +/- 31.778 %.
+    def p20():
+        assert len(CHANGEPOINTS) >= 2, CHANGEPOINTS
+        stamps = [c[0] for c in CHANGEPOINTS]
+        assert stamps == sorted(stamps), ("oldest first", stamps)
+        assert len(set(stamps)) == len(stamps), stamps
+        assert CHANGEPOINT == stamps[-1], (CHANGEPOINT, stamps)
+        assert CHANGEPOINT != stamps[0], (
+            "the FIRST entry is the wrong answer and is what was resolved "
+            "until 2026-09-09")
+        for ts, on, why in CHANGEPOINTS:
+            assert ts.endswith("Z") and len(ts) == 20, ts
+            assert on in COLUMNS, (on, "located on a column that exists")
+            assert len(why) > 40, (ts, why)
+    case("P20", "--since changepoint is the LATEST boundary, not the first", p20)
+
     for cid, what in ok:
         print("  ok   %-4s %s" % (cid, what))
     for cid, what, why in bad:
@@ -817,12 +1160,19 @@ def main():
 
     s = sub.add_parser("stats", help="recompute n and the band from the tsv")
     s.add_argument("--since", default=None,
-                   help="an ISO timestamp, or the word `changepoint` for "
-                        "CI-5's own (%s). The row ON the boundary belongs to "
-                        "the segment that STARTS there." % CHANGEPOINT)
+                   help="an ISO timestamp, or the word `changepoint` for the "
+                        "LATEST declared boundary (%s of %d). The row ON the "
+                        "boundary belongs to the segment that STARTS there. "
+                        "Giving --since is CLAIMING a population, so A8 and A9 "
+                        "carry an exit code there and not on the pooled view."
+                        % (CHANGEPOINT, len(CHANGEPOINTS)))
     s.add_argument("--pool", action="store_true",
                    help="pool rows whose job sets differ (A4 says do not)")
     s.set_defaults(fn=cmd_stats)
+
+    g = sub.add_parser("segments", help="audit every declared partition, "
+                                        "with the pooled view as the control")
+    g.set_defaults(fn=cmd_segments)
 
     c = sub.add_parser("check", help="runs on GitHub with no row here")
     c.add_argument("--last", type=int, default=40)

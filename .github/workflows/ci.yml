@@ -389,6 +389,19 @@ jobs:
       - name: citime self-test
         run: /usr/bin/python3 tools/citime.py --self-test 2>&1 | tee ci-out/citime.out; exit "${PIPESTATUS[0]}"
 
+      # `segments` is not a case suite over fixtures -- it is an audit of the
+      # committed series, and it is here because the defect it catches took a
+      # day to notice by eye.  量 2026-09-09: `CHANGEPOINT` was one hardcoded
+      # string, the 2026-09-08 step was described in full in the comment above
+      # `BIG3` and never declared, and `stats --since changepoint` therefore
+      # pooled a 502 population with a 954 one and printed +/- 31.778 % over
+      # n=69.  Its three cases do not move when a changepoint is declared, so
+      # declaring one costs no census edit and a CENSUS-MISMATCH never becomes
+      # the price of doing the right thing.  It reads ci-suite-cost.tsv only:
+      # no gh, no network, no $FWRE_WORK.
+      - name: citime segments
+        run: /usr/bin/python3 tools/citime.py segments 2>&1 | tee ci-out/citime-segments.out; exit "${PIPESTATUS[0]}"
+
       - name: test-looptime-mutants
         run: /usr/bin/python3 tools/test-looptime-mutants.py 2>&1 | tee ci-out/test-looptime-mutants.out; exit "${PIPESTATUS[0]}"
 
