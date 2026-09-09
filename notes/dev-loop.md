@@ -1168,3 +1168,46 @@ so.  That is the right failure -- they are assertions about the plan's shape,
 and the docstring's stage table was updated in the same edit.
 
 量 after: **66 passed, 0 failed**.
+
+## 17. 🟢 2026-09-09 (seating 19): `S5c` caught a real fault on its first bench outing, and the value is WHERE it pointed rather than that it fired
+
+`looprun` 1.1 added `S5c` at the forty-fourth segment as a desk change with a
+self-test and no field evidence. Seating 19 is its first fault.
+
+```
+looprun: STOPPED at S5c -- the HOST cannot reach 10.1.1.1
+  S5  rescue    rc=0    0.24 s
+  S5b burnflag  rc=0    2.20 s
+  S5c hostlink  FAIL    1.02 s
+      ok   P-a the host has an address on the route to 10.1.1.1 -- dev=eth0 src=172.18.136.170
+      FAIL P-b the board answers ARP -- no lladdr no state
+```
+
+**The cause was the host**: the USB GbE had been attached to WSL and never given
+`10.1.1.2/24`, which `RUNSHEET.md` § P3 records as 量 at seating 16 —
+*the address does not survive a re-attach*.
+
+🟢 **Three things this stop did that the previous shape could not.**
+
+1. **It stopped before `S6`.** Without it the first symptom is a TFTP transfer
+   with nobody answering, which § 15 records reading as a board fault.
+2. **It named the host in the host's own vocabulary** — `dev=eth0
+   src=172.18.136.170`, WSL's NAT vNIC, which is the whole diagnosis in one
+   line. Every other gate `looprun` owns points at the **board**.
+3. **`P-a` passed and `P-b` failed**, which separates *this machine has no
+   route* from *the route exists and the peer is silent*. A single combined
+   check would have printed one red for two different repairs.
+
+🟢 **And the retry used `--attempt 2` rather than `--force`**, so attempt 1's
+`C1-rescue.json` and its `AUTOBURN` read-back are still on disk beside attempt
+2's. That flag was added in the same segment as `S5c` and for the same reason;
+this is its first field use too.
+
+⚠️ **What it cost**: one `looprun` invocation and **no power cycle**. The board
+stayed at the loader prompt throughout, because `S5` and `S5b` had already run
+and nothing after `S5c` executes.
+
+⚠️ **What it does not establish**: `S5c` has still never been observed
+distinguishing a *board* that is silent from a *host* that is misconfigured —
+both of this seating's readings are the host. The board-silent case remains
+covered by the self-test only.
