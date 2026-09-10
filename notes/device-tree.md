@@ -220,11 +220,23 @@ identifiers.
   `fixed-clock` and `simple-bus` are declared unmatched.
   `dtcheck --extra-schema <linux>/Documentation/devicetree/bindings` validates
   against them when a kernel tree is at hand, and **that has not been run**.
-* **`R5-7` (🔄 upstream `leds-gpio`, *not* `leds-rtl819x` — decided 2026-09-10,
-  `notes/gpio-driver.md` § 9) and `R5-8` (`gpio-keys`) have no drivers**, so the
-  `leds` and `keys` nodes in the board file describe measured hardware with
-  nothing bound to them. The LED node also documents a conflict rather than
-  hiding it: the vendor's `rtl_gpio_timer` drives bit 6 as well, and bit 6 is
-  not in the 2.6.30 driver's `known_mask` (`0x00000020`, bit 5 only), so that
-  driver would refuse the consumer at `.request` before `ALLOW_OUT_MASK` was
-  ever consulted.
+* ~~**`R5-7` (🔄 upstream `leds-gpio`, *not* `leds-rtl819x` — decided
+  2026-09-10, `notes/gpio-driver.md` § 9) and `R5-8` (`gpio-keys`) have no
+  drivers**~~ 🔄 **2026-09-10, later the same day: `R5-7` has one and `R5-8`
+  does not.** The `leds` node's consumer exists — `rtl819x-gpio` 1.1 carries
+  `known_mask 0x60` and `ALLOW_OUT_MASK (1u << 6)`, and
+  `arch/rlx/kernel/rlxfw-devices.c` registers the `platform_device` upstream
+  `leds-gpio` binds to, in image `r58`. **Nothing has probed on hardware**, so
+  the `.dts` claim is unchanged: this file describes measured hardware and the
+  binding has never been exercised by a device tree, because 2.6.30 has none.
+  🔴 **The `keys` node still has nothing bound**, and 量 2026-09-10 the reason
+  is a link error rather than a probe failure: `gpio_keys.c` calls
+  `gpio_to_irq()` at six sites and `arch/rlx` declares it without defining it
+  anywhere, so `CONFIG_KEYBOARD_GPIO=y` does not build. That is `R5-8`.
+  The LED node also documents a conflict rather than
+  hiding it: the vendor's `rtl_gpio_timer` drives bit 6 as well. ⚠️ The
+  sentence that used to end this bullet — *bit 6 is not in the 2.6.30 driver's
+  `known_mask` (`0x00000020`, bit 5 only), so that driver would refuse the
+  consumer at `.request` before `ALLOW_OUT_MASK` was ever consulted* — was true
+  of 1.0 and is false of 1.1; it is kept here because it is the reading that
+  made the two-mask change necessary.

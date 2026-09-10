@@ -216,12 +216,30 @@ a timer interrupt needs — and the driver itself is `R10a`'s.
 
 ## 5. The open blocker, stated where the next reader will look
 
-`R5-7` (🔄 upstream **`leds-gpio`**, *not* `leds-rtl819x` — the step's driver
+🔄 **2026-09-10, later the same day: this section is no longer the open
+blocker, and the paragraph it opened with is kept because the two masks are
+what changed.** `rtl819x-gpio` **1.1** carries `known_mask 0x60` and
+`ALLOW_OUT_MASK (1u << 6)`, `arch/rlx/kernel/rlxfw-devices.c` registers the
+`platform_device` upstream `leds-gpio` binds to, and image `r58`
+(`RECIPE_ID` `083b1cb8`) is built and gated. ⚠️ **What is open is now a
+seating and not a decision**: nothing of this has run, `n_writes` has never
+read anything but 0 on the device, and the eight refutation conditions in
+`notes/gpio-driver.md` § 8 are all unanswered. The original text:
+
+*(`R5-7` (🔄 upstream **`leds-gpio`**, *not* `leds-rtl819x` — the step's driver
 was decided by measurement on 2026-09-10 and the reasons are in
 `notes/gpio-driver.md` § 9) needs **two** masks changed, not one. `known_mask` is
 `0x00000020` — bit 5 only — so `.request` refuses line 6 before
 `ALLOW_OUT_MASK` is ever consulted. And the vendor's `rtl_gpio_timer` writes
-bit 6 as well, so two consumers want one line.
+bit 6 as well, so two consumers want one line.)*
+
+🔴 **The contention that paragraph names is not solved and is not claimed to
+be.** Nothing arbitrates between `gpiolib` and the vendor's `rtl_gpio_timer`,
+because the vendor's driver does not go through `gpiolib`. What 1.1 adds is an
+instrument rather than an arbiter — a foreign-write detector counting how often
+the live `PABCD_DAT` bit 6 differs from the value this driver last wrote — and
+its positive control is a button held for ten seconds against a 1 Hz writer.
+`notes/gpio-driver.md` § 6.
 
 🟢 **`dt/rtl8196e-totolink-n150rt.dts` is where that conflict became something
 to point at.** In a device tree, two consumers of one GPIO line is visible in
