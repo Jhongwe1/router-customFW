@@ -222,7 +222,7 @@ what changed.** `rtl819x-gpio` **1.1** carries `known_mask 0x60` and
 `ALLOW_OUT_MASK (1u << 6)`, `arch/rlx/kernel/rlxfw-devices.c` registers the
 `platform_device` upstream `leds-gpio` binds to, and image `r58`
 (`RECIPE_ID` `083b1cb8`) is built and gated. ⚠️ **What is open is now a
-seating and not a decision**: nothing of this has run, `n_writes` has never
+seating and not a decision**: ~~nothing of this has run, `n_writes` has never~~ 🔄 **2026-09-10, seating 20: it ran, and this clause is what was left stale.** `r59` (`RECIPE_ID` `692a2801`), seventeen boots: `allow_out_mask` reads `00000040` in every dump, `n_writes` reads **2** at rest and **4** after the LED boot with all four accounted for, an unmodified upstream `leds-gpio` produced **light** from a sysfs write, and the guard was exercised in both directions. The eight refutation conditions did not fire. *(The struck clause read:)* `n_writes` has never
 read anything but 0 on the device, and the eight refutation conditions in
 `notes/gpio-driver.md` § 8 are all unanswered. The original text:
 

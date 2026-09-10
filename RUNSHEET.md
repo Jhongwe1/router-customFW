@@ -522,7 +522,7 @@ nil: both end in a watchdog reset, which is the point of both.
 
 ## Session B3 — R0: the vendor kernel booted from RAM, and the loader head and `cr6c` header are unchanged
 
-**This is the active gate.** Everything below is read out of this unit's own
+🔄 ~~**This is the active gate.**~~ **`R0` closed 2026-08-24 and this sentence was left in present tense for eighteen days.** 量 2026-09-11: it is the ONLY `This is the active gate` in this file — `B1`, `B2`, `B4` and `B5` carry no such line — so it was a live claim rather than frozen wording, and it made this file a second owner of what `PROGRESS.md` owns. **Which gate is active, `PROGRESS.md` says.** Everything below is read out of this unit's own
 loader or measured on it, and the mechanism has been done once on this physical
 device — upstream's `P9-12`, 2026-08-21: `J 80500000` into a 156-byte image the
 device had never seen, 🔄 **512 bytes of a 4,194,304-byte part measured unchanged** across three kernel executions and two uploads — which is what `G8-pre`/`G8a`/`G8b` bought and is `G8b`'s own wording — with `AutoBurning=0` echoed in the same boot. *(This read “zero flash bytes”, the sentence `G8b` forbids, fifty lines above the row that forbids it.)*

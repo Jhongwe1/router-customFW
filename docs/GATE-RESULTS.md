@@ -720,7 +720,7 @@ sentence. 量.**
   into `/sbin/init`. 量 on all eleven captures of seating 14: byte **925**
   against **965** (raw, as captured), **885** against **923** with the
   carriage returns removed. Nothing was asked of the tick core about itself
-  and no shell was required. *(🔴 The pair `887 / 925` appears in eight
+  and no shell was required. *(🔴 The pair `887 / 925` appears in **nine**
   committed files and reproduces under neither convention; see § the
   corrections list in `LOG.md` 2026-09-11. The **ordering** holds under both.)*
 * 🟢 **And it is caused, not asserted.** `cereload` changes TC1's reload and

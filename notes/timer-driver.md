@@ -1709,8 +1709,10 @@ rather than from the terminal:
 | `irq_spurious` / `irq_stuck` / `ce_hw_bad` / `ce_badmode` | all 0 |
 | boot capture **1,069 bytes**, `RLXFW-ID0=EA6EE537` | 10/10 |
 
-🟢 **The headline is that `TA8` precedes `B10` in the same capture** — byte 887
-against 925 on `M1`. 讀 `init/main.c`: `do_basic_setup()` runs every initcall
+🟢 **The headline is that `TA8` precedes `B10` in the same capture** — ~~byte 887
+against 925 on `M1`~~ 🔄 **量 2026-09-11 (`R5-11`): that pair reproduces under neither convention — raw (925, 965), CR-stripped (885, 923), identical on all eleven captures. The ORDERING holds under both; only the two offsets were wrong, and their *difference* of 38 is right, which is why nine files carried them. `SPEC.md` `CLK-27`.**
+🔴 **This was the NINTH site and the last one found, because the two numbers sit on either side of a line break here** — the sweep that found the other eight was
+line-granular, so this file was invisible to it. A partial view hid the count of a finding about partial views. 讀 `init/main.c`: `do_basic_setup()` runs every initcall
 level to completion and only then does `kernel_init` call `init_post()`. So
 *the system tick was this driver's before userspace existed* is proved by two
 marks in one capture, quoting no address, asking the tick core nothing about
