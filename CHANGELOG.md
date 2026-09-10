@@ -1,5 +1,101 @@
 # Changelog
 
+🟢 **2026-09-10, fifty-sixth segment, seating 20: `R5-7` and `R5-8` both met
+their DoD on the die, and the largest result was on no card.**
+**One power cycle against a budget of one**, seventeen boots, 169 captures, 55
+carded cells and 29 declared off-card ones. **Zero flash-write commands, zero
+`FLR`, `n_writes 4` with every one of the four accounted for.** Date measured
+three ways and agreeing: `2026-09-10 19:14 +08:00` on Git Bash, WSL and Windows.
+`check-predictions` **55 of 55**, `capdate` **0 RED** over 29 directories and
+1,121 captures, every boot capture **1,637 bytes** against a prediction of
+1,637, `RLXFW-ID0=692A2801` on all seventeen.
+
+🔴🔴 **An entry below ends with three claims this seating refutes**, and two of
+them had already been refuted at the desk without this file noticing.
+*"`ALLOW_OUT_MASK` is 0"* — `r59` ran with `1u << 6` and `allow_out_mask` read
+`00000040` on seventeen boots. *"no consumer is bound to it"* — upstream's
+`leds-gpio` holds line 6 and `rtl819x-keys` holds line 5, `n_req_ok 2` at rest
+on every boot. **What survives is narrower and is now stated as such**: nothing
+the system *needs* depends on this chip — the LED is an indicator no code reads
+back, the button's events have no consumer in this image, and `.to_irq` is still
+`NULL`.
+
+🟢 **`R5-7`'s DoD is a photon and the negative control is the operator's.** An
+**unmodified upstream** `leds-gpio`, bound to a `gpio_chip` of mine, produced
+light from a sysfs write: `dat 0000007C → 0000003C`, `n_set_ok` 0 → 1,
+`n_writes` 2 → 3, with LED #2 of eight lit and #1/#4 reported unchanged.
+🟢 **And the guard was taken down and put back up**, which `ALLOW_OUT_MASK = 0`
+made impossible until today: `lock 6` then `brightness ← 0` leaves the LED
+**lit** while the class device reports **0**, with `n_writes` **unmoved** — the
+refusal is ordered before the write rather than logged after it. **A guard that
+has only ever been seen refusing is a wall.**
+
+🟢 **`R5-8`'s DoD is a three-state control and four exact poll counts.**
+`(n_open, n_poll)` reads `(0,0) → (1,60) → (2,120) → (2,120)`: sixty polls per
+three-second open at 20 Hz, twice, and **flat** for a sleep carrying no open.
+Across the resolution ladder at 10 / 50 / 200 ms, `j_last − j_first` is exactly
+`(n_poll − 1) × poll_jiffies` with **no remainder at any of the three periods**.
+🟢🟢 **The 32-slot ring earned its place at the coarsest rung**: six edges — all
+three physical presses — with `b0_n_press` **2**, and the press the debouncer
+declined is the **0.20 s** one, exactly one poll period at `b0_need = 1`. A
+counter alone reports *a press was lost*; the ring reports *a press was seen and
+refused*, and those are different facts.
+
+🔴🔴 **The result nobody planned: the vendor's `rtl_gpio_timer` acts ONCE PER
+BOOT**, started by the first press held past about two seconds and never again
+on that boot. **Nine button episodes, four boots, zero exceptions**, with three
+confounds each broken by an experiment rather than an argument: *poll rate*
+(boot 14's two holds are both at `interval 50`, one blinks and one does not);
+*`default_flag`* (boot 15's second hold makes a **6.85 s** contact with
+`/proc/load_default` reading `0` **before and after**); and *any press consumes
+it* (boot 17's first episode is a **0.45 s** press, and the 17.90 s hold after it
+on the same boot blinks and takes the flag to `1`). 🟢 `/proc/load_default` is a
+second, independent observable and agrees five times out of five — the LED
+branch and the factory-default branch are the same timer, so they live and die
+together. 🟢 **And the new rule explains seating 19's OLD observations**, which
+is why it stands rather than merely replacing them; the old rule cannot
+accommodate boot 15. **`SPEC.md` `REG-37`'s "the blink is gated by
+`default_flag`" is struck in place**, and the confound is named: *the only way
+to set that flag is the kind of hold that consumes the timer.* ⚠️ 推, and the
+consequence reaches past this image: on this board the reset button's `>= 5 s`
+factory-default branch can be entered **once per power-up**. The behaviour is
+量; the mechanism is unread and is carried to `R5-9`.
+
+🔴 **Five cells of the frozen card would have reported `55 of 55` with nothing
+in them, and the audit that found it ran before power.** `--idle N` is *N
+seconds since the last byte on the wire*, so a payload opening with a longer
+silence ends its own capture inside that silence — leaving ~54 bytes of the
+command line's echo under a clean `stop_reason`, which `check-predictions`
+scores as a pass because it reads existence and mtime rather than content.
+Caught by three sources: the code, **7 of 7 in the capture corpus**, and a
+checker whose five positive controls all fired. 🟢 **It is now a rule with a
+measured false-positive rate**: `cardcheck` `A22`–`A24`/`B11` sweep **60
+committed cards, 235 capture cells, 17 carrying a `sleep`** — and the only five
+violations are those five, excused by name because a frozen card cannot be
+repaired.
+
+🔴 **Three of the card's own predictions were refuted and two are the card
+contradicting itself.** `cnr_as_spec` / `dir_as_spec` predicted `1 / 1` and read
+`0 / 0` — the driver compares the live value against `REG-26` / `REG-27`, which
+are **loader-state** constants, and 量 over the corpus says 29 committed files
+and 35 occurrences have all read `0`, so `RC3` as written would have fired on
+every seating this project has ever run. ⚠️ `cardcheck numbers` passed 28 of 28
+and could not catch it: the `1 / 1` is prose in a table cell. `n_get` /
+`n_state_chk` predicted `1 / 1` and read `3 / 3` — and the card's numbers are
+**right about the driver and placed under the wrong cell**, because one `cat` is
+**two `read_proc` invocations** on this kernel (`FW-64`), so both of the card's
+counter identities carry a missing factor of two.
+
+🟢 **`FW-63`: a counter that samples without timestamping cannot resolve a
+phase, and the operator's eye is what did.** A low-fraction of 0.61 is equally
+consistent with *evenly spread* and with *steady for the first 3.9 s, then
+alternating*. The operator's sentence chose between them, and only then could
+`T + (hold − T)/2 = low` be solved on three holds for **T = 3.95 / 3.05 /
+3.90 s**. **Ten operator readings across the seating, ten agreements with the
+register**, and exactly one of them carried information no counter had.
+
+---
+
 🟢 **2026-09-09, forty-seventh segment, seating 18: `R5-6`'s second bench half —
 `OVSEL[2]` found, two residuals closed, and the best result is a mechanism
 nobody put on the card.**
