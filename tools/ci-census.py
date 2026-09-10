@@ -83,6 +83,46 @@ SKIP_BARE_RE = re.compile(r"^ {2}skip\s{2,}(\S(?:.*?\S)?)\s*$")
 # stop being counted and start being reported as malformed instead.
 UNPARSABLE_RE = re.compile(r"^ {2}(ok|FAIL|skip)\b")
 
+# 🔴 CENSUS-2, carried forward from 2026-09-08 and closed 2026-09-10.
+#
+# The four expressions above all demand EXACTLY TWO leading spaces -- `^ {2}`
+# -- and `UNPARSABLE_RE` does too, so a tool that prints its case lines with
+# FOUR spaces produces a capture in which nothing matches anything: `ok` is 0,
+# `fails` is 0, `skips` is empty, and `unparsable` IS EMPTY AS WELL.  The
+# arithmetic then reports
+#
+#     CENSUS-MISMATCH 0+0+0 != 13 -- cases went missing with neither a FAIL
+#     nor a skip line
+#
+# which is true and useless.  No case went missing: every one of them ran and
+# printed, and none of them was ever PARSED.  量: that shape has cost two
+# pushes -- capdate/capfield on 2026-09-08 and regcensus on 2026-09-10 -- and
+# neither red named the cause, so it was found by reading this file's source
+# both times.
+#
+# This expression is deliberately LOOSER than the four above: any leading
+# whitespace, and the token need only be followed by one space.  Its job is
+# not to parse a case, it is to notice a line that WANTS to be one.
+MISINDENT_RE = re.compile(r"^(\s*)(ok|FAIL|skip)\s")
+
+
+def misindented(text):
+    """Case-shaped lines whose indentation is not the two spaces we parse.
+
+    Returns (count, first_example).  A line with exactly two leading spaces is
+    excluded whatever else is wrong with it -- that one is `unparsable`'s
+    business, and the two findings must not be reported as one.
+    """
+    n, first = 0, None
+    for line in text.splitlines():
+        m = MISINDENT_RE.match(line)
+        if m and len(m.group(1)) != 2:
+            n += 1
+            if first is None:
+                first = line
+    return n, first
+
+
 
 def load_table(path):
     """Return {suite: (bench_total, {label: covers}, {label: reason})}, declared.
@@ -227,7 +267,8 @@ def census(table, capdir, only=None, check_arithmetic=True, out=sys.stdout, decl
             red = True
             continue
         with open(path, encoding="utf-8", errors="replace") as fh:
-            ok, fails, skips, unparsable = parse_capture(fh.read())
+            captured = fh.read()
+        ok, fails, skips, unparsable = parse_capture(captured)
 
         covered = 0
         bad_labels = []
@@ -252,8 +293,24 @@ def census(table, capdir, only=None, check_arithmetic=True, out=sys.stdout, decl
                          f"did not parse")
         if check_arithmetic and ok + fails + covered != total:
             status, red = "RED", True
-            notes.append(f"CENSUS-MISMATCH {ok}+{fails}+{covered} != {total} -- "
-                         f"cases went missing with neither a FAIL nor a skip line")
+            # CENSUS-2: name the cause when the cause is knowable.  A capture
+            # in which NOTHING parsed, and which holds case-shaped lines at
+            # the wrong indentation, is not a suite that lost cases -- it is a
+            # suite this parser could not read.  The two get different
+            # sentences because they need different repairs.
+            mis_n, mis_first = misindented(captured)
+            if ok + fails + covered == 0 and mis_n:
+                notes.append(f"INDENT {mis_n} line(s) are case-shaped and are "
+                             f"not indented by exactly two spaces, so NOTHING "
+                             f"in this capture parsed -- 0 ok, 0 FAIL, 0 skip, "
+                             f"0 unparsable. The suite ran; this parser could "
+                             f"not read it. First: {mis_first.rstrip()!r}")
+            else:
+                notes.append(f"CENSUS-MISMATCH {ok}+{fails}+{covered} != {total} -- "
+                             f"cases went missing with neither a FAIL nor a skip line")
+                if mis_n:
+                    notes.append(f"and {mis_n} line(s) are case-shaped at the "
+                                 f"wrong indentation, which may be some of them")
 
         not_run += covered
         lines.append(f"  {status:<5} {suite:<24} ran {ok:>3}/{total:<3} "
@@ -358,6 +415,42 @@ def self_test():
         ck("C4b the same input with the arithmetic disabled -> green, so C4 tests it",
            red, False)
         _write(cap, "beta.out", skipped)
+
+        # C4c/C4d/C4e/C4f -- CENSUS-2, carried forward from 2026-09-08.
+        # A capture in which NOTHING parsed because every case line carries
+        # four spaces must SAY SO, and must not say "cases went missing":
+        # nothing went missing, and the two sentences point at different
+        # repairs.  量: this shape cost a push on 2026-09-08 (capdate,
+        # capfield) and another on 2026-09-10 (regcensus), and neither red
+        # named the cause.
+        def _one(text):
+            _write(cap, "alpha.out", text)
+            b = io.StringIO()
+            r, _l = census(table, cap, only=["alpha"], out=b)
+            return r, b.getvalue()
+
+        four = "".join(f"    ok    case {i}  something\n" for i in range(10))
+        red4, out4 = _one(four)
+        ck("C4c ten four-space case lines -> red", red4, True)
+        ck("C4d and the message names the INDENTATION, not missing cases",
+           ("INDENT" in out4) and ("went missing" not in out4), True)
+
+        # C4e -- THE POSITIVE CONTROL ON THE NEW BRANCH.  The same ten at the
+        # right indentation must be GREEN, or C4c is passed by a rule that
+        # reds every capture and the new message means nothing.
+        red5, out5 = _one("".join(f"  ok    case {i}  something\n"
+                                  for i in range(10)))
+        ck("C4e POSITIVE CONTROL: the same ten at two spaces -> green",
+           red5, False)
+
+        # C4f -- a GENUINE shortfall with no misindented line must still get
+        # the old sentence, so the branch discriminates rather than replaces.
+        red6, out6 = _one("".join(f"  ok    case {i}  something\n"
+                                  for i in range(7)))
+        ck("C4f a real 7-of-10 still reads CENSUS-MISMATCH and not INDENT",
+           red6 and ("CENSUS-MISMATCH" in out6) and ("INDENT" not in out6),
+           True)
+        _write(cap, "alpha.out", clean)
 
         # C15 the NOT-RUN total, declared in the table and CHECKED.
         # Before 2026-08-29 this number lived only in a prose comment in

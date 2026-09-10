@@ -215,7 +215,17 @@ PY
 # `the declarations are the shape this suite was written against`, and a
 # case that recomputes its own expectation cannot say that.  What has to
 # change is the closeout, not the assertion.
-ck "E1 the committed delta parses: 50 rules, 27 set, 23 derived" "50 27 23" \
+# 🔴 2026-09-10 (`R5-8`), THE THIRD TIME, AND THIS ONE WAS CAUGHT BEFORE
+# THE PUSH BECAUSE THE CLOSEOUT CHANGED.  The paragraph above says what
+# has to change is the closeout; the fifty-fourth segment ran
+# `desk-sweep run` -- the whole ci.yml, not `ci-census --only` -- and this
+# suite came back `unexpected red (rc=1)` with these four cases and no
+# others, on a desk, with nothing pushed.  The segment added TWENTY-ONE
+# `set` rows to config/rlxfw-kernel.delta (the INPUT family: four on,
+# sixteen pinned off, plus CONFIG_HID_SUPPORT, which a directory-scoped
+# enumeration had missed) and one build row `MK8` to
+# config/rlxfw-marks.tsv.  50/27 -> 71/48, 52/29 -> 73/50, and G4c 6 -> 7.
+ck "E1 the committed delta parses: 71 rules, 48 set, 23 derived" "71 48 23" \
    "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
 
 # E1b -- the same file, per variant, and it also runs on a clean clone.  Without
@@ -239,9 +249,9 @@ except SystemExit as e:
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1b --variant loud: 52 rules, 29 set, 23 derived"  "52 29 23" \
+ck "E1b --variant loud: 73 rules, 50 set, 23 derived"  "73 50 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
-ck "E1b --variant quiet does NOT pick them up"         "50 27 23" \
+ck "E1b --variant quiet does NOT pick them up"         "71 48 23" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
@@ -390,7 +400,7 @@ ck "G4b and TWELVE marks in total"        12 \
 # conditional, so without CONFIG_WATCHDOG=y the file is never compiled and
 # everything downstream is green.  A string witness read out of the built
 # image is the only thing here that can tell those two apart.
-ck "G4c and SIX present-witness build rows"   6 \
+ck "G4c and SEVEN present-witness build rows" 7 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
 ck "G4d and ONE absent-witness build row"     1 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"

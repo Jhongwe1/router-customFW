@@ -257,6 +257,55 @@ def _no_prefix(path, rows):
                     % (path, a, b))
 
 
+def _no_needle_contain(path, rows):
+    """No image needle may contain another, and none may be shared.
+
+    量 2026-09-10 (R5-8), while choosing MK8's witness, and it was a
+    near miss rather than a design.  A `str:` witness is checked as
+    `_count(image, needle) >= 1` -- a byte substring search over the whole
+    vmlinux -- so a needle that CONTAINS another row's needle satisfies that
+    row too, and the containing row's object alone is then enough to make the
+    contained row green.  MK8's first draft set its input->phys to
+    `rtl819x-pabcd/input0`, which contains MK3's witness `rtl819x-pabcd`:
+    shipping it would have left MK3 passing with rtl819x-gpio.o absent from
+    the image.  Nothing here would have said so.
+
+    `_no_prefix` above is the SAME hazard on mark TAGS, found the same way on
+    2026-08-28 with `RLXFW-B1` inside `RLXFW-B10`.  This is its other half.
+    Mark strings and `str:` witnesses go into ONE search over ONE image, so
+    they are checked as one population and not as two: a witness that
+    contains a mark's bytes is exactly as bad as one that contains another
+    witness's.
+
+    `sym:` and `absent:` are deliberately NOT in it.  `_symbols()` reads
+    System.map by field, so a symbol name containing another cannot match --
+    that is W7d, and this rule would only add a refusal for a collision that
+    cannot happen.
+    """
+    needles = []
+    for r in rows:
+        if r.kind == "mark":
+            needles.append((r.id, "mark string", r.string))
+        elif r.wkind == "str":
+            needles.append((r.id, "str: witness", r.wval))
+    for i, (ida, ka, a) in enumerate(needles):
+        for j, (idb, kb, b) in enumerate(needles):
+            if i == j:
+                continue
+            if a == b:
+                if i < j:
+                    die("%s: %s's %s and %s's %s are the SAME needle %r. One "
+                        "object in the image makes both rows green, so "
+                        "neither can fail"
+                        % (path, ida, ka, idb, kb, a))
+            elif a in b:
+                die("%s: %s's %s %r CONTAINS %s's %s %r. `verify` searches "
+                    "the whole image for each needle, so %s's object alone "
+                    "would satisfy %s and that row could no longer fail. "
+                    "Rename one of them"
+                    % (path, idb, kb, b, ida, ka, a, idb, ida))
+
+
 def parse_decl(path, text=None):
     """[Row].  Tab separated, six columns, a comment is `#` at column 0.
 
@@ -307,6 +356,7 @@ def parse_decl(path, text=None):
         seen[key] = lineno
         rows.append(r)
     _no_prefix(path, rows)
+    _no_needle_contain(path, rows)
     if not rows:
         die("%s: no rows. An empty declaration would make `check` pass on a "
             "tree with no marks in it" % path)
@@ -905,6 +955,46 @@ def self_test():
         _m, _r, w = verify_marks(d26, mine, [theirs], mp)
         ck("W7d a longer symbol containing the witness does not match",
            w[0][3] is False, str(w[0][:3]))
+
+        # W16 -- 🔴 A `str:` WITNESS THAT CONTAINS ANOTHER ROW'S NEEDLE IS
+        # REFUSED, and this case exists because R5-8 nearly shipped one.
+        # MK8's first draft spelled the driver's input->phys
+        # `rtl819x-pabcd/input0`; MK3's witness is `rtl819x-pabcd`.  Both
+        # strings in one image and MK3 can no longer fail -- a witness that
+        # cannot fail is the defect this whole column was added to remove,
+        # one layer down.  The literals here are the real ones on purpose.
+        inner = ("MK9", "sub/Makefile", "after", "obj-y += x.o",
+                 "obj-y += drv.o", "str:rtl819x-pabcd", "links a driver")
+        outer = ("MKA", "sub/Makefile", "after", "obj-y += y.o",
+                 "obj-y += k.o", "str:rtl819x-pabcd/input0", "links another")
+        d40 = os.path.join(tmp, "d40")
+        io.open(d40, "w").write(_decl(markrow, inner, outer))
+        ok, why = refuses(parse_decl, d40)
+        ck("W16 a str: witness containing another row's needle is refused",
+           ok, why)
+
+        # W16b -- POSITIVE CONTROL.  The same two rows with the containment
+        # removed must PARSE.  Without it W16 is also passed by a rule that
+        # refuses every declaration, and this file's own standard is that a
+        # check which cannot pass proves as little as one which cannot fail.
+        d41 = os.path.join(tmp, "d41")
+        io.open(d41, "w").write(_decl(
+            markrow, inner,
+            outer[:5] + ("str:rtl819x-keys/input0",) + outer[6:]))
+        rr41, _ = parse_decl(d41)
+        ck("W16b POSITIVE CONTROL: two witnesses that contain neither the "
+           "other nor a mark parse", len(rr41) == 3, str(len(rr41)))
+
+        # W16c -- the rule reaches MARK strings too, which is what makes the
+        # population one and not two.  `_no_prefix` compares TAGS; this
+        # compares the bytes `verify` actually searches for, and a witness
+        # is not a tag.
+        d42 = os.path.join(tmp, "d42")
+        io.open(d42, "w").write(_decl(
+            markrow, inner[:5] + ("str:RLXFW-B0",) + inner[6:]))
+        ok, why = refuses(parse_decl, d42)
+        ck("W16c a str: witness inside a MARK's own needle is refused",
+           ok, why)
 
         # W9 -- an --absent artefact carrying TWO OR MORE of this declaration's
         # marks is one of mine and is refused as a control.
