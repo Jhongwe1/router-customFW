@@ -3837,6 +3837,18 @@ one wants the card immutable in *time*, the other wants it correct in *syntax*
 — and nothing here had noticed. `spec-check` takes two seconds. **Run it before
 the commit that freezes the card**, and the two never have to be traded off.
 
+🔴 **2026-09-09 (seating 19) found the hole in that sentence, and 2026-09-10 closed it with a two-armed control.** `spec-check` sweeps **tracked** `.md` files, and a card is untracked until the commit that freezes it — so *run it before the commit* is a rule the gate cannot obey: **the gate that exists to check the card cannot see the card.** Seating 19's own sweep, an hour after five green gates, then reported a `C8` in the frozen card.
+
+🟢 **量 2026-09-10, one file, one deliberate `C8`, one variable:**
+
+| the file is | findings naming it | `spec-check` |
+|---|---|---|
+| untracked | **0** | `rc 0` |
+| `git add`ed | **1** | `rc 1` |
+
+**So the rule is: `git add` the card, THEN run gate 2, THEN commit.** 🟢 It caught something on its first real use — the fifty-fifth segment's card carried an unescaped `|` inside a code span in a table cell, which `C8`'s own message says makes every checker reading a field by index read the wrong cell and pass. Under the old order that defect leaves the desk.
+⚠️ **Staging is not committing**, and that is the point: the card can still be repaired at this moment without the `check-predictions` mtime cost the paragraphs above describe, because no capture exists yet.
+
 🔴 **2026-09-08 (seating 17): the rule as written above is too NARROW, and CI
 found the gap rather than the rule doing it.** It names *the commit that freezes
 the card*, and that commit was clean — five gates, `spec-check` rc 0. The defect
