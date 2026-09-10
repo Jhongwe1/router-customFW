@@ -169,6 +169,66 @@ FLR_LEGACY_CARDS = {
 # suppressed by this list is REPORTED with the reason rather than passed in
 # silence, and `echo` -- the only one any card has used -- is also a declared
 # symlink, so nothing currently rests on the list at all.
+# ----------------------------------------------------------------------------
+# 🔴 `--idle N` IS *N SECONDS SINCE THE LAST BYTE ON THE WIRE*, so a payload
+# whose first act is a silence longer than N ends its own capture in the middle
+# of that silence -- and the capture that results is not obviously broken.  量
+# 2026-09-10, seating 20, before power: five cells of a FROZEN card sent
+# `sleep 15`/`sleep 25` under `--idle 4`.  Each would have produced ~54 bytes
+# (the command line's own echo) with the clean `stop_reason`
+# `--idle 4.0 with no bytes`, and `check-predictions` scores a cell on whether a
+# capture exists and postdates the card, NOT on its content -- so the seating
+# would have reported `55 of 55` with the whole press ladder and both long holds
+# empty.
+#
+# 🟢 THE FALSE-POSITIVE RATE IS MEASURED, NOT ASSUMED.  量 over every committed
+# card: 60 cards, 235 capture cells, **17 carry a `sleep`**, and the only five
+# that violate the rule are the five above.  Every other card in this
+# repository's history separates its sleep from its idle -- the widest is
+# `sleep 5` under `--idle 8` -- so this is a rule the corpus already obeyed and
+# nothing had written down.
+IDLE_UNDER_SLEEP_EXEMPT = {
+    # 2026-09-10, seating 20.  FROZEN before the defect was found; the five
+    # cells were run with `--idle` REMOVED and the deviation is recorded in
+    # `bench/2026-09-10/CORRECTIONS-block17.md` § 0.  The card may not be
+    # repaired -- `check-predictions` reads its mtime -- so it is excused BY
+    # NAME, as `FLR_LEGACY_CARDS` excuses its two.
+    "bench/2026-09-10/PREDICTIONS-B18-block17.md",
+}
+
+_IDLE_RE = __import__("re").compile(r"--idle\s+([0-9.]+)")
+_SLEEP_RE = __import__("re").compile(r"\bsleep\s+([0-9]+)")
+_OUT_RE = __import__("re").compile(r"--out\s+(\S+)")
+
+
+def idle_under_sleep(text):
+    """-> [(cell, longest sleep, idle)] for every capture line that would stop
+    before its own payload speaks.
+
+    A line with no `--idle`, or no `sleep` in its `--send`, is not a finding:
+    `--seconds` alone is a hard duration and cannot stop early.
+    """
+    out = []
+    for line in text.split("\n"):
+        if "console-capture" not in line or "--send" not in line:
+            continue
+        mi = _IDLE_RE.search(line)
+        if not mi:
+            continue
+        ms = SEND_RE.search(line)
+        if not ms:
+            continue
+        sl = [int(x) for x in _SLEEP_RE.findall(ms.group(1))]
+        if not sl:
+            continue
+        idle = float(mi.group(1))
+        if max(sl) >= idle:
+            mo = _OUT_RE.search(line)
+            cell = mo.group(1).split("/")[-1] if mo else "?"
+            out.append((cell, max(sl), idle))
+    return out
+
+
 ASH_BUILTINS = {
     ":", ".", "break", "cd", "continue", "eval", "exec", "exit", "export",
     "false", "hash", "local", "read", "return", "set", "shift", "source",
@@ -394,6 +454,18 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
         report(f"  FAIL  {cid}: {cmd}")
         for it in keep:
             report(f"          {it}")
+    # 🔴 The `--idle` guard.  See IDLE_UNDER_SLEEP_EXEMPT's comment: a capture
+    # that stops before its own payload speaks leaves a file that passes every
+    # other check in this repository.
+    idle_bad = 0
+    if card_rel.replace("\\", "/") not in IDLE_UNDER_SLEEP_EXEMPT:
+        for cell, sl, idle in idle_under_sleep(text):
+            idle_bad += 1
+            report(f"  FAIL  {cell}: --idle {idle:g} <= sleep {sl} in --send")
+            report(f"          the capture stops ~{idle:g} s in and the payload "
+                   f"speaks at ~{sl} s; use --seconds alone, or --idle > {sl}")
+    bad += idle_bad
+
     report(f"  {len(pairs)} command(s): "
            + ", ".join(f"{v} {k}" for k, v in sorted(kinds.items()))
            + f"; declaration has {len(names)} invocable name(s)"
@@ -836,6 +908,37 @@ def run_controls():
     row("A21", "and no OTHER loader verb is touched by it",
         not other, f"{len(other)} of 5 flagged" + (f": {other}" if other else ""))
 
+    # ----------------------------------------------------------------- A22-A24
+    # 🔴 The `--idle` guard, with the same three-case shape as A19-A21: it
+    # fires, a named frozen card is excused, and it does not touch a cell that
+    # is fine.
+    LINE = ("/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 "
+            "--out bench/x/C1-A --send 'sleep 15 ; cat /proc/x' --idle 4 --seconds 40")
+    hits = idle_under_sleep(LINE)
+    row("A22", "a cell whose --idle is under its own sleep is REPORTED",
+        len(hits) == 1 and hits[0] == ("C1-A", 15, 4.0),
+        f"{len(hits)} hit(s): {hits[0] if hits else '-'}")
+
+    frozen = "bench/2026-09-10/PREDICTIONS-B18-block17.md"
+    row("A23", "and the FROZEN card carrying the five is excused by name",
+        frozen in IDLE_UNDER_SLEEP_EXEMPT
+        and len(idle_under_sleep(_read(frozen).decode("utf-8", "replace"))) == 5,
+        f"exempt={frozen in IDLE_UNDER_SLEEP_EXEMPT}, "
+        f"{len(idle_under_sleep(_read(frozen).decode('utf-8', 'replace')))} "
+        f"cell(s) in it")
+
+    # 🔴 THE CONTROL THAT SAYS IT IS A GUARD AND NOT A BLANKET.  Three shapes
+    # that must stay silent: idle comfortably over the sleep, a sleep with no
+    # --idle at all (--seconds is a hard duration), and no sleep at all.
+    quiet = [
+        "... capture --out bench/x/A --send 'sleep 3 ; cat /proc/x' --idle 4 --seconds 30",
+        "... capture --out bench/x/B --send 'sleep 15 ; cat /proc/x' --seconds 40",
+        "... capture --out bench/x/C --send 'cat /proc/x' --idle 3 --seconds 15",
+    ]
+    noisy = [q for q in quiet if idle_under_sleep(q)]
+    row("A24", "and a cell that is FINE is not touched by it",
+        not noisy, f"{len(noisy)} of 3 flagged" + (f": {noisy}" if noisy else ""))
+
     # ------------------------------------------------------------------- B10
     # 🔴 THE CORPUS SWEEP, IN BOTH DIRECTIONS.  Forwards: no card outside the
     # list may type `FLR`.  Backwards: no card ON the list may have stopped
@@ -859,6 +962,29 @@ def run_controls():
         + (f"NEW offender(s): {offenders}" if offenders else "")
         + (f"STALE list entr(y/ies): {stale}" if stale else "")
         + ("list exact" if not offenders and not stale else ""))
+
+    # ------------------------------------------------------------------- B11
+    # 🔴 THE CORPUS SWEEP, IN BOTH DIRECTIONS, as B10 does it for `FLR`.
+    # Forwards: no card outside the list may carry the shape.  Backwards: a
+    # card ON the list that no longer carries it is a list entry that has
+    # stopped being needed, and an allow-list that keeps those becomes a
+    # blanket one card at a time.
+    idle_users = set()
+    for c in cards:
+        try:
+            t = _read(c).decode("utf-8", "replace")
+        except OSError:
+            continue
+        if idle_under_sleep(t):
+            idle_users.add(c)
+    off = sorted(idle_users - IDLE_UNDER_SLEEP_EXEMPT)
+    stale2 = sorted(IDLE_UNDER_SLEEP_EXEMPT - idle_users)
+    row("B11", "every card whose --idle is under its sleep is a named frozen one",
+        not off and not stale2,
+        f"{len(cards)} swept, {len(idle_users)} carry the shape; "
+        + (f"NEW offender(s): {off}" if off else "")
+        + (f"STALE list entr(y/ies): {stale2}" if stale2 else "")
+        + ("list exact" if not off and not stale2 else ""))
 
     print()
     return 0 if ok else 1
