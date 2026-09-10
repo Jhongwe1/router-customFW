@@ -229,7 +229,37 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # those two numbers from the loader's own reset-cause line, knowing nothing
 # about power switches or `biteraw`.
 # 2026-09-09, seating 19 (bench/2026-09-09b): +1 cold +8 warm -> 33/108.
-ck "thirty-three cold, one hundred and eight warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 33 cold, 108 warm, 0 unknown')"
+# 🔄 33/108 -> 34/141 on 2026-09-10 (seating 20, `bench/2026-09-10`), which
+# is ONE cold power-on and THIRTY-THREE warm resets -- and it is by far the
+# largest single-seating delta this case has taken.  The cold one is `C1-A`,
+# the 150 s ESC window the operator pressed power inside.  The thirty-three
+# decompose exactly: SIXTEEN are `looprun`'s own S4 (`J BFC00000`) -- seventeen
+# invocations minus `C1`, which ran `--skip S2,S3,S4` because `C1-A` had
+# already reset the board -- and SEVENTEEN are `busybox reboot -f` cells
+# (`C1-RB`..`C13-RB` plus the off-card `X17-RB`, `X21-RB`, `X22-RB`, `X29-RB`),
+# each a watchdog bite at `OVSEL` 0 (`FW-37`, `CLK-08b`).  Isolation check, run
+# before this line was touched: every directory EXCEPT `2026-09-10` still
+# reports **33 cold, 108 warm**, and `2026-09-10` alone reports **1 cold, 33
+# warm** -- so the delta is exactly +1/+33 and nothing was reclassified.
+# ⚠️ The seating's other 135 captures produce no row and the tool says
+# `135 capture(s) produced no row; 0 of them hold boot text` -- they are shell
+# captures taken at a prompt after S7, so having no boot line is correct, and
+# the `0 of them hold boot text` half is what makes that a reading rather than
+# an assumption.  The corpus-wide `4 of them hold boot text` is older than this
+# seating and none of the four is here.
+# 🔴 THIS COMMENT DOES NOT ADD AN ORDINAL, AND THE REASON IS A READING.  The
+# first draft said "EIGHTH seating in a row" and "the seventh time"; both were
+# written without deriving them.  量, this file's own chain: the last ordinal
+# it uses is **ELEVENTH** (seating 17), the entry after it (seating 19,
+# `bench/2026-09-09b`) carries none, and that entry's stated `+1 cold +8 warm`
+# does not close the gap from `31/74` to `33/108` -- so the chain is
+# INCOMPLETE and no ordinal can be derived from it.  A number that cannot be
+# derived is not written down here.
+# 🔴 What IS derivable and is the point: `CLAUDE.md` carries the rule -- *a
+# seating changes DATA, and data
+# is what these cases assert on, so after a seating run every suite that can
+# run on this host* -- and it was read past again.
+ck "thirty-four cold, one hundred and forty-one warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 34 cold, 141 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -311,8 +341,14 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # tool's `0 of them hold boot text` half is what makes that a reading.
 # 2026-09-09, seating 19: four more warm resets -- three `bite 3` rungs and
 # one `biteraw` -- so n=45 -> n=49.
-ck "entry population is forty-nine warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=49')"
+# 🔄 49 -> 65 on 2026-09-10 (seating 20): the same +16 the isolation
+# check above measures for this row -- `2026-09-10` alone reports
+# `entry, warm  n=16`, and every other directory still reports n=49.
+# ⚠️ 33 warm resets but only 16 entry intervals, because an `entry`
+# interval needs BOTH ends in one capture and a `-RB` cell ends at the
+# loader prompt by design (`--until '<RealTek>'`).
+ck "entry population is sixty-five warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=65')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
