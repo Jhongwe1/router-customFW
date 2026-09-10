@@ -22204,6 +22204,8 @@ gives it the verdict *"blind of any implementation"*」。**兩半都在寫下�
 | `xcheck sweep` | 956 artefacts、3 identities、**0 disagreements** |
 | `flashwin scan` | **CLEAN**,3,435 個檔案 |
 | `test-file-modes` | 3 passed、0 failed、75 個可執行 |
-| `dtcheck` | **REFUSED** 而不是跳過(缺 `dtschema`);`dt/` 這一段沒動,由 `db5741c` 的綠 `text` job 涵蓋 |
-| `desk-sweep` | 全套,見下 |
+| `dtcheck` | ~~**REFUSED** 而不是跳過(缺 `dtschema`);`dt/` 這一段沒動,由 `db5741c` 的綠 `text` job 涵蓋~~ 🔄 **這一列在寫下的當天就被下面那次掃描推翻了**:`desk-sweep` 的 `instruments/dtcheck` **5.22 s ok**,`dtcheck self-test` **30.05 s ok** —— 掃描自己建 `dtschema` venv,所以 `dt/` 是**真的在這台桌面驗過**,不是推給 CI。手打 `dtcheck` 會 REFUSED 是因為那個 venv 只存在於掃描的環境裡,而 **REFUSED 而不是跳過本身就是工具在照設計動作** |
+| `desk-sweep run` | 🟢 **70 宣告、2 skipped、68 ran、66 green、2 expected-red、0 unexpected**。複製逐項驗證(**3,740 entries**,「the copy IS the source」),而且**源樹在掃描期間沒有移動**。兩個 expected-red 是 `census/merge the captures` 與 `census/census`,`CLAUDE.md` 早就記過它們在這台桌面必紅的理由。最貴的三步:`test-console-capture-mutants` **785.93 s**、`test-rlxprobe` **245.59 s**、`test-console-capture` **124.94 s** |
+
+🔴 **而這張表自己帶了兩個缺陷進來,兩個都是我寫的。** `dtcheck` 那一列上面已經劃掉了;`desk-sweep` 那一列原本寫「全套,**見下**」而**下面什麼都沒有** ——一個指向不存在的東西的交叉引用,在一份以「數字要指名來源」為規矩的紀錄裡。兩個都是在掃描**還在跑**的時候寫的,也就是說我在結果出來之前就先寫了結論的位置。**這和 §9 開頭那個順序問題是同一件事,只是小一號。**
 
