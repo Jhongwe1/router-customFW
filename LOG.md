@@ -21794,3 +21794,329 @@ domain 的計數沒動、沒有新檔案變成被引用、樹的形狀沒變。
 掃描器把它們判成 out-of-scope,我還是宣告。⚠️ 但一個 `obj-y` 清單不帶暫存器
 位址、不帶位元編號、不帶順序,所以**兩者都不落在 §5 計分的任何一層**。
 帳本:in-scope **57 → 58**,`led` domain **3 → 4**,`ledgerscan check` 回綠。
+
+---
+
+## 2026-09-10 — 第五十三段(桌面,不通電):`R5-7` 的程式碼,而最好的讀數帶著兩個沒有人安排的負控制
+
+**03:37 開場,三邊一致**:Windows `2026-09-10 03:37:01 +08:00`、Git Bash
+`2026-09-10 03:37:01 TST (Thu)`、WSL `2026-09-10 03:37:08 CST (Thu)`,UTC 都是
+`2026-09-09T19:37Z`。**同一個日曆日的第三段** —— 上一段 03:34 收工,相隔 3 分鐘 ——
+所以檔名是 `study/20260910-study3.md`,依開場日命名。桌面,**不通電**,零電源循環,
+沒有 `bench/` 目錄。
+
+⚠️ **08:17 收工,4 小時 40 分。** 上一段是 1 小時 28 分,前一段 1 小時 5 分。這一段
+是它們的三倍多,而寫下來是因為一段的長度是排程用的資料。時間花在哪裡是可以指名的:
+建置本身 45 秒,三道門加起來不到兩分鐘,其餘幾乎全部是讀廠商原始碼與寫擁有者檔案。
+
+---
+
+### 1. 開場三件事
+
+**① 日期**:上面那三行。
+
+**② CI —— 四次 push 全紅,而交辦給我的歸因是錯的、讀數是對的。**
+
+`b40c2e5`／`bd52b05` 讀到的時候已經 `failure`,`4bbb238`／`323642f` 還在跑(建立於
+19:33/19:34,我讀它們的時候是 19:37,而這個 workflow 要 ~18 分鐘)。後來四個全紅,
+而且是同一個原因。
+
+倒的是 `census` job 的第 5 步,訊息逐字是:
+
+```
+RED   regcensus   ran 0/21  failed 0  not run 0
+      CENSUS-MISMATCH 0+0+0 != 21 -- cases went missing with neither a FAIL nor a skip line
+```
+
+開場交辦寫著「紅在 census → `ci-expected.tsv` 的 `regcensus` 那一列有問題」。**量:
+那一列完全正常** —— 宣告 21、零 skip、not-run-total 不動,三項都如交辦所預期,而
+`ci-census` 也確實讀到了 21。壞的是另一邊:`ci-census` 從 `regcensus.out` 只解析出
+**0** 個 case。
+
+`text` job 三次都是 `success`,所以那支工具自己跑完是綠的。跑一次就看見了:
+
+```
+$ /usr/bin/python3 tools/regcensus.py --self-test
+regcensus controls
+  21/21 controls ok
+```
+
+**兩行,一個逐 case 行都沒有。** `ci-census` 的 `OK_RE` 是 `^ {2}ok\s{2,}(.*)$` ——
+正好兩個前導空白 —— 所以它數到 ok 0、FAIL 0、skip 0,`0+0+0 != 21`。
+
+🟢 **這個形狀 `CLAUDE.md` 逐字記過**:2026-09-08 `capdate` 與 `capfield` 印的 case 行
+有四個前導空白,「would have read `ran 0/13` and `ran 0/10` with zero failures ——
+green tools, red census, discovered after a push」。同一個形狀,現在是 `ran 0/21`。
+
+**桌面重現,逐字相同**:自己產一份 `ci-out/regcensus.out` 再跑
+`ci-census.py tools/ci-expected.tsv ci-out --only regcensus`,印出同一行,rc=1。
+
+修法照 `capdate.py` 的形狀而不是自己發明:逐 case 行印在 `ck()` 裡面,兩個前導空白,
+旁邊的註解引用 `ci-census` 的 `OK_RE` 並記下兩次事故的日期與 run id。
+
+🟢 **正控制是突變而不是綠。** 在副本上強制 `C1` 為假:
+
+| | 輸出 | census |
+|---|---|---|
+| 修後 | 21 行 `  ok    Cn` ＋ 摘要,rc 0 | `ok regcensus ran 21/21 failed 0` rc 0 |
+| 突變 | `  FAIL  C1  -- …` | `RED … ran 20/21 failed 1 … **1 FAILED**` rc 1 |
+
+突變那一列印的是 `1 FAILED` 而**不是** `CENSUS-MISMATCH`:算術照樣合攏(20+1+0=21),
+紅是因為那一格倒了。所以修法沒有把兩種紅併成一種。
+
+🔴 **多做的一件事,以及不做它的理由。** `ck()` 印 FAIL 訊息時把空白摺成一行。理由不是
+美觀:census 是**逐行**解析的,所以一個控制的訊息不可以有能力合成出一個 case 行。今天
+每一則訊息都是字面量或 `%r`,這個改動把它從「目前呼叫點的性質」變成「不變式」。
+
+`db5741c` 推上去,四個 job 全 success,含 `census`。
+
+**③ `citime`。** `check` 指名缺 `34397301668`;`record` 進帳 **BIG3=957**。
+`segments` **3/3**:
+
+* `(start) .. 2026-09-01T14:27:11Z` n=16,`A8` 0.996 %
+* `2026-09-01T14:27:11Z .. 2026-09-08T20:43:13Z` n=58,`A8` 0.699 %
+* `2026-09-08T20:43:13Z .. (now)` **n=17**,`A8` **0.787 %**
+
+帶:**n=17、945..960 = 15 s、中點 952.5、半幅 7.5、± 0.787 %、中位數 956**。
+**連續第三次進帳而帶紋風不動。** 併池正控制兩條都發射:`A8` 31.778 %(上限 5.0)、
+`A9` 167.61 sd(下限 8.0)指名 `e79ff63`。
+
+⚠️ **而我差一點引用錯數字。** `PROGRESS.md` `CI-5` 那一列的**尾巴**寫 `± 0.787 %(n = 11)`,
+交辦寫 n=16。兩個 `0.787 %` 相同不是巧合 —— `945..960` 的中點 952.5、半幅 7.5,
+`7.5/952.5 = 0.7874 %`,**帶沒動時這個百分比與 n 無關**。查:`CI-5` 那一列有 11 個日期
+區塊,最新的(2026-09-10)在**列的開頭**,尾巴那個 `n = 11` 是 2026-09-09 的舊區塊。
+這正是 `spec-check` `C12` 為 `Next after this` 修過的同一個排序陷阱。**最後用的是導出來
+的**:`citime stats` 印的 n=90 序列尾端十六個值 ≥945,逐一數 = 16,與交辦逐位相符。
+
+**④ `CI-5` ③ 的排程落差沒有重現。** 量,run 建立時間對 job 啟動時間:
+
+| run | commit | `lint` | `text` | `instruments` |
+|---|---|---|---|---|
+| 34393578330 | `b40c2e5` | +3 s | +3 s | +3 s |
+| 34393733450 | `bd52b05` | +3 s | +3 s | +3 s |
+| 34397301668 | `db5741c` | +3 s | +4 s | +2 s |
+| 34384886518 | `88a4fe8` | **+18 m 28 s** | +3 s | **+18 m 28 s** |
+
+**n=4,一次有落差三次沒有。** 所以那是一次事件而不是一個分佈,而交辦自己寫著「一次觀察
+不是一個分佈」——現在有四次了,答案是它不重現。
+
+---
+
+### 2. `R5-7` 的程式碼半
+
+論證是上一段寫的(`notes/gpio-driver.md`,693 行),§7 逐條定死了要寫什麼,所以這一段
+沒有做任何設計決定 —— 除了下面那些論證沒有涵蓋的。
+
+**`rtl819x-gpio` 1.1,673 → 986 行。** 兩個遮罩(`KNOWN_MASK` `0x20` → `0x60`、
+`ALLOW_OUT_MASK` `0` → `0x40`)、`.direction_output` 加 CNR 驗證、`unlocked` 換成只能
+收窄的 `out_locked`、外來寫入偵測器、`G7`／`G8` 兩個 mark。
+
+**§7.1 —— 實作比論證多做的四件事,每一件都是決定:**
+
+1. **`n_state_chk` 坐在 `n_state_foreign` 旁邊。** 「零次分歧」與「零次比較」印出來
+   都是 `0`,而後者是一支從來沒跑的儀器。`RC5` 的「十次開機 `n_state_foreign` 是 0」
+   只有在 `n_state_chk` 非零時才引用得動。
+2. **`G7`／`G8` 在鎖**外**發射,值在鎖內取樣。** `rlxfw_markx` 走 `prom_putchar`,忙等
+   UART FIFO;一行 `markx` 是 19 位元組,38400 8N1 下約 4.9 ms,兩行在
+   `spin_lock_irqsave` 裡就是約 10 ms 的關中斷視窗。⚠️ 不是安全問題(`FW-52` 的狗在
+   `OVSEL` 3 咬在 1,334 ms),是**儀器不該改變它量的東西**,而關中斷視窗正是 `IRQ-13`
+   的掉 tick 計數敏感的東西。
+3. **`.set` 刻意不重複 CNR 檢查**,不對稱寫下來而不是留給人發現。gpiolib 到不了沒有設過
+   方向的線,所以那條線這次開機已經讀過 CNR 了。⚠️ 這段推理是關於**這支**驅動的:
+   CNR 哪天變成可寫,`.set` 裡那段註解就是第一個失效的東西。
+4. **`lock`／`unlock` 變成三個動詞。** `lock N` 置位、`unlock N` 清位、裸 `lock` 是
+   1.0 的拼法(整個遮罩)。`unlock` 對編譯遮罩外的線回 `-EPERM`。量:`bench/` 裡沒有
+   任何凍結卡片打過這兩個動詞(碰這支驅動的四張打的是 `claim`／`sample`／`probe04`／
+   `tryout N`),所以改語意不動到已提交的證據。
+
+**第一個 platform device**:`config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c`,
+`arch_initcall`(3),註冊上游 `leds-gpio` 綁的那顆裝置。§9.1 用三個量測選的位置,而
+🔴 **不是 `arch/rlx/bsp/`** —— 量,`bsp` 是 `arch/rlx` 底下唯一的 symlink,指向
+`boards/rtl8196e/bsp`,而 `rlxfw-marks.py` 依設計拒絕 `src-vendor/`。
+
+⚠️ **它是這個專案第一支必須零警告否則建置停下來的檔案**(`arch/rlx/kernel/Makefile`
+帶 `EXTRA_CFLAGS += -Werror`)。它做到了:warning 數 **161 對 161 逐一相同**。
+
+🟢 **檔案裡有兩個 `#error`,而它們補的是一個記錄在案的洞。** `CFG-2`:
+`kconfig-delta check` 從來不被 `rlxfw-kbuild.sh` 呼叫,所以 delta 與建出來的 `.config`
+可以漂移而沒有人發現 —— `CONFIG_GPIO_SYSFS` 就是這樣在三顆已出貨的映像裡沒被宣告。
+一個 Kbuild 列讀不到 `.config`,一個 translation unit 讀得到。
+
+**`config/rlxfw-marks.tsv` 的 `MK7`。** 錨點用廠商自己的 `obj-y += rlx-time.o rlx-cevt.o`
+(出現正好一次)而不是 `MK` 插進去的那一行,理由是不要讓同一個檔的兩列變成有順序相依,
+而 `core-y` 目錄內的連結順序決定不了任何 initcall。
+
+🟢 **見證選 `str:` 而不是 `sym:`,而那是量出來的。** `str:` 的規則是「在我的映像裡、
+且不在廠商映像裡」。量 `r0-vendor-kernel.bin`(987,138 位元組,這台自己的廠商 kernel):
+`n150rt`、`N150RT`、`leds-gpio` 各出現 **0** 次 —— **這台機器自己的型號字串不在它自己的
+kernel 映像裡**,它在 userspace。所以 `str:n150rt:green:led2` 兩半都成立;而它比
+`sym:` 多買到一件事:那個字串同時是 `.dts` 的 label 與 `/sys/class/leds` 的目錄名,
+三者有一個被改而其他沒改,`verify` 就會紅。
+
+**`config/rlxfw-kernel.delta` —— 五列,不是規劃的三列。**
+
+把 `drivers/leds/Kconfig` 的 35 個符號逐一對 `r57.config-built` 展開每一層 `if`、
+`depends on` 與提示:**可達提示 5 個,其中 2 個不在 `.config` 裡**。
+
+| 符號 | 為什麼在 delta 裡 |
+|---|---|
+| `CONFIG_NEW_LEDS=y` | `drivers/Makefile:94` 是 `obj-$(CONFIG_NEW_LEDS) += leds/`,沒有它整個目錄不會被進入,而建置是綠的 |
+| `CONFIG_LEDS_CLASS=y` | `/sys/class/leds` 基礎設施 |
+| `CONFIG_LEDS_GPIO=y` | 上游驅動 |
+| **`CONFIG_LEDS_GPIO_PLATFORM=y`** | 🔴 **規劃裡沒有的那一行**。讀 `leds-gpio.c`:`gpio_led_probe`、它的 `platform_driver`、`gpio_led_init` 裡的 `platform_driver_register` **全部**在 `#ifdef CONFIG_LEDS_GPIO_PLATFORM` 裡 |
+| `CONFIG_LEDS_TRIGGERS=n` | 釘死讓 `(NEW)` 維持 0;**而 n 是有理由的**:trigger 是同一顆 LED 上的第二個計時器寫入者,而 bit 6 已經有一個(廠商的 `rtl_gpio_timer`),那會讓外來寫入偵測器的讀數在結構上無法歸屬 |
+
+其餘 27 個 `LEDS_*` 卡在第二個相依(`I2C`／`X86`／`SPI`／`ARCH_S3C2410`／`MIPS_COBALT`…),
+`LEDS_GPIO_OF` 卡在 `OF_DEVICE`。**所以「兩個」是一個有界的清單而不是抽樣。**
+
+🟢 **建置後 `(NEW)` 讀到 0**,列舉預測成立。
+
+🔴 **而 `.dts` 那一半根本不是待辦。** 開場交辦的 (d) 寫著「`D2` 的 `.dts` 節點與
+binding」;量:`dt/rtl8196e-totolink-n150rt.dts` 的 `leds` 節點(`gpio-leds`、
+`gpios = <&gpio 6 1>`、`default-state = "off"`)與 `dt/unmatched-allow.tsv` 裡
+`gpio-leds` 的帶理由列**上一段就都在了**。照著交辦做會產生一個重複的節點。
+
+---
+
+### 3. 建置與三道門
+
+`rlxfw-kbuild.sh r58 --variant quiet --marks --jobs 4`,`RECIPE_ID` **`083b1cb8`**
+(`r57` 是 `f67eed22`),vmlinux **4,055,777** 位元組(`r57` 4,049,730,**+6,047**),
+**605** 個 CC 物件(`r57` 601)。多的四個逐一指名:`arch/rlx/kernel/rlxfw-devices.o`、
+`drivers/leds/led-class.o`、`drivers/leds/led-core.o`、`drivers/leds/leds-gpio.o`。
+initramfs spec 的 sha256 與 `r57` **逐位相同**(`54dc0983…`),少一個變數。
+
+| 門 | 結果 |
+|---|---|
+| `rlxfw-marks verify` | rc 0;12 個 mark 各一次;**7** 個見證(`r57` 6);`MK7` `str:n150rt:green:led2` 我的 1 次、廠商 0 次 |
+| `kconfig-delta check` | 綠;23 derived ＋ 27 set;「模板與這次建置的 `.config` 之間每一個差異都在清單上」 |
+| `hazlint` | **111,540 個 load、0 violations**,母體控制成立 |
+
+---
+
+### 4. `RC1`,以及兩個沒有人安排的負控制
+
+`RC1` 是八條否證條件的第一條,而它是其餘七條的閘門:*遮罩的改動有沒有真的到達 artefact*。
+讀數是 `FW-39` 的直接後繼 —— 那一列說 `ALLOW_OUT_MASK` 是 0 時編譯器證明兩條寫入路徑
+不可達並移除了它們,`direction_output` 是 `0x70`。
+
+| 函式 | `r57`(遮罩 0) | `r58`(遮罩 1<<6) | |
+|---|---|---|---|
+| `direction_output` | **112 B (0x70)** | **552 B (0x228)** | 4.93× |
+| `.set` | 160 B | 300 B | 1.88× |
+| `direction_input` | 416 B | **416 B** | 🟢 負控制 |
+| `request` | 200 B | **200 B** | 🟢 負控制 |
+| `get` | 56 B | 176 B | 鎖＋偵測器 |
+| `read_proc` | 880 B | 1,296 B | 新欄位 |
+
+`lui …,0xb800` 在 `direction_output` 裡 **0 → 2**、`sw` **1 → 17**,而且它現在呼叫
+`rlxfw_puts_hex`、`rtl819x_gpio_state_check`、`rtl819x_gpio_state_note` —— `r57` 的
+版本一個呼叫都沒有。
+
+🟢 **兩個負控制不是我安排的。** `direction_input` 與 `request` 的邏輯沒有改(它們測的是
+`KNOWN_MASK`,而常數從 `0x20` 變 `0x60` 不改變指令形狀),而它們**一個位元組都沒動**。
+所以長大的是寫入路徑回來,不是整個檔被重新編得不一樣。
+
+⚠️ **尺寸取自 `System.map` 相鄰符號。** 第一次我用「切 `objdump` 清單到空白行」的方法,
+它對 `System.map` 說是 `0x70` 的函式報 **88** —— 儀器錯了整張表就沒有意義,所以換掉並
+在 `SPEC.md` 那一列寫下來。
+
+---
+
+### 5. 開機擷取的預測,寫在建置之前
+
+量 `bench/2026-09-09b/C2-boot.log`:**1,424** 位元組,其中 **45 個 `RLXFW-` 行佔 754**,
+其餘 670 是 loader 四行、廠商 NIC 的橫幅、以及結束視窗的兩行 userspace。
+
+mark 巨集讓算術是精確的:`rlxfw_mark(tag)` 是 `len(tag) + 8` 位元組,
+`rlxfw_markx(tag, v)` 是 `len(tag) + 17`。四個新 mark:`PD0` 11 ＋ `PD1` 20 ＋
+`G7` 19 ＋ `G8` 19 = **69**。
+
+🟢 **而總數是三向鑑別而不是一個數字**,因為 `G7`／`G8` 在 `.direction_output` 的允許
+路徑**裡面**而 `PD0`／`PD1` 不是:
+
+| 位元組 | 意思 |
+|---|---|
+| **1,493** | 裝置註冊 ＋ `leds-gpio` probe ＋ `.direction_output` 被允許 |
+| **1,455** | 裝置註冊了,但輸出呼叫沒發生(`gpio_request` 拿 `EBUSY`、遮罩或 CNR 擋下、或根本沒 probe) |
+| **1,424** | 兩個檔都沒進映像 |
+
+⚠️ **它不能說 `led_classdev_register` 成功**:`create_gpio_led` 先呼叫
+`gpio_direction_output` 才 `led_classdev_register`,所以 1,493 與 LED class 註冊失敗
+是相容的。說這件事的欄位是 `/sys/class/leds/n150rt:green:led2/` 存不存在與 `n_dirout_ok`。
+
+---
+
+### 6. 三個是我自己的錯,三個都是檢查抓到而不是我讀出來
+
+**① 背景建置第一次沒跑成,而任務通知說 `exit code 0`。**
+命令寫成 `wsl … -- bash /mnt/c/…/build.sh; echo "SCRIPT EXIT: $?"` 丟到背景。MSYS 把
+`/mnt/c/…` 翻成 `C:/Program Files/Git/mnt/c/…`(`CLAUDE.md` 逐字記過的陷阱),`bash`
+回 `No such file or directory`,工具印了 `SCRIPT EXIT: 127` —— **而完成通知說
+`exit code 0`**,因為外層 shell 的最後一個命令是那個 `echo`,而 `echo` 成功了。
+抓到它的是去 `stat` log 檔發現它不存在。**在背景命令尾巴加 `; echo "… $?"` 會把每一次
+失敗變成一個綠色通知**,而那是 `CLAUDE.md` 自己的 `EXIT CODE: 0` 事件,發生在操作者
+唯一看得到的那個數字上。已寫進 `CLAUDE.md`。
+
+**② `SPEC.md` 的補丁腳本被自己的錨點斷言拒絕兩次,而兩次都一個位元組都沒寫進去。**
+第一次:`docs/blind-write-ledger.md §4.9 |` 在 `SPEC.md` 裡出現**兩次**。第二次:我把
+錨點加長重打,而檔案裡的括號是**全形**、我打的是半形,所以出現 **0** 次。第三次改用
+**行索引**加一個「該行以 `` | `FW-54` `` 開頭」的斷言。🟢 兩次拒絕都是守衛在工作,而
+寫入是「先組整個字串、寫 `.tmp`、`os.replace`」,所以拒絕等於零損害。**教訓是:人重打
+的錨點就是會被重打錯的錨點。**
+
+**③ 我又踩了一次 `$?`。** `echo "rc written next line:"; echo "rc=$?"` 報的是前一個
+`echo` 的狀態。同一段裡我才剛把 ① 寫進 `CLAUDE.md`。
+
+**三個的共同教訓是同一條:去查效果(`grep -c 'FW-55' SPEC.md`),不要相信「沒有錯誤
+訊息」。** ② 那次我第一眼把腳本的 stderr 與 echo 交錯讀成「沒有輸出所以成功了」,
+是 `git diff --stat` 空的才抓到。
+
+---
+
+### 7. 更正的擁有者檔案
+
+| 檔案 | 更正 |
+|---|---|
+| `docs/KNOWN-ISSUES.md` | 「`ALLOW_OUT_MASK` 在 `main` 上與每一顆跑過的 artefact 上都還是 0」—— **前半過期、後半沒有**,而差別正是這一列存在的理由 |
+| `docs/FINDINGS.md` | `FW-39` 那一列的 ⚠️「一顆 artefact,換個遮罩就是另一顆映像」是預測,現在是讀數 |
+| `docs/bringup.md` §5 | 「開的阻擋」不再是決定,是一次 seating |
+| `notes/device-tree.md` | 「`R5-7` 與 `R5-8` 都沒有驅動」→ `R5-7` 有了,`R5-8` 沒有,而 `R5-8` 的原因是連結失敗 |
+| `CLAUDE.md` | 環境列 ⑤ 的補救方式是**假的**(見下);背景任務 exit code 那條新增 |
+| `SPEC.md` | `FW-39` 補後繼讀數;新增 `FW-55` |
+
+🔴 **`CLAUDE.md` 環境列 ⑤ 兩處都錯,而它推薦的補救方式正是失敗的那一個。**
+原文說「A native command piped into anything gets a UTF-8 BOM prepended … It is not
+`gh` — `gh … > file` and reading the file is clean」。量,六個案例三個產生者兩條路徑,
+讀前八個位元組:
+
+| 產生者 | `>` | `\|` |
+|---|---|---|
+| `gh --version`(原生 exe) | BOM | BOM |
+| `cmd /c echo`(另一個原生 exe) | BOM | BOM |
+| 一個純 PowerShell 字串 | BOM | BOM |
+
+所以既不是 `gh`、也不是「原生命令」:**`>` 與 `\|` 在這個 shell 裡都會加 BOM,與誰產生
+文字無關**,而 `gh … > f` 之後 `json.load(open(f))` 死得跟管線一模一樣 —— 量,這一列
+就是這樣被重新量到的。**規則只有一條而且沒有例外:每一個這種檔案或串流都用
+`utf-8-sig` 讀**,它也接受沒有 BOM 的輸入,所以永遠不會錯。⚠️ 原因找到一半:
+`$PSDefaultParameterValues['Out-File:Encoding']` 是 `utf8`,而 Windows PowerShell 5.1
+的 `utf8` 是**含** BOM 的,`>` 就是 `Out-File`。管線那一半**未定**:`$OutputEncoding`
+是 `UTF8Encoding` 而 `GetPreamble().Length` 是 **0**,簡單的解釋活不下來。
+
+---
+
+### 8. 這一段沒有做的事
+
+* **上機半。** 八條否證條件(`RC1`…`RC8`)只答了 `RC1`,而 `RC1` 是唯一一條不需要電的。
+* **`CENSUS-2`。** `ci-census` 的訊息說「cases went missing」,而 case 沒有不見,是從來
+  沒有被印。這個形狀花掉兩次 push 而兩次的訊息都沒指出原因。修法是一個分支加一個
+  fixture,這一段沒做 —— 收工前動仲裁者本身要連 `ci-expected.tsv` 的 `ci-census` 總數
+  一起改。記成 carried-forward。
+* **`R5-8` 桌面半。** 擁有者 2026-09-10 裁定收在這裡。
+* ⚠️ **`r58` 會被 `r59` 取代**,因為 `RECIPE_ID` 是 `config/` 的摘要而 `R5-8` 的兩個
+  檔都住在 `config/`。`r58` 不是浪費(`RC1` 與三道門都在它身上答完),但 **1,493 這個
+  預測是 `r58` 的**,`r59` 要重算。
+
+**零 flash 寫入命令、零 `FLR`、零電源循環、零 `--send`**,括號仍然
+1,024 / 4,194,304 ＝ **0.0244 %**。
