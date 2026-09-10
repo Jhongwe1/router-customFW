@@ -780,7 +780,7 @@ the control, not one of the ten.
 🟢 **"Before userspace" is proved by an ORDER, not by a field.** `RLXFW-TA8`,
 printed the instant `clockevents_register_device()` returned, precedes
 `RLXFW-B10`, which sits immediately before `init_post()`'s branch into
-`/sbin/init` — in the same capture, on all eleven, byte 887 against 925. 讀
+`/sbin/init` — in the same capture, on all eleven. ~~Byte 887 against 925.~~ 🔄 **量 2026-09-11 (`R5-11`): that pair reproduces under neither convention — raw (925, 965), CR-stripped (885, 923), identical on all eleven captures. The ORDERING holds under both; only the two offsets were wrong, and their *difference* of 38 is right, which is why eight files carried them. `SPEC.md` `CLK-27`.** 讀
 `init/main.c`: `do_basic_setup()` completes every initcall level first. **No
 address quoted, nothing asked of the tick core about itself, no shell needed.**
 
@@ -1407,6 +1407,67 @@ Tags mark where the outside world can check the work, not where a feature landed
 ---
 
 ## Unreleased
+
+### `R5` closed — six drivers in one image, seventeen boots, and the DoD row that was met as a ratio
+
+2026-09-11, the fifty-eighth segment, at the desk, **no power**. Thirteen steps
+of thirteen. `docs/GATE-RESULTS.md` gains its **eighth** entry.
+
+**Six drivers are in ONE image, and that is a reading over the corpus rather
+than a count of six seatings.** Image `692A2801` carries `rtl819x-timer`,
+`rtl819x-gpio`, `rtl819x-spi` + MTD, `rtl819x-wdt`, `rtl819x-keys` and
+upstream's unmodified `leds-gpio`. **Seventeen** boot captures, every one
+**1,637 bytes**, falling into exactly **two** sha256 values whose whole
+difference is one line. 量 over all **85** boot captures under `bench/` that
+carry an `RLXFW-` mark: the ladder 1,069 → 1,184 → 1,318 → 1,424 → **1,637**
+bytes is monotone, every increment is one driver's marks, and no capture ever
+loses a family it had. 🔴 **Seventeen boots of one image is not seventeen boots
+of six images**, and `D1`'s *ten boots each* was met per driver on five
+different images before this one existed.
+
+**Three of the six are load bearing and each dependence is a different
+sentence.** The tick: a `clock_event_device` at rating 300 armed from inside
+the kernel, the tick core exchanging the devices on eleven independent boots,
+and *before userspace* proved by an **ordering** — `RLXFW-TA8` precedes
+`RLXFW-B10` in the same capture on all eleven — rather than by any field.
+Zero lost ticks over 263.73 s and again over 654.76 s, three ways, residual 0.
+The watchdog is strictly stronger: from `late_initcall` **the board reboots
+unless code of mine keeps running**. 🔴 The evidence that this is engineering
+rather than assertion is a **refusal**: driver 4.0 refused its own handover
+twice with `-ETIME`, 574 of 585 interrupts across the vendor's NIC
+initialisation, 1.88 % against a 1 % tolerance — **the tolerance was not
+widened, the window was moved**.
+
+**The independence the whole diff rests on is measured.** § 1 of
+`docs/driver-diff.md` was committed **85 seconds** before the clone of the
+second public tree began. Positive control **175**, three negative controls
+**0**, floor **0**, and no threshold was ever introduced. 🔴 The controls found
+a defect in the instrument before any candidate was compared, and the fix went
+to the baseline rather than to the threshold, with its own refutation condition
+written first.
+
+🔴 **What `R5` did not establish** is longer than what it did, and it is in the
+entry: `D4` named `/proc/timer_list` — which **exists in this kernel** and was
+never read — and asked for a **frequency** where `wall`, `jiffies` and TC1
+descend from one divider, so what is 量 is the **ratio** `2000 : 1` and the
+absolute stays 推. That is the **third** gate whose DoD named an artefact
+instead of the property it wanted, at entries 4, 6 and 8. The *clocksource*
+half is untouched, `rating` read 0 in every dump of every seating. One of the
+six is upstream code. Two of the six bindings validate only against a kernel
+tree, and which of `PABCD`'s four ports bit 5 belongs to has never been
+measured. **Zero flash-write commands and zero `FLR` across the whole gate**;
+the bracket stands at 1,024 of 4,194,304 = 0.0244 %.
+
+🔴🔴 **The operating clause fires on a new thing for the first time**, at eight
+entries: `R4` → `R5` share *the loop has never run `S2` → `S7` in one
+invocation*. 量, **71 of 71** real `--mode bench` invocations across six
+seatings carried `--skip`, and 71 of 71 uploaded a pre-built image. Every one
+of those skips was correct where it was made; no seating could see the pattern.
+
+`R5` ran **32 segments** against the plan's 31 — **1.03×** — with the
+stop-loss at 34, and the gate board is calibrated for the first time: nine
+closed gates run at **0.33×–1.38×**, so what came out is a band and not the
+multiplier the board's own note asked for.
 
 ### `R5-5` on the silicon — every field prediction hit, and the digest they were leading up to refuted itself
 
