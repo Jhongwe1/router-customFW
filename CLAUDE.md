@@ -304,7 +304,10 @@ released source.
 > last character**, five lengths, negative control, located to ash by sending
 > the same failing write through `cat`; so a mark the board printed can be
 > absent from a `grep` (`FW-41`). ⚠️ **What is still narrower**: nothing
-> depends on this chip — no consumer is bound, `ALLOW_OUT_MASK` is 0, `.to_irq`
+> depends on this chip — no consumer is bound, ~~`ALLOW_OUT_MASK` is 0~~
+> 🔄 **`ALLOW_OUT_MASK` is `1u << 6` on `main` since 2026-09-10 (`R5-7`), and
+> the owner of that state is `docs/KNOWN-ISSUES.md`, not this file — what is
+> still true is that no artefact carrying it has ever run**, `.to_irq`
 > is NULL — and **which of `PABCD`'s four ports bit 5 belongs to is still
 > unmeasured**, which is exactly the claim a seating full of `PABCD` readings
 > looks like it closed. **Zero flash-write commands, zero `FLR`, bracket
