@@ -209,3 +209,38 @@ nod	/dev/mtd2ro	c:90:5	0400	rlxfw	R5-5: read-only by the KERNEL (odd minor) over
 # mere OPENING changes the hardware.
 # ----------------------------------------------------------------------------
 nod	/dev/watchdog	c:10:130	0600	rlxfw	R5-6: the miscdevice rtl819x-wdt registers. 讀 include/linux/miscdevice.h:15 WATCHDOG_MINOR = 130, and MISC_MAJOR = 10 in the same file. 0600 because the only thing that opens it is a test run as root at the shell, and a mode that let any process arm the hardware watchdog on a one-device project is a wider door than the experiment needs. ⚠ OPENING THIS NODE ARMS THE SILICON: rtl819x_wdt_open() enters WDT_USER, and closing it WITHOUT writing 'V' first leaves the userspace deadline running, after which the board resets. That is the /dev/watchdog contract and not a defect, but it means `cat /dev/watchdog` is not a free read the way /dev/mtd0ro is, and no bench cell may treat it as one. The /proc/rtl819x-wdt verbs exist so that every experiment that does not specifically need the character device can avoid this node entirely.
+
+# ----------------------------------------------------------------------------
+# R5-8, 2026-09-10.  Two entries, and the second is the only reason the keys
+# driver ever polls.
+#
+# 讀 drivers/input/input-polldev.c: input-polldev queues its poll work from
+# input_open_polled_device(), which is input_dev->open, which the input core
+# calls when a HANDLER opens the device.  量 drivers/input/evdev.c:190 --
+# evdev's input_open_device() is inside evdev_open(), gated on
+# `!evdev->open++`, so it runs on the FIRST USERSPACE OPEN of the node and
+# not at connect.  Without this node nothing in this image can perform that
+# open, rtl819x-keys registers, /proc/rtl819x-keys appears, and every counter
+# in it reads 0 for ever with CONFIG_PRINTK=n saying nothing about why.
+#
+# 🟢 THAT IS A CONTROL RATHER THAN A HAZARD, once the node exists.  n_open
+# and n_poll then read
+#
+#     0 / 0            nothing has opened it
+#     1 / rising       it is open and the workqueue is running
+#     1 / flat         it was opened and closed
+#
+# which is the same three-state shape as R5-3a's line 25 being absent from
+# /proc/interrupts before request_irq and after free_irq.  A bench cell opens
+# it with `cat /dev/input/event0 > /dev/null &` and closes it by killing that.
+#
+# ⚠️ WHAT COMES OUT OF THE NODE IS BINARY AND NOTHING IN THIS IMAGE DECODES
+# IT.  FW-46: this busybox has no dd, no md5sum and no --list, and nothing
+# here has been shown to hold od or hexdump.  A `cat` of this node onto the
+# console would put raw struct input_event bytes on the wire (16 bytes each
+# on this 32-bit kernel, and ESC among them), which is why the cell above
+# redirects to /dev/null: the OPEN is what is needed, not the data.  What the
+# events were is read from /proc/rtl819x-keys' counters and its jiffies ring.
+# ----------------------------------------------------------------------------
+dir	/dev/input	-	0755	rlxfw	R5-8: MINE, and the check would have found it -- 量, this unit's own squashfs /dev holds only a `log` symlink, misc, pts and voip, so there is no /dev/input to carry forward and an entry tagged `unit` would be refused by mkinitramfs's own counterpart check. Same shape as /tmp above.
+nod	/dev/input/event0	c:13:64	0600	rlxfw	R5-8: evdev's node for the first registered input device, and the only way anything in this image can OPEN rtl819x-keys so that input-polldev starts polling. THE NUMBERS HAVE TWO SOURCES EACH, which is this project's rule for a constant entering code: major 13 is `#define INPUT_MAJOR 13` at include/linux/major.h:29 AND `13 char Input core` at Documentation/devices.txt:479; minor 64 is `#define EVDEV_MINOR_BASE 64` at drivers/input/evdev.c:11 AND drivers/input/Kconfig's own help for INPUT_EVDEV, *"char device 13:64+ - /dev/input/eventX"*. ⚠️ event0 AND NOT eventN: the minor is assigned by evdev in registration order, so this node is the first input device to register and nothing else in this image registers one -- REFUTED BY a /proc/bus/input/devices that lists more than one N: line, in which case the number this node names is a guess. 0600 for /dev/watchdog's reason: the only thing that opens it is a test run as root at the shell. 🟢 Unlike /dev/watchdog, OPENING THIS IS FREE -- it starts a poll loop and touches no register the vendor's own rtl_gpio_timer is not already reading once a second (量 FW-40).
