@@ -15,6 +15,8 @@ dump or a document · **推** inferred, pending a measurement.
 
 | | | |
 |---|---|---|
+| 🔴 量 | **A capture can stop eleven to twenty-one seconds before its own payload speaks, and what it leaves behind passes every check in this repository.** `--idle N` is *N seconds since the last byte on the wire*, so a cell whose payload begins with a silence longer than `N` ends its own capture inside that silence — leaving ~54 bytes of the command line's echo and the clean `stop_reason` `--idle N with no bytes`. **`check-predictions` scores a cell on existence and mtime, not content**, so a seating with five such cells reports `55 of 55` with its whole press ladder and both long holds empty. Five cells of the frozen 2026-09-10 card were exactly that, caught before power by three sources: the code, **7 of 7 in the capture corpus** (473 `--idle` captures, seven carry a `sleep`, every one has `idle > sleep`), and a checker whose five positive controls all fired. 🟢 **Now a rule with a measured false-positive rate**: `cardcheck` `A22`–`A24`/`B11` sweep **60 committed cards, 235 capture cells, 17 carrying a `sleep`** — and the only five violations are those five, excused by name because a frozen card cannot be repaired. | `tools/cardcheck.py` `IDLE_UNDER_SLEEP_EXEMPT` · `bench/2026-09-10/CORRECTIONS-block17.md` § 0 |
+| 🔴 量 | **A prediction that no `cardnum` row can re-derive is a number nothing checks until the board contradicts it.** The 2026-09-10 card predicted `cnr_as_spec` / `dir_as_spec` = `1 / 1` and declared that either reading `0` fires `RC3` and stops the block; both read `0`, and 量 over the corpus — **29 committed files, 35 occurrences, every one `0`** — says they have read `0` on every seating this project has ever run, because the driver compares the live value against `REG-26`/`REG-27`, which are **loader-state** constants. **`cardcheck numbers` passed 28 of 28 and could not have caught it**: the `1 / 1` is prose in a table cell. The board prints `cnr FFFFFF8B` beside `boot_cnr FFFFFFDF` in the same capture, so nothing needed re-measuring. | `bench/2026-09-10/CORRECTIONS-block17.md` § 3.1 |
 | 🔴 量 | **The gate that exists to check a bench card cannot see the card, and it is now measured in both directions rather than reasoned about.** Seating 18 recorded the hole: `spec-check` sweeps **tracked** `.md`, and a card is untracked until the commit that freezes it. 量 2026-09-10, one file with one deliberate `C8` defect, one variable: **untracked → 0 findings naming it, `rc 0`; the same file `git add`ed → 1 finding, `rc 1`.** 🟢 **And the fix caught something on its first real use** — the fifty-fifth segment staged its card before gate 2 and `spec-check` reported a `C8` in it, an unescaped `\|` inside `` `dat \| 0x40` `` that shifts every column after it and makes every check reading a field by index read the wrong cell and pass. Under the old order that defect leaves the desk. | `RUNSHEET.md` § *Four rules about the card's lifecycle* rule 1 |
 | 🔴 讀 | **The same command is two different experiments on two images, and `test_and_set_bit`'s return value is what decides which.** 2.6.30's `gpio_ensure_requested()` reads `WARN(test_and_set_bit(FLAG_REQUESTED, ...) == 0, ...)`, and `test_and_set_bit` returns the **old** bit — so the compatibility path that auto-requests a line runs **only** where nobody holds it. On an image where a real consumer already holds line 5 the test is `WARN(1 == 0)`, nothing is auto-requested, and `gpio_direction_output()` dispatches straight to the chip. 🟢 That turns seating 15's `EBUSY` from an artefact of the cell above it into gpiolib arbitrating between my chip and a real consumer, **and it is what decided that `R5-7` and `R5-8` share one image**. Refuted by `n_req_ok` moving across `tryout 5`. | `SPEC.md` `FW-61` · `bench/2026-09-10/PREDICTIONS-B18-block17.md` § 2.1 |
 | 🔴 讀 | **A prediction written for one sampler is wrong by ten when a second driver becomes the sampler — and the correction shrinks the instrument's own blind window from seconds to 50 ms.** `notes/gpio-driver.md` § 6.2 predicted a foreign-write count of *about one per second* under a held button, written when the sampler was a human typing `cat`. With `rtl819x-keys` in the same image every 50 ms poll reads the pin through gpiolib, which is `chip->get`, which is one of `state_check()`'s four call sites: the rate is `1000 / poll_ms` per second. **On an image carrying the GPIO driver alone none of it exists**, which is the measured reason the two drivers share a seating rather than a preference for fewer boots. | `SPEC.md` `FW-60` · `notes/gpio-driver.md` § 6.2 |
@@ -149,6 +151,37 @@ dump or a document · **推** inferred, pending a measurement.
 | 🔴 量 | **`ping -c` does nothing on this image: five requests, four packets every time.** `-c 4`, `-c 20`, `-c 2`, `-c 7`, `-c20` and an explicit `busybox ping -c 3`, with the command line echoed intact in every capture | **It invalidates nothing** — four replies is four replies — but every `ping -c 4` in this repository got the default rather than what it asked for, and a card cannot ask this image for another count · `SPEC.md` `NET-26`, `notes/rootfs-census.md` |
 
 ## It changed what an instrument may claim
+
+🆕 **2026-09-10 (seating 20) — one `cat` of a `/proc` file is TWO `read_proc`
+calls on this kernel, and two of this project's counter identities were written
+as though it were one.** 量 with five off-card cells that repeat the *same*
+command: `cat /proc/rtl819x-gpio` moves `n_state_chk` by **+2, +2** with `n_get`
+unmoved, and prefixing one `cat /proc/rtl819x-keys` moves `n_get` by **+2** —
+both twos, because 2.6.30's `proc_file_read` calls the handler again after
+`*eof`. 🟢 **The independent second reading is a cell nobody designed for it**:
+`C11-P0`, the one cell of the seating with no keys read in front of it, reads
+`n_get 1 / n_state_chk 1` where all eleven pair reads read `3 / 3`. So the
+card's predicted `1 / 1` is **right about the driver and placed under the wrong
+cell** — a narrower defect than *the counters were wrong* — and both of § 4's
+identities carry a missing factor of two. ⚠️ One outlier (`+3` where every later
+pair is `+2`) is left standing rather than smoothed away.
+`SPEC.md` `FW-64` · `bench/2026-09-10/CORRECTIONS-block17.md` § 3.2
+
+🆕 **2026-09-10 (seating 20) — a counter that samples without timestamping
+cannot resolve a phase, and the operator's eye is what did.**
+`n_state_foreign / n_state_chk` = 0.61 is equally consistent with *low 61 % of
+the time, evenly spread* and with *steadily low for the first 3.9 s, then
+alternating*; the driver counts samples, not their order, and every long hold
+of the seating measured 0.573–0.609 rather than the 0.5 the card derived from
+parity. The operator's sentence — *"lit first, then after a while it starts
+blinking, and after release it stays lit"* — chose between them, and only then
+could `T + (hold − T)/2 = low` be solved on three holds for
+**T = 3.95 / 3.05 / 3.90 s**, with a fourth hold of 4.30 s never reaching the
+alternation at all. 🟢 **Ten operator readings across the seating, ten
+agreements with the register**, and exactly one of them carried information no
+counter had. ⚠️ `notes/gpio-driver.md`'s instrument section now says the counter
+cannot resolve the phase, which it did not before.
+`SPEC.md` `FW-63` · `notes/gpio-driver.md` § 13.5
 
 🆕 **2026-09-07 — a `jal` census cannot see an indirect call, so a
 zero from one is not "dead code".** Asked which path the kernel's MTD read
@@ -479,6 +512,35 @@ rather than by a checker.
 | 讀 | **A key-derivation choice had never been costed in memory.** scrypt at meaningful parameters wants 16 MiB of the 26 MiB this kernel gets, from one unauthenticated request | The rate limiter moves in front of the KDF, and the parameters are set by an anti-DoS budget · plan D8 |
 
 ## It answered a question that had been open
+
+🆕 **2026-09-10 (seating 20) — the vendor's reset-button timer acts ONCE PER
+BOOT, and three confounds had to be broken by experiment before that sentence
+could be written.** `REG-37` had recorded, since seating 15, that bit 6
+alternates while the button is held; `SPEC.md` explained the exceptions by
+saying the blink is *gated by `default_flag`*. 量, nine button episodes over
+four boots with two independent observables: the ratio
+`n_state_foreign / n_state_chk` reads **0.4752 / 0.4752 / 0.5307** on the first
+long hold of a boot and **0.0000** on every later one, and the operator's eye
+agrees each time. 🟢 **The three confounds, each broken by one experiment rather
+than by an argument**: *poll rate* — boot 14's two holds are both at `interval
+50`, one blinks and one does not; *`default_flag`* — boot 15's second hold makes
+a **6.85 s** contact with `/proc/load_default` reading `0` **before and after**,
+so the flag never moved and the blink was still gone; *any press consumes it* —
+boot 17's first episode is a **0.45 s** press (LED unmoved, flag `0`) and the
+17.90 s hold after it on the same boot blinks and takes the flag to `1`.
+🟢 **`/proc/load_default` is a second, independent observable and agrees five
+times out of five** — the LED branch and the factory-default branch are the same
+timer, so they live and die together. 🟢 **And the new rule explains seating
+19's OLD observations**, which is why it stands rather than merely replacing
+them: rebuilding `bench/2026-09-09b`'s cell order shows `C1-L1` was boot 1's
+*first* hold (blinked), `X4-relax` a *later* hold on the same boot (did not),
+and `X5-blink` boot 5's first (blinked). The old explanation cannot accommodate
+boot 15. **The confound is now named: the only way to set that flag is the kind
+of hold that consumes the timer.** ⚠️ **推, and the consequence is large**: on
+this board the reset button's `>= 5 s` factory-default branch can be reached
+**once per power-up**. The behaviour is 量; the mechanism is unread and is
+`FW-62` 殘留, owned by `R5-9`.
+`SPEC.md` `FW-62` · `bench/2026-09-10/CORRECTIONS-block17.md` § 4
 
 🆕 **2026-09-08 (seating 17) — what the watchdog counts, and the answer arrived
 by measuring the thing the row said measuring could not settle.** `CLK-08b`

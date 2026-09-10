@@ -897,5 +897,93 @@ than answered.
    driver's 32-slot jiffies ring and `b0_n_bounce` are the instrument for it,
    and `jiffies` at `HZ=100` bounds the resolution at 10 ms, which is also
    the floor of the poll interval.
-8. **Nothing of `rtl819x-keys` has run on the silicon.** 213 of the 1,637
-   predicted boot-capture bytes have never been measured.
+8. ~~**Nothing of `rtl819x-keys` has run on the silicon.** 213 of the 1,637
+   predicted boot-capture bytes have never been measured.~~
+   🔄 **Expired 2026-09-10 at 19:40** — § 13.
+
+---
+
+## 13. 🆕 Seating 20, 2026-09-10 — both halves on the silicon
+
+One power cycle, seventeen boots, 169 captures, 55 carded cells and 29 declared
+off-card ones. The full record is
+`bench/2026-09-10/CORRECTIONS-block17.md`; this section keeps only what this
+file owns.
+
+### 13.1 `R5-7`'s DoD, and the instrument is an eye
+
+**An unmodified upstream `leds-gpio`, bound to a `gpio_chip` of mine, produced
+light from a sysfs write.** `ls /sys/class/leds` lists `n150rt:green:led2` and
+nothing else (`RC7`); `echo 1 > …/brightness` takes `dat` from `0000007C` to
+`0000003C` with `n_set_ok` 0 → 1 and `n_writes` 2 → 3; and the operator reports
+**LED #2 of eight lit, with #1 and #4 unchanged** — the negative control is
+theirs, not the register's.
+
+### 13.2 § 7 ②'s two-sided test, which `ALLOW_OUT_MASK = 0` made impossible
+
+| cell | operator | `out_locked` | `out_effective` | `n_set_ok` | `n_set_no` | `n_writes` |
+|---|---|---|---|---|---|---|
+| `C11-L1` | lights | `00000000` | `00000040` | 1 | 0 | **3** |
+| `C11-L3`/`L4` | **stays lit**, `brightness` reads `0` | `00000040` | `00000000` | 1 | **1** | **3** |
+| `C11-L5`/`L6` | goes dark | `00000000` | `00000040` | **2** | 1 | **4** |
+
+🟢 **`n_writes` does not move at `C11-L4`.** The refusal is ordered before the
+write, so `out_locked` narrows the mask rather than logging a rejection after
+the fact — which is the half a guard that has only ever been seen refusing
+cannot show. **A guard that has only ever been seen refusing is a wall**; this
+one was taken down and put back up, with the light as the readout both times.
+
+### 13.3 `R5-8`'s DoD, and § 6.1's instrument
+
+The three-state control reads **(0, 0) → (1, 60) → (2, 120) → (2, 120)**: sixty
+polls per three-second open at `poll_ms 50`, twice, and **flat** for a
+three-second sleep that carries no open. `j_last − j_first` on the first open is
+**295 = 59 × 5**. The polling is caused by the open.
+
+The resolution ladder ran at 10 / 50 / 200 ms with `b0_need` reading **10 / 2 /
+1**, and `j_last − j_first` is exactly `(n_poll − 1) × poll_jiffies` on all
+three plus the off-card control — **no remainder at any of the three periods**.
+
+🟢🟢 **The ring earned its place at the 200 ms rung.** Six edges — all three
+physical presses — with `b0_n_press` **2**: the press the debouncer declined is
+the **0.20 s** one, exactly one poll period at `b0_need = 1`. A counter alone
+would have reported *"one press was lost"*; the ring reports *"one press was
+seen and refused"*, and those are different facts.
+
+### 13.4 § 6.2's prediction, and what actually samples the detector
+
+§ 6.2 predicted *about one foreign sample per second* and `FW-60` corrected it
+to ~10/s for a 20 Hz sampler. **Both are superseded by `FW-62`**: the detector's
+foreign count is not a rate at all, because the thing it samples — the vendor's
+bit-6 activity — happens **once per boot**. On a boot whose first long hold has
+already happened, `n_state_foreign` is **0** however long the button is held and
+however fast the poll runs.
+
+### 13.5 § 6.1's instrument had a limit this file did not state
+
+`n_state_foreign` counts samples whose watched bits differ; it does not
+timestamp them. So a ratio of 0.61 is equally consistent with *"low 61 % of the
+time, evenly"* and with *"low for the first 3.9 s, then alternating"*.
+**`FW-63`'s `T` exists because the operator said which one it was.** The
+instrument section should say that the counter cannot resolve the phase, and
+now does.
+
+### 13.6 What § 11's list still holds, and what leaves it
+
+**Leaves it**: item 8 (nothing of `rtl819x-keys` has run) — expired above; and
+the `-ENXIO` half of item 6, which `RLXFW-K4 = FFFFFFFA` and `/proc`'s
+`irq_probe`/`irq_live`/`enxio` all reading `-6` now measure from two call sites.
+
+**Still holds, unchanged**: which port of `PABCD` bit 5 and bit 6 belong to;
+that a press reached userspace (`b0_n_report` is an upper bound and nothing in
+this image decodes `/dev/input/event0`); and that the vendor's reset path is out
+of the way — it is not, there is no arbitration, only the observation that both
+are readers.
+
+**Narrower now, not gone** — item 7, the bounce: `b0_n_bounce` read **0** in
+every carded rung, so the correct sentence is *bounce is below 10 ms or falls
+between polls*, **not** *this button does not bounce*. The seating's only
+non-zero is `X21-long`'s **1**, on a hold whose ring carries sixteen edges with
+20–35 ms breaks — contact chatter during a hold rather than bounce at a press
+edge, which is a different measurement and is not what `debounce_interval`
+guards.
