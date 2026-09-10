@@ -665,7 +665,199 @@ hour before power, and both fired on the board. 量.**
 
 ---
 
-## The operating clause, re-run at seven entries
+## 2026-09-11 — `R5` (six drivers, and three of them are load bearing)
+
+### One line
+
+Six drivers are in **one** image, that image booted **seventeen** times with
+every one of them printing its own observable on every boot, and three are now
+load bearing — the tick is mine before userspace exists, the board reboots
+unless my watchdog keeps being fed, and an unmodified upstream `leds-gpio` gets
+its line from my `gpio_chip` — while the DoD row that asked for a **frequency**
+against `CLK-02` was met as a **ratio**, and the row that asked for
+`/proc/timer_list` was met by reading something else.
+
+### Three claims that stand
+
+**① Six drivers are in ONE image, and that is a reading over the whole corpus
+rather than a count of six seatings. 量.**
+
+* Image `692A2801` carries `rtl819x-timer`, `rtl819x-gpio`, `rtl819x-spi` + MTD,
+  `rtl819x-wdt`, `rtl819x-keys` and upstream `leds-gpio`. **Seventeen** boot
+  captures, every one **1,637 bytes**, falling into exactly **two** sha256
+  values — 14 × `e5938242…` and 3 × `5717da6a…` — whose whole difference is
+  **one line**: `RLXFW-G3`, bit 6, the LED the vendor's own `rtl_gpio_timer`
+  blinks (`FW-40`, `FW-62`).
+* Presence is a mark family per driver in that same capture: `TA0`…`TA9`,
+  `G0`…`G8`, `K0`…`K8`, `S0`…`S8`, `W0`…`W5`. `leds-gpio` prints nothing,
+  because it is upstream and unmodified; its evidence is `n_writes` moving
+  **2 → 4** with every one of the four accounted for.
+* 🟢 **The ladder is monotone, and no capture ever loses a family it had.**
+  量 over all **85** boot captures under `bench/` that carry an `RLXFW-` mark:
+  **1,069 B** (`EA6EE537`, 11 boots, timer alone) → **1,184** (`5DA34246`, 10,
+  plus gpio) → **1,318** (`FCE0AF22`, 10, plus spi) → **1,424** (`B417A3E7`,
+  10, plus wdt) → **1,424** (`F67EED22`, 19) → **1,637** (`692A2801`, 17, plus
+  keys). Seventeen of the 85 carry all five families and they are the last
+  seventeen.
+* 🔴 **This claim was on no card and no seating measured it.** Every seating
+  measured its own driver; the composition is a sweep of the committed captures
+  written at `R5-11`. It is offered as the strongest form of `D1` **and** as
+  the reason `D1` as written is weaker than it reads: *ten boots each* was met
+  per driver on **five different images**, and five images each carrying one
+  new driver is not six drivers coexisting.
+
+**② Three of the six are load bearing, and each dependence is a different
+sentence. 量.**
+
+* **The tick.** A `clock_event_device` at rating 300, armed from inside the
+  kernel (`arch_initcall` arms, `late_initcall` registers), the tick core
+  exchanging the devices on **eleven** independent boots — `ce_live=1`,
+  `ce_mode=2`, `ce_mode_calls=2`, `ce_handler` `80036D50` → `80036FC4`, with a
+  rating-99 device registered as the negative control and never called.
+* 🟢 **Before userspace is proved by an ORDERING, not by a field.**
+  `RLXFW-TA8` — printed the instant `clockevents_register_device()` returned —
+  precedes `RLXFW-B10`, which sits immediately before `init_post()` branches
+  into `/sbin/init`. 量 on all eleven captures of seating 14: byte **925**
+  against **965** (raw, as captured), **885** against **923** with the
+  carriage returns removed. Nothing was asked of the tick core about itself
+  and no shell was required. *(🔴 The pair `887 / 925` appears in eight
+  committed files and reproduces under neither convention; see § the
+  corrections list in `LOG.md` 2026-09-11. The **ordering** holds under both.)*
+* 🟢 **And it is caused, not asserted.** `cereload` changes TC1's reload and
+  the kernel's clock follows: six rows, ratios `1.0000 / 2.0000 / 1.0000 /
+  4.0000 / 1.0000 / 10.0000`, each on its prediction to four decimals. At
+  reload 20000 the shell answered a `cat` after a `sleep 5` that took **50
+  real seconds** and nothing in the kernel could notice. Zero lost ticks over
+  **263.73 s** and again over **654.76 s**, `Δjiffies` = `Δirq_count` =
+  `Δce_cycles ÷ 2000` three ways, residual **0** in both.
+* 🟢 **The watchdog is a strictly stronger dependence than the tick.**
+  `BOOTGUARD` arms the hardware at `late_initcall` and feeds it from a kernel
+  timer, so from that instant **the board reboots unless code of mine keeps
+  running** — which the tick never was, because a tick can be handed back.
+  Nine bites in one seating, every one confirmed by the loader's own
+  `Reboot Result from Watchdog Timeout!`, and the user path end to end:
+  `sleep 400 > /dev/watchdog` reset the board at **143.563 s** against 143.886
+  predicted, **−0.22 %**.
+* 🔴 **The evidence that this is engineering and not assertion is a REFUSAL.**
+  Driver 4.0 refused its own handover on both boots it was given —
+  `RLXFW-TA7=FFFFFFC2`, `-ETIME` — with `ce_check_dj=585 / dc=574`
+  byte-identical on a cold boot and a warm one. Its pre-check window spanned
+  the vendor's NIC initialisation, over which TC1 delivers 574 of 585
+  interrupts: **1.88 %** against a **1 %** tolerance, where the same boot at a
+  shell loses **1 in 14,385**. **The tolerance was not widened; the window was
+  moved.** `SPEC.md` `IRQ-13`.
+
+**③ The independence the whole diff rests on is measured, with a positive
+control and a floor of zero, and the instrument's own defect was caught before
+it looked at a candidate. 量 ＋ 讀.**
+
+* **Pre-registration is a clock reading, not a promise.** `docs/driver-diff.md`
+  § 1 — what the check may look at, its instrument, its controls and its
+  verdict rule — was committed at `161862e`, **15:26:24Z**; the clone of the
+  second public tree began at **15:27:49Z**. Eighty-five seconds, in `git log`,
+  where "I had not seen it" is otherwise unverifiable.
+* **Positive control 175, three negative controls 0.** The positive is one file
+  present in two SDK generations — **71,494 bytes against 66,608**, so the
+  instrument had to see derivation *through divergence*; the negatives are two
+  board directories in one kernel, a cross-tree cross-era pair, and **two
+  router SoCs that are not Realtek at all**. Baseline: 178,038 identifiers from
+  5,081 files, subtracted from every intersection.
+* 🔴 **The controls found a defect in the instrument first, which is the entire
+  reason they run first.** Both negatives initially read **2**, both times
+  `get_system_type` and `prom_putchar` — mainline platform API that every MIPS
+  board *defines* because a generic header *declares* it, and the extractor
+  skips declarations on purpose. **The fix went to the baseline, not to the
+  threshold**, and its refutation condition was written before it was applied:
+  *if the positive falls below 100 the fix has destroyed the sensitivity and
+  must be reverted*. 量 after: negatives **0 / 0 / 0**, positive **175 —
+  unchanged to the identifier** — across a baseline that grew from 71,469 to
+  178,038.
+* ⚠️ **No threshold was ever introduced.** The floor is **0**, measured on three
+  negative controls rather than chosen, and every verdict is *zero or
+  non-zero*.
+* **What it bought.** Eleven candidate domains across two public ports:
+  ten INDEPENDENT, one DERIVED — `ggbruno`'s `prom.c`, four UART macros
+  carrying the vendor's own `BSP_` prefix. 🟢 The trees' own copyright blocks
+  agree with the instrument and nobody arranged that: the three files with a
+  named author score 0, and the two files with **no copyright line at all**
+  are `prom.c` and `setup.c`. The DERIVED row lands outside all six drivers, so
+  no row of § 3 is voided.
+
+### What `R5` did not establish
+
+* 🔴 **`D4` was not met as written, and this is the THIRD gate whose DoD named
+  an artefact instead of the property it wanted.** `/proc/timer_list` exists in
+  this kernel — 讀, `kernel/time/Makefile` carries `obj-y += … timer_list.o`
+  and `timer_list.c` calls `proc_create("timer_list", …)` — and it was never
+  read. `R5-2` used the driver's own `/proc`, which carries both counters
+  inside one `spin_lock_irqsave`, and recorded why in place. **Nor is it a
+  frequency**: `wall`, `jiffies` and TC1 all descend from one divider, so what
+  is 量 is the **ratio** `TC1 : tick = 2000 : 1` and the absolute 200.005 kHz
+  stays 推. The ± 50 ppm bar is met by three orders of magnitude against a bar
+  that measures the wrong thing.
+* 🔴 **The clocksource half is untouched.** `rating` read **0** in every dump of
+  every seating and the system's time *source* is still `jiffies`. Only the
+  *tick* is this driver's, and `docs/KNOWN-ISSUES.md` has narrowed that row
+  six times rather than let it read as more.
+* 🔴 **One of the six is not mine.** `leds-gpio` is upstream and unmodified —
+  deliberately, because an unmodified upstream consumer binding to my
+  `gpio_chip` is evidence a driver of my own cannot produce. The count is six
+  only if an upstream driver counts, and five if it does not.
+* 🔴 **`D2` is met by a directory nothing has probed and nothing can.**
+  Linux 2.6.30 has no device tree at all, so `dt/` is a compile-test and says
+  so in its own first paragraph. **Two of the six bindings are not validated
+  by default** — `gpio-leds` and `gpio-keys` are kernel-subsystem schemas that
+  `dtschema` does not ship, declared by name in `dt/unmatched-allow.tsv` and
+  reached only with `--extra-schema`. And `GPIO-1` is open: **which of
+  `PABCD`'s four ports bit 5 belongs to has never been measured**, which is
+  exactly the claim a gate full of `PABCD` readings looks like it closed.
+* 🔴 **Compiling against 6.18 is not upstream acceptance.** `R5-12` produced
+  four `.o` files at rc 0 with zero warnings; three of the four would be
+  rejected on sight — a hand-rolled `miscdevice` where a modern driver
+  registers a `watchdog_device`, a gpio chip with no `of_node` and no
+  `platform_driver`, and a `/proc` file on every one of them.
+* 🔴 **The loop has still never run `S2` → `S7` in one invocation, and `R5` had
+  decided that it would.** `R5-0` ② closed `SEAM-1` as a decision — *the first
+  bench iteration runs without `--skip S2,S3`* — and the desk half executed
+  (`--mode desk`, `S4..S7 SKIPPED`, and `S-3` rebuilt an image that had run on
+  the die byte for byte). 量 over `bench/`: **71 of 71** real `--mode bench`
+  invocations across six seatings carried `--skip`, and 71 of 71 uploaded a
+  pre-built `--image` with `--recipe-override`. Each skip was locally correct;
+  the pattern is what no seating could see.
+* 🔴 **§ 3.7's five, unchanged**: this is not a claim that my drivers are
+  better; neither third-party image has been run on this board and neither
+  will be; two of the six drivers have **no partner at all** and two more have
+  exactly one, so four cells of the diff are ABSENT; the L1 agreement is worth
+  a cross-check on my transcription and no more, because three implementations
+  describing one part agree *because it is one part*; and `spi` was not
+  compared field by field.
+* ⚠️ **`.to_irq` is still `NULL`** — no interrupt path passes through the gpio
+  chip — and `IRQ-13`'s loss mechanism is **worked around, not isolated**: the
+  driver moves its window rather than explaining why the vendor's NIC
+  initialisation costs 11 of 585 interrupts.
+* ⚠️ **Nothing the system *needs* depends on the gpio chip.** The LED is an
+  indicator no code reads back and the button's events have no consumer in this
+  image (`FW-46`). A consumer being bound and the system depending on it are
+  two different sentences and only the first one moved.
+* ⚠️ **The flash sentence did not move.** Zero flash-write commands and zero
+  `FLR` across the whole gate; the bracket stands at **1,024 of 4,194,304 =
+  0.0244 %**, and `FLS-26`'s ledger — 4,177,920 B proven identical, 8,192 B
+  proven different, 8,192 B undetermined — is where `R5-5`'s driver left it.
+* ⚠️ **One board, one unit, one operator, and six seatings.** Nothing here is a
+  claim about a second N150RT.
+* 🔴 **The estimate, and the gate that was supposed to calibrate it.**
+  `R5` ran **32 segments** (the 27th to the 58th) against the plan's 小計 of
+  **31** — **1.03×** — and against the gate board's `Est.` of 24, **1.33×**.
+  The stop-loss was 34, so it closed with **two segments** of margin. 🔴 The
+  prior the step list carried and declined to apply — `0.571×`, pooled from
+  `S0` and `R0`, n = 2 — would have predicted **17.7** segments: it
+  **under-predicts by 1.81×**, and the step list's own sentence *"it is written
+  down so a surprise is visible"* is what made that readable. The calibration
+  itself is under the gate board.
+
+---
+
+## The operating clause, re-run at eight entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -673,7 +865,8 @@ thing make that thing the next gate.
 *(Run for the first time at five entries on 2026-09-01. Re-run 2026-09-02 with
 `P4b-gate` inserted in close order and `R4` appended, which changes the pair set
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
-pairs, and `P4a`'s neighbour on the right changed.)*
+pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
+appended, which adds exactly one pair.)*
 
 | pair | shared? |
 |---|---|
@@ -681,45 +874,107 @@ pairs, and `P4a`'s neighbour on the right changed.)*
 | `R2a/b/d` → `R1h` | no |
 | `R1h` → `R3` | **yes — decision ② / `CPU-45`.** `R1h` carries it as 未定 after the first of two allowed seatings; `R3` carries it as still `R1-gate`'s |
 | `R3` → `P4a` | no |
-| `P4a` → `P4b-gate` 🆕 | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
-| `P4b-gate` → `R4` 🆕 | no |
+| `P4a` → `P4b-gate` | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
+| `P4b-gate` → `R4` | no |
+| `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it |
 
-🔴 **Two new entries and no new firing.** The clause still names exactly one
-thing — `CPU-45` — and it names it from the same pair it named it from at five
-entries. Written down because the opposite would have been the suspicious
-result: a rule that fires more often simply because the ledger got longer is
-measuring length, not repetition.
+🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
+ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
+from one pair, and that was written down because *a rule that fires more often
+simply because the ledger got longer is measuring length, not repetition*. The
+eighth entry adds one pair and that pair fires, so the clause now names **two**
+things and they came from two different pairs.
 
-🔴 **And at seven entries the clause's own reach became visible, which it was
-not at five.** There *is* a residual that repeats — **a DoD that named an
-artefact instead of the property it wanted** — and the clause cannot see it:
+**What the new firing names, in the words of the two entries that share it:**
+
+* `R4`: *"No single invocation has run `S2` → `S7`. The bench half ran with
+  `--skip S2,S3`; the desk half ran with the bench stages skipped. **73.88 s is
+  a sum of two runs, not a measured total**"* — and *"the image the loop builds
+  has never been uploaded by the loop … that is the one stage still untested in
+  one command, and it needs the board."*
+* `R5`: `R5-0` ② made it this gate's question and answered it as a decision —
+  *the first bench iteration runs without `--skip S2,S3`* — and 量 over
+  `bench/`, **71 of 71** real `--mode bench` invocations across six seatings
+  carried `--skip`, and 71 of 71 uploaded a pre-built `--image` with
+  `--recipe-override`.
+
+🟢 **This is the shape the clause was written for, and it is the first time it
+has been visible.** Every one of those 71 skips was correct where it was made:
+the image was already staged, rebuilding at the bench spends ~36 s of the
+scarcest resource, and `CORRECTIONS-block8.md` `D1` measured the reason an hour
+before power on the first of them. **No seating could see the pattern, because
+each seating's decision was locally right.** Two entries side by side is the
+smallest instrument that can.
+
+⚠️ **What it does NOT name.** The clause names a *thing*, not a gate — the
+precedent is `CPU-45`, which is a question the owner has kept scheduling rather
+than a gate. Where this one goes is the owner's, and it is cheap: `SEAM-1`'s own
+reading (`notes/dev-loop.md` § 10.6) is that a no-skip run **needs no additional
+power cycle** — it rides the opening cold boot of a seating and costs ~39 s of
+board idle.
+
+⚠️ **And one honest deduction against the firing**: `R4`'s residual is about
+`R4`'s deliverable. It is counted as `R5`'s because `R5`'s own step list took it
+on in writing at `R5-0` ②, not because a gate inherits its predecessor's
+residuals by default. If the clause is ever read as doing the latter it will
+fire on every pair and stop meaning anything.
+
+### The pattern the clause still cannot see, now at three instances
+
+🔴 **At seven entries this section recorded a residual that repeats and that the
+rule cannot reach — a DoD that named an artefact instead of the property it
+wanted. The eighth entry is the third instance, and they are at entries 4, 6 and
+8: every other one.**
 
 * `R3`'s `D3` named the string `MemTotal:`, which this kernel never prints.
 * `P4b-gate`'s `D2` named the path `study/weekly-results.md`, which is
   gitignored by a ruling the same gate made.
+* `R5`'s `D4` named `/proc/timer_list`, which exists in this kernel and cannot
+  carry the property the row wanted — two counters read atomically.
 
-Those are the same defect and they are **two apart**, with `P4a` between them.
-The rule says *consecutive*, so it does not fire, and this entry does not
-pretend it did. ⚠️ Whether the rule should read *within any three consecutive*
-is a change to the rule, and changing a rule because it failed to produce the
-answer you had already reached is exactly how such a rule stops being an
-instrument. Recorded, not applied.
+The rule says *consecutive*, and no two of those are. ⚠️ **The rule is still not
+changed**, for the reason written here at seven entries and unchanged by a third
+instance: changing a rule because it failed to produce the answer you had
+already reached is how such a rule stops being an instrument. A third data point
+makes the pattern more certain; it does not make the change less circular.
+
+🔴 **What was done instead is a census, with its refutation condition written
+before it ran.** *If the census finds a fourth instance nobody here already
+knows about, an enforcer has a real target and a real positive control and gets
+written in the segment that has one; if it returns only the known instances, the
+base rate rests on three points and an instrument fitted to three points should
+not exist.*
+
+量 2026-09-11 over the whole population — every gate-level DoD row this project
+has written in `D`-row form: `R3` 5, `P4b-gate` 4, `R4` 4, `R5` 4 = **17 rows**
+across four gates, plus the gate-board sentence for the four gates that predate
+the form. **Three instances, all three already known. No fourth.** So the
+enforcer is **not written**, and this paragraph is what that decision rests on
+rather than a preference.
+
+🟢 **The census did turn up something else, of a weaker class, and it is
+recorded because nothing here connects the two halves.** `R3`'s `D5` names the
+observable `ping -c 4`, and `SPEC.md` `NET-26` measures that **this image's
+`ping` ignores `-c` and always sends four packets**. The row was met, and it was
+met because the default happened to equal the request. That is not the same
+defect — the artefact *could* deliver the property — but it is an **inert token
+in an observable**, and a search of every committed `.md` finds no file that
+puts `NET-26` and `D5` in the same sentence.
+
+### Carried unchanged from the seven-entry run
 
 ⚠️ **Both caveats from the first run still travel with `CPU-45`'s firing**, and
 one of them is now weaker in a way worth stating: four of the first five entries
 were written in one sitting with hindsight, and `P4b-gate`'s — written a day
 late, but before any gate closed after it — is the sixth. `R4`'s was written on
-the day `R4` closed, from readings taken that morning. ⚠️ **That is not a claim
-to be the first such entry** — `P4a`'s was also written on the day `P4a`
-closed. The difference is only that `P4a`'s was written in a sitting that was
-simultaneously backfilling four others, which is a statement about the
-*selection* of residuals and not about their dates.
+the day `R4` closed, from readings taken that morning; `R5`'s was written on the
+day `R5` closed, and its § ① is a sweep taken that day over captures committed
+between 2026-09-06 and 2026-09-10.
 
-🟢 **One thing this run does settle**: `P4a`'s residual *`ID0` has never been
-read off the board* is closed by `R4`'s seating, so it cannot repeat forward. A
-residual that a later gate closes is removed from the clause's input by being
-closed, not by being edited out — `P4a`'s entry keeps its wording and `R4`'s
-says which line it closes.
+🟢 **One thing the seven-entry run settled and this one does not undo**: `P4a`'s
+residual *`ID0` has never been read off the board* is closed by `R4`'s seating,
+so it cannot repeat forward. A residual that a later gate closes is removed from
+the clause's input by being closed, not by being edited out.
 
 ---
 
