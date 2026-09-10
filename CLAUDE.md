@@ -827,6 +827,15 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `NameError` one line later leaves the file at zero bytes. It emptied
   `PROGRESS.md` on 2026-08-27; `git checkout --` got it back because it was
   committed. Build the whole string first, write to `path.tmp`, `os.replace`.
+  🔴 **2026-09-10: that rule protects ONE file, and a patch script that edits two
+  needs a second half — every anchor checked BEFORE the first write.** 量, this
+  segment's own owner-file edit: a script patched `SPEC.md` and
+  `notes/gpio-driver.md`, the first anchor matched and was written, the second
+  missed by **one space** (`it samples.  A write` against the file's `it
+  samples. A write`) and raised. `SPEC.md` was already on disk. **The result is a
+  half-applied two-file edit — the multi-file version of the `open(path, 'w')`
+  trap above**, and it is not caught by writing each file safely, because each
+  file WAS written safely. Check every anchor first, then write.
 - 🆕 **Running a vendor binary is not a read-only act, and `--version` is not a
   safe way to ask one what it is.** Measured 2026-08-28: a census that ran every
   executable in the three rsdk `bin/` directories with `--version` deleted
@@ -981,6 +990,19 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   the same class with the sign flipped. `-First N` is fine for reading *output*;
   **never read `$LASTEXITCODE` through it**. Run the command bare (or redirect to
   a file) when the exit code is the thing being measured.
+  🆕 ⑥ **`Get-Date -UFormat %s` is off by the local UTC offset in Windows
+  PowerShell 5.1 — it computes the epoch from LOCAL time as though it were UTC.**
+  量 2026-09-10, one host, two routes, two controls: `-UFormat %s` gives
+  `1789060095.69966` while `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()` gives
+  `1789031295` — **28,800 apart, exactly UTC+8** — and
+  `(Get-Date).ToUniversalTime()` prints `09:08:15Z` beside a local
+  `17:08:15+08:00`. Git Bash and WSL both agree with the reference route to the
+  **byte** (`1789031272` on both), so the error is PowerShell's alone. 🔴 It is
+  the dangerous shape this file keeps recording: **a wrong number wearing a
+  measurement's clothes**, and an eight-hour error in a project whose
+  directory names are dated assertions. **Use
+  `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`, or take the epoch from Git
+  Bash or WSL.**
 - 🆕 **The `Monitor` tool's command runs in the Bash tool's shell — Git Bash —
   so a `/mnt/c/…` path there is not a missing file, it is a DIFFERENT
   filesystem's name for nothing.** 量 2026-09-07: a monitor watching a

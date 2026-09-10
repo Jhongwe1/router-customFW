@@ -403,11 +403,37 @@ A counted zero is a claim. The control is already on the bench and is free:
 | population | act | `n_state_foreign` |
 |---|---|---|
 | the ten `D1` boots | button untouched | must be **0** |
-| one extra boot | button **held** for ~10 s while `/proc` is sampled | must be **> 0**, about one per second |
+| one extra boot | button **held** for ~10 s while `/proc` is sampled | must be **> 0** — 🔄 **and NOT *about one per second*; see below** |
 
 🔴 **The detector's stated limit**: it samples. A write undone before the next
 sample is invisible. That is why the positive control holds the button for
 seconds against a 1 Hz writer rather than looking for a single event.
+
+🔄 **2026-09-10, fifty-fifth segment: `about one per second` is wrong by ten on
+the image this control will actually run on, and the reason is that this section
+was written before `R5-8` existed.**  It assumed the sampler was a human typing
+`cat`.  On `r59` the sampler is `rtl819x-keys`.
+
+讀, and it is arithmetic rather than an estimate: `rtl819x_gpio_state_check()`
+has four call sites — `.get`, `.direction_output`, `.set` and `read_proc` — and
+in the two op cases the refusal paths return **before** the comparison, so only
+the `_ok` counters contribute.  `rtl819x_keys_poll()` does one
+`gpio_get_value()` per button per poll, through gpiolib, which is `chip->get`.
+
+**So the detector is sampled at `1000 / poll_ms` times per second**, and the
+compiled-in `poll_ms` is 50 — **20 Hz**.  Over a 15 s hold at `interval 50`,
+`n_state_chk` grows by about **300** and `n_state_foreign` by about **150**.
+
+🟢 **And the limit in the paragraph above shrinks with it**: the window in which
+a write can be undone unseen is no longer *seconds, between one human's `cat`
+and the next*; it is **50 ms**, and `interval 10` makes it 10 ms.
+
+⚠️ **On an image carrying `rtl819x-gpio` alone none of this holds** — nothing
+calls `.get` between `/proc` reads.  That is the measured reason `R5-7` and
+`R5-8` share a seating and an image, rather than a preference for fewer boots.
+`SPEC.md` `FW-60` carries the row; `bench/2026-09-10/PREDICTIONS-B18-block17.md`
+§ 7 carries the experiment, including the `interval 10` control that says the
+ratio belongs to the vendor's writer and not to my sampler.
 
 ---
 
