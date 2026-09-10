@@ -127,12 +127,7 @@ because mainline is zero-write through `R9`.
 32.58 s**, against 3 `CC` for the same edit with `RECIPE_ID` held (`SPEC.md`
 `TC-45`); and whether confining `-DRLXFW_SRC_ID` moves the product — it does
 not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
-*Arriving*: 🔴 **whether the public RTL8196E ports derive from the vendor's
-`arch/rlx`.** `docs/blind-write-ledger.md` § 6 — it decides whether reading the
-vendor's MTD map cost `R5-5`'s independence, it cannot be settled before
-cloning, and cloning is the act the ledger dates. `R5-9` carries it as an
-ordering constraint: the derivation check runs **before** any register map is
-read.
+*Arriving*: ✅ ~~🔴 **whether the public RTL8196E ports derive from the vendor's `arch/rlx`.**~~ 🟢 **ANSWERED 2026-09-11 (`R5-9`): they do not, with one file's exception.** The derivation check ran with its ordering constraint intact — pre-registration in `git log` eighty-five seconds before the clone — and read `shibajee` INDEPENDENT on every domain it implements and `ggbruno` DERIVED on `prom.c` alone, four `BSP_` UART macros in the early console path. ⚠️ **It does NOT clear `R5-5`.** That step's independence was already spent on the vendor side by `docs/blind-write-ledger.md` § 4.5, which is a different question from this one and is not touched. `docs/driver-diff.md` § 2.
 
 * ✅ ~~**Whether an interrupt of mine can be delivered at all.**~~
   🟢 **ANSWERED 2026-09-04, seating 12: yes, 119,818 times.** Every one

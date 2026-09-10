@@ -129,6 +129,8 @@ for bit** — `BSP_TC0EN (1<<31)`, `BSP_TC0MODE_TIMER (1<<30)`,
 `BSP_TC1IE (1<<30)`, `BSP_TC0IP (1<<29)`, `BSP_TC1IP (1<<28)`. Until today
 both tables stood on the leaked draft datasheet alone.
 
+🔄 **2026-09-11 (`R5-9`): two more sources, and neither of them is a datasheet or a Realtek header.** `shibajee/linux-rtl8196e`'s `drivers/clocksource/timer-rtl8196e.c` and `ggbruno/openwrt`'s `arch/mips/realtek/rtl819x-timer.c` both give `TC0EN`/`TC0MODE`/`TC1EN`/`TC1MODE` as **31 / 30 / 29 / 28** and `TC0IE`/`TC1IE`/`TC0IP`/`TC1IP` as **31 / 30 / 29 / 28**, together with all six register offsets. **Fourteen fields, three implementations, no disagreement.** 🟢 It matters for this file specifically because `IRQ-08`/`IRQ-09` and § 3.6's whole argument rest on bit 30 being TC1's enable and bit 28 its pending flag, and until tonight that had **one** documentary source and **one** vendor header derived from it. ⚠️ Per `docs/blind-write-ledger.md` § 5 this is an **L1 cross-check and nothing more**: three implementations describing one part agree because it is one part. What it buys is a check on the transcription, which is what was wanted here. `docs/driver-diff.md` § 3.1.
+
 🔴 **`IRR0` is a register `SPEC.md` does not have at all.** The step's own
 title says *"`IRR1`–`IRR3`"*; there are **four**.
 

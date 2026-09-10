@@ -938,9 +938,9 @@ diff survives.
 reading the vendor is reading their ancestor, and the independence is gone
 without a single third-party file having been opened.
 
-🔴 **This cannot be settled now** — settling it requires cloning, which is the
-act this ledger dates. And it cannot be settled *after* reading them either,
-because by then the reading has happened.
+~~🔴 **This cannot be settled now** — settling it requires cloning, which is the act this ledger dates. And it cannot be settled *after* reading them either, because by then the reading has happened.~~
+
+🟢 **SETTLED 2026-09-11 at `R5-9`, and the ordering constraint below is what made it settleable.** The pre-registration entered `git log` as `161862e` at **15:26:24Z** and the clone script's first line reads **15:27:49Z** — eighty-five seconds. `tools/derivcheck.py` ran with a positive control at **175** and three negative controls at **0**. Verdicts: `shibajee` **INDEPENDENT** on every domain it implements, including its SoC register header, whose intersection with the vendor's is zero; `ggbruno` INDEPENDENT on timer, gpio, irq, spi and setup, and **DERIVED on `prom.c` alone** — four `BSP_`-prefixed UART macros in the early console path, which is not one of `R5`'s six drivers. **No `driver-diff` row is void and `D3` survives.** `docs/driver-diff.md` § 1 and § 2; the paths read are § 4.11 above.
 
 **So it becomes an ordering constraint on `R5-9`, recorded here while it is
 still free to impose:**
@@ -962,7 +962,7 @@ written down in advance and by naming what it may look at.
 
 1. 🔴 **It is a lower bound (§ 0 ①).** Nothing here can rule out a file read in
    2026-08 and never mentioned.
-2. 🔴 **§ 6 is open**, and it is the largest single threat to `D3`.
+2. ✅ ~~**§ 6 is open**, and it is the largest single threat to `D3`.~~ 🟢 **Closed 2026-09-11 at `R5-9`** — see § 6. ⚠️ What replaces it is smaller and is stated where it belongs: a verdict of INDEPENDENT is a claim about **what is in the tree**, not a clean-room claim, and § 4.11's reading of both trees **voids any future independence claim at `R10a`/`R10b`**.
 3. ⚠️ **`ledgerscan`'s regex sees paths, not prose.** *"the vendor's clockevent
    driver"* names no path. `scan --topics` is a second net over subsystem
    keywords, reported separately and **never merged**, because a keyword hit is

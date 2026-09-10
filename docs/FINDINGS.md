@@ -538,8 +538,7 @@ and `X5-blink` boot 5's first (blinked). The old explanation cannot accommodate
 boot 15. **The confound is now named: the only way to set that flag is the kind
 of hold that consumes the timer.** ⚠️ **推, and the consequence is large**: on
 this board the reset button's `>= 5 s` factory-default branch can be reached
-**once per power-up**. The behaviour is 量; the mechanism is unread and is
-`FW-62` 殘留, owned by `R5-9`.
+**once per power-up**. The behaviour is 量; ~~the mechanism is unread and is `FW-62` 殘留, owned by `R5-9`~~ 🟢 **and the mechanism is 讀 as of 2026-09-11 (`R5-9`): `rtl_gpio_timer` has three exits and `mod_timer` is on only one of them, while the two that are a release after a hold clear NEITHER `probe_counter` NOR `probe_state` — so the state machine is latched dead rather than merely unscheduled.** `notes/gpio-driver.md` § 14.
 `SPEC.md` `FW-62` · `bench/2026-09-10/CORRECTIONS-block17.md` § 4
 
 🆕 **2026-09-08 (seating 17) — what the watchdog counts, and the answer arrived

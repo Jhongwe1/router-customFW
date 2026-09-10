@@ -23210,12 +23210,34 @@ u32  disable(0)                       →  0x40000000     CONTROL
 * 🟢 **`POS-1` 關了,選項 ③,擁有者把決定交給工程判斷。** 否證條件先寫:*若 `LOG.md` 並不真的持有那四列的內容,刪掉就是丟資訊*。量:`LOG.md` **89** 個帶日期的 `## ` 條目、一段一個,四列描述的第 42–45 段全在裡面,1,540,554 位元組對 `PROGRESS.md` 的 784,918。**沒有觸發。** 🔴 **而過程中量到 session 歷史其實有三個擁有者**,前兩段的 `POS-1` 沒看到:`## Session ladder` 也持有同樣的列標籤,但那是**凍結的存檔**(和 `## Corrections` 同形),不是活的重複 —— 四列本來就該輪進那個 ladder,而它們停了。**收縮活的那一份,存檔不動。**
 * 🟢 **`ledgerscan` 的隔離清單加了「解除」,而解除有反向控制。** 它的註解本來就寫著 *"must stay uncloned **until R5-9**"*。四個狀態四個案例:present+無解除 = RED(`P12c`)、present+解除 = ok 而且**印出紀錄**(`P12e`/`P12e2`)、**ABSENT+解除 = RED**(`P12f` —— 對不存在的樹記解除是陳舊的白名單,而會默默變長的白名單不是守衛)、解除紀錄不成形則擋不住(`P12g`)。🔴 **`P12c` 必須搬到合成表格**:真表上兩棵已解除,舊 fixture 會為了**反向控制**變紅而不是為了它自己指名的違規,**而為了錯的理由通過的控制不是控制**。80 → 84。
 * 🔴 **`ledgerscan check` 紅,10 條路徑** —— `driver-diff.md` 引用了沒有 ledger 列的第三方檔。ledger 得到 § 4.11(14 條路徑),而它是這個檔裡**唯一一節不是污染紀錄**的:每一支驅動都在兩棵樹落地之前寫完、建好、**在矽片上跑過**,`git log` 與 `bench/2026-09-10/` 是證據。⚠️ **它改變的是 `R10a`／`R10b`** —— 那兩個 gate 計畫做現代核心移植,而今晚之後這個 repo 讀過兩份。
-* 🔴 **其中一條是我自己工具裡的 fixture 字串**(`drivers/gpio/x.c`,`derivcheck.py` 的自測案例)—— **掃描器分不出 fixture 與引用**,和第五十段那個從編譯訊息引出來的暫存檔名同一類。改成工具自己的路徑。
+* 🔴 **其中一條是我自己工具裡的 fixture 字串** —— `derivcheck.py` 的一個自測案例會印出一個長得像核心驅動路徑的字串，**而引用掃描器分不出 fixture 與真的引用**，和第五十段那個從編譯訊息引出來的暫存檔名同一類。改成工具自己的路徑。 🔴 **而這一行的第一版把那個假路徑逐字寫了出來，於是 `ledgerscan check` 又紅了一次** —— **描述一個引用缺陷本身就是一次引用**。這跟 `docs/blind-write-ledger.md` § 0 記過的形狀一模一樣：那裡寫下兩條「只存在於歷史中」的路徑，就把它們放進了 `HEAD`，而重新導出那個數字需要 checkout 一個更早的 commit。
 * 🔴 **`spec-check` 的 `C8` 抓到我的 `R5-9` 列多了一欄**(6 對表頭的 5),因為替換前綴時多加了一個 `|`。
 * 🔴 **`ledgerscan` 的 `P13` 抓到我把兩棵樹的 `fetch` 改成 `done` 之後,隔離清單與 `fetch: later` 集合不再相等。** 控制是對的,規則跟著擴成**聯集**:`later ∪ 已解除`。
 * `SOURCES.json`:兩棵樹釘了 sha、記了分支與 clone 時刻,`ggbruno` 的 `needed_by` 從 `R10b` 改成 `R5-9 (driver-diff), R10b` —— 🔴 **那是兩個擁有者檔案打架**:`PROGRESS.md` 的 `R5-9` 列一直寫著 *against **both** public trees*。
 * `docs/KNOWN-ISSUES.md`:`.to_irq` 那一項拿到路線,而**那一列不動** —— 變的是「沒有人證明這顆晶片做得到」不再是理由之一。
 * `CLAUDE.md`:PowerShell 陷阱 **⑦**。
+
+### 五之二、收工稽核:八處,而全部是 `git grep` 全 repo 抓到的,不是重讀自己抓到的
+
+**方法是完整列舉「這一段讓哪些句子過期」,對整個 repo 搜尋,而不是回頭看我今晚寫了什麼。**
+
+🔴 **五處過期的句子**,全部就地劃掉並附上量到的取代:
+
+* `PROGRESS.md` 的 `R5` 前提列寫著 **「`ggbruno/openwrt` is NOT cloned」** —— 而那一列的兩個佐證事實**在被否證之前就已經是錯的**:`SOURCES.json` 寫 `needed_by: R10b` 而下面的 `R5-9` 步驟列一直寫著 *against **both** public trees*(兩個擁有者檔案不同意),以及取預設分支根本找不到 RTL8196E。
+* `docs/blind-write-ledger.md` § 6 的 **「This cannot be settled now」** —— 今天被 § 6 自己加的排序約束解掉了。
+* 同檔 § 7 的 **「§ 6 is open,而它是 `D3` 最大的單一威脅」**。
+* `docs/FINDINGS.md` 的 **「機制未讀,`FW-62` 殘留,owned by `R5-9`」**。
+* `docs/KNOWN-ISSUES.md` 的 *Arriving* 項 **「第三方移植是否衍生自廠商的 `arch/rlx`」** —— ⚠️ 而更正明講**它不解除 `R5-5`**:那一步的獨立性早就在廠商那一側花掉了(§ 4.5),是另一個問題。
+
+🔴 **三個擁有者檔案該改而我原本沒想到,由完整列舉抓到:**
+
+* **`docs/interrupt-map.md`** 說 `TCIR` 的位元指派「在今天以前只站在洩漏的草稿資料手冊上」。現在有兩個獨立的第三方實作同意 —— 而 `IRQ-08`／`IRQ-09` 整段論證都靠 bit 30 是 TC1 的致能。
+* **`notes/timer-driver.md`** 的除數列 —— `CLK-06` 多了第三個來源,而且那個來源同時給出**除數在高十六位元**與**基頻 200 MHz**。
+* 🔴 **`PROGRESS.md` 的 `README-1` 引了一個從來沒有被重新導出過的數字。** 用它自己寫下的母體定義重新導出:**43 個裡 27 個在 README、16 個不在**,而它寫的是 **36 / 27 / 9**。**「27」沒動,母體從 36 長到 43** —— 七支新工具進來而一支都沒進 README,**其中只有一支是今晚加的**。**一列引了數字而母體會動,那個數字就是一個會過期的宣稱。**
+
+🔴 **而稽核自己也踩了兩個坑,兩個都是這一段稍早踩過同一個的第二次:** 把說明段落插進 Markdown 表格中間(`spec-check` 的 `C8c` 第二次抓到我),以及**寫下那個 fixture 假路徑來描述它,於是 `ledgerscan check` 又紅一次** —— **描述一個引用缺陷本身就是一次引用**,和 `docs/blind-write-ledger.md` § 0 記過的自我指涉一模一樣。
+
+🟢 **收工的八個閘門全部 `rc=0`**:`spec-check`、`ledgerscan check`／`quarantine`／`--self-test`、`xcheck sweep`、`derivcheck --self-test`、`ci-census --self-test`、`test-file-modes`。
 
 ### 六、環境:PowerShell 陷阱 ⑦,量出來的
 

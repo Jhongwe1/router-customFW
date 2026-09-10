@@ -653,6 +653,8 @@ the loader prompt:
 | `TC0DATA` | `0x0022E0A0` = 142,858 ≪ 4 | 🔴 **`0x00007D00` = 2,000 ≪ 4** |
 | `TCCNR` `TCIR` `TC1DATA` | `C0000000` `80000000` `00000000` | identical |
 
+🟢 **2026-09-11 (`R5-9`): a third source for `CLK-06`, and it is not a datasheet.** `ggbruno/openwrt`'s `arch/mips/realtek/rtl819x-timer.c` writes `div_fac << 16` into the same offset with `div_fac = 200000000 / timer_rate`, so it says two things this repository had from one place each: **the divisor occupies the high sixteen bits** — which both readings in the table above already show, `0x000E` = 14 and `0x03E8` = 1000 — and **the base clock is 200 MHz**, against `CLK-02`'s measured 200.0049 MHz ± 7 ppm. `CLK-06` was 讀 from the draft datasheet's Table 26 and this repository holds one copy of that datasheet; it now has a second, independent 讀. ⚠️ `shibajee` supplies neither: its driver never touches `CDBR` and takes its rate from the device tree, which is itself the L2 difference `docs/driver-diff.md` § 3.4.3 records.
+
 ```
 loader :  200.0049 MHz / 14   = 14,286,057 Hz ;  / 142,858 = 100.0 Hz
 Linux  :  200.0049 MHz / 1000 =    200,005 Hz ;  /   2,000 = 100.0 Hz
