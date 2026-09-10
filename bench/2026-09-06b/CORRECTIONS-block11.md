@@ -138,7 +138,7 @@ Written before power, checked afterwards against the captures:
 | §5.2 | `RLXFW-TA6=00000000` (4.0's meaning: the wait) | `TA6=00000000` on `K1` and `K2` |
 | §5.2 | `TA5 − TA0` = **540…600** jiffies | `FFFF8D2E − FFFF8AE5` = **585** |
 | §5.4 | `TA2` in **1…5** | **1**, every boot |
-| §5.1 | **`TA8` occurs before `B10`** | true on all ten; byte 887 against 925 on `M1` |
+| §5.1 | **`TA8` occurs before `B10`** | true on all ten; ~~byte 887 against 925 on `M1`~~ 🔄 **量 2026-09-11 (`R5-11`): that pair reproduces under neither convention — raw (925, 965), CR-stripped (885, 923), identical on all eleven captures. The ORDERING holds under both; only the two offsets were wrong, and their *difference* of 38 is right, which is why eight files carried them. `SPEC.md` `CLK-27`.** |
 | §5.6 | the vendor's NIC bring-up sits **between `TA4` and `TA5`** | exactly so, on every boot |
 | §5.5 | `ce_probe_registered=1` with `ce_probe_mode_calls=0` | on all ten, at boot |
 | §2.1 | 推 a watchdog reset clears `TCCNR`'s `TC1En` | `tccnr_at_init=C0000000` and `TA1=00000000` on the warm boots — two witnesses |
