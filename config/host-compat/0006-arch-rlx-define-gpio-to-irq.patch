@@ -1,0 +1,242 @@
+Define `gpio_to_irq()` and `irq_to_gpio()` on `arch/rlx`, which declares both
+and defines neither.
+
+WHY THIS EXISTS.  `config/host-compat/0005`'s own closing section names this
+defect and hands it on -- "That is `R5-4`'s risk to carry, not this patch's to
+fix."  This is `R5-8` discharging it, and one sentence in that hand-off is
+refuted below rather than quoted.
+
+THE DEFECT, 量 2026-09-10 over the staged tree of the baseline drop
+(`src-vendor/rtl819x-toolchain @ 5c9be5d9`).
+
+  `arch/rlx/include/asm/mach-generic/gpio.h:16-17` declares
+
+      int gpio_to_irq(unsigned gpio);
+      int irq_to_gpio(unsigned irq);
+
+  OUTSIDE the `#ifdef CONFIG_GPIOLIB` guard, so both are declared in every
+  configuration.  Line 16 is the ONLY occurrence of `gpio_to_irq` anywhere
+  under `arch/rlx/` -- one grep, one line, no definition.
+
+  It is not an `arch/rlx` mistake.  量: `arch/rlx/include/asm/mach-generic/
+  gpio.h` and `arch/mips/include/asm/mach-generic/gpio.h` are BYTE-IDENTICAL
+  in this drop, md5 `8c6bc68ef836ae3f7b36f01b94d37792` both.  The header was
+  copied whole and the hole came with it.  `mach-generic` is the fallback for
+  a board that supplies its own; 量, no `.c` file under `arch/` in this drop
+  defines `gpio_to_irq` in any form, and neither does the vendor's `boards/`
+  tree -- so no board here supplies one.
+
+  `include/asm-generic/gpio.h` does not fill it either.  Under `CONFIG_GPIOLIB`
+  it declares `__gpio_to_irq` and stops; under `!CONFIG_GPIOLIB` its `#else`
+  branch has no `gpio_to_irq` at all.  The arch header is the layer that is
+  supposed to connect the two, and rlx's connects three of the four:
+  `gpio_get_value`, `gpio_set_value` and `gpio_cansleep` are `#define`d to
+  their `__`-prefixed gpiolib bodies on lines 5-7 and `gpio_to_irq` is not.
+
+  `include/linux/gpio.h:98` DOES define a `gpio_to_irq`, and it is unreachable
+  here: it sits in the `#else` of `#ifdef CONFIG_GENERIC_GPIO`, and gpiolib
+  `select`s `GENERIC_GPIO`, so on any image that has a `gpio_chip` the `#if`
+  branch is taken and `<asm/gpio.h>` is what is read.  🔴 A grep for
+  "definitions of gpio_to_irq in this tree" returns FIVE and the honest count
+  of definitions reachable from `arch/rlx` with gpiolib on is ZERO.  The first
+  draft of `R5-8`'s plan said "the whole tree has no definition"; that is the
+  weaker true statement and this file states the stronger one instead.
+
+🔴 WHAT 0005 GOT WRONG, AND IT IS THE HALF THAT DECIDES URGENCY.  0005 says
+"Nothing in the built set is known to call them".  量: `drivers/gpio/
+gpiolib.c:1155` calls `gpio_to_irq()` -- not `__gpio_to_irq()` -- inside
+`gpiolib_dbg_show()`, and gpiolib.c IS in the built set on every image since
+`r54`.  The call sits inside `#ifdef CONFIG_DEBUG_FS`, which opens at :1133
+and closes at :1263, and this project's images carry
+`# CONFIG_DEBUG_FS is not set`, so the preprocessor removes it and the link
+succeeds.  `drivers/gpio/rtl819x-gpio.c`'s own file header (NOT ESTABLISHED 3)
+recorded that on 2026-09-06 and named this fix.  So the sentence in 0005 is
+true only of the CONFIGURATION and reads as a statement about the TREE, which
+is the distinction this file exists to keep.
+
+  The consequence, stated as a fact rather than a worry: **on this tree,
+  before this patch, `CONFIG_DEBUG_FS=y` and `CONFIG_GPIOLIB=y` together are a
+  link failure**, and nothing but a build says so.
+
+THE SECOND CALLER IS THE ONE `R5-8` CAME FOR.  `drivers/input/keyboard/
+gpio_keys.c` calls `gpio_to_irq()` at :62, :134, :175, :199, :222 and :240 --
+six sites, and :62 is a `BUG_ON` inside the ISR.  Every one is unconditional
+within the file.  So `CONFIG_KEYBOARD_GPIO=y` on this tree is a LINK failure
+and not a probe failure, which is why `R5-8` writes `rtl819x-keys` at all.
+
+WHERE THE VALUE COMES FROM, WHICH IS THE WHOLE REASON FOR THE FORM CHOSEN.
+讀 `drivers/gpio/gpiolib.c:1097-1103`, verbatim in this drop:
+
+    int __gpio_to_irq(unsigned gpio)
+    {
+        struct gpio_chip    *chip;
+
+        chip = gpio_to_chip(gpio);
+        return chip->to_irq ? chip->to_irq(chip, gpio - chip->base) : -ENXIO;
+    }
+
+`drivers/gpio/rtl819x-gpio.c:658` is `.to_irq = NULL`.  So aliasing
+`gpio_to_irq` to `__gpio_to_irq` makes `gpio_to_irq(5)` return `-ENXIO`
+BECAUSE THIS CHIP HAS NO `to_irq` HOOK -- a value produced by the data
+structure, not a constant somebody typed.  The day an `rtl819x-gpio` with a
+real `.to_irq` exists, `gpio_to_irq` starts returning a real irq number with
+no second patch and no edit here.
+
+WHY NOT x86's SHAPE.  讀 `arch/x86/include/asm/gpio.h:44-47`, inside its
+`CONFIG_GPIOLIB` branch:
+
+    /*
+     * Not implemented, yet.
+     */
+    static inline int gpio_to_irq(unsigned int gpio)
+    {
+        return -ENOSYS;
+    }
+
+That is one of the two upstream precedents and it was rejected, not
+overlooked.  A constant is a number this project chose, and this project's
+rule is that a value entering code needs two agreeing sources; `-ENXIO` from
+`chip->to_irq == NULL` needs none, because it is not an input.  It also makes
+one of the four gpiolib aliases in this header behave differently from the
+other three for no reason a reader could reconstruct.
+
+WHY A `#define` AND NOT A `static inline` WRAPPER.  Two reasons, and the
+second is mechanical.  ① Lines 5-7 of this file are already three `#define`s
+of exactly this shape; a fourth finishes a list, where an inline would start
+a second convention in a twenty-line file.  ② 讀: `__gpio_to_irq` is declared
+by `#include <asm-generic/gpio.h>`, which is on line 19 -- BELOW the point
+where the declaration being replaced sits.  A `static inline` wrapper written
+in place would call an undeclared function; a `#define` has no such ordering
+requirement because it is expanded at the call site.
+
+WHY THE DECLARATION MOVES INTO THE `#else` RATHER THAN BEING DELETED.  Under
+`!CONFIG_GPIOLIB` this header's `#else` branch declares six GPIO entry points
+-- `gpio_request`, `gpio_free`, `gpio_direction_input`,
+`gpio_direction_output`, `gpio_get_value`, `gpio_set_value` -- and `arch/rlx`
+defines NONE of them, exactly as it defines no `gpio_to_irq`.  That branch is
+coherent as it stands: this architecture has no non-gpiolib GPIO
+implementation, and any consumer built against it fails at link, loudly, on
+whichever symbol it touches first.  Adding a working `gpio_to_irq` there would
+fix one of seven and produce a configuration that links a little further
+before failing, which is worse than one that fails at the first call.  So the
+declaration moves down one line and that branch is left exactly as broken as
+it was, deliberately.
+
+`irq_to_gpio` IS DIFFERENT AND IS HANDLED DIFFERENTLY.  There is no
+`__irq_to_gpio` in gpiolib -- 量, zero occurrences in the tree -- so no alias
+is available and any definition is a constant.  Two upstream sources in this
+drop agree on which: `arch/x86/include/asm/gpio.h:49` returns `-EINVAL`, and
+`include/linux/gpio.h:105`, the no-GENERIC_GPIO fallback, returns `-EINVAL`
+after a `WARN_ON(1)`.  The `WARN_ON` is not copied: it is right for a platform
+that has no GPIO support at all and wrong for one that has gpiolib and no GPIO
+interrupts, where asking is not a bug.
+
+It is placed AFTER `#include <asm-generic/gpio.h>` and not with the others,
+and the position is load-bearing: `EINVAL` reaches this header only through
+that include (`asm-generic/gpio.h` opens with `<linux/types.h>` and
+`<linux/errno.h>`), and `include/linux/gpio.h` includes `<asm/gpio.h>` on its
+line 7 with no `errno.h` before it.  Written in place it would not compile.
+
+⚠️ AND ITS REFUTATION CONDITION IS WEAKER THAN `gpio_to_irq`'s, WHICH IS SAID
+HERE RATHER THAN LEFT TO BE FOUND.  量: three files in this drop call
+`irq_to_gpio` -- `drivers/power/tosa_battery.c`, `drivers/mmc/host/at91_mci.c`
+and `drivers/ata/pata_rb532_cf.c` -- and this board builds none of them.  So
+no image this project ships can demonstrate that this half of the patch did
+anything.  What demonstrates it is a compile probe run at the desk against the
+staged tree, which is the experiment below and not an image.
+
+WHAT THIS CHANGES ON THE BOARD.  `gpio_keys` stops failing at link and starts
+failing at probe, with the SoC's own answer in the errno.  讀
+`gpio_keys_probe`, in order, for a button on a line this chip knows:
+
+    gpio_request(5, ...)            succeeds -- bit 5 is inside
+                                    RTL819X_GPIO_KNOWN_MASK (0x60 in 1.1)
+    gpio_direction_input(5)         succeeds
+    irq = gpio_to_irq(5)            -ENXIO, from .to_irq == NULL
+    if (irq < 0) {
+        error = irq;
+        gpio_free(button->gpio);    <- THE LINE RELEASES
+        goto fail2;
+    }
+  fail2:
+    while (--i >= 0) { ... }        <- with one button i is 0, so the body
+                                    does not run: no double free, no leak
+
+So a `gpio-keys` device that fails this way leaves the GPIO line free, and a
+driver that requests it afterwards gets it rather than `-EBUSY`.  That is
+read out of the source and is NOT the reason `R5-8` keeps `gpio_keys` out of
+the image -- the reason is that the order of two probes on one line would rest
+on initcall link order, and `rtl819x-keys` carries the same call and prints
+its result as a boot mark instead.
+
+WHAT THIS PATCH DOES NOT ESTABLISH.  That this SoC has a GPIO interrupt.  It
+establishes the opposite, in a form software can read: `gpio_to_irq()` on this
+board answers `-ENXIO` and does it by consulting the chip.  `docs/interrupt-
+map.md` still has no row for a GPIO interrupt and no GPIO interrupt has been
+measured on this die.
+
+REFUTATION CONDITION, WRITTEN BEFORE THE BUILD.
+
+  ① A compile probe -- one translation unit calling both `gpio_to_irq()` and
+     `irq_to_gpio()`, compiled with the staged tree's own flags -- must fail
+     WITHOUT this patch and succeed WITH it.  Without the patch the failure is
+     at link, so the probe is read with `nm`: the unpatched object carries an
+     undefined `gpio_to_irq`, the patched one carries an undefined
+     `__gpio_to_irq` instead and no `irq_to_gpio` at all.  A probe that passes
+     both ways would mean the patch is not the thing being tested.
+
+  ② `CONFIG_KEYBOARD_GPIO=y` must link WITH this patch.  Without it the same
+     build must fail naming `gpio_to_irq`.  This is the same claim as ① one
+     layer up, on real upstream code rather than on a probe of mine, and it is
+     the reason a control image is built at all.
+
+  ③ REFUTED BY any build in which `gpio_to_irq` appears as an undefined symbol
+     in the linked `vmlinux`, or in which `CONFIG_DEBUG_FS=y` still fails to
+     link on it.
+
+WHAT IS DELIBERATELY NOT TOUCHED.  `arch/mips/include/asm/mach-generic/
+gpio.h`, the byte-identical copy.  This build is `ARCH=rlx` and no file under
+`arch/mips/` is compiled, so patching it would change no artefact and would
+double the blast radius of every future rebase of this patch.  The identity is
+recorded above because it is evidence about where the defect came from, not
+because both copies need fixing.
+
+`HC-1` moves from five declared patches to six.  Which of the six the
+directory's name fits, and what is owed about that, is `PROGRESS.md`'s to say.
+
+--- a/arch/rlx/include/asm/mach-generic/gpio.h
++++ b/arch/rlx/include/asm/mach-generic/gpio.h
+@@ -5,6 +5,7 @@
+ #define gpio_get_value	__gpio_get_value
+ #define gpio_set_value	__gpio_set_value
+ #define gpio_cansleep	__gpio_cansleep
++#define gpio_to_irq	__gpio_to_irq
+ #else
+ int gpio_request(unsigned gpio, const char *label);
+ void gpio_free(unsigned gpio);
+@@ -12,10 +13,23 @@
+ int gpio_direction_output(unsigned gpio, int value);
+ int gpio_get_value(unsigned gpio);
+ void gpio_set_value(unsigned gpio, int value);
++int gpio_to_irq(unsigned gpio);
+ #endif
+-int gpio_to_irq(unsigned gpio);
+-int irq_to_gpio(unsigned irq);
+ 
+ #include <asm-generic/gpio.h>		/* cansleep wrappers */
+ 
++/* BELOW the include on purpose: EINVAL reaches this header only
++ * through <asm-generic/gpio.h>, and include/linux/gpio.h includes
++ * <asm/gpio.h> with no errno.h ahead of it.  There is no
++ * __irq_to_gpio to alias, so this is a constant, and the two upstream
++ * sources in this drop that answer the question -- arch/x86's
++ * gpio.h:49 and include/linux/gpio.h:105 -- both answer -EINVAL.  The
++ * WARN_ON(1) the second of those carries is deliberately not copied:
++ * on a platform with gpiolib and no GPIO interrupt, asking is not a
++ * bug.  rlxfw R5-8, config/host-compat/0006. */
++static inline int irq_to_gpio(unsigned irq)
++{
++	return -EINVAL;
++}
++
+ #endif /* __ASM_MACH_GENERIC_GPIO_H */
