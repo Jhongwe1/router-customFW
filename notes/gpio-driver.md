@@ -987,3 +987,335 @@ non-zero is `X21-long`'s **1**, on a hold whose ring carries sixteen edges with
 20–35 ms breaks — contact chatter during a hold rather than bounce at a press
 edge, which is a different measurement and is not what `debounce_interval`
 guards.
+
+---
+
+## 14. 🆕 `FW-62`'s mechanism, read out of the compiled code — `R5-9`, 2026-09-10
+
+`SPEC.md`'s `FW-62` recorded a **behaviour** on 2026-09-10 (seating 20): the
+vendor's `rtl_gpio_timer` acts once per boot, started by the first hold past
+about two seconds, and never again on that boot. Nine button episodes, four
+boots, three confounds each broken by an experiment, `/proc/load_default`
+agreeing five times out of five. Its residual row said, in its own words,
+*"沒有一個字說明機制"* — **not one word explains the mechanism** — and named
+three questions, each answerable on an `objdump` listing, with the explicit
+instruction that **re-running the bench measurement is not a substitute**.
+
+This section answers all three. It is 讀 throughout: nothing here was measured
+on the device tonight, and the device was not powered.
+
+### 14.0 The refutation conditions, written before the disassembly
+
+| # | question | candidate mechanism `FW-62` recorded | what refutes it |
+|---|---|---|---|
+| ① | which path re-arms, and which path a release takes | `mod_timer(&t, jiffies + 100)` is on the tick path only | the re-arm is **unconditional** — reached on the release path too. Then the behaviour has some other cause and this candidate is dead |
+| ② | is there a second `add_timer` / `mod_timer` site | only `rtl_gpio_init`, once | any **runtime-reachable** second scheduling site for the same `timer_list` |
+| ③ | what the hold counter is cleared to on release | 0 | it is not cleared, or it is cleared in a way that does not affect scheduling |
+
+**All three came out on the candidate's side, and ③ came out the opposite way
+from the candidate while making the mechanism stronger rather than weaker.**
+That is written here rather than smoothed over: the candidate guessed *cleared
+to 0*; the code does not clear it at all on the two paths that matter, and the
+not-clearing is the second half of the latch.
+
+### 14.1 The artefact, and why it is this one
+
+`$FWRE_WORK/rebuild/bench-only/r59-20260910/vmlinux`, **4,095,382 bytes**, with
+its `System.map` (**384,617 bytes**) beside it. That is the image seating 20
+actually booted, so the disassembly and the behaviour are readings of **one
+artefact**. `FW-40`'s addresses are `r54b`'s and do not carry over — in this
+image `rtl_gpio_timer` is at `0x800E8D08`, not `0x800E5C48`.
+
+Instrument: `/usr/bin/mips-linux-gnu-objdump`, **GNU Binutils for Ubuntu
+2.42** — a distribution binary, not the vendor toolchain, so
+`tools/vendor-tripwire.sh` is not in the path (same reasoning as `FW-39`).
+Whole-image listing: **674,126 lines**.
+
+⚠️ **Only the compiled code was read. `drivers/char/rtl_gpio.c` was not
+opened**, which is the `artefact` depth of `docs/blind-write-ledger.md` § 4.9.
+
+**Sizes come from `System.map`'s neighbouring symbol, never from where an eye
+stops in a listing** — `FW-39` is 4 bytes wrong for exactly that reason, and on
+a machine whose delay slot is architecturally visible the missed instruction is
+the one after `jr ra`.
+
+| symbol | address | size from the next symbol |
+|---|---|---|
+| `reset_button_pressed` | `0x800E8A98` | `0x68` = 104 B |
+| `rtl_gpio_timer` | `0x800E8D08` | `0x2F0` = **752 B** |
+| `rtl_gpio_init` | `0x802C970C` | `0x1D8` = 472 B |
+| `rtl_gpio_exit` | `0x802D951C` | `0x0C` = 12 B |
+
+🟢 **The state the mechanism turns on is named by the image's own symbol table**,
+so none of it is a guess about what an anonymous word is for:
+
+| symbol | address |
+|---|---|
+| `probe_timer` | `0x80375E30` |
+| `probe_counter` | `0x80375E48` |
+| `probe_state` | `0x80375E4C` |
+| `AutoCfg_LED_Blink` | `0x80375E50` |
+| `AutoCfg_LED_Toggle` | `0x80375E54` |
+| `AutoCfg_LED_Slow_Blink` | `0x80375E58` |
+| `AutoCfg_LED_Slow_Toggle` | `0x80375E5C` |
+
+### 14.2 ① The function has exactly **three** exits, and only one re-arms
+
+Mechanically enumerated over the function's whole 752 bytes — every `jr ra` and
+every `j` whose target is outside the function:
+
+| exit | instruction | what it is |
+|---|---|---|
+| `0x800E8E4C` | `jr ra`, delay slot `sb v1,-6088(v0)` | release with `probe_counter >= 5`: store ASCII `'1'` into `default_flag` (`0x802AE838`) and **return** |
+| `0x800E8ECC` | `j 0x80021248 <kill_pid>` | release with `2 <= probe_counter < 5`: tail-call `kill_pid(find_vpid(1), 15, 1)` — SIGTERM to PID 1 — and **return through it** |
+| `0x800E8FF0` | `j 0x8001E890 <mod_timer>` | tail-call `mod_timer(&probe_timer, jiffies + 100)` |
+
+**So the re-arm is not unconditional: it is one of three exits, and the other
+two are both *release after a hold*.** ① is answered, and the candidate stands.
+
+The full state machine, `probe_state` = S, `probe_counter` = C, both 0 at init,
+`p` = `reset_button_pressed()`:
+
+| S | p | what happens | re-arms |
+|---|---|---|---|
+| 0 | 0 | `C = 0` | yes |
+| 0 | 1 | `S = 1`, `C = C + 1` (so `C` becomes 1) | yes |
+| 1 | 1 | hold tick — `C = C + 1`, and the LED per § 14.6 | yes |
+| 1 | 0, `C < 2` | `C = 0`, `S = 0` | **yes** |
+| 1 | 0, `2 <= C < 5` | `kill_pid(1, SIGTERM)` | 🔴 **no** |
+| 1 | 0, `C >= 5` | `default_flag = '1'` | 🔴 **no** |
+
+🟢 **That row-for-row reproduces the measured behaviour and it reproduces the
+one episode that looked like an exception.** Boot 17's first episode was a
+**0.45 s** press: too short to reach `C = 2`, so it takes the `C < 2` release
+row, resets the state and **re-arms** — and the 17.90 s hold later on the same
+boot still blinked and still set the flag. `FW-62` broke that confound with an
+experiment; the code says why the experiment came out that way.
+
+🔴 **And the threshold is sharper than *about two seconds*.** `C` advances once
+per tick and the tick period is `jiffies + 100` at `HZ = 100`, so `C` reaches 2
+only if the button is still down on the **second** tick after the press. With
+the press landing uniformly inside a tick, the wall-clock boundary is
+**anywhere in (1 s, 2 s]** — *held past 2 s* is sufficient and *held past 1 s*
+is necessary. A ~1.5 s hold should consume the timer on some presses and not
+others, which is a falsifiable prediction this reading produces and the bench
+measurement could not.
+
+### 14.3 ② There is no second scheduling site — four instructions, zero loaded data words
+
+`&probe_timer` has to be materialised before anything can schedule it. Over the
+whole 674,126-line listing, the instructions that do so are:
+
+| address | in | what it feeds |
+|---|---|---|
+| `0x800E8FE8` | `rtl_gpio_timer` | the tail `mod_timer` of § 14.2 |
+| `0x802C9878` | `rtl_gpio_init` | the argument to `init_timer_key` |
+| `0x802C98A4` | `rtl_gpio_init` | the base for the `.expires` / `.function` / `.data` stores and the one `mod_timer` |
+| `0x802D9524` | `rtl_gpio_exit` | the argument to `del_timer` — the whole function is `lui; j del_timer; addiu` |
+
+**Four. There is no fifth, and `rtl_gpio_exit` is a module-unload path in a
+kernel with no module for this.**
+
+🔴 **A scan reporting four is making a claim, so three ways it could have been
+blind were closed by measurement rather than by argument.**
+
+* **A different `lui` split.** `0x80375E30` can also be built as
+  `lui 0x8038` + `addiu -41424`. 量: **0** such `addiu`, and the whole image
+  contains exactly **one** `lui …,0x8038` anywhere.
+* **The `ori` form instead of `addiu`.** 量: **0** occurrences of
+  `ori …,0x5E30`. 🟢 **Positive control fires** — the image holds **3,232**
+  address-forming `ori` instructions, one of them inside `rtl_gpio_timer`
+  itself (`ori s0,v0,0x350c`, building `0xB800350C`). So the zero is a reading
+  and not a regex that finds nothing.
+* **The pointer stored as data and reloaded.** Searching the raw file for the
+  big-endian word `80 37 5E 30` finds **exactly one** occurrence, at file
+  offset `0x382264` — and `readelf -S` puts that offset inside **`.symtab`**,
+  which is not a loaded section and which the running kernel never sees.
+  🔴 **The first control chosen for this was wrong and did not fire**:
+  `&"load_default"` occurs zero times as a stored word, because
+  `create_proc_entry`'s argument is built with `lui`/`addiu` and never lands in
+  a table, so it could not have demonstrated anything. The control that does
+  fire is `&rtl_gpio_init` (`0x802C970C`), found **twice**, once at file offset
+  `0x2E12BC` inside **`.initcall.init`** — a real loaded section. **So the
+  instrument can find a stored pointer in loaded bytes, and it found none for
+  `probe_timer`.**
+
+⚠️ Stated limit: this reaches direct materialisation and stored words. A
+pointer computed at runtime from an unrelated base would escape it. Nothing in
+these three functions computes one, and `probe_timer` is a file-static.
+
+### 14.4 ③ The counter is **not** cleared on the paths that matter, and that is the second half of the latch
+
+Every instruction in the image that touches either word, at any width:
+
+| word | touches | where |
+|---|---|---|
+| `probe_counter` `0x80375E48` | **7** | `0x800E8D4C` `0x800E8D60` `0x800E8D74` `0x800E8D8C` `0x800E8E10` `0x800E8E2C` — all inside `rtl_gpio_timer` — plus `0x802C9894` in `rtl_gpio_init` |
+| `probe_state` `0x80375E4C` | **4** | `0x800E8D2C` `0x800E8D54` `0x800E8E24` inside `rtl_gpio_timer`, plus `0x802C989C` in `rtl_gpio_init` |
+
+🟢 The scan is not mnemonic-restricted — it matches any instruction with that
+displacement — and its control fires: the same shape finds **7,164** byte and
+half-word accesses across the image, including `default_flag`'s own
+`sb v1,-6088(v0)` at `0x800E8E50`.
+
+**So `rtl_gpio_init` and `rtl_gpio_timer` are the only writers, and the two
+non-re-arming exits write neither.** On both of them `probe_state` stays **1**
+and `probe_counter` keeps the value the hold left it at.
+
+🔴 **That is not an omission, it is the other half of the mechanism.** Suppose
+something did schedule `probe_timer` again. The next tick would find `S == 1`
+with the button released, take the release row again, see `C` still at its old
+value — still `>= 2` — and exit through `kill_pid` or `default_flag` **without
+re-arming**, immediately. The state machine is **latched dead**, not merely
+un-scheduled. Recovering it needs a write to `probe_state`, and § 14.4's table
+says only two functions can perform one, both of which are unreachable
+afterwards.
+
+> **`FW-62`'s behaviour is the conjunction of two facts, not one:** the release
+> path does not re-arm, **and** it does not reset the state that would let a
+> re-arm help.
+
+### 14.5 What this makes sayable about the vendor firmware, and what it does not
+
+🟢 **Sayable.** On this SoC, in Realtek's `drivers/char/rtl_gpio.c` as compiled
+into this kernel, the reset button's SIGTERM branch and its factory-default
+branch can each fire **at most once per boot**, and the first hold longer than
+one tick consumes both. `FW-62`'s 推 becomes 讀 on the mechanism.
+
+🔴 **Not sayable, and the boundary is the same one `FW-40` drew.** This says
+nothing about the **loader**. Nothing here reads `stage2.bin`, and the loader's
+own reset-button handling is a separate question that no cell in this segment
+touched.
+
+⚠️ Also not sayable: that TOTOLINK's *shipped* firmware behaves this way. The
+image read here is **mine**, built from the vendor SDK; the shipped image is a
+different build of a tree this project does not have. What transfers is the
+source-level behaviour of the file, which is strong, and not a byte-level claim
+about the retail firmware.
+
+### 14.6 The LED waveform falls out of the same function, and it refutes a derived number in `FW-63`
+
+The hold path writes bit 6 of `PABCD_DAT` on a rule the code states exactly:
+
+| `probe_counter` on entry to the tick | bit 6 | LED (active low, `BRD-13`) |
+|---|---|---|
+| 1, 2, 3, 4 | cleared | **lit** |
+| otherwise, with `C + 1 < 5` | not written | unchanged |
+| otherwise, `C + 1` even | cleared | **lit** |
+| otherwise, `C + 1` odd | set | **dark** |
+
+Walking it from a press at `t`, with the tick phase `φ` uniform in `(0, 1]`:
+
+* tick 1 at `t + φ` — `S` goes 0 to 1, `C` goes 0 to 1, **no bit-6 write**, so
+  the LED holds its rest value, which `REG-37` measures as `dat = 0x0000007C`,
+  bit 6 = 1, **dark**.
+* ticks 2 to 6, at `t + φ + 1` … `t + φ + 5` — `C` on entry is 1, 2, 3, 4, then
+  5 (whose `C + 1 = 6` is even). **All five clear bit 6: lit.**
+* tick 7 onward — `C + 1` alternates odd, even, odd … so **dark, lit, dark …**,
+  one second each, **starting dark**.
+
+Three consequences, and the third is a correction:
+
+1. 🟢 **First transition to lit is `φ + 1` after the press, so 1 s to 2 s.**
+   `X19-short` measured **1.75 s**. Inside the predicted interval, and the
+   interval was not fitted to it.
+2. 🟢 **A hold shorter than about `φ + 6` never alternates at all.**
+   `X19-short` is a 4.30 s hold and `FW-63` records that it went low at 1.75 s
+   and then *"完全沒有交替"*. The code says alternation cannot begin before
+   `t + φ + 6`.
+3. 🔴 **`FW-63`'s `T` is not the steady-lit period, and the code says the
+   steady period is a constant.** `FW-63` solved `T + (hold − T) / 2 = low` and
+   got `T` = **3.95 / 3.05 / 3.90 s** on three holds. The real shape is *dark
+   for `φ + 1`, lit for exactly **5.000 s**, then alternation starting dark* —
+   a shape whose initial dark second and dark-first alternation the two-phase
+   model has nowhere to put, so both land in `T` and pull it below 5.
+   量, the same three holds against the code's shape with `φ` swept over its
+   whole range `[0, 1]`:
+
+   | cell | hold | `FW-63` low fraction | code's band over `φ ∈ [0, 1]` |
+   |---|---|---|---|
+   | `C13-H50` | 18.35 s | 0.608 | 0.582 … 0.609 |
+   | `X15-h1` | 20.95 s | 0.573 | 0.572 … 0.595 |
+   | `X28-long` | 17.90 s | 0.609 | 0.584 … 0.612 |
+
+   **All three measured fractions are inside the band the code predicts**, and
+   the band is not free — it is one second wide in `φ` and nothing else.
+   🟢 **`FW-63`'s measured fractions stand and its reasoning stands**; what
+   does not survive is the *derived* `T`, and it does not survive because the
+   model it came from had the wrong number of phases. `FW-63` says in its own
+   row that the counters could not distinguish the shapes and that the
+   operator's eye chose between them; the eye was right and the arithmetic
+   behind `T` was carrying two errors that partly cancel.
+
+🔴 **The experiment that would settle § 14.6 ③ directly is not the one already
+run.** `FW-63`'s instrument counts samples and not their time order, so no
+re-run of it can produce the transition times. What is needed is a poll loop
+that **timestamps each bit-6 transition** during one long hold; the prediction
+is `φ + 1`, then a 5.000 s low, then 1.000 s alternation. That is a bench cell
+on the next seating and it costs no extra power cycle.
+
+### 14.7 🔴 Three things this reading found that were on nobody's list
+
+**① `rtl_gpio_init` creates FIVE `/proc` entries, and `FW-40` says three.**
+量, on `r54b` — the artefact `FW-40` itself cites, not this segment's image —
+`rtl_gpio_init` has **5** `create_proc_entry` call sites, with name strings at
+`0x80276138`, `0x80276140`, `0x80276150`, `0x80276160`, `0x8027616C`. `FW-40`
+named the last three. The five are **`gpio`**, **`usb_mode_detect`**,
+`load_default`, `rf_switch`, `watchdog_reboot`. The same five are present in
+`r59` at `0x80286238` … `0x8028626C`. **`FW-40`'s `default_flag` claim is
+unaffected** — that was a separate scan of that word's readers — but its count
+of entries is wrong and is corrected in place.
+
+**② `/proc/gpio` is a writable, userspace-reachable path that drives bit 6, and
+this repository has never named it.** `write_proc` (`0x800E9194`) copies **one**
+byte from userspace and dispatches on its ASCII value:
+
+| byte | calls |
+|---|---|
+| `E` (69) | `autoconfig_gpio_init` |
+| `0` (48) | `autoconfig_gpio_off` |
+| `1` (49) | `autoconfig_gpio_on` |
+| `2` (50) | `autoconfig_gpio_blink` |
+| `3` (51) | `autoconfig_gpio_slow_blink` |
+| `4` (52) | a longer branch, not read here |
+
+and those five helpers write the registers this driver owns, on the
+`sys_bonding_type() != 13` arm:
+
+| helper | writes |
+|---|---|
+| `autoconfig_gpio_init` | `PABCD_CNR &= ~0x04`, `CNR &= ~0x40`, `PABCD_DIR &= ~0x04`, `DIR \|= 0x40`, `PABCD_DAT \|= 0x40` |
+| `autoconfig_gpio_off` | `DAT \|= 0x40`; `AutoCfg_LED_Blink = 0` |
+| `autoconfig_gpio_on` | `DAT &= ~0x40`; `AutoCfg_LED_Blink = 0` |
+| `autoconfig_gpio_blink` | `DAT &= ~0x40`; `Blink = 1`, `Toggle = 1`, `Slow_Blink = 0` |
+| `autoconfig_gpio_slow_blink` | `DAT &= ~0x40`; all four flags set |
+
+🔴 **§ 3.4 of this file measured the *initcall order* and concluded the order is
+in this driver's favour. That is still true and it is now visibly not enough**:
+ordering is a statement about boot, and `/proc/gpio` is a writer at **runtime**.
+A single `echo 1 > /proc/gpio` on the image `R5-7` ran changes `PABCD_DAT` bit 6
+underneath `leds-gpio`, and `echo E > /proc/gpio` changes `CNR` and `DIR` as
+well — the two registers § 3.1 and § 3.2 argue about.
+
+🟢 **This is what `n_state_foreign` was built for and has never been pointed
+at.** § 6.1's detector samples `CNR`/`DIR`/`DAT` and counts changes it did not
+make. Aiming it at `/proc/gpio` gives the first **positive control on a real
+foreign writer** rather than the synthetic one, and it costs a single `echo`.
+
+🔴 **And there is a prediction with a sign, derived here and not yet measured**:
+`autoconfig_gpio_blink` only sets flags; the code that acts on them is the
+**second** bit-6 block inside `rtl_gpio_timer`, gated on `AutoCfg_LED_Blink == 1`
+at `0x800E8EE0`. That block runs only while the timer is alive. So
+
+> after a hold long enough to consume the timer (§ 14.2), `echo 2 > /proc/gpio`
+> should set the flags and produce **no blink at all**, while before it, it
+> should blink.
+
+Two `echo`s and an eye, on one boot, and the two halves are each other's
+control.
+
+**③ `reset_button_pressed` is a pure read, confirmed at instruction level.**
+Its only store is `sw ra,16(sp)`. On the `sys_bonding_type() != 13` arm it is
+`lw` from `0xB800350C`, `andi 0x20`, return 1 when the bit is 0 — which is
+`BRD-05` stated by the vendor's own code, and it settles that polling the
+button through this function cannot itself perturb the register the LED shares.
