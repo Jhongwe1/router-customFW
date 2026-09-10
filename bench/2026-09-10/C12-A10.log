@@ -1,0 +1,2 @@
+echo interval 10 > /proc/rtl819x-keys ; echo clear > /proc/rtl819x-keys
+# 

@@ -1,0 +1,3 @@
+cat /proc/load_default
+0
+# 

@@ -1,0 +1,22 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-10T21:27:22+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 180.0,
+  "idle": 0.0,
+  "until": "map_lines",
+  "until_offset": 2997,
+  "sent": "echo map 0 > /proc/rtl819x-spi ; cat /proc/rtl819x-spi-map",
+  "sent_hex": "6563686f206d61702030203e202f70726f632f72746c383139782d737069203b20636174202f70726f632f72746c383139782d7370692d6d61700d",
+  "stop_reason": "--until matched at offset 2997",
+  "bytes": 3013,
+  "duration_s": 14.079998,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

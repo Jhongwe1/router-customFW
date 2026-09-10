@@ -1,0 +1,1 @@
+sleep 15 < /dev/input/event0 ; cat /proc/rtl819x-keys ; cat /proc/rtl819x-gpio

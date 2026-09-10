@@ -1,0 +1,39 @@
+echo 0 > /sys/class/leds/n150rt:green:led2/brightness ; cat /proc/rtl819x-gpio
+version rtl819x-gpio 1.1
+added 1
+add_rc 0
+base 0
+ngpio 32
+cnr FFFFFF8B
+dir FF000040
+dat 0000007C
+boot_cnr FFFFFFDF
+boot_dir FF000000
+boot_dat 0000007C
+cnr_as_spec 0
+dir_as_spec 0
+btn_raw 1
+btn_pressed 0
+known_mask 00000060
+allow_out_mask 00000040
+out_locked 00000000
+out_effective 00000040
+n_get 3007
+n_req_ok 2
+n_req_no 0
+n_dirin_ok 1
+n_dirin_no 0
+n_dirout_ok 1
+n_dirout_no 0
+n_set_ok 2
+n_set_no 0
+n_writes 4
+state_known 1
+state_last 0000007C
+n_state_chk 3019
+n_state_foreign 2747
+foreign_seen 1
+foreign_first 0000001C
+probed04 0
+val04 00000000
+# 

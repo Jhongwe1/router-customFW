@@ -1,0 +1,2 @@
+echo lock 6 > /proc/rtl819x-gpio
+# 

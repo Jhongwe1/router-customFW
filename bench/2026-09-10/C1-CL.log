@@ -1,0 +1,3 @@
+echo claim | cat > /proc/rtl819x-gpio
+cat: write error: Device or resource busy
+# 

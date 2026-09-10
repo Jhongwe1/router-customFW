@@ -1,0 +1,4 @@
+echo 0 > /sys/class/leds/n150rt:green:led2/brightness ; cat /sys/class/leds/n1
+50rt:green:led2/brightness
+0
+# 

@@ -1,0 +1,22 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-10T21:05:41+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 55.0,
+  "idle": 0.0,
+  "until": null,
+  "until_offset": null,
+  "sent": "sleep 25 < /dev/input/event0 ; cat /proc/rtl819x-keys ; cat /proc/rtl819x-gpio",
+  "sent_hex": "736c656570203235203c202f6465762f696e7075742f6576656e7430203b20636174202f70726f632f72746c383139782d6b657973203b20636174202f70726f632f72746c383139782d6770696f0d",
+  "stop_reason": "--seconds 55.0 elapsed",
+  "bytes": 1172,
+  "duration_s": 55.103445,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}
