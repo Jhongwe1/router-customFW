@@ -386,3 +386,325 @@ bindings have a second opinion available for the first time.
    board directory of the SDK, and two people naming a driver after the family
    is convergence on a public label. It is written down because a hostile
    reader would find it and it would look worse unexplained than explained.
+
+---
+
+## 3. The diff
+
+Written **after** § 2 and after the commit that carries it, which is the order
+`docs/blind-write-ledger.md` § 6 imposed. Everything below reads the
+third-party implementations at full depth; nothing above did.
+
+### 3.0 The three sides, and what each one is
+
+| | what it is | depth |
+|---|---|---|
+| **mine** | `rtl819x-timer` 4.1, `rtl819x-gpio` 1.1, `rtl819x-spi` 1.1, `rtl819x-wdt` 1.0, upstream `leds-gpio` bound to my chip, `rtl819x-keys` 1.0 — six drivers written blind of any third-party port, all six run on the silicon | the source, mine |
+| **`shibajee`** | a **modern-kernel** port: `drivers/clocksource/timer-rtl8196e.c` (237 lines), `drivers/irqchip/irq-rtl8196e.c` (104), a DT `.dtsi`, a board `.dts` for a TOTOLINK N100RE, and one 35-line SoC header | full source read |
+| **`ggbruno`** | an **OpenWrt 4.14 target**: `arch/mips/realtek/{rtl819x-timer,gpio,irq,setup,prom}.c`, `drivers/spi/spi-realtek.c`, `arch/mips/mm/c-lexra.c` | full source read |
+
+⚠️ **`shibajee` has no gpio, spi, wdt, led or keys driver**, and `ggbruno` has
+no wdt, led, keys or MTD driver. Four of my six drivers therefore have **at
+most one** partner, and two have none. That is a fact about what exists in
+public, and it is why the scoreboard in § 3.7 has as many ABSENT cells as it
+does.
+
+### 3.1 L1 — the timer block, and three implementations agree on every field
+
+Base `0xB8003100`. `docs/blind-write-ledger.md` § 5 says agreement here is
+expected and carries no information about independence; it is a **cross-check
+of my register map**, and that is what it delivers.
+
+| field | mine | `shibajee` | `ggbruno` |
+|---|---|---|---|
+| `TC0DATA` | `+0x00` | `+0x00` | `+0x00` |
+| `TC1DATA` | `+0x04` | `+0x04` | `+0x04` |
+| `TC0CNT` | `+0x08` | `+0x08` | `+0x08` |
+| `TC1CNT` | `+0x0c` | `+0x0c` | `+0x0c` |
+| `TCCNR` | `+0x10` | `+0x10` | `+0x10` |
+| `TCIR` | `+0x14` | `+0x14` | `+0x14` |
+| `CDBR` | `+0x18` | *(not used)* | `+0x18` |
+| `TC0EN` / `TC0MODE` / `TC1EN` / `TC1MODE` | 31 / 30 / 29 / 28 | 31 / 30 / 29 / 28 | 31 / 30 / 29 / 28 |
+| `TC0IE` / `TC1IE` / `TC0IP` / `TC1IP` | 31 / 30 / 29 / 28 | 31 / 30 / 29 / 28 | 31 / 30 / 29 / 28 |
+
+**Fourteen fields, three implementations, no disagreement.** 🟢 The row that is
+worth something beyond the cross-check is the last one: `SPEC.md` `IRQ-08` and
+`IRQ-09` rest on `TCIR` bit 30 being TC1's interrupt *enable* and bit 28 being
+its *pending* flag, and this project reached that from one datasheet table plus
+readings on the die. **Two independent implementations now say the same thing**,
+and neither of them is the datasheet.
+
+### 3.2 L1 — the rest of the map, and eleven registers this project has never named
+
+`shibajee`'s 35-line `arch/mips/include/asm/mach-rtl8196e/rtl8196e.h` is a bare
+address list, and it lines up with this project's readings exactly:
+
+| register | this project | `shibajee` |
+|---|---|---|
+| `PABCD_CNR` | `0xB8003500` (`REG-26`, 量) | `0x3500` |
+| `PABCD_DIR` | `0xB8003508` (`REG-27`, 量) | `0x3508` |
+| `PABCD_DAT` | `0xB800350C` (`BRD-05`, 量) | `0x350C` |
+| `CDBR` | `0xB8003118` (`REG-11`, 量) | `0x3118` |
+| `WDTCNR` | `0xB800311C` (`REG-12`, 量) | `0x311C` |
+| `UART0` | `0xB8002000` | `0x2000` |
+
+🟢 **Five addresses this project measured on the die, confirmed by a source
+that is not the datasheet, not the vendor SDK, and not this project.**
+
+🔴 **And it carries ELEVEN this repository has never named, in six rows:**
+
+| register | offset | what it is for |
+|---|---|---|
+| `GPABCDTYPE` | `0x3504` | the port-type word, between `CNR` and `DIR` |
+| `GPABCDISR` | `0x3510` | GPIO interrupt status |
+| `GPABIMR` | `0x3514` | interrupt mask, ports A and B |
+| `GPCDIMR` | `0x3518` | interrupt mask, ports C and D |
+| `GPEFGHCNR` / `TYPE` / `DIR` / `DATA` / `ISR` | `0x351C`–`0x352C` | a **second** four-port bank |
+| `GPEFIMR` / `GPGHIMR` | `0x3530` / `0x3534` | its two mask registers |
+
+⚠️ **This is 讀 from one source and nothing here measures it.** It is written
+down because two of this project's open items point straight at it:
+`docs/KNOWN-ISSUES.md`'s *`.to_irq` is NULL* (the three GPIO-interrupt
+registers are `0x3510`/`0x3514`/`0x3518`), and `GPIO-1`, *which of `PABCD`'s
+four ports bit 5 belongs to* — a second bank named `EFGH` makes the packing
+question sharper rather than answering it.
+
+### 3.3 🔴 L1's one disagreement, and this project has already measured the answer
+
+`shibajee` treats `TC0CNT`/`TC1CNT` as **plain 32-bit** counters:
+`clocksource_mmio_init(base + TC0_CNT, …, 32, clocksource_mmio_readl_down)`,
+and it seeds them with `0xFFFFFFFF`. `ggbruno` says *"two clocks of 28 bits"*
+and applies `RTLADJ_TICK(x) = x >> 4` on every read and `delta << 4` on every
+write. Mine uses `RTL819X_TC_VALUE_SHIFT 4` with the same shape.
+
+**Two say the count sits in bits 31:4; one says there is no shift.**
+
+🟢 **The die settles it, and the reading is already in this repository.**
+`SPEC.md` `REG-05`: `TC0DATA` reads `0x0022E0A0`, which is `142,858 << 4`, and
+142,858 is the reload that produces the measured 100.0018 Hz tick. `TM-3`
+(seating 11) is the other direction: this driver *wrote* a period of `2^27` and
+`TC1DATA` read back **`0x80000000`** = `0x08000000 << 4`.
+
+> **`shibajee`'s clocksource reads a register that is sixteen times its own
+> count.** 推, and stated as such: its rate comes from the device tree, so the
+> clocksource would advance sixteen times too fast unless the DT clock is
+> scaled to compensate. The experiment that settles it is one boot of that
+> image on this part, which this project has not run and does not plan to.
+
+⚠️ `ggbruno` and I agree on the shift and differ on the field width — it calls
+the field **28** bits and my driver's ceiling is `2^27`. That is not a
+disagreement: my `RTL819X_TC1_BITS_MAX 27` is a **period** ceiling and the
+comment beside it already says *"the ceiling is the 28-bit `TC1Data[27:0]`
+field"*. Two sources, one number.
+
+### 3.4 L2 — the decision layer
+
+#### 3.4.1 Which timer is which, and the two ports choose opposite
+
+| | clocksource | clockevent |
+|---|---|---|
+| mine | TC1, **rating 0** | TC1, **rating 300** |
+| `shibajee` | **TC0**, rating 500 | **TC1**, rating 200 |
+| `ggbruno` | **TC1**, rating 200 | **TC0**, rating 100 |
+
+🔴 **`shibajee` and `ggbruno` assign the two timers to opposite roles.** The
+silicon does not prefer either — the two timers are the same block twice — so
+this is a pure decision and it is exactly the kind of row § 5 of the ledger
+says the diff exists to find. **Neither is wrong.**
+
+🔴 **Mine is different from both, and for a reason neither of them has.** My
+driver runs *beside* a vendor kernel whose tick already owns TC0 and whose
+handler writes `TCIR` a hundred times a second (`IRQ-09`). So TC1 is not a
+choice: it is the only timer available. And the clocksource sits at **rating 0**
+— below `jiffies`' 1 — deliberately, so the kernel will not switch to it, while
+the clockevent sits at 300 so the tick core will. **The two third parties
+replace the vendor; I coexist with it.** That is a different problem, not a
+better answer, and this row would read as a quality judgement if it did not say
+so.
+
+#### 3.4.2 🔴🔴 The interrupt acknowledge — and this is the row the silicon decided
+
+`TCIR`'s two `IP` bits are **write-1-to-clear**.
+
+| | what the handler writes |
+|---|---|
+| the **vendor** | `REG32(BSP_TCIR) \|= BSP_TC0IP` — read, OR, write back |
+| `shibajee` | `status = readl(TCIR); writel(status, TCIR);` — *"Clear all interrupts"* |
+| `ggbruno` | `tc0_irs = tc_r32(IR); tc0_irs \|= TC0_PENDING; tc_w32(tc0_irs, IR);` |
+| **mine** | `ackip` writes **one bit**, `1u << 28`, and reads it back |
+
+**Three of the four commit the same read-modify-write on a write-1-to-clear
+register**, and each of the three therefore clears *every* pending bit that
+happened to be set — including one belonging to a driver it has never heard of.
+
+🟢 **This project measured the consequence rather than arguing it.**
+`SPEC.md` `IRQ-09`, seating 12: the vendor's tick handler clears my `TC1IP`
+about a hundred times a second, so **a `TCIR` pending bit on this part has a
+lifetime of at most one 10 ms tick**, which bounds every single-sample reading
+of that register this project has ever taken. The card's own decision cell came
+out `0|0` and the reading was right while the assignment was wrong.
+
+> **Two independent third parties, written years apart, in different kernels,
+> reproduce the vendor's defect; the one implementation that does not is the
+> one whose author had the register's behaviour measured in front of him.** The
+> row is not *my code is better* — it is that a measurement bought a decision
+> that reading the datasheet did not.
+
+⚠️ And the honest half: my single-bit write is only safe because `TCIR`'s `IP`
+bits are documented write-1-to-clear *and* because `ackip` proves it at run time
+before `reqirq` is allowed to proceed. The driver's own comment says a proof at
+one instant is not a proof at every instant, and the handler carries the guard
+again.
+
+#### 3.4.3 The divider, and a third source for `CLK-06`
+
+`ggbruno` writes `div_fac << 16` into `CDBR` at `+0x18`, with
+`div_fac = 200000000 / timer_rate` — so **the divisor occupies the high 16 bits
+and the base clock is 200 MHz**.
+
+🟢 Both halves cross-check against readings this project already has.
+`SPEC.md` `TM-1` (seating 11): under Linux `CDBR` reads `0x03E80000` and
+`0x03E8` is **1000**; the loader leaves `0x000E0000` and `0x000E` is **14**.
+Both are the high half. And `CLK-02` measured the base clock at
+**200.0049 MHz ± 7 ppm**.
+
+`CLK-06` was 讀 from the draft datasheet's Table 26 and this repository has one
+copy of that datasheet. **It now has a second, independent 讀** — and `shibajee`
+supplies neither, because its driver never touches `CDBR` at all and takes its
+rate from the device tree.
+
+#### 3.4.4 Wrap handling, and mine is the one with a recorded failure
+
+| | how the wrap is handled |
+|---|---|
+| mine | software extension `tc1_ext`, with a `tc1_ext_trusted` flag and a reported maximum sample gap |
+| `shibajee` | none — `clocksource_mmio_readl_down`, 32-bit mask, the core does it |
+| `ggbruno` | none — `CLOCKSOURCE_MASK(28)`, the core does it |
+
+🔴 **The two third parties took the simpler option and mine is the one whose
+extension has a measured failure on the record.** `SPEC.md` `CLK-22`: over a
+703.46 s arm the real gap was **140,693,532** counts, a full `2^27` period was
+lost, and `tc1_ext_trusted` read **1** while claiming the reading was
+trustworthy. Handing the wrap to the clocksource core, as both of them do,
+cannot fail that way because it never claims anything about a gap it did not
+see.
+
+⚠️ It is not a free swap. The core's mask-based unwrap needs the clocksource to
+be *read* more often than half a wrap, which is exactly what my rating-0
+registration prevents: nothing reads it. The row is a genuine trade and it is
+recorded as one.
+
+#### 3.4.5 GPIO interrupts — `ggbruno` shows they are implementable and I do not implement them
+
+`docs/KNOWN-ISSUES.md` carries *`.to_irq` is NULL* for `rtl819x-gpio`, on the
+stated ground that no GPIO interrupt has been measured on this part.
+`ggbruno`'s `arch/mips/realtek/gpio.c` (301 lines) has a full `irq_chip` with a
+chained parent handler, `irq_data_get_irq_chip_data` and
+`irq_desc_get_handler_data`.
+
+🟢 **So it is not that the part cannot; it is that this project has not.** With
+§ 3.2's `GPABCDISR` / `GPABIMR` / `GPCDIMR` addresses beside it, that item stops
+being *unknown how* and becomes *unmeasured*, which is a smaller claim and a
+different piece of work. **This does not close it** — nothing here is 量, and
+one boot of `ggbruno`'s image on this board is not an experiment this project
+is going to run.
+
+#### 3.4.6 The three rows where nothing can be compared
+
+`wdt`, `leds` and `keys`: both third-party trees are **ABSENT**. For `leds` and
+`keys` that is expected and correct — my `R5-7` and `R5-8` bind **unmodified
+upstream drivers** to my chip, so there is nothing SoC-specific to diff and the
+comparison that matters (does upstream bind?) was answered on the silicon.
+For `wdt` there is genuinely nothing: neither port implements one, and
+`docs/blind-write-ledger.md` § 4.10.1 already records that my watchdog's
+**vendor** side is spent, so that domain has no blind diff available from any
+direction.
+
+### 3.5 Two defects found by reading, and both were measured before being written down
+
+🔴 **Neither of these is a claim about this board.** They are claims about C,
+and each was reproduced with a compiled control before it entered this file —
+because the first version of one of them was wrong.
+
+**① `shibajee`'s four `TCCNR` bit-setters cannot set any of the four bits they
+exist to set.** Each is `u16 tccnr; tccnr = readl(base + TCCNR); … tccnr |=
+TCCNR_TC0_EN_BIT; writel(tccnr, base + TCCNR);` with the four control bits at
+31:28. The read truncates to sixteen bits; the `|=` promotes to `int`, ORs, and
+converts back to `u16`, discarding bit 31 again.
+
+量, the same function body compiled twice with one type changed, which is the
+control:
+
+| | operation | result |
+|---|---|---|
+| `u16` | `enable(1)` on `TCCNR = 0` | **`0x00000000`** — the enable bit never arrives |
+| `u16` | `disable(0)` on `TCCNR = 0xC0000000` | **`0x00000000`** — it also clears `TC0MODE`, which it was not asked to touch |
+| `u32` | `enable(1)` on `TCCNR = 0` | `0x80000000` ✅ |
+| `u32` | `disable(0)` on `TCCNR = 0xC0000000` | `0x40000000` ✅ |
+
+🔴 **And `-Wall` on the MIPS cross compiler reports zero warnings.** It takes
+`-Wconversion`, which the kernel does not use. **It is silent.**
+
+⚠️ **My driver does not have it, and the reason is not foresight.** I used
+`u32` because the registers are 32 bits wide, which is the obvious choice; the
+avoidance is a consequence. 量, before this paragraph was written: the five
+drivers' only narrow types are two byte arrays for a digest comparison, one
+struct field, and two explicitly-cast ring-buffer fields. **No narrow type is
+the destination of a register read anywhere in my tree.**
+
+**② `shibajee`'s interrupt dispatcher shifts by 128, and the value comes out
+right anyway — which is the more interesting outcome.**
+`#define RTL8196E_NR_IRQS 128` and then
+`pending = gimr & gisr & ((1 << RTL8196E_NR_IRQS) - 1)`. `1 << 128` on an `int`
+is undefined behaviour.
+
+🔴 **The first draft of this row said the mask folds to zero and every interrupt
+would be reported spurious. 量 refutes it**: GCC constant-folds
+`(1 << 128) - 1` to **`0xffffffff`** — the value the author meant — on the host
+and on the big-endian MIPS cross compiler alike, and warns
+`-Wshift-count-overflow` in both.
+
+What survives is narrower and still real: **the code is wrong and works, and
+what makes it work is the compiler's choice rather than anything in the
+language.** A fold to `0` is equally permitted, and then `pending` is always
+zero and every interrupt is spurious. In a kernel built `-Werror` the warning
+is a build failure. `RTL8196E_NR_IRQS 128` against a 32-bit `GIMR`/`GISR` is a
+separate, plain inconsistency.
+
+> **That row nearly went in as a confident false claim.** The ten seconds it
+> took to compile it is the whole difference, and it is recorded here rather
+> than quietly corrected.
+
+### 3.6 The scoreboard
+
+| driver | `shibajee` | `ggbruno` | L1 | L2 rows with a verdict | L2 rows 未定 |
+|---|---|---|---|---|---|
+| `rtl819x-timer` | INDEPENDENT | INDEPENDENT | 14 fields agree, **1 disagrees** (§ 3.3) | § 3.4.1, § 3.4.2, § 3.4.3, § 3.4.4 | — |
+| `rtl819x-gpio` | ABSENT | INDEPENDENT | 3 agree, **7 new addresses** (§ 3.2) | § 3.4.5 | which port bit 5 is on (`GPIO-1`) |
+| `rtl819x-spi` + MTD | ABSENT | INDEPENDENT | not compared | — | the transaction order is the vendor's; ledger § 4.5 voids the blind claim |
+| `rtl819x-wdt` | ABSENT | ABSENT | 1 agrees (`WDTCNR`) | — | ledger § 4.10.1: informed contrast, not a blind diff |
+| `leds-gpio` (upstream) | ABSENT | ABSENT | — | nothing SoC-specific to diff | — |
+| `rtl819x-keys` | ABSENT | ABSENT | — | nothing SoC-specific to diff | — |
+
+### 3.7 What this diff does not establish
+
+1. 🔴 **It is not a claim that my drivers are better.** § 3.4.1 is a difference
+   in *problem*; § 3.4.4 is a trade my side loses on simplicity; § 3.5's two
+   defects are C, not engineering judgement, and one of them I nearly got
+   wrong.
+2. 🔴 **Neither third-party image has been run on this board and neither will
+   be.** Every statement about what their code *would do* on this part is 推
+   and says so.
+3. 🔴 **Two of six drivers have no partner at all** and two more have exactly
+   one. A diff over six drivers where four cells are ABSENT is thinner than the
+   plan imagined, and the ledger's own § 4.10.1 and § 4.5 had already removed
+   the blind claim from two of them for a different reason.
+4. ⚠️ **The L1 agreement is worth exactly what § 5 says it is worth.** Three
+   implementations describing one part agree because it is one part. What it
+   buys is a cross-check on my transcription, and it delivered that on fourteen
+   timer fields and five addresses.
+5. ⚠️ **`spi` was not compared field by field.** `ggbruno`'s
+   `drivers/spi/spi-realtek.c` (340 lines) is a full SPI-master driver and mine
+   is a read-only MTD path sharing a controller with the vendor's. The two
+   solve different problems and the comparison would have been shaped by that
+   rather than by either implementation. It is left as an explicit gap.
