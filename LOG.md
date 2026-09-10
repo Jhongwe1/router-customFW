@@ -22209,3 +22209,416 @@ gives it the verdict *"blind of any implementation"*」。**兩半都在寫下�
 
 🔴 **而這張表自己帶了兩個缺陷進來,兩個都是我寫的。** `dtcheck` 那一列上面已經劃掉了;`desk-sweep` 那一列原本寫「全套,**見下**」而**下面什麼都沒有** ——一個指向不存在的東西的交叉引用,在一份以「數字要指名來源」為規矩的紀錄裡。兩個都是在掃描**還在跑**的時候寫的,也就是說我在結果出來之前就先寫了結論的位置。**這和 §9 開頭那個順序問題是同一件事,只是小一號。**
 
+
+---
+
+## 2026-09-10 — 第五十四段(桌面,不通電):`R5-8` 桌面半,而兩個最值錢的讀數都是我的預測被自己的建置否證
+
+**開場 12:17,三邊一致。零電源循環,沒有 `bench/` 目錄,零 flash 寫入命令,零 `FLR`。**
+
+---
+
+### 1. 開場三件事
+
+**日期。** Windows `2026-09-10T12:17:35+08:00` / Git Bash `2026-09-10T12:17:26+08:00`
+/ WSL `2026-09-10T12:17:32+08:00`;`Thursday`、`Taipei Standard Time`、`TST`。
+三次呼叫差九秒。開場日是 09-10,所以本段的 study 檔是 `study/20260910-study4.md`。
+
+**CI。** 上一段的八個 run 全部收齊:六綠(`db5741c`／`d54e9ca`／`02ded87`／
+`4851647`／`119d543`／`006db51`)、兩個**預期紅**(`f43ae78`／`5a4f131`,
+`test-config-gates`,修正在它們之後才推),沒有一個是新問題。
+
+🔴 **而這份清單本身有一個交辦沒問的讀數:上一段是 11 個 commit → 8 個 CI run。**
+`710119f`(08:30:57)、`7ca6a19`(08:31:22)、`2c3c115`(08:31:39)、`f43ae78`(08:32:03)
+四個 commit 落在 66 秒內,而 CI 只替 `f43ae78` 建了一個 run(08:32:08)。
+讀 `.github/workflows/ci.yml:182-187`,`on: push / branches: [main]` —— **一次 push
+到 main 恰好一個 run**。所以「九次 push」與 8 這兩個數至少有一個錯,而正確的那個
+是 8。
+
+**citime。** `check` 指名三列未進帳(`4851647`／`02ded87`／`d54e9ca`),
+進帳後 `119d543`／`006db51` 收綠再進兩列,`check` 回 **0 missing**。
+帶用 `citime stats --since 2026-09-08T20:43:13Z` 導出而不是從 `PROGRESS.md` 抄:
+
+| | 上一段 | 本段 |
+|---|---|---|
+| n | 17 | **22** |
+| range | 945..960 = 15 s | **945..960 = 15 s** |
+| 中點／半幅 | 952.5 / 7.5 | **952.5 / 7.5** |
+| ± | 0.787 % | **0.787 %** |
+| 中位數 | 956 | **957** |
+| mean | — | **955.27** |
+
+五個新點 **956 / 958 / 951 / 957 / 958** 全部落在既有區間內 —— **連續第四次進帳而
+區間紋風不動。** `citime segments` **3/3**,併池正控制兩條都 FIRED
+(A8 31.778 %、A9 167.57 sd)。
+
+---
+
+### 2. `patch 0006`,而它的否證條件在寫任何一行驅動之前就跑完了
+
+**先去看它在不在。** `config/host-compat/` 有五個 patch、沒有第六個;
+`config/rlxfw-src/` 底下沒有任何 `rtl819x-keys.c`。兩件都真的要做。
+
+**量測改寫了交辦裡的兩句話。**
+
+🔴 **①「`arch/rlx` 宣告 `gpio_to_irq()` 而全樹沒有定義」不精確。** 全樹有**五處**
+定義(`include/linux/gpio.h:98`、`arch/x86/include/asm/gpio.h:44`、
+`arch/mips/include/asm/pmc-sierra/msp71xx/gpio.h:36`、以及 `mach-rc32434` 與 `mach-au1x00` 兩個
+`#define`),**從 `arch/rlx` 走得到的路上是零** —— `include/linux/gpio.h:98` 那個
+在 `#else of #ifdef CONFIG_GENERIC_GPIO` 裡,而 gpiolib `select` 了 `GENERIC_GPIO`。
+較弱而為真的說法是「這條路上沒有」。
+
+🔴 **而它不是 rlx 打錯字。** 量:`arch/rlx/include/asm/mach-generic/gpio.h` 與
+`arch/mips/include/asm/mach-generic/gpio.h` **位元組相同**,md5 兩邊都是
+`8c6bc68ef836ae3f7b36f01b94d37792`。標頭被整份複製過來,洞跟著來。全樹沒有任何
+`arch/` 底下的 `.c` 定義它,廠商 `boards/` 樹零引用。
+
+🔴 **②「`CONFIG_KEYBOARD_GPIO=y` 是連結失敗」只在 patch 之前成立。** 讀
+`gpio_keys_probe` 一行一行:`gpio_request(5)` **成功**(bit 5 在 `KNOWN_MASK`
+`0x60` 內)→ `gpio_direction_input(5)` **成功** → `irq = gpio_to_irq(5)` →
+`if (irq < 0) { gpio_free(button->gpio); goto fail2; }`,而 `fail2` 的
+`while (--i >= 0)` 在單顆按鈕時 `i` 是 0、迴圈體不執行 —— **乾淨退出、不
+double-free、不留 `-EBUSY`**。
+
+> **所以 patch 做的事不是「讓它能建」,是把一個連結期失敗換成一個帶著晶片自己
+> errno 的 probe 期失敗。** 連結失敗是建置意外;`-ENXIO` 是硬體事實用軟體講出來。
+
+**修法是接到 gpiolib,不是寫一個常數。** 讀 `drivers/gpio/gpiolib.c:1097-1103`:
+
+```c
+int __gpio_to_irq(unsigned gpio)
+{
+        struct gpio_chip *chip;
+        chip = gpio_to_chip(gpio);
+        return chip->to_irq ? chip->to_irq(chip, gpio - chip->base) : -ENXIO;
+}
+```
+
+而 `rtl819x-gpio.c:658` 是 `.to_irq = NULL`。所以 `#define gpio_to_irq __gpio_to_irq`
+讓 `-ENXIO` **由資料結構產生而不是由我選定**,而且哪天有了 `.to_irq` 就自動回傳真的
+中斷號碼、不需要第二個 patch。x86 的 `static inline` 回 `-ENOSYS` 是被**拒絕**而不是
+沒看到:那是我選的數字,而且會讓那個 `#ifdef` 裡四個 alias 有一個沒有理由地不一樣。
+另外兩個機械理由:那個區塊裡本來就有三個同形狀的 `#define`;而 `__gpio_to_irq` 要到
+`#include <asm-generic/gpio.h>`(第 19 行)才被宣告,所以寫在原地的 inline **編不過**。
+
+**`irq_to_gpio` 分開處理,而它的否證條件比較弱,這句話寫在 patch 裡而不是留給人發現。**
+沒有 `__irq_to_gpio` 可接,所以只能是常數;兩個上游來源同意 `-EINVAL`
+(`arch/x86/include/asm/gpio.h:49`、`include/linux/gpio.h:105`,後者的 `WARN_ON(1)` 刻意不抄
+—— 在一塊有 gpiolib、沒有 GPIO 中斷的板子上,問這件事不是 bug)。⚠️ 全樹三個呼叫者
+(`tosa_battery`／`at91_mci`／`pata_rb532_cf`),這塊板子一個都不建,**所以這一半在
+這塊板子上無法用映像否證**。
+
+**diff 是導出來的,不是手寫的。** `@@` 行是這個房子自己那條「不要重建工具能導出的
+東西」的規矩,而 `patch -p1` 對錯掉的行數會在 kernel 建置中間才拒絕。腳本先驗
+md5、再對每一處改動 assert 錨點恰好一次、最後 `difflib.unified_diff`。12,552 位元組。
+
+**否證條件 ②,兩臂唯一的變數是 patch 在不在:**
+
+| 臂 | 預測 | 量到 |
+|---|---|---|
+| `k8c1`(patch 移到 `.disabled`) | 連結失敗,指名 `gpio_to_irq` | **rc=1**,`undefined reference to 'gpio_to_irq'`,**四個**重定位點,其中 `.text.gpio_keys_isr+0x1c` 就是 `:62` 那個 ISR 裡的 `BUG_ON` |
+| `k8c2`(patch 在) | rc=0 | **rc=0**,vmlinux 4,134,081 |
+
+原始碼六個呼叫點、連結器四個位置 —— 編譯器合併了兩個。六和四都對,它們在講不同層次。
+
+---
+
+### 3. 🔴🔴 列舉被自己的建置否證,而那值 56 KB
+
+打開 `CONFIG_INPUT` 會讓一批選項變成「可以被問」,而沒有釘死的就由 `< /dev/null`
+決定。**建置之前寫下的預測是 20 個**,由逐一展開 `drivers/input/Kconfig` 與它
+`source` 的六個檔得到。
+
+**兩個方向的讀數,而它們在相反方向失敗:**
+
+| 讀數 | 預測 | 量到(`k8c1`／`k8c2`) |
+|---|---|---|
+| 20 個釘子在 built config 裡存活 | 20 | **兩臂都 20/20** —— 清單不是超集 |
+| `(NEW)` | **0** | 🔴 **五個符號,一行,全部是 HID** |
+
+`HID_SUPPORT`／`HID`／`HID_DEBUG`／`HIDRAW`／`HID_PID`,而 built config 真的收下了
+`CONFIG_HID=y` 與 `CONFIG_HID_DEBUG=y`。
+
+🔴 **原因:`depends on` 是全樹關係,而我的列舉是目錄範圍的。**
+讀 `drivers/hid/Kconfig:4-7` —— `menuconfig HID_SUPPORT` / `depends on INPUT` /
+`default y`。量,全樹 **17 個** Kconfig 檔寫著 `depends on INPUT`,十六個卡在
+USB／PCI／ACPI／X86／SOUND,`drivers/hid/` 是唯一其他條件都滿足的。
+**R5-7 的 LEDS 區塊做同樣的目錄範圍列舉而沒出事**,因為 `drivers/leds/` 外面沒有東西
+依賴 `NEW_LEDS`。
+
+**成本是量的不是估的。** `size` 對 `k8c2` 自己的物件:`drivers/hid/built-in.o` 是
+51,920 text ＋ 4,136 data ＝ **56,056** 位元組(`hid-input` 24,904、`hid-debug`
+16,032、`hid-core` 15,168),在一塊沒有 USB host、沒有藍牙、不可能接上任何 HID
+裝置的板子上;旁邊 `gpio_keys.o` 是 1,492。⚠️ 兩者相加 57,548,而 ELF 差 72,652 ——
+**餘下的約 15 KB 這次沒有歸屬**。
+
+**修好的預測是 21,然後被量**(cell `k8c3`,同一設定加 `HID_SUPPORT=n`、
+`KEYBOARD_GPIO` 回 n、沒有我的驅動,所以這一臂是 INPUT 這一族單獨):
+
+| 讀數 | 預測 | 量到 |
+|---|---|---|
+| `(NEW)` | 0 | **0** |
+| 21 個釘子存活 | 21 | **21/21** |
+| `HID`／`HID_DEBUG`／`HIDRAW`／`HID_PID` | **被丟棄**(不是被回答) | **四個全部從 built config 消失** |
+| vmlinux | — | 4,061,429,對 `r58` 的 4,055,777 = **INPUT 族單獨 +5,652** |
+
+**21 個裡有六個 `default y`,其中四個被釘成相反**(`INPUT_MOUSEDEV`／`INPUT_MOUSE`／
+`KEYBOARD_ATKBD`／`HID_SUPPORT`)—— 那四個才是會改變出貨內容的列。
+`KEYBOARD_ATKBD` 是最危險的:`default y` ＋ `select SERIO` ＋ `select SERIO_LIBPS2`,
+而 `select` **無視 depends**。三顆映像的 built config 都仍讀
+`# CONFIG_SERIO is not set`,所以那顆地雷確實被釘住了。
+
+---
+
+### 4. `rtl819x-keys` 1.0
+
+880 行(大半是為什麼這樣寫)。`drivers/input/keyboard/rtl819x-keys.c`,
+由 `config/rlxfw-marks.tsv` 的 `MK8` 掛上,錨點是
+`obj-$(CONFIG_KEYBOARD_GPIO) += gpio_keys.o` —— **它取代的那一支**。
+
+**它重用上游兩樣東西,而那是主張不是省事。**
+`struct gpio_keys_platform_data` 是上游那支不能用的驅動所用的**同一個**結構,
+所以板檔用上游的詞彙描述這顆按鈕,「上游驅動不能驅動這塊板子」就是一句關於矽片的
+話而不是關於我的資料格式的話;`input_polldev` 是上游的輪詢骨架。
+**而它拒絕的東西也是刻意的**:`gpio_keys_button.wakeup` 非零會被 probe **拒絕**
+而不是默默忽略 —— 一個被接受然後丟掉的欄位比一個被拒絕的欄位糟。
+
+🔴 **一個會燒掉一次上電的性質,在桌面上讀到。** 讀 `drivers/input/input-polldev.c`:
+輪詢工作只由 `input_open_polled_device()` 排進去,而那是 `input_dev->open`,
+**只有 handler 開啟裝置時才被呼叫**。量,這個 drop 裡每一個會呼叫
+`input_open_device()` 的 handler:
+
+| handler | 何時開 | 這顆映像 |
+|---|---|---|
+| `evdev`(`evdev.c:190`,在 `evdev_open()` 裡,`!evdev->open++`) | **使用者空間**開 `/dev/input/eventN` | **加了** |
+| `evbug`(`evbug.c:63`,在 `evbug_connect()` 裡) | 一連上就開 | **刻意不加** |
+| VT 鍵盤(`drivers/char/keyboard.c`) | 一連上就開 | 需要 `CONFIG_VT`,沒有 |
+
+`mousedev`／`joydev` 不會配對只有 `EV_KEY` 的裝置,`apm-power` 要 `APM_EMULATION`,
+`rfkill-input` 要 rfkill,兩個都不在。**沒有 handler,`poll()` 一次都不會跑**,
+而 `CONFIG_PRINTK=n` 連一行訊息都不會有。
+
+🟢 **選 `evdev` 而不選看起來更省事的 `evbug`,因為 `evbug` 會永遠開著而毀掉一個控制。**
+有了 `evdev`,計數器讀出三態:`n_open 0 / n_poll 0` 沒人開過、`n_open 1 / n_poll 在動`
+開著且輪詢在跑、`n_open 1 / n_poll 不動` 開過又關了。**這說明輪詢是被開啟造成的,
+不只是碰巧同時發生** —— 和 `R5-3a` 的第 25 行在 `request_irq` 前後都不存在是同一個形狀。
+`config/rlxfw-initramfs.tsv` 為此加了 `/dev/input` 與 `/dev/input/event0`(`c:13:64`,
+major 與 minor 各有兩個來源)。
+
+🟢 **負控制是一行,不是一段話。** 驅動在 probe 裡做上游驅動在它自己 `:134` 做的那個
+呼叫,並把答案印出來:
+
+```c
+rtl819x_keys_irq_probe = gpio_to_irq(rtl819x_keys_btn[0].b->gpio);
+rlxfw_markx("K4", (unsigned)rtl819x_keys_irq_probe);
+```
+
+同一根線、同一次開機、同一個 gpiolib。**把 `gpio_keys` 也放進映像當活的負控制被拒絕**:
+兩個消費者搶一根線,誰先 probe 由 `device_initcall` 的連結順序決定,而
+`rlxfw-devices.c` 自己的註解就說這個專案不靠 Makefile 的行號。
+
+**時序由儀器自己記錄。** 32 格環形緩衝,每一次接腳電位變化記下當時的 `jiffies`,
+`/proc` 印出來,並且有 `n_ev_drop` 讓「這份紀錄完不完整」是一個數字而不是一個假設。
+`jiffies` 不是妥協是上限:系統時鐘源仍是 `jiffies`(`R5-3b` 刻意把 clocksource 留在
+rating 0),`HZ=100` 給 10 ms,而輪詢間隔本來就不會低於一個 tick。
+
+**板檔多了四個 `#error`,而它們放在那裡是因為量測。** 驅動自己的
+`#error CONFIG_INPUT` **不可能觸發** —— `drivers/Makefile:71` 是
+`obj-$(CONFIG_INPUT) += input/`,目錄沒被進入時檔案根本不編譯。而
+`arch/rlx/Makefile:117` 的 `core-y += arch/rlx/kernel/` 是**無條件**的,所以同樣四行
+寫在板檔裡**會**在建置時停下來。第四個是三選一的析取
+(`INPUT_EVDEV || INPUT_EVBUG || VT`),因為那才是真正的條件。
+
+---
+
+### 5. 🔴 我差點讓一個既有的檢查永遠不會紅
+
+`MK8` 的見證本來要寫 `str:rtl819x-pabcd/input0`(驅動的 `input->phys`)。
+寫下去之前讀了工具:`tools/rlxfw-marks.py:516-523` 的 `_count` 是 `b.find` 迴圈,
+`:621-624` 的判準是 `got >= 1` —— **對整顆映像做位元組子字串搜尋**。
+而 `MK3` 的見證是 `str:rtl819x-pabcd`。
+
+> 我的字串**包含**它。兩個字串在同一顆映像裡,`MK3` 就算 `rtl819x-gpio.o` 掉了也還是綠。
+
+改成 `rtl819x-keys/input0`(不含任何既有見證,而 `rlxfw-devices.c` 的裝置名
+`rtl819x-keys` 是它的**前綴**,無法滿足它),並且把規則寫進工具:
+`_no_needle_contain()`,標記字串與 `str:` 見證當作**同一個母體**(它們進的是同一次
+對同一顆映像的搜尋),`sym:`／`absent:` 排除(`_symbols()` 按欄位比對,W7d)。
+三個案例:`W16` 紅、**`W16b` 正控制**(拿掉包含關係必須綠,否則我寫的可能是一條
+「什麼都拒絕」的規則)、`W16c` 跨類別。自測 **58 passed / 0 failed**,
+`ci-expected.tsv` 的 `rlxfw-marks` 55 → 58。
+
+**這個專案早就處理過同一類問題的另一半**:2026-08-28 的第一次真 verify 發現
+`RLXFW-B1` 被 `RLXFW-B10` 撞到,於是 `_no_prefix()` 管住了標記**標籤**,標記也補零
+成兩位數。**規則只管了標籤,沒管見證,而見證是 2026-09-04 才加的欄位。**
+量,新規則上線後對真正的宣告:**23 列、18 個映像搜尋標的、零包含、零重複。**
+
+---
+
+### 6. 建置 `r59` 與三道門
+
+`RECIPE_ID` **`083b1cb8` → `692a2801`**、vmlinux **4,095,382**、
+**611** 個 CC 物件(`r58` 605)、warning **161 對 161**、
+6 個 host-compat patch、23 條 marks 列、35 個 initramfs 項目、44 秒。
+
+**多的六個逐一指名,而且沒有任何物件消失**(`comm` 兩個方向):
+`drivers/input/input.o`、`input-compat.o`、`ff-core.o`(三個合成 `input-core.o`)、
+`input-polldev.o`、`evdev.o`、`keyboard/rtl819x-keys.o`。
+
+| 門 | 結果 |
+|---|---|
+| `rlxfw-marks verify` | **rc 0**;12 個 mark 各一次;**8** 個見證(`r58` 7);`MK8` 的 `str:rtl819x-keys/input0` 我的 1 次、廠商 0 次 |
+| `kconfig-delta check` | **rc 0**;23 derived ＋ **48** set;「模板與這次建置的 `.config` 之間每一個差異都在清單上」 |
+| `hazlint-objs` | **0 violations / 3,096 loads / 70 leaf objects / 101,824 位元組**;`Q0` 用 sha256 釘住 `r59.vmlinux.elf`、`Q5` 正控制在 `-march=5281` 下 **11** 個 |
+
+🔴 **`hazlint` 我第一次跑漏了 `drivers/leds`**,而 `leds-gpio` 明明是這顆映像的一部分。
+第二次補上,母體 67 → 70 個 leaf object。
+🟢 **而工具擋掉了我另一個錯**:`--also arch/rlx/kernel` 加了 **0** 個物件
+(`arch/rlx` 本來就在母體裡),`Q1b` 直接拒絕 —— 它的規矩是「一個什麼都沒加的 `--also`
+是在對母體說謊」。
+
+---
+
+### 7. 開機擷取的四段預測,寫在建置之前(13:12:34,建置 13:13:11)
+
+模型:`rlxfw_mark(tag)` = `8 + len(tag)`、`rlxfw_markx(tag,v)` = `17 + len(tag)`。
+**沒有直接相信它,先用兩個已發表的數字檢查:** 上一段的卡片寫 `1,455 − 1,424 = 31`,
+模型給 `PD0 + PD1 = 11 + 20 = 31` ✅;卡片寫 `1,493 − 1,455 = 38`,模型給
+`G7 + G8 = 19 + 19 = 38` ✅。兩處命中才用。
+
+| 位元組 | 停在哪裡 |
+|---|---|
+| **1,493** | `rtl819x-keys.o` 沒進映像(兩個有條件的目錄下降沒發生);`MK8` 的見證也會紅 |
+| **1,551** | `K0 K6 K7 K8` —— 驅動註冊了,**probe 從未被呼叫**;`K7` 讀 `00000001`,真 probe 產不出的哨兵值 |
+| **1,580** | ＋`K1 K2` —— probe 進去了而 `gpio_request` 失敗;`K2` 帶 errno |
+| **1,637** | ＋`K3 K4 K5` —— probe 跑完 |
+
+到 1,637 之後由**值**決定:`K3` = `00000001`(按鈕沒被按住,低態有效)、
+**`K4` = `FFFFFFFA`**(`-ENXIO`)、`K5` = `K7` = `00000000`。
+
+🟢 **桌面那一半驗證了**:九個 K 字面值在 `r59.vmlinux.elf` 裡各出現一次,
+長度加總 **144**,對上預測的 144。
+🔴 **1,637 裡有 213 個位元組從未在矽片上量過**(R5-7 的 69 ＋ R5-8 的 144),
+量過的只有 1,424 這個底。這句話寫下來,是因為它很容易被引用成「1,637 是量到的」。
+
+---
+
+### 8. 🔴 這個 repo 自己的度量是階梯狀的,而以前沒有任何地方寫過
+
+`k8c3` → `r59`,兩顆 built config **位元組相同**(`diff` 空),唯一變數是驅動。
+ELF 檔差 **+33,953**,而節區大小總和只差 **+9,808**。拆開之後完全合攏:
+
+| 項 | 位元組 |
+|---|---|
+| `.text` +3,568、`.rodata` +832、`.data` +352、`.init.text` +1,128、`.exit.text` +188、`.init.data` +8、`.initcall.init` +4 | **+6,080 真實內容** |
+| 對照:`rtl819x-keys.o` 5,708 text ＋ 116 data | 5,824,餘 ~256 是板檔的第二個裝置 |
+| `__param` | **+3,264,是填充不是內容** |
+| `.bss` | +464,不佔檔案空間 |
+| **剩下的 32,768** | **一個對齊階** |
+
+`__param` 是填充,量到的:它在兩顆映像裡都**剛好結束在 4 KiB 邊界**
+(`0x80294bac + 0x454 = 0x80295000`、`0x80298eec + 0x1114 = 0x8029A000`)。
+而 `.data` 的 `AddrAlign` 是 **32768**,它的檔案偏移正好移了 **+32,768** ——
+所以 3,568 位元組的 `.text` 成長把整個檔案推了一整格。
+
+> **兩顆映像的 `vmlinux` 位元組數相減,最多可以高估或低估 32 KiB。**
+
+⚠️ 這不追溯改寫任何既有讀數:小的增量不跨邊界,大的沒有被重新量過。
+
+---
+
+### 9. 🔴 一個重現不出來的數字,而它在 `SPEC.md` 裡
+
+`SPEC.md` `FW-55` 記上一段的第三道門是 `hazlint`:**111,540 個 load、0 violations**。
+
+我對 **`r58` 的超集**(同樣的目錄再加 `drivers/input/keyboard`)跑同一支工具,
+得到 **3,096 個 load**。**超集不可能比子集少。** 唯一比它更寬的跑法 `--also drivers`
+在 `Q7b` **拒絕**(25 個空的 `built-in.o` 聚合體),所以那個數也不是那樣來的。
+而 `LOG.md:16522` 更早的一次記的是 `1,986 loads / 61 leaf objects`,和 `3,096 / 70`
+是同一條連續序列。
+
+**那一列沒有寫下掃了哪些目錄。** 而這支工具每一次跑都把母體印在第三行,正是因為
+「掃描自己的母體是一個主張」。數字**留在原地不刪**,加註說明重現不出來 ——
+負面結果與寫錯的紀錄都留著。
+
+---
+
+### 10. 三筆舊債
+
+**`CENSUS-2` — 收掉。** `ci-census` 的四個剖析式都要求**恰好兩個**前導空格,
+`UNPARSABLE_RE` 也是,所以一支印四個空格的工具產出的擷取裡 `ok`／`fails`／`skips`
+**與 `unparsable` 全部是空的**,而 `C4` 報 `CENSUS-MISMATCH 0+0+0 != N -- cases went
+missing`。真而無用:沒有 case 不見,每一個都跑了也印了,只是從來沒有被剖析。
+這個形狀花掉兩次 push(2026-09-08 `capdate`／`capfield`、2026-09-10 `regcensus`),
+兩次都是靠讀工具原始碼才找到原因。`misindented()` 刻意比那四個**寬**(任何前導空白、
+token 後只要一個空格),因為它的工作不是剖析一個 case,是注意到一行**想當** case。
+四個案例:`C4c` 紅、`C4d` 訊息說 `INDENT` 且不說 `went missing`、
+**`C4e` 正控制**(同樣十行改成兩格必須綠)、**`C4f` 鑑別控制**(真的少了三個仍讀
+`CENSUS-MISMATCH` 而不是 `INDENT`)。自測 30 passed / 0 failed,`ci-census` 26 → 30。
+⚠️ `C11`(巢狀工具的深縮排行不算 case)仍然綠 —— 新分支只在**什麼都沒剖析到**時觸發。
+
+**`LEDGER-4` 第三個形狀 — 歸因被否證。** 上一段記的是「`ledgerscan` 的 `TEXT_EXT`
+不含 `.c`/`.h`」。量,兩個獨立來源說它是錯的:① `tools/ledgerscan.py:240` 從
+`aa89317`(**2026-09-03 00:49**)起就含 `.c` 與 `.h`,比那句話早**七天**;
+② 掃描器今天**就從 `rlxfw-devices.c` 這個 `.c` 檔裡抓到兩個引用**。
+🔴 **真正的機制是引用的形式。** 量:`include/linux/leds.h` 這個字串只出現在三個 `.md`
+裡,`.c` 檔裡的形式是 `#include <linux/leds.h>`,**不包含 `include/` 前綴**。
+⚠️ **而把兩者對映起來會是錯的**,所以沒有做:一個 `#include` 不是「讀過」的證據,
+而這本帳的主題是**取用**了什麼。**所以這不是第三個形狀**,它併回第二個 ——
+一個檔在某一天被讀、在另一天才被宣告,而 `check` 對這段空窗是綠的,因為 `check`
+比對的是引用不是閱讀。
+
+**`HC-1` — 決定不改名,而這是決定不是拖延。** 量:`host-compat` 全 repo **99** 個
+引用,其中 **18** 個在 append-only 的 `LOG.md`、10 個在 `PROGRESS.md`、
+**4 個在凍結的 bench 卡片裡**。改名會讓歷史說謊,而 `bench/2026-08-30` 當初就是用
+同一個判準(40 與 84 個引用)決定**具名宣告而不重新命名**。這一段觸碰了那個目錄
+(第六個 patch),所以由這一段結案。
+
+---
+
+### 11. 這一段自己踩到的東西
+
+1. **列舉照目錄做** —— 漏掉 HID,差點多 56 KB。是**建置**否證了我,不是我發現的。
+2. **見證字串會削弱既有的檢查** —— 讀工具原始碼才發現,差一點就寫下去。
+3. **`hazlint` 第一次跑漏了 `drivers/leds`**。
+4. **`--also arch/rlx/kernel` 是多餘的**,工具拒絕。工具在做它該做的事。
+5. 🔴 **我差點把一個紅記成綠。** `ledgerscan check` 用
+   `wsl -- bash -lc "… ; echo rc=\$?"` 讀到 **rc=0**,從腳本檔裡讀是 **rc=1**。
+   `$?` 在 Git Bash 那一層就被展開了 —— CLAUDE.md 寫了這條規矩,而我照規矩複查
+   才抓到。**這是這個檔案自己的 `EXIT CODE: 0` 事件的第 N 次。**
+6. 🔴 **凍結程序那個洞不是 `spec-check` 特有的。** 量:`git add` 之前
+   `ledgerscan check` 報 **3** 個未宣告路徑,之後報 **4** —— 多的
+   `include/linux/gpio_keys.h` 的引用在還沒進索引的 `rtl819x-keys.c:50`。
+   **任何以 `git ls-files` 為母體的檢查器都有這個洞**,今天量到第二個實例。
+
+---
+
+### 12. 收工
+
+
+**`desk-sweep run`(全套,不是 `ci-census --only`),而它抓到了交辦說它會抓到的東西。**
+
+```
+70 declared, 2 skipped, 68 ran, 64 green, 2 expected-red, 2 unexpected
+copy 21.1s + verify 11.7s + sweep 1801.5s
+🔴 text/test-config-gates: unexpected red (rc=1)
+🔴 text/ledgerscan check (exit-code gate): unexpected red (rc=1)
+ok  the source did not move: this verdict is about the tree on disk now
+```
+
+兩個非預期的紅**都是我這一段造成的,而且都在推之前**:
+
+**① `text/test-config-gates`,四個寫死的母體計數。**
+`E1` 50/27/23 → **71/48/23**、`E1b --variant loud` 52/29/23 → **73/50/23**、
+`E1b --variant quiet` 同 `E1`、`G4c` 6 → **7**(`MK8`)。
+`71 = 48 + 23`,而 `48 = 27 + 21`。這支套件 `E1` 上方的註解 2026-09-06 就寫著
+「**你編輯的那支套件,和擁有你編輯的東西的那支套件,不是同一組**」,而它
+**2026-09-06、2026-09-10(第五十三段)、今天** 各觸發一次。前兩次都是紅在 CI 上;
+這一次紅在桌面上,**因為收工流程改了**。那個註解自己也寫著「要改的是收工流程,
+不是斷言」—— 這一次是它說對了的證據。改完 **60 passed / 0 failed**。
+
+**② `text/ledgerscan check`,四個未宣告路徑** —— 見下面的帳本一節,收工時補齊。
+
+**收工時重跑的、主題是 `.md` 的檢查**(`desk-sweep` 的判決是關於它掃描時看到的那棵樹,
+而這一段的紀錄是在掃描之後才寫的 —— `CLAUDE.md` 的 ③b):
+

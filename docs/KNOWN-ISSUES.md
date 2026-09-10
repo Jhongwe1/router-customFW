@@ -232,6 +232,38 @@ read.
 * 🔴 **`looprun --iterations` above 1 is refused, because the loop cannot
   repeat.** `S4` is a loader command and iteration 1 ends with the loader
   gone. A loop that runs once is what exists; `R5` is six drivers. `LOOP-3`.
+* 🆕 **`gpio_to_irq()` on this die.** 2026-09-10 (`R5-8`).
+  `config/host-compat/0006` aliases it to gpiolib's `__gpio_to_irq`, which
+  returns `-ENXIO` when `chip->to_irq` is `NULL`, and `rtl819x-gpio.c:658` is
+  `.to_irq = NULL` — but **that chain is READ, not measured on the silicon**.
+  `rtl819x-keys` prints the live value as `RLXFW-K4` on every boot and the
+  prediction is `FFFFFFFA`; nothing has booted it. The same sentence covers
+  the `-EINVAL` this patch gives `irq_to_gpio()`, and that half is WEAKER
+  still: 量, three files in this drop call it and this board builds none of
+  them, so no image this project ships can demonstrate it either way.
+* 🆕 **This button's bounce.** 2026-09-10 (`R5-8`). The
+  `debounce_interval = 100` in `arch/rlx/kernel/rlxfw-devices.c` is a guess
+  and the file says so. The instrument for it is `rtl819x-keys`' 32-slot
+  jiffies ring and its `b0_n_bounce` counter, and the ring's resolution is
+  bounded at 10 ms by `HZ=100` — which is also the floor of the poll
+  interval, because `input-polldev` converts it with `msecs_to_jiffies()`.
+  **A polled button cannot see bounce finer than its own poll interval**;
+  that is a property of polling and not a defect of the timestamp.
+* 🆕 **Whether `rtl819x-keys` polls at all on the die.** 2026-09-10.
+  `input-polldev` queues no work until a HANDLER opens the input device
+  (讀 `drivers/input/input-polldev.c`), and in this image the only handler
+  that can is `evdev`, whose `input_open_device()` is inside `evdev_open()`
+  (`drivers/input/evdev.c:190`) — i.e. it needs a userspace open of
+  `/dev/input/event0`. Nothing has performed one. `n_open`/`n_poll` are the
+  three-state reading that will say so.
+* 🆕 **`SPEC.md` `FW-55`'s `111,540 個 load` is not reproducible.**
+  2026-09-10. The same `tools/hazlint-objs.py` on `r59` — a SUPERSET of
+  `r58`'s population — reports 3,096 loads over 70 leaf objects, and a
+  superset cannot be smaller. `--also drivers`, the only wider run, REFUSES
+  on `Q7b`. The row does not record which directories were swept, and the
+  tool prints its population on every run precisely because a sweep's own
+  population is a claim. The number stays in place with the correction beside
+  it.
 
 
 ---

@@ -615,3 +615,56 @@ same commit or it does not arrive — the same condition `P4a`'s `L2-6` put on
 * 🔴 **`.version` means an incremental build is never reproducible**, whatever
   the scope. Every reproducibility claim in `notes/reproducible-build.md` is a
   fresh-stage claim and stays one.
+
+
+---
+
+## 8. 🔴 `FW-59`, 2026-09-10 (`R5-8`): the `vmlinux` byte count this project quotes is a STEP function
+
+Every build note here, and `SPEC.md` beside them, records image growth as the
+size of `vmlinux.elf`. 量 2026-09-10, and the number is quantised.
+
+`k8c3` and `r59` differ by exactly one driver: their built `.config` files are
+**byte-identical** (`diff` over the non-comment lines is empty), and the trees
+differ by `drivers/input/keyboard/rtl819x-keys.o` plus one more platform
+device in `arch/rlx/kernel/rlxfw-devices.o`.
+
+    ELF file                      4,061,429 -> 4,095,382     +33,953
+    sum of section sizes                                      +9,808
+    of which .bss (no file space)                               +464
+
+The +33,953 decomposes with nothing left over:
+
+| term | bytes | what it is |
+|---|---|---|
+| `.text` +3,568, `.rodata` +832, `.data` +352, `.init.text` +1,128, `.exit.text` +188, `.init.data` +8, `.initcall.init` +4 | **+6,080** | real content. `size` on the object: `rtl819x-keys.o` is 5,708 text + 116 data = 5,824, and the remaining ~256 is the board file's second device |
+| `__param` | **+3,264** | **padding, not content** |
+| `.bss` | +464 | occupies no file space |
+| the remainder | **32,768** | **one alignment step** |
+
+**`__param` is padding, and that is measured rather than argued.** 讀
+`readelf -SW` on both images: `__param` sits at `0x80294bac` with size `0x454`
+in `k8c3` and at `0x80298eec` with size `0x1114` in `r59`, and
+`0x80294bac + 0x454 = 0x80295000` while `0x80298eec + 0x1114 = 0x8029A000` —
+**both end exactly on a 4 KiB boundary**. The section absorbs the slack up to
+that boundary, so its reported size is parameters plus however much padding
+the sections above it happened to leave.
+
+**The 32,768 is `.data`'s alignment.** `readelf` reports `AddrAlign` **32768**
+for `.data`, and its file offset moved from `0x2a0000` to `0x2a8000` —
+**+32,768 exactly** — while the content above it grew 3,568. Every section
+after `.data` carries the same shift.
+
+> **So subtracting two images' `vmlinux` byte counts can overstate the change
+> by up to 32,767 bytes, or understate it by the same, depending on where the
+> content above `.data` happens to fall.**
+
+⚠️ **This does not retroactively rewrite any figure already recorded.** A
+small increment cannot cross the boundary — `SPEC.md`'s `+233` for one image
+pair is safe by inspection — and the large ones (`+33,539` for `rtl819x-spi`
+1.1, `+39,605` for `r58` → `r59`) have not been re-measured against their
+loadable content. What changes is what a future figure has to say: **quote the
+section sums, or say that the ELF number is a step function and by how much.**
+
+🔴 Nothing checks this. There is no tool here that reads two images and
+reports loadable growth; the number every note quotes is `stat -c%s`.

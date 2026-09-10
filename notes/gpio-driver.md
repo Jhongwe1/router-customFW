@@ -783,3 +783,93 @@ the name does not fit.
    put my driver and `rtl_gpio_timer` in contention on purpose.
 5. **Anything about the loader.** No `FLR` ran, no flash byte was read, and
    the bracket is unchanged.
+
+---
+
+## 12. 🆕 `R5-8`'s desk half, and where § 10's plan was wrong
+
+2026-09-10, the fifty-fourth segment. Desk, no power. Both halves of § 10's
+decision landed: `config/host-compat/0006` and
+`drivers/input/keyboard/rtl819x-keys.c` (880 lines), image `r59`,
+`RECIPE_ID` `692a2801`.
+
+### 12.1 § 10 said "define `gpio_to_irq()` as returning `-ENXIO`". It does not.
+
+That sentence is a value this project would have chosen. What shipped is one
+line —
+
+```c
+#define gpio_to_irq     __gpio_to_irq
+```
+
+— and the `-ENXIO` comes out of `drivers/gpio/gpiolib.c:1102`,
+`chip->to_irq ? chip->to_irq(...) : -ENXIO`, because `rtl819x-gpio.c:658` is
+`.to_irq = NULL`. **The value is produced by the data structure rather than
+typed**, and the day a `.to_irq` exists it starts returning a real irq with
+no second patch. `arch/x86/include/asm/gpio.h:44` is the shape § 10 described
+— a `static inline` returning `-ENOSYS` — and it was rejected for that
+reason, not overlooked. Two mechanical reasons come with it: lines 5-7 of the
+arch header are already three `#define`s of exactly this shape, and
+`__gpio_to_irq` is not declared until the `#include <asm-generic/gpio.h>` on
+line 19, so an inline wrapper written where the declaration sat would not
+compile.
+
+§ 10's other three claims held as written: `gpio-keys-polled` is not in the
+drop, `gpio_keys.c` has six `gpio_to_irq()` sites, and the patch turns a link
+failure into a probe failure. The last one is now measured rather than
+predicted — cells `k8c1`/`k8c2`, one variable, `rc=1` with
+`undefined reference to 'gpio_to_irq'` at four relocation sites against
+`rc=0`.
+
+### 12.2 The thing that would have cost a power cycle
+
+`input-polldev` queues its poll work only from `input_open_polled_device()`,
+which is `input_dev->open` — so **nothing polls until a handler opens the
+device**. 量, the handlers in this drop that call `input_open_device()`:
+`evdev.c:190` (inside `evdev_open()`, on the first userspace open),
+`evbug.c:63` (inside `evbug_connect()`, at registration), and
+`drivers/char/keyboard.c` (needs `CONFIG_VT`, absent here). `mousedev` and
+`joydev` do not match an EV_KEY-only device; `apm-power` needs
+`APM_EMULATION` and `rfkill-input` needs rfkill.
+
+`CONFIG_INPUT_EVDEV=y` and `/dev/input/event0` are in the image for that
+reason, and `evbug` — which would have opened it with no userspace at all —
+is pinned `n`, because it would make the polling unconditional and destroy
+the three-state reading `n_open`/`n_poll` gives. That reading is the same
+shape as `R5-3a`'s line 25 being absent from `/proc/interrupts` before
+`request_irq` and after `free_irq`.
+
+### 12.3 The negative control is a mark, not a paragraph
+
+`rtl819x-keys`' probe makes the call `gpio_keys` makes at its own `:134`, on
+the same line, in the same boot, and prints the answer as `RLXFW-K4`.
+Predicted `FFFFFFFA`. Shipping `gpio_keys` beside it as a live control was
+**rejected**: two consumers of one GPIO line make the probe order matter, and
+that order rests on `device_initcall` link order — which
+`arch/rlx/kernel/rlxfw-devices.c`'s own comment says this project will not
+rest on.
+
+### 12.4 The enumeration was scoped to a directory and reachability is not
+
+§ 7's LEDS block enumerated `drivers/leds/Kconfig` and got away with it.
+`CONFIG_INPUT` has a dependent in another directory: `drivers/hid/Kconfig:4-7`
+is `menuconfig HID_SUPPORT` / `depends on INPUT` / `default y`, and 17 Kconfig
+files in this drop carry `depends on INPUT`. The prediction of 20 came back
+as 20 survivors and **five** `(NEW)`, all HID, with `CONFIG_HID=y` and
+`CONFIG_HID_DEBUG=y` taken from `< /dev/null` — 56,056 bytes of `drivers/hid/`
+on a board with no USB host and no bluetooth. Repaired to 21 and re-measured
+(`k8c3`): `(NEW)` 0, 21 of 21 survivors, the four HID children dropped rather
+than answered.
+
+### 12.5 What § 11's list gains
+
+6. **The `-ENXIO` value has not been measured on this die.** It is read out
+   of gpiolib and out of this driver's own `.to_irq`, and `RLXFW-K4` is what
+   will measure it.
+7. **The button's bounce has never been measured.** The 100 ms
+   `debounce_interval` in `rlxfw-devices.c` is a guess and says so; the
+   driver's 32-slot jiffies ring and `b0_n_bounce` are the instrument for it,
+   and `jiffies` at `HZ=100` bounds the resolution at 10 ms, which is also
+   the floor of the poll interval.
+8. **Nothing of `rtl819x-keys` has run on the silicon.** 213 of the 1,637
+   predicted boot-capture bytes have never been measured.

@@ -229,10 +229,22 @@ identifiers.
   `leds-gpio` binds to, in image `r58`. **Nothing has probed on hardware**, so
   the `.dts` claim is unchanged: this file describes measured hardware and the
   binding has never been exercised by a device tree, because 2.6.30 has none.
-  🔴 **The `keys` node still has nothing bound**, and 量 2026-09-10 the reason
+  ~~🔴 **The `keys` node still has nothing bound**, and 量 2026-09-10 the reason
   is a link error rather than a probe failure: `gpio_keys.c` calls
   `gpio_to_irq()` at six sites and `arch/rlx` declares it without defining it
-  anywhere, so `CONFIG_KEYBOARD_GPIO=y` does not build. That is `R5-8`.
+  anywhere, so `CONFIG_KEYBOARD_GPIO=y` does not build. That is `R5-8`.~~
+  🔄 **2026-09-10, later the same day (the fifty-fourth segment): both halves
+  of that expired.** The link error is fixed by `config/host-compat/0006`
+  (量, cells `k8c1`/`k8c2`), and `CONFIG_KEYBOARD_GPIO=y` is still pinned `n`
+  — not because it cannot build but because on this SoC it would probe and
+  fail `-ENXIO`, and because two consumers of one GPIO line make the probe
+  order rest on `device_initcall` link order. **The `keys` node has a driver
+  now**: `drivers/input/keyboard/rtl819x-keys.c`, polled through upstream's
+  `input_polldev`, consuming upstream's unmodified
+  `struct gpio_keys_platform_data` from a `platform_device` in
+  `arch/rlx/kernel/rlxfw-devices.c`, in image `r59`. ⚠️ **Nothing has probed
+  on hardware**, so the `.dts` claim below is unchanged for the same reason
+  the LED's is.
   The LED node also documents a conflict rather than
   hiding it: the vendor's `rtl_gpio_timer` drives bit 6 as well. ⚠️ The
   sentence that used to end this bullet — *bit 6 is not in the 2.6.30 driver's

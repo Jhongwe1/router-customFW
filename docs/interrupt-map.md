@@ -689,10 +689,26 @@ only worth having if you can see what it used to say.**
    the only caller in the built set, it is compiled out, and turning DEBUG_FS
    on breaks the link). 🔴 **The new consequence is `R5-8`'s**: upstream
    `gpio_keys.c` calls `gpio_to_irq()` at six sites — `:62` (a `BUG_ON` inside
-   the ISR), `:134`, `:175`, `:199`, `:222`, `:240` — so **`CONFIG_KEYBOARD_GPIO=y`
-   does not fail at probe, it fails at link.** This file still has no row for a
-   GPIO interrupt line and `.to_irq` is still `NULL`; what changed is that the
-   absence now has a second, sharper witness than "nobody measured one".
+   the ISR), `:134`, `:175`, `:199`, `:222`, `:240` — so ~~**`CONFIG_KEYBOARD_GPIO=y`
+   does not fail at probe, it fails at link.**~~
+   🔄 **2026-09-10, later the same day (the fifty-fourth segment): that
+   sentence expired and the thing that replaces it is stronger.**
+   `config/host-compat/0006` adds `#define gpio_to_irq __gpio_to_irq` to the
+   arch header — finishing a list of three that was already there — so
+   `CONFIG_KEYBOARD_GPIO=y` now BUILDS, and 量 (cells `k8c1`/`k8c2`, one
+   variable): without the patch `undefined reference to 'gpio_to_irq'` at four
+   relocation sites including `.text.gpio_keys_isr+0x1c`, with it `rc=0`.
+   🟢 **The failure moves to probe and carries the chip's own errno.** 讀
+   `drivers/gpio/gpiolib.c:1102`, `chip->to_irq ? … : -ENXIO`, and
+   `drivers/gpio/rtl819x-gpio.c:658`, `.to_irq = NULL` — so
+   `gpio_to_irq(5)` answers `-ENXIO` **because this chip supplies no
+   mapping**, not because anybody typed the constant. 讀 `gpio_keys_probe`:
+   `gpio_request` succeeds, `gpio_direction_input` succeeds, the irq lookup
+   fails, and the driver frees the line on the way out, so it leaves no
+   `-EBUSY` behind. ⚠️ **`-ENXIO` has not been measured on this die.**
+   `drivers/input/keyboard/rtl819x-keys.c` makes that same call at probe and
+   prints it as `RLXFW-K4`; the prediction is `FFFFFFFA`. This file still has
+   no row for a GPIO interrupt line and `.to_irq` is still `NULL`.
    `PROGRESS.md`'s `R5-8` row carries the decision that follows from it.
 
 ---
