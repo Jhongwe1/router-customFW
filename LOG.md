@@ -22120,3 +22120,90 @@ mark 巨集讓算術是精確的:`rlxfw_mark(tag)` 是 `len(tag) + 8` 位元組,
 
 **零 flash 寫入命令、零 `FLR`、零電源循環、零 `--send`**,括號仍然
 1,024 / 4,194,304 ＝ **0.0244 %**。
+
+---
+
+### 9. 收工之後才發生的事,而它們證明第 8 節那份清單當時是不完整的
+
+**這一節存在的理由是一個順序問題,不是紀律問題。** `CLAUDE.md` 的 ③b 寫著
+「一次掃描永遠涵蓋不到這一段自己的寫上去」——同一個順序讓寫上去也涵蓋不到它自己的
+收工。上面第 1–8 節在 08:17 寫完;下面全部發生在那之後。
+
+#### 9.1 🔴 `test-config-gates` 紅了,而它上方的註解四天前就逐字警告過
+
+推上去之後 CI 的 `text` job 紅在 `test-config-gates`,四個寫死的母體計數:
+
+| case | 之前 | 之後 |
+|---|---|---|
+| `E1` 已提交的 delta | 45 rules / 22 set / 23 derived | **50 / 27 / 23** |
+| `E1b --variant loud` | 47 / 24 / 23 | **52 / 29 / 23** |
+| `E1b --variant quiet` | 45 / 22 / 23 | **50 / 27 / 23** |
+| `G4c` present-witness build 列 | 5 | **6** |
+
+全部是我這一段加的(五條 `set` 列、一條 `MK7`)。
+
+🔴 **而 `E1` 正上方的註解從 2026-09-06 就寫著這件事**:
+
+> *「THIS SUITE IS WHY THAT SEGMENT'S CLOSEOUT WAS INCOMPLETE. It names the
+> suites whose CODE it touched and ran those; test-config-gates owns the two
+> files it touched most and was not among them … **the suite you edited is not
+> the same set as the suite that owns what you edited.**」*
+
+我改了 `config/rlxfw-kernel.delta` 與 `config/rlxfw-marks.tsv`,跑了
+`ci-census --only regcensus`(因為 `regcensus` 是我改過**程式碼**的那一支),然後
+推上去。**同一個形狀、同兩個檔案、同四個 case。**
+
+⚠️ **計數刻意仍然寫死。** 從活的檔案導出來會讓這四個 case 變成不可否證 —— 它們存在
+的目的是宣稱「這些宣告是這支套件被寫來對付的形狀」,而一個自己重算期望值的 case
+說不出這句話。**要改的是收工流程,不是斷言。**
+
+本機重跑:**60 passed, 0 failed, 0 skipped**(CI 上那 7 個 skip 需要廠商模板,
+這台桌面有)。`ci-expected.tsv` 的宣告仍是 60,不需要動,所以不會有
+`CENSUS-MISMATCH`。
+
+#### 9.2 🔴 帳本有兩個缺口,而 `ledgerscan check` 兩個都看不見 —— 結構上
+
+**① `include/linux/leds.h` 被讀了(兩個結構整個讀完)而帳本沒有列。**
+它是 `arch/rlx/kernel/rlxfw-devices.c` 填的那八個欄位的來源,而
+`leds-gpio.c` 自己回答不了「一顆 platform device 要帶什麼」。
+
+量:`ledgerscan` 的 `TEXT_EXT` 是 `.md .tsv .json .py .sh .yml .yaml .txt`,
+**不含 `.c`／`.h`**,而這條路徑在整棵樹裡唯一的引用是我自己驅動裡的
+`#include <linux/leds.h>`。所以 `check` 綠是結構性的。
+
+**② `drivers/leds/Kconfig` 的深度變了而沒有人記。** 帳本那一列寫 `:12-16` 與
+`:121-129`;這一段把**整份 35 個符號**連同每一層 `if`／`depends on`／提示全部展開。
+帳本 §2.1 的規則是「記範圍,而且往多報的方向錯」,所以更寬的範圍要進去。
+
+🔴 **這是 `LEDGER-4` 的第三個形狀。** 第一個是掃描器看不見的**深度**改變;第二個是
+讀了但從來沒寫出來的檔;這一個是**引用存在,但在掃描器不打開的檔案類型裡**。
+三個的共同點是同一句:一個引用掃描器只證明「被引用的都有列」,它不證明
+「被讀的都有列」。
+
+⚠️ **兩個都不動 in-scope 的 58** —— 那是**掃描**的數字,不是這張表的列數,而掃描
+看不見這條路徑。
+
+#### 9.3 🔴 `notes/gpio-driver.md` §5 的第一句話上一段就過期了,而我今天改了那個檔三次
+
+§5 寫著「§4.1 records the `led` domain at **zero cited paths**, and § 8's table
+gives it the verdict *"blind of any implementation"*」。**兩半都在寫下它的那一段
+裡就變成假的**:`led` domain 在同一段 **0 → 4**,而 §8 的判定在同一個 commit 裡被
+收窄成 *"blind of any implementation **ON THIS SoC**"* —— 因為 `leds-gpio.c` **是**
+一個實作,一個泛用 GPIO LED 的實作。
+
+🟢 **底下那個取捨完全不受影響,而把這件事記下來而不是重寫,正是為了這句**:§5 決定
+不去讀的是**廠商的**七個 `PABCD_DAT` 符號,而那七個一個都沒被打開。**對取捨承重的
+那個計數仍然是零。**
+
+#### 9.4 收工檢查(最終樹)
+
+| 檢查 | 結果 |
+|---|---|
+| `spec-check` | rc 0,0 findings ——⚠️ **它先紅過一次**:我在 Active step 那格裡放了兩個未逸出的 `\|`,把 2 欄的列變成 4 欄,而兩個都在我**寫的正是關於逸出**的行內碼裡 |
+| `ledgerscan check` | ok(而 §9.2 是它看不見的那兩件) |
+| `xcheck sweep` | 956 artefacts、3 identities、**0 disagreements** |
+| `flashwin scan` | **CLEAN**,3,435 個檔案 |
+| `test-file-modes` | 3 passed、0 failed、75 個可執行 |
+| `dtcheck` | **REFUSED** 而不是跳過(缺 `dtschema`);`dt/` 這一段沒動,由 `db5741c` 的綠 `text` job 涵蓋 |
+| `desk-sweep` | 全套,見下 |
+

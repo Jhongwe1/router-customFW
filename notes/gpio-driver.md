@@ -322,9 +322,22 @@ names read like a vendor LED API.
 next step is to disassemble them and find out whether anything calls them.
 This segment did not, and the reason is a trade rather than an oversight.
 
-`docs/blind-write-ledger.md` § 4.1 records the `led` domain at **zero cited
+~~`docs/blind-write-ledger.md` § 4.1 records the `led` domain at **zero cited
 paths**, and § 8's table gives it the verdict *"blind of any implementation"*.
-§ 0 ② calls that *"this ledger's strongest row"*. Reading `autoconfig_gpio_*`
+§ 0 ② calls that *"this ledger's strongest row"*.~~
+
+🔄 **2026-09-10, fifty-third segment: both halves of that sentence had already
+expired when this section was written, and this file was edited three times
+today before anyone noticed.** The `led` domain went **0 → 4** in the same
+segment that wrote § 5 — `leds-gpio.c`, `led-class.c`, `drivers/leds/Kconfig`
+and one `origin: none` path — and § 8's verdict was narrowed in the same commit to
+*"blind of any implementation **ON THIS SoC**"*, because `leds-gpio.c` IS an
+implementation, of a GPIO-connected LED in general.
+
+🟢 **The trade below is unaffected, and recording that is why this correction
+is here rather than a rewrite**: what § 5 declines to read is the VENDOR's seven
+`PABCD_DAT` symbols, and not one of them has been opened. The count that matters
+to the trade is still zero. Reading `autoconfig_gpio_*`
 would spend it — and § 4.3.1 has already established that a count taken out of
 the vendor's *object* code is a declarable reading with a depth, not a
 loophole.
