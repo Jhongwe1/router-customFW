@@ -22621,4 +22621,269 @@ ok  the source did not move: this verdict is about the tree on disk now
 
 **收工時重跑的、主題是 `.md` 的檢查**(`desk-sweep` 的判決是關於它掃描時看到的那棵樹,
 而這一段的紀錄是在掃描之後才寫的 —— `CLAUDE.md` 的 ③b):
+---
+
+## 2026-09-10 — 第五十五段(桌面,不通電):`R5-7` ＋ `R5-8` 的上機卡片,而交辦的兩個決定都是用讀出來的東西定的
+
+桌面日,未接觸裝置。**零 flash 位元組、零電源循環、零裝置讀數 —— 今天這句話成立,
+因為機器沒有通電。** 括號不動:**1,024 ／ 4,194,304 = 0.0244 %**;
+`FLS-26` 的 99.61 ／ 0.195 ／ 0.195 一個位元組都沒有動。
+
+17:07 開場,同一個日曆日的**第五段**。
+
+---
+
+### 0. 開場三件事
+
+**日期,三邊。** Windows `2026-09-10 17:07:54`／`Thursday`／`Taipei Standard Time`、
+Git Bash `2026-09-10 17:07:49 TST (Thu)`、WSL `2026-09-10 17:07:52 CST (Thu)`。
+`TST` 與 `CST` 是同一個 UTC+8 的兩種拼法,而**兩邊的 epoch 位元組相同**:
+`1789031272`。
+
+🔴 **而 Windows 那一側的 epoch 差了 28802 秒,那是 PowerShell 的第六個陷阱。**
+量,同一顆機器兩條路:`Get-Date -UFormat %s` → `1789060095.69966`,
+`[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()` → `1789031295`。差 **28800**,
+正好是本地 UTC 偏移;`(Get-Date).ToUniversalTime()` 印 `09:08:15Z` 而 local 是
+`17:08:15+08:00`。**Windows PowerShell 5.1 的 `-UFormat %s` 是拿本地時間當 UTC 算的。**
+Git Bash 與 WSL 都站在 reference 那一側,所以三邊一致的**日期**沒有用到那個壞掉的數 ——
+但它是一個穿著量測外衣的錯誤數字,而這個 repo 對那一類的態度是寫進 `CLAUDE.md`。
+
+**CI。** 只有一個 run 未收,`cc725ca` = **34457297211**,**attempt 1**(沒有重跑),
+`createdAt 2026-09-10T08:50:00Z` = 本地 **16:50**,收在 `09:08:05Z`,整段 **18m05s**。
+**四個 job 全綠**:`text` 3m9s、`instruments` 17m49s、`lint` 19s、`census` 10s。
+交辦寫的四個否證條件(apt/Chrome 外部故障、`test-config-gates` 的第五個宣告、
+`spec-check`／`ledgerscan` 的收工 `.md`、`census` 的 `ci-expected.tsv`)**一個都沒觸發**。
+⚠️ 交辦說「17:50 前後起跑」,量到的是 **16:50**;上一段 16:52 收工,push 在收工前兩分鐘,
+對得上,17:50 那個數字進不了紀錄。
+🟢 `census` 的 job id(`102811843656`)比另外三個(`1028065696xx`)高一個量級,
+那**不是重跑**:job id 在 job 起跑時才配,而 `census` 宣告 `needs: [text, instruments]`,
+要等 `instruments` 的 17m49s 結束。**這是 `needs:` 被看見的樣子。**
+
+**citime。** `check` 說一列未進帳(rc=1 是它在報缺,不是它壞了),進帳後:
+
+| | |
+|---|---|
+| `n` | 22 → **23** |
+| 帶 | **945..960 = 15 s**,中點 952.5,半幅 7.5,**± 0.787 %** —— 連續第**五**次進帳而不動 |
+| 新列 | `34457297211` `cc725ca` **BIG3=955**,落在帶內 |
+| mean | 955.27 → **955.26** |
+| 中位數 | **957 → 956.0** |
+
+🔴 **帶不動不等於分布不動,而動的正是交接帶著的那個數。** `± 0.787 %` 與 `n` 無關
+(`945..960` 的半幅/中點恆為 0.7874 %),所以陳舊的 `n` 讀起來永遠像最新的 —— 交接時
+帶的是 `n=22 中位數 957`,今天是 `n=23 中位數 956.0`。
+`segments` **3/3**,兩條併池正控制都 FIRED:**A8 31.778 %**(不動)、
+**A9 167.57 → 168.45 sd**(新列讓池子微移)。
+
+---
+
+### 1. 🟢 決定①(一顆映像收兩支驅動)是量出來的,不是省事
+
+交辦把兩個決定留給這張卡片。第一個的反對意見很具體:`rtl819x-keys` 在 probe 就
+`gpio_request(5)`,而 `RC4` 的儀器是 `tryout 5` 要回**我自己 guard 的** `-EPERM`;
+如果 gpiolib 更早就拒了,`RC4` 會讀起來像觸發而 guard 根本沒被走到。
+**那不是假設** —— seating 15 量到的就是角色對調的同一件事
+(`bench/2026-09-06c/CORRECTIONS-block12.md` § 2)。
+
+讀,兩處,而它把問題關掉:
+
+* `gpiolib.c` 的 `gpio_ensure_requested()`:條件是
+  `WARN(test_and_set_bit(FLAG_REQUESTED, ...) == 0, ...)`,而 `test_and_set_bit`
+  回的是**舊值**。線已被請求時是 `WARN(1 == 0)` —— 假 —— 整個區塊跳過:
+  不自動請求、不 `WARN`、不 `try_module_get`、回 **0**。
+* `gpio_direction_output()`:`status == 0` 於是 `if (status)` 不成立,
+  `chip->request` 不被呼叫,直接進 `chip->direction_output`。
+
+**所以 `r59` 上 `tryout 5` 走得到 `rtl819x_gpio_direction_output`,
+撞上 `!((1u << 5) & out_mask())`,回 `-EPERM`。** `RC4` 完好,而且是**因為**
+一個真的消費者持有那條線才完好。
+
+🟢 **兩件事因此從 artefact 變成正面結果:**
+
+| | `r58`(沒有 keys) | `r59`(keys 持有 line 5) |
+|---|---|---|
+| `tryout 5` | 自動請求 line 5、`n_req_ok` +1、把線留在 `[auto]` 標籤下 | 走得到 guard,`n_req_ok` **不動** |
+| `claim` | `-EBUSY`,而原因是**它上面那個 `tryout`** —— seating 15 的 artefact | `-EBUSY`,原因是 `rtl819x-keys` 真的持有它 —— gpiolib 在我的 chip 與一個真消費者之間仲裁 |
+
+🔴 **可否證的一半是那個「不動」**:`C1-P` 與 `C1-P2` 之間 `n_req_ok` 若由 2 變 3,
+我對 `test_and_set_bit` 回傳值的讀法就是錯的,§ 2.1 整節跟著倒。`SPEC.md` `FW-61`。
+
+---
+
+### 2. 🔴 `notes/gpio-driver.md` § 6.2 的預測被這一段自己推翻十倍
+
+§ 6.2 寫的是「按住約十秒,`n_state_foreign` 必須 > 0,**大約每秒一次**」。
+那句話是把「一個人打 `cat`」當取樣器寫的,而它寫的時候 `R5-8` 還不存在。
+
+讀,四個 `rtl819x_gpio_state_check()` 的呼叫站點:`.get`、`.direction_output`、
+`.set`、`read_proc`。兩個 op 的**拒絕路徑都在比對之前就 return**,所以只有 `_ok`
+那兩個計數進得來。再讀 `rtl819x_keys_poll()`:每次 poll 對每個按鈕做一次
+`gpio_get_value()`,那是 `chip->get`。
+
+**於是 `r59` 上偵測器的取樣率是 `1000 / poll_ms` 次每秒**,編譯進去的
+`poll_ms = 50` 給 **20 Hz**。十五秒按住、`interval 50`:`n_state_chk` ≈ **300**、
+`n_state_foreign` ≈ **150**,不是 15。
+
+🟢 **同一個讀數把偵測器自己寫下的限制縮小了。** § 6.1 說「兩次取樣之間被還原的
+寫入看不見」——那個窗從「人打字的秒」縮到 **50 ms**,而 `interval 10` 那一格
+再縮到 10 ms。
+⚠️ **在 `r58` 上這一整段不存在**:沒有 keys 驅動就沒有東西呼叫 `.get`,
+偵測器只在有人 `cat` 的時候比對一次。**這是「一顆映像收兩支驅動」的量測依據。**
+`SPEC.md` `FW-60`,更正就地寫回 `notes/gpio-driver.md` § 6.2。
+
+---
+
+### 3. 🟢 兩支驅動之間有一條逐格相等的恆等式,而分成兩顆映像就沒有
+
+同一批讀數推出兩條算式,寫在卡片 § 4:
+
+    Δn_get       = Δn_poll + (keys 的 /proc 讀數) + (keys 的 sample verb) + Δn_open
+    Δn_state_chk = Δn_get  + (gpio 的 /proc 讀數) + Δn_dirout_ok + Δn_set_ok
+
+🔴 **殘差是 0 或 1,而那個 1 不是誤差,是第二個量測。** 一格裡的兩個 `cat` 不同時,
+所以一次 poll 可能落在 keys 讀與 gpio 讀之間。`N` 格裡殘差為 1 的比例乘 `poll_ms`
+估的是 shell 的 `cat`-到-`cat` 間隔,而 `.timing` 獨立估同一個量。
+**兩個來源,量一件沒有人打算量的事。**
+🟢 `C10-X` 不估它,它**消掉**它:讀 `keys ; gpio ; keys`,gpio 讀那一瞬的 poll 數
+被兩個 `n_poll` 讀數**兩側夾住**,恆等式變成沒有自由項的雙邊不等式。
+
+---
+
+### 4. 🔴 交接裡的三態方案關不掉,而查出來的過程比結論有用
+
+交接寫:「卡片必須有一個 cell 把 `/dev/input/event0` 開起來,例如
+`cat /dev/input/event0 > /dev/null &`」。
+
+量,兩層:① 這顆映像宣告的 busybox symlink 有十一條 —— `sh`／`ash`／`cat`／`echo`／
+`ls`／`mount`／`ps`／`ifconfig`／`ping`／`mkdir`／`sleep` —— **`kill` 不在裡面**;
+② `kill` 是 ash 的 builtin,而 `cardcheck` 的 `ASH_BUILTINS` 清單**拒絕**任何靠
+builtin 的卡片,理由寫在它自己的註解裡(那份清單是 **推**,沒有卡片可以壓在上面)。
+seating 18 的第一版卡片用 `exec 3>` 被同一條規則擋掉過。
+
+**所以那個 cell 開得起來、關不掉,三態只拿得到兩態。**
+
+改成 **`sleep N < /dev/input/event0`**:`<` 是 `O_RDONLY` 的 open,evdev 的
+`evdev_open()` 只在乎 open 這件事而不在乎是哪個 fd;`sleep` 結束 fd 就關,
+`evdev_release()` → `input_close_device()` → poll work 取消。
+不需要背景工作、不需要 `kill`、時長是決定好的。
+
+🟢 **而它比原方案多給一樣東西**:三格排成 `(0,0)` → 第一次 open →
+**第二次 open** → 一次**沒有 open 的 `sleep`**,於是「polling 由 open 造成」
+被看到**兩次**,加上一個 `n_poll` 持平的第三態。原方案只能看到一次。
+
+---
+
+### 5. 🟢 一個沒有人放在清單上的格子:把 guard 的拒絕變成看得見的光
+
+`notes/gpio-driver.md` § 7 ② 要的是「兩側測試」,而 `ALLOW_OUT_MASK = 0` 讓它到
+2026-09-10 為止不可能跑 —— **一個只被看過拒絕的 guard 是一堵牆。**
+
+`r59` 上 `ALLOW_OUT_MASK = 1u << 6`,而 `lock 6`／`unlock 6` 是執行期遮罩的兩個 verb。
+讀 `leds-gpio.c`,極性套用在**恰好一個地方**:`create_gpio_led` 是
+`gpio_direction_output(gpio, active_low)` = `(6, 1)` = bit 6 高 = **暗**;
+`gpio_led_set` 是 `level = 1` 然後 `if (active_low) level = !level` →
+`gpio_set_value(6, 0)` = bit 6 低 = **亮**。`BRD-13` 量過那顆燈是八顆裡的第 2 顆。
+
+於是六格:
+
+| 格 | 動作 | 操作者看到 | `/proc` |
+|---|---|---|---|
+| `C11-L1` | `brightness` ← 1 | **LED #2 亮** | `dat` bit 6 → 0、`n_set_ok` 1、`n_writes` **3** |
+| `C11-L2` | `lock 6` | 什麼都沒有 | `out_locked` `00000040`、`out_effective` `00000000` |
+| `C11-L3` | `brightness` ← 0 | **LED #2 不滅** | `brightness` 讀回 **0** |
+| `C11-L4` | 讀 `/proc` | — | `dat` bit 6 仍 **0**、`n_set_no` **1**、`n_writes` 仍 **3** |
+| `C11-L5` | `unlock 6`,`brightness` ← 0 | **LED #2 滅** | |
+| `C11-L6` | 讀 `/proc` | — | `dat` bit 6 → 1、`n_set_ok` **2**、`n_writes` **4** |
+
+🟢 **`C11-L3` 是這張卡片上最好的單一讀數**:LED class device 報 brightness 0,
+而接腳還在驅動那道光。**Linux 對世界的模型與接腳的實際狀態當場分岔,而那個分岔就是 guard。**
+
+---
+
+### 6. 🔴 五道門抓到三個缺陷,全部在通電之前
+
+* `cardcheck numbers` 抓到**兩個計數錯**:`expansion-pair` 我寫 12 而實際 13
+  (漏數 `C1-P2`)、`expansion-open` 我寫 5 而實際 7(三態的兩格也帶
+  `< /dev/input/event0`)。
+* `spec-check` 的 **`C8`** 抓到一個沒跳脫的 `|`:表格裡的 `` `dat | 0x40` ``。
+  它會把那一列往後每一欄推移一格,而所有按索引讀 `V`／`來源`／`擁有者` 的檢查
+  都會讀到錯的格子**還回報通過**。第十七次更新為了同一類東西寫過八十個假缺陷。
+
+五道門最後的狀態:rule 4 `RECIPE_ID` `692a2801` 三個來源、`spec-check` **rc 0**
+(9 個變異控制 ＋ 18 個表格控制 ＋ C11 10/10 ＋ C12 13/13 全部先過)、
+`cardcheck commands` **54 個指令**全部可叫用(55 格減掉沒有 `--send` 的 `C1-A`)、
+`cardcheck numbers` **28 of 28**、`check-predictions` **`0 of 55`**。
+
+---
+
+### 7. 🔴 兩個我自己的失誤,而第二個是 `CLAUDE.md` 已有規則的多檔版本
+
+**① `$?` 又來了一次,這次穿的是 PowerShell 的衣服。** 我把 cardcheck 寫成
+`bash -c "... ; echo NUMBERS_RC=\$?"`,回來的是 `NUMBERS_RC=True` ——
+**那是 PowerShell 自己的 `$?`(布林)**,因為反斜線在 PowerShell 裡不是跳脫字元。
+`CLAUDE.md` 的規則不是「小心 `$?`」,是「**結束碼只能從腳本檔裡面讀**」,
+而我在同一段裡先違反它再照它做了一次。
+
+**② 一個多檔 patch 腳本在寫完第一個檔案之後才拒絕。** 腳本改 `SPEC.md` 與
+`notes/gpio-driver.md`;`SPEC.md` 的錨點命中並寫入,`notes/` 的錨點差一個空格
+(我寫 `it samples.  A write`,檔案是 `it samples. A write`)於是 `SystemExit`。
+**結果是半套用的兩檔編輯。** `CLAUDE.md` 已經記了 `open(path,'w')` 的單檔版本
+(先建整串、寫 `.tmp`、`os.replace`),而這是它的多檔版本:
+**每一個錨點都要在第一次寫入之前檢查完。** 重寫的版本就是那樣寫的,
+它自己的 docstring 說了為什麼。
+
+---
+
+### 8. 卡片本身
+
+`bench/2026-09-10/PREDICTIONS-B18-block17.md`,**55 格、13 次開機、1 次電源循環、
+3 段「手在板子上」**。
+
+* **決定②**:三段分開三次開機,順序是**強制的而不是選的** —— `REG-37` 量到長按之後
+  `dat` 閂在 `0000003C`(bit 6 低,燈亮)至少 152.1 秒,**而重跑救不回來**,
+  所以任何排在長按之後的 LED 讀數都是廢的。三種 `interval` 共用一次開機,
+  因為 `interval N` 是執行期 verb。
+* **§ 3** 把兩個 `/proc` 的每一個欄位在通電前預測完,包含一個從
+  `drivers/Makefile` 鏈結順序推出來的**次序**預測(`input/` :71 在 `leds/` :94 之前,
+  兩支都是 `device_initcall`,所以每一份擷取裡 `K0`…`K8` 都在 `G7`／`G8` 之前),
+  以及它的一個後果:keys probe 時 `state_known` 還是 0,所以 **`n_state_chk`
+  整個開機都是 0**,第一次 `/proc` 讀是偵測器有史以來第一次比對。
+* **§ 6** 是彈跳的解析度階梯,而它明講儀器的地板:`n_bounce` 三個 rung 都讀 0 的
+  正確說法是「彈跳在 10 ms 以下或落在兩次 poll 之間」,**不是**「這顆按鈕不彈跳」。
+* **§ 7.1** 把 `>= 5 s` 那條分支的安全性寫成三條量測(PID 1 是 shell script 會忽略
+  `SIGTERM`、`default_flag` 在這顆映像裡只有兩個 `/proc` handler 讀、
+  seating 19 已經在 `r57` 上跨過它一次且 flash 括號位元組相同),而不是一句保證。
+* **§ 10 是丟棄順序**,五列,每一列寫了丟掉會失去什麼,以及哪四組不准丟。
+  它在卡片上而不是在誰的腦子裡,因為 `bench/2026-09-10` 這個目錄名是一個
+  **有期限的斷言**:每一份擷取的 `started_wallclock` 都必須落在 09-10。
+
+---
+
+### 9. 映像凍結
+
+`rtkimage build` 在 `tools/vendor-tripwire.sh` 底下跑(它會執行廠商自己的
+`rtkload` Makefile、`lzma` 與 `cvimg`),回報 **`CLEAN cmd-rc=0 4 tree(s) watched`**。
+`r59` 的 staged tree 還在 `r3-4/cells/r59/top/`,所以**不用重新 stage 480 MB**。
+
+| | |
+|---|---|
+| `rlxfw-r59-20260910.bin` | **1,052,672** B,`c890e0efeb6881ecb87473a737a139cd23c95c651dd942af59c7fe088019fcb5` |
+| `vmlinux` | 4,095,382 B,`fe12f9ea0d78803f…` |
+| `System.map` | 384,617 B,`5217513de5179e55…` |
+| `manifest.tsv` | 598 B,`recipe_id 692a2801` |
+
+---
+
+### 10. 收工狀態
+
+* **`R5-7` 與 `R5-8` 的桌面半都 DONE,上機卡片凍結。** 下一步就是 seating 20 本身。
+* **carried-forward**:`POS-1`(PROGRESS.md 的四個 session-history 列)仍然開著,
+  而這一段沒有擅自輪動 —— 但它多了**第三個選項**,見下。
+  `XNUM-1`／`CHLOG-1` 不動。`HC-1` 已結案、`CENSUS-2` 已收、`LEDGER-4` 第三形狀已否證。
+* **新的 carried-forward `PS-6`**:PowerShell `Get-Date -UFormat %s` 差一個本地 UTC
+  偏移,已寫進 `CLAUDE.md` 的陷阱清單。
+* **`POS-1` 的第三個選項**:那四列是 `LOG.md` 已經擁有的東西的**第二個擁有者**,
+  而這個 repo 已經關過一次完全一樣的形狀 —— `P4b-1`(2026-09-01)的處置是**刪掉**
+  第二個擁有者,不是把它同步。所以選項不只「每段輪動」與「改名」,還有
+  「**縮成指向 `LOG.md` 的指標**」。這一段不替擁有者決定。
 
