@@ -304,10 +304,17 @@ released source.
 > last character**, five lengths, negative control, located to ash by sending
 > the same failing write through `cat`; so a mark the board printed can be
 > absent from a `grep` (`FW-41`). ⚠️ **What is still narrower**: nothing
-> depends on this chip — no consumer is bound, ~~`ALLOW_OUT_MASK` is 0~~
+> depends on this chip — ~~no consumer is bound~~, ~~`ALLOW_OUT_MASK` is 0~~
 > 🔄 **`ALLOW_OUT_MASK` is `1u << 6` on `main` since 2026-09-10 (`R5-7`), and
-> the owner of that state is `docs/KNOWN-ISSUES.md`, not this file — what is
-> still true is that no artefact carrying it has ever run**, `.to_irq`
+> the owner of that state is `docs/KNOWN-ISSUES.md`, not this file — ~~what is
+> still true is that no artefact carrying it has ever run~~ 🔄 **and THAT
+> expired at seating 20 too, along with "no consumer is bound": `r59` ran,
+> `allow_out_mask` read `00000040` on all seventeen boots, and `leds-gpio` and
+> `rtl819x-keys` both hold a line through `gpio_request` (`n_req_ok 2` at rest
+> on every boot). The claim that survives is narrower and lives in
+> `docs/KNOWN-ISSUES.md`: nothing the system NEEDS depends on this chip — the
+> LED is an indicator nothing reads back, the button's events have no consumer
+> in this image (`FW-46`), and `.to_irq` is still NULL**, `.to_irq`
 > is NULL — and **which of `PABCD`'s four ports bit 5 belongs to is still
 > unmeasured**, which is exactly the claim a seating full of `PABCD` readings
 > looks like it closed. **Zero flash-write commands, zero `FLR`, bracket
@@ -670,6 +677,102 @@ released source.
 > measurements. The freeze-time one WAS real, because it ran inside `freeze.sh`.
 > **The rule is not "be careful with `$?`", it is "read an exit code only from
 > inside a script file", and this segment proves it by having done both.**
+> 🔄 **2026-09-10, EIGHTEENTH update — seating 20, ONE power cycle against a
+> budget of one, seventeen boots, and the biggest result was on no card.**
+> 🟢🟢 **Two drivers of mine ran on the silicon and both met their DoD.**
+> `R5-7`: an **unmodified upstream `leds-gpio`**, bound to a `gpio_chip` of
+> mine, produced **light** from a sysfs write — `dat 0000007C` → `0000003C`,
+> `n_set_ok` 0 → 1, `n_writes` 2 → 3, with the operator reporting LED #2 of
+> eight lit and #1/#4 unchanged as their own negative control. `R5-8`: a polled
+> input device of mine turned presses of the reset button into
+> `input_report_key()` calls, and **the three-state control is
+> `(0,0) → (1,60) → (2,120) → (2,120)`** — sixty polls per three-second open at
+> 20 Hz, twice, and **flat** for a sleep carrying no open.
+> 🟢 **§ 7 ②'s two-sided test, which `ALLOW_OUT_MASK = 0` made impossible until
+> today, ran and the readout is a photon**: `lock 6` then `brightness ← 0`
+> leaves the LED **lit** while the class device reports **0**, with `n_writes`
+> **unmoved** — the refusal is ordered before the write, not logged after it.
+> **A guard that has only ever been seen refusing is a wall**; this one was
+> taken down and put back up.
+> 🟢 **D1: seventeen boot captures, every one 1,637 bytes against a prediction
+> of 1,637** (213 of those bytes had never been on this die), falling into
+> **two sha256 values, 14 and 3, whose whole difference is ONE LINE** —
+> `RLXFW-G3`, bit 6. Ten at-rest pair reads, 68 fields each, and the only
+> fields that ever differ are the free-running `j_now` and `boot_dat`'s bit 6.
+> **62 of the card's 66 field predictions hit.**
+> 🔴🔴 **THE HEADLINE: the vendor's `rtl_gpio_timer` acts ONCE PER BOOT**,
+> started by the first press held past about two seconds, and never again on
+> that boot. **Nine button episodes, four boots, zero exceptions**, with
+> **three confounds each broken by an experiment rather than an argument**:
+> poll rate (boot 14's two holds are both at 50 ms, one blinks and one does
+> not); `default_flag` (boot 15's second hold makes a **6.85 s** contact with
+> `/proc/load_default` reading `0` **before and after**); and *any press
+> consumes it* (boot 17's first episode is a **0.45 s** press, and the 17.90 s
+> hold after it on the same boot blinks and takes the flag to `1`).
+> 🟢 **`/proc/load_default` is a second, independent observable and agrees five
+> times out of five** — the LED branch and the factory-default branch are the
+> same timer (`FW-40`), so they live and die together. 🟢 **And the new rule
+> explains seating 19's OLD observations**, which is why it stands: rebuilding
+> `bench/2026-09-09b`'s cell order shows `C1-L1` was boot 1's *first* hold
+> (blinked), `X4-relax` a *later* hold on the same boot (did not), `X5-blink`
+> boot 5's first (blinked). **`SPEC.md` `REG-37`'s "the blink is gated by
+> `default_flag`" is struck in place**, and the confound is named: **the only
+> way to set that flag is the kind of hold that consumes the timer.**
+> ⚠️ **推**: on this board the reset button's `>= 5 s` factory-default branch
+> can be reached **once per power-up**. The behaviour is 量; the mechanism is
+> unread and goes back to `FW-40`'s disassembly. `SPEC.md` `FW-62`.
+> 🟢 **`FW-63`: the counters could not have produced this and the operator's
+> eye did.** A low-fraction of 0.61 is equally consistent with *evenly spread*
+> and with *steady for the first 3.9 s, then alternating* — the driver counts
+> samples and does not timestamp their values. The operator's *"lit first, then
+> after a while it starts blinking"* chose between them, and solving
+> `T + (hold−T)/2 = low` on three holds gives **T = 3.95 / 3.05 / 3.90 s**.
+> **Ten operator readings, ten agreements with the register**, and only the
+> tenth carried information no counter had.
+> 🔴 **Five cells of the frozen card would have stopped ELEVEN TO TWENTY-ONE
+> SECONDS before their own output, and would not have looked like a failure.**
+> `--idle N` is *N seconds since the last byte*, and five cells send a payload
+> whose first act is a `sleep` longer than their `--idle` — so each would have
+> produced ~54 bytes with a clean `stop_reason`, and **`check-predictions`
+> scores existence and mtime, not content: the seating would have reported
+> `55 of 55` with the whole press ladder and both long holds empty.** Caught
+> before power by three sources — the code, **7 of 7 in the corpus** (473
+> `--idle` captures, seven carry a `sleep`, every one has `idle > sleep`), and
+> a checker whose **five positive controls all fired**. **The fix is the
+> removal of one flag and no change to any number**, written into
+> `bench/2026-09-10/CORRECTIONS-block17.md` § 0 **before it was executed**,
+> rejected alternatives included — `--until` would have been better and is
+> unusable, because the keys `/proc` ends with the 32-slot ring the ladder
+> exists to measure and a match drains only 50 ms.
+> 🔴 **Three of the card's predictions were refuted and two of them are the
+> card contradicting itself.** `cnr_as_spec`/`dir_as_spec` predicted `1/1` and
+> read `0/0` — the driver compares against `REG-26`/`REG-27`, which are
+> **loader-state** constants, while Linux reads `FFFFFF8B`/`FF000040`; 量,
+> **29 committed files, 35 occurrences, every one `0`**, so `RC3` as written
+> would have fired on every seating this project has ever run. ⚠️ **`cardcheck
+> numbers` passed 28 of 28 and could not catch it**: the `1/1` is prose in a
+> table, not a `cardnum` row. `n_get`/`n_state_chk` predicted `1/1` and read
+> `3/3` — and 🟢 **the card's numbers are right about the driver and placed
+> under the wrong cell**: `C11-P0`, the one cell with no keys read in front of
+> it, reads **`1/1`**. The cause is `FW-64`: **one `cat` is TWO `read_proc`
+> invocations** on this kernel, so both of § 4's identities carry a missing
+> factor of two.
+> 🔴 **And § 7's control was void for a reason the card itself contains**:
+> `REG-37`'s latch contaminates the second hold's starting state, and the card
+> cited `REG-37` to order the LED episode first while not applying it to the
+> second hold. 🟢 **`REG-37`'s own sentence is narrower now** — *"re-running
+> does not recover it"* is true of re-pressing and **false of writing**: one
+> `echo 0 > …/brightness` takes `dat` back to `0000007C` and it stays.
+> ⚠️ **Zero flash-write commands, zero `FLR`, `n_writes 4` with every one of
+> the four accounted for**; `C1-M0`, `C13-M1` and the off-card `X29-M2` are
+> **byte-identical to each other and to seating 19's `C1-M0`** — four maps, two
+> seatings, one digest `b3d3d7d0…`. `FLS-26`'s ledger does not move.
+> 🔴 **A guard of mine produced a false RED and it is recorded because it
+> failed in the right direction**: a pre-flight check for the `--baud` default
+> grepped for the literal `38400` two lines after `add_argument("--baud"`,
+> where the default is the named constant `DEFAULT_BAUD`. **It refused before
+> the port was opened and before the operator pressed power**, so it cost one
+> round trip and no power cycle.
 > > **Which gate that is, `PROGRESS.md` says** — this
 > file does not restate it, because one piece of state has exactly one owner
 > and a gate id copied to a second place goes stale there.
