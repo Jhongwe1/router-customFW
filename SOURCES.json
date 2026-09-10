@@ -139,8 +139,10 @@
       "approx_size": "~1.5 GB",
       "why": "The furthest anyone has publicly taken RTL8196E on a modern kernel: OpenWrt master + Linux 4.14, arch/rlx, with GPIO/PCI/IRQ/timers working. K3 reference.",
       "caveat": "'Working' is a forum claim, not a measurement. Switch driver incomplete, WiFi not started.",
-      "needed_by": "R10b",
-      "fetch": "later"
+      "needed_by": "R5-9 (driver-diff), R10b",
+      "fetch": "done 2026-09-10 (R5-9)",
+      "pin": "8a0ccb93f3431bcf8f5c5d03d4acc2c8e442de67",
+      "pin_note": "Branch Realtek, NOT the default. Cloned --depth 1 on 2026-09-10T15:28:54Z at R5-9 and the Realtek and lexra branches fetched at 15:51:10Z. The default branch master is ee69f81ca5032f13e39ce7c2515ae9c5ee0a78f1 and 量: exactly ONE of its 10,127 paths matches 8196, and it is a Qualcomm ipqess patch. A clone that takes the default branch would have reported this tree as having no RTL8196E support at all, which would have been a fact about the clone script. lexra is a different SoC (RTL8197f, arch/mips/rtl838x)."
     },
     {
       "id": "realtek-switch-hacking",
@@ -164,8 +166,10 @@
       "why": "A modern-kernel RTL8196E port carrying arch/mips/boot/dts/realtek/{rtl8196e.dtsi, rtl8196e_totolink_n100re.dts} -- a device tree for a TOTOLINK board on this SoC -- plus CPU_RLX4181 in cpu_type_enum, -march=rlx4181, R3000 cache paths, wait-instruction support, rdhwr emulation and a defconfig. It is the closest prior art to R5's drivers and DT bindings and to R10a/R10b.",
       "consumed_as": "SECOND IMPLEMENTATION, NOT AN ANSWER. D12 source class 5: same SoC, so stronger than a sister-core document; written by someone who was also guessing, so weaker than a vendor SDK. One vote. Its use is to generate advance predictions and to fill the comparison column of docs/driver-diff.md -- R5 writes its drivers blind first, then diffs.",
       "caveat": "Completeness is claimed by its author and its README, not established here. The first thing to do with it is read rtl8196e.dtsi's compatible strings and register addresses and check them against SPEC.md section 9 -- values already read on this unit. If they disagree, this tree may not be describing this part.",
-      "needed_by": "R5 (driver-diff), R10a, R10b",
-      "fetch": "later"
+      "needed_by": "R5-9 (driver-diff), R10a, R10b",
+      "fetch": "done 2026-09-10 (R5-9)",
+      "pin": "ef14875f9dd70d45c1de79a2bee0d26263039b35",
+      "pin_note": "Branch RTL8196E, its default, cloned --depth 1 on 2026-09-10T15:27:49Z at R5-9. HEAD date 2020-03-28. Recorded because a --depth 1 clone of a moving branch is not a citable artefact."
     }
   ],
   "documents": [
@@ -287,7 +291,12 @@
         "about": "Actions Microelectronics, Shenzhen. MA-L, registered 2020-08-25, updated 2024-08-13. Cited because SPEC.md §18 and notes/leak-surface.md rest on it: the thirteenth session called FC:19:28 TOTOLINK's OUI and built a leak finding on that, and it is the OUI of the workstation's USB GbE adapter instead. 🔴 THIS IS A THIRD-PARTY MIRROR of the IEEE registry, not the registry itself. The authoritative source is https://standards-oui.ieee.org/oui/oui.txt and this claim has n=1 against a mirror. Re-checking it against the IEEE file is one download and has NOT been done.",
         "role": "reference",
         "fetch": "manual",
-        "used_by": ["SPEC.md §18", "notes/leak-surface.md §1", "tools/audit-bench-log.py PATTERNS", "docs/FINDINGS.md"]
+        "used_by": [
+          "SPEC.md §18",
+          "notes/leak-surface.md §1",
+          "tools/audit-bench-log.py PATTERNS",
+          "docs/FINDINGS.md"
+        ]
       }
     ],
     "_comment": "Read, cited, never downloaded. Listed so a claim in the plan can be traced to where it came from.",

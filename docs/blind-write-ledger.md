@@ -844,6 +844,62 @@ renaming to match would destroy the only independent naming this project has.
 
 ---
 
+
+### 4.11 🆕 `R5-9` the third-party ports — 14 paths, and every one of them was read **after** all six drivers had run on the silicon
+
+**2026-09-10, the fifty-seventh segment.** `shibajee/linux-rtl8196e` at
+`ef14875f` and `ggbruno/openwrt` at `8a0ccb93` (branch `Realtek`) were cloned
+and read. `docs/driver-diff.md` § 1 and § 2 carry the pre-registration, the
+instrument, the controls and the verdicts; this section is the ledger half.
+
+🟢 **The ordering that makes these rows harmless is checkable and is not an
+assertion.** Every one of `R5`'s six drivers was written, built and **run on
+this board** before either tree existed on disk:
+
+| | date | evidence |
+|---|---|---|
+| last driver source committed | 2026-09-10, `R5-7`/`R5-8` desk halves | `git log` over `config/rlxfw-src/` |
+| last driver run on silicon | 2026-09-10, seating 20, 17 boots | `bench/2026-09-10/` |
+| **these trees cloned** | 2026-09-10 **T15:27:49Z** | the clone script's own log line, quoted in `docs/driver-diff.md` § 2.1 |
+
+> **A reading that happens after the code is written cannot have shaped it.**
+> That is what distinguishes § 4.11 from every other section of this file: § 4.1
+> through § 4.10 are a *lower bound on contamination*, and § 4.11 is not a
+> contamination record at all. It is here because `ledgerscan check` requires
+> every cited path to have a row, and because a ledger that quietly omits the
+> reading its own § 6 authorised would be worse than one that records it.
+
+⚠️ **What it DOES change is `R10a`/`R10b`.** Those gates plan a modern-kernel
+port, and after tonight this repository has read two. Any future claim of
+independence there is void, and the row that says so is this one.
+
+| path | depth | tree | what was taken |
+|---|---|---|---|
+| `drivers/clocksource/timer-rtl8196e.c` | **line** | shibajee | read in full. Timer roles (TC0 clocksource / TC1 clockevent), ratings 500 and 200, the `readl(TCIR); writel(status, TCIR)` acknowledge, the 32-bit counter assumption, and the two defects in `docs/driver-diff.md` § 3.5 |
+| `drivers/irqchip/irq-rtl8196e.c` | **line** | shibajee | `GIMR`/`GISR` offsets, `plat_irq_dispatch`'s `fls` loop, and `RTL8196E_NR_IRQS 128` |
+| `arch/mips/include/asm/mach-rtl8196e/rtl8196e.h` | **line** | shibajee | the whole 35-line address list. Five addresses cross-check readings this project already had; **eleven are registers this repository had never named** (`docs/driver-diff.md` § 3.2) |
+| `arch/mips/rtl8196e/setup.c` | **line** | shibajee | `get_system_type`'s return string, read while checking whether the file carries a Realtek copyright. It does not |
+| `arch/mips/rtl8196e/time.c` | **name** | shibajee | ten lines; its one identifier and the fact that it is a shim |
+| `arch/mips/rtl8196e/irq.c` | **name** | shibajee | eight lines; one identifier |
+| `arch/mips/rtl8196e/prom.c` | **name** | shibajee | identifier set only |
+| `arch/mips/boot/dts/realtek/rtl8196e.dtsi` | **line** | shibajee | the node names and the `compatible` strings, including `lexra,rlx4181` — a fourth source for `CPU-42`'s core identity (`docs/driver-diff.md` § 2.6 ①) |
+| `arch/mips/boot/dts/realtek/rtl8196e_totolink_n100re.dts` | **name** | shibajee | its existence. A TOTOLINK board file, not this board |
+| `arch/mips/realtek/rtl819x-timer.c` | **line** | ggbruno | read in full. TC1 clocksource / TC0 clockevent, ratings 200 and 100, the read-modify-write acknowledge, the 28-bit field and its shift of four, and `CDBR`'s divisor in the high sixteen bits with a 200 MHz base — the second independent 讀 of `CLK-06` |
+| `arch/mips/realtek/gpio.c` | **line** | ggbruno | the `gpio_chip` setup, the dynamic `base`, and the full `irq_chip` with a chained parent handler — which is what makes `docs/KNOWN-ISSUES.md`'s *`.to_irq` is NULL* an unmeasured item rather than an unknown one |
+| `arch/mips/realtek/irq.c` | **name** | ggbruno | identifier set and copyright block only |
+| `arch/mips/realtek/setup.c` | **name** | ggbruno | identifier set only; it carries no copyright line |
+| `arch/mips/realtek/prom.c` | **name** | ggbruno | identifier set only. 🔴 **This is the one file in either tree that reads DERIVED** — four `BSP_`-prefixed UART macros — and it carries no copyright line |
+| `drivers/spi/spi-realtek.c` | **name** | ggbruno | identifier set, size and copyright block. **Not compared field by field**, and `docs/driver-diff.md` § 3.7 ⑤ says why |
+| `arch/mips/include/asm/mach-realtek/lxregs.h` | **name** | ggbruno | grepped for timer and watchdog names; **zero hits**, which is why the timer register map above comes from the `.c` |
+
+⚠️ **Depth here means what `docs/driver-diff.md` took, not how many bytes
+passed under an eye.** `arch/mips/realtek/gpio.c` is 301 lines and this segment
+read perhaps forty of them; it is marked `line` because what it took —
+*a chained `irq_chip` exists* — is a decision-layer fact, and § 4.3.1's test is
+*what was taken, and could it have shaped a decision*. On `R10a` it could.
+
+---
+
 ## 5. 🔴 What `driver-diff` compares — the two layers, and why the definition moved
 
 The gate opened with `R5-9` written as *"blind first, then **register by

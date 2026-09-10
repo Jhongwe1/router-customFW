@@ -435,28 +435,45 @@ def ledger_rows(root, rel=LEDGER):
 # quarantine -- the ports that must stay uncloned until R5-9
 # --------------------------------------------------------------------------
 
+# The fourth element is the RELEASE.  None means the tree must stay absent.  A
+# string is the record of a deliberate clone: step, date, and the commit that
+# pre-registered the reading.  A release is not a suppression -- see
+# render_quarantine, where a release recorded against an ABSENT tree is RED,
+# so the list cannot accrete entries nobody is using.
 QUARANTINE = [
     ("shibajee-linux-rtl8196e", "src-vendor/shibajee-linux-rtl8196e",
-     "R5 (driver-diff): the closest prior art to these six drivers"),
+     "R5 (driver-diff): the closest prior art to these six drivers",
+     "R5-9, 2026-09-10, pre-registered in 161862e at 15:26:24Z, "
+     "cloned 15:27:49Z; docs/driver-diff.md sections 1 and 2"),
     ("ggbruno-openwrt", "src-vendor/ggbruno-openwrt",
-     "R10b: the furthest anyone has taken this SoC on a modern kernel"),
+     "R10b: the furthest anyone has taken this SoC on a modern kernel",
+     "R5-9, 2026-09-10, same commit and same clone run; branch Realtek "
+     "fetched 15:51:10Z after ls-remote showed master carries no RTL8196E"),
     ("openwrt-rtk", "src-vendor/openwrt-rtk",
-     "R6, R10a/b: Realtek's own OpenWrt SDK, carries arch/rlx"),
+     "R6, R10a/b: Realtek's own OpenWrt SDK, carries arch/rlx", None),
     ("utessel-edimax", "src-vendor/edimax",
-     "R6: a second independent rtl819x network driver"),
+     "R6: a second independent rtl819x network driver", None),
     ("vankel-rtl819x-sdk", "src-vendor/rtl819x-sdk-3.4.9.3",
-     "R10a: SDK 3.4.9.3 on Linux 3.10"),
+     "R10a: SDK 3.4.9.3 on Linux 3.10", None),
 ]
 
+# A release record has to look like one.  An empty string, or a bare word,
+# cannot be allowed to silence the guard: the record is the evidence.
+def release_is_wellformed(rec):
+    if not isinstance(rec, str) or len(rec) < 20:
+        return False
+    return ("R5-9" in rec or "R6" in rec or "R10" in rec) and "20" in rec
 
-def quarantine_state(root):
-    """-> [(id, dest, present, why)].  `present` is None when src-vendor/
-    itself is absent, which is a runner and not a breach."""
+
+def quarantine_state(root, table=None):
+    """-> [(id, dest, present, why, released)].  `present` is None when
+    src-vendor/ itself is absent, which is a runner and not a breach."""
+    tbl = QUARANTINE if table is None else table
     sv = os.path.join(root, "src-vendor")
     if not os.path.isdir(sv):
-        return [(i, d, None, w) for i, d, w in QUARANTINE]
-    return [(i, d, os.path.exists(os.path.join(root, d)), w)
-            for i, d, w in QUARANTINE]
+        return [(i, d, None, w, r) for i, d, w, r in tbl]
+    return [(i, d, os.path.exists(os.path.join(root, d)), w, r)
+            for i, d, w, r in tbl]
 
 
 # --------------------------------------------------------------------------
@@ -630,22 +647,39 @@ def render_check(root, out=sys.stdout):
     return rc
 
 
-def render_quarantine(root, out=sys.stdout):
-    st = quarantine_state(root)
-    print("ledgerscan quarantine -- ports that must stay uncloned", file=out)
-    if all(p is None for _i, _d, p, _w in st):
+def render_quarantine(root, out=sys.stdout, table=None):
+    st = quarantine_state(root, table=table)
+    print("ledgerscan quarantine -- ports that must stay uncloned, and the "
+          "ones deliberately released", file=out)
+    if all(p is None for _i, _d, p, _w, _r in st):
         print("  (skipped: src-vendor/ is absent -- this is a runner, not a "
               "breach, %d port(s))" % len(st), file=out)
         return 0
     rc = 0
-    for i, d, present, why in st:
-        if present:
+    for i, d, present, why, released in st:
+        if present and not released:
             rc = 1
             print("  RED  %-28s IS PRESENT at %s" % (i, d), file=out)
             print("       %s" % why, file=out)
             print("       R5-0's ledger records this tree as unread. A clone "
                   "is not a reading, but it is the end of the claim that "
                   "reading it was impossible.", file=out)
+        elif present and not release_is_wellformed(released):
+            rc = 1
+            print("  RED  %-28s released with a record that is not one"
+                  % i, file=out)
+            print("       a release must name the step, the date and the "
+                  "commit; this one is %r" % (released,), file=out)
+        elif present:
+            print("  ok   %-28s RELEASED and present (%s)" % (i, d), file=out)
+            print("       %s" % released, file=out)
+        elif released:
+            rc = 1
+            print("  RED  %-28s released but ABSENT at %s" % (i, d), file=out)
+            print("       a release records a clone that happened. This tree "
+                  "is not here, so either the release is stale or the tree "
+                  "was removed without the record following it.", file=out)
+            print("       %s" % released, file=out)
         else:
             print("  ok   %-28s absent (%s)" % (i, d), file=out)
     return rc
@@ -923,13 +957,45 @@ def self_test():
         rc = render_quarantine(tmp, out=buf)
         ck("P12 quarantine stands down without src-vendor/", rc == 0)
         ck("P12b and says so", "skipped" in buf.getvalue(), buf.getvalue())
-        os.makedirs(os.path.join(tmp, "src-vendor",
-                                 "shibajee-linux-rtl8196e"))
+        # The four states are driven on a SYNTHETIC table.  On the real one
+        # two ports are RELEASED (R5-9, 2026-09-10), so a fixture that only
+        # creates a directory would go red for the reverse control rather than
+        # for the breach it names -- and a control that passes for the wrong
+        # reason is not a control.
+        REL = ("R5-9, 2026-09-10, pre-registered in 161862e; a record with a "
+               "step, a date and a commit")
+        held = [("held-port", "src-vendor/held-port", "why", None)]
+        rel = [("rel-port", "src-vendor/rel-port", "why", REL)]
+        badrec = [("bad-port", "src-vendor/bad-port", "why", "yes")]
+
+        os.makedirs(os.path.join(tmp, "src-vendor", "held-port"))
         buf = io.StringIO()
-        rc = render_quarantine(tmp, out=buf)
-        ck("P12c a cloned quarantined port is RED", rc == 1, buf.getvalue())
-        ck("P12d and it is named", "shibajee" in buf.getvalue(),
+        rc = render_quarantine(tmp, out=buf, table=held)
+        ck("P12c a cloned port with NO release is RED", rc == 1,
            buf.getvalue())
+        ck("P12d and it is named", "held-port" in buf.getvalue(),
+           buf.getvalue())
+
+        os.makedirs(os.path.join(tmp, "src-vendor", "rel-port"))
+        buf = io.StringIO()
+        rc = render_quarantine(tmp, out=buf, table=rel)
+        ck("P12e a cloned port WITH a release is ok", rc == 0,
+           buf.getvalue())
+        ck("P12e2 and the record is printed, not just the verdict",
+           "161862e" in buf.getvalue(), buf.getvalue())
+
+        buf = io.StringIO()
+        rc = render_quarantine(tmp, out=buf,
+                               table=[("gone-port", "src-vendor/gone-port",
+                                       "why", REL)])
+        ck("P12f REVERSE: a release recorded against an ABSENT tree is RED",
+           rc == 1, buf.getvalue())
+
+        os.makedirs(os.path.join(tmp, "src-vendor", "bad-port"))
+        buf = io.StringIO()
+        rc = render_quarantine(tmp, out=buf, table=badrec)
+        ck("P12g a release record that is not one cannot silence the guard",
+           rc == 1, buf.getvalue())
 
     # ---- P16: a ledger row whose first code span is not path-shaped is not a
     # declaration.  The real ledger has three such tables (the quarantine's
@@ -1069,10 +1135,15 @@ def self_test():
     with open(os.path.join(ROOT, "SOURCES.json"), encoding="utf-8") as fh:
         src = json.load(fh)
     later = {e["id"] for e in src["source_trees"] if e.get("fetch") == "later"}
-    ck("P13 quarantine covers every SOURCES.json `fetch: later` tree",
-       later == {i for i, _d, _w in QUARANTINE},
-       "SOURCES.json: %s  QUARANTINE: %s"
-       % (sorted(later), sorted(i for i, _d, _w in QUARANTINE)))
+    ck("P13 quarantine == SOURCES.json `fetch: later` UNION the released "
+       "(a tree stops being `later` the moment R5-9 clones it, and it must "
+       "stay in the list because that is where its release record lives)",
+       later | {i for i, _d, _w, r in QUARANTINE if r}
+       == {i for i, _d, _w, _r in QUARANTINE},
+       "SOURCES.json later: %s  released: %s  QUARANTINE: %s"
+       % (sorted(later),
+          sorted(i for i, _d, _w, r in QUARANTINE if r),
+          sorted(i for i, _d, _w, _r in QUARANTINE)))
 
     print()
     print("%d passed, %d failed" % (ok, fail))

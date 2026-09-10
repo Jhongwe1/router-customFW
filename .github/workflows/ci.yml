@@ -542,6 +542,9 @@ jobs:
       - name: ledgerscan self-test
         run: /usr/bin/python3 tools/ledgerscan.py --self-test 2>&1 | tee ci-out/ledgerscan.out; exit "${PIPESTATUS[0]}"
 
+      - name: derivcheck self-test
+        run: /usr/bin/python3 tools/derivcheck.py --self-test 2>&1 | tee ci-out/derivcheck.out; exit "${PIPESTATUS[0]}"
+
       - name: ledgerscan check (exit-code gate)
         run: /usr/bin/python3 tools/ledgerscan.py check
 

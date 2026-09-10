@@ -236,6 +236,11 @@ read.
   `config/host-compat/0006` aliases it to gpiolib's `__gpio_to_irq`, which
   returns `-ENXIO` when `chip->to_irq` is `NULL`, and `rtl819x-gpio.c:658` is
   `.to_irq = NULL` — but **that chain is READ, not measured on the silicon**.
+  🔄 **2026-09-11 (`R5-9`): still not measured, and it is now an unmeasured thing rather than an unknown one.** `ggbruno/openwrt`'s
+  `arch/mips/realtek/gpio.c` implements a full `irq_chip` on this SoC's GPIO with a chained parent handler, and `shibajee`'s SoC header names the three
+  registers it would need — `GPABCDISR`, `GPABIMR`, `GPCDIMR` — which this repository had never named. `docs/driver-diff.md` § 3.2 and
+  § 3.4.5. ⚠️ Neither is 量 on this die and neither third-party image has been run here, so this row does not move: what changed is that
+  *nobody has shown it works on this part* is no longer one of the reasons.
   `rtl819x-keys` prints the live value as `RLXFW-K4` on every boot and the
   prediction is `FFFFFFFA`; ~~nothing has booted it~~ 🔄 **量 2026-09-10,
   seating 20: `RLXFW-K4 = FFFFFFFA` on all seventeen boot captures, and

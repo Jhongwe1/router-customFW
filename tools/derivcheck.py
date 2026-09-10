@@ -362,8 +362,8 @@ def self_test():
     ck("R2 emit refuses a lower-case hex literal", refuses(_check_emit, "0xb800"), True)
     ck("R3 emit_ident refuses a source line",
        refuses(emit_ident, "static int foo(void)"), True)
-    ck("R4 emit accepts a path and a count", _check_emit("  drivers/gpio/x.c: 12"),
-       "  drivers/gpio/x.c: 12")
+    ck("R4 emit accepts a path and a count", _check_emit("  tools/derivcheck.py: 12"),
+       "  tools/derivcheck.py: 12")
 
     # ---- extraction -------------------------------------------------------
     src = ("#define BSP_TCIR 0xB8003100\n"
