@@ -784,7 +784,22 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   the roles swapped: there a failure was reported as a success, here a failure
   was reported correctly and nothing downstream read it. **A step whose
   failure must stop the next one has to be on the same command line, or the
-  next one has to test for its output.**
+  next one has to test for its output.
+  🔴 **2026-09-10: the same `$?` row has a third face, and this one reaches the
+  BACKGROUND-TASK COMPLETION NOTICE.** 量, this segment's first build attempt:
+  a command written `wsl … -- bash /mnt/c/…/build.sh; echo "SCRIPT EXIT: $?"`
+  was run in the background. The script never started — MSYS translated the
+  path, exactly as the row two bullets down predicts, and `bash` reported
+  `No such file or directory` — and the tool printed `SCRIPT EXIT: 127`. **The
+  completion notification said `exit code 0`**, because the outer shell's last
+  command was the `echo`, and the `echo` succeeded. The build's log file was
+  never created and the first check for it — `stat` on a path that does not
+  exist — is what caught it. **Appending `; echo "… $?"` to a backgrounded
+  command converts every failure into a green notification**, which is this
+  file's own `EXIT CODE: 0` incident in the one place where the exit code is
+  all the operator sees. **Never put anything after the command whose status
+  matters**, and treat the notice's code as a claim about the LAST thing on
+  the line rather than about the work.**
   🆕 **But do not nest a second heredoc inside that one.** Measured 2026-08-26,
   three times before it was believed: a `python3 - <<'PY' … PY` inside the outer
   heredoc **loses one level of backslash**, so `\\t` reaches Python as `\t` and
@@ -950,7 +965,7 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   dies with *unexpected EOF* on nested quotes. **Same fix as the Bash tool's:
   write the script to a file and run it by path** — `wsl -d Ubuntu-24.04 --
   bash /mnt/c/…/x.sh`.
-  🆕 ⑤ **A native command piped into anything gets a UTF-8 BOM prepended, and a JSON parser on the other end dies on it.** 量 2026-09-09: `gh run view … --json … | python -c "json.load(sys.stdin)"` raises `json.decoder.JSONDecodeError: Unexpected UTF-8 BOM (decode using utf-8-sig)` at line 1 column 1. It is not `gh` — `gh … > file` and reading the file is clean. **Redirect to a file and read it, or use `utf-8-sig`.** Same class as ④: the pipeline, not either program, is what breaks.
+  🆕 ⑤ **A native command piped into anything gets a UTF-8 BOM prepended, and a JSON parser on the other end dies on it.** 量 2026-09-09: `gh run view … --json … | python -c "json.load(sys.stdin)"` raises `json.decoder.JSONDecodeError: Unexpected UTF-8 BOM (decode using utf-8-sig)` at line 1 column 1. ~~It is not `gh` — `gh … > file` and reading the file is clean. **Redirect to a file and read it, or use `utf-8-sig`.** Same class as ④: the pipeline, not either program, is what breaks.~~ 🔴 **2026-09-10: the remedy in that sentence is FALSE and the cause is too narrow, and the workaround it recommended is the one that failed.** 量, six cases with controls — three producers × two paths, first eight bytes read as binary: `gh --version`, `cmd /c echo` **and a plain PowerShell string** each get `EF BB BF` prepended, through `>` **and** through `|`. So it is neither `gh` nor "a native command": **`>` and `|` both prepend a BOM in this shell whatever produced the text**, and `gh … > f` followed by `json.load(open(f))` dies exactly as the pipe does — 量, that is how this row got re-measured. **The rule is one thing and it has no exceptions: read every such file or stream with `utf-8-sig`**, which also accepts a BOM-less input, so it is never wrong. ⚠️ Cause partly identified: `$PSDefaultParameterValues['Out-File:Encoding']` is `utf8`, and in Windows PowerShell 5.1 `utf8` means *with* BOM — `>` is `Out-File`, which covers the redirect half. The pipe half is **未定**: `$OutputEncoding` is `UTF8Encoding` with `GetPreamble().Length` **0**, which the simple explanation does not survive.
   🆕 ④ **`| Select-Object -First N` KILLS the native process when `N` is fewer
   lines than it produces, and the exit code becomes `-1` — which the tool
   surfaces as `255` and which is indistinguishable from a real failure.** 量,
