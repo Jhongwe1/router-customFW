@@ -432,6 +432,48 @@ and four consequences that are not one-line:
    `G7` = `PABCD_DAT` immediately before the first permitted
    `.direction_output`, `G8` = immediately after.
 
+### 7.1 What the implementation added beyond that list, 2026-09-10
+
+Four things, and each is a decision rather than a detail. They are here and not
+only in the source because the first two change what a *reading* means.
+
+**① `n_state_chk` sits beside `n_state_foreign`.** § 6.2 says a counted zero is
+a claim. It is a weaker claim than it looks: *zero divergences* and *zero
+comparisons* print the same `0` and are not the same reading — the second is an
+instrument that never ran. The detector therefore counts both, and `RC5`'s
+"`n_state_foreign` is 0 on ten boots" is only quotable beside a non-zero
+`n_state_chk`.
+
+**② `G7`/`G8` are emitted OUTSIDE the spinlock, from values sampled inside it.**
+`rlxfw_markx` reaches the wire through `prom_putchar`, which busy-waits on the
+UART FIFO; a `markx` line is 19 bytes, and 19 bytes at 38400 8N1 is ~4.9 ms.
+Two of them inside `spin_lock_irqsave` would be ~10 ms with interrupts off, on
+a kernel whose tick is 100 Hz and whose watchdog this project drives itself.
+The values are the ones sampled under the lock, so the reading is identical;
+only the wait moved out. ⚠️ It is not a *safety* fix — `FW-52`'s watchdog bites
+at 1,334 ms at `OVSEL` 3, so 10 ms was never near it — it is that an
+instrument should not change the thing it measures, and an IRQ-off window is
+exactly what `IRQ-13`'s lost-tick count is sensitive to.
+
+**③ `.set` deliberately does NOT repeat the CNR check, and the asymmetry with
+`.direction_output` is written down rather than left to be noticed.** gpiolib
+cannot reach `.set` on a line whose direction was never set, so the CNR reading
+has already been taken on that line in that boot; repeating it would cost an
+uncached read on the sysfs write path — the one path a human drives at speed —
+to re-answer a question whose answer cannot change without a CNR write, and
+this driver never writes CNR. ⚠️ **That reasoning is about *this* driver.** If
+CNR ever becomes writable from anywhere, the comment in `.set` is the thing
+that stops being true.
+
+**④ `lock`/`unlock` became three verbs, not two.** `lock N` sets a bit in the
+runtime mask, `unlock N` clears it, and a bare `lock` — 1.0's spelling — sets
+the whole mask, which is what it meant. `unlock` refuses `-EPERM` for any line
+outside the compiled `ALLOW_OUT_MASK`; `lock` accepts any valid line, because
+taking away a permission that does not exist is harmless and refusing it would
+make the pair asymmetric for nothing. 量: no frozen card in `bench/` types
+either verb — the four that touch this driver type `claim`, `sample`,
+`probe04` and `tryout N` — so redefining them breaks no committed evidence.
+
 ### What `n_writes` becomes, predicted before the build
 
 `leds-gpio`'s probe is, 讀, verbatim: `gpio_request` → `gpio_cansleep` →
@@ -462,6 +504,48 @@ latched at `0000003C` — bit 6 **low**, the LED lit — stable for at least
 pin, from lit to dark. That is still a state the vendor holds it in for most
 of its life, and `G7`/`G8` are there so the capture says which of the two
 happened rather than leaving it to be assumed.
+
+### What the BOOT CAPTURE becomes, predicted before the build
+
+量 2026-09-09, `bench/2026-09-09b/C2-boot.log` and the twenty-eight other boot
+captures of image `f67eed22` (`r57`): **1,424 bytes**, of which **45 `RLXFW-`
+lines occupy 754** and the remaining 670 are the loader's four lines, the
+vendor NIC's banner block and the two userspace lines that end the window at
+the shell prompt.
+
+The mark macros make the arithmetic exact — `rlxfw_mark(tag)` is
+`"RLXFW-" tag "\n"` with the `\n` reaching the wire as CRLF, so **len(tag) + 8**
+bytes, and `rlxfw_markx(tag, v)` adds `=` and eight hex digits, so
+**len(tag) + 17**. `R5-7` adds four marks:
+
+| mark | shape | bytes |
+|---|---|---|
+| `PD0` | `rlxfw_mark` | 11 |
+| `PD1` | `rlxfw_markx` | 20 |
+| `G7` | `rlxfw_markx` | 19 |
+| `G8` | `rlxfw_markx` | 19 |
+| | | **69** |
+
+🟢 **And the total is a three-way discriminator rather than one number**,
+because `G7`/`G8` sit inside the permitted path of `.direction_output` and
+`PD0`/`PD1` do not:
+
+| bytes | what it says |
+|---|---|
+| **1,493** | the platform device registered AND `leds-gpio` probed AND `.direction_output` was permitted |
+| **1,455** | the platform device registered and the output call never happened — `gpio_request` took `-EBUSY`, or the mask/CNR check refused, or `leds-gpio` never probed at all |
+| **1,424** | neither file reached the image |
+
+⚠️ **What it does NOT say, stated so it cannot be read as coverage**:
+`create_gpio_led` calls `gpio_direction_output` *before*
+`led_classdev_register`, so **1,493 is consistent with the LED class device
+failing to register**. With `CONFIG_PRINTK=n` that failure is silent. The
+fields that settle it are `/sys/class/leds/n150rt:green:led2/` existing and
+`n_dirout_ok` reading 1 — not the byte count.
+
+⚠️ `RLXFW-ID0` moves `F67EED22` → **`083B1CB8`** (量, `rlxfw-kbuild.sh
+--dry-run`, 2026-09-10) and is the same width, so it does not enter the
+arithmetic.
 
 ---
 
@@ -582,6 +666,44 @@ link order, so this is the one ordering in `R5-7` that does **not** rest on a
 Makefile's line numbers (§ 3.4 rests on one and then declines to). It is also
 before `rtl819x-gpio`'s own `subsys_initcall` (4), which is harmless:
 registering a platform device touches no GPIO.
+
+### 9.2 The config is FIVE lines and the step was planned as three
+
+🔴 **The two extra ones were found by enumerating, not by reading the plan.**
+量 2026-09-10: `drivers/leds/Kconfig` parsed symbol by symbol against
+`r57.config-built` with `NEW_LEDS`/`LEDS_CLASS`/`LEDS_GPIO` forced on and every
+enclosing `if`, every `depends on` and every prompt evaluated — 35 symbols,
+**five reachable prompts**, and **exactly two of the five absent from the
+`.config`**. Those two are what `oldconfig` would have asked about, which is
+the `(NEW)` count `config/rlxfw-kernel.delta`'s header promises is zero.
+
+| symbol | why it is in the delta |
+|---|---|
+| `CONFIG_NEW_LEDS=y` | `drivers/Makefile:94` is `obj-$(CONFIG_NEW_LEDS) += leds/` — without it the directory is never descended into and the build is green with no LED support at all |
+| `CONFIG_LEDS_CLASS=y` | the `/sys/class/leds` infrastructure `leds-gpio` registers into |
+| `CONFIG_LEDS_GPIO=y` | the upstream driver |
+| **`CONFIG_LEDS_GPIO_PLATFORM=y`** | 🔴 **the one the plan did not have.** 讀 `drivers/leds/leds-gpio.c`: `gpio_led_probe`, the `platform_driver` that carries it, and the `platform_driver_register` call inside `gpio_led_init` are **all** inside `#ifdef CONFIG_LEDS_GPIO_PLATFORM`. Without it, `leds-gpio` compiles, links, registers no platform driver, and § 9.1's `platform_device` sits on the bus for ever with nothing to bind to — silently, because `CONFIG_PRINTK=n` |
+| `CONFIG_LEDS_TRIGGERS=n` | pinned so `(NEW)` stays 0; it depends on nothing but the enclosing `if NEW_LEDS`, so it becomes reachable the moment `NEW_LEDS` does |
+
+The other twenty-seven `LEDS_*` drivers are unreachable on their *second*
+dependency — `I2C`, `X86`, `SPI`, `MFD_WM8350`, `ARCH_S3C2410`, `MIPS_COBALT`
+and so on — and `LEDS_GPIO_OF` on `OF_DEVICE`, which this arch does not carry.
+That is what makes "two" a bounded list rather than a sample.
+
+🔴 **`LEDS_TRIGGERS` is `n` on its merits and not only for size.** A trigger is
+a second writer of the same LED on a timer, and PABCD bit 6 *already has* a
+second writer — the vendor's `rtl_gpio_timer` (量 `FW-40`, `REG-37`). § 6's
+whole instrument asks *is anything other than me writing this bit*; adding a
+kernel timer of my own that also writes it would make that reading
+unattributable by construction.
+
+🟢 **And the requirement is enforced from the build side too, because the
+config side has a known hole.** `CFG-2` records that `kconfig-delta check` is
+never invoked by `rlxfw-kbuild.sh`, so the delta and the built `.config` can
+drift with nothing noticing — that is how `CONFIG_GPIO_SYSFS` stayed undeclared
+in three shipped images. `rlxfw-devices.c` therefore carries two `#error`
+directives, on `CONFIG_LEDS_GPIO` and on `CONFIG_LEDS_GPIO_PLATFORM`. A Kbuild
+row cannot read a `.config`; a translation unit can.
 
 ---
 

@@ -43,8 +43,32 @@
  *   SPEC.md BRD-05   That button is a GPIO and NOT RESET#.  It has a pull-up.
  *
  * ------------------------------------------------------------------------
+ * 🔴 1.1, R5-7, 2026-09-10: THIS DRIVER NOW WRITES TWO WORDS, ON ONE BIT.
+ *
+ * The banner below said "THIS DRIVER WRITES NOTHING TO THE SILICON, AND THAT
+ * IS THE IMPLEMENTATION RATHER THAN AN ABUNDANCE OF CAUTION."  It is kept
+ * because everything under it is still true of bit 5 and of the other thirty
+ * lines, and because a claim that stopped being true is worth more in place
+ * than deleted.  What changed is one bit and it is written down in one
+ * constant: RTL819X_GPIO_ALLOW_OUT_MASK is (1u << 6).
+ *
+ * The argument is notes/gpio-driver.md -- three hazards answered one at a
+ * time for bit 6 only (§ 3), eight refutation conditions written before the
+ * change (§ 8), a runtime contention detector because the vendor's
+ * rtl_gpio_timer writes the same bit and nothing can arbitrate (§ 6), and
+ * § 5, which states in its own words the hole the argument does NOT close:
+ * seven functions in this image materialise PABCD_DAT and have not been read.
+ *
+ * 🟢 The two writes are predicted to change nothing: DIR already reads
+ * FF000040 (bit 6 already an output) and DAT already reads 0000007C (bit 6
+ * already high, the LED already dark), both put there by the vendor's own
+ * firmware and measured on this die.  G7/G8 are in the boot capture so that
+ * is a reading rather than an assumption.
+ * ------------------------------------------------------------------------
+ *
+ * ------------------------------------------------------------------------
  * THIS DRIVER WRITES NOTHING TO THE SILICON, AND THAT IS THE IMPLEMENTATION
- * RATHER THAN AN ABUNDANCE OF CAUTION.
+ * RATHER THAN AN ABUNDANCE OF CAUTION.       [1.0.  See the 1.1 note above.]
  * ------------------------------------------------------------------------
  *
  * The loader already cleared bit 5 of CNR and of DIR before Linux started
@@ -76,6 +100,16 @@
  * and refuses; the `tryout` verb exists to demonstrate the refusal ON THE
  * SILICON with a before/after register comparison, because a guard that has
  * never been observed refusing is a guard nobody has tested.
+ *
+ * 🟢 1.1: A LINE DID ACQUIRE ONE, AND THE SENTENCE ABOVE IS WHY THE CHANGE IS
+ * ONE CONSTANT.  BRD-13 (量 2026-09-09, seating 19) is that measurement for
+ * bit 6: it drives the second of the board's eight LEDs, active low, polarity
+ * read at BOTH levels with the other seven LEDs as the negative control.
+ * Bit 5's paragraph above is untouched and bit 5 is still refused -- which is
+ * `RC4`, the refutation condition that makes the other seven mean anything:
+ * `tryout 5` must still come back -EPERM in the SAME boot in which bit 6
+ * works.  The `tryout` verb therefore did not become obsolete when the mask
+ * opened; it became the control.
  *
  * 🔴 A LIMITATION OF 2.6.30's gpiolib THAT SHAPES THIS FILE.
  * struct gpio_chip's .set returns void (include/asm-generic/gpio.h:92-93 in
@@ -129,7 +163,11 @@
  *
  *  2. THAT ANY OTHER BIT IS A GPIO.  ngpio is 32 because the register is 32
  *     bits wide, not because 32 pins exist.  .request refuses every line
- *     outside RTL819X_GPIO_KNOWN_MASK, so the chip's usable width is one.
+ *     outside RTL819X_GPIO_KNOWN_MASK, so the chip's usable width is TWO in
+ *     1.1 -- bit 5 (BRD-05, a button) and bit 6 (BRD-13, an LED) -- and it
+ *     was one in 1.0.  Thirty of the thirty-two are still refused, and the
+ *     two that are not are the two this project has driven or watched with
+ *     its own eyes on this board.
  *
  *  3. AN INTERRUPT.  .to_irq is NULL.  No GPIO interrupt has been measured
  *     on this die, and docs/interrupt-map.md has no row for one.
@@ -162,7 +200,7 @@
  * Constants.  Every one of these has a SPEC.md id above.
  * ------------------------------------------------------------------------ */
 
-#define RTL819X_GPIO_VERSION	"rtl819x-gpio 1.0"
+#define RTL819X_GPIO_VERSION	"rtl819x-gpio 1.1"
 
 #define RTL819X_GPIO_PHYS	0x18003500	/* 0xB8003500 through KSEG1 */
 
@@ -173,15 +211,47 @@
 
 #define RTL819X_GPIO_NGPIO	32
 #define RTL819X_GPIO_BUTTON	5		/* BRD-05 */
+#define RTL819X_GPIO_LED2	6		/* BRD-13 */
 
-/* The one line this die is known to carry as a GPIO.  REG-26: bit 5 is the
- * only cleared bit of CNR, and the loader is what cleared it. */
-#define RTL819X_GPIO_KNOWN_MASK	(1u << RTL819X_GPIO_BUTTON)
+/* The lines this die is known to carry as GPIOs.
+ *
+ * bit 5  REG-26: the only cleared bit of CNR, and the loader is what cleared
+ *        it.  A button, active low, BRD-05.
+ * bit 6  BRD-13, 量 2026-09-09 (seating 19): drives the SECOND of the eight
+ *        LEDs on the board, ACTIVE LOW, polarity measured at both levels with
+ *        the other seven LEDs as the negative control.  🔴 It is NOT a
+ *        cleared bit of CNR -- the live CNR is FFFFFF8B (量 C1-G0), and bit 6
+ *        is clear there because the VENDOR's rtl_gpio_init cleared it, not the
+ *        loader.  notes/gpio-driver.md § 3.1 is the whole argument and § 3.4
+ *        is the ordering it rests on; .direction_output below turns that
+ *        ordering into a runtime check rather than leaving it an assumption. */
+#define RTL819X_GPIO_KNOWN_MASK	((1u << RTL819X_GPIO_BUTTON) | \
+				 (1u << RTL819X_GPIO_LED2))
 
-/* Zero, and the long comment at the top of this file is the reason.  This is
- * the single place that changes if a line ever acquires a measured safe
- * output state. */
-#define RTL819X_GPIO_ALLOW_OUT_MASK	0u
+/* 🔴 THIS WAS 0 UNTIL 2026-09-10 AND THE OLD COMMENT IS KEPT BELOW.
+ *
+ * It is bit 6 and nothing else.  notes/gpio-driver.md § 3 answers the three
+ * hazards for that one bit and § 8 writes eight refutation conditions before
+ * the change; the short form is that every level either writer can produce on
+ * bit 6 has already been produced on this die BY THE VENDOR'S OWN FIRMWARE,
+ * measured (REG-37, twelve strictly alternating samples; BRD-13, both levels
+ * seen by eye), and that DIR already reads FF000040 -- bit 6 is already an
+ * output, put there by the vendor.
+ *
+ * Bit 5 stays out, and that is the load-bearing half: it has a pull-up and a
+ * button to ground, so driving it high while the button is held shorts the pad
+ * driver through the switch.  `tryout 5` must still be refused in the same
+ * boot in which bit 6 works -- notes/gpio-driver.md § 8 `RC4`.
+ *
+ * (Original: "Zero, and the long comment at the top of this file is the
+ * reason.  This is the single place that changes if a line ever acquires a
+ * measured safe output state."  A line did.) */
+#define RTL819X_GPIO_ALLOW_OUT_MASK	(1u << RTL819X_GPIO_LED2)
+
+/* The bit the foreign-write detector watches.  Bit 6 only: bit 5 is a button
+ * and legitimately moves under the operator's finger, so watching it would
+ * measure the operator.  notes/gpio-driver.md § 6.1. */
+#define RTL819X_GPIO_WATCH_MASK		(1u << RTL819X_GPIO_LED2)
 
 /* The values REG-27 and REG-26 recorded on 2026-08-24.  They are used only to
  * report agreement or disagreement -- nothing is written to make them true. */
@@ -227,7 +297,28 @@ static DEFINE_SPINLOCK(rtl819x_gpio_lock);
 
 static int  rtl819x_gpio_added;		/* gpiochip_add() returned 0 */
 static int  rtl819x_gpio_add_rc = -EAGAIN;
-static int  rtl819x_gpio_unlocked = -1;	/* line unlocked for output, or -1 */
+
+/* 🔴 REPLACES `rtl819x_gpio_unlocked`, AND THE REPLACEMENT IS A WEAKENING.
+ *
+ * The old interlock was opt-in: output was impossible until somebody typed
+ * `unlock N`.  leds-gpio cannot type anything, so an opt-in interlock means
+ * either the LED never works or the interlock is open from boot -- and an
+ * interlock that must be open for the driver's only consumer to bind is not an
+ * interlock.  notes/gpio-driver.md § 7 ② states this as a weakening rather
+ * than dressing it as a refactor.
+ *
+ * What replaces it can only NARROW: the effective mask is
+ * ALLOW_OUT_MASK & ~out_locked, so no runtime act can grant output on a line
+ * the compiled mask does not carry.  `unlock` refuses any such line outright.
+ *
+ * 🟢 The compensation is that the guard becomes two-sided and testable on the
+ * die in one boot: `lock 6` then a sysfs brightness write must leave DAT
+ * unmoved, `unlock 6` then the same write must move it.  Until 1.1 the guard
+ * had only ever been observed refusing, which is a wall and not a guard.
+ *
+ * The name is inverted deliberately: `unlocked` defaulting to "everything
+ * unlocked" would be a name that lies. */
+static u32  rtl819x_gpio_out_locked;	/* lines forbidden at run time. 0. */
 
 static u32  rtl819x_gpio_boot_cnr;	/* latched at subsys_initcall */
 static u32  rtl819x_gpio_boot_dir;
@@ -238,15 +329,95 @@ static unsigned long rtl819x_gpio_n_req_ok;	/* .request accepted */
 static unsigned long rtl819x_gpio_n_req_no;	/* .request refused */
 static unsigned long rtl819x_gpio_n_dirin_ok;
 static unsigned long rtl819x_gpio_n_dirin_no;
+static unsigned long rtl819x_gpio_n_dirout_ok;	/* .direction_output permitted */
 static unsigned long rtl819x_gpio_n_dirout_no;	/* .direction_output refused */
+static unsigned long rtl819x_gpio_n_set_ok;	/* .set permitted */
 static unsigned long rtl819x_gpio_n_set_no;	/* .set refused (counted, void) */
-static unsigned long rtl819x_gpio_n_writes;	/* actual register writes.  0. */
+
+/* 🔴 NO LONGER ZERO ON THIS IMAGE, and that is the whole of R5-7.  1.0's
+ * comment here read "actual register writes.  0." -- see notes/gpio-driver.md
+ * § 7, which predicts exactly 2 after probe (one DAT, one DIR, from the single
+ * .direction_output leds-gpio issues) and predicts that BOTH write a value the
+ * register already holds. */
+static unsigned long rtl819x_gpio_n_writes;
+
+/* ------------------------------------------------------------------------
+ * The foreign-write detector.  notes/gpio-driver.md § 6.
+ *
+ * Two writers, no arbiter: gpio_request arbitrates between gpiolib consumers,
+ * and the vendor's rtl_gpio_timer does not go through gpiolib, so nothing can
+ * mediate.  § 6 bounds the CONSEQUENCE (every level either writer can produce
+ * on bit 6 has already been produced on this die by the vendor, so the worst
+ * outcome of losing the race is that a light is wrong) and this is the
+ * instrument that says whether the race happens at all.
+ *
+ * Same shape as rtl819x-spi's n_state_foreign, which read 0 across 4,115
+ * transfers: remember the value last written to DAT, and on every subsequent
+ * access compare the live register's WATCH_MASK bits against it.
+ *
+ * 🔴 ITS STATED LIMIT, which is why the positive control is what it is: it
+ * SAMPLES.  A write undone before the next sample is invisible.  The control
+ * therefore holds the button for ~10 s against a 1 Hz writer (FW-40) rather
+ * than looking for a single event -- notes/gpio-driver.md § 6.2.  A counted
+ * zero is a claim, and this one is only worth reading beside a boot in which
+ * the same counter was made to move.
+ * ------------------------------------------------------------------------ */
+static int  rtl819x_gpio_state_known;	/* have we ever written DAT? */
+static u32  rtl819x_gpio_state_last;	/* the whole word we last wrote */
+static unsigned long rtl819x_gpio_n_state_chk;	/* comparisons made */
+static unsigned long rtl819x_gpio_n_state_foreign;	/* of those, diverged */
+static int  rtl819x_gpio_foreign_seen;	/* first divergence latched */
+static u32  rtl819x_gpio_foreign_first;	/* the live DAT at that moment */
+
+/* G7/G8 are emitted OUTSIDE the lock from values sampled inside it.  See
+ * rtl819x_gpio_direction_output() for why that is not a convenience. */
+static int  rtl819x_gpio_first_out_done;
+static u32  rtl819x_gpio_first_out_before;
+static u32  rtl819x_gpio_first_out_after;
 
 /* The unnamed word at +0x04 is not read at boot.  A read is normally free,
  * but a read-to-clear status register is a write in effect and nothing here
  * knows what +0x04 is.  `probe04` makes reading it a typed act. */
 static int  rtl819x_gpio_probed04;
 static u32  rtl819x_gpio_val04;
+
+/* ------------------------------------------------------------------------
+ * Policy and detector helpers.  Both are called with the lock held.
+ * ------------------------------------------------------------------------ */
+
+/* The effective output permission: the compiled mask, narrowed by whatever
+ * the runtime mask has taken away.  There is deliberately no path that can
+ * widen it -- see the comment on rtl819x_gpio_out_locked. */
+static inline u32 rtl819x_gpio_out_mask(void)
+{
+	return (u32)RTL819X_GPIO_ALLOW_OUT_MASK & ~rtl819x_gpio_out_locked;
+}
+
+/* Compare the live DAT against the value this driver last wrote, on the
+ * watched bits only.  Called with the lock held, ALWAYS BEFORE a write of our
+ * own -- otherwise the driver would be counting itself. */
+static void rtl819x_gpio_state_check(u32 dat)
+{
+	if (!rtl819x_gpio_state_known)
+		return;
+	rtl819x_gpio_n_state_chk++;
+	if (((dat ^ rtl819x_gpio_state_last) & RTL819X_GPIO_WATCH_MASK) == 0)
+		return;
+	rtl819x_gpio_n_state_foreign++;
+	if (!rtl819x_gpio_foreign_seen) {
+		rtl819x_gpio_foreign_seen = 1;
+		rtl819x_gpio_foreign_first = dat;
+	}
+}
+
+/* Record what we just put in DAT.  The WHOLE word is kept, not just the
+ * watched bits, so that /proc can show a reader the value rather than a
+ * fragment of one. */
+static void rtl819x_gpio_state_note(u32 dat)
+{
+	rtl819x_gpio_state_last = dat;
+	rtl819x_gpio_state_known = 1;
+}
 
 /* ------------------------------------------------------------------------
  * gpio_chip operations.
@@ -284,13 +455,20 @@ static void rtl819x_gpio_free(struct gpio_chip *chip, unsigned off)
 
 static int rtl819x_gpio_get(struct gpio_chip *chip, unsigned off)
 {
+	unsigned long flags;
 	u32 dat;
 
 	if (off >= RTL819X_GPIO_NGPIO)
 		return -EINVAL;
 
+	/* 1.1 takes the lock here, which 1.0 did not: the counter is no longer
+	 * the only shared state a .get touches -- the detector's comparison is
+	 * one too, and it has to see the same word the count is for. */
+	spin_lock_irqsave(&rtl819x_gpio_lock, flags);
 	dat = rtl819x_gpio_rd(RTL819X_PABCD_DAT);
 	rtl819x_gpio_n_get++;
+	rtl819x_gpio_state_check(dat);
+	spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
 
 	/* The RAW pin level, not the logical one.  REG-28 makes the button
 	 * active low, and inverting here would put the polarity in two places
@@ -346,30 +524,84 @@ static int rtl819x_gpio_direction_output(struct gpio_chip *chip, unsigned off,
 					 int value)
 {
 	unsigned long flags;
-	u32 dir;
+	u32 dir, dat, newdat;
+	int first = 0;
 
 	if (off >= RTL819X_GPIO_NGPIO)
 		return -EINVAL;
 
 	spin_lock_irqsave(&rtl819x_gpio_lock, flags);
-	if (!((1u << off) & RTL819X_GPIO_ALLOW_OUT_MASK) ||
-	    rtl819x_gpio_unlocked != (int)off) {
+	if (!((1u << off) & rtl819x_gpio_out_mask())) {
 		rtl819x_gpio_n_dirout_no++;
 		spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
 		return -EPERM;
 	}
 
-	/* Unreachable while RTL819X_GPIO_ALLOW_OUT_MASK is 0.  It is written
-	 * out rather than left as a `return -EPERM;` so that the day a line
-	 * acquires a measured safe output state, the change is one constant
-	 * and not a new code path written under time pressure at a bench. */
+	/* § 3.4's ORDERING ASSUMPTION, TURNED INTO A RUNTIME CHECK.
+	 *
+	 * The argument for opening bit 6 rests on the vendor's rtl_gpio_init
+	 * having already cleared CNR bit 6 -- i.e. on this driver's
+	 * subsys_initcall (4) running after that.  notes/gpio-driver.md § 3.4
+	 * measures the ordering and then declines to rely on it: if CNR bit 6
+	 * is SET when we get here, the pin is on a peripheral function and
+	 * driving it would take that pin away from whatever owns it.
+	 *
+	 * -EIO and not -EPERM, for .direction_input's reason: the hardware
+	 * disagreeing with a recorded measurement is a different event from
+	 * the policy refusing, and the two must not arrive as one errno.
+	 *
+	 * This driver still never writes CNR. */
+	if (rtl819x_gpio_rd(RTL819X_PABCD_CNR) & (1u << off)) {
+		rtl819x_gpio_n_dirout_no++;
+		spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
+		return -EIO;
+	}
+
+	dat = rtl819x_gpio_rd(RTL819X_PABCD_DAT);
 	dir = rtl819x_gpio_rd(RTL819X_PABCD_DIR);
-	rtl819x_gpio_wr(RTL819X_PABCD_DAT,
-			value ? (rtl819x_gpio_rd(RTL819X_PABCD_DAT) | (1u << off))
-			      : (rtl819x_gpio_rd(RTL819X_PABCD_DAT) & ~(1u << off)));
+
+	/* Before our own write, never after: a detector that ran afterwards
+	 * would be comparing the register against what we just put in it. */
+	rtl819x_gpio_state_check(dat);
+
+	newdat = value ? (dat | (1u << off)) : (dat & ~(1u << off));
+
+	/* DAT before DIR.  The level is established while the pin is still an
+	 * input, so enabling the driver cannot glitch it through the old
+	 * level.  On this die both writes are predicted to be no-ops --
+	 * notes/gpio-driver.md § 7 -- and G7/G8 below are what say whether
+	 * they were. */
+	rtl819x_gpio_wr(RTL819X_PABCD_DAT, newdat);
 	rtl819x_gpio_wr(RTL819X_PABCD_DIR, dir | (1u << off));
 	rtl819x_gpio_n_writes += 2;
+	rtl819x_gpio_state_note(newdat);
+	rtl819x_gpio_n_dirout_ok++;
+
+	if (!rtl819x_gpio_first_out_done) {
+		rtl819x_gpio_first_out_done = 1;
+		rtl819x_gpio_first_out_before = dat;
+		rtl819x_gpio_first_out_after =
+			rtl819x_gpio_rd(RTL819X_PABCD_DAT);
+		first = 1;
+	}
 	spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
+
+	/* 🔴 THE MARKS ARE EMITTED HERE AND NOT INSIDE THE LOCK, and that is a
+	 * decision rather than a tidy-up.  rlxfw_markx reaches the wire through
+	 * prom_putchar, which busy-waits on the UART FIFO: eleven bytes at
+	 * 38400 8N1 is ~2.9 ms, and inside spin_lock_irqsave that is 2.9 ms
+	 * with interrupts off.  The VALUES are the ones sampled inside the
+	 * lock, so the reading is unchanged; only the wait moved out.
+	 *
+	 * G7 is DAT immediately before the first permitted .direction_output
+	 * and G8 immediately after.  Predicted equal, and equal to 0000007C --
+	 * unless the board booted into the post-long-press state REG-37 caught
+	 * (0000003C, bit 6 low, the LED lit), in which case G7 says so instead
+	 * of it being assumed. */
+	if (first) {
+		rlxfw_markx("G7", rtl819x_gpio_first_out_before);
+		rlxfw_markx("G8", rtl819x_gpio_first_out_after);
+	}
 	return 0;
 }
 
@@ -379,23 +611,35 @@ static int rtl819x_gpio_direction_output(struct gpio_chip *chip, unsigned off,
 static void rtl819x_gpio_set(struct gpio_chip *chip, unsigned off, int value)
 {
 	unsigned long flags;
-	u32 dat;
+	u32 dat, newdat;
 
 	if (off >= RTL819X_GPIO_NGPIO)
 		return;
 
 	spin_lock_irqsave(&rtl819x_gpio_lock, flags);
-	if (!((1u << off) & RTL819X_GPIO_ALLOW_OUT_MASK) ||
-	    rtl819x_gpio_unlocked != (int)off) {
+	if (!((1u << off) & rtl819x_gpio_out_mask())) {
 		rtl819x_gpio_n_set_no++;
 		spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
 		return;
 	}
 
+	/* No CNR check here, deliberately, and the asymmetry with
+	 * .direction_output is the point: gpiolib will not reach this op
+	 * without a direction_output having succeeded first (a consumer that
+	 * has not set a direction has nothing to set a value on), so the CNR
+	 * reading has already been taken on this line in this boot.  Repeating
+	 * it would cost an uncached read on the sysfs write path -- the one
+	 * path a human drives at speed -- to re-answer a question whose answer
+	 * cannot change without a CNR write, and this driver never writes CNR.
+	 * ⚠️ That reasoning is about THIS driver: if CNR ever becomes writable
+	 * from anywhere, this comment is the thing that stops being true. */
 	dat = rtl819x_gpio_rd(RTL819X_PABCD_DAT);
-	rtl819x_gpio_wr(RTL819X_PABCD_DAT,
-			value ? (dat | (1u << off)) : (dat & ~(1u << off)));
+	rtl819x_gpio_state_check(dat);
+	newdat = value ? (dat | (1u << off)) : (dat & ~(1u << off));
+	rtl819x_gpio_wr(RTL819X_PABCD_DAT, newdat);
 	rtl819x_gpio_n_writes++;
+	rtl819x_gpio_state_note(newdat);
+	rtl819x_gpio_n_set_ok++;
 	spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
 }
 
@@ -424,10 +668,31 @@ static struct gpio_chip rtl819x_gpio_chip = {
 static int rtl819x_gpio_read_proc(char *page, char **start, off_t off,
 				  int count, int *eof, void *data)
 {
-	u32 cnr = rtl819x_gpio_rd(RTL819X_PABCD_CNR);
-	u32 dir = rtl819x_gpio_rd(RTL819X_PABCD_DIR);
-	u32 dat = rtl819x_gpio_rd(RTL819X_PABCD_DAT);
+	unsigned long flags;
+	unsigned long n_chk, n_foreign;
+	u32 cnr, dir, dat, locked, s_last, f_first;
+	int s_known, f_seen;
 	int len = 0;
+
+	/* 🔴 READING THIS FILE IS AN OBSERVATION, NOT A REPORT OF ONE.  The
+	 * detector samples (notes/gpio-driver.md § 6.1), so `cat` IS a sample
+	 * -- § 6.2's positive control is the button held for ~10 s while this
+	 * file is read in a loop.  Everything is taken under the lock so the
+	 * three live words, the comparison they feed and the counters printed
+	 * from them are one snapshot rather than several. */
+	spin_lock_irqsave(&rtl819x_gpio_lock, flags);
+	cnr = rtl819x_gpio_rd(RTL819X_PABCD_CNR);
+	dir = rtl819x_gpio_rd(RTL819X_PABCD_DIR);
+	dat = rtl819x_gpio_rd(RTL819X_PABCD_DAT);
+	rtl819x_gpio_state_check(dat);
+	locked	  = rtl819x_gpio_out_locked;
+	s_known	  = rtl819x_gpio_state_known;
+	s_last	  = rtl819x_gpio_state_last;
+	n_chk	  = rtl819x_gpio_n_state_chk;
+	n_foreign = rtl819x_gpio_n_state_foreign;
+	f_seen	  = rtl819x_gpio_foreign_seen;
+	f_first	  = rtl819x_gpio_foreign_first;
+	spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
 
 	len += sprintf(page + len, "version %s\n", RTL819X_GPIO_VERSION);
 	len += sprintf(page + len, "added %d\n", rtl819x_gpio_added);
@@ -464,18 +729,39 @@ static int rtl819x_gpio_read_proc(char *page, char **start, off_t off,
 		       (u32)RTL819X_GPIO_KNOWN_MASK);
 	len += sprintf(page + len, "allow_out_mask %08X\n",
 		       (u32)RTL819X_GPIO_ALLOW_OUT_MASK);
-	len += sprintf(page + len, "unlocked %d\n", rtl819x_gpio_unlocked);
+	/* Three fields and not one, because the runtime mask and the compiled
+	 * one answer different questions and a reader must not have to AND
+	 * them in their head. */
+	len += sprintf(page + len, "out_locked %08X\n", locked);
+	len += sprintf(page + len, "out_effective %08X\n",
+		       (u32)RTL819X_GPIO_ALLOW_OUT_MASK & ~locked);
 
 	len += sprintf(page + len, "n_get %lu\n", rtl819x_gpio_n_get);
 	len += sprintf(page + len, "n_req_ok %lu\n", rtl819x_gpio_n_req_ok);
 	len += sprintf(page + len, "n_req_no %lu\n", rtl819x_gpio_n_req_no);
 	len += sprintf(page + len, "n_dirin_ok %lu\n", rtl819x_gpio_n_dirin_ok);
 	len += sprintf(page + len, "n_dirin_no %lu\n", rtl819x_gpio_n_dirin_no);
+	len += sprintf(page + len, "n_dirout_ok %lu\n", rtl819x_gpio_n_dirout_ok);
 	len += sprintf(page + len, "n_dirout_no %lu\n", rtl819x_gpio_n_dirout_no);
+	len += sprintf(page + len, "n_set_ok %lu\n", rtl819x_gpio_n_set_ok);
 	len += sprintf(page + len, "n_set_no %lu\n", rtl819x_gpio_n_set_no);
 
-	/* THE NUMBER THIS DRIVER EXISTS TO KEEP AT ZERO. */
+	/* 🔴 1.0's comment here was "THE NUMBER THIS DRIVER EXISTS TO KEEP AT
+	 * ZERO."  It is not zero on this image and the change is R5-7 itself.
+	 * notes/gpio-driver.md § 7 predicts exactly 2 after probe, both of
+	 * them writing a value the register already held. */
 	len += sprintf(page + len, "n_writes %lu\n", rtl819x_gpio_n_writes);
+
+	/* The foreign-write detector.  n_state_chk is what makes the zero
+	 * readable: a zero divergence count beside a zero comparison count is
+	 * an instrument that never ran, and those two are not the same
+	 * reading. */
+	len += sprintf(page + len, "state_known %d\n", s_known);
+	len += sprintf(page + len, "state_last %08X\n", s_last);
+	len += sprintf(page + len, "n_state_chk %lu\n", n_chk);
+	len += sprintf(page + len, "n_state_foreign %lu\n", n_foreign);
+	len += sprintf(page + len, "foreign_seen %d\n", f_seen);
+	len += sprintf(page + len, "foreign_first %08X\n", f_first);
 
 	len += sprintf(page + len, "probed04 %d\n", rtl819x_gpio_probed04);
 	len += sprintf(page + len, "val04 %08X\n", rtl819x_gpio_val04);
@@ -551,22 +837,39 @@ static int rtl819x_gpio_verb_probe04(void)
 	return 0;
 }
 
-static int rtl819x_gpio_verb_unlock(const char *arg)
+/* `lock N` takes a line out of the runtime mask; `unlock N` puts it back.
+ *
+ * Neither can grant output on a line RTL819X_GPIO_ALLOW_OUT_MASK does not
+ * carry: `unlock` refuses such a line with -EPERM rather than silently doing
+ * nothing, so a card that types `unlock 5` gets a reading either way.  `lock`
+ * accepts any valid line, because taking away a permission that does not exist
+ * is harmless and refusing it would make the two verbs asymmetric for no
+ * measurable reason.
+ *
+ * 🟢 THESE TWO ARE THE GUARD'S TWO-SIDED TEST, which 1.0 could not run.  With
+ * the compiled mask at 0 the only observable outcome was a refusal, and a
+ * guard that has only ever been seen refusing is a wall.  In one boot:
+ * `lock 6` then a sysfs brightness write must leave DAT unmoved, `unlock 6`
+ * then the same write must move it.  notes/gpio-driver.md § 7 ②. */
+static int rtl819x_gpio_verb_lock(const char *arg, int set)
 {
 	unsigned long line;
+	unsigned long flags;
 	char *end;
 
 	line = simple_strtoul(arg, &end, 0);
 	if (end == arg || line >= RTL819X_GPIO_NGPIO)
 		return -EINVAL;
 
-	/* -EPERM for every line while the mask is 0, and the /proc dump
-	 * carries allow_out_mask so the refusal is legible without this
-	 * source. */
-	if (!((1u << line) & RTL819X_GPIO_ALLOW_OUT_MASK))
+	if (!set && !((1u << line) & RTL819X_GPIO_ALLOW_OUT_MASK))
 		return -EPERM;
 
-	rtl819x_gpio_unlocked = (int)line;
+	spin_lock_irqsave(&rtl819x_gpio_lock, flags);
+	if (set)
+		rtl819x_gpio_out_locked |= (1u << line);
+	else
+		rtl819x_gpio_out_locked &= ~(1u << line);
+	spin_unlock_irqrestore(&rtl819x_gpio_lock, flags);
 	return 0;
 }
 
@@ -592,9 +895,19 @@ static int rtl819x_gpio_write_proc(struct file *file, const char __user *buffer,
 	else if (!strncmp(buf, "tryout ", 7))
 		ret = rtl819x_gpio_verb_tryout(buf + 7);
 	else if (!strncmp(buf, "unlock ", 7))
-		ret = rtl819x_gpio_verb_unlock(buf + 7);
+		ret = rtl819x_gpio_verb_lock(buf + 7, 0);
+	else if (!strncmp(buf, "lock ", 5))
+		ret = rtl819x_gpio_verb_lock(buf + 5, 1);
 	else if (!strcmp(buf, "lock")) {
-		rtl819x_gpio_unlocked = -1;
+		/* Bare `lock` keeps 1.0's meaning -- NOTHING may output -- so
+		 * the spelling a card already knows still does what it said.
+		 * ~0 and not ALLOW_OUT_MASK, because the field should read as
+		 * "everything", which is what was typed. */
+		unsigned long f;
+
+		spin_lock_irqsave(&rtl819x_gpio_lock, f);
+		rtl819x_gpio_out_locked = ~0u;
+		spin_unlock_irqrestore(&rtl819x_gpio_lock, f);
 		ret = 0;
 	} else if (!strcmp(buf, "probe04"))
 		ret = rtl819x_gpio_verb_probe04();
