@@ -49,6 +49,12 @@ What it checks
                 ``started_wallclock`` could be read is RED, not green.  A
                 tool reporting zero mismatches over zero readable timestamps
                 is making a claim it cannot support.
+``D4`` (index)  every directory under ``root`` must appear exactly once
+                in ``README.md``'s index section, and every row of that
+                index must name a directory that exists.  Both
+                directions, because a row left behind by a rename is as
+                wrong as a directory nobody added.  An absent index
+                section is RED, not a skip.  ``BRD-README-1``.
 
 What it does NOT prove
 ----------------------
@@ -231,6 +237,111 @@ def scan(root, known=None):
                     os.path.basename(meta))
         reports.append(rep)
     return reports, n_meta
+
+
+# ---------------------------------------------------------------------------
+# D4.  The index in bench/README.md, swept in BOTH directions.
+#
+# ``BRD-README-1``: the file opens by calling itself the evidence behind
+# RUNSHEET's Results tables, it reads as a per-directory index, and 量
+# 2026-09-11 it named 16 of 29 -- with the last five seatings in a row absent.
+# It drifted for five seatings because nothing here could see it.
+#
+# 🔴 The carried-forward item proposed ``ls -d bench/2026-* | wc -l`` against
+# ``grep -c '^## 2026'`` as the whole check.  That is a COUNT comparison and it
+# passes on a duplicate plus a miss, which is one of the shapes a drifting
+# index actually produces.  This is set-based and reports both directions, the
+# way ledgerscan, flashwin scan and sweep()'s own STALE loop already do.
+#
+# 🔴 And it lives beside sweep() rather than inside it.  Its subject is
+# `bench/` as a published record, not "a directory tree" -- the controls below
+# sweep synthetic trees that have no README at all, and a D4 inside sweep()
+# turns four of them red for a reason unrelated to what they test.  量: the
+# first draft did that and C7 is what reported it.
+# ---------------------------------------------------------------------------
+
+#: The exact heading the index section sits under.  A heading and not an HTML
+#: comment, because a marker a reader cannot see is a marker a reader will
+#: delete; and an exact string rather than a pattern, because bench/README.md
+#: is 1,400 lines of narrative that quotes directory names constantly and any
+#: looser rule would pick a paragraph up as a row.
+INDEX_HEADING = "## Index \u2014 every directory here, and who owns its record"
+
+BENCH_DIRNAME = re.compile(r"^2026-\d\d-\d\d[a-z]?$")
+
+
+def index_rows(readme_path):
+    """Return (rows, found_section).
+
+    A row is a Markdown table row inside the index section whose first cell is
+    a directory name, optionally backticked and optionally bolded.  The
+    section ends at the next ``## `` heading, so a table after it is not read.
+    """
+    try:
+        with open(readme_path, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return [], False
+    start = None
+    for i, line in enumerate(lines):
+        if line.strip() == INDEX_HEADING:
+            start = i
+            break
+    if start is None:
+        return [], False
+    rows = []
+    for line in lines[start + 1:]:
+        if line.startswith("## "):
+            break
+        if not line.startswith("|"):
+            continue
+        cell = line.split("|")[1].strip().strip("*").strip("`").strip()
+        if BENCH_DIRNAME.match(cell):
+            rows.append(cell)
+    return rows, True
+
+
+def index_coverage(root, readme_path):
+    """Return (missing, orphan, dup, found, n_on_disk).
+
+    ``missing`` is on disk and not in the index; ``orphan`` is in the index
+    and not on disk.  Neither direction is optional: a row left behind by a
+    rename is as wrong as a directory nobody added.
+    """
+    on_disk = sorted(
+        n for n in (os.listdir(root) if os.path.isdir(root) else [])
+        if BENCH_DIRNAME.match(n) and os.path.isdir(os.path.join(root, n)))
+    rows, found = index_rows(readme_path)
+    missing = [d for d in on_disk if d not in rows]
+    orphan = [r for r in rows if r not in on_disk]
+    dup = sorted(r for r in set(rows) if rows.count(r) > 1)
+    return missing, orphan, dup, found, len(on_disk)
+
+
+def index_check(root):
+    """Print D4 and return an exit code.  0 clean, 1 findings, 2 no section.
+
+    2 and not 1 for a missing section, for sweep()'s reason: a check that
+    reported nothing because it could not find its subject has not checked
+    anything, and a green there is a claim about nothing.
+    """
+    readme = os.path.join(root, "README.md")
+    missing, orphan, dup, found, n_dirs = index_coverage(root, readme)
+    if not found:
+        print("  D4    REFUSING -- %s has no %r section, so this check has "
+              "nothing to report on" % (readme, INDEX_HEADING))
+        return 2
+    for d in missing:
+        print("  D4    %-24s on disk and not in the index" % d)
+    for d in orphan:
+        print("  D4    %-24s in the index and no such directory" % d)
+    for d in dup:
+        print("  D4    %-24s named twice in the index" % d)
+    bad = len(missing) + len(orphan) + len(dup)
+    if not bad:
+        print("  D4    index covers all %d directories, both directions"
+              % n_dirs)
+    return 1 if bad else 0
 
 
 def sweep(root, quiet=False, known=None):
@@ -436,13 +547,78 @@ def controls():
            "an exception must cover only the directory it names; got %r"
            % (got,))
 
+        # ------------------------------------------------------------------
+        # D4's controls.  Four, and C15 is the one that makes the other three
+        # mean anything: without a case that must come out clean, C14/C16/C17
+        # all pass for a checker that calls every directory missing.
+        # ------------------------------------------------------------------
+        def _readme(path, listed):
+            body = ["# bench/", "", INDEX_HEADING, "",
+                    "| dir | note |", "|---|---|"]
+            body += ["| `%s` | x |" % d for d in listed]
+            body += ["", "## After the index", "",
+                     "| dir | note |", "|---|---|", "| `2026-12-31` | x |"]
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("\n".join(body) + "\n")
+
+        root = os.path.join(tmp, "c14")
+        _mk(os.path.join(root, "2026-01-02"), "a", "2026-01-02T10:00:00+0800")
+        _mk(os.path.join(root, "2026-01-03"), "a", "2026-01-03T10:00:00+0800")
+        _readme(os.path.join(root, "README.md"), ["2026-01-02"])
+        miss, orph, dup, found, n = index_coverage(
+            root, os.path.join(root, "README.md"))
+        ck("C14", found and miss == ["2026-01-03"] and not orph and n == 2,
+           "a directory on disk and not in the index must be reported; got "
+           "found=%r missing=%r orphan=%r n=%r" % (found, miss, orph, n))
+
+        # C15 negative: a complete index must come out clean, AND the table
+        # after the next heading must not contribute a row -- which is what
+        # makes the section delimiter a delimiter rather than a decoration.
+        root = os.path.join(tmp, "c15")
+        _mk(os.path.join(root, "2026-01-02"), "a", "2026-01-02T10:00:00+0800")
+        _mk(os.path.join(root, "2026-01-03"), "a", "2026-01-03T10:00:00+0800")
+        _readme(os.path.join(root, "README.md"), ["2026-01-02", "2026-01-03"])
+        miss, orph, dup, found, n = index_coverage(
+            root, os.path.join(root, "README.md"))
+        ck("C15", found and not miss and not orph and not dup and n == 2,
+           "a complete index must be clean and the table after the next "
+           "heading must not be read; got missing=%r orphan=%r dup=%r"
+           % (miss, orph, dup))
+
+        # C16 positive, the other direction: a row naming no directory.
+        root = os.path.join(tmp, "c16")
+        _mk(os.path.join(root, "2026-01-02"), "a", "2026-01-02T10:00:00+0800")
+        _readme(os.path.join(root, "README.md"), ["2026-01-02", "2026-01-09"])
+        miss, orph, dup, found, n = index_coverage(
+            root, os.path.join(root, "README.md"))
+        ck("C16", found and not miss and orph == ["2026-01-09"],
+           "an index row naming no directory must be reported; got "
+           "missing=%r orphan=%r" % (miss, orph))
+
+        # C17: no section at all must REFUSE with 2, not report a clean
+        # sweep.  A count check would have read this as `0 == 0` and gone
+        # green, which is the whole reason D4 is set-based.
+        root = os.path.join(tmp, "c17")
+        _mk(os.path.join(root, "2026-01-02"), "a", "2026-01-02T10:00:00+0800")
+        with open(os.path.join(root, "README.md"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("# bench/\n\nno index here\n")
+        os.environ[RECURSION_GUARD] = "1"
+        try:
+            rc17 = index_check(root)
+        finally:
+            os.environ.pop(RECURSION_GUARD, None)
+        ck("C17", rc17 == 2,
+           "an absent index section must return 2, not a clean 0; got %r"
+           % (rc17,))
+
     return bad, ran
 
 
 def run_controls():
     print("capdate controls")
     bad, ran = controls()
-    expected = 13
+    expected = 17
     if len(ran) != expected:
         print("capdate: REFUSING -- %d controls ran, %d expected. A control "
               "set that did not execute proves nothing." % (len(ran), expected))
@@ -472,7 +648,9 @@ def main(argv=None):
         rc = run_controls()
         if rc:
             return rc
-    return sweep(args.root, quiet=args.quiet)
+    rc = sweep(args.root, quiet=args.quiet)
+    rc4 = index_check(args.root)
+    return rc or rc4
 
 
 if __name__ == "__main__":

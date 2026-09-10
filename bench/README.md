@@ -10,6 +10,88 @@ reason.
 So: the Results tables say what a reading **means**. These files say what the
 device **sent**. If the two disagree, these win.
 
+## What this file is, and what it is not
+
+🔴 **It is not a second account of what each seating found, and it must not
+become one.** Every seating's record has exactly one owner: the
+`PREDICTIONS-*.md` frozen in its directory before power, the
+`CORRECTIONS-*.md` written into the same directory afterwards, and that
+segment's dated entry in `LOG.md`. Repeating any of it here would give one
+piece of state two owners, which is house rule 1 and which this repository has
+now twice closed by **deleting** the duplicate rather than synchronising it
+(`P4b-1` 2026-09-01, `POS-1` 2026-09-11).
+
+**What this file owns is two things.** ① The **index** below — one row per
+directory, pointing at the owner and nothing more. ② The `## <date>` sections
+after it, which are **not** an index and are not complete: each exists because
+that seating produced a *rule* that outlived it — the redaction audit, the
+`-text` attribute, the sentence about *zero flash bytes* this file was not
+entitled to. A seating that produced only readings has no section here and does
+not need one.
+
+⚠️ **`BRD-README-1` proposed two repairs and this is the second one**, taken
+over *fill in the fifteen missing sections* for a measured reason rather than
+for cost: writing fifteen more narrative sections is precisely the duplicate
+above, at scale, and this project has already deleted that shape twice.
+
+## Index — every directory here, and who owns its record
+
+**Derived, not typed.** `tools/capdate.py` `D4` requires every directory under
+`bench/` to appear in this table exactly once and every row of it to name a
+directory that exists — **both directions**, because a row left behind by a
+rename is as wrong as a directory nobody added. `D4` returns 2, not 0, if this
+section is missing, so deleting the table is not a way to make the check pass.
+The *captures* column counts `*.log`; the last column is the card's own `# `
+title with its `CORRECTIONS`/`PREDICTIONS` prefix removed.
+
+🔴 **Seating numbers are deliberately NOT a column.** Each card states its own,
+`LOG.md` states it again, and 量 2026-09-11 the two already disagree once — the
+`## 2026-08-31` heading below says *seating 8* while the card frozen in
+`bench/2026-08-31/` says *seating 7*, because that heading is about
+`2026-08-31c` and kept the name the directory had before it was renamed. Its
+body records the rename; its heading did not follow. A third source for a
+number two sources disagree about is not an index, it is a fourth defect.
+
+| directory | captures | the card in it | what that card calls it |
+|---|---:|---|---|
+| `2026-08-23` | 4 | — | — |
+| `2026-08-24` | 10 | — | — |
+| `2026-08-24b` | 33 | `PREDICTIONS-block3b.md` (+3) | Block 3b — the console outage left the loader's line buffer in an unknown state |
+| `2026-08-24c` | 46 | `PREDICTIONS-block6.md` (+9) | block 6: `G6`, the reference boot |
+| `2026-08-24d` | 24 | `PREDICTIONS-block9b.md` (+5) | block 9b: verifying the poison before relying on it |
+| `2026-08-24e` | 1 | `PREDICTIONS-block12.md` | block 12: `G8b`, the half `G8a` could not do |
+| `2026-08-24f` | 10 | `PREDICTIONS-block13.md` | block 13: `G8b`, retried with a window that cannot be missed |
+| `2026-08-25` | 26 | `PREDICTIONS-b4-block9.md` (+9) | Session B4, block 9 (`H3a`, `C-17`'s second instance through a different reset path) |
+| `2026-08-25b` | 18 | `PREDICTIONS-b4-block3.md` (+3) | Session B4, `R1g-4b`, block 3: `probe2` a second time |
+| `2026-08-26` | 0 | `PREDICTIONS-b4-block0.md` | Session B4, block 0 |
+| `2026-08-30` | 13 | `CORRECTIONS-block0.md` (+1) | `PREDICTIONS-B5-block0.md`, after the seating |
+| `2026-08-30b` | 24 | `CORRECTIONS-block1.md` (+1) | `PREDICTIONS-B5-block1.md`, after the seating |
+| `2026-08-30c` | 21 | `CORRECTIONS-block2.md` (+1) | `PREDICTIONS-B5-block2.md` |
+| `2026-08-30d` | 10 | — | — |
+| `2026-08-31` | 35 | `CORRECTIONS-block3.md` (+2) | Session B5, block 3 (seating 7, 2026-08-31, two power cycles) |
+| `2026-08-31b` | 27 | `PREDICTIONS-B5-block3e.md` (+2) | Session B5, block 3e: the safety property's second instance, and the control that the node set IS the declaration |
+| `2026-08-31c` | 49 | `CORRECTIONS-block4.md` (+1) | block 4, `bench/2026-08-31c/` |
+| `2026-09-01` | 43 | `CORRECTIONS-block6.md` (+2) | seating 9, blocks 5 and 6, 2026-09-01 |
+| `2026-09-02` | 10 | `CORRECTIONS-block7.md` (+1) | seating 10, block 7, 2026-09-02 |
+| `2026-09-03` | 20 | `CORRECTIONS-block8.md` (+1) | block 8, `R5-2`, seating 11 |
+| `2026-09-04` | 35 | `CORRECTIONS-block9.md` (+1) | block 9, `R5-3a`, seating 12 |
+| `2026-09-06` | 59 | `CORRECTIONS-block10.md` (+1) | Block 10, `R5-3b-1`, seating 13 |
+| `2026-09-06b` | 76 | `CORRECTIONS-block11.md` (+2) | Block 11 — corrections, and what the card got right |
+| `2026-09-06c` | 86 | `CORRECTIONS-block12.md` (+1) | Block 12 — corrections, and what the card got right |
+| `2026-09-08` | 87 | `CORRECTIONS-block13.md` (+1) | Corrections and additions — block 13, `R5-5`, seating 16 |
+| `2026-09-08b` | 69 | `CORRECTIONS-block14.md` (+1) | Corrections and results — block 14, seating 17, 2026-09-08 |
+| `2026-09-09` | 85 | `CORRECTIONS-block15.md` (+1) | block 15, seating 18, 2026-09-09 |
+| `2026-09-09b` | 39 | `CORRECTIONS-block16.md` (+1) | block 16, seating 19, 2026-09-09 |
+| `2026-09-10` | 169 | `CORRECTIONS-block17.md` (+1) | block 17, seating 20, 2026-09-10 |
+
+⚠️ **Two directories are named for a day none of their captures happened on**
+and may not be renamed — `2026-08-30` and `2026-08-30b`, both holding captures
+taken entirely on 2026-08-29. They are declared by name in `capdate.py`'s
+`KNOWN_MISNAMED` with the measurement and the reason. **`2026-08-26` holds no
+captures at all**: it is a card written for a seating, and `capdate` reports it
+as SKIP rather than as a pass.
+
+
 ## What is in a file, and what is not device output
 
 `B.log` and `E.log` were produced by piping `upstream/tools/console-dump.py`
