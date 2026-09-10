@@ -22880,8 +22880,21 @@ seating 18 的第一版卡片用 `exec 3>` 被同一條規則擋掉過。
 * **carried-forward**:`POS-1`(PROGRESS.md 的四個 session-history 列)仍然開著,
   而這一段沒有擅自輪動 —— 但它多了**第三個選項**,見下。
   `XNUM-1`／`CHLOG-1` 不動。`HC-1` 已結案、`CENSUS-2` 已收、`LEDGER-4` 第三形狀已否證。
-* **新的 carried-forward `PS-6`**:PowerShell `Get-Date -UFormat %s` 差一個本地 UTC
-  偏移,已寫進 `CLAUDE.md` 的陷阱清單。
+* 🔴 **一個我自己編的 id,收工稽核抓到。** 這一列原本寫「新的 carried-forward `PS-6`」。量,`git grep -E '\bPS-[0-9]\b'`:這個 repo **沒有 `PS-` 系列**,
+  而且它根本不是 carried-forward —— PowerShell `Get-Date -UFormat %s` 差一個
+  本地 UTC 偏移這件事已經寫進 `CLAUDE.md` 的 PowerShell 陷阱清單成為 **⑥**,
+  沒有東西還開著。**正確的引用是「PowerShell 陷阱 ⑥」。**
+* 🔴 **收工稽核抓到 `docs/blind-write-ledger.md` 的一個缺口,而五道門全綠。**
+  `gpiolib.c` 那一列在 seating 15 之後就寫著 `gpio_ensure_requested()`,
+  但只描述了「線沒有主人」那一支,寫得像無條件的;而我這一段的決定①壓的
+  正是另一支。路徑早就宣告了、函式名字也早就在裡面,**所以沒有任何掃描器
+  看得見這個變化 —— 它是宣告過的路徑裡面的深度改變,也就是 `LEDGER-4` 本身**,
+  而 `ledgerscan check` 當時是綠的。`gpio` 網域的路徑計數不動。
+  同一次稽核也補了 `leds-gpio.c` 的 `gpio_led_set` 全文(極性套用的那一行,
+  卡片 § 5 壓在它上面)。**綠的閘門不是稽核。**
+* 🔴 **`POS-1` 從來沒有進過 `PROGRESS.md` § Carried forward。** 它只存在於
+  `Last session` 那一列的內文裡,而那是一列描述過去的列。這一段把它補進
+  擁有它的那一節,帶三個選項。
 * **`POS-1` 的第三個選項**:那四列是 `LOG.md` 已經擁有的東西的**第二個擁有者**,
   而這個 repo 已經關過一次完全一樣的形狀 —— `P4b-1`(2026-09-01)的處置是**刪掉**
   第二個擁有者,不是把它同步。所以選項不只「每段輪動」與「改名」,還有
