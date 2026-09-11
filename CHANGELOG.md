@@ -1408,10 +1408,34 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+*(Nothing yet. `R1-pub + R2c` opened 2026-09-11, in the segment `R5` closed;
+its first step is `R1-pub-0`.)*
+
+---
+
+## v0.3 — 2026-09-11
+
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R4` — edit → result as one command, with a reset that does not touch the power
+switch — plus `R5`, six drivers in-tree, each with a compile-tested DT binding
+marked *not probed on hardware*, and `docs/driver-diff.md`.
+
+🔴 **No take, and that is a decision rather than an omission.** `v0.2` carried a
+60-second replay; the version map does not put one in `v0.3`'s definition, and
+none was made. The artefact that does the same job here is
+[`docs/GATE-RESULTS.md`](docs/GATE-RESULTS.md), whose seventh and eighth entries
+are `R4`'s and `R5`'s, each with three claims and a longer list of what the gate
+did **not** establish.
+
+⚠️ **What a release's known-issues list is**: the copy of
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) at this tag, which is frozen. The
+one on `main` keeps moving.
+
 ### `R5` closed — six drivers in one image, seventeen boots, and the DoD row that was met as a ratio
 
-2026-09-11, the fifty-eighth segment, at the desk, **no power**. Thirteen steps
-of thirteen. `docs/GATE-RESULTS.md` gains its **eighth** entry.
+2026-09-11, the fifty-eighth segment, at the desk, **no power**. **Fifteen
+steps of fifteen** — `R5-0` through `R5-12`, with `R5-3` split into `R5-3a`
+and `R5-3b`, and `R5-3b` split again. `docs/GATE-RESULTS.md` gains its **eighth** entry.
 
 **Six drivers are in ONE image, and that is a reading over the corpus rather
 than a count of six seatings.** Image `692A2801` carries `rtl819x-timer`,

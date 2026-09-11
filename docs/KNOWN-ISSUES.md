@@ -1,15 +1,13 @@
 # Known issues
 
-**What this repository does not establish.**
-The project's charter asks for a known-issues list beside every release. This is
-that list, and it is written to the same standard as everything else here: each
-entry names what is *not* true, what was measured instead, and which gate changes
-it. Nothing below is a plan; the plan is `PROGRESS.md`'s gate board.
+**What this repository does not establish, at `v0.3`.**
+`plan/CHARTER.md` §110 rule 2 asks for a known-issues list beside every release.
+This is that list, and it is written to the same standard as everything else
+here: each entry names what is *not* true, what was measured instead, and which
+gate changes it. Nothing below is a plan; the plan is `PROGRESS.md`'s gate board.
 
-⚠️ **This file on `main` is the CURRENT list, not `v0.2`'s.** A release's list is
-the copy at that release's tag, which is frozen; this one keeps moving. Anything
-that has since been closed is at the bottom rather than deleted, so the two can
-be read against each other.
+Anything that has since been closed is at the bottom rather than deleted, so
+this list and `v0.2`'s can be read against each other.
 
 Marked the same way as the rest of the repository: **量** measured on the device
 · **讀** read out of code, a dump or a document · **推** inferred, pending a
