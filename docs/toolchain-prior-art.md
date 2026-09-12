@@ -324,11 +324,34 @@ stated rather than left to be inferred:
    table, so naming the assembler is not a tidy-up: it is what every
    per-`-march` claim here now needs.
 
-**The gate is re-scoped in the open**: `R1-pub-6` is an *assembly* step with
-one measurement in it, not two segments of measurement. The band for the gate
-as a whole is not touched — that is `docs/isa-prior-art.md` § 6's arithmetic
-and nothing here moves it — but `R2c`'s own 2 段 cap is now expected to come in
-under, and this file says so before the work rather than after.
+**The gate is re-scoped in the open**: ~~`R1-pub-6` is an *assembly* step
+with one measurement in it, not two segments of measurement.~~
+🔴 **2026-09-13, the next segment: that sentence is true of the
+*assembly* and false of the *step*, and the difference is the one row the
+plan says can kill the project quietly.** `plan/router-rebuild-plan.md:1141`
+requires the **load-delay row of `R2c`'s table to run on the silicon in all
+three columns** — `R1f`'s fragment compiled once per toolchain — and the same
+file's § 389 table marks that row as the only cell that can kill the project
+silently. **Nothing in this census reaches it**: § 5 records `TC-43` as the
+only row here whose number contains a device reading, so two of the three
+columns have never had anything run on this die. The correct statement is
+that `R1-pub-6`'s **desk** half is one segment and its silicon row is a bench
+row this census could not have filled and did not claim to.
+⚠️ **This is not a measurement being corrected, it is a requirement that was
+never read.** Neither this file nor `PROGRESS.md`'s step-table DoD rejected
+it, recorded it as dropped, or named it as an omission; the only thing in
+the repository that still remembered it was the `bench 1` in the step's
+effort column, with no DoD sentence left to explain why it was there.
+The band for the gate as a whole is not touched — that is
+`docs/isa-prior-art.md` § 6's arithmetic and nothing here moves it — but
+`R2c`'s own 2 段 cap is now expected to come in under **on the desk side
+alone**, and this file says so before the work rather than after.
+🟢 **And the silicon side is cheaper than it reads, for a structural
+reason rather than an optimistic one**: `R1-pub-5` is `R1f` at one toolchain
+by ≥ 2 `-march` values, and this row is `R1f` at three toolchains, so one
+payload generator taking (toolchain, `-march`) as parameters puts both
+steps' bench halves on **one** seating. `PROGRESS.md`'s step table carries
+that as the other half of this correction.
 
 ---
 
