@@ -606,6 +606,13 @@ is exactly the shape of thing a reader takes for a hardware result.
 after**, and the artefacts are in `$FWRE_WORK/rebuild/r1pub0b/` rather than
 here, which is the same rule `notes/vendor-kernel-isa.md` § 6's table follows.
 
+🟢 **The ordering is verifiable to the second, which is stronger than the usual
+`git log` argument.** `51a8cba` has committer time **00:15:55** and the first
+probe output in `$FWRE_WORK/rebuild/r1pub0b/` has mtime **00:16** — the
+prediction was in the history before any of the bytes it predicts existed. The
+counts in § 7 are earlier still: the scripts that produced them ran at
+**23:28–23:33 on 2026-09-12**, before this file had a § 8.
+
 | | prediction | result |
 |---|---|---|
 | **P1** | all three assemblers give the same 160-cell matrix | 🔴 **REFUTED** — see below |
