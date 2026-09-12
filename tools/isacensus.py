@@ -36,11 +36,11 @@ four are NOT a bare-metal reading:
 
   (1)  量 on the die, by a payload of ours, under a handler of ours.
   (2)  量 on the die INDIRECTLY: code that has run on this part contains the
-       encoding, and the boot completes with no exception message.  Usually that
-       code is the loader's or the vendor kernel's; on exactly one row here it is
-       an image of THIS PROJECT's, and that row is the sharpest instance of what
-       route (2) cannot see.  `SPEC.md` `CPU-17` already carries exactly this
-       mark -- 讀(count) · 量(the absence).
+       encoding, and the boot completes with no exception message.  On every row
+       here that code is the loader's or the vendor kernel's -- 量 2026-09-12,
+       `hazlint` reports 0 violations on three images of this project's that have
+       booted, so nothing of ours contributes a route-(2) reading.  `SPEC.md`
+       `CPU-17` already carries exactly this mark -- 讀(count) · 量(the absence).
   (3)  讀 vendor material: the assembler's per-`-march` answer, a Kconfig knob,
        a count in a binary.  Never the die.  §6 of `notes/vendor-kernel-isa.md`
        records the two vendor sources DISAGREEING about `ll`/`sc`.
@@ -282,7 +282,7 @@ def render(rows, kind):
 
 
 def render_counts(rows):
-    out = ['| | ① bare metal, ours | ② on the die, in running code | ③ vendor material only | ④ nothing | total |',
+    out = ['| | ① bare metal, ours | ② vendor code on the die | ③ vendor material only | ④ nothing | total |',
            '|---|---:|---:|---:|---:|---:|']
     for kind, label in (('r1a', '`R1a` instruction rows'),
                         ('r1b', '`R1b` hazard rows')):
