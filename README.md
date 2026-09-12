@@ -295,6 +295,14 @@ loader's seventeen commands read to instruction level, including the four that
 can write an arbitrary memory address, and the 128-byte console line buffer
 whose `readline` writes its NUL only on the CR path.
 
+**[`docs/isa-prior-art.md`](docs/isa-prior-art.md)** — what this repository
+already held about this core's instruction set and its hazards, frozen before
+any `R1a`/`R1b` payload source existed. 43 rows on four evidence routes, three
+of them on the die by one of our own payloads and eight with no evidence of any
+class. Its two populations are derived from `tools/hazlint` and
+`tools/isa-probe.sh` rather than chosen, and `tools/isacensus.py check` joins
+the derivation to the adjudication table in both directions.
+
 **[`docs/rlx-cache-and-cp0.md`](docs/rlx-cache-and-cp0.md)** — what two bare-metal
 payloads measured about the cache and the CP0 file, and the four driver decisions
 each reading unblocks. Three of the four name a measurement; the fourth — whether
