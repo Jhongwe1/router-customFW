@@ -146,9 +146,24 @@ not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
 * **Whether a DMA write is visible to a cached CPU read.** Nothing has been
   measured in that direction, and it is the one driver decision the cache gate
   closed without.
-* **Whether this silicon retires the `cache` instruction.** This unit's own
+* ✅ ~~**Whether this silicon retires the `cache` instruction.** This unit's own
   vendor kernel contains 37 of them, D side only; none has been executed by
-  anything of this project's.
+  anything of this project's.~~
+  🟢 **ANSWERED 2026-08-29, seating 7, and this bullet had carried the refuted
+  sentence for fourteen days.** 量 `bench/2026-08-30/QJ.log`: `probe3`'s Group X
+  issued four op values — `0x10` `IInval`, `0x11` `DInval`, `0x15` `DWBInval`,
+  `0x19` `DWB` — and every one returned `n=00000000`, with `x ri`'s
+  `cause=00000028` (ExcCode 10) in the **same capture on the same boot** as the
+  control that makes *no trap* a reading rather than a dead handler. `SPEC.md`
+  `CPU-44`, `docs/probe3-cells.md` § Group X.
+  🔴 **What survives is narrower and is already written there**: `CPU-44` closes
+  on *retires*, not on *invalidates* — `x c10`'s untreated twin moved too, so the
+  six intervening `CCTL` stages explain the treated victim as readily as
+  `cache 0x10` does.
+  ⚠️ **Found by `R1-pub-0`'s census (2026-09-12), not by any gate.** Five checks
+  were green over this file the whole time: none of them compares a sentence
+  about the future to a capture that has already answered it.
+  `docs/isa-prior-art.md` § 3.
 * **The pipeline hazards**, which need a controlled loop and a timing harness.
 * **What an incremental build of a REAL edit costs on this tree.** 量 2026-09-02
   fixed the reason there was no incremental build at all — a bare `#` truncating
