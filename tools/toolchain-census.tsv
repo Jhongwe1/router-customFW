@@ -1,0 +1,111 @@
+# tools/toolchain-census.tsv -- the adjudication half of `R1-pub-0b`'s census.
+#
+# `tools/tccensus.py` derives the POPULATION from two instruments and checks
+# this table against it in both directions.  It IMPORTS `tools/isacensus.py`
+# for the join machinery rather than restating it; the reasons are in its
+# docstring and they are measured, not preferences.
+#
+# POPULATION
+#   r2c  one RECORDED TOOLCHAIN FINDING -- every `TC-*` id `SPEC.md` carries,
+#        through `tools/spec-check.py`'s own parser.  量 2026-09-12: 48 in
+#        § 14 and one, `TC-h`, that exists only in § 17's blank list.
+#   r2t  one TOOLCHAIN RELEASE -- every `CONFIG_RSDK_*` line in
+#        `config/rlxfw-sdk.config`, selected or not.  A release this project
+#        can name and does not have is a `declared` row with a cite.
+#
+# ROUTES.  These are NOT the ISA census's four and must not be read across.
+#   r1  量 at the DESK -- a toolchain program was executed, or an artefact it
+#       produced was executed, and the result measured.  On this axis the
+#       strongest route costs no power, which is why § 6's scope answer comes
+#       out the way it does.
+#   r2  量 on an ARTEFACT -- a shipped binary or a device reading was READ and
+#       a toolchain property inferred.  Nothing was executed.
+#   r3  讀 vendor material -- a Makefile, a wrapper log, a `.config`, source,
+#       or a vendor patch says so.  Nothing was executed and nothing was read
+#       out of a binary.
+#   (all three `.` is route 4 -- no evidence of any class)
+#
+#   p   ⓟ PUBLIC PRIOR ART.  The ISA census has no such column and the
+#       difference is structural: `R1-pub`'s claim is *this is not in public
+#       data*, which holds for the die and largely does not for the toolchain.
+#       `p=y` means a public source STATES this row's finding -- not that the
+#       material is public, and not that someone could derive it.  Every `y`
+#       carries a `pub=` cite.  The column is a LOWER bound: it was
+#       adjudicated only where a concrete public source was read.
+#
+#   mx  a declared disagreement with `SPEC.md`'s own V mark.  `L12` computes
+#       the strongest route a mark supports (量 -> 1, 讀 -> 2, 文 -> 3,
+#       推/— -> 4) and requires anything stronger to be declared here.  量
+#       2026-09-12: eighteen rows need it and fifteen are ONE shape -- V=讀
+#       on a row whose evidence is a desk EXECUTION, several of whose value
+#       cells open with the character 量.  `SPEC.md`'s mark legend is written
+#       for readings about the DEVICE; on this axis "a compiler was run" has
+#       no mark of its own.
+#
+# `subj` -- tc (the build side: a toolchain, a drop, the build system), die
+# (this silicon), or both.  The step table asks every row for this in those
+# words, so there is no `-`.
+#
+# Tab separated.  No `|` in any cell: the note column is rendered into a
+# markdown table and `spec-check`'s C8 counts cells by pipe.
+kind	name	src	subj	r1	r2	r3	p	mx	spec	seat	cite	note
+r2c	TC-01	derived	tc	.	y	y	.	.	TC-09	-	-	this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2
+r2c	TC-02	derived	tc	.	y	.	.	y	TC-02a	-	-	the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark
+r2c	TC-02a	derived	tc	.	y	.	.	y	TC-02	-	-	the corpus matrix EXCLUDES the 2019/2020 generation and bounds the rest; six shipped images cannot say which source release sat on the build machine, so the exclusions are 量 and the identification stays 推
+r2c	TC-03	derived	tc	.	.	y	.	y	TC-02	-	-	the drop's target board is read out of the drop; that DDR timing, PHY and GPIO may therefore differ is the conjecture the mark is about, and getting it wrong need not crash
+r2c	TC-04	derived	tc	.	y	.	.	.	CPU-16	-	-	`e_flags` read out of six shipped `boa`, spanning the 2018-03-30 to 2019-03-15 change from `0x1007` with pic to `0x1005`. A header field, not an execution
+r2c	TC-05	derived	tc	.	.	.	.	.	TC-14	-	-	a DECISION, and half of it is still blank. The environment half closed 2026-08-28; the userspace half is `R7` and the never-built T-modern column is `R2c` itself
+r2c	TC-06	derived	tc	y	.	.	y	.	TC-07	-	pub=gcc.gnu.org onlinedocs MIPS Options -mfp32	`mips-linux-gnu-gcc-12` executed here. That `-march=mips1` alone is refused is upstream gcc behaviour and is documented, so this row is public prior art as well as ours
+r2c	TC-07	derived	tc	y	.	.	.	.	TC-06	-	-	the same C at two `-march` on gcc-12, with the object's existence as its own control -- a zero that never compiled looks like a zero that did
+r2c	TC-08	derived	both	y	.	y	y	.	CPU-46	-	pub=MIPS IV Instruction Set Rev 3.2 A 8.3.4	binutils 2.42 executed here, and COP3's ISA-level history is in the published MIPS IV manual. The die half is `CPU-46`
+r2c	TC-09	derived	tc	.	y	.	.	.	TC-01	-	-	`.comment` survives in two of six trees and carries `TC-01`'s exact string. A second independent artefact -- userland against kernel -- and a read, not a run
+r2c	TC-10	derived	tc	.	y	.	.	.	TC-12	-	-	the 2+2+2 container partition, entirely from ELF metadata with no similarity measure involved. It is the control that `TC-12`'s clustering is not an artefact of the ruler
+r2c	TC-11	derived	tc	.	y	.	.	.	TC-12	-	-	the ruler's own calibration. `binsim` READS binaries, it does not execute them, which is why this is route 2 on an axis where route 1 means something ran
+r2c	TC-12	derived	tc	.	y	.	.	.	TC-10	-	-	three clusters, cell for cell identical to `TC-10`'s container fingerprints, and this unit's nearest neighbour at 0.9818 against 0.8951
+r2c	TC-13	derived	tc	y	.	y	y	y	CPU-18	-	pub=gist c07dd5e3745f90b45e5ed6c1e86fde41 opcodes/mips-opc.c	🔴 the vendor assembler RUN at eight `-march` values over twenty instructions, 160 cells with two controls. Its answers are a lookup of a hand-maintained flag word, and the public Lexra patch holds that word -- see § 7
+r2c	TC-14	derived	tc	y	.	.	.	y	TC-16	-	-	all three wrappers executed. `FATAL: -march mismatch` with exit 1 and no output file is an execution result, and the directory name is NOT the raw driver's default
+r2c	TC-15	derived	tc	y	.	.	y	y	TC-21	-	pub=gcc-4.8.4 Lexra patch INSN_RLXB and -mno-bdsl	the compiler executed, six `-march`, nop-after-load counted. The public gcc Lexra patch states the same split from the other side, and `SOURCES.json` has described it since before this row existed
+r2c	TC-16	derived	tc	y	.	.	.	y	TC-14	-	-	`tc-smoke`'s four rungs, all three releases reaching the top, plus three real builds. The nine encoded words hashing identically across all three is the control that the rungs measured the same thing
+r2c	TC-17	derived	tc	.	.	y	.	.	TC-14	-	-	three drops' top-level `.config` read. Nothing executed, and the control is that each file carries three independent lines naming the same release
+r2c	TC-18	derived	tc	y	.	.	.	y	TC-12	-	-	the single-variable rebuild cells: only `-march` 0.3360, only toolchain generation 0.2132. Toolchains executed, and the row that refuted the plan's own premise about which factor dominates
+r2c	TC-19	derived	tc	y	y	.	.	y	TC-15	-	-	twelve shipped binaries READ, and the ground truth supplied by seven builds RUN here. The strongest leg is the second, which is why the route exceeds the mark
+r2c	TC-20	derived	tc	.	.	y	.	.	TC-14	-	-	`grep -rnI` over three trees: a release every drop's `users/Makefile` names and none ships. The row that makes `R2c`'s missing column visible from the vendor's side
+r2c	TC-21	derived	tc	y	.	.	.	y	TC-15	-	-	each `.S` preprocessed once and assembled twice at two `-march`, then `hazlint` on each. The value cell opens with the character 量 and the mark reads 讀
+r2c	TC-22	derived	both	y	.	.	.	y	TC-h	-	-	four sites of one shape, found by building and by `hazlint`. Whether they are hazards is `TC-h`, and no image that has booted on this die carries them -- `-fno-if-conversion` removes the sites and `hazlint` is a build gate
+r2c	TC-23	derived	tc	y	.	.	.	y	TC-30	-	-	a kernel built here and executed under `qemu-system-mips` with this unit's own kernel as the positive control. An execution, and the mark reads 讀
+r2c	TC-24	derived	tc	y	.	.	.	y	TC-26	-	-	`oldconfig` run under five policies with the symbol-level diff taken, after a first version whose four claims were three-quarters wrong. The correction is in the row
+r2c	TC-25	derived	tc	y	.	.	.	y	TC-22	-	-	three builds differing only in `CFLAGS_KERNEL`, with the conditional-move count taken by importing `hazlint` itself rather than by a second scanner that could disagree with it
+r2c	TC-26	derived	tc	y	.	.	.	y	TC-24	-	-	the declared kernel delta, pinned to a baseline by sha256 rather than by filename, and checked by a tool that reads the BUILT `.config` and not the copied-in one
+r2c	TC-27	derived	tc	.	.	y	.	.	TC-28	-	-	a grep and find census over a vendor source tree with a seeded positive control. Nothing executed; the finding is that a blind spot is real and that the obvious prescription for it is wrong
+r2c	TC-28	derived	tc	.	.	y	.	.	TC-27	-	-	`git ls-files` and `readlink -f` over three drops: two of the three have `arch/rlx/bsp` pointing at nothing. Read, not run
+r2c	TC-29	derived	tc	.	y	.	.	.	TC-30	-	-	`readelf` and `objdump` over an artefact built here. A static read of a binary, and the answer is that by default nothing can put a word on the wire
+r2c	TC-30	derived	tc	y	.	.	.	y	TC-29	-	-	marks applied to a staged tree and verified against the BUILT `vmlinux`, which is the half that catches a mark that compiled and is not in the image
+r2c	TC-31	derived	tc	y	.	.	.	y	TC-26	-	-	two builds' sizes and their `(NEW)` counts. The trap fired on the first attempt, which is the evidence that the two variants are declared rather than discovered
+r2c	TC-32	derived	tc	y	.	.	.	.	TC-30	-	-	two routes cross-checked, one of them `objcopy -O binary`. The error was in the conservative direction, so nothing over the ceiling ever passed
+r2c	TC-33	derived	tc	y	.	.	.	y	TC-34	-	-	the drop's own `rtkload` pipeline executed end to end with the drop's own `vmlinux.elf` as the positive control, and `nfjrom` came out byte-identical
+r2c	TC-34	derived	tc	y	.	.	.	.	TC-33	-	-	`cvimg` executed directly, and the signature it writes is not the one this unit's flash carries. The row's first version claimed more than this and was narrowed
+r2c	TC-35	derived	tc	y	.	.	.	.	TC-21	-	-	`hazlint-objs` over objects built here: an excision that is printed and does not happen, in the safe direction. `TC-m` in `PROGRESS.md` is the carried-forward half
+r2c	TC-36	derived	both	.	y	.	.	.	TC-01	-	-	a format string present in this unit's kernel and absent from both of mine, with the control on the same physical unit under factory firmware. A read, and the second data point that the shipped kernel came from no drop here
+r2c	TC-37	derived	tc	y	.	.	.	.	TC-25	-	-	four builds, and the whole difference was one compiler flag that no committed file recorded. Found by diffing kbuild's own `.cmd` files word by word
+r2c	TC-38	derived	tc	y	.	.	.	.	TC-37	-	-	four build pairs through `repdiff`: the same tree twice gives the same sha256, and the 84 bytes that once differed are two causes and not one
+r2c	TC-39	derived	tc	y	.	.	.	.	TC-38	-	-	one declared epoch rendered into two derived values before staging, so they cannot drift, and verified against the built artefact. Midnight UTC is the signal that it is declared
+r2c	TC-40	derived	tc	y	.	.	.	.	TC-43	-	-	four cells timed from the build driver's own stdout with the driver unmodified. Stage boundaries are the instrument, not a stopwatch
+r2c	TC-41	derived	tc	y	.	.	.	.	TC-44	-	-	`make vmlinux` rebuilds 599 objects with nothing changed, twice running, and the cause is two generated headers whose contents are byte-identical
+r2c	TC-42	derived	tc	y	.	.	.	.	TC-41	-	-	`--keep` buys 3 to 5 per cent and cannot be used with `--marks` at all. Both halves measured, and the reproducibility cost is 2 bytes of 3,968,240
+r2c	TC-43	derived	both	y	.	.	.	.	TC-40	-	-	the machine pipeline total, and its last term is a 7.260 s boot on the silicon. The only row here whose number contains a device reading
+r2c	TC-44	derived	tc	y	.	.	.	.	TC-41	-	-	a patch applied and removed inside one sequence, single variable, with kbuild's own `V=2` naming the cause: 597 objects rebuilt for a command line that is byte-identical
+r2c	TC-45	derived	tc	y	.	.	.	.	TC-44	-	-	six builds. One real edit costs a full build, and the refutation condition was that the floor could not be reproduced -- it was
+r2c	TC-46	derived	tc	y	.	.	.	.	TC-45	-	-	the same real edit at 4 objects instead of 592, product byte-identical. The one consumer in the staged tree is what made a narrower scope legal
+r2c	TC-47	derived	tc	y	.	.	.	.	TC-26	-	-	three images carry an undeclared config difference and the gate that would have caught it was never invoked by the build driver. The gate was right and nobody ran it
+r2c	TC-h	derived	die	.	.	.	.	.	TC-22	-	-	🔴 the only row in this census whose subject is the silicon: does a conditional move in a load delay slot READ its destination. Owned by `R1a`, no evidence of any class, and the reason `TC-22` stops where it does
+r2c	lwl-codegen-sweep	declared	tc	y	.	.	.	.	CPU-16	-	SPEC.md:CPU-16	🔴 a three-toolchain by four-`-march` codegen sweep -- 1.3.6 emits zero `lwl`, 1.5.5 emits four, and `-march` moves neither -- recorded under a `CPU-*` id. A `TC-*` derivation cannot see it, which is what a declared row is for
+r2c	lexra-binutils-patch	declared	tc	.	.	y	y	.	TC-13	-	SOURCES.json:100+ Lexra-proprietary mnemonics;pub=gist c07dd5e3745f90b45e5ed6c1e86fde41	the public binutils-2.24 Lexra patch. `SOURCES.json` has held its `INSN_*` masks and its RLXA/RLXB groupings since the entry was written, no `TC-*` row owns it, and nothing had joined it to `TC-13`
+r2c	lexra-gcc-patch	declared	tc	.	.	y	y	.	TC-15	-	SOURCES.json:gcc-4.8.4 Lexra patch;pub=gcc-4.8.4 Lexra patch TUNE_RLX	the public gcc-4.8.4 Lexra patch: `lwl`/`lwr`/`swl`/`swr` generation disabled for Lexra targets, conditional move gated on `INSN_RLXB`, and `-mno-bdsl` for BRANCH delay slots -- which is not the load-use delay and the distinction has to be kept
+r2c	rebuild-tenth-cell	declared	tc	.	.	y	.	.	TC-18	-	notes/rebuild-vs-shipped.md:The tenth cell	the synthesised `rsdk-1.5.5` at `-march=4181`: 推, because the 1.5.5 wrapper refuses that `-march` and the flags were reconstructed from its own log. A column of `R2c`'s table that no toolchain on this disk can produce
+r2t	rsdk-1.3.6-4181-EB-2.6.30-0.9.30	derived	tc	y	.	.	.	.	TC-14	-	-	the release rlxfw builds with, and the only wrapper on hand that accepts `-march=4181`. ⚠️ a public mirror of the 1.3.6 family exists and states gcc-3.4.6 with uClibc-0.9.30; it states neither this release string nor a `-march`, so ⓟ is not claimed
+r2t	rsdk-1.3.6-5281-EB-2.6.30-0.9.30	derived	tc	y	.	.	.	.	TC-15	-	-	the 5281 sibling, and the control that makes `TC-15`'s split a measurement: same gcc, same binutils, one `-march` apart, and the delay-slot behaviour differs
+r2t	rsdk-1.5.5-5281-EB-2.6.30-0.9.30.3-110714	derived	tc	y	.	.	.	.	TC-01	-	-	the generation that built this unit's firmware, in the wrong `-march` and the wrong patch level. Its binutils would not start at all until an i386 `libz.so.1` was supplied
+r2t	rsdk-1.5.5-4181-EB-2.6.30-0.9.30.3-110225	declared	tc	.	.	y	.	.	TC-20	-	SPEC.md:110225	🔴 named by all three drops' `users/Makefile` and shipped by none. Right generation AND right core -- the one release that would settle `TC-01` directly, and the reason `R2c`'s most relevant column cannot be filled
+r2t	rsdk-1.5.0-4181-EB-2.6.30-0.9.30.{2,3}	declared	tc	.	.	y	.	.	TC-20	-	SPEC.md:rsdk-1.5.0-4181	two more branches tested for by three files in each drop and shipped by none. Recorded as one row because the record treats them as one item; splitting them here would invent a distinction
+r2t	gcc 4.4.5-1.5.5p2	declared	tc	.	y	.	.	.	TC-01	-	SPEC.md:1.5.5p2	🔴 the toolchain that built THIS unit's firmware, known only by its banner. Not a directory on this disk, so every `R2c` column is a proxy for it and none of them is it
+r2t	mips-linux-gnu-gcc-12 with binutils 2.42	declared	tc	y	.	.	y	.	TC-06	-	SPEC.md:mips-linux-gnu-gcc-12;pub=gcc.gnu.org and sourceware.org releases	the modern host toolchain, and the only one here that is not Realtek's. It has produced `TC-06`, `TC-07` and `TC-08` and has never built a kernel for this board -- the plan's T-modern, still zero columns wide

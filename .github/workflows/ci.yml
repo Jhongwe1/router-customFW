@@ -784,6 +784,19 @@ jobs:
       - name: isacensus
         run: /usr/bin/python3 tools/isacensus.py --self-test 2>&1 | tee ci-out/isacensus.out; exit "${PIPESTATUS[0]}"
 
+      # `R1-pub-0b`'s census, the toolchain axis.  A SIBLING of the step
+      # above rather than part of it: it imports isacensus's join
+      # machinery and keeps its own table, its own document and its own
+      # controls, so a defect in one census cannot hide the other.
+      - name: tccensus
+        run: /usr/bin/python3 tools/tccensus.py --self-test 2>&1 | tee ci-out/tccensus.out; exit "${PIPESTATUS[0]}"
+
+      # The 160-cell prediction in that census's § 8.1, made machine-
+      # checkable against the committed assembler matrix.  No assembler
+      # runs here: both inputs are committed markdown.
+      - name: marchcmp
+        run: /usr/bin/python3 tools/marchcmp.py --self-test 2>&1 | tee ci-out/marchcmp.out; exit "${PIPESTATUS[0]}"
+
       # Skips cleanly with no cross compiler: one skip line standing for all
       # 202 cases, which the census prints rather than hides.
       - name: test-rlxprobe

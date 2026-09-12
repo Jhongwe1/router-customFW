@@ -169,7 +169,16 @@ def population(hz=None, probe_path=None):
 # axis B -- the adjudication table
 # --------------------------------------------------------------------------
 
-def read_tsv(path=None):
+def read_tsv(path=None, cols=None):
+    """Read an adjudication table.
+
+    `cols` exists so that a second census on a different axis can reuse this
+    reader rather than restate its rules -- the header must match exactly, a
+    short or long line is a REFUSAL and not a skipped row, and `#` is a
+    comment.  `tools/tccensus.py` passes its own columns; the ISA axis's
+    default is unchanged, and `--self-test` `T0` is the control that says so.
+    """
+    cols = tuple(cols or COLS)
     path = path or TSV
     if not os.path.exists(path):
         raise Refused('adjudication table not found at %s' % path)
@@ -181,14 +190,14 @@ def read_tsv(path=None):
             cells = ln.rstrip('\n').split('\t')
             if header is None:
                 header = cells
-                if tuple(header) != COLS:
+                if tuple(header) != cols:
                     raise Refused('table header is %r, expected %r'
-                                  % (header, list(COLS)))
+                                  % (header, list(cols)))
                 continue
-            if len(cells) != len(COLS):
+            if len(cells) != len(cols):
                 raise Refused('line %d has %d cells, header has %d'
-                              % (n, len(cells), len(COLS)))
-            rows.append(dict(zip(COLS, cells), _line=n))
+                              % (n, len(cells), len(cols)))
+            rows.append(dict(zip(cols, cells), _line=n))
     if header is None:
         raise Refused('adjudication table has no header')
     if not rows:
@@ -293,8 +302,11 @@ def render_counts(rows):
     return '\n'.join(out)
 
 
-def doc_block(text, tag):
-    b, e = BEGIN % tag, END % tag
+def doc_block(text, tag, begin=None, end=None):
+    """Extract one marked block.  `begin`/`end` exist so a second census on a
+    different axis reuses this rather than restating it; the ISA axis's
+    markers are the default and `--self-test` `T9`/`T17` are the controls."""
+    b, e = (begin or BEGIN) % tag, (end or END) % tag
     if b not in text or e not in text:
         return None
     return text.split(b, 1)[1].split(e, 1)[0].strip('\n')
