@@ -200,6 +200,7 @@ conclusion and silent about the inputs.
 | `TC-50` | tc | y | . | . | . | 量 | `TC-14` | the name `mips-linux-gcc` is the raw driver on 1.3.6 and the WRAPPER on 1.5.5, decided by behaviour rather than by filename or size, and the two generations' wrappers inject different flag sets. The consequence is that a committed method sentence names the wrong binary for half of its own table |
 | `TC-51` | tc | y | . | . | . | 量 | `TC-15` | the two rsdk-1.3.6 releases' code generators are byte-identical at `-march=4181` and differ at `-march=5281`, where they read 425/0/162 and 424/0/147. The published row is the first one's, and that is the release whose wrapper refuses that `-march` |
 | `TC-52` | tc | y | . | . | . | 量 | `TC-50` | of the three flags the 1.5.5 wrapper injects, only `-ffix-bdsl` changes a load-use reading, and what it changes is the unresolved-successor class: nineteen to zero, with the object sha256 identical within each group |
+| `TC-53` | tc | y | . | . | . | 量 | `TC-05` | hardening, three columns and a modern control. gcc 3.4.6 refuses `-fstack-protector` outright; gcc 4.4.5-1.5.5p4 accepts it, warns that it is unsupported for this target, emits no guard and exits 0. No `libc.a` in any release carries a `__*_chk` entry point, which attributes `FW-18` to the library rather than to a build-flag choice |
 | `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep, recorded under a `CPU-*` id that a `TC-*` derivation cannot see, which is what a declared row is for. 🔴 Its headline -- 1.3.6 emits zero `lwl` and 1.5.5 emits four -- was narrowed on 2026-09-13: the two generations' raw drivers agree at zero and the asymmetry is the 1.5.5 wrapper injecting `-fuse-uls`. See `TC-50` |
 | `TC-01` | tc | . | y | y | . | 量 | `TC-09` | this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2 |
 | `TC-02` | tc | . | y | . | . | 推 | `TC-02a` | the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark |
@@ -246,12 +247,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:counts begin -->
 | | ① toolchain in hand | ② artefact | ③ vendor material | ④ nothing | ⓟ public | total |
 |---|---:|---:|---:|---:|---:|---:|
-| `R2c` recorded findings | 38 | 10 | 8 | 2 | 6 | **58** |
+| `R2c` recorded findings | 39 | 10 | 8 | 2 | 6 | **59** |
 | toolchain releases | 4 | 1 | 2 | 0 | 1 | **7** |
 
 | subject | `R2c` rows | toolchain rows |
 |---|---:|---:|
-| tc | 53 | 7 |
+| tc | 54 | 7 |
 | die | 1 | 0 |
 | both | 4 | 0 |
 <!-- tccensus:counts end -->
@@ -261,7 +262,7 @@ conclusion and silent about the inputs.
 <!-- tccensus:marks begin -->
 | `SPEC.md` V mark | ① | ② | ③ | ④ | declared disagreements |
 |---|---:|---:|---:|---:|---:|
-| 量 | 22 | 2 | 0 | 0 | 0 |
+| 量 | 23 | 2 | 0 | 0 | 0 |
 | 讀 | 15 | 6 | 4 | 0 | 15 |
 | 推 | 0 | 2 | 1 | 0 | 3 |
 | — | 0 | 0 | 0 | 1 | 0 |
@@ -286,19 +287,22 @@ side are the whole point:
 | | route ① | any evidence | rows |
 |---|---:|---:|---:|
 | `R1a` + `R1b`, the die (`docs/isa-prior-art.md` § 6) | **3** (6.7 %) | 37 (82.2 %) | 45 |
-| `R2c`, the toolchains (§ 5 above) | **35** (63.6 %) | 53 (96.4 %) | 55 |
+| `R2c`, the toolchains (§ 5 above) | **39** (66.1 %) | 57 (96.6 %) | 59 |
 
 Both totals are the whole table, derived plus declared, so the two rows are
-comparable — 量 over both files: 45 is **39 derived and 6 declared**, 55 is
-**51 derived and 4 declared**. ⚠️ The toolchain row moved from 33/53 to 35/55
-during this segment, because § 9's run produced two findings and `SPEC.md`
-gained two rows for them. The ratio barely moves; the fact that a census
-grows when the record grows is the derivation working.
+comparable — 量 over both files: 45 is **39 derived and 6 declared**, 59 is
+**55 derived and 4 declared**. ⚠️ The toolchain row moved from 33/53 to 35/55
+during `R1-pub-0b`, because § 9's run produced two findings and `SPEC.md`
+gained two rows for them, and 🔄 **from 35/55 to 39/59 on 2026-09-13**, when
+`R1-pub-6`'s assembly produced four more (`TC-50` … `TC-53`). The ratio barely
+moves; the fact that a census grows when the record grows is the derivation
+working, and the fact that the prose has to be patched beside the generated
+block is `XNUM-1`, which is why it is done in the same commit.
 
-🔴 **Thirty-five of fifty-five recorded toolchain findings already have a
+🔴 **Thirty-nine of fifty-nine recorded toolchain findings already have a
 desk-執行 reading, and only two rows have no evidence of any class.** The
 mechanism is not diligence, it is economics: **route ① on this axis costs no
-power.** Every one of those 32 rows was obtainable by typing a command, and
+power.** Every one of those rows was obtainable by typing a command, and
 over thirty-two segments of `R5` that is what happened. On the die axis the
 same route costs the most expensive unit this project has.
 
