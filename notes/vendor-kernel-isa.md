@@ -678,6 +678,7 @@ integrated the core. Both controls hold: `addu` accepted in every column,
 | `madd` `rdhwr` `pref` | . | **.** | . | . | . | . | . | . |
 | `mfc3` `mtc3` `lwc3` | y | **y** | y | y | y | y | y | y |
 | `mfc1` `lwc1` | y | **y** | y | y | y | y | y | y |
+| `jalx` | y | **y** | y | y | y | y | y | y |
 
 What it settles, and what it does not:
 
@@ -701,6 +702,7 @@ What it settles, and what it does not:
   cores are synthesisable and LL/SC is an option of the *instance*, while
   `-march` describes the *family*; that is inferred, and it is written here as a
   disagreement rather than as a conclusion.
+- 🆕 **`jalx`, added 2026-09-12, and it was probed for six weeks before it had a row here.** 量: accepted in **all eight** columns, `mips1` and `lx4180` included. ⚠️ **So it discriminates nothing, for the same reason the ULS row does not** — the table only ever *subtracts* from MIPS-I and `jalx` is never subtracted. It is here because `CPU-09`/`CPU-48` establish that this unit's kernel *runs* MIPS16 code on this die, so a reader will come looking; the answer is that the assembler has nothing to say about it. 🔴 **It was missing because a count was taken one way**: `isa-probe.sh` has **20** probe rows and this table had **19**, and the set difference in both directions (`docs/isa-prior-art.md` § 10 ②) is exactly this one row with an empty reverse.
 - ⚠️ **The ULS row proves nothing.** Every column accepts `lwl`, including
   `lx4180` and `mips1` — the table inherits MIPS-I's unaligned instructions
   everywhere and only ever *subtracts* per core. So the assembler is not evidence
