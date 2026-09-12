@@ -725,6 +725,15 @@ Lexra-patch change from an upstream binutils change between 2.16.94 and
   `lx4180` and `mips1` — the table inherits MIPS-I's unaligned instructions
   everywhere and only ever *subtracts* per core. So the assembler is not evidence
   about ULS in either direction, and §2's argument does not use it.
+  🆕 **2026-09-13: that sentence now has a counted mechanism, and it was already
+  half-written down.** `SOURCES.json`'s entry for the public Lexra binutils patch
+  has said *"it does NOT disable `lwl`/`lwr`/`swl`/`swr` — the assembler still
+  accepts them"* since before this row existed. 量, the patch downloaded: those
+  four mnemonics appear **zero** times in it — not added, not removed, not
+  re-gated — so they keep stock `I1` and no `-march` can subtract them. What
+  suppresses their *generation* is the separate gcc Lexra patch
+  (`!TARGET_LEXRA && !TARGET_RLX` on those patterns), so the guard is in the
+  compiler and not in the assembler.
 - **`rlx4181` is a strict superset of `mips1` here.** `-march=mips1` therefore
   stays a safe conservative choice for `TC-05`, with the consequence written
   down: it forbids `cache` and `movz`, which this core has, so bare-metal probes

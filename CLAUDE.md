@@ -1054,6 +1054,19 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   not even a language. ⚠️ **This was true on every previous segment and was
   written down nowhere**, which is why it cost two failed invocations before
   being noticed.
+- 🆕 **`gh gist view --raw` does NOT return the raw file — it prepends the
+  gist's DESCRIPTION line, and a sha256 taken from it is not that file's
+  sha256.** 量 2026-09-13, the same gist two ways: `gh gist view --raw > f`
+  gives **1,580** lines and `curl` on the `gist.githubusercontent.com/.../raw/`
+  URL gives **1,577**; the three extra are the description, a blank line after
+  it, and a trailing blank. 67 bytes, and the two hash differently. 🔴 On this
+  host the `gh` route is corrupted **twice more** before it reaches disk,
+  because PowerShell's `>` adds a UTF-8 BOM and converts every LF to CRLF: the
+  file landed at 71,482 bytes where the gist is **69,833**, so 1,649 of its
+  bytes were added by the tooling. 🟢 The counts taken from it were unaffected
+  — none of the three extra lines is an opcode-table entry, and that was
+  **checked by diffing the two copies** rather than assumed. **Fetch a gist
+  with `curl` inside WSL when the bytes matter**; `gh` is fine for reading.
 - ✅ **`console-capture.py` refuses a capture with neither `--seconds` nor
   `--idle`, and records both in its metadata — fixed 2026-08-30.** *(Until then
   such a capture never returned: both default to `0.0` and the read loop broke on

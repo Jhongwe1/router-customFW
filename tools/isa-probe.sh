@@ -33,7 +33,15 @@
 #     isa-probe.sh [--as PATH] [--archs "a b c"] [--quiet]
 #
 #     --as      the assembler. Default: search $FWRE_WORK/rebuild/src-vendor
-#               for rsdk-linux-as, newest rsdk first.
+#               for rsdk-linux-as, OLDEST rsdk first -- the search is a plain
+#               glob and the shell expands it lexicographically, so
+#               `rsdk-1.3.6-4181` is the first candidate. 量 2026-09-13: that
+#               is what every table this project has ever printed came from,
+#               and this comment said "newest rsdk first" until then.
+#               🔴 DO NOT "fix" the order. It is load-bearing now: `TC-13`'s
+#               committed matrix reproduces 160 of 160 against 1.3.6-4181, and
+#               the three releases do NOT agree (`TC-48`), so changing which
+#               one is picked by default would silently invalidate it.
 #     --archs   override the -march list.
 #     --quiet   print only the table body, for diffing.
 #

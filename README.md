@@ -297,11 +297,19 @@ whose `readline` writes its NUL only on the CR path.
 
 **[`docs/isa-prior-art.md`](docs/isa-prior-art.md)** — what this repository
 already held about this core's instruction set and its hazards, frozen before
-any `R1a`/`R1b` payload source existed. 43 rows on four evidence routes, three
+any `R1a`/`R1b` payload source existed. 45 rows on four evidence routes, three
 of them on the die by one of our own payloads and eight with no evidence of any
 class. Its two populations are derived from `tools/hazlint` and
 `tools/isa-probe.sh` rather than chosen, and `tools/isacensus.py check` joins
 the derivation to the adjudication table in both directions.
+
+**[`docs/toolchain-prior-art.md`](docs/toolchain-prior-art.md)** — the same
+census for the toolchain axis, frozen before `R2c` is built. 55 rows, and its
+refutation condition fires where the ISA census's did not: 35 rows already have
+a desk reading against 3 on the die, because on this axis the strongest route
+costs no power. It carries a column the other one does not — whether a public
+source states the row's finding — and § 8 writes a 160-cell prediction down
+before the run that § 9 then tests.
 
 **[`docs/rlx-cache-and-cp0.md`](docs/rlx-cache-and-cp0.md)** — what two bare-metal
 payloads measured about the cache and the CP0 file, and the four driver decisions

@@ -213,7 +213,7 @@ conclusion and silent about the inputs.
 | `TC-20` | tc | . | . | y | . | 讀 | `TC-14` | `grep -rnI` over three trees: a release every drop's `users/Makefile` names and none ships. The row that makes `R2c`'s missing column visible from the vendor's side |
 | `TC-27` | tc | . | . | y | . | 讀 | `TC-28` | a grep and find census over a vendor source tree with a seeded positive control. Nothing executed; the finding is that a blind spot is real and that the obvious prescription for it is wrong |
 | `TC-28` | tc | . | . | y | . | 讀 | `TC-27` | `git ls-files` and `readlink -f` over three drops: two of the three have `arch/rlx/bsp` pointing at nothing. Read, not run |
-| `lexra-binutils-patch` | tc | . | . | y | y | — | `TC-13` | the public binutils-2.24 Lexra patch. `SOURCES.json` has held its `INSN_*` masks and its RLXA/RLXB groupings since the entry was written, no `TC-*` row owns it, and nothing had joined it to `TC-13` |
+| `lexra-binutils-patch` | tc | . | . | y | y | — | `TC-13` | the public binutils-2.24 Lexra patch. `SOURCES.json` has held its `INSN_*` masks and its RLXA/RLXB groupings since the entry was written, no `TC-*` row owns it, and nothing had joined it to `TC-13`. 🔴 The first cite here was the entry's own phrase `100+ Lexra-proprietary mnemonics`, and correcting that phrase to the measured counts BROKE it -- L3 caught the dangling citation on the same run, which is what a declared row's cite is for. It now names the entry by id, and the entry moved to `documents` with a sha256 as its own text instructed |
 | `lexra-gcc-patch` | tc | . | . | y | y | — | `TC-15` | the public gcc-4.8.4 Lexra patch: `lwl`/`lwr`/`swl`/`swr` generation disabled for Lexra targets, conditional move gated on `INSN_RLXB`, and `-mno-bdsl` for BRANCH delay slots -- which is not the load-use delay and the distinction has to be kept |
 | `rebuild-tenth-cell` | tc | . | . | y | . | — | `TC-18` | the synthesised `rsdk-1.5.5` at `-march=4181`: 推, because the 1.5.5 wrapper refuses that `-march` and the flags were reconstructed from its own log. A column of `R2c`'s table that no toolchain on this disk can produce |
 | `TC-05` | tc | . | . | . | . | — | `TC-14` | a DECISION, and half of it is still blank. The environment half closed 2026-08-28; the userspace half is `R7` and the never-built T-modern column is `R2c` itself |
@@ -319,6 +319,10 @@ stated rather than left to be inferred:
    toolchain's answer and the committed table does not say which. § 8 is the
    pre-registered experiment that fixes it, and it is the only place where
    `R2c` needs a reading this repository does not already have.
+   🔄 **§ 9: it ran, and the answer is `rsdk-1.3.6-4181` — but it also refuted
+   the assumption underneath this item.** The three releases are *not* one
+   table, so naming the assembler is not a tidy-up: it is what every
+   per-`-march` claim here now needs.
 
 **The gate is re-scoped in the open**: `R1-pub-6` is an *assembly* step with
 one measurement in it, not two segments of measurement. The band for the gate
@@ -433,8 +437,12 @@ conclusion supplied. The consequence is actionable rather than cosmetic:
 the assembler's dictionary. The same applies to `msub`, which the patch gives
 `I32` ∪ `N55` ∪ `RLXA` and which `isa-probe.sh` does not probe at all.
 
-**⑥ `-march=rlx4181` is not a guard against unaligned loads, and the patch is
-why.** 量: `lwl`, `lwr`, `swl` and `swr` appear **zero** times in the patch —
+**⑥ `-march=rlx4181` is not a guard against unaligned loads — and 🔴 this is a
+CONFIRMATION, not a finding, because `SOURCES.json` already said so.** That
+entry has carried *"NOTE: it does NOT disable `lwl`/`lwr`/`swl`/`swr` — the
+assembler still accepts them"* since before this census existed, and the first
+draft of this item presented it as new. What is actually added here is the
+**count** and the join: 量: `lwl`, `lwr`, `swl` and `swr` appear **zero** times in the patch —
 not added, not removed, not re-gated. They keep stock `I1` and therefore
 assemble under every one of the six Lexra `-march` values. `notes/vendor-kernel-isa.md`
 § 6 already says the ULS row *"proves nothing"* as an observation; this is the
@@ -482,6 +490,15 @@ discharge.** Whether they become `R1a` payload rows is `R1-pub-1`'s decision,
 where each extra row's cost is actually paid, and the number it needs — 14 —
 now exists.
 
+🔴 **And the row that would have held them was declared and never written.**
+`SOURCES.json`'s entry for this patch says it is the *"Source of `R1a`'s named
+Lexra ASE row (`F52`)"*. 量 2026-09-13, both directions: **`F52` is defined
+nowhere** — not in `SPEC.md`, not under `upstream/`, and its only other
+occurrences in this repository are four hex digits inside two bench captures.
+So this census's fourteen are the contents of a row this repository promised
+itself and never wrote, and the promise was invisible because `SOURCES.json`
+is not a `.md` and no citation checker reads it.
+
 **⑧ `isa-probe.sh`'s docstring says *newest rsdk first* and its code takes the
 oldest.** 讀: the search is a plain glob, `"$ROOT"/*/toolchain/*/bin/rsdk-linux-as`,
 which the shell expands lexicographically, so `rsdk-1.3.6-4181` is the first
@@ -492,6 +509,11 @@ does not say so.** § 8 measures it rather than reasoning about it.
 ---
 
 ## 8. The pre-registered experiment, written before it was run
+
+> **§ 9 has the result.** Nothing in this section was edited after the run —
+> `git log` on this file shows § 8 committed at `51a8cba` and § 9 added after
+> it, which is the only thing that makes the five predictions below
+> predictions.
 
 `R1-pub-6` needs exactly one reading this repository does not have: the
 assembler matrix **per toolchain**. All three are on this disk and the run
