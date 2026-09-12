@@ -164,6 +164,30 @@ The shipped firmware has **more** conditional moves than my build and places
 first code of this shape to execute on this silicon — and two of them are on
 `R3`'s own path.
 
+🟢 **2026-09-12: that future tense is now 量 rather than inferred, and the table
+above never measured the artefact it turns on.** Every row of it is either a
+vendor artefact or a `-march` sweep build; **none is an image that has actually
+booted on this die.** 量, `hazlint` on three that have:
+
+| image | loads | load-use violations |
+|---|---:|---:|
+| `r59`, the seventeen-boot image of seating 20 | 112,505 | **0** |
+| `loudm`, booted 2026-08-29 | 111,801 | **0** |
+| `quietm`, booted 2026-08-30 | 109,922 | **0** |
+
+Zero of **any** shape, so zero of this one. And the mechanism is not luck:
+`config/rlxfw-cflags` puts `-fno-if-conversion` on every image
+`rlxfw-kbuild.sh` builds — 2,597 conditional moves → 31, `hazlint` 7 → 0 — and
+**`hazlint` is a build gate**, so an image carrying these four could not have
+been produced by the committed recipe. The `1.3.6 at 4181` row above is a
+**flagless** build that has never been on the device.
+
+🔴 **This paragraph exists because a later segment got it wrong in the other
+direction.** `R1-pub-0`'s census (2026-09-12) read the *"two of them are on
+`R3`'s own path"* clause above, concluded the shape had executed, and published
+that. The sentence it needed was the one immediately before it, in the future
+tense. `docs/isa-prior-art.md` § 10 ④ carries the correction and the reason.
+
 ⚠️ **The whole-image row reads the MIPS16 band as 4-byte words, so that part of it is not a valid decoding** — a zero there is neither evidence for nor against. The 32-bit spans are the reading, and they are still ~180,000 loads.
 
 At the 4181 build's rate (4 in 61,567) the expected count over the shipped kernel's 143,555 loads alone is **9.3**, and `P(0) = e^-9.3 ≈ 9e-5`. ⚠️ That null treats two different code bases as one population and they are not, so it is an order-of-magnitude statement rather than a test. What makes it worth acting on is not the count: it is that the consequence is silent and the cost of removing it is small.

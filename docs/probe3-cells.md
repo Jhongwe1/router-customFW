@@ -1717,6 +1717,14 @@ verdict. ⓑ is unanswered and the stop-loss allows a second seating.
 `cause=00000028` (ExcCode 10, RI), `epc=80501874`. Same handler, same run — so
 *no trap* is a reading and not a broken handler.
 
+🟢 **2026-09-12: this cell's reading is now load-bearing for a later gate, and
+that is recorded here so an edit to it is not made blind.** `R1-pub`'s plan
+requires a reserved-opcode control that traps, in the strongest terms it uses
+anywhere — *any negative control that does not fire voids the whole table* — and
+`docs/isa-prior-art.md` § 8 names this cell as **C2**, with `x c10`/`c11`/`c15`/
+`c19` as **C3** and `probe2`'s `break` as **C1**. **Changing what `x-ri` issues,
+or removing it, removes `R1a`'s control.**
+
 ⚠️ §6.4's pre-registered caveat is the one that stands: `x.c10.treated=00000001`
 **and** `x.c10.twin=00000001`. The untreated twin moved too, so the six
 intervening `CCTL` stages explain the treated victim as readily as `cache 0x10`

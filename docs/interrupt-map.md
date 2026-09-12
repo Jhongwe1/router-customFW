@@ -83,6 +83,19 @@ the assembler's own encoding of the neighbouring mnemonics:
 | **`mtlxc0 $2,$0`** (as built) | **`0x40e20000`** | `010000` COP0 | **7** |
 | `mfc3 v0,$0` | `0x4c020000` | `010011` **COP3** | 0 |
 
+🟢 **2026-09-12 (`R1-pub-0`'s closeout audit): how many of each are in the artefacts, with a negative control that fired.** A scan for 4-byte-aligned big-endian words with opcode `0x10` and `rs` 3 or 7:
+
+| artefact | `mfc0` rs 0 | **`mflxc0` rs 3** | `mtc0` rs 4 | **`mtlxc0` rs 7** |
+|---|---:|---:|---:|---:|
+| this unit's decompressed vendor kernel, 3,374,772 B | 6,390 | **30** | 6,264 | **6** |
+| `r59` `vmlinux`, the image seating 20 booted seventeen times | 5,235 | **14** | 5,176 | **6** |
+| `R3`'s `loudm` `vmlinux`, booted 2026-08-29 | 5,064 | **14** | 5,006 | **6** |
+| 🔴 NEG control: 3 MiB of `/dev/urandom` | 411 | 356 | 372 | 377 |
+
+🔴 **The negative control fired and the prediction written beside it was wrong by four hundred times.** It said random data would give *essentially zero*; the rate is **1 in 2,048 words** (opcode 6 bits, `rs` 5 bits), so 786,432 words give ~384 of each shape. Two consequences: the `mfc0`/`mtc0` columns are the positive control and they hold, far above that rate; and **a count taken on a high-entropy region is noise** — the same scan over the *compressed* `r0-vendor-kernel.bin` gives 114/112/111/133, which is exactly its random rate and is not a reading.
+
+⚠️ **What this is and is not.** It is a count of the ENCODING with no section filter; a section-filtered count is what would make it clean, and `hazlint`/`opcount` already know how. It does not probe the `lxc0` register file, so the sentence below stands unchanged. 🟢 What it does settle is that both encodings are present in images that have executed on this die, and `arch/rlx` reaches them on every irq-save path — so a trap would stop the kernel dead rather than produce a wrong value. `docs/isa-prior-art.md` carries them as route-② rows for that reason.
+
 So `mflxc0` is **COP0's opcode with a `rs` field MIPS leaves unassigned**, and
 it is a different thing from the `mfc3` this project measured reachable on
 2026-08-29. 🔴 **Do not carry the CP3 result over to it**; they are separate
