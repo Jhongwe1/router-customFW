@@ -24543,3 +24543,241 @@ NOT change the image"*。兩句話同時成立,因為兩個 digest 的對象不�
   buildroot 的 patch、LinuxMIPS 的 Lexra 頁、rtl8181 cookbook 全部在 `SOURCES.json`
   裡而這次一份都沒有重讀。**如果 `R1-pub` 的可發表性主張被一個有敵意的讀者查,
   工具鏈這一半是會被先查的那一半。**
+
+## 2026-09-13 — 第六十二段(01:54 開場,桌面,**不通電**):`R1-pub-6` 的桌面半收了,而三個最有價值的結果都是同一個形狀 —— 量一張已提交的表時,發現那張表沒說它是用哪一支二進位量的
+
+與第六十一段只隔 **24 分鐘**。產物是 `docs/toolchain-comparison.md`(`R2c` 的三欄表)、
+`SPEC.md` 四列新的(`TC-50`…`TC-53`)、`CPU-16` 與 `TC-05` 各收窄一次、
+`notes/vendor-toolchains.md` 兩個新小節、`notes/lwl-mystery.md` 一段就地更正,
+以及七個在 `tools/vendor-tripwire.sh` 底下跑的實驗。**零電源、零 `--send`、
+零 flash 寫入命令**,括號不動 **1,024 / 4,194,304 = 0.0244 %**。
+
+### 0. 開場,三處與簡報不符
+
+三邊日期一致:**2026-09-13 01:54 +08:00**、UTC `2026-09-12T17:54Z`、
+epoch `1789235661`(Windows 與 Git Bash 逐字相同,WSL 差 8 秒,是呼叫順序)。
+
+| | 簡報 | 量到 |
+|---|---|---|
+| 未收的 CI run | 4 | **6** —— `72b3e7c`、`ea57572` 推的時候還在跑,量的時候都完成了 |
+| `citime segments` 的 A9 併池控制 | 165.53 sd | **159.00 sd** |
+| `R1-pub-6` 的規模 | 「可能是一個桌面的下午」 | 對了一半,見 §2 |
+
+六個 run 全綠,三種預先寫下的紅一種都沒發生。**帶連續第十二次進帳而紋風不動**:
+n 36 → **42**、`945..960` = 15 s、中點 952.5、半幅 7.5、**± 0.79 %**;中位數
+957.0 → 956.0、mean 955.47 → **955.19**。A9 的位移是控制在讀新列,不是不符。
+
+🔴 **而我在開場第五分鐘產了一個錯的發現。** 我讀 `PROGRESS.md` 第 19 列的開頭,
+判定 `Next after this` 過期兩步(還指著已關的 `R1-pub-0`)。跑 `spec-check`:
+`C12` 報 `state ok`,列的步驟是 `R1-pub-0, R1-pub-0b, R1-pub-1, R1-pub-3`。
+**那一列兩端都不能取** —— `C12` 自己的 docstring 量過「28 個日期區塊,最近四個降冪、
+之前全部升冪」,所以它取的是**日期最大**的區塊。我讀的是最舊的那一個。
+這是 `CLAUDE.md` 自己那條「引用局部視圖而不是重新導出」,而擋下它的是儀器。
+
+### 1. 開場掃描抓到的:一個計畫要求,在兩個下游檔案裡都不見了
+
+`R1-pub-6` 有三個擁有者,三個講不同的話:
+
+| 檔案 | 說什麼 |
+|---|---|
+| `plan/router-rebuild-plan.md:1141` | 「三欄 × 三列的表,其中『load delay 的處理』那一列**三條都必須上矽片**」,而 §389 的表把那一列標成**唯一會安靜殺死專案的一格** |
+| `PROGRESS.md:126` | 工作量欄 `desk 2 + **bench 1**`(與計畫一致),DoD 只寫桌面比對 |
+| `docs/toolchain-prior-art.md:327` | 「`R1-pub-6` is an ***assembly*** step with one measurement in it」 |
+
+**「弄丟」在這裡有精確的意思**:那個要求沒有出現在任何一個「開工時會被讀到」的
+檔案裡。`CLAUDE.md` 規定 `PROGRESS.md` 每段先讀,`plan/` 是 gitignored 且
+「只在要決定某件事的時候翻」。所以失效路徑是:讀 DoD → 在桌面把表組出來 →
+**DoD 逐字滿足** → 打勾 → 沒有人記得那一列曾經要上矽片。
+**被砍掉的要求會留下一個決定,被弄丟的要求什麼都不留下。** 停損條款砍第三條
+工具鏈時會寫「the omission named」;而 `bench 1` 旁邊已經沒有任何 DoD 句子解釋它,
+所以它是一個**孤兒數字**,下一個讀到的人最可能的動作是把它當過期估計刪掉。
+
+擁有者選 ①:計畫那句維持為真,要求接回兩個下游檔案,`docs/toolchain-prior-art.md`
+§6 那句**就地更正**而不是重寫。
+
+### 2. ⓐ/ⓑ 的判斷,以及為什麼「一個桌面的下午」對了一半
+
+簡報建議先收 `R1-pub-6`,理由是它便宜。**組裝那一半確實是一個桌面的下午**;而
+計畫稱為唯一會安靜殺死專案的那一列要三條工具鏈的碼上這顆 die,**而三條裡有兩條
+從來沒有任何東西在這顆 die 上跑過** —— `docs/toolchain-prior-art.md` §5 自己寫著
+`TC-43` 是唯一一列數字裡含裝置讀數的。
+
+🟢 **而它比看起來便宜,理由是結構的不是樂觀的**:`R1-pub-5`(`R1f`,bench ½)
+與這一列是同一個實驗的兩個寬度 —— 一條工具鏈 × ≥2 個 `-march`,對 三條工具鏈 ×
+同一段碼。一支把(toolchain, `-march`)當參數的 payload 產生器可以讓兩個 bench 半
+**共用一次上電**。
+
+### 3. `mips-linux-gcc` 這個名字在兩代之間換了角色,而一張表的方法句對它自己一半的列指錯了二進位
+
+`notes/vendor-toolchains.md` §2 早就寫著:1.5.5 上 `rsdk-linux-gcc` 是
+`mips-linux-gcc` 的 symlink,raw driver 叫 `mips-linux-xgcc`。同一份檔案 §5 的
+方法句說那張 load-delay 表用的是「**`mips-linux-gcc`, not `rsdk-linux-gcc`**」。
+
+**用行為判定,不用檔名也不用大小**(量,`W1`):
+
+| invocation | answer |
+|---|---|
+| `rsdk-1.3.6-4181/bin/rsdk-linux-gcc -march=5281` | `FATAL: -march mismatch. RSDK is configured for -march=4181 only` |
+| `rsdk-1.3.6-4181/bin/mips-linux-gcc -march=5281` | 編得過 —— **raw driver** |
+| `rsdk-1.5.5/bin/rsdk-linux-gcc -march=4181` | `FATAL: -march mismatch … -march=5281 only` |
+| `rsdk-1.5.5/bin/mips-linux-gcc -march=4181` | **同一個 FATAL —— 它就是 wrapper** |
+| `rsdk-1.5.5/bin/mips-linux-xgcc -march=4181` | 編得過 —— **raw driver** |
+
+那張表的 1.5.5 三列是 `mips-linux-xgcc` 的(我逐格重現了),而它們六欄裡有五欄
+根本走不了 wrapper。⚠️ **而換過去不是沒有代價**:在 wrapper 唯一接受的那一欄,
+兩者讀出 **390/0/0/133** 對 **390/1/19/134**。
+
+🟢 **1.3.6 那一半的方法句是對的而且無害** —— 量 `RSDK_LOGFILE`,1.3.6 的 wrapper
+只交下去 `-EB`,而 `-EB` 是空操作(量 `readelf -h`:不給 `-EB` 的物件已經是
+big endian)。**所以它在它被寫下來的那一半上是對的,這就是為什麼沒有人抓到。**
+
+### 4. 兩份 1.3.6 的碼產生器:四欄相同、兩欄不同,而不同的兩欄正好是有 violation 的那兩欄
+
+同一份 `users/dhrystone/dhry_1.c`、同樣 `-DNO_PROTOTYPES=1 -O2`、raw driver、
+`tools/hazlint`(loads / nop after load / violations):
+
+| release | `4180` | `4181` | `5181` | `5280` | `5281` | `4281` |
+|---|---|---|---|---|---|---|
+| `rsdk-1.3.6-4181` | 421/121/**0** | 421/121/**0** | 421/121/**0** | 425/0/**107** | 425/0/**162** | 425/0/**162** |
+| `rsdk-1.3.6-5281` | 421/121/**0** | 421/121/**0** | 421/121/**0** | 425/0/**107** | **424/0/147** | **424/0/147** |
+| `rsdk-1.5.5-5281` | 388/90/**0** | 388/90/**0** | 384/91/**0** | 390/1/**134** | 390/1/**134** | 390/1/**134** |
+
+🟢 **控制**:`rsdk-1.3.6-4181` 在 `5281` 讀出 425/0/162,與已提交那一列逐格相同,
+三列 1.5.5 也逐格重現 —— **所以量的是同一台儀器**。
+
+🔴 **已發表的那個數字屬於 `rsdk-1.3.6-4181`,而那正是 wrapper 拒絕 `-march=5281`
+的那一份。** `arch/rlx/Makefile` 用 `CROSS_COMPILE := rsdk-linux-`,所以唯一
+**建得出來**的 1.3.6 @ 5281 是 `rsdk-1.3.6-5281` 的,而它讀 **147**。
+
+🟢 **而在 `4181` 那一側,兩者送出的 `.s` 在 `-O2` 與 `-Os` 都逐位元組相同**
+(雜湊相同,比三元組吻合強)。**一個只查 4181 那一側的讀者會得出「標籤無害」的
+結論。** 這個不對稱是這條發現最有用的部分。
+
+⚠️ **這一段沒有把整顆 `vmlinux` 那張表一起查**,理由是成本:那要三次 kernel 建置
+(每次重新 stage 480 MB)而不是三個 `.o`。做成 `TC-q`。
+
+### 5. 三個旗標裡只有一個做事,而它做的不是它名字說的那件事
+
+1.5.5 的 wrapper 交下去 `-ffix-bdsl -fuse-uls -msoft-float -EB`。九次單變因編譯,
+每次把物件自己的 sha256 印在讀數旁邊:
+
+| 加上的旗標 | 物件 sha256 | loads/nop/unres/viol |
+|---|---|---|
+| 無 · `-EB` · `-msoft-float` · `-fuse-uls` · `-fuse-uls -msoft-float` | `7158a9e158…` | 390/1/19/**134** |
+| 任何含 `-ffix-bdsl` 的組合 | `c4d49a6d25…` | 390/0/0/**133** |
+
+**九次呼叫,兩個相異產物。** 🔴 **十九個 unresolved 全部消失**:每一個都寫著
+*the load is in the delay slot of a register jump*,而把分支延遲槽填滿就把那個
+load 移出這一類。`SOURCES.json` 提醒 `-ffix-bdsl` 講的是**分支**延遲槽、不可與
+load-use 混為一談 —— 量:它確實沒有修 load-use(violation 只動 1),**卻改變了
+load-use 的讀數**,因為 `hazlint` 的閘門把 unresolved 判為失敗。
+**兩者在意義上獨立,在量測上不獨立。**
+
+### 6. `lwl` 的世代不對稱是 wrapper 的,不是世代的
+
+`notes/lwl-mystery.md` §3 的表記著 1.3.6 預設 0、1.5.5 預設 **4**,`SPEC.md`
+`CPU-16` 也這樣寫。同一份 fixture(packed struct,一個 load 一個 store),不給旗標:
+
+| driver | `lwl`+`lwr`+`swl`+`swr` |
+|---|---:|
+| 1.3.6-4181 raw / wrapper | 0 / 0 |
+| 1.3.6-5281 raw / wrapper | 0 / 0 |
+| 1.5.5 `mips-linux-xgcc`(raw) | **0** |
+| 1.5.5 `mips-linux-gcc`(= wrapper) | **4** |
+| 1.5.5 `rsdk-linux-gcc` | **4** |
+
+**三個控制全部發火**:`-fuse-uls` 讓**兩個世代**的 raw driver 都給 4;
+`-fno-use-uls` 透過 1.5.5 wrapper 把 4 壓回 0;`-fzzz-not-a-flag` 被
+`cc1: error: unrecognized command line option` 拒絕,所以「接受 `-fuse-uls`」
+是辨識而不是照單全收。
+
+⚠️ **量與推分清楚**:量的是「在這份 fixture 上不對稱完全是 wrapper 的,而 raw 路徑
+三份 release 都給 0/4/0」;推的是「當時那張表走的是 wrapper 路徑」—— 那張表沒有
+指名驅動程式,而 wrapper 路徑逐列重現它、raw 路徑一列都重現不了。收掉它的實驗是
+**重跑並指名驅動程式**,而它需要當時的 fixture,那份沒有提交。
+
+🟢 **`notes/lwl-mystery.md` 自己的結論活下來而且變窄**:槓桿是 `-fuse-uls` 這個
+旗標 —— 現在加上「**兩個世代自己的預設是一樣的**」。
+
+### 7. 加固:0 欄變 3 欄加一個現代對照,而舊的失敗得大聲、新的失敗得安靜
+
+這一列在三欄裡本來**一格都沒有**。
+
+| | 1.3.6 兩份 | 1.5.5 | `mips-linux-gnu-gcc-12` |
+|---|---|---|---|
+| `-fstack-protector` / `-all` | **拒絕**,`unrecognized command line option` | **接受** | 接受 |
+| `-fstack-protector-strong` | 拒絕 | 拒絕 | 接受 |
+| 真的送出的 `__stack_chk` 符號 | — | 🔴 **0** | **2** |
+| 它一邊這樣做一邊說什麼 | — | `warning: -fstack-protector not supported for this target`,**exit 0** | — |
+| `libc.a` 裡的 `__*_chk` 進入點 | **0** | **0** | — |
+
+🔴 **一個傳了這個旗標又只看 exit code 的建置系統會拿到一顆沒有保護的乾淨產物。**
+控制:同一份 fixture 走 host gcc 送出 `U __stack_chk_fail`、走
+`mips-linux-gnu-gcc-12` 送出 2 個,所以儀器是好的、也不是「MIPS 做不到」;反組譯
+出來是乾淨的 prologue。`_FORTIFY_SOURCE` 三條都無處可落,而同一次掃描的 `memcpy`
+是 1(非零分母)。🟢 **這把 `FW-18`「出貨產物一個緩解機制都沒有」歸因到函式庫,
+而不是建置旗標的選擇。**
+
+### 8. `jalx` 的歸因:兩個候選被量掉,而**不開新列**
+
+`docs/KNOWN-ISSUES.md` 已經是這個問題的擁有者。**不開第二個** —— 那正是第六十一段
+兩次差點犯、一次真的推上去的錯。就地更新它:
+
+1. 量:公開的 Lexra binutils-2.24 patch 含 **0** 行 `jalx` —— 新增、刪除、上下文
+   全部 0,對照 **917** 行新增、**14** 個檔案;POS 控制 `movz` 在(opcode 表列上
+   加 `RLXB`),NEG 控制 0。**所以不是這份公開 patch 做的。**
+2. 讀,上游:binutils 對 `jalx` opcode membership 的改動是 Catherine Moore 的,
+   **2010 年 5 月**,`I16` → `I1` —— **在 2.19.92.20091006 之後**、而且是**放寬**
+   的方向,所以它解釋不了「2.16.94 接受、2.19.92 拒絕」。
+
+**剩下的候選是 Realtek 自己對那兩版 binutils 的 patch,而兩份都不在這顆硬碟上。**
+原本寫下的實驗(並排讀 stock `mips-opc.c`)不變,而且現在是唯一剩下的那一個。
+
+### 9. 🔴 我犯的三個錯,三個都被控制或驗證擋下來
+
+1. 🔴 **E1 的六個編譯全部失敗、寫出零位元組,而 `N2` 擋住了。** 沒有 `N2` 的話,
+   `cmp -s` 會把六個空檔案全報成 `IDENTICAL` —— C1「成立」、N1「被推翻」,同一口氣
+   裡兩個都是假的。兩個原因都從錯誤訊息讀出來:`dhry_1.c` 要 `-DNO_PROTOTYPES=1`
+   (它自己的 Makefile 有傳,而那張表的方法描述沒寫),以及我把 1.5.5 的 wrapper
+   當成 raw driver —— **§3 那件事我讀過還是用錯了**。
+2. 🔴 **`hazlint` 的剖析器讀到它自己的控制區塊。** `K2` 那行寫著
+   `2 violations at 0x1c, 0x2c`,我的 `head -1` 取到它,十八格全報 `2/2`。
+   **十八格完全相同,在 E1 已經量到那些 `.s` 不同之後是不可能的。** 修法是
+   `hazlint` 自己的 `K17`:`HAZLINT_CHILD` 壓掉控制區塊。
+3. 🔴 **一個我自己的「發現」被驗證推翻,而它差點進 `SPEC.md`。** 我 grep
+   `features.h` 的 `__UCLIBC_MAJOR__`/`MINOR`/`SUBLEVEL`,三份 release 全部回
+   `0.9.26`,而 release 字串說 0.9.30 / 0.9.30.3 —— 看起來像一個大發現。
+   讀原始行:**那三行在一個註解區塊裡**,是 features.h 自己的文件範例。
+   **uClibc 版本那一格仍然只有 release 字串**,而我現在知道一條走不通的路,
+   寫在 `docs/toolchain-comparison.md` §6。
+
+⚠️ 另外兩個環境陷阱又各踩一次,兩個 `CLAUDE.md` 都已經記過:PowerShell 把
+native command 參數裡的雙引號吃掉並在空白處裂開(三次),以及 Bash 工具的 MSYS
+把 `/mnt/c/...` 翻成 `C:/Program Files/Git/mnt/c/...`(一次)。**兩個的修法都是
+同一條:寫成腳本檔,用路徑跑。**
+
+### 10. 產物與閘門
+
+`docs/toolchain-comparison.md`(七節)、`SPEC.md` `TC-50`…`TC-53`、
+`CPU-16` 與 `TC-05` 各一次就地收窄、`notes/vendor-toolchains.md` §5.1/§5.2、
+`notes/lwl-mystery.md` §3 就地更正、`docs/KNOWN-ISSUES.md` 的 `jalx` 列、
+`PROGRESS.md` 三列加 `TC-q`、`tools/toolchain-census.tsv` 四列。
+
+閘門:`spec-check` rc=0、`tccensus check` **66 列雙向**、`tccensus --self-test`
+**21/21**、`isacensus --self-test` **18/18**(凍結的工具沒被動到)、
+`ledgerscan check`/`quarantine` rc=0、`xcheck sweep` 1,125 個產物 0 個不一致、
+`flashwin scan` 3,984 個檔案 **CLEAN**、`capdate` 29 個目錄雙向、
+`test-file-modes` 3/3。
+
+🔴 **`docs/toolchain-prior-art.md` §6 的散文數字 35/55 被同一個 commit 改成
+39/59**,因為母體長了四列而那張表是生成的、散文不是 —— **那正是 `XNUM-1`**,
+而數字是從 TSV 重新導出的,不是拿舊的心算。
+
+### 11. 這一段沒有做的事
+
+* **`R1-pub-6` 沒有關。** 矽片那一列只有一欄,要一次上電,與 `R1-pub-5` 共用。
+* **整顆 `vmlinux` 那張表沒有重新量**(`TC-q`),要三次 kernel 建置。
+* **`jalx` 沒有歸因完**,剩下的候選是 Realtek 自己的 binutils patch,不在手上。
+* **uClibc 版本仍然只有 release 字串**,兩欄空著。
+* **那 14 個 Lexra ASE 助憶碼還是沒進 `R1a` 的母體**,那是 `R1-pub-1` 的決定。
+* ⓟ 那一欄沒有重讀,理由與上一段同一條。
