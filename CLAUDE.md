@@ -1029,6 +1029,19 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `C:\Program Files\Python310\python.exe`.** WSL's `/usr/bin/python3` has
   neither problem, so a script that works one side can fail the other with no
   code difference at all.
+- 🆕 **And the two Pythons are not the same LANGUAGE version, so a tool of this
+  repository's can fail to PARSE on one of them.** 量 2026-09-12: Windows is
+  **3.10.7**, WSL is **3.12.3**, and `tools/spec-check.py` carries an f-string
+  whose expression part holds a backslash — legal from 3.12, a `SyntaxError` at
+  3.10. So it is not that `spec-check` misbehaves under Windows Python; it never
+  runs, and **neither does anything that imports it**, which is how this was
+  found (a new tool reuses its row parser rather than writing a second one).
+  🔴 The failure is at import time and names a line inside `spec-check.py`, so
+  it reads as a defect in that file rather than as a host difference. **Run
+  anything that touches `spec-check.py`, `SPEC.md`'s parser, or any tool built
+  on them under WSL's `/usr/bin/python3`.** ⚠️ The requirement is undeclared:
+  nothing in the repository states a minimum Python version, and CI happens to
+  satisfy it because `ubuntu-latest` ships 3.12.
 - 🆕 **`gh` exists only on the Windows side and `jq` only inside WSL, so no
   single shell can run both — and a tool that needs one runs where that one
   is.** 量 2026-09-07: `tools/citime.py` shells out to `gh`, so running it
