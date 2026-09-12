@@ -775,6 +775,15 @@ jobs:
       - name: test-isa-probe
         run: bash tools/test-isa-probe.sh 2>&1 | tee ci-out/test-isa-probe.out; exit "${PIPESTATUS[0]}"
 
+      # `R1-pub-0`'s census. T0 IS the `check` gate -- it runs it against a
+      # byte-identical copy of the committed table and document -- so one step
+      # covers both, and the nine mutations under it are what say the check can
+      # fail. No vendor material, no device, no dump: it reads `tools/hazlint`,
+      # `tools/isa-probe.sh` and SPEC.md's own parser, all of which are in a
+      # clone.
+      - name: isacensus
+        run: /usr/bin/python3 tools/isacensus.py --self-test 2>&1 | tee ci-out/isacensus.out; exit "${PIPESTATUS[0]}"
+
       # Skips cleanly with no cross compiler: one skip line standing for all
       # 202 cases, which the census prints rather than hides.
       - name: test-rlxprobe

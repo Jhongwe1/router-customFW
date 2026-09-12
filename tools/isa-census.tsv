@@ -1,0 +1,73 @@
+# tools/isa-census.tsv -- the adjudication half of `R1-pub-0`'s census.
+#
+# `tools/isacensus.py` derives the POPULATION from two instruments and checks
+# this table against it in both directions.  What is adjudicated here is the
+# EVIDENCE, per row, on four routes:
+#
+#   r1  量 on the die, by a payload of ours, under a handler of ours.
+#   r2  量 on the die INDIRECTLY -- code that has run on this part contains
+#       the encoding and the boot completes with no exception message.  Usually
+#       that code is the loader's or the vendor kernel's; on exactly one row it
+#       is an image of THIS project's, and that row is the sharpest instance of
+#       what route 2 cannot see.  `SPEC.md` `CPU-17` carries this exact mark.
+#   r3  讀 vendor material only: the assembler's per-`-march` answer, a Kconfig
+#       knob, a count in a binary.  Never the die.
+#   (a row with all three `.` is route 4 -- no evidence of any class)
+#
+# `route` in the report is the STRONGEST route present, and `seat` may be named
+# only where r1 is `y` (`isacensus check` K6/K7 enforce both directions).
+#
+# For an `r1b` row, r2 is evidence that the SHAPE executes on this die.
+# It is never evidence that the hazard is absent -- see the
+# document's § 2.2.  `SPEC.md` `CPU-31` says so in its own words.
+#
+# A `declared` row is one no instrument derives.  It must carry a
+# `path:token` cite that is still present in that file, or the population
+# would be tunable by whoever edits this table.
+#
+# Tab separated.  No `|` in any cell: the note column is rendered into a
+# markdown table and `spec-check`'s C8 counts cells by pipe.
+kind	name	src	r1	r2	r3	spec	seat	cite	note
+r1a	cache	derived	y	y	y	CPU-44	2026-08-30	-	retires, four op values (0x10 IInval, 0x11 DInval, 0x15 DWBInval, 0x19 DWB), n=0 on each. `x-c10`'s untreated twin moved too, so this is *retires* and not *invalidates*
+r1a	mfc3	derived	y	.	y	CPU-46	2026-08-30	-	eight reads with `CU3` set and held, `m.traps=00000000`; under qemu all eight trap with ExcCode 0x0B, so the die and the emulator disagree about this row
+r1a	jalx	derived	.	y	y	CPU-09,CPU-48	-	-	180 in-image targets in this unit's kernel, one MIPS16 function disassembled with four internal consistency points. Also the one row `isa-probe.sh` probes and §6's committed table has no line for -- 20 probes against 19 table rows
+r1a	lwl	derived	.	y	y	CPU-15,CPU-16	-	-	this unit's kernel `memcpy` uses it from `0x80002464`, and `do_ri` has no ULS emulation at all, so a MISSING `lwl` would reach `die_if_kernel`. What route 2 cannot see is a wrong VALUE, and `CPU-15` names the closer: one `lwl` under a handler of ours
+r1a	lwr	derived	.	y	y	CPU-15,CPU-16	-	-	the other half of the idiom pair; 82 of the 101 pairs in this kernel's `.text` are `lwl`/`lwr`
+r1a	movn	derived	.	y	y	CPU-17	-	-	as `movz`
+r1a	movz	derived	.	y	y	CPU-17	-	-	18 in the loader program area, two of them inside `check_image()`, which runs on every boot, with no exception message in 18 captures. §17's blank for this row is exactly route 2's blind spot: implemented, or silently emulated
+r1a	mtc3	derived	.	y	y	CPU-46	-	-	four `mtc3` at `0x8000227C`-`0x800022E8` set the IMEM/DMEM windows at boot. CP3's READ side is route 1 and its WRITE side is this one, which is the sharpest pair in the table
+r1a	swl	derived	.	y	y	CPU-15,CPU-16	-	-	19 of the 101 pairs are `swl`/`swr`
+r1a	swr	derived	.	y	y	CPU-15,CPU-16	-	-	as `swl`
+r1a	COP1	derived	.	.	y	CPU-47	-	-	one `COP1` word in this kernel's text, adjudicated into a non-code island. §1 of `notes/vendor-kernel-isa.md` says in terms that every piece of evidence here is about EMULATION and none of it is evidence about the core: `Status.CU1` on the device is what decides it, and that read has never been taken
+r1a	SPECIAL2	derived	.	.	y	CPU-18	-	-	opcode 0x1C as a group: zero in the loader program area, by three independent decoders
+r1a	SPECIAL3	derived	.	.	y	CPU-18	-	-	opcode 0x1F as a group: zero in the loader program area
+r1a	beql	derived	.	.	y	CPU-18	-	-	branch-likely: zero in the loader, and the assembler rejects it for every RLX column while accepting it for `mips2`
+r1a	bgtzl	derived	.	.	y	CPU-18	-	-	as `bnel`
+r1a	blezl	derived	.	.	y	CPU-18	-	-	as `bnel`
+r1a	bnel	derived	.	.	y	CPU-18	-	-	branch-likely, zero in the loader, and NOT probed by the assembler instrument at all -- `isa-probe.sh` asks about `beql` alone, so this row's route 3 is one source where `beql`'s is two
+r1a	ldc1	derived	.	.	y	CPU-47	-	-	two `ldc1` words in this kernel's text, both inside the same adjudicated non-code island as the `COP1`
+r1a	ll	derived	.	.	y	CPU-18,CPU-47	-	-	the row the plan calls the most important one, because it decides libc. Route 2 is empty BY CONSTRUCTION: `ARCH_CPU_LLSC=n`, so zero in the loader and zero in 2.85 MB of kernel text, and nothing on this die has ever executed one. And the two vendor sources DISAGREE -- the assembler accepts it for `rlx4181`
+r1a	lwc1	derived	.	.	y	CPU-47	-	-	zero in this kernel's text; accepted in all eight assembler columns, which discriminates nothing
+r1a	lwc3	derived	.	.	y	CPU-47	-	-	accepted in all eight assembler columns, non-discriminating in exactly the way the ULS row is; 量 zero occurrences in `stage2.bin` or in any payload
+r1a	madd	derived	.	.	y	CPU-18	-	-	SPECIAL2 form: rejected in all eight assembler columns, zero in the loader
+r1a	mfc1	derived	.	.	y	CPU-47	-	-	accepted in all eight assembler columns; zero in the loader
+r1a	pref	derived	.	.	y	CPU-18	-	-	rejected in all eight assembler columns, zero in the loader. Its opcode 0x33 was mislabelled `pref` in `hazlint` until 2026-08-27, when it was re-levelled to MIPS-I `lwc3`
+r1a	rdhwr	derived	.	.	y	CPU-18,CPU-47	-	-	rejected in all eight assembler columns, and the vendor `#if 0`'d both `simulate_rdhwr` call sites that mainline calls unconditionally
+r1a	sc	derived	.	.	y	CPU-18,CPU-47	-	-	as `ll`
+r1a	sdc1	derived	.	.	y	CPU-47	-	-	zero in this kernel's text
+r1a	swc1	derived	.	.	y	CPU-47	-	-	zero in this kernel's text
+r1a	swc3	derived	.	.	y	CPU-47	-	-	as `lwc3`, and not probed by the assembler at all
+r1a	sync	derived	.	.	y	CPU-18,CPU-47	-	-	the ONE row where this project's two-source rule is actually met: the assembler rejects it for `rlx4181` and accepts it for `rlx5281`, which is the same split the board configs make with `ARCH_CPU_SYNC`
+r1a	COP2	declared	.	.	.	-	-	tools/hazlint:COP2 (0x12) is NOT on the list	`hazlint`'s own comment declares this a gap rather than closing it: MIPS-I A 8.3.3 makes coprocessor 2 optional in the same words as coprocessor 3, and nothing in this repository has looked for CP2 on this part
+r1a	teq	derived	.	.	.	-	-	-	MIPS-II trap instruction. Not in `CPU-18`'s scan list, not probed by `isa-probe.sh`, absent from §6's table: no evidence of any class exists for this row
+r1a	tge	derived	.	.	.	-	-	-	as `teq`
+r1a	tgeu	derived	.	.	.	-	-	-	as `teq`
+r1a	tlt	derived	.	.	.	-	-	-	as `teq`
+r1a	tltu	derived	.	.	.	-	-	-	as `teq`
+r1a	tne	derived	.	.	.	-	-	-	as `teq`
+r1b	load then a reader of the loaded register	declared	y	.	y	CPU-14	upstream	tools/hazlint:for every load, does an instruction that can execute next	exposed, no interlock. The ONLY route-1 hazard reading this project holds, and it is not this repository's: the single-variable experiment is upstream's `P9-12`, `upstream/BENCH-LOG.md` `T-89`/`T-90`, on the same physical device
+r1b	mtc0 then mfc0	derived	.	y	y	CPU-30,CPU-31	-	-	three sites in the loader, the first of them a `Status` write read back immediately, running on every boot. `CPU-31` states the limit: countable is not decidable
+r1b	mult/div then mfhi/mflo	derived	.	y	y	CPU-29,CPU-31	-	-	16 sites in the loader with no `nop` between them, running on every boot. `CPU-31`: the count is equally consistent with an interlocked core and with an interlocked core where those sites are bugs
+r1b	a load sitting in a delay slot	derived	.	.	y	-	-	-	量 zero of `stage2.bin`'s 1,474 loads sit in any delay slot, so the vendor code offers no site at all and this is a payload-only question. `hazlint` reports `unresolved` for an unresolvable target rather than checking the wrong word
+r1b	movz or movn write-enable in a load delay slot	declared	.	y	y	TC-h,TC-22	-	SPEC.md:TC-h	route 2 by an image of MINE, which is the only row here where it is not vendor code: 量, the VENDOR's artefacts hold ZERO sites of this shape (this kernel 0 of 3,183 conditional moves, `boa` 0, `busybox` 0, `stage2.bin` 0) and my own build holds FOUR, two of them on `R3`'s boot path -- `__add_preferred_console` and `load_elf_binary`. That image has booted on this die seventeen times and the boot completes, which is route 2's blind spot at its sharpest: `TC-h` says the alternative is a silent clobber of the loaded value
+r1b	store, the class hazlint has no rule for	declared	.	.	.	-	-	tools/hazlint:`C-9`/`F47` -- stores	no instrument in this repository has counted a store hazard shape, and the shape itself is unspecified. Specifying it is the first thing `R1-pub-2` has to do, before any payload
