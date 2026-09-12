@@ -72,9 +72,14 @@ filed under a different id space.
 Both of those failures are real and both are in the table:
 
 * **filed elsewhere** — `CPU-16`'s last third is a **three-toolchain × four
-  `-march` codegen sweep** (1.3.6 emits zero `lwl`, 1.5.5 emits four, `-march`
-  moves neither). It is a toolchain measurement wearing a `CPU-*` id, and no
-  `TC-*` derivation can reach it. It is in the table as a `declared` row.
+  `-march` codegen sweep** (~~1.3.6 emits zero `lwl`, 1.5.5 emits four,
+  `-march` moves neither~~ 🔄 **2026-09-13: the two generations' raw drivers
+  both emit zero and the asymmetry is the 1.5.5 wrapper injecting `-fuse-uls`
+  — `SPEC.md` `CPU-16`, `TC-50`**). It is a toolchain measurement wearing a
+  `CPU-*` id, and no `TC-*` derivation can reach it. It is in the table as a
+  `declared` row — and 🔴 **the declared row's note is regenerated from the TSV
+  while this sentence is not, which is why the correction had to be made twice
+  in one file.**
 * **not filed at all** — the public Lexra binutils and gcc patches are
   described in `SOURCES.json` and owned by no `TC-*` row, and
   `notes/rebuild-vs-shipped.md` § 4's tenth rebuild cell is owned by none
@@ -324,8 +329,18 @@ stated rather than left to be inferred:
    this disk.**
 3. ⚠️ **`TC-13`'s 160-cell assembler matrix records no assembler.** It is one
    toolchain's answer and the committed table does not say which. § 8 is the
-   pre-registered experiment that fixes it, and it is the only place where
-   `R2c` needs a reading this repository does not already have.
+   pre-registered experiment that fixes it, and ~~it is the only place where
+   `R2c` needs a reading this repository does not already have~~ 🔴 **that last
+   clause expired on 2026-09-13: `R1-pub-6`'s assembly took five more readings
+   the repository did not have** — which binary is the raw driver in each
+   release, the two rsdk-1.3.6 releases separated on `hazlint`, the wrapper's
+   injected flags decomposed one at a time, the `lwl` default per driver, and
+   the hardening row, which had no cell in any column.
+   ⚠️ **The same clause at § 8 is NOT repaired**, and that is deliberate: § 8's
+   own preamble says nothing in it was edited after the run, which is the only
+   thing making its five predictions predictions. Repairing a sentence there
+   would destroy that the way repairing a frozen bench card destroys
+   `check-predictions`' mtime evidence.
    🔄 **§ 9: it ran, and the answer is `rsdk-1.3.6-4181` — but it also refuted
    the assumption underneath this item.** The three releases are *not* one
    table, so naming the assembler is not a tidy-up: it is what every

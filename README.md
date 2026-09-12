@@ -304,12 +304,22 @@ class. Its two populations are derived from `tools/hazlint` and
 the derivation to the adjudication table in both directions.
 
 **[`docs/toolchain-prior-art.md`](docs/toolchain-prior-art.md)** — the same
-census for the toolchain axis, frozen before `R2c` is built. 55 rows, and its
-refutation condition fires where the ISA census's did not: 35 rows already have
+census for the toolchain axis, frozen before `R2c` is built. 59 rows, and its
+refutation condition fires where the ISA census's did not: 39 rows already have
 a desk reading against 3 on the die, because on this axis the strongest route
 costs no power. It carries a column the other one does not — whether a public
 source states the row's finding — and § 8 writes a 160-cell prediction down
 before the run that § 9 then tests.
+
+**[`docs/toolchain-comparison.md`](docs/toolchain-comparison.md)** — `R2c`'s
+three columns, assembled from the five files that held them and never joined
+them. A column here is a **package** — a release, a driver binary inside it and
+a `-march` — because the same filename is the raw compiler driver in one
+release and the wrapper in the next, and half of one committed table had been
+measured through each without saying so. It lists what still has no cell in two
+or more columns, and it says at the top that it does not close `R2c`: the row
+the plan calls the only one that can kill the project silently is filled at the
+desk in all three columns and on the die in one.
 
 **[`docs/rlx-cache-and-cp0.md`](docs/rlx-cache-and-cp0.md)** — what two bare-metal
 payloads measured about the cache and the CP0 file, and the four driver decisions

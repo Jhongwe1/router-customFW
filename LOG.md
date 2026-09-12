@@ -24756,6 +24756,46 @@ native command 參數裡的雙引號吃掉並在空白處裂開(三次),以及 B
 把 `/mnt/c/...` 翻成 `C:/Program Files/Git/mnt/c/...`(一次)。**兩個的修法都是
 同一條:寫成腳本檔,用路徑跑。**
 
+### 9a. 🔴 收工稽核兩輪,七件,而五道閘門對其中六件一個都看不到
+
+**第一輪 —— 方法二(全 repo grep 我這一段動過的每一個數字)與方法五(完整列舉):**
+
+1. 🔴 **`README.md` 寫著普查「55 rows … 35 rows already have a desk reading」。**
+   我今晚加了四列,母體是 **59**、route ① 是 **39**。這是 `XNUM-1` 的形狀
+   **第六次**在 `README` 上發生:一個生成的區塊會自己更新,旁邊那句散文不會。
+2. 🔴 **`README` 逐一列出 `docs/` 底下每一個檔案,而少了今晚新增的那一個。**
+   這是完整列舉抓的,不是重讀自己抓的。
+3. 🔴 **`docs/FINDINGS.md` 也寫著 `35 of 55` (63.6 %)。** 那個檔案自述
+   「A map, not a summary … Nothing here is the owner of anything」,所以它要跟,
+   而且用 🔄 跟而不是直接覆蓋。
+4. 🔴 **`docs/toolchain-prior-art.md` §6 第 3 點說 §8 是「the only place where
+   `R2c` needs a reading this repository does not already have」。**
+   這一段拿了**五個**新讀數,所以那句是**描述未來狀態而被這一段變成假的**(方法四)。
+   就地劃掉並列出那五個。
+5. ⚠️ **同一句話在 §8 裡也有一份,而我刻意不修。** §8 自己的前言寫著
+   「Nothing in this section was edited after the run」—— 那是它五個預測之所以是
+   預測的**全部**理由。修那裡就等於修一張凍結的 bench card,毀掉 `check-predictions`
+   的 mtime 證據。**這是「負面結果留在原地」的另一面:一句過期的話留在凍結區塊裡,
+   是那個區塊還沒被動過的證據。**
+
+**第二輪 —— 再一次完整列舉,而它在我今晚已經改過兩次的檔案裡抓到第六件:**
+
+6. 🔴 **`docs/toolchain-prior-art.md:75` 的散文還寫著舊的 `lwl` 說法。**
+   我改的是 `tools/toolchain-census.tsv` 那一列,然後 `tccensus write` 把表重新生成 ——
+   **而 §1 那一句是手寫的,沒有任何東西會重新生成它。** 同一個檔案,同一個宣稱,
+   一個會自動更新一個不會,**所以同一次更正要做兩次。**
+
+**第三件事是閘門抓的,而它抓的是我修稽核時新犯的錯:**
+
+7. 🔴 **我把 `FINDINGS.md` 的新列插在下一個 `##` 標題前面**,中間隔著一個空行和
+   一條 `---`,所以那一列**沒有表頭**。`spec-check` 的 `C8c` 報:
+   *starts with `|` and belongs to no table … every check that reads a cell by
+   index skips it entirely*。修法是把它接到上一張表的最後一列後面。
+   ⚠️ **這正是第六十一段記下來的那條**(往一張自己沒寫過的表加一列之前先量),
+   而我踩的是它的另一半:**不是欄數錯,是位置錯**。
+
+🟢 **七件裡有六件是稽核抓的、一件是閘門抓的,而閘門抓的那一件是稽核造成的。**
+
 ### 10. 產物與閘門
 
 `docs/toolchain-comparison.md`(七節)、`SPEC.md` `TC-50`…`TC-53`、
