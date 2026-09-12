@@ -31,6 +31,12 @@ with `R3-7` — they are the same step — so what is live is `R1h-3`, which sha
 `R3-8`'s seating, and `R1h-4`, which follows it.** *(This sentence paired a
 closed step with a closed step until 2026-08-29.)*
 
+### 🔴 Carried forward 2026-09-13 — `CHANGELOG.md` is five segments behind and nothing checks it
+
+| | |
+|---|---|
+| **`CHLOG-2`** 🆕 | 量 2026-09-13, by complete enumeration rather than by comparison: `CHANGELOG.md`'s newest entry is the **fifty-sixth** segment (2026-09-10) and `LOG.md` is at the **sixty-first**. So the 57th, 58th, 59th, 60th and 61st have no entry — **including the 59th, which tagged and released `v0.3`**. ⚠️ Desk segments are NOT exempt: the file's own newest eight headlines include four that say *desk*. 🔴 **Nothing in this repository checks it** — `spec-check` reads its markdown shape and no tool compares its newest entry to `LOG.md`'s. **This segment did NOT add its own entry**, deliberately: one new entry above a four-segment hole makes the file read as current when it is not, and backfilling four segments this session did not run is the owner's call, not a closeout action A checker is the option that stops this recurring, and it needs a rule for which segments earn an entry, which the file does not currently state. **Owner's decision**: backfill, declare the file release-only, or write that checker |
+
 ### The four things this file tracks, because they are not the same thing
 
 This line existed to name one of them and was read as naming all four. **Active

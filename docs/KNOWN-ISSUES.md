@@ -30,6 +30,15 @@ measurement.
 
 ---
 
+## 🔴 Every per-`-march` claim here is about ONE toolchain, and until 2026-09-13 none of them said which
+
+| | |
+|---|---|
+| 🆕 **The vendor assembler's per-core ISA table is not *the* vendor assembler's.** 量 2026-09-13 (`R1-pub-0b`), four `isa-probe.sh` runs under the vendor tripwire: the two `rsdk-1.3.6` releases agree in **160 of 160** cells, and `rsdk-1.5.5` does not. Its `as` (binutils 2.19.92) answers `Error: Bad value (lx4180) for -march` for two of the six spellings — taking the numeric `4180`/`5280` for the same cores — and over the six columns the two generations share it differs in **2 of 120**, both `jalx` at `mips1` and `mips2`. `notes/vendor-kernel-isa.md` § 6's committed matrix reproduces exactly, and it is `rsdk-1.3.6-4181`'s: `isa-probe.sh` picks the OLDEST release, because its search is a plain glob, and its docstring said *newest* until this segment. **So `TC-13`, `CPU-12`, `CPU-44` and every other row that quotes an assembler column are rows about a named release**, and the rows now name it. `SPEC.md` `TC-48`, `docs/toolchain-prior-art.md` § 9 | 量 2026-09-13 |
+| **What changes it** | reading stock `opcodes/mips-opc.c` for binutils 2.16.94 and 2.19.92 side by side, which attributes the `jalx` difference; and `R1-pub-6`, which builds the three-column table these readings are the first column of |
+| ⚠️ **The `jalx` difference is UNATTRIBUTED.** Nothing here separates a Lexra-patch change from an upstream binutils change between 2.16.94 and 2.19.92. Reading stock `opcodes/mips-opc.c` for both versions is the experiment that would, and it has not been done. **Neither generation's answer is evidence about the die** — every cell in that table is a statement about an opcode table, which § 6 says in its own words | ⚠️ 推 |
+| ⚠️ **`R2c`'s most relevant column cannot be filled by any toolchain on this disk.** `rsdk-1.5.5-4181-EB-2.6.30-0.9.30.3-110225` is the release whose generation built this unit's firmware and whose `-march` this board needs. All three GPL drops' `users/Makefile` name it; none ships it. `SPEC.md` `TC-20`, `TC-01` | 量 — grep over three drops |
+
 ## The flash claim, and why it is not "zero bytes written"
 
 | | |

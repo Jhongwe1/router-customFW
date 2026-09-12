@@ -352,14 +352,22 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather
-than counted by eye.** 🔄 **量 2026-09-10**, over `git ls-files tools/`
-(**94** files), taking those whose first two bytes are `#!` and excluding
-`tools/test-*`: **44** programs, of which **21 are described below and 23 are
+than counted by eye.** 🔄 **量 2026-09-13**, over `git ls-files tools/`
+(**100** files), taking those whose first two bytes are `#!` and excluding
+`tools/test-*`: **48** programs, of which **21 are described below and 27 are
 not** — `audit-bench-log`, `binsim`, `capdate`, `capfield`, `ci-census`,
-`citime`, `desk-sweep`, **`dtcheck`**, `fetch-sources`, `flashmap`,
-`fsmanifest`, `isa-probe`, `leakscan`, `opcount`, `rbcheck`,
-`rebuild-census`, **`regcensus`**, `repdiff`, `rlxfw-kbuild`,
-`rlxprobe/qemu-run`, `tc-smoke`, `vendor-tripwire` and `verify-backup-copy`.
+`citime`, **`derivcheck`**, `desk-sweep`, `dtcheck`, `fetch-sources`,
+`flashmap`, `fsmanifest`, `isa-probe`, **`isacensus`**, `leakscan`,
+**`marchcmp`**, `opcount`, `rbcheck`, `rebuild-census`, `regcensus`, `repdiff`,
+`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, **`tccensus`**,
+`vendor-tripwire` and `verify-backup-copy`.
+🔴 **A FIFTH time, and it was stale by TWO before this segment added two.**
+`derivcheck` landed 2026-09-11 and `isacensus` 2026-09-12, and neither moved
+this count; `marchcmp` and `tccensus` are this segment's. **The +4 in programs
+and the +6 in files are those four plus two `.tsv`**, and the only reason the
+two older ones are visible at all is that the count was re-derived rather than
+incremented — which is what the sentence below this one has now said four
+times.
 🔴 **A FOURTH time, and the mechanism is now boringly reliable.** `dtcheck`
 landed on 2026-09-09 (`R5`'s `D2` instrument, 44 cases) and did not move this
 count; `regcensus` landed on 2026-09-10 with it. **The +2 in both columns is

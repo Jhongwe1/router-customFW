@@ -83,6 +83,22 @@ the assembler's own encoding of the neighbouring mnemonics:
 | **`mtlxc0 $2,$0`** (as built) | **`0x40e20000`** | `010000` COP0 | **7** |
 | `mfc3 v0,$0` | `0x4c020000` | `010011` **COP3** | 0 |
 
+🟢 **2026-09-13: the two `lxc0` encodings have a SECOND SOURCE, and it is a
+public one.** The rows above are 量 — what this project's assembler emitted —
+and `CLAUDE.md`'s rule is that no register value enters code on one source. 讀,
+the public binutils-2.24 Lexra patch (`SOURCES.json` `lexra-binutils-2.24`,
+sha256 `888e368a…6695`): `{"mflxc0", "t,#d4", 0x40600000, 0xFFE007FF, …, RLXB}`
+and `{"mtlxc0", "t,#d4", 0x40E00000, 0xFFE007FF, …, RLXB}`. Base words with
+`rs` 3 and 7, the same two this table read out of the assembler, and the
+`#d4` operand is what the `0x20000` in the built words above is — `rd` = 4.
+🟢 **And `RLXB` = every Lexra core but `lx4180`**, which is exactly what
+`CLAUDE.md`'s Never-table records being measured on 2026-09-04: assembles at
+`rlx4181`, `rlx4281`, `rlx5181`, `lx5280`, `rlx5281`, rejected at `lx4180`.
+**Five for and one against, predicted by a file this project had never
+opened.** ⚠️ It is still a statement about a toolchain table and not about the
+die; what runs on the die is `SPEC.md` `CPU-46` and the `arch/rlx` irq-save
+path. `docs/toolchain-prior-art.md` § 7 ①.
+
 🟢 **2026-09-12 (`R1-pub-0`'s closeout audit): how many of each are in the artefacts, with a negative control that fired.** A scan for 4-byte-aligned big-endian words with opcode `0x10` and `rs` 3 or 7:
 
 | artefact | `mfc0` rs 0 | **`mflxc0` rs 3** | `mtc0` rs 4 | **`mtlxc0` rs 7** |
