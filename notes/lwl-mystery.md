@@ -211,8 +211,43 @@ driver answers `FATAL: -march mismatch` and exits 1 **without writing the output
 file**, and `$?` was not checked, so the count came off a leftover `.s`.
 Corrected 2026-08-28 with the exit status checked at every point.
 
-**So the lever is a build flag, `-fuse-uls`, which both toolchain generations
-carry — only the default differs**, and Realtek pass it explicitly in
+~~**So the lever is a build flag, `-fuse-uls`, which both toolchain generations
+carry — only the default differs**~~ 🔴 **2026-09-13 (`R1-pub-6`): the lever
+is the flag and the two generations' DEFAULTS DO NOT DIFFER. The asymmetry in the
+table above belongs to the WRAPPER.** 量, one fixture — a packed struct with one
+load and one store through it, which is the program item 3 of the open-questions
+list below describes — under `tools/vendor-tripwire.sh`, no flag given:
+
+| driver | `lwl`+`lwr`+`swl`+`swr` in the object |
+|---|---:|
+| `rsdk-1.3.6-4181` `mips-linux-gcc` (raw) | 0 |
+| `rsdk-1.3.6-4181` `rsdk-linux-gcc` (wrapper) | 0 |
+| `rsdk-1.3.6-5281` `mips-linux-gcc` (raw) | 0 |
+| `rsdk-1.3.6-5281` `rsdk-linux-gcc` (wrapper) | 0 |
+| `rsdk-1.5.5-5281` `mips-linux-xgcc` (raw) | **0** |
+| `rsdk-1.5.5-5281` `mips-linux-gcc` (which on 1.5.5 IS the wrapper) | **4** |
+| `rsdk-1.5.5-5281` `rsdk-linux-gcc` (wrapper) | **4** |
+
+**Three controls, all firing.** `-fuse-uls` takes **both** raw drivers to 4, so
+the fixture can produce a non-zero and gcc 3.4.6 emits these instructions as
+readily as 4.4.5 when asked. `-fno-use-uls` through the 1.5.5 wrapper takes it
+back to **0**, so the injection is a flag and not a built-in. And
+`-fzzz-not-a-flag` is **refused** — `cc1: error: unrecognized command line
+option` — so the acceptance of `-fuse-uls` is recognition rather than gcc
+swallowing any `-f`. 量 `RSDK_LOGFILE`: the 1.5.5 wrapper hands down
+`-ffix-bdsl -fuse-uls -msoft-float -EB` and the 1.3.6 wrapper hands down `-EB`.
+
+⚠️ **What is 量 and what is 推.** 量: on this fixture the asymmetry is wholly
+the wrapper's, and the raw route gives 0 / 4 / 0 for **all three** releases.
+推: that the table above took the wrapper route — the table does not name its
+driver binary, and the wrapper route reproduces its three rows exactly while the
+raw route reproduces none of them. **The experiment that closes it is re-running
+that table with the driver named**, which costs one desk command and needs the
+fixture source, which was never committed. `notes/vendor-toolchains.md` § 5.2
+has the driver-naming measurement this rests on.
+
+🟢 **The conclusion of this section survives and gets narrower**: the lever is
+`-fuse-uls`, Realtek pass it explicitly in
 `rsdk-1.5.5`'s own uClibc configuration. This unit's kernel banner names
 `4.4.5-1.5.5p2`.
 

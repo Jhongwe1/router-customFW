@@ -197,7 +197,10 @@ conclusion and silent about the inputs.
 | `TC-47` | tc | y | . | . | . | 量 | `TC-26` | three images carry an undeclared config difference and the gate that would have caught it was never invoked by the build driver. The gate was right and nobody ran it |
 | `TC-48` | tc | y | . | . | . | 量 | `TC-13` | 🔴 the three rsdk assemblers are not one table. Two 1.3.6 agree in 160 of 160; 1.5.5 rejects the `-march` spellings `lx4180` and `lx5280` outright and differs on 2 of the 120 cells it can be compared over, both `jalx`. Measured under the vendor tripwire, both ends CLEAN |
 | `TC-49` | tc | y | . | y | . | 量 | `TC-13` | the public Lexra patch predicts this repository's committed matrix in 158 of 160 cells, with the prediction committed BEFORE the run and compared by an instrument. ⚠️ ⓟ is not claimed: the patch is public and this agreement rate is not, which is what § 2.1's rule for the column actually says |
-| `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep -- 1.3.6 emits zero `lwl`, 1.5.5 emits four, and `-march` moves neither -- recorded under a `CPU-*` id. A `TC-*` derivation cannot see it, which is what a declared row is for |
+| `TC-50` | tc | y | . | . | . | 量 | `TC-14` | the name `mips-linux-gcc` is the raw driver on 1.3.6 and the WRAPPER on 1.5.5, decided by behaviour rather than by filename or size, and the two generations' wrappers inject different flag sets. The consequence is that a committed method sentence names the wrong binary for half of its own table |
+| `TC-51` | tc | y | . | . | . | 量 | `TC-15` | the two rsdk-1.3.6 releases' code generators are byte-identical at `-march=4181` and differ at `-march=5281`, where they read 425/0/162 and 424/0/147. The published row is the first one's, and that is the release whose wrapper refuses that `-march` |
+| `TC-52` | tc | y | . | . | . | 量 | `TC-50` | of the three flags the 1.5.5 wrapper injects, only `-ffix-bdsl` changes a load-use reading, and what it changes is the unresolved-successor class: nineteen to zero, with the object sha256 identical within each group |
+| `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep, recorded under a `CPU-*` id that a `TC-*` derivation cannot see, which is what a declared row is for. 🔴 Its headline -- 1.3.6 emits zero `lwl` and 1.5.5 emits four -- was narrowed on 2026-09-13: the two generations' raw drivers agree at zero and the asymmetry is the 1.5.5 wrapper injecting `-fuse-uls`. See `TC-50` |
 | `TC-01` | tc | . | y | y | . | 量 | `TC-09` | this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2 |
 | `TC-02` | tc | . | y | . | . | 推 | `TC-02a` | the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark |
 | `TC-02a` | tc | . | y | . | . | 推 | `TC-02` | the corpus matrix EXCLUDES the 2019/2020 generation and bounds the rest; six shipped images cannot say which source release sat on the build machine, so the exclusions are 量 and the identification stays 推 |
@@ -243,12 +246,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:counts begin -->
 | | ① toolchain in hand | ② artefact | ③ vendor material | ④ nothing | ⓟ public | total |
 |---|---:|---:|---:|---:|---:|---:|
-| `R2c` recorded findings | 35 | 10 | 8 | 2 | 6 | **55** |
+| `R2c` recorded findings | 38 | 10 | 8 | 2 | 6 | **58** |
 | toolchain releases | 4 | 1 | 2 | 0 | 1 | **7** |
 
 | subject | `R2c` rows | toolchain rows |
 |---|---:|---:|
-| tc | 50 | 7 |
+| tc | 53 | 7 |
 | die | 1 | 0 |
 | both | 4 | 0 |
 <!-- tccensus:counts end -->
@@ -258,7 +261,7 @@ conclusion and silent about the inputs.
 <!-- tccensus:marks begin -->
 | `SPEC.md` V mark | ① | ② | ③ | ④ | declared disagreements |
 |---|---:|---:|---:|---:|---:|
-| 量 | 19 | 2 | 0 | 0 | 0 |
+| 量 | 22 | 2 | 0 | 0 | 0 |
 | 讀 | 15 | 6 | 4 | 0 | 15 |
 | 推 | 0 | 2 | 1 | 0 | 3 |
 | — | 0 | 0 | 0 | 1 | 0 |

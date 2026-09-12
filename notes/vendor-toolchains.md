@@ -314,7 +314,9 @@ run ahead of it. Both are consumers of the same thing: whatever table assigns an
 ISA level to each `-march` name in Realtek's binutils/gcc lineage. **What that
 buys is a check against one of them being misread, not a second witness.**
 
-**The compiler**, and it is **`mips-linux-gcc`, not `rsdk-linux-gcc`** — §2's own
+**The compiler**, and it is ~~**`mips-linux-gcc`, not `rsdk-linux-gcc`**~~ — 🔴 **that
+name is the raw driver on 1.3.6 and the WRAPPER on 1.5.5; § 5.2 has the
+measurement and what it costs** — §2's own
 point is that the wrapper accepts exactly one `-march`, so four of the six columns
 below cannot be reached through it at all. The raw driver is the only way to ask
 the question, and it means these rows are a property of the **code generator**,
@@ -335,6 +337,97 @@ not of a build anyone could perform with the wrapper in place. Same source, same
 version of this table.** The padding is a habit; the violation is the defect the
 padding prevents. Zero on one side of the partition and 107–162 on the other,
 from one C file, in both toolchain generations.
+
+### 5.1 🔴 The rows above are labelled by GENERATION and were measured on a RELEASE, and at two of six `-march` the two releases disagree
+
+量 2026-09-13 (`R1-pub-6`, desk, under `tools/vendor-tripwire.sh` — six trees
+CLEAN before and after, four runs). The table above carries three rows labelled
+`1.3.6`. There are **two** rsdk-1.3.6 releases on this disk; §1 records that
+their `mips-linux-gcc`, `cc1` and `mips-linux-ld` differ while their
+`mips-linux-as` is byte-identical; and nothing had ever put both of them on this
+instrument. Same source, same flags, same `tools/hazlint`:
+
+| release | `4180` | `4181` | `5181` | `5280` | `5281` | `4281` |
+|---|---|---|---|---|---|---|
+| `rsdk-1.3.6-4181` | 421/121/**0** | 421/121/**0** | 421/121/**0** | 425/0/**107** | 425/0/**162** | 425/0/**162** |
+| `rsdk-1.3.6-5281` | 421/121/**0** | 421/121/**0** | 421/121/**0** | 425/0/**107** | **424/0/147** | **424/0/147** |
+| `rsdk-1.5.5-5281` | 388/90/**0** | 388/90/**0** | 384/91/**0** | 390/1/**134** | 390/1/**134** | 390/1/**134** |
+
+*loads / nop after load / violations. The drivers are the **raw** ones —
+`mips-linux-gcc` on 1.3.6 and `mips-linux-xgcc` on 1.5.5; § 5.2 is why those are
+not the same name.*
+
+🟢 **The control that makes this comparable with the table above**:
+`rsdk-1.3.6-4181` at `-march=5281` reads **425 / 0 / 162**, which is that table's
+committed `1.3.6 | 5281/4281` row cell for cell. And its `1.5.5` rows reproduce
+at 388/90/0, 384/91/0 and 390/1/134. **So this run is on the same instrument, and
+the published `1.3.6` numbers are the 4181 release's.**
+
+🔴 **`rsdk-1.3.6-5281` gives 424 / 0 / 147** — fifteen fewer violations
+(9.3 %) and one load fewer. The two releases agree in four of six columns and
+differ in **exactly the two that have violations in them**. A reader who checked
+the `4181` side would have concluded the label was harmless: there the emitted
+`.s` is **byte-identical** between the two releases at `-O2` and at `-Os`, sha256
+and all, which is a stronger statement than the triples matching.
+
+🔴 **And the release the published number belongs to is the one whose wrapper
+refuses that `-march`.** `arch/rlx/Makefile` sets `CROSS_COMPILE := rsdk-linux-`,
+and `rsdk-1.3.6-4181`'s wrapper answers `FATAL: -march mismatch` for `5281`
+(§2). **The only 1.3.6 build at `-march=5281` anyone can perform is
+`rsdk-1.3.6-5281`'s, and it reads 147.** ⚠️ This is a statement about *this*
+table. Whether `notes/kernel-build.md` §1.1's whole-`vmlinux` delta — *`-march`
+alone, generation held at 1.3.6: 4 → 20,201* — carries the same confound is
+**undetermined**: neither file records which 1.3.6 built the `-march=5281`
+`vmlinux`, and settling it costs three kernel builds rather than three `.o`.
+
+### 5.2 🔴 `mips-linux-gcc` is the raw driver on 1.3.6 and the WRAPPER on 1.5.5, and § 5's method sentence names it for both
+
+§2 records the fact — on 1.5.5 `rsdk-linux-gcc` is a symlink to
+`mips-linux-gcc` and the raw driver beside them is `mips-linux-xgcc` — and the
+sentence above did not apply it. 量 2026-09-13, **by behaviour, not by filename
+or by size**:
+
+| invocation | answer |
+|---|---|
+| `rsdk-1.3.6-4181/bin/rsdk-linux-gcc -march=5281` | `FATAL: -march mismatch. RSDK is configured for -march=4181 only` |
+| `rsdk-1.3.6-4181/bin/mips-linux-gcc -march=5281` | compiles — **raw driver** |
+| `rsdk-1.5.5/bin/rsdk-linux-gcc -march=4181` | `FATAL: -march mismatch. RSDK is configured for -march=5281 only` |
+| `rsdk-1.5.5/bin/mips-linux-gcc -march=4181` | **the same FATAL — it is the wrapper** |
+| `rsdk-1.5.5/bin/mips-linux-xgcc -march=4181` | compiles — **raw driver** |
+
+**§ 5's `1.5.5` rows are therefore `mips-linux-xgcc`'s**, which § 5.1 reproduces
+cell for cell; five of their six columns cannot be reached through the wrapper at
+all. ⚠️ **And the substitution would not have been free.** At the one column the
+wrapper does accept:
+
+| driver, `-O2 -march=5281` | loads | nop | unresolved | violations |
+|---|---:|---:|---:|---:|
+| `mips-linux-xgcc` | 390 | 1 | 19 | **134** |
+| `rsdk-linux-gcc` | 390 | 0 | **0** | **133** |
+
+🟢 **The cause is one flag of three, separated by single-variable runs.**
+量 `RSDK_LOGFILE`: the 1.5.5 wrapper hands down `-ffix-bdsl -fuse-uls
+-msoft-float -EB`, the 1.3.6 wrapper hands down `-EB` alone — which is why the
+two agree on 1.3.6, the default already being big-endian (量 `readelf -h` on an
+object built with no `-EB`). One flag at a time, with the object's own sha256
+beside the reading:
+
+| added to `mips-linux-xgcc -O2 -march=5281` | object sha256 | loads/nop/unres/viol |
+|---|---|---|
+| none · `-EB` · `-msoft-float` · `-fuse-uls` · `-fuse-uls -msoft-float` | `7158a9e158…` | 390/1/19/**134** |
+| every combination containing `-ffix-bdsl` | `c4d49a6d25…` | 390/0/0/**133** |
+
+**Only `-ffix-bdsl` moves anything, and the objects are byte-identical within
+each group** — nine invocations, two distinct products.
+🔴 **It removes all nineteen unresolved successors**, and that is the half worth
+keeping: every one of them reads *the load is in the delay slot of a register
+jump; the successor is not statically known*, and filling branch delay slots
+takes the load out of that class. `SOURCES.json` warns that `-ffix-bdsl` is about
+the **branch** delay slot and must not be conflated with the load-use delay.
+量: it does not fix a load-use hazard — the violation count moves by one — and it
+changes the load-use **reading** anyway, because `hazlint`'s gate fails an
+unresolved successor. The two are independent in what they mean and not in what
+they measure.
 
 **The assembler.** rsdk-1.5.5's `as` carries a load-use checker — the strings
 `possible LOAD-USE: regno=%d`, `warn-possible-load-use`, `load_delay_nop`,
