@@ -49,7 +49,7 @@ r1a	ldc1	derived	.	.	y	CPU-47	-	-	two `ldc1` words in this kernel's text, both i
 r1a	ll	derived	.	.	y	CPU-18,CPU-47	-	-	the row the plan calls the most important one, because it decides libc. Route 2 is empty BY CONSTRUCTION: `ARCH_CPU_LLSC=n`, so zero in the loader and zero in 2.85 MB of kernel text, and nothing on this die has ever executed one. And the two vendor sources DISAGREE -- the assembler accepts it for `rlx4181`
 r1a	lwc1	derived	.	.	y	CPU-47	-	-	zero in this kernel's text; accepted in all eight assembler columns, which discriminates nothing
 r1a	lwc3	derived	.	.	y	CPU-47	-	-	accepted in all eight assembler columns, non-discriminating in exactly the way the ULS row is; 量 zero occurrences in `stage2.bin` or in any payload
-r1a	madd	derived	.	.	y	CPU-18	-	-	SPECIAL2 form: rejected in all eight assembler columns, zero in the loader
+r1a	madd	derived	.	.	y	CPU-18	-	-	SPECIAL2 form: rejected in all eight assembler columns, zero in the loader. 🔴 2026-09-12: that rejection is a SPELLING and not the encoding. The public Lexra patch gives `mad` -- the same word 0x70000000 -- membership RLXA, all six Lexra cores, and leaves `madd` at I32. So a payload for this row must emit the WORD or it measures the assembler's dictionary. `docs/toolchain-prior-art.md` section 7 item 5
 r1a	mfc1	derived	.	.	y	CPU-47	-	-	accepted in all eight assembler columns; zero in the loader
 r1a	pref	derived	.	.	y	CPU-18	-	-	rejected in all eight assembler columns, zero in the loader. Its opcode 0x33 was mislabelled `pref` in `hazlint` until 2026-08-27, when it was re-levelled to MIPS-I `lwc3`
 r1a	rdhwr	derived	.	.	y	CPU-18,CPU-47	-	-	rejected in all eight assembler columns, and the vendor `#if 0`'d both `simulate_rdhwr` call sites that mainline calls unconditionally

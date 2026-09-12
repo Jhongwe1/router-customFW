@@ -59,7 +59,7 @@ file.
 
 | | instrument | what it contributes | atomic unit |
 |---|---|---|---|
-| `r2c` | `SPEC.md` through `tools/spec-check.py`'s own parser | every id in an id column whose first token starts `TC-` — **48** in § 14 and one, `TC-h`, that exists only in § 17's blank list | one recorded finding |
+| `r2c` | `SPEC.md` through `tools/spec-check.py`'s own parser | every id in an id column whose first token starts `TC-` — **50** in § 14 and one, `TC-h`, that exists only in § 17's blank list. ⚠️ It read **48 and one at the freeze**; § 9's own run added `TC-48` and `TC-49`, which is the derivation doing its job rather than the file drifting | one recorded finding |
 | `r2t` | `config/rlxfw-sdk.config`'s `CONFIG_RSDK_*` lines | the only committed **closed set** of the releases on hand — **3**, selected or not | one toolchain release |
 
 🔴 **`r2c`'s instrument is this repository's own record, and that is
@@ -195,6 +195,8 @@ conclusion and silent about the inputs.
 | `TC-45` | tc | y | . | . | . | 量 | `TC-44` | six builds. One real edit costs a full build, and the refutation condition was that the floor could not be reproduced -- it was |
 | `TC-46` | tc | y | . | . | . | 量 | `TC-45` | the same real edit at 4 objects instead of 592, product byte-identical. The one consumer in the staged tree is what made a narrower scope legal |
 | `TC-47` | tc | y | . | . | . | 量 | `TC-26` | three images carry an undeclared config difference and the gate that would have caught it was never invoked by the build driver. The gate was right and nobody ran it |
+| `TC-48` | tc | y | . | . | . | 量 | `TC-13` | 🔴 the three rsdk assemblers are not one table. Two 1.3.6 agree in 160 of 160; 1.5.5 rejects the `-march` spellings `lx4180` and `lx5280` outright and differs on 2 of the 120 cells it can be compared over, both `jalx`. Measured under the vendor tripwire, both ends CLEAN |
+| `TC-49` | tc | y | . | y | . | 量 | `TC-13` | the public Lexra patch predicts this repository's committed matrix in 158 of 160 cells, with the prediction committed BEFORE the run and compared by an instrument. ⚠️ ⓟ is not claimed: the patch is public and this agreement rate is not, which is what § 2.1's rule for the column actually says |
 | `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep -- 1.3.6 emits zero `lwl`, 1.5.5 emits four, and `-march` moves neither -- recorded under a `CPU-*` id. A `TC-*` derivation cannot see it, which is what a declared row is for |
 | `TC-01` | tc | . | y | y | . | 量 | `TC-09` | this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2 |
 | `TC-02` | tc | . | y | . | . | 推 | `TC-02a` | the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark |
@@ -241,12 +243,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:counts begin -->
 | | ① toolchain in hand | ② artefact | ③ vendor material | ④ nothing | ⓟ public | total |
 |---|---:|---:|---:|---:|---:|---:|
-| `R2c` recorded findings | 33 | 10 | 8 | 2 | 6 | **53** |
+| `R2c` recorded findings | 35 | 10 | 8 | 2 | 6 | **55** |
 | toolchain releases | 4 | 1 | 2 | 0 | 1 | **7** |
 
 | subject | `R2c` rows | toolchain rows |
 |---|---:|---:|
-| tc | 48 | 7 |
+| tc | 50 | 7 |
 | die | 1 | 0 |
 | both | 4 | 0 |
 <!-- tccensus:counts end -->
@@ -256,7 +258,7 @@ conclusion and silent about the inputs.
 <!-- tccensus:marks begin -->
 | `SPEC.md` V mark | ① | ② | ③ | ④ | declared disagreements |
 |---|---:|---:|---:|---:|---:|
-| 量 | 17 | 2 | 0 | 0 | 0 |
+| 量 | 19 | 2 | 0 | 0 | 0 |
 | 讀 | 15 | 6 | 4 | 0 | 15 |
 | 推 | 0 | 2 | 1 | 0 | 3 |
 | — | 0 | 0 | 0 | 1 | 0 |
@@ -281,13 +283,16 @@ side are the whole point:
 | | route ① | any evidence | rows |
 |---|---:|---:|---:|
 | `R1a` + `R1b`, the die (`docs/isa-prior-art.md` § 6) | **3** (6.7 %) | 37 (82.2 %) | 45 |
-| `R2c`, the toolchains (§ 5 above) | **33** (62.3 %) | 51 (96.2 %) | 53 |
+| `R2c`, the toolchains (§ 5 above) | **35** (63.6 %) | 53 (96.4 %) | 55 |
 
 Both totals are the whole table, derived plus declared, so the two rows are
-comparable — 量 over both files: 45 is **39 derived and 6 declared**, 53 is
-**49 derived and 4 declared**.
+comparable — 量 over both files: 45 is **39 derived and 6 declared**, 55 is
+**51 derived and 4 declared**. ⚠️ The toolchain row moved from 33/53 to 35/55
+during this segment, because § 9's run produced two findings and `SPEC.md`
+gained two rows for them. The ratio barely moves; the fact that a census
+grows when the record grows is the derivation working.
 
-🔴 **Thirty-three of fifty-three recorded toolchain findings already have a
+🔴 **Thirty-five of fifty-five recorded toolchain findings already have a
 desk-執行 reading, and only two rows have no evidence of any class.** The
 mechanism is not diligence, it is economics: **route ① on this axis costs no
 power.** Every one of those 32 rows was obtainable by typing a command, and
@@ -568,6 +573,88 @@ reads as `y` and that is the intended reading.
 **die**. Every cell is a statement about an opcode table. `notes/vendor-kernel-isa.md`
 § 6 says so in its own words and § 2 above repeats it, because a 480-cell table
 is exactly the shape of thing a reader takes for a hardware result.
+
+---
+
+## 9. The run, 2026-09-13, and P1 is refuted
+
+§ 8 was committed at `51a8cba` and the assemblers were run after it. Four
+`isa-probe.sh` invocations plus one `-march` vocabulary scan, all under
+`tools/vendor-tripwire.sh`: **six trees watched, CLEAN before and CLEAN
+after**, and the artefacts are in `$FWRE_WORK/rebuild/r1pub0b/` rather than
+here, which is the same rule `notes/vendor-kernel-isa.md` § 6's table follows.
+
+| | prediction | result |
+|---|---|---|
+| **P1** | all three assemblers give the same 160-cell matrix | 🔴 **REFUTED** — see below |
+| **P2** | the measured matrix equals the committed one | 🟢 **160 of 160**, twelve days later |
+| **P3a** | `cache` at `lx5280` reads `.` | 🟢 held |
+| **P3b** | `sync` at `rlx5181` reads `.` | 🟢 held |
+| **P4** | the default selection is `rsdk-1.3.6-4181` | 🟢 held — `GNU assembler 2.16.94-1.3.6 20060612` |
+| **P5** | both controls hold in all 24 columns | 🟢 in the two that ran; 🔴 the third's POS control **fired** |
+
+**So the public patch predicts the rsdk-1.3.6 table in 158 cells of 160, and
+that is now measured rather than inferred.** Both misses are the patch being
+more permissive, and § 7 ④'s prior — two tables of one lineage, binutils 2.16.94
+against 2.24 — is the reading that survives.
+
+### 9.1 🔴 How P1 was refuted, in two separable pieces
+
+**① The `-march` vocabulary is not the same.** 量, `addu` at fourteen spellings
+per assembler:
+
+| assembler | `lx4180` | `lx5280` | `4180` | `5280` | the other ten |
+|---|:-:|:-:|:-:|:-:|:-:|
+| `rsdk-1.3.6-4181` — binutils 2.16.94-1.3.6 | y | y | y | y | all y |
+| `rsdk-1.3.6-5281` — binutils 2.16.94-1.3.6 | y | y | y | y | all y |
+| `rsdk-1.5.5-5281` — binutils 2.19.92.20091006 | **.** | **.** | y | y | all y |
+
+`rsdk-1.5.5`'s assembler answers `Error: Bad value (lx4180) for -march` and
+takes the numeric `4180` for the same core. **So it is a spelling that was
+removed between the two generations, not a core** — which a table of
+rejections would have reported as the opposite.
+
+**② `isa-probe.sh` REFUSED the whole 1.5.5 table, and that is the tool being
+right.** Its POS control failed in exactly those two columns, so it printed
+nothing: six columns of data beside two columns of `.` would have read as *1.5.5
+rejects everything for lx4180 and lx5280*, which is false. Re-run over the six
+`-march` values that assembler **does** know — a narrower question, declared as
+one, not a widened control — it produces a full table with both controls
+holding.
+
+**③ Over those six shared columns the two generations differ in 2 of 120
+cells, and both are `jalx` at `mips1` and `mips2`.** 1.3.6 accepts, 1.5.5
+rejects; all four Lexra columns agree. 🔴 **That lands on the row
+`docs/isa-prior-art.md` § 10 ② added twelve hours earlier**, whose committed
+sentence is *accepted in all eight columns … so it discriminates nothing*. True
+of 1.3.6 and **false of 1.5.5**, where the row does discriminate — weakly, by
+separating MIPS-I/II from the Lexra set. ⚠️ **Unattributed**: nothing here
+separates a Lexra-patch change from an upstream binutils change between 2.16.94
+and 2.19.92, and reading stock `mips-opc.c` for both versions is the experiment
+that would. 🟢 The blind second derivation of § 8.1 flagged `jalx` in advance as
+*"the one row most worth checking against a real build"* — the only row it
+marked that way, and the only row that moved.
+
+### 9.2 What the refutation costs, and it is the cost § 8.3 wrote down
+
+> …then `TC-13` is one toolchain's answer that has been quoted as if it were
+> *the vendor assembler's*, `R2c`'s three columns are three genuinely different
+> machine descriptions, and **every per-`-march` claim in this repository has to
+> name its toolchain**.
+
+All three consequences land. `SPEC.md` `TC-13` and `notes/vendor-kernel-isa.md`
+§ 6 now name the assembler and its version; the `jalx` bullet there is scoped to
+the generation that produced it. 🟢 **And `R2c` gains a column it did not know
+it needed**: *which `-march` spellings does each release accept* is a row of the
+three-column table, it is measured, and it separates the generations where the
+instruction matrix nearly does not.
+
+⚠️ **What this does not settle.** Whether any cell is true of the die — every
+one is a statement about an opcode table, and § 2 says so. Whether the 1.5.5
+`-march` removal is Realtek's or upstream's. And whether the fourth release,
+`rsdk-1.5.5-4181-…-110225`, would agree with either: it is named by all three
+drops and shipped by none, so `R2c`'s most relevant column is still the one no
+toolchain here can fill.
 
 ---
 

@@ -192,7 +192,7 @@ route-② row is always the third verdict cell.
 | `ll` | . | . | y | `CPU-18`, `CPU-47` | — | the row the plan calls the most important one, because it decides libc. Route 2 is empty BY CONSTRUCTION: `ARCH_CPU_LLSC=n`, so zero in the loader and zero in 2.85 MB of kernel text, and nothing on this die has ever executed one. And the two vendor sources DISAGREE -- the assembler accepts it for `rlx4181` |
 | `lwc1` | . | . | y | `CPU-47` | — | zero in this kernel's text; accepted in all eight assembler columns, which discriminates nothing |
 | `lwc3` | . | . | y | `CPU-47` | — | accepted in all eight assembler columns, non-discriminating in exactly the way the ULS row is; 量 zero occurrences in `stage2.bin` or in any payload |
-| `madd` | . | . | y | `CPU-18` | — | SPECIAL2 form: rejected in all eight assembler columns, zero in the loader |
+| `madd` | . | . | y | `CPU-18` | — | SPECIAL2 form: rejected in all eight assembler columns, zero in the loader. 🔴 2026-09-12: that rejection is a SPELLING and not the encoding. The public Lexra patch gives `mad` -- the same word 0x70000000 -- membership RLXA, all six Lexra cores, and leaves `madd` at I32. So a payload for this row must emit the WORD or it measures the assembler's dictionary. `docs/toolchain-prior-art.md` section 7 item 5 |
 | `mfc1` | . | . | y | `CPU-47` | — | accepted in all eight assembler columns; zero in the loader |
 | `pref` | . | . | y | `CPU-18` | — | rejected in all eight assembler columns, zero in the loader. Its opcode 0x33 was mislabelled `pref` in `hazlint` until 2026-08-27, when it was re-levelled to MIPS-I `lwc3` |
 | `rdhwr` | . | . | y | `CPU-18`, `CPU-47` | — | rejected in all eight assembler columns, and the vendor `#if 0`'d both `simulate_rdhwr` call sites that mainline calls unconditionally |
@@ -597,11 +597,26 @@ section filter**, which is what would make it clean.
   hypothetical: it fired on the first day.** If a Lexra ASE operation is in
   neither `hazlint`'s watch list nor `isa-probe.sh`'s rows, it has no row here —
   and `mflxc0`/`mtlxc0` were exactly that, added as declared rows by the
-  closeout audit (§ 10 ⑥) rather than by the derivation. The binutils Lexra
-  patch adds more than a hundred proprietary mnemonics to these cores and this
-  project has not downloaded it — `R2c`. **`x-ri`'s own comment already names
-  this as the way that cell could retire**, so the gap is known, it is now
-  measured once, and it is not closed.
+  closeout audit (§ 10 ⑥) rather than by the derivation. **`x-ri`'s own comment
+  already names this as the way that cell could retire**, so the gap is known,
+  it is now measured once, and it is not closed.
+  🔄 **2026-09-12, the next segment: the size of that gap is measured and it is
+  14, not "more than a hundred."** This bullet's original wording — *the
+  binutils Lexra patch adds more than a hundred proprietary mnemonics to these
+  cores and this project has not downloaded it* — traced to `SOURCES.json`'s
+  description of the patch and was a **read count, never a count**. 量, the
+  patch downloaded: **148** new mnemonics over two opcode files, of which
+  **16** are claimed for `RLX4181` by the patch's own membership words and
+  **14** are new to this repository (`mflxc0` and `mtlxc0` being the two § 10 ⑥
+  already added). The other 132 are gated on flags that exclude `INSN_4181` —
+  the RADIAX set, claimed for 5181/5280/5281 — so they are **not a statement
+  about this core**. The fourteen are `ltw`, `madh`, `madl`, `mazh`, `mazl`,
+  `msbh`, `msbl`, `mszh`, `mszl`, `sleep`, `udi0i`, `udi1i`, `udi2i`, `udi3i`.
+  ⚠️ They are deliberately **not** added to this census: it was frozen with an
+  ordering property, and growing its population by 36 % on evidence from the
+  toolchain axis would muddy the only thing that makes it worth anything.
+  Whether they become `R1a` payload rows is `R1-pub-1`'s decision, and the
+  number it needs now exists. `docs/toolchain-prior-art.md` § 7 ⑦.
 * **Route ② rests on *no exception message in a capture*.** That is an absence,
   and an absence in a capture is only as strong as the capture's coverage.
   `SPEC.md` `CPU-17` says eighteen captures; `FW-41` and `FW-47` measured two

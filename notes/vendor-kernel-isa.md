@@ -667,6 +667,16 @@ six as `arch/rlx/Kconfig` — so assembling one instruction at a time against ea
 integrated the core. Both controls hold: `addu` accepted in every column,
 `daddu` rejected in every column.
 
+🔴 **The assembler is `rsdk-1.3.6-4181`'s, `GNU assembler 2.16.94-1.3.6
+20060612`, and until 2026-09-12 this table did not say so.** 量 that day, four
+runs under `tools/vendor-tripwire.sh`: `isa-probe.sh` with no `--as` selects
+that one, and the reason is that its docstring says *newest rsdk first* while
+its code is a plain glob the shell expands lexicographically — **oldest first**.
+Re-run against this table it reproduces in **160 of 160** cells, twelve days
+later. ⚠️ The two other releases do not simply agree with it, so every
+per-`-march` claim in this repository is a claim about *a* toolchain — see the
+`jalx` row below and `docs/toolchain-prior-art.md` § 9.
+
 | | lx4180 | **rlx4181** | rlx5181 | lx5280 | rlx5281 | rlx4281 | mips1 | mips2 |
 |---|---|---|---|---|---|---|---|---|
 | `lwl` `lwr` `swl` `swr` | y | **y** | y | y | y | y | y | y |
@@ -702,7 +712,15 @@ What it settles, and what it does not:
   cores are synthesisable and LL/SC is an option of the *instance*, while
   `-march` describes the *family*; that is inferred, and it is written here as a
   disagreement rather than as a conclusion.
-- 🆕 **`jalx`, added 2026-09-12, and it was probed for six weeks before it had a row here.** 量: accepted in **all eight** columns, `mips1` and `lx4180` included. ⚠️ **So it discriminates nothing, for the same reason the ULS row does not** — the table only ever *subtracts* from MIPS-I and `jalx` is never subtracted. It is here because `CPU-09`/`CPU-48` establish that this unit's kernel *runs* MIPS16 code on this die, so a reader will come looking; the answer is that the assembler has nothing to say about it. 🔴 **It was missing because a count was taken one way**: `isa-probe.sh` has **20** probe rows and this table had **19**, and the set difference in both directions (`docs/isa-prior-art.md` § 10 ②) is exactly this one row with an empty reverse.
+- 🆕 **`jalx`, added 2026-09-12, and it was probed for six weeks before it had a row here.** 量: accepted in **all eight** columns, `mips1` and `lx4180` included. ⚠️ **So it discriminates nothing, for the same reason the ULS row does not** — the table only ever *subtracts* from MIPS-I and `jalx` is never subtracted. It is here because `CPU-09`/`CPU-48` establish that this unit's kernel *runs* MIPS16 code on this die, so a reader will come looking; the answer is that the assembler has nothing to say about it. 🔴 **It was missing because a count was taken one way**: `isa-probe.sh` has **20** probe rows and this table had **19**, and the set difference in both directions (`docs/isa-prior-art.md` § 10 ②) is exactly this one row with an empty reverse. 🔴 **And *"all eight columns"*
+is true of THIS assembler and false of the next generation's, 量 2026-09-12**:
+`rsdk-1.5.5`'s `as` (binutils 2.19.92.20091006) rejects `jalx` for `mips1` and
+`mips2` while accepting it for all four Lexra `-march` values it knows. Over
+the six columns the two generations share, that is **the only difference — 118
+of 120 cells agree** — so on 1.5.5 this row *does* discriminate, weakly, where
+on 1.3.6 it discriminates nothing. ⚠️ **Unattributed**: nothing here separates a
+Lexra-patch change from an upstream binutils change between 2.16.94 and
+2.19.92, and reading stock `mips-opc.c` for both is what would.
 - ⚠️ **The ULS row proves nothing.** Every column accepts `lwl`, including
   `lx4180` and `mips1` — the table inherits MIPS-I's unaligned instructions
   everywhere and only ever *subtracts* per core. So the assembler is not evidence
