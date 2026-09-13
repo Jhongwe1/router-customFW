@@ -26,6 +26,21 @@ make qemu  P=probe1   run it under qemu-system-mips -- HARNESS ONLY
 make clean
 ```
 
+🔴 **`RESULT_BASE` has a guard, and it is a parse-time refusal rather than a
+comment.** Each payload's result block sits in DRAM that survives the run, and
+`probe1`'s and `probe2`'s hold `R1d`'s and `R1e`'s measurements — recovered with
+`DW` after their seatings. A payload built onto another's block destroys one.
+`RB_CLASH` refuses that before a single object is compiled, and `probe0` is
+exempt **by measurement**: it writes no block, and the first version of this
+check refused to build it at all.
+
+🔄 **2026-09-13: the list it guards is DERIVED from `PAYLOADS`.** It used to be
+`probe1 probe2 probe3 probe4` written out beside the real population, so a
+payload added to `PAYLOADS` and forgotten there would be built onto another's
+block with no refusal — the exact failure the guard exists to prevent. And the
+other direction has its own refusal: a guarded payload with no `RB_LC_` address
+declared would match nothing, so **the guard would pass by being blind**.
+
 Knobs: `LOADADDR=0x80500000`, `RESET=1`, `CROSS=mips-linux-gnu-`, and for the
 later payloads `RESULT_BASE`, `GEOM`, `GEOM_BASE`. 🔄 **`FLUSH_ISC` was removed on 2026-08-25** — `probe1` cell 4 measured that `Status.IsC` does not isolate on this core and that its byte stores reach DRAM, so the knob stopped being a knob rather than gaining a danger note. What replaced it is `ISC`, which is set per payload in the `Makefile` with `override` and is 1 only for `probe1`, whose cell 4 IS that measurement.
 
