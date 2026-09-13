@@ -25432,6 +25432,33 @@ touch probe4rows.h ; make P=probe4 payload   -> probe4.o 沒有重編
 `R1-pub-2` 用掉 **1 段**,預算是 **2 段**,而**這一段沒有讓 `R1-pub-3` 的上限變鬆** ——
 它的停損是最多兩次 seating(`plan:190`),而它要一次收三顆 payload 加兩個 rider。
 
+### 11. 🔴 推上去之後 census 紅了,而它紅在一個我**斷言**過的數字上
+
+CI run `34745994861`:`lint`／`text`／`instruments` 三個 job 全綠(所以 `spec-check`
+與三支新 suite 都過),紅在 `census` 第 5 步:
+
+```
+NOT-RUN-TOTAL MISMATCH: the table declares 493 and this job did not run 501.
+```
+
+差 **8**,而那正好是 `test-rlxprobe` 從 216 長到 224。那支 suite 在 CI **不跑**,
+它的 skip 是 `everything`、covers 欄等於 declared 欄 —— **所以它每長一個案例,
+`not-run-total` 就要跟著長一個。**
+
+🔴 **而這是一個「兩個 patch」的缺陷,正是這個 repo 反覆記下的形狀。**
+`patch-ci.py` 的 docstring 寫著 *not-run-total does NOT move: all three declare
+`-` for their skip and cover 0* —— **對那三支新 suite 是真的**,它們在任何 runner
+上都跑。然後**另一個** patch 動了 `test-rlxprobe`,而沒有任何東西回去重新導出總數;
+收工的口頭簡報又把 493 當成斷言重述了一次。
+**一個在表停止生長之前寫下的數字,讀起來跟現行的一模一樣。**
+
+🟢 **抓到它的只可能是 census,而這正是它存在的理由** —— `not-run-total` 就是那個
+沒有人會重新導出的數字。修成 **501**,而 8 有兩個獨立來源:runner 自己的算術,
+以及唯一動過的那一列的 delta。`ci-census --self-test` 30/30,含 `C19`(讀真表)。
+⚠️ **這是 census 第二次為了「一支長大的 suite」在這個 repo 上發火。**
+
+### 12. 帶走
+
 五條 carried-forward,全部有擁有者:`CPU-52` 殘留(測得出來的 store-producer 變形)、
 `docs/isa-hazard.md` §7.1(每一列都跑在熱快取上,強制 miss 的原語已經量過而沒用)、
 普查那一列沒拆開、`isapay verify --strict` 對 probe5 是啞的(**乾淨的結果是靠瞎掉通過的**,這句話寫在工具自己的輸出裡)、

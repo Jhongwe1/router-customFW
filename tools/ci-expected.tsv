@@ -3,7 +3,20 @@
 # One row per allowed skip. Tab separated:
 #
 #
-# not-run-total: 493
+# not-run-total: 501
+#   🔄 493 -> 501 on 2026-09-13 (sixty-fourth segment), and ALL EIGHT are
+#   test-rlxprobe growing 216 -> 224 with `G4`. Its skip is `everything`, so
+#   its covers column equals its declared count and every case it gains is a
+#   case CI does not run. The three suites this segment ADDED -- hazpay,
+#   hazdecl, test-hazpay -- contribute 0, because they run on any runner and
+#   declare `-`.
+#   🔴 THE CENSUS CAUGHT THIS AND IT IS THE ONLY THING THAT COULD HAVE. The
+#   segment's own patch reasoned correctly about the three new suites and said
+#   so in its docstring; a SEPARATE patch moved test-rlxprobe, and nothing went
+#   back to re-derive the total. The closeout brief then repeated 493 as an
+#   assertion. `not-run-total` is exactly the number nobody re-derives, which
+#   is why this check exists -- and it is the second time it has fired on this
+#   repository for a suite that grew.
 #   🔄 unchanged at 493 on 2026-09-09 (forty-ninth segment): dtcheck
 #   arrives with 23 self-test controls and 21 cases over the real dt/
 #   tree, and declares NO skip at all. dtc comes from apt and dtschema
