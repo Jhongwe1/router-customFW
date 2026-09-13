@@ -217,8 +217,22 @@ One instruction pair under `R1a`'s bare-metal harness settles it:
 `lw $2,X` / `movz $2,$3,$4` with `$4 != 0`, then read `$2`. If `$2` holds the
 loaded value the implementation is write-enable and `hazlint`'s conservatism can
 be relaxed with a reason; if it holds the pre-load value, **every build of this
-kernel by this toolchain has four latent silent-corruption sites**. Owned by
-`R1a`, and it rides the same payload as `C-12`.
+kernel by this toolchain has four latent silent-corruption sites**.
+
+🔄 **2026-09-13: built, and NOT in the payload this paragraph named.** It said
+*Owned by `R1a`, and it rides the same payload as `C-12`*; `R1a`'s rows are
+single encodings and this one is a SEQUENCE, so it is `R1b`/`probe5`'s `movrd`
+family — `mr_d0` and `mr_d1`, `tools/isa-hazard.tsv`. The encoding is emitted as
+a **word** and not a mnemonic: 量 the same day, `-march=mips1` rejects `movz`
+and `movn` outright (`SPEC.md` `CPU-53`).
+
+🔴 **And that family cannot be read the way every other row in that table is.**
+With the condition false, its interlocked-looking answer means *write-enable*
+and **not** *interlocked* — a core with the load hazard but a write-enable
+conditional move gives the same word as a core with no hazard at all. The row
+that separates them is `lu_alu_d0`, which establishes whether the load hazard
+exists; this one then says whether `rd` is read. `docs/isa-hazard.md` § 3.3.
+⚠️ **Nothing of it has run on the die**: that is `R1-pub-3`.
 
 ### 1.4 🔄 What `hazlint` was not looking at was **0.62 %** of the text, not 40 %
 

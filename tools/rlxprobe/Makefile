@@ -74,6 +74,10 @@ RESULT_BASE_probe3 := 0x80A02000
 # probe4 is clear of probe3's block: probe3 is 718 words from 0x80A02000,
 # i.e. it ends at 0x80A02B38, and probe4's own poison margin starts here.
 RESULT_BASE_probe4 := 0x80A03000
+# probe5 is clear of probe4's block: probe4 is 641 poison words from
+# 0x80A03000, i.e. it ends at 0x80A03A04, and probe5's own margin starts
+# here.  probe5 is 225 poison words, ending at 0x80A04384.
+RESULT_BASE_probe5 := 0x80A04000
 RESULT_BASE?= $(RESULT_BASE_$(P))
 # The 16550. These are the DEVICE's addresses and nothing but qemu-run.sh ever
 # overrides them -- see rlxdefs.h. On this part the registers are four bytes
@@ -118,12 +122,25 @@ ISC_probe3 := 0
 # probe4 writes CP0 Status nowhere on a device build -- the one writer is
 # under RLX_CLEAR_BEV, which is qemu only.
 ISC_probe4 := 0
+# probe5 writes CP0 Status nowhere on a device build either -- the one
+# writer is in p5support.S under RLX_CLEAR_BEV, which is qemu only.  The
+# one CP0 register probe5 DOES write on the device is 14 (EPC), inside the
+# `cp0` family's cells, and `tools/isa-hazard.tsv`'s row for it says why.
+ISC_probe5 := 0
 
 HERE       := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+# This file, BY PATH.  `dep-check` recurses, and a recursion written
+# `$(MAKE)` with no `-f` re-reads `Makefile` whatever file it was invoked
+# from -- so that check could not be tested by substituting a crippled copy,
+# which is exactly how its first negative control came back GREEN against a
+# Makefile with the prerequisite deleted.  A gate that cannot be tested is a
+# gate nobody has shown to be closed.
+THISMK     := $(abspath $(lastword $(MAKEFILE_LIST)))
 HAZLINT    := $(HERE)../hazlint
+HAZDECL    := $(HERE)../hazdecl.py
 BUILD      ?= $(HERE)build
 
-PAYLOADS   := probe0 probe1 probe2 probe3 probe4
+PAYLOADS   := probe0 probe1 probe2 probe3 probe4 probe5
 
 # -march=mips1 needs -msoft-float on gcc 12.4.0, which rejects the flag on its
 # own: "cc1: error: '-march=mips1' requires '-mfp32'".  Measured 2026-08-24;
@@ -191,6 +208,7 @@ RB_LC_probe1 := 0x80a00000
 RB_LC_probe2 := 0x80a01000
 RB_LC_probe3 := 0x80a02000
 RB_LC_probe4 := 0x80a03000
+RB_LC_probe5 := 0x80a04000
 
 # 🔴 THE GUARDED LIST IS DERIVED, 2026-09-13.  It was `probe1 probe2 probe3
 # probe4` written out, beside a `PAYLOADS` list that is the real population --
@@ -236,6 +254,10 @@ SRC_probe3 := start.S uart.S report.c cache.S exc.S cells.S probe3.c
 # this table asked for, which `make show`'s outside-I line would then have
 # to explain.
 SRC_probe4 := start.S uart.S report.c cache.S exc.S p4support.S cells4.S probe4.c
+# probe5 links `probe5rows.c` as its own translation unit rather than
+# including it: `probe5rows.h` then holds declarations only, so nothing in
+# the build has two definitions of the row table.
+SRC_probe5 := start.S uart.S report.c cache.S exc.S p5support.S cells5.S probe5rows.c probe5.c
 SRC        := $(SRC_$(P))
 # The result block's length in words, so `show` prints a DW that reads all of it.
 # 88 was printed for BOTH payloads until 2026-08-25 and is right for neither: it
@@ -286,6 +308,9 @@ RB_WORDS_probe3 := 718
 # check each other -- which is what the four hand-maintained numbers above
 # need `tools/test-rlxprobe.sh` for.
 -include $(HERE)probe4rows.mk
+# probe5's likewise, and 量 on its first build: without this line
+# `make show P=probe5` printed `DW 80A04000 ` with the count EMPTY.
+-include $(HERE)probe5rows.mk
 
 # probe2's build stamp, recomputed here from the same bit positions probe2.c's
 # FLAGS_W uses. It is a SECOND copy of that arithmetic on purpose: the payload
@@ -346,17 +371,121 @@ $(shell mkdir -p $(OBJDIR); echo '$(DEFS) LOADADDR=$(LOADADDR) STACK_SIZE=$(STAC
 $(OBJDIR)/%.o: $(HERE)%.S $(HERE)rlxdefs.h $(OBJDIR)/.flags | $(OBJDIR)
 	$(CC) $(ASFLAGS) -c -o $@ $<
 
-$(OBJDIR)/%.o: $(HERE)%.c $(HERE)rlxprobe.h $(HERE)rlxdefs.h $(OBJDIR)/.flags | $(OBJDIR)
+# 🔴 THE GENERATED HEADER IS A PREREQUISITE, 2026-09-13, and it was not one.
+#
+# 量: `touch probe5rows.h; make P=probe5 payload` did NOT rebuild `probe5.o`,
+# and the same on probe4.  `P5_ROWS` reaches `O_SEAL`, `RB_WORDS`, the sweep's
+# loop bound and BOTH compile-time assertions from inside `probe5.c` -- so a row
+# added to the table regenerated `cells5.S` and `probe5rows.c`, left `probe5.o`
+# compiled against the old count, and linked a 23-row driver over a 24-row table.
+# `make show` would then print a `DW` count from the NEW `.mk`, so a read-back
+# with the printed count runs past or stops short of the seal.
+#
+# It was found by an UNEXPLAINED SHA and not by a checker: the incremental
+# `probe5.bin` hashed differently from a clean build of the same sources, and
+# chasing that rather than shrugging at it is what turned it up.  `dep-check`
+# below is the control, because a prerequisite nobody has shown to be
+# load-bearing is one that gets deleted by accident.
+#
+# Empty for probe0..probe3, which have no generated header, and make is happy
+# with an empty prerequisite.
+GENHDR_probe4 := $(HERE)probe4rows.h
+GENHDR_probe5 := $(HERE)probe5rows.h
+
+$(OBJDIR)/%.o: $(HERE)%.c $(HERE)rlxprobe.h $(HERE)rlxdefs.h $(GENHDR_$(P)) $(OBJDIR)/.flags | $(OBJDIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+# THE CONTROL ON THAT PREREQUISITE.  It touches the generated header, asks make
+# whether the payload's object is now out of date, and RESTORES the mtime it
+# found -- `touch -r`, from a copy taken first, so the working tree is left
+# exactly as it was.  A payload with no generated header reports `skip` and says
+# which one, rather than passing silently.
+dep-check: | $(OBJDIR)
+	@echo '--- dep-check: $(P).o must depend on its GENERATED row header ---'
+	@if [ -z '$(GENHDR_$(P))' ]; then \
+	    echo "  skip   $(P) has no generated header"; exit 0; \
+	 fi
+	@$(MAKE) -f $(THISMK) --no-print-directory BUILD=$(BUILD) P=$(P) $(OBJDIR)/$(P).o >/dev/null
+	@cp -p $(GENHDR_$(P)) $(OBJDIR)/genhdr.mtime
+	@# NOT a plain `touch`: in a fresh BUILD directory the object is written a
+	@# fraction of a second before this line runs, and mtimes here have
+	@# one-second granularity -- so make sees equal timestamps and calls the
+	@# target up to date.  量: green with the default BUILD, FAIL on both
+	@# payloads with BUILD=$$(mktemp -d), with the prerequisite present in both.
+	@# A plain touch tests the clock as much as it tests the dependency.
+	@touch -d @$$(( $$(date +%s) + 5 )) $(GENHDR_$(P))
+	@rc=0; $(MAKE) -q -f $(THISMK) --no-print-directory BUILD=$(BUILD) P=$(P) $(OBJDIR)/$(P).o >/dev/null 2>&1 || rc=$$?; \
+	 touch -r $(OBJDIR)/genhdr.mtime $(GENHDR_$(P)); \
+	 if [ $$rc -eq 0 ]; then \
+	     echo "  FAIL   $(P).o is NOT out of date after touching $(notdir $(GENHDR_$(P)))."; \
+	     echo "         A row added to the table would leave the driver compiled"; \
+	     echo "         against the old row count, and RB_WORDS with it."; \
+	     exit 1; \
+	 fi; \
+	 echo "  ok     $(P).o depends on $(notdir $(GENHDR_$(P))), make -q said out of date"
 
 $(ELF): $(OBJS) $(HERE)rlxprobe.lds
 	$(CC) $(LDFLAGS) -Wl,-Map,$(OBJDIR)/$(P).map -o $@ $(OBJS)
 
-# THE GATE.  Nothing downstream of this exists unless hazlint exited 0.
+# THE STALENESS GATE, and it is a DEFECT FIX for probe4 as much as a new rule for
+# probe5.  Both payloads' cells are GENERATED from a table and NO MAKE TARGET
+# GENERATED THEM: `isapay emit` and `hazpay emit` are run by hand, and
+# `emit --check` was run by nothing at all.  `tools/isapay.py:829` and
+# `cells4.S:4` both say that check "is a case in `tools/test-isapay.py`" -- a
+# file that does not exist -- and CI runs only `--self-test`.  So a stale or
+# hand-edited `cells4.S` built and shipped, with nothing able to say so.
+#
+# 量 2026-09-13: this segment built `cells5.S` from a generator state two edits
+# old for exactly that reason.  The gate's finding on that build was unaffected,
+# which is luck.
+#
+# It does NOT regenerate.  A build that quietly rewrote a committed artefact
+# would destroy the evidence that the artefact and the table ever disagreed;
+# refusing is what makes the disagreement a reading.
+GEN_probe4 := $(HERE)../isapay.py
+GEN_probe5 := $(HERE)../hazpay.py
+GENTSV_probe4 := $(HERE)../isa-payload.tsv
+GENTSV_probe5 := $(HERE)../isa-hazard.tsv
+
+ifneq ($(GEN_$(P)),)
+$(OBJDIR)/$(P).gen: $(GEN_$(P)) $(GENTSV_$(P)) | $(OBJDIR)
+	@echo '--- gate: $(notdir $(GEN_$(P))) emit --check ---'
+	$(GEN_$(P)) emit --check
+	@touch $@
+$(OBJDIR)/$(P).gate: $(OBJDIR)/$(P).gen
+endif
+
+# THE GATE.  Nothing downstream of this exists unless it exited 0.
+#
+# 🔴 probe5 IS THE ONE PAYLOAD WHOSE CELLS CONTAIN THE HAZARDS THIS GATE
+# EXISTS TO REFUSE, ON PURPOSE, and `plan:1038` requires exactly that: the
+# `R1b` load-delay test is `lw` 後緊接讀取同一暫存器, which is word for word
+# `tools/hazlint`'s own definition of a violation.  Nothing in this
+# repository had noticed the collision.
+#
+# The resolution is NOT a waiver and NOT an address window.  `--vma-range`
+# and `--section` are filters that drop silently, which is what the comment
+# under `$(BIN)` already argues against, and they would additionally create
+# a seam at which a load in one window and its consumer in the other would
+# go unchecked.  `tools/hazdecl.py` runs the UNMODIFIED `hazlint` over the
+# WHOLE linked image -- no flags that restrict it -- and adjudicates its
+# output in both directions: every violation must sit at a declared hazard
+# site, every declared site must appear in its declared channel, no padded
+# rung may appear in either, and `hazlint` exiting 0 is a FAILURE, because a
+# probe5 with no violations has had its hazards compiled away -- which is
+# `PROGRESS.md:122`'s risk column.  `hazlint` is not modified, `gate-check`
+# below is not touched, and every other payload's gate is what it was.
+ifeq ($(P),probe5)
+$(OBJDIR)/$(P).gate: $(ELF) $(HAZLINT) $(HAZDECL) $(HERE)../isa-hazard.tsv $(HERE)../hazpay.py
+	@echo '--- gate: tools/hazdecl.py -- hazlint over the whole image, adjudicated both ways ---'
+	$(HAZDECL) $<
+	@touch $@
+else
 $(OBJDIR)/$(P).gate: $(ELF) $(HAZLINT)
 	@echo '--- gate: tools/hazlint on the linked payload ---'
 	$(HAZLINT) $<
 	@touch $@
+endif
 
 # No --only-section here, on purpose.  A hard-coded section list is a filter
 # that drops silently; these two assertions are checks that fail loudly.
@@ -423,10 +552,17 @@ show: $(BIN)
 	@printf 'first word %s   (must be the first instruction of _start)\n' \
 	        "$$($(OBJDUMP) -d $(ELF) | sed -n 's/^ *$(patsubst 0x%,%,$(LOADADDR)):\t\([0-9a-f]*\).*/\1/p' | head -1)"
 	@echo 'reset      RESET=$(RESET)   1 = arm the watchdog and hand the prompt back with no power cycle'
-ifneq ($(filter $(P),probe2 probe3),)
+# 🔴 probe4 AND probe5 ADDED 2026-09-13.  probe4 was in neither of these two
+# filters, so `RB_WORDS_probe4 := 633` -- generated for the express purpose
+# of printing the right `DW` -- had never been printed, and the
+# *** NOT A DEVICE BUILD *** warning had never fired for it.  A qemu-knobbed
+# probe4 image was indistinguishable from a device one in `make show`, on the
+# payload that is about to go to the bench.  `tools/test-rlxprobe.sh` holds
+# zero occurrences of `probe4`, so no existing case changes.
+ifneq ($(filter $(P),probe2 probe3 probe4 probe5),)
 	@echo 'flags      $(FLAGS_HEX)   header word 5, and the banner prints it'
 	@echo 'flush      CCTL 0x002 -- measured sufficient, R1d decision 1. Not a knob'
-	@echo 'isc        ISC=$(ISC)   1 = rlx_isc_inv is linked. probe2/probe3 must be 0'
+	@echo 'isc        ISC=$(ISC)   1 = rlx_isc_inv is linked. probe2 onward must be 0'
 endif
 ifeq ($(P),probe3)
 	@printf 'template   %s .. %s   the two-word victim, GUARD FIRST\n' \
@@ -445,7 +581,7 @@ ifeq ($(P),probe3)
 	@echo '           is upper. rb=80a00000 or rb=80a01000 means this image is a'
 	@echo '           probe1/probe2-based build and is about to poison a measurement.'
 endif
-ifneq ($(filter $(P),probe1 probe2 probe3),)
+ifneq ($(filter $(P),probe1 probe2 probe3 probe4 probe5),)
 	@echo 'result     RESULT_BASE=$(RESULT_BASE)   read it back with: DW $(patsubst 0x%,%,$(RESULT_BASE)) $(RB_WORDS_$(P))'
 ifneq ($(filter $(P),probe1),)
 	@printf 'victims    %s .. %s\n' \

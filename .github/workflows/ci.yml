@@ -800,6 +800,22 @@ jobs:
       - name: isapay
         run: /usr/bin/python3 tools/isapay.py --self-test 2>&1 | tee ci-out/isapay.out; exit "${PIPESTATUS[0]}"
 
+      # `R1b`'s three, 2026-09-13.  `hazpay` generates probe5 and holds the
+      # two-source expectation check; `hazdecl` is probe5's BUILD GATE and its
+      # two pure functions are what run here -- `tools/hazlint` itself needs a
+      # linked ELF and a cross compiler, so the adjudication is tested against
+      # fixtures and the invocation is tested at the desk.  `test-hazpay` is the
+      # mutant runner that says the other two can fail, and it also runs
+      # `emit --check` for BOTH generated payloads, which until today nothing ran.
+      - name: hazpay
+        run: /usr/bin/python3 tools/hazpay.py --self-test 2>&1 | tee ci-out/hazpay.out; exit "${PIPESTATUS[0]}"
+
+      - name: hazdecl
+        run: /usr/bin/python3 tools/hazdecl.py --self-test 2>&1 | tee ci-out/hazdecl.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-hazpay
+        run: /usr/bin/python3 tools/test-hazpay.py 2>&1 | tee ci-out/test-hazpay.out; exit "${PIPESTATUS[0]}"
+
       # The 160-cell prediction in that census's § 8.1, made machine-
       # checkable against the committed assembler matrix.  No assembler
       # runs here: both inputs are committed markdown.

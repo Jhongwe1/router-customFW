@@ -330,6 +330,17 @@ artefact with binutils — the only source here this repository did not write, a
 the one that found that `ll` and `sc` are `lwc0` and `swc0` on a MIPS-I decoder.
 It names what it defers, with the experiment that closes each.
 
+**[`docs/isa-hazard.md`](docs/isa-hazard.md)** — `R1b`'s payload, and it is
+not the same shape: a row here is a SEQUENCE, and the reading is the distance
+at which a consumer stops seeing its producer's stale value. Every row carries
+TWO expected constants, and they are different kinds of claim — the
+interlocked one is the ISA's, the exposed one is a hypothesis about this
+implementation, because MIPS-I says the result is UNPREDICTABLE. 🔴 **Its
+build gate runs the other way round**: the payload contains, on purpose, the
+hazards `tools/hazlint` exists to refuse, so `tools/hazdecl.py` runs the
+unmodified gate over the whole image and adjudicates its output in both
+directions — and there, `hazlint` exiting 0 is a build failure.
+
 **[`docs/rlx-cache-and-cp0.md`](docs/rlx-cache-and-cp0.md)** — what two bare-metal
 payloads measured about the cache and the CP0 file, and the four driver decisions
 each reading unblocks. Three of the four name a measurement; the fourth — whether

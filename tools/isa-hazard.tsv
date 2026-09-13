@@ -1,0 +1,105 @@
+# tools/isa-hazard.tsv -- the population `probe5` probes, one row per rung.
+#
+# THIS IS THE OWNER.  `tools/hazpay.py emit` generates the payload's cells and
+# its row table from this file; nothing else may declare a probed hazard.
+#
+# WHY THIS IS NOT `tools/isa-payload.tsv`.  That table's rows are single
+# encodings and its question is *does this instruction exist and compute the
+# right answer*.  These rows are SEQUENCES and the question is *what does the
+# pipeline do when a consumer follows its producer too closely*.  They need two
+# expected constants where `R1a` needs one, a different verdict vocabulary, a
+# different result-block tag, and a build gate that runs the opposite way round.
+# `plan/router-rebuild-plan.md:1031-1046` is the specification; `R1b`.
+#
+# WHY IT IS A LADDER AND NOT A LIST.  `SPEC.md` `CPU-31`'s residual row (§ 17)
+# writes the shape itself: 裸機上一組 `mult`→`mflo`、`mtc0`→`mfc0`,
+# 中間補 0/1/2 個 `nop`, 看讀值何時開始正確.  So every family appears at several
+# distances, and the reading is the distance at which the value becomes correct.
+# A single rung answers *is there a hazard*; a ladder answers *how deep*.
+#
+# THE TWO CONSTANTS ARE NOT THE SAME KIND OF CLAIM, AND THIS IS THE LOAD-BEARING
+# SENTENCE OF THE WHOLE TABLE.
+#
+#   expect_lock  讀.  Ordinary ISA semantics: what the consumer computes when it
+#                sees its producer's result.  Derivable, and `hazpay model`
+#                derives it independently of this column.
+#   expect_open  推.  MIPS-I says the result of reading too early is
+#                UNPREDICTABLE, so *the consumer sees the register's prior
+#                value* is a hypothesis about THIS IMPLEMENTATION and not a
+#                fact about the architecture.
+#
+# The consequence is in the verdict vocabulary: a row that reads neither
+# constant is `OTHER`, and `OTHER` is NOT a failure.  It means the hazard is
+# open and the mechanism is not the prior value -- a larger finding than `OPEN`,
+# and the reason the payload records the value rather than a boolean.
+#
+# COLUMNS (tab-separated; no `|` anywhere -- `spec-check` C8 counts cells by pipe)
+#
+#   family   which hazard family.  The family owns the instruction SEQUENCE and
+#            the per-row control; this table owns the operands and the distance.
+#            `hazpay population` checks every family named in
+#            `docs/isa-prior-art.md` § 4 has at least one row, so dropping one
+#            is loud.
+#   name     unique.  Becomes the C symbol `rlx_p5_<name>` and the site symbols.
+#   dist     how many instructions sit between producer and consumer.  0 is the
+#            hazard; 1 and up are the same cell with padding, and they are rungs
+#            rather than controls -- the ladder's shape is the result.
+#   kind     haz -> the two constants MUST differ, or the row cannot distinguish.
+#            ctl -> they MUST be equal, because there is nothing to distinguish.
+#            One rule, opposite signs, and the parser enforces both.
+#   in_a     -> $8    hex
+#   in_b     -> $9    hex.  For the load-use families this is ALSO the hazard
+#            register's PRIOR value, which is what `expect_open` is about.
+#   mem0     -> the word at 0($10)   hex
+#   mem1     -> the word at 4($10)   hex
+#   seed     -> $2 before the sequence.  hex
+#   read     which recorded word the two constants are about: gpr / m0 / m1.
+#            `aux` is never here: aux belongs to the per-row control.
+#   lock     expect_lock, above.  讀
+#   open     expect_open, above.  推
+#   ctl      what `aux` must hold on BOTH arms.  The family writes it after the
+#            hazard has settled, and it is what separates *the hazard is open*
+#            from *the producer never produced*.  A row whose ctl reading is
+#            wrong is VOID, not OPEN.
+#   haz      which of `tools/hazlint`'s two channels this rung's hazard site
+#            must appear in.  量 2026-09-13, nine shapes with both controls:
+#            main (the load-use check, exit 1), survey (counted, never a
+#            verdict), both, or none.  `none` is an assertion too -- a padded
+#            rung that shows up in either channel has lost its padding, which
+#            is `PROGRESS.md:122`'s risk column.  `tools/hazdecl.py` checks all
+#            four values in both directions.
+#   qemu     PRE-REGISTERED prediction for the qemu leg.  `lock` for every row,
+#            and the parser refuses anything else: C4
+#            (`plan/DAY-ZERO.md:603`, `plan:1074`) makes the interlocked arm
+#            mandatory, and a row predicting otherwise would be predicting that
+#            qemu has no interlock.
+#   dev      PRE-REGISTERED prediction for the DEVICE arm, or `-` where this is
+#            the measurement.  Only three rows have one and each names its
+#            prior art in `why`.  A `-` here is the honest majority.
+#   why      one line.  No tabs, no pipes.
+#
+family	name	dist	kind	in_a	in_b	mem0	mem1	seed	read	lock	open	ctl	haz	qemu	dev	why
+loaduse	lu_alu_d0	0	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	main	lock	open	THE POSITIVE CONTROL ON THE DEVICE ARM. dev=open is pre-registered from CPU-14, whose only route-1 reading is upstream P9-12 T-89/T-90 on this same physical device and is NOT this repository's. If it reads lock, either that reading was wrong or this cell is broken, and either is the loudest finding this payload can produce
+loaduse	lu_alu_d1	1	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	none	lock	-	THE SHARPEST RUNG IN THE TABLE AND ITS dev IS EMPTY ON PURPOSE. Two vendor sources disagree about this distance and nobody has measured it: upstream P9-12 v2 fixed the failure with TWO nops, while rsdk 1.3.6 emits ONE under -fuse-uls (notes/vendor-toolchains.md 252-255). One of those two beliefs is wrong about this die
+loaduse	lu_alu_d2	2	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	none	lock	lock	dev=lock is pre-registered from upstream P9-12 v2, which is the image that WORKED on this device with two nops and nothing else changed. A reading of open here refutes that single-variable experiment
+storedata	lu_sd_d0	0	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m1	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	main	lock	-	The consumer is a STORE and the loaded register is its DATA. Store data may be read at a later pipeline stage than an ALU operand, so this family can disagree with loaduse and that disagreement would be the result. 量 2026-09-13 that hazlint covers this shape, which is half of what docs/isa-prior-art.md 225 called the class it has no rule for
+storedata	lu_sd_d1	1	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m1	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	none	lock	-	The padded rung. Its reading is only worth something beside its d0 twin, which is why both are here and neither is called a control
+storebase	sb_m0_d0	0	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m0	0xB10CB10C	0xA5A5F00D	0x00000010	main	lock	-	The consumer is a STORE and the loaded register is its BASE, so the reading is WHICH ADDRESS WAS WRITTEN and it lands in memory rather than in a register. CONTAINMENT IS STRUCTURAL AND NOT AN ARGUMENT: the two candidate addresses are scratch+16 and scratch+20, which differ in one bit, so every bitwise mixture of the two words is still one of the two addresses and every outcome is inside the scratch block
+storebase	sb_m1_d0	0	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m1	0x5A5A0FF2	0xB10CB10C	0x00000010	main	lock	-	The same cell read from the other word. The PAIR is the control: sb_m0 and sb_m1 must reach the same verdict, because exactly one of the two addresses can have been written. They disagree only if the store went nowhere or somewhere else, and hazpay verdict voids the family when they do
+storebase	sb_m0_d1	1	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m0	0xB10CB10C	0xA5A5F00D	0x00000010	none	lock	-	The padded rung, read from mem0
+storebase	sb_m1_d1	1	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m1	0x5A5A0FF2	0xB10CB10C	0x00000010	none	lock	-	The padded rung, read from mem1. Its pair control is sb_m0_d1
+hilo	hl_d0	0	haz	0x12345678	0x00000010	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x23456780	0xCAFE0000	0x00000001	survey	lock	-	CPU-29 counts 16 sites in the loader where mult is followed immediately by mfhi or mflo and the board boots, and CPU-31 states the limit in its own words: 數得出來不等於判得出來. in_b is 16 so the product is in_a shifted left four and both halves are checkable by eye. open is the PRIMED LO, and the prime is what turns did-not-move and moved into two readings
+hilo	hl_d1	1	haz	0x12345678	0x00000010	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x23456780	0xCAFE0000	0x00000001	none	lock	-	One instruction after mult. MIPS-I requires two, so a core that is correct here is more permissive than the architecture asks
+hilo	hl_d2	2	haz	0x12345678	0x00000010	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x23456780	0xCAFE0000	0x00000001	none	lock	-	The first architecturally legal distance. A reading of open HERE would mean the vendor compiler is wrong about its own core
+hilo	hl_d3	3	haz	0x12345678	0x00000010	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x23456780	0xCAFE0000	0x00000001	none	lock	-	THIS RUNG EXISTS BECAUSE THE LADDER MUST BE ABLE TO RUN OFF THE END OF THE ARCHITECTURAL REQUIREMENT. If d2 still reads open there has to be a rung beyond it or the table reports a hazard with no measured depth
+cp0	c0_d0	0	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x5A5A5A50	0xA5A5A5A0	0x5A5A5A50	survey	lock	-	CPU-30 counts three sites in the loader where mtc0 is followed immediately by mfc0, the first of them a Status write read straight back, running on every boot. THE REGISTER IS EPC, CP0 14, chosen because it is the only full-width read-write CP0 register on this core that is inert outside an exception return: writing an unidentified CP0 register on the one device this project has is refused by tools/isa-payload.tsv own doctrine, and Status has reserved bits so its read-back would not be a self-contained constant
+cp0	c0_d1	1	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x5A5A5A50	0xA5A5A5A0	0x5A5A5A50	none	lock	-	One instruction after the write
+cp0	c0_d2	2	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x5A5A5A50	0xA5A5A5A0	0x5A5A5A50	none	lock	-	Two instructions after the write, which is what the loader does NOT do at any of CPU-30 three sites
+movcond	mc_d0	0	haz	0x12345678	0x00000000	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x12345678	0xDEADBEEF	0xA5A5F00D	main	lock	-	movn with the CONDITION register freshly loaded. in_b is zero and mem0 is not, so an interlocked core moves and an open one does not. THE ENCODING IS A WORD AND NOT A MNEMONIC: 量 2026-09-13 that -march=mips1 rejects movz and movn outright, which is the same trap docs/toolchain-prior-art.md recorded for madd one segment earlier
+movcond	mc_d1	1	haz	0x12345678	0x00000000	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0x12345678	0xDEADBEEF	0xA5A5F00D	none	lock	-	The padded rung
+movrd	mr_d0	0	haz	0x12345678	0x00000000	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xDEADBEEF	0xA5A5F00D	main	lock	-	TC-h AND THIS ROW READS DIFFERENTLY FROM EVERY OTHER ROW IN THE TABLE. The DESTINATION is the freshly loaded register and the condition is false, so an implementation that only write-enables leaves the load standing while one that read-selects-and-always-writes writes the stale destination back and DESTROYS the load. notes/kernel-build.md 155-160 says this project has never measured which one this die has. lock here means write-enable and NOT interlocked, and lu_alu_d0 is the row that separates them
+movrd	mr_d1	1	haz	0x12345678	0x00000000	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xDEADBEEF	0xA5A5F00D	none	lock	-	The padded rung. With one nop the destination is settled whichever implementation this is, so a reading of open here would refute the whole family
+dslot	ds_d0	0	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	both	lock	-	The load sits in a TAKEN branch delay slot and its consumer is the first instruction at the target. 量 zero of stage2.bin 1474 loads sit in any delay slot, so the vendor code offers no site and this is a payload-only question. It is the one row in both hazlint channels, and its main-check record must say jump target rather than next word -- 量 2026-09-13. NO PROBED INSTRUCTION IS IN THE SLOT, only a load that cannot fault: exc.S advances EPC by four unconditionally and would be wrong about a slot, and Cause is recorded whole so BD is visible if it ever happens anyway
+dslot	ds_d1	1	haz	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xA5A5F00D	0xB10CB10C	0xA5A5F00D	survey	lock	-	The same branch with the consumer one instruction past the target
+storeprod	st_p	0	ctl	0x12345678	0xB10CB10C	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	m0	0xB10CB10C	0xB10CB10C	0xB10CB10C	none	lock	lock	THE ROW docs/isa-prior-art.md 225 SAYS HAS NO SHAPE, AND IT IS A CONTROL RATHER THAN A HAZARD. 量 2026-09-13 hazlint has no rule for a store as PRODUCER on either of the two shapes tried, which is the precise version of that sentence. It is not measurable as a hazard because MIPS-I requires the load to see the store and every program on this die depends on it at population scale, so an observed violation would be a broken payload and not a reading. What it IS is the positive control on the memory observable that storedata and storebase depend on, and its two constants are equal BY DECLARATION which the parser enforces the opposite way round from every other row
+hiloprime	hl_ctl	3	ctl	0x12345678	0x00000010	0xA5A5F00D	0x5A5A0FF2	0xDEADBEEF	gpr	0xCAFE0000	0xCAFE0000	0xBEEF0000	none	lock	lock	THE CONTROL THE QEMU RUN SHOWED WAS MISSING. It primes LO and HI and reads them with NO mult at all, so gpr says mtlo worked and aux says mthi worked. Without it the hilo family open leg is unfalsifiable: mult overwrites both halves, so a prime that never landed and a hazard that is closed produce the same capture, and the row could only ever read LOCK or OTHER. dist is 3 so it sits beyond the architectural mflo window and both machines must agree

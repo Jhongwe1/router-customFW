@@ -147,6 +147,45 @@ ck "gate-check exit code"              0 "$rc"
 ck "the gate refused it"               1 "$(printf '%s\n' "$out" | grep -c 'ok .*the gate refused it, exit 1')"
 
 echo
+echo "=== G4: the GENERATED row header must be a prerequisite of the driver ==="
+# 🔴 It was not, on BOTH generated payloads, until 2026-09-13, and it was found by
+# an UNEXPLAINED SHA rather than by a checker: an incremental `probe5.bin` hashed
+# differently from a clean build of the same sources.  `P{4,5}_ROWS` reaches
+# `O_SEAL`, `RB_WORDS`, the sweep's loop bound and both compile-time assertions
+# from inside the driver `.c`, so a row added to the table regenerated the cells
+# and the row table, left the driver compiled against the OLD count, and linked a
+# 23-row driver over a 24-row table -- while `make show` printed a `DW` count from
+# the NEW `.mk`.  A read-back with that count runs past or stops short of the seal.
+for p in probe4 probe5; do
+    out="$(make -C "$RP" BUILD="$B" P=$p dep-check 2>&1)"; rc=$?
+    ck "dep-check $p exit code"            0 "$rc"
+    ck "dep-check $p says ok"              1 "$(printf '%s\n' "$out" | grep -c "ok .*$p\.o depends on ${p}rows\.h")"
+done
+# a payload with no generated header must SKIP and name itself, not pass silently
+out="$(make -C "$RP" BUILD="$B" P=probe2 dep-check 2>&1)"
+ck "dep-check probe2 skips and names itself" 1 \
+   "$(printf '%s\n' "$out" | grep -c 'skip .*probe2 has no generated header')"
+
+# THE NEGATIVE CONTROL.  A copy of the Makefile with the prerequisite deleted must
+# make the check FAIL.  Its first version came back GREEN because `dep-check`
+# recursed with a bare `$(MAKE)`, which re-reads `Makefile` whatever file it was
+# invoked from -- so the crippled copy's recipe ran against the intact Makefile.
+# `THISMK` is why the recursion now carries `-f`.
+cp "$RP/Makefile" "$RP/.Makefile.g4"
+sed -i 's|GENHDR_$(P)) $(OBJDIR)/\.flags|$(OBJDIR)/.flags|' "$RP/.Makefile.g4"
+ck "G4 control: the prerequisite is gone from the copy" 0 \
+   "$(grep -c 'GENHDR_$(P)) $(OBJDIR)/.flags' "$RP/.Makefile.g4")"
+# `-f` is relative to the directory `-C` moves to: a path-qualified one is
+# resolved a second time and make dies with *No rule to make target*, which is
+# a non-zero exit and would have scored the `refuses it` case green for the
+# wrong reason. The `says why` case beside it is what caught that.
+out="$(make -f .Makefile.g4 -C "$RP" BUILD="$B" P=probe5 dep-check 2>&1)"; rc=$?
+ck "G4 control: the check REFUSES it"   1 "$([ "$rc" -ne 0 ] && echo 1 || echo 0)"
+ck "G4 control: and says why"           1 \
+   "$(printf '%s\n' "$out" | grep -c 'FAIL .*is NOT out of date after touching')"
+rm -f "$RP/.Makefile.g4"
+
+echo
 echo "=== G3: removing the gate must BREAK the build, not skip it ==="
 # A gate you can get past by deleting one file is a lint. Point HAZLINT at
 # something that is not there and the build must fail, not carry on.

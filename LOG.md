@@ -25214,3 +25214,225 @@ CI 新增一步 `isapay`,`ci-expected.tsv` 宣告 **24** 案 covers 0,
 
 **不改歷史**(已推出去的 commit 重寫比這個缺陷本身糟),記在這裡。
 下一段的切法:**產生數字的那個 commit 就要帶 `SPEC.md`**,稽核與紀錄可以留到第二個。
+
+## 2026-09-13 — 第六十四段(14:04 開場,桌面,**不通電**):`R1-pub-2` 收了,一段收掉兩段的預算,而這一段最大的發現是這個 repo 的**建置閘門擋住了它自己計畫書要求做的實驗**
+
+與第六十三段隔 **12 分 30 秒**(`2618af3` 是 13:51:30,開場量到 14:04:00 —— 兩個都是 `date`,不是心算)。
+產物:`tools/isa-hazard.tsv`(24 列母體)、`tools/hazpay.py`(產生器 ＋ 兩源期望值 ＋ 兩源通道 ＋ 桌面判讀,自測 36)、
+`tools/hazdecl.py`(**建置閘門**,十二項檢查,自測 19)、`tools/test-hazpay.py`(22 個突變體 ＋ 兩個 `emit --check`)、
+`tools/rlxprobe/probe5.c` 與 `p5support.S`、生成的 `cells5.S`／`probe5rows.h`／`probe5rows.c`／`probe5rows.mk`、
+`docs/isa-hazard.md`(十節)、`SPEC.md` `CPU-52`／`CPU-53`／`CPU-54` 加兩列殘留改寫、`qemu/2026-09-13/probe5.txt`。
+**零電源、零 `--send`、零 flash 寫入命令**,括號不動 **1,024 / 4,194,304 = 0.0244 %**。
+
+### 0. 開場,三處與簡報不符
+
+三邊日期一致:**2026-09-13 14:04 +08:00**、UTC `06:04`、epoch Git Bash `1789279439` / Windows `…444` / WSL `…452`(差是呼叫順序)。
+
+| | 簡報 | 量到 |
+|---|---|---|
+| 未收的 CI run | 4 | **5**,而且五個都是 `completed success`;第六個 `2618af3` 還 `in_progress` |
+| cell 模板數 | 「五個(`alu`/`hilo`/`machilo`/`branch`/`jr`)」 | **七個** —— TSV 裡還用了 `load` 與 `store`(41/10/9/7/5/2/1) |
+| `R1b` 的六列 | 照計畫書那六列 | **普查 §4 的六列不是同一組** —— 它把「branch delay slot」與「cache 一致性」換成了「load 在 delay slot 裡」與「`movz`/`movn` 的 write-enable 在 load delay slot 裡」 |
+
+簡報的 study 檔名與下一步兩項都正確。CI 沒有紅,簡報擔心的 `census`/`isapay` 沒有發生。
+
+### 1. 🔴🔴 這一段的頭條:**閘門與實驗互相衝突,而 repo 裡沒有任何文件注意到**
+
+`plan:1038` 要求 `R1b` 的 load-delay 測試是「`lw` 後緊接讀取同一暫存器」。
+`tools/hazlint` 對 violation 的定義逐字是「for every load, does an instruction that can execute next read the register that was loaded」。
+**是同一句話。**
+
+而 `tools/rlxprobe/Makefile` 讓 `.bin` 在 hazlint 非 0 時建不出來、選項表裡**沒有任何 waiver**、
+`gate-check` 會在閘門被放寬時讓建置失敗(而且**堅持退出碼必須是 1**,所以「用錯的理由拒絕」也會被抓)、
+`cells.S:69 (a payload that built its victim instructions at)` 又預先封死了執行期產生指令那條路。
+
+**兩條錯的解法,都被既有的文字自己駁掉:**
+①位址視窗 —— 一個寫死的視窗是「會安靜掉東西的過濾器」(Makefile 自己的註解就在譴責 `--only-section`),
+而且它會造出一個**接縫**:一個 load 在視窗 A 的結尾、消費者在視窗 B 的開頭,兩邊都不檢查。
+②資料區 ＋ 執行期 arena —— 對閘門結構性隱形,正是 `mkramboot.py` 那個「比裝置仁慈的模型,會認證裝置一定會拒絕的錯誤」的翻版。
+
+**對的解法比原本嚴:** `tools/hazdecl.py` 讓**未修改的** hazlint 掃**整顆**映像(不帶任何限制範圍的旗標),
+再雙向裁決它的輸出 —— 十二項檢查,`P1` 到 `P12`。
+**而對 probe5 來說 hazlint 退出 0 是建置失敗**:一顆沒有 violation 的 hazard payload,是 hazard 被編掉了的 payload,
+那正是 `PROGRESS.md:122` 的風險欄。`hazlint` 一個字沒改,`gate-check` 一個字沒改,其他每一顆 payload 的閘門一模一樣。
+
+### 2. 🟢 閘門在**第一次真跑**就發火,而且發火在一件真的事情上
+
+`ds_d1`(delay slot 那一族的 d1)被 survey 算進「a load sitting in a delay slot」,而表宣告它是 `none`。
+**錯的是宣告不是 payload**:load 的位置跟 padding 無關 —— padding 加在**分支目標**與消費者之間,不在分支與 load 之間。
+
+那一欄因此改成**兩個來源**(手寫 ＋ `derived_channel` 導出,不一致就拒絕),
+而導出規則一共錯過**兩次**:另一次是 `main` 通道還需要生產者**是一個 load** ——
+`hilo` 的生產者是 `mult`、`cp0` 的是 `mtc0`,兩個都不是,所以那兩族對主檢查在**每一階**都是隱形的,只出現在 `--survey`。
+`H24b` 因此把導出規則**一對一對釘死**:一條錯過兩次的規則需要一張答案表,不是一句話。
+
+### 3. 🟢 `store` 那一列的形狀定義出來了,而普查的措辭是**不準**而不是**空的**
+
+普查 §4 第六列自己寫著「Specifying it is the first thing `R1-pub-2` has to do, before any payload」。
+
+量,九個 fixture、`-march=mips1`、big-endian、對真的 `stage2.bin` 母體控制,正負控制各一個都發火:
+
+| 形狀 | violations | rc |
+|---|:-:|:-:|
+| `lw $9` ; `addu $2,$9,$0` —— 正控制 | **1** | 1 |
+| `lw $9` ; `nop` ; `addu` —— 負控制 | **0** | 0 |
+| `lw $9` ; `sw $9,4($10)` —— store 的**資料** | **1** | 1 |
+| `lw $10` ; `sw $9,0($10)` —— store 的**基底** | **1** | 1 |
+| `sw $9,0($10)` ; `lw $2,0($10)` —— store 當**生產者** | **0** | 0 |
+| 同上而暫存器重疊 | **0** | 0 |
+| `lw $2` ; `movn $2,$8,$9` —— 條件搬移的 `rd` | **1** | 1 |
+| `mult` ; `mflo $2` | **0** | **2 = 拒絕** |
+| `mtc0 $11,$14` ; `mfc0 $2,$14` | **0** | **2 = 拒絕** |
+
+**沒有規則的是 store 當生產者那一側。** 而那一側**不是測不出來而已,是有理由的測不出來**:
+MIPS-I 要求 load 看得見前面同位址的 store,而這顆晶片上每一支程式都靠它(`stage2.bin` 的 1,474 個 load、本機核心的 128,440 個),
+所以**一個觀測到違規的 payload 觀測到的是自己壞了,不是 hazard**。它進表當控制 `st_p`,不當 hazard 列。
+一個**真的測得出來**的變形被點名並延後(store 一個位址、load 同一條 cache line 的另一個位址;鄰居是 `CPU-45`)。
+⚠️ **普查那一列沒有被拆開**:拆開會動到普查的母體,那由 `R1-pub-0` 擁有。
+
+### 4. 🟢 母體是一把**梯子**,而形狀是 `SPEC.md` 自己寫的
+
+`CPU-31` 的殘留列逐字寫著「中間補 0/1/2 個 `nop`,看讀值何時開始正確」。
+所以每一族在數個距離各一階,而**一階的孿生只差 padding** —— `hazpay` 的模板把 body 拆成四塊組起來,所以一階不可能跟它的孿生差別的東西。
+
+**表裡最利的一階是 `lu_alu_d1`,而它的 `dev` 欄故意是空的**:
+上游 `P9-12` v2 修那個 bug 用了**兩個** `nop`,而 rsdk 1.3.6 在 `-fuse-uls` 下只放**一個**
+(`notes/vendor-kernel-isa.md` §252-255)。**兩個廠商來源對同一個距離給了不同答案,而沒有人量過。**
+
+24 列、10 個 family、每列**兩個**期望常數,而它們不是同一種主張:`lock` 是**讀**(ISA 語意),
+`open` 是**推**(MIPS-I 對讀太早只寫 UNPREDICTABLE)。所以判讀有第三格 `OTHER`,而 **`OTHER` 不是失敗** ——
+它的意思是「外露了,而機制不是舊值」,比 `OPEN` 更大條。
+
+### 5. 🟢 C4 成立,而且**先記錄**
+
+`qemu/2026-09-13/probe5.txt`,3,035 bytes,sha256 `f913be43…8388816d`。
+**24 列全部 `LOCK`,事前登記的 `qemu` 欄 24 中 24 命中。** 每一族都「closes at d0」——
+那正是互鎖那一臂該給的空洞答案,而重點是它**先被記錄下來**(普查 §8 的規則)。
+控制:`trapped=0`／`ran=24`／`scratch.bad=0`／`addr0.bad=0`／**`aux.zero=0`**／`break.cause=00000424` → ExcCode 9／
+`install.bad=0`／`restore.mismatch=0`／`epc.end=5a5a5a50` = `EPC_NEW`。
+
+🟢 **而讀那份擷取找到表裡一個真的洞。** `hilo` 族的 `open` 常數是預置的 LO,
+所以若 `mtlo` 沒落地,那一族只會讀到 `LOCK` 或 `OTHER` —— 而「預置沒落地」會被誤讀成「沒有 hazard」。
+qemu 也證明不了它,因為 `mult` 會覆蓋累加器的兩個半邊。
+`hl_ctl` 為此而加:預置 LO 與 HI、**完全不跑 `mult`**、距離放在架構要求之外所以兩台機器必須一致。
+量到 `gpr = cafe0000` 與 `aux = beef0000` —— **`mtlo` 與 `mthi` 都有作用,那一族的 `open` 腿是可否證的**。
+**其他族不需要,而那是量的**:`sb_m0_d0` 讀到 `LOCK` 值 `B10CB10C` **就是**「`$9` 真的拿到 `in_b`」的跨列控制。
+
+🟢 **拿 device 那一臂去評 qemu 的擷取,正確地推翻了 `lu_alu_d0` 的事前登記、確認了另外三個** ——
+那是 `dev` 機制有牙齒的活示範,而且零成本。
+
+### 6. 🔴 兩件既有缺陷,都不是這一段造成的
+
+**①沒有任何東西在檢查產生出來的檔案有沒有過期。** `isapay.py:829 (that check is a case in)` 與
+`cells4.S:4 (that check is a case in)` 都聲稱 `emit --check` 是 `tools/test-isapay.py` 的一個案例 ——
+**那個檔案從寫下那句話的那天起就不存在**,而 CI 只跑 `--self-test`,也沒有任何 make target 產生那些檔案。
+所以一顆過期或被手改的 `cells4.S` 會直接建出來、直接出貨,**而那顆映像正要上機**。
+這一段自己也踩到:改了產生器兩次,建置用的還是改之前的檔案。
+修法兩層:Makefile 現在把 `emit --check` 當成 probe4 **和** probe5 的建置前置條件,而那句話現在指向真的存在的檔案。
+🟢 **而那個註解改動是惰性的,量出來的**:改前改後 `probe4.bin` 的 sha256 都是 `3320c89b…8871ceb`。
+
+**②`make show P=probe4` 是半盲的。** probe4 不在那兩個 `ifneq` 名單裡,所以
+專為印出而產生的 `RB_WORDS_probe4 := 633` 從來沒印過,`*** NOT A DEVICE BUILD ***` 對它也從來沒發火過 ——
+一顆帶 qemu 旋鈕的 probe4 映像在 `make show` 裡跟裝置版長得一樣。
+`tools/test-rlxprobe.sh` 裡 `probe4` 出現 **0** 次,所以加進去不動任何既有案例。
+🟢 **`DW 80A03000 633` 是那個數字有史以來第一次被印出來。**
+同一個形狀在 probe5 上立刻又出現一次(`-include` 只收了 probe4 的 `.mk`,所以 `DW 80A04000 ` 的字數是空的),一起修了。
+
+**③🔴🔴 一個**產生出來的標頭**不是相依,而**兩顆產生型 payload 都有**,而抓到它的是一個
+無法解釋的 sha。** `build/probe5/probe5.bin` 增量建置出來是 `ae5252d8…`,而同一份原始碼
+從乾淨建是 `dc90e6d2…`。追下去:
+
+```
+touch probe5rows.h ; make P=probe5 payload   -> probe5.o 沒有重編
+touch probe4rows.h ; make P=probe4 payload   -> probe4.o 沒有重編
+```
+
+`.c` 的規則列了 `rlxprobe.h` 與 `rlxdefs.h`,**就是沒列產生出來的那個 row 標頭**。
+所以 `P5_ROWS` 從 23 變 24 的時候,`probe5rows.c` 重編了(它自己的原始碼變了),
+而 `probe5.c` 沒變所以 `probe5.o` 沒重編 —— 而 `P5_ROWS` 正是從 `probe5.c` 裡面
+到達 `O_SEAL`、`RB_WORDS`、掃描的迴圈上界與**兩個編譯期斷言**的。
+**連出來的映像是一個 23 列的驅動,壓在一張 24 列的表上。**
+
+🔴 **而這在 probe4 上是活的,而 probe4 正要上機。** 往 `isa-payload.tsv` 加一列會重生
+`cells4.S` 與 `probe4rows.c`,留下對著舊 `P4_ROWS` 編譯的 `probe4.o`,
+而 `make show` 印的 `DW` 字數來自**新的** `.mk` —— 用那個字數讀回來會讀過頭或讀不足,
+而 seal 正是「跑完」與「被截斷」唯一的區別。
+
+🟢 **沒有東西是從那顆過期的映像出去的**:提交的 qemu 擷取來自 `qemu-run.sh` 自己在
+暫存目錄裡的從零建置,而它帶著全部 24 列、包含 `hl_ctl` 的正確讀數。
+🟢 **而那個註解改動是惰性的,量出來的**:舊註解與新註解都建出 `dc90e6d2…`。
+
+修法是把 `GENHDR_$(P)` 加進相依,並加 `dep-check` 當它的控制。
+🔴 **`dep-check` 的第一個負控制回綠** —— 一份把相依刪掉的 Makefile 副本,檢查還是說 ok,
+因為 recipe 裡的 `$(MAKE)` **沒有帶 `-f`**,所以子 make 讀的是真的 `Makefile`。
+**一個測不到的閘門,是沒有人證明它關著的閘門。** `THISMK` 是為此而存在的,
+而修好之後控制兩個方向都成立(真檔 `ok`;刪掉相依的副本 `FAIL` rc=2)。
+`test-rlxprobe.sh` 的 `G4` 是它的八個案例,套件 216 → 224。
+
+🔴 **而它一共要修三次,後兩次都是「因為錯的理由是綠的」。**
+②`dep-check` 在套件裡紅,而相依是在的 —— 套件用 `BUILD=$(mktemp -d)`,
+在一個全新的建置目錄裡 `.o` 寫完不到一秒就被 `touch`,而這裡的 mtime 是
+**一秒解析度**,所以 `make` 看到相同的時間戳就說「最新的」。
+**一個 `touch` 測的是時鐘,跟測相依一樣多。** 改成把標頭的 mtime 明確設到未來。
+③負控制那一臂寫成 `make -f "$RP/.Makefile.g4" -C "$RP"`,而 `-f` 是相對於
+`-C` 進去之後的目錄,所以它找的是 `tools/rlxprobe/tools/rlxprobe/...`、
+死在 *No rule to make target* —— **那是一個非零的離開碼,而「它拒絕了」那一格
+把它算成通過**。抓到它的是旁邊那一格「而且說出理由」,它要求那句 `FAIL` 訊息
+真的出現。**一個控制需要兩格,因為一格只看得到退出碼。**
+
+### 7. 🔴 我這一段自己做錯的五件
+
+1. **解析器連續兩次說謊,而兩次都印出一個數字。** 第一版 `grep -oE '[0-9]+ violation'` 抓到的是 `hazlint`
+   **自己控制項**輸出裡的「Expected: 2 violations」,四格全印 `violations=2`,**包括應該是 0 的負控制**;
+   第二版 `awk '/^VIOLATIONS/'` 沒匹配到,因為那一行縮排兩格,四格全印 `?`。
+   兩次都是靠**退出碼**這個第二來源抓到的。**這直接變成 `hazdecl` 的第一項檢查**(`P1`:解析出來的記錄數必須等於 hazlint 自己印的計數)。
+2. **在 heredoc 裡又嵌了一個 heredoc**,而 `CLAUDE.md` 明文記過那會掉一層反斜線 —— 我的腳本滿是 `\t`。
+3. **Bash 工具的 MSYS 路徑翻譯** ×1(`/mnt/c/...` 變成 `C:/Program Files/Git/mnt/c/...`)。
+4. **PowerShell 引號陷阱 ⑦** ×1(`awk` 的雙引號被吃掉、指令碎掉)。
+5. **`/tmp` 被清掉** ×1 —— 第一次量完 store 形狀之後要回去讀輸出檔,檔案不在了,而 `CLAUDE.md` 記過 distro 在工具呼叫之間重啟。
+
+### 8. 🔴 突變套件第一次跑,20 個全部「殺掉」而其實一個案例都沒執行
+
+**mutant** 是故意把工具改壞一行、要求它的測試套件發現。第一版把改壞的工具複製到一個空的暫存目錄 ——
+但每一支工具都用 `__file__` 的目錄去找資料檔,資料檔不在那裡,所以 20 個突變體全部在跑任何案例**之前**就拒絕了,rc=3。
+**看起來像 20 次擊殺,實際上是 20 次什麼都沒量** —— 這是這個 repo 自己記過的「a suite that REFUSES is fast, and a fast suite looks like a win」把符號翻過來。
+
+**抓到它的是 runner 記錄「是哪一個案例殺掉它」而不是只記有沒有。** 改成影子連結樹(`test-spec-check-mutants.py` 的判例)之後,同一支 runner 接著抓到兩件:
+
+* 一個突變體**活下來了** —— 我把 `P9` 的 **survey** 半邊改壞,沒有任何案例發現,因為 `D10` 只把 padded rung 放進
+  violation 清單那一半。**`hazdecl` 的套件對 `P9` 的另一半沒有案例。** 補了 `D10b`。
+* 補完之後,那個突變體被 `D10b` 殺掉,而我在 runner 裡寫的「應該殺它的案例」還是舊名字,runner 回報 `WRONG`。
+  **同一個突變體,連續兩次告訴我不同的事。**
+
+🟢 另外兩個突變體是被**已提交的那張表**殺掉的(改壞導出規則 → 表的兩源檢查先拒絕),
+比案例更早也更強 —— 所以 runner 有第三種結果 `TABLE`,因為「rc=3 且零案例」也是一支壞掉的工具的樣子。
+
+🟢 **而寫這個套件的時候抓到一個子 agent 報告裡不成立的算術主張**:
+它說 `ROW_WORDS` 是「8、4、12 保住 `1 mod 4`;6 或 10 破壞它」。**不對** ——
+33 是奇數,所以 `33 + W·R` 對**任何偶數** `W` 都是奇數,永遠不可能是 4 的倍數;只有**奇數** `W` 會破壞。
+`H25` 現在用範圍測它而不是用一句話。
+
+### 9. 這一段的數字
+
+| | |
+|---|---|
+| 母體 | **24** 列、**10** 個 family |
+| `hazpay` 自測 | **36/36** |
+| `hazdecl` 自測 | **19/19**,十二項檢查 |
+| `test-hazpay` | **24 ok / 0 bad**(22 突變體 ＋ 2 `emit --check`),**1.9 s** |
+| probe5 | **11,056** bytes,`RESULT_BASE=0x80A04000`,`RB_WORDS = 225`(`33+8×24`,`225 mod 4 = 1`) |
+| 閘門在真產物上 | 266 loads / **7** violations / 0 unresolved / **4** survey 站點 / **14** padded rung 兩通道都不出現 / 24 個距離全部 `4×(dist+1)` |
+| qemu | 3,035 bytes,**24 列全 `LOCK`**,事前登記 24/24 |
+| `test-rlxprobe.sh` | **216 passed / 0 failed**(Makefile 改動沒打壞任何東西) |
+| 閘門 | 十二個全綠,離開碼全部從腳本檔案裡讀 |
+| 上機 | **一列都還沒跑** —— 那是 `R1-pub-3` |
+
+### 10. 帶走
+
+`R1-pub-2` 用掉 **1 段**,預算是 **2 段**,而**這一段沒有讓 `R1-pub-3` 的上限變鬆** ——
+它的停損是最多兩次 seating(`plan:190`),而它要一次收三顆 payload 加兩個 rider。
+
+五條 carried-forward,全部有擁有者:`CPU-52` 殘留(測得出來的 store-producer 變形)、
+`docs/isa-hazard.md` §7.1(每一列都跑在熱快取上,強制 miss 的原語已經量過而沒用)、
+普查那一列沒拆開、`isapay verify --strict` 對 probe5 是啞的(**乾淨的結果是靠瞎掉通過的**,這句話寫在工具自己的輸出裡)、
+`DW` 讀回剖析器兩顆 payload 都還沒寫。

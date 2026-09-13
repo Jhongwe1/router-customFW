@@ -63,6 +63,11 @@ asked for this* and *our instruments derive this* stay distinguishable.
 
 ### Why this is not `tools/isa-census.tsv`
 
+`docs/isa-hazard.md` is this document's sibling for `R1b`/`probe5`, which
+shares this harness and this register map and asks a different question; where
+the two disagree about something both describe, the one whose payload it is
+wins.
+
 `docs/isa-prior-art.md` is the prior-art census (`R1-pub-0`), and its § 0 says
 in its own words that it *"does not claim … that the population is the ISA"*,
 and that *"an instruction this core obviously has, and that the loader executes
