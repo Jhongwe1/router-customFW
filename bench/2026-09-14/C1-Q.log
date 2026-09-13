@@ -1,0 +1,20 @@
+?
+----------------- COMMAND MODE HELP ------------------
+HELP (?)				    : Print this help message
+DB <Address> <Len>
+DW <Address> <Len>
+EB <Address> <Value1> <Value2>...
+EW <Address> <Value1> <Value2>...
+CMP: CMP <dst><src><length>
+IPCONFIG:<TargetAddress>
+AUTOBURN: 0/1
+LOADADDR: <Load Address>
+J: Jump to <TargetAddress>
+FLR: FLR <dst><src><length>
+FLW <dst_ROM_offset><src_RAM_addr><length_Byte> <SPI cnt#>: Write offset-data to SPI from RAM
+MDIOR:  MDIOR <phyid> <reg>
+MDIOW:  MDIOW <phyid> <reg> <data>
+PHYR: PHYR <PHYID><reg>
+PHYW: PHYW <PHYID><reg><data>
+PORT1: port 1 patch for FT2
+<RealTek>
