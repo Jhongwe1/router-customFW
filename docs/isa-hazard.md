@@ -345,6 +345,22 @@ Running `verdict --arm device` against the **qemu** capture refutes `lu_alu_d0`
 and confirms the other three, which is correct — qemu has interlocks. That
 cross-arm run is a positive control on the `dev` scoring and costs nothing.
 
+🟢🟢 **量 2026-09-14 (seating 21), `bench/2026-09-14/C1-P5j.log`: all four hit.**
+`lu_alu_d0` read **OPEN** (`B10CB10C`), `lu_alu_d2` **LOCK** (`A5A5F00D`),
+`st_p` **LOCK** (`B10CB10C`), `hl_ctl` **LOCK** (`CAFE0000`). 🟢 **And the
+cross-arm control fired in the direction that matters**: the same **device**
+capture judged on the **qemu** arm produces **nine** findings, so the device and
+qemu disagree on **9 of 24** rows. *A device run that looks like the qemu run is
+the run that refutes the experiment* — it does not look like it.
+
+🟢🟢 **`lu_alu_d1`, whose `dev` was empty on purpose, is answered: LOCK.** Two
+vendor sources disagreed about that one distance and nobody had measured it —
+upstream's `P9-12` v2 fixed its failure with **two** `nop`s while rsdk 1.3.6
+emits **one** under `-fuse-uls`. **The load-use hazard closes at d1, so rsdk's
+single `nop` is sufficient and upstream's second one was not needed.** That is a
+finding about another project's fix, produced by measurement rather than by
+reading either source again.
+
 ---
 
 ## 6. The controls, family by family
@@ -391,6 +407,25 @@ always says yes*.
    overwrites EPC in hardware and the handler reads the hardware value, so the
    cell's writes cannot mislead the handler. **The bench card must re-confirm
    this rather than inherit it.**
+   🔴🔴 **量 2026-09-14: the card did re-confirm it, and the READ-WRITE half of
+   that premise is REFUTED.** `mfc0 $x, $14` reads EPC and **`mtc0 $x, $14` does
+   not write it** on this die. All three `cp0` rungs read `VOID` with the control
+   word at **`80500270`**, which is neither the written `5A5A5A50` nor the prior
+   `A5A5A5A0` — it is the address of the payload's own `break`, the only one in
+   the image, located by disassembly. Five reads agree (three rows' `out_gpr`,
+   the same three rows' `out_aux`, and the header's `epc.end`), and the three
+   alternatives are closed in the artefact: the emitted word is `408b7000`
+   `mtc0 t3,c0_epc`, `$11` is loaded by `lui`/`ori` immediately before, and all
+   three rows carry `n=0 cause=0` — which `VOID` already implies, because `TRAPS`
+   outranks it. 🟢 **The SAFETY half held exactly as written**: nothing trapped,
+   the handler was not misled, and `epc.end` read from outside every cell agrees
+   with the in-cell reads. So the family's verdict is *not measurable with this
+   register on this part*, with the reason measured rather than argued —
+   `SPEC.md` `CPU-56`.
+   🔴 **And `aux.zero` was blind here.** It tests for *equal to zero*, not *equal
+   to the expected constant*; `80500270` is not zero, so it read 0 while the
+   control was wrong. What caught it is `hazpay verdict`'s per-row `ctl`
+   comparison against the constant. **First time the two came apart.**
 5. **`dslot` puts a load in a branch delay slot and `exc.S` adds 4 to EPC
    unconditionally**, which is wrong in a delay slot. The row is trap-free by
    construction — a `lw` from the scratch block cannot fault on a core with no
@@ -406,6 +441,21 @@ always says yes*.
    store-producer shape the table declares not measurable.
 7. **The `DW` read-back parser is not written**, exactly as `isapay`'s is not.
    The `P5 ` line is the only channel qemu has and the second one on the device.
+   🔄 **2026-09-14: the channel was read, by hand, and `tools/rbcheck.py` is
+   where the tool goes.** Two defects in it were measured at the desk **before**
+   power: its `PROGRESS`/`MAGICS`/`SRC` tables know `probe1`..`probe3` only, so
+   `524C5835` falls through to a `restamp` of `0x10`; and its `UARTSUM` regex
+   matches `sum=` where this payload prints `seal=`, so channel (1) drops out —
+   loudly, because the tool says `absent -- channel (1) did not run`.
+   🟢 **The correct `restamp` is 1, and that is `rbcheck`'s own control `C9`
+   arriving**: both new payloads use `P_RESTORED 0xF0` / `P_SEALED 0xF1`, and
+   because `ladder()` derives the value from the table rather than hardcoding it,
+   extending the table is the whole fix. Done by hand tonight: `seal=D72EB67D` on
+   all three channels, **24 of 24 rows byte-identical between the UART and the
+   `DW` read-back**, and the eight margin words past the seal all poison.
+   ⚠️ The read-back command is `DW 80A04000 233` — `RB_POISON_W`, not the `225`
+   `make show` prints, because `LDR-07` rounds up and `225` shows three of the
+   eight margin words.
 8. **`hazlint`'s survey is a count and this table trusts its ADDRESSES.** 量
    2026-09-13 that the address it prints is the producer's in all three buckets,
    with a fixture that makes each one fire alone. A hazlint that changed which
@@ -488,4 +538,6 @@ addresses when an ELF is given.
 | the payload | `tools/rlxprobe/probe5.c`, `p5support.S` |
 | generated | `cells5.S`, `probe5rows.h`, `probe5rows.c`, `probe5rows.mk` |
 | the qemu leg | `qemu/2026-09-13/probe5.txt` |
-| the numbers | `SPEC.md` `CPU-52`, `CPU-53`, `CPU-54` |
+| the device leg 🆕 | `bench/2026-09-14/` — `C1-P5j` the run, `C1-P5rb` the `DW` channel, `X1-P5j` the off-card second execution |
+| the card | `bench/2026-09-14/PREDICTIONS-B19-block18.md`, corrections in `CORRECTIONS-block18.md` |
+| the numbers | `SPEC.md` `CPU-52`, `CPU-53`, `CPU-54`, `CPU-56` |

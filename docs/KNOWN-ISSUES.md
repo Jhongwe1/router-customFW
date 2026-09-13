@@ -248,7 +248,14 @@ not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
 * 🔴 **`R4`'s loop has never run `S2` to `S7` in one invocation, so its 73.88 s
   is a sum of two runs.** The bench half skipped the build; the desk half
   skipped the board. The one stage untested in a single command is *upload
-  the image the loop just assembled*, and it needs a power cycle. `SEAM-1`.
+  the image the loop just assembled*, ~~and it needs a power cycle~~. `SEAM-1`.
+  🔴🔴 **2026-09-14: and it CANNOT be run at all, which is narrower and worse
+  than needing a power cycle.** The `--image` pre-flight is above the stage loop
+  and requires the file to exist; `S3` is what creates it. Two arms refused with
+  **zero files created**; the control (`--skip S2,S3` with an existing image)
+  passed the same guard and reached `S4`. So the never-run is **structural**, not
+  a scheduling accident, and it cost no power cycle to establish.
+  `notes/dev-loop.md` § 10.6.
 * 🔴 **`looprun --iterations` above 1 is refused, because the loop cannot
   repeat.** `S4` is a loader command and iteration 1 ends with the loader
   gone. A loop that runs once is what exists; `R5` is six drivers. `LOOP-3`.

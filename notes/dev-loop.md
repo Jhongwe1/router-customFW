@@ -712,9 +712,35 @@ of them costing power:
    the board is never touched.** `--control build-fail` already exercises it.
 3. `R4-2` measured the scripted reset 21/21 without the power switch.
 
-**So a no-skip run needs no additional power cycle.** It rides the opening
+~~**So a no-skip run needs no additional power cycle.** It rides the opening
 cold boot of the next seating; what it costs is **39.15 s** of board idle
-(`S2` 35.96 + `S3` 3.19) and one failure mode that consumes no power cycle.
+(`S2` 35.96 + `S3` 3.19) and one failure mode that consumes no power cycle.~~
+
+🔴🔴 **REFUTED at the desk, 2026-09-14 (seating 21), and the refutation is about
+whether the run is POSSIBLE, not about what it costs.** `looprun --mode bench`
+with no `--skip` is refused **before any stage runs**, because the `--image`
+pre-flight sits above the stage loop and requires `os.path.isfile(img)` — and
+**`S3` is what creates that file.** The guard's own message says so:
+*S3 writes `<work>/<label>/kroot/rtkload/nfjrom` and nothing carries that path
+here*. Measured with the board off, output outside the repository, refutation
+condition written first:
+
+| arm | result | files created |
+|---|---|---|
+| no `--image`, no `--skip` | `rc=2`, refused | **0** |
+| `--image` = the path `S3` will write | `rc=2`, `not a regular file` | **0** |
+| control: `--skip S2,S3` + an existing image | **past the same guard**, reached `S4` in 12.25 s | three captures |
+
+**The control is what makes the two arms mean anything**: the same guard admits
+an existing file and lets the tool touch the board. So
+`docs/GATE-RESULTS.md`'s *71 of 71 real `--mode bench` invocations carried
+`--skip`* is not a discipline finding — **the tool is structurally unable to do
+it.** And 讀 `tools/looprun.py:644`: the `--image-sha256` pin is checked above
+the same loop, so on a no-skip run it pins the file `S3` is about to overwrite.
+
+⚠️ **The repair is carried forward rather than done here**: the image pre-flight
+has to move to after `S3` when `S3` is in the plan, and `--image-sha256` must
+then be refused or moved with it. Owner: `R4`/`R5`.
 
 **Decision: `R5`'s first bench iteration runs without `--skip S2,S3`.**
 
@@ -724,6 +750,9 @@ objects to keep and `INC-2`'s win is entirely on the desk side
 
 🔴 **A decision is not a reading.** What is closed is *whether to*; `SEAM-1`'s
 measurement waits for the seating, and its card carries the row.
+🔴 **2026-09-14: `SEAM-1` has a reading and it is NEGATIVE — see the struck
+paragraph above.** It cost **zero power cycles**, which is the one thing this
+carried-forward row and § 11 both got right about it.
 
 ---
 

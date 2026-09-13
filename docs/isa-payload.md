@@ -279,6 +279,35 @@ because the value that was thrown away is the one that turns out to be needed.
 | C3 | the four `cache` op values must **not** trap, in the same capture | 量 same boot |
 | C4 | the qemu arm, run and recorded first | `plan/DAY-ZERO.md:603` |
 
+🟢🟢 **量 2026-09-14 (seating 21), `bench/2026-09-14`: every one of them held.**
+The `baseline` group read **`RIGHT` on all seven rows** (`add`, `lw`, `sw`,
+`mult`, `mult_hi`, `beq`, `jr`); `break.count=00000001` with
+`break.cause=00000024` → ExcCode 9; **`special0e` trapped with ExcCode 10**, so
+the table is not void; and the four `cache` values retired in the same capture
+with `n=0`, so *does not trap* is a reading rather than a dead handler. Tally
+over 75 rows: **RAN 16, RIGHT 16, TRAPS 42, WRONG 1.** Two rounds, 75 row lines
+and 18 header fields byte-identical, and the `DW` channel agrees word for word
+with `seal=AF7A728B` on all three channels.
+
+### 🔴🔴 The `WRONG` cell is observed, and the value was written down first
+
+`rotr` read **`00123456`** where the table expects **`78123456`**, with no
+exception. Input `12345678`, shift 8: a rotate gives `78123456`, a logical shift
+right gives `00123456`. The encoding is `0x00291202` — SPECIAL with `rs=1`, and
+that one bit in the `rs` field is the whole difference between `rotr` and `srl`.
+**This core ignores it and executes `srl`.**
+
+🟢 **`tools/isa-payload.tsv`'s own `why` for that row said so before the board was
+powered**: *a core that ignores it computes srl and answers 0x00123456, which is
+the WRONG cell doing its job*. The value, the mechanism, and the reason the row
+exists were all pre-registered, and the device delivered all three.
+
+🔴 **This is the first-hand evidence for `CLAUDE.md`'s ban on `-march=mips32`.**
+That rule's stated reason is *mips32 miscompiles silently — no fault, no warning,
+just wrong values*, and until tonight it was inherited rather than measured on
+this die. ⚠️ **It is one encoding, not a claim about mips32 as a whole**: the
+population is these 75 rows and `WRONG` is 1 of 75.
+
 C1, C2 and C3 together are what make a zero mean something: C1 and C2 prove the
 handler catches, C3 proves it does not catch everything, and both halves are in
 one capture on one boot.
@@ -409,3 +438,15 @@ it writes register zero and only the base is chosen.
   on the device. The loader-side parser is `R1-pub-3`'s, and writing it now
   against a capture that does not exist would be a second implementation of a
   format nobody has read yet.
+  🔄 **2026-09-14: the capture exists now, and the channel was read by hand.**
+  `DW 80A03000 641` — `RB_POISON_W`, not the `633` `make show` prints, because
+  `LDR-07` rounds up and `633` shows three of the eight margin words while a
+  payload that overran its block writes **upward** from the seal. Reply 7,593
+  bytes, exactly `tools/reply-size.py`'s prediction. **All three channels read
+  `AF7A728B` and 75 of 75 row lines are byte-identical between the UART and the
+  read-back**; the eight margin words are all poison. The tool that should do
+  this is `tools/rbcheck.py`, and **it cannot yet** — two defects measured at the
+  desk before power: its payload tables know `probe1`..`probe3` only, and its
+  `UARTSUM` regex matches `sum=` where `probe4` prints `seal=`. Extending it is
+  carried forward with tonight's capture as its on-device anchor, which is the
+  `C16`/`C39` pattern.

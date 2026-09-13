@@ -83,6 +83,7 @@ number two sources disagree about is not an index, it is a fourth defect.
 | `2026-09-09` | 85 | `CORRECTIONS-block15.md` (+1) | block 15, seating 18, 2026-09-09 |
 | `2026-09-09b` | 39 | `CORRECTIONS-block16.md` (+1) | block 16, seating 19, 2026-09-09 |
 | `2026-09-10` | 169 | `CORRECTIONS-block17.md` (+1) | block 17, seating 20, 2026-09-10 |
+| `2026-09-14` | 14 | `CORRECTIONS-block18.md` (+1) | block 18, seating 21, 2026-09-14 — `R1-pub-3` slot 1, both payloads on one power cycle |
 
 ⚠️ **Two directories are named for a day none of their captures happened on**
 and may not be renamed — `2026-08-30` and `2026-08-30b`, both holding captures
