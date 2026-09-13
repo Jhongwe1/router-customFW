@@ -78,6 +78,24 @@ toolchain on this disk:
 
 ## 2. The table
 
+🔴 **The plan specifies this table's rows, and a deliverable that does not map
+onto its own specification cannot be checked against it.**
+`plan/router-rebuild-plan.md:389` is a three-row table headed *what to measure /
+how / why this row is on the table*. Here is each row, where it is answered, and
+whether it is finished:
+
+| the plan's row | how the plan says to measure it | answered in | finished |
+|---|---|---|---|
+| **load-delay handling** — the plan's own note on it is *the only cell that can kill the project silently* | `R1f`'s fragment, compiled once per toolchain, **all three run on the silicon** | § 2.2 and § 3 | 🔴 **desk yes, silicon 1 of 3** |
+| **`lwl`/`lwr` generation** | a small program containing an unaligned access, counted by disassembly | § 2.3 | 🟢 yes, and by the method the plan names |
+| **size, and which hardening flags are available** | compressed rootfs size; whether `-fstack-protector[-strong]` and `_FORTIFY_SOURCE` are there | § 2.4 for the flags, § 2.1 for the sizes | ⚠️ **flags yes, compressed rootfs size NOT measured** |
+
+⚠️ **The third row's size half is about a root filesystem and this table has
+none.** § 2.1 gives `vmlinux` and `boa` sizes, which are what this repository has
+built three of; the plan's figure is a *compressed rootfs* and it feeds `R7`'s
+budget. It is named here rather than quietly substituted, because a size that
+answers a different question is the shape § 5 spends five items on.
+
 Cells are 量 at the desk unless marked. A cell that is a committed reading names
 its owner; a cell taken on 2026-09-13 for this file is marked 🆕.
 

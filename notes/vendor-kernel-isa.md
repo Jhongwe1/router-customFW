@@ -721,6 +721,10 @@ of 120 cells agree** — so on 1.5.5 this row *does* discriminate, weakly, where
 on 1.3.6 it discriminates nothing. ⚠️ **Unattributed**: nothing here separates a
 Lexra-patch change from an upstream binutils change between 2.16.94 and
 2.19.92, and reading stock `mips-opc.c` for both is what would.
+🔄 **2026-09-13: two of the three candidates are measured out and the third
+is not on this disk** — the public Lexra patch holds zero `jalx` lines and
+upstream's own change is later and permissive. `docs/KNOWN-ISSUES.md` owns
+that reading; this row points at it rather than restating it.
 - ⚠️ **The ULS row proves nothing.** Every column accepts `lwl`, including
   `lx4180` and `mips1` — the table inherits MIPS-I's unaligned instructions
   everywhere and only ever *subtracts* per core. So the assembler is not evidence

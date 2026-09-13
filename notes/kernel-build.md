@@ -112,6 +112,19 @@ two single-variable deltas:
   violations.
 * **generation alone**, `-march` held at 5281: **20,201 → 21,185**, +4.9 %.
 
+🔴 **2026-09-13 (`R1-pub-6`): the first of those two is not verifiable as
+single-variable from what is committed, and the reason is a LABEL.** There are
+two rsdk-1.3.6 releases; 量 at desk scale on one C file, their raw drivers are
+byte-identical at `-march=4181` and differ at `-march=5281`, where `hazlint`
+reads **425/0/162** and **424/0/147**. `arch/rlx/Makefile` sets
+`CROSS_COMPILE := rsdk-linux-` and the 4181 release's wrapper refuses
+`-march=5281`, so the 5281 `vmlinux` above cannot have come from it — and
+neither this file nor `notes/vendor-toolchains.md` records which one built it.
+⚠️ **This does not say the delta is wrong**; it says the label *1.3.6* covers
+two code generators that are measurably different on exactly the axis the
+delta is about. `PROGRESS.md` `TC-q` owns the open question, and closing it
+costs three kernel builds rather than three objects.
+
 **So reason 2 of Decision A is about the `-march` and not about the vintage of
 the compiler** — which matters, because Decision A picks the *older* generation
 and the shipped firmware was built by the newer one. `K2` is satisfied in the
