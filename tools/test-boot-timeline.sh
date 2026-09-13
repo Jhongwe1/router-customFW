@@ -259,7 +259,36 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # seating changes DATA, and data
 # is what these cases assert on, so after a seating run every suite that can
 # run on this host* -- and it was read past again.
-ck "thirty-four cold, one hundred and forty-one warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 34 cold, 141 warm, 0 unknown')"
+# 🔄 34/141 -> 35/145 on 2026-09-14 (seating 21, `bench/2026-09-14`), which is
+# ONE cold power-on and FOUR warm resets -- the smallest single-seating delta
+# this case has taken, because the seating ran two bare-metal payloads and no
+# kernel.  The cold one is `C1-A`, the 150 s ESC window the operator pressed
+# power inside.  🟢 **The four warm ones are the four payload bites**, and that
+# is a reading the card did not predict: `C1-P4j`, `C1-P5j`, `X1-P4j` and
+# `X1-P5j` each carry the loader's `Reboot Result from Watchdog Timeout!` INSIDE
+# the same capture as the payload's report, because every one of those cells
+# carried `--esc-after` and caught the loader on the way back.  So `RESET=1`
+# actually happened four times, confirmed by the loader's own line rather than
+# by the prompt returning.  Isolation check, run before this line was touched:
+# every directory EXCEPT `2026-09-14` still reports **34 cold, 141 warm**, and
+# `2026-09-14` alone reports **1 cold, 4 warm** -- so the delta is exactly +1/+4
+# and nothing was reclassified.
+# ⚠️ The seating's other 9 captures produce no row and the tool says
+# `9 capture(s) produced no row; 0 of them hold boot text` -- they are `DW`
+# replies and the `?` help text taken at the loader prompt, so having no boot
+# line is correct, and the `0 of them hold boot text` half is what makes that a
+# reading rather than an assumption.
+# 🟢 And one number that came free: within this one power cycle the cold
+# `booting` interval is **0.3464 s** against four warm ones spanning
+# **0.3445 .. 0.3524 s**, so `cold - max(warm) = -0.0060 s` -- the cold boot is
+# NOT the slow one here, which is the opposite of what a reader would guess and
+# is why the tool prints the within-one-power-cycle line at all.
+# 🔴 THIS IS THE THIRD TIME `CLAUDE.md`'s rule has fired on this suite, and the
+# full sweep is what caught it: `tools/desk-sweep.py run` reported
+# `73 green, 2 expected-red, 1 unexpected` with this suite as the one, while a
+# `--only` run over the suites whose CODE changed would have been green --
+# nothing in this file changed, only the data it asserts on.
+ck "thirty-five cold, one hundred and forty-five warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 35 cold, 145 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
