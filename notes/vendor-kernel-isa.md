@@ -708,7 +708,14 @@ What it settles, and what it does not:
   discriminating fact.
 - 🔴 **`ll`/`sc`: the two vendor sources disagree.** The assembler accepts them
   for `rlx4181`; `boards/rtl8196e/config.in` says `ARCH_CPU_LLSC=n` and this
-  unit's kernel has none. Not resolved. The reading that fits both is that these
+  unit's kernel has none. Not resolved. 🔄 **2026-09-13: a third thing is now
+  known about that pair and it is about the ENCODING rather than the sources.**
+  Opcode `0x30` is `lwc0` in MIPS-I and was reassigned to `ll` at MIPS-II;
+  `0x38` is `swc0`/`sc`. This core is MIPS-I, so **a bare-metal probe finding
+  that encoding does not trap would not show `ll` exists** -- it could be
+  `lwc0` executing. `SPEC.md` `CPU-49` owns that reading and
+  `docs/isa-payload.md` § 8 owns what it costs; this row does not restate
+  either. The reading that fits both is that these
   cores are synthesisable and LL/SC is an option of the *instance*, while
   `-march` describes the *family*; that is inferred, and it is written here as a
   disagreement rather than as a conclusion.

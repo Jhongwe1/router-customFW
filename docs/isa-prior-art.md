@@ -403,7 +403,7 @@ cannot be read as *"therefore everything else is reserved"* — MIPS16 needs
 `JALX` at opcode `0x1D`. The control's job is to prove the instrument, and for
 that the die's behaviour is the whole requirement.
 
-**Decision, the three controls `R1-pub-1` through `-3` carry:**
+**Decision, the ~~three~~ **FOUR** controls `R1-pub-1` through `-3` carry:** 🔄 **2026-09-13: corrected in place.** The caption said *three* and the table below it has always listed four; `R1-pub-1` implemented all four and the count was read off the table rather than off this line, so the prose was wrong and harmless until somebody quoted it.
 
 | | control | what it proves | precedent |
 |---|---|---|---|
@@ -615,8 +615,8 @@ section filter**, which is what would make it clean.
   ⚠️ They are deliberately **not** added to this census: it was frozen with an
   ordering property, and growing its population by 36 % on evidence from the
   toolchain axis would muddy the only thing that makes it worth anything.
-  Whether they become `R1a` payload rows is `R1-pub-1`'s decision, and the
-  number it needs now exists. `docs/toolchain-prior-art.md` § 7 ⑦.
+  ~~Whether they become `R1a` payload rows is `R1-pub-1`'s decision, and the
+  number it needs now exists.~~ 🔄 **2026-09-13: the decision is made and it is THIRTEEN of the fourteen.** `probe4` carries `madh` `madl` `mazh` `mazl` `msbh` `msbl` `mszh` `mszl` `ltw` `udi0i` `udi1i` `udi2i` `udi3i`, plus six more the same patch adds (`udi0`..`udi5`) that this list did not name. **`sleep` is excluded by name**: a bare-metal payload that sleeps does not come back. 🔴 **And the encodings are NOT the ones a reader would take from the mnemonics** -- the eight MAC names appear twice in that patch, once at 16-bit encodings in `mips16-opc.c` (mask `0xf81f`) and once at 32-bit in `mips-opc.c` (mask `0xFC00FFFF`), and only the second set is what a 32-bit payload can issue. This census is still not grown: the rows live in `tools/isa-payload.tsv` and `isapay population` joins the two in both directions. `SPEC.md` `CPU-50`, `docs/isa-payload.md` § 9. `docs/toolchain-prior-art.md` § 7 ⑦.
 * **Route ② rests on *no exception message in a capture*.** That is an absence,
   and an absence in a capture is only as strong as the capture's coverage.
   `SPEC.md` `CPU-17` says eighteen captures; `FW-41` and `FW-47` measured two

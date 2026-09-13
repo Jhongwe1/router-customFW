@@ -321,6 +321,15 @@ or more columns, and it says at the top that it does not close `R2c`: the row
 the plan calls the only one that can kill the project silently is filled at the
 desk in all three columns and on the die in one.
 
+**[`docs/isa-payload.md`](docs/isa-payload.md)** — `R1a`'s payload: 75
+encodings, one row each, and three verdicts — traps with its `ExcCode`, does not
+trap and is right, or 🔴 does not trap and is **wrong**, which is the cell a
+payload that compares in-place throws away. Every encoding is derived three ways
+and every expected constant twice, the last of them by disassembling the built
+artefact with binutils — the only source here this repository did not write, and
+the one that found that `ll` and `sc` are `lwc0` and `swc0` on a MIPS-I decoder.
+It names what it defers, with the experiment that closes each.
+
 **[`docs/rlx-cache-and-cp0.md`](docs/rlx-cache-and-cp0.md)** — what two bare-metal
 payloads measured about the cache and the CP0 file, and the four driver decisions
 each reading unblocks. Three of the four name a measurement; the fourth — whether

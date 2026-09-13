@@ -791,6 +791,15 @@ jobs:
       - name: tccensus
         run: /usr/bin/python3 tools/tccensus.py --self-test 2>&1 | tee ci-out/tccensus.out; exit "${PIPESTATUS[0]}"
 
+      # `R1-pub-1`'s instrument.  probe4's cells are GENERATED from
+      # tools/isa-payload.tsv, and this is the half of that which runs
+      # without a cross compiler: the table's own rules, the encoding
+      # check against the fields column, the expectation check against
+      # an independent model, and unit tests of the two predicates that
+      # need an artefact at the bench.
+      - name: isapay
+        run: /usr/bin/python3 tools/isapay.py --self-test 2>&1 | tee ci-out/isapay.out; exit "${PIPESTATUS[0]}"
+
       # The 160-cell prediction in that census's § 8.1, made machine-
       # checkable against the committed assembler matrix.  No assembler
       # runs here: both inputs are committed markdown.
