@@ -813,6 +813,18 @@ jobs:
       - name: hazdecl
         run: /usr/bin/python3 tools/hazdecl.py --self-test 2>&1 | tee ci-out/hazdecl.out; exit "${PIPESTATUS[0]}"
 
+      # `R1f`/`R2c`'s one, 2026-09-14.  `tcpay` generates probe6 -- ten builds of
+      # one C fragment by four toolchains -- and is ALSO its build gate, the same
+      # inverted shape `hazdecl` has for probe5: `hazlint` exiting 0 on that
+      # payload is a build FAILURE.  What runs here is the pure half: the table's
+      # eight refusals, the emitter, the hazlint-output parser (including the
+      # case that it must NOT read a number off a control line), and four cases
+      # that drive the tool as a subprocess to read its exit code.  `gate` and
+      # `verify` need a linked ELF and a cross compiler and are the desk half,
+      # split out for exactly `isapay` T19's reason.
+      - name: tcpay
+        run: /usr/bin/python3 tools/tcpay.py --self-test 2>&1 | tee ci-out/tcpay.out; exit "${PIPESTATUS[0]}"
+
       - name: test-hazpay
         run: /usr/bin/python3 tools/test-hazpay.py 2>&1 | tee ci-out/test-hazpay.out; exit "${PIPESTATUS[0]}"
 

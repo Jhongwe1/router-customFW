@@ -84,6 +84,7 @@ number two sources disagree about is not an index, it is a fourth defect.
 | `2026-09-09b` | 39 | `CORRECTIONS-block16.md` (+1) | block 16, seating 19, 2026-09-09 |
 | `2026-09-10` | 169 | `CORRECTIONS-block17.md` (+1) | block 17, seating 20, 2026-09-10 |
 | `2026-09-14` | 14 | `CORRECTIONS-block18.md` (+1) | block 18, seating 21, 2026-09-14 — `R1-pub-3` slot 1, both payloads on one power cycle |
+| `2026-09-14b` | 7 | `CORRECTIONS-block19.md` (+1) | block 19, seating 22, 2026-09-14 — `R1f` ＋ `R2c`'s silicon row, ten compilers in one payload |
 
 ⚠️ **Two directories are named for a day none of their captures happened on**
 and may not be renamed — `2026-08-30` and `2026-08-30b`, both holding captures

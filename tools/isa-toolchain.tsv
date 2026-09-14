@@ -1,0 +1,113 @@
+# tools/isa-toolchain.tsv -- the population `probe6` runs, one row per build.
+#
+# THIS IS THE OWNER.  `tools/tcpay.py emit` generates the payload's thunks, its
+# row table and its per-variant compile rules from this file; nothing else may
+# declare a probed build.
+#
+# WHAT THIS TABLE ASKS, AND WHY IT IS NEITHER OF THE OTHER TWO
+#
+#   `tools/isa-payload.tsv`   one encoding per row.  Does this instruction exist
+#                             on this die, and does it compute the right answer?
+#   `tools/isa-hazard.tsv`    one hand-written SEQUENCE per row.  What does the
+#                             pipeline do when a consumer follows its producer
+#                             too closely?
+#   this file                 one COMPILER INVOCATION per row.  Given a core
+#                             whose load-use hazard is measured OPEN at distance
+#                             0, does the code this compiler emits for ordinary
+#                             C read the stale value?
+#
+# The first two ask about the die.  This one asks about the die AND a toolchain
+# at the same time, and that is the whole of `R1f` and of `R2c`'s silicon row.
+# `plan/router-rebuild-plan.md:1063-1068` (`R1f`) and `:1140-1141` (`R2c`, the
+# row that says all three toolchains must reach silicon).
+#
+# THE FRAGMENT IS ONE LINE AND IT WAS CHOSEN BY REFUTATION, NOT BY TASTE.
+#
+#   tools/rlxprobe/frag.c:   void rlxf(volatile unsigned *d,
+#                                      volatile const unsigned *s) { *d = *s; }
+#
+# 量 2026-09-14, at the desk, before power.  The first fragment tried was
+# `*p ^ seed`, and gcc filled the load delay slot with `jr ra` in ALL NINE
+# configurations -- the hazard was never present to be exposed.  That is
+# `PROGRESS.md:122`'s stated risk ("a hazard test the compiler has already
+# fixed") arriving as a measurement, and `SPEC.md` `TC-07` had recorded the same
+# shape two weeks earlier.  Seven candidates were swept with `tools/hazlint`;
+# this is the only one that is (a) split by `-march` in every column and (b) has
+# ZERO unresolved successors in every column, so `hazlint` can gate it whole.
+#
+# WHY IT CANNOT TRAP, WHICH IS THE HALF THE PLAN ASKS ABOUT.  The fragment
+# compiles to `lw` + `sw` and nothing else in every column below.  Neither is a
+# MIPS32 addition, so no row here can produce the loud failure `probe4` measured
+# for `clz`/`clo`/`mul` (`bench/2026-09-14/C1-P4j.log`, ExcCode 10).  A wrong
+# answer here can only be a SILENT one, which is what
+# `plan/router-rebuild-plan.md` calls 錯誤,且沒有任何警告或 fault.
+#
+# THE PREDICTION IS A COMPOSITION OF TWO MEASUREMENTS AND NEITHER IS NEW
+#
+#   desk    `SPEC.md` `TC-15` 量: the exposed-`-march` set (4180 4181 5181
+#           mips1) pads the load delay slot and the non-exposed set (5280 5281
+#           4281 mips2 mips32) does not.
+#   silicon `SPEC.md` `CPU-14` 量 seating 21, `bench/2026-09-14/C1-P5j.log`:
+#           `lu_sd_d0` reads OPEN -- a store whose DATA operand is the register a
+#           load wrote one instruction earlier stores the register's PRIOR value.
+#
+# So a row's device prediction follows from its `pad` column and from nothing
+# else, and `pad` is itself checked against the artefact by `tcpay verify`.
+# **That is what makes this refutable rather than a rehearsal**: a row whose
+# build says `nopad` and whose device answer is `lock` refutes `CPU-14` under
+# compiler-generated conditions, and a row whose build says `pad` and whose
+# device answer is `open` refutes the harness.
+#
+# COLUMNS (tab-separated; no `|` anywhere -- `spec-check` C8 counts cells by pipe)
+#
+#   vid      the row id.  `v*` is a compiled variant, `c*` a hand-written
+#            control.  Used as the thunk's symbol suffix and printed in the
+#            report, so it must be [a-z0-9_]+.
+#   tc       toolchain key.  `T4` is the host cross-compiler every payload this
+#            project has ever run on this die was built with, and it is in the
+#            table as the INSTRUMENT'S OWN CONTROL, not as a fourth column of
+#            `R2c`.  `T1`..`T3` are the three rsdk releases `R2c` names.
+#            `--` for a hand-written control, which no compiler produces.
+#   march    the `-march=` value handed to that driver.  `--` for a control.
+#   pad      `pad` if the compiler is predicted to put an instruction between
+#            the `lw` and the `sw`, `nopad` if not.  讀 for the compiled rows
+#            (`TC-15`), and 量 by `tcpay verify` on every build.
+#   expect   the device prediction: `lock` (the store writes the LOADED value)
+#            or `open` (it writes the register's prior value).  Derived from
+#            `pad` plus `CPU-14`; it is NOT an independent guess.
+#   why      one sentence.  What this row is for, and what its refutation means.
+#
+# THE TWO CONTROLS ARE NOT OPTIONAL AND THEY RUN IN OPPOSITE DIRECTIONS
+#
+#   c_lock   hand-written `lw ; nop ; sw`.  MUST read `lock`.  If it does not,
+#            the thunk is not priming the sentinel, or the scratch words are not
+#            what the payload believes, and every `open` below is unattributable.
+#   c_open   hand-written `lw ; sw`, which is `isa-hazard.tsv`'s `lu_sd_d0` with
+#            this payload's own operands.  MUST read `open`.  If it does not,
+#            this die's d0 is not open TODAY and no compiled row can be read as
+#            evidence about a compiler -- the table is void, not partly valid.
+#
+#   Together they are `plan:1074`'s two halves: the positive control establishes
+#   that a correct build reads correctly, the negative that this payload can
+#   observe the wrong answer at all.  `tcpay.py`'s `check_controls` enforces
+#   both and refuses a verdict without them.
+#
+# THE THIRD CONTROL IS NOT IN THIS FILE.  Under qemu every row must read `lock`,
+# because qemu interlocks.  A qemu run that reproduces the device's `open` rows
+# means the harness is reading something other than the hazard.  `tcpay verdict
+# --arm qemu` enforces it and it is the forced anti-control, the same shape as
+# `hazpay`'s `C4`.
+#
+vid	tc	march	pad	expect	why
+c_lock	--	--	pad	lock	POSITIVE CONTROL. Hand-written lw nop sw with this payload's own operands. A correct build reads the loaded value; if this row does not, nothing below is attributable.
+c_open	--	--	nopad	open	NEGATIVE CONTROL. Hand-written lw sw. isa-hazard.tsv lu_sd_d0 with these operands. Shows this payload can observe the wrong answer at all; if it reads lock the table is void.
+v1	T4	mips1	pad	lock	THE INSTRUMENT'S OWN CONTROL. Every payload that has ever executed on this die was built exactly here. A refutation of this row is a refutation of probe4 and probe5 as well.
+v2	T4	mips2	nopad	open	The smallest step off the exposed side. mips2 adds the load interlock to the architecture and nothing else this fragment can use.
+v3	T4	mips32	nopad	open	The march CLAUDE.md's Never-table bans by name. This is the row that turns a rule this project follows into a rule it has demonstrated.
+v4	T1	4181	pad	lock	rsdk-1.3.6-4181 at its own core. The release that built every kernel this project has booted.
+v5	T1	5281	nopad	open	THE SAME RELEASE at the other march. With v4 it separates the flag from the release.
+v6	T2	4181	pad	lock	rsdk-1.3.6-5281 at the OTHER release's core. With v7 it is the second half of that separation.
+v7	T2	5281	nopad	open	rsdk-1.3.6-5281 at its own core. R2c column two.
+v8	T3	4181	pad	lock	rsdk-1.5.5-5281 gcc 4.4.5 at 4181. R2c column three at the exposed march.
+v9	T3	5281	nopad	open	rsdk-1.5.5-5281 at its own core. R2c column three.
+v10	T3	4281	nopad	open	The fourth Lexra core name in TC-15's non-exposed set. Nothing has ever been built at 4281 in this project.

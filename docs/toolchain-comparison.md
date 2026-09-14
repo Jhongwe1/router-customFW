@@ -299,6 +299,45 @@ about something other than what was asked.
 
 ---
 
+## 5b. 🆕 2026-09-14: the padding follows the FLAG, not the release — and the ELF header cannot tell them apart
+
+量 at the desk, before power, under `tools/vendor-tripwire.sh` (six trees CLEAN
+both sides). One source file, one set of flags, the raw drivers, nine
+single-variable compilations:
+
+| | `-march=4181` | `-march=5281` | `-march=4281` |
+|---|---|---|---|
+| **T1** rsdk-1.3.6-**4181** | pads | **does not pad** | — |
+| **T2** rsdk-1.3.6-**5281** | **pads** | does not pad | — |
+| **T3** rsdk-1.5.5-5281 | pads | does not pad | does not pad |
+| **T4** host gcc 12.4.0 | — | — | — (`mips1` pads, `mips2`/`mips32` do not) |
+
+**The two cross cells are the whole point.** T1 is the release whose *wrapper*
+accepts only `-march=4181`, and through the raw driver at `-march=5281` it does
+not pad; T2 is the converse. So on this axis all three releases behave the same
+way and `TC-15`'s split is a property of the **flag**, not of the release.
+
+⚠️ **This does not close `TC-q`.** That row is about the whole-`vmlinux`
+load-delay counts — 425/424 against 162/147 — and it is a question about code
+generation across a kernel, not about this one shape, on which the two 1.3.6
+drops do not differ at all.
+
+🔴 **And the ELF header cannot be used for provenance.** All six rsdk objects
+read `0x1001, noreorder, o32, mips1` in `readelf -h`, whatever `-march` produced
+them; only the host toolchain's objects carry a distinguishing flag word
+(`0x10001001` for `mips2`, `0x50001001` for `mips32`). **So an object's `-march`
+is not recoverable from the object.** `probe6` therefore carries its provenance
+in the *payload's* row table and in the site addresses `tcpay verify` reads back
+out of the linked image, not in any ELF field.
+
+🟢 **The fragment that made this measurable was chosen by refutation**, and the
+first candidate is worth recording here because it is a fact about these
+compilers rather than about the experiment: `return (*p) ^ seed;` at `-O2`
+compiles, in **all nine** configurations, to `lw` / `jr ra` / `xor` — the return
+jump's delay slot absorbs the load's, so no column shows the hazard. `SPEC.md`
+`TC-54`.
+
+
 ## 6. The rows with no cell in two or more columns
 
 Stated as a list, because a table that quietly omits them reads as complete.
