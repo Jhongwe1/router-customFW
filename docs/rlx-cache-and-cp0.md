@@ -779,6 +779,132 @@ the *proxy* is now known to behave — the aliasing path produced a clean
 `P1`/`P1` pair with the negative control firing — so the next attempt is about
 making a line resident, not about whether the cell can read.
 
+### ⓑ-2 🔴🔴 2026-09-14 (sixty-seventh segment, desk, no power): the disjunction collapses, on a reading taken on 2026-08-29
+
+`t-hit` is the one cell in `probe3` that observes residency **without going
+through the alias**, and `docs/probe3-cells.md:772-780` says so in advance:
+*"The remaining two are not separable by any experiment that observes only
+through the alias … A timing signal observes residency without going through
+the alias at all, so it is the only route on this device that could split
+them."* It ran on 2026-08-29 and twice more on 2026-08-31. **Nothing has ever
+read the three numbers it produced.**
+
+#### The reading
+
+`rlx_tc_walk` (`cells.S:397 (u32 rlx_tc_walk)`) walks 256 loads at 16-byte
+stride — a **4 KiB** footprint — `passes` times, bracketed by two `TC0CNT`
+reads. The caller (`probe3.c:1335 (A_VSIZE, 1u)`) runs it three times: **one warming
+pass of 256 loads, discarded**, then **32 passes = 8,192 loads through KSEG0**,
+then **the same 8,192 through KSEG1**. The two timed legs differ in **exactly
+one bit of one register** — `A_VSIZE` against `A_VSIZE | KSEG1_BIT` — so the
+routine, its text addresses, its instruction stream and its bracket are
+identical.
+
+| leg | ticks | loads | ticks/load | ns/load | minus the loop's own ALU cost |
+|---|---:|---:|---:|---:|---:|
+| `t.hit.warm` — KSEG0, **cold** | 552 | 256 | 2.1563 | 150.93 | **138.43 ns** |
+| `t.hit.ks0` — KSEG0, **warm** | 1,472 | 8,192 | 0.1797 | 12.578 | **0.07 ns** |
+| `t.hit.ks1` — KSEG1, uncached | 13,698 | 8,192 | 1.6721 | 117.05 | **104.54 ns** |
+
+One tick is 69.998321 ns (`CLK-17`, and it is a loader-state constant that
+cancels out of every ratio here). The ALU term is 0.17862 ticks for the
+five-instruction inner body, derived from `t-cal`'s
+`15,090 ticks / 140,800 iterations / 3 instructions`.
+
+Three power cycles, byte-identical to 0.075 %:
+
+| capture | `t.hit.warm` | `t.hit.ks0` | `t.hit.ks1` | ks1/ks0 |
+|---|---:|---:|---:|---:|
+| `bench/2026-08-30/QJ.log` | 552 | 1,472 | 13,698 | 9.3057 |
+| `bench/2026-08-31c/K-J.log` | 553 | 1,472 | 13,697 | 9.3050 |
+| `bench/2026-08-31c/K2-J.log` | 554 | 1,473 | 13,697 | 9.2987 |
+
+#### What it establishes, and the three alternatives the data itself closes
+
+**The same routine, over the same addresses, costs 138 ns per load cold and
+0.07 ns per load warm.** Something retained 4 KiB and served it at the cost of
+the loop's own instruction issue.
+
+| alternative | why it is closed | mark |
+|---|---|---|
+| *the D-cache does not read-allocate* | it requires the warm leg to be as slow as the cold one. 量: **12× apart** | 量 |
+| *SDRAM page mode, not a cache* | the KSEG1 leg walks **the same addresses at the same stride** and costs 104.5 ns/load. A page-open policy would help it identically | 量 |
+| *nothing reads `$3`, so a load need not stall* | true of both legs. The KSEG1 leg has no consumer either **and it stalls anyway**, so the absence of a consumer is not what makes the warm leg fast | 量 |
+| *the I-cache, not the D-cache* | `lw` is a data-side access, and the loop body is 5 instructions in both legs | 讀 |
+| *the loop was elided* | `t-cal` at 140,800 and 70,400 gives **2.0003**, and the warming pass runs the same routine and is slow | 量 |
+
+⇒ **The D-cache on this die read-allocates, and holds at least 4 KiB.**
+🟢 **The second half is a NEW measurement**: this repository had no D-side
+capacity figure at all — `notes/cache-model.md:904` reads *"D-cache — **not
+measured** — 8 KiB / 16 B (讀, `bspcpu.h:13`) — **no measurement exists**"*.
+It now has a **lower bound of 4 KiB, 量**.
+
+#### What it does to `c-A`
+
+`c-A`'s *fresh* was a three-way disjunction: **no read-allocate**, **the alias
+is snooped**, **the line was evicted**. Eviction was already excluded by the
+two-separations control (`c-A` against `c-A2`, `vd=00000202` on all three
+power cycles). Read-allocate is now excluded. ⇒ **the alias is snooped.**
+
+⚠️ **And here is where the mark changes.** `t-hit` shows allocation over an
+8,192-load walk; `c-A` performs **one** cached load, of a line an uncached
+store wrote immediately before. Transferring "allocates" from the first to the
+second is **推**, not 量 — strong (no MIPS-class D-cache allocates only on
+repeated access) but not measured.
+
+⚠️ **The caveat this file already wrote still stands, unweakened.**
+`docs/probe3-cells.md:855-864`: the alias is a **proxy**, and *"a real DMA
+write looks like an uncached CPU store from the cache's side"* is an
+assumption that cannot be tested without the engine. **`R6` re-tests it with
+the real engine before relying on it.**
+
+#### 🔴 The weakness, and it is the one this project cares about most
+
+**`t-hit` has no pre-registered refutation for the outcome it got.**
+`docs/probe3-cells.md:770`'s *refuted by* column names exactly one condition
+— `equal` — and a large ratio was never assigned a falsifier. Every
+condition in the table above was written **after** the reading. By this
+project's own rule (*nothing counts as a result until its refutation condition
+is written first*) that makes this an interpretation of an observation, not a
+result.
+
+Two further mismatches found while reading it, both recorded rather than
+repaired:
+
+* 🔴 `docs/probe3-cells.md:770` and `:778` say **4096 iterations**; the code
+  does **8,192** (`probe3.c:1339 (A_VSIZE, 32u)` × `cells.S:426 (256 loads x 16 B = 4 KiB)`). The one
+  quantitative prediction in the row — *"N=4096 gives 1,760–5,850 ticks"* —
+  therefore doubles to **3,520–11,700**, and `t.hit.ks1` = **13,698** is
+  **above the top of it**. A prediction was missed and nobody noticed, because
+  nobody read the field.
+* 🔴 `docs/probe3-cells.md:1290`'s stage-0 row says the arena is
+  initialised. It is not — `rlx_w_arm` runs in Groups W and V, stages 3 and 7,
+  and Group T is stage 2. **`t-hit` loads uninitialised DRAM**, which does not
+  affect a timing measurement but does mean the row is wrong.
+
+#### The experiment that would pre-register it, and it is `R1-pub-3` slot 2
+
+The repository has been asking the wrong question. `SPEC.md` `CPU-45`'s
+residual says *"the next attempt is about making a line resident"*; `t-hit`
+says lines **are** resident. The two questions that remain are **capacity** and
+**snoop**, and both are parameters on routines that already exist:
+
+| cell | what it does | prediction, written before it is built |
+|---|---|---|
+| **`t-hit` ladder** | the same walk at footprints **1, 2, 4, 8, 16, 32 KiB**, `passes` scaled so the load count is constant | per-load cost stays at the ~0.07 ns hit floor up to the D-cache size and rises toward the ~105 ns miss cost above it. **The knee is the D-cache size**, measured for the first time. Refuted if the cost is flat across all six (no cache, and then `ks0`'s 0.07 ns needs another explanation) or rises immediately (the cache is smaller than 1 KiB) |
+| **`t-hit` A–B–A** | KSEG0 warm → KSEG1 → **KSEG0 again** | if LX4189 § 5.2 transfers — *"if the location is resident in the data cache it will be invalidated"* by an uncached read — the second KSEG0 leg reads **cold**, ~138 ns/load. If it reads ~0.07 ns, an uncached read does **not** invalidate, and `c-G`'s question is answered from the timing side with no `CCTL` primitive at all |
+
+Both are additions to `rlx_tc_walk`'s caller, not new assembly. ⚠️
+`cells.S:454 (NOT A GENERALISATION OF rlx_tc_walk)` forbids adding a parameter **inside** `rlx_tc_walk` — its
+body is what the published numbers were measured against — so the ladder gets
+its own leaf, exactly as `rlx_tc_stride` did for Group F.
+
+🔴 **And this makes `CF-1` moot in the useful direction.** The stop-loss asks
+what happens after two seatings *if cell A still cannot be made to hold*. Cell
+A does not need to be made to hold — the line was always resident, and the
+question it was gating is answered. What the next seating buys is the
+**pre-registration**, not the answer.
+
 ### ⓒ — answered, positively, with the positive control that makes it mean something
 
 ```
