@@ -3,6 +3,20 @@
 **`R1-pub-0`, desk, 2026-09-12. No power, no payload source, no device
 reading.**
 
+🔄 **2026-09-14: the route ① column has moved, and the dateline above stays
+because the freeze is what makes the rest of this file worth reading.** `R1a`'s
+and `R1b`'s payloads ran on the silicon at seating 21
+(`bench/2026-09-14/C1-P4j.log`, `bench/2026-09-14/C1-P5j.log`), and **37 of the
+39 `R1a` rows and 5 of the 6 `R1b` rows now carry a route-① reading**, where 3
+of 45 did at the freeze. The frozen figures are kept verbatim in § 6 and are
+what the step's refutation condition was evaluated against; the ordering
+property is unchanged and is still checkable the way the paragraph below says.
+**What moved is one column, not the population**: every row's ② and ③ flags and
+every prior-art sentence in its note are untouched, and where a note made a
+present-tense claim the reading has expired, it is struck in place rather than
+removed. The two `R1a` rows with no route-① reading are `jalx` and `mtlxc0`,
+both excluded from the payload by name and for a stated reason.
+
 `R1-pub`'s claim is *this is not in public data*. That claim is only worth
 making if it is also true that it is not already in **this** data, and
 afterwards *"we had not measured it"* is unverifiable. So this file freezes,
@@ -93,8 +107,8 @@ recomputation is what refused the first number.
 <!-- isacensus:counts begin -->
 | | ① bare metal, ours | ② vendor code on the die | ③ vendor material only | ④ nothing | total |
 |---|---:|---:|---:|---:|---:|
-| `R1a` instruction rows | 2 | 10 | 20 | 7 | **39** |
-| `R1b` hazard rows | 1 | 2 | 2 | 1 | **6** |
+| `R1a` instruction rows | 37 | 2 | 0 | 0 | **39** |
+| `R1b` hazard rows | 5 | 1 | 0 | 0 | **6** |
 <!-- isacensus:counts end -->
 
 ---
@@ -169,45 +183,45 @@ route-② row is always the third verdict cell.
 <!-- isacensus:r1a begin -->
 | row | ① | ② | ③ | `SPEC.md` | reading taken at | what is still open |
 |---|:-:|:-:|:-:|---|---|---|
-| `cache` | y | y | y | `CPU-44` | `bench/2026-08-30` | retires, four op values (0x10 IInval, 0x11 DInval, 0x15 DWBInval, 0x19 DWB), n=0 on each. `x-c10`'s untreated twin moved too, so this is *retires* and not *invalidates* |
-| `mfc3` | y | . | y | `CPU-46` | `bench/2026-08-30` | eight reads with `CU3` set and held, `m.traps=00000000`; under qemu all eight trap with ExcCode 0x0B, so the die and the emulator disagree about this row |
-| `jalx` | . | y | y | `CPU-09`, `CPU-48` | — | 180 in-image targets in this unit's kernel, one MIPS16 function disassembled with four internal consistency points. Also the one row `isa-probe.sh` probes and §6's committed table has no line for -- 20 probes against 19 table rows |
-| `lwl` | . | y | y | `CPU-15`, `CPU-16` | — | this unit's kernel `memcpy` uses it from `0x80002464`, and `do_ri` has no ULS emulation at all, so a MISSING `lwl` would reach `die_if_kernel`. What route 2 cannot see is a wrong VALUE, and `CPU-15` names the closer: one `lwl` under a handler of ours |
-| `lwr` | . | y | y | `CPU-15`, `CPU-16` | — | the other half of the idiom pair; 82 of the 101 pairs in this kernel's `.text` are `lwl`/`lwr` |
-| `mflxc0` | . | y | y | — | — | COP0's opcode 0x10 with `rs` 3, which MIPS leaves unassigned -- a THIRD coprocessor register file, and `docs/interrupt-map.md` § 1.1 says in terms that the 2026-08-29 CP3 result must not be carried over to it. 量 2026-09-12: 30 in this unit's decompressed vendor kernel and 14 in each of two images of mine that have booted. Route 2 is sound here for a reason the `movz` row did not have: `arch/rlx` reaches them on every irq-save path, so a trap would stop the kernel dead |
-| `movn` | . | y | y | `CPU-17` | — | as `movz` |
-| `movz` | . | y | y | `CPU-17` | — | 18 in the loader program area, two of them inside `check_image()`, which runs on every boot, with no exception message in 18 captures. §17's blank for this row is exactly route 2's blind spot: implemented, or silently emulated |
-| `mtc3` | . | y | y | `CPU-46` | — | four `mtc3` at `0x8000227C`-`0x800022E8` set the IMEM/DMEM windows at boot. CP3's READ side is route 1 and its WRITE side is this one, which is the sharpest pair in the table |
-| `mtlxc0` | . | y | y | — | — | the write side, `rs` 7. 量 2026-09-12: 6 in the vendor kernel and 6 in each booted image of mine. ⚠️ The scan is over 4-byte words with no section filter and its NEGATIVE CONTROL FIRED: 3 MiB of /dev/urandom gives 356-411 of each shape, because the random rate is 1 in 2,048 words -- so the 112/133 read off the COMPRESSED vendor kernel is noise and not a reading. A section-filtered count is what would make this clean |
-| `swl` | . | y | y | `CPU-15`, `CPU-16` | — | 19 of the 101 pairs are `swl`/`swr` |
-| `swr` | . | y | y | `CPU-15`, `CPU-16` | — | as `swl` |
-| `COP1` | . | . | y | `CPU-47` | — | one `COP1` word in this kernel's text, adjudicated into a non-code island. §1 of `notes/vendor-kernel-isa.md` says in terms that every piece of evidence here is about EMULATION and none of it is evidence about the core: `Status.CU1` on the device is what decides it, and that read has never been taken |
-| `SPECIAL2` | . | . | y | `CPU-18` | — | opcode 0x1C as a group: zero in the loader program area, by three independent decoders |
-| `SPECIAL3` | . | . | y | `CPU-18` | — | opcode 0x1F as a group: zero in the loader program area |
-| `beql` | . | . | y | `CPU-18` | — | branch-likely: zero in the loader, and the assembler rejects it for every RLX column while accepting it for `mips2` |
-| `bgtzl` | . | . | y | `CPU-18` | — | as `bnel` |
-| `blezl` | . | . | y | `CPU-18` | — | as `bnel` |
-| `bnel` | . | . | y | `CPU-18` | — | branch-likely, zero in the loader, and NOT probed by the assembler instrument at all -- `isa-probe.sh` asks about `beql` alone, so this row's route 3 is one source where `beql`'s is two |
-| `ldc1` | . | . | y | `CPU-47` | — | two `ldc1` words in this kernel's text, both inside the same adjudicated non-code island as the `COP1` |
-| `ll` | . | . | y | `CPU-18`, `CPU-47` | — | the row the plan calls the most important one, because it decides libc. Route 2 is empty BY CONSTRUCTION: `ARCH_CPU_LLSC=n`, so zero in the loader and zero in 2.85 MB of kernel text, and nothing on this die has ever executed one. And the two vendor sources DISAGREE -- the assembler accepts it for `rlx4181` |
-| `lwc1` | . | . | y | `CPU-47` | — | zero in this kernel's text; accepted in all eight assembler columns, which discriminates nothing |
-| `lwc3` | . | . | y | `CPU-47` | — | accepted in all eight assembler columns, non-discriminating in exactly the way the ULS row is; 量 zero occurrences in `stage2.bin` or in any payload |
-| `madd` | . | . | y | `CPU-18` | — | SPECIAL2 form: rejected in all eight assembler columns, zero in the loader. 🔴 2026-09-12: that rejection is a SPELLING and not the encoding. The public Lexra patch gives `mad` -- the same word 0x70000000 -- membership RLXA, all six Lexra cores, and leaves `madd` at I32. So a payload for this row must emit the WORD or it measures the assembler's dictionary. `docs/toolchain-prior-art.md` section 7 item 5 |
-| `mfc1` | . | . | y | `CPU-47` | — | accepted in all eight assembler columns; zero in the loader |
-| `pref` | . | . | y | `CPU-18` | — | rejected in all eight assembler columns, zero in the loader. Its opcode 0x33 was mislabelled `pref` in `hazlint` until 2026-08-27, when it was re-levelled to MIPS-I `lwc3` |
-| `rdhwr` | . | . | y | `CPU-18`, `CPU-47` | — | rejected in all eight assembler columns, and the vendor `#if 0`'d both `simulate_rdhwr` call sites that mainline calls unconditionally |
-| `sc` | . | . | y | `CPU-18`, `CPU-47` | — | as `ll` |
-| `sdc1` | . | . | y | `CPU-47` | — | zero in this kernel's text |
-| `swc1` | . | . | y | `CPU-47` | — | zero in this kernel's text |
-| `swc3` | . | . | y | `CPU-47` | — | as `lwc3`, and not probed by the assembler at all |
-| `sync` | . | . | y | `CPU-18`, `CPU-47` | — | the ONE row where this project's two-source rule is actually met: the assembler rejects it for `rlx4181` and accepts it for `rlx5281`, which is the same split the board configs make with `ARCH_CPU_SYNC` |
-| `COP2` | . | . | . | — | — | `hazlint`'s own comment declares this a gap rather than closing it: MIPS-I A 8.3.3 makes coprocessor 2 optional in the same words as coprocessor 3, and nothing in this repository has looked for CP2 on this part |
-| `teq` | . | . | . | — | — | MIPS-II trap instruction. Not in `CPU-18`'s scan list, not probed by `isa-probe.sh`, absent from §6's table: no evidence of any class exists for this row |
-| `tge` | . | . | . | — | — | as `teq` |
-| `tgeu` | . | . | . | — | — | as `teq` |
-| `tlt` | . | . | . | — | — | as `teq` |
-| `tltu` | . | . | . | — | — | as `teq` |
-| `tne` | . | . | . | — | — | as `teq` |
+| `COP1` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | one `COP1` word in this kernel's text, adjudicated into a non-code island. §1 of `notes/vendor-kernel-isa.md` says in terms that every piece of evidence here is about EMULATION and none of it is evidence about the core: `Status.CU1` on the device is what decides it, and that read has never been taken. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): THE GROUP SPLITS ACROSS TWO EXCEPTIONS. `mfc1` `0x44020000`, `lwc1` `0xC5400000` and `swc1` `0xE5400000` all TRAPS `cause=1000002c` -- ExcCode 11 (CpU) with `CE` 1; `ldc1` `0xD5400000` and `sdc1` `0xF5400000` TRAPS `cause=10000028` -- ExcCode 10 (RI). So the three MIPS-I COP1 opcodes decode as coprocessor accesses and the two MIPS-II ones do not decode at all. ⚠️ `CU1` is NOT set by that payload (`tools/rlxprobe/cells4.S` says so at the `mfc1` word), so a CpU does not separate *no FPU* from *FPU disabled* -- the `Status.CU1` read named above is still the one that decides it, and it has still not been taken. `SPEC.md` `CPU-57` |
+| `COP2` | y | . | . | `CPU-57` | `bench/2026-09-14` | `hazlint`'s own comment declares this a gap rather than closing it: MIPS-I A 8.3.3 makes coprocessor 2 optional in the same words as coprocessor 3, and ~~nothing in this repository has looked for CP2 on this part~~ 🔄 **something has**. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): `mfc2` `0x48020000` TRAPS -- `cause=2000002c`, ExcCode 11 (CpU) with the `Cause` `CE` field reading 2 -- so opcode 0x12 decodes as a coprocessor-2 access on this die. ⚠️ `Status.CU2` is not set by that payload, so this says the opcode is in the coprocessor CLASS and NOT that CP2 exists, which is the same limit the `COP1` row states. `SPEC.md` `CPU-57` |
+| `SPECIAL2` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | opcode 0x1C as a group: zero in the loader program area, by three independent decoders. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): THE GROUP IS NOT UNIFORMLY ABSENT. `funct 0x00` (`madd`, `0x71090000`) is RIGHT on both halves -- `13526780` in LO and `0BAD0002` in HI, the carry `cells4.S` says a core adding the halves independently gets wrong -- while `funct 0x02` (`mul`), `0x20` (`clz`) and `0x21` (`clo`) all TRAPS `cause=00000028`, ExcCode 10 (RI). ⚠️ Which NAME the retiring word carries is a toolchain question and not a die one: the same word is Lexra `mad` in the public patch this table's `madd` row cites. `SPEC.md` `CPU-57` |
+| `SPECIAL3` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | opcode 0x1F as a group: zero in the loader program area. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): opcode 0x1F is not implemented -- `ext` `0x7D023A00`, `ins` `0x7D027A04`, `seb` `0x7C091420` and `wsbh` `0x7C0910A0` all TRAPS `cause=30000028`, ExcCode 10 (RI), four of four. `SPEC.md` `CPU-57` |
+| `beql` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | branch-likely: zero in the loader, and the assembler rejects it for every RLX column while accepting it for `mips2`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=30000028`, ExcCode 10 (RI), with the operands chosen so the branch would be TAKEN, so a retiring core could not have read as a trap. The route-3 prediction held, and all four of the family agree. `SPEC.md` `CPU-57` |
+| `bgtzl` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | as `bnel`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=30000028`, ExcCode 10 (RI), with the operands chosen so the branch would be TAKEN, so a retiring core could not have read as a trap. The route-3 prediction held, and all four of the family agree. `SPEC.md` `CPU-57` |
+| `blezl` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | as `bnel`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=30000028`, ExcCode 10 (RI), with the operands chosen so the branch would be TAKEN, so a retiring core could not have read as a trap. The route-3 prediction held, and all four of the family agree. `SPEC.md` `CPU-57` |
+| `bnel` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | branch-likely, zero in the loader, and NOT probed by the assembler instrument at all -- `isa-probe.sh` asks about `beql` alone, so this row's route 3 is one source where `beql`'s is two. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=30000028`, ExcCode 10 (RI), with the operands chosen so the branch would be TAKEN, so a retiring core could not have read as a trap. The route-3 prediction held, and all four of the family agree. `SPEC.md` `CPU-57` |
+| `cache` | y | y | y | `CPU-44` | `bench/2026-08-30` | retires, four op values (0x10 IInval, 0x11 DInval, 0x15 DWBInval, 0x19 DWB), n=0 on each. `x-c10`'s untreated twin moved too, so this is *retires* and not *invalidates*. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): a second payload on a second seating repeats it -- `cache10`/`cache11`/`cache15`/`cache19` all RAN, `n=0`, `cause=00000000`. `SPEC.md` `CPU-57` |
+| `ldc1` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | two `ldc1` words in this kernel's text, both inside the same adjudicated non-code island as the `COP1`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=10000028`, ExcCode 10 (RI) and not CpU, so opcode 0x35 does not decode as a coprocessor access on this die at all. `SPEC.md` `CPU-57` |
+| `ll` | y | . | y | `CPU-18`, `CPU-47`, `CPU-57` | `bench/2026-09-14` | the row the plan calls the most important one, because it decides libc. Route 2 is empty BY CONSTRUCTION: `ARCH_CPU_LLSC=n`, so zero in the loader and zero in 2.85 MB of kernel text, ~~and nothing on this die has ever executed one~~ 🔄 **one has**. And the two vendor sources DISAGREE -- the assembler accepts it for `rlx4181`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `gpr 0000A5F0`, `n=0`, the constant written down before power. `tools/rlxprobe/cells4.S` records why that verdict discriminates: opcode 0x30 is `lwc0` on a MIPS-I decoder, and `lwc0` would leave the GPR at its `DEADBEEF` seed, which reads WRONG. ⚠️ It says the word retires and loads the right word and NOTHING about atomicity, so the two disagreeing vendor sources above are not adjudicated by it. `SPEC.md` `CPU-57` |
+| `lwc1` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | zero in this kernel's text; accepted in all eight assembler columns, which discriminates nothing. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=1000002c`, ExcCode 11 (CpU), `CE` 1. Same `CU1` caveat as the `COP1` row. `SPEC.md` `CPU-57` |
+| `lwc3` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | accepted in all eight assembler columns, non-discriminating in exactly the way the ULS row is; 量 zero occurrences in `stage2.bin` or in any payload. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=3000002c`, ExcCode 11 (CpU), `CE` 3, so opcode 0x33 decodes as a coprocessor-3 load on this die. Read it beside the `pref` row, which is the SAME OPCODE with a different destination and got the same answer. `SPEC.md` `CPU-57` |
+| `lwl` | y | y | y | `CPU-15`, `CPU-16` | `bench/2026-09-14` | this unit's kernel `memcpy` uses it from `0x80002464`, and `do_ri` has no ULS emulation at all, so a MISSING `lwl` would reach `die_if_kernel`. What route 2 cannot see is a wrong VALUE, and ~~`CPU-15` names the closer: one `lwl` under a handler of ours~~ 🔄 **that closer ran**. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `gpr A5F00D44` against the constant written down before power, `n=0`. `SPEC.md` `CPU-57` |
+| `lwr` | y | y | y | `CPU-15`, `CPU-16` | `bench/2026-09-14` | the other half of the idiom pair; 82 of the 101 pairs in this kernel's `.text` are `lwl`/`lwr`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `gpr 1122335A`, `n=0`. `SPEC.md` `CPU-57` |
+| `madd` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | SPECIAL2 form: rejected in all eight assembler columns, zero in the loader. 🔴 2026-09-12: that rejection is a SPELLING and not the encoding. The public Lexra patch gives `mad` -- the same word 0x70000000 -- membership RLXA, all six Lexra cores, and leaves `madd` at I32. So a payload for this row must emit the WORD or it measures the assembler's dictionary. `docs/toolchain-prior-art.md` section 7 item 5. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): the payload emitted the WORD as that sentence requires, and it is RIGHT on both halves -- LO `13526780` and HI `0BAD0002` against an accumulator primed to `0BAD0000F00D0000`, `n=0`. So SPECIAL2 `funct 0x00` retires and computes a 64-bit multiply-accumulate on this die. ⚠️ Which name that word carries is still the toolchain question stated above. `SPEC.md` `CPU-57` |
+| `mfc1` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | accepted in all eight assembler columns; zero in the loader. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=1000002c`, ExcCode 11 (CpU), `CE` 1. Same `CU1` caveat as the `COP1` row. `SPEC.md` `CPU-57` |
+| `mfc3` | y | . | y | `CPU-46` | `bench/2026-08-30` | eight reads with `CU3` set and held, `m.traps=00000000`; under qemu all eight trap with ExcCode 0x0B, so the die and the emulator disagree about this row. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): THE MATCHED CONTROL ON THAT READING. The same word `0x4C020000` with `CU3` NOT set traps -- `cause=3000002c`, ExcCode 11 (CpU), and the `Cause` `CE` field reads 3, which names the coprocessor. So the 2026-08-30 retirement is the enable and not the decoder, and the die-vs-emulator disagreement narrows to the CU3-set case. `tools/rlxprobe/cells4.S` says this row is that control, in its own words, at the `0x4C020000` word. `SPEC.md` `CPU-57` |
+| `mflxc0` | y | y | y | `CPU-57` | `bench/2026-09-14` | COP0's opcode 0x10 with `rs` 3, which MIPS leaves unassigned -- a THIRD coprocessor register file, and `docs/interrupt-map.md` § 1.1 says in terms that the 2026-08-29 CP3 result must not be carried over to it. 量 2026-09-12: 30 in this unit's decompressed vendor kernel and 14 in each of two images of mine that have booted. Route 2 is sound here for a reason the `movz` row did not have: `arch/rlx` reaches them on every irq-save path, so a trap would stop the kernel dead. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RAN -- `n=0`, `gpr 00000000` against a seed of `DEADBEEF`, so the destination was written and the encoding retires. Per `docs/isa-payload.md` § 0 a RAN says only that it did not trap. In the same capture the five real CP3 encodings all trap ExcCode 11, which is the 2026-09-04 correction -- these are not `mfc3` -- confirmed on the silicon. `SPEC.md` `CPU-57` |
+| `movn` | y | y | y | `CPU-17` | `bench/2026-09-14` | as `movz`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `gpr 0000002A`, `n=0`. `SPEC.md` `CPU-57` |
+| `movz` | y | y | y | `CPU-17` | `bench/2026-09-14` | 18 in the loader program area, two of them inside `check_image()`, which runs on every boot, with no exception message in 18 captures. ~~§17's blank for this row is exactly route 2's blind spot: implemented, or silently emulated~~ 🔄 **answered, and the answer is implemented**. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `gpr 0000002A`, and `n=0` means no exception was taken at all, so nothing could have emulated it. `SPEC.md` `CPU-57` |
+| `mtc3` | y | y | y | `CPU-46` | `bench/2026-09-14` | four `mtc3` at `0x8000227C`-`0x800022E8` set the IMEM/DMEM windows at boot. CP3's READ side is route 1 and its WRITE side is this one, which is the sharpest pair in the table. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=3000002c`, ExcCode 11 (CpU), `CE` 3. ⚠️ `CU3` is not set by that payload, so this reads the ENABLE and not whether CP3 holds the register; the route-2 boot-time writes are unchanged and the pair still stands. `SPEC.md` `CPU-57` |
+| `pref` | y | . | y | `CPU-18`, `CPU-57` | `bench/2026-09-14` | rejected in all eight assembler columns, zero in the loader. Its opcode 0x33 was mislabelled `pref` in `hazlint` until 2026-08-27, when it was re-levelled to MIPS-I `lwc3`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): THE SAME WORD IS TWO INSTRUCTIONS AND THE DIE NAMED WHICH. `0xCD400000` TRAPS with `cause=3000002c` -- ExcCode 11 (CpU) and the `Cause` `CE` field reading 3 -- so opcode 0x33 is the MIPS-I coprocessor-3 load on this part and not the MIPS32 `pref` hint, which would have retired. The 2026-08-27 re-levelling recorded above is confirmed on the silicon. `SPEC.md` `CPU-57` |
+| `rdhwr` | y | . | y | `CPU-18`, `CPU-47`, `CPU-57` | `bench/2026-09-14` | rejected in all eight assembler columns, and the vendor `#if 0`'d both `simulate_rdhwr` call sites that mainline calls unconditionally. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=30000028`, ExcCode 10 (RI). The route-3 prediction held. `SPEC.md` `CPU-57` |
+| `sc` | y | . | y | `CPU-18`, `CPU-47`, `CPU-57` | `bench/2026-09-14` | as `ll`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RAN -- `n=0`, and `m0` reads `5A5A0FF2`, which is `rt` (`$9`), where the scratch word had been `A5A5F00D`. Per `docs/isa-payload.md` § 0 a RAN is not evidence the core has `sc`. 推, on two sources: `cells4.S` says the MIPS-I reading of opcode 0x38 is `swc0`, which would have stored CP0 register 9, and `CPU-42` measured CP0 9 (`Count`) unimplemented and reading zero -- so the stored value is the GPR's and not CP0's. ⚠️ `$9` itself is not recorded, so whether an `sc` success/failure code was written back is untouched, and so is atomicity. `SPEC.md` `CPU-57` |
+| `sdc1` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | zero in this kernel's text. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=10000028`, ExcCode 10 (RI) and not CpU, so opcode 0x3D does not decode as a coprocessor access. `SPEC.md` `CPU-57` |
+| `swc1` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | zero in this kernel's text. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=1000002c`, ExcCode 11 (CpU), `CE` 1, and `m0` is unchanged at `A5A5F00D` so no store happened. Same `CU1` caveat as the `COP1` row. `SPEC.md` `CPU-57` |
+| `swc3` | y | . | y | `CPU-47`, `CPU-57` | `bench/2026-09-14` | as `lwc3`, and not probed by the assembler at all. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=3000002c`, ExcCode 11 (CpU), `CE` 3, `m0` unchanged at `A5A5F00D`. The PRE-REGISTERED qemu prediction for this row was ExcCode 0x0A, because 0x3B is unassigned at MIPS32; the die gives 0x0B, so on this part 0x3B is still the MIPS-I coprocessor-3 store. `SPEC.md` `CPU-57` |
+| `swl` | y | y | y | `CPU-15`, `CPU-16` | `bench/2026-09-14` | 19 of the 101 pairs are `swl`/`swr`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `m0 A55A5A0F`, `n=0`. `SPEC.md` `CPU-57` |
+| `swr` | y | y | y | `CPU-15`, `CPU-16` | `bench/2026-09-14` | as `swl`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): RIGHT -- `m0 5A0FF20D`, `n=0`. `SPEC.md` `CPU-57` |
+| `sync` | y | . | y | `CPU-18`, `CPU-47`, `CPU-57` | `bench/2026-09-14` | the ONE row where this project's two-source rule is actually met: the assembler rejects it for `rlx4181` and accepts it for `rlx5281`, which is the same split the board configs make with `ARCH_CPU_SYNC`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=00000028`, ExcCode 10 (RI). The two agreeing vendor sources this row names both predicted that and the silicon is the third. `SPEC.md` `CPU-57` |
+| `teq` | y | . | . | `CPU-57` | `bench/2026-09-14` | MIPS-II trap instruction. Not in `CPU-18`'s scan list, not probed by `isa-probe.sh`, absent from §6's table: ~~no evidence of any class exists for this row~~ 🔄 **that expired on 2026-09-14 at 05:39, and the answer is that this core does not have it**. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=20000028`, ExcCode 10 (RI), with the operands chosen so the trap condition is TRUE, so ExcCode 13 was the reachable alternative and the die did not take it. `tools/rlxprobe/cells4.S` registered all three outcomes at this word before power: *13 if the core has them, 10 if it does not, and a retirement if neither*. `SPEC.md` `CPU-57` |
+| `tge` | y | . | . | `CPU-57` | `bench/2026-09-14` | as `teq`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=20000028`, ExcCode 10 (RI), condition TRUE. All six of the family agree, and the family is not implemented. `SPEC.md` `CPU-57` |
+| `tgeu` | y | . | . | `CPU-57` | `bench/2026-09-14` | as `teq`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=20000028`, ExcCode 10 (RI), condition TRUE. All six of the family agree, and the family is not implemented. `SPEC.md` `CPU-57` |
+| `tlt` | y | . | . | `CPU-57` | `bench/2026-09-14` | as `teq`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=20000028`, ExcCode 10 (RI), condition TRUE. All six of the family agree, and the family is not implemented. `SPEC.md` `CPU-57` |
+| `tltu` | y | . | . | `CPU-57` | `bench/2026-09-14` | as `teq`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=20000028`, ExcCode 10 (RI), condition TRUE. All six of the family agree, and the family is not implemented. `SPEC.md` `CPU-57` |
+| `tne` | y | . | . | `CPU-57` | `bench/2026-09-14` | as `teq`. 🔄 量 2026-09-14 (seating 21, `probe4`, `bench/2026-09-14/C1-P4j.log`): TRAPS -- `cause=20000028`, ExcCode 10 (RI), condition TRUE. All six of the family agree, and the family is not implemented. `SPEC.md` `CPU-57` |
+| `jalx` | . | y | y | `CPU-09`, `CPU-48` | — | 180 in-image targets in this unit's kernel, one MIPS16 function disassembled with four internal consistency points. Also the one row `isa-probe.sh` probes and §6's committed table has no line for -- 20 probes against 19 table rows. ⚠️ 2026-09-14 (seating 21): STILL NO READING, and the reason is structural. `jalx` has no row in `tools/isa-payload.tsv` at all -- `isapay`'s `DEFERRED_GROUPS` excludes it by name with the `mips16` group, because a retiring `jalx` lands control in MIPS16 mode at an address a 26-bit field chooses and this payload has no MIPS16 return path. With `mtlxc0` it is one of exactly two `r1a` rows seating 21 did not touch |
+| `mtlxc0` | . | y | y | — | — | the write side, `rs` 7. 量 2026-09-12: 6 in the vendor kernel and 6 in each booted image of mine. ⚠️ The scan is over 4-byte words with no section filter and its NEGATIVE CONTROL FIRED: 3 MiB of /dev/urandom gives 356-411 of each shape, because the random rate is 1 in 2,048 words -- so the 112/133 read off the COMPRESSED vendor kernel is noise and not a reading. A section-filtered count is what would make this clean. ⚠️ 2026-09-14 (seating 21): STILL NO READING, and deliberately. `tools/isa-payload.tsv`'s `mflxc0` row states the exclusion in its own words -- writing an unidentified CP0 register on the one device this project has is not a measurement worth a board. With `jalx` it is one of exactly two `r1a` rows seating 21 did not touch |
 <!-- isacensus:r1a end -->
 
 ---
@@ -217,12 +231,12 @@ route-② row is always the third verdict cell.
 <!-- isacensus:r1b begin -->
 | row | ① | ② | ③ | `SPEC.md` | reading taken at | what is still open |
 |---|:-:|:-:|:-:|---|---|---|
-| `load then a reader of the loaded register` | y | . | y | `CPU-14` | `upstream/` | exposed, no interlock. The ONLY route-1 hazard reading this project holds, and it is not this repository's: the single-variable experiment is upstream's `P9-12`, `upstream/BENCH-LOG.md` `T-89`/`T-90`, on the same physical device |
-| `mtc0 then mfc0` | . | y | y | `CPU-30`, `CPU-31` | — | three sites in the loader, the first of them a `Status` write read back immediately, running on every boot. `CPU-31` states the limit: countable is not decidable |
-| `mult/div then mfhi/mflo` | . | y | y | `CPU-29`, `CPU-31` | — | 16 sites in the loader with no `nop` between them, running on every boot. `CPU-31`: the count is equally consistent with an interlocked core and with an interlocked core where those sites are bugs. 2026-09-13: `probe5` has this family at d0/d1/d2/d3 and `hl_ctl` beside it, because 量 shows `mult` overwrites both halves of the accumulator -- so without a rung that primes and reads back with NO `mult`, *the prime did not land* and *there is no hazard* would be one capture |
-| `a load sitting in a delay slot` | . | . | y | — | — | 量 zero of `stage2.bin`'s 1,474 loads sit in any delay slot, so the vendor code offers no site at all and this is a payload-only question. `hazlint` reports `unresolved` for an unresolvable target rather than checking the wrong word. 2026-09-13: this is the ONE shape in BOTH of hazlint's channels, and its main-check record says `jump target of` where every other family's says `next word` -- which is what separates it from `load then a reader`. Its survey presence does NOT depend on the padding, and believing otherwise is the defect `tools/hazdecl.py` caught on its first real build |
-| `movz or movn write-enable in a load delay slot` | . | . | y | `TC-h`, `TC-22` | — | nothing that has run on this die exercises the shape, and that is 量 rather than inherited: the VENDOR's artefacts hold ZERO sites (this kernel 0 of 3,183 conditional moves, `boa` 0, `busybox` 0, `stage2.bin` 0), and `hazlint` on three images of mine that HAVE booted -- r59 with seventeen boots, `R3`'s `loudm` and `quietm` -- reports 0 violations in 112,505 / 111,801 / 109,922 loads, because `config/rlxfw-cflags`'s `-fno-if-conversion` removes the sites and `hazlint` is a build gate. `TC-22`'s four are in a FLAGLESS build. § 10 ④ is this file getting that wrong and being corrected |
-| `store, the class hazlint has no rule for` | . | . | . | — | — | SPECIFIED 2026-09-13 (`R1-pub-2`), and this row's LABEL is imprecise rather than the class being empty: 量 with nine fixtures and both controls, `hazlint` has a rule for a store as a CONSUMER on BOTH operand paths (data `rt` and base `rs`) and no rule for a store as a PRODUCER on either shape tried. So the class splits by the store's role into `storedata`, `storebase` and a producer shape that is NOT MEASURABLE AS A HAZARD with a reason -- MIPS-I requires a load to see a preceding store and every program on this die depends on it at population scale, so an observed violation would be a broken payload and not a reading. It is in `probe5` as the control `st_p`. This row is deliberately NOT split: splitting changes this census's population and that belongs to `R1-pub-0`. `SPEC.md` `CPU-52`, `docs/isa-hazard.md` section 8 |
+| `a load sitting in a delay slot` | y | . | y | `CPU-54` | `bench/2026-09-14` | 量 zero of `stage2.bin`'s 1,474 loads sit in any delay slot, so the vendor code offers no site at all and ~~this is a payload-only question~~ 🔄 **a payload asked it**. `hazlint` reports `unresolved` for an unresolvable target rather than checking the wrong word. 2026-09-13: this is the ONE shape in BOTH of hazlint's channels, and its main-check record says `jump target of` where every other family's says `next word` -- which is what separates it from `load then a reader`. Its survey presence does NOT depend on the padding, and believing otherwise is the defect `tools/hazdecl.py` caught on its first real build. 🔄 量 2026-09-14 (seating 21, `probe5`, `bench/2026-09-14/C1-P5j.log`): `ds_d0` reads OPEN (`B10CB10C`) with the load in a TAKEN branch delay slot and its consumer at the target, and `ds_d1` reads LOCK -- the same depth as the plain load-use family, so the delay slot does not move where the hazard closes. `SPEC.md` `CPU-54` |
+| `load then a reader of the loaded register` | y | . | y | `CPU-14`, `CPU-54` | `bench/2026-09-14` | exposed, no interlock. ~~The ONLY route-1 hazard reading this project holds, and it is not this repository's~~ 🔄 **this repository's own instrument has it now**: the single-variable experiment is upstream's `P9-12`, `upstream/BENCH-LOG.md` `T-89`/`T-90`, on the same physical device. 🔄 量 2026-09-14 (seating 21, `probe5`, `bench/2026-09-14/C1-P5j.log`): `lu_alu_d0` reads OPEN (`B10CB10C`, the pre-load value of `$9`) and hits the PRE-REGISTERED `dev=open` that came from upstream, while `lu_alu_d1` and `lu_alu_d2` read LOCK -- so the hazard closes at ONE instruction, which upstream's own v2 fix (two `nop`s) overshot. The `seat` column moves off `upstream` for that reason and not because the provenance changed; the single-variable experiment named above is still upstream's and is now reproduced here. ⚠️ All three rungs ran on a WARM cache: `probe5` controls neither its operand's nor its own cells' cache state, so the reading is *interlock behaviour on a warm cache* in `docs/isa-hazard.md` § 7's own words -- its FIRST numbered item, and 🔴 `SPEC.md` `CPU-14` cites that as a `§7.1`, which does not exist in that file. `SPEC.md` `CPU-14` |
+| `movz or movn write-enable in a load delay slot` | y | . | y | `TC-h`, `TC-22`, `CPU-54` | `bench/2026-09-14` | nothing that has run on this die exercises the shape, and that is 量 rather than inherited: the VENDOR's artefacts hold ZERO sites (this kernel 0 of 3,183 conditional moves, `boa` 0, `busybox` 0, `stage2.bin` 0), and `hazlint` on three images of mine that HAVE booted -- r59 with seventeen boots, `R3`'s `loudm` and `quietm` -- reports 0 violations in 112,505 / 111,801 / 109,922 loads, because `config/rlxfw-cflags`'s `-fno-if-conversion` removes the sites and `hazlint` is a build gate. `TC-22`'s four are in a FLAGLESS build. § 10 ④ is this file getting that wrong and being corrected. 🔄 量 2026-09-14 (seating 21, `probe5`, `bench/2026-09-14/C1-P5j.log`): the shape RAN and it is NOT exposed. `probe5`'s `movrd` family is this row -- its `mr_d0` line names `TC-h` in its own words -- and `mr_d0` and `mr_d1` both read LOCK (`A5A5F00D`), so with the destination freshly loaded and the condition false the move does not leave a stale load standing. ⚠️ The NEIGHBOURING shape does read OPEN and is not this row: `movcond`, which is `movn` with the CONDITION register freshly loaded, gives `mc_d0` OPEN and `mc_d1` LOCK. `SPEC.md` `CPU-54` |
+| `mult/div then mfhi/mflo` | y | y | y | `CPU-29`, `CPU-31`, `CPU-54` | `bench/2026-09-14` | 16 sites in the loader with no `nop` between them, running on every boot. `CPU-31`: the count is equally consistent with an interlocked core and with an interlocked core where those sites are bugs. 2026-09-13: `probe5` has this family at d0/d1/d2/d3 and `hl_ctl` beside it, because 量 shows `mult` overwrites both halves of the accumulator -- so without a rung that primes and reads back with NO `mult`, *the prime did not land* and *there is no hazard* would be one capture. 🔄 量 2026-09-14 (seating 21, `probe5`, `bench/2026-09-14/C1-P5j.log`): ANSWERED, and the answer is that this hazard is NOT exposed. `hl_d0` through `hl_d3` all read LOCK (`23456780` four times), so a `mult` followed immediately by `mflo` reads correctly -- and the control the sentence above asks for ran beside them: `hl_ctl` primes LO and HI with NO `mult` at all and reads `CAFE0000` / `aux BEEF0000`, so the four LOCK legs are not a prime that failed to land. `CPU-29`'s sixteen unpadded loader sites are therefore consistent with the silicon rather than sixteen bugs. `SPEC.md` `CPU-31` |
+| `store, the class hazlint has no rule for` | y | . | . | `CPU-52`, `CPU-54` | `bench/2026-09-14` | SPECIFIED 2026-09-13 (`R1-pub-2`), and this row's LABEL is imprecise rather than the class being empty: 量 with nine fixtures and both controls, `hazlint` has a rule for a store as a CONSUMER on BOTH operand paths (data `rt` and base `rs`) and no rule for a store as a PRODUCER on either shape tried. So the class splits by the store's role into `storedata`, `storebase` and a producer shape that is NOT MEASURABLE AS A HAZARD with a reason -- MIPS-I requires a load to see a preceding store and every program on this die depends on it at population scale, so an observed violation would be a broken payload and not a reading. It is in `probe5` as the control `st_p`. This row is deliberately NOT split: splitting changes this census's population and that belongs to `R1-pub-0`. `SPEC.md` `CPU-52`, `docs/isa-hazard.md` section 8. 🔄 量 2026-09-14 (seating 21, `probe5`, `bench/2026-09-14/C1-P5j.log`): all three sub-shapes RAN. `storedata` `lu_sd_d0` OPEN and `lu_sd_d1` LOCK; `storebase` `sb_m0_d0` and `sb_m1_d0` both OPEN and `sb_m0_d1` and `sb_m1_d1` both LOCK, with the `m0`/`m1` PAIR as its own control because exactly one of the two addresses can have been written; and the producer control `st_p` reads LOCK. So a store consumes at the same depth as an ALU consumer, and the producer shape behaved as this row says it must. ⚠️ The row is still NOT split -- that belongs to `R1-pub-0` -- so its ① is a reading of the three shapes under one row. `SPEC.md` `CPU-52` |
+| `mtc0 then mfc0` | . | y | y | `CPU-30`, `CPU-31`, `CPU-56` | — | three sites in the loader, the first of them a `Status` write read back immediately, running on every boot. `CPU-31` states the limit: countable is not decidable. 🔄 量 2026-09-14 (seating 21, `probe5`, `bench/2026-09-14/C1-P5j.log`): a route-1 attempt RAN and it is VOID with a measured reason, which is not a reading and is why this row's ① stays empty. `c0_d0`/`c0_d1`/`c0_d2` all VOID -- the control word reads `80500270`, neither the `5A5A5A50` written nor the `A5A5A5A0` it held -- because `mtc0 $x,$14` does not write on this die (`SPEC.md` `CPU-56`). So this family cannot be asked through `EPC` at all; asking it needs a CP0 register that is writable, which needs Lexra's CP0 map (`CPU-49`) |
 <!-- isacensus:r1b end -->
 
 ---
@@ -272,6 +286,17 @@ The step's refutation condition, written before this census ran:
   entitled to say this gate is mostly done, and that reading has to be answered
   rather than ignored.**
 
+🔄 **2026-09-14: both figures above are the 2026-09-12 state and are kept
+exactly as they were, because they are what the refutation condition was
+evaluated against.** 量 after seating 21: route ① is **42 of 45 (93.3 %)** —
+37 `R1a` rows and 5 `R1b` rows — and the three still without it are `jalx`,
+`mtlxc0` and the `mtc0`→`mfc0` hazard, the last of which had a route-① attempt
+that came back VOID with a measured cause (`SPEC.md` `CPU-56`). **That is not
+prior art arriving late; it is this gate's own payloads doing the thing the
+gate exists to do**, which is why the refutation condition is still recorded as
+not having fired: it asked whether *the rows this repository already holds*
+covered the census, and the answer to that question did not change.
+
 The answer is § 2.1, and it is a measurement rather than an argument: 22 of
 those 37 rows are route ③, which is *what Realtek's toolchain believes*, and
 § 6 of `notes/vendor-kernel-isa.md` records the two vendor sources **flatly
@@ -288,7 +313,7 @@ have been convenient to get wrong.** What the census changes, item by item:
 | ③'s reserved-opcode control | **already exists and has fired on this die** — § 8 | one instrument fewer |
 | `R1b`'s store row | its **shape is unspecified**, by no instrument, and the plan does not name the task | one design task more |
 | `R1c`'s ruler | decided here, § 9, from readings already taken | no change to the step count |
-| the `movz` delay-slot precondition | **answered, and the answer is the negative one** — § 10 ④ | no change to the step count; the row stays route ③ |
+| the `movz` delay-slot precondition | **answered, and the answer is the negative one** — § 10 ④ | no change to the step count; ~~the row stays route ③~~ 🔄 2026-09-14: route ① from seating 21, and the negative answer held on the die — `mr_d0`/`mr_d1` both LOCK |
 
 One instrument fewer and one design task more is not a re-scope. **The
 calibrated band stays at 7–28 段 with a median of 17, and claiming a shrink on
@@ -515,7 +540,55 @@ the vendor kernel at all.
    the same family"*. **The outcome depends on the unknown being measured**: if
    the core implements them, the probe panics; if not, it raises RI and the
    handler returns SIGILL normally. `R1-pub-4` cannot probe that family without
-   a separate decision, and this is written here **before** the payload exists.
+   a separate decision, ~~and this is written here **before** the payload
+   exists~~ 🔄 **2026-09-14: that clause was false at the moment it was
+   written.** This item was committed at **16:20:41** on 2026-09-14;
+   `tools/isa-payload.tsv` had carried all six rows since 2026-09-13, and
+   `bench/2026-09-14/C1-P4j.log` had landed at **05:39** — 10 h 41 min
+   earlier. Three amendments, and the first one resolves the item on its own
+   stated condition:
+
+   **(a) 🟢 The unknown WAS measured, and it is the safe answer.** 量
+   `bench/2026-09-14/C1-P4j.log` (seating 21, `probe4`, bare metal, under a
+   handler of ours): all six read **`n=1 cause=20000028` — ExcCode 10,
+   Reserved Instruction** — with the operands chosen so the trap condition is
+   TRUE, and `tools/rlxprobe/cells4.S` registered all three outcomes at the
+   `teq` word before power (*13 if the core has them, 10 if it does not, and a
+   retirement if neither*). `SPEC.md` `CPU-57`. **So this core does not
+   implement the family, and no `teq`/`tge`/`tgeu`/`tlt`/`tltu`/`tne` can
+   reach the missing cause-13 vector by being issued.**
+
+   **(b) 🔴 That is a KERNEL-MODE reading and this item is about USER mode,
+   and this repository holds no user-mode `ExcCode` reading of any instruction
+   on this die.** The step from one to the other is **推**, and it is not a
+   free step — item 3 immediately below is the counterexample for a
+   neighbouring class: `ll`/`sc` are `lwc0`/`swc0`, user mode runs with `CU0`
+   clear, so from user mode they raise **Coprocessor Unusable (cause 11)**,
+   where `probe4` measured them retiring in kernel mode. **A change of
+   privilege changed the exception for that pair, so it may change it for any
+   other.** One user-mode reading settles it, and `R1-pub-4` is the step that
+   could take it.
+
+   **(c) 🔴 Cause 13 is not the only unvectored cause — 21 of 32 are.** 讀
+   `arch/rlx/kernel/traps.c`, `trap_init()`: the default loop installs
+   `handle_reserved` for `i = 0..31` and exactly **eleven** causes are then
+   overwritten —
+
+   ```
+   set_except_vector(0, rlx_irq_dispatch);   set_except_vector(8,  handle_sys);
+   set_except_vector(1, handle_tlbm);        set_except_vector(9,  handle_bp);
+   set_except_vector(2, handle_tlbl);        set_except_vector(10, handle_ri);
+   set_except_vector(3, handle_tlbs);        set_except_vector(11, handle_cpu);
+   set_except_vector(4, handle_adel);        set_except_vector(12, handle_ov);
+   set_except_vector(5, handle_ades);
+   ```
+
+   — so **6, 7, 13 and 14–31** all reach `do_reserved` → `panic()`. Mainline's
+   `arch/mips/kernel/traps.c` carries `set_except_vector(13, handle_tr)` and is
+   the positive control that says the omission is the vendor's. **The hazard
+   this item names is therefore a class and not one instruction**: any encoding
+   on this die that raises one of those 21 causes panics this kernel, and a
+   user-mode census has no list of which encodings those are.
 
 3. ⚠️ **The amplification estimate is anchored to the wrong function.** § 9
    says an emulated instruction *"costs an exception round trip through
@@ -567,11 +640,30 @@ worth having — and it is the same non-discriminating shape as the ULS row,
 accepted in all eight columns including `mips1`, which is precisely why § 6
 warns that the ULS row proves nothing.
 
-**③ Six rows have no evidence of any class, and they are all the same family.**
+**③ Six rows have no evidence of any class, and they are all the same family**
+— 量 2026-09-12, and 🔄 **the first half of that heading expired on 2026-09-14;
+the second half is why the finding was worth having.**
 `teq`, `tge`, `tgeu`, `tlt`, `tltu`, `tne` — the MIPS-II trap instructions. Not
 in `CPU-18`'s scan list, not probed by `isa-probe.sh`, absent from § 6's table.
-They are on `hazlint`'s watch list and nothing else in this repository has ever
-mentioned them.
+They are on `hazlint`'s watch list and ~~nothing else in this repository has
+ever mentioned them~~ 🔄 **that stopped being true on 2026-09-13 and the
+reading landed on 2026-09-14 at 05:39.** `tools/isa-payload.tsv` gave all six a
+row in its `traps` group (words `0x01090030`–`0x01090036`) and seating 21 ran
+them: **all six TRAPS, `cause=20000028` — ExcCode 10, Reserved Instruction —
+with the operands chosen so the trap condition is TRUE**, so ExcCode 13 was the
+reachable alternative and the die did not take it. **This core does not
+implement the MIPS-II trap family.** 量 `bench/2026-09-14/C1-P4j.log`,
+`SPEC.md` `CPU-57`; § 3's rows are route ① from that seating.
+
+⚠️ **The correction is one segment late and that is the finding inside the
+finding.** The paragraph above was true when it was committed (2026-09-12
+22:36). § 9's item 2, written 2026-09-14 at 16:20, then quoted it as a live
+blank and rested a safety argument on it — **10 h 41 min after the capture that
+answered it, and 12 commits later**. Nothing in this repository connects a
+committed capture to the rows it fills: `isacensus check` compares the table
+against the two population instruments and against this document, and **no
+check of any kind reads a `bench/` capture**. That is a gap with a name and no
+owner yet.
 
 **④ 🔴🔴 One `R1b` row was classified route ② in this file's own first
 version, that was WRONG, and the correction is here rather than in the history

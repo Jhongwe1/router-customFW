@@ -312,6 +312,41 @@ C1, C2 and C3 together are what make a zero mean something: C1 and C2 prove the
 handler catches, C3 proves it does not catch everything, and both halves are in
 one capture on one boot.
 
+### 🔴 A SECOND pre-registered prediction was refuted, and it settles which machine this die is
+
+🆕 **2026-09-14 (sixty-eighth segment, desk, zero power cycles, re-reading
+`bench/2026-09-14/C1-P4j.log`).** § 8's table registers the ambiguity in
+advance: *`0x33` | `lwc3` | `pref` at MIPS32*. `tools/isa-payload.tsv`'s `pref`
+row carries the encoding **`0xCD400000`** and the expected verdict **`run`** —
+the MIPS32 hint retires and writes nothing.
+
+**量: it trapped.** `bench/2026-09-14/C1-P4j.log:38` reads
+`P4 00000016 pref 52340016 00000001 3000002c 805016ec …` — `n = 1`,
+`cause = 3000002C`, so **ExcCode 11 (Coprocessor Unusable) with `CE` = 3**.
+A MIPS32 `pref` has no coprocessor field and cannot raise CpU; a MIPS-I `lwc3`
+does, from COP3, and `CE` names it. ⇒ **opcode `0x33` decodes as `lwc3` on this
+die and the MIPS32 hint is not implemented**, which is exactly the question
+`cells4.S` says the row exists to ask.
+
+🟢 **`mfc2` is the row beside it and its prediction HELD**: encoding
+`0x48020000`, expected `trap:0x0B`, measured `cause = 2000002C` →
+ExcCode 11 with `CE` = **2**. This repository had never looked for CP2 on this
+part; `tools/isa-census.tsv`'s `COP2` row was route ④ until tonight.
+
+⚠️ **Both were missing from `SPEC.md` `CPU-57`**, the row that owns this
+census, and neither mnemonic appeared in it. The `pref` half is the one worth
+the paragraph: a refuted prediction whose refutation is a **positive**
+identification of the decoder, not an absence.
+
+🟢 **And the `CE` field itself is a reading — `SPEC.md` `CPU-59`.** Over the 42
+rows of this capture that took an exception, `CE` is written **only** on CpU
+and it names the coprocessor (3 for `pref`/`mfc3`/`mtc3`/`cfc3`/`lwc3`/`swc3`,
+1 for `mfc1`/`lwc1`/`swc1`, 2 for `mfc2`); the 32 RI rows carry the `CE` the
+previous CpU row left, with **zero** inconsistencies. The control is the five
+RI rows that precede any CpU at all: they read `CE` 0. That is also why the
+trap family's cause word is `20000028` where `special0e`'s is `00000028` —
+`mfc2` is the row immediately before `teq`.
+
 ### The trap laid for the answer checker
 
 `plan:761`: the reserved encoding is fed to the trap check **and** to the answer
