@@ -41,13 +41,24 @@ Modes
 
 The controls run first on every invocation and the tool refuses to report on a
 file if one of them fails, because a checksum comparison that has not been
-shown able to fail is not a checksum comparison.  🔄 **Thirty-one of them since
-2026-08-31** -- the prose here and the row in ``tools/ci-expected.tsv`` both
-still said *ten* while the count column said sixteen, once.  C1..C16 run off
-captures committed in this repository -- no ``$FWRE_WORK``, no device -- so
-they run on a runner, which ``hazlint``'s population control cannot; C17..C30
-run on a block this file synthesises, and that is stated in the code beside
-them because **they show the check works, not that any payload does.**
+shown able to fail is not a checksum comparison.
+
+🔴 **How many there are is NOT written here, deliberately, and that is a
+repair rather than an omission.**  This paragraph has carried a count three
+times and been wrong twice -- it said *ten* while the column said sixteen, and
+it said *thirty-one* while the column said forty.  ``run_controls``'s own
+docstring said *sixteen* on the day there were forty.  The owner of that number
+is the ``rbcheck`` row in ``tools/ci-expected.tsv``, `ci-census` compares it
+against what actually ran, and a second copy in prose is a copy that goes stale
+silently -- which is `CNT-1`'s class, in this file, about this file.
+
+C1..C16 and C39 run off captures committed in this repository -- no
+``$FWRE_WORK``, no device -- so they run on a stock runner, which ``hazlint``'s
+population control cannot; C17..C30 run on a block this file synthesises, and
+that is stated in the code beside them because **they show the check works, not
+that any payload does.**  🆕 C40..C48, 2026-09-14: the payload population and
+its positive controls, plus two REAL on-device blocks (`probe4`, `probe5`,
+seating 21) that the tool could not read at all that morning -- `RB-1`.
 
 Group F, and the line this tool does NOT cross
 ----------------------------------------------
@@ -91,7 +102,20 @@ DWLINE = re.compile(r"^([0-9A-Fa-f]{8}):((?:\t[0-9A-Fa-f]{8})+)\s*$")
 #: `report.c`'s digit table is lower case; the loader's is upper.  That is the
 #: free discriminator between a payload-printed word and a loader-printed one,
 #: so the pattern is anchored to lower case deliberately.
-UARTSUM = re.compile(r"rlxprobe:\s*sum=([0-9a-f]{8})")
+#:
+#: 🔴 2026-09-14 (`RB-1`, cause ②): the KEY is not a constant either, and this
+#: pattern was one.  `probe1`..`probe3` print ``field("sum", sum)``;
+#: `probe4`..`probe6` print ``field("seal", sum)`` -- 量,
+#: ``grep -n 'field("s' tools/rlxprobe/probe*.c``.  Anchored to `sum=` it
+#: matched nothing in `bench/2026-09-14/C1-P4j.log`, so channel (1) dropped out
+#: of every reading of the two newest payloads.  🟢 It dropped out LOUDLY --
+#: `check_block` says *absent -- channel (1) did not run* rather than reporting
+#: two agreeing channels as three -- which is the difference between a declared
+#: scope limit and a hole, and it is why this cost a reading rather than a
+#: wrong answer.  Both keys are accepted and the key is CAPTURED, so `C42` can
+#: compare the accepted set against what the sources actually print instead of
+#: against this comment.
+UARTSUM = re.compile(r"rlxprobe:\s*(sum|seal)=([0-9a-f]{8})")
 
 POISON = 0xDEADC0DE
 
@@ -114,25 +138,80 @@ PROGRESS = {
         0xA0: "P_ISC", 0xA8: "P_FLASHWIN", 0xB0: "P_RESTORED",
         0xC0: "P_SEALED",
     },
+    # 🆕 2026-09-14 (`RB-1`, cause ①).  The third generation's ladder is a
+    # different SHAPE, not just different numbers: it starts at 0x01 rather
+    # than 0x10, it seals at 0xF1, and `P_ROWS` is a BASE plus a row index
+    # rather than a stage.  讀 `probe4.c:106-112`, `probe5.c:137-144`,
+    # `probe6.c:132-139`; `C10` re-reads all three and this copy is what it
+    # compares against.
+    #
+    # 🟢 `P_SEALED - P_RESTORED` is **1** for all three, where it is 0x10 for
+    # probe2 and probe3.  That is `C9` arriving: its 2026-08-31 docstring said
+    # *"it happens to be 0x10 for both payloads that exist, and control C9 is
+    # what would notice if a future one differed"*.  Three differed at once,
+    # and because `ladder()` derives the value from the table rather than
+    # hardcoding it, **not one line of arithmetic changed here**.
+    0x524C5834: {
+        0x01: "P_POISON", 0x02: "P_HEADER", 0x03: "P_INSTALLED",
+        0x04: "P_BREAK", 0x10: "P_ROWS", 0xF0: "P_RESTORED",
+        0xF1: "P_SEALED",
+    },
+    0x524C5835: {
+        0x01: "P_POISON", 0x02: "P_HEADER", 0x03: "P_INSTALLED",
+        0x04: "P_BREAK", 0x05: "P_ADDR0", 0x10: "P_ROWS",
+        0xF0: "P_RESTORED", 0xF1: "P_SEALED",
+    },
+    0x524C5836: {
+        0x01: "P_POISON", 0x02: "P_HEADER", 0x03: "P_INSTALLED",
+        0x04: "P_BREAK", 0x05: "P_CELLS", 0x10: "P_ROWS",
+        0xF0: "P_RESTORED", 0xF1: "P_SEALED",
+    },
 }
 
-MAGICS = {0x524C5831: "probe1", 0x524C5832: "probe2", 0x524C5833: "probe3"}
+MAGICS = {0x524C5831: "probe1", 0x524C5832: "probe2", 0x524C5833: "probe3",
+          0x524C5834: "probe4", 0x524C5835: "probe5", 0x524C5836: "probe6"}
 
 
 def ladder(magic):
     """(names, sealed, restamp) for the payload this block names.
 
     ``restamp`` is ``P_SEALED - P_RESTORED`` **computed from that payload's own
-    ladder**, not the literal 0x10.  It happens to be 0x10 for both payloads
-    that exist, and control C9 is what would notice if a future one differed:
-    a correction quoted as a constant is a constant that goes stale, and this
-    one is the difference between two symbols in one header.
+    ladder**, not the literal 0x10.  🔄 **2026-09-14: the future that sentence
+    was written for arrived, and the derivation is what made it free.**  It
+    read *"it happens to be 0x10 for both payloads that exist, and control C9
+    is what would notice if a future one differed"*; `probe4`, `probe5` and
+    `probe6` all seal at 0xF1 over a 0xF0 restore, so the value is **1** for
+    three of the six payloads and no arithmetic here changed.  A correction
+    quoted as a constant is a constant that goes stale; this one is the
+    difference between two symbols in one header.
     """
     names = PROGRESS.get(magic)
     if not names:
         return None, None, None
     inv = {v: k for k, v in names.items()}
     return names, inv["P_SEALED"], inv["P_SEALED"] - inv["P_RESTORED"]
+
+
+def stage_name(names, prog):
+    """The ladder's name for a progress word, the row loop included.
+
+    🔴 2026-09-14 (`RB-1`): `P_ROWS` is a **base plus a row index**, not a
+    stage -- 讀 `tools/rlxprobe/probe4.c:110`,
+    ``#define P_ROWS\t0x10u\t/* + row index */``.  A plain dict lookup calls
+    every run that stopped inside the row loop `NOT A STAGE`, which is the
+    least informative thing this tool could say about the only kind of partial
+    run these three payloads can produce.  The base and the stage above it are
+    both read out of the ladder, so no number here is hardcoded and a payload
+    without a `P_ROWS` stage is unaffected.
+    """
+    if prog in names:
+        return names[prog]
+    base = next((v for v, n in names.items() if n == "P_ROWS"), None)
+    if base is not None:
+        above = [v for v in names if v > base]
+        if prog > base and (not above or prog < min(above)):
+            return f"P_ROWS+{prog - base:#x} (stopped in the row loop)"
+    return "NOT A STAGE"
 
 
 class Refuse(Exception):
@@ -220,11 +299,11 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
                      f"checked at all -- reported rather than assumed")
         restamp = 0x10
     else:
-        report(f"  progress    {prog:08X}   {names.get(prog, 'NOT A STAGE')}"
+        report(f"  progress    {prog:08X}   {stage_name(names, prog)}"
                f"   (sealed = {sealed:#04x})")
         if prog != sealed:
             fails.append(
-                f"progress is {prog:08X} ({names.get(prog, 'not a stage')}), "
+                f"progress is {prog:08X} ({stage_name(names, prog)}), "
                 f"not P_SEALED ({sealed:#04x}) -- the run stopped there and "
                 f"the sum is of a partial block")
 
@@ -521,13 +600,15 @@ def check_block(words, base, count, uart_sum=None, seal_kind=1,
 def read_uart_sum(path):
     with open(path, "rb") as f:
         text = f.read().decode("latin-1")
-    hits = UARTSUM.findall(text)
+    hits = UARTSUM.findall(text)          # (key, hex) pairs since 2026-09-14
     if not hits:
         return None
     if len(set(hits)) > 1:
-        raise Refuse(f"{path}: {len(set(hits))} different sum= lines -- "
-                     f"this capture holds more than one run")
-    return int(hits[0], 16)
+        keys = sorted({k for k, _ in hits})
+        raise Refuse(f"{path}: {len(set(hits))} different seal lines "
+                     f"(key(s) {', '.join(keys)}) -- this capture holds more "
+                     f"than one run, or two payloads' output is interleaved")
+    return int(hits[0][1], 16)
 
 
 # ----------------------------------------------------------------- controls
@@ -547,12 +628,181 @@ P3QJ = "bench/2026-08-30/QJ.log"
 # block whose three channels agree.
 PAIRRB = "bench/2026-08-31c/K2b-rb.log"
 
+#: 🆕 2026-09-14 (`RB-1`): the third generation's anchors, and they are REAL
+#: on-device blocks rather than synthetic ones.  `PROGRESS.md`'s `RB-1` row
+#: asks for exactly this -- *"擴充的錨要用 2026-09-14 那份真的 on-device 擷取"*
+#: -- on the `C16`/`C39` ground that a control rewritten to fit new code is no
+#: longer evidence about the code.  Both were read at the loader prompt on
+#: seating 21 with `DW <base> RB_POISON_W`, so each capture carries its own
+#: eight-word poison margin and `C5`'s over-run check runs on it for free.
+#:
+#: ⚠️ What these two do NOT establish: `probe6`.  Its block does not exist
+#: yet -- seating 22 is tonight -- so `probe6`'s row in every table above is a
+#: PREDICTION this suite makes and cannot yet test.  `C40` is what refuses to
+#: let it be forgotten.
+P4RB, P4J = "bench/2026-09-14/C1-P4rb.log", "bench/2026-09-14/C1-P4j.log"
+P4_BASE, P4_WORDS, P4_SEAL = 0x80A03000, 633, 0xAF7A728B
+P5RB, P5J = "bench/2026-09-14/C1-P5rb.log", "bench/2026-09-14/C1-P5j.log"
+P5_BASE, P5_WORDS, P5_SEAL = 0x80A04000, 225, 0xD72EB67D
+
 #: where the ladders actually live.  C10 re-reads these rather than trusting
 #: the copy above.
 SRC = {0x524C5832: "tools/rlxprobe/probe2.c",
-       0x524C5833: "tools/rlxprobe/probe3.c"}
+       0x524C5833: "tools/rlxprobe/probe3.c",
+       0x524C5834: "tools/rlxprobe/probe4.c",
+       0x524C5835: "tools/rlxprobe/probe5.c",
+       0x524C5836: "tools/rlxprobe/probe6.c"}
 
-DEFINE = re.compile(r"^#define\s+(P_[A-Z_]+)\s+(0x[0-9A-Fa-f]+)u?\s*$")
+#: 🔴 2026-09-14: the `$` anchor made this a THIRD way `RB-1` would have
+#: bitten.  `probe4`..`probe6` write ``#define P_ROWS\t0x10u\t/* + row index
+#: */``, and an anchored pattern skips it -- so `C10` would have compared a
+#: six-stage source against a seven-stage table and failed the three payloads
+#: this segment added, for a reason that has nothing to do with their ladders.
+#: A trailing C comment is allowed; 量, `probe2.c` and `probe3.c` carry none,
+#: so relaxing it adds no stage to the two payloads that already passed.
+#: 🔴 And the name class needed a DIGIT.  `probe5.c:141` is
+#: ``#define P_ADDR0\t\t0x05u`` -- `P_[A-Z_]+` does not match it, so the stage
+#: parsed out of the source was silently one short and `C10` reported
+#: ``here-only {'P_ADDR0': 5}``.  **`C10` caught that, on this segment's own
+#: first run**, which is the control doing precisely what its 2026-08-31
+#: docstring says it exists for: *"this control FAILS if somebody edits a
+#: ladder in the C and not here"* -- here it was the parser rather than an
+#: edit, and the comparison does not care which.
+DEFINE = re.compile(
+    r"^#define\s+(P_[A-Z_0-9]+)\s+(0x[0-9A-Fa-f]+)u?\s*(?:/\*.*\*/)?\s*$")
+
+
+#: The two facts a payload source states about itself that this tool keeps a
+#: second copy of.  Both are read back rather than trusted -- see
+#: `payload_census`.
+RB_MAGIC_RE = re.compile(r"^#define\s+RB_MAGIC\s+(0x[0-9A-Fa-f]+)u?\b")
+#: The KEY only.  `probe1` prints `field("sum", rb_get(...))` where the others
+#: print `field("sum", sum)`, so a pattern that also pinned the argument would
+#: have silently excluded the oldest payload from the census -- which is this
+#: file's own defect wearing a different sleeve.
+SEALFIELD = re.compile(r'field\("(sum|seal)",')
+
+#: 🔴 Declared BY NAME, and its correctness is a control rather than this
+#: comment.  `probe1` carries an `RB_MAGIC` and a result block but **no
+#: progress ladder at all** -- 量 2026-09-14: zero `#define P_*` lines in
+#: `probe1.c`, and its word 2 is `RB_VERSION` (`probe1.c:396`) where every
+#: later payload puts `H_PROGRESS`.  It is therefore legitimately absent from
+#: `PROGRESS` and from `SRC`, and it is in `MAGICS` only so that a probe1 block
+#: is named rather than reported `unknown`.
+#:
+#: ⚠️ **It was absent from both tables before today as well, and no file said
+#: so.**  That is `RB-1`'s own shape -- an undeclared gap in a table about this
+#: repository's own contents -- one payload older, and it surfaced only because
+#: the population control below enumerates the tree instead of the tables.
+#: 🔴 A consequence that is NOT fixed here and is recorded instead: given a
+#: probe1 block, `check_block` falls to `restamp = 0x10`, which is wrong twice
+#: over -- probe1 does not re-stamp word 2 at all, so `--seal-kind 0` is the
+#: correct reading for it.  No probe1 block has ever been passed to this tool.
+NO_LADDER = {
+    0x524C5831: "probe1 has no `#define P_*` and its word 2 is RB_VERSION, "
+                "not a progress word",
+}
+
+
+def payload_census(root=None):
+    """Every payload that EXISTS, read off the filesystem.
+
+    🔴 **2026-09-14: this is `RB-1`'s root cause, and the three missing table
+    rows were its symptom.**  `MAGICS`, `PROGRESS`, `SRC` and `UARTSUM` are
+    four copies of one fact -- *which payloads exist and what they print* --
+    and nothing in this tool had ever compared any of them against
+    `tools/rlxprobe/`.  `probe4` and `probe5` were built on 2026-09-13 and
+    `probe6` on 2026-09-14; this suite ran **40 of 40 green on both days** and
+    said nothing about any of them, because every control it owns runs on a
+    payload that is already in the tables.
+
+    `C13` is the near miss worth naming: it asserts that an unrecognised magic
+    SAYS it cannot judge completion, so it passes *because* the gap exists, and
+    it would stay green if `MAGICS` were emptied to a single entry.  A control
+    over the announcement is not a control over the population.
+
+    Returns ``{magic: (name, relpath, sealkey)}``, so a payload cannot enter
+    the population without a file on disk, and `sealkey` is `None` when the
+    source prints no seal field at all (`probe0` has no result block).
+    """
+    root = root or _root()
+    d = os.path.join(root, "tools", "rlxprobe")
+    out = {}
+    for fn in sorted(os.listdir(d)):
+        if not (fn.startswith("probe") and fn.endswith(".c")):
+            continue
+        text = io_read(os.path.join(d, fn))
+        magic = None
+        for line in text.splitlines():
+            m = RB_MAGIC_RE.match(line.strip())
+            if m:
+                magic = int(m.group(1), 16)
+                break
+        if magic is None:
+            continue
+        k = SEALFIELD.search(text)
+        out[magic] = (fn[:-2], f"tools/rlxprobe/{fn}", k.group(1) if k else None)
+    return out
+
+
+def _uart_accepts(key):
+    """Does `UARTSUM` match a seal line printed with this key?
+
+    Behavioural, not introspective: it runs the pattern against a line of the
+    shape `report.c`'s `field()` emits.  Reading the accepted keys out of the
+    pattern's own text would be a fifth copy of the same fact.
+    """
+    return UARTSUM.search(f"rlxprobe: {key}=deadbeef") is not None
+
+
+def _population_gap(census, progress, magics, src):
+    """Payloads on disk that some table or the UART pattern does not know.
+
+    Takes the tables as arguments so a control can hand it a mutilated copy
+    and require it to complain -- without that, *the tables cover the tree* is
+    a sentence that cannot fail.
+    """
+    gaps = []
+    for magic, (name, _rel, key) in sorted(census.items()):
+        tables = [("MAGICS", magics)]
+        if magic not in NO_LADDER:
+            tables += [("PROGRESS", progress), ("SRC", src)]
+        missing = [t for t, d in tables if magic not in d]
+        if missing:
+            gaps.append(f"{name} ({magic:08X}) is not in "
+                        f"{'/'.join(missing)}")
+        if key is not None and not _uart_accepts(key):
+            gaps.append(f"{name} prints `{key}=` and UARTSUM does not "
+                        f"match it, so channel (1) silently drops out")
+    return gaps
+
+
+def _exemption_exact(census, exempt):
+    """`NO_LADDER` in BOTH directions.  [] means the list is exact.
+
+    An allow-list that only ever excuses things cannot fail.  This one has to
+    be wrong in two ways before it is trusted: an exempt payload that is no
+    longer on disk is reported, and an exempt payload that turns out to HAVE a
+    ladder is reported -- so the exemption cannot hide a real table gap, which
+    is the only way it could ever do damage.
+    """
+    notes = []
+    for magic in sorted(exempt):
+        if magic not in census:
+            notes.append(f"{magic:08X} is excused and no source on disk "
+                         f"carries that RB_MAGIC")
+            continue
+        name, rel, _k = census[magic]
+        try:
+            text = io_read(os.path.join(_root(), rel))
+        except OSError as e:
+            notes.append(f"{rel}: {e}")
+            continue
+        stages = [ln for ln in text.splitlines() if DEFINE.match(ln.strip())]
+        if stages:
+            notes.append(f"{name} is excused from PROGRESS but its source has "
+                         f"{len(stages)} `#define P_*` line(s)")
+    return notes
 
 
 def _ladders_match_source():
@@ -607,7 +857,12 @@ def _quiet(*_a, **_k):
 
 
 def run_controls():
-    """Sixteen, and eleven of them must fail.  Returns 0 if every one behaved."""
+    """Every control, in order.  Returns 0 if every one behaved.
+
+    🔴 No count here either, and for the reason the module docstring gives: this
+    line read *"Sixteen, and eleven of them must fail"* on a day there were
+    forty.  ``tools/ci-expected.tsv`` owns the number and `ci-census` checks it.
+    """
     print("rbcheck controls")
     ok = True
 
@@ -1091,6 +1346,115 @@ def run_controls():
     row("C30", "a 707-word block declines Group F rather than reading it",
         not f, f"n_res=194 with a fault word planted in the row area; "
                f"{len(f)} failure(s)")
+
+    # ----------------------------------------------------------- C40..C48
+    # 🔴 2026-09-14, `RB-1`.  C40..C44 are the POPULATION and its four positive
+    # controls; C45..C48 are the two real on-device blocks the row asked for
+    # and what they establish.  Everything above this line runs on a payload
+    # that was already in the tables, which is exactly why 40 of 40 stayed
+    # green while three payloads were built that this tool could not read.
+
+    census = payload_census()
+    gaps = _population_gap(census, PROGRESS, MAGICS, SRC)
+    both = set(census) >= set(SRC)
+    row("C40", "the tables and tools/rlxprobe/ cover each other, both ways",
+        not gaps and both,
+        f"{len(census)} payload(s) on disk carry an RB_MAGIC: "
+        + ", ".join(census[m][0] for m in sorted(census))
+        + ("" if both else "; SRC names a magic no source carries")
+        + (f"; GAPS: {'; '.join(gaps)}" if gaps else ""))
+
+    # C41 -- C40's positive control on the table half.  Without it, *the tables
+    # cover the tree* is a sentence with no way to be false.
+    minus6 = {k: v for k, v in PROGRESS.items() if k != 0x524C5836}
+    g = _population_gap(census, minus6, MAGICS, SRC)
+    row("C41", "a payload missing from PROGRESS is REPORTED",
+        any("probe6" in x and "PROGRESS" in x for x in g),
+        f"{len(g)} gap(s) with probe6 dropped from the ladder table")
+
+    # C42 -- C40's positive control on the UART half.  This is the one that
+    # says the pattern is not `anything=hex`: cause ② of `RB-1` was a key
+    # rename, and a pattern that accepted every key would have hidden it.
+    g = _population_gap({0x1: ("probeX", "x.c", "checksum")},
+                        PROGRESS, MAGICS, SRC)
+    row("C42", "a payload printing an unaccepted seal key is REPORTED",
+        any("checksum" in x for x in g) and _uart_accepts("sum")
+        and _uart_accepts("seal") and not _uart_accepts("checksum"),
+        "accepts sum= and seal=, rejects checksum=")
+
+    # C43 -- the exemption list, in both directions.
+    ex = _exemption_exact(census, NO_LADDER)
+    row("C43", "NO_LADDER is exact: excused payloads exist and have no ladder",
+        not ex,
+        f"{len(NO_LADDER)} excused ("
+        + ", ".join(census[m][0] for m in sorted(NO_LADDER) if m in census)
+        + ")" + (f"; {'; '.join(ex)}" if ex else ""))
+
+    # C44 -- C43's positive control.  An allow-list that only ever excuses
+    # cannot fail, so excusing a payload that HAS a ladder must be caught.
+    pretend = dict(NO_LADDER)
+    pretend[0x524C5832] = "pretend probe2 has no ladder"
+    ex = _exemption_exact(census, pretend)
+    row("C44", "excusing a payload that HAS a ladder is caught",
+        any("probe2" in x for x in ex),
+        f"{len(ex)} note(s) with probe2 wrongly excused")
+
+    # C45/C46 -- the anchors.  Real blocks, read at the loader prompt on
+    # seating 21, on a payload generation this tool could not read this
+    # morning.  Note what they check that no synthetic block can: the seal is
+    # a sum the DEVICE computed, and the UART line was printed by the payload
+    # while the `DW` read-back came from the loader -- two programs.
+    try:
+        p4w = parse_words(_read(P4RB))
+        p4u = read_uart_sum(os.path.join(_root(), P4J))
+        f = check_block(p4w, P4_BASE, P4_WORDS, uart_sum=p4u,
+                        expect_magic=0x524C5834, report=_quiet)
+        row("C45", "probe4 at 633 words on silicon: three channels agree",
+            not f and p4u == P4_SEAL,
+            f"seal {P4_SEAL:08X}, UART {p4u:08X}, {len(f)} failure(s)"
+            if p4u is not None else "no seal= line found -- cause (2) of RB-1")
+    except (OSError, Refuse) as e:
+        row("C45", "probe4 at 633 words on silicon: three channels agree",
+            False, str(e))
+
+    try:
+        p5w = parse_words(_read(P5RB))
+        p5u = read_uart_sum(os.path.join(_root(), P5J))
+        f = check_block(p5w, P5_BASE, P5_WORDS, uart_sum=p5u,
+                        expect_magic=0x524C5835, report=_quiet)
+        row("C46", "probe5 at 225 words on silicon: three channels agree",
+            not f and p5u == P5_SEAL,
+            f"seal {P5_SEAL:08X}, UART {p5u:08X}, {len(f)} failure(s)"
+            if p5u is not None else "no seal= line found -- cause (2) of RB-1")
+    except (OSError, Refuse) as e:
+        row("C46", "probe5 at 225 words on silicon: three channels agree",
+            False, str(e))
+
+    # C47 -- C9 for the third generation, and the reason the fix touched no
+    # arithmetic.  The restamp is 1 here and 0x10 for probe2/probe3; if the
+    # naive sum already equalled the seal the subtraction would be a fudge.
+    try:
+        naive = 0
+        for w in block(parse_words(_read(P4RB)), P4_BASE, P4_WORDS)[:P4_WORDS - 1]:
+            naive = (naive + w) & MASK
+        _, _, rs4 = ladder(0x524C5834)
+        row("C47", "probe4's re-stamp is 1 and the subtraction is not a no-op",
+            rs4 == 1 and naive != P4_SEAL and (naive - rs4) & MASK == P4_SEAL,
+            f"restamp {rs4}, naive {naive:08X}, seal {P4_SEAL:08X}")
+    except (OSError, Refuse) as e:
+        row("C47", "probe4's re-stamp is 1 and the subtraction is not a no-op",
+            False, str(e))
+
+    # C48 -- a run that stopped inside the row loop is NAMED.  `P_ROWS` is a
+    # base plus an index, so the dict lookup alone calls the only partial run
+    # these payloads can produce `NOT A STAGE`.
+    n6 = PROGRESS[0x524C5836]
+    row("C48", "a progress word inside the row loop is named, not NOT A STAGE",
+        stage_name(n6, 0x15).startswith("P_ROWS+0x5")
+        and stage_name(n6, 0x04) == "P_BREAK"
+        and stage_name(n6, 0xF5) == "NOT A STAGE",
+        f"0x15 -> {stage_name(n6, 0x15).split(' ')[0]}, "
+        f"0xF5 -> {stage_name(n6, 0xF5)}")
 
     print()
     return 0 if ok else 1

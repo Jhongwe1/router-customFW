@@ -54,9 +54,13 @@ MUT = [
      'pass  # fails.append(f"magic {magic:08X} names no payload this tool has a "'),
     ("M9  summation extent off by one",
      "    for w in b[:count - 1]:", "    for w in b[:count - 2]:"),
-    ("M12 the lower-case anchoring removed",
-     r'UARTSUM = re.compile(r"rlxprobe:\s*sum=([0-9a-f]{8})")',
-     r'UARTSUM = re.compile(r"rlxprobe:\s*sum=([0-9a-fA-F]{8})")'),
+    # 🔄 2026-09-14: this anchor moved with `RB-1`'s cause ②.  The pattern now
+    # accepts `seal=` as well as `sum=` and captures the key, so the old anchor
+    # matched nothing -- which `A0` would have reported as AMBIGUOUS-ANCHOR
+    # (0x) rather than as a survivor, and that is `A0` working.
+    ("M12 the lower-case anchoring removed                  (kills C15)",
+     r'UARTSUM = re.compile(r"rlxprobe:\s*(sum|seal)=([0-9a-f]{8})")',
+     r'UARTSUM = re.compile(r"rlxprobe:\s*(sum|seal)=([0-9a-fA-F]{8})")'),
     ("M17 the seal-is-poison refusal deleted",
      "    if seal == POISON:", "    if False:"),
     ("M18 the margin check made vacuous",
@@ -141,6 +145,52 @@ MUT = [
     ("M40 the pairing pass replaced by an empty result      (kills C33)",
      "            pos = fresh_positions(o_bmpk, o_seal, kept)",
      "            pos = []"),
+
+    # ------------------------------------------------------------- M41..M49
+    # 🔴 2026-09-14, `RB-1`.  Nine mutations over the payload population and
+    # the two on-device anchors.  The suite was 29/29 green on 2026-09-13 while
+    # `probe4` and `probe5` existed and the tool could not read either, so every
+    # row below is aimed at a construct that did not exist then.  M44 and M49
+    # are the two that matter: one resurrects the defect's cause ① exactly, the
+    # other makes the population control vacuous, which is the shape this
+    # repository calls *a tool reporting 0 is making a claim*.
+    ("M41 the seal= alternation reverted to sum= only       (kills C42)",
+     r'UARTSUM = re.compile(r"rlxprobe:\s*(sum|seal)=([0-9a-f]{8})")',
+     r'UARTSUM = re.compile(r"rlxprobe:\s*(sum)=([0-9a-f]{8})")'),
+    ("M42 probe6 dropped from MAGICS                        (kills C40)",
+     '          0x524C5834: "probe4", 0x524C5835: "probe5", '
+     '0x524C5836: "probe6"}',
+     '          0x524C5834: "probe4", 0x524C5835: "probe5"}'),
+    ("M43 the population gap always reports none            (kills C41)",
+     "    gaps = []\n"
+     "    for magic, (name, _rel, key) in sorted(census.items()):",
+     "    return []\n"
+     "    gaps = []\n"
+     "    for magic, (name, _rel, key) in sorted(census.items()):"),
+    ("M44 the payload census returns an empty population    (kills C40)",
+     "    out = {}\n"
+     "    for fn in sorted(os.listdir(d)):",
+     "    out = {}\n"
+     "    return out\n"
+     "    for fn in sorted(os.listdir(d)):"),
+    ("M45 the exemption list is never checked               (kills C44)",
+     "    notes = []\n"
+     "    for magic in sorted(exempt):",
+     "    notes = []\n"
+     "    return notes\n"
+     "    for magic in sorted(exempt):"),
+    ("M46 DEFINE refuses a trailing comment again           (kills C10)",
+     r'    r"^#define\s+(P_[A-Z_0-9]+)\s+(0x[0-9A-Fa-f]+)u?\s*(?:/\*.*\*/)?\s*$")',
+     r'    r"^#define\s+(P_[A-Z_0-9]+)\s+(0x[0-9A-Fa-f]+)u?\s*$")'),
+    ("M47 the row-loop naming removed                       (kills C48)",
+     '    base = next((v for v, n in names.items() if n == "P_ROWS"), None)',
+     "    base = None"),
+    ("M48 probe4's on-device seal off by one                (kills C45)",
+     "P4_BASE, P4_WORDS, P4_SEAL = 0x80A03000, 633, 0xAF7A728B",
+     "P4_BASE, P4_WORDS, P4_SEAL = 0x80A03000, 633, 0xAF7A728C"),
+    ("M49 the re-stamp hardcoded back to 0x10               (kills C47)",
+     '    return names, inv["P_SEALED"], inv["P_SEALED"] - inv["P_RESTORED"]',
+     '    return names, inv["P_SEALED"], 0x10'),
 ]
 
 

@@ -273,14 +273,20 @@ jobs:
       - name: test-tcheck
         run: /usr/bin/python3 tools/test-tcheck.py 2>&1 | tee ci-out/test-tcheck.out; exit "${PIPESTATUS[0]}"
 
-      # rbcheck's ten controls run off two captures committed in this
-      # repository -- bench/2026-08-25b/H2g.log and H2a.log -- so unlike
-      # hazlint, whose population control is 56 KiB of this unit's bootloader
-      # and can never be committed, every one of them runs on a stock runner.
-      # Six of the ten must FAIL for a pass to mean anything: a checksum
+      # rbcheck's controls run off captures committed in this repository --
+      # bench/2026-08-25b/H2g.log and H2a.log, and since 2026-09-14 also
+      # bench/2026-09-14/C1-P4rb.log and C1-P5rb.log with their UART halves --
+      # so unlike hazlint, whose population control is 56 KiB of this unit's
+      # bootloader and can never be committed, every one of them runs on a
+      # stock runner. Several must FAIL for a pass to mean anything: a checksum
       # comparison that has not been shown able to fail is not a checksum
       # comparison, and C9 is the row that fails if the seal correction ever
       # becomes a no-op.
+      #
+      # 🔴 The count is NOT restated here. This comment said "ten controls" and
+      # "six of the ten" on a day there were forty, which is CNT-1's class in
+      # the workflow file. tools/ci-expected.tsv owns it and ci-census checks
+      # it against what actually ran.
       - name: rbcheck self-test
         run: /usr/bin/python3 tools/rbcheck.py --self-test 2>&1 | tee ci-out/rbcheck.out; exit "${PIPESTATUS[0]}"
 
