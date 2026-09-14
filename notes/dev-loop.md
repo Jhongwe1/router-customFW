@@ -1240,3 +1240,39 @@ and nothing after `S5c` executes.
 distinguishing a *board* that is silent from a *host* that is misconfigured —
 both of this seating's readings are the host. The board-silent case remains
 covered by the self-test only.
+
+---
+
+## 18. 🔴 2026-09-14 (seating 21): the loop cannot drive a payload that resets the board, and that decision saved a power cycle
+
+`S4`…`S7` is exactly the five-step shape a bare-metal payload needs — reset,
+rescue, burn-flag read-back, upload, staged-head read-back, jump — and its guards
+are better than a hand-written card's, because `S6b` derives its expectation from
+the file `S6` sent rather than from anything typed.
+
+🔴 **And `S7` cannot be used for a payload built `RESET=1`.** Its capture is
+`--send 'J <LOAD_ADDR>' --idle 8 --seconds 45`, with **no `--esc-after`**. A
+payload with `RESET=1` ends by arming the watchdog; the board resets inside that
+cell; and without `--esc-after` the loader's ESC window is missed and **the
+vendor firmware boots**. That is the failure that cost seating 17 two of its
+three power cycles (`bench/2026-09-08b/CORRECTIONS-block14.md` § 4.1), and it
+would have cost this seating one.
+
+🔴 **`S8` is the second reason and it is not fixable by a flag.** It asserts the
+kernel's eleven boot marks and `RLXFW-ID0`; a payload prints neither, so the only
+way through is `--skip S8` — and a run whose assertion is switched off is an
+upload, not an iteration. `--skip S5b` is refused on exactly that ground.
+
+🟢 **So seating 21's card wrote the five steps by hand, in the `H1a`/`H2a` shape,
+and both `J` cells carried `--esc-after 60 --esc-period 0.002 --until '<RealTek>'
+--seconds 120`.** 量: all four payload runs of that seating (`C1-P4j`,
+`C1-P5j`, and the off-card `X1-P4j`, `X1-P5j`) carry the loader's
+`Reboot Result from Watchdog Timeout!` **inside the same capture as the payload's
+report** — so the bite is confirmed by the loader's own line rather than inferred
+from the prompt returning, and `tools/boot-timeline.py` classifies all four as
+warm resets.
+
+⚠️ **What this section does NOT claim**: that `looprun` should grow a payload
+mode. The repair it names is narrower — `S7` wants an `--esc-after` that the
+caller can set, and `S8`'s assertion set is what makes a payload a different
+animal. Whether that is worth doing is `R4`/`R5`'s, and it is not on any card.

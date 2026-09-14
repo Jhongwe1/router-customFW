@@ -824,6 +824,16 @@ it looked at a candidate. 量 ＋ 讀.**
   invocations across six seatings carried `--skip`, and 71 of 71 uploaded a
   pre-built `--image` with `--recipe-override`. Each skip was locally correct;
   the pattern is what no seating could see.
+* 🔴🔴 **2026-09-14 (seating 21): that never-run is STRUCTURAL, and this entry's
+  own sentence was the wrong shape.** `looprun --mode bench` with no `--skip`
+  is refused **before any stage runs**: the `--image` pre-flight sits above the
+  stage loop and requires `os.path.isfile(img)`, and **`S3` is what creates that
+  file**. Two arms, both `rc 2`, **zero files created**; the control —
+  `--skip S2,S3` with an existing image — passed the same guard and reached `S4`
+  in 12.25 s. So *71 of 71 carried `--skip`* is not a discipline finding and
+  *each skip was locally correct* is not the whole of it: **the tool cannot do
+  it at all**, and establishing that cost no power cycle.
+  `notes/dev-loop.md` § 10.6, `SEAM-1`.
 * 🔴 **§ 3.7's five, unchanged**: this is not a claim that my drivers are
   better; neither third-party image has been run on this board and neither
   will be; two of the six drivers have **no partner at all** and two more have
@@ -876,7 +886,7 @@ appended, which adds exactly one pair.)*
 | `R3` → `P4a` | no |
 | `P4a` → `P4b-gate` | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
 | `P4b-gate` → `R4` | no |
-| `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it |
+| `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it 🔴🔴 **2026-09-14: this firing is DISCHARGED, and the answer is negative.** The seam is not a thing a seating was going to do — `looprun --mode bench` with no `--skip` cannot run, because its `--image` pre-flight requires the file `S3` creates. Measured at the desk with two refusing arms and a control that passed the same guard, for **zero power cycles**. ⚠️ So the clause's only new firing at eight entries was real and its subject turns out to be a tool defect rather than a missing measurement — which is a reading about the clause too: it names a *thing*, and a thing can be impossible. |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,

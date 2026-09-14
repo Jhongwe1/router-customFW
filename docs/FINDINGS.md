@@ -15,6 +15,8 @@ dump or a document · **推** inferred, pending a measurement.
 
 | | | |
 |---|---|---|
+| 🔴 量 | **A FULL SWEEP AND AN `--only` SWEEP DISAGREED, and the rule that predicted it names the suite by name.** 2026-09-14, seating 21 added 14 captures and changed no suite's code. `tools/desk-sweep.py run` reported `73 green, 2 expected-red, 1 unexpected` and the one was `text/test-boot-timeline`, whose `B2` asserts a hardcoded `N cold, M warm` over the whole of `bench/`. An `--only` run over the suites whose CODE changed would have been green -- and this is the THIRD time, the first two having gone red on GitHub after a local green. **A seating changes DATA, and data is what these cases assert on.** The isolation check `B2` documents for itself came back clean: corpus 35/145, the new directory alone 1/4, every other directory still 34/141 byte-for-byte, so the delta is exactly +1/+4 and nothing was reclassified | `CLAUDE.md`, `tools/test-boot-timeline.sh` `B2` |
+| 🔴 量 | **A CHECK FIRED ON A ROW IT HAD ALWAYS SKIPPED, because the row gained its first checkable number.** `spec-check`'s `C5` requires one literal from a `SPEC.md` row to appear in the file that row names as owner. `CPU-14`'s value cell had held no extractable literal at all -- its counts live in the 來源 cell, which `C5` excludes -- so `C5` had silently skipped it for the row's whole life. Adding two measured constants on 2026-09-14 made it a checked row, and it went red because `tools/hazlint` is a linter and those are payload constants. **The fix is the owner cell, not the linter**: `hazlint` owns how many load-use sites exist; the new half of the row is at what distance the hazard closes, and that is `docs/isa-hazard.md`'s. ⚠️ The general shape: **a row with no numbers is a row no owner check can reach** | `tools/spec-check.py` `C5`, `SPEC.md` `CPU-14` |
 | 🔴 量 | **A BUILD GATE PREVENTED EXACTLY THE EXPERIMENT THE PLAN ASKS FOR, and no document in this repository had noticed.** `plan:1038` requires `R1b`'s load-delay test to be `lw` 後緊接讀取同一暫存器, which is word for word `tools/hazlint`'s own definition of a violation -- and `tools/rlxprobe/Makefile` makes `.bin` unbuildable unless `hazlint` exits 0, with no waiver in its option table, with `gate-check` failing the build if the gate is loosened, and with `cells.S:69 (a payload that built its victim instructions at)` foreclosing run-time construction. **The resolution is not a waiver and not an address window** -- a window drops silently and creates a SEAM neither side checks. `tools/hazdecl.py` runs the UNMODIFIED gate over the WHOLE image and adjudicates its output in both directions, and for probe5 **`hazlint` exiting 0 is a build failure**: a hazard payload with no hazards has had them compiled away. The gate's output became data for a second check, which is strictly more than *zero* ever said | `docs/isa-hazard.md` § 4, `SPEC.md` `CPU-54` |
 | 🔴 量 | **A GENERATED HEADER WAS NOT A PREREQUISITE, on both generated payloads, and it was found by an unexplained sha rather than by a checker.** An incremental `probe5.bin` hashed differently from a clean build of the same sources. 量: `touch probe5rows.h; make P=probe5 payload` does not rebuild `probe5.o`, and the same on probe4 -- the `.c` rule lists the two hand-written headers and not the generated one, while `P5_ROWS` reaches `O_SEAL`, `RB_WORDS`, the sweep's loop bound and both compile-time assertions from inside the driver. A row added to the table linked a 23-row driver over a 24-row table while `make show` printed a `DW` count from the NEW `.mk`, so a read-back with the printed count runs past or stops short of the seal. **Live on probe4, the payload going to the bench.** 🔴 And `dep-check`'s FIRST negative control came back green, because its recursion carried no `-f` and the crippled copy's recipe ran against the intact Makefile: **a gate that cannot be tested is a gate nobody has shown to be closed** | `tools/rlxprobe/Makefile`, `tools/test-rlxprobe.sh` `G4` |
 | 🔴 量 | **Two parsers of mine printed a number that was not what they claimed to be measuring, within one hour, and the exit code caught both.** One matched `hazlint`'s OWN control line (*Expected: 2 violations*) and read 2 for every case including the negative control; one anchored `VIOLATIONS` at column 0 where the line is indented two spaces and read `?` for all of them. **The fix is not care, it is a control**: `hazdecl`'s FIRST check is that the number of records it parsed equals the count the tool itself printed, and a disagreement is a refusal rather than a report | `tools/hazdecl.py` `P1` |
@@ -527,6 +529,44 @@ rather than by a checker.
 | 讀 | **A key-derivation choice had never been costed in memory.** scrypt at meaningful parameters wants 16 MiB of the 26 MiB this kernel gets, from one unauthenticated request | The rate limiter moves in front of the KDF, and the parameters are set by an anti-DoS budget · plan D8 |
 
 ## It answered a question that had been open
+
+🔴🔴 **2026-09-14 (seating 21) — the cell `plan`'s `D1` had been holding open
+for a whole gate is observed, attributed, AND was pre-registered to the bit.**
+`D1` requires that *does not trap and computes the wrong answer* has either been
+observed or is recorded as never observed over a stated population. `probe4`'s
+`rotr` row read **`00123456`** where MIPS32r2 says `78123456`, with no exception.
+Input `12345678`, shift 8: a rotate gives `78123456`, a logical shift right gives
+`00123456`. The encoding is `0x00291202` — SPECIAL with `rs=1`, and that one bit
+in the `rs` field is the whole difference between `rotr` and `srl`. **This core
+ignores it and executes `srl`.** 🟢 And the value was not reconstructed
+afterwards: `tools/isa-payload.tsv`'s own `why` for that row reads *a core that
+ignores it computes srl and answers 0x00123456, which is the WRONG cell doing its
+job*. The value, the mechanism and the reason the row exists were all on paper
+before the board was powered. 🔴 **It is the first-hand evidence for
+`CLAUDE.md`'s ban on `-march=mips32`**, whose stated reason — *miscompiles
+silently, no fault, no warning, just wrong values* — had been inherited rather
+than measured on this die. ⚠️ One encoding, not a claim about mips32 as a whole:
+the population is 75 rows and `WRONG` is 1 of 75.
+`量` · `SPEC.md` `CPU-55`, `docs/isa-payload.md` § 6, `bench/2026-09-14/C1-P4j.log`.
+
+🔴🔴 **2026-09-14 — `mfc0 $x, $14` reads EPC on this die and `mtc0 $x, $14` does
+not write it, and the way that was established is three alternatives closed in
+the artefact rather than one reading believed.** `probe5`'s three `cp0` rungs all
+read `VOID` with the control word at **`80500270`** — neither the written
+`5A5A5A50` nor the prior `A5A5A5A0`. That value has a named source: it is the
+address of the payload's own `break`, the only one in the image, located by
+disassembly. Five reads agree (three rows' `out_gpr`, the same three rows'
+`out_aux`, and the header's `epc.end`). The three ways it could have been the
+instrument are each closed: the emitted word is `408b7000` `mtc0 t3,c0_epc`;
+`$11` is loaded by `lui`/`ori` immediately before; and all three rows carry
+`n=0 cause=0`, which `VOID` already implies because `TRAPS` outranks it.
+⚠️ **It refutes the read-write half of `docs/isa-hazard.md` § 7.4's premise for
+choosing EPC while its SAFETY half held exactly as written** — nothing trapped
+and the handler was not misled. So the family's verdict is *not measurable with
+this register on this part*, with the reason measured rather than argued, which
+is what `D3` asks of a *not measurable*. 🔴 And the payload's own `aux.zero`
+control was blind here: it tests for *equal to zero*, not *equal to the expected
+constant*. `量` · `SPEC.md` `CPU-56`, `docs/isa-hazard.md` § 7.4.
 
 🆕 **2026-09-10 (seating 20) — the vendor's reset-button timer acts ONCE PER
 BOOT, and three confounds had to be broken by experiment before that sentence
