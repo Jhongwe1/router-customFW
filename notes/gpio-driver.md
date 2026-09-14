@@ -382,7 +382,10 @@ about, in reverse.
 `rtl_gpio_timer` as touching bit 6 only while the button is held, and on
 release. `REG-37`'s released control is twenty-seven samples of a static
 `0000007C`, and `X6-decay`'s post-long-press control is thirty samples of a
-static `0000003C` across 152.1 s. So with the button untouched the vendor is
+static `0000003C` across **139.251 s** (🔄 corrected 2026-09-14: 152.1 was
+`duration_s`, which includes the `--idle 8.0` tail; the interval over which the
+latch was *observed* constant is first `dat` to last `dat`). So with the button
+untouched the vendor is
 not observed to write bit 6 at all.
 
 ### 6.1 The instrument
@@ -539,7 +542,7 @@ vendor's own driver, measured on this die.**
 
 🔴 **The stated exception**: after a long press, `REG-37` measured `dat`
 latched at `0000003C` — bit 6 **low**, the LED lit — stable for at least
-152.1 s. If the board boots into that state, the probe write *does* change the
+**139.251 s** (🔄 2026-09-14, was 152.1 = `duration_s`). If the board boots into that state, the probe write *does* change the
 pin, from lit to dark. That is still a state the vendor holds it in for most
 of its life, and `G7`/`G8` are there so the capture says which of the two
 happened rather than leaving it to be assumed.

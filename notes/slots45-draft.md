@@ -15,8 +15,8 @@ repository**, which is the part worth writing down before it is forgotten.
 
 | slot | row | what it asks for |
 |---|---|---|
-| 4 | `SPEC.md:625`, `FW-65` 殘留 | `/proc/gpio` is the **vendor's** user-writable path and `FW-65` only read the compiled code. Two questions: ① does `echo 1 > /proc/gpio` get seen by `rtl819x-gpio`'s `n_state_foreign` — which would be that detector's first **non-synthetic** positive control; ② is `AutoCfg_LED_Blink` (set by `echo 2`) consumed by the second bit-6 block inside `rtl_gpio_timer`, which only runs while the timer is alive |
-| 5 | `SPEC.md:624`, `FW-63` 殘留 | **is the steady-lit interval a constant 5.000 s?** The shape read out of the code is *dark `φ+1` s → lit 5.000 s → alternate every 1 s starting dark*, and seating 20's three low-fractions all fall inside its band — **but a fraction is an integral and has limited power to resolve a shape.** It needs an instrument that **timestamps every bit-6 transition**, and `FW-63`'s own instrument counts samples |
+| 4 | `SPEC.md:628` (`FW-65` 殘留), 🔄 **was `:625`, which is a different, already-closed row — the citation was measured before the commit that shipped it added three lines above it** | `/proc/gpio` is the **vendor's** user-writable path and `FW-65` only read the compiled code. Two questions: ① does `echo 1 > /proc/gpio` get seen by `rtl819x-gpio`'s `n_state_foreign` — which would be that detector's first **non-synthetic** positive control; ② is `AutoCfg_LED_Blink` (set by `echo 2`) consumed by the second bit-6 block inside `rtl_gpio_timer`, which only runs while the timer is alive |
+| 5 | `SPEC.md:627` (`FW-63` 殘留), 🔄 **was `:624`, same cause** | **is the steady-lit interval a constant 5.000 s?** The shape read out of the code is *dark `φ+1` s → lit 5.000 s → alternate every 1 s starting dark*, and seating 20's three low-fractions all fall inside its band — **but a fraction is an integral and has limited power to resolve a shape.** It needs an instrument that **timestamps every bit-6 transition**, and `FW-63`'s own instrument counts samples |
 
 **Slot 4's ② and slot 5 both depend on `FW-62`**: the vendor's `rtl_gpio_timer`
 acts **once per boot**, started by the first hold past ~2 s. So slot 4's two
@@ -43,10 +43,20 @@ the first with `offset >= b`.
 
 ### ② No `--send` in this project's history has ever contained a shell loop
 
-量: 0 of all committed `*.meta.json` `sent` fields contain `while`, `until` or
-`for`. `while` / `[` / `$((…))` are POSIX and busybox ash has them — but that is
-**推** about *this* binary, and `tools/cardcheck.py:166-171` says in its own
-comment that this repository has never enumerated its builtin table.
+🔴 **REFUTED 2026-09-14 (sixty-seventh segment). There are TEN**, on silicon:
+`bench/2026-09-06c/X14-fast`, `X15-slow`, `X16-heldfast`, `X17-heldslow`,
+`X23-after` and `bench/2026-09-09b/X2-relax`, `X3-relax`, `X4-relax`,
+`X5-blink`, `X6-decay` — all `for i in <literal list>; do busybox grep …; done`,
+four of them nested two deep, across two images and two seatings. 量 over 1,135
+committed `.meta.json`. **So the construct needed no pre-flight at all**; what
+is genuinely un-exercised is `while`/`until`/`$((…))`, and `cardcheck`'s `B9`
+then refused those anyway. The struck claim, as written:
+
+> ~~量: 0 of all committed `*.meta.json` `sent` fields contain `while`, `until` or
+> `for`.~~ `while` / `[` / `$((…))` are POSIX and busybox ash has them — but that
+> is **推** about *this* binary, and `tools/cardcheck.py:166 (this project has)`
+> says in its own comment that this repository has never enumerated its builtin
+> table. 🟢 **That half is now 量 too — `SPEC.md` `FW-66`.**
 
 **Pre-flight it at the desk** with the instrument that produced `FW-25`, `FW-26`
 and `FW-42`: `qemu-mips-static -L $FWRE_WORK/extracted/unit-2018/squashfs-root`
