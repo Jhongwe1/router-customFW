@@ -301,6 +301,20 @@ def cmd_refresh(kroot):
     print("  swept %d source file(s) under %s" % (len(files), kroot))
     print("  wrote %d symbol(s), %d on the exception path, to %s"
           % (len(per), n_exc, os.path.relpath(TABLE, ROOT)))
+    # \U0001F534 The `files` column is path-shaped, so every refresh CITES vendor
+    # source as far as `tools/ledgerscan.py` is concerned -- and on 2026-09-14
+    # that turned CI red on `arch/rlx/kernel/irq.c`, a file nobody opened.  The
+    # coupling was invisible; the tool that causes it now says so out loud, and
+    # names the paths, so the operator does not have to notice.
+    paths = sorted({p for fl in per.values() for p in fl})
+    print()
+    print("  \U0001F534 this table CITES %d vendor source path(s). `ledgerscan` "
+          "cannot tell" % len(paths))
+    print("     a generated enumeration from a file somebody read, so run")
+    print("       /usr/bin/python3 tools/ledgerscan.py check")
+    print("     before committing. A path in an in-scope domain that is not in")
+    print("     docs/blind-write-ledger.md turns CI red, and the desk sweep")
+    print("     cannot catch it because this file is written after the sweep.")
     return 0
 
 
