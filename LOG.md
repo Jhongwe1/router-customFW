@@ -27226,3 +27226,23 @@ C2-MM0  (任何核心之前)                    C4-MM1  (三個核心之後)
 boot 3／4 前面也是 Linux 而讀 `7C`。`boot_dir FF000000` ⇒ 我的驅動讀的時候 bit 6 是**輸入**,
 所以那一位是接腳電位。中途我用三個點形成了一個「裸機→亮、Linux→暗」的讀法並講了兩次,
 第四個點推翻它 —— 記在這裡因為它被講出去過。
+
+### 13. 🔴 收工時的第七個缺陷,而證據印在它前面那一行
+
+`215d1a5` 的訊息第一句是 *"The study file for seating 22, and the three CI timings…"*,
+而那個 commit 的 diff 只有 `tools/ci-suite-cost.tsv` 一個檔。
+**`study/` 在 `.gitignore:17` 裡** —— 它和 `plan/` 一樣是本地檔,設計上不進 repo。
+所以 commit 的**內容**是對的,**訊息**點名了一個它不可能包含的檔案。
+
+🔴 **而證據就印在 commit 的前一行**:同一支腳本在 `git commit` 之前跑了
+`git status --porcelain=v1`,輸出只有 `M tools/ci-suite-cost.tsv` 一行。
+我看著它跑過去了。`CLAUDE.md` 記過同一類:*一個 commit 的訊息描述了它沒有包含的改動*,
+那一次是 heredoc 終止符讓 `&&` 什麼都沒有串起來;這一次是我沒讀自己剛印出來的東西。
+
+**不用 `--amend` 加 force push 修**:那個 commit 已經推出去了,而這個專案的規矩是
+*負面結果留在原地,做錯的紀錄也留在原地*。`study/20260914-study6.md` 寫好了、17,463 位元組、
+在工作樹裡,和前五篇一樣。
+
+⚠️ 順帶一個更窄的觀察:`git add -A` 之後的 `git status` 是這個流程裡**唯一**
+會告訴你「訊息和內容對不對得上」的地方,而它印在 commit 執行之前。
+把它印出來而不讀,和不印是一樣的。
