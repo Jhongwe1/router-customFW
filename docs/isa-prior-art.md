@@ -465,6 +465,84 @@ the first cell of `R1-pub-4` measures the empty loop as its own control.
 which one is `R1-pub-4`'s decision, not this one — but it is **not** a new
 driver: `rtl819x-timer` already exposes its own counters.
 
+### 9.1 🔴🔴 2026-09-14: sentence ② is FALSE under this step's own definition, and four other things came out with it
+
+**The contradiction, in three sentences that are all in this repository and
+cannot all be true.**
+
+| | claim | where |
+|---|---|---|
+| A | `R1c` runs as a Linux userspace program **under the vendor kernel** | `PROGRESS.md`'s `R1-pub-4` row |
+| B | the ruler is `jiffies` for wraps ＋ `TC0CNT` for the sub-tick residue, read from userspace | § 9 above, decision ③ |
+| C | reaching it "is **not** a new driver: `rtl819x-timer` already exposes its own counters" | § 9 ②, the paragraph directly above |
+
+`rtl819x-timer` is a file of **mine**. It reaches a staged tree through
+`config/rlxfw-marks.tsv`'s `MK2` row, and its `/proc` entry is created by
+`create_proc_entry(RTL819X_PROC_NAME, ...)` in
+`config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`.
+**It cannot exist in the vendor kernel.** A and C cannot both hold.
+
+⚠️ **A 量 mark is carrying an inference.** `PROGRESS.md`'s inherited-state
+table marks *"The SoC timer is a driver of mine now, so `R1c`'s ruler exists"*
+as 量. `CLK-27` is real; the operative clause *so `R1c`'s ruler exists* is
+推, and it is the inference that fails. Both halves were written in one commit
+(2026-09-11); sentence C was added a day later in `R1-pub-0`'s own commit and
+is the only sentence in § 9 carrying no mark at all.
+
+🔴 **A second sign the working model was "my kernel":** § 7's seating
+schedule books slot 3 as **"`J` to a kernel of mine"** and books no slot for
+the vendor kernel at all.
+
+**Four more findings, none of which had reached any file:**
+
+1. 🔴 **The plan's own fallback ruler is broken too, by a different
+   mechanism.** `plan:1058` ② names `0x8040DCE8`. That is a **loader `.data`
+   variable**, not a register — `docs/loader-phy-and-switch.md` records its
+   single writer as the loader's timer ISR. Under Linux `Status.BEV` is 0, the
+   vectors are at `0x80000080`, and the loader's ISR does not run, so **that
+   counter does not advance at all**. § 9 above silently substituted the
+   *register* `TC0CNT` for the plan's *RAM address* without recording that the
+   plan's address was unusable. 推, and nothing in the repo states it.
+
+2. 🔴🔴 **A SIGILL-handler census can PANIC this kernel, and the family it
+   would panic on is exactly one of the census's blanks.** 讀,
+   `arch/rlx/kernel/traps.c`: `do_tr` **is not defined** and cause 13 gets no
+   vector from `set_except_vector`, so a trap exception falls to
+   `handle_reserved` → `do_reserved` → **`panic()`**, with no
+   `die_if_kernel` guard — so a **user-mode** trap instruction panics the
+   board. The MIPS-II trap family `teq`/`tge`/`tgeu`/`tlt`/`tltu`/`tne` is
+   precisely § 10's *"six rows have no evidence of any class, and they are all
+   the same family"*. **The outcome depends on the unknown being measured**: if
+   the core implements them, the probe panics; if not, it raises RI and the
+   handler returns SIGILL normally. `R1-pub-4` cannot probe that family without
+   a separate decision, and this is written here **before** the payload exists.
+
+3. ⚠️ **The amplification estimate is anchored to the wrong function.** § 9
+   says an emulated instruction *"costs an exception round trip through
+   `do_ri`"*. For `ll`/`sc` **from user mode** that is not the handler: `ll` is
+   `lwc0`'s opcode and user mode runs with `CU0` clear, so the exception is
+   Coprocessor Unusable (cause 11) → `do_cpu`, whose path is shorter. The
+   vendor kept mainline's comment saying exactly this. 推.
+
+4. 🟢 **The problem is much smaller than § 9 makes it look.** The census is
+   45 rows; the emulation surface is `ll`, `sc`, `sync` and the unaligned
+   `lh`/`lhu`/`lw`/`sh`/`sw`. **The two-column DIFF is trap / no-trap and needs
+   no clock at all** — the ruler is needed for roughly **four rows of
+   forty-five**. Nothing in the repo states this, and it changes the weight of
+   the whole problem.
+
+⚠️ **And one prerequisite sits two gates downstream**: `R1c` needs a compiled
+userspace C program, and *which toolchain rlxfw's userspace uses* is
+`docs/GATE-RESULTS.md`'s open item owned by **`R7`**.
+
+🔴 **This section does NOT pick an option.** The option space — run on
+rlxfw's image and correct the step; run on the pristine vendor kernel with a
+10 ms ruler and N-amplification; add one read-only `/proc` file to a vendor
+config; ship the diff and drop the cost column; derive the cost bare metal;
+split the step; or `/dev/mem` + `mmap`, which the repo has **zero** hits for
+anywhere — is `R1-pub-4`'s first desk session's work, and the decision is the
+owner's. `PROGRESS.md`'s `R1C-1` carries it.
+
 ---
 
 ## 10. 🔴 What this census found that was on nobody's list
