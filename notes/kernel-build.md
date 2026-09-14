@@ -699,9 +699,27 @@ symbol table and the word sits in `cpu_idle` via `arch/rlx/kernel/process.c:55`
 once, at `0x80007EA8`.
 
 **What carries the safety claim is not the opcode, it is `R0`**: on 2026-08-24
-that kernel reached a shell and answered `ping` 2/2 at 3.6 ms. A kernel that
-serves a shell has gone through its idle loop. The sleep path on this silicon is
-not a hypothesis about an opcode; it is a thing that has already happened.
+that kernel ~~reached a shell~~ 🔄 **reached USERSPACE** and answered `ping` 2/2
+at 3.6 ms. ~~A kernel that serves a shell has gone through its idle loop.~~
+🔄 **A kernel that answers ping from userspace has gone through its idle loop.**
+The sleep path on this silicon is not a hypothesis about an opcode; it is a
+thing that has already happened.
+
+> 🔄 **2026-09-14 (the sixty-ninth segment, desk): *reached a shell* was wrong,
+> and this is the only place in the repository that said it.** 量, chasing an
+> unrelated question about whether a program of ours could reach a running
+> vendor system: every `--send` in the four `R0` bench directories is a **loader**
+> command, both boot captures end at `boa: starting server pid=350, port 80`
+> with no prompt, and the vendor's `/etc/inittab` has **every console line
+> commented out** — no getty, no login, no `askfirst` shell (`SPEC.md` `FW-05`).
+> The ping was issued host to board and the vendor stack answered it.
+> `README.md`, `CHANGELOG.md` and `PROGRESS.md`'s `R0` row all say *reached
+> userspace*, which is correct; this file is the one that overstated it.
+> 🟢 **The conclusion survives and the premise is what moved** — answering ping
+> from userspace requires the idle loop just as serving a shell would, so `K9`
+> and the `ARCH_CPU_SLEEP` argument are untouched. That is why the sentence is
+> corrected rather than deleted: an argument whose support changes and whose
+> conclusion does not is worth more on the record than a clean paragraph.
 
 > **K9, written now because the correction needs one.** *"`ARCH_CPU_SLEEP` does
 > not need turning off"* is refuted by a bring-up that stops with no further

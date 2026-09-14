@@ -797,6 +797,24 @@ jobs:
       - name: tccensus
         run: /usr/bin/python3 tools/tccensus.py --self-test 2>&1 | tee ci-out/tccensus.out; exit "${PIPESTATUS[0]}"
 
+      # `R1C-1-c`.  The decision in `docs/isa-prior-art.md` section 9.3 rests on
+      # one measured sentence -- rlxfw's kernel and the vendor's have the same
+      # emulation surface -- and that sentence can stop being true SILENTLY, by
+      # one line entering `config/rlxfw-kernel.delta`.  The refutation condition
+      # is written as a checker rather than a promise, and this is the step that
+      # makes that true.  It reads two COMMITTED files, so it runs in a clone
+      # where `src-vendor/` is a dangling symlink; `emueq refresh` is the desk
+      # half that re-derives the table from the pinned drop.
+      - name: emueq
+        run: /usr/bin/python3 tools/emueq.py --self-test 2>&1 | tee ci-out/emueq.out; exit "${PIPESTATUS[0]}"
+
+      # The same tool run in ANGER rather than on fixtures.  The self-test above
+      # proves the check can fail; this proves the committed tree passes it, and
+      # the two are different claims -- `emueq --self-test` would stay green on
+      # a tree whose delta had grown a new emulation gate.
+      - name: emueq check
+        run: /usr/bin/python3 tools/emueq.py check 2>&1 | tee ci-out/emueq-check.out; exit "${PIPESTATUS[0]}"
+
       # `R1-pub-1`'s instrument.  probe4's cells are GENERATED from
       # tools/isa-payload.tsv, and this is the half of that which runs
       # without a cross compiler: the table's own rules, the encoding

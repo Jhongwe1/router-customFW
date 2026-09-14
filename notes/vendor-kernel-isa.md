@@ -126,6 +126,88 @@ thing that had to be set aside.
 
 ---
 
+### 1.4 🔴 2026-09-14 (the sixty-ninth segment, desk): the surface is fully enumerated, and three of its edges are sharp
+
+讀 `arch/rlx/kernel/traps.c` in the pinned drop. **Exactly two `simulate_*`
+functions exist in this port and both are called from `do_ri`; a third call site
+exists and its function does not.**
+
+| order | call | site | gate | compiled in |
+|---|---|---|---|---|
+| 1 | `simulate_llsc` | `traps.c:567` | `#ifndef CONFIG_CPU_HAS_LLSC` | **yes** |
+| 2 | `simulate_rdhwr` | `traps.c:572` | `#if 0` | **no** |
+| 3 | `simulate_sync` | `traps.c:577` | `#ifndef CONFIG_CPU_HAS_SYNC` | **yes** |
+
+🔴 **`simulate_rdhwr` is not merely disabled -- it is not defined.** 量: a
+sweep of the whole tree outside `arch/mips` finds **two** hits, both call sites,
+both inside `#if 0`. Deleting the `#if 0` would not build.
+
+🔴🔴 **`special0e` is clean by ONE function code, and nothing in this
+repository had noticed.** `simulate_sync` matches SPECIAL with function field
+**`0x0F`** (`traps.c:454-462`, `rs`/`rt`/`rd`/`sa` all ignored), and returns 0 --
+a pure no-op with `epc` already advanced. `special0e` is SPECIAL function
+**`0x0E`**. **Adjacent.** Had the reserved-encoding control been `0x0000000F`
+instead, `do_ri` would have emulated it silently, sent no signal, and the probe
+would have reported *does not trap* on a die that may well raise RI for it.
+
+🔴 **`do_cpu` and `do_ri` are not symmetric, and the asymmetry inverts a
+user-mode census.** `do_cpu` (`traps.c:589-636`) carries `simulate_llsc` and
+**not** `simulate_sync`. From user mode `CU0` is clear (讀
+`arch/rlx/kernel/process.c:72-73`: `start_thread()` clears `ST0_CU0` and sets
+`KU_USER`), so `ll` and `sc` -- which are `lwc0` and `swc0` on a MIPS-I decoder
+-- raise Coprocessor Unusable, reach `do_cpu`'s `cpid == 0` branch, are
+**emulated**, and return with no signal at all. **A census scoring *no signal
+implies the instruction exists* records `ll` and `sc` as implemented on this
+die, which is exactly backwards.**
+
+🔴 **Two things that break a SIGILL probe itself.** `traps.c:584` rewinds
+`cp0_epc` to `old_epc` **before** signalling, so a `SIGILL` handler that returns
+normally re-executes the faulting instruction -- an infinite loop; the probe must
+`siglongjmp` out or advance `uc_mcontext.pc` itself. And `force_sig` sends
+`SEND_SIG_PRIV`, so the `siginfo` carries `si_code = SI_KERNEL` and **no
+`si_addr`** -- it overlaps `si_pid`/`si_uid` in the union and reads **0**, not
+the faulting PC.
+
+🟢 **`die_if_kernel` finally has its citation, and it is in a different file
+from `traps.c`, which is why nothing here had quoted it.**
+`arch/rlx/include/asm/ptrace.h:89-93` is `if (unlikely(!user_mode(regs))) die(...)`;
+`user_mode` is `:80`, `((regs)->cp0_status & KU_MASK) == KU_USER`; and
+`asm/isadep.h:15-17` gives `KU_MASK = KU_USER = 0x08` -- R3000 `Status` layout,
+bit 3 is `KUc`. So from user mode the guard does not fire and `do_ri` continues.
+The `do_ri` and `trap_init` halves of that chain were already cited here and in
+`docs/isa-prior-art.md`; **this half never was**, and it is the half that carries
+the whole claim.
+
+🟢 **Unaligned access: the entry point is `do_ade`, not `do_adel`/`do_ades`,
+and it emulates for user mode by default.** 量: `do_adel`/`do_ades` have **zero**
+occurrences under `arch/rlx`; `genex.S:211-212` routes both stubs to `do_ade`
+(`unaligned.c:400-439`). `TIF_FIXADE` is set in `INIT_THREAD_INFO`
+(`asm/thread_info.h:47`), so every process inherits emulation on.
+`emulate_load_store_insn` emulates exactly `lh`, `lhu`, `lw`, `sh`, `sw` and
+**deliberately refuses** `ll`, `sc`, `lb`, `lbu`, `sb`, `lwl`, `lwr`, `swl`,
+`swr` with `goto sigbus`. 🔴 There is **no counter and no sysctl** on this
+build: the debugfs `unaligned_instructions` file and the `unaligned_action` knob
+are entirely inside `#ifdef CONFIG_DEBUG_FS`, which the board config leaves
+unset, so `unaligned_action` is the compile-time constant
+`UNALIGNED_ACTION_QUIET`. The only per-process knob is
+`sysmips(MIPS_FIXADE, x)` -- and 🔴 `arch/rlx/kernel/syscall.c:306` clears
+**`TIF_FIXADE`** where it plainly means `TIF_LOGADE`, so `sysmips(MIPS_FIXADE, 1)`
+sets the flag and then clears it again and only `arg1 == 3` leaves emulation on.
+⚠️ That typo is mainline 2.6.30's, present in `arch/mips` in the same drop; it
+is not a Realtek edit.
+
+🟢 **And the surface is the same on rlxfw's own kernel, which is a measurement
+rather than an assumption.** The three symbols that decide it --
+`CONFIG_CPU_HAS_ULS`, `CONFIG_CPU_HAS_LLSC`, `CONFIG_CPU_HAS_SYNC`, mapped by
+`arch/rlx/Kconfig`'s `default y if ARCH_CPU_*` -- are **unanimous across all
+eight** `config.linux-2.6.30.RTL8196E*` files in the pinned drop
+(`ARCH_CPU_ULS=y` 8 of 8, `ARCH_CPU_LLSC` unset 8 of 8, `ARCH_CPU_SYNC` unset
+8 of 8), with `CONFIG_RTL_ODM_WLAN_DRIVER` differing across the same eight as
+the negative control; and **none of the three appears in
+`config/rlxfw-kernel.delta`**. The full equivalence argument, its derived
+population and its controls are `docs/isa-prior-art.md` § 9.2.1, and the
+decision that rests on it is § 9.3.
+
 ## 2. `C-7` / `F51` — the unaligned instructions
 
 `notes/lwl-mystery.md` asked, as the discriminator: *does the vendor kernel carry

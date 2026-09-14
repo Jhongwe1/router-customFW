@@ -616,6 +616,259 @@ split the step; or `/dev/mem` + `mmap`, which the repo has **zero** hits for
 anywhere — is `R1-pub-4`'s first desk session's work, and the decision is the
 owner's. `PROGRESS.md`'s `R1C-1` carries it.
 
+🔄 **2026-09-14 (the sixty-ninth segment, desk, zero power): it is picked, in § 9.3 below, and § 9.2 is what made it pickable.** The paragraph above stays because it was true when written and because its own shape is the finding: seven options in one sentence, with no ids, drawn from two orthogonal questions -- so nothing in it could be cited and no two of its items were alternatives to each other.
+
+### 9.2 🟢 2026-09-14: the option space is a GRID, and that is why it could not be picked from
+
+§ 9.1 names seven options in one sentence. **They are not alternatives to one
+another**, which is why the section could not choose: they are drawn from two
+orthogonal questions, one scheduling move and one scope cut, and the list has no
+ids, so a reader cannot cite one of them either.
+
+**The two questions.**
+
+| | question | values |
+|---|---|---|
+| **Q-kernel** | under which kernel does the userspace census run | vendor-shipped, vendor-rebuilt, rlxfw |
+| **Q-ruler** | what measures a cost | `gettimeofday` + N, `TC0CNT` through a `/proc` file, `TC0CNT` through `/dev/mem`, bare metal, none |
+
+**The two deliverables.** `R1-pub-4`'s DoD asks for both, and they do not have
+the same needs:
+
+| | deliverable | rows | needs a clock |
+|---|---|---|---|
+| **D-diff** | the two-column table; the difference is the emulation surface | 45 | **no** -- § 9.1 item 4 |
+| **D-cost** | each difference's cost | ~4 | yes |
+
+**The seven, placed.** The ids are assigned here for the first time; the wording
+in column two is § 9.1's own.
+
+| id | § 9.1's wording | Q-kernel | Q-ruler | scope |
+|---|---|---|---|---|
+| `O1` | run on rlxfw's image and correct the step | rlxfw | `/proc`, mine | both |
+| `O2` | pristine vendor kernel, 10 ms ruler, N-amplification | vendor-shipped | `gettimeofday` + N | both |
+| `O3` | add one read-only `/proc` file to a vendor config | vendor-rebuilt | `/proc` | both |
+| `O4` | ship the diff and drop the cost column | any | none | D-diff only |
+| `O5` | derive the cost bare metal | vendor-shipped | bare metal | both |
+| `O6` | split the step | -- | -- | scheduling |
+| `O7` | `/dev/mem` + `mmap` | vendor-shipped | `/dev/mem` | both |
+
+`O6` is compatible with every other row, and `O4` is `O6` with the second half
+cancelled rather than deferred. **So the choice is one value of Q-kernel, one
+value of Q-ruler, and a yes or no on splitting** -- three small decisions, not
+one seven-way one.
+
+#### 9.2.1 Five measurements taken to decide it. All desk, zero power.
+
+**① 🟢 rlxfw's kernel and the vendor's have the same emulation surface,
+and the population is derived rather than chosen.** 量: the population is
+every source file under `arch/rlx/kernel/` and `arch/rlx/mm/` -- **49 files** --
+in which **74** distinct `CONFIG_` symbols are named; `config/rlxfw-kernel.delta`
+carries **73**; the intersection is **7**. Six of the seven act on initrd, the
+command line, a wlan driver, or a branch gated on `CONFIG_RTL_8198`, which is a
+different SoC. The seventh is `CONFIG_RTL_WTDOG`, `y` to `n`, and its four sites
+are `arch/rlx/kernel/rlx-cevt.c:31` and `:151` and
+`arch/rlx/kernel/traps.c:316` and `:534` -- inside `die()` and `do_bp()`,
+**outside every `simulate_*` function**. Controls: two delta symbols known to be
+present reported HIT, an invented symbol reported absent, and `CONFIG_LEDS_GPIO`
+occurs **0** times in the arch population.
+
+**② 🟢 The three symbols that DO gate the emulation are unanimous
+across every configuration Realtek ships for this SoC.** 量: the population is
+every `config.linux-2.6.30.RTL8196E*` in the pinned drop -- **8 files** --
+and `CONFIG_ARCH_CPU_ULS=y` is **8 of 8**,
+`# CONFIG_ARCH_CPU_LLSC is not set` is **8 of 8**, and
+`# CONFIG_ARCH_CPU_SYNC is not set` is **8 of 8**. `arch/rlx/Kconfig`'s
+`default y if ARCH_CPU_*` maps them onto `CPU_HAS_ULS` / `CPU_HAS_LLSC` /
+`CPU_HAS_SYNC`, which are the `#ifndef` gates on `simulate_llsc` and
+`simulate_sync` in `do_ri` and the `#ifdef` in `unaligned.c`. **Negative
+control**: `CONFIG_RTL_ODM_WLAN_DRIVER` differs across the same eight files
+(2 set, 6 absent), so the unanimity is a property of those three symbols and not
+of the comparison. **This is the measured answer to the objection
+*your configuration is not theirs*, and it covers all eight of theirs.**
+
+**③ 🔴 The vendor's shipped kernel cannot state its own
+configuration.** 讀 `# CONFIG_IKCONFIG is not set` in the baseline, so there is
+no `/proc/config.gz` and no embedded blob. ⚠️ That is 讀 on the drop's
+config and not 量 on the shipped binary -- and the attempt to make it 量
+failed for a reason worth keeping: a search for `IKCFG_ST` in the raw 4 MiB flash
+proves nothing, because the kernel there is compressed. **The sweep's own output
+is what caught that**: the literal string `Linux` occurs **1** time in
+4,194,304 bytes, which no uncompressed router firmware could manage. A sweep
+without a positive control had been about to return a clean answer.
+
+**④ 🔴 The one path the `CONFIG_RTL_WTDOG` difference reaches is
+`do_bp`, and no census row can enter it -- but the harness can.** 量: `break`
+and `syscall` appear in neither the **45**-row census (`tools/isa-census.tsv`)
+nor the **75**-row payload table (`tools/isa-payload.tsv`). So the difference is
+unreachable by anything `R1c` issues on purpose. 推: gcc emits `break 7` for
+integer division by zero, so the `R1c` **program** can carry one even though no
+row does. **That is a build gate and not an argument** -- `objdump -d` the linked
+binary and require a `break` count of **0**, the same shape as `hazlint`'s gate
+on the bare-metal payloads.
+
+**⑤ 🔴 § 9's refutation of ruler candidate ① cites the wrong kernel, and
+the conclusion survives for a stronger reason.** The row cites *`rating` read 0
+in all eleven dumps of seating 14* -- that is **rlxfw's own `rtl819x-timer`**
+clocksource's rating, a field belonging to a driver that cannot exist in the
+vendor kernel. § 9.1 item C already makes that point about the ruler; nobody had
+applied it to the refutation. What actually makes the row true is 讀: the vendor
+rlx port **registers no clocksource at all** -- the only `clocksource_set_clock`
+is inside `#if 0` at `arch/rlx/kernel/rlx-time.c:50-79` -- so `curr_clocksource`
+never leaves `clocksource_jiffies`, whose granularity computes to exactly
+**10,000,000 ns** at `CONFIG_HZ=100`. 🔴 **And the escape hatch is measured
+shut**: `arch/rlx` supplies no `gettimeoffset`, there is no vDSO, no
+`sched_clock` override, no `CONFIG_CPU_FREQ` and no high-resolution timers, so
+**under the vendor kernel no userspace API yields better than 10 ms.** 🟢 The
+same sweep found `/dev/mem` open on that kernel -- `CONFIG_DEVMEM` does not exist
+as a symbol in 2.6.30, `CONFIG_STRICT_DEVMEM` is declared only under
+`arch/x86`, `drivers/char/mem.c` is `obj-y`, and the node ships in
+`boards/rtl8196e/romfs.txt:6` -- which is what keeps `O7` alive as a fallback.
+
+### 9.3 🟢 The decision -- `R1C-1`
+
+**Q-kernel = rlxfw. Q-ruler = `TC0CNT` through this project's own `/proc` file,
+which is § 9's ruler ③. Split = yes.** In the ids above that is **`O6` applied
+to `O1`**, with `O7` named as the fallback and `O2` excluded by measurement
+⑤ rather than by preference.
+
+**What it costs is claim A**, and the wording is retired and replaced rather than
+quietly dropped. `PROGRESS.md`'s `R1-pub-4` row says *under the vendor kernel*.
+The replacement is longer and is measured rather than asserted:
+
+> the emulation surface of the vendor's `arch/rlx`, measured on a kernel built
+> from Realtek's own board configuration for this SoC with 73 documented deltas,
+> none of which reaches any `simulate_*` function, and with the single delta that
+> reaches `traps.c` at all gating a path no probed encoding can enter.
+
+**Why that is a stronger publication than running the shipped binary rather than
+a weaker one.** Three reasons, each a measurement above rather than an argument:
+
+1. the shipped binary **cannot state its own configuration** (③), while
+   rlxfw's is a 73-line delta from a baseline pinned by sha256;
+2. **every** configuration Realtek ships for this SoC agrees on the three symbols
+   that decide the surface (②), so the objection *your configuration is not
+   theirs* has an answer covering all eight of theirs;
+3. the recipe is byte-reproducible (`P4a`, Level 1) and the shipped binary is not
+   reproducible at all, so a reader can re-run the first and can only believe the
+   second.
+
+**Refutation conditions, written before the work rather than after it.**
+
+| id | what would prove this decision wrong |
+|---|---|
+| `R1C-1-a` | any row whose user-mode reading under rlxfw's kernel disagrees with what the vendor's `arch/rlx` source predicts for it. The prediction is written first, per row; a disagreement refutes the equivalence and makes `O7` the required route |
+| `R1C-1-b` | a `break` in the linked `R1c` binary (④). The equivalence covers census rows and not the harness, and if the gate cannot be made to pass, `O1` is refused for the cost half |
+| `R1C-1-c` | a configuration symbol naming code on `arch/rlx`'s exception path entering `config/rlxfw-kernel.delta`. **This one is not a promise, it is a checker** -- the argument lapses silently otherwise, and ①'s population and controls are the test |
+
+**What this does NOT decide, stated so it is not later read as settled.**
+🔄 **2026-09-14, later the same segment: the question below was measured while
+this section was being written, and the answer is in § 9.5.** It does not move the
+decision -- it hardens it, because the only demonstrated route into vendor
+userspace writes flash. The paragraph is kept as written because it was the state
+of knowledge the decision was taken on.
+Whether a program of ours can reach a running vendor system at all is an open
+question with no owner: 讀 `# CONFIG_APP_LOGIN_CONSOLE is not set` in the
+vendor's userspace configuration, and 量 there is no record anywhere in this
+repository of ever reaching a shell under vendor firmware. `O2`, `O3` and `O7`
+all rest on it. The decision above does not, which is part of why it was taken --
+but a future comparison run against the shipped binary would, and that is the
+sentence `R1C-1-a` would cash.
+
+
+### 9.5 🔴 2026-09-14: the entry question, measured -- and it hardens § 9.3 rather than reopening it
+
+§ 9.3 left *can a program of ours reach a running vendor system* open with no
+owner. It was measured the same segment, at the desk, from the extracted rootfs
+and this unit's own decompressed kernel.
+
+**Every technical precondition is satisfied, and most of them are measured.**
+讀 `squashfs-root/etc/init.d/rcS:9-10`: the vendor mounts `ramfs` on `/var`
+with **no options at all**, and `/tmp` is a symlink into it -- so there is a
+writable, executable filesystem at runtime. 量, with its control: the token
+`noexec` occurs **exactly once in the whole extracted rootfs**, inside
+`bin/busybox`'s own option-name table, and appears in no script. `/bin/wget` is
+a standalone **GNU Wget 1.9.1**, not an applet, so a payload can be pulled over
+HTTP or FTP. The unit's own `libuClibc-0.9.30.3.so` exports `__libc_sigaction`,
+`_setjmp` and `__sigsetjmp`, so the harness can be a small dynamically-linked
+binary. ⚠️ That last reading needed a substring match: whole-line matching
+reported `sigaction 0` and `setjmp 0`, because ELF string tables tail-merge --
+the same false zero `notes/rootfs-census.md` already records for `printf`.
+
+**🔴 What blocks it is entry, not capability.** 量 `SPEC.md` `FW-05`: the
+serial console has no shell, no getty and no login -- 讀
+`squashfs-root/etc/inittab`, **every console line is commented out** and
+`::sysinit:/etc/init.d/rcS` is the only live entry. 讀
+`docs/loader-command-semantics.md:300-313`: thirteen command-line-shaped needles
+return **zero hits** against a scan proven to find all seventeen documented
+loader commands, so there is no `init=` or `bootargs` mechanism. `TELNET_ENABLED`
+is 0 on this unit.
+
+**🔴 The one route that demonstrably works writes flash.** Unauthenticated
+command injection into `boa` (`formSysCmd`) is 量 in `upstream/BENCH-LOG.md`,
+and 量 `upstream/test-ledger.md:914` `P10-10` says firing that handler moves
+`COMPCS` at flash `0x00C000`. The blast radius is measured and bounded --
+`COMPCS` and `COMPDS` only, with `H601` and the loader region byte-identical
+afterwards -- but it is unambiguously a flash write, it needs the owner's
+explicit yes, and it would perturb `FLS-26`'s ledger and the 0.0244 % bracket.
+**So `O2`, `O3` and `O7` are not merely harder than `O1`; every one of them
+begins with a flash write on this device.**
+
+**🟢 And one finding makes `O3` unnecessary rather than expensive.**
+`/proc/rtl865x/memory` is an unbounded 32-bit peek/poke that the vendor kernel
+**already ships**: 讀
+`drivers/net/rtl819x/rtl865x_proc_debug.c:4115-4175`, `proc_mem_write()` runs
+`simple_strtol` on the address and then `WRITE_MEM32` **with no bounds check at
+all**, and the vendor's own `/bin/dw` and `/bin/ew` are two-line shell scripts
+that drive it. Both sources this project requires agree it is enabled here: 讀
+the board config's `CONFIG_RTL_DEBUG_TOOL=y`, and 讀 four decisive strings in
+this unit's own decompressed kernel with `priveSkbDebug` -- a neighbouring
+`/proc` entry under a different `#if` -- reading **0** as the negative control.
+**§ 9's open residual *"reaching `TC0CNT` from userspace needs `/dev/mem` or a
+`/proc` file, and which one is `R1-pub-4`'s decision"* therefore had an answer
+this repository was already holding.** ⚠️ 推 and unmeasured: its *read* output
+goes to `rtlglue_printf`, i.e. to the console, not back to the reading process,
+so it is a write-side primitive plus a console-side read.
+
+**⚠️ Two safety findings that travel with the route and are worth more than it.**
+讀 `unsquashfs -ll` on the image: `/dev/mtdblock0` ships at mode **0666** and
+covers the loader and `H601`, and `/bin/flash` sits in the same `PATH` -- so any
+injected command line on this device runs one typo away from an unrecoverable
+brick. And 讀 `notes/kernel-build.md:701-702` says gate `R0`'s vendor kernel
+*"reached a shell"*; **no capture supports it**, every `--send` in the four `R0`
+directories is a loader command, and `README.md`, `PROGRESS.md` and
+`CHANGELOG.md` all correctly say *reached userspace*. That sentence is the one
+place in the repository that overstates it.
+
+### 9.4 🔴 Two holes this adjudication opened, both wider than the decision
+
+**① 🔴🔴 The REGIMM trap-immediate family is outside every instrument in this
+repository, and the SPECIAL-form result does not transfer to it.** 量:
+`teqi`, `tnei`, `tgei`, `tgeiu`, `tlti`, `tltiu` have **zero** occurrences
+anywhere under `tools/`, `docs/` or `SPEC.md`; `tools/hazlint`'s `ISA_TRAPS`
+carries the six **SPECIAL function codes** only. They are REGIMM -- opcode
+`0x01` with `rt` in `0x08` to `0x0E` -- a different field of a different opcode.
+🔴 **And the one REGIMM encoding this project has probed retired**: `synci`,
+`0x055F0000`, REGIMM `rt = 0x1F`, which MIPS-I leaves unassigned, read `n=0` in
+`bench/2026-09-14/C1-P4j.log`. So this core's REGIMM `rt` decode does **not**
+funnel unassigned values to RI, which is exactly the inference that would have
+let § 9.1 item 2(a)'s SPECIAL-form answer carry over. 推: `teqi` and its five
+siblings are the highest-probability remaining route to the unvectored cause 13,
+and one payload row settles it at zero incremental bench cost if it rides an
+existing card.
+
+**② 🟢 Item 2(c)'s class hazard now has its list, and the list is empty.**
+量, re-derived from `bench/2026-09-14/C1-P4j.log` rather than from any prose:
+75 rows, **42** exceptions and **33** retirements; the 42 carry exactly **two**
+distinct ExcCodes -- **10 (RI) on 32 rows** and **11 (CpU) on 10 rows** -- and
+both are vectored by `trap_init`. **Zero of the 42 landed on any of the 21
+unvectored causes.** So for the measured population, issuing the encoding cannot
+reach `do_reserved` and its unconditional `panic()`. ⚠️ Three limits travel with
+that, and the first is the one item 2(b) already names: it is a **kernel-mode**
+reading at `Status=1000FC00`; the population is 75 encodings of 2^32; and
+`do_reserved` is reached by a *cause*, so this bounds *can a census row panic the
+board* and not *can the board panic*.
+
 ---
 
 ## 10. 🔴 What this census found that was on nobody's list

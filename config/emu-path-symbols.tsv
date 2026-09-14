@@ -1,0 +1,89 @@
+# Every CONFIG_ symbol NAMED in arch/rlx's own sources, with the
+# files that name it.  Derived by `tools/emueq.py refresh`; the
+# checker that reads it is `tools/emueq.py check`, and what it is
+# for is `docs/isa-prior-art.md` section 9.3's `R1C-1-c`.
+#
+# exc_path is decided by FILE, not by judgement about a particular
+# #ifdef.  The list is EXC_FILES in tools/emueq.py, so changing it
+# is a code change with a diff.
+#
+# LIMIT, stated rather than left to be found: this is a sweep of
+# symbol NAMES under arch/rlx.  A symbol that changes the behaviour
+# of a function arch/rlx calls, without being named under arch/rlx,
+# is outside this table and outside the check that reads it.
+#
+symbol	n_files	exc_path	files
+CONFIG_ARCH_CPU_RLX5281	2	n	arch/rlx/mm/dma-default.c,arch/rlx/mm/imem-dmem.S
+CONFIG_BLK_DEV_INITRD	3	n	arch/rlx/kernel/setup.c,arch/rlx/kernel/vmlinux.lds.S,arch/rlx/mm/init.c
+CONFIG_BOOT_ELF64	1	n	arch/rlx/kernel/vmlinux.lds.S
+CONFIG_BOOT_RAW	1	n	arch/rlx/kernel/head.S
+CONFIG_CMDLINE	1	n	arch/rlx/kernel/setup.c
+CONFIG_CPU_HAS_CACHE_OP	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_HAS_DCACHE_OP	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_HAS_ICACHE_OP	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_HAS_L2C	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_HAS_LLSC	3	y	arch/rlx/kernel/rlx-switch.S,arch/rlx/kernel/scall32-o32.S,arch/rlx/kernel/traps.c
+CONFIG_CPU_HAS_RADIAX	1	n	arch/rlx/kernel/asm-offsets.c
+CONFIG_CPU_HAS_SYNC	1	y	arch/rlx/kernel/traps.c
+CONFIG_CPU_HAS_ULS	1	y	arch/rlx/kernel/unaligned.c
+CONFIG_CPU_HAS_WBC	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_HAS_WBIC	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_LITTLE_ENDIAN	1	n	arch/rlx/kernel/ptrace.c
+CONFIG_CPU_RLX4181	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_RLX4281	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_RLX5181	1	n	arch/rlx/mm/cache-rlx.c
+CONFIG_CPU_RLX5281	2	n	arch/rlx/kernel/irq.c,arch/rlx/mm/cache-rlx.c
+CONFIG_DEBUG_FS	2	y	arch/rlx/kernel/setup.c,arch/rlx/kernel/unaligned.c
+CONFIG_DEBUG_HIGHMEM	1	n	arch/rlx/mm/highmem.c
+CONFIG_DMA_NONCOHERENT	1	n	arch/rlx/mm/cache.c
+CONFIG_DUMMY_CONSOLE	1	n	arch/rlx/kernel/setup.c
+CONFIG_EARLY_PRINTK	1	n	arch/rlx/kernel/setup.c
+CONFIG_HIGHMEM	3	n	arch/rlx/kernel/setup.c,arch/rlx/mm/init.c,arch/rlx/mm/pgtable-32.c
+CONFIG_KALLSYMS	3	y	arch/rlx/kernel/process.c,arch/rlx/kernel/stacktrace.c,arch/rlx/kernel/traps.c
+CONFIG_KGDB	2	y	arch/rlx/kernel/irq.c,arch/rlx/kernel/traps.c
+CONFIG_MAPPED_KERNEL	2	n	arch/rlx/kernel/head.S,arch/rlx/kernel/vmlinux.lds.S
+CONFIG_MIPS_L1_CACHE_SHIFT	1	n	arch/rlx/kernel/vmlinux.lds.S
+CONFIG_NEED_MULTIPLE_NODES	1	n	arch/rlx/mm/init.c
+CONFIG_NO_EXCEPT_FILL	1	n	arch/rlx/kernel/head.S
+CONFIG_NUMA	1	n	arch/rlx/kernel/topology.c
+CONFIG_PANIC_PRINTK	2	y	arch/rlx/kernel/traps.c,arch/rlx/mm/fault.c
+CONFIG_PREEMPT	2	n	arch/rlx/kernel/entry.S,arch/rlx/mm/highmem.c
+CONFIG_PROBE_INITRD_HEADER	1	n	arch/rlx/kernel/setup.c
+CONFIG_RTK_VOIP	5	n	arch/rlx/kernel/irq.c,arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c,arch/rlx/kernel/rlx-cevt.c,arch/rlx/mm/imem-dmem.S
+CONFIG_RTK_VOIP_BOARD	1	n	arch/rlx/kernel/irq_vec.c
+CONFIG_RTL8192CD	3	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c,arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL8192E	2	n	arch/rlx/kernel/irq_vec.c,arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL8192SE	1	n	arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL8196C_REVISION_B	1	n	arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL8197B_PANA	1	n	arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL8198_REVISION_B	1	n	arch/rlx/mm/imem-dmem.S
+CONFIG_RTL865X_PANAHOST	1	n	arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL_8196C	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8196CS	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8196CT	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8196E	1	n	arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8197D	1	n	arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8197DL	1	n	arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8198	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_8198_NFBI_BOARD	3	n	arch/rlx/kernel/head.S,arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_819X	4	n	arch/rlx/kernel/irq.c,arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c,arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL_819XD	3	n	arch/rlx/kernel/irq_vec.c,arch/rlx/mm/cache-rlx.c,arch/rlx/mm/imem-dmem.S
+CONFIG_RTL_819X_SWCORE	1	n	arch/rlx/kernel/irq.c
+CONFIG_RTL_865X_ETH	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_89	1	n	arch/rlx/mm/imem-dmem.S
+CONFIG_RTL_92D_DMDP	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_92D_SUPPORT	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_DUAL_PCIESLOT_BIWLAN_D	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_ICTEST_SWITCH	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_NFBI_MDIO	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_RTL_TIMER_ADJUSTMENT	1	n	arch/rlx/kernel/rlx-cevt.c
+CONFIG_RTL_WTDOG	2	y	arch/rlx/kernel/rlx-cevt.c,arch/rlx/kernel/traps.c
+CONFIG_SERIAL_RTL8198_UART1	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_SERIAL_SC16IS7X0_CONSOLE	2	n	arch/rlx/kernel/early_printk.c,arch/rlx/kernel/setup.c
+CONFIG_TRACE_IRQFLAGS	2	y	arch/rlx/kernel/entry.S,arch/rlx/kernel/genex.S
+CONFIG_TRAD_SIGNALS	1	n	arch/rlx/kernel/signal.c
+CONFIG_USB	2	n	arch/rlx/kernel/irq_cpu.c,arch/rlx/kernel/irq_vec.c
+CONFIG_VGA_CONSOLE	1	n	arch/rlx/kernel/setup.c
+CONFIG_VT	1	n	arch/rlx/kernel/setup.c
+CONFIG_ZONE_DMA	2	n	arch/rlx/mm/dma-default.c,arch/rlx/mm/init.c
+CONFIG_ZONE_DMA32	2	n	arch/rlx/mm/dma-default.c,arch/rlx/mm/init.c

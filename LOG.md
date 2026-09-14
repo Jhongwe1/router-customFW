@@ -26596,3 +26596,218 @@ committed 的表),所以它只能被更正,而更正會再過期。**能用那�
 `check-predictions` 兩張卡仍是 **`0 of 7`** 與 **`0 of 27`**,
 **兩張卡的 mtime 沒動**(`13:31:20` 與 `15:56:58`)。
 **零 flash 寫入命令、零 `FLR`、`0.0244 %` 不動。**
+
+## 2026-09-14 — 第六十九段(18:28 開場,桌面,**零電源循環**,上機改到下一段):`R1C-1` 裁了,而讓它裁得下去的不是想通了,是量到「七個選項不在同一個軸上」
+
+**交辦的三條路 A／B／C,擁有者要我決定。決定是 A,而 B 被一個量出來的先後順序擋掉。**
+🔴 **B(`TCPAY-1`)不能今天做**:今晚的 card A 會跑 `tcpay gate`／`verify`／`check_controls`,
+而 `bench/2026-09-14b/CORRECTIONS-block19.md` § 0.3.5 **已經凍結**,裡面逐字寫著
+*決定是今晚不動儀器*,並指名 `tcpay.py` 的 251／257／889 與斷言那個字串的 `T22`。
+現在改它,會讓一份**上電前就進 git 的證據檔**描述一支已經不是那樣的儀器。
+⚠️ 而順帶量到 `TCPAY-1` 比它自己點名的大:另外三個同型誤引在 `tools/ci-expected.tsv:279`、
+`tools/toolchain-census.tsv:119` 與 `docs/toolchain-prior-art.md:209`,
+**後兩者被 `tccensus check` 雙向綁死**,所以那一段要改的是五個檔加一個生成關係,不是三個檔。
+
+---
+
+### 1. 🔴 為什麼 § 9.1 選不出來 —— 那不是猶豫,是型別錯誤
+
+`docs/isa-prior-art.md:611-617` 在**一個散文句子**裡點了七個選項,沒有編號、沒有成本欄。
+量,而且是三件事一起錯:**沒有 id 所以任何人都引用不了它們**;
+`jalx` 與 `special0e` 兩個論證**根本不在這個檔裡**(`grep -c 'special0e' docs/isa-prior-art.md` = **0**,
+它們在 `PROGRESS.md:1708` 與 `LOG.md:26503`);而 `:668` 那句
+*沒有任何檢查讀 `bench/` 下的擷取* **被寫下來的時候就已經是假的** ——
+`rbcheck.py` 的 `C45`／`C46` 讀的正是那兩個擷取,`6ccf643` 17:28:47,比那句話早 **16 分鐘**。
+
+**而最深的問題是型別**:七個選項來自**兩個正交的問題**加一個排程動作加一個範圍切割。
+
+| | 問題 | 值 |
+|---|---|---|
+| Q-kernel | 使用者空間普查跑在哪一顆 kernel 下 | vendor-shipped、vendor-rebuilt、rlxfw |
+| Q-ruler | 用什麼量成本 | `gettimeofday` 加 N、`/proc` 的 `TC0CNT`、`/dev/mem` 的 `TC0CNT`、裸機、不量 |
+
+加上兩個交付物:**D-diff**(45 列,§ 9.1 item 4 說它**一個時鐘都不需要**)與 **D-cost**(約 4 列)。
+所以選擇是「Q-kernel 一個值、Q-ruler 一個值、分不分半」三個小決定,不是一個七選一。
+`O1` 到 `O7` 的 id 與格子在 `docs/isa-prior-art.md` § 9.2。
+
+---
+
+### 2. 🟢🟢 五個量測,全部桌面、零電源,而第一個是整個裁決的地基
+
+**① 導出的母體,不是我挑的兩個檔。** 母體 = `arch/rlx/kernel/` 加 `arch/rlx/mm/` 的
+**49** 個原始檔,其中出現 **74** 個相異 `CONFIG_` 符號;`config/rlxfw-kernel.delta` 有 **73** 行;
+**交集 7**。六個在 initrd／cmdline／wlan／另一顆 SoC(`CONFIG_RTL_8198`)的分支上。
+第七個是 `CONFIG_RTL_WTDOG`,`y → n`,四個站點是 `rlx-cevt.c:31`、`:151` 與
+`traps.c:316`、`:534` —— `die()` 與 `do_bp()`,**在每一個 `simulate_*` 之外**。
+控制:兩個已知在 delta 裡的符號回報 HIT、一個捏造的符號回報 absent、
+`CONFIG_LEDS_GPIO` 在 arch 母體裡 **0** 次。
+🔴 **第一版是我挑了 `traps.c` 與 `unaligned.c` 兩個檔去 grep,而「挑的母體」是這個 repo 最不接受的東西。**
+改成導出的之後結論更強而不是更弱,這一點值得記著。
+
+**② 決定模擬面的三個符號在八份出貨 config 上 8／8 一致。** 母體 = 釘死那個 drop 裡
+全部 **8** 份 `config.linux-2.6.30.RTL8196E*`:`CONFIG_ARCH_CPU_ULS=y` 8／8、
+`# CONFIG_ARCH_CPU_LLSC is not set` 8／8、`# CONFIG_ARCH_CPU_SYNC is not set` 8／8,
+經 `arch/rlx/Kconfig` 的 `default y if ARCH_CPU_*` 映射到 `CPU_HAS_*`,
+而那正是 `do_ri` 裡兩個 `#ifndef` 與 `unaligned.c` 裡那個 `#ifdef` 的開關。
+**負控制發火**:同樣八份對 `CONFIG_RTL_ODM_WLAN_DRIVER` 不一致(2 設、6 缺席)。
+**這是「你那份 config 不是他們的」這個反駁的量測答案,而且蓋掉他們全部八份。**
+
+**③ 🔴 出貨的廠商 kernel 說不出自己的 config。** 讀 baseline `# CONFIG_IKCONFIG is not set`。
+⚠️ 而把它從 讀 升級成 量 的嘗試**失敗了,失敗的方式值得留著**:在原始 4 MiB flash 上找
+`IKCFG_ST` 什麼都不證明,因為那裡的 kernel 是壓縮的。**是那次掃描自己的輸出抓到的** ——
+字串 `Linux` 在 4,194,304 位元組裡只出現 **1** 次,沒有一顆未壓縮的路由器韌體做得到。
+一支沒有正控制的掃描差一點就交出一個乾淨的答案。
+
+**④ 🔴 那個唯一的 config 差異只碰得到 `do_bp`,而沒有任何一列普查進得去 —— 但 harness 進得去。**
+量:`break` 與 `syscall` 在 **45** 列普查(`tools/isa-census.tsv`)與 **75** 列 payload
+(`tools/isa-payload.tsv`)裡**都不存在**。推:gcc 對整數除以零就是發 `break 7`,
+所以 `R1c` 的**程式自己**帶得進去。**那是一個建置閘門而不是一個論證** ——
+`objdump -d` 之後 `break` 的計數必須是 **0**,跟 `hazlint` 對裸機 payload 做的事同一類。
+
+**⑤ 🔴 § 9 對尺候選 ① 的否證引錯了 kernel,而結論靠一個更硬的理由存活。**
+它引的是 *seating 14 十一份 dump 裡 `rating` 讀 0* —— 那是 **rlxfw 自己的** `rtl819x-timer`
+的欄位,一個在廠商 kernel 裡不可能存在的驅動。§ 9.1 的 item C 對「尺」講過這件事,
+沒有人把它套到「否證」上。真正讓那一列成立的是 讀:**廠商的 rlx port 根本沒有註冊任何 clocksource**
+(唯一的 `clocksource_set_clock` 在 `rlx-time.c:50-79` 的 `#if 0` 裡),
+所以 `curr_clocksource` 從不離開 `clocksource_jiffies`,在 `CONFIG_HZ=100` 下算出來正好
+**10,000,000 ns**。🔴 **而逃生門也量掉了**:`arch/rlx` 沒有 `gettimeoffset`、沒有 vDSO、
+沒有 `sched_clock` 覆寫、沒有 `CONFIG_CPU_FREQ`、沒有 high-res timers ——
+**廠商 kernel 下沒有任何 userspace API 優於 10 ms**。
+
+---
+
+### 3. 🟢 裁決,以及讓它不會靜靜失效的那支工具
+
+**Q-kernel = rlxfw。Q-ruler = § 9 的尺 ③。分半 = 是。** 也就是 `O6` 套在 `O1` 上,
+`O7` 具名為 fallback,`O2` 被量測 ⑤ 排除而不是被偏好排除。
+代價是**claim A**:`PROGRESS.md` 的 `R1-pub-4` 說 *under the vendor kernel*,
+那個措辭被**取代**而不是刪掉,取代成一句量過的話(逐字在 § 9.3)。
+**為什麼那比跑出貨的二進位更強而不是更弱**,三個理由每一個都是上面的量測而不是論證:
+出貨的二進位說不出自己的 config(③);**每一份** Realtek 為這顆 SoC 出的 config 都同意那三個符號(②);
+而 rlxfw 的配方逐位元組可重現(`P4a` Level 1),出貨的二進位完全不可重現。
+
+**三個否證條件事先寫下**:`R1C-1-a`(任何一列的 user-mode 讀數與原始碼預測不符)、
+`R1C-1-b`(連結後的 `R1c` 二進位裡出現 `break`)、`R1C-1-c`(一個命名 `arch/rlx` 例外路徑
+程式碼的 config 符號進入 `config/rlxfw-kernel.delta`)。
+🟢 **而 `-c` 現在真的是一支檢查器**:`tools/emueq.py` 加 `config/emu-path-symbols.tsv`,
+**19 個案例全過**,雙向斷言(E1 新的交集要發火;E2／E3 允許清單不能養著已經消失的東西),
+`T0` 要求**已提交的那一對是乾淨的而且交集非空**(否則綠是靠沒東西可查),
+`T5` 把允許清單清空後**必須變紅**(否則 `T0` 的綠是靠赦免一切)。
+表是**提交的**而不是現掃的,因為 `src-vendor/` 在 CI 裡是斷掉的符號連結 ——
+`isa-census.tsv` 配 `isacensus` 的同一個分法。CI 兩個步驟而不是一個:
+自測證明這支檢查會失敗,`emueq check` 證明這棵樹過得了,**兩件事互不蘊含**。
+
+---
+
+### 4. 🔴 裁決過程開了兩個比決定本身更寬的洞
+
+**① REGIMM 的 trap-immediate 家族在整個 repo 的每一支儀器之外。**
+量:`teqi`、`tnei`、`tgei`、`tgeiu`、`tlti`、`tltiu` 在 `tools/`、`docs/`、`SPEC.md` 裡
+**零命中**;`hazlint` 的 `ISA_TRAPS` 只有六個 **SPECIAL function code**。
+它們是 REGIMM —— opcode `0x01`、`rt` 落在 `0x08` 到 `0x0E` —— 另一個 opcode 的另一個欄位。
+🔴 **而 SPECIAL 那一組的結果不能搬過去**:payload 唯一那一個 REGIMM 探針 ——
+`synci`,`0x055F0000`,`rt = 0x1F`,MIPS-I 未指派 —— 在 `C1-P4j.log` 讀 `n=0`,
+**retire 了而沒有發 RI**。所以這顆核心的 REGIMM `rt` 解碼不會把未指派值導向 RI,
+而那正是讓 § 9.1 item 2(a) 的答案能外推的那個前提。
+推:`teqi` 與它的五個手足是通往未向量 cause 13 的最高機率剩餘路徑,
+**一列 payload 就結掉,搭現有卡片零增量成本。**
+
+**② 🟢 item 2(c) 的類危害現在有清單了,而清單是空的。**
+量,從 `bench/2026-09-14/C1-P4j.log` 重新導出:75 列、**42** 個例外、**33** 個 retire;
+42 個只帶 **兩個**相異 ExcCode —— **10(RI)32 列、11(CpU)10 列** —— 兩個都被
+`trap_init` 向量化。**零個落在那 21 個未向量 cause 上。**
+⚠️ 三個限制跟著走:這是 **kernel mode** 的讀數;母體是 2³² 裡的 75 個編碼;
+而 `do_reserved` 是被 **cause** 到達的,所以這界定的是「一列普查會不會讓板子 panic」,
+不是「板子會不會 panic」。
+
+---
+
+### 5. 🔴 三個讓探針自己壞掉的東西,repo 裡一個都沒有
+
+**① `special0e` 乾淨是靠一個 function code 的邊界。** `simulate_sync`(`traps.c:454-462`)
+匹配 SPECIAL function **`0x0F`**,`rs`／`rt`／`rd`／`sa` 全部忽略,回 0 —— 純 no-op、`epc` 已前進。
+`special0e` 是 **`0x0E`**。**相鄰。** 當初若選 `0x0000000F`,`do_ri` 會靜靜地模擬它,
+探針回報「不 trap」,而那顆晶片可能根本會發 RI。
+
+**② `do_cpu` 與 `do_ri` 不對稱,而不對稱會把 user-mode 普查的計分反過來。**
+`do_cpu`(`traps.c:589-636`)有 `simulate_llsc`、**沒有** `simulate_sync`。
+User mode 下 `CU0` 清著(讀 `process.c:72-73`:`start_thread()` 清 `ST0_CU0` 設 `KU_USER`),
+所以 `ll`／`sc`(= `lwc0`／`swc0`)走 CpU → `do_cpu` 的 `cpid == 0` 分支 → **被模擬、完全不發訊號**。
+**一個「沒訊號 ⇒ 這條指令存在」的普查會把它們記成這顆晶片有實作,正好相反。**
+
+**③ 兩個機制層的坑。** `traps.c:584` 在發訊號**之前**把 `cp0_epc` 倒回 `old_epc`,
+所以一個正常返回的 `SIGILL` handler 會**重新執行**那條指令 —— 無限迴圈;
+探針必須 `siglongjmp` 出去或自己推進 `uc_mcontext.pc`。
+而 `force_sig` 送 `SEND_SIG_PRIV`,`siginfo` 帶 `si_code = SI_KERNEL` 且**沒有 `si_addr`**
+—— 它和 `si_pid`／`si_uid` 在 union 裡重疊,讀到 **0**,不是出錯的 PC。
+
+🟢 **而 `die_if_kernel` 終於有引用了,它在 `traps.c` 以外的檔案裡,這就是為什麼沒人引過它。**
+`asm/ptrace.h:89-93` 是 `if (unlikely(!user_mode(regs))) die(...)`;`user_mode` 在 `:80`;
+`asm/isadep.h:15-17` 給 `KU_MASK = KU_USER = 0x08` —— R3000 的 `Status` 佈局,bit 3 是 `KUc`。
+`do_ri` 與 `trap_init` 兩半本來就有引用;**這一半從來沒有**,而它是撐住整句話的那一半。
+
+---
+
+### 6. 🔴 進入廠商系統的每一條路都以一次 flash 寫入開場
+
+技術前提幾乎全部滿足:廠商在 `/var` 掛 **`ramfs` 而且完全沒有選項**(`rcS:9-10`),
+`/tmp` 是進去的符號連結;量,帶控制:`noexec` 在整棵解出來的 rootfs 裡**只出現一次**,
+在 `bin/busybox` 自己的選項名表裡;`/bin/wget` 是獨立的 **GNU Wget 1.9.1**;
+這台自己的 `libuClibc-0.9.30.3.so` 匯出 `__libc_sigaction`、`_setjmp`、`__sigsetjmp`。
+⚠️ 最後那個讀數需要子字串比對:整行比對回報 `sigaction 0`、`setjmp 0`,因為 ELF
+字串表會做尾端合併 —— `notes/rootfs-census.md` 已經為 `printf` 記過同一個假零。
+
+🔴 **擋路的是入口不是能力**:主控台**沒有 shell、沒有 getty、沒有 login**
+(`/etc/inittab` 每一行控制台都被註解掉,`::sysinit:/etc/init.d/rcS` 是唯一活的);
+loader **沒有任何 `init=` 或 `bootargs` 機制**(13 個針、0 命中);`TELNET_ENABLED` = 0。
+**唯一有實證的入口是 boa 的 `formSysCmd` 注入,而量 `P10-10`:觸發它會把 `SYSCMD_SELECT`
+寫進 flash `0x00C000` 的 `COMPCS`。** 在兩個禁區之外、blast radius 有界,但它是一次 flash 寫入。
+**所以 `O2`、`O3`、`O7` 不是比 `O1` 難,是每一個都以一次 flash 寫入開場。**
+
+🟢 **而 `O3` 變成多餘的:`/proc/rtl865x/memory` 是一個無界的 32 位元 peek/poke,廠商 kernel 已經出貨了它。**
+讀 `rtl865x_proc_debug.c:4115-4175`,`proc_mem_write()` 對位址做 `simple_strtol` 然後
+`WRITE_MEM32`,**完全沒有邊界檢查**;廠商自己的 `/bin/dw` 與 `/bin/ew` 是驅動它的兩行 shell script。
+兩個來源都說這台是開的:讀 board config 的 `CONFIG_RTL_DEBUG_TOOL=y`,
+加上這台自己解壓 kernel 裡四個決定性字串,`priveSkbDebug` 當負控制讀 **0**。
+**`docs/isa-prior-art.md:489` 問的那個殘留,這個 repo 手上一直有答案而不知道。**
+
+⚠️ **兩個比那條路本身更值錢的安全發現**:`/dev/mtdblock0` 出貨在 **0666**、涵蓋 loader 與 `H601`,
+而 `/bin/flash` 就在同一個 `PATH` 裡 —— 任何注入的命令列都離不可回復的變磚一個 typo。
+以及 `notes/kernel-build.md:702` 寫 `R0` 那顆 kernel *"reached a shell"*,**沒有任何擷取支持**,
+而 `README.md`、`PROGRESS.md`、`CHANGELOG.md` 三個都正確寫 *reached userspace*。
+🟢 **已更正,而結論存活**:從 userspace 回應 ping 一樣需要走過 idle loop,所以 `K9` 與
+`ARCH_CPU_SLEEP` 的論證不動。那就是為什麼它被更正而不是刪掉。
+
+---
+
+### 7. 🔴 這一段自己的三個缺陷
+
+**① 同一個類在這一段咬了三次,而三次在三個不同的層 —— 兩次被 `spec-check` 在 commit
+之前抓到,第三次被我自己寫的守衛抓到。**
+第一次接在收尾的直立線之後 —— GFM 沒有結束那一列,把下一列吞進來(`5 + 6 = 11` 格);
+第二次把文字搬進第 3 格時**連著第一次補回去的那個收尾符號一起搬**,等於把分隔符放進儲存格;
+第三次是我在這篇紀錄裡描述前兩次時,用了一個字面的直立線,而我為這件事寫的守衛擋下了它。
+然後第四次:跳脫成 `\|` 之後,**我自己那支拆列的函式不懂那個跳脫**,把它算成一個格子邊界,
+於是它的格數自檢拒絕了一列完全合法的列。
+**所以規則比「跳脫你的直立線」深一層:每一支操作 GFM 列的工具都必須懂那個跳脫,而我的不懂。**
+最後的形狀:**先把列拆成 cells(拆的時候認得 `\|`)、全程不碰原始的分隔符、寫出去之前自己比對格數**。
+⚠️ 而 `git checkout --` 修那兩個檔的時候,**連同一個檔裡 1708 行的裁決記錄一起退掉了**;
+是收工前重跑 `spec-check` 與逐項對照發現的。
+
+**② 一支沒有正控制的掃描差一點交出乾淨的答案**(§ 2 ③)。
+
+**③ 母體是我挑的**(§ 2 ①)。改成導出的之後結論更強,但那是運氣不是方法。
+
+---
+
+### 8. 不變式與收工
+
+**`PROGRESS.md` 與 `SPEC.md` 的行數一個都沒動**(1864 與 734),
+因為今晚兩份凍結的更正檔引用它們的行號(`:1700`、`:1708`、`:124`、`:330`、`:671`);
+`docs/isa-prior-art.md` 808 → 1061,插入點在 621,而凍結檔唯一引用的 `:356` 在它之上。
+`R1C-1` 仍在 1708、`CPU-47` 仍在 121。
+`spec-check` **rc=0**、`test-file-modes` 3 passed、`emueq --self-test` **19 passed**、
+`emueq check` rc=0(交集 1 = `CONFIG_RTL_WTDOG`)、壞路徑 `refresh` **REFUSED rc=3**、
+`citime check` rc=0(補了 4 筆)。
+**兩張卡的 mtime 沒動,`check-predictions` 仍是 `0 of 7` 與 `0 of 27`。**
+**零 flash 寫入命令、零 `FLR`、零電源循環,括號不動 `0.0244 %`。**
