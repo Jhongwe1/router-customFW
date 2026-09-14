@@ -118,6 +118,22 @@ What keeps them from being reached is the userspace surface, not their absence:
 `config/rlxfw-initramfs.tsv`. **Those are access controls on a path that
 exists.**
 
+🔴 **2026-09-14 (sixty-ninth segment): that access control exists on MY side and
+NOT on the vendor's, and the difference is measured.** 讀 `unsquashfs -ll` on
+this unit's own shipped image — not on the extracted tree, where `unsquashfs`
+without root reports `created 0 devices` and every node reads as absent, which
+is a false zero this finding nearly took: `/dev/mtd0`–`/dev/mtd4` ship
+`crw-rw-rw-` and **`/dev/mtdblock0`–`3` ship `brw-rw-rw-`, mode 0666**.
+`/dev/mtdblock0` covers the **loader and `H601`** — the two windows this
+project's own rules call unrecoverable — and `/bin/flash` (87,664 B) sits in the
+same `PATH`. 讀 the board config: `# CONFIG_MTD_CHAR is not set`, so the `mtd*`
+char nodes are dead (`ENODEV`), but `CONFIG_MTD_BLOCK=y`, so **`mtdblock*` is
+live**. ⚠️ **This narrows the section's own sentence rather than contradicting
+it**: *the userspace surface is what keeps them unreached* is true of every
+image rlxfw builds and **false of the vendor's**, where nothing is in the way
+except the absence of a shell. `SPEC.md` `FW-68`; the route that would reach it,
+and its own flash-write cost, is `PROGRESS.md`'s `VDR-1`.
+
 🟢 So the sentence `R5-5`'s `D4` earns is **rlxfw contributes no
 flash-write code to this image**. It is *not* *this image cannot write flash*,
 and no write-up may use the first to imply the second. `rtl819x-spi`'s own

@@ -26816,9 +26816,11 @@ loader **沒有任何 `init=` 或 `bootargs` 機制**(13 個針、0 命中);`TEL
 
 ### 9. 🔴 收工稽核跑第八種方法,抓到五件,而第一件是我自己找到卻沒有修的
 
-**方法是「列舉這一段做出什麼,再問每一件誰擁有它」** —— 前七種方法(讀自己的 diff、
-讀擁有者清單、`git grep` 陳舊數字、讀「描述未來狀態」的列、完整列舉、`git log -S`、
-驗別人給的已知原因)在這一段全部是綠的。第八種抓到五件:
+**方法是「列舉這一段做出什麼，再問每一件誰擁有它」**。
+~~前七種方法（讀自己的 diff、讀擁有者清單、`git grep` 陳舊數字、
+讀「描述未來狀態」的列、完整列舉、`git log -S`、驗別人給的已知原因）
+在這一段全部是綠的。~~
+🔴🔴 **同一晚後來的第二輪把這句話推翻了，而它錯的方式正好是這一節在講的那件事。** 那七種方法**沒有跑** —— 它是一句斷言，穿著量測的衣服，而它就寫在一節「綠的閘門不是稽核」裡面。第二輪（一個全新視角、只讀不寫的稽核員）抓到四個具體缺陷、五句被這一段弄假而沒划掉的話、以及三個有對應節次而從頭到尾沒被打開的擁有者檔 —— 逐條在 § 10。下面這五件是第一輪抓到的，留着：
 
 | | 缺口 | 落到哪 |
 |---|---|---|
@@ -26846,3 +26848,84 @@ loader **沒有任何 `init=` 或 `bootargs` 機制**(13 個針、0 命中);`TEL
 `spec-check` rc=0、`emueq --self-test` 19 passed、`emueq check` rc=0、
 `ci-census --only emueq` **ran 19/19 failed 0**。
 **零 flash 寫入命令、零 `FLR`、零電源循環,括號不動 `0.0244 %`。**
+
+---
+
+### 10. 🔴🔴 第二輪稽核:一個全新視角的讀者,抓到四個缺陷、五句沒劃掉的假話、三個沒打開的擁有者檔
+
+**這一輪的方法是反過來的:不是「我做了什麼」,而是「讀我實際改了哪些檔,
+然後去找我沒改而應該改的」。** 而它抓到的第一件事就是 § 9 那句
+「前七種方法全部是綠的」—— 那七種**沒有跑**。已在上面劃掉。
+
+#### 10.1 🔴 最有牙齒的一件:一個永遠不會有人讀的 `.out`
+
+CI 會寫 `ci-out/emueq.out` **與** `ci-out/emueq-check.out`,而只有前者有
+`ci-expected.tsv` 的列。🔴 **我稍早查過這件事,量到 `ci-census` 迭代的是
+「表格列」而不是「目錄」,於是判定那個孤兒無害,然後停手。**
+對「census 會不會紅」那是對的;對**覆蓋**完全是錯的 —— 那個檔會被產生、
+上傳、合併,然後靜靜地被忽略,而 `emueq check` 哪天不再印它的斷言,
+census 還是綠的。**那正是 `ci-census` 自己的 docstring 說它存在要防的失敗。**
+⚠️ 而它抓不到自己:`ci-census` 沒有孤兒 `.out` 偵測,唯一的
+「not in the table」紅是給 `--only` 的(`:228`)。
+量:既有的 `xcheck`／`dtcheck`／`citime` **三個都宣告兩列**。補上之後
+`emueq-check` 回報 **ran 1/1**。
+
+#### 10.2 🔴 劃掉兩句、留下五句,比七句都留著更糟
+
+一個讀者看到一句被劃掉,會合理地假設其餘都查過了。留著的五句:
+`docs/isa-prior-art.md:591` 說 user-mode 普查「沒有那份清單」,而**同一段做出了
+那份清單而且它是空的**;`:593-598` item 3 的 **推** 標記,而同一段把它變成 **讀**
+並且大幅加強;`:489-491` 說拿 `TC0CNT` 需要 `/dev/mem` 或一個 `/proc` 檔,
+而那**逐字是 § 9.1 自己那張矛盾表的 claim C**,而且同一段回答了它;
+以及 `:837` 用現在式指著 `notes/kernel-build.md:701-702`「說」reached a shell ——
+🔴 **而那一句是同一個 commit 劃掉的**,所以順著引用去看的人會看到更正而不是缺陷。
+全部補上,而且全部是**劃掉加 🔄 指標**而不是刪除。
+
+#### 10.3 🔴 三個有對應節次、卻從頭到尾沒被打開的擁有者檔
+
+| 檔 | 它的節次標題就是答案 | 本來落在哪 |
+|---|---|---|
+| `docs/isa-payload.md` § 7 | **What is deferred, by name, with the experiment** —— REGIMM 那個洞的 `why` 與 `what closes it` 兩欄都已經寫好了 | `SPEC.md` `CPU-60`、`PROGRESS.md` `REGIMM-1`、§ 9.4 ①,**沒有一個在母體旁邊** |
+| `docs/KNOWN-ISSUES.md:117` | 「`/dev/mtdblock1` 宣告成 `0400`」是那一節說「擋路的是 userspace 表面」的理由 —— 而這一段量到**廠商出貨的 `/dev/mtdblock0` 是 0666** 且涵蓋 loader 與 `H601` | `notes/rootfs-census.md` 與 § 9.5 |
+| `docs/FINDINGS.md:96` | **It changed what a payload of mine may execute** —— `do_cpu` 的不對稱與兩個會弄壞 SIGILL 探針的東西 | `notes/vendor-kernel-isa.md` 與 `LOG.md` |
+
+🔴 **而第二件有一個同一個 commit 裡的反例**:我為 `/proc/rtl865x/memory` 開了
+`SPEC.md` `FW-67`,理由逐字是「它是一個裝置能力而 `SPEC.md` 沒有它的列」。
+`/dev/mtdblock0` 的 0666 形狀完全相同、同樣沒有列,卻只拿到一則註記。
+**兩個一模一樣的發現,同一個 commit,兩種待遇。** 現在是 `FW-68`。
+
+#### 10.4 🔴 `config/rlxfw-kernel.delta:2` 說它被一支工具檢查
+
+而這一段替同一個檔加了**第二支**檢查器並接進 CI 兩個步驟。那一行是**逐檔的宣告**
+而不是一份策展索引 —— 它是讀這個 delta 的人唯一會學到「誰在守它」的地方。
+兩支問的是不同的問題:`kconfig-delta` 問這個檔描述的是不是它宣稱的 `.config`,
+`emueq` 問它描述的東西能不能移動廠商 kernel 的模擬面。**互不蘊含。**
+
+#### 10.5 🟢 稽核員同意、而我要記下來的幾件「不是缺陷」
+
+`CHANGELOG.md` 自 2026-09-11 起是**發版剪裁**而不是逐段更新(前五段都沒動它),
+所以這一段不欠它;`README.md` 的工具索引是策展的(82 支裡缺 42 支);
+`docs/GATE-RESULTS.md` 要等 `R1-pub-7`;`docs/isa-hazard.md` **不是** `ISA_TRAPS` 的
+擁有者(零命中,擁有者是 `docs/isa-prior-art.md:75`);`§ Now` 的
+`Blocked on` 與 `Active gate` **正確地沒有動** —— gate 沒移動,而 `R1C-1`
+從來就不在 `Blocked on` 上。
+
+#### 10.6 ⚠️ 不變式,重驗
+
+凍結卡片釘住的行號從 13 個擴充到 **15 個**(加上 `docs/isa-prior-art.md:356` 與
+`docs/KNOWN-ISSUES.md:26`),逐一對照 `558cc65`:**15 of 15 仍指向同一列**,
+負控制(就地改過的 `PROGRESS.md:1708` 必須被報成 MOVED)發火。
+`emueq` 19/19、`emueq-check` **1/1**、`ledgerscan check`／`quarantine`、
+`xcheck sweep`、`spec-check` 全部 rc=0。
+**零 flash 寫入命令、零 `FLR`、零電源循環,括號不動 `0.0244 %`。**
+
+#### 10.7 🔴 而 CI 在這之前就抓到一件第二輪也沒抓到的
+
+`ledgerscan check` 在前兩個 commit 都紅了,而根因是**這一段自己的工具產生的引用**:
+`emueq refresh` 的表列出每個符號被哪些檔案命名,`CONFIG_KGDB` 出現在
+`arch/rlx/kernel/irq.c`,而引用掃描器分不出「產生的列舉」與「有人讀過的檔」。
+**這是 CLAUDE.md 規則 ③b 第二次咬這個 repo,第一次是由工具造成的。**
+而我只跑了那條規則點名的四支裡的兩支(`spec-check`、`test-file-modes`),
+**漏掉的那一支正好是紅的那一支。**
+修法不是再加一列 ledger:`emueq refresh` 現在會印出它引用的 **28** 個廠商原始碼
+路徑,並說 `ledgerscan check` 必須跟在它後面 —— 因為桌面 sweep 永遠早於這個檔。

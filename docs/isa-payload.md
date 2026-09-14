@@ -408,8 +408,33 @@ deferred group that has grown rows is an exemption nobody removed, and
 | **`sleep`** | `0x42000038`, RLXA. A bare-metal payload that sleeps does not come back | a payload with a timer already armed |
 | **`sc` as a pair** | without a preceding `ll` to the same address, a correct `sc` has an unspecified outcome, so there is no single computable constant | a two-word cell, which the one-word-per-row schema does not express |
 | **COP1 with `CU1` set** | this payload writes no CP0 `Status` on a device build, so a `CpU` verdict does not separate *no FPU* from *FPU disabled* | set `CU1`, read it back, repeat the five rows |
+| 🔴 **REGIMM trap-immediate** 🆕 | 🆕 **2026-09-14 (sixty-ninth segment), and this one is ABSENT rather than deferred.** `teqi`, `tnei`, `tgei`, `tgeiu`, `tlti`, `tltiu` -- opcode `0x01` with `rt` in `0x08`-`0x0E` -- have **no row in this table and no entry in `DEFERRED_GROUPS`**, because that dict excludes groups that are present; these were never added. 量: zero occurrences anywhere under `tools/`, `docs/` or `SPEC.md`. `hazlint`'s `ISA_TRAPS` carries the six **SPECIAL** function codes only, and `CPU-57`'s SPECIAL answer does NOT carry across -- the one REGIMM encoding ever probed, `synci` (`0x055F0000`, `rt = 0x1F`, unassigned in MIPS-I), **retired instead of raising RI**, so this core's REGIMM `rt` decode does not funnel unassigned values to RI | one row: `teqi $8,0x2A` with `$8 = 0x2A` so the condition is TRUE, plus one line in `hazlint`'s `ISA_TRAPS`. 推 it is the highest-probability remaining route to the unvectored cause 13. Zero incremental bench cost if it rides an existing card. `SPEC.md` `CPU-60`, `PROGRESS.md` `REGIMM-1`, `docs/isa-prior-art.md` § 9.4 ① |
 
 ---
+
+> 🔴 **2026-09-14 (sixty-ninth segment): two things break a SIGILL-handler
+> payload before any row of it runs, and both are 讀 out of the vendor kernel.**
+> They constrain `R1c`, which is this table run again in USER mode, and they
+> constrain nothing about the bare-metal payloads above -- which is exactly why
+> nothing here had noticed them.
+>
+> ① **`traps.c:584` rewinds `cp0_epc` to `old_epc` BEFORE signalling.** A
+> `SIGILL` handler that returns normally therefore re-executes the faulting
+> instruction, forever. The payload must `siglongjmp` out of the handler, or
+> advance `uc_mcontext.pc` itself.
+>
+> ② **The `siginfo` carries nothing.** `force_sig` sends `SEND_SIG_PRIV`, so
+> `si_code` is `SI_KERNEL` and there is **no `si_addr`** -- it overlaps
+> `si_pid`/`si_uid` in the union and reads **0**, not the faulting PC. A probe
+> that identifies which row faulted from `si_addr` identifies every row as
+> address zero.
+>
+> ⚠️ And a third that is not a bug but decides the scoring: `do_cpu` carries
+> `simulate_llsc` and **not** `simulate_sync`, so from user mode `ll` and `sc`
+> are emulated and return **with no signal at all**. Scoring *no signal implies
+> the instruction exists* records them backwards.
+> `notes/vendor-kernel-isa.md` § 1.4.
+
 
 ## 8. Encodings with two names, 量 2026-09-13
 

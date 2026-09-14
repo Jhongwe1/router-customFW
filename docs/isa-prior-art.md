@@ -72,7 +72,7 @@ written for other reasons:
 
 | | instrument | what it contributes | why it is the right source |
 |---|---|---|---|
-| **`R1a`** | `tools/hazlint`'s `ISA_OPS` and `ISA_TRAPS` | 27 mnemonics | the tool states its own membership rule: MIPS-I **minus** the four unaligned ones, because a Lexra core is MIPS-I minus those; everything above MIPS-I; and MIPS-I's own optional coprocessors 2 and 3 |
+| **`R1a`** | `tools/hazlint`'s `ISA_OPS` and `ISA_TRAPS` | 27 mnemonics | the tool states its own membership rule: MIPS-I **minus** the four unaligned ones, because a Lexra core is MIPS-I minus those; everything above MIPS-I; and MIPS-I's own optional coprocessors 2 and 3 🔄 **2026-09-14 (sixty-ninth segment): this membership rule has a MEASURED hole and it is in `ISA_TRAPS`.** That set is the six **SPECIAL** function codes; the six **REGIMM** trap-immediate encodings (`teqi`, `tnei`, `tgei`, `tgeiu`, `tlti`, `tltiu`, opcode `0x01` with `rt` in `0x08`-`0x0E`) are absent from it and from every other instrument here, and the SPECIAL result does NOT carry across -- § 9.4 ①, `SPEC.md` `CPU-60` |
 | **`R1a`** | `tools/isa-probe.sh`'s probe rows | 20 mnemonics | what the vendor's own assembler was actually asked about, per `-march`, across six Lexra architectures |
 | **`R1b`** | `tools/hazlint`'s `survey()` keys | 3 shapes | its docstring: these are the shapes it counts and **refuses** to give a verdict on, because *"the shapes are what R1b goes and measures"* |
 
@@ -486,9 +486,18 @@ found.** ① The **amplification factor** is 推: an emulated instruction costs 
 exception round trip through `do_ri` — microseconds — and a native one costs
 nanoseconds, so N must be chosen per row so the total clears ~100 counts, and
 the first cell of `R1-pub-4` measures the empty loop as its own control.
-② Reaching `TC0CNT` from userspace needs `/dev/mem` or a `/proc` file, and
+② ~~Reaching `TC0CNT` from userspace needs `/dev/mem` or a `/proc` file, and
 which one is `R1-pub-4`'s decision, not this one — but it is **not** a new
-driver: `rtl819x-timer` already exposes its own counters.
+driver: `rtl819x-timer` already exposes its own counters.~~
+🔄 **2026-09-14 (sixty-ninth segment): struck, and BOTH halves are wrong.**
+The second half is claim **C** of § 9.1's own contradiction table, which that
+section declares cannot hold beside A — it is kept above only because § 9.1
+quotes it. And the first half had an answer this repository was already
+holding: **the vendor kernel ships `/proc/rtl865x/memory`**, an unbounded
+32-bit peek/poke with no bounds check at all, driven by the vendor's own
+`/bin/dw` and `/bin/ew`. § 9.5 and `SPEC.md` `FW-67`. ⚠️ The residual is not
+closed, it is **replaced**: reaching that file at all needs vendor userspace,
+and § 9.5 measures that every route into it begins with a flash write.
 
 ### 9.1 🔴🔴 2026-09-14: sentence ② is FALSE under this step's own definition, and four other things came out with it
 
@@ -588,14 +597,29 @@ the vendor kernel at all.
    the positive control that says the omission is the vendor's. **The hazard
    this item names is therefore a class and not one instruction**: any encoding
    on this die that raises one of those 21 causes panics this kernel, and a
-   user-mode census has no list of which encodings those are.
+   ~~user-mode census has no list of which encodings those are~~
+   🔄 **2026-09-14: it has one now, and the list is EMPTY — § 9.4 ②.** 量,
+   re-derived from `bench/2026-09-14/C1-P4j.log`: 42 exceptions over 75 rows,
+   two distinct ExcCodes (**10** on 32 rows, **11** on 10 rows), and both are
+   vectored by `trap_init`. Zero landed on any of the 21. ⚠️ Three limits
+   travel with that and § 9.4 ② states them; the first is this item's own (b).
 
 3. ⚠️ **The amplification estimate is anchored to the wrong function.** § 9
    says an emulated instruction *"costs an exception round trip through
    `do_ri`"*. For `ll`/`sc` **from user mode** that is not the handler: `ll` is
    `lwc0`'s opcode and user mode runs with `CU0` clear, so the exception is
    Coprocessor Unusable (cause 11) → `do_cpu`, whose path is shorter. The
-   vendor kept mainline's comment saying exactly this. 推.
+   vendor kept mainline's comment saying exactly this. ~~推~~
+   🔄 **2026-09-14: 讀, and the correction makes it much worse than
+   "shorter".** `traps.c:589-636`: `do_cpu` carries `simulate_llsc` and
+   **does NOT carry `simulate_sync`** — the asymmetry with `do_ri` is in the
+   source and is recorded nowhere else. So from user mode `ll` and `sc` are
+   not merely cheaper to trap: they reach `do_cpu`'s `cpid == 0` branch, are
+   **emulated, and return with no signal at all**. 🔴 **A census scoring
+   *no signal implies the instruction exists* therefore records `ll` and `sc`
+   as implemented on this die, which is backwards** — and that is a defect in
+   `R1c`'s scoring rather than in its cost model.
+   `notes/vendor-kernel-isa.md` § 1.4.
 
 4. 🟢 **The problem is much smaller than § 9 makes it look.** The census is
    45 rows; the emulation surface is `ll`, `sc`, `sync` and the unaligned
@@ -834,11 +858,17 @@ so it is a write-side primitive plus a console-side read.
 讀 `unsquashfs -ll` on the image: `/dev/mtdblock0` ships at mode **0666** and
 covers the loader and `H601`, and `/bin/flash` sits in the same `PATH` -- so any
 injected command line on this device runs one typo away from an unrecoverable
-brick. And 讀 `notes/kernel-build.md:701-702` says gate `R0`'s vendor kernel
+brick. And 讀 `notes/kernel-build.md` **used to say** gate `R0`'s vendor kernel
 *"reached a shell"*; **no capture supports it**, every `--send` in the four `R0`
 directories is a loader command, and `README.md`, `PROGRESS.md` and
-`CHANGELOG.md` all correctly say *reached userspace*. That sentence is the one
-place in the repository that overstates it.
+`CHANGELOG.md` all correctly say *reached userspace*. It was the one place in
+the repository that overstated it. 🔄 **Corrected in the same commit as this
+paragraph — which is why the sentence above is past tense now: the first draft
+pointed a present-tense `notes/kernel-build.md:701-702` at a line the same
+commit had already struck, so a reader following the citation found the
+correction and not the defect.** The conclusion that sentence supported
+survives: answering ping from userspace needs the idle loop just as serving a
+shell would.
 
 ### 9.4 🔴 Two holes this adjudication opened, both wider than the decision
 

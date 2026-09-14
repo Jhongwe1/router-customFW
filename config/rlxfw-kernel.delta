@@ -1,5 +1,12 @@
 # rlxfw's kernel configuration, expressed as a line-by-line delta with a reason
 # per line.  R3-4.   Checked by: tools/kconfig-delta.py check
+#                    AND (2026-09-14, R1C-1-c) by tools/emueq.py check, which
+#                    asserts that no symbol on this list names code on
+#                    arch/rlx's exception path without a reasoned exemption.
+#                    Two checkers, two subjects: kconfig-delta asks whether
+#                    this file describes the .config it claims to; emueq asks
+#                    whether what it describes can move the vendor kernel's
+#                    emulation surface.  Neither implies the other.
 #
 # baseline-drop: src-vendor/rtl819x-toolchain @ 5c9be5d9
 # baseline-file: boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW
