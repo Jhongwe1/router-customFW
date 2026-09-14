@@ -25,6 +25,14 @@ card's lifecycle*):
    around.
 4. `cardcheck numbers` — every stated number re-derivable.
 5. `check-predictions` — **`0 of 27`**, because no capture exists yet.
+7. 🔴 **AMENDED AT 15:56:47, BEFORE POWER, AND DECLARED RATHER THAN DONE
+   SILENTLY.** One comment line in § 10 still read *THE DECISION POINT — read
+   its duration, then pick N from section 5.2*, which § 5.2 had already stopped
+   being: the rate is predicted from the wire and `C2-R` checks the prediction.
+   **No number, no prediction, no command and no cell name changed.** The card
+   held **zero captures** at the time, so every one of the 27 is still newer
+   than it and `check-predictions`'s ordering evidence is strengthened rather
+   than weakened. First frozen `d8e270a`, 2026-09-14T15:33:16+08:00.
 6. **rule 3** — the directory name is a **prediction** until a capture lands in
    it. `bench/2026-09-14c` is the third directory of this calendar day;
    `bench/2026-09-14` is seating 21's and closed, `bench/2026-09-14b` is this
@@ -431,7 +439,7 @@ noticed, because seating 15's card had a capture outside its fence and
 /usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-14c/C2-SI --send 'cat /proc/slabinfo' --idle 4 --seconds 45
 #-- 🔴 THE FIRST READ OF /proc/uptime ON THIS DEVICE.  Two numbers, 10 ms resolution.
 /usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-14c/C2-U --send 'cat /proc/uptime' --idle 3 --seconds 12
-#-- 🔴 THE DECISION POINT.  Read its duration, then pick N from section 5.2.  DO NOT TOUCH THE BUTTON.
+#-- 🔴 THE PREDICTION CHECK.  Section 5.2 predicts 4.09 s (band 4.04-4.14).  DO NOT TOUCH THE BUTTON.
 /usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-09-14c/C2-R --send 'for a in 1 2 3 4 5;do for b in 1 2 3 4 5;do cat /proc/uptime /proc/rtl819x-gpio;done;done' --idle 5 --seconds 90
 #-- 🔴 SLOT 5, CLEAN HOLD ONE.  OPERATOR: start the command, wait about two seconds, then PRESS AND HOLD
 #-- THE RESET BUTTON FOR FIFTEEN SECONDS BY YOUR OWN CLOCK, then release.  Launch time does not matter.

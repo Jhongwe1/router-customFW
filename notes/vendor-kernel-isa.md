@@ -820,6 +820,59 @@ gives.
 `stage2.bin`'s 1,474 — on the one artefact in this project that is both real code
 and this machine's own.
 
+## 4.3 The MIPS16 map of `.iram`, as an address-range excision list
+
+**讀, 2026-09-14, desk, no power.** Same artefact; both sha256 verified
+before use. Disassembler: Realtek's own
+`rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin/mips-linux-objdump` (GNU objdump
+2.16.94-1.3.6), `-D -b binary -m mips:16 -EB`, every invocation wrapped in
+`tools/vendor-tripwire.sh` and run from a scratch directory — verdict
+CLEAN, 6 trees watched, on every run. Cross-checked against binutils 2.42
+`mips-linux-gnu-objdump`: **0 of 37 functions differ**.
+
+**Why an address list and not a symbol list.** `hazlint`'s
+`excise_mips16()` reads `STO_MIPS16` out of `.symtab`, and on this artefact
+it says so itself: *"This file has no symbol table, so nothing could be
+excised by name."* Excision-by-symbol only works on ELF inputs. A raw dump
+needs ranges, and these are they — every byte walked from a proven entry
+point by recursive traversal, so literal pools are never decoded as
+instructions.
+
+**The 12 contiguous MIPS16 runs** (two-byte `0x6500` MIPS16-`nop` fillers
+merged in; 15,098 bytes, 46.1 % of `.iram`):
+
+```
+0x802B8118 .. 0x802B8174     92      0x802BB2A4 .. 0x802BB34C    168
+0x802B8478 .. 0x802B8514    156      0x802BB660 .. 0x802BBAD2   1138
+0x802B8BA0 .. 0x802B8CFC    348      0x802BBDDC .. 0x802BCC20   3652
+0x802B8F90 .. 0x802B904C    188      0x802BE27C .. 0x802BE7E4   1384
+0x802B90D4 .. 0x802B96B0   1500      0x802BE9C8 .. 0x802BEAA4    220
+0x802B9910 .. 0x802BB158   6216      0x802BEC2C .. 0x802BEC50     36
+```
+
+**The complement — what a 4-byte scanner MAY read above `0x802B8000`**,
+17,670 bytes it currently refuses wholesale:
+
+```
+0x802B8000-0x802B8118  280    0x802BB158-0x802BB2A4  332
+0x802B8174-0x802B8478  772    0x802BB34C-0x802BB660  788
+0x802B8514-0x802B8BA0 1676    0x802BBAD2-0x802BBDDC  778
+0x802B8CFC-0x802B8F90  660    0x802BCC20-0x802BE27C 5724
+0x802B904C-0x802B90D4  136    0x802BE7E4-0x802BE9C8  484
+0x802B96B0-0x802B9910  608    0x802BEAA4-0x802BEC2C  392
+                              0x802BEC50-0x802C0000 5040 (all zero)
+```
+
+⚠️ **`--vma-range` takes ONE window** (`hazlint`'s usage block), so 12
+runs need either 13 invocations or a repeatable `--exclude LO:HI` that does
+not exist yet. That is a tool change and it is deliberately not made here.
+
+🔴 **The complement is not all 32-bit code, and the difference matters
+for anything that counts.** 5,040 of those 17,670 bytes are the `.iram`
+tail padding — `ALIGN(8192)` between the last MIPS16 byte at
+`0x802BEC50` and `__dram` at `0x802C0000`, all zero — and they are the
+reason `.iram`'s real content ends where it does.
+
 ---
 
 ## What could still be wrong
@@ -828,9 +881,51 @@ and this machine's own.
    blob that is neither MIPS32 nor coherent MIPS16 — it holds every FPU-opcode
    and `SPECIAL2` hit in the span. It is excluded by adjudication, not by a
    bound, and a second such island would not be noticed by anything here.
-2. **The `.iram` region is not fully mapped.** 23 MIPS16 entry points are known
-   from the call side; where each function ends, and whether the region also
-   holds MIPS32, is not established.
+   ✅ **2026-09-14: resolved, and it is coherent MIPS16.** 讀, same
+   artefact, entered at **`0x80188884`** rather than at the block boundary:
+   a complete function, prologue `addiu sp,-112` / `sw ra,108(sp)`, 287
+   instructions, literal pool `0x80188B20`–`0x80188B3C`, terminator
+   `jr a3` at `0x80188B1A` — **extent `[0x80188884, 0x80188B3C)` = 696
+   bytes**. Read as 32-bit the same bytes give `daddi`, `lld`, `ldl`, which
+   is MIPS64 nonsense on a MIPS-I core. 讀: over hazlint's whole span
+   `[0x80000000, 0x802B8000)` there are **3 COP1-family and 5 `SPECIAL2`
+   words, and 100 % of both sit inside that 696-byte extent** — so this
+   item's own observation was the signature of MIPS16, not of a blob.
+   🔴 **It is reached ONLY by a MIPS16 `jal` from `.iram`.** 讀: zero
+   `jalx` words anywhere in the image target `0x80188000`–`0x8018C000`.
+   So `opcount --mips16` and `hazlint`'s refusal are blind to it **by
+   construction** — both look for a 32-bit `jalx`, and there is none.
+   🔴 **Therefore `hazlint`'s bound at `0x802B8000` does NOT exclude
+   all MIPS16 in this image**, which is what that bound is taken to mean.
+   Measured consequence: `hazlint --vma-range 0x80188000:0x8018C000`
+   reports 476 loads, 0 violations and **2 unresolved**, at `0x80188A68`
+   and `0x80188B14` — both inside the island, both MIPS16 halfword pairs
+   read as 32-bit jumps. `K4b` pins **3 unresolved** over the whole span;
+   at least two of the three are this.
+   ⚠️ **And this file's `__iram` citation is half a citation.**
+   `hazlint` names `0x8000226C` for `__iram`, but the constant is a
+   `lui`/`addiu` PAIR: `0x80002268` `lui t0,0x802c` carries the `0x802C`
+   and `0x8000226C` `addiu t0,t0,-32768` only completes it. The value
+   `0x802B8000` is right; the citation is half of it. **The tool is not
+   changed here** — what is recorded is that `KERNEL_TEXT_HI` could be
+   raised `0x2B8000` → `0x2C0000` given the 12-run excision list in
+   § 4.3, with `K4b`'s 128,440 / 40,182 / 58 / 3 re-pinned against the
+   wider span. 推 until someone runs it.
+2. **The `.iram` region is not fully mapped.** ✅ **2026-09-14: mapped.**
+   All 23 `jalx` entry points terminate (7,602 bytes between them); the
+   region **does** also hold 32-bit MIPS, 12,630 bytes of it; and `.iram`'s
+   byte accounting closes exactly on 32,768. § 4.3 has the map and
+   `SPEC.md` `CPU-48` 殘留 has the numbers. What is still open is
+   narrower and is three things, all settled by the same experiment: three
+   MIPS16 functions with no resolved caller (`0x802B8BA0`, `0x802B8F90`,
+   `0x802B9224`); the frameless-leaf blind spot in the prologue detector
+   (5 of the 37 known functions have no prologue, so not-found is not
+   absent); and the 32-bit side being proved at **gap** level rather than
+   byte level (1,200 of the 12,630 bytes are walked, the rest rest on a
+   positive 32-bit entry point per gap plus the complement). The one
+   experiment: build `linux-2.6.30` with this unit's config and read
+   `STO_MIPS16` out of the resulting `.symtab` — §4.2 did that once
+   already and got **39** `[MIPS16]` symbols. No power required.
 3. **The ULS conclusion is an inference from "the device boots".** It is a good
    inference and it is not a measurement. `R1a`.
 4. **The `PRId` table is one source in three copies and no code reads it.** §5.
@@ -850,6 +945,23 @@ and this machine's own.
    32-bit. Searched in this image and not found — 29 words hold an odd in-image
    address and all of them are in data — so §4.2's reading stands; **not-found is
    not absent**, and a stronger test would follow the odd constants.
+   🔴 **2026-09-14: that stronger test was run. The CONCLUSION is
+   untouched and the REASON above is not load-bearing.** *"all of them are
+   in data"* cannot dismiss them, because **an ops-struct function pointer
+   IS data by construction** — that is what one looks like. 讀, and the
+   **29** reproduces exactly: of the 29 odd in-image words, exactly one
+   points into `.iram` — **`[0x802D3994]` = `[0x802D3A1C]` = `0x802B9609`**,
+   sitting among `0x8018954C`, `0x80188304`, `0x801818FC` and `0x80182358`,
+   i.e. a wireless-driver ops table. `0x802B9608` is a real MIPS16 function
+   (168 bytes, `jr a3` at `0x802B969E`) that **no `jalx` and no MIPS16
+   `jal` reaches**. Following the constants further — `lui` + `addiu`
+   or `ori` pairs synthesising an odd `.iram` address, which no word-scan
+   can see — gives **six** more sites, of which two resolve real
+   functions: `0x8011E3C4` → `0x802BE461` and `0x80189790` →
+   `0x802B9105`. ⚠️ Four of the six synthesise `0x802BFFFF`, which is
+   `__dram` minus one and a range check, not a function pointer; that is
+   the false-positive class of this scan and it is named rather than
+   filtered. §4.2's reading stands, on the evidence it always had.
 7. **The codeness cut (80) and window (64 words) are chosen, not derived.**
    `hazlint`'s K10 now pins the cut into `[66, 87]` with two dilution fixtures,
    and the score is bimodal on this artefact with an empty band there — but a

@@ -689,6 +689,19 @@ The hash of the input is the one `RUNSHEET.md` `P4` already records for the imag
 `R0` booted, so the chain of custody closes against a committed record rather
 than against a filename.
 
+🔴 **Do not gate this step on `lzma`'s exit code.** 量 2026-09-14: the
+CLI route `lzma -d -c kernel.lzma > vmlinux.bin` **exits 1** with
+*"Compressed data is corrupt"* while writing **byte-exact** output —
+3,374,772 bytes, sha256 `cf0d60a8…`. The cause is measured, not assumed:
+the LZMA-alone header declares `size = 3374772` and **420 bytes of uImage
+padding follow the stream**, so the CLI keeps reading past the end and
+calls the tail corrupt. Python's `LZMADecompressor(FORMAT_ALONE)` — the
+route written above — stops at the declared size and reports `eof=True`
+with `unused_data` of exactly those 420 bytes, which is why nobody here has
+seen the `1`. **A script that gates on that exit code would refuse a good
+artefact.** The hash is the check that matters; the exit code is not a
+check at all on this input.
+
 **52 words in the image carry primary opcode `0x2F`, and they separate into two
 populations on three independent properties at once:**
 

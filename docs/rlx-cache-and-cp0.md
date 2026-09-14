@@ -774,7 +774,21 @@ write-through here.
 
 **Decision ② therefore names its next experiment rather than an argument**, which
 is what `R1h-4`'s DoD requires of it: the stop-loss allows two seatings before
-`CPU-45` is recorded 未定, and this was the first. What the seating adds is that
+`CPU-45` is recorded 未定, and this was the first. 🔄 **2026-09-14: this
+sentence is where `CF-1` said the owner's judgement had to land, and the
+judgement has been overtaken — see § ⓑ-2 below, which answers the question
+this stop-loss was counting seatings toward. `CF-1`'s reading (seating 8 does
+not count, because the stop-loss says *cell A cannot be made to hold* and
+*made* implies an attempt, and seating 8 ran the same Group C source with no
+residency variant) stands and is now moot in the useful direction.** ⚠️ And
+two of `CF-1`'s own numbers are wrong: `c-A` has been negative **three**
+times on silicon, not twice (`bench/2026-08-30/QJ.log`,
+`bench/2026-08-31c/K-J.log`, `K2-J.log`), and *同一顆 Group F 建置* read as
+binary identity is false — the two payloads are 29,088 and 31,536 bytes with
+different sha256. What is true, and what the claim actually rests on, is that
+the Group C **source** is identical: `git show --numstat 494b07f` shows
+`cells.S` additions only and twelve deleted lines in `probe3.c` that are all
+block-layout constants. What the seating adds is that
 the *proxy* is now known to behave — the aliasing path produced a clean
 `P1`/`P1` pair with the negative control firing — so the next attempt is about
 making a line resident, not about whether the cell can read.

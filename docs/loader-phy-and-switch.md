@@ -296,7 +296,7 @@ for s4 in 0..16:
     for s6 in 0..3:
         phy = byte[s6]
         phy_write(4,   31, 1)          ; page select on PHY 4
-        phy_write(4,   20, 0xB20 | (1<<phy))
+        phy_write(4,   20, 0xB20 + (1<<phy))   ; ADD, not OR -- see below
         phy_read (4,   20, &scratch)
         phy_write(phy, 31, 1)          ; page select on the target
         for s1 in 0..s4:
@@ -322,8 +322,15 @@ register — but `PORT1` itself is **A**-only, like `MDIOR`.
 
 Two things it hands B2 for free. **This unit's own loader names PHY addresses
 `{0, 2, 3, 4}` as PHYs** — and skips 1, which is a prediction B2 can test. And
-PHY address 4 is used as the control for register 20 while the others are
-targets, which says 4 is not merely another port.
+PHY address 4 hosts the register-20 control for every target — 🔄 **and the
+narrower true statement, 2026-09-14: 4 is ALSO a target.** The four bytes at
+`0x8040B890` are `{0, 2, 3, 4}`, so PHY 4 receives the same page-select and
+register-19 writes as the other three. What is asymmetric is that PHY 4 **hosts a
+global control register** the others do not — **B** confirms it by addressing
+register 20 at PHY 4 even when its own `port` argument is 4. *(This sentence read
+"PHY address 4 is used as the control for register 20 while the others are
+targets, which says 4 is not merely another port" until then; the second half was
+half right and the first half was wrong.)*
 
 ### Why address 1 is skipped, and the explanation that was killed at the bench
 
@@ -351,13 +358,119 @@ to the port being tested. *Inferred, pending a measurement.*
 **Refutation path: read what the routine writes.** The pseudocode above is the
 artefact and it is already decoded; what is missing is the *meaning* of the two
 payloads — page-1 vendor register 19 (the 17-word Gray-code table at
-`0x8040B84C`) and `0xB20 | (1<<phy)` written to register 20 on PHY 4, where the
+`0x8040B84C`) and `0xB20 + (1<<phy)` written to register 20 on PHY 4, where the
 `1<<phy` shift is the only place a per-port selection appears. If that pair turns
 out to configure each target port for its own sake rather than to hold the other
 four out of the way, this reading falls and `NET-07`'s reason is open again. **No
 source held here documents either register**, so this is desk work against **A**
 alone, and it cannot be done by running the command: `PORT1` takes no arguments
 and cannot be stopped.
+
+### 🔴 The reading above FELL, 2026-09-14 — desk, zero power
+
+**Instrument**: `/usr/bin/mips-linux-gnu-objdump` 2.42, a distribution binary
+and not a vendor one, so no `vendor-tripwire.sh` was required; it was run
+anyway and reported `CLEAN  6 tree(s) watched, 0 lines` before and after. The
+artefact hashes to the value `docs/loader-command-semantics.md` records, and
+that file's own control fires — `ComSrlCmd_RDID` reappears at
+`0x8040591C`-`0x80405970`. Every load-bearing instruction below was also
+re-decoded from the raw file bytes by a second implementation sharing no code
+with objdump. Everything here is **讀**; the device readings it cites
+(`E11e`, `E9b`) are **量**.
+
+**① Structure, from A alone.** `0x8040A188` is `sllv a2,a2,s2`: it sets
+**exactly one** bit, and that bit is the same `s2` that receives the
+register-19 writes three instructions later at `0x8040A1D4`. Holding the other
+four out of the way would be one four-bit mask written once; this is one bit
+per target, cleared between targets, and the exit write at `0x8040A250` is
+`0xB20` with **no** port bit — the "none selected" state a selector has
+and a mask does not. And the Gray payload is **identical for every phy**, so
+the four are not being configured differently from one another.
+
+**② The vendor's own source.** ⚠️ **This is B, and B is a
+DIFFERENT GENERATION** — `CONFIG_RTL8196C_REVISION_B`, where this part is
+RTL8196E. It explains why the constant is what it is; it is never a substitute
+for A. What makes it load-bearing here is that A's compiled form matches it in
+register triple, constant and ordering. `swCore.c:938 (set_gray_code_by_port)`,
+identical in both bootcode drops and reproduced at
+`rtl865x_asicL2.c:1274 (set_gray_code_by_port)`:
+
+```c
+void set_gray_code_by_port(int port) {
+       uint32 val;
+       rtl8651_setAsicEthernetPHYReg( 4, 31, 1 );
+       rtl8651_getAsicEthernetPHYReg( 4, 20, &val );
+       rtl8651_setAsicEthernetPHYReg( 4, 20, val + (0x1 << port) );
+       rtl8651_setAsicEthernetPHYReg( port, 31, 1 );
+       rtl8651_setAsicEthernetPHYReg( port, 19,  0x5400 );
+       if (port<4) rtl8651_setAsicEthernetPHYReg( port, 19,  0x5440 );
+       if (port<3) rtl8651_setAsicEthernetPHYReg( port, 19,  0x54c0 );
+       if (port<2) rtl8651_setAsicEthernetPHYReg( port, 19,  0x5480 );
+       if (port<1) rtl8651_setAsicEthernetPHYReg( port, 19,  0x5580 );
+       rtl8651_setAsicEthernetPHYReg( 4, 20, 0xb20 );
+       rtl8651_setAsicEthernetPHYReg( port, 31, 0 );
+       rtl8651_setAsicEthernetPHYReg( 4, 31, 0 );
+}
+```
+
+The function is named for the port it takes; `0x1 << port` names the same port
+that then receives the register-19 writes; and both callers —
+`swCore.c:1000 (set_gray_code_by_port)` and
+`rtl865x_asicL2.c:1413 (set_gray_code_by_port)` — are `for i=0; i<5; i++`,
+**including port 1**. Its runtime caller
+`rtl_nic.c:3198 (re865x_setPhyGrayCode)` applies it to the port that has just
+gone link-down, under `CONFIG_RTL8196C_ETH_IOT`.
+
+⇒ **`1<<phy` selects the port being patched. It does not mask the others
+off.** The four listed ports are the subjects of the patch, not bystanders
+being parked, so the candidate reading falls and `NET-07`'s reason is open
+again — on much narrower ground.
+
+**The instruction is `addiu`, not `or`, and the distinction is load-bearing.**
+`0x8040A198` is `addiu a2,a2,2848`. Here it is equivalent, because `0xB20`'s
+bits 4:0 are all clear so `+` is `|` for phy 0-4 — but the vendor's form
+composes on a value it has **just read back** (`val + (0x1 << port)`), and
+writing it as an OR hides that. `SPEC.md` `NET-07` said 「或上」
+and now says 「加上」.
+
+**Register 19 on page 1 now has a NAME, and it is the vendor's own.**
+`rtl865x_asicL2.c:4114 (finetune 100M DAC current)` is a comment table giving
+page 1, address 19, default `0x4400`, programmed value `0x5400`, purpose
+*finetune 100M DAC current*; the surrounding block adds *Port#0~#4 (per port
+control), Page1,Reg19,bit[13:11]* and programs bits 13:11 to 2. Arithmetic:
+`0x5400` has bits 13:11 = 2, which is exactly that. So **the Gray field is bits
+9:6 and it rides on top of the vendor's correct DAC-current constant** — a
+different field in the same register. ⚠️ **Bits 9:6 themselves are
+still unnamed**: they read 0 in both `0x4400` and `0x5400`, and no source held
+says what they do. Undetermined; what closes it is D's page-1 register map or
+an 8196E-generation SDK header with the page-1 reg-19 bit fields.
+
+**The routine is SELF-RESTORING.** The last outer round (i = 16) ends the inner
+walk on `table[16]` = `0x5400`, which is the vendor's documented programmed
+value; the epilogue returns register 20 to `0xB20` with no port bit and both
+pages to 0. So `PORT1` leaves all four PHYs at the setting the vendor's own
+patch would have left them at — which is worth knowing before it is typed,
+even though it stays on the do-not-type list for the reasons above.
+
+**There is no skip in the code, and that reframes the question.** The middle
+loop bound is `sltiu v0,s6,4` at `0x8040A214`, so the routine walks a
+**four-entry byte table**; the PHY address is `lbu s2,72(v0)`, pure data. A
+scan of every word in `0x8040A0A0`-`0x8040A290` for a branch or compare
+touching `s2`, or any compare against immediate 1, returns **0 hits** —
+and the control fired, because the same scanner counts **7** branches and
+compares in the routine, so it was capable of reporting. The routine never
+compares a PHY address against anything; it cannot skip 1, it was never given
+1. 量: `0x8040B890` is referenced twice in the whole image and
+`0x8040B84C` once, all three inside `PORT1`, so neither is a loader-wide list.
+
+⚠️ **What is still open, and it is narrower**: why this loader's
+private four-byte table omits 1 when the vendor's loop does not. **The
+discriminating experiment costs no power**: read the same table out of a second
+RTL8196E loader from a different board. A five-LAN board carrying
+`00 01 02 03 04` against this four-LAN board's `00 02 03 04` makes it board
+configuration and nothing to do with port 1; both omitting 1 makes it about
+port 1. Failing that, the FT2 test procedure, or the bootcode source this
+loader was built from.
 
 **`PORT1` goes on `RUNSHEET.md`'s do-not-type list.** It was not on it before,
 because that list was written from the four memory-write paths, and `PORT1`
@@ -443,6 +556,22 @@ Four addresses have two documentary sources plus A's behaviour. Eight have one,
 and that one is a different generation. **One has none.** R6 inherits that list
 as it stands; nothing here is promoted by being adjacent to something documented.
 
+🔴 **The count of 13 is a floor, and the reason is the census's own
+form — 2026-09-14 (desk).** A function does one `lui` into a base
+register and then many `ori`s off it, so pairing each `lui` with its
+FOLLOWING `ori` sees one offset per function. A census of `ori rX,rY,0x4xxx`
+immediates finds **33 distinct `0xBB804xxx` offsets**, all 13 above among
+them and 20 more that this table does not carry: `0x4108`, `0x410C`,
+`0x4110`, `0x4114`, `0x4204`, `0x4300`, `0x4410`, `0x4754`, `0x4924`,
+`0x4A0C`, `0x4A10`, `0x4A14`, `0x4D04`, `0x4D20`, `0x4D24`, `0x4D28`,
+`0x4D2C`, `0x4D30`, `0x4D34`, `0x4D38`. ⚠️ **The new census has a
+form limitation of its own**: it counts one instruction form, does not verify
+the base register held `0xbb800000` at every site, and cannot see
+displacement forms such as `lw v1,16644(v0)` — which is exactly how the
+table above missed the `PCRP` loop below. 33 is a floor, not a total. The
+consequence for `PROGRESS.md`'s `C-15` is that the set of unnamed addresses
+is LARGER than one, so that row widens rather than closes.
+
 **`0xBB802000` is not in this table, and that matters.** **B**'s `asicregs.h`
 defines `PHY_BASE (SWCORE_BASE + 0x00002000)` with a memory-mapped shadow of MII
 registers 0–5 for each of seven ports — `PORT0_PHY_IDENTIFIER_1` at `0xBB802008`
@@ -484,7 +613,34 @@ It sets `EnForceMode`, `ForceLink` and a forced speed/duplex —
 `(PCRP0 & 0xFF83FFFF) | 0x028C0000` on one branch and `| 0x02940000` on another,
 selected by a strap read from `0xB800000C & 0xF` compared against 13.
 
-**No loop over `PCRP1`…`PCRP4` exists in the image.** So those four should still
+🔴 **~~No loop over `PCRP1`…`PCRP4` exists in the image.~~
+REFUTED 2026-09-14 — desk, zero power, and it was found by chasing the
+`0xBB804234` census, not by looking for it.** 讀: the loop is at
+`0x804033F4`-`0x80403414`. `lui a2,0xbb80` sits three instructions above it;
+the body is `lw v1,16644(v0)` / `and v1,v1,a1` / `sw v1,16644(v0)` where
+`16644` is `0x4104`, and the tail is `addiu a0,a0,1` / `slti v0,a0,5` /
+`bnez` — `i < 5`, so it walks `PCRP0 + i*4` across **all five ports**.
+The mask is `0xFDFFFFFF` = `~(1<<25)`, and **B**
+`asicregs.h:919 (EnForceMode)` defines `EnForceMode` as `(1<<25)`, so this is
+verbatim the vendor's `for i=0; i<5; i++` `REG32(PCRP0+i*4) &= ~EnForceMode`.
+A second such site is at `0x804032E4`, and an unrolled `&= ~1` block covering
+`PCRP0`-`PCRP4` sits at `0x804092F4`-`0x80409358`. ⚠️ **B is a
+different generation** (RTL8196C rev B against this part's RTL8196E); what
+carries the claim is A's own instruction stream, and B only names the bit.
+
+🟢 **Prediction 4's READING survives and its REASON does not, and the
+distinction is the whole point.** The reason given was *nothing writes them*;
+something does. The reading held anyway because the loop touches **bit 25**
+and `ExtPHYID` is **bits 30:26** — different fields. `E9b`'s
+`047F0039 087F0039 0C7F0039 107F0039` still give `ExtPHYID` = 1, 2, 3, 4
+(量), and bit 25 reads **0** in all four, which is what a loop that ran
+leaves behind rather than a contradiction. ⚠️ **The heading above
+this paragraph is now too strong as well** — `PCRP1`-`PCRP4` ARE written
+— and it is left standing rather than edited, because other files cite
+this section by its heading text.
+
+*(What follows is this section's original reasoning, kept in place because
+its prediction hit:)* So those four should still
 hold reset defaults, and **D** Table 64 makes bits 30:26 predictable: `ExtPHYID`
 = 1, 2, 3, 4. That is a read of the PHY-address assignment **that does not go
 through MDIO**, and it is the cross-check B2 uses on the sweep.
