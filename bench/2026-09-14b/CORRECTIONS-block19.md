@@ -387,4 +387,136 @@ against it.
 
 ## 1. What the seating did differently
 
-*(to be written after the cells run)*
+Seating 22 ran on 2026-09-14, **one power cycle**, the only one budgeted. All
+seven carded cells ran in the order § 11 types them, plus the off-card round
+§ 10 declares. `check-predictions`: **7 of 7 came after the prediction, 0 did
+not**. `capdate`: `bench/2026-09-14b`, 11 captures, all 2026-09-14 — the
+directory name's prediction held.
+
+### 1.1 The result
+
+**12 of 12 rows read the verdict their `pad` column predicts**, `tcpay verdict
+--arm device` rc 0, both controls held (`c_lock` LOCK, `c_open` OPEN):
+
+| | rows |
+|---|---|
+| **LOCK** (5) | `c_lock`, `v1` (T4 `mips1`), `v4` (T1 `4181`), `v6` (T2 `4181`), `v8` (T3 `4181`) |
+| **OPEN** (7) | `c_open`, `v2` (T4 `mips2`), `v3` (T4 `mips32`), `v5` (T1 `5281`), `v7` (T2 `5281`), `v9` (T3 `5281`), `v10` (T3 `4281`) |
+
+The forced anti-control is the one that matters: the qemu leg read **12 of 12
+LOCK**, and § 5.4 says a device run that reproduces it refutes the experiment.
+It read 5/7. `trapped 0`, `cell.bad 0`, `split 0`, `ran 0000000c`.
+
+⚠️ Read every `CPU-14` in the card and in `tcpay`'s output as **`CPU-58`**,
+per 0.3.5. Nothing in the instrument was changed tonight and that decision is
+unchanged.
+
+**The report window is 1,808 bytes, exactly**, against the equality § 5.3
+derives from the qemu capture's 1,869 minus 61. Four reply sizes were predicted
+by `tools/reply-size.py` and all four hit: `71 / 71 / 118 / 1671`.
+
+### 1.2 The two field predictions that were refuted, and they have one cause
+
+`C1-P6j` read `install.changed=00000015` (21) against the card's `0000002b`
+(43, `2c` admissible), and `restore.stillhdl=00000001` against `00000000`.
+
+讀, `tools/rlxprobe/probe6.c:218-245` against `probe5.c:220-249`:
+
+* `probe5` counts `ins_changed` at **both** vectors (two `ins_changed++` sites,
+  :241 and :246), ceiling `2 × 22 = 44`. `probe6` counts **only**
+  `VEC_GENERAL` (one site, :232), ceiling `22`. Both write both vectors; only
+  the counting differs. **`43 = 44 − 1` and `21 = 22 − 1` are the same
+  measurement.**
+* `probe5:488-494` guards `res_stillhdl` with `saved_vec[...] != rlx_exc_entry[i]`
+  and says why in a comment — *"A restore that put back a word which was
+  already equal proves nothing."* `probe6:465-467` dropped the guard, so it also
+  counts the word that was already equal.
+
+So exactly one of `VEC_GENERAL`'s 22 words already held the handler's value:
+invisible to `install.changed`, counted by `probe6`'s unguarded
+`restore.stillhdl`. `restore.mismatch = 0` — the field that reports whether the
+restore worked — reads 0.
+
+🔴 **The card had been burned by this class one row earlier.** `install.words`
+was predicted `00000019` on seating 21 by copying a **qemu** build's capture;
+that row was fixed by deriving from the device ELF, and the row directly
+beneath it was not.
+
+### 1.3 The identity, and it was committed before the round that could refute it
+
+`install.changed + restore.stillhdl == install.words` is in neither the payload
+nor the card and holds only if 1.2 is right. `bench/2026-09-14b/PREDICT-X1-offcard.md`
+states it with six refutation conditions and was committed in **`db5510b`,
+21:07:44**, before any `X1-*` capture existed. **None of `X1-a`…`X1-f` fired.**
+
+`X1-P6j2`'s report window is **byte-identical** to `C1-P6j`'s — 1,808 bytes,
+sha256 `e6c5457c…` on both — and `X1-P6rb2` is byte-identical to `C1-P6rb`.
+`21 + 1 == 22` on both runs.
+
+🟢 **`X1-c`'s negative outcome is itself a reading**: run 1 was entered from a
+**cold** prompt and run 2 from a **watchdog-reset** prompt, and
+`install.changed` read 21 both times. The narrow claim is about the **count**,
+not the content: 21 words differing from the handler is not 21 particular
+values.
+
+### 1.4 The off-card round carried the guard the card omitted
+
+0.3.3's correction was executed: `X1-P6bf2` reads `DW 8040D4A0 1` between the
+rescue and the upload, all four words `00000000`, and the script refuses to
+upload otherwise. `X1-P6sh2` re-checks the staged head against the binary before
+the jump. Both guards are hard gates in the runner, not judgement calls.
+
+### 1.5 The corrections that acted, and what each was worth
+
+| § | what it changed at the bench |
+|---|---|
+| 0.3.1 | the burn-flag guard was read **by address**. `C1-P6bf` and `X1-P6bf2` both returned four `00000000` words, so the ambiguity never bit — but it was read the safe way twice rather than by luck |
+| 0.3.2 | `C1-P6rb` returned **140** words: seal at 128, poison at 129–136, and **137/138/139 reading `17755557 5DB73175 30555155`**. An operator checking *every word past the seal is `DEADC0DE`* sees a failure on a block that passed. `rbcheck`'s `margin()` walks `range(129, 137)` and reported `8 word(s) past the block, 8 poison` |
+| 0.3.3 | the off-card round ran **before** block 20's first `looprun`, and carried a burn-flag read-back |
+| 0.3.4 | not reached — the seating did not cross midnight |
+
+### 1.6 The pre-registered `rbcheck` run, field by field
+
+0.3a was written before power and no `probe6` block existed anywhere. Every row
+hit, on both runs:
+
+```
+magic     524C5836   probe6
+progress  000000F1   P_SEALED   (sealed = 0xf1)
+seal word BEA03C14   w128 at 80A05200
+re-sum    BEA03C15   naive, w0..w127
+corrected BEA03C14   minus 0x1 = P_SEALED - P_RESTORED
+UART sum  BEA03C14   channel (1), from a seal= line
+margin    8 word(s) past the block, 8 poison
+RESULT: the block agrees on 3 channel(s)
+```
+
+`restamp` is **1**, which is the row 0.3a says the whole fix turns on. All 48
+`rbcheck` controls held on both runs.
+
+### 1.7 Defects in this seating's own instruments, all mine
+
+1. 🔴 **A `probe6*` filename glob missed the staged binary.** The pre-power
+   check searched `-name 'probe6*'`, which does not match
+   `rlxfw-probe6-20260914.bin`. Re-run with `*probe6*` it is present at the
+   exact path § 1 names, sha256 `030866f5…fac09728`, mtime identical to the
+   build tree's copy **to the nanosecond**. Seating 8 lost a power cycle to a
+   card naming a file nobody had staged; this nearly reported the opposite.
+2. 🔴 **A `.timing` parser read the columns in the wrong order.** The header
+   says `# offset seconds`; the first draft read `(float, int)`. It raised
+   rather than producing a number, which is the safe direction.
+3. 🔴 **A map comparison selected cells by FILENAME.** It globbed
+   `bench/*/C1-M1.log` and reported `bench/2026-09-09/C1-M1` as a differing
+   flash map. That cell's `sent` field is `echo map 1 0` — the level-2 map of
+   group 0, not a `map 0` at all. Re-selected by the `sent` field in each
+   capture's own `.meta.json`, **nine `map 0` captures across five seatings and
+   six days digest to one value**. `CLAUDE.md` records this class twice, both
+   times in a runner; this is the third and it is in a comparison.
+
+### 1.8 What did not move
+
+**Zero flash-write commands, zero `FLR`, `AUTOBURN` read as four zero words
+before each of the two uploads.** The bracket stands at **1,024 of 4,194,304 =
+0.0244 %** and `FLS-26`'s ledger does not move. 🟢 An **off-card** `map 0`
+(`bench/2026-09-14c/X7-M0`) is byte-identical to the eight before it — see
+`bench/2026-09-14c/CORRECTIONS-block20.md` § 1, which owns that reading.

@@ -288,7 +288,18 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # `73 green, 2 expected-red, 1 unexpected` with this suite as the one, while a
 # `--only` run over the suites whose CODE changed would have been green --
 # nothing in this file changed, only the data it asserts on.
-ck "thirty-five cold, one hundred and forty-five warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 35 cold, 145 warm, 0 unknown')"
+# 🔄 35/145 -> 36/159 on 2026-09-14 (seating 22, `bench/2026-09-14b` and
+# `bench/2026-09-14c`): ONE cold power-on and FOURTEEN warm resets, from a
+# single power press. The cold one is `C1-A`, the ESC window the operator
+# pressed power inside; two of the warm ones are `probe6` biting its own
+# watchdog at the end of a run (`C1-P6j`, `X1-P6j2`) and the other twelve are
+# seven `looprun` `S4` resets plus five `busybox reboot -f` typed into the
+# shell of the boot before. Isolation check, run before this line was touched:
+# every directory EXCEPT those two still reports 35 cold, 145 warm; `2026-09-14b`
+# alone reports 1 cold / 2 warm and `2026-09-14c` alone 0 cold / 12 warm -- so
+# the delta is exactly +1/+14 and nothing was reclassified. Caught by the
+# run-every-suite rule at the desk this time, before the push.
+ck "thirty-six cold, one hundred and fifty-nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 36 cold, 159 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -376,8 +387,14 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # ⚠️ 33 warm resets but only 16 entry intervals, because an `entry`
 # interval needs BOTH ends in one capture and a `-RB` cell ends at the
 # loader prompt by design (`--until '<RealTek>'`).
-ck "entry population is sixty-five warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=65')"
+# 🔄 65 -> 71 on 2026-09-14 (seating 22): SIX of the seating's fourteen warm
+# resets produce an entry interval. `2026-09-14c` alone reports
+# `entry, warm  n=6` and `2026-09-14b` alone reports `n=0` -- both `probe6`
+# runs and every `-RB` cell end at the loader prompt by design
+# (`--esc-after` / `--until '<RealTek>'`), and an `entry` interval needs BOTH
+# ends in one capture. Every other directory still reports n=65.
+ck "entry population is seventy-one warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=71')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
