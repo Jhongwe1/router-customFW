@@ -289,6 +289,28 @@ over 75 rows: **RAN 16, RIGHT 16, TRAPS 42, WRONG 1.** Two rounds, 75 row lines
 and 18 header fields byte-identical, and the `DW` channel agrees word for word
 with `seal=AF7A728B` on all three channels.
 
+> 🔴🔴 **2026-09-14 (the sixty-ninth segment, desk): `C2` is clean by
+> EXACTLY ONE FUNCTION CODE, and nothing here knew it.**
+> 讀 the vendor's `arch/rlx/kernel/traps.c:454-462`, `simulate_sync` — it
+> matches SPECIAL with function field **`0x0F`**, ignoring `rs`, `rt`, `rd` and
+> `sa`, and returns 0: a pure no-op with `epc` already advanced.
+> `special0e` is SPECIAL function **`0x0E`**. **Adjacent.**
+>
+> Had this control been `0x0000000F`, it would have trapped, entered `do_ri`,
+> been **emulated silently**, sent no signal, and the payload would have reported
+> *does not trap* — on a die that may well raise RI for it. **A negative control
+> would have come back green while saying nothing**, which is the one failure
+> mode a negative control exists to prevent.
+>
+> ⚠️ **It matters for `R1c` more than for `probe4`.** Under a bare-metal
+> handler of ours the kernel's emulation is not in the path at all; `R1c` runs
+> this same table in USER mode under the vendor kernel, where `do_ri`'s emulation
+> is live for every row. **Any encoding added to this table from now on has to be
+> checked against `simulate_llsc` (primary opcodes `0x30` and `0x38`) and
+> `simulate_sync` (SPECIAL `0x0F`) before it can be called a control.**
+> The whole surface is enumerated in `notes/vendor-kernel-isa.md` § 1.4;
+> `docs/isa-prior-art.md` § 9.3 is the decision that rests on it.
+
 ### 🔴🔴 The `WRONG` cell is observed, and the value was written down first
 
 `rotr` read **`00123456`** where the table expects **`78123456`**, with no

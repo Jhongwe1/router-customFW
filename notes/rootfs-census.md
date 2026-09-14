@@ -32,6 +32,27 @@ lib/libapmib.so  lib/libcrypt-0.9.30.3.so  lib/libstdc++.so.6.0.13
 lib/libuClibc-0.9.30.3.so‡
 ```
 
+> 🔴 **2026-09-14 (the sixty-ninth segment, desk): two of those names are a
+> safety finding together, and nothing here had put them side by side.**
+> 讀 `unsquashfs -ll` on the image itself — the extracted tree shows no device
+> nodes at all, because `unsquashfs` could not create them without root and its
+> own log says `created 0 devices`, so reading the extraction rather than the
+> image gives a false zero here. In the image: `/dev/mtd0`–`/dev/mtd4` at
+> `crw-rw-rw-` 90,0–90,4 and **`/dev/mtdblock0`–`3` at `brw-rw-rw-` 31,0–31,3**.
+> `/dev/mtdblock0` is **mode 0666 and covers the loader and `H601`** — the two
+> regions this project's own rules call unrecoverable — and `bin/flash`
+> (87,664 B) sits in the same `PATH`. 讀 the board config's
+> `# CONFIG_MTD_CHAR is not set`, so the `mtd*` char nodes are dead (`ENODEV`);
+> `CONFIG_MTD_BLOCK=y`, so **`mtdblock*` is live**.
+> ⚠️ **What this does and does not say**: it is about the vendor's shipped
+> rootfs, not about rlxfw's, and nothing of this project's has ever run there.
+> What it changes is the cost of the one route into vendor userspace that is
+> known to work — **any injected command line on this device runs one typo away
+> from a brick**, which is a reason beyond the flash-write one to leave that
+> route alone. `PROGRESS.md`'s `VDR-1` carries the route; this row carries why
+> the route is worse than its own flash write.
+
+
 `*` both `system` and `popen` · `†` `popen` only · `‡` this is libc, so it is the
 definition rather than a use.
 
