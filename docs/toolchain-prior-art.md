@@ -206,6 +206,9 @@ conclusion and silent about the inputs.
 | `TC-51` | tc | y | . | . | . | 量 | `TC-15` | the two rsdk-1.3.6 releases' code generators are byte-identical at `-march=4181` and differ at `-march=5281`, where they read 425/0/162 and 424/0/147. The published row is the first one's, and that is the release whose wrapper refuses that `-march` |
 | `TC-52` | tc | y | . | . | . | 量 | `TC-50` | of the three flags the 1.5.5 wrapper injects, only `-ffix-bdsl` changes a load-use reading, and what it changes is the unresolved-successor class: nineteen to zero, with the object sha256 identical within each group |
 | `TC-53` | tc | y | . | . | . | 量 | `TC-05` | hardening, three columns and a modern control. gcc 3.4.6 refuses `-fstack-protector` outright; gcc 4.4.5-1.5.5p4 accepts it, warns that it is unsupported for this target, emits no guard and exits 0. No `libc.a` in any release carries a `__*_chk` entry point, which attributes `FW-18` to the library rather than to a build-flag choice |
+| `TC-54` | tc | y | . | . | . | 量 | `TC-15` | one C statement compiled in six (toolchain, -march) columns emits the same two instructions in all six, and the only difference is whether a `nop` sits between them -- `hazlint` reads 0/1/1/0/1/1 with zero unresolved successors everywhere. What is held is the COMPOSITION of `TC-15`'s desk split with `CPU-14`'s silicon reading, not a second measurement of either. And the fragment was chosen by refutation: the obvious one had its load delay slot filled with `jr ra` in all nine configurations tried, so it could not have exposed anything |
+| `TC-55` | tc | y | . | . | . | 量 | `TC-51` | the load-delay padding follows the `-march` FLAG and not the rsdk release: the 4181 release at `-march=5281` does not pad and the 5281 release at `-march=4181` does, in all three drops. It does NOT close `TC-q`, which is about whole-`vmlinux` counts and not this shape. It also holds that provenance cannot come from the artefact: all six rsdk objects read `0x1001 ... mips1` in the ELF header whatever `-march` produced them |
+| `TC-56` | tc | y | . | . | . | 量 | `TC-50` | a 32-bit rsdk driver cannot stat a source file on DrvFs -- `cc1` dies with `Value too large for defined data type` against an inode that does not fit a 32-bit `struct stat`, while the same bytes on ext4 compile. What is held is that the message names the C file and therefore reads as a defect in it; what is NOT held is any claim about which other vendor binaries share the limit, because only the compiler driver was tested |
 | `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep, recorded under a `CPU-*` id that a `TC-*` derivation cannot see, which is what a declared row is for. 🔴 Its headline -- 1.3.6 emits zero `lwl` and 1.5.5 emits four -- was narrowed on 2026-09-13: the two generations' raw drivers agree at zero and the asymmetry is the 1.5.5 wrapper injecting `-fuse-uls`. See `TC-50` |
 | `TC-01` | tc | . | y | y | . | 量 | `TC-09` | this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2 |
 | `TC-02` | tc | . | y | . | . | 推 | `TC-02a` | the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark |
@@ -252,12 +255,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:counts begin -->
 | | ① toolchain in hand | ② artefact | ③ vendor material | ④ nothing | ⓟ public | total |
 |---|---:|---:|---:|---:|---:|---:|
-| `R2c` recorded findings | 39 | 10 | 8 | 2 | 6 | **59** |
+| `R2c` recorded findings | 42 | 10 | 8 | 2 | 6 | **62** |
 | toolchain releases | 4 | 1 | 2 | 0 | 1 | **7** |
 
 | subject | `R2c` rows | toolchain rows |
 |---|---:|---:|
-| tc | 54 | 7 |
+| tc | 57 | 7 |
 | die | 1 | 0 |
 | both | 4 | 0 |
 <!-- tccensus:counts end -->
@@ -267,7 +270,7 @@ conclusion and silent about the inputs.
 <!-- tccensus:marks begin -->
 | `SPEC.md` V mark | ① | ② | ③ | ④ | declared disagreements |
 |---|---:|---:|---:|---:|---:|
-| 量 | 23 | 2 | 0 | 0 | 0 |
+| 量 | 26 | 2 | 0 | 0 | 0 |
 | 讀 | 15 | 6 | 4 | 0 | 15 |
 | 推 | 0 | 2 | 1 | 0 | 3 |
 | — | 0 | 0 | 0 | 1 | 0 |

@@ -26053,5 +26053,34 @@ seating 21 正是在這一格被推翻的(預測 `00000019`、讀到 `00000016`,
 
 **沒做的,而且每一件都有擁有者**:`R1-pub-3` slot 2(`CPU-45` residency 變形)
 一行都沒寫,`CF-1` 的判讀還沒落到那三處;slots 4／5(`FW-65`／`FW-63`)排進來
-又沒落地(`BLKC-1`);`R1c` 的桌面半沒動;`citime` 的 7 個 MISSING 沒補;
+又沒落地(`BLKC-1`);`R1c` 的桌面半沒動;
 `RB-1`、`LOOP-4b`、`THIT-1` 不動。
+`citime` 的 7 個 MISSING **補了**(`record --last 12`,寫入 8 列,`check` 回 0 missing)。
+
+### 10. 🔴 CI 抓到桌面五個閘門都沒抓到的東西,而我的第一次修法是修樣本不是修儀器
+
+這一節在 §9 之後,理由還是 `rule 3b`:紀錄永遠寫在它所描述的那件事之後。
+
+推上去(`1bbd587`)之後 CI **紅**,而紅的不是新加的 `tcpay`(它過了),是
+**`tccensus`** —— 一支我在寫 `SPEC.md` 之前不知道存在的工具。它的 `L1 r2c` 要求
+**`SPEC.md` §14 的每一列 `TC-*` 在工具鏈普查的母體裡都有一列對應**,而我加了三列
+`TC-54`／`55`／`56`、母體一列都沒加。
+
+🟢 **這正是那支普查的用途**:一個發現不能只進 `SPEC.md` 而不進「工具鏈這條軸被
+對照的母體」。桌面上跑過的五個閘門(`spec-check`、`test-file-modes`、`cardcheck`
+×2、`capdate`)沒有一個的主題是它,所以五綠並不覆蓋它 —— 這是
+`rlxfw-audit-method` 那條「綠的閘門不是稽核」再一次。
+
+🔴 **而我的第一次修法是錯的,是工具自己說的。** 我手寫三列進
+`docs/toolchain-prior-art.md` 的表,然後 `tccensus write` 回
+**`every block already matched the derivation -- nothing written`**,而 `check`
+**同時**還在說表裡缺兩列 —— 兩句話不可能同時對。讀碼才發現那張表是
+`<!-- tccensus:r2c begin -->` 圍起來的**產生區塊**,母體是
+`tools/toolchain-census.tsv`。**我改的是樣本,母體沒動。**
+還原手改、三列進 TSV、`write` 重生區塊(`rewrote block(s): r2c, counts, marks`,
+69 列雙向檢查),`--self-test` **21/21**。
+
+⚠️ **代價是一次紅的 CI,而它買到的是一個沒人知道的閘門被走過一次。**
+下一段的開場要記得:**新增一列 `SPEC.md` §14 的 `TC-*`,就要新增一列
+`tools/toolchain-census.tsv`,然後跑 `tccensus write`** —— 而這件事在這個 repo 裡
+沒有任何一個地方寫著,除了這一段。
