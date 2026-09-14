@@ -1,8 +1,8 @@
-# Slots 4 and 5 — the Linux half of a seating, drafted but not carded
+# Slots 4 and 5 — the Linux half of a seating, ~~drafted but not carded~~ carded and run
 
-**Written 2026-09-14, sixty-sixth segment, at the desk.** This is a DRAFT, not a
-card: nothing here has been frozen, no `cardcheck` has run over it, and no cell
-has executed. `PROGRESS.md`'s `BLKC-1` is the carried-forward row that owns it.
+**Written 2026-09-14, sixty-sixth segment, at the desk.** ~~This is a DRAFT, not a
+card: nothing here has been frozen, no `cardcheck` has run over it, and no cell has
+executed.~~ 🔄 **2026-09-14: frozen as `bench/2026-09-14c/PREDICTIONS-B21-block20.md`; 27 cells ran, `check-predictions` 27 of 27.** `PROGRESS.md`'s `BLKC-1` owns it.
 
 It exists because the two residuals it covers need **no build** — they ride
 `$FWRE_WORK/rebuild/bench-only/r59-20260910/rlxfw-r59-20260910.bin`, seating 20's

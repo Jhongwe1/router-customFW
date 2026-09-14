@@ -844,7 +844,23 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `usbipd detach` takes the busid out of *Connected* too — for about a second,
   while Windows re-enumerates the device — so a `usbipd list` run immediately
   after a detach reads **exactly** like the drop. **Re-read before concluding
-  anything from one listing.** The same day the CP2102 was also absent from
+  anything from one listing.**
+  🆕 **2026-09-15: there IS a discriminator and it is not `usbipd`.** 量, on a
+  real drop: `[System.IO.Ports.SerialPort]::getportnames()` returns **empty**
+  and `Get-PnpDevice -FriendlyName '*CP210*'` reads Status **`Unknown`**,
+  because the device is off the Windows USB bus altogether. A deliberate
+  detach leaves Windows **re-enumerating** it, so the COM port comes back —
+  the two are identical in `usbipd list` and different in `getportnames()`.
+  **Ask that first**: one call, no re-read, and it separates what four weeks
+  of `usbipd list` readings could not. ⚠️ It does **not** move the three root
+  causes; it only tells you which question you are in.
+  🔴 **And `usbipd attach` can fail while looking like it worked.** With no
+  long-lived WSL process it exits non-zero saying *there is no WSL 2
+  distribution running* — and if that line is not read, `/dev/ttyUSB0` never
+  appears and the next thing to touch the port reports a missing file.
+  量 2026-09-15: that is exactly what happened, the failed attach was recorded
+  in my head as a success, and **what caught it was the free pre-flight below**
+  an hour later. The same day the CP2102 was also absent from
   *Connected* on **first insertion**, with no COM port on the Windows side at
   all, and returned only after a re-seat: consistent with the loose connector
   and separating nothing, so the three candidates stand.
@@ -1004,6 +1020,14 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   a bench-time one. **And a 3-second capture with the board OFF is a free
   pre-flight**: 0 bytes, and the tool splits that into three causes — the
   adapter, the port, or the board — before a power cycle is spent.
+  🆕 **2026-09-15: it catches a fourth thing, which is the one you cannot see
+  by looking.** A pre-flight that dies with *could not open port* is not a
+  board fault and not an adapter fault — it is an **attach that did not
+  happen**, and an attach that did not happen is invisible everywhere else
+  until a cell fails. 量 2026-09-15, board unpowered, after re-attaching:
+  **0 bytes, 3.079489 s, all three artefacts written** — the information is
+  not the zero, it is that the tool opened the port, ran the whole window and
+  produced files. Run it **after every attach**, not only before a seating.
   🔄 **2026-09-02: the resolution above is true in a LOGIN shell and not
   otherwise, which makes the trap intermittent rather than constant — and
   an intermittent trap is the worse kind.** 量, with the control run beside

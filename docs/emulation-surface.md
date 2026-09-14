@@ -1,0 +1,271 @@
+# The emulation surface — two columns over 45 rows, and the five instructions that have no row
+
+**`R1-pub-4`'s part `4a` (`D-diff`).** Opened 2026-09-15, seventy-first
+segment, at the desk. One row per census row; **column ①** is the verdict when
+the encoding runs bare metal under this project's own exception handler,
+**column ②** is the verdict when the same encoding is issued from Linux user
+mode. **The rows where the two differ are the kernel's emulation surface** —
+what Linux on a Lexra silently does for you that the silicon does not.
+
+Cited **by id, never by `FILE:NNN`**. `CITE-2` measured eleven of thirteen
+pinned line numbers already wrong before a board was powered, and this file is
+new enough to start correct.
+
+---
+
+## § 0. What this claims, and the four things it does not
+
+**Claims:** that for each row of `tools/isa-census.tsv` there is a bare-metal
+verdict and a user-mode verdict, and that the difference set is the surface.
+
+**Does not claim ①** anything about the **vendor's shipped** kernel. `R1C-1`
+(2026-09-14) replaced the vendor kernel with rlxfw's own as column ②'s host,
+on the measured ground that the two have the same emulation surface — the
+derived-population argument lives in `docs/isa-prior-art.md` § 9.3 and the
+checker that keeps it true is `tools/emueq.py`. Column ②'s generality rests on
+that equivalence and not on this file.
+
+**Does not claim ②** a cost. Every "how much does the emulation cost"
+question is `4b` (`D-cost`), which needs a clock and a seating. 🔴 This
+project's DoD row `D4` bundled the cost into the same sentence until
+2026-09-15 and was corrected in place; a finished `4a` does not satisfy the
+old wording and never could.
+
+**Does not claim ③** completeness over the emulation surface. It is complete
+over *the census*, and § 6 is the measured difference between those two
+things.
+
+**Does not claim ④** that column ② has ever been measured. It has not — for
+any row. `PROGRESS.md`'s carried-forward record puts it plainly: this
+repository has never measured any instruction's exception code in **user
+mode**. Every reading it holds is kernel-mode, under its own handler, at
+`Status = 0x1000FC00`. Column ② in this file is a **pre-registered
+prediction**, and it is labelled as one on every row.
+
+---
+
+## § 1. The population, and the four decisions taken to define it
+
+量 2026-09-15, counted from `tools/isa-census.tsv`: **46 non-comment lines =
+1 header + 45 data rows**, splitting **39 `r1a` + 6 `r1b`**. The `r1` coverage
+flag reads **42 `y` and 3 `.`**.
+
+Four things had to be decided before a table could exist. They are engineering
+decisions, taken here, with the alternative and the reason:
+
+**① 45 rows, not 39.** The six `r1b` rows are hazard *shapes*, not
+instructions, and a trap/no-trap harness cannot ask their question (§ 5).
+Dropping them would make a clean table by deleting the part that is hard.
+They stay, each carrying an explicit cell that says which question this
+instrument cannot ask — which is `docs/toolchain-comparison.md` § 6's shape,
+the house form for exactly this.
+
+**② `jalx` gets a row with an EXCLUDED cell, not a blank.** 讀: MIPS16 is
+implemented on this part, so a user-mode `jalx` does **not** trap — it
+succeeds, and lands control in MIPS16 mode at an address a 26-bit field
+chooses. That is worse than a panic, because it is non-deterministic and it
+spends the power cycle. A blank cell reads as *not done yet*; an EXCLUDED cell
+with its reason reads as *decided*.
+
+**③ The five unaligned instructions are a declared gap, not a silent one.**
+§ 6.
+
+**④ This file, not `docs/rlx-isa.md`.** That file does not exist and is
+`R1-pub-7`'s deliverable; creating it here would claim another step's
+artefact. `docs/isa-prior-art.md` § 0 ④ explicitly refuses the job of saying
+anything about kernel behaviour, so the table does not belong there either.
+`R1-pub-7` will cite this file.
+
+---
+
+## § 2. 🔴 The confound that has to come before the table
+
+**Column ①'s readings were all taken at `Status = 0x1000FC00`. That is
+`CU0 = 1`. Column ② is user mode, where `CU0 = 0`.**
+
+So every coprocessor-0-class encoding in the census differs between the two
+columns **for a reason that has nothing to do with emulation** — it differs
+because the second run is unprivileged. `cache`, `mflxc0`, `ll` and `sc` are
+all in that set: on the die they retire because CU0 is set, and from user mode
+they take CpU(11) with CE 0.
+
+🔴 **A difference column that does not separate *privilege* from *emulation*
+is not the emulation surface.** It is the union of two unrelated things, and
+the larger of the two is an artefact of how column ① was measured. Every row
+below therefore carries a **why** — `same`, `emulation`, or `privilege` — and
+only the `emulation` rows are the surface.
+
+⚠️ This was not in `R1c`'s definition anywhere. The plan, `docs/isa-prior-art.md`
+§ 9 and `PROGRESS.md`'s `D4` all say *bare metal against the kernel*; none of
+them says that one of those is privileged and the other is not.
+
+---
+
+## § 3. The table — 39 `r1a` rows
+
+Column ① is **量**, from `bench/2026-09-14/C1-P4j.log` (`probe4`, 75 payload
+rows, header `trapped=0x2a` = 42, `ran=0x21` = 33) unless noted.
+Column ② is **推**, a prediction registered here before any harness exists.
+
+| # | row | ① on the die | ② predicted from user mode | why |
+|---|---|---|---|---|
+| 1 | `cache` | retire (4 of 4 ops, n=0) | CpU(11) CE 0 → `do_cpu` cpid 0 → `simulate_llsc` no match → **SIGILL** | 🔴 privilege |
+| 2 | `mfc3` | exc 11 CpU CE 3 | SIGILL | same |
+| 3 | `jalx` | **none** | 🔴 **EXCLUDED — must not be run.** MIPS16 is implemented, so it retires into MIPS16 at an address a 26-bit field picks | — |
+| 4 | `lwl` | retire, gpr `A5F00D44` | retire | same |
+| 5 | `lwr` | retire, gpr `1122335A` | retire | same |
+| 6 | `movn` | retire, gpr `0000002A` | retire | same |
+| 7 | `movz` | retire, gpr `0000002A` | retire | same |
+| 8 | `mtc3` | exc 11 CpU CE 3 | SIGILL | same |
+| 9 | `swl` | retire, m0 `A55A5A0F` | retire | same |
+| 10 | `swr` | retire, m0 `5A0FF20D` | retire | same |
+| 11 | `COP1` | **mixed** — CpU CE 1 ×3 (`mfc1`/`lwc1`/`swc1`), RI ×2 (`ldc1`/`sdc1`) | SIGILL for all five; no `math-emu` exists under `arch/rlx` | same |
+| 12 | `SPECIAL2` | **mixed** — retire (`madd`), RI ×3 (`mul`/`clz`/`clo`) | retire / SIGILL, matching ① | same |
+| 13 | `SPECIAL3` | exc 10 RI (4 of 4) | SIGILL | same |
+| 14 | `beql` | exc 10 RI | SIGILL | same |
+| 15 | `bgtzl` | exc 10 RI | SIGILL | same |
+| 16 | `blezl` | exc 10 RI | SIGILL | same |
+| 17 | `bnel` | exc 10 RI | SIGILL | same |
+| 18 | `ldc1` | exc 10 RI | SIGILL | same |
+| 19 | **`ll`** | retire, gpr `0000A5F0` | CpU(11) CE 0 → `do_cpu` cpid 0 → **`simulate_llsc` MATCHES opcode `0x30` → emulated, no signal** | 🔴 emulation, **invisible** |
+| 20 | `lwc1` | exc 11 CpU CE 1 | SIGILL | same |
+| 21 | `lwc3` | exc 11 CpU CE 3 | SIGILL | same |
+| 22 | `madd` | retire, LO `13526780` / HI `0BAD0002` | retire | same |
+| 23 | `mfc1` | exc 11 CpU CE 1 | SIGILL | same |
+| 24 | `pref` | exc 11 CpU CE 3 (the die names `0x33` as MIPS-I `lwc3`) | SIGILL | same |
+| 25 | `rdhwr` | exc 10 RI | SIGILL — `simulate_rdhwr`'s two call sites are `#if 0` and **the function is not defined in this tree** | same |
+| 26 | **`sc`** | retire, m0 = rt's value | CpU(11) CE 0 → **`simulate_llsc` MATCHES opcode `0x38` → emulated, no signal** | 🔴 emulation, **invisible** |
+| 27 | `sdc1` | exc 10 RI | SIGILL | same |
+| 28 | `swc1` | exc 11 CpU CE 1, m0 unchanged | SIGILL | same |
+| 29 | `swc3` | exc 11 CpU CE 3, m0 unchanged | SIGILL | same |
+| 30 | **`sync`** | exc 10 RI | `do_ri` → **`simulate_sync` MATCHES SPECIAL funct `0x0F` → emulated, no signal** | 🟢 **emulation, VISIBLE** |
+| 31 | `mflxc0` | retire, gpr `00000000` from a `DEADBEEF` seed | CpU(11) CE 0 → `simulate_llsc` no match → SIGILL | 🔴 privilege |
+| 32 | `mtlxc0` | **none** — never given a payload row, deliberately | SIGILL, by the same argument as `mflxc0` | — |
+| 33 | `COP2` | exc 11 CpU CE 2 | SIGILL | same |
+| 34 | `teq` | exc 10 RI — condition deliberately TRUE, and ExcCode 13 (Tr) was reachable | SIGILL | same |
+| 35 | `tge` | exc 10 RI | SIGILL | same |
+| 36 | `tgeu` | exc 10 RI | SIGILL | same |
+| 37 | `tlt` | exc 10 RI | SIGILL | same |
+| 38 | `tltu` | exc 10 RI | SIGILL | same |
+| 39 | `tne` | exc 10 RI | SIGILL | same |
+
+量 counts over column ①: **11 retire, 9 CpU(11), 15 RI(10), 2 mixed, 2 none,
+0 void.** Non-`none` = 37; with the five `r1b` rows that have a route-① reading
+(§ 5) that is **42**, which is exactly the census's own 42 `y` flags —
+derived independently from the raw logs and from the flag column, and they
+agree.
+
+🔴 **A disagreement, reported rather than resolved.** `mfc3` reads CpU CE 3 at
+`Status = 0x1000FC00` (CU3 clear), and a different 2026-08-30 payload that set
+and held CU3 read **retire, eight times, `traps = 0`**. Both are in the record.
+Route ① as scoped here is the `0x1000FC00` reading, and the other one is why
+row 2's cell says nothing about whether CP3 holds a register.
+
+---
+
+## § 4. 🔴 The result the table produces, and it is one row
+
+Of 39 census rows, **exactly one — `sync` — is predicted to show the
+emulation surface as a trap/no-trap difference.**
+
+`ll` and `sc` are emulated in user mode and the test **cannot see it**: they
+already retire on the die, so both columns read *no signal* and the difference
+is invisible to the instrument. It is real and it is in the mechanism column,
+which is why every row carries a *why* rather than only a verdict.
+
+`cache` and `mflxc0` differ, and **not because of emulation** — they differ
+because column ① was privileged.
+
+> **So `D-diff`, run over this population, yields a one-row surface with two
+> invisible entries and two privilege artefacts.** That is the honest yield,
+> it is known before a board is powered, and it is the strongest possible
+> argument for § 6's population gap.
+
+⚠️ 推 throughout. If the seating reads `sync` as SIGILL, `simulate_sync` is
+not reached from this path and the whole § 1.4 reading is wrong — that is the
+single most informative outcome available, and it is worth the seating on its
+own.
+
+---
+
+## § 5. The six rows this instrument cannot ask
+
+The `r1b` rows are `load then a reader of the loaded register`, `mtc0 then
+mfc0`, `mult/div then mfhi/mflo`, `a load sitting in a delay slot`, `movz or
+movn write-enable in a load delay slot`, and `store, the class hazlint has no
+rule for`.
+
+Their verdict vocabulary is **exposed / not exposed / not measurable** — a
+question about whether the pipeline hazard is architecturally visible. A
+SIGILL harness reads *did a signal arrive*, which is a different question with
+a different answer set. 🔴 **Nothing in the repository had decided what these
+six rows do in a trap/no-trap table**, and the count `45` was quoted without
+anyone noticing that six of the rows have no cell to fill.
+
+They keep their rows and their column-① readings; column ② carries **`n/a —
+different question`** with a pointer here. Giving them a real column ② needs a
+second instrument, and that is not `4a`.
+
+---
+
+## § 6. 🔴 Five of the eight instructions on the surface have no row, and cannot have one
+
+讀, the emulation surface as `docs/isa-prior-art.md` states it: `ll`, `sc`,
+`sync`, **and the unaligned `lh`, `lhu`, `lw`, `sh`, `sw`**.
+
+量 2026-09-15, by name against `tools/isa-census.tsv`:
+
+| instruction | on the surface | has a census row |
+|---|---|---|
+| `ll` | yes | **yes** |
+| `sc` | yes | **yes** |
+| `sync` | yes | **yes** |
+| `lh` `lhu` `lw` `sh` `sw` | yes | 🔴 **no, all five** |
+
+**And they cannot have one by rule.** `docs/isa-prior-art.md` § 0's *"does not
+claim ②"* excludes any instruction the loader obviously executes, and a Lexra
+loader executes `lw` on every other line. So the census's own admission rule
+removes five of the eight instructions the table exists to expose.
+
+**This is a population defect, not a table defect**, and the population is
+`R1-pub-0`'s. It is declared here rather than repaired here because widening
+the census would move a table two frozen artefacts join against. What `4a` can
+do is say the number out loud: **this table can show 3 of the 8 known
+emulated instructions.**
+
+⚠️ It is also the likeliest source of the `~4` in `4b`'s row count — the cost
+side has always been about a handful of instructions, and nobody wrote down
+which handful or why it was not eight.
+
+---
+
+## § 7. What could still be wrong
+
+1. **Column ② is a prediction.** Every cell is 推 until a seating runs, and a
+   prediction that turns out right is worth something only because it was
+   written first. If a later reading disagrees with a cell here, **the cell
+   stays and the disagreement is the result.**
+2. **The equivalence column ② rests on is `R1C-1`'s, not this file's.** If
+   `tools/emueq.py` ever goes red, every column-② cell inherits the doubt.
+3. **Two rows reach `do_cpu` on a path the obvious model misses.** 讀: from
+   user mode `CU0` is clear, and `ll`/`sc` encode as `lwc0`/`swc0`, so they
+   take **CpU(11)** rather than RI — and `do_cpu`'s `cpid == 0` arm carries
+   `simulate_llsc`. A harness scoring *no signal ⇒ the instruction is
+   implemented* would record `ll` and `sc` as present on this die, which is
+   backwards. `mflxc0`/`mtlxc0` are the same shape: COP0 opcode with an
+   unassigned `rs`, so `simulate_llsc` is *attempted* before SIGILL.
+4. **A SIGILL probe has two failure modes before any row runs.** 讀: the
+   vendor's `traps.c` rewinds `cp0_epc` before signalling, so a handler that
+   simply returns re-executes forever — the harness must `siglongjmp` or
+   advance `uc_mcontext.pc`; and `force_sig` sends `SEND_SIG_PRIV`, so
+   `si_code` is `SI_KERNEL` and **`si_addr` reads 0**, not the faulting PC.
+   Any design that identifies the faulting row by `si_addr` is dead on
+   arrival.
+5. **The harness does not exist and its toolchain is undecided.** `R7` owns
+   which toolchain rlxfw's userspace uses, and 量 `config/rlxfw-initramfs.tsv`:
+   the image carries the unit's own busybox and uClibc and **no compiled
+   userspace of this project's at all**. `R1c`'s harness would be the first.
+6. **`R1C-1-b`'s build gate is written down and not built.** The linked `R1c`
+   binary must contain **zero `break` instructions** — gcc emits `break 7` for
+   integer division by zero, and a `break` in the harness is an exception the
+   harness did not intend. `objdump -d`, count must be 0.

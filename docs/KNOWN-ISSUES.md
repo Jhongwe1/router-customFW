@@ -356,6 +356,24 @@ and `FW-35` is in this repository because `awk` read `8001e714` as scientific
 notation. Its self-test runs against committed captures whose answers are
 known and every other mode refuses to answer if it fails.
 
+🆕 **2026-09-15, and this one says a line number can be undefined.** Building
+`CITE-2`'s checker turned up a second consequence of a lone `\r`, on the
+instrument side rather than the shell side. Python's
+`subprocess(..., text=True)` applies universal-newline translation, so a bare
+`\r` **becomes a line break** — `bench/2026-08-23/B.log` is 39 lines of bytes
+and **59** read that way, while the same file read with `newline=""` is 39.
+The first working version of `citecheck` had one side each way and reported
+**76 rotted citations where there are 57**; the nineteen artefacts were all
+`bench/` logs and all displaced by a *negative* amount, which is what gave it
+away. Both sides now read bytes and split on `\n` only.
+
+🔴 **What survives the fix is a stated limit, not a repair.** 量 2026-09-15:
+**7 cited files hold a bare `\r`**, and in those files *line N* is not a
+well-defined thing — an editor, `sed -n` and a universal-newline reader do not
+agree on which line that is. `citecheck` prints the count on every run rather
+than resolving it, because there is nothing to resolve: the ambiguity is in
+the file.
+
 ## 🔴 `\r\r\n` has two sources and only one of them is a wrap
 
 量 2026-09-08 over all 762 committed captures (`FW-49`). busybox ash's line
@@ -386,6 +404,35 @@ They are **not renamed**: 40 and 84 references across 23 and 17 files,
 including two frozen cards and three tools. They are declared by name in
 `capdate.KNOWN_MISNAMED`, and the list is swept in both directions so an entry
 that stops applying fails rather than sitting there.
+
+## 🔴 The check that asks whether a committed file holds forbidden flash bytes cannot run in CI, and has been invoked wrong
+
+`tools/flashwin.py scan` is the only instrument that asks, **by the bytes**,
+whether a file this repository has already committed contains content from
+`H601` or the loader region. It needs `--dump` — the 4 MiB reference dump —
+and that dump may never be committed, because it identifies one physical
+device.
+
+**So the check is desk-only by construction.** 量 2026-09-15 on
+`.github/workflows/ci.yml`: CI runs `flashwin --self-test` and
+`tools/test-flashwin-mutants.py` and **no step runs `scan`**. Those two say
+the tool works; neither says anything about what is in the tree.
+
+🔴 **And a desk-only check has nobody to notice that it did not run.** 量
+2026-09-15: a `co-flashwin-scan.out` dated **2026-09-10** sits in
+`$FWRE_WORK/rebuild/` and its entire content is
+`flashwin.py scan: error: the following arguments are required: --dump`. 推:
+that closeout's cell did not run and the error was not read. The same
+invocation was made again on 2026-09-15 and caught the same way — by reading
+the output instead of the exit line.
+
+🟢 Run correctly on 2026-09-15 it reads **CLEAN over 4,441 files with 113
+distinct 16-byte probes**. That is the reading; the issue is that nothing
+makes it happen.
+
+⚠️ What would close this is not a CI step — it cannot be one. It is a closeout
+script that names `--dump` explicitly and fails loudly without it, and the
+place that owns the closeout list is `CLAUDE.md`, which is the owner's file.
 
 ## Closed since `v0.2` was tagged
 

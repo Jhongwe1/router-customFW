@@ -305,7 +305,9 @@ have been most useful.** 量 2026-09-10 with `tools/regcensus.py` on `r57`:
 **nine** symbols in this image materialise `PABCD_DAT` (`0xB800350C`) and
 **seven have never been read**, five of them named `autoconfig_gpio_off` /
 `_on` / `_blink` / `_slow_blink` / `_init` — which read like the vendor's own
-LED API sitting on the pin `R5-7` is about to drive. Disassembling them was
+LED API sitting on the pin `R5-7` is about to drive. 🔄 **2026-09-15
+(seventy-first segment): five of those seven have now been read, and not as
+disassembly — as `.c`. See § 9.4.** Disassembling them was
 the obvious next step and it was declined: § 6's ordering principle says the
 reading is available later and the blindness is not, and
 `notes/gpio-driver.md` § 5 and § 6 carry the trade and the runtime instrument
@@ -340,6 +342,8 @@ which state; this line names the drivers and states no count.)*
 | `arch/rlx/bsp/vmlinux.lds` | name | vendor | the link script — where `R3`'s `start address: 0x80003600` comes from |
 | `arch/rlx/kernel/setup.c` | line | vendor | the anchors for marks `B01`/`B02`/`B03`/`B08` (`config/rlxfw-marks.tsv`), and `:546` (`setup_early_printk`) |
 | `boards/rtl8196e/bsp/prom.c` | line | vendor | `bsp_init()` computes `mem_size` by reading the DRAM configuration register at `BSP_MC_MTCR0` — bank/bus-width/row/column decode |
+| `boards/rtl8196e/bsp/serial.c` | line | vendor | 🆕 **2026-09-15, for `SPEC.md` `FW-70`.** The live `#if 1` arm of `bsp_serial_init()`: `s.type = PORT_16550A`, `s.regshift = 2`, `s.uartclk = BSP_SYS_CLK_RATE`, `s.fifosize = 16`, `s.flags = UPF_SKIP_TEST`. 🔴 **And a NEGATIVE fact, which is the one that mattered**: the `#else` arm carrying `UPF_SPD_CUST` and `s.custom_divisor` is dead, so the generic 8250 driver computes the divisor rather than the board overriding it. Nothing was carried into a driver of mine — this was read to give a baud figure a source. `notes/console-link.md` § 1.1 |
+| `boards/rtl8196e/bsp/bspchip.h` | line | vendor | 🆕 **2026-09-15, for `SPEC.md` `FW-70`.** `BSP_SYS_CLK_RATE` and `BSP_BAUDRATE`, and the `#ifdef CONFIG_FPGA_PLATFORM` that selects between 27 MHz and **200 MHz**. The constant is taken; so is the fact that the file defines it three times with two arms live, which is why it was checked rather than quoted. `notes/console-link.md` § 1.1 |
 | `arch/rlx/bsp/prom.c` | name | vendor | the same file through the `arch/rlx/bsp` symlink |
 | `arch/rlx/bsp/timer.c` | 🔴 **line** | 🔴 **vendor** | 🆕 **2026-09-04, `R5-10`, and it is the deepest timer reading in this ledger.** `bsp_timer_init()` **in full**: `REG32(BSP_TCCNR)=0` before touching `CDBR`; `REG32(BSP_CDBR)=(BSP_DIVISOR)<<BSP_DIVF_OFFSET`; the **runtime** `(REG32(BSP_REVR) & 0xFFFFF000)==BSP_RTL8196E` branch selecting `<<4` over `<<BSP_TCD_OFFSET`; `rlx_clockevent_init(BSP_TC0_IRQ)`; and the two closing **assignments** `REG32(BSP_TCCNR)=BSP_TC0EN\|BSP_TC0MODE_TIMER` and `REG32(BSP_TCIR)=BSP_TC0IE`. Also `bsp_timer_ack()` and the `CONFIG_RTL_TIMER_ADJUSTMENT` block's `rtl865x_setupTimer1()`, which writes `TC1DATA`/`TCCNR`/`TCIR` for TC1. 🔴 **2026-09-04, seating 12: `bsp_timer_ack()` was recorded here as a write and its CONSEQUENCE was not drawn, and the consequence is the finding.** It is `REG32(BSP_TCIR) \|= BSP_TC0IP;` — a read-modify-write on a register whose `IP` bits are write-1-to-clear — called on every 100 Hz tick, so it clears **every** pending bit in `TCIR`, including one belonging to a driver it has never heard of. `TI-3` read `TC1IP = 0` after sixteen full TC1 periods because of it. 量: the reading was in this ledger one segment before the cell it explains ran, and no sentence anywhere in the tree had connected them. **A ledger row that records a write without its effect is a reading that has been banked and not spent.** `SPEC.md` `IRQ-09`, `docs/interrupt-map.md` § 3.6. ⚠️ **`R5-1`'s driver source predates this reading by one day** (`config/rlxfw-src/…/rtl819x-timer.c`, 2026-09-03; this, 2026-09-04), so the blind-write claim for the *timer driver as written* survives — **but `driver-diff`'s timer section may not be written as blind from here on**, and § 4.3's contamination sentence is bounded by this row rather than by itself |
 | `arch/rlx/bsp/irq.c` | 🔴 **line** | 🔴 **vendor** | 🆕 **2026-09-04, `R5-10`, in full.** `bsp_irq_init()` (`GIMR=0`, the three domain inits, `:222-225` writing all four `IRR` registers from `BSP_IRR*_SETTING`); `bsp_ictl_irq_mask`/`unmask` (`GIMR &= ~(1<<(irq-16))` / `\|=`); `bsp_ictl_irq_init` (`set_irq_chip_and_handler` over 32 lines, `setup_irq(BSP_ICTL_IRQ)`); `bsp_ictl_irq_dispatch` (`pending = GIMR & GISR`, the UART0/UART1/**TC1** chain, and the `else` that masks what it cannot name); `bsp_irq_dispatch` (`read_c0_cause() & read_c0_status()`, `CAUSEF_IP2` first). 🔴 **Decision layer, not fact layer** — it is where the routing policy lives |
@@ -639,9 +643,20 @@ symbol was read as "both arches select the optional one", and only x86 does.
 
 #### The artefact, and it is a reading of the vendor's GPIO driver
 
+🔄 **2026-09-15: the same file was read again, at `line` depth, from the `.c`.**
+The row below is the artefact-depth reading `FW-40` rests on and stays as it
+is; this one carries the machine-readable depth, because `ledger_rows` keeps
+the deeper of two claims for one path and `artefact` is not a word in its
+vocabulary.
+
 | path | depth | origin | what was taken |
 |---|---|---|---|
-| `drivers/char/rtl_gpio.c` | **`artefact`** | vendor | 🔴 **The `.c` was never opened. Its compiled form was.** Disassembly of this project's own `vmlinux` (cell `r54b`) with a distribution `objdump`: `rtl_gpio_init` at `0x802B1670` writes `0xB8000040`, then `PABCD_CNR &= ~0x74`, then `PABCD_DIR &= ~0x04 / ~0x10 / ~0x20`, then `PABCD_DIR \|= 0x40`. `SPEC.md` `REG-35` owns the reading; `System.map` supplies the initcall levels (mine 4, the vendor's 6). 🔄 **2026-09-06, seating 15: the same file was read at the same depth again and MUCH further, because the board asked a question the desk had not.** `PABCD_DAT` bit 6 moved under the operator's hand, so the **nine** functions that materialise `0xB800350C` were located — 🔴 *this row said FOUR until the count was re-derived off the eleven `ori` sites; it had been written from five resolved addresses* — and ~~**three of them were actually read**: `reset_button_pressed` (`0x800e59d8`), `rtl_gpio_timer` (`0x800e5c48`) and `rtl_gpio_init`~~ 🔴 **TWO of them — corrected 2026-09-10 by re-deriving the census with `tools/regcensus.py` on `r57`.** `rtl_gpio_init` **is not one of the nine**: it materialises the block base and `PABCD_DIR` and never `PABCD_DAT`, which is exactly what `REG-35`'s reading of it says (`CNR &= ~0x74`, four `DIR` operations, **no `DAT` write**). It was read, and it is not in this set. So **two read, seven unread**, and the row's own parenthetical list below — the six plus `rf_switch_read_proc` — is those seven, which means **the list was right and the count beside it was wrong**, the same shape as the *"These four"* this file corrected on 2026-09-07 and the same shape as `XNUM-1`. The other six (`autoconfig_gpio_init`, `_off`, `_on`, `_blink`, `_slow_blink`, `read_proc`) plus `rf_switch_read_proc` were seen and not read, and **that distinction is the whole point of this column**. What was taken is a one-second `mod_timer`, a three-way branch on the hold count (`< 2`, `2`–`4` → `kill_pid(find_vpid(1), 15, 1)`, `≥ 5` → `sb 49` into `default_flag` at `0x80296478`), the `count & 1` blink on bit 6, and the three `/proc` names read out of the ELF at `0x80276150`/`0x80276160`/`0x8027616c`. `SPEC.md` `FW-40` owns it. ⚠️ **This is the deepest read of a vendor driver this project has taken and it is still `artefact`** — no `.c`, no header, no symbol names beyond `System.map`'s. 🔴 **Two of the four functions were SEEN and not read**, and that is written down rather than left to look like coverage: `autoconfig_gpio_init` and `rf_switch_read_proc` also touch `PABCD_DAT` |
+| `drivers/char/rtl_gpio.c` | line | vendor | 🆕 **2026-09-15, for `SPEC.md` `FW-69`.** `rtl_gpio_timer` 842-1045 — the ordering of its six `PABCD_DAT` bit-6 writers and the guard on each; the pin/database macros at 360-366 and 492-522; `autoconfig_gpio_blink` 773-832; the `/proc` write handler 1215-1245; the release-path `return` at 971. **Ordering and guard conditions**, which are facts about the vendor's runtime behaviour — no register address or bit number was carried across that this project had not already measured. § 9.4 states what it costs. `notes/gpio-driver.md` § 21 |
+
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/char/rtl_gpio.c` | **`artefact`** | vendor | 🔴 **The `.c` was never opened. Its compiled form was.** Disassembly of this project's own `vmlinux` (cell `r54b`) with a distribution `objdump`: `rtl_gpio_init` at `0x802B1670` writes `0xB8000040`, then `PABCD_CNR &= ~0x74`, then `PABCD_DIR &= ~0x04 / ~0x10 / ~0x20`, then `PABCD_DIR \|= 0x40`. `SPEC.md` `REG-35` owns the reading; `System.map` supplies the initcall levels (mine 4, the vendor's 6). 🔄 **2026-09-06, seating 15: the same file was read at the same depth again and MUCH further, because the board asked a question the desk had not.** `PABCD_DAT` bit 6 moved under the operator's hand, so the **nine** functions that materialise `0xB800350C` were located — 🔴 *this row said FOUR until the count was re-derived off the eleven `ori` sites; it had been written from five resolved addresses* — and ~~**three of them were actually read**: `reset_button_pressed` (`0x800e59d8`), `rtl_gpio_timer` (`0x800e5c48`) and `rtl_gpio_init`~~ 🔴 **TWO of them — corrected 2026-09-10 by re-deriving the census with `tools/regcensus.py` on `r57`.** `rtl_gpio_init` **is not one of the nine**: it materialises the block base and `PABCD_DIR` and never `PABCD_DAT`, which is exactly what `REG-35`'s reading of it says (`CNR &= ~0x74`, four `DIR` operations, **no `DAT` write**). It was read, and it is not in this set. So **two read, seven unread**, and the row's own parenthetical list below — the six plus `rf_switch_read_proc` — is those seven, which means **the list was right and the count beside it was wrong**, the same shape as the *"These four"* this file corrected on 2026-09-07 and the same shape as `XNUM-1`. The other six (`autoconfig_gpio_init`, `_off`, `_on`, `_blink`, `_slow_blink`, `read_proc`) plus `rf_switch_read_proc` were seen and not read, and **that distinction is the whole point of this column**. What was taken is a one-second `mod_timer`, a three-way branch on the hold count (`< 2`, `2`–`4` → `kill_pid(find_vpid(1), 15, 1)`, `≥ 5` → `sb 49` into `default_flag` at `0x80296478`), the `count & 1` blink on bit 6, and the three `/proc` names read out of the ELF at `0x80276150`/`0x80276160`/`0x8027616c`. `SPEC.md` `FW-40` owns it. ⚠️ ~~**This is the deepest read of a vendor driver this project has taken and it is still `artefact`** — no `.c`, no header, no symbol names beyond `System.map`'s.~~ 🔄 **2026-09-15: it is no longer the deepest and it is no longer `artefact`.** The `.c` was opened, at `source` depth, to answer `FW-69`. § 9.4 is the entry; this row stays because the artefact-depth reading is what `FW-40` rests on and the two are a preimage and its image rather than two sources. 🔴 **Two of the four functions were SEEN and not read**, and that is written down rather than left to look like coverage: `autoconfig_gpio_init` and `rf_switch_read_proc` also touch `PABCD_DAT` |
 
 🔴 **This is the most expensive single reading in this ledger for its size, and
 the reason is what it contains.** § 4.3.1's `artefact` precedent — the
@@ -1049,3 +1064,60 @@ differ by exactly that entry, and neither is wrong.
 
 **Committed before any driver source exists.** `git log --diff-filter=A` over
 `config/rlxfw-src/` is the check.
+
+
+---
+
+## § 9.4 — `drivers/char/rtl_gpio.c` was opened, 2026-09-15
+
+**Depth: `line`** — the deepest word `ledgerscan`'s vocabulary has
+(`DEPTHS = ("none", "name", "line")`), and the row in § 4.3.2's table carries
+it. ⚠️ *Source* below describes **what was read** — the `.c` rather than a
+disassembly — and is not a depth word; a cell holding it yields no declared
+depth at all, which is why the artefact-depth row for this file declared none
+for six weeks.
+
+| | |
+|---|---|
+| path | `drivers/char/rtl_gpio.c`, drop `src-vendor/rtl819x-toolchain` |
+| depth | **`source`** — the `.c`, not a disassembly |
+| what was taken | `rtl_gpio_timer`'s body (842-1045): the ordering of its six `PABCD_DAT` bit-6 writers and the guard on each; `RESET_LED_PIN` / `AUTOCFG_LED_PIN` / `PROBE_TIME` / `RESET_LED_DATABASE` / `AUTOCFG_LED_DATABASE` at 360-366 and 492-522; `autoconfig_gpio_blink` (773-832); the `/proc` write handler (1215-1245); the release-path `return` at 971 |
+| why | `SPEC.md` `FW-69`'s 殘留 asks which of two bit-6 blocks runs later. The behaviour was already 量; only the mechanism was missing |
+| owner of the finding | `notes/gpio-driver.md` § 21 |
+
+### What this costs, stated rather than left to look like nothing
+
+🔴 **Blindness, once lost, is not recoverable, and § 6's ordering principle is
+exactly about that.** `config/rlxfw-src/**/rtl819x-gpio.c` was written blind
+and is unaffected — reading cannot un-write it — but **any future change to my
+GPIO driver in this area is no longer blind**, and `driver-diff`'s GPIO
+section becomes an informed contrast rather than a blind diff, the same way
+`R5-6`'s watchdog section did.
+
+⚠️ **What was NOT taken**: no register address, bit number or initialisation
+sequence was carried across that this project had not already measured or
+derived. `REG-35` (`CNR`/`DIR` at init) is 量 on the die; `REG-37` is 量;
+`BRD-13` ties bit 6 to a board LED from the other side. What the `.c` supplied
+is **ordering and a guard condition** — facts about the vendor's runtime
+behaviour, which is the thing `FW-69` is about.
+
+🟢 **And it is the preimage of an artefact this project already has.** § 4.3.2
+(`FW-40`) is a disassembly of *this project's own* `vmlinux`, built from this
+same drop. So the `.c` and the `objdump` are two views of one object: they can
+be **checked against each other**, which is strictly more than two independent
+sources could do, and strictly less than corroboration — a point that must
+travel with any quotation of either.
+
+🔴 **The one thing source could not settle.** All six bit-6 writers sit inside
+`if (sys_bonding_type() == BOND_8196ES)`; if that were true at runtime every
+write would go to the WiFi NIC and the whole reading would be about dead code.
+That is excluded **量**, not 讀: `REG-37` read strict alternation on
+`PABCD_DAT` itself.
+
+⚠️ **Three drops carry this file and `md5sum` splits them TWO ways, not one.**
+`saturn49-wecb` and `wecb-vz-gpl` are byte-identical to each other;
+`rtl819x-toolchain` — the drop that builds — differs. In the timer region the
+difference is confined to the button-read helper and the `RTL8188E` bonding
+branch, so the bit-6 structure and its ordering are the same in both groups.
+That is better than `cpu.h`'s one-source-three-copies, and it is not
+independence.

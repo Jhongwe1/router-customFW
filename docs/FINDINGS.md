@@ -184,8 +184,12 @@ both twos, because 2.6.30's `proc_file_read` calls the handler again after
 `n_get 1 / n_state_chk 1` where all eleven pair reads read `3 / 3`. So the
 card's predicted `1 / 1` is **right about the driver and placed under the wrong
 cell** — a narrower defect than *the counters were wrong* — and both of § 4's
-identities carry a missing factor of two. ⚠️ One outlier (`+3` where every later
-pair is `+2`) is left standing rather than smoothed away.
+identities carry a missing factor of two. ⚠️ ~~One outlier (`+3` where every later
+pair is `+2`) is left standing rather than smoothed away.~~ 🔄 **2026-09-15: explained.** The handler increments a counter it
+then prints, so a decade crossing makes the second invocation render one byte more,
+which makes `proc_file_read` return 1 and `cat` issue a third read. 6 predicted and
+6 observed against 618 predicted flat and 618 observed flat, with a trailing extra
+CRLF as the independent observable. `notes/gpio-driver.md` § 19.
 `SPEC.md` `FW-64` · `bench/2026-09-10/CORRECTIONS-block17.md` § 3.2
 
 🆕 **2026-09-10 (seating 20) — a counter that samples without timestamping

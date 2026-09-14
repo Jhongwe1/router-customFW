@@ -200,7 +200,16 @@ jobs:
           # live under upstream/. Without the submodule it exits 1 on findings
           # that are an absent checkout, not a defect in the file.
           submodules: recursive
-          fetch-depth: 1
+          # 🔴 0, NOT 1, since 2026-09-15 and it is load-bearing for citecheck.
+          # Its oracle is `git blame` on the CITING line, and 量 on a --depth 1
+          # clone of this repository `git blame PROGRESS.md` attributes every
+          # line to ONE commit against 132 in a full clone -- so the cited file
+          # "as it was at the citing commit" is the cited file now, every
+          # citation reads STABLE, and the check cannot fail. citecheck REFUSES
+          # on a shallow repository rather than reporting that, so with 1 here
+          # the step would go red with a REFUSING line instead of going quietly
+          # green; the cost is the full history on this job.
+          fetch-depth: 0
 
       - name: capture dir
         run: mkdir -p ci-out
@@ -659,6 +668,33 @@ jobs:
       - name: capdate
         run: /usr/bin/python3 tools/capdate.py bench 2>&1 | tee ci-out/capdate.out; exit "${PIPESTATUS[0]}"
 
+      # `FW-70`'s instrument. Two estimators over committed .timing files; one
+      # of them REFUSES on this console and the refusal is the point -- at
+      # 38400 the reader is faster than the wire, so every read returns 3-4
+      # bytes and a slope fitted through that range is meaningless. S7/S8
+      # quantify how meaningless: the same estimator is 0.11 bits low over
+      # chunk sizes [1,60] and 2.41 bits low over [1,12].
+      #
+      # 🔴 The self-test exists because this tool's own first synthetic model
+      # was WRONG -- it added the USB latency floor to elapsed TIME, so a true
+      # 10.00 bits/char stream read as 16.33 and three cases fired. A latency
+      # timer delays a TIMESTAMP; it does not slow the wire.
+      - name: uartrate
+        run: /usr/bin/python3 tools/uartrate.py selftest 2>&1 | tee ci-out/uartrate.out; exit "${PIPESTATUS[0]}"
+
+      # `FW-64`'s `+3`, re-derived from the raw captures by a tool written
+      # without the one that produced the finding in front of it. Two steps,
+      # not one, the shape emueq already uses: a self-test proves the check
+      # CAN fail and says nothing about whether this tree passes it.
+      - name: procgrow self-test
+        run: /usr/bin/python3 tools/procgrow.py --self-test 2>&1 | tee ci-out/procgrow.out; exit "${PIPESTATUS[0]}"
+
+      # And the sweep in anger. Its first five lines carry numbers that move
+      # when a capture is added and a case COUNT that does not, which is what
+      # this file's rule about census rows moving with the corpus requires.
+      - name: procgrow check
+        run: /usr/bin/python3 tools/procgrow.py 2>&1 | tee ci-out/procgrow-check.out; exit "${PIPESTATUS[0]}"
+
       # The shared field reader the four false stops of seating 16 are the
       # specification for: strip CR, read read_proc FIELDS and never marks,
       # refuse a field that occurs more than once, and require an explicit
@@ -685,6 +721,44 @@ jobs:
       # not move.
       - name: regcensus
         run: /usr/bin/python3 tools/regcensus.py --self-test 2>&1 | tee ci-out/regcensus.out; exit "${PIPESTATUS[0]}"
+
+      # CITE-2. This repository cites its own files as `FILE:NNN`, and a line
+      # inserted above a cited row silently re-points every citation below it.
+      # `spec-check`'s C11 covers one population -- the payload sources under
+      # config/rlxfw-src/ -- by carrying a token from the line; citecheck
+      # covers every tracked file and uses an oracle C11 does not have: blame
+      # the CITING line, read the cited file at that commit, and find where
+      # that content is now. 量 2026-09-15 over HEAD: 239 live citations, 163
+      # stable, 57 rotted, 16 whose content no longer exists at all.
+      #
+      # The 57 are on tools/citecheck-baseline.tsv, keyed on the CONTENT of
+      # the cited row rather than on its line number -- several of them sit in
+      # PROGRESS.md rows that frozen bench cards pin BY LINE NUMBER, so they
+      # cannot be repaired without destroying the evidence check-predictions
+      # reads. The gate is: nothing NEW, and no baseline row that has stopped
+      # naming a finding.
+      #
+      # 🔴 This step needs fetch-depth: 0 above. It refuses on a shallow
+      # checkout rather than reporting 100 % stable.
+      - name: citecheck
+        run: /usr/bin/python3 tools/citecheck.py 2>&1 | tee ci-out/citecheck.out; exit "${PIPESTATUS[0]}"
+
+      # The process-level half: exit codes, the two-space contract with
+      # ci-census, and whether the COMMITTED baseline is a file a reviewer can
+      # read. Its shallow-clone case makes a real --depth 1 clone of a fixture
+      # and requires the refusal; if git will not make one here that case
+      # SKIPS under the label ci-expected.tsv allows.
+      - name: test-citecheck
+        run: bash tools/test-citecheck.sh 2>&1 | tee ci-out/test-citecheck.out; exit "${PIPESTATUS[0]}"
+
+      # And the mutation suite, because thirty-six green controls is a claim
+      # about the controls. Five of its twenty-three survived their first run:
+      # two were defects in citecheck (a URL filter that could not fire, and a
+      # bare-CR control that asserted STABLE where the convention decides a
+      # NUMBER) and three were controls asserting the wrong quantity. None was
+      # visible to the thirty-three cases that existed then.
+      - name: test-citecheck mutation suite
+        run: /usr/bin/python3 tools/test-citecheck-mutants.py 2>&1 | tee ci-out/test-citecheck-mutants.out; exit "${PIPESTATUS[0]}"
 
       - name: fetch-sources --list (offline; never fetches)
         run: bash tools/fetch-sources.sh --list

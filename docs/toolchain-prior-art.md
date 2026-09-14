@@ -366,8 +366,10 @@ requires the **load-delay row of `R2c`'s table to run on the silicon in all
 three columns** — `R1f`'s fragment compiled once per toolchain — and the same
 file's § 389 table marks that row as the only cell that can kill the project
 silently. **Nothing in this census reaches it**: § 5 records `TC-43` as the
-only row here whose number contains a device reading, so two of the three
-columns have never had anything run on this die. The correct statement is
+only row here whose number contains a device reading, so ~~two of the three
+columns have never had anything run on this die~~ 🔄 **2026-09-14 (seating 22): the
+bench row was filled — all three columns ran on the die, plus T4, as `probe6`'s
+twelve rows; `bench/2026-09-14b/`.** The correct statement is
 that `R1-pub-6`'s **desk** half is one segment and its silicon row is a bench
 row this census could not have filled and did not claim to.
 ⚠️ **This is not a measurement being corrected, it is a requirement that was

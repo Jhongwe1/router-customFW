@@ -4004,3 +4004,70 @@ would have called for a rebuild that was not needed.
 prose is not a rule.** A checker would have to know which image a card names
 and re-derive the id at commit time; it is carried forward rather than
 claimed.
+
+
+---
+
+## A fifth rule, and it is about the operator rather than the card — 2026-09-14
+
+**`OPS-1`. A cell whose payload samples a window that a human action has to land
+inside needs an explicit ready-handshake, and "launch time does not matter" is a
+claim that has now been measured false.**
+
+量, seating 22, four button holds on one power cycle:
+
+| how the cell was launched | landed inside the sampling window |
+|---|---|
+| asked *"tell me when you are ready"* and waited for the reply | **2 of 2** |
+| `GO` typed at the end of a long message | **0 of 2** |
+
+The frozen card's `C4-H` reads *"the window is 20 s and launch time does not
+matter"*. On this interface the operator's reading-and-reacting delay is the
+same order as the window, so it matters. The driver is cleared by its own
+counters in the same capture: `n_poll 400` against
+`j_last − j_first = 19.95 s` is exactly 20 s at 50 ms, and an 8 s hold is 160
+polls — nothing was missed. `load_default` went 0 → 1 between `C4-H` and
+`C4-LD`, so the press happened and was late.
+
+⚠️ The card's `R4-6` enumerated two causes for a missed hold — *pressed too
+briefly* and *the window had closed on release* — and left out the third,
+**it had not opened yet**; its prescription was to re-run the boot, which would
+have reproduced the miss identically.
+
+🔴 **A third hold was lost to a different cause and it is a tooling rule, not an
+operator one.** Re-running the same hand-written runner reused the same
+`--out`, and `console-capture.py` **correctly refused to overwrite** the
+previous artefact (`rc=2`), so the board never received the payload. That is
+`looprun` 1.1's attempt-numbering discipline landing on a script that does not
+have it: the fix is a fresh output name, never `--force`, because `--force`
+destroys the evidence of the attempt you are retrying.
+
+**So, before any cell that contains a timed physical action:**
+
+1. The card carries a row naming the action, who performs it, and the window.
+2. The operator is asked to confirm readiness and the reply is waited for —
+   the instrument is started *after* the reply, not before it.
+3. The window is opened long and the instrument records the timing; the
+   conversation's turns are not the clock. Retries get a new `--out`.
+
+
+---
+
+## The UART block has two registers that a `DW` destroys — 2026-09-15
+
+**讀, and it is on this page because a `DW` looks read-only and two of these
+are not.** The 16550A block at `0xB8002000` (`MAP-06`) is reached on this part
+with a 4-byte stride and the register in the top byte.
+
+| offset | register | reading it |
+|---|---|---|
+| `+0x00` | RBR | 🔴 **pops a byte off the receive FIFO** |
+| `+0x08` | IIR | 🔴 **clears the pending interrupt ID** |
+| `+0x0C` | LCR | safe |
+| `+0x14` | LSR | safe |
+
+So **never `DW B8002000 <n>` across the block.** Under Linux the first one
+steals a character from the console driver, which is a fault that appears
+somewhere else entirely. The two safe offsets are the two that carry the
+question worth asking: `DW B800200C 1` should read a top byte of `03` — 8N1 —
+and `07` would be 8N2, `0B` 8N1-with-parity. `SPEC.md` `FW-70`.

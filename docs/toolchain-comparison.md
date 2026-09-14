@@ -86,7 +86,7 @@ whether it is finished:
 
 | the plan's row | how the plan says to measure it | answered in | finished |
 |---|---|---|---|
-| **load-delay handling** — the plan's own note on it is *the only cell that can kill the project silently* | `R1f`'s fragment, compiled once per toolchain, **all three run on the silicon** | § 2.2 and § 3 | 🔴 **desk yes, silicon 1 of 3** |
+| **load-delay handling** — the plan's own note on it is *the only cell that can kill the project silently* | `R1f`'s fragment, compiled once per toolchain, **all three run on the silicon** | § 2.2 and § 3 | 🔄 **desk yes; silicon ~~1 of 3~~ 3 of 3 — 2026-09-14 (seating 22), `probe6` rows `v4`-`v10`, `bench/2026-09-14b/C1-P6j.log`** |
 | **`lwl`/`lwr` generation** | a small program containing an unaligned access, counted by disassembly | § 2.3 | 🟢 yes, and by the method the plan names |
 | **size, and which hardening flags are available** | compressed rootfs size; whether `-fstack-protector[-strong]` and `_FORTIFY_SOURCE` are there | § 2.4 for the flags, § 2.1 for the sizes | ⚠️ **flags yes, compressed rootfs size NOT measured** |
 
@@ -200,7 +200,7 @@ than to a build-flag choice.
 | `binsim` containment vs this unit's 2018 `boa` | 0.2401 | 0.1033 | 0.2522 | `TC-12`, same |
 | which drop's `.config` selects it | `rtl819x-toolchain` (RTL8196E) | `saturn49-wecb` **and** `wecb-vz-gpl` (RTL8198) | **none** | `TC-17` |
 | uClibc version | 🔴 unmeasured | 🔴 unmeasured | `0.9.30.3` — from the release **string**, not the library | `TC-01`, § 6 |
-| **has anything it built ever run on this die** | ✅ three kernels, `hazlint` **0** in each (112,505 / 111,801 / 109,922 loads); one boot timed at **7.260 s** | 🔴 **nothing** | 🔴 **nothing** | `TC-43`, `notes/kernel-build.md` |
+| **has anything it built ever run on this die** | ✅ three kernels, `hazlint` **0** in each (112,505 / 111,801 / 109,922 loads); one boot timed at **7.260 s** | ✅ 🔄 **2026-09-14 (seating 22): `probe6` `v6`/`v7`** | ✅ 🔄 **same seating: `v8`/`v9`/`v10`** | `TC-43`, `notes/kernel-build.md` |
 
 ---
 

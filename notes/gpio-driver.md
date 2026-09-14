@@ -1305,7 +1305,7 @@ at.** § 6.1's detector samples `CNR`/`DIR`/`DAT` and counts changes it did not
 make. Aiming it at `/proc/gpio` gives the first **positive control on a real
 foreign writer** rather than the synthetic one, and it costs a single `echo`.
 
-🔴 **And there is a prediction with a sign, derived here and not yet measured**:
+🔴 **And there is a prediction with a sign, derived here and ~~not yet measured~~ — 量 2026-09-14, and both halves landed** (the reading is at the end of this file; these six lines are quoted verbatim by a frozen corrections file and do not move):
 `autoconfig_gpio_blink` only sets flags; the code that acts on them is the
 **second** bit-6 block inside `rtl_gpio_timer`, gated on `AutoCfg_LED_Blink == 1`
 at `0x800E8EE0`. That block runs only while the timer is alive. So
@@ -1322,3 +1322,216 @@ Its only store is `sw ra,16(sp)`. On the `sys_bonding_type() != 13` arm it is
 `lw` from `0xB800350C`, `andi 0x20`, return 1 when the bit is 0 — which is
 `BRD-05` stated by the vendor's own code, and it settles that polling the
 button through this function cannot itself perturb the register the LED shares.
+
+
+---
+
+## 19. The `+3` is not a third caller. It is the second one, invoked three times
+
+**量 2026-09-15, seventy-first segment, desk, no power.** `LOG.md` § 6 of the
+seating-22 entry left one thing open: `n_state_chk` advances an extra time
+roughly once per hundred reads, with `n_state_foreign` moving in step, so it is
+a real call rather than a counter fault. The question was written as *which
+third caller*. There isn't one.
+
+### The four call sites are the four call sites
+
+`state_check` is called from exactly four places (`rtl819x-gpio.c:470` `.get`,
+`:565` `.direction_output`, `:637` `.set`, `:687` `read_proc`), and § 12 of this
+file already said so. Three of them are excluded **by counters printed in the
+same snapshot as the anomaly**, not by argument: every occurrence has
+`Δn_get = 0`, `n_dirout_ok` frozen at 1, `n_set_ok` 0 and `n_writes` 2.
+`.request`, `.free`, `.direction_input` do not call it; `.to_irq` is NULL; the
+driver has no timer, workqueue or notifier; and the staged `leds-gpio` contains
+no `gpio_get_value`, no `brightness_get` and no `default_trigger`.
+
+### The handler mutates the length of its own output
+
+`rtl819x_gpio_read_proc` sets `*eof = 1` and returns `len`. 2.6.30's
+`proc_file_read` (`fs/proc/generic.c`, byte-identical across all 32 staged
+cells) loops `while ((nbytes > 0) && !eof)`, and after the handler returns it
+computes `n -= *ppos` and breaks when `n <= 0`.
+
+In steady state the rendering length **L** is constant, so `cat`'s first
+`read()` is one invocation returning L with `ppos = L`, and its second is a
+second invocation returning L, `n = L − L = 0`, break, EOF. **Two invocations
+per `cat`** — that is `FW-64`.
+
+But invocation 2 runs `state_check` at `:687` **before** `:761`/`:762` render
+the counters. When the incremented value crosses a power of ten it gains a
+digit, so invocation 2 renders **L+1** bytes. Now `n = (L+1) − L = 1 > 0`:
+`proc_file_read` copies **one byte** — `page[L]`, the closing newline — `cat`
+sees a one-byte read and issues a **third** `read()`, which is invocation 3.
+
+    Δn_state_chk = +3.
+
+### Both directions, over every dump a version with the detector ever produced
+
+Predicate, registered before the sweep: *(`n_state_chk`+1) is a power of ten,
+or the check diverges and (`n_state_foreign`+1) is a power of ten*. Tested
+against an independent observable — *the dump carries a trailing extra CRLF* —
+over 624 dumps from seatings 20 and 22:
+
+| | extra byte | no extra byte |
+|---|---|---|
+| **predicted to grow** | **6** | 0 |
+| **predicted flat** | 0 | **618** |
+
+Zero false positives, zero false negatives. The six are `C11-L6`, `X1-getg`,
+`X4-again2`, `C2-R`, `C3-R`, `C4-S2`. **Negative control on a different file**:
+42 `/proc/rtl819x-keys` dumps, 0 predicted, 0 observed.
+
+The extra byte is the second observable and it is visible without reading a
+counter at all: dump 33 of `C4-S2.log` — and no other dump of its hundred — is
+followed by a blank line.
+
+### It explains the outlier `FW-64` deliberately left standing
+
+`SPEC.md` `FW-64` records `X1 → X2` as `+3` where every later pair is `+2`, and
+says *"這組資料解釋不了它"*. `X1-getg` is hit #2 of the six and carries the
+extra byte.
+
+### The rate in the original question is wrong, and the correct shape is sharper
+
+Not *once per hundred reads*. **Once per decade-crossing of a printed monotone
+counter, gated by parity.** From a boot the printed sequence is 1, 3, 5, 7, 9,
+so the crossing lands on the **fifth `cat` of every quiet boot** — five of the
+six hits are `chk 9 → 12` — and afterwards the sequence is even and a power of
+ten is unreachable until parity flips again. The 6/624 = 0.96 % is an artefact
+of corpus composition, not a rate.
+
+### What would refute it
+
+1. **Free, and already registered by the arithmetic.** On the next boot, with
+   `cat /proc/rtl819x-gpio` repeated and nothing touching `.get`, the fifth read
+   must print `n_state_chk 9`, the sixth must print **12**, and only that dump
+   may carry a trailing blank line. A `+3` at any read where neither `chk+1` nor
+   `foreign+1` is a power of ten refutes this outright.
+2. **Decisive, one line of source.** Print the counters at fixed width
+   (`%10lu`). The `+3` must then never occur again, on any read, ever. Its
+   survival refutes this. Costs a new `RECIPE_ID`, so it rides a rebuild.
+
+### Re-derived by a second tool, and the re-derivation sharpened it
+
+**量 2026-09-15, `tools/procgrow.py`**, written from the raw captures rather
+than from the script that produced the table above, so the two are a
+cross-check rather than a re-run. Over `bench/**/*.log`: **6 captures, 544
+consecutive dump pairs**, and three numbers that are the same three pairs
+read three ways —
+
+| | |
+|---|---|
+| predicted to grow | **3** |
+| carrying the extra blank line | **3** |
+| delta 3 | **3** |
+
+with `V1` (delta 3, growth not predicted) **0**, `V2` (growth predicted, delta
+2) **0**, `V3` (extra blank on a delta-2 pair) **0**. `--self-test` plants one
+of each of those three into a synthetic capture and requires all three to
+fire, plus two clean pairs that must fire nothing: **5 of 5**. A sweep that
+prints three zeros and cannot print anything else is not evidence.
+
+⚠️ **Scope**: this tool needs two dumps in one capture to compute a delta, so
+it is silent about the three single-dump instances (`X1-getg`, `X4-again2`,
+`C11-L6`) where the blank line is visible and no delta exists. It confirms
+three of the six.
+
+🔴 **And the first implementation produced NINE apparent counter-examples,
+which were the predicate's fault and not the mechanism's.** Written as *"a
+power of ten lies between one displayed value and the next"* it flagged
+`chk 98 → 100`, `fgn 8 → 10` and `fgn 98 → 100` as growths that failed to
+produce a third read. Working through the invocations shows why that is the
+wrong question:
+
+    invocation 1: counter += 1 -> V, renders V at length L1.  cat copies it,
+                  so V is the value the dump SHOWS.
+    invocation 2: counter += 1 -> V+1, renders V+1 at length L2.
+    L2 > L1  =>  proc_file_read returns 1  =>  invocation 3.
+
+The condition is on **V+1**, where V is the displayed value — not on anything
+lying between two displayed values. `98` displays; `99` adds no digit; two
+invocations is correct. `9` displays; `10` adds one; three. And `10**0` must
+not count, because `0` and `1` are both one character wide. With the
+condition stated that way all nine disappear and `V2` reads 0.
+
+### Reach beyond this driver — 推, untested
+
+Every `read_proc` here that prints a counter it also increments has this
+structure. `rtl819x-keys` is directly checkable: a third invocation there costs
+an extra `gpio_get_value` per button, i.e. `Δn_get = 3` on one `cat`.
+
+---
+
+## 20. § 18's signed prediction, measured
+
+**量 2026-09-14, seating 22, boot 4.** The prediction at § 18 — six lines that a
+frozen corrections file quotes, so they were not edited — asked for two `echo`s
+and an eye on one boot, with the hold between them. It got exactly that.
+Counting `dat` at the start of a line in `bench/2026-09-14c/`, so that
+`boot_dat` and `state_last` cannot contaminate the count:
+
+| cell | `dat 0000003C` | `dat 0000007C` | reading |
+|---|---|---|---|
+| `C4-S1` — after `echo 2`, before the hold | **56** | **44** | bit 6 alternating: it blinks |
+| `C4-H` | — | — | the hold, which consumes the timer |
+| `C4-S2` — after `echo 2`, after the hold | **100** | **0** | flat: no blink at all |
+
+100 samples each, one boot. Both halves of the prediction hit, and the two are
+each other's control exactly as § 18 asked.
+
+🔴 **And the same reading is `FW-69`'s positive half**, which is why the card's
+`R4-5` read a moving bit 6 in `C4-S1` as a refutation of `FW-62`'s once-per-boot
+timer. It is not: it is the AutoCfg path of the same timer, started by a `/proc`
+write rather than by a press. The mechanism is § 21.
+
+---
+
+## 21. Which of the bit-6 writers wins, read out of the vendor's `.c`
+
+**讀 2026-09-15**, `drivers/char/rtl_gpio.c` in the drop that builds
+(`tools/rlxfw-kbuild.sh` sets `DROP=$SV/rtl819x-toolchain`). `rtl_gpio_timer`
+is lines 842–1045. Every preprocessor arm below was resolved against
+`boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW`, not by eye.
+
+| # | write | guard, arms resolved | bit 6 | LED |
+|---|---|---|---|---|
+| A | 861 | `!8196E` — **compiled out on this board** | set | — |
+| B | **910** | pressed, `2 <= probe_counter <= 5` | clear | on |
+| C | **933** | pressed, `>= 5`, odd | set | off |
+| D | **942** | pressed, `>= 5`, even | clear | on |
+| E | **1005** | `AutoCfg_LED_Blink == 1 && Toggle` | set | off |
+| F | **1021** | `AutoCfg_LED_Blink == 1 && !Toggle` | clear | on |
+
+All six are read-modify-write on `PABCD_DAT`; none is atomic or locked.
+**B/C/D precede E/F, so the AutoCfg block is last and wins**, and its guard at
+`:991` never reads `pressed`, `probe_state` or `probe_counter`. `Toggle` flips
+every tick at `:1037` and `mod_timer(jiffies + HZ)` closes the function at
+`:1043`, which is the 1.000 s half-period measured with no discontinuity at the
+press. `default_flag = '1'` at `:968` is a `static char` store and not a GPIO
+write at all, so the override cannot touch it: a factory reset can be triggered
+with no visual indication.
+
+🔴 **Two decoys.** `RESET_LED_NO` = 27 and `AUTOCFG_LED_NO` = 20 survive only as
+`#ifdef` existence guards. The numbers that move are `RESET_LED_PIN` and
+`AUTOCFG_LED_PIN`, which the 8196E arm at `rtl_gpio.c:492-504` redefines to
+**6 for both**. Reading 27 and 20 gives two LEDs on two bits, which is why "two
+paths write bit 6" was not visible from a skim.
+
+🟢 **A second confirmation was already in the data.** The `return` at `:971` is
+on the release path, **before** the AutoCfg block and before `mod_timer`. So a
+hold-and-release past 5 s kills the timer and freezes bit 6 wherever it stood —
+which is § 20's `C4-S2`, flat at 100/0. One `return` explains both the override
+and that pair.
+
+⚠️ **Source cannot settle one thing**: all six sites are inside
+`if (sys_bonding_type() == BOND_8196ES)`, and if that were true at runtime every
+write would go to the WiFi NIC instead. That is settled 量 rather than 讀 —
+`REG-37` read strict alternation on `PABCD_DAT` itself.
+
+⚠️ **Source level, stated because it changes a ledger row.** `FW-40` was
+obtained by disassembling this project's own `vmlinux`; this is the `.c` that
+artefact was built from, so the two are a preimage and its image rather than two
+independent sources, and they can be checked against each other. Three drops
+carry this file; `md5sum` splits them **two** ways, and the difference in the
+timer region is confined to the button-read helper and the `RTL8188E` bonding
+branch — the bit-6 structure and its ordering are the same in both.
