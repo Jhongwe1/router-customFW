@@ -882,7 +882,7 @@ appended, which adds exactly one pair.)*
 |---|---|
 | `R1-gate` → `R2a/b/d` | no. `R1-gate`'s residuals are the D side and the cache; `R2a/b/d`'s are drop identification and toolchain choice |
 | `R2a/b/d` → `R1h` | no |
-| `R1h` → `R3` | **yes — decision ② / `CPU-45`.** `R1h` carries it as 未定 after the first of two allowed seatings; `R3` carries it as still `R1-gate`'s |
+| `R1h` → `R3` | **yes — decision ② / `CPU-45`.** `R1h` carries it as 未定 after the first of two allowed seatings; `R3` carries it as still `R1-gate`'s. 🔄 **2026-09-14: the seating count is no longer what decides this.** `c-A` has read negative **three** times on silicon, not once — and the question it was gating is answered from `t-hit`, at the desk, with no seating at all (`docs/rlx-cache-and-cp0.md` § ⓑ-2; `SPEC.md` `CPU-45`). What the next seating buys is the **pre-registration**, because the reading that answers it had no refutation condition written first |
 | `R3` → `P4a` | no |
 | `P4a` → `P4b-gate` | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
 | `P4b-gate` → `R4` | no |

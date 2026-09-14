@@ -342,3 +342,30 @@ busybox here is this unit's own `bin/busybox`, `BusyBox v1.13.4`, 273,332
 bytes — a vendor binary, so if the count is patched in, `config/host-compat/`'s
 rule applies and it may only be changed on a staged tree. `SPEC.md` `NET-26`
 carries the reading and §17 carries the gap.
+
+---
+
+## 🆕 2026-09-14 — the BUILTIN side, probed for the first time, and one control that did not fire
+
+Every census above is about **applets**. `tools/cardcheck.py:166 (this project has)` says in its own comment that the *builtin* table of this binary **has never been enumerated**, and that nothing currently rests on its guess. A bench card needed a sampling loop, so it was enumerated. `SPEC.md` **`FW-66`**.
+
+量: `qemu-mips-static -L $FWRE_WORK/extracted/unit-2018/squashfs-root` running that unit's own `bin/busybox ash -c`, from a scratch directory, wrapped in `tools/vendor-tripwire.sh`. **BusyBox v1.13.4 (2018-01-10 14:56:45 CST)**.
+
+| construct | result |
+|---|---|
+| `while` + `[` + `$((n+1))` | rc 0, N lines |
+| `until`, `for … in` | rc 0 |
+| `cat` of two files in one invocation | rc 0, both emitted |
+| `busybox grep -e ^dat`, two `-e` patterns | rc 0 |
+| command substitution `$(…)` | rc 0 |
+| `printf` | rc 0 |
+| `read` **without** `-t` | rc 0 |
+| `read -t` | 🔴 **`ash: read: line 1: illegal option -t`** |
+| `sleep 0.13` / `sleep .13` / `sleep 0.5` | rc 0, and they really sleep — 0.18 / 0.15 / 0.53 s against a `sleep 0` floor of 0.045 s |
+
+🔴 **One of my controls did not fire, and that is a measurement rather than a harness fault.** I predicted `[[ … ]]` is bash-only and this ash would reject it. **It has it, and it evaluates**: `[[ 1 -eq 1 ]]` takes the true branch and `[[ 1 -eq 2 ]]` the false one, so it is not simply always-true. The harness is still shown able to report failure by two other controls in the same run — an absent applet gives **rc 127** and an absent file **rc 1**.
+
+⚠️ **What this does NOT do.** It does not enumerate the builtin table; it probes the constructs one card needed. `cardcheck`'s guess list is still 推, and the honest change is that the specific words a card now types are 量.
+
+⚠️ **And the applet half is not new** — the run reproduced the same **50** applets § *What `busybox` here can actually do* already records, by a different route (running the binary rather than reading it). Two routes, one number.
+

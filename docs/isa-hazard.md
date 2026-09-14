@@ -361,6 +361,21 @@ single `nop` is sufficient and upstream's second one was not needed.** That is a
 finding about another project's fix, produced by measurement rather than by
 reading either source again.
 
+🟢🟢 **And so is `lu_sd_d0`, whose `dev` was empty for a different reason.**
+量 2026-09-14, the same two captures, identical in both: **OPEN**, value
+`B10CB10C`. `tools/isa-hazard.tsv:85 (storedata\tlu_sd_d0)`'s own `why` says
+this family *can disagree with `loaduse` and that disagreement would be the
+result*. **At d0 it does not disagree**, so the consumer being a store's data
+operand rather than an ALU operand changes nothing about when the load's value
+becomes available.
+
+🔴 **That reading had no row anywhere until 2026-09-14, and what found it was
+a pre-flight on a frozen card.** `bench/2026-09-14b`'s card rests ten `open`
+predictions on it and cites **`CPU-14`** for it — and `CPU-14` documents the
+`loaduse` family, not this one. The card could not be edited, so the reading
+got its own row: `SPEC.md` **`CPU-58`**. **A number a frozen card depends on
+and no table contains is the shape this file's § 5.3 exists to prevent.**
+
 ---
 
 ## 6. The controls, family by family
