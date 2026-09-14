@@ -1650,7 +1650,13 @@ and a prompt. Block recovered with one `DW` into `Q5-rb.log`, 7,593 bytes / 161
 lines. **`cells.run=0000000e` (14), `cells.void=00000008` (8)** — 22 accounted
 for, which is the arithmetic that says nothing was silently skipped.
 
-**Two channels, mechanically.** `tools/rbcheck.py` (new, ten controls): the
+**Two channels, mechanically.** `tools/rbcheck.py` (new; ~~ten controls~~ 🔄
+**2026-09-14: the count is deleted rather than corrected.** It was written when
+there were ten and has been wrong through 16, 23, 33, 40 and 49 without anything
+noticing. `tools/ci-expected.tsv` owns that number and `ci-census` compares it
+against what actually ran; a second copy in prose is `CNT-1`'s class, and the
+repair available here — because a machine-readable owner exists — is to stop
+stating the fact): the
 UART's `sum=`, the seal word `w640`, and `sum(w0…w639) − 0x10` are all
 **`C93E60B5`**; the three free margin words are `DEADC0DE`; and the 25
 field-to-word pairings of §12 agree **25 of 25** after one pairing in that table

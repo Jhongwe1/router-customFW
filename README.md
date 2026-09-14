@@ -297,17 +297,24 @@ whose `readline` writes its NUL only on the CR path.
 
 **[`docs/isa-prior-art.md`](docs/isa-prior-art.md)** — what this repository
 already held about this core's instruction set and its hazards, frozen before
-any `R1a`/`R1b` payload source existed. 45 rows on four evidence routes, three
+any `R1a`/`R1b` payload source existed. 45 rows on four evidence routes, ~~three
 of them on the die by one of our own payloads and eight with no evidence of any
-class. Its two populations are derived from `tools/hazlint` and
+class~~ 🔄 **2026-09-14 (sixty-eighth segment): 42 of them on the die by one of
+our own payloads (93.3 %) and NONE with no evidence of any class**, re-derived
+from `tools/isa-census.tsv` after seating 21 — the frozen 3-of-45 is kept
+verbatim in that file's § 6 because it is the figure its refutation condition
+was evaluated against. Its two populations are derived from `tools/hazlint` and
 `tools/isa-probe.sh` rather than chosen, and `tools/isacensus.py check` joins
 the derivation to the adjudication table in both directions.
 
 **[`docs/toolchain-prior-art.md`](docs/toolchain-prior-art.md)** — the same
 census for the toolchain axis, frozen before `R2c` is built. 59 rows, and its
 refutation condition fires where the ISA census's did not: 39 rows already have
-a desk reading against 3 on the die, because on this axis the strongest route
-costs no power. It carries a column the other one does not — whether a public
+a desk reading against ~~3~~ 🔄 **42** on the die, because on this axis the
+strongest route costs no power. 🔄 **The contrast survives the update and is
+sharper for it**: the toolchain axis reached 66 % as a by-product of thirty-two
+desk segments, and the silicon axis reached 93 % only by spending a power
+cycle. It carries a column the other one does not — whether a public
 source states the row's finding — and § 8 writes a 160-cell prediction down
 before the run that § 9 then tests.
 

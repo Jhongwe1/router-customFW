@@ -294,7 +294,7 @@ side are the whole point:
 
 | | route ① | any evidence | rows |
 |---|---:|---:|---:|
-| `R1a` + `R1b`, the die (`docs/isa-prior-art.md` § 6) | **3** (6.7 %) | 37 (82.2 %) | 45 |
+| `R1a` + `R1b`, the die (`docs/isa-prior-art.md` § 6) | ~~**3** (6.7 %)~~ 🔄 **42** (93.3 %) | ~~37 (82.2 %)~~ 🔄 **45** (100 %) | 45 |
 | `R2c`, the toolchains (§ 5 above) | **39** (66.1 %) | 57 (96.6 %) | 59 |
 
 Both totals are the whole table, derived plus declared, so the two rows are
@@ -305,7 +305,15 @@ gained two rows for them, and 🔄 **from 35/55 to 39/59 on 2026-09-13**, when
 `R1-pub-6`'s assembly produced four more (`TC-50` … `TC-53`). The ratio barely
 moves; the fact that a census grows when the record grows is the derivation
 working, and the fact that the prose has to be patched beside the generated
-block is `XNUM-1`, which is why it is done in the same commit.
+block is `XNUM-1`, which is why it is done in the same commit. 🔄 **2026-09-14
+(sixty-eighth segment): the DIE row moved for the first time, 3 → 42 and
+37 → 45**, re-derived from `tools/isa-census.tsv` after seating 21. It was
+found by a closeout ownership audit and not by a checker — the cells above sit
+**outside** the `<!-- tccensus: -->` markers, so nothing regenerates them, which
+is the same `XNUM-1` shape this paragraph already records, one row up. 🟢 **And
+the argument below survives the change intact**: the toolchain axis reached
+66 % as a by-product of desk work, and the die axis reached 93 % only by
+spending a power cycle. The contrast was never about which number is larger.
 
 🔴 **Thirty-nine of fifty-nine recorded toolchain findings already have a
 desk-執行 reading, and only two rows have no evidence of any class.** The

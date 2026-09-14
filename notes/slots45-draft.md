@@ -178,7 +178,7 @@ pressed+lit.
 | 2 | bit 6 then stays **0 for exactly 5.000 s** |
 | 3 | then alternation at **1.000 s** per level |
 | 4 | the first level of that alternation is **HIGH (dark)** |
-| 5 | after release, bit 6 latched **0**, held ≥ 152.1 s (`REG-37`) |
+| 5 | after release, bit 6 latched **0**, held ≥ ~~152.1~~ 🔄 **139.251** s (`REG-37`) — 更正 2026-09-14 (第六十八段): 152.098 是那份擷取的 `duration_s`，含它自己 `--idle 8.0` 的尾巴；量到的閂住區間是 **139.251348 s**，舊值高報 9.2 %。`SPEC.md:331` 是擁有者。這一行被 `bench/2026-09-14c/CORRECTIONS-block20.md` § 0.4 逐字指名過而當時沒改 —— 那張卡已凍結不能動，**這份草稿沒有凍結** |
 | 6 | the ring gives `(j_release − j_press)/100` ≈ the hold, `b0_n_release 1` |
 | 7 | integral cross-check `Δforeign/Δchk` over the hold ≈ **0.58–0.61** (量 0.608 / 0.573 / 0.609 on three seating-20 holds) |
 

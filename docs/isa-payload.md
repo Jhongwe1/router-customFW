@@ -480,8 +480,22 @@ it writes register zero and only the base is chosen.
   bytes, exactly `tools/reply-size.py`'s prediction. **All three channels read
   `AF7A728B` and 75 of 75 row lines are byte-identical between the UART and the
   read-back**; the eight margin words are all poison. The tool that should do
-  this is `tools/rbcheck.py`, and **it cannot yet** — two defects measured at the
-  desk before power: its payload tables know `probe1`..`probe3` only, and its
+  this is `tools/rbcheck.py`, and ~~**it cannot yet** — two defects measured at
+  the desk before power: its payload tables know `probe1`..`probe3` only, and its
   `UARTSUM` regex matches `sum=` where `probe4` prints `seal=`. Extending it is
   carried forward with tonight's capture as its on-device anchor, which is the
-  `C16`/`C39` pattern.
+  `C16`/`C39` pattern.~~
+
+  🟢 **2026-09-14 (sixty-eighth segment, `6ccf643`): it can, and that carried-
+  forward clause is DISCHARGED on its own terms.** `C45` and `C46` anchor on
+  exactly the two captures this section is about — `bench/2026-09-14/C1-P4rb.log`
+  with `C1-P4j.log`, and `C1-P5rb.log` with `C1-P5j.log` — so the `C16`/`C39`
+  pattern cashed rather than being re-promised. End to end through the CLI:
+  three channels agree, `AF7A728B` and `D72EB67D`, `rc 0`, margin 8 words and
+  8 poison. 🔴 **And the two defects above were symptoms.** The root cause is
+  that `MAGICS`, `PROGRESS`, `SRC` and `UARTSUM` are four copies of one fact —
+  which payloads exist and what they print — and nothing had ever compared any
+  of them against `tools/rlxprobe/`: the suite was 40 of 40 green on the day
+  `probe4` and `probe5` were built and again on the day `probe6` was.
+  `C40`…`C44` are the population control and its three positive controls.
+  `PROGRESS.md` `RB-1`.

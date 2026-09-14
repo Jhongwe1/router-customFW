@@ -640,9 +640,12 @@ worth having — and it is the same non-discriminating shape as the ULS row,
 accepted in all eight columns including `mips1`, which is precisely why § 6
 warns that the ULS row proves nothing.
 
-**③ Six rows have no evidence of any class, and they are all the same family**
-— 量 2026-09-12, and 🔄 **the first half of that heading expired on 2026-09-14;
-the second half is why the finding was worth having.**
+**③ ~~Six rows have no evidence of any class~~, and they are all the same
+family** — 量 2026-09-12, and 🔄 **the struck half expired on 2026-09-14 (all
+six read ExcCode 10 on the die); the second half is why the finding was worth
+having.** *(The strike was added on 2026-09-14 by a closeout audit: the
+annotation below already said the half had expired, but the heading still read
+as current, and a heading is what a reader quotes.)*
 `teq`, `tge`, `tgeu`, `tlt`, `tltu`, `tne` — the MIPS-II trap instructions. Not
 in `CPU-18`'s scan list, not probed by `isa-probe.sh`, absent from § 6's table.
 They are on `hazlint`'s watch list and ~~nothing else in this repository has

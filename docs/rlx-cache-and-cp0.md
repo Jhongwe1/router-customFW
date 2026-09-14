@@ -650,7 +650,10 @@ recovered with one `DW` into `bench/2026-08-30/Q5-rb.log`.
 **The two channels agree**, and that is now a tool rather than an eyeball:
 `tools/rbcheck.py` reports the UART's `sum=`, the seal word `w640` and
 `sum(w0…w639) − 0x10` all equal to **`C93E60B5`**, with three margin words at
-`DEADC0DE` and ten controls green. The 25 field-to-word pairings in
+`DEADC0DE` and ~~ten controls~~ 🔄 **`rbcheck`'s controls** green *(2026-09-14:
+the count is deleted rather than corrected — `tools/ci-expected.tsv` owns it and
+`ci-census` compares it against what ran; it had been wrong through 16, 23, 33,
+40 and 49)*. The 25 field-to-word pairings in
 `PREDICTIONS-B5-block0.md` §12 agree **25 of 25** once one pairing in that table
 is corrected — see the correction file.
 

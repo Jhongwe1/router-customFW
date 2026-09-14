@@ -465,7 +465,16 @@ always says yes*.
    🟢 **The correct `restamp` is 1, and that is `rbcheck`'s own control `C9`
    arriving**: both new payloads use `P_RESTORED 0xF0` / `P_SEALED 0xF1`, and
    because `ladder()` derives the value from the table rather than hardcoding it,
-   extending the table is the whole fix. Done by hand tonight: `seal=D72EB67D` on
+   ~~extending the table is the whole fix~~ 🔄 **2026-09-14 (sixty-eighth
+   segment, `6ccf643`): the table was extended and that was NOT the whole fix.**
+   Both defects are closed and `C46` now reads this very capture as a control —
+   but the root cause is that `MAGICS`/`PROGRESS`/`SRC`/`UARTSUM` are four
+   copies of *which payloads exist and what they print* with nothing comparing
+   them against `tools/rlxprobe/`, which is why the suite stayed 40 of 40 green
+   while three unreadable payloads were built. `C40`…`C44` are that population
+   control; `restamp = 1` is now derived from an extended ladder and `C47` is
+   `C9`'s 2026-08-31 prediction cashing. `PROGRESS.md` `RB-1`. Done by hand
+   tonight: `seal=D72EB67D` on
    all three channels, **24 of 24 rows byte-identical between the UART and the
    `DW` read-back**, and the eight margin words past the seal all poison.
    ⚠️ The read-back command is `DW 80A04000 233` — `RB_POISON_W`, not the `225`
