@@ -27946,3 +27946,186 @@ C2-UPR  794 + 20行 + 21回音 + 2提示符 =  837   量到  837   EXACT
 * `UP-AUD-1` 的 ③④ 本來被建議在上機前做完，**沒做**。③ 現在更好做，因為第二條 arm 已經跑過，那一節可以用量測而不是預測寫。
 * ⚠️ **`4a` 只有一次上機、一個 boot，沒有任何一列被重複過。** 下一次上機若有空格，重跑一次 `uprobe` 是最便宜的重複性證據。
 * `FW-70` 帶出一個新的小發現：**`DW <addr> 1` 在這個 loader 上印回四個字**（`03000000 00000000 00000000 10000000`）。這次安全 —— 起點在 `+0x0C`，`RBR`(`+0x00`)與 `IIR`(`+0x08`)沒被碰到 —— 但**卡片的安全論證建立在「只讀一個字」上，而那句話是錯的**。下一張卡片要約束的是**起始位址**而不是字數。
+
+## 2026-09-15 — 第七十四段（21:39 開場，桌面，**零電源循環**，板子全程斷電）：這個 repo 第一次有一份文件寫在它的量測之前，而寫它的時候抓到三個檔案一起斷言了一句頁面上沒有的話
+
+### 1. 結果
+
+**`docs/rlx-isa.md` 存在了。** `R1-pub-7` 的兩個產出物之一，十節，英文，**不擁有任何數字**，全部引 `SPEC.md` id 與 `bench/` 擷取名，一個 `FILE:NNN` 都沒有。
+
+🔴 **另一個產出物今晚不能寫，而簡報說它可以。** `PROGRESS.md:127` 逐字：「**The write-up**: `docs/rlx-isa.md`, and `docs/GATE-RESULTS.md` gains its **ninth** entry」。而 `docs/GATE-RESULTS.md` 第 3 行的契約是 **one entry per closed gate**，`R1-pub` 開著。寫第九則等於宣告一個沒關的 gate 關了。
+
+🟢 **所以「寫早了」被做成這個專案自己的形式：§ 8 是一份事前登記。** 對 gate 剩下的每一列，寫下這份文件在那一步落地後**會說什麼**，以及**什麼會否證它**。三條：`R1-pub-3` slot 2 的 D-cache 轉折點會落在 8 KiB、`4b` 的 `D-cost` 會只找到一列有成本（因為 `4a` 量到的可見面就是一列）、`R1-pub-6` 的選擇會用既有判準而不是新判準。**這個 repo 的每一份 `docs/` 檔到今天為止都寫在它的量測之後；一份寫在之後的文件只能同意它自己的證據。**
+
+### 2. 🔴🔴 §4 的否證條件被刪掉了，不是劃掉，而三個檔案都斷言它還在
+
+量，`git show cbd1d0d:docs/emulation-surface.md` 對 `0ff8c3c`：
+
+```
+cbd1d0d:184   ⚠️ 推 throughout. If the seating reads `sync` as SIGILL, `simulate_sync` is
+        186   single most informative outcome available, and it is worth the seating on its
+0ff8c3c:204   ~~⚠️ 推 throughout.~~ 🔄 2026-09-15: 量 throughout, …        ← 條件本身不見了
+HEAD   :216   "…rather than deleted, because a refutation condition that is quietly removed…"
+```
+
+seating 那次編輯只劃掉了 `⚠️ 推 throughout.` 三個字，**把條件本身刪掉了**，而同一節的括號句繼續斷言它被留下來。**假了三個 commit。**
+
+🔴 **斷言它的有三個檔案，沒有一個對過頁面**：那一節自己、`SPEC.md` `CPU-64`、以及**今晚新寫的 `docs/rlx-isa.md` —— 那一句是我從 `CPU-64` 抄的**。前兩者是引用局部視圖，第三個是同一個病在同一個晚上的第三次。
+
+⚠️ **沒有任何檢查器看得到這一類**：`spec-check`、`citecheck`、`xcheck sweep`、`ledgerscan check` 在它是假的期間**全部 rc=0**，而那是在動手之前先跑出來當基線的。劃除線是散文，沒有任何東西把「某段文字被保留了」這個宣稱接回那段文字。條件已按 `cbd1d0d` 原文還原。
+
+### 3. 🔴 `CPU-15` 的答案落在擁有者檔而沒落在索引，而它否證的是公開資料
+
+`SPEC.md` `CPU-15` 問「矽片有沒有 `lwl`／`lwr`／`swl`／`swr`」，值 `*(未定)*`，V 與 N 兩欄都是 `—`，而它自己的結案條件逐字是「**裸機 RI 處理器下執行一條 `lwl` 就結案**」。
+
+`probe4` 在 **2026-09-14（seating 21）** 就是那個實驗：裸機、帶自己的例外處理器、負控制 `special0e` TRAPS `ExcCode 10` 證明處理器會抓、正控制 MIPS-I 基線七列全 `RIGHT` 證明 payload 在執行。**四條全 `RIGHT`。**
+
+而 `CPU-15` 的 ⚠️ 反方欄寫著：*公開的 Lexra 說法是這族核心拿掉了這四條，而 LKML 的 LX5280 patch 明說 LX5280 沒有*。⚠️ **範圍收窄**：這是一顆 RLX4181 的讀數，LX5280 那一句沒有被碰到。⚠️ 而支持它的那條 `memcpy` 推論現在是**多餘**而不是被證實 —— 它推的是「若沒有就開不起來」，那是關於這台開得起來的推論。
+
+**三個控制在關它的過程裡各擋下一個真的錯：**
+
+* 🟢 我的 anchor 守衛**拒絕執行**：`CPU-15` 有**兩列**（§2 與 §17）。只改一列的話 `SPEC.md` 會一邊說關了一邊說開著 —— 而 §17 自己記著 `spec-check` 的 `C1` 只掃 §1–§16、看不到那裡，上一次是被人讀出來的（`CPU-25 幾何`）。這是第二個實例。
+* 🟢 `spec-check` `C3` 抓到我保留的歷史全文裡帶著 `*(未定)*` —— **刪除線對 `BLANK_RX` 不存在**，整列繼續讀成開著。§17 的 `FW-34` 記著同一個坑、`MAP-12` 是更早一次，**這是第三次，也是第一次由檢查器而不是由人抓到**。
+* 🟢 `citecheck` 抓到 baseline 有一列因此過期，並且直接寫出修法（`Repaired? delete the row.`）。
+
+### 4. 🔴 模擬面以「值」算是兩列而不是一列 —— `CPU-66`
+
+`tools/emupredict.py` 的 `C21` 是一個**會失敗的**斷言（每一列規則覆蓋的列兩欄值相同），而失敗的那一列是 `sc`：
+
+| | ① 裸機 `CU0=1` | ② Linux 使用者模式 |
+|---|---|---|
+| 判決 | `RAN` | `RAN` |
+| scratch 字（`read = m0`） | **`5A5A0FF2`** = `rt` | **`A5A5F00D`** = 種子原封 |
+
+🟢 **種子同源是建構出來的不是巧合**：`A5A5F00D` 是 `tools/isa-payload.tsv` 那一列自己的 `mem0` 欄，而 `uprobe` 逐字連結 `cells4.S`。
+
+🟢 **而同一列的 `why` 欄在兩個讀數之前就寫著兩者為何允許不同**：*without a preceding `ll` to the same address a correct `sc` has an unspecified outcome* —— 這顆 payload 沒有前置 `ll`。**所以量到的是方向：矽片存了而核心的模擬拒絕存，寬鬆的是矽片。**
+
+⚠️ **這顆 payload 說不出為什麼**：「根本沒有 link 語意」與「有 link 語意但沒有位址檢查」都預測矽片那個結果。⚠️ **而它不推翻 §4 的頭條**：以判決算仍然是一列，以值算是兩列；`ll` 兩欄在兩種意義上都相同。
+
+🔴 **子 agent 把機制歸給「context switch 清掉 `ll_bit`」，那是最弱的一環，而更好的解釋早就寫在表自己的 `why` 欄裡。** 進產出物前自己讀那一行，今晚第二次回本。
+
+### 4b. 🔴 收工稽核的第八種方法又找到三個擁有者檔，而其中兩個是我自己的錯
+
+五支閘門都綠了、寫上去也寫完了、完整 sweep 也跑完之後，反過來列舉「這一段做出什麼」再問誰擁有它：
+
+🔴 **① 我寫「這個 repo 裡一個字都沒有」提到 MIPS／Lexra 專利訴訟 —— 它有，三個地方。**
+`notes/lwl-mystery.md` 第 10 行有專利號（**US Patent 4,814,976**），`README.md:280` 有，
+`upstream/notes/hardware-inspection.md:109` 也有。我當時的 grep **被 `head -10` 截斷**，
+前十個命中全是 `notes/cache-model.md` 的 `settle`。
+⚠️ **「被截斷的清單」是這個專案自己列名的危害之一，而我就是這樣踩的。**
+🟢 **而正確的版本比我寫的強、也比我原本刪掉的強**，因為 `notes/lwl-mystery.md` 同一段還寫著：
+更早一次商標訴訟的和解條件，是要求 **Lexra 把自己的產品「描述」成不實作未對齊載入儲存**。
+所以那個公開描述有一部分是一次和解要求的描述。讀 —— 公開帳本說這四條不在；
+量 —— **這顆 RLX4181 四條全部執行而且算出事前導出的常數**。
+⚠️ 一顆 die，不碰 LX5280 那一句，**也不說那個描述在寫下的當時是假的**。
+`docs/rlx-isa.md` § 1 已改成有來源的版本。
+
+🔴 **② 我寫「`CPU-15` 被答了十八天沒人關」—— 錯的。**
+量：`docs/isa-prior-art.md` 第 199 行在 **2026-09-14 當天**就寫了
+*~~`CPU-15` names the closer: one `lwl` under a handler of ours~~ 🔄 **that closer ran***，
+帶著讀數。**擁有者檔記了，而索引沒有。**
+🔴 而真相更尖銳：`CLAUDE.md` 的規則逐字是「一個發現或一個更正先落在擁有它的檔案，
+**並在同一個 commit 落在 `SPEC.md`**」—— 被破的是這一條，不是「沒人注意到」。
+而 `SPEC.md` §17 那一列同時落後，`spec-check` 的 `C1` 看不到 §17。
+
+🔴 **③ `README.md` 兩處過期，而它們是因為這件事才過期的。**
+`:38-44` 寫著 `lwl`／`lwr` 是**推**、「Neither is a measurement」、
+並且「`R1a` 是一條 `lwl` 之遙」—— 那條 `lwl` 在 2026-09-14 跑了。
+`:280-281` 寫著「Lexra's cores implement MIPS I **without them**」—— 對這顆已知為假。
+兩處都就地劃掉並補上量測。
+
+🟢 **④ 而最便宜的那一件是可發現性**：今晚寫的 `docs/rlx-isa.md`
+與寫了一整天的 `docs/emulation-surface.md` 在 `README.md` 裡**都沒有任何連結**。
+一份沒有任何地方連得到的文件，對第一次看的人而言等於不存在。兩段 blurb 補上。
+
+### 4c. 🔴 完整 sweep 的一紅，以及它為什麼不能算修好了
+
+`tools/desk-sweep.py run`：**90 declared, 2 skipped, 88 ran, 85 green, 2 expected-red, 1 unexpected**，
+1,579.7 秒，而且 `the source did not move` —— sweep 期間沒有動樹。
+⚠️ **背景通知說 exit code 0，而腳本裡讀到的是 `SWEEP RC=1`** —— `CLAUDE.md` 記的那個陷阱，
+最後一個命令是 `echo`。**退出碼只能從腳本檔裡面讀。**
+
+那一紅是 `text/test-citecheck` 的 `HEAD is clean against the committed baseline — expected 0, got 1`。
+診斷：`citecheck --rev HEAD` 兩個 `CITE-ROT`，都是
+`PROGRESS.md:1707 cites SPEC.md:658 -- that row is now at line 659`；
+工作樹本身 **rc=0**。所以它是「工作樹超前 HEAD」的產物，commit 之後會消失。
+
+🔴 **但那不是修好了，而且理由值得寫下來。** 工作樹之所以綠，是因為那個引用被釘住的**舊文字整個消失了**
+（`CPU-15` 兩列今晚都重寫了），所以 oracle 沒辦法說它「移動了」。
+而 `SPEC.md:658` **仍然指向錯的列** —— 現在是 `CPU-04`，而 `PROGRESS.md:1707` 自己寫著那裡是 `CPU-25`。
+**靠證據消失而變綠，是錯的那種綠。**
+⚠️ 而那一列裡的行號**同時是資料**（它記的就是「哪幾個行號當時是錯的」），
+把它們換成 id 會毀掉那個紀錄 —— 所以不動，記成 `CITE-2` 的第十二個實例。
+🔴 **同一個 `SPEC.md:658` 在三個時刻是三個不同的列**：
+baseline 寫時是 `CPU-15`、第六十六段量到是 `CPU-25`、現在是 `CPU-04`。
+
+### 5. 🔴 我自己的缺陷，照原樣記
+
+1. **我在 `docs/rlx-isa.md` 斷言 §4 的否證條件「struck in place」，從 `CPU-64` 抄的，沒對過頁面** —— 而它當時是假的。§2 那件事的第三個斷言者是我。
+2. **我給 emupredict 的 group map 漏了 `COP1`。** 它貢獻 **0 個新列**，所以是最容易漏的那一格；工具的 `population()` 會因此**拒絕**而不是少算。
+3. **我給 UP-AUD 的算式是類別滑動**：「32 + 12 = 44 census rows」—— 32 數的是 census 列、12 數的是 payload 列，44 是「census 覆蓋到的 payload 列」。census 那一側是 **37 of 39**。兩個方向都自洽、一個是錯的，而那正是 memory 裡記的最難抓的型態。
+4. **我給 mustrun 的範圍配方是 commit 不是 push。** `b40e40c` 自己的 diff 沒有任何 bench 擷取 —— 那些在同一次 push 的兩個 commit 之前。CI 一次 push 跑一次。子 agent 沒有特例化，加了 `H7b` 當控制。
+5. **我用 `sh` 跑 `test-file-modes.sh`**，而它報綠、量到零。用錯的是我；暴露出來的是工具的缺陷（§6）。
+6. **我在 `rlx-isa.md` §1 寫了 Lexra 因授權拿掉未對齊指令的歷史** —— repo 裡 `patent|lawsuit|litigat` 零命中，而且被 §3 打臉（四條在這顆上全 `RIGHT`）。自查抓到，改成 `CPU-15` 的 ⚠️ 反方那個有來源的版本，而那個版本比原本的強。
+7. **我保留 `CPU-15` 歷史全文時把 `BLANK_RX` 保留字帶進來**（§3 第二個控制）。
+
+### 6. 🔴 一個收工必跑的閘門報綠而量到零，已修
+
+`tools/test-file-modes.sh` 是 `CLAUDE.md` 要求每次收工前跑的兩個閘門之一。量，同一棵樹兩種跑法並排：
+
+```
+bash tools/test-file-modes.sh   ->  92 recorded executable,  3 passed, rc 0
+sh   tools/test-file-modes.sh   ->   0 recorded executable,  3 passed, rc 0
+```
+
+`ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"` 是 bashism；dash 下 `BASH_SOURCE` 不存在，`ROOT` 跑到 repo 外面，`git ls-files` 印兩行 `fatal:`，而 `found` 為空**正是這支 suite 的成功分支**。
+
+**兩次跑在判決與退出碼上完全一樣，唯一差別是 `ok` 旁邊那個數字。** 它有掃描邏輯的正控制（合成 repo，一個方向一個違規），**沒有「掃描確實跑過這個 repo」的控制**。補上母體與兩側控制（不是 repo 的目錄必須產出 ZERO、這個必須不是），**3 → 5 案**，`ci-expected.tsv` 同步。驗過兩個方向：`bash` **5 passed**、`sh` 現在 **rc=1** 並指名原因。
+
+### 7. 🟢 兩支新工具，而它們的價值在控制不在功能
+
+**`tools/emupredict.py`（22 案）** —— 欄① → 欄② 的規則產生器。**驗收測試是它從欄①**單獨**重新導出凍結卡片那一行**：`verdict (user arm): 75 row(s), RAN 12, RIGHT 16, TRAPS 46, WRONG 1`，欄②從頭到尾沒有被查閱，然後與實測逐列比對 **0 findings over 75 rows**。`C8`／`C9`／`C10` 各從規則表的**副本**刪掉一個例外並要求預測那一行變成**寫死的錯誤值**（拿掉 `sync` → `RAN 11 / TRAPS 47`；拿掉一列 `cache` → `RAN 13 / TRAPS 45`；拿掉五列 → `RAN 17 / TRAPS 41`）—— **一支產不出不同答案的規則產生器什麼都沒證明**。`C19` 從同一套規則重新導出 `docs/emulation-surface.md` §3 人寫的 `why` 欄（37 列比對、2 列排除、0 不一致），`C20` 在那個檔的副本裡種一個錯格子並要求被報出來。
+
+**`tools/mustrun.py`（23 案）** —— 給一個 commit 範圍，指名哪些 CI suite 讀到了變動的檔案。它存在是因為 **2026-09-13 到 09-15 之間六次 CI 紅，六次全是「一個關於這個 repo 自身內容的已提交宣稱過期」**，而修法（跑完整 sweep）要 ~1,000 秒所以會被跳過。**它不取代 sweep，它讓跳過變成可稽核的。**
+
+🔴 **它的控制是七個歷史正控制加兩個控制的控制。** `H1`–`H7` 各重播一次那些紅掉的 run，範圍是 **CI 實際測到的那一次 push**，要求 `mustrun` 指名那個紅掉的步驟。`H7b` 是 `H7` 的控制：`b40e40c` 自己那一個 commit **必須不**指名 `test-boot-timeline` —— 否則一支「什麼都指名」的工具會拿到 7 of 7。`H8` 是 `H1`–`H7` 的控制，因為**其中三個是弱的**：`H3`／`H4`／`H5` 指的 suite 掃 `git ls-files`，任何非空 diff 都會指名它們；`H8` 要求至少四個指名一個**不**掃全樹的 suite，量 **4 of 7**。
+
+🔴 **而負控制在真樹上不存在，工具自己說出來**：量 **0 of 4,198** 個追蹤路徑會指名零個步驟（十一個 live 步驟掃 `git ls-files`），所以 `C5` 跑在合成 fixture 上，而 `C11` 斷言那個**理由**——若哪天沒有任何 live 步驟掃全樹，`C11` 會紅，負控制就在真樹上可用了。
+
+🟢 **第一次實戰就在這一段自己的樹上**：**49 of 90 步被指名，超過一半**，工具印出「the cheap move is `desk-sweep.py run`」。它也自己註記 `ci.yml` 本身變了、步驟清單移動過。
+
+### 8. 🔴 下一段不能是上機，而這是量出來的
+
+簡報說下一個 session 是「`R1-pub-3` 第二次 ＋ `R1-pub-4b` 同 session 上電」。量：**兩半的 payload 都不存在。**
+
+* **slot 2 的階梯 leaf 沒有寫。** `cells.S:397` 的簽名是 `rlx_tc_walk(u32 base, u32 passes, u32 *raw_ks1)` —— 沒有 footprint 參數，footprint 硬寫在 `cells.S:426`。而 `cells.S:454` 逐字禁止在裡面加參數。階梯要一片新 leaf ＋ 新呼叫端 ＋ 新結果字 ＋ 一次 `probe3` 重建。⚠️ `docs/rlx-cache-and-cp0.md` 那一節寫著「Both are additions to `rlx_tc_walk`'s caller, **not new assembly**」，而**同一句話的後半自己說 the ladder gets its own leaf** —— 一片 leaf 就是新組語。就地劃掉。
+* **`4b` 的尺在晶片上了，它的程式不在。** 🟢 `rtl819x-timer.c` 已經在 `/proc` 印 `tc0cnt=%08X`，所以 `R1C-1` 選的尺③ 隨 `r59`／`up2` 上線了。🔴 但 `uprobe` 是一次性 trap 普查，每個編碼跑一次；量成本要「N 次模擬路徑對一個控制」，那是另一支程式 → 新的 `config/` 檔 → **`RECIPE_ID` 移動 → 一次完整 kernel 重建 → 新卡片**。
+
+→ **真實順序是 75 建置＋凍卡片、76 上機。**
+
+### 9. 🔴 slot 2 的事前登記有一個混淆，它自己沒寫，補在卡片存在之前
+
+`docs/rlx-cache-and-cp0.md` 那一節逐字寫著「**轉折點就是 D-cache 容量**」，否證條件只有「六點全平」與「立刻上升」。
+
+而 `CPU-46`：**D-MEM 是 8 KiB，D-cache 也是 8 KiB** —— 同一個數字。`CPU-25` 自己的 ⚠️ 說「任何『大小』量測都分不開這兩個結構」，而關聯度躲得過是因為 **scratchpad 沒有 set**；**容量躲不過**。
+
+兩個讀數讓它很可能不活而**不是被排除**：讀 `CPU-24`——這台的 loader 程式區**一條 COP3 都沒有**（掃 opcode `0x13`，97 命中全在 `0x8040A5B8` 以上且全是 ASCII），所以窗在 reset 預設；量 `bench/2026-08-30/QJ.log`——`m.dmembase=20000000` 而 `m.dmemtop=00000000`，**base 沒有配對的 top 不算一個窗**，那是 `docs/probe3-cells.md` block 0 自己的規則，也正是 `w-imem` 記成**未定**的理由。
+
+🟢 **鑑別器從兩個結構各自「是什麼」導出來：scratchpad 是位址窗，cache 不是。** 同一個 footprint 跑在**兩個 arena base** 上 —— 兩處同價 ⇒ cache，只有一處有 hit floor ⇒ scratchpad 而階梯的頭條作廢。成本是一片本來就要寫的 leaf 上多一個參數。
+
+### 10. 閘門
+
+`spec-check` **rc=0**（「every check that can fail, did not」）· `citecheck` **rc=0**（36＋8）· `test-file-modes` **5 passed，93 recorded executable of 4,198 tracked** · `xcheck sweep` **rc=0**（1,242 artefacts、3 identities、0 disagreements）· `ledgerscan check`／`quarantine` **rc=0** · `emupredict --self-test` **22/22** · `mustrun --self-test` **23/23** · `ci-census --only emupredict,test-file-modes` 兩支都 ok。
+
+`SPEC.md` 的行號約束守住：`CPU-15` 兩列（107 與 659，都在 672 之上）**就地不增減行**，778 → 778；`CPU-64` 就地；`CPU-66` 進 §19。`PROGRESS.md:124` 就地，1,870 → 1,870。
+
+### 11. 帶走
+
+* 🔴 **`isapay verify` 剩下的 52 個 finding 仍然沒有稽核**（第七十三段帶下來的，這一段也沒做）。
+* 🔴 **`tools/isa-payload.tsv` 的 `special0e` `why` 欄與生成的 `cells4.S` 仍寫 `C2`**，而文件已改叫 `C5`。**刻意不修**：量，`cat uprobe.c cells4.S probe4rows.h rlxasm.h | sha256sum` = `a87be346bb83e7f9`，正是 seating 23 擷取印的 `BUILD_ID`；正控制——在 `cells4.S` 尾巴加一行註解，digest 變成 `4ac4cd1f6c0b61ed`。**改那個 `why` 欄會把 digest 移離那次擷取。** 要在 nonce 本來就會動的那一次一起改。
+* 🔴 **`PROGRESS.md:1707` 引用 `SPEC.md:658`，而那一行在三個時刻是三個不同的列**（baseline 寫時是 `CPU-15`、第六十六段量到是 `CPU-25`、現在是 `CPU-04`）。`CITE-2` 說 11 of 13 已經錯了；這是第十二個，而且出現在一句**記錄前一次引用錯誤的更正句**裡。擁有者是 `R1-pub-7`。
+* 🔴 **`tools/isapay.py` 的 docstring 寫 `verdict LOG --base A`，而 parser 只收 `--arm {qemu,device,user}`** —— 照 docstring 打會 exit 2。
+* ⚠️ **`docs/emulation-surface.md` 的標題長度 117 字元**，這個檔的標題常態約 96；插進去的是結果那一句，要退回只退那一句。
+* ⚠️ **scratchpad 是共用的**，這一段有一支 agent 的腳本被另一支覆蓋。下次 fan out 前先講好命名。
+* ⚠️ `UP-AUD-1` 還開著：**①②⑤ 未動、⑥ 的工具普查半未動、⑦ 三件未動**；③④ 今晚收掉。

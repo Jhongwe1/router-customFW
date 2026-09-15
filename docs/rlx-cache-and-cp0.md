@@ -911,16 +911,72 @@ says lines **are** resident. The two questions that remain are **capacity** and
 | **`t-hit` ladder** | the same walk at footprints **1, 2, 4, 8, 16, 32 KiB**, `passes` scaled so the load count is constant | per-load cost stays at the ~0.07 ns hit floor up to the D-cache size and rises toward the ~105 ns miss cost above it. **The knee is the D-cache size**, measured for the first time. Refuted if the cost is flat across all six (no cache, and then `ks0`'s 0.07 ns needs another explanation) or rises immediately (the cache is smaller than 1 KiB) |
 | **`t-hit` A–B–A** | KSEG0 warm → KSEG1 → **KSEG0 again** | if LX4189 § 5.2 transfers — *"if the location is resident in the data cache it will be invalidated"* by an uncached read — the second KSEG0 leg reads **cold**, ~138 ns/load. If it reads ~0.07 ns, an uncached read does **not** invalidate, and `c-G`'s question is answered from the timing side with no `CCTL` primitive at all |
 
-Both are additions to `rlx_tc_walk`'s caller, not new assembly. ⚠️
-`cells.S:454 (NOT A GENERALISATION OF rlx_tc_walk)` forbids adding a parameter **inside** `rlx_tc_walk` — its
-body is what the published numbers were measured against — so the ladder gets
-its own leaf, exactly as `rlx_tc_stride` did for Group F.
+~~Both are additions to `rlx_tc_walk`'s caller, not new assembly.~~ 🔄 **The
+first half of that is wrong and the second half of the same sentence says so.**
+The A–B–A cell is a caller change; **the ladder is not** — a footprint
+parameter is exactly what `rlx_tc_walk` does not take, so the ladder is a new
+leaf, and a leaf is new assembly. ⚠️ `cells.S:454 (NOT A GENERALISATION OF
+rlx_tc_walk)` forbids adding a parameter **inside** `rlx_tc_walk` — its body is
+what the published numbers were measured against — so the ladder gets its own
+leaf, exactly as `rlx_tc_stride` did for Group F. **That leaf does not exist**
+(量 2026-09-15 at the desk, over `tools/rlxprobe/cells.S`: the only walk
+signatures present are `rlx_tc_walk(base, passes, raw_ks1)` and
+`rlx_tc_stride(base, stride, count, raw_ks1)`), so slot 2 cannot be carded
+until a `probe3` carrying it is built. The card cannot pin an image that does
+not exist.
 
 🔴 **And this makes `CF-1` moot in the useful direction.** The stop-loss asks
 what happens after two seatings *if cell A still cannot be made to hold*. Cell
 A does not need to be made to hold — the line was always resident, and the
 question it was gating is answered. What the next seating buys is the
 **pre-registration**, not the answer.
+
+#### 🔴 The ladder as specified cannot tell a cache from a scratchpad, and this section did not say so
+
+**Added 2026-09-15 at the desk, before any card exists.** The two cells above
+were written in this file and nothing in them mentions the local memories.
+
+量 `SPEC.md` `CPU-46`: this core has a **D-MEM scratchpad of 8 KiB** beside the
+D-cache, and 讀 the part datasheet's own first page gives the **D-cache as
+8 KiB** as well. **They are the same number.** `SPEC.md` `CPU-25`'s own ⚠️
+already states the consequence for the instruction side — *I-MEM and the I-cache
+are both 16 KiB, so any measurement of "size" cannot separate them* — and says
+associativity escapes it **because a scratchpad has no sets**. 🔴 **Capacity has
+no such escape.** A knee at 8 KiB is exactly what an 8 KiB D-cache predicts and
+exactly what an 8 KiB D-MEM predicts, and the ladder as written above has no
+cell that distinguishes them.
+
+**Two readings say the confound is probably not live, and neither closes it:**
+
+* 讀 `SPEC.md` `CPU-24`: **this unit's loader region contains not one COP3
+  instruction** — a sweep of primary opcode `0x13` returns 97 hits, all at or
+  above `0x8040A5B8` and all inside ASCII. So the loader never writes the CP3
+  base/top registers and the windows sit at their reset defaults.
+* 量 `bench/2026-08-30/QJ.log`, `probe3` Group M at the loader prompt:
+  `m.dmembase=20000000` with `m.dmemtop=00000000`. **A base without a top above
+  it is not a window**, which is `docs/probe3-cells.md` block 0's own rule, and
+  it is why `w-imem` is recorded **未定** rather than *the scratchpad is off*.
+
+⚠️ **By this project's own rule 未定 is not 排除**, and the quantity slot 2
+measures is the one the confound attacks. So the ladder needs a discriminator,
+and there is a cheap one that follows from what the two structures *are*.
+
+**The discriminator: a scratchpad is an address window and a cache is not.**
+Run the ladder's boundary footprint from **two arena bases** — the one the
+existing cells use, and a second at least the scratchpad's size away from it.
+
+| outcome | what it means |
+|---|---|
+| the two bases give the **same** per-load cost at every footprint | the structure follows the data, not the address ⇒ a **cache**, and the knee is the D-cache size |
+| the hit floor appears at **one** base and not the other | the structure is fixed to an address range ⇒ a **scratchpad**, and the knee is the D-MEM size. The ladder's headline is void and what it measured is `CPU-46`'s window, which no reading has ever had |
+| neither base shows a floor | the arena is outside both; the run says nothing and is not a refutation of either |
+
+🟢 **It costs one parameter on a leaf that has to be written anyway, and it
+carries its own control**: the second base is chosen from the *first* base's
+measured floor, so a run in which neither base has a floor is visibly different
+from a run in which one does. ⚠️ **What it does not do** is locate the window —
+that is `w-imem`'s job and `w-imem` is still 未定 because CP0 20 is write-only
+and *identical* is also the no-op reading.
 
 ### ⓒ — answered, positively, with the positive control that makes it mean something
 
