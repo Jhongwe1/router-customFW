@@ -209,6 +209,8 @@ conclusion and silent about the inputs.
 | `TC-54` | tc | y | . | . | . | 量 | `TC-15` | one C statement compiled in six (toolchain, -march) columns emits the same two instructions in all six, and the only difference is whether a `nop` sits between them -- `hazlint` reads 0/1/1/0/1/1 with zero unresolved successors everywhere. What is held is the COMPOSITION of `TC-15`'s desk split with `CPU-14`'s silicon reading, not a second measurement of either. And the fragment was chosen by refutation: the obvious one had its load delay slot filled with `jr ra` in all nine configurations tried, so it could not have exposed anything |
 | `TC-55` | tc | y | . | . | . | 量 | `TC-51` | the load-delay padding follows the `-march` FLAG and not the rsdk release: the 4181 release at `-march=5281` does not pad and the 5281 release at `-march=4181` does, in all three drops. It does NOT close `TC-q`, which is about whole-`vmlinux` counts and not this shape. It also holds that provenance cannot come from the artefact: all six rsdk objects read `0x1001 ... mips1` in the ELF header whatever `-march` produced them |
 | `TC-56` | tc | y | . | . | . | 量 | `TC-50` | a 32-bit rsdk driver cannot stat a source file on DrvFs -- `cc1` dies with `Value too large for defined data type` against an inode that does not fit a 32-bit `struct stat`, while the same bytes on ext4 compile. What is held is that the message names the C file and therefore reads as a defect in it; what is NOT held is any claim about which other vendor binaries share the limit, because only the compiler driver was tested |
+| `TC-57` | tc | y | . | . | . | 量 | `TC-05` | `TC-05`'s own criterion -- pass `hazlint` with 0 violations -- run for the FIRST time over a whole `libc.a`, in all three releases, two scans each: the linked `-Os -static` sample and `ar x` plus `ld -r` so no member boundary is read across. 1.3.6-4181 reads 0 over 19,096 loads with 4,051 nops (21.21 %); 1.3.6-5281 reads 140 and 4,574 over 19,141 with ONE nop (0.01 %); 1.5.5-5281 reads 128 and 3,741 over 14,491 with none. It discriminates uniquely and selects 1.3.6-4181. Two bounds: `hazlint --isa` is rc=1 in all three, so reading the criterion as `--isa` 0 as well selects nothing; and 1.5.5 is eliminated by violations and NOT by `lwl`/`lwr`, which this die executes |
+| `TC-58` | tc | y | . | . | . | 量 | `TC-57` | the first binary this project has compiled that runs as a Linux process -- `R1c`'s column-2 instrument, 29,184 stripped, 40,188 ELF, entry 0x400160, flags 0x1005 noreorder cpic o32 mips1, no `PT_INTERP`, 75 `_w` symbols, `hazlint` 0 violations in 938 loads. `R1C-1-b`'s literal zero-`break` gate is NOT met: exactly two, both inside `__GI_abort`, counted by opcode rather than by a disassembler's mnemonics. The gate is bounded rather than waived |
 | `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep, recorded under a `CPU-*` id that a `TC-*` derivation cannot see, which is what a declared row is for. 🔴 Its headline -- 1.3.6 emits zero `lwl` and 1.5.5 emits four -- was narrowed on 2026-09-13: the two generations' raw drivers agree at zero and the asymmetry is the 1.5.5 wrapper injecting `-fuse-uls`. See `TC-50` |
 | `TC-01` | tc | . | y | y | . | 量 | `TC-09` | this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2 |
 | `TC-02` | tc | . | y | . | . | 推 | `TC-02a` | the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark |
@@ -228,7 +230,7 @@ conclusion and silent about the inputs.
 | `lexra-binutils-patch` | tc | . | . | y | y | — | `TC-13` | 🔄 2026-09-13: `SPEC.md` `CPU-50` now owns a reading taken FROM this patch -- the 32-bit opcode table's Lexra entries and their membership words -- and `probe4` issues thirteen of them. That is a CPU-axis row, so the sentence below stays true as written. `docs/isa-payload.md` § 9. the public binutils-2.24 Lexra patch. `SOURCES.json` has held its `INSN_*` masks and its RLXA/RLXB groupings since the entry was written, no `TC-*` row owns it, and nothing had joined it to `TC-13`. 🔴 The first cite here was the entry's own phrase `100+ Lexra-proprietary mnemonics`, and correcting that phrase to the measured counts BROKE it -- L3 caught the dangling citation on the same run, which is what a declared row's cite is for. It now names the entry by id, and the entry moved to `documents` with a sha256 as its own text instructed |
 | `lexra-gcc-patch` | tc | . | . | y | y | — | `TC-15` | the public gcc-4.8.4 Lexra patch: `lwl`/`lwr`/`swl`/`swr` generation disabled for Lexra targets, conditional move gated on `INSN_RLXB`, and `-mno-bdsl` for BRANCH delay slots -- which is not the load-use delay and the distinction has to be kept |
 | `rebuild-tenth-cell` | tc | . | . | y | . | — | `TC-18` | the synthesised `rsdk-1.5.5` at `-march=4181`: 推, because the 1.5.5 wrapper refuses that `-march` and the flags were reconstructed from its own log. A column of `R2c`'s table that no toolchain on this disk can produce |
-| `TC-05` | tc | . | . | . | . | — | `TC-14` | a DECISION, and half of it is still blank. The environment half closed 2026-08-28; the userspace half is `R7` and the never-built T-modern column is `R2c` itself |
+| `TC-05` | tc | . | . | . | . | — | `TC-14` | a DECISION, and half of it is still blank. The environment half closed 2026-08-28; the userspace half is `R7` and the never-built T-modern column is `R2c` itself. 2026-09-15: the userspace half is no longer blank as a READING -- `TC-57` ran the criterion this row itself names over all three candidates and it discriminates uniquely. The row stays a DECISION because the `R7` gate decision is still `R7`'s; what changed is that it now has a measurement under it rather than a deferral |
 | `TC-h` | die | . | . | . | . | — | `TC-22` | 🔴 the only row in this census whose subject is the silicon: does a conditional move in a load delay slot READ its destination. Owned by `R1a`, no evidence of any class, and the reason `TC-22` stops where it does |
 <!-- tccensus:r2c end -->
 
@@ -255,12 +257,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:counts begin -->
 | | ① toolchain in hand | ② artefact | ③ vendor material | ④ nothing | ⓟ public | total |
 |---|---:|---:|---:|---:|---:|---:|
-| `R2c` recorded findings | 42 | 10 | 8 | 2 | 6 | **62** |
+| `R2c` recorded findings | 44 | 10 | 8 | 2 | 6 | **64** |
 | toolchain releases | 4 | 1 | 2 | 0 | 1 | **7** |
 
 | subject | `R2c` rows | toolchain rows |
 |---|---:|---:|
-| tc | 57 | 7 |
+| tc | 59 | 7 |
 | die | 1 | 0 |
 | both | 4 | 0 |
 <!-- tccensus:counts end -->
@@ -270,7 +272,7 @@ conclusion and silent about the inputs.
 <!-- tccensus:marks begin -->
 | `SPEC.md` V mark | ① | ② | ③ | ④ | declared disagreements |
 |---|---:|---:|---:|---:|---:|
-| 量 | 26 | 2 | 0 | 0 | 0 |
+| 量 | 28 | 2 | 0 | 0 | 0 |
 | 讀 | 15 | 6 | 4 | 0 | 15 |
 | 推 | 0 | 2 | 1 | 0 | 3 |
 | — | 0 | 0 | 0 | 1 | 0 |

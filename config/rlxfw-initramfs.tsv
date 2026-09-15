@@ -12,8 +12,14 @@
 # WHAT IS DELIBERATELY NOT HERE.  The vendor's own /init (a busybox symlink,
 # which runs /etc/inittab and brings up boa, the switch and the wireless) is
 # not used.  R3's first boot is a ladder and rung 1 is "a shell", so /init is a
-# four-line script of mine.  That is the only executable content in the image
-# that is not this unit's.
+# four-line script of mine.  ~~That is the only executable content in the image
+# that is not this unit's.~~
+# 🔄 2026-09-15: there are TWO.  `/bin/uprobe` below is `R1c`'s column-②
+# instrument and the first binary this project has compiled that runs as a
+# Linux process.  Decision B is unchanged and this is why: NOTHING EXECS IT.
+# `/init` does not, so the boot is still the vendor's shell and the shell is
+# still not the new thing; the binary is typed at that shell, by an operator,
+# after the boot the card predicts.
 #
 # SIZE.  量 2026-09-15, and there are TWO totals here that are easy to read as
 # one.  The FIVE ELF files below total 608,828 bytes (579,644 for this unit's
@@ -28,13 +34,19 @@
 # their DIFFERENCE was checked.  `mkinitramfs build` recomputes the total on
 # every run: if it and this comment disagree, the tool is right and this line
 # is stale.
-# 🔴 This block used to say the headroom was 2,395,932 bytes, and 量
-# 2026-09-15 that number describes a kernel from before the drivers
-# landed.  RUNSHEET.md's P9 and notes/kernel-build.md record the live
-# figure: decompressed 3,472,384, margin 1,770,496, 66.2 % of the
-# 5,242,880 ceiling (notes/kernel-build.md 3.4).  uprobe is 1.6 % of that
-# margin.  The ceiling is only actually CHECKED when mkinitramfs.py is
-# given --kernel-image; without it the tool says so and checks nothing.
+# 🔴 This block used to say the headroom was 2,395,932 bytes, which describes
+# a kernel from before the drivers landed.  🔴 AND THE FIRST CORRECTION
+# REPLACED IT WITH ANOTHER PRE-DRIVER NUMBER -- 3,472,384 / 1,770,496 /
+# 66.2 %, which is 量 2026-08-28 on `quiet`, the same objection word for
+# word.  The closeout audit caught it; nothing in the tree could have.
+#
+# 量 2026-09-15 on the image this declaration actually built, `up1`, with
+# `mkinitramfs build --kernel-image`: decompressed **3,609,088**, margin
+# **1,633,792**, **68.8 %** of the 5,242,880 ceiling -- the highest this
+# project has built.  uprobe is 29,184 of that margin, **1.79 %**.
+# The ceiling is only actually CHECKED when mkinitramfs.py is given
+# --kernel-image; without it the tool says so and checks nothing, and both
+# wrong numbers above were quoted from a file rather than measured here.
 # 🔴 The line here said "The 47 busybox symlinks" and 量 2026-08-30 there are
 # THIRTEEN `slink` rows, ELEVEN of them pointing at busybox (the other two are
 # the loader's search names for uClibc). 47 is the count of NOTHING in this
@@ -53,7 +65,8 @@ dir	/tmp	-	1777	rlxfw	MINE, and the check found it: this unit's dump has /tmp as
 dir	/var	-	0755	unit	-
 dir	/etc	-	0755	unit	-
 
-# --- the one file in the image that is mine, and it says so on the console ---
+# --- the two files in the image that are mine.  Only the first says so on
+#     the console: the second is never executed by the boot ---
 file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discriminator, mounts /proc and /sys, execs a shell
 
 # --- and the one binary of mine, which nothing at boot runs ---
@@ -62,7 +75,7 @@ file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discr
 # build/, deliberately outside config/: RECIPE_ID is `find config -type f`
 # with no exclusions and does not consult .gitignore, so an object file
 # left under config/ would silently move the id the board prints.
-file	/bin/uprobe	$REPO/build/rlxfw-user/isaprobe/uprobe	0755	rlxfw	R1c's column-2 instrument and the FIRST binary this project has compiled that runs as a Linux process. 29,092 bytes stripped, static, no PT_INTERP. Links tools/rlxprobe/cells4.S verbatim, so the 75 encodings probe4 ran bare metal are the same bytes here. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
+file	/bin/uprobe	$REPO/build/rlxfw-user/isaprobe/uprobe	0755	rlxfw	R1c's column-2 instrument and the FIRST binary this project has compiled that runs as a Linux process. 29,184 bytes stripped, static, no PT_INTERP (🔴 this said 29,092 for one commit -- the manifest value from the build before the last, contradicting the SIZE block nine lines above it; exactly the self-consistent-pair trap that block was rewritten to name). Links tools/rlxprobe/cells4.S verbatim, so the 75 encodings probe4 ran bare metal are the same bytes here. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
 
 # --- this unit's own binaries, unmodified ---
 file	/bin/busybox	$UNIT/bin/busybox	0755	unit	273,332 bytes; NEEDED = libc.so.0, libgcc_s.so.1; interp /lib/ld-uClibc.so.0

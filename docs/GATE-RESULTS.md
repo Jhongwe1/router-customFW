@@ -253,8 +253,15 @@ positive control the file had already been forced to learn. 讀.**
   container step became a step of this gate and then dissolved.
 * **Which toolchain rlxfw itself should use for userspace** (`TC-05` residual ①)
   — narrowed by `TC-19` (twelve shipped binaries across six trees, all on the
-  delay-slot-padding side, `hazlint` 0 violations), decided for the kernel, open
-  for userspace. `R7` owns it.
+  delay-slot-padding side, `hazlint` 0 violations), decided for the kernel, ~~open
+  for userspace~~. `R7` owns it.
+  🔄 **Expired 2026-09-15 (`SPEC.md` `TC-57`), and by the criterion this
+  bullet itself names.** `hazlint` was run over each candidate's whole
+  `libc.a` for the first time: `rsdk-1.3.6-4181` reads **0** over 19,096
+  loads, the two 5281 releases read **4,574** and **3,741**. It discriminates
+  uniquely. ⚠️ What that settles is which toolchain `R1c`'s harness uses;
+  the `R7` GATE decision is still `R7`'s, and a reader reaching this bullet
+  today must not carry the present tense out of it.
 * ⚠️ **It did close something belonging to `R1-gate`**: item 8 above. The
   `PRId` assignment table turned up inside a GPL drop this project already had,
   so `RLX4181` became writable (讀) and `RLX5281` became positively excluded

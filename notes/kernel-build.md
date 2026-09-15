@@ -489,7 +489,7 @@ builds: `0x0022ee44` = 2,289,220 for the drop's kernel, `0x001b0400` =
 1,770,496 for `quiet`/`quietm`, `0x0019e400` = 1,696,768 for `loud`/`loudm` —
 the same numbers §11.6 computes from the program headers, by a route with no
 code in common. §13.4. **The `mine, 1.3.6@4181` row above is the pre-`R3-4`
-build and is kept as written**; the four current images are in §13.3.
+build and is kept as written**; 🔄 **2026-09-15: ~~current~~ — those four are R3-era and the current image is `up2` (`RECIPE_ID 5abefd82`, vmlinux 4,125,078, decompressed 3,609,088, margin 1,633,792, 68.8 % used — the highest this project has built). § 18.6's table is the most recent margin table here and `up2` exceeds every cell in it.** The four R3-era images are in §13.3.
 
 ---
 
@@ -947,7 +947,7 @@ disk. The whole difference between the two files is the build timestamp in
 
 ## 9. `R3-5`: the initramfs, declared
 
-`config/rlxfw-initramfs.tsv` — **29 entries**, every one tagged `unit` (carved
+`config/rlxfw-initramfs.tsv` — ~~**29 entries**~~ 🔄 **36 entries, 量 2026-09-15: 9 dir, 6 file, 13 slink, 8 nod; 24 `unit` and 12 `rlxfw`, and the `rlxfw` byte column is no longer 988 but 30,172, because `/bin/uprobe` is the first `rlxfw` entry with content since `/init`. The per-kind and per-owner tables below this line are all at the 29-entry state**, every one tagged `unit` (carved
 out of this device's own flash dump) or `rlxfw` (mine), and the tag is
 **checked**, not trusted. `tools/mkinitramfs.py`, **23** controls — 19 → 23 on 2026-08-28/29, and the four new ones are §11.7's: the ceiling was being measured on the ELF file size.
 

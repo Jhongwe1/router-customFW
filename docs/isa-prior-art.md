@@ -628,9 +628,14 @@ the vendor kernel at all.
    forty-five**. Nothing in the repo states this, and it changes the weight of
    the whole problem.
 
-⚠️ **And one prerequisite sits two gates downstream**: `R1c` needs a compiled
+⚠️ ~~**And one prerequisite sits two gates downstream**: `R1c` needs a compiled
 userspace C program, and *which toolchain rlxfw's userspace uses* is
-`docs/GATE-RESULTS.md`'s open item owned by **`R7`**.
+`docs/GATE-RESULTS.md`'s open item owned by **`R7`**.~~
+🔄 **2026-09-15: discharged for this harness.** `SPEC.md` `TC-57` ran
+`TC-05`'s own criterion over all three candidates' whole `libc.a` and it
+selects `rsdk-1.3.6-4181` by 0 against 4,574 and 3,741. The compiled
+userspace C program exists (`TC-58`, `notes/userspace-probe.md`). `R7`'s
+gate decision is still `R7`'s; the prerequisite is not.
 
 🔴 **This section does NOT pick an option.** The option space — run on
 rlxfw's image and correct the step; run on the pristine vendor kernel with a
@@ -782,7 +787,7 @@ a weaker one.** Three reasons, each a measurement above rather than an argument:
 | id | what would prove this decision wrong |
 |---|---|
 | `R1C-1-a` | any row whose user-mode reading under rlxfw's kernel disagrees with what the vendor's `arch/rlx` source predicts for it. The prediction is written first, per row; a disagreement refutes the equivalence and makes `O7` the required route |
-| `R1C-1-b` | a `break` in the linked `R1c` binary (④). The equivalence covers census rows and not the harness, and if the gate cannot be made to pass, `O1` is refused for the cost half |
+| `R1C-1-b` | ~~a `break` in the linked `R1c` binary (④). The equivalence covers census rows and not the harness, and if the gate cannot be made to pass, `O1` is refused for the cost half~~ 🔄 **2026-09-15: THIS PRE-REGISTRATION FIRED, and it was neither cashed nor waived.** The gate was built and the artefact does not meet it as written: the linked binary holds exactly **two** `break 0xff`, both inside `__GI_abort`, which `__uClibc_main.os` pulls into the link. 🔴 The 推 above was `break 7` from integer division; the cause is the C library's abort path, which no division would have produced. Zero needs `-nostdlib` plus a hand-written `_start`/`rt_sigaction`/`sigsetjmp`, and that trade was DECLINED because a hand-written MIPS `sigsetjmp` saving the wrong callee-saved register is silent in an instrument that IS a signal handler. `O1` is **not** refused; the gate is re-specified as BOUNDED — `G1` zero in code this project wrote, `G1b` exactly two and both inside `__GI_abort`, a third is red. `notes/userspace-probe.md` §5 |
 | `R1C-1-c` | a configuration symbol naming code on `arch/rlx`'s exception path entering `config/rlxfw-kernel.delta`. **This one is not a promise, it is a checker** -- the argument lapses silently otherwise, and ①'s population and controls are the test |
 
 **What this does NOT decide, stated so it is not later read as settled.**
