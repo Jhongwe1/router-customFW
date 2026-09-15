@@ -585,6 +585,8 @@ X7-NW1   n_pio_bytes 4194304    n_writes 0
 
 **A counter that moved by 4,194,304 beside one that did not.**
 
+**Owner of `SPEC.md` `FLS-27`.**
+
 ### 🔴 And the other flash sweep of this seating made a false claim too
 
 A grep for flash-write verbs over `bench/2026-09-16/*.log` returned **one

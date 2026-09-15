@@ -768,6 +768,8 @@ repeat is of a different artefact.
 🔴 **The deferral now has an expiry rather than a wish**: the first rebuild after
 this repeat. That rebuild has not happened.
 
+**Owner of `SPEC.md` `FW-74`.**
+
 ### 🟢 One thing the comparison establishes that neither run alone could
 
 The two runs were given **different arguments** (`d73`, `a91`) and produced

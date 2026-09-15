@@ -1366,6 +1366,8 @@ in-ladder counterparts (1,485) because the repeat gets its own warming pass.
 the 17,4xx rungs (0.05 %)**, and `l.aba.c1` 545 → 544. No timing rung in this
 project had been repeated across a reset before.
 
+**Owner of `SPEC.md` `CPU-69` (the knee and the discriminator), `CPU-70` (the invalidation), `CPU-71` (the two miss costs) and `CPU-72` (the cold column's model error).**
+
 ### 🔴 The one residual this section leaves
 
 **Base A's rung 0 is +5 and +7 over base B's on two runs.** It is stable and it

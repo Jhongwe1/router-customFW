@@ -614,6 +614,8 @@ in user mode. Two states of one machine; neither refutes the other. **The
 experiment that decides it is `lwu2` timed bare metal**, which needs a `probe3`
 row and a seating.
 
+**Owner of `SPEC.md` `CPU-73` (the four costs and the exception round trip), `CPU-74` (§ 8.2 refuted) and `CPU-75` (`CPU-15` and this document are about two different things).**
+
 ### ⚠️ What this does not price
 
 The surface is **eight** entries and this prices **four**. The other four are
