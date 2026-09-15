@@ -817,6 +817,27 @@ jobs:
       - name: desk-sweep self-test
         run: /usr/bin/python3 tools/desk-sweep.py --self-test 2>&1 | tee ci-out/desk-sweep.out; exit "${PIPESTATUS[0]}"
 
+      # `mustrun` names WHICH suites read files that changed, so a skipped
+      # full sweep is auditable instead of invisible.  It exists because six
+      # CI runs went red between 2026-09-13 and 2026-09-15 and every one of
+      # them was a committed claim about this repository's own contents going
+      # stale -- caught by a gate that already runs here, and not one of them
+      # a code defect.  What failed was the desk closeout running a
+      # hand-picked list of ten gates instead of `desk-sweep.py run`, which
+      # costs ~1,000 s.  🔴 It does NOT replace that sweep.
+      #
+      # It is in THIS job for the same reason desk-sweep's self-test is: it
+      # imports desk-sweep's `enumerate_steps`, and that needs the
+      # python3-yaml the apt step above declares.
+      #
+      # 🔴 The cost of that placement is one declared skip.  This job
+      # checks out at `fetch-depth: 1`, so the historical controls -- each one
+      # of those red runs replayed over the range CI actually tested -- cannot
+      # reach their shas here and stand down.  They run at a desk and on any
+      # full clone; `ci-expected.tsv` covers 9.
+      - name: mustrun
+        run: /usr/bin/python3 tools/mustrun.py --self-test 2>&1 | tee ci-out/mustrun.out; exit "${PIPESTATUS[0]}"
+
       # 66 s. Drives a pty, not a serial port; no device is involved.
       - name: test-console-capture
         run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
@@ -907,6 +928,32 @@ jobs:
       # skip here and the row says so.
       - name: elfops
         run: /usr/bin/python3 tools/elfops.py --self-test 2>&1 | tee ci-out/elfops.out; exit "${PIPESTATUS[0]}"
+
+      # `emupredict` is the column ① -> column ② transform AS CODE.  `probe4`
+      # runs 75 encodings bare metal at `Status = 0x1000FC00` (`CU0 = 1`) and
+      # `uprobe` runs the SAME `cells4.S` bytes from Linux user mode; the
+      # transform between the two columns -- three arms plus three exception
+      # classes over eight named rows -- was frozen in
+      # `bench/2026-09-15/PREDICTIONS-B22-block21.md` § 6.1/§ 6.2 BEFORE the
+      # board was powered, and pre-registered per census row in
+      # `docs/emulation-surface.md` § 3.  The tool derives column ② from
+      # column ① ALONE and re-produces the card's own
+      # `RAN 12, RIGHT 16, TRAPS 46, WRONG 1`.
+      # 🔴 The controls are what make that worth anything.  C8/C9/C10 delete
+      # an exception from a COPY of the rule table and require the predicted
+      # line to change to a STATED wrong value -- a rule generator that cannot
+      # produce a different answer proves nothing.  C19 re-derives
+      # `docs/emulation-surface.md` § 3's hand-written `why` column from the
+      # same rules, which is the second and independent side, and C20 plants a
+      # wrong cell in a copy of that file and requires it to be reported.  C22
+      # pins the exit codes apart: an absent input is 3 and not 1, because 1 is
+      # this tool's code for A FINDING and a traceback would read as a refuted
+      # rule set.
+      # Everything it reads is committed here -- two bench captures, two TSVs
+      # and one `.md` -- so there is no toolchain, no `$FWRE_WORK` artefact and
+      # no device, and it declares no skip.
+      - name: emupredict
+        run: /usr/bin/python3 tools/emupredict.py --self-test 2>&1 | tee ci-out/emupredict.out; exit "${PIPESTATUS[0]}"
 
       # `R1b`'s three, 2026-09-13.  `hazpay` generates probe5 and holds the
       # two-source expectation check; `hazdecl` is probe5's BUILD GATE and its

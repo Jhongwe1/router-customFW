@@ -41,7 +41,6 @@ ROT	PROGRESS.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.
 ROT	PROGRESS.md	tools/rlxfw-kbuild.sh	203	843497a555cbe23d	# anti-DoD's build-stamp leg loses its "WHICH of my builds" role the m
 ROT	PROGRESS.md	SPEC.md	144	f35b0928d91ae737	| `CPU-41` 🆕 | **`rfe` 有沒有正確彈 KU/IE 堆疊** | 🔴 **有。`status_end == status
 ROT	PROGRESS.md	SPEC.md	147	15a16b7f8b5250a4	| `CPU-44` 🆕 | **這顆上到底有沒有在執行 `cache` 指令**（🔄 本欄原寫「MIPS-II 的 `cache`」，見值
-ROT	PROGRESS.md	SPEC.md	658	5b5da4153c131f6e	| `CPU-15` | 矽片到底有沒有 `lwl`/`lwr`/`swl`/`swr` | 裸機 Reserved Instruction
 ROT	PROGRESS.md	SPEC.md	661	9571128a9b5e63cc	| `CPU-24` 殘留 🆕 | CP0 r20 剩下的位元 —— bit 6／7，以及 `0x400`／`0x800` | 🔴 **頭條
 ROT	PROGRESS.md	docs/probe3-cells.md	1952	1b9bfc2ff2a72248	| Group C | `c-A` negative again, so **Group V is VOID** by its own in
 ROT	PROGRESS.md	docs/rlx-cache-and-cp0.md	777	1522649c1c7b161d	`CPU-45` is recorded 未定, and this was the first. 🔄 **2026-09-14: this

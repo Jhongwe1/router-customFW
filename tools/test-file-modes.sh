@@ -79,6 +79,35 @@ ck "the correct files are not reported" \
    "0" "$(scan "$T" | grep -c -e correct.sh -e plain.md || true)"
 
 echo
+echo "=== CONTROL: an empty scan and a clean scan must not look the same ==="
+# `found` empty is this suite's success branch, and it is empty in two unrelated
+# situations: the repository is clean, and the scan never ran.  量 2026-09-15,
+# the same suite over the same tree, two ways:
+#
+#     bash tools/test-file-modes.sh  ->  92 recorded executable, 3 passed, rc 0
+#     sh   tools/test-file-modes.sh  ->   0 recorded executable, 3 passed, rc 0
+#
+# `${BASH_SOURCE[0]}` on line 31 is a bashism; under dash it is unset, ROOT
+# becomes the parent of the working directory, `git ls-files` prints `fatal: not
+# a git repository`, and this suite passed.  The verdict and the exit code were
+# identical to a real clean run; the only difference was the number printed
+# beside the word `ok`.  The shebang makes `bash` the documented invocation, but
+# a gate that is silently right only when invoked correctly is not a gate.
+#
+# So the population is established before it is judged, with a control on each
+# side: a directory that is not a repository must yield ZERO, and this one must
+# not.  Without the first, "nonzero" could be a constant.
+E="$(mktemp -d)"
+e_tracked="$(git -C "$E" ls-files -s 2>/dev/null | grep -c . || true)"
+if [ "$e_tracked" -gt 0 ]; then e_pop=nonzero; else e_pop=ZERO; fi
+rm -rf "$E"
+ck "a directory that is not a repository yields ZERO" "ZERO" "$e_pop"
+
+tracked="$(git -C "$ROOT" ls-files -s 2>/dev/null | grep -c . || true)"
+if [ "$tracked" -gt 0 ]; then pop=nonzero; else pop=ZERO; fi
+ck "and this repository yields a population to scan" "nonzero" "$pop"
+
+echo
 echo "=== THIS REPOSITORY ==="
 found="$(scan "$ROOT" || true)"
 if [ -n "$found" ]; then
@@ -86,7 +115,8 @@ if [ -n "$found" ]; then
     fail=$((fail + $(echo "$found" | grep -c .)))
 else
     n="$(git -C "$ROOT" ls-files -s | grep -c '^100755' || true)"
-    printf '  ok     %-40s %s recorded executable\n' "every tracked program is 100755" "$n"
+    printf '  ok     %-40s %s recorded executable of %s tracked\n' \
+           "every tracked program is 100755" "$n" "$tracked"
     pass=$((pass+1))
 fi
 
