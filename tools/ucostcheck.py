@@ -82,11 +82,100 @@ def load_tsv(path):
     return out, dup
 
 
+SELFTEST_SRC = """\
+\tuc_cell nop_a, uc_w_nop_a, 0x00000000
+\tuc_cell nop_b, uc_w_nop_b, 0x00000000
+\tuc_cell sync,  uc_w_sync,  0x0000000F
+\tuc_cell lw,    uc_w_lw,    0x8D420000
+\tuc_cell ll,    uc_w_ll,    0xC1420000
+\tuc_cell sw,    uc_w_sw,    0xAD490000
+\tuc_cell sc,    uc_w_sc,    0xE1490000
+\tuc_cell lwu2,  uc_w_lwu2,  0x8D420000, 2
+"""
+
+
+def self_test():
+    """Every check above, shown able to FAIL.
+
+    🔴 A GREEN `ucostcheck` IS A CLAIM AND UNTIL THIS EXISTED NOTHING TESTED
+    IT.  The tool is a build gate -- `UG0` -- so it runs on every `ucost`
+    build and has never once reported a finding.  That is exactly the shape
+    `CLAUDE.md` names: a tool reporting 0 is making a claim, and a tool that
+    cannot fail proves nothing.  Each case below mutates the fixture in ONE
+    way and requires the named check to fire; `P1` is the population control
+    that stops the rest passing on a fixture that parses to nothing.
+    """
+    import tempfile
+
+    cases, fails = [], 0
+
+    def run(name, text, want_rc, want_sub=None):
+        nonlocal fails
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, "ucost-cells.S")
+        with open(p, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+        import io as _io
+        import contextlib
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = _check(p)
+        out = buf.getvalue()
+        ok = (rc == want_rc) and (want_sub is None or want_sub in out)
+        cases.append((name, ok, "rc=%d" % rc))
+        if not ok:
+            fails += 1
+        return out
+
+    run("P1 the unmutated fixture is clean", SELFTEST_SRC, 0)
+    run("P2 and it parsed all eight cells", SELFTEST_SRC, 0, "8 cell(s)")
+    # C1 -- a probed word that is not its census row's
+    run("N1 a word that differs from the tsv is caught",
+        SELFTEST_SRC.replace("0x0000000F", "0x0000001F"), 1, "C1 sync")
+    # C2 -- a symbol that does not name its cell
+    run("N2 a mis-named _w symbol is caught",
+        SELFTEST_SRC.replace("uc_w_sync", "uc_w_synch"), 1, "C2 cell sync")
+    # C3 both ways
+    run("N3 a cell with no mapping and no exemption is caught",
+        SELFTEST_SRC + "\tuc_cell teq, uc_w_teq, 0x00000034\n", 1,
+        "C3 cell(s) with no tsv mapping")
+    run("N4 an exemption no cell took is caught",
+        SELFTEST_SRC.replace("\tuc_cell nop_b, uc_w_nop_b, 0x00000000\n", ""),
+        1, "C3 exemption(s) named here")
+    # C4 -- the offset, which is invisible in the .word
+    run("N5 an offset on the wrong cell is caught",
+        SELFTEST_SRC.replace("uc_w_lw,    0x8D420000", "uc_w_lw,    0x8D420000, 4"),
+        1, "C4 non-zero base offsets")
+    run("N6 the unaligned cell losing its offset is caught",
+        SELFTEST_SRC.replace("0x8D420000, 2", "0x8D420000"), 1,
+        "C4 non-zero base offsets")
+    # C5 -- the twin relationship
+    run("N7 lwu2 ceasing to be lw's twin is caught",
+        SELFTEST_SRC.replace("uc_w_lwu2,  0x8D420000, 2",
+                             "uc_w_lwu2,  0x8C420000, 2"), 1, "C1 lwu2")
+    # C0 -- the population control, and it is the one that makes the rest mean
+    # something: a fixture the regex cannot read must REFUSE, not report clean.
+    run("N8 a file the regex cannot read REFUSES, not reports clean",
+        "\tuc_cell_nop_a:\n\t.word 0\n", 1, "C0 only 0 cell(s) parsed")
+
+    for name, ok, note in cases:
+        print("  %-4s %-52s %s" % ("ok" if ok else "FAIL", name, note))
+    print("RESULT: %d passed, %d failed" % (len(cases) - fails, fails))
+    return 1 if fails else 0
+
+
 def main():
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        return self_test()
     if len(sys.argv) != 2:
-        print("usage: ucostcheck.py <ucost-cells.S>", file=sys.stderr)
+        print("usage: ucostcheck.py <ucost-cells.S> | --self-test",
+              file=sys.stderr)
         return 2
-    src = sys.argv[1]
+    return _check(sys.argv[1])
+
+
+def _check(src):
+    """The checks, factored out so `--self-test` can drive them in-process."""
 
     tsv, dup = load_tsv(TSV)
     cells = []

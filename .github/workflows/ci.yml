@@ -955,6 +955,30 @@ jobs:
       - name: emupredict
         run: /usr/bin/python3 tools/emupredict.py --self-test 2>&1 | tee ci-out/emupredict.out; exit "${PIPESTATUS[0]}"
 
+      # `R1-pub-4b`'s encoding join, 2026-09-16.  `ucost-cells.S` is HAND
+      # WRITTEN -- a cost measurement needs the probed word inside a counted
+      # loop, and `cells4.S`'s cells are shaped for one execution under a fault
+      # handler, and `cells4.S` may not be touched at all because it feeds a
+      # digest two artefacts join against.  So nothing structural makes the two
+      # payloads agree on their encodings, and this is what does.
+      #
+      # 🔴 It is already a BUILD gate (`UG0` in the isaprobe Makefile), which
+      # is exactly why it needs this: a gate that has only ever reported 0 is
+      # making a claim nobody has tested.  Eight of the ten cases are negative
+      # -- one per check, plus the population control that stops the other nine
+      # passing on a fixture the regex could not read.
+      #
+      # Everything it reads is committed here (`tools/isa-payload.tsv` and the
+      # `.S`), so no toolchain, no `$FWRE_WORK` artefact, no device, no skip.
+      - name: ucostcheck self-test
+        run: /usr/bin/python3 tools/ucostcheck.py --self-test 2>&1 | tee ci-out/ucostcheck-self-test.out; exit "${PIPESTATUS[0]}"
+
+      # And the same tool in ANGER rather than on fixtures -- the shape
+      # `emueq-check` and `xcheck-sweep` already use.  `--self-test` proves the
+      # check CAN fail and says nothing about whether THIS tree passes it.
+      - name: ucostcheck
+        run: /usr/bin/python3 tools/ucostcheck.py config/rlxfw-user/isaprobe/ucost-cells.S 2>&1 | tee ci-out/ucostcheck.out; exit "${PIPESTATUS[0]}"
+
       # `R1b`'s three, 2026-09-13.  `hazpay` generates probe5 and holds the
       # two-source expectation check; `hazdecl` is probe5's BUILD GATE and its
       # two pure functions are what run here -- `tools/hazlint` itself needs a

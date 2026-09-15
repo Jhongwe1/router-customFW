@@ -1585,7 +1585,7 @@ make -C tools/rlxprobe P=probe3 show
 |---|---|---|
 | `make` itself | it **compiles**. `Nothing to be done for 'payload'` is a **HARD STOP** | the tree already held an image and nothing rebuilt; `show` will print the knob you asked for beside the binary you already had |
 | `sha256` | 🔄 **`fc7b21d479478fcb925723237323176adc7946502a0e71588ae799a626e2824e`, 31,536 bytes, since 2026-08-31** — Group F. *(It was `6f78727507bb0364…` / 29,680 from 2026-08-31)* — the retained bitmap region and the `M(T)` ladder. *(It was `1a0725c0e925b8c3857802d01791768f6b8241dbcf271b1dbd391e287a5ecc0b`, 29,088 bytes, from 2026-08-26 to 2026-08-30, and byte-identical across three rebuilds in that window.)* | the sources moved. That is fine — but the number in `qemu/2026-08-26/probe3.build` no longer describes the image, and the qemu capture beside it was produced by a different payload |
-| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 718` *(707 from 2026-08-31, 641 before that)* | anything else and the read-back is the wrong length or the wrong address |
+| `result` | `RESULT_BASE=0x80A02000 … DW 80A02000 **754**` *(718 from 2026-08-31 to 2026-09-16, 707 and 641 before that)* | anything else and the read-back is the wrong length or the wrong address. 🔴 **A card reads back `RB_POISON_W` = 762, not this 754** — the two poison words past the seal are the over-run control |
 | `stale check` | `rb=80a02000` | this is the **on-the-wire** check and it is what the operator watches for in the banner |
 | `vectors` / `uart` | `general 0x80000080`, `THR 0xB8002000`, `CLEAR_BEV=0`, and **no `*** NOT A DEVICE BUILD ***` line** | a qemu image would install a handler into RAM this device never reads and then fault into the loader's permanent hang |
 
