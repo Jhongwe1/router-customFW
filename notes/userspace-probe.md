@@ -417,3 +417,64 @@ probed word is at 00401330`*. And a user capture handed to `--arm device`
 6. **The `--range` arguments are typed by an operator.** A card that types the
    wrong range gets a short capture, and the `first=`/`last=` header fields
    are what make that visible rather than silent.
+
+---
+
+## § 9. `ucost` — the second compiled binary, and why it does not share the first one's digest
+
+**2026-09-16, the seventy-fifth segment.** `R1-pub-4b`'s instrument.
+
+| | |
+|---|---|
+| `UCOST_BUILD_ID` | **`8403799745aeb189`** — `cat ucost.c ucost-cells.S \| sha256sum \| cut -c1-16` |
+| stripped | **16,692** bytes, static, no `PT_INTERP` |
+| sha256 | `76c7e2318021484967ccc0e8c5a2eadd992c5bee372a2a7bcd10d0a1ebe3c6db` |
+| flags | `0x1005, noreorder, cpic, o32, mips1` |
+| in the image | `uc1`, `RECIPE_ID` **`efa93621`** |
+
+### § 9.1 🔴 It links neither `cells4.S` nor anything else `uprobe` links, and that is the decision
+
+`uprobe`'s `BUILD_ID` is a digest over **four** files — `uprobe.c`,
+`cells4.S`, `probe4rows.h`, `rlxasm.h` — and seating 23's capture printed it:
+`a87be346bb83e7f9`. Seating 24 **re-runs a `4a` row**, which is the first time
+any column-② row will have been repeated, and that repeat is worth most when
+the binary is **byte-identical** to the one that produced the original.
+
+So `ucost` is a **separate product in the same directory** with every variable
+prefixed, its own digest over its own two files, and no path that reaches those
+four. 量 at the end of the segment, after every edit: `a87be346bb83e7f9`,
+unchanged.
+
+⚠️ **Consequence, stated rather than left to be found**: this defers
+`tools/isa-payload.tsv`'s `special0e` `why` column (`C2` where the
+documentation says `C5`) a **fourth** time. The deferral now has an expiry
+instead of a wish — **the first rebuild after that repeat lands**.
+
+### § 9.2 Why the probed words are hand written, and what checks them
+
+A cost measurement needs the probed word inside a **counted loop** and nothing
+else inside it; `cells4.S`'s cells are shaped for **one** execution under a
+fault handler with eight recorded words, and reusing one would measure its
+epilogue. And `cells4.S` may not be modified at all this segment (§ 9.1).
+
+So `ucost-cells.S` is hand written — and then nothing structural makes its
+encodings agree with the census `4a` ran. `tools/ucostcheck.py` is what does,
+and it sweeps **both** directions: six cells are joined to their
+`tools/isa-payload.tsv` row, two (`nop_a`, `nop_b`) take a **named** exemption
+because `nop` has no census row and cannot have one, and the set that took the
+exemption must be **exactly** that list. 量 on its first run: 8 cells, 6
+matched, 2 exempt. Its `--self-test` is ten cases of which eight are negative.
+
+### § 9.3 ⚠️ What the gates do NOT say here
+
+* **`hazlint` says nothing about the `ll` cell.** Its load set is MIPS-I and
+  `ll` is opcode `0x30`. The gate is green — **0 violations in 642 loads** —
+  and that green is not evidence about that one cell.
+* **`UG1b` is bounded, not zero**, for the same measured reason as `uprobe`'s:
+  the linked ELF holds exactly two `break`s and both are inside `__GI_abort`,
+  which is uClibc's own startup. Zeroing them means hand-marshalling signal
+  plumbing, and that trade was declined here as it was there.
+* **`.align 4` removes I-cache line straddle between a row and its twin. It
+  does not remove index conflict** against the exception handler's own lines,
+  and no control in this instrument catches that. The experiment that would —
+  four forced offsets per cell, slope must be flat — is named and not run.

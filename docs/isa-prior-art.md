@@ -1169,3 +1169,45 @@ section filter**, which is what would make it clean.
   about the toolchains. A census of that is the same shape as this one and it
   has not been done, which is a stated risk to the cap rather than a
   deferral without a reason.
+
+---
+
+## 9.2 🔴 2026-09-16: choice B's composite is wrong on this image, and fixing it measured something nobody had checked
+
+§ 9.1's choice **B** is *"`jiffies` for wraps ＋ `TC0CNT` for the sub-tick
+residue"*. **That composite is wrong on `uc1`, and it was wrong on every image
+since `R5-3b-2`.**
+
+量, twelve committed captures in `bench/2026-09-06b/` — `mode=ce`,
+`ce_live=1`, spanning 655 s:
+
+```
+((tc0cnt >> 4) − tc1_cycles) mod 2000   =   716 or 717, in all twelve
+```
+
+🟢 **The first half of that is a result and it is free**: TC0 and TC1 are
+**phase-locked to ±1 count over 655 s** on this part. Nothing had checked it
+from outside the timer block.
+
+🔴 **The second half is why B cannot be used as written.** Since `R5-3b-2` the
+system tick is my own clockevent, so **`jiffies` counts TC1, not TC0's wraps**,
+and the two are **716 counts = 3.58 ms** apart. `jiffies × 2000 + (TC0CNT>>4)`
+therefore carries a two-valued step, and a Δ taken across a wrap is wrong by
+exactly one reload — **10.0 ms — on roughly 46 % of intervals** (推, uniform
+endpoints).
+
+The fix costs nothing: `tc1_cycles` is in the **same** spin-locked snapshot.
+But the polarity **flips** when `ce_live=0`, so `ucost` chooses neither — it
+emits **both** phases and both composites per rung and lets the capture's own
+`mode=` / `ce_live=` decide at the desk.
+
+⚠️ Two more things this row does not let a reader assume:
+
+* `tc0cnt` is printed **raw** and the count is bits 31:4, so it must be shifted
+  right by 4. The TC1 path shifts; the TC0 path does not.
+* The wrap is **2,000 counts** and is **not a power of two**, so masking is
+  wrong wherever the difference is taken.
+
+`SPEC.md` `CLK-30`. ⚠️ And 200,005 Hz is **推**, not 量 — the driver's own
+derived `hz_used` prints **200,000**, and what is 量 is the 2,000-counts-per-
+jiffy ratio rather than the absolute rate.
