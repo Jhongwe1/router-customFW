@@ -1028,6 +1028,14 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   **0 bytes, 3.079489 s, all three artefacts written** — the information is
   not the zero, it is that the tool opened the port, ran the whole window and
   produced files. Run it **after every attach**, not only before a seating.
+  🔴 **And a healthy pre-flight EXITS 1, so the exit code is the one thing
+  that must not be read as the verdict.** 量 2026-09-15 (seating 23), a
+  second instance: 0 bytes, **3.079642 s**, three artefacts, and `rc=1` —
+  `console-capture.py:833` returns 1 whenever `offset == 0`, printing the
+  three-cause line to **stderr**. With the board deliberately off that is the
+  instrument *making its claim*, not failing. **Read the three artefacts and
+  the duration; a script that gates on `$?` here will refuse a good
+  pre-flight.**
   🔄 **2026-09-02: the resolution above is true in a LOGIN shell and not
   otherwise, which makes the trap intermittent rather than constant — and
   an intermittent trap is the worse kind.** 量, with the control run beside

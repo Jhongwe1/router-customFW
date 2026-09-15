@@ -4071,3 +4071,29 @@ steals a character from the console driver, which is a fault that appears
 somewhere else entirely. The two safe offsets are the two that carry the
 question worth asking: `DW B800200C 1` should read a top byte of `03` — 8N1 —
 and `07` would be 8N2, `0B` 8N1-with-parity. `SPEC.md` `FW-70`.
+
+🟢 **量 2026-09-15 (seating 23), `bench/2026-09-15/C1-LCR.log`: `03`.** 8N1,
+10 bit/char, and neither refutation value appeared. `FW-70` moves to
+讀×2 量×1 — the loader's `LCR`; Linux's stays 讀, because this image has no
+applet that can read a register (`FW-46`).
+
+🔴 **AND THE RULE ABOVE IS WEAKER THAN IT NEEDS TO BE, measured by the same
+cell.** The loader answered `DW B800200C 1` with **one complete reply line of
+FOUR words** — `03000000 00000000 00000000 10000000`, i.e. `+0x0C` through
+`+0x18`. **There is no sub-line `DW`**: the smallest read this loader serves
+touches four consecutive words, whatever length is typed.
+
+So *never across the block* is not the rule. **The rule is about the START
+ADDRESS**, because the length cannot make the window smaller than four words:
+
+| a cell typing | serves | verdict |
+|---|---|---|
+| `DW B8002000 1` | `+0x00` `+0x04` `+0x08` `+0x0C` | 🔴 **destroys both** — RBR and IIR |
+| `DW B8002008 1` | `+0x08` … `+0x14` | 🔴 **destroys IIR** |
+| `DW B800200C 1` | `+0x0C` … `+0x18` | 🟢 safe, and it is the cell above |
+
+⚠️ Seating 23's card argued its safety as *this cell reads one word*. That
+sentence is false and the cell was safe for a different reason — its start
+address. **A card must constrain where a `DW` begins, never how long it is.**
+`docs/loader-command-semantics.md` owns the granularity; the three extra words
+are recorded there so they are not read again as a new measurement.

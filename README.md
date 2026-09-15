@@ -74,10 +74,14 @@ rules with a reason each — 14 that rlxfw sets, 21 that kconfig derives, and
 the baseline named by **sha256** rather than by filename, because three of the
 four GPL drops carry a file at that exact path and two of them differ from this
 one on eight symbol lines. [`rlxfw-initramfs.tsv`](config/rlxfw-initramfs.tsv)
-is the first boot's userspace, **31 entries, 24 of them this device's own
-binaries unmodified and 7 named as mine** — re-derived 2026-09-03 from
+is the first boot's userspace, **36 entries, 24 of them this device's own
+binaries unmodified and 12 named as mine** — re-derived 2026-09-15 from
 `mkinitramfs build`'s own output, which is where those numbers come from;
-this paragraph had carried 29 and 5. [`rlxfw-sdk.config`](config/rlxfw-sdk.config)
+this paragraph had carried 29 and 5, then 31 and 7. 🔴 **The 31/7 went stale
+on 2026-09-15 when `/bin/uprobe` was declared**, and both halves moved: the
+file content those twelve carry is 30,172 bytes against 579,644 for the
+device's own. **Re-derived with the tool rather than by counting rows**, and a
+`grep` on the declaration's tag column agrees — two readers, one owner. [`rlxfw-sdk.config`](config/rlxfw-sdk.config)
 and [`host-compat/`](config/host-compat) are the two build inputs that were
 undeclared until 2026-08-28 — one of them normally produced by a curses
 program, which is not a step anyone else can reproduce.
