@@ -23,14 +23,14 @@
 # reviewer can see what the citation was for without running git.
 #
 # kind	citing-file	cited-path	cited-line	sha256-16	the row, then
-M3	PROGRESS.md	docs/probe3-cells.md	1952	74a757e97f822467	docs/probe3-cells.md:1952 is a blank line
+M3	PROGRESS.md	docs/probe3-cells.md	1955	366453e0f608a85e	docs/probe3-cells.md:1955 is a blank line
 M3	PROGRESS.md	docs/rlx-cache-and-cp0.md	777	9a441b99cea9b7c6	docs/rlx-cache-and-cp0.md:777 is a blank line
 M3	PROGRESS.md	tools/check-predictions.py	50	d6d8a07f8241682c	tools/check-predictions.py:50 is a blank line
 M3	SPEC.md	notes/cache-model.md	904	c17943a11a87a041	notes/cache-model.md:904 is a blank line
 M3	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	55ce45b90472365b	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c:471 
 M3	SPEC.md	tools/console-capture.py	431	bc270a8e75d0c313	tools/console-capture.py:431 is a blank line
 M3	docs/rlx-cache-and-cp0.md	notes/cache-model.md	904	c17943a11a87a041	notes/cache-model.md:904 is a blank line
-M3	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	1290	3044530671c7ddf8	docs/probe3-cells.md:1290 is a blank line
+M3	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	1293	68ec71163e2f0d85	docs/probe3-cells.md:1293 is a blank line
 ROT	CLAUDE.md	tools/ci-expected.tsv	142	e8db9a299a0f1289	# -- deliberately, because hazlint is *bench-only* for exactly the opp
 ROT	PROGRESS.md	config/rlxfw-kernel.delta	82	5ff8ac5ee469b923	derive CONFIG_GENERIC_GPIO - y selected drivers/gpio/Kconfig:31 -- `me
 ROT	PROGRESS.md	LOG.md	5859	6917a92bf34bfd3d	| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根
@@ -39,15 +39,9 @@ ROT	PROGRESS.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configurati
 ROT	PROGRESS.md	tools/ledgerscan.py	505	adcf3fd1b132405c	depth = "line" if withln else "name"
 ROT	PROGRESS.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	20901d98fdbb85c2	* They are different quantities that must agree: the first descends fr
 ROT	PROGRESS.md	tools/rlxfw-kbuild.sh	203	843497a555cbe23d	# anti-DoD's build-stamp leg loses its "WHICH of my builds" role the m
-ROT	PROGRESS.md	SPEC.md	144	f35b0928d91ae737	| `CPU-41` 🆕 | **`rfe` 有沒有正確彈 KU/IE 堆疊** | 🔴 **有。`status_end == status
-ROT	PROGRESS.md	SPEC.md	147	15a16b7f8b5250a4	| `CPU-44` 🆕 | **這顆上到底有沒有在執行 `cache` 指令**（🔄 本欄原寫「MIPS-II 的 `cache`」，見值
-ROT	PROGRESS.md	SPEC.md	661	9571128a9b5e63cc	| `CPU-24` 殘留 🆕 | CP0 r20 剩下的位元 —— bit 6／7，以及 `0x400`／`0x800` | 🔴 **頭條
-ROT	PROGRESS.md	docs/probe3-cells.md	1952	1b9bfc2ff2a72248	| Group C | `c-A` negative again, so **Group V is VOID** by its own in
-ROT	PROGRESS.md	docs/rlx-cache-and-cp0.md	777	1522649c1c7b161d	`CPU-45` is recorded 未定, and this was the first. 🔄 **2026-09-14: this
 ROT	PROGRESS.md	tools/opcount.py	44	e29c0e802df78873	# 0x13 read ("COP1X", "MIPS-IV") until 2026-08-27, which is the answer
 ROT	PROGRESS.md	docs/loader-command-semantics.md	1054	02497b0b5a347d69	provoke** — `J <addr>` clears `IE` and zeroes `GIMR0` before entering
 ROT	SPEC.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
-ROT	SPEC.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
 ROT	SPEC.md	notes/cache-model.md	904	1b3bc3eb0eab8e22	| D-cache | **not measured** | 8 KiB / 16 B (讀, `bspcpu.h:13`) | **no
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/gpio/rtl819x-gpio.c	120	4141c46181ee6c1a	* 1. WHICH PORT LETTER BIT 5 IS. PABCD packs four ports into one word
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	6434cf036758c7c6	static int rtl819x_ack_proven; /* WE watched TC1IP go 1 -> 0 */
@@ -56,6 +50,7 @@ ROT	SPEC.md	tools/console-capture.py	431	f5d6833b72eabd21	meta["started_wallcloc
 ROT	SPEC.md	tools/console-capture.py	462	fe65d0cd4a7cc378	timing.write(f"{offset} {time.monotonic() - t0:.6f}\n")
 ROT	SPEC.md	tools/rlxfw-kbuild.sh	412	327b72644d48cdd9	esac
 ROT	SPEC.md	tools/console-capture.py	373	13441e73708565fb	r, _, _ = select.select([fd], [], [], min(remaining, 0.05))
+ROT	SPEC.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
 ROT	docs/FINDINGS.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It changed what this repository may claim about itself
 ROT	docs/FINDINGS.md	tools/console-capture.py	430	cacf9733abd348fc	t0 = time.monotonic()
 ROT	docs/KNOWN-ISSUES.md	config/rlxfw-kernel.delta	82	5ff8ac5ee469b923	derive CONFIG_GENERIC_GPIO - y selected drivers/gpio/Kconfig:31 -- `me
@@ -70,7 +65,6 @@ ROT	docs/probe3-cells.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedd
 ROT	docs/rlx-cache-and-cp0.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
 ROT	docs/rlx-cache-and-cp0.md	notes/cache-model.md	904	1b3bc3eb0eab8e22	| D-cache | **not measured** | 8 KiB / 16 B (讀, `bspcpu.h:13`) | **no
 ROT	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	855	629b45003d38781e	> 🔴 **And in the write-through branch the two survivors are not separa
-ROT	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	1290	a0474e2d5c0a33e1	| 0 | poison the result block; **initialise the arena**; header; banne
 ROT	notes/cache-model.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
 ROT	notes/dev-loop.md	tools/console-capture.py	368	8120ab3315bbc42b	_fail(f"{p} exists. Refusing to overwrite a capture; use --force or a
 ROT	notes/flash-digest-scope.md	SPEC.md	178	aea1cedcd624cc3f	| `FLS-14` 🔄 | 完整 dump | 4,194,304 bytes，`sha256 a800059a…10f37ea`，用 `
