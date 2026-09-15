@@ -1243,6 +1243,41 @@ covered by the self-test only.
 
 ---
 
+## 17b. 🔴 2026-09-15 (seating 23): `S3` is a stage a handover can forget, and the tree gives no sign of it
+
+**The image a seating uploads is `<work>/<label>/kroot/rtkload/nfjrom`, and
+`S2` does not produce it.** `S3` — `tools/rtkimage.py build` — does,
+from the tree `S2` staged.
+
+量 2026-09-15, checking a handover that said *the image is already on disk*:
+`up2.vmlinux.elf` existed, 4,125,078 bytes, with a manifest and a matching
+`RECIPE_ID`. **`S3` had never been run for it**, so there was no uploadable
+image at all, and the seating would have discovered that with the board already
+at the loader prompt.
+
+🔴 **And the tree actively hides it.** Every staged cell directory
+holds `top/linux-2.6.30/rtkload/nfjrom` and three more under
+`top/boards/*/image/` — **all dated 2026-08-23, all identical across every
+cell**, because they are the vendor's own, copied in by the stage. So *a file
+called `nfjrom` exists under this image's tree* is true and means nothing. The
+test is whether `<work>/<label>/kroot/rtkload/nfjrom` exists and what its
+`sha256` is; `looprun`'s `--image-sha256` is the flag that makes that a check
+rather than a belief, and § 16's `S6` note is where it is stated.
+
+🟢 Running it cost **one desk command** and produced `nfjrom`
+1,057,792 bytes, `sha256 3ff8b3c94029b8ea…`. Its `vmlinux_img` is
+**3,609,088** bytes, which independently reproduces the decompressed-size
+figure `config/rlxfw-initramfs.tsv` records for `up1` — a second reader of
+a number that file measured with a different tool.
+
+⚠️ **`--skip S2,S3` is therefore two different decisions**, and
+§ 10.3 already says the pair cannot be separated by accident: skipping
+`S2` when the build is current is a convenience; skipping `S3` is only safe
+once `S3` has actually run **for this image**, and nothing in the tool or the
+tree distinguishes *assembled* from *never assembled*.
+
+---
+
 ## 18. 🔴 2026-09-14 (seating 21): the loop cannot drive a payload that resets the board, and that decision saved a power cycle
 
 `S4`…`S7` is exactly the five-step shape a bare-metal payload needs — reset,

@@ -369,9 +369,13 @@ probed word is at 00401330`*. And a user capture handed to `--arm device`
 
 ## § 8. What could still be wrong
 
-1. **Nothing here has run on the silicon.** Every statement in § 2 and § 3 is
-   讀 out of source; every statement in § 5 and § 7 is 量 on an artefact or an
-   emulator. The first device reading is `R1-pub-4a`'s seating.
+1. ~~**Nothing here has run on the silicon.**~~ 🔄 **2026-09-15, seating 23:
+   it ran, and this row expired at 20:12:38.** `bench/2026-09-15/C2-UP.log` —
+   75 payload rows, `install_rc=0`, `c1a_raise=1`, `c1b_special0e_n=1`,
+   `scratch_bad=0`, terminator present, `C2` run with `--elf` and silent. § 2
+   and § 3 are still 讀 out of source; what changed is that the artefact they
+   describe has now answered. ⚠️ **One seating, one boot** — nothing here has
+   been repeated.
 2. **The `rt_sigframe` size, 480 bytes, is 推** — derived from the struct's
    members rather than from `sizeof` on the target. It matters only to § 2's
    statement of how far past the frame a stock-header write would land; the
@@ -385,10 +389,31 @@ probed word is at 00401330`*. And a user capture handed to `--arm device`
    against the same artefact. A stronger check would compare the WORD at that
    address against the table, which `isapay.py verify` already does
    separately — running both on the seating's artefact is the pair.
-5. **`alarm(30)` is a number, not a measurement.** 7,195 bytes at 38400 8N1
-   is 1.87 s of wire time and the qemu compute was far below it, so 30 is
-   ~16× — but the device's `write(2)` path through the vendor console driver
-   has not been timed.
+   🔄 **2026-09-15: the pair has been run.** 量 on
+   `build/uprobe.elf`, the artefact seating 23 executed:
+   **0 `artefact has` mismatches and 0 `NOT FOUND` symbols** over all 75 rows,
+   beside a `C2` that ran with `--elf` and was silent.
+   ⚠️ **Two things this does not say.** `verify` reports **52** findings of
+   the *naming* kind (31 *decodes it as*, 21 *names it*) — by design, because
+   a `.word` this core cannot execute still assembles and binutils will not
+   name it — and **this segment did not audit whether all 52 are expected**;
+   it read only the two counts that pair with `C2`. And 🔴 **`verify` needs
+   `--objdump <the rsdk cross objdump>`**: run without it the host's x86
+   binutils decodes every row as `00000000` and the tool reports **75 of 75**
+   findings, which is a misapplied instrument and not a result. Measured
+   today, in that order.
+5. ~~**`alarm(30)` is a number, not a measurement.**~~ 🔄 **2026-09-15: it is
+   a measurement now, and the estimate was close.** 量
+   `bench/2026-09-15/C2-UP.timing`: from the command going out to
+   `rlxuprobe: end` arriving is **2.1140 s**, so `alarm(30)` is **14.2×** and
+   not the ~16× estimated — the difference being that the console, not the
+   compute, is what the run spends its time on.
+   🟢 **And that timing independently reproduces `FW-70`.** The capture is
+   7,305 bytes in 2.1189 s = **3,447 B/s = 89.8 % of 38400 8N1's nominal
+   3,840 B/s**, which lands inside the **88.4–92.7 %** band `FW-70` measured
+   for the Linux era over a completely different payload. The device's
+   `write(2)` path through the vendor console driver is therefore timed, which
+   is the clause this row said was missing.
 6. **The `--range` arguments are typed by an operator.** A card that types the
    wrong range gets a short capture, and the `first=`/`last=` header fields
    are what make that visible rather than silent.

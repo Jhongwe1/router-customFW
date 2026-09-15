@@ -434,6 +434,26 @@ makes it happen.
 script that names `--dump` explicitly and fails loudly without it, and the
 place that owns the closeout list is `CLAUDE.md`, which is the owner's file.
 
+🔴 **2026-09-15, seating 23's closeout: a THIRD occurrence, and the half that
+was missing is now the half that worked.** The closeout ran `scan` without
+`--dump` for the third time — 2026-09-10, 2026-09-15 (seventy-second segment),
+and again here. **What changed is that the closeout was a script that captured
+each gate's output and printed `RED <name> (rc=2)` with the first lines of it**,
+so the failure was read in the same minute rather than sitting in a `.out` file
+for five days. Re-run correctly it reads **CLEAN over 4,467 files with 113
+distinct 16-byte probes**, against `$FWRE_WORK/dumps/flash-n150rt-console-2.bin`
+— the dump `notes/flash-digest-scope.md` names.
+
+⚠️ **The remaining half is still open and it is the one this row asked for**:
+the script had to be told `--dump` by a human after it went red, so a fourth
+occurrence is available to anyone who writes the closeout from memory again.
+🔴 **And a second failure mode was found the same way**: the same closeout
+invoked `tools/xcheck.py check`, which does not exist — the mode is `sweep` —
+and that produced a second `RED` that was also a misuse and not a finding.
+**Two of the eight gates went red for reasons that had nothing to do with the
+tree**, which is the shape that trains a reader to skim reds. Run correctly,
+`xcheck sweep` reads 1,242 artefacts, 3 identities, 0 disagreements.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

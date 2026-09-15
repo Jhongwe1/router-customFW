@@ -1,0 +1,22 @@
+/bin/uprobe r73 0 3
+
+*** rlxuprobe PU a87be346bb83e7f9 r73 ***
+rlxuprobe: rows=0000004b
+rlxuprobe: first=00000000
+rlxuprobe: last=00000003
+rlxuprobe: scratch_b=00000030
+rlxuprobe: uc_pc_lo=00000024
+rlxuprobe: max_sig=00000008
+rlxuprobe: scratch_at=00445d88
+rlxuprobe: install_rc=00000000
+rlxuprobe: c1a_raise=00000001
+rlxuprobe: c1b_special0e_n=00000001
+rlxuprobe: rows begin
+PU 00000000 add 52340000 00000000 00000000 00000000 23456789 a5a5f00d 5a5a0ff2 00000000
+PU 00000001 lw 52340001 00000000 00000000 00000000 a5a5f00d a5a5f00d 5a5a0ff2 00000000
+PU 00000002 sw 52340002 00000000 00000000 00000000 deadbeef 5a5a0ff2 00000000 00000000
+PU 00000003 mult 52340003 00000000 00000000 00000000 23456780 00000000 00000000 00000001
+rlxuprobe: rows end
+rlxuprobe: scratch_bad=00000000
+rlxuprobe: end
+# 

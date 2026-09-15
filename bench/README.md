@@ -86,6 +86,7 @@ number two sources disagree about is not an index, it is a fourth defect.
 | `2026-09-14` | 14 | `CORRECTIONS-block18.md` (+1) | block 18, seating 21, 2026-09-14 — `R1-pub-3` slot 1, both payloads on one power cycle |
 | `2026-09-14b` | 7 | `CORRECTIONS-block19.md` (+1) | block 19, seating 22, 2026-09-14 — `R1f` ＋ `R2c`'s silicon row, ten compilers in one payload |
 | `2026-09-14c` | 27 | `CORRECTIONS-block20.md` (+1) | block 20, **the same power cycle as `2026-09-14b`**, 2026-09-14 — `FW-65` 殘留 ＋ `FW-63` 殘留 on three Linux boots of seating 20's image, plus `MEM-11`/`MEM-12`'s two `DW` cells and `/proc/slabinfo` |
+| `2026-09-15` | 14 | `PREDICTIONS-B22-block21.md` | block 21, seating 23, 2026-09-15, **one power cycle against a budget of one** — `R1-pub-4a`'s column ② on the silicon: 75 payload rows from Linux user mode, `sync` emulated and visible, `ll`/`sc` invisible, `cache`/`mflxc0` privilege artefacts. Riders: `FW-70`'s `LCR` 讀×2 → 量×1, `FW-64`'s six `cat`s, and `IRQ-14` |
 
 ⚠️ **Two directories are named for a day none of their captures happened on**
 and may not be renamed — `2026-08-30` and `2026-08-30b`, both holding captures

@@ -1266,6 +1266,40 @@ different reason; this is the instruction-level one.
 
 ---
 
+## 🔴 `DW <addr> 1` returns FOUR words, not one — 2026-09-15, seating 23
+
+量 `bench/2026-09-15/C1-LCR.log`. The cell typed `DW B800200C 1` and the
+loader answered
+
+```
+B800200C:	03000000	00000000	00000000	10000000
+```
+
+**one complete reply line of four words.** `LDR-41` above establishes the
+length field's *parsing*; this is its *granularity*: the loader does not serve
+a sub-line read, so the smallest `DW` touches **four consecutive words**.
+
+🔴 **Why it matters, and it is a safety property rather than a
+curiosity.** `SPEC.md` `FW-70` forbids reading the UART block indiscriminately:
+`+0x00` is `RBR` and reading it pops a byte off the receive FIFO, `+0x08` is
+`IIR` and reading it clears the pending interrupt id — on the very console
+the seating is being captured over. Seating 23's card argued its safety as
+*this cell reads one word*. **That sentence is false**, and the cell was safe
+for a different reason: its start address is `+0x0C`, so the four words served
+were `+0x0C` (`LCR`), `+0x10`, `+0x14` and `+0x18`, and neither dangerous
+register was in the window.
+
+**So a card must constrain the START ADDRESS, never the count.** A
+`DW B8002000 1` would have been written under the same argument and would have
+read `RBR` and `IIR` both.
+
+⚠️ The three extra words are recorded here so they are not read again
+as a new measurement: `+0x10` `00000000`, `+0x14` `00000000`, `+0x18`
+`10000000`. **Uninterpreted** — no source in this repository has been read
+for what those offsets are on this UART.
+
+---
+
 ## `DW` takes a four-digit length — 2026-08-29, `LDR-41`
 
 量, `bench/2026-08-30/Q3-len.log`. `DW 80A00000 2000` returned **23,527 bytes in

@@ -1462,6 +1462,38 @@ an extra `gpio_get_value` per button, i.e. `Δn_get = 3` on one `cat`.
 
 ---
 
+## 19b. 🟢 2026-09-15 (seating 23): § 19's refutation condition ran, and both halves held
+
+§ 19 states the mechanism and ends with a refutation condition written for
+the next quiet boot: **the fifth `cat` must print `n_state_chk 9`, the sixth
+must print `12`, and only that one dump may carry an extra blank line**; a `+3`
+anywhere `chk+1` is not a power of ten refutes it.
+
+**量 `bench/2026-09-15/C2-G1` … `C2-G6`**, six consecutive
+`cat /proc/rtl819x-gpio` on a boot with nothing else reading that file:
+
+| cell | `n_state_chk` | capture bytes |
+|---|---|---|
+| `C2-G1` | 1 | 600 |
+| `C2-G2` | 3 | 600 |
+| `C2-G3` | 5 | 600 |
+| `C2-G4` | 7 | 600 |
+| `C2-G5` | **9** | **602** |
+| `C2-G6` | **12** | 601 |
+
+🟢 **The byte column is an independent second observable and it
+separates two different causes**, which is why the card predicted them
+separately: `C2-G5`'s **+2** is the extra CRLF the third `read()` copies, and
+`C2-G6`'s **+1** is simply `12` being one character wider than `9`. A single
+"the dumps get longer" prediction would have been satisfied by either.
+
+⚠️ The precondition is the whole rider and it was stated on the card:
+nothing may read `/proc/rtl819x-gpio` between the boot and `C2-G1`. `uprobe`,
+the block's main cell, reads no `/proc` at all — which is why it could be
+ordered first without disturbing this.
+
+---
+
 ## 20. § 18's signed prediction, measured
 
 **量 2026-09-14, seating 22, boot 4.** The prediction at § 18 — six lines that a

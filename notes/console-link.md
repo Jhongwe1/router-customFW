@@ -183,6 +183,42 @@ loader fastest.*
 
 ---
 
+## 2b. 🟢 2026-09-15 (seating 23): the `LCR` is 量, and the scope is narrower than `FW-70` reads
+
+`FW-70`'s residual ① asked for one cell: `DW B800200C 1` at the loader
+prompt, to move `LCR` from 讀×2 量×0 to a measurement. It ran.
+
+**量 `bench/2026-09-15/C1-LCR.log`: `B800200C: 03000000`.** Top byte `03` —
+8N1, 10 bit/char. The two 讀 sources agreed with it and the two values
+written down in advance as refutations — `07` (8N2) and `0B` (parity) —
+did not appear. **So the 3,840 B/s denominator under every percentage in § 2
+is measured rather than inferred.**
+
+⚠️ **What it does NOT measure.** This is the **loader's** `LCR`, so it
+settles source ② (`rlxdefs.h:195 (stage 1 writes 0x03000000 to LCR)`).
+**Linux's own `LCR` stays 讀**: this image has no `devmem` and `FW-46`
+records that its busybox has no applet that can read a register, so there is no
+route to the Linux-era value from a shell. The row is 讀×2 量×1,
+not 量×2.
+
+🟢 **And the same seating reproduced § 2's throughput band from a
+different payload.** `bench/2026-09-15/C2-UP` is 7,305 bytes in 2.1189 s =
+**3,447 B/s = 89.8 %** of nominal, inside the **88.4–92.7 %** this file
+measured for the Linux era over the `/proc`-dump corpus. Two unrelated payloads,
+one band.
+
+🔴 **A finding this cell produced that nobody asked for: `DW <addr> 1`
+returns FOUR words on this loader**, not one —
+`03000000 00000000 00000000 10000000`, i.e. `+0x0C` through `+0x18`. It was
+safe here because the start address is `+0x0C`, so `RBR` (`+0x00`, reading it
+pops a byte off the receive FIFO) and `IIR` (`+0x08`, reading it clears the
+pending interrupt id) were never touched — **but the card's safety argument
+was written as *this reads one word*, and that sentence is false.** What a card
+must constrain is the **start address**, not the count.
+`docs/loader-command-semantics.md` owns the reply-granularity half.
+
+---
+
 ## 3. Related rows
 
 `SPEC.md` `FW-70` (this file owns it), `LDR-40` (the loader's `DW` reply

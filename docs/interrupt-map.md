@@ -874,6 +874,50 @@ completed, and over 25,853 periods it produced none. ⚠️ That is a **bound at
 
 ---
 
+## 7b. 🟢 2026-09-15 (seating 23): `TA6` does not follow image size, measured with the code held still
+
+`IRQ-13`'s lost-interrupt count `RLXFW-TA6` read **11** on nine of seating 17's
+ten boots and **8** on all thirteen of seating 18's. The only mechanism ever
+offered was that `vmlinux` grew and moved the vendor NIC init's I-cache
+alignment, and **that was already refuted by a third image whose size changed
+and whose `TA6` did not**.
+
+Seating 23 is a fourth point, and it is the first one taken with the confound
+held still.
+
+量 2026-09-15 at the desk, before power, `r59.System.map` against
+`up2.System.map` over the **13,172** symbol names that occur exactly once in
+both files:
+
+* **12,271 symbols at the same address;**
+* **exactly one `t`/`T` symbol moved, and it is `__initramfs_end`**
+  (`80369e00` → `80371200`, `+0x7400` = 29,696 bytes = `uprobe` plus its
+  cpio header);
+* 900 `b`/`B`/`d` symbols moved by the same `0x7400`;
+* the two mark sets are identical row for row, and the built `.config` files
+  differ by **one line, which is the timestamp comment**.
+
+So the image grew by 29,696 bytes **without moving a single instruction**. The
+prediction registered in `bench/2026-09-15/PREDICTIONS-B22-block21.md` § 5
+was `TA6 = 0000000B`, with the discrimination stated: **a different value could
+not be explained by the I-cache alignment of code, because no code moved.**
+
+**量 `bench/2026-09-15/up2-boot.log`: `RLXFW-TA6=0000000B`.** `SPEC.md`
+`IRQ-14`.
+
+⚠️ **This narrows the candidates; it does not explain the loss.**
+§ 8's phase-of-boot reading is untouched, and the mechanism behind
+`IRQ-13` is still unexplained — the driver works around it.
+
+🔴 **The instrument that nearly produced the opposite answer.** A
+`join` on the symbol name reports **3,873** differing addresses, because a
+`System.map` holds 119 repeated names and the join pairs the wrong rows. It
+disagreed with six hand-checked symbols, and that disagreement is what exposed
+it. The population above — names unique **in both files** — is one a
+pairing cannot get wrong.
+
+---
+
 ## 8. 🆕 2026-09-06 (seating 14): where TC1's interrupts go missing, and it is a phase of boot rather than a rate
 
 § 7 bounded the loss at zero over 258.53 s **after** a handover, and § 3.6's
