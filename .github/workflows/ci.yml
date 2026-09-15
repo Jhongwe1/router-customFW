@@ -898,6 +898,16 @@ jobs:
       - name: isapay
         run: /usr/bin/python3 tools/isapay.py --self-test 2>&1 | tee ci-out/isapay.out; exit "${PIPESTATUS[0]}"
 
+      # `elfops` counts MIPS encodings BY OPCODE.  量 2026-09-15: the rsdk
+      # objdumps decline to name `movz`/`movn` and print the raw word, so
+      # grepping a disassembly for a mnemonic is a lower bound that looks
+      # like a total.  C7/C8 cross-check ADDRESS FOR ADDRESS against
+      # `tools/hazlint`'s own K6a pins and need $FWRE_WORK/stage2.bin,
+      # which is this unit's bootloader and cannot be committed; they
+      # skip here and the row says so.
+      - name: elfops
+        run: /usr/bin/python3 tools/elfops.py --self-test 2>&1 | tee ci-out/elfops.out; exit "${PIPESTATUS[0]}"
+
       # `R1b`'s three, 2026-09-13.  `hazpay` generates probe5 and holds the
       # two-source expectation check; `hazdecl` is probe5's BUILD GATE and its
       # two pure functions are what run here -- `tools/hazlint` itself needs a

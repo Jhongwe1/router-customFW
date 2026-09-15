@@ -1121,3 +1121,76 @@ difference is confined to the button-read helper and the `RTL8188E` bonding
 branch, so the bit-6 structure and its ordering are the same in both groups.
 That is better than `cpu.h`'s one-source-three-copies, and it is not
 independence.
+
+---
+
+## § 9.5 — the signal-delivery path was read, 2026-09-15 (`R1c`, seventy-second segment)
+
+**Not one of these paths is in scope, and `ledgerscan check` was green before
+they were declared.** 量 on the tree carrying
+`config/rlxfw-user/isaprobe/uprobe.c`: **83 in-scope paths, green**, and every
+path below classes `out-of-scope` — no `domain_of` needle matches `traps`,
+`signal`, `unaligned`, `branch`, `sigcontext` or `siginfo`. They are declared
+anyway, on § 2.1's stated direction of error and for the reason § 4.4 gives
+for `rlxregs.h`: **a ledger whose only rows are the ones a checker demanded is
+a ledger whose omissions cannot be audited.**
+
+⚠️ **What this reading is NOT.** No peripheral driver was opened. Nothing here
+carries a register address, a bit number or an initialisation sequence, so
+none of it lands on either layer § 5 scores, and **no `R5` driver's
+blind-write claim moves.** What was taken is the kernel's
+**exception-to-signal ABI** — where the EPC points when a signal is delivered,
+what `struct sigcontext` looks like on this port, which signal numbers this
+port uses — because `uprobe.c` runs 75 encodings as an ordinary process and
+has to read the frame the kernel hands it.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `arch/rlx/kernel/traps.c` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `do_ri` `:546-587`, `do_cpu` `:589-636`, `simulate_llsc` `:443-451`, `simulate_ll` `:356-393`, `simulate_sc` `:395-434`, `simulate_sync` `:454-462`, the opcode masks `:334-345`, the `force_sig` path `:580-586`. **The finding is an ORDERING, not a value**: the EPC is advanced by `compute_return_epc()` and then put back immediately before `force_sig`, and `do_cpu`'s `cpid != 0` arm never advances it at all — so all three signal-delivering paths leave `sc_pc` on the faulting instruction and `uprobe.c`'s `+4` is uniformly correct. 🔴 Cited 32 times across 18 files before today and **never declared**, because the domain rules put it out of scope; § 4's own prose names it as the example of an out-of-scope file |
+| `arch/rlx/kernel/signal.c` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `setup_rt_frame` `:369-425`, `setup_sigcontext` `:57-71`, `restore_sigcontext` `:73-89`, `sys_rt_sigreturn` `:278-321`, `install_sigtramp` `:113-130`, the `a0`/`a1`/`a2` loads `:409-414`. **Where the `uc + 24` / `uc + 32` / `uc + 40 + 8i` offsets come from** — the numbers `uprobe.c` asserts against the libc header at compile time — and the fact that the kernel plants its own two-word sigtramp on the user stack, so `SA_RESTORER` must not be set |
+| `arch/rlx/include/asm/sigcontext.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `struct sigcontext` `:19-26`, sizeof **288**. 🔴 **The whole reason the reading was needed**: the toolchain's stock-MIPS header makes it **592**, so a write to `uc->uc_sigmask` through the libc definition lands 136 bytes past the end of the frame the kernel allocated. Byte-identical in all three GPL drops — one source, three copies, the same weakness as `cpu.h` |
+| `arch/rlx/include/asm/ucontext.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `struct ucontext` `:13-19`, read for one thing: the field order that puts `uc_mcontext` at `uc + 24` and `uc_sigmask` at `uc + 312`. Nothing in this tree had cited it before today |
+| `arch/rlx/include/asm/signal.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. The `SIGnn` numbering `:24-61`, `struct sigaction` and `k_sigaction` `:114-122`, `sig_uses_siginfo` `:100-104`. 🔴 **MIPS numbers its signals differently from every other port and the difference lands exactly where this instrument reads**: `SIGEMT` takes 7, so `SIGBUS` is 10 — a table copied from `signal(7)` prints a genuine `SIGBUS` as `SIGEMT` and nothing looks wrong. `tools/isapay.py`'s `MIPS_SIGNAMES` is this reading |
+| `arch/rlx/include/asm/branch.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `delay_slot()`, `exception_epc()`, `compute_return_epc()` `:13-36` — the declarations the undo-skip-over argument is read against, so it rests on two files rather than on one |
+| `arch/rlx/kernel/branch.c` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `__compute_return_epc` `:22-52` — what the advance would have been, which is what makes the restore a cancellation rather than a no-op, and why a probed word in a branch delay slot would break `+4`. Previously cited once by `tools/emueq.py` and never declared |
+| `arch/rlx/kernel/unaligned.c` | **line** | 🔴 **vendor** | 🆕 2026-09-15. The `lwl`/`lwr`/`swl`/`swr` refusal `:122-139` and `do_ade` `:400-439`. 🔴 **And it corrected an owner file**: `notes/vendor-kernel-isa.md` § 2 said *no such handler exists*, and a handler does exist and is built unconditionally — what does not exist is emulation of those four instructions themselves. `arch/rlx/kernel/Makefile:7-9` is the second half of that |
+| `arch/rlx/include/asm/ptrace.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `user_mode()` `:80` and `die_if_kernel()` `:89-93` — read to establish that a fault taken by this program takes the *user* arm, and, from the other side, that **a kernel-mode probe cannot reach any `simulate_*` at all**. Cited at `notes/vendor-kernel-isa.md` since before today and never declared |
+| `arch/rlx/include/asm/isadep.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `KU_MASK` / `KU_USER` `:15-17`, the two constants `user_mode()` is written on. Three lines, declared because the claim above rests on them |
+| `arch/rlx/include/asm/unistd.h` | **line** | 🔴 **vendor** | 🆕 2026-09-15. `:20` and `:214-215` — `__NR_rt_sigaction` **4194** and `__NR_rt_sigreturn` **4193**, read so the sigtramp can be identified by number rather than trusted by name |
+| `arch/rlx/include/asm/inst.h` | **name** | 🔴 **vendor** | 🆕 2026-09-15, and **the row exists because a citation was invented before the file was opened**. `tools/elfops.py`'s first draft said its opcode table was *"cross-checked against `arch/rlx/include/asm/inst.h`'s own enum"*; the file was then opened and holds `fmovz_op = 0x12` and `fmovn_op = 0x13` — **the COP1 floating-point variants, a different field of a different opcode** — and no integer `movz`/`movn` at all. 🔴 A citation that, if followed, supplies the wrong numbers. Depth is `name` and not `line`: what was taken is the absence, by one grep, not the enum |
+| `include/asm-generic/siginfo.h` | **line** | **generic** | 🆕 2026-09-15. `SI_KERNEL` `0x80` `:144` and the `ILL_*` / `FPE_*` / `SEGV_*` / `BUS_*` / `TRAP_*` codes `:159-203`. Read so the `si_code` decode predicts rather than describes: `force_sig` sends `SEND_SIG_PRIV`, so a reserved instruction is **expected** to carry `SI_KERNEL` and `ILL_ILLOPC` would be the surprise. Generic Linux, unmodified |
+| `kernel/signal.c` | **line** | **generic** | 🆕 2026-09-15. `force_sig` `:1250-1254` and the `SEND_SIG_PRIV` arm `:877-883` — the other half of that prediction, and the reason it is a statement about the *kernel* rather than about `arch/rlx`. Generic Linux |
+
+### The two paths `ledgerscan` is structurally blind to, and the four it cannot see at all
+
+🔴 **`arch/rlx/Kconfig` and `arch/rlx/kernel/Makefile` were both read again this
+segment** — `CPU_HAS_LLSC` / `CPU_HAS_SYNC` `:91-98` and `TRAD_SIGNALS` `:17-19`
+in the first, the `obj-y` list `:7-9` in the second. Both already have rows, in
+§ 4.9 and § 4.1. ⚠️ **Neither row is counted by anything**: `PATH_RX` requires a
+`.c` / `.h` / `.S` suffix, so a suffix-less path is invisible to `scan` and to
+`ledger_rows` alike. They are declarations to a reader and to nothing else, and
+saying so is worth more than adding a third row that is equally invisible.
+
+🔴 **And the toolchain's own headers cannot be declared in a way any checker
+reads.** `PATH_RX`'s prefix alternation is a 2.6.30 tree's top level, so
+`bits/sigcontext.h` and `sys/ucontext.h` never appear as citations at any
+depth. The four below are for a human.
+
+| path, under `rsdk-1.3.6-4181-EB-2.6.30-0.9.30/include/` | depth | origin | what was taken |
+|---|---|---|---|
+| `bits/sigcontext.h` | **line** | 🔴 **toolchain, not a kernel tree** | 🆕 2026-09-15. The **stock MIPS** `struct sigcontext` in full, sizeof **592** against the kernel's 288. **The disagreement is the finding**; `uprobe.c`'s compile-time offset assertions exist so a toolchain that stops agreeing fails the build instead of producing a measurement |
+| `sys/ucontext.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-15. `struct ucontext` — puts `uc_sigmask` at `uc + 616` and `sizeof(ucontext_t)` at about **744**, against the kernel's 312 and 推 480 |
+| `bits/sigstack.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-15. `stack_t` = `ss_sp`, `ss_size`, `ss_flags` — 12 bytes, the same on both sides, which is what puts `uc_mcontext` at `uc + 24` in both and makes the agreement checkable rather than assumed |
+| `bits/sigset.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-15. `_SIGSET_NWORDS` — the 128 bytes an assignment to `uc->uc_sigmask` would write |
+
+⚠️ **§ 8's counts are stale and this segment makes them staler**, which is
+declared rather than repaired here: § 8's out-of-scope figure is **68** and its
+in-scope figure is **58**, while `ledgerscan scan` reads **122** and `check`
+reads **83**. The drift predates this segment; a reader comparing the new
+section against § 8 should use the tool.
+
+*(Those two numbers were first written here inside code spans, which wrapped
+across a line break and left a line starting with `|`. `spec-check`'s `C8c`
+caught it — the same defect the seventeenth update of `CLAUDE.md` records in a
+frozen card, and the reason it is worth repeating is that a pipe at the start
+of a wrapped line is invisible in a rendered view.)*

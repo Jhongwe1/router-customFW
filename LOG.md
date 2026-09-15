@@ -27740,3 +27740,82 @@ CHANGED = 那段內容不存在了(不可判定,報出來而不是報紅)。
 廠商的 `traps.c` 在發訊號**之前**倒回 `cp0_epc`,所以一個「返回就好」的處理器會永遠重跑;
 而 `force_sig` 送的是 `SEND_SIG_PRIV`,所以 `si_code` 是 `SI_KERNEL` 而 **`si_addr` 讀 0**,
 不是出錯的 PC —— 任何用 `si_addr` 認列的設計一上場就死。
+
+
+## 2026-09-15 — 第七十二段(16:48 開場,桌面,**零電源循環**,板子全程斷電):`TC-05` 的判準第一次真的跑,唯一地選出一條 —— 而我當成新發現寫上去的另一件,上一段就已經量過了
+
+**這一段做出來的東西是 `uprobe`:本專案第一個自己編、在 Linux 下當行程跑的二進位,也是 `R1-pub-4a` 欄②的儀器。** 到收工為止它過了六個閘門、進了一顆建好的映像、桌面端的判讀器接上並用真擷取驗過正負兩個方向 —— 而**矽片上一列都還沒跑**。
+
+### 1. 為什麼是這件事
+
+`R1-pub-4a` 的欄② 只卡在一件不存在的東西上。`docs/emulation-surface.md` §7.5 當時寫著 *"The harness does not exist and its toolchain is undecided"*,而偵察下去發現那兩半都比看起來近得多:`tools/tc-smoke.sh:214` 已經在做 `-static` 連結並斷言 big-endian／MIPS／EXEC,`SPEC.md` `TC-16` 記著三個 release 都到 L4,`tools/hazlint` 掃的是可執行 `PT_LOAD` 而不需要 `PT_DYNAMIC`(所以靜態 ELF 直接可驗),映像餘裕以百萬位元組計。
+
+**決定是做整支,理由不是「比較大」。** 板子斷電,造儀器沒有機會成本 —— 這正是造儀器的時候。而整支有一個半支沒有的性質:`cells4.S` 是 `isapay.py` 從 `isa-payload.tsv` 產生的 75 個 `.globl` 函式,**可以原封不動連進 userspace 二進位**,所以欄①與欄②不是兩張碰巧一致的表,是**同一個產生器、同一張母體表、同一批 `.word`,只差特權層級**。
+
+### 2. 工具鏈,用寫好的判準量出來(`TC-57`)
+
+`SPEC.md:696` 的殘留寫著 userspace 工具鏈的判準與 kernel 同一條 —— 過 `hazlint` 0 violations —— 而 `notes/vendor-toolchains.md` 記著這條檢查**從沒對任何 `libc.a` 跑過**。跑了:
+
+| | 連結後的二進位 | 整個 `libc.a`(`ar x` ＋ `ld -r`) | libc 裡 load 後接 nop |
+|---|---|---|---|
+| **`rsdk-1.3.6-4181`** | **0** | **0 / 19,096 loads** | **4,051(21.21 %)** |
+| `rsdk-1.3.6-5281` | 140 | **4,574** / 19,141 | **1(0.01 %)** |
+| `rsdk-1.5.5-5281` | 128 | **3,741** / 14,491 | **0(0.00 %)** |
+
+**判準判得動,而且唯一。** 🔴 **那個 0.01 % 就是全部的解釋**:`notes/vendor-toolchains.md` §5 早就預測用 `-march=5281` 建的 uClibc 是為一顆有 load interlock 的核心建的,而 19,141 個 load 裡只有一個補了延遲槽 —— 不是比較少,是沒有。用那兩條之一就是把三四千個 load-use hazard 放進一顆把 load delay slot 架構性暴露出來的晶片上的 userspace。
+
+### 3. harness 寫來對付的 ABI,以及它推翻的兩個模型
+
+**`CPU-61`:kernel 與工具鏈對 `struct sigcontext` 不同意。** `arch/rlx` 的是截短版 sizeof **288**,工具鏈的 `bits/sigcontext.h` 是原版 MIPS sizeof **592**。兩者在 `uc_mcontext` = 24、`sc_pc` = 32(BE 有效字 36)、`sc_regs[i]` = 40+8i 上**逐格相同**,分歧從 `sc_fpregs` 開始 —— kernel 把 `uc_sigmask` 寫在 `uc+312`、整個 `rt_sigframe` 推 480 位元組,libc 標頭說 `uc+616`。🔴 **透過 libc 標頭寫 `uc->uc_sigmask` 會把 128 位元組寫到 kernel 配的框外 136 位元組處。** harness 因此自己宣告版面,並在**編譯期**斷言那三個偏移。
+
+**`CPU-62`:`+4` 一律正確,而那不是顯然的讀法。** 一個合理的模型會說 `do_cpu` 的 `cpid != 0` 臂把 EPC 推進了、`+4` 會多跳一條,而那會錯在九個 COP1/2/3 列上。讀源碼:`compute_return_epc` **寫在 `if (cpid == 0)` 區塊裡面**,那一臂根本沒執行過它。三條送訊號的路徑因此都把 `sc_pc` 留在出錯指令上。⚠️ 同一次讀出來的另一半:`die_if_kernel` 在**每一個** `simulate_*` 之前,所以**一個 kernel 模組的探針到不了任何模擬器** —— 那條路不是使用者空間那條的替代品。
+
+**`CPU-63`:MIPS 的 `SIGBUS` 是 10,不是 7**(`SIGEMT` 佔了 7)。照 `signal(7)` 抄的表會把真的 `SIGBUS` 印成 `SIGEMT` 而看起來完全正常。`force_sig` 走 `SEND_SIG_PRIV`,所以 `si_code` 是 `SI_KERNEL` = `0x80`、`si_addr` 讀 **0** —— 出錯的 PC 只能從 `uc_mcontext.sc_pc` 拿,而 qemu 上讀到 `004011c0` 正是它。
+
+### 4. 六個閘門,與 G1b 為什麼是窄化而不是豁免
+
+`emit --check` / 我們的碼 `break` 0 / **連結後 `break` 恰好 2 且都在 `__GI_abort` 內** / `hazlint` 0 violations 在 938 個 load 上 / `_w` 符號 75 對 75 / 連結警告 known 1 unexpected 0。
+
+🔴 **`R1C-1-b` 的字面要求是連結後零 `break`,而這顆做不到。** `abort.os` 是 `__uClibc_main.os` 拉進來的,歸零要 `-nostdlib` 加手寫 `_start`／`rt_sigaction`／`sigsetjmp`／`siglongjmp`。**那個交換被拒絕,理由寫下來了**:手寫的 MIPS `sigsetjmp` 存錯一個 callee-saved 暫存器是**靜默的**,而這整支儀器就是一個訊號處理器。閘門因此變成**有界**而不是被豁免 —— 跟 G4 同一個形狀,第三個 `break` 就紅。
+
+### 5. 桌面那一半,與它唯一能做的身分檢查
+
+`tools/isapay.py` 多了 `--arm user`,五個新案例,**29 of 29**。最尖的接縫是勘查在工具寫出來之前抓到的:`verdict_row` 用 `if n:` 判 trap,而我原本在 `n` 的 bit 31 放 ESCAPED 旗標 —— **一個逃生但沒 trap 的列會被讀成 `TRAPS`**。而旗標是多餘的(逃生口在 `n > max_sig` 觸發),所以**改格式而不是改工具**,`n` 保持純計數,閾值由擷取自己帶出來。
+
+**C2 是這個 arm 才有的控制**:`force_sig` 走 `SEND_SIG_PRIV` ⇒ `si_addr` 讀 0,所以唯一的身分來源是 `sc_pc`,而它必須等於該列自己 `rlx_p4_<name>_w` 的位址。**查在桌面端,用 ELF 自己的符號表** —— 把 75 個位址編進二進位會是 ELF 已經帶著的東西的第二份。正控制:35 個 trap 列全中。負控制:改壞一個 PC ⇒ `C2 special0e faulted at DEADBEE0, its probed word is at 00401330`。**不給 `--elf` 就報 `C2 NOT RUN` 並 rc=1 —— 缺席的檢查不是通過的檢查。**
+
+### 6. `tools/elfops.py`,與它自己的 C7 抓到我
+
+按 opcode 解碼而不是按 objdump 的助憶符。**8 of 8**,而 C7 是它值得信任的全部理由:對 `stage2.bin` 的程式碼區,與 `tools/hazlint` 的 `K6a` **位址逐一比對**(hazlint 自己的註解寫著為什麼 —— 一個計數看不見一個字答錯,只要總數沒變)。
+
+🔴 **C7 第一次跑就紅了,而 hazlint 是對的。** 我讀 `movn 12`,它釘 6。查下去:hazlint 把 `stage2.bin` 切成程式碼區與資料區(`STAGE2_CODE_HI = 0x8040A000`)而只數前者,我掃了整個檔;我多出來的六個全是同一個字 `0000004b`,落在 `0x8040D800/820/840` 與 `0x8040DB00/B20/B40` —— 間隔 0x20 的兩組三個,一張資料表。**對程式碼與資料混在一起的裸 blob 做 opcode 掃描會過數,而過數長得跟量測一模一樣。** `--range` 因此存在,而那個發現被留成控制 C8。
+
+### 7. 映像
+
+`mkinitramfs` 接受了新的一列(36 entries,manifest 裡 `/bin/uprobe file 29092 …` 的 sha256 與建置輸出逐位元組相同)。`config/` 定稿後建 `up1`:`recipe=fa75a5bb`、vmlinux **4,125,078** 位元組、decompressed 3,609,088、margin **1,633,792**(68.8 % used)。**uprobe 真的在裡面,三個獨立證據**:7 個 `rlxuprobe` 字串、1 個 `bin/uprobe` cpio 路徑、1 個編進去的 build id `a87be346bb83e7f9`。
+
+**開機擷取的預測寫下來了:1,637 位元組**,與 `bench/2026-09-14c` 的四份同長,唯一必然不同的一行是 `RLXFW-ID0` 由 `692A2801` 變 `FA75A5BB`。⚠️ `RLXFW-TA6` 可能也會動,理由是 seating 18 量過的 I-cache 對齊。
+
+### 8. 🔴 這一段自我推翻八次,而那才是它可信的理由
+
+| | 被推翻的 | 推翻它的 |
+|---|---|---|
+| 1 | 子 agent 推論 `do_cpu` 的 `cpid != 0` 臂會讓 `+4` 多跳一條 | 我自己讀 `traps.c:589-636` |
+| 2 | 子 agent 說 1.5.5 因為 uClibc `memcpy` 的 `lwl/lwr` 被淘汰 | 本專案自己的 `probe4` 讀數 —— 這顆晶片執行那一組 |
+| 3 | 我的 Makefile 註解說 `-mno-abicalls` 對 `cells4.S` 是必要的 | 我自己的兩臂實驗:逐位元組相同 |
+| 4 | 我在 `n` 的 bit 31 放 ESCAPED 旗標 | 勘查發現它與 `verdict_row` 的 `if n:` 碰撞;旗標本來就多餘 |
+| 5 | 我的 `elfops` 讀 `movn 12` | `hazlint` 的 `K6a` 釘 6,而它是對的 |
+| 6 | `elfops.py` 說它的表「cross-checked against `arch/rlx/include/asm/inst.h`」 | 我沒讀過那個檔;讀了以後發現它只有 `fmovz_op = 0x12`／`fmovn_op = 0x13`,**照著抄會拿到錯的值** |
+| 7 | 我把 `EOVERFLOW` 三臂當新發現 | `SPEC.md` `TC-56`,量於 **2026-09-14**,同樣的原因、同樣的錯誤訊息、同樣那句「第三張臉」。新的只有第三臂(`-I` 指向 DrvFs 也一樣死) |
+| 8 | 我說 rsdk objdump「拒絕命名 `movz`/`movn`」是工具鏈的缺陷 | `docs/isa-payload.md` 早就有那條原則:被告知 MIPS-I 的解碼器拒絕 MIPS-IV 編碼是**對的**。陷阱在上一層 —— 一個在某個 ISA level 解碼的普查看不見另一個 level 的編碼 |
+
+🔴 **第 7 條與第 8 條是同一個方法失效的兩個實例,而抓到它們的是 `git grep` 全 repo,不是重讀自己的草稿。** 而第一版的掃描腳本把 `--` 放在 pattern 前面,git 於是把全部當成 pathspec,**每一項都回 0** —— 包含 `TC-56` 明明含有的 "Value too large"。**一個報 0 的工具在做一個宣稱**,第二版因此自帶正控制。
+
+### 9. 帶走的
+
+- **卡片還沒寫。** 那是下一段上電之前的第一件事,而 `config/` 從 18:05 之後一個位元組都沒動,`RECIPE_ID` 重新導出仍然是 `fa75a5bb`。
+- 🔴 **`config/rlxfw-user/isaprobe/Makefile` 裡那段 objdump 的措辭還是舊的(太強的那個版本)。** 沒有就地改,**理由是改它會移動 `RECIPE_ID` 並使剛建好的映像作廢** —— 改正寫在 `tools/elfops.py` 與 `notes/userspace-probe.md` 裡,Makefile 等下一次 `config/` 本來就要動的時候。
+- `docs/blind-write-ledger.md` §8 的兩個計數已經過期(68 對 122、58 對 83),§9.5 宣告而沒有修。
+- `spec-check` 的 `C8c` 抓到我寫的帳本段落:一個 code span 換行後新的一行以 `|` 開頭,被讀成孤立的表格列。**與第十七次更新記在凍結卡片上的是同一個缺陷。**
+- 上一段的桌面清單原封不動:`CLK-29` 無擁有者檔、`SPEC.md` §17 三列的搬家、`REGIMM-1`、`VDR-1`、`R1-pub-4b`、`citecheck` 的 57 個 ROT。
+- ⚠️ `du -sh $FWRE_WORK/rebuild` = **26 G**(磁碟還有 894 G,不急,但在長)。

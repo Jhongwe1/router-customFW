@@ -261,11 +261,33 @@ which handful or why it was not eight.
    `si_code` is `SI_KERNEL` and **`si_addr` reads 0**, not the faulting PC.
    Any design that identifies the faulting row by `si_addr` is dead on
    arrival.
-5. **The harness does not exist and its toolchain is undecided.** `R7` owns
-   which toolchain rlxfw's userspace uses, and 量 `config/rlxfw-initramfs.tsv`:
-   the image carries the unit's own busybox and uClibc and **no compiled
-   userspace of this project's at all**. `R1c`'s harness would be the first.
-6. **`R1C-1-b`'s build gate is written down and not built.** The linked `R1c`
-   binary must contain **zero `break` instructions** — gcc emits `break 7` for
-   integer division by zero, and a `break` in the harness is an exception the
-   harness did not intend. `objdump -d`, count must be 0.
+5. ~~**The harness does not exist and its toolchain is undecided.**~~ 🔄
+   **2026-09-15 (seventy-second segment): it exists, it is gated six ways,
+   and it is in an image.** `config/rlxfw-user/isaprobe/uprobe.c` links
+   `tools/rlxprobe/cells4.S` VERBATIM -- the same file `probe4` links -- so
+   columns ① and ② are the same `.word` bytes at two privilege levels
+   rather than two tables that happen to agree. `notes/userspace-probe.md`
+   owns it. The toolchain was decided by `TC-05`'s already-written
+   criterion, applied and measured: `rsdk-1.3.6-4181` reads 0 `hazlint`
+   violations over its whole `libc.a` where the two 5281 toolchains read
+   4,574 and 3,741. ⚠️ **`R7`'s gate decision is still `R7`'s** -- what
+   this settles is which toolchain `R1c`'s harness uses.
+   🔴 **Column ② is still 推 for every row**: nothing of this has run on
+   the silicon, and `qemu-mips-static` is an instrument test whose scope
+   is `qemu/README.md`'s new section, not a reading.
+6. ~~**`R1C-1-b`'s build gate is written down and not built.**~~ 🔄
+   **2026-09-15: built, and the artefact does not meet it as written.**
+   The linked binary must contain **zero `break`** -- gcc emits `break 7`
+   for integer division by zero, and a `break` in the harness is an
+   exception the harness did not intend. 量: it contains **two**, both
+   `break 0xff` inside `__GI_abort`, which `__uClibc_main.os` pulls into
+   the link. Zero needs `-nostdlib` and a hand-written `_start`,
+   `rt_sigaction`, `sigsetjmp` and `siglongjmp`; that trade was declined
+   because a hand-written MIPS `sigsetjmp` that saves the wrong
+   callee-saved register is SILENT and this instrument is a signal
+   handler. The gate is therefore **bounded rather than waived**:
+   `G1` is zero in code this project wrote, `G1b` is *exactly two, both
+   inside `__GI_abort`*, and a third would be red.
+   🔴 And the count is taken **by opcode**, never from objdump's
+   mnemonic: 量 2026-09-15 the rsdk objdumps decline to name `movz` and
+   `movn` and print the raw word. `tools/elfops.py` decodes.

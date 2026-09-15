@@ -144,8 +144,27 @@ been run on the device and nothing here says it has.
 at `-march=5281` is built for a core with a load interlock, so it carries no
 load-delay padding; linking it under a 4181 object puts exactly the code §5
 measures as wrong for this core into every binary. **The mixture is not safe; it
-is unexamined on the axis that matters most**, and the check is one `hazlint` run
-over `mips-linux/lib/libc.a` that has not been done.
+is unexamined on the axis that matters most**, and ~~the check is one `hazlint` run
+over `mips-linux/lib/libc.a` that has not been done~~
+🔄 **2026-09-15 (seventy-second segment): that run has been done, for all
+three toolchains, at population scale, and this section's own prediction is
+quantified by it.** `R7`/`TC-05`'s written criterion -- pass `hazlint` with
+0 violations -- was applied to each candidate twice: once to a linked static
+harness and once to the whole `libc.a`, relinked with `ld -r` so nothing is
+read across a member seam.
+
+| toolchain | linked binary | whole `libc.a` | load followed by `nop`, in libc |
+|---|---|---|---|
+| `rsdk-1.3.6-4181` | **0** | **0 over 19,096 loads** | **4,051 (21.21 %)** |
+| `rsdk-1.3.6-5281` | 140 | **4,574** over 19,141 | **1 (0.01 %)** |
+| `rsdk-1.5.5-5281` | 128 | **3,741** over 14,491 | **0 (0.00 %)** |
+
+🔴 **The 0.01 % is this section's prediction arriving as a number.** A
+uClibc built at `-march=5281` is built for a core with a load interlock: it
+carries **one** nop-after-load in 19,141. Not *less padding* -- none.
+⚠️ And the 3-violation `boa` figure below is a sample of the same thing at a
+much smaller scale; the population number is 4,574. `notes/userspace-probe.md`
+§ 1 owns the measurement and the decision it licenses.
 🔄 **2026-08-28: it is no longer unexamined, and it fails.** `R2a/b/d-4` built
 the vendor's own `boa` this way — `mips-linux-xgcc` at `-march=4181` against the
 5281-built uClibc — and `hazlint` over `[DT_INIT, DT_FINI)` reports **3
@@ -153,8 +172,13 @@ violations** against **0** for the same source built with `rsdk-1.3.6-4181`.
 量: they are at `0x004039b8`, `0x00403a04` and `0x00403a14`, and 讀 the section
 table puts all three in `.init` (`0x0040394c`, 0x78 bytes) and the first 0x44
 bytes of `.text` — **the crt prologue, i.e. the first instructions the program
-executes**. `libc.a` itself is still not scanned; what is scanned is what the
-linker actually pulled in. `notes/rebuild-vs-shipped.md` §4.
+executes**. ~~`libc.a` itself is still not scanned; what is scanned is what the
+linker actually pulled in.~~ 🔄 **2026-09-15: it is scanned now, and the
+table above this paragraph is that scan** -- `ar x` then `ld -r` over every
+member, 19,096 loads for `rsdk-1.3.6-4181` against 19,141 and 14,491 for the
+other two. The sentence was true of THIS measurement, which is a linked
+`boa`, and it stayed here describing the file rather than the paragraph.
+`notes/rebuild-vs-shipped.md` §4.
 
 ### What it injects
 

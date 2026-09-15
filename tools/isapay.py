@@ -44,6 +44,12 @@ Usage
     isapay.py emit [--check]        generate cells4.S and probe4rows.h
     isapay.py verify ELF            source 3: disassemble what was built
     isapay.py verdict LOG --base A  three-way, from a `DW` read-back or qemu
+    isapay.py verdict LOG --arm user [--elf E]
+                                    the same three-way over `uprobe`'s
+                                    Linux-userspace capture; with --elf it
+                                    also checks each trapping row's
+                                    faulting PC against that row's own
+                                    `_w` symbol in the artefact
     isapay.py --self-test           the controls
 
 Exit
@@ -1208,14 +1214,13 @@ def decode_ok(r, dis):
     return True, tok
 
 
-def cmd_verify(rows, elf, objdump=None, quiet=False, strict=False):
-    """Source 3.  The only one this repository did not write.
+def _objdump_probe_sites(elf, objdump=None):
+    """(at, probe_addrs, sym_addr) for every `*_w` symbol in the artefact.
 
-    Disassembles the linked artefact and requires, for every row, that the word
-    at `rlx_p4_<name>_w` is the table's word and that binutils' own decode of
-    it names something consistent with the row.  A row whose decode binutils
-    refuses to name at all is reported rather than passed: `.word` is a
-    directive, so an encoding this core cannot execute still assembles.
+    Extracted from `cmd_verify` when the user arm needed the ADDRESSES, which
+    this loop already computed and then threw into an anonymous set.  One
+    owner of "where are the probe sites in this binary" rather than two
+    objdump invocations that could disagree.
     """
     objdump = objdump or os.environ.get("OBJDUMP", "mips-linux-gnu-objdump")
     if not os.path.exists(elf):
@@ -1230,6 +1235,7 @@ def cmd_verify(rows, elf, objdump=None, quiet=False, strict=False):
         raise Refuse("%s exited %d" % (objdump, p.returncode))
     at = {}
     probe_addrs = set()
+    sym_addr = {}
     cur = None
     for line in p.stdout.split("\n"):
         m = re.match(r"^([0-9a-f]+) <(.+)>:$", line.strip())
@@ -1237,10 +1243,24 @@ def cmd_verify(rows, elf, objdump=None, quiet=False, strict=False):
             cur = m.group(2)
             if cur.endswith("_w"):
                 probe_addrs.add(int(m.group(1), 16))
+                sym_addr[cur] = int(m.group(1), 16)
             continue
         m = DIS_RE.match(line)
         if m and cur and cur.endswith("_w"):
             at.setdefault(cur, []).append((m.group(2), m.group(3).strip()))
+    return at, probe_addrs, sym_addr
+
+
+def cmd_verify(rows, elf, objdump=None, quiet=False, strict=False):
+    """Source 3.  The only one this repository did not write.
+
+    Disassembles the linked artefact and requires, for every row, that the word
+    at `rlx_p4_<name>_w` is the table's word and that binutils' own decode of
+    it names something consistent with the row.  A row whose decode binutils
+    refuses to name at all is reported rather than passed: `.word` is a
+    directive, so an encoding this core cannot execute still assembles.
+    """
+    at, probe_addrs, _sym_addr = _objdump_probe_sites(elf, objdump)
     bad = 0
     for r in rows:
         sym = "rlx_p4_%s_w" % r["name"]
@@ -1364,6 +1384,167 @@ def verdict_row(r, rec):
 
 ROW_RE = re.compile(r"^P4\s+([0-9a-fA-F]{8})\s+(\S+)((?:\s+[0-9a-fA-F]{8}){8})\s*$")
 
+# ---------------------------------------------------------------------------
+# The second arm.  `config/rlxfw-user/isaprobe/uprobe.c` links the SAME
+# `cells4.S` and emits the same eight words with the same `ROW_TAG_BASE`; the
+# encodings are not a copy of probe4's, they are the same bytes.  Two things
+# differ and only two: the line prefix, and the meaning of word 2 -- a MIPS
+# `Cause` register on the bare-metal arm, a packed `(signal << 16) | si_code`
+# here, because a Linux process is not handed a Cause register.
+#
+# 🔴 TWO REGEXES, NOT ONE `P4|PU` ALTERNATION.  With one pattern a file
+# holding both arms would be merged into one result block, and `read_rows`'s
+# duplicate-index guard would report the merge as "row N appears twice with
+# different values" -- corruption's message for something that is not
+# corruption, which is the worst kind of wrong message.
+# ---------------------------------------------------------------------------
+UROW_RE = re.compile(r"^PU\s+([0-9a-fA-F]{8})\s+(\S+)"
+                     r"((?:\s+[0-9a-fA-F]{8}){8})\s*$")
+
+# arm -> (row regex, the prefix its refusal message names)
+ARMS = {
+    "device": (ROW_RE, "P4 "),
+    "qemu":   (ROW_RE, "P4 "),
+    "user":   (UROW_RE, "PU "),
+}
+
+# `rlxuprobe: <key>=<8 hex>` header fields.
+UHDR_RE = re.compile(r"^rlxuprobe:\s+([a-z_0-9]+)=([0-9a-fA-F]{8})\s*$")
+UEND = "rlxuprobe: end"
+
+# 🔴 MIPS numbers its signals differently from every other Linux port, and the
+# difference lands exactly where this instrument reads.  讀
+# `arch/rlx/include/asm/signal.h`: SIGEMT takes 7, so SIGBUS is 10 and SIGSEGV
+# is 11 -- where the generic ABI has SIGBUS 7 and SIGSEGV 11.  A table copied
+# from `signal(7)` would print a genuine SIGBUS as SIGEMT and nothing would
+# look wrong.
+MIPS_SIGNAMES = {
+    4: "SIGILL", 5: "SIGTRAP", 6: "SIGABRT", 7: "SIGEMT", 8: "SIGFPE",
+    9: "SIGKILL", 10: "SIGBUS", 11: "SIGSEGV", 12: "SIGSYS", 14: "SIGALRM",
+}
+
+# `si_code`.  讀 `include/asm-generic/siginfo.h`: the kernel strips
+# `__SI_MASK` on the way to userspace, so a fault code arrives as its low
+# number, and `SI_KERNEL` is 0x80.  `force_sig` sends `SEND_SIG_PRIV`, which
+# fills `si_code = SI_KERNEL` -- so 0x80 is what a reserved instruction is
+# EXPECTED to carry here, and `ILL_ILLOPC` would be the surprise.
+SI_CODES = {
+    0x80: "SI_KERNEL",
+    1: "_FAULT|1", 2: "_FAULT|2", 3: "_FAULT|3", 4: "_FAULT|4",
+    5: "_FAULT|5", 6: "_FAULT|6", 7: "_FAULT|7", 8: "_FAULT|8",
+}
+
+
+def cause_str(arm, rec):
+    """The `cause` column, which is a different register on each arm.
+
+    On the bare-metal arm word 2 is CP0 `Cause` and `exccode` slices it.  On
+    the user arm there is no Cause: word 2 is what the harness packed, and
+    running `exccode` over it yields a number that looks like an ExcCode and
+    is not one.  That line was unguarded before this arm existed.
+    """
+    if not (rec and rec[1]):
+        return "-"
+    if arm == "user":
+        sig = (rec[2] >> 16) & 0xFFFF
+        code = rec[2] & 0xFFFF
+        return "%s/%s" % (MIPS_SIGNAMES.get(sig, "sig %d" % sig),
+                          SI_CODES.get(code, "0x%X" % code))
+    return "ExcCode %-2d" % exccode(rec[2])
+
+
+def read_user_header(path):
+    """(fields, ended) from a `uprobe` capture.  Pure parse, no judgement."""
+    hdr = {}
+    ended = False
+    txt = io.open(path, encoding="utf-8", errors="replace").read()
+    for line in txt.replace("\r", "\n").split("\n"):
+        line = line.strip()
+        if line == UEND:
+            ended = True
+            continue
+        m = UHDR_RE.match(line)
+        if m:
+            hdr[m.group(1)] = int(m.group(2), 16)
+    return hdr, ended
+
+
+def user_controls(hdr, ended, out, sym_addr=None):
+    """The user arm's own controls.  Pure, so it is testable with no capture.
+
+    `check_controls` covers the answer checker (baseline RIGHT, reserved not
+    RIGHT) and is arm-free -- it holds identically here.  These are the ones
+    that only exist because this arm runs under an operating system:
+
+      C1a  the handler installed at all.  A harness whose `sigaction` failed
+           reports "no signal" for every row, and "no signal" is exactly the
+           reading that means THE SILICON IMPLEMENTS IT.
+           `docs/emulation-surface.md` § 7.3 names that backwards reading for
+           `ll`/`sc`; this is the same trap one level down.
+      C1b  an actual reserved encoding reached the handler.
+      C2   every trapping row's faulting PC is that row's own probed word.
+           Needs the artefact, so it is skipped rather than faked when no
+           `--elf` is given -- and the skip is PRINTED.
+      end  the run reached its own terminator.  "it stopped" and "it ended"
+           are different observations; `qemu/README.md` says so first.
+    """
+    f = []
+    if not hdr:
+        f.append("no `rlxuprobe:` header fields in the capture -- this is "
+                 "either not a user-arm capture or the run never started")
+        return f
+    if hdr.get("install_rc") is None:
+        f.append("no install_rc field: the harness did not reach its own "
+                 "handler installation")
+    elif hdr["install_rc"] != 0:
+        f.append("install_rc=%d -- sigaction failed on signal #%d of the list, "
+                 "so every row's `no signal` is the instrument's silence and "
+                 "not the die's" % (hdr["install_rc"], hdr["install_rc"]))
+    if hdr.get("c1a_raise") != 1:
+        f.append("C1a raise(SIGILL) did not reach the handler (c1a_raise=%s)"
+                 % hdr.get("c1a_raise"))
+    c1b = hdr.get("c1b_special0e_n")
+    if c1b is None or c1b == 0 or c1b == 0xFFFFFFFF:
+        f.append("C1b the reserved encoding did not trap (c1b_special0e_n=%s)"
+                 % (("0x%X" % c1b) if c1b is not None else None))
+    if hdr.get("scratch_bad", 0) != 0:
+        f.append("scratch_bad=%d -- a cell's own inputs were altered, so its "
+                 "outputs are about something other than the table's row"
+                 % hdr["scratch_bad"])
+    if not ended:
+        f.append("the capture has no `%s` -- the run stopped rather than "
+                 "ended, and every row after the last one printed is missing "
+                 "rather than absent" % UEND)
+
+    max_sig = hdr.get("max_sig")
+    if max_sig is not None:
+        esc = [r["name"] for r, v, _val, rec in out
+               if rec and rec[1] > max_sig]
+        if esc:
+            f.append("%d row(s) hit the escape hatch (n > max_sig=%d): %s -- "
+                     "their output words are whatever the cell had written "
+                     "before it stopped"
+                     % (len(esc), max_sig, ", ".join(esc)))
+
+    if sym_addr is None:
+        f.append("C2 NOT RUN: no --elf, so no faulting PC was checked against "
+                 "its own probed word.  An absent check is not a passing one")
+    else:
+        bad = []
+        for r, _v, _val, rec in out:
+            if not (rec and rec[1]):
+                continue
+            want = sym_addr.get("rlx_p4_%s_w" % r["name"])
+            if want is None:
+                bad.append("%s has no _w symbol in the artefact" % r["name"])
+            elif rec[3] != want:
+                bad.append("%s faulted at %08X, its probed word is at %08X"
+                           % (r["name"], rec[3], want))
+        for b in bad:
+            f.append("C2 " + b)
+    return f
+
+
 # Pre-registered qemu predictions that the qemu run REFUTED, 量 2026-09-13,
 # each with what it actually did and why.
 #
@@ -1391,7 +1572,7 @@ QEMU_REFUTED = {
 }
 
 
-def read_rows(path, nrows):
+def read_rows(path, nrows, arm="device"):
     """Parse a capture into the flat result block.
 
     Two input shapes, because the payload has two channels and they must agree:
@@ -1406,11 +1587,12 @@ def read_rows(path, nrows):
     written now against a capture that does not exist would be a second
     implementation of a format nobody has read yet.
     """
+    rx, prefix = ARMS[arm]
     words = [None] * (nrows * ROW_WORDS)
     seen = {}
     txt = io.open(path, encoding="utf-8", errors="replace").read()
     for line in txt.replace("\r", "\n").split("\n"):
-        m = ROW_RE.match(line.strip())
+        m = rx.match(line.strip())
         if not m:
             continue
         idx = int(m.group(1), 16)
@@ -1423,8 +1605,8 @@ def read_rows(path, nrows):
         seen[idx] = vals
         words[idx * ROW_WORDS:(idx + 1) * ROW_WORDS] = vals
     if not seen:
-        raise Refuse("no `P4 ` rows in %s -- an empty capture and a capture of "
-                     "absences are different answers" % path)
+        raise Refuse("no `%s` rows in %s -- an empty capture and a capture "
+                     "of absences are different answers" % (prefix, path))
     return words, sorted(seen)
 
 
@@ -1432,15 +1614,20 @@ def exccode(cause):
     return (cause >> 2) & 0x1F
 
 
-def cmd_verdict(rows, path, arm="device", quiet=False):
+def cmd_verdict(rows, path, arm="device", quiet=False, elf=None,
+                objdump=None):
     """The three-way verdict, computed HERE and never in the payload.
 
-    `arm` is `qemu` or `device`.  On the qemu arm the `qemu` column is a
-    PRE-REGISTERED prediction and this compares against it; on the device arm
-    it is not evidence at all -- `plan:706` (D14-1) -- and is printed only so
-    the two columns can be read side by side.
+    `arm` is `qemu`, `device` or `user`.  On the qemu arm the `qemu` column
+    is a PRE-REGISTERED prediction and this compares against it; on the device
+    arm it is not evidence at all -- `plan:706` (D14-1) -- and is printed only
+    so the two columns can be read side by side.  The `user` arm is the same
+    encodings issued from Linux user mode by
+    `config/rlxfw-user/isaprobe/uprobe.c`; it gets no prediction scoreboard
+    (there is no registered column for it here -- `docs/emulation-surface.md`
+    owns that) and it gets controls the other two cannot have.
     """
-    words, present = read_rows(path, len(rows))
+    words, present = read_rows(path, len(rows), arm)
     out = []
     for r in rows:
         base = r["idx"] * ROW_WORDS
@@ -1467,7 +1654,7 @@ def cmd_verdict(rows, path, arm="device", quiet=False):
         print("  %-10s %-10s %-8s %-9s %-9s %s"
               % ("row", "group", "verdict", "value", "expect", "cause"))
         for r, v, val, rec in out:
-            cs = ("ExcCode %-2d" % exccode(rec[2])) if (rec and rec[1]) else "-"
+            cs = cause_str(arm, rec)
             print("  %-10s %-10s %-8s %-9s %-9s %s"
                   % (r["name"], r["group"], v,
                      ("%08X" % val) if val is not None else "-",
@@ -1479,6 +1666,16 @@ def cmd_verdict(rows, path, arm="device", quiet=False):
              ", ".join("%s %d" % (k, tally[k]) for k in sorted(tally))))
 
     findings = check_controls(out)
+    if arm == "user":
+        hdr, ended = read_user_header(path)
+        sym_addr = None
+        if elf:
+            _at, _pa, sym_addr = _objdump_probe_sites(elf, objdump)
+        findings = findings + user_controls(hdr, ended, out, sym_addr)
+        if not quiet:
+            print("  header: %s"
+                  % ", ".join("%s=%d" % (k, hdr[k]) for k in sorted(hdr)))
+            print("  terminator: %s" % ("present" if ended else "ABSENT"))
     for f in findings:
         print("  CONTROL: %s" % f)
     novel = []
@@ -1798,6 +1995,106 @@ def self_test():
         assert seen == 0 and not stray, "empty input is not an empty answer"
     case("T19 the converse check catches a word outside every probe site", t19)
 
+    # T20..T23 -- the user arm.  Every one of these is a pure function over
+    # values, so none needs a capture, an ELF or a device.
+    def t20():
+        p4 = ("P4 00000007 special0e 52340007 00000001 00000028 80500100 "
+              "deadbeef 00000000 00000000 00000000")
+        pu = ("PU 00000007 special0e 52340007 00000001 00040080 004011c0 "
+              "deadbeef 00000000 00000000 00000000")
+        assert ROW_RE.match(p4), "the device row does not match its own regex"
+        assert UROW_RE.match(pu), "the user row does not match its own regex"
+        assert not ROW_RE.match(pu), "a PU row matched the P4 regex"
+        assert not UROW_RE.match(p4), "a P4 row matched the PU regex"
+    case("T20 the two arms' row shapes do not match each other", t20)
+
+    def t20b():
+        import tempfile
+        pu = ("rlxuprobe: install_rc=00000000\n"
+              "rlxuprobe: c1a_raise=00000001\n"
+              "rlxuprobe: c1b_special0e_n=00000001\n"
+              "rlxuprobe: max_sig=00000008\n"
+              "rlxuprobe: scratch_bad=00000000\n"
+              "PU 00000000 add 52340000 00000000 00000000 00000000 "
+              "23456789 00000000 00000000 00000000\n"
+              "rlxuprobe: end\n")
+        fd, tp = tempfile.mkstemp(suffix=".log")
+        os.close(fd)
+        try:
+            io.open(tp, "w", encoding="utf-8").write(pu)
+            w, seen = read_rows(tp, len(rows), "user")
+            assert seen == [0], "the user capture did not parse"
+            assert w[4] == 0x23456789, "the user row's value is wrong"
+            refuses(lambda: read_rows(tp, len(rows), "device"),
+                    "a user capture read on the device arm")
+            hdr, ended = read_user_header(tp)
+            assert ended, "the terminator was not seen"
+            assert hdr["max_sig"] == 8, "max_sig did not parse"
+        finally:
+            os.unlink(tp)
+    case("T20b a user capture parses on its arm and REFUSES on the other", t20b)
+
+    def t21():
+        rec_u = (0, 1, 0x00040080, 0, 0, 0, 0, 0)
+        assert cause_str("user", rec_u) == "SIGILL/SI_KERNEL", \
+            cause_str("user", rec_u)
+        rec_d = (0, 1, 0x28, 0, 0, 0, 0, 0)
+        assert cause_str("device", rec_d).startswith("ExcCode 10")
+        assert cause_str("user", (0, 0, 0, 0, 0, 0, 0, 0)) == "-"
+        # 讀 arch/rlx/include/asm/signal.h: SIGEMT takes 7 on MIPS, so SIGBUS
+        # is 10.  A table copied from signal(7) prints a real SIGBUS as
+        # SIGEMT and nothing looks wrong.
+        assert MIPS_SIGNAMES[10] == "SIGBUS", "MIPS signal numbering"
+        assert MIPS_SIGNAMES[7] == "SIGEMT", "MIPS signal numbering"
+        assert cause_str("user", (0, 1, 0x000A0001, 0, 0, 0, 0, 0)) \
+            == "SIGBUS/_FAULT|1"
+    case("T21 the cause column is a different register on each arm", t21)
+
+    def t22():
+        good = {"install_rc": 0, "c1a_raise": 1, "c1b_special0e_n": 1,
+                "scratch_bad": 0, "max_sig": 8}
+        r0 = dict(rows[0])
+        r0["idx"] = 0
+        ok_out = [(r0, V_RIGHT, 0, (ROW_TAG_BASE, 0, 0, 0, 0, 0, 0, 0))]
+        assert user_controls(good, True, ok_out, {}) == [], \
+            user_controls(good, True, ok_out, {})
+        assert user_controls({}, True, ok_out, {}), "an empty header passed"
+        for k, v in (("install_rc", 3), ("c1a_raise", 0),
+                     ("c1b_special0e_n", 0), ("scratch_bad", 2)):
+            bad = dict(good)
+            bad[k] = v
+            assert user_controls(bad, True, ok_out, {}), \
+                "a broken %s passed" % k
+        assert user_controls(good, False, ok_out, {}), "no terminator passed"
+        esc = [(r0, V_TRAP, 0, (ROW_TAG_BASE, 9, 0, 0, 0, 0, 0, 0))]
+        assert any("escape hatch" in x
+                   for x in user_controls(good, True, esc, {})), \
+            "an escaped row was not reported"
+        assert any("C2 NOT RUN" in x
+                   for x in user_controls(good, True, ok_out, None)), \
+            "a skipped C2 was not said out loud"
+    case("T22 the user arm's controls fire in both directions", t22)
+
+    def t23():
+        good = {"install_rc": 0, "c1a_raise": 1, "c1b_special0e_n": 1,
+                "scratch_bad": 0, "max_sig": 8}
+        r0 = dict(rows[0])
+        r0["idx"] = 0
+        sym = "rlx_p4_%s_w" % r0["name"]
+        trapped = [(r0, V_TRAP, 0, (ROW_TAG_BASE, 1, 0x40080, 0x400120,
+                                    0, 0, 0, 0))]
+        assert user_controls(good, True, trapped, {sym: 0x400120}) == [], \
+            "a PC that matches its own probed word was reported"
+        f = user_controls(good, True, trapped, {sym: 0x400999})
+        assert any("faulted at" in x for x in f), "a wrong PC was not caught"
+        f = user_controls(good, True, trapped, {})
+        assert any("no _w symbol" in x for x in f), \
+            "a missing probe symbol was not caught"
+        ran = [(r0, V_RIGHT, 0, (ROW_TAG_BASE, 0, 0, 0, 0, 0, 0, 0))]
+        assert user_controls(good, True, ran, {}) == [], \
+            "a row that did not trap had its PC checked"
+    case("T23 C2 catches a faulting PC that is not the row's own word", t23)
+
     # T17 -- the population join reports a difference rather than hiding it.
     def t17():
         mine = set(r["name"] for r in rows)
@@ -1820,7 +2117,11 @@ def main(argv=None):
     ap.add_argument("--strict", action="store_true",
                     help="also require every non-MIPS-I word hazlint can see "
                          "to sit at a declared probe symbol")
-    ap.add_argument("--arm", choices=["qemu", "device"], default="device")
+    ap.add_argument("--arm", choices=["qemu", "device", "user"],
+                    default="device")
+    ap.add_argument("--elf",
+                    help="the user arm's artefact, for the faulting-PC "
+                         "identity check (C2)")
     ap.add_argument("--objdump")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--self-test", action="store_true")
@@ -1847,7 +2148,8 @@ def main(argv=None):
         if a.mode == "verdict":
             if not a.arg:
                 raise Refuse("verdict needs a capture")
-            return cmd_verdict(rows, a.arg, a.arm, a.quiet)
+            return cmd_verdict(rows, a.arg, a.arm, a.quiet, a.elf,
+                               a.objdump)
     except Refuse as e:
         print("REFUSED: %s" % e)
         return 3

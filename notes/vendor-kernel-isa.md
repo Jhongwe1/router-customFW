@@ -211,8 +211,28 @@ decision that rests on it is § 9.3.
 ## 2. `C-7` / `F51` — the unaligned instructions
 
 `notes/lwl-mystery.md` asked, as the discriminator: *does the vendor kernel carry
-an unaligned-access emulation handler?* The answer is **no such handler exists**,
-and the reason is that the core does not need one.
+an unaligned-access emulation handler?* ~~The answer is **no such handler exists**,
+and the reason is that the core does not need one.~~
+
+🔴 **2026-09-15 (seventy-second segment): that sentence is too strong and this
+file's own § 1.4 contradicts it.** 讀, reading `arch/rlx` for the signal path:
+`arch/rlx/kernel/Makefile` carries `unaligned.o` in **unconditional `obj-y`**,
+`do_ade` is its entry point from `genex.S`'s `adel`/`ades` handlers, and
+`emulate_load_store_insn` is compiled in. A handler exists and runs.
+
+**The narrow claim, which is the one the discriminator needed:** no handler
+emulates the `lwl`/`lwr`/`swl`/`swr` instructions *themselves*. `unaligned.c`
+names all four in a `switch` and sends them straight to `sigbus`, under a
+comment saying they are instructions a compiler does not generate and that
+emulating them would break the semantics anyway. The conclusion this section
+goes on to draw is unaffected, and **this project has since measured the
+premise from the other side**: `docs/emulation-surface.md` rows 4, 5, 9 and
+10 read `lwl` retire gpr `A5F00D44`, `lwr` retire `1122335A`, `swl` retire
+m0 `A55A5A0F`, `swr` retire m0 `5A0FF20D`. The core executes them.
+
+⚠️ This correction was found by reading the source for a different question
+entirely, which is why it sat here unnoticed: nothing joins § 1.4's reading
+of the same file to § 2's opening sentence.
 
 ### 2.1 The idiom, and an instrument that can fail
 

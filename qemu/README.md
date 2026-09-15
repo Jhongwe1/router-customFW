@@ -154,6 +154,63 @@ self-evict. **That is the branch the seventeenth session restructured, and qemu
 is the only environment that drives it.** On silicon it must NOT fire; if it
 does, `w.assoc.tm` reads `000000ff` and every associativity cell is void.
 
+## 🆕 2026-09-15: a SECOND EMULATOR is in here now, and it is not the one above
+
+Everything above this section is `qemu-system-mips -M malta` — a whole
+machine, no kernel, the payload at the reset vector. `2026-09-15/` holds two
+captures from **`qemu-mips-static`, USER mode**, which is a different program
+doing a different thing, and the filenames say so: `uprobe-user.txt`,
+`uprobe-user-range.txt`.
+
+`config/rlxfw-user/isaprobe/uprobe.c` is a Linux process. Under
+`qemu-mips-static` its instructions are translated by qemu and its **system
+calls and signal delivery are the HOST kernel's**, reached through qemu's
+translation layer. So this arm is further from the device than the system-mode
+arm is, not closer, and it is in here for one narrow purpose.
+
+**What these two captures are evidence for.** Five statements, all about the
+instrument, every one of them written down before the run:
+
+1. `install_rc=0` — the five `sigaction` calls succeeded.
+2. `c1a_raise=1` — a `raise(SIGILL)` reached the handler. **This is the one
+   that matters most.** A harness whose handler never installed reports *no
+   signal* for all 75 rows, and *no signal* is exactly the reading that means
+   THE SILICON IMPLEMENTS IT — `docs/emulation-surface.md` § 7.3 names that
+   backwards reading for `ll`/`sc`, and this is the same trap one level down,
+   at the instrument.
+3. `c1b_special0e_n=1` — an actual reserved encoding reached the handler too,
+   by a mechanism that borrows nothing from libc.
+4. 75 well-formed `PU ` rows, and the run reached `rlxuprobe: end`. *It
+   stopped* and *it ended* are different observations.
+5. `scratch_bad=0` — no cell altered its own inputs.
+
+**What they are NOT evidence for, and the list is longer than the one above.**
+
+- 🔴 **Nothing here is column ② of `docs/emulation-surface.md`.** That column
+  is about what *rlxfw's kernel on this die* does with an encoding —
+  `simulate_llsc`, `simulate_sync`, `do_cpu`'s `cpid == 0` arm. qemu has none
+  of that code. `sync` reads *no signal* in `uprobe-user.txt` because qemu
+  implements `sync`, which says nothing whatever about `simulate_sync`.
+- 🔴 **The per-row verdicts here are qemu's answers and are not registered
+  against anything.** `tools/isa-payload.tsv`'s `qemu` column is a
+  pre-registered prediction for the **system-mode, bare-metal** arm; scoring
+  this arm against it would be comparing two different experiments.
+  `isapay.py verdict --arm user` deliberately gets no prediction scoreboard.
+- ⚠️ **The 288-vs-592 `sigcontext` divergence is NOT exercised here.** `arch/rlx`
+  truncates `struct sigcontext` after `sc_regs`; the toolchain's own header
+  carries the stock 592-byte one; qemu builds the stock frame too. The three
+  offsets this harness reads — `uc_mcontext` 24, `sc_pc` 32, `sc_regs[i]`
+  40+8i — agree in all three, which is why it works here. The half that
+  differs is the half the harness never touches, so neither this arm nor the
+  device arm can validate it, and that is by design rather than by omission.
+- The load-delay caveat at the top of this file applies unchanged: qemu
+  interlocks and this core does not.
+
+量: `qemu-mips version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)`, and both
+captures carry the artefact's own build id in their banner —
+`*** rlxuprobe PU a87be346bb83e7f9 … ***` — so a capture from a different
+binary cannot be mistaken for one of these.
+
 Captures are committed **only when they are evidence for a written expectation**.
 `qemu-run.sh`'s default output goes to `tools/rlxprobe/build/qemu/`, which is
 gitignored; putting one here is a deliberate act.
