@@ -914,7 +914,7 @@ then as *"from the board rather than from a build constant"* — both readings o
 | I-cache size | **16 KiB** | 16 KiB (讀, `bspcpu.h:14`) | yes |
 | I-cache line | **16 B** | 16 B (讀, `bspcpu.h:19`, under `CONFIG_RTL_8196E`) | yes |
 | associativity | **2-way** (量); **512 sets** is 推 | LX4189 says *"direct mapped **or** two-way set associative"* — a sister core's document, and a **disjunction** | ⚠️ a disjunction over {1, 2} is **not** a second vote for 2: it excludes 4- and 8-way and nothing more |
-| D-cache | **not measured** | 8 KiB / 16 B (讀, `bspcpu.h:13`) | **no measurement exists** |
+| D-cache | 🔄 ~~**not measured**~~ **8 KiB fits, 16 KiB does not** (量 2026-09-16, seating 24 — the footprint ladder's knee, `bench/2026-09-16/C1-P3j.log`) | 8 KiB / 16 B (讀, `bspcpu.h:13`) | 🔄 ~~**no measurement exists**~~ **a bracket, not a point** — the ladder has no 12 KiB rung, so *exactly* 8 KiB is still the build constant's. `SPEC.md` `CPU-69`; owner `docs/rlx-cache-and-cp0.md` § ⓑ-3 |
 
 ### The walk, and both of its controls
 
