@@ -1,4 +1,4 @@
-# The emulation surface — two columns over 45 rows, and the five instructions that have no row
+# The emulation surface — two columns over 45 rows, one row of difference, and the five instructions that have no row
 
 **`R1-pub-4`'s part `4a` (`D-diff`).** Opened 2026-09-15, seventy-first
 segment, at the desk. One row per census row; **column ①** is the verdict when
@@ -75,11 +75,14 @@ with its reason reads as *decided*.
 **③ The five unaligned instructions are a declared gap, not a silent one.**
 § 6.
 
-**④ This file, not `docs/rlx-isa.md`.** That file does not exist and is
-`R1-pub-7`'s deliverable; creating it here would claim another step's
-artefact. `docs/isa-prior-art.md` § 0 ④ explicitly refuses the job of saying
-anything about kernel behaviour, so the table does not belong there either.
-`R1-pub-7` will cite this file.
+**④ This file, not `docs/rlx-isa.md`.** ~~That file does not exist and is~~
+🔄 **2026-09-15: `R1-pub-7` opened that file the same day, in its own
+segment.** It is `R1-pub-7`'s deliverable; creating it here would have claimed
+another step's artefact. `docs/isa-prior-art.md` § 0 ④ explicitly refuses the
+job of saying anything about the vendor kernel's behaviour, so the table does
+not belong there either. ~~`R1-pub-7` will cite this file.~~ 🔄 **It does**:
+`docs/rlx-isa.md` cites § 2, § 3, § 4 and § 8.1 rather than restating any of
+them.
 
 ---
 
@@ -120,7 +123,40 @@ which was committed at `9874012` before the board had power. **No cell in this
 table changed**, so § 7 ①'s *the cell stays and the disagreement is the result*
 was never invoked.
 
-| # | row | ① on the die | ② predicted from user mode | why |
+🔴 **That summary line is four counts, and four counts are not thirty-nine
+cells.** `RAN 12, RIGHT 16, TRAPS 46, WRONG 1` reads the same if two rows swap
+verdicts, so quoting it as the evidence that *every cell below was read back as
+written* is weaker than the sentence it is offered for. 量 2026-09-15 at the
+desk, per row, over both captures through `tools/isapay.py verdict` —
+`--arm device` on `bench/2026-09-14/C1-P4j.log` and `--arm user` on
+`bench/2026-09-15/C2-UP.log`, **75 of 75 rows parsed on each side** — and
+grouped back onto the census rows they realise:
+
+* **34** of the 37 census rows that have a payload row agree between the two
+  columns in the trap/no-trap sense, and `SPECIAL2`'s internal mixture of one
+  `retire` and three `RI` agrees member by member;
+* **`sync` alone** is die-traps-and-user-runs — the surface, one row, § 4;
+* **`cache` (its four payload rows) and `mflxc0`** are die-runs-and-user-traps
+  — the privilege pair, § 2;
+* `jalx` and `mtlxc0` have no payload row on either side, which is rows 3 and
+  32's `none` read back from the other end.
+
+**That is the per-cell statement the summary line cannot make**, and it is what
+§ 4's result rests on.
+
+⚠️ **The two columns do not observe the same quantity, and every mechanism
+clause in column ② is 讀 rather than 量.** Column ① reads `Cause.ExcCode` under
+this project's own handler. Column ② is an unprivileged process: 讀
+`config/rlxfw-user/isaprobe/uprobe.c`, whose per-row record is
+`w[2] = (up_sig << 16) | (up_code & 0xffff)` — a **signal number and an
+`si_code`**, nothing more — and nothing in user mode can read `Cause` at all.
+So in every column-② cell below, `SIGILL` / `SI_KERNEL` / *no signal* is 量,
+and the arrow in front of it (`CpU(11) CE 0 → do_cpu → simulate_llsc …`) is 讀,
+out of the vendor's `traps.c`. **The seating measured the endpoint; the path to
+it is still a reading of source**, and a different path arriving at the same
+signal would be indistinguishable here.
+
+| # | row | ① on the die | ② 量 from user mode, `C2-UP.log` | why |
 |---|---|---|---|---|
 | 1 | `cache` | retire (4 of 4 ops, n=0) | CpU(11) CE 0 → `do_cpu` cpid 0 → `simulate_llsc` no match → **SIGILL** | 🔴 privilege |
 | 2 | `mfc3` | exc 11 CpU CE 3 | SIGILL | same |
@@ -178,20 +214,54 @@ row 2's cell says nothing about whether CP3 holds a register.
 
 ## § 4. 🔴 The result the table produces, and it is one row
 
-Of 39 census rows, **exactly one — `sync` — is predicted to show the
-emulation surface as a trap/no-trap difference.**
+Of 39 census rows, ~~**exactly one — `sync` — is predicted to show the
+emulation surface as a trap/no-trap difference.**~~ 🔄 **2026-09-15: exactly
+one — `sync` — does show it**, and the difference set was re-derived row by row
+rather than read off the summary line (§ 3).
 
 🟢 **量 2026-09-15, seating 23, and the prediction held: `sync` read `RAN` —
 no signal.** It takes `ExcCode 10` on the die and returns silently from user
 mode, so `do_ri` reaches `simulate_sync`, SPECIAL funct `0x0F` matches, and
 **the emulation surface is visible on this part**. The ⚠️ at the foot of this
 section named `SIGILL` as the outcome that would have refuted § 1.4's whole
-reading; it did not happen.
+reading — that is `notes/vendor-kernel-isa.md` § 1.4, where the surface is
+enumerated, and **not** § 1 ④ of this file; it did not happen.
 
 `ll` and `sc` are emulated in user mode and the test **cannot see it**: they
 already retire on the die, so both columns read *no signal* and the difference
 is invisible to the instrument. It is real and it is in the mechanism column,
 which is why every row carries a *why* rather than only a verdict.
+
+🔴🔴 **That sentence is about the VERDICT, and it has to be, because `sc`'s
+VALUE is not invisible.** 量 2026-09-15 at the desk, found by
+`tools/emupredict.py`'s `C21` — a case that asserts every rule-covered row
+carries the same value on both arms, and therefore a case that can fail:
+
+| | ① bare metal, `CU0 = 1` | ② Linux user mode |
+|---|---|---|
+| verdict | `RAN` | `RAN` |
+| the scratch word (`read = m0`) | **`5A5A0FF2`** — the value in `rt` | **`A5A5F00D`** — the seed, untouched |
+
+The seed is `tools/isa-payload.tsv`'s own `mem0` column for that row, and
+`uprobe` links `cells4.S` verbatim, so **the two arms start from the same value
+by construction and not by coincidence**. So on the die the store happened and
+under Linux it did not.
+
+🟢 **And the table already says why the two are allowed to differ**, in the
+same row's `why` column, written before either reading: *without a preceding
+`ll` to the same address a correct `sc` has an unspecified outcome*. This
+payload has none — `ll` and `sc` are separate rows with separate scratch words.
+**So what is measured is the DIRECTION: the die stored where the kernel's
+emulation refused, and the die is the permissive one.**
+
+⚠️ **This payload cannot say why.** *No link semantics at all* and *link
+semantics with no address check* both predict what the die did, and nothing
+here separates them. A row that reads `rt` after the `sc`, or an `ll` to the
+same scratch word immediately before it, would.
+
+⚠️ **It does not make the yield sentence below wrong.** As a **verdict**
+surface this is still one row. **As a value surface it is two**, and `ll` is
+identical on both arms in both senses. `SPEC.md` `CPU-66`.
 
 `cache` and `mflxc0` differ, and **not because of emulation** — they differ
 because column ① was privileged.
@@ -201,7 +271,10 @@ because column ① was privileged.
 > it is known before a board is powered, and it is the strongest possible
 > argument for § 6's population gap.
 
-~~⚠️ 推 throughout.~~ 🔄 **2026-09-15: 量 throughout, and the yield is
+~~⚠️ 推 throughout. If the seating reads `sync` as SIGILL, `simulate_sync` is
+not reached from this path and the whole § 1.4 reading is wrong — that is the
+single most informative outcome available, and it is worth the seating on its
+own.~~ 🔄 **2026-09-15: 量 throughout, and the yield is
 exactly the sentence above.** All four legs read as predicted in one capture:
 `sync` `RAN`; `ll` `RIGHT` `0000A5F0` and `sc` `RAN`, both **invisible**
 because they already retire on the die; `cache10`/`11`/`15`/`19` and `mflxc0`
@@ -215,6 +288,24 @@ dressed up. *(The refutation condition it carried — "if the seating reads
 `sync` as SIGILL, the whole § 1.4 reading is wrong" — is kept above, struck
 rather than deleted, because a refutation condition that is quietly removed
 once it fails to fire was never a refutation condition.)*
+
+🔴 **And that sentence was false for three commits, in the section that
+states the rule.** 量 2026-09-15, `git show` on this file's first commit
+`cbd1d0d` against `0ff8c3c`: the seating's edit struck the three words
+`⚠️ 推 throughout.` and **deleted the refutation condition itself**, leaving the
+parenthetical above to assert that a sentence was kept which was not on the
+page. `SPEC.md` `CPU-64` (*那個條件原樣留在 `docs/emulation-surface.md`
+§4,劃掉而不刪掉*) and `R1-pub-7`'s `docs/rlx-isa.md` (*struck through in
+place in `docs/emulation-surface.md` § 4*) both describe this file by that
+sentence, so **three files asserted it and none of them was checked against
+the page** — the two consumers because they were quoting a local view of it,
+and this one because a file cannot notice its own omission. The condition is
+restored above, verbatim from `cbd1d0d`.
+
+⚠️ **No checker in this repository can see this class of defect.**
+Strike-through is prose; nothing joins a claim that some text was kept to the
+text itself, and `spec-check`, `citecheck`, `xcheck` and `ledgerscan` were all
+green over this file while the sentence was false.
 
 ---
 
@@ -279,8 +370,15 @@ which handful or why it was not eight.
    disagreement is the result*. What is gone is only the word 推. ⚠️ **One
    seating is one seating**: every column-② cell rests on a single capture on
    a single die, and nothing here has been repeated on a second boot.
-2. **The equivalence column ② rests on is `R1C-1`'s, not this file's.** If
-   `tools/emueq.py` ever goes red, every column-② cell inherits the doubt.
+2. **The equivalence column ② rests on is `R1C-1`'s, not this file's.**
+   ~~If `tools/emueq.py` ever goes red, every column-② cell inherits the
+   doubt.~~ 🔄 **2026-09-15: narrower now that the cells are 量.** The
+   readings were taken under **rlxfw's own** kernel and inherit nothing from
+   an argument — a signal that arrived, arrived. What rests on
+   `tools/emueq.py` is their **generality**: the claim that they also describe
+   the vendor's shipped kernel, which is § 0 ①'s and not this file's. If it
+   goes red the readings stand and the word *Linux* in them shrinks to *this
+   image*.
 3. **Two rows reach `do_cpu` on a path the obvious model misses.** 讀: from
    user mode `CU0` is clear, and `ll`/`sc` encode as `lwc0`/`swc0`, so they
    take **CpU(11)** rather than RI — and `do_cpu`'s `cpid == 0` arm carries
@@ -375,7 +473,7 @@ that the encodings needing `CU0` or reaching an emulator are exactly `cache`,
 fail, and no way to repair it row by row after the reading, which a 31-row
 table would have allowed.
 
-### 8.3 What § 3 still cannot say
+### 8.3 What this file still does not establish, and it is the section to read last
 
 Unchanged by the seating: § 5's six `r1b` rows still have no cell a
 trap/no-trap harness can fill, and § 6's population gap is untouched — **this
@@ -383,3 +481,34 @@ table shows 3 of the 8 known emulated instructions**, because the five
 unaligned ones cannot have a census row under
 `docs/isa-prior-art.md` § 0's admission rule. Measuring column ② does not
 widen the population it is measured over.
+
+🔴 **No cost was measured and nothing here is timed.** The surface on this
+part is one row; **what that row costs is `4b` (`D-cost`), which needs a clock
+and a seating and has not been opened.** § 0 ② is the standing form of this and
+the seating did not touch it. A reader who leaves this file with a number
+attached to `sync` took it from somewhere else.
+
+🔴 **One seating, one boot, and no row repeated.** Every column-② cell rests
+on a single capture — `bench/2026-09-15/C2-UP.log` — taken on one power cycle
+on one die. `C2-UPR` is a range control on the same boot, not a second reading.
+Nothing here has a repeat, a second board or a second image behind it, and
+§ 7 ① is where that is carried.
+
+⚠️ **The instrument reads signals, not exception codes.** § 3's preamble states
+the bound and it governs § 4 as well: column ②'s verdicts are 量 and column
+②'s *mechanisms* are 讀. This file names `simulate_sync`, `simulate_llsc` and
+`do_cpu`'s `cpid == 0` arm because they were read in the vendor's source —
+**nothing on the die reported any of them**, and a different path reaching the
+same signal would read identically.
+
+🔴 **This instrument cannot find a ninth emulated instruction that already
+retires on the die, and *one row* must not be read as a count of what the
+kernel emulates.** Over the 37 census rows with a payload row, exactly one
+shows the trap/no-trap difference and all 37 were looked at — so *no second
+visible one* is a real negative result rather than an absence of looking. But
+the difference is invisible **whenever column ① already retires**, which is
+exactly `ll` and `sc` (§ 4): an instruction the silicon implements and the
+kernel also emulates reads *no signal* in both columns. So a ninth could sit
+**inside this table unseen**, as well as outside it in § 6's five, in § 5's
+six, or in whatever the census never admitted. **One row is what this
+instrument can see in this population.**

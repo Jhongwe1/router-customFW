@@ -35,13 +35,18 @@ The last two rows are the ones to read. A binary that avoids an instruction is
 evidence about the toolchain that compiled it, not about the hardware that runs
 it, and every ISA claim in this repository is still of the first kind.
 
-🔄 **That was true of every ISA claim here until 2026-08-27. Two are now of the
-second kind, and both are inferred.** The core is named `RLX4181` from a `PRId`
-assignment table, and `lwl`/`lwr` are inferred present because this unit's own
-kernel uses them in `memcpy` while its `do_ri` carries no emulation for them —
-so either the core has them or the device would not boot, and it boots. Neither
-is a measurement. `R1a` is one `lwl` under a bare-metal RI handler away from
-converting the second.
+🔄 **That was true of every ISA claim here until 2026-08-27. Two were then of
+the second kind and both were inferred** — the core is named `RLX4181` from a
+`PRId` assignment table, and `lwl`/`lwr` were inferred present because this unit's
+own kernel uses them in `memcpy` while its `do_ri` carries no emulation for them,
+so either the core has them or the device would not boot, and it boots.
+🟢 **2026-09-14 (seating 21): the second one is a measurement now.** `probe4`,
+bare metal, under an exception handler of ours, read `lwl`, `lwr`, `swl` and `swr`
+all `RIGHT` — they retired and computed the constants derived at the desk
+beforehand — with the reserved encoding `special0e` trapping in the same capture
+so that *did not trap* is a reading and not a dead processor. **The `memcpy`
+inference is redundant now rather than confirmed.** `SPEC.md` `CPU-15`,
+`CPU-57`; [`docs/rlx-isa.md`](docs/rlx-isa.md) § 3.
 
 ⚠️ **The vendor toolchains were measured too, and the first answer was wrong.**
 The emission of `lwl`/`lwr` is controlled by a build flag, `-fuse-uls`, that both
@@ -278,8 +283,11 @@ so both were changed, after the twelve userland binaries were re-checked and
 found clean.
 
 **[`notes/lwl-mystery.md`](notes/lwl-mystery.md)** — MIPS Technologies sued
-Lexra over the patent covering `lwl`/`lwr`/`swl`/`swr`, and Lexra's cores
-implement MIPS I without them. This unit's `/bin/boa` contains 144. Its
+Lexra over **US Patent 4,814,976**, which covers `lwl`/`lwr`/`swl`/`swr`, and the
+public account is that Lexra's cores implement MIPS I ~~without them~~
+🔄 **2026-09-14: without them — and this die has all four, 量 by `probe4`
+under a bare-metal handler.** ⚠️ One RLX4181, which leaves the LX5280 claim
+where it was. This unit's `/bin/boa` contains 144. Its
 bootcode, written by Realtek, contains none in 40 KiB of code — and neither does
 the vendor's own `busybox`. Across six firmware builds `boa` carries 176, then
 144, then zero from 2019 onward. 🔄 **2026-08-27: the discriminator this file
@@ -298,6 +306,21 @@ is one of the eight image signatures it accepts.
 loader's seventeen commands read to instruction level, including the four that
 can write an arbitrary memory address, and the 128-byte console line buffer
 whose `readline` writes its NUL only on the CR path.
+
+**[`docs/rlx-isa.md`](docs/rlx-isa.md)** — **start here for the instruction
+set.** Everything this project has established about the Lexra RLX4181's ISA in
+one place, in an order a reader who has never seen this repository can follow:
+what the core is and how it was named, which of 75 encodings this die executes,
+the one row that does not trap and computes the WRONG answer, what the kernel
+emulates and the single row on which that is visible, how deep the load delay
+slot goes, and what the vendor's own toolchains believe about the part. It owns
+nothing — every number points at the file that owns it, cited by `SPEC.md` id
+and capture name and never by a line number. 🔴 **And it was written while its
+gate was still open, deliberately**: § 8 registers, for each measurement still
+outstanding, what this page will be able to say when that measurement lands and
+what would refute it — so the remaining seatings either cash it or strike it in
+place. Every other document here was written after its evidence, and a document
+written afterwards can only agree with it.
 
 **[`docs/isa-prior-art.md`](docs/isa-prior-art.md)** — what this repository
 already held about this core's instruction set and its hazards, frozen before
@@ -360,6 +383,19 @@ the document is mostly about why the obvious answer is not one. Written closing 
 gate, it also records that the gate's own *"the D-cache is write-through"* does
 not follow from what was measured, and that a refutation condition this project
 wrote for itself turned out to be met.
+
+**[`docs/emulation-surface.md`](docs/emulation-surface.md)** — the two-column
+diff: what this core's instructions do bare metal, against what the same
+encodings do from Linux user mode, and the rows where the two differ are the
+kernel's emulation surface. 🔴 It puts a confound before the table — column ①
+was measured with `CU0 = 1` and column ② is unprivileged — so every row is
+labelled `same`, `emulation` or `privilege`, and only the second kind is the
+surface. The yield is **one row**, `sync`, with `ll` and `sc` emulated and
+*invisible* because they already retire on the die — 🔴 **and one of those two
+is invisible only in the VERDICT**: `sc`'s recorded value moves, so the die
+stored where the kernel's emulation refused to. Column ② was registered as a
+prediction and measured the same evening; **no cell changed**. It says what it
+does not establish at greater length than what it does.
 
 **[`tools/rlxprobe/`](tools/rlxprobe/)** — bare-metal payloads. The build is
 gated: no payload exists unless `tools/hazlint` exited 0 on the linked image.

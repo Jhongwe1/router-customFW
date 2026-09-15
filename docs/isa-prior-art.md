@@ -433,7 +433,7 @@ that the die's behaviour is the whole requirement.
 | | control | what it proves | precedent |
 |---|---|---|---|
 | **C1** | `break` | the handler is reached and returns | 量 `bench/2026-08-25b`, `break.count=1`, `cause=00000024` (ExcCode 9), `restore.mismatch=0` |
-| **C2** | `0x0000000E` | the **RI** path specifically, not just any exception | 量 `bench/2026-08-30`, above. Re-run rather than quoted, because it costs one cell |
+| **~~C2~~ C5** | `0x0000000E` | the **RI** path specifically, not just any exception | 量 `bench/2026-08-30`, above. Re-run rather than quoted, because it costs one cell. 🔄 **Renumbered 2026-09-15**, because `C2` came to mean two different controls inside one instrument's documentation once the user arm existed; `docs/isa-payload.md` § 6 carries the decision and the measurement it rests on |
 | **C3** | four `cache` op values | a `n=0` verdict is a reading and not a dead handler | 量 same capture, same boot |
 | **C4** | every `R1b` row under **qemu** | the *interlocked* arm. qemu interlocks the load delay slot, so a hazard test that returns the same value on both machines has not measured a hazard | 量 `probe1` cell 1 came back STALE on the die and FRESH under qemu — the opposite answer, which is the shape this demands |
 
@@ -669,6 +669,40 @@ the same needs:
 | **D-diff** | the two-column table; the difference is the emulation surface | 45 | **no** -- § 9.1 item 4 |
 | **D-cost** | each difference's cost | ~4 | yes |
 
+🔴 **2026-09-15: the 45 in that table and the 75 the harness runs are
+NOT the same number, and nothing in this file said so until the second arm ran.**
+`tools/isa-census.tsv` holds **45** data rows (39 `r1a` plus 6 `r1b`);
+`tools/isa-payload.tsv` holds **75**. 量 2026-09-15 at the desk, joined in
+both directions:
+
+* **By name**, which is the only join `isapay population` implements: **32** in
+  both, **43** payload rows with no census row, **7** census `r1a` rows with no
+  payload row.
+* Five of those seven are opcode **GROUPS** whose members are payload rows
+  — `cache` to `cache10`/`cache11`/`cache15`/`cache19`, `COP2` to `mfc2`,
+  `SPECIAL2` to `clz`/`clo`/`mul`, `SPECIAL3` to
+  `ext`/`ins`/`seb`/`wsbh`, and `COP1` to five rows that are already among the
+  32 by name. So following a group to its members adds **12** payload rows and
+  nothing at all for `COP1`.
+* **32 plus 12 = 44** payload rows the census covers; **75 minus 44 = 31** it
+  does not, and those 31 are the seven baseline controls, `special0e`,
+  `madd_hi`, `rotr`, `synci`, `cfc3`, `ltw`, the eight Lexra ASE
+  multiply-accumulates and the ten `udi*`.
+* In the other direction, **37 of the 39 `r1a` rows have a payload row** (32 by
+  name plus the five groups). The two that do not are `jalx` and `mtlxc0`, both
+  excluded by name and for a stated reason — § 3's rows say so and
+  `docs/isa-payload.md` § 7 owns the exclusions. The 6 `r1b` rows are
+  hazard shapes and are `probe5`'s, not `probe4`'s, and § 5 of
+  `docs/emulation-surface.md` is why a trap/no-trap harness cannot ask their
+  question at all.
+
+⚠️ **No instrument re-derives the 44/31 split.** `isapay population`
+joins by name and prints 43/7/32; the group join is written down in
+`bench/2026-09-15/PREDICTIONS-B22-block21.md` § 6.2 and in
+`docs/emulation-surface.md` § 8.2 and is checked by nothing — two
+agreeing hand counts rather than a derivation, which is exactly the weaker
+thing this file's § 1 argues against for the population itself.
+
 **The seven, placed.** The ids are assigned here for the first time; the wording
 in column two is § 9.1's own.
 
@@ -729,12 +763,53 @@ without a positive control had been about to return a clean answer.
 **④ 🔴 The one path the `CONFIG_RTL_WTDOG` difference reaches is
 `do_bp`, and no census row can enter it -- but the harness can.** 量: `break`
 and `syscall` appear in neither the **45**-row census (`tools/isa-census.tsv`)
-nor the **75**-row payload table (`tools/isa-payload.tsv`). So the difference is
-unreachable by anything `R1c` issues on purpose. 推: gcc emits `break 7` for
-integer division by zero, so the `R1c` **program** can carry one even though no
-row does. **That is a build gate and not an argument** -- `objdump -d` the linked
-binary and require a `break` count of **0**, the same shape as `hazlint`'s gate
-on the bare-metal payloads.
+nor the **75**-row payload table (`tools/isa-payload.tsv`) -- two populations
+with two different jobs, and § 9.2's table above is the join between them. So
+the difference is unreachable by anything `R1c` issues on purpose. ~~推: gcc
+emits `break 7` for integer division by zero, so the `R1c` **program** can carry
+one even though no row does. **That is a build gate and not an argument** --
+`objdump -d` the linked binary and require a `break` count of **0**, the same
+shape as `hazlint`'s gate on the bare-metal payloads.~~
+
+🔄 **2026-09-15: the gate was built, and BOTH struck clauses were
+replaced by measurement -- where the `break` comes from, and how to count one.**
+
+**The source is not a division.** 量 on `build/uprobe.elf`, the artefact
+seating 23 executed: the linked binary holds exactly **two** `break`, both
+`break 0xff` and both inside `__GI_abort`, which `__uClibc_main.os` pulls into
+the link -- the C runtime's own startup, which no division would have produced.
+⚠️ The struck 推's mechanism is real and was measured beside it, just
+not here: the three-toolchain scan found **four** `break` in every
+`printf`-using test binary, two of them in `__GI_fwrite_unlocked`'s
+divide-by-zero check and two in abort, and this harness writes with `write(2)`
+and carries neither of the first pair. **So the prediction named a mechanism
+that exists and attributed to it a count it did not produce**, which is the
+harder kind to catch, because the mechanism checks out.
+`SPEC.md` `TC-58`, `notes/userspace-probe.md` § 5.
+
+**The method is not `objdump -d`.** 量 2026-09-15: the rsdk binutils this
+project builds with print `0231280b` and then the raw word again for `movn`,
+naming nothing, because the driver's default decoder is MIPS-I and `movn` is
+MIPS-IV. 🔴 **That is the decoder being RIGHT** -- `docs/isa-payload.md`
+§ 3 already holds the principle that a decoder told MIPS-I correctly declines
+a later encoding, under its own heading. **The trap is one level up**: a count
+taken by grepping a disassembly for a mnemonic is a lower bound wearing a
+total's clothes, and on this toolchain the default level hides exactly the
+encodings this project cares most about. `tools/elfops.py`
+counts by decoding the word, which has no ISA level at all; `nm` supplies only
+the symbol extent, which is the one thing it does not lie about here. A second
+trap in the same idiom, measured beside it: GNU `grep -E` does not interpret
+`\t`, so `grep -cE '\tlw\b'` over a disassembly returns **0** -- which is also
+a clean file's answer, so the miscount is invisible.
+
+🔴 **And the pre-registration this item existed to serve FIRED.**
+§ 9.3's `R1C-1-b` required **zero** `break` in the linked binary and the
+artefact holds two, so the row is neither cashed nor waived: it is re-specified
+as BOUNDED -- `G1` zero in code this project wrote, `G1b` exactly two and both
+inside `__GI_abort`, and a third is red. Zero would need `-nostdlib` with a
+hand-written `_start`, `rt_sigaction` and `sigsetjmp`, and that trade was
+DECLINED because a hand-written MIPS `sigsetjmp` that saves the wrong
+callee-saved register is silent in an instrument that IS a signal handler.
 
 **⑤ 🔴 § 9's refutation of ruler candidate ① cites the wrong kernel, and
 the conclusion survives for a stronger reason.** The row cites *`rating` read 0

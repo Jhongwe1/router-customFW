@@ -90,6 +90,33 @@ The 7 the census has and this table does not:
 | `jalx` | excluded, § 7 |
 | `mtlxc0` | excluded, § 7 |
 
+🔄 **2026-09-15: that join is BY NAME, and a name-only join understates
+the overlap by twelve rows.** Four of the seven above are opcode groups whose
+members ARE rows here, so a join that follows a group to its members gives a
+different pair of numbers, and both pairs are right about different questions.
+量 2026-09-15 at the desk, over the two committed tables:
+
+| join | in both | payload rows the census does not cover | census `r1a` rows with no payload row |
+|---|---:|---:|---:|
+| by name, which is what `isapay population` prints | 32 | 43 | 7 |
+| by name or GROUP | 44 | 31 | 2 |
+
+The twelve the group join adds are `cache10`/`cache11`/`cache15`/`cache19` to
+`cache`, `mfc2` to `COP2`, `clz`/`clo`/`mul` to `SPECIAL2`, and
+`ext`/`ins`/`seb`/`wsbh` to `SPECIAL3`. **`COP1` adds none**: its five members
+— `mfc1`, `lwc1`, `swc1`, `ldc1`, `sdc1` — are census rows in their own
+right and are already among the 32. The two `r1a` rows uncovered under either
+join are `jalx` and `mtlxc0`, both excluded by name in § 7.
+
+⚠️ **No instrument derives the second row of that table.** `isapay
+population` implements the name join only, and the 44/31 split is written down
+in `bench/2026-09-15/PREDICTIONS-B22-block21.md` § 6.2 and again in
+`docs/emulation-surface.md` § 8.2 — two agreeing hand counts rather
+than a derivation, which is the weaker thing and is said out loud rather than
+left to be found. `docs/isa-prior-art.md` § 9.2 carries the same
+reconciliation from the census side, which is where a reader who has met the
+number 45 is sent.
+
 ---
 
 ## 2. The cell, and why a generator
@@ -250,7 +277,7 @@ The payload records eight words per row and decides nothing:
 |---|---|
 | 0 | the tag, `0x5234` in the top half and the row index in the low — **written before the cell is called**, so a row that hangs names itself |
 | 1 | the exception count across the cell |
-| 2 | the whole `Cause` word |
+| 2 | the whole `Cause` word. 🔄 **On the second arm this word is not `Cause` at all — § 11.2** |
 | 3 | `EPC` |
 | 4..7 | `$2`, memory word 0, memory word 1, and the aux result |
 
@@ -275,9 +302,32 @@ because the value that was thrown away is the one that turns out to be needed.
 |---|---|---|
 | positive | the `baseline` group must read `RIGHT` | `plan:1013`, `:1074` |
 | C1 | `break` must trap — the handler is reached and returns | `plan`; 量 `bench/2026-08-25b` |
-| C2 | `special0e` must trap, ExcCode 10 | 量 `bench/2026-08-30` |
+| ~~C2~~ **C5** | `special0e` must trap, ExcCode 10 | 量 `bench/2026-08-30`; renumbered 2026-09-15, below |
 | C3 | the four `cache` op values must **not** trap, in the same capture | 量 same boot |
 | C4 | the qemu arm, run and recorded first | `plan/DAY-ZERO.md:603` |
+
+🔄 **2026-09-15: `C2` is renumbered `C5`, because one id meant two
+different controls inside one instrument's documentation.** The second arm
+(§ 11) reaches these same 75 encodings from Linux user mode through the
+same `tools/isapay.py`, and `notes/userspace-probe.md` § 4 names that
+arm's controls `C1a`, `C1b` and `C2` — where its `C2` is *every trapping
+row's faulting PC equals that row's own `_w` symbol*, which is not this control
+and is not even the same kind of claim.
+
+**Which one moved was decided by measurement rather than by seniority.** 量
+2026-09-15 over every frozen `bench/*/PREDICTIONS-*.md`: the user arm's `C2` is
+pinned by name in `bench/2026-09-15/PREDICTIONS-B22-block21.md` § 6.4 and
+is a literal string `tools/isapay.py` prints (`C2 NOT RUN`), so moving it would
+strand a frozen card and a tool's own output; **no frozen card names this one
+`C2`** — seating 21's card and `SPEC.md` `CPU-57` both call the
+reserved-encoding control `D2` — so this is the one that can move.
+
+⚠️ **`C1` and `C4` did not move with it**, although a whole
+re-lettering would have read better: seating 21's card names both by their bare
+ids (`break.count` is *"this is `C1` and it is mandatory"*, and the forced
+anti-control is `C4`), so re-lettering the set would have stranded two
+citations to buy tidiness. **The gap left at `C2` is the record and is not
+closed up.**
 
 🟢🟢 **量 2026-09-14 (seating 21), `bench/2026-09-14`: every one of them held.**
 The `baseline` group read **`RIGHT` on all seven rows** (`add`, `lw`, `sw`,
@@ -289,7 +339,7 @@ over 75 rows: **RAN 16, RIGHT 16, TRAPS 42, WRONG 1.** Two rounds, 75 row lines
 and 18 header fields byte-identical, and the `DW` channel agrees word for word
 with `seal=AF7A728B` on all three channels.
 
-> 🔴🔴 **2026-09-14 (the sixty-ninth segment, desk): `C2` is clean by
+> 🔴🔴 **2026-09-14 (the sixty-ninth segment, desk): ~~`C2`~~ `C5` is clean by
 > EXACTLY ONE FUNCTION CODE, and nothing here knew it.**
 > 讀 the vendor's `arch/rlx/kernel/traps.c:454-462`, `simulate_sync` — it
 > matches SPECIAL with function field **`0x0F`**, ignoring `rs`, `rt`, `rd` and
@@ -330,9 +380,9 @@ just wrong values*, and until tonight it was inherited rather than measured on
 this die. ⚠️ **It is one encoding, not a claim about mips32 as a whole**: the
 population is these 75 rows and `WRONG` is 1 of 75.
 
-C1, C2 and C3 together are what make a zero mean something: C1 and C2 prove the
-handler catches, C3 proves it does not catch everything, and both halves are in
-one capture on one boot.
+C1, ~~C2~~ C5 and C3 together are what make a zero mean something: C1 and C5
+prove the handler catches, C3 proves it does not catch everything, and both
+halves are in one capture on one boot.
 
 ### 🔴 A SECOND pre-registered prediction was refuted, and it settles which machine this die is
 
@@ -546,3 +596,146 @@ it writes register zero and only the base is chosen.
   `probe4` and `probe5` were built and again on the day `probe6` was.
   `C40`…`C44` are the population control and its three positive controls.
   `PROGRESS.md` `RB-1`.
+
+---
+
+## 11. 🟢 The second arm — the same 75 encodings from Linux user mode, and the one word that means something else
+
+**量 2026-09-15, seating 23, one power cycle, one boot.** It sits after
+§ 10 for the reason `docs/emulation-surface.md` puts its § 8 after its
+own *what could still be wrong*: the arm is newer than that list, and a section
+that arrived later should read as later. It carries its own limits in § 11.5.
+
+**What this section is not.** The instrument is
+`config/rlxfw-user/isaprobe/uprobe.c`, and `notes/userspace-probe.md` owns it
+— its ABI, its build, its six gates. The 45-row two-column table whose second
+column this arm fills is `docs/emulation-surface.md`'s, and that file's
+§ 3, § 4 and § 8 own every per-row cell. What is owned here is what
+this file is for: **the payload's recorded format and its limits**, on an arm
+that did not exist when § 5 was written.
+
+### 11.1 The same bytes, and two differences
+
+`uprobe.c` links **this payload's own `cells4.S`**. The encodings are not a
+second copy of the table's words; they are the same object, so a row that is
+wrong here is wrong on both arms and cannot be wrong on one — which is the
+same argument § 2 makes for generating the cells at all, one level up.
+
+| | bare metal, `probe4` | user mode, `uprobe` |
+|---|---|---|
+| line prefix | `P4 ` | `PU ` |
+| row shape | `<idx:8hex> <name>` then eight 8-hex words | the same |
+| word 0 | the tag, `0x5234` over the row index | the same |
+| word 1 | the exception count across the cell | the signal count across the cell |
+| word 2 | the whole CP0 `Cause` word | 🔴 **not `Cause` — § 11.2** |
+| word 3 | `EPC` | the faulting PC, from `uc_mcontext.sc_pc` |
+| words 4..7 | `$2`, `mem0`, `mem1`, aux | the same |
+
+🔴 **`tools/isapay.py` carries two regexes rather than one `P4|PU`
+alternation**, and its own comment says why: with a single pattern a file
+holding both arms merges into one result block and the duplicate-index guard
+reports *row N appears twice with different values* — corruption's message
+for something that is not corruption, which is the worst kind of wrong message.
+
+### 11.2 🔴 Word 2 is not a `Cause` register, and `exccode` over it yields a number that looks like one
+
+A Linux process is not handed `Cause`. The harness packs the signal number into
+the high half and `si_code` into the low half — `(signal << 16) | si_code`
+— and `isapay verdict --arm user` decodes it through a table rather than
+through `exccode`. That line was unguarded until this arm existed.
+
+**量 `bench/2026-09-15/C2-UP.log`: all 46 trapping rows carry the same word,
+`00040080`.** That is `SIGILL` over `SI_KERNEL`, and both halves are readings
+rather than defaults:
+
+* **`SIGILL` is 4 here and `SIGBUS` is 10**, because this port gives `SIGEMT`
+  the number 7 where the generic Linux ABI gives it to `SIGBUS`. A decoder
+  table copied from `signal(7)` prints a genuine `SIGBUS` as `SIGEMT` and
+  nothing looks wrong. `SPEC.md` `CPU-63`.
+* **`SI_KERNEL` (`0x80`) is what a reserved instruction is EXPECTED to carry**,
+  because `force_sig` sends `SEND_SIG_PRIV`. `ILL_ILLOPC` would have been the
+  surprise.
+* 🔴 **The same `SEND_SIG_PRIV` is why `si_addr` reads 0** — it
+  overlaps `si_pid` in the union — so a probe that identifies a row by
+  `si_addr` identifies every row as address zero. Word 3 is the only handle on
+  *which* row faulted, which is the whole reason the user arm carries a
+  PC-identity control at all.
+
+⚠️ **One value across 46 rows is a thin reading, and it is stated as one.**
+The capture holds no second signal number and no second `si_code`, so nothing
+in it separates *the harness decodes both halves* from *the harness prints
+whatever one word it was given*. What makes it more than that is the
+`raise(SIGILL)` control — `c1a_raise` — which reaches the same handler
+by a route that borrows nothing from the encodings under test.
+
+### 11.3 The reading, and the line was frozen before the board was powered
+
+量 `bench/2026-09-15/C2-UP.log`, `/bin/uprobe d73`, under rlxfw's own kernel:
+
+```
+verdict (user arm): 75 row(s), RAN 12, RIGHT 16, TRAPS 46, WRONG 1
+```
+
+🟢 **`bench/2026-09-15/PREDICTIONS-B22-block21.md` § 6.3 carries
+that line character for character**, frozen at `9874012` before power. The
+result is `SPEC.md` `CPU-64`'s; the per-row cells and the single row on which
+the emulation surface is visible are `docs/emulation-surface.md` § 3 and § 4's.
+
+Two readings the row lines carry that no header field reports:
+
+* **46 rows took a signal and 29 did not, and every one of the 46 took exactly
+  one.** So the handler's `+4` returned into each cell's own epilogue every
+  time rather than re-faulting on the same word, and the escape hatch was never
+  approached. 讀 `uprobe.c`: the escape is `n == max_sig + 1` by
+  construction and there is deliberately **no escaped-flag bit** in word 1,
+  because `isapay.py` decides `TRAPS` on the truthiness of that raw word and a
+  flag in it would have made an escaped row that never trapped read `TRAPS`.
+  **The count stays a count on both arms**, and a row that re-faulted would be
+  visible in it without having to hang first.
+* **29 = RAN 12 + RIGHT 16 + WRONG 1**, so the three-way verdict of § 5
+  survives the change of arm rather than collapsing to trap/no-trap: `rotr`
+  reads `WRONG 00123456` here exactly as it does bare metal, which is
+  `SPEC.md` `CPU-55` measured a second time at a second privilege level.
+
+### 11.4 The header and the trailer, which are the instrument judging itself
+
+The header is `rows`, `first`, `last`, `scratch_b`, `uc_pc_lo`, `max_sig`,
+`scratch_at`, `install_rc`, `c1a_raise` and `c1b_special0e_n`; the rows are
+fenced by `rows begin` and `rows end`; the trailer is `scratch_bad` and `end`.
+量 on the seating: `rows=0000004b` (75), `first=00000000`,
+`last=0000004a`, `install_rc=00000000`, `c1a_raise=00000001`,
+`c1b_special0e_n=00000001`, `scratch_bad=00000000`, terminator present.
+
+`bench/2026-09-15/C2-UPR.log` is the range control, on the same boot and with
+its own nonce so the two captures cannot be confused: `/bin/uprobe r73 0 3`
+returns four rows with `last=00000003` while `rows` still reads `0000004b`.
+**A mistyped range therefore shows up in a header field rather than as a short
+capture nobody questions**, which is the same shape as § 5's rule that the
+payload records and decides nothing.
+
+### 11.5 What this arm does not establish
+
+* **One seating, one boot, and not one row repeated.** Every cell above rests
+  on a single capture. Re-running `uprobe` is the cheapest repeatability
+  evidence a later seating can buy.
+* 🔴 **The qemu leg measures the instrument and nothing else, and that
+  sentence now has a number on it**: 34 of these 75 rows disagree between the
+  die and `qemu-mips-static`, in both directions. `SPEC.md` `CPU-65`. A card
+  written from the emulator would have been wrong on 34 rows and right on the
+  summary line by accident.
+* 🔴 **`isapay verify` without `--objdump <the rsdk cross objdump>` is
+  a misapplied instrument and not a result**: the host's x86 binutils decodes
+  every row as `00000000` and the tool reports **75 of 75** findings. Given the
+  right one it reports 0 word mismatches and 0 absent symbols over all 75 rows,
+  beside **52 findings of the *binutils declines to name this encoding* kind
+  — which § 3 says are a reading rather than a defect, and which
+  nothing has audited.**
+* ⚠️ **The device's line terminator is not the emulator's.** Every
+  device line arrives `CR CR LF` where qemu writes `CR LF` (`SPEC.md`
+  `FW-49`), which is why a byte prediction taken off the qemu file read 7,195
+  against a capture of 7,305. The parser is unaffected — `isapay.py` folds
+  every `CR` to a newline before matching — and `LOG.md` under 2026-09-15
+  holds the arithmetic that closes both captures exactly.
+* ⚠️ **The census this arm is compared against is not this payload.**
+  § 1's join is the bridge, and **31 of these 75 rows have no census row
+  under either direction of it.**

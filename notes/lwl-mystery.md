@@ -141,9 +141,31 @@ uses none of the four instructions in 40 KiB of code, and neither does the
 vendor's `busybox`. `boa` used them until some point in 2018–2019 and then
 stopped.
 
-**Not established:** whether the silicon implements them. Nothing here is a
+~~**Not established:** whether the silicon implements them. Nothing here is a
 measurement on the device. A binary that avoids an instruction is evidence about
-the toolchain that built it, not about the hardware that runs it.
+the toolchain that built it, not about the hardware that runs it.~~
+
+🟢🟢 **2026-09-14 (seating 21): the silicon implements all four, and that sentence
+stops being true.** `probe4` — bare metal, with an exception handler of its own —
+read `lwl`, `lwr`, `swl` and `swr` all `RIGHT`: they retired and computed the
+constants derived at the desk beforehand. The same capture carries both controls
+that make the reading mean something — the reserved encoding `special0e` TRAPS with
+`ExcCode 10`, so the handler catches, and the seven MIPS-I baseline rows all read
+`RIGHT`, so the payload executed. 量 `bench/2026-09-14/C1-P4j.log`; `SPEC.md`
+`CPU-15` and `CPU-57`; the payload's design is `docs/isa-payload.md` § 6.
+
+🔴 **What that refutes is public information, and it is worth stating apart from
+the result.** The public account of this core family is that it removed these four
+instructions, and the LKML patch for the LX5280 says that part does not have them.
+⚠️ **This measurement is one RLX4181 die and says nothing about LX5280**, so the
+LKML claim is untouched; what is refuted is reading it as family-wide, for this
+part.
+
+⚠️ **And the inference this file had been leaning on is now redundant rather than
+confirmed.** The `memcpy` argument — *if the core lacked them, the first unaligned
+copy would take a Reserved Instruction, `do_ri` has no emulation for it, and the
+device boots* — was an inference about the device booting, not a measurement of
+these four encodings. It was right. It was still 推, and this file said so.
 
 **Refutation condition, written before the scan:** the claim "`stage2` contains
 none of the four" is refuted by any 4-byte aligned word in the file whose
@@ -321,9 +343,13 @@ counter-example by luck is still a claim that was wrong.
    instructions and every one of `boa`'s 144 sites was a trap into the kernel.
    The kernel is not carved yet — `extracted/*/` holds only `rootfs.squashfs`
    and its expansion. (R2)
-2. **R1a on the device, bare metal.** Execute one `lwl` under a Reserved
+2. ~~**R1a on the device, bare metal.** Execute one `lwl` under a Reserved
    Instruction handler. That is the only thing here that measures the silicon,
-   and it is now the only thing left in this list that is not desk work.
+   and it is now the only thing left in this list that is not desk work.~~
+   ✅ **Answered 2026-09-14 (seating 21): all four retired and computed the right
+   value.** See *What this establishes* above. Kept rather than deleted, because
+   what this item records is that the list had exactly one entry that was not desk
+   work, and the file waited eighteen days for it.
 3. ~~**Compile a program with unaligned struct access using the vendor rsdk and
    count.**~~ ✅ **Answered 2026-08-27, corrected twice on 2026-08-28**, above:
    the lever is `-fuse-uls`, both toolchain generations carry it, **and no drop's
@@ -355,7 +381,10 @@ counter-example by luck is still a claim that was wrong.
    against 10 `lwr`), while every shipped image is exactly paired and this file
    uses pairing as its evidence that the bounds are right. The 4181-driven build
    *is* paired. Unexplained. ③ Nothing here is a measurement on the device.
-4. If the hardware does lack them: `boa` on this unit takes a kernel trap on
+4. ~~If the hardware does lack them: `boa` on this unit takes a kernel trap on
    every unaligned string access, and the cost is measurable. (P2) — **now the
    unlikely branch**, but it stays here until `R1a` closes it, because the
-   evidence for the other branch is entirely read rather than measured.
+   evidence for the other branch is entirely read rather than measured.~~
+   ✅ **Excluded 2026-09-14, by item 2's own condition.** `R1a` closed it, so this
+   is not the unlikely branch any more, it is gone: there is no kernel trap to cost,
+   because the instructions retire.
