@@ -652,3 +652,76 @@ last and is the file most likely to carry a raw reading.
 the record before running the `.md` gates, so the sweep sees it. **The repair
 that would be a guard** — a `--include-untracked` mode, or a closeout step that
 stages first — is named here and not built.
+
+---
+
+## 11. 🔴 The closeout's own citation gate, and a checker of mine that could not fail
+
+`citecheck` is run after the commit, because its `C4` suspends baseline rows
+whose citing file is dirty — 13 rows against 55. On the clean tree it went red:
+**one stale baseline row**.
+
+### 11.1 What made it stale, and it applies to eleven rows this seating wrote
+
+The baseline is *keyed on content, not on a line number*, and its own header
+says how: **the digest is of the cited row's content AT THE COMMIT THAT LAST
+WROTE THE CITING LINE.**
+
+This seating appended to **eight `SPEC.md` rows and three `docs/probe3-cells.md`
+rows** in place. Appending to a table row that carries a citation **moves that
+line's blame**, so the oracle re-reads the cited content at a newer commit —
+even though the citation itself is untouched. One of the eleven went stale. The
+other ten did not, and that is luck: their cited content happened not to have
+moved.
+
+### 11.2 Chasing it found a claim three desk checks had missed
+
+`notes/cache-model.md`'s geometry table still read
+*`| D-cache | **not measured** | … | **no measurement exists** |`*, and tonight
+measured it. **`spec-check`'s `C5` could not catch that**: `CPU-69`'s owner is
+`docs/rlx-cache-and-cp0.md`, and this is a different file with no row pointing
+at it.
+
+Both citations of that row — `SPEC.md`'s and
+`docs/rlx-cache-and-cp0.md:855`'s — pointed at **`:904`, blank since the file
+was restructured**. Both now point at `:917` and carry a token, which `C11`
+requires, and the quoted phrase is kept in the row struck through so the
+citations still resolve to what they were written to quote.
+
+### 11.3 🔴 And the second citation had gone blind rather than been repaired
+
+Regenerating the baseline after the first repair dropped **three** rows, and one
+of them was `docs/rlx-cache-and-cp0.md → :904`, **which nothing had touched**.
+
+**Measured rather than reasoned**, because reasoning about it did not converge:
+the baseline was regenerated at `HEAD~1` in a throwaway worktree and diffed
+against `HEAD`. The mechanism is that until the geometry row was edited there
+was a **second copy of the quoted text at `:917`**, so the oracle could still
+resolve what `:904` used to hold; editing `:917` removed it, and the `ROT`
+verdict vanished while the citation stayed exactly as rotted.
+
+**Applying the regenerated baseline there would have deleted a row for a live
+finding** — the failure segment 75's own commit is named for. So the second
+citation was repaired too, and then all four dropped rows are honest.
+
+### 11.4 🔴 The check that was supposed to prove that, and could not fail
+
+The rule used is objective: **a dropped baseline row is honest only if the
+citation it names no longer exists in its citing file.** The first
+implementation was shell:
+
+```
+n=$(grep -c "…" "$src" 2>/dev/null || echo 0)
+if [ "$n" -gt 0 ]; then bad=1; fi
+```
+
+`grep -c` prints `0` **and** exits 1 when there is no match, so `|| echo 0`
+appends a second line and `$n` becomes `"0\n0"`. `[ "0\n0" -gt 0 ]` raises
+*integer expression expected*, which is neither true nor false — **the flag was
+never set and the table was applied anyway.**
+
+It happened to be applying a correct table. **That is the whole problem**: a
+checker that cannot fail agrees with everything, including the next thing that
+is wrong. It was replaced with a Python version carrying a positive control —
+it is shown able to report STILL CITED on a citation that really is there — and
+the verdict was re-taken: **4 dropped rows, 4 genuine repairs, 0 added.**
