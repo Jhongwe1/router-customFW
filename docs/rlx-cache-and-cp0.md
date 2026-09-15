@@ -894,7 +894,7 @@ repaired:
   therefore doubles to **3,520–11,700**, and `t.hit.ks1` = **13,698** is
   **above the top of it**. A prediction was missed and nobody noticed, because
   nobody read the field.
-* 🔴 `docs/probe3-cells.md:1290`'s stage-0 row says the arena is
+* 🔴 `docs/probe3-cells.md:1293`'s stage-0 row says the arena is
   initialised. It is not — `rlx_w_arm` runs in Groups W and V, stages 3 and 7,
   and Group T is stage 2. **`t-hit` loads uninitialised DRAM**, which does not
   affect a timing measurement but does mean the row is wrong.
