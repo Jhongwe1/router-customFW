@@ -299,7 +299,18 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # alone reports 1 cold / 2 warm and `2026-09-14c` alone 0 cold / 12 warm -- so
 # the delta is exactly +1/+14 and nothing was reclassified. Caught by the
 # run-every-suite rule at the desk this time, before the push.
-ck "thirty-six cold, one hundred and fifty-nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 36 cold, 159 warm, 0 unknown')"
+# 🔄 36/159 until 2026-09-15 (seating 23), which added ONE cold power-on
+# (`2026-09-15/C1-esc`) and ONE warm reset (`2026-09-15/up2-rz`, looprun's `S4`
+# `J BFC00000`).  Isolation check, run before this line was touched: every
+# directory EXCEPT `2026-09-15` still reports 36 cold, 159 warm, and
+# `2026-09-15` alone reports 1 cold / 1 warm -- so the delta is exactly +1/+1
+# and nothing was reclassified.
+# 🔴 NOT caught at the desk this time.  The closeout ran a hand-picked list of
+# ten gates instead of every suite, and this went red on GitHub -- the third
+# time this assertion has, and the first time the run-every-suite rule was
+# available and skipped.  `CLAUDE.md` states that rule; the previous segment
+# followed it and caught the 35→36 move before its push.
+ck "thirty-seven cold, one hundred and sixty warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 37 cold, 160 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -393,8 +404,12 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # runs and every `-RB` cell end at the loader prompt by design
 # (`--esc-after` / `--until '<RealTek>'`), and an `entry` interval needs BOTH
 # ends in one capture. Every other directory still reports n=65.
-ck "entry population is seventy-one warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=71')"
+# 🔄 n=71 until 2026-09-15 (seating 23).  `2026-09-15/up2-rz` is `looprun`'s
+# `S4`, which sends `J BFC00000` with `--esc-after 10`, so both ends of the
+# interval are in one capture and it qualifies.  Every other directory still
+# reports n=71.
+ck "entry population is seventy-two warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=72')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
