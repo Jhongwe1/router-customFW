@@ -28129,3 +28129,189 @@ sh   tools/test-file-modes.sh   ->   0 recorded executable,  3 passed, rc 0
 * ⚠️ **`docs/emulation-surface.md` 的標題長度 117 字元**，這個檔的標題常態約 96；插進去的是結果那一句，要退回只退那一句。
 * ⚠️ **scratchpad 是共用的**，這一段有一支 agent 的腳本被另一支覆蓋。下次 fan out 前先講好命名。
 * ⚠️ `UP-AUD-1` 還開著：**①②⑤ 未動、⑥ 的工具普查半未動、⑦ 三件未動**；③④ 今晚收掉。
+
+## 2026-09-16 — 第七十五段（2026-09-15 23:51 開場，桌面，**零電源循環**，板子全程斷電）：兩顆 payload 都建起來了、卡片凍了，而最值錢的三件事都是「事前登記自己算錯了」
+
+### 1. 結果
+
+`R1-pub-3` slot 2 與 `R1-pub-4b` 的 payload 都存在了，卡片
+`bench/2026-09-16/PREDICTIONS-B23-block22.md` 凍結，seating 24 可以上機。
+
+* `probe3` 多了 **Group L**：六個 footprint × 兩個 arena base 的階梯、五條腿的
+  A–B–A、36 個結果字，`RB_WORDS` 718 → **754**，`DW 80A02000 754`（卡片用
+  `RB_POISON_W` = **762**）。映像 **33,616** 位元組，sha256 `c2069e250794ee7f…`。
+* 新 leaf `rlx_tc_ladder(base, passes, lines, raw_ks1)`。
+* `ucost` 建好：`UCOST_BUILD_ID` **`8403799745aeb189`**、16,692 位元組、四道閘門
+  全過（`hazlint` **642 loads 0 violations**）。映像 `uc1`，`RECIPE_ID`
+  **`efa93621`**、vmlinux 4,141,974、`nfjrom` 1,059,840。
+* `test-rlxprobe` 224 → **233 passed, 0 failed**；`cardcheck numbers` **12 of
+  12**；`check-predictions` **0 of 11**（通電前正確）。
+
+**零 flash 寫入、零 `FLR`、括號不動 0.0244 %。**
+
+### 2. 🔴🔴 最值錢的一件：A–B–A 的事前登記把自己的數字算錯 8.9 倍，而錯的方向會把「真的作廢了」讀成「沒有作廢」
+
+`docs/rlx-cache-and-cp0.md` 的 A–B–A 列寫著第二條 KSEG0 腿會
+*"reads cold, ~138 ns/load"* —— 那是 **17,664** ticks。
+
+算，只用三個已發表的 `t-hit` 數字：那條腿是 **32 passes**，一次作廢的 uncached
+讀只讓**第一趟**變冷，其餘 31 趟命中。所以
+
+```
+256 misses × 2.1563 + 7,936 hits × 0.1797 = 1,978 ticks  (16.90 ns/load)
+沒作廢                                      = 1,472 ticks
+```
+
+**1.34×，不是 8.9×。** 拿量到的 1,978 去對 *"~138 ns/load"*，讀者會說它是暖的、
+結論「沒有作廢」—— **正好相反**。
+
+🟢 修法是一趟而不是一段文字：同樣的 walk 在 `passes = 1` 下分開 **12.00×**
+（552 對 46）。格子從三條腿變**五條**，兩條 32-pass 腿留著，因為它們重現
+`t.hit.ks0` 與 `t.hit.ks1`，是這一格對自己的交叉檢查。`SPEC.md` `CPU-68`。
+
+### 3. 🟢 leaf 對已發表數字的權利是「同一段指令」，而那是量出來的
+
+`cells.S:454` 逐字禁止在 `rlx_tc_walk` 裡面加參數，所以階梯要一片新 leaf。
+**最短的寫法是抄 `rlx_tc_stride`**（它已經是參數化的 walk），而那是錯的：
+
+| leaf | 內圈 | ALU floor |
+|---|---:|---:|
+| `rlx_tc_walk` | **5** 條 | 0.17862 tick |
+| `rlx_tc_stride` | **7** 條 | 0.25007 tick，**高 40 %** |
+
+兩份擁有者檔案引用的 `~0.07 ns` 是對**五條**校正出來的（`t-cal` 的
+`15,090/140,800/3 × 5`）。所以 `rlx_tc_ladder` 是 `rlx_tc_walk` 把字面 `256`
+提進暫存器，別的都不動。量，objdump 對 `cells.o`：
+
+* 內圈五個字**逐位元組相同**：`8d630000 256b0010 2739ffff 1720fffc 00000000`
+* 兩支外圈跨距都是 **10** 條
+* 整支常式只差 **四個字**：raw 指標暫存器、兩個 prime 常數、以及 reload
+  （`addu` 對 `addiu`，同位置同成本）
+* 長度 walk **30** / ladder **31** / stride **32**
+
+🟢 **所以 4 KiB 那一檔要求逐 tick 重現 `t.hit.ks0 = 1,472`，而不是近似。**
+`tools/test-rlxprobe.sh` § `L1` 是常設閘門，含一個負半邊（stride 的 body 必須
+**不**等於 walk 的），套件 224 → 233。`SPEC.md` `CPU-67`。
+
+### 4. 🔴 `4b` 的尺是錯的，而修它的時候掉出一個免費的量測
+
+`R5-3b-2` 之後 `jiffies` 數的是 **TC1**（我自己的 clockevent），不是 TC0 的
+wrap。量 `bench/2026-09-06b/` 十二份擷取（`mode=ce`、`ce_live=1`、橫跨 655 s）：
+
+```
+((tc0cnt>>4) − tc1_cycles) mod 2000  =  716 或 717，十二份全部
+```
+
+🟢 **TC0 與 TC1 鎖相，±1 count / 655 s** —— 沒有人從外面檢查過這件事。
+🔴 而偏移**不是 0**，是 716 counts = **3.58 ms**，所以原本要用的
+`jiffies × 2000 + (TC0CNT>>4)` 在約 **46 %** 的區間上剛好差一個 reload = 10.0 ms。
+`ucost` 因此每個 rung 同時吐兩個 composite，由擷取自己的 `mode=`／`ce_live=`
+決定，因為 `ce_live=0` 時極性會翻。`SPEC.md` `CLK-30`。
+
+### 5. 🔴 `4b` 從來沒有 DoD，而它有一個「一列」的預測 —— 那個預測**刻意不改**
+
+`PROGRESS.md` 的 `D4` 在 2026-09-14 把 *"with a measured cost"* 劃掉並改派給
+`4b`，**而替代品從來沒有寫在任何地方**。這一段補上 `E1`–`E7`、兩條否證（一條
+作廢、一條**收窄**）與停損。
+
+🔴🔴 而 `docs/rlx-isa.md` § 8.2 早就登記了 *"`D-cost` 會找到恰好一列有可量成本"*。
+**它一個字都沒改。** 如果 `ll`／`sc` 有成本，那個預測就**被否證**，而那個否證
+就是這次上機的結果；如果沒有，*"在使用者模式下被模擬"* 就被否證成一句關於
+**執行中的機器**的話，而 § 8.2 **成立**。兩個結果都是結果，兩個都寫在卡片上。
+
+**寫在量測之前的文件是這個 repo 最稀有的東西。現在改它去迎合儀器即將說的話，
+就是把那個性質花掉換一場空。**
+
+### 6. 🔴 `lwu2` —— 這個 repo 兩份自己的檔案對同一件事給不同答案
+
+`ucost` 多了第四列：同一個 `lw` 編碼，base **+2**。孿生是 base +0 的那一列，
+是整張表裡最好的孿生（同編碼、同暫存器、同 cache line，只差一個奇位址）。
+
+* `SPEC.md` `CPU-15`，量在這顆 die 的 loader prompt：**四條未對齊載入儲存全部
+  執行而且算對** —— 那是否證公開紀錄的那一筆。⇒ kernel 的 handler 從不觸發，
+  `lwu2` 的成本**等於** `lw`。
+* `docs/emulation-surface.md` 把**五個未對齊形式**列在模擬面的八條裡。⇒
+  `lwu2` 付一次例外來回，是這顆 kernel 上最貴的模擬、也是真實程式唯一會踩到的。
+
+**那是兩個不同的數字，而這一格讀其中一個。** 普查按規則排除未對齊形式（所以
+`4a` 構不到），而 `4b` 自己寫 `.word`，構得到。
+
+### 7. 🟢 `uprobe` 的 digest 一位元組都沒動，而那是決定不是巧合
+
+`BUILD_ID` = `cat uprobe.c cells4.S probe4rows.h rlxasm.h` = `a87be346bb83e7f9`，
+正是 seating 23 擷取印的那個。seating 24 要**重跑一列 `4a`** 求重複性 ——
+欄② 從來沒有任何一列被重複過 —— 而那次重跑在二進位**逐位元組相同**時最值錢。
+
+所以 `ucost` 被刻意做成**獨立產物**：自己的 `UCOST_BUILD_ID`、自己的兩個輸入、
+**不 link `cells4.S`**。收工時重量一次：digest 仍是 `a87be346bb83e7f9`。
+
+🔴 **這讓 `special0e` 的 `C2` → `C5` 第四次被帶走**，而這一次帶走的理由是積極的，
+並且**有到期日**：那次重跑落地之後的第一次重建。⚠️ 而它記錄的正控制
+`4ac4cd1f6c0b61ed` **重現不出來**（加的那行註解內容從來沒寫下來，實測得到
+`5aae6385f8d5a65d`）—— 機制成立，那個常數不可重現，不要再引用。
+
+### 8. 🔴 我自己犯的，照原樣記
+
+1. **我在 sweep 跑的時候改樹，兩次。** `CLAUDE.md` 桌面 sweep 規則 ③ 逐字寫著
+   不准。第一次讓 `test-rlxprobe` 回報 7 個 FAIL，其中 4 個是移動中的樹造成的
+   假象，真的只有 3 個（718 的鏡像）。**代價是一次 35 分鐘的重跑。**
+2. **我的第一支建置腳本重現了這個檔案自己的 `EXIT CODE: 0` 陷阱**：
+   `make ... | tail` 之後讀 `$?`，讀到的是 `tail` 的。make 失敗而腳本印
+   `PAYLOAD_RC=0`。
+3. **`\t` 在 GNU `grep -E` 的 bracket 裡不是 tab，在 GNU `sed` 裡是** —— 同一個
+   class 我在四行之內寫對一次寫錯一次，**而且一小時後在 Makefile 裡又寫錯兩次**。
+   前者害 L1 四格 FAIL，後者害 `UG3` 報 `cells=0`。
+4. 🔴 **我的註解寫 Group L 佔 32 字、`RB_WORDS` 750，而實際是 36 與 754** ——
+   兩份 prose 副本同步錯，第三份（建置讀的那個）是對的，**所以建置永遠不會發現**。
+   這正是記憶檔裡那條「一對錯的數字只要差是對的就永遠自洽」。抓到它的是一次
+   對抗性重讀，不是任何檢查器。
+5. 🔴 **階梯的 24 個 rung 原本印成沒有 `rlxprobe: ` 前綴的兩行**（`pair()` 只吐
+   一個前導空格），而卡片裡每一個 grep 都錨在 `^rlxprobe: `。**slot 2 的頭條會
+   對去找它的卡片隱形。** 同上，抓到它的是對抗性重讀。
+6. 我在卡片上寫 `dwreply 762` = 9,044 與 fence = 12，`cardcheck numbers` 重新導出
+   得到 **9,003** 與 **11**。工具是對的；那正是它存在的理由。
+
+### 9. 🟢 順帶修掉的既有缺陷
+
+* `cells.S:53` 規則 3 寫 *"NO GPR $12 OR $13 IS USED ANYWHERE IN THIS FILE"*，
+  而 `rlx_tc_stride` 自 2026-08-31（`494b07f`）起用了**兩個、五次**。規則寫於
+  2026-08-26（`07d9928`），中間隔五天。**就地記錄不修**：改五個暫存器會為了一條
+  可讀性規則移動已發表的 Group F 數字。⚠️ 而 `rlx_w_exec` 那一處同樣的句子是
+  **routine-local 而且是真的**，不是第二個實例，不要被一起引用。
+* 47 個 `FILE:NNN` 引用因為 `cells.S`／`probe3.c` 行號移動而腐爛（28 + 19 兩批），
+  外加 4 個 `citecheck` 的 rot。修法不是手改：`spec-check` 的 C11 **自己會說 token
+  現在在第幾行**，所以修理器只是把它的答案抄回去；有歧義的（token 現在出現兩次）
+  用其餘列的 median shift 選最近的候選並印出來給人看。
+
+### 10. 閘門
+
+`spec-check` **rc=0** · `citecheck` **rc=0** · `ledgerscan check`／`quarantine`
+**rc=0** · `xcheck sweep` **rc=0** · `test-file-modes` **5 passed** ·
+`capdate` **rc=0**（34 目錄，兩個方向）· `ucostcheck` **rc=0**（8 格，6 對表，
+2 具名豁免，兩個方向）· `test-rlxprobe` **233 passed, 0 failed** ·
+`cardcheck commands` rc=0 · `cardcheck numbers` **12 of 12** ·
+`check-predictions` **0 of 11**。
+
+`SPEC.md` 的行號約束守住：五個新列全部進 § 19（778 → 783），`:672` 之上一行都沒動；
+`SPEC.md:555` 的引用是**就地改數字**，784 → 784。`PROGRESS.md` 第 17／19 列就地
+整列改寫，1,870 → 1,870（⚠️ `wc -l` 讀 1,869；上一段的 LOG 寫 1,870 → 1,870 而
+兩半都差一，只有 `SPEC.md` 那半是對的 —— 那正是同一個自洽陷阱，記在這裡）。
+
+### 11. 帶走
+
+* 🔴 **`isapay verify` 剩下的 52 個 finding 仍然沒有稽核**（第四次）。重新導出：
+  **31 "decodes it as" / 21 "names it"**，0 word mismatch。⚠️ 而它記的成因不可能
+  對：`NO_MNEMONIC_GROUPS` 蓋 21 列、`MNEMONIC_REQUIRED` 11 列，**最多 32 不是
+  52** —— 要稽核的是那個描述，不只是那些 finding。
+* 🔴 **`special0e` 的 `C2`**，第四次帶走，**有到期日**（§ 7）。
+* 🔴 **`citecheck-baseline.tsv` 在第七十四段被刪掉了 `PROGRESS.md:1707 →
+  SPEC.md:658` 那一列**，所以 `CITE-2` 第十二個實例現在**一個閘門都沒有蓋到**。
+* 🔴 **`tools/isapay.py` 的 docstring 寫 `verdict LOG --base A`**，parser 只收
+  `--arm` —— 一行的修法，在 `tools/isapay.py:52`。
+* ⚠️ `UP-AUD-1` ①②⑤⑦ 未動；⑥ 的普查量測重新導出是 **136 檔／59 程式**
+  （`README.md` 寫 100／48），而那一列自己要求**重新導出**而不是抄。
+  🔴 ⑦ 的 `notes/dev-loop.md` 半邊**被打勾了但沒做**：`:28-29` 仍寫著
+  *"A userspace-only iteration is a different loop"*，正是 ⑦ 要求收回的那句。
+* ⚠️ `docs/emulation-surface.md` 標題 117 字元；**「常態約 96」是錯的**，量 20 份
+  docs 標題中位數 **56**、次長 **82**，所以理由要寫成「比次長的長 37 字元」。
+* ⚠️ `docs/rlx-isa.md` § 8.2 的「恰好一列」**刻意留著等被否證**（§ 5）。

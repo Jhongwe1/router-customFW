@@ -662,7 +662,7 @@ is corrected — see the correction file.
 | | reading | what makes it a reading |
 |---|---|---|
 | **size** | **16 KiB** | working set 1/2/4/8 KiB → `fresh=0` at every point; 16 KiB → 20 of 512; 32 KiB → 1024 of 1024; 64 KiB → 2048 of 2048 |
-| **line** | **16 B** | `w.line.bits=11222222` against `L_LINE[]` (`probe3.c:517 (static const u32 L_LINE[])`): offsets `0` and `8` STALE, `16` FRESH |
+| **line** | **16 B** | `w.line.bits=11222222` against `L_LINE[]` (`probe3.c:656 (static const u32 L_LINE[])`): offsets `0` and `8` STALE, `16` FRESH |
 | **associativity** | **2-way** (量). ⚠️ **512 sets is 推** | `w.assoc.tm=00002003` → `(T, M) = (8192, 3)`, and it is the *argmin over T* that discriminates — see below. The set count divides by a line size neither this cell nor `w.size` can see |
 
 **否證 ⓐ's own controls both fired, in both directions.** The negative
@@ -682,7 +682,7 @@ as evidence for them. **`M = 3` alone does not imply two ways** — it is equall
 "two ways in one set" or "one way in two sets", so direct-mapped at half the way
 size gives `M = 3` too.
 
-What discriminates is *which* `T` minimises `M`. `probe3.c:1582-1646 (c_size = (boundary != 0xFFFFFFFFu))` searches
+What discriminates is *which* `T` minimises `M`. `probe3.c:1895-1959 (c_size = (boundary != 0xFFFFFFFFu))` searches
 `t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
 
 | hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |
@@ -799,7 +799,7 @@ making a line resident, not about whether the cell can read.
 ### ⓑ-2 🔴🔴 2026-09-14 (sixty-seventh segment, desk, no power): the disjunction collapses, on a reading taken on 2026-08-29
 
 `t-hit` is the one cell in `probe3` that observes residency **without going
-through the alias**, and `docs/probe3-cells.md:772-780` says so in advance:
+through the alias**, and `docs/probe3-cells.md:775-780` says so in advance:
 *"The remaining two are not separable by any experiment that observes only
 through the alias … A timing signal observes residency without going through
 the alias at all, so it is the only route on this device that could split
@@ -808,9 +808,9 @@ read the three numbers it produced.**
 
 #### The reading
 
-`rlx_tc_walk` (`cells.S:397 (u32 rlx_tc_walk)`) walks 256 loads at 16-byte
+`rlx_tc_walk` (`cells.S:418 (u32 rlx_tc_walk)`) walks 256 loads at 16-byte
 stride — a **4 KiB** footprint — `passes` times, bracketed by two `TC0CNT`
-reads. The caller (`probe3.c:1335 (A_VSIZE, 1u)`) runs it three times: **one warming
+reads. The caller (`probe3.c:1530 (A_VSIZE, 1u)`) runs it three times: **one warming
 pass of 256 loads, discarded**, then **32 passes = 8,192 loads through KSEG0**,
 then **the same 8,192 through KSEG1**. The two timed legs differ in **exactly
 one bit of one register** — `A_VSIZE` against `A_VSIZE | KSEG1_BIT` — so the
@@ -889,7 +889,7 @@ Two further mismatches found while reading it, both recorded rather than
 repaired:
 
 * 🔴 `docs/probe3-cells.md:770` and `:778` say **4096 iterations**; the code
-  does **8,192** (`probe3.c:1339 (A_VSIZE, 32u)` × `cells.S:426 (256 loads x 16 B = 4 KiB)`). The one
+  does **8,192** (`probe3.c:1534 (A_VSIZE, 32u)` × `cells.S:447 (256 loads x 16 B = 4 KiB)`). The one
   quantitative prediction in the row — *"N=4096 gives 1,760–5,850 ticks"* —
   therefore doubles to **3,520–11,700**, and `t.hit.ks1` = **13,698** is
   **above the top of it**. A prediction was missed and nobody noticed, because
@@ -908,22 +908,90 @@ says lines **are** resident. The two questions that remain are **capacity** and
 
 | cell | what it does | prediction, written before it is built |
 |---|---|---|
-| **`t-hit` ladder** | the same walk at footprints **1, 2, 4, 8, 16, 32 KiB**, `passes` scaled so the load count is constant | per-load cost stays at the ~0.07 ns hit floor up to the D-cache size and rises toward the ~105 ns miss cost above it. **The knee is the D-cache size**, measured for the first time. Refuted if the cost is flat across all six (no cache, and then `ks0`'s 0.07 ns needs another explanation) or rises immediately (the cache is smaller than 1 KiB) |
-| **`t-hit` A–B–A** | KSEG0 warm → KSEG1 → **KSEG0 again** | if LX4189 § 5.2 transfers — *"if the location is resident in the data cache it will be invalidated"* by an uncached read — the second KSEG0 leg reads **cold**, ~138 ns/load. If it reads ~0.07 ns, an uncached read does **not** invalidate, and `c-G`'s question is answered from the timing side with no `CCTL` primitive at all |
+| **`t-hit` ladder** | the same walk at footprints **1, 2, 4, 8, 16, 32 KiB**, `passes` scaled so the load count is constant | per-load cost stays at the ~0.07 ns hit floor up to the D-cache size and rises toward the ~105 ns miss cost above it. **The knee is the D-cache size**, measured for the first time. Refuted if the cost is flat across all six (no cache, and then `ks0`'s 0.07 ns needs another explanation) or rises immediately (the cache is smaller than 1 KiB) 🔴 **AND A THIRD FALSIFIER THIS ROW DID NOT CARRY, added 2026-09-16: a knee at 8 KiB is equally what an 8 KiB D-MEM predicts.** The prose below this table has said so since 2026-09-15 and this cell did not, so a card written by copying the row would have lost it. The discriminator is the two-base run, and the row now names it rather than leaving it two screens away |
+| **`t-hit` A–B–A** | KSEG0 warm → KSEG1 → **KSEG0 again** | ~~if LX4189 § 5.2 transfers — *"if the location is resident in the data cache it will be invalidated"* by an uncached read — the second KSEG0 leg reads **cold**, ~138 ns/load. If it reads ~0.07 ns, an uncached read does **not** invalidate~~ 🔴 **REFUTED AS AN ARITHMETIC 2026-09-16, before it ran** — see below — and `c-G`'s question is still the one answered from the timing side with no `CCTL` primitive at all |
+
+🔴 **One thing the ladder row's numbers must NOT be read as, 算 2026-09-16.**
+*"per-load cost stays at the hit floor"* is true of the **warm** leg, whose
+load count is held at 8,192 — so every footprint that fits reads **1,472
+ticks** and every one that does not reads **17,664**, a flat-then-step of
+**12.00×**. It is **not** true of the **cold** leg, which walks each line
+once: that column must come out **138 / 276 / 552 / 1,104 / 2,208 / 4,416**,
+doubling at every rung, knee or no knee. **The cold column is therefore a
+control and not a second reading of the same thing** — a cold column that is
+not linear means the walk is not walking what the table says, which is a
+failure the warm column alone cannot show.
+
+#### 🔴🔴 The A–B–A's own prediction was wrong by 8.9×, and as written a TRUE invalidation would have read as a refutation
+
+**算 2026-09-16 at the desk, from the three published `t-hit` numbers and
+nothing else.** The row above says the second KSEG0 leg *"reads **cold**,
+~138 ns/load"*. It does not, and it cannot: the leg is **32 passes**, and an
+uncached read that invalidated all 256 lines leaves only the **first** pass
+cold. The other 31 hit.
+
+| leg 2, 32 passes | ticks | ns/load |
+|---|---:|---:|
+| the row's own number, ~138 ns/load | 17,664 | 138.4 |
+| **what an invalidating read actually gives** — 256 misses + 7,936 hits | **1,978** | **16.90** |
+| nothing invalidated | 1,472 | 12.58 |
+
+**The separation the cell was specified with is 1.34×, not the 8.9× its own
+figure implies** — and a reader comparing a measured 1,978 against *"~138
+ns/load"* would call it warm and conclude **no invalidation**, which is the
+opposite of what would have happened. 🔴 That is this project's own failure
+shape: *a pair of numbers stays self-consistent as long as the difference is
+right*, here with the difference wrong too.
+
+🟢 **The fix is one pass, not one paragraph.** The same walk at
+`passes = 1` separates the two outcomes **12.00×** — 552 ticks if the lines
+were invalidated, 46 if they were not — which is exactly the ratio the cold
+and warm per-load costs already have. So the cell is now **five** recorded
+legs, and the two 32-pass legs stay because they reproduce `t.hit.ks0` and
+`t.hit.ks1` and are the cell's cross-check on itself:
+
+| leg | what it is | predicted |
+|---|---|---:|
+| `l.aba.0` | KSEG0, 32 passes, warm | **1,472** (= `t.hit.ks0`) |
+| `l.aba.w1` | KSEG0, **1 pass**, still warm — the reference | **46** |
+| `l.aba.1` | KSEG1, 32 passes | **13,698** (= `t.hit.ks1`) |
+| `l.aba.c1` | KSEG0, **1 pass**, immediately after | **552** invalidated / **46** not |
+| `l.aba.2` | KSEG0, 32 passes, re-warmed | **1,472** either way |
+
+⚠️ `l.aba.w1` exists so the comparison is between two readings **of the same
+shape in the same run**, rather than between a reading and a constant from
+another seating.
 
 ~~Both are additions to `rlx_tc_walk`'s caller, not new assembly.~~ 🔄 **The
 first half of that is wrong and the second half of the same sentence says so.**
 The A–B–A cell is a caller change; **the ladder is not** — a footprint
 parameter is exactly what `rlx_tc_walk` does not take, so the ladder is a new
-leaf, and a leaf is new assembly. ⚠️ `cells.S:454 (NOT A GENERALISATION OF
-rlx_tc_walk)` forbids adding a parameter **inside** `rlx_tc_walk` — its body is
+leaf, and a leaf is new assembly. ⚠️ `cells.S:565 (NOT A GENERALISATION OF rlx_tc_walk)`
+forbids adding a parameter **inside** `rlx_tc_walk` — its body is
 what the published numbers were measured against — so the ladder gets its own
-leaf, exactly as `rlx_tc_stride` did for Group F. **That leaf does not exist**
-(量 2026-09-15 at the desk, over `tools/rlxprobe/cells.S`: the only walk
+leaf, exactly as `rlx_tc_stride` did for Group F. ~~**That leaf does not exist**~~
+~~(量 2026-09-15 at the desk, over `tools/rlxprobe/cells.S`: the only walk
 signatures present are `rlx_tc_walk(base, passes, raw_ks1)` and
 `rlx_tc_stride(base, stride, count, raw_ks1)`), so slot 2 cannot be carded
 until a `probe3` carrying it is built. The card cannot pin an image that does
-not exist.
+not exist.~~
+
+🟢 **2026-09-16 (the seventy-fifth segment, desk): it exists.**
+`rlx_tc_ladder(base, passes, lines, raw_ks1)` is in `cells.S`, Group L is in
+`probe3.c`, and the payload builds — `probe3.bin`, `RB_WORDS` 718 → **754**,
+`DW 80A02000 754`. **The leaf is not a copy of `rlx_tc_stride` and that was
+the decision worth making**: 量, objdump over `cells.o`, the two leaves'
+inner loops are **five** instructions against **seven**, and the published
+`~0.07 ns` floor is corrected against the five (`0.17862 = 15,090/140,800/3
+× 5`). A ladder built from `rlx_tc_stride` would have carried a **0.25007**-tick
+floor, 40 % higher, and every quotation of the floor in this file would have
+stopped being the number the instrument produces. `rlx_tc_ladder` is
+`rlx_tc_walk` with the literal `256` lifted into a register: **the inner five
+words are byte-identical** (`8d630000 256b0010 2739ffff 1720fffc 00000000`),
+both outer-loop spans are 10 instructions, and exactly **four** words differ in
+the whole routine — the raw-pointer register, the two prime constants, and the
+reload, which is `addu` where the walk has `addiu`, at the same position and
+the same cost. `tools/test-rlxprobe.sh` § L1 is the standing gate on all of it.
 
 🔴 **And this makes `CF-1` moot in the useful direction.** The stop-loss asks
 what happens after two seatings *if cell A still cannot be made to hold*. Cell
@@ -972,9 +1040,30 @@ existing cells use, and a second at least the scratchpad's size away from it.
 | neither base shows a floor | the arena is outside both; the run says nothing and is not a refutation of either |
 
 🟢 **It costs one parameter on a leaf that has to be written anyway, and it
-carries its own control**: the second base is chosen from the *first* base's
+carries its own control**: ~~the second base is chosen from the *first* base's
 measured floor, so a run in which neither base has a floor is visibly different
-from a run in which one does. ⚠️ **What it does not do** is locate the window —
+from a run in which one does.~~ 🔴 **That control cannot be built as written
+and a better one already existed, 2026-09-16.** A base *"chosen from the first
+base's measured floor"* is a value that only exists once the run is under way;
+both bases are compiled into the payload, so the sentence describes something
+the instrument cannot do. **The floor does not have to be chosen from this run
+— it was measured on three power cycles in 2026-08/09 and published**:
+`t.hit.ks0` = 1,472 / 1,472 / 1,473 ticks. So *"neither base shows a floor"* is
+decidable against a constant that predates the run, which is strictly stronger
+than deciding it against the run's own first half.
+
+🟢 **And the comparison is licensed by construction rather than by argument.**
+量: the two bases are `0x80A40000` and `0x80A90000`, **0x50000 = 320 KiB**
+apart — bits 16 and 18 only. An 8 KiB cache indexes with **bit 12 at most**,
+direct-mapped (512 sets) or two-way (256 sets) alike, so **every cache index
+bit is equal at the two bases** and the only thing that differs is the address
+window. `probe3.c` asserts it at compile time
+(`lad_bases_share_cache_index`) and `tools/test-rlxprobe.sh` § L1 asserts it
+again from the outside. ⚠️ **320 KiB is 40× the scratchpad's size as READ, not
+as measured** — `SPEC.md` `CPU-46`'s 8 KiB is 讀. If D-MEM were wider than
+320 KiB this discriminator is blind and nothing in it could say so; Group M's
+`m.dmembase`/`m.dmemtop`, read on the same boot, is the independent second
+answer. ⚠️ **What it does not do** is locate the window —
 that is `w-imem`'s job and `w-imem` is still 未定 because CP0 20 is write-only
 and *identical* is also the no-op reading.
 
@@ -1044,7 +1133,7 @@ m.cp3 4 v1=20000000 v2=20000000                 → r4
 m.cp3 1,2,3,5,6,7  v1=00000000 v2=00000000
 ```
 
-The two primes are `0xC0DE0300|i` and `0xD1CE0300|i` (讀, `probe3.c:1738-1762 (v1 = rlx_call0_primed)`).
+The two primes are `0xC0DE0300|i` and `0xD1CE0300|i` (讀, `probe3.c:2051-2075 (v1 = rlx_call0_primed)`).
 **No reading equals its own prime and `v1 == v2` for all eight** — so the
 destination register was written and the value is stable, which is the pair of
 failures the two primes exist to separate (`F50b`). `CU3` sticking is the

@@ -178,7 +178,7 @@ and `tools/hazlint`'s own docstring defines a violation as
 unbuildable unless `hazlint` exits 0, with **no waiver flag anywhere in its
 option table**, with a `gate-check` target that fails the build if the gate is
 loosened *and insists on exit 1 specifically* so a refusal for the wrong reason
-is caught, and with `cells.S:69 (a payload that built its victim instructions at)` foreclosing run-time construction on purpose.
+is caught, and with `cells.S:90 (a payload that built its victim instructions at)` foreclosing run-time construction on purpose.
 
 **The build gate prevented exactly the experiment the plan asks for, and no
 document in `plan/`, `docs/`, the Makefile or `hazlint` addressed it.**

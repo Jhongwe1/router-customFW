@@ -51,6 +51,27 @@
  *    `BD` that happens anyway is visible.
  *
  * 3. NO GPR $12 OR $13 IS USED ANYWHERE IN THIS FILE.
+ *    🔴 FALSE SINCE 2026-08-31, AND RECORDED RATHER THAN REPAIRED.  量
+ *    2026-09-16 over this file: `rlx_tc_stride` uses BOTH, five times --
+ *    `$13` at :480 and `$12` at :492, :498, :499, :500.  It arrived in
+ *    `494b07f` (2026-08-31) with Group F, five days after this rule was
+ *    written in `07d9928` (2026-08-26), and nothing noticed.
+ *
+ *    THE NARROW CLAIM SURVIVES AND IT IS WORTH KEEPING SEPARATE.  The rule's
+ *    stated reason is that `mtc0 $10, $12` means CP0 register 12 while
+ *    `addu $12, ...` means general register 12, and a reader should not have
+ *    to hold that distinction.  `rlx_tc_stride` contains no `mtc0` and no
+ *    `mfc0`, so inside that routine the ambiguity the rule exists to prevent
+ *    cannot arise.  The violation is real and local and harmless -- what is
+ *    false is this sentence's word ANYWHERE.
+ *
+ *    ⚠️ The second statement of the same rule, at rlx_w_exec's register budget
+ *    (`$12`/`$13` are not used), is scoped to THAT ROUTINE and is TRUE.  It is
+ *    not a second instance of this defect and must not be quoted as one.
+ *
+ *    Not repaired: renaming five registers in a routine whose Group F numbers
+ *    are in a committed block would move a published reading for a
+ *    readability rule.  `rlx_tc_ladder` honours the rule as written.
  *    cache.S's rule, kept because this file writes CP0 register 12 and CP0
  *    register 20.  `mtc0 $10, $12` means CP0 register 12; `addu $12, ...` means
  *    general register 12.  A reader checking this against the R3000 or the
@@ -441,6 +462,96 @@ rlx_tc_walk:
 	jr	$31
 	nop
 	.end	rlx_tc_walk
+
+/* ---------------------------------------------------------------------------
+ * u32 rlx_tc_ladder(u32 base, u32 passes, u32 lines, u32 *raw_ks1)
+ * -- `R1-pub-3` slot 2, the footprint ladder.
+ *
+ * `lines` loads at 16-byte stride = a `lines * 16` byte footprint, `passes`
+ * times, bracketed.  It is rlx_tc_walk with the literal 256 lifted into a
+ * register and NOTHING ELSE CHANGED, which is the whole design and not an
+ * accident of editing.
+ *
+ * 🔴 THE FIVE-INSTRUCTION INNER BODY IS LOAD-BEARING AND IT IS WHY THIS IS NOT
+ * A COPY OF rlx_tc_stride.  rlx_tc_stride is the other parameterised walk in
+ * this file and lifting ITS mask would have been the shorter edit -- but its
+ * inner body is SEVEN instructions (`lw` `addu` `and` `addu` `addiu` `bne`
+ * `nop`) against rlx_tc_walk's FIVE (`lw` `addiu` `addiu` `bne` `nop`), and the
+ * published `t-hit` floor is corrected against the five:
+ *
+ *      0.17862 ticks = 15,090 / 140,800 / 3 * 5        (t-cal, docs/rlx-cache-
+ *                                                       and-cp0.md:824-826)
+ *
+ * A seven-instruction body's floor is 0.25007 ticks, 40 % higher, and every
+ * "~0.07 ns hit floor" in both owner files would have stopped being the number
+ * this leaf produces.  The footprint does NOT need a mask: rlx_tc_walk restarts
+ * `p = base` at the head of every pass, so `lines` alone bounds the walk and
+ * the address update stays a single `addiu`.
+ *
+ * 🟢 WHAT THAT BUYS, AND IT IS THE CONTROL RATHER THAN THE CONVENIENCE.  With
+ * `lines = 256` and `passes = 32` at A_VSIZE this routine is THE SAME
+ * EXPERIMENT as `t-hit`'s KS0 leg -- same base, same footprint, same pass
+ * count, same five instructions -- so that one rung must reproduce
+ * `t.hit.ks0 = 1,472` ticks, a number measured on three power cycles and
+ * byte-identical to 0.075 %.  `lines = 256, passes = 1` likewise reproduces
+ * `t.hit.warm = 552`.  A ladder whose 4 KiB rung misses those is a broken leaf
+ * and says so before any knee is read off it.
+ *
+ * REGISTER BUDGET, and it is rlx_tc_walk's plus one:
+ *
+ *      $14 base   $15 passes   $24 raw   $25 inner counter   $11 p
+ *      $8 before  $10 after    $9 TC0CNT address   $3 the load's destination
+ *      $2 `lines`, the inner reload, until the bracket's subtraction
+ *         overwrites it on the way out
+ *
+ * `$2` rather than a spare temporary because this file's rule 3 bars GPR $12
+ * and $13 -- ⚠️ a rule `rlx_tc_stride` has broken since 2026-08-31 at :480 and
+ * :492-500, recorded at rule 3 rather than repaired here -- and every other
+ * register above is spoken for.  `$4` is SAFE_A0's and is never written after
+ * it (rule 4).
+ *
+ * 🔴 `lines` AND `passes` MUST BOTH BE >= 1.  `bne $25, $0` on a zero reload
+ * decrements to 0xFFFFFFFF and walks four billion lines off the end of the
+ * arena; probe3.c's caller refuses the call rather than relying on the table
+ * being right.  The same is true of rlx_tc_walk's `passes` and always was.
+ * ------------------------------------------------------------------------- */
+	.globl	rlx_tc_ladder
+	.ent	rlx_tc_ladder
+	.type	rlx_tc_ladder, @function
+rlx_tc_ladder:
+	addu	$14, $4, $0		/* t6 = base */
+	addu	$15, $5, $0		/* t7 = passes */
+	addu	$2, $6, $0		/* v0 = lines, the inner reload */
+	addu	$24, $7, $0		/* t8 = raw, KSEG1 */
+	SAFE_A0
+	lui	$9, RLX_TC0CNT>>16
+	ori	$9, $9, RLX_TC0CNT&0xffff
+	lui	$8, 0xc0de
+	ori	$8, $8, 0x7800		/* prime for "before" */
+	lui	$10, 0xd1ce
+	ori	$10, $10, 0x7800	/* prime for "after"  */
+	lw	$8, 0($9)
+	nop				/* LOAD DELAY SLOT */
+2:
+	addu	$11, $14, $0		/* p = base */
+	addu	$25, $2, $0		/* lines x 16 B = the footprint */
+3:
+	lw	$3, 0($11)
+	addiu	$11, $11, 16		/* does not read $3 */
+	addiu	$25, $25, -1
+	bne	$25, $0, 3b
+	nop				/* delay slot, filled by hand */
+	addiu	$15, $15, -1
+	bne	$15, $0, 2b
+	nop				/* delay slot, filled by hand */
+	lw	$10, 0($9)
+	nop				/* LOAD DELAY SLOT */
+	sw	$8, 0($24)
+	sw	$10, 4($24)
+	subu	$2, $10, $8
+	jr	$31
+	nop
+	.end	rlx_tc_ladder
 
 /* ---------------------------------------------------------------------------
  * u32 rlx_tc_stride(u32 base, u32 stride, u32 count, u32 *raw_ks1) -- Group F.

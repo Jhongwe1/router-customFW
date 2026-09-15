@@ -71,8 +71,11 @@ RESULT_BASE_probe0 := 0x80A00000
 RESULT_BASE_probe1 := 0x80A00000
 RESULT_BASE_probe2 := 0x80A01000
 RESULT_BASE_probe3 := 0x80A02000
-# probe4 is clear of probe3's block: probe3 is 718 words from 0x80A02000,
-# i.e. it ends at 0x80A02B38, and probe4's own poison margin starts here.
+# probe4 is clear of probe3's block: probe3 is 762 POISON words from
+# 0x80A02000 (754 + 8), i.e. it ends at 0x80A02BE8, and probe4's own poison
+# margin starts here.  🔄 2026-09-16: 718 words / 0x80A02B38 until Group L.
+# ⚠️ RB_CLASH below compares BASES ONLY and would not have caught a crossing;
+# the headroom is 262 words and this comment is the only thing that reads it.
 RESULT_BASE_probe4 := 0x80A03000
 # probe5 is clear of probe4's block: probe4 is 641 poison words from
 # 0x80A03000, i.e. it ends at 0x80A03A04, and probe5's own margin starts
@@ -325,7 +328,17 @@ RB_WORDS_probe2 := 809
 # block writes UPWARD from the seal, so the first poison word is the first one
 # it reaches.  RB_POISON_W is still RB_WORDS + 8 and a longer explicit `DW`
 # reads the rest.
-RB_WORDS_probe3 := 718
+#
+# 🔄 2026-09-16: 718 -> 754, Group L's **36** words (`R1-pub-3` slot 2).
+# 36 is a multiple of four, so the remainder is PRESERVED rather than
+# re-checked: 754 is 2 mod 4 exactly as 718 was, `DW 80A02000 754` returns
+# 756 words, and w754..w755 are the two poison words.  probe3.c's
+# `rb_readback_shows_poison` is what refuses the sizes that would not.
+# 🔴 This comment said 32 / 750 for one hour of one segment, in step
+# with probe3.c's, while the value below and the C's assert both said 754.
+# Two prose copies of one number went stale together; the third copy is the
+# one the build reads, which is why the build never noticed.
+RB_WORDS_probe3 := 754
 
 # probe4's is a FUNCTION of the row count, so it is generated beside the
 # cells rather than typed here as a second copy of the arithmetic.  probe4.c

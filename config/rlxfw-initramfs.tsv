@@ -21,8 +21,14 @@
 # still not the new thing; the binary is typed at that shell, by an operator,
 # after the boot the card predicts.
 #
-# SIZE.  量 2026-09-15, and there are TWO totals here that are easy to read as
-# one.  The FIVE ELF files below total 608,828 bytes (579,644 for this unit's
+# 🔴 2026-09-16: ucost was added below, so BOTH TOTALS IN THIS BLOCK ARE STALE
+# BY CONSTRUCTION and are struck rather than recomputed by hand -- this block's
+# own next paragraph predicted exactly this, and a hand-recomputed pair is how
+# the last one went wrong.  `mkinitramfs build` recomputes and prints the real
+# figure on every run; the card quotes THAT.  Six ELF files now, not five.
+#
+# ~~SIZE.  量 2026-09-15, and there are TWO totals here that are easy to read as
+# one.~~  The FIVE ELF files below total 608,828 bytes (579,644 for this unit's
 # four, plus 29,184 for uprobe).  `mkinitramfs build` prints 609,816, which is
 # every `file` entry's content and therefore also counts /init's 988-byte
 # shell script, which is not an ELF.  609,816 is the figure a card predicts
@@ -76,6 +82,7 @@ file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discr
 # with no exclusions and does not consult .gitignore, so an object file
 # left under config/ would silently move the id the board prints.
 file	/bin/uprobe	$REPO/build/rlxfw-user/isaprobe/uprobe	0755	rlxfw	R1c's column-2 instrument and the FIRST binary this project has compiled that runs as a Linux process. 29,184 bytes stripped, static, no PT_INTERP (🔴 this said 29,092 for one commit -- the manifest value from the build before the last, contradicting the SIZE block nine lines above it; exactly the self-consistent-pair trap that block was rewritten to name). Links tools/rlxprobe/cells4.S verbatim, so the 75 encodings probe4 ran bare metal are the same bytes here. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
+file	/bin/ucost	$REPO/build/rlxfw-user/isaprobe/ucost	0755	rlxfw	R1-pub-4b's D-cost instrument, and the SECOND binary this project has compiled that runs as a Linux process. 16,692 bytes stripped, static, no PT_INTERP (量 2026-09-16, `make ucost-show`, sha256 76c7e2318021484967ccc0e8c5a2eadd992c5bee372a2a7bcd10d0a1ebe3c6db). 🔴 It does NOT link cells4.S and that is deliberate: cells4.S is one of the four files feeding uprobe's BUILD_ID, which seating 23's capture printed, and seating 24 re-runs a 4a row for repeatability -- worth most if that binary is byte-identical. ucost hand-writes its own probed words instead and `tools/ucostcheck.py` checks every one against tools/isa-payload.tsv in BOTH directions. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
 
 # --- this unit's own binaries, unmodified ---
 file	/bin/busybox	$UNIT/bin/busybox	0755	unit	273,332 bytes; NEEDED = libc.so.0, libgcc_s.so.1; interp /lib/ld-uClibc.so.0

@@ -943,7 +943,7 @@ this file's refutation condition says.
 *all STALE up to 16 KiB, FRESH at 32 KiB*. What happened is 20 of 512 at 16 KiB
 — 3.9 %. 🔴 **The first version of this paragraph explained that as "a working
 set that exactly fills the cache", and that is false.** `W_STRIDE` is 32
-(`probe3.c:497 (#define W_STRIDE 32u)`) over a 16-byte line, so the walk touches only **even sets: 256
+(`probe3.c:636 (#define W_STRIDE 32u)`) over a 16-byte line, so the walk touches only **even sets: 256
 of 512, two victims each** — it fills half the sets in both ways, not the cache.
 The correct reading is the payload's own footprint colliding once both ways are
 occupied, and §*the argument for two-way* below turns that into a positive
@@ -955,8 +955,8 @@ not 20.
 
 `w.line.bits=11222222` and `w.line.bits2=22222000`, against
 `L_LINE[] = {13, 0, 8, 16, 24, 32, 48, 64, 96, 128, 160, 192, 256, 320}`
-(`probe3.c:517 (static const u32 L_LINE[])`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
-(`probe3.c:410-417 (#define V_NEVER 0x0u)`):
+(`probe3.c:656 (static const u32 L_LINE[])`) and the verdict nibbles `V_STALE=1`, `V_FRESH=2`, `V_NEVER=0`
+(`probe3.c:512-519 (#define V_NEVER 0x0u)`):
 
 * offset **0** — STALE
 * offset **8** — STALE
@@ -971,7 +971,7 @@ never landed.
 ### Associativity — and the argument below replaces a circular one
 
 `w.assoc.tm=00002003` packs `(best_t & 0xFFFFFF00) | (best_m & 0xFF)`
-(`probe3.c:1630 (best_t & 0xFFFFFF00u)`), so **T = 8,192 and M = 3**, with
+(`probe3.c:1943 (best_t & 0xFFFFFF00u)`), so **T = 8,192 and M = 3**, with
 `w.assoc.capped=00000000` — the search was not clipped by its own bound.
 
 🔴 **The argument for two-way is the argmin over `T`, and it is written out here
@@ -1007,7 +1007,7 @@ the reason two paragraphs above; both make it checkable. `tools/rbcheck.py`
 `C33`…`C39` own the judgement, `C36` is the population control that refuses a
 verdict from a single-valued region, and `docs/rlx-cache-and-cp0.md` § ⓓ is the
 owner of the write-up.
- `probe3.c:1582-1646 (c_size = (boundary != 0xFFFFFFFFu))` searches
+ `probe3.c:1895-1959 (c_size = (boundary != 0xFFFFFFFFu))` searches
 `t ∈ {2048, 4096, 8192, 16384}` and keeps the strictly smallest `M`:
 
 | hypothesis | M at 4096 | M at 8192 | M at 16384 | reported (T, M) |

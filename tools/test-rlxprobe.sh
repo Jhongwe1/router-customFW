@@ -823,7 +823,7 @@ ck "show DW count == probe3 RB_WORDS" "$p3w" \
    "$(make -C "$RP" --no-print-directory BUILD="$B" P=probe3 show 2>/dev/null | sed -n 's/^result .*DW [0-9A-Fa-f]* \([0-9]*\)$/\1/p' | head -1)"
 # The C carries the same arithmetic as a compile-time assertion, so a layout
 # that does not add up does not build. SM3 below is the mutation on that.
-ck "and the C says 718"                718 "$p3w"
+ck "and the C says 754"                754 "$p3w"
 echo
 echo "=== Y2c: two defines may not name the same word ==="
 # 🔴 量 2026-08-31, AND IT HAD BEEN COMMITTED FOR A DAY.  The three header words
@@ -986,7 +986,7 @@ ck "SM2 an extra cache op is visible"    6 \
 ck "SM2 and it is 0x1b, the one that must not ship" 1 \
    "$($OBJDUMP -d -m mips:3000 "$s2/b/probe3/probe3.elf" 2>/dev/null | grep -c '0xbd1b0000')"
 
-# SM3 -- the block layout. probe3.c asserts RB_WORDS == 718 at COMPILE time with
+# SM3 -- the block layout. probe3.c asserts RB_WORDS == 754 at COMPILE time with
 # a negative array bound, because a layout that does not add up must not reach a
 # `.bin` at all. The mutation moves one field and the build must FAIL.
 s3="$(smut sm3)"
@@ -998,27 +998,29 @@ ck "SM3 a layout that does not add up does not build" no \
 # SM3b -- 🆕 2026-08-31, THE OTHER COMPILE-TIME ASSERTION.  `DW` rounds a word
 # count UP to a multiple of four (LDR-07), so a block whose RB_WORDS IS a
 # multiple of four returns NO poison word and the over-run control silently
-# stops existing.  641, 707 and 718 each happened to leave one; probe3.c now
+# stops existing.  641, 707 and 718 each happened to leave one; 754 is the
+# first that CHOSE its remainder -- Group L took 36 words, a multiple of four,
+# so 718's remainder of 2 is preserved by construction; probe3.c now
 # carries `rb_readback_shows_poison` so that it is a property instead of a
-# remainder.  The mutation takes RB_BMPKW to 66 -- RB_WORDS 720 -- AND moves
+# remainder.  The mutation takes RB_BMPKW to 66 -- RB_WORDS 756 -- AND moves
 # `rb_layout_adds_up` to match, so the only assertion left that CAN fire is the
 # new one.  🔴 The case then asserts on that assertion's NAME: SM3 already shows
 # that a bad layout does not build, and a case that could not tell the two
 # apart would pass on either and cover neither.
 s3b="$(smut sm3b)"
 sed -i 's/^#define RB_BMPKW	64u$/#define RB_BMPKW	66u/' "$s3b/src/probe3.c"
-sed -i 's/(RB_WORDS == 718u)/(RB_WORDS == 720u)/' "$s3b/src/probe3.c"
+sed -i 's/(RB_WORDS == 754u)/(RB_WORDS == 756u)/' "$s3b/src/probe3.c"
 make -C "$s3b/src" BUILD="$s3b/b" P=probe3 payload HAZLINT="$HERE/hazlint"      >"$s3b/out" 2>&1
 ck "SM3b a word count divisible by four does not build" no    "$([ -s "$s3b/b/probe3/probe3.bin" ] && echo yes || echo no)"
 ck "SM3b and it is the poison-margin assertion that fires" yes    "$(grep -q 'rb_readback_shows_poison' "$s3b/out" && echo yes || echo no)"
 # SM3c is SM3b's population control: the SAME two edits with the count left at
-# 719 -- not divisible by four -- must BUILD.  Without it, SM3b passes on a
+# 755 -- not divisible by four -- must BUILD.  Without it, SM3b passes on a
 # tree that cannot build at all.
 s3c="$(smut sm3c)"
 sed -i 's/^#define RB_BMPKW	64u$/#define RB_BMPKW	65u/' "$s3c/src/probe3.c"
-sed -i 's/(RB_WORDS == 718u)/(RB_WORDS == 719u)/' "$s3c/src/probe3.c"
+sed -i 's/(RB_WORDS == 754u)/(RB_WORDS == 755u)/' "$s3c/src/probe3.c"
 make -C "$s3c/src" BUILD="$s3c/b" P=probe3 payload HAZLINT="$HERE/hazlint"      >/dev/null 2>&1
-ck "SM3c and a count of 719 still builds" yes    "$([ -s "$s3c/b/probe3/probe3.bin" ] && echo yes || echo no)"
+ck "SM3c and a count of 755 still builds" yes    "$([ -s "$s3c/b/probe3/probe3.bin" ] && echo yes || echo no)"
 
 # SM4 -- a Status write outside the three routines that may make one. W3 counts
 # them AND names their owners; without the owner half, a fourth write inside an
@@ -1483,6 +1485,76 @@ else
     sk "the four Must-fix mutations" "they run under qemu"
     sk "probe3 under qemu, and its six qemu mutations" "they run under qemu"
 fi
+
+echo "=== L1: the ladder leaf's timed region is rlx_tc_walk's, instruction ==="
+echo "===     for instruction, and that is what licenses one published number ==="
+# `R1-pub-3` slot 2.  `rlx_tc_ladder` exists to take a footprint parameter that
+# `cells.S:454` forbids adding inside `rlx_tc_walk`.  Its whole claim to the
+# published `t-hit` floor is that its TIMED PATH is rlx_tc_walk's:
+#
+#   * the five-instruction inner body is BYTE-IDENTICAL, so the 0.17862-tick
+#     ALU correction (t-cal, 15,090/140,800/3 x 5) transfers unchanged, and
+#   * the outer-loop span is the same LENGTH, so the per-pass cost is too.
+#
+# That is what makes `l.a.w4k` predict `t.hit.ks0` = 1,472 EXACTLY rather than
+# approximately -- same base, same 4 KiB, same 32 passes, same instructions --
+# and a rung that misses it means the leaf, not the cache.
+#
+# 🔴 THE OTHER LEAF IS THE REASON THIS IS A CASE AND NOT A COMMENT.
+# `rlx_tc_stride` is the file's other parameterised walk and the shorter edit
+# would have been to copy it -- but its inner body is SEVEN instructions, whose
+# floor is 0.25007 ticks, 40 % higher.  A future edit that "simplifies" the
+# ladder by merging it into rlx_tc_stride would silently move a number that is
+# quoted in two owner files.  So the seven is asserted too: if these two ever
+# become equal, one of them has been changed.
+lad_body () {
+    # the five words from the inner `lw` onward, for the named function
+    printf '%s\n' "$1" | awk -v fn="$2" '
+        $0 ~ "<"fn">:" {on=1; next}
+        on && /^$/     {on=0}
+        on             {print}' |
+      sed -n 's/^[ \t]*[0-9a-f]*:[ \t]*\([0-9a-f]\{8\}\).*/\1/p' |
+      awk '/^8d630000$/{f=1} f{print; n++} n==5{exit}' | tr '\n' ' '
+}
+lad_len () {
+    printf '%s\n' "$1" | awk -v fn="$2" '
+        $0 ~ "<"fn">:" {on=1; next}
+        on && /^$/     {on=0}
+        on             {print}' |
+      grep -cE '^[[:space:]]*[0-9a-f]+:[[:space:]]*[0-9a-f]{8}'
+}
+d3c="$($OBJDUMP -d "$B/probe3/cells.o")"
+lw_body="$(lad_body "$d3c" rlx_tc_walk)"
+ll_body="$(lad_body "$d3c" rlx_tc_ladder)"
+ck "the walk's inner body is the five we think" \
+   "8d630000 256b0010 2739ffff 1720fffc 00000000 " "$lw_body"
+ck "the ladder's inner body is IDENTICAL to it" "$lw_body" "$ll_body"
+ck "rlx_tc_walk is 30 instructions"   30 "$(lad_len "$d3c" rlx_tc_walk)"
+ck "rlx_tc_ladder is 31 -- one entry copy" 31 "$(lad_len "$d3c" rlx_tc_ladder)"
+# The negative half: the leaf it is NOT a copy of. If this ever reads 5, the
+# ladder and the stride walk have been merged and the floor has moved.
+ls_body="$(lad_body "$d3c" rlx_tc_stride)"
+ck "rlx_tc_stride's body DIFFERS from the walk's" different \
+   "$([ "$ls_body" = "$lw_body" ] && echo same || echo different)"
+# 🔴 AND IT IS NON-EMPTY, WHICH IS THE HALF THE FIRST DRAFT GOT WRONG.  That
+# draft asserted the stride body was the EMPTY string -- but rlx_tc_stride's
+# inner loop opens with the same `lw $3,0($11)`, so `lad_body` finds it and
+# returns five words.  Asserting emptiness would have passed only on a run
+# where the extraction failed, which is the exact defect this block exists to
+# catch one leaf over.  量 2026-09-16: it returns
+# `8d630000 018d6021 018f6024 01cc5821 2739ffff`.
+ck "  and it is non-empty, so that is a comparison" yes \
+   "$([ -n "$ls_body" ] && echo yes || echo no)"
+# 32 is a PIN taken from the artefact (量 2026-09-16, objdump over cells.o),
+# not a prediction -- what is asserted is that it differs from the ladder's 31
+# and that its body is not the walk's five.  The four leaf lengths on that
+# build are spin 22, reads 23, walk 30, ladder 31, stride 32.
+ck "  and it is still the longer leaf"  32 "$(lad_len "$d3c" rlx_tc_stride)"
+# The two bases, and the property that makes them comparable at all.
+ck "the ladder's two bases are 0x50000 apart" 0 \
+   "$(( (0x80A90000 - 0x80A40000) ^ 0x50000 ))"
+ck "  which leaves every cache index bit equal" 0 \
+   "$(( (0x80A90000 - 0x80A40000) & 0x1FFF ))"
 
 echo
 if [ "$fail" -ne 0 ]; then

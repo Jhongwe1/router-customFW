@@ -267,3 +267,138 @@ dis: $(ELF)
 
 clean:
 	rm -rf $(STAGE) $(INSTALL)
+
+# ===========================================================================
+# `ucost` -- `R1-pub-4b`, D-cost.  A SECOND PRODUCT IN THIS DIRECTORY, and
+# every variable below is prefixed so that not one of uprobe's moves.
+#
+# 🔴 IT DOES NOT SHARE uprobe's DIGEST, AND THAT IS THE WHOLE REASON IT IS A
+# SEPARATE PRODUCT RATHER THAN A SECOND ARM OF THE SAME ONE.  `BUILD_ID` above
+# is `cat uprobe.c cells4.S probe4rows.h rlxasm.h`, and seating 23's capture
+# printed `a87be346bb83e7f9` for it.  Seating 24 re-runs a `4a` row for
+# repeatability -- the first time any column-② row has ever been repeated --
+# and that repeat is worth most if the binary is BYTE-IDENTICAL to the one
+# that produced the original.  So `ucost` touches none of those four files,
+# carries its own `UCOST_BUILD_ID` over its own two, and `uprobe`'s digest is
+# expected to still read a87be346bb83e7f9 after this segment.
+#
+# ⚠️ That also defers the `special0e` `why` column's `C2` -> `C5` correction a
+# FOURTH time, and the deferral now has an expiry rather than a wish: the
+# first rebuild AFTER the 4a repeat lands.
+# ===========================================================================
+
+UC_STAGE   ?= $(FWRE_WORK)/rebuild/rlxfw-user/ucost
+UC_SRC     := $(UC_STAGE)/src
+UC_OBJ     := $(UC_STAGE)/build
+UC_INSTALL ?= $(REPO)/build/rlxfw-user/isaprobe
+
+UC_NAMES   := ucost.c ucost-cells.S
+UC_REPO    := $(HERE)ucost.c $(HERE)ucost-cells.S
+UC_BUILD_ID := $(shell cat $(UC_REPO) 2>/dev/null | sha256sum | cut -c1-16)
+
+UC_CFLAGS  := -Os -std=gnu99 -Wall -Wextra -Werror -Wundef -Wshadow \
+              -fno-builtin -fno-strict-aliasing -fno-common \
+              -I$(UC_SRC) -DUCOST_BUILD_ID='"$(UC_BUILD_ID)"'
+UC_ASFLAGS := -Os -mno-abicalls -fno-pic -I$(UC_SRC)
+
+UC_OBJS    := $(UC_OBJ)/ucost.o $(UC_OBJ)/ucost-cells.o
+UC_ELF     := $(UC_OBJ)/ucost.elf
+UC_BIN     := $(UC_OBJ)/ucost
+UC_OUT     := $(UC_INSTALL)/ucost
+
+.PHONY: ucost ucost-stage ucost-gate ucost-show ucost-dis ucost-clean
+
+ucost: $(UC_OUT)
+
+ucost-stage:
+	@mkdir -p $(UC_SRC) $(UC_OBJ)
+	@set -e; for f in $(UC_REPO); do cp -f "$$f" $(UC_SRC)/; done
+	@set -e; bad=0; \
+	 for n in $(UC_NAMES); do \
+	   a=$$(sha256sum "$(HERE)$$n"  | cut -d' ' -f1); \
+	   b=$$(sha256sum $(UC_SRC)/$$n | cut -d' ' -f1); \
+	   if [ "$$a" != "$$b" ]; then echo "STAGE MISMATCH: $$n"; bad=1; fi; \
+	 done; \
+	 [ $$bad = 0 ] || { echo "REFUSED: the staged copy is not the source"; exit 1; }
+	@echo "staged 2 files to $(UC_SRC), both hashes equal to the repo's"
+
+$(UC_OBJ)/ucost.o: ucost-stage
+	$(CC) $(UC_CFLAGS) -c $(UC_SRC)/ucost.c -o $@
+
+$(UC_OBJ)/ucost-cells.o: ucost-stage
+	$(CC) $(UC_ASFLAGS) -c $(UC_SRC)/ucost-cells.S -o $@
+
+$(UC_ELF): $(UC_OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(UC_OBJS) 2>$(UC_OBJ)/link.log; rc=$$?; \
+	 cat $(UC_OBJ)/link.log; exit $$rc
+
+# UG0  the probed words are `tools/isa-payload.tsv`'s, checked BOTH ways so
+#      the exemption list cannot accrete unreported.  `nop` has no tsv row and
+#      cannot have one -- the census excludes what the loader obviously runs --
+#      so this is an allow-list by NAME, `flashwin`'s shape, not a lookup.
+# UG1/UG1b  the break count, BY OPCODE.  Same bounded gate as uprobe's and for
+#      the same measured reason: `__GI_abort` carries exactly two and zeroing
+#      them means hand-marshalling signal plumbing, which was declined.
+# UG2  hazlint over the LINKED ELF.  ⚠️ AND IT SAYS LESS THAN IT LOOKS FOR ONE
+#      CELL: hazlint's load set is MIPS-I and `ll` is opcode 0x30, so a green
+#      gate is not evidence about `uc_cell_ll`.  Recorded, not waived.
+# UG3  one `uc_w_*` symbol per cell, so the desk can resolve each probed word
+#      out of THIS binary rather than out of a table compiled into it.
+ucost-gate: $(UC_ELF)
+	@echo '--- gate UG0: every probed word against tools/isa-payload.tsv ---'
+	@$(PYTHON) $(REPO)/tools/ucostcheck.py $(HERE)ucost-cells.S
+	@echo '--- gate UG1: break count over our two objects, BY OPCODE ---'
+	@n=$$($(PYTHON) $(REPO)/tools/elfops.py count $(UC_OBJ)/ucost.o --ops break --quiet | sed -n 's/^  break *//p'); \
+	 m=$$($(PYTHON) $(REPO)/tools/elfops.py count $(UC_OBJ)/ucost-cells.o --ops break --quiet | sed -n 's/^  break *//p'); \
+	 echo "break ucost.o=$$n  ucost-cells.o=$$m"; \
+	 [ "$$n" = "0" ] && [ "$$m" = "0" ] || { echo "REFUSED: a break in code this project wrote"; exit 1; }
+	@echo '--- gate UG1b: the LINKED ELF, and every break in it named ---'
+	@$(PYTHON) $(REPO)/tools/elfops.py where $(UC_ELF) --op break > $(UC_OBJ)/breaks.txt; \
+	 n=$$(sed -n 's/^break *//p' $(UC_OBJ)/breaks.txt); \
+	 lo=$$($(NM) -S $(UC_ELF) | awk '$$4=="__GI_abort"{printf "%d", strtonum("0x"$$1); exit}'); \
+	 sz=$$($(NM) -S $(UC_ELF) | awk '$$4=="__GI_abort"{printf "%d", strtonum("0x"$$2); exit}'); \
+	 echo "linked break=$$n  __GI_abort=[$$lo,+$$sz)"; \
+	 [ -n "$$lo" ] || { echo "REFUSED: no __GI_abort symbol to account against"; exit 1; }; \
+	 out=0; \
+	 for a in $$(grep -oE '^  0x[0-9A-F]+' $(UC_OBJ)/breaks.txt | tr -d ' \t'); do \
+	   d=$$(printf '%d' $$a); \
+	   if [ $$d -lt $$lo ] || [ $$d -ge $$((lo + sz)) ]; then \
+	     echo "  OUTSIDE __GI_abort: $$a"; out=$$((out + 1)); \
+	   fi; \
+	 done; \
+	 [ "$$n" = "2" ] && [ "$$out" = "0" ] || { \
+	   echo "REFUSED: expected exactly 2 breaks, both inside __GI_abort"; exit 1; }
+	@echo '--- gate UG2: hazlint over the linked ELF ---'
+	@HAZLINT_CHILD=1 $(PYTHON) $(HAZLINT) $(UC_ELF)
+	@echo '--- gate UG3: one _w symbol per cell ---'
+	@c=$$(grep -cE '^[[:space:]]*uc_cell [a-z0-9_]+,' $(HERE)ucost-cells.S); \
+	 s=$$($(NM) $(UC_ELF) | grep -c ' uc_w_'); \
+	 echo "cells=$$c  uc_w_ symbols=$$s"; \
+	 [ "$$c" = "$$s" ] || { echo "REFUSED: $$s symbols for $$c cells"; exit 1; }
+
+$(UC_BIN): ucost-gate
+	cp $(UC_ELF) $@
+	$(STRIP) $@
+
+$(UC_OUT): $(UC_BIN)
+	@mkdir -p $(UC_INSTALL)
+	cp -f $(UC_BIN) $(UC_OUT)
+	@echo "installed $(UC_OUT)  ucost_build_id=$(UC_BUILD_ID)"
+
+ucost-show: ucost
+	@echo "tc              $(TC)"
+	@echo "ucost_build_id  $(UC_BUILD_ID)"
+	@echo "elf_bytes       $$(wc -c < $(UC_ELF))"
+	@echo "bin_bytes       $$(wc -c < $(UC_BIN))"
+	@echo "sha256          $$(sha256sum $(UC_BIN) | cut -d' ' -f1)"
+	@echo "cells           $$(grep -cE '^[[:space:]]*uc_cell [a-z0-9_]+,' $(HERE)ucost-cells.S)"
+	@echo "cell_syms       $$($(NM) $(UC_ELF) | grep -c ' uc_w_')"
+	@echo "entry           $$($(READELF) -h $(UC_ELF) | awk '/Entry point/{print $$4}')"
+	@echo "flags           $$($(READELF) -h $(UC_ELF) | awk -F'Flags:' '/Flags:/{print $$2}')"
+	@echo "interp          $$($(READELF) -l $(UC_ELF) | grep -c INTERP || true)"
+
+ucost-dis: $(UC_ELF)
+	$(OBJDUMP) -d $(UC_ELF)
+
+ucost-clean:
+	rm -rf $(UC_STAGE)

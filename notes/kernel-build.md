@@ -4037,7 +4037,7 @@ CPI ambiguity does not have to be resolved first.
    confirmation of an existing band instead of a new safety case. **It is still
    run**, and its refutation condition is `MEM-13`'s verbatim: any
    pointer-shaped word and the address is re-chosen.
-2. **`0x80A90000` is exactly `probe3`'s `ARENA_END`.** 讀 `probe3.c:440-441 (#define ARENA 0x80A10000u)`:
+2. **`0x80A90000` is exactly `probe3`'s `ARENA_END`.** 讀 `probe3.c:542-543 (#define ARENA 0x80A10000u)`:
    `ARENA = 0x80A10000`, `ARENA_END = 0x80A90000`. So the read cannot land in
    the arena — which matters because `MEM-17` (量 2026-08-31) is that **DRAM
    keeps a previous cycle's `FLR` output across a power cycle**, and a

@@ -103,7 +103,7 @@
 #define RB_POISON	0xDEADC0DEu
 
 #define RB_HDR		64u
-#define RB_RES		205u
+#define RB_RES		241u
 #define RB_ROWS		16u
 #define RB_ROWW		8u
 #define RB_BMPW		256u
@@ -127,7 +127,10 @@
 #define O_BMP		(O_ROWS + RB_ROWS * RB_ROWW)
 #define O_BMPK		(O_BMP + RB_BMPW)
 #define O_SEAL		(O_BMPK + RB_BMPKW)
-#define RB_WORDS	(O_SEAL + 1u)		/* 707 -- mirrored in the Makefile */
+#define RB_WORDS	(O_SEAL + 1u)		/* 754 -- mirrored in the Makefile
+						 * 🔴 this comment said 707 from
+						 * 2026-08-31 to 2026-09-16, two
+						 * growths after the value moved */
 #define RB_POISON_W	(RB_WORDS + 8u)		/* a margin, so a run that wrote
 						 * PAST its own block shows data
 						 * where poison was predicted */
@@ -137,7 +140,7 @@
  * compile-time half of the same check: a layout that does not add up does not
  * build.  (C99 has no _Static_assert; a negative array bound is the portable
  * form and it has been the portable form for thirty years.) */
-typedef char rb_layout_adds_up[(RB_WORDS == 718u) ? 1 : -1];
+typedef char rb_layout_adds_up[(RB_WORDS == 754u) ? 1 : -1];
 
 /* 🔴 AND THE POISON MARGIN MUST SURVIVE THE READ-BACK, which until now was
  * arithmetic luck rather than a checked property.  `DW base n` prints
@@ -147,7 +150,25 @@ typedef char rb_layout_adds_up[(RB_WORDS == 718u) ? 1 : -1];
  * first, because the overrun goes UPWARD from the seal.  641 returned three
  * such words and 707 returned one; both were the remainder falling out that
  * way, and the Makefile comment says so.  718 returns two, and this line is
- * what stops a future layout from silently returning none. */
+ * what stops a future layout from silently returning none.
+ *
+ * 🔴 2026-09-16, AND THIS IS THE FIRST GROWTH THAT CHOSE ITS SIZE RATHER THAN
+ * TOOK WHAT FELL OUT.  Group L needs word slots; 718 % 4 == 2, so adding N
+ * words builds only when N % 4 != 2 -- N = 2, 6, 10, 14 are REFUSED by the
+ * assertion below and N = 12, 36 are accepted.  Group L takes **36** and
+ * RB_WORDS becomes **754**, which is 2 mod 4 exactly as 718 was, so the
+ * read-back still returns two poison words.  Choosing a multiple of four
+ * preserves the remainder by construction instead of re-checking it.
+ *
+ * 🔴 THIS COMMENT SAID 32 AND 750 UNTIL 2026-09-16, AND THOSE TWO
+ * WRONG NUMBERS WERE CONSISTENT WITH EACH OTHER.  Group L grew from 32
+ * words to 36 when the A-B-A gained its one-pass probe and the 8 KiB rung
+ * gained a within-boot repeat; the CODE moved (`RB_RES` 241, the assert
+ * 754) and this prose did not.  Nothing in the build could catch it --
+ * the asserts check the arithmetic, not the sentence describing it -- and
+ * an adversarial read is what did.  It is the failure this repository
+ * names most often: a pair of wrong numbers stays self-consistent as long
+ * as the difference between them is right. */
 typedef char rb_readback_shows_poison[(RB_WORDS % 4u != 0u) ? 1 : -1];
 
 #define UNC(a)		((volatile u32 *)((a) | KSEG1_BIT))
@@ -253,6 +274,9 @@ typedef char rb_readback_shows_poison[(RB_WORDS % 4u != 0u) ? 1 : -1];
 #define P_HEADER	0x10u
 #define P_HANDLER	0x20u
 #define P_TIMER		0x30u
+#define P_LADDER	0x38u	/* Group L, between T and W -- the same shape
+				 * as P_FLASHWIN between P_ISC and P_RESTORED,
+				 * so no existing stamp moves */
 #define P_WALK_I	0x40u
 #define P_IMEM_OFF	0x50u
 #define P_SCRATCH	0x60u
@@ -404,7 +428,85 @@ typedef char rb_readback_shows_poison[(RB_WORDS % 4u != 0u) ? 1 : -1];
 				 * handler's own time is INSIDE the brackets,
 				 * so a non-zero here voids every tick above */
 
-typedef char res_area_is_full[(R_F_FAULTS + 1u == RB_RES) ? 1 : -1];
+/* --- Group L: the footprint ladder, `R1-pub-3` slot 2 ---------------------
+ * Six footprints x two bases x {cold, warm}, plus the A-B-A cell, plus three
+ * echoes so a capture describes its own configuration, plus one raw pair.
+ *
+ * THE COLD LEG IS RECORDED RATHER THAN DISCARDED.  `t-hit` calls its warming
+ * pass discarded and then stores it as `t.hit.warm` anyway, which is what made
+ * the 138 ns/load cold cost readable at all.  Here it is load-bearing: the
+ * cold leg touches every line of the footprint exactly once, so its tick count
+ * must rise LINEARLY with the footprint at every rung, knee or no knee.  A
+ * cold column that is not linear means the walk is not walking what the table
+ * says, and that is a failure the warm column alone cannot show. */
+#define R_L_BASE1	205u	/* echo: A_LAD1                            */
+#define R_L_BASE2	206u	/* echo: A_LAD2                            */
+#define R_L_LOADS	207u	/* echo: LAD_LOADS, the held-constant N    */
+#define R_L_A_C1K	208u	/* base 1, cold, 1 KiB                     */
+#define R_L_A_C2K	209u
+#define R_L_A_C4K	210u
+#define R_L_A_C8K	211u
+#define R_L_A_C16K	212u
+#define R_L_A_C32K	213u
+#define R_L_A_W1K	214u	/* base 1, warm, 1 KiB                     */
+#define R_L_A_W2K	215u
+#define R_L_A_W4K	216u	/* == t.hit.ks0 by construction, see below */
+#define R_L_A_W8K	217u
+#define R_L_A_W16K	218u
+#define R_L_A_W32K	219u
+#define R_L_B_C1K	220u	/* base 2, cold                            */
+#define R_L_B_C2K	221u
+#define R_L_B_C4K	222u
+#define R_L_B_C8K	223u
+#define R_L_B_C16K	224u
+#define R_L_B_C32K	225u
+#define R_L_B_W1K	226u	/* base 2, warm                            */
+#define R_L_B_W2K	227u
+#define R_L_B_W4K	228u
+#define R_L_B_W8K	229u
+#define R_L_B_W16K	230u
+#define R_L_B_W32K	231u
+#define R_L_ABA_0	232u	/* KSEG0 warm, 32 passes                   */
+#define R_L_ABA_1	233u	/* KSEG1 uncached, over the same addresses */
+#define R_L_ABA_2	234u	/* KSEG0 AGAIN, 32 passes                  */
+#define R_L_ABA_W1	235u	/* KSEG0 warm, ONE pass, BEFORE the KSEG1
+				 * leg -- the reference the one below is
+				 * read against                            */
+#define R_L_ABA_C1	236u	/* KSEG0, ONE pass, AFTER the KSEG1 leg --
+				 * THIS is the A-B-A measurement           */
+#define R_L_REP_A8K	237u	/* the 8 KiB warm rung again, base 1       */
+#define R_L_REP_B8K	238u	/* ... and base 2: within-boot repeatability
+				 * of the rung the knee turns on           */
+#define R_L_RAW0	239u	/* the last leg's raw bracket, both halves */
+#define R_L_RAW1	240u
+
+/* 🔴🔴 WHY THE ONE-PASS PROBE EXISTS, AND IT IS A DEFECT IN THE SPECIFICATION
+ * RATHER THAN AN OPTIMISATION.  `docs/rlx-cache-and-cp0.md`'s A-B-A row
+ * predicts that if an uncached read invalidates a resident line then the
+ * second KSEG0 leg "reads cold, ~138 ns/load".  算 2026-09-16 from the three
+ * published t-hit numbers: over 32 passes only the FIRST is cold, so an
+ * invalidating read gives 256 misses + 7,936 hits = 1,978 ticks = 16.90
+ * ns/load -- against 1,472 if nothing was invalidated.  **1.34x, not the
+ * 8.9x the row's own number implies**, and a reader comparing 1,978 against
+ * "~138 ns/load" would call it warm and conclude NO invalidation, which is
+ * the opposite of what happened.
+ *
+ * ONE pass separates them 12.00x: 552 if invalidated, 46 if not, the same
+ * ratio the cold and warm per-load costs already have.  `R_L_ABA_W1` is the
+ * same one-pass walk taken BEFORE the uncached leg, so the comparison is
+ * between two readings of the same shape in the same run rather than between
+ * a reading and a constant from another seating.  The 32-pass legs stay
+ * because they reproduce `t.hit.ks0` and `t.hit.ks1` and are the cell's
+ * cross-check on itself. */
+typedef char res_area_is_full[(R_L_RAW1 + 1u == RB_RES) ? 1 : -1];
+
+/* 🔴 AND THE GROUP F ASSERT IS KEPT, because the one above stopped saying what
+ * it used to say.  Until 2026-09-16 `res_area_is_full` was the only thing
+ * pinning Group F's last slot, and moving it to Group L's last slot silently
+ * released that pin.  A region whose end is checked and whose middle is not is
+ * a region where an overlapping #define compiles. */
+typedef char res_group_f_still_ends_at_204[(R_F_FAULTS == 204u) ? 1 : -1];
+typedef char res_group_l_starts_after_f[(R_L_BASE1 == R_F_FAULTS + 1u) ? 1 : -1];
 
 /* --- verdict nibbles, shared with cells.S -------------------------------- */
 #define V_NEVER		0x0u
@@ -438,7 +540,7 @@ typedef char res_area_is_full[(R_F_FAULTS + 1u == RB_RES) ? 1 : -1];
  * Both hold measurements recovered from DRAM after their seatings.  probe3's is
  * at 0x80A02000 and the arena starts a whole 64 KiB above it. */
 #define ARENA		0x80A10000u
-#define ARENA_END	0x80A90000u
+#define ARENA_END	0x80AA0000u
 
 /*      offset       size     what
  *      0x00000      1 KiB    w-line's block
@@ -450,9 +552,22 @@ typedef char res_area_is_full[(R_F_FAULTS + 1u == RB_RES) ? 1 : -1];
  *      0x30000     64 KiB    the D-side sweep
  *      0x40000     32 KiB    Group C's targets, and Group X's scratch word
  *      0x48000    224 KiB    both associativity sweeps
+ *      0x80000     64 KiB    Group L's SECOND ladder base            <- 2026-09-16
  *
- * The 512 KiB is inside the proven span and it is fully accounted for above;
- * nothing in this payload writes outside it except its own result block. */
+ * The 576 KiB is inside the proven span and it is fully accounted for above;
+ * nothing in this payload writes outside it except its own result block.
+ *
+ * 🔴 THE ARENA GREW BY 64 KiB ON 2026-09-16 AND THE TOP IS STILL INSIDE THE
+ * PROVEN SPAN, which is the only thing that licenses the growth.  0x80AA0000
+ * against the span's 0x80AF1002 leaves 331 KiB unclaimed.  It is a WHOLE NEW
+ * SLOT rather than a corner of `A_ASSOC` because `A_ASSOC` + `A_ASSOC_SPAN`
+ * reaches exactly the old `ARENA_END` -- the map above was already fully
+ * allocated, so every address that looks free inside it is spoken for.
+ *
+ * 🔴 AND GROUP L ONLY READS.  The ladder loads and never stores, so the
+ * sentence above about writing is unaffected by the new slot; it is declared
+ * anyway, because an undeclared region a payload touches is exactly what this
+ * map exists to make impossible. */
 #define A_PAT_LINE	(ARENA + 0x00000u)
 #define A_PAT_LINE0	(ARENA + 0x08000u)
 #define A_PAT_BACK	(ARENA + 0x10000u)
@@ -463,6 +578,30 @@ typedef char res_area_is_full[(R_F_FAULTS + 1u == RB_RES) ? 1 : -1];
 #define A_XSCRATCH	(ARENA + 0x47000u)
 #define A_ASSOC		(ARENA + 0x48000u)
 #define A_ASSOC_SPAN	0x38000u
+
+/* --- Group L: the footprint ladder's two bases ----------------------------
+ * `R1-pub-3` slot 2.  A_LAD1 is `t-hit`'s own base, ON PURPOSE: the 4 KiB rung
+ * there is then the same experiment as `t.hit.ks0` and must reproduce its
+ * 1,472 ticks.  A_LAD2 is the discriminator's second base.
+ *
+ * THE SEPARATION IS 320 KiB AND THE TWO PROPERTIES IT NEEDS ARE DIFFERENT
+ * ONES.  (i) It must exceed the scratchpad's size so that an 8 KiB D-MEM
+ * window cannot contain both -- 40x, 讀 `SPEC.md` CPU-46's 8 KiB.  (ii) It
+ * must leave every D-cache index bit unchanged, or the two bases would differ
+ * in cache behaviour for a reason that has nothing to do with the question.
+ * 0x50000 sets bits 16 and 18 only; the index bits of an 8 KiB cache reach
+ * bit 12 at most, direct-mapped or two-way.  So the two ladders are
+ * index-identical BY CONSTRUCTION and differ only in the address window.
+ *
+ * ⚠️ (i) is conditional on a number this project has READ and not MEASURED.
+ * If D-MEM were larger than 320 KiB the discriminator would be blind, and
+ * nothing here can see that.  Group M's `m.dmembase`/`m.dmemtop` are read on
+ * the same boot and are the second, independent answer. */
+#define A_LAD1		A_VSIZE
+#define A_LAD2		(ARENA + 0x80000u)
+#define A_LAD_SPAN	0x8000u		/* 32 KiB, the largest rung */
+#define LAD_LOADS	8192u		/* held constant across rungs, and it is
+					 * t-hit's own load count */
 
 /* Group C's two targets are FAR APART and the separation is deliberately not a
  * power of two.  *Far apart* defeats LINE SHARING; it does not defeat SET
@@ -559,6 +698,7 @@ u32  rlx_tc_spin(u32 spins, u32 *raw_ks1);
 u32  rlx_tc_reads(u32 k, u32 *raw_ks1);
 u32  rlx_tc_stride(u32 base, u32 stride, u32 count, u32 *raw_ks1);
 u32  rlx_tc_walk(u32 base, u32 passes, u32 *raw_ks1);
+u32  rlx_tc_ladder(u32 base, u32 passes, u32 lines, u32 *raw_ks1);
 void rlx_w_arm(u32 ctl_ks1, u32 list_ks1);
 void rlx_w_patch(u32 ctl_ks1, u32 list_ks1);
 u32  rlx_w_exec(u32 ctl_ks1, u32 list_ks1);
@@ -1085,6 +1225,61 @@ static u32 tc_bracket(u32 (*fn)(u32, u32 *), u32 arg)
 	return tc_ticks(rd_unc((u32)&tc_raw[0]), rd_unc((u32)&tc_raw[1]));
 }
 
+/* --- Group L: the footprint ladder ---------------------------------------
+ * `R1-pub-3` slot 2.  Six footprints, the load count HELD CONSTANT, at two
+ * arena bases.
+ *
+ * 🔴 THE PASS COUNTS ARE A TABLE AND NOT A DIVISION, and that is not a style
+ * choice: gcc emits `break 7` for a division whose divisor it cannot prove
+ * non-zero, and a `break` in this payload arrives at the loader's own
+ * `do_reserved` -- the exact hazard `SAFE_A0` exists for.  The table's
+ * products are checked at compile time below, so *the load count is constant*
+ * is a property the build enforces rather than a claim this comment makes. */
+static const u32 LAD_LINES[6]  = {  64u, 128u, 256u, 512u, 1024u, 2048u };
+static const u32 LAD_PASSES[6] = { 128u,  64u,  32u,  16u,    8u,    4u };
+
+typedef char lad_loads_are_constant[
+	(64u * 128u == LAD_LOADS && 128u * 64u == LAD_LOADS &&
+	 256u * 32u == LAD_LOADS && 512u * 16u == LAD_LOADS &&
+	 1024u * 8u == LAD_LOADS && 2048u * 4u == LAD_LOADS) ? 1 : -1];
+
+/* The largest rung is exactly the slot, both slots are inside what they were
+ * declared inside, and -- the one that states the design argument rather than
+ * a bound -- the two bases differ in NO bit an 8 KiB cache could index with.
+ * 0x1FFF is bits 0..12, which covers direct-mapped (512 sets) and two-way
+ * (256 sets) alike, so the two ladders are index-identical by construction. */
+typedef char lad_largest_rung_is_the_span[(2048u * 16u == A_LAD_SPAN) ? 1 : -1];
+typedef char lad1_inside_its_slot[(A_LAD1 + A_LAD_SPAN <= A_COH) ? 1 : -1];
+typedef char lad2_inside_the_arena[(A_LAD2 + A_LAD_SPAN <= ARENA_END) ? 1 : -1];
+typedef char lad_bases_share_cache_index[
+	(((A_LAD2 - A_LAD1) & 0x1FFFu) == 0u) ? 1 : -1];
+
+/* One leg.  `0xFFFFFFFE` is REFUSED and is not `tc_ticks`'s `0xFFFFFFFF`,
+ * which means the uncached load did not write its destination: a caller bug
+ * and a machine reading must not arrive as the same word. */
+static u32 lad_leg(u32 base, u32 passes, u32 lines)
+{
+	u32 raw = (u32)&tc_raw[0] | (u32)KSEG1_BIT;
+
+	if (lines == 0u || passes == 0u)
+		return 0xFFFFFFFEu;
+	(void)rlx_tc_ladder(base, passes, lines, (u32 *)raw);
+	return tc_ticks(rd_unc((u32)&tc_raw[0]), rd_unc((u32)&tc_raw[1]));
+}
+
+/* One base's six rungs.  Cold first -- one pass, every line a compulsory miss
+ * -- then the timed constant-N pass over a footprint that is now resident if
+ * anything is going to retain it. */
+static void lad_base(u32 base, u32 r_cold, u32 r_warm)
+{
+	u32 i;
+
+	for (i = 0u; i < 6u; i++) {
+		res_put(r_cold + i, lad_leg(base, 1u, LAD_LINES[i]));
+		res_put(r_warm + i, lad_leg(base, LAD_PASSES[i], LAD_LINES[i]));
+	}
+}
+
 /* --- the handler ---------------------------------------------------------- */
 static void copy_vec_out(void)
 {
@@ -1398,6 +1593,124 @@ void rlxprobe_main(void)
 		field("g.timer", g_timer);
 	}
 	progress(P_TIMER);
+
+	/* --- 2b. Group L -- the footprint ladder, `R1-pub-3` slot 2 ------ */
+	/* 🔴 THE STAGE NUMBER IS LOAD-BEARING AND UNTIL 2026-09-16 NOTHING SAID
+	 * SO.  Group L runs AFTER Group T and its 4 KiB rung is required to
+	 * reproduce `t.hit.ks0` IN THE SAME CAPTURE.  If the two were the other
+	 * way round the ladder would warm the arena that `t-hit` then measures,
+	 * and the cross-check would be circular -- `t-hit` would agree with the
+	 * ladder because the ladder put the lines there.  2b, not 3b.
+	 *
+	 * ⚠️ AND ONE CONTAMINATION CASE THAT HAS NEVER MATTERED AND COULD.
+	 * `A_LAD1` is `A_VSIZE`, which is Group V's arena, and base 1's ladder
+	 * caches up to 32 KiB of it at this stage where Group V runs at stage 7.
+	 * Group V is gated on `g_ca` and `c-A` has read negative on all three
+	 * silicon runs, so Group V has always been VOID and the question has
+	 * never arisen.  🔴 If `c-A` reads POSITIVE on this seating, Group V's
+	 * observation channel is *an uncached write is invisible to a resident
+	 * clean line* -- and residency established by GROUP L rather than by
+	 * Group V's own arm produces a STALE that means nothing.  **Then Group
+	 * V's result is void for that reason and the card says so in advance.**
+	 * ⚠️ Honest narrowing: `t-hit` already walks 4 KiB of that arena at
+	 * stage 2 on every previous seating, so this is a widening from 4 KiB to
+	 * 32 KiB and not a new class. */
+	/* THE LADDER IS GATED ON `g_timer` AND THAT IS NOT DEFENSIVENESS.  Every
+	 * word this group produces is a tick count; under qemu Group T has
+	 * already found there is no timer at TC0CNT, and twelve rungs of
+	 * 0xFFFFFFFF would be twelve readings of the host rather than of a
+	 * cache.  A group that cannot measure records that it did not run.
+	 *
+	 * 🟢 TWO OF THESE RUNGS ARE NOT NEW EXPERIMENTS AND THAT IS THE POINT.
+	 * `lad_leg(A_LAD1, 32, 256)` is `t-hit`'s KS0 leg to the instruction --
+	 * same base, same 4 KiB footprint, same 32 passes, same five-instruction
+	 * inner body -- so `l.a.w4k` must reproduce `t.hit.ks0`, measured 1,472 /
+	 * 1,472 / 1,473 on three power cycles.  `lad_leg(A_LAD1, 1, 256)` is the
+	 * warming pass and must reproduce `t.hit.warm`, 552 / 553 / 554.  A
+	 * ladder that misses those two is a broken leaf, and it says so before
+	 * anybody reads a knee off the other ten rungs.
+	 *
+	 * ORDER: base 1's six rungs, base 2's six, then A-B-A.  A-B-A runs LAST
+	 * because it needs its own warming pass and the ladder leaves the cache
+	 * holding base 2's 32 KiB -- which is the strongest possible cold start
+	 * for it and costs nothing. */
+	if (g_timer) {
+		res_put(R_L_BASE1, A_LAD1);
+		res_put(R_L_BASE2, A_LAD2);
+		res_put(R_L_LOADS, LAD_LOADS);
+
+		lad_base(A_LAD1, R_L_A_C1K, R_L_A_W1K);
+		lad_base(A_LAD2, R_L_B_C1K, R_L_B_W1K);
+
+		/* A-B-A: KSEG0 warm -> KSEG1 over THE SAME ADDRESSES -> KSEG0
+		 * again.  If an uncached read invalidates a resident line
+		 * (LX4189 § 5.2), leg 2 reads cold; if it does not, leg 2 reads
+		 * at the hit floor and `c-G`'s question is answered from the
+		 * timing side with no CCTL primitive at all.  Legs 0 and 1 are
+		 * `t-hit`'s two legs again, so the cell carries its own
+		 * cross-check before its own answer. */
+		(void)lad_leg(A_LAD1, 1u, 256u);	/* warming, discarded */
+		res_put(R_L_ABA_0,  lad_leg(A_LAD1, 32u, 256u));
+		res_put(R_L_ABA_W1, lad_leg(A_LAD1, 1u, 256u));
+		res_put(R_L_ABA_1,  lad_leg(A_LAD1 | (u32)KSEG1_BIT, 32u, 256u));
+		res_put(R_L_ABA_C1, lad_leg(A_LAD1, 1u, 256u));
+		res_put(R_L_ABA_2,  lad_leg(A_LAD1, 32u, 256u));
+
+		/* The 8 KiB rung again, both bases, LAST.  It is the rung the
+		 * knee turns on if the datasheet's 8 KiB is right, and no
+		 * timing rung in this project has ever been repeated inside one
+		 * boot -- only across power cycles, where a difference has two
+		 * explanations.
+		 *
+		 * 🔴 EACH REPEAT GETS ITS OWN WARMING PASS AND THAT IS NOT
+		 * BOILERPLATE.  By the time control reaches here the cache
+		 * holds the A-B-A's 4 KiB at base 1 and nothing of base 2 --
+		 * so a repeat taken without warming would be half-cold at one
+		 * base and fully cold at the other, and the pair would differ
+		 * for a reason that has nothing to do with either base. */
+		(void)lad_leg(A_LAD1, 1u, 512u);
+		res_put(R_L_REP_A8K, lad_leg(A_LAD1, 16u, 512u));
+		(void)lad_leg(A_LAD2, 1u, 512u);
+		res_put(R_L_REP_B8K, lad_leg(A_LAD2, 16u, 512u));
+
+		res_put(R_L_RAW0, rd_unc((u32)&tc_raw[0]));
+		res_put(R_L_RAW1, rd_unc((u32)&tc_raw[1]));
+
+		/* 🔴 THE PREFIX IS NOT DECORATION.  `pair()` emits a leading
+		 * SPACE and nothing else, so a line built only out of it starts
+		 * with ` lw=...` -- and every grep in this project's cards is
+		 * anchored on `^rlxprobe: `.  The first draft of this block had
+		 * no prefix, which would have made the whole headline of slot 2
+		 * invisible to the card that went looking for it.  Every other
+		 * caller of `pair()` in this file opens with `rlx_puts` for the
+		 * same reason (`:788`, `:1091`, `:1158`). */
+		rlx_puts("rlxprobe: l a");
+		for (i = 0u; i < 6u; i++) {
+			pair("w", rb_get(O_RES + R_L_A_W1K + i));
+			pair("c", rb_get(O_RES + R_L_A_C1K + i));
+		}
+		rlx_puts("\r\n");
+		rlx_puts("rlxprobe: l b");
+		for (i = 0u; i < 6u; i++) {
+			pair("w", rb_get(O_RES + R_L_B_W1K + i));
+			pair("c", rb_get(O_RES + R_L_B_C1K + i));
+		}
+		rlx_puts("\r\n");
+		field("l.aba.0", rb_get(O_RES + R_L_ABA_0));
+		field("l.aba.w1", rb_get(O_RES + R_L_ABA_W1));
+		field("l.aba.1", rb_get(O_RES + R_L_ABA_1));
+		field("l.aba.c1", rb_get(O_RES + R_L_ABA_C1));
+		field("l.aba.2", rb_get(O_RES + R_L_ABA_2));
+		field("l.rep.a8k", rb_get(O_RES + R_L_REP_A8K));
+		field("l.rep.b8k", rb_get(O_RES + R_L_REP_B8K));
+		cells_run += 2u;	/* the ladder and the A-B-A are TWO cells */
+	} else {
+		rlx_puts("rlxprobe: Group L VOID -- Group T found no live "
+			 "timer, and every word this group makes is a tick "
+			 "count\r\n");
+		cells_void += 2u;
+	}
+	progress(P_LADDER);
 
 	/* --- 3. Group W -- the I-side walk ------------------------------- */
 	/* Nothing here is new: uncached stores, cached fetches, `CCTL 0x002`.
