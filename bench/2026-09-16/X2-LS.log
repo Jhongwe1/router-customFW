@@ -1,0 +1,6 @@
+ls -l /bin/ucost /bin/uprobe /proc/rtl819x-spi /proc/rtl819x-spi-map
+-rwxr-xr-x    1 0        0           16692 Sep  1  2026 /bin/ucost
+-rwxr-xr-x    1 0        0           29184 Sep  1  2026 /bin/uprobe
+-rw-r--r--    1 0        0               0 Jan  1 00:00 /proc/rtl819x-spi
+-r--r--r--    1 0        0               0 Jan  1 00:00 /proc/rtl819x-spi-map
+# 
