@@ -852,9 +852,9 @@ the loop's own instruction issue.
 
 ⇒ **The D-cache on this die read-allocates, and holds at least 4 KiB.**
 🟢 **The second half is a NEW measurement**: this repository had no D-side
-capacity figure at all — `notes/cache-model.md:904` reads *"D-cache — **not
-measured** — 8 KiB / 16 B (讀, `bspcpu.h:13`) — **no measurement exists**"*.
-It now has a **lower bound of 4 KiB, 量**.
+capacity figure at all — `notes/cache-model.md:917 (no measurement exists)`
+read *"D-cache — **not measured** … **no measurement exists**"* when this was
+written. It now has a **lower bound of 4 KiB, 量**, and § ⓑ-3 below closes it.
 
 #### What it does to `c-A`
 
