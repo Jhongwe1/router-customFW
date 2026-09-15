@@ -528,3 +528,71 @@ boot, no reboot between them**, identical over all 32 group digests.
 writes that cancel, `H601`'s 8,192 bytes are skipped by rule, and **no `FLR`
 ran**.
 
+
+---
+
+## 🆕 2026-09-16 (seating 24) — eleven map readings, one unit digest, and a checker that cried wolf
+
+`bench/2026-09-16/C2-M0.log` (boot 1) and `X7-M3.log` (boot 3), against the nine
+map captures already committed: `2026-09-08b/C1-M0`, `2026-09-08b/C1-M1`,
+`2026-09-09/C1-M0`, `2026-09-09b/C1-M0`, `2026-09-09b/C1-M1`,
+`2026-09-10/C1-M0`, `2026-09-10/C13-M1`, `2026-09-10/X29-M2`,
+`2026-09-14c/X7-M0`.
+
+**Eleven readings, six seatings, nine days — every one has the same 32 unit
+digests, and tonight's two are `0 of 32 units differ` against every other.**
+`map_hashed` 4,186,112, `map_h601_skipped` 8,192, `map_truncated` 0,
+`map_lines` 32.
+
+### 🔴 The whole-file digest is the WRONG instrument, and the frozen card said so
+
+A whole-file sha256 of tonight's `C2-M0` gives `5ff5de0d…` against the reference
+family's `b3d3d7d0…`, **which reads as a flash difference**. It is `map_jiffies`
+**1279 against 1280** and nothing else.
+
+The frozen card's § 8 carried the warning in advance — *"`map_jiffies` varies by
+a tick, so a whole-file `cmp` is wrong; compare the unit digests"* — and the
+first pass over tonight's captures used the whole-file form anyway. **A checker
+that is wrong in the alarming direction still trains a reader to distrust the
+right one**, which is why it is recorded here rather than quietly fixed.
+
+### ⚠️ What this does and does not say about `FLS-26`
+
+**It does not move the ledger.** The map compares tonight's flash against
+**2026-09-08's**; `FLS-26`'s *proven identical 4,177,920 B / proven different
+8,192 B / undetermined 8,192 B* is against the **2026-08-16 dump**. Two
+populations, and only one of them has a full-dump comparison behind it.
+
+What it adds is a bracket: **between 2026-09-08 and 2026-09-16, across six
+seatings, 4,186,112 bytes did not move.** The two vendor-firmware runs of
+seating 17 are inside that interval.
+
+### 🟢 `n_writes 0` now has a positive control in the same dump
+
+The sentence *zero flash writes* has an instrument, and until tonight that
+instrument had been read on a boot where it had done nothing — every counter
+zero, so the reading made a claim it could not support. *A tool reporting 0 is
+making a claim.*
+
+Boot 3, three captures, one `/proc` file:
+
+```
+X7-NW0   n_pio_bytes 0          n_writes 0
+X7-M3    map_ran 1  map_rc 0  map_hashed 4186112  map_lines 32
+X7-NW1   n_pio_bytes 4194304    n_writes 0
+         n_mmio_bytes 4194304   n_state_foreign 0   n_state_bad 0
+```
+
+**A counter that moved by 4,194,304 beside one that did not.**
+
+### 🔴 And the other flash sweep of this seating made a false claim too
+
+A grep for flash-write verbs over `bench/2026-09-16/*.log` returned **one
+`FLW`, one `EB`, one `EW`, one `FLR`**. All four are in `C1-Q.log`: that cell
+sends `?` and **the loader prints its own command table**. A `.log` holds what
+the board printed as well as what the host sent.
+
+The instrument that answers the question is each capture's `.meta.json` `sent`
+field plus the rescue transcripts — **65 sent strings this seating, 0 carrying a
+flash-write verb**, with a synthetic `FLR 80A00200 006000 100` as the scan's
+positive control.

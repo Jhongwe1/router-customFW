@@ -1180,3 +1180,197 @@ part would have reported `(16384, 2)`. **What changed is that a reader can now
 check the exclusion in the block, twice, instead of following an argument about
 a search's tie-breaking.** `tools/rbcheck.py` `C33`…`C39` own the judgement and
 `C36` is the control that stops it being read off a vacuous region.
+
+---
+
+## ⓑ-3 — 🆕 2026-09-16 (seating 24): the ladder RAN, and the knee is a measurement
+
+**One power cycle, two independent runs of the payload** — the second after a
+`reboot -f`, a rescue, a re-upload and a second `J`, so the ladder has a
+cross-reset repeat and not only the within-boot one § 5.6 asked for.
+
+Captures: `bench/2026-09-16/C1-P3j.log` (run 1) and
+`bench/2026-09-16/X6-P3j2.log` (run 2). The frozen card is
+`bench/2026-09-16/PREDICTIONS-B23-block22.md`; its corrections file is
+`bench/2026-09-16/CORRECTIONS-block22.md`.
+
+### The three constants this section rests on, reproduced exactly
+
+`t.hit.warm` **552**, `t.hit.ks0` **1,472**, `t.hit.ks1` **13,698** on run 1;
+552 / 1,472 / 13,696 on run 2. Power cycles four and five for these numbers, and
+the first two are still at zero spread across all of them.
+
+### The warm column, and the knee
+
+| footprint | lines × passes | base A | base B | **A − B** |
+|---:|---|---:|---:|---:|
+| 1 KiB | 64 × 128 | 1,496 | 1,496 | **0** |
+| 2 KiB | 128 × 64 | 1,480 | 1,480 | **0** |
+| 4 KiB | 256 × 32 | **1,472** | **1,472** | **0** |
+| 8 KiB | 512 × 16 | 1,485 | 1,485 | **0** |
+| 16 KiB | 1024 × 8 | 17,405 | 17,406 | −1 |
+| 32 KiB | 2048 × 4 | 17,404 | 17,408 | −4 |
+
+Flat through 8 KiB, then **11.72×** at 16 KiB against the 12.00× this section
+derived. **The knee is between 8 KiB and 16 KiB**, so the capacity is ≥ 8 KiB
+and < 16 KiB.
+
+⚠️ **The ladder has no 12 KiB rung**, so *exactly 8 KiB* is still the
+datasheet's 讀. What is 量 is the bracket.
+
+🟢 **`docs/rlx-isa.md` § 8.1's registered prediction is confirmed**: the knee
+lands at 8 KiB and the datasheet's number is measured for the first time.
+
+### § 5.4's discriminator: it is a CACHE
+
+`A_LAD2 − A_LAD1` = `0x50000` = 320 KiB, and `probe3.c:1255 (A_LAD2 - A_LAD1)`
+asserts at compile time that the separation sets no bit below 13 — so **every
+cache index bit is equal at the two bases by construction**, and an address
+window would show a floor at one base and not the other.
+
+**Four of six rungs differ by 0 ticks; the largest difference is 4 (0.27 %).**
+By this section's own table that is *the structure follows the data, not the
+address* ⇒ a cache, and the knee is the D-cache size. **`CPU-46`'s confound is
+resolved by the second base and not by the knee**, which is what the
+pre-registration said it would have to be.
+
+🟢 **Group M on the same boot is the independent second answer**:
+`m.dmembase = 20000000`, `m.dmemtop = 00000000` — a base with no top above it is
+not a window, by `docs/probe3-cells.md` block 0's own rule.
+
+### The A–B–A: an uncached read invalidates resident lines
+
+| leg | run 1 | run 2 | derived |
+|---|---:|---:|---|
+| `l.aba.0` KSEG0, 32 passes, warm | 1,472 | 1,473 | 1,472 = `t.hit.ks0` |
+| `l.aba.w1` KSEG0, **1 pass**, warm | 47 | 47 | 46 |
+| `l.aba.1` KSEG1, 32 passes | 13,697 | 13,697 | 13,698 = `t.hit.ks1` |
+| **`l.aba.c1` KSEG0, 1 pass, immediately after** | **545** | **544** | **552** invalidated / **46** not |
+| `l.aba.2` KSEG0, 32 passes, re-warmed | 1,472 | 1,472 | 1,472 either way |
+
+**545 is 7 from the invalidated branch and 499 from the other.** The cell's own
+cross-checks — legs 0 and 1 must reproduce `t-hit` — both hold, so it is not
+void before its answer is read.
+
+🟢 **§ 925's correction is the reason this cell could answer at all.** At 32
+passes the separation is 1.34×; at one pass it is 12.00×. A reader comparing a
+32-pass reading of 1,978 against this section's own *"~138 ns/load"* would have
+called it warm and concluded *no invalidation*, which is the opposite of what
+the die does.
+
+🟢 **`CPU-45`'s disjunction is therefore closed from the timing side, with no
+`CCTL` primitive**, which is what `docs/probe3-cells.md` said was the only path
+this device offers. Group C's proxy path came back negative for the fourth time
+in the same `J` — `c-A` negative, `B`/`C`/`D`/`F`/`G` all `VOID 10` — and its
+stop-loss is now spent without having been extended.
+
+### 🔴 § 5.5's stop condition fired, and the cause is in `lad_base()`
+
+`l.a.w4k` = **1,472**, exact, against 1,472 ± 1. **`l.a.c4k` = 296**, against
+**552 ± 2**.
+
+讀 `probe3.c:1273 (lad_base)`: six rungs run on one base with ascending
+footprint and **nothing invalidates between them**, while the routine's own
+comment says *"Cold first — one pass, every line a compulsory miss"*. It is not:
+rung `k` walks `2 × LAD_LINES[k−1]` lines from the same base and the first half
+is still resident from rung `k−1`'s warm leg.
+
+🔴 **This is the same mistake § 925 caught and corrected one section earlier**,
+and it sits in three places at once: the source comment, this document's § 5.2
+prediction, and `docs/probe3-cells.md`'s `l-ladder` row.
+
+**The evidence that this is the cause and not a rescue**, in three parts:
+
+**① A constant ratio, which noise does not produce.**
+
+| KiB | base A | base B | the specified model | A / model |
+|---:|---:|---:|---:|---:|
+| 1 | 143 | **138** | 138 | 1.036 |
+| 2 | 149 | 148 | 276 | **0.540** |
+| 4 | 296 | 297 | 552 | **0.536** |
+| 8 | 594 | 593 | 1,104 | **0.538** |
+| 16 | 1,191 | 1,191 | 2,208 | **0.539** |
+| 32 | 4,351 | 4,352 | 4,416 | 0.985 |
+
+**② A model with no free parameter fits all twelve rungs**, once the entry
+state is accounted for and the two miss costs below are used:
+
+| KiB | model | A | B | A − model |
+|---:|---:|---:|---:|---:|
+| 1 | 138.0 | 143 | 138 | +5.0 |
+| 2 | 149.5 | 149 | 148 | −0.5 |
+| 4 | 299.0 | 296 | 297 | −3.0 |
+| 8 | 598.0 | 594 | 593 | −4.0 |
+| 16 | 1,196.0 | 1,191 | 1,191 | −5.0 |
+| 32 | 4,351.5 | 4,351 | 4,352 | **−0.5** |
+
+**③ The one rung whose cold leg really is all-compulsory lands exactly.**
+`l.b.c1k` = **138** against `64 × (552 / 256)` = **138.0**. Base A's rung 0 is
+also all-compulsory — `t-hit`'s last leg is a KSEG1 walk over the same
+addresses, and the A–B–A in this same capture measures that such a read
+invalidates — and it reads **143 / 144**, +5 and +7 over the derived value on
+two runs.
+
+### The decision, and what refutes it
+
+**The leaf is verified on both paths and the knee stands.** The warm path is
+verified by the cell § 5.5 names, to the tick. The miss path is verified by a
+cell § 5.5 does **not** name — `l.b.c1k` — and that one is a genuine
+compulsory-miss leg, which `l.a.c4k` never could have been.
+
+🔴 **Refuted if** a payload with the cold check moved to rung 0 reads
+`l.a.c1k` ≠ 138 ± 2, or if invalidating between rungs does not bring the cold
+column onto the doubling series § 5.2 specified. Either would mean the leaf was
+not verified and the knee comes down.
+
+**The repair is a specification change, not a re-measurement**: move the cold
+half of the leaf check to rung 0, or invalidate between rungs. Neither changes a
+number measured here.
+
+### 🟢 A constant nobody set out to measure: this part has TWO miss costs
+
+Six legs in which every load should miss — two bases × {warm 16 KiB, warm
+32 KiB, cold 32 KiB}, three different leg lengths (8,192 / 8,192 / 2,048) — all
+land at the same fraction of the compulsory-miss cost derived from
+`t.hit.warm`:
+
+```
+0.985337  0.985394  0.985281  0.985507  0.985281  0.985507
+spread 0.000226
+```
+
+**The refutation condition was written before the arithmetic**: if the six
+fractions differed by more than the ladder's own repeatability — the two 8 KiB
+repeats agreed to 0 ticks and the two bases to ≤ 4 — then this is six
+coincidences and the paragraph is dropped.
+
+* **first-touch (compulsory) miss = 2.15625 ticks**
+* **steady-state (capacity) miss = 2.12474 ticks**
+* **they differ by 1.462 %**
+
+🟢 It closes the 32 KiB cold rung's residual from **−65 to −0.5**, and the
+1.462 % was measured on the *other five* legs, so nothing was fitted.
+
+⚠️ **The mechanism is 推**: a first-touch pass activates a fresh DRAM row per
+line where a thrashing walk re-reads recently-open ones. **The experiment that
+would decide it** is a cold column at two strides — the row-locality hypothesis
+predicts the gap closes at a stride that changes rows every line.
+
+### Within-boot and across-reset repeatability
+
+§ 5.6's cell: `l.rep.a8k` = `l.rep.b8k` = **1,473** on run 1 and **1,473 /
+1,473** on run 2 — the two bases identical, both runs, and 12 ticks below their
+in-ladder counterparts (1,485) because the repeat gets its own warming pass.
+
+**Across a reset**: every rung reproduces to **±1 on the 1,4xx rungs and ±9 on
+the 17,4xx rungs (0.05 %)**, and `l.aba.c1` 545 → 544. No timing rung in this
+project had been repeated across a reset before.
+
+### 🔴 The one residual this section leaves
+
+**Base A's rung 0 is +5 and +7 over base B's on two runs.** It is stable and it
+is not noise. 推, and the best candidate: base A's rung 0 is the **first call**
+to `rlx_tc_ladder`, so it pays the leaf's own I-cache fill, where base B's rung 0
+is the thirteenth. **The experiment that decides it**: discard one `lad_leg`
+before the ladder starts, exactly as `t-hit` effectively does for
+`rlx_tc_walk`. Needs a payload; costs no extra power cycle once one exists.

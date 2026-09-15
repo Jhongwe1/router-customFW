@@ -622,3 +622,72 @@ census population and what each row already had before any of this ran) ·
 `docs/toolchain-prior-art.md` (the toolchain axis) · `notes/vendor-kernel-isa.md`
 (what the vendor's kernel does about all of it) · `SPEC.md` (every value, with its
 own two marks and its owner).
+
+---
+
+## 8.4 🆕 2026-09-16 — § 8.1 and § 8.2 have both been run, and they went opposite ways
+
+Seating 24, one power cycle. **Neither § 8.1 nor § 8.2 above is edited**: they
+are pre-registrations, and a document written before its own measurement is the
+rarest thing this repository has. This section is the verdict on them.
+
+### § 8.1 — CONFIRMED
+
+The knee lands at **8 KiB**. The warm column is flat at 1,496 / 1,480 / 1,472 /
+1,485 ticks through 8 KiB and steps to 17,405 / 17,404 at 16 and 32 KiB — a
+**11.72×** step against a derived 12.00×. The prediction's three refutation
+clauses — flat across all six, rises immediately, knee elsewhere — none fired.
+
+🟢 **And the confound § 8.1 itself registered is resolved**, by the thing it
+said would have to resolve it rather than by the knee: the ladder ran at **two
+arena bases 320 KiB apart whose cache index bits are equal by construction**,
+and **four of six rungs differ by 0 ticks**, the largest by 4. A scratchpad is
+an address window and would show a floor at one base only. Group M on the same
+boot is the independent second answer — `m.dmembase 20000000` with
+`m.dmemtop 00000000`, a base with no top above it.
+
+⚠️ **The measured statement is a bracket, not a point**: the ladder has no
+12 KiB rung, so *8 KiB fits and 16 KiB does not* is 量 and *exactly 8 KiB*
+remains the datasheet's 讀.
+
+Owner: `docs/rlx-cache-and-cp0.md` § ⓑ-3. `SPEC.md` `CPU-69`, `CPU-70`,
+`CPU-71`, `CPU-72`.
+
+### § 8.2 — REFUTED, and by a row it did not name
+
+§ 8.2's refutation clause is *more than one row shows a cost*. 量: **two**.
+
+| row | cost over its twin, boot 1 / boot 2 |
+|---|---|
+| `sync` | **988.6 / 989.5 ns per iteration** |
+| `lwu2` (an unaligned `lw`) | **915.6 / 915.4 ns** |
+| `ll` | 5.0 / 4.8 ns — native, two cycles |
+| `sc` | +0.2 / −0.2 ns — the sign flips; indistinguishable from zero |
+
+🔴 **The mechanism of the error is in § 8.2's own sentence.** It reasoned from
+`4a`'s *visible* surface, and `docs/emulation-surface.md` § 481 records that the
+census **excludes the unaligned forms by rule**. **The prediction was derived
+from an instrument that could not see the thing that refutes it** — which is a
+sharper failure than a wrong guess, and the reason this section does not soften
+it.
+
+🟢 **The half § 8.2 got right is worth stating too**: `ll` and `sc` do not pay
+an exception, so *"emulated in user mode"* is refuted as a statement about the
+executing machine and the source reading is re-attributed — `simulate_llsc`
+exists and is not reached for these two on this die, in user mode.
+
+🟢 **And `sync`'s cost resolved against the chosen ruler**, which is § 8.2's
+other refutation branch and did not fire: 988.6 ns against a zero control of
+**0.001 ns**, on a ruler whose own off-by-one is documented in
+`SPEC.md` `FW-73`.
+
+Owner: `docs/emulation-surface.md`. `SPEC.md` `CPU-73`, `CPU-74`, `CPU-75`.
+
+### What the pair of them says about this section's method
+
+**Two registered predictions, one confirmed and one refuted, from one power
+cycle** — and the refuted one is refuted by a cell the same card built for a
+different question (§ 6.6's `lwu2`, which existed to adjudicate two other files
+of this repository against each other). **The value of registering a prediction
+is not that it is right; it is that a reader can tell which way it went without
+taking anybody's word for it.**

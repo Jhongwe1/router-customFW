@@ -512,3 +512,111 @@ kernel also emulates reads *no signal* in both columns. So a ninth could sit
 **inside this table unseen**, as well as outside it in § 6's five, in § 5's
 six, or in whatever the census never admitted. **One row is what this
 instrument can see in this population.**
+
+---
+
+## 🆕 2026-09-16 (seating 24) — the surface is PRICED, and it is a slope
+
+`R1-pub-4b`'s instrument is `/bin/ucost`, `UCOST_BUILD_ID`
+**`8403799745aeb189`**, run under rlxfw's own kernel on **two independent
+boots** — `bench/2026-09-16/C2-UC.log` (boot 1) and `C2-UC2.log` (boot 2), each
+boot its own rescue, upload and `J`.
+
+Each row is a slope over four iteration counts, and each cost is **that row's
+slope minus its twin's**. The twins share the memory shape, the cell prologue
+and the loop, so only the probed word differs. **No fitting happens on the
+board**: it emits raw snapshots and the desk recomputed both composites from
+them, 64 rungs, **0 disagreements**.
+
+### The four costs
+
+| row | twin | boot 1 | boot 2 | agreement | verdict |
+|---|---|---:|---:|---:|---|
+| `sync` | `nop_a` | **988.6 ns/it** | **989.5 ns/it** | 0.09 % | **emulated** |
+| `lwu2` | `lw` | **915.6 ns/it** | **915.4 ns/it** | 0.02 % | **emulated** |
+| `ll` | `lw` | 5.0 ns/it | 4.8 ns/it | 4 % | native, +2 cycles |
+| `sc` | `sw` | +0.2 ns/it | **−0.2 ns/it** | **sign flips** | native, indistinguishable |
+
+The slopes fall into two clusters about **90×** apart:
+
+```
+native  : nop_a .00205  nop_b .00205  lw .00205  sw .00212  sc .00216  ll .00306
+emulated: lwu2  .18513  sync  .19978              (counts per iteration)
+```
+
+**`E2`'s zero control** — two `nop` cells at two different addresses, because
+`x − x` is a tool that cannot fail — is **0.001 ns/it** on boot 1 and 0.011 on
+boot 2. Every quoted cost is at least 84,000× it.
+
+### 🟢 The exception round trip on this kernel
+
+**~900–990 ns, i.e. 366–396 cycles at 400 MHz**, measured two independent ways:
+two different instructions through two different handlers, agreeing to **7.4 %**.
+The dominant term is therefore the trap and the return, not the handler body.
+This number did not exist in this repository before tonight.
+
+### 🟢 `sc` costs nothing, and the evidence is the sign
+
+A quantity that reads +0.2 ns/it on one boot and −0.2 on another is the
+instrument finding zero. That is a stronger statement than either number, and it
+is the reason `sc` is reported as a bound rather than as a cost.
+
+⚠️ `ll`'s +2 cycles failed `E4`'s linearity clause on boot 2 and `sc`'s twin
+`sw` failed it on boot 1 — a different row each time, which is what a threshold
+inside the noise looks like. **Both are therefore reported as bounds**: neither
+pays an exception, and that conclusion does not depend on either fit, because
+the clusters are 90× apart.
+
+### 🔴 `docs/rlx-isa.md` § 8.2 is REFUTED, and not by the rows it named
+
+§ 8.2 registered *"`D-cost` will find exactly one row with a measurable cost"*,
+**refuted if more than one row shows a cost**. 量: **two**, `sync` and `lwu2`,
+both at the exception scale.
+
+🔴 **The reason is in § 8.2's own sentence.** It reasoned from `4a`'s *visible*
+surface — and this document's own § 481 records that the census **excludes the
+unaligned forms by rule**. It was a prediction derived from an instrument that
+was blind to the thing that refutes it.
+
+**§ 8.2 is left exactly as written.** A document written before its measurement
+is the rarest thing this repository has.
+
+### 🟢 The `ll`/`sc` half, and the re-attribution
+
+`ll` and `sc` **do not pay an exception in user mode**. So *"emulated in user
+mode"* is refuted as a statement about the **executing machine**, and the source
+reading is re-attributed: `simulate_llsc` exists in this kernel and, for these
+two instructions on this die, is never reached.
+
+⚠️ Narrow twice: this says nothing about kernel mode, and `ucost` times an
+instruction without checking that its semantics are correct — whether `ll`/`sc`
+actually implement atomicity is a different question and this cell does not ask
+it.
+
+### 🔴 `lwu2`, and the two rows of this repository that appeared to disagree
+
+The card's § 6.6 set `SPEC.md` `CPU-15` against this document, and they are not
+in conflict once two things are separated:
+
+* **`CPU-15` is about four unaligned INSTRUCTIONS** — `lwl`, `lwr`, `swl`,
+  `swr`. They execute. 量 in the same seating: `bench/2026-09-16/C2-UP.log` rows
+  8, 9 and `0a` raise **no signal**, agreeing with this table's column ② for
+  those rows.
+* **This document's five unaligned forms are the aligned `lh`, `lhu`, `lw`,
+  `sh`, `sw` at unaligned ADDRESSES.** That is an address error, not a reserved
+  instruction, and `lwu2` — the same `lw` word as its twin with two added to a
+  base register outside the loop — is one. 量 **915.5 ns**. **This document's
+  prediction is confirmed.**
+
+🔴 **What is still open, and it is a state difference rather than a
+disagreement**: `CPU-15` was measured at the loader prompt and this under Linux
+in user mode. Two states of one machine; neither refutes the other. **The
+experiment that decides it is `lwu2` timed bare metal**, which needs a `probe3`
+row and a seating.
+
+### ⚠️ What this does not price
+
+The surface is **eight** entries and this prices **four**. The other four are
+unpriced, and that is a declared scope limit rather than a gap —
+`PROGRESS.md`'s `E7` says the number goes in the write-up rather than being
+discovered by a reader.

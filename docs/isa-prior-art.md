@@ -1211,3 +1211,48 @@ emits **both** phases and both composites per rung and lets the capture's own
 `SPEC.md` `CLK-30`. ⚠️ And 200,005 Hz is **推**, not 量 — the driver's own
 derived `hz_used` prints **200,000**, and what is 量 is the 2,000-counts-per-
 jiffy ratio rather than the absolute rate.
+
+---
+
+## 11. 🔴 2026-09-16: § 7's slot table went stale, and reading it stale nearly cost a power cycle
+
+§ 7's *Decision, for `R1-pub-3`'s seating* lists five slots and says slots 3–5
+ride the seating at no marginal cost. **Two of those five were already done when
+seating 24 ran, and this table still listed them.**
+
+| slot | what | where it actually happened |
+|---|---|---|
+| 1 | `R1a`'s and `R1b`'s payloads, plus the loop seam | seatings 21 and 22 |
+| 2 | `CPU-45`'s cells A–G | **seating 24** — `c-A` negative a fourth time, `B`/`C`/`D`/`F`/`G` `VOID 10` |
+| 3 | `J` to a kernel of mine | **seating 24**, three boots |
+| 4 | `FW-65`'s two `echo` writes bracketing one long hold | ✅ **seating 22, 2026-09-14** — `bench/2026-09-14c/C4-E2A`, `C4-E2B`, `C4-S1`, `C4-S2` |
+| 5 | `FW-63`'s bit-6 transition timestamps on a fresh boot | ✅ **seating 22, 2026-09-14** — four predictions, all hit |
+
+**Seating 24's card was right not to carry slots 4 and 5**, and its § 9 was
+right not to list them as dropped: they were not that seating's to drop.
+
+### 🔴 What went wrong when this table was read against `SPEC.md`
+
+Seating 24's closeout audit read this table, checked the two residuals in
+`SPEC.md`, and reported both as **open riders that had been silently dropped**.
+They are closed, and the audit had the closure in front of it: `SPEC.md`'s
+residual rows are single table rows carrying **both** the open question **and**
+the ✅ that closes it, appended to the same row. The audit read them through a
+`cut`, saw *"兩件事未定"* at the head of the row and not *"✅ 收了
+2026-09-14（seating 22）"* at its tail.
+
+**The operator had already agreed to power the board on for work that was
+finished two days earlier**; the second read is what stopped it.
+
+🔴 **The rule that would have prevented it**: never read a `SPEC.md` row through
+a truncating view. A row is one line and its verdict is at the end of that line.
+This is the *partial view instead of a re-derivation* failure, with a date and a
+cost attached.
+
+### The repair
+
+This section is the repair for the stale table. **§ 7's table is not edited** —
+it is a dated decision and its own dateline says 2026-09-12 — and this section
+is what a reader reaches next. The general fix, carried forward: a schedule
+table that outlives its slots needs a status column that something checks, and
+nothing in this repository checks one.

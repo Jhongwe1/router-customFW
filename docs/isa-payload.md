@@ -739,3 +739,38 @@ payload records and decides nothing.
 * ⚠️ **The census this arm is compared against is not this payload.**
   § 1's join is the bridge, and **31 of these 75 rows have no census row
   under either direction of it.**
+
+---
+
+## 🆕 2026-09-16 (seating 24) — the first repeat of a column-② row, and it is byte-identical
+
+`R1-pub-4a` had one bench, one boot, and no row had ever been repeated. Seating
+24 re-ran it.
+
+**`bench/2026-09-15/C2-UP.log`** (seating 23, argument `d73`) against
+**`bench/2026-09-16/C2-UP.log`** (seating 24, argument `a91`), both under
+rlxfw's own kernel, on different boots of different images:
+
+* **75 `PU` rows, `cmp` IDENTICAL.**
+* All eleven header fields equal, including `scratch_at = 00445d88` — the same
+  address, so nothing in this userspace moves a static allocation between boots.
+* `install_rc` 0, `c1a_raise` 1, `c1b_special0e_n` 1, `scratch_bad` 0 on both.
+
+### Why it is worth anything, and what it cost to keep it that way
+
+Both captures print `BUILD_ID` **`a87be346bb83e7f9`**, which is
+`cat uprobe.c cells4.S probe4rows.h rlxasm.h | sha256sum | cut -c1-16`. **A
+repeat is only a repeat if the binary is the same one**, so the `special0e` `why`
+column's `C2` → `C5` correction in `tools/isa-payload.tsv` was deferred a fourth
+time — correcting it regenerates `cells4.S` and moves the digest, and then the
+repeat is of a different artefact.
+
+🔴 **The deferral now has an expiry rather than a wish**: the first rebuild after
+this repeat. That rebuild has not happened.
+
+### 🟢 One thing the comparison establishes that neither run alone could
+
+The two runs were given **different arguments** (`d73`, `a91`) and produced
+**identical rows**. So the argument is a label carried into the banner and not a
+selector over the population — which the tool's own source says, and which had
+never been checked from outside.
