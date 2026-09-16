@@ -296,7 +296,7 @@ before the card's seating, in clauses that can fail:
   `Δirq = Δjiffies + 1`, the same sign five times out of five.** Counted with
   both conjuncts, as the sentence is written: boot 1 is **10 / 32 = 31.2 %**,
   boot 2 is 7 / 32 = 21.9 %, the seating is 17 / 64 = 26.6 % — **boot 1 and the
-  seating both cross this clause's own ¼ void threshold.**
+  seating both cross this clause's own ¼ void threshold.** ⚠️ **而第二個合取項自己的數字也要在這裡,因為這個區塊是它的擁有者**:`FW-73` 量到兩次開機合計 **13 / 64** 個 rung 在第二個合取項上「失敗」,而**每一個都恰好差 1** —— 四個差 ±1、三個差 ±**1,999**,而 **1,999 = 一個 reload 減 1**。*(2026-09-16 第七十八段補:`spec-check` 的 `C5` 追不到這個字面,因為 `SPEC.md` § 19 整節在它的列級視窗之外;視窗拉開之後它第一次開火。)*
   🟢 **The four costs do not move, and the reason is structural rather than a
   rescue.** The ruler is `comp_tc1 = Δjiffies × 2000 + Δtc1`; `Δirq` is not in
   it, and both of its terms are snapshotted inside one `spin_lock_irqsave` —

@@ -65,6 +65,17 @@ the smallness says it is wrong.
 
 **R5. A ratchet is per check, never a total.** § 4.
 
+**R5b. A gate that sweeps TRACKED files cannot see a file you are adding.**
+量 2026-09-16, and it cost a red CI run: `spec-check` walks `git ls-files`, so
+`notes/record-integrity.md` — this file — was invisible to every local run of
+the gate while it was untracked, and its two `C8` defects were reported by CI
+on the commit that added it. `CLAUDE.md` already carries this for bench cards
+(*a card is untracked until the freezing commit, so the gate that exists to
+check the card cannot see the card*); **it is not a fact about cards, it is a
+fact about every new `.md` file**. 🟢 The fix is one command and it is
+measured: `git add -N <path>` puts the file in `git ls-files` (0 → 1 on a
+probe) without staging its content, so the gate sees it before the commit.
+
 **R6. The number is re-derived, never copied.** 量 2026-09-16: a patch script
 anchored on ninety characters quoted out of `PROGRESS.md` was REFUSED, because
 the file reads `補丁的錪點` and the quotation had silently corrected the typo
@@ -90,9 +101,9 @@ check whose entire subject is *is this step finished*.
 | ① | `NO-STEP-ID` was printed and was never a finding, so *deliberately empty* and *forgotten* had one output — and `T23`, which demands at least one step id on the live file, turned the second into `REFUSING to report on the file`, rc 2, the whole tool. **The file could not sit between gates without taking the checker down.** | `R1z` was opened the hour `R1-pub` closed, by a control rather than by a preference |
 | ② | closure was read from a per-step `✅` only, and `R4`'s five step rows and `R1-gate`'s four carry none under headers dated `CLOSED 2026-09-02` and `closed 2026-08-26` | nine steps read as open work for two weeks |
 | ③ | a step id inside struck-through text or a `*( … )*` correction is *described*, not pointed at, and `C12` counted both | the seventy-seventh segment struck a false sentence holding a closed id and `C12` counted it; a draft of the seventy-eighth named nine closed steps **while describing hole ②** and made `C12` green on ids nobody intended to point at |
-| ④ | the row guard required the line to start `| **` and a backtick, so `R1h-0`…`R1h-4` — written `| ~~**`R1h-0`**~~ ✅ |` and `| ✅ **`R1h-2`** |` — were **absent** from the map rather than misclassified | worse than misclassification: an absent id is dropped from `C12`'s own id set without a word |
+| ④ | the row guard required the line to start with a pipe, two asterisks and a backtick, so `R1h-0`…`R1h-4` — whose first cells are `~~**`R1h-0`**~~ ✅` and `✅ **`R1h-2`**` — were **absent** from the map rather than misclassified | worse than misclassification: an absent id is dropped from `C12`'s own id set without a word |
 | ⑤ | the id class was `R` plus a digit, so `P4b-1`…`P4b-4`, `P4a-1`…`P4a-5` and `R2a/b/d-0`…`R2a/b/d-4` were invisible | fourteen ids in three CLOSED sections; and it is why the debt gate had to be called `R1z` and not `P5` |
-| ⑥ | `| **`cr6c` for `R9`** 🆕 |` is a carried-forward row living inside `R3`'s step-list section, and the guard accepted it | `R9` was returned as an OPEN STEP, so a `Next after this` row that merely **mentioned** that gate satisfied `C12` |
+| ⑥ | a carried-forward row whose first cell reads ``**`cr6c` for `R9`** 🆕`` lives inside `R3`'s step-list section, and the guard accepted it | `R9` was returned as an OPEN STEP, so a `Next after this` row that merely **mentioned** that gate satisfied `C12` |
 
 **After: 72 step ids known, 68 closed, 4 open — `R1z-1`, `R1z-2`, `R1z-3`,
 `R1z-4`, and all four are real.**

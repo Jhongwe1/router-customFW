@@ -146,7 +146,26 @@ ROOT = os.path.dirname(HERE)
 # The id, plus whatever decoration the house style puts after it -- RUNSHEET.md
 # writes `| **C5** 🆕 |`, and SPEC.md does the same.
 ID_RX = re.compile(r'^\*{0,2}`?([A-Z]{2,3}-\d{2}[a-z]?)`?\*{0,2}(?:\s.*)?$')
-MARKS = ('量', '讀', '推', '文', '—')
+MARKS = ('量', '讀', '推', '文', '—', '算')
+
+# 🔄 2026-09-16 (`R1z-2`): `算` joins the alphabet.  It means *derived by
+# ARITHMETIC from values this repository already holds* -- not a new reading
+# (`量`), not read out of code or a dump (`讀`), not a guess (`推`), not a
+# document's claim (`文`).  量: four rows use it (`CPU-68` V, `CPU-71` N,
+# `CPU-72` N, `FW-73` N), each recomputing a published number from published
+# numbers, and all four were in SPEC.md § 19 -- the section no row-level check
+# could reach until this segment.  **An unwatched section grew a vocabulary.**
+#
+# It is declared here rather than in SPEC.md's legend because the legend
+# physically cannot gain a row: it ends at SPEC.md:34, and every one of the 28
+# distinct `SPEC.md:NNN` citations in this repository points at line 106 or
+# below, fifteen of them inside three FROZEN bench artefacts.  One inserted
+# line moves all of them.  `C2b` is what keeps this from being a silent
+# divergence and what forces the declaration out once `CITE-2` is paid.
+MARK_UNLEGENDED = {'算': 'the legend cannot gain a row until `CITE-2` replaces '
+                         'line-numbered citations into SPEC.md; 量 2026-09-16, '
+                         'inserting one line at :35 moves 28 citations, 15 of '
+                         'them in frozen bench artefacts'}
 
 # A value cell may legitimately hold no value.  Three of these are open
 # questions and must appear in section 17; the other two are not questions at
@@ -863,8 +882,37 @@ def check(path, quiet=False):
     tables, lines = parse(path)
     text = '\n'.join(lines)
 
-    defs = [t for t in tables if t['section'] and 1 <= t['section'] <= 16]
+    # 🔄 2026-09-16 (`R1z-2`).  This was `1 <= section <= 16`, a number, and
+    # 量 it left § 19 -- THIRTY-THREE rows carrying the same seven columns as
+    # §§ 1-7, and the staging section every row measured since 2026-09-14
+    # lands in -- outside `C1`, `C2`, `C4`, `C5` and `C7` entirely.  It was
+    # found by asking why `C5` had not caught `TC-57`'s owner pointer, and the
+    # answer was that `C5` had never looked: 450 rows checked, 141 not.
+    #
+    # 🔴 The repair is NOT `<= 19`, which is the same defect one section later.
+    # A numbered section is a definition table UNLESS it is one of the two that
+    # are not, and both exclusions are ASSERTED below rather than trusted, so a
+    # section added tomorrow is checked by default and a section that changes
+    # shape says so.  Failing safe here means including, not excluding.
+    EXCLUDE = {17: 'the residuals index -- its own shape and its own check, C3',
+               18: 'the deliberately-not-here list -- it has no id column'}
+    defs = [t for t in tables
+            if t['section'] and t['section'] not in EXCLUDE]
     idx17 = [t for t in tables if t['section'] == 17]
+    for s, why in sorted(EXCLUDE.items()):
+        ts = [t for t in tables if t['section'] == s]
+        if not ts:
+            continue
+        if s == 17 and any(col(t, 'owning gate') is None for t in ts):
+            findings.append(('C0', f'SPEC.md § 17 no longer carries an '
+                                   f'`owning gate` column, so excluding it '
+                                   f'from the row checks ({why}) is no longer '
+                                   f'the reason it was excluded for'))
+        if s == 18 and any(col(t, 'id') is not None for t in ts):
+            findings.append(('C0', f'SPEC.md § 18 now carries an `id` column, '
+                                   f'so it is a definition table and excluding '
+                                   f'it ({why}) hides its rows from every '
+                                   f'row-level check'))
 
     # ---- C1: ids well formed and unique -------------------------------------
     seen, rows = {}, []
@@ -903,6 +951,55 @@ def check(path, quiet=False):
             elif not any(mk in cell for mk in MARKS):
                 findings.append(('C2', f"{path}:{r['line']}: {r['id']} {which} mark is not one of {'/'.join(MARKS)}: {cell[:30]!r}"))
     stats['exempt_tables'] = exempt
+
+    # ---- C2b: MARKS and the legend must be the same alphabet ----------------
+    # 🆕 2026-09-16 (`R1z-2`).  量, the hour § 19 came into scope: FOUR rows
+    # carry a mark `算` -- *computed by arithmetic from values this repository
+    # already holds* -- which is a SIXTH provenance the legend does not
+    # declare and `MARKS` did not contain.  It was invented while § 19 was
+    # outside every row-level check, which is what an unwatched section does
+    # to a vocabulary.  This check derives the alphabet from SPEC.md's own
+    # legend and compares it with the constant, in BOTH directions, so a mark
+    # can never again exist in one place and not the other.
+    #
+    # 🔴 `MARK_UNLEGENDED` is a DECLARED divergence, the shape `tccensus`'s
+    # `mx` column already uses, and it exists because the legend physically
+    # cannot gain a row today: 量 2026-09-16, the legend table ends at
+    # SPEC.md:34 and all 28 distinct `SPEC.md:NNN` citations in this
+    # repository point at lines 106 or below-- fifteen of them inside three
+    # FROZEN bench artefacts that may not be edited.  Inserting one line moves
+    # every one of them.  That is `CITE-2`'s cost, measured.
+    legend = None
+    for t in tables:
+        if t['header'][:2] == ['標記', '意思']:
+            legend = t
+            break
+    if legend is None:
+        findings.append(('C2b', f'{path}: no mark legend table (a table whose '
+                                f'header is 標記/意思), so `MARKS` has nothing '
+                                f'to be checked against'))
+    else:
+        dec = set()
+        for lineno, cells, _span in legend['rows']:
+            if cells:
+                dec.add(cells[0].strip().strip('*').strip())
+        for mk in MARKS:
+            if mk in dec or mk in MARK_UNLEGENDED:
+                continue
+            findings.append(('C2b', f'{path}: `MARKS` accepts {mk!r} and the '
+                                    f'legend does not declare it'))
+        for mk in sorted(dec - set(MARKS)):
+            findings.append(('C2b', f'{path}: the legend declares {mk!r} and '
+                                    f'`MARKS` does not accept it, so a row '
+                                    f'using it is reported as illegal'))
+        for mk in sorted(MARK_UNLEGENDED):
+            if mk in dec:
+                findings.append(('C2b', f'{path}: {mk!r} is declared unlegended '
+                                        f'and the legend now declares it -- '
+                                        f'delete the declaration'))
+            elif mk not in MARKS:
+                findings.append(('C2b', f'{path}: {mk!r} is declared unlegended '
+                                        f'and `MARKS` does not accept it'))
 
     # ---- C3: blanks <-> section 17 -----------------------------------------
     listed = set()

@@ -1324,3 +1324,15 @@ commit** — a spec table that lags the finding is worse than no table, because 
 reads as current. Then run `python3 tools/spec-check.py` — it runs its eight
 controls first and refuses to report on the file if any of them fails — and
 `bash tools/test-file-modes.sh` if a file was added. Two seconds for both.
+
+🔴 **And `git add -N` every NEW `.md` file before running that gate.** 量
+2026-09-16 (seventy-eighth segment), on a red CI run: `spec-check` sweeps
+`git ls-files`, so a file that is still untracked is invisible to it, and
+`notes/record-integrity.md`'s two `C8` defects were found by CI on the commit
+that added the file — after five local runs had reported clean. This file
+already records the same hole for **bench cards** (*gate 2 is `spec-check`,
+and a card is untracked until the freezing commit, so the gate that exists to
+check the card cannot see the card*); it is not a fact about cards, it is a
+fact about every new file a sweep is supposed to cover. 🟢 `git add -N <path>`
+puts it in `git ls-files` without staging its content — measured, 0 → 1 on a
+probe — and that is the whole fix.
