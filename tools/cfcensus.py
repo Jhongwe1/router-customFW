@@ -51,14 +51,28 @@ closed.  量 on the live file at this tool's first run: **18 rows**, of which
 prose case (`REL-0`, `REL-3`).  Sixteen one-character edits and two declared
 exemptions -- not a heuristic.
 
-  ⚠️ A HAND ADJUDICATION OF THE SAME 108 ROWS, RUN BESIDE THIS ONE ON THE SAME
-  AFTERNOON, PUT THE NUMBER AT 23 AND WAS WRONG ON FIVE.  It read `TOOL-1`,
-  `LOOP-1`, `REL-1`, `CITE-2` and `OPS-1` as closed on the strength of prose;
-  each of those rows ENDS with its own residual -- *絕對速率只能被框住…量不
-  出來*, *這一列問的東西在這個迴圈上仍然是零*, *a hard precondition of that
-  tag*, *一個都沒修*.  The offset rule got all five right without reading a
-  word of them.  That is this gate's own thesis, demonstrated on its own first
-  step: the failure mode of a hand list is not that it is slow.
+  🔴 AND THE FIRST VERSION OF THIS PARAGRAPH WAS WRONG, IN THE SENTENCE IT WAS
+  PROUDEST OF.  It said a hand adjudication run the same afternoon "was wrong
+  on five" -- `TOOL-1`, `LOOP-1`, `REL-1`, `CITE-2`, `OPS-1` -- and that the
+  offset rule "got all five right without reading a word of them".  量, on the
+  rows themselves rather than on either verdict: **three of those five carry an
+  explicit closure and the hand was right about them**:
+
+      `TOOL-1`  🟢 **CLOSED 2026-09-02: `tools/xcheck.py`, 三條恆等式, 390 個檔**
+      `LOOP-1`  🟢 **CLOSED 2026-09-02（第二十五段），而這一列的病因是錯的。**
+      `REL-1`   🟢 **CLOSED 2026-09-01: the take EXISTS.** + the artefact's URL
+
+  and two carry none, so the instrument was right about `CITE-2` and `OPS-1` --
+  where the hand had inferred closure from a tool existing OUTSIDE the row,
+  which is a different claim from the row being closed.
+
+  **The mechanism is exact and it is this tool's, not the reader's**: `hints()`
+  keyed on the CHARACTER `✅`, and those three rows spell their closure with
+  the WORD `CLOSED` under a green circle.  A rule that reads one of the two
+  spellings its own file uses is not an offset rule that beat a human; it is a
+  narrower rule that agreed with one by luck on the rows where both spellings
+  happen to coincide.  The token set below is the measured one, and the rows
+  where a closure word is prose about a GATE are exempted by name.
 
   axis A -- the POPULATION.
       `cf`    one CARRIED-FORWARD ROW.  Derived from `PROGRESS.md` § Carried
@@ -144,6 +158,25 @@ END = '<!-- cfcensus:%s end -->'
 GATE_SHAPE = re.compile(r'(?<![0-9A-Za-z-])([RPS]\d[0-9A-Za-z]*'
                         r'(?:[-/][0-9A-Za-z]+)*)(?![0-9A-Za-z-])')
 
+# 🔄 2026-09-16, the measured spelling set.  This was the single character
+# `✅` and that made the tool blind to three rows that spell a closure
+# `🟢 **CLOSED <date>**` -- `TOOL-1`, `LOOP-1` and `REL-1`, the last of which
+# carries the artefact's URL in the same sentence.  量 over all 108 rows: the
+# `✅`-only rule sees 18 of the 21 rows that carry any closure spelling.
+CLOSURE = re.compile(r'✅|CLOSED|Closed|已關|關了')
+
+# 🔴 THE CHARACTER AND THE WORD ARE NOT THE SAME EVIDENCE, AND THE FILE SAYS SO.
+# 量 2026-09-16 over every OPEN row: a `✅` deep in a QUESTION cell marks a
+# sub-item five times out of five (offsets 322, 1,288, 1,335, 3,282, 28,437),
+# so that character counts only at the head.  The WORD is the opposite -- all
+# **eleven** occurrences in OPEN rows' question cells are row-level verdicts
+# (`LOG-1` at 340, `LOOP-4` at 643, `TOOL-1` at 806, `ESC-1` at 963, `LOOP-1`
+# at 1,143, and six `✅ **Closed` heads at offset 4), with **no** sub-item use.
+# So the word counts anywhere and the character does not.  Eleven of eleven,
+# zero counterexamples, and the asymmetry is read off the data rather than
+# chosen -- which is the whole difference from the `✅`-only rule this replaces.
+CLOSURE_WORD = re.compile(r'CLOSED|Closed')
+
 # The owning-gate cell forms that are NOT a gate and say so.
 NONE_WORDS = ('none', '無', "the owner's decision", '擁有者', 'closed')
 SEGMENT_WORDS = ('任何一段', 'any desk segment', 'any segment', '的桌面段',
@@ -159,7 +192,18 @@ L8_EXEMPT = {
              'release decision, not about this row',
     'REL-3': 'owner is `none`, see `REL-0`; the ✅ is inside a sentence about '
              '`notes/kernel-build.md` §21.7',
+    'XNUM-1': 'the owner cell\'s 關了 is `R5-11` the GATE closing, inside a '
+              'recorded handover; the row is the one thing `R1z` exists to '
+              'finish',
 }
+# 🔴 `GPIO-1` was in this list for one run and `L9` deleted it, which is the
+# rot control doing its job on its first real use.  量: the token set above
+# carries `CLOSED` and `Closed` and NOT lower-case `closed`, and `GPIO-1`'s is
+# the lower-case prose spelling beside a gate id in a cell that also says
+# *still not measured*.  Lower-case `closed` is excluded because the only
+# instances in an OPEN row's owner cell are prose; `HC-1` and `LADDER-1` use it
+# as a real closure and are already CLOSED in their first cell, so no `L8`
+# question arises there.
 
 
 # What each control asserts, so `--self-test`'s output says what ran rather
@@ -517,7 +561,14 @@ def owner_kind(row, board, hdr, steps, sowner=None):
         if live:
             return 'LIVE', ';'.join(live), resolved, unresolved
         shut = ';'.join(t for (t, _, _) in resolved)
-        if {'owner', 'question-head'} & set(hints(row)):
+        # 🔴 A NAMED EXEMPTION MUST ALSO BLOCK THE DEMOTION.  量 2026-09-16:
+        # widening the closure spellings moved `XNUM-1` to `ORPHAN?`, i.e.
+        # *probably finished* -- the row this gate exists to finish, whose
+        # owner cell says `R5-11` 關了 about the GATE.  Suppressing only its
+        # `L8` finding while letting the same signal reclassify it is the
+        # mislabel the exemption was written to prevent, one layer down.
+        if (row['id'] not in L8_EXEMPT
+                and {'owner', 'question-head'} & set(hints(row))):
             return 'ORPHAN?', shut, resolved, unresolved
         return 'ORPHAN', shut, resolved, unresolved
     if any(w in cell or w in low for w in SEGMENT_WORDS):
@@ -544,12 +595,12 @@ def hints(row):
     is the rule; a character window would be a parameter fitted to ten points.
     """
     out = []
-    if '✅' in row['owner_cell']:
+    if CLOSURE.search(row['owner_cell']):
         out.append('owner')
     q = row['question'].lstrip()
-    if q.startswith('✅'):
+    if q.startswith('✅') or CLOSURE.match(q) or CLOSURE_WORD.search(q):
         out.append('question-head')
-    elif '✅' in q:
+    elif CLOSURE.search(q):
         out.append('question-body')
     return out
 
@@ -828,7 +879,16 @@ def report_check():
 # That is this repository's own recorded trap -- a pair of wrong numbers is
 # self-consistent as long as the difference is right -- reproduced inside the
 # instrument written to prevent it.
-BASELINE = {'L1': 44, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 16, 'L10': 2}
+BASELINE = {'L1': 42, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 19, 'L10': 2}
+# 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
+# **both moves are the instrument getting less wrong rather than a debt
+# moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`
+# made three rows that had always been closed stop being reported as *nobody
+# will do it*: `TOOL-1` and `LOOP-1` (`🟢 **CLOSED 2026-09-02**` mid-question)
+# and `REL-1` (`🟢 **CLOSED 2026-09-01: the take EXISTS.**` with the artefact's
+# URL, in the owner cell).  The ratchet refused the run until this line moved,
+# which is what it is for: the debt did not shrink, the measurement of it
+# changed, and the commit has to say which.
 # 量 2026-09-16, `R1z-1`, 86 findings.  `L6` moved 2 → 4 inside that step and
 # BOTH moves were the checker getting stricter rather than a debt appearing:
 # `P4a`'s five step rows became visible when the id class stopped being

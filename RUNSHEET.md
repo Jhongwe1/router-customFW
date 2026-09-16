@@ -4053,6 +4053,71 @@ destroys the evidence of the attempt you are retrying.
 
 ---
 
+## A sixth rule, and it is about what ONE card covers — 2026-09-16
+
+**Owner's ruling, seventy-eighth segment.** The four rules above say how a card
+is frozen and checked. None of them says how much a card should cover, and the
+answer this project had been using — **one card per experiment** — was inherited
+from a cost model that its own measurements have since halved.
+
+> 🟢 **One card per POWER CYCLE, not one card per experiment.** Inside one
+> power-up, run an automated loop that needs no card at all, because
+> `looprun`'s assertions ARE the prediction: compiled into the image, compared
+> by the tool, typed by nobody.
+
+### Why the old shape was right, and what changed
+
+**A card exists for one reason: a prediction written after the measurement is
+not a prediction.** That reason has not weakened — seating 17's `OVSEL`
+constant was wrong by **76×** and was caught only because the card wrote the
+number down first; without it the wrong number would have been *confirmed*.
+
+🔴 **What changed is the cost of a power cycle, and this repository measured it
+itself:**
+
+| | | where |
+|---|---|---|
+| `busybox reboot -f` → loader prompt | **2.407 s** | `FW-37`, seating 14 |
+| `looprun --mode bench`, reset → rescue → burn-flag read-back → upload → boot → assert, no operator gap | **34.74 s** | seating 10 |
+| chained cells in ONE power cycle | **828 s, 14 boots** | seating 18 |
+| boots per power cycle | 10 / 14 / 17 | seatings 16 / 18 / 20 |
+
+**Twelve boots cost one press of the power switch.** A seating stopped being
+one experiment some time around seating 14 and nothing said so.
+
+### What still costs a power cycle, and it is exactly one thing
+
+🔴 **`J` destroys the loader prompt.** TFTP upload, `FLR` flash reads, `DW`
+reads of loader-state registers, a bare-metal payload — all of them happen
+before the jump and **none of them can be redone without a power cycle**. That
+is the only irreversible thing on this board's software path, and it is what a
+card is buying.
+
+### So a seating has two kinds of cell and only one kind needs a card
+
+| | what | card? |
+|---|---|---|
+| **cold** | anything at the loader prompt | 🔴 **yes** — asking the wrong question costs a power cycle and cannot be undone |
+| **hot** | after Linux is up: edit → build → `looprun` uploads and boots → read `/proc` → `reboot -f` → repeat, 2.4 s a turn | **no** — the assertion is in the tool, and the tool is the same on every run |
+
+⚠️ **This loosens nothing.** Rules 1–4 apply unchanged to every cold card:
+`git add` then gate 2 then commit, one cell name per image, no directory name
+that is a prediction, `RECIPE_ID` re-derived before the freeze. What moves is
+**how much one card covers**, and the hot half gets a stricter instrument than
+a card rather than a weaker one — a compiled-in assertion cannot be misread,
+and `RECIPE_ID` means it cannot be edited without the image saying so
+(seating 10's `RLXFW-ID0=B1434383`, a sha256 over `config/`, computed by the
+build and compared by the tool).
+
+🔴 **The refutation condition, written now.** If a hot-cell run ever produces a
+number that nobody predicted and nobody can adjudicate — because the assertion
+that should have carried the prediction was not written — then this rule has
+failed and the honest repair is a card for that cell, named. **A hot cell with
+no assertion is not a hot cell; it is an unpredicted measurement.**
+
+---
+
+
 ## The UART block has two registers that a `DW` destroys — 2026-09-15
 
 **讀, and it is on this page because a `DW` looks read-only and two of these

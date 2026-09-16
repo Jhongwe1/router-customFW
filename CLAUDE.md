@@ -1335,4 +1335,8 @@ and a card is untracked until the freezing commit, so the gate that exists to
 check the card cannot see the card*); it is not a fact about cards, it is a
 fact about every new file a sweep is supposed to cover. 🟢 `git add -N <path>`
 puts it in `git ls-files` without staging its content — measured, 0 → 1 on a
-probe — and that is the whole fix.
+probe — and that is the whole fix. ⚠️ **And it applies only to a file that WILL
+be tracked**: 量, the first time the rule was applied, `git add -N` on a new
+`study/` file was refused because `study/` is gitignored — so a gitignored new
+file is a third state, never swept and never meant to be. The rule is about
+files the sweep is meant to cover, not about new files.

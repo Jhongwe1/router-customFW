@@ -482,6 +482,74 @@ and that produced a second `RED` that was also a misuse and not a finding.
 tree**, which is the shape that trains a reader to skim reds. Run correctly,
 `xcheck sweep` reads 1,242 artefacts, 3 identities, 0 disagreements.
 
+## 🔴 What the seventy-eighth segment did NOT establish — 2026-09-16
+
+**Three instruments landed and a gate closed two of its five steps. This
+section is what none of that settled.**
+
+🔴 **The debt census is the record auditing itself, and it is blind by
+construction.** Both of `cfcensus`'s populations come from one file. It cannot
+see a debt this project incurred and never wrote down — which is the class the
+seventy-seventh segment's closeout found **by hand**, four owner files that no
+checker could reach. `U6` keeps that from being a sentence nobody tests (the
+live file must yield at least one open row owned by a live gate, or the census
+refuses), but a control that the tool is still reading is not a control that
+the tool is reading enough.
+
+🔴 **The 44 orphans are not 44 things still to do.** An adversarial review and
+three independent triage passes agree that the classification has false
+positives in at least four shapes, all measured: a row whose closure is written
+`🟢 CLOSED` rather than `✅` is missed entirely (`REL-1`, whose owner cell
+carries a URL to the artefact); a row naming a gate id **and** a standing
+segment owner is reported as an orphan because the gate test runs first
+(`TCPAY-1`, `CENS-1`, `C12-1`, `REGIMM-1`, `CAPD-1`); nine of the eleven
+`L2` rows name work that exists under another name (`R2a` is `R2a/b/d`, `R1a`
+and `R1b` were folded into `R1-pub`); and a row closed in `PROGRESS.md` §
+Corrections rather than in its own cell is invisible (`C-16`). **The number is
+an upper bound with a known direction, and it is published as one.**
+
+🔴 **And one sentence of mine was committed and is wrong.** `tools/cfcensus.py`'s
+docstring says a hand adjudication run the same afternoon was wrong about
+`REL-1`. It was not: `REL-1`'s owner cell ends `🟢 **CLOSED 2026-09-01: the
+take EXISTS.**` with the link. On that row the hand was right and the
+instrument is wrong. The correction is in place and the claim is not repeated.
+
+⚠️ **`R1z-2` is half done.** The `SPEC.md` § 19 scope defect and its six
+findings are paid; **the 58 row dispositions are not**, deliberately — applying
+them against a classification with four known false-positive shapes would bake
+the defect into the table. The census is fixed first.
+
+⚠️ **`C12`'s block selection is correct and was inert.** 量 2026-09-16: the
+live `Next after this` row carried **zero** `🔄` markers, so `c12_blocks`
+returned a single block covering the whole row, and the date-based selection
+four controls were built for in the forty-fifth segment was doing nothing on
+the live file. The code is right and the data had drifted. **Nothing here
+measures inertness**, and `spec-check`'s own comment still said 28 dated blocks,
+measured 2026-09-08.
+
+🔴 **A citation format this repository prefers is indistinguishable from the one
+it is replacing.** 量: the largest `SPEC.md:NNN`-shaped match in the repository
+is that file's name followed by a colon and **110225**, in `tools/toolchain-census.tsv`'s `cite` column — whose
+format is `FILE:TOKEN`, a **search token**, and whose token here is the tail of
+the release name `rsdk-1.5.5-4181-EB-2.6.30-0.9.30.3-110225`. That is the good
+format, the one `CITE-2` wants. It is simply unreadable as such by any scanner
+when the token is all digits, and that is a hazard for the migration rather
+than a defect in the row.
+
+🟢 **And the scanner proved the sentence above while the sentence was being written.** The first draft of this section spelled that token out as a literal, and `citecheck`'s `M1` immediately reported *`docs/KNOWN-ISSUES.md` cites `SPEC.md`:110225 — SPEC.md has 804 lines*. A paragraph explaining that a scanner cannot tell the two formats apart was itself unreadable by the scanner, so it is written apart here — which is the workaround, not a fix.
+
+
+⚠️ **The legend cannot gain the row it needs.** `算` is a sixth provenance mark
+and it is declared in `tools/spec-check.py` rather than in `SPEC.md`'s legend,
+because 量 the legend ends at `SPEC.md:34` and every one of the 28 distinct
+`SPEC.md:NNN` citations in this repository points at line 696 or below, fifteen
+of them inside three FROZEN bench artefacts. One inserted line moves all of
+them. `C2b` is the control that forces the declaration out once `CITE-2` is
+paid; until then two files disagree on purpose.
+
+---
+
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

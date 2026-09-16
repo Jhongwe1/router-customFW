@@ -76,6 +76,8 @@ fact about every new `.md` file**. 🟢 The fix is one command and it is
 measured: `git add -N <path>` puts the file in `git ls-files` (0 → 1 on a
 probe) without staging its content, so the gate sees it before the commit.
 
+⚠️ **And this rule already existed, one subject too narrow, with the same measurement.** `RUNSHEET.md`'s card-lifecycle rule 1 carries it dated 2026-09-10, with a two-armed control — the same file untracked reports 0 findings at `rc 0` and `git add`ed reports 1 at `rc 1`. **I re-derived a measurement this repository already held**, which is the failure `cfcensus` exists to make visible, committed by the segment that built it. What is new is the subject: the rule was written about bench cards and is true of every new file a sweep is meant to cover.
+
 **R6. The number is re-derived, never copied.** 量 2026-09-16: a patch script
 anchored on ninety characters quoted out of `PROGRESS.md` was REFUSED, because
 the file reads `補丁的錪點` and the quotation had silently corrected the typo
@@ -175,4 +177,4 @@ own handling, and § 19 — the staging section every row measured since
 2026-09-14 lands in — is reached by `C1`, `C2`, `C4`, `C5` and `C7` **not at
 all**. The section exists for a good reason (inserting rows higher up moved
 nine frozen bench-card line references), and the cost was never stated. It is
-`R1z-2`'s.
+`R1z-2`'s. 🟢 **Paid the same day**: the window is `every numbered section except the two that are not definition tables`, both exclusions asserted, and 483 rows in 17 tables are checked where 450 in 16 were. Six defects fell out of it in the hour.
