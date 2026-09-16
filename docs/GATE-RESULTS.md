@@ -1139,7 +1139,206 @@ exemption-rot control — firing on cue: marking the closed row made
 ---
 
 
-## The operating clause, re-run at ten entries
+## 2026-09-17 — `P1` (a production test, and every check made to fail once)
+
+### One line
+
+**v0.3+, four segments (81st–84th), one power cycle against the one budgeted.**
+`config/mfgtest.sh` runs eleven checks on this board. Seating 25 returned
+**11 of 11 on a good unit**, then turned **five of them red by physical
+injection** — each red specific to the check its row named, each revert measured
+before the next injection, and all of `P1-4` for **zero resets**. **The second
+half is the gate; the first half is a demonstration**, which is `PROGRESS.md`'s
+own sentence written the day the gate opened and not softened since.
+
+**The weakest thing here is not a reading, it is a denominator.** Five of the
+eleven live rows are class `S` — simulated at the boundary, so they prove the
+check's logic and not its wiring — and 量 2026-09-17, **the two files that say
+so both said *four***, from the commit that wrote them.
+
+### Three claims that stand
+
+**① `D2` is paid, and what makes it a payment rather than a demonstration is
+that three of the five injections were RE-SPECIFIED against the implementation
+before the board was powered.** 量 seating 25: five physical injections, five
+kills, each one specific — `M25` `lock 6` (`dat=0000003C bit6=0 (want 0)
+n_set_ok 2->2 n_writes 4->4`, the refusal ordered *before* the write rather than
+logged after it), `M26` no press (`n_open 2->3 n_poll 2200->2600 b0_n_press
+1->1` — the first two terms **move**, which is what makes the third one mean
+something), `M27` `corrupt 0x9000` (`diff_units=1`, and **only** `MT-FLASH-3`
+red: `8 of 9 ok`), `M28` `cereload 20000` (`reload=20000 want=2000`), `M29`
+`stop` (`state=STOPPED (want BOOTGUARD)`). The `WRONG-CASE` control never fired,
+every revert was read back before the next injection (`9 of 9 ok` four times,
+`1 of 1 ok` once), and `tools/mfginject.py` carries the other 25 rows
+host-side: **25 of 25 killed, 0 alive, 5 stood down for `P1-4`** — the stand-down
+declared as one skip line rather than as a smaller green.
+🟢 **`M25` was read in BOTH directions, and the readout is a photon.** Locked, a
+request to turn the lamp *off* left it lit; unlocked, the same request turned it
+off (`dat 0000007C`, `n_set_ok 3`, `n_writes 5`); locked again, a request to turn
+it *on* left it off (`n_set_ok 3->3 n_writes 5->5`). **The card wrote only the
+first direction, where the operator's word is *lit* — the same word as the pass
+path.** The two middle cells are off-card and the reason is in
+`bench/2026-09-17/CORRECTIONS-block23.md` § 5: *a guard that has only ever been
+seen refusing is a wall.*
+🔴 **Two of the five could not have gone red as written**, and both were caught
+at the desk: `M26` because nothing in `mt_button` opened `/dev/input/event0`, so
+the counters were flat whether or not anyone pressed; `M29` because `kickms`
+moves neither field `mt_wdt` reads — it lets the hardware bite, which ends the
+boot instead of reddening a check. **That second correction is why `P1-4` cost no
+reset at all.**
+
+**② Six defects were found by reading a THIRD PARTY, never by re-reading the
+thing under test — and the sixth was found by the good unit itself.** 量: four
+of the eleven checks could not have gone green on a healthy board, and two of the
+five injections could not have gone red on a broken one. The third parties were
+the driver's own header (`rtl819x-keys.c:91-103`), the built `.config`
+(`p11d.config-built:769`, `# CONFIG_INPUT_EVBUG is not set`), **this project's
+own card from `bench/2026-09-10`**, two programs' format strings (`%08X` against
+`sha256sum | cut -c1-8`, compared with `=`), and this unit's own busybox `ash`
+under `qemu-mips-static`.
+🔴 **The obvious fix for the case mismatch was refuted before it shipped.**
+`$((0x$want))` is correct under `dash` and wrong on this die: 量, `$((0xb1818b92))`
+saturates to **2147483647** in this unit's `ash` against 2978057106 on the host,
+so a 2 × 2 (two shells × two forms) has the arithmetic version green under `dash`
+and **red under the shell that matters**. The shipped fix is a string fold.
+🔴 **The sixth was the good unit refuting the card.** § 5 predicted `9 of 9`;
+`C1-AUTO` returned **`8 of 9`** with a clock that was entirely healthy, and the
+capture is kept. Two independent causes: a 2.6.30 `read_proc_t` re-renders its
+whole page on every `read()` while the shell's `read` builtin consumes one byte
+per call, so a free-running field that grows shifts everything after it
+(`FW-87`); and this shell saturates its arithmetic, so with `jiffies` counted
+from `INITIAL_JIFFIES` **every jiffies delta taken on the device is 0**
+(`FW-88`). 🔴🔴 **The second of those had been measured three hours earlier, at
+the desk, in the 2 × 2 above — and was not asked of a second place.**
+
+**③ `D3`'s second conjunct was met by an instrument roughly four thousand times
+larger than the one it names, and the one it names never ran.** `D3` says *the
+`FLR` bracket is byte-identical across the gate*; 量, **zero `FLR` ran in `P1`**
+— `grep -rn FLR bench/2026-09-17/` returns nothing. What stands in its place is
+`MT-FLASH-3`'s own map: 32 groups over **4,186,112 bytes** (`H601`'s 8,192
+skipped by rule, `map_h601_hashed 0`), **line-for-line identical to
+`bench/2026-09-09b` and `bench/2026-09-10`** eight days earlier, with
+`map_diff_units 0` and `corrupt_at -1`; and **nine** `MT-FLASH-2` readings across
+the seating, `n_write_refused` stepping 2 → 16 by twos and `n_writes` reading
+**0** in every one. The bracket covers 1,024 bytes; the map covers 4,186,112.
+⚠️ **More coverage, less independence, and the difference is not decorative**:
+the `FLR` bracket reads flash through the *loader*, with Linux not running and my
+driver not loaded, while the map is computed by the same driver whose writes it
+is being used to rule out. `n_writes 0` comes from that driver too. **The gate's
+flash evidence is therefore wider and shallower than `D3` asked for**, and
+`FLS-26`'s ledger does not move.
+
+### What `P1` did not establish
+
+* 🔴🔴 **The design table over-declares on THREE rows and only one of them was
+  ever caught.** § 2 is the gate's own DoD input for `D1`, and 量 2026-09-17,
+  comparing all eleven pass criteria against the eleven implementations one row
+  at a time: **`MT-TICK`** declared `/proc/interrupts` as a second input and the
+  script never read it — found at seating 25 and struck in place;
+  **`MT-PORT`** declares *"link up on the connected port, **and the output names
+  the vendor driver**"* and `mt_port` prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`,
+  which names the **port**; **`MT-MAC`** declares *"body checksum 0"* and
+  `mt_h601`'s `MT-MAC` condition is `rc && sig && ver && sane && nz && nf && !gb`
+  — `hw_sum_ok` is deliberately in `MT-RFCAL`'s condition alone, so a unit with a
+  valid header and a broken body checksum scores `MT-MAC` **ok**. All three
+  over-declare in the same direction: the table claims a conjunct the script does
+  not test. 🔴 **`MT-TICK`'s instance was found, written up and struck, and
+  nobody looked at the other ten rows** — which is verbatim the sentence the
+  previous segment closed with (*a measurement that refutes one line usually
+  refutes two more, and nothing here goes looking for the other two*). This is
+  the first time something went looking, and it found exactly two.
+* 🔴 **And `MT-PORT`'s missing conjunct is the one `R6` needs.** The plan's own
+  ordering note for `P1` says the port check runs against the **vendor's** driver
+  until `R6` lands, so *「要在 `mfgtest` 的輸出裡寫明白是哪一支在跑，否則 R6
+  落地之後那一格的歷史數字沒有意義」*. The design row promised exactly that and
+  the implementation does not print it, so **every `MT-PORT` line this project
+  has captured is unlabelled as to which driver served it.** Carried to `R6-0`.
+* 🔴 **Five of eleven live rows are class `S`, and § 5 — the section whose whole
+  job is to understate nothing — said four.** 量 by two independent routes
+  (a column parse with an escaped-pipe guard, and a separate `awk` pass):
+  `S` 5, `R` 4, `P` 2. `git log -S` puts the sentence and the `MT-ID` row in the
+  **same commit**, `e362ffa`, so it was wrong on the day it was written rather
+  than gone stale. Corrected in place today, original quoted. **Nothing in this
+  repository counts a table column**, which is why five weeks of gates and a full
+  desk sweep walked past it.
+* 🔴🔴 **The map digest this gate publishes does not re-derive from the committed
+  capture.** `ae87ac03269985d6` is quoted in three files as the digest over the
+  32 map lines; 量, `sed -n '19,50p' X8-M0.log | sha256sum` gives
+  **`70484defc9714ecc…`**, and the published value comes back only after
+  `tr -d '\r'`. Every capture here is CRLF and **no file says the lines are
+  CR-stripped first**, so a reader re-deriving it concludes the flash moved.
+  🔴 **This is the same root cause as the four false stops the previous segment
+  recorded** (`[ "1\r" = "1" ]` is false) **and it is the fourth consumer** — the
+  first three were gates, this one is a published number. Negative control: 31 of
+  the 32 lines give a third value.
+* 🔴 **The independent rate reference `MT-TICK` needs is measured and is not
+  wired in.** 量 `FW-91`, one boot, the same cell shape twice with one `cereload`
+  between: normal `Δ`line 13 = **503**, `Δ`line 25 = **503**, ratio **1.000**;
+  at `cereload 20000`, **5,009** and **501**, ratio **9.998**. 🟢 The number that
+  matters is the **501** — the kernel's own view of elapsed time is identical
+  whether its clock is right or ten times slow, which is precisely why an
+  internal comparison can never see the fault. ⚠️ Line 13's rate comes from the
+  same timer block, so it is independent of **this driver's reload** and **not**
+  of the SoC's divider. `config/mfgtest.sh` reads `/proc/interrupts` in
+  **comments only** (`:461`, `:463`), and that comment still describes § 2 in the
+  present tense after § 2 was struck. ⚠️ **And `FW-91`'s declared second source,
+  `s25-X9-irq.log`, is not in this repository** — 量, `git ls-files | grep s25-`
+  returns 0.
+* 🔴 **No capture holds an operator's answer.** 量: five captures contain the
+  string `OPERATOR`, one occurrence each, and every one is the **prompt**
+  `mfgtest` printed. The register half of each pairing *is* in the capture and
+  closes exactly — `n_set_ok` 1→2, refused, →3, refused, 4→5 with `n_set_no 2`
+  counting the two refusals; `n_poll` +400 / +1800 / +400 against windows of
+  20 / 90 / 20 s at 20 Hz, to the poll. **So the human readings are anchored, not
+  unanchored — but they live in `LOG.md` and the corrections file, and a reader
+  with only `bench/` cannot recover them.** `MT-LED` and `MT-BUTTON` are the two
+  checks whose verdict a machine cannot reconstruct from the evidence directory.
+* 🔴 **`MT-ID`'s verdict line is never machine-readable, and the script's header
+  claims the opposite.** `FW-89`: 量, `^  (ok|FAIL)  +MT-ID ` matches **0 of 9**
+  auto captures while the ` of 9 ok` summary matches 9 of 9 — `rlxfw_mark()` and
+  ash's echo interleave deterministically at that exact position. The header says
+  the line shape *"is the one `tools/ci-census.py` already parses"*, which is true
+  for eight of nine. **The machine-readable contract is the summary, not the
+  per-check lines**, and the header has not been narrowed to say so.
+* 🔴 **A fourth check compares across time and does not use the snapshot.**
+  `config/mfgtest.sh`'s own comment says *ONLY THE THREE CHECKS THAT COMPARE
+  ACROSS TIME USE THIS … because those files' fields are static between verbs* —
+  and `mt_flash2` reads `$P_SPI` live before and after `act "$P_SPI" trywrite`,
+  requiring `n_write_refused` to move by 2 **across a verb**. The stated reason
+  names the property that makes the other eight safe and excludes precisely this
+  one. Whether `/proc/rtl819x-spi` has a field that moves *within* one traversal
+  is unmeasured; the nine readings taken are clean, which is an observation and
+  not a proof.
+* 🔴 **`MFG_SHELL`'s target-shell pass stays bench-only, and that is this step's
+  decision rather than an omission.** `tools/mipsash.sh` runs all 25 injections
+  and all six controls under this unit's own busybox `ash`, and the thing it runs
+  is this device's userspace carved from its flash dump, which `CLAUDE.md`'s Never
+  table forbids committing. **It is not written as a declared skip row**: a skip
+  row in `ci-expected.tsv` declares work CI *would* do given the population, and
+  the population here can never exist on a runner. It refuses rather than falling
+  back (量, `rc=2` on a bad `RLXFW_UNIT_ROOT`), and that refusal is the honest
+  form. ⚠️ So the `ci-expected.tsv` not-run ledger does **not** account for it,
+  and this paragraph is the only place that says so.
+* **Flash writability is untested** — the substitute tests that the write path
+  refuses, which is a different claim. **DDR is untested** and struck with its
+  reason. **Four of the vendor's eight factory-test areas** — TX power, RX
+  sensitivity, PSD, thermal — are outside what this project can measure at all.
+  **The unit's identity is the host's, not the device's**: the serial-equivalent
+  is its MAC, which may not enter this repository.
+* ⚠️ **`MFG_BUTTON_SECONDS` still defaults to 20**, which is too short for this
+  project's bench protocol — the operator cannot see the console, so the window's
+  start cannot be tied to a conversation turn. 量: the variable appears nowhere in
+  `docs/mfgtest.md` and nowhere in `tools/mfginject.py`; the 90 s override that
+  made `MT-BUTTON` pass exists only inside two capture files. Changing the default
+  needs a rebuild and `RECIPE_ID` is a digest over `config/`, so it is `R6`-era
+  work.
+* **Zero flash-write commands, zero `FLR`, `n_writes 0` in all nine
+  `MT-FLASH-2` readings.** The `FLR` bracket stays at 1,024 of 4,194,304 bytes =
+  **0.0244 %**, untouched by this gate.
+
+---
+
+## The operating clause, re-run at eleven entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -1149,7 +1348,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried.)*
 
 | pair | shared? |
 |---|---|
@@ -1162,6 +1361,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it 🔴🔴 **2026-09-14: this firing is DISCHARGED, and the answer is negative.** The seam is not a thing a seating was going to do — `looprun --mode bench` with no `--skip` cannot run, because its `--image` pre-flight requires the file `S3` creates. Measured at the desk with two refusing arms and a control that passed the same guard, for **zero power cycles**. ⚠️ So the clause's only new firing at eight entries was real and its subject turns out to be a tool defect rather than a missing measurement — which is a reading about the clause too: it names a *thing*, and a thing can be impossible. |
 | `R1-pub + R2c` → `R1z` 🆕 | **no, and the reason is the clause's own discipline.** Both residual sets contain an instrument that could not be asked about its own subject — `hazpay`'s `check_controls` inspecting 2 of 26, and this census being blind to a paid debt — but that is the same SHAPE, not the same THING. Every previous firing named one item both entries carry verbatim (`CPU-45`; `S2`→`S7` in one invocation; a same-instant read of two counters). **A clause that fires on a resemblance measures the reader, not the ledger** |
 | `R5` → `R1-pub + R2c` 🆕 | **yes — a same-instant read of two kernel counters.** `R5` carries it as `D4` naming `/proc/timer_list`, *which exists in this kernel and cannot carry the property the row wanted — two counters read atomically*. `R1-pub` carries it as `D-cost`'s `E5` requiring `Δirq_count == Δjiffies` on every rung, failing **5 of 64**, and the one `/proc` file that serves both not sampling them together. 🔴 **The sentence that connects them is inside `R5`'s own bullet** — it says the substitute `R5-2` used *carries both counters inside one `spin_lock_irqsave`*, which is true of the pair `R5` used and **false of the pair `R1-pub` needed**: 讀 `drivers/clocksource/rtl819x-timer.c`, `j = get_jiffies_64()` is at line 2001 inside the lock held from 1998 to 2042, and `irq_count` is read live at line 2147, **105 lines after the unlock** |
+| `R1z` → `P1` 🆕 | **no, and the reason is one no previous non-firing has used: the single item both entries carry, they carry because `P1` CLOSED it.** `R1z`'s last ⚠️ is *"`RECIPE_ID` moved … the next card must re-derive `RLXFW-ID0`"*; the next segment found the superseded `c433013b` in three places here, its own step row says *"The next card was about to predict `MT-ID` against it"*, and the board then printed `RLXFW-ID0=BB684EB0`. This file's own rule governs — *a residual that a later gate closes is removed from the clause's input by being closed, not by being edited out*. ⚠️ The rest of the two sets do not touch: `R1z`'s residuals are about this repository's record, `P1`'s about a design table that over-declares on three rows and a denominator its own does-not-establish list got wrong |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -1330,6 +1530,110 @@ random), and because inventing a category that makes a rule fire is the same
 circularity as changing a rule that failed to fire, wearing the other coat. **It
 is recorded so the tenth entry can decide it with this one in view** — which is
 the only thing that stops the decision being made twice by accident.
+
+### 🆕 At eleven entries the clause does not fire, and the reason is one no previous non-firing has used
+
+**What the new pair shares is one item, verbatim, in both entries — and `P1`
+CLOSED it.** `R1z`'s last ⚠️ reads *"`RECIPE_ID` moved … the next card must
+re-derive `RLXFW-ID0`."* The very next segment found the superseded value
+`c433013b` written in three places in this repository and its own step row says
+*"The next card was about to predict `MT-ID` against it"*; the id was recomputed
+from `config/`, the card was corrected before it froze, and the board printed
+**`RLXFW-ID0=BB684EB0`** on both boots. 量 again at this entry, independently of
+any record: `find config -type f | sort | xargs sha256sum | sha256sum | cut -c1-8`
+over 30 files returns **`bb684eb0`**.
+
+This file's own rule decides it: *a residual that a later gate closes is removed
+from the clause's input by being closed, not by being edited out.* So the pair
+does not fire, and it does not fire for the **good** reason rather than the
+absence of one.
+
+🟢 **An observation about the clause itself, recorded and deliberately not made
+into a rule.** There have now been exactly two residuals in this ledger's history
+discharged by a later gate rather than repeated — `P4a`'s *`ID0` has never been
+read off the board*, closed by `R4`'s seating, and `R1z`'s *the next card must
+re-derive `RLXFW-ID0`*, closed by `P1`'s. **Both are the same field.** Two points
+is not a pattern; it is written down so a third can be recognised rather than
+discovered.
+
+⚠️ **The rest of the two residual sets do not touch**, and the ten-entry run's own
+discipline is what says so: `R1z`'s are about this repository's record and `P1`'s
+about a design table that over-declares and a denominator that was miscounted.
+Both gates contain *an instrument that could not be asked about its own subject* —
+which is the same SHAPE the ten-entry run already refused to fire on, and refusing
+it twice is cheaper than inventing a precedent.
+
+### 🔴 The tenth entry was handed a decision and did not make it
+
+The nine-entry run closed with a widening it declined, and with a sentence about
+what to do next: *"It is recorded so the tenth entry can decide it with this one
+in view — which is the only thing that stops the decision being made twice by
+accident."*
+
+量 2026-09-17, by `git show` on `126f659` rather than by re-reading: the tenth
+entry changed **three** things in this section — the heading, one clause in the
+parenthetical, and one row of the pair table. **It did not decide the widening,
+and it did not re-run the census**, although the nine-entry run had pre-registered
+the census as *"re-run rather than assumed"*. A repository-wide grep finds the
+decision made nowhere else either. **So it is made here, one entry late, and the
+lateness is part of the record.**
+
+### 🆕 The widening is declined a second time, and this time by a measurement
+
+The family proposed at nine entries was *a threshold whose scale is not the scale
+of the quantity it judges*: `R5`'s `D4` ±50 ppm bar, *"met by three orders of
+magnitude against a bar that measures the wrong thing"* (entry 8), and `D-cost`'s
+`E4`, a 1 %-of-the-row's-own-Δ tolerance sitting in the noise (entry 9). Adopted,
+it would have fired on a consecutive pair.
+
+**Entry 11 supplies a third instance, and it is what settles the question.**
+`MT-TICK`'s original criterion was `dj > 0 && skew ≤ 2`, and 量 `C10-M28`: with
+`cereload 20000` the line reads **`dj=503 di=503 skew=0`** — the tolerance
+satisfied, on a board whose clock was running at a tenth of its rate — because one
+interrupt advances both counters. That is `D4`'s failure mode exactly: **a bar met
+by construction rather than by the hardware being right.** `E4`'s failure mode is
+the opposite one, a threshold that fires at random.
+
+**So over three points the family splits two against one, and the two that match
+each other are entries 8 and 11, which are not consecutive.** The widening does
+not make the clause fire even on its own terms, and it is declined — 🟢 **for a
+reason that arrived as a reading rather than as an argument, and which removes a
+firing instead of creating one.** That is the opposite of the circularity the
+nine-entry run was guarding against, and it is why the decision is worth having
+waited for.
+
+⚠️ **The honest deduction against it.** The third instance was nominated by the
+entry that also decided the question, which is the shape the clause's own caveats
+warn about. What keeps it admissible is that the reading was not fitted: the
+`NO-TAKE` diagnosis for `M28` was **pre-registered before the board was powered**
+(`bench/2026-09-17/PREDICTIONS-B24-block23.md` §, 讀), and `dj=503 di=503 skew=0`
+was then produced by the die in the same capture that reports the clock wrong.
+
+### 🆕 The census re-run at eleven entries — no fourth, and the weaker class doubles
+
+量 2026-09-17 over the widened population: the `D`-row form is now **38 clauses
+across seven gates** — `R3` 5, `P4b-gate` 4, `R4` 4, `R5` 4, `R1-pub` 13,
+`R1z` 4, `P1` 4 — with the four gates predating the form carrying 13 more in
+numbered- or lettered-question tables. **The three instances are the same three.
+No fourth.** The enforcer stays unwritten, for the reason given at seven entries
+and unchanged by a fourth run of the check.
+
+🔴 **What entry 11 adds is a second instance of the WEAKER class, and the class
+had exactly one.** The nine-entry run recorded it as *an inert token in an
+observable*: `R3`'s `D5` named `ping -c 4`, and `NET-26` measures that this
+image's `ping` ignores `-c` and always sends four — **the row was met because the
+default happened to equal the request.** `P1`'s `D3` is the same thing one layer
+up: it names *the `FLR` bracket*, **no `FLR` ran in this gate**, and the property
+it wanted — the unit unchanged — was delivered by `MT-FLASH-3`'s 32-group map over
+4,186,112 bytes, roughly four thousand times the bracket's 1,024. **The named
+instrument was capable and idle; a different one did the work.**
+
+⚠️ The two sit at entries 4 and 11, so the rule's *consecutive* still does not
+reach them, and the rule is still not changed — the argument at seven entries
+holds: changing a rule because it failed to produce an answer you had already
+reached is how such a rule stops being an instrument. **What is different is that
+the weaker class now has two points and a name**, so the twelfth entry can
+recognise a third rather than rediscover the class.
 
 ### Carried unchanged from the seven-entry run
 

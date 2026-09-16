@@ -215,6 +215,16 @@ REDACTION_ALLOWLIST = {
         'the word, in a row about the default naming scheme. No SSID value is recorded',
     ('SSID / passphrase', 'ssid'):
         'as above, lower case',
+    ('H601 / calibration', 'RFCAL'):
+        "the tail of the CHECK ID MT-RFCAL, added 2026-09-17 by P1-5. The same "
+        "hit was adjudicated one layer down on 2026-09-17: audit-bench-log "
+        "allowlists it because the line the check prints is `hw_sum_ok=1 over "
+        "<n> body bytes` -- a boolean and a length, ruled on in docs/mfgtest.md "
+        "section 4. This is the BROADEST entry on this list: the pattern is "
+        "`rf_?cal` and this excuses the bare token anywhere in SPEC.md. What "
+        "makes that acceptable is that the instrument protecting the CONTENT "
+        "is flashwin scan, which reads bytes and not shapes, and which is run "
+        "over the committed tree as this entry's control.",
 }
 
 

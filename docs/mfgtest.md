@@ -232,12 +232,12 @@ see §5.
 | **`MT-FLASH-1`** | `/proc/rtl819x-spi`, new `rdid` verb | SPI NOR · `FLS-04` | `1C7016` | feed the comparator a wrong id | S — stands in for *a different or dead flash part*, which needs class **T** | n/a |
 | **`MT-FLASH-2`** | `/proc/rtl819x-spi` after `trywrite` | SPI NOR · `FLS-27` | both pointers return `-EOPNOTSUPP`; `n_writes == 0` | build one image with `.flags` not `MTD_CAP_ROM` | S | n/a (build-time); **this is the substitute for the plan's erase/write-back** |
 | **`MT-FLASH-3`** | `/proc/rtl819x-spi-map`, 32 × 32 | flash content · `FLS-26` | 31 of 32 groups identical to the reference; group 0 as recorded | the driver's existing `corrupt` verb, which moved the 4 MiB digest on `C1-NG` | R | 量 — it corrupts the RAM copy, not flash; a reboot clears it |
-| **`MT-TICK`** | `/proc/rtl819x-timer` ~~+ `/proc/interrupts`~~ 🔴 **the second input was never implemented — see § 9.4** | TC1 · `CLK-27` | `ce_live=1`, `ce_mode=2`, `irq_spurious=0`, `irq_stuck=0`, `Δjiffies == Δirq_count` **and `ce_reload == ce_reload_hz`** | `cereload` to a wrong value ~~: the ratio breaks~~ 🔴 **the ratio does NOT break — one interrupt advances both counters, so the old criterion is GREEN with the clock at a tenth of its rate. 量 `C10-M28`: `dj=503 di=503 skew=0` while `reload=20000 want=2000`. What breaks is the driver's own `-ERANGE` criterion** | R | 量 — seating 13 did six reloads over four values and came back each time |
+| **`MT-TICK`** | `/proc/rtl819x-timer` ~~+ `/proc/interrupts`~~ 🔴 **the second input was never implemented — see § 9.3** *(this read § 9.4 until 2026-09-17; § 9.4 is the shell's two properties)* | TC1 · `CLK-27` | `ce_live=1`, `ce_mode=2`, `irq_spurious=0`, `irq_stuck=0`, `Δjiffies == Δirq_count` **and `ce_reload == ce_reload_hz`** | `cereload` to a wrong value ~~: the ratio breaks~~ 🔴 **the ratio does NOT break — one interrupt advances both counters, so the old criterion is GREEN with the clock at a tenth of its rate. 量 `C10-M28`: `dj=503 di=503 skew=0` while `reload=20000 want=2000`. What breaks is the driver's own `-ERANGE` criterion** | R | 量 — seating 13 did six reloads over four values and came back each time |
 | **`MT-WDT`** | `/proc/rtl819x-wdt` | watchdog · `FW-52` | `wdtcnr_at_probe = A5000000`; ~~the ten `ovselN` rows exact~~ (the script checks two fields, not ten); `state_name = BOOTGUARD` | ~~`kickms` long enough that the bite falls outside the window~~ 🔴 **`kickms` moves NEITHER field the script reads; it lets the hardware bite, which ends the boot rather than reddening the check. `stop` — the physical counterpart of fixture row `M15`** | R | 量 — `bootguard` restores it, read back in the same field. 🔴 ~~**Ordered last: the pass path resets the board**~~ **the implemented pass path issues no verb and resets nothing; the ordering rule was about this table, not about the script** |
 | **`MT-LED`** | `/proc/rtl819x-gpio`, `/sys/class/leds/*/brightness`, **and the operator's eye** | LED · `BRD-13` (driver: none) | `dat` bit 6 clears, `n_set_ok` increments, `n_writes` increments, operator sees LED #2 of eight lit | `lock 6` first: the write is refused **before** it happens, `n_writes` unmoved, the lamp does not change | R | 量 — `unlock 6` restores it; both directions ran at seating 20 |
 | **`MT-BUTTON`** | `/proc/rtl819x-keys` | button · `BRD-05`, `REG-28` (driver: none) | 🔴 ~~a 3 s hold at 20 Hz gives `(n_open, n_poll)` `(1, 60)`~~ **that pair comes from the OPEN, not from the press, and reading it as the press is what made the first implementation score a quantity nothing in it caused.** Three terms: `n_open` moved (the node opened), `n_poll` moved (the poller ran), **`b0_n_press` moved** (a debounced press was seen) | do not press: **`b0_n_press` stays flat while the first two MOVE** | P | 量 — the flat control already ran at seating 20 |
-| **`MT-PORT`** | vendor `/proc/rtl865x/port_status` 推 | Ethernet · **no Linux-state id** — every `NET-*` is loader-state | link up on the connected port, and the output **names the vendor driver** | unplug the cable | P | 量 — plug it back in |
-| **`MT-MAC`** | `H601` header + body, in the kernel, **verdict only** | `H601` · see §4 | signature `H6`, version `1`, body checksum 0, MAC not all-`00`, not all-`FF`, group bit clear | feed the parser a synthetic buffer (`$FWRE_WORK/h601-synth.bin`) | S — stands in for *清 MAC*, which is **permanently forbidden** | n/a |
+| **`MT-PORT`** | vendor `/proc/rtl865x/port_status` 推 | Ethernet · **no Linux-state id** — every `NET-*` is loader-state | link up on the connected port, ~~and the output **names the vendor driver**~~ 🔴 **the second conjunct was never implemented — 量 2026-09-17 (`P1-5`), `mt_port` prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the PORT. It is the conjunct `R6` needs** (the plan's own ordering note: the port check runs against the *vendor's* driver until `R6` lands, so the output has to say which one served it, or the historical numbers mean nothing afterwards). Carried to `R6-0`; § 9.9 | unplug the cable | P | 量 — plug it back in |
+| **`MT-MAC`** | `H601` header + body, in the kernel, **verdict only** | `H601` · see §4 | signature `H6`, version `1`, ~~body checksum 0,~~ MAC not all-`00`, not all-`FF`, group bit clear | feed the parser a synthetic buffer (`$FWRE_WORK/h601-synth.bin`) | S — stands in for *清 MAC*, which is **permanently forbidden** | n/a |
 | **`MT-RFCAL`** | the same read, the same verdict | `H601` · see §4 | the 8-bit sum of all `len` body bytes, checksum byte included, is 0 | the same synthetic buffer with one byte moved | S | n/a |
 | **`MT-DDR`** | 🔴 **struck, with the reason** | — | — | — | — | — |
 
@@ -392,8 +392,8 @@ on it rather than being left to be discovered.
 * **Nothing the vendor measures with an instrument is covered**: TX power, RX
   sensitivity, PSD, thermal. Four of the vendor's eight areas are outside what
   this project can measure at all.
-* 🔴 **Four of the eleven live rows are class `S`** — simulated at the boundary.
-  They prove the check's logic, not its wiring.
+* 🔴 ~~**Four of the eleven live rows are class `S`**~~ **FIVE — 量 2026-09-17 (`P1-5`), by two independent routes over § 2's own class column: `S` 5 (`MT-ID`, `MT-FLASH-1`, `MT-FLASH-2`, `MT-MAC`, `MT-RFCAL`), `R` 4, `P` 2.** Simulated at the boundary:
+  they prove the check's logic, not its wiring. 🔴 **The sentence and the `MT-ID` row were written in the SAME commit** (`e362ffa`, `git log -S`), so it was wrong on the day it was written rather than gone stale — and **nothing in this repository counts a table column**, which is why a full desk sweep and three closeout audits walked past it. It is the understating direction, in the section whose whole job is to understate nothing.
 * **`MT-PORT` has no Linux-state `SPEC.md` id to cite.** Every `NET-*` row in
   this repository is loader-state. The check reads a vendor `/proc` file whose
   existence in *this* kernel is 推 until the first seating.
@@ -650,11 +650,12 @@ produced `M26`'s exact line because the operator's press and the 20 s window
 were not in the same twenty seconds; `CORRECTIONS-block23.md` § 3 has it. It is
 evidence about the prediction and not an execution of it.
 
-**Zero flash-write commands, zero `FLR`, `n_writes 0` in all eight
-`MT-FLASH-2` readings**, and the 32-group map is **byte-identical** to
+**Zero flash-write commands, zero `FLR`, `n_writes 0` in all ~~eight~~ **nine**
+`MT-FLASH-2` readings** *(量 2026-09-17 (`P1-5`): nine captures carry an `MT-FLASH-2` line, `n_write_refused` stepping 2 → 16 by twos; the ninth is off-card `X11-final`. Every one reads `n_writes=0`, so the claim holds either way and only the count moves.)*, and the 32-group map is **byte-identical** to
 `bench/2026-09-09b` and `bench/2026-09-10` — digest `ae87ac03269985d6` over all
-32 lines, so 4,186,112 bytes are unchanged across eight days and this whole
-seating. `FLS-26`'s ledger does not move.
+32 lines **after `tr -d '\r'`**, so 4,186,112 bytes are unchanged across eight days and this whole
+seating.
+🔴🔴 **That normalisation was not written down until 2026-09-17 (`P1-5`), and without it the digest does not re-derive.** 量: `sed -n '19,50p' X8-M0.log | sha256sum` gives `70484defc9714ecc…`; the published value comes back only with the carriage returns stripped. Every capture here is CRLF. **A reader re-deriving this number from the committed capture concludes the flash moved** — and this is the same root cause as the four false stops of 2026-09-08 (`[ "1\r" = "1" ]` is false), **now on its fourth consumer, the first three being gates and this one a published number.** Negative control: 31 of the 32 lines give a third value, `b4935056fc9b7702…`. `FLS-26`'s ledger does not move.
 
 ### 9.5 The harness can run on the shell the die runs, and already could
 
@@ -682,3 +683,63 @@ fixture here, so this catches shell semantics and nothing about a driver — and
 the two defects it could *not* have caught are exactly the two the die found,
 `FW-87` and the `/proc` side of `FW-88`. Whether CI gains a declared bench-only
 row for a second pass is `P1-5`'s decision.
+
+### 9.9 The other ten rows, swept — and two of them over-declare as well
+
+§ 9.3 found that § 2's `MT-TICK` row named an input the script never read, and
+struck it. **Nothing then looked at the other ten rows.** That is verbatim the
+sentence the eighty-third segment closed with — *a measurement that refutes one
+line usually refutes two more, and nothing in this repository goes looking for
+the other two* — and `P1-5` is the first time something went looking.
+
+量 2026-09-17, each of § 2's eleven pass criteria read against the `chk` call
+that implements it, one row at a time:
+
+| row | § 2's criterion | what the script tests | verdict |
+|---|---|---|---|
+| `MT-ID` | equals `RECIPE_ID`, case-insensitive | a lower-folded string compare | agrees |
+| `MT-FLASH-1` | `1C7016` | `rdid_id` against `$MFG_RDID`, plus `rdid_match` | agrees |
+| `MT-FLASH-2` | both pointers `-EOPNOTSUPP`; `n_writes == 0` | `n_write_refused` moves by 2, `n_writes == 0` | agrees |
+| `MT-FLASH-3` | 31 of 32 groups identical; group 0 as recorded | `map_rc`, `h601_hashed`, `diff_units` — **and the verdict line says so**: *"(digests scored at the desk)"* | agrees, divergence declared in the output itself |
+| `MT-TICK` | ~~+ `/proc/interrupts`~~ | `/proc/rtl819x-timer` only | **over-declared — struck § 9.3** |
+| `MT-WDT` | `wdtcnr_at_probe`; ~~ten `ovselN` rows~~; `state_name` | two fields | agrees, already annotated in § 2 |
+| `MT-LED` | `dat` bit 6 clears, `n_set_ok` ↑, `n_writes` ↑, operator sees it | `lit && b1>b0 && w1>w0`, then the operator prompt | agrees |
+| `MT-BUTTON` | `n_open` moved, `n_poll` moved, `b0_n_press` moved | all three | agrees |
+| `MT-PORT` | link up **and the output names the vendor driver** | link up | 🔴 **over-declares** |
+| `MT-MAC` | sig, version, **body checksum 0**, MAC not `00`/`FF`, group bit clear | sig, version, `hw_len_sane`, `mac_not_zero`, `mac_not_ff`, `mac_group_bit` | 🔴 **over-declares** |
+| `MT-RFCAL` | 8-bit sum over `len` body bytes is 0 | `hw_sum_ok` | agrees |
+
+🔴 **Three rows over-declare, and all three in the same direction**: the table
+claims a conjunct the script does not test, so the table reads stronger than the
+instrument. None of the three is a row that *under*-declares — where the script
+tests more than the table promises, which would be harmless.
+
+**`MT-PORT`.** `mt_port` ends `chk MT-PORT 1 "$MFG_PORT LinkUp"`. The pass line
+names the port. Reading `/proc/rtl865x/port_status` at all implies the vendor's
+switch driver is present — that is true and it is not the same as recording it,
+because the recording is what a later reader needs. 🔴 **This is the conjunct
+`R6` depends on**: the plan's ordering note says the port item runs against the
+*vendor's* driver until `R6` lands, so the output has to say which driver served
+it or the historical numbers stop meaning anything the moment mine does.
+**Every `MT-PORT` line this project has captured is unlabelled.** Carried to
+`R6-0` rather than fixed here: fixing it moves `RECIPE_ID`, and `RECIPE_ID` is
+what `MT-ID` compares against.
+
+**`MT-MAC`.** `mt_h601` gates `MT-MAC` on
+`rc && sig && ver && sane && nz && nf && !gb` and puts `hw_sum_ok` in
+**`MT-RFCAL`'s** condition alone. The script's own comment says why — *one sum is
+both checks' evidence, which is why they are two lines rather than one* — so the
+split is deliberate and, taken by itself, better engineering than the table:
+a broken checksum reddens exactly one check and you can see which. ⚠️ **But the
+consequence is stated nowhere**: a unit with a valid `H6` header, a sane length
+and a usable unicast MAC, over a body whose checksum does not close, scores
+`MT-MAC` **ok**. The table says it would not.
+
+🟢 **What this sweep is, and what it is not.** It is 讀 — eleven comparisons of
+two committed files, no board involved — and it needs no power, which is why it
+could be done in the write-up step at all. It is **not** an instrument: nothing
+here will catch a twelfth row added tomorrow. Whether one gets written is a
+question for a gate with a population to derive it from; **three instances in
+eleven rows is a rate, not a target**, and this file records the rate rather than
+fitting a checker to it.
+
