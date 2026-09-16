@@ -1664,25 +1664,116 @@ def report_tables(findings, stats):
 
 C12_ROW = '| **Next after this** |'
 C12_DATE = re.compile(r'\*\*(20\d\d-\d\d-\d\d)')
-C12_STEP = re.compile(r'`(R\d[0-9a-zA-Z]*(?:-[0-9a-zA-Z]+)*)`')
+
+# 🔄 2026-09-16 (`R1z-1`): `[RPS]` and `/`, where this was `R` and `-`.
+# 量: the old class could not see `P4b-1`…`P4b-4`, `P4a-1`…`P4a-5` or
+# `R2a/b/d-0`…`R2a/b/d-4` -- FOURTEEN step ids across three CLOSED sections,
+# every one of them invisible to a check whose whole job is to ask whether a
+# named step is finished.  It is also why the debt gate had to be called
+# `R1z` and not `P5`: a gate named in the P series could not be checked by
+# the checker that exists to check the row naming it.
+C12_STEP = re.compile(r'`([RPS]\d[0-9a-zA-Z]*(?:[-/][0-9a-zA-Z]+)*)`')
+
+C12_SECTION = re.compile(r'^##\s.*step list', re.IGNORECASE)
+C12_ISO = re.compile(r'20\d\d-\d\d-\d\d')
+C12_NOTID = re.compile(r'[^0-9A-Za-z/_-]')
+
+# The explicit, machine-readable declaration that this gate has closed and the
+# next one is not chosen.  🔄 2026-09-16 (`R1z-1`): before this, NO-STEP-ID was
+# printed and was never a finding, so *the row was deliberately left empty*
+# and *the row was forgotten* had the same output -- and `T23`, which demands
+# at least one step id on the live file, turned the SECOND of those into
+# `REFUSING to report on the file`, taking the whole tool down with it.  An
+# HTML comment because it has to be unmistakable and must not render.
+C12_NOSTEP = '<!-- C12: between gates, no step id -->'
+
+# 🔄 2026-09-16 (`R1z-1`), hole ③.  A step id inside struck-through text or
+# inside a `*( … )*` parenthetical is DESCRIBED, not POINTED AT.  This file's
+# house style strikes a retracted sentence in place and puts the retraction in
+# that parenthetical, so both constructs are exactly where a closed step id
+# legitimately appears in a row about what comes next.  量 2026-09-16: the
+# seventy-seventh segment struck a false sentence in this row, the sentence
+# held a closed step id, and `C12` counted it as the work being pointed at --
+# and the same afternoon a draft of the seventy-eighth named nine closed steps
+# while DESCRIBING the hole, which made `C12` green on nine ids nobody
+# intended to point at.  Removing them can only SHRINK the id set, so this
+# change can only make the check fire more often.
+C12_DESCRIBED = re.compile(r'~~.*?~~|\*\([^)]*\)\*|\*（[^）]*）\*')
 
 
-def progress_step_state(text):
+def _step_row_id(cell):
+    """The step id this first cell IS, or None if the cell merely mentions one.
+
+    🔴 THE CELL MUST BE THE ID, NOT CONTAIN IT.  量 2026-09-16:
+    `| **`cr6c` for `R9`** 🆕 |` is a carried-forward row sitting inside `R3`'s
+    step-list section, and the old guard -- does the line start `| **` and a
+    backtick -- accepted it, so `progress_step_state` returned `R9` as an OPEN
+    STEP.  A `Next after this` row that merely mentioned `` `R9` `` therefore
+    satisfied `C12`.  Stripping decoration and requiring what is left to BE the
+    id rejects it, and accepts every real shape this file uses:
+    `` **`R4-0`** ``, `` `P4b-1` ``, `` ~~**`R1h-0`**~~ ✅ ``,
+    `` ✅ **`R1h-2`** `` (the decoration-BEFORE case `C12-1` recorded) and
+    `` **`R1-pub-0`** ✅ **2026-09-12** ``.
+    """
+    ids = C12_STEP.findall(cell)
+    if len(ids) != 1:
+        return None
+    bare = C12_NOTID.sub('', C12_ISO.sub('', cell))
+    return ids[0] if bare == ids[0] else None
+
+
+def progress_step_state(text, header_closes=True):
     """{step id: is it closed} for every § Step list row.
 
+    `header_closes=False` answers the NARROWER question -- *does this step row
+    carry its own mark* -- and exists because the two are different claims and
+    a caller must say which it wants.  🔴 量 2026-09-16: `tools/cfcensus.py`'s
+    `L6` reports the nine step rows of `R4` and `R1-gate` that carry no `✅`,
+    and when the header rule below landed, `L6` went silent on all nine while
+    the rows were exactly as unmarked as before.  A reader of `PROGRESS.md`
+    still sees nine closed steps with no mark; a checker that stops reporting
+    because a DIFFERENT tool got smarter is a debt paid by nobody.
+
     Read from the FIRST cell only, so a ✅ that appears in a later cell as prose
-    about some other step cannot mark this one closed."""
-    out = {}
+    about some other step cannot mark this one closed.
+
+    🔄 2026-09-16 (`R1z-1`).  Three defects, each measured before it was fixed
+    and each of which made this function report a step as OPEN WORK that had
+    been finished for weeks.  量 on the live file before: 54 ids, 14 open, of
+    which **4** were really open.  After: 72 ids, 4 open, all four real.
+
+      ② A CLOSED SECTION HEADER IS NOW A CLOSURE.  `R4`'s and `R1-gate`'s step
+        rows carry no per-step `✅` under headers that say `CLOSED 2026-09-02`
+        and `closed 2026-08-26` -- nine steps read as open.  A rule keyed on
+        `✅ CLOSED` would still miss four of them, because two headers write
+        lower-case `closed` with no tick, so the test is case-insensitive
+        `closed` on the section header.  It only ever ADDS closure: a step
+        marked `✅` under an open header stays closed, which is what keeps
+        `R1z-0` closed and `R1z-1`…`R1z-4` open.
+      ④ THE ROW GUARD NO LONGER REQUIRES `| **` + a backtick.  `R1h-0`…`R1h-4`
+        are written `| ~~**`R1h-0`**~~ ✅ |` and `| ✅ **`R1h-2`** |`, so all
+        five were ABSENT from this map rather than misclassified -- which is
+        worse than `C12-1` recorded, because an absent id is silently dropped
+        from `C12`'s own `ids` set.
+      ⑦ AND THE ROWS ARE TAKEN FROM STEP-LIST SECTIONS ONLY, with `_step_row_id`
+        deciding what a step row is.  Widening the guard without narrowing the
+        scope would have pulled in every `|`-row in the file.
+    """
+    out, inside, header_shut = {}, False, False
     for ln in text.split('\n'):
-        if not ln.startswith('| **`'):
+        if ln.startswith('## '):
+            inside = bool(C12_SECTION.match(ln))
+            header_shut = (inside and header_closes
+                           and 'closed' in ln.lower())
+            continue
+        if not inside or not ln.startswith('|'):
             continue
         cell = ln.split('|')[1]
-        ids = C12_STEP.findall(cell)
-        if not ids:
+        i = _step_row_id(cell)
+        if i is None:
             continue
-        shut = '✅' in cell
-        for i in ids:
-            out[i] = out.get(i, False) or shut
+        shut = ('✅' in cell) or ('⊘' in cell) or header_shut
+        out[i] = out.get(i, False) or shut
     return out
 
 
@@ -1747,10 +1838,18 @@ def progress_findings(text, path='PROGRESS.md'):
                 'NO-DATE', [])
     newest_date = max(d for d, _b in blocks)
     tail = ' '.join(b for d, b in blocks if d == newest_date)
+    tail = C12_DESCRIBED.sub(' ', tail)
     steps = progress_step_state(text)
     ids = sorted({i for i in C12_STEP.findall(tail) if i in steps})
     if not ids:
-        return ([], 'NO-STEP-ID', [])
+        if C12_NOSTEP in row:
+            return ([], 'NO-STEP-DECLARED', [])
+        return ([('C12', f'{path}: the newest block of `Next after this` '
+                         f'(dated {newest_date}) points at no step of § Step '
+                         f'list.  If the gate has closed and the next one is '
+                         f'not chosen, say so with {C12_NOSTEP}; otherwise '
+                         f'this row has been left behind')],
+                'NO-STEP-ID', [])
     if all(steps[i] for i in ids):
         return ([('C12', f'{path}: the newest block of `Next after this` (dated '
                          f'{newest_date}) names only steps § Step list '
@@ -1760,11 +1859,63 @@ def progress_findings(text, path='PROGRESS.md'):
     return ([], 'ok', ids)
 
 
-C12_STEPS = ('| Step | | What it produces |\n'
-             '|---|---:|---|\n'
-             '| **`R9-1`** ✅ | desk | closed |\n'
+_HEAD = '| Step | | What it produces |\n|---|---:|---|\n'
+
+# 🔄 2026-09-16 (`R1z-1`): the fixture gained a SECTION HEADER, because step
+# rows are now read from step-list sections only.  The header deliberately
+# does not say `closed`, so `R9-3` stays open and every case written before
+# today keeps the verdict it was written for.
+def progress_step_owner(text):
+    """{step id: the gate named by the section header it sits under}.
+
+    🔴 A STEP BELONGS TO ITS SECTION, NOT TO ITS PREFIX.  量 2026-09-16,
+    `tools/cfcensus.py` guessing the owner from the string: `R1g-0` had to be
+    special-cased to `R1-gate`, and `P4b-1`…`P4b-4` were handed to `P4b` --
+    a gate that has not started -- instead of to `P4b-gate`, which closed on
+    2026-09-01.  Four unmarked step rows went unreported because of it.  The
+    section header is the file's own answer and needs no rule.
+    """
+    out, cur = {}, None
+    for ln in text.split('\n'):
+        if ln.startswith('## '):
+            m = re.search(r'`([^`]+)`', ln)
+            cur = (m.group(1).strip()
+                   if (C12_SECTION.match(ln) and m) else None)
+            continue
+        if cur is None or not ln.startswith('|'):
+            continue
+        i = _step_row_id(ln.split('|')[1])
+        if i is not None:
+            out.setdefault(i, cur)
+    return out
+
+
+C12_STEPS = ("## `R9`'s step list — written 2026-01-01\n\n" + _HEAD
+             + '| **`R9-1`** ✅ | desk | closed |\n'
              '| **`R9-2`** ✅ | desk | closed |\n'
              '| **`R9-3`** | desk | open |\n')
+
+# Hole ②: a CLOSED header with no per-step mark anywhere.  Lower-case `closed`
+# on purpose -- two of the live file's ten headers write it that way, and a
+# rule keyed on `✅ CLOSED` leaves four of the nine unmarked steps behind.
+C12_STEPS_SHUT = ("## `R9`'s step list — closed 2026-01-01\n\n" + _HEAD
+                  + '| **`R9-1`** | desk | no per-step mark |\n'
+                  '| **`R9-2`** | desk | no per-step mark |\n')
+
+# Hole ④: the decoration-before-the-id shapes the live `R1h` section uses.
+C12_STEPS_DECOR = ("## `R9`'s step list — closed 2026-01-01\n\n" + _HEAD
+                   + '| ~~**`R9-1`**~~ ✅ | desk | struck then ticked |\n'
+                   '| ✅ **`R9-2`** | desk | ticked first |\n')
+
+# The phantom: a carried-forward row living inside a step-list section, which
+# is what `| **`cr6c` for `R9`** 🆕 |` is on the live file.
+C12_STEPS_PHANTOM = ("## `R9`'s step list — written 2026-01-01\n\n" + _HEAD
+                     + '| **`R9-1`** ✅ | desk | a real step |\n'
+                     '| **`cr6c` for `R9-9`** 🆕 | — | not a step at all |\n')
+
+# The P series, invisible to the old `R`-only id class.
+C12_STEPS_P = ("## `P9-gate`'s step list — ✅ CLOSED 2026-01-01\n\n" + _HEAD
+               + '| `P9-1` | desk | no per-step mark, P series |\n')
 
 _OLD = '🔄 **2026-01-01（第一段）**：下一步是 `R9-3`。'
 _NEW_SHUT = '🔄 **2026-02-02（第二段）**：下一步是 `R9-1`。'
@@ -1806,6 +1957,37 @@ C12_CASES = [
     ('P22 a second **date inside a block does not split it',
      '| **Next after this** | 🔄 **2026-02-02（第二段）**：見 **2026-01-01** 的'
      '判斷，下一步是 `R9-3`。 |', 0, 'ok'),
+
+    # 🔄 P23-P31, 2026-09-16 (`R1z-1`).  Each one is a fixture the version
+    # before today PASSED and this one catches; that is the gate's `D2` and
+    # the reason these are cases rather than a paragraph.  Each carries its
+    # own step list, given as a fifth element.
+    ('P23 ② a CLOSED header closes its steps even with no per-step mark',
+     '| **Next after this** | ' + _NEW_SHUT + ' |', 1, 'FIRE', C12_STEPS_SHUT),
+    ('P24 ② an OPEN header leaves them open -- closure is never removed',
+     '| **Next after this** | ' + _NEW_SHUT + ' |', 0, 'ok',
+     C12_STEPS_SHUT.replace('closed 2026-01-01', 'written 2026-01-01')),
+    ('P25 ④ decoration before the id no longer hides the row',
+     '| **Next after this** | ' + _NEW_SHUT + ' |', 1, 'FIRE',
+     C12_STEPS_DECOR),
+    ('P26 ⑦ a carried-forward row inside a step list is not a step',
+     '| **Next after this** | 🔄 **2026-02-02**：下一步是 `R9-9`。 |',
+     1, 'NO-STEP-ID', C12_STEPS_PHANTOM),
+    ('P27 ① no step id and no declaration is a finding',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：gate 關了。 |',
+     1, 'NO-STEP-ID', None),
+    ('P28 ① no step id WITH the declaration is quiet',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：gate 關了。'
+     + C12_NOSTEP + ' |', 0, 'NO-STEP-DECLARED', None),
+    ('P29 ③ an open id inside ~~struck~~ text does not rescue the row',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：'
+     '~~下一步是 `R9-3`~~ 下一步是 `R9-1`。 |', 1, 'FIRE', None),
+    ('P30 ③ an open id in a *(correction)* does not rescue it either',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：下一步是 `R9-1`。'
+     '*(這一句原本寫 `R9-3`。)* |', 1, 'FIRE', None),
+    ('P31 the P series is visible at all',
+     '| **Next after this** | 🔄 **2026-02-02（第二段）**：下一步是 `P9-1`。 |',
+     1, 'FIRE', C12_STEPS_P),
 ]
 
 
@@ -1820,7 +2002,11 @@ def progress_controls(verbose=True):
     fail = ok = 0
     if verbose:
         print('=== C12 CONTROLS: a fixture step list, and one case per failure ===')
-    for label, row, n_want, state_want in C12_CASES:
+    for case in C12_CASES:
+        label, row, n_want, state_want = case[:4]
+        steps = case[4] if len(case) > 4 else C12_STEPS
+        if steps is None:
+            steps = C12_STEPS
         if row is None:
             # P21: one content, two orders, one verdict.  This is the case that
             # makes the fix a rule rather than a patch -- it fails for EITHER
@@ -1838,7 +2024,7 @@ def progress_controls(verbose=True):
                       f'append {sb!r}/{len(gb)} -- position still decides')
                 fail += 1
             continue
-        got, state, _ids = progress_findings(C12_STEPS + row + '\n', 'fixture.md')
+        got, state, _ids = progress_findings(steps + row + '\n', 'fixture.md')
         good = (len(got) == n_want and state == state_want)
         if good:
             print(f'  ok    {label:58s} {state}, {len(got)} finding(s)')
@@ -1854,7 +2040,17 @@ def progress_controls(verbose=True):
     if os.path.exists(live):
         with io.open(live, encoding='utf-8') as f:
             _f, state, ids = progress_findings(f.read())
-        if state in ('ok', 'FIRE') and ids:
+        # 🔄 2026-09-16 (`R1z-1`): `NO-STEP-DECLARED` is a fourth legal state.
+        # 量, before this: the only way to express *the gate closed and the
+        # next is not chosen* was NO-STEP-ID, which this control calls "passing
+        # without reading anything" -- so `progress_controls` failed, and
+        # `main()` printed `REFUSING to report on the file` and exited 2.  The
+        # file physically could not sit between gates without taking the whole
+        # checker down, which is why `R1z` was opened the same hour `R1-pub`
+        # closed.  The declaration is explicit, so this control still refuses
+        # the case it was written for: a row simply left behind.
+        if state in ('ok', 'FIRE', 'NO-STEP-DECLARED') and (ids or state ==
+                                                            'NO-STEP-DECLARED'):
             print(f'  ok    {"T23 the live row is reached and parsed":58s} '
                   f'state {state}, {len(ids)} step id(s) in the newest block')
             ok += 1

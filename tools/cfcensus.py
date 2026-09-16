@@ -133,11 +133,14 @@ PROGRESS = os.path.join(ROOT, 'PROGRESS.md')
 BEGIN = '<!-- cfcensus:%s begin -->'
 END = '<!-- cfcensus:%s end -->'
 
-# A gate-SHAPED token.  Deliberately broader than `spec-check`'s `C12_STEP`,
-# which is `R` + a digit and therefore cannot see `P1`, `P4b-gate` or `S0` --
-# that narrowness is `C12`'s fourth hole and is why the debt gate had to be
-# called `R1z` and not `P5`.  Broader here means more false candidates, which
-# is why an unresolved candidate is a REPORTED finding and never a silent drop.
+# A gate-SHAPED token.  Still broader than `spec-check`'s `C12_STEP` even
+# after `R1z-1` widened that one to `[RPS]` and `/`: this one has to match a
+# bare GATE name in prose (`R6`, `P4b-gate`, `S0`), where `C12_STEP` matches
+# a backticked STEP id.  🔄 2026-09-16: until `R1z-1`, `C12_STEP` was `R` plus
+# a digit and could not see `P4b-1` or `S0` at all -- which is why the debt
+# gate had to be called `R1z` and not `P5`.  Broader here means more false
+# candidates, which is why an unresolved candidate is a REPORTED finding
+# (`L2`) and never a silent drop.
 GATE_SHAPE = re.compile(r'(?<![0-9A-Za-z-])([RPS]\d[0-9A-Za-z]*'
                         r'(?:[-/][0-9A-Za-z]+)*)(?![0-9A-Za-z-])')
 
@@ -190,7 +193,8 @@ CASE_WHAT = {
     'U12=': 'the ratchet passes at its own baseline',
     'U12+': 'a GROWN debt is red',
     'U12-': 'a SHRUNK debt is red too -- an unrecorded payment is the defect',
-    'U12live': 'the live file sits exactly at BASELINE',
+    'U12live': 'the live file sits exactly at BASELINE, check by check',
+    'U13': 'two checks moving in opposite directions is still red',
     'U8': '`write` refuses a document with no block rather than creating one',
     'U9': "isacensus's shared `doc_block` reads a cfcensus-tagged block",
 }
@@ -429,7 +433,15 @@ def step_state(text):
                       % (sys.version_info[0], sys.version_info[1], e))
     except Exception as e:
         raise Refused('spec-check.py would not import: %r' % (e,))
-    return sc.progress_step_state(text)
+    # 🔴 TWO QUESTIONS, ASKED SEPARATELY.  `marked` is *does this step row
+    # carry its own ✅*; `state` is *is this step closed by anything*, which
+    # from 2026-09-16 includes its section header saying CLOSED.  `L6`'s
+    # subject is the DATA -- nine rows of two closed gates with no mark -- and
+    # asking the wider question would have made `L6` go silent the hour
+    # `spec-check` learned to read the header, with the rows unchanged.
+    return (sc.progress_step_state(text),
+            sc.progress_step_state(text, header_closes=False),
+            sc.progress_step_owner(text))
 
 
 def population(text=None):
@@ -437,25 +449,32 @@ def population(text=None):
     rows, raw, skipped = cf_rows(text)
     board = board_gates(text)
     hdr = header_gates(text)
-    steps = step_state(text)
-    return {'rows': rows, 'raw': raw, 'skipped': skipped,
-            'board': board, 'header': hdr, 'steps': steps, 'text': text}
+    steps, marked, owner = step_state(text)
+    return {'rows': rows, 'raw': raw, 'skipped': skipped, 'board': board,
+            'header': hdr, 'steps': steps, 'marked': marked,
+            'step_owner': owner, 'text': text}
 
 
 # --------------------------------------------------------------------------
 # the join
 # --------------------------------------------------------------------------
 
-def gate_of_step(sid, board):
+def gate_of_step(sid, board, owner=None):
     """The board gate a step id belongs to, or None.
 
-    Longest prefix wins, so `R1-pub-7` resolves to `R1-pub` and not to `R1`.
-    `R1g-*` is the one step family whose prefix is not its gate's name -- the
-    gate is `R1-gate` -- and it is mapped by name because guessing it from the
-    string would be a rule with one instance.
+    🔴 THE SECTION HEADER FIRST, THE PREFIX ONLY AS A FALLBACK.  量
+    2026-09-16: the prefix rule needed `R1g-*` special-cased to `R1-gate`, and
+    it still handed `P4b-1`…`P4b-4` to `P4b`, a gate that has not started,
+    rather than to `P4b-gate`, which closed on 2026-09-01 -- so four unmarked
+    step rows went unreported by `L6` and the miss looked like clean data.
+    `spec-check.progress_step_owner` reads the header the rows sit under,
+    which is the file's own answer; `GATE_ALIAS` maps a composite header such
+    as `R1-pub + R2c` onto its board row.
     """
-    if sid.startswith('R1g-'):
-        return 'R1-gate' if 'R1-gate' in board else None
+    if owner and sid in owner:
+        g = GATE_ALIAS.get(owner[sid], owner[sid])
+        if g in board:
+            return g
     best = None
     for g in board:
         if sid == g or sid.startswith(g + '-'):
@@ -464,7 +483,7 @@ def gate_of_step(sid, board):
     return best
 
 
-def resolve(owner_cell, board, hdr, steps):
+def resolve(owner_cell, board, hdr, steps, sowner=None):
     """(resolved, unresolved) -- gate ids in the cell, split by whether the
     populations know them.  Strikethrough ids are dropped: `~~R3~~ → R1h` is a
     handover, and the struck half is history, not an owner."""
@@ -480,7 +499,7 @@ def resolve(owner_cell, board, hdr, steps):
         elif tok in hdr:
             resolved.append((tok, hdr[tok][0], 'header'))
         elif tok in steps:
-            g = gate_of_step(tok, board)
+            g = gate_of_step(tok, board, sowner)
             shut = steps[tok] or (g is not None and board[g] == 'CLOSED')
             resolved.append((tok, shut, 'step'))
         else:
@@ -488,10 +507,10 @@ def resolve(owner_cell, board, hdr, steps):
     return resolved, unresolved
 
 
-def owner_kind(row, board, hdr, steps):
+def owner_kind(row, board, hdr, steps, sowner=None):
     """One of LIVE / ORPHAN / ORPHAN? / DEAD / SEGMENT / NONE, with evidence."""
     cell = row['owner_cell']
-    resolved, unresolved = resolve(cell, board, hdr, steps)
+    resolved, unresolved = resolve(cell, board, hdr, steps, sowner)
     low = cell.lower()
     if resolved:
         live = [t for (t, shut, _) in resolved if not shut]
@@ -540,7 +559,8 @@ def census(pop=None):
     board, hdr, steps = pop['board'], pop['header'], pop['steps']
     out = []
     for r in pop['rows']:
-        kind, ev, resolved, unresolved = owner_kind(r, board, hdr, steps)
+        kind, ev, resolved, unresolved = owner_kind(
+            r, board, hdr, steps, pop['step_owner'])
         d = dict(r)
         d['hints'] = hints(r)
         d['kind'] = kind
@@ -602,17 +622,17 @@ def check(pop=None, exempt=None):
     # is reported by `population` and is not a finding.
 
     # ---- direction 2b: a closed gate's steps must be marked closed -------
-    steps, unmarked = pop['steps'], {}
+    steps, unmarked = pop['marked'], {}
     for sid, shut in steps.items():
         if shut:
             continue
-        g = gate_of_step(sid, board)
+        g = gate_of_step(sid, board, pop['step_owner'])
         if g and board[g] == 'CLOSED':
             unmarked.setdefault(g, []).append(sid)
     for g in sorted(unmarked):
         f.append('L6 %s: the gate board says CLOSED and %d of its step rows '
-                 'carry no ✅ in the first cell (%s) -- so `spec-check`\'s '
-                 '`progress_step_state` reads them as open work'
+                 'carry no ✅ of their own (%s) -- a reader of the step table '
+                 'sees finished work with no mark on it'
                  % (g, len(unmarked[g]), ' '.join(sorted(unmarked[g]))))
 
     # ---- L10: one id, one row -------------------------------------------
@@ -799,34 +819,53 @@ def report_check():
 # recorded, and that is red too, because a payment nobody writes down is how
 # this table came to have 44 orphans.  `T13b`'s shape: an exemption that stops
 # being load-bearing must force its own removal.
-BASELINE = 85
+# 🔴 PER CHECK, NOT A TOTAL -- and the total is what this was until it was
+# caught by its own first real event.  量 2026-09-16, one hour after the
+# ratchet landed: `R1z-1` made `spec-check` stop returning the phantom step
+# `R9` (`L7` 1 → 0) and, in the same edit, made the `P` series visible so a
+# fifth unmarked step family appeared (`L6` 2 → 3).  **The total stayed at 85
+# and the ratchet went green**, on a run in which two different things moved.
+# That is this repository's own recorded trap -- a pair of wrong numbers is
+# self-consistent as long as the difference is right -- reproduced inside the
+# instrument written to prevent it.
+BASELINE = {'L1': 44, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 16, 'L10': 2}
+# 量 2026-09-16, `R1z-1`, 86 findings.  `L6` moved 2 → 4 inside that step and
+# BOTH moves were the checker getting stricter rather than a debt appearing:
+# `P4a`'s five step rows became visible when the id class stopped being
+# `R`-only, and `P4b-gate`'s four arrived when a step stopped being attributed
+# to a gate by its PREFIX -- `P4b-1` had been handed to `P4b`, which has not
+# started, instead of to `P4b-gate`, which closed on 2026-09-01.  Eighteen
+# unmarked step rows across four closed gates, where the record said nine.
 
 
 def ratchet(pop=None, baseline=None, exempt=None):
-    BASE = BASELINE if baseline is None else baseline
+    BASE = dict(BASELINE if baseline is None else baseline)
     f = check(pop, exempt=exempt)
-    n = len(f)
     by = {}
     for ln in f:
         by[ln.split()[0]] = by.get(ln.split()[0], 0) + 1
+    keys = sorted(set(BASE) | set(by))
+    moved = [(k, BASE.get(k, 0), by.get(k, 0))
+             for k in keys if BASE.get(k, 0) != by.get(k, 0)]
     detail = ' '.join('%s %d' % (k, by[k]) for k in sorted(by))
-    if n > BASE:
-        print('FAIL the debt GREW: %d finding(s) against a baseline of %d'
-              % (n, BASE))
+    if moved:
+        grew = [m for m in moved if m[2] > m[1]]
+        print('FAIL the debt moved and `BASELINE` did not:')
+        for k, want, got in moved:
+            print('     %-4s baseline %-3d now %-3d   %s'
+                  % (k, want, got, 'GREW' if got > want else 'shrank'))
         print('     %s' % detail)
-        print('     A new row with no live owner is a new debt.  Give it an '
-              'owner, or raise BASELINE in the commit that adds the row and '
-              'say why.')
+        if grew:
+            print('     A new row with no live owner is a new debt.  Give it '
+                  'an owner, or raise its `BASELINE` entry in the commit that '
+                  'adds the row and say why.')
+        else:
+            print('     Lower the entry in the same commit as the fix.  A '
+                  'payment nobody records is how this table reached 44 '
+                  'orphans.')
         return 1
-    if n < BASE:
-        print('FAIL the debt SHRANK and the baseline did not: %d finding(s) '
-              'against a baseline of %d' % (n, BASE))
-        print('     %s' % detail)
-        print('     Lower BASELINE to %d in the same commit as the fix.  A '
-              'payment nobody records is how this table reached 44 orphans.'
-              % n)
-        return 1
-    print('  ok  %d finding(s), exactly the baseline' % n)
+    print('  ok  %d finding(s) in %d check(s), every one exactly the baseline'
+          % (len(f), len(by)))
     print('      %s' % detail)
     return 0
 
@@ -1036,14 +1075,25 @@ def self_test():
         with contextlib.redirect_stdout(io.StringIO()):
             return ratchet(pop, baseline=base, exempt=ex)
 
-    case('U12=', rc(one, 1) == 0, 'the ratchet failed at its own baseline')
-    case('U12+', rc(one, 0) == 1, 'a GROWN debt was not reported')
-    case('U12-', rc(one, 2) == 1,
+    case('U12=', rc(one, {'L1': 1}) == 0,
+         'the ratchet failed at its own baseline')
+    case('U12+', rc(one, {'L1': 0}) == 1, 'a GROWN debt was not reported')
+    case('U12-', rc(one, {'L1': 2}) == 1,
          'a SHRUNK debt was accepted -- a payment nobody records is the '
          'defect this ratchet exists for')
     case('U12live', rc(None, None, None) == 0,
-         'the live file is not at BASELINE=%d; if a debt was paid or added '
-         'in this commit, move BASELINE in it and say why' % BASELINE)
+         'the live file is not at BASELINE=%r; if a debt was paid or added '
+         'in this commit, move that entry in it and say why' % (BASELINE,))
+    # 🔴 The control on the per-check shape.  A TOTAL-only ratchet passes when
+    # two checks move in opposite directions, which is exactly what happened
+    # an hour after the first version landed.  This fixture holds the total
+    # still and moves two checks, and the ratchet must still be red.
+    swap = dict(BASELINE)
+    swap['L1'] = swap['L1'] + 1
+    swap['L2'] = swap['L2'] - 1
+    case('U13', rc(None, swap, None) == 1,
+         'two checks moved by equal and opposite amounts and the ratchet '
+         'passed on the unchanged total -- the defect this shape exists for')
 
     # ---- L10: duplicate ids ---------------------------------------------
     t = _fixture(rows_md=['| `A-1` 🆕 | q | `R6` |', '| `A-1` 🆕 | r | `R6` |'])
