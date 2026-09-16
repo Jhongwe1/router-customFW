@@ -391,6 +391,53 @@ and no table contains is the shape this file's § 5.3 exists to prevent.**
 | `lu_alu_d0` | `dev = open`, pre-registered | this repository would be quoting a reading it has never taken |
 | the table | `lock != open` for a `haz` row, `lock == open` for a `ctl` row | a row that cannot distinguish would read `LOCK` whatever the die did |
 
+🔴🔴 **2026-09-16: the `per row` line above was declared here and in
+`tools/isa-hazard.tsv:60-63`, and until today NOTHING ENFORCED IT.** 量:
+`hazpay`'s `check_controls` selected only rows whose `kind` is `ctl`, and there
+are **2** of those against **24** per-row controls — so it inspected 2 of 26
+declared controls and returned *no findings* while the same run printed three
+failures on screen. On `bench/2026-09-14/C1-P5j.log` the three `cp0` rows read
+`ctl read 0x80500270, want 0x5A5A5A50`, the verdict tally read `VOID 3`, and the
+exit code was **0**.
+
+🔴 **And the device side was blind to the same three rows for a different
+reason.** `tools/rlxprobe/probe5.c`'s header counter `aux.zero` tests
+`scratch[9] == 0u` — *rows whose cell never wrote its control*. The wrong value
+was `0x80500270`, which is not zero, so that field read `00000000` and passed on
+the same run. **A declared counter and a declared checker, blind to one set of
+rows, by two unrelated mechanisms.**
+
+🟢 **What enforces it now**, and the shape matters more than the fix:
+
+* The per-row control is **recomputed from the parsed records and the TSV**,
+  never from `verdict_row`'s answer. 🔴 Gating on the `VOID` would have been a
+  check reading its own output, because `verdict_row` is what *produces* that
+  `VOID` from this very comparison — the same defect one layer down.
+* A counted line is printed on **every** run:
+  `per-row controls: 21 of 24 fired, 3 did not (cp0: c0_d0, c0_d1, c0_d2)`.
+  A zero is never printable without its denominator.
+* A failed per-row control is **counted and is not a finding**. A single `VOID`
+  row is `D3`'s legal *not measurable* carrying its reason, and making it a
+  finding would turn a correct `VOID` into a failure. The two findings are the
+  two paths **disagreeing**, and **every** per-row control failing.
+* Negative control: the qemu arm reads `24 of 24 fired, 0 did not`. Positive
+  control: a row whose recomputed control is wrong while its verdict is forced
+  non-`VOID` must produce a finding.
+
+⚠️ **The consequence for the gate is not repaired by any of that.**
+`R1-pub-3`'s DoD clause is *every hazard test's own control fires*, and it reads
+**21 of 24**. The three `cp0` rows are `VOID` and `D3` permits that, but the
+clause says *every*. **It is still not met; it is merely measurable now**, and
+`docs/GATE-RESULTS.md`'s ninth entry says so under *what it did not establish*.
+`SPEC.md` `FW-76`.
+
+🔴 **One more rendering defect from the same run**: the ladder summary printed
+an all-`VOID` family as `open at every rung`. **`VOID` is not `OPEN`** — a reader
+of that line takes it as *the cp0 hazard is exposed at every distance*, which is
+the opposite of *this family could not be measured*. It now reads
+`not measurable at any rung (see the ctl column)`, and the two healthy strings
+are byte-identical to before, so no reading moved.
+
 **The collapse rule is one rule with opposite signs and the parser enforces
 both**, which is `isapay`'s reserved-row trap in the hazard table's own terms.
 Its ancestor is a recorded defect: `isapay`'s first `T_JR` template let a `jr`

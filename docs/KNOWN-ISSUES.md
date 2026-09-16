@@ -75,7 +75,9 @@ measurement.
 | ⚠️ **`R3-2`'s `TC-d` half stayed half-done for one step.** | It is carried as a debt in the running-order note rather than counted as a pass. |
 | ⚠️ **`R1h`'s decision ② is still `R1-gate`'s.** | It was answered on the D side by a bare-metal payload, and not by the gate that owned it. |
 | 🔴 **`R5`'s `D4` named an artefact that cannot carry the property, and it is the THIRD time.** | The row asked that *the timer is the system time base and `/proc/timer_list` agrees with `CLK-02` to ± 50 ppm*. `/proc/timer_list` **exists in this kernel** — 讀, `kernel/time/Makefile` carries `obj-y += … timer_list.o` and `timer_list.c` calls `proc_create("timer_list", …)` — and it was never read: `R5-2` used the driver's own `/proc`, which carries both counters inside one `spin_lock_irqsave`, and recorded why in place. **Nor is it a frequency**: `wall`, `jiffies` and TC1 all descend from one divider, so what is 量 is the ratio `TC1 : tick = 2000 : 1` and the absolute 200.005 kHz stays 推. With `R3`'s `D3` (`MemTotal:`) and `P4b-gate`'s `D2` (`study/weekly-results.md`) that is three of eight gates — and they sit at entries 4, 6 and 8, so `docs/GATE-RESULTS.md`'s operating clause, which reads *consecutive*, still cannot see the pattern. 🔴 **A census of all 17 gate-level DoD rows was run at `R5-11` with its refutation condition written first — *a fourth instance nobody already knows about buys an enforcer; only the known three means an instrument fitted to three points should not exist* — and it returned the three. No enforcer was written.** |
-
+| 🔴 **`R1-pub-3`'s control clause is not met, and the instrument that should have said so could not be asked.** | *Every hazard test's own control fires* reads **21 of 24**: three `cp0` rows' per-row `ctl` control did not fire. Those rows are `VOID` and `D3` permits that, but the clause says *every*. `hazpay`'s `check_controls` inspected **2 of 26** declared controls and the probe's own `aux.zero` header field was blind to the same three rows for an unrelated reason — it tests *equal to zero* and the wrong value was `0x80500270`. Both were fixed in the segment that closed the gate; **the clause is still not met, it is merely measurable now.** `SPEC.md` `FW-76`, `docs/isa-hazard.md` § 6 |
+| 🔴🔴 **`R1-pub`'s `D-cost` `E5` is a conjunction and every adjudication of it quoted one conjunct.** | `Δirq_count == Δjiffies` on every rung fails **5 of 64**, all five one-sided, and counting both conjuncts as the sentence is written takes boot 1 to **31.2 %** against that clause's own ¼ void threshold. 🟢 The four costs do not move and the reason is structural: the ruler is `comp_tc1`, `Δirq` is not in it, and both of its terms are snapshotted inside one lock — readable with no reference to the outcome. 🔴 The clause put two properties under one threshold and only one bears on what the threshold protects. `SPEC.md` `FW-75` |
+| ⚠️ **`R1-pub`'s `R2c` half fired a stop-loss whose remedy is impossible, and got no decision.** | The plan caps `R2c` at 2 段; charged three defensible ways it spent 1, 2, or 3–4. The prescribed remedy — drop the third toolchain and ship two columns — cannot be applied, because all three columns are already on silicon. Nothing in this repository counts the segments, and the gate closed with the count recorded three ways rather than with the flattering one taken |
 ---
 
 ## The artefacts
@@ -154,6 +156,32 @@ because mainline is zero-write through `R9`.
 `TC-45`); and whether confining `-DRLXFW_SRC_ID` moves the product — it does
 not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
 *Arriving*: ✅ ~~🔴 **whether the public RTL8196E ports derive from the vendor's `arch/rlx`.**~~ 🟢 **ANSWERED 2026-09-11 (`R5-9`): they do not, with one file's exception.** The derivation check ran with its ordering constraint intact — pre-registration in `git log` eighty-five seconds before the clone — and read `shibajee` INDEPENDENT on every domain it implements and `ggbruno` DERIVED on `prom.c` alone, four `BSP_` UART macros in the early console path. ⚠️ **It does NOT clear `R5-5`.** That step's independence was already spent on the vendor side by `docs/blind-write-ledger.md` § 4.5, which is a different question from this one and is not touched. `docs/driver-diff.md` § 2.
+
+* 🔴 **Whether an unaligned ACCESS costs an exception on bare metal.**
+  `CPU-15` measured the four unaligned *instructions* — `lwl`, `lwr`, `swl`,
+  `swr` — executing at the loader prompt, and `CPU-75` measured an unaligned
+  *address* costing **915 ns** in Linux user mode. Two states of one machine and
+  neither refutes the other. The deciding experiment is timing the same `lwu2`
+  at the loader prompt; it needs a payload and a seating.
+* 🔴 **Four of the eight instructions on the emulation surface are unpriced**
+  — the unaligned `lh`, `lhu`, `sh` and `sw`. `4b` priced `sync`, `lwu2`, `ll`
+  and `sc`; `E7` required the number to be in the write-up rather than
+  discovered by a reader, and it is (`docs/emulation-surface.md`). The rows are
+  still unpriced.
+* 🔴 **Two counters read at one instant, through this driver's own `/proc`.**
+  Neither `R5` nor `R1-pub` established it — which is what the operating clause
+  fires on at nine entries. 讀 `drivers/clocksource/rtl819x-timer.c`:
+  `j = get_jiffies_64()` is inside the lock held 1998–2042 and `irq_count` is
+  read live at 2147, 105 lines after the unlock. 🟢 Three lines would settle the
+  pairing; what it needs after that is a measurement that the five one-sided
+  differences go away, and 🔴 **if they do not, the mechanism is something other
+  than sampling skew and that is the larger finding** — the gap is symmetric in
+  sign and does not predict five same-sign differences in sixty-four rungs.
+* ⚠️ **Whether `docs/rlx-isa.md` is readable by someone who did not build it.**
+  Every claim in it is *checkable* from a clone — § 9 is that table, and one row
+  of it was a promise the page could not keep until the day the gate closed.
+  **Checkable and readable-by-an-outsider are different properties and only the
+  first is established.** That is a different deliverable and it has no DoD yet.
 
 * ✅ ~~**Whether an interrupt of mine can be delivered at all.**~~
   🟢 **ANSWERED 2026-09-04, seating 12: yes, 119,818 times.** Every one
