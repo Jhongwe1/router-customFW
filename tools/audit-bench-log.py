@@ -136,6 +136,45 @@ ALLOW = [
      "and flashwin scan checks the bytes; this tool checks the topic keyword "
      "and cannot tell a field name from a calibration blob, which is why it "
      "is allowlisted by NAME and not by pattern"),
+    ("line", "S-H601=",
+     "rtl819x-spi 1.2's `h601` VERB mark, a fourth string carrying the "
+     "region's name and a sibling of RLXFW-S-MH601 above -- which does not "
+     "cover it, the two tags differing by one letter. 讀 rtl819x-spi.c:1919, "
+     "`rlxfw_markx(\"S-H601\", (unsigned)rtl819x_spi_h601_rc)`: the value is "
+     "the verb's RETURN CODE and never a byte of the window; the driver emits "
+     "booleans, a version and a structure size for that region and nothing "
+     "else, which docs/mfgtest.md 4 rules on. 量 2026-09-17 (seating 25), "
+     "nine captures, one hit each -- the first in this repository, because "
+     "1.2's h601 verb had never run on silicon before.\n"
+     "🔴 THE NEEDLE IS `S-H601=` AND NOT `RLXFW-S-H601`, AND THAT IS "
+     "MEASURED, NOT TIDINESS. SPEC.md FW-89: rlxfw_mark() interleaves "
+     "character by character with busybox ash's still-flushing output, "
+     "deterministically, at exactly this point in `mfgtest auto` -- so the "
+     "line in all nine captures reads `XFW-S-H601=00000000`, with the `RL` "
+     "consumed by the MT-PORT line it collided with. An entry scoped to the "
+     "full tag would not have matched a single one of them.\n"
+     "\u26a0\ufe0f What that costs is MEASURED, not reasoned. Because the mark "
+     "shares a line with whatever it interleaved into, this entry exempts "
+     "that other text too -- 量 2026-09-17, three probes with the same "
+     "calibration blob: on a DIFFERENT line from the needle it fires (rc 1); "
+     "on the SAME line it does not (rc 0); with no needle anywhere it fires "
+     "(rc 1). The first and third are what make the second a reading rather "
+     "than an assertion. It is a real widening and it is one line wide -- "
+     "and flashwin scan, which reads the BYTES against the reference dump "
+     "rather than a topic keyword, is the check that cannot be widened this "
+     "way at all. 量 2026-09-17: CLEAN over 4,737 committed files"),
+    ("line", "MT-RFCAL",
+     "the RF-calibration CHECK's id from docs/mfgtest.md 2's table, matched "
+     "by the pattern aimed at radio calibration -- the same shape as "
+     "`Calibrating delay loop` above, where a word means something else on "
+     "the line it sits on. The line is "
+     "`ok    MT-RFCAL     hw_sum_ok=1 over <n> body bytes`: a BOOLEAN and a "
+     "length. Both are ruled on in docs/mfgtest.md 4 -- hw_len is "
+     "sizeof(HW_SETTING_T)+1 and identical on every unit of this model, so it "
+     "identifies the MODEL and not this device. Scoped to the line, so a real "
+     "calibration blob still fires. Renaming the check to please a scanner "
+     "would desynchronise it from the table that defines it, which is the "
+     "objection h601_hashed's entry already makes"),
 ]
 
 
