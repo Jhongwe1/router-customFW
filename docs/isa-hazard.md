@@ -154,7 +154,11 @@ The destination is the freshly loaded register and the condition is false. A
 write-enable implementation leaves the load standing; one that read-selects and
 always writes puts the **stale destination** back and destroys the load.
 `notes/kernel-build.md` § 155-160 says this project has never measured which one
-this die has (`TC-h`).
+this die has (`TC-h`). 🟢 **2026-09-14 it did**: `probe5`'s `movrd` rows
+`mr_d0` and `mr_d1` both read `A5A5F00D`, which for this family means
+**write-enable** — the load stands. The internal control is in the same run:
+`mc_d0` reads `DEADBEEF` and `mc_d1` `12345678`, so the instrument is not
+stuck on `LOCK`.
 
 So for that family **`LOCK` means *write-enable*, not *interlocked***, and
 `lu_alu_d0` is the row that separates them: it establishes whether the load

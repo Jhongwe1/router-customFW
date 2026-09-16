@@ -2268,6 +2268,11 @@ put an unmeasured sentence next to eight measured ones.
   image, not corroboration by a second party.
 * **§1.2's conclusion is about a microarchitecture nobody has asked.** The four
   sites are a hazard *if* `movz` reads `rd`, and that is `TC-h`, unmeasured.
+  🟢 **2026-09-14 it was measured and the answer is write-enable** (`probe5`'s
+  `movrd` family, `mr_d0`/`mr_d1` both `A5A5F00D`,
+  `bench/2026-09-14/C1-P5j.log`), **so the four sites are NOT hazards.** This
+  bullet is left standing because it was true when written and because the
+  two days it stayed true after the measurement are the finding (`FW-82`).
 * **§2's eleven hazards are counted by `hazlint` in a mode that has never
   produced a false positive on hand-written `arch/rlx` assembly** — and a
   classifier that has not been shown to be able to fire wrongly on this material
@@ -2283,6 +2288,14 @@ put an unmeasured sentence next to eight measured ones.
 * **§7's flag removes the sites without answering whether they were hazards.**
   If `TC-h` measures `movz` as write-enable on this die, 0.69 % of `.text` was
   bought for nothing — and the finding would be worth more than the bytes.
+  🔴 **2026-09-16: `TC-h` did measure write-enable, and this conditional has
+  fired only HALF.** `hazlint` counts `{rs, rt, rd}` as read for `movz`/`movn`,
+  so a violation is one of three shapes, and the condition-register shape
+  (`movcond`) measured **OPEN** — still a hazard. Whether the 0.69 % was bought
+  for nothing depends on which shape each of the flagless build's **7**
+  violations is, and nothing has classified them. That is a bounded desk
+  experiment: run `hazlint` over one flagless build and split the seven by
+  whether the load writes `rd` or `rt`/`rs`.
 * **§7's count of 31 surviving conditional moves has not been looked at one by
   one.** `hazlint` says none is in a load delay slot, which is the property that
   matters; nothing here says what they are.

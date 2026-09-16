@@ -591,6 +591,10 @@ read by a policy its own source states. Two of the four are on `R3`'s boot path,
 and nothing measured to run on this die — this unit's whole kernel, its `boa`,
 its `busybox`, its loader — carries the pattern at all. Whether they are real
 hazards is `TC-h`, a microarchitectural question nobody has asked this die.
+🟢 **2026-09-14 the die was asked: write-enable** (`probe5`'s `movrd` family,
+`mr_d0`/`mr_d1` both `A5A5F00D`), so the pattern is not a hazard in the shape
+where the load writes the move's DESTINATION. ⚠️ The neighbouring shape, where
+the load writes the CONDITION register, measured OPEN and is.
 ⚠️ **The 21,185 are still not explained**, beyond being what a toolchain that
 does not pad produces.
 

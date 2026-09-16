@@ -36,7 +36,6 @@ ROT	PROGRESS.md	docs/FINDINGS.md	375	bb2be593c5112831	| 🔴 讀 | **`arch/rlx/b
 ROT	PROGRESS.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
 ROT	PROGRESS.md	tools/ledgerscan.py	505	adcf3fd1b132405c	depth = "line" if withln else "name"
 ROT	PROGRESS.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	20901d98fdbb85c2	* They are different quantities that must agree: the first descends fr
-ROT	PROGRESS.md	tools/rlxfw-kbuild.sh	203	843497a555cbe23d	# anti-DoD's build-stamp leg loses its "WHICH of my builds" role the m
 ROT	PROGRESS.md	tools/opcount.py	44	e29c0e802df78873	# 0x13 read ("COP1X", "MIPS-IV") until 2026-08-27, which is the answer
 ROT	PROGRESS.md	docs/loader-command-semantics.md	1054	02497b0b5a347d69	provoke** — `J <addr>` clears `IE` and zeroes `GIMR0` before entering
 ROT	SPEC.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac

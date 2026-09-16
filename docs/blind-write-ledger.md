@@ -754,7 +754,7 @@ is blind of every third-party implementation and of nothing else.
 | `drivers/mtd/mtdpart.c` | line | generic | partition registration |
 | `drivers/mtd/mtdcore.c` | line | generic | — |
 | `drivers/mtd/chips/rtl819x/spi_common.c` | name | **vendor** | named in `SPEC.md`; no extract recorded |
-| `drivers/mtd/chips/rtl819x/spi_common.h` | line | **vendor** | `notes/kernel-build.md:3471` |
+| `drivers/mtd/chips/rtl819x/spi_common.h` | line | **vendor** | `notes/kernel-build.md` § 19.4 |
 | `drivers/mtd/chips/rtl819x/spi_probe.c` | line | **vendor** | `bench/2026-08-31/PREDICTIONS-B5-block3.md:448` |
 | `bootcode/boot/flash/spi_common.c` | name | **loader** | the loader's SPI, `docs/loader-flash-write.md` |
 | `drivers/mtd/chips/rtl819x/spi_probe.c` | **line** | **vendor** | 🔴 **added 2026-09-07 (`R5-5`).** `:101-103` -- `spi_chip_setup()` installs `mtd->read = mtd_spi_read`, `mtd->write`, `mtd->erase` UNCONDITIONALLY, and `:67-71` registers the chip driver as `flash_bank_1`, which is the name `rtl819x_flash.c` hands `do_map_probe`. This is the reading that showed the map layer is not on the path |
