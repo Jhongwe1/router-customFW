@@ -30115,3 +30115,23 @@ FAIL  MT-TICK  reload=20000 want=2000  dj=503 di=503 skew=0
 ---
 
 **零 flash 寫入命令、零 `FLR`、八次 `MT-FLASH-2` 全部 `n_writes=0`、括號不動 0.0244 %、一次電源循環（budget 一次）。**
+
+### 10. 🔴 收工後補記:CI 紅了一道,而那道是我**自己選集合時漏掉的**
+
+推送後 `35143522897` 紅在 **`audit-bench-log (exit-code gate)`**,而它之後的**十三個步驟全部被跳過** —— `capdate`、`procgrow`、`capfield`、`appletcensus`、`flashmap`、`regcensus`、`citecheck` … 一次 push 只看得到一層,這個檔案自己記過這個形狀。
+
+**原因不是工具錯,是我挑了一個集合而沒有跑 sweep。** 收工時我跑的是 `spec-check`／`leakscan --self-test`／`flashwin scan`／`capdate`／`test-file-modes`／`test-boot-timeline`／`mfginject`／`cardcheck`／`check-predictions` —— 九支,憑判斷挑的。而 `CLAUDE.md` 自己寫著:**「上機日之後,把這台跑得動的每一支都跑過,不是只跑程式碼有改的那幾支」**,而 `tools/desk-sweep.py` 會**讀** `ci.yml` 把全部跑一遍。我沒有跑它,理由是時間,代價是一次紅的 CI。
+
+**紅的內容不是外洩。** 18 個命中 = 九份 `mfgtest auto` 擷取各 2 個,是關鍵字 `H601` 與 `RFCAL`:
+
+* 讀 `rtl819x-spi.c:1919`,`rlxfw_markx("S-H601", (unsigned)rtl819x_spi_h601_rc)` —— mark 帶的是 **verb 的回傳碼**,而那支驅動對那個區域只發布林、版本與結構大小。
+* `MT-RFCAL` 那一行是 `hw_sum_ok=1 over 1166 body bytes`,一個布林和一個長度,`docs/mfgtest.md` § 4 早就裁決過。
+* 而**按位元組**的那把尺 `flashwin scan` 對 4,737 個已提交檔案是 **CLEAN**。
+
+🔴 **而 allowlist 的 needle 必須寫 `S-H601=` 不能寫 `RLXFW-S-H601`,這是量出來的。** `FW-89`:mark 和 ash 的 echo 決定性地在**這個位置**交錯,所以九份擷取裡那一行全部讀作 `XFW-S-H601=00000000` —— `RL` 被它撞上的 `MT-PORT` 那行吃掉了。**寫完整 tag 的話,九份一份都比不中。** 今晚寫下的那個發現,幾小時後在另一條路上咬了第二次。
+
+🔴 **而「line scope 的代價」也是量的,不是說的。** 同一段校正資料三個探針:和 needle **不同行** → 開火(rc 1);**同一行** → 不開火(rc 0);**完全沒有 needle** → 開火(rc 1)。**第一和第三個才讓第二個是讀數而不是斷言。** 工具自己的兩個正控制也都還在:九個樣式全部在合成檔上開火、沒有任何控制命中被吞掉。
+
+修完之後,那十三個被遮住的步驟**逐字照 `ci.yml` 的 `run:` 值**跑過,十個全綠 —— 而我第一次跑它們時**重建了三個命令**(`--self-type` 寫成 `--self-test` 而工具吃 `selftest`、`flashmap` 吃 `controls`),得到三個 `rc=2`,**那三個和真失敗長得一模一樣**。那也是這個檔案記過的規矩,在同一個晚上示範了自己。
+
+⚠️ `35144102676` 也會紅,而且**是預期的**:它是修正前的那次推送,帶著同一個缺陷。要看的是 `35145345291`。
