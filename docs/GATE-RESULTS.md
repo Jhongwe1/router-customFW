@@ -1053,7 +1053,7 @@ held and the anti-control forced.**
 
 ---
 
-## The operating clause, re-run at eight entries
+## The operating clause, re-run at nine entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -1062,7 +1062,8 @@ thing make that thing the next gate.
 `P4b-gate` inserted in close order and `R4` appended, which changes the pair set
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
-appended, which adds exactly one pair.)*
+appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
+appended, which adds exactly one pair — and that pair fires.)*
 
 | pair | shared? |
 |---|---|
@@ -1073,6 +1074,7 @@ appended, which adds exactly one pair.)*
 | `P4a` → `P4b-gate` | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
 | `P4b-gate` → `R4` | no |
 | `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it 🔴🔴 **2026-09-14: this firing is DISCHARGED, and the answer is negative.** The seam is not a thing a seating was going to do — `looprun --mode bench` with no `--skip` cannot run, because its `--image` pre-flight requires the file `S3` creates. Measured at the desk with two refusing arms and a control that passed the same guard, for **zero power cycles**. ⚠️ So the clause's only new firing at eight entries was real and its subject turns out to be a tool defect rather than a missing measurement — which is a reading about the clause too: it names a *thing*, and a thing can be impossible. |
+| `R5` → `R1-pub + R2c` 🆕 | **yes — a same-instant read of two kernel counters.** `R5` carries it as `D4` naming `/proc/timer_list`, *which exists in this kernel and cannot carry the property the row wanted — two counters read atomically*. `R1-pub` carries it as `D-cost`'s `E5` requiring `Δirq_count == Δjiffies` on every rung, failing **5 of 64**, and the one `/proc` file that serves both not sampling them together. 🔴 **The sentence that connects them is inside `R5`'s own bullet** — it says the substitute `R5-2` used *carries both counters inside one `spin_lock_irqsave`*, which is true of the pair `R5` used and **false of the pair `R1-pub` needed**: 讀 `drivers/clocksource/rtl819x-timer.c`, `j = get_jiffies_64()` is at line 2001 inside the lock held from 1998 to 2042, and `irq_count` is read live at line 2147, **105 lines after the unlock** |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -1115,6 +1117,48 @@ on in writing at `R5-0` ②, not because a gate inherits its predecessor's
 residuals by default. If the clause is ever read as doing the latter it will
 fire on every pair and stop meaning anything.
 
+### 🆕 At nine entries it fires again, and on something smaller than either
+
+**What the new firing names, in the words of the two entries that share it:**
+
+* `R5`: *"`/proc/timer_list` exists in this kernel … and it was never read.
+  `R5-2` used the driver's own `/proc`, **which carries both counters inside one
+  `spin_lock_irqsave`**"* — and the property `D4` wanted is *two counters read
+  atomically*.
+* `R1-pub`: `D-cost`'s `E5` required `Δirq_count == Δjiffies` on every rung. It
+  fails **5 of 64**, all five one-sided, and the pair it names is not inside that
+  lock together.
+
+🟢 **`R5`'s sentence is not wrong, it is over-general, and that is exactly what
+makes this a pair rather than a repetition.** `R5-2` read `jiffies` against
+`ce_cycles`, and both of those **are** snapshotted inside the lock. The bullet
+generalised from the pair it used to *both counters*, and the pair the next gate
+needed turned out to be a different one in the same file.
+
+⚠️ **The guard this section carries for itself is applied, and it passes.** *A
+gate does not inherit its predecessor's residuals by default; if the clause is
+ever read as doing the latter it will fire on every pair and stop meaning
+anything.* `D-cost`'s block cites neither `R5`'s `D4` nor this file. It required
+the property independently, in its own words, and independently failed to get it.
+**Two gates arriving at one wall from different directions is what the clause is
+for**, and it is a stronger pair than an inherited residual would have been.
+
+⚠️ **And the honest deduction against it.** `R5`'s bullet was written 2026-09-11
+and `R1-pub`'s on 2026-09-16, five days and two sittings apart — but *the reading
+that shows `R5`'s sentence to be over-general* was taken in the segment that wrote
+the ninth entry, by opening the driver. **The pair is real; one half of it is one
+day old**, and the first three runs of this clause carry the same caveat for the
+same reason.
+
+🟢 **What it would cost, because a firing that names something unbuildable is
+not worth having.** Snapshotting `irq_count` inside `rtl819x_tc_lock` in that
+`/proc` read is three lines and needs no new instrument. What it needs after that
+is a measurement that the five one-sided differences go away — and 🔴 **if they do
+not, the mechanism is something other than sampling skew, and that is the larger
+finding**: the gap between the two reads is symmetric in sign, so it does not
+predict five differences of the same sign in sixty-four rungs. **Where the thing
+goes is the owner's**, which is the precedent `CPU-45` set at five entries.
+
 ### The pattern the clause still cannot see, now at three instances
 
 🔴 **At seven entries this section recorded a residual that repeats and that the
@@ -1156,6 +1200,49 @@ met because the default happened to equal the request. That is not the same
 defect — the artefact *could* deliver the property — but it is an **inert token
 in an observable**, and a search of every committed `.md` finds no file that
 puts `NET-26` and `D5` in the same sentence.
+
+### 🆕 The census re-run at nine entries, and what entry 9 adds instead
+
+🔴 **The refutation condition above was pre-registered, so it is re-run rather
+than assumed.** 量 2026-09-16 over the widened population: the `D`-row form is now
+**30 clauses across five gates** — `R3` 5, `P4b-gate` 4, `R4` 4, `R5` 4, and
+`R1-pub`'s `D1`–`D5` plus `D2b` plus `D-cost`'s `E1`–`E7` = **13** — and the four
+gates that predate the form carry **13** more, in numbered- or lettered-question
+tables rather than in `D` rows. **The three instances are the same three. No
+fourth.** The enforcer stays unwritten, for the reason already given.
+
+🔴 **What entry 9 adds is a DIFFERENT shape, three instances deep on its first
+appearance.** Not *a DoD that named an artefact instead of the property it
+wanted*, but **a threshold a correct instrument could not meet**:
+
+* `E4`'s tolerance is 1 % of **the row's own** largest Δ, so it is ~50× stricter
+  on cheap rows — where the absolute noise floor is the same and its share is
+  largest. **A different row failed on each boot**, which is what a threshold
+  sitting in the noise looks like from the outside.
+* `E5`'s second conjunct demanded exact equality of two composites whose own
+  source — the frozen card's § 6.2 — had measured as *"716 **or** 717"*. Allow
+  that ±1 and 0 of 64 rungs fail.
+* `E5`'s first conjunct demanded exact equality of two counters the serving
+  `/proc` file does not sample together.
+
+⚠️ **All three sit at entry 9, so there is no consecutive pair and the clause
+cannot fire on this shape either.** 推, and written down because it is checkable
+later: all three are in one `D-cost` block, and that block was written **late, in
+one sitting, to fill a hole a correction left when it struck *"with a measured
+cost"* out of `D4` and wrote no replacement anywhere**. A shape that appears three
+times in one hurried block and not once in four previous gates is more likely a
+property of how that block was written than of this project's DoDs.
+
+🔴 **And there is a widening that would make it fire, declined here for a stated
+reason.** `R5`'s `D4` records its ± 50 ppm bar as *"met by three orders of
+magnitude against a bar that measures the wrong thing"*. Read as one family — *a
+threshold whose scale is not the scale of the quantity it judges* — that is entry
+8, `E4` is entry 9, **and the pair is consecutive**. It is declined because the
+two fail in opposite directions (one cannot fire at all; the other fires at
+random), and because inventing a category that makes a rule fire is the same
+circularity as changing a rule that failed to fire, wearing the other coat. **It
+is recorded so the tenth entry can decide it with this one in view** — which is
+the only thing that stops the decision being made twice by accident.
 
 ### Carried unchanged from the seven-entry run
 
