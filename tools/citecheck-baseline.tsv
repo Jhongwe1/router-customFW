@@ -34,7 +34,6 @@ ROT	PROGRESS.md	config/rlxfw-kernel.delta	82	5ff8ac5ee469b923	derive CONFIG_GENE
 ROT	PROGRESS.md	LOG.md	5859	6917a92bf34bfd3d	| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根
 ROT	PROGRESS.md	docs/FINDINGS.md	375	bb2be593c5112831	| 🔴 讀 | **`arch/rlx/bsp` is a dangling symlink in two of the three GPL
 ROT	PROGRESS.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
-ROT	PROGRESS.md	tools/ledgerscan.py	505	adcf3fd1b132405c	depth = "line" if withln else "name"
 ROT	PROGRESS.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	20901d98fdbb85c2	* They are different quantities that must agree: the first descends fr
 ROT	PROGRESS.md	tools/opcount.py	44	e29c0e802df78873	# 0x13 read ("COP1X", "MIPS-IV") until 2026-08-27, which is the answer
 ROT	PROGRESS.md	docs/loader-command-semantics.md	1054	02497b0b5a347d69	provoke** — `J <addr>` clears `IE` and zeroes `GIMR0` before entering
@@ -54,7 +53,6 @@ ROT	docs/KNOWN-ISSUES.md	notes/timer-driver.md	273	415d2c4eb64624a2	`kernel/time
 ROT	docs/blind-write-ledger.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It changed what this repository may claim about itself
 ROT	docs/blind-write-ledger.md	notes/timer-driver.md	273	415d2c4eb64624a2	`kernel/time/jiffies.c:37` — `NSEC_PER_JIFFY` is `((u64)NSEC_PER_SEC <
 ROT	docs/blind-write-ledger.md	notes/timer-driver.md	41	862ec0101d49b31f	⚠️ **An earlier draft of this sentence cited `kernel/time/timekeeping.
-ROT	docs/blind-write-ledger.md	tools/ledgerscan.py	505	adcf3fd1b132405c	depth = "line" if withln else "name"
 ROT	docs/blind-write-ledger.md	PROGRESS.md	1353	5453c2e11b271961	| **Last session but twenty-nine** | 🔴 **2026-08-25, desk only, second
 ROT	docs/probe3-cells.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
 ROT	docs/rlx-cache-and-cp0.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac

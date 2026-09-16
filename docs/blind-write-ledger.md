@@ -581,7 +581,7 @@ as *unrecognised*, not as *wrong*, and an unrecognised depth is skipped rather
 than failed. A row that declared `ful1` would be skipped the same way.
 **`LEDGER-3` is that pair of gaps**, and it is carried forward rather than
 fixed here: adding a fourth depth word moves `scan`'s own computation
-(`ledgerscan.py:505` derives `line` or `name` from whether a citation carries a
+(`ledgerscan.py:522` derives `line` or `name` from whether a citation carries a
 line number, and nothing can derive *whole file* from a citation), so it is a
 design change to the tool and not a table edit.
 

@@ -25,6 +25,32 @@ find where that content is NOW.
            NOT red.  This is the declared blind spot and it is 16 citations
            today; a rewritten line is indistinguishable from a deleted one
 
+🔴 THE ORACLE'S UNIT IS A LINE, AND ANY EDIT TO THAT LINE RESETS IT.
+量 2026-09-16 (eightieth segment), by CI going red where the desk was green:
+`PROGRESS.md`'s `LEDGER-3` row cites `tools/ledgerscan.py:505` for a line that
+moved to `:522` long ago.  That rot was KNOWN and on the baseline.  The segment
+appended a re-ownership note to a DIFFERENT CELL of the same row -- and because
+blame is per LINE, the citing line's blame moved to today, so the oracle read
+today's file against today's line number and called it STABLE.  `C4` caught it,
+because the baseline is swept in both directions and a row that stops naming a
+finding is reported.
+
+  * **The baseline header says *repair the citation and the blame moves*.  It
+    does not say that ANY edit to the citing line moves it, and that is the
+    gap.**  The damage is bounded -- laundering can only hide rot that was
+    already rot, and the baseline is the register of exactly those -- but rot
+    that is NEW in the same commit that edits its row is laundered and never
+    recorded.  There is no control for that case.
+  * **In this repository a line is not a sentence.**  量 2026-09-16: 117
+    citations live on 64 lines of `PROGRESS.md`, and one table row carries
+    NINE.  Touching one cell re-blames all of them.
+  * 🔴 **And the desk cannot see any of it.**  On a dirty tree this tool
+    says so -- *their baseline rows are suspended* -- and suspends every
+    baseline row belonging to a modified citing file.  A closeout run at a desk
+    with twenty edited rows is a run with those rows switched off.  **Run it
+    again after the commit, on the clean tree, before pushing.**  That is what
+    CI does and it is why CI saw this and the desk did not.
+
 REFUTATION CONDITIONS, written before the code:
 
   * If this tool reports ~100 % STABLE, it is measuring nothing.  量 2026-09-15:
