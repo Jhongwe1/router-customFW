@@ -659,11 +659,46 @@ def resolve_indexed(relpath, fld, templates, bounds):
     return True, "%s%%d%s with %d < %s[]=%d" % (prefix, suffix, idx, sym, n)
 
 
+#: TYPED, never computed, for the same reason DECLARED is.
+#:
+#: 🔴 量 2026-09-17, and this is the failure C1 exists to catch arriving in C1
+#: itself.  When mt_tick, mt_led and mt_button moved to `snap` + `field
+#: "$MFG_SNAP"`, the regex below stopped matching them: C1 went from **36
+#: reads over 5 drivers** to **22 over 2** and PRINTED `ok`, because its
+#: population floor was `checked >= 15`.  A control that silently covers less
+#: prints the same green as one that covers everything.  C1b -- "the indexed
+#: path must have been taken" -- is what fired.
+DECLARED_READS = 36
+DECLARED_DRIVERS = 5
+
+
 def script_fields():
     """(P_ variable, field name) for every read the script makes, so the
-    check can be per-file."""
+    check can be per-file.
+
+    🔴 A READ THROUGH THE SNAPSHOT IS ATTRIBUTED TO THE FILE THAT WAS
+    SNAPSHOTTED.  `snap "$P_X"` sets the owner for the reads that follow it in
+    the same function; a function boundary clears it, so a `field "$MFG_SNAP"`
+    with no `snap` ahead of it is reported as UNMAPPED rather than silently
+    dropped -- which is the difference between a control that shrinks and one
+    that complains.
+    """
     src = open(SCRIPT, encoding="utf-8").read()
-    return set(re.findall(r'field "\$(P_[A-Z]+)" ([a-z0-9_]+)', src))
+    out = set()
+    owner = None
+    for line in src.splitlines():
+        if re.match(r"^[a-z0-9_]+\(\)\s*\{", line):
+            owner = None
+            continue
+        m = re.search(r'snap "\$(P_[A-Z]+)"', line)
+        if m:
+            owner = m.group(1)
+            continue
+        for pv, fld in re.findall(r'field "\$(P_[A-Z]+)" ([a-z0-9_]+)', line):
+            out.add((pv, fld))
+        for fld in re.findall(r'field "\$MFG_SNAP" ([a-z0-9_]+)', line):
+            out.add((owner or "P_UNSNAPPED", fld))
+    return out
 
 
 def script_commands():
@@ -762,7 +797,12 @@ def main(argv):
     # The population half: a mapping that resolved to nothing would report
     # zero missing, which is what a control that cannot fail prints.
     biggest = max((len(v) for v in cache.values()), default=0)
-    good = not missing and checked >= 15 and biggest >= 30
+    if checked != DECLARED_READS or len(cache) != DECLARED_DRIVERS:
+        missing.append("POPULATION: %d read(s) over %d driver(s); DECLARED_READS "
+                       "says %d over %d.  A control that covers less prints the "
+                       "same green as one that covers everything"
+                       % (checked, len(cache), DECLARED_READS, DECLARED_DRIVERS))
+    good = not missing and biggest >= 30
     print("  %s  %-14s %s" % ("ok  " if good else "FAIL", "C1",
                               "every field the script reads is emitted by the driver "
                               "that owns that file (%d reads, %d drivers, %d by index)"

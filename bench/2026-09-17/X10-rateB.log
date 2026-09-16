@@ -1,0 +1,35 @@
+cat /proc/interrupts; grep jiffies /proc/rtl819x-timer; sleep 5; cat /proc/int
+errupts; grep jiffies /proc/rtl819x-timer
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:      16723        RLX LOPI  serial (0x20)
+ 13:     164998        RLX LOPI  rlx timer (0x620)
+ 25:     158209            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+
+ SW:          0
+ TX:          0
+ RX:          0
+LNK:          0
+ERR:          0
+/bin/sh: grep: not found
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:      17172        RLX LOPI  serial (0x20)
+ 13:     170007        RLX LOPI  rlx timer (0x620)
+ 25:     158710            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+
+ SW:          0
+ TX:          0
+ RX:          0
+LNK:          0
+ERR:          0
+/bin/sh: grep: not found
+# 

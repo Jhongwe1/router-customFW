@@ -1,0 +1,6 @@
+echo unlock 6 > /proc/rtl819x-gpio ; echo 0 > /sys/class/leds/n150rt:green:led
+2/brightness ; /bin/mfgtest led
+mfgtest 1.0  phase=led
+  ok    MT-LED       dat=0000003C bit6=0 n_set_ok 4->5 n_writes 6->7 -- OPERATOR: is LED #2 lit?
+1 of 1 ok, 0 FAIL
+# 

@@ -1,0 +1,6 @@
+MFG_BUTTON_SECONDS=90 /bin/mfgtest button
+mfgtest 1.0  phase=button
+OPERATOR: press and hold the reset button for about 3 seconds, any time in the next 90.
+  ok    MT-BUTTON    n_open 1->2 n_poll 400->2200 b0_n_press 0->1
+1 of 1 ok, 0 FAIL
+# 

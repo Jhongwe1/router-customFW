@@ -244,3 +244,123 @@ against it.
 3. **Score `8 of 9` and carry `MT-TICK` forward.** Refused: `P1-3` is *the whole
    list passes on a good unit*, and a gate that reports success with a row it
    could not read is the failure mode this whole block exists to find.
+
+---
+
+## 3. `C4-BTN`'s window was tied to a conversation turn, and the operator cannot see this console
+
+**Written at 03:35, while the replacement window was open.**
+
+`C4-BTN` ran exactly as § 8.2 types it and returned
+
+```
+  FAIL  MT-BUTTON    n_open 0->1 (open) n_poll 0->400 (poller) b0_n_press 0->0 (press)
+```
+
+🟢 **The first two terms are the night's fix working on the die.** `n_poll`
+moved by **exactly 400**, which is 20 Hz over the 20 s window, and
+`j_last - j_first` is **1,995 jiffies = 19.95 s**. Before § 2.1's fix this
+would have read `0->0` and MT-BUTTON would have failed with a perfect button.
+
+🔴 **The third term did not move, and the driver says why.** Off-card read of
+`/proc/rtl819x-keys` immediately after: **`b0_n_edge 0`**, **`n_ev 0`**,
+`b0_raw 1`, `b0_state 0`. `n_edge` counts RAW pin transitions before any
+debounce, so a 10 ms bounce would have registered. **Nothing touched GPIO 5
+during those 400 polls**, and the poller was demonstrably running throughout.
+
+So this is not the button and not the driver: the window and the operator were
+not in the same 20 seconds.
+
+### The cause is a protocol defect this project had already written down
+
+The operator cannot see this console — `CLAUDE.md` § Environment — so the
+`OPERATOR: press and hold …` line the script prints is never read at the moment
+it is printed. § 3 ④ of the card says exactly that and the window was made 20 s
+*because* of it. **20 s was not enough, because the window's START was still
+tied to a conversation turn**: the operator answers, the answer is read, the
+command is issued, and only then does the window open.
+
+### What is run instead
+
+`C4-BTN2`, off-card: `MFG_BUTTON_SECONDS=90`, `--seconds 130`, and the capture
+is started **in the background** so the instruction to press reaches the
+operator while the window is already open. The operator presses at a moment of
+their own choosing and reports afterwards; nothing about the verdict depends on
+when inside the window the press lands.
+
+🔴 `C4-BTN`'s capture is **kept**. A prediction that was refuted, and the
+refutation, are both part of the record.
+
+### An unplanned instance of `M26`
+
+⚠️ **`C4-BTN`'s line is, letter for letter, the reading § 6 predicts for
+`M26`** — `n_open` and `n_poll` moving while `b0_n_press` stays flat. It is
+**not** scored as `M26`: an injection is a thing that is done on purpose, and
+an accident that produces the same reading is evidence about the prediction,
+not an execution of it. `M26` is still run deliberately, and this capture is
+cited beside it as an independent arrival at the same line.
+
+### Rejected
+
+1. **Score `C4-BTN` as `M26` and re-run only the positive.** Refused, above.
+2. **Shorten the hold instead.** There is nothing to shorten: the pin never
+   moved, so no hold of any length was seen.
+3. **Raise `MFG_BUTTON_SECONDS`'s default from 20.** Not tonight — the default
+   is compiled into an image the rest of this seating is running, and changing
+   it costs a rebuild for a value the card can pass. Carried forward: the
+   default should be the one a bench card actually uses.
+
+---
+
+## 4. Off-card work, declared
+
+Four groups, all after the carded cells, none of them in the fence.
+
+| cell | why it is off-card |
+|---|---|
+| `X6a-unlockoff`, `X6a-dat`, `X6b-lockon` | § 2 of the card gives `M25` in one direction only, and the operator's reading there is *lit* — the same word as `C3-LED`'s. These three run the guard in the OTHER direction so the operator's readings **differ**: off after `unlock`, still off under `lock` with the check asking for ON. A guard seen only refusing is a wall. |
+| `C4-BTN2` | § 3. |
+| `X8-M0` | The 32-group flash map, to bracket the seating. **Byte-identical to `bench/2026-09-09b` and `bench/2026-09-10`** — digest `ae87ac03269985d6` over all 32 lines. |
+| `X10-rateA`, `X10-rateB`, `X10-slow-in`, `X10-slow-out`, `X11-final` | § 9.3's carried-forward item, measured instead of left as a guess — below. |
+
+### 4.1 The independent rate reference works, and the numbers are exact
+
+§ 2.4 records that `MT-TICK` catches a period programmed wrong and says nothing
+about rate, and that the independent reference is the vendor's tick on
+`/proc/interrupts` line 13. 量, same cell shape twice on one boot:
+
+| | Δ line 13 (vendor) | Δ line 25 (mine) | ratio |
+|---|---|---|---|
+| normal | **503** | **503** | **1.000** |
+| `cereload 20000` | **5,009** | **501** | **9.998** |
+
+🟢 **`Δ mine` is ~500 in both.** The kernel's own view of elapsed time is
+identical whether the clock is right or ten times slow, which is exactly why
+an internal comparison cannot see the fault — and the vendor's line 13 is the
+only counter in the system that noticed.
+
+🟢 It also reconciles a number that was already on disk: at the end of the
+seating line 13 minus line 25 read **6,058**, where seating 14 measured that
+difference at **34**. `C10-M28` ran 66.78 s with the clock at a tenth, losing
+`66.78 × 90 ≈ 6,010` ticks; `6,010 + 34 = 6,044`, against 6,058 — **14 ticks
+apart**, and the extra is the `echo cereload` cell either side.
+
+⚠️ **The scope limit, stated rather than found later**: line 13's own rate comes
+from the same timer block, set by `TC0DATA` and `CDBR`. It is independent of
+**this driver's clockevent reload** and **not** independent of the SoC's
+divider — a real clock drift would move both. What it buys is a check that
+`cereload`, and anything else that reprograms TC1 alone, cannot fool.
+
+### 4.2 A cell of mine walked into the trap the card's § 4 names
+
+`X10-rateA`'s first run carried `--idle 4` against a payload whose own `sleep`
+is 5 s. It stopped at **4.28 s**, before the second half of its own output —
+which is § 4's *"No `--idle` shorter than a cell's own `sleep`"*, on an
+off-card cell, written by the same person who wrote the rule an hour earlier.
+Re-run with `--seconds` only. **The rule is in the card and the card is not a
+place a command looks.**
+
+### 4.3 The unit was left clean
+
+`X11-final`, after every injection and every revert: **`9 of 9 ok, 0 FAIL`**,
+`MT-TICK ce_live=1 ce_mode=2 reload=2000=2000 dj=525 di=525 skew=0`.

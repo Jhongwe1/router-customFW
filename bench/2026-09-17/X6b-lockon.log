@@ -1,0 +1,5 @@
+echo lock 6 > /proc/rtl819x-gpio ; /bin/mfgtest led
+mfgtest 1.0  phase=led
+  FAIL  MT-LED       dat=0000007C bit6=1 (want 0) n_set_ok 3->3 n_writes 5->5
+0 of 1 ok, 1 FAIL
+# 

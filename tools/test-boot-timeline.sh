@@ -331,7 +331,13 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # (17 %), and every one of the five distinct failing steps is a `.md` or
 # data-population check that runs at this desk in seconds.  The rule is not
 # "be more careful", it is "after a seating, run the sweep".
-ck "thirty-eight cold, one hundred and sixty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 38 cold, 167 warm, 0 unknown')"
+# 🔄 2026-09-17 (seating 25): 167 -> 169 warm.  Three `J BFC00000` resets
+# and one `busybox reboot -f`; the seating's ONE cold power-on is NOT here,
+# because its rescue capture went to $FWRE_WORK and not to bench/ -- which is
+# why the cold count is unchanged at 38.  This row is the case CLAUDE.md
+# names: a seating moves the POPULATION every census-shaped case reads, and
+# `--only <the suites you touched>` cannot see it.
+ck "thirty-eight cold, one hundred and sixty-nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 38 cold, 169 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -438,8 +444,9 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # shell -- none of them is a jump straight into a reset.  Isolation check: every
 # directory EXCEPT `2026-09-16` still reports n=72, and `2026-09-16` alone
 # reports n=3.
-ck "entry population is seventy-five warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=75')"
+# 🔄 2026-09-17 (seating 25): 75 -> 77, the same two rows as above.
+ck "entry population is seventy-seven warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=77')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="

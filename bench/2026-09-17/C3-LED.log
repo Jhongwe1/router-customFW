@@ -1,0 +1,4 @@
+echo 0 > /sys/class/leds/n150rt:green:led2/brightness ; /bin/mfgtest led
+mfgtest 1.0  phase=led
+  ok    MT-LED       dat=0000003C bit6=0 n_set_ok 1->2 n_writes 3->4 -- OPERATOR: is LED #2 lit?
+1 of 1 ok,

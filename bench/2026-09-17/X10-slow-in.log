@@ -1,0 +1,2 @@
+echo cereload 20000 > /proc/rtl819x-timer
+# 

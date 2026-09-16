@@ -551,7 +551,24 @@ criterion at `rtl819x-timer.c:1544`.
 ⚠️ Both are software values, so this catches a period programmed wrong and says
 nothing about a hardware clock that has drifted. **`/proc/interrupts` line 13 —
 the vendor's tick, which `cereload` does not touch — is still not read, and § 2's
-table said it was.** Carried forward.
+table said it was.** Carried forward — 🟢 **but no longer as a guess.**
+
+量 2026-09-17, the same cell shape twice on one boot with one `cereload`
+between them:
+
+| | Δ line 13 (vendor) | Δ line 25 (mine) | ratio |
+|---|---|---|---|
+| normal | **503** | **503** | **1.000** |
+| `cereload 20000` | **5,009** | **501** | **9.998** |
+
+🟢 **The number that matters is the 501.** `Δ mine` is ~500 in both, so the
+kernel's own view of elapsed time is identical whether the clock is right or
+ten times slow — which is exactly why an internal comparison can never see it,
+and the vendor's counter is the only one in the system that noticed.
+
+⚠️ Line 13's rate comes from the same timer block, so it is independent of
+**this driver's clockevent reload** and **not** of the SoC's divider. `SPEC.md`
+`FW-91`.
 
 ### 9.4 Two properties of this shell, and only one was looked for twice
 
@@ -573,6 +590,71 @@ project could have taken was `0`. `SPEC.md` `FW-88`.
 not asked of a second place. That is the whole lesson of the block: a
 measurement that refutes one line usually refutes three, and nothing in this
 repository looks for the other two.
+
+### 9.6 One of the nine verdict lines is never machine-readable, and it is always the same one
+
+量, eight captures of `mfgtest auto` from this seating: the summary line
+`N of 9 ok, M FAIL` is present in **8 of 8**; a grep for `MT-ID`'s verdict line
+matches in **0 of 8**; and so does a grep for `RLXFW-S-RDID=00000001`, the mark
+that collided with it. Eight of the nine lines are greppable, every time.
+
+The collision is deterministic rather than racy: `mt_id` runs first, `mt_flash1`
+immediately issues the `rdid` verb, and the kernel's `rlxfw_mark()` interleaves
+character by character with busybox ash's still-flushing output — `FW-47` and
+`FW-41`'s family. Both messages are intact and neither is a line.
+
+🟢 **The script's own `DECLARED_auto` is what keeps this from mattering.** A
+phase that runs fewer checks than it declares exits 3 with `POPULATION
+MISMATCH`, so the summary cannot report a smaller green. **The machine-readable
+contract is the summary, not the per-check lines** — and this file's header
+says the line shape is *"the one `tools/ci-census.py` already parses"*, which is
+true for eight of nine and false for the ninth on this console. `SPEC.md`
+`FW-89`.
+
+### 9.7 A question § 4 declined to answer got answered for free
+
+§ 4's guard prefixes every LED cell with `echo 0`, on the stated ground that
+whether this kernel's LED class short-circuits an unchanged brightness is *"not
+known here"*. 量 `C8-M25r`: the `echo 0` was sent while the lamp was already
+off — `X6b` had just read `dat 0000007C` — and `n_set_ok` still moved **3 → 4**
+with `n_writes` **5 → 6**. **An unchanged brightness still reaches
+`gpio_set_value()`.** The prefix stays: it is redundant insurance now rather
+than a necessary evasion. `SPEC.md` `FW-90`.
+
+### 9.8 What `P1-3` and `P1-4` actually returned
+
+**`P1-3`, 11 of 11 on a good unit.** Nine automatic in `C1-AUTO2`
+(`9 of 9 ok, 0 FAIL`), `MT-LED` in `C3-LED` with the operator reading LED #2 of
+eight lit and #1 and #4 unchanged, `MT-BUTTON` in `C4-BTN2` with
+`n_open 1->2 n_poll 400->2200 b0_n_press 0->1` — `+1800` polls being 20 Hz over
+the 90 s window, exactly.
+
+**`P1-4`, five physical injections, five real kills, each specific:**
+
+| id | typed | red line | revert, measured |
+|---|---|---|---|
+| `M25` | `lock 6` | `dat` unchanged, `n_set_ok 2->2`, `n_writes 4->4`, **and the lamp never went out** | `unlock 6` → `1 of 1 ok`, lamp obeys |
+| `M26` | nothing | `n_open 2->3`, `n_poll 2200->2600`, **`b0_n_press 1->1`** | none needed; `C4-BTN2` is the positive |
+| `M27` | `corrupt 0x9000` | `diff_units=1`, and **only** `MT-FLASH-3` red | `corrupt off` → `9 of 9` |
+| `M28` | `cereload 20000` | `reload=20000 want=2000` **while `dj=503 di=503 skew=0`** | `cereload 2000` → `9 of 9` |
+| `M29` | `stop` | `state=STOPPED (want BOOTGUARD)` | `bootguard` → `9 of 9` |
+
+🟢 **`M25` was read in both directions, with photons.** Locked, a request to
+turn the lamp OFF left it lit; unlocked, the same request turned it off;
+locked again, a request to turn it ON left it off. Three operator readings, and
+the middle one is the only reason the other two discriminate — a guard seen only
+refusing is a wall.
+
+🔴 **`M26`'s first arrival was an accident and is recorded as one.** `C4-BTN`
+produced `M26`'s exact line because the operator's press and the 20 s window
+were not in the same twenty seconds; `CORRECTIONS-block23.md` § 3 has it. It is
+evidence about the prediction and not an execution of it.
+
+**Zero flash-write commands, zero `FLR`, `n_writes 0` in all eight
+`MT-FLASH-2` readings**, and the 32-group map is **byte-identical** to
+`bench/2026-09-09b` and `bench/2026-09-10` — digest `ae87ac03269985d6` over all
+32 lines, so 4,186,112 bytes are unchanged across eight days and this whole
+seating. `FLS-26`'s ledger does not move.
 
 ### 9.5 The harness can run on the shell the die runs, and already could
 
