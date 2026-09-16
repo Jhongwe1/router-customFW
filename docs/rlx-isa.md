@@ -31,15 +31,22 @@ description of **one die**, in one router, with no spare. Nothing here distingui
 implements X*. Where a second unit exists in this project it is a different board
 and has never run any of these payloads.
 
-🔴 **Does not claim ② — that the gate behind it is closed.** `R1-pub` has five open
-steps as of this dateline. Two of its Definition-of-Done rows are unmeasured, and
-§ 8 names them, says what this page will be able to say when they land, and states
-what outcome would refute that. **The write-up is early on purpose.** A document
-written after the evidence can only agree with it.
+🔴 ~~**Does not claim ② — that the gate behind it is closed.** `R1-pub` has five open
+steps as of this dateline. Two of its Definition-of-Done rows are unmeasured~~
+🔄 **2026-09-16: `R1-pub` closed, and this clause expired with it.** § 11 is the
+verdict on every pre-registration § 8 made, and `docs/GATE-RESULTS.md` holds the
+gate's ninth entry. What the clause still buys is the part that does not expire:
+§ 8 names each open row, says what this page will be able to say when it lands, and
+states what outcome would refute that. **The write-up was early on purpose.** A
+document written after the evidence can only agree with it — and § 11 is where a
+reader can check which way each one went without taking anybody's word for it.
 
-🔴 **Does not claim ③ — a cost.** Every *how much does the emulation cost* question
-is `R1-pub-4b` (`D-cost`), which needs a clock and a seating and has not run.
-§ 4 says which rows are on the surface; it does not say what any of them costs.
+🔴 ~~**Does not claim ③ — a cost.** Every *how much does the emulation cost* question
+is `R1-pub-4b` (`D-cost`), which needs a clock and a seating and has not run.~~
+🔄 **2026-09-16: `4b` ran on seating 24 and four rows are priced** — § 11.2, and
+`docs/emulation-surface.md` owns them. § 4 still says only which rows are on the
+surface; **the costs are not folded into it**, because two of the four priced rows
+have no census row and cannot have one.
 
 ⚠️ **Does not claim ④ — completeness of the population.** The instruction census is
 derived from this repository's own instruments — `tools/hazlint`'s `ISA_OPS` and
@@ -492,12 +499,20 @@ is readable. Owner `docs/toolchain-comparison.md` and `notes/vendor-toolchains.m
 
 ## § 8. 🔴 What is NOT measured — and this section is a pre-registration
 
-This page is being written with `R1-pub` open. That is deliberate and it costs
-something, so it has to buy something. What it buys is this section: **for each
-still-open row, what this page will be able to say when the measurement lands is
-written down now, before it is taken, together with what would refute it.** When
-those seatings run, this page is either **cashed** or **struck in place**. A
-write-up composed afterwards can only agree with its own evidence.
+~~This page is being written with `R1-pub` open.~~ 🔄 **2026-09-16: it closed, and
+every row below has been adjudicated in § 11.** The sentence stays struck rather
+than removed because what follows it is the argument for having written the page
+early, and that argument is now **settled rather than asserted**: of the four
+pre-registrations, one was confirmed, one refuted, one confirmed by a route it did
+not name, and one cashed.
+
+That was deliberate and it cost something, so it had to buy something. What it
+buys is this section: **for each still-open row, what this page will be able to
+say when the measurement lands is written down now, before it is taken, together
+with what would refute it.** When those seatings run, this page is either
+**cashed** or **struck in place**. A write-up composed afterwards can only agree
+with its own evidence. 🔴 **Nothing in § 8.1–§ 8.4 below has been edited since it
+was written**, which is the only thing that makes the previous sentence checkable.
 
 ### 8.1 The D-cache capacity — `R1-pub-3` slot 2
 
@@ -569,7 +584,23 @@ from it.
 | 4 | the emulation surface | `tools/isapay.py verdict --arm user --elf` | `bench/2026-09-15/C2-UP.log` |
 | 5 | the hazard ladder | `tools/hazpay.py`, `tools/hazdecl.py` | `bench/2026-09-14/C1-P5j.log` |
 | 6 | the CP0 census | `tools/rlxprobe/exc.S`'s `CP0STUB` | `bench/2026-08-25b/H2a.log` |
-| 7 | the toolchain rows | `tools/hazlint`, `tools/tcpay.py` | the built artefacts under `$FWRE_WORK` |
+| 7 | the toolchain rows, desk | `tools/hazlint`, `tools/tcpay.py` | the built artefacts under `$FWRE_WORK` |
+| 7 / 11.3 | the toolchain rows, **silicon** | `tools/tcpay.py verdict --arm device` | `bench/2026-09-14b/C1-P6j.log` |
+| 11.2 | the emulation surface's **cost** | `tools/ucostfit.py` | `bench/2026-09-16/C2-UC.log`, `C2-UC2.log` |
+
+🔴 **One row of that table was a promise this page could not keep until
+2026-09-16, and it was the newest one.** `§ 11.2`'s four costs are least-squares
+slopes, the fit was done at the desk on the seating's own night and thrown away,
+and for eight days *the command that re-derives the reading* did not exist for
+them. `tools/ucostfit.py` is that command: it reads the two committed captures,
+re-derives all four costs to three decimals, re-derives the `E2` zero control,
+`E4`'s linearity and both of `E5`'s identities, and carries three injected
+corruptions that must each make a named check fail. **It found something in the
+doing**: run on one capture instead of two it quoted a 5 ns exception round trip,
+because the filter it used was *quoted* and `ll` is quoted on boot 1 alone — the
+range it published was right for a reason the code did not contain. That is fixed
+and pinned by a case. ⚠️ A promise a page makes about itself is exactly the kind
+this project has no checker for.
 
 ⚠️ **One command in that table will mislead you if you get it wrong**, and it is
 worth stating because this project got it wrong once: `tools/isapay.py verify`
@@ -614,18 +645,18 @@ pass first.
 
 ---
 
-**Owner files, for anything this page compresses:** `docs/isa-prior-art.md` (the
-census population and what each row already had before any of this ran) ·
-`docs/isa-payload.md` (`probe4`'s design) · `docs/isa-hazard.md` (`probe5`'s design)
-· `docs/emulation-surface.md` (the two-column diff) · `docs/rlx-cache-and-cp0.md`
-(the CP0 census and the cache model) · `docs/toolchain-comparison.md` and
-`docs/toolchain-prior-art.md` (the toolchain axis) · `notes/vendor-kernel-isa.md`
-(what the vendor's kernel does about all of it) · `SPEC.md` (every value, with its
-own two marks and its owner).
-
 ---
 
-## 8.4 🆕 2026-09-16 — § 8.1 and § 8.2 have both been run, and they went opposite ways
+## § 11. 🆕 The verdicts on § 8's pre-registrations
+
+⚠️ **This section was numbered `8.4` until 2026-09-16, which collided with the
+`### 8.4` inside § 8** — two headings, one number, eighty lines apart, one at H2
+and one at H3. Renumbered here; **§ 8's own `8.4` is untouched**, because it is a
+pre-registration and this page does not edit those. The owner-files footer used to
+sit above this section and is now at the foot, where a footer belongs; it was
+appended past rather than moved when this section was added.
+
+### 🆕 2026-09-16 — § 8.1 and § 8.2 have both been run, and they went opposite ways
 
 Seating 24, one power cycle. **Neither § 8.1 nor § 8.2 above is edited**: they
 are pre-registrations, and a document written before its own measurement is the
@@ -691,3 +722,63 @@ different question (§ 6.6's `lwu2`, which existed to adjudicate two other files
 of this repository against each other). **The value of registering a prediction
 is not that it is right; it is that a reader can tell which way it went without
 taking anybody's word for it.**
+
+
+### § 8.3 — CONFIRMED, and the row the plan named decided nothing
+
+§ 8.3 registered that **the table would select one toolchain, and that the
+selecting criterion would be the one already written** — `hazlint` clean over the
+whole `libc.a` — **not a new one**; *refuted if a new criterion has to be
+introduced to break a tie*.
+
+量: the table selects **`rsdk-1.3.6-4181`**, and the criterion is `TC-05`'s, run
+over each release's whole prebuilt `libc.a` at `TC-57` — **0 violations against
+4,574 and 3,741**. No new criterion was introduced. **Confirmed.**
+
+🔴 **But the refutation clause came nearer than a clean confirmation reads, and
+what kept it from firing is a date rather than an argument.** The silicon row —
+the one `plan/router-rebuild-plan.md:1138-1140` calls the only cell that can kill
+the project silently — came back on 2026-09-14 with **no discriminating power at
+all**: at matched `-march` the three columns are identical, and the plan's own
+second refutation condition fired there and went unrecorded for two days
+(`SPEC.md` `TC-59`, `TC-60`; `docs/toolchain-comparison.md` § 3.1–§ 3.2). What broke
+that tie is `TC-57`, taken on 2026-09-15 — **after the tie existed**. The criterion
+is the same; **the artefact it was applied to is not**. That is not a new criterion
+introduced to break a tie, and the thing that makes the distinction checkable
+rather than convenient is that `TC-57` was taken for a different step:
+`docs/isa-prior-art.md:634` records it as *discharged for this harness*, which is
+`R1-pub-4a`'s userspace probe needing a toolchain of its own.
+
+🟢 **And the result worth carrying is not the choice, it is what the choice turns
+out to be about.** Three releases, three gcc major versions eighteen years apart,
+**one answer** to the load-delay question at matched `-march`; what differs is
+which `-march` each release's prebuilt `libc.a` was built for. So `R2c` compares
+**packaging**, and the plan's framing of it as a comparison of compilers is
+refuted by the plan's own mandatory silicon row. `SPEC.md` `TC-61` carries the
+consequence for `R7`.
+
+### § 8.4 — cashed
+
+§ 8.4 registered that closing the gate would give `docs/GATE-RESULTS.md` its
+**ninth** entry and re-run the operating clause over nine entries, and that writing
+that entry *here* would be a claim the gate had closed. 量 2026-09-16: the gate
+closed, the ninth entry is in that file and not in this one, and the clause was
+re-run. **§ 8.4 was right about where the entry goes** and is left as written.
+
+🔴 **Three sentences on this page expired within the same hour and are struck
+above rather than deleted** — § 0 ②'s *five open steps*, § 0 ③'s *has not run*, and
+§ 8's *this page is being written with `R1-pub` open*. Each was true when written.
+**That is the price of writing a gate's page before the gate closes**, which § 8's
+first paragraph calls deliberate; the price is paid in strikes, and this paragraph
+is the receipt.
+
+---
+
+**Owner files, for anything this page compresses:** `docs/isa-prior-art.md` (the
+census population and what each row already had before any of this ran) ·
+`docs/isa-payload.md` (`probe4`'s design) · `docs/isa-hazard.md` (`probe5`'s design)
+· `docs/emulation-surface.md` (the two-column diff) · `docs/rlx-cache-and-cp0.md`
+(the CP0 census and the cache model) · `docs/toolchain-comparison.md` and
+`docs/toolchain-prior-art.md` (the toolchain axis) · `notes/vendor-kernel-isa.md`
+(what the vendor's kernel does about all of it) · `SPEC.md` (every value, with its
+own two marks and its owner).

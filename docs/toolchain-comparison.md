@@ -9,10 +9,14 @@ this file existed, that most of that table was already in the repository and had
 never been assembled: five files, one table, nobody had written it. This is the
 table.
 
-**It is an assembly plus five new readings, and it does not close `R2c`.** The
+~~**It is an assembly plus five new readings, and it does not close `R2c`.** The
 plan requires one row — the load delay — to run **on the silicon in all three
-columns**, and § 3 says where that stands. This file says so at the top rather
-than at the bottom.
+columns**, and § 3 says where that stands.~~ 🔄 **2026-09-16: the silicon
+ran on 2026-09-14 (seating 22) and § 3 now holds the readings.** All three
+columns executed on this die, both controls held, and the plan's row is filled
+by the method the plan named. This file says so at the top rather than at the
+bottom. 🔴 **And the result is that the three columns agree**, which is the
+plan's own second refutation condition — § 3.1.
 
 ---
 
@@ -31,7 +35,8 @@ measured through each without saying so.
 
 🔴 **Does not claim ② — that any cell is a statement about the die.** Every row
 but one is a property of a program on this disk. The one that is about the die
-is marked, and it has one column filled of three.
+is marked, and ~~it has one column filled of three~~ 🔄 **2026-09-16: it has
+three of three, 量 2026-09-14 (seating 22)** — § 3.1.
 
 🔴 **Does not claim ③ — that the three columns are the choice.** The release
 that would settle `TC-01` is not on this disk (§ 4). Every column here is a
@@ -206,14 +211,123 @@ than to a build-flag choice.
 
 ## 3. 🔴 The row the plan calls the only one that can kill the project quietly
 
-`plan/router-rebuild-plan.md:1141` requires `R2c`'s table to have three rows and
-says of the load-delay one that all three columns **must run on the silicon** —
-`R1f`'s fragment compiled once per toolchain — and § 389 of the same file marks
-that row as the only cell that can kill the project silently.
+`plan/router-rebuild-plan.md:1138-1140` requires `R2c`'s table to have three
+rows and says of the load-delay one that all three columns **must run on the
+silicon** — `R1f`'s fragment compiled once per toolchain — and § 389 of the same
+file marks that row as the only cell that can kill the project silently.
+⚠️ **The citation used to read `:1141` here and in two other files, and
+量 2026-09-16 that line is blank**; the sentence is at 1138-1140. Corrected in
+place rather than silently, because a citation that points one line past its
+subject is the failure mode `CITE-2` exists for.
 
-**§ 2.2 fills it at the desk in all three columns and on the die in one.** Two
+~~**§ 2.2 fills it at the desk in all three columns and on the die in one.** Two
 of the three columns have never had anything execute on this device, and that is
-not a gap this file can close: it needs a seating.
+not a gap this file can close: it needs a seating.~~ 🔄 **2026-09-16: the
+seating happened — 2026-09-14, seating 22 — and § 3.1 is the column it bought.**
+
+### 3.1 🟢 The silicon column, and the three columns agree
+
+量 2026-09-14 (seating 22), one power cycle, `probe6`, capture
+`bench/2026-09-14b/C1-P6j.log`; population `tools/isa-toolchain.tsv`, one
+**compiler invocation** per row, every row compiling the same one-line fragment
+`tools/rlxprobe/frag.c` at identical flags. `A5A5F00D` is LOCK (the delay slot
+was padded, so the load's result is seen), `B10CB10C` is OPEN (it was not).
+
+| row | toolchain | gcc | `-march` | what that flag claims | read |
+|---|---|---|---|---|---|
+| `c_lock` | hand-written `lw; nop; sw` | — | — | control: must read LOCK | **LOCK** |
+| `c_open` | hand-written `lw; sw` | — | — | control: must read OPEN | **OPEN** |
+| `v1` | T4 (host control) | 12.4.0 | `mips1` | no load interlock | **LOCK** |
+| `v2` | T4 | 12.4.0 | `mips2` | interlocked | **OPEN** |
+| `v3` | T4 | 12.4.0 | `mips32` | interlocked | **OPEN** |
+| `v4` | **T1** rsdk-1.3.6-4181 | 3.4.6 | `4181` | no load interlock | **LOCK** |
+| `v5` | **T1** | 3.4.6 | `5281` | interlocked | **OPEN** |
+| `v6` | **T2** rsdk-1.3.6-5281 | 3.4.6 | `4181` | no load interlock | **LOCK** |
+| `v7` | **T2** | 3.4.6 | `5281` | interlocked | **OPEN** |
+| `v8` | **T3** rsdk-1.5.5-5281 | 4.4.5 | `4181` | no load interlock | **LOCK** |
+| `v9` | **T3** | 4.4.5 | `5281` | interlocked | **OPEN** |
+| `v10` | **T3** | 4.4.5 | `4281` | interlocked | **OPEN** |
+
+**12 of 12 read the verdict their `pad` column predicted before the board was
+powered**, both controls held, and the forced anti-control — the same payload
+under `qemu-system-mips`, which interlocks — read **24 of 24 LOCK**, so the
+device's 5/7 split is the device's.
+
+🟢🟢 **The table has two axes and only one of them moves.**
+
+* **Same toolchain, two flags → the behaviour changes.** `v4`/`v5`, `v6`/`v7`,
+  `v8`/`v9` — three times, one binary each.
+* **Three toolchains, one flag → the behaviour does not.** `v4` = `v6` = `v8`
+  (all LOCK) and `v5` = `v7` = `v9` (all OPEN), **across gcc 3.4.6, 4.4.5 and
+  12.4.0** — releases eighteen years apart.
+
+**So the padding is a function of the `-march` flag and the compiler is not a
+variable in it.** That is 量 over four toolchains and twelve invocations, and it
+is the same sentence `TC-55` reached at the desk from `hazlint` counts, now with
+the die's own answer under it.
+
+### 3.2 🔴 The plan's second refutation condition FIRED, and nothing recorded it
+
+`plan/router-rebuild-plan.md:415-416`, verbatim:
+
+> 🆕 **第二個推翻條件**：三條的矽片結果全部相同 → 這張表沒有鑑別力，
+> **那本身是一個要寫下來的結果**（它會說「這題核心對 codegen 的容忍度比預期高」）。
+
+**It fired on 2026-09-14 and no file in this repository said so until
+2026-09-16.** At matched `-march` the three columns are identical, so on the row
+the plan calls *the only cell that can kill the project silently*, **this table
+has no discriminating power between the three toolchains.**
+
+⚠️ **Two readings of the clause, and the narrow one is the one taken.** Read as
+*all twelve rows the same* it did not fire — the readings are 5 LOCK / 7 OPEN.
+Read as *the three columns the same*, which is what a three-column table means,
+it fired. This file takes the second and says so, rather than taking the first
+and reporting a clean pass.
+
+🔴 **The plan's own gloss on what the firing would mean does not survive the
+measurement, and that is worth more than the firing.** The gloss is *this core's
+tolerance for codegen is higher than expected* — a statement about the core. The
+measurement says something else and says it about the **packaging**: three
+releases, three gcc major versions, one code generator's answer to this
+question. Nothing about the die entered the result; the die is what made LOCK
+and OPEN distinguishable at all.
+
+### 3.3 🟢 The choice, made by the table — and it is not about the compiler
+
+`TC-05`'s criterion, run 2026-09-15 over each release's whole prebuilt
+`libc.a` (`SPEC.md` `TC-57`), discriminates absolutely:
+
+| release | `hazlint` violations in `libc.a` | loads | nop after load |
+|---|---|---|---|
+| `rsdk-1.3.6-4181` | **0** | 19,096 | 4,051 (21.21 %) |
+| `rsdk-1.3.6-5281` | **4,574** | 19,141 | 1 (0.01 %) |
+| `rsdk-1.5.5-5281` | **3,741** | 14,491 | 0 (0.00 %) |
+
+🟢🟢 **The two instruments disagree and both are right, and § 3.1 is what
+reconciles them.** § 3.1 says the three code generators answer this question
+identically at matched `-march`. `TC-57` says the three shipped libraries do
+not. Both hold, because **`-march` is the variable on both sides**: a `libc.a`
+built at `-march=5281` was built for a core with a load interlock, and `TC-57`
+already reads that off the 0.01 % — one padded load in 19,141 is not *fewer*,
+it is *none*.
+
+**So the choice `R2c` makes is `rsdk-1.3.6-4181`, and the reason is narrower
+than the name suggests: it is the only one of the three whose prebuilt
+`libc.a` was built for a core without a load interlock.** Not a better
+compiler — 量, there is no difference to have.
+
+🔴 **Which changes what the fallback is.** The plan's fallback (`:409-412`) is
+*use T-A to build userspace directly*, phrased as a choice between packages.
+**推**, and it follows from § 3.1 rather than from preference: rebuilding uClibc
+at `-march=4181` should make **any** of the three releases usable on this axis,
+because the code generator is not what differs. That has **not** been done and
+is not claimed — it is named here because `R7` inherits this choice and the
+table now says what its real degree of freedom is.
+
+⚠️ **What this choice is not.** It is `R1c`'s harness and userspace toolchain.
+The `R7` gate decision is still `R7`'s, `docs/GATE-RESULTS.md` says so at the
+`R2a/b/d` entry, and the kernel half was settled separately at `TC-05` in
+2026-08-28.
 
 ⚠️ **Why the desk half is not a substitute, stated rather than assumed.**
 `hazlint` reads a static instruction stream. A violation it reports is a load
@@ -350,8 +464,10 @@ Stated as a list, because a table that quietly omits them reads as complete.
   inside a **documentation comment** in all three trees, so a grep for them
   returns `0.9.26` for every release and that is the example in the comment, not
   the version. Recorded because it looked like a finding for about two minutes.
-* 🔴 **Anything running on this die, 2 of 3 empty.** § 2.5, and § 3 is what it
-  would take.
+* ~~🔴 **Anything running on this die, 2 of 3 empty.** § 2.5, and § 3 is what it
+  would take.~~ 🔄 **2026-09-16: 3 of 3, 量 2026-09-14 (seating 22).** § 3.1.
+  ⚠️ **The replacement row is narrower than the old one looks**: what executed
+  is one compiled fragment per invocation, not a program of that toolchain's.
 * ⚠️ **The wrapper's injected flag line for `T2`** — recorded for `T1` and `T3`.
   Its `-EB`-only shape is 讀 from `T1`'s, not measured on `T2`'s own log.
 * ⚠️ **The published 20-instruction matrix body for `T2` and `T3`.** Only `T1`'s
@@ -378,6 +494,10 @@ Stated as a list, because a table that quietly omits them reads as complete.
   (`TC-11`), and the three values in § 2.5 are quoted from
   `notes/rebuild-vs-shipped.md` rather than recomputed.
 * 🔴 **The fourth column's absence is not a gap in this file, it is the shape of
-  the problem** (§ 4). Anything here that reads as *which toolchain should rlxfw
+  the problem** (§ 4). ~~Anything here that reads as *which toolchain should rlxfw
   use* is `TC-05`, half of which is still blank, and it is a decision rather
-  than a reading.
+  than a reading.~~ 🔄 **2026-09-16: `TC-05`'s userspace half was filled by
+  `TC-57` on 2026-09-15, and § 3.3 makes the choice here, from this table.** The
+  sentence above was accurate for two days and is kept because it records what
+  this file believed while the deciding reading already existed elsewhere —
+  which is the same shape as § 3.2, one layer down.

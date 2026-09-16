@@ -25,11 +25,15 @@ derived-population argument lives in `docs/isa-prior-art.md` § 9.3 and the
 checker that keeps it true is `tools/emueq.py`. Column ②'s generality rests on
 that equivalence and not on this file.
 
-**Does not claim ②** a cost. Every "how much does the emulation cost"
-question is `4b` (`D-cost`), which needs a clock and a seating. 🔴 This
-project's DoD row `D4` bundled the cost into the same sentence until
-2026-09-15 and was corrected in place; a finished `4a` does not satisfy the
-old wording and never could.
+~~**Does not claim ②** a cost. Every "how much does the emulation cost"
+question is `4b` (`D-cost`), which needs a clock and a seating.~~ 🔄
+**2026-09-16, seating 24: `4b` ran, and this file now claims four costs.** They
+are in the 2026-09-16 section at the foot of this page, and `E7` there states
+the gap in the same breath: the surface is **eight** entries and `4b` prices
+**four**. 🔴 This project's DoD row `D4` bundled the cost into the same
+sentence until 2026-09-15 and was corrected in place; a finished `4a` does not
+satisfy the old wording and never could. *(That half is unchanged and still
+governs — it is why `4a` and `4b` are two steps and not one.)*
 
 **Does not claim ③** completeness over the emulation surface. It is complete
 over *the census*, and § 6 is the measured difference between those two
@@ -367,9 +371,19 @@ which handful or why it was not eight.
    sentence carried is unchanged and still governs: *a prediction that turns
    out right is worth something only because it was written first*, and *if a
    later reading disagrees with a cell here, the cell stays and the
-   disagreement is the result*. What is gone is only the word 推. ⚠️ **One
+   disagreement is the result*. What is gone is only the word 推. ⚠️ ~~**One
    seating is one seating**: every column-② cell rests on a single capture on
-   a single die, and nothing here has been repeated on a second boot.
+   a single die, and nothing here has been repeated on a second boot.~~
+   🔄 **2026-09-16 (seating 24): the repeat exists and it is
+   byte-identical.** `bench/2026-09-15/C2-UP.log` (seating 23, argument `d73`)
+   against `bench/2026-09-16/C2-UP.log` (seating 24, argument `a91`): **75 `PU`
+   rows `cmp` IDENTICAL**, eleven header fields equal, the same `BUILD_ID`
+   `a87be346bb83e7f9`. `SPEC.md` `FW-74`, and it is the first time this project
+   has repeated any column-② row. ⚠️ **What the repeat does not buy**: one
+   die, one image, one operator — two boots of the same unit bound this
+   instrument's reproducibility and say nothing about a second part. 🟢 The
+   two invocations differ in their argument and the rows do not, which is what
+   makes that argument a label rather than a selector.
 2. **The equivalence column ② rests on is `R1C-1`'s, not this file's.**
    ~~If `tools/emueq.py` ever goes red, every column-② cell inherits the
    doubt.~~ 🔄 **2026-09-15: narrower now that the cells are 量.** The
@@ -482,17 +496,39 @@ unaligned ones cannot have a census row under
 `docs/isa-prior-art.md` § 0's admission rule. Measuring column ② does not
 widen the population it is measured over.
 
-🔴 **No cost was measured and nothing here is timed.** The surface on this
+🔴 ~~**No cost was measured and nothing here is timed.** The surface on this
 part is one row; **what that row costs is `4b` (`D-cost`), which needs a clock
 and a seating and has not been opened.** § 0 ② is the standing form of this and
 the seating did not touch it. A reader who leaves this file with a number
-attached to `sync` took it from somewhere else.
+attached to `sync` took it from somewhere else.~~ 🔄 **2026-09-16 (seating
+24): `4b` opened, ran, and the number attached to `sync` is now in this file,
+about thirty lines below this paragraph** — **988.6 / 989.5 ns** per iteration,
+on two independent boots. 🟢 **One clause survives and it is worth separating
+out**: *the surface on this part is one row* is a statement about **the
+census**, and it is still true, because the second priced row — `lwu2` — has no
+census row and cannot have one (§ 6).
 
-🔴 **One seating, one boot, and no row repeated.** Every column-② cell rests
+🔴🔴 **The paragraph above is struck rather than edited, because what it now
+records is the defect that produced it.** The seating-24 write-up was appended
+with **zero deletions**, so that paragraph and the one below it went on
+asserting the opposite of the same page for as long as nobody read the page end
+to end. **That is the class `CPU-64` already records against this same file** —
+*three files asserted a sentence and none of them was checked against the page*
+— repeated inside the same seating that recorded it. ⚠️ **And no checker in
+this repository can see it**: strike-through is prose, `spec-check` reads tables
+and backtick parity, and an append that contradicts a page is neither.
+
+🔴 ~~**One seating, one boot, and no row repeated.** Every column-② cell rests
 on a single capture — `bench/2026-09-15/C2-UP.log` — taken on one power cycle
 on one die. `C2-UPR` is a range control on the same boot, not a second reading.
 Nothing here has a repeat, a second board or a second image behind it, and
-§ 7 ① is where that is carried.
+§ 7 ① is where that is carried.~~ 🔄 **2026-09-16: two of those three are
+false now and the third is not.** *No row repeated* — `FW-74`, 75 rows
+byte-identical across seatings 23 and 24. *One boot* — `4b`'s four costs are
+each read on **two** independent boots, which is `D-cost`'s `E3` and was
+over-achieved: all four rows **and** all four twins, each boot with its own
+rescue, upload and `J`. ⚠️ **A second board is still what nothing here has**,
+and that clause does not expire: one die is one die, and § 7 ① carries it.
 
 ⚠️ **The instrument reads signals, not exception codes.** § 3's preamble states
 the bound and it governs § 4 as well: column ②'s verdicts are 量 and column
