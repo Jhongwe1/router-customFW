@@ -1,5 +1,68 @@
 # Changelog
 
+🟢🟢 **2026-09-16, seventy-seventh segment, desk, zero power cycles: `R1-pub
++ R2c` is CLOSED.** Ten steps of ten, the 58th segment to the 77th — **20
+segments, 1.00× the plan's estimate of 20**, inside the calibrated band of 7–28
+and above its median of 17. `docs/GATE-RESULTS.md` holds its **ninth** entry and
+the operating clause has been re-run over nine. Date measured three ways and
+agreeing: `2026-09-16 11:13 +08:00` on Git Bash, WSL and Windows. **Zero
+flash-write commands, zero `FLR`, the board unpowered throughout.**
+
+🔴 **One of the four steps the previous segment listed as open did not exist.**
+`R1-pub-2` closed on 2026-09-13; its workload cell reads `desk 1 of 2 ✅`, which
+is a **budget** cell — `LOG.md:25432` says *used 1 segment, the budget is 2* —
+and the sentence *"`R1-pub-2`'s second desk segment"* was invented at the
+previous segment's closeout. 量: `git log -S` finds it in **one** commit,
+`fe3f9ab`, three days after the step closed — **the same commit whose message
+is about that segment's closeout audit producing a false finding by reading a
+truncated view of a row**. Two instances of one mistake in one push, and only
+the first was caught.
+
+🟢 **The operating clause fires at nine entries, and what it names is three
+lines of driver.** `R5` did not establish *two counters read atomically* — its
+`D4` named `/proc/timer_list`, which exists and cannot carry it. `R1-pub` did
+not establish it either: `D-cost`'s `E5` required `Δirq_count == Δjiffies` on
+every rung and it fails **5 of 64**. 🔴 **The sentence that joins them is inside
+`R5`'s own bullet** — *the driver's own `/proc` carries both counters inside one
+`spin_lock_irqsave`* — true of the pair `R5` read, false of the pair `R1-pub`
+needed: `get_jiffies_64()` is at line 2001 inside the lock held 1998–2042 and
+`irq_count` is read live at 2147, 105 lines after the unlock.
+
+🔴🔴 **`D-cost`'s `E5` is a conjunction and every adjudication of it quoted one
+conjunct.** Counted with both halves, boot 1 of seating 24 is at **31.2 %**
+against `E5`'s own ¼ void threshold. 🟢 **The four costs do not move**, and the
+reason is structural rather than a rescue written afterwards: the ruler is
+`comp_tc1`, `Δirq` is not in it, and both of its terms are snapshotted inside
+one lock — readable with no reference to the outcome. ⚠️ **And five of five
+differences are one-sided where the mechanism is symmetric, which is recorded as
+an open question rather than explained.**
+
+🟢 **`R2c` resolves, and not into a comparison of compilers.** Twelve compiler
+invocations on the die: same toolchain, two `-march` values → the behaviour
+changes, three times; three toolchains, one `-march` → it does not, **across gcc
+3.4.6, 4.4.5 and 12.4.0**. So the plan's second refutation condition — *three
+identical silicon results mean the table has no discriminating power* — **fired
+on 2026-09-14 and no file here said so for two days**. What selects is the
+prebuilt `libc.a` and which `-march` it was built for, not the code generator.
+
+🟢 **Two instruments, both written because a claim here could not fail.**
+`hazpay`'s `check_controls` inspected **2 of 26** declared controls, so *the
+controls are clean* was unfalsifiable; it now recomputes the per-row control by
+a second path and prints `21 of 24 fired` on every run, with the qemu arm's
+`24 of 24` as the negative control. `tools/ucostfit.py` is the command
+`docs/rlx-isa.md` § 9 promises for every reading and `CPU-73` did not have — it
+re-derives all four costs from the committed captures, and found that the
+published exception round-trip range had been right for a reason its own code
+did not contain.
+
+⚠️ **What the gate did not establish is ten bullets long and includes its own
+DoD.** `R1-pub-3`'s clause *every hazard test's own control fires* reads 21 of
+24 and is still not met — it is merely measurable now; four of the eight
+emulated instructions are unpriced; whether an unaligned access costs an
+exception on bare metal is undecided; `R2c`'s mandatory silicon row decided
+nothing; and `docs/rlx-isa.md` is checkable from a clone without yet being
+readable by someone who did not build it.
+
 🟢 **2026-09-10, fifty-sixth segment, seating 20: `R5-7` and `R5-8` both met
 their DoD on the die, and the largest result was on no card.**
 **One power cycle against a budget of one**, seventeen boots, 169 captures, 55
