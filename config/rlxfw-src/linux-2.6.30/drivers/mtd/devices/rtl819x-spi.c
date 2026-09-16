@@ -306,7 +306,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SPI_VERSION	"rtl819x-spi 1.1"
+#define RTL819X_SPI_VERSION	"rtl819x-spi 1.2"
 
 /* CKSEG1ADDR of these gives 0xB80012xx and 0xBD000000.  __raw_readl and not
  * readl: an on-chip register on this big-endian part is already in CPU
@@ -336,6 +336,21 @@
 						 * board -- REG-13 */
 #define RTL819X_SPI_FASTREAD_DUMMY 1		/* DUMMYCOUNT_1 */
 
+/* JEDEC Read ID.  `MT-FLASH-1`.  讀 from this unit's own loader, whose
+ * ComSrlCmd_RDID at 0x804058BC issues exactly this opcode; D's own example
+ * names 0x9F for this part.  Two sources, REG-14's rule satisfied. */
+#define RTL819X_SPI_CMD_RDID	0x9Fu
+/* The 24-bit answer this part gives.  FLS-04, and REG-21's flash descriptor
+ * at 0x8040FBD4 holds the same three bytes two ways (001C7016 / 1C701600).
+ * It identifies the PART, not this UNIT -- see the alphabet note above. */
+#define RTL819X_SPI_RDID_EXPECT	0x001C7016u
+/* The loader reads FOUR bytes and takes the top three: 量 from the fresh
+ * disassembly, both callers at 0x80405050 and 0x8040505C pass a1 = 4, and
+ * 0x80405064 is `srl s1,v0,0x8`.  This driver reuses that width rather than
+ * asking for three, because a 4-byte phase is the one shape this controller
+ * has been measured to serve 4,115 times. */
+#define RTL819X_SPI_RDID_LEN	4
+
 #define RTL819X_SPI_SIZE	0x00400000u	/* FLS-14 */
 #define RTL819X_SPI_ERASESIZE	0x00001000u	/* sector, from the loader's
 						 * fallback descriptor */
@@ -345,6 +360,36 @@
  * partial-chunk arithmetic. */
 #define RTL819X_SPI_H601_LO	0x00006000u
 #define RTL819X_SPI_H601_HI	0x00008000u
+#define RTL819X_SPI_H601_SIZE	(RTL819X_SPI_H601_HI - RTL819X_SPI_H601_LO)
+
+/* The `h601` verb's structure constants.  讀, from the vendor's own source;
+ * every one is a layout fact of this SoC family, not a fact about this unit.
+ *
+ *   HDR   sizeof(PARAM_HEADER_T) -- signature[4] + len, __attribute__((packed)),
+ *         apmib.h:2291-2295 and SIGNATURE_LEN 4 at :1648.  Corroborated three
+ *         ways: apmib.c:326 declares `char hw_setting_start[6]`, apmib.c:329
+ *         and flash.c:2050 both read exactly 6, and apmib.c:537 starts the
+ *         body at OFFSET+sizeof(hsHeader).
+ *   NIC0  offset of nic0Addr INSIDE the body.  HW_SETTING_T begins
+ *         `unsigned char boardVer;` then `nic0Addr[6]` -- mibdef.h:13-15, and
+ *         the struct is __PACK__ with every member a char, so no ABI can
+ *         insert padding and the answer is 1 on any compiler.
+ */
+#define RTL819X_SPI_H601_HDR	6u
+#define RTL819X_SPI_H601_NIC0	1u
+
+/* The clamp.  🔴 NEITHER BOUND IS THE VENDOR'S -- see the verb's comment.
+ * MIN is the smallest body this parser actually touches: boardVer(1) +
+ * nic0Addr(6) + nic1Addr(6) + the checksum byte(1).  It is deliberately NOT
+ * sizeof(HW_SETTING_T)+1 = 1166: that number is 推, computed from the drop's
+ * headers and never compiled, and 980 of its bytes are a 5 GHz channel table
+ * on a 2.4 GHz-only board -- so gating on it would refuse a good unit if this
+ * drop is not the drop this unit shipped with.  `hw_len` is printed instead,
+ * so a surprise is diagnosable without the gate having an opinion.
+ * MAX keeps header+body inside the window that was read. */
+#define RTL819X_SPI_H601_LEN_MIN	14u
+#define RTL819X_SPI_H601_LEN_MAX	(RTL819X_SPI_H601_SIZE - \
+					 RTL819X_SPI_H601_HDR)
 
 #define RTL819X_SPI_CHUNK	4096u
 #define RTL819X_SPI_COMPLEMENT	4186112u	/* FLS-24 */
@@ -389,6 +434,13 @@
  * leaves 512 bytes of headroom against a line format that grows.  Checked
  * before every sprintf, not after. */
 #define RTL819X_SPI_MAP_BUDGET	3584
+
+/* The same ceiling for the FIRST /proc file, which had none until the rdid
+ * and h601 fields arrived.  RESERVE is what the guarded block plus the
+ * self-measuring line can emit at their widest -- 340 + 40 = 380, rounded
+ * up.  Both numbers are derived in the comment at the guard itself. */
+#define RTL819X_SPI_PROC_BUDGET		3584
+#define RTL819X_SPI_PROC_RESERVE	512
 
 /* 🔴 The bound the vendor's driver does not have.  A read of SFCSR is an
  * uncached KSEG1 load; FW-34 Group F measured an uncached word through the
@@ -476,6 +528,34 @@ static unsigned long rtl819x_spi_n_writes;
 /* L2 firing.  Separate from n_writes because a REFUSED write is evidence the
  * layer works, and a write is evidence it did not. */
 static unsigned long rtl819x_spi_n_write_refused;
+
+/* `rdid` results.  n_rdid is SEPARATE from n_pio_bytes deliberately: that
+ * counter means *bytes of the flash ARRAY read*, and RDID reads none -- it
+ * reads the chip's identity register.  Folding the two would make a counter
+ * this project quotes mean two things. */
+static unsigned long rtl819x_spi_n_rdid;
+static int  rtl819x_spi_rdid_ran;
+static int  rtl819x_spi_rdid_rc = -EAGAIN;
+static u32  rtl819x_spi_rdid_id;
+
+/* `h601` results.  VERDICTS ONLY -- see the H601 paragraph in the header.
+ * Every field below is either a boolean, a structure size identical on every
+ * unit of this model, or a count. */
+static int  rtl819x_spi_h601_ran;
+static int  rtl819x_spi_h601_rc = -EAGAIN;
+static int  rtl819x_spi_h601_sig_ok;
+static int  rtl819x_spi_h601_ver;
+static u32  rtl819x_spi_h601_len;
+static int  rtl819x_spi_h601_len_sane;
+static int  rtl819x_spi_h601_sum_ok;
+static int  rtl819x_spi_h601_mac_not_zero;
+static int  rtl819x_spi_h601_mac_not_ff;
+static int  rtl819x_spi_h601_mac_group_bit;
+/* 🔴 THERE IS NO mac_local_bit AND THAT IS DELIBERATE.  The first draft had
+ * one.  docs/mfgtest.md §4 declares exactly four MAC booleans and states
+ * that they leak four bits per run; a fifth would widen a containment
+ * decision this file does not own, so it was removed rather than argued
+ * for.  If a local-bit verdict is ever wanted, it is a change to §4 first. */
 
 /* verify() results, all -1 / 0 until it has run once */
 static int  rtl819x_spi_v_ran;
@@ -1330,6 +1410,102 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 	len += sprintf(page + len, "map_jiffies %lu\n",
 		       rtl819x_spi_map_jiffies);
 
+	/* ---------------------------------------------------------------
+	 * 🔴 THE BUDGET, AND IT ARRIVES WITH THE FIRST FIELDS THAT NEEDED IT.
+	 *
+	 * This handler is a 2.6.30 read_proc_t: it sprintf()s into ONE page
+	 * and there is no bounds check in that interface.  The header has
+	 * said so since 1.1 -- "a driver that overran it would corrupt
+	 * whatever follows the page, on a board with no spare" -- and then
+	 * guarded only the SECOND file, because that is the one whose output
+	 * grows with a loop.  This file's output grows when someone adds a
+	 * field, which is slower and just as unbounded.
+	 *
+	 * 量, before the fields below were written: the worst case this
+	 * handler could already produce is 1,101 bytes -- every %lu at ten
+	 * digits, every %d at -2147483648, and the printed-digest branch
+	 * taken, which is the widest of its three.  The SIXTEEN fields below
+	 * add at most 340, and the self-measuring line after the guard adds
+	 * at most 40, so RESERVE is 380 rounded up to 512.  (That arithmetic
+	 * was got wrong once while writing this -- "fourteen fields, 317
+	 * bytes" -- and re-derived by script rather than patched, because a
+	 * reserve and a field count that are both wrong by the same amount
+	 * stay self-consistent forever.)  So the guard is not load-bearing today and
+	 * is written now because the moment to add one is while the headroom
+	 * is still three kilobytes, not when a reader is chasing a corrupted
+	 * page on a board with no spare.
+	 *
+	 * It guards what FOLLOWS it and nothing above, which is stated
+	 * rather than left to be discovered: retro-fitting a check to 48
+	 * existing sprintf()s would be a large edit to code that is 量 to
+	 * fit, and a large edit to working code is its own risk. */
+	if (len + RTL819X_SPI_PROC_RESERVE <= RTL819X_SPI_PROC_BUDGET) {
+		/* `MT-ID`, and putting it here turns a host-side check into a
+		 * device-side one.  RLXFW_SRC_ID is the build's own digest
+		 * over config/, delivered to every C object as KCPPFLAGS, and
+		 * until now its only reader was init/main.c printing the
+		 * RLXFW-ID0 boot mark.  A capture and a /proc read are then
+		 * two independent routes to one number, which is the shape
+		 * this project prefers over one route asserted twice.
+		 *
+		 * The #else is not defensive padding: `--id-scope main` is a
+		 * real, declared build mode under which this define does not
+		 * reach this file, and a check must be able to see that it is
+		 * looking at such a build rather than read a missing line as
+		 * a mismatch. */
+#ifdef RLXFW_SRC_ID
+		len += sprintf(page + len, "recipe_id %08X\n",
+			       (unsigned)RLXFW_SRC_ID);
+#else
+		len += sprintf(page + len, "recipe_id absent\n");
+#endif
+		len += sprintf(page + len, "n_rdid %lu\n", rtl819x_spi_n_rdid);
+		len += sprintf(page + len, "rdid_ran %d\n",
+			       rtl819x_spi_rdid_ran);
+		len += sprintf(page + len, "rdid_rc %d\n",
+			       rtl819x_spi_rdid_rc);
+		len += sprintf(page + len, "rdid_id %06X\n",
+			       rtl819x_spi_rdid_id);
+		/* The comparand is compiled in, so the board is not told what
+		 * to expect by whoever typed the verb.  MT-FLASH-1's own
+		 * injection is on the SCRIPT's comparator, which is class S
+		 * and is declared as such in docs/mfgtest.md §2. */
+		len += sprintf(page + len, "rdid_expect %06X\n",
+			       RTL819X_SPI_RDID_EXPECT);
+		len += sprintf(page + len, "rdid_match %d\n",
+			       rtl819x_spi_rdid_ran && !rtl819x_spi_rdid_rc &&
+			       rtl819x_spi_rdid_id == RTL819X_SPI_RDID_EXPECT);
+
+		len += sprintf(page + len, "h601_ran %d\n",
+			       rtl819x_spi_h601_ran);
+		len += sprintf(page + len, "h601_rc %d\n",
+			       rtl819x_spi_h601_rc);
+		len += sprintf(page + len, "hw_sig_ok %d\n",
+			       rtl819x_spi_h601_sig_ok);
+		len += sprintf(page + len, "hw_ver %d\n",
+			       rtl819x_spi_h601_ver);
+		/* A structure size, identical on every unit of this model.
+		 * docs/mfgtest.md §4 rules on it explicitly. */
+		len += sprintf(page + len, "hw_len %u\n",
+			       rtl819x_spi_h601_len);
+		len += sprintf(page + len, "hw_len_sane %d\n",
+			       rtl819x_spi_h601_len_sane);
+		len += sprintf(page + len, "hw_sum_ok %d\n",
+			       rtl819x_spi_h601_sum_ok);
+		len += sprintf(page + len, "mac_not_zero %d\n",
+			       rtl819x_spi_h601_mac_not_zero);
+		len += sprintf(page + len, "mac_not_ff %d\n",
+			       rtl819x_spi_h601_mac_not_ff);
+		len += sprintf(page + len, "mac_group_bit %d\n",
+			       rtl819x_spi_h601_mac_group_bit);
+	} else {
+		len += sprintf(page + len, "proc_truncated 1\n");
+	}
+	/* Self-measuring, so the headroom is a reading a card can assert on
+	 * rather than an arithmetic nobody re-runs.  It reports the length
+	 * BEFORE its own line, which is why it is last and why it says so. */
+	len += sprintf(page + len, "proc_bytes_before_this_line %d\n", len);
+
 	*eof = 1;
 	return len;
 }
@@ -1455,6 +1631,292 @@ static int rtl819x_spi_verb_probe(void)
 	rlxfw_markx("S-PROBE", (unsigned)rc);
 	/* The four bytes are NOT printed.  Offset 0 is the loader region, and
 	 * this driver emits no flash byte anywhere -- see the header. */
+	return rc;
+}
+
+/*
+ * `rdid` -- JEDEC Read ID, opcode 0x9F.  `MT-FLASH-1`.
+ *
+ * ------------------------------------------------------------------------
+ * WHY THIS ISSUES NO SFCR WRITE, AND WHY THAT IS A READING AND NOT A HOPE
+ * ------------------------------------------------------------------------
+ *
+ * `docs/mfgtest.md` §7 opened this as an undetermined question, on the
+ * ground that "this driver never writes SFCR" while the loader's
+ * ComSrlCmd_RDID does.  Both halves of that sentence were wrong, and the
+ * second one was wrong in a way that hid the answer.
+ *
+ *  1. 🔴 THIS DRIVER HAS NEVER HAD SUCH A CONTRACT.  It writes SFCR on
+ *     every transaction, at rtl819x_spi_release().  The only "never writes
+ *     it" in this file is about SFCSR's CMD_BYTE field.  The true invariant
+ *     is narrower and stronger: SFCR is only ever written back with the
+ *     value claim() read microseconds earlier, never with a value of this
+ *     driver's own choosing -- and release()'s read-back is what enforces
+ *     it rather than asserts it.  This verb keeps that invariant exactly.
+ *
+ *  2. 🔴 THE LOADER'S SFCR WRITE IS NOT PART OF THE TRANSACTION.  讀, from
+ *     a fresh disassembly of the FULL routine -- the excerpt quoted in
+ *     `docs/loader-flash-write.md` begins at 0x8040591C, which is 96 bytes
+ *     and 24 instructions into a routine that starts at 0x804058BC, and
+ *     the SFCR write lives in the part not shown.  The order is:
+ *
+ *         804058E4  spin on SFCSR RDY
+ *         80405900  sw   0xFFC00000 -> SFCR     <-- divider, BEFORE any CS
+ *         80405904  jal  0x804057AC             <-- CS_L/CS_H twice: an idle
+ *         80405914  jal  SFCSR_CS_L(chip, 0, 0) <-- the transaction starts
+ *         80405944  sw   0x9F000000 -> SFDR     <-- the opcode
+ *         80405954  jal  SFCSR_CS_L(chip, n-1, 0)
+ *         8040595C  lw   SFDR                   <-- the answer
+ *         80405968  jal  SFCSR_CS_H(chip, 0, 0)
+ *
+ *     CS is asserted at 0x80405914, sixteen instructions AFTER the SFCR
+ *     write.  So the SFCR write is bus setup performed at probe time, when
+ *     the divider is unknown -- not a step the opcode needs.
+ *
+ *  3. AND UNDER LINUX THE DIVIDER IS ALREADY THAT VALUE.  量, seating 16:
+ *     boot_sfcr reads FFC00000, which is the exact word ComSrlCmd_RDID
+ *     writes, because spi_regist calls it twice at device_initcall and it
+ *     is the only function in the whole image that writes that register.
+ *     So the loader's SFCR write would be idempotent here.  Skipping it
+ *     runs this opcode at precisely the divider the vendor's own RDID runs
+ *     it at, and n_state_foreign is the standing instrument that says so:
+ *     it counts transactions beginning with an SFCR this driver did not
+ *     expect, and it read 0 across 4,115 of them.
+ *
+ * REFUTATION CONDITIONS, written before the verb ran anywhere:
+ *   - rdid_id != 1C7016 -> either this sequence is wrong or FLS-04 is.
+ *     Discriminator: the loader reads the same value on every boot into the
+ *     descriptor REG-21 measured as 001C7016 at 0x8040FBD4.
+ *   - n_state_foreign moves on this transaction -> §3 above is refuted and
+ *     the divider was not what registration latched.
+ *   - n_state_bad moves, or wedged latches -> the restore did not take.
+ *   - n_writes moves -> this is no longer a read-only act.  It cannot: no
+ *     code path in this translation unit increments it.
+ *
+ * WHAT IT EMITS, AND WHY THAT IS A WIDENING THIS FILE HAS TO DECLARE.  The
+ * header's permitted alphabet is "digests over the complement, an offset,
+ * counters and controller registers".  A JEDEC id is none of those, so it
+ * is a new class and is named here rather than left for a reviewer to
+ * infer.  It is admissible because it identifies the PART and not this
+ * UNIT -- every N150RT of this revision answers 1C7016 -- and because the
+ * value is already committed in this repository twice, at SPEC.md FLS-04
+ * and in REG-21's descriptor.  It is not a byte of the flash array: RDID
+ * is answered by the chip's identity register and reads no array address.
+ */
+static int rtl819x_spi_verb_rdid(void)
+{
+	struct rtl819x_spi_state s;
+	int rc, rc2;
+	u32 v = 0;
+
+	mutex_lock(&rtl819x_spi_lock);
+	rc = rtl819x_spi_claim(&s);
+	if (rc) {
+		mutex_unlock(&rtl819x_spi_lock);
+		rtl819x_spi_rdid_ran = 1;
+		rtl819x_spi_rdid_rc = rc;
+		rtl819x_spi_rdid_id = 0;
+		/* The mark is emitted on EVERY path, including this one.  A
+		 * verb that prints a mark when it succeeds and nothing when
+		 * it is refused teaches a card to read silence as a failure
+		 * mode it cannot distinguish from a mark that was lost. */
+		rlxfw_markx("S-RDID", 0);
+		return rc;
+	}
+	rtl819x_spi_n_rdid++;
+
+	/* One byte out.  The opcode is taken from the TOP byte of the word
+	 * when LEN selects one byte -- the same reason read_pio shifts its
+	 * address left rather than masking it. */
+	rc = rtl819x_spi_cs_low(0);
+	if (rc)
+		goto out;
+	rtl819x_spi_wr(RTL819X_SFDR, (u32)RTL819X_SPI_CMD_RDID << 24);
+
+	/* Four bytes back, which is what the loader asks for: both of its
+	 * callers pass 4 and then take the top three with `srl v0,8`. */
+	rc = rtl819x_spi_cs_low(RTL819X_SPI_RDID_LEN - 1);
+	if (rc)
+		goto out;
+	v = rtl819x_spi_rd(RTL819X_SFDR);
+out:
+	rc2 = rtl819x_spi_release(&s);
+	mutex_unlock(&rtl819x_spi_lock);
+	rc = rc ? rc : rc2;
+
+	rtl819x_spi_rdid_ran = 1;
+	rtl819x_spi_rdid_rc = rc;
+	/* The fourth byte is whatever the part clocks out after the three
+	 * identity bytes.  It is undefined by JEDEC for this opcode, nothing
+	 * here depends on it, and it is discarded rather than printed. */
+	rtl819x_spi_rdid_id = rc ? 0 : (v >> 8);
+	rlxfw_markx("S-RDID", rtl819x_spi_rdid_id);
+	return rc;
+}
+
+/*
+ * `h601` -- the hardware-settings block, read as a STRUCTURE and reported as
+ * VERDICTS.  `MT-MAC` and `MT-RFCAL`.
+ *
+ * ------------------------------------------------------------------------
+ * WHY THIS IS NOT A SECOND INSTRUMENT MEASURING WHAT `map 1 0` MEASURES
+ * ------------------------------------------------------------------------
+ *
+ * `map 1 0` already emits a per-4-KiB line for offsets 006000 and 007000 --
+ * an offset, a PIO-vs-MMIO equality boolean, and the word SKIPPED.  So
+ * "are those pages readable and self-consistent" is answered.  This verb
+ * answers a question that one cannot: whether the bytes PARSE.  A page can
+ * be read identically by two paths and still hold a block whose checksum
+ * does not close, which is the failure a factory test exists to catch.
+ * If this verb only reported equality it would be a zero that means
+ * nothing, and it would not be written.
+ *
+ * ------------------------------------------------------------------------
+ * THE STRUCTURE, 讀 FROM THE VENDOR'S OWN SOURCE, AND THE FOUR PLACES THE
+ * DESIGN DOCUMENT WAS WRONG OR SILENT
+ * ------------------------------------------------------------------------
+ *
+ *   +0x0000  4  signature -- 'H' '6' then the version as two ASCII digits
+ *   +0x0004  2  len       -- body bytes INCLUDING the trailing checksum
+ *   +0x0006  .  body      -- boardVer(1), nic0Addr[6], nic1Addr[6], ...
+ *   +0x0006+len-1  1      -- the checksum byte
+ *
+ *  1. 🔴 `len` IS BIG-ENDIAN AND §4 DOES NOT SAY SO.  The device stores it
+ *     in native order and this part is big-endian; the proof is the x86
+ *     HOST builder, which swaps on the way in -- `cvcfg.c:635`,
+ *     `Header.len = WORD_SWAP(Header.len);//important!`, and again at :1794,
+ *     :1829, :1883.  Read the other way round, 0x048E becomes 0x8E04, a
+ *     length that runs off the end of the window.  This reads it byte by
+ *     byte so the order is written down rather than inherited.
+ *
+ *  2. 🔴 THE VENDOR BOUNDS `len` FROM BELOW ONLY.  `apmib.c:469` refuses
+ *     `len < sizeof(HW_SETTING_T)+1` and compares it against nothing else;
+ *     `HW_SETTING_SECTOR_LEN` appears only on the COMPRESSED path
+ *     (`apmib.c:369`, `:1626`).  So a corrupt length makes the vendor read
+ *     straight through this window and into DEFAULT_SETTING at 0x8000.
+ *     The clamp below is this driver's, not the vendor's, and it is what
+ *     keeps every access inside the 8 KiB that was read.
+ *
+ *  3. 🔴 THE CHECKSUM FORMULA IS AT `apmib.h:1833`, NOT `apmib.c:547`.
+ *     §4 cites the call site.  The arithmetic §4 states is right:
+ *     CHECKSUM sums bytes into an `unsigned char` and returns `~sum + 1`,
+ *     so CHECKSUM_OK's invariant is that the sum over all `len` body bytes,
+ *     the checksum byte included, is zero.  The 6-byte header is NOT
+ *     covered -- `apmib.c:537` reads the body from OFFSET+sizeof(header)
+ *     and `:547` checksums that same buffer, and `/bin/flash`'s own
+ *     `flash.c:2946-2951` does the identical thing independently.
+ *
+ *  4. ⚠️ "H6" IS NOT THE ONLY TAG THE VENDOR ACCEPTS.  `apmib.c:338` also
+ *     takes "Hf" and "Hu", and anything else means a COMPRESSED block with
+ *     a different layout, not a corrupt one.  So `hw_sig_ok 0` here means
+ *     *not the uncompressed H6 form*.  It is a stricter test than the
+ *     vendor's and the direction is the safe one, but it is not the same
+ *     test and saying so is the difference between a verdict and a guess.
+ *
+ * ------------------------------------------------------------------------
+ * CONTAINMENT
+ * ------------------------------------------------------------------------
+ *
+ * The bytes enter DRAM, which `verify` and `map` already do and the header
+ * already says.  What may not happen is that any of them, or any digest of
+ * them, reaches the console -- CLAUDE.md's second Never row is explicit
+ * that not even a sha256 of this window may enter the repository.  So this
+ * verb prints: three booleans about the header, a version, a structure size
+ * identical on every unit of this model, and four booleans about the MAC.
+ * docs/mfgtest.md §4 declares exactly that set and states its cost as four
+ * bits per run.  Nothing here prints a byte, a digest, or an index into
+ * the body.
+ */
+static int rtl819x_spi_verb_h601(void)
+{
+	u8 *buf;
+	int rc;
+	u32 len, i;
+	u8 sum = 0;
+	const u8 *body, *mac;
+
+	/* 🔴 EVERY VERDICT IS CLEARED FIRST, and that is not tidiness.  These
+	 * are file statics, and the two MAC booleans are OR-accumulated in a
+	 * loop that only ever writes 1.  Without this, a second run against a
+	 * blanked block would inherit the first run's `mac_not_zero 1` and
+	 * report a good MAC that is not there -- a stale pass, which is the
+	 * one direction a factory test may never fail in.  The early `goto
+	 * out` paths make it worse: they leave every field at whatever the
+	 * previous run left. */
+	rtl819x_spi_h601_sig_ok = 0;
+	rtl819x_spi_h601_ver = -1;
+	rtl819x_spi_h601_len = 0;
+	rtl819x_spi_h601_len_sane = 0;
+	rtl819x_spi_h601_sum_ok = 0;
+	rtl819x_spi_h601_mac_not_zero = 0;
+	rtl819x_spi_h601_mac_not_ff = 0;
+	rtl819x_spi_h601_mac_group_bit = 0;
+
+	buf = kmalloc(RTL819X_SPI_H601_SIZE, GFP_KERNEL);
+	if (!buf) {
+		rtl819x_spi_h601_ran = 1;
+		rtl819x_spi_h601_rc = -ENOMEM;
+		rlxfw_markx("S-H601", (unsigned)-ENOMEM);
+		return -ENOMEM;
+	}
+
+	mutex_lock(&rtl819x_spi_lock);
+	rc = rtl819x_spi_read_pio(RTL819X_SPI_H601_LO,
+				  RTL819X_SPI_CHUNK, buf);
+	if (!rc)
+		rc = rtl819x_spi_read_pio(RTL819X_SPI_H601_LO +
+					  RTL819X_SPI_CHUNK,
+					  RTL819X_SPI_CHUNK,
+					  buf + RTL819X_SPI_CHUNK);
+	mutex_unlock(&rtl819x_spi_lock);
+
+	rtl819x_spi_h601_ran = 1;
+	rtl819x_spi_h601_rc = rc;
+	if (rc)
+		goto out;
+
+	rtl819x_spi_h601_sig_ok = (buf[0] == 'H' && buf[1] == '6');
+
+	/* Two ASCII decimal digits.  -1 where they are not digits, which is
+	 * what the vendor's sscanf failure leaves too. */
+	if (buf[2] >= '0' && buf[2] <= '9' && buf[3] >= '0' && buf[3] <= '9')
+		rtl819x_spi_h601_ver = (buf[2] - '0') * 10 + (buf[3] - '0');
+	else
+		rtl819x_spi_h601_ver = -1;
+
+	len = ((u32)buf[4] << 8) | buf[5];		/* big-endian, see 1 */
+	rtl819x_spi_h601_len = len;
+	rtl819x_spi_h601_len_sane =
+		(len >= RTL819X_SPI_H601_LEN_MIN &&
+		 len <= RTL819X_SPI_H601_LEN_MAX);
+
+	/* Every read below is inside the 8 KiB already in `buf`, and it is
+	 * the clamp above that makes that true rather than the layout. */
+	if (!rtl819x_spi_h601_len_sane)
+		goto out;
+
+	body = buf + RTL819X_SPI_H601_HDR;
+	for (i = 0; i < len; i++)
+		sum += body[i];
+	rtl819x_spi_h601_sum_ok = (sum == 0);
+
+	mac = body + RTL819X_SPI_H601_NIC0;
+	for (i = 0; i < 6; i++) {
+		if (mac[i] != 0x00u)
+			rtl819x_spi_h601_mac_not_zero = 1;
+		if (mac[i] != 0xFFu)
+			rtl819x_spi_h601_mac_not_ff = 1;
+	}
+	/* Bit 0 of the first octet.  Clear on any unicast address, so a set
+	 * bit here says the block does not hold a usable station MAC. */
+	rtl819x_spi_h601_mac_group_bit = mac[0] & 1u;
+out:
+	/* 🔴 The buffer held this unit's MAC.  Zero it before freeing: the
+	 * page goes back to the allocator, and MEM-17 measured this DRAM
+	 * keeping a previous power cycle's contents. */
+	memset(buf, 0, RTL819X_SPI_H601_SIZE);
+	kfree(buf);
+	rlxfw_markx("S-H601", (unsigned)rtl819x_spi_h601_rc);
 	return rc;
 }
 
@@ -1634,6 +2096,10 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 
 	if (!strcmp(buf, "probe"))
 		ret = rtl819x_spi_verb_probe();
+	else if (!strcmp(buf, "rdid"))
+		ret = rtl819x_spi_verb_rdid();
+	else if (!strcmp(buf, "h601"))
+		ret = rtl819x_spi_verb_h601();
 	else if (!strcmp(buf, "wedge"))
 		ret = rtl819x_spi_verb_wedge();
 	else if (!strcmp(buf, "unwedge")) {

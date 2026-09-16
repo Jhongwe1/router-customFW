@@ -267,8 +267,14 @@ already measured what happens when it is relaxed: 量 2026-08-31, five of
 
 1. **Every row NAMES the check it must turn red.** The name is a required field
    of the row, not a substring of a free-text label — 量, in the
-   `(kills XX)`-in-the-label flavour, `test-rbcheck.py` has eleven rows with no
-   such suffix and they silently fall back to bare `rc != 0`.
+   `(kills XX)`-in-the-label flavour, `test-rbcheck.py` has ~~eleven~~ **EIGHT** rows
+   with no
+   such suffix and they silently fall back to bare `rc != 0`. 🔴 **量 2026-09-17, two
+   ways (a grep and a structural parse of the `MUT` table), and the number was
+   already wrong when it was written**: that file last changed 2026-09-14 and
+   this document was written 2026-09-16, so nothing moved between them. The
+   CLASS of defect is real and still unfixed; the count was a 量-marked figure
+   with no instrument behind it.
 2. **A kill is `rc != 0` **and** the named check among the reds.** Anything else
    is `WRONG-CASE`, which is a survivor with a different name.
 3. **`SURVIVOR`** means the check it names does not work. It is not a pass.
@@ -285,6 +291,14 @@ already measured what happens when it is relaxed: 量 2026-08-31, five of
    whose reversal is 推 rather than 量 does not run at all.** Every `R` and `V`
    row's reversal is verified by measurement *before the next injection*, not at
    the end of the seating.
+
+🟢 **REALISED 2026-09-17 as `tools/mfginject.py` (`P1-2`).** 29 rows, four
+controls and a REFUSING `B0`. **24 of 24 class-S injections killed, 0 alive**, and
+the must-survive row survived as proved. The five class-R/P rows are physical and
+stand down as ONE skip line covering 5, so `P1-4` inherits a table rather than a
+memory. It runs at a desk because `config/mfgtest.sh` reads every surface through
+`$MFG_ROOT` — which is what makes *simulated at the boundary* an executable
+statement instead of a described one.
 
 **Ordering is a safety property, not a convenience.** `MT-WDT` resets the board
 and goes last. `MT-FLASH-3`'s `corrupt` is in RAM and must be followed by a
@@ -310,10 +324,42 @@ two ASCII decimal digits (`sscanf(&sig[2], "%02d", &ver)`). **`"H6"` + `"01"` =
 | `+0x0006` | `len-1` | body — `HW_SETTING_T`, packed: `boardVer`, `nic0Addr[6]`, `nic1Addr[6]`, then the per-radio calibration block |
 | `+0x0006+len-1` | 1 | checksum |
 
-The checksum is a one-byte two's-complement sum, live at `apmib.c:547`:
+The checksum is a one-byte two's-complement sum, ~~live at `apmib.c:547`~~
+🔴 **defined at `apmib.h:1833-1846` — `:547` is the VERIFICATION CALL SITE,
+not the formula** (corrected 2026-09-17):
 `CHECKSUM(d,n) = (~Σd[i] + 1) & 0xFF`, and the invariant a reader checks is
 **`Σ` over all `len` body bytes, checksum byte included, `== 0`**. The 6-byte
-header is not covered.
+header is not covered — 讀 twice independently, `apmib.c:537`+`:547` and
+`/bin/flash`'s own `flash.c:2946-2951`, both of which advance past
+`sizeof(header)` before checksumming.
+
+🔴 **FOUR CORRECTIONS TO THE TABLE ABOVE, all 讀 2026-09-17, and three of
+them change a parser.**
+
+1. **`len` IS BIG-ENDIAN AND THIS SECTION WAS SILENT ON IT.** The device stores
+   it in native order and this part is big-endian; the proof is the x86 HOST
+   builder, which swaps on the way in — `cvcfg.c:635`,
+   `Header.len = WORD_SWAP(header.len);//important!`, and again at `:1794`,
+   `:1829`, `:1883`. Read the other way round, `0x048E` becomes `0x8E04`, a
+   length that runs off the end of the window. Silence here is not neutral.
+2. **The vendor bounds `len` FROM BELOW ONLY.** `apmib.c:469` refuses
+   `len < sizeof(HW_SETTING_T)+1` and compares it against nothing else;
+   `HW_SETTING_SECTOR_LEN` appears only on the *compressed* path (`:369`,
+   `:1626`). 量 by grep: there is no upper bound on the uncompressed path, so
+   a corrupt length makes the vendor read straight through this window and
+   into `DEFAULT_SETTING` at `0x8000`. **Any parser of ours must clamp, and
+   that clamp is ours and not the vendor's.**
+3. **`"H6"` is not the only tag the vendor accepts.** `apmib.c:338` also takes
+   `"Hf"` and `"Hu"`; anything else means a COMPRESSED block with a different
+   layout, not a corrupt one. So `hw_sig_ok 0` means *not the uncompressed H6
+   form*, which is a stricter test than the vendor's and must not be reported
+   as *corrupt*.
+4. **The body holds TEN more MACs, not two.** *"then the per-radio calibration
+   block"* understates it: `HW_WLAN_SETTING_T` opens with `macAddr` …
+   `macAddr7`, **eight further 6-byte MACs** (`mibdef.h:21-28`), and
+   calibration starts 48 bytes in. `nic0Addr` is at body **+1** (one byte of
+   `boardVer` first), absolute `0x6007` — the one offset `MT-MAC` needs, and
+   it is confirmed.
 
 🟢 **`/bin/flash test-hwconf` does exactly this and exits 0 or −1**, and the
 literal is 量 present in this unit's own `/bin/flash`. 🔴 **It is not available
@@ -409,10 +455,10 @@ distribution, not a sample from it.
 
 | | |
 |---|---|
-| `MT-FLASH-1` needs an `rdid` verb in `rtl819x-spi` | 量: that driver does not issue `RDID` today, and its own contract is that it **never writes `SFCR`** — which the loader's `ComSrlCmd_RDID` does. 🔴 **And this repository already holds material on it that this row's first draft did not point at** — found by this segment's own closeout audit, not while writing the row. `PROGRESS.md`'s `C-3` records 讀 that `ComSrlCmd_RDID()` at `0x804058bc` **spins on `SFCSR` bit 27 and writes `0x9F000000` to `SFDR`**, while `rtl819x-spi.c:59` says it **rewrites `SFCR`**. Two readings of one routine from two disassemblies, and they are not in conflict — they name different registers, so the routine plausibly touches all three. **So the question is narrower than this row first stated**: not *does RDID touch `SFCR`* but *does the sequence THIS driver would need to*. `P1-1` reconciles the two readings before it writes a verb |
+| `MT-FLASH-1` needs an `rdid` verb in `rtl819x-spi` | ✅ **CLOSED 2026-09-17 (`P1-1`), and the question was wrong twice over.** 🔴 **量: this driver has NEVER had that contract.** The only *never writes it* in `rtl819x-spi.c` is line 110 and its subject is **SFCSR's `CMD_BYTE` field**, not `SFCR`; the driver writes `SFCR` on every transaction at `:619`, restoring what `:583` read. The true invariant is narrower and stronger — it never writes a value of its OWN choosing, and `release()`'s read-back enforces that rather than asserting it. 🔴 **讀: and the `C-3` excerpt is a PARTIAL VIEW.** `docs/loader-flash-write.md:137` opens at `0x8040591C`; the routine starts at `0x804058BC`, so **96 bytes and 24 instructions precede it and nothing said so**. A fresh disassembly of the whole routine (same recipe, same `sha256 f88869d1…`) shows the order: spin → **`SFCR = 0xFFC00000` at `0x80405900`** → a CS idle toggle → `SFCSR_CS_L` at `0x80405914` → the opcode. **CS is asserted sixteen instructions AFTER the SFCR write**, so that write is bus setup at probe time and not a step the opcode needs. And 量 seating 16 read live `SFCR = FFC00000` under Linux — the exact word `ComSrlCmd_RDID` writes — so it would be idempotent here anyway. **The verb writes no `SFCR` and the reason is measured, not hoped.** `SPEC.md` `LDR-43`/`REG-39` |
 | `MT-MAC` / `MT-RFCAL` need an `h601` verb | ~30 lines, verdicts only, §4 |
-| `MT-PORT`'s surface is 推 | `/proc/rtl865x/port_status` is the vendor NIC driver's; whether it exists in *this* kernel is unmeasured |
-| the image is a second build-matrix entry | `RECIPE_ID` differs, so the boot-capture byte count is **re-derived, not copied** |
+| `MT-PORT`'s surface is ~~推~~ ✅ **讀 + 量-on-artefact 2026-09-17** | **CLOSED AT THE DESK, zero bench time.** `CONFIG_RTL_DEBUG_TOOL` is a *promptless* `default y` symbol (`drivers/net/rtl819x/Kconfig:45-47`) so it cannot be switched off from a menu; it is `=y` in the board template and `config/rlxfw-kernel.delta` is silent on it. The entry is created at `rtl865x_proc_debug.c:5854` under `#if CONFIG_RTL_PROC_DEBUG \|\| CONFIG_RTL_DEBUG_TOOL`. 🟢 **And the artefact agrees TWO-SIDED**: `strings` over my own `vmlinux` finds `port_status`, `rtl865x` and `Dump Port Status:` present, and `vlan`, `netif`, `priveSkbDebug` — the entries gated on `CONFIG_RTL_PROC_DEBUG` ALONE, which is off — absent. Every entry the config predicts present is present and every one it predicts absent is absent. 🔴 **And the pass criterion was written against the wrong index space**: the file prints SWITCH port indices, and 量 `NET-13` says this kernel's netdev map is the MIRROR of the vendor's, so the operator's jack is **switch port 3** (`eth4` here). The token is **`Port3`**, not `Port4`. `SPEC.md` `NET-27` |
+| the image is a second build-matrix entry | 🔴 **量 2026-09-17: `RECIPE_ID` MOVES NO BYTES.** `RLXFW-ID0=XXXXXXXX` is twenty bytes whatever the digest is, so this row's stated reason does not hold. What would move the count is a different `/init`, which changes the 93-byte userspace tail. ✅ **Re-derived rather than copied, by `tools/bootbytes.py`**: `boot_bytes = 710 + Σ marks`, with the 710 recomputed independently from **95 committed captures spanning seven images** and coming out to one value. The two new verbs' marks (`S-RDID`, `S-H601`) are on-demand and fire only when the verb is typed, so **the prediction is 1,637 — unchanged — and that is a derivation, not a copy**. The script ships as `/bin/mfgtest`, a file nothing execs, which the `/bin/uprobe` precedent in `config/rlxfw-initramfs.tsv` already measured as costing 0 bytes. So there is no second image: `P1-3` types `mfgtest auto <id>` at the shell. `SPEC.md` `FW-86` |
 | what the device can actually run is now measured | `config/image-commands.tsv` and `tools/appletcensus.py` — §8 |
 
 ---
@@ -436,9 +482,9 @@ rather than by offset, and never executes anything. 量:
 
 | | |
 |---|---|
-| the binary | this unit's own `/bin/busybox`, **273,332 bytes**, `BusyBox v1.13.4 (2018-01-10 14:56:45 CST)`, declared at `config/rlxfw-initramfs.tsv:104` |
+| the binary | this unit's own `/bin/busybox`, **273,332 bytes**, `BusyBox v1.13.4 (2018-01-10 14:56:45 CST)`, declared at `config/rlxfw-initramfs.tsv:105` |
 | applets | **50** — against `FW-25`'s independently measured 50, by a different method with no shared code |
-| ash builtins | **40** — `cardcheck.py:370`'s own refusal message says *"this project has never read this binary's builtin table"* |
+| ash builtins | **40** — `cardcheck.py:451`'s own refusal message says *"this project has never read this binary's builtin table"*. 🔄 **Was `:370`; that row moved when `P1-1` inserted the `CARD-4` correction above it, and `citecheck` caught the rot on the same segment that caused it** |
 | controls | **19 of 19** silicon readings reproduced: 15 present, 4 absent, from three sources |
 | one of them out-of-sample | `seq` was registered **after** the extractor had run, found by censusing every `sent` field in `bench/**/*.meta.json`. `bench/2026-09-14c/X-seq.log`: `busybox seq 3` → `seq: applet not found` |
 

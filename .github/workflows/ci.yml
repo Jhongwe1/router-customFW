@@ -376,6 +376,32 @@ jobs:
       - name: test-flrbracket-mutants
         run: /usr/bin/python3 tools/test-flrbracket-mutants.py --jobs 8 2>&1 | tee ci-out/test-flrbracket-mutants.out; exit "${PIPESTATUS[0]}"
 
+      # P1-2's injection harness.  It runs config/mfgtest.sh -- the device-side
+      # factory checks -- against a fixture of /proc files and requires each
+      # injection to turn the check it NAMES red.  It needs no board and no
+      # $FWRE_WORK, because mfgtest.sh reads everything through $MFG_ROOT.
+      #
+      # The five class-R/P rows are physical (unplug the cable, lock a gpio
+      # line, do not press the button) and stand down here as one skip line;
+      # P1-4 runs them on the die.
+      #
+      # Its C1 control is the one that earns its place: it takes each rlxfw
+      # driver's own /proc format strings out of the C and requires every
+      # field the script reads to be emitted by the driver that owns that
+      # file.  量 on its first run, that caught a real defect -- the timer
+      # emits `name=value` where every other driver emits `name value`, so
+      # the script could not read a single field of /proc/rtl819x-timer, and
+      # the fixture had been written in the same wrong format as the parser.
+      - name: mfginject
+        run: /usr/bin/python3 tools/mfginject.py 2>&1 | tee ci-out/mfginject.out; exit "${PIPESTATUS[0]}"
+
+      # P1-1's DoD requires the boot-capture byte count to be re-derived rather
+      # than copied.  bootbytes is that derivation as a command: it recomputes
+      # the non-mark constant from every committed boot capture and requires
+      # ONE value across all of them (量 710, 95 captures, seven images).
+      - name: bootbytes
+        run: /usr/bin/python3 tools/bootbytes.py 2>&1 | tee ci-out/bootbytes.out; exit "${PIPESTATUS[0]}"
+
       # repdiff answers the question sha256sum cannot: WHICH bytes differ
       # between two builds of one tree, and in which section and symbol.  Its
       # controls build ELF32 big-endian images in memory, so nothing here needs

@@ -169,6 +169,42 @@ FLR_LEGACY_CARDS = {
 # suppressed by this list is REPORTED with the reason rather than passed in
 # silence, and `echo` -- the only one any card has used -- is also a declared
 # symlink, so nothing currently rests on the list at all.
+#
+# 🔄 2026-09-17 (`P1-1`, `CARD-4`).  THE SIX LINES ABOVE ARE NOW FALSE AND ARE
+# KEPT WORD FOR WORD, because `notes/rootfs-census.md:371` cites line 166 by
+# its text and because the record of having been wrong is worth more than a
+# tidy comment.  What changed:
+#
+#   量 2026-09-16, `tools/appletcensus.py`: this binary's builtin table HAS
+#   been enumerated, statically, out of the ELF.  It is **40** names and it is
+#   committed at `config/image-commands.tsv`.  The 27-name guess above has
+#   zero false positives and is short by **thirteen**, of which eleven are not
+#   also applets:
+#
+#       [[ alias bg chdir fg jobs let printf pwd readonly unalias
+#
+#   🔴 `printf` is the one that matters.  `awk` is genuinely absent from this
+#   image (`FW-83`), so `printf` is the only formatting primitive a
+#   device-side test has -- and `config/mfgtest.sh`, which `P1-1` writes,
+#   types it.
+#
+# 🔴 AND THE LAST CLAUSE ABOVE WAS THE MISLEADING PART, not the first.
+# *"nothing currently rests on the list at all"* reads as *a name on this list
+# is allowed*.  It is not: landing on `ASH_BUILTINS` appends an ISSUE with
+# different wording, and `cards_commands()` counts any non-absent issue as
+# `bad`.  So before today a card typing `exec` FAILED, exactly as one typing
+# `awk` did, and only the message differed.  Widening the set would have
+# changed the message and not the verdict.
+#
+# So the fix is not a wider guess.  There are now THREE outcomes:
+#
+#   量 measured present  ->  silently allowed.  It is in this image.
+#   推 guessed only      ->  allowed WITH the caveat issue, as before.
+#   neither              ->  NOT IN IMAGE.
+#
+# `MEASURED_BUILTINS` below is the first of those, and it is read from the
+# committed census rather than copied into this file -- a second copy here
+# would be a second owner of a set that is already measured.
 # ----------------------------------------------------------------------------
 # 🔴 `--idle N` IS *N SECONDS SINCE THE LAST BYTE ON THE WIRE*, so a payload
 # whose first act is a silence longer than N ends its own capture in the middle
@@ -235,6 +271,47 @@ ASH_BUILTINS = {
     "test", "times", "trap", "true", "type", "ulimit", "umask", "unset",
     "wait", "[",
 }
+
+# The MEASURED census: `tools/appletcensus.py extract` reads this unit's own
+# busybox statically and writes this file.  It is the 量 half of the 推 set
+# above, and it is READ rather than copied -- see the 🔄 note by line 172.
+IMAGE_COMMANDS = "config/image-commands.tsv"
+
+
+def measured_builtins():
+    """The ash builtin names measured in this image's own busybox.
+
+    Returns an EMPTY set if the census is missing or unparsable, and the
+    caller must treat that as "fall back to the 推 list", never as "this
+    image has no builtins" -- an empty set read as authoritative would make
+    every builtin NOT IN IMAGE, which is the same defect this fixes with the
+    sign flipped.  `A25` is the control on exactly that.
+    """
+    out = set()
+    try:
+        raw = _read(IMAGE_COMMANDS).decode("utf-8", "replace")
+    except OSError:
+        return out
+    for line in raw.splitlines():
+        if not line or line.startswith("#") or line.startswith("kind\t"):
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[0] == "builtin":
+            out.add(parts[1])
+    return out
+
+
+_MEASURED = None
+
+
+def _measured():
+    """Cached, because the corpus sweep classifies thousands of commands and
+    re-reading the census per command would make `B1` quadratic for nothing."""
+    global _MEASURED
+    if _MEASURED is None:
+        _MEASURED = frozenset(measured_builtins())
+    return _MEASURED
+
 
 # Word separators that start a NEW simple command, so the word after them is
 # also an argv[0].  A card that writes `a | b` invokes two programs.
@@ -365,6 +442,10 @@ def classify_command(cmd, names, paths, allow_flr=False):
                 issues.append(f"{w}: no such path in the declaration")
             continue
         if base in names:
+            continue
+        # 量 first, 推 second.  A name measured in this image's own builtin
+        # table is allowed SILENTLY -- there is nothing left to caveat.
+        if base in _measured():
             continue
         if base in ASH_BUILTINS:
             issues.append(f"{base}: ALLOWED as an ash builtin -- 推, this "
@@ -938,6 +1019,64 @@ def run_controls():
     noisy = [q for q in quiet if idle_under_sleep(q)]
     row("A24", "and a cell that is FINE is not touched by it",
         not noisy, f"{len(noisy)} of 3 flagged" + (f": {noisy}" if noisy else ""))
+
+    # ----------------------------------------------------------------- A25
+    # `CARD-4`.  The measured builtin table is load-bearing, so it gets a
+    # population floor BEFORE anything uses it.  An empty or unparsable
+    # census would make `_measured()` return the empty set, and every builtin
+    # would fall through to the 推 list or to NOT IN IMAGE -- which is this
+    # bug again with the sign flipped, and silent.
+    meas = measured_builtins()
+    row("A25", "the measured builtin census parses and is a population",
+        len(meas) >= 30 and "printf" in meas and "read" in meas,
+        f"{len(meas)} builtin(s) from {IMAGE_COMMANDS}; "
+        f"printf={'printf' in meas} read={'read' in meas}")
+
+    # ----------------------------------------------------------------- A26
+    # 🔴 THE CONTROL THAT SAYS IT IS A GUARD AND NOT A BLANKET.  Widening a
+    # suppression set and deleting the check print the same green, and the
+    # only difference visible from outside is whether something still fails.
+    # `awk` is 量 ABSENT from this image (`FW-83`), and `FW-42` measured that
+    # even `grep` is here with `-E` missing -- so a name that is neither an
+    # applet, nor a declared symlink, nor a measured builtin must still be
+    # reported.
+    nm, ph = load_decl()
+    _k, blanket = classify_command("awk '{print $1}' /proc/uptime", nm, ph)
+    _k, blanket2 = classify_command("nosuchtool -x", nm, ph)
+    row("A26", "a word in NO population is still NOT IN IMAGE",
+        any("NOT IN IMAGE" in i for i in blanket) and
+        any("NOT IN IMAGE" in i for i in blanket2),
+        f"awk -> {len(blanket)} issue(s), nosuchtool -> {len(blanket2)}")
+
+    # ----------------------------------------------------------------- A27
+    # And the thing `P1-1` actually needs: a MEASURED builtin passes with no
+    # issue at all, not with a differently-worded one.  🔴 This case FAILS on
+    # the implementation that existed before today, where `printf` produced
+    # `NOT IN IMAGE` -- it is the fixture the change required.
+    _k, pf = classify_command("printf '%s\\n' hello", nm, ph)
+    row("A27", "a MEASURED builtin is allowed SILENTLY, not re-worded",
+        not pf, f"printf -> {len(pf)} issue(s)"
+        + (f": {pf}" if pf else ""))
+
+    # ----------------------------------------------------------------- A28
+    # 🔴 THE 推 BRANCH IS CURRENTLY UNREACHABLE, AND THAT IS A READING.
+    #
+    # 量 2026-09-17: ASH_BUILTINS is a strict SUBSET of the measured table --
+    # 27 of 40, zero false positives -- so every name that would have taken
+    # the caveat branch now takes the silent one before it.  The branch is
+    # kept rather than deleted because `appletcensus`'s T6 pins only the
+    # DIRECTION (推 must stay a subset), not equality: a future hand-added
+    # guess, or a census taken from a different busybox, makes it live again.
+    #
+    # This case exists so that stops being invisible.  If it ever goes red,
+    # the caveat branch has become reachable and somebody should know which
+    # name did it rather than discovering it in a card refusal.
+    only_guessed = sorted(ASH_BUILTINS - meas)
+    row("A28", "every 推 builtin is also a MEASURED one, so the caveat "
+        "branch is unreachable",
+        not only_guessed,
+        "推 is a strict subset of 量 (27 of 40)" if not only_guessed
+        else f"reachable via: {only_guessed}")
 
     # ------------------------------------------------------------------- B10
     # 🔴 THE CORPUS SWEEP, IN BOTH DIRECTIONS.  Forwards: no card outside the

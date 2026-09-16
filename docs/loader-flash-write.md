@@ -189,8 +189,39 @@ reset value `11`** — `SPI_RDY` = 1 (ready), `IO_WIDTH` = `00` (serial),
 `CHIP_SEL` = 0, and `CMD_BYTE` = **`0x05`**, which is the SPI `RDSR` opcode.
 `SFCR2`'s top byte is **`0x0B`**, `Fast Read`.
 
-**So this loader does not leave the controller at reset; it leaves it configured
-for status polling**, with the memory-mapped read command set to `Fast Read`.
+~~**So this loader does not leave the controller at reset; it leaves it configured
+for status polling**, with the memory-mapped read command set to `Fast Read`.~~
+
+🔴 **REFUTED 2026-09-17 (`P1-1`), and by a disassembly of code this
+repository has held since 2026-08-23.** Both halves of that decode read a
+CONSTANT as a decision.
+
+`SFCSR_CS_H` at `0x80405868` — which every SPI operation in this loader ends
+with — composes its word as
+
+```
+80405870   li   v0,1
+80405874   .word 0x43180A          ; movz v1,v0,v1   -- len 0 becomes len 1
+80405894   sll  v0,a2,0x19         ; iowidth << 25
+80405898   sll  v1,v1,0x1c         ; len     << 28
+804058a0   lui  v0,0xc805          ; 0xC8050000
+804058b0   sw   v1,0(v0)           ; SFCSR = 0xC8050000 | len<<28 | iow<<25
+```
+
+* **`CMD_BYTE = 0x05` is baked into `lui v0,0xc805`.** It is written on *every*
+  CS transition regardless of which command ran, so it carries no information
+  about the last transaction. *The `RDSR` the loader left configured* is not
+  something the reading can support.
+* **`LEN = 01` is the `movz`.** 量: seven of the eight call sites of `CS_H` pass
+  `a1 = 0`, and `movz` turns 0 into 1. So `0xC8050000 | (1 << 28)` =
+  **`0xD8050000`** — bit for bit the value `REG-13` measured at the prompt on
+  2026-08-25, twenty-three days before this was traced.
+
+🟢 **A 讀 that predicts a 量 taken three weeks earlier, to the bit.** And it
+is corroborated from the other side: the vendor's LINUX build of the same
+routine composes from `lui 0xc800` with no `movz`, giving `0xC8000000`, which
+is what seating 16 measured under Linux. **Two builds of one vendor function,
+each measured value its own build's composer constant.** `SPEC.md` `REG-39`.
 That is a fact `R5b` needs and it was not in any of the three sources.
 
 🔴 **A prediction of mine was refuted here, and it is kept.** `ComSrlCmd_RDID()`

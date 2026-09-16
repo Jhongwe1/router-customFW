@@ -66,7 +66,7 @@ that could produce nothing and cost a boot.**
 
 ### ③ `cardcheck commands` will report five issues per loop cell and exit 1
 
-`argv0s()` (`tools/cardcheck.py:294-319`) has no notion of shell keywords, so
+`argv0s()` (`tools/cardcheck.py:371-396`) has no notion of shell keywords, so
 after each `;` it takes the next word as an `argv[0]`: `n=0`, `while`, `do`,
 `n=$((n+1))` and `done` are all reported *NOT IN IMAGE*. The mechanism for that
 is a ```` ```cardabsent ```` fence (`:389`, `:428-434`), which reports them as

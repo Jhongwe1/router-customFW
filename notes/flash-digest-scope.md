@@ -237,7 +237,18 @@ the three items above, not on that flag.
 ### 8.2 The bisection, and the limit that comes with it
 
 `verify <n>` hashes `[0, min(n,0x6000))` and `[0x8000, n)`, rounding `n` down to
-`RTL819X_SPI_CHUNK` = 4096 (`rtl819x-spi.c:765`, `limit &= ~(CHUNK-1u)`). Nine
+`RTL819X_SPI_CHUNK` = 4096 (`rtl819x-spi.c:394` for the value,
+`rtl819x-spi.c:941` for the rounding — `len &= ~(RTL819X_SPI_CHUNK - 1u);`).
+🔴 **This read `:765` with the token `limit &= ~(CHUNK-1u)` until 2026-09-17,
+and that citation never pointed at what this sentence claims.** 量 at `HEAD`
+before that segment's edits, line 765 was `0xF6, 0xEC, 0xED, 0xD4, …` — a
+sha256 known-answer vector. It went undetected because `citecheck` reports a
+citation into a NON-blank line differently from one into a blank line, and
+`P1-1`'s insertions happened to push a blank line onto 765. **So this was
+exposed by an unrelated edit rather than found, which is the second time that
+has happened to this file's citations** — and the token was also misquoted
+(`limit` for `len`, `CHUNK` for the full macro name), so a reader following it
+would have found nothing under either spelling. Nine
 rungs, each compared against the dump computed to the same scope:
 
 | `verify n` | hashed | verdict |

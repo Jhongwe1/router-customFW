@@ -206,7 +206,7 @@ builds its word from `lui 0xc800` — `SPI_CSB(3) | SPI_RDY(1)` — or'd with
 
 **So the last write to `SFCSR` before `rtl819x_spi_init` reads it is
 `0xC8000000`**, and `REG-13` measured `D8050000` at the loader prompt
-(`LEN` = 01, `CMD_BYTE` = `0x05`, the `RDSR` the loader left configured).
+(`LEN` = 01, `CMD_BYTE` = `0x05`, ~~the `RDSR` the loader left configured~~ — 🔴 **refuted 2026-09-17: both fields are constants of the LOADER's own `SFCSR_CS_H` composer, `lui 0xc805` plus a `movz` that turns `len` 0 into 1. `0xD8050000` is what that composer writes and says nothing about the last command.** `docs/loader-flash-write.md`, and it strengthens this section rather than weakening it: the LINUX build of the same routine composes from `lui 0xc800` with no `movz`, which is exactly the `C8000000` measured here).
 `S3` is therefore a second 讀 → 量 in the same mark set, derived the same
 way and falsifiable the same way. ⚠️ It assumes nothing reads flash
 between `device_initcall` and `late_initcall`; if `S3` comes back as something
@@ -796,3 +796,135 @@ rather than 4,186,112.
   counter read; the card's § 6 claimed they would and no cell tested it.
 * ***Proven identical* still means *digests agree with the 2026-08-16 dump***.
   It cannot see two writes that cancel, and **no `FLR` full re-dump has run**.
+
+
+---
+
+## 11. 🆕 2026-09-17 (`P1-1`, desk, no power): 1.2 — two verbs, a page budget, and the contract this file was supposed to have
+
+### 11.1 🔴 The blocking question was framed on a sentence that is not in this file
+
+`docs/mfgtest.md` §7 opened `P1-1` with an undetermined question: `MT-FLASH-1`
+needs `RDID`, and *"this driver's own contract is that it **never writes
+`SFCR`**"*, while the loader's `ComSrlCmd_RDID` does.
+
+量, by grep: **the only `never writes` in `rtl819x-spi.c` is line 110, and its
+subject is SFCSR's `CMD_BYTE` field.** There is no such contract about `SFCR`
+and there never was. This driver writes `SFCR` on **every** transaction, at
+`:619`, inside `release()`.
+
+The true invariant is narrower, stronger, and enforced rather than asserted:
+
+> **`SFCR` is never written with a value of this driver's own choosing.**
+> `release()` writes back exactly what `claim()` read at `:583`, then reads it
+> back at `:624` and compares at `:634`. `n_state_bad` is what fires if the
+> restore did not take, and `wedge` is the positive control that makes that
+> counter able to move.
+
+⚠️ Worth stating plainly, because the wrong version is the memorable one: the
+false sentence is **simpler**, which is exactly why it propagated into another
+document and became a question that blocked a step.
+
+### 11.2 🔴 And the `C-3` excerpt everyone had been reading is a partial view
+
+`docs/loader-flash-write.md:137` says the routine *"sits at `0x804058bc`"* and
+then prints a listing that begins at `0x8040591C`. **96 bytes and 24
+instructions separate those two addresses, and nothing says the listing is
+elided at the front.** The `SFCR` write lives in them.
+
+Re-derived with the recipe `docs/loader-command-semantics.md` already carries
+(`stage2.bin`, sha256 `f88869d1…`, which was re-checked and matches):
+
+| | |
+|---|---|
+| `804058E4` | spin on `SFCSR` bit 27 |
+| `80405900` | **`SFCR = 0xFFC00000`** |
+| `80405904` | `jal 0x804057AC` — CS_L/CS_H twice, an idle toggle |
+| `80405914` | `jal SFCSR_CS_L(chip, 0, 0)` — **the transaction starts here** |
+| `80405944` | `SFDR = 0x9F000000` |
+| `80405954` | `jal SFCSR_CS_L(chip, n-1, 0)` |
+| `8040595C` | `lw SFDR` |
+| `80405968` | `jal SFCSR_CS_H(chip, 0, 0)` |
+
+**CS is asserted sixteen instructions after the `SFCR` write**, so that write
+is bus setup done at probe time when the divider is unknown — not a step the
+opcode needs. And §3.1 above already measured the divider under Linux as
+`FFC00000`, the exact word `ComSrlCmd_RDID` writes, so it would be idempotent
+here in any case.
+
+🟢 Two further readings fall out. `ComSrlCmd_RDID` takes **two** arguments and
+both callers pass `nbytes = 4` (`80405050`, `8040505C`, each `li a1,4`), with
+`80405064` taking the top three bytes — which is `REG-21`'s stored `001C7016`.
+So `rdid` here reads four bytes and shifts, reusing the one phase width this
+controller is 量 to have served 4,115 times.
+
+⚠️ **The `SFCR` write itself is not a new finding** — `notes/kernel-build.md`
+§19.7 recorded stage 2 writing it twice (`0x804055F8`, `0x80405900`) on
+2026-08-31. What is new is the **order**, and the order is the whole question.
+
+`SPEC.md` `LDR-43`.
+
+### 11.3 The two verbs
+
+`rdid` is a sibling of `read_pio`: `claim` → `cs_low(0)` → `SFDR = 0x9F000000`
+→ `cs_low(3)` → `rd(SFDR)` → `release`. It moves `n_xfer` and `n_reg_writes`,
+gets its own `n_rdid`, and **must not move `n_pio_bytes`** — that counter means
+*flash array bytes*, and `RDID` reads none of them.
+
+🔴 **It emits a class of value this file's alphabet did not contain.** The
+header permits *digests over the complement, an offset, counters and controller
+registers*; a JEDEC id is none of those. It is admissible because it identifies
+the **part** and not this **unit**, and the value is already committed twice
+(`FLS-04`, `REG-21`). That widening is declared in the verb's own comment
+rather than left for a reviewer to infer.
+
+`h601` parses the hardware-settings block and prints **verdicts only**.
+🔴 **It has to justify itself against `map 1 0`, which already emits a
+PIO-vs-MMIO equality boolean for both H601 pages** — so a verb that reported
+equality again would be a second instrument measuring one thing, and its zero
+would mean nothing. What it answers that `map` cannot is whether the bytes
+**parse**: a page can be read identically by two paths and still hold a block
+whose checksum does not close.
+
+Four corrections to `docs/mfgtest.md` §4 went into it, all 讀 and three of them
+changing a parser — `len` is **big-endian** (§4 was silent), the vendor bounds
+it **from below only**, `"H6"` is not the only accepted tag, and the body holds
+**ten** MACs rather than two. `SPEC.md` `FLS-29`.
+
+⚠️ And the buffer is zeroed before `kfree`: it held this unit's MAC, the page
+goes back to the allocator, and `MEM-17` measured this DRAM keeping a previous
+power cycle's contents.
+
+### 11.4 🔴 The page budget, and where it does NOT reach
+
+§9.1 gave the *map's* `read_proc` a budget because its output grows with a
+loop. The first file's output grows when someone adds a field, which is slower
+and just as unbounded — and it had no budget at all, while the header had named
+the hazard since 1.1.
+
+量 before the new fields: the widest this handler could already produce is
+**1,101 bytes**. The sixteen new fields add at most **340**, and the
+self-measuring line after them at most **40**, so `RESERVE` is 380 rounded to
+512 against a `BUDGET` of 3,584.
+
+⚠️ **It guards what follows it and nothing above**, and that is stated in the
+code rather than left to be found: retro-fitting a check to 48 existing
+`sprintf()`s would be a large edit to code that is 量 to fit, and a large edit
+to working code is its own risk.
+
+🔴 That arithmetic was got **wrong** on the first pass — *"fourteen fields, 317
+bytes"* — and re-derived by script rather than patched, because a field count
+and a reserve that are both wrong by the same amount stay self-consistent
+forever.
+
+### 11.5 What 1.2 does not establish
+
+* **Nothing here has run on the silicon.** `p11a` builds, the marks verify, and
+  `rdid_ran` / `h601_ran` have never been anything but 0. `P1-3` is the first
+  reading.
+* **`d1_match` still has no positive control**, unchanged from §8.
+* **The `rdid` sequence is the loader's order**, not a measured-optimal one —
+  the same limit §8 states for the Fast Read.
+* **`h601`'s clamp is mine.** The vendor has no upper bound at all, so there is
+  no prior art saying `0x1FFA` is the right ceiling; it is the ceiling that
+  keeps every access inside the 8 KiB actually read.

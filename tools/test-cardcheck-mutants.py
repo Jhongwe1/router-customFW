@@ -73,6 +73,18 @@ MUT = [
      '    "bench/2026-08-31/PREDICTIONS-B5-block3.md",',
      '    "bench/2026-08-31/PREDICTIONS-B5-block3-NOTHING.md",'),
 
+    # `CARD-4`, 2026-09-17.  Two mutants because the change has two halves
+    # that fail in opposite directions: the census can stop being READ, and
+    # the branch that consumes it can stop being TAKEN.  One mutant would
+    # leave the other half unobserved.
+    ("M23 the measured builtin census parses to nothing     (kills A25)",
+     '        if len(parts) >= 2 and parts[0] == "builtin":',
+     '        if False:'),
+
+    ("M24 the measured branch is never taken                (kills A27)",
+     "        if base in _measured():\n            continue",
+     "        if False:\n            continue"),
+
     ("M7  MDIOR removed from the verb list                  (kills B2)",
      '"PHYR", "PHYW", "MDIOR", "MDIOW",',
      '"PHYR", "PHYW", "MDIOW",'),
