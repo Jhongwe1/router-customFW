@@ -619,7 +619,7 @@ still happen, the other requires the zero to be capable of being non-zero.
 `docs/bringup.md` and `notes/device-tree.md` — **six sites in three files**,
 量 by a repo-wide grep at closeout, after the first draft of this section had
 already said there were two.
-`config/rlxfw-kernel.delta:82` — written 2026-09-06, at `R5-4` — calls it
+`config/rlxfw-kernel.delta:89` — written 2026-09-06, at `R5-4` — calls it
 **`LEDS_GPIO`**, and `docs/KNOWN-ISSUES.md` calls it `leds-gpio`, and says `CONFIG_GENERIC_GPIO` *"is what `R5-7` (LEDS_GPIO)
 and `R5-8` (KEYBOARD_GPIO) both depend on"*. 🔴 **Five owner files have been
 saying two different things about one step for four days, three against two.**
