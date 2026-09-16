@@ -211,6 +211,9 @@ conclusion and silent about the inputs.
 | `TC-56` | tc | y | . | . | . | 量 | `TC-50` | a 32-bit rsdk driver cannot stat a source file on DrvFs -- `cc1` dies with `Value too large for defined data type` against an inode that does not fit a 32-bit `struct stat`, while the same bytes on ext4 compile. What is held is that the message names the C file and therefore reads as a defect in it; what is NOT held is any claim about which other vendor binaries share the limit, because only the compiler driver was tested |
 | `TC-57` | tc | y | . | . | . | 量 | `TC-05` | `TC-05`'s own criterion -- pass `hazlint` with 0 violations -- run for the FIRST time over a whole `libc.a`, in all three releases, two scans each: the linked `-Os -static` sample and `ar x` plus `ld -r` so no member boundary is read across. 1.3.6-4181 reads 0 over 19,096 loads with 4,051 nops (21.21 %); 1.3.6-5281 reads 140 and 4,574 over 19,141 with ONE nop (0.01 %); 1.5.5-5281 reads 128 and 3,741 over 14,491 with none. It discriminates uniquely and selects 1.3.6-4181. Two bounds: `hazlint --isa` is rc=1 in all three, so reading the criterion as `--isa` 0 as well selects nothing; and 1.5.5 is eliminated by violations and NOT by `lwl`/`lwr`, which this die executes |
 | `TC-58` | tc | y | . | . | . | 量 | `TC-57` | the first binary this project has compiled that runs as a Linux process -- `R1c`'s column-2 instrument, 29,184 stripped, 40,188 ELF, entry 0x400160, flags 0x1005 noreorder cpic o32 mips1, no `PT_INTERP`, 75 `_w` symbols, `hazlint` 0 violations in 938 loads. `R1C-1-b`'s literal zero-`break` gate is NOT met: exactly two, both inside `__GI_abort`, counted by opcode rather than by a disassembler's mnemonics. The gate is bounded rather than waived |
+| `TC-59` | tc | y | . | . | . | 量 | `TC-55` | the silicon column of the `R2c` table, and the three columns agree. Twelve compiler invocations, one per row of `tools/isa-toolchain.tsv`, all compiling the same one-line fragment at identical flags, executed on the die at seating 22: 12 of 12 read the verdict their `pad` column predicted before power. Same toolchain, two `-march` values -> the behaviour changes, three times; three toolchains, one `-march` -> it does not, across gcc 3.4.6, 4.4.5 and 12.4.0. So the padding is a function of the FLAG and the compiler is not a variable in it. This is `TC-55`'s desk reading with the die's own answer under it; it says nothing about the prebuilt `libc.a`, which is where the three do differ |
+| `TC-60` | tc | y | . | . | . | 量 | `TC-59` | the plan's second refutation condition for `R2c` fired and no file in this repository said so for two days. `plan:415-416` writes *three identical silicon results mean the table has no discriminating power, and that is itself a result to write down*; `TC-59` is that outcome. Two readings of the clause and the narrow one is taken: read as *all twelve rows the same* it did not fire (5 LOCK / 7 OPEN), read as *the three columns the same* it did, and a three-column table takes the second. What is NOT held is the plan's own gloss on the firing -- *this core's tolerance for codegen is higher than expected* is a statement about the core, and the core did not enter the result |
+| `TC-61` | tc | y | . | . | . | 量 ＋ 推 | `TC-57` | the choice `R2c` makes, and it is about packaging rather than about compilers. `TC-59` says the three code generators answer the load-delay question identically at matched `-march`; `TC-57` says the three shipped `libc.a` do not, 0 against 4,574 and 3,741. Both hold because `-march` is the variable on both sides, and `TC-57` already reads that off its own 0.01 % -- one padded load in 19,141 is none rather than fewer. So `rsdk-1.3.6-4181` is selected because its prebuilt library was built for a core without a load interlock. What is NOT held: that rebuilding uClibc at `-march=4181` would make the other two usable. That follows from `TC-59` and has not been done; `SPEC.md` marks the value 量 ＋ 推 because the fallback half of this row is an inference that has not been done, and the mark is about that half, which is why the route disagrees with it -- the selection itself rests on `TC-57` and `TC-59`, both 量 |
 | `lwl-codegen-sweep` | tc | y | . | . | . | — | `CPU-16` | 🔴 a three-toolchain by four-`-march` codegen sweep, recorded under a `CPU-*` id that a `TC-*` derivation cannot see, which is what a declared row is for. 🔴 Its headline -- 1.3.6 emits zero `lwl` and 1.5.5 emits four -- was narrowed on 2026-09-13: the two generations' raw drivers agree at zero and the asymmetry is the 1.5.5 wrapper injecting `-fuse-uls`. See `TC-50` |
 | `TC-01` | tc | . | y | y | . | 量 | `TC-09` | this unit's own kernel banner, and `TC-09` finds the same string in a shipped `boa`'s `.comment` -- two artefacts. The toolchain itself has never been run here: the only 1.5.5 on hand is 5281/p4 and this unit is 4181/p2 |
 | `TC-02` | tc | . | y | . | . | 推 | `TC-02a` | the banner match is evidence on artefacts and the CONCLUSION is a hypothesis until `R2a`; `SPEC.md` marks the value 推 for the conclusion, which is why the route disagrees with the mark |
@@ -257,12 +260,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:counts begin -->
 | | ① toolchain in hand | ② artefact | ③ vendor material | ④ nothing | ⓟ public | total |
 |---|---:|---:|---:|---:|---:|---:|
-| `R2c` recorded findings | 44 | 10 | 8 | 2 | 6 | **64** |
+| `R2c` recorded findings | 47 | 10 | 8 | 2 | 6 | **67** |
 | toolchain releases | 4 | 1 | 2 | 0 | 1 | **7** |
 
 | subject | `R2c` rows | toolchain rows |
 |---|---:|---:|
-| tc | 59 | 7 |
+| tc | 62 | 7 |
 | die | 1 | 0 |
 | both | 4 | 0 |
 <!-- tccensus:counts end -->
@@ -272,11 +275,12 @@ conclusion and silent about the inputs.
 <!-- tccensus:marks begin -->
 | `SPEC.md` V mark | ① | ② | ③ | ④ | declared disagreements |
 |---|---:|---:|---:|---:|---:|
-| 量 | 28 | 2 | 0 | 0 | 0 |
+| 量 | 30 | 2 | 0 | 0 | 0 |
 | 讀 | 15 | 6 | 4 | 0 | 15 |
 | 推 | 0 | 2 | 1 | 0 | 3 |
 | — | 0 | 0 | 0 | 1 | 0 |
 | (none) | 1 | 0 | 3 | 1 | 0 |
+| 量 ＋ 推 | 1 | 0 | 0 | 0 | 1 |
 <!-- tccensus:marks end -->
 
 ---

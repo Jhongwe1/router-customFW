@@ -28849,6 +28849,53 @@ dirty 而**被暫停**。那是工具正確的行為，也正是 `CLAUDE.md` ③
 以及一個會接受已完成工作的「接下來要做什麼」檢查。
 **四個都不會讓任何東西看起來壞掉。**
 
+### 7c. 🟢 而一支檢查器做了其他四支做不到的事，它抵掉了這一段的主題
+
+桁面 sweep 跑完：**93 宣告、2 跳過、91 跑、88 綠、2 預期紅、
+🔴 1 個非預期紅** —— `instruments/tccensus`。
+
+它的訊息：
+
+```
+FAIL U0  the committed table and document are clean -- got
+  L1 r2c: the instrument derives 'TC-59' and the table has no derived row for it
+  L1 r2c: the instrument derives 'TC-60' and the table has no derived row for it
+  L1 r2c: the instrument derives 'TC-61' and the table has no derived row for it
+RESULT: REFUSING -- the unmutated pair is already red, so no control below means anything
+```
+
+**我把三個 `TC-*` 加進 `SPEC.md` 而沒有補工具鏈普查表，而那張表是
+`R1-pub-0b` 的交付物。** 它的母體是「`SPEC.md` 持有的每一個 `TC-*` id」，
+所以我一加列它就知道。
+
+🟢 **三件事讓它跟今天其他四支分開：**
+
+① **它的母體是從另一個儀器導出來的，不是挑的。** 一個手選的清單會
+漏掉新加的列；從 `SPEC.md` 導出的清單不會。
+
+② **它雙向檢查**：`L1` 抱怨「儀器有而表沒有」，`L2` 抱怨「表有而沒有
+儀器導得出來」。一個只查一個方向的清單，可以靠不斷加列來永遠是綠的。
+
+③ 🟢🟢 **而最重要的是最後那一行：`REFUSING`。** 它後面還有一排突變體
+控制（故意改壞自己、看檢查會不會抱怨）。因為**未突變的那一對已經是紅的**，
+它不跑那些控制，並且說出理由：在一個本來就紅的樹上，每一個控制都會
+「成功」，而那個成功不含任何資訊。
+
+**這一段其他四個檢查器的毛病，都是「它以為自己在檢查、而其實沒有」。
+這一支的行為是「我現在檢查不了，而我說出來」。** 兩者的差別是一整段。
+
+修法：三列進 `tools/toolchain-census.tsv`（route `r1` —— 它的定義是「一個
+工具鏈程式被執行，**或它產生的產出物被執行**」，而這三列全建立在十二個
+編譯出來、在晶片上跑過的片段上），文件表由 `tccensus write` 重新生成。
+
+🔴 **而它接著又抓到第二件**：`L12` 報 `TC-61` 的 route 是 (1) 而 `SPEC.md`
+給它的標記是 `量 ＋ 推`，只到 (4)。**兩個檔案不同意。** 沒有把任一邊弄彎，
+而是用 `mx=y` 宣告這個分歧並寫下理由：那個 `推` 是在說 fallback 那一半（重建
+uClibc，沒做），而選擇本身建立在 `TC-57` 與 `TC-59` 上，兩個都是量。
+`mx` 欄存在的理由就是這個，而表裡已經有十八列用到它。
+
+重跑：`tccensus check` **ok, 74 列雙向**，自測 21/21。
+
 ### 8. 兩支儀器
 
 🟢 **`tools/ucostfit.py`**（894 行，37 斷言）是 `docs/rlx-isa.md` § 9 對每一個讀數
