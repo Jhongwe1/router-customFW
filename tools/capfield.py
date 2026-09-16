@@ -132,6 +132,105 @@ def fields(log, sent):
     return out, ee is not None
 
 
+WRAP = "\r\r\n"
+
+
+def wrap_census(root):
+    """Sweep every committed capture and bracket the line-editor wrap.
+
+    🔴 THE RULE HAS ONE OWNER AND THIS IS IT.  `echo_end` already walks the
+    echo stepping over CR and LF, which is the only reason a wrap inside the
+    echo can be told from the end of the command; a census that re-implemented
+    that walk would be a second definition of `FW-49` able to drift from the
+    first.  `tools/flashmap.py` importing `flashwin.overlaps_forbidden` is this
+    repository's precedent.
+
+    🔴 AND THE LOG IS READ AS BYTES.  `read_capture` does
+    `open(p, "rb").read().decode(...)`, which is what makes this measurable at
+    all: an ad-hoc sweep written with `io.open(p, encoding="utf-8")` gets
+    universal-newline translation, which turns the `\r\r\n` being counted into
+    `\n\n`, and reports ZERO wraps at every length -- including the 33 `FW-49`
+    recorded above 80.  量 2026-09-16: that is exactly what the first draft of
+    this measurement did, and the positive control below is what caught it.
+    """
+    import glob
+    import json
+    metas = sorted(glob.glob(os.path.join(root, "bench", "**",
+                                          "*.meta.json"), recursive=True))
+    rows, unmatched = [], 0
+    for m in metas:
+        try:
+            sent = json.load(open(m, encoding="utf-8")).get("sent")
+        except ValueError:
+            continue
+        if sent is None:
+            continue
+        prefix = m[:-len(".meta.json")]
+        try:
+            log, _s = read_capture(prefix)
+        except Refused:
+            continue
+        ee = echo_end(log, sent)
+        if ee is None:
+            unmatched += 1               # `FW-47`'s echo-interleaving family
+            continue
+        rows.append({"path": os.path.relpath(prefix, root),
+                     "n": len(sent), "sent": sent,
+                     "wrap": WRAP in log[:ee]})
+    wrapped = [r for r in rows if r["wrap"]]
+    plain = [r for r in rows if not r["wrap"]]
+    lo = min([r["n"] for r in wrapped], default=None)
+    # Everything longer than the shortest wrap that does NOT wrap is REPORTED,
+    # never dropped: on this corpus they are the loader's own long commands
+    # (`FW-49`'s stated negative control -- the loader has no line editor), and
+    # a new one would be a refutation rather than a footnote.
+    exceptions = ([r for r in plain if lo is not None and r["n"] >= lo]
+                  if lo is not None else [])
+    hi = max([r["n"] for r in plain if lo is None or r["n"] < lo], default=None)
+    return {"metas": len(metas), "rows": rows, "unmatched": unmatched,
+            "wrapped": wrapped, "plain": plain, "lo": lo, "hi": hi,
+            "exceptions": exceptions}
+
+
+def report_wrapcensus():
+    root = _repo_root()
+    c = wrap_census(root)
+    rows = c["rows"]
+    print("capfield wrapcensus -- `FW-49`'s threshold over the committed "
+          "corpus")
+    print("  %d .meta.json, %d with a `sent`, %d classified "
+          "(%d echo unmatched, `FW-47`'s family)"
+          % (c["metas"], len(rows) + c["unmatched"], len(rows),
+             c["unmatched"]))
+    buckets = {}
+    for r in rows:
+        b = buckets.setdefault(r["n"], [0, 0])
+        b[0 if r["wrap"] else 1] += 1
+    print("  len   wrap  nowrap")
+    for n in sorted(buckets):
+        w, p = buckets[n]
+        if w == 0 and n < 60:
+            continue
+        print("  %-5d %-5d %-5d" % (n, w, p))
+    print("  longest UNWRAPPED below the first wrap : %s" % c["hi"])
+    print("  shortest WRAPPED                       : %s" % c["lo"])
+    if c["hi"] is not None and c["lo"] is not None:
+        print("  -> the threshold T is in (%d, %d]" % (c["hi"], c["lo"]))
+        gap = [n for n in range(c["hi"] + 1, c["lo"] + 1)
+               if n not in buckets]
+        print("     lengths inside the bracket with NO capture: %s"
+              % (gap or "none -- T is pinned"))
+    for r in c["exceptions"]:
+        print("  exception: len=%d does not wrap -- %s  %r"
+              % (r["n"], r["path"], r["sent"][:48]))
+    if not c["wrapped"]:
+        print("capfield: REFUSING -- zero wraps at any length.  `FW-49` "
+              "recorded 33 above 80 on a smaller corpus, so a sweep that "
+              "sees none has a broken reader, not an empty corpus.")
+        return EXIT_REFUSED
+    return EXIT_OK
+
+
 def pick(values, name, nth=None):
     if not values:
         raise KeyError(name)
@@ -278,6 +377,32 @@ def selftest(verbose=True):
     ck("K9", pick(f["cmp_bytes"], "x") != "4194305",
        "a wrong expected value must not compare equal")
 
+    # ---- the wrap census, both controls and the reconciliation ----------
+    c = wrap_census(root)
+    nhi = len([r for r in c["wrapped"] if r["n"] >= 80])
+    # K10 POSITIVE.  `FW-49` measured 33 wraps above 80 over 713 captures; the
+    # corpus only grows, so fewer than 33 means the reader is broken.  量
+    # 2026-09-16: a draft written with universal-newline reads scored 0 here.
+    ck("K10", nhi >= 33,
+       "only %d wrapped capture(s) at len >= 80; `FW-49` recorded 33 on a "
+       "smaller corpus, so this reader is not seeing `\\r\\r\\n`" % nhi)
+    # K11 NEGATIVE.  A census that says everything wraps is as useless as one
+    # that says nothing does.
+    nlo = len([r for r in c["wrapped"] if r["n"] <= 70])
+    ck("K11", nlo == 0,
+       "%d capture(s) at len <= 70 reported as wrapped" % nlo)
+    # K12 the reconciliation: nothing may be lost between the sweep and the
+    # split, and every unwrapped capture at or above the first wrapping length
+    # must be REPORTED as an exception rather than dropped.
+    ok12 = (len(c["rows"]) == len(c["wrapped"]) + len(c["plain"])
+            and all(r["n"] >= c["lo"] for r in c["exceptions"])
+            and len(c["exceptions"]) == len([r for r in c["plain"]
+                                             if r["n"] >= c["lo"]]))
+    ck("K12", ok12,
+       "%d rows against %d+%d, %d exception(s)"
+       % (len(c["rows"]), len(c["wrapped"]), len(c["plain"]),
+          len(c["exceptions"])))
+
     return bad, ran
 
 
@@ -285,7 +410,7 @@ def run_selftest(quiet=False):
     if not quiet:
         print("capfield self-test")
     bad, ran = selftest(verbose=not quiet)
-    expected = 10
+    expected = 13
     if len(ran) != expected:
         print("capfield: REFUSING -- %d self-test checks ran, %d expected"
               % (len(ran), expected))
@@ -339,6 +464,8 @@ def main(argv=None):
     cap(p)
 
     sub.add_parser("selftest", help="run the self-test and stop")
+    sub.add_parser("wrapcensus",
+                   help="`FW-49`'s wrap threshold over the whole corpus")
 
     args = ap.parse_args(argv)
     if args.cmd is None:
@@ -351,6 +478,10 @@ def main(argv=None):
         if rc:
             run_selftest()
             return rc
+    # Intercepted here, before `read_capture(args.capture)` below: this verb
+    # takes no capture.
+    if args.cmd == "wrapcensus":
+        return report_wrapcensus()
 
     try:
         log, sent = read_capture(args.capture)
