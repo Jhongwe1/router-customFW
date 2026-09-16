@@ -357,6 +357,8 @@ CASE_WHAT = {
     'L12+': 'a standing-instruction owner beside a closed gate is reported',
     'L13+': 'a superseded gate name is reported, and resolves',
     'L14+': 'a declared non-gate that becomes a real gate is reported',
+    'L15+': 'a CLOSED row that still declares a residual is reported',
+    'L15-': 'a closed row MENTIONING a residual is not -- the bold rule',
     'U27': 'every `GATE_RENAME` target is a real board gate or step id',
     'U28': 'the head rule fires on `none` and NOT on `擁有者`',
     'U29': 'a SEGMENT phrase in PROSE is not read as an owner',
@@ -958,6 +960,23 @@ def census(pop=None):
 # the checks
 # --------------------------------------------------------------------------
 
+# 🔴 CLOSING A ROW TAKES ITS RESIDUAL OUT OF EVERY CHECK IN THIS TOOL.
+# `L1`, `L2`, `L3`, `L8` and `L11` all open with `if r['state'] != 'OPEN':
+# continue`, which is right -- a closed row is not a debt -- but a row may
+# close WITH a residual, and that residual then names a gate nobody looks at.
+# 量 2026-09-16, before the twenty rows of this segment were marked: one of
+# the seventeen already-closed rows carried one, and two of the twenty about
+# to be marked did.  So the check is written in the same commit as the
+# marking, and not afterwards.
+#
+# 🔴 THE PATTERN IS THE BOLD ONE AND THE BARE ONE IS REFUTED.  量: `殘留` or
+# `Residual` anywhere gives four closed rows; `**Residual` / `**殘留` gives
+# two.  The two extras are MENTIONS of other rows' residuals -- `BLKC-1`'s is
+# "(… 殘留、`FW-63` 殘留) 在這一段被排進 seating 22 又沒有落地", which is about
+# two `SPEC.md` rows and not about itself.  A row declares its own residual in
+# bold; it mentions someone else's in prose.
+RESIDUAL = re.compile(r'\*\*(?:Residual|殘留)')
+
 CORR_CLOSE = re.compile(r'closes|closed|關了|已關|收了')
 # Every § Corrections entry opens with a `**bold**` headline that says what the
 # entry IS.  The span is taken with the leading decoration skipped, because the
@@ -1117,6 +1136,20 @@ def check(pop=None, exempt=None):
                      'a closure for it (%s) -- the table that owns this row\'s '
                      'state is not the one that says it is finished'
                      % (r['id'], where))
+
+    # ---- L15: a CLOSED row that still carries a residual -----------------
+    for r in rows:
+        if r['state'] == 'OPEN':
+            continue
+        m = RESIDUAL.search(r['question']) or RESIDUAL.search(r['owner_cell'])
+        if m:
+            src = (r['question'] if RESIDUAL.search(r['question'])
+                   else r['owner_cell'])
+            f.append('L15 %s: the first cell says it is finished and the row '
+                     'still declares a residual (%s) -- every other check '
+                     'here skips a closed row, so this one is now invisible'
+                     % (r['id'],
+                        re.sub(r'\s+', ' ', src[m.start():m.start() + 70])))
 
     # ---- L14: a declared non-gate may not become a gate ------------------
     for tok in sorted(NON_GATE):
@@ -1296,8 +1329,15 @@ def report_check():
 # That is this repository's own recorded trap -- a pair of wrong numbers is
 # self-consistent as long as the difference is right -- reproduced inside the
 # instrument written to prevent it.
-BASELINE = {'L1': 45, 'L2': 1, 'L3': 14, 'L6': 4, 'L8': 19, 'L10': 2,
-            'L11': 1, 'L12': 4, 'L13': 11}
+# 🔄 2026-09-16, `R1z-2`: twenty rows whose closure this table recorded
+# somewhere it does not declare had their first cells marked, in place.  `L8`
+# 19 → **0** and `L11` 1 → **0** are the payment, and they are a payment
+# RECORDED rather than one absorbed: every one of the twenty was read on the
+# row before it moved, and the movement was written down first.  `L1` 44 is
+# `C-16` alone of the twenty; `L3` 9 is the five that were `NONE`; `L13` 10 is
+# `TC-c`.  All nine predicted counts came out exact.
+BASELINE = {'L1': 44, 'L2': 1, 'L3': 9, 'L6': 4, 'L8': 0, 'L10': 2,
+            'L11': 0, 'L12': 4, 'L13': 10, 'L15': 2}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
 # directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
@@ -1312,9 +1352,13 @@ BASELINE = {'L1': 45, 'L2': 1, 'L3': 14, 'L6': 4, 'L8': 19, 'L10': 2,
 # layer earning its place on its first real event: the counts alone (`L1` 45,
 # `L8` 19, `L11` 1) would have matched the new baseline while three different
 # row sets moved underneath them.
-BASELINE_SIG = {'L1': '039ed67a', 'L10': 'c56612d3', 'L11': 'ef38ccd5',
-                'L12': '84a6187d', 'L13': 'd8ad2d44', 'L2': '10ef882f',
-                'L3': '757eabf3', 'L6': 'b86a38d5', 'L8': 'e9fe5859'}
+# ⚠️ `L8` and `L11` have no entry here because they have no findings: a check
+# at zero contributes no ids to digest.  `BASELINE` still carries them at 0,
+# which is where the claim lives -- *zero rows record a closure in a place this
+# table does not declare* is a result and not an absence.
+BASELINE_SIG = {'L1': '41c9b24a', 'L10': 'c56612d3', 'L12': '84a6187d',
+                'L13': 'b9bd31b9', 'L15': 'ccd15bf1', 'L2': '10ef882f',
+                'L3': '3be8ef29', 'L6': 'b86a38d5'}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`
@@ -1775,6 +1819,20 @@ def self_test():
     c33 = census(population(t33))[0]
     case('U33', not c33['hints'] and c33['kind'] == 'ORPHAN',
          '`Answered` gave hints %r and kind %r' % (c33['hints'], c33['kind']))
+
+    # 🔴 `L15±`.  The negative half is `BLKC-1`'s measured shape: a closed row
+    # naming OTHER rows' residuals in prose, which the bare pattern caught and
+    # the bold one does not.
+    t15 = _fixture(rows_md=['| `A-1` ✅ | done. **Residual**: the bench half '
+                            '| `R5` |'])
+    t15n = _fixture(rows_md=['| `A-1` ✅ | done, and `FW-63` 殘留 與 `CLK-08b` '
+                             '殘留 都排進了下一次 | `R5` |'])
+    case('L15+', any(x.startswith('L15 A-1')
+                     for x in findings(t15, exempt={})),
+         'a closed row declaring a residual was not reported')
+    case('L15-', not any(x.startswith('L15 A-1')
+                         for x in findings(t15n, exempt={})),
+         'a closed row MENTIONING other rows\' residuals was reported')
 
     # ---- U14: THE SENTENCE, NOT THE PREFIX -----------------------------
     # 🔴 Every `L<n>±` control above asserts `startswith('L<n> <id>')` and
