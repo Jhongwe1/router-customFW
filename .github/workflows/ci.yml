@@ -704,6 +704,18 @@ jobs:
       - name: capfield
         run: /usr/bin/python3 tools/capfield.py selftest 2>&1 | tee ci-out/capfield.out; exit "${PIPESTATUS[0]}"
 
+      # `FW-83`. What this image can INVOKE, read statically out of this unit's
+      # own busybox -- the question `FW-46`'s own warning says nothing here can
+      # ask before a card is frozen, and that `FW-25` answered once on
+      # 2026-08-29 and recorded as a COUNT rather than a list.  The extraction
+      # half reads $FWRE_WORK and is bench-only; these two read the committed
+      # TSV and run anywhere.
+      - name: appletcensus
+        run: /usr/bin/python3 tools/appletcensus.py --self-test 2>&1 | tee ci-out/appletcensus.out; exit "${PIPESTATUS[0]}"
+
+      - name: appletcensus check
+        run: /usr/bin/python3 tools/appletcensus.py check 2>&1 | tee ci-out/appletcensus-check.out; exit "${PIPESTATUS[0]}"
+
       # The desk half of rtl819x-spi 1.1's `map`. Ten of its twelve controls
       # are synthetic and run here; F1/F1b need this unit's dump and stand
       # down, which is the same split flashwin has and for the same reason.

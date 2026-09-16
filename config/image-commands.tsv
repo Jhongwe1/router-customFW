@@ -1,0 +1,100 @@
+# config/image-commands.tsv -- what the first-boot image can INVOKE.
+# Derived by tools/appletcensus.py from the busybox declared at
+# config/rlxfw-initramfs.tsv:104.  Regenerate with `appletcensus.py
+# extract --write`; that half is BENCH-ONLY because it reads $FWRE_WORK.
+#
+# 🔴 kind=applet means `busybox <name>` resolves.  It does NOT mean the
+#    applet works, and it says NOTHING about options: SPEC.md FW-42
+#    measured `grep` present and `grep -E` absent on this same image.
+# busybox	v1.13.4	273332 bytes
+kind	name
+applet	ash
+applet	bunzip2
+applet	bzcat
+applet	cat
+applet	chpasswd
+applet	cp
+applet	cut
+applet	date
+applet	echo
+applet	expr
+applet	false
+applet	free
+applet	getty
+applet	grep
+applet	halt
+applet	head
+applet	hostname
+applet	ifconfig
+applet	init
+applet	ip
+applet	kill
+applet	killall
+applet	klogd
+applet	ln
+applet	login
+applet	ls
+applet	mkdir
+applet	mount
+applet	nice
+applet	nslookup
+applet	ping
+applet	ping6
+applet	poweroff
+applet	ps
+applet	reboot
+applet	renice
+applet	rm
+applet	route
+applet	sed
+applet	sh
+applet	sleep
+applet	syslogd
+applet	tail
+applet	telnetd
+applet	tr
+applet	traceroute
+applet	true
+applet	umount
+applet	uptime
+applet	wc
+builtin	.
+builtin	:
+builtin	[
+builtin	[[
+builtin	alias
+builtin	bg
+builtin	break
+builtin	cd
+builtin	chdir
+builtin	continue
+builtin	echo
+builtin	eval
+builtin	exec
+builtin	exit
+builtin	export
+builtin	false
+builtin	fg
+builtin	hash
+builtin	jobs
+builtin	kill
+builtin	let
+builtin	local
+builtin	printf
+builtin	pwd
+builtin	read
+builtin	readonly
+builtin	return
+builtin	set
+builtin	shift
+builtin	source
+builtin	test
+builtin	times
+builtin	trap
+builtin	true
+builtin	type
+builtin	ulimit
+builtin	umask
+builtin	unalias
+builtin	unset
+builtin	wait
