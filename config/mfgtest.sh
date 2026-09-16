@@ -56,6 +56,11 @@ P_GPIO="$MFG_ROOT/proc/rtl819x-gpio"
 P_KEYS="$MFG_ROOT/proc/rtl819x-keys"
 P_PORT="$MFG_ROOT/proc/rtl865x/port_status"
 P_LED="$MFG_ROOT/sys/class/leds/n150rt:green:led2/brightness"
+# evdev's node for rtl819x-keys, and OPENING IT IS THE ONLY REASON THE DRIVER
+# EVER POLLS -- see mt_button.  Prefixed like every other path here so a
+# fixture run cannot reach the real one; what actually keeps it unreachable
+# at a desk is the `[ -z "$MFG_ROOT" ]` guard, the same one act() uses.
+P_EVENT="$MFG_ROOT/dev/input/event0"
 
 # The switch port the cable is in.  量 NET-13: this kernel's netdev numbering
 # is the MIRROR of the vendor's (mine = 4 - vendor), so the jack the operator
@@ -95,6 +100,22 @@ MFG_TICK_TOL=2
 # window for that is not weakening the check -- the tolerance above is
 # absolute, not proportional, so a shorter window is a STRICTER test.
 : "${MFG_TICK_SECONDS:=5}"
+
+# How long MT-BUTTON holds /dev/input/event0 open, which is also how long the
+# operator has to press.
+#
+# 🔴 NOT 3 OR 4 SECONDS, AND THE REASON IS THIS PROJECT'S BENCH PROTOCOL
+# RATHER THAN THE HARDWARE.  The operator cannot see this console -- CLAUDE.md
+# 2 Environment: "at the bench you write the commands and read what I paste
+# back" -- so the `starting now` line below is never read at the moment it is
+# printed, and a 4 s window would ask for a press nobody can time.  The window
+# is therefore long enough to be entered at leisure; the verdict does not
+# depend on its length, only on a press landing somewhere inside it.
+#
+# Overridable for the same reason MFG_TICK_SECONDS is: a card states its own
+# window, and a longer one is not a weaker test -- b0_n_press must still move
+# by at least one, whatever the window.
+: "${MFG_BUTTON_SECONDS:=20}"
 
 ok=0
 bad=0
@@ -151,6 +172,30 @@ field() {
 	return 1
 }
 
+# hexupper <string> -- fold a hex string to upper case, one character at a
+# time, with no applet and no arithmetic.
+#
+# `tr` is not among this image's fifty applets (FW-46's family), and
+# arithmetic is ruled out by the saturation measured in mt_id below.  The
+# first-character idiom `${s%${s#?}}` is POSIX parameter expansion twice over:
+# `${s#?}` drops one character and `${s%that}` removes it as a suffix.
+# 量 on this unit's own busybox ash under qemu-mips-static, seven inputs
+# including b1818b92, 03E7721C already upper, and DeadBeef mixed.
+hexupper() {
+	_u=""
+	_r=$1
+	while [ -n "$_r" ]; do
+		_c=${_r%${_r#?}}
+		_r=${_r#?}
+		case $_c in
+		a) _c=A ;; b) _c=B ;; c) _c=C ;;
+		d) _c=D ;; e) _c=E ;; f) _c=F ;;
+		esac
+		_u="$_u$_c"
+	done
+	printf '%s\n' "$_u"
+}
+
 # act <file> <verb> -- issue a verb, but never under a fixture.
 act() {
 	if [ -n "$MFG_ROOT" ]; then
@@ -205,6 +250,35 @@ mt_id() {
 		chk MT-ID 0 "no expected id was supplied; read [$got]"
 		return
 	fi
+	# 🔴 FOLD THE COMPARAND, because the two sides of this `=` are produced
+	# by different tools in different cases.  量 2026-09-17:
+	# tools/rlxfw-kbuild.sh:262 computes the id as `sha256sum | cut -c1-8`,
+	# which is LOWER case, and rtl819x-spi.c prints it with "%08X", which is
+	# UPPER.  `mfgtest auto 03e7721c` -- the spelling PROGRESS.md and the
+	# segment brief both carried -- would have turned MT-ID red with exactly
+	# the right image on the board, which is the one failure a factory check
+	# may never have.
+	#
+	# It is the ONLY comparand here that comes from outside this file.
+	# MFG_RDID, A5000000 and BOOTGUARD were each written by reading the
+	# driver's own format string, so their case was never in question.
+	#
+	# 🔴 AND IT IS A STRING FOLD, NOT ARITHMETIC, FOR A MEASURED REASON.
+	# 量 2026-09-17, this unit's own busybox ash under qemu-mips-static:
+	# `$((0xb1818b92))` is **2147483647** -- it SATURATES at INT32_MAX
+	# instead of wrapping -- while dash and bash on the build host both give
+	# 2978057106.  So `printf '%08X' $((0x$want))` would have silently
+	# rewritten every id with its top bit set, which is half of them, and
+	# b1818b92 -- the image built four minutes before this fix -- was one.
+	# Two hex digits at a time can never reach that, and a pure parameter
+	# expansion cannot reach it at all.
+	case "$want" in
+	"" | *[!0-9A-Fa-f]*)
+		chk MT-ID 0 "expected id [$want] is not hex digits; read [$got]"
+		return
+		;;
+	esac
+	want=$(hexupper "$want")
 	[ "$got" = "$want" ]
 	r=$?
 	chk MT-ID $((1 - r)) "recipe_id=$got expected=$want"
@@ -279,6 +353,42 @@ mt_tick() {
 	spur=$(field "$P_TIMER" irq_spurious) || spur="(absent)"
 	stuck=$(field "$P_TIMER" irq_stuck) || stuck="(absent)"
 
+	# 🔴 THE PERIOD TERM, AND WITHOUT IT EVERYTHING BELOW IS A TAUTOLOGY.
+	#
+	# The delta pair below compares two quantities that are both counted by
+	# the same interrupt: one tick is one jiffy and one irq_count.  So a tick
+	# running at a tenth of its proper rate keeps skew at 0 and dj > 0, and
+	# `sleep 5` simply takes fifty real seconds -- 量 seating 13, which put it
+	# exactly this way: "nothing in the kernel could notice".  M28's stated
+	# injection is `cereload` to a wrong value, and against the check as first
+	# written that was a NO-TAKE: the counters agree with each other whatever
+	# the period is.
+	#
+	# 讀 rtl819x-timer.c:860-861, which is where these two fields come from:
+	#     rtl819x_ce_reload      counts per tick, LIVE   (what `cereload` writes)
+	#     rtl819x_ce_reload_hz   counts per tick that HZ implies (derived at
+	#                            init from hz_used / HZ)
+	# and :1544, where the DRIVER ITSELF refuses to hand the tick over with
+	# -ERANGE when they differ, its own comment reading "`cereload` has already
+	# made the period deliberately wrong".  So this is the driver's criterion
+	# read back, not a second one invented here.
+	#
+	# TWO DIFFERENT SENTINELS on purpose.  With one, two absent fields would
+	# compare equal and the term would be satisfied by a timer that reports
+	# neither -- a control that cannot fail, which this repository does not
+	# accept.
+	#
+	# ⚠️ WHAT THIS TERM DOES NOT DO, stated rather than left to be found: both
+	# values are software, so it catches a period programmed wrong and says
+	# nothing about a hardware clock that has drifted.  The independent rate
+	# check is Δjiffies against the VENDOR's tick -- /proc/interrupts line 13,
+	# which `cereload` does not touch and which seating 13's P3-7 used to take
+	# the two apart.  docs/mfgtest.md 2 lists /proc/interrupts among MT-TICK's
+	# inputs and this script still does not read it; that gap is carried
+	# forward rather than papered over.
+	rel=$(field "$P_TIMER" ce_reload) || rel=-1
+	relhz=$(field "$P_TIMER" ce_reload_hz) || relhz=-2
+
 	# 量: the timer's field is `jiffies`.  `j_now` is the KEYS driver's
 	# name for the same quantity, and reading it here returned nothing.
 	j0=$(field "$P_TIMER" jiffies) || j0=0
@@ -294,10 +404,11 @@ mt_tick() {
 	[ "$skew" -lt 0 ] && skew=$((0 - skew))
 
 	if [ "$live" = "1" ] && [ "$mode" = "2" ] && [ "$spur" = "0" ] &&
-	   [ "$stuck" = "0" ] && [ "$dj" -gt 0 ] && [ "$skew" -le "$MFG_TICK_TOL" ]; then
-		chk MT-TICK 1 "ce_live=1 ce_mode=2 dj=$dj di=$di skew=$skew"
+	   [ "$stuck" = "0" ] && [ "$rel" = "$relhz" ] && [ "$rel" -gt 0 ] &&
+	   [ "$dj" -gt 0 ] && [ "$skew" -le "$MFG_TICK_TOL" ]; then
+		chk MT-TICK 1 "ce_live=1 ce_mode=2 reload=$rel=$relhz dj=$dj di=$di skew=$skew"
 	else
-		chk MT-TICK 0 "ce_live=$live ce_mode=$mode spur=$spur stuck=$stuck dj=$dj di=$di skew=$skew"
+		chk MT-TICK 0 "ce_live=$live ce_mode=$mode spur=$spur stuck=$stuck reload=$rel want=$relhz dj=$dj di=$di skew=$skew"
 	fi
 }
 
@@ -403,7 +514,29 @@ mt_led() {
 	# in the SEVENTH from the left, not the eighth; a pattern that reads
 	# the last digit tests bits 0-3 and would have called every value lit.
 	# Arithmetic expansion understands 0x and cannot be off by a nibble.
-	bit6=$(( (0x$dat >> 6) & 1 ))
+	# 🔴 GUARD THEN LOW BYTE, and both halves are measured.
+	#
+	# The guard: `$((0x$dat))` with dat=(absent) is an arithmetic syntax
+	# error, which in ash ABORTS the script -- so a missing gpio driver would
+	# have ended the phase instead of failing this check, and the population
+	# line would have said POPULATION MISMATCH rather than naming the cause.
+	#
+	# The low byte: 量 2026-09-17, this unit's own busybox ash under
+	# qemu-mips-static saturates $(( )) at INT32_MAX -- $((0xb1818b92)) is
+	# 2147483647 -- so a `dat` with its top bit set would have been read as
+	# 0x7FFFFFFF and bit 6 of that is 1, i.e. `not lit`, whatever the lamp was
+	# doing.  This board's dat is 000000xx today and the same driver's `cnr`
+	# reads FFFFFF8B, so the exposure is real and has simply not been reached.
+	# Bit 6 lives in the low byte; the last two hex digits are all of it and
+	# two digits cannot saturate.
+	case "$dat" in
+	"" | *[!0-9A-Fa-f]*)
+		chk MT-LED 0 "dat=[$dat] is not hex -- $P_GPIO did not report it; n_set_ok $b0->$b1 n_writes $w0->$w1"
+		return
+		;;
+	esac
+	lowdat=${dat#${dat%??}}
+	bit6=$(( (0x$lowdat >> 6) & 1 ))
 	lit=$((1 - bit6))
 	if [ "$lit" = "1" ] && [ "$b1" -gt "$b0" ] && [ "$w1" -gt "$w0" ]; then
 		chk MT-LED 1 "dat=$dat bit6=0 n_set_ok $b0->$b1 n_writes $w0->$w1 -- OPERATOR: is LED #2 lit?"
@@ -413,19 +546,62 @@ mt_led() {
 }
 
 # MT-BUTTON.  Needs a press, so it is its own phase.
+#
+# 🔴 THREE TERMS, AND THE FIRST TWO ARE WHY THE NEGATIVE CONTROL MEANS
+# ANYTHING.  The first version of this read n_poll either side of a bare
+# `sleep 4` and scored "n_poll moved".  Both halves were wrong, and the
+# second half is the one that would have survived a fix of the first:
+#
+#   (a) NOTHING IN IT OPENED THE DEVICE, so the delta had no cause.  讀
+#       drivers/input/input-polldev.c: the poll work is queued by
+#       input_open_polled_device(), which the input core calls through
+#       input_dev->open -- when a HANDLER opens the device.  讀
+#       rtl819x-keys.c's own header, lines 91-103: "with no handler that
+#       opens, poll() is NEVER CALLED ... every counter reads 0 for ever".
+#       量 p11a.config-built:769, `# CONFIG_INPUT_EVBUG is not set`, so
+#       nothing in this image opens it unprompted.  n_poll would have been
+#       flat and MT-BUTTON WOULD HAVE FAILED ON A GOOD UNIT, pressed or not.
+#       bench/2026-09-10's card had already measured this and typed
+#       `sleep 3 < /dev/input/event0`, with its own note reading "the open
+#       is what is needed"; this file dropped the redirect and kept the sleep.
+#
+#   (b) n_poll DOES NOT SEE THE PRESS.  It counts polls, and polls happen
+#       because the node is open.  The field that moves when the button goes
+#       down is b0_n_press, incremented in rtl819x_keys_poll() only after
+#       `need` consecutive stable samples at the new level (100 ms debounce
+#       over a 50 ms poll = 2).  A check that scores n_poll is green with the
+#       button unplugged.
+#
+# So: n_open moved (the node was opened), n_poll moved (the poller actually
+# ran), b0_n_press moved (a debounced press was seen).  Three failure modes,
+# three terms, and the detail line names which one fired.
+#
+# 🔴 THE FIRST TWO TERMS ARE WHAT MAKE M26 A KILL RATHER THAN A NO-TAKE.
+# M26 is "do not press; the counters must stay flat".  Against the old check
+# that proved nothing -- the counters were flat either way -- which is
+# pulling a cable that was never plugged in.  With the poller demonstrably
+# running, a flat b0_n_press is the button, and nothing else.
 mt_button() {
 	o0=$(field "$P_KEYS" n_open) || o0=-1
 	p0=$(field "$P_KEYS" n_poll) || p0=-1
+	k0=$(field "$P_KEYS" b0_n_press) || k0=-1
 	if [ -z "$MFG_ROOT" ]; then
-		printf 'OPERATOR: hold the reset button for 3 seconds, starting now.\n'
-		sleep 4
+		printf 'OPERATOR: press and hold the reset button for about 3 seconds, any time in the next %s.\n' "$MFG_BUTTON_SECONDS"
+		# THE REDIRECT IS THE CAUSE, and it is `sleep N < node` rather
+		# than `cat node &` for two measured reasons: the OPEN is what
+		# starts the poll work (a background cat opens it no better), and
+		# what comes out of the node is raw struct input_event bytes with
+		# ESC among them, which on this console is 16 bytes per event on
+		# the wire.  bench/2026-09-10's card settles both.
+		sleep "$MFG_BUTTON_SECONDS" < "$P_EVENT"
 	fi
 	o1=$(field "$P_KEYS" n_open) || o1=-1
 	p1=$(field "$P_KEYS" n_poll) || p1=-1
-	if [ "$p1" -gt "$p0" ]; then
-		chk MT-BUTTON 1 "n_open $o0->$o1 n_poll $p0->$p1"
+	k1=$(field "$P_KEYS" b0_n_press) || k1=-1
+	if [ "$o1" -gt "$o0" ] && [ "$p1" -gt "$p0" ] && [ "$k1" -gt "$k0" ]; then
+		chk MT-BUTTON 1 "n_open $o0->$o1 n_poll $p0->$p1 b0_n_press $k0->$k1"
 	else
-		chk MT-BUTTON 0 "n_poll did not move: $p0->$p1"
+		chk MT-BUTTON 0 "n_open $o0->$o1 (open) n_poll $p0->$p1 (poller) b0_n_press $k0->$k1 (press)"
 	fi
 }
 

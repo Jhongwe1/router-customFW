@@ -194,6 +194,8 @@ ce_mode_calls=2
 irq_spurious=0
 irq_stuck=0
 ce_rating=0
+ce_reload=2000
+ce_reload_hz=2000
 jiffies=100000
 irq_count=200000
 """
@@ -207,6 +209,8 @@ ce_mode_calls=2
 irq_spurious=0
 irq_stuck=0
 ce_rating=0
+ce_reload=2000
+ce_reload_hz=2000
 jiffies=100200
 irq_count=200200
 """
@@ -414,17 +418,38 @@ MUT = [
      "MT-BUTTON", [], BENCH),
     ("M27", "R", "corrupt the RAM copy so the two read paths disagree on the die",
      "MT-FLASH-3", [], BENCH),
-    ("M28", "R", "cereload to a wrong value so the tick ratio breaks",
+    ("M28", "R", "cereload to a wrong value; ce_reload then differs from "
+                 "ce_reload_hz, which is the driver's own -ERANGE criterion",
      "MT-TICK", [], BENCH),
-    ("M29", "R", "kickms long enough that the bite falls outside the window",
+    # 🔴 M29 WAS `kickms long enough that the bite falls outside the window`
+    # and that was a NO-TAKE against the check that exists.  量 2026-09-17,
+    # reading mt_wdt: it scores `wdtcnr_at_probe` -- latched at probe and not
+    # writable at run time -- and `state_name`.  `kickms` moves NEITHER.  What
+    # it does is let the hardware bite, which resets the board, so MT-WDT is
+    # not turned red: the boot ends and no check runs at all.
+    #
+    # `stop` is the physical counterpart of fixture row M15, "nothing is
+    # feeding the watchdog": state_name leaves BOOTGUARD, mt_wdt's second term
+    # fails, and `bootguard` puts it back with the revert MEASURABLE in the
+    # same field.  It also costs no reset, so P1-4 no longer needs one.
+    ("M29", "R", "stop, so nothing is arming the watchdog and state_name "
+                 "leaves BOOTGUARD",
      "MT-WDT", [], BENCH),
+    # 🟢 The DESK half of M28.  M28 is class R and needs the die; this is the
+    # same fault at the fixture boundary, so the term M28 relies on is tested
+    # before any board is powered -- which is the whole reason the class-S
+    # rows exist.
+    ("M30", "S", "the tick period was reprogrammed: ce_reload no longer "
+                 "matches the ce_reload_hz that HZ implies",
+     "MT-TICK", [("A", "proc/rtl819x-timer", "ce_reload", "20000"),
+                 ("B", "proc/rtl819x-timer", "ce_reload", "20000")], None),
 ]
 
 #: TYPED, never computed.  A deleted row would otherwise read as
 #: "n of n killed, 0 alive" and exit 0.
-DECLARED = 29
+DECLARED = 30
 #: Of those, the ones this harness can actually run.
-DECLARED_RUNNABLE = 24
+DECLARED_RUNNABLE = 25
 
 CASE_RE = re.compile(r"^ {2}(ok|FAIL)\s{2,}(\S+)")
 
@@ -525,6 +550,115 @@ def driver_fields(relpath):
             set(re.findall(r'"([a-z0-9_]+)=%', src)))
 
 
+#: The board file, which is the THIRD source C1 needs.  The driver says an
+#: indexed template exists; this file says how many indices are legal; the
+#: script says which one it reads.  No two of those were written in one
+#: thought, which is the only property that makes C1 worth running.
+BOARD_SRC = os.path.join(SRCROOT, "arch", "rlx", "kernel", "rlxfw-devices.c")
+
+#: Which board array bounds which indexed prefix, per driver.  DECLARED and
+#: not inferred: a tool that guessed which array bounds `b%d_` would be
+#: guessing the very thing this control exists to check.
+INDEX_BOUNDS = {
+    ("drivers/input/keyboard/rtl819x-keys.c", "b"): ("rlxfw_board_keys", ".code"),
+}
+
+INDEXED_RE = re.compile(r"^([a-z]+)([0-9]+)(_[a-z0-9_]+)$")
+
+
+def _strip_c_comments(src):
+    """Comments can hold braces, and the brace walk below would trip on one.
+
+    量: rlxfw_board_keys[]'s own initialiser carries four block comments.
+    """
+    src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
+    return re.sub(r"//[^\n]*", " ", src)
+
+
+def driver_index_templates(relpath):
+    """Fields whose NAME carries a %d -- `"b%d_n_press %lu\n"`.
+
+    driver_fields() cannot see these: its character class stops at the `%`,
+    so `b%d_n_press` reads as no field at all.  量 2026-09-17, and it is how
+    this function came to exist -- C1 reported `b0_n_press not emitted by
+    rtl819x-keys.c` about a field the driver emits at line 486.  The control
+    was right to refuse (it could not prove the field existed) and wrong
+    about the driver, so it is taught rather than relaxed.
+
+    Returns {(prefix, suffix)}, e.g. {("b", "_n_press")}.
+    """
+    src = open(os.path.join(SRCROOT, relpath), encoding="utf-8").read()
+    return (set(re.findall(r'"([a-z0-9_]*)%d([a-z0-9_]+) %', src)) |
+            set(re.findall(r'"([a-z0-9_]*)%d([a-z0-9_]+)=%', src)))
+
+
+def board_array_count(symbol, member):
+    """How many entries the board file declares in `symbol[]`.
+
+    rtl819x-keys prints b%d_* for i < nbuttons, and nbuttons is
+    ARRAY_SIZE(rlxfw_board_keys).  A desk tool cannot evaluate that; it can
+    count the initialiser.
+
+    Counts `member =` occurrences inside the outer braces rather than
+    brace-depth, because a struct entry and a nested initialiser look the
+    same to a depth counter and a gpio_keys_button carries exactly one .code.
+
+    RAISES rather than returning a default.  A bound this tool guessed would
+    make C1's refusal unfalsifiable, which is the failure this whole file is
+    written against.
+    """
+    src = _strip_c_comments(open(BOARD_SRC, encoding="utf-8").read())
+    m = re.search(r"\b%s\s*\[\s*\]\s*=\s*\{" % re.escape(symbol), src)
+    if not m:
+        raise RuntimeError("%s: no `%s[] = {` declaration"
+                           % (os.path.basename(BOARD_SRC), symbol))
+    i = m.end() - 1
+    depth = 0
+    body = None
+    for j in range(i, len(src)):
+        if src[j] == "{":
+            depth += 1
+        elif src[j] == "}":
+            depth -= 1
+            if depth == 0:
+                body = src[i + 1:j]
+                break
+    if body is None:
+        raise RuntimeError("%s: `%s[]` initialiser is not brace-balanced"
+                           % (os.path.basename(BOARD_SRC), symbol))
+    n = len(re.findall(re.escape(member) + r"\s*=", body))
+    if n < 1:
+        raise RuntimeError("%s: `%s[]` declares no `%s =`; the bound would be 0"
+                           % (os.path.basename(BOARD_SRC), symbol, member))
+    return n
+
+
+def resolve_indexed(relpath, fld, templates, bounds):
+    """(ok, why) for a field driver_fields() could not see literally.
+
+    Three conditions, and the third is the one with teeth: the driver has the
+    template, the prefix has a DECLARED bounding array, and the index is
+    inside it.  Without the third, `b7_n_press` would resolve on a
+    one-button board.
+    """
+    m = INDEXED_RE.match(fld)
+    if not m:
+        return False, "not an indexed name"
+    prefix, idx, suffix = m.group(1), int(m.group(2)), m.group(3)
+    if (prefix, suffix) not in templates:
+        return False, "no `%s%%d%s` template in that driver" % (prefix, suffix)
+    key = (relpath, prefix)
+    if key not in INDEX_BOUNDS:
+        return False, "no declared bounding array for `%s%%d_` in that driver" % prefix
+    sym, member = INDEX_BOUNDS[key]
+    n = bounds[key] if key in bounds else board_array_count(sym, member)
+    bounds[key] = n
+    if idx >= n:
+        return False, ("index %d is outside %s[], which declares %d"
+                       % (idx, sym, n))
+    return True, "%s%%d%s with %d < %s[]=%d" % (prefix, suffix, idx, sym, n)
+
+
 def script_fields():
     """(P_ variable, field name) for every read the script makes, so the
     check can be per-file."""
@@ -603,7 +737,10 @@ def main(argv):
 
     # --- C1: every field the script reads, the OWNING driver emits --------
     cache = {}
+    tcache = {}
+    bounds = {}
     checked = 0
+    indexed = 0
     missing = []
     for pvar, fld in sorted(script_fields()):
         rel = DRIVERS.get(pvar)
@@ -612,21 +749,73 @@ def main(argv):
             continue
         if rel not in cache:
             cache[rel] = driver_fields(rel)
+            tcache[rel] = driver_index_templates(rel)
         checked += 1
-        if fld not in cache[rel]:
-            missing.append("%s not emitted by %s" % (fld, os.path.basename(rel)))
+        if fld in cache[rel]:
+            continue
+        got, why = resolve_indexed(rel, fld, tcache[rel], bounds)
+        if got:
+            indexed += 1
+        else:
+            missing.append("%s not emitted by %s -- %s"
+                           % (fld, os.path.basename(rel), why))
     # The population half: a mapping that resolved to nothing would report
     # zero missing, which is what a control that cannot fail prints.
     biggest = max((len(v) for v in cache.values()), default=0)
     good = not missing and checked >= 15 and biggest >= 30
     print("  %s  %-14s %s" % ("ok  " if good else "FAIL", "C1",
                               "every field the script reads is emitted by the driver "
-                              "that owns that file (%d reads, %d drivers)"
-                              % (checked, len(cache))
+                              "that owns that file (%d reads, %d drivers, %d by index)"
+                              % (checked, len(cache), indexed)
                               if good else
                               "%s" % (missing or
                                       "the control resolved nothing: %d reads, "
                                       "largest driver %d fields" % (checked, biggest))))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+
+    # --- C1b: the index path is EXERCISED, and the bound is named ---------
+    #
+    # C1 above would print the same `ok` if no read had gone through
+    # resolve_indexed() at all, which is a control that cannot fail on the
+    # half of itself that is new.  This one requires the path to have been
+    # taken and prints where the bound came from, so a reader can check it
+    # against the file rather than against this tool.
+    kb = ("drivers/input/keyboard/rtl819x-keys.c", "b")
+    try:
+        nb = board_array_count(*INDEX_BOUNDS[kb])
+        err = None
+    except RuntimeError as e:
+        nb, err = 0, str(e)
+    good = err is None and indexed >= 1 and nb >= 1
+    print("  %s  %-14s %s" % ("ok  " if good else "FAIL", "C1b",
+                              "%d indexed read(s) resolved; the bound is "
+                              "%s[]=%d, counted in %s"
+                              % (indexed, INDEX_BOUNDS[kb][0], nb,
+                                 os.path.basename(BOARD_SRC))
+                              if good else
+                              "indexed=%d bound=%d %s" % (indexed, nb, err or "")))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+
+    # --- C1c: THE BOUND IS LOAD-BEARING, and the suffix is checked --------
+    #
+    # Two probes against the real driver and the real board file.  The first
+    # asks for the index one past the last legal one: a control that accepted
+    # it would accept `b7_n_press` on a one-button board, which is C1 giving
+    # its blessing to a field that cannot exist.  The second asks for a
+    # suffix no template carries, so a prefix-only match is caught too.
+    rel_k = kb[0]
+    if rel_k not in tcache:
+        tcache[rel_k] = driver_index_templates(rel_k)
+    over, over_why = resolve_indexed(rel_k, "b%d_n_press" % nb, tcache[rel_k], bounds)
+    bogus, bogus_why = resolve_indexed(rel_k, "b0_no_such_field", tcache[rel_k], bounds)
+    good = (not over) and (not bogus) and nb >= 1
+    print("  %s  %-14s %s" % ("ok  " if good else "FAIL", "C1c",
+                              "b%d_n_press is REFUSED (%s) and b0_no_such_field "
+                              "is REFUSED (%s) -- the bound and the suffix both bite"
+                              % (nb, over_why, bogus_why)
+                              if good else
+                              "over=%s(%s) bogus=%s(%s)"
+                              % (over, over_why, bogus, bogus_why)))
     ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
 
     # --- C2: every command the script types exists in this image ----------
