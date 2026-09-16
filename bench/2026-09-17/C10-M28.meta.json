@@ -1,0 +1,22 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-17T03:06:13+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 240.0,
+  "idle": 0.0,
+  "until": " of 9 ok",
+  "until_offset": 796,
+  "sent": "echo cereload 20000 > /proc/rtl819x-timer ; /bin/mfgtest auto bb684eb0",
+  "sent_hex": "6563686f20636572656c6f6164203230303030203e202f70726f632f72746c383139782d74696d6572203b202f62696e2f6d666774657374206175746f2062623638346562300d",
+  "stop_reason": "--until matched at offset 796",
+  "bytes": 816,
+  "duration_s": 66.779261,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

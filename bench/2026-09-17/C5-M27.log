@@ -1,0 +1,19 @@
+echo corrupt 0x9000 > /proc/rtl819x-spi ; /bin/mfgtest auto bb684eb0
+mfgtest 1.0  phase=auto
+  ok   R MLT-ID X F W -  S - RreciDpeI_idD==B0B60814ECB700 e1xp6ec
+ted=BB684EB0
+  ok    MT-FLASH-1   rdid_id=1C7016 rdid_match=1
+RLXFW-S-TRYW=00000001
+  ok    MT-FLASH-2   n_write_refused=4 n_writes=0
+RLXFW-S-MRC=00000000
+RLXFW-S-MDIFF=00000001
+RLXFW-S-MH601=00000000
+  FAIL  MT-FLASH-3   map_ran=1 map_rc=0 h601_hashed=0 diff_units=1
+  ok    MT-TICK      ce_live=1 ce_mode=2 reload=2000=2000 dj=526 di=526 skew=0
+  ok    MT-WDT       wdtcnr_at_probe=A5000000 state=BOOTGUARD
+  ok    MT-PORT      Port3 LinkURpLX
+FW-S-H601=00000000
+  ok    MT-MAC       sig_ok=1 ver=1 len=1166 mac unicast
+  ok    MT-RFCAL     hw_sum_ok=1 over 1166 body bytes
+8 of 9 ok, 1 FAIL
+# 

@@ -196,6 +196,79 @@ hexupper() {
 	printf '%s\n' "$_u"
 }
 
+# snap <file> -- copy a /proc file, then parse the COPY.
+#
+# 🔴 量 ON THE DIE 2026-09-17, and no fixture could have shown it.  The shell's
+# `read` builtin consumes a file ONE BYTE AT A TIME, so that it does not
+# over-read a pipe.  A 2.6.30 read_proc_t re-renders its ENTIRE page on every
+# one of those reads and the kernel returns one byte out of the fresh render.
+# /proc/rtl819x-timer is 101 fields and several of them are free-running
+# counters, so a field that grows by one character between two consecutive
+# byte-reads shifts everything after it and a character already consumed is
+# served again.
+#
+# The reading, three passes of the same loop over the live file:
+#     [ce_live==1]        <- ONE doubled `=`, a field had grown
+#     (nothing)           <- a field had shrunk and a character was skipped
+#     (nothing)
+# and MT-TICK's own failure line read `ce_live=11 ce_mode=(absent)
+# spur=(absent) stuck=(absent)`: the first field corrupted, every field after
+# it lost.
+#
+# The same loop over a `cat` snapshot, same shell, same fields, same minute:
+#     [ce_reload=2000] [ce_reload_hz=2000] [ce_live=1] [ce_mode=2] ... all
+#     eleven, clean.
+# `cat` reads in whole blocks, so ONE render answers the whole file.
+#
+# 🟢 It also makes a before/after pair atomic, which the old code was not:
+# FW-75 records that the driver reads `jiffies` inside the spin lock and
+# `irq_count` 105 lines later outside it, and the old code compounded that by
+# opening the file twice more.
+#
+# ⚠️ ONLY THE THREE CHECKS THAT COMPARE ACROSS TIME USE THIS, and the reason is
+# a measurement rather than a preference: in the same capture that caught
+# MT-TICK, the eight other checks read /proc/rtl819x-spi, /proc/rtl819x-wdt and
+# the vendor's port_status correctly, because those files' fields are static
+# between verbs.  The hazard is latent for them and is carried forward rather
+# than fixed blind.
+: "${MFG_SNAP:=/tmp/mfgtest.snap}"
+
+snap() {
+	cat "$1" > "$MFG_SNAP" 2>/dev/null || return 1
+	[ -s "$MFG_SNAP" ]
+}
+
+# jdelta <before> <after> -- difference of two counters that can exceed
+# INT32_MAX, computed without ever handing this shell a number that large.
+#
+# 🔴 量 ON THE DIE 2026-09-17, this shell's own arithmetic:
+#     $((4294950451))            -> 2147483647    PARSING SATURATES
+#     $((4294950451-4294950000)) -> 0             so a difference is lost
+#     $((2147483647+1))          -> -2147483648   ARITHMETIC WRAPS
+# Parsing saturates and arithmetic wraps -- two different behaviours in one
+# shell, and the same saturation was measured at the desk hours earlier under
+# qemu-mips-static with this unit's own busybox, which predicted the die
+# exactly.
+#
+# jiffies starts at INITIAL_JIFFIES, and this board printed jiffies=4294950451
+# with 131 s of uptime, so EVERY jiffies reading here is past the saturation
+# point and $(( j1 - j0 )) is 0 whatever really happened.
+#
+# The last six digits are enough: a 5 s window at 100 Hz is 500.  They are
+# zero-padded first so a short counter works, and prefixed with `1` for two
+# reasons -- a leading zero would make $(( )) read the value as OCTAL, and the
+# prefix keeps both operands far below the saturation point.  The wrap term
+# handles the six-digit window rolling over.
+jdelta() {
+	_s=000000$1
+	_a=1${_s#${_s%??????}}
+	_s=000000$2
+	_b=1${_s#${_s%??????}}
+	_d=$((_b - _a))
+	[ "$_d" -lt 0 ] && _d=$((_d + 1000000))
+	printf '%s\n' "$_d"
+}
+
 # act <file> <verb> -- issue a verb, but never under a fixture.
 act() {
 	if [ -n "$MFG_ROOT" ]; then
@@ -348,10 +421,14 @@ mt_flash3() {
 
 # MT-TICK.  The clockevent is live, and it advances.
 mt_tick() {
-	live=$(field "$P_TIMER" ce_live) || live="(absent)"
-	mode=$(field "$P_TIMER" ce_mode) || mode="(absent)"
-	spur=$(field "$P_TIMER" irq_spurious) || spur="(absent)"
-	stuck=$(field "$P_TIMER" irq_stuck) || stuck="(absent)"
+	snap "$P_TIMER" || {
+		chk MT-TICK 0 "cannot snapshot $P_TIMER"
+		return
+	}
+	live=$(field "$MFG_SNAP" ce_live) || live="(absent)"
+	mode=$(field "$MFG_SNAP" ce_mode) || mode="(absent)"
+	spur=$(field "$MFG_SNAP" irq_spurious) || spur="(absent)"
+	stuck=$(field "$MFG_SNAP" irq_stuck) || stuck="(absent)"
 
 	# 🔴 THE PERIOD TERM, AND WITHOUT IT EVERYTHING BELOW IS A TAUTOLOGY.
 	#
@@ -386,20 +463,25 @@ mt_tick() {
 	# the two apart.  docs/mfgtest.md 2 lists /proc/interrupts among MT-TICK's
 	# inputs and this script still does not read it; that gap is carried
 	# forward rather than papered over.
-	rel=$(field "$P_TIMER" ce_reload) || rel=-1
-	relhz=$(field "$P_TIMER" ce_reload_hz) || relhz=-2
+	rel=$(field "$MFG_SNAP" ce_reload) || rel=-1
+	relhz=$(field "$MFG_SNAP" ce_reload_hz) || relhz=-2
 
 	# 量: the timer's field is `jiffies`.  `j_now` is the KEYS driver's
 	# name for the same quantity, and reading it here returned nothing.
-	j0=$(field "$P_TIMER" jiffies) || j0=0
-	i0=$(field "$P_TIMER" irq_count) || i0=0
+	# Both out of the snapshot already taken, so they come from ONE render.
+	j0=$(field "$MFG_SNAP" jiffies) || j0=0
+	i0=$(field "$MFG_SNAP" irq_count) || i0=0
 	# Unconditional: see MFG_TICK_SECONDS.  Under a fixture this is the
 	# window the harness writes the second state into.
 	sleep "$MFG_TICK_SECONDS"
-	j1=$(field "$P_TIMER" jiffies) || j1=0
-	i1=$(field "$P_TIMER" irq_count) || i1=0
-	dj=$((j1 - j0))
-	di=$((i1 - i0))
+	snap "$P_TIMER" || {
+		chk MT-TICK 0 "cannot snapshot $P_TIMER the second time"
+		return
+	}
+	j1=$(field "$MFG_SNAP" jiffies) || j1=0
+	i1=$(field "$MFG_SNAP" irq_count) || i1=0
+	dj=$(jdelta "$j0" "$j1")
+	di=$(jdelta "$i0" "$i1")
 	skew=$((dj - di))
 	[ "$skew" -lt 0 ] && skew=$((0 - skew))
 
@@ -497,14 +579,22 @@ mt_h601() {
 
 # MT-LED.  Needs the operator's eye, so it is its own phase.
 mt_led() {
-	b0=$(field "$P_GPIO" n_set_ok) || b0=-1
-	w0=$(field "$P_GPIO" n_writes) || w0=-1
+	snap "$P_GPIO" || {
+		chk MT-LED 0 "cannot snapshot $P_GPIO"
+		return
+	}
+	b0=$(field "$MFG_SNAP" n_set_ok) || b0=-1
+	w0=$(field "$MFG_SNAP" n_writes) || w0=-1
 	if [ -z "$MFG_ROOT" ]; then
 		echo 1 > "$P_LED"
 	fi
-	dat=$(field "$P_GPIO" dat) || dat="(absent)"
-	b1=$(field "$P_GPIO" n_set_ok) || b1=-1
-	w1=$(field "$P_GPIO" n_writes) || w1=-1
+	snap "$P_GPIO" || {
+		chk MT-LED 0 "cannot snapshot $P_GPIO after the write"
+		return
+	}
+	dat=$(field "$MFG_SNAP" dat) || dat="(absent)"
+	b1=$(field "$MFG_SNAP" n_set_ok) || b1=-1
+	w1=$(field "$MFG_SNAP" n_writes) || w1=-1
 	# bit 6 is the lamp.  BRD-13: LED #2 of eight, ACTIVE LOW, so the bit
 	# CLEARS when the lamp lights -- `dat` 0000007C -> 0000003C, 量 at
 	# seating 20.
@@ -582,9 +672,13 @@ mt_led() {
 # pulling a cable that was never plugged in.  With the poller demonstrably
 # running, a flat b0_n_press is the button, and nothing else.
 mt_button() {
-	o0=$(field "$P_KEYS" n_open) || o0=-1
-	p0=$(field "$P_KEYS" n_poll) || p0=-1
-	k0=$(field "$P_KEYS" b0_n_press) || k0=-1
+	snap "$P_KEYS" || {
+		chk MT-BUTTON 0 "cannot snapshot $P_KEYS"
+		return
+	}
+	o0=$(field "$MFG_SNAP" n_open) || o0=-1
+	p0=$(field "$MFG_SNAP" n_poll) || p0=-1
+	k0=$(field "$MFG_SNAP" b0_n_press) || k0=-1
 	if [ -z "$MFG_ROOT" ]; then
 		printf 'OPERATOR: press and hold the reset button for about 3 seconds, any time in the next %s.\n' "$MFG_BUTTON_SECONDS"
 		# THE REDIRECT IS THE CAUSE, and it is `sleep N < node` rather
@@ -595,9 +689,13 @@ mt_button() {
 		# the wire.  bench/2026-09-10's card settles both.
 		sleep "$MFG_BUTTON_SECONDS" < "$P_EVENT"
 	fi
-	o1=$(field "$P_KEYS" n_open) || o1=-1
-	p1=$(field "$P_KEYS" n_poll) || p1=-1
-	k1=$(field "$P_KEYS" b0_n_press) || k1=-1
+	snap "$P_KEYS" || {
+		chk MT-BUTTON 0 "cannot snapshot $P_KEYS after the window"
+		return
+	}
+	o1=$(field "$MFG_SNAP" n_open) || o1=-1
+	p1=$(field "$MFG_SNAP" n_poll) || p1=-1
+	k1=$(field "$MFG_SNAP" b0_n_press) || k1=-1
 	if [ "$o1" -gt "$o0" ] && [ "$p1" -gt "$p0" ] && [ "$k1" -gt "$k0" ]; then
 		chk MT-BUTTON 1 "n_open $o0->$o1 n_poll $p0->$p1 b0_n_press $k0->$k1"
 	else

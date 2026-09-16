@@ -1,0 +1,19 @@
+echo cereload 20000 > /proc/rtl819x-timer ; /bin/mfgtest auto bb684eb0
+mfgtest 1.0  phase=auto
+  ok  R  LMTX-FIWD-  S  - R D I Drec=i0p0e_id1=BBC678041EB06 ex
+pected=BB684EB0
+  ok    MT-FLASH-1   rdid_id=1C7016 rdid_match=1
+RLXFW-S-TRYW=00000001
+  ok    MT-FLASH-2   n_write_refused=8 n_writes=0
+RLXFW-S-MRC=00000000
+RLXFW-S-MDIFF=00000000
+RLXFW-S-MH601=00000000
+  ok    MT-FLASH-3   map_rc=0 h601_hashed=0 diff_units=0 (digests scored at the desk)
+  FAIL  MT-TICK      ce_live=1 ce_mode=2 spur=0 stuck=0 reload=20000 want=2000 dj=503 di=503 skew=0
+  ok    MT-WDT       wdtcnr_at_probe=A5000000 state=BOOTGUARD
+  ok    MT-PORT      Port3 LinkURpLX
+FW-S-H601=00000000
+  ok    MT-MAC       sig_ok=1 ver=1 len=1166 mac unicast
+  ok    MT-RFCAL     hw_sum_ok=1 over 1166 body bytes
+8 of 9 ok, 1 FAIL
+# 
