@@ -1,15 +1,13 @@
 # Known issues
 
-**What this repository does not establish.**
+**What this repository does not establish, at `v0.4`.**
 `plan/CHARTER.md` §110 rule 2 asks for a known-issues list beside every release.
 This is that list, and it is written to the same standard as everything else
 here: each entry names what is *not* true, what was measured instead, and which
 gate changes it. Nothing below is a plan; the plan is `PROGRESS.md`'s gate board.
 
-⚠️ **This file on `main` is the CURRENT list, not `v0.3`'s.** A release's list is
-the copy at that release's tag, which is frozen; this one keeps moving. Anything
-that has since been closed is at the bottom rather than deleted, so the two can
-be read against each other. 🔄 **`v0.2` → `v0.3` on 2026-09-11.**
+Anything that has since been closed is at the bottom rather than deleted, so
+this list and `v0.3`'s can be read against each other.
 
 Marked the same way as the rest of the repository: **量** measured on the device
 · **讀** read out of code, a dump or a document · **推** inferred, pending a
@@ -402,6 +400,24 @@ agree on which line that is. `citecheck` prints the count on every run rather
 than resolving it, because there is nothing to resolve: the ambiguity is in
 the file.
 
+🔴🔴 **A FOURTH consumer, 2026-09-17, and this one is not a
+gate — it is a published number.** `docs/mfgtest.md` § 9.8,
+`bench/2026-09-17/CORRECTIONS-block23.md` and `LOG.md` all quote
+**`ae87ac03269985d6`** as the digest over the 32 lines of `MT-FLASH-3`'s flash
+map, and it is the number carrying *4,186,112 bytes are unchanged across eight
+days*. 量: `sed -n '19,50p' X8-M0.log \| sha256sum` returns
+**`70484defc9714ecc…`**. The published value comes back only after
+`tr -d '\r'`, **and none of the three files says so.** Negative control: 31 of
+the 32 lines give a third value.
+
+⚠️ **The direction matters.** The first three instances failed
+loudly — a gate said STOP on a cell that had passed. This one fails
+quietly and in the wrong direction: a reader re-deriving the digest from the
+committed capture gets a different answer and concludes **the flash moved**.
+The normalisation is now written down in `docs/mfgtest.md` § 9.8 and
+`SPEC.md` `FW-92`; **nothing enforces it**, and no other published digest in
+this repository has been checked the same way.
+
 ## 🔴 `\r\r\n` has two sources and only one of them is a wrap
 
 量 2026-09-08 over all 762 committed captures (`FW-49`). busybox ash's line
@@ -712,6 +728,24 @@ directory already holds its captures — but **the next card must re-derive
 
 ---
 
+
+## 🔴 What `P1` did NOT establish — 2026-09-17 (eighty-fourth segment)
+
+`P1` shipped a production test that runs on this board: eleven checks, **11 of
+11 on a good unit**, and **five of them turned red by physical injection** with
+every revert measured. **Six things it did not establish**, each with what
+would settle it.
+
+| | |
+|---|---|
+| 🔴🔴 **The design table over-declares on three of its eleven rows, and only one had ever been caught.** 讀 2026-09-17, every § 2 pass criterion read against the `chk` call that implements it: `MT-TICK` named an input the script never reads (found at seating 25, struck), **`MT-PORT` declares *the output names the vendor driver* and prints the port**, **`MT-MAC` declares *body checksum 0* and puts that condition in `MT-RFCAL` alone** — so a unit with a valid header and a broken body checksum scores `MT-MAC` **ok**. All three claim a conjunct the script does not test | **What would settle it**: an instrument whose population is the table and whose subject is the script. This sweep is eleven hand comparisons and **will not see a twelfth row added tomorrow.** Three in eleven is a rate, not a target, and a checker fitted to three points should not exist — the same argument this repository already applied to the `D`-row census |
+| 🔴 **`MT-PORT`'s missing conjunct is the one `R6` needs.** The plan's own ordering note says the port item runs against the **vendor's** driver until `R6` lands, so the output must record which driver served it or the historical numbers stop meaning anything the moment mine does. **Every `MT-PORT` line this project has captured is unlabelled** | **What would settle it**: one line in `mt_port`. It is `R6-0` work and not a tidy-up, because changing `config/mfgtest.sh` moves `RECIPE_ID`, and `MT-ID` compares against `RECIPE_ID` |
+| 🔴 **Five of the eleven live rows are class `S` — simulated at the boundary — and two files said four.** 量 2026-09-17 by two independent routes: `S` 5, `R` 4, `P` 2. `git log -S` puts the sentence and the `MT-ID` row in the **same commit**, so it was wrong the day it was written, in the section whose whole job is to understate nothing | **What would settle it**: nothing in this repository counts a table column. Corrected in place with the original quoted; the class of defect is open |
+| 🔴 **No capture holds an operator's answer.** 量: five captures contain the string `OPERATOR`, once each, and every one is the **prompt**. The register half of each pairing is captured and closes exactly — `n_set_ok` 1→2, refused, →3, refused, 4→5 with `n_set_no 2` counting the two refusals; `n_poll` +400 / +1800 / +400 against 20 / 90 / 20 s at 20 Hz. **But `MT-LED` and `MT-BUTTON` are two checks whose verdict a machine cannot reconstruct from `bench/` alone** | **What would settle it**: the operator's reading typed into the capture as a `--send`, so the human answer and the register land in one file with one timestamp. That is a card-format change, the same shape `CAPD-1` already owes |
+| 🔴 **Flash writability is untested, DDR is untested, and four of the vendor's eight factory-test areas are out of reach.** The flash substitute tests that the write path **refuses**, which is a different claim. `MT-DDR` is struck with its reason: no owned surface, no `devmem`, and `MEM-17` measured DRAM retaining a previous power cycle's contents, so a naive walking-1s can pass on stale data. TX power, RX sensitivity, PSD and thermal need instruments this project does not have | **What would settle it**: for DDR, a kernel verb over a `__get_free_pages` region — costed by nobody. For the other four, hardware. Recorded as a gap **against the plan**, not against the prior art: 讀, the vendor does not test DDR either |
+| 🔴 **`D3`'s second conjunct was paid by an instrument it does not name, and the one it names never ran.** `D3` says *the `FLR` bracket is byte-identical across the gate*; 量, **zero `FLR` ran in `P1`**. What paid it is `MT-FLASH-3`'s 32-group map over 4,186,112 bytes, line-identical to two seatings eight days earlier — about four thousand times the bracket's 1,024 bytes | ⚠️ **Wider and less independent, and both halves are the finding.** The bracket reads flash under the *loader*, with Linux down and my driver unloaded; the map is computed by the same driver whose writes it is used to rule out, and `n_writes 0` comes from that driver too. **What would settle it**: one `FLR` bracket on `R6`'s first seating, which costs nothing — it rides the opening cold boot |
+
+---
 
 ## Closed since `v0.2` was tagged
 

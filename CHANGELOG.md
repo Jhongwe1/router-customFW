@@ -1471,8 +1471,67 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
-*(Nothing yet. `R1-pub + R2c` opened 2026-09-11, in the segment `R5` closed;
-its first step is `R1-pub-0`.)*
+*(Nothing yet. `R6` is next and is **not opened** — opening a gate is the
+owner's decision, and `R6` has no step list yet. `R6-0` is a forward reference
+in planning prose that `PROGRESS.md` has never contained; `cfcensus`'s `L2`
+has already fired once on a citation of it.)*
+
+---
+
+## v0.4 — 2026-09-17
+
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R1-pub + R2c` — the instruction / hazard / Lexra-ASE census, the
+vendor-kernel emulation column, and the three-toolchain silicon comparison —
+plus **`P1`**, a production test that runs on this board and that has been made
+to fail.
+
+🟢 **What `P1` is, in one sentence.** `config/mfgtest.sh` runs eleven
+checks on the device — image identity, three flash checks, the system tick,
+the watchdog, an LED, the reset button, an Ethernet port, and two verdicts over
+the calibration block — and prints one `ok`/`FAIL` line each. Seating 25
+returned **11 of 11 on a good unit**, then turned **five of them red by physical
+injection**, each red specific to the check its row named, each revert measured
+before the next injection, and the whole of it for **zero resets**.
+
+🔴 **The second half is the gate; the first half is a demonstration.**
+A check that cannot be made to fail proves the tool prints `ok`, not that the
+board is good. `tools/mfginject.py` carries 25 host-side injections
+(**25 of 25 killed, 0 alive**) and the five that need the die and the operator
+stand down as one declared skip line rather than as a smaller green.
+
+🔴 **No take, and it is a decision rather than an omission** — the
+same ruling `v0.3` made. The artefact doing that job is
+[`docs/GATE-RESULTS.md`](docs/GATE-RESULTS.md), whose tenth and eleventh entries
+are `R1z`'s and `P1`'s, each with three claims and a longer list of what the
+gate did **not** establish.
+
+🔴 **Three of the eleven design-table rows over-declare, and finding two
+of them is the release's most useful result.** 讀 2026-09-17: `MT-PORT`
+declares *the output names the vendor driver* and prints the port; `MT-MAC`
+declares *body checksum 0* and puts that condition in `MT-RFCAL` alone. Both
+were found by executing a sentence the previous segment had written and not
+acted on — *a measurement that refutes one line usually refutes two more,
+and nothing here goes looking for the other two*. `MT-PORT`'s missing conjunct
+is the one `R6` depends on.
+
+🔴 **And one published number in this release does not re-derive from
+its own evidence without a step nobody wrote down.** The flash map's digest
+`ae87ac03269985d6` needs `tr -d '\r'` first; raw it is `70484defc9714ecc…`.
+Fourth consumer of this repository's carriage-return finding, and the first one
+that is a number rather than a gate.
+
+⚠️ **What a release's known-issues list is**: the copy of
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) at this tag, which is frozen. The
+one on `main` keeps moving.
+
+**Zero flash-write commands and zero `FLR` across the whole gate.** The
+byte-level bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %** — and
+what actually establishes *the unit is unchanged* here is a different and wider
+instrument, `MT-FLASH-3`'s 32-group map over 4,186,112 bytes, line-identical to
+two seatings eight days earlier. Wider, and **less independent**: the digest is
+computed by the same driver whose writes it is used to rule out. Both halves are
+in the known-issues list.
 
 ---
 
