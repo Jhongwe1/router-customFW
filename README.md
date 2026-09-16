@@ -434,9 +434,9 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather than counted by
-eye.** 🔄 **量 2026-09-16**, over `git ls-files tools/` (**139** files), taking those whose
-first two bytes are `#!` and excluding `tools/test-*`: **62** programs, of which **21 are
-described below and 41 are not** — `audit-bench-log`, `binsim`, `capdate`, `capfield`,
+eye.** 🔄 **量 2026-09-16**, over `git ls-files tools/` (**140** files), taking those whose
+first two bytes are `#!` and excluding `tools/test-*`: **63** programs, of which **21 are
+described below and 42 are not** — **`appletcensus`**, `audit-bench-log`, `binsim`, `capdate`, `capfield`,
 **`cfcensus`**, `ci-census`, **`citecheck`**, `citime`, `derivcheck`, `desk-sweep`, `dtcheck`,
 **`elfops`**, **`emueq`**, **`emupredict`**, `fetch-sources`, `flashmap`, `fsmanifest`,
 **`hazdecl`**, **`hazpay`**, `isa-probe`, `isacensus`, **`isapay`**, `leakscan`, `marchcmp`,
@@ -444,12 +444,12 @@ described below and 41 are not** — `audit-bench-log`, `binsim`, `capdate`, `ca
 `rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, `tccensus`, **`tcpay`**, **`uartrate`**,
 **`ucostcheck`**, **`ucostfit`**, `vendor-tripwire` and `verify-backup-copy`.
 🔴 **A SIXTH time, and this time it was stale by ELEVEN.** 量 2026-09-16: the
-fourteen new programs are `hazdecl`, `hazpay` and `isapay` (2026-09-13, all
+fifteen new programs are `hazdecl`, `hazpay` and `isapay` (2026-09-13, all
 three committed AFTER the 01:24 commit that wrote the count above), `emueq` and
 `tcpay` (09-14), `citecheck`, `elfops`, `emupredict`, `mustrun`, `procgrow` and
 `uartrate` (09-15), and `cfcensus`, `ucostcheck` and `ucostfit` (09-16) — so
 **eleven had landed and been committed before today and none of them moved this
-count.** The **+39 in files** is those fourteen plus three `tools/test-*`, four
+count.** 🔄 **2026-09-16 (`P1-0`), and this is the first time the count moved in the SAME segment that added the program**: `appletcensus` (09-16) is the fifteenth, and 量 re-derived rather than incremented — `git ls-files tools/` is **140** and the `#!`-and-not-`test-*` filter gives **63**. It was found by the closeout audit asking who owns each thing the segment produced, not by reading this row. The **+39 in files** is those fourteen plus three `tools/test-*`, four
 `.tsv` and **eighteen payload sources under `tools/rlxprobe/`**, with nothing
 removed. **Described stayed at 21**, so the whole of the growth is undescribed.
 🔴 **A FIFTH time, and it was stale by TWO before this segment added two.**

@@ -409,7 +409,7 @@ distribution, not a sample from it.
 
 | | |
 |---|---|
-| `MT-FLASH-1` needs an `rdid` verb in `rtl819x-spi` | 量: that driver does not issue `RDID` today, and its own contract is that it **never writes `SFCR`** — which the loader's `ComSrlCmd_RDID` does. Whether a read-only RDID can be issued without touching `SFCR` is the first thing `P1-1` must settle |
+| `MT-FLASH-1` needs an `rdid` verb in `rtl819x-spi` | 量: that driver does not issue `RDID` today, and its own contract is that it **never writes `SFCR`** — which the loader's `ComSrlCmd_RDID` does. 🔴 **And this repository already holds material on it that this row's first draft did not point at** — found by this segment's own closeout audit, not while writing the row. `PROGRESS.md`'s `C-3` records 讀 that `ComSrlCmd_RDID()` at `0x804058bc` **spins on `SFCSR` bit 27 and writes `0x9F000000` to `SFDR`**, while `rtl819x-spi.c:59` says it **rewrites `SFCR`**. Two readings of one routine from two disassemblies, and they are not in conflict — they name different registers, so the routine plausibly touches all three. **So the question is narrower than this row first stated**: not *does RDID touch `SFCR`* but *does the sequence THIS driver would need to*. `P1-1` reconciles the two readings before it writes a verb |
 | `MT-MAC` / `MT-RFCAL` need an `h601` verb | ~30 lines, verdicts only, §4 |
 | `MT-PORT`'s surface is 推 | `/proc/rtl865x/port_status` is the vendor NIC driver's; whether it exists in *this* kernel is unmeasured |
 | the image is a second build-matrix entry | `RECIPE_ID` differs, so the boot-capture byte count is **re-derived, not copied** |
