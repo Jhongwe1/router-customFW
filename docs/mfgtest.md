@@ -658,9 +658,27 @@ seating. `FLS-26`'s ledger does not move.
 
 ### 9.5 The harness can run on the shell the die runs, and already could
 
-`tools/mfginject.py` takes `MFG_SHELL`. Pointed at a two-line wrapper that
-execs `qemu-mips-static -L <squashfs-root> bin/busybox ash`, **all 25 injections
-and all six controls pass on the target shell**, with no change to the tool.
+`tools/mfginject.py` takes `MFG_SHELL`. Pointed at **`tools/mipsash.sh`**,
+which execs `qemu-mips-static -L <squashfs-root> bin/busybox ash`, **all 25
+injections and all six controls pass on the target shell**, with no change to
+the tool — `MFG_SHELL` was already the right seam.
+
+    MFG_SHELL=tools/mipsash.sh /usr/bin/python3 tools/mfginject.py
+
 The 2 × 2 that makes it load-bearing: the arithmetic form of § 9.2's fix is
 **ok under `dash` and FAIL under this unit's `ash`**; the shipped string fold is
 ok under both.
+
+🔴 **The script is committed and the thing it runs is not.** `$UNIT` is this
+device's own userspace, carved out of its flash dump, which `CLAUDE.md`'s Never
+table forbids committing — the same shape as `test-hazlint.sh`'s `K4`
+population. So it **refuses rather than falling back**: a wrapper that
+silently ran the host's shell would make every result a claim about the wrong
+machine, which is the one thing this file exists to prevent. 量, `rc=2` with a
+bad `RLXFW_UNIT_ROOT`.
+
+⚠️ **Running the shell is not running the kernel.** Every `/proc` file is a
+fixture here, so this catches shell semantics and nothing about a driver — and
+the two defects it could *not* have caught are exactly the two the die found,
+`FW-87` and the `/proc` side of `FW-88`. Whether CI gains a declared bench-only
+row for a second pass is `P1-5`'s decision.
