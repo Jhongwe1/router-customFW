@@ -979,6 +979,21 @@ jobs:
       - name: ucostcheck
         run: /usr/bin/python3 tools/ucostcheck.py config/rlxfw-user/isaprobe/ucost-cells.S 2>&1 | tee ci-out/ucostcheck.out; exit "${PIPESTATUS[0]}"
 
+      # `CPU-73`'s four costs were fitted at the desk on the seating's own night
+      # and the fit was thrown away, so `docs/rlx-isa.md` § 9's promise -- an
+      # instrument, a capture committed here, and the command that re-derives
+      # the reading -- was FALSE for that row until 2026-09-16.
+      #
+      # 🔴 There is deliberately NO second `in anger` step of the shape
+      # `ucostcheck` above carries, and that is a difference rather than an
+      # omission: `ucostcheck --self-test` runs on synthetic fixtures, so a
+      # green one says nothing about this tree, while thirty of this suite's
+      # thirty-seven cases assert against the two committed captures directly.
+      # The self-test IS the run in anger.  Both captures are committed here,
+      # so no toolchain, no `$FWRE_WORK` artefact, no device, no skip.
+      - name: ucostfit
+        run: /usr/bin/python3 tools/ucostfit.py --self-test 2>&1 | tee ci-out/ucostfit.out; exit "${PIPESTATUS[0]}"
+
       # `R1b`'s three, 2026-09-13.  `hazpay` generates probe5 and holds the
       # two-source expectation check; `hazdecl` is probe5's BUILD GATE and its
       # two pure functions are what run here -- `tools/hazlint` itself needs a

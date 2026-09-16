@@ -118,6 +118,52 @@ MUTANTS = [
      '        if len(pair) == 2 and pair[0][1] != pair[1][1]:',
      '        if False:',
      "H29"),
+    # The per-row control (2026-09-16).  `check_controls` used to inspect the
+    # two `kind == "ctl"` rows and nothing else -- 2 of the 26 controls the
+    # table declares -- so three declared controls could fail, the verdict
+    # table print the failure on three rows, and the run report zero findings
+    # and exit 0.  Each of these breaks ONE branch of the replacement.
+    ("hazpay", "the ctl recomputation always says the control fired",
+     '            state[r["name"]] = (rec[7] == r["ctl_v"])',
+     '            state[r["name"]] = True',
+     "H32"),
+    ("hazpay", "a wrong ctl with a non-VOID verdict stops being a finding",
+     '        if st is False and v != V_VOID:',
+     '        if False and st is False and v != V_VOID:',
+     "H33"),
+    ("hazpay", "a VOID verdict with a ctl that FIRED stops being a finding",
+     '        elif st is True and v == V_VOID:',
+     '        elif False:',
+     "H33"),
+    # 🔴 The one that makes the check able to fire on a LEGAL outcome.
+    # `verdict_row` puts the tag and the exception above the control on
+    # purpose (H27), so a trapped row whose ctl is also wrong reads TRAPS and
+    # that is the documented answer, not a disagreement.  A check that fires
+    # on a correct capture is worse than one that never fires.
+    ("hazpay", "TRAPS and NOT-RUN stop being excluded from the agreement",
+     '        if st is None or v in (V_TRAP, V_NORUN):',
+     '        if st is None:',
+     "H33"),
+    ("hazpay", "the every-control-failed finding is removed",
+     '    if evaluated and not fired:',
+     '    if False:',
+     "H34"),
+    ("hazpay", "the counted line loses its denominator",
+     '    parts = ["per-row controls: %d of %d fired" % (len(fired), len(rows))]',
+     '    parts = ["per-row controls: %d fired" % len(fired)]',
+     "H35"),
+    # These two restore the ladder defect from both ends: the first makes
+    # VOID a reading again, which is the 2026-09-16 bug verbatim (`cp0`
+    # printing `open at every rung` for a family that could not be measured);
+    # the second keeps the classification and removes the wording.
+    ("hazpay", "VOID/TRAPS/NOT-RUN count as readings again",
+     'NOT_A_READING = (V_VOID, V_NORUN, V_TRAP)',
+     'NOT_A_READING = ()',
+     "H36"),
+    ("hazpay", "the all-unmeasurable ladder branch is removed",
+     '    if len(unread) == len(rungs):',
+     '    if False:',
+     "H36"),
     # --- hazdecl ----------------------------------------------------------
     ("hazdecl", "P1 stops comparing the record count with the VIOLATIONS count",
      '    elif len(viols) != counts["violations"]:',

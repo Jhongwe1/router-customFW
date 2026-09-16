@@ -950,6 +950,12 @@ def check_distances(rows, syms):
 V_NORUN, V_TRAP, V_VOID = "NOT-RUN", "TRAPS", "VOID"
 V_LOCK, V_OPEN, V_OTHER = "LOCK", "OPEN", "OTHER"
 
+# The three verdicts that are NOT a reading of the hazard.  A rung with one
+# of these did not answer the question; it failed to be asked.  Kept as one
+# name because the ladder and the control recomputation must agree about
+# which verdicts those are.
+NOT_A_READING = (V_VOID, V_NORUN, V_TRAP)
+
 ROW_RE = re.compile(r"^P5\s+([0-9a-fA-F]{8})\s+(\S+)"
                     r"((?:\s+[0-9a-fA-F]{8}){8})\s*$")
 
@@ -1011,7 +1017,77 @@ def read_rows(path, nrows):
     return recs
 
 
-def check_controls(rows, out, arm):
+def recompute_ctls(rows, recs):
+    """The per-row control on EVERY row, recomputed from the capture.
+
+    `tools/isa-hazard.tsv:60-63` declares a `ctl` for every row and not only
+    for the two whose `kind` is `ctl`: *what `aux` must hold on BOTH arms.
+    The family writes it after the hazard has settled, and it is what
+    separates `the hazard is open` from `the producer never produced`.  A row
+    whose ctl reading is wrong is VOID, not OPEN.*  `docs/isa-hazard.md`
+    repeats it as a row of the control table.
+
+    Until 2026-09-16 `check_controls` inspected the two `kind == "ctl"` rows
+    and nothing else -- 2 of the 26 declared controls -- so the gate's own
+    DoD sentence, *every hazard test's own control fires*, had no instrument
+    behind it at all.  量: `bench/2026-09-14/C1-P5j.log` has three rows whose
+    declared control did not fire, the verdict table prints that failure on
+    all three rows, and the run reported zero findings and exit 0.
+
+    THIS MUST NOT READ `verdict_row`'s ANSWER.  It takes the parsed records
+    and the table and redoes the comparison, so that the two paths can be
+    required to agree.  Gating on the VOID that `verdict_row` produces FROM
+    this same comparison would be a check reading its own output, which is
+    the defect being fixed one layer up and not a second source.
+
+    Returns (state, fired, failed, norec).  `state` maps a row NAME to True
+    (its control fired), False (it did not) or None (this row has no record
+    of its own, so there is no aux word and the question does not arise).
+    """
+    state = {}
+    for r in rows:
+        rec = None
+        if recs is not None and 0 <= r["idx"] < len(recs):
+            rec = recs[r["idx"]]
+        # The tag check is redone here for the same reason the ctl check is:
+        # a record whose tag is not this row's is not this row's record, and
+        # its aux word is about something else.
+        if rec is None or rec[0] != (ROW_TAG_BASE | r["idx"]):
+            state[r["name"]] = None
+        else:
+            state[r["name"]] = (rec[7] == r["ctl_v"])
+    fired = [r for r in rows if state[r["name"]] is True]
+    failed = [r for r in rows if state[r["name"]] is False]
+    norec = [r for r in rows if state[r["name"]] is None]
+    return state, fired, failed, norec
+
+
+def ctl_line(rows, recs):
+    """The counted line, printed beside the verdict tally.
+
+    A zero is not printable here without its denominator: `0 did not` is
+    worth nothing except beside `24 of 24 fired`, and the whole reason this
+    line exists is that `check_controls` used to be able to report nothing
+    about 24 declared controls without ever saying how many it had looked
+    at.  The three counts are exhaustive and sum to the row count.
+    """
+    _st, fired, failed, norec = recompute_ctls(rows, recs)
+    byfam = {}
+    for r in failed:
+        byfam.setdefault(r["family"], []).append(r["name"])
+    parts = ["per-row controls: %d of %d fired" % (len(fired), len(rows))]
+    if failed:
+        parts.append("%d did not (%s)" % (len(failed), "; ".join(
+            "%s: %s" % (fam, ", ".join(byfam[fam])) for fam in sorted(byfam))))
+    else:
+        parts.append("0 did not")
+    if norec:
+        parts.append("%d with no record (%s)"
+                     % (len(norec), ", ".join(r["name"] for r in norec)))
+    return ", ".join(parts)
+
+
+def check_controls(rows, out, arm, recs):
     """The controls, and the two that are two-sided.
 
     Returns a list of findings.  A finding here is not a row's reading being
@@ -1029,6 +1105,54 @@ def check_controls(rows, out, arm):
             f.append("CONTROL %s read %s, not LOCK -- the payload cannot see "
                      "its own memory observable and the table is VOID"
                      % (r["name"], v))
+
+    # --- the per-row control, on every row, by a second path --------------
+    #
+    # TWO findings and no more, and the line between them is this function's
+    # own docstring.  A row whose declared control did not fire is VOID, and
+    # ONE VOID row is a legal outcome -- `PROGRESS.md` `D3`'s *not
+    # measurable* carrying its reason.  Making that a finding would turn a
+    # correct VOID into a failure, so it is COUNTED instead (`ctl_line`,
+    # printed beside the tally) and only these two shapes are findings:
+    #
+    #   the two paths DISAGREE   the instrument contradicting itself, which
+    #                            is reachable the moment `verdict_row` is
+    #                            edited -- and a check that cannot become
+    #                            reachable is a check that cannot fail;
+    #   EVERY control failed     not one row read its own observable, so no
+    #                            row's reading is about anything.
+    state, fired, failed, _norec = recompute_ctls(rows, recs)
+    for r, v, _val, _a in out:
+        st = state.get(r["name"])
+        if st is None or v in (V_TRAP, V_NORUN):
+            # `verdict_row` puts the tag and the exception ABOVE the control
+            # ON PURPOSE and `H27` pins that ordering, so a trapped row whose
+            # ctl is also wrong reading TRAPS is the documented answer and
+            # not a disagreement.  Excluding them here is what keeps this
+            # check from firing on a legal outcome.
+            continue
+        aux = recs[r["idx"]][7]
+        if st is False and v != V_VOID:
+            f.append("INCOHERENT %s: recomputed from the capture its aux word "
+                     "is 0x%08X against a declared ctl of 0x%08X, so this row "
+                     "cannot be read -- and the verdict is %s, not VOID. Two "
+                     "paths over one capture disagree and one of them is "
+                     "broken. A single VOID row is not a finding; this is"
+                     % (r["name"], aux, r["ctl_v"], v))
+        elif st is True and v == V_VOID:
+            f.append("INCOHERENT %s: the verdict is VOID and the aux word "
+                     "recomputed from the capture is 0x%08X, which IS the "
+                     "declared ctl. `verdict_row` has exactly one route to "
+                     "VOID and this capture does not show it"
+                     % (r["name"], aux))
+    evaluated = len(fired) + len(failed)
+    if evaluated and not fired:
+        f.append("EVERY per-row control failed -- %d of the %d row(s) with a "
+                 "record, and not one aux word matched its `ctl` column. The "
+                 "payload is not reading its own observables at all, so no "
+                 "row's reading here is about anything. One such row is VOID "
+                 "and legal; all of them is the table unable to support any "
+                 "reading" % (len(failed), evaluated))
 
     # C4.  `plan:1074` calls this the only failure that can make the table
     # rubbish, which is why it is mandatory.
@@ -1057,6 +1181,52 @@ def check_controls(rows, out, arm):
                      % (d, pair[0][0]["name"], pair[0][1],
                         pair[1][0]["name"], pair[1][1]))
     return f
+
+
+def ladder_depth(rungs):
+    """One family's depth sentence.  `rungs` is [(dist, verdict), ...].
+
+    VOID IS NOT OPEN.  Until 2026-09-16 this read "open at every rung" whenever
+    no rung read LOCK, so an all-VOID family -- one whose own per-row control
+    did not fire, i.e. one that could not be measured at all -- printed the
+    sentence a reader takes as *the hazard is exposed at every distance*.  量:
+    the `cp0` family on `bench/2026-09-14/C1-P5j.log` printed exactly that, on
+    the same run whose verdict table said `ctl read 0x80500270, want 0x5A5A5A50`
+    three lines above.  TRAPS and NOT-RUN are the same class -- the absence of a
+    reading rather than a reading of OPEN -- and `NOT_A_READING` is the one name
+    for all three.
+
+    THE PARTLY-UNMEASURED WORDINGS ARE DELIBERATE and are why this is three
+    branches and not two.  A ladder with a hole in it can still show a depth,
+    but that depth is a claim about the rungs that WERE read, so the count of
+    the ones that were not is printed beside it: `closes at d1` with d0 VOID
+    must not be read as *d0 is open*, which is the same mistake one rung down.
+
+    The two healthy strings are unchanged on purpose.  A capture in which every
+    rung is a reading prints exactly what it printed before, so this fix moves
+    no reading and no number -- it is a rendering fix and nothing else.
+
+    IT IS A FUNCTION because the two partly-unmeasured branches are not
+    reachable from any committed capture (every family in the device capture is
+    either wholly read or wholly VOID), and a branch no case can exercise is a
+    rendering rule nobody has shown to work.  `H36` calls this directly.
+    """
+    closed = [d for d, v in rungs if v == V_LOCK]
+    unread = [(d, v) for d, v in rungs if v in NOT_A_READING]
+    nvoid = sum(1 for _d, v in rungs if v == V_VOID)
+    if len(unread) == len(rungs):
+        return ("not measurable at any rung (see the ctl column)"
+                if nvoid == len(rungs) else
+                "not measurable at any rung (%d VOID, %d other)"
+                % (nvoid, len(rungs) - nvoid))
+    if closed:
+        return ("closes at d%d" % min(closed)) + (
+            "" if not unread else
+            " -- but %d of %d rung(s) not measurable"
+            % (len(unread), len(rungs)))
+    return ("open at every rung" if not unread else
+            "open at every MEASURED rung (%d of %d not measurable)"
+            % (len(unread), len(rungs)))
 
 
 def cmd_verdict(rows, path, arm, quiet=False):
@@ -1097,8 +1267,9 @@ def cmd_verdict(rows, path, arm, quiet=False):
     print("")
     print("  %d row(s), %s" % (len(out), ", ".join(
         "%s %d" % (k, tally[k]) for k in sorted(tally))))
+    print("  %s" % ctl_line(rows, recs))
 
-    findings = check_controls(rows, out, arm)
+    findings = check_controls(rows, out, arm, recs)
 
     # The ladder, which is the result rather than a check.  Printed because a
     # table of per-row verdicts is not yet an answer to "how deep".
@@ -1109,10 +1280,8 @@ def cmd_verdict(rows, path, arm, quiet=False):
                         if r["family"] == fam])
         if not rungs:
             continue
-        closed = [d for d, v in rungs if v == V_LOCK]
         shape = " ".join("d%d=%s" % (d, v) for d, v in rungs)
-        depth = ("closes at d%d" % min(closed)) if closed else "open at every rung"
-        print("    %-10s %-44s %s" % (fam, shape, depth))
+        print("    %-10s %-44s %s" % (fam, shape, ladder_depth(rungs)))
 
     if mispred:
         print("")
@@ -1711,31 +1880,58 @@ def self_test():
         assert verdict_row(r, tuple(w))[0] == V_VOID
     case("H27 TRAPS outranks VOID and VOID outranks the value", h27)
 
+    def mkrecs(subset, ctl_ok=True):
+        """A synthetic record set over the LIVE table: every row ran, every
+        aux word is (or deliberately is not) that row's declared ctl.
+        Indexed by `idx`, exactly as `read_rows` returns it."""
+        rr = [None] * len(live)
+        for r in subset:
+            rr[r["idx"]] = (ROW_TAG_BASE | r["idx"], 0, 0, 0,
+                            r["lock_v"], r["lock_v"], r["lock_v"],
+                            r["ctl_v"] if ctl_ok else (r["ctl_v"] ^ 1))
+        return rr
+
+    def capture_out(rows_, path):
+        """cmd_verdict's table, without cmd_verdict's printing."""
+        rr = read_rows(os.path.join(ROOT, path), len(rows_))
+        o = []
+        for r in rows_:
+            rec = rr[r["idx"]]
+            if rec is None:
+                o.append((r, V_NORUN, None, None))
+            else:
+                v, val, aux = verdict_row(r, rec)
+                o.append((r, v, val, aux))
+        return rr, o
+
     def h28():
         def mkout(verdicts):
             out = []
             for r, v in zip(live, verdicts):
                 out.append((r, v, r["lock_v"], r["ctl_v"]))
             return out
+        good = mkrecs(live)
         allock = mkout([V_LOCK] * len(live))
-        assert not check_controls(live, allock, "qemu"), \
+        assert not check_controls(live, allock, "qemu", good), \
             "a healthy qemu arm must produce no finding"
         one = mkout([V_LOCK] * len(live))
         one[0] = (live[0], V_OPEN, live[0]["open_v"], live[0]["ctl_v"])
-        f = check_controls(live, one, "qemu")
+        f = check_controls(live, one, "qemu", good)
         assert any("C4" in x for x in f), f
-        assert not any("C4" in x for x in check_controls(live, one, "device")), \
+        assert not any("C4" in x
+                       for x in check_controls(live, one, "device", good)), \
             "C4 must not fire on the device arm -- OPEN there is the reading"
         # the control row must read LOCK
         ctlidx = [i for i, r in enumerate(live) if r["kind"] == "ctl"]
         assert ctlidx, "the live table has no control row"
         two = mkout([V_LOCK] * len(live))
         two[ctlidx[0]] = (live[ctlidx[0]], V_OTHER, 0, 0)
-        f = check_controls(live, two, "device")
+        f = check_controls(live, two, "device", good)
         assert any("CONTROL" in x and "VOID" in x for x in f), f
         # and a table with no control row at all
         noctl = [r for r in live if r["kind"] != "ctl"]
-        f = check_controls(noctl, mkout([V_LOCK] * len(noctl)), "device")
+        f = check_controls(noctl, mkout([V_LOCK] * len(noctl)), "device",
+                           mkrecs(noctl))
         assert any("NO CONTROL ROW" in x for x in f), f
     case("H28 check_controls fires in both directions, and C4 only on qemu", h28)
 
@@ -1745,7 +1941,7 @@ def self_test():
         out = [(r, V_LOCK, r["lock_v"], r["ctl_v"]) for r in live]
         idx = live.index(pairs[1])
         out[idx] = (pairs[1], V_OPEN, pairs[1]["open_v"], pairs[1]["ctl_v"])
-        f = check_controls(live, out, "device")
+        f = check_controls(live, out, "device", mkrecs(live))
         assert any("storebase pair" in x for x in f), f
     case("H29 a storebase pair that disagrees is caught", h29)
 
@@ -1762,6 +1958,163 @@ def self_test():
         w = [0x52340000 | r["idx"], 0, 0, 0, 0, 0, 0, r["ctl_v"]]
         assert verdict_row(r, tuple(w))[0] == V_NORUN
     case("H31 a probe4 tag reads as NOT-RUN here", h31)
+
+    def h32():
+        """The recomputation itself, in three directions.  It is the SECOND
+        path, so its own positive control cannot be `verdict_row` agreeing with
+        it -- it is a record built here with a known-wrong aux word."""
+        st, fired, failed, norec = recompute_ctls(live, mkrecs(live))
+        assert len(fired) == len(live) and not failed and not norec, \
+            (len(fired), len(failed), len(norec))
+        st, fired, failed, norec = recompute_ctls(live, mkrecs(live, ctl_ok=False))
+        assert not fired and len(failed) == len(live), (len(fired), len(failed))
+        # one row wrong, the rest right
+        rr = mkrecs(live)
+        i = live[0]["idx"]
+        rr[i] = rr[i][:7] + (live[0]["ctl_v"] ^ 1,)
+        st, fired, failed, norec = recompute_ctls(live, rr)
+        assert [r["name"] for r in failed] == [live[0]["name"]], failed
+        assert st[live[0]["name"]] is False
+        # a row whose record is absent, and a row carrying probe4's tag, are
+        # both `no record` rather than a failed control: there is no aux word
+        # to compare and saying `did not fire` would be a claim about nothing
+        rr = mkrecs(live)
+        rr[live[1]["idx"]] = None
+        rr[i] = (0x52340000 | i,) + rr[i][1:]
+        st, fired, failed, norec = recompute_ctls(live, rr)
+        assert sorted(r["name"] for r in norec) == \
+            sorted([live[0]["name"], live[1]["name"]]), norec
+        assert not failed, failed
+    case("H32 the per-row ctl is recomputed independently, all three states", h32)
+
+    def h33():
+        """The two paths must AGREE, and disagreement is the finding.  A single
+        VOID row is NOT a finding -- it is `D3`'s not-measurable carrying its
+        reason -- so the positive control here is a row whose recomputed ctl is
+        wrong while its verdict is forced to something else."""
+        rr = mkrecs(live)
+        i = live[0]["idx"]
+        rr[i] = rr[i][:7] + (live[0]["ctl_v"] ^ 1,)
+        out = [(r, V_LOCK, r["lock_v"], r["ctl_v"]) for r in live]
+        f = check_controls(live, out, "device", rr)
+        assert any("INCOHERENT" in x and live[0]["name"] in x for x in f), f
+        # the honest pairing of the same records: VOID, and no finding
+        out[0] = (live[0], V_VOID, live[0]["lock_v"], live[0]["ctl_v"] ^ 1)
+        assert not check_controls(live, out, "device", rr), \
+            "one VOID row with a genuinely wrong ctl is a legal outcome (D3)"
+        # the other sign: VOID with a control that DID fire
+        out2 = [(r, V_LOCK, r["lock_v"], r["ctl_v"]) for r in live]
+        out2[0] = (live[0], V_VOID, live[0]["lock_v"], live[0]["ctl_v"])
+        f = check_controls(live, out2, "device", mkrecs(live))
+        assert any("INCOHERENT" in x for x in f), f
+        # AND IT MUST NOT FIRE ON THE DOCUMENTED ORDERING.  `verdict_row` puts
+        # the exception and the tag above the control (H27), so a trapped row
+        # with a wrong ctl reads TRAPS and that is not a disagreement.
+        out3 = [(r, V_LOCK, r["lock_v"], r["ctl_v"]) for r in live]
+        out3[0] = (live[0], V_TRAP, live[0]["lock_v"], live[0]["ctl_v"] ^ 1)
+        assert not check_controls(live, out3, "device", rr), \
+            "TRAPS outranks the control by design -- this must not be a finding"
+    case("H33 the two ctl paths disagreeing is a FINDING, VOID alone is not", h33)
+
+    def h34():
+        """Every control failing is the payload not reading its observables at
+        all.  The negative control is one row failing, which must stay silent."""
+        allbad = mkrecs(live, ctl_ok=False)
+        out = [(r, V_VOID, r["lock_v"], r["ctl_v"] ^ 1) for r in live]
+        f = check_controls(live, out, "device", allbad)
+        assert any("EVERY per-row control failed" in x for x in f), f
+        rr = mkrecs(live)
+        i = live[0]["idx"]
+        rr[i] = rr[i][:7] + (live[0]["ctl_v"] ^ 1,)
+        out = [(r, V_LOCK, r["lock_v"], r["ctl_v"]) for r in live]
+        out[0] = (live[0], V_VOID, live[0]["lock_v"], live[0]["ctl_v"] ^ 1)
+        assert not any("EVERY" in x for x in
+                       check_controls(live, out, "device", rr)), \
+            "one failed control must not read as all of them"
+    case("H34 EVERY per-row control failing is a finding, one is not", h34)
+
+    def h35():
+        """The counted line, on the two committed captures.  The qemu arm is the
+        NEGATIVE control -- 24 of 24, and a checker that cannot report a clean
+        run is as useless as one that cannot report a dirty one -- and the
+        device capture is the reading: three declared controls did not fire and
+        the run is still rc 0, because three VOID rows are legal."""
+        rr, out = capture_out(live, "qemu/2026-09-13/probe5.txt")
+        _st, fired, failed, norec = recompute_ctls(live, rr)
+        assert (len(fired), len(failed), len(norec)) == (24, 0, 0), \
+            (len(fired), len(failed), len(norec))
+        assert ctl_line(live, rr) == "per-row controls: 24 of 24 fired, 0 did not", \
+            ctl_line(live, rr)
+        assert not check_controls(live, out, "qemu", rr), \
+            check_controls(live, out, "qemu", rr)
+        rr, out = capture_out(live, "bench/2026-09-14/C1-P5j.log")
+        assert ctl_line(live, rr) == ("per-row controls: 21 of 24 fired, 3 did "
+                                      "not (cp0: c0_d0, c0_d1, c0_d2)"), \
+            ctl_line(live, rr)
+        assert not check_controls(live, out, "device", rr), \
+            check_controls(live, out, "device", rr)
+    case("H35 the counted line: qemu 24 of 24, the device capture 21 of 24", h35)
+
+    def h36():
+        """The ladder must not call an unmeasurable family open.  This is a
+        RENDERING case: it asserts on the printed line and on no verdict.
+
+        The direct half comes first because the two PARTLY-unmeasured wordings
+        are not reachable from any committed capture -- every family in the
+        device capture is either wholly read or wholly VOID -- so without it
+        those two branches would be rendering rules nothing exercises."""
+        assert ladder_depth([(0, V_LOCK), (1, V_LOCK)]) == "closes at d0"
+        assert ladder_depth([(0, V_OPEN), (1, V_LOCK)]) == "closes at d1"
+        assert ladder_depth([(0, V_OPEN), (1, V_OPEN)]) == "open at every rung"
+        assert ladder_depth([(0, V_VOID), (1, V_VOID)]) == \
+            "not measurable at any rung (see the ctl column)"
+        assert ladder_depth([(0, V_VOID), (1, V_TRAP)]) == \
+            "not measurable at any rung (1 VOID, 1 other)"
+        assert ladder_depth([(0, V_NORUN), (1, V_TRAP)]) == \
+            "not measurable at any rung (0 VOID, 2 other)"
+        assert ladder_depth([(0, V_VOID), (1, V_LOCK)]) == \
+            "closes at d1 -- but 1 of 2 rung(s) not measurable"
+        assert ladder_depth([(0, V_VOID), (1, V_OPEN)]) == \
+            "open at every MEASURED rung (1 of 2 not measurable)"
+        # OTHER is a reading -- the table's own doctrine, `isa-hazard.tsv:30-33`
+        assert ladder_depth([(0, V_OTHER)]) == "open at every rung"
+        import io as _io
+        import contextlib as _cl
+
+        def ladder(path, arm):
+            buf = _io.StringIO()
+            with _cl.redirect_stdout(buf):
+                cmd_verdict(live, os.path.join(ROOT, path), arm)
+            got, seen = {}, False
+            for ln in buf.getvalue().split("\n"):
+                if "the ladder (" in ln:
+                    seen = True
+                    continue
+                if seen:
+                    if not ln.strip():
+                        break
+                    got[ln.split()[0]] = ln.strip()
+            return got
+        L = ladder("bench/2026-09-14/C1-P5j.log", "device")
+        # PIN THE PARSE FIRST. Both loops below are `for ... assert not
+        # in`, which pass over an empty dict -- so without this the whole
+        # negative half of this case could not fail.
+        assert sorted(L) == sorted(FAMILIES), sorted(L)
+        assert "cp0" in L, sorted(L)
+        assert "not measurable at any rung" in L["cp0"], L["cp0"]
+        assert "open at every rung" not in L["cp0"], L["cp0"]
+        # the negative control: a family with a reading at every rung is
+        # untouched, and no OTHER family may pick up the new wording
+        assert L["loaduse"].endswith("closes at d1"), L["loaduse"]
+        for fam, ln in L.items():
+            if fam != "cp0":
+                assert "not measurable" not in ln, (fam, ln)
+        # and the qemu arm, where nothing is VOID at all
+        Q = ladder("qemu/2026-09-13/probe5.txt", "qemu")
+        assert sorted(Q) == sorted(FAMILIES), sorted(Q)
+        for fam, ln in Q.items():
+            assert "not measurable" not in ln, (fam, ln)
+    case("H36 an all-VOID family renders as not measurable, not as open", h36)
 
     print("")
     print("self-test: %d of %d" % (ok, n))
