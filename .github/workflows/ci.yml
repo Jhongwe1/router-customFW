@@ -892,6 +892,27 @@ jobs:
       - name: tccensus
         run: /usr/bin/python3 tools/tccensus.py --self-test 2>&1 | tee ci-out/tccensus.out; exit "${PIPESTATUS[0]}"
 
+      # `R1z-0`'s census, the DEBT axis, and the third sibling of the two
+      # above.  It imports `isacensus`'s `Refused`/`doc_block` and
+      # `spec-check`'s own `progress_step_state` rather than restating
+      # either.  Its subject is `PROGRESS.md` section Carried forward, whose
+      # own opening line -- an item with no owning gate is a bug in this list
+      # -- nothing had checked in the twenty-five segments since it was
+      # written.  量 on its first run: 44 rows whose every owning gate is
+      # closed, 11 naming a gate that exists nowhere, 9 naming none at all.
+      - name: cfcensus
+        run: /usr/bin/python3 tools/cfcensus.py --self-test 2>&1 | tee ci-out/cfcensus.out; exit "${PIPESTATUS[0]}"
+
+      # The ratchet, deliberately a SEPARATE step from the controls above so
+      # that a debt moving cannot be read as a control breaking.  It is red
+      # when the debt grows AND when it shrinks without `BASELINE` moving in
+      # the same commit: a payment nobody records is how the table it reads
+      # came to hold 44 orphans.  A plain `check` gate was rejected -- it
+      # would be red on every run until `R1z` closes, and a step that is
+      # always red trains a reader to stop reading reds.
+      - name: cfcensus ratchet
+        run: /usr/bin/python3 tools/cfcensus.py ratchet 2>&1 | tee ci-out/cfcensus-ratchet.out; exit "${PIPESTATUS[0]}"
+
       # `R1C-1-c`.  The decision in `docs/isa-prior-art.md` section 9.3 rests on
       # one measured sentence -- rlxfw's kernel and the vendor's have the same
       # emulation surface -- and that sentence can stop being true SILENTLY, by

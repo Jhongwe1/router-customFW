@@ -1,0 +1,1115 @@
+#!/usr/bin/env python3
+"""cfcensus.py -- the DEBT axis of the census, derived rather than chosen.
+
+`R1z-0` has to say what this repository OWES before `R1z-1`..`R1z-3` pay any
+of it.  `tools/isacensus.py` did that job for the ISA axis on 2026-09-12 and
+`tools/tccensus.py` for the toolchain axis on 2026-09-12; this is the third
+sibling and it IMPORTS both of the pieces it shares rather than restating
+them (`isacensus.Refused`, `isacensus.doc_block`, and `spec-check`'s own
+`progress_step_state`).
+
+WHY IT EXISTS, and the sentence is the gate's.  `PROGRESS.md` § Carried
+forward opens with its own rule -- *an item with no owning gate is a bug in
+this list* -- and in the twenty-five segments since that line was written
+**nothing has ever checked it**.  The seventy-seventh segment measured why
+that matters: four checkers went green while believing they were checking
+something, and the one checker that did its job (`tccensus`) differed from
+them in exactly one respect -- **its population came from another instrument
+instead of from a hand-written list**.  A hand list cannot notice a row added
+after the list was written.  This tool is that lesson applied to the debts.
+
+🔴 THE FIRST-CELL RULE, MEASURED BEFORE IT WAS WRITTEN.  A row is CLOSED iff
+its FIRST cell carries `✅` or `⊘`.  The obvious alternative -- believe the
+owning-gate cell when it says `關了` / `closed` / `✅` -- was tried first and
+量 2026-09-16 it mislabels **5 of 16** rows (31 %), because that cell also
+carries prose about a GATE closing:
+
+    `XNUM-1`   owner cell says ``R5-11` 關了` -- the GATE closed, and the row
+               is the one thing `R1z` exists to finish.  Calling it closed
+               would delete this gate's own test case.
+    `GPIO-1`   owner cell says *still not measured* beside a closed gate id.
+    `REL-0`/`REL-1`/`REL-3`  owner is the word `none`; the `✅`/`closed` in
+               the cell is prose about `R3-11` and about v0.2.
+
+Narrowing the keyword set to `✅` alone drops `XNUM-1` and `GPIO-1` but keeps
+`REL-0` and `REL-3`, so no keyword rule on that cell is correct.  **The first
+cell is the only cell whose `✅` means "this row".**
+
+🔴 AND THERE IS A THIRD PLACE, WHICH THE FIRST DRAFT OF THIS TOOL MISSED.
+The QUESTION cell also carries closures.  量 over all 108 rows, re-derived
+rather than carried: 17 rows mark the first cell, 13 more mark only the
+owning-gate cell, and 10 more mark only the question cell -- and those ten
+split with no tuning at all, because five have the `✅` at offset **1**
+(`TC-c`, `C-8`, `C-10`, `C-14`, `C-17`, each reading `✅ **Closed <date>**`)
+and five have it at 322, 1,288, 1,335, 3,282 and 28,437, marking a sub-item
+inside a row that is plainly still open.  `hints()` carries that rule.
+
+🟢 AND THE DISAGREEMENT IS KEPT AS A FINDING RATHER THAN RESOLVED BY GUESSING.
+`L8` fires when the first cell says open and one of the other two says
+closed.  量 on the live file at this tool's first run: **18 rows**, of which
+16 are genuinely closed and never got their first-cell mark and 2 are the
+prose case (`REL-0`, `REL-3`).  Sixteen one-character edits and two declared
+exemptions -- not a heuristic.
+
+  ⚠️ A HAND ADJUDICATION OF THE SAME 108 ROWS, RUN BESIDE THIS ONE ON THE SAME
+  AFTERNOON, PUT THE NUMBER AT 23 AND WAS WRONG ON FIVE.  It read `TOOL-1`,
+  `LOOP-1`, `REL-1`, `CITE-2` and `OPS-1` as closed on the strength of prose;
+  each of those rows ENDS with its own residual -- *絕對速率只能被框住…量不
+  出來*, *這一列問的東西在這個迴圈上仍然是零*, *a hard precondition of that
+  tag*, *一個都沒修*.  The offset rule got all five right without reading a
+  word of them.  That is this gate's own thesis, demonstrated on its own first
+  step: the failure mode of a hand list is not that it is slow.
+
+  axis A -- the POPULATION.
+      `cf`    one CARRIED-FORWARD ROW.  Derived from `PROGRESS.md` § Carried
+              forward: every table row between that heading and the next
+              `## `.  量 2026-09-16: 110 lines begin `|`, two of them are the
+              header and the rule, so **108 rows**.
+      `gate`  one GATE.  Derived from § Gate board's `Status` column (`✓`
+              closed, `~` in progress, `·` not started, `⊘` declined) and
+              CROSS-CHECKED against the `^## ...step list` section headers,
+              which carry their own `CLOSED <date>`.  A gate the two sources
+              disagree about is `L5` and not a silent pick.
+
+  🔴 The population's own weakness, stated because it does not go away.  Both
+  populations come from ONE file.  This is the record auditing itself, and it
+  cannot see a debt this project incurred and never wrote down -- which is
+  exactly the class the seventy-seventh segment's eighth audit method found by
+  hand (four owner files, no checker able to see them).  `U6` is the control
+  that keeps that from being a sentence nobody tests: the live file must yield
+  at least one OPEN row owned by a LIVE gate, or the census refuses -- a census
+  that finds everything closed has stopped reading.
+
+  axis B -- the JOIN, per row.  An owning-gate cell is scanned for ids that
+  are IN the gate population; the row's owner state is then:
+
+      LIVE      at least one resolved owner is open.  Somebody will do it.
+      ORPHAN    every resolved owner is closed, and no other cell holds a
+                `✅`.  **Nobody will ever do this** -- the population `R1z`
+                exists for.  量 44.
+      ORPHAN?   every resolved owner is closed and an `L8` signal is present.
+                Probably a row that is really finished.  Counted apart,
+                because folding the two would inflate the debt by 12.
+      DEAD      the cell names something gate-shaped that is in no population.
+      NONE      the cell names nothing gate-shaped at all.
+      SEGMENT   the cell defers to *any desk segment that touches X*.  Not a
+                gate, not an orphan -- unscheduled, and counted as its own
+                kind so it cannot hide inside either.
+
+Usage
+    cfcensus.py population        both populations with their provenance
+    cfcensus.py census            the joined table and the counts
+    cfcensus.py check             every check (L1..L10), and the doc's blocks
+    cfcensus.py write             regenerate the doc's blocks, then check
+    cfcensus.py ratchet           the finding count against `BASELINE`, which
+                                  may move only in a commit that says so
+    cfcensus.py --self-test       the controls
+
+Exit
+    0  clean
+    1  a finding
+    3  REFUSED -- an instrument could not be read, so nothing is reported.
+
+⚠️ Python 3.12.  Not a preference: this tool imports `tools/spec-check.py`,
+which carries an f-string with a backslash in its expression part, and that is
+a SyntaxError at 3.10.  `CLAUDE.md` records the same trap one tool earlier.
+"""
+
+import argparse
+import io
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+
+import isacensus                                            # noqa: E402
+from isacensus import Refused, doc_block                    # noqa: E402
+
+PROGRESS = os.path.join(ROOT, 'PROGRESS.md')
+
+BEGIN = '<!-- cfcensus:%s begin -->'
+END = '<!-- cfcensus:%s end -->'
+
+# A gate-SHAPED token.  Deliberately broader than `spec-check`'s `C12_STEP`,
+# which is `R` + a digit and therefore cannot see `P1`, `P4b-gate` or `S0` --
+# that narrowness is `C12`'s fourth hole and is why the debt gate had to be
+# called `R1z` and not `P5`.  Broader here means more false candidates, which
+# is why an unresolved candidate is a REPORTED finding and never a silent drop.
+GATE_SHAPE = re.compile(r'(?<![0-9A-Za-z-])([RPS]\d[0-9A-Za-z]*'
+                        r'(?:[-/][0-9A-Za-z]+)*)(?![0-9A-Za-z-])')
+
+# The owning-gate cell forms that are NOT a gate and say so.
+NONE_WORDS = ('none', '無', "the owner's decision", '擁有者', 'closed')
+SEGMENT_WORDS = ('任何一段', 'any desk segment', 'any segment', '的桌面段',
+                 'the seating that', '下一次上機', '下一張卡片')
+
+# 🔴 Declared exemptions from `L8`, by row id, each with the reason it is not
+# a defect.  This is `spec-check`'s `C8C_EXEMPT` / `C10_EXEMPT` idiom and it
+# carries the same obligation: `U9` re-runs `L8` with the exemptions OFF and
+# goes red if an exempted row ever becomes clean, so the list cannot rot into
+# a blanket.  量 2026-09-16: 13 `L8` rows, 2 exempted, 11 real.
+L8_EXEMPT = {
+    'REL-0': 'owner is the word `none`; the cell\'s ✅ is prose about a '
+             'release decision, not about this row',
+    'REL-3': 'owner is `none`, see `REL-0`; the ✅ is inside a sentence about '
+             '`notes/kernel-build.md` §21.7',
+}
+
+
+# What each control asserts, so `--self-test`'s output says what ran rather
+# than only how many did.  A dynamic name (`U7:<row>`, `U10:<alias>`) falls
+# back to its own failure message.
+CASE_WHAT = {
+    'U0': 'the live file can be read at all',
+    'U1': 'a row not closed by `|` is REFUSED, not half-parsed',
+    'U2': 'a row with fewer fields than the table declares is REFUSED',
+    'U3': 'the fixture parses, and its row count reconciles with its raw lines',
+    'U4': 'the owner is the second-to-last field, on a row holding a pipe',
+    'U5': 'an owner cell saying a GATE closed does not close the ROW',
+    'U6': 'an all-closed table yields no live-owned row (the population guard)',
+    'L1+': 'an open row owned only by a closed gate is reported',
+    'L1-': 'an open row owned by an OPEN gate is not',
+    'L2+': 'a row naming a gate that exists nowhere is reported',
+    'L3+': 'an open row naming no gate at all is reported',
+    'L3-': 'an any-desk-segment row is not read as having no owner',
+    'L4+': 'a step list with no gate board row is reported',
+    'L5+': 'a header/board disagreement about closure is reported',
+    'L6+': 'an unmarked step row under a CLOSED gate is reported',
+    'L6-': 'a properly marked closed step is not',
+    'L7+': 'a non-step row inside a step list is reported as a phantom',
+    'L7-': 'a clean step list reports no phantom',
+    'L8+': 'closure recorded outside the first cell is reported',
+    'L8x': 'a named exemption suppresses exactly that row',
+    'L9+': 'an exemption naming a row that no longer exists is reported',
+    'L9c': 'an exemption that no longer fires is reported, so it cannot rot',
+    'L10+': 'two rows sharing an id are reported',
+    'L10-': 'a table of distinct ids reports no duplicate',
+    'U12=': 'the ratchet passes at its own baseline',
+    'U12+': 'a GROWN debt is red',
+    'U12-': 'a SHRUNK debt is red too -- an unrecorded payment is the defect',
+    'U12live': 'the live file sits exactly at BASELINE',
+    'U8': '`write` refuses a document with no block rather than creating one',
+    'U9': "isacensus's shared `doc_block` reads a cfcensus-tagged block",
+}
+
+
+# --------------------------------------------------------------------------
+# reading PROGRESS.md
+# --------------------------------------------------------------------------
+
+def read_progress(path=None):
+    p = path or PROGRESS
+    if not os.path.exists(p):
+        raise Refused('no PROGRESS.md at %s -- nothing to census' % p)
+    with io.open(p, encoding='utf-8') as fh:
+        return fh.read()
+
+
+def section(text, heading):
+    """The lines of one `## ` section, heading excluded, next `## ` exclusive."""
+    out, inside = [], False
+    for ln in text.split('\n'):
+        if ln.startswith('## '):
+            if inside:
+                break
+            inside = ln.strip() == heading or ln.strip().startswith(heading)
+            continue
+        if inside:
+            out.append(ln)
+    return out
+
+
+def tables_in(lines):
+    """The contiguous runs of `|` lines in a section -- one per markdown table.
+
+    🔴 A section is not a table.  量 2026-09-16: `## Gate board` holds TWO --
+    the board itself and the `| gate | actual | plan 小計 | ratio |`
+    calibration table below it -- and the first version of this tool read the
+    section as one table and refused on the second one's field count.  That
+    refusal was correct and useless; the rule is to take the board's own run
+    and say how many runs were seen.
+    """
+    runs, cur = [], []
+    for ln in lines:
+        if ln.startswith('|'):
+            cur.append(ln)
+        elif cur:
+            runs.append(cur)
+            cur = []
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+def split_row(ln):
+    """(id_cell, question, owner_cell) for one table row, or None.
+
+    🔴 The owner is the SECOND-TO-LAST field and not `cells[3]`.  量
+    2026-09-16: of 108 rows, three carry a literal `|` inside the question
+    cell -- shell pipelines in code spans (`sha256sum \\| ...`, `sort -z \\|
+    xargs`) -- so those rows split into 6, 7 and 9 fields.  A parser keyed on
+    a fixed index reads a fragment of a pipeline as the owning gate on three
+    rows and never says so.  The invariants are asserted instead of assumed:
+    the row opens and closes with `|`, and there are at least four fields.
+    """
+    if not ln.startswith('|'):
+        return None
+    if not ln.rstrip().endswith('|'):
+        raise Refused('row does not end with `|`, so the cell boundaries are '
+                      'not knowable: %r' % ln[:80])
+    a = ln.split('|')
+    if len(a) < 5:
+        raise Refused('row has %d fields, fewer than the four the table '
+                      'declares: %r' % (len(a) - 2, ln[:80]))
+    return (a[1].strip(), '|'.join(a[2:len(a) - 2]).strip(), a[-2].strip())
+
+
+ID_RX = re.compile(r'`?([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)`?')
+
+# The gate board's first cell is `**NAME**` plus optional marks.  量
+# 2026-09-16: all 20 rows, and NAME is taken verbatim -- `R2a/b/d` and
+# `P4b-gate` are gate names that `ID_RX` truncates at the `/` and would
+# silently rename.
+BOARD_NAME = re.compile(r'^\*\*([^*]+)\*\*')
+
+# A `## ...step list` header names a gate that the board may hold under a
+# shorter name.  Declared, because a guess here renames a gate.  `U10` is the
+# control: every alias target must be a board row.
+GATE_ALIAS = {
+    'R1-pub + R2c': 'R1-pub',   # 量: the board row is `R1-pub`; `R2c` was
+                                # folded into it on 2026-09-11 and never got
+                                # a row of its own.
+}
+
+
+def cf_rows(text):
+    """The § Carried forward population, with a count that must reconcile."""
+    runs = tables_in(section(text, '## Carried forward'))
+    if len(runs) != 1:
+        raise Refused('§ Carried forward holds %d tables, not one -- a census '
+                      'that takes the first would drop the rest silently'
+                      % len(runs))
+    raw = runs[0]
+    rows, skipped = [], 0
+    for ln in raw:
+        got = split_row(ln)
+        if got is None:                                     # unreachable
+            continue
+        idc, question, owner = got
+        if set(idc) <= set('-: ') or idc == '#':            # rule / header
+            skipped += 1
+            continue
+        m = ID_RX.match(idc)
+        if not m:
+            raise Refused('a § Carried forward row has no id in its first '
+                          'cell: %r' % idc[:60])
+        rows.append({
+            'id': m.group(1),
+            'id_cell': idc,
+            'question': question,
+            'owner_cell': owner,
+            'state': ('CLOSED' if '✅' in idc
+                      else 'DECLINED' if '⊘' in idc else 'OPEN'),
+        })
+    if len(rows) + skipped != len(raw):
+        raise Refused('parsed %d rows + %d header lines against %d raw `|` '
+                      'lines -- rows were lost silently'
+                      % (len(rows), skipped, len(raw)))
+    if not rows:
+        raise Refused('§ Carried forward yielded no rows -- the heading moved '
+                      'or the table shape changed')
+    return rows, len(raw), skipped
+
+
+def board_gates(text):
+    """{gate: status} from § Gate board's own `Status` column.
+
+    🔴 THE COLUMN IS FOUND BY ITS OWN HEADER AND THE FIELD COUNT IS ASSERTED.
+    量 2026-09-16: the first version of this function read `cells[6]` because
+    that index had been measured with `awk`, whose `split()` is 1-based where
+    Python's is 0-based -- so it read the EVIDENCE column, found `·` in
+    `bench/2026-08-30/ · QJ.log` and `⊘` in `S0b`'s prose, and reported four
+    gates of twenty with `S0` and `R1h` and `R4` all wrong.  It did not crash
+    and it printed a plausible table.  The header lookup below cannot make
+    that mistake, and the count assertion is what stops a row with an embedded
+    `|` from shifting the column silently.
+    """
+    runs = tables_in(section(text, '## Gate board'))
+    if not runs:
+        raise Refused('§ Gate board holds no table')
+    idx, nf, out = None, None, {}
+    for ln in runs[0]:
+        a = ln.split('|')
+        if idx is None:
+            head = [c.strip() for c in a]
+            if 'Status' not in head:
+                raise Refused('§ Gate board\'s first table row is not its '
+                              'header (no `Status` column): %r' % ln[:80])
+            idx, nf = head.index('Status'), len(a)
+            continue
+        if set(a[1].strip()) <= set('-: *'):                # the rule row
+            continue
+        if len(a) != nf:
+            raise Refused('a § Gate board row has %d fields against the '
+                          'header\'s %d, so the Status column has moved on '
+                          'that row: %r' % (len(a), nf, ln[:80]))
+        m = BOARD_NAME.match(a[1].strip())
+        if not m:
+            continue
+        st = a[idx]
+        state = ('CLOSED' if '✓' in st else
+                 'LIVE' if '~' in st else
+                 'DECLINED' if '⊘' in st else
+                 'NOTSTARTED' if '·' in st else None)
+        if state is None:
+            continue
+        out[m.group(1).strip()] = state
+    if not out:
+        raise Refused('§ Gate board yielded no gate -- the Status column moved')
+    return out
+
+
+def header_gates(text):
+    """{gate: (closed?, header name)} from the `^## ...step list` headers.
+
+    The SECOND source for gate closure.  `L5` requires it to agree with the
+    board; a gate whose header says CLOSED while the board says otherwise is
+    a file disagreeing with itself, which is the shape `C12`'s hole ② has.
+
+    🔴 Closure is `CLOSED` in either case.  量 2026-09-16: seven of ten
+    headers say `✅ CLOSED <date>` and two -- `R2a/b/d` and `R1-gate` -- say
+    lower-case `closed` with no tick.  A rule keyed on `✅ CLOSED` reads those
+    two as open, which is four of the nine unmarked steps left behind.
+    """
+    out = {}
+    for ln in text.split('\n'):
+        # 🔴 case-insensitive: the ACTIVE gate's section is `## Step list for
+        # the active gate — `R1z`` with a capital S, and every closed gate's
+        # is `` ## `R5`'s step list ``.  量 2026-09-16: a case-sensitive test
+        # made the one live gate the only one this function could not see,
+        # which is the half of the population that matters.
+        if not ln.startswith('## ') or 'step list' not in ln.lower():
+            continue
+        m = re.search(r'`([^`]+)`', ln)
+        if not m:
+            continue
+        name = m.group(1).strip()
+        out[GATE_ALIAS.get(name, name)] = ('closed' in ln.lower(), name)
+    if not out:
+        raise Refused('no `## ...step list` header found -- the section '
+                      'convention changed')
+    return out
+
+
+def step_state(text):
+    """{step id: closed?} through `spec-check`'s OWN parser, not a copy.
+
+    🟢 Importing rather than restating is deliberate and it buys a second
+    thing besides one owner for the rule: when `R1z-1` makes
+    `progress_step_state` stricter, this census gets stricter in the same
+    commit and the two tools cannot drift.  `tools/flashmap.py` importing
+    `flashwin.overlaps_forbidden` is this repository's precedent.
+    """
+    import importlib.machinery
+    import importlib.util
+    p = os.path.join(HERE, 'spec-check.py')
+    if not os.path.exists(p):
+        raise Refused('spec-check.py not found -- cannot resolve step state')
+    loader = importlib.machinery.SourceFileLoader('speccheck_mod', p)
+    spec = importlib.util.spec_from_loader('speccheck_mod', loader)
+    sc = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(sc)
+    except SyntaxError as e:
+        raise Refused('spec-check.py would not import (it needs Python 3.12; '
+                      'this is %d.%d): %r'
+                      % (sys.version_info[0], sys.version_info[1], e))
+    except Exception as e:
+        raise Refused('spec-check.py would not import: %r' % (e,))
+    return sc.progress_step_state(text)
+
+
+def population(text=None):
+    text = read_progress() if text is None else text
+    rows, raw, skipped = cf_rows(text)
+    board = board_gates(text)
+    hdr = header_gates(text)
+    steps = step_state(text)
+    return {'rows': rows, 'raw': raw, 'skipped': skipped,
+            'board': board, 'header': hdr, 'steps': steps, 'text': text}
+
+
+# --------------------------------------------------------------------------
+# the join
+# --------------------------------------------------------------------------
+
+def gate_of_step(sid, board):
+    """The board gate a step id belongs to, or None.
+
+    Longest prefix wins, so `R1-pub-7` resolves to `R1-pub` and not to `R1`.
+    `R1g-*` is the one step family whose prefix is not its gate's name -- the
+    gate is `R1-gate` -- and it is mapped by name because guessing it from the
+    string would be a rule with one instance.
+    """
+    if sid.startswith('R1g-'):
+        return 'R1-gate' if 'R1-gate' in board else None
+    best = None
+    for g in board:
+        if sid == g or sid.startswith(g + '-'):
+            if best is None or len(g) > len(best):
+                best = g
+    return best
+
+
+def resolve(owner_cell, board, hdr, steps):
+    """(resolved, unresolved) -- gate ids in the cell, split by whether the
+    populations know them.  Strikethrough ids are dropped: `~~R3~~ → R1h` is a
+    handover, and the struck half is history, not an owner."""
+    cell = re.sub(r'~~.*?~~', '', owner_cell)
+    seen, resolved, unresolved = set(), [], []
+    for m in GATE_SHAPE.finditer(cell):
+        tok = m.group(1)
+        if tok in seen:
+            continue
+        seen.add(tok)
+        if tok in board:
+            resolved.append((tok, board[tok] == 'CLOSED', 'board'))
+        elif tok in hdr:
+            resolved.append((tok, hdr[tok][0], 'header'))
+        elif tok in steps:
+            g = gate_of_step(tok, board)
+            shut = steps[tok] or (g is not None and board[g] == 'CLOSED')
+            resolved.append((tok, shut, 'step'))
+        else:
+            unresolved.append(tok)
+    return resolved, unresolved
+
+
+def owner_kind(row, board, hdr, steps):
+    """One of LIVE / ORPHAN / ORPHAN? / DEAD / SEGMENT / NONE, with evidence."""
+    cell = row['owner_cell']
+    resolved, unresolved = resolve(cell, board, hdr, steps)
+    low = cell.lower()
+    if resolved:
+        live = [t for (t, shut, _) in resolved if not shut]
+        if live:
+            return 'LIVE', ';'.join(live), resolved, unresolved
+        shut = ';'.join(t for (t, _, _) in resolved)
+        if {'owner', 'question-head'} & set(hints(row)):
+            return 'ORPHAN?', shut, resolved, unresolved
+        return 'ORPHAN', shut, resolved, unresolved
+    if any(w in cell or w in low for w in SEGMENT_WORDS):
+        return 'SEGMENT', '', resolved, unresolved
+    if unresolved:
+        return 'DEAD', ';'.join(unresolved), resolved, unresolved
+    if any(w in low for w in NONE_WORDS) or '無' in cell:
+        return 'NONE', '', resolved, unresolved
+    return 'NONE', '', resolved, unresolved
+
+
+def hints(row):
+    """The closure signals this table uses that are NOT its declared one.
+
+    🔴 THIS TABLE RECORDS "CLOSED" IN THREE PLACES AND DECLARES ONE.  量
+    2026-09-16 over all 108 rows: 17 carry `✅` in the FIRST cell, which is
+    the convention; 13 more carry it only in the OWNING-GATE cell; and 10
+    more carry it only in the QUESTION cell.  The last ten split cleanly and
+    the split needs no tuning -- five have the `✅` at offset **1**, i.e. the
+    question cell opens with it (`TC-c`, `C-8`, `C-10`, `C-14`, `C-17`, each
+    reading `✅ **Closed <date>**`), and the other five have it at 322, 1,288,
+    1,335, 3,282 and 28,437, where it marks a sub-item inside a live row
+    (`CAPD-1`, `OPS-1`, `CITE-2`, `UP-AUD-1`, `CI-5`).  **Offset 1 or not**
+    is the rule; a character window would be a parameter fitted to ten points.
+    """
+    out = []
+    if '✅' in row['owner_cell']:
+        out.append('owner')
+    q = row['question'].lstrip()
+    if q.startswith('✅'):
+        out.append('question-head')
+    elif '✅' in q:
+        out.append('question-body')
+    return out
+
+
+def census(pop=None):
+    pop = population() if pop is None else pop
+    board, hdr, steps = pop['board'], pop['header'], pop['steps']
+    out = []
+    for r in pop['rows']:
+        kind, ev, resolved, unresolved = owner_kind(r, board, hdr, steps)
+        d = dict(r)
+        d['hints'] = hints(r)
+        d['kind'] = kind
+        d['owner_ev'] = ev
+        d['unresolved'] = unresolved
+        d['l8'] = (r['state'] == 'OPEN'
+                   and bool({'owner', 'question-head'} & set(d['hints'])))
+        out.append(d)
+    return out
+
+
+# --------------------------------------------------------------------------
+# the checks
+# --------------------------------------------------------------------------
+
+def check(pop=None, exempt=None):
+    """Findings.  Empty is clean.  `exempt=False` turns `L8`'s list off."""
+    pop = population() if pop is None else pop
+    ex = L8_EXEMPT if exempt is None else (exempt or {})
+    rows = census(pop)
+    board, hdr = pop['board'], pop['header']
+    f = []
+
+    # ---- direction 1: rows -> gates -------------------------------------
+    for r in rows:
+        if r['state'] != 'OPEN':
+            continue
+        if r['kind'] == 'ORPHAN':
+            f.append('L1 %s: open, and every owner it names is a CLOSED gate '
+                     '(%s) -- nobody will do it' % (r['id'], r['owner_ev']))
+        elif r['kind'] == 'DEAD':
+            f.append('L2 %s: names %s as its owner and no gate by that name '
+                     'exists on the board or in a step list'
+                     % (r['id'], r['owner_ev']))
+        elif r['kind'] == 'NONE':
+            f.append('L3 %s: open and names no owning gate -- the table\'s '
+                     'own rule calls that a bug in the table'
+                     % (r['id'],))
+        if r['l8'] and r['id'] not in ex:
+            f.append('L8 %s: the first cell does not say ✅ and the %s cell '
+                     'does -- the table records closure in a place it does '
+                     'not declare'
+                     % (r['id'],
+                        ' and '.join(h for h in r['hints']
+                                     if h in ('owner', 'question-head'))))
+
+    # ---- direction 2: gates -> rows -------------------------------------
+    for g, (shut, name) in sorted(hdr.items()):
+        if g not in board:
+            f.append('L4 %s: has a `## ...step list` section (header names '
+                     '`%s`) and no row on the gate board' % (g, name))
+            continue
+        bshut = board[g] == 'CLOSED'
+        if shut != bshut:
+            f.append('L5 %s: the step-list header says %s and the gate board '
+                     'says %s' % (g, 'CLOSED' if shut else 'open',
+                                  'CLOSED' if bshut else 'open'))
+    # a gate may legitimately have no step list (`R0`, `S0`, `R6`..`P4b`); that
+    # is reported by `population` and is not a finding.
+
+    # ---- direction 2b: a closed gate's steps must be marked closed -------
+    steps, unmarked = pop['steps'], {}
+    for sid, shut in steps.items():
+        if shut:
+            continue
+        g = gate_of_step(sid, board)
+        if g and board[g] == 'CLOSED':
+            unmarked.setdefault(g, []).append(sid)
+    for g in sorted(unmarked):
+        f.append('L6 %s: the gate board says CLOSED and %d of its step rows '
+                 'carry no ✅ in the first cell (%s) -- so `spec-check`\'s '
+                 '`progress_step_state` reads them as open work'
+                 % (g, len(unmarked[g]), ' '.join(sorted(unmarked[g]))))
+
+    # ---- L10: one id, one row -------------------------------------------
+    # 量 2026-09-16, by a second parser run beside this one: `REL-3` occupies
+    # two rows and `CFG-2` occupies two, one open and one closed.  A debt
+    # table that gives two different debts the same name is `NET-14`'s
+    # collision inside the record rather than inside `SPEC.md`, and a reader
+    # who greps for the id gets whichever row comes first.
+    byid = {}
+    for r in rows:
+        byid.setdefault(r['id'], []).append(r)
+    for k in sorted(byid):
+        if len(byid[k]) > 1:
+            f.append('L10 %s: %d rows share this id (%s) -- two debts with '
+                     'one name, and every lookup keyed on it reads whichever '
+                     'comes first'
+                     % (k, len(byid[k]),
+                        ', '.join('%s/%s' % (x['state'], x['kind'])
+                                  for x in byid[k])))
+
+    # ---- L7: a step id that is really a gate name is a phantom ----------
+    # 量 2026-09-16: `progress_step_state` returns `R9`, because
+    # `PROGRESS.md:1036` -- `| **`cr6c` for `R9`** 🆕 |`, a carried-forward
+    # row sitting INSIDE `R3`'s step-list section -- opens `| **`` and so
+    # passes its row guard.  A `Next after this` row that merely mentions
+    # `` `R9` `` therefore satisfies `C12` today.  The census can see it
+    # because it knows the gate names and `spec-check` does not.
+    for sid in sorted(steps):
+        if sid in board:
+            f.append('L7 %s: `progress_step_state` returns it as a STEP and '
+                     'the gate board holds it as a GATE -- a non-step row '
+                     'inside a step-list section is being read as a step'
+                     % (sid,))
+
+    # ---- L9: the exemption list may not rot -----------------------------
+    # 🔴 ANY row with the id, not the first.  量 2026-09-16: `REL-3` occupies
+    # two rows -- one CLOSED, one OPEN -- and a `hit[0]` lookup read the
+    # closed one and declared the exemption dead.  A duplicate id does not
+    # only confuse a reader; it silently re-points every lookup keyed on it,
+    # which is `L10`'s whole cost demonstrated inside this function.
+    for k in sorted(ex):
+        hit = [r for r in rows if r['id'] == k]
+        if not hit:
+            f.append('L9 %s is exempted from L8 and is not a row of this '
+                     'table any more -- the exemption outlived its subject'
+                     % (k,))
+        elif not any(r['l8'] for r in hit):
+            f.append('L9 %s is exempted from L8 and no longer triggers it on '
+                     'any of its %d row(s) -- the exemption is dead and must '
+                     'be deleted' % (k, len(hit)))
+    return f
+
+
+# --------------------------------------------------------------------------
+# rendering
+# --------------------------------------------------------------------------
+
+def render_debt(rows):
+    """The population, as a DERIVED CLASSIFICATION and nothing else.
+
+    🔴 The question text is deliberately NOT reproduced here.  § Carried
+    forward is the owner of what each debt asks; a generated block that
+    repeated it would give every one of these rows a second owner inside the
+    same file, which is house rule 1 broken by the tool written to enforce
+    house rule 1.  What this block adds is the join the table cannot state
+    about itself: which gate each row named, and whether that gate is gone.
+
+    ⚠️ **No line numbers either.** `CITE-2` is a row of this very table and
+    what it says is that `FILE:NNN` into a live owner file is a structurally
+    unmaintainable citation; a generated block that numbered its own source's
+    lines would commit that defect inside the instrument that reports it.
+    """
+    out = ['| # | kind | owner named |', '|---|---|---|']
+    for r in rows:
+        if r['state'] != 'OPEN' or r['kind'] == 'LIVE':
+            continue
+        out.append('| `%s` | %s | %s |'
+                   % (r['id'], r['kind'], r['owner_ev'] or '—'))
+    return '\n'.join(out)
+
+
+def render_counts(rows, pop):
+    k = {}
+    for r in rows:
+        key = r['state'] if r['state'] != 'OPEN' else r['kind']
+        k[key] = k.get(key, 0) + 1
+    order = ['LIVE', 'SEGMENT', 'ORPHAN', 'ORPHAN?', 'DEAD', 'NONE',
+             'CLOSED', 'DECLINED']
+    out = ['| what | n | meaning |', '|---|---:|---|']
+    mean = {
+        'LIVE': 'open, and a gate that is still open owns it',
+        'SEGMENT': 'open, deferred to *any segment that touches X* — '
+                   'unscheduled, not orphaned',
+        'ORPHAN': '🔴 open, and every gate it names is CLOSED — **nobody '
+                  'will do it**',
+        'ORPHAN?': 'open by its first cell, owner closed, and a ✅ sits in the '
+                   'owning-gate cell or opens the question — probably an '
+                   '`L8` row that is finished and never marked',
+        'DEAD': '🔴 names a gate that exists nowhere in this file',
+        'NONE': 'open and names no gate at all',
+        'CLOSED': 'first cell says ✅',
+        'DECLINED': 'first cell says ⊘',
+    }
+    for key in order:
+        if key in k:
+            out.append('| %s | %d | %s |' % (key, k[key], mean[key]))
+    out.append('| **total** | **%d** | rows parsed, reconciled against %d raw '
+               'table lines minus %d header lines |'
+               % (len(rows), pop['raw'], pop['skipped']))
+    l8 = sum(1 for r in rows if r['l8'])
+    out.append('| `L8` | %d | closure recorded somewhere this table does not '
+               'declare — the owning-gate cell, or the head of the question; '
+               '%d exempted by name |' % (l8, len(L8_EXEMPT)))
+    return '\n'.join(out)
+
+
+# --------------------------------------------------------------------------
+# reports
+# --------------------------------------------------------------------------
+
+def report_population():
+    pop = population()
+    print('=== population `cf` — PROGRESS.md § Carried forward ===')
+    print('%d rows (%d raw `|` lines, %d header lines)'
+          % (len(pop['rows']), pop['raw'], pop['skipped']))
+    st = {}
+    for r in pop['rows']:
+        st[r['state']] = st.get(r['state'], 0) + 1
+    print('  first-cell state: ' + ', '.join('%s %d' % (k, st[k])
+                                             for k in sorted(st)))
+    print()
+    print('=== population `gate` — § Gate board, cross-checked ===')
+    for g in sorted(pop['board']):
+        h = pop['header'].get(g)
+        print('  %-12s board=%-10s header=%s'
+              % (g, pop['board'][g],
+                 '—' if h is None else ('CLOSED' if h[0] else 'open')))
+    extra = [g for g in pop['header'] if g not in pop['board']]
+    if extra:
+        print('  step lists with no board row: ' + ' '.join(sorted(extra)))
+    print()
+    print('=== steps, through spec-check\'s own progress_step_state ===')
+    print('  %d step ids, %d marked closed'
+          % (len(pop['steps']), sum(1 for v in pop['steps'].values() if v)))
+    return 0
+
+
+def report_census():
+    pop = population()
+    rows = census(pop)
+    print(render_counts(rows, pop))
+    print()
+    print(render_debt(rows))
+    return 0
+
+
+def report_check():
+    pop = population()
+    f = check(pop)
+    rows = census(pop)
+    live = [r for r in rows if r['state'] == 'OPEN' and r['kind'] == 'LIVE']
+    if not live:
+        raise Refused('no OPEN row is owned by a LIVE gate -- a debt census '
+                      'that finds everything closed has stopped reading')
+    for ln in f:
+        print('FAIL ' + ln)
+    print('%d row(s), %d finding(s), %d live-owned'
+          % (len(rows), len(f), len(live)))
+    return 1 if f else 0
+
+
+# 🔴 THE RATCHET.  量 2026-09-16, `R1z-0`, before any fix: 85 findings on the
+# committed file -- 44 `L1`, 11 `L2`, 9 `L3`, 16 `L8`, 2 `L6`, 2 `L10`, 1 `L7`.
+#
+# Why a ratchet and not a gate.  A gate would be RED on every run until `R1z`
+# closes, and a step that is always red trains a reader to stop reading reds --
+# which is this repository's own recorded objection to a local sweep that ends
+# in two expected failures every time.  Why not simply leave `check` out of CI:
+# that is `CI-3`, a row of the very table this tool censuses -- *nothing
+# notices a tool with a `--self-test` that is never in CI*.
+#
+# So the number moves in one direction and it moves ON PURPOSE.  Above the
+# baseline is a debt that grew; BELOW it is a debt that was paid without being
+# recorded, and that is red too, because a payment nobody writes down is how
+# this table came to have 44 orphans.  `T13b`'s shape: an exemption that stops
+# being load-bearing must force its own removal.
+BASELINE = 85
+
+
+def ratchet(pop=None, baseline=None, exempt=None):
+    BASE = BASELINE if baseline is None else baseline
+    f = check(pop, exempt=exempt)
+    n = len(f)
+    by = {}
+    for ln in f:
+        by[ln.split()[0]] = by.get(ln.split()[0], 0) + 1
+    detail = ' '.join('%s %d' % (k, by[k]) for k in sorted(by))
+    if n > BASE:
+        print('FAIL the debt GREW: %d finding(s) against a baseline of %d'
+              % (n, BASE))
+        print('     %s' % detail)
+        print('     A new row with no live owner is a new debt.  Give it an '
+              'owner, or raise BASELINE in the commit that adds the row and '
+              'say why.')
+        return 1
+    if n < BASE:
+        print('FAIL the debt SHRANK and the baseline did not: %d finding(s) '
+              'against a baseline of %d' % (n, BASE))
+        print('     %s' % detail)
+        print('     Lower BASELINE to %d in the same commit as the fix.  A '
+              'payment nobody records is how this table reached 44 orphans.'
+              % n)
+        return 1
+    print('  ok  %d finding(s), exactly the baseline' % n)
+    print('      %s' % detail)
+    return 0
+
+
+def write_blocks(path=None):
+    p = path or PROGRESS
+    with io.open(p, encoding='utf-8') as fh:
+        text = fh.read()
+    pop = population(text)
+    rows = census(pop)
+    body = {'counts': render_counts(rows, pop), 'debt': render_debt(rows)}
+    for tag, new in body.items():
+        b, e = BEGIN % tag, END % tag
+        if b not in text or e not in text:
+            raise Refused('%s has no cfcensus:%s block -- `write` regenerates '
+                          'blocks, it does not create the section' % (p, tag))
+        head, rest = text.split(b, 1)
+        _, tail = rest.split(e, 1)
+        text = head + b + '\n' + new + '\n' + e + tail
+    tmp = p + '.tmp'
+    with io.open(tmp, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(text)
+    os.replace(tmp, p)
+    return 0
+
+
+def report_write():
+    write_blocks()
+    print('blocks regenerated')
+    return report_check()
+
+
+# --------------------------------------------------------------------------
+# the controls
+# --------------------------------------------------------------------------
+
+def _fixture(rows_md=None, board_md=None, hdr=None, steps_md=None):
+    """A minimal PROGRESS.md with the four structures this tool reads."""
+    rows_md = rows_md if rows_md is not None else [
+        '| `A-1` 🆕 | ask one | `R6` |',
+        '| `B-1` ✅ | ask two | `R5` |',
+    ]
+    board_md = board_md if board_md is not None else [
+        '| **R5** | closed thing | 1 | 1 | **`✓`** | ev |',
+        '| **R6** | open thing | 1 | — | `·` | |',
+    ]
+    hdr = hdr if hdr is not None else ["## `R5`'s step list — ✅ CLOSED 2026-01-01"]
+    steps_md = steps_md if steps_md is not None else [
+        '| **`R5-0`** ✅ | a | b | c | d |',
+    ]
+    return '\n'.join(
+        ['# P', ''] + hdr + [''] + steps_md + ['']
+        + ['## Gate board', '', '| Gate | What | Est. | Actual | Status | Ev |',
+           '|---|---|---:|---:|:---:|---|'] + board_md + ['']
+        + ['## Carried forward', '', '| # | Question | Owning gate |',
+           '|---|---|---|'] + rows_md + ['', '## Corrections', ''])
+
+
+def self_test():
+    """The controls.
+
+    🔴 THE OUTPUT SHAPE IS PART OF THE CONTRACT, not a preference.
+    `tools/ci-census.py`'s `OK_RE` is `^ {2}ok\\s{2,}(.*)$` -- exactly two
+    leading spaces -- and it counts those lines, not a summary.  A suite that
+    prints only `33 case(s), 0 failure(s)` is read as `ran 0/33` and takes the
+    census red on the next push.  `CLAUDE.md` records `capdate` and `capfield`
+    doing exactly that with four spaces; this one was caught before the push
+    by reading `ci-census.py`'s regex instead of trusting the summary line.
+    """
+    ok, bad = [0], []
+    print('cfcensus self-test')
+
+    def case(name, cond, why=''):
+        ok[0] += 1
+        what = CASE_WHAT.get(name)
+        if what is None:
+            what = ('the live file still needs this `L8` exemption'
+                    if name.startswith('U7:') else
+                    'the declared alias points at a real gate board row'
+                    if name.startswith('U10:') else why or '—')
+        if cond:
+            print('  ok   %-9s %s' % (name, what))
+        else:
+            print('  FAIL  %-9s %s' % (name, why))
+            bad.append('%s  %s' % (name, why))
+
+    def findings(text, exempt=None):
+        return check(population(text), exempt=exempt)
+
+    # ---- U0: the committed file is clean, or the run says which check ----
+    try:
+        live_f = check()
+        case('U0', True)
+    except Refused as e:
+        print('REFUSING -- the live file could not be read: %s' % e)
+        return 3
+
+    # ---- U1..U3: the parser's own invariants ----------------------------
+    try:
+        cf_rows(_fixture(rows_md=['| `A-1` 🆕 | q | `R6`']))
+        case('U1', False, 'a row not ending in `|` was accepted')
+    except Refused:
+        case('U1', True)
+    try:
+        cf_rows(_fixture(rows_md=['| `A-1` |']))
+        case('U2', False, 'a three-field row was accepted')
+    except Refused:
+        case('U2', True)
+    rows, raw, skipped = cf_rows(_fixture())
+    case('U3', len(rows) == 2 and raw == 4 and skipped == 2,
+         'fixture parsed %d rows from %d raw lines' % (len(rows), raw))
+
+    # ---- U4: the owner is the SECOND-TO-LAST field, not cells[3] --------
+    piped = _fixture(rows_md=[
+        '| `A-1` 🆕 | a `sort \\| xargs` pipeline | `R6` |'])
+    r = cf_rows(piped)[0][0]
+    case('U4', r['owner_cell'] == '`R6`',
+         'owner read as %r on a row with an embedded pipe' % r['owner_cell'])
+
+    # ---- U5: first-cell rule, and the keyword rule it replaced ----------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` 關了，交給 `R6` |'])
+    c = census(population(t))
+    case('U5', c[0]['state'] == 'OPEN' and c[0]['kind'] == 'LIVE',
+         'a row whose owner cell says a GATE closed was read as closed')
+
+    # ---- U6: the population control (the T23 shape) ---------------------
+    dead = _fixture(rows_md=['| `A-1` ✅ | q | `R5` |'])
+    try:
+        pop = population(dead)
+        rs = census(pop)
+        case('U6', not [x for x in rs
+                        if x['state'] == 'OPEN' and x['kind'] == 'LIVE'],
+             'the all-closed fixture still reported a live-owned row')
+    except Refused:
+        case('U6', True)
+
+    # ---- L1: the orphan ------------------------------------------------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'])
+    case('L1+', any(x.startswith('L1 A-1') for x in findings(t)),
+         'an open row owned by a closed gate was not reported')
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R6` |'])
+    case('L1-', not any(x.startswith('L1') for x in findings(t)),
+         'an open row owned by an OPEN gate was reported as an orphan')
+
+    # ---- L2: the dead gate id ------------------------------------------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R5b` |'])
+    case('L2+', any(x.startswith('L2 A-1') for x in findings(t)),
+         'a row naming a gate that does not exist was not reported')
+
+    # ---- L3: no owner at all -------------------------------------------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | nothing in particular |'])
+    case('L3+', any(x.startswith('L3 A-1') for x in findings(t)),
+         'a row naming no gate was not reported')
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | 任何一段動 `xyz` 的桌面段 |'])
+    case('L3-', not any(x.startswith('L3') for x in findings(t)),
+         'an any-segment row was reported as having no owner')
+
+    # ---- L4/L5: the two gate sources must agree ------------------------
+    t = _fixture(hdr=["## `R7`'s step list — ✅ CLOSED 2026-01-01"])
+    case('L4+', any(x.startswith('L4 R7') for x in findings(t)),
+         'a step list with no board row was not reported')
+    t = _fixture(hdr=["## `R6`'s step list — ✅ CLOSED 2026-01-01"])
+    case('L5+', any(x.startswith('L5 R6') for x in findings(t)),
+         'a header/board disagreement was not reported')
+
+    # ---- L6: C12's hole ②, seen from the other side --------------------
+    t = _fixture(steps_md=['| **`R5-0`** | a | b | c | d |'])
+    case('L6+', any(x.startswith('L6 R5') for x in findings(t)),
+         'an unmarked step of a CLOSED gate was not reported')
+    t = _fixture(steps_md=['| **`R5-0`** ✅ | a | b | c | d |'])
+    case('L6-', not any(x.startswith('L6') for x in findings(t)),
+         'a properly marked closed step was reported')
+
+    # ---- L8: the two cells disagree ------------------------------------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | **✅ 關了 —— `R6`** |'])
+    case('L8+', any(x.startswith('L8 A-1') for x in findings(t)),
+         'a first-cell/owner-cell disagreement was not reported')
+    case('L8x', not any(x.startswith('L8') for x in
+                        findings(t, exempt={'A-1': 'because'})),
+         'an exempted row still reported L8')
+
+    # ---- L9: the exemption list may not rot ----------------------------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R6` |'])
+    case('L9+', any(x.startswith('L9 Z-9') for x in
+                    findings(t, exempt={'Z-9': 'stale'})),
+         'an exemption naming a row that does not exist was not reported')
+    case('L9c', any(x.startswith('L9 A-1') for x in
+                    findings(t, exempt={'A-1': 'stale'})),
+         'an exemption on a row that no longer triggers L8 was not reported')
+
+    # ---- U7: the live exemptions are all still needed -------------------
+    live_ex_off = check(exempt=False)
+    for k in L8_EXEMPT:
+        case('U7:' + k,
+             any(x.startswith('L8 ' + k) for x in live_ex_off),
+             'exempted on the live file but L8 does not fire there')
+
+    # ---- U12: the ratchet moves in one direction, and only on purpose ---
+    import contextlib
+    one = population(_fixture(rows_md=['| `A-1` 🆕 | q | `R5` |']))
+
+    def rc(pop, base, ex=False):
+        # 🔴 `ex=False` on a fixture.  The LIVE exemption list names rows a
+        # fixture does not have, so `L9` fires twice and the count a ratchet
+        # control needs exactly is off by two -- measured, on this case's
+        # first run.
+        with contextlib.redirect_stdout(io.StringIO()):
+            return ratchet(pop, baseline=base, exempt=ex)
+
+    case('U12=', rc(one, 1) == 0, 'the ratchet failed at its own baseline')
+    case('U12+', rc(one, 0) == 1, 'a GROWN debt was not reported')
+    case('U12-', rc(one, 2) == 1,
+         'a SHRUNK debt was accepted -- a payment nobody records is the '
+         'defect this ratchet exists for')
+    case('U12live', rc(None, None, None) == 0,
+         'the live file is not at BASELINE=%d; if a debt was paid or added '
+         'in this commit, move BASELINE in it and say why' % BASELINE)
+
+    # ---- L10: duplicate ids ---------------------------------------------
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R6` |', '| `A-1` 🆕 | r | `R6` |'])
+    case('L10+', any(x.startswith('L10 A-1') for x in findings(t)),
+         'two rows sharing an id were not reported')
+    case('L10-', not any(x.startswith('L10') for x in findings(_fixture())),
+         'a table with distinct ids reported a duplicate')
+
+    # ---- U10: every declared alias points at a real board row -----------
+    live_board = population()['board']
+    for src, dst in GATE_ALIAS.items():
+        case('U10:' + src, dst in live_board,
+             'alias target %r is not a gate board row' % dst)
+
+    # ---- U11: the phantom step detector, both ways ----------------------
+    t = _fixture(steps_md=['| **`R5-0`** ✅ | a | b | c | d |',
+                           '| **`R6`** 🆕 | a | b | c | d |'])
+    case('L7+', any(x.startswith('L7 R6') for x in findings(t)),
+         'a non-step row inside a step list was not reported as a phantom')
+    case('L7-', not any(x.startswith('L7') for x in findings(_fixture())),
+         'a clean step list reported a phantom')
+
+    # ---- U8: `write` refuses on a document with no blocks ---------------
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        p = os.path.join(td, 'PROGRESS.md')
+        with io.open(p, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(_fixture())
+        try:
+            write_blocks(p)
+            case('U8', False, '`write` created a block instead of refusing')
+        except Refused:
+            case('U8', True)
+
+    # ---- U9: doc_block is the shared one, not a copy --------------------
+    case('U9', doc_block('x' + (BEGIN % 'counts') + '\nQ\n'
+                         + (END % 'counts') + 'y', 'counts',
+                         begin=BEGIN, end=END) == 'Q',
+         'the shared doc_block did not read a cfcensus block')
+
+    print('RESULT: %d/%d' % (ok[0] - len(bad), ok[0]))
+    if live_f:
+        print('note: the live file has %d finding(s); that is `check`\'s '
+              'report and not a control failure' % len(live_f))
+    return 1 if bad else 0
+
+
+# --------------------------------------------------------------------------
+
+def main(argv):
+    ap = argparse.ArgumentParser(prog='cfcensus.py')
+    ap.add_argument('verb', nargs='?', default='check',
+                    choices=('population', 'census', 'check', 'write',
+                             'ratchet'))
+    ap.add_argument('--self-test', action='store_true')
+    a = ap.parse_args(argv)
+    try:
+        if a.self_test:
+            return self_test()
+        return {'population': report_population, 'census': report_census,
+                'check': report_check, 'write': report_write,
+                'ratchet': ratchet}[a.verb]()
+    except Refused as e:
+        print('REFUSED: %s' % e)
+        return 3
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
