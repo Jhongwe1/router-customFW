@@ -130,6 +130,7 @@ a SyntaxError at 3.10.  `CLAUDE.md` records the same trap one tool earlier.
 """
 
 import argparse
+import hashlib
 import io
 import os
 import re
@@ -239,8 +240,27 @@ CASE_WHAT = {
     'U12-': 'a SHRUNK debt is red too -- an unrecorded payment is the defect',
     'U12live': 'the live file sits exactly at BASELINE, check by check',
     'U13': 'two checks moving in opposite directions is still red',
+    'U12sig': 'the ratchet passes against a digest computed from the same run',
+    'U12sig-': 'a WRONG digest with a right count is red',
     'U8': '`write` refuses a document with no block rather than creating one',
     'U9': "isacensus's shared `doc_block` reads a cfcensus-tagged block",
+    'U14': "a finding's WHOLE SENTENCE, not its id prefix",
+    'U14b': 'two rows trading places inside one check is red, though the '
+            'count holds',
+    'U15': 'a `⊘` DECLINED row is reported by nothing, end to end',
+    'U15+': 'and the same row OPEN is reported, so `U15` is not vacuous',
+    'U16': "`resolve`'s header branch resolves a gate the board lacks",
+    'U17': "`gate_of_step`'s longest-prefix tie-break, with the section "
+           'header deliberately defeated',
+    'U18': 'a board row whose gate cell is unreadable is REFUSED',
+    'U19': 'a board row whose Status cell is unreadable is REFUSED',
+    'U20': 'two board rows for one gate are REFUSED',
+    'U21': 'a `## ` heading inside a table is REFUSED',
+    'U22': 'a second `## Carried forward` section is REFUSED',
+    'U23': 'a row with a fourth column is REFUSED',
+    'U24': 'an ESCAPED pipe in the owner cell is read whole, not split',
+    'U25': "a two-column row is REFUSED -- the guard's real boundary",
+    'U26': 'a renamed header cell is REFUSED, not read as a debt row',
 }
 
 
@@ -257,9 +277,29 @@ def read_progress(path=None):
 
 
 def section(text, heading):
-    """The lines of one `## ` section, heading excluded, next `## ` exclusive."""
+    """The lines of one `## ` section, heading excluded, next `## ` exclusive.
+
+    🔴 THE HEADING MUST OCCUR EXACTLY ONCE.  量 2026-09-16, adversarially: a
+    SECOND `## Carried forward` section carrying its own table of debts leaves
+    every number this tool prints byte-identical -- 108 rows, 85 findings,
+    ratchet green -- because this function stops at the first `## ` after the
+    first match and never looks again.  A whole second table of debts was
+    invisible to every check, and it is the quietest corruption that pass
+    found.  The prefix match stays (the heading may carry a trailing note) and
+    is exactly why the count is asserted: a `## Carried forward (archive)`
+    placed earlier would otherwise silently become the population.
+    """
+    lines = text.split('\n')
+    hits = [i for i, ln in enumerate(lines)
+            if ln.startswith('## ') and (ln.strip() == heading
+                                         or ln.strip().startswith(heading))]
+    if len(hits) > 1:
+        raise Refused('`%s` heads %d sections (lines %s) -- this reader takes '
+                      'the first, and every debt under the others is invisible '
+                      'to every check in this tool'
+                      % (heading, len(hits), [h + 1 for h in hits]))
     out, inside = [], False
-    for ln in text.split('\n'):
+    for ln in lines:
         if ln.startswith('## '):
             if inside:
                 break
@@ -268,6 +308,47 @@ def section(text, heading):
         if inside:
             out.append(ln)
     return out
+
+
+# 🔴 A `## ` HEADING BETWEEN TWO TABLE ROWS TRUNCATES A POPULATION IN SILENCE.
+# 量 2026-09-16, adversarially, on a pinned tree: one `## ` line inserted
+# mid-table takes § Carried forward from 108 rows to 53 and the findings from
+# 85 to 43 **with no complaint** -- because `cf_rows`'s reconciliation counts
+# its raw lines from the section `section()` has already truncated, so that
+# check can only ever certify itself.  The one signal is the ratchet firing as
+# *the debt SHRANK ... lower BASELINE to 43*, whose remedy would record a parse
+# loss as a payment.
+#
+# 🔴 THE RULE IS NOT "a heading with table rows on both sides".  量 2026-09-16:
+# that catches `## Gate board`, whose section opens with a table and whose
+# previous section ends with one -- the fixture and this file both.  The
+# discriminator is that a legitimate table STARTS with a header row and a
+# `|---|` rule row underneath it; a heading dropped into the middle of a table
+# is followed by a row with no rule row after it.  量 with both controls: 0 of
+# 146 tracked `.md` files flagged, and the deliberately corrupted fixture
+# flagged at its inserted line.
+PIPE_ROW = re.compile(r'^\s*\|')
+RULE_ROW = re.compile(r'^\s*\|[\s:|-]+\|\s*$')
+
+
+def heading_inside_table(text):
+    """Every `## ` heading that lands inside a table rather than before one."""
+    lines = text.split('\n')
+    bad = []
+    for i, ln in enumerate(lines):
+        if not ln.startswith('## '):
+            continue
+        prev = next((lines[j] for j in range(i - 1, -1, -1)
+                     if lines[j].strip()), '')
+        nxt_i = next((j for j in range(i + 1, len(lines))
+                      if lines[j].strip()), None)
+        if nxt_i is None:
+            continue
+        after = lines[nxt_i + 1] if nxt_i + 1 < len(lines) else ''
+        if (PIPE_ROW.match(prev) and PIPE_ROW.match(lines[nxt_i])
+                and not RULE_ROW.match(after)):
+            bad.append((i + 1, ln.strip()[:60]))
+    return bad
 
 
 def tables_in(lines):
@@ -292,27 +373,43 @@ def tables_in(lines):
     return runs
 
 
-def split_row(ln):
-    """(id_cell, question, owner_cell) for one table row, or None.
+# Markdown's own escape: `\|` inside a cell is a literal pipe and not a cell
+# boundary.  Declared once because two functions need the same rule.
+PIPE_SPLIT = re.compile(r'(?<!\\)\|')
 
-    🔴 The owner is the SECOND-TO-LAST field and not `cells[3]`.  量
-    2026-09-16: of 108 rows, three carry a literal `|` inside the question
-    cell -- shell pipelines in code spans (`sha256sum \\| ...`, `sort -z \\|
-    xargs`) -- so those rows split into 6, 7 and 9 fields.  A parser keyed on
-    a fixed index reads a fragment of a pipeline as the owning gate on three
-    rows and never says so.  The invariants are asserted instead of assumed:
-    the row opens and closes with `|`, and there are at least four fields.
+
+def split_row(ln):
+    r"""(id_cell, question, owner_cell) for one table row, or None.
+
+    🔴 THE SPLIT IS ON AN UNESCAPED PIPE AND THE COLUMN COUNT IS EXACT.  量
+    2026-09-16: of the 110 table lines three carry a literal `|` inside the
+    question cell -- shell pipelines in code spans, written `\|` because that
+    is markdown's escape -- and splitting on a bare `|` gave those three rows
+    6, 7 and 9 fields where the table declares three columns.  The old rule
+    took the owner as the SECOND-TO-LAST field, which is right on those three
+    by luck and cannot be checked.  Splitting on `(?<!\\)\|` makes all 110
+    lines exactly five fields -- 量 twice, by the escape and by masking
+    backticked spans, 110/110 both ways -- so the count can be ASSERTED
+    instead of worked around.
+
+    🔴 What the assertion buys, 量 adversarially on a pinned tree: an
+    unescaped `|` added inside an OWNER cell silently re-read the owner and
+    moved the findings 85 → 84 with nothing reported; a fourth column added to
+    one row moved `L1` 44→43 and `L3` 9→10 for an unchanged total of 85 with
+    the ratchet green.  Both are refusals now.  `board_gates` has asserted its
+    own field count since it was written and this table had no check at all.
     """
     if not ln.startswith('|'):
         return None
     if not ln.rstrip().endswith('|'):
         raise Refused('row does not end with `|`, so the cell boundaries are '
                       'not knowable: %r' % ln[:80])
-    a = ln.split('|')
-    if len(a) < 5:
-        raise Refused('row has %d fields, fewer than the four the table '
-                      'declares: %r' % (len(a) - 2, ln[:80]))
-    return (a[1].strip(), '|'.join(a[2:len(a) - 2]).strip(), a[-2].strip())
+    a = PIPE_SPLIT.split(ln)
+    if len(a) != 5:
+        raise Refused('row splits into %d cells against the three this table '
+                      'declares -- an unescaped `|` inside a cell, or a column '
+                      'only this row has: %r' % (len(a) - 2, ln[:80]))
+    return (a[1].strip(), a[2].strip(), a[-2].strip())
 
 
 ID_RX = re.compile(r'`?([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)`?')
@@ -341,6 +438,17 @@ def cf_rows(text):
                       'that takes the first would drop the rest silently'
                       % len(runs))
     raw = runs[0]
+    # 🔴 THE HEADER IS ASSERTED, NOT RECOGNISED BY SHAPE.  量 2026-09-16,
+    # adversarially: renaming the header's first cell `#` → `Item` makes the
+    # header row itself a debt row, because the skip test below keys on the
+    # literal `#`.  The three column names are what this parser's field
+    # positions MEAN, so they are the thing to check.
+    head = [c.strip() for c in PIPE_SPLIT.split(raw[0])]
+    if head[1:4] != ['#', 'Question', 'Owning gate']:
+        raise Refused('§ Carried forward\'s header reads %r, not '
+                      '`| # | Question | Owning gate |` -- this parser\'s '
+                      'column positions are named by that header'
+                      % (head[1:4],))
     rows, skipped = [], 0
     for ln in raw:
         got = split_row(ln)
@@ -406,15 +514,40 @@ def board_gates(text):
                           'that row: %r' % (len(a), nf, ln[:80]))
         m = BOARD_NAME.match(a[1].strip())
         if not m:
-            continue
+            # 🔴 WAS AN UNCONDITIONAL `continue`.  量 2026-09-16,
+            # adversarially: strip the `**bold**` from one board row's gate
+            # cell and that gate leaves the population entirely -- every row
+            # owned by it is then reported `L2 …: no gate by that name exists
+            # on the board`, **while the board row is right there**, and the
+            # findings go 85 → 89.  A parser that drops a row it cannot read
+            # goes on to blame the rows that name it.
+            raise Refused('a § Gate board row\'s first cell is not '
+                          '`**NAME**`, so its gate would leave the population '
+                          'and every row owning it would be reported as '
+                          'naming a gate that does not exist: %r'
+                          % (a[1].strip()[:60],))
         st = a[idx]
         state = ('CLOSED' if '✓' in st else
                  'LIVE' if '~' in st else
                  'DECLINED' if '⊘' in st else
                  'NOTSTARTED' if '·' in st else None)
         if state is None:
-            continue
-        out[m.group(1).strip()] = state
+            # 🔴 The same drop through the other door: blanking one `Status`
+            # cell had the identical 85 → 89 effect.
+            raise Refused('§ Gate board row `%s` has an unreadable `Status` '
+                          'cell (%r) -- the gate would leave the population '
+                          'and its rows would be reported as orphans of a '
+                          'gate that does not exist'
+                          % (m.group(1).strip(), st.strip()[:30]))
+        name = m.group(1).strip()
+        if name in out:
+            # 🔴 `L10` exists for two ROWS sharing an id and there was no
+            # equivalent here.  量: two board rows for `R5` disagreeing about
+            # its status -- last wins, in silence, findings 85 → 77.
+            raise Refused('§ Gate board holds two rows for `%s` -- the later '
+                          'silently overwrites the earlier, which is `L10`\'s '
+                          'defect on the other table' % name)
+        out[name] = state
     if not out:
         raise Refused('§ Gate board yielded no gate -- the Status column moved')
     return out
@@ -490,6 +623,14 @@ def step_state(text):
 
 def population(text=None):
     text = read_progress() if text is None else text
+    bad = heading_inside_table(text)
+    if bad:
+        raise Refused('a `## ` heading sits inside a table (%s) -- it '
+                      'truncates whatever section it lands in, and this '
+                      'tool\'s own row reconciliation counts from the '
+                      'truncated section, so the loss would be certified '
+                      'rather than reported'
+                      % '; '.join('line %d: %s' % b for b in bad))
     rows, raw, skipped = cf_rows(text)
     board = board_gates(text)
     hdr = header_gates(text)
@@ -880,6 +1021,16 @@ def report_check():
 # self-consistent as long as the difference is right -- reproduced inside the
 # instrument written to prevent it.
 BASELINE = {'L1': 42, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 19, 'L10': 2}
+# 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
+# BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
+# directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
+# instrument reported; the one below is WHICH ROWS -- sha256 over that check's
+# sorted row ids, first eight hex.  Two rows trading places inside one check
+# moves the digest and not the count.  `U14b` is the control, and this is the
+# third layer of one lesson this file already carries twice: a scalar total,
+# then a per-check count, now a per-check identity.
+BASELINE_SIG = {'L1': 'b0e76a66', 'L10': 'c56612d3', 'L2': '21f32778',
+                'L3': '7f50eda0', 'L6': 'b86a38d5', 'L8': 'e9fe5859'}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`
@@ -898,16 +1049,48 @@ BASELINE = {'L1': 42, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 19, 'L10': 2}
 # unmarked step rows across four closed gates, where the record said nine.
 
 
-def ratchet(pop=None, baseline=None, exempt=None):
-    BASE = dict(BASELINE if baseline is None else baseline)
-    f = check(pop, exempt=exempt)
+def finding_sig(f):
+    """{check: (count, 8-hex digest over its sorted row ids)}."""
     by = {}
     for ln in f:
-        by[ln.split()[0]] = by.get(ln.split()[0], 0) + 1
+        p = ln.split()
+        by.setdefault(p[0], []).append(p[1].rstrip(':') if len(p) > 1 else '')
+    return {k: (len(v),
+                hashlib.sha256('\n'.join(sorted(v)).encode('utf-8'))
+                .hexdigest()[:8])
+            for k, v in by.items()}
+
+
+def ratchet(pop=None, baseline=None, exempt=None, sig=None):
+    # 🔴 A HAND BASELINE MAY NOT INHERIT THE LIVE DIGESTS.  量, on this
+    # change's own first run: `U12=` went red because it passes
+    # `baseline={'L1': 1}` for a two-row fixture and the digest defaulted to
+    # the live file's, so the control that asserts *the ratchet passes at its
+    # own baseline* was comparing a fixture's rows against `PROGRESS.md`'s.
+    # A caller that supplies counts and not ids is testing counts.
+    BASE = dict(BASELINE if baseline is None else baseline)
+    SIG = (dict(BASELINE_SIG) if sig is None and baseline is None
+           else dict(sig or {}))
+    f = check(pop, exempt=exempt)
+    got = finding_sig(f)
+    by = {k: v[0] for k, v in got.items()}
+    swapped = [(k, SIG[k], got[k][1]) for k in sorted(set(SIG) & set(got))
+               if BASE.get(k, 0) == by.get(k, 0) and SIG[k] != got[k][1]]
     keys = sorted(set(BASE) | set(by))
     moved = [(k, BASE.get(k, 0), by.get(k, 0))
              for k in keys if BASE.get(k, 0) != by.get(k, 0)]
     detail = ' '.join('%s %d' % (k, by[k]) for k in sorted(by))
+    if swapped and not moved:
+        print('FAIL the debt did not move and WHICH ROWS did:')
+        for k, want, now in swapped:
+            print('     %-4s count %-3d unchanged, ids %s -> %s'
+                  % (k, by[k], want, now))
+        print('     %s' % detail)
+        print('     One row left this check and another joined it.  A count '
+              'cannot see that, which is the whole reason the digest is '
+              'here.  Move `BASELINE_SIG` in the same commit and say which '
+              'rows moved.')
+        return 1
     if moved:
         grew = [m for m in moved if m[2] > m[1]]
         print('FAIL the debt moved and `BASELINE` did not:')
@@ -924,9 +1107,11 @@ def ratchet(pop=None, baseline=None, exempt=None):
                   'payment nobody records is how this table reached 44 '
                   'orphans.')
         return 1
-    print('  ok  %d finding(s) in %d check(s), every one exactly the baseline'
-          % (len(f), len(by)))
+    print('  ok  %d finding(s) in %d check(s), every one exactly the '
+          'baseline, and in every check the same rows' % (len(f), len(by)))
     print('      %s' % detail)
+    print('      ids %s' % ' '.join('%s/%s' % (k, got[k][1])
+                                    for k in sorted(got)))
     return 0
 
 
@@ -1127,17 +1312,27 @@ def self_test():
     import contextlib
     one = population(_fixture(rows_md=['| `A-1` 🆕 | q | `R5` |']))
 
-    def rc(pop, base, ex=False):
+    def rc(pop, base, ex=False, sig=None):
         # 🔴 `ex=False` on a fixture.  The LIVE exemption list names rows a
         # fixture does not have, so `L9` fires twice and the count a ratchet
         # control needs exactly is off by two -- measured, on this case's
         # first run.
         with contextlib.redirect_stdout(io.StringIO()):
-            return ratchet(pop, baseline=base, exempt=ex)
+            return ratchet(pop, baseline=base, exempt=ex, sig=sig)
 
     case('U12=', rc(one, {'L1': 1}) == 0,
          'the ratchet failed at its own baseline')
     case('U12+', rc(one, {'L1': 0}) == 1, 'a GROWN debt was not reported')
+    # 🔴 `U12=` passing now means the digest check is OFF for a hand baseline,
+    # so it has to be shown ON somewhere or the whole `BASELINE_SIG` layer is
+    # a line of code nothing exercises.  Two cases, one each way, on the same
+    # fixture: the real digest passes and a wrong one is red.
+    _sig_one = finding_sig(check(one))
+    case('U12sig', rc(one, {'L1': 1}, sig={'L1': _sig_one['L1'][1]}) == 0,
+         'the ratchet failed against its own freshly computed digest')
+    case('U12sig-', rc(one, {'L1': 1}, sig={'L1': 'deadbeef'}) == 1,
+         'a wrong digest with a right count was accepted -- the layer added '
+         'for exactly that case does not fire')
     case('U12-', rc(one, {'L1': 2}) == 1,
          'a SHRUNK debt was accepted -- a payment nobody records is the '
          'defect this ratchet exists for')
@@ -1175,6 +1370,153 @@ def self_test():
          'a non-step row inside a step list was not reported as a phantom')
     case('L7-', not any(x.startswith('L7') for x in findings(_fixture())),
          'a clean step list reported a phantom')
+
+    # ---- U14: THE SENTENCE, NOT THE PREFIX -----------------------------
+    # 🔴 Every `L<n>±` control above asserts `startswith('L<n> <id>')` and
+    # nothing else.  量 2026-09-16, adversarially: `L1`'s message inverted to
+    # *"no owner it names is a CLOSED gate"*, `L8`'s to *"the first cell DOES
+    # say ✅"* and `L6`'s count multiplied by ten all survive the whole suite.
+    # The product of this tool is the sentence a reader acts on, and nothing
+    # asserted it.  One fixture, three checks, compared whole.
+    t = _fixture(rows_md=[
+        '| `A-1` 🆕 | q | `R5` |',
+        '| `B-1` 🆕 | q | `R99` |',
+        '| `C-1` 🆕 | q | — |',
+    ])
+    want = [
+        'L1 A-1: open, and every owner it names is a CLOSED gate (R5) -- '
+        'nobody will do it',
+        'L2 B-1: names R99 as its owner and no gate by that name exists on '
+        'the board or in a step list',
+        "L3 C-1: open and names no owning gate -- the table's own rule calls "
+        'that a bug in the table',
+    ]
+    # 🔴 `exempt={}` IS NOT TIDINESS, IT IS THE FIRST THING THIS CONTROL
+    # FOUND.  量, on its own first run: `check()` on ANY fixture emits three
+    # `L9 … is exempted from L8 and is not a row of this table any more`
+    # findings, because `L8_EXEMPT` names three rows of the LIVE file and a
+    # fixture has none of them.  Thirty-five controls asserted
+    # `startswith('L<n> <id>')` and not one of them could see three whole
+    # extra findings sitting beside the one they looked at.  The exemption
+    # list is a statement about `PROGRESS.md`, so a fixture is run without it.
+    got14 = sorted(findings(t, exempt={}))
+    case('U14', got14 == sorted(want),
+         'the finding sentences differ from the literal:\n       got  %r\n'
+         '       want %r' % (got14, sorted(want)))
+
+    # ---- U14b: two rows trading places inside one check -----------------
+    ta = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |',
+                           '| `B-1` 🆕 | q | `R6` |'])
+    tb = _fixture(rows_md=['| `A-1` 🆕 | q | `R6` |',
+                           '| `B-1` 🆕 | q | `R5` |'])
+    sa = finding_sig(check(population(ta)))
+    sb = finding_sig(check(population(tb)))
+    case('U14b',
+         sa.get('L1', (0, ''))[0] == 1 and sb.get('L1', (0, ''))[0] == 1
+         and sa['L1'][1] != sb['L1'][1],
+         'a row leaving `L1` while another joined it left both the count and '
+         'the digest unchanged: %r vs %r' % (sa.get('L1'), sb.get('L1')))
+
+    # ---- U15: `⊘` / DECLINED, end to end --------------------------------
+    # 🔴 `cf_rows` computes the state, `render_counts` prints a row for it,
+    # and NOTHING in `check` distinguished it from `CLOSED`.  量 2026-09-16:
+    # mutating `if r['state'] != 'OPEN'` to `== 'CLOSED'` survives the whole
+    # suite, because the live file has zero declined rows and no fixture had
+    # one.  `R1z` is the gate that writes the first `⊘` into that table, so
+    # the control has to exist before the row does.
+    t = _fixture(rows_md=['| `A-1` ⊘ | q | `R5` |'])
+    r = cf_rows(t)[0][0]
+    case('U15', r['state'] == 'DECLINED' and findings(t, exempt={}) == [],
+         'a declined row parsed as %r and produced %r'
+         % (r['state'], findings(t, exempt={})))
+    t = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'])
+    case('U15+', len(findings(t, exempt={})) == 1,
+         'the same row OPEN produced %d finding(s), so `U15` proves nothing'
+         % len(findings(t, exempt={})))
+
+    # ---- U16: `resolve`'s header branch ---------------------------------
+    # Dead on the live file -- all ten header gates are board rows too -- and
+    # dead in every fixture, so inverting its closure survived.  The branch can
+    # only fire on a document that ALSO has an `L4`, which is why the fixture
+    # deliberately has one.
+    t = _fixture(
+        hdr=["## `R5`'s step list — ✅ CLOSED 2026-01-01",
+             "## `R7`'s step list — ✅ CLOSED 2026-01-02"],
+        rows_md=['| `A-1` 🆕 | q | `R7` |'])
+    res16, un16 = resolve('`R7`', board_gates(t), header_gates(t),
+                          step_state(t)[0])
+    case('U16', res16 == [('R7', True, 'header')] and not un16,
+         'the header branch returned %r / %r' % (res16, un16))
+
+    # ---- U17: `gate_of_step`'s longest-prefix tie-break ------------------
+    # 🔴 Worse than untested: the whole fallback loop is dead, because
+    # `progress_step_owner` answers for all 72 live step ids.  A control has
+    # to defeat the section-header answer DELIBERATELY (`owner=None`) or it
+    # tests the line above the rule and reports it as the rule.
+    bd17 = {'R5': 'CLOSED', 'R5-3': 'CLOSED'}
+    g17 = (gate_of_step('R5-3-1', bd17, None),
+           gate_of_step('R5-9', bd17, None),
+           gate_of_step('R5-3-1', bd17, {'R5-3-1': 'R5'}))
+    case('U17', g17 == ('R5-3', 'R5', 'R5'),
+         'longest prefix / short prefix / header override gave %r' % (g17,))
+
+    # ---- U18..U20: `board_gates` used to drop rows in silence ------------
+    for nm18, bmd18, why18 in (
+            ('U18', ['| R5 | closed thing | 1 | 1 | **`✓`** | ev |',
+                     '| **R6** | open thing | 1 | — | `·` | |'],
+             'a board row with no `**NAME**` was accepted'),
+            ('U19', ['| **R5** | closed thing | 1 | 1 |  | ev |',
+                     '| **R6** | open thing | 1 | — | `·` | |'],
+             'a board row with a blank Status was accepted'),
+            ('U20', ['| **R5** | closed thing | 1 | 1 | **`✓`** | ev |',
+                     '| **R5** | again | 1 | 1 | `~` | ev |',
+                     '| **R6** | open thing | 1 | — | `·` | |'],
+             'two board rows for one gate were accepted, last wins')):
+        try:
+            board_gates(_fixture(board_md=bmd18))
+            case(nm18, False, why18)
+        except Refused:
+            case(nm18, True)
+
+    # ---- U21/U22: the two document-wide corruptions ----------------------
+    base21 = _fixture()
+    t21 = base21.replace('| `A-1` 🆕 | ask one | `R6` |\n',
+                         '| `A-1` 🆕 | ask one | `R6` |\n## Interrupting\n')
+    try:
+        population(t21)
+        case('U21', False, 'a `## ` heading inside a table was accepted, '
+                           'truncating the population in silence')
+    except Refused:
+        case('U21', True)
+    t22 = base21 + ('\n## Carried forward\n\n| # | Question | Owning gate |\n'
+                    '|---|---|---|\n| `Z-1` 🆕 | hidden | `R5` |\n')
+    try:
+        population(t22)
+        case('U22', False, 'a second `## Carried forward` section was '
+                           'invisible to every check')
+    except Refused:
+        case('U22', True)
+
+    # ---- U23..U26: the row shape ----------------------------------------
+    for nm23, rmd23, why23 in (
+            ('U23', ['| `A-1` 🆕 | q | `R5` | extra |'],
+             'a row with a fourth column was accepted'),
+            ('U25', ['| `A-1` 🆕 | q |'],
+             "a two-column row was accepted -- the guard's real boundary")):
+        try:
+            cf_rows(_fixture(rows_md=rmd23))
+            case(nm23, False, why23)
+        except Refused:
+            case(nm23, True)
+    esc = cf_rows(_fixture(rows_md=[r'| `A-1` 🆕 | q | `a \| b` |']))[0][0]
+    case('U24', esc['owner_cell'] == r'`a \| b`',
+         'an escaped pipe in the owner cell read as %r' % esc['owner_cell'])
+    try:
+        cf_rows(_fixture().replace('| # | Question | Owning gate |',
+                                   '| Item | Question | Owning gate |'))
+        case('U26', False, 'a renamed header cell was read as a debt row')
+    except Refused:
+        case('U26', True)
 
     # ---- U8: `write` refuses on a document with no blocks ---------------
     import tempfile
