@@ -156,6 +156,67 @@ in CI*.
 
 ---
 
+🔄 **2026-09-16, `R1z-2`: a per-check COUNT is still not enough, and the
+adversarial pass said so before the per-check count existed** — *a mutant that
+moves two rows in opposite directions WITHIN `L1` is still invisible*. So the
+ratchet now carries a second dict: `BASELINE_SIG`, a sha256 over each check's
+sorted row ids, first eight hex. The count says HOW MANY the instrument
+reported; the digest says WHICH ROWS.
+
+🟢 **It fired on its first real event and showed something a count could not.**
+Reverting the `Answered` widening left `L1` at 45, `L8` at 19 and `L11` at 1 —
+every count matching the moved baseline while three different row sets moved
+underneath them. And `L8`'s digest came back `e9fe5859`, byte-for-byte the
+value it carried before the widening: the revert restored the same nineteen
+rows, not merely the same nineteen.
+
+🔴 **A hand baseline does not inherit the live digests**, and that went red on
+the same run: `U12=` passes `baseline={'L1': 1}` for a two-row fixture and was
+comparing it against `PROGRESS.md`'s rows. A caller that supplies counts and
+not ids is testing counts. `U12sig` and `U12sig-` are the pair that keep the
+layer from being a line of code nothing exercises — the same fixture, its own
+freshly computed digest passing and a wrong one red.
+
+---
+
+## 6. The five classification fixes, and the two that this file's own rules
+## refuted
+
+量 2026-09-16, `R1z-2`. Each rule is read off the data, and each REPRODUCES the
+rows that were already right before it fixes the ones that were not — that
+symmetry is what separates a derived rule from a chosen one.
+
+* **A no-owner declaration at the owner cell's head beats a gate id anywhere in
+  it.** Ten cells begin `**none…`; ten of ten are genuine; five were being
+  classified by a gate id scraped from the same cell's prose. `擁有者` is
+  deliberately excluded — four cells begin with it and in all four it
+  introduces a real owner, one of them `XNUM-1`.
+* **A standing-instruction owner is one of the cell's CLAUSES, not a substring
+  of it.** Eight clause-head hits: the three already classified `SEGMENT`, plus
+  five. The naive reordering would have mislabelled `GPIO-1` (offset 76 of a
+  669-character cell) and `UP-AUD-1` (inside `~~ ~~`).
+* **Ten of the eleven `L2` rows name work that has a home under another name**,
+  so `GATE_RENAME` is declared with a committed source per entry.
+* **An unresolved token is reported on any row**, not only on one that resolved
+  nothing — four rows were dropping six tokens against `GATE_SHAPE`'s own
+  comment.
+* **`L11`** reads a closure recorded in § Corrections rather than in the row.
+
+🔴 **Two of this file's own rules then refuted two of those changes within the
+hour.** `Answered` is not a closure (four of four end in an open residual; the
+character carries the verdict and the word does not). And `L11`'s first form —
+the id within sixty characters of a closure verb — caught a sentence about what
+closing would COST; the discriminator is structural, the closure must BE the
+entry's `**bold**` headline, and it is 2 of 2 with no counterexample either
+way.
+
+⚠️ **And the hint label had been lying about where it looked.** `L8` reported a
+`CLOSED` at character 1,143 as *the head of the question*, because that branch
+ORed a position-free word search onto two position tests. The classification
+was right and only the sentence was wrong; there are two labels now.
+
+---
+
 ## 5. What none of these instruments can see
 
 ⚠️ **Both of `cfcensus`'s populations come from one file.** It is the record
