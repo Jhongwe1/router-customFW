@@ -228,14 +228,14 @@ see §5.
 
 | id | what it reads | peripheral · `SPEC.md` id | pass criterion | how it is made to fail | class | reversible on this unit? |
 |---|---|---|---|---|:---:|---|
-| **`MT-ID`** | the image's own `RLXFW-ID0` mark | — | equals the `RECIPE_ID` the build computed | build a second image; the printed id must differ | S | n/a (build-time) |
+| **`MT-ID`** | the image's own `RLXFW-ID0` mark | — | equals the `RECIPE_ID` the build computed, **compared case-insensitively** — 🔴 the driver prints `%08X` and `rlxfw-kbuild.sh` computes `sha256sum \| cut -c1-8`, so an `=` between them turns a good unit red | build a second image; the printed id must differ | S | n/a (build-time) |
 | **`MT-FLASH-1`** | `/proc/rtl819x-spi`, new `rdid` verb | SPI NOR · `FLS-04` | `1C7016` | feed the comparator a wrong id | S — stands in for *a different or dead flash part*, which needs class **T** | n/a |
 | **`MT-FLASH-2`** | `/proc/rtl819x-spi` after `trywrite` | SPI NOR · `FLS-27` | both pointers return `-EOPNOTSUPP`; `n_writes == 0` | build one image with `.flags` not `MTD_CAP_ROM` | S | n/a (build-time); **this is the substitute for the plan's erase/write-back** |
 | **`MT-FLASH-3`** | `/proc/rtl819x-spi-map`, 32 × 32 | flash content · `FLS-26` | 31 of 32 groups identical to the reference; group 0 as recorded | the driver's existing `corrupt` verb, which moved the 4 MiB digest on `C1-NG` | R | 量 — it corrupts the RAM copy, not flash; a reboot clears it |
-| **`MT-TICK`** | `/proc/rtl819x-timer` + `/proc/interrupts` | TC1 · `CLK-27` | `ce_live=1`, `ce_mode=2`, `irq_spurious=0`, `irq_stuck=0`, and `Δjiffies == Δirq_count` | `cereload` to a wrong value: the ratio breaks | R | 量 — seating 13 did six reloads over four values and came back each time |
-| **`MT-WDT`** | `/proc/rtl819x-wdt` | watchdog · `FW-52` | `wdtcnr_at_probe = A5000000`; the ten `ovselN` rows exact; `BOOTGUARD` feeding | `kickms` long enough that the bite falls outside the window | R | 量 — a reboot restores it. 🔴 **Ordered last: the pass path resets the board** |
+| **`MT-TICK`** | `/proc/rtl819x-timer` ~~+ `/proc/interrupts`~~ 🔴 **the second input was never implemented — see § 9.4** | TC1 · `CLK-27` | `ce_live=1`, `ce_mode=2`, `irq_spurious=0`, `irq_stuck=0`, `Δjiffies == Δirq_count` **and `ce_reload == ce_reload_hz`** | `cereload` to a wrong value ~~: the ratio breaks~~ 🔴 **the ratio does NOT break — one interrupt advances both counters, so the old criterion is GREEN with the clock at a tenth of its rate. 量 `C10-M28`: `dj=503 di=503 skew=0` while `reload=20000 want=2000`. What breaks is the driver's own `-ERANGE` criterion** | R | 量 — seating 13 did six reloads over four values and came back each time |
+| **`MT-WDT`** | `/proc/rtl819x-wdt` | watchdog · `FW-52` | `wdtcnr_at_probe = A5000000`; ~~the ten `ovselN` rows exact~~ (the script checks two fields, not ten); `state_name = BOOTGUARD` | ~~`kickms` long enough that the bite falls outside the window~~ 🔴 **`kickms` moves NEITHER field the script reads; it lets the hardware bite, which ends the boot rather than reddening the check. `stop` — the physical counterpart of fixture row `M15`** | R | 量 — `bootguard` restores it, read back in the same field. 🔴 ~~**Ordered last: the pass path resets the board**~~ **the implemented pass path issues no verb and resets nothing; the ordering rule was about this table, not about the script** |
 | **`MT-LED`** | `/proc/rtl819x-gpio`, `/sys/class/leds/*/brightness`, **and the operator's eye** | LED · `BRD-13` (driver: none) | `dat` bit 6 clears, `n_set_ok` increments, `n_writes` increments, operator sees LED #2 of eight lit | `lock 6` first: the write is refused **before** it happens, `n_writes` unmoved, the lamp does not change | R | 量 — `unlock 6` restores it; both directions ran at seating 20 |
-| **`MT-BUTTON`** | `/proc/rtl819x-keys` | button · `BRD-05`, `REG-28` (driver: none) | a 3 s hold at 20 Hz gives `(n_open, n_poll)` `(1, 60)`, and a second gives `(2, 120)` | do not press: the counters stay flat | P | 量 — the flat control already ran at seating 20 |
+| **`MT-BUTTON`** | `/proc/rtl819x-keys` | button · `BRD-05`, `REG-28` (driver: none) | 🔴 ~~a 3 s hold at 20 Hz gives `(n_open, n_poll)` `(1, 60)`~~ **that pair comes from the OPEN, not from the press, and reading it as the press is what made the first implementation score a quantity nothing in it caused.** Three terms: `n_open` moved (the node opened), `n_poll` moved (the poller ran), **`b0_n_press` moved** (a debounced press was seen) | do not press: **`b0_n_press` stays flat while the first two MOVE** | P | 量 — the flat control already ran at seating 20 |
 | **`MT-PORT`** | vendor `/proc/rtl865x/port_status` 推 | Ethernet · **no Linux-state id** — every `NET-*` is loader-state | link up on the connected port, and the output **names the vendor driver** | unplug the cable | P | 量 — plug it back in |
 | **`MT-MAC`** | `H601` header + body, in the kernel, **verdict only** | `H601` · see §4 | signature `H6`, version `1`, body checksum 0, MAC not all-`00`, not all-`FF`, group bit clear | feed the parser a synthetic buffer (`$FWRE_WORK/h601-synth.bin`) | S — stands in for *清 MAC*, which is **permanently forbidden** | n/a |
 | **`MT-RFCAL`** | the same read, the same verdict | `H601` · see §4 | the 8-bit sum of all `len` body bytes, checksum byte included, is 0 | the same synthetic buffer with one byte moved | S | n/a |
@@ -300,9 +300,12 @@ memory. It runs at a desk because `config/mfgtest.sh` reads every surface throug
 `$MFG_ROOT` — which is what makes *simulated at the boundary* an executable
 statement instead of a described one.
 
-**Ordering is a safety property, not a convenience.** `MT-WDT` resets the board
-and goes last. `MT-FLASH-3`'s `corrupt` is in RAM and must be followed by a
-verified clean re-read before anything else is trusted.
+**Ordering is a safety property, not a convenience.** 🔴 ~~`MT-WDT` resets the
+board and goes last.~~ **量 2026-09-17: the implemented `mt_wdt` issues no verb
+and reads two fields, and `M29` is `stop` rather than `kickms`, so nothing in
+`P1-4` resets the board.** `MT-FLASH-3`'s `corrupt` is in RAM and must be
+followed by a verified clean re-read before anything else is trusted — 量
+`C5-M27`/`C6-M27r`, `diff_units` 1 then 0.
 
 ---
 
@@ -503,3 +506,79 @@ and `grep -E` absent on this same image. And it ships **no keyword list**: the
 run-based signature recovers 8 of ash's ~20 keywords, while 量 `for` was typed at
 this device 17 times and `while` 4 times and neither is in the extracted run. A
 short list a checker consumes is worse than none.
+
+---
+
+## 9. What `P1-3` measured, and the four things it had to fix first
+
+量 2026-09-17, seating 25. `P1-1` shipped eleven checks; **four of them could
+not have gone green on a good unit, and a fifth pair of injections could not
+have gone red on a broken one.** Every one was found by reading a *third party*
+— the driver's own source, the built `.config`, this unit's busybox under an
+emulator, or one of this project's own earlier cards — and never by re-reading
+the thing under test.
+
+### 9.1 `MT-BUTTON` scored a delta nothing in it caused
+
+`mt_button` read `n_poll` either side of a bare `sleep 4`. `n_poll` advances
+only while `/dev/input/event0` is open, and nothing in the check opened it. 讀
+`rtl819x-keys.c:91-103`: *"with no handler that opens, poll() is NEVER CALLED …
+every counter reads 0 for ever"*; 量 `p11d.config-built:769`,
+`# CONFIG_INPUT_EVBUG is not set`. `bench/2026-09-10`'s card had already typed
+`sleep 3 < /dev/input/event0` with the note *"the open is what is needed"*.
+
+🔴 **The consequence was larger than the check.** `M26` is *do not press; the
+counters must stay flat* — and they were flat either way, so the injection
+proved nothing. It is a **`NO-TAKE`**, which is a different finding from a
+`SURVIVOR` and gets its own name.
+
+### 9.2 `MT-ID` compared two cases of one number
+
+`rtl819x-spi.c` prints `recipe_id %08X`; `rlxfw-kbuild.sh:262` computes
+`sha256sum | cut -c1-8`. `mfgtest auto <lower-case id>` — the spelling
+`PROGRESS.md` carried — would have turned `MT-ID` red with the right image on
+the board. It is the only comparand in the script that comes from outside it.
+
+### 9.3 `MT-TICK` compared a quantity with itself
+
+One interrupt advances both `jiffies` and `irq_count`, so a clock at a tenth of
+its rate keeps `skew` at 0 and `dj > 0`. 量 `C10-M28`: with `cereload 20000`
+the line reads **`dj=503 di=503 skew=0`** — the old criterion satisfied — while
+the cell took **66.78 s** against 21.9 s for a healthy one. The check now also
+reads `ce_reload` against `ce_reload_hz`, which is the driver's own `-ERANGE`
+criterion at `rtl819x-timer.c:1544`.
+
+⚠️ Both are software values, so this catches a period programmed wrong and says
+nothing about a hardware clock that has drifted. **`/proc/interrupts` line 13 —
+the vendor's tick, which `cereload` does not touch — is still not read, and § 2's
+table said it was.** Carried forward.
+
+### 9.4 Two properties of this shell, and only one was looked for twice
+
+**The reader.** A 2.6.30 `read_proc_t` re-renders its whole page on every
+`read()`, and the shell's `read` builtin consumes one byte per call.
+`/proc/rtl819x-timer` has 101 fields and several free-running counters, so a
+field that grows one character shifts everything after it and a character
+already consumed is served again. 量, three passes of one loop over the live
+file: `[ce_live==1]`, then nothing, then nothing. Over a `cat` snapshot, same
+shell, same minute: eleven of eleven fields clean. `SPEC.md` `FW-87`.
+
+**The arithmetic.** `$((4294950451))` is `2147483647` — parsing **saturates** —
+while `$((2147483647+1))` is `-2147483648` — arithmetic **wraps**. `jiffies`
+starts above the saturation point, so every device-side jiffies difference this
+project could have taken was `0`. `SPEC.md` `FW-88`.
+
+🔴 **The second one had been measured at the desk hours earlier**, under
+`qemu-mips-static` with this unit's own busybox, while fixing § 9.2 — and it was
+not asked of a second place. That is the whole lesson of the block: a
+measurement that refutes one line usually refutes three, and nothing in this
+repository looks for the other two.
+
+### 9.5 The harness can run on the shell the die runs, and already could
+
+`tools/mfginject.py` takes `MFG_SHELL`. Pointed at a two-line wrapper that
+execs `qemu-mips-static -L <squashfs-root> bin/busybox ash`, **all 25 injections
+and all six controls pass on the target shell**, with no change to the tool.
+The 2 × 2 that makes it load-bearing: the arithmetic form of § 9.2's fix is
+**ok under `dash` and FAIL under this unit's `ash`**; the shipped string fold is
+ok under both.
