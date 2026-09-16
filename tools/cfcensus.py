@@ -1337,7 +1337,7 @@ def report_check():
 # the closures, reported rather than absorbed: `C-2` and `C-7` close carrying a
 # residual, and every other check here skips a closed row.
 BASELINE = {'L1': 11, 'L2': 1, 'L3': 5, 'L6': 4, 'L8': 0, 'L10': 2,
-            'L11': 0, 'L12': 3, 'L13': 0, 'L15': 4, 'L9': 0}
+            'L11': 0, 'L12': 2, 'L13': 0, 'L15': 4, 'L9': 0}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
 # directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
@@ -1356,7 +1356,7 @@ BASELINE = {'L1': 11, 'L2': 1, 'L3': 5, 'L6': 4, 'L8': 0, 'L10': 2,
 # at zero contributes no ids to digest.  `BASELINE` still carries them at 0,
 # which is where the claim lives -- *zero rows record a closure in a place this
 # table does not declare* is a result and not an absence.
-BASELINE_SIG = {'L1': '62bfc297', 'L10': 'c56612d3', 'L12': 'ea2c4b8c',
+BASELINE_SIG = {'L1': '62bfc297', 'L10': 'c56612d3', 'L12': '51eb4e6f',
                 'L15': 'ae84aa3e', 'L2': '10ef882f', 'L3': '1c90011a',
                 'L6': 'b86a38d5'}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and

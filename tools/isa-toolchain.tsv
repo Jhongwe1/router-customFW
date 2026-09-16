@@ -47,14 +47,14 @@
 #   desk    `SPEC.md` `TC-15` 量: the exposed-`-march` set (4180 4181 5181
 #           mips1) pads the load delay slot and the non-exposed set (5280 5281
 #           4281 mips2 mips32) does not.
-#   silicon `SPEC.md` `CPU-14` 量 seating 21, `bench/2026-09-14/C1-P5j.log`:
+#   silicon `SPEC.md` `CPU-58` 量 seating 21, `bench/2026-09-14/C1-P5j.log`:
 #           `lu_sd_d0` reads OPEN -- a store whose DATA operand is the register a
 #           load wrote one instruction earlier stores the register's PRIOR value.
 #
 # So a row's device prediction follows from its `pad` column and from nothing
 # else, and `pad` is itself checked against the artefact by `tcpay verify`.
 # **That is what makes this refutable rather than a rehearsal**: a row whose
-# build says `nopad` and whose device answer is `lock` refutes `CPU-14` under
+# build says `nopad` and whose device answer is `lock` refutes `CPU-58` under
 # compiler-generated conditions, and a row whose build says `pad` and whose
 # device answer is `open` refutes the harness.
 #
@@ -74,7 +74,18 @@
 #            (`TC-15`), and 量 by `tcpay verify` on every build.
 #   expect   the device prediction: `lock` (the store writes the LOADED value)
 #            or `open` (it writes the register's prior value).  Derived from
-#            `pad` plus `CPU-14`; it is NOT an independent guess.
+#            `pad` plus `CPU-58`; it is NOT an independent guess.
+#
+# 🔄 2026-09-16 (`R1z-2`/`TCPAY-1`): these three comments and four lines of
+# `tcpay.py` said `CPU-14` while quoting `lu_sd_d0` in the same sentence.
+# `CPU-14` is the loaduse family, measured by `lu_alu_d0`; `CPU-58` is
+# load → store-data, measured by `lu_sd_d0`, which is what this payload
+# runs.  The decision on 2026-09-14 was NOT to move the instrument, because
+# a tool saying `CPU-58` would have disagreed with the frozen card it was
+# about to analyse, hours before a seating.  🔴 The frozen cards of
+# `bench/2026-09-14b` still say `CPU-14` and are NOT edited; the
+# reconciliation is `CORRECTIONS-block19.md` § 0.3.5, which is the
+# mechanism this project has for exactly this.
 #   why      one sentence.  What this row is for, and what its refutation means.
 #
 # THE TWO CONTROLS ARE NOT OPTIONAL AND THEY RUN IN OPPOSITE DIRECTIONS

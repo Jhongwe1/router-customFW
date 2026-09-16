@@ -1905,16 +1905,27 @@ def self_test():
         return rr, o
 
     def h28():
-        def mkout(verdicts):
+        # 🔴 `mkout` USED TO ZIP `live` WHATEVER IT WAS ASKED FOR, and the
+        # last case below asks for `noctl`.  `zip` stops at the shorter, so it
+        # produced the right NUMBER of tuples carrying `live`'s first rows --
+        # which equal `noctl` only because the `ctl` rows happen to be last in
+        # the table.  The case passed for a reason that is a property of the
+        # row order and not of the code under test.  The rows are a parameter
+        # now, and the assertion below is what stops the coincidence being
+        # load-bearing again.
+        def mkout(rows, verdicts):
             out = []
-            for r, v in zip(live, verdicts):
+            for r, v in zip(rows, verdicts):
                 out.append((r, v, r["lock_v"], r["ctl_v"]))
+            assert len(out) == len(rows) == len(verdicts),                 "mkout was asked for %d row(s) and built %d" % (len(rows),
+                                                                len(out))
+            assert [x[0] for x in out] == list(rows),                 "mkout built its output from rows other than the ones asked for"
             return out
         good = mkrecs(live)
-        allock = mkout([V_LOCK] * len(live))
+        allock = mkout(live, [V_LOCK] * len(live))
         assert not check_controls(live, allock, "qemu", good), \
             "a healthy qemu arm must produce no finding"
-        one = mkout([V_LOCK] * len(live))
+        one = mkout(live, [V_LOCK] * len(live))
         one[0] = (live[0], V_OPEN, live[0]["open_v"], live[0]["ctl_v"])
         f = check_controls(live, one, "qemu", good)
         assert any("C4" in x for x in f), f
@@ -1924,13 +1935,13 @@ def self_test():
         # the control row must read LOCK
         ctlidx = [i for i, r in enumerate(live) if r["kind"] == "ctl"]
         assert ctlidx, "the live table has no control row"
-        two = mkout([V_LOCK] * len(live))
+        two = mkout(live, [V_LOCK] * len(live))
         two[ctlidx[0]] = (live[ctlidx[0]], V_OTHER, 0, 0)
         f = check_controls(live, two, "device", good)
         assert any("CONTROL" in x and "VOID" in x for x in f), f
         # and a table with no control row at all
         noctl = [r for r in live if r["kind"] != "ctl"]
-        f = check_controls(noctl, mkout([V_LOCK] * len(noctl)), "device",
+        f = check_controls(noctl, mkout(noctl, [V_LOCK] * len(noctl)), "device",
                            mkrecs(noctl))
         assert any("NO CONTROL ROW" in x for x in f), f
     case("H28 check_controls fires in both directions, and C4 only on qemu", h28)

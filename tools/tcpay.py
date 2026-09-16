@@ -248,13 +248,13 @@ def read_table(path=TSV):
                 raise Refuse("%s:%d: expect is %r, want lock or open"
                              % (path, n, expect))
             # The prediction is a COMPOSITION and this is where that is enforced:
-            # `pad` plus CPU-14 determines `expect`, so a row where they
+            # `pad` plus CPU-58 determines `expect`, so a row where they
             # disagree is a typo, not a hypothesis.  A future die on which d0 is
             # closed changes this rule; it does not get to change one row.
             want = "lock" if pad == "pad" else "open"
             if expect != want:
                 raise Refuse("%s:%d: %s says pad=%s and expect=%s. expect is "
-                             "DERIVED from pad plus CPU-14 (lu_sd_d0 OPEN); the "
+                             "DERIVED from pad plus CPU-58 (lu_sd_d0 OPEN); the "
                              "two cannot disagree row by row"
                              % (path, n, vid, pad, expect))
             if (tc == "--") != (march == "--"):
@@ -886,7 +886,7 @@ def cmd_verdict(rows, path, arm):
     else:
         print("")
         print("  %d row(s) refuted their prediction. A `nopad` row reading LOCK "
-              "refutes CPU-14 under compiler-generated conditions; a `pad` row "
+              "refutes CPU-58 under compiler-generated conditions; a `pad` row "
               "reading OPEN refutes the harness." % len(dis))
         return 1
     return 0
@@ -1233,8 +1233,8 @@ def self_test():
         rc, out = verdict_rc({"c_lock": OK_LOCK, "c_open": OK_OPEN,
                               "v1": OK_LOCK, "v2": OK_LOCK})
         assert rc == 1, "a refuted prediction exited %d, want 1\n%s" % (rc, out)
-        assert "refutes CPU-14" in out, out
-    case("T22 a `nopad` row reading LOCK is reported as refuting CPU-14", t22)
+        assert "refutes CPU-58" in out, out
+    case("T22 a `nopad` row reading LOCK is reported as refuting CPU-58", t22)
 
     print("")
     if failed:
