@@ -451,6 +451,18 @@ always says yes*.
 
 ---
 
+🔄 **2026-09-16 (`R1z-3`): `H28`, the control over `check_controls`,
+passed for a reason that is a property of this table's ROW ORDER.** Its last
+case asks for the table with the `ctl` rows removed, and the helper that built
+the case's input zipped the FULL row list whatever it was asked for. `zip`
+stops at the shorter, so the case got the right number of tuples carrying the
+full table's first rows — which equal the control-free table only because the
+`ctl` rows are last in the `.tsv`. **Reordering this file's rows would have
+made that case test something else without saying so.** The rows are a
+parameter now, and two assertions inside the helper stop the coincidence being
+load-bearing again. 41/41 before and after: the fix changes no verdict, it
+removes a reason the verdict was reached.
+
 ## 7. What could still be wrong
 
 1. **Every row runs on a warm D-cache and a warm I-cache.** `probe5` does not
