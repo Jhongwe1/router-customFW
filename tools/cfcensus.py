@@ -308,13 +308,8 @@ NON_GATE = {
 # goes red if an exempted row ever becomes clean, so the list cannot rot into
 # a blanket.  量 2026-09-16: 13 `L8` rows, 2 exempted, 11 real.
 L8_EXEMPT = {
-    'REL-0': 'owner is the word `none`; the cell\'s ✅ is prose about a '
-             'release decision, not about this row',
     'REL-3': 'owner is `none`, see `REL-0`; the ✅ is inside a sentence about '
              '`notes/kernel-build.md` §21.7',
-    'XNUM-1': 'the owner cell\'s 關了 is `R5-11` the GATE closing, inside a '
-              'recorded handover; the row is the one thing `R1z` exists to '
-              'finish',
 }
 # 🔴 `GPIO-1` was in this list for one run and `L9` deleted it, which is the
 # rot control doing its job on its first real use.  量: the token set above
@@ -1336,8 +1331,13 @@ def report_check():
 # row before it moved, and the movement was written down first.  `L1` 44 is
 # `C-16` alone of the twenty; `L3` 9 is the five that were `NONE`; `L13` 10 is
 # `TC-c`.  All nine predicted counts came out exact.
-BASELINE = {'L1': 44, 'L2': 1, 'L3': 9, 'L6': 4, 'L8': 0, 'L10': 2,
-            'L11': 0, 'L12': 4, 'L13': 10, 'L15': 2}
+# 🔄 2026-09-16, `R1z-2`'s disposition: thirty-eight rows ended ✅, `⊘` with a
+# re-open condition, or re-owned to a gate that is still open.  `L1` 44 → **11**
+# and `L13` 10 → **0**; live-owned goes 11 → **25**.  `L15` 2 → 4 is the cost of
+# the closures, reported rather than absorbed: `C-2` and `C-7` close carrying a
+# residual, and every other check here skips a closed row.
+BASELINE = {'L1': 11, 'L2': 1, 'L3': 5, 'L6': 4, 'L8': 0, 'L10': 2,
+            'L11': 0, 'L12': 3, 'L13': 0, 'L15': 4, 'L9': 0}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
 # directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
@@ -1356,9 +1356,9 @@ BASELINE = {'L1': 44, 'L2': 1, 'L3': 9, 'L6': 4, 'L8': 0, 'L10': 2,
 # at zero contributes no ids to digest.  `BASELINE` still carries them at 0,
 # which is where the claim lives -- *zero rows record a closure in a place this
 # table does not declare* is a result and not an absence.
-BASELINE_SIG = {'L1': '41c9b24a', 'L10': 'c56612d3', 'L12': '84a6187d',
-                'L13': 'b9bd31b9', 'L15': 'ccd15bf1', 'L2': '10ef882f',
-                'L3': '3be8ef29', 'L6': 'b86a38d5'}
+BASELINE_SIG = {'L1': '62bfc297', 'L10': 'c56612d3', 'L12': 'ea2c4b8c',
+                'L15': 'ae84aa3e', 'L2': '10ef882f', 'L3': '1c90011a',
+                'L6': 'b86a38d5'}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`

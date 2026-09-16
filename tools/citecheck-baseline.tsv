@@ -55,7 +55,6 @@ ROT	docs/blind-write-ledger.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It chang
 ROT	docs/blind-write-ledger.md	notes/timer-driver.md	273	415d2c4eb64624a2	`kernel/time/jiffies.c:37` — `NSEC_PER_JIFFY` is `((u64)NSEC_PER_SEC <
 ROT	docs/blind-write-ledger.md	notes/timer-driver.md	41	862ec0101d49b31f	⚠️ **An earlier draft of this sentence cited `kernel/time/timekeeping.
 ROT	docs/blind-write-ledger.md	tools/ledgerscan.py	505	adcf3fd1b132405c	depth = "line" if withln else "name"
-ROT	docs/blind-write-ledger.md	notes/kernel-build.md	3471	88d28a45bf60d6de	| **A** — `drivers/mtd/chips/rtl819x/spi_common.h:87` | `SFCR_SPI_CLK_
 ROT	docs/blind-write-ledger.md	PROGRESS.md	1353	5453c2e11b271961	| **Last session but twenty-nine** | 🔴 **2026-08-25, desk only, second
 ROT	docs/probe3-cells.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
 ROT	docs/rlx-cache-and-cp0.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
