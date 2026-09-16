@@ -874,6 +874,185 @@ it looked at a candidate. 量 ＋ 讀.**
 
 ---
 
+## 2026-09-16 — `R1-pub + R2c` (what this die's instruction set is, and what the kernel and three toolchains believe about it)
+
+### One line
+
+One die's instruction set is measured rather than read — **75 encodings, three
+verdicts, and the cell that matters, *does not trap and computes the wrong
+answer*, observed once** — with the kernel's emulation surface priced in
+nanoseconds and the load-delay hazard walked to the distance where it closes.
+**The weakest thing here is not a reading, it is an arithmetic on top of one**:
+`D-cost`'s `E5` is a conjunction, eight days of adjudication quoted one half of
+it, and the half nobody counted fails five rungs of sixty-four — enough, counted
+honestly, to cross that clause's own void threshold on one of the two boots.
+
+### Three claims that stand
+
+**① This die executes four instructions the public record says its family does
+not have, and the census that says so has a three-way verdict whose third cell
+was observed. 量, with a two-sided negative control that fires and a positive
+control that was missing from the DoD for two segments.**
+
+* `probe4`, bare metal, its own exception handler, 75 encodings on one power
+  cycle — seating 21, `bench/2026-09-14/C1-P4j.log`: **RAN 16 · RIGHT 16 ·
+  TRAPS 42 · WRONG 1**, three channels agreeing on `seal=AF7A728B`, and every
+  expected constant derived at the desk and **printed beside the reading**
+  rather than compared inside the payload — which is the only reason the third
+  cell can exist at all.
+* **`lwl`, `lwr`, `swl` and `swr` all read RIGHT.** They execute, and they
+  compute the constant the desk derived. The public Lexra statement is that this
+  family removed them. `SPEC.md` `CPU-15` carries the refutation with its own
+  scope limit: one RLX4181 revision 1, and the LX5280 claim is untouched.
+* **The negative control fires and it is two-sided.** `special0e` traps with
+  `ExcCode 0x0A`, and `tools/isa-payload.tsv` sets its `expect` **equal to the
+  seed on purpose**, so a checker reading the value instead of the exception
+  count would say RIGHT and void the table. It said TRAPS. 🔴 **And it is clean
+  by one function code**: `simulate_sync` matches SPECIAL `0x0F` and this row is
+  `0x0E`; `0x0000000F` would have been silently emulated and reported as *does
+  not trap*.
+* **The positive control is `D2b`**, which had to be added to the DoD two
+  segments after `D2` — `plan:1074`'s pass condition has two halves and `D2`
+  restated the negative one word for word and the positive one not at all,
+  because a list organised around refutability drops a requirement that has no
+  refutation attached. `probe4`'s seven MIPS-I baseline rows must read RIGHT.
+  All seven did.
+* 🔴 **The third cell is one row, not a rate.** *Does not trap and computes the
+  wrong answer* was observed **once in 75**. One observation is what makes the
+  cell real; it is not a measurement of how often this core does that.
+
+**② The load-delay hazard closes at one instruction, and the kernel's emulation
+surface costs 366–396 cycles a trip. 量, on two independent boots, with a zero
+control four orders of magnitude below the smallest number quoted.**
+
+* `probe5`, 24 behavioural hazard rows, same power cycle: **LOCK 15 · OPEN 6 ·
+  VOID 3**. The ladder closes at **d1** for `loaduse`, `storedata`, `storebase`,
+  `movcond` and `dslot` — one `nop` suffices, and the second one upstream's
+  `P9-12` inserts is not needed on this part. `hilo` reads LOCK at every
+  distance: **the HI/LO hazard is not exposed here.** `movz`/`movn`'s
+  write-enable is exposed at d0, which is the first measurement of that shape on
+  this silicon.
+* **The surface is one visible census row and its visibility is bounded rather
+  than assumed.** All 37 census rows with a payload row were looked at; exactly
+  one — `sync` — shows the trap/no-trap difference; and the reason a second
+  could hide is written down: an instruction the silicon retires **and** the
+  kernel emulates reads *no signal* in both columns, which is `ll` and `sc`.
+* **Priced, and every quoted cost is a slope over four iteration counts, not a
+  point.** `sync` **988.6 / 989.5 ns** per iteration and `lwu2` **915.6 /
+  915.4 ns**, each on two independent boots with its own rescue, upload and `J`.
+  At 400 MHz that is **366–396 cycles**, and two different instructions through
+  two different handlers differ by **7.4 %** — so the dominant term is
+  trap-and-return rather than either handler's body.
+* **The zero control is two separately assembled `nop` cells at two addresses**,
+  so what it measures is not `x − x`: **0.0014 / 0.0108 ns**, and the smallest
+  quoted cost is **84,700×** it. `tools/ucostfit.py` re-derives all of this from
+  the two committed captures, and carries three injected corruptions that each
+  have to make a named check fail.
+* 🟢 **`sc` costs nothing, and the evidence is a sign rather than a number**:
+  **+0.187** on one boot and **−0.194** on the other. A quantity whose sign flips
+  between boots is zero more convincingly than a small number is.
+* 🔴 **`ll` and `sc` are published as bounds, not costs.** Each failed `E4` on
+  one of the two boots, and `E4`'s tolerance is a proportion of **the row's own**
+  magnitude, so it is ~50× stricter where the noise share is largest. A
+  different row failed on each boot, which is the signature of a threshold
+  sitting in the noise rather than a property of either row.
+
+**③ Three vendor toolchains spanning eighteen years of gcc give one answer to the
+load-delay question, and what differs between them is the `-march` their shipped
+`libc.a` was built for. 量, twelve compiler invocations on the die, both controls
+held and the anti-control forced.**
+
+* `probe6`, seating 22, `bench/2026-09-14b/C1-P6j.log`: twelve rows, **one
+  compiler invocation each**, all compiling the same one-line fragment at
+  identical flags. **12 of 12 read the verdict their `pad` column predicted
+  before the board was powered.**
+* **Same toolchain, two flags → the behaviour changes** — three times, one
+  binary each. **Three toolchains, one flag → it does not**: `v4` = `v6` = `v8`
+  all LOCK and `v5` = `v7` = `v9` all OPEN, across gcc **3.4.6, 4.4.5 and
+  12.4.0**.
+* **The controls**: a hand-written `lw; nop; sw` must read LOCK and a
+  hand-written `lw; sw` must read OPEN — both did — and the forced anti-control,
+  the same payload under `qemu-system-mips`, read **24 of 24 LOCK**, so the
+  device's 5/7 split is the device's.
+* 🔴 **The plan's own second refutation condition fired here and nothing in this
+  repository said so for two days**: *three identical silicon results mean the
+  table has no discriminating power, and that is itself a result to write down*.
+  `SPEC.md` `TC-59`, `TC-60`.
+* 🟢 **What selects is `TC-57`** — the same criterion, `hazlint` clean, applied
+  to each release's whole prebuilt `libc.a`: **0 violations against 4,574 and
+  3,741**. Both instruments are right, because `-march` is the variable on both
+  sides. So `R2c` chooses **`rsdk-1.3.6-4181`**, and the reason is that its
+  shipped `libc.a` was built for a core without a load interlock — **not that
+  its compiler is better, because measured, there is no difference to have.**
+
+### What `R1-pub + R2c` did not establish
+
+* 🔴 **One die, one revision, one operator.** `PRId` = `0x0000CD01`, RLX4181
+  revision 1. Every payload here ran on that unit. The one repeat that exists —
+  `FW-74`, 75 rows byte-identical across two seatings — bounds this instrument's
+  reproducibility and says nothing about a second part; the other board this
+  project owns has never run any of these payloads.
+* 🔴 **`R1-pub-3`'s own DoD clause is not met, and the instrument that should
+  have said so could not be asked.** *Every hazard test's own control fires*
+  reads **21 of 24**: three `cp0` rows' per-row `ctl` control did not fire, and
+  those rows are VOID, which `D3` permits — but the clause says *every*.
+  `hazpay`'s `check_controls` inspected **2 of 26** declared controls, and the
+  probe's own `aux.zero` header field was blind to the same three rows for a
+  different reason: it tests *equal to zero*, and the wrong value was
+  `0x80500270`. **Both were fixed in the segment that wrote this entry, and the
+  clause is still not met — it is merely measurable now.** `SPEC.md` `FW-76`.
+* 🔴🔴 **`D-cost`'s `E5` is a conjunction, and every adjudication of it quoted
+  one conjunct.** The other — `Δirq_count == Δjiffies` on every rung — fails
+  **5 of 64**, all five in the same direction, and counting both takes boot 1 to
+  **10 / 32 = 31.2 %** against `E5`'s own ¼ void threshold. 🟢 **The four costs do
+  not move**, and the reason is structural rather than a rescue written
+  afterwards: the ruler is `comp_tc1 = Δjiffies × 2000 + Δtc1`, `Δirq` is not in
+  it, and both of its terms are snapshotted inside one `spin_lock_irqsave` —
+  readable in `ucost.c` and in the timer driver with no reference to the outcome.
+  🔴 **The clause's defect is that it put two properties under one threshold and
+  only one of them bears on what the threshold protects.** 讀,
+  `drivers/clocksource/rtl819x-timer.c`: `j = get_jiffies_64()` sits at line 2001
+  inside the lock held from 1998 to 2042, and `irq_count` is read live at line
+  2147, **105 lines after the unlock**. ⚠️ **And the five differences are not
+  explained by that mechanism**: the gap is symmetric in sign and these are five
+  of five one-sided. Recorded as an open question, not as a cause. `SPEC.md`
+  `FW-75`.
+* 🔴 **Four of the eight emulated instructions are unpriced** — the unaligned
+  `lh`, `lhu`, `sh` and `sw`. `E7` required the number to be in the write-up
+  rather than discovered by a reader, and it is; the rows are still unpriced.
+* 🔴 **Whether an unaligned access costs an exception on BARE METAL is
+  undecided.** `CPU-15` measured the four unaligned *instructions* executing at
+  the loader prompt; `CPU-75` measured an unaligned *address* costing 915 ns in
+  Linux user mode. Two states of one machine, neither refuting the other. The
+  deciding experiment is timing the same `lwu2` at the loader prompt, and it
+  needs a payload and a seating.
+* 🔴 **`R2c`'s mandatory silicon row decided nothing.** The plan calls it the
+  only cell that can kill the project silently; it has no discriminating power
+  between the three columns. What decided was a desk criterion applied to a
+  different artefact, taken for a different step, on a later date — and that
+  sequence is why § 8.3's *refuted if a new criterion has to be introduced to
+  break a tie* did not fire. It came nearer than a clean confirmation reads.
+* 🔴 **A cell the plan names is empty in all three toolchain columns**:
+  compressed rootfs size. `R7`'s budget wants it, and this table has no root
+  filesystem to compress.
+* 🔴 **`docs/rlx-isa.md` is not yet a document an outside reader can use.** It
+  compresses eight owner files and assumes its reader knows what rlxfw is. Every
+  claim in it is checkable from a clone — § 9 is that table, and one row of it
+  was a promise the page could not keep until the day the gate closed — but
+  *checkable* and *readable by someone who did not build it* are different
+  properties and only the first is established here.
+* ⚠️ **`R2c`'s 2-段 cap cannot be scored, and nothing in this repository counts
+  it.** Charged three defensible ways, the gate spent **1, 2, or 3–4 段** on it.
+  The stop-loss's prescribed remedy — drop the third toolchain and ship two
+  columns with the omission named — is **inapplicable**, because all three
+  columns are already on silicon. A fired stop-loss whose remedy is impossible
+  needs a decision, and this entry records that it did not get one.
+* ⚠️ **The population was not widened.** Six `r1b` hazard rows have no cell the
+  trap/no-trap vocabulary can fill, and the five unaligned forms have no census
+  row and cannot have one under `docs/isa-prior-art.md` § 0's admission rule.
+
+---
+
 ## The operating clause, re-run at eight entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
