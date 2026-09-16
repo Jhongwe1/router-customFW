@@ -959,6 +959,32 @@ vendor's**:
 construction — which is § 7's own caveat, and the reason this measurement was
 taken before the handover rather than after.
 
+🔴🔴 **2026-09-16: that `1 short` has a second explanation, and it is the size
+of a sampling skew this driver's own `/proc` cannot avoid.** 讀
+`drivers/clocksource/rtl819x-timer.c`: the `/proc` read snapshots
+`j = get_jiffies_64()` at line **2001**, inside the lock held from 1998 to 2042,
+and emits `irq_count=` at line **2147** by reading the global **live, 105 lines
+after the unlock** — with interrupts on. So one `read()` from userspace returns
+two counters taken at two instants, and a tick landing in that gap makes
+`Δirq_count` and `Δjiffies` differ by exactly one. **1 in 14,385 is that size.**
+
+⚠️ **This does not overturn the reading and does not claim that this particular
+1 was skew.** It says a mechanism sufficient to produce a ±1 was not considered,
+so *one lost tick* and *one sampling skew* were never separated here — and the
+two have different consequences. 🟢 **`IRQ-13`'s large finding is untouched**:
+574 of 585 during the NIC's initialisation is **11 short, 1.88 %**, which no ±1
+skew can produce.
+
+🔴 **The same pair failed 5 of 64 rungs on seating 24 in one direction**, which
+is what `R1-pub`'s `D-cost` `E5` required and did not get (`SPEC.md` `FW-75`),
+and it is what the operating clause fires on at nine entries: **two counters read
+at one instant, which neither `R5` nor `R1-pub` established.** ⚠️ And the skew as
+read does **not** explain five one-sided differences — the gap is symmetric in
+sign — so the mechanism is identified and not shown to be sufficient.
+🟢 Snapshotting `irq_count` inside `rtl819x_tc_lock` is three lines and settles
+the pairing; what it needs after that is the measurement that the five
+differences go away.
+
 Confirmed a second way by comparing the two interrupt lines directly,
 `K1-Q` → `K1-T`: the vendor's line 13 advanced **16,464**, this driver's line
 25 advanced **16,463**.
