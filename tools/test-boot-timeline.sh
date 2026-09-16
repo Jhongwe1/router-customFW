@@ -310,7 +310,28 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # time this assertion has, and the first time the run-every-suite rule was
 # available and skipped.  `CLAUDE.md` states that rule; the previous segment
 # followed it and caught the 35→36 move before its push.
-ck "thirty-seven cold, one hundred and sixty warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 37 cold, 160 warm, 0 unknown')"
+# 🔄 37/160 until 2026-09-16 (seating 24), which added ONE cold power-on
+# (`2026-09-16/C1-A`) and SEVEN warm resets -- `C1-P3j` and `X6-P3j2` are
+# `probe3`'s own watchdog bites, `X3-RB` and `X5-RB` are `busybox reboot -f`,
+# and `uc1-rz`, `uc1-att2-rz`, `uc1-att3-rz` are looprun's three `S4`
+# `J BFC00000`.  Isolation check, run before this line was touched: every
+# directory EXCEPT `2026-09-16` still reports 37 cold, 160 warm, and
+# `2026-09-16` alone reports 1 cold / 7 warm -- so the delta is exactly +1/+7
+# and nothing was reclassified.  🟢 The breakdown is also an independent audit
+# of that seating's own account of itself: one power cycle against a budget of
+# one, and seven warm resets, which is what its record says.
+# 🔴🔴 NOT caught at the desk, AGAIN, and this is the fourth and fifth time
+# this assertion has gone red on GitHub.  The comment directly above says the
+# previous segment ran "a hand-picked list of ten gates instead of every
+# suite"; this one ran a hand-picked list of NINE, pushed, went red, pushed a
+# repair without running the sweep either, and went red on the same assertion a
+# second time.  **`tools/desk-sweep.py` exists for exactly this** -- it reads
+# every `run:` step out of `ci.yml` rather than reconstructing a list -- and it
+# was not run.  量 2026-09-16 over the last 60 completed CI runs: 10 red
+# (17 %), and every one of the five distinct failing steps is a `.md` or
+# data-population check that runs at this desk in seconds.  The rule is not
+# "be more careful", it is "after a seating, run the sweep".
+ck "thirty-eight cold, one hundred and sixty-seven warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 38 cold, 167 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -408,8 +429,17 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # `S4`, which sends `J BFC00000` with `--esc-after 10`, so both ends of the
 # interval are in one capture and it qualifies.  Every other directory still
 # reports n=71.
-ck "entry population is seventy-two warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=72')"
+# 🔄 n=72 until 2026-09-16 (seating 24).  The three that qualify are
+# `2026-09-16/uc1-rz`, `uc1-att2-rz` and `uc1-att3-rz` -- looprun's `S4` on each
+# of the three boots, `J BFC00000` with `--esc-after 10`, so both ends of the
+# interval are in one capture.  The seating's four OTHER warm resets do not
+# qualify and that is the rule working: `C1-P3j` and `X6-P3j2` jump to `probe3`,
+# which prints 6.8 KB before biting, and `X3-RB`/`X5-RB` are `reboot -f` from a
+# shell -- none of them is a jump straight into a reset.  Isolation check: every
+# directory EXCEPT `2026-09-16` still reports n=72, and `2026-09-16` alone
+# reports n=3.
+ck "entry population is seventy-five warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=75')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
