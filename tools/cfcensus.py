@@ -164,7 +164,20 @@ GATE_SHAPE = re.compile(r'(?<![0-9A-Za-z-])([RPS]\d[0-9A-Za-z]*'
 # `🟢 **CLOSED <date>**` -- `TOOL-1`, `LOOP-1` and `REL-1`, the last of which
 # carries the artefact's URL in the same sentence.  量 over all 108 rows: the
 # `✅`-only rule sees 18 of the 21 rows that carry any closure spelling.
-CLOSURE = re.compile(r'✅|CLOSED|Closed|已關|關了')
+# 🔄 2026-09-16, `R1z-2`: `Answered` is a fifth spelling and it is the one
+# the `C-*` family uses.  量 over all 108 rows: four OPEN rows open their
+# QUESTION cell with `Answered` and carry no `✅` in the first cell -- `C-1`,
+# `C-2`, `C-3`, `C-7` -- and four of four are unambiguous closures
+# (`Answered, docs/loader-command-semantics.md §a: **it scans.**`).  Adding it
+# is strictly stricter: `L8` gains those four, and two of them demote out of
+# `L1` into *probably finished*.
+CLOSURE = re.compile(r'✅|CLOSED|Closed|已關|關了|Answered')
+
+# Struck-through text is RETRACTED.  Declared once, because `resolve` honoured
+# it and `hints`, the segment test and the none test all read the raw cell --
+# 量 2026-09-16, adversarially: striking out a `✅` in an owner cell left all
+# 85 findings identical, so a withdrawn closure still closed.
+STRUCK = re.compile(r'~~.*?~~')
 
 # 🔴 THE CHARACTER AND THE WORD ARE NOT THE SAME EVIDENCE, AND THE FILE SAYS SO.
 # 量 2026-09-16 over every OPEN row: a `✅` deep in a QUESTION cell marks a
@@ -178,10 +191,105 @@ CLOSURE = re.compile(r'✅|CLOSED|Closed|已關|關了')
 # chosen -- which is the whole difference from the `✅`-only rule this replaces.
 CLOSURE_WORD = re.compile(r'CLOSED|Closed')
 
-# The owning-gate cell forms that are NOT a gate and say so.
-NONE_WORDS = ('none', '無', "the owner's decision", '擁有者', 'closed')
+# 🔴 A NO-OWNER DECLARATION AT THE CELL'S HEAD BEATS A GATE ID ANYWHERE IN IT.
+# 量 2026-09-16: ten owner cells begin `**none…` after decoration and ten of
+# ten are genuine declarations -- and FIVE of them were being classified by a
+# gate id scraped out of the same cell's PROSE.  `REL-0`, the row that states
+# this census's own thesis in its own words (*§110's obligations still appear
+# on no gate*), was `LIVE` because the clause "the part of `P4b` that blocks
+# tagging" names a gate that has not started; `CI-1` was `DEAD` because
+# "(`C7`/`Q1`/`R14`)" names a `replay-capture` test case.  One head rule, two
+# opposite wrong answers.
+#
+# 🔴 `擁有者` IS DELIBERATELY NOT IN THIS SET AND THAT EXCLUSION IS THE POINT.
+# Four cells begin with it and in all four it introduces a REAL owner --
+# `XNUM-1` (`擁有者 `R5-11` → `R1-pub-7``), `FLW-1`, `POS-1`, `REL-3`'s closed
+# row.  Including it would reclassify `XNUM-1`, which is the one row `R1z`
+# exists to finish.  The old `NONE_WORDS` carried it, and `('none', '無',
+# "the owner's decision", '擁有者', 'closed')` was measured DEAD CODE: setting
+# it to `()` changed nothing, because the branch that read it was preceded by
+# an identical unconditional return.
+NONE_HEAD_WORDS = ('none',)
+NONE_HEAD = re.compile(r'^\s*\*{0,2}\s*(?:%s)\b'
+                       % '|'.join(NONE_HEAD_WORDS), re.I)
+
 SEGMENT_WORDS = ('任何一段', 'any desk segment', 'any segment', '的桌面段',
                  'the seating that', '下一次上機', '下一張卡片')
+
+# 🔴 A STANDING-INSTRUCTION OWNER IS ONE OF THE CELL'S CLAUSES, NOT A SUBSTRING
+# OF IT.  量 2026-09-16: eleven rows hold a `SEGMENT_WORD` somewhere.  Splitting
+# the owner cell on its disjunction separators and testing each CLAUSE's head
+# gives eight -- the three rows already classified `SEGMENT` (so the rule
+# reproduces them rather than replacing them) and five more that named a gate
+# first and were called orphans because `owner_kind` tested `if resolved:`
+# before it tested this.  The three rows where the phrase is prose are
+# correctly missed: `GPIO-1` (offset 76 of a 669-character cell, mid-sentence),
+# `CAPD-1` (`` `R5-6`（下一張卡片） ``, a parenthetical gloss and not a
+# disjunct) and `UP-AUD-1` (inside `~~ ~~`, and not at a clause head even after
+# stripping -- two independent reasons).
+#
+# 🔴 Testing `SEGMENT` first would mislabel the two prose rows, which is why
+# the fix is not a reordering.  量 with both commas: the separator is ASCII `,`
+# on three rows and fullwidth `，` on one, so a pattern anchored on one of them
+# matches three of four.
+CLAUSE_SEP = re.compile(r'[;；]|，或|,或|,\s*或|\s+or\s+|／|、')
+DECOR = re.compile(r'^[\s*`🔴🟢🆕🔄⚠️✅⊘>|（(]+')
+
+
+def clause_head_is_segment(cell):
+    """True when a `SEGMENT_WORD` heads one of the owner cell's clauses."""
+    for c in CLAUSE_SEP.split(STRUCK.sub('', cell)):
+        h = DECOR.sub('', c.strip())
+        for w in SEGMENT_WORDS:
+            if h.startswith(w) or h.lower().startswith(w.lower()):
+                return True
+    return False
+
+
+# 🔴 TEN OF THE ELEVEN `L2` ROWS NAME WORK THAT HAS A HOME UNDER ANOTHER NAME,
+# and `L2`'s sentence -- *no gate by that name exists* -- is true of the string
+# and misleading about the state.  Each entry carries a COMMITTED source,
+# because a mapping justified only by a gitignored plan is the defect the
+# commit before this gate's last one was named for.  `U27` requires every
+# target to be a real board gate or step, and `U28` requires an entry to die
+# when its source id becomes resolvable on its own.
+GATE_RENAME = {
+    'R2a': ('R2a/b/d',
+            'the board row and the `## `R2a/b/d`\'s step list` header; that '
+            'gate\'s own cell reads "Split out of `R2`"'),
+    'R2c': ('R1-pub',
+            '`GATE_ALIAS`\'s own comment in this file: folded into `R1-pub` '
+            'on 2026-09-11 and never given a row of its own'),
+    'R1a': ('R1-pub',
+            '`PROGRESS.md` § `R1-pub`\'s step list -- `R1-pub-1`\'s cell is '
+            'literally "**`R1a`\'s payload**"'),
+    'R1b': ('R1-pub',
+            'the same step list -- `R1-pub-0` reads "Every `R1a` instruction '
+            'row and every `R1b` hazard row"'),
+    'R5-3': ('R5-3a',
+             '`PROGRESS.md` § Session ladder: "`R5-3` 正式拆成 `R5-3a` … 與 '
+             '`R5-3b` …", and both are live step ids'),
+}
+
+# 🔴 `GATE_SHAPE` IS DELIBERATELY BROAD, SO SOME OF WHAT IT MATCHES IS NOT A
+# GATE.  量 2026-09-16: four rows carried six such tokens and every one was
+# dropped in SILENCE, because `owner_kind` returned `DEAD` only when nothing
+# else in the cell resolved -- against this file's own header comment, which
+# says an unresolved candidate *is a REPORTED finding and never a silent drop*.
+# A token that equals a row id of this same table is filtered MECHANICALLY and
+# needs no entry here (`P4A-1`, in `IMG-1`).  The rest are declared, with the
+# source that says what they are, and `L14` is the rot control.
+# 🔴 `R5b` is deliberately NOT here: it is a plan-level gate for the MTD driver
+# that never reached the gate board, and whether it now means `R5` or is simply
+# stale is a decision this tool does not get to make.  It is REPORTED.
+NON_GATE = {
+    'S2': '`looprun` stage id -- `bench/2026-09-03/CORRECTIONS-block8.md` '
+          'records `SEAM-1` running `--skip S2,S3`',
+    'S3': 'the same',
+    'S4': 'the same `looprun` stage family',
+    'R14': "a `replay-capture` test-case id -- `PROGRESS.md`'s own row says "
+           '"`replay-capture`\'s `R14` reads this table"',
+}
 
 # 🔴 Declared exemptions from `L8`, by row id, each with the reason it is not
 # a defect.  This is `spec-check`'s `C8C_EXEMPT` / `C10_EXEMPT` idiom and it
@@ -233,6 +341,16 @@ CASE_WHAT = {
     'L8x': 'a named exemption suppresses exactly that row',
     'L9+': 'an exemption naming a row that no longer exists is reported',
     'L9c': 'an exemption that no longer fires is reported, so it cannot rot',
+    'L11+': 'a closure written in § Corrections and not in the row',
+    'L11-': 'a bare MENTION in § Corrections is not read as a closure',
+    'L12+': 'a standing-instruction owner beside a closed gate is reported',
+    'L13+': 'a superseded gate name is reported, and resolves',
+    'L14+': 'a declared non-gate that becomes a real gate is reported',
+    'U27': 'every `GATE_RENAME` target is a real board gate or step id',
+    'U28': 'the head rule fires on `none` and NOT on `擁有者`',
+    'U29': 'a SEGMENT phrase in PROSE is not read as an owner',
+    'U30': 'a struck-through closure does not close',
+    'U31': 'every kind is rendered, including the ones sitting at zero',
     'L10+': 'two rows sharing an id are reported',
     'L10-': 'a table of distinct ids reports no duplicate',
     'U12=': 'the ratchet passes at its own baseline',
@@ -637,7 +755,8 @@ def population(text=None):
     steps, marked, owner = step_state(text)
     return {'rows': rows, 'raw': raw, 'skipped': skipped, 'board': board,
             'header': hdr, 'steps': steps, 'marked': marked,
-            'step_owner': owner, 'text': text}
+            'step_owner': owner, 'text': text,
+            'rowids': frozenset(r['id'] for r in rows)}
 
 
 # --------------------------------------------------------------------------
@@ -668,11 +787,21 @@ def gate_of_step(sid, board, owner=None):
     return best
 
 
-def resolve(owner_cell, board, hdr, steps, sowner=None):
+def _shut(name, board, steps, sowner):
+    """Is this board gate or step id closed?  (None if it is neither.)"""
+    if name in board:
+        return board[name] == 'CLOSED'
+    if name in steps:
+        g = gate_of_step(name, board, sowner)
+        return steps[name] or (g is not None and board[g] == 'CLOSED')
+    return None
+
+
+def resolve(owner_cell, board, hdr, steps, sowner=None, rowids=()):
     """(resolved, unresolved) -- gate ids in the cell, split by whether the
     populations know them.  Strikethrough ids are dropped: `~~R3~~ → R1h` is a
     handover, and the struck half is history, not an owner."""
-    cell = re.sub(r'~~.*?~~', '', owner_cell)
+    cell = STRUCK.sub('', owner_cell)
     seen, resolved, unresolved = set(), [], []
     for m in GATE_SHAPE.finditer(cell):
         tok = m.group(1)
@@ -687,15 +816,38 @@ def resolve(owner_cell, board, hdr, steps, sowner=None):
             g = gate_of_step(tok, board, sowner)
             shut = steps[tok] or (g is not None and board[g] == 'CLOSED')
             resolved.append((tok, shut, 'step'))
+        elif tok in GATE_RENAME:
+            new = GATE_RENAME[tok][0]
+            s = _shut(new, board, steps, sowner)
+            if s is None:
+                unresolved.append(tok)
+            else:
+                resolved.append((tok, s, 'renamed:' + new))
+        elif tok in NON_GATE or tok in rowids:
+            continue                     # declared, or a row id of this table
         else:
             unresolved.append(tok)
     return resolved, unresolved
 
 
-def owner_kind(row, board, hdr, steps, sowner=None):
-    """One of LIVE / ORPHAN / ORPHAN? / DEAD / SEGMENT / NONE, with evidence."""
+def owner_kind(row, board, hdr, steps, sowner=None, rowids=()):
+    """One of LIVE / ORPHAN / ORPHAN? / DEAD / SEGMENT / NONE, with evidence.
+
+    🔴 THE ORDER IS THE FIX.  A declaration that this row has no owner, and a
+    standing instruction naming who will do it, are both statements the cell
+    makes ABOUT ITS OWN OWNERSHIP; a gate id can be a mention.  So the two
+    structural reads come first and the scrape comes last.  `resolve` is still
+    run for every row, so a `NONE` or `SEGMENT` row's tokens stay visible to
+    `L2` and `L12` rather than being thrown away with the classification.
+    """
     cell = row['owner_cell']
-    resolved, unresolved = resolve(cell, board, hdr, steps, sowner)
+    resolved, unresolved = resolve(cell, board, hdr, steps, sowner, rowids)
+    plain = STRUCK.sub('', cell)
+    if NONE_HEAD.match(plain):
+        return 'NONE', '', resolved, unresolved
+    if clause_head_is_segment(cell):
+        return ('SEGMENT', ';'.join(t for (t, s, _) in resolved if s),
+                resolved, unresolved)
     low = cell.lower()
     if resolved:
         live = [t for (t, shut, _) in resolved if not shut]
@@ -712,12 +864,8 @@ def owner_kind(row, board, hdr, steps, sowner=None):
                 and {'owner', 'question-head'} & set(hints(row))):
             return 'ORPHAN?', shut, resolved, unresolved
         return 'ORPHAN', shut, resolved, unresolved
-    if any(w in cell or w in low for w in SEGMENT_WORDS):
-        return 'SEGMENT', '', resolved, unresolved
     if unresolved:
         return 'DEAD', ';'.join(unresolved), resolved, unresolved
-    if any(w in low for w in NONE_WORDS) or '無' in cell:
-        return 'NONE', '', resolved, unresolved
     return 'NONE', '', resolved, unresolved
 
 
@@ -735,10 +883,18 @@ def hints(row):
     (`CAPD-1`, `OPS-1`, `CITE-2`, `UP-AUD-1`, `CI-5`).  **Offset 1 or not**
     is the rule; a character window would be a parameter fitted to ten points.
     """
+    # 🔴 THE STRUCK TEXT IS DROPPED HERE TOO.  量 2026-09-16, adversarially:
+    # `resolve` honoured `~~ ~~` and this function did not, so rewriting one
+    # owner cell's `**✅ 關了 …**` to `**~~✅~~ 關了 …**` left all 85 findings
+    # identical -- a RETRACTED closure still closed.  The live file uses the
+    # convention (`TC-g`'s owner is ``~~`R3`~~ ✅``), so the fix is a control
+    # rather than a behaviour change here, and the pre-flight that says so is
+    # in the commit message rather than in a comment that could go stale.
     out = []
-    if CLOSURE.search(row['owner_cell']):
+    owner = STRUCK.sub('', row['owner_cell'])
+    if CLOSURE.search(owner):
         out.append('owner')
-    q = row['question'].lstrip()
+    q = STRUCK.sub('', row['question']).lstrip()
     if q.startswith('✅') or CLOSURE.match(q) or CLOSURE_WORD.search(q):
         out.append('question-head')
     elif CLOSURE.search(q):
@@ -752,12 +908,15 @@ def census(pop=None):
     out = []
     for r in pop['rows']:
         kind, ev, resolved, unresolved = owner_kind(
-            r, board, hdr, steps, pop['step_owner'])
+            r, board, hdr, steps, pop['step_owner'], pop.get('rowids', ()))
         d = dict(r)
         d['hints'] = hints(r)
         d['kind'] = kind
         d['owner_ev'] = ev
         d['unresolved'] = unresolved
+        d['renamed'] = [(t, s.split(':', 1)[1])
+                        for (t, _sh, s) in resolved if s.startswith('renamed')]
+        d['shut_named'] = [t for (t, sh, _s) in resolved if sh]
         d['l8'] = (r['state'] == 'OPEN'
                    and bool({'owner', 'question-head'} & set(d['hints'])))
         out.append(d)
@@ -767,6 +926,27 @@ def census(pop=None):
 # --------------------------------------------------------------------------
 # the checks
 # --------------------------------------------------------------------------
+
+CORR_CLOSE = re.compile(r'closes|closed|關了|已關|收了')
+
+
+def corrections_closure(text, rowid):
+    """The § Corrections date cell that records a closure of this row id.
+
+    The test is the id followed WITHIN 60 CHARACTERS by a closure verb, inside
+    a § Corrections table row.  A bare mention is not a closure: five other row
+    ids are named in that section for other reasons.
+    """
+    pat = re.compile(r'`%s`' % re.escape(rowid))
+    for ln in section(text, '## Corrections'):
+        if not ln.lstrip().startswith('|'):
+            continue
+        for m in pat.finditer(ln):
+            if CORR_CLOSE.search(ln[m.end():m.end() + 60]):
+                cells = PIPE_SPLIT.split(ln)
+                return cells[1].strip() if len(cells) > 1 else '§ Corrections'
+    return ''
+
 
 def check(pop=None, exempt=None):
     """Findings.  Empty is clean.  `exempt=False` turns `L8`'s list off."""
@@ -783,11 +963,25 @@ def check(pop=None, exempt=None):
         if r['kind'] == 'ORPHAN':
             f.append('L1 %s: open, and every owner it names is a CLOSED gate '
                      '(%s) -- nobody will do it' % (r['id'], r['owner_ev']))
-        elif r['kind'] == 'DEAD':
+        # 🔴 `L2` NO LONGER DEPENDS ON THE KIND.  It used to fire only when a
+        # row resolved NOTHING, so six unresolved tokens on four rows were
+        # dropped in silence -- against `GATE_SHAPE`'s own header comment.
+        if r['unresolved']:
             f.append('L2 %s: names %s as its owner and no gate by that name '
                      'exists on the board or in a step list'
-                     % (r['id'], r['owner_ev']))
-        elif r['kind'] == 'NONE':
+                     % (r['id'], ';'.join(r['unresolved'])))
+        if r['renamed']:
+            f.append('L13 %s: names %s, a gate this file no longer uses that '
+                     'name for (%s) -- the work has a home and the row points '
+                     'at the old sign'
+                     % (r['id'],
+                        ';'.join(t for t, _ in r['renamed']),
+                        ';'.join('%s→%s' % x for x in r['renamed'])))
+        if r['kind'] == 'SEGMENT' and r['shut_named']:
+            f.append('L12 %s: a standing-instruction owner beside a CLOSED '
+                     'gate (%s) -- somebody may do it, and the gate the row '
+                     'names will not' % (r['id'], r['owner_ev']))
+        if r['kind'] == 'NONE':
             f.append('L3 %s: open and names no owning gate -- the table\'s '
                      'own rule calls that a bug in the table'
                      % (r['id'],))
@@ -859,6 +1053,33 @@ def check(pop=None, exempt=None):
                      'inside a step-list section is being read as a step'
                      % (sid,))
 
+    # ---- L11: a closure the table records SOMEWHERE ELSE IN THIS FILE ---
+    # 🔴 § Carried forward is the owner of each debt's state, and `C-16`'s
+    # closure is written in § Corrections instead -- ``🔴 **`C-16` closes, and
+    # the refutation recorded against it was the part that was wrong.**`` --
+    # while `C-16`'s own row scans zero for every closure spelling this tool
+    # knows.  `L8` reports a closure in the wrong CELL; this reports one in the
+    # wrong SECTION, and neither can be found by reading the row.
+    for r in rows:
+        if r['state'] != 'OPEN':
+            continue
+        where = corrections_closure(pop['text'], r['id'])
+        if where:
+            f.append('L11 %s: its first cell is open and § Corrections records '
+                     'a closure for it (%s) -- the table that owns this row\'s '
+                     'state is not the one that says it is finished'
+                     % (r['id'], where))
+
+    # ---- L14: a declared non-gate may not become a gate ------------------
+    for tok in sorted(NON_GATE):
+        if tok in board or tok in hdr:
+            f.append('L14 %s is declared a non-gate token and is now a real '
+                     'gate -- the declaration outlived its reason' % tok)
+    for tok, (tgt, _why) in sorted(GATE_RENAME.items()):
+        if tok in board or tok in hdr:
+            f.append('L14 %s is declared a superseded name and is on the '
+                     'board again -- the rename outlived its reason' % tok)
+
     # ---- L9: the exemption list may not rot -----------------------------
     # 🔴 ANY row with the id, not the first.  量 2026-09-16: `REL-3` occupies
     # two rows -- one CLOSED, one OPEN -- and a `hit[0]` lookup read the
@@ -928,9 +1149,16 @@ def render_counts(rows, pop):
         'CLOSED': 'first cell says ✅',
         'DECLINED': 'first cell says ⊘',
     }
+    # 🔴 EVERY KIND IS PRINTED, INCLUDING AT ZERO.  量 2026-09-16, one
+    # minute after `R1z-2`'s rename map took `DEAD` from 11 to 0: the `DEAD`
+    # row VANISHED from this block.  *Zero rows name a gate that exists
+    # nowhere* is a result and this table stopped saying it -- which is this
+    # repository's own rule, that a tool reporting `0` is making a claim,
+    # broken by the renderer of the tool that reports it.  `DECLINED` is the
+    # same and matters more: `R1z` writes the first `⊘` into this table, and
+    # until it does, *none yet* is the reading.
     for key in order:
-        if key in k:
-            out.append('| %s | %d | %s |' % (key, k[key], mean[key]))
+        out.append('| %s | %d | %s |' % (key, k.get(key, 0), mean[key]))
     out.append('| **total** | **%d** | rows parsed, reconciled against %d raw '
                'table lines minus %d header lines |'
                % (len(rows), pop['raw'], pop['skipped']))
@@ -1020,7 +1248,8 @@ def report_check():
 # That is this repository's own recorded trap -- a pair of wrong numbers is
 # self-consistent as long as the difference is right -- reproduced inside the
 # instrument written to prevent it.
-BASELINE = {'L1': 42, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 19, 'L10': 2}
+BASELINE = {'L1': 43, 'L2': 1, 'L3': 14, 'L6': 4, 'L8': 23, 'L10': 2,
+            'L11': 2, 'L12': 4, 'L13': 11}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
 # directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
@@ -1029,8 +1258,9 @@ BASELINE = {'L1': 42, 'L2': 11, 'L3': 9, 'L6': 4, 'L8': 19, 'L10': 2}
 # moves the digest and not the count.  `U14b` is the control, and this is the
 # third layer of one lesson this file already carries twice: a scalar total,
 # then a per-check count, now a per-check identity.
-BASELINE_SIG = {'L1': 'b0e76a66', 'L10': 'c56612d3', 'L2': '21f32778',
-                'L3': '7f50eda0', 'L6': 'b86a38d5', 'L8': 'e9fe5859'}
+BASELINE_SIG = {'L1': 'bfe3863f', 'L10': 'c56612d3', 'L11': '7c9e8e5a',
+                'L12': '84a6187d', 'L13': 'd8ad2d44', 'L2': '10ef882f',
+                'L3': '757eabf3', 'L6': 'b86a38d5', 'L8': '97ae0a23'}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`
@@ -1147,7 +1377,8 @@ def report_write():
 # the controls
 # --------------------------------------------------------------------------
 
-def _fixture(rows_md=None, board_md=None, hdr=None, steps_md=None):
+def _fixture(rows_md=None, board_md=None, hdr=None, steps_md=None,
+             corr_md=None):
     """A minimal PROGRESS.md with the four structures this tool reads."""
     rows_md = rows_md if rows_md is not None else [
         '| `A-1` 🆕 | ask one | `R6` |',
@@ -1166,7 +1397,8 @@ def _fixture(rows_md=None, board_md=None, hdr=None, steps_md=None):
         + ['## Gate board', '', '| Gate | What | Est. | Actual | Status | Ev |',
            '|---|---|---:|---:|:---:|---|'] + board_md + ['']
         + ['## Carried forward', '', '| # | Question | Owning gate |',
-           '|---|---|---|'] + rows_md + ['', '## Corrections', ''])
+           '|---|---|---|'] + rows_md + ['', '## Corrections', '']
+        + (['| date | what |', '|---|---|'] + corr_md if corr_md else []))
 
 
 def self_test():
@@ -1202,7 +1434,8 @@ def self_test():
 
     # ---- U0: the committed file is clean, or the run says which check ----
     try:
-        live_f = check()
+        live_pop = population()
+        live_f = check(live_pop)
         case('U0', True)
     except Refused as e:
         print('REFUSING -- the live file could not be read: %s' % e)
@@ -1370,6 +1603,100 @@ def self_test():
          'a non-step row inside a step list was not reported as a phantom')
     case('L7-', not any(x.startswith('L7') for x in findings(_fixture())),
          'a clean step list reported a phantom')
+
+    # ---- U27..U30 and L11..L14: the five classification fixes ----------
+    # 🔴 `U27` is `U10`'s obligation on the new map: a rename that points at a
+    # gate this file does not have is a rename that renames nothing.
+    bad27 = [(k, v[0]) for k, v in GATE_RENAME.items()
+             if _shut(v[0], live_pop['board'], live_pop['steps'],
+                      live_pop['step_owner']) is None]
+    case('U27', not bad27,
+         'a `GATE_RENAME` target is neither a board gate nor a step id: %r'
+         % (bad27,))
+
+    # 🔴 `U28` is the head rule in BOTH directions, and the second half is the
+    # one that matters: `擁有者` heads four cells and introduces a real owner
+    # in all four, so a head set containing it would reclassify `XNUM-1`.
+    yes28 = _fixture(rows_md=['| `A-1` 🆕 | q | **none — but `R6` blocks '
+                              'tagging** |'])
+    no28 = _fixture(rows_md=['| `A-1` 🆕 | q | 擁有者 `R6` → `R5`, 2026-01-01 |'])
+    ky = census(population(yes28))[0]['kind']
+    kn = census(population(no28))[0]['kind']
+    case('U28', ky == 'NONE' and kn == 'LIVE',
+         'head `none` gave %r (want NONE) and head `擁有者` gave %r (want '
+         'LIVE)' % (ky, kn))
+
+    # 🔴 `U29` is the discriminator the naive fix would have got wrong: the
+    # same words, once as a clause and once as prose.
+    yes29 = _fixture(rows_md=['| `A-1` 🆕 | q | `R5`，或任何一段動 `x` 的桌面段 |'])
+    no29 = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` bench, and the seating '
+                             'that could have read it did not |'])
+    k29a = census(population(yes29))[0]['kind']
+    k29b = census(population(no29))[0]['kind']
+    case('U29', k29a == 'SEGMENT' and k29b == 'ORPHAN',
+         'a clause-head phrase gave %r (want SEGMENT) and the same words in '
+         'prose gave %r (want ORPHAN)' % (k29a, k29b))
+
+    # 🔴 `U30`: a retracted closure must not close.
+    t30 = _fixture(rows_md=['| `A-1` 🆕 | q | **~~✅ 關了~~ 還沒** `R5` |'])
+    t30b = _fixture(rows_md=['| `A-1` 🆕 | q | **✅ 關了** `R5` |'])
+    h30 = census(population(t30))[0]['hints']
+    h30b = census(population(t30b))[0]['hints']
+    case('U30', 'owner' not in h30 and 'owner' in h30b,
+         'struck gave hints %r and unstruck gave %r' % (h30, h30b))
+
+    # 🔴 `L13+`: the renamed token RESOLVES (so the row is not `DEAD`) and is
+    # REPORTED (so the rename is not a way of going quiet).
+    t13 = _fixture(rows_md=['| `A-1` 🆕 | q | `R2a` |'],
+                   board_md=['| **R2a/b/d** | renamed | 1 | 1 | **`✓`** | e |',
+                             '| **R6** | open thing | 1 | — | `·` | |'])
+    f13 = findings(t13, exempt={})
+    case('L13+',
+         any(x.startswith('L13 A-1') for x in f13)
+         and not any(x.startswith('L2 A-1') for x in f13)
+         and any(x.startswith('L1 A-1') for x in f13),
+         'a superseded name gave %r' % (f13,))
+
+    # 🔴 `L12+`: a standing-instruction owner beside a CLOSED gate.
+    f12 = findings(yes29, exempt={})
+    case('L12+', any(x.startswith('L12 A-1') for x in f12)
+         and not any(x.startswith('L1 A-1') for x in f12),
+         'a segment row beside a closed gate gave %r' % (f12,))
+
+    # 🔴 `L11±`: a closure written in § Corrections, and a bare MENTION which
+    # is not one.  Five other row ids are named in that section for reasons
+    # that are not closures, so the negative half is the load-bearing one.
+    t11 = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'],
+                   corr_md=['| 2026-01-01 | `A-1` closes, and here is why |'])
+    t11n = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'],
+                    corr_md=['| 2026-01-01 | `A-1` is the row this changes '
+                             'the reasoning of, and it stays open |'])
+    case('L11+', any(x.startswith('L11 A-1')
+                     for x in findings(t11, exempt={})),
+         'a § Corrections closure was not reported')
+    case('L11-', not any(x.startswith('L11 A-1')
+                         for x in findings(t11n, exempt={})),
+         'a bare mention in § Corrections was read as a closure')
+
+    # 🔴 `L14+`: a declared non-gate that becomes a real gate.
+    t14 = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'],
+                   board_md=['| **R5** | closed | 1 | 1 | **`✓`** | e |',
+                             '| **S2** | a real gate now | 1 | — | `·` | |',
+                             '| **R6** | open thing | 1 | — | `·` | |'])
+    case('L14+', any(x.startswith('L14 S2') for x in findings(t14, exempt={})),
+         'a declared non-gate token that is now a board gate was not reported')
+
+    # 🔴 `U31`: the first control this tool has ever had over its RENDERED
+    # output.  The adversarial pass's words: *nothing asserts `render_debt` /
+    # `render_counts` at all, so the generated `PROGRESS.md` block has no
+    # control of any kind*.
+    t31 = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'])
+    r31 = render_counts(census(population(t31)), population(t31))
+    miss31 = [x for x in ('LIVE', 'SEGMENT', 'ORPHAN', 'ORPHAN?', 'DEAD',
+                          'NONE', 'CLOSED', 'DECLINED')
+              if ('| %s |' % x) not in r31]
+    case('U31', not miss31 and '| DEAD | 0 |' in r31,
+         'kinds missing from the rendered block: %r' % (miss31,))
 
     # ---- U14: THE SENTENCE, NOT THE PREFIX -----------------------------
     # 🔴 Every `L<n>±` control above asserts `startswith('L<n> <id>')` and

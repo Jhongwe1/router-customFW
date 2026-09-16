@@ -2094,15 +2094,16 @@ owned by a live gate, or the census refuses to report at all.
 <!-- cfcensus:counts begin -->
 | what | n | meaning |
 |---|---:|---|
-| LIVE | 12 | open, and a gate that is still open owns it |
-| SEGMENT | 3 | open, deferred to *any segment that touches X* — unscheduled, not orphaned |
-| ORPHAN | 42 | 🔴 open, and every gate it names is CLOSED — **nobody will do it** |
-| ORPHAN? | 14 | open by its first cell, owner closed, and a ✅ sits in the owning-gate cell or opens the question — probably an `L8` row that is finished and never marked |
-| DEAD | 11 | 🔴 names a gate that exists nowhere in this file |
-| NONE | 9 | open and names no gate at all |
+| LIVE | 11 | open, and a gate that is still open owns it |
+| SEGMENT | 7 | open, deferred to *any segment that touches X* — unscheduled, not orphaned |
+| ORPHAN | 43 | 🔴 open, and every gate it names is CLOSED — **nobody will do it** |
+| ORPHAN? | 16 | open by its first cell, owner closed, and a ✅ sits in the owning-gate cell or opens the question — probably an `L8` row that is finished and never marked |
+| DEAD | 0 | 🔴 names a gate that exists nowhere in this file |
+| NONE | 14 | open and names no gate at all |
 | CLOSED | 17 | first cell says ✅ |
+| DECLINED | 0 | first cell says ⊘ |
 | **total** | **108** | rows parsed, reconciled against 110 raw table lines minus 2 header lines |
-| `L8` | 22 | closure recorded somewhere this table does not declare — the owning-gate cell, or the head of the question; 3 exempted by name |
+| `L8` | 26 | closure recorded somewhere this table does not declare — the owning-gate cell, or the head of the question; 3 exempted by name |
 <!-- cfcensus:counts end -->
 
 ### The rows with no live owner
@@ -2110,18 +2111,18 @@ owned by a live gate, or the census refuses to report at all.
 Every open row whose owner is not a gate that is still open. `ORPHAN` is the
 population `R1z` exists for; `ORPHAN?` is a row that is probably finished and
 was never marked, and the two are counted apart because folding them would
-inflate the debt by twelve.
+inflate the debt by sixteen.
 
 <!-- cfcensus:debt begin -->
 | # | kind | owner named |
 |---|---|---|
 | `UP-AUD-1` | ORPHAN | R1-pub-7 |
-| `TCPAY-1` | ORPHAN | R1-pub-6 |
-| `CENS-1` | ORPHAN | R1-pub-7 |
+| `TCPAY-1` | SEGMENT | R1-pub-6 |
+| `CENS-1` | SEGMENT | R1-pub-7 |
 | `CORR-1` | SEGMENT | — |
 | `BRD-2` | SEGMENT | — |
-| `TC-q` | ORPHAN | R1-pub |
-| `C12-1` | ORPHAN | R1-pub-7 |
+| `TC-q` | ORPHAN | R1-pub;R2c |
+| `C12-1` | SEGMENT | R1-pub-7 |
 | `ISA-1` | ORPHAN | R1-pub-0b |
 | `LEDGER-4` | ORPHAN | R5-9 |
 | `RUN-1` | ORPHAN | R1-pub-7 |
@@ -2151,14 +2152,15 @@ inflate the debt by twelve.
 | `TOOL-1` | ORPHAN? | R4-3 |
 | `RECIPE-1` | ORPHAN? | R5 |
 | `LOOP-4` | ORPHAN? | R5 |
-| `TMR-2` | DEAD | R5-3 |
+| `TMR-2` | ORPHAN | R5-3 |
 | `CARD-1` | ORPHAN | R4-3 |
 | `ESC-1` | ORPHAN? | R4-3 |
-| `REL-1` | ORPHAN? | R3-11 |
-| `REL-2` | ORPHAN | P4b-gate |
-| `REL-3` | ORPHAN | R3;P4b-gate;R2a/b/d;R1h;P4a;P4b-2;S0;R0 |
+| `REL-0` | NONE | — |
+| `REL-1` | NONE | — |
+| `REL-2` | NONE | — |
+| `REL-3` | NONE | — |
 | `NAME-1` | NONE | — |
-| `CI-1` | DEAD | R14 |
+| `CI-1` | NONE | — |
 | `CI-2` | NONE | — |
 | `CNT-1` | NONE | — |
 | `GR-1` | NONE | — |
@@ -2168,29 +2170,29 @@ inflate the debt by twelve.
 | `PRED-1` | NONE | — |
 | `TC-i` | ORPHAN | R3-7 |
 | `TC-n` | ORPHAN | R5 |
-| `TC-e` | DEAD | R2a |
-| `TC-f` | DEAD | R2a |
+| `TC-e` | ORPHAN | R2a |
+| `TC-f` | ORPHAN | R2a |
 | `TC-g` | NONE | — |
-| `TC-h` | DEAD | R1a |
-| `TC-a` | DEAD | R1a |
-| `TC-b` | DEAD | R2a |
-| `TC-c` | DEAD | R2a |
+| `TC-h` | ORPHAN | R1a |
+| `TC-a` | ORPHAN | R1a |
+| `TC-b` | ORPHAN | R2a |
+| `TC-c` | ORPHAN? | R2a |
 | `TC-d` | ORPHAN | R3 |
-| `C-2` | ORPHAN | R4 |
+| `C-2` | ORPHAN? | R4 |
 | `C-5` | NONE | — |
 | `C-6` | ORPHAN | R1h |
-| `C-7` | DEAD | R1a;R2a |
+| `C-7` | ORPHAN? | R1a;R2a |
 | `C-8` | ORPHAN? | R4 |
-| `C-9` | DEAD | R1b |
+| `C-9` | ORPHAN | R1b |
 | `C-10` | ORPHAN? | S0 |
-| `C-12` | DEAD | R1a |
+| `C-12` | ORPHAN | R1a |
 | `C-14` | ORPHAN? | R4 |
 | `LOOP-4b` | ORPHAN | R4;R5 |
 | `R1C-1` | ORPHAN | R1-pub-4 |
 | `C-16` | ORPHAN | R0 |
 | `C-17` | ORPHAN? | R4 |
 | `C-19` | ORPHAN | R4 |
-| `REGIMM-1` | ORPHAN | R1-pub-4 |
+| `REGIMM-1` | SEGMENT | R1-pub-4 |
 | `VDR-1` | ORPHAN | R1-pub-4 |
 | `CITE-2` | ORPHAN | R1-pub-7 |
 | `OPS-1` | ORPHAN | R1-pub-7 |
