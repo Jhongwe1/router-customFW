@@ -36,7 +36,7 @@ the reason `cfcensus` exists and it is the rule this file keeps.
 
 ---
 
-## 2. Six rules, each from a measurement
+## 2. Seven rules, each from a measurement
 
 **R1. A population comes from an instrument, not from a list.** A hand list
 cannot notice a row added after the list was written. 量 2026-09-16:
@@ -85,6 +85,16 @@ to `錨點`. **The danger of a quoted anchor is not that it fails to match — a
 failure is cheap — it is that a slightly different one matches the wrong
 place.** Address a row by its label; a label is derived from the table and
 there is nothing to mistype.
+
+**R7. A mechanical repair checks the SHAPE of what it repairs, not only that it is unique.** 量 2026-09-17 (eighty-fourth segment): opening `R6` inserted **118 lines** into `PROGRESS.md`, and `citecheck` reported **six** committed citations rotted across **three** files — that is the measured cost of a line citation, and it is not small. The repair script applied exactly what the tool reported and asserted each old citation occurred **once on its own line**. 🔴 **It did not ask whether the citation was a single line or a RANGE.** one row held a **range**, and only its start moved — giving a citation that counts backwards:
+
+```
+before   SPEC.md:803  ->  PROGRESS.md:462-465
+after    SPEC.md:803  ->  PROGRESS.md:580-465      <- counts backwards
+correct  SPEC.md:803  ->  PROGRESS.md:580-583      <- both ends +118
+```
+
+🔴 **The examples above are FENCED, and that is not cosmetic.** Written as prose they are real citations to this tool, and the first draft of this rule was itself reported by `citecheck` as *counts backwards* — **the rule about broken citations, flagged as a broken citation.** Fencing is the tool's own filter class 6, so the example is excluded by the instrument rather than by weakening it. `citecheck`'s `M2` caught it on the next run. ⚠️ **The uniqueness check passed and was the wrong question**: uniqueness says *I found the right one*, and what was needed was *I know what kind of thing this is*. A repair is an edit, and an edit written from a tool's report inherits only what the report happened to print.
 
 ---
 
