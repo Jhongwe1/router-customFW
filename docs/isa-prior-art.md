@@ -370,7 +370,7 @@ The bare-metal half cares and the Linux half does not:
   reset. That the loader's own init undoes all of it is **推**, and a payload's
   readings should not rest on 推 when the cold slot is free.
 
-**Decision, for `R1-pub-3`'s seating:**
+**Decision, for `R1-pub-3`'s seating:** 🔄 **2026-09-16 (`R1z-2`): READ § 11 BEFORE THIS TABLE.** § 11 is a slot-by-slot correction of it, committed by `c435bea` at 03:50:57 on 2026-09-16, and this caption is the only thing that was missing — 量, `grep '§ 11'` over § 7 returned nothing, so a reader of § 7 reached § 8. 🔴 **Three consecutive closeouts (the 77th, 78th and 79th segments) recorded this table as still stale AFTER the repair existed**, because each carried the previous one's note forward instead of re-reading the file. That is the finding, and it is larger than the table.
 
 | slot | what runs | why it is there |
 |---|---|---|

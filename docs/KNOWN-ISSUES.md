@@ -659,6 +659,26 @@ paid; until then two files disagree on purpose.
 ---
 
 
+## 🔴 What `R1z` did NOT pay — 2026-09-16 (eightieth segment)
+
+`R1z` took `cfcensus check` from 29 findings to 0 and the ratchet to a gate.
+**Three things it did not do, each with what would settle it.**
+
+| | |
+|---|---|
+| 🔴 **The debt census cannot see a debt that has already been PAID.** Its population is § Carried forward and that table is a claim, not a measurement. 量 2026-09-16: of the rows disposed of in one segment, **five had been paid while the record still carried them as owing** — one of them 13 h 43 m before the step row that named it, and one repaired at 03:50:57 and carried as stale by three consecutive closeouts. `cfcensus`'s own ⚠️ says it is blind to a debt never written down; this is that blindness with the sign flipped and it is **not** fixed | **What would settle it**: an instrument whose population is the ARTEFACT rather than the table — for each open row, the file it names, asked whether the sentence it complains about is still there. That is `tccensus`'s shape applied to prose, and its false-positive rate is unmeasured |
+| 🔴 **`UP-AUD-1` ⑤c is unpaid and needs a build.** `notes/kernel-build.md` § 18.6's `up2` column takes a figure from a build artefact, and this gate ran no build. Re-owned to *any desk segment that runs a build*, first handover counted | **What would settle it**: one build, then the column |
+| 🔴 **`CI-5` is `⊘`, not paid.** 量: `BIG3` has no consumer — no gate's DoD names it and no checker reads it — so carrying it further would be carrying an instrument nobody asked for | **Re-open condition**, on the row: the next CI run whose `BIG3` leaves the current band's upper bound, or the first gate DoD to cite it |
+
+⚠️ **And one cost this gate incurred rather than removed**: `RECIPE_ID` moved
+(an id rename inside `config/rlxfw-src/`, and the initramfs table's new build
+commands). 量: no card was frozen against the old value — every `bench/`
+directory already holds its captures — but **the next card must re-derive
+`RLXFW-ID0` rather than copy it.**
+
+---
+
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

@@ -25,8 +25,8 @@ not captures.
 ### 1.1 The seven stages
 
 An `R5` iteration — the loop this gate exists to make fast — is a change to a
-**kernel** source file. That is the loop measured here. A userspace-only
-iteration is a different loop and is noted where it differs.
+**kernel** source file. That is the loop measured here. ~~A userspace-only
+iteration is a different loop and is noted where it differs.~~ 🔴 **2026-09-16: on this image there is no such loop** — `config/rlxfw-user/isaprobe/uprobe.c` is under `config/`, so one edited line moves `RECIPE_ID` (量 2026-09-16) and buys the whole `INC-1` build, 592 `CC`.
 
 | # | stage | performed by | what an instrument can see |
 |---|---|---|---|
@@ -174,7 +174,7 @@ Three more machine stages, same session:
 | stage | n | measured |
 |---|---:|---|
 | `rtkimage.py build` (S3) | 2 | **3.551 / 4.131 s** |
-| `mkinitramfs build` (userspace iterations only) | 1 | **0.159 s** |
+| `mkinitramfs build` ~~(userspace iterations only)~~ 🔄 **2026-09-16: a userspace iteration pays this PLUS a full `S2` — § 1.1** | 1 | **0.159 s** |
 | `vendor-tripwire.sh -- true`, the envelope every `run` pays | 3 | **2.583 / 2.613 / 2.772 s** |
 
 The tripwire is paid twice per build — once around `oldconfig`, once around

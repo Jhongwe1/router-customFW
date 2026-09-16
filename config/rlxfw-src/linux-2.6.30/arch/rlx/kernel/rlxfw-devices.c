@@ -89,7 +89,7 @@
  *
  * config/rlxfw-kernel.delta declares CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS,
  * CONFIG_LEDS_GPIO and CONFIG_LEDS_GPIO_PLATFORM -- but `kconfig-delta check`
- * is never invoked by tools/rlxfw-kbuild.sh (CFG-2, and it is the same shape
+ * is never invoked by tools/rlxfw-kbuild.sh (CFG-3, and it is the same shape
  * as `rlxfw-marks verify` never being run automatically).  So the delta and
  * the built .config can drift with nothing noticing.  A build that drifted
  * here would produce an image in which this file registers a platform device

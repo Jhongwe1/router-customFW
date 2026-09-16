@@ -498,11 +498,11 @@ Two things had to exist before it could be run at all:
 
 ### 7.1 The hypothesis, written before the run
 
-`R5`'s drivers live under `config/rlxfw-src/`. `RECIPE_ID` is a sha256 over
-**every file under `config/`**, and `rlxfw-kbuild.sh` passes it as
-`KCPPFLAGS=-DRLXFW_SRC_ID=0x<id>`, which `Makefile:572` appends to
-`KBUILD_CPPFLAGS` — so it reaches **every C object's command line**. Since
-`0004` fixed the truncated `.cmd` files, kbuild's arg-check works.
+`R5`'s drivers live under `config/rlxfw-src/`. 🔄 **2026-09-16: `config/` now holds a SECOND source tree, `config/rlxfw-user/`, which
+`rlxfw-kbuild.sh` never stages (讀 `:358` stages `config/rlxfw-src` alone) and which compiles into no kernel object — and it is
+inside the digest anyway, so § 7.5's fourth bullet is where that goes.** `RECIPE_ID` is a sha256 over **every file under
+`config/`**, and `rlxfw-kbuild.sh` passes it as `KCPPFLAGS=-DRLXFW_SRC_ID=0x<id>`, which `Makefile:572` appends to `KBUILD_CPPFLAGS`
+— so it reaches **every C object's command line**. Since `0004` fixed the truncated `.cmd` files, kbuild's arg-check works.
 
 > **H1** — editing a driver source rebuilds **all** objects, because
 > `RECIPE_ID` moved and every command line moved with it.
@@ -615,6 +615,14 @@ same commit or it does not arrive — the same condition `P4a`'s `L2-6` put on
 * 🔴 **`.version` means an incremental build is never reproducible**, whatever
   the scope. Every reproducibility claim in `notes/reproducible-build.md` is a
   fresh-stage claim and stays one.
+* 🔴 **A file that compiles into NO kernel object moves it too.** 量
+  2026-09-16, on a copy of `config/` outside the repository, running
+  `rlxfw-kbuild.sh:262-263`'s own pipeline: one comment line appended to
+  `config/rlxfw-user/isaprobe/uprobe.c` — a Linux userspace program that
+  `rlxfw-kbuild.sh` never stages (讀 `:358`) — moves `RECIPE_ID`, so it buys
+  § 7.2's 592 `CC`. § 7.1's *drivers* is narrower than the mechanism. ⚠️ The
+  before/after pair is deliberately not quoted: it is a digest over the whole
+  of `config/` and is not the same pair on any two days.
 
 
 ---

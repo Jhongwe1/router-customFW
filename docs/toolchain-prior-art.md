@@ -301,32 +301,32 @@ side are the whole point:
 | | route ① | any evidence | rows |
 |---|---:|---:|---:|
 | `R1a` + `R1b`, the die (`docs/isa-prior-art.md` § 6) | ~~**3** (6.7 %)~~ 🔄 **42** (93.3 %) | ~~37 (82.2 %)~~ 🔄 **45** (100 %) | 45 |
-| `R2c`, the toolchains (§ 5 above) | **39** (66.1 %) | 57 (96.6 %) | 59 |
+| `R2c`, the toolchains (§ 5 above) | ~~**39** (66.1 %)~~ 🔄 **47** (70.1 %) | ~~57 (96.6 %)~~ 🔄 **65** (97.0 %) | ~~59~~ 🔄 **67** |
 
-Both totals are the whole table, derived plus declared, so the two rows are
-comparable — 量 over both files: 45 is **39 derived and 6 declared**, 59 is
-**55 derived and 4 declared**. ⚠️ The toolchain row moved from 33/53 to 35/55
-during `R1-pub-0b`, because § 9's run produced two findings and `SPEC.md`
-gained two rows for them, and 🔄 **from 35/55 to 39/59 on 2026-09-13**, when
-`R1-pub-6`'s assembly produced four more (`TC-50` … `TC-53`). The ratio barely
-moves; the fact that a census grows when the record grows is the derivation
-working, and the fact that the prose has to be patched beside the generated
-block is `XNUM-1`, which is why it is done in the same commit. 🔄 **2026-09-14
-(sixty-eighth segment): the DIE row moved for the first time, 3 → 42 and
-37 → 45**, re-derived from `tools/isa-census.tsv` after seating 21. It was
-found by a closeout ownership audit and not by a checker — the cells above sit
-**outside** the `<!-- tccensus: -->` markers, so nothing regenerates them, which
-is the same `XNUM-1` shape this paragraph already records, one row up. 🟢 **And
-the argument below survives the change intact**: the toolchain axis reached
-66 % as a by-product of desk work, and the die axis reached 93 % only by
-spending a power cycle. The contrast was never about which number is larger.
+Both totals are the whole table, derived plus declared, so the two rows are comparable — 量
+over both files: 45 is **39 derived and 6 declared**, ~~59 is
+**55 derived and 4 declared**~~ 🔄 **2026-09-16: 67 is 63 derived and 4 declared**. ⚠️ The
+toolchain row moved from 33/53 to 35/55 during `R1-pub-0b`, because § 9's run produced two
+findings and `SPEC.md` gained two rows for them, and 🔄 **from 35/55 to 39/59 on
+2026-09-13**, when `R1-pub-6`'s assembly produced four more (`TC-50` … `TC-53`), and 🔄
+**from 39/59 to 47/67 on 2026-09-16**, re-derived with `tools/tccensus.py census`. The
+ratio barely moves; the fact that a census grows when the record grows is the derivation
+working, and the fact that the prose has to be patched beside the generated block is
+`XNUM-1`, which is why it is done in the same commit. 🔄 **2026-09-14 (sixty-eighth
+segment): the DIE row moved for the first time, 3 → 42 and 37 → 45**, re-derived from
+`tools/isa-census.tsv` after seating 21. It was found by a closeout ownership audit and
+not by a checker — the cells above sit **outside** the `<!-- tccensus: -->` markers, so
+nothing regenerates them, which is the same `XNUM-1` shape this paragraph already records,
+one row up. 🟢 **And the argument below survives the change intact**: the toolchain axis
+reached ~~66 %~~ 🔄 **70 %** as a by-product of desk work, and the die axis reached 93 %
+only by spending a power cycle. The contrast was never about which number is larger.
 
-🔴 **Thirty-nine of fifty-nine recorded toolchain findings already have a
-desk-執行 reading, and only two rows have no evidence of any class.** The
-mechanism is not diligence, it is economics: **route ① on this axis costs no
-power.** Every one of those rows was obtainable by typing a command, and
-over thirty-two segments of `R5` that is what happened. On the die axis the
-same route costs the most expensive unit this project has.
+🔴 **~~Thirty-nine of fifty-nine~~ 🔄 2026-09-16: FORTY-SEVEN OF SIXTY-SEVEN
+recorded toolchain findings already have a desk-執行 reading, and only two rows
+have no evidence of any class.** The mechanism is not diligence, it is economics:
+**route ① on this axis costs no power.** Every one of those rows was obtainable
+by typing a command, and over thirty-two segments of `R5` that is what happened.
+On the die axis the same route costs the most expensive unit this project has.
 
 **So `R2c` is smaller than the plan's 2 段, and the reason it is smaller is
 not that the work was done — it is that the work was cheap.** Three consequences,

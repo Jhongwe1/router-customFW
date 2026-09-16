@@ -118,8 +118,8 @@ its owner; a cell taken on 2026-09-13 for this file is marked 🆕.
 
 ### 2.2 The load delay slot — the row this table exists for
 
-`tools/hazlint` over `users/dhrystone/dhry_1.c` at `-O2`, through each
-release's **raw** driver. loads / nop after load / violations.
+`tools/hazlint` over `users/dhrystone/dhry_1.c` at `-O2`, through each release's **raw** driver. loads / nop after
+load / violations. 🆕 **2026-09-16: the third artefact on this axis is each release's `libc.a` — 量 `TC-57`, § 3.3.**
 
 | `-march` | `T1` | `T2` | `T3` |
 |---|---|---|---|
@@ -426,10 +426,10 @@ single-variable compilations:
 | **T3** rsdk-1.5.5-5281 | pads | does not pad | does not pad |
 | **T4** host gcc 12.4.0 | — | — | — (`mips1` pads, `mips2`/`mips32` do not) |
 
-**The two cross cells are the whole point.** T1 is the release whose *wrapper*
-accepts only `-march=4181`, and through the raw driver at `-march=5281` it does
-not pad; T2 is the converse. So on this axis all three releases behave the same
-way and `TC-15`'s split is a property of the **flag**, not of the release.
+**The two cross cells are the whole point.** T1 is the release whose *wrapper* accepts only `-march=4181`, and through
+the raw driver at `-march=5281` it does not pad; T2 is the converse. So ~~on this axis all three releases behave the
+same way~~ 🔄 **2026-09-16: in CODE GENERATION they do** and `TC-15`'s split is a property of the **flag**, not of the
+release. 🔴 **As SHIPPED they do not** — 量 `TC-57` reads 0 / 4,574 / 3,741 over the three prebuilt `libc.a`, § 3.3.
 
 ⚠️ **This does not close `TC-q`.** That row is about the whole-`vmlinux`
 load-delay counts — 425/424 against 162/147 — and it is a question about code

@@ -307,10 +307,20 @@ NON_GATE = {
 # carries the same obligation: `U9` re-runs `L8` with the exemptions OFF and
 # goes red if an exempted row ever becomes clean, so the list cannot rot into
 # a blanket.  量 2026-09-16: 13 `L8` rows, 2 exempted, 11 real.
-L8_EXEMPT = {
-    'REL-3': 'owner is `none`, see `REL-0`; the ✅ is inside a sentence about '
-             '`notes/kernel-build.md` §21.7',
-}
+# 🔄 2026-09-16 (`R1z-2`, eightieth segment): THE LIST IS EMPTY, and it
+# was emptied by its own control rather than by a decision.  `REL-3`'s row
+# carried `✅ **CLOSED 2026-09-01 (`P4b-2`)**` in its OWNING-GATE cell and
+# `🆕` in its first, so `L8` was right about it all along and this
+# exemption -- whose stated reason, *owner is `none`*, had stopped describing
+# that cell -- was hiding it.  Marking the first cell made `L9` fire within the
+# minute with *the exemption is dead and must be deleted*.  That is the second
+# entry `L9` has removed from this dict and the FIRST it removed because a row
+# was fixed rather than because the rule was wrong.
+# ⚠️ The 量 line above is left as it was taken and is now stale by one:
+# it says 2 exempted where the dict has held 1 since `GPIO-1` went.  It is a
+# dated reading, so it is not corrected in place -- this line is the correction,
+# and the class is `CNT-1`'s.
+L8_EXEMPT = {}
 # 🔴 `GPIO-1` was in this list for one run and `L9` deleted it, which is the
 # rot control doing its job on its first real use.  量: the token set above
 # carries `CLOSED` and `Closed` and NOT lower-case `closed`, and `GPIO-1`'s is
@@ -1089,6 +1099,12 @@ def check(pop=None, exempt=None):
     # table that gives two different debts the same name is `NET-14`'s
     # collision inside the record rather than inside `SPEC.md`, and a reader
     # who greps for the id gets whichever row comes first.
+    # 🔄 2026-09-16 (`R1z-2`): both are resolved, and by the same rule
+    # `NET-14` used -- the EARLIER user of an id keeps it and the later one is
+    # renamed.  `CFG-2`@1821 -> `CFG-3`, `REL-3`@1817 -> `REL-4`.  🔴
+    # `LOG.md` and `CHANGELOG.md` keep the old names deliberately: they are
+    # dated records, and editing one to agree with a later rename falsifies it.
+    # So a grep for `CFG-2` still returns history, and that is correct.
     byid = {}
     for r in rows:
         byid.setdefault(r['id'], []).append(r)
@@ -1162,6 +1178,11 @@ def check(pop=None, exempt=None):
     # closed one and declared the exemption dead.  A duplicate id does not
     # only confuse a reader; it silently re-points every lookup keyed on it,
     # which is `L10`'s whole cost demonstrated inside this function.
+    # 🔄 2026-09-16 (`R1z-2`): the duplicate is gone (`REL-3`@1817 is
+    # `REL-4` now), so this loop sees one row for `REL-3` -- and with the row
+    # marked, `L9` correctly declared the exemption dead for the OTHER reason.
+    # The `ANY row` rule is kept: it was right before the rename and is what
+    # would catch the next collision.
     for k in sorted(ex):
         hit = [r for r in rows if r['id'] == k]
         if not hit:
@@ -1336,8 +1357,36 @@ def report_check():
 # and `L13` 10 → **0**; live-owned goes 11 → **25**.  `L15` 2 → 4 is the cost of
 # the closures, reported rather than absorbed: `C-2` and `C-7` close carrying a
 # residual, and every other check here skips a closed row.
-BASELINE = {'L1': 11, 'L2': 1, 'L3': 5, 'L6': 4, 'L8': 0, 'L10': 2,
-            'L11': 0, 'L12': 2, 'L13': 0, 'L15': 4, 'L9': 0}
+# 🔄 2026-09-16 (`R1z-2`/`R1z-4`, eightieth segment): **ZERO, on every
+# check.**  29 findings -> 0 in one desk segment, and the ratchet is now a GATE:
+# at an all-zero baseline every direction is red, so a new orphan cannot be
+# CREATED rather than being created and found by a later census.  The comment
+# above -- *a gate would be RED on every run until `R1z` closes* -- was the
+# reason this was a ratchet, and it expired.
+# 🔴 WHAT EACH CHECK COST, so that a reader can see this was not one
+# edit: `L6` 4->0 is nine step rows of `R1-gate`/`R4` marked in the column
+# `spec-check.progress_step_state` reads (*from the FIRST cell only*) plus nine
+# of `P4a`/`P4b-gate` whose `done` column was a SECOND owner of that state;
+# `L15` 4->0 is three dead residuals unbolded (a residual is declared by the
+# BOLD `**Residual`, so `~~ ~~` alone does not retract one) and `C-5` turned
+# from a restatement into a pointer; `L10` 2->0 is two genuine id collisions
+# resolved by `NET-14`'s rule -- the EARLIER user keeps the id, `CFG-2`@1821 ->
+# `CFG-3` and `REL-3`@1817 -> `REL-4`; `L12` 2->0 and `L2` 1->0 are dead gate
+# ids struck (`STRUCK` drops them) -- `R5b` was never a gate at all; `L3` 5->0
+# is four standing instructions written as CLAUSE HEADS with their `none`
+# declarations retracted, because `owner_kind` reads `NONE_HEAD` first and its
+# comment says why; `L1` 11->0 is eleven debts each measured rather than read.
+# 🔴 AND THE MEASUREMENT THAT MATTERS MOST IS NOT IN THIS DICT: of the
+# rows disposed of, **five had already been paid** while the record still
+# carried them as owing -- `UP-AUD-1` ③④ (paid 13 h 43 m before the
+# step row that named them), `①c` and `②`'s third sub-item (one
+# commit that never names the row), `②a`, and `docs/isa-prior-art.md`
+# § 7 (repaired 03:50:57 and carried by three consecutive closeouts).
+# **This census cannot see a paid debt.**  Its population is the table and the
+# table is a claim; the file's own ⚠️ above says it is blind to a debt
+# never written down, and this is the same blindness with the sign flipped.
+BASELINE = {'L1': 0, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
+            'L11': 0, 'L12': 0, 'L13': 0, 'L15': 0, 'L9': 0}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
 # directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
@@ -1356,9 +1405,13 @@ BASELINE = {'L1': 11, 'L2': 1, 'L3': 5, 'L6': 4, 'L8': 0, 'L10': 2,
 # at zero contributes no ids to digest.  `BASELINE` still carries them at 0,
 # which is where the claim lives -- *zero rows record a closure in a place this
 # table does not declare* is a result and not an absence.
-BASELINE_SIG = {'L1': '62bfc297', 'L10': 'c56612d3', 'L12': '51eb4e6f',
-                'L15': 'ae84aa3e', 'L2': '10ef882f', 'L3': '1c90011a',
-                'L6': 'b86a38d5'}
+# 🔄 2026-09-16: EMPTY, and that is the honest shape rather than a
+# convenience.  A check at zero contributes no ids, so there is nothing to
+# digest -- the same sentence the ⚠️ below already carries for `L8`
+# and `L11`, now true of every check.  The layer is not deleted: the moment any
+# check goes non-zero its digest has to be written here beside its count, and
+# `U14b` is the control that says a count alone is not enough.
+BASELINE_SIG = {}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`
@@ -1638,6 +1691,21 @@ def self_test():
         case('U7:' + k,
              any(x.startswith('L8 ' + k) for x in live_ex_off),
              'exempted on the live file but L8 does not fire there')
+
+    # ---- U7-none: an EMPTY list is a CLAIM, not an absence ---------------
+    # 🔴 量 2026-09-16 (`R1z-2`): `L9` emptied `L8_EXEMPT`, the loop
+    # above then generated ZERO cases, and the suite went 64 -> 63 with no
+    # case reporting anything.  A suite that shrinks silently is this
+    # repository's own recorded defect -- *a tool reporting 0 is making a
+    # claim* -- and the claim an empty list makes is *nothing is hidden right
+    # now*.  That sentence is testable: with no exemptions, turning them off
+    # may not change a single finding.  The case exists only while the dict is
+    # empty; the moment an entry is added, `U7:<k>` above owns it again, so
+    # the two together leave no state in which neither runs.
+    if not L8_EXEMPT:
+        case('U7-none', live_ex_off == check(),
+             'the exemption list is empty and yet turning exemptions off '
+             'changes the findings -- one of the two is not reading the list')
 
     # ---- U12: the ratchet moves in one direction, and only on purpose ---
     import contextlib

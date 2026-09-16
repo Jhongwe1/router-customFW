@@ -75,12 +75,28 @@ dir	/etc	-	0755	unit	-
 #     the console: the second is never executed by the boot ---
 file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discriminator, mounts /proc and /sys, execs a shell
 
-# --- and the one binary of mine, which nothing at boot runs ---
+# --- and the two binaries of mine, which nothing at boot runs ---
 #
-# Its source is config/rlxfw-user/isaprobe/ and its PRODUCT is under
+# Their source is config/rlxfw-user/isaprobe/ and their PRODUCT is under
 # build/, deliberately outside config/: RECIPE_ID is `find config -type f`
 # with no exclusions and does not consult .gitignore, so an object file
 # left under config/ would silently move the id the board prints.
+#
+# HOW TO PRODUCE THEM.  These two rows are the first sources in this table
+# that DO NOT EXIST IN A CLEAN CLONE -- $REPO/build/ is gitignored -- and
+# until 2026-09-16 this file named them without saying how to make them, so
+# `mkinitramfs build` on a fresh clone failed on a missing file with no
+# pointer to the recipe.  Both come from one Makefile:
+#
+#     make -C config/rlxfw-user/isaprobe            -> build/…/uprobe
+#     make -C config/rlxfw-user/isaprobe ucost      -> build/…/ucost
+#
+# 讀 that Makefile's `INSTALL ?= $(REPO)/build/rlxfw-user/isaprobe`, which is
+# where the two paths below come from; it is the owner of how they are built
+# and this comment deliberately does not restate its gates.
+# ⚠️ It needs the rsdk driver, so it is not a clone-and-make: the Makefile's
+# own header records why it stages to ext4 first (a 32-bit `stat()` cannot
+# represent a DrvFs inode, so every /mnt/c path returns EOVERFLOW).
 file	/bin/uprobe	$REPO/build/rlxfw-user/isaprobe/uprobe	0755	rlxfw	R1c's column-2 instrument and the FIRST binary this project has compiled that runs as a Linux process. 29,184 bytes stripped, static, no PT_INTERP (🔴 this said 29,092 for one commit -- the manifest value from the build before the last, contradicting the SIZE block nine lines above it; exactly the self-consistent-pair trap that block was rewritten to name). Links tools/rlxprobe/cells4.S verbatim, so the 75 encodings probe4 ran bare metal are the same bytes here. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
 file	/bin/ucost	$REPO/build/rlxfw-user/isaprobe/ucost	0755	rlxfw	R1-pub-4b's D-cost instrument, and the SECOND binary this project has compiled that runs as a Linux process. 16,692 bytes stripped, static, no PT_INTERP (量 2026-09-16, `make ucost-show`, sha256 76c7e2318021484967ccc0e8c5a2eadd992c5bee372a2a7bcd10d0a1ebe3c6db). 🔴 It does NOT link cells4.S and that is deliberate: cells4.S is one of the four files feeding uprobe's BUILD_ID, which seating 23's capture printed, and seating 24 re-runs a 4a row for repeatability -- worth most if that binary is byte-identical. ucost hand-writes its own probed words instead and `tools/ucostcheck.py` checks every one against tools/isa-payload.tsv in BOTH directions. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
 

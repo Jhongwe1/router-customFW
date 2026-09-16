@@ -740,7 +740,7 @@ kernel timer of my own that also writes it would make that reading
 unattributable by construction.
 
 🟢 **And the requirement is enforced from the build side too, because the
-config side has a known hole.** `CFG-2` records that `kconfig-delta check` is
+config side has a known hole.** `CFG-3` records that `kconfig-delta check` is
 never invoked by `rlxfw-kbuild.sh`, so the delta and the built `.config` can
 drift with nothing noticing — that is how `CONFIG_GPIO_SYSFS` stayed undeclared
 in three shipped images. `rlxfw-devices.c` therefore carries two `#error`

@@ -800,7 +800,7 @@ banning a string.
 build; the auditor half runs when somebody remembers. That is the same shape as
 `rlxfw-marks.py verify`, which `LOG.md` records as never being run
 automatically either — **two working gates, neither on any path** —
-and it is carried forward as `CFG-2`.
+and it is carried forward as `CFG-3` (renamed from `CFG-2` 2026-09-16, `R1z-2`).
 
 🟢 **Repaired and re-measured the same day**: the row is declared, and `r56c`'s
 `oldconfig` log carries **0** `(NEW)` lines with `kconfig-delta check` green.
@@ -964,15 +964,15 @@ reason.
 | | entries | file bytes |
 |---|---:|---:|
 | `unit` — this device's own binaries, unmodified | 24 | 579,644 |
-| `rlxfw` — mine | 5 | 988 |
-| **total** | **29** | **580,632** |
+| `rlxfw` — mine | ~~5~~ 🔄 **13** | ~~988~~ 🔄 **46,864** |
+| **total** | ~~**29**~~ 🔄 **37** | ~~**580,632**~~ 🔄 **626,508** (量 2026-09-16) |
 
 ⚠️ **Only 4 of the 24 `unit` entries carry bytes**, and they are the 579,644.
 The other 20 are directories and symlinks: the declaration says the dump has
 those, and the tool checks that it does, but there is nothing to hash.
 
-8 dirs, 5 files, 13 symlinks, 3 device nodes. The five `rlxfw` entries are
-`/init`, `/tmp`, `/dev/console`, `/dev/null` and `/dev/tty`. ~~**There is no
+~~8 dirs, 5 files, 13 symlinks, 3 device nodes. The five `rlxfw` entries are
+`/init`, `/tmp`, `/dev/console`, `/dev/null` and `/dev/tty`.~~ 🔄 **量 2026-09-16: 9 dirs, 7 files, 13 symlinks, 8 device nodes, and THIRTEEN `rlxfw` entries; the three files are `/init`, `/bin/uprobe` and `/bin/ucost`.** ~~**There is no
 symlink of mine left**: because `RUNSHEET` `K5` types `uname -a` and this unit's
 dump has 50 busybox symlinks without that being one of them. **It is declared as
 mine rather than passed off as the unit's.**~~

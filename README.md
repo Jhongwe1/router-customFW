@@ -433,16 +433,25 @@ Three rules run through all of it:
 Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
-⚠️ **This is a selection, not a census, and the numbers are derived rather
-than counted by eye.** 🔄 **量 2026-09-13**, over `git ls-files tools/`
-(**100** files), taking those whose first two bytes are `#!` and excluding
-`tools/test-*`: **48** programs, of which **21 are described below and 27 are
-not** — `audit-bench-log`, `binsim`, `capdate`, `capfield`, `ci-census`,
-`citime`, **`derivcheck`**, `desk-sweep`, `dtcheck`, `fetch-sources`,
-`flashmap`, `fsmanifest`, `isa-probe`, **`isacensus`**, `leakscan`,
-**`marchcmp`**, `opcount`, `rbcheck`, `rebuild-census`, `regcensus`, `repdiff`,
-`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, **`tccensus`**,
-`vendor-tripwire` and `verify-backup-copy`.
+⚠️ **This is a selection, not a census, and the numbers are derived rather than counted by
+eye.** 🔄 **量 2026-09-16**, over `git ls-files tools/` (**139** files), taking those whose
+first two bytes are `#!` and excluding `tools/test-*`: **62** programs, of which **21 are
+described below and 41 are not** — `audit-bench-log`, `binsim`, `capdate`, `capfield`,
+**`cfcensus`**, `ci-census`, **`citecheck`**, `citime`, `derivcheck`, `desk-sweep`, `dtcheck`,
+**`elfops`**, **`emueq`**, **`emupredict`**, `fetch-sources`, `flashmap`, `fsmanifest`,
+**`hazdecl`**, **`hazpay`**, `isa-probe`, `isacensus`, **`isapay`**, `leakscan`, `marchcmp`,
+**`mustrun`**, `opcount`, **`procgrow`**, `rbcheck`, `rebuild-census`, `regcensus`, `repdiff`,
+`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, `tccensus`, **`tcpay`**, **`uartrate`**,
+**`ucostcheck`**, **`ucostfit`**, `vendor-tripwire` and `verify-backup-copy`.
+🔴 **A SIXTH time, and this time it was stale by ELEVEN.** 量 2026-09-16: the
+fourteen new programs are `hazdecl`, `hazpay` and `isapay` (2026-09-13, all
+three committed AFTER the 01:24 commit that wrote the count above), `emueq` and
+`tcpay` (09-14), `citecheck`, `elfops`, `emupredict`, `mustrun`, `procgrow` and
+`uartrate` (09-15), and `cfcensus`, `ucostcheck` and `ucostfit` (09-16) — so
+**eleven had landed and been committed before today and none of them moved this
+count.** The **+39 in files** is those fourteen plus three `tools/test-*`, four
+`.tsv` and **eighteen payload sources under `tools/rlxprobe/`**, with nothing
+removed. **Described stayed at 21**, so the whole of the growth is undescribed.
 🔴 **A FIFTH time, and it was stale by TWO before this segment added two.**
 `derivcheck` landed 2026-09-11 and `isacensus` 2026-09-12, and neither moved
 this count; `marchcmp` and `tccensus` are this segment's. **The +4 in programs
@@ -533,7 +542,7 @@ tools/rlxfw-marks.py       one of the two tools that edit somebody else's source
                            a tree with some marks present builds, and what it builds is
                            not what the table describes. A20 requires plain `apply` to
                            still refuse a marked tree, so A4 is bypassed only when asked.
-                           32 controls, and the one that earns
+                           58 controls, and the one that earns
                            its keep is `verify` -- `check` reads the staged tree and
                            answers "did the insertion happen", which a mark can pass
                            while being absent from the image; `verify` reads the BUILT
@@ -664,7 +673,7 @@ tools/ledgerscan.py        R5's blind-write ledger is COMPUTED, not written. It
                            claimed those domains are empty on the real tree, which is
                            the LEDGER's claim, and it went red on this repository's own
                            prose naming a path as an example. The prose was not
-                           rewritten to make it green. 71 controls, and `check` also
+                           rewritten to make it green. 84 controls, and `check` also
                            has a negative control on real material: removing one row
                            from the committed ledger must name the path it lost.
 
@@ -681,7 +690,7 @@ tools/looprun.py           two of its ten stages exist only to make it safe to r
                            requires the board to say the id the build just produced. A
                            stale image, the vendor's firmware, and the loader's own
                            re-staging of 0x80500000 from flash after a watchdog reset are
-                           then all red for the same reason. 55 controls, and N1..N7 each
+                           then all red for the same reason. 66 controls, and N1..N7 each
                            require exactly ONE of the four assertions to fail: a control
                            set where one broken input trips every check cannot say which
                            check is load-bearing. Its first run found two defects in
@@ -746,7 +755,7 @@ tools/test-flrbracket-mutants.py
                            that case failed. Both controls exist because a pass over
                            `flashwin` reported 8 of 8 killed and every kill was
                            invalid
-tools/cardcheck.py         31 controls, and it reads a card the way the DEVICE will.
+tools/cardcheck.py         35 controls, and it reads a card the way the DEVICE will.
                            `commands` checks every command a card types against what
                            the image DECLARES it can invoke; `numbers` re-derives every
                            number a card states from the artefact it names. It exists

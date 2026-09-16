@@ -1053,7 +1053,93 @@ held and the anti-control forced.**
 
 ---
 
-## The operating clause, re-run at nine entries
+## 2026-09-16 — `R1z` (the debts this repository's own record names)
+
+### One line
+
+**v0.3+, three desk segments, zero power cycles.** `tools/cfcensus.py check`
+goes from **29 findings to 0** over seven checks, and the instrument that
+reports it becomes a gate rather than a ratchet — so a debt with no owner can no
+longer be *created*, where before it could be created and found by a later
+census.
+
+**The weakest thing here is not a reading, it is a scope**: every number below
+is about this repository's record, not about the device. Nothing was measured on
+the silicon; the board was unpowered for all three segments.
+
+### Three claims that stand
+
+**① The debt table's own rule — *an item with no owning gate is a bug in this
+list* — is now enforced, and every one of the 29 findings was reached by
+measuring the item rather than by reading the row.** 量 2026-09-16: `L1` 11→0,
+`L2` 1→0, `L3` 5→0, `L6` 4→0, `L10` 2→0, `L12` 2→0, `L15` 4→0.
+`cfcensus --self-test` 64/64; `ratchet` at an all-zero `BASELINE`, which is what
+makes it a gate — any check leaving zero in either direction is red, and it
+names which check and which rows. **No CI step and no `ci-expected.tsv` row
+changed**: 量, `check`'s clean output carries no two-space `ok` line and
+`ratchet`'s does, so moving the constants was the whole change.
+
+**② Eighteen step rows of four closed gates carried no closure mark, and
+measuring them found that *none* of them was unfinished.** 讀
+`spec-check.progress_step_state`: closure is read *from the FIRST cell only*.
+Nine rows of `R1-gate`/`R4` had no mark anywhere and are now marked; nine rows of
+`P4a`/`P4b-gate` carried `✅` in a `done` column their table heads — a **second
+owner** of one piece of state, which is house rule 1's subject and is recorded
+rather than repaired. 🔴 **The checker was NOT changed.** Its own docstring
+carries the argument against changing it: *a checker that stops reporting
+because a DIFFERENT tool got smarter is a debt paid by nobody.*
+🟢 `R1g-3` was nearly ticked wrongly — `LOG.md`'s section on it is headed *`R1g-3`
+的完成定義其實沒滿足* — and reading the whole section showed the DoD was found
+unmet mid-segment and then met by `PREDICTIONS-b4-block0.md` alone. The tick
+stands and the caveat went into the column headed *where it is most likely to be
+wrong*.
+
+**③ Two id collisions were real and are resolved by the earlier user keeping the
+id.** 量 by `git log -S`: `CFG-2` was established by the closed timer-comment row
+(`bd9fecd`, 2026-09-04) and re-used by the open two-gates-on-no-path row
+(`b1a25f8`, 2026-09-08) → the later is `CFG-3`; `REL-3` was established by the
+`study/weekly-results.md` row (`2266324`, 2026-09-01) and re-used by the release
+row (2026-09-11) → the later is `REL-4`. 🔴 `LOG.md` and `CHANGELOG.md` keep the
+old names **deliberately**: they are dated records, and editing one to agree with
+a later rename falsifies it. 🟢 And the `REL-3` half ended with `L9` — the
+exemption-rot control — firing on cue: marking the closed row made
+`L8_EXEMPT['REL-3']` dead within the minute, and it was deleted.
+
+### What `R1z` did not establish
+
+* 🔴🔴 **This census cannot see a debt that has already been PAID.** Its
+  population is the table and the table is a claim. 量 2026-09-16: of the rows
+  disposed of here, **five had been paid while the record still carried them as
+  owing** — `UP-AUD-1` ③④ (paid 13 h 43 m *before* the step row that named them
+  as outstanding was written), `①c` and `②`'s third sub-item (one commit whose
+  message never names the row), `②a`, and `docs/isa-prior-art.md` § 7 (repaired
+  at 03:50:57 and carried as stale by three consecutive closeouts). The file's
+  own ⚠️ already says it is blind to a debt never written down; **this is the
+  same blindness with the sign flipped, and nothing here fixes it.**
+* 🔴 **Four of the findings this segment cleared were created by this segment**,
+  and every one was caught by a tool rather than by re-reading: a retraction that
+  names what it retracts outside the `~~ ~~`; an owner cell explaining a gate is
+  `已關`, which is a token the table's own closure detector reads; a standing
+  instruction written as prose where the rule wants a clause head; and a new
+  `FILE:NNN` citation onto a blank line, written in the same commit as the
+  disposition that says line citations rot. **A fifth appeared when the gate
+  closed**: every disposition put `R1z-2` in the owner cell, so eleven rows read
+  LIVE by pointing at the step that was disposing of them — circular, and
+  invisible until the step was marked.
+* 🔴 **`UP-AUD-1` is not finished.** Thirteen of fourteen faces are paid; `⑤c`
+  needs a build artefact and this gate ran no build. Re-owned, first handover.
+* 🔴 **`CI-5` is `⊘`**, with a re-open condition rather than a plan.
+* ⚠️ **`RECIPE_ID` moved** (`CFG-2`→`CFG-3` inside `config/`, and the initramfs
+  table's new build commands). No card was frozen against the old value —
+  measured, every `bench/` directory already holds captures — but **the next
+  card must re-derive `RLXFW-ID0`.**
+* **Zero flash-write commands, zero `FLR`, board unpowered throughout.** The
+  bracket stays at 1,024 of 4,194,304 bytes = 0.0244 %.
+
+---
+
+
+## The operating clause, re-run at ten entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -1063,7 +1149,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire.)*
 
 | pair | shared? |
 |---|---|
@@ -1074,6 +1160,7 @@ appended, which adds exactly one pair — and that pair fires.)*
 | `P4a` → `P4b-gate` | no. `P4a`'s are Level-2 reproducibility, one machine, one afternoon; `P4b-gate`'s are the unowned rule, the missing tag, and the ledger's own omission |
 | `P4b-gate` → `R4` | no |
 | `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it 🔴🔴 **2026-09-14: this firing is DISCHARGED, and the answer is negative.** The seam is not a thing a seating was going to do — `looprun --mode bench` with no `--skip` cannot run, because its `--image` pre-flight requires the file `S3` creates. Measured at the desk with two refusing arms and a control that passed the same guard, for **zero power cycles**. ⚠️ So the clause's only new firing at eight entries was real and its subject turns out to be a tool defect rather than a missing measurement — which is a reading about the clause too: it names a *thing*, and a thing can be impossible. |
+| `R1-pub + R2c` → `R1z` 🆕 | **no, and the reason is the clause's own discipline.** Both residual sets contain an instrument that could not be asked about its own subject — `hazpay`'s `check_controls` inspecting 2 of 26, and this census being blind to a paid debt — but that is the same SHAPE, not the same THING. Every previous firing named one item both entries carry verbatim (`CPU-45`; `S2`→`S7` in one invocation; a same-instant read of two counters). **A clause that fires on a resemblance measures the reader, not the ledger** |
 | `R5` → `R1-pub + R2c` 🆕 | **yes — a same-instant read of two kernel counters.** `R5` carries it as `D4` naming `/proc/timer_list`, *which exists in this kernel and cannot carry the property the row wanted — two counters read atomically*. `R1-pub` carries it as `D-cost`'s `E5` requiring `Δirq_count == Δjiffies` on every rung, failing **5 of 64**, and the one `/proc` file that serves both not sampling them together. 🔴 **The sentence that connects them is inside `R5`'s own bullet** — it says the substitute `R5-2` used *carries both counters inside one `spin_lock_irqsave`*, which is true of the pair `R5` used and **false of the pair `R1-pub` needed**: 讀 `drivers/clocksource/rtl819x-timer.c`, `j = get_jiffies_64()` is at line 2001 inside the lock held from 1998 to 2042, and `irq_count` is read live at line 2147, **105 lines after the unlock** |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
