@@ -394,9 +394,27 @@ on it rather than being left to be discovered.
   this project can measure at all.
 * 🔴 ~~**Four of the eleven live rows are class `S`**~~ **FIVE — 量 2026-09-17 (`P1-5`), by two independent routes over § 2's own class column: `S` 5 (`MT-ID`, `MT-FLASH-1`, `MT-FLASH-2`, `MT-MAC`, `MT-RFCAL`), `R` 4, `P` 2.** Simulated at the boundary:
   they prove the check's logic, not its wiring. 🔴 **The sentence and the `MT-ID` row were written in the SAME commit** (`e362ffa`, `git log -S`), so it was wrong on the day it was written rather than gone stale — and **nothing in this repository counts a table column**, which is why a full desk sweep and three closeout audits walked past it. It is the understating direction, in the section whose whole job is to understate nothing.
-* **`MT-PORT` has no Linux-state `SPEC.md` id to cite.** Every `NET-*` row in
+* 🔴🔴 ~~**`MT-PORT` has no Linux-state `SPEC.md` id to cite.** Every `NET-*` row in
   this repository is loader-state. The check reads a vendor `/proc` file whose
-  existence in *this* kernel is 推 until the first seating.
+  existence in *this* kernel is 推 until the first seating.~~ **BOTH HALVES ARE FALSE, 量
+  2026-09-17 (`R6-0`'s survey).** `NET-27` — *`/proc/rtl865x/port_status` exists in this
+  kernel*, `讀 + 量-on-artefact`, **dated the same day** — is a Linux-state row, and so
+  are `NET-23` (the NIC driver's own `chip name: 8196C` string), `NET-25` (`eth4`'s
+  first open), `NET-26` (this image's `ping` ignoring `-c`), `NET-04` and part of
+  `NET-01` (the vendor kernel's boot log) and half of `NET-13`. The second half is
+  stale against `NET-27` too, and against this file's own § 7, which already
+  carries the 推→✅ strike.
+  🔴 **And the way this was missed is the finding.** The bullet directly above
+  it — the class-`S` count — was corrected earlier in the same segment, and § 9.9's
+  sweep compared § 2's pass criteria against the script. **Neither looked at § 5's
+  other bullets.** § 9.9 opens by quoting *a measurement that refutes one line usually
+  refutes two more*; it applied that to a table one section away and not to the
+  paragraph it was editing. **Third instance in one file in one day.**
+  ⚠️ What survives, narrower: **`MT-PORT`'s own pass criterion cites no id**, because
+  every `NET-*` row that is Linux-state is about something else — the file's
+  existence, a netdev, a `ping`. The check's subject is *link state on a named
+  port*, and that has no numbered row in either state. The precise loader / Linux
+  tally of all 27 rows is `R6-0`'s census and is deliberately not restated here.
 * 🔴 **The driver ids do not exist for two peripherals.** `PROGRESS.md`'s P1
   inherited table says *"the LED and the button have no `SPEC.md` id at all"*,
   and 量 that is false in the safe direction: `BRD-05` (the button — `PABCD`

@@ -28,7 +28,7 @@ codegen 或 ISA 正確的證據*. What the qemu arm is for is § 4.
 derive, joined in both directions by `isapay population`. Two groups are
 deferred and § 7 names them.
 
-**Does not compare anything in the payload.** `PROGRESS.md:396`'s risk column:
+**Does not compare anything in the payload.** `PROGRESS.md:514`'s risk column:
 *a payload that compares in-place reports a boolean and throws the value away.*
 The expected constants are not in the image at all, so there is nothing there
 for a wrong expectation to be silently right against.
