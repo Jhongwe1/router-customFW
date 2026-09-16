@@ -2096,14 +2096,14 @@ owned by a live gate, or the census refuses to report at all.
 |---|---:|---|
 | LIVE | 11 | open, and a gate that is still open owns it |
 | SEGMENT | 7 | open, deferred to *any segment that touches X* — unscheduled, not orphaned |
-| ORPHAN | 43 | 🔴 open, and every gate it names is CLOSED — **nobody will do it** |
-| ORPHAN? | 16 | open by its first cell, owner closed, and a ✅ sits in the owning-gate cell or opens the question — probably an `L8` row that is finished and never marked |
+| ORPHAN | 45 | 🔴 open, and every gate it names is CLOSED — **nobody will do it** |
+| ORPHAN? | 14 | open by its first cell, owner closed, and a ✅ sits in the owning-gate cell or opens the question — probably an `L8` row that is finished and never marked |
 | DEAD | 0 | 🔴 names a gate that exists nowhere in this file |
 | NONE | 14 | open and names no gate at all |
 | CLOSED | 17 | first cell says ✅ |
 | DECLINED | 0 | first cell says ⊘ |
 | **total** | **108** | rows parsed, reconciled against 110 raw table lines minus 2 header lines |
-| `L8` | 26 | closure recorded somewhere this table does not declare — the owning-gate cell, or the head of the question; 3 exempted by name |
+| `L8` | 22 | closure recorded somewhere this table does not declare — the owning-gate cell, or the head of the question; 3 exempted by name |
 <!-- cfcensus:counts end -->
 
 ### The rows with no live owner
@@ -2111,7 +2111,7 @@ owned by a live gate, or the census refuses to report at all.
 Every open row whose owner is not a gate that is still open. `ORPHAN` is the
 population `R1z` exists for; `ORPHAN?` is a row that is probably finished and
 was never marked, and the two are counted apart because folding them would
-inflate the debt by sixteen.
+inflate the debt by fourteen.
 
 <!-- cfcensus:debt begin -->
 | # | kind | owner named |
@@ -2178,10 +2178,10 @@ inflate the debt by sixteen.
 | `TC-b` | ORPHAN | R2a |
 | `TC-c` | ORPHAN? | R2a |
 | `TC-d` | ORPHAN | R3 |
-| `C-2` | ORPHAN? | R4 |
+| `C-2` | ORPHAN | R4 |
 | `C-5` | NONE | — |
 | `C-6` | ORPHAN | R1h |
-| `C-7` | ORPHAN? | R1a;R2a |
+| `C-7` | ORPHAN | R1a;R2a |
 | `C-8` | ORPHAN? | R4 |
 | `C-9` | ORPHAN | R1b |
 | `C-10` | ORPHAN? | S0 |

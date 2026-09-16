@@ -164,14 +164,25 @@ GATE_SHAPE = re.compile(r'(?<![0-9A-Za-z-])([RPS]\d[0-9A-Za-z]*'
 # `🟢 **CLOSED <date>**` -- `TOOL-1`, `LOOP-1` and `REL-1`, the last of which
 # carries the artefact's URL in the same sentence.  量 over all 108 rows: the
 # `✅`-only rule sees 18 of the 21 rows that carry any closure spelling.
-# 🔄 2026-09-16, `R1z-2`: `Answered` is a fifth spelling and it is the one
-# the `C-*` family uses.  量 over all 108 rows: four OPEN rows open their
-# QUESTION cell with `Answered` and carry no `✅` in the first cell -- `C-1`,
-# `C-2`, `C-3`, `C-7` -- and four of four are unambiguous closures
-# (`Answered, docs/loader-command-semantics.md §a: **it scans.**`).  Adding it
-# is strictly stricter: `L8` gains those four, and two of them demote out of
-# `L1` into *probably finished*.
-CLOSURE = re.compile(r'✅|CLOSED|Closed|已關|關了|Answered')
+# 🔴 `Answered` WAS ADDED HERE AND IS REFUTED, BY READING THE FOUR ROWS IT
+# CAUGHT.  The claim was *four OPEN rows open their question cell with
+# `Answered` and four of four are unambiguous closures*.  量, reading each row
+# whole instead of its first sixty characters: all four end in an explicit
+# open residual.
+#   `C-1`  "**Residual**: two `DW`s at the bench refute or confirm it"
+#   `C-2`  "**Residual, and it is R4's first payload's job**: confirm the
+#          buffer survives load-to-entry untouched"
+#   `C-3`  "**Residual**: which of `burn()`'s four callees erases and which
+#          programs"
+#   `C-7`  "**Residual, and it is now one thing and not two** … the 2019 drop
+#          to zero is still unexplained"
+# `Answered` means the QUESTION was answered; it does not close the ROW.  The
+# row that looked like the counterexample, `C-17`, reads `✅ **Answered
+# 2026-08-24**` -- and it is closed because of the `✅`, not the word.  So this
+# file's own derivation was right and the extension was wrong: the CHARACTER
+# carries a row-level verdict and `CLOSED` happens to as well; `Answered` does
+# not.  Four of four, no survivors, reverted.
+CLOSURE = re.compile(r'✅|CLOSED|Closed|已關|關了')
 
 # Struck-through text is RETRACTED.  Declared once, because `resolve` honoured
 # it and `hints`, the segment test and the none test all read the raw cell --
@@ -351,6 +362,8 @@ CASE_WHAT = {
     'U29': 'a SEGMENT phrase in PROSE is not read as an owner',
     'U30': 'a struck-through closure does not close',
     'U31': 'every kind is rendered, including the ones sitting at zero',
+    'U32': 'a closure WORD deep in a question cell is not labelled `head`',
+    'U33': '`Answered` at a question head does NOT close a row',
     'L10+': 'two rows sharing an id are reported',
     'L10-': 'a table of distinct ids reports no duplicate',
     'U12=': 'the ratchet passes at its own baseline',
@@ -861,12 +874,18 @@ def owner_kind(row, board, hdr, steps, sowner=None, rowids=()):
         # `L8` finding while letting the same signal reclassify it is the
         # mislabel the exemption was written to prevent, one layer down.
         if (row['id'] not in L8_EXEMPT
-                and {'owner', 'question-head'} & set(hints(row))):
+                and HINT_CLOSES & set(hints(row))):
             return 'ORPHAN?', shut, resolved, unresolved
         return 'ORPHAN', shut, resolved, unresolved
     if unresolved:
         return 'DEAD', ';'.join(unresolved), resolved, unresolved
     return 'NONE', '', resolved, unresolved
+
+
+# The hint names that count as a row-level closure recorded in the wrong cell.
+# `question-body` is deliberately not one: it is emitted so a reader can see
+# that the tool looked, and it has never fed a decision.
+HINT_CLOSES = frozenset(('owner', 'question-tick', 'question-word'))
 
 
 def hints(row):
@@ -895,9 +914,21 @@ def hints(row):
     if CLOSURE.search(owner):
         out.append('owner')
     q = STRUCK.sub('', row['question']).lstrip()
-    if q.startswith('✅') or CLOSURE.match(q) or CLOSURE_WORD.search(q):
-        out.append('question-head')
-    elif CLOSURE.search(q):
+    # 🔴 THE LABEL USED TO SAY `question-head` FOR A WORD AT OFFSET 1,143.
+    # 量 2026-09-16: `LOOP-1`'s `🟢 **CLOSED 2026-09-02…**` sits at character
+    # 1,143 of its question cell and `TOOL-1`'s at 806, and both were reported
+    # by `L8` as *the head of the question* -- because that branch ORs a
+    # position-free `CLOSURE_WORD.search` onto two position tests.  The
+    # classification is right (this file's own measurement: eleven of eleven
+    # `CLOSED`s in an open row's question cell are row-level verdicts, with no
+    # sub-item use), and only the sentence was wrong.  Two labels now, because
+    # they are two different pieces of evidence: the CHARACTER counts at the
+    # head and the WORD counts anywhere, which is exactly what was derived.
+    if q.startswith('✅') or CLOSURE.match(q):
+        out.append('question-tick')
+    if CLOSURE_WORD.search(q):
+        out.append('question-word')
+    if not out[1:] and CLOSURE.search(q):
         out.append('question-body')
     return out
 
@@ -918,7 +949,7 @@ def census(pop=None):
                         for (t, _sh, s) in resolved if s.startswith('renamed')]
         d['shut_named'] = [t for (t, sh, _s) in resolved if sh]
         d['l8'] = (r['state'] == 'OPEN'
-                   and bool({'owner', 'question-head'} & set(d['hints'])))
+                   and bool(HINT_CLOSES & set(d['hints'])))
         out.append(d)
     return out
 
@@ -928,23 +959,40 @@ def census(pop=None):
 # --------------------------------------------------------------------------
 
 CORR_CLOSE = re.compile(r'closes|closed|關了|已關|收了')
+# Every § Corrections entry opens with a `**bold**` headline that says what the
+# entry IS.  The span is taken with the leading decoration skipped, because the
+# entries open `🔴 **…`.
+CORR_HEADLINE = re.compile(r'^(?:[\s🔴🟢🆕🔄⚠️✅⊘]|\*\*)*?\*\*(.+?)\*\*', re.S)
 
 
 def corrections_closure(text, rowid):
     """The § Corrections date cell that records a closure of this row id.
 
-    The test is the id followed WITHIN 60 CHARACTERS by a closure verb, inside
-    a § Corrections table row.  A bare mention is not a closure: five other row
-    ids are named in that section for other reasons.
+    🔴 THE CLOSURE MUST BE IN THE ENTRY'S HEADLINE, AND THE FIRST VERSION OF
+    THIS FUNCTION WAS *THE ID WITHIN 60 CHARACTERS OF A CLOSURE VERB ANYWHERE
+    IN THE ENTRY*.  量, on its first run: two hits, and reading them settled
+    it.  `C-16`'s is the whole headline -- ``🔴 **`C-16` closes, and the
+    refutation recorded against it was the part that was wrong.**`` -- and
+    `C-3`'s sits at offset 478 of an entry with no headline at all, reading
+    "`C-3` closes and it costs one console command", which is a sentence about
+    what closing it would COST.  `C-3`'s own row still ends with an explicit
+    `**Residual**`.  Two hits, one true, and the discriminator is structural
+    rather than a character window: 2 of 2, no counterexample either way.
     """
     pat = re.compile(r'`%s`' % re.escape(rowid))
     for ln in section(text, '## Corrections'):
         if not ln.lstrip().startswith('|'):
             continue
-        for m in pat.finditer(ln):
-            if CORR_CLOSE.search(ln[m.end():m.end() + 60]):
-                cells = PIPE_SPLIT.split(ln)
-                return cells[1].strip() if len(cells) > 1 else '§ Corrections'
+        cells = PIPE_SPLIT.split(ln)
+        if len(cells) < 4:
+            continue
+        h = CORR_HEADLINE.match(cells[2].strip())
+        if not h:
+            continue
+        head = h.group(1)
+        for m in pat.finditer(head):
+            if CORR_CLOSE.search(head[m.end():m.end() + 60]):
+                return cells[1].strip()
     return ''
 
 
@@ -991,7 +1039,7 @@ def check(pop=None, exempt=None):
                      'not declare'
                      % (r['id'],
                         ' and '.join(h for h in r['hints']
-                                     if h in ('owner', 'question-head'))))
+                                     if h in HINT_CLOSES)))
 
     # ---- direction 2: gates -> rows -------------------------------------
     for g, (shut, name) in sorted(hdr.items()):
@@ -1248,8 +1296,8 @@ def report_check():
 # That is this repository's own recorded trap -- a pair of wrong numbers is
 # self-consistent as long as the difference is right -- reproduced inside the
 # instrument written to prevent it.
-BASELINE = {'L1': 43, 'L2': 1, 'L3': 14, 'L6': 4, 'L8': 23, 'L10': 2,
-            'L11': 2, 'L12': 4, 'L13': 11}
+BASELINE = {'L1': 45, 'L2': 1, 'L3': 14, 'L6': 4, 'L8': 19, 'L10': 2,
+            'L11': 1, 'L12': 4, 'L13': 11}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
 # directions WITHIN `L1` is still invisible*.  The dict above is HOW MANY the
@@ -1258,9 +1306,15 @@ BASELINE = {'L1': 43, 'L2': 1, 'L3': 14, 'L6': 4, 'L8': 23, 'L10': 2,
 # moves the digest and not the count.  `U14b` is the control, and this is the
 # third layer of one lesson this file already carries twice: a scalar total,
 # then a per-check count, now a per-check identity.
-BASELINE_SIG = {'L1': 'bfe3863f', 'L10': 'c56612d3', 'L11': '7c9e8e5a',
+# 🔄 2026-09-16, `R1z-2`: `L8` goes back to `e9fe5859`, which is BYTE-FOR-BYTE
+# the digest it carried before the `Answered` widening -- the revert restored
+# the same nineteen rows and not merely the same nineteen.  That is the digest
+# layer earning its place on its first real event: the counts alone (`L1` 45,
+# `L8` 19, `L11` 1) would have matched the new baseline while three different
+# row sets moved underneath them.
+BASELINE_SIG = {'L1': '039ed67a', 'L10': 'c56612d3', 'L11': 'ef38ccd5',
                 'L12': '84a6187d', 'L13': 'd8ad2d44', 'L2': '10ef882f',
-                'L3': '757eabf3', 'L6': 'b86a38d5', 'L8': '97ae0a23'}
+                'L3': '757eabf3', 'L6': 'b86a38d5', 'L8': 'e9fe5859'}
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`
@@ -1667,10 +1721,15 @@ def self_test():
     # is not one.  Five other row ids are named in that section for reasons
     # that are not closures, so the negative half is the load-bearing one.
     t11 = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'],
-                   corr_md=['| 2026-01-01 | `A-1` closes, and here is why |'])
+                   corr_md=['| 2026-01-01 | 🔴 **`A-1` closes, and the '
+                            'thing recorded against it was the part that was '
+                            'wrong.** Then a paragraph of why. |'])
+    # 🔴 the negative half is `C-3`'s shape, measured: a closure verb beside
+    # the id, in an entry with no headline, meaning what closing it would COST.
     t11n = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'],
-                    corr_md=['| 2026-01-01 | `A-1` is the row this changes '
-                             'the reasoning of, and it stays open |'])
+                    corr_md=['| 2026-01-01 | the sentence was right about the '
+                             'callers and wrong about the conclusion. `A-1` '
+                             'closes and it costs one console command. |'])
     case('L11+', any(x.startswith('L11 A-1')
                      for x in findings(t11, exempt={})),
          'a § Corrections closure was not reported')
@@ -1697,6 +1756,25 @@ def self_test():
               if ('| %s |' % x) not in r31]
     case('U31', not miss31 and '| DEAD | 0 |' in r31,
          'kinds missing from the rendered block: %r' % (miss31,))
+
+    # 🔴 `U32`: the label has to say where it looked.  `LOOP-1` (1,143) and
+    # `TOOL-1` (806) were both reported as *the head of the question*.
+    t32 = _fixture(rows_md=['| `A-1` 🆕 | ' + 'x' * 300
+                            + ' 🟢 **CLOSED 2026-01-01** | `R5` |'])
+    h32 = census(population(t32))[0]['hints']
+    case('U32', 'question-word' in h32 and 'question-tick' not in h32,
+         'a closure word at offset 300 gave hints %r' % (h32,))
+
+    # 🔴 `U33`: the widening this file tried and reverted.  Four rows in the
+    # live table read `Answered, <file>: …` and every one ends in an explicit
+    # open residual, so the word must NOT close a row.  The control is here so
+    # the next reader who notices the spelling finds the experiment already
+    # done.
+    t33 = _fixture(rows_md=['| `A-1` 🆕 | Answered, `x.md`: **yes.** '
+                            '**Residual**: the bench half | `R5` |'])
+    c33 = census(population(t33))[0]
+    case('U33', not c33['hints'] and c33['kind'] == 'ORPHAN',
+         '`Answered` gave hints %r and kind %r' % (c33['hints'], c33['kind']))
 
     # ---- U14: THE SENTENCE, NOT THE PREFIX -----------------------------
     # 🔴 Every `L<n>±` control above asserts `startswith('L<n> <id>')` and
