@@ -1,0 +1,5 @@
+echo read 0xBB804000 4 > /proc/rtl865x/mecmd read
+m
+bb804000:  o80r4Ay0185
+  		 	 	 	 	 	 	 	 	 	 	 	 	€J …
+# 

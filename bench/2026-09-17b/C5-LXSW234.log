@@ -1,0 +1,5 @@
+echo read 0xBB804234 4 > /proc/rtlcmd read
+8
+bb804234:  600500x7F/00m  e	m	 o	 r	 y	 	 
+	 	 	 	 	 	 	 	   
+# 

@@ -1,0 +1,5 @@
+echo read 0xBB804128 4 >cmd read
+ 
+bb804128:  /00p00r00oE0c  /	r	 t	 l	 8	 6	 5	 x	 /	 m	 e	 m	 o	 r	   ày
+
+# 

@@ -1,0 +1,5 @@
+echo read 0xBB804100 4 > /proc/rtl865x/cmd read
+m
+bb804100:  e00m00o00r00y  	
+	 	 	 	 	 	 	 	 	 	 	 	 	    
+# 

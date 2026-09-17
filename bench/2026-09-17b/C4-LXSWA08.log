@@ -1,0 +1,5 @@
+echo read 0xBB804A08 4 > /proc/rcmd read
+t
+bb804a08:  l00809600509x  /	m	 e	 m	 o	 r	 y	 	 
+	 	 	 	 	 	    
+# 

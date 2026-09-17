@@ -1,0 +1,5 @@
+sleep 1 ; echo read 0xBB804000 4 > /proc/rtl865x/memory
+cmd read
+
+bb804000:  804A0185  		 	 	 	 	 	 	 	 	 	 	 	 	€J …
+# 
