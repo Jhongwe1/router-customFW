@@ -30356,3 +30356,97 @@ sed -n '19,49p' X8-M0.log | tr -d '\r' | sha256sum -> b4935056fc9b7702…   ← 
 ⚠️ **`CAPD-1` 的字面條件滿足而機制沒有**：量，`cardcheck.py` 裡 `started_wallclock`／`strptime`／`datetime` 出現**零次**，`capdate.py` 從不開啟 `PREDICTIONS-*.md`。**沒有任何檢查器讀得到卡片宣告的日期。** 三張卡片都帶了 `declared-date` 這個 `cardnum` 列，那是機器看得見的最小一步，而它跟任何東西都還沒有比對過。
 
 ⚠️ **零 flash 寫入命令、零 `FLR`、`n_writes` 沒有被讀（這一段沒有跑我自己的 SPI 驅動的寫入路徑）**；`AUTOBURN` 被 `looprun` 的 `S5` 設成 0 是因為上傳需要它，而 `S5b` 讀回 `00000000`。括號維持 1,024 / 4,194,304 = **0.0244 %**，而 `FLS-26` 的帳本不動：99.61 % 證明相同、0.195 % 證明不同、0.195 % 未定。
+
+## 2026-09-17 — 第八十六段（18:26 開場，桌面，**零電源循環**，板子全程斷電）：`R6-0` 關了，而關它的東西在第一次執行就產出一個發現 —— 這個專案交換器暫存器的母體一直是「loader 碰過什麼」
+
+🔴🔴 **帶進這一段的第一件事是一個識別碼衝突，本專案的第二次。** 量：`tools/regcensus.py` **早就存在** —— 已追蹤、`100755`、`ci.yml:760`、`ci-expected.tsv:350`、21 個控制、綠的，加入於 `bebf51d` 2026-09-10。而它是**完全不同的儀器**：它自己的 docstring 寫 *"which SYMBOLS in an image materialise a given register address, counted from a disassembly and attributed through `System.map`"*，是為 `R5-7` 的 GPIO 寫入遮罩做的目的碼符號普查。
+
+`PROGRESS.md` §Now 寫的是「**`regcensus` 沒有以工具的形式提交到 `tools/`**」——**照字面是假的**。同一份 `PROGRESS.md` 的 `R6-0` DoD 又說程式碼側是「`regcensus` 對廠商乙太網路驅動」，而已提交的那個**不讀任何 C 標頭**。
+
+🔴 **這比 `NET-14`（2026-09-06 的第一次）更會騙人**：`NET-14` 兩邊都只是文件列，這次衝突的名字是**一個在 CI 裡跑的已追蹤工具**，所以任何人 `ls tools/` 看到它就會結論「這筆債付掉了」。名字沒有重用。
+
+---
+
+🔴🔴 **欠的那個工具交付了，而它第一次執行就說出母體是錯的。**
+
+`tools/hdrcensus.py`，18 個控制全過，接上 `ci.yml` 與 `ci-expected.tsv`（不宣告 skip，`not-run-total` 不動），`ci-census` 認得它：`ran 18/18 failed 0`。
+
+量，對 `AsicDriver/rtl865xc_asicregs.h` 在 `-D CONFIG_RTL_8196E` 下：**2,316 個活分支 `#define` → 546 個位址、1,636 個位元/遮罩、76 個未解析**；與本 repo 所有已追蹤檔案裡出現過的位址交叉之後，**印過 69 個、沒印過 477 個（87.4 %）**。ALE 區塊 `0xBB804400`–`0xBB8044FF` 的 21 個位址裡 **19 個從來沒被印過**。
+
+🔴 **而其中三個正是 `R6-2` 自己那一行定義指名的東西** —— `MSCR 0xBB804410`（L2/L3/L4 模式與兩個 ACL enable）、`VCR0 0xBB804A00`（`En1QtagVIDignore`）、`SWTCR1 0xBB80441C`。**loader 從不寫它們，所以 `NET-21` 從 48 個 `lui` 站點導出來的母體看不見它們。** 一個母體來自單一行為者的普查，看不見那個行為者忽略的一切 —— `tccensus` 自己寫過的那句話升一層。`SPEC.md` `NET-35`。
+
+⚠️ **這個覆蓋率是知識的上界而不是下界**：它問的是「有沒有任何已提交檔案印過這個位址」，一張只是**提到**位址的卡片也算。
+
+🟢 **工具的正確性性質是 `#if` 的處理，而不是剖析。** 標頭把 `PCRP` 的位元位置**定義了兩次**，在 `#if defined(CONFIG_RTL_8196E)` 與 `#else` 底下，**值不同** —— `EnLoopBack` 一邊是 bit 7、另一邊是 bit 10。`K3`／`K4` 是那一對，而一個對條件編譯無知的實作**恰好過其中一個**。
+
+🟢 **`K1` 是讓這個套件不是自說自話的那一格**：它斷言基底鏈把 `MEMCR` 解成 `0xBB804234`，而那是 `bench/2026-09-17b/C3-SW234` 在矽片上量到的位址，量在任何工具解析它之前。
+
+🟢 **它自己的第一次執行抓到廠商標頭的兩個缺陷**：`BISTTSDR0` 與 `BISTTSDR1` 宣告在**同一個位址** `0xBB804238`；`GPIO_BASE` 定義兩次，而第二套拼法整體偏移 `0x0C`，名字與該位址的功能**不一致** —— `PABDAT`（註解寫 "Port AB data"）落在 `0xB8003514`，那是第一套的 `PAB_IMR`，**中斷遮罩**。本專案用的是正確的那一套（`PABCD_DAT = 0xB800350C`，`docs/blind-write-ledger.md` § 4.9 普查的那個位址），所以這裡沒有東西是錯的 —— 但那是一個活的陷阱，而工具在沒有人看的情況下抓到它。
+
+---
+
+🟢🟢 **`R6-2` 的 DoD 從「做不到」變成一次量測，而說它做不到的是上一段自己的卡片。**
+
+`bench/2026-09-17b/PREDICTIONS-B25-block24.md:96` 逐字寫著：*「`一個與 reset 不同的讀回值` **今天做不到**：那八個沒有一個有已知的 reset 值。」*
+
+讀 `rtl865xc_asicregs.h`：`SSIR`（別名 `SIRR`）= `0x04 + SWMISC_BASE` = **`0xBB804204`**，帶 `SwitchFullRst = (1<<2)` 註解 *"Reset all tables & queues"*、`TRXRDY = (1<<0)` 註解 *"Start normal TX and RX"*。讀 `rtl865x_asicCom.c:2002-2040`：**廠商自己的初始化就在用它**。
+
+🟢 **而這個推導自己帶一個對量測的驗證**：同一組定義算出 `MEMCR = 0x34 + SWMISC_BASE = 0xBB804234`，**與上機量到的位址一字不差**；`SWMACCR_BASE → 0xBB804000 = MACCR`、`TACI_BASE → 0xBB804D00 = SWTACR` 同樣對上。三個獨立的吻合，而且吻合的對象是在這個推導存在之前取得的讀數。
+
+🔴 **在 8196E 上廠商不信任單獨的 `FULL_RST`**：`FullAndSemiReset()` 在它後面接一段 650 ms 的交換器核心時脈閘控（`SYS_CLK_MAG` bit 11 關掉再開）。**那段多出來的時間改不改任何暫存器，本 repo 沒有任何來源回答過** —— 驅動因此帶兩種配方，卡片比較它們的 dump。
+
+🟢 **重置後的預測有一個文件來源，而它讓整個區塊兩個方向都可否證**：`rtl8651_clearRegister()`（`rtl865x_asicCom.c:946-1115`）有 82 個帶字面值的寫入，含 **`MSCR = 0`**、`VCR0/VCR1 = 0`、`PVCR0..4 = 0`、`SWTCR0/1 = 0`、`PCRP0..4 = (1 \| MacSwReset) = 0x9`。🔴 量，**它沒有任何呼叫者**（`grep` 對整棵廠商乙太網路樹只回三筆：原型、說明註解、定義）。所以它是廠商認為「空白」長什麼樣，不是矽片讀到什麼 —— 若 `FULL_RST` 留下這些值，九個 dumb 寫入每一個都移動它的暫存器；若它不動，**重置的正控制開火**，區塊帶著理由作廢。
+
+⚠️ **界線寫下來而不是省略**：`FULL_RST` 是「表與佇列」的軟重置，**沒有被證明等同上電重置**。`R6-2` 能說的是「與這顆零件自己文件化的完整重置所留下的狀態不同」——嚴格強於「與 loader-state 不同」、嚴格弱於「與上電預設不同」。
+
+---
+
+🟢 **`R6-2` 的驅動寫好、建好、在映像裡。**
+
+`config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c`，`MK9`，`subsys_initcall`。37 個暫存器的普查表、四個快照槽、兩種重置配方、九個寫入的 dumb 設定、以及一個**開機零寫入**的寫入守衛（每個寫入都在一個 verb 後面**而且**在一個執行期解鎖後面，所以 `n_writes` 在開機擷取上讀 0 是一次量測而不是一個承諾）。
+
+`recipe=f681f8e0`（上一顆 `bb684eb0`），`vmlinux` **4,175,548** bytes（r58 4,055,777 → r59 4,095,382）。`System.map` 有 18 個 `rtl819x_sw_*` 符號與 **`__initcall_rtl819x_sw_init4`**，level 4 = `subsys_initcall`。
+
+**證明是四個角而不是兩個**：S0（loader，已量）、**S0′**（早期核心初始化後、廠商 NIC 驅動前，在 `subsys_initcall` 閂鎖 —— **從來沒有東西量過這個狀態**）、S1（`FULL_RST` 後）、S3（dumb）。`D2` 是 **S3 ≠ S1**。四個控制寫在驅動自己的註解裡：重置的正控制（至少一個暫存器要 `S1 ≠ S0′`）、寫入的負控制（沒被寫的暫存器要 `S3 == S1`）、來回（`restore` 要把 `S0′` 拿回來 —— 這顆零件已經有一個不會讀回的暫存器，`FW-52` 的 `WDTCLR`）、以及讀取路徑的控制（`CVIDR`；⚠️ 它的值在這顆晶粒上**未定**，所以第一次上機它只是負控制，從第二次起才是正控制）。
+
+---
+
+🔴🔴 **一個稽核發現：本 repo 有一個已提交的量測，建立在一個不可能失敗的 grep 上。**
+
+`config/rlxfw-marks.tsv` 的 `MK7` 理由寫著：*量 on `r0-vendor-kernel.bin`（987,138 bytes，this unit's own vendor kernel）：`n150rt`、`N150RT` 和 `leds-gpio` 各出現 ZERO 次*。
+
+我本來要在自己的 `MK9` 上做同一件事。照專案規則先跑正控制 —— **`Linux version`、`Realtek`、`eth`、`rtl819x` 全部也回 0**。那個檔案是 **LZMA 壓縮的映像**，對它 grep 任何明文字串都只能回 0。
+
+🟢 **結論活下來、證據沒有**：在解壓後的核心（3,374,772 bytes，sha256 `cf0d60a8…`，`docs/rlx-cache-and-cp0.md:386` 記的值，量，`$FWRE_WORK` 裡五份副本逐位元相同）上重量，四個正控制讀 **1／3／24／2**，三個字串仍然全是 **0**。兩邊都寫進 `rlxfw-marks.tsv`。
+
+🟢 **而它立刻付出代價**：`rlxfw-marks.py verify` 需要一個 `--absent` 映像當鑑別器。給它壓縮檔會讓**每一個** mark 都「不在廠商映像裡」——一個不會失敗的鑑別器。給解壓檔，它回 `all 12 mark(s) present once in the image, 8 witness(es) present, 1 witness(es) confirmed ABSENT, and absent from 1 vendor artefact(s)`，`MK9 str:rtl819x-switch mine:3 vmlinux.bin:0`，rc 0。
+
+---
+
+🟢🟢 **`NET-33` 殘留 ① 關掉了，而關它的兩個來源不共用一行程式碼。**
+
+讀 `rtl865xc_asicregs.h:2392-2430`：`PVCR` **一個字裝兩個埠**，而且表頭把每一個埠的位移各自具名。bits 11:0 = 偶數埠 PVID、bits 14:12 = 其優先權、bits 27:16 = 奇數埠 PVID、bits 30:28 = 其優先權。
+
+🔴 **兩個對 `docs/loader-phy-and-switch.md` 的更正**：① 它把欄位寫成 **16 位元**，實際是 **12 位元 + 3 位元優先權**（目前優先權都讀 0，所以數字沒錯、描述錯了）；② 它把**六個位址都當成 `PVCR`**，第六個 `0xBB804A1C` 是 **`PBVCR0`**，Protocol-Based VLAN Control Register 0，另一個暫存器。
+
+解碼 block 26 的讀數：P0=9 P1=9 P2=9 P3=9 **P4=8** P5=1 P6=1 P7=1 P8=9。
+
+🔴 **`NET-04` 說 WAN 是埠 0、這裡說埠 4，兩個都是量。** 我去查 `NET-04` 引的原始來源，量到：**原廠韌體** `eth1 added. vid=8 Member port 0x1` = 埠 0（5 次）；**我的映像** `Member port 0x10` = **埠 4**（104 次），而其餘四個介面全部是 4−n 的鏡像。block 26 的擷取帶 `RLXFW-ID0=BB684EB0`，所以它跑在我的映像上。**兩個都對，是兩個不同的狀態**，而 `NET-33` 自己那個 ⚠️「`NET-04` 的埠號不能直接套過來」正是對的。`SPEC.md` `NET-37`。
+
+---
+
+🔴 **這一段自己的缺陷，五個，全部被閘門或控制抓到。**
+
+① **背景任務的完成通知說 `exit code 0`，而建置失敗 rc=1** —— CLAUDE.md 記著這個陷阱，而它這次咬的是我自己的腳本：腳本把 rc 寫進檔案（救了我），但腳本本身的結束碼是最後那個 `echo` 的。補上 `exit "$rc"` 之後，第二次失敗的通知就誠實了。
+② 第一次建置漏了 `--initramfs`（`gen_initramfs_list.sh: Cannot open 'usr/rlxfw-initramfs.spec'`）；第二次把**宣告檔**當成 spec 傳進去（那是 `mkinitramfs.py build --decl` 的輸入，不是 `gen_init_cpio` 的）。
+③ **`spec-check` 在我自己的 `NET-36` 上抓到一個沒有跳脫的 `|`** —— `(1 | MacSwReset)` 讓那一列變成 8 格對 7 格的標頭，而 `C8` 的訊息自己寫著後果：*讀 V/N/來源/擁有者 的檢查會讀到錯的格子然後**通過***。
+④ `C3`：`NET-37` 帶 `未定` 而 §17 沒有對應的殘留列。補上 `NET-37` 殘留。
+⑤ **加三列進 `SPEC.md` 讓十二處引用腐爛**，跨四個檔案 —— 而位移**不是齊一的**（§5 的三列讓下面 +3，§17 那一列再讓它下面的 +4），所以一個統一位移會是錯的。`citecheck` 修完之後 `36 passed, 0 failed` 與 `8 passed, 0 failed`。
+
+🔴 **而一個工具的總計行仍然不是它的判決**：`spec-check` 的 `tail -6` 顯示的是 `C12` 那一格**通過**，而檔案上面有一個 `FAIL`。這一段是在讀 `RC=1` 而不是讀 tail 的時候發現的。
+
+---
+
+**產物**：`tools/hdrcensus.py`（新）、`config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c`（新）、`notes/switch-driver.md`（新）、`config/rlxfw-marks.tsv`（`MK9` + `MK7` 的證據更正）、`.github/workflows/ci.yml`、`tools/ci-expected.tsv`、`SPEC.md`（`NET-35`／`NET-36`／`NET-37` + `NET-33` 殘留 ① 關閉 + `NET-37` 殘留）、`PROGRESS.md`（§Now 三列，就地，行數不變）、以及 `citecheck` 修好的十二處引用（`PROGRESS.md`、`SPEC.md`、`docs/FINDINGS.md`、`notes/slots45-draft.md`）。
+
+**零電源循環，板子全程斷電，零 flash 寫入命令。**
