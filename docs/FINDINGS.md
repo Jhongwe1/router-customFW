@@ -546,6 +546,49 @@ rather than by a checker.
 
 ## It answered a question that had been open
 
+🟢🟢🟢 **2026-09-17 (seating 26) — `CPU-45` is answered, and the answer is that
+this D-cache is NOT coherent with a real bus master.** The question had been
+open since `R1-gate`; `R1h` was opened for it and closed without a measurement;
+the KSEG0/KSEG1 proxy returned negative **five times across three seatings**.
+What answered it was an **engine instead of a model**: the switch's CPU-port RX
+DMA, which the seating's own power cycle already had running, with **eight
+1472-byte broadcast UDP frames** as the treatment and **zero writes, zero
+uploads, zero `J`**. Two of four buffers, in each of two runs with different
+patterns, read `V1 == V0` while `V2` differed.
+🔴 **The reading is airtight and the reason is the asymmetry the design was
+built around**: `V2 ≠ V0` proves the DMA wrote, and a miss would have fetched
+`V2` — so the line *was* resident, and **there is no *it was evicted* escape.**
+`docs/probe3-cells.md:770` had registered only `equal` as a refuter, which is
+exactly why `c-A` could never separate its three causes.
+🟢 The payload value was computed before the frames were sent — offset 1398,
+42 bytes of header, `1356 mod 256 = 0x4C` — and **all four buffers returned
+`4C4D4E4F 50515253 54555657 58595A5B`**, which incidentally confirmed that the
+mbuf data pointer is the first byte of the Ethernet header and that this switch
+inserts no CPU tag. 🟢 Run 2 carried a second pre-registered prediction — that
+`V0` would read run 1's pattern rather than zeros, because run 1's uncached read
+invalidated the lines — and **all four hit, so `CPU-70` is confirmed on a path
+completely different from the A–B–A ladder it was measured on**.
+⚠️ **What it does not establish** is in `docs/KNOWN-ISSUES.md` and is not small:
+write policy, D-side geometry, the mechanism behind the two ambiguous buffers,
+and the cost of uncached rings.
+
+🟢🟢 **2026-09-17 — `NET-10` closed after 24 days, and what closed it was
+opening a file that had been in this repository the whole time.** The row said
+in its own words *"the spacing is inferred; no source in hand names these two
+addresses"*. 讀 `AsicDriver/rtl865xc_asicregs.h:1132-1151`:
+`PCRAM_BASE = SWCORE_BASE+0x4100`, and every one of `PCRP5`, `PCRP6`,
+`PSRP5`–`PSRP8` is named there with its offset and a comment. 🔴 **The thing
+that was missing was not a measurement.** It is a finding about how this project
+searches, and it is the second of its kind this month.
+🟢 It was then confirmed from the other side: **eighteen fields agree** between
+loader-prompt `PSRP` readings and the vendor driver's own
+`/proc/rtl865x/port_status`, including the field that carries it — `NWay Mode
+Disabled` on exactly the register whose bit 7 is clear.
+🔴 **`0xBB804118` is the exception and it is a three-way disagreement**: the
+header names `PCRP5`, the datasheet's table skips it, and the silicon reads
+`00000000` where every neighbour reads `xx7F00xx`. **The measurement sides with
+the datasheet.**
+
 🟢🟢 **2026-09-16 (seating 24) — the D-cache's capacity is measured, and what
 separates it from the scratchpad is not the knee.** A footprint ladder at six
 sizes with the load count held at 8,192 reads **1,496 / 1,480 / 1,472 / 1,485 /

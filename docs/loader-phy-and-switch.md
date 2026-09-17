@@ -875,3 +875,114 @@ written as a netdev name it is true for exactly one of the two kernels.
 
 ⚠️ **Which of the two numberings matches the silk-screen labels is undetermined**
 and neither log can settle it: both are the driver's own table, not the PCB.
+
+
+---
+
+## 🆕 2026-09-17 (seating 26) — `NET-10` closes on a header that was here all along, and eleven registers are read in both states
+
+### The closure, and the lesson is about searching
+
+§ 7 above says of `0xBB804118`/`0x411C` that *the spacing is inferred* and that
+**no source in hand names these two addresses**. 讀,
+`src-vendor/rtl819x-toolchain/linux-2.6.30/drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h:1132-1151`:
+
+    #define PCRAM_BASE   (SWCORE_BASE+0x4100)        /* REAL_SWCORE_BASE = 0xBB800000, :147 */
+    #define PCRP5        (0x018 + PCRAM_BASE)        -> 0xBB804118
+    #define PCRP6        (0x01C + PCRAM_BASE)        /* Port Configuration Register of Ext Port 0 */
+    #define PSRP5..PSRP8 (0x03C..0x048 + PCRAM_BASE) -> 0xBB80413C .. 0xBB804148
+
+**Every one of them is named, with an offset and a comment, in a file this
+repository has carried since day one.** 🔴 What was missing was not a
+measurement; it was somebody opening that file. This is the second finding of
+that shape this month and it is about how the project searches.
+
+### The cross-state confirmation — eighteen fields
+
+量 2026-09-17: block 24's loader-prompt `PSRP` readings against the vendor
+driver's own `/proc/rtl865x/port_status` (`bench/2026-09-17/C2-PORT.log`, and
+again in the same power cycle at `bench/2026-09-17b/C6-PORT.log`, **byte-identical**,
+md5 `6413559b8e7bb4b853b91fc9cca7d333`).
+
+| register | loader-state | `/proc` under Linux |
+|---|---|---|
+| `PSRP3` `0xBB804134` | `000010F9` | `Port3 … LinkUp \| NWay Mode Enabled` / `RXPause \| TXPause` / `Duplex \| Speed 100M` |
+| `PSRP5` `0xBB80413C` | `000000E2` | `Port5 … LinkDown` |
+| `PSRP6`/`PSRP7` `0x4140`/`0x4144` | `0000007A` | `CPUPort … LinkUp \| NWay Mode **Disabled**` / `RXPause \| TXPause` / `Duplex \| **Speed 1G**` |
+
+🟢 **`NWay Mode Disabled` is the load-bearing field.** Every real port on this
+part reads `NWayEnable = 1`; a CPU port does not negotiate. It is the one field
+that could not have been guessed from link state, and `/proc` prints it for
+exactly the register whose bit 7 is clear. 🟢 § 7's own 2026-08-24 inference that
+speed code `10` is *higher than `01` = 100M* becomes 量, by a file that prints
+the characters `1G`.
+
+### 🔴 `0xBB804118` is a three-way disagreement, not a confirmation
+
+B names `PCRP5` there. **D's Table 62 skips it.** The silicon reads
+**`00000000`** where every neighbour reads `xx7F00xx`. **The measurement sides
+with D**: the address decodes — it returns zero rather than garbage — but this
+part does not populate that port. A driver written from B alone would program a
+register that is not there.
+
+### The eleven registers, both states
+
+量 2026-09-17. Loader side `bench/2026-09-17b/C1`–`C9`; Linux side `X28`–`X47`
+through `/proc/rtl865x/memory`, which needs no new image.
+
+| address | symbol | loader | Linux |
+|---|---|---|---|
+| `0xBB804000` | `MACCR` | `804A0185` | `804A0185` |
+| `0xBB804004` | `MDCIOCR` | `96181441` | `84001300` |
+| `0xBB804008` | `MDCIOSR` | `00000000` | `00001100` |
+| `0xBB804100` | `PITCR` | `00000000` | `00000000` |
+| `0xBB80414C` | `P0GMIICR` | `00037D00` | `00037D00` |
+| `0xBB804234` | `MEMCR` | `00007F7F` | `00007F00` |
+| `0xBB804418` | `SWTCR0` | `00080000` | `00097DE0` |
+| `0xBB804428` | `FFCR` | `00000003` | `00000009` |
+| `0xBB804A08` | `PVCR0` | `00080008` | `00090009` |
+| `0xBB804D00` | `SWTACR` | `00000000` | `00000000` |
+| `0xBB804D08` | `SWTAA` | `BB060100` | `BB040020` |
+| `0xBB804D3C` | `TCR7` | `00000000` | `07000030` |
+
+🔴 **Before this, no word in `0xBB804xxx` had ever been read under Linux** —
+量, `grep -rl BB804 bench/` returns 41 files in four directories, newest
+`bench/2026-08-25`.
+
+### 🟢 `PVCR` is per-port PVID
+
+`0xBB804A08`–`0xBB804A1C` under Linux: `00090009`, `00090009`, **`00010008`**,
+`00010001`, `00000009`, `00021B74`. **Six addresses, five distinct values**, so
+the block is not aliasing, and both intended negative controls differ. **Exactly
+one 16-bit field reads `8`** and the other PVID-shaped fields read `9` or `1` —
+and `NET-04`, 量 from the vendor kernel's own boot lines, records exactly one
+port on **vid 8** (the WAN) against four on **vid 9**. ⚠️ **推**: which physical
+port `0xBB804A10` is. `NET-13` measured this kernel's netdev↔port map as the
+**mirror** of the vendor's, so `NET-04`'s port numbers do not carry across.
+
+### 🔴 `ip link set <if> down` is not a link-down event on this RTL8153
+
+量: the host interface went `down → up → down → up` and the board's `PSRP3`
+never left `000010F9`. **The peer was identified from the board's side**:
+`PHYR 3 5` reads `ANLPAR` = **`0x0000CDE1`** and `PHYR 3 1` reads `BMSR` =
+**`0x000078ED`**, and § 7's `NET-14` holds three fingerprints of which **two are
+negative controls that did not match** (`0xC1E1` a PC NIC, `0x0001` unlinked;
+`0x78C9` unlinked). ⚠️ **推**: the driver leaves the PHY powered and negotiated
+while the interface is administratively down.
+
+⚠️ **`ethtool` on this usbip path is not a second source**: it reports
+`Supports auto-negotiation: No` and `Duplex: Half` for a gigabit adapter, and it
+**disagrees with the board**, whose `PSRP3` bit 3 is set. The board is the
+better source.
+
+**Consequence**: a link transition cannot be produced on this bench with
+`ip link set`. It needs a physical unplug or a host-side PHY command, and
+neither has been shown to work on this adapter.
+
+### 🔴 `PSRP` bit 12 — two instances, and it is not about link
+
+`PSRP0`: `000010E0` at the prompt, `000000E0` under Linux, on a **LinkDown**
+port. `PSRP3`: `000010F9` → `000000F9`, on a **LinkUp** port. The low byte is
+identical in both ports and both states; **the whole difference is bit 12**, and
+§ 7's `NET-11` bit map stops at bit 8. Re-read after `ifconfig eth4 up`: still
+clear, so `ndo_open` does not set it either. **未定.**

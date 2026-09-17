@@ -1471,10 +1471,47 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
-*(Nothing yet. `R6` is next and is **not opened** — opening a gate is the
-owner's decision, and `R6` has no step list yet. `R6-0` is a forward reference
-in planning prose that `PROGRESS.md` has never contained; `cfcensus`'s `L2`
-has already fired once on a citation of it.)*
+🔴 **This section said `R6` was "next and not opened" and that had been stale
+since 2026-09-17 morning**, when `R6` was opened in the same segment `v0.4` was
+tagged. Corrected here on the evening of the same day.
+
+### `R6-1` — the cold seating, one power cycle, and the gate's precondition is answered
+
+🟢🟢🟢 **`CPU-45` is answered: this D-cache is NOT coherent with a real bus
+master.** Open since `R1-gate`, attempted five times across three seatings with
+a proxy that could never have answered it. The engine used instead is the
+switch's CPU-port RX DMA, already running at the loader prompt; the treatment is
+eight broadcast frames; **zero writes, zero uploads, zero `J`**. Two of four
+buffers, two runs, two patterns: the cache returned the old value after the
+engine overwrote the DRAM, and the eviction branch is closed by the data itself.
+`R6-3`'s rings go in the uncached window because of a reading rather than a
+vendor's opinion.
+
+🟢🟢 **`NET-10` closed after 24 days** — by opening a vendor header that had been
+in the repository all along. Eighteen loader↔Linux fields agree; `0xBB804118` is
+a three-way disagreement in which the silicon sides with the datasheet.
+
+🟢 **Eleven switch registers read for the first time, in both states.** Before
+this, no word in `0xBB804xxx` had ever been read under Linux on this device —
+twenty-three seatings, 41 committed files, newest 2026-08-25. `PVCR` turns out
+to be per-port PVID and its value is the VLAN id the vendor's own boot log
+records. `0xBB804234` has a name (`MEMCR`) and its two bytes are two separately
+writable fields.
+
+🟢 **Two inferences closed by being caused rather than observed**: `ndo_open`
+writes `CPUICR` (`00000000` → `C4000000`, the predicted value bit for bit), and
+`/proc/rtl865x/memory` reads any physical address under Linux with no new image,
+so `RECIPE_ID` did not move.
+
+🔴 **`FLS-26`'s bracket closed for a five-minute vendor-firmware interval**, and
+the more useful half is that its comparison method was broken: the four prior
+maps were compared by the digest of the whole capture, and all four came from
+one image. Change the image and that comparison reports a flash change. Compare
+the map body.
+
+⚠️ **`R6-0` is half done**: the census content is delivered, `regcensus` is not
+committed as a tool. `CAPD-1`'s literal condition is met and its mechanism does
+not exist — no checker in this repository reads a card's declared date.
 
 ---
 

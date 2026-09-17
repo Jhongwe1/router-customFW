@@ -609,3 +609,63 @@ The instrument that answers the question is each capture's `.meta.json` `sent`
 field plus the rescue transcripts — **65 sent strings this seating, 0 carrying a
 flash-write verb**, with a synthetic `FLR 80A00200 006000 100` as the scan's
 positive control.
+
+
+---
+
+## 🆕 2026-09-17 (seating 26) — the bracket closed for a vendor-firmware interval, and the comparison method it closed with was broken
+
+### What ran, and why this interval needed a bracket at all
+
+The vendor firmware executed on this part for about five minutes, ~10:57–11:02,
+because a backgrounded ESC window never opened (its command's leading `/` was
+path-translated; `CLAUDE.md`'s MSYS row). **That it ran is 量, and the
+instrument is an ESC echo signature rather than a log**:
+
+| capture | `0x1b` echoed | `^` | `[` | BEL |
+|---|---:|---:|---:|---:|
+| `bench/2026-09-16/C1-A.log` (known loader) | 65,315 | 0 | 1 | 0 |
+| `bench/2026-09-14/C1-A.log` | 66,134 | 0 | 1 | 0 |
+| `bench/2026-09-10/C1-A.log` | 66,296 | 0 | 1 | 0 |
+| `bench/2026-09-17b/X0-esc.log` (the interval) | **0** | **4,095** | **4,095** | **2,277** |
+| `bench/2026-09-17b/X1-esc.log` (12 min later, same adapter) | **5,182** | 0 | 1 | 0 |
+
+The loader echoes ESC as a raw `0x1b`; whatever answered during that interval
+rendered it in caret notation and beeped on a full line buffer. 推: busybox
+ash's line editor, so the flash image was running. 量: that capture holds no
+shell prompt, no command echo and no command output — **nothing was executed**.
+
+### 🟢 The bracket closed
+
+`bench/2026-09-17b/C7-M0`, **3,013 bytes in 13.763 s**: all thirty-two unit
+digests and `RLXFW-S-MDIFF=00000000` **byte-identical** to
+`bench/2026-09-10/C1-M0`. **So those five minutes wrote nothing to the 4,186,112
+bytes this map covers.**
+
+### 🔴🔴 And the method used to compare the four prior maps is wrong
+
+**The whole capture's sha256 DID change**: `b3d3d7d081310c0d…` →
+`7de2d527a4edc415…`. `SPEC.md` `FLS-26` records four maps agreeing across two
+seatings **by exactly that digest** — and all four came from the **same image**.
+
+`diff` on the two captures returns **two lines**:
+
+    5c5    < version rtl819x-spi 1.1     >  version rtl819x-spi 1.2
+    16c16  < map_jiffies 1280            >  map_jiffies 1279
+
+The driver's own version string — `p11e` carries `rtl819x-spi` **1.2** where the
+2026-09-10 image carried **1.1** — and a free-running elapsed count. Filtering
+those two lines out and re-diffing: **identical**.
+
+🔴 **A digest over a capture that contains a version string and a timing
+measurement is not a digest over the flash**, and when the image changes it
+fails in the **worst direction**: it reports a flash change. **The corrected
+rule is that the comparison is over the map BODY**, not over the capture.
+**2026-09-17 is the first seating on which the two could be told apart**, because
+it is the first time a map was taken from a different image.
+
+⚠️ `RLXFW-S-MDIFF=00000000` is the driver's own answer and it read zero — but a
+flag reading zero is a claim, and **what settled this was the byte-level diff**.
+
+🟢 One free reading: `map_jiffies` is **1279**, inside the 1279–1280 band this
+file already records, making it ten runs over five seatings and nine days.

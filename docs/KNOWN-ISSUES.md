@@ -196,9 +196,29 @@ not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
   write-1-to-clear register (`SPEC.md` `IRQ-09`). That does not stop
   delivery and it does bound every single-sample reading of that
   register ever taken here.
-* **Whether a DMA write is visible to a cached CPU read.** Nothing has been
+* ✅ ~~**Whether a DMA write is visible to a cached CPU read.** Nothing has been
   measured in that direction, and it is the one driver decision the cache gate
-  closed without.
+  closed without.~~ 🟢🟢 **ANSWERED 2026-09-17 (seating 26), and the answer is
+  that it is NOT visible: this D-cache holds stale lines after a real bus master
+  overwrites the underlying DRAM.** The engine is the switch's CPU-port RX DMA,
+  already running at the loader prompt; the treatment is eight broadcast frames;
+  two of four buffers read `V1 == V0` with `V2` different, in each of two runs.
+  The reading is airtight rather than suggestive because a miss would have
+  fetched `V2`, so the line *was* resident — **there is no *it was evicted*
+  escape**, which is what every previous attempt lacked.
+  `docs/rlx-cache-and-cp0.md` § ⓑ-4.
+  🔴 **What is still open, and it is not small**:
+  * the D-cache's **write policy** (`CPU-19` 殘留 ①) has **zero** measurements,
+    and § ② says why that is decisive for a ring — a ring is a *write hit on a
+    resident line*;
+  * D-side **line size** and **associativity** have never been measured; the
+    量 16-byte / 2-way figures are the **I**-cache, and `v-line`/`v-assoc` have
+    never run;
+  * **why two of the four buffers read the new value is undetermined** — the
+    split is structural, the same two both runs, and the geometry that would
+    explain it is the unmeasured one above;
+  * the **throughput cost of uncached rings** is unmeasured and is a different
+    number (`R6-1` `D5`).
 * ✅ ~~**Whether this silicon retires the `cache` instruction.** This unit's own
   vendor kernel contains 37 of them, D side only; none has been executed by
   anything of this project's.~~
