@@ -760,6 +760,31 @@ jobs:
       - name: regcensus
         run: /usr/bin/python3 tools/regcensus.py --self-test 2>&1 | tee ci-out/regcensus.out; exit "${PIPESTATUS[0]}"
 
+      # R6-0's owed half, and 🔴 IT IS NOT `regcensus` ABOVE. That tool reads a
+      # disassembly and a System.map; this one reads the vendor's C header.
+      # `PROGRESS.md` §Now says "regcensus 沒有以工具的形式提交到 tools/" while a
+      # tool of that exact name sits one step above this one, green -- an id
+      # collision, the second in this project after `NET-14`. The name was not
+      # reused; the reason is in this tool's own docstring so that a reader who
+      # finds either one is told there are two.
+      #
+      # WHY IT EXISTS: `SPEC.md` `NET-21` derives this project's switch-register
+      # population from 48 `lui` sites in the LOADER. That is what one agent
+      # touched, not what configures the switch -- so `MSCR` (the acceleration
+      # master switch), `VCR0` (the 802.1Q-unaware bit) and `SWTCR1` were
+      # invisible to it, and `R6-2`'s definition names all three. This takes the
+      # population from the DECLARATION side instead.
+      #
+      # The correctness property is the `#if` handling: the header defines
+      # `PCRP`'s bit positions twice with different values, so a grep-shaped
+      # census produces a field map wrong for whichever part you hold. K3/K4 are
+      # that pair and a conditional-blind implementation passes exactly one.
+      # All eighteen controls are synthetic -- the live census needs
+      # src-vendor/, which is not committed, and is a desk command rather than a
+      # case -- so this declares NO skip and the not-run-total does not move.
+      - name: hdrcensus
+        run: /usr/bin/python3 tools/hdrcensus.py --self-test 2>&1 | tee ci-out/hdrcensus.out; exit "${PIPESTATUS[0]}"
+
       # CITE-2. This repository cites its own files as `FILE:NNN`, and a line
       # inserted above a cited row silently re-points every citation below it.
       # `spec-check`'s C11 covers one population -- the payload sources under
