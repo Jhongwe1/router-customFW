@@ -925,7 +925,21 @@ with D**: the address decodes — it returns zero rather than garbage — but th
 part does not populate that port. A driver written from B alone would program a
 register that is not there.
 
-### The eleven registers, both states
+### ~~The eleven registers, both states~~ — 🔴 **the heading says ELEVEN and the table below has TWELVE rows**
+
+*(Corrected in place 2026-09-17, eighty-sixth segment. The heading is left
+standing rather than rewritten, because other files quote it.)*
+
+量: the table carries twelve distinct addresses. `SPEC.md` `NET-21` lists
+**thirteen** loader-touched addresses, of which **two already carried a value**
+(`0x4100 PITCR`, `0x4104 PCRP0`) — so *the eleven* is the other eleven, and
+`PROGRESS.md`'s 十一個 is **correct**. What is wrong is this table: it silently
+gained `PITCR`, which already had a value, and omits `PCRP0`, which did not.
+🔴 **And the omission is the one `R6-2` needed** — `PCRP0` is the Port
+Configuration Register of port 0, and 量 `0xBB804104` has **no Linux-state
+reading anywhere in `bench/`**.
+
+### The register readings, both states
 
 量 2026-09-17. Loader side `bench/2026-09-17b/C1`–`C9`; Linux side `X28`–`X47`
 through `/proc/rtl865x/memory`, which needs no new image.
@@ -952,12 +966,12 @@ through `/proc/rtl865x/memory`, which needs no new image.
 ### 🟢 `PVCR` is per-port PVID
 
 `0xBB804A08`–`0xBB804A1C` under Linux: `00090009`, `00090009`, **`00010008`**,
-`00010001`, `00000009`, `00021B74`. **Six addresses, five distinct values**, so
+`00010001`, `00000009`, `00021B74`. ~~**Six addresses, five distinct values**~~ 🔴 **the sixth is not a `PVCR`** — `0xBB804A1C` is **`PBVCR0`**, the Protocol-Based VLAN Control Register (讀 `rtl865xc_asicregs.h:2306`), so its `00021B74` is not a PVID word at all. **Five addresses, five distinct values**, so
 the block is not aliasing, and both intended negative controls differ. **Exactly
-one 16-bit field reads `8`** and the other PVID-shaped fields read `9` or `1` —
+one ~~16-bit~~ **12-bit** field reads `8`** 🔴 *(the field is 12 bits + 3 bits of priority, not 16 — 讀 `:2392-2430`, where the header names `PVIDP0_OFFSET 0` / `DPRIOP0_OFFSET 12` / `PVIDP1_OFFSET 16` / `DPRIOP1_OFFSET 28`. Every priority reads 0 here so no number changes; the description would have misled the first time one was set. `SPEC.md` `NET-37`.)* and the other PVID-shaped fields read `9` or `1` —
 and `NET-04`, 量 from the vendor kernel's own boot lines, records exactly one
 port on **vid 8** (the WAN) against four on **vid 9**. ⚠️ **推**: which physical
-port `0xBB804A10` is. `NET-13` measured this kernel's netdev↔port map as the
+port `0xBB804A10` is.~~ 🟢🟢 **ANSWERED 2026-09-17 (`NET-37`), and this section's own caution was right.** The five words decode to P0=9 P1=9 P2=9 P3=9 **P4=8** P5=1 P6=1 P7=1 P8=9 — the WAN on **port 4**, where `NET-04` says port 0. Both are 量 and they are two different states: 量, this image's own boot line is `eth1 added. vid=8 Member port 0x10` (bit 4) on **104** captures, the vendor firmware's `upstream/dumps/uart-boot.log:27` is `Member port 0x1` (bit 0) on **5**, and all five interfaces are the **4−n mirror** of each other. block 26's capture carries `RLXFW-ID0=BB684EB0`, so it ran under rlxfw. 🟢 **So the mirror is confirmed by a path sharing no code with the register read.** ⚠️ 推: `NET-13` measured this kernel's netdev↔port map as the
 **mirror** of the vendor's, so `NET-04`'s port numbers do not carry across.
 
 ### 🔴 `ip link set <if> down` is not a link-down event on this RTL8153

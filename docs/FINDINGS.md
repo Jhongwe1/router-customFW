@@ -12,6 +12,11 @@ dump or a document · **推** inferred, pending a measurement.
 ---
 
 ## It changed how this repository checks itself
+| | | |
+|---|---|---|
+| 🔴🔴 量 | **A CENSUS WHOSE POPULATION IS ONE AGENT'S BEHAVIOUR IS BLIND TO EVERYTHING THAT AGENT IGNORES.** 2026-09-17: this project's switch-register population came from **48 `lui …,0xbb80` sites in the loader**, converging on 13 addresses — *what the loader touched*, not *what configures the switch*. 量 with a new instrument that takes the population from the vendor header's declarations instead: **546 addresses declared, 69 ever printed here, 477 (87.4 %) never** — and `MSCR` (the acceleration master switch), `VCR0` (the 802.1Q-unaware bit) and `SWTCR1`, **all three named by `R6-2`'s own one-line definition**, are in the 477 because the loader never writes them. 🟢 The instrument's correctness property is not its parser but its `#if` handling: the header defines `PCRP`'s bit positions **twice with different values**, so a grep-shaped census builds a field map wrong for whichever part you hold, and `K3`/`K4` are a pair a conditional-blind implementation passes **exactly one** of. ⚠️ Its coverage number is an upper bound on knowledge — *printed* counts a card that merely names an address. | `SPEC.md` `NET-35`, `notes/switch-driver.md` § 1, `tools/hdrcensus.py` |
+| 🔴🔴 量 | **A COMMITTED MEASUREMENT RESTED ON A GREP THAT COULD NOT HAVE FAILED, AND THE ONLY REASON IT WAS CAUGHT IS THAT THE NEXT PERSON RAN A POSITIVE CONTROL.** `config/rlxfw-marks.tsv`'s `MK7` cited *量 on `r0-vendor-kernel.bin` … `n150rt`, `N150RT` and `leds-gpio` each occur ZERO times*. That file is the **LZMA-compressed** image: 量 2026-09-17, `Linux version`, `Realtek`, `eth` and `rtl819x` all return **0** on it too, so a grep for any plaintext string there can return nothing else. 🟢 **The conclusion survives and the evidence does not** — re-taken on the decompressed kernel (sha256 `cf0d60a8…`) with four controls reading 1/3/24/2, all three strings still read 0. 🔴 **And it was about to cost something**: `rlxfw-marks.py verify` needs an `--absent` vendor image as its discriminator, and feeding it the compressed file makes **every** mark "absent from theirs" — a check that prints green on nothing. | `config/rlxfw-marks.tsv` `MK7`/`MK9`, `LOG.md` 第八十六段 |
+| 🔴 量 | **"THE VENDOR'S DRIVER WORKS, SO COPYING ITS DECLARATION IS SAFE" IS TRUE ONLY OF THE FIELDS THE WORKING PATH TOUCHES.** 2026-09-17, an argument this project made and asked a reviewer to break: the vendor's Ethernet driver runs on this die, so the layout its compiler produced equals the layout the hardware expects, so a driver of mine can copy the declaration without knowing any absolute bit position. Three of the four steps hold. The second fails on `ph_queueId`: 量, `grep -ran` over the whole vendor Ethernet tree returns it **once — its own declaration** — with `ph_mbuf` 50, `m_data` 28, `ph_len` 11 and `ph_flags` 10 as controls. **Copying it inherits a bit position nothing has ever executed**, and the header's own `/* bit 2~0 */` comment disagrees with MSB-first allocation with no execution to arbitrate. 🟢 The useful half: a minimal RX/TX ladder touches **zero bitfields**, so it blocks nothing yet. | `SPEC.md` `NET-38` 殘留, `notes/switch-driver.md` § 7.1 |
 
 | | | |
 |---|---|---|
@@ -768,7 +773,7 @@ on a bare-metal reading alone; two independent paths now say the same thing.**
 已經下過同一個判決。** 上面那些節的表格中間插一列，會把它底下每一行的行號
 往下推 —— 量 2026-09-16：把三列插進 § *It changed how this repository checks
 itself* 的表頭之後，`PROGRESS.md`、`docs/blind-write-ledger.md` 與這個檔案
-自己引用的 `docs/FINDINGS.md:375` 全部落到一行空白上，而 `citecheck` 的 `M3`
+自己引用的 `docs/FINDINGS.md:380` 全部落到一行空白上，而 `citecheck` 的 `M3`
 當場抓到三個。**搬到節尾也不夠 —— 那一節在第 85 行結束，375 照樣被推走。**
 
 

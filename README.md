@@ -434,8 +434,8 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather than counted by
-eye.** 🔄 **量 2026-09-16**, over `git ls-files tools/` (**140** files), taking those whose
-first two bytes are `#!` and excluding `tools/test-*`: **63** programs, of which **21 are
+eye.** 🔄 **量 2026-09-17 (eighty-sixth segment), re-derived and not incremented**, over `git ls-files tools/` (**144** files), taking those whose
+first two bytes are `#!` and excluding `tools/test-*`: **67** programs, of which **21 are
 described below and 42 are not** — **`appletcensus`**, `audit-bench-log`, `binsim`, `capdate`, `capfield`,
 **`cfcensus`**, `ci-census`, **`citecheck`**, `citime`, `derivcheck`, `desk-sweep`, `dtcheck`,
 **`elfops`**, **`emueq`**, **`emupredict`**, `fetch-sources`, `flashmap`, `fsmanifest`,
