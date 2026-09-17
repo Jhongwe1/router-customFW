@@ -376,6 +376,17 @@ ck "G4b and TWELVE marks in total"        12 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]{2} +RLXFW-')"
 # G4c -- and the witnesses are COUNTED rather than merely excluded. A block that
 # is only ever filtered out of an assertion is a block nothing checks.
+# 🔄 2026-09-17 (`R6-2`, eighty-sixth segment): 7 -> 8.  `MK9` links
+# rtl819x-switch.o into drivers/net/, and its witness is `rtl819x-switch`.
+# 🔴 THIS SUITE WAS NOT RUN AT THE DESK AND CI IS WHAT CAUGHT IT.  The desk
+# gate list that segment ran was spec-check / citecheck / test-file-modes /
+# ledgerscan / xcheck / flashwin / capdate -- every one of them keyed on `.md`
+# or on captures, and none on this file's population.  CLAUDE.md already
+# carries the rule: after a change that moves the population a census-shaped
+# case asserts on, run every suite that can run on this host, not only the ones
+# whose code changed.  Adding an MK row IS that change, and the number below is
+# a hardcoded population count exactly like test-boot-timeline's B2, which went
+# red on GitHub twice for the same reason.
 # 🔄 2026-09-06 (`R5-4`): 2 -> 3.  `MK3` links rtl819x-gpio.o into
 # drivers/gpio/, and its witness is the chip label `rtl819x-pabcd`.
 # 🟢 G4b above stays at TWELVE, and that is the half of this pair that
@@ -400,7 +411,7 @@ ck "G4b and TWELVE marks in total"        12 \
 # conditional, so without CONFIG_WATCHDOG=y the file is never compiled and
 # everything downstream is green.  A string witness read out of the built
 # image is the only thing here that can tell those two apart.
-ck "G4c and SEVEN present-witness build rows" 7 \
+ck "G4c and EIGHT present-witness build rows" 8 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
 ck "G4d and ONE absent-witness build row"     1 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
