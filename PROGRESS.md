@@ -1930,6 +1930,14 @@ version by hindsight, which is the same objection that kept `S0` and `R0` out of
 
 🟢 **`v0.3` SHIPPED 2026-09-11** — tag `v0.3` at `8f42644`, and the release at
 <https://github.com/Jhongwe1/router-customFW/releases/tag/v0.3>.
+
+🟢 **`v0.4` SHIPPED 2026-09-17** — tag `v0.4` at `b24abfb`, and the release at
+<https://github.com/Jhongwe1/router-customFW/releases/tag/v0.4>.
+🔴🔴 **AND THE OWNER HAD TO ASK AGAIN, WHICH MAKES `REL-4`'s GAP A SECOND INSTANCE SIX DAYS AFTER THE FIRST.** The `v0.3` paragraph directly above records that the release *became due without anything here noticing* and that **what found it was the owner asking, not a check**. 🔴 `REL-4` was then closed as ✅ — correctly, because the task *make the v0.3 release* was done — **and the finding inside it was left as a sentence rather than turned into an instrument.** 量 2026-09-17: the tag was pushed at 02:0x and the **release did not exist**; `gh release list` returned `v0.3` and `v0.2` only, and the owner said *我在 github 上沒看到你 release*. Same trigger, same person, six days apart.
+🔴 **The closeout audit could not have caught it, and that is the transferable half.** Method 8 enumerates *what this segment produced* and asks *which FILE owns it* — and a GitHub Release is **not a file in this repository**. Every gate was green and every owner file was correct; the missing artefact lived outside the tree entirely. **The method has a blind spot for outward-facing artefacts**, and this is its first measured instance.
+⚠️ **What a check would need, written down rather than built.** `README.md` owns version → contents; the gate board owns which gates are `✓`. A release is DUE the moment every gate in a version's row is closed, so the check is a join over two committed tables plus one question `gh release list` answers — which means it cannot be a pure repository check and belongs in CI, where a token exists. **It is not built here**: two instances is a rate, not a target, and building it inside the segment that hit it is fitting an instrument to its own occasion. **The re-open condition is a third instance.**
+🟢 Order taken from the precedent again: tag and release first, record second, so no sentence here is written before the thing it describes exists.
+
 🟢 **It is the first release this project has made UNDER that rule rather than in
 spite of it**: `v0.0` was tagged and never released, `v0.1` was never tagged, and
 `v0.2` was released on the day the rule was written down. 🔴 **And it became due
