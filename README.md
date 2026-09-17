@@ -1,7 +1,7 @@
 # rlxfw
 
 An independent firmware for the Realtek RTL8196E — a big-endian MIPS SoC with a
-Lexra core — built from four vendors' GPL drops and one leaked draft register
+Lexra core — built from three vendors' GPL drops and one leaked draft register
 manual, for a router whose vendor never released its source.
 
 🎬 **[60 seconds: a kernel of mine boots this device to a shell, and pings](https://youtu.be/7UjzFiAmzVs)**

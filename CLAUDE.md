@@ -1,8 +1,17 @@
 # CLAUDE.md
 
 rlxfw — an independent firmware for the TOTOLINK N150RT: Realtek RTL8196E, Lexra
-core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from four
-vendors' GPL drops and one leaked draft datasheet, because TOTOLINK never
+core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from three
+vendors' GPL drops and one leaked draft datasheet 🔁 **2026-09-17: this said *four* and it was wrong; the owner of the
+count is `notes/vendor-kernel-isa.md`, which has said *three* throughout.**
+量: `SOURCES.json` gives `frederic/rtl819x-toolchain` role **base** and
+`jameshilliard/WECB-VZ-GPL` + `Saturn49/wecb` role **reference** — three Realtek
+SDK trees, 44,297 / 45,014 / 47,050 `.c`+`.h` files. The two things that could
+have been miscounted as a fourth are both labelled by `SOURCES.json` itself and
+neither is a vendor GPL drop: `shibajee/linux-rtl8196e` is
+**reference-implementation** (a community mainline port) and
+`libc0607/Realtek_switch_hacking` is **doc** — 量, **zero** `.c` and **zero**
+`.h` files in it. ⚠️ Which of the two produced the *four* is undetermined, because TOTOLINK never
 released source.
 
 > **This file holds only what is true today.** 🔄 **2026-08-29, third update:
@@ -848,7 +857,20 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   🆕 **2026-09-15: there IS a discriminator and it is not `usbipd`.** 量, on a
   real drop: `[System.IO.Ports.SerialPort]::getportnames()` returns **empty**
   and `Get-PnpDevice -FriendlyName '*CP210*'` reads Status **`Unknown`**,
-  because the device is off the Windows USB bus altogether. A deliberate
+  because the device is off the Windows USB bus altogether.
+  🔴 **2026-09-17: that discriminator has a PRECONDITION this row never stated,
+  and without it the check produces a FALSE RED.** 量, seating 26, both
+  directions on one adapter within four minutes: **while the device is
+  `Attached` to WSL**, `getportnames()` returns **empty** and `Get-PnpDevice`
+  reads **`Unknown`** — the exact signature above — while the link is perfectly
+  healthy, and the positive control taken in the same minute is a console round
+  trip that came back in **0.124524 s** with the right value. **After
+  `usbipd detach`**, the same two calls return **`COM3`** and **`OK`**. The
+  cause is not subtle: *attaching to WSL is removing the device from the Windows
+  USB stack*, so having no COM port is the normal attached state. **The
+  discriminator is valid only when the device is NOT attached. While it is
+  attached the liveness question is answered on the WSL side** — `/dev/ttyUSB0`
+  present, and a command that comes back. A deliberate
   detach leaves Windows **re-enumerating** it, so the COM port comes back —
   the two are identical in `usbipd list` and different in `getportnames()`.
   **Ask that first**: one call, no re-read, and it separates what four weeks
@@ -889,6 +911,18 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   `tail -6 f 2>/dev/null || echo "still running"` cannot tell *running* from
   *never started* — that is this project's own "a tool reporting 0 is making a
   claim", in a one-line shell check. **Feed the script over stdin instead** —
+  🔴 **2026-09-17: and the heredoc protects the BODY, not the `wsl` command's own
+  ARGUMENTS — which is the distinction that makes this trap survive the
+  workaround.** 量, three times in one segment: `wsl -d Ubuntu-24.04 --
+  /usr/bin/python3 - <<'PY'` fails with **exit 127** and
+  `C:/Program Files/Git/usr/bin/python3: No such file or directory`, because the
+  leading `/` of the *argument* is translated before `wsl` ever sees it, heredoc
+  or no heredoc. `wsl -d Ubuntu-24.04 -- bash -ls <<'EOF'` works for exactly one
+  reason: **`bash` has no leading slash.** 🔴 The first of those three failures
+  cost the boot banner of a seating — a backgrounded ESC window never opened, and
+  the vendor firmware ran unobserved for about five minutes. **Either keep every
+  `wsl` argument slash-free, or write the script to a file and launch it from
+  PowerShell, which does no path translation at all.**
   nothing in the body is touched, and shell variables work:
 
   ```

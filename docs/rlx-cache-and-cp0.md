@@ -96,7 +96,13 @@ An MTD driver that reads through the SPI controller's own registers
 never asks the question. **That is a design choice `R5b` gets to make with its
 eyes open, which is the point of writing this down now rather than at 2 a.m.**
 
-### ② `R6`'s descriptor rings: 未答, and the obvious answer is not one
+### ② `R6`'s descriptor rings: ~~未答~~ — 🟢🟢 **ANSWERED 2026-09-17, and the answer is
+NOT COHERENT. See § ⓑ-4 at the end of this file.** The section below is kept as
+written, because the reasoning in it is what made the redesign necessary — and
+because § ⓑ-4's first result is that this section's own proxy was biased toward a
+false all-clear, which is a thing only the original wording shows.
+
+### ② (as written) `R6`'s descriptor rings: 未答, and the obvious answer is not one
 
 **This is the decision the gate did not make.** It is written out at length
 because a write-up is exactly where a gate widens its own claim, and this is the
@@ -1376,3 +1382,159 @@ to `rlx_tc_ladder`, so it pays the leaf's own I-cache fill, where base B's rung 
 is the thirteenth. **The experiment that decides it**: discard one `lad_leg`
 before the ladder starts, exactly as `t-hit` effectively does for
 `rlx_tc_walk`. Needs a payload; costs no extra power cycle once one exists.
+
+
+---
+
+## ⓑ-4 — 🟢🟢🟢 2026-09-17 (seating 26, block 25): decision ② is ANSWERED, and the answer is NOT COHERENT
+
+§ ② has said *未答* since this file was written. It is answered. **This D-cache
+holds stale lines after a real bus master overwrites the underlying DRAM.**
+
+### The reframing that made a redesign necessary rather than preferred
+
+§ ② already said of itself that the KSEG0/KSEG1 alias is *a model, not the
+thing*. What it did not say — and what `R6-0` had to say first — is that **the
+proxy is biased toward a FALSE ALL-CLEAR**, which is the worst direction a
+coherency instrument can fail in.
+
+量 `CPU-70` (seating 24): **an uncached read invalidates a resident line**
+(`l.aba.c1` = 545, against 552 derived for *invalidated* and 46 for *not*).
+The proxy protocol is *write through the uncached alias, then read through the
+cached one*. 推, and the burden runs this way rather than the other: if an
+uncached **access** invalidates the line, the proxy's own write destroys the
+line under test before the verifying read happens; that read then misses,
+fetches DRAM, and returns the new value — **which is exactly what a snooping
+cache would have produced.** ⚠️ `CPU-70` measured a *read*; that a write behaves
+likewise is 推 and does not need proving here, because for `c-A`'s *fresh* to be
+evidence **for** coherence somebody would have to show the uncached write does
+**not** invalidate, and nobody has.
+
+**So the five negatives across three seatings were never evidence that this
+cache is coherent.** They are equally consistent with § 5.1's *"Caches do not
+snoop the system bus"* plus a self-inflicted invalidation.
+
+### 🔴 A replacement design was killed at the desk, and it failed the same way
+
+Before the card existed, the proposal was to use the **loader's TFTP receive**
+as the bus master. 讀, two independent desk passes reached the same kill:
+`0x80401A18` calls `0x80406D0C`, which is `lbu` / **`sb` at `0x80406D24`** in a
+count loop — the CPU copies every TFTP byte into `LOADADDR`. 算 agrees from the
+other side: `MBUF_2048BYTES` against a 1,059,840-byte upload means the DMA fills
+2 KiB mbufs and software moves them on.
+
+🔴 **It would not have failed quietly.** A CPU store into a resident line hits
+and updates it, so the verifying read returns the NEW bytes — **a false positive
+for coherence, the identical bias to the proxy it was meant to replace.**
+Recorded because it was nearly built.
+
+### The engine that worked, and it cost nothing
+
+The switch's **CPU-port RX DMA**, which the seating's own power cycle already
+had running (`---Ethernet init Okay!`). The treatment is **eight 1472-byte
+broadcast UDP frames** from the workstation. No TFTP, no upload, no `AUTOBURN`
+change, no `J`, no payload, **zero writes of any kind**.
+
+量, `SPEC.md` `NET-32`: `CPUICR` at `0xB8010000` reads **`C4000000`** — `TXCMD`,
+**`RXCMD`**, `BUSBURST_32WORDS`, **`MBUF_2048BYTES`** — decoded from
+`rtl865xc_asicregs.h:527-537` and predicted before the read. The RX mbuf ring at
+`0xA040FCD0` holds four descriptors; their data buffers are `A040FF9A`,
+`A041079A`, `A0410F9A`, `A041179A`, **spaced exactly `0x800` = 2048**, which is
+the `CPUICR` field confirming itself against the buffers it describes.
+
+### The protocol, frozen before it ran
+
+Frozen in commit `e85fd0c`, **with its decision rule**, before any of the ring
+walk existed:
+
+1. `DW 80…L 4` — **cached** read. Value **V0**. (Read-allocate is 量, `t-hit`.)
+2. eight broadcast frames — **a real bus master writes DRAM**
+3. `DW 80…L 4` — **cached** read. Value **V1**. ← the measurement
+4. `DW A0…L 4` — **uncached** read. Value **V2**. 🔴 **last, because `CPU-70`**
+
+`L` is a 16-byte-aligned line at **offset ≈ 1400** of a 2048-byte mbuf. 🔴 That
+offset is the whole design: the loader parses roughly the first 42 bytes
+uncached and drops the frame, and on any byte it touches **both hypotheses
+predict `V1 == V2`** — the cell would be dead. ⚠️ 推 that the parse stops there.
+
+🟢 **`DW`'s KSEG0 is a default for bare addresses, not a mask** (量,
+`bench/2026-08-25/H0a3.log`: `DW A0000080 32` echoed `A0000080:`), which is what
+makes steps 3 and 4 two different reads of one address. Without it this
+experiment is impossible.
+
+### The reading
+
+| run | buffer | V0 | V1 (cached, after the DMA wrote) | V2 (uncached) | |
+|---|---|---|---|---|---|
+| 1 | `80410510` | `00000000` ×4 | **`00000000` ×4** | `4C4D4E4F 50515253 54555657 58595A5B` | 🔴 **STALE** |
+| 1 | `80411510` | `00000000` ×4 | **`00000000` ×4** | `4C4D4E4F 50515253 54555657 58595A5B` | 🔴 **STALE** |
+| 2 | `80410510` | `4C4D4E4F …` | **`4C4D4E4F …`** | `CCCDCECF D0D1D2D3 D4D5D6D7 D8D9DADB` | 🔴 **STALE** |
+| 2 | `80411510` | `4C4D4E4F …` | **`4C4D4E4F …`** | `CCCDCECF D0D1D2D3 D4D5D6D7 D8D9DADB` | 🔴 **STALE** |
+
+**Buffers 1 and 3 read `V1 == V2` in both runs** — recorded as *cannot
+distinguish*, per the frozen rule, and **not** written up as coherence.
+
+### Why it is airtight, which is the part § ② never had
+
+1. **V2 ≠ V0** → the bus master definitely wrote that DRAM address.
+2. **V1 == V0** → the cached read returned the old value.
+3. **A miss would have fetched V2.** Therefore the line *was* resident.
+
+**There is no *it was evicted* escape.** `docs/probe3-cells.md:770` registered
+only `equal` as a refuter, and `c-A` could never separate *no read-allocate*
+from *the alias is snooped* from *the line was evicted*. Here the eviction
+branch is closed **by the data**: an evicted line reads V2, not V0.
+
+🔴 **And the ambiguous buffers cannot rescue a coherence reading.** Per the
+frozen rule they are *snooped, or evicted, or the loader touched it* — and the
+first is excluded by the other two buffers **in the same run**. A cache either
+snoops or it does not; it cannot snoop for two buffers and not the other two.
+
+### 🟢 Three predictions, and the third is about a different question
+
+1. The payload value was **computed before the frames were sent**: the line sits
+   at buffer offset 1398, a frame carries 14 + 20 + 8 = 42 bytes of header, so
+   the payload index is 1356 and the pattern is a byte counter —
+   `1356 mod 256 = 76 = 0x4C`. **All four buffers returned
+   `4C4D4E4F 50515253 54555657 58595A5B`.** That confirmed three things nothing
+   set out to test: the DMA wrote where predicted, the mbuf data pointer is the
+   first byte of the Ethernet header, and **this switch inserts no CPU tag**.
+2. Run 2 used a different pattern and its V2 was predicted as
+   `CCCDCECF D0D1D2D3 D4D5D6D7 D8D9DADB`. **Four for four.**
+3. 🟢🟢 **Run 2's V0 was predicted to be run 1's pattern rather than zeros**,
+   because run 1's step 4 was an uncached read of all four lines and `CPU-70`
+   says that invalidates them. **Four for four — so `CPU-70`, measured on the
+   A–B–A timing ladder, is confirmed on a completely different path: a real
+   DMA-written buffer.**
+
+### What this does NOT establish, stated rather than left to be found
+
+1. **Nothing about the D-cache's write policy** — `CPU-19` 殘留 ① still has
+   **zero** measurements, and § ② itself says why that is decisive for a ring:
+   a ring is a *write hit on a resident line*.
+2. **Nothing about D-side line size or associativity.** The measured 16-byte /
+   2-way figures are the **I**-cache; `v-line` and `v-assoc` have never run.
+3. **The split between the two stale buffers and the two ambiguous ones is
+   undetermined.** It is structural — the same two both runs — and the four
+   addresses are `0x800` apart, so under the *read-only* D-side geometry two
+   share a set and two share another. **Whatever distinguishes those sets is
+   unmeasured.**
+4. **The throughput cost of uncached rings is not measured**, and it is a
+   different number (`R6-1` `D5`).
+
+### What it settles downstream
+
+`PROGRESS.md`'s `R6` stop-loss, written before any of this: *"`R6` carries the
+conservative cost: rings **and** payload buffers in the uncached window, which
+is what the vendor's own driver does for the rings."* 🟢 **That was a precaution
+and is now a requirement, by measurement.** The three 讀 sources — § 5.1, the
+vendor's Linux driver (uncached rings plus explicit `_dma_cache_wback_inv()`,
+and no `dma_alloc_coherent` anywhere in 79 files with a positive control), and
+this unit's own loader forcing packet buffers to KSEG1 at seven sites — all said
+the same thing. **The silicon agrees**, so `R6-3`'s rings go in KSEG1 because of
+a reading rather than because of a vendor's opinion.
+
+🔴 And `R6`'s 否證 ② becomes a named risk rather than a hypothetical: *if
+corruption is intermittent and load-dependent, that is `D1` not having been
+answered*. `D1` is answered. If it happens anyway, the cause is elsewhere and
+the gate does not get to blame coherency.
