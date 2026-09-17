@@ -337,7 +337,15 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # why the cold count is unchanged at 38.  This row is the case CLAUDE.md
 # names: a seating moves the POPULATION every census-shaped case reads, and
 # `--only <the suites you touched>` cannot see it.
-ck "thirty-eight cold, one hundred and sixty-nine warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 38 cold, 169 warm, 0 unknown')"
+# 🔄 2026-09-17 (seating 26): 38/169 -> 39/170. `bench/2026-09-17b` alone
+# reports `1 cold, 1 warm` -- the cold is `X1-esc`, the power-on that opened the
+# seating, and the warm is `p11e-rz`, `looprun`'s own `J BFC00000`. 🔴 This
+# suite went RED ON CI while the desk closeout was green, for the third time and
+# for the reason CLAUDE.md names: the closeout ran spec-check, capdate,
+# check-predictions, cardcheck, ledgerscan and xcheck, and **not this one**,
+# because none of its code had changed. A seating changes DATA, and data is what
+# this case asserts on.
+ck "thirty-nine cold, one hundred and seventy warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 39 cold, 170 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -445,8 +453,10 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # directory EXCEPT `2026-09-16` still reports n=72, and `2026-09-16` alone
 # reports n=3.
 # 🔄 2026-09-17 (seating 25): 75 -> 77, the same two rows as above.
-ck "entry population is seventy-seven warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=77')"
+# 🔄 2026-09-17 (seating 26): 77 -> 78, one row, and it is `looprun`'s `S4`.
+# Isolation check: `bench/2026-09-17b` alone reports `entry, warm n=1`.
+ck "entry population is seventy-eight warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=78')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
