@@ -212,3 +212,86 @@ flag reading zero is a claim, and what settled this was the byte-level diff.
    the ledger.
 5. **Zero flash writes, zero `FLR`.** `AUTOBURN` was set to `0` by `looprun`'s
    `S5` because an upload requires it, and `S5b` read it back `00000000`.
+
+---
+
+## 6. After the card — two inferences closed, both CAUSED rather than observed
+
+Declared off-card, `X43`–`X56`, same power-on.
+
+### 6.1 🟢🟢 `ndo_open` writes `CPUICR`, and the transition was made to happen
+
+§ 2.4 recorded a 推 and said it was not tested. It is now:
+
+```
+read 0xB8010000  ->  00000000      (X48, before)
+ifconfig eth4 up                   (X49)
+read 0xB8010000  ->  C4000000      (X50, after)
+```
+
+**The value is the one predicted, bit for bit.** So the desk read of the
+vendor's init order holds end to end on the silicon: `probe` does
+`CPUICR &= ~(TXCMD|RXCMD)`; `rtl865x_start()`, called from `ndo_open`, writes
+`0xC4000000`. 🟢 `CPURMDCR0` moves from the loader's `A040FCDC` to **`A155A000`**
+in the same step — Linux allocates its own rings rather than inheriting the
+loader's, which is why block 25's buffer addresses do not survive a boot.
+
+### 6.2 🟢 `PVCR` is per-port PVID, and `NET-04`'s shape appears
+
+| address | value | |
+|---|---|---|
+| `0xBB804A08` `PVCR0` | `00090009` | |
+| `0xBB804A0C` `PVCR1` | `00090009` | |
+| `0xBB804A10` `PVCR2` | **`00010008`** | 🔴 the only `8` |
+| `0xBB804A14` `PVCR3` | `00010001` | |
+| `0xBB804A18` `PVCR4` | `00000009` | 🟢 negative control — differs |
+| `0xBB804A1C` `PVCR5` | `00021B74` | 🟢 second negative control — not PVID-shaped at all |
+
+**Six addresses, five distinct values**, so the block is not aliasing. Exactly
+one 16-bit field reads **8** and the other PVID-shaped fields read **9** or
+**1** — and `NET-04`, 量 from the vendor kernel's own boot lines, records
+exactly one port on **vid 8** (the WAN) against four on **vid 9**.
+
+⚠️ **推, and it is the part not to skip**: which physical port `0xBB804A10`
+belongs to. `NET-13` measured that this kernel's netdev↔port map is the
+**mirror** of the vendor's, so `NET-04`'s port numbers cannot be carried across
+unchanged.
+
+### 6.3 The remaining census registers, which is what completes `R6-1`'s DoD row 1
+
+| address | symbol | loader | Linux |
+|---|---|---|---|
+| `0xBB804004` | `MDCIOCR` | `96181441` | **`84001300`** |
+| `0xBB804008` | `MDCIOSR` | `00000000` | **`00001100`** |
+| `0xBB80414C` | `P0GMIICR` | `00037D00` | `00037D00` |
+| `0xBB804418` | `SWTCR0` | `00080000` | **`00097DE0`** |
+| `0xBB804428` | `FFCR` | `00000003` | **`00000009`** |
+| `0xBB804D00` | `SWTACR` | `00000000` | `00000000` |
+| `0xBB804D08` | `SWTAA` | `BB060100` | **`BB040020`** |
+| `0xBB804D3C` | `TCR7` | `00000000` | **`07000030`** |
+
+### 6.4 🔴 `PSRP` bit 12, second instance — and it is not about link
+
+`PSRP3` reads `000010F9` at the prompt and **`000000F9`** under Linux. That
+port is **LinkUp**; § 2.3's instance was on a **LinkDown** port. The low byte is
+identical in both ports and both states. Re-read after `ifconfig eth4 up`:
+still `000000F9`, so `ndo_open` does not set it either.
+
+**量: bit 12 is a loader-state bit, on both a linked and an unlinked port.**
+What it is remains 未定 (`SPEC.md` § 17, `NET-33` 殘留 ③).
+
+### 6.5 🔴 A cell of mine was malformed and produced nothing
+
+`X53-PING` typed `ping 10.1.1.2` with `eth4` **up but unaddressed**, and the
+board answered `ping: sendto: Network is unreachable`. **That cell tested
+nothing** and is kept as written. Re-run with an address (`X54`/`X55`), it reads
+**4 packets transmitted, 4 received, 0% packet loss**.
+
+### 6.6 🟢 The positive control that gives every reading above its context
+
+`ifconfig eth4` after the ping: `RX packets:6 errors:0 dropped:0 overruns:0`,
+`TX packets:6 errors:0`, `Interrupt:12`. **The whole switch/MAC path was live
+in the state these registers were read in** — so none of § 6.3's values is a
+reading of a dead block. ⚠️ `Interrupt:12` is the Linux NIC IRQ, which `R6-0`'s
+census flagged as a fact no `SPEC.md` row records; it still does not, and it is
+`R6-3`'s control that its own line is a different one.

@@ -1,0 +1,5 @@
+sleep 1 ; echo read 0xB801001C 4 > /proc/rtl865x/memory
+cmd read
+
+b801001c:  A155A000  		 	 	 	 	 	 	 	 	 	 	 	 	¡U  
+# 
