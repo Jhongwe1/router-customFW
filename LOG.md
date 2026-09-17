@@ -30450,3 +30450,28 @@ sed -n '19,49p' X8-M0.log | tr -d '\r' | sha256sum -> b4935056fc9b7702…   ← 
 **產物**：`tools/hdrcensus.py`（新）、`config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c`（新）、`notes/switch-driver.md`（新）、`config/rlxfw-marks.tsv`（`MK9` + `MK7` 的證據更正）、`.github/workflows/ci.yml`、`tools/ci-expected.tsv`、`SPEC.md`（`NET-35`／`NET-36`／`NET-37` + `NET-33` 殘留 ① 關閉 + `NET-37` 殘留）、`PROGRESS.md`（§Now 三列，就地，行數不變）、以及 `citecheck` 修好的十二處引用（`PROGRESS.md`、`SPEC.md`、`docs/FINDINGS.md`、`notes/slots45-draft.md`）。
 
 **零電源循環，板子全程斷電，零 flash 寫入命令。**
+
+---
+
+🔴🔴 **收工前一件事推翻了本段自己的一條論證,而且是我請人來反駁我的結果。**
+
+本段提出:*廠商驅動在這顆矽片上會動,所以它的編譯器從那份宣告產生的佈局等於硬體
+期待的佈局,所以照抄宣告就安全,不必知道任何絕對位元位置。*
+
+第一、三、四步成立。**第二步正好在 `ph_queueId` 上失敗**:「驅動會動」只約束那條
+會動的路徑**碰過**的欄位。量:`grep -ran ph_queueId` 對整棵廠商乙太網路樹**只回它
+自己的宣告那一行**,而正控制 `ph_mbuf` 50、`m_data` 28、`ph_len` 11、`ph_flags` 10
+全部發火。**照抄那份宣告是繼承一個沒有任何程式碼執行過的位元位置。**
+
+🟢 **而有用的答案是:那件事現在不重要。** 最小的 RX／TX 階梯**一個位元欄位都不碰**
+—— 全部是自然對齊的純量。所以 `R6-3` 的前幾階可以在那個問題解掉之前寫完並跑。
+
+🔴 **兩個本段自己的錯誤也記在這裡。** ① 我報告「這台主機沒有不經包裝的 MIPS
+反組譯器」,而那個控制跑在錯的二進位上:純 `objdump` 只有 x86,但量
+`/usr/bin/mips-linux-gnu-objdump` 存在且 `-i` 列出 **33** 個 MIPS 目標。**不必動
+廠商二進位的路線是存在的。** ② `common/mbuf.h:186-208` 的三個巨集參照
+`ph_unnumber`,而 `struct rtl_pktHdr` 沒有宣告這個欄位 —— 這份 drop 的表頭是一份
+**縮減過的副本**,所以註解裡的「exactly 32 bytes」不可以抄進配置。
+
+⚠️ **一條我沒能核對的不帶進產出物**:有人回報 `ph_extPortList` 的全部用處都在
+`#if 0` 裡,而我看到的輸出被截斷、沒有上下文。**未核對就不記。**

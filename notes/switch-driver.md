@@ -339,3 +339,138 @@ the read is the measurement rather than a courtesy.
    reads this driver makes — but nothing here has established that the direct
    path is free of the same problem, and the `snap`/`diff` verbs exist partly
    so a register can be sampled twice.
+
+---
+
+## 7. ⚠️ Temporarily housed here: the CPU interface's control bits (`NET-38`)
+
+**This section is in the wrong file and says so.** It belongs to `R6-3`'s NIC
+driver, which does not exist yet, and this project's convention is that a
+finding lands in an owning file in the same commit — not that it waits for the
+right file to be created. It moves the day `R6-3`'s driver note appears.
+
+`CPU_IFACE_BASE = 0xB8010000` (讀 `rtl865xc_asicregs.h:491`, whose own comment
+gives the address). `CPUICR` is at `+0x000`.
+
+### `CPUICR` control bits, 讀 `:527-548`
+
+| bit | name | |
+|---:|---|---|
+| 31 / 30 | `TXCMD` / `RXCMD` | enable TX / RX |
+| 29:28 | bus burst | `32WORDS` is 0 |
+| 26:24 | mbuf size | `MBUF_2048BYTES` is `(4<<24)` |
+| 23 | `TXFD` | notify TX descriptor fetch |
+| 22 | `SOFTRST` | *"Re-initialize all descriptors"* |
+| 21 | `STOPTX` | |
+| **20** | **`SWINTSET`** | *"Set software interrupt"* |
+| **19** | **`LBMODE`** | *"Loopback mode"* |
+| 18 | `LB10MHZ` **and** `LB100MHZ` | 🔴 **two names, one bit** (`:543`, `:544`) — nothing says which is right |
+| 17 / 16 | `MITIGATION` / `EXCLUDE_CRC` | |
+
+🟢 `TXCMD|RXCMD|BUSBURST_32WORDS|MBUF_2048BYTES` = **`0xC4000000`**, and
+`SPEC.md` `NET-32` 量 exactly that on this die. The arithmetic closes with no
+residual, which is a free confirmation of this field map.
+
+### 🟢🟢 `SWINTSET` puts a rung BELOW the plan's first, and it costs nothing
+
+讀 `plan/router-rebuild-plan.md:1416`, the plan's checkpoint ladder is
+*loopback → 單向 TX → RX → NAPI，不要跳*. Writing `SWINTSET` raises the NIC's
+interrupt **with no ring, no descriptor, no PHY and no cable**.
+
+That matters because of what it separates. From outside, *loopback does not
+work* and *my interrupt never arrives* are the same observation — and so are
+three other failures. A rung that exercises only the interrupt path removes one
+of them before the descriptor code is ever written.
+
+### 🔴 And there is no software-interrupt STATUS bit in any source
+
+量: `grep -n 'SWINT\|SW_INT\|SOFT_INT'` over the whole header returns **one
+line**, `:541`, which is `SWINTSET` itself. The `CPUIISR` bit list occupies
+1, 2, 3–8, 9, 10, 16, 17–22, 23, 24, 25–30 and 31 — **bit 0 is the only
+unassigned bit.** 推 that it is the one; that is an inference and not a reading.
+
+🟢 **So the first rung is a DISCOVERY cell rather than a pass/fail**: read the
+whole `CPUIISR` word, write `CPUICR \|= SWINTSET`, read it again — whichever
+bit changed is the pending bit, and that names something no source in this
+project documents.
+
+⚠️ **`CPUIIMR` must not be touched.** With the mask closed no interrupt fires,
+so the vendor's handler never runs, so its
+`REG32(CPUIISR) = REG32(CPUIISR)` ack never clears the bit. That is exactly
+`SPEC.md` `IRQ-09`'s shape — the vendor's read-modify-write on a
+write-1-to-clear register clearing pending bits belonging to drivers it has
+never heard of — and the masked-observation strategy has already held twice on
+this device (`IRQ-08`, `IRQ-09`).
+
+⚠️ **Whether `SWINTSET` self-clears is undetermined**, so the cell reads
+`CPUICR`, sets the bit, and writes the original value back.
+
+🔴 **The interrupt does not go through the ICTL cascade.** 讀: the NIC is
+IRQ 12 = LOPI 4 and needs **both** `GIMR` bit 15 (`BSP_SW_IE`) and
+`IRR1[31:28]`. `R5-3`'s timer went through the cascade at line 25, so none of
+that experience carries across. ⚠️ And the vendor's NIC driver owns IRQ 12, so
+a driver of mine cannot `request_irq` it unshared — which is a second reason
+the first rung is a polled read rather than a handler.
+
+### 7.1 What a minimal ladder actually touches, and why `ph_queueId` can wait
+
+量 2026-09-17, `grep -ran` over the whole vendor Ethernet tree:
+
+| field | hits | |
+|---|---:|---|
+| `ph_queueId` | **1** | its own declaration, and nothing else |
+| `ph_mbuf` | 50 | control |
+| `m_data` | 28 | control |
+| `m_len` | 14 | control |
+| `ph_len` | 11 | control |
+| `ph_flags` | 10 | control |
+| `ph_extPortList` | 10 | control |
+
+🔴🔴 **That refutes an argument this segment made and nearly acted on.** The
+argument was: *the vendor's driver works on this silicon, therefore the layout
+its compiler produced equals the layout the hardware expects, therefore copying
+the declaration is safe without knowing any absolute bit position.*
+
+Steps one, three and four hold. **Step two fails exactly on `ph_queueId`**:
+"the driver works" constrains only the fields the working path **touches**, and
+nothing touches that one. Copying the declaration would inherit a bit position
+**no code has ever exercised** — the header's `/* bit 2~0 */` comment and the
+MSB-first allocation disagree, and no execution has ever arbitrated between
+them.
+
+🟢 **But the useful answer is that it does not matter yet.** A minimal RX/TX
+ladder touches **zero bitfields**:
+
+* **RX** — the ring word (`OWN`/`WRAP`), `ph_mbuf` @0, `ph_len` @4
+  (⚠️ minus 4: the ASIC counts the FCS), `m_data` @12, and the mbuf ring word.
+* **TX** — adds `m_len` @8, `m_extbuf` @16, `m_extsize` @20,
+  `ph_portlist` @15, and `CPUICR |= TXFD`.
+
+All naturally-aligned scalars. So `R6-3`'s first rungs can be written and run
+before the bitfield question is settled, and settling it is `R6-4`/`R6-6` work
+rather than a blocker.
+
+### 7.2 🔴 The GPL drop's `mbuf.h` is a REDUCED copy
+
+量: `common/mbuf.h:186-208` defines `PKTHDR_PHUNNUMBER_SET/CLEAR/TEST`, all of
+which dereference **`ph_unnumber`** — and a scan of `struct rtl_pktHdr`'s own
+body finds no such field. The macros are therefore dead code that would not
+compile if anything called them.
+
+⚠️ 推, and **not verified here**: that the header's `sizeof(rtl_pktHdr)` is
+therefore 24 where the running kernel uses 32. The struct's own comment says
+*"Each pkthdr is exactly 32 bytes"*.
+
+**The operational rule either way: do not copy `32` out of that comment into an
+allocation.** Compute the size, or take it from the running kernel's own
+behaviour.
+
+### 7.3 ⚠️ A correction to this segment's own tooling claim
+
+This segment reported that there is no unwrapped route to a MIPS disassembler
+on this host, so the vendor toolchain's `objdump` would have to be wrapped in
+`tools/vendor-tripwire.sh`. **That was wrong, and the control was run on the
+wrong binary**: plain `objdump` is x86-only here, but 量
+`/usr/bin/mips-linux-gnu-objdump` exists and `-i` lists **33** MIPS targets,
+including `elf32-tradbigmips`. **An unwrapped, non-vendor disassembler is
+available**, which removes the reason the vendor binary would ever be run.

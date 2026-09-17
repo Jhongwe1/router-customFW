@@ -769,6 +769,25 @@ would settle it.
 
 ---
 
+## 🔴 What `R6-2`'s desk half did NOT establish — 2026-09-17 (eighty-sixth segment)
+
+A switch driver of mine is in the image, it writes nothing at boot, and the
+DoD a frozen card called unsatisfiable is now a measurement that can be taken.
+**None of it has run on the silicon.** Seven things this segment did not
+establish, each with what would settle it.
+
+| | |
+|---|---|
+| 🔴🔴 **Not one instruction of `rtl819x-switch.c` has executed.** The driver compiles, links, and its witness string is in the artefact three times against zero in the vendor's — but `rlxfw-marks verify` proves a translation unit is in an image and says nothing about whether any code path was reached. Every claim about `MSCR`, `VCR0`, `SWTCR1`, `FULL_RST` and the dumb configuration is 讀 | **What would settle it**: one power cycle. The boot marks `SW0`–`SW6` land in the boot capture with no verb typed, so the first reading is free once the board is on |
+| 🔴 **Eight of the nine registers the `dumb` verb writes have no reading on this die in ANY state.** `R6-1` read `SWTCR0` and `PVCR0`; `MSCR`, `VCR0`, `SWTCR1` and `PVCR1`–`PVCR4` have never been read. So the driver's own `snap` of them at `subsys_initcall` is the first measurement, and **a write is being aimed at a register whose current value is unknown** | **What would settle it**: the `subsys_initcall` latch, which happens on every boot. It is ordered before any verb precisely so the reading exists before a write can disturb it |
+| 🔴 **That a switch register reads back at all is assumed.** This part has one measured counter-example — `WDTCLR` was written `00A40000` and read `00240000` (`SPEC.md` `FW-52`) — and the vendor's own `_rtl8651_readAsicEntry` reads a switch TABLE entry **twice into two buffers and retries up to ten times** if the two disagree. ⚠️ That is the indirect table path, not the direct register path this driver uses, and **nothing here has established that the direct path is free of the same problem** | **What would settle it**: the `restore` round trip, and `snap`/`diff` taken twice on an unchanged state. Both are on the driver and neither has run |
+| 🔴 **That `MSCR`, `VCR0` and `SWTCR1` are decoded by this part at all.** The header names them; this die is already known to name a register it does not populate — `PCRP5` at `0xBB804118` reads `00000000` where every neighbour reads `xx7F00xx`, and `SPEC.md` `NET-10` records the datasheet siding with the silicon against the header | **What would settle it**: reading them. A register that decodes returns a value; one that does not returns zero or garbage, and the neighbours are the control |
+| 🔴 **`FULL_RST` is not proven to be a reset in the sense `D2` means.** It is documented *"Reset all tables & queues"*, the vendor asserts it, and `rtl8651_clearRegister()` says what Realtek thinks blank looks like — but that function **has no caller anywhere in the tree** (量), so it is an opinion and not a reading. Whether `FULL_RST` alone reaches the same state as the vendor's `FULL_RST` + 650 ms clock-gate recipe is **unmeasured by any source in this repository** | **What would settle it**: the `resetcmp` verb, which runs both and diffs the dumps. 🔴 **And the refutation is written first**: if no census register satisfies `S1 ≠ S0'`, the reset did nothing and the whole block is void rather than passed |
+| 🔴 **`CVIDR` is a read-path control that cannot be positive yet.** Its value on this die is **未定** — nothing has read `0xBB804200`. On the first seating it can only fail (a wrong value proves the read path is broken); it becomes a positive control from the second seating onward, when there is a prior value to agree with | **What would settle it**: reading it once. Stated here rather than left for a reader to discover that a named control was doing half a job |
+| 🔴 **`R6-2`, `R6-3` and `R6-4` are marked `desk N` and none of their DoDs can be met at a desk.** 量 `PROGRESS.md:105-111`: only `R6-1` (closed) and `R6-5` carry a seating. But `R6-2`'s DoD is a register read-back, `R6-3`'s is a ladder with an observable per rung, and `R6-4`'s is `ping` in both directions — all three are silicon. **The desk/bench column and the DoD column disagree for three consecutive rows** | 推, and it is a reading of the table rather than a fact about it: `desk N` means *this step consumes no power cycle of its own* and the proofs accumulate to `R6-5`'s seating, which the gate's own stop-loss anticipates (*any step that turns out to need the board … goes to the step that owns a seating*). **What would settle it**: the owner saying which reading is intended. 🔴 **The cost of the 推 being right is that a wrong register write or a wrong descriptor layout is discovered at the most expensive possible moment**, which is why the ordering of cells within that one card matters more than usual |
+
+---
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**
