@@ -1374,3 +1374,50 @@ be tracked**: 量, the first time the rule was applied, `git add -N` on a new
 `study/` file was refused because `study/` is gitignored — so a gitignored new
 file is a third state, never swept and never meant to be. The rule is about
 files the sweep is meant to cover, not about new files.
+
+🔴 **And run `citecheck` whenever a row was ADDED to `SPEC.md`, before pushing.**
+量 2026-09-17 (eighty-fifth segment), on a red CI run: seven new rows plus five
+§ 17 residuals shifted every line below them, and **twelve citations across four
+files** went stale — `PROGRESS.md`, `SPEC.md` citing itself, `docs/FINDINGS.md`
+and `notes/slots45-draft.md`. **A line-number citation into `SPEC.md` is
+invalidated by any row inserted above it, and `citecheck` is the only thing in
+this repository that can see it.** 🔴 It is not a hypothetical drift:
+`notes/slots45-draft.md:18` already carried a note saying it had been `:625`,
+*"a different, already-closed row — the citation was measured before the commit
+that shipped it added three lines above it"*, so **that one citation has now
+rotted twice for the same reason**, and the second time it landed on a blank line.
+⚠️ The fix is cheap and must not shift anything itself: replace only the digits,
+check that the exact old token is on the exact line first, and **re-derive each
+new line number by reading it back** rather than copying it out of the checker's
+message.
+
+🔴🔴 **A tool's own totals line is not its verdict either, and this is
+wider than the `tail` rule above.** 量 2026-09-17, the same red CI run:
+`capdate` printed
+
+    capdate: 36 directories, 1400 captures, 32 OK, 0 spanning, 2 declared, 0 RED, 0 stale
+      D4    2026-09-17b              on disk and not in the index
+
+and **exited 1**. `D4` is not counted in the `RED` column, so the summary line
+says `0 RED, 0 stale` on a run that is failing. Anyone reading that line
+concludes clean. 🔴 **Three instrument failures then composed, and the
+composition is the thing to remember**: ① a closeout script filtered the output
+with `grep -iE '^\s*(FAIL|RED|ERROR)'` and the finding's line begins with two
+spaces and `D4`, so the only match left on screen was a `RED` from `capdate`'s own
+self-test fixture — which made the `rc=1` look like it belonged to the fixture;
+② a second script then "confirmed" it as `capdate … | tail -6` followed by
+`echo rc=$?`, which is **`tail`'s** status, manufacturing a green; ③ the summary
+line agreed with the green. **Two individually harmless instrument defects
+composed into a green that hid a red, and the composition only ever fails toward
+green.** The rule is the one this file already has, applied one level up: **read
+the exit code, from inside a script file, with no pipe on the command that
+carries it** — and if a pipe is unavoidable, `${PIPESTATUS[0]}`, which is what
+this repository's own `ci.yml` already does.
+
+🔴 **And the targeted closeout is not a substitute for `desk-sweep`.** 量 the
+same day: a closeout that ran `spec-check`, `capdate`, `check-predictions`,
+`cardcheck`, `ledgerscan` and `xcheck` reported clean, and `tools/desk-sweep.py`
+over all 99 declared steps reported **three unexpected reds** — `capdate`,
+`citecheck` and `test-citecheck` — of which **two were completely unknown**. The
+sweep costs about 31 minutes of wall clock on ext4 and it found what three
+consecutive pushes did not.
