@@ -345,7 +345,17 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # check-predictions, cardcheck, ledgerscan and xcheck, and **not this one**,
 # because none of its code had changed. A seating changes DATA, and data is what
 # this case asserts on.
-ck "thirty-nine cold, one hundred and seventy warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 39 cold, 170 warm, 0 unknown')"
+# 🔄 2026-09-19 (seating 27): 39/170 -> 41/171, and BOTH deltas are named.
+# +2 cold is this seating's two cold power-ons -- X1-esc at 00:58 and X16-esc3
+# at ~02:00, the second forced by a `PHYR` fault that hung the loader.
+# +1 warm is `looprun`'s S4, one `J BFC00000`, capture `r6sw1-rz`.
+# 🔴 FOURTH time this row has gone red for the same reason, and the desk sweep
+# is what caught it again while a six-gate targeted closeout ran green. The
+# durable fix is not a bigger number: it is to assert the PROPERTY and report
+# the count, the shape `ci-expected.tsv:338` already argues for. Carried
+# forward rather than done here, because changing what this case asserts is
+# not a thing to do at the end of a seating.
+ck "forty-one cold, one hundred and seventy-one warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 41 cold, 171 warm, 0 unknown')"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -455,8 +465,10 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # 🔄 2026-09-17 (seating 25): 75 -> 77, the same two rows as above.
 # 🔄 2026-09-17 (seating 26): 77 -> 78, one row, and it is `looprun`'s `S4`.
 # Isolation check: `bench/2026-09-17b` alone reports `entry, warm n=1`.
-ck "entry population is seventy-eight warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=78')"
+# 🔄 2026-09-19 (seating 27): 78 -> 79, one row, and it is the same
+# `looprun` S4 that moved the warm count above -- one `J BFC00000`.
+ck "entry population is seventy-nine warm resets" 1 \
+   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=79')"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="

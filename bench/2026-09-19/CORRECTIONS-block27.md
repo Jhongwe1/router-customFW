@@ -705,3 +705,46 @@ as zero because the register pair does not carry them. Internal corroboration:
 the vendor tree's only PHY-ID constant, `0x001CC912`, carries the **same 22
 bits**. ⚠️ **No part number is asserted** — nothing in this repository maps a
 Realtek model number to one.
+
+---
+
+## § 5 — the desk sweep found what six green gates did not
+
+`tools/desk-sweep.py run`, 100 declared steps, **1,828.6 s of sweep** plus
+83.2 s copy and 19.7 s verify. **98 ran, 93 green, 2 expected-red, 3
+unexpected.** The targeted closeout before it — `spec-check`, `citecheck`,
+`capdate`, `check-predictions`, `cardcheck` ×2, `test-file-modes`,
+`ledgerscan`, `xcheck`, `flashwin scan` — was **green on every one**.
+
+🔴 **That is `CLAUDE.md`'s own rule arriving as a measurement for the second
+time**: *"the targeted closeout is not a substitute for `desk-sweep`."*
+
+| unexpected red | on the current tree | what it was |
+|---|---|---|
+| `text/citecheck` | **green** | the copy predates the citation repair. `citecheck` was red *at the moment the sweep copied* and I fixed it forty minutes later. The sweep's own `THE SOURCE MOVED` notice is what makes that legible rather than confusing |
+| `text/test-citecheck` | **green** | same cause — its 29 controls read the tree |
+| `text/test-boot-timeline` | 🔴 **genuinely red** | `B2`'s hardcoded corpus counts. See below |
+
+🔴 **`test-boot-timeline` `B2` has now gone red for the same reason FOUR
+times.** 量: `39 cold, 170 warm` → **`41 cold, 171 warm`**, and
+`entry, warm n=78` → **`n=79`**. Both deltas are named rather than absorbed:
+
+* **+2 cold** = this seating's two cold power-ons, `X1-esc` at 00:58 and
+  `X16-esc3` at ~02:00, the second forced by the `PHYR` fault of § 1.4.
+* **+1 warm** = `looprun`'s `S4`, one `J BFC00000`, capture `r6sw1-rz`.
+
+⚠️ **The durable fix is not a bigger number.** `tools/ci-expected.tsv:338`
+already argues the shape — *assert the PROPERTY and report the count* — and
+16 of this repository's 18 red CI runs are a count about its own contents kept
+in a second place. **Carried forward**, with the reason for not doing it
+tonight stated in the test file itself: changing what a case asserts is not a
+thing to do at the end of a seating.
+
+🟢 **And the sweep's own guard did its job.** It ended
+`THE SOURCE MOVED WHILE THE SWEEP RAN -- 7 difference(s)` and listed all seven
+— `LOG.md`, `PROGRESS.md`, `SPEC.md`, `docs/FINDINGS.md`,
+`notes/switch-driver.md`, this file, and `.git/index`. Every one is an edit
+made after the copy was taken, so **the green certifies the tree that was
+copied and says so out loud** instead of leaving a reader to assume it covers
+the tree on disk. That is the difference between a stated scope limit and a
+hole.
