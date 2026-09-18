@@ -1194,8 +1194,11 @@ state transition two projects have measured.** 讀 `0x804092F4`–`0x80409354`,
 the last thing `J` does before `flush_cache` and `jalr`:
 
 ```
-ori a0,v1,0x4104 ; lw v0,0(a0) ; and v0,v0,a1 ; sw v0,0(a0)    ; a1 = -2
-  ... and the same three instructions for 0x4108, 0x410C, 0x4110, 0x4114
+804092dc  lui v1,0xbb80                              ; v1 = 0xBB800000
+804092f4  ori a0,v1,0x4104                           ; PCRP0
+804092f8  lw v0,0(a0) ;  li a1,-2 ;  and v0,v0,a1 ;  sw v0,0(a0)
+          ... and the same read-modify-write at 0x80409308, 0x8040931C,
+              0x80409330 and 0x80409344 for 0x4108, 0x410C, 0x4110, 0x4114
 ```
 
 **Five registers, one bit each, and the bit is `EnablePHYIf`.** So

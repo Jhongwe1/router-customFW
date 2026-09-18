@@ -850,7 +850,7 @@ between them and no reset**, and it costs nothing.
 量: the token `resetcmp` occurs in this repository only as a comment at
 `rtl819x-switch.c:323` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
 in the parser**, and a frozen card's cell 8 asked for it. Typing it returns
-`-EINVAL`. 讀 `rtl819x-switch.c:535-609`, the parser accepts exactly nine
+`-EINVAL`. 讀 `rtl819x-switch.c:536-609`, the parser accepts exactly nine
 forms and nothing else:
 
 ```

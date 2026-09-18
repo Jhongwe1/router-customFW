@@ -410,8 +410,12 @@ what `upstream/BENCH-LOG.md:4770-4795` recorded in August**: *"At rest under the
 loader: `007F0039`… **After `J`: all `...0038`**."* Two projects, three weeks
 apart, the same state transition.
 
-**The full `S0'` → Linux table: 25 of 37 registers move** once the vendor NIC
-driver's `device_initcall` has run. `C9-SW0` carries both columns.
+**The full `S0'` → Linux table: 26 of 37 registers move** once the vendor NIC
+driver's `device_initcall` has run, measured on `C9-SW0`, which carries both
+columns. ⚠️ **26 is a moment and not a constant**: `C11` and `C12` also read 26
+and `C26-UNLK` reads **25**, the difference being `SSIR` bit 0 `TRXRDY`, which
+the vendor driver toggles. A count like this quoted without naming its capture
+quotes an instant.
 
 🟢 **And it settles `C7`'s undetermined.** `TEACR` and `ALECR` read `00000000`
 at the loader **and** at `S0'`, which alone cannot distinguish *the register is
@@ -444,7 +448,7 @@ with a number.
 | control | predicted | measured |
 |---|---|---|
 | **same-state sampling** | `SW-DIFF=00000000` | **`00000000`** — two back-to-back 37-register snapshots identical |
-| **the reset's POSITIVE control** | at least one register differs `S0'` → `S1` | **24 of 37 differ.** The block is licensed, not void |
+| **the reset's POSITIVE control** | at least one register differs `S0'` → `S1` | **11 of 37 differ**, read off `C27-RST1`'s own two columns, which is the pairing the control is defined on. The block is licensed, not void. 🔴 **This cell said 24 for two hours**: that is Linux-live (`C11`) against `S1` (`C27`), a different pair. Both fire; only one answers the control as written |
 | **idempotence** | `SW-DIFF=00000000` | **`00000000`** by the verb **and 0 of 37 by the captures** — two instruments |
 
 ### 2.6 🟢 What the vendor's 650 ms clock gate adds: nothing, and the one thing that moved proves it worked
@@ -560,14 +564,23 @@ Autoneg Complete **clear**, and PHY 0 is port 0, which `PSRP0` and
 and the Linux netdev's software accounting agree exactly, sharing no code.**
 That is `D3`'s *two sources* shape, demonstrated.
 
-🔴 **And an unplanned reading with a tension in it.** The traffic appears on
+🟢 **And the dump names the CPU port itself.** The traffic appears on
 `<Port: 3>` in both directions — the port `PSRP3` says is the only one linked —
-**and on `<Port: 5>` as TX only, 6 unicast, RX zero.** 推 (weak) that port 5's
-TX counter counts frames forwarded toward the CPU. ⚠️ **It contradicts the desk
-reading that port 5 is the unpopulated MII port**, which `PCRP5 = 00000000` in
-all three states supports. This project already knows the CPU port carries three
-disagreeing numberings (`enum PORTID` 6, `swNic.h` 7, the VLAN path's bit 8);
-the MIB dump is a fourth data point and it is **recorded, not adjudicated**.
+and the matching `Snd 536 bytes, 6 unicast` sits under
+**`<CPU port (extension port included)>`**, the heading AFTER `<Port: 5>`.
+`<Port: 5>` is **all zero in both directions**, consistent with `PCRP5 =
+00000000` in all three states and with the desk reading that port 5 is the
+unpopulated MII port.
+
+🔴 **This paragraph said the opposite for two hours, and the fault was my own
+instrument.** The first pass attributed blocks with `awk '/^<Port:/{h=$0}'`,
+which does not match `<CPU port …>` — so every line under that heading was
+credited to the last `<Port:` heading seen, which is 5. **A partial view of the
+heading set manufactured a contradiction that does not exist**, and it reached
+`SPEC.md`, `docs/FINDINGS.md` and `LOG.md` before an adversarial pass disputed
+it and I re-measured. 讀 `rtl865x_asicCom.c:1776-1787`:
+`rtl865xC_dumpAsicDiagCounter()` loops `0 … RTL8651_PORT_NUMBER` **inclusive**,
+and the last iteration prints the CPU heading.
 
 ### 2.12 🔴 The card's own defect: a window sized for the success case
 
@@ -624,3 +637,71 @@ control `C3`; what changed is the sweep's population, by a predicate that
 belongs to neither parser. Two new controls, `C3d` and `C3e`, say the exclusion
 happens and that it is a guard rather than a blanket: self-test 18 → **20**,
 `ci-expected.tsv` updated in the same edit.
+
+---
+
+## § 4 — four numbers this segment published were wrong, and what found them
+
+**All four were found by an adversarial pass I commissioned**, whose brief said
+*report anything that contradicts what I told you*. It reported seven things.
+🔴 **I re-measured every one myself before changing anything** — an agent's word
+is not enough to change a number I published, and it is not enough to leave one
+standing either.
+
+| | what I published | what it is | how it got wrong |
+|---|---|---|---|
+| **A** | `<Port: 5>` transmits `536 bytes / 6 unicast`, contradicting *port 5 is the unpopulated MII port* | **`<Port: 5>` is all zero both ways.** The traffic is under `<CPU port (extension port included)>`, the heading AFTER it. There is **no** contradiction with `PCRP5 = 00000000` | **my own instrument.** `awk '/^<Port:/{h=$0}'` does not match `<CPU port …>`, so every line under that heading was credited to the last `<Port:` seen. 讀 `rtl865x_asicCom.c:1776-1787`: the dump loops `0 … RTL8651_PORT_NUMBER` **inclusive** and the last iteration is the CPU |
+| **B** | `S0'` → Linux moves **25 of 37** | **26** in `C9`, `C11` and `C12`; **25** in `C26`. The mover is `SSIR` bit 0 `TRXRDY` | a count taken from one capture and written as a property. **26 is a moment, not a constant**, and quoting it without its capture quotes an instant |
+| **C** | the reset's positive control is **24 of 37** | the control **as defined** is `S1 ≠ S0'`, both columns of `C27-RST1`'s own cat: **11 of 37**. The 24 is Linux-live against `S1` | the right question answered on the wrong pairing. Both fire, so the verdict is unchanged; the number was not |
+| **D** | three `MDIOR` argument pairs all printing `Reg=0` shows `argv[1]` is the register | the three probes varied **`argv[2]`** and never `argv[1]`, so they show `argv[2]` is ignored and nothing about `argv[1]`. A handler ignoring **both** prints the same thing | a measurement quoted for a claim it does not reach. The discriminating cell is `MDIOR 2`, carried forward |
+
+🔴 **A is the one worth keeping.** It is this project's own recorded hazard —
+*quoting a partial view instead of re-deriving* — arriving as an `awk` pattern
+that matched a subset of the heading set, and it **manufactured a
+contradiction that does not exist** and put it into four files. What caught it
+was not a checker; no checker in this repository can. It was a second reader
+asked to disagree.
+
+🟢 **And the corrected reading is better than the one it replaced.** The
+counter dump names the CPU port itself, so the CPU port's traffic is identified
+by the vendor's own label rather than by an index this project would have had
+to guess at — and it agrees with `PCRP5 = 00000000`, with the desk reading, and
+with `ifconfig`'s 536 bytes and six packets, instead of fighting them.
+
+### 4.1 Three things the same pass found that were not corrections
+
+🟢🟢 **The loader's `J` handler is what clears `EnablePHYIf`.** 讀, and
+re-derived here rather than transcribed — `mips-linux-gnu-objdump -m mips:3000`
+on `stage2.bin` at `0x804092F4`–`0x80409354`:
+
+```
+804092f4  ori a0,v1,0x4104        ; v1 = 0xBB800000, so a0 = PCRP0
+804092f8  lw  v0,0(a0)
+804092fc  li  a1,-2               ; ~1 : EnablePHYIf
+80409300  and v0,v0,a1
+80409304  sw  v0,0(a0)
+  ... the same read-modify-write at 0x80409308, 0x8040931C, 0x80409330
+      and 0x80409344 for 0x4108, 0x410C, 0x4110, 0x4114
+```
+
+immediately before `flush_cache` and `jalr`. **So `upstream/BENCH-LOG.md`'s
+"After `J`: all `...0038`" is literally right**, the `S0'` transition is not the
+kernel's doing, and **a payload entered with `J` inherits five disabled PHY
+interfaces** — which is a fact `R6-3` and `R6-4` both need and which nothing in
+this repository had.
+
+🟢 **The `PHYR` fault chain was already closed by a measurement on disk.**
+`docs/rlxprobe-audit-2026-08-25.md:96` records the UTLB refill vector holding
+**`5A5AA5A5`**, whose opcode `0x16` is `BLEZL` — a branch-likely this core does
+not implement. So a KUSEG load from NULL vectors to `0x80000000`, executes
+that, and raises RI **at `0x80000000` exactly**, which is the `epc` the board
+printed. **That is the second time in one seating that the answer was already
+in the repository** and the first time was § 1.4's.
+
+🟢 **The OUI arithmetic, shown so it can be redone.** `PHYIDR1 = 0x001C`,
+`PHYIDR2 = 0xC880` give a 22-bit field `0x732`, model **8**, revision **0**;
+reversing each octet gives **`00-E0-4C`**, with the I/G and U/L bits supplied
+as zero because the register pair does not carry them. Internal corroboration:
+the vendor tree's only PHY-ID constant, `0x001CC912`, carries the **same 22
+bits**. ⚠️ **No part number is asserted** — nothing in this repository maps a
+Realtek model number to one.
