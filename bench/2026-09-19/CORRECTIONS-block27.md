@@ -200,3 +200,114 @@ they differed, the card would have predicted a string the board never prints.
    mitigation, and it is a procedure rather than a guard.
 5. **Nothing here is 量 on the silicon.** Every finding above is 讀 or a desk
    measurement on an artefact. The card's predictions are untested.
+
+---
+
+## § 1 — the loader phase, and the probe that cost a power press
+
+**Everything below is 量, after power, on 2026-09-19 between 01:42 and 01:45.**
+§ 0 above was committed at 01:41:31 (`8e51c4d`) and predates every capture in
+this section.
+
+### 1.1 `C1`–`C7`: seven cells, and one refutation
+
+| cell | read | against the card |
+|---|---|---|
+| `C1-L4104` | `007F0039 047F0039 087F0039 0C7F0039` | 🟢 **four of four**, byte-identical to `upstream/BENCH-LOG.md:4770-4795` from 2026-08 — a cross-seating repeatability result three weeks and several power cycles apart |
+| `C2-L4114` | `107F0039` **`00000000`** `187F0038 1C7F0038` | 🟢 `PCRP4` as predicted; **`PCRP5 = 0` — the negative control fires**; `PCRP6` bit 25 clear as `A2` predicted |
+| `C3-L4128` | `000010E0 000010E0 000010E0` **`000011F9`** | 🟢 **exactly one of `PSRP0`–`PSRP4` carries `LinkUp` with speed 100M, and it is port 3** — so the cable is in socket 3, measured rather than looked at |
+| `C4-L4138` | `000010E0` `000000E2` `0000007A` `0000007A` | 🟢 **three of three** — `PSRP5`, `PSRP6`, `PSRP7` all as predicted from block 24's decode |
+| `C5-L4148` | **`PSRP8 = 0000007A`**, `P0GMIICR = 00037D00` | `PSRP8`'s first reading ever; `P0GMIICR` as predicted. See § 1.2 |
+| `C6-L4600` | **`0000007E`** | 🔴 **REFUTED.** The card predicted `0000007A` from the header comment `/*CPU Port Status : R/W */`. `PSRP6 XOR PSRP6_RW = 0x00000004` — **one bit, bit 2** — so `0xBB804600` is not a second view of `PSRP6`. The corroboration the card hoped for is withdrawn, and a new 未定 replaces it: what bit 2 is |
+| `C7-L4400` | `00000000` ×4 | `TEACR` and `ALECR`, two of the seven never-read registers, both read **zero**. ⚠️ **未定, not a result**: all four words in the window are zero and the window has no non-zero neighbour to act as a control, unlike `C2` where `PCRP5`'s zero sits between non-zero values |
+
+### 1.2 🔴 `NET-10 殘留` closes, and it closes by REMOVING a piece of evidence
+
+`A2`'s report proposed the test in advance: *"If `PSRP8` is also `0000007A`,
+then `7A` is the non-PHY default and **`PSRP7`'s equality with `PSRP6` carries
+no information**."* 量: `PSRP8` **is** `0000007A`. `PSRP6`, `PSRP7` and `PSRP8`
+are the same word, and that word is what a port with no PHY reads.
+
+So `SPEC.md` `NET-10 殘留`'s *"`/proc` lists exactly one `CPUPort`"* was already
+known to be predicted by the printer's loop bound rather than by the hardware,
+and now the register-side half is gone too. **What settles which port is the CPU
+port is the vendor printer's own loop variable (`CPU = 6`, and the device
+printed `Port0`…`Port5` then one `CPUPort` row), not any property of `PSRP7`.**
+
+### 1.3 🟢🟢 `C8-MDIOR` was a discovery cell and it discovered more than a syntax
+
+`MDIOR` bare returns **`Parameters not enough!`** — not `Unknown command !`. So
+the command in `upstream/RUNBOOK.md:988`'s table is real, reachable from the
+prompt, and takes arguments. **It had never been executed in either project.**
+
+Three off-card probes (`X8`, `X9`, `X10`, declared here) then found that
+`MDIOR <a> <b>` **sweeps all 32 MDIO addresses and reads register 0 regardless
+of its arguments** — `Reg=0` in all three, with three different argument pairs.
+⚠️ **What the two arguments mean is 未定.**
+
+But the sweep is the result:
+
+> **MDIO addresses 0x00–0x04 read `0x1100`. Addresses 0x05–0x1F read
+> `0x0000`.**
+
+`0x1100` decoded: `aneg_enable` (bit 12) and `duplex` (bit 8) — an
+autonegotiating, full-duplex-preferring PHY. `0x0000` at an MDIO address is the
+classic *nothing answers here*.
+
+🟢 **So there are exactly five PHYs on this die, at MDIO addresses 0–4 — and
+tonight three other register families say the same thing, sharing no code with
+MDIO and no code with each other:**
+
+| family | what it says |
+|---|---|
+| MDIO (`X8`) | PHYs answer at 0–4, silence at 5–31 |
+| `PCRP` bit 0 `EnablePHYIf` (`C1`/`C2`) | set on 0–4, **clear** on 6 and 7; `PCRP5` not populated at all |
+| `PSRP` bits 13:12 `PortEEEStatus` (`C3`/`C4`/`C5`) | set on 0–4, clear on 5, 6, 7, 8 — and EEE is a PHY feature |
+| `PSRP` value (`C4`/`C5`) | `0x7A` on 6, 7 and 8 — one non-PHY default |
+
+⚠️ **And `PCRP`'s top byte is `4n`** — `00 04 08 0C 10 · — · 18 1C` — which is
+exactly the address-echo pattern `upstream/BENCH-LOG.md:4790-4791` worried
+about. **`PCRP5` reading `00000000` instead of `147F00xx` is what closes it**,
+for the second time and on a second seating.
+
+### 1.4 🔴🔴 `PHYR` with no arguments HANGS THE LOADER, and the card's recovery for that hazard does not work
+
+量 `X11-phyr`, 82 bytes:
+
+```
+PHYR
+cp0_cause=00000028, cp0_epc=80000000, ra=00000000Undefined Exception happen.
+```
+
+`cp0_cause = 0x28` → `ExcCode = (cause >> 2) & 0x1F` = **10 = RI, Reserved
+Instruction**. `epc = 0x80000000` — the base of KSEG0 — and `ra = 0`, so it was
+not reached by a `jal`. The loader jumped to the bottom of RAM and executed what
+was there.
+
+**Then nothing.** `X12` and `X13` are **0 bytes**; `X14-probe` streamed ESC for
+8 s over a 12 s window and got **0 bytes** with `prompt_seen: false`, while
+`/dev/ttyUSB0` was present and the tool opened the port and ran the whole
+window. **The board is hung in the exception handler and no watchdog resets
+it.**
+
+🔴 **The card's § 2.2 says, of exactly this hazard:** *"The loader runs its own
+watchdog at roughly one second (`CLK-08b`), so a fault resets the board — and
+`--esc-after 15` catches the prompt that comes back."* **That is refuted.**
+`--esc-after` was armed on `X11` for 10 s and there was nothing to catch.
+`CLK-08b`'s ~1 s is the watchdog's **configured** period in loader state; it is
+not evidence that the loader **arms** it at the prompt, and this measurement
+says it does not. **The sentence is left in the frozen card and corrected here,
+because repairing a frozen card destroys its own mtime evidence.**
+
+⚠️ **What this cost, counted rather than estimated**: one power press. All eight
+loader cells were already captured; the remaining phases need a fresh loader
+prompt anyway, which the power cycle provides. **Zero flash writes, zero `FLR`**
+— a Reserved Instruction exception is a CPU event and touches no flash.
+
+🔴 **The rule that comes out of it**, and it is narrower than *do not type
+unknown commands*: **a loader command that reports `Parameters not enough!` for
+zero arguments is safe to explore; one that faults is not, and the two are
+indistinguishable before the fact.** `MDIOR` did the first, `PHYR` did the
+second, and they are adjacent entries in the same command table. Any future
+probe of `PHYW`, `MDIOW` or `PORT1` must assume the `PHYR` outcome, not the
+`MDIOR` one.
