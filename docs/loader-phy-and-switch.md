@@ -999,4 +999,222 @@ neither has been shown to work on this adapter.
 port. `PSRP3`: `000010F9` → `000000F9`, on a **LinkUp** port. The low byte is
 identical in both ports and both states; **the whole difference is bit 12**, and
 § 7's `NET-11` bit map stops at bit 8. Re-read after `ifconfig eth4 up`: still
-clear, so `ndo_open` does not set it either. **未定.**
+clear, so `ndo_open` does not set it either. ~~**未定.**~~
+🟢 **CLOSED 2026-09-19 — it is `PortEEEStatus[0]`.** See the seating-27 section
+below.
+
+---
+
+## 🆕 2026-09-17 → 2026-09-19 (seating 27) — five PHYs by four register families, and the PHY is identified
+
+**量 on this device 2026-09-19 between 01:42 and 02:40**, captures
+`bench/2026-09-19/C1`–`C41` and `X0`–`X24`; the seating's own record is
+`bench/2026-09-19/CORRECTIONS-block27.md`. 讀 claims below name the file and
+line they came out of.
+
+### 🟢🟢 Section 6's prediction held, and three other families said the same thing independently
+
+§ 6 wrote, before any of this was measured: *"PHY addresses 0–4 answer; 5–31 do
+not"*, with the refutation *"all 32 addresses returning the same plausible
+value means the bus is echoing and nothing was measured."*
+
+量 `X8-mdior02` — the first execution of `MDIOR` in either project:
+
+> **MDIO addresses `0x00`–`0x04` read `0x1100`. Addresses `0x05`–`0x1F` read
+> `0x0000`.**
+
+The refutation did not fire: 27 of the 32 answered `0x0000`, which is the
+classic *nothing answers here*. `0x1100` decodes as `BMCR` with bit 12
+`aneg_enable` and bit 8 `duplex` — an autonegotiating, full-duplex-preferring
+PHY. 🟢 **And address 1 answers like the other four**, which is `SPEC.md`
+`NET-07` confirmed a second time and on a second instrument: § 4's `PORT1`
+patch list skips address 1, and the skip is about the **port**, not the PHY.
+
+🟢 **Three further families agree, sharing no code with MDIO and none with each
+other:**
+
+| family | capture | what it says |
+|---|---|---|
+| MDIO sweep | `X8` | PHYs answer at 0–4, silence at 5–31 |
+| `PCRP` bit 0 `EnablePHYIf` | `C1-L4104`, `C2-L4114` | set on 0–4 (`nn7F0039`), **clear** on 6 and 7 (`187F0038`, `1C7F0038`); `PCRP5` reads `00000000` |
+| `PSRP` bits 13:12 `PortEEEStatus` | `C3`, `C4`, `C5` | **1** on 0–4, **0** on 5, 6, 7 and 8 — and EEE is a PHY feature |
+| `PSRP` value | `C4`, `C5` | `0x0000007A` on 6, 7 **and 8** — one non-PHY default |
+
+⚠️ **`PCRP`'s top byte is `4n`** — `00 · 04 · 08 · 0C · 10 · — · 18 · 1C` —
+which is exactly the address-echo pattern `upstream/BENCH-LOG.md:4790-4791`
+worried about. 🟢 **`PCRP5` reading `00000000` rather than `147F00xx` is what
+closes it**, for the second time and on a second seating: an echoing bus would
+have produced the missing `14`.
+
+### 🟢🟢 The PHY is identified, and the decode is shown rather than asserted
+
+量 `C19-PHYID`, `C20-PHYST`, through the vendor's `/proc/rtl865x/phyReg`
+(⚠️ the *write* side — `proc_phyReg_read`'s whole body is
+`return PROC_READ_RETURN_VALUE;`, so `cat` on that file prints nothing and the
+output arrives on the console):
+
+```
+phyId(0) regId(0) = 0x1100     BMCR
+phyId(0) regId(1) = 0x78c9     BMSR
+phyId(0) regId(2) = 0x001c     PHYIDR1
+phyId(0) regId(3) = 0xc880     PHYIDR2
+```
+
+🟢 **`BMCR = 0x1100` is byte-identical to what the loader's `MDIOR` read for
+PHY 0** — the vendor's `/proc` under Linux and the loader's own MDIO primitive
+at `0x80402F80`, two paths, one value, across a power cycle. § 1's three-source
+agreement about the primitive now has a fourth leg that is a reading rather
+than a document.
+
+**The identifier, decoded by the IEEE 802.3 clause 22.2.4.3.1 split, stated so
+it can be redone**: composite `phy_id = (PHYIDR1 << 16) | PHYIDR2` =
+**`0x001CC880`**; `PHYIDR1[15:0]` carries OUI bits 3–18, `PHYIDR2[15:10]`
+carries OUI bits 19–24, `PHYIDR2[9:4]` is the model number and `PHYIDR2[3:0]`
+the revision.
+
+| field | arithmetic | value |
+|---|---|---|
+| OUI, 22 bits | `(0x001CC880 >> 10) & 0x3FFFFF` | **`0x732`** |
+| model number | `(0xC880 >> 4) & 0x3F` | **8** |
+| revision | `0xC880 & 0xF` | **0** |
+
+**Recovering the 24-bit OUI.** The 22 bits are OUI bits 3–24 in transmission
+order, so they are laid out `000000 · 00000111 · 00110010`; bits 1 and 2 are
+the I/G and U/L bits and are **not carried by the register pair at all**, so
+they are supplied as zero, which is what an OUI assigned to a manufacturer
+has. Reversing each octet into canonical form gives `0x00 · 0xE0 · 0x4C` —
+**`00-E0-4C`**.
+
+🔴 **What that OUI is called is external to this repository, and the internal
+corroboration is the stronger half.** § 6 above already records that the only
+PHY-ID constant anywhere in **B** is `0x001CC912`, whose own comment calls it
+*"8212 two giga port"*. 量: `(0x001CC912 >> 10) & 0x3FFFFF` = **`0x732`** — the
+**same 22 bits**. So this die's PHY and the vendor tree's own Realtek constant
+carry one OUI, established without leaving the repository. 推, from the IEEE
+registry and nothing in this project: `00-E0-4C` is Realtek Semiconductor.
+⚠️ **The part is NOT named here.** Model 8 revision 0 is what the bits say, and
+**no source in this repository maps a Realtek model number to a part number** —
+§ 6 looked for a PHY register map in **D** and there is none. Naming an
+`RTL8201x` from these four bits would be the same move § 3 records for
+`MDIOR`: a confident answer from a tree that is not this unit.
+
+🟢 **`BMSR = 0x78C9` is consistent with three other sources.** Link Status
+(bit 2) and Autoneg Complete (bit 5) are **clear**; PHY 0 is port 0; `PSRP0`
+reads `LinkUp` clear and `/proc/rtl865x/port_status` prints `Port0 … LinkDown`.
+⚠️ `0x78C9` is also one of the three fingerprints § 7's `NET-14` holds, where
+it is the **unlinked** negative control — consistent, and it is a negative
+control matching, not a new identification.
+
+### 🟢 `NET-10 殘留` closes, and it closes by REMOVING a piece of evidence
+
+§ 7's `A2` proposed the test in advance: *"If `PSRP8` is also `0000007A`, then
+`7A` is the non-PHY default and `PSRP7`'s equality with `PSRP6` carries no
+information."* 量 `C5-L4148`: **`PSRP8` is `0000007A`** — its first reading
+ever. `PSRP6`, `PSRP7` and `PSRP8` are the same word, and that word is what a
+port with no PHY reads.
+
+**So what settles which port is the CPU port is a printer's loop variable, not
+any property of `PSRP7`.** 讀, and now on two printers rather than one:
+`rtl865xC_dumpAsicDiagCounter()`, `rtl865x_asicCom.c:1776-1787`, loops
+`i` over `0 … RTL8651_PORT_NUMBER` **inclusive** and prints
+`<CPU port (extension port included)>` at `i == RTL8651_PORT_NUMBER`, which is
+`RTL8651_MAC_NUMBER` = **6** (`rtl865x_asicCom.h:24-25`). `port_status` prints
+`Port0`…`Port5` then one `CPUPort` row for the same reason. **Two `/proc`
+files, one constant, and neither is a statement about the silicon.**
+
+### 🔴 `PSRP6_RW` is not a second view of `PSRP6`
+
+量 `C6-L4600`: `0xBB804600` reads **`0000007E`**, where `PSRP6` at `0xBB804140`
+reads `0000007A` in the same power cycle. 讀
+`rtl865xc_asicregs.h:1825`: `#define PSRP6_RW (SWCORE_BASE+0x4600)
+/*CPU Port Status : R/W */`.
+
+`PSRP6 XOR PSRP6_RW` = `0x00000004` — **one bit, bit 2**. The card predicted
+`0000007A` from that header comment and the prediction is **refuted**: the
+comment does not describe a second view of the same word. **What bit 2 is:
+未定.** ⚠️ The other three words the `DW` served are recorded so they are not
+read again as a discovery: `+0x04` `00000000`, `+0x08` `00000000`, `+0x0C`
+`0C400000`, all **uninterpreted**.
+
+### 🟢 `PSRP` bit 12 is `PortEEEStatus[0]`, and the loader-state values carry their own control
+
+讀 `rtl865xc_asicregs.h:1326-1327`:
+`PortEEEStatus_MASK (3<<12)`, `PortEEEStatus_OFFSET 12`, under the comment
+`/* PSRP0..PSRP8 - Port Status Register Port 0~8 */`.
+
+🟢 **Two things make this a closure rather than a guess.** First, 量 over the
+whole 2.6.30 tree the symbol has **three** occurrences — the two defines and
+**one** use, `rtl865x_proc_debug.c:4218-4219`, which is the line that prints
+`EEE Status %0x`. *The only consumer of the field in the entire vendor driver
+is a printf.* Second, the loader-state readings are their own control: bits
+13:12 read **1** on exactly the five ports with an embedded PHY and **0** on
+the three without, with the unpopulated port 5 sitting between the classes —
+an arrangement a bit that meant something else would have to reproduce by
+accident.
+
+⚠️ **It also explains the § above rather than merely renaming it**: the field
+is `10E0` at the prompt and `00E0` under Linux on both a LinkDown and a LinkUp
+port, so whatever sets it is the loader's own bring-up and the vendor's NIC
+driver clears it. `/proc/rtl865x/port_status` under Linux prints
+`EEE Status 0` for every port (量 `C21-PORT`), which is the same reading from
+the other side. ⚠️ Unlike `PCRP`, this define is **outside every `#if`** — it
+sits immediately after the `#endif` at `:1323` — so § 4's double-definition
+hazard (`rtl865xc_asicregs.h` defining `PCRP`'s bit positions twice with
+different values) does not apply to it.
+
+### 🟢 The cable is in port 3, measured rather than looked at
+
+量 `C3-L4128`: `PSRP0`–`PSRP2` read `000010E0` and **`PSRP3` reads
+`000011F9`** — the only one of `PSRP0`–`PSRP4` with `LinkUp` (bit 4) and speed
+`01` = 100M. `/proc/rtl865x/port_status` prints `Port3 … LinkUp | NWay Mode
+Enabled / Duplex | Speed 100M` and `asicCounter` puts all six frames of a
+four-packet ping on `<Port: 3>` in both directions. **Three instruments, one
+port**, and the silkscreen map above says port 3 is LAN3.
+
+### 🆕 § 7's census is a floor, and here are the addresses it was missing
+
+§ 7's thirteen addresses come from resolving each `lui …,0xbb80` to its
+following `ori` or displacement. 讀 2026-09-19, the same resolution carried
+**forward through the base register for 40 instructions** instead of stopping
+at the first hit — with § 7's thirteen as the positive control, **all thirteen
+re-found**:
+
+| address | what it is | where |
+|---|---|---|
+| `0xBB804108` · `0x410C` · `0x4110` · `0x4114` | **`PCRP1`–`PCRP4`** | two sites each: `0x80403494`… and the `J` handler |
+| `0xBB804204` | `SSIR` — `\|= 1` (`TRXRDY`) | `0x80403970` |
+| `0xBB804300` | unnamed in every source here — written `0x00200000` | `0x804039B0` |
+| `0xBB804410` | **`MSCR`** — written the literal `0x00000001` | `0x80403950` |
+| `0xBB804754` | unnamed in every source here — written `0x00001249` | `0x8040395C` |
+| `0xBB804A0C` · `0x4A10` · `0x4A14` | **`PVCR1`–`PVCR3`** — written `0x00080008` | `0x80403930`… |
+| `0xBB804D04` · `0x4D20`–`0x4D38` | the TACI block's interior | one site each |
+
+🔴🔴 **The most consequential of those is in the `J` handler, and it explains a
+state transition two projects have measured.** 讀 `0x804092F4`–`0x80409354`,
+the last thing `J` does before `flush_cache` and `jalr`:
+
+```
+ori a0,v1,0x4104 ; lw v0,0(a0) ; and v0,v0,a1 ; sw v0,0(a0)    ; a1 = -2
+  ... and the same three instructions for 0x4108, 0x410C, 0x4110, 0x4114
+```
+
+**Five registers, one bit each, and the bit is `EnablePHYIf`.** So
+`upstream/BENCH-LOG.md:4770-4795`'s August reading — *"At rest under the
+loader: `007F0039`… **After `J`: all `...0038`**"* — and seating 27's `S0′`
+latch (`nn7F0038` at `subsys_initcall`, `nn7F0039` at the prompt) are the same
+fact, and neither is about the kernel. **A payload entered with `J` inherits
+five disabled PHY interfaces.** `notes/switch-driver.md` § 8.3 owns the
+consequence for a driver.
+
+⚠️ **Two negative results from the same census, each with its control.** It
+finds **no site anywhere in the 56,592 bytes** that forms `0xBB804A00` (`VCR0`)
+or `0xBB80441C` (`SWTCR1`) — no `ori`/`addiu` with those immediates and no load
+or store with displacement 18944 or 17436 — while the controls `0x4410`,
+`0x4204` and `0x4A08` each return exactly one. 推 that the loader-prompt
+readings `000001FF` and `00000200` are therefore the **power-on** values.
+🔴 **The census's blind spots are stated rather than left to be found**: a base
+register carried in across a call, or `lui …,0xbb81` with a negative
+displacement, would be invisible to it, and either would refute the 推.
+⚠️ And `PITCR` is the standing warning against reading a write as a value:
+`0x80403904` does `PITCR |= 1` and `PITCR` reads `00000000` at the prompt and
+under Linux both.

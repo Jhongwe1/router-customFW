@@ -1,0 +1,5 @@
+sleep 1 ; echo read 0 0 > /proc/rtl865x/phyReg ; echo read 0 1 > /proc/rtl865x
+/phyReg
+read phyId(0), regId(0),regData:0x1100
+read phyId(0), regId(1),regData:0x78c9
+# 

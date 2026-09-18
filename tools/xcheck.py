@@ -85,7 +85,7 @@ import os
 import sys
 import tempfile
 
-VERSION = "1.0"
+VERSION = "1.1"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(ROOT, "tools")
 
@@ -231,6 +231,27 @@ def corpus(root):
     return sorted(out)
 
 
+def sweep_excluded(prefix):
+    """-> True if the sweep leaves this capture out of every identity.
+
+    The predicate belongs to NEITHER parser: a `.log` of 0 bytes.  A `.timing`
+    row is written per `read()` that delivered data, so no bytes is no rows by
+    construction, and `C3` already documents that the two parsers disagree
+    about how to represent nothing.  Excluding them here keeps that divergence
+    where it is tested -- in a control -- instead of reporting it once per
+    empty capture as if it were news.
+
+    🔴 Seating 27 is what made this reachable: `bench/2026-09-19` holds the
+    first five committed 0-byte captures, four of them the evidence that a
+    hung board sent nothing and one the documented healthy board-off
+    pre-flight.  Deleting them would delete the evidence.
+    """
+    try:
+        return os.path.getsize(prefix + ".log") == 0
+    except OSError:
+        return False
+
+
 def sweep(root, verbose=False, out=sys.stdout):
     if MUT["x1_drop_last"] or MUT["x2_shift"] or MUT["x3_bias"]:
         raise Refused("a mutation hook is set; sweep is for real artefacts only")
@@ -243,12 +264,16 @@ def sweep(root, verbose=False, out=sys.stdout):
     n1 = n1bad = 0
     n2 = n2bad = 0
     n3 = n3bad = 0
+    nskip = 0
     same_read = split_read = 0
     x3rows = []
     failures = []
 
     for prefix in caps:
         rel = os.path.relpath(prefix, ROOT).replace(os.sep, "/")
+        if sweep_excluded(prefix):
+            nskip += 1
+            continue
         v1, d1 = x1(prefix)
         n1 += 1
         if v1 == "DIFFER":
@@ -288,6 +313,15 @@ def sweep(root, verbose=False, out=sys.stdout):
           file=out)
     print("  %-4s %-46s %8d %8d" % ("X3", "lead - artifact == gap(d0, d0+2)",
                                     n3, n3bad), file=out)
+    print("", file=out)
+    print("  excluded: %d capture(s) with a 0-byte .log -- no bytes is no "
+          "timing rows by" % nskip, file=out)
+    print("            construction, and C3 owns the divergence about how the "
+          "two parsers", file=out)
+    print("            represent nothing.  The count is printed because a "
+          "population that can", file=out)
+    print("            shrink silently is the failure this tool exists to "
+          "prevent.", file=out)
     print("", file=out)
     print("  X3's population, split by whether one read() delivered both anchors:",
           file=out)
@@ -405,6 +439,17 @@ def selftest(out=sys.stdout):
         open(p6 + ".timing", "w", encoding="utf-8").close()
         ck("C3", "an empty .timing: one refuses, one returns []", "DIFFER",
            x1(p6)[0])
+
+        # ---- C3d/C3e: the sweep's population predicate, and the control that
+        # says it is a guard and not a blanket.  Added 2026-09-19 when seating
+        # 27 put the first 0-byte captures into the corpus.
+        p6b = os.path.join(d, "empty-log")
+        open(p6b + ".log", "w", encoding="utf-8").close()
+        open(p6b + ".timing", "w", encoding="utf-8").close()
+        ck("C3d", "a 0-byte .log is excluded from the sweep", True,
+           sweep_excluded(p6b))
+        ck("C3e", "a NON-empty capture is NOT excluded, whatever its parses do",
+           False, sweep_excluded(p5))
 
         # ---- C7: X2 over a real-shaped row list, unmutated
         p7 = write_capture(d, "lookup", body, rows_split)

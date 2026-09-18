@@ -28,9 +28,9 @@ never printed at all. In the ALE block alone — `0xBB804400`–`0xBB8044FF` —
 
 Three of those are named directly by `R6-2`'s own one-line definition:
 
-| register | address | what it is | why the loader never touched it |
+| register | address | what it is | ~~why the loader never touched it~~ 🔴 **the premise is refuted for `MSCR` — § 8.9** |
 |---|---|---|---|
-| **`MSCR`** | `0xBB804410` | Module Switch Control — the L2/L3/L4 mode and both ACL enables | the loader does no forwarding; it never leaves L2 |
+| **`MSCR`** | `0xBB804410` | Module Switch Control — the L2/L3/L4 mode and both ACL enables | ~~the loader does no forwarding; it never leaves L2~~ 🔴 **the loader DOES touch it**: 讀 `0x80403948`–`0x80403950` in this unit's own stage 2 writes the literal `1`. The *reason* survives — `MSCR = 1` is `Mode_enL2` alone — but *never touched* is false, and 量 `bench/2026-09-19/X3-L4410` reads `00000001` at the prompt, which is that literal |
 | **`VCR0`** | `0xBB804A00` | VLAN Control — holds `En1QtagVIDignore` | the loader sends no tagged frames |
 | `SWTCR1` | `0xBB80441C` | the stateful-inspection (SPI) enables | likewise |
 
@@ -131,6 +131,18 @@ like*, not what the silicon reads after `FULL_RST`.
 * if `FULL_RST` leaves them alone, **the positive control on the reset fires**
   (`S1 == S0'` everywhere) and the block is void with its reason, which is
   also a result.
+
+🔴🔴 **量 2026-09-19: NEITHER arm happened, and a disjunction written as
+exhaustive was not.** `bench/2026-09-19/C27-RST1`, the `cat` taken immediately
+after `reset full`: `MSCR` `00000001`, `VCR0` `000001FF`, `SWTCR0` `00080000`,
+`SWTCR1` `00000200` — **none of them zero**, so `clearRegister()`'s values are
+not what `FULL_RST` leaves; and `PVCR0`–`PVCR3` went `00080008` → `00010001`,
+so it did not leave them alone either. `FULL_RST` leaves a **third** state, and
+the two arms above between them could not name it. § 8.5 has the numbers.
+🟢 **The one prediction in this section that did hit is the datasheet's.**
+`PCRP0` after `FULL_RST` reads **`007F0038`** — top half `0x007F`, exactly what
+Table 64's assembled per-bit defaults predict (量, same capture). The leaked
+draft is corroborated on the one register it could be corroborated on.
 
 🟢 **And there is an independent check on exactly one register.** The draft
 datasheet's Table 64 gives per-bit defaults for `PCRP0`–`PCRP4` which assemble
@@ -287,7 +299,7 @@ the other.
 | | state | how |
 |---|---|---|
 | S0 | the loader's | 量 already, block 24 |
-| **S0′** | after early kernel init, before the vendor NIC driver | latched at `subsys_initcall`. **Nothing has ever measured this state.** |
+| **S0′** | after early kernel init, before the vendor NIC driver | latched at `subsys_initcall`. ~~**Nothing has ever measured this state.**~~ 🔄 **量 2026-09-19 — § 8.3** |
 | S1 | after `FULL_RST` | the `reset` verb |
 | S3 | the dumb configuration | the `dumb` verb |
 
@@ -316,9 +328,18 @@ the other.
 | `SWTCR0` | `0x4418` | read-modify-write, clearing bits 15, 14, 4:3, 2, 1, 0 |
 | `SWTCR1` | `0x441C` | `0x00000000` |
 
-⚠️ **Eight of those nine registers have no prior reading on this die at all**,
-so each write is preceded by a read of the same register in the same verb and
-the read is the measurement rather than a courtesy.
+~~⚠️ **Eight of those nine registers have no prior reading on this die at
+all**~~ 🔴 **Wrong by a factor of four when it was written, and zero now.**
+量 2026-09-19 (`bench/2026-09-19/CORRECTIONS-block27.md` F3, which found the
+same error in `docs/KNOWN-ISSUES.md:777` and traced this line to it):
+`SWTCR1` = `00000200` and `PVCR1`/`2`/`3` = `00080008` were already in
+`bench/2026-09-17b` and in `SPEC.md`, so it was **two of nine** — `MSCR` and
+`VCR0` — and after this seating's `X3`/`X4` it is **zero of nine**. 推 the
+mechanism: `hdrcensus` searches committed files for an 8-hex token, and a
+`DW <base> 4` window labels only its base, so the other three words of every
+such window are invisible to it. **The sentence the count was supporting still
+holds** — each write is preceded by a read of the same register in the same
+verb and the read is the measurement rather than a courtesy.
 
 ### What it does not do
 
@@ -474,3 +495,411 @@ wrong binary**: plain `objdump` is x86-only here, but 量
 `/usr/bin/mips-linux-gnu-objdump` exists and `-i` lists **33** MIPS targets,
 including `elf32-tradbigmips`. **An unwrapped, non-vendor disassembler is
 available**, which removes the reason the vendor binary would ever be run.
+
+---
+
+# 8. 2026-09-19 (seating 27) — the driver ran
+
+**Everything in this section is 量 on this die unless it is marked otherwise.**
+The record of the seating is `bench/2026-09-19/CORRECTIONS-block27.md`; the
+captures are `bench/2026-09-19/C1`–`C41` and `X0`–`X24`. Where a number below
+disagrees with that file, the disagreement is stated and the recount is shown,
+because a count nobody can redo is not a measurement.
+
+## 8.1 What ran
+
+`check-predictions`: **41 of 41** captures came after the prediction, 0 did not.
+`looprun --mode bench --skip S2,S3` closed reset → rescue → upload → boot →
+assert in **39.24 s** with nine assertions. The boot capture is
+**1,759 bytes against a prediction of 1,759** (量 `wc -c r6sw1-boot.log`), and
+the id the build computed is the id the board printed:
+**`RLXFW-ID0=F681F8E0`**.
+
+```
+RLXFW-SW0 · SW1=81964000 · SW2=00000001 · SW3=00000200 · SW4=000001FF
+SW5=00080008 · SW6 · RLXFW-ID0=F681F8E0
+```
+
+`SW6`, not `SW6-NOPROC` — the `/proc` entry was created.
+
+## 8.2 The read path, before anything is read from it
+
+`SW1` is `boot_cvidr`, latched by `__raw_readl()` at `subsys_initcall`. It reads
+**`81964000`**, which is byte-identical to the loader's `DW BB804200` read four
+times across a power cycle (`X2`, `X6`, `X7`, `X18`). The live `CVIDR` column
+and the slot-0 column of every `cat` read it again. § 6's read-path control was
+declared a *negative* control until a second seating gave it a value; **this is
+that seating, and it is a positive control from here on.** Two code paths that
+share nothing agree on a register nobody writes. Every reading below is
+licensed by this one.
+
+## 8.3 `S0′` — the state § 6 said nothing had ever measured
+
+`C9-SW0` prints all 37 registers twice: the live value and the slot-0 latch
+taken at `subsys_initcall`. The four registers the boot marks carry are
+**byte-identical to loader state**: `MSCR` `00000001`, `SWTCR1` `00000200`,
+`VCR0` `000001FF`, `PVCR0` `00080008`.
+
+🔴 **That is not "early init does not touch the switch".** `PCRP0`–`PCRP4` read
+`nn7F0038` at `S0′` and `nn7F0039` at the loader prompt (量 `C1-L4104`,
+`C2-L4114`) — **`EnablePHYIf`, bit 0, is clear at `S0′` and set at the
+prompt.** `upstream/BENCH-LOG.md:4770-4795` recorded the same transition in
+August — *"At rest under the loader: `007F0039`… **After `J`: all `...0038`**"*
+— three weeks and several power cycles earlier, on a different project's
+capture.
+
+🟢 **And the instruction that does it is in the loader, not in the kernel.**
+讀, this unit's own stage 2 (`sha256 f88869d1…c9c1b4ee`, load base
+`0x80400000`), the `J` command handler at `0x8040925C`, its last act before
+`jalr s0`:
+
+```
+804092dc  lui v1,0xbb80         ; (delay slot of the bne above) v1 = 0xBB800000
+804092f4  ori a0,v1,0x4104      ; PCRP0
+804092f8  lw  v0,0(a0)
+804092fc  li  a1,-2             ; ~1  == ~EnablePHYIf
+80409300  and v0,v0,a1
+80409304  sw  v0,0(a0)
+80409308  ori a0,v1,0x4108      ; PCRP1, then lw / and / sw
+8040931c  ori a0,v1,0x410c      ; PCRP2, then lw / and / sw
+80409330  ori a0,v1,0x4110      ; PCRP3, then lw / and / sw
+80409344  ori v1,v1,0x4114      ; PCRP4, then lw / and / sw
+80409358  jal 0x80406728        ; flush_cache
+80409360  jalr s0               ; enter the payload
+```
+
+**Five registers, one bit each, and the bit is `EnablePHYIf`.** `0x39 & ~1` is
+`0x38`, which is what both projects measured. So `upstream/BENCH-LOG.md`'s
+*"After `J`"* is literally right: nothing in rlxfw's early init clears
+`EnablePHYIf`, because it was already clear when the kernel got control.
+🔴 **Consequence for any bring-up:** a payload entered with `J` inherits five
+disabled PHY interfaces. The vendor's NIC driver sets them back — `C9-SW0`'s
+live column reads `nn7F0039` again — and a driver of mine that does not will
+have no link and no register that says why. `docs/loader-phy-and-switch.md`
+§ 7 owns the census this came out of.
+
+**The full `S0′` → live table: 26 of 37 registers move** once the vendor NIC
+driver's `device_initcall` has run. ⚠️ **The corrections file says 25, and
+names `C9-SW0`.** Recount, `awk '/^r /{if($4!=$5)d++}'`: `C9-SW0` **26**,
+`C11-CAT1` **26**, `C12-LOCK` **26**, `C26-UNLK` **25**. The whole difference
+is **`SSIR` bit 0 (`TRXRDY`)**, which the vendor driver toggles — it reads
+`00000000` live in the first three captures and `00000001` in the fourth,
+against an `S0′` of `00000001`. **So the count is not a constant, and quoting
+it without its capture is quoting a moment.** 26 is right for the capture the
+corrections file names.
+
+🟢 **It also settles `C7`'s undetermined.** `TEACR` (`0x4400`) and `ALECR`
+(`0x440C`) read `00000000` at the loader **and** at `S0′`, which alone cannot
+separate *the register is zero* from *the window is not decoded*. Live they
+read **`00000002`** and **`000505F2`**. Same addresses, non-zero values: the
+window decodes and the zeros were real.
+
+## 8.4 Every counter in the derived table hit
+
+Measured, in order across the seating: `n_reads` **38 · 186 · 261 · 335 · 410 ·
+521 · 596 · 707 · 782 · 893 · 976**, `n_writes` **0 · 0 · 0 · 0 · 1 · 1 · 2 ·
+2 · 7 · 7 · 16**, ending at **`n_writes 25`, `n_refused 1`, `n_reset 3`,
+`n_dumb 1`, `n_restore 1`** with all four snapshot slots full.
+
+🟢 **`n_reads 186` on the first `cat` confirms `FW-64` on a second driver.**
+`38` at boot, `+74` for `C10-SAME`'s two `snap`s, `+37+37` for the `cat` —
+**one `cat` is two `read_proc` invocations** on this kernel, first measured on
+`rtl819x-spi` and now on a driver that shares no code with it.
+
+🟢 **`n_writes` 2 → 7 across `reset vendor` confirms it is FIVE writes**, not
+one: one `SSIR` plus four `SYS_CLK_MAG` that bypass the guarded write path and
+increment the counter by hand (讀 § 3's recipe). A card predicting `+1` would
+have been refuted by a driver behaving exactly as written.
+
+🟢 **`n_refused 1`, not 9** (量 `C12-LOCK`, with `n_writes 0` beside it) — a
+locked `dumb` costs one read and one refusal, because the verb returns on its
+first `-EPERM` rather than trying all nine. The guard was seen refusing, with a
+number.
+
+**The whole of `n_writes 25`, with every contribution named**: `reset full` 1
+(`C27`) + `reset full` 1 (`C29`) + `reset vendor` 5 (`C31`) + `dumb` 9 (`C34`)
++ `restore 0` 9 (`C39`) = **25**.
+
+## 8.5 The controls, and one of them is quoted against the wrong pair
+
+| control | as § 6 defines it | measured |
+|---|---|---|
+| **same-state sampling** | `SW-DIFF=00000000` | **`00000000`** (`C10-SAME`) — two back-to-back 37-register snapshots identical |
+| **positive control on the reset** | at least one register satisfies `S1 ≠ S0′` | **11 of 37** (`C27-RST1`, live-vs-slot-0). The block is licensed, not void |
+| **negative control on the writes** | a register `dumb` never writes satisfies `S3 == S1` | **0 of the 28 non-`dumb` registers moved** (§ 8.6) |
+| **idempotence** | `SW-DIFF=00000000` | **`00000000`** by the verb and **0 of 37** by the captures (`C28`/`C29`/`C30`) — two instruments |
+| **round trip** | `restore` brings `S0′` back | **9 of 9** (§ 8.7) |
+
+⚠️ **The corrections file gives the positive control as *24 of 37*, and that is
+the answer to a different question.** Recount: `S1` against `S0′` — which is
+the control as § 6 wrote it — is **11**. `S1` against the *live Linux* state is
+**24** when the Linux column is taken from `C11-CAT1` and **25** when it is
+taken from `C26-UNLK`, the capture immediately before the reset. All three
+numbers are ≥ 1, so the control fires whichever is used; **what does not
+survive is the pairing, and a control whose pair is not stated cannot be
+re-derived by a reader.**
+
+🔴 **The idempotence control exists because a confound would otherwise have
+been invisible.** `rtl819x_sw_do_reset()` asserts `FULL_RST` on **both** paths
+(`:336-339`); the vendor recipe only adds the clock gate afterwards. A naive
+`reset full` → snap → `reset vendor` → snap → diff measures *the 650 ms clock
+gate* **and** *`FULL_RST` applied a second time* and cannot separate them.
+Running `FULL_RST` twice with a snapshot between measures idempotence **before**
+the clock-gate delta is attributed, and only then is § 8.8's zero a statement
+about the clock gate.
+
+## 8.6 🟢🟢 `D2` holds — on two registers, and the sharp part is the other seven
+
+`diff 3 1` = **`SW-DIFF=00000002`** (量 `C35-D2`). By the captures, `S1` → `S3`:
+
+```
+SWTCR1  441C  00000200 -> 00000000
+VCR0    4A00  000001FF -> 80000000
+of the 9 registers `dumb` writes,  2 moved
+of the 28 it never writes,         0 moved   <- the NEGATIVE control
+```
+
+🔴🔴 **Seven of the nine writes are no-ops against `S1`.** 量 `C27-RST1`'s live
+column — the state `dumb` was applied to — beside the values `dumb` writes:
+
+| register | `S1` reads | `dumb` writes | |
+|---|---|---|---|
+| `MSCR` | `00000001` | `0x00000001` | no-op |
+| `SWTCR0` | `00080000` | `v & ~0xC01F` | no-op — none of those bits is set |
+| `PVCR0`–`PVCR3` | `00010001` | `0x00010001` | no-op ×4 |
+| `PVCR4` | `00000001` | `0x00000001` | no-op |
+| **`SWTCR1`** | `00000200` | `0x00000000` | **moves** |
+| **`VCR0`** | `000001FF` | `0x80000000` | **moves** |
+
+**So Realtek's own `FULL_RST` is already most of a dumb switch.** That is
+`R6-2`'s own named failure mode — *that a dumb switch looks identical to a
+switch nobody configured* — arriving as a measurement rather than as a worry.
+The DoD survives it because two registers do move and because the card named
+which two, from loader-state readings taken twenty minutes earlier, before the
+verb ran.
+
+🟢 **And for those two registers the claim is stronger than § 3.2 allows.**
+§ 3.2 says `R6-2` can only support *differs from the state this part's own
+documented full reset leaves it in*, because nothing on this board can read the
+switch before the loader runs. 讀, a census of every `0xBB80xxxx` address this
+loader forms — `lui …,0xbb80` followed within 40 instructions by an `ori`,
+`addiu` or a load/store displacement off the same register, with `NET-21`'s
+thirteen addresses as its positive control (**all thirteen re-found**) —
+**finds no site anywhere in the 56,592 bytes that forms `0xBB804A00` or
+`0xBB80441C`**, and no load or store with displacement 18944 or 17436 either.
+The controls `0x4410`, `0x4204` and `0x4A08` each return exactly one site, so
+the zeros are not the instrument failing to look. 推: for `VCR0` and `SWTCR1`
+the loader-prompt reading **is** the power-on value, so `D2` on these two is
+*differs from the power-on default*. ⚠️ **Refutation**: a site forming either
+address in a form this census cannot see — a base register carried in across a
+call, or `lui …,0xbb81` with a negative displacement. Until that census exists
+the sentence is 推 and § 3.2's weaker claim is the one to quote.
+
+## 8.7 🟢🟢 The round trip: 9 of 9 came back
+
+量 `C39-REST`. After `restore 0`, every one of the nine registers `dumb`
+disturbed reads its `S0′` value again — `MSCR` `00000001`, `SWTCR0` `00080000`,
+`SWTCR1` `00000200`, `VCR0` `000001FF`, `PVCR0`–`PVCR3` `00080008`, `PVCR4`
+`00000001`. **The direct register path on this die reads back.**
+
+§ 6's round-trip control was written because this part already has a register
+that does not (`WDTCLR`: written `00A40000`, read `00240000` — `SPEC.md`
+`FW-52`). 🔴 **That counter-example does not generalise to this block**, and
+the vendor's own ten-retry double-read (`_rtl8651_readAsicEntry`, § 6 item 4)
+is about the indirect TABLE path and is not evidence about this one either.
+This was the most consequential thing the card could have found, and the answer
+is the reassuring one, measured rather than assumed.
+
+## 8.8 What the vendor's 650 ms clock gate adds: nothing, and the one thing that moved is the gate working
+
+`diff 2 3` = **`00000000`** — over all 37 registers, the clock-gate cycle
+changes nothing that a snapshot pair can see. The capture diff of the `cat`
+immediately before against the one immediately after reads **1 of 37**, and it
+is `PSRP0` `000010E0` → `000011E0`: **bit 8, `LinkDownEventFlag`, which
+`NET-11` says is read-to-clear.** So the gate **did** drop and restore the
+link, and the only register that records it is a latch the next read consumes.
+
+🟢 **That latch is then seen being consumed, in three consecutive captures**:
+`C30` `000010E0`, `C32` `000011E0`, `C33` `000010E0`. `NET-11`'s read-to-clear,
+demonstrated in the wild rather than read out of a header.
+
+🔴 **The two instruments disagreeing is itself the finding.** `SW-DIFF` compares
+two snapshots taken at two instants; `C32`'s `cat` sat between `snap 2` and
+`snap 3` and consumed the latch, so the verb could not see it. **A `diff` count
+is a statement about two moments, not about an interval**, and any register
+that changes for a reason other than the verb is invisible to it.
+
+⚠️ So the honest claim is narrower than *the clock gate changes nothing*: over
+the nine `dumb` registers it changes nothing, over 36 of 37 it changes nothing,
+and the one that moves is a link-status latch moving because the gate worked.
+
+## 8.9 What the loader itself writes to this block
+
+讀, the same census as § 8.6, on the boot-path routine at `0x804038DC`–
+`0x804039B0`. It is listed here because § 1's table asserted the opposite for
+one of its three registers:
+
+| site | write | reads back at the prompt? |
+|---|---|---|
+| `0x804038EC` | `MACCR (0x4000) \|= 0x1000` | — |
+| `0x80403904` | `PITCR (0x4100) \|= 0x1` | 🔴 **no** — `PITCR` reads `00000000` in both states; `docs/loader-phy-and-switch.md` already owns that |
+| `0x80403918` | `P0GMIICR (0x414C) \|= 0x40` | — |
+| `0x8040392C`–`0x80403944` | `PVCR0`–`PVCR3` = `0x00080008` | 🟢 **yes**, 量 `X4`/`X5` — all four read `00080008` |
+| `0x80403950` | **`MSCR (0x4410) = 0x00000001`** | 🟢 **yes**, 量 `X3-L4410` |
+| `0x8040395C` | `0xBB804754 = 0x00001249` | unnamed in every source here |
+| `0x80403970` | `SSIR (0x4204) \|= 0x1` (`TRXRDY`) | 🟢 consistent — `S0′` latches `00000001` |
+| `0x804039B0` | `0xBB804300 = 0x00200000` | unnamed in every source here |
+
+🔴 **So § 1's *"why the loader never touched it"* is false for `MSCR`**, and the
+row is struck in place above. The reason given there — *the loader never leaves
+L2* — is confirmed rather than refuted: `MSCR = 1` is `Mode_enL2` with no ACL
+and no L3/L4, which is exactly the value the `dumb` verb writes. **The loader
+had already written the acceleration master switch to the dumb value, and this
+file said it had never addressed the register.** `VCR0` and `SWTCR1`, the other
+two rows, survive: the census finds no site for either (§ 8.6).
+
+## 8.10 🔴 `dumb` kills the network, and `restore 0` does not bring it back
+
+`C24-PING0` before: **4 transmitted, 4 received, 0 % loss.** After `dumb`
+(`C36-PING1`, whose statistics line is displaced into `C38-PORT2`):
+**4 transmitted, 0 received, 100 % loss.** After `restore 0` (`X24-ping3`,
+off-card): **no reply in 12.13 s** — the capture holds the two header lines and
+then silence, `stop_reason: --idle 12.0 with no bytes`. ⚠️ That is an absence
+of reply lines, not a statistics line; a working ping on this image prints four
+of them inside about four seconds.
+
+⚠️ **The second half is correct behaviour, not a failure.** `restore 0` writes
+back `S0′`, and `S0′` is the state **before** the vendor NIC driver configured
+the switch — `VCR0 = 000001FF`, all nine ingress filters on, every PVID at 8.
+It was never a working configuration. The card's round-trip prediction is about
+**register values**, and those came back 9 of 9 (§ 8.7).
+
+## 8.11 🔴 `SWINTSET` is refuted, and an off-card control says it is the die and not the instrument
+
+`C15-SWSET` wrote `CPUICR = 0x00100000` through the vendor's
+`/proc/rtl865x/memory`; the handler's own read-back printed **`0x0`**.
+`C16-IMR2`, made character-identical to `C14-IMR` so the over-read is the same
+on both sides of the write, reads `CPUIIMR 00000000` and `CPUIISR 80000000` —
+**byte-identical to `C14`. Zero bits moved.** `C13-DMA0` and `C18-DMA1` both
+read `CPUICR 00000000`.
+
+🔴 **The card had no control for *the write never reached the register*.** Four
+off-card cells added one: `X19`–`X22` wrote `0x04000000` — the mbuf-size field,
+configuration rather than a trigger, with `TXCMD`/`RXCMD` clear — through the
+**same** `echo write` path. It **stuck** (`dat 0x4000000: 0x4000000`, read back
+`04000000` by an independent `echo read`) and the restore to `0` also took.
+
+**So `C16`'s zero is a fact about bit 20.** With the engine off (`CPUICR` `0`)
+and the mask closed (`CPUIIMR` `0`), writing `SWINTSET` leaves no trace and
+raises no `CPUIISR` bit. § 7's `NET-38 殘留` ① — *which `CPUIISR` bit is the
+software interrupt* — is **not** answered; 推 it needs `TXCMD`/`RXCMD` set, or
+the mask open, or bit 20 is not `SWINTSET` on this part. 🔴 **§ 7's *"the first
+rung is a DISCOVERY cell rather than a pass/fail"* is the claim that falls:
+`R6-3`'s rung zero as designed does not work**, and it is worth more knowing
+that before the driver exists than after.
+
+🟢 `CPUIISR`'s first reading ever is **`80000000`**.
+🟢 The output format hit exactly: `%p` lowercase zero-padded (`0xb8010000`),
+`%x` **not** padded (`dat 0x100000`). A card predicting `dat 0x00100000` would
+have read a correct result as a refutation.
+
+## 8.12 🔴 The `<Port: 5>` tension does not exist — it is a section boundary
+
+`asicCounter` bracketing four pings went from all-zero (`C22-ACNT0`) to
+`Rcv 536 bytes, 6 unicast` and `Snd 536 bytes, 5 unicast + 1 broadcast`
+(`C25-ACNT1`), and `SPEC.md` `NET-34` records `ifconfig eth4` reading
+`RX packets:6 TX packets:6`, `RX bytes:536 TX bytes:536` for the same
+operation. 🟢 **The switch silicon's MIB and the Linux netdev's software
+accounting agree exactly, sharing no code.**
+
+🔴 **The corrections file § 2.11 reads a TX-only 6 unicast on `<Port: 5>` and
+calls it a tension with `PCRP5 = 00000000`. There is no such reading.** 量, by
+splitting both captures on their own `^<…>$` headings and extracting each
+section's counters:
+
+| section | `C22-ACNT0` | `C25-ACNT1` |
+|---|---|---|
+| `<Port: 0>`…`<Port: 2>`, `<Port: 4>` | all zero | all zero |
+| `<Port: 3>` | all zero | **Rcv 536 / 6 uni · Snd 536 / 5 uni + 1 bcast** |
+| **`<Port: 5>`** | all zero | **all zero, both directions** |
+| `<CPU port (extension port included)>` | all zero | **Snd 536 / 6 uni**, Rcv 0 bytes with `CRCAlignErr 6` |
+
+**The 6 unicast belongs to `<CPU port (extension port included)>`, which is the
+heading *after* `<Port: 5>`.** 讀 `rtl865xC_dumpAsicDiagCounter()`,
+`rtl865x_asicCom.c:1776-1787`: it loops `i` over `0 … RTL8651_PORT_NUMBER`
+**inclusive** and prints `<CPU port (extension port included)>` when
+`i == RTL8651_PORT_NUMBER`, which is `RTL8651_MAC_NUMBER` = **6**
+(`rtl865x_asicCom.h:24-25`). So the dump has six port sections and a seventh
+that is not a port. **`PCRP5 = 00000000` in
+all three states, the desk reading that port 5 is an unpopulated MII port, and
+the MIB are consistent, and nothing here needs adjudicating.**
+
+⚠️ **Two instrument caveats on this dump, both unresolved.** The CPU section
+counts `CRCAlignErr 6` against `Rcv 0 bytes` while its size buckets hold the
+same six frames — 未定. And the third reading (`C37`, displaced into
+`C38-PORT2`) is **all zero including port 3**, after three `FULL_RST`s and a
+`dumb`; 讀 `rtl8651_returnAsicCounter()` is a plain `READ_MEM32`, and its
+caller's comment (`_rtl8651_initialRead`, *"read counter for the first time
+will get value -1"*) documents a first-read hazard and **not** a read-to-clear,
+so whether the MIB was cleared by the resets or by the reads is 未定. **The
+discriminating cell is two `asicCounter` reads back to back with traffic
+between them and no reset**, and it costs nothing.
+
+## 8.13 `resetcmp` is not a verb, and this file's verb list is the one the parser has
+
+量: the token `resetcmp` occurs in this repository only as a comment at
+`rtl819x-switch.c:323` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
+in the parser**, and a frozen card's cell 8 asked for it. Typing it returns
+`-EINVAL`. 讀 `rtl819x-switch.c:535-609`, the parser accepts exactly nine
+forms and nothing else:
+
+```
+unlock <token>   lock   snap <s>   diff <a> <b>
+reset full       reset vendor      start   dumb   restore <s>
+```
+
+`snap 0` is refused as well — slot 0 is the boot latch and is not the
+operator's to overwrite. What the missing verb was for was composed instead out
+of `reset full` → `snap` → `reset vendor` → `snap` → `diff`, and § 8.5 records
+what composing it exposed.
+
+## 8.14 🔴🔴 What `/proc/rtl865x/` this image actually has — 13 of the vendor's 42
+
+**`SPEC.md` `NET-42`.** The vendor registers **42** distinct
+`/proc/rtl865x/` entries. **Thirteen survive into this image**: `stats`, `arp`,
+`ip`, `pppoe`, `igmp`, `memory`, `diagnostic`, `port_status`, `phyReg`,
+`asicCounter`, `mmd`, `mac`, `fc_threshold`. **Twenty-nine do not**, among them
+`vlan`, `pvid`, `rxRing`, `txRing`, `mbufRing` and `nic_mbuf`.
+
+**The method, 量 2026-09-19 on the built flat image, because a `/proc` entry's
+name is a NUL-delimited `.rodata` literal**: search the image for
+`b"\x00name\x00"`. Four controls ran with it — `port_status` **1**, `memory`
+**2**, `rtl819x-switch` **1** (this driver's own entry, which must be found or
+the search is not looking at the right image) and a synthetic name **0**.
+
+🟢 **讀, the three gates that decide it** (`rtl865x_proc_debug.c`):
+
+| line | gate | effect here |
+|---|---|---|
+| `:5227` | `#ifdef CONFIG_RTL_PROC_DEBUG` | off in rlxfw — takes `vlan` and most of the 29 |
+| `:5817` | `#if defined(CONFIG_RTL_PROC_DEBUG)\|\|defined(CONFIG_RTL_DEBUG_TOOL)` | **rlxfw has the second**, which is why `memory` survives and is the path every register reading in § 8.11 went through |
+| `:5396` | `#if defined(RTL_DEBUG_NIC_SKB_BUFFER)` | a plain `#define`, **not a Kconfig symbol** — it gates `nic_mbuf`, `rxRing`, `txRing`, `mbufRing`, `pvid` |
+
+🔴 **The four `R6-3` would want are behind the one gate that costs a `-D` and
+nothing else.** `rxRing`, `txRing`, `mbufRing` and `nic_mbuf` are the vendor's
+own view of the descriptor rings — the second source the descriptor argument in
+§ 7.1 was refuted for lacking — and they are absent from rlxfw's board template
+by a configuration decision nobody made deliberately. Carried forward rather
+than changed here.
+
+⚠️ **This is a fact about THIS image's configuration, not about the device.**
+The vendor firmware has more of them.
+
+🟢 **`FW-46` now has a method, and it killed two cells of the very card that
+produced it.** `FW-46` is *nothing in this repository can ask "can this image
+run this command" before a card is frozen.* The first draft of seating 27's
+card read `/proc/rtl865x/vlan` and `/proc/rtl865x/pvid`; **neither exists in
+this image**, both would have printed *"No such file or directory"*, and
+`check-predictions` scores existence and mtime rather than content — so the
+seating would have reported `41 of 41` with two cells empty. The three-line
+search above is what caught them, before power.

@@ -1,0 +1,6 @@
+sleep 1 ; echo snap 1 > /proc/rtl819x-switch ; echo snap 2 > /proc/rtl819x-swi
+tch ; echo diff 1 2 > /proc/rtl819x-switch
+RLXFW-SW-SNAP=00000001
+RLXFW-SW-SNAP=00000002
+RLXFW-SW-DIFF=00000000
+# 

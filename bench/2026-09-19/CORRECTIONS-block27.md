@@ -360,3 +360,267 @@ indistinguishable before the fact.** `MDIOR` did the first, `PHYR` did the
 second, and they are adjacent entries in the same command table. Any future
 probe of `PHYW`, `MDIOW` or `PORT1` must assume the `PHYR` outcome, not the
 `MDIOR` one.
+
+---
+
+## § 2 — the Linux phase, and `R6-2`'s DoD
+
+**量, 2026-09-19 between 02:01 and 02:40, on the power cycle the `PHYR` fault
+made necessary.** `check-predictions`: **`41 of 41` captures came after the
+prediction, 0 did not.**
+
+### 2.1 The boot
+
+`looprun --mode bench --skip S2,S3` closed the loop in **39.24 s** with **nine
+assertions**, the one that matters being `A3 the id the build computed -- board
+printed f681f8e0, build computed f681f8e0`. `A0b` read `AUTOBURN` back as
+`00000000` **from the word at `0x8040D4A0`**, not from the loader's echo.
+
+🟢 **The boot capture is 1,759 bytes against a prediction of 1,759**, derived at
+the desk as `710 const + 927 baseline marks + 122 switch marks` with the
+precondition checked (all 57 baseline tags present in the flat image, all seven
+switch marks present exactly once).
+
+```
+RLXFW-SW0 · SW1=81964000 · SW2=00000001 · SW3=00000200 · SW4=000001FF
+SW5=00080008 · SW6 · RLXFW-ID0=F681F8E0
+```
+
+`SW6`, not `SW6-NOPROC`.
+
+### 2.2 🟢 The read path is proved, by paths that share no code
+
+`SW1` is `boot_cvidr`, latched by `__raw_readl()` at `subsys_initcall`. It reads
+**`81964000`** — **identical to the loader's `DW BB804200`**, which was read
+four times across a power cycle (`X2`, `X6`, `X7`, `X18`, all byte-identical).
+The live `CVIDR` column and the slot-0 column in every `cat` read it too. **Two
+code paths sharing nothing, on a register nobody writes.** Every reading below
+is licensed by this.
+
+### 2.3 🟢🟢 `S0'`, a state nobody had ever measured
+
+The four marked registers are **byte-identical to loader state**: `MSCR`
+`00000001`, `SWTCR1` `00000200`, `VCR0` `000001FF`, `PVCR0` `00080008`.
+
+🔴 **But that is not "early init does not touch the switch", and the first draft
+of this section said so.** 量 from `C9-SW0`'s two columns: `PCRP0`–`PCRP4` are
+`nn7F0038` at `S0'` and `nn7F0039` at the loader — **`EnablePHYIf` is CLEARED
+between the prompt and `subsys_initcall`**. 🟢 And that transition is **exactly
+what `upstream/BENCH-LOG.md:4770-4795` recorded in August**: *"At rest under the
+loader: `007F0039`… **After `J`: all `...0038`**."* Two projects, three weeks
+apart, the same state transition.
+
+**The full `S0'` → Linux table: 25 of 37 registers move** once the vendor NIC
+driver's `device_initcall` has run. `C9-SW0` carries both columns.
+
+🟢 **And it settles `C7`'s undetermined.** `TEACR` and `ALECR` read `00000000`
+at the loader **and** at `S0'`, which alone cannot distinguish *the register is
+zero* from *the window is not decoded*. Live they read **`00000002`** and
+**`000505F2`**. Same addresses, non-zero values: **the window is decoded and the
+zeros were real.**
+
+### 2.4 🟢 Every counter in the derived table hit
+
+`scratchpad/s87-counters4.py` re-implements the driver's arithmetic from
+`file:line`. Measured, in order: `n_reads` **38 · 186 · 261 · 335 · 410 · 521 ·
+596 · 707 · 782 · 893 · 976** and `n_writes` **0 · 0 · 0 · 0 · 1 · 1 · 2 · 2 ·
+7 · 7 · 16**, ending at **`n_writes 25`, `n_refused 1`, `n_reset 3`, `n_dumb 1`,
+`n_restore 1`**, all four slots full.
+
+🟢 **`n_reads 186` on the first `cat` after two snapshots confirms `FW-64` on a
+SECOND driver**: `38 + 74 + 37 + 37`. One `cat` is two `read_proc` invocations.
+
+🟢 **`n_writes` 2 → 7 across `reset vendor` confirms it is FIVE writes**, one
+`SSIR` plus four `SYS_CLK_MAG` that bypass the guarded path and increment the
+counter by hand. A card predicting +1 would have been refuted by a driver
+behaving exactly as written.
+
+🟢 **`n_refused 1`, not 9** — a locked `dumb` costs one read and one refusal
+because the verb returns on its first `-EPERM`. The guard was seen refusing,
+with a number.
+
+### 2.5 🟢🟢 The three controls the block rests on
+
+| control | predicted | measured |
+|---|---|---|
+| **same-state sampling** | `SW-DIFF=00000000` | **`00000000`** — two back-to-back 37-register snapshots identical |
+| **the reset's POSITIVE control** | at least one register differs `S0'` → `S1` | **24 of 37 differ.** The block is licensed, not void |
+| **idempotence** | `SW-DIFF=00000000` | **`00000000`** by the verb **and 0 of 37 by the captures** — two instruments |
+
+### 2.6 🟢 What the vendor's 650 ms clock gate adds: nothing, and the one thing that moved proves it worked
+
+`diff 2 3` = **`00000000`**. The capture diff of the `cat` immediately before
+against the one immediately after reads **1 of 37**, and it is `PSRP0`
+`000010E0` → `000011E0` — **bit 8, `LinkDownEventFlag`, which `NET-11` says is
+read-to-clear.** So the clock gate **did** drop and restore the link, and the
+only register that records it is a latch the next read consumes.
+
+🟢 **That latch is then seen being consumed, in three consecutive captures**:
+`C30` `000010E0`, `C32` `000011E0`, `C33` `000010E0`. `NET-11`'s read-to-clear,
+demonstrated in the wild rather than read out of a header.
+
+🔴 **And the two instruments disagreeing is itself the finding.** `SW-DIFF`
+compares two SNAPSHOTS taken at two instants; `C32`'s `cat` sat between `snap 2`
+and `snap 3` and consumed the latch, so the verb could not see it. **A `diff`
+count is a statement about two moments, not about an interval**, and any
+register that changes for a reason other than the verb is invisible to it.
+
+⚠️ **So the honest claim is narrower than *the clock gate changes nothing***:
+over the nine `dumb` registers it changes nothing, over 36 of 37 it changes
+nothing, and the one that moves is a link-status latch moving because the gate
+worked.
+
+### 2.7 🟢🟢 `D2` HOLDS — on two registers, exactly as the desk predicted
+
+`diff 3 1` = **`SW-DIFF=00000002`**. By the captures, `S2v` → `S3`:
+
+```
+SWTCR1  441C  00000200 -> 00000000
+VCR0    4A00  000001FF -> 80000000
+of the 9 registers `dumb` writes, 2 moved
+of the 28 it never writes,        0 moved   <- the NEGATIVE control
+```
+
+🔴🔴 **Seven of the nine writes are no-ops against `S1`, and the card said which
+seven before the verb ran.** 量 the `S1` column: `MSCR` `00000001`, `SWTCR0`
+`00080000` (and `v & ~0xC01F` leaves it), `PVCR0`–`PVCR3` `00010001`, `PVCR4`
+`00000001` — **each already exactly the value `dumb` writes.**
+
+**So Realtek's own `FULL_RST` is already most of a dumb switch.** That is
+`R6-2`'s named failure mode — *"that a dumb switch looks identical to a switch
+nobody configured"* — arriving as a measurement rather than as a worry. The DoD
+survives it because two registers do move, and because the card predicted which
+two from the loader-state readings taken twenty minutes earlier.
+
+### 2.8 🟢🟢 The round trip: 9 of 9 came back
+
+After `restore 0`, every one of the nine registers `dumb` disturbed reads its
+`S0'` value again. **The direct register path on this die reads back.**
+`FW-52`'s `WDTCLR` counter-example — written `00A40000`, read `00240000` — does
+**not** generalise to this block, and the vendor's own ten-retry double-read on
+the indirect TABLE path is not evidence about this path. That was the most
+consequential thing this card could have found and it is the reassuring answer,
+measured.
+
+### 2.9 🔴 `dumb` kills the network, and `restore 0` does not bring it back
+
+`C24-PING0` before: **4 transmitted, 4 received, 0 % loss.**
+After `dumb`: **4 transmitted, 0 received, 100 % loss.**
+After `restore 0` (`X24-ping3`, off-card, window sized for a failing ping):
+**still no reply.**
+
+⚠️ **The second half is correct behaviour, not a failure.** `restore 0` writes
+back `S0'`, and `S0'` is the state **before** the vendor NIC driver configured
+the switch — `VCR0 = 000001FF` with all nine ingress filters on and every PVID
+at 8. It was never a working configuration. The card's round-trip prediction is
+about **register values**, and those came back 9 of 9.
+
+### 2.10 🔴 `SWINTSET` is refuted, and an off-card control says it is the die and not the instrument
+
+`C15` wrote `CPUICR = 0x00100000` and the handler's own read-back printed
+`0x0`; `C16`, character-identical to `C14`, read `CPUIIMR 00000000` and
+`CPUIISR 80000000` — **byte-identical to `C14`. Zero bits moved.**
+
+🟢 The output format hit exactly: `%p` lowercase zero-padded (`0xb8010000`),
+`%x` **not** padded (`dat 0x100000`). A card predicting `dat 0x00100000` would
+have read a correct result as a refutation.
+
+🔴 **The card had no control for *the write never reached the register*.** Four
+off-card cells added one: `X19`–`X22` wrote `0x04000000` — the mbuf-size field,
+configuration rather than a trigger, with `TXCMD`/`RXCMD` clear — through the
+**same** `echo write` path. It **stuck**, confirmed by the handler's read-back
+**and** by an independent `echo read`, and the restore to `0` also took.
+
+**So `C16`'s zero is a fact about bit 20.** With the engine off (`CPUICR` `0`)
+and the mask closed (`CPUIIMR` `0`), writing `SWINTSET` leaves no trace and
+raises no `CPUIISR` bit. `NET-38 殘留` ① — *which `CPUIISR` bit is the software
+interrupt* — is **not** answered; 推 it needs `TXCMD`/`RXCMD` set, or the mask
+open, or bit 20 is not `SWINTSET` on this part. **`R6-3`'s rung zero as designed
+does not work**, and that is worth more before the driver exists than after.
+
+🟢 `CPUIISR`'s first reading ever is **`80000000`**.
+
+### 2.11 🟢🟢 The PHY is identified, and the ASIC's own counters agree with the netdev
+
+```
+phyId(0) regId(2) = 0x001c      phyId(0) regId(3) = 0xc880
+phyId(0) regId(0) = 0x1100      phyId(0) regId(1) = 0x78c9
+```
+
+🟢 **`BMCR = 0x1100` is byte-identical to what the loader's `MDIOR` read for
+PHY 0** — the vendor's `/proc/rtl865x/phyReg` under Linux and the loader's own
+MDIO primitive, two paths, one value. `BMSR = 0x78c9` has Link Status and
+Autoneg Complete **clear**, and PHY 0 is port 0, which `PSRP0` and
+`/proc/rtl865x/port_status` both report LinkDown. Three sources agree.
+
+🟢 **`asicCounter` bracketing four pings went from all-zero to `Rcv 536 bytes,
+6 unicast` and `Snd 536 bytes, 5 unicast + 1 broadcast`** — and `SPEC.md`
+`NET-34` records `ifconfig eth4` reading `RX packets:6 TX packets:6`,
+`RX bytes:536 TX bytes:536` for the same operation. **The switch silicon's MIB
+and the Linux netdev's software accounting agree exactly, sharing no code.**
+That is `D3`'s *two sources* shape, demonstrated.
+
+🔴 **And an unplanned reading with a tension in it.** The traffic appears on
+`<Port: 3>` in both directions — the port `PSRP3` says is the only one linked —
+**and on `<Port: 5>` as TX only, 6 unicast, RX zero.** 推 (weak) that port 5's
+TX counter counts frames forwarded toward the CPU. ⚠️ **It contradicts the desk
+reading that port 5 is the unpopulated MII port**, which `PCRP5 = 00000000` in
+all three states supports. This project already knows the CPU port carries three
+disagreeing numberings (`enum PORTID` 6, `swNic.h` 7, the VLAN path's bit 8);
+the MIB dump is a fourth data point and it is **recorded, not adjudicated**.
+
+### 2.12 🔴 The card's own defect: a window sized for the success case
+
+`--idle 6` on the two `ping` cells is shorter than a **failing** ping takes to
+give up. `C36-PING1` ended at ~6 s with the ping still running, so the next
+command sat in the tty buffer and **`C36`, `C37`, `C40` and `C41`'s output is
+each displaced one cell later** — `C38-PORT2`'s capture holds `C37`'s command
+and the `100 % packet loss` line belonging to `C36`.
+
+**Nothing is lost and nothing is void**; the data is in the following capture
+and `check-predictions` scores `41 of 41` because every cell ran. But
+**`check-predictions` scores existence and mtime, so a displaced capture looks
+exactly like a correct one** — the same family as the `--idle`/`sleep` trap that
+nearly emptied a whole press ladder on seating 20.
+
+**The rule this adds**: a cell whose payload can FAIL must have its window sized
+for the failure, not for the success. A succeeding `ping` prints for ~4 s; a
+failing one prints **nothing** for ~4 s and then prints its statistics, so an
+`--idle` shorter than that ends the capture with the shell still busy.
+
+---
+
+## § 3 — where this seating's instruments went, and the audit pass that asked
+
+The eighth audit method — *enumerate what this segment produced, then ask who
+owns each thing* — found one gap that the other seven do not reach: **the card
+cites two scripts by a `scratchpad/` path, and a scratchpad is session-local.**
+A card citing a script nobody can run cites nothing, and this repository's own
+lesson is that *recording a conclusion without the re-runnable command that
+produced it is not recording it* — which is why `tools/bootbytes.py` exists.
+
+| built as | landed as | why it is worth keeping |
+|---|---|---|
+| `scratchpad/s87-procs.py` | **`tools/imgprocs.py`** | `FW-46`'s answer. It is what killed two cells of this card before power, and every future card needs it. Four controls print on every run and a broken search REFUSES rather than reporting absences |
+| `scratchpad/s87-diff.py` | **`tools/swdiff.py`** | the instrument behind every register conclusion in § 2. It refuses unless both captures carry exactly 37 rows, and it splits the report by the `dumb` flag so the negative control is read off the same output |
+| `scratchpad/s87-counters4.py` | ⚠️ **not promoted** | the driver's counter arithmetic, re-implemented from `file:line`. It is cited by the card's § 2.6 and by § 2.4 above, and it is **carried forward** rather than committed tonight: it hardcodes one cell ordering, so promoting it means parameterising the cell list, and a tool committed without controls is the thing this repo refuses |
+| `scratchpad/s87-bootpred.py` | ⚠️ **not promoted** | it wraps `bootbytes` and adds the precondition `bootbytes predict` does not check — *is every baseline tag still in this image*. It belongs **inside** `bootbytes`, not beside it, and that is a small edit to an existing tool with an existing suite |
+| `scratchpad/s87-run.sh` | ⚠️ **not promoted** | runs a card's cells taken verbatim out of the frozen card rather than retyped. Genuinely reusable and genuinely untested |
+
+🔴 **So three of five are carried forward, and saying so is the point.** The
+card's § 2.6 quotes `scratchpad/s87-counters4.py` and that citation will not
+resolve for a future reader; this row is where they find out what it was and
+that it was not lost, only not promoted.
+
+🟢 **And one tool was changed rather than added.** `tools/xcheck.py` 1.0 → 1.1:
+the sweep now excludes a capture whose `.log` is 0 bytes, **counted and
+printed**. 量 2026-09-19: this seating committed the **first five 0-byte
+captures in the repository's history** — four of them the evidence that a hung
+board sent nothing, one the documented healthy board-off pre-flight — and
+`tools/ci-expected.tsv:338` already listed *"an empty file refuses in one and
+returns `[]` in the other"* among the *"REAL divergence(s) the corpus cannot
+reach"*. **The corpus reached it.** The divergence stays where it is tested, in
+control `C3`; what changed is the sweep's population, by a predicate that
+belongs to neither parser. Two new controls, `C3d` and `C3e`, say the exclusion
+happens and that it is a guard rather than a blanket: self-test 18 → **20**,
+`ci-expected.tsv` updated in the same edit.

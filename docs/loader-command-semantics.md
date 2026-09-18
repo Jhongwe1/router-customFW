@@ -1365,3 +1365,265 @@ most for the shortest replies, which is the wrong direction for a safety margin.
 includes per-line formatting. `docs/probe3-cells.md` §4's wall is about the
 *payload* writing the UART directly. Carrying either number across that boundary
 is importing a measurement out of the conditions it was taken in.
+
+---
+
+## §11 — the command table's `argc` field is DEAD, and eight commands crash on a bare name — 2026-09-19
+
+**Everything in this section is 讀 unless marked 量**, and re-derived rather
+than quoted: `/home/key/fwre-work/stage2.bin`, **56,592 bytes**, `sha256
+f88869d108cdafdfcff5d9461b0ead5c061a6725effb0314bb954572c9c1b4ee` — the value
+§0 records — disassembled with
+`mips-linux-gnu-objdump -D -b binary -m mips:3000 -EB --adjust-vma=0x80400000`.
+Load base `0x80400000`. **A** only; **B**'s `monitor.c` is a different bootcode
+generation and §3 of `docs/loader-phy-and-switch.md` records what happens when
+it is read as this unit's.
+
+### The table
+
+**`0x8040DBC0`**, file offset **56,256**, **17 entries × 16 bytes**, layout
+`{const char *name; int argc; int (*func)(int, char **); const char *help;}`.
+The field order is not an assumption: `RUNSHEET.md` `B1` has been reading
+entry 0 as `8040B070 00000000 80409A9C 8040B074` on this device since
+2026-08-24 (量, five power cycles, byte-identical), and parsing the bytes here
+gives `name = "?"`, `argc = 0`, `func = 0x80409A9C`, `help = "HELP (?)…"`.
+
+| # | name | declared `argc` | handler | |
+|---:|---|---:|---|---|
+| 0 | `?` | 0 | `0x80409A9C` | |
+| 1 | `DB` | 2 | `0x804095D0` | |
+| 2 | `DW` | 2 | `0x804094B4` | |
+| 3 | `EB` | 2 | `0x8040978C` | |
+| 4 | `EW` | 2 | `0x80409650` | |
+| 5 | `CMP` | 3 | `0x80409820` | |
+| 6 | `IPCONFIG` | 2 | `0x80409378` | |
+| 7 | `AUTOBURN` | 1 | `0x80409914` | |
+| 8 | `LOADADDR` | 1 | `0x8040996C` | |
+| 9 | `J` | 1 | `0x8040925C` | |
+| 10 | `FLR` | 3 | `0x804099AC` | |
+| 11 | `FLW` | 4 | `0x80409B6C` | |
+| 12 | `MDIOR` | **0** | `0x80409C54` | |
+| 13 | `MDIOW` | 0 | `0x80409CE8` | |
+| 14 | `PHYR` | **2** | `0x80409D98` | |
+| 15 | `PHYW` | 3 | `0x80409E10` | |
+| 16 | `PORT1` | 3 | `0x8040A294` | |
+
+### 🔴🔴 The dispatcher never reads the `argc` field
+
+The command loop at `0x80409144` walks the table sixteen bytes at a time and
+loads **two** words out of each entry:
+
+```
+804091e0  sll  v0,s1,0x4        ; index * 16
+804091e4  addu s0,v0,s3         ; s3 = 0x8040DBC0
+804091ec  lw   a1,0(s0)         ; the NAME pointer   <- offset 0
+804091f0  jal  0x80406c40       ; compare against the typed token
+804091f8  beqz v0,0x80409230
+804091fc   addiu a0,s4,-1       ; (delay slot) a0 = tokens - 1
+80409204  sltiu v0,s1,17        ; seventeen entries
+...
+80409230  lw   v0,8(s0)         ; the HANDLER        <- offset 8
+80409238  jalr v0
+8040923c   addiu a1,s2,4        ; (delay slot) a1 = &argv[1]
+```
+
+量 on the disassembly: **`lw <reg>,4(s0)` occurs zero times between
+`0x80409144` and `0x8040925C`**, and `0(s0)` is the only displacement off the
+entry pointer other than the `8(s0)` above. **The `argc` column is written down
+and never read.** Every handler is entered with `a0` = the number of tokens
+after the command name and `a1` = the first of them; whether that number
+satisfies the table is each handler's own business, and nine of them do not
+check.
+
+🔴 **The device says so, in the sharpest possible form, twice on one seating.**
+`MDIOR` declares **0** and a bare `MDIOR` is *refused by its own handler* —
+量 `bench/2026-09-19/C8-MDIOR.log`, `Parameters not enough!`. `PHYR` declares
+**2** and a bare `PHYR` **faulted and hung the board** (量 `X11-phyr`, below).
+**Had the dispatcher enforced the field, the declaration that was already
+correct would have refused the command that cost the power cycle.**
+
+### 🔴🔴 The unchecked family
+
+Method: for each handler, walk from its entry to the next handler's entry and
+find (a) the first instruction that compares or branches on `a0` or on a
+register `a0` was moved into, and (b) the first load off `a1` or a register
+`a1` was moved into. Unchecked = (b) with no (a) before it.
+
+| | commands |
+|---|---|
+| 🔴 **dereference the first argument with no `a0` test before it** | **`EB` · `EW` · `AUTOBURN` · `LOADADDR` · `FLR` · `FLW` · `PHYR` · `PHYW`** |
+| 🟢 test `a0` first | `DB` (`bgtz` @`804095E0`) · `DW` (`bgtz` @`804094CC`) · `CMP` (`slti …,3` @`8040983C`) · `IPCONFIG` (`bnez` @`8040938C`) · `J` (`blez` @`80409264`) · `MDIOR` (`bgtz` @`80409C64`) · `MDIOW` (`slti …,3` @`80409CFC`) |
+| ⚠️ read no argument at all | `?` · `PORT1` |
+
+⚠️ **`PORT1` is safe from a crash and is not safe.** It is a seven-instruction
+wrapper around `0x8040A0A0` and reads neither `argc` nor `argv` — and
+`0x8040A0A0` performs 612 writes to PHY vendor register 19 across four PHYs
+(`docs/loader-phy-and-switch.md` §4). *Takes no arguments* and *harmless* are
+different properties.
+
+🔴 **The first version of this scan got two of these wrong and a stated
+disagreement is what caught it.** It walked a fixed 48 instructions from each
+entry, so `EB` was credited with `CMP`'s `slti a0,a0,3` forty-four
+instructions past its own end; and its branch pattern had no `beqz`/`bnez`,
+which objdump prints as their own mnemonics, so `IPCONFIG`'s `bnez a0` was
+invisible and it was reported unchecked. **Both defects only ever move a
+command from the safe column to the dangerous one or back**, which is why the
+table above is only worth what its controls are: `DB`, `DW`, `J` and `MDIOR`
+must come out checked, and the dispatcher's own `blez s4` — which is outside
+every handler — must not be counted as one.
+
+### 量 2026-09-19: a bare `PHYR` faults, and § 10 predicted every part of it
+
+`bench/2026-09-19/X11-phyr.log`, 82 bytes:
+
+```
+PHYR
+cp0_cause=00000028, cp0_epc=80000000, ra=00000000Undefined Exception happen.
+```
+
+`ExcCode = (cause >> 2) & 0x1F` = **10, Reserved Instruction**. `X12` and `X13`
+are 0 bytes; `X14-probe` streamed ESC for 8 s over a 12 s window and got 0
+bytes with `prompt_seen: false`, while `/dev/ttyUSB0` was present, the tool
+opened the port and ran the whole window, `usbipd list` still read `Attached`,
+and `dmesg` showed only a read-timeout URB unlink. **The link was healthy and
+the board was silent. One power press.**
+
+**§ 10 above is the owner of this and had it all in writing on 2026-08-25** —
+the `j 0x80400c18` self-branch, the unarmed watchdog, *"nothing recovers it,
+one fault costs one power cycle"*, and **neither string ending in `\n`**, which
+is why the two lines arrive fused as `…ra=00000000Undefined Exception happen.`
+with no separator. Five of its claims went 讀 → 量 in one accidental capture;
+they are not restated here. ⚠️ § 10's own free cell, `DW 80000080 32`, **has
+still never been run**, and this measurement is not a substitute for it: it
+observes the behaviour, not the vector table.
+
+🆕 **What this seating adds is the step § 10 does not name: how a null argument
+reaches `0x80000000` at all.** 推, and every input to it is already measured in
+this repository:
+
+1. 讀 `PHYR` at `0x80409D98`: `lw a0,0(a1)` then `jal 0x80406EE0` (`strtoul`,
+   base 16). The tokeniser zeroes all twenty pointer slots per line
+   (`docs/loader-phy-and-switch.md` §3), so `strtoul` is handed **NULL** and
+   loads from virtual address 0.
+2. 讀 `notes/cache-model.md:791`: address 0 is in KUSEG, and on this R3000-class
+   CP0 a KUSEG access with no TLB entry vectors to the **UTLB refill vector at
+   `0x80000000`**, which *"the loader installs nothing"* at.
+3. 量 `docs/rlxprobe-audit-2026-08-25.md:96` (`H0c`, 2026-08-25): the word at
+   the UTLB refill vector reads **`5A5AA5A5`**, and that write-up already drew
+   the conclusion — *"so a kuseg fault lands on a `BLEZL` and not on a jump
+   into loader code"*. Opcode `0x5A5AA5A5 >> 26` = `0x16` = **`BLEZL`**, a
+   MIPS-II branch-likely.
+4. **The CPU executes it, it is not implemented, and `EPC` is `0x80000000`
+   exactly — which is what the board printed.** `ra = 0` fits: no `jal` reached
+   that address.
+
+🔴 **So this is the second time in one seating that the answer was already on
+disk.** ⚠️ It stays 推 because `H0c` read that word on a different power cycle
+three weeks earlier. **Refutation, one zero-risk cell**: `DW 80000000` at a
+fresh prompt reading anything other than `5A5AA5A5`.
+
+### 🟢 `PHYR <phyid> <reg>` is safe — the fault is the missing count, not the command
+
+讀 `0x80409D98`–`0x80409E08`: two `strtoul(…, 16)` on `0(a1)` and `4(a1)`, one
+`phy_read` at `0x80402F80`, one `prom_printf`, `jr ra`. There is no write and
+no loop.
+
+* it needs **two or more** arguments. `PHYR 0` reaches `4(a1)` — also NULL —
+  and takes the same fault. **`PHYR 0` is not a safer probe than `PHYR`.**
+* it parses **base 16** where `MDIOR`/`MDIOW` parse **base 10** (§3 of
+  `docs/loader-phy-and-switch.md`). For registers 0–9 they agree; MII's vendor
+  space starts at 16, where they do not.
+
+### 🔴 `MDIOR` reads ONE argument, it is the register, and the help string has the two backwards
+
+讀 `0x80409C54`–`0x80409CE4`, the whole handler:
+
+```
+80409c64  bgtz a0,0x80409c80      ; else "Parameters not enough!"
+80409c80  lw   a0,0(a1)           ; the FIRST argument, and the only one read
+80409c88  jal  0x80406ee0 ; li a2,10    ; strtoul base 10  -> s1 = the REGISTER
+80409ca0  jal  0x80402f80          ; phy_read(s0, s1, &scratch)   s0 = 0..31
+80409cc4  slti v0,s0,32            ; sweep every MDIO address
+```
+
+The table's own help is `MDIOR:  MDIOR <phyid> <reg>`; the handler treats the
+first argument as the **register** and sweeps the **PHY id** itself. The format
+string at `0x8040B568` is a second witness for the radix —
+`'PhyID=0x%02x Reg=%02d Data =0x%04x\r\n'`, decimal for the register and hex
+for the other two. **There is no `4(a1)` load anywhere in the handler.**
+
+🔴 **And that format string is where this loader's `prom_printf` is caught not
+implementing its own width field.** 量 `X8-mdior02`, one line:
+`PhyID=0x05 Reg=0 Data =0x0000`. `%02x` padded, `%04x` padded, **`%02d`
+printed one character where the format asks for two.** So `prom_printf` pads
+`%0Nx` and does not pad `%0Nd`, measured on a single line that contains all
+three. **A card predicting `Reg=02` would read a correct result as a
+refutation** — the same trap `notes/switch-driver.md` § 8.11 records for the
+vendor driver's unpadded `%x`, on the other side of the boot.
+
+⚠️ **量 `X8`/`X9`/`X10` prove half of that and not the other half, and the
+corrections file states the stronger half.** The three probes were
+`MDIOR 0 2`, `MDIOR 0 3` and `MDIOR 0 1` — **the second argument varies and the
+first never does.** So they measure, with three values and an identical output,
+that **the second argument is ignored**; they cannot measure that the first one
+is the register, because it was `0` every time and `Reg=0` is what a handler
+that ignored *both* would also print. *"Reads register 0 regardless of its
+arguments"* is not what was tested. 🟢 **The discriminating cell is one command
+and it is zero-risk**: `MDIOR 2` must print `Reg=2` on all 32 lines — **not
+`Reg=02`**, by the padding measurement above — with `Data` equal to `PHYIDR1`
+on addresses 0–4, which seating 27 measured through Linux as `0x001c`
+(`docs/loader-phy-and-switch.md`). Carried forward. ⚠️ It is `MDIOR 2` and not
+`MDIOR 2 0`: a second argument is accepted and ignored, and including one makes
+the cell unable to distinguish the two readings it exists to separate.
+
+### Why nothing recovered the fault: the loader does not arm the watchdog
+
+讀. Every site in all 56,592 bytes that forms `WDTCNR` (`0xB800311C`) — found
+by resolving each `lui …,0xb800` through its following `ori`, with `GIMR`
+(`0xB8003000`, 24 sites) as the positive control:
+
+```
+80401304  lui v0,0xb800 ; ori v0,v0,0x311c
+8040130c  sw  zero,0(v0)
+80401310  j   0x80401310          <- spin until it bites
+
+804092e0  lui v0,0xb800 ; ori v0,v0,0x311c      (inside the J handler)
+804092e8  sw  zero,0(v0)
+804092ec  j   0x804092ec          <- spin until it bites
+```
+
+**Exactly two, both `sw zero` immediately followed by a branch to self.** Both
+are deliberate reboots, and the second sits behind `bne v1,0xBFC00000` at
+`0x804092D8` — **which is why `J BFC00000` resets the board** rather than
+jumping to the boot ROM. There is no third site, and nothing on the command
+loop's path arms the timer. ⚠️ §10's own raw four-byte search for `b800311c`
+returns **zero** hits in the image, so the byte-pattern instrument cannot see
+either of these: an address built by `lui`+`ori` never appears as four
+contiguous bytes. §10's conclusion was right; its instrument could not have
+established it.
+
+⚠️ **推, with its refutation.** `SPEC.md` `CLK-08b` gives the loader's `OVSEL`
+as ≈ 1 s. That is a **configured field in a disabled block**: seating 17 read
+`wdtcnr_at_probe = A5000000` under Linux, where `WDTE = 0xA5` is the *stop*
+pattern, and a full-word `sw zero` is what turns it on. So the ≈ 1 s is what
+the watchdog *would* count if something armed it, and the card that wrote
+*"the loader runs its own watchdog at roughly one second, so a fault resets the
+board"* was refuted on the wire: `--esc-after` was armed for 10 s on `X11` and
+there was nothing to catch. **Refutation of the 推**: `DW B800311C` at a fresh
+prompt reading a top byte other than `A5`.
+
+### Three zero-risk loader cells, carried forward
+
+None writes anything and each is one command at the prompt.
+
+| cell | settles |
+|---|---|
+| `DW 80000000` | whether the UTLB refill vector still holds `5A5AA5A5` — the one 推 in the fault chain above |
+| `DW 80410094` | ⚠️ **未定 — no file in this repository says what this address is.** It is carried in `docs/KNOWN-ISSUES.md` and in the working log as one of the three, with no stated target. 量: it is **`0x2384` bytes past the loaded image's own end** (`0x80400000 + 56,592 = 0x8040DD10`), so it is BSS or beyond, and it is **not** `exception_handlers[32]`, which §10 places at `0x8040EB40`. **A carried-forward cell whose purpose nobody wrote down is a cell whose result nobody can read**, and that is worth more than the reading would have been |
+| `DW B800311C` | whether `WDTE` reads `A5` at the prompt, which is the refutation condition for the paragraph above |
+
+⚠️ §10's `DW 80000080 32` is the fourth and is older than all of these.
+**`DW <addr> 1` serves four words, not one** (the `LDR-41`/seating-23 section
+above), so each of these reads its target plus the three words after it; none
+of those windows reaches the UART block, which is the only region a `DW` start
+address has to be constrained against.

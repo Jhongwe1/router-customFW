@@ -1,0 +1,126 @@
+sleep 1 ; cat /proc/rtl865x/port_status
+
+--- 10.1.1.2 ping statistics ---
+4 packets transmitted, 0 packets received, 100% packet loss
+# sleep 1 ; cat /proc/rtl865x/asicCounter
+<Port: 0>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 1>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 2>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 3>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 4>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 5>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<CPU port (extension port included)>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Whole system counters>
+   CpuEvent 0 pkts
+# sleep 1 ; cat /proc/rtl865x/port_status
+Dump Port Status:
+Port0 Force Mode disable
+EEE Status 1
+LinkDown
+
+Port1 Force Mode disable
+EEE Status 1
+LinkDown
+
+Port2 Force Mode disable
+EEE Status 1
+LinkDown
+
+Port3 Force Mode disable
+EEE Status 1
+LinkUp | NWay Mode Enabled
+	RXPause Enabled | TXPause Enabled
+	Duplex Enabled | Speed 100M
+
+Port4 Force Mode disable
+EEE Status 1
+LinkDown
+
+Port5 Force Mode disable
+EEE Status 0
+LinkDown
+
+CPUPort Force Mode disable
+EEE Status 0
+LinkUp | NWay Mode Disabled
+	RXPause Enabled | TXPause Enabled
+	Duplex Enabled | Speed 1G
+
+# 

@@ -1,0 +1,22 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-19T02:05:32+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 30.0,
+  "idle": 5.0,
+  "until": null,
+  "until_offset": null,
+  "sent": "sleep 1 ; echo write 0xB8010000 0x00000000 > /proc/rtl865x/memory",
+  "sent_hex": "736c6565702031203b206563686f20777269746520307842383031303030302030783030303030303030203e202f70726f632f72746c383635782f6d656d6f72790d",
+  "stop_reason": "--idle 5.0 with no bytes",
+  "bytes": 118,
+  "duration_s": 6.116582,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

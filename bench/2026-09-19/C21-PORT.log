@@ -1,0 +1,35 @@
+sleep 1 ; cat /proc/rtl865x/port_status
+Dump Port Status:
+Port0 Force Mode disable
+EEE Status 0
+LinkDown
+
+Port1 Force Mode disable
+EEE Status 0
+LinkDown
+
+Port2 Force Mode disable
+EEE Status 0
+LinkDown
+
+Port3 Force Mode disable
+EEE Status 0
+LinkUp | NWay Mode Enabled
+	RXPause Enabled | TXPause Enabled
+	Duplex Enabled | Speed 100M
+
+Port4 Force Mode disable
+EEE Status 0
+LinkDown
+
+Port5 Force Mode disable
+EEE Status 0
+LinkDown
+
+CPUPort Force Mode disable
+EEE Status 0
+LinkUp | NWay Mode Disabled
+	RXPause Enabled | TXPause Enabled
+	Duplex Enabled | Speed 1G
+
+# 

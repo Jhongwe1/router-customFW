@@ -1,0 +1,37 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-19T02:12:25+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 12.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {
+    "esc_after": {
+      "requested_period_s": 0.02,
+      "writes": 591,
+      "window_s": 12.005896,
+      "achieved_period_s": 0.020315
+    }
+  },
+  "cr": {
+    "esc_after": {
+      "written": true,
+      "prompt_seen": false,
+      "waited_s": 2.009859,
+      "log_offset": 534,
+      "settle_budget_s": 2.0
+    }
+  },
+  "cr_settle_s": 2.0,
+  "seconds": 35.0,
+  "idle": 0.0,
+  "until": "RealTek>",
+  "until_offset": null,
+  "sent": "sleep 1 ; echo reset vendor > /proc/rtl819x-switch",
+  "sent_hex": "736c6565702031203b206563686f2072657365742076656e646f72203e202f70726f632f72746c383139782d7377697463680d",
+  "stop_reason": "--seconds 35.0 elapsed",
+  "bytes": 535,
+  "duration_s": 35.094134,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}
