@@ -290,6 +290,55 @@ was there.
 window. **The board is hung in the exception handler and no watchdog resets
 it.**
 
+⚠️ **The alternative explanation was eliminated by measurement, not assumed.**
+`usbipd list` still reads `Attached`, `/dev/ttyUSB0` is present with its mtime
+advancing on every open, and `dmesg` shows only `vhci_hcd: urb->status -104`
+(`-ECONNRESET`, a URB unlink on a read timeout) and no disconnect. The link is
+healthy and the board is silent.
+
+### 🔴 THE CORRECTION THIS SECTION NEEDS, AND IT IS ABOUT HOW IT WAS WRITTEN
+
+The paragraph above was drafted as a discovery. **It is not one.**
+`docs/loader-command-semantics.md` § 10, written **2026-08-25**, already says all
+of it, marked 讀, with the cheap cell that would make it 量 named and never run:
+
+> `do_reserved` at **`0x80400BE8`** … `80400c18: j 0x80400c18  <- BRANCH TO
+> ITSELF` … The exception entry has already pushed the KU/IE stack so `IEc` is
+> 0, **and the watchdog is not armed** … **Nothing recovers it. One fault costs
+> one power cycle.** … **Neither string ends in `\n`** (NUL at `0xA52B` and
+> `0xA547`), so what reaches the wire is **one unterminated line followed by
+> permanent silence.**
+
+**I wrote up a finding without reading the file that owns it.** That is the
+process failure, and it is recorded because the repository's own audit method
+says the valuable pass is the one that asks *who owns this claim* before writing
+it down.
+
+🟢 **What tonight actually is, and it is worth more than a discovery: FIVE of
+§ 10's claims went 讀 → 量 in one accidental capture.**
+
+| § 10 claim, written 2026-08-25 | tonight |
+|---|---|
+| a fault reaches `do_reserved` for an ordinary ExcCode | ✅ ExcCode **10 (RI)** is one of the thirty slots § 10 says point at `0x80400BE8` |
+| the two strings are printed by two `prom_printf` calls | ✅ both appeared, and the format matches `"cp0_cause=%X, cp0_epc=%X, ra=%X"` |
+| **neither string ends in `\n`**, so the wire sees ONE unterminated line | ✅ **byte-exactly**: `…ra=00000000Undefined Exception happen.` with no separator at all |
+| the watchdog is not armed, so nothing bites | ✅ no reset over 12 s with ESC streaming |
+| **one fault costs one power cycle** | ✅ |
+
+⚠️ § 10 also says *"Nothing here is measured on the device; the cell that would
+make it a measurement is `DW 80000080 32` at the prompt, which is read-only and
+costs nothing."* **That cell has never been run, and tonight measured the same
+thing the expensive way.** The accidental measurement is in one respect stronger
+— it observes the *behaviour* rather than the vector table — but it is not a
+substitute for the free cell, and that cell is carried forward.
+
+🟢 **And one thing tonight adds that § 10 does not have**: `epc = 0x80000000`
+with `ra = 0`. Nothing had been uploaded, so `0x80000000` held whatever a
+cold-booted board leaves there, and executing it raised RI rather than, say, an
+address error. **What `PHYR` transfers control to is `0x80000000` itself** — not
+a wild pointer, but that exact address, which § 10 notes is also where a
+`boot.img` upload would begin writing.
+
 🔴 **The card's § 2.2 says, of exactly this hazard:** *"The loader runs its own
 watchdog at roughly one second (`CLK-08b`), so a fault resets the board — and
 `--esc-after 15` catches the prompt that comes back."* **That is refuted.**
