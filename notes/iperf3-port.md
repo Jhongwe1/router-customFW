@@ -181,7 +181,62 @@ not the driver's.
    may not be `iperf3`.
 4. **`-Z`, `-C` and `--affinity` are advertised by `--version` and untested.**
 
-## § 8. It is not in an image yet
+## § 7a. 🔴 The interop test in § 7.2 was run on the wrong medium
+
+量 2026-09-20, twice, and the second measurement refutes the first.
+
+**At the desk, over loopback**: this binary as client against an apt-installed
+`iperf 3.16` server — four cases, **all rc 0** (TCP, `-R`, `-J`, UDP `-b 10M`
+with 0/444 lost). That was reported as retiring § 7.2's 推.
+
+**On the die, over the real 1500-byte Ethernet path**: the same binary against
+the same 3.16 server got `iperf3: error - control socket has closed
+unexpectedly`, and the server printed
+**`WARNING: Size of data read does not correspond to offered length`** with
+**no `Accepted connection` from the board at all**.
+
+推, and it is the obvious reading: loopback's MTU is 65536 and delivers
+iperf3's length-prefixed control JSON in one read; a 1500-byte path splits it.
+**Loopback cannot test a protocol whose failure mode is a short read.**
+
+🟢 **The fix is constructive rather than diagnostic**: run **3.1.3 on both
+ends**. 量: `qemu-mips-static ./iperf3 -s -B 10.1.1.2 -p 5201` binds the real
+interface (`ss` shows `10.1.1.2:5201 LISTEN users:(("qemu-mips-stati"))`) and a
+same-version client completes against it. The emulation cost sits on the server
+side, which counts bytes rather than generating them.
+
+⚠️ **The lesson generalises past iperf3**: a desk test of a network protocol run
+over loopback has silently removed segmentation, reordering, loss and the MTU.
+§ 7's remaining 推 rows should be read with that in mind.
+
+## § 8. ~~It is not in an image yet~~ 🔄 **It is, since 2026-09-20**
+
+🟢 **量 2026-09-20 (ninetieth segment).** `config/rlxfw-initramfs.tsv` gained one
+`file` row (38 → **39** entries), so `RECIPE_ID` moved `f2aa2fdd` → **`edc94765`** and
+the image was rebuilt as cell `r6if1`. The binary is **not** under `config/` — it is at
+`$REPO/build/rlxfw-user/iperf3/iperf3`, produced by an `install` target added to this
+directory's Makefile, with objects staged under `$FWRE_WORK` so no `.o` can move the id.
+🟢 **The rebuild through that rule reproduced the audited artefact byte for byte**
+(sha256 `3144db60…`), which is a control on the recipe rather than a formality: a
+different digest would have meant the committed recipe does not build the committed
+measurement. Decompressed image **3,943,424** of 5,242,880 = **75.2 %**, margin
+1,299,456 — and that figure was predicted from a `gen_init_cpio` delta before the build
+and matched exactly. `nfjrom` **1,152,000** bytes, sha256 `89051d6a396c305b`.
+
+⚠️ **`RECIPE_ID` cannot see the binary.** The id is a digest over `config/` and the
+product lives under `build/`, so two different builds of `iperf3` give two images with
+the **same** `RLXFW-ID0`. What pins the artefact is the assembled image's own sha256.
+
+⚠️ **This file's § 3 headroom figure and the tsv's own SIZE comment block are now
+stale by one image**, and are deliberately NOT edited this segment: `config/` is inside
+`RECIPE_ID`, two frozen cards state `edc94765`, and moving the id to fix a comment would
+make those cards unreproducible. Carried forward.
+
+🔴 **And nothing of it produced a throughput number.** See § 7a and
+`SPEC.md` `NET-59`/`NET-60`.
+
+### § 8.1 The original note, kept
+
 
 The binary lives at `$FWRE_WORK/iperf3-port/iperf3` and is **not** committed —
 binaries never are. Putting it in the image means a row in

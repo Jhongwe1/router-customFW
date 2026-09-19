@@ -855,6 +855,30 @@ not close, each with what would settle it.
 
 ---
 
+## 🔴 What `R6-5`'s seating did NOT establish — 2026-09-20 (ninetieth segment, seating 29)
+
+`D5` and `D6` are both open. Seven things did not close, each with what would
+settle it.
+
+| | what would settle it |
+|---|---|
+| 🔴🔴 **No throughput number exists.** Every `iperf3` run on the die either failed its control exchange (`SPEC.md` `NET-60`) or hung the board (`NET-59`). `D5` asks for a number with its spread over three runs and there is not one | The next seating, with **3.1.3 on both ends** — 量 that a `qemu-mips-static` server binds the real interface and a same-version client completes against it |
+| 🔴🔴 **A real TCP load hangs the whole board and the mechanism is undetermined.** Two reproductions; console silent for 100 s at 0 bytes; `reboot -f` ineffective (7,489 bytes captured, all of it ESC, no loader prompt); and **not a panic**, because `traps.c:52` is `#define printk panic_printk` and nothing printed | A **bounded** transfer — `-n 64K`, then bisect upward — with a liveness probe between every step and `n_irq` read after each. 推: an interrupt storm, because the CPU is alive and making no progress |
+| 🔴 **`D6` was never attempted.** The 30-minute flood did not start | Gated on the two rows above |
+| 🔴 **`-l 8K`'s survival is uninterpretable.** It did not hang, but its control connection broke before any data moved, so it is not evidence that a small blksize is safe | Re-run it once the control exchange works |
+| 🔴 **`NET-54`'s re-attribution is 推, not 量.** A marginal cable produced exactly `NET-54`'s shape — interface deaf, below both drivers, recovered by an action that involves handling the board. That is a hypothesis about a past reading, not a measurement of it | `NET-54` reproducing with the cable demonstrably untouched |
+| 🔴 **The vendor-driver contrast could not be taken.** `ifconfig eth4 up` returned `SIOCSIFFLAGS: Device or resource busy` because my driver holds a non-shared `request_irq(12)` — 量 `bench/2026-09-20/X9` | An image in which my driver is not bound, or a shared IRQ. Until then *below both drivers* cannot be re-measured on this arrangement |
+| ⚠️ **Whether the three defects in `notes/nic-driver.md` § 8 interact is unknown.** `NET-57` (no watchdog), `NET-58` (a re-open leaves the engine loose) and `NET-59` (the hang) were each measured alone | `NET-59` first; the other two have identified causes and it does not |
+
+⚠️ **And one process failure of mine, recorded because it cost the most.**
+Block 29 lost **fourteen carded cells** by typing them into a shell that was
+already dead — nothing checked between cells, so each `--send` went into a hung
+console and produced a 39-byte capture that `check-predictions` scores exactly
+like a real one, since it reads existence and mtime and never content. The fix
+is a two-line liveness probe between steps, and it paid for itself on its first
+run: the next failure cost **one** cell instead of fourteen. **A card's cells
+are one-shot, and a gate between them is not optional.**
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

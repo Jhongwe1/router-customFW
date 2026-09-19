@@ -1,0 +1,10 @@
+cat /proc/stat
+cpu  4 0 642 41157 0 0 6 0 0
+cpu0 4 0 642 41157 0 0 6 0 0
+intr 92894 0 0 0 0 0 0 0 0 9191 0 0 0 48 41880 0 0 0 0 0 0 0 0 0 0 0 41775 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 9296
+btime 0
+processes 26
+procs_running 1
+procs_blocked 0
+# 

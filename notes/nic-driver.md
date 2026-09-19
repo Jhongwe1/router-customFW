@@ -872,3 +872,118 @@ do not measure what they claim).
 fires* before any load; the load then tests only *does it hold under load*. A
 first flood run against an untested wake would have been testing two things at
 once, and a green result could not have said which.
+
+## 8. `R6-4a`'s first silicon run — what it established and what it refuted
+
+🟢 **Measured 2026-09-20, seating 29, `bench/2026-09-20/`.** Everything here ran
+on the die. § 7 above is the desk half and is deliberately not edited; this is
+what happened when it met the hardware.
+
+### 8.1 🟢 § 7.7's acceptance set is MET, and the first attempt's "refutation" was an artefact
+
+Block 29's `D8`–`D11`, one fresh boot, no interface re-open:
+
+| cell | `n_tx_stop` | `n_tx_wake` | `n_tx_wake_race` | `tx_stopped` | `now_icr` |
+|---|---:|---:|---:|---:|---|
+| `D8-BASE` | 0 | 0 | 0 | 0 | `C4000000` |
+| `D9-STALL` | **1** | 0 | 0 | **1** | **`44000000`** |
+| `D10-OFF` | 1 | **1** | 0 | **0** | **`C4000000`** |
+| `D11-RECOV` | 1 | 1 | 0 | 0 | `C4000000` |
+
+`D11`'s ping came back **3 of 4**, so transmit resumed and the control is not
+void. § 7.7 asks for `n_tx_stop > 0`, `n_tx_wake > 0`,
+`n_tx_wake + n_tx_wake_race >= n_tx_stop`, `tx_stopped 0`, and the stream still
+alive: **all five hold.**
+
+🔴 **Block 28 read `n_tx_stop 2` with `n_tx_wake 0`, which is exactly § 7.7's
+stated refutation — *wrong wake site*. It was not that.** `nic_tx_try_wake()`
+returns 0 while the current TX descriptor is still `OWN`ed, and § 8.3's runaway
+engine meant that descriptor would never be retired. **The wake site is right;
+its precondition had been destroyed.** Telling those two apart is what the
+second card existed for, and a card that had stopped at the first reading would
+have recorded a working driver as broken.
+
+🟢 **Two predictions hit exactly.** `n_writes` moves **+1** on `txstall on` and
+**+2** on `txstall off` (the restore and the doorbell) — 14 → 15 → 17. And
+`now_icr` returns to `C4000000`, **not** `C4800000`, so **`TXFD` is a
+self-clearing doorbell**, which § 3.3 recorded as unmeasured anywhere in this
+repository.
+
+### 8.2 🔴 `ndo_tx_timeout` still cannot fire, and § 7.4 needs a correction
+
+§ 7.4 says the watchdog was dead because the driver set `watchdog_timeo` and
+supplied no `ndo_tx_timeout`, and that `R6-4a` fixes it by supplying one.
+**Supplying one is not enough.** 讀, three lines:
+
+* `net/ethernet/eth.c:349-353` — under `CONFIG_RTL_819X`, Realtek's
+  `ether_setup` sets `dev->tx_queue_len = 0` (*"reduce queue size for max free
+  sdram"*); the `#else` arm is the usual 1000.
+* `net/sched/sch_generic.c:589` — a zero-length device gets `&noqueue_qdisc`.
+* `:605-606` — `need_watchdog` is set **only** for a non-noqueue qdisc, and
+  `:630` is its only reader and `dev_watchdog_up()`'s only caller.
+
+∴ the timer is never armed. 量 `X18`: `tx_stopped 1` for minutes with
+`n_tx_timeout 0`. **`SPEC.md` `NET-57`.**
+
+🔴 **And the larger consequence lands on § 7's own argument.**
+`rtl819x-nic.c:880-885` argues that returning `NETDEV_TX_BUSY` while waking is
+correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue` is
+**NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
+freed. **The argument is right for the kernel it cites and wrong for this
+board.** It is not deleted: what is wrong is not the reasoning but an unstated
+assumption that this device has a qdisc at all.
+
+### 8.3 🔴 A re-opened interface resumes the DMA engine outside its ring
+
+量 `X12`: `ifconfig rlx0 down ; ifconfig rlx0 10.1.1.3 up` printed `ENGOFF`,
+`NDSTOP`, `ENGON`, `NDOPEN` and **no `RLXFW-N-ALLOC` and no `RLXFW-N-ARM`** —
+`ndo_open` skips both when `nic_allocated`/`nic_armed` are already set, so
+nothing rewrites the descriptor base registers. 量 `X23`: with the engine on,
+`rpdcr0_pos` advanced `A15B1C00` → `A15B1C64` while `rx_ring` is `A15B8000`.
+It was reading descriptors from outside the ring and writing frame data wherever
+those words pointed. `X25`'s `ifconfig down` stopped it (`engine_on 0`,
+`now_icr 04000000`, both position registers frozen at `X26`).
+
+🟢 **A fresh boot does not have this**: `D5-UP` and `X41` both print
+`N-ALLOC=A15B8000` and `N-ARM=A15B8000`. **`SPEC.md` `NET-58`.**
+
+### 8.4 🔴🔴 The network was PHYSICALLY faulty for all of block 28, and no software reading could have said so
+
+量, and it is the reading `SPEC.md` `NET-54 殘留` named as missing from seating
+28's set: the switch's own port-3 receive counters were **frozen** while the
+host's `tcpdump` showed six ARP replies and three broadcasts leaving the
+adapter. Not counted, not even as errors. A cable re-seat at both ends —
+**single variable, no power cycle, no software change** — took port 3 from
+`Rcv 600` to `Rcv 2124` (the counter prints no separator) with fifteen new broadcasts and **zero** new
+`CRCAlignErr`.
+
+⚠️ **推, and the honest form of it**: `NET-54`'s shape is the same, and a cold
+power-on involves handling the board. **Refuted by** `NET-54` reproducing with
+the cable demonstrably untouched. **`SPEC.md` `NET-56`.**
+
+### 8.5 🔴 A real TCP load hangs the whole board, and the mechanism is undetermined
+
+Two independent reproductions: `D14` (`-t 10`, default 128 KiB blksize) and
+`X45` (`-l 32K -t 2`). Both left the console **completely silent** — `X34` sent
+nothing for 100 s and captured **0 bytes** — with ping dead and
+`busybox reboot -f` ineffective (`X35`: 7,489 bytes, all ESC, no loader prompt).
+
+🔴 **It is not a panic.** `arch/rlx/kernel/traps.c:52` is
+`#define printk panic_printk` with `CONFIG_PANIC_PRINTK=y`, so `die()` reaches
+the console even at `CONFIG_PRINTK=n`, and nothing printed. And
+`CONFIG_RTL_WTDOG=n` means no armed watchdog will recover it.
+
+⚠️ `-l 8K` survived, but its control connection broke before any data moved
+(`NET-60`), so it is **not** evidence that a small blksize is safe.
+**`SPEC.md` `NET-59`, and it is the first thing the next seating must narrow.**
+
+### 8.6 What this run did NOT establish
+
+1. **No throughput number exists.** `D5` is not met. Every `iperf3` run on the
+   die either failed its control exchange or hung the board.
+2. **`D6` was never attempted.** The 30-minute flood did not start.
+3. **The hang is not isolated** — § 8.5.
+4. **The vendor-driver contrast could not be taken**: `ifconfig eth4 up` returns
+   `SIOCSIFFLAGS: Device or resource busy` because this driver holds a
+   non-shared `request_irq(12)` (量 `X9`). So *below both drivers* — `NET-54`'s
+   own phrase — cannot be re-measured while `rlx0` is bound.

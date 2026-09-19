@@ -30780,3 +30780,74 @@ parse 的第二份拷貝**（`int(argv[2], 10)`，只為了組推導字串）原
 CI 六個紅全綠。`R6-5` 的映像側準備好，**下一段的第一件事是把 `iperf3` 加進
 `config/rlxfw-initramfs.tsv`**（會動 `RECIPE_ID`，要重建），然後**凍卡片** ——
 `R6-5` 的計畫列明寫 **card 要**，而 seating 28 沒凍。
+
+## 2026-09-20 — 第九十段（01:30 開場，seating 29，**四次電源事件**，04:2x 收工）：`R6-5` 跑了，`D5` 與 `D6` 都沒拿到，而沒拿到的理由每一條都是量出來的
+
+**電源事件四次**：01:34 首次上電；一次我的疏失（叫操作者按電源之前沒先開 ESC
+視窗，廠商韌體因此無人觀察地跑了約一分鐘）；一次重按並接住；加上一次
+`busybox reboot -f`（不算電源）。**⚠️ 所以這一段不能說「只有我的映像在這顆上
+執行過」。**
+
+### 做完的
+
+🟢 **`iperf3` 第一次進映像。** `config/rlxfw-initramfs.tsv` 38 → **39** 列，
+`RECIPE_ID` `f2aa2fdd` → **`edc94765`**（兩個獨立導出一致：by-hand 的
+`find config | sort | sha256sum` 與 `rlxfw-kbuild.sh --dry-run`）。二進位放在
+`$REPO/build/rlxfw-user/iperf3/`，由一個新的 `install` target 產生，物件放在
+`config/` 之外 —— 而**重建逐位元組重現了已稽核的產出物**（sha256 `3144db60…`）。
+不同的 sha256 會代表「提交的配方建不出提交的量測」。
+
+🟢 **開機擷取 1,874 = 預測 1,874，三次獨立命中**（`C2-BOOT`、`D2-BOOT`、
+`X38-boot`）。預測由 `bootbytes predict` 從 mark 表導出，並靠
+`config/rlxfw-marks.tsv` 自 `edb7122` 未動過這一件事。`RLXFW-ID0=EDC94765`。
+
+🟢🟢 **`notes/nic-driver.md` § 7.7 的驗收集合全部成立**：`n_tx_stop 1`、
+`n_tx_wake 1`、`n_tx_wake + n_tx_wake_race >= n_tx_stop`、`tx_stopped 0`、
+ping 恢復 3/4。`now_icr` `C4000000` → **`44000000`** → `C4000000`，而且**不是**
+`C4800000`，所以 `TXFD` 是自清的門鈴 —— § 3.3 標為「整個 repo 沒量過」的那一格。
+`n_writes` +1 / +2 兩個預測都精確命中。
+
+### 🔴 四個新發現，兩個是我自己驅動的缺陷
+
+* **`NET-56`** 接觸不良造成**單向**鏈路失效，而**交換器自己的 port 3 計數器是
+  唯一能把它跟所有軟體原因分開的讀數** —— 那正是 `SPEC.md` `NET-54 殘留`
+  點名缺的那一個。單變因：只拔插網路線，`Rcv 600 → 2124`、`Broadcast 0 → 15`、
+  **`CRCAlignErr` 仍是 6（零個新錯誤）**。
+* **`NET-57`** 廠商把 `ether_setup` 改成 `tx_queue_len = 0` → noqueue qdisc →
+  `dev_watchdog_up()` **從未被呼叫** → `ndo_tx_timeout` 永遠不可能發火。
+  而第二個後果更大：`noqueue_qdisc.enqueue` 是 NULL，所以驅動自己
+  `rtl819x-nic.c:880-885` 那段「`qdisc_restart` 會重排隊」的正確性論證
+  **在一般 Linux 上成立、在這顆上不成立**。
+* **`NET-58`** re-open 不重新武裝描述子基底（`X12` 沒有 `N-ALLOC`/`N-ARM`），
+  引擎從舊位置繼續走：`rpdcr0_pos A15B1C00 → A15B1C64` 而 `rx_ring A15B8000`。
+  **對任意 DRAM 做 DMA。**
+* **`NET-59`** 🔴 **一個真正的 TCP 負載把整台板子掃住**，兩次獨立重現，
+  console 100 秒 0 bytes，`reboot -f` 無效，**不是 panic**（`traps.c:52` 是
+  `#define printk panic_printk`，什麼都沒印）。機制未定。
+
+### 🔴 `NET-60` 是對我自己桌面結果的修正
+
+iperf 3.1.3 ↔ 3.16 互通，我在 loopback 上跑了四個案例全過，並且報告「互通不再
+是推」。**在真實 1500 的路上它失敗**：client 得到
+`control socket has closed unexpectedly`，server 印
+`WARNING: Size of data read does not correspond to offered length`。
+loopback 的 MTU 是 65536，把帶長度前綴的控制 JSON 一次送達。
+**loopback 測不了一個失敗模式是短讀的協定。** 解法是構造性的：主機也跑 3.1.3。
+
+### ⚠️ 最貴的過程錯誤是我的
+
+block 29 把**十四個已凍結的 cell** 打進一個已經死掉的 shell，因為 cell 之間
+沒有任何檢查。`check-predictions` 只看存在與 mtime，所以 39 bytes 的空擷取
+跟真的一樣得分。加了兩行存活探測之後，下一次失敗只花掉**一個** cell。
+**一張卡的 cell 是一次性的，而 cell 之間的閘門不是可選的。**
+
+另外兩個小的：一個 `-t` 雜檔進了凍結 commit（根因是我把
+`git add -A && git status && git commit` 串成一行，status 印在 staging 之後）；
+一次 patch 腳本用巢狀 heredoc 改自己而掉了一層反斜線 —— `CLAUDE.md` 自己記著
+的那個陷阱，補救方式也是它寫的：用 Write 寫檔、按路徑執行。
+
+### 帶進下一段的
+
+🔴 **第一件事是 `NET-59`**：有界傳輸 `-n 64K` 往上二分，每一步之間存活探測，
+每一步讀 `n_irq`。推的領先假說是中斷風暴。
+**零 flash 寫入、零 `FLR`、每次開機靜止時 `n_writes 0`。**

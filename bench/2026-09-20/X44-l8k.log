@@ -1,0 +1,4 @@
+iperf3 -c 10.1.1.2 -t 2 -f m -l 8K
+Connecting to host 10.1.1.2, port 5201
+iperf3: error - control socket has closed unexpectedly
+# 

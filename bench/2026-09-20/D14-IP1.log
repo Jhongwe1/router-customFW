@@ -1,0 +1,23 @@
+iperf3 -c 10.1.1.2 -t 10 -i 1 -f m -J
+{
+	"start":	{
+		"connected":	[],
+		"version":	"iperf 3.1.3",
+		"system_info":	"Linux (none) 2.6.30.9 #1 Tue Sep 1 00:00:00 UTC 2026 rlx",
+		"timestamp":	{
+			"time":	"Thu, 01 Jan 1970 00:07:23 GMT",
+			"timesecs":	443
+		},
+		"connecting_to":	{
+			"host":	"10.1.1.2",
+			"port":	5201
+		},
+		"cookie":	"(none).443.610000.48d587fd28fd1b99.1",
+		"tcp_mss_default":	1448
+	},
+	"intervals":	[],
+	"end":	{
+	},
+	"error":	"error - control socket has closed unexpectedly"
+}
+# 
