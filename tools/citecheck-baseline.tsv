@@ -35,7 +35,6 @@ ROT	PROGRESS.md	docs/FINDINGS.md	375	bb2be593c5112831	| 🔴 讀 | **`arch/rlx/b
 ROT	PROGRESS.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
 ROT	PROGRESS.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	20901d98fdbb85c2	* They are different quantities that must agree: the first descends fr
 ROT	PROGRESS.md	tools/opcount.py	44	e29c0e802df78873	# 0x13 read ("COP1X", "MIPS-IV") until 2026-08-27, which is the answer
-ROT	PROGRESS.md	docs/loader-command-semantics.md	1054	02497b0b5a347d69	provoke** — `J <addr>` clears `IE` and zeroes `GIMR0` before entering
 ROT	SPEC.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/gpio/rtl819x-gpio.c	120	4141c46181ee6c1a	* 1. WHICH PORT LETTER BIT 5 IS. PABCD packs four ports into one word
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	6434cf036758c7c6	static int rtl819x_ack_proven; /* WE watched TC1IP go 1 -> 0 */
