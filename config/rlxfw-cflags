@@ -8,6 +8,21 @@
 # `.text` 2,444,228 against 2,427,448.  The entire difference was ONE compiler
 # flag, found by diffing kbuild's own `.sched.o.cmd` files word by word.
 #
+# 🔴 2026-09-20 (eighty-ninth segment): THIS FLAG CANNOT REACH A PREBUILT
+# `libc.a`, AND THAT GENERALISES TO EVERY STATIC USERSPACE TOOL.  量 on the
+# `iperf 3.1.3` cross build, two builds as a control: flagged and flagless
+# carry the SAME 114 conditional moves (65 `movz`, 49 `movn`), and every one
+# of them is in uClibc/libm -- `iperf`'s own sixteen objects emit ZERO.  The
+# flag is a compile-time option and Realtek compiled `libc.a` years ago, so
+# a statically linked binary inherits whatever that compiler chose.
+# `hazlint` reports 0 load-use violations on the result, which is the check
+# that matters; the 114 rest on `docs/isa-prior-art.md`'s prior art (the
+# vendor kernel carries 3,183 of them and `CPU-54` measured the shape
+# executing correctly on this die), NOT on this flag having done anything.
+# The flagged build is shipped anyway, because a policy with an exception
+# per artefact is not a policy -- but it may not be CLAIMED to have bought
+# anything for a static userspace binary.  `notes/iperf3-port.md` § 4.
+#
 # The flag is `-fno-if-conversion` and it is SPEC.md TC-25: it takes `hazlint`
 # from SEVEN load-use violations to ZERO by removing 98.8 % of this gcc's
 # conditional moves (2,597 -> 31), at a cost of +0.69 % of .text.  It is the

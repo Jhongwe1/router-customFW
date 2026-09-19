@@ -12,6 +12,30 @@
 # a node is described elsewhere or not yet described at all; deleting one is
 # what happens when a binding arrives.
 #
+# 🔴 2026-09-20 (eighty-ninth segment): FIVE OF THE SEVEN ROWS BELOW SAY
+# "Validated when --extra-schema points at a kernel tree", AND THAT HATCH
+# DOES NOT OPEN.  量, same .dtb, same schemas, only the packaging changed:
+# one `-s` gives 4 unmatched and two give 11, because a second `-s` makes
+# this project's own six bindings stop matching.  It is version-INDEPENDENT
+# -- equally broken under the dtschema 2026.6 that ci.yml now pins -- and it
+# was never caught because CI never passes the flag.
+#
+# So those five rows presently name a remedy nobody can run.  They stay,
+# because the scope limit they declare is TRUE and deleting them would hide
+# it; what is false is the sentence about how to lift it.
+#
+# ⚠️ AND A SECOND THING THIS FILE COULD NOT SAY UNTIL NOW.  An unmatched
+# compatible does not only leave its node's BINDING unchecked -- it leaves
+# that node's PROPERTIES untyped, and an untyped property is not validated
+# at all.  量 2026-09-20 with a negative control in the same command: supply
+# minimal `gpio-keys` and `gpio-leds` schemas and dtschema 2026.9 reports 0
+# complaints about `linux,code`, `debounce-interval` and `default-state`;
+# omit them and it reports 3.  dtcheck's `C2` enumerates unmatched
+# COMPATIBLES and cannot see the property half, which is why 2026.9 going
+# red looked like a regression and was a stricter instrument reporting a
+# scope limit that was always there.  docs/KNOWN-ISSUES.md carries what
+# would settle both.
+#
 # compatible<TAB>reason
 gpio-leds	kernel subsystem binding (Documentation/devicetree/bindings/leds/leds-gpio.yaml); not in dtschema's corpus. Validated when --extra-schema points at a kernel tree.
 gpio-keys	kernel subsystem binding (bindings/input/gpio-keys.yaml); same.
