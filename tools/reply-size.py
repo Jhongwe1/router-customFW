@@ -95,7 +95,20 @@ DW_LINE = 47             # one DW output line, terminator included
 DW_DEFAULT_WORDS = 4     # what a bare `DW <addr>` prints -- 量, see _dw_body
 
 
-def _dw_body(argv):
+def _dw_words(argv):
+    """How many words a `DW` prints.  ONE source of truth, and that is the
+    entire reason this function exists rather than the parse sitting inline.
+
+    🔴 2026-09-19: there were TWO.  The bare-`DW` default was taught to
+    `_dw_body` and the identical parse in `predict`'s derivation string --
+    `int(argv[2], 10)` -- was left alone, so `--self-test` stayed green while
+    `check` over the corpus died with `IndexError` on the first of the three
+    seating-28 captures.  Ten controls passed and not one of them called a bare
+    `DW`: every one goes through the helper, and the crash was in the caller.
+    **A control that exercises a helper does not exercise its caller** -- the
+    same sentence as `hazlint` 1.0's `K4` and as this file's own S5, with the
+    roles swapped.  `C9` calls `predict`, on purpose.
+    """
     if not argv:
         raise ValueError("DW needs an address")
     if len(argv) < 2:
@@ -109,12 +122,15 @@ def _dw_body(argv):
         # the echo of the ` 4`.  So the loader's default really is one line of
         # four words, and it is derived from a difference rather than assumed.
         # 否證: a bare-`DW` capture anywhere in the corpus that is not 69 bytes.
-        n = DW_DEFAULT_WORDS
-    else:
-        n = int(argv[1], 10)      # LDR-07: the address is hex, the LENGTH is decimal
+        return DW_DEFAULT_WORDS
+    n = int(argv[1], 10)          # LDR-07: the address is hex, the LENGTH is decimal
     if n < 0:
         raise ValueError("negative length")
-    return DW_LINE * math.ceil(n / 4)
+    return n
+
+
+def _dw_body(argv):
+    return DW_LINE * math.ceil(_dw_words(argv) / 4)
 
 
 # family -> (body function, sample count behind it, ends with the prompt)
@@ -155,6 +171,12 @@ FIXTURES = [
     ("PHYR 1 5",              87, "OK",        "bench/2026-08-24b/E12b.log"),
     ("PHYR 0 1",              87, "OK",        "bench/2026-08-24b/E12c.log"),
     ("FLR 80A00000 000000 100", 104, "OK",     "bench/2026-08-24c/G8pre-flr0.log"),
+    # The bare `DW`.  量 2026-09-19 (seating 28): three captures, all 69 bytes.
+    # In the table so that `C2` -- the loop that classifies every fixture --
+    # walks the bare path too, which is the control the CORPUS should not have
+    # had to provide.  ⚠️ n=3 and all three are from one seating.
+    ("DW 80000000",           69, "OK",         "bench/2026-09-19b/X2-dw-80000000.log"),
+    ("DW B8010000 4",         71, "OK",         "bench/2026-09-19b/X5-cpublk-a.log"),
     ("DW 8040DCE8 1",         24, "ECHO-ONLY", "bench/2026-08-24b/CONT.log"),
     ("DW 8040DBC0 1",         44, "UNKNOWN-COMMAND",
                                                "bench/2026-08-24/A0-reopen-control.log"),
@@ -181,7 +203,11 @@ def predict(cmd):
     how = "len(%r)=%d + %d echo tail + %d body + %d prompt" % (
         cmd, len(cmd), ECHO_TAIL, body, tail)
     if fam == "DW":
-        n_words = int(argv[2], 10)
+        # NOT a second parse of the command.  The derivation string and the
+        # body must never be able to disagree about how many words the loader
+        # printed; that they could is what took the sweep down on 2026-09-19,
+        # and `C9c` is the control that now says they cannot.
+        n_words = _dw_words(argv[1:])
         how += "   [%d words -> %d lines x %d, LDR-07 rounds UP]" % (
             n_words, math.ceil(n_words / 4), DW_LINE)
     how += "   [model fitted on n=%d captures]" % n
@@ -257,6 +283,43 @@ def controls():
     ck("C8 'DW 81000400 16' is 14 chars, so 213 and not 214",
        213, predict("DW 81000400 16")[0])
 
+    # 9. THE BARE `DW`, AND IT GOES THROUGH `predict` ON PURPOSE.
+    #    🔴 2026-09-19: `_dw_body` knew the default and `predict` did not.  A
+    #    control written against the helper would have been green while `check`
+    #    over bench/ crashed on its first bare-DW capture.  This one calls the
+    #    function that crashed.
+    ck("C9 a bare 'DW 80000000' predicts 69", 69, predict("DW 80000000")[0])
+    # 9b. and the 4 is DERIVED rather than assumed: the only difference between
+    #     the two commands is the echo of ` 4`, so the BODIES are identical.
+    #     量 over the whole corpus 2026-09-19 -- three bare-DW captures at 69,
+    #     fifty-eight `DW <addr> 4` at 71, command lengths 11 and 13.
+    ck("C9b ' 4' costs exactly its own two characters",
+       len(" 4"), predict("DW 80000000 4")[0] - predict("DW 80000000")[0])
+    # 9c. one source of truth, stated as a property rather than as a number:
+    #     whatever `_dw_words` answers, the derivation string must say the same.
+    #     Re-introduce an independent parse that differs and this fires.
+    ck("C9c the derivation never disagrees with the body", True,
+       all(("[%d words" % _dw_words(c.split()[1:])) in predict(c)[1]
+           for c in ("DW 80000000", "DW 80000000 4", "DW 80A00000 137",
+                     "DW 8040DBC0 1")))
+
+    # 10. A command the model cannot parse must RAISE here, because `cmd_check`
+    #     catches it and reports the row.  Pinning that it raises is what keeps
+    #     that `except` reachable instead of decorative -- 量 2026-09-19, before
+    #     it existed, three captures took a 516-capture sweep down.
+    def _raises(cmd):
+        try:
+            classify(cmd, 69)
+        except Exception:                          # noqa: BLE001
+            return True
+        return False
+    ck("C10 'DW' with no address raises, it does not classify",
+       True, _raises("DW"))
+    ck("C10b and a negative length raises too", True, _raises("DW 80000000 -1"))
+    # The negative control on C10: a parseable command must NOT raise, or C10
+    # is passing because everything raises.
+    ck("C10c a good command does not raise", False, _raises("DW 80000000 4"))
+
     return out, bad
 
 
@@ -313,7 +376,20 @@ def cmd_check(args):
         if not sent:
             tally["NO-COMMAND"] = tally.get("NO-COMMAND", 0) + 1
             continue
-        st, want, delta = classify(sent, m.get("bytes"))
+        try:
+            st, want, delta = classify(sent, m.get("bytes"))
+        except Exception as e:                    # noqa: BLE001
+            # 🔴 2026-09-19: THIS BRANCH DID NOT EXIST, and three captures whose
+            # command the model could not parse took the whole sweep down --
+            # 516 DW captures on disk and not one of them classified.  That is
+            # this file's own S5 repair happening a second time one layer up:
+            # there, the branch that reports an unusable CAPTURE could not
+            # print; here, there was no branch at all for an unusable COMMAND.
+            # It is a miss and never an UNMODELLED.  UNMODELLED is a declared
+            # decision not to model a family and is not counted against the
+            # sweep -- a parse failure must not be able to hide there.
+            st, want, delta = "UNPARSEABLE", None, None
+            sent = ("%s [%s]" % (sent, type(e).__name__))[:34]
         tally[st] = tally.get(st, 0) + 1
         rows.append((p, sent, m.get("bytes"), st, want, delta))
 
@@ -346,12 +422,14 @@ def cmd_check(args):
     # The exit code was never wrong -- an UNREADABLE row is a miss and forces
     # exit 1 either way -- so this changes the number, not the verdict.
     modelled = sum(v for k, v in tally.items()
-                   if k not in ("UNMODELLED", "NO-COMMAND", "UNREADABLE"))
+                   if k not in ("UNMODELLED", "NO-COMMAND", "UNREADABLE",
+                                "UNPARSEABLE"))
     if modelled == 0:
         print("\nRESULT: refused -- 0 modelled captures were examined, so a clean"
               " result would mean nothing")
         return 2
-    misses = tally.get("SHORT", 0) + tally.get("LONG", 0) + tally.get("UNREADABLE", 0)
+    misses = (tally.get("SHORT", 0) + tally.get("LONG", 0)
+              + tally.get("UNREADABLE", 0) + tally.get("UNPARSEABLE", 0))
     if misses:
         print("\nRESULT: %d modelled, %d unexplained" % (modelled, misses))
         return 1

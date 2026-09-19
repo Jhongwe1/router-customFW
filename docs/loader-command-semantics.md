@@ -775,6 +775,7 @@ word count anything honours; it is a **line count in disguise, rounded up**:
 
 | `N` | words printed | lines | measured on |
 |---:|---:|---:|---|
+| *(omitted)* | 4 | 1 | `X2`, `X3`, `X4` — **69 bytes each**, 量 2026-09-19 |
 | 1 | 4 | 1 | `A0`, `E1b`, `CONT2` — 71 bytes each |
 | **3** | **4** | **1** | never sent, and the reason is below |
 | 8 | 8 | 2 | `C7-pre2`, `E10b`, `E9b`, `E11a` — 118 bytes each |
@@ -811,6 +812,7 @@ Six values, each predicted before its cell ran and each exact:
 
 | capture | command | predicted | `.log` |
 |---|---|---|---:|
+| `X2` | `DW 80000000` | 11 + 2 + 47 + 9 | **69** |
 | `A0` | `DW 8040DBC0 1` | 13 + 2 + 47 + 9 | **71** |
 | `E10b` | `DW BB804128 8` | 13 + 2 + 2×47 + 9 | **118** |
 | `C7a-rb` | `DW 81000400 16` | 14 + 2 + 4×47 + 9 | **213** |
@@ -833,7 +835,10 @@ missing — is the case where this fired.
 ✅ **2026-08-25: this is `tools/reply-size.py` now, and the population went from
 fifteen hand-counted cases to 121.** `reply-size.py check bench/` classifies
 every capture that carries a `sent` field and no ESC stream: **121 modelled, 0
-unexplained.** The per-family constants were FITTED from those captures rather
+unexplained.** 🔄 **量 2026-09-19, re-measured rather than carried: 598
+modelled, 0 unexplained**, out of 1,373 captures that carry a command and no
+ESC stream (595 `OK`, 762 `UNMODELLED`, 13 `NO-COMMAND`, 1 `ECHO-ONLY`, 2
+`UNKNOWN-COMMAND`), with a further 244 ESC-streamed and out of model. The per-family constants were FITTED from those captures rather
 than read out of the loader or counted in a terminal — `DW` 47×⌈N/4⌉ over 91
 samples, `EW`/`EB` no output over 11, `Y` 23 over 6, `PHYR` 68 over 5, and `FLR`
 79 over 6 **with no `<RealTek>` at all**, because it stops at its own Y/N prompt.
@@ -845,6 +850,31 @@ miss.** `CONT`'s 24 bytes are `ECHO-ONLY` — the command was echoed and not act
 on, which is `C-19`'s signature — and `A0-reopen-control`'s 44 are
 `UNKNOWN-COMMAND`. Folding either into "short" would throw away the thing a
 bench operator actually needs to know.
+
+🆕 **2026-09-19: `DW <addr>` with NO length is legal, and it prints one line
+of four words — 69 bytes.** 量, and derived from a difference rather than
+assumed: the three bare-`DW` captures in the corpus (`X2`, `X3`, `X4`,
+`bench/2026-09-19b/`) are **69 bytes each**, the fifty-eight `DW <addr> 4`
+captures are **71**, and the commands are **11** and **13** characters. The
+difference is exactly `len(" 4")` = 2, so the two replies carry **identical
+bodies** and the loader's default really is `ceil(4/4) = 1` line. It drops
+straight out of the formula above: `11 + 2 + 47 + 9 = 69`.
+
+**否證, and it is cheap because the sweep already runs:** a bare-`DW` capture
+anywhere in `bench/` that is not 69 bytes. ⚠️ `n = 3`, and all three are from
+one seating (28) — the value is one reading of one loader, not a family.
+
+🔴 **The reason this is in the record at all is that it took a 516-capture
+sweep down.** `reply-size.py` raised on the shape, so `check bench` died before
+classifying anything — while `--self-test` stayed **green**. The default had
+been taught to the helper `_dw_body` and `predict` kept its own, second copy of
+the same parse, and every one of the tool's ten controls reached the helper.
+**A control that exercises a helper does not exercise its caller**, which is the
+same sentence as `hazlint` 1.0's `K4` and as this tool's own `S5`, with the
+roles swapped. The repair is one function (`_dw_words`) that both callers ask,
+a control that goes through `predict` on purpose, and a `cmd_check` that reports
+an unparseable command as a row instead of raising — because a sweep that dies
+on row 1 has said nothing about rows 2..N.
 
 **The reason it is a tool and not a formula in a document** is `block 3` on
 2026-08-25: predicted 214 bytes, measured 213, because `DW 81000400 16` is

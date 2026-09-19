@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Controls for tools/reply-size.py.
 #
-# The tool carries twelve controls of its own and refuses to report on a file
-# until every one of them passes. This file exists for the two things the tool
-# cannot check about itself.
+# The tool carries its own controls and refuses to report on a file until every
+# one of them passes.  (This comment used to say "twelve" -- a count of
+# something that grows, asserted in prose where nothing can check it, which is
+# the same defect this project spent 2026-09-19 removing from five test cases.)
+# This file exists for the things the tool cannot check about itself.
 #
 #   S1  the controls are wired in: a build with a broken model must REFUSE,
 #       not report. `--self-test` proving itself green says nothing about
@@ -24,6 +26,11 @@
 #       with %+d. The branch existed, was tallied, and counted toward
 #       `misses` -- and could never print. Same defect class as `hazlint`
 #       1.0's K4 and `test-gitignore.sh`'s exit-1: a control that cannot fire.
+#   S6  the same thing one layer up: a capture whose COMMAND the model cannot
+#       parse must be reported, not raise. 量 2026-09-19: three bare-`DW`
+#       captures took a 516-capture sweep down with `IndexError`, while
+#       `--self-test` stayed green -- all ten of its controls went through the
+#       helper and the crash was in the caller.
 set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -126,6 +133,66 @@ ck "and the mutant tracebacks"            1 \
    "$(printf '%s\n' "$out" | grep -c 'Traceback')"
 ck "on exactly the TypeError this repaired" 1 \
    "$(printf '%s\n' "$out" | grep -c 'TypeError: %d format')"
+
+echo
+echo "=== S6: one unparseable command must not take the sweep down ==="
+# S5 proves the tool survives a file it cannot READ.  This proves it survives a
+# capture whose COMMAND it cannot parse, which is a different layer and was not
+# covered until 2026-09-19.
+#
+# 量 2026-09-19: it did not survive.  Three `DW <addr>` captures with no length
+# made `check` over bench/ die with `IndexError: list index out of range` before
+# it classified any of the other 513 -- and `--self-test` was green throughout,
+# because all ten of its controls went through `_dw_body` and the crash was in
+# `predict`.  A green self-test beside a crashing sweep is the shape this
+# project keeps finding: the control and the caller were not the same code.
+#
+# The good file beside the bad one is what makes this a control rather than a
+# smoke test -- the sweep has to get PAST the bad row and still classify the
+# good one.
+cp "$ROOT/bench/2026-08-25b/A0.meta.json" "$T/g2.meta.json"
+sed -e 's/"sent": "[^"]*"/"sent": "DW"/' \
+    -e 's/"sent_hex": "[^"]*"/"sent_hex": ""/' \
+    "$ROOT/bench/2026-08-25b/A0.meta.json" > "$T/nolen.meta.json"
+ck "the fixture really carries a bare DW"  1 \
+   "$(grep -c '"sent": "DW"' "$T/nolen.meta.json")"
+out="$("$PY" "$HERE/reply-size.py" check "$T/g2.meta.json" "$T/nolen.meta.json" 2>&1)"; rc=$?
+ck "it does not traceback"                 0 \
+   "$(printf '%s\n' "$out" | grep -c 'Traceback')"
+# TWO lines carry the word -- the row and the tally -- so a bare
+# `grep -c UNPARSEABLE` counts 2, and a case asserting 1 is a case that is
+# wrong rather than a tool that is.  量 2026-09-19: the first draft of this
+# case did exactly that and went red on a tool that was behaving correctly.
+ck "the tally counts exactly one"          1 \
+   "$(printf '%s\n' "$out" | grep -cE '^ +UNPARSEABLE +1$')"
+ck "and the row names the command"         1 \
+   "$(printf '%s\n' "$out" | grep -c 'UNPARSEABLE *DW \[')"
+# `1 modelled` and not 2: a capture whose command could not be parsed was not
+# modelled by anything, exactly as an UNREADABLE one was not.
+ck "the good one is still modelled"        1 \
+   "$(printf '%s\n' "$out" | grep -c 'RESULT: 1 modelled, 1 unexplained')"
+ck "and it counts as a miss, so exit 1"    1 "$rc"
+
+# The mutation: take the guard away and the sweep must die again. Without it,
+# the rows above would pass on a tool that never had a bad row to survive.
+"$PY" - "$HERE/reply-size.py" "$T/mutant3.py" <<'MUT'
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+head = '        try:\n            st, want, delta = classify(sent, m.get("bytes"))\n'
+tail = '        tally[st] = tally.get(st, 0) + 1\n'
+i = src.find(head)
+j = src.find(tail, i) if i >= 0 else -1
+out = src
+if i >= 0 and j > i:
+    out = src[:i] + '        st, want, delta = classify(sent, m.get("bytes"))\n' + src[j:]
+open(sys.argv[2], "w", encoding="utf-8").write(out)
+print("cut" if out != src else "INCOMPLETE")
+MUT
+ck "the mutant differs from the original"  1 \
+   "$(cmp -s "$T/mutant3.py" "$HERE/reply-size.py" && echo 0 || echo 1)"
+out="$("$PY" "$T/mutant3.py" check "$T/g2.meta.json" "$T/nolen.meta.json" 2>&1)"
+ck "and the mutant tracebacks"             1 \
+   "$(printf '%s\n' "$out" | grep -c 'Traceback')"
 
 echo
 if [ "$fail" -ne 0 ]; then
