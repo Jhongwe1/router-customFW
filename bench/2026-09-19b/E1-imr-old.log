@@ -1,0 +1,5 @@
+echo write 0xB8010028 0x000007FE > /proc/rtl865x/memory ; cmd write
+eWrite memory 0xb8010028 dat 0x7fe: 0x7fe
+cho rc=$?
+rc=0
+# 

@@ -1,0 +1,5 @@
+echo read 0xBB804134 4 > /proc/rtl86cmd read
+5
+bb804134:  x00/00m00eF9m  o	r	 y	 	 
+	 	 	 	 	 	 	 	 	 	   ù
+# 

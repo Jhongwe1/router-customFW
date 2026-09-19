@@ -1,0 +1,4 @@
+echo unlock > /proc/rtl819x-nic ; echo rc=$R?L
+XFW-N-UNLOCK
+rc=0
+# 

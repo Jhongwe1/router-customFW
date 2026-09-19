@@ -1,0 +1,3 @@
+cat /proc/rtl819x-nic | grep -E "^(n_rx|n_irq|seen_iisr|now_iimr) "
+/bin/sh: grep: not found
+# 

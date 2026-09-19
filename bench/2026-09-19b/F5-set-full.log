@@ -1,0 +1,4 @@
+echo write 0xB8010028 0x007E0FFE > /proc/rtl865x/memocmd write
+rWrite memory 0xb8010028 dat 0x7e0ffe: 0x7e0ffe
+y
+# 

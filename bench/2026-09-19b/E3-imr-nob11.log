@@ -1,0 +1,5 @@
+echo write 0xB8010028 0x007E07FE > /proc/rtl865x/memorcmd write
+yWrite memory 0xb8010028 dat 0x7e07fe: 0x7e07fe
+ ; echo rc=$?
+rc=0
+# 

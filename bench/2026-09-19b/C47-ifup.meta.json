@@ -1,0 +1,22 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-19T12:54:51+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 30.0,
+  "idle": 6.0,
+  "until": null,
+  "until_offset": null,
+  "sent": "ifconfig rlx0 10.1.1.3 up ; echo rc=$? ; ifconfig rlx0",
+  "sent_hex": "6966636f6e66696720726c78302031302e312e312e33207570203b206563686f2072633d243f203b206966636f6e66696720726c78300d",
+  "stop_reason": "--idle 6.0 with no bytes",
+  "bytes": 580,
+  "duration_s": 6.270548,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

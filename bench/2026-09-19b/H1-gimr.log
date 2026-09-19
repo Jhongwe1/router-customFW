@@ -1,0 +1,5 @@
+echo read 0xB8003000 16 > /proc/rtl865x/memocmd read
+r
+b8003000:  y0020
+9300  88000004    22222222  C222FA2D  	  “ ˆ   """"Â"ú-
+# 

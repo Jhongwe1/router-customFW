@@ -1,0 +1,4 @@
+echo unlock i-mean-it > /proc/rtl819x-switch ; echo rc=$?RL
+XFW-SW-UNLOCK
+rc=0
+# 

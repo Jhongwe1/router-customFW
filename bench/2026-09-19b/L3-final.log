@@ -1,0 +1,65 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.0
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 50
+n_writes 14
+n_refused 0
+n_irq 8263
+n_irq_spurious 0
+n_tx 7471
+n_rx 7471
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00003206
+seen_iisr 0000320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 481
+n_napi_complete 17
+n_xmit 7471
+n_xmit_busy 0
+n_skb_fail 0
+nd_stats rx 7471/10755558 tx 7471/10755558 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A157001C
+rmdcr0_pos A157003C
+tpdcr0_pos A157004C
+rx_ring A1570000
+mb_ring A1570020
+tx_ring A1570040
+bufs A1570290
+rx_idx 7
+tx_idx 3
+rxd0 A1570051 len 0 f 8063 pl 03
+rxd1 A1570069 len 0 f 8063 pl 03
+rxd2 A1570081 len 0 f 8063 pl 03
+rxd3 A1570099 len 0 f 8063 pl 03
+rxd4 A15700B1 len 0 f 8063 pl 03
+rxd5 A15700C9 len 0 f 8063 pl 03
+rxd6 A15700E1 len 0 f 8063 pl 03
+rxd7 A15700FB len 0 f 8063 pl 03
+txd0 A15701D0 len 102
+txd1 A15701E8 len 102
+txd2 A1570200 len 102
+txd3 A157021A len 102
+rx_len 0
+rx_ph1 00660411
+rx_ph3 80630003
+rx_ph4 00090000
+# 

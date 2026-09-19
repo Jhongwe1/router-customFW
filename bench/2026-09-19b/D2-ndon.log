@@ -1,0 +1,4 @@
+echo netdev on > /proc/rtl819x-nic ; echo rc=$?RL
+XFW-N-NDREG
+rc=0
+# 

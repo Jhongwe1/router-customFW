@@ -130,9 +130,18 @@
  *    would be expecting something this configuration does not do.
  * 4. It does not copy `swNic_receive`'s checksum test.  讀
  *    `rtl865xc_swNic.c:604`: the vendor DROPS any frame whose `ph_flags`
- *    lacks BOTH `CSUM_IP_OK` and `CSUM_TCPUDP_OK`.  An ARP frame carries
- *    neither.  Copying that test without understanding it would silently eat
- *    exactly the traffic this ladder's RX rung is most likely to see first.
+ *    lacks BOTH `CSUM_IP_OK` and `CSUM_TCPUDP_OK`.
+ *    🔴 THE REASON THIS COMMENT FIRST GAVE WAS WRONG AND THE SILICON SAID SO.
+ *    It read *"An ARP frame carries neither"*.  量 2026-09-19,
+ *    `bench/2026-09-19b/C32-nic10`: a broadcast ARP request delivered to the
+ *    CPU port arrives with `ph_flags = 0x8063`, which INCLUDES both bits.  So
+ *    the vendor's test would have passed that frame and the worked example
+ *    was invented rather than measured.  The rule survives and is narrower:
+ *    the test is a filter on a field this driver has not characterised, its
+ *    two bits are set by hardware for reasons nothing here has established,
+ *    and adopting it would make RX depend on that.  What is measured is the
+ *    VALUE, twice: 0x80E3 for a frame the loader received and 0x8063 for one
+ *    Linux received, each decomposing into named bits with no residue.
  * 5. It implements NAPI's MECHANISM -- mask at interrupt, bounded poll,
  *    unmask at exhaustion -- but does not bind a `struct napi_struct`,
  *    because in 2.6.30 that needs a `net_device` and the `net_device` is
@@ -180,6 +189,9 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/jiffies.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
 
 #include <linux/rlxfw-mark.h>
 #include <asm/io.h>
@@ -279,13 +291,44 @@
 						 * enables bit 11. */
 #define NIC_IP_MBUF_RUNOUT	(1u << 16)
 
-/* What this driver unmasks.  Deliberately NOT the vendor's 0x807E01FE: the
- * link-change bit is left masked because a link-change interrupt that nothing
- * services would fire continuously with the cable in, and rung 0's whole
- * observable is a COUNT.  An interrupt source that free-runs would make
- * `n_irq` unreadable as evidence for the software interrupt. */
+/* What this driver unmasks.
+ *
+ * 🔴🔴 THE FIRST VERSION OF THIS CONSTANT WEDGED THE INTERFACE UNDER LOAD AND
+ * THE MEASUREMENT IS `bench/2026-09-19b/C58-afterflood2`.  It read
+ * `(RX_DONE_ALL | TX_DONE_ALL | TX_ALL_DONE_ALL)` = 0x7FE, dropping the
+ * run-out enables on the stated ground that only the sources this ladder
+ * observes should be on.  量, under four concurrent 1400-byte floods: the RX
+ * pkthdr ring ran out, `CPUIISR` latched bit 17 `PKTHDR_DESC_RUNOUT_IP0`, and
+ * because bits 17-22 were masked NO INTERRUPT FIRED -- so NAPI was never
+ * scheduled, two filled descriptors were never harvested or handed back, and
+ * the interface went permanently deaf with every error counter reading zero.
+ * `n_rx 6411` against `n_tx 6154`, 65 % loss, and `now_iisr` still holding
+ * 0x00020000 at rest, which proves the ISR had not run since -- the ISR W1Cs
+ * everything it reads.
+ *
+ * 🟢 THE LESSON IS ABOUT THE VENDOR'S CONSTANT, NOT ABOUT THIS BIT.  The
+ * vendor writes `CPUIIMR = 0x807E01FE` and `0x007E0000` is exactly the field
+ * dropped here.  A constant read out of a working driver carries knowledge
+ * that its own source does not explain, and the part of it that could not be
+ * justified from first principles was the part that mattered.  Dropping a bit
+ * because its purpose is not understood is not conservatism.
+ *
+ * ⚠️ `MBUF_DESC_RUNOUT`'s enable is bit 11 and its STATUS is bit 16, 讀
+ * `rtl865xc_asicregs.h:585-586` and `:630-631` -- the only pair in this block
+ * that does not share a position.  That asymmetry is load-bearing here and is
+ * why the enable and the status are two separate constants below.
+ *
+ * LINK_CHANGE is still deliberately masked: it is not needed by any rung, and
+ * an unserviced link-change would free-run with the cable in and make `n_irq`
+ * unreadable as evidence. */
 #define NIC_IIMR_LADDER		(NIC_IE_RX_DONE_ALL | NIC_IE_TX_DONE_ALL | \
-				 NIC_IE_TX_ALL_DONE_ALL)
+				 NIC_IE_TX_ALL_DONE_ALL | \
+				 NIC_IE_PKTHDR_RUNOUT | NIC_IE_MBUF_RUNOUT)
+
+/* The STATUS bits that mean "there is RX work to do".  Note the bit-16/bit-11
+ * asymmetry above: this is the IP side and it is not NIC_IIMR_LADDER's. */
+#define NIC_IP_RX_WORK		(NIC_IE_RX_DONE_ALL | NIC_IE_PKTHDR_RUNOUT | \
+				 NIC_IP_MBUF_RUNOUT)
 
 #define NIC_IRQ			12	/* BSP_SWCORE_IRQ, 讀
 					 * `boards/rtl8196e/bsp/bspchip.h:108`,
@@ -427,6 +470,43 @@ static u32 nic_last_rx_len;
 static u32 nic_last_rx_ph1, nic_last_rx_ph3, nic_last_rx_ph4;
 
 /* ------------------------------------------------------------------------
+ * R6-4's state.  A `net_device` and a real NAPI instance, neither of which
+ * exists at boot: the device is ALLOCATED at late_initcall and REGISTERED
+ * only by a verb, so an image carrying this driver still comes up with
+ * nothing of mine bound to anything.
+ *
+ * THE MAC ADDRESS IS LOCALLY ADMINISTERED AND THAT IS A CONTAINMENT DECISION,
+ * NOT A SHORTCUT.  This unit's real address lives in `H601`, the 8 KiB region
+ * CLAUDE.md forbids touching and whose CONTENT may not enter this repository
+ * -- not even its digest.  A driver that read it would put this device's
+ * identity into every capture of every seating from here on.  So the address
+ * is fixed at 02:52:4C:58:46:57 -- 0x02 marks it locally administered, and
+ * the remaining five bytes are ASCII "RLXFW".
+ *
+ * 🟢 That turns a limitation into R6-4's own DoD requirement.  The gate asks
+ * for a POSITIVE discriminator -- "a string only my driver produces" rather
+ * than the vendor's absence -- and an address no Realtek OUI can contain,
+ * on an interface named `rlx0` where the vendor's are `eth0`..`eth5`, is
+ * exactly that.  ⚠️ The limitation is still real and is named here: this
+ * driver cannot yet be the interface a shipped firmware uses, because a
+ * shipped firmware must present the address on the label.  Reading `H601`
+ * safely is a separate problem and it is not solved by this file.
+ * ------------------------------------------------------------------------ */
+#define NIC_NAPI_WEIGHT	16
+
+static struct net_device *nic_ndev;
+static struct napi_struct nic_napi;
+static int nic_ndev_registered;
+static int nic_ndev_up;
+static unsigned long nic_n_napi_poll;
+static unsigned long nic_n_napi_complete;
+static unsigned long nic_n_xmit;
+static unsigned long nic_n_xmit_busy;
+static unsigned long nic_n_skb_fail;
+
+static const u8 nic_mac[6] = { 0x02, 0x52, 0x4C, 0x58, 0x46, 0x57 };
+
+/* ------------------------------------------------------------------------
  * Register access.  `CKSEG1ADDR`, not the bare `KSEG1ADDR` -- 11 of the 13
  * uses across rlxfw's drivers are `CKSEG1ADDR` and the two that are not are
  * in the newest file, so matching the newest file would propagate the
@@ -506,6 +586,16 @@ static inline void nic_re_set(u32 ring, unsigned int idx, u32 v)
  * beyond counters for exactly that reason -- the frames are harvested by a
  * verb, in process context, under no deadline.
  * ------------------------------------------------------------------------ */
+/* Forward declarations.  R6-4's netdev layer is written next to the ISR it
+ * belongs with, and it calls the R6-3 primitives, which are defined below it
+ * because that is the order they were written and measured in.  Declaring
+ * rather than reordering keeps every line the ladder ran against where it
+ * was. */
+static int nic_do_alloc(void);
+static int nic_do_arm(void);
+static int nic_do_engine(int on);
+static void nic_refill(unsigned int i);
+
 static irqreturn_t nic_isr(int irq, void *dev_id)
 {
 	u32 isr;
@@ -520,8 +610,295 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
 	if (!isr)
 		nic_n_irq_spurious++;
 
+	/* R6-4: NAPI, and the ORDER here is the whole of it.
+	 *
+	 * `napi_schedule_prep` first, so that if a poll is already scheduled
+	 * or running this interrupt adds nothing and, crucially, does NOT
+	 * mask -- masking without scheduling is how an interface goes deaf
+	 * with every counter looking healthy.
+	 *
+	 * The mask goes down BEFORE `__napi_schedule`: between those two the
+	 * poll cannot yet be running, so nothing can race the unmask that
+	 * `nic_poll` does at the end.  The reverse order has a window in
+	 * which the poll completes and unmasks, and then this line masks
+	 * again with no poll left to undo it.
+	 *
+	 * 🔴 Written with `__raw_writel` and not `nic_wr` deliberately: this
+	 * is interrupt context, and `nic_wr` takes the unlock decision and
+	 * bumps a non-atomic counter.  The write guard's job is to stop a
+	 * BOOT from writing, and by the time an interrupt can arrive the
+	 * unlock has already been given; making n_writes racy would cost a
+	 * measurement to protect nothing. */
+	/* 🔴 The condition is NIC_IP_RX_WORK and not RX_DONE alone, for the
+	 * reason NIC_IIMR_LADDER's comment records: a descriptor run-out means
+	 * there are filled descriptors waiting AND no free ones, which is
+	 * exactly when a poll is most needed and is precisely the case the
+	 * first version of this driver could not see. */
+	if (nic_ndev_up && (isr & NIC_IP_RX_WORK)) {
+		if (napi_schedule_prep(&nic_napi)) {
+			u32 m = __raw_readl(nic_reg(NIC_CPUIIMR));
+
+			__raw_writel(m & ~(NIC_IE_RX_DONE_ALL |
+					   NIC_IE_PKTHDR_RUNOUT |
+					   NIC_IE_MBUF_RUNOUT),
+				     nic_reg(NIC_CPUIIMR));
+			__napi_schedule(&nic_napi);
+		}
+	}
+
 	return IRQ_HANDLED;
 }
+
+/* ------------------------------------------------------------------------
+ * R6-4: the NAPI poll, the transmit path, and the net_device.
+ * ------------------------------------------------------------------------ */
+
+/* Harvest at most `budget` frames into sk_buffs.  Returns how many.
+ *
+ * ⚠️ The copy is byte-wise and that is a MEASUREMENT PROBLEM DEFERRED, not an
+ * oversight.  The DMA buffers are 2 mod 4 (`NIC_RX_OFFSET`, which is what
+ * makes the IP header land aligned behind a 14-byte Ethernet header), so a
+ * word-at-a-time copy out of them would be an unaligned load, which on this
+ * core is a fault and not a slow path.  Making it fast means either aligning
+ * the buffer and unaligning the IP header, or using the unaligned load/store
+ * instructions -- and which of those is worth it is an R6-5 question with a
+ * number attached, so it is not guessed at here. */
+static int nic_napi_harvest(int budget)
+{
+	int done = 0;
+
+	while (done < budget) {
+		unsigned int i = nic_rx_idx;
+		u32 e = nic_re(nic_rx_ring, i);
+		u32 w1, len, bf, k;
+		struct sk_buff *skb;
+
+		if (e & NIC_DESC_OWN)
+			break;
+
+		w1 = nic_dw(nic_rx_ph, i, 1);
+		len = NIC_PH_LEN(w1);
+		len = (len >= 4) ? (len - 4) : len;	/* ph_len carries FCS */
+		if (len > NIC_BUF_SZ - NIC_RX_OFFSET)
+			len = 0;
+
+		nic_last_rx_ph1 = w1;
+		nic_last_rx_ph3 = nic_dw(nic_rx_ph, i, 3);
+		nic_last_rx_ph4 = nic_dw(nic_rx_ph, i, 4);
+
+		bf = nic_dw(nic_rx_mb, i, 3);
+		skb = len ? dev_alloc_skb(len + 2) : NULL;
+		if (skb) {
+			skb_reserve(skb, 2);
+			for (k = 0; k < len; k++)
+				skb->data[k] =
+					__raw_readb((void __iomem *)(bf + k));
+			skb_put(skb, len);
+			skb->protocol = eth_type_trans(skb, nic_ndev);
+			nic_ndev->stats.rx_packets++;
+			nic_ndev->stats.rx_bytes += len;
+			netif_receive_skb(skb);
+		} else {
+			nic_n_skb_fail++;
+			nic_ndev->stats.rx_dropped++;
+		}
+
+		nic_refill(i);
+		nic_rx_idx = (i + 1) % NIC_RX_DESC;
+		nic_n_rx++;
+		done++;
+	}
+	return done;
+}
+
+static int nic_poll(struct napi_struct *napi, int budget)
+{
+	int done;
+
+	nic_n_napi_poll++;
+	done = nic_napi_harvest(budget);
+
+	/* Under budget means the ring ran dry, which is the only safe moment
+	 * to say the poll is finished.  `napi_complete` BEFORE the unmask:
+	 * if a frame lands in between, the interrupt it raises finds NAPI not
+	 * scheduled and schedules it, which is correct.  Unmasking first
+	 * leaves a window where an interrupt arrives, `napi_schedule_prep`
+	 * refuses because this poll has not completed yet, and the frame
+	 * waits for the next unrelated interrupt -- a stall that no counter
+	 * of drops would show. */
+	if (done < budget) {
+		unsigned long flags;
+		u32 m;
+
+		napi_complete(napi);
+		nic_n_napi_complete++;
+
+		spin_lock_irqsave(&nic_lock, flags);
+		/* Clear any run-out that latched while this poll was draining
+		 * the ring, BEFORE unmasking.  The descriptors have just been
+		 * handed back, so the condition is no longer true; leaving the
+		 * stale status set and then unmasking would take an interrupt
+		 * for a run-out that is already over. */
+		__raw_writel(NIC_IE_PKTHDR_RUNOUT | NIC_IP_MBUF_RUNOUT,
+			     nic_reg(NIC_CPUIISR));
+		m = __raw_readl(nic_reg(NIC_CPUIIMR));
+		__raw_writel(m | NIC_IE_RX_DONE_ALL | NIC_IE_PKTHDR_RUNOUT |
+			     NIC_IE_MBUF_RUNOUT, nic_reg(NIC_CPUIIMR));
+		spin_unlock_irqrestore(&nic_lock, flags);
+	}
+	return done;
+}
+
+static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	unsigned int i;
+	unsigned long flags;
+	u32 e, bf, len, k, icr, wrap, ph;
+
+	if (!nic_engine_on) {
+		dev_kfree_skb(skb);
+		dev->stats.tx_dropped++;
+		return NETDEV_TX_OK;
+	}
+
+	spin_lock_irqsave(&nic_lock, flags);
+
+	i = nic_tx_idx;
+	e = nic_re(nic_tx_ring, i);
+	if (e & NIC_DESC_OWN) {
+		/* The engine still owns this slot.  Stop the queue and tell
+		 * the stack to retry -- do NOT drop, and do NOT free the skb,
+		 * which the caller still owns after NETDEV_TX_BUSY. */
+		netif_stop_queue(dev);
+		nic_n_xmit_busy++;
+		spin_unlock_irqrestore(&nic_lock, flags);
+		return NETDEV_TX_BUSY;
+	}
+
+	len = skb->len;
+	if (len > NIC_BUF_SZ - NIC_RX_OFFSET - 8) {
+		spin_unlock_irqrestore(&nic_lock, flags);
+		dev_kfree_skb(skb);
+		dev->stats.tx_dropped++;
+		return NETDEV_TX_OK;
+	}
+
+	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + NIC_RX_OFFSET;
+	for (k = 0; k < len; k++)
+		__raw_writeb(skb->data[k], (void __iomem *)(bf + k));
+	/* 讀 `rtl865xc_swNic.c:718-721`: a runt is padded to 64 and the FCS is
+	 * counted in ph_len.  Both are the ASIC's arithmetic. */
+	while (len < 60) {
+		__raw_writeb(0, (void __iomem *)(bf + len));
+		len++;
+	}
+
+	nic_dw_set(nic_tx_mb, i, 3, bf);
+	nic_dw_set(nic_tx_mb, i, 4, bf);
+	nic_dw_set(nic_tx_mb, i, 2, NIC_MB_MK2(len, NIC_MB_FLAGS_INIT));
+	nic_dw_set(nic_tx_mb, i, 5, NIC_MB_MK5(NIC_BUF_SZ - NIC_RX_OFFSET));
+
+	nic_dw_set(nic_tx_ph, i, 1, NIC_PH_MK1(len + 4, 0, 0));
+	/* ph_flags 0x8800 and portlist 0x3F are not chosen: they are what this
+	 * die's own loader puts in a TX descriptor, 量
+	 * `bench/2026-09-19b/X14-rings-post` word 3 of `A040FCE8` reading
+	 * `8800003F` after a real transfer. */
+	nic_dw_set(nic_tx_ph, i, 3, NIC_PH_MK3(NIC_PH_FLAGS_TX_DEFAULT, 0x3F));
+	nic_dw_set(nic_tx_ph, i, 4, 0);
+
+	wrap = (i == NIC_TX_DESC - 1) ? NIC_DESC_WRAP : 0;
+	ph = nic_tx_ph + i * NIC_DESC_BYTES;
+	nic_re_set(nic_tx_ring, i, ph | NIC_DESC_OWN | wrap);	/* OWN last */
+
+	icr = __raw_readl(nic_reg(NIC_CPUICR));
+	__raw_writel(icr | NIC_TXFD, nic_reg(NIC_CPUICR));	/* doorbell */
+
+	nic_tx_idx = (i + 1) % NIC_TX_DESC;
+	nic_n_tx++;
+	nic_n_xmit++;
+	spin_unlock_irqrestore(&nic_lock, flags);
+
+	dev->stats.tx_packets++;
+	dev->stats.tx_bytes += len;
+	dev->trans_start = jiffies;
+	dev_kfree_skb(skb);
+	return NETDEV_TX_OK;
+}
+
+static int nic_ndo_open(struct net_device *dev)
+{
+	int rc;
+
+	/* House rule 6 applies to this path too: every hardware write is
+	 * behind the runtime unlock, including the ones an `ifconfig up`
+	 * causes.  The device is not registered at boot, so nothing can reach
+	 * here without a verb having been typed first -- but saying so with a
+	 * refusal is worth more than saying it in a comment. */
+	if (!nic_unlocked) {
+		nic_n_refused++;
+		return -EPERM;
+	}
+
+	if (!nic_allocated) {
+		rc = nic_do_alloc();
+		if (rc)
+			return rc;
+	}
+	if (!nic_armed) {
+		rc = nic_do_arm();
+		if (rc)
+			return rc;
+	}
+	if (!nic_irq_taken) {
+		nic_irq_rc = request_irq(NIC_IRQ, nic_isr, IRQF_DISABLED,
+					 "rtl819x-nic", &nic_lock);
+		if (nic_irq_rc)
+			return nic_irq_rc;
+		nic_irq_taken = 1;
+	}
+
+	napi_enable(&nic_napi);
+	nic_ndev_up = 1;
+
+	rc = nic_do_engine(1);
+	if (rc) {
+		nic_ndev_up = 0;
+		napi_disable(&nic_napi);
+		return rc;
+	}
+
+	netif_start_queue(dev);
+	rlxfw_mark("N-NDOPEN");
+	return 0;
+}
+
+static int nic_ndo_stop(struct net_device *dev)
+{
+	netif_stop_queue(dev);
+	nic_ndev_up = 0;
+	napi_disable(&nic_napi);
+	nic_do_engine(0);
+	if (nic_irq_taken) {
+		free_irq(NIC_IRQ, &nic_lock);
+		nic_irq_taken = 0;
+	}
+	rlxfw_mark("N-NDSTOP");
+	return 0;
+}
+
+static struct net_device_stats *nic_ndo_stats(struct net_device *dev)
+{
+	return &dev->stats;
+}
+
+static const struct net_device_ops nic_netdev_ops = {
+	.ndo_open		= nic_ndo_open,
+	.ndo_stop		= nic_ndo_stop,
+	.ndo_start_xmit		= nic_xmit,
+	.ndo_get_stats		= nic_ndo_stats,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_change_mtu		= eth_change_mtu,
+};
 
 /* ------------------------------------------------------------------------
  * alloc -- build the rings in memory.  NO hardware write happens here, which
@@ -919,6 +1296,29 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page + len, "last_iisr %08X\n", nic_last_iisr);
 	len += sprintf(page + len, "seen_iisr %08X\n", nic_seen_iisr);
 
+	/* R6-4.  `nd_name` is the POSITIVE discriminator the gate asks for:
+	 * an interface this driver named, beside the vendor's eth0..eth5. */
+	len += sprintf(page + len, "nd_alloc %d\n", nic_ndev ? 1 : 0);
+	len += sprintf(page + len, "nd_registered %d\n", nic_ndev_registered);
+	len += sprintf(page + len, "nd_up %d\n", nic_ndev_up);
+	len += sprintf(page + len, "nd_name %s\n",
+		       nic_ndev ? nic_ndev->name : "-");
+	len += sprintf(page + len, "n_napi_poll %lu\n", nic_n_napi_poll);
+	len += sprintf(page + len, "n_napi_complete %lu\n",
+		       nic_n_napi_complete);
+	len += sprintf(page + len, "n_xmit %lu\n", nic_n_xmit);
+	len += sprintf(page + len, "n_xmit_busy %lu\n", nic_n_xmit_busy);
+	len += sprintf(page + len, "n_skb_fail %lu\n", nic_n_skb_fail);
+	if (nic_ndev)
+		len += sprintf(page + len,
+			       "nd_stats rx %lu/%lu tx %lu/%lu drop %lu/%lu\n",
+			       nic_ndev->stats.rx_packets,
+			       nic_ndev->stats.rx_bytes,
+			       nic_ndev->stats.tx_packets,
+			       nic_ndev->stats.tx_bytes,
+			       nic_ndev->stats.rx_dropped,
+			       nic_ndev->stats.tx_dropped);
+
 	/* Boot state: what this driver found at late_initcall, before it
 	 * wrote anything.  `boot_icr 00000000` is the whole evidence that the
 	 * vendor's probe disarmed the engine on THIS boot. */
@@ -1139,6 +1539,39 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 
 		return (int)count;
 	}
+	if (!strncmp(buf, "netdev ", 7)) {
+		/* R6-4.  Registration is a verb and not a boot action, so an
+		 * image carrying this driver still comes up with nothing of
+		 * mine bound to anything -- which is what makes `n_writes 0`
+		 * on a boot capture mean something. */
+		if (!nic_ndev)
+			return -ENODEV;
+		if (!strcmp(buf + 7, "on")) {
+			int rc;
+
+			if (nic_ndev_registered)
+				return -EEXIST;
+			if (!nic_unlocked) {
+				nic_n_refused++;
+				return -EPERM;
+			}
+			rc = register_netdev(nic_ndev);
+			if (rc)
+				return rc;
+			nic_ndev_registered = 1;
+			rlxfw_mark("N-NDREG");
+			return (int)count;
+		}
+		if (!strcmp(buf + 7, "off")) {
+			if (!nic_ndev_registered)
+				return -ENXIO;
+			unregister_netdev(nic_ndev);
+			nic_ndev_registered = 0;
+			rlxfw_mark("N-NDUNREG");
+			return (int)count;
+		}
+		return -EINVAL;
+	}
 	if (!strcmp(buf, "disarm")) {
 		nic_do_engine(0);
 		if (nic_irq_taken) {
@@ -1201,6 +1634,27 @@ static int __init rtl819x_nic_init(void)
 	pde->read_proc  = nic_read_proc;
 	pde->write_proc = nic_write_proc;
 	rlxfw_mark("N5");
+
+	/* R6-4.  ALLOCATED here, REGISTERED only by a verb.  `alloc_netdev`
+	 * with "rlx%d" rather than `alloc_etherdev`, whose format is "eth%d"
+	 * -- the name is half of this gate's positive discriminator and it
+	 * must not collide with the vendor's six interfaces.
+	 *
+	 * A failure here emits its own mark and returns 0.  An initcall that
+	 * fails the boot to report that an OPTIONAL device could not be
+	 * allocated would trade a working system for a diagnostic, and this
+	 * driver's whole arrangement is that nothing depends on it. */
+	nic_ndev = alloc_netdev(0, "rlx%d", ether_setup);
+	if (!nic_ndev) {
+		rlxfw_mark("N6-NONDEV");
+		return 0;
+	}
+	nic_ndev->netdev_ops = &nic_netdev_ops;
+	nic_ndev->irq = NIC_IRQ;
+	nic_ndev->watchdog_timeo = 5 * HZ;
+	memcpy(nic_ndev->dev_addr, nic_mac, 6);
+	netif_napi_add(nic_ndev, &nic_napi, nic_poll, NIC_NAPI_WEIGHT);
+	rlxfw_markx("N6", (u32)NIC_NAPI_WEIGHT);
 
 	return 0;
 }
