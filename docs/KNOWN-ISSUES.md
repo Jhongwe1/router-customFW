@@ -870,6 +870,12 @@ settle it.
 | 🔴 **The vendor-driver contrast could not be taken.** `ifconfig eth4 up` returned `SIOCSIFFLAGS: Device or resource busy` because my driver holds a non-shared `request_irq(12)` — 量 `bench/2026-09-20/X9` | An image in which my driver is not bound, or a shared IRQ. Until then *below both drivers* cannot be re-measured on this arrangement |
 | ⚠️ **Whether the three defects in `notes/nic-driver.md` § 8 interact is unknown.** `NET-57` (no watchdog), `NET-58` (a re-open leaves the engine loose) and `NET-59` (the hang) were each measured alone | `NET-59` first; the other two have identified causes and it does not |
 
+⚠️ **A closeout audit was launched and its report was never read.** The segment
+ended while an adversarial *what did this produce, and who owns it* pass was still
+running, so its findings are not in this list. That is a hole of a known shape: the
+audit's whole job is to find what the write-up failed to record, and nobody read the
+answer. **The next segment re-runs it before anything else touches these files.**
+
 ⚠️ **And one process failure of mine, recorded because it cost the most.**
 Block 29 lost **fourteen carded cells** by typing them into a shell that was
 already dead — nothing checked between cells, so each `--send` went into a hung
