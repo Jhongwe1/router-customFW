@@ -1,0 +1,53 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.1
+unlocked 0
+allocated 0
+armed 0
+engine_on 0
+irq_taken 0
+irq_rc -1
+n_reads 6
+n_writes 0
+n_refused 0
+n_irq 0
+n_irq_spurious 0
+n_tx 0
+n_rx 0
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000000
+seen_iisr 00000000
+nd_alloc 1
+nd_registered 0
+nd_up 0
+nd_name rlx%d
+n_napi_poll 0
+n_napi_complete 0
+n_xmit 0
+n_xmit_busy 0
+n_skb_fail 0
+n_tx_stop 0
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 0/0 tx 0/0 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 80000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr 00000000
+now_iimr 00000000
+now_iisr 80000000
+rpdcr0_pos 00000000
+rmdcr0_pos 00000000
+tpdcr0_pos 00000000
+rx_len 0
+rx_ph1 00000000
+rx_ph3 00000000
+rx_ph4 00000000
+
+# 

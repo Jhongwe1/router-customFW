@@ -1,0 +1,12 @@
+ifconfig eth4 10.1.1.4 up ; ifconfig eth4
+ifconfig: SIOCSIFFLAGS: Device or resource busy
+eth4      Link encap:Ethernet  HWaddr 00:12:34:56:78:94  
+          inet addr:10.1.1.4  Bcast:10.255.255.255  Mask:255.0.0.0
+          BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:7 errors:6 dropped:0 overruns:0 frame:6
+          TX packets:23 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:600 (600.0 B)  TX bytes:1776 (1.7 KiB)
+          Interrupt:12 
+
+# 
