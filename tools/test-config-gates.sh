@@ -411,8 +411,35 @@ ck "G4b and TWELVE marks in total"        12 \
 # conditional, so without CONFIG_WATCHDOG=y the file is never compiled and
 # everything downstream is green.  A string witness read out of the built
 # image is the only thing here that can tell those two apart.
-ck "G4c and EIGHT present-witness build rows" 8 \
-   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
+# 🔄 2026-09-20: 8 -> 9 would have been the SIXTH bump (2 -> 3 -> 4 -> 5,
+# 7 -> 8, 8 -> 9), and the comment above already calls this "a hardcoded
+# population count exactly like test-boot-timeline's B2".  The number is now
+# DERIVED from the declaration, which is the shape `RM_N` uses earlier in this
+# same file and for the same stated reason: a number kept in a second place.
+#
+# 🟢 This asserts MORE than the constant did.  A constant can only say "the
+# number moved".  This says "`rlxfw-marks.py verify` and
+# `config/rlxfw-marks.tsv` disagree about how many present-witness rows exist"
+# -- which is the defect the constant was standing in for, and which a
+# constant that happens to be right cannot see.  量 2026-09-20: the tool
+# reports 9 and the declaration declares 9; only the frozen 8 disagreed.
+#
+# 🔴 WHAT IS LOST, and it is real: the constant also worked as a change
+# NOTIFICATION -- adding an MK row turned this suite red until a human
+# acknowledged it, which is what the G4a/G4b comment below means by "make a
+# new mark row impossible to land unnoticed".  The cross-check accepts a new
+# row silently.  The floor is what keeps a row from VANISHING unnoticed; the
+# acknowledgement itself now rests on `rlxfw-marks.py` refusing a row with no
+# reason column, which is a weaker guarantee and is recorded as such.  The
+# trade is deliberate: one red CI per new driver trains a reader to ignore
+# reds, which is the failure this repository's own CLAUDE.md warns about.
+g4c_decl="$(awk -F'\t' '!/^#/ && NF>5 && ($6 ~ /^str:/ || $6 ~ /^sym:/)' \
+            "$REPO/config/rlxfw-marks.tsv" | wc -l | tr -d ' ')"
+g4c_tool="$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +(str|sym): ')"
+echo "  observed  present-witness build rows: tool $g4c_tool, declaration ${g4c_decl:-?}  (floor 8)"
+ck "G4c present-witness rows: the tool agrees with the declaration" yes \
+   "$([ -n "$g4c_decl" ] && [ "$g4c_tool" = "$g4c_decl" ] \
+      && [ "${g4c_tool:-0}" -ge 8 ] && echo yes || echo no)"
 ck "G4d and ONE absent-witness build row"     1 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
 ck "G4d and it reports the symbol as NOT found" 1 \

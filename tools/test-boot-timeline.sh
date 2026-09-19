@@ -355,7 +355,34 @@ base="$("$PY" "$BT" "$ROOT/bench" 2>/dev/null)"
 # the count, the shape `ci-expected.tsv:338` already argues for. Carried
 # forward rather than done here, because changing what this case asserts is
 # not a thing to do at the end of a seating.
-ck "forty-one cold, one hundred and seventy-one warm"  1 "$(printf '%s\n' "$base" | grep -c 'C-8): 41 cold, 171 warm, 0 unknown')"
+# 🔄 2026-09-20 (FIFTH red, and this is the fix rather than a fifth number).
+# The constant is gone.  What is asserted now is what the constant was only
+# ever standing in for:
+#   * the classifier produced a parseable summary at all -- an empty or
+#     renamed summary line reads as 0/0/0 and must not read as clean;
+#   * `unknown` is 0, i.e. no row the tool built was left unclassified;
+#   * neither class is empty, and neither is BELOW the count measured on
+#     2026-09-20 (43 cold, 177 warm).  `bench/` is append-only committed
+#     evidence, so a FLOOR can go stale without ever going red -- that is the
+#     whole difference from the equality it replaces, and it is the shape
+#     `ci-expected.tsv:338` argues for.
+# WHAT THIS STILL CATCHES that the old case caught: a capture disappearing
+# from bench/, a classifier that stops classifying, a class collapsing to
+# empty, and an `unknown` appearing.
+# 🔴 WHAT IT NO LONGER CATCHES, stated here rather than discovered later: a
+# classifier that moves a capture from cold to warm while both stay above
+# their floors.  That is covered instead by the NAMED witnesses -- B2b's
+# `A-catch` must stay cold and `H2a` must stay warm, immediately below -- and
+# by B2's own mutation case.  Those are invariant to corpus size.
+c8="$(printf '%s\n' "$base" | sed -n 's/^classified by the loader.s own line (C-8): //p')"
+n_cold="$(printf '%s\n' "$c8" | sed -n 's/^\([0-9][0-9]*\) cold.*/\1/p')"
+n_warm="$(printf '%s\n' "$c8" | sed -n 's/.*[^0-9]\([0-9][0-9]*\) warm.*/\1/p')"
+n_unk="$( printf '%s\n' "$c8" | sed -n 's/.*[^0-9]\([0-9][0-9]*\) unknown$/\1/p')"
+echo "  observed  C-8 classification: ${n_cold:-?} cold, ${n_warm:-?} warm, ${n_unk:-?} unknown  (floors 43/177, unknown must be 0)"
+ck "C-8 classifies every row, both classes above their floor" yes \
+   "$([ -n "$n_cold" ] && [ -n "$n_warm" ] && [ "${n_unk:-1}" = 0 ] \
+      && [ "${n_cold:-0}" -ge 43 ] && [ "${n_warm:-0}" -ge 177 ] \
+      && echo yes || echo no)"
 
 # 🆕 B2b: the artifact prefix is not always one byte, and it is not always the
 # instrument's. Both halves have to hold or the column means something
@@ -467,8 +494,23 @@ ck "H3a, which sent J BFC00000, has one" 1 \
 # Isolation check: `bench/2026-09-17b` alone reports `entry, warm n=1`.
 # 🔄 2026-09-19 (seating 27): 78 -> 79, one row, and it is the same
 # `looprun` S4 that moved the warm count above -- one `J BFC00000`.
-ck "entry population is seventy-nine warm resets" 1 \
-   "$(printf '%s\n' "$base" | grep -c 'entry, warm  *n=79')"
+# 🔄 2026-09-20: 79 -> 81, and the number stops being an assertion.  This case
+# never tested `entry` -- the two cases ABOVE it do, by name: `H1b` sent
+# `J 80500000` and must have NO entry value, `H3a` sent `J BFC00000` and must
+# have one.  Those are the refutation and they are invariant to corpus size.
+# All this row ever asserted was the SIZE of the population they run over, so
+# it becomes a FLOOR: the population may not shrink, may not go empty, and the
+# `entry, warm` row must exist at all -- a missing row prints nothing, which a
+# `grep -c` for a specific number cannot tell from a wrong number.
+# 🔴 WHAT IS LOST: a capture that stops qualifying as a warm reset while a new
+# one starts is invisible here.  The isolation checks in the comments above
+# were how that was actually caught, and they are notes, not cases -- if that
+# matters enough to assert, the honest form is a per-directory case over a
+# NAMED directory, not a total.
+n_entry="$(printf '%s\n' "$base" | sed -n 's/^  entry, warm  *n=\([0-9][0-9]*\).*/\1/p')"
+echo "  observed  entry, warm population: ${n_entry:-?}  (floor 81)"
+ck "the entry population is non-empty and has not shrunk" yes \
+   "$([ -n "$n_entry" ] && [ "${n_entry:-0}" -ge 81 ] && echo yes || echo no)"
 
 echo
 echo "=== B3b: a capture that produced no row is NAMED, not dropped ==="
