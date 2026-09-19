@@ -367,7 +367,16 @@ verb and the read is the measurement rather than a courtesy.
 
 **This section has moved and this is the pointer it left.** It read *"This section is in the wrong file and says so … It moves the day `R6-3`'s driver note appears."* That note appeared on 2026-09-19 (seating 28) and the body went with it, verbatim, subheadings renumbered 7.x → 8.x.
 
-⚠️ **Two of its readings were refuted by the seating that moved it**, and the refutations live in `notes/nic-driver.md` § 4 rung 0 and § 3.4: `SWINTSET` does not raise an interrupt on this die even with the engine on and the mask open, and the pkthdr stride is 24 rather than the 32 its own § 7.2 left undetermined. The moved text is not edited to agree with them.
+⚠️ **THREE of its readings were refuted by the seating that moved it** — this line first said two, and the third was found by a reviewer asked to disagree with the write-up rather than by any checker. The refutations live in `notes/nic-driver.md` § 4 rung 0, § 3.4 and § 1: ① `SWINTSET` does not raise an interrupt on this die even with the engine on and the mask open; ② the pkthdr stride is 24 rather than the 32 its own § 7.2 left undetermined; ③ **the vendor's NIC driver does NOT own IRQ 12 in this arrangement** — 讀 `rtl_nic.c:4227` puts its `request_irq` in `re865x_open()`, not probe, and 量 `irq_rc 0` says the line was unclaimed. A fourth is weakened rather than refuted: the 推 that `CPUIISR` bit 0 is the software-interrupt pending bit has no source behind it at all. The moved text is not edited to agree with any of them.
+
+# 8. 2026-09-19 (seating 27) — the driver ran
+
+**Everything in this section is 量 on this die unless it is marked otherwise.**
+The record of the seating is `bench/2026-09-19/CORRECTIONS-block27.md`; the
+captures are `bench/2026-09-19/C1`–`C41` and `X0`–`X24`. Where a number below
+disagrees with that file, the disagreement is stated and the recount is shown,
+because a count nobody can redo is not a measurement.
+
 
 ## 8.1 What ran
 

@@ -41,7 +41,7 @@
  * not a wish: `irqon` reports the `request_irq` return value rather than
  * assuming it, and a `-EBUSY` there means somebody opened an interface.
  *
- * ⚠️ IRQ 12 IS NOT LINE 25.  `notes/switch-driver.md:429-433`: the switch
+ * ⚠️ IRQ 12 IS NOT LINE 25.  `notes/switch-driver.md:438-442`: the switch
  * core is `BSP_SWCORE_IRQ` = 12 = LOPI base 8 + 4, gated by `GIMR` bit 15
  * (`BSP_SW_IE`), and it does NOT go through the ICTL cascade that `R5-3`'s
  * timer used at line 25.  None of that driver's interrupt experience carries

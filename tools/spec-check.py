@@ -211,6 +211,26 @@ REDACTION_ALLOWLIST = {
         'checker would misreport what the driver printed',
     ('private IPv4', '192.168.1.6'):
         "the loader's compiled-in TFTP address, read out of stage2.bin. Not this unit's configuration",
+    ('MAC, colon form', '02:52:4C:58:46:57'):
+        "rtl819x-nic's OWN address, a constant compiled into "
+        "config/rlxfw-src/.../rtl819x-nic.c. It is locally administered "
+        "(0x02) plus ASCII RLXFW, and it exists PRECISELY SO THAT this "
+        "unit's real address -- which lives in H601 and may not be "
+        "published -- never has to be read. Redacting it would hide a "
+        "driver constant while protecting nothing; the thing this entry "
+        "must not be allowed to excuse is a Realtek OUI, and 02: cannot "
+        "be one, because locally-administered addresses are not "
+        "assigned to any vendor.",
+    ('MAC, colon form', '02:52:4c:58:46:57'):
+        'as above, lower case: the HOST prints it that way in ip neigh, '
+        'and quoting a measurement under a different spelling to satisfy '
+        'a checker would misreport what the instrument printed',
+    ('private IPv4', '10.1.1'):
+        "the bench network between this desk and the board -- 10.1.1.1 "
+        "is what IPCONFIG sets on the loader, .2 is the workstation's "
+        "USB adapter and .3 is rlx0. All three are typed by this desk "
+        "for one seating and none is this unit's configuration, exactly "
+        "as the 192.168.1.6 entry above.",
     ('SSID / passphrase', 'SSID'):
         'the word, in a row about the default naming scheme. No SSID value is recorded',
     ('SSID / passphrase', 'ssid'):

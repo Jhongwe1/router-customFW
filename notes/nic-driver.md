@@ -109,6 +109,8 @@ is exactly `LINK_CHANGE_IP`. The second explains a reading that had been
 sitting in two different states: the same value appears at the loader prompt
 and under Linux because W1C bits do not decay, and nothing had written it back.
 
+⚠️ **The loader's `0x7F8` and this driver's `0x7FE` differ by bits 1 and 2, and that is deliberate.** `0x7FE` = `0x7F8` \| `TX_ALL_DONE_IE_ALL (0x3<<1)`. The loader asks to be told when ONE TX descriptor completes; this driver also asks to be told when the whole TX ring has drained. Every `now_iimr 000007FE` in §§ 4 and 6 is that value and no other.
+
 🟢 **`CPUTPDCR2`/`3` were predicted before they were read.** `X9` dumped the
 loader's DRAM and found **four** ring structures at `A040FC88`, `A040FCA0`,
 `A040FCB0` and `A040FCC0`, where the header declares only two TX bases in the
@@ -328,7 +330,7 @@ fails silently.
 `/proc/interrupts` has **no line 12** before `irqon`; a line
 `12: … RLX LOPI rtl819x-nic (0x20)` during; and **no line 12** after `disarm`.
 `RLX LOPI`, not the ICTL cascade `R5-3` used at line 25 — which
-`notes/switch-driver.md:429-433` predicted.
+`notes/switch-driver.md:438-442` predicted.
 
 ---
 
@@ -465,7 +467,7 @@ KILLED IT.** The obvious comparison — C58 (unfixed, wedged) against L2 (fixed,
 healthy) — has **two** variables, because a cold power cycle happened between
 them. So the unfixed image `r6nic2` was reloaded onto the *same cold-booted
 hardware*, with no power cycle, and given the identical flood: `M7-after`,
-**7,539 frames at 0.0531 % loss, survived 5/5**, with `now_iimr 000007FE` —
+**7,539 frames at 0.0531 % loss, survived a 5-packet HOST-side `ping -c 5` afterwards at 0 % loss**, with `now_iimr 000007FE` —
 the mask that supposedly caused the wedge. § 6.1a's table is the two side by
 side and they are statistically indistinguishable.
 
@@ -555,6 +557,8 @@ seating carried `ph_portlist 3`.
 ---
 
 ## 8. The CPU interface's control bits (`NET-38`) — moved from `notes/switch-driver.md` § 7
+
+🔴 **THREE readings in the moved text are refuted by the seating that moved it, not two.** The stub left in `notes/switch-driver.md` names two — `SWINTSET`, and the 24-vs-32 pkthdr stride. The third is this section's *"the interrupt does not go through the ICTL cascade … the vendor's NIC driver owns IRQ 12"*: the cascade half is confirmed (§ 4), and the ownership half is **refuted** by § 1 — 讀 `rtl_nic.c:4227` puts the vendor's `request_irq` in `re865x_open()`, not probe, and 量 `irq_rc 0` says line 12 was unclaimed. A fourth is weakened rather than refuted: the 推 that `CPUIISR` bit 0 is the software-interrupt pending bit has, per § 4, no source behind it at all. **The stub's count of two is wrong and this line is the correction; the moved text below is still not edited.**
 
 **Moved here verbatim from `notes/switch-driver.md` § 7 on 2026-09-19**, which is the day that section said it would move: *"It moves the day `R6-3`'s driver note appears."* The subheadings are renumbered 7.x → 8.x and nothing else in the text is changed — including the readings it makes that later sections of this file went on to refute, which are marked where they are refuted and not edited here.
 
@@ -691,14 +695,6 @@ including `elf32-tradbigmips`. **An unwrapped, non-vendor disassembler is
 available**, which removes the reason the vendor binary would ever be run.
 
 ---
-
-# 8. 2026-09-19 (seating 27) — the driver ran
-
-**Everything in this section is 量 on this die unless it is marked otherwise.**
-The record of the seating is `bench/2026-09-19/CORRECTIONS-block27.md`; the
-captures are `bench/2026-09-19/C1`–`C41` and `X0`–`X24`. Where a number below
-disagrees with that file, the disagreement is stated and the recount is shown,
-because a count nobody can redo is not a measurement.
 
 ## 9. What this file does NOT establish
 
