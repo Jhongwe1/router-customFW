@@ -1,0 +1,4 @@
+echo unlock i-mean-it > /proc/rtl819x-switch ; echRoL rXc=$F?W
+-SW-UNLOCK
+rc=0
+# 

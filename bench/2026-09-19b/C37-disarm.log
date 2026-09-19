@@ -1,0 +1,5 @@
+echo disarm > /proc/rtl819x-nic ; echo rc=$R?L
+XFW-N-ENGOFF
+RLXFW-N-DISARM
+rc=0
+# 

@@ -1,0 +1,55 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.0
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 76
+n_writes 16
+n_refused 0
+n_irq 0
+n_irq_spurious 0
+n_tx 0
+n_rx 0
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000000
+seen_iisr 00000000
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4080000
+now_iimr 000007FE
+now_iisr 00000000
+rpdcr0_pos A1560000
+rmdcr0_pos A1560020
+tpdcr0_pos A1560040
+rx_ring A1560000
+mb_ring A1560020
+tx_ring A1560040
+bufs A1560290
+rx_idx 0
+tx_idx 0
+rxd0 A1560051 len 0 f 0000 pl 00
+rxd1 A1560069 len 0 f 0000 pl 00
+rxd2 A1560081 len 0 f 0000 pl 00
+rxd3 A1560099 len 0 f 0000 pl 00
+rxd4 A15600B1 len 0 f 0000 pl 00
+rxd5 A15600C9 len 0 f 0000 pl 00
+rxd6 A15600E1 len 0 f 0000 pl 00
+rxd7 A15600FB len 0 f 0000 pl 00
+txd0 A15601D0 len 0
+txd1 A15601E8 len 0
+txd2 A1560200 len 0
+txd3 A156021A len 0
+rx_len 0
+rx_ph1 00000000
+rx_ph3 00000000
+rx_ph4 00000000
+# 

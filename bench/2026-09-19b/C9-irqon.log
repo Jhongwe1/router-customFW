@@ -1,0 +1,4 @@
+echo irqon > /proc/rtl819x-nic ; echo rc=R$L?X
+FW-N-IRQON
+rc=0
+# 

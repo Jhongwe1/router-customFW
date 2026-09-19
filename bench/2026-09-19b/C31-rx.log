@@ -1,0 +1,3 @@
+echo rx > /proc/rtl819x-nic ; echo rc=$?
+rc=0
+# 

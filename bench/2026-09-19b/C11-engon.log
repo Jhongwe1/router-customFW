@@ -1,0 +1,4 @@
+echo engine on > /proc/rtl819x-nic ; echo rcR=L$?X
+FW-N-ENGON=C4000000
+rc=0
+# 

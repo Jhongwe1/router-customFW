@@ -1,0 +1,56 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.0
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 128
+n_writes 20
+n_refused 0
+n_irq 10
+n_irq_spurious 0
+n_tx 3
+n_rx 1
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000008
+seen_iisr 0000320E
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 000007FE
+now_iisr 00000000
+rpdcr0_pos A1560000
+rmdcr0_pos A1560020
+tpdcr0_pos A156004C
+rx_ring A1560000
+mb_ring A1560020
+tx_ring A1560040
+bufs A1560290
+rx_idx 1
+tx_idx 3
+rxd0 A1560051 len 0 f 821F pl 00
+rxd1 A1560068 len 64 f 8063 pl 03
+rxd2 A1560080 len 64 f 8063 pl 03
+rxd3 A1560098 len 64 f 8063 pl 03
+rxd4 A15600B0 len 64 f 8063 pl 03
+rxd5 A15600C8 len 64 f 8063 pl 03
+rxd6 A15600E0 len 64 f 8063 pl 03
+rxd7 A15600FA len 64 f 8063 pl 03
+txd0 A15601D0 len 64
+txd1 A15601E8 len 64
+txd2 A1560200 len 64
+txd3 A156021A len 0
+rx_len 60
+rx_ph1 00400000
+rx_ph3 821F0000
+rx_ph4 00000000
+rx_bytes FFFFFFFFFFFF02524C58465788B5524C5846572D4E494320304B4C4D4E4F505152535455565758595A5B5C5D5E5F606162636465666768696A6B6C6D
+# 

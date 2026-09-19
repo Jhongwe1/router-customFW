@@ -1,0 +1,4 @@
+echo start > /proc/rtl819x-switch ;R LeXchFo Wrc=$?-
+SW-START
+rc=0
+# 
