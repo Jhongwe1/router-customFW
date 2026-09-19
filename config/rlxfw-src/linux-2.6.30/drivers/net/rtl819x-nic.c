@@ -198,7 +198,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_NIC_VERSION	"rtl819x-nic 1.0"
+#define RTL819X_NIC_VERSION	"rtl819x-nic 1.1"
 #define RTL819X_NIC_PROC_NAME	"rtl819x-nic"
 
 /* ------------------------------------------------------------------------
@@ -504,6 +504,29 @@ static unsigned long nic_n_xmit;
 static unsigned long nic_n_xmit_busy;
 static unsigned long nic_n_skb_fail;
 
+/* R6-4a.  The TX queue's stop/wake ledger.  Four counters and one state,
+ * because `n_xmit_busy` alone cannot tell "the stop path was never
+ * reached" from "it was reached and the wake worked" -- both read 0.
+ * 量 `bench/2026-09-19b`, four concurrent 1400-byte floods on two images:
+ * `n_xmit_busy 0` every time, which is the first reading and was mistaken
+ * for nothing at all.
+ *
+ *   n_tx_stop        netif_stop_queue() calls from nic_xmit
+ *   n_tx_wake        netif_wake_queue() calls from nic_isr's level test
+ *   n_tx_wake_race   netif_wake_queue() calls from the post-stop re-test
+ *   n_tx_timeout     ndo_tx_timeout entries -- the recovery of last
+ *                    resort, and the reading that REFUTES the
+ *                    interrupt-driven wake if it is ever non-zero
+ *
+ * `n_tx_stop` is kept separate from `n_xmit_busy` although today they
+ * move together: the first counts a transition of the QUEUE's state, the
+ * second counts a RETURN VALUE, and a later change to either path must
+ * not silently merge two different measurements. */
+static unsigned long nic_n_tx_stop;
+static unsigned long nic_n_tx_wake;
+static unsigned long nic_n_tx_wake_race;
+static unsigned long nic_n_tx_timeout;
+
 static const u8 nic_mac[6] = { 0x02, 0x52, 0x4C, 0x58, 0x46, 0x57 };
 
 /* ------------------------------------------------------------------------
@@ -596,6 +619,56 @@ static int nic_do_arm(void);
 static int nic_do_engine(int on);
 static void nic_refill(unsigned int i);
 
+/* R6-4a.  Restart the transmit queue if -- and only if -- the slot that
+ * `nic_xmit` will look at next is CPU-owned again.
+ *
+ * 🔴 THE TEST IS A LEVEL, NOT AN EDGE, AND THAT IS THE WHOLE DESIGN.  The
+ * obvious form is "the ISR saw TX_DONE, therefore wake", and an edge can
+ * be consumed by an ISR invocation that runs while the queue is not yet
+ * stopped -- after which no further edge is owed and the queue stays
+ * stopped for the life of the interface.  This form re-evaluates the
+ * condition `nic_xmit` itself tests, on EVERY interrupt whatever raised
+ * it, so a lost TX_DONE costs a delay until the next interrupt of any
+ * kind instead of costing the interface.
+ *
+ * 🟢 That the source exists at all is 量 on this die and not assumed.
+ * `bench/2026-09-19b/C19-nic6.log` is a single `tx` verb with `n_rx 0`,
+ * and it reads `n_irq 1` with `last_iisr 0000320E` -- bits 1 and 2
+ * (TX_ALL_DONE) and bit 9 (TX_DONE).  One transmit, one interrupt, TX
+ * completion in its status word.  `seen_iisr` carries the same bits in
+ * every later capture of that seating.
+ *
+ * Cost in interrupt context: one KSEG1 read, one bit test, and on the
+ * rare taken branch a `test_and_clear_bit` plus a softirq raise.
+ * Bounded, no loop -- `FW-45`'s ~1.33 s hardware watchdog is nowhere
+ * near.  量 the config this builds under: `CONFIG_CPU_HAS_LLSC` is
+ * ABSENT, so `test_and_clear_bit` takes arch/rlx's `raw_local_irq_save`
+ * fallback (`arch/rlx/include/asm/bitops.h`, the `#else` of the
+ * `#ifdef CONFIG_CPU_HAS_LLSC` pairs) -- not an `ll`/`sc` pair, and so
+ * not the `simulate_llsc` emulator either.  `napi_schedule_prep` in the
+ * handler below already does the same class of operation, 12,623 times
+ * in `bench/2026-09-19b/C58-afterflood2.log`.
+ *
+ * ⚠️ `nic_tx_idx` is read here with no lock.  量: this image is built
+ * `# CONFIG_SMP is not set` and `CONFIG_PREEMPT_NONE=y`, and the only
+ * writer is inside `nic_xmit`'s `spin_lock_irqsave`, which on that
+ * configuration is a `local_irq_save` -- so this handler cannot observe
+ * a half-updated index.  UNDER SMP OR PREEMPTION THAT IS FALSE and this
+ * function would have to take `nic_lock`. */
+static int nic_tx_try_wake(void)
+{
+	if (!nic_ndev || !nic_ndev_up || !nic_allocated)
+		return 0;
+	if (!netif_queue_stopped(nic_ndev))
+		return 0;
+	if (nic_re(nic_tx_ring, nic_tx_idx) & NIC_DESC_OWN)
+		return 0;
+
+	nic_n_tx_wake++;
+	netif_wake_queue(nic_ndev);
+	return 1;
+}
+
 static irqreturn_t nic_isr(int irq, void *dev_id)
 {
 	u32 isr;
@@ -645,6 +718,12 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
 			__napi_schedule(&nic_napi);
 		}
 	}
+
+	/* R6-4a.  The TX-queue wake, placed AFTER the NAPI block so that
+	 * block's mask/schedule ordering -- which its own comment says is
+	 * the whole of it -- is not disturbed.  Deliberately NOT gated on
+	 * `isr & NIC_IE_TX_DONE_ALL`; see nic_tx_try_wake(). */
+	nic_tx_try_wake();
 
 	return IRQ_HANDLED;
 }
@@ -770,7 +849,40 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 		 * the stack to retry -- do NOT drop, and do NOT free the skb,
 		 * which the caller still owns after NETDEV_TX_BUSY. */
 		netif_stop_queue(dev);
+		nic_n_tx_stop++;
 		nic_n_xmit_busy++;
+
+		/* RE-TEST AFTER THE STOP.  The engine can retire this slot
+		 * between the read above and the stop.
+		 *
+		 * 🔴 ON THIS BUILD THAT WINDOW CANNOT LOSE THE WAKE, AND WHAT
+		 * CLOSES IT IS NOT IN THIS FILE.  量 `# CONFIG_SMP is not set`
+		 * and `CONFIG_PREEMPT_NONE=y`, so the `spin_lock_irqsave`
+		 * above is a `local_irq_save` and nic_isr cannot run inside
+		 * it; the completion latches in CPUIISR, which is sticky W1C,
+		 * and the interrupt is delivered the instant the unlock below
+		 * restores the mask.  The ISR then finds the queue stopped and
+		 * the slot free and wakes it.
+		 *
+		 * This re-test is here anyway for three reasons, none of which
+		 * is the classic race: a correctness argument that rests on
+		 * two Kconfig lines nobody reading this file can see is a bad
+		 * place to leave it; it removes a whole interrupt's latency
+		 * from the common case; and `n_tx_wake_race` then MEASURES how
+		 * often the window is real instead of leaving it argued.
+		 *
+		 * Waking while returning NETDEV_TX_BUSY is correct, 讀
+		 * `net/sched/sch_generic.c:124-178`: qdisc_restart requeues
+		 * the skb and then zeroes its return ONLY if the queue is
+		 * still stopped, so an un-stopped queue makes __qdisc_run loop
+		 * and re-offer the same skb -- which now finds a free slot.
+		 * That loop is bounded by its own `jiffies != start_time`. */
+		e = nic_re(nic_tx_ring, i);
+		if (!(e & NIC_DESC_OWN)) {
+			nic_n_tx_wake_race++;
+			netif_wake_queue(dev);
+		}
+
 		spin_unlock_irqrestore(&nic_lock, flags);
 		return NETDEV_TX_BUSY;
 	}
@@ -891,11 +1003,55 @@ static struct net_device_stats *nic_ndo_stats(struct net_device *dev)
 	return &dev->stats;
 }
 
+/* R6-4a.  The recovery of last resort, and an instrument.
+ *
+ * 讀 `rtl819x-nic.c:1654`: this driver has ALWAYS set
+ * `dev->watchdog_timeo = 5 * HZ`.  讀 `net/sched/sch_generic.c:240-249`:
+ * `__netdev_watchdog_up()` arms the timer only
+ * `if (dev->netdev_ops->ndo_tx_timeout)` -- so until this line existed
+ * that assignment was DEAD CODE and the watchdog was never started.  讀
+ * `:227` of the same file: when it does fire it calls `ndo_tx_timeout`
+ * with NO NULL check, so the pairing is not optional in either
+ * direction.
+ *
+ * 量 that the handler can really be entered: `netif_carrier_ok()` is
+ * `!test_bit(__LINK_STATE_NOCARRIER)` (`netdevice.h:1532-1535`), this
+ * driver never calls `netif_carrier_off()`, and that bit has zero
+ * occurrences in `net/core/dev.c` -- so the carrier precondition is
+ * satisfied by default rather than by anything this driver does.
+ *
+ * IT TOUCHES NO HARDWARE.  Resetting the DMA engine from a timer, on a
+ * part whose ingress path has wedged once with the mechanism
+ * unidentified (`notes/nic-driver.md` § 6.2), would be a repair nobody
+ * could afterwards distinguish from the fault.  It re-runs the same
+ * level test the ISR runs, and counts the entry.
+ *
+ * `dev->trans_start` is deliberately NOT refreshed.  While the engine is
+ * genuinely stuck this handler is re-entered every `watchdog_timeo`, so
+ * `n_tx_timeout` reads as a RATE -- entries per 5 s of stall -- rather
+ * than as a single event; and `n_tx_timeout 0` after a load is then the
+ * evidence that the interrupt-driven wake never needed help.
+ *
+ * 量 the console cost, which is the thing that could have made this
+ * unsafe under `FW-45`'s ~1.33 s hardware watchdog: `dev_watchdog`
+ * guards the call with `WARN_ONCE`, and this image is built
+ * `# CONFIG_BUG is not set`, under which `WARN(cond, fmt)` reduces to
+ * `!!(cond)` (`include/asm-generic/bug.h:90-112`) -- no printk, no
+ * dump_stack, zero bytes on a 38400 baud console.  A `loud` image would
+ * print one backtrace, once. */
+static void nic_ndo_tx_timeout(struct net_device *dev)
+{
+	nic_n_tx_timeout++;
+	dev->stats.tx_errors++;
+	nic_tx_try_wake();
+}
+
 static const struct net_device_ops nic_netdev_ops = {
 	.ndo_open		= nic_ndo_open,
 	.ndo_stop		= nic_ndo_stop,
 	.ndo_start_xmit		= nic_xmit,
 	.ndo_get_stats		= nic_ndo_stats,
+	.ndo_tx_timeout		= nic_ndo_tx_timeout,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_change_mtu		= eth_change_mtu,
 };
@@ -1309,6 +1465,22 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page + len, "n_xmit %lu\n", nic_n_xmit);
 	len += sprintf(page + len, "n_xmit_busy %lu\n", nic_n_xmit_busy);
 	len += sprintf(page + len, "n_skb_fail %lu\n", nic_n_skb_fail);
+	len += sprintf(page + len, "n_tx_stop %lu\n", nic_n_tx_stop);
+	len += sprintf(page + len, "n_tx_wake %lu\n", nic_n_tx_wake);
+	len += sprintf(page + len, "n_tx_wake_race %lu\n",
+		       nic_n_tx_wake_race);
+	len += sprintf(page + len, "n_tx_timeout %lu\n", nic_n_tx_timeout);
+	/* A STATE, not a count.  `n_tx_stop == n_tx_wake` cannot say whether
+	 * the queue is stopped RIGHT NOW, and that is the reading by which a
+	 * wedged interface is told from a busy one.  -1 when there is no
+	 * net_device, so the field never has to be read as 0-meaning-two-
+	 * things.  量 the page budget this sits in: the largest committed
+	 * dump of this file is `bench/2026-09-19b/C58-afterflood2.log` at
+	 * 1,244 bytes including the echoed command; these five lines add
+	 * about 110, against the 4,096 `read_proc` gives and does not
+	 * bound-check. */
+	len += sprintf(page + len, "tx_stopped %d\n",
+		       nic_ndev ? netif_queue_stopped(nic_ndev) : -1);
 	if (nic_ndev)
 		len += sprintf(page + len,
 			       "nd_stats rx %lu/%lu tx %lu/%lu drop %lu/%lu\n",
@@ -1470,6 +1642,56 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		u32 icr = nic_rd(NIC_CPUICR);
 		int rc = nic_wr(NIC_CPUICR, icr | NIC_SWINTSET);
 
+		return rc ? rc : (int)count;
+	}
+	if (!strncmp(buf, "txstall ", 8)) {
+		/* R6-4a's POSITIVE CONTROL, and the reason the next seating's
+		 * first flood can test ONE thing instead of two.
+		 *
+		 * `n_xmit_busy 0` after a flood is ambiguous: it is what a
+		 * working wake looks like AND what a stop path that was never
+		 * reached looks like.  量 `bench/2026-09-19b/L2-after` and
+		 * `M7-after`: four concurrent 1400-byte floods never exhausted
+		 * four TX descriptors on either image, so the ambiguity is
+		 * measured rather than feared.  This verb takes the load out
+		 * of the question -- stop the engine consuming descriptors,
+		 * offer five frames, and the fifth MUST take the stop path.
+		 *
+		 * TXCMD and not STOPTX (bit 21).  Either would do it; TXCMD is
+		 * a bit this driver already writes on every `engine on` and
+		 * whose value is anchored by this die's own `CPUICR C4000000`
+		 * at the loader prompt, while `NIC_STOPTX` is 讀 out of
+		 * `rtl865xc_asicregs.h` and has never been exercised here.
+		 *
+		 * `nic_engine_on` is deliberately LEFT SET: clearing it would
+		 * make nic_xmit drop the skb (`:758-762`) instead of stopping
+		 * the queue, which is the opposite of what this control is
+		 * for.  RXCMD is left set so the interface can still be pinged
+		 * while transmit is stalled, which is the negative half of the
+		 * reading.
+		 *
+		 * ⚠️ REFUTATION CONDITION FOR THE CONTROL ITSELF: if
+		 * `txstall off` does not restore transmit -- a ping after it
+		 * fails, or the `txd*` OWN bits stay set -- then clearing
+		 * TXCMD mid-flight wedges this engine, the control is VOID,
+		 * and the seating falls back to the flood alone.  That has to
+		 * be on the card before the board is powered. */
+		u32 icr;
+		int rc;
+
+		if (!nic_armed)
+			return -ENXIO;
+		icr = nic_rd(NIC_CPUICR);
+		if (!strcmp(buf + 8, "on")) {
+			rc = nic_wr(NIC_CPUICR, icr & ~NIC_TXCMD);
+		} else if (!strcmp(buf + 8, "off")) {
+			rc = nic_wr(NIC_CPUICR, icr | NIC_TXCMD);
+			if (!rc)
+				rc = nic_wr(NIC_CPUICR,
+					    nic_rd(NIC_CPUICR) | NIC_TXFD);
+		} else {
+			return -EINVAL;
+		}
 		return rc ? rc : (int)count;
 	}
 	if (!strncmp(buf, "lb ", 3)) {

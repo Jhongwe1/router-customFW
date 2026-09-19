@@ -718,3 +718,157 @@ available**, which removes the reason the vendor binary would ever be run.
    any drop resolves it.
 7. **The two unnamed `CPUIISR` bits.** `last_iisr` carried bits 12 and 13 on
    every transmit in this seating; the header names neither.
+
+
+## 7. `R6-4a` — the TX queue was stopped and nothing ever restarted it
+
+🔴 **Written at the desk on 2026-09-20 and NOT YET RUN ON THE SILICON.**
+Everything in this section is 讀 out of the source or 量 on committed captures.
+The register readings it predicts are `R6-5`'s to take.
+
+### 7.1 The defect
+
+讀 `rtl819x-nic.c`: `nic_xmit` finds the engine still owns the next slot,
+calls `netif_stop_queue(dev)` and returns `NETDEV_TX_BUSY` — correctly, because
+the caller still owns the skb after that return. 量 before this change:
+`netif_wake_queue` appeared **zero** times in the file. Once that path is taken,
+transmit is dead for the life of the interface.
+
+⚠️ **The counter that should have said so cannot.** `n_xmit_busy` read **0**
+in every flood of seating 28, on both images — and `0` is what a working wake
+looks like **and** what a stop path that was never reached looks like. Four
+concurrent 1400-byte ping floods never exhausted four TX descriptors, so the
+ambiguity is measured rather than feared.
+
+### 7.2 Why the wake is LEVEL-triggered
+
+The obvious design — *the ISR saw `TX_DONE`, so wake* — is edge-triggered, and
+an edge can be consumed by an interrupt that runs before the stop takes effect;
+after that, no edge is owed and the queue stays stopped forever.
+
+`nic_tx_try_wake()` instead re-tests **exactly what `nic_xmit` tests** — is the
+queue stopped, and is `nic_tx_idx`'s descriptor free — on **every** interrupt,
+whatever raised it. A lost `TX_DONE` then costs a delay and not the interface.
+
+🟢 **The TX-completion interrupt is real on this die and was already being
+discarded.** 讀: `NIC_IE_TX_DONE_ALL` and `TX_ALL_DONE` are in
+`NIC_IIMR_LADDER`, and `nic_isr` W1Cs them and then acts only on
+`NIC_IP_RX_WORK`. 量 `bench/2026-09-19b/C19-nic6.log`: one `tx` verb, `n_rx 0`,
+**`n_irq 1`, `last_iisr 0000320E`** — bit 9 is `TX_DONE`. One transmit, one
+interrupt, TX completion in its status word.
+
+**Two sites were rejected and the reasons are measured.** `nic_poll` — 讀
+`nic_isr`, NAPI is scheduled only on RX bits, so a TX-only stall never polls.
+The top of `nic_xmit` — 讀 `net/sched/sch_generic.c:145-147`, a stopped queue is
+never offered to the driver.
+
+### 7.3 The classic race cannot happen here, and the remedy stays anyway
+
+量 on this image's own `.config`: `# CONFIG_SMP is not set` and
+`CONFIG_PREEMPT_NONE=y`. So `spin_lock_irqsave(&nic_lock)` in `nic_xmit` is a
+`local_irq_save` and `nic_isr` **cannot** run between the descriptor read and
+the `netif_stop_queue`. The hardware can still retire the slot inside that
+window — but `CPUIISR` is sticky write-1-to-clear, so the interrupt is
+*pending*, not lost, and is delivered the instant the unlock restores the mask.
+
+🔴 **What closes the race is therefore two Kconfig lines, neither of them in
+this file.** The post-stop re-test is added anyway, for three reasons that are
+not the race: a correctness argument resting on two symbols nobody reading this
+driver can see is a bad place to leave it; it removes a whole interrupt's
+latency from the common case; and `n_tx_wake_race` then **measures** how often
+the window is real instead of leaving it argued.
+
+Waking while returning `NETDEV_TX_BUSY` is correct — 讀
+`net/sched/sch_generic.c:124-178`: `qdisc_restart` requeues the skb and zeroes
+its return **only if the queue is still stopped**, so an un-stopped queue makes
+`__qdisc_run` re-offer the same skb, bounded by its own `jiffies != start_time`.
+
+### 7.4 🔴 `watchdog_timeo = 5 * HZ` has been DEAD CODE since it was written
+
+讀 `net/sched/sch_generic.c:240-249`: `__netdev_watchdog_up()` arms the timer
+only `if (dev->netdev_ops->ndo_tx_timeout)`. This driver set `watchdog_timeo`
+and never supplied that handler, so **the netdev watchdog has never started for
+`rlx0`**, and the assignment has been inert for its whole life. 讀 `:227` of the
+same file: when it does fire it calls `ndo_tx_timeout` with **no NULL check**,
+so the pairing is mandatory in both directions.
+
+`nic_ndo_tx_timeout` is added, and **it touches no hardware**. Resetting the DMA
+engine from a timer, on a part whose ingress path has wedged once with the
+mechanism unidentified (§ 6.2), would be a repair nobody could afterwards
+distinguish from the fault. It re-runs the same level test the ISR runs and
+counts the entry. `dev->trans_start` is deliberately **not** refreshed, so while
+the engine is genuinely stuck the handler is re-entered every `watchdog_timeo`
+and `n_tx_timeout` reads as a **rate** — entries per 5 s of stall — rather than
+as a single event.
+
+量 the console cost, because that is what could have made it unsafe under
+`FW-45`'s ~1.33 s hardware watchdog: `dev_watchdog` guards the call with
+`WARN_ONCE`, and this image is `# CONFIG_BUG is not set`, under which
+`WARN(cond, fmt)` reduces to `!!(cond)` — no printk, no `dump_stack`, **zero
+bytes** on a 38400 baud console. A `loud` image would print one backtrace, once.
+
+⚠️ The vendor has both halves and recovers nothing — 讀 `rtl_nic.c:5183-5186`
+is one `printk`. This diverges deliberately.
+
+### 7.5 The ledger, and why five fields and not one
+
+| field | what it counts |
+|---|---|
+| `n_tx_stop` | `netif_stop_queue()` calls from `nic_xmit` |
+| `n_tx_wake` | `netif_wake_queue()` from the ISR's level test |
+| `n_tx_wake_race` | `netif_wake_queue()` from the post-stop re-test |
+| `n_tx_timeout` | `ndo_tx_timeout` entries — the reading that **refutes** the interrupt-driven wake if it is ever non-zero |
+| `tx_stopped` | a **STATE**, `netif_queue_stopped()` at read time, `-1` with no netdev |
+
+`tx_stopped` is not derivable from the others: `n_tx_stop == n_tx_wake` cannot
+say whether the queue is stopped **now**, and that is the reading by which a
+wedged interface is told from a busy one. `n_tx_stop` is kept separate from
+`n_xmit_busy` although today they move together — the first counts a transition
+of the QUEUE's state, the second counts a RETURN VALUE, and a later change to
+either path must not silently merge two different measurements.
+
+### 7.6 The positive control, and why the flood alone is not one
+
+🔴 **`txstall on|off`.** The flood cannot be the test, because
+`n_xmit_busy 0` after it is ambiguous (§ 7.1). This verb takes the load out of
+the question: clear `CPUICR.TXCMD` so the engine stops consuming descriptors,
+offer five frames, and the fifth **must** take the stop path. `txstall off`
+restores it. One cell, two-sided, one image.
+
+`TXCMD` and not `STOPTX`: `TXCMD` is a bit this driver already writes on every
+`engine on` and whose value is anchored by this die's own `CPUICR C4000000` at
+the loader prompt, while `NIC_STOPTX` is 讀 out of a vendor header and has never
+been exercised here. `nic_engine_on` is deliberately **left set** — clearing it
+makes `nic_xmit` *drop* the skb instead of stopping the queue, which is the
+opposite of what this control is for. `RXCMD` is left set so the interface can
+still be pinged while transmit is stalled, which is the negative half.
+
+🔴 **A trap this verb walks into, caught before the card was written.**
+`CLAUDE.md` 量 that this image's `ping` ignores `-c` and always sends **four**
+packets — and the ring holds **four**. One `ping` fills it exactly and never
+reaches the fifth frame. **The cell needs two `ping` runs**, or the control is
+void while looking like it ran.
+
+⚠️ **Refutation of the control itself, which must be on the card before
+power**: if `txstall off` does not restore transmit — a ping after it fails, or
+the `txd*` OWN bits stay set — then clearing `TXCMD` mid-flight wedges this
+engine, the control is VOID, and the seating falls back to the flood alone.
+
+### 7.7 The refutation condition for `R6-5`'s bench run
+
+With `txstall` run **first** and the throughput load after, `/proc` must read
+`n_tx_stop > 0`, `n_tx_wake > 0`,
+`n_tx_wake + n_tx_wake_race >= n_tx_stop`, `tx_stopped 0`, `n_tx_timeout 0`,
+and the stream must still be running at the read.
+
+**Refuted by**: `n_tx_stop > 0` with both wake counters 0 (wrong wake site);
+`tx_stopped 1` at rest with the stream dead (the wake fired and was
+insufficient); **`n_tx_timeout > 0`** — the ISR wake missed and only the 5 s
+watchdog saved it, so the design is wrong even though the link survived; or
+`n_tx_wake` exceeding `n_tx_stop + n_tx_wake_race` by more than 1 (the counters
+do not measure what they claim).
+
+**The ordering is the point.** `txstall` settles *reachability* and *the wake
+fires* before any load; the load then tests only *does it hold under load*. A
+first flood run against an untested wake would have been testing two things at
+once, and a green result could not have said which.
