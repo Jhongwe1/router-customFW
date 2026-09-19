@@ -29,7 +29,31 @@ CC           := $(CROSS)gcc
 STRIP        := $(CROSS)strip
 READELF      := $(CROSS)readelf
 
-SRC          ?= ../src313/src
+# WHERE THINGS GO, AND WHY NOT HERE.
+# `RECIPE_ID` is `find config -type f` with no exclusions and does not consult
+# .gitignore (讀 tools/rlxfw-kbuild.sh:262-263), so a single .o left beside this
+# Makefile would silently move the id the board prints.  Objects therefore go
+# under $FWRE_WORK and the product goes to $REPO/build/, which is gitignored --
+# the same split config/rlxfw-user/isaprobe/Makefile:62 uses, and the same
+# reason config/rlxfw-initramfs.tsv gives for uprobe and ucost.
+HERE         := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO         := $(abspath $(HERE)../../..)
+FWRE_WORK    ?= /home/key/fwre-work
+STAGE        ?= $(FWRE_WORK)/rebuild/rlxfw-user/iperf3
+OBJDIR       := $(STAGE)/build
+INSTALL      ?= $(REPO)/build/rlxfw-user/iperf3
+OUT          := $(INSTALL)/iperf3
+
+# ⚠️ SRC IS NOT STAGED, AND THAT IS A STATED LIMIT RATHER THAN AN OVERSIGHT.
+# isaprobe copies its sources into $(STAGE)/src before building; this does not.
+# iperf 3.1.3's tree is 6 MB and carries two GENERATED headers -- iperf_config.h
+# (this directory's, produced by probe.sh) and version.h (from version.h.in) --
+# which config/rlxfw-user/iperf3/build.sh staged INTO the source tree.  So a
+# clean clone cannot build this target: it needs an src313 tree that has already
+# been staged.  Carried forward rather than fixed here, because inventing a
+# staging rule in the hour before a bench card is frozen is how a guard gets
+# written wrong.
+SRC          ?= $(FWRE_WORK)/iperf3-port/src313/src
 EXTRA_CFLAGS ?= -fno-if-conversion
 
 CPPFLAGS     := -D_GNU_SOURCE -I$(SRC)
@@ -45,21 +69,43 @@ CFILES := main.c cjson.c iperf_api.c iperf_client_api.c iperf_error.c \
           iperf_udp.c iperf_util.c net.c tcp_info.c tcp_window_size.c \
           timer.c units.c
 
-OBJS := $(CFILES:%.c=%.o)
+OBJS := $(CFILES:%.c=$(OBJDIR)/%.o)
+ELF  := $(OBJDIR)/iperf3.elf
+BIN  := $(OBJDIR)/iperf3
 
-all: iperf3
+all: install
 
-%.o: $(SRC)/%.c
+$(OBJDIR):
+	@mkdir -p $(OBJDIR)
+
+$(OBJDIR)/%.o: $(SRC)/%.c | $(OBJDIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-iperf3.elf: $(OBJS)
+$(ELF): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-iperf3: iperf3.elf
+$(BIN): $(ELF)
 	cp $< $@
 	$(STRIP) $@
 
-clean:
-	rm -f $(OBJS) iperf3 iperf3.elf
+install: $(BIN)
+	@mkdir -p $(INSTALL)
+	cp -f $(BIN) $(OUT)
+	@echo "installed $(OUT)"
+	@sha256sum $(OUT)
+	@# $(BIN) and not $(OUT): the rsdk readelf is 32-bit and a DrvFs
+	@# inode overflows its stat().  Same bytes, ext4 side.
+	@$(READELF) -h $(BIN) | grep -E 'Class|Data|Machine|Flags'
 
-.PHONY: all clean
+# Every number a bench card would state about this artefact, printed by the
+# artefact's own build so the card quotes a measurement and not a memory.
+show: install
+	@echo "bytes   $$(stat -c %s $(OUT))"
+	@echo "sha256  $$(sha256sum $(OUT) | cut -d' ' -f1)"
+	@echo "dynamic $$($(READELF) -d $(BIN) 2>&1 | grep -c 'no dynamic section') (1 = static)"
+
+clean:
+	rm -rf $(OBJDIR)
+	rm -f $(OUT)
+
+.PHONY: all install show clean

@@ -307,3 +307,45 @@ nod	/dev/watchdog	c:10:130	0600	rlxfw	R5-6: the miscdevice rtl819x-wdt registers
 # ----------------------------------------------------------------------------
 dir	/dev/input	-	0755	rlxfw	R5-8: MINE, and the check would have found it -- 量, this unit's own squashfs /dev holds only a `log` symlink, misc, pts and voip, so there is no /dev/input to carry forward and an entry tagged `unit` would be refused by mkinitramfs's own counterpart check. Same shape as /tmp above.
 nod	/dev/input/event0	c:13:64	0600	rlxfw	R5-8: evdev's node for the first registered input device, and the only way anything in this image can OPEN rtl819x-keys so that input-polldev starts polling. THE NUMBERS HAVE TWO SOURCES EACH, which is this project's rule for a constant entering code: major 13 is `#define INPUT_MAJOR 13` at include/linux/major.h:29 AND `13 char Input core` at Documentation/devices.txt:479; minor 64 is `#define EVDEV_MINOR_BASE 64` at drivers/input/evdev.c:11 AND drivers/input/Kconfig's own help for INPUT_EVDEV, *"char device 13:64+ - /dev/input/eventX"*. ⚠️ event0 AND NOT eventN: the minor is assigned by evdev in registration order, so this node is the first input device to register and nothing else in this image registers one -- REFUTED BY a /proc/bus/input/devices that lists more than one N: line, in which case the number this node names is a guess. 0600 for /dev/watchdog's reason: the only thing that opens it is a test run as root at the shell. 🟢 Unlike /dev/watchdog, OPENING THIS IS FREE -- it starts a poll loop and touches no register the vendor's own rtl_gpio_timer is not already reading once a second (量 FW-40).
+
+# ----------------------------------------------------------------------------
+# R6-5, 2026-09-20.  One file, and it is the first entry in this table that is
+# a THIRD-PARTY program rather than this unit's or mine.
+#
+# 🔴 APPENDED AT THE END ON PURPOSE.  Four committed citations point into this
+# file by line number -- config/image-commands.tsv:3 and tools/appletcensus.py
+# cite the busybox row, docs/mfgtest.md cites it too, RUNSHEET.md cites the
+# header block -- so an insertion beside /bin/mfgtest would shift every one of
+# them.  `citecheck` is the only thing in this repository that can see that,
+# and appending costs nothing.
+#
+# WHAT IT NEEDS AT RUN TIME, measured rather than assumed:
+#   /tmp writable   -- 讀 iperf_api.c:2667,2694,2713: EVERY stream, both ends,
+#                      does mkstemp("/tmp/iperf3.XXXXXX") -> unlink -> ftruncate
+#                      (blksize) -> mmap(MAP_PRIVATE).  3.1.3 has no TMPDIR
+#                      support, so the path is hardcoded.  `dir /tmp 1777` above
+#                      is therefore load-bearing for this row.
+#   /dev/urandom    -- NOT needed.  量 2026-09-20 with a negative control: the
+#                      strings are uClibc's __gen_tempname, and with BOTH
+#                      /dev/urandom and /dev/random absent a full TCP test
+#                      completed under qemu-mips-static.  No node is added.
+#   numeric IPs     -- there is no /etc/hosts or /etc/resolv.conf here, so a
+#                      hostname would not resolve.  量: neither file is opened
+#                      on the numeric path.
+#   nothing else    -- fully static, no PT_INTERP, single-threaded (量: zero
+#                      pthread symbols), no persistent write.
+#
+# 🔴 THE ONE PATH NOTHING OFF-SILICON CAN TEST.  This kernel has no CONFIG_TMPFS
+# and no CONFIG_SHMEM (量, the built .config), so / is ramfs and the qemu runs
+# above used a real filesystem for /tmp.  ftruncate+mmap on ramfs is 讀 to work
+# (ramfs_file_operations.mmap = generic_file_mmap) and is 推 until the die says
+# so.  If iperf3 fails on the device with "unable to create a new stream", THIS
+# is the suspect and not the driver.
+#
+# ⚠️ RECIPE_ID CANNOT SEE THIS BINARY.  The id is a digest over config/ and the
+# product lives under build/, so two different builds of iperf3 give two
+# different images with the SAME RLXFW-ID0.  What pins it is the assembled
+# image's own sha256 (looprun --image-sha256), not the id the board prints.
+# Nothing execs it: /init does not, so Decision B is unchanged and the boot
+# capture's predicted length is unchanged by it.
+file	/bin/iperf3	$REPO/build/rlxfw-user/iperf3/iperf3	0755	rlxfw	R6-5's throughput instrument, and the FOURTH executable here that is not this unit's. iperf 3.1.3, 252,644 bytes stripped, static, no PT_INTERP, MIPS-I MSB o32. Built by config/rlxfw-user/iperf3/ with no ./configure -- every line of iperf_config.h came from a compile probe against THIS toolchain rather than a cross-compile guess. Needs /tmp writable for mkstemp+mmap on every stream; needs no /dev/urandom (量, negative control). Nothing execs it
