@@ -811,6 +811,26 @@ establish, each with what would settle it.
 
 ---
 
+## 🔴 What seating 28 did NOT establish — 2026-09-19 (eighty-eighth segment)
+
+`R6-3` and `R6-4` both closed. Ten things they did not close, each with what
+would settle it.
+
+| | |
+|---|---|
+| 🔴🔴 **EIGHT CI SUITES ARE RED AND THEY WERE RED WHEN THIS SEGMENT WAS PUSHED.** `desk-sweep` over 100 steps: `text/test-reply-size` (5 failed), `text/test-boot-timeline` (2), `text/bootbytes` (`K2`), `text/test-config-gates` (1), `text/audit-bench-log`, `text/citecheck`, `text/test-citecheck`, `instruments/dtcheck`. CI run `35425822141` agrees. **At least four are the same root cause: a hardcoded corpus count, and this seating added 148 captures** | The durable fix is the one carried forward since the eighty-seventh segment and NOT done again here: **assert the property, report the count** — a suite that hardcodes `41 cold / 171 warm` goes red every time the corpus grows, which is not a finding. `test-boot-timeline`'s `B2` has now gone red for the **fifth** time for this reason. ⚠️ `bootbytes` `K2` is a DIFFERENT shape and must not be lumped in: it reports `{307: 1, 309: 1, 710: 105}`, i.e. the constant it asserts is one value is now three, and two of the three are this seating's |
+| 🔴 **Why the switch's ingress path wedged is unidentified, and the flood is not proven to have caused it.** What is measured is its LOCATION (below both drivers — the vendor's own driver also sent 2 and received 0) and its REMEDY (a cold power-on). It happened **once** | `SPEC.md` `NET-54 殘留`. First: does it reproduce at all, from a known-healthy cold boot? Second: the reading set was too thin — all eight `PSRP<n>`, `MACCR`, `FFCR`, `SWTCR0`, and above all `/proc/rtl865x/asicCounter`, which would say whether frames reached the SWITCH. Without it, *the switch got them and would not forward to the CPU port* and *the port never saw them* are still one hypothesis |
+| 🔴 **The run-out fix is an untested guard.** It is compiled into `r6nic3` and 量 shows the path it adds was never exercised: `seen_iisr` carries no run-out bit in either image, and loss is 0.0536 % with it against 0.0531 % without | It is kept because a descriptor run-out raising no interrupt is a real hazard. To test it you must first be able to STARVE the ring on healthy hardware, which four concurrent 1400-byte floods did not do |
+| 🔴 **`netif_wake_queue` is never called, and the defect is real and unreached.** `nic_xmit` stops the queue on a busy descriptor and nothing restarts it | `n_xmit_busy` read **0** in every flood on both images, so four TX descriptors were never exhausted at `pipe 2`–`pipe 4`. A load with a real window — an `iperf3` stream, `R6-5` — should reach it. 否證: if `n_xmit_busy` moves while the interface keeps working, this analysis is wrong |
+| 🔴 **Throughput is unmeasured.** Every number this seating produced is ping-bound: each flood waits for a reply, so 1.88 MB/s each way is a floor on the path and not a rate | `R6-5`. And its method must be written down with it — this project has recorded four times that a single number is not a curve |
+| 🔴 **`R6-4`'s `D4` is only partially met.** The vendor's driver is still in the image. What is measured is that it is not carrying the traffic: non-shared `request_irq(12)` succeeded, `CPUICR` read `00000000` until my driver wrote it, and the rings in use are at addresses my driver printed | Removing it is not free and the reason is measured: 讀 `rtl_nic.c:6214-6215`, the vendor's **probe** is the only thing in this image that disarms the DMA engine the loader leaves running at `0xA040FC70` — memory Linux hands out. Remove the driver and something else must do that first |
+| 🔴 **No card was frozen for this seating.** Predictions were written into each runner script before it ran, but `check-predictions` cannot score it and there is no mtime evidence | An exchange of auditability for iteration speed. It bought six boots and three images on one power cycle. Whether to repeat it is a decision for `R6-5`, whose seating has a fixed budget |
+| ⚠️ **`ph_queueId`'s layout is still inherited from a declaration nothing has ever executed.** 量: one grep hit in the whole vendor Ethernet tree — its own declaration — against `ph_mbuf` 50, `m_data` 28, `ph_len` 11 | The minimal ladder does not touch it, which is why `R6-3` closed without it. `R6-5`'s larger frames may |
+| ⚠️ **Whether TX rings 2 and 3 interrupt at all is undetermined.** `CPUIIMR`/`CPUIISR` define two TX rings' worth of bits and this part has four | No source in any drop resolves it. This driver uses ring 0 only |
+| ⚠️ **`CPUIISR` bits 12 and 13 fire on every transmit and the header names neither.** `last_iisr` read `00003206` and `0000320E` throughout | Two unnamed bits in a register this whole gate turns on. A sweep of `CPUICR` states against `CPUIISR` would bound them |
+
+---
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

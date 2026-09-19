@@ -60,4 +60,3 @@ ROT	notes/dev-loop.md	tools/console-capture.py	368	8120ab3315bbc42b	_fail(f"{p} 
 ROT	notes/flash-digest-scope.md	SPEC.md	178	aea1cedcd624cc3f	| `FLS-14` 🔄 | 完整 dump | 4,194,304 bytes，`sha256 a800059a…10f37ea`，用 `
 ROT	notes/kernel-build.md	tools/console-capture.py	462	fe65d0cd4a7cc378	timing.write(f"{offset} {time.monotonic() - t0:.6f}\n")
 ROT	notes/kernel-build.md	tools/ci-census.py	201	e4651339e13566e2	for label in skips:
-ROT	notes/slots45-draft.md	SPEC.md	627	4da1ec6f47782090	|---|---|---|---|
