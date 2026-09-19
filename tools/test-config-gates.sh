@@ -225,8 +225,33 @@ PY
 # sixteen pinned off, plus CONFIG_HID_SUPPORT, which a directory-scoped
 # enumeration had missed) and one build row `MK8` to
 # config/rlxfw-marks.tsv.  50/27 -> 71/48, 52/29 -> 73/50, and G4c 6 -> 7.
-ck "E1 the committed delta parses: 71 rules, 48 set, 23 derived" "71 48 23" \
-   "$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
+# 🔄 2026-09-20 (eighty-ninth segment): THIS WAS A HARDCODED POPULATION OVER
+# config/rlxfw-kernel.delta, and adding ONE row to that file for `R6-5`
+# (CONFIG_NET_PKTGEN) turned all three of these cases red -- which is the same
+# defect class this segment spent the night removing from B2, B3 and G4c, in
+# the one suite whose own header already called it out by name.
+# 🔴 It also caught me by the route its header predicts: the suite was run at
+# the desk BEFORE the delta changed and not after, and CLAUDE.md's rule --
+# after a change that moves a population a census-shaped case asserts on, run
+# every suite that can run on this host -- is exactly what was skipped.
+#
+# What is asserted now is what the numbers were standing in for:
+#   * the committed delta PARSES at all -- an exception or an empty rule set
+#     must not read as clean;
+#   * its arithmetic CLOSES -- total == set + derived, which a parser that
+#     silently dropped a row could not satisfy;
+#   * and the population has not SHRUNK below what was measured on 2026-09-20.
+# The triple is printed as an observation with no assertion attached.
+q="$("$PY" "$T/e1.py" "$KD" "$DELTA" 2>&1 | tail -1)"
+q_tot="$(printf '%s\n' "$q" | awk '{print $1}')"
+q_set="$(printf '%s\n' "$q" | awk '{print $2}')"
+q_der="$(printf '%s\n' "$q" | awk '{print $3}')"
+echo "  observed  committed delta: ${q_tot:-?} rules, ${q_set:-?} set, ${q_der:-?} derived  (floors 49/23, total must equal set+derived)"
+ck "E1 the committed delta parses and its arithmetic closes" yes \
+   "$([ -n "$q_tot" ] && [ -n "$q_set" ] && [ -n "$q_der" ] \
+      && [ "$q_tot" -eq $((q_set + q_der)) ] \
+      && [ "$q_set" -ge 49 ] && [ "$q_der" -ge 23 ] \
+      && echo yes || echo no)"
 
 # E1b -- the same file, per variant, and it also runs on a clean clone.  Without
 # it the variant mechanism is exercised only on kconfig-delta's own synthetic
@@ -249,10 +274,25 @@ except SystemExit as e:
 sets = sum(1 for r in rules.values() if r.kind == "set")
 print("%d %d %d" % (len(rules), sets, len(rules) - sets))
 PY
-ck "E1b --variant loud: 73 rules, 50 set, 23 derived"  "73 50 23" \
-   "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud 2>&1 | tail -1)"
-ck "E1b --variant quiet does NOT pick them up"         "71 48 23" \
-   "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
+# 🔄 2026-09-20: the same three numbers, replaced by the property they were
+# standing in for -- and it asserts MORE than they did.  A constant can only
+# say "the count moved".  This says "the parser's variant handling and the
+# FILE'S OWN `@loud` rows disagree", which is the defect the constants stood
+# in for and which a constant that happens to be right cannot see.
+lo="$("$PY" "$T/e1b.py" "$KD" "$DELTA" loud  2>&1 | tail -1)"
+qu="$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet 2>&1 | tail -1)"
+lo_set="$(printf '%s\n' "$lo" | awk '{print $2}')"; lo_der="$(printf '%s\n' "$lo" | awk '{print $3}')"
+qu_tot="$(printf '%s\n' "$qu" | awk '{print $1}')"
+qu_set="$(printf '%s\n' "$qu" | awk '{print $2}')"; qu_der="$(printf '%s\n' "$qu" | awk '{print $3}')"
+n_loud="$(grep -c '^set@loud[[:space:]]' "$DELTA" | tr -d ' ')"
+echo "  observed  loud set=${lo_set:-?} quiet set=${qu_set:-?} delta=$(( ${lo_set:-0} - ${qu_set:-0} )), and the file declares ${n_loud:-?} \`set@loud\` row(s)"
+ck "E1b loud picks up every @loud row the file declares, and only those" yes \
+   "$([ -n "$lo_set" ] && [ -n "$qu_set" ] && [ -n "$n_loud" ] && [ "$n_loud" -ge 1 ] \
+      && [ $((lo_set - qu_set)) -eq "$n_loud" ] && [ "$lo_der" = "$qu_der" ] \
+      && echo yes || echo no)"
+ck "E1b quiet is the same file without them, and its arithmetic closes" yes \
+   "$([ -n "$qu_tot" ] && [ "$qu_tot" -eq $((qu_set + qu_der)) ] \
+      && [ "$qu_set" -ge 49 ] && echo yes || echo no)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
 
