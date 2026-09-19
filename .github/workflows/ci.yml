@@ -211,22 +211,52 @@ jobs:
           # green; the cost is the full history on this job.
           fetch-depth: 0
 
+      # 🔴 `id: prep` and the `if:` on every step below it, 2026-09-19.
+      #
+      # Until today this job aborted at its first failing step and SKIPPED the
+      # rest, so a push could only ever show ONE red.  That is not a small
+      # inconvenience: on 2026-09-19 `docs/KNOWN-ISSUES.md` said eight suites
+      # were red (from a desk sweep, which runs every step) and `a411b35`
+      # corrected it to two (from CI, which had stopped at the first) -- and
+      # BOTH numbers were right about different things, which is the worst
+      # shape a disagreement can have.  Eight reds would have cost eight
+      # pushes at ~18 minutes each.
+      #
+      # `!cancelled()` and NOT `continue-on-error: true`: the second marks the
+      # step green and takes the run green with it, which is this file's own
+      # `EXIT CODE: 0` incident bought deliberately.  With `!cancelled()` every
+      # step runs and the job still FAILS.  `always()` is rejected because it
+      # also runs when a human cancels the run.
+      #
+      # `steps.prep.outcome == 'success'` is the ordering the platform has no
+      # per-step `needs` for: if checkout fails, `prep` is skipped, its outcome
+      # is not `success`, and the suites below stay skipped instead of
+      # reporting forty-five failures in an empty directory.
+      #
+      # 否證, written before the first run that carries this: the next red push
+      # must report MORE THAN ONE failing step in this job.  If it still
+      # reports exactly one, the guard did not take effect.
       - name: capture dir
+        id: prep
         run: mkdir -p ci-out
 
       - name: spec-check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/spec-check.py 2>&1 | tee ci-out/spec-check.out; exit "${PIPESTATUS[0]}"
 
       - name: test-gitignore
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-gitignore.sh 2>&1 | tee ci-out/test-gitignore.out; exit "${PIPESTATUS[0]}"
 
       # Reads the git INDEX rather than the working tree, because the working
       # tree is what DrvFs lies about on the machine this repo is developed on.
       # A depth-1 checkout still produces a full index, so this is meaningful here.
       - name: test-kbuild-cflags
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-kbuild-cflags.sh 2>&1 | tee ci-out/test-kbuild-cflags.out; exit "${PIPESTATUS[0]}"
 
       - name: test-file-modes
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-file-modes.sh 2>&1 | tee ci-out/test-file-modes.out; exit "${PIPESTATUS[0]}"
 
       # Both of these read `bench/`, which is committed, and need nothing but
@@ -234,9 +264,11 @@ jobs:
       # loader's reply-length model; boot-timeline reads the .timing files
       # beside them. Neither touches a device and neither needs a compiler.
       - name: test-reply-size
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-reply-size.sh 2>&1 | tee ci-out/test-reply-size.out; exit "${PIPESTATUS[0]}"
 
       - name: test-boot-timeline
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-boot-timeline.sh 2>&1 | tee ci-out/test-boot-timeline.out; exit "${PIPESTATUS[0]}"
 
       # 2026-08-29 (R3-7). Until today this tool was in no workflow, no
@@ -261,6 +293,7 @@ jobs:
       # suite that prints a constant tuple of labels reports controls that did
       # not execute -- measured, on this file, by deleting a control block.
       - name: check-predictions self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/check-predictions.py --self-test 2>&1 | tee ci-out/check-predictions.out; exit "${PIPESTATUS[0]}"
 
       # tcheck reads an rtl819x-timer /proc dump out of a console capture and
@@ -273,6 +306,7 @@ jobs:
       # because the mutation suite below showed they were passing for the
       # wrong reason (T5, T9).
       - name: tcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/tcheck.py --self-test 2>&1 | tee ci-out/tcheck.out; exit "${PIPESTATUS[0]}"
 
       # And the claim that those controls bite: nine mutants of tcheck.py,
@@ -280,6 +314,7 @@ jobs:
       # must turn it red.  A green control set is a claim about the control
       # set; this is the thing that makes it a measurement.
       - name: test-tcheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-tcheck.py 2>&1 | tee ci-out/test-tcheck.out; exit "${PIPESTATUS[0]}"
 
       # rbcheck's controls run off captures committed in this repository --
@@ -297,6 +332,7 @@ jobs:
       # the workflow file. tools/ci-expected.tsv owns it and ci-census checks
       # it against what actually ran.
       - name: rbcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/rbcheck.py --self-test 2>&1 | tee ci-out/rbcheck.out; exit "${PIPESTATUS[0]}"
 
       # 🔴 The self-test above reported 10/10 while FOUR mutations lived, two of
@@ -305,6 +341,7 @@ jobs:
       # rbcheck.py -- and, for M20, probe3.c -- and demands the suite notice.
       # A control that has not been shown able to fail is not a control.
       - name: rbcheck mutation suite
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-rbcheck.py 2>&1 | tee ci-out/test-rbcheck.out; exit "${PIPESTATUS[0]}"
 
       # flashwin renders the loader's `DW` reply for a window of flash out of a
@@ -322,6 +359,7 @@ jobs:
       # reproduces two captures they CAN see, bench/2026-08-24d/G8a-rd{0,6}.log,
       # byte for byte.
       - name: flashwin self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/flashwin.py --self-test 2>&1 | tee ci-out/flashwin.out; exit "${PIPESTATUS[0]}"
 
       # And the mutation suite flashwin never had. It is the tool three other
@@ -335,6 +373,7 @@ jobs:
       # address-column rule no case could see, and a row whose named case was
       # C9 where the measurement says C10.
       - name: flashwin mutation suite
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-flashwin-mutants.py 2>&1 | tee ci-out/test-flashwin-mutants.out; exit "${PIPESTATUS[0]}"
 
       # flrbracket reads the loader's `FLR` echo by machine before the operator
@@ -358,6 +397,7 @@ jobs:
       # carried-forward row that a card template cannot close. Needs nothing
       # but git.
       - name: flrbracket self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/flrbracket.py --self-test 2>&1 | tee ci-out/flrbracket.out; exit "${PIPESTATUS[0]}"
 
       # 🔴 And the mutation suite for it, in the same commit, because the tool
@@ -374,6 +414,7 @@ jobs:
       # 19 of the 22 that existed then, three alive, and one of the
       # three was a control of the tool's own that could not fail.
       - name: test-flrbracket-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-flrbracket-mutants.py --jobs 8 2>&1 | tee ci-out/test-flrbracket-mutants.out; exit "${PIPESTATUS[0]}"
 
       # P1-2's injection harness.  It runs config/mfgtest.sh -- the device-side
@@ -393,6 +434,7 @@ jobs:
       # the script could not read a single field of /proc/rtl819x-timer, and
       # the fixture had been written in the same wrong format as the parser.
       - name: mfginject
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mfginject.py 2>&1 | tee ci-out/mfginject.out; exit "${PIPESTATUS[0]}"
 
       # P1-1's DoD requires the boot-capture byte count to be re-derived rather
@@ -400,6 +442,7 @@ jobs:
       # the non-mark constant from every committed boot capture and requires
       # ONE value across all of them (量 710, 95 captures, seven images).
       - name: bootbytes
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/bootbytes.py 2>&1 | tee ci-out/bootbytes.out; exit "${PIPESTATUS[0]}"
 
       # repdiff answers the question sha256sum cannot: WHICH bytes differ
@@ -407,9 +450,11 @@ jobs:
       # controls build ELF32 big-endian images in memory, so nothing here needs
       # $FWRE_WORK, a cross toolchain or a 4 MB build product.
       - name: repdiff self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/repdiff.py --self-test 2>&1 | tee ci-out/repdiff.out; exit "${PIPESTATUS[0]}"
 
       - name: test-repdiff-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-repdiff-mutants.py 2>&1 | tee ci-out/test-repdiff-mutants.out; exit "${PIPESTATUS[0]}"
 
       # looptime is R4-0's instrument.  It answers the two terms of the
@@ -418,6 +463,7 @@ jobs:
       # byte the board drove.  Its fixtures are built in a TemporaryDirectory,
       # so it needs no capture, no device and no $FWRE_WORK.
       - name: looptime self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/looptime.py --self-test 2>&1 | tee ci-out/looptime.out; exit "${PIPESTATUS[0]}"
 
       # citime is CI-5's instrument, and it exists because that row's rule
@@ -428,6 +474,7 @@ jobs:
       # rest).  All three were found by re-deriving, none by re-reading.
       # Its fixtures are synthetic dicts, so it touches no network and no gh.
       - name: citime self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/citime.py --self-test 2>&1 | tee ci-out/citime.out; exit "${PIPESTATUS[0]}"
 
       # `segments` is not a case suite over fixtures -- it is an audit of the
@@ -441,9 +488,11 @@ jobs:
       # the price of doing the right thing.  It reads ci-suite-cost.tsv only:
       # no gh, no network, no $FWRE_WORK.
       - name: citime segments
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/citime.py segments 2>&1 | tee ci-out/citime-segments.out; exit "${PIPESTATUS[0]}"
 
       - name: test-looptime-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-looptime-mutants.py 2>&1 | tee ci-out/test-looptime-mutants.out; exit "${PIPESTATUS[0]}"
 
       # xcheck is TOOL-1's instrument, and it is the first thing here that
@@ -456,6 +505,7 @@ jobs:
       # suites.  The self-test's fixtures are synthetic; the sweep reads the
       # committed captures under `bench/`, which every clone has.
       - name: xcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/xcheck.py --self-test 2>&1 | tee ci-out/xcheck.out; exit "${PIPESTATUS[0]}"
 
       # 🔴 The sweep prints ONE `ok` line whatever the corpus size, on purpose.
@@ -463,6 +513,7 @@ jobs:
       # consecutive seatings; a census row that moves when a capture is added is
       # the single largest recorded source of CI failure here.
       - name: xcheck sweep
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/xcheck.py sweep 2>&1 | tee ci-out/xcheck-sweep.out; exit "${PIPESTATUS[0]}"
 
       # looprun is R4-3's D3: the whole edit->result iteration as one command.
@@ -474,6 +525,7 @@ jobs:
       # `--self-test` drives `--mode replay`: no build, no port, no board, every
       # fixture a string in the file.
       - name: looprun self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/looprun.py --self-test 2>&1 | tee ci-out/looprun.out; exit "${PIPESTATUS[0]}"
       # cardcheck reads a bench card the way the DEVICE will. It exists because
       # seating 7 typed `wc -lc < /dev/mtd0ro` and got `wc: not found`: `wc` is
@@ -485,6 +537,7 @@ jobs:
       # red case and not a paragraph. Needs no $FWRE_WORK and no device: the
       # declaration and every card are committed.
       - name: cardcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/cardcheck.py --self-test 2>&1 | tee ci-out/cardcheck.out; exit "${PIPESTATUS[0]}"
 
       # And the mutation suite, because 26 green controls is a claim about the
@@ -492,6 +545,7 @@ jobs:
       # read as a command, and `nod` entries folded into the invocable set --
       # and neither was visible to any of the 23 cases that existed then.
       - name: cardcheck mutation suite
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-cardcheck-mutants.py 2>&1 | tee ci-out/test-cardcheck-mutants.out; exit "${PIPESTATUS[0]}"
       # replay-capture turns a committed .log + .timing back into the terminal
       # it came from, so R3-11's artefact is DERIVED from evidence rather than
@@ -502,9 +556,11 @@ jobs:
       # scriptreplay(1) itself; if util-linux is absent that one case SKIPS
       # under the label ci-expected.tsv allows, and R14 checks the label.
       - name: replay-capture self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/replay-capture.py --self-test 2>&1 | tee ci-out/replay-capture.out; exit "${PIPESTATUS[0]}"
 
       - name: replay-capture mutation suite
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-replay-capture-mutants.py 2>&1 | tee ci-out/test-replay-capture-mutants.out; exit "${PIPESTATUS[0]}"
 
 
@@ -522,9 +578,11 @@ jobs:
       # 8 -> 22 on 2026-08-27 and this sentence carried the old number for one
       # commit, which is the failure the header above spends forty lines on.
       - name: binsim self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/binsim.py --self-test 2>&1 | tee ci-out/binsim.out; exit "${PIPESTATUS[0]}"
 
       - name: test-binsim
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-binsim.sh 2>&1 | tee ci-out/test-binsim.out; exit "${PIPESTATUS[0]}"
 
       # rebuild-census composes binsim, opcount and hazlint onto ONE window, so
@@ -538,21 +596,26 @@ jobs:
       # test-config-gates breaks each of them seven ways and names the control
       # that has to go red.
       - name: kconfig-delta
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/kconfig-delta.py self-test 2>&1 | tee ci-out/kconfig-delta.out; exit "${PIPESTATUS[0]}"
 
       - name: mkinitramfs
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mkinitramfs.py self-test 2>&1 | tee ci-out/mkinitramfs.out; exit "${PIPESTATUS[0]}"
 
       # 🔴 The suite that says mkinitramfs's controls work, and it could
       # not exist until `cmd_verify` had any. Needs no device, no
       # $FWRE_WORK and no cross tools; it builds its own ELF and cpio.
       - name: test-mkinitramfs-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-mkinitramfs-mutants.py 2>&1 | tee ci-out/test-mkinitramfs-mutants.out; exit "${PIPESTATUS[0]}"
 
       - name: test-config-gates
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-config-gates.sh 2>&1 | tee ci-out/test-config-gates.out; exit "${PIPESTATUS[0]}"
 
       - name: test-rebuild-census
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-rebuild-census.sh 2>&1 | tee ci-out/test-rebuild-census.out; exit "${PIPESTATUS[0]}"
 
       # Both stand down on a runner and say so. test-vendor-tripwire needs a
@@ -561,9 +624,11 @@ jobs:
       # zero is the first one: with nothing to look at the tool exits 3 and
       # prints no table, so absence can never be read as a measurement.
       - name: test-vendor-tripwire
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-vendor-tripwire.sh 2>&1 | tee ci-out/test-vendor-tripwire.out; exit "${PIPESTATUS[0]}"
 
       - name: test-tc-smoke
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-tc-smoke.sh 2>&1 | tee ci-out/test-tc-smoke.out; exit "${PIPESTATUS[0]}"
 
       # 🔴 rlxfw-marks had NO CI step at all until 2026-09-02 (R5-0), and
@@ -574,6 +639,7 @@ jobs:
       # and the one whose every inserted line is a declared row with a reason.
       # Its 32 controls had never run on a runner.
       - name: rlxfw-marks self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/rlxfw-marks.py self-test 2>&1 | tee ci-out/rlxfw-marks.out; exit "${PIPESTATUS[0]}"
 
       # R5-0's blind-write ledger. The self-test is the instrument's controls;
@@ -581,20 +647,25 @@ jobs:
       # that goes red as R5 proceeds -- writing about a new vendor file in
       # LOG.md makes it fail until the ledger says what was taken.
       - name: ledgerscan self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ledgerscan.py --self-test 2>&1 | tee ci-out/ledgerscan.out; exit "${PIPESTATUS[0]}"
 
       - name: derivcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/derivcheck.py --self-test 2>&1 | tee ci-out/derivcheck.out; exit "${PIPESTATUS[0]}"
 
       - name: ledgerscan check (exit-code gate)
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ledgerscan.py check
 
       # Stands down on a runner (src-vendor/ is a symlink into $FWRE_WORK) and
       # prints the skip rather than passing silently.
       - name: ledgerscan quarantine (exit-code gate)
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ledgerscan.py quarantine
 
       - name: ci-census self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ci-census.py --self-test 2>&1 | tee ci-out/ci-census.out; exit "${PIPESTATUS[0]}"
 
       # Two tools that do not print ok/FAIL/skip cases; they are exit-code gates
@@ -635,6 +706,7 @@ jobs:
       # the bytes that produced it) and L9 (nor does an attribution line, and
       # not the OUI either).
       - name: leakscan self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/leakscan.py --self-test 2>&1 | tee ci-out/leakscan.out; exit "${PIPESTATUS[0]}"
 
       # 🔴 The mutation suite for it, and it is here for a measured reason
@@ -649,9 +721,11 @@ jobs:
       # whole finding tuple, bytes included, past a control that checked two
       # string forms of the value and not its repr.
       - name: test-leakscan-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-leakscan-mutants.py --jobs 8 2>&1 | tee ci-out/test-leakscan-mutants.out; exit "${PIPESTATUS[0]}"
 
       - name: audit-bench-log (exit-code gate)
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f -name '*.log')
 
       # 🔴 `check-predictions.py --sweep bench` IS NOT HERE, and the reason is
@@ -692,6 +766,7 @@ jobs:
       # swept in both directions, so an entry that stops applying is an error
       # rather than a comfort.
       - name: capdate
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/capdate.py bench 2>&1 | tee ci-out/capdate.out; exit "${PIPESTATUS[0]}"
 
       # `FW-70`'s instrument. Two estimators over committed .timing files; one
@@ -706,6 +781,7 @@ jobs:
       # 10.00 bits/char stream read as 16.33 and three cases fired. A latency
       # timer delays a TIMESTAMP; it does not slow the wire.
       - name: uartrate
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/uartrate.py selftest 2>&1 | tee ci-out/uartrate.out; exit "${PIPESTATUS[0]}"
 
       # `FW-64`'s `+3`, re-derived from the raw captures by a tool written
@@ -713,12 +789,14 @@ jobs:
       # not one, the shape emueq already uses: a self-test proves the check
       # CAN fail and says nothing about whether this tree passes it.
       - name: procgrow self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/procgrow.py --self-test 2>&1 | tee ci-out/procgrow.out; exit "${PIPESTATUS[0]}"
 
       # And the sweep in anger. Its first five lines carry numbers that move
       # when a capture is added and a case COUNT that does not, which is what
       # this file's rule about census rows moving with the corpus requires.
       - name: procgrow check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/procgrow.py 2>&1 | tee ci-out/procgrow-check.out; exit "${PIPESTATUS[0]}"
 
       # The shared field reader the four false stops of seating 16 are the
@@ -728,6 +806,7 @@ jobs:
       # Its self-test runs against committed captures whose answers are known,
       # so it is a real gate here and not a fixture exercise.
       - name: capfield
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/capfield.py selftest 2>&1 | tee ci-out/capfield.out; exit "${PIPESTATUS[0]}"
 
       # `FW-83`. What this image can INVOKE, read statically out of this unit's
@@ -737,9 +816,11 @@ jobs:
       # half reads $FWRE_WORK and is bench-only; these two read the committed
       # TSV and run anywhere.
       - name: appletcensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/appletcensus.py --self-test 2>&1 | tee ci-out/appletcensus.out; exit "${PIPESTATUS[0]}"
 
       - name: appletcensus check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/appletcensus.py check 2>&1 | tee ci-out/appletcensus-check.out; exit "${PIPESTATUS[0]}"
 
       # The desk half of rtl819x-spi 1.1's `map`. Ten of its twelve controls
@@ -748,6 +829,7 @@ jobs:
       # It imports flashwin.overlaps_forbidden rather than restating the H601
       # rule, and F8 is the control that says the import is load-bearing.
       - name: flashmap
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/flashmap.py controls 2>&1 | tee ci-out/flashmap.out; exit "${PIPESTATUS[0]}"
 
       # R5-7's desk half. It attributes register-address materialisations to
@@ -758,6 +840,7 @@ jobs:
       # vendor material -- so it declares NO skip and the not-run-total does
       # not move.
       - name: regcensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/regcensus.py --self-test 2>&1 | tee ci-out/regcensus.out; exit "${PIPESTATUS[0]}"
 
       # R6-0's owed half, and 🔴 IT IS NOT `regcensus` ABOVE. That tool reads a
@@ -783,6 +866,7 @@ jobs:
       # src-vendor/, which is not committed, and is a desk command rather than a
       # case -- so this declares NO skip and the not-run-total does not move.
       - name: hdrcensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/hdrcensus.py --self-test 2>&1 | tee ci-out/hdrcensus.out; exit "${PIPESTATUS[0]}"
 
       # CITE-2. This repository cites its own files as `FILE:NNN`, and a line
@@ -804,6 +888,7 @@ jobs:
       # 🔴 This step needs fetch-depth: 0 above. It refuses on a shallow
       # checkout rather than reporting 100 % stable.
       - name: citecheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/citecheck.py 2>&1 | tee ci-out/citecheck.out; exit "${PIPESTATUS[0]}"
 
       # The process-level half: exit codes, the two-space contract with
@@ -812,6 +897,7 @@ jobs:
       # and requires the refusal; if git will not make one here that case
       # SKIPS under the label ci-expected.tsv allows.
       - name: test-citecheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-citecheck.sh 2>&1 | tee ci-out/test-citecheck.out; exit "${PIPESTATUS[0]}"
 
       # And the mutation suite, because thirty-six green controls is a claim
@@ -821,12 +907,15 @@ jobs:
       # NUMBER) and three were controls asserting the wrong quantity. None was
       # visible to the thirty-three cases that existed then.
       - name: test-citecheck mutation suite
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-citecheck-mutants.py 2>&1 | tee ci-out/test-citecheck-mutants.out; exit "${PIPESTATUS[0]}"
 
       - name: fetch-sources --list (offline; never fetches)
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/fetch-sources.sh --list
 
       - uses: actions/upload-artifact@v4
+        if: "${{ !cancelled() }}"
         with:
           name: ci-out-text
           path: ci-out/
@@ -856,6 +945,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips python3-yaml device-tree-compiler
 
       - name: capture dir
+        id: prep
         run: mkdir -p ci-out
 
       # desk-sweep runs every suite in THIS file at a desk, on a verified copy
@@ -878,6 +968,7 @@ jobs:
       # control on the copy verifier -- one byte changed in the copy must be a
       # refusal, or "the copy IS the source" is a line that cannot fail.
       - name: desk-sweep self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/desk-sweep.py --self-test 2>&1 | tee ci-out/desk-sweep.out; exit "${PIPESTATUS[0]}"
 
       # `mustrun` names WHICH suites read files that changed, so a skipped
@@ -899,10 +990,12 @@ jobs:
       # reach their shas here and stand down.  They run at a desk and on any
       # full clone; `ci-expected.tsv` covers 9.
       - name: mustrun
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mustrun.py --self-test 2>&1 | tee ci-out/mustrun.out; exit "${PIPESTATUS[0]}"
 
       # 66 s. Drives a pty, not a serial port; no device is involved.
       - name: test-console-capture
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
 
       # ~6 min, and it is the step that stops the one above from being a claim
@@ -917,6 +1010,7 @@ jobs:
       # failure and it is diagnosable, because the refusal prints the suite's
       # own tail.
       - name: test-console-capture-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-console-capture-mutants.py --jobs 8 2>&1 | tee ci-out/test-console-capture-mutants.out; exit "${PIPESTATUS[0]}"
 
       # C10 is a checker, and a checker's controls are a claim about the
@@ -926,9 +1020,11 @@ jobs:
       # check_tables() is called at all, so phase 2 plants real defects in a
       # tracked file and runs the whole tool. 17 mutants. Synthetic throughout -- no device, no $FWRE_WORK, no pty.
       - name: test-spec-check-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-spec-check-mutants.py --jobs 8 2>&1 | tee ci-out/test-spec-check-mutants.out; exit "${PIPESTATUS[0]}"
 
       - name: test-opcount
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-opcount.sh 2>&1 | tee ci-out/test-opcount.out; exit "${PIPESTATUS[0]}"
 
       # The vendor rsdk assemblers live in the GPL drops under $FWRE_WORK and are
@@ -937,6 +1033,7 @@ jobs:
       # skip: with no assembler the tool exits 3 and prints no table, so an absent
       # toolchain can never be read as twenty rejections.
       - name: test-isa-probe
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-isa-probe.sh 2>&1 | tee ci-out/test-isa-probe.out; exit "${PIPESTATUS[0]}"
 
       # `R1-pub-0`'s census. T0 IS the `check` gate -- it runs it against a
@@ -946,6 +1043,7 @@ jobs:
       # `tools/isa-probe.sh` and SPEC.md's own parser, all of which are in a
       # clone.
       - name: isacensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/isacensus.py --self-test 2>&1 | tee ci-out/isacensus.out; exit "${PIPESTATUS[0]}"
 
       # `R1-pub-0b`'s census, the toolchain axis.  A SIBLING of the step
@@ -953,6 +1051,7 @@ jobs:
       # machinery and keeps its own table, its own document and its own
       # controls, so a defect in one census cannot hide the other.
       - name: tccensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/tccensus.py --self-test 2>&1 | tee ci-out/tccensus.out; exit "${PIPESTATUS[0]}"
 
       # `R1z-0`'s census, the DEBT axis, and the third sibling of the two
@@ -964,6 +1063,7 @@ jobs:
       # written.  量 on its first run: 44 rows whose every owning gate is
       # closed, 11 naming a gate that exists nowhere, 9 naming none at all.
       - name: cfcensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/cfcensus.py --self-test 2>&1 | tee ci-out/cfcensus.out; exit "${PIPESTATUS[0]}"
 
       # The ratchet, deliberately a SEPARATE step from the controls above so
@@ -974,6 +1074,7 @@ jobs:
       # would be red on every run until `R1z` closes, and a step that is
       # always red trains a reader to stop reading reds.
       - name: cfcensus ratchet
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/cfcensus.py ratchet 2>&1 | tee ci-out/cfcensus-ratchet.out; exit "${PIPESTATUS[0]}"
 
       # `R1C-1-c`.  The decision in `docs/isa-prior-art.md` section 9.3 rests on
@@ -985,6 +1086,7 @@ jobs:
       # where `src-vendor/` is a dangling symlink; `emueq refresh` is the desk
       # half that re-derives the table from the pinned drop.
       - name: emueq
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/emueq.py --self-test 2>&1 | tee ci-out/emueq.out; exit "${PIPESTATUS[0]}"
 
       # The same tool run in ANGER rather than on fixtures.  The self-test above
@@ -992,6 +1094,7 @@ jobs:
       # the two are different claims -- `emueq --self-test` would stay green on
       # a tree whose delta had grown a new emulation gate.
       - name: emueq check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/emueq.py check 2>&1 | tee ci-out/emueq-check.out; exit "${PIPESTATUS[0]}"
 
       # `R1-pub-1`'s instrument.  probe4's cells are GENERATED from
@@ -1001,6 +1104,7 @@ jobs:
       # an independent model, and unit tests of the two predicates that
       # need an artefact at the bench.
       - name: isapay
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/isapay.py --self-test 2>&1 | tee ci-out/isapay.out; exit "${PIPESTATUS[0]}"
 
       # `elfops` counts MIPS encodings BY OPCODE.  量 2026-09-15: the rsdk
@@ -1011,6 +1115,7 @@ jobs:
       # which is this unit's bootloader and cannot be committed; they
       # skip here and the row says so.
       - name: elfops
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/elfops.py --self-test 2>&1 | tee ci-out/elfops.out; exit "${PIPESTATUS[0]}"
 
       # `emupredict` is the column ① -> column ② transform AS CODE.  `probe4`
@@ -1037,6 +1142,7 @@ jobs:
       # and one `.md` -- so there is no toolchain, no `$FWRE_WORK` artefact and
       # no device, and it declares no skip.
       - name: emupredict
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/emupredict.py --self-test 2>&1 | tee ci-out/emupredict.out; exit "${PIPESTATUS[0]}"
 
       # `R1-pub-4b`'s encoding join, 2026-09-16.  `ucost-cells.S` is HAND
@@ -1055,12 +1161,14 @@ jobs:
       # Everything it reads is committed here (`tools/isa-payload.tsv` and the
       # `.S`), so no toolchain, no `$FWRE_WORK` artefact, no device, no skip.
       - name: ucostcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ucostcheck.py --self-test 2>&1 | tee ci-out/ucostcheck-self-test.out; exit "${PIPESTATUS[0]}"
 
       # And the same tool in ANGER rather than on fixtures -- the shape
       # `emueq-check` and `xcheck-sweep` already use.  `--self-test` proves the
       # check CAN fail and says nothing about whether THIS tree passes it.
       - name: ucostcheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ucostcheck.py config/rlxfw-user/isaprobe/ucost-cells.S 2>&1 | tee ci-out/ucostcheck.out; exit "${PIPESTATUS[0]}"
 
       # `CPU-73`'s four costs were fitted at the desk on the seating's own night
@@ -1076,6 +1184,7 @@ jobs:
       # The self-test IS the run in anger.  Both captures are committed here,
       # so no toolchain, no `$FWRE_WORK` artefact, no device, no skip.
       - name: ucostfit
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/ucostfit.py --self-test 2>&1 | tee ci-out/ucostfit.out; exit "${PIPESTATUS[0]}"
 
       # `R1b`'s three, 2026-09-13.  `hazpay` generates probe5 and holds the
@@ -1086,9 +1195,11 @@ jobs:
       # mutant runner that says the other two can fail, and it also runs
       # `emit --check` for BOTH generated payloads, which until today nothing ran.
       - name: hazpay
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/hazpay.py --self-test 2>&1 | tee ci-out/hazpay.out; exit "${PIPESTATUS[0]}"
 
       - name: hazdecl
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/hazdecl.py --self-test 2>&1 | tee ci-out/hazdecl.out; exit "${PIPESTATUS[0]}"
 
       # `R1f`/`R2c`'s one, 2026-09-14.  `tcpay` generates probe6 -- ten builds of
@@ -1101,20 +1212,24 @@ jobs:
       # `verify` need a linked ELF and a cross compiler and are the desk half,
       # split out for exactly `isapay` T19's reason.
       - name: tcpay
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/tcpay.py --self-test 2>&1 | tee ci-out/tcpay.out; exit "${PIPESTATUS[0]}"
 
       - name: test-hazpay
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-hazpay.py 2>&1 | tee ci-out/test-hazpay.out; exit "${PIPESTATUS[0]}"
 
       # The 160-cell prediction in that census's § 8.1, made machine-
       # checkable against the committed assembler matrix.  No assembler
       # runs here: both inputs are committed markdown.
       - name: marchcmp
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/marchcmp.py --self-test 2>&1 | tee ci-out/marchcmp.out; exit "${PIPESTATUS[0]}"
 
       # Skips cleanly with no cross compiler: one skip line standing for all
       # 202 cases, which the census prints rather than hides.
       - name: test-rlxprobe
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"
 
       # The eighteen B/M cases read the GPL drop's own nfjrom and stand down
@@ -1123,17 +1238,20 @@ jobs:
       # exit contract, which is the part a runner can check and the bench
       # usually does not.
       - name: test-rtkimage
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-rtkimage.sh 2>&1 | tee ci-out/test-rtkimage.out; exit "${PIPESTATUS[0]}"
 
       # Runs in full on a runner: D2 assembles its own MIPS payload, loads it
       # through the same -bios stub the real images use, and requires the
       # string back out of the emulated UART. Nothing here needs a GPL drop.
       - name: test-deskchan
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-deskchan.sh 2>&1 | tee ci-out/test-deskchan.out; exit "${PIPESTATUS[0]}"
 
       # The reference set must be non-empty, and C1 flips a byte in its
       # lexicographically first file, so that file must have a byte to flip.
       - name: verify-backup-copy self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: |
           mkdir -p /tmp/refset
           printf 'hello\n' > /tmp/refset/RESTORE.md
@@ -1167,6 +1285,8 @@ jobs:
       # is carried in docs/KNOWN-ISSUES.md, and the pin exists so that CI goes
       # red for the repository's reasons until somebody does.
       - name: dtschema
+        id: dtschema
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: |
           /usr/bin/python3 -m venv /tmp/dtvenv
           /tmp/dtvenv/bin/pip install -q 'dtschema==2026.6'
@@ -1182,6 +1302,7 @@ jobs:
       # own A2/A3 stages redundant), and T14 fails if the exit-status
       # unreliability that justifies this whole file ever goes away.
       - name: dtcheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' && steps.dtschema.outcome == 'success' }}"
         run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py --self-test 2>&1 | tee ci-out/dtcheck-self-test.out; exit "${PIPESTATUS[0]}"
 
       # The tree itself. --min-bindings is a population control: a glob that
@@ -1191,9 +1312,11 @@ jobs:
       # corpus here, so every compatible it would have described is enumerated
       # by name in dt/unmatched-allow.tsv and an undeclared one is a finding.
       - name: dtcheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' && steps.dtschema.outcome == 'success' }}"
         run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py 2>&1 | tee ci-out/dtcheck.out; exit "${PIPESTATUS[0]}"
 
       - uses: actions/upload-artifact@v4
+        if: "${{ !cancelled() }}"
         with:
           name: ci-out-instruments
           path: ci-out/
