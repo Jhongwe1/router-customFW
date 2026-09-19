@@ -1147,10 +1147,29 @@ jobs:
       # --break-system-packages, because Ubuntu 24.04 is PEP 668 and a runner
       # that silently falls back to the system python is a different
       # experiment from the desk's.
+      # 🔴 PINNED 2026-09-19, and the pin is a MEASUREMENT rather than a habit.
+      # This install was unpinned, and 量 on two runs seventeen hours apart --
+      # the version is printed by the line below, so both logs carry it --
+      # the GREEN run 35387305159 got dt-validate (2026.6) and reported
+      # `ok C1`, and the RED run 35425822141 got (2026.9) and reported
+      # `FAIL C1`, on the same .dts with no commit touching dt/.
+      # An unpinned dependency makes a green run unreproducible: the tree did
+      # not move, the answer did.
+      #
+      # ⚠️ THE PIN IS NOT A VERDICT ON THE COMPLAINT.  2026.9 rejects
+      # `linux,code`, `debounce-interval` and `default-state` as `bytes` where
+      # it wants an integer.  The .dts writes them the ordinary way
+      # (`linux,code = <408>`), so this looks like a dtschema regression in
+      # reading u32 cells back out of a DTB -- but "looks like" is not a
+      # reading, and this file's own dtcheck entry records that all three dt
+      # tools print real failures and exit 0, which is exactly the shape that
+      # makes a wrong dismissal cheap.  Adjudicating 2026.9's three complaints
+      # is carried in docs/KNOWN-ISSUES.md, and the pin exists so that CI goes
+      # red for the repository's reasons until somebody does.
       - name: dtschema
         run: |
           /usr/bin/python3 -m venv /tmp/dtvenv
-          /tmp/dtvenv/bin/pip install -q dtschema
+          /tmp/dtvenv/bin/pip install -q 'dtschema==2026.6'
           /tmp/dtvenv/bin/dt-validate --version
 
       # 23 controls, and they are the reason the step below is worth reading.

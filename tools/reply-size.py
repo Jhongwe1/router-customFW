@@ -92,10 +92,26 @@ UNKNOWN_BODY = 20        # 'Unknown command !' + CR LF + CR
 DW_LINE = 47             # one DW output line, terminator included
 
 
+DW_DEFAULT_WORDS = 4     # what a bare `DW <addr>` prints -- 量, see _dw_body
+
+
 def _dw_body(argv):
+    if not argv:
+        raise ValueError("DW needs an address")
     if len(argv) < 2:
-        raise ValueError("DW needs an address and a length")
-    n = int(argv[1], 10)          # LDR-07: the address is hex, the LENGTH is decimal
+        # 🔴 A BARE `DW <addr>` IS LEGAL AND THIS FUNCTION USED TO RAISE ON IT,
+        # which crashed `check` over the whole corpus rather than misreporting
+        # one capture.  量 2026-09-19 (seating 28), three captures, one value:
+        # `DW 80000000`, `DW 80410094` and `DW B800311C` are **69 bytes each**
+        # (X2/X3/X4), and `DW B8010000 4` is **71** (X5/X6).  The model here is
+        # len(cmd) + ECHO_TAIL + body + PROMPT, so 11+2+47+9 = 69 and
+        # 13+2+47+9 = 71: the bodies are IDENTICAL and the two extra bytes are
+        # the echo of the ` 4`.  So the loader's default really is one line of
+        # four words, and it is derived from a difference rather than assumed.
+        # 否證: a bare-`DW` capture anywhere in the corpus that is not 69 bytes.
+        n = DW_DEFAULT_WORDS
+    else:
+        n = int(argv[1], 10)      # LDR-07: the address is hex, the LENGTH is decimal
     if n < 0:
         raise ValueError("negative length")
     return DW_LINE * math.ceil(n / 4)
