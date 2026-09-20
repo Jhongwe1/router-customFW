@@ -775,3 +775,29 @@ this image**, both would have printed *"No such file or directory"*, and
 `check-predictions` scores existence and mtime rather than content — so the
 seating would have reported `41 of 41` with two cells empty. The three-line
 search above is what caught them, before power.
+
+
+## 8.15 🔴 The CPU port counts every CPU-sourced frame as `CRCAlignErr`, so that counter is meaningless for CPU traffic
+
+量 2026-09-20 (seating 30), `bench/2026-09-20b/X2-asic.log`. The
+`<CPU port (extension port included)>` block's **receive** side — which is the
+switch receiving *from* the CPU — reads `CRCAlignErr 217`, and in the same
+capture port 3's output side reads `Unicast 216 pkts` plus `Broadcast 1 pkts`,
+which is **217**. The size buckets on that same block are 10 + 4 + 20 + 183 =
+**217** as well.
+
+🟢 **And all 217 frames arrived**: rungs `H1-frag1` through `H4-f6` were 1/1 and
+three times 20/20 on the host, so the host received every reply the board sent
+in that window.
+
+推 the mechanism: the CPU hands the switch a frame without an FCS and the
+switch appends one, so the MIB counts each as a CRC/alignment error on the way
+in. **It is a constant offset equal to the CPU-sourced frame count, not a
+fault.**
+
+🔴 **What this costs**: `NET-56` used port 3's `CRCAlignErr` as the discriminator
+that separated a faulty cable from every software cause, and that use is still
+sound — it is port 3's **receive** side, i.e. the wire. The CPU port's is a
+different counter with the same name, and reading it as an error indicator
+would report a healthy board as broken on every frame it transmits.
+`SPEC.md` `NET-65`.

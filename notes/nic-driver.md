@@ -1086,6 +1086,29 @@ it. ⚠️ That refutes a softirq livelock **at the load actually applied** and 
 in general.
 
 
+### 10.5a 🔴 `ping -c N -w D` does not send N packets
+
+量 2026-09-20, and it matters because four of this seating's rungs derive a
+frame count from `-c`.
+
+iputils' own man page, verbatim: *"ping does not stop after count packets are
+sent, it waits either for deadline expire or until count probes are
+**answered**"*. So with a deadline **and** loss, `-c` bounds the number of
+**replies**, not the number of requests.
+
+量, the two rungs where it bit: `-c 20 -s 20000 -i 0.1 -w 15` sent **145**
+packets (15.38 s ÷ 0.106 s) and `-c 10 -s 60000 -i 0.2 -w 15` sent **74**
+(15.25 s ÷ 0.206 s).
+
+🟢 **The measurement survived because the driver closes on the larger number**:
+145 × 14 = 2,030 against `Δn_rx` +2,032, and 74 × 41 = 3,034 against +3,035,
+with the residuals being ARP. 🔴 **But block 32's card computed its expected
+frame counts from `-c`**, and on a lossy rung that arithmetic is wrong. A card
+that needs an exact request count must read it back from the host's own
+`packets transmitted` line and not from the flag it typed.
+
+`SPEC.md` `FW-97`.
+
 ### 10.6 🔴 What an adversarial pass took back out of § 10
 
 A second reader was given the cards, the captures and the driver and asked to

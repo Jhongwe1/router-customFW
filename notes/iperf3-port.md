@@ -243,3 +243,34 @@ binaries never are. Putting it in the image means a row in
 `config/rlxfw-initramfs.tsv`, which is under `config/`, so it **moves
 `RECIPE_ID`** and needs a rebuild. That is `R6-5`'s first desk act, and until it
 happens no card may predict an `RLXFW-ID0` that includes it.
+
+
+## § 9. 🔴 `-n` does not transfer N bytes, and `-t` cannot bound it
+
+量 2026-09-20, on this project's own cross-built MIPS artefact under
+`qemu-mips-static`, five points, all consistent.
+
+讀 `iperf_api.c:1853`: the client sends **`multisend = 10`** blocks between
+bound checks, and the `break` that fires when the byte budget is spent leaves
+the **stream** loop, not the multisend loop. So
+
+    bytes transferred = ceil(N / (10 x blksize)) x 10 x blksize
+
+At the default `-l 128K`, `-n 64K` therefore moves **1,310,720 bytes in ten
+128 KiB writes** rather than 65,536 — which is exactly `D14-IP1`'s
+configuration, one of the two that ended seating 29.
+
+🟢 **Any `-b` sets `multisend = 1` and makes `-n` exact.** 量:
+`-n 64K -l 1K -b 100M` transferred exactly **65,536** bytes in **64** writes of
+1,024; `-k 1 -l 1K -b 100M` transferred **1.00 KBytes**.
+
+⚠️ **`-b` on TCP has a floor of `blksize x 8 / 0.1 s`**, because the send timer
+is a fixed 100 ms: `-b 100K`, `-b 1M` and `-b 10M` at the default `-l` all gave
+the same 11,528 kbit/s, while `-b 200K -l 1K` gave 199 and `-b 50K -l 1K` gave
+**90.1** — the floor winning is its own negative control. UDP paces correctly.
+
+🔴 **`-t` and `-n` are mutually exclusive** (`IEENDCONDITIONS`), so an `-n` run
+has **no wall-clock cap at all**: a board that stops sending hangs the client
+until it is killed. Any card using `-n` has to carry its own timeout.
+
+`SPEC.md` `FW-98`.

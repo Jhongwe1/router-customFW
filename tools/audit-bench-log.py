@@ -88,6 +88,20 @@ ALLOW = [
      "Linux. None is this unit's configuration -- the loader's own compiled-in "
      "TFTP address is 192.168.1.6, which is allowlisted in spec-check.py for "
      "the same reason and is deliberately NOT allowlisted here"),
+    ("match", "enxfc19286184c9",
+     "🆕 2026-09-20 (seating 30). The WORKSTATION's USB Gigabit adapter, on "
+     "this desk's side of the cable -- the same distinction the 10.1.1 entry "
+     "above draws, and for the same reason: none of it is this unit's. It "
+     "reaches bench/ because seating 30 was the first to run host-side "
+     "generators as carded cells, so eighteen .log files open with "
+     "`$ ping -I <it> ...` and carry iputils' own banner. 🔴 It is "
+     "allowlisted rather than redacted because a .log is a measurement "
+     "artefact and editing one is exactly what --force exists to be "
+     "forbidden. The forward fix is on the CARD and not here: `ping -I "
+     "10.1.1.2` binds by source address, needs no interface name, and that "
+     "address is already covered above. ⚠️ This suppresses the EXACT literal "
+     "only, so a different enx interface -- or anything read off the board -- "
+     "still fires, which control A2 proves"),
     ("match", "00:12:34:56:78:9",
      "the six netdev MACs are SDK placeholders compiled into the vmlinux this "
      "seating built -- 量 2026-08-30, found as literal bytes at file offsets "
