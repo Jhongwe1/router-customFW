@@ -1251,6 +1251,7 @@ at every read across six arms. The reason the loop stays is the TX side.
   `ifconfig down/up` reached 2/4; a second returned to 0/4.
 * **Whether the fault needs TCP.** Every wedge tonight was TCP. A long ping
   flood — RX plus TX, no TCP — is the discriminator and was not run.
+* 🔴 **One dump of the whole seating is anomalous and nothing in the block explains it.** `R4-FINAL` — an off-card read taken after the interface cycle, when ping was already only 2/4 — carries `seen_iisr 0002320E`, **bit 17 `PKTHDR_RUNOUT`, sticky, and the only non-`0000320E` reading of the night**; `n_dsync 1` with `dsync_last_d 4`; `rx_idx 5` against a hardware position of slot 2; and `rxd0`/`rxd1` both CPU-owned at `len 102`. 未定 — **one observation, off-card, and taken in a state that was already degraded.** It is recorded because it is the only place all night where a run-out bit set at all, and because the block's own "driver index == hardware index held at every read" is a claim about the CARDED cells and this dump is not one of them.
 * **`D5` and `D6` were not obtained.** `NET-60`'s half *is* closed: 量 `V1`,
   `Reverse mode, remote host 10.1.1.2 is sending`, so 3.1.3 at both ends
   completes the control exchange 3.16 could not.
