@@ -492,6 +492,35 @@ static u32 nic_last_rx_ph1, nic_last_rx_ph3, nic_last_rx_ph4;
  * shipped firmware must present the address on the label.  Reading `H601`
  * safely is a separate problem and it is not solved by this file.
  * ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------------
+ * R6-5's desync detector -- `NET-61` and `NET-62`.
+ *
+ * The engine keeps TWO RX positions, one per ring.  Seating 30 measured them
+ * coming exactly 4 slots apart and STAYING there (`SPEC.md` `NET-61`: nine
+ * readings, five Delta 0 and four Delta 4, about 12,000 frames, no
+ * exceptions), after which this driver reads OWN from one ring and the length
+ * from the other with ONE index -- so a frame is delivered carrying another
+ * frame's length.
+ *
+ * NOTHING IN THIS DRIVER COULD SEE THAT.  `n_rx` counted every one of 5,281
+ * frames while 218 datagrams died above it -- 量 seating 30, and it is why
+ * `PROGRESS.md`'s D6 row says *zero drops by the driver's own counters* would
+ * be "true and meaningless".  This is the counter that makes that row mean
+ * something.
+ *
+ * OBSERVE-ONLY: it never acts, so it cannot be a second variable in the
+ * experiment it exists to instrument.  Two KSEG1 loads per POLL and not per
+ * frame, which is the budget `notes/nic-driver.md` 10.4 set for it.
+ * ------------------------------------------------------------------------ */
+static unsigned long nic_n_dsync_chk;	/* checks performed -- the denominator */
+static unsigned long nic_n_dsync;		/* checks that saw Delta != 0 */
+static unsigned int  nic_dsync_last_d;
+static unsigned int  nic_dsync_first_d;
+static u32 nic_dsync_first_rp, nic_dsync_first_rm;
+static unsigned long nic_dsync_first_nrx;
+static unsigned int  nic_dsync_test_d;	/* `dsynctest`'s answer */
+static int nic_dsync_test_seen;
+
 #define NIC_NAPI_WEIGHT	16
 
 static struct net_device *nic_ndev;
@@ -503,6 +532,7 @@ static unsigned long nic_n_napi_complete;
 static unsigned long nic_n_xmit;
 static unsigned long nic_n_xmit_busy;
 static unsigned long nic_n_skb_fail;
+static unsigned long nic_n_arm_flush;	/* CPU-owned slots `arm` discarded */
 
 /* R6-4a.  The TX queue's stop/wake ledger.  Four counters and one state,
  * because `n_xmit_busy` alone cannot tell "the stop path was never
@@ -742,6 +772,60 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
  * the buffer and unaligning the IP header, or using the unaligned load/store
  * instructions -- and which of those is worth it is an R6-5 question with a
  * number attached, so it is not guessed at here. */
+/* Delta between the two RX positions, in slots, on the ring's own modulus.
+ *
+ * Both arguments are ABSOLUTE addresses -- `SPEC.md` `NET-32` and the
+ * `rpdcr0_pos` note further down: these registers read back the engine's
+ * CURRENT POSITION, not the base this driver wrote.  The index is
+ * `(pos - base) / 4`, which is the arithmetic `NET-61` used to turn
+ * `A15B8000`/`A15B8020` into its nine-row table.
+ *
+ * SEPARATED FROM THE REGISTER READ ON PURPOSE, so the same arithmetic can be
+ * exercised with typed values through `dsynctest`.  A detector that has only
+ * ever reported 0 is a claim with no control.
+ *
+ * The subtraction is unsigned and wraps mod 2^32; NIC_RX_DESC is 8, which
+ * divides 2^32, so the `%` recovers the right slot difference.  ⚠️ On an
+ * 8-slot ring 4 is its own negative, so this reports HOW FAR apart and not
+ * WHICH ring leads -- `NET-61`'s residual, which this function does not
+ * close. */
+static unsigned int nic_dsync_calc(u32 rp, u32 rm)
+{
+	unsigned int pi = ((rp - nic_rx_ring) / 4) % NIC_RX_DESC;
+	unsigned int mi = ((rm - nic_mb_ring) / 4) % NIC_RX_DESC;
+
+	return (pi - mi) % NIC_RX_DESC;
+}
+
+/* One check.  Reads each position ONCE and passes those same two values to
+ * both the comparison and the first-occurrence record, so what is recorded is
+ * what was compared and not a second, later read. */
+static void nic_dsync_check(void)
+{
+	u32 rp, rm;
+	unsigned int d;
+
+	if (!nic_allocated)
+		return;
+
+	rp = nic_rd(NIC_CPURPDCR0);
+	rm = nic_rd(NIC_CPURMDCR0);
+	d = nic_dsync_calc(rp, rm);
+
+	nic_n_dsync_chk++;
+	if (!d)
+		return;
+
+	if (!nic_n_dsync) {
+		nic_dsync_first_rp = rp;
+		nic_dsync_first_rm = rm;
+		nic_dsync_first_nrx = nic_n_rx;
+		nic_dsync_first_d = d;
+	}
+	nic_n_dsync++;
+	nic_dsync_last_d = d;
+}
+
 static int nic_napi_harvest(int budget)
 {
 	int done = 0;
@@ -795,6 +879,9 @@ static int nic_poll(struct napi_struct *napi, int budget)
 	int done;
 
 	nic_n_napi_poll++;
+	/* BEFORE the harvest, so it observes the state the harvest is about
+	 * to act on rather than the state the harvest left behind. */
+	nic_dsync_check();
 	done = nic_napi_harvest(budget);
 
 	/* Under budget means the ring ran dry, which is the only safe moment
@@ -1186,12 +1273,95 @@ static int nic_do_alloc(void)
  * enabled. */
 static int nic_do_arm(void)
 {
+	unsigned long flags;
+	unsigned int i;
 	int rc;
 
 	if (!nic_allocated)
 		return -ENXIO;
 	if (nic_engine_on)
 		return -EBUSY;
+
+	/* THE WRITE GUARD IS ASKED HERE AND NOT BY THE FIRST `nic_wr` BELOW.
+	 * The descriptor stores are `nic_re_set`/`nic_dw_set` and do not go
+	 * through `nic_wr`, so a locked driver would flush the whole ring and
+	 * THEN return -EPERM -- a refusal that has already done the thing it
+	 * refused, and left the software index describing a ring the hardware
+	 * is no longer pointed at.  That is the very skew this function was
+	 * changed to remove, reproduced by the guard firing.  Reachable by
+	 * typing: neither `alloc` nor `arm` has an unlock precondition.
+	 * `n_refused` is incremented here because `nic_wr` is never reached. */
+	if (!nic_unlocked) {
+		nic_n_refused++;
+		return -EPERM;
+	}
+
+	/* RE-ESTABLISH BOTH RINGS AND ZERO BOTH INDICES, TOGETHER, BEFORE THE
+	 * BASE REGISTERS ARE WRITTEN.
+	 *
+	 * 量 `bench/2026-09-20b/R9-NB0` and `N1`, the two dumps either side of
+	 * `A1`'s re-arm.  BEFORE: `rx_idx 1`, `rpdcr0_pos A15B8004`,
+	 * `rmdcr0_pos A15B8024` -- slot 1 on both -- and all eight ring words
+	 * SWCORE-owned, so THE RING WAS CLEAN.  AFTER the arm and one ping:
+	 * `rp 1 rm 1` again but `rx_idx 2`, and `rxd0 A15B8050 len 1446` is
+	 * `L1`'s reply-less ping sitting CPU-owned in a slot this driver will
+	 * not look at for a full lap.  The base write restarted the hardware at
+	 * slot 0; nothing restarted the software.  So `arm` creates an INDEX
+	 * SKEW, and the skew then manufactures the hole one frame at a time.
+	 *
+	 * ⚠️ On that run the index reset alone would have sufficed, and this
+	 * function cannot tell which case it is in.  `engine off` writes
+	 * CPUIIMR 0 and does NOT call `napi_disable()`, and `arm` is a separate
+	 * /proc write, so a frame already delivered and not yet harvested is
+	 * still CPU-owned here -- a hole the engine stalls on.  Handing every
+	 * slot back makes the post-arm state the post-alloc state, and the
+	 * post-alloc state is the only one measured to work end to end
+	 * (`R6-BASE` -> `R8-B0`, 20 of 20).  ⚠️ True of the ring words and of
+	 * what `nic_refill` writes; it does NOT restore `rx_ph[i].dw0`,
+	 * `rx_mb[i].dw1`, `rx_mb[i].dw5` or `rx_ph[i].dw3`, exactly as on every
+	 * ordinary harvest.
+	 *
+	 * 🔴 IT DISCARDS THOSE FRAMES.  `n_rx` does not move and `rx_dropped`
+	 * does not move, so `n_arm_flush` is what stops "arm destroyed nothing"
+	 * being unfalsifiable -- the same reason `n_dsync_chk` exists beside
+	 * `n_dsync`.
+	 *
+	 * 讀 `rtl865xc_swNic.c:1134-1384`: the vendor's only arm is inside
+	 * `swNic_init`, which builds every descriptor, zeroes
+	 * `currRxPkthdrDescIndex[]` and `currRxMbufDescIndex`, and writes
+	 * `CPURPDCR0`/`CPURMDCR0` LAST, all under `local_irq_save`.  The vendor
+	 * never re-arms a live ring.  ⚠️ `swNic_resetDescriptors` (`:1406`)
+	 * looks like a lighter precedent and is NOT one: its body clears
+	 * TXCMD|RXCMD and returns, inside `#ifdef FAT_CODE`, which the tree
+	 * defines nowhere (量, two hits -- the `#ifdef` and its `#endif`).
+	 *
+	 * TX is the SAME bit with the opposite RESTING value, not an inverted
+	 * polarity: OWN set is the engine's on both rings (`NIC_DESC_OWN`, and
+	 * 讀 `rtl865xc_asicregs.h:553-554`), but an idle TX slot is the CPU's.
+	 * A slot left SWCORE-owned here is a stale buffer the engine transmits
+	 * the moment it is enabled.
+	 *
+	 * 🔴 THE LOCK IS NOT DECORATION AND `nic_engine_on` IS NOT A SUBSTITUTE
+	 * FOR IT.  `nic_do_engine(0)` does not `napi_disable()`, so a poll
+	 * scheduled before the mask was cleared can still run `nic_poll` in
+	 * softirq and write `nic_rx_idx` and call `nic_refill()` in the middle
+	 * of this loop.  52 uncached stores with interrupts off, against the up
+	 * to 1518 `__raw_writeb` `nic_xmit` already does inside this lock. */
+	spin_lock_irqsave(&nic_lock, flags);
+	for (i = 0; i < NIC_RX_DESC; i++) {
+		if (!(nic_re(nic_rx_ring, i) & NIC_DESC_OWN))
+			nic_n_arm_flush++;
+		nic_refill(i);
+	}
+	for (i = 0; i < NIC_TX_DESC; i++) {
+		u32 wrap = (i == NIC_TX_DESC - 1) ? NIC_DESC_WRAP : 0;
+
+		nic_re_set(nic_tx_ring, i,
+			   (nic_tx_ph + i * NIC_DESC_BYTES) | wrap);
+	}
+	nic_rx_idx = 0;
+	nic_tx_idx = 0;
+	spin_unlock_irqrestore(&nic_lock, flags);
 
 	rc = nic_wr(NIC_CPURPDCR0, nic_rx_ring);
 	if (rc)
@@ -1209,6 +1379,13 @@ static int nic_do_arm(void)
 
 	nic_armed = 1;
 	rlxfw_markx("N-ARM", nic_rx_ring);
+	/* A mark only the re-establishing arm emits, so a capture can say WHICH
+	 * arm ran without resting on `RLXFW-ID0` alone.  🔴 It does NOT claim
+	 * the ring is repaired: 量 `Z10-nic`, `arm` already zeroed both
+	 * hardware positions BEFORE this change, and 量 `Z11-f6` read 11/181
+	 * (93.9 % loss) after exactly that repair where a fresh boot reads
+	 * 20/20.  This makes `arm` non-fatal; it does not make it a repair. */
+	rlxfw_markx("N-ARMR", (u32)nic_n_arm_flush);
 	return 0;
 }
 
@@ -1516,6 +1693,26 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page + len, "tpdcr0_pos %08X\n",
 		       nic_rd(NIC_CPUTPDCR0));
 
+	/* R6-5's desync ledger.  `n_dsync_chk` is the denominator: without it
+	 * `n_dsync 0` cannot tell "it never happened" from "nobody looked". */
+	len += sprintf(page + len, "n_arm_flush %lu\n", nic_n_arm_flush);
+	/* ⚠️ `n_dsync_chk` is ~2x `n_napi_poll`, because the check is two
+	 * `nic_rd()` per poll -- so `n_reads` is no longer the small
+	 * auditable number it was before this driver version. */
+	len += sprintf(page + len, "n_dsync_chk %lu\n", nic_n_dsync_chk);
+	len += sprintf(page + len, "n_dsync %lu\n", nic_n_dsync);
+	len += sprintf(page + len, "dsync_last_d %u\n", nic_dsync_last_d);
+	len += sprintf(page + len, "dsync_first_d %u\n", nic_dsync_first_d);
+	len += sprintf(page + len, "dsync_first_rp %08X\n",
+		       nic_dsync_first_rp);
+	len += sprintf(page + len, "dsync_first_rm %08X\n",
+		       nic_dsync_first_rm);
+	len += sprintf(page + len, "dsync_first_nrx %lu\n",
+		       nic_dsync_first_nrx);
+	len += sprintf(page + len, "dsync_test_d %u\n", nic_dsync_test_d);
+	len += sprintf(page + len, "dsync_test_seen %d\n",
+		       nic_dsync_test_seen);
+
 	if (nic_allocated) {
 		len += sprintf(page + len, "rx_ring %08X\n", nic_rx_ring);
 		len += sprintf(page + len, "mb_ring %08X\n", nic_mb_ring);
@@ -1603,6 +1800,35 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		int rc = nic_do_arm();
 
 		return rc ? rc : (int)count;
+	}
+	/* THE DETECTOR'S POSITIVE CONTROL.  Two absolute addresses in hex, put
+	 * through the SAME arithmetic the poll path uses.  No register is read
+	 * and no hardware is touched, so it is free and can be run on a live
+	 * board at any moment.  The card computes both arguments from the
+	 * `rx_ring`/`mb_ring` this same file prints, so a wrong base makes the
+	 * control FAIL rather than pass quietly. */
+	if (!strncmp(buf, "dsynctest ", 10)) {
+		char *p = buf + 10;
+		u32 rp, rm;
+
+		/* Without this the control computes against a ring base of
+		 * ZERO and can pass on a driver that has no ring at all. */
+		if (!nic_allocated)
+			return -ENXIO;
+
+		rp = simple_strtoul(p, &p, 16);
+		while (*p == ' ')
+			p++;
+		rm = simple_strtoul(p, &p, 16);
+		nic_dsync_test_d = nic_dsync_calc(rp, rm);
+		nic_dsync_test_seen = 1;
+		return (int)count;
+	}
+	/* One check on demand, for a cell that wants a reading at a moment of
+	 * its own choosing rather than at whenever the next poll happens. */
+	if (!strcmp(buf, "dsyncchk")) {
+		nic_dsync_check();
+		return (int)count;
 	}
 	if (!strcmp(buf, "irqon")) {
 		if (nic_irq_taken)
