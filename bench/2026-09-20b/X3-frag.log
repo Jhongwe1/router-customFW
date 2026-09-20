@@ -1,0 +1,6 @@
+cat /proc/sys/net/ipv4/ipfrag_high_thresh ; cat /proc/sys/net/ipv4/ipfrag_low_
+thresh ; cat /proc/sys/net/ipv4/ipfrag_time
+262144
+196608
+30
+# 

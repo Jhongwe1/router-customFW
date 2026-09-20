@@ -1,0 +1,70 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.1
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 143
+n_writes 30
+n_refused 0
+n_irq 6148
+n_irq_spurious 0
+n_tx 498
+n_rx 15680
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000008
+seen_iisr 0001320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 5232
+n_napi_complete 5232
+n_xmit 498
+n_xmit_busy 19
+n_skb_fail 0
+n_tx_stop 19
+n_tx_wake 8
+n_tx_wake_race 11
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 15680/22593478 tx 498/660262 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 80000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15B8000
+rmdcr0_pos A15B8030
+tpdcr0_pos A15B8040
+rx_ring A15B8000
+mb_ring A15B8020
+tx_ring A15B8040
+bufs A15B8290
+rx_idx 0
+tx_idx 2
+rxd0 A15B8051 len 0 f 8063 pl 03
+rxd1 A15B8069 len 0 f 8063 pl 03
+rxd2 A15B8081 len 0 f 8063 pl 03
+rxd3 A15B8099 len 0 f 8063 pl 03
+rxd4 A15B80B1 len 0 f 8063 pl 03
+rxd5 A15B80C9 len 0 f 8063 pl 03
+rxd6 A15B80E1 len 0 f 8063 pl 03
+rxd7 A15B80FB len 0 f 8063 pl 03
+txd0 A15B81D0 len 1518
+txd1 A15B81E8 len 1518
+txd2 A15B8200 len 1518
+txd3 A15B821A len 1518
+rx_len 0
+rx_ph1 02520411
+rx_ph3 8063C003
+rx_ph4 00090000
+# 

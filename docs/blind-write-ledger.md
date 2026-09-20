@@ -917,6 +917,18 @@ read perhaps forty of them; it is marked `line` because what it took —
 
 ---
 
+### 4.12 🆕 `R6-5` seating 30 — the softirq path, one row, and it is vendor
+
+量 2026-09-20. One file, read to give block 30's **third** hypothesis a shape
+and a discriminator before the board was touched. The hypothesis was then
+refuted, which is the outcome this section exists to make checkable: nothing
+taken from this file entered a driver, and what it bounded was a guess that did
+not survive.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `kernel/softirq.c` | line | 🔴 **vendor** | 🆕 **2026-09-20, `R6-5`.** Two constants, both inside `#if defined(CONFIG_RTL_819X)` and therefore Realtek's rather than generic: `:197-201`, `MAX_SOFTIRQ_RESTART` is **2000** where mainline is **10**; and `:646-650`, `ksoftirqd()` opens with `set_user_nice(current, -20)` where mainline leaves it at 0. 量 the built config: `CONFIG_RTL_819X=y`, so both are live. **What they were for**: they bound how long one `__do_softirq` can hold the CPU without process context, which is the *softirq livelock* hypothesis of `bench/2026-09-20b/PREDICTIONS-B32-block30.md` § 1, and the discriminator they pointed at is `/proc/net/softnet_stat` column 3 — read `net/core/dev.c:2954`, already declared. 🟢 **The hypothesis was refuted on the die**: `time_squeeze` read `00000000` at the load applied. ⚠️ **Nothing from this file entered any driver of mine**, and nothing in it touches the decision layer: the numbers sized a guess, and the guess is gone |
+
 ## 5. 🔴 What `driver-diff` compares — the two layers, and why the definition moved
 
 The gate opened with `R5-9` written as *"blind first, then **register by

@@ -1,0 +1,4 @@
+echo 4194304 > /proc/sys/net/ipv4/ipfrag_high_thresh ; cat /proc/sys/net/ipv4/
+ipfrag_high_thresh
+4194304
+# 

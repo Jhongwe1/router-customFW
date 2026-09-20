@@ -987,3 +987,126 @@ the console even at `CONFIG_PRINTK=n`, and nothing printed. And
    `SIOCSIFFLAGS: Device or resource busy` because this driver holds a
    non-shared `request_irq(12)` (量 `X9`). So *below both drivers* — `NET-54`'s
    own phrase — cannot be re-measured while `rlx0` is bound.
+
+
+## 10. `R6-5` seating 30 — why a datagram loses exactly one fragment
+
+**量 2026-09-20, blocks 30–32 and their corrections.** Everything in this
+section is from `bench/2026-09-20b/`.
+
+### 10.1 What was refuted first
+
+Block 30's ladder was written to test three hypotheses and refuted all three.
+
+| hypothesis | pre-registered discriminator | reading |
+|---|---|---|
+| interrupt storm | `n_irq` explodes | **1,936 interrupts for 5,281 frames** = 2.7 frames per interrupt |
+| TX-queue death | `tx_stopped` goes to 1 | **0** at every rung — 🔴 **and that refutation is VACUOUS.** 量 `n_tx`: `C14-f6` 214, `C16-f14` 216, `C17-f41` 217, so the 14- and 41-frame rungs applied **no transmit load** (two ARP replies). The hypothesis was never tested; the deepest TX burst the ladder produced was six, the rung that worked. See § 10.6 |
+| softirq livelock | `time_squeeze` explodes | `/proc/net/softnet_stat` column 3 = **`00000000`**, first reading of that file on this board |
+
+The TX-queue hypothesis was this file's own § 7, and the experiment written to
+confirm it refuted it instead.
+
+### 10.2 The chain that survived
+
+1. A burst of frames arrives back-to-back into an **8**-entry RX ring faster than
+   the driver hands descriptors back. ⚠️ **The evidence is the switch's `pause`
+   counter and `MBUF_RUNOUT` itself, not a copy rate**: 1.88 MB/s is recorded at
+   `:701` of this file as a *ping-bound floor*, and quoting it as the copy rate
+   was an error in this section's first draft.
+2. `MBUF_RUNOUT` fires: `seen_iisr` goes `0000320E` → `0001320E`, and bit 16 is
+   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:292`). First seen at `C16-f14`.
+3. The engine's two RX position registers desynchronise by **exactly 4** and
+   stay there. Indices are `(pos − base) / 4` with `rx_ring A15B8000` and
+   `mb_ring A15B8020`:
+
+   | capture | `rp` | `rm` | Δ |
+   |---|---:|---:|---:|
+   | `C8-BASE` | 6 | 6 | 0 |
+   | `C11-frag1` | 1 | 1 | 0 |
+   | `C12-f1` | 7 | 7 | 0 |
+   | `C13-f3` | 4 | 4 | 0 |
+   | `C14-f6` | 6 | 6 | 0 |
+   | `C16-f14` | 6 | **2** | **4** |
+   | `C17-f41` | 1 | **5** | **4** |
+   | `Y6-nic` | 5 | **1** | **4** |
+   | `Z7-nic` | 7 | **3** | **4** |
+
+4. The driver reads OWN from `nic_rx_ring[i]` (`:751`), the length from
+   `nic_rx_ph[i]` (`:758`) and the buffer address from `nic_rx_mb[i]` (`:768`) with
+   one `i`, and `nic_refill` (`:1227-1241`, the two `nic_re_set` calls that hand
+   ownership back are at `:1239-1240`) refills both at that same `i`. **Nothing
+   re-synchronises them.** 🟢 `bf` is a pure function of `i` (`:1232`), so the
+   address is never wrong — only the length is.
+5. Frames are then delivered carrying another frame's length, and `ip_rcv`
+   drops them — `InTruncatedPkts` **1250**, one per failed datagram.
+6. Switch port 3 received **13,541** frames with `CRCAlignErr 0`, `Drop 0` and
+   `< 64: 0 pkts`, so the wire and the switch are clean and the truncation is
+   this driver's.
+
+### 10.3 Causality, both ways
+
+`arm` writes `CPURPDCR0 ← nic_rx_ring` and `CPURMDCR0 ← nic_mb_ring`
+(`:1187-1213`), so it is the repair. 量: Δ went **4 → 0** with no traffic
+between (`Z10-nic`), and **0 → 4** after one six-frame ping run (`Z14-nic2`).
+
+⚠️ It did not restore the symptom — `Z11-f6` was 11/181 where the
+byte-identical `H4-f6` had been 20/20 — so either something else accumulates or
+the rings re-desynchronise within the first datagrams. A fresh boot does restore
+it: `R8-B0` is 20/20 (`NET-63`).
+
+### 10.4 What this costs the driver, and what a fix has to contain
+
+Stated so the fix is not designed in the same breath as the measurement.
+
+* `nic_do_arm()` must reset `nic_rx_idx` (and `nic_tx_idx`). **Not doing so hard-hung the board** — `NET-64`.
+* `:768` reads `bf` out of a descriptor the DMA engine writes and `:772-774`
+  dereferences it with no bound check. A validated `bf` turns a bus hang into a
+  dropped frame, and it is the difference between a measurement that ends a
+  seating and one that does not.
+* The poll path needs to notice the desync. Both positions are readable; a
+  compare costs two KSEG1 loads.
+* The copy rate is the underlying cause of the run-out, and this file's own
+  § 6 already records that the alternatives were left as an `R6-5` question with
+  a number attached. It now has one.
+
+🔴 **None of these belongs in the image that measured the fault.**
+
+### 10.5 Three counters, three sources, one number
+
+量: `/proc/net/softnet_stat` column 1 read `0x14a1` at `C19-soft`; the driver's
+own `n_rx` read 5281 at `C17-f41`; the switch MIB's port 3 `Unicast` read 5281
+at `X2-asic`. 0x14a1 is 5281. **Three counters that share no code, and not one
+of them was written to agree with the others.**
+
+Column 3 of `softnet_stat` is `time_squeeze` and it read `00000000` — the first
+reading of that file on this board. 讀 `net/core/dev.c:2954`: it is incremented
+exactly where `net_rx_action` breaks on its two-jiffy limit, and `:3185` prints
+it. ⚠️ That refutes a softirq livelock **at the load actually applied** and not
+in general.
+
+
+### 10.6 🔴 What an adversarial pass took back out of § 10
+
+A second reader was given the cards, the captures and the driver and asked to
+refute. Five things in the first draft of this section did not survive, and the
+corrections are in `bench/2026-09-20b/CORRECTIONS-block32.md` § 2 with their
+measurements:
+
+* **`NET-59` was never a hang.** The board was draining a queue of `connect()`
+  calls at **189 s** each — `3+6+12+24+48+96` from `TCP_SYN_RETRIES 5` and
+  `TCP_TIMEOUT_INIT 3*HZ`, against two measured completion intervals of
+  **188.6 s** and **189.3 s**. `bench/2026-09-20/D23-ST3` typed
+  `cat /proc/stat` and returned an `iperf3` JSON. `busybox reboot -f` was never
+  executed; it sat behind further runs.
+* **The TX-queue-death refutation was vacuous** (§ 10.1's table now says so),
+  and the fault then appeared for real in `Z11-f6`: five counters across three
+  subsystems all reading **19**.
+* **The `+1` on `ReasmOKs` is `Icmp InErrors 1`** — one datagram reassembled out
+  of the wrong bytes and failed at ICMP. It is the most direct evidence in the
+  seating and the draft filed it as noise.
+* **Δ = 4 on an 8-entry ring is its own negative**, so which ring leads is
+  undetermined; the draft's headline picked one.
+* **The `41 vs 22` liveness payload is an "is the shell busy" gate**, not an "is
+  the board alive" gate: `X45-l32k-live`'s 22 bytes were taken 35 s into a 189 s
+  `connect()`.
