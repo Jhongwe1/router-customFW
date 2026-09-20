@@ -4494,3 +4494,19 @@ What the `--idle 8` does establish is the terminator's cost rather than the
 boot's: 8 of those 15.189 s are the capture waiting for a silence that had
 already happened. `TERM-1` owns that, and `notes/dev-loop.md` §10.2 has the
 decomposition across all four capture stages.
+
+## `FW-99` — `RECIPE_ID` cannot tell two kconfig variants apart
+
+量 2026-09-21 (seating 31). `s31b` (`--variant quiet`) and `s31L`
+(`--variant loud`) were built from the **same** `config/` tree. Both
+report `recipe_id f179cf21`, because `RECIPE_ID` is a digest over
+`config/` only and the variant is not a file in it. They are not the
+same image: `config_sha256` is `59efa73c…` against `929c693b…`, and
+`vmlinux` differs by **106,916** bytes (4,465,171 against 4,572,087).
+
+`tools/ci-expected.tsv:339` already said this could happen. This is the
+pair that measures it.
+
+🔴 **The discriminator is the assembled image's sha256**, which
+`looprun --image-sha256` checks. A card that separates quiet from loud
+by `RLXFW-ID0` will pass a board carrying the wrong image.

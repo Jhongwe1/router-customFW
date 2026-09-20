@@ -145,7 +145,13 @@ ROOT = os.path.dirname(HERE)
 
 # The id, plus whatever decoration the house style puts after it -- RUNSHEET.md
 # writes `| **C5** 🆕 |`, and SPEC.md does the same.
-ID_RX = re.compile(r'^\*{0,2}`?([A-Z]{2,3}-\d{2}[a-z]?)`?\*{0,2}(?:\s.*)?$')
+# 🔴 `\d{2,3}` and not `\d{2}` since 2026-09-21.  The `FW` series reached
+# `FW-100` that night and C1 reported it as "first cell is not an id", which
+# reads as a malformed row and is actually an id space that ran out at 99.
+# Two digits stay legal, so every existing row is unaffected; three are now
+# legal too.  ⚠️ The leading zero is deliberately NOT accepted as a fix --
+# `FW-099` would sort with the two-digit ids and read as a different row.
+ID_RX = re.compile(r'^\*{0,2}`?([A-Z]{2,3}-\d{2,3}[a-z]?)`?\*{0,2}(?:\s.*)?$')
 MARKS = ('量', '讀', '推', '文', '—', '算')
 
 # 🔄 2026-09-16 (`R1z-2`): `算` joins the alphabet.  It means *derived by

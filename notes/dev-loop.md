@@ -1311,3 +1311,43 @@ warm resets.
 mode. The repair it names is narrower — `S7` wants an `--esc-after` that the
 caller can set, and `S8`'s assertion set is what makes a payload a different
 animal. Whether that is worth doing is `R4`/`R5`'s, and it is not on any card.
+
+
+## `FW-100` — a verification taken before the thing it certifies can change
+
+量 2026-09-21 (seating 31). The host-side `iperf3` server for `D5` was started
+with `nohup … &` inside a `wsl -d Ubuntu-24.04 -- bash -ls` heredoc.
+`CLAUDE.md`'s environment section already records that such a process **dies
+with its parent shell**.
+
+Two seconds after starting it, `ss -ltnp` printed
+`LISTEN 10.1.1.2:5201 users:(("qemu-mips-stati",pid=33277,fd=3))`, and that was
+recorded as verified. **It was true when it was taken and false when it
+mattered.** The server was gone by the time the board dialled; the board sat in
+`connect()` for the full capture window, and its TX ring wedged against
+nothing. Cost: one cold power press, and a `NET-59`-shaped reading that was my
+instrument rather than the board.
+
+🔴 **The rule is not "remember that `nohup` dies".** It is:
+
+> **A check belongs at the point of USE, not the point of start.**
+
+A check taken at t₀ certifies the state at t₀. If the thing it certifies can
+change between t₀ and the use, the check has to be re-taken *at the use*, or it
+is decoration that reads as evidence.
+
+🟢 **The fix is in the scripts rather than in this paragraph.**
+`bench/2026-09-21/d5run.sh` and `bench/2026-09-21/bwladder.sh` both re-read
+`ss` immediately before each board-side command and **refuse** rather than
+measure:
+
+```
+if ! ss -ltn 2>/dev/null | grep -q '10\.1\.1\.2:5201'; then
+    echo "REFUSED $TAG: no listener at the moment of use"
+    exit 1
+fi
+```
+
+⚠️ And the durable form of the server is not `nohup` at all — it is a process
+the harness owns, which survived three board reboots in the same seating while
+the `nohup` one did not survive its own parent shell.

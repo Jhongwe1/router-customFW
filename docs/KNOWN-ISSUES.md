@@ -885,6 +885,45 @@ is a two-line liveness probe between steps, and it paid for itself on its first
 run: the next failure cost **one** cell instead of fourteen. **A card's cells
 are one-shot, and a gate between them is not optional.**
 
+## 🔴 What `R6-5`'s third seating did NOT establish — 2026-09-21 (ninety-second segment, seating 31)
+
+Image `s31b`, `RECIPE_ID f179cf21`, four cold power-ons, 29 of 29 carded cells
+spent.
+
+| | |
+|---|---|
+| 🔴🔴 **No throughput number exists, and the reason changed for the third time.** Seating 29 blamed the iperf3 control exchange (`NET-60`); seating 30 blamed the ring desync (`NET-61`); **both are now excluded.** `NET-60` is closed — 量 `V1`, `Reverse mode, remote host 10.1.1.2 is sending`, so 3.1.3 at both ends negotiates a bulk transfer 3.16 could not. `NET-61` is excluded — `n_dsync 0` through all three wedges with the detector's positive control proven in the same boot. What stops `D5` is `NET-67`: sustained TCP fills all four TX descriptors and the queue never wakes | Next: read the ENGINE side. `tpdcr0_pos` across a wedge and `/proc/rtl865x/asicCounter`'s CPU-port `Snd` — neither was read, and neither costs power |
+| 🔴 **`D6` was never attempted, and this seating established it is unmeetable on any image this project has run.** 讀 `config/rlxfw-kernel.delta:138`, `set@loud CONFIG_PRINTK n y`: with `PRINTK=n` an oops prints nothing and there is no kernel log, so *zero oops* and *kernel log captured whole* are both unobservable | `s31L` was built `--variant loud` for it and **never uploaded**. 🔴 And `RECIPE_ID` cannot tell the two images apart (`FW-99`) — the discriminator must be the assembled image's sha256 |
+| 🔴 **Why the switch engine stops retiring TX descriptors is unanswered.** The fault is fully characterised on the driver's side and completely unexamined on the engine's side | `NET-67` 殘留 |
+| 🔴 **Whether the fault needs TCP at all is untested.** Every wedge this seating was TCP; a long ping flood is RX-plus-TX with no TCP and is the discriminator | Not run |
+| 🔴 **The recovery is partial and decays, and the three readings were not separated.** `arm` alone moved every counter but left ping at 0/4; one `ifconfig down/up` reached 2/4; a second returned to 0/4 | `NET-68` 殘留 |
+| ⚠️ **`R6-6` was not attempted**, deliberately. Two of its three DoD clauses were established unreachable before power: two ports need two simultaneous endpoints, and rlxfw cannot write the VLAN **table** at all (讀 `rtl819x-switch.c:88-92` — the table is the indirect TACI path, so what a restore restores is the PVID register, not the object the DoD names) | Carried to the next segment with `R6-7` |
+| ⚠️ **`n_rx` rose by more than the fragment count on several ladder rungs** (e.g. +14 for a 9-fragment datagram). 推 background ARP and stragglers; not chased | — |
+
+### 🔴 `NET-64`'s owner passage, which did not exist until now
+
+`SPEC.md` has named `docs/KNOWN-ISSUES.md` as `NET-64`'s owner since
+2026-09-20 and this file contained **zero** occurrences of the string — the
+same defect class commit `4ce031e` fixed for `NET-65`/`FW-97`/`FW-98` and did
+not find here.
+
+**`NET-64` asked what made the board silent for 112 minutes with a watchdog
+armed at ~84 s that never bit.** Its own row recorded the contradiction: if it
+bit, the loader should have echoed the ESC stream and did not; if it did not
+bit, the CPU was running. Both branches cost the "hard hang" reading.
+
+🟢 **Seating 31 answers the branch.** 量, twice: during the fault the tty
+echoes the exact bytes sent (`X5-ECHO2`, 24 bytes, precisely
+`echo RLXFW-ECHO-PROBE2\r\n`) while a read-only window with `sent: null`
+returns **0 bytes over 30 s**. Echo is done by the kernel's line discipline, so
+**the kernel was running** — `NET-64`'s H4/H6 branch, and the "hard hang"
+headline is refuted rather than merely unsupported.
+
+⚠️ **What is still not established** is whether seating 30's 112-minute silence
+is the *same* fault as seating 31's wedges. Seating 30's console gave **0 bytes
+with no echo at all**; seating 31's echoes. Those are different observables, and
+this file does not merge them.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

@@ -926,7 +926,7 @@ supplied no `ndo_tx_timeout`, and that `R6-4a` fixes it by supplying one.
 `n_tx_timeout 0`. **`SPEC.md` `NET-57`.**
 
 🔴 **And the larger consequence lands on § 7's own argument.**
-`rtl819x-nic.c:880-885` argues that returning `NETDEV_TX_BUSY` while waking is
+`rtl819x-nic.c:967-972` argues that returning `NETDEV_TX_BUSY` while waking is
 correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue` is
 **NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
 freed. **The argument is right for the kernel it cites and wrong for this
@@ -1133,3 +1133,124 @@ measurements:
 * **The `41 vs 22` liveness payload is an "is the shell busy" gate**, not an "is
   the board alive" gate: `X45-l32k-live`'s 22 bytes were taken 35 s into a 189 s
   `connect()`.
+
+---
+
+## 11. `R6-5` seating 31 — the board is MUTE, not deaf, and `NET-61` is not what stops `D5`
+
+Seating 30 concluded that a burst desynchronises the engine's two RX position
+registers and that this is what prevents a throughput number. Seating 31 built
+an image to remove that obstacle, instrumented it, and **refuted the
+attribution**. Everything below is 量 on 2026-09-21, image `s31b`,
+`RECIPE_ID f179cf21`, four cold power-ons.
+
+### 11.1 The one change that made the fault visible
+
+Every previous observation of this fault ran the client in the **foreground**,
+so the board's shell was blocked behind it and `/proc` could not be read. The
+board looked silent because nothing could ask it anything.
+
+Seating 31 put a single `&` on the board's `iperf3` line. The shell stayed
+free, and the driver's own counters became readable **during** the fault.
+
+🔴 **That is the whole methodological content of this section.** The fault had
+been observed four times across three seatings and was opaque every time for a
+reason that had nothing to do with the fault.
+
+### 11.2 What the counters say
+
+| | before | during | after | late |
+|---|---|---|---|---|
+| `n_rx` | 10 | 19 | 23 | **27** → 35 → **38** |
+| `n_napi_poll` | 8 | 16 | 20 | 24 |
+| `n_tx` | 7 | 23 | **26** | **26** |
+| `n_xmit_busy` | 0 | 0 | 1 | 1 |
+| `n_tx_stop` | 0 | 0 | **1** | **1** |
+| `tx_stopped` | 0 | 0 | **1** | **1** |
+| `n_tx_wake` | 0 | 0 | **0** | **0** |
+| `n_tx_timeout` | 0 | 0 | 0 | 0 |
+| `n_dsync` | 0 | 0 | **0** | **0** |
+| `n_skb_fail` | 0 | 0 | 0 | 0 |
+| `seen_iisr` | `0000320E` | `0000320E` | `0000320E` | `0000320E` |
+
+**`n_rx` rises while the host reports zero replies.** The board receives the
+ICMP requests and cannot send the answers.
+
+### 11.3 The smoking gun
+
+`bench/2026-09-21/W6-TXD`:
+
+```
+txd0 A15B81D1   txd1 A15B81E9   txd2 A15B8201   txd3 A15B821B
+```
+
+Bit 0 set on all four. 讀 `NIC_DESC_OWN`: `1 = SWCORE owns, 0 = CPU`. **All
+four TX descriptors are engine-owned**, and `tx_idx 2` points at one of them.
+
+The chain, each link with its evidence:
+
+1. Sustained TCP makes the board transmit continuously. 量: the frozen `txd`
+   lengths are 82 / 74 / 82 / 74 — ACK-sized.
+2. **The engine stops retiring TX descriptors.** 🔴 *Why* is not established;
+   see 11.6.
+3. All four fill.
+4. `nic_xmit` reads slot `tx_idx`, finds `NIC_DESC_OWN`, calls
+   `netif_stop_queue`. 量: `n_tx_stop 1`, `tx_stopped 1`, `n_xmit_busy 1`.
+5. The wake path — `nic_tx_try_wake`, from the ISR — tests **the same slot**.
+   It never becomes CPU-owned. 量: `n_tx_wake 0` while `n_irq` rises 43 → 47.
+6. `ndo_tx_timeout` cannot fire: `NET-57`, `tx_queue_len = 0` makes this a
+   `noqueue` device. 量: `n_tx_timeout 0`.
+
+### 11.4 What this refutes, by name
+
+* 🔴 **`NET-54`'s "ingress wedge"** — ingress is healthy throughout.
+* 🔴 **"the board went deaf"** — it hears every frame.
+* 🔴 **`NET-64`'s "hard hang"** — the kernel runs, the driver polls, and the
+  tty echoes. 量 twice, and the echo is exact: `X5-ECHO2` returned **24 bytes**,
+  precisely `echo RLXFW-ECHO-PROBE2\r\n`, with `X6-SILENT2` reading **0 bytes
+  over 30 s with `sent: null`** — a true silence taken with the instrument
+  demonstrably running.
+* 🔴 **`NET-61` as `D5`'s blocker** — `n_dsync 0` through all three wedges,
+  with the detector's three-way positive control (0 / 4 / 1) proven in the same
+  boot. **The desync is not involved.**
+
+⚠️ **And it is not rate-dependent.** The bandwidth ladder wedged on its first
+rung, `-b 1M`: 1.25 MB over 10 s, against 2.59 MB carried in the run before it
+and against 14-frame ping bursts the same boot handled without trouble.
+
+### 11.5 🟢 `arm` recovers it, so `NET-54`'s recovery cost is wrong here
+
+量, on an already-wedged board, costing nothing:
+
+```
+after `engine off ; arm ; engine on`:
+txd0 A15B81D0  txd1 A15B81E8  txd2 A15B8200  txd3 A15B821A    <- bit 0 CLEAR
+tx_stopped 1 -> 0     n_tx_wake 0 -> 1     n_tx 26 -> 31
+```
+
+`ifconfig rlx0 down ; ifconfig rlx0 10.1.1.3 up` then took ping to **2/4**.
+
+`docs/KNOWN-ISSUES.md` carries `NET-54` as *only a cold power-on cleared it*.
+**For this fault that is false**, and what makes it false is the TX reclaim loop
+added to `nic_do_arm()` this seating.
+
+🔴 **The recovery is not durable** — the next traffic re-wedged it
+(`R6-REST` returned 1 byte). It buys a power cycle back, not a working path.
+
+⚠️ **And the RX half of the same change is untriggered code**: `n_arm_flush 0`
+at every read across six arms. The reason the loop stays is the TX side.
+
+### 11.6 What § 11 does NOT establish
+
+* **Why the engine stops retiring TX descriptors.** Nothing was read on the
+  engine's side of the ring: `tpdcr0_pos` was not sampled across a wedge, and
+  `/proc/rtl865x/asicCounter`'s CPU-port `Snd` was never read. Those are the
+  two cheapest next readings and neither costs power.
+* **Why the recovery is partial and why it decays.** Three readings gave three
+  results — `arm` alone moved the counters but left ping at 0/4; one
+  `ifconfig down/up` reached 2/4; a second returned to 0/4.
+* **Whether the fault needs TCP.** Every wedge tonight was TCP. A long ping
+  flood — RX plus TX, no TCP — is the discriminator and was not run.
+* **`D5` and `D6` were not obtained.** `NET-60`'s half *is* closed: 量 `V1`,
+  `Reverse mode, remote host 10.1.1.2 is sending`, so 3.1.3 at both ends
+  completes the control exchange 3.16 could not.
