@@ -1,0 +1,80 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.1
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 208
+n_writes 110
+n_refused 0
+n_irq 104
+n_irq_spurious 0
+n_tx 48
+n_rx 74
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000008
+seen_iisr 0000320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 34
+n_napi_complete 34
+n_xmit 48
+n_xmit_busy 0
+n_skb_fail 0
+n_tx_stop 0
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 74/71036 tx 48/37558 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 80000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15B8018
+rmdcr0_pos A15B8030
+tpdcr0_pos A15B8040
+n_arm_flush 0
+n_dsync_chk 34
+n_dsync 13
+dsync_last_d 2
+dsync_first_d 3
+dsync_first_rp A15B800C
+dsync_first_rm A15B8020
+dsync_first_nrx 20
+dsync_test_d 1
+dsync_test_seen 1
+rx_ring A15B8000
+mb_ring A15B8020
+tx_ring A15B8040
+bufs A15B8290
+rx_idx 6
+tx_idx 0
+rxd0 A15B8051 len 0 f 8263 pl 03
+rxd1 A15B8069 len 0 f 8263 pl 03
+rxd2 A15B8081 len 0 f 8263 pl 03
+rxd3 A15B8099 len 0 f 8263 pl 03
+rxd4 A15B80B1 len 0 f 8263 pl 03
+rxd5 A15B80C9 len 0 f 8463 pl 03
+rxd6 A15B80E1 len 0 f 8263 pl 03
+rxd7 A15B80FB len 0 f 8263 pl 03
+txd0 A15B81D0 len 64
+txd1 A15B81E8 len 64
+txd2 A15B8200 len 726
+txd3 A15B821A len 64
+rx_len 0
+rx_ph1 03260411
+rx_ph3 84630003
+rx_ph4 00090000
+# 

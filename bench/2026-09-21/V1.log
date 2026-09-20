@@ -1,0 +1,3 @@
+iperf3 -c 10.1.1.2 -p 5201 -t 10 -i 0 -f m -R
+Connecting to host 10.1.1.2, port 5201
+Reverse mode, remote host 10.1.1.2 is sending

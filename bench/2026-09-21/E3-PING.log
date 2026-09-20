@@ -1,0 +1,6 @@
+$ ping -I 10.1.1.2 -c 4 -W 2 -q 10.1.1.3
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 : 56(84) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3058ms
+rtt min/avg/max/mdev = 1.694/2.228/3.149/0.550 ms
