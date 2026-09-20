@@ -1,0 +1,9 @@
+echo read 0xB8010020 4 >/proc/rtl865x/memory ; echo read 0xB801000cmd read
+0
+b8010020:   A145B 80>48/  p	r	 o	 c	 /	 r	 	 	 
+	 t	 l	 8	 6	 5	¡[€Hx
+/mecmd read
+m
+b8010000:  oC4r00y0000
+  		 	 	 	 	 	 	 	 	 	 	 	 	Ä   
+# 

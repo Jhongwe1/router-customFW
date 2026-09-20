@@ -1,0 +1,17 @@
+echo RLXFW-PROBE-D
+RLXFW-PROBE-D
+# [  534.330000] Virtual device rlx0 asks to queue packet!
+[  535.390000] Virtual device rlx0 asks to queue packet!
+[  536.450000] Virtual device rlx0 asks to queue packet!
+[  537.520000] Virtual device rlx0 asks to queue packet!
+[  538.580000] Virtual device rlx0 asks to queue packet!
+[  539.640000] Virtual device rlx0 asks to queue packet!
+[  540.700000] Virtual device rlx0 asks to queue packet!
+[  541.760000] Virtual device rlx0 asks to queue packet!
+[  542.820000] Virtual device rlx0 asks to queue packet!
+[  543.880000] Virtual device rlx0 asks to queue packet!
+[  544.940000] Virtual device rlx0 asks to queue packet!
+[  546.000000] Virtual device rlx0 asks to queue packet!
+[  547.060000] Virtual device rlx0 asks to queue packet!
+[  548.120000] Virtual device rlx0 asks to queue packet!
+[  549.180000] Virtual device rlx0 asks to queue packet!

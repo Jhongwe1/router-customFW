@@ -1,0 +1,7 @@
+echo RLXFW-PROBE-E
+[  871.930000] Virtual device rlx0 asks to queue packet!
+[  872.980000] Virtual device rlx0 asks to queue packet!
+[  874.030000] Virtual device rlx0 asks to queue packet!
+[  878.840000] Virtual device rlx0 asks to queue packet!
+[  879.900000] Virtual device rlx0 asks to queue packet!
+[  880.940000] Virtual device rlx0 asks to queue packet!

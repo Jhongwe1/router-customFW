@@ -1,0 +1,21 @@
+iperf3 -c 10.1.1.2 -p 5201 -t 10 -i 1 -f m -u -l 1400 -b 20M
+Connecting to host 10.1.1.2, port 5201
+[  635.320000] Virtual device rlx0 asks to queue packet!
+[  635.850000] Virtual device rlx0 asks to queue packet!
+[  641.570000] Virtual device rlx0 asks to queue packet!
+[  642.290000] Virtual device rlx0 asks to queue packet!
+[  643.350000] Virtual device rlx0 asks to queue packet!
+[  644.410000] Virtual device rlx0 asks to queue packet!
+[  649.240000] Virtual device rlx0 asks to queue packet!
+[  650.310000] Virtual device rlx0 asks to queue packet!
+[  651.370000] Virtual device rlx0 asks to queue packet!
+[  655.010000] Virtual device rlx0 asks to queue packet!
+[  656.190000] Virtual device rlx0 asks to queue packet!
+[  657.250000] Virtual device rlx0 asks to queue packet!
+[  658.310000] Virtual device rlx0 asks to queue packet!
+[  663.150000] Virtual device rlx0 asks to queue packet!
+[  664.210000] Virtual device rlx0 asks to queue packet!
+[  665.270000] Virtual device rlx0 asks to queue packet!
+[  670.100000] Virtual device rlx0 asks to queue packet!
+[  671.170000] Virtual device rlx0 asks to queue packet!
+[  672.230000] Virtual device rlx0 asks to queue packet!

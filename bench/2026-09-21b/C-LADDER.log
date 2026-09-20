@@ -1,0 +1,15 @@
+=== s93udp.sh  2026-09-21T01:47:59+08:00
+--- rung 2M  pre-ping 2/2
+C-2M-r1  bytes=151  
+    
+    !! n_tx_stop is NOT 0 -- this rung's number is VOID (card § 5.4)
+C-2M-r2  bytes=149  
+    now_icr C4000000 tpdcr0_pos A15B804C 
+    !! n_tx_stop is NOT 0 -- this rung's number is VOID (card § 5.4)
+C-2M-r3  bytes=64  
+    
+    !! n_tx_stop is NOT 0 -- this rung's number is VOID (card § 5.4)
+--- rung 2M  post-ping 0/2
+=== WEDGED at 2M
+=== stopping ON PURPOSE: the recovery bisection in card § 6 needs a
+=== LIVE wedge, and the next rung would destroy it.

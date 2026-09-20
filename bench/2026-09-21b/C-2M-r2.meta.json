@@ -1,0 +1,22 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-21T01:49:08+0800",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 45.0,
+  "idle": 0.0,
+  "until": "iperf Done|error|refused|unable",
+  "until_offset": 72,
+  "sent": "iperf3 -c 10.1.1.2 -p 5201 -t 10 -i 1 -f m -u -l 1400 -R -b 2M",
+  "sent_hex": "697065726633202d632031302e312e312e32202d702035323031202d74203130202d692031202d66206d202d75202d6c2031343030202d52202d6220324d0d",
+  "stop_reason": "--until matched at offset 72",
+  "bytes": 149,
+  "duration_s": 17.907771,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

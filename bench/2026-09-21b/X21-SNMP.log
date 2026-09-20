@@ -1,0 +1,3 @@
+grep -A1 Icmp: /proc/net/snmp
+/bin/sh: grep: not found
+# 

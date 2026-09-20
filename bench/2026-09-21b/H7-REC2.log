@@ -1,0 +1,24 @@
+echo engine off > /proc/rtl819x-nic ; echo arm > /proc/rtl819x-nic ; echo engine on > /proc/rtl819x-nic
+[  789.330000] Virtual device rlx0 asks to queue packet!
+[  790.390000] Virtual device rlx0 asks to queue packet!
+[  795.220000] Virtual device rlx0 asks to queue packet!
+[  796.280000] Virtual device rlx0 asks to queue packet!
+[  797.340000] Virtual device rlx0 asks to queue packet!
+[  802.180000] Virtual device rlx0 asks to queue packet!
+[  803.240000] Virtual device rlx0 asks to queue packet!
+[  804.310000] Virtual device rlx0 asks to queue packet!
+[  809.150000] Virtual device rlx0 asks to queue packet!
+[  810.220000] Virtual device rlx0 asks to queue packet!
+[  811.280000] Virtual device rlx0 asks to queue packet!
+[  816.110000] Virtual device rlx0 asks to queue packet!
+[  817.170000] Virtual device rlx0 asks to queue packet!
+[  818.230000] Virtual device rlx0 asks to queue packet!
+[  823.070000] Virtual device rlx0 asks to queue packet!
+[  824.130000] Virtual device rlx0 asks to queue packet!
+[  825.190000] Virtual device rlx0 asks to queue packet!
+[  830.030000] Virtual device rlx0 asks to queue packet!
+[  831.090000] Virtual device rlx0 asks to queue packet!
+[  832.150000] Virtual device rlx0 asks to queue packet!
+[  836.980000] Virtual device rlx0 asks to queue packet!
+[  838.040000] Virtual device rlx0 asks to queue packet!
+[  839.100000] Virtual device rlx0 asks to queue packet!

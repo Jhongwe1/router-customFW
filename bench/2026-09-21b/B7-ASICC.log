@@ -1,0 +1,2 @@
+echo clear > /proc/rtl865x/asicCounter
+# 

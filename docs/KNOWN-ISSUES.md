@@ -924,6 +924,35 @@ is the *same* fault as seating 31's wedges. Seating 30's console gave **0 bytes
 with no echo at all**; seating 31's echoes. Those are different observables, and
 this file does not merge them.
 
+## 🔴 What `R6-5`'s fourth seating did NOT establish — 2026-09-21 (ninety-third segment, seating 32)
+
+Images `s31b` (quiet) and `s31L` (loud, first execution on this silicon),
+`RECIPE_ID f179cf21` for both. Three power cycles; the second and third were
+**recoveries**, not experiments. Card
+`bench/2026-09-21b/PREDICTIONS-B36-block34.md`, results
+`bench/2026-09-21b/RESULTS-block34.md`.
+
+| | what would settle it |
+|---|---|
+| 🔴🔴 **Why the engine stops is still unanswered, but the question is now precise.** Five hypotheses went in and four came out refuted **by direct measurement, against refutation conditions written before power**: the ASIC descriptor pool is not exhausted (`USEDDSC` 18 of a live `S_DSC_RUNOUT` of 244, high-water 30, `DSCRUNOUT` and `SharedBufFCON_Flag` 0 throughout), no port's output queue is congested (`PCSR0`/`PCSR1` both `00000000`, CPU port included), the doorbell is not it (`txstall off` does not recover), and the engine's command state is not it (`engine off ; engine on` does not recover). `STOPTX` is clear and `seen_iisr` carries no error bit. **The engine sits on a descriptor it owns, at its own position pointer, short of nothing, and will not consume it** | The one surviving hypothesis is the ring state, and `arm` changes three things at once. Two are excluded by measurement — repositioning (rung 2 did it alone and failed) and the index reset (software-only) — leaving the OWN-clear. 🔴 **Isolating it needs a build**: no verb on this image clears one descriptor without the others. `NET-71`, `NET-72` |
+| 🔴🔴 **`D5` NOT OBTAINED, and for the first time the reason is a mechanism.** `PROGRESS.md`'s `D5` names `iperf3` and nothing else; `iperf3` always opens a TCP control socket; and a TCP connection is the one factor present in every wedge and absent from every non-wedge. Five `iperf3` invocations this seating, five wedges, one of them with the host-side server log **empty** — the control connection never completed | ⚠️ **"A TCP connection" and "`iperf3`" are not separated.** A raw TCP connection with no `iperf3` — `socat` from the host to any listening port — separates them. **The first cell of the next seating, and it costs no power and no image.** `NET-73` |
+| 🟢🟢 **`D6` IS MET** — 31.66 minutes, `drop 0/0`, zero console bytes on a `PRINTK=y` image, one unbroken read-only capture; **7.067 GB both ways at 29.761 Mbit/s aggregate**. 🔴 **What did NOT close with it**: the capture ran 1,860.084 s and the flood 1,899.593 s, so **the last 39.5 s are uncaptured — 97.9 % coverage, not whole**. `ping -w` overshoots its deadline while waiting for outstanding replies, measured here at **99.6 s** | One number: the capture's `--seconds` must exceed the flood's `-w` by more than the overshoot. `SPEC.md` `NET-76` |
+| 🔴 **After the flood the board answers ARP and not ICMP echo, and it is not `NET-67`.** 量: ARP `REACHABLE`, `n_tx_stop 0`, `tx_stopped 0`, all four `txd` OWN clear, and `nd_stats` advancing in **both** directions across four ping attempts (`rx +6`, `tx +3`). So the TX path works | `/proc/net/snmp`'s `Icmp:` pair, `cat` whole — ⚠️ this image's `busybox grep` has no `/bin/` symlink (`FW-96`), so it cannot be filtered on the board. Host-side `tcpdump` on the bench network is the third route. `NET-76` 殘留 |
+| 🔴 **The vendor-driver contrast still could not be taken**, for the same reason as seating 29: `ifconfig eth4 up` returns `SIOCSIFFLAGS: Device or resource busy` because this driver holds a non-shared `request_irq(12)`. **So "the vendor's driver survives what kills mine" remains 推 in this repository** | An image in which this driver is not bound, or a shared IRQ |
+| 🔴 **Why the shell stops executing while the kernel and the tty stay alive.** 量, a three-state reading: kernel printing every 1.06 s, tty echoing a 101-character line in full, and `echo RLXFW-PROBE-E` — an ash **builtin**, no `fork`, no `/proc` — returning one line instead of two | 推: `printk` reaches the wire through polled `prom_putchar` while a userspace write needs the UART **TX interrupt**. **Reading `/proc/interrupts`' serial line across the transition settles it; not read.** `NET-75` |
+| 🔴 **It is why `busybox reboot -f` cannot recover this fault** — the shell never executes it. 量 twice now: seating 31 captured 7,489 bytes, all ESC; this seating **7,883 bytes, all ESC**. **Two of this seating's three power cycles were spent on that** | The same `/proc/interrupts` reading, plus a kernel-side escape that does not need the shell (the watchdog driver's `/proc` has one, and it also needs the shell) |
+| ⚠️ **`seen_iisr` bits 12 and 13 are set in health and in fault and are unnamed** in this driver's bit table | Not chased. `rtl865xc_asicregs.h`'s `CPUIISR` field list |
+| ⚠️ **Seating 31's `n_rx` anomaly is still unexplained.** The loopback hypothesis that would have explained it is refuted at the desk: `portlist 0x3F` is bits 0–5 and the CPU port is 6 in the `PORTID` namespace and 7 in the TX-descriptor mask namespace, so `0x3F` excludes it under both | Not chased |
+
+⚠️ **And two process failures of this segment, recorded because one of them
+nearly became a measurement.** An overwrite refusal was sent to `/dev/null` and
+the stale files that the tool had declined to replace were then read as the new
+reading — five of nine rows wrong, internally consistent. And a **byte count
+was read as a boot**, where the uptime stamps inside the same capture showed the
+board had never lost power; `looprun` stopped at `S5` and uploaded nothing.
+🟢 Both were caught by something other than the person who made them — the
+second by the tool's own abort gate. `RESULTS-block34.md` § 1, § 9.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

@@ -1,0 +1,2 @@
+iperf3 -c 10.1.1.2 -p 5201 -t 10 -i 1 -f m -u -l 1400 -b 20M
+Connecting to host 10.1.1.2, port 5201

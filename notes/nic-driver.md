@@ -1255,3 +1255,169 @@ at every read across six arms. The reason the loop stays is the TX side.
 * **`D5` and `D6` were not obtained.** `NET-60`'s half *is* closed: 量 `V1`,
   `Reverse mode, remote host 10.1.1.2 is sending`, so 3.1.3 at both ends
   completes the control exchange 3.16 could not.
+
+## 12. `R6-5` seating 32 — the fault needs a TCP connection, and the engine is not short of anything
+
+Everything below is 量 on 2026-09-21, images `s31b` (quiet) and `s31L` (loud,
+its first execution on this silicon), `RECIPE_ID f179cf21` for both — the two
+are told apart by the assembled image's sha256 and never by `RECIPE_ID`
+(`FW-99`). Card `bench/2026-09-21b/PREDICTIONS-B36-block34.md`; results
+`bench/2026-09-21b/RESULTS-block34.md`.
+
+### 12.1 🔴 The residual this block was written against was already answered
+
+§ 11.6 and `SPEC.md`'s `NET-67` 殘留 say the engine-side TX register *"was not
+read"*. It was read **six times**, by seating 31's own captures, because
+`rtl819x-nic.c:1693-1694` prints `tpdcr0_pos` on every `cat`. The reason nobody
+saw it: `bench/2026-09-21/wedgeprobe.sh` writes the full `/proc` to the `.log`
+and shows the operator a filtered view whose filter (`:32`) names `rpdcr0_pos`
+and `rmdcr0_pos` and **not** `tpdcr0_pos`. 量:
+`grep -c tpdcr0_pos bench/2026-09-21/wedgeprobe.sh` → **0**.
+
+**An instrument's own summary hid its own reading, and the gap it manufactured
+looked like honest work remaining.** Four files restated it.
+
+### 12.2 🔴 The engine stops with ONE descriptor outstanding
+
+Reading seating 31's six captures as a series, with `tx_ring = A15B8040` and
+slot = `(pos − base)/4`: at `W3-DURING` exactly one descriptor was engine-owned
+(slot 2) and the engine's pointer sat on it; by `W4-AFTER` the driver had
+filled three more (`n_tx` 23 → 26) and the engine's pointer had **not moved**.
+
+**So the all-four-owned state is a consequence and not the trigger**, and
+`NIC_TX_DESC = 4` plus the missing N−1 invariant are a *second and independent*
+defect — they are why an engine pause becomes a dead interface here.
+
+### 12.3 🔴🔴 The engine is not short of anything — first reading of the SWCORE descriptor-diagnostic block
+
+Read through the vendor's `/proc/rtl865x/memory`, one address per cell.
+Addresses re-derived from `rtl865xc_asicregs.h`: `SWCORE_BASE 0xBB800000`
+(`:147`) + `SWCORECNR 0x6000` (`:674`) + `DESCDIAG_BASE 0x0100` (`:699`).
+
+| register | address | at rest | during the wedge |
+|---|---|---|---|
+| `GDSR0` | `0xBB806100` | `00120013` | **`0012001E`** |
+| `PCSR0` | `0xBB806108` | `00000000` | `00000000` |
+| `PCSR1` | `0xBB80610C` | `00000000` | `00000000` |
+| `P6_DCR0` | `0xBB806170` | `00000000` | `00000000` |
+| `SBFCR0` | `0xBB804500` | `000000F4` | `000000F4` |
+| `CPUTPDCR0` | `0xB8010020` | `A15B8048` | `A15B804C` |
+| `CPUICR` | `0xB8010000` | `C4000000` | `C4000000` |
+
+* `USEDDSC` (bits 25:16) = **18** at rest and **18** during the wedge.
+* `MaxUsedDsc` (bits 13:0) = 19 → **30** over the whole episode.
+* `DSCRUNOUT` (bit 27), `TotalDscFctrl_Flag` (26), `SharedBufFCON_Flag` (14):
+  **0 throughout**.
+* `S_DSC_RUNOUT` = `0xF4` = **244** — 🔴 not the **480** the vendor's
+  `rtl865x_asicCom.c:1052` writes.
+
+🔴 **The shared descriptor pool is not exhausted**: 18/244 = 7.4 %, high water
+30/244 = 12.3 %. 🔴 **No port's output queue is congested**, CPU port included.
+🔴 **`STOPTX` (bit 21) is clear** — `C4000000 & 00200000 = 0`, so the engine is
+commanded to run. 🔴 **No error bit ever set**: `seen_iisr 0000320E` throughout
+the wedge, no `TX_ERR` (23), no `PKTHDR_RUNOUT` (17–22), no `MBUF_RUNOUT` (16).
+
+**The engine reports nothing wrong and does not consume a descriptor it owns.**
+
+🟢 `MaxUsedDsc` is **not** clear-on-read (two reads at rest, identical) — a
+control written to find out, which answered no.
+
+🟢 `CPUTPDCR0` has **two sources sharing no code** for the first time: the
+driver's `nic_rd()` and the vendor's `/proc/rtl865x/memory`, read seconds apart
+with no traffic between, both `A15B8048`.
+
+### 12.4 🟢 The recovery bisection
+
+| rung | writes | recovered |
+|---|---|---|
+| `txstall off` | `TXCMD` + `TXFD` doorbell **only** | ❌ |
+| `engine off ; engine on` | full `CPUICR` rewrite by plain `=` | ❌ |
+| `engine off ; arm ; engine on` | + four ring words OWN-clear, + bases, + indices | 🟢 **ping 4/4, rtt 1.307 ms** |
+
+The doorbell is excluded; the engine's command state is excluded. 🟢 And rung 2
+moved `tpdcr0_pos` from slot 3 to the ring base **without writing
+`CPUTPDCR0`** — `nic_do_engine` touches only `0x000`, `0x028`, `0x02C` — so
+**cycling `TXCMD` resets the engine's TX pointer**, and repositioning alone is
+also excluded. Of `arm`'s three changes, the index reset is software-only, so
+**the OWN-clear is the only one that can have acted.** 🔴 推: no verb on this
+image clears one descriptor without the others.
+
+🟢 Rung 3 recovered to **4/4** where seating 31 reached 2/4, so `NET-68`'s
+*"the recovery is partial"* belongs to that seating's sequence, not to `arm`.
+
+### 12.5 🔴🔴 The fault needs a TCP connection — § 11.6's discriminator, run
+
+| workload | TCP | in flight | small TX | frames each way | wedge |
+|---|---|---|---|---|---|
+| flood ping 1400 B (seating 27) | ✗ | 4 | ✗ | 7,466 TX | ✗ |
+| flood ping 1400 B, `-l 32` | ✗ | **34** | ✗ | **27,017** | ✗ |
+| bulk flood + concurrent 18-byte ping | ✗ | 34+4 | **3,110** | 21,388 | ✗ |
+| `iperf3` TCP bulk (seating 31) | ✓ | — | ✓ | 26 TX | **✓** |
+| `iperf3 -u -R`, board receives | ✓ control | — | ✓ | 51 TX | **✓** |
+| `iperf3 -u`, board sends | ✓ control | — | ✓ | — | **✓** |
+
+**Excluded by measurement: frame size, in-flight depth, total volume,
+direction, bulk transport.** Two of the three wedging runs carried no bulk TCP
+at all, and one wedged with the host-side server log **empty** — the control
+connection never completed, so the handshake is inside the triggering window.
+
+⚠️ 推, and the experiment that decides it: `iperf3` always opens a TCP control
+socket, so **"a TCP connection" and "`iperf3`" are not separated**. A raw TCP
+connection with no `iperf3` — `socat` from the host to any listening port —
+separates them. **Not run; first cell of the next seating.**
+
+### 12.6 The first measured throughput of this driver, and why it is not `D5`
+
+量, both directions simultaneously, 20.852 s, host and board counters agreeing
+to the byte (`rx 27017/38942234`, `tx 27017/38942234`):
+
+* **1.868 MB/s = 14.94 Mbit/s each way**, **29.88 Mbit/s aggregate**
+* **0.0815 % loss**, `pipe 34`, `n_tx_stop 0`, all four `txd` OWN clear
+
+🔴 **It does not satisfy `D5`**, which names `iperf3` and nothing else. 🟢 It
+falls inside the 24.7–33.1 Mbit/s bracket derived at the desk, before the run,
+from seating 31's `-s` fragment ladder.
+
+### 12.7 🟢 The loud image makes the fault announce itself
+
+`CONFIG_PRINTK=y`: a wedged board prints
+`Virtual device rlx0 asks to queue packet!` every **1.06 s**, ratelimited. 讀
+`net/core/dev.c`, `dev_queue_xmit()` — the `q->enqueue == NULL` branch taken
+when `netif_tx_queue_stopped()` is true, i.e. the printed composition of
+`NET-57` (`tx_queue_len = 0` ⇒ `noqueue`) with the wedge. Every outbound packet
+is dropped there.
+
+**On the quiet image the interface dies silently.** That is a diagnostic reason
+for the loud variant independent of `D6`'s wording.
+
+### 12.8 🔴 A three-state reading of what `NET-64` calls "mute"
+
+| layer | state | evidence |
+|---|---|---|
+| kernel | alive | ratelimited `printk` every 1.06 s |
+| tty | alive | the full 101-character line echoed back |
+| shell | **not executing** | `echo RLXFW-PROBE-E` returns one line, not two — and `echo` is an ash **builtin** |
+
+推: `printk` reaches the wire through `prom_putchar`, a polled write bypassing
+the tty layer, while a userspace write needs the UART **TX interrupt** to drain
+the tty ring. A shell blocked on `write()` with polled `printk` still working
+is what a lost UART TX interrupt looks like. **`/proc/interrupts`' serial line
+across the transition settles it; not read.**
+
+🔴 It also explains why `reboot -f` cannot work there — the shell never
+executes it — reproducing seating 31's *7,489 bytes, all ESC*. This seating:
+**7,883 bytes, all ESC**.
+
+### 12.9 What § 12 does NOT establish
+
+* **Why the engine stops.** Five hypotheses were carried in; `H-POOL`, `H-FC`,
+  `H-BELL` and `H-CMD` are refuted by measurement and `H-RING` is where the
+  evidence points without isolating it.
+* **TCP versus `iperf3`.** § 12.5's ⚠️.
+* **Whether the vendor's driver survives what kills this one.** 推 strongly, but
+  the contrast has never been taken: 讀 `docs/KNOWN-ISSUES.md`, seating 29's
+  `ifconfig eth4 up` returned `SIOCSIFFLAGS: Device or resource busy` because
+  this driver holds a non-shared `request_irq(12)`.
+* **`D6`.** Not attempted. 🟢 But its precondition is now measured rather than
+  assumed: a flood ping at depth 34 carries 27,017 frames each way with
+  `n_tx_stop 0`, so the 30-minute flood has a proven-survivable form.

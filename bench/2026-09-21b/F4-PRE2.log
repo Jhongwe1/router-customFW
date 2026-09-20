@@ -1,0 +1,14 @@
+cat /proc/rtl819x-nic
+[  746.530000] Virtual device rlx0 asks to queue packet!
+[  747.590000] Virtual device rlx0 asks to queue packet!
+[  748.650000] Virtual device rlx0 asks to queue packet!
+[  753.480000] Virtual device rlx0 asks to queue packet!
+[  754.540000] Virtual device rlx0 asks to queue packet!
+[  755.610000] Virtual device rlx0 asks to queue packet!
+[  760.450000] Virtual device rlx0 asks to queue packet!
+[  761.510000] Virtual device rlx0 asks to queue packet!
+[  762.580000] Virtual device rlx0 asks to queue packet!
+[  767.420000] Virtual device rlx0 asks to queue packet!
+[  768.480000] Virtual device rlx0 asks to queue packet!
+[  769.540000] Virtual device rlx0 asks to queue packet!
+[  774.370000] Virtual device rlx0 asks to queue packet!

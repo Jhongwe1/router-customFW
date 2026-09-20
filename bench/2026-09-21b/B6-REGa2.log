@@ -1,0 +1,9 @@
+echo read 0xBB806100 4 >/proc/rtl865x/memory ; echo read 0xBB806104 4 >/proc/r
+tl86cmd read
+5
+bb806100:  x00/12m00e13m  o	r	 y	 	 
+	 	 	 	 	 	 	 	 	 	    
+cmd read
+
+bb806104:  00000000  		 	 	 	 	 	 	 	 	 	 	 	 	    
+# 

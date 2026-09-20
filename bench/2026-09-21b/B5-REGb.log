@@ -1,0 +1,9 @@
+echo read 0xBB806108 4 >/proc/rtl865x/memory ; echo read 0xBB80610C 4 cmd read
+>
+bb806108:  /00p00r00o00c  /	r	 	 	 
+	 t	 l	 8	 6	 5	 x	 /	 m	 e	    m
+orycmd read
+
+bb80610c:  
+00000000  		 	 	 	 	 	 	 	 	 	 	 	 	    
+# 
