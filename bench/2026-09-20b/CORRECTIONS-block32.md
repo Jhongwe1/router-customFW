@@ -279,3 +279,68 @@ nothing, and the same applies to a prediction.
   `InReceives`**, with 221 + 875 = **1,096 = `Z1`'s `InTruncatedPkts`**, to the
   packet. ⚠️ `InTruncatedPkts` is per-**skb** (`ip_input.c:532`), so *one per
   failed datagram* compares two different units and is dropped.
+
+---
+
+## 3. The post-mortem ran, its gate fired, and the control is worth more than the payload
+
+**量 2026-09-20 22:04–22:05, power cycle 2 of seating 30.** The operator turned
+the board off at ~21:58 unprompted and powered it back on at ~22:04, so the
+unpowered interval is **~6–7 minutes** — the start resting on their report and
+the end on this desk's own timestamps. The card assumed **≤ 5 s**, so **the
+experiment ran outside its own stated precondition.**
+
+### The gate fired
+
+| window | expected, from the ELF | read | differing bits |
+|---|---|---|---|
+| `Q1b-TXTHI` `80200000` | `.text` | 5 words differ | **5 / 512 = 0.977 %** |
+| `Q3b-MAC` `8028ED50` | `02524c58 46570000 …` | word 2 differs | **1 / 128 = 0.781 %** |
+| `Q5b-TXTHI2` | same window as `Q1b` | — | **byte-identical to `Q1b`** |
+
+Every one of the five differences is a **single bit**.
+
+🔴 **So `Q2b-NIC`'s and `Q4b-WDT`'s numbers are DISCARDED**, because § 1's rule,
+written before the read, says *"If any one of `Q1`, `Q3` and `Q5` differs in one
+nibble, every number from `Q2` and `Q4` is discarded and not interpreted."* The
+captures are committed and uninterpreted; a later card with a properly derived
+tolerance can read them.
+
+Not softening it after the fact is the point. This seating already refused twice
+to repair an instrument so it would agree with an experiment.
+
+### 🟢🟢 What the control bought instead — a third point on this part's retention curve
+
+| unpowered | bits flipped | source |
+|---|---|---|
+| ~2 min | 1 / 22,976 = **0.004 %** | `MEM-17` |
+| **~6–7 min** | **6 / 640 = 0.938 %** | **this block** |
+| 35.1 min | 598 / 22,976 = **2.603 %** | `MEM-17` |
+| ~14.5 h | ≈ **50 %** (statistically independent) | `MEM-18`, `P1`–`P7` |
+
+🟢 And `Q1b == Q5b` byte-identical again: the flips are **stable across the read
+session**, which is the same control shape `P1`/`P7` gave.
+
+### 🔴🔴 And the gate's own design is refuted by using it
+
+A binary *one nibble and everything is discarded* cannot express **99.06 %
+retained**. It was written for an interval where the answer is either 0 bits or
+noise, and it was applied at an interval where the answer is a rate.
+
+**The fix belongs on the next card, not here**: the gate must carry a **bit-count
+tolerance derived from the curve above BEFORE the read**, so that "is 1 % close
+enough" is answered by a number chosen in advance rather than by whoever is
+looking at the screen.
+
+### 🔴 One instrument defect, and it cost one cell
+
+`Q1-TXTHI` came back **45 bytes with no data line**, in 0.0 s: `--until
+'RealTek>'` matched the loader's **own backlog** — the `Unknown command !` /
+`<RealTek>` still draining from the ESC window that had just been killed — and
+ended the capture before the `DW` reply arrived.
+
+⚠️ **The cell is kept, not `--force`d over**: `Q1b`…`Q5b` are new names, and a
+four-second drain capture with no `--send` runs first. `console-capture`'s
+`--until` arms after the write and cannot tell the payload's answer from
+whatever the port was already about to say.
+
