@@ -1244,6 +1244,12 @@ at every read across six arms. The reason the loop stays is the TX side.
 
 * **Why the engine stops retiring TX descriptors.** Nothing was read on the
   engine's side of the ring: `tpdcr0_pos` was not sampled across a wedge, and
+  🔄 **2026-09-21 (seating 32): THAT CLAUSE IS FALSE and was false when it
+  was written.** `rtl819x-nic.c:1693-1694` prints `tpdcr0_pos` on every
+  `cat /proc/rtl819x-nic`, so this seating sampled it **six times** across
+  the wedge without meaning to. What hid it is `wedgeprobe.sh:32`, whose
+  operator filter names `rpdcr0_pos` and `rmdcr0_pos` and not
+  `tpdcr0_pos`. § 12.1.
   `/proc/rtl865x/asicCounter`'s CPU-port `Snd` was never read. Those are the
   two cheapest next readings and neither costs power.
 * **Why the recovery is partial and why it decays.** Three readings gave three
@@ -1251,6 +1257,11 @@ at every read across six arms. The reason the loop stays is the TX side.
   `ifconfig down/up` reached 2/4; a second returned to 0/4.
 * **Whether the fault needs TCP.** Every wedge tonight was TCP. A long ping
   flood — RX plus TX, no TCP — is the discriminator and was not run.
+  🔄 **2026-09-21 (seating 32): it was run, and the answer is that a TCP
+  connection IS required.** Three negative controls — a flood ping at
+  in-flight depth 34 (27,017 frames each way), the same flood with 3,110
+  concurrent 18-byte pings, and the original depth-4 flood — none of them
+  wedged. § 12.5.
 * 🔴 **One dump of the whole seating is anomalous and nothing in the block explains it.** `R4-FINAL` — an off-card read taken after the interface cycle, when ping was already only 2/4 — carries `seen_iisr 0002320E`, **bit 17 `PKTHDR_RUNOUT`, sticky, and the only non-`0000320E` reading of the night**; `n_dsync 1` with `dsync_last_d 4`; `rx_idx 5` against a hardware position of slot 2; and `rxd0`/`rxd1` both CPU-owned at `len 102`. 未定 — **one observation, off-card, and taken in a state that was already degraded.** It is recorded because it is the only place all night where a run-out bit set at all, and because the block's own "driver index == hardware index held at every read" is a claim about the CARDED cells and this dump is not one of them.
 * **`D5` and `D6` were not obtained.** `NET-60`'s half *is* closed: 量 `V1`,
   `Reverse mode, remote host 10.1.1.2 is sending`, so 3.1.3 at both ends
@@ -1418,6 +1429,55 @@ executes it — reproducing seating 31's *7,489 bytes, all ESC*. This seating:
   the contrast has never been taken: 讀 `docs/KNOWN-ISSUES.md`, seating 29's
   `ifconfig eth4 up` returned `SIOCSIFFLAGS: Device or resource busy` because
   this driver holds a non-shared `request_irq(12)`.
-* **`D6`.** Not attempted. 🟢 But its precondition is now measured rather than
-  assumed: a flood ping at depth 34 carries 27,017 frames each way with
-  `n_tx_stop 0`, so the 30-minute flood has a proven-survivable form.
+*(This bullet read **"`D6`. Not attempted."** when § 12 was written, and that
+stopped being true at 03:19 the same night. § 12.10 is what replaced it.)*
+
+### 12.10 🟢🟢 `D6` is met — 31.66 minutes, 7.067 GB, `drop 0/0`
+
+量, image `s31L`, host `ping -f -w 1800 -l 32 -s 1400`, **1,899.593 s**:
+
+| | |
+|---|---|
+| host | 2,450,381 sent / 2,450,254 received / +7 duplicates / **0.00518 % loss**, `pipe 37` |
+| board RX | 2,450,491 frames / 3,533,456,154 bytes |
+| board TX | 2,450,389 frames / 3,533,309,070 bytes |
+| driver | **`drop 0/0`**, `n_tx_stop 0`, `tx_stopped 0`, `n_xmit_busy 0`, `n_skb_fail 0`, four `txd` OWN **clear** at `len 1446` |
+| console | **0 bytes**, `sent: null`, `duration_s 1860.084442` |
+
+Re-derived: `3,533,456,154 ÷ 1,899.593` = **1,860,112 B/s = 14.881 Mbit/s**
+receiving, **14.880 Mbit/s** transmitting, **29.761 Mbit/s aggregate**,
+**1,290 frames/s each way**, **7,066,765,224 bytes = 7.067 GB** both ways.
+🟢 **0.4 % from § 12.6's 20-second figure**, over a run 91× longer.
+
+**The zero-oops evidence is the zero bytes**: this image has `printk`, an oops
+prints, and a wedge prints once every 1.06 s (§ 12.7). Neither appeared.
+
+🔴 **The gap in the third conjunct is mine.** The capture ran 1,860.084 s and
+the flood 1,899.593 s — `ping -w` is a deadline it overshoots while waiting for
+outstanding replies, **measured here at 99.6 s**. The last **39.5 s** are
+uncaptured: **97.9 % coverage, not whole.** The reading taken immediately after
+is clean, but an oops inside those 39 seconds would not have been recorded.
+
+🔴 **And after the flood the board answers ARP and not ICMP echo.** 量: ARP
+`REACHABLE`, `n_tx_stop 0`, `tx_stopped 0`, OWN clear, and `nd_stats` advancing
+in **both** directions across four ping attempts (`rx +6`, `tx +3`). **Not
+`NET-67`** — the TX path works. 未定; `SPEC.md` `NET-76` 殘留 names the reading
+that settles it and why this image could not take it (`busybox grep` has no
+`/bin/` symlink, `FW-96`).
+
+### 12.11 Three second sources the loud image handed over for free
+
+量 `F1-boot.log`, **7,714 bytes** against the quiet image's **1,874**:
+
+* `CPU revision is: 0000cd01` — the kernel's own `PRId`, agreeing with
+  `RLX4181` revision 1 by a route that reads the register rather than a vendor
+  header's table.
+* `icache: 16kB/16B, dcache: 8kB/16B, scache: 0kB/0B` — agreeing with
+  `probe3`'s **experimentally** measured 16 KiB / 16-byte-line I-cache, by a
+  completely different method.
+* `Calibrating delay loop... 398.95 BogoMIPS (lpj=1994752)` — agreeing with the
+  loader banner's `(400MHz)`.
+
+⚠️ **None of the three is in `SPEC.md` yet**, because each corroborates a row
+that already has a value and the corroboration belongs in that row rather than
+in a new one. Carried forward, named here so it is not lost.
