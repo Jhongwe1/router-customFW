@@ -989,6 +989,17 @@ Agreeable understatement is how a claim reaches a hostile reader undefended.
   half-applied two-file edit — the multi-file version of the `open(path, 'w')`
   trap above**, and it is not caught by writing each file safely, because each
   file WAS written safely. Check every anchor first, then write.
+- 🆕 **`sudo apt-get install -y` hangs, and `-y` is not the flag that stops it.**
+  量 2026-09-19: stdin here is the null device, so `dpkg-preconfigure` blocks on a
+  debconf prompt that `-y` does not cover and the command never returns. Prefix
+  **`DEBIAN_FRONTEND=noninteractive`**; `-y` alone is not enough.
+- 🔴 **`git add -A && git status && git commit` on one line prints the status
+  AFTER staging, so the thing you ran it to see is unreadable.** 量 2026-09-20
+  (seating 29): a stray `-t` file reached that seating's **freezing** commit that
+  way. This file already says a step whose failure must stop the next one has to
+  be on the same command line; this is the mirror — **a step whose OUTPUT must be
+  read has to be its own call.** Read `git status --porcelain` first, then
+  `git add` by name, then commit.
 - 🆕 **Running a vendor binary is not a read-only act, and `--version` is not a
   safe way to ask one what it is.** Measured 2026-08-28: a census that ran every
   executable in the three rsdk `bin/` directories with `--version` deleted
@@ -1390,6 +1401,22 @@ rotted twice for the same reason**, and the second time it landed on a blank lin
 check that the exact old token is on the exact line first, and **re-derive each
 new line number by reading it back** rather than copying it out of the checker's
 message.
+🔴 **And `citecheck`'s green says NOTHING about a line you have just edited.**
+量 2026-09-20, twice in one evening on the same question: its own control `T26`
+is *"an uncommitted citing line is skipped, not assumed stable"*, so after an
+editing session it reports `0 new rot` while `25 suspended (citing file dirty)`
+sits two lines above — and `docs/FINDINGS.md:807` was citing a row that had moved
+two lines, on a run that exited 0. **The verdict you want is the one taken AFTER
+the commit**, where `0 suspended` appears in `C4`'s line; before that, re-derive
+every citation you touched yourself, from the row name, by reading `SPEC.md`
+back.
+🔴 **And an automatic citation repairer will eventually edit a number a human
+sentence on the SAME LINE forbids editing.** 量 the same evening: `SPEC.md`
+carries *"🔄 **2026-09-17 刻意拿掉反引號,而這一處不准改號碼**"* because that
+number quotes what a **frozen card** said, and a repair loop that re-derives its
+target changed it anyway — the target check cannot see a permission. **Neither
+the repairer nor `citecheck` can tell a live pointer from a historical
+quotation**; only the prose can, and only a reader reads prose.
 
 🔴🔴 **A tool's own totals line is not its verdict either, and this is
 wider than the `tail` rule above.** 量 2026-09-17, the same red CI run:
