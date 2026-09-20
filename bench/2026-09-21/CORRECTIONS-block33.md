@@ -213,7 +213,7 @@ counter.**
 ## § 7 Power cycles
 
 **Four**, against a card that budgeted one: the 22:29 cold boot plus three
-recoveries at ~01:25, ~01:47 and ~01:58. Every one was a genuine cold power-on,
+recoveries at ~23:43, ~23:52 and ~23:57. Every one was a genuine cold power-on,
 each confirmed by the loader's own discriminator being **absent**
 (`Reboot Result from Watchdog Timeout!`, 0 occurrences in `X4`/`X7`/`X8`).
 
