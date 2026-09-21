@@ -1,0 +1,48 @@
+{
+  "target": "10.1.1.1",
+  "src": "10.1.1.2",
+  "dev": "enxfc19286184c9",
+  "port": 9999,
+  "payload_len": 1400,
+  "frame_bits": 11568,
+  "step_s": 8.0,
+  "rates_mbit": [
+    8.0
+  ],
+  "arp_load": false,
+  "started_wallclock": "2026-09-21T22:40:13+0800",
+  "pre": [
+    {
+      "src": "arping",
+      "ok": true,
+      "detail": "arping rc=0 received=1"
+    },
+    {
+      "src": "ip-neigh",
+      "ok": true,
+      "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+    }
+  ],
+  "steps": [
+    {
+      "rate_mbit_requested": 8.0,
+      "frames": 5534,
+      "seconds": 8.001,
+      "rate_mbit_actual": 8.001,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ]
+    }
+  ],
+  "verdict": "survived the whole ladder"
+}

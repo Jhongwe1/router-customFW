@@ -1,0 +1,323 @@
+{
+  "target": "10.1.1.1",
+  "src": "10.1.1.2",
+  "dev": "enxfc19286184c9",
+  "port": 9999,
+  "payload_len": 1400,
+  "frame_bits": 11568,
+  "step_s": 8.0,
+  "rates_mbit": [
+    0.5,
+    1.0,
+    2.0,
+    4.0,
+    8.0
+  ],
+  "arp_load": true,
+  "started_wallclock": "2026-09-21T22:34:31+0800",
+  "pre": [
+    {
+      "src": "arping",
+      "ok": true,
+      "detail": "arping rc=0 received=1"
+    },
+    {
+      "src": "ip-neigh",
+      "ok": true,
+      "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+    }
+  ],
+  "steps": [
+    {
+      "rate_mbit_requested": 0.5,
+      "frames": 347,
+      "seconds": 8.006,
+      "rate_mbit_actual": 0.501,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.102,
+            true
+          ],
+          [
+            2.226,
+            true
+          ],
+          [
+            3.343,
+            true
+          ],
+          [
+            4.476,
+            true
+          ],
+          [
+            5.594,
+            true
+          ],
+          [
+            6.71,
+            true
+          ],
+          [
+            7.814,
+            true
+          ],
+          [
+            8.927,
+            true
+          ]
+        ],
+        "n": 8,
+        "n_ok": 8,
+        "first_fail_t": null
+      }
+    },
+    {
+      "rate_mbit_requested": 1.0,
+      "frames": 693,
+      "seconds": 8.006,
+      "rate_mbit_actual": 1.001,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.095,
+            true
+          ],
+          [
+            2.204,
+            true
+          ],
+          [
+            3.325,
+            true
+          ],
+          [
+            4.469,
+            true
+          ],
+          [
+            5.585,
+            true
+          ],
+          [
+            6.691,
+            true
+          ],
+          [
+            7.799,
+            true
+          ],
+          [
+            8.899,
+            true
+          ]
+        ],
+        "n": 8,
+        "n_ok": 8,
+        "first_fail_t": null
+      }
+    },
+    {
+      "rate_mbit_requested": 2.0,
+      "frames": 1385,
+      "seconds": 8.005,
+      "rate_mbit_actual": 2.001,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.135,
+            true
+          ],
+          [
+            2.255,
+            true
+          ],
+          [
+            3.384,
+            true
+          ],
+          [
+            4.483,
+            true
+          ],
+          [
+            5.591,
+            true
+          ],
+          [
+            6.73,
+            true
+          ],
+          [
+            7.834,
+            true
+          ],
+          [
+            8.931,
+            true
+          ]
+        ],
+        "n": 8,
+        "n_ok": 8,
+        "first_fail_t": null
+      }
+    },
+    {
+      "rate_mbit_requested": 4.0,
+      "frames": 2768,
+      "seconds": 8.002,
+      "rate_mbit_actual": 4.001,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.115,
+            true
+          ],
+          [
+            2.223,
+            true
+          ],
+          [
+            3.323,
+            true
+          ],
+          [
+            4.423,
+            true
+          ],
+          [
+            5.527,
+            true
+          ],
+          [
+            6.642,
+            true
+          ],
+          [
+            7.755,
+            true
+          ],
+          [
+            8.842,
+            true
+          ]
+        ],
+        "n": 8,
+        "n_ok": 8,
+        "first_fail_t": null
+      }
+    },
+    {
+      "rate_mbit_requested": 8.0,
+      "frames": 5534,
+      "seconds": 8.001,
+      "rate_mbit_actual": 8.001,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.11,
+            true
+          ],
+          [
+            2.231,
+            true
+          ],
+          [
+            3.355,
+            true
+          ],
+          [
+            4.49,
+            true
+          ],
+          [
+            5.607,
+            true
+          ],
+          [
+            6.71,
+            true
+          ],
+          [
+            7.846,
+            true
+          ],
+          [
+            8.958,
+            true
+          ]
+        ],
+        "n": 8,
+        "n_ok": 8,
+        "first_fail_t": null
+      }
+    }
+  ],
+  "verdict": "survived the whole ladder"
+}

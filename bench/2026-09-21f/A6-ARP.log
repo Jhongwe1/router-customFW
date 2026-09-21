@@ -1,0 +1,2 @@
+  arping    ANSWERS  arping rc=0 received=1
+  ip-neigh  ANSWERS  neigh 56:0a:01:01:01:e8 REACHABLE

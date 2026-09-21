@@ -1,0 +1,10 @@
+echo unlock > /proc/rtl819x-nic ; echo netdev on > /proc/rtl819x-nic ; ifconfi
+g rlx0R L1X0.F1.W1.-3N -uUpN
+LOCK
+RLXFW-N-NDREG
+RLXFW-N-ALLOC=A15B8000
+RLXFW-N-ARM=A15B8000
+RLXFW-N-ARMR=00000000
+RLXFW-N-ENGON=C4000000
+RLXFW-N-NDOPEN
+# 

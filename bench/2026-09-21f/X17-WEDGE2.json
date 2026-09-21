@@ -1,0 +1,28 @@
+{
+  "target": "10.1.1.3",
+  "src": "10.1.1.2",
+  "dev": "enxfc19286184c9",
+  "port": 9999,
+  "payload_len": 1400,
+  "frame_bits": 11568,
+  "step_s": 8.0,
+  "rates_mbit": [
+    0.5
+  ],
+  "arp_load": false,
+  "started_wallclock": "2026-09-21T23:13:46+0800",
+  "pre": [
+    {
+      "src": "arping",
+      "ok": false,
+      "detail": "arping rc=1 received=0"
+    },
+    {
+      "src": "ip-neigh",
+      "ok": false,
+      "detail": "neigh no-lladdr INCOMPLETE"
+    }
+  ],
+  "steps": [],
+  "refused": "target silent before the ladder"
+}

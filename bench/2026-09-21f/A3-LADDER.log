@@ -1,0 +1,10 @@
+  pre  arping    ANSWERS  arping rc=0 received=1
+  pre  ip-neigh  ANSWERS  neigh 56:0a:01:01:01:e8 REACHABLE
+pre-ladder: target answers -- the refutation condition is armed
+  0.5 Mbit/s requested       347 frames in  8.01 s  =  0.50 Mbit/s actual  ->  target ANSWERS   [arp load 8/8 ok]
+  1.0 Mbit/s requested       693 frames in  8.01 s  =  1.00 Mbit/s actual  ->  target ANSWERS   [arp load 8/8 ok]
+  2.0 Mbit/s requested      1385 frames in  8.01 s  =  2.00 Mbit/s actual  ->  target ANSWERS   [arp load 8/8 ok]
+  4.0 Mbit/s requested      2768 frames in  8.00 s  =  4.00 Mbit/s actual  ->  target ANSWERS   [arp load 8/8 ok]
+  8.0 Mbit/s requested      5534 frames in  8.00 s  =  8.00 Mbit/s actual  ->  target ANSWERS   [arp load 8/8 ok]
+every step survived -- on 0.5..8.0 Mbit/s at 1400-byte frames this target does not stop transmitting
+wrote bench/2026-09-21f/A3-LADDER.json

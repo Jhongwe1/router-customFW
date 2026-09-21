@@ -1,0 +1,6 @@
+  pre  arping    ANSWERS  arping rc=0 received=1
+  pre  ip-neigh  ANSWERS  neigh 56:0a:01:01:01:e8 REACHABLE
+pre-ladder: target answers -- the refutation condition is armed
+  8.0 Mbit/s requested      5534 frames in  8.00 s  =  8.00 Mbit/s actual  ->  target ANSWERS
+every step survived -- on 8.0..8.0 Mbit/s at 1400-byte frames this target does not stop transmitting
+wrote bench/2026-09-21f/X6-BLAST.json

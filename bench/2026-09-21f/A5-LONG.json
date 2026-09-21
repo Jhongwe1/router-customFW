@@ -1,0 +1,163 @@
+{
+  "target": "10.1.1.1",
+  "src": "10.1.1.2",
+  "dev": "enxfc19286184c9",
+  "port": 9999,
+  "payload_len": 1400,
+  "frame_bits": 11568,
+  "step_s": 30.0,
+  "rates_mbit": [
+    8.0
+  ],
+  "arp_load": true,
+  "started_wallclock": "2026-09-21T22:36:24+0800",
+  "pre": [
+    {
+      "src": "arping",
+      "ok": true,
+      "detail": "arping rc=0 received=1"
+    },
+    {
+      "src": "ip-neigh",
+      "ok": true,
+      "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+    }
+  ],
+  "steps": [
+    {
+      "rate_mbit_requested": 8.0,
+      "frames": 20748,
+      "seconds": 30.0,
+      "rate_mbit_actual": 8.0,
+      "alive_after": true,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": true,
+          "detail": "arping rc=0 received=1"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": true,
+          "detail": "neigh 56:0a:01:01:01:e8 REACHABLE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.107,
+            true
+          ],
+          [
+            2.215,
+            true
+          ],
+          [
+            3.303,
+            true
+          ],
+          [
+            4.431,
+            true
+          ],
+          [
+            5.555,
+            true
+          ],
+          [
+            6.67,
+            true
+          ],
+          [
+            7.795,
+            true
+          ],
+          [
+            8.899,
+            true
+          ],
+          [
+            10.007,
+            true
+          ],
+          [
+            11.135,
+            true
+          ],
+          [
+            12.271,
+            true
+          ],
+          [
+            13.383,
+            true
+          ],
+          [
+            14.507,
+            true
+          ],
+          [
+            15.642,
+            true
+          ],
+          [
+            16.743,
+            true
+          ],
+          [
+            17.867,
+            true
+          ],
+          [
+            18.983,
+            true
+          ],
+          [
+            20.071,
+            true
+          ],
+          [
+            21.187,
+            true
+          ],
+          [
+            22.315,
+            true
+          ],
+          [
+            23.419,
+            true
+          ],
+          [
+            24.542,
+            true
+          ],
+          [
+            25.65,
+            true
+          ],
+          [
+            26.747,
+            true
+          ],
+          [
+            27.867,
+            true
+          ],
+          [
+            28.971,
+            true
+          ],
+          [
+            30.08,
+            true
+          ]
+        ],
+        "n": 27,
+        "n_ok": 27,
+        "first_fail_t": null
+      }
+    }
+  ],
+  "verdict": "survived the whole ladder"
+}

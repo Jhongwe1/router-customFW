@@ -1,0 +1,4 @@
+echo write 0xB8010000 0xC4400000 > /[ 1251.580000] cmd write
+p[ 1251.580000] Write memory 0xb8010000 dat 0xc4400000: 0x4000000
+roc/rtl865x/memory
+# 

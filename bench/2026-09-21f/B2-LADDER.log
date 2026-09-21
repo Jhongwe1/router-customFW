@@ -1,0 +1,6 @@
+  pre  arping    ANSWERS  arping rc=0 received=1
+  pre  ip-neigh  ANSWERS  neigh 02:52:4c:58:46:57 REACHABLE
+pre-ladder: target answers -- the refutation condition is armed
+  0.5 Mbit/s requested       347 frames in  8.01 s  =  0.50 Mbit/s actual  ->  target SILENT
+threshold is between the previous step and 0.5 Mbit/s
+wrote bench/2026-09-21f/B2-LADDER.json

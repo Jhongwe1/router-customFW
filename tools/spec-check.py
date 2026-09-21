@@ -231,6 +231,22 @@ REDACTION_ALLOWLIST = {
         'as above, lower case: the HOST prints it that way in ip neigh, '
         'and quoting a measurement under a different spelling to satisfy '
         'a checker would misreport what the instrument printed',
+    ('MAC, colon form', '56:0a:01:01:01:e8'):
+        "the LOADER's address, and it is synthesised rather than stored: "
+        "量 (notes/leak-surface.md, 2026-09-06) bytes 2-5 are 0a:01:01:01 "
+        "= 10.1.1.1, which is what THIS DESK types into IPCONFIG for one "
+        "seating, exactly as the 10.1.1 entry below. The value is already "
+        "committed in 12 files including RUNSHEET.md and "
+        "notes/leak-surface.md, which owns the leak-surface question; "
+        "redacting it here alone would protect nothing. "
+        "⚠️ THE RESIDUAL, stated rather than left out: bytes 1 and 6 "
+        "(0x56 and 0xe8) are NOT accounted for by that derivation. They "
+        "have read the same on every seating that recorded them, which is "
+        "equally consistent with a constant and with something unit-"
+        "specific, and no seating has ever set a different IPCONFIG "
+        "address to tell the two apart. 未定. This entry rests on bytes "
+        "2-5 being measured and on the value already being public, not on "
+        "bytes 1 and 6 being understood.",
     ('private IPv4', '10.1.1'):
         "the bench network between this desk and the board -- 10.1.1.1 "
         "is what IPCONFIG sets on the loader, .2 is the workstation's "

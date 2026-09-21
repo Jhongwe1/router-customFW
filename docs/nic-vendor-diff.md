@@ -749,8 +749,22 @@ is a divergence to know about rather than a defect.
 
 ### 12.5 🟢 What this read buys: a bench cell that needs no image and no boot
 
-量 `looprun`'s `S5c`, every seating: **at the loader prompt the board answers
-ARP.** That is this service loop running, and transmitting, on the same engine
+~~量 `looprun`'s `S5c`, every seating: **at the loader prompt the board answers
+ARP.**~~ 🔴 **REFUTED on the silicon 2026-09-21 (seating 36), and the correction
+is one command.** `S5c` passes *after* `S5`, the rescue, which sends
+`IPCONFIG`; 讀 `RUNSHEET.md:566` has said since 2026-08-24 that *the loader
+answers the network only after this*, and 量 `tools/looprun.py:345-363` puts
+the rescue before `S5c` in the plan. **So no `S5c` reading has ever been taken
+on a bare cold boot.** Measured on one: `arping` 5 transmitted / 0 received and
+`ip neigh` `INCOMPLETE` three times, **twice** — once with an ESC stream up and
+once with the console quiet and nothing holding the port, which is what rules
+out the instrument. After `IPCONFIG 10.1.1.1` the same probe reads
+`56:0a:01:01:01:e8 REACHABLE`, and bytes 2–5 of that address are `0a:01:01:01`
+= 10.1.1.1, so the loader synthesises its MAC from what `IPCONFIG` gave it.
+`SPEC.md` `NET-95`.
+
+The corrected sentence: **after `IPCONFIG`**, the loader answers ARP at its
+prompt. That is this service loop running, and transmitting, on the same engine
 and the same four descriptors.
 
 So the loader is a **test harness that is already on the device**:
@@ -768,3 +782,199 @@ So the loader is a **test harness that is already on the device**:
 🔴 **Either answer is worth more than another driver iteration**, and it costs
 no TFTP, no boot and no image: the board is at that prompt after every reset
 this project already performs.
+
+---
+
+## 13. What § 12.5's seating returned — the engine is fine, and the fault is above it
+
+量 2026-09-21, seating 36, `bench/2026-09-21f`, card `PREDICTIONS-B41-block39.md`.
+One cold power-on at 22:22, no image, no boot, no TFTP.
+
+### 13.1 🔴 The framing had to be corrected before a single frame went out
+
+§ 12.5 said *at the loader prompt the board answers ARP*. It does not, until
+`IPCONFIG` has been typed — see § 12.5, corrected in place. Two probes on the
+bare cold boot, one with an ESC stream up and one with the console quiet and
+nothing holding the port, both read `arping` **0 received** and `ip neigh`
+**`INCOMPLETE`**. The second is what rules out the instrument; `RUNSHEET.md:566`
+is what named the cause.
+
+### 13.2 🟢🟢 The loader does not stop transmitting, at 16× the dose
+
+`A3` walked the ladder and `A5` held its top for 30 s. Every rung kept ARP
+requests going for the whole of the rung, so the TX ring was cycling **during**
+the blast and not only asked about afterwards.
+
+| rung | requested | frames | seconds | actual | ARP during | after |
+|---|---|---:|---:|---|---|---|
+| `A3` 1 | 0.5 Mbit/s | **347** | **8.01** | 0.501 | 8/8 | ANSWERS |
+| `A3` 2 | 1.0 | 693 | 8.01 | 1.001 | 8/8 | ANSWERS |
+| `A3` 3 | 2.0 | 1,385 | 8.01 | 2.001 | 8/8 | ANSWERS |
+| `A3` 4 | 4.0 | 2,768 | 8.00 | 4.001 | 8/8 | ANSWERS |
+| `A3` 5 | 8.0 | 5,534 | 8.00 | 8.001 | 8/8 | ANSWERS |
+| `A5` | 8.0 | **20,748** | 30.00 | 8.000 | 27/27 | ANSWERS |
+
+🟢 **Rung 1 is `Y5`'s dose and not merely close to it**: `NET-87` records `Y5`
+as *347 frames / 8.01 s / 0.5 Mbit/s*, and `tools/netblast.py` carries
+`y5-rateladder.py`'s `blast()` unchanged with a self-test (`C1a`–`C1e`) that
+re-derives that file's constants from the file and refuses on drift.
+
+🟢 **It is not the assertion path.** `A3-CON` and `A5-CON` are console captures
+that send nothing; both are **0 bytes**, so `0x80403DC8`'s
+`printf("Assertion fail") ; j self` never ran. 🟢 **And the board never reset**:
+`A7-PROMPT` and `S0-catch` hold **0** occurrences of
+`Reboot Result from Watchdog Timeout!` while `B1-rz` holds **1**, which is the
+positive control that makes those two zeros readings rather than absences.
+
+### 13.3 🟢🟢 And the frames reached the ENGINE, which is the half that makes 13.2 worth anything
+
+Everything in 13.2 is compatible with a host that sent 31,475 datagrams into a
+switch that dropped them. `X5`–`X7` close it with the loader's own globals, and
+the decode has a second source for every word.
+
+| address | instruction site | what it is | idle control | across one 8 Mbit/s × 8 s rung |
+|---|---|---|---|---|
+| `0x8040EAC4` | `lw / addiu 1 / sw` at `0x80403B14`, inside `rx_receive` (`0x80403AB8`) | received frames | unchanged | **31,638 → 37,182 = +5,544** against **5,534** sent |
+| `0x8040EAC8` | the identical idiom at `0x80403EA0`, inside `tx_send` — § 12.1 already named this one | `tx_count` | unchanged | **103 → 109 = +6** |
+| `0x8040EAC0` | reclaim's head, `beq` against `0x8040EABC` = § 12.2's `while (tx_done_idx != tx_idx)` | `tx_done_idx` | unchanged | **3 → 1** |
+
+🔴 **The negative control is the whole reason these are readings**: `X5-globA`
+and `X5-globB`, 10 s apart with nothing sent, are **byte-identical**. These
+words do not free-run.
+
+🟢 **Three ways, and the residual is accounted for rather than absent.**
++5,544 against 5,534 sent leaves **10**,
+and exactly one pre-probe and one post-probe ran inside that bracket, each a
+handful of ARP and ICMP frames (推 for the decomposition — no capture of the
+wire was taken; 量 for the +10). `tx_done_idx` 3 → 1 is `(3 + 6) mod 4` on the
+4-deep ring of § 12.3, so **the reclaim walk retired exactly the six
+descriptors `tx_send` queued** — a check the other two counters cannot fake.
+
+⚠️ `CPUIISR` read **`00000000`** at `X4` against `NET-48`'s cold-loader
+`80000000`. That is § 12.2's *"clears the entire `CPUIISR` unconditionally on
+every entry"* arriving from the silicon side — and it also means this register
+**cannot** accumulate run-out evidence under the loader, so it is not available
+as an instrument here.
+
+### 13.4 🔴🔴 The single-variable comparison, same power-up, twenty minutes apart
+
+`B1`–`B2` booted `s32a` through `looprun` on the **same power-up** (`S4`'s
+watchdog reset, zero power presses) and ran the same generator at the same dose
+down the same cable into the same switch port.
+
+| | dose | result |
+|---|---|---|
+| **loader** | 347 frames, then 31,128 more up to 8 Mbit/s (31,475 total) | **ANSWERS**, every rung |
+| **rlxfw** | **347 frames**, 8.01 s, 0.501 Mbit/s | **SILENT** |
+
+`B1-PING` before it was **4/4, 0 % loss**, so the ladder had something to
+break. At +16 s the four TX descriptors read `A15B81D1 / 81E9 / 8201 / 821B`
+against `81D0 / 81E8 / 8200 / 821A` before — **bit 0 set on all four** — with
+`n_tx_stop 1`, `tx_stopped 1`, `n_tx_recovered 0`, and `tx` frozen at **17**
+while `rx` kept climbing.
+
+🔴 **So the engine is not the difference. Whatever stops rlxfw is above it**,
+and for the first time that sentence rests on a reference implementation
+measured on the same silicon within the same power-up rather than on the
+absence of an alternative.
+
+---
+
+## 14. The recovery, measured — and it is three calls the driver already has
+
+§ 13.4 leaves the fault above the engine. `R6-5`'s remaining question was
+which of two repairs to build: *deeper ring + a real timeout* (if the stall
+clears itself) or *detect the stall and re-arm* (if it does not).
+
+### 14.1 🔴 It does not clear itself, over 600 seconds
+
+Four readings after one wedge, each paired with a ping:
+
+| t | `n_irq` | `n_tx` | `n_rx` | txd OWN | `n_tx_recovered` | ping |
+|---|---:|---:|---:|---|---:|---|
+| before | 10 | 5 | 5 | `0 0 0 0` | 0 | 4/4 |
+| +16 s | 377 | **17** | 363 | `1 1 1 1` | 0 | 0/4 |
+| +46 s | 383 | **17** | 369 | `1 1 1 1` | 0 | 0/4 |
+| +120 s | 389 | **17** | 375 | `1 1 1 1` | 0 | 0/4 |
+| +600 s | 395 | **17** | 381 | `1 1 1 1` | 0 | 0/4 |
+
+🟢 **The internal control is in the same columns.** `n_rx` and `n_irq` both
+advance **exactly +6** per interval, and exactly one ping (4 ICMP requests plus
+2 ARP) runs between consecutive cells. So the receive side is not merely alive,
+it is losing nothing, while the transmit side does not move for ten minutes.
+`NET-88` bounded recovery on a microsecond scale; this bounds it at 600 s.
+`SPEC.md` `NET-99`.
+
+### 14.2 🔴 `SOFTRST` alone is not it, and two facts fell out of finding that
+
+讀 `rtl865xc_asicregs.h:527-548` calls `CPUICR` bit 22 *"Re-initialize all
+descriptors"*. Written to a wedged engine through the vendor's
+`/proc/rtl865x/memory` — `0xC4400000`, the live value with bit 22 set:
+
+* 🟢 **It self-clears, and it clears `TXCMD` and `RXCMD` with it.** Read back
+  `04000000`, on three sources: the vendor handler's own
+  `dat 0xc4400000: 0x4000000`, an independent `echo read`, and rlxfw's
+  `now_icr`. Nothing in this repository said either of those things.
+* 🔴 **It does not touch the OWN bits in the DRAM ring.** All four descriptors
+  unchanged, ping still dead.
+* 🟢 **And it really reached the hardware**, which is a negative control rather
+  than an assumption: with the engine off `n_rx` froze at **387** — it did not
+  even count the 6 frames of the ping taken in that window — and resumed
+  390 → 396 after `engine on`.
+
+`SPEC.md` `NET-100`.
+
+### 14.3 🟢🟢 `engine off` → `arm` → `engine on` recovers it, twice
+
+讀 `rtl819x-nic.c:1462-1468`: `arm`'s TX loop writes each slot as
+`address | WRAP` with **no OWN bit**, which is `NET-72`'s one remaining
+candidate. 量, on a **pristine** wedge — fresh boot, ping 4/4, `Y5`'s dose,
+dead, nothing else written to the engine:
+
+```
+RLXFW-N-ENGOFF
+RLXFW-N-ARM=A15B8000   RLXFW-N-ARMR=00000000
+RLXFW-N-ENGON=C4000000
+```
+
+→ descriptors back to `A15B81D0 / 81E8 / 8200 / 821A`, **ping 4/4, 0 % loss**.
+Wedged again at the same dose and recovered again on the same boot:
+`n_tx_stop 2`, `n_tx_wake 2`, `tx_stopped 0`, ping 4/4.
+
+🟢 **The queue half is already in the driver, and which code does it is a
+reading rather than a guess.** The dump taken after the recovery but *before*
+the ping reads `tx_stopped 1` / `n_tx_wake 0`; the one after it reads
+`tx_stopped 0` / `n_tx_wake 1`. The host's ARP-for-`10.1.1.3` arrives, and the
+level test at `rtl819x-nic.c:754` — which runs on **any** interrupt, not only
+`TX_DONE` — sees the freed ring and calls `netif_wake_queue()` itself.
+
+🔴 **Three things the repair may not be**, each excluded by a measurement
+rather than by preference:
+
+* not `ndo_stop`/`ndo_open`: `X16` re-opened an interface that had just
+  recovered and **broke it again** (100 % loss, `n_tx_stop` back to 1), which
+  is `NET-58` reproduced;
+* not `watchdog_timeo`: `NET-55`/`NET-57` measured it dead on this board;
+* not `arm` with the engine running: that is `NET-64`'s hard hang, which is
+  why `engine off` is first.
+
+`SPEC.md` `NET-101`.
+
+### 14.4 ⚠️ What § 13 and § 14 do NOT establish
+
+* **Why the engine stops.** Nothing here explains it. The repair restores the
+  ring; it does not name the mechanism, and `NET-67 殘留` stays open.
+* **The run-out mask divergence of § 12.4 is untested, and it cannot be tested
+  without an image.** A cell was written to set `CPUIIMR` to the loader's
+  `0x000007F8` through the vendor's `/proc` and was **discarded at the desk**:
+  讀 `rtl819x-nic.c:966-968`, the NAPI-complete path ORs the run-out bits back
+  in on every completion, so the write would be undone by the first arriving
+  packet — and the read-back cell would have shown a **false green**, because
+  `echo read` puts no traffic on the wire.
+* **Whether the loader would wedge at a dose above 8 Mbit/s.** The ladder
+  stopped there. 8.6 Mbit/s is where `Y1` took rlxfw down, so the loader has
+  been tested past that point and no further.
+* **The recovery has been measured three times on one board on one evening**,
+  twice from a pristine wedge and once from a ring that had also had `SOFTRST`
+  written to it. It has never run from inside the driver, because the detector
+  does not exist yet.
