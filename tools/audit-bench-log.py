@@ -88,6 +88,31 @@ ALLOW = [
      "Linux. None is this unit's configuration -- the loader's own compiled-in "
      "TFTP address is 192.168.1.6, which is allowlisted in spec-check.py for "
      "the same reason and is deliberately NOT allowlisted here"),
+    ("match", "fc:19:28:61:84:c9",
+     "\U0001f195 2026-09-21 (seatings 33 and 34). THE SAME ADAPTER AS THE ENTRY "
+     "BELOW, in the spelling `tcpdump` prints. The adjudication is not new -- it "
+     "was made on 2026-09-20 and is stated in full in the next entry -- only the "
+     "spelling is: seating 30 met this adapter through iputils' banner, which "
+     "writes the INTERFACE NAME `enxfc19286184c9`, and seatings 33/34 met it "
+     "through `tcpdump -e`, which writes the MAC in colon form. \U0001f534 Quoting a "
+     "capture under a different spelling to satisfy a checker would misreport "
+     "what the instrument printed -- the same reason `h601` and "
+     "`02:52:4c:58:46:57` each carry two entries. \u26a0\ufe0f It suppresses the "
+     "EXACT literal only, so any other MAC -- including anything read off the "
+     "board -- still fires, which control A2 proves. The two captures are "
+     "`bench/2026-09-21c/X4-TCPDUMP.log` and `bench/2026-09-21d/X10-TCPDUMP.log`, "
+     "and they are `SPEC.md` `NET-78`'s wire-side evidence: three ARP requests "
+     "leave the workstation and no frame comes back. **The host's own address is "
+     "not what that finding rests on**; the board's is, and the board's is the "
+     "driver constant allowlisted in `spec-check.py`"),
+    ("match", "ff:ff:ff:ff:ff:ff",
+     "\U0001f195 2026-09-21. The Ethernet BROADCAST address, which the MAC pattern "
+     "matches by shape and which identifies nothing by construction -- no NIC "
+     "has it as its own address, and every ARP request in every capture carries "
+     "it as the destination. \u26a0\ufe0f The all-ZERO MAC already has an entry "
+     "below on the same ground (*an all-zero MAC identifies nothing by "
+     "construction*); this is its counterpart at the other end. It suppresses "
+     "the exact literal only"),
     ("match", "enxfc19286184c9",
      "🆕 2026-09-20 (seating 30). The WORKSTATION's USB Gigabit adapter, on "
      "this desk's side of the cable -- the same distinction the 10.1.1 entry "

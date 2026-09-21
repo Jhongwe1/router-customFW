@@ -31259,3 +31259,204 @@ patch 在 `rtl819x-nic.c` 加了 131 行，而 `SPEC.md` 與 `notes/nic-driver.m
 seating 33 的板子在 shell 卡住約兩到四分鐘之後自己恢復，又在 79.93 秒後
 **自己重置**，loader 從 flash 自動開機進了廠商韌體，直到操作者切電源。
 **是什麼重置了它，未定。**
+
+## 2026-09-21 — 第九十五段（桌面，**零電源循環**，板子全程斷電）：`D3` 自己寫下的否證條件第一次被執行，而最值錢的三件裡有兩件是「這個 repo 說做不到的事其實做得到」
+
+`D5` 四次上機沒拿到，而阻擋者被具名了四次：`NET-59`（控制連線）→ `NET-61`
+（RX 環失步）→ `NET-67`（TX 描述子填滿）→ `NET-78`（引擎吃掉描述子、線上零
+訊框）。每一個名字都被**下一次上機的量測**殺掉。這不是四個錯誤，這是一個
+**沒有參考實作的搜尋**：每一輪花一次電源循環，只能排除一個候選。
+
+所以這一段不追故障，去建立參考。`R6` 的 `D3` 其實早就寫著怎麼做：
+
+> **否證 `D3`** — if frames go out and none come back, the descriptor field
+> layout is wrong for big-endian. The honest output is a **field-by-field
+> comparison against the vendor's driver**, written down, and not a retry.
+
+🔴 **`D3` 過了，而那份比較從來沒有被寫出來過。** `docs/nic-vendor-diff.md`
+是它，十條軸，每一條兩欄，每一條標明是不是 `NET-78` 的候選。
+⚠️ 它**不是** `docs/driver-diff.md`：量，`grep -ci "nic|ethernet|rtl865x|swNic|eth0"`
+掃那整份檔案是 **0**，它的 scope 是 `R5` 的六支驅動對第三方 port。
+
+### 🟢🟢 廠商在這塊板子上根本不是用 rlxfw 那個機制送訊框
+
+讀 `rtl_nic.c:4951-4970`，廠商有**兩支** TX 設定函式：
+
+```c
+rtl_direct_txInfo(port_mask, txInfo):          /* 直接指定出口 */
+    portlist = port_mask & 0x3f;  srcExtPort = 0;
+    flags    = (PKTHDR_USED | PKT_OUTGOING);            /* == 0x8800 */
+
+rtl_hwLookup_txInfo(txInfo):                   /* 交給 ASIC 查 L2 表 */
+    portlist = RTL8651_CPU_PORT;  srcExtPort = PKTHDR_EXTPORT_LIST_CPU;
+    flags    = (PKTHDR_USED | PKTHDR_HWLOOKUP | PKTHDR_BRIDGING | PKT_OUTGOING);
+```
+
+`rtl_fill_txInfo()`（`:5029-5075`）對單播呼叫 `rtl_isHwlookup()` 決定走哪一支。
+🔴 **關鍵是把那支函式的五個 `#if` 對這塊板子的組態解開**，量，
+`boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW`：`CONFIG_RTL_MULTI_LAN_DEV`、
+`CONFIG_POCKET_ROUTER_SUPPORT`、`CONFIG_RTL_HW_VLAN_SUPPORT`、
+`CONFIG_RTL_LOCAL_PUBLIC` **四個全部不存在**，而 `rtk_vlan_support_enable` 的
+初值是 **0**（`rtl_nic.c:6645`，唯二寫它的在 `:8538-8570` 的 `/proc` 路徑）。
+剩下的化簡成：LAN 裝置、無 IP option 的普通單播 → **`flag = TRUE` → 硬體查表**。
+
+**所以廠商的 `eth4` 送普通單播，`ph_portlist` 是魔術值 `0x07`，由 ASIC 的
+位址表決定出口。rlxfw 每一個訊框寫 `0x3F`，而 `RTL8651_MAC_NUMBER` 是 6
+（`l2Driver/rtl865x_fdb.h:3`）—— 泛流到每一個 MAC，單播也泛流。**
+🔴 廠商的 `_swNic_send` 還會 `& 0x1f`（`rtl865xc_swNic.c:730-734`），rlxfw 自己
+寫描述子所以 bit 5 沒被遮。🔴 廠商還有一個 rlxfw 沒有的守衛：`portlist == 0`
+就釋放 skb 回 FAILED（`:5092-5096`）。`SPEC.md` `NET-81`。
+
+⚠️ **這裡最弱的地方要自己寫下來**：rlxfw 的 `0x3F` 不是發明的 —— 量
+`bench/2026-09-19b/X14-rings-post`，這顆晶粒自己的 loader 在一次真實傳輸後把
+`8800003F` 留在 TX 描述子 word 3。**loader 是裸機、沒有 L2 表，direct+泛流對
+loader 是對的**；分歧是一個 loader 慣例被帶進了一支 Linux 驅動。
+
+### 🟢🟢 `NET-61` 在廠商原始碼裡有結構性的解，而 rlxfw 早就握著那個指標
+
+`swNic.c:386-517`（`__swNic_geRxRingIdx` 與 `swNic_getRxringIdx`）是整個 repo
+**引用次數為零**的一段 —— 而它正是「下一個讀哪個 RX 環、哪個索引」的機器。
+讀完之後：
+
+```c
+pPkthdr = (struct rtl_pktHdr *)(rxPkthdrRing[ring][idx] & ~(DESC_OWNED_BIT|DESC_WRAP));
+info->input = pPkthdr->ph_mbuf->skb;      /* 跟著 pkthdr word 0 的指標走 */
+```
+
+**廠商從來不用索引去 mbuf 環找收到訊框的緩衝區。** 只有一個消費索引，
+`currRxPkthdrDescIndex[ring]`；`currRxMbufDescIndex` 屬於 refill。
+而 rlxfw 用同一個 `i` 索引兩個環（`rtl819x-nic.c:891` 拿 OWN、`:908` 拿緩衝區
+位址）—— **`NET-61` 量到的就是這兩個環會被一次突發拉開。**
+🟢 rlxfw 建環時已經把 mbuf 描述子位址寫進 RX pkthdr 的 word 0（`:1335`），
+寫了、在 harvest 路徑上從來沒讀過。`SPEC.md` `NET-82`。
+
+⚠️ **代價要一起寫**：改成跟指標走會**移除**那一類故障而不是偵測它，但兩個環
+從此被允許漂開，所以 `NET-70` 的 `n_dsync` 偵測器（帶三態正控制）就從故障
+指示變成正常讀數。這個改動必須保留那個計數器並重新定義非零的意義，否則是
+拿一個量過的儀器換一個沒量過的假設。**不在這一段的範圍內。**
+
+### 🟢 兩個交叉驗證，以及一個在桌面上被否證的候選
+
+量，loader 的閒置模板：TX word 3 = `0x88000000` → `ph_flags` `0x8800`；
+RX word 3 = `0x90000000` → `0x9000`。讀，廠商 `swNic_init`：TX 寫
+`PKTHDR_USED|PKT_OUTGOING`、RX 寫 `PKTHDR_USED|PKT_INCOMING`，而
+`common/mbuf.h:25`/`:111`/`:118-119` 給 `BUF_USED = 0x80` → `PKTHDR_USED = 0x8000`、
+`PKT_OUTGOING = 0x0800`、`PKT_INCOMING = 0x1000`。**`0x8800` 與 `0x9000`，
+兩邊逐位元相同。** 驅動自己稱 `ph_flags` 是 *the one field this driver cannot
+derive*；**模板值現在推導得出來了，而且兩個來源不共用任何程式碼。**
+`SPEC.md` `NET-83`。
+
+🔴 **而一個候選在桌面上就被已提交的擷取殺掉了。** `ph_vlanId`：rlxfw 每個訊框
+寫 0、廠商寫 `cp->id`。看起來像候選，不是：讀
+`AsicDriver/rtl865xc_asicregs.h:2387-2391`，`VCR0` bits 8:0 是 `EnVlanInF_MASK`
+（九個埠各一位元的 VLAN **入向過濾致能**）；量
+`bench/2026-09-21d/C2-SWPRE`／`C4-SWPRE2`／`C8-SWPOST`，live **`00000000`** 對
+`subsys_initcall` 快照的 `000001FF`，而 `NET-78` 自己量到 37 個暫存器跨那三份
+dump 逐位元組相同 —— **故障前、中、後過濾都是關的**。
+🟢 **關掉它的是廠商自己的 probe**：`AsicDriver/rtl865x_asicL2.c:4691`，
+`WRITE_MEM32(VCR0, READ_MEM32(VCR0) & ~EN_ALL_PORT_VLAN_INGRESS_FILTER)`，註解
+逐字是 *Disable VLAN ingress filter of all ports*。⚠️ 而 `rtl819x-nic.c:124`
+早就引了**同一支函式的 `:4694` 與 `:4703`** —— `:4691` 在它前面三行被讀過去了。
+
+🔴 **我差點把一個沒量過的歸因寫進去**：初稿說 `VCR0 = 0` 是 `R6-2` 的 dumb
+state 做的。同一份 dump 的表頭寫著 `n_dumb 0`、`n_reset 0`、`n_restore 0`、
+`n_writes 1`（那一次是 `start` 寫 `SIRR`）。**dumb 那時根本還沒跑。** 抓到它的
+是讀那份 dump 自己的表頭，而不是重讀我寫的句子。
+
+### 🟢🟢 這個 repo 說「拿不到」的廠商對照，其實三個指令就拿得到
+
+`docs/KNOWN-ISSUES.md:870`/`:941` 寫著：廠商驅動的對照取不到，因為
+`ifconfig eth4 up` 回 `SIOCSIFFLAGS: Device or resource busy`，所以
+*「廠商的驅動活得過殺死我的那件事」在這個 repository 裡仍然是 **推***。
+
+量，那個讀數來自 `bench/2026-09-20/X9-eth4.log`，而它的第一行是：
+
+```
+ifconfig eth4 10.1.1.4 up ; ifconfig eth4
+ifconfig: SIOCSIFFLAGS: Device or resource busy
+```
+
+**沒有先 `ifconfig rlx0 down`** —— 而同一次上機的 `X11-eth4off.log` 證明 `rlx0`
+當時是 `UP BROADCAST RUNNING`。量 `notes/nic-driver.md:518-519`，seating 28：
+先 `rlx0 down`，交接**成功**，`12: 2 RLX LOPI eth4`、`UP BROADCAST RUNNING`。
+
+兩頭再從程式碼釘死：讀 `rtl819x-nic.c:1183-1193`，`nic_ndo_stop()` 做
+`napi_disable` → `nic_do_engine(0)` → **`free_irq(NIC_IRQ, …)`**；讀
+`rtl_nic.c:4192-4210`，廠商的第一次 open 呼叫 **`rtl865x_init_hw()`**，完整硬體
+重初始化含所有描述子基底。**所以交接過去的是一顆被廠商自己重新武裝過的
+硬體 —— 同一次開機、同一顆矽、同一條線、同一支 `iperf3`，唯一的變數是驅動。**
+
+🔴 **而 repo 裡這件事寫對過**：`notes/nic-driver.md:986-988` 的原句是
+*「在 `rlx0` 還綁著的時候不能重量」*，限定詞在；`:1428-1430` 抄過去時掉了它，
+把一個**條件性的失敗**變成了**驅動的性質**，然後進了 carried-forward。
+
+🟢 **額外的一件**：`rlx0` down 之後 rlxfw 自己的 `/proc/rtl819x-nic` 變成廠商
+驅動的**唯讀觀測儀** —— `now_icr`、`rpdcr0_pos`、`rmdcr0_pos`、`tpdcr0_pos` 讀的
+是硬體暫存器不是驅動狀態，而一個 `cat` 不寫任何東西（`n_writes` 是分開的
+計數器）。兩個不共用程式碼的來源，零成本。
+
+### 🔴 `NET-78` 的一項讀數要降級，而結論不動
+
+`NET-78` 列著 `tpdcr0_pos` **`A15B8044` 前後不變**。量，同一列自己的數字：
+TX 環 4 格，`n_tx` 第一次取樣 5、第二次 37 —— **5 mod 4 = 1、37 mod 4 = 1**，
+兩次都落在索引 1。**在一個四格環上「位置暫存器沒變」正是一個全速運轉的
+引擎在那兩個取樣點會印出來的值。** 「引擎跑過並歸還了每一個描述子」仍然
+成立，但它靠的是 OWN 位元與 `n_tx` 在前進，**不是**靠那個暫存器。
+
+### 🔴 `citecheck` 的範圍缺口：`file:A,B,C` 只有 `A` 被檢查
+
+稽核說 `NET-61` 的六個來源行號有五個腐朽。自己讀回來：`751` 是 `return 0;`、
+`758` 是 `nic_isr` 的簽名、`768` 是空行、`1232` 是一段講 `FW-45` 看門狗的註解、
+`1239` 是 `{`。**五個腐朽，而同一次執行的 `citecheck` 報 0 個新 rot、
+8 passed 0 failed。**
+
+量，直接問工具自己而不是讀它的原始碼推論：
+
+```
+>>> citecheck.CITE_RX.findall("rtl819x-nic.c:292,891,895,898-900,908")
+[('rtl819x-nic.c', '292', '')]
+```
+
+**一個元素。** 它在逗號處停住。而 `292` 正好是**唯一沒有腐朽的那一個** ——
+檢查器看的就是那一個。量，母體：`git grep` 掃已追蹤的 `.md`，逗號形式的引用
+**11** 個、裝著 **32** 個行號、其中 **21 個對 `citecheck` 不存在**。
+⚠️ **這是範圍缺口不是工具壞掉**，而且**沒有在這一段修** —— 改一個檢查器的
+母體要先有正控制，而那個正控制還不存在。`SPEC.md` `FW-105`、
+`notes/record-integrity.md` § 5.1。
+
+### 🔴 我自己的五個缺陷，全部被自己的守衛擋在寫入之前
+
+寫進 repo 的每一個 patch 都是「**先檢查全部錨點，再寫任何一個檔案**」的形狀
+（`CLAUDE.md` 的兩檔案半套用規則）。它發火了五次，五次都在寫入之前：
+
+1. **全形／半形**：錨點打成 `（= \`tx_ring\` 基底 + 4，…）`，而 `SPEC.md` 那一列
+   用的是半形。`REFUSING: anchor not unique`。
+2. **算術**：`5 mod 4 = 1、7 mod 4 = 1（即 37）` —— 應該是 `37 mod 4`。
+   自己讀出來抓到，那正是「事前登記的算術要重算、不要抄」。
+3. **id 碰撞的假陽性**：守衛查 `` `FW-105` `` 出現在檔案裡就拒絕，而那個出現
+   是我自己在 `NET-61` 註記裡寫的**前向引用**。收緊成查「是否已有那一**列**」。
+4. **選擇器太寬**：`` `| `NET-61` ` `` 命中兩列（本列與 `NET-61 殘留`）。
+5. **錨點指錯行**：`D5` 條目橫跨 128–129 兩行，我用 `"* **D5**" in lines[j]`
+   檢查末行，當然不中。改成三面夾擊（上一行開 `D5`、下一行開 `D6`、末行
+   以 `偷渡進去**。` 結尾）。
+
+🔴 **而一個沒被守衛擋住的是 `CLAUDE.md` 已經寫著的那一條**：背景 sweep 用
+`wsl -d Ubuntu-24.04 -- bash "/mnt/c/…/sweep95.sh"` 啟動，**exit 127**，訊息逐字是
+`bash: C:/Program Files/Git/mnt/c/Users/…: No such file or directory`。
+heredoc 保護的是**本體**，不是 `wsl` 自己的**參數**。把路徑移進 heredoc 本體
+就好了，代價是一次重跑。
+
+### 產出物
+
+- 🆕 `docs/nic-vendor-diff.md` —— `D3` 的否證條件，九節
+- `SPEC.md` —— `NET-81`／`NET-82`／`NET-83`／`FW-105` 四列新增（**附加在檔尾**，
+  所以零行號推移）；`NET-78` 與 `NET-78 殘留` 就地修訂；`NET-61` 的來源行號
+  重新導出並註記
+- `docs/KNOWN-ISSUES.md` —— `eth4` EBUSY 的理由更正、`D5` 阻擋者過期的更正、
+  第九十五段的「沒有建立什麼」一節
+- `notes/record-integrity.md` § 5.1 —— `citecheck` 的範圍缺口
+- `PROGRESS.md` —— § Now 的 `Next after this` 與 `D5` 列，**就地不增減行**
+  （86 個行號引用指進這個檔案，其中一個在凍結的更正檔裡）
+
+**零 flash 寫入、零 `FLR`、板子全程斷電、括號維持 1,024 / 4,194,304 = 0.0244 %。**
+⚠️ **這一段沒有任何東西在矽片上跑過。**

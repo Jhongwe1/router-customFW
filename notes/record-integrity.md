@@ -249,3 +249,48 @@ own handling, and § 19 — the staging section every row measured since
 all**. The section exists for a good reason (inserting rows higher up moved
 nine frozen bench-card line references), and the cost was never stated. It is
 `R1z-2`'s. 🟢 **Paid the same day**: the window is `every numbered section except the two that are not definition tables`, both exclusions asserted, and 483 rows in 17 tables are checked where 450 in 16 were. Six defects fell out of it in the hour.
+
+### 5.1 A citation written `file:A,B,C` is checked at `A` and nowhere else — 量 2026-09-21
+
+🔴 `citecheck` is the instrument this repository trusts to say a line-number
+citation still points at what it pointed at. It has a blind spot that is one
+regex wide.
+
+量, asking the tool itself rather than reading its source and inferring:
+
+```
+>>> import citecheck
+>>> citecheck.CITE_RX.findall("rtl819x-nic.c:292,891,895,898-900,908")
+[('rtl819x-nic.c', '292', '')]
+```
+
+**One element.** `CITE_RX` (`tools/citecheck.py:276`) matches `file:N` and stops
+at the comma; every line number after the first is not a citation as far as this
+tool is concerned.
+
+🔴 **How it surfaced, and the detail worth keeping.** `SPEC.md` `NET-61`
+cited `rtl819x-nic.c:292,751,758,768,1232,1239`. 量, read back one at a time:
+`751` is `return 0;`, `758` is `nic_isr`'s signature, `768` is a blank line,
+`1232` is a comment about `FW-45`'s watchdog and `1239` is `{`. **Five of six had
+rotted.** The same run of `citecheck` reported `0 new rot`, `8 passed, 0 failed`
+— because the only number it could see was `292`, and `292` is the one that had
+not moved. **The checker looked at exactly the number that was still right.**
+
+量, the population, so this is a finding and not an anecdote: `git grep` over
+tracked `.md` finds **11** citations in the comma form, carrying **32** line
+numbers, of which **21 are invisible to `citecheck`**. Examples:
+`include/linux/jiffies.h:43,54,58`, `net/core/dev.c:2954,3185`,
+`rtl819x-nic.c:908,912-914,1383-1499`.
+
+⚠️ **This is a scope gap, not a broken tool**, and the distinction is the
+same one § 5 makes about every other instrument here: everything `CITE_RX` can
+see, `citecheck` checked, and its `T26` control (an uncommitted citing line is
+suspended rather than assumed stable) is unaffected. What it cannot see, it has
+never claimed to see — **and that claim was never written down, which is why
+five rotted citations sat under a green verdict.**
+
+🔴 **Not fixed here, deliberately.** Widening `CITE_RX` changes the
+population every one of this tool's cases is scored against, and this
+repository's own rule is that a checker's population may not move without a
+positive control that the new rows are really checked. That control does not
+exist yet. `SPEC.md` `FW-105`; the fix is the next segment's.
