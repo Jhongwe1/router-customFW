@@ -628,3 +628,143 @@ refuted, the minimal reproducer is **347 inbound frames at 0.5 Mbit/s with no
 TCP and no listener**, and the vendor's ring-full contract does not rescue it
 because the engine never returns the descriptor — 1,548 OWN-bit reads, zero
 recoveries.
+
+---
+
+## 12. The loader's TX path — the third implementation, read end to end
+
+The other two implementations of this engine are the vendor's Linux driver
+(§§ 1–9, from source) and rlxfw's. The third is **this unit's own second-stage
+loader**, bare metal, no Linux, no NAPI, no interrupts — and it was the only
+one nobody had read.
+
+Method is `docs/loader-command-semantics.md`'s, unchanged:
+
+```
+mips-linux-gnu-objdump -D -b binary -m mips:3000 -EB \
+    --adjust-vma=0x80400000 $W/stage2.bin
+```
+
+🟢 **The VMA control holds instruction for instruction**: `0x8040591C`…
+`0x80405934` reproduce `docs/loader-flash-write.md`'s quoted `lui v0,0xb800` /
+`ori a0,v0,0x1208` / `lui v1,0x800` / `lw` / `and` / `beqz` exactly, so the
+addresses below are this unit's.
+
+**The whole NIC surface is five instructions wide.** 量: `lui …,0xb801` — the
+CPU-interface block at `0xB8010000` — occurs **5 times** in 12,288 lines.
+
+### 12.1 The send routine, `0x80403CF0`
+
+```c
+loader_tx_send(pkt, len)
+{
+    next = (tx_idx + 1 == ring_count) ? 0 : tx_idx + 1;
+    if (next == tx_done_idx) {
+        printf("Tx Desc full!\n");          /* 0x8040AC40 */
+        return -1;
+    }
+    memcpy(...);                             /* 0x80406D0C */
+    if (ring[tx_idx] & OWN) {                /* 0x80403DAC */
+        printf("\nAssertion fail at file");  /* 0x8040AC50 */
+        for (;;) ;                           /* 0x80403DC8: j 0x80403DC8 */
+    }
+    ... build pkthdr ...
+    *(u8 *)(hdr + 15) = 63;                  /* 0x80403E58: li v0,63 */
+    ring[tx_idx] |= OWN;                     /* 0x80403E80 */
+    CPUICR |= TXFD;                          /* 0x80403E88, 1<<23 */
+    tx_count++;                              /* 0x8040EAC8 */
+    tx_idx = next;
+    return 0;                                /* no wait, no poll */
+}
+```
+
+🟢 **`ph_portlist = 0x3F` is literally `li v0,63 ; sb v0,15(a0)`**, which is
+`NET-81`'s reading of this unit's live ring arriving from the code side.
+
+🔴 **The vendor's own bare-metal author treats a stuck descriptor as
+impossible.** Not a retry, not a recovery, not a reset — an assertion and a
+one-instruction infinite loop. That is the strongest statement available about
+how this condition was expected to behave.
+
+### 12.2 The reclaim, `0x80403ED0`, and when it runs
+
+```c
+loader_tx_reclaim()
+{
+    while (tx_done_idx != tx_idx) {
+        if (ring[tx_done_idx] & OWN) break;
+        tx_done_idx = (tx_done_idx + 1 == ring_count) ? 0 : tx_done_idx + 1;
+    }
+}
+```
+
+量: it has exactly **two** call sites, both inside the NIC service loop at
+`0x804023C4`:
+
+```c
+loader_nic_service()
+{
+    CPUIISR = CPUIISR;            /* 0x804023CC-D4: W1C, EVERYTHING, every entry */
+    goto check;
+loop:
+    loader_tx_reclaim();          /* 0x804023F0 */
+    handle_rx();                  /* 0x804023F8 -> 0x80402040 */
+check:
+    if (rx_receive(&buf, &len) == 0) goto loop;   /* 0x80403AB8 */
+    loader_tx_reclaim();          /* 0x80402418, once more on the way out */
+}
+```
+
+So the loader **reclaims on every pass of a polled service loop, whether or
+not it transmitted**, and **clears the entire `CPUIISR` unconditionally on
+every entry**. rlxfw has no reclaim walk and no done-index at all: it frees
+the skb synchronously in `nic_xmit` and learns the ring's state only when it
+next transmits.
+
+### 12.3 🔴 The ring depths, and the hypothesis they kill
+
+量 `bench/2026-09-19b/X7-cpufull-a` (`DW B8010000 16`, loader state) together
+with `X14-rings-post`, counting `DESC_WRAP` (bit 1) to find each ring's end:
+
+| ring | register | base | depth |
+|---|---|---|---|
+| RX pkthdr 0 | `CPURPDCR0` | `A040FC70` | **4** |
+| RX mbuf | `CPURMDCR0` | `A040FCD0` | **4** |
+| TX 0 | `CPUTPDCR0` | `A040FC88` | **4** |
+| TX 1 | `CPUTPDCR1` | `A040FCA0` | 2 |
+
+**The loader runs the same four TX descriptors rlxfw does** — and it drives
+TFTP transfers of a megabyte at a time, with long gaps between sends, and it
+does not wedge. 🔴 **So "four is too shallow" is refuted as the explanation.**
+It may still be worth more margin; it is not the difference.
+
+### 12.4 The one configuration divergence this read found
+
+量, loader state: `CPUIIMR = 0x000007F8` — `RX_DONE_IE0..5` (bits 3–8) and
+`TX_DONE_IE0/1` (bits 9–10), nothing else. rlxfw runs `0x007E0FFE`: bits 1–11
+**and** 17–22, i.e. it additionally unmasks `TX_ALL_DONE`, `MBUF_DESC_RUNOUT`
+and all six `PKTHDR_DESC_RUNOUT`. ⚠️ rlxfw matches the vendor's **Linux**
+driver here (讀 `rtl_nic.c:10809`), so the loader is the odd one out and this
+is a divergence to know about rather than a defect.
+
+### 12.5 🟢 What this read buys: a bench cell that needs no image and no boot
+
+量 `looprun`'s `S5c`, every seating: **at the loader prompt the board answers
+ARP.** That is this service loop running, and transmitting, on the same engine
+and the same four descriptors.
+
+So the loader is a **test harness that is already on the device**:
+
+> Blast UDP at the board **while it sits at the loader prompt**, exactly as
+> `Y1` does to Linux, then ask whether it still answers ARP.
+
+* **It survives** → the engine is fine under this traffic and the fault is in
+  rlxfw's software. Every driver-side candidate stays alive and the search has
+  a control it has never had.
+* **It stops answering ARP** → the fault is below both implementations, rlxfw
+  is exonerated, and `R6-5`'s whole framing changes — including whether `D5`
+  is reachable on this hardware at all.
+
+🔴 **Either answer is worth more than another driver iteration**, and it costs
+no TFTP, no boot and no image: the board is at that prompt after every reset
+this project already performs.
