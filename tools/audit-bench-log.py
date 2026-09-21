@@ -105,6 +105,24 @@ ALLOW = [
      "leave the workstation and no frame comes back. **The host's own address is "
      "not what that finding rests on**; the board's is, and the board's is the "
      "driver constant allowlisted in `spec-check.py`"),
+    ("match", "56:0a:01:01:01:e8",
+     "🆕 2026-09-21 (seating 36). The LOADER's address, and it is "
+     "SYNTHESISED rather than stored: 量 bytes 2-5 are `0a:01:01:01` = "
+     "10.1.1.1, which is what this desk types into `IPCONFIG` for one seating "
+     "-- the same distinction the 10.1.1 entry draws, and for the same reason. "
+     "It reaches bench/ because this seating was the first to probe the loader "
+     "with ARP as a carded cell, so seven host-side .log files carry it out of "
+     "`ip neigh`. 🔴 Allowlisted rather than redacted because a .log is "
+     "a measurement artefact and editing one is what --force exists to forbid; "
+     "`spec-check.py`'s REDACTION_ALLOWLIST carries the same literal with the "
+     "same reason. ⚠️ THE RESIDUAL, stated rather than left out: bytes "
+     "1 and 6 (0x56 and 0xe8) are NOT accounted for by that derivation. They "
+     "have read the same on every seating that recorded them, which is equally "
+     "consistent with a constant and with something unit-specific, and no "
+     "seating has set a different IPCONFIG address to tell the two apart. "
+     "未定. ⚠️ It suppresses the EXACT literal only, so any "
+     "other MAC -- including anything read off the board -- still fires, which "
+     "control A2 proves"),
     ("match", "ff:ff:ff:ff:ff:ff",
      "\U0001f195 2026-09-21. The Ethernet BROADCAST address, which the MAC pattern "
      "matches by shape and which identifies nothing by construction -- no NIC "
