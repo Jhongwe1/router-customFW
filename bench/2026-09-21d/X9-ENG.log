@@ -1,0 +1,9 @@
+echo read 0xBB806100 4 >/proc/rtl865x/memory ; echo read 0xB8010[  349.690000] cmd read
+0[  349.690000] 
+[  349.690000] bb806100:  000012 0041E   >	/	 p	 r	 o	 c	 /	 r	 	 	 
+	 t	 l	 8	    6
+5x/[  349.710000] cmd read
+m[  349.710000] 
+[  349.710000] b8010000:  eC4m00o00r00y  	
+	 	 	 	 	 	 	 	 	 	 	 	 	Ä   
+# 

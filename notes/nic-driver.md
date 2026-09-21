@@ -926,7 +926,7 @@ supplied no `ndo_tx_timeout`, and that `R6-4a` fixes it by supplying one.
 `n_tx_timeout 0`. **`SPEC.md` `NET-57`.**
 
 🔴 **And the larger consequence lands on § 7's own argument.**
-`rtl819x-nic.c:967-972` argues that returning `NETDEV_TX_BUSY` while waking is
+`rtl819x-nic.c:1076-1081` argues that returning `NETDEV_TX_BUSY` while waking is
 correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue` is
 **NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
 freed. **The argument is right for the kernel it cites and wrong for this
@@ -1245,7 +1245,7 @@ at every read across six arms. The reason the loop stays is the TX side.
 * **Why the engine stops retiring TX descriptors.** Nothing was read on the
   engine's side of the ring: `tpdcr0_pos` was not sampled across a wedge, and
   🔄 **2026-09-21 (seating 32): THAT CLAUSE IS FALSE and was false when it
-  was written.** `rtl819x-nic.c:1693-1694` prints `tpdcr0_pos` on every
+  was written.** `rtl819x-nic.c:1812-1813` prints `tpdcr0_pos` on every
   `cat /proc/rtl819x-nic`, so this seating sampled it **six times** across
   the wedge without meaning to. What hid it is `wedgeprobe.sh:32`, whose
   operator filter names `rpdcr0_pos` and `rmdcr0_pos` and not
@@ -1279,7 +1279,7 @@ are told apart by the assembled image's sha256 and never by `RECIPE_ID`
 
 § 11.6 and `SPEC.md`'s `NET-67` 殘留 say the engine-side TX register *"was not
 read"*. It was read **six times**, by seating 31's own captures, because
-`rtl819x-nic.c:1693-1694` prints `tpdcr0_pos` on every `cat`. The reason nobody
+`rtl819x-nic.c:1812-1813` prints `tpdcr0_pos` on every `cat`. The reason nobody
 saw it: `bench/2026-09-21/wedgeprobe.sh` writes the full `/proc` to the `.log`
 and shows the operator a filtered view whose filter (`:32`) names `rpdcr0_pos`
 and `rmdcr0_pos` and **not** `tpdcr0_pos`. 量:
@@ -1481,3 +1481,136 @@ that settles it and why this image could not take it (`busybox grep` has no
 ⚠️ **None of the three is in `SPEC.md` yet**, because each corroborates a row
 that already has a value and the corroboration belongs in that row rather than
 in a new one. Carried forward, named here so it is not lost.
+
+---
+
+## 13 The failure is below the DMA engine, and a TCP connection is not what causes it
+
+量 2026-09-21, seatings 33 and 34. Two frozen cards, four blocks, two
+independent cold boots.
+
+### 13.1 `NET-73` said *a TCP connection*, and a TCP connection is not enough
+
+`NET-73` excluded five dimensions by measurement and left one ⚠️: `iperf3`
+always opens a TCP control socket, so *"a TCP connection"* and *"the `iperf3`
+program"* had never been separated. Block 35 is that separation, and it is a
+ladder ordered by how much TCP each rung carries:
+
+| rung | what it did | wedge |
+|---|---|---|
+| `T1` | one refused TCP connection, nothing running on the board | no |
+| `T2` | fifty refused | no |
+| `T3` | **35,062 refused in 30.000103 s = 1,168.73/s**, zero connected | **no** |
+| `T4` | a **completed** handshake against `busybox telnetd` (PID 22 in `ps`), no `iperf3` in the process table | **no** |
+| `X2` | `iperf3` | **WEDGE** |
+
+🟢 **The board's own counters corroborate every rung from the other side**, and
+that is what makes the ladder more than a host-side story. `/proc/net/snmp`
+after the run: `Tcp OutRsts` **35,114** — the RSTs `T1`–`T4` provoked;
+`PassiveOpens` **1** — `T4`'s handshake, seen from the board; `ActiveOpens` 2
+with `AttemptFails` 1 — the two `iperf3` attempts, one of which never reached a
+server. And `Icmp InEchos`/`OutEchoReps` went 4/4 → **28/28**, exactly the six
+four-packet pings between the two snmp captures, so **every echo the board
+received, it answered**.
+
+⚠️ What survives is narrower than `NET-73`'s wording: **data actually flowing on
+an established connection**, or **the `iperf3` program itself**. `T5` — bulk
+host → board into that same socket — did not run, because `telnetd` served
+`T4`'s connection and exited, so by `T5` there was no listener. The card
+predicted `telnetd` would be unable to allocate a pty (讀
+`config/rlxfw-initramfs.tsv`: no `/dev/ptmx`, no `/dev/pts`) and said the
+handshake completing was the whole requirement.
+
+### 13.2 And the wedge is not `NET-67`
+
+| reading | `NET-67`, seating 31 | seatings 33 and 34 |
+|---|---|---|
+| `tx_stopped` | 1 | **0** |
+| `n_tx_stop` / `n_xmit_busy` | ≥ 1 | **0 / 0** |
+| four `txd` OWN bits | all **engine**-owned | all **CPU**-owned |
+| `n_tx` | frozen at 26 | **advancing**, 5 → 37 |
+| `n_tx_full` | — | **0**, the ring never filled |
+
+Every one is the opposite. The queue was never stopped, the ring never filled,
+nothing was ever waiting on a wake.
+
+### 13.3 What the engine is doing, and what it is not
+
+Across the failure, from this driver's own `/proc` fields:
+
+* `now_icr` **`C4000000`** before and after — `TXCMD` and `RXCMD` set, `STOPTX`
+  clear. The engine is commanded to run.
+* `tpdcr0_pos` **`A15B8044`** before and after — that is `tx_ring` base + 4, so
+  slot 1, and `tx_idx` is also 1. The engine consumed all 32 frames and its
+  pointer came back to where the driver is.
+* `rpdcr0_pos` and `rmdcr0_pos` both advance. RX is untouched.
+
+From the vendor's `/proc/rtl865x/memory`, read post-failure with a leading
+`sleep 1` (`CORRECTIONS-block34.md` § 0's fix for echo interleaving):
+
+* `GDSR0` **`0012001E`** — `USEDDSC` 18, `MaxUsedDsc` 30, and `DSCRUNOUT`,
+  `TotalDscFctrl_Flag` and `SharedBufFCON_Flag` **all clear**. The descriptor
+  pool is short of nothing.
+
+From my own switch driver, all 37 registers, three dumps in one boot
+(`C2-SWPRE` before `ndo_open`, `C4-SWPRE2` after it, `C8-SWPOST` after the
+failure): **byte-identical, all three**.
+
+🔴 **And that last one is a correction to seating 33's own reading.** `X5-SW`
+had shown `MEMCR` at `00007F00` against `00007F7F` "at probe", and `PSRP0`/
+`PSRP3` both having lost bit 12 — which looks like evidence the failure moved
+them. It is not. `X5-SW` was taken only *after*, and the probe column is the
+driver's `subsys_initcall` snapshot, taken before `start`, before `ndo_open`
+and before any traffic. Block 37 took the reading before as well and **`MEMCR`
+already reads `00007F00` at `C2-SWPRE`**. The delta is a boot-time fact. The
+card committed to that prediction in writing before power.
+
+From the host, twice, on two independent boots: `tcpdump` shows the host's ARP
+requests going out and **zero frames of any kind from the board's MAC**.
+
+**So: the driver transmits, the engine consumes every descriptor and clears
+every OWN bit, the command register still says run, the switch registers do not
+move, the descriptor pool reports no shortage — and not one frame leaves the
+board, while RX keeps working.** The fault is below the CPU port's DMA engine
+and above nothing this project can currently see.
+
+### 13.4 Why the vendor's driver survives what kills this one
+
+讀 2026-09-21, over 60 `.c`/`.h` files under the vendor's
+`drivers/net/rtl819x/`, enumerated with `find` rather than `grep -r` (`GREP-1`).
+Three facts, and the third is the answer to *how can theirs work and ours not*:
+
+1. **Ring depth.** On this board the vendor runs **TX 128 / RX 256**
+   (`rtl865xc_swNic.h:78-88`, the `#else` branch with
+   `DELAY_REFILL_ETH_RX_BUF`), usable TX depth **127** because `:703` keeps one
+   slot. 🔴 `TX 1024 / RX 512` is the `CONFIG_RTL_8198` branch and is **not**
+   this board — a correction to what this project believed going in.
+2. **The vendor never stops the queue.** `netif_stop_queue` occurs three times
+   in those 60 files and all three are `close` paths; `netif_wake_queue` and
+   `NETDEV_TX_BUSY` occur **zero** times; `re865x_start_xmit` returns 0 on
+   every path.
+3. **On a full ring it reclaims inline and retries** (`rtl_nic.c:5161-5171`),
+   128 times, then drops the frame and reports success. So its transmit path
+   makes forward progress **from the context that needs the slot**, with no
+   dependency on the TX-done interrupt at all.
+
+rlxfw does the opposite, and `NET-67` is what that costs. `s32a` adds the
+vendor's contract as `tx_mode 1`, default off.
+
+### 13.5 `s32a`, and what its own counters say about it
+
+Built 2026-09-21. `RECIPE_ID` **`84385d91`** against `s31L`'s `f179cf21`.
+`vmlinux` **4,572,389** bytes against `s31L`'s **4,572,087** — **+302**, which
+is the whole of the change. The assembled `nfjrom` is **1,180,672** bytes,
+*the same size as `s31L`'s*, while its sha256 differs
+(`eee556f46adf9c06…` against `a038044da964b833…`): `FW-99`'s lesson a second
+time, that a size cannot tell two images apart here. The initramfs spec's
+sha256 is **`7130245fbcd92afc…`, byte-identical to `s31L`'s**, which is the
+control that says only the kernel differs.
+
+⚠️ **And `s32a`'s own counters say it is aimed at something that did not
+happen.** `n_tx_full` read **0**: the ring never filled, so the vendor-contract
+path never executed, and the board became unreachable after 37 frames with an
+empty TX ring. The change is still right — it removes a real liveness
+dependency the vendor never had — but it is not what is breaking this board
+now, and the card said so before it ran.

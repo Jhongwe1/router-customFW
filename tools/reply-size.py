@@ -19,9 +19,9 @@ WHAT A PREDICTED REPLY LENGTH IS WORTH
 It is a control that costs nothing and that a truncated or a stale capture
 cannot pass.  Short by 47 -- a `DW` line went missing.  Short by 9 -- the prompt
 never arrived.  Short by anything else -- it is not the reply to the command
-that was sent.  Two states that are NOT misses have their own names here,
-because a capture that came back 24 bytes when 71 were predicted is telling you
-something specific and `MISS` would throw it away:
+that was sent.  States that are not simply "wrong by n" have their own names
+here, because a capture that came back 24 bytes when 71 were predicted is
+telling you something specific and `MISS` would throw it away:
 
     ECHO-ONLY        the command was echoed and the prompt came back with no
                      output at all.  `bench/2026-08-24b/CONT.log`, 24 bytes:
@@ -29,6 +29,69 @@ something specific and `MISS` would throw it away:
                      not acted on (C-19).
     UNKNOWN-COMMAND  the loader answered `Unknown command !`.
                      `bench/2026-08-24/A0-reopen-control.log`, 44 bytes.
+    SILENT           nothing came back AT ALL.  This IS a miss.  It is
+                     separated from SHORT because the two are about different
+                     things: SHORT is a statement about the size model, and
+                     SILENT is a statement about whether anything was
+                     listening.  A dead port, a dead adapter and a board that
+                     is not at a prompt all land here, and none of them is
+                     evidence about `DW`'s 47.
+    SILENT-EXPLAINED a SILENT whose cause is already written down on disk, in
+                     the metadata of the capture taken immediately before it.
+                     NOT a miss -- and the only state here that is decided by
+                     something outside the capture's own file.
+
+WHEN SILENCE IS EVIDENCE OF SOMETHING ELSE
+------------------------------------------
+量 2026-09-21: `bench/2026-09-21b/F0-PROMPT` sent `DW 8040D4A0 1` and got 0
+bytes in 6.088599 s.  The reason is not in that capture.  It is in the one
+before it -- `F0-RB`, `busybox reboot -f` -- whose own metadata records
+`cr.esc_after.prompt_seen: false`: the instrument wrote down that the loader
+prompt never came back.  A `DW` fired into a board that is not at a prompt gets
+nothing, and that is a correct reading of a board rather than a defect in this
+model.
+
+So a SILENT is excused only when the capture IMMEDIATELY BEFORE IT IN THE SAME
+DIRECTORY recorded `cr.<key>.prompt_seen == false`.  Every clause of that
+sentence is load-bearing:
+
+  * IMMEDIATELY BEFORE.  Not "somewhere earlier in the directory" -- a prompt
+    that went missing twenty captures ago says nothing about this one.
+  * IN THE SAME DIRECTORY.  A directory is one seating.
+  * ORDERED BY `started_wallclock`, out of the metadata.  NOT by mtime and NOT
+    by filename.  量 on the real case: sorting `bench/2026-09-21b` by filename
+    puts `E1-TXUDP` immediately before `F0-PROMPT` and finds no explanation at
+    all, because a seating's cells are not named in the order they ran.  mtime
+    happens to agree there, and that is the trap -- it agrees until a `cp -a`,
+    a restore or a checkout rewrites it, and then it agrees no longer.  The
+    timestamp the instrument wrote when it opened the port is the only one of
+    the three that is a record rather than a side effect.
+  * `prompt_seen == false`, by identity and not by falsiness.  A capture with
+    no `cr` block, or a `cr` block with no `prompt_seen`, made no claim about
+    the prompt and therefore explains nothing.
+
+否證, and it is deliberately easy to hit: a SILENT that is the first capture in
+its directory, or whose predecessor DID see the prompt, is reported as a miss
+and turns the sweep red.  A dead port has no predecessor to hide behind, and a
+sweep that excused every silence could not tell a bench session from a session
+in which nothing was plugged in.
+
+ONE CONFIRMATION OUT OF SAMPLE, AND WHY IT IS OUT OF SAMPLE
+-----------------------------------------------------------
+F0-PROMPT is the only capture this rule was built on, and n=1 is not a rule.
+量 2026-09-21 there is a second: `bench/2026-09-19/X12-phyr02` sent `PHYR 0 2`
+-- a MODELLED family, so it is not kept out of the model by being a shell
+command -- and got 0 bytes, and its wallclock predecessor `X11-phyr` recorded
+`cr.esc_after.prompt_seen: false`.  The rule reaches the right answer on it,
+on a seating two days earlier that nobody was looking at when the rule was
+written.
+
+It is not a case in `test-reply-size.sh` and it never runs in the sweep,
+because `esc_after_seconds` is 10.0 and `cmd_check` skips an ESC-streamed
+capture before `classify` is reached.  ⚠️ So the reason there is exactly ONE
+SILENT in `bench/` is the ESC skip and NOT the command families -- a statement
+worth keeping, because it says where the next one will come from if the ESC
+rule is ever narrowed.
 
 THE MODEL, AND WHERE EVERY CONSTANT IN IT CAME FROM
 ---------------------------------------------------
@@ -80,6 +143,7 @@ this project calls a sweep with no positive control.
 """
 
 import argparse
+import datetime
 import glob
 import json
 import math
@@ -178,6 +242,9 @@ FIXTURES = [
     ("DW 80000000",           69, "OK",         "bench/2026-09-19b/X2-dw-80000000.log"),
     ("DW B8010000 4",         71, "OK",         "bench/2026-09-19b/X5-cpublk-a.log"),
     ("DW 8040DCE8 1",         24, "ECHO-ONLY", "bench/2026-08-24b/CONT.log"),
+    # 0 bytes in 6.088599 s.  In the table so that `C2` walks the SILENT path
+    # over a real capture and not only over the hand-made lengths in C11.
+    ("DW 8040D4A0 1",          0, "SILENT",    "bench/2026-09-21b/F0-PROMPT.log"),
     ("DW 8040DBC0 1",         44, "UNKNOWN-COMMAND",
                                                "bench/2026-08-24/A0-reopen-control.log"),
     ("DB 81000200 4",        153, "UNMODELLED", "bench/2026-08-24/C4b.log"),
@@ -216,18 +283,107 @@ def predict(cmd):
 
 def classify(cmd, nbytes):
     """(state, predicted, delta). state is one of OK / ECHO-ONLY /
-    UNKNOWN-COMMAND / SHORT / LONG / UNMODELLED."""
+    UNKNOWN-COMMAND / SILENT / SHORT / LONG / UNMODELLED.
+
+    SILENT-EXPLAINED is NOT produced here and cannot be: it depends on a
+    neighbouring file, and this function sees one command and one length.
+    `cmd_check` promotes a SILENT to it and `_explained_by` reads the evidence.
+    """
     want, how = predict(cmd)
     if want is None:
+        # AHEAD of the SILENT branch, and the order is the whole of it: a
+        # zero-byte capture of a family this tool declined to model is still
+        # UNMODELLED.  量 2026-09-21: of the seven zero-byte captures in
+        # `bench/` that carry a command, six are shell commands or an
+        # unmodelled family, and SILENT must not reach in and reclassify them.
+        # SILENT is a statement about the size model; there is no size model
+        # for those, so there is nothing for it to say.  C11c/C11d.
         return "UNMODELLED", None, None
     if nbytes == want:
         return "OK", want, 0
+    if nbytes == 0:
+        # NOT `SHORT`.  A truncated reply and no reply at all are different
+        # events and only the first is about this model.  This branch can never
+        # steal an OK: `want` for a modelled family is at least
+        # len(cmd) + ECHO_TAIL, so it is never 0.
+        return "SILENT", want, nbytes - want
     body_seen = nbytes - len(cmd.strip()) - ECHO_TAIL - PROMPT
     if body_seen == 0:
         return "ECHO-ONLY", want, nbytes - want
     if body_seen == UNKNOWN_BODY:
         return "UNKNOWN-COMMAND", want, nbytes - want
     return ("SHORT" if nbytes < want else "LONG"), want, nbytes - want
+
+
+def _started(path):
+    """The moment the instrument opened the port, or None.
+
+    None is the conservative answer and every failure returns it -- unreadable
+    file, absent field, unparseable field.  A capture whose start time cannot
+    be established is never offered as anybody's predecessor, so the unknown
+    case falls toward a miss rather than toward an excuse.
+    """
+    try:
+        sw = json.load(open(path, encoding="utf-8")).get("started_wallclock")
+    except Exception:                                  # noqa: BLE001
+        return None
+    if not sw:
+        return None
+    try:
+        return datetime.datetime.strptime(sw, "%Y-%m-%dT%H:%M:%S%z")
+    except (ValueError, TypeError):
+        return None
+
+
+def _explained_by(path):
+    """(predecessor name, cr key) if the capture before this one on disk
+    recorded that the loader prompt never came back; None otherwise.
+
+    It reads the capture's DIRECTORY rather than the argument list the sweep
+    was invoked with.  The claim is about the board, which is a property of the
+    seating and not of how somebody spelled the command, so
+    `check <one file>` and `check bench` must reach the same verdict about that
+    file.  量 2026-09-21: the explaining capture in the real case is itself
+    ESC-streamed, so the sweep skips it before classifying and it appears in no
+    row list -- reading the directory is what makes it reachable at all.
+
+    Ties in `started_wallclock` are broken by filename: arbitrary, but
+    deterministic.  量 2026-09-21, 53 directories under `bench/` hold at least
+    one pair of captures sharing a whole-second timestamp, so leaving the order
+    of a tie unstated would leave the verdict unstated too.
+    """
+    ap = os.path.abspath(path)
+    d = os.path.dirname(ap)
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return None
+    rows = []
+    for n in names:
+        if not n.endswith(".meta.json"):
+            continue
+        t = _started(os.path.join(d, n))
+        if t is not None:
+            rows.append((t, n))
+    rows.sort()
+    me = os.path.basename(ap)
+    here = [i for i, r in enumerate(rows) if r[1] == me]
+    if not here or here[0] == 0:
+        # First in its directory: nothing on disk could explain it.  This is
+        # the branch that keeps a dead port red.
+        return None
+    prev = rows[here[0] - 1][1]
+    try:
+        cr = json.load(open(os.path.join(d, prev), encoding="utf-8")).get("cr")
+    except Exception:                                  # noqa: BLE001
+        return None
+    for k in sorted(cr or {}):
+        v = cr[k]
+        # `is False`, not falsy: a missing key is not a claim that the prompt
+        # was absent, and neither is `None`.
+        if isinstance(v, dict) and v.get("prompt_seen") is False:
+            return prev, k
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -320,6 +476,33 @@ def controls():
     # is passing because everything raises.
     ck("C10c a good command does not raise", False, _raises("DW 80000000 4"))
 
+    # 11. SILENT, and the controls that stop it eating its neighbours.
+    #     Until 2026-09-21 a zero-byte capture read SHORT, which put "the reply
+    #     was cut off" and "nothing came back" in one bucket -- and only the
+    #     first of those is evidence about the size model.
+    ck("C11 zero bytes reads SILENT, not SHORT",
+       "SILENT", classify("DW 8040D4A0 1", 0)[0])
+    # 11b. the negative control on C11: one byte is not zero bytes, and a
+    #      genuinely truncated reply must still be the miss it always was.
+    #      Without this, C11 would pass on a build that called everything
+    #      SILENT.
+    ck("C11b a truncated reply is still SHORT",
+       "SHORT", classify("DW 8040D4A0 1", 70)[0])
+    # 11c/d. the ORDER inside `classify`, as cases rather than as a comment:
+    #      an unmodelled family with 0 bytes stays UNMODELLED.  Move the SILENT
+    #      branch above the `want is None` test and both of these fire.
+    ck("C11c zero bytes on an unmodelled family stays UNMODELLED",
+       "UNMODELLED", classify("J 80500000", 0)[0])
+    ck("C11d and on a shell command too",
+       "UNMODELLED", classify("echo RLXFW-PROBE-C", 0)[0])
+    # 11e. SILENT-EXPLAINED is not reachable from here, and saying so is the
+    #      point: this function cannot see a neighbouring file, so a build that
+    #      returned it from `classify` would be deciding the question with no
+    #      evidence in hand.
+    ck("C11e classify never returns SILENT-EXPLAINED", True,
+       all(classify(c, b)[0] != "SILENT-EXPLAINED"
+           for c, b, _, _ in FIXTURES))
+
     return out, bad
 
 
@@ -349,6 +532,7 @@ def cmd_check(args):
 
     tally = {}
     rows = []
+    notes = {}
     skipped_esc = 0
     for p in metas:
         try:
@@ -390,6 +574,14 @@ def cmd_check(args):
             # sweep -- a parse failure must not be able to hide there.
             st, want, delta = "UNPARSEABLE", None, None
             sent = ("%s [%s]" % (sent, type(e).__name__))[:34]
+        if st == "SILENT":
+            # The one classification made from outside the capture's own file.
+            # A promotion and never a demotion: a SILENT that nothing on disk
+            # accounts for stays SILENT and stays a miss.
+            ex = _explained_by(p)
+            if ex:
+                st = "SILENT-EXPLAINED"
+                notes[p] = "   <- %s recorded cr.%s.prompt_seen=false" % ex
         tally[st] = tally.get(st, 0) + 1
         rows.append((p, sent, m.get("bytes"), st, want, delta))
 
@@ -401,8 +593,9 @@ def cmd_check(args):
         # able to take the printer down -- a reporter that dies on the row it
         # was written to report is worse than one that says nothing.
         d = " (%+d)" % delta if isinstance(delta, int) and delta else ""
-        print("  %-14s %-34s got %-6s want %-6s%s   %s" % (
-            st, sent, got, "--" if want is None else want, d, p))
+        print("  %-14s %-34s got %-6s want %-6s%s   %s%s" % (
+            st, sent, got, "--" if want is None else want, d, p,
+            notes.get(p, "")))
 
     print()
     print("  captures with a command and no ESC stream: %d" % sum(tally.values()))
@@ -428,7 +621,13 @@ def cmd_check(args):
         print("\nRESULT: refused -- 0 modelled captures were examined, so a clean"
               " result would mean nothing")
         return 2
+    # SILENT is here and SILENT-EXPLAINED is not, which is the whole of it:
+    # silence is a miss until something already on disk accounts for it.
+    # Both count toward `modelled` above, and that is deliberate rather than an
+    # oversight -- the family WAS modelled and a number WAS predicted; what the
+    # capture did not do is come back.
     misses = (tally.get("SHORT", 0) + tally.get("LONG", 0)
+              + tally.get("SILENT", 0)
               + tally.get("UNREADABLE", 0) + tally.get("UNPARSEABLE", 0))
     if misses:
         print("\nRESULT: %d modelled, %d unexplained" % (modelled, misses))
