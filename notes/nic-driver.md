@@ -1614,3 +1614,177 @@ path never executed, and the board became unreachable after 37 frames with an
 empty TX ring. The change is still right — it removes a real liveness
 dependency the vendor never had — but it is not what is breaking this board
 now, and the card said so before it ran.
+
+---
+
+## 14 Seating 35 — the vendor carries it, and the wedge needs neither TCP nor a listener
+
+2026-09-21, two power presses, **eight boots**, one frozen card
+(`bench/2026-09-21e/PREDICTIONS-B40-block38.md`, `check-predictions` **43 of
+52**) and an off-card ladder that went further than the card could. The image
+is unchanged from seating 34: `s32a`, `RECIPE_ID` `84385d91`, `nfjrom`
+1,180,672 B.
+
+### 14.1 The vendor baseline, and the handover that this repository said was impossible
+
+Boot 1 handed the hardware to the vendor's driver **inside one boot**:
+`ifconfig rlx0 down` removed line 12 from `/proc/interrupts`, and
+`ifconfig eth4 10.1.1.4 up` took it back as `12: 12 RLX LOPI eth4`. The
+vendor's driver then carried a full `iperf3` run and **survived it**. The
+numbers and the contrast live in `docs/nic-vendor-diff.md` § 11; what belongs
+here is the consequence: **`D5`'s blocker is in this driver, not in the
+hardware path.**
+
+### 14.2 `W1` — the board wedges as a SERVER, so it does not have to open anything
+
+Boot 2, board running `iperf3 -s`, host the client. The board opened nothing
+and wedged anyway. Host side, `ss -tin` while it was down:
+
+| connection | reading |
+|---|---|
+| data | `bytes_sent 140,493`, **`bytes_acked 36,238`**, `bytes_retrans 76,744`, `cwnd 1`, `backoff 5`, `rwnd_limited 322,948 ms (100.0%)` |
+| control | `bytes_acked 124`, `lastrcv 322,964 ms` |
+| ARP | `10.1.1.3 INCOMPLETE` |
+
+Board side, `W1-NIC`: `tx_stopped 1`, `n_tx_stop 1`, `n_tx_full 1`,
+**`n_tx_wake 0`**, all four `txd` engine-owned, `n_rx 393`,
+`nd_stats rx 393/96,680`, `n_dsync 291` of `n_dsync_chk 350`,
+`seen_iisr 0002320E`. The shell answered `ALIVE-W1` in two lines.
+
+**So `NET-77`'s candidate ⓒ — the board opening an outbound connection — is
+refuted.**
+
+### 14.3 `W2` — this driver's first bulk TCP number, and it is not `D5`
+
+Boot 3, the same arrangement with `-R`, so the **board** sent the bulk. The
+host received **203 MBytes in 72.91 s = 23.3 Mbit/s**, and the board's own
+counters at the end read `nd_stats tx 152,618/222,575,314`,
+`rx 74,589/4,923,228`, **`drop 0/0`**, `tx_stopped 0`, `n_tx_full 0`, four
+`txd` CPU-owned, `n_dsync 70,700` of `n_dsync_chk 73,810`, `n_reads 147,628`.
+
+🔴 **It is not `D5`.** `D5` asks for an `iperf3` figure *with its method and its
+spread over at least three runs*; this is one run, and its control connection
+stalled at about 10 s — the `-t 10` never took effect and the data connection
+ran 62.91 s longer than it was told to. The number is the average of a transfer
+that was never terminated properly, and it is quoted that way or not at all.
+
+### 14.4 The state `W2` left behind — neither deaf nor dumb
+
+After `W2` the board answered nothing on the network, and three brackets say
+why it is not the obvious thing:
+
+1. **Inbound reaches the driver.** Four host pings: switch CPU-port `Snd`
+   **+4**, driver `n_rx` **+4**, `n_napi_poll` **+4**, `n_dsync` **+4**.
+2. **Outbound reaches the wire.** The board's own `ping`: driver `n_tx` **+6**,
+   the CPU port's count of frames taken from the CPU **+6**, port 3
+   `Snd Unicast` **+6**, and the host's `tcpdump` shows all four echo requests
+   **and the host's own four replies** on the wire.
+3. **The stack acts on some of it.** `/proc/net/snmp` across the same window:
+   `Icmp InEchos` **+3**, `OutMsgs` **+3**.
+
+The board's `ping` still reported 100 % loss. 🔴 **So frames arrive, are
+counted, and are delivered in a form the stack cannot use** — and 讀
+`rtl819x-nic.c:885-930`, `nic_napi_harvest()` takes the OWN bit and the length
+from `nic_rx_ring`/`nic_rx_ph` at index `i` and the buffer address from
+`nic_rx_mb` at **the same `i`**, which is exactly the coupling `NET-82` says
+the vendor does not have. The final dump reads `n_dsync 70,717` of
+`n_dsync_chk 73,828`.
+
+### 14.5 `W5` — the known wedge, and the kernel names the mechanism
+
+Boot 4, board as `iperf3` client. The wedge arrived **in the control
+exchange**: `tcpdump` has the SYN, the 37-byte cookie, the host's one-byte
+reply and then that same byte retransmitted at 0.21, 0.42, 0.85 and 1.68 s,
+never acknowledged.
+
+The console then printed, about once a second:
+
+```
+Virtual device rlx0 asks to queue packet!
+```
+
+讀 `net/core/dev.c:1933-1950`: that line is the **no-qdisc** path of
+`dev_queue_xmit`, taken when the queue is stopped or `dev_hard_start_xmit`
+returns non-zero, and it **drops** the skb. 讀 `net/ethernet/eth.c:349-353`:
+under `CONFIG_RTL_819X` the vendor's `ether_setup` sets `tx_queue_len = 0`,
+and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:2226`)
+uses that same function — so `rlx0` has no qdisc and nothing holds the frames.
+
+🔴 **And the driver's own correctness argument for the stop/wake design,
+`rtl819x-nic.c:1070-1078`, cites `sch_generic.c:124-178`'s requeue — a path
+this device cannot reach.** In this state `echo` returned one line, `ARP` went
+unanswered (six requests, zero replies), and `busybox reboot -f` could not be
+typed. That is what cost the second power press.
+
+### 14.6 `Y1`, `Y4`, `Y5` — the reproducer shrinks to 347 frames
+
+| rung | inbound | rate | result |
+|---|---|---|---|
+| `Y1` | 1,400 B UDP to a **closed port**, 30 s | 22,321 frames, 32,135,907 B, 744 frame/s | **wedge**, `tx_stopped 1`, `n_tx 13`, `n_dsync 2,809`/2,818 |
+| `Y4` | 64 B UDP to a closed port, 30 s | 174,173 frames, 18,461,984 B, 5,806 frame/s | **wedge**, `tx_stopped 1`, `n_tx 15`, `n_dsync 21,771`/21,777 |
+| `Y5` | 1,400 B UDP, paced, 8 s | **347 frames, 0.50 Mbit/s, 43 frame/s** | **wedge**, `tx_stopped 1`, `n_tx 9`, **`n_dsync 0`** |
+
+`Y1` alone refutes the rest of `NET-77`: no TCP, no listener, **no userspace
+process on the board at all**, and it still wedges. `Y4` excludes frame size
+(13× smaller frames, 8× the frame rate, same outcome). `Y5` is the important
+one twice over: it shrinks the trigger to 347 frames in 8.01 s, and its
+**`n_dsync 0`** takes the ring desync out of this failure entirely.
+
+🔴 **Rate is not a single variable either, and the contradiction is in this
+seating's own data.** `W2` took **1,023 inbound frame/s** (66-byte ACKs,
+0.54 Mbit/s) for 72.91 s and did not wedge — twenty-four times `Y5`'s frame
+rate. What separates them is byte rate or mbuf occupancy, and that is 推 on
+two points against one. `bench/2026-09-21e/y5-rateladder.py` is the instrument
+that settles it; its steps go down from 0.5 Mbit/s, not up.
+
+### 14.7 `Y6` — the vendor's contract runs, and the engine still does not give the descriptor back
+
+Boot 9, a single-variable A/B against `Y5`: same image, same boot procedure,
+same ladder step, one extra `/proc` write — `echo txmode 1`, the vendor
+ring-full contract `NET-80` added and never executed.
+
+| counter | `tx_mode 0` (`Y5`) | `tx_mode 1` (`Y6`) |
+|---|---|---|
+| `tx_stopped` / `n_tx_stop` | **1 / 1** | 0 / 0 |
+| `n_tx_full` | 1 | 12 |
+| `n_tx_retry` | 0 | **1,548** |
+| `tx_retry_max_seen` | 0 | **129** |
+| `n_tx_recovered` | 0 | **0** |
+| `n_tx_drop_full` | 0 | 12 |
+| board reachable | no | no |
+
+**1,548 reads of the OWN bit and not one of them found it clear.**
+`tx_retry_max_seen 129` is the 128-retry ceiling plus one, so every single
+occurrence ran to the limit. So the engine's refusal to retire a TX descriptor
+is **permanent**, no TX-side driver strategy masks it, and `NET-79`'s vendor
+contract — which is right about the liveness dependency — does not rescue this
+board. What is left is `NET-67 殘留`: why the engine stops.
+
+🟢 What `tx_mode 1` does buy, measured: no console storm, `tx_stopped 0`, and
+the drops counted as drops (`nd_stats drop 0/12`) instead of a KERN_CRIT line
+per packet.
+
+### 14.8 What the seating did not establish, and the instruments that fired
+
+* **Why the engine stops.** Untouched. The switch side is healthy in the
+  minimal case: `GDSR0 0012001E`, `pause 0`, CPU port `Snd 502,426 / 351 pkts`.
+* **`W3` and `W4` did not run** (9 of the card's 52 cells). `Y1` refuted the
+  same candidates more strongly than `W3` could — no listener, no TCP, no
+  userspace — and `W4`'s question (UDP instead of TCP) was answered by `Y1`
+  being UDP. The four `W5-*` post-state cells could not run because `W5` killed
+  the shell, which § 2.8 of the card named in advance as a reading.
+* 🟢 **Three guards fired and none of them cost a power cycle**: a 132-character
+  `--send` refused against the loader's 128-byte line buffer; a refusal to
+  overwrite an existing capture, which is the only reason a **stale** `Y6-NIC`
+  was caught being read as a measurement; and the ladder's own pre-probe
+  refusing on an unreachable board rather than printing a table of zeros.
+* 🔴 **One instrument defect was mine**: `env PATH=.:$PATH qemu-mips-static
+  iperf3 …` exits **127** under WSL because this host's `PATH` carries Windows
+  paths with spaces. The fix is the binary's full path.
+* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:1818-1820`
+  says `n_dsync_chk` is about 2× `n_napi_poll`. 量: they are **equal** (5/5,
+  350/350, 73,810/73,810) and it is `n_reads` that is about 2× (18, 720,
+  **147,628**). The substance is right and the counter named is wrong.
+
+**Zero flash-write commands, zero `FLR`, `AUTOBURN 00000000` read back on all
+five uploads, and no vendor firmware executed at any point.**

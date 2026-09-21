@@ -551,3 +551,80 @@ It does not add `txd ph2/ph3/ph4` to the dump and it does not set
 together, and that image is not this seating's — **a card that predicts a boot
 capture's byte count has to be written against the image that will actually
 boot.**
+
+---
+
+## 11. What § 10's seating returned — the baseline exists
+
+Seating 35, 2026-09-21, boot 1. Card
+`bench/2026-09-21e/PREDICTIONS-B40-block38.md`, frozen before any cell ran.
+
+### 11.1 🟢🟢 The vendor's driver carries `iperf3` on this board and survives it
+
+`V6` was the cell the seating existed for, and § 10 wrote its three outcomes
+before the board was powered. It returned the second **and** the third:
+
+| instrument | figure |
+|---|---|
+| the board's own `iperf3 -c`, sender side | **31.3 MBytes / 10.34 s / 25.4 Mbit/s**, `Retr 0` |
+| the host's `iperf3 -s`, receiver side | **31.3 MBytes / 11.53 s / 22.7 Mbit/s** |
+| the host's steady-state 1-second intervals | 25.9 → **26.8 Mbit/s** |
+
+Both ends ran the **same binary** — `iperf 3.1.3`, 252,644 bytes, sha256
+`3144db60…` — natively on the board and under `qemu-mips-static` on the host,
+which is what `NET-60` requires. Afterwards `V7-PING` was 4 of 4 both ways and
+`V7-ALIVE` returned two lines.
+
+🔴 **The pre-registered guess was that the vendor would survive** (§ 2.5 of the
+card, on 讀 `NET-79`'s ring depths and never-stop-the-queue contract) and it
+held. Had it wedged, the fault would have been below both drivers and every
+driver-side candidate in `NET-78` would have died with it.
+
+⚠️ **The two figures are not one figure.** 22.7 Mbit/s is the whole
+transaction including setup; 26.8 Mbit/s is the steady state; 25.4 Mbit/s is
+the sender's own average over a shorter window. Compared at the same
+instrument — the host's receiver side — the vendor's 22.7 sits beside rlxfw's
+**23.3 Mbit/s** (`NET-85`), and compared at steady state the vendor's 26.8
+sits above rlxfw's 23.2–24.4. **rlxfw reaches 0.87–0.92× of the vendor on this
+board**, and that ratio is the thing this file was written to make possible.
+
+### 11.2 🟢 The handover is real, and the reason it was thought impossible is not
+
+| cell | reading |
+|---|---|
+| `V2-DOWN` | after `ifconfig rlx0 down`, `/proc/interrupts` has **no line 12** |
+| `V3-ETH4` | `ifconfig eth4 10.1.1.4 up` → `UP BROADCAST RUNNING`, `Interrupt:12`, and `12: 12 RLX LOPI eth4` |
+| `V5` | `ping` 4 of 4 in **both** directions on 10.1.1.4 |
+
+So `docs/KNOWN-ISSUES.md`'s two `EBUSY` rows are refuted **on the device**:
+the capture they rest on never ran `ifconfig rlx0 down` first. § 8 ④ of this
+file predicted exactly that at the desk one segment earlier, 推; it is 量 now,
+and it cost three commands on a boot that was happening anyway.
+
+### 11.3 🟢 The two drivers do not share rings, so boot 1's readings are unambiguous
+
+`V4-NIC` is rlxfw's `/proc` read **while its own device is down** and the
+vendor's is up. The three engine position registers had left rlxfw's ring
+addresses:
+
+| field | rlxfw up (`V1`) | vendor up (`V4`) |
+|---|---|---|
+| `rpdcr0_pos` | `A15B8014` | **`A15B2C00`** |
+| `rmdcr0_pos` | `A15B8034` | **`A15B0000`** |
+| `tpdcr0_pos` | `A15B8044` | **`A1FCA400`** |
+
+讀 `rtl_nic.c:4192-4210`, the vendor's first open calls `rtl865x_init_hw()`,
+a full re-init including every descriptor base — and this is that re-init seen
+from the other driver's `/proc`. 🟢 The control in the same cells: `n_writes`
+is **16 before and 16 after** three `cat`s, while `n_reads` goes 33 → 45, so
+rlxfw's `/proc` really is a read-only observer.
+
+### 11.4 What boot 2 onwards did to § 10's ladder
+
+The `W` ladder's first rung wedged the board, which is the strongest of the
+outcomes § 2.6 of the card listed, and the rest of the seating is in
+`notes/nic-driver.md` § 14. In one line: `NET-77`'s three candidates are all
+refuted, the minimal reproducer is **347 inbound frames at 0.5 Mbit/s with no
+TCP and no listener**, and the vendor's ring-full contract does not rescue it
+because the engine never returns the descriptor — 1,548 OWN-bit reads, zero
+recoveries.
