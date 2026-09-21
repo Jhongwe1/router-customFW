@@ -1788,3 +1788,40 @@ per packet.
 
 **Zero flash-write commands, zero `FLR`, `AUTOBURN 00000000` read back on all
 🔴 **eight** uploads -- this figure was published as *five* first, because it was measured after `L6` and then quoted rather than re-derived when `L7`, `L8` and `L9` ran; 量, `bench/2026-09-21e/*-ab2.log` is **8** files and all eight read `00000000` -- and no vendor firmware executed at any point.**
+
+### 14.9 The two unnamed `seen_iisr` bits, named — and both excluded
+
+Asked after the seating, at the desk, from material that was already
+committed. 讀 `AsicDriver/rtl865xc_asicregs.h:561-640`:
+
+* **bit 17** is `PKTHDR_DESC_RUNOUT_IP0` — the RX **pkthdr** descriptor ring
+  ran out.
+* **bit 16** is the **mbuf** descriptor ring run-out. Its *enable* is bit 11
+  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:283-292`
+  and `:316` already carry it.
+
+量, the seven states this seating produced:
+
+| state | `seen_iisr` | extra bit | wedged? |
+|---|---|---|---|
+| `V1` healthy | `0000320E` | — | no |
+| `W1` inbound bulk TCP | `0002320E` | 17, pkthdr run-out | **yes** |
+| `W2` 203 MBytes outbound | `0001320E` | 16, mbuf run-out | **no** |
+| `Y1` UDP 1,400 B | `0002320E` | 17 | **yes** |
+| `Y4` UDP 64 B | `0002320E` | 17 | **yes** |
+| `Y5` 0.5 Mbit/s | `0000320E` | none | **yes** |
+| `Y6` same, `tx_mode 1` | `0000320E` | none | **yes** |
+
+🔴 **So neither run-out is the cause.** One of them fires on the single run
+that did **not** wedge, and neither fires on the two minimal reproducers that
+did. That is the same shape as `NET-91`'s `SharedBufFCON_Flag`: a consequence
+of load, sitting where a cause would be.
+
+⚠️ And this driver does clear them — `:762-763` reads `CPUIISR` and writes it
+back, which is W1C — so a stuck pending bit is excluded too.
+
+🔴 **What is left after this is a silence.** In the minimal failure state the
+silicon reports nothing at all: no new `CPUIISR` bit, `GDSR0 0012001E`, `PCSR`
+zero, `STOPTX` clear, and the switch's 37 registers byte-identical across the
+fault. Every status bit this part exposes to us says it is healthy while it
+refuses to retire a TX descriptor.
