@@ -1904,3 +1904,169 @@ detector left to write.** `SPEC.md` `NET-101`.
 It does not say why the engine stops. `NET-67 殘留` is untouched: there is a
 repair that works and no mechanism behind it. And the repair has never run from
 inside the driver — it was three `/proc` writes typed at a shell.
+
+
+## 16 Seating 37 — the driver repairs itself, and a one-word bug was worth 250x
+
+量 2026-09-22, `bench/2026-09-22`, card `PREDICTIONS-B42-block40.md`, image
+`s99c` (`RECIPE_ID c3cb552b`, `rtl819x-nic 1.2`). **One power press**, the
+22:45 cold power-on of 2026-09-22, which was also seating 36's budget.
+
+### 16.1 🟢🟢 The recovery runs from inside the driver, and the trigger is time
+
+`NET-101` measured `engine off` -> `arm` -> `engine on` as three things an
+operator typed. This driver does them itself.
+
+🔴 **The trigger cannot be a count, and that is a reading rather than a
+preference.** `nic_xmit` calls `netif_stop_queue()` when the slot it wants is
+engine-owned; after that `dev_queue_xmit` stops offering, because `NET-57`'s
+`tx_queue_len = 0` puts every `net_device` on this board behind
+`noqueue_qdisc`. So `n_tx_full` freezes at the stop and never moves again --
+which is `NET-99`'s table read from the driver's side, where `n_tx` sits at
+**17** across +16/+46/+120/+600 s. A counter-based detector would read the same
+value forever. The trigger is therefore **time since the stop**, on a private
+`timer_list`, armed at `netif_stop_queue()` and deleted by `:754`'s level test
+when the cheap path wins first.
+
+Not `watchdog_timeo`: `NET-55`/`NET-57` measured `dev_watchdog_up()` never
+being called on this board. Not `ndo_stop`/`ndo_open`: `NET-58`, reproduced as
+seating 36's `X16`. `engine off` is ordered first: `NET-64`.
+
+**The single-variable demonstration.** The fault was created with the detector
+OFF, read whole, and the detector switched on in front of it -- so nothing else
+had to be held constant:
+
+| cell | `n_recov_arm` | `fire` | `ok` | `wake` | `fail` | `tx_stopped` | ping |
+|---|---:|---:|---:|---:|---:|---|---|
+| `B4-WEDGE` (`recover 0`) | **0** | 0 | 0 | 0 | 0 | **1** | 0/4 |
+| `B6-AFTER` (`recover 1`) | **1** | **1** | **1** | **1** | **0** | **0** | **4/4** |
+
+`B5-ON`'s capture holds the three marks in order -- `RLXFW-N-ENGOFF`,
+`RLXFW-N-ARM=A15B8000`, `RLXFW-N-ARMR=00000000`, `RLXFW-N-ENGON=C4000000` --
+and the four TX descriptors return to `A15B81D0 / 81E8 / 8200 / 821A`.
+
+🟢 **The latency is a prediction, not an event.**
+`recov_j_fire - recov_j_arm` = 4294957538 - 4294957438 = **100**, which is
+`recov_jiffies` exactly (`HZ = 100`, `msecs_to_jiffies(1000)`). A second firing
+later in the seating repeats it: 4294959483 - 4294959383 = **100**.
+
+🟢 **Over the whole seating: 26 stops, 26 recoveries, `n_recov_fail` 0,
+`n_recov_spurious` 0** -- including at `recovms 20`, where `recov_jiffies`
+reads **2** and the spurious counter still reads 0, so a threshold 50x shorter
+does not fire on transients the level test has already cleared.
+
+🔴 **`n_recov_arm` reading 0 at `B4-WEDGE` is the control that makes the row
+above an experiment.** It is the refutation condition the card wrote first: a
+non-zero there would have meant the arming is not gated on the mode, and
+`B1`-`B4` would not have been a `recover 0` arm at all.
+
+### 16.2 🟢🟢 `NET-82` is real, it is rate-dependent, and it was worth 250x
+
+The harvest used one index for two rings: `nic_re(nic_rx_ring, i)` for the OWN
+bit and `nic_dw(nic_rx_mb, i, 3)` for the buffer. 讀 `rtl865xc_swNic.c:629`,
+the vendor instead follows `pPkthdr->ph_mbuf`. `rtl819x-nic 1.2` measures the
+difference in **both** modes and only *uses* the followed address when
+`phfollow 1`.
+
+| load | frames harvested | `n_ph_diff` moved by |
+|---|---:|---:|
+| UDP ladder, `Y5`'s dose, **43 frame/s** (Part B + `J1`) | **1,094** | **0** |
+| bulk TCP, ~1,500 frame/s (`D0`-`H3`) | ~141,000 | **~141,000** |
+
+So the pairing is the identity at 43 frame/s and diverges on essentially every
+frame at 1,500 frame/s. 🔴 **This is why Part B's reading refuted `NET-82` and
+the refutation was too broad**: `n_ph_diff 0` over 732 frames was true, and
+true only of that load.
+
+**The first divergence is kept whole**: `ph_first_exp A15B8170` against
+`ph_first_w0 A15B8110` -- harvesting pkthdr slot **4**, `ph_mbuf` pointed at
+mbuf slot **0**. `n_ph_bad` is **0** throughout, so every divergent pointer was
+in range and correctly strided: these are real pairings, not garbage.
+
+🟢 **The detector is known to fire, which is what makes the zeros readings.**
+`phtest` drives `nic_ph_class()` with typed values and touches no hardware; its
+four arguments were computed at the desk from `nic_do_alloc`'s layout and
+cross-checked against `NET-98`'s descriptor values *before power*:
+
+| argument | predicted | measured |
+|---|---|---|
+| `A15B8110 0` | AGREE, j 0 | **0 / 0** |
+| `A15B8128 0` | SKEW, j 1 | **1 / 1** |
+| `DEADBEEF 0` | BAD, j 0 | **2 / 0** |
+| `A15B8114 0` (in range, mis-strided) | BAD, j 0 | **2 / 0** |
+
+### 16.3 🟢🟢 `D5` — an `iperf3` figure with its method and its spread
+
+Host drives, board is the server (backgrounded), same `iperf 3.1.3` MIPS binary
+both ends under `qemu-mips-static`, `-t 30`, `timeout 70` on the host.
+
+| run | `phfollow` | bytes | window | **Mbit/s** |
+|---|:-:|---:|---|---:|
+| `D0-CTRL` | 0 | 308 KBytes | 71.22 s | 0.04 |
+| `D1-R1` | 0 | 635 KBytes | 71.96 s | 0.07 |
+| `D1-R2` | 0 | 499 KBytes | 68.22 s | 0.06 |
+| `D1-R3` | 0 | 491 KBytes | 67.20 s | 0.06 |
+| `D2-R1` | 0 | 615 KBytes | 72.11 s | 0.07 |
+| **`F1`** | **1** | **60.9 MBytes** | **30.00 s, `rc=0`** | **17.03** |
+| **`H1`** | **1** | **63.5 MBytes** | 30 s data phase | **17.76** |
+| **`H2`** | **1** | **61.1 MBytes** | 30 s data phase | **17.09** |
+| `H3` | 1 | 7.42 MBytes | collapsed after 10 s | 0.86 |
+
+**`D5` = 17.03 / 17.76 / 17.09 Mbit/s, n = 3, spread 0.73 Mbit/s (4.2 %)**,
+against the vendor's **25.4 Mbit/s** (`NET-84`) on the same binary = **68 %**.
+
+⚠️ **Two things about the method, said rather than left to be found.** `F1` is
+the only run that exited 0; `H1` and `H2` hit `timeout 70` in the control
+exchange *after* the data phase, and their own `30.00-71.44 sec` interval rows
+read **0.00 Bytes**, so the extra elapsed time carries no data and the figure
+is bytes / the `-t 30` window. And `H3` collapsed after one interval — **one
+run in four**, reported rather than dropped.
+
+🔴 **`n_ph_used` is the refutation condition and it held**: 44,256 in `F1`'s
+arm, 0 in every `phfollow 0` arm. That counter increments only on the branch
+that returns the followed address, so a zero would have meant both arms were
+the same experiment and the whole comparison void.
+
+### 16.4 🔴 What it does NOT fix, and this is the part that matters
+
+**The TX stall is not downstream of the RX corruption.** `J1` ran `Y5`'s exact
+dose with `phfollow 1` and `recover 0`: the board went **silent**, `n_tx_stop`
+23 -> 24, all four `txd*` OWN set, ping 0/4. So `NET-67 殘留` is untouched.
+
+🔴 **And an inference of mine was refuted by my own later cells.** `F1`'s
+`n_tx_stop` did not move across a 30 s run at 17 Mbit/s, and I read that as
+*the stall was a consequence of the corruption*. `H1`, `H2` and `H3` each moved
+it, and `J1` reproduces the stall with the corruption fixed. The narrow claim
+that survives is only that a 30-second transfer at 17 Mbit/s **can** run
+without a stall.
+
+**§ 12.4's run-out mask is also refuted as the cause.** `E1-SET` put
+`CPUIIMR = 0x000007F8`, the loader's own value, with `iimr_base` and
+`now_iimr` **both** reading `000007F8` — the two-source check that the `/proc`
+route could never have passed, because the NAPI-complete path used to OR the
+run-out bits back in and `echo read` puts nothing on the wire. Under that mask
+the same dose still stopped the queue **twice** (`n_tx_stop` 24 -> 26).
+⚠️ That cell has a defect of its own: `recover 1` was left on, so the ladder
+reported `ANSWERS` and the verdict has to be read from `n_tx_stop`, not from
+the ladder. 🟢 The card's four-row discriminator did its job: `n_rx` kept
+climbing and `now_iisr` read `00000000`, so this was the TX wedge and not
+`C58-afterflood2`'s RX-deaf failure.
+
+🟢 **One new observable, and it switches on the same variable as `n_ph_diff`.**
+`seen_iisr` reads `0000320E` in the first eight dumps and `0002320E` at
+`D0-CTRL-N` (`n_rx 876`, the first bulk TCP run), then `0003320E` and stays.
+Bits 17 and 16 are `PKTHDR_DESC_RUNOUT_IP0` and `MBUF_DESC_RUNOUT` — `NET-92`
+named them and **this project had never seen them latch**. 推: the 8-deep RX
+ring runs out at ~1,500 frame/s, the engine pipelines, and the two rings
+decouple. The mechanism is unread.
+
+### 16.5 ⚠️ What this seating does not say
+
+* It does not say **why** the engine stops retiring a TX descriptor. Two
+  candidates died here; none was replaced.
+* It does not say why the pairing decouples. The correlation with frame rate
+  rests on two points, both from one board on one evening.
+* `phfollow 1` is **not** the default in this image and no image has been built
+  with it as the default.
+* `recovms` was swept over two values, 1000 and 20, and the throughput did not
+  move between them — so the recovery latency is not what limits the number.

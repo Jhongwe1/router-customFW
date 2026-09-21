@@ -978,3 +978,67 @@ rather than by preference:
   twice from a pristine wedge and once from a ring that had also had `SOFTRST`
   written to it. It has never run from inside the driver, because the detector
   does not exist yet.
+
+
+## 15. What seating 37 returned — the divergence that mattered was not the one this file was chasing
+
+量 2026-09-22, `bench/2026-09-22`, image `s99c`. The driver side is
+`notes/nic-driver.md` § 16; what belongs here is what it says about **this
+file's comparison**.
+
+### 15.1 🔴 § 12.4's configuration divergence is refuted as the cause of the stall
+
+§ 12.4 found one configuration difference between the loader and rlxfw and
+called it *a divergence to know about*. `NET-67 殘留` then promoted it to the
+strongest remaining candidate. It is not the cause.
+
+`E1-SET` set `CPUIIMR` to the loader's `0x000007F8` through the new `iimr`
+verb. **Two sources agree it took**: `iimr_base 000007F8` (what the driver
+believes it armed) and `now_iimr 000007F8` (the register read back). Under that
+mask, `Y5`'s dose still stopped the transmit queue **twice** — `n_tx_stop`
+24 → 26, `n_recov_fire` 23 → 25.
+
+🟢 **This is the measurement § 14.4 said could not be made without an image,
+and the reason it could not is now visible in the result.** 讀
+`rtl819x-nic.c`'s NAPI-complete path as it was: it OR-ed the three RX-work
+enables back in on every completion, so a mask written through the vendor's
+`/proc/rtl865x/memory` would have been undone by the first arriving packet —
+and the read-back cell would have read it back unchanged, because `echo read`
+puts nothing on the wire. In `1.2` the restore is bounded by `iimr_base`, which
+is why the two sources can be compared at all.
+
+⚠️ **The cell has a defect of its own, recorded rather than repaired**:
+`recover 1` was left armed, so `netblast`'s ladder reported `ANSWERS` and the
+verdict has to be read from `n_tx_stop` rather than from the ladder's own
+line. 🟢 The card's four-row discriminator did what it was written for: `n_rx`
+kept climbing and `now_iisr` read `00000000`, so this was the TX wedge and not
+`bench/2026-09-19b/C58-afterflood2`'s RX-deaf failure, which the same mask
+could have reproduced.
+
+### 15.2 🟢🟢 The divergence that DID matter is § 6's, and it is rate-dependent
+
+§ 6 read the vendor's receive path and found it following `pPkthdr->ph_mbuf`
+where rlxfw indexes the mbuf ring. Measured on the die, in both modes, sharing
+one denominator:
+
+| load | frames | `n_ph_diff` moved by | throughput |
+|---|---:|---:|---|
+| UDP ladder, 43 frame/s | 1,094 | **0** | — |
+| bulk TCP, ~1,500 frame/s | ~141,000 | **~141,000** | 0.06 → **17.0 Mbit/s** |
+
+**So the two implementations differ in a way that costs 250× at the load a
+router actually carries, and nothing at the load this file had been using to
+reproduce the fault.** 🔴 That is the strongest argument in this document for
+reading a second implementation rather than reasoning from one: the difference
+was in § 6 from the day it was written, and every experiment since had been run
+at a rate where it does not show.
+
+### 15.3 ⚠️ What § 15 does not establish
+
+* Why the pairing decouples at high frame rate. The correlation is two points
+  on one board on one evening; the mechanism is unread. `NET-103 殘留`.
+* Why the engine stops retiring a TX descriptor. Two candidates died in § 15.1
+  and § 16.4 and neither was replaced.
+* Whether the loader would show the same pairing behaviour. The loader's
+  service loop is polled and its rings are 4 deep, so the comparison is not
+  obviously transferable, and it was not attempted.
