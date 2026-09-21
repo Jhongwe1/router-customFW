@@ -350,6 +350,25 @@
  * ------------------------------------------------------------------------ */
 #define NIC_RX_DESC		8
 #define NIC_TX_DESC		4
+
+/* s32a.  How many times tx_mode 1 re-reads the OWN bit of the slot it wants
+ * before it gives up and drops the frame.
+ *
+ * 讀 `rtl_nic.c:5122`, the vendor's own constant for the same decision:
+ *
+ *     #define	RTL_NIC_TX_RETRY_MAX		(128)
+ *
+ * The number is copied rather than chosen, and it is NOT claimed to be tuned:
+ * the vendor's iteration does real work (swNic_txDone walks its ring), ours is
+ * one uncached read of one word, so 128 of ours is a far shorter wall-clock
+ * window than 128 of theirs.  What matters is that the loop is BOUNDED and that
+ * the bound is a number somebody can point at.  `tx_retry_max_seen` reports the
+ * high-water actually reached, so whether 128 was ever approached is measured
+ * rather than argued. */
+#define NIC_TX_RETRY_MAX	128
+
+#define NIC_TXMODE_STOPQ	0	/* today's path: netif_stop_queue + BUSY  */
+#define NIC_TXMODE_VENDOR	1	/* 讀 rtl_nic.c:5161-5171: poll, then drop */
 #define NIC_BUF_SZ		2048	/* must agree with NIC_MBUF_2048 */
 #define NIC_RX_OFFSET		2	/* 量: the loader's buffers are at
 					 * `...9A`, 2 mod 4 */
@@ -556,6 +575,43 @@ static unsigned long nic_n_tx_stop;
 static unsigned long nic_n_tx_wake;
 static unsigned long nic_n_tx_wake_race;
 static unsigned long nic_n_tx_timeout;
+
+/* s32a.  The switch, and six readings that make its effect falsifiable.
+ *
+ *   tx_mode            0 = netif_stop_queue (today), 1 = the vendor's contract
+ *   n_tx_full          times nic_xmit found its slot engine-owned.  Counted in
+ *                      BOTH modes, so the two modes are compared on the same
+ *                      denominator rather than on two different ones.
+ *   n_tx_retry         total OWN re-reads across all calls (mode 1 only)
+ *   tx_retry_max_seen  the most re-reads any single call needed.  This is what
+ *                      says whether NIC_TX_RETRY_MAX was ever approached.
+ *   n_tx_recovered     calls where the engine returned the slot before the
+ *                      bound.  🔴 THIS IS THE ONE THAT ANSWERS AN OPEN
+ *                      QUESTION: > 0 means the engine resumes by itself, which
+ *                      no reading in this project has ever been able to see,
+ *                      because the queue-stop killed the interface at the first
+ *                      full ring and nothing transmitted again.
+ *   n_tx_drop_full     frames dropped after the bound (mode 1 only)
+ *
+ * `n_tx_full` is kept separate from `n_xmit_busy` for the same reason
+ * `n_tx_stop` already is: one counts an OBSERVATION of ring state, the other a
+ * RETURN VALUE, and in mode 1 there is no BUSY return at all -- so a later
+ * reader who merged them would find n_xmit_busy 0 and conclude the ring never
+ * filled. */
+static int           nic_tx_mode = NIC_TXMODE_STOPQ;
+static unsigned long nic_n_tx_full;
+static unsigned long nic_n_tx_retry;
+static unsigned long nic_tx_retry_max_seen;
+static unsigned long nic_n_tx_recovered;
+static unsigned long nic_n_tx_drop_full;
+
+/* s32a.  Which context nic_xmit is called from.  No behaviour depends on this;
+ * it exists because mode 1 spins with interrupts already disabled by the
+ * spin_lock_irqsave below, and "is that safe here" is a question about the
+ * caller's context that this project has never measured on this die. */
+static unsigned long nic_n_xmit_hardirq;
+static unsigned long nic_n_xmit_softirq;
+static unsigned long nic_n_xmit_process;
 
 static const u8 nic_mac[6] = { 0x02, 0x52, 0x4C, 0x58, 0x46, 0x57 };
 
@@ -921,6 +977,15 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 	unsigned long flags;
 	u32 e, bf, len, k, icr, wrap, ph;
 
+	/* s32a: context census.  Before the early return, so the denominator is
+	 * every call rather than every call that got as far as the ring. */
+	if (in_irq())
+		nic_n_xmit_hardirq++;
+	else if (in_softirq())
+		nic_n_xmit_softirq++;
+	else
+		nic_n_xmit_process++;
+
 	if (!nic_engine_on) {
 		dev_kfree_skb(skb);
 		dev->stats.tx_dropped++;
@@ -931,6 +996,50 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	i = nic_tx_idx;
 	e = nic_re(nic_tx_ring, i);
+	if (e & NIC_DESC_OWN)
+		nic_n_tx_full++;
+
+	/* s32a MODE 1 -- the vendor's ring-full contract, 讀 rtl_nic.c:5161-5171.
+	 *
+	 * Poll the OWN bit of the slot we want, bounded; if it frees, fall
+	 * through and transmit; if it does not, DROP the frame and report
+	 * NETDEV_TX_OK.  The queue is never stopped, so there is nothing that
+	 * has to be woken, so there is no liveness dependency on an interrupt.
+	 *
+	 * 🔴 Spinning with interrupts off is correct HERE and would not be in
+	 * general: the OWN bit is cleared by the engine's own DMA write, not by
+	 * anything this CPU runs, so the condition can change while interrupts
+	 * are masked.  That is the same reason the vendor's swNic_txDone polls
+	 * inside local_irq_save (rtl865xc_swNic.c:795-833).
+	 *
+	 * ⚠️ WHAT THIS DOES NOT DO: it does not make the engine resume, and it
+	 * does not reclaim anything -- this driver frees the skb synchronously
+	 * at the end of nic_xmit, so there is no completion queue to drain.
+	 * The only thing the vendor's swNic_txDone does for us is the OWN-bit
+	 * read, and that is what this loop is. */
+	if ((e & NIC_DESC_OWN) && nic_tx_mode == NIC_TXMODE_VENDOR) {
+		unsigned int r = 0;
+
+		while (e & NIC_DESC_OWN) {
+			if (++r > NIC_TX_RETRY_MAX) {
+				nic_n_tx_retry += r;
+				if (r > nic_tx_retry_max_seen)
+					nic_tx_retry_max_seen = r;
+				nic_n_tx_drop_full++;
+				spin_unlock_irqrestore(&nic_lock, flags);
+				dev_kfree_skb(skb);
+				dev->stats.tx_dropped++;
+				return NETDEV_TX_OK;
+			}
+			e = nic_re(nic_tx_ring, i);
+		}
+		nic_n_tx_retry += r;
+		if (r > nic_tx_retry_max_seen)
+			nic_tx_retry_max_seen = r;
+		nic_n_tx_recovered++;
+		/* the slot is ours; fall through to the transmit below */
+	}
+
 	if (e & NIC_DESC_OWN) {
 		/* The engine still owns this slot.  Stop the queue and tell
 		 * the stack to retry -- do NOT drop, and do NOT free the skb,
@@ -1641,6 +1750,16 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 		       nic_n_napi_complete);
 	len += sprintf(page + len, "n_xmit %lu\n", nic_n_xmit);
 	len += sprintf(page + len, "n_xmit_busy %lu\n", nic_n_xmit_busy);
+	len += sprintf(page + len, "tx_mode %d\n", nic_tx_mode);
+	len += sprintf(page + len, "n_tx_full %lu\n", nic_n_tx_full);
+	len += sprintf(page + len, "n_tx_retry %lu\n", nic_n_tx_retry);
+	len += sprintf(page + len, "tx_retry_max_seen %lu\n",
+		       nic_tx_retry_max_seen);
+	len += sprintf(page + len, "n_tx_recovered %lu\n", nic_n_tx_recovered);
+	len += sprintf(page + len, "n_tx_drop_full %lu\n", nic_n_tx_drop_full);
+	len += sprintf(page + len, "n_xmit_ctx %lu/%lu/%lu\n",
+		       nic_n_xmit_hardirq, nic_n_xmit_softirq,
+		       nic_n_xmit_process);
 	len += sprintf(page + len, "n_skb_fail %lu\n", nic_n_skb_fail);
 	len += sprintf(page + len, "n_tx_stop %lu\n", nic_n_tx_stop);
 	len += sprintf(page + len, "n_tx_wake %lu\n", nic_n_tx_wake);
@@ -1869,6 +1988,18 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		int rc = nic_wr(NIC_CPUICR, icr | NIC_SWINTSET);
 
 		return rc ? rc : (int)count;
+	}
+	/* s32a.  One verb, two values, and it refuses anything else rather than
+	 * treating an unparsed argument as 0 -- which would silently put the
+	 * board back in the mode the cell was written to leave. */
+	if (!strncmp(buf, "txmode ", 7)) {
+		if (!strcmp(buf + 7, "0"))
+			nic_tx_mode = NIC_TXMODE_STOPQ;
+		else if (!strcmp(buf + 7, "1"))
+			nic_tx_mode = NIC_TXMODE_VENDOR;
+		else
+			return -EINVAL;
+		return (int)count;
 	}
 	if (!strncmp(buf, "txstall ", 8)) {
 		/* R6-4a's POSITIVE CONTROL, and the reason the next seating's

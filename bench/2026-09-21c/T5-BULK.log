@@ -1,0 +1,2 @@
+T5-BULK precondition=REFUSED -- no listener on 10.1.1.3:9999
+T5-BULK verdict=NOT-RUN (this would be a repeat of T1, not a bulk transfer)

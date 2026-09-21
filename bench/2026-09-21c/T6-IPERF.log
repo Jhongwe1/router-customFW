@@ -1,0 +1,3 @@
+iperf3 -c 10.1.1.2 -p 5201 -t 10 -i 1 -f m
+iperf3: error - unable to connect to server: Connection refused
+# 

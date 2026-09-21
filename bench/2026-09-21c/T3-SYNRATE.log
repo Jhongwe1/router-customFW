@@ -1,0 +1,4 @@
+T3-SYNRATE window_s=30.0 elapsed_s=30.000103
+T3-SYNRATE attempts=35062 refused=35062 connected=0 other=0
+T3-SYNRATE rate_per_s=1168.73
+T3-SYNRATE board_tx_segments_lower_bound=35062
