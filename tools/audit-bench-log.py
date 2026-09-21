@@ -223,6 +223,10 @@ ALLOW = [
      "fired before. docs/KNOWN-ISSUES.md carries what would settle the "
      "class: a cross-check over the two allowlists that requires every "
      "difference to be declared rather than merely true"),
+    ("match", "02:52:4c:58:46:57",
+     "\U0001f195 2026-09-21 (seating 35). THE SAME ADDRESS AS THE ENTRY ABOVE, in the spelling `tcpdump` prints. The adjudication is that entry's and is not repeated: it is a driver constant, locally administered, and it exists precisely so this unit's real address in H601 never has to be read.\n"
+     "\U0001f534 WHAT IS NEW IS THAT THIS FILE'S OWN TEXT SAID THIS ENTRY ALREADY EXISTED. The `fc:19:28:61:84:c9` entry, written on 2026-09-21 for seatings 33/34, states that `h601` and `02:52:4c:58:46:57` EACH CARRY TWO ENTRIES; \u91cf, on the commit that shipped it, this address carried ONE here and two in spec-check.py. The case pair was made in the other file and the sentence describing it was written in this one. It fired at seating 35, on the first `tcpdump` here to capture an ARP REPLY from the board -- X7-TCPDUMP and X13-TCPDUMP, 4 hits across 2 files -- because every earlier reading of this address came from the console, which prints it upper-case.\n"
+     "\u26a0\ufe0f This is the THIRD instance of the divergence the entry above already names as a class, and the cross-check that would settle it -- every difference between the two allowlists declared rather than merely true -- still does not exist. docs/KNOWN-ISSUES.md owns it"),
     ("match", "10.255.255",
      "the BROADCAST address of the bench network the entry at the top of "
      "this list already allows. \u91cf 2026-09-20, the line busybox prints: "
