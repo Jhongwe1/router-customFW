@@ -1,0 +1,88 @@
+sleep 1 ; cat /proc/rtl865x/asicCounter
+[  866.900000] <Port: 0>
+[  866.900000] Rx counters
+[  866.900000]    Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.900000]    CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.900000]    Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+[  866.900000]    < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+[  866.900000]    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+[  866.900000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.900000] Output counters
+[  866.900000]    Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+[  866.900000]    Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+[  866.900000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.900000] <Port: 1>
+[  866.900000] Rx counters
+[  866.900000]    Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.900000]    CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.900000]    Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+[  866.900000]    < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+[  866.900000]    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+[  866.900000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.900000] Output counters
+[  866.900000]    Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+[  866.900000]    Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+[  866.900000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.900000] <Port: 2>
+[  866.910000] Rx counters
+[  866.920000]    Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.920000]    CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.920000]    Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+[  866.920000]    < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+[  866.920000]    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+[  866.920000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.920000] Output counters
+[  866.920000]    Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+[  866.920000]    Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+[  866.920000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.920000] <Port: 3>
+[  866.920000] Rx counters
+[  866.920000]    Rcv 5223882 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.920000]    CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.920000]    Unicast 74614 pkts, Multicast 0 pkts, Broadcast 2 pkts
+[  866.920000]    < 64: 0 pkts, 64: 30 pkts, 65 -127: 74585 pkts, 128 -255: 1 pkts
+[  866.920000]    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+[  866.920000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.920000] Output counters
+[  866.920000]    Snd 223187434 bytes, Unicast 152639 pkts, Multicast 0 pkts
+[  866.920000]    Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+[  866.920000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.920000] <Port: 4>
+[  866.920000] Rx counters
+[  866.930000]    Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.930000]    CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.930000]    Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+[  866.930000]    < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+[  866.930000]    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+[  866.930000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.930000] Output counters
+[  866.930000]    Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+[  866.940000]    Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+[  866.940000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.940000] <Port: 5>
+[  866.940000] Rx counters
+[  866.940000]    Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.940000]    CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.940000]    Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+[  866.940000]    < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+[  866.940000]    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+[  866.940000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.940000] Output counters
+[  866.940000]    Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+[  866.940000]    Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+[  866.940000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.940000] <CPU port (extension port included)>
+[  866.940000] Rx counters
+[  866.950000]    Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+[  866.950000]    CRCAlignErr 152639, SymbolErr 0, FragErr 0, JabberErr 0
+[  866.950000]    Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+[  866.950000]    < 64: 0 pkts, 64: 18 pkts, 65 -127: 5087 pkts, 128 -255: 0 pkts
+[  866.950000]    256 - 511: 0 pkts, 512 - 1023: 1619 pkts, 1024 - 1518: 145915 pkts
+[  866.950000]    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+[  866.950000] Output counters
+[  866.950000]    Snd 5223882 bytes, Unicast 74614 pkts, Multicast 0 pkts
+[  866.950000]    Broadcast 2 pkts, Late collision 0, Deferred transmission 0 
+[  866.950000]    Collisions 0 Single collision 0 Multiple collision 0 pause 0
+[  866.950000] <Whole system counters>
+[  866.950000]    CpuEvent 0 pkts
+# 

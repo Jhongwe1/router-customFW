@@ -1,0 +1,4 @@
+iperf3 -s > /dev/null 2>&1 & sleep 3 ; ps
+[  370.110000] Virtual device rlx0 asks to queue packet!
+[  371.170000] Virtual device rlx0 asks to queue packet!
+[  372.220000] Virtual device rlx0 asks to queue packet!

@@ -1,0 +1,11 @@
+ifconfig rlx0
+rlx0      Link encap:Ethernet  HWaddr 02:52:4C:58:46:57  
+          inet addr:10.1.1.3  Bcast:10.255.255.255  Mask:255.0.0.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:74616 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:152639 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:4925418 (4.6 MiB)  TX bytes:222576878 (212.2 MiB)
+          Interrupt:12 
+
+# 

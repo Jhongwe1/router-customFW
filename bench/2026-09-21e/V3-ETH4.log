@@ -1,0 +1,27 @@
+ifconfig eth4 10.1.1.4 up ; ifconfig eth4 ; cat /proc/interrupts
+eth4      Link encap:Ethernet  HWaddr 00:12:34:56:78:94  
+          inet addr:10.1.1.4  Bcast:10.255.255.255  Mask:255.0.0.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:6 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:6 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:536 (536.0 B)  TX bytes:536 (536.0 B)
+          Interrupt:12 
+
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:       2755        RLX LOPI  serial (0x20)
+ 12:         12        RLX LOPI  eth4 (0x20)
+ 13:      20971        RLX LOPI  rlx timer (0x620)
+ 25:      20774            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+
+ SW:          0
+ TX:          0
+ RX:          0
+LNK:          0
+ERR:          0
+# 

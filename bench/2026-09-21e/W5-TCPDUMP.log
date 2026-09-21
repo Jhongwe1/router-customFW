@@ -1,0 +1,25 @@
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+20:13:47.868088 ARP, Request who-has 10.1.1.2 tell 10.1.1.3, length 46
+20:13:47.868096 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+20:13:48.190943 IP 10.1.1.3.45370 > 10.1.1.2.5201: Flags [S], seq 1450423200, win 5840, options [mss 1460,sackOK,TS val 4294946551 ecr 0,nop,wscale 1], length 0
+20:13:48.190967 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [S.], seq 1575415836, ack 1450423201, win 65160, options [mss 1460,sackOK,TS val 1959249675 ecr 4294946551,nop,wscale 7], length 0
+20:13:48.191850 IP 10.1.1.3.45370 > 10.1.1.2.5201: Flags [.], ack 1, win 2920, options [nop,nop,TS val 4294946551 ecr 1959249675], length 0
+20:13:48.194363 IP 10.1.1.3.45370 > 10.1.1.2.5201: Flags [P.], seq 1:38, ack 1, win 2920, options [nop,nop,TS val 4294946552 ecr 1959249675], length 37
+20:13:48.194390 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [.], ack 38, win 509, options [nop,nop,TS val 1959249678 ecr 4294946552], length 0
+20:13:48.194426 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959249678 ecr 4294946552], length 1
+20:13:48.400585 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959249885 ecr 4294946552], length 1
+20:13:48.608559 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959250093 ecr 4294946552], length 1
+20:13:49.036759 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959250521 ecr 4294946552], length 1
+20:13:49.868671 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959251353 ecr 4294946552], length 1
+20:13:51.532550 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959253017 ecr 4294946552], length 1
+20:13:54.988580 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959256473 ecr 4294946552], length 1
+20:14:01.644682 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959263129 ecr 4294946552], length 1
+20:14:14.956556 IP 10.1.1.2.5201 > 10.1.1.3.45370: Flags [P.], seq 1:2, ack 38, win 509, options [nop,nop,TS val 1959276441 ecr 4294946552], length 1
+20:14:21.478163 ARP, Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+20:14:22.502127 ARP, Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+20:14:23.525982 ARP, Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+
+19 packets captured
+19 packets received by filter
+0 packets dropped by kernel

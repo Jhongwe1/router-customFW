@@ -1,0 +1,5 @@
+sleep 1 ; echo read 0xBB806100 4 >/proc/rtl865x/memory
+[  335.550000] cmd read
+[  335.560000] 
+[  335.560000] bb806100:  0012001E  		 	 	 	 	 	 	 	 	 	 	 	 	    
+# 

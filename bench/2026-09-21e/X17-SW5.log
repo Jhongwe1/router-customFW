@@ -1,0 +1,6 @@
+echo unlock i-mean-it > /proc/rtl819x-switch ; echo start > /proc/rtl819x-switch
+[  312.390000] Virtual device rlx0 asks to queue packet!
+[  313.390000] Virtual device rlx0 asks to queue packet!
+[  314.380000] Virtual device rlx0 asks to queue packet!
+[  315.440000] Virtual device rlx0 asks to queue packet!
+[  316.500000] Virtual device rlx0 asks to queue packet!
