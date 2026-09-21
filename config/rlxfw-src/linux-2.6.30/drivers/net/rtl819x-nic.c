@@ -189,6 +189,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/jiffies.h>
+#include <linux/timer.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -198,8 +199,38 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_NIC_VERSION	"rtl819x-nic 1.1"
+#define RTL819X_NIC_VERSION	"rtl819x-nic 1.2"
 #define RTL819X_NIC_PROC_NAME	"rtl819x-nic"
+
+/* 🔴 `read_proc` is handed ONE 4,096-byte page and `nic_read_proc` does not
+ * bounds-check, so an overflow is not a truncated dump -- it is a store past
+ * the page.  `rtl819x-spi` 1.1 met this same limit and answered it by putting
+ * its 1,024-line map on a SECOND /proc file.  That answer is wrong here: this
+ * dump's readers are cells in frozen cards, and a second file moves every one
+ * of them.
+ *
+ * 量 2026-09-22, `scratchpad/pagebudget.py` walking every `sprintf` format in
+ * this handler and charging each conversion its widest expansion (`%u` 10
+ * digits, `%d` 11, `%08X` 8, `rx_bytes` at its 64-byte cap, the three loops at
+ * their full trip counts): **3,829 of 4,096 = 93.5 %**.  The realistic figure
+ * is about 2.1 KB -- the largest dump committed before tonight is 1,244 B
+ * (`bench/2026-09-19b/C58-afterflood2.log`).
+ *
+ * So the page is not expected to overflow.  The cap exists because *not
+ * expected* is not a bound, and because the three cheapest things to add to
+ * this driver are all `sprintf` lines.  A capped dump SAYS `truncated 1`
+ * instead of corrupting memory.
+ *
+ * 🔴 THE CHECK IS PER ITERATION AND NOT PER BLOCK, and the first version of
+ * this cap got that wrong: gating ENTRY to the descriptor loops bounds
+ * nothing, because a loop admitted at 3,899 then emits up to 618 more bytes
+ * and lands at 4,517.  Inside the loops the ceiling is provable by reading:
+ * the fixed scalar run is 2,297 worst case, a loop cannot start an iteration
+ * above 3,900, the longest line is 61, and the marker is 12 -- so the handler
+ * cannot write past **3,973** of 4,096.  The hexdump's guard is exact rather
+ * than per-iteration, because a frame dump cut in half is worse than one that
+ * is absent. */
+#define NIC_PROC_CAP		3900
 
 /* ------------------------------------------------------------------------
  * The register block.
@@ -369,6 +400,15 @@
 
 #define NIC_TXMODE_STOPQ	0	/* today's path: netif_stop_queue + BUSY  */
 #define NIC_TXMODE_VENDOR	1	/* 讀 rtl_nic.c:5161-5171: poll, then drop */
+
+/* s99a (c).  How a pkthdr's `ph_mbuf` word relates to its own slot index.
+ * Three states and not two on purpose: AGREE alone says the detector does not
+ * fire spuriously, SKEW alone says it fires, and only BAD -- a value that is
+ * not a slot address at all -- says it can tell a usable pointer from a word
+ * the engine used for something else. */
+#define NIC_PHC_AGREE		0
+#define NIC_PHC_SKEW		1
+#define NIC_PHC_BAD		2
 #define NIC_BUF_SZ		2048	/* must agree with NIC_MBUF_2048 */
 #define NIC_RX_OFFSET		2	/* 量: the loader's buffers are at
 					 * `...9A`, 2 mod 4 */
@@ -376,6 +416,28 @@
 					 * header's "exactly 32 bytes" comment
 					 * is wrong -- sizeof is 24 under
 					 * CONFIG_RTL_8196E */
+/* 🔴 2026-09-22: THAT IS TRUE OF `rtl_pktHdr` AND FALSE OF `rtl_mBuf`, and
+ * this one constant is the stride for BOTH rings.  讀 `common/mbuf.h:33-49`,
+ * counted by declaration order: `m_next` 0, `m_pkthdr` 4, `m_len` 8,
+ * `m_flags` 10, one pad byte at 11 so `m_data` can be 4-aligned, `m_data` 12,
+ * `m_extbuf` 16, `m_extsize` 20, `m_reserved[2]` 22, **`skb` 24** --
+ * sizeof(struct rtl_mBuf) = **28**.
+ *
+ * The CONSTANT is still right for this driver and the REASON was wrong.  24
+ * is correct here because rlxfw lays out its own mbuf descriptors at that
+ * stride (`nic_do_alloc`) and nothing in hardware strides the descriptor
+ * ARRAY -- the engine is given per-slot absolute pointers.  It is NOT the
+ * vendor's divisor: `rtl865xc_swNic.c:370` divides by
+ * `sizeof(struct rtl_mBuf)` = 28, so porting that line literally would be
+ * wrong by 4 in 28 per slot.
+ *
+ * ⚠️ One consequence is load-bearing for `NET-82` below: rlxfw's mbuf
+ * descriptors are 24 bytes and therefore have NO `skb` word.  The vendor's
+ * receive path takes `pPkthdr->ph_mbuf->skb` (`:629`) -- byte 24, which does
+ * not exist here.  rlxfw's analogue is `m_data` at word 3, which is what it
+ * writes at alloc and refill and what it reads at harvest.  That is rlxfw's
+ * own construction and not a port of the vendor's line, and it is said here
+ * so nobody later "corrects" word 3 to word 6. */
 
 /* Descriptor words.  Word i is bytes 4i..4i+3, big-endian, so bit 31 of word
  * i is the most significant bit of byte 4i -- which is how a `DW` hexdump
@@ -576,6 +638,187 @@ static unsigned long nic_n_tx_wake;
 static unsigned long nic_n_tx_wake_race;
 static unsigned long nic_n_tx_timeout;
 
+/* ------------------------------------------------------------------------
+ * s99a (b) -- THE INTERRUPT MASK AS A VARIABLE, so `NET-67 殘留`'s strongest
+ * remaining candidate can be run as a single-variable A/B on one boot.
+ *
+ * 量 `docs/nic-vendor-diff.md` 12.4: at the loader prompt this die's
+ * `CPUIIMR` is `0x000007F8` -- RX_DONE 0..5 and TX_DONE 0/1, nothing else --
+ * while this driver arms `NIC_IIMR_LADDER` = `0x007E0FFE`, which additionally
+ * unmasks TX_ALL_DONE (bits 1-2), MBUF_DESC_RUNOUT's enable (bit 11) and all
+ * six PKTHDR_DESC_RUNOUT (bits 17-22).  The loader carries 31,475 frames at
+ * 16x the dose that wedges this driver (`NET-98`), so the divergence is worth
+ * testing; it is not evidence on its own, because the loader also POLLS
+ * (`12.2`: a service loop with two reclaim call sites) and therefore does not
+ * depend on any of those interrupts for liveness.
+ *
+ * 🔴 WHY THIS CANNOT BE DONE FROM /proc WITH THE OLD CODE, which is the
+ * reason it needs an image at all: 讀 the unmask in `nic_poll` below -- it
+ * OR-ed the three RX-work enables back in on EVERY napi_complete.  A mask
+ * written through the vendor's `/proc/rtl865x/memory` would be restored by
+ * the first arriving packet, and the read-back cell would have shown a FALSE
+ * GREEN because `echo read` puts no traffic on the wire.  A cell written to
+ * do it was discarded at the desk for that reason (`14.4`).  So the restore
+ * is bounded by this variable, and the variable is what the verb sets.
+ *
+ * 🔴 THE A/B HAS A CONFOUND AND IT IS NAMED HERE RATHER THAN LEFT TO BE
+ * FOUND.  `NIC_IIMR_LADDER`'s own comment records that dropping the run-out
+ * enables -- mask `0x7FE`, which is the loader's `0x7F8` plus TX_ALL_DONE --
+ * made this interface PERMANENTLY DEAF under load
+ * (`bench/2026-09-19b/C58-afterflood2`): the pkthdr ring ran out, `CPUIISR`
+ * latched bit 17, no interrupt fired, NAPI was never scheduled.  So arm B may
+ * reproduce that RX failure instead of illuminating the TX wedge.  The two
+ * are DISTINGUISHABLE and the discriminator is already printed: the RX-deaf
+ * failure freezes `n_rx` and leaves a run-out bit standing in `now_iisr`,
+ * while the TX wedge keeps `n_rx` climbing with all four `txd` OWN bits set
+ * and `now_iisr` clear.  A card that reads only "did it stop answering"
+ * cannot tell them apart; one that reads `n_rx` and `now_iisr` can.
+ *
+ * 🟢 TWO SOURCES: `iimr_base` is what this driver believes it armed and
+ * `now_iimr` is the register read back.  If they disagree, something else is
+ * writing `CPUIIMR` -- which is the very defect 14.4 warned about, arriving
+ * as a reading instead of as a worry. */
+static u32 nic_iimr_base = NIC_IIMR_LADDER;
+
+/* ------------------------------------------------------------------------
+ * s99a (a) -- THE STALL DETECTOR AND ITS RECOVERY.  `P2`'s only new code.
+ *
+ * WHAT IS ALREADY MEASURED, so that what is new here is small:
+ *   `NET-99`  the stall does not clear itself in 600 s -- four readings,
+ *             `n_tx` frozen at 17 throughout, `n_rx`/`n_irq` advancing
+ *             exactly +6 per interval as the internal control;
+ *   `NET-101` `engine off` -> `arm` -> `engine on` clears all four OWN bits
+ *             and restores ping 4/4, twice, from a pristine wedge;
+ *   `:754`    the level test already in this file wakes the queue on any
+ *             interrupt once the slot is CPU-owned again.
+ * So the recovery is three calls this driver already has, and the only thing
+ * missing was something to notice.
+ *
+ * THREE THINGS IT MAY NOT BE, each excluded by a measurement:
+ *   not `watchdog_timeo`  -- `NET-55`/`NET-57`: the vendor's `ether_setup`
+ *                            sets `tx_queue_len = 0`, so every net_device on
+ *                            this board gets `noqueue_qdisc`, so
+ *                            `dev_watchdog_up()` is never called.  The timer
+ *                            below is a private one for exactly that reason.
+ *   not `ndo_stop`/`ndo_open` -- `NET-58`, reproduced on demand as `X16`:
+ *                            re-opening an interface that had just recovered
+ *                            broke it again, because `ndo_open` skips
+ *                            `alloc`/`arm` when they are already done.
+ *   not `arm` with the engine running -- `NET-64`'s hard hang.  Which is why
+ *                            `nic_do_engine(0)` is ordered first below and
+ *                            why `nic_do_arm()`'s own `-EBUSY` guard is left
+ *                            in place as the second layer.
+ *
+ * WHY A TIMER AND NOT THE ISR.  The obvious cheap form is to recover from
+ * `nic_tx_try_wake()`, which already runs on every interrupt.  量 `NET-99`:
+ * during the wedge `n_irq` advanced ONLY because the host kept pinging -- six
+ * interrupts per probe and nothing in between.  A recovery hung off the
+ * interrupt therefore does not run on a board that has gone quiet, which is
+ * the case where it is most needed.  The kernel's own answer to this is
+ * `dev_watchdog`, and the only reason it is unavailable is `NET-57`.
+ *
+ * DEFAULT OFF.  `nic_recov_mode` is 0, so an image carrying this behaves
+ * exactly as `s32a` did until a verb is typed -- which is what lets one boot
+ * produce the broken arm and the repaired arm with nothing else changed.
+ *
+ * THE READOUT IS FOUR-STATE, which is what stops a counter reading 0 for two
+ * different reasons -- the defect this project recorded as `n_arm_flush`
+ * reading 0 both when `arm` never ran and when `arm` ran and worked:
+ *
+ *   arm  fire  ok   meaning
+ *   0    0     0    the queue never stopped; there was nothing to recover
+ *   >0   0     0    it stopped and `:754`'s wake handled it inside recov_ms
+ *   >0   >0    0    the recovery ran and every attempt returned an error
+ *   >0   >0    >0   the recovery ran and all three calls returned 0
+ *
+ * and `recov_rc` carries WHICH call failed rather than collapsing to a count.
+ *
+ * 🔴 REFUTATION CONDITIONS, written before the board is powered:
+ *   - `n_recov_ok >= 1` with the ping after it still 0/4 REFUTES "these three
+ *     calls are a recovery" -- they returned 0 and the interface did not come
+ *     back.  `NET-101` measured the opposite twice, by hand.
+ *   - `n_recov_arm == 0` on a board that is wedged with `recover 1` set
+ *     REFUTES the whole detector: the wedge is then reached without
+ *     `netif_stop_queue()` ever being called, and `n_tx_stop` is where to
+ *     look.
+ *   - `n_recov_spurious` climbing with `n_recov_fire` at 0 means the timer
+ *     is firing on transients the level test has already cleared, i.e.
+ *     `recov_ms` is too short to be a stall detector.
+ * ------------------------------------------------------------------------ */
+#define NIC_RECOV_MS_MIN	10u
+#define NIC_RECOV_MS_MAX	600000u
+
+static int		 nic_recov_mode;	/* 0 = off, the default */
+static unsigned int	 nic_recov_ms = 1000;
+static struct timer_list nic_recov_timer;
+static int		 nic_recov_timer_ready;
+static int		 nic_recov_busy;
+static unsigned long	 nic_n_recov_arm;
+static unsigned long	 nic_n_recov_fire;
+static unsigned long	 nic_n_recov_spurious;
+static unsigned long	 nic_n_recov_ok;
+static unsigned long	 nic_n_recov_fail;
+static unsigned long	 nic_n_recov_wake;
+static unsigned long	 nic_recov_j_arm;
+static unsigned long	 nic_recov_j_fire;
+static int		 nic_recov_rc[3];
+
+/* ------------------------------------------------------------------------
+ * s99a (c) -- `NET-82`, AS AN INSTRUMENT FIRST AND A CHANGE SECOND.
+ *
+ * 讀 `rtl865xc_swNic.c:597-628`: the vendor consumes a received frame with
+ * ONE index.  It tests OWN on `rxPkthdrRing[currRxPkthdrDescIndex]`, masks
+ * `OWN|WRAP` off to get the pkthdr's address, and then FOLLOWS that pkthdr's
+ * `ph_mbuf` pointer to the mbuf and the buffer.  It never indexes the mbuf
+ * ring to find a buffer; `currRxMbufDescIndex` exists and belongs to refill.
+ *
+ * 讀 this file at `nic_do_alloc`: rlxfw writes `rx_ph[i].w0 = &rx_mb[i]` when
+ * it builds the ring, and `nic_refill()` does NOT rewrite w0.  So after a
+ * frame has been delivered, `rx_ph[i].w0` holds whatever the ENGINE left
+ * there.  That makes one word a direct test of `NET-61`'s mechanism:
+ *
+ *   if `rx_ph[i].w0` still equals `&rx_mb[i]`, the engine paired the two
+ *   rings the way this driver's indexing assumes;
+ *   if it does not, the engine used a different mbuf slot for this pkthdr
+ *   and `nic_dw(nic_rx_mb, i, 3)` is reading SOMEBODY ELSE'S BUFFER.
+ *
+ * 🔴 WHY THIS IS NOT SIMPLY "SWITCH TO THE VENDOR'S WAY".  `NET-70`'s
+ * `n_dsync` detector -- which has a three-state positive control and has read
+ * 0 through every wedge -- measures the two hardware POSITION registers.  It
+ * cannot see what the engine wrote into a descriptor.  Swapping the harvest
+ * to follow the pointer would REMOVE this class of fault rather than observe
+ * it, and would leave `n_dsync` non-zero as a NORMAL reading with nothing
+ * left that distinguishes normal from broken.  `SPEC.md` `NET-82` says the
+ * cost has to be written down before the change is made; so the change is
+ * behind `nic_ph_follow`, default 0, and the counters below are collected in
+ * BOTH modes.  `n_ph_diff` is the finding; `n_ph_chk` is its denominator.
+ *
+ * 🔴 THE BOUNDS TEST IS NOT DEFENSIVE PROGRAMMING, IT IS THE SAFETY
+ * ARGUMENT.  `ph0` is a word a DMA engine wrote into memory this driver does
+ * not otherwise validate.  Dereferencing it unchecked is the same shape as
+ * the mechanism `NET-64`'s retracted draft feared -- and here it is cheap to
+ * close by construction: the follow is taken only when `ph0` lies inside this
+ * driver's own mbuf descriptor array.  A pointer outside it is not a crash,
+ * it is a reading, and `n_ph_bad` is where it lands.
+ * ------------------------------------------------------------------------ */
+static int		 nic_ph_follow;		/* 0 = index by i (today) */
+static unsigned long	 nic_n_ph_chk;		/* the denominator */
+static unsigned long	 nic_n_ph_diff;		/* w0 != &rx_mb[i] */
+static unsigned long	 nic_n_ph_bad;		/* w0 outside the mbuf array */
+static unsigned long	 nic_n_ph_used;		/* harvests that FOLLOWED it */
+static u32		 nic_ph_first_w0;
+static u32		 nic_ph_first_exp;
+static unsigned long	 nic_ph_first_nrx;
+static u32		 nic_ph_last;		/* the raw w0, last harvest  */
+static u32		 nic_ph_last_bf;	/* the m_data it resolved to */
+static unsigned int	 nic_ph_last_j;		/* the slot it named	     */
+static int		 nic_ph_test_cls = -1;	/* `phtest`'s answer	     */
+static unsigned int	 nic_ph_test_j;
+static int		 nic_ph_test_seen;
+
+/* `nic_ph_buf()` itself is defined with the harvest path below, because it
+ * calls the descriptor accessors, which are declared after this block. */
+
 /* s32a.  The switch, and six readings that make its effect falsifiable.
  *
  *   tx_mode            0 = netif_stop_queue (today), 1 = the vendor's contract
@@ -745,14 +988,123 @@ static int nic_tx_try_wake(void)
 {
 	if (!nic_ndev || !nic_ndev_up || !nic_allocated)
 		return 0;
+	/* s99a.  The recovery below tears the rings down and puts them back,
+	 * and between `arm` and `engine on` this function would see every TX
+	 * slot CPU-owned and wake a queue whose engine is off -- after which
+	 * `nic_xmit` drops the frame at its `!nic_engine_on` gate.  Not fatal
+	 * and it would be counted, but it is a second variable inside the one
+	 * experiment this image exists for.  One flag removes it.  The window
+	 * is real: the recovery runs in softirq and this runs in hardirq. */
+	if (nic_recov_busy)
+		return 0;
 	if (!netif_queue_stopped(nic_ndev))
 		return 0;
 	if (nic_re(nic_tx_ring, nic_tx_idx) & NIC_DESC_OWN)
 		return 0;
 
+	/* s99a.  The cheap path won, so the stall timer is not owed a firing.
+	 * `del_timer` and NOT `del_timer_sync`: this runs in interrupt context,
+	 * where the _sync form may not be called. */
+	if (nic_recov_timer_ready)
+		del_timer(&nic_recov_timer);
+
 	nic_n_tx_wake++;
 	netif_wake_queue(nic_ndev);
 	return 1;
+}
+
+/* s99a.  Arm the stall timer.  Called from `nic_xmit`'s stop path, i.e. at
+ * the one transition that can begin a stall, and only after the post-stop
+ * re-test has already failed -- so a stop that the engine undid within the
+ * same critical section never arms anything.
+ *
+ * ⚠️ `mod_timer` is called with `nic_lock` held and interrupts off.  That is
+ * safe -- it takes the timer base's own lock, which nothing here holds -- and
+ * it is the reason the arm is not done after the unlock: between the unlock
+ * and the arm, the ISR can run, wake the queue and `del_timer` a timer that
+ * does not exist yet, leaving it armed over a queue that is already running.
+ * The spurious branch in `nic_recov_fn` would catch that, but catching it is
+ * worse than not creating it. */
+static void nic_recov_arm(void)
+{
+	if (!nic_recov_mode || !nic_recov_timer_ready)
+		return;
+	nic_n_recov_arm++;
+	nic_recov_j_arm = jiffies;
+	mod_timer(&nic_recov_timer, jiffies + msecs_to_jiffies(nic_recov_ms));
+}
+
+static void nic_recov_disarm(void)
+{
+	if (nic_recov_timer_ready)
+		del_timer(&nic_recov_timer);
+}
+
+/* s99a.  The recovery itself -- `NET-101`'s three calls, from inside the
+ * driver for the first time.
+ *
+ * Runs in softirq (timer) context.  `nic_do_arm()` takes `nic_lock` with
+ * interrupts off for its 52 uncached descriptor stores, which is the same
+ * lock and the same cost `nic_xmit` already pays for up to 1518 `writeb`s, so
+ * `FW-45`'s ~1.33 s watchdog is nowhere near.  `nic_poll` also runs in
+ * softirq, so on this image -- `# CONFIG_SMP is not set`, `CONFIG_PREEMPT_NONE=y`
+ * -- the two cannot interleave. */
+static void nic_recov_fn(unsigned long data)
+{
+	int rc0, rc1, rc2;
+
+	if (!nic_recov_mode)
+		return;
+	if (!nic_ndev || !nic_ndev_up || !nic_allocated)
+		return;
+
+	/* THE SAME LEVEL `:754` TESTS, re-evaluated here.  If the engine
+	 * retired the slot after the timer was armed but before it fired, this
+	 * is not a stall and nothing is touched. */
+	if (!netif_queue_stopped(nic_ndev) ||
+	    !(nic_re(nic_tx_ring, nic_tx_idx) & NIC_DESC_OWN)) {
+		nic_n_recov_spurious++;
+		return;
+	}
+
+	nic_n_recov_fire++;
+	nic_recov_j_fire = jiffies;
+	nic_recov_busy = 1;
+
+	/* ORDER IS LOAD-BEARING: `engine off` FIRST.  `NET-64` hard-hung this
+	 * board -- 0 console bytes for 112 minutes -- by arming a running
+	 * engine.  Each step is skipped if the one before it failed, so a
+	 * refusal cannot leave the ring half re-established. */
+	rc0 = nic_do_engine(0);
+	rc1 = rc0 ? 1 : nic_do_arm();
+	rc2 = rc1 ? 1 : nic_do_engine(1);
+	nic_recov_rc[0] = rc0;
+	nic_recov_rc[1] = rc1;
+	nic_recov_rc[2] = rc2;
+
+	if (rc0 || rc1 || rc2) {
+		nic_n_recov_fail++;
+		nic_recov_busy = 0;
+		return;
+	}
+	nic_n_recov_ok++;
+
+	/* `arm` zeroed both indices and handed every TX slot back, so the
+	 * level is true and the queue can run.
+	 *
+	 * 🔴 THIS IS A DEPARTURE FROM WHAT `NET-101` MEASURED AND IT IS
+	 * DELIBERATE.  By hand, the queue stayed stopped after the three writes
+	 * and was woken only when the host's next ARP arrived and `:754` saw
+	 * the freed ring -- `tx_stopped 1 / n_tx_wake 0` before the ping,
+	 * `0 / 1` after.  That is fine when someone is pinging and useless when
+	 * nothing is: a TX-wedged board may have nothing left to talk to it.
+	 * The wake is counted SEPARATELY from `n_tx_wake` so the two paths stay
+	 * distinguishable in a dump. */
+	nic_recov_busy = 0;
+	if (netif_queue_stopped(nic_ndev)) {
+		nic_n_recov_wake++;
+		netif_wake_queue(nic_ndev);
+	}
 }
 
 static irqreturn_t nic_isr(int irq, void *dev_id)
@@ -882,6 +1234,91 @@ static void nic_dsync_check(void)
 	nic_dsync_last_d = d;
 }
 
+/* One inspection.  Returns the buffer address to use and records what it
+ * saw.  Called from both harvest paths so the two cannot drift apart -- the
+ * failure `nic_dsync_calc` was separated out to avoid. */
+/* THE ARITHMETIC HALF, SPLIT OUT SO IT CAN BE DRIVEN WITH TYPED VALUES.
+ * Pure: it touches no hardware and reads one ring base.  `phtest` puts
+ * declared values through this exact code, for the reason `dsynctest` exists
+ * beside `n_dsync` -- a detector that has only ever reported AGREE is a claim
+ * with no control, and `n_ph_diff 0` would otherwise be unfalsifiable.
+ *
+ * The stride is `NIC_DESC_BYTES` and that is rlxfw's own mbuf stride, not
+ * `sizeof(struct rtl_mBuf)` = 28.  See the note at NIC_DESC_BYTES. */
+static int nic_ph_class(u32 w0, unsigned int i, unsigned int *j_out)
+{
+	*j_out = i;
+	if (w0 == nic_rx_mb + i * NIC_DESC_BYTES)
+		return NIC_PHC_AGREE;
+	if (w0 < nic_rx_mb ||
+	    w0 >= nic_rx_mb + NIC_RX_DESC * NIC_DESC_BYTES ||
+	    ((w0 - nic_rx_mb) % NIC_DESC_BYTES) != 0)
+		return NIC_PHC_BAD;
+	*j_out = (w0 - nic_rx_mb) / NIC_DESC_BYTES;
+	return NIC_PHC_SKEW;
+}
+
+/* THE HARDWARE HALF.  Resolve the data buffer for the frame in RX pkthdr slot
+ * `i`, and measure whether the two routes to it disagree.
+ *
+ * 🔴 THE COMPARISON IS UNCONDITIONAL AND THE SWITCH ONLY PICKS THE ANSWER.
+ * Putting the comparison inside the switch would confound "the pointer was
+ * different" with everything else `phfollow 1` does; this way a single boot in
+ * the DEFAULT mode already says whether the switch can matter at all.
+ *
+ * 🔴 And in mode 0 every return below is literally `nic_dw(nic_rx_mb, i, 3)`
+ * -- the expression this replaced -- so "the default is today's behaviour" is
+ * a property of the text rather than of a test.
+ *
+ * The two bound tests are separate because they fail for different reasons: a
+ * `w0` outside the descriptor array means word 0 is not a live `ph_mbuf` at
+ * all (or the engine writes a PHYSICAL address where this driver wrote
+ * KSEG1 -- `ph_last` prints the value so that case is read rather than
+ * guessed); a `bf` outside the RX buffer region means word 3 of an otherwise
+ * legitimate mbuf is not a buffer of ours. */
+static u32 nic_ph_buf(unsigned int i)
+{
+	u32 w0 = nic_dw(nic_rx_ph, i, 0) & NIC_DESC_ADDR;
+	unsigned int j;
+	int cls;
+	u32 bf;
+
+	nic_n_ph_chk++;
+	nic_ph_last = w0;
+	cls = nic_ph_class(w0, i, &j);
+	nic_ph_last_j = j;
+
+	if (cls == NIC_PHC_AGREE)
+		return nic_dw(nic_rx_mb, i, 3);
+
+	if (!nic_n_ph_diff) {
+		nic_ph_first_w0  = w0;
+		nic_ph_first_exp = nic_rx_mb + i * NIC_DESC_BYTES;
+		nic_ph_first_nrx = nic_n_rx;
+	}
+	nic_n_ph_diff++;
+
+	if (cls == NIC_PHC_BAD) {
+		nic_n_ph_bad++;
+		return nic_dw(nic_rx_mb, i, 3);
+	}
+
+	bf = nic_dw(nic_rx_mb, j, 3);
+	nic_ph_last_bf = bf;
+	/* RX buffers are the FIRST NIC_RX_DESC of the buffer region; the TX
+	 * half is never a legitimate RX m_data. */
+	if (bf < nic_bufs || bf >= nic_bufs + NIC_RX_DESC * NIC_BUF_SZ) {
+		nic_n_ph_bad++;
+		return nic_dw(nic_rx_mb, i, 3);
+	}
+
+	if (nic_ph_follow) {
+		nic_n_ph_used++;
+		return bf;
+	}
+	return nic_dw(nic_rx_mb, i, 3);
+}
+
 static int nic_napi_harvest(int budget)
 {
 	int done = 0;
@@ -905,7 +1342,7 @@ static int nic_napi_harvest(int budget)
 		nic_last_rx_ph3 = nic_dw(nic_rx_ph, i, 3);
 		nic_last_rx_ph4 = nic_dw(nic_rx_ph, i, 4);
 
-		bf = nic_dw(nic_rx_mb, i, 3);
+		bf = nic_ph_buf(i);		/* s99a (c): was nic_dw(nic_rx_mb, i, 3) */
 		skb = len ? dev_alloc_skb(len + 2) : NULL;
 		if (skb) {
 			skb_reserve(skb, 2);
@@ -963,9 +1400,16 @@ static int nic_poll(struct napi_struct *napi, int budget)
 		 * for a run-out that is already over. */
 		__raw_writel(NIC_IE_PKTHDR_RUNOUT | NIC_IP_MBUF_RUNOUT,
 			     nic_reg(NIC_CPUIISR));
+		/* s99a: bounded by `nic_iimr_base` and no longer by the
+		 * compiled constant.  This one line is why the run-out mask
+		 * A/B needs an image: with the old form, a mask written from
+		 * outside was restored here by the next arriving packet, and
+		 * an `echo read` -- which puts nothing on the wire -- read it
+		 * back unchanged and called that a pass. */
 		m = __raw_readl(nic_reg(NIC_CPUIIMR));
-		__raw_writel(m | NIC_IE_RX_DONE_ALL | NIC_IE_PKTHDR_RUNOUT |
-			     NIC_IE_MBUF_RUNOUT, nic_reg(NIC_CPUIIMR));
+		__raw_writel(m | (nic_iimr_base &
+				  (NIC_IE_RX_DONE_ALL | NIC_IE_PKTHDR_RUNOUT |
+				   NIC_IE_MBUF_RUNOUT)), nic_reg(NIC_CPUIIMR));
 		spin_unlock_irqrestore(&nic_lock, flags);
 	}
 	return done;
@@ -1077,6 +1521,12 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (!(e & NIC_DESC_OWN)) {
 			nic_n_tx_wake_race++;
 			netif_wake_queue(dev);
+		} else {
+			/* s99a.  The queue is stopped and the slot is still the
+			 * engine's -- the one transition that can begin a stall.
+			 * Arming here and not after the unlock is deliberate; see
+			 * `nic_recov_arm()`. */
+			nic_recov_arm();
 		}
 
 		spin_unlock_irqrestore(&nic_lock, flags);
@@ -1184,6 +1634,9 @@ static int nic_ndo_stop(struct net_device *dev)
 {
 	netif_stop_queue(dev);
 	nic_ndev_up = 0;
+	/* s99a.  Before `napi_disable`, so a timer that fires during the
+	 * teardown cannot find `nic_ndev_up` still set. */
+	nic_recov_disarm();
 	napi_disable(&nic_napi);
 	nic_do_engine(0);
 	if (nic_irq_taken) {
@@ -1558,7 +2011,7 @@ static unsigned int nic_harvest(unsigned int budget)
 		if (nic_last_rx_len > NIC_KEEP)
 			nic_last_rx_len = NIC_KEEP;
 		if (nic_last_rx_len) {
-			u32 bf = nic_dw(nic_rx_mb, i, 3);
+			u32 bf = nic_ph_buf(i);	/* s99a (c) */
 			u32 k;
 
 			for (k = 0; k < nic_last_rx_len; k++)
@@ -1702,7 +2155,7 @@ static int nic_do_engine(int on)
 	if (rc)
 		return rc;
 	nic_wr(NIC_CPUIISR, nic_rd(NIC_CPUIISR));	/* W1C stale */
-	nic_wr(NIC_CPUIIMR, NIC_IIMR_LADDER);
+	nic_wr(NIC_CPUIIMR, nic_iimr_base);		/* s99a: a variable */
 	nic_engine_on = 1;
 	rlxfw_markx("N-ENGON", nic_rd(NIC_CPUICR));
 	return 0;
@@ -1815,9 +2268,67 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	/* R6-5's desync ledger.  `n_dsync_chk` is the denominator: without it
 	 * `n_dsync 0` cannot tell "it never happened" from "nobody looked". */
 	len += sprintf(page + len, "n_arm_flush %lu\n", nic_n_arm_flush);
-	/* ⚠️ `n_dsync_chk` is ~2x `n_napi_poll`, because the check is two
-	 * `nic_rd()` per poll -- so `n_reads` is no longer the small
-	 * auditable number it was before this driver version. */
+
+	/* s99a (b).  `iimr_base` is what this driver believes it armed;
+	 * `iimr_ladder` is the compiled default, printed so a card can read
+	 * the A arm's value instead of typing it; `now_iimr` above is the
+	 * register.  Two of the three are independent sources. */
+	len += sprintf(page + len, "iimr_base %08X\n", nic_iimr_base);
+	len += sprintf(page + len, "iimr_ladder %08X\n",
+		       (u32)NIC_IIMR_LADDER);
+
+	/* s99a (a).  The stall detector's ledger.  See the four-state table
+	 * by `nic_recov_mode`'s declaration: `n_recov_arm` separates "the
+	 * queue never stopped" from "it stopped and the cheap path won", and
+	 * `n_recov_fire` separates that from "the recovery ran". */
+	len += sprintf(page + len, "recov_mode %d\n", nic_recov_mode);
+	len += sprintf(page + len, "recov_ms %u\n", nic_recov_ms);
+	len += sprintf(page + len, "recov_jiffies %u\n",
+		       (unsigned)msecs_to_jiffies(nic_recov_ms));
+	len += sprintf(page + len, "n_recov_arm %lu\n", nic_n_recov_arm);
+	len += sprintf(page + len, "n_recov_fire %lu\n", nic_n_recov_fire);
+	len += sprintf(page + len, "n_recov_spurious %lu\n",
+		       nic_n_recov_spurious);
+	len += sprintf(page + len, "n_recov_ok %lu\n", nic_n_recov_ok);
+	len += sprintf(page + len, "n_recov_fail %lu\n", nic_n_recov_fail);
+	len += sprintf(page + len, "n_recov_wake %lu\n", nic_n_recov_wake);
+	len += sprintf(page + len, "recov_rc %d %d %d\n",
+		       nic_recov_rc[0], nic_recov_rc[1], nic_recov_rc[2]);
+	len += sprintf(page + len, "recov_j_arm %lu\n", nic_recov_j_arm);
+	len += sprintf(page + len, "recov_j_fire %lu\n", nic_recov_j_fire);
+
+	/* s99a (c).  `NET-82`.  `n_ph_diff` over `n_ph_chk` is the reading;
+	 * `ph_first_*` is the first occurrence kept whole, because a rate
+	 * cannot say WHICH slot the engine paired with which.  `n_ph_used` is
+	 * 0 unless `phfollow 1` was typed, so a dump says which behaviour
+	 * produced the frames it is describing. */
+	len += sprintf(page + len, "ph_follow %d\n", nic_ph_follow);
+	len += sprintf(page + len, "n_ph_chk %lu\n", nic_n_ph_chk);
+	len += sprintf(page + len, "n_ph_diff %lu\n", nic_n_ph_diff);
+	len += sprintf(page + len, "n_ph_bad %lu\n", nic_n_ph_bad);
+	len += sprintf(page + len, "n_ph_used %lu\n", nic_n_ph_used);
+	len += sprintf(page + len, "ph_first_w0 %08X\n", nic_ph_first_w0);
+	len += sprintf(page + len, "ph_first_exp %08X\n", nic_ph_first_exp);
+	len += sprintf(page + len, "ph_first_nrx %lu\n", nic_ph_first_nrx);
+	len += sprintf(page + len, "ph_agree %lu\n",
+		       nic_n_ph_chk - nic_n_ph_diff);
+	len += sprintf(page + len, "ph_last %08X\n", nic_ph_last);
+	len += sprintf(page + len, "ph_last_j %u\n", nic_ph_last_j);
+	len += sprintf(page + len, "ph_last_bf %08X\n", nic_ph_last_bf);
+	len += sprintf(page + len, "ph_test_cls %d\n", nic_ph_test_cls);
+	len += sprintf(page + len, "ph_test_j %u\n", nic_ph_test_j);
+	len += sprintf(page + len, "ph_test_seen %d\n", nic_ph_test_seen);
+	len += sprintf(page + len, "j_now %lu\n", jiffies);
+	/* ⚠️ `n_dsync_chk` EQUALS `n_napi_poll` -- one check per poll.  The
+	 * counter that is ~2x is `n_reads`, because the check is two
+	 * `nic_rd()` per poll, so `n_reads` is no longer the small auditable
+	 * number it was before this driver version.
+	 *
+	 * 🔴 `FW-107`: until 2026-09-22 this comment hung the factor on
+	 * `n_dsync_chk`, and it is the comment that exists to prevent a
+	 * misreading.  量 2026-09-21, three dumps: `n_dsync_chk` 5 / 350 /
+	 * 73,810 against `n_napi_poll` 5 / 350 / 73,810, while `n_reads` reads
+	 * 18 / 720 / 147,628 = 2x + 8 / 2x + 20 / 2x + 8. */
 	len += sprintf(page + len, "n_dsync_chk %lu\n", nic_n_dsync_chk);
 	len += sprintf(page + len, "n_dsync %lu\n", nic_n_dsync);
 	len += sprintf(page + len, "dsync_last_d %u\n", nic_dsync_last_d);
@@ -1840,7 +2351,9 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 		len += sprintf(page + len, "rx_idx %u\n", nic_rx_idx);
 		len += sprintf(page + len, "tx_idx %u\n", nic_tx_idx);
 
-		for (i = 0; i < NIC_RX_DESC; i++)
+		for (i = 0; i < NIC_RX_DESC; i++) {
+			if (len > NIC_PROC_CAP)
+				goto truncated;
 			len += sprintf(page + len,
 				       "rxd%u %08X len %u f %04X pl %02X\n",
 				       i, nic_re(nic_rx_ring, i),
@@ -1848,11 +2361,30 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 				       NIC_PH_FLAGS(nic_dw(nic_rx_ph, i, 3)),
 				       NIC_PH_PORTLIST(nic_dw(nic_rx_ph, i,
 							      3)));
-		for (i = 0; i < NIC_TX_DESC; i++)
+		}
+		for (i = 0; i < NIC_TX_DESC; i++) {
+			if (len > NIC_PROC_CAP)
+				goto truncated;
 			len += sprintf(page + len,
 				       "txd%u %08X len %u\n",
 				       i, nic_re(nic_tx_ring, i),
 				       NIC_PH_LEN(nic_dw(nic_tx_ph, i, 1)));
+		}
+		/* s99a (c)'s SECOND WITNESS, and it does not depend on any of the
+		 * new code being right.  `ph` is pkthdr word 0 exactly as the
+		 * engine left it.  `ml` is the mbuf's `m_len`, which `nic_refill()`
+		 * zeroes only for the slot it is handed -- so a non-zero `ml` on
+		 * slot j is the ENGINE saying it put a frame in mbuf j, written by
+		 * hardware and readable with `phfollow` never touched. */
+		for (i = 0; i < NIC_RX_DESC; i++) {
+			if (len > NIC_PROC_CAP)
+				goto truncated;
+			len += sprintf(page + len,
+				       "mbd%u %08X ph %08X ml %u\n",
+				       i, nic_re(nic_mb_ring, i),
+				       nic_dw(nic_rx_ph, i, 0),
+				       NIC_MB_LEN(nic_dw(nic_rx_mb, i, 2)));
+		}
 	}
 
 	/* The last received frame, printed as hex.  `FW-46`: this image's
@@ -1869,12 +2401,25 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 
 		if (n > 64)
 			n = 64;
+		/* 9 for the label, 2 per byte, 1 for the newline.  Checked
+		 * against the whole block rather than per byte, because a
+		 * hexdump cut in half is worse than one that is absent. */
+		if (len + 9 + 2 * (int)n + 1 > NIC_PROC_CAP)
+			goto truncated;
 		len += sprintf(page + len, "rx_bytes ");
 		for (i = 0; i < n; i++)
 			len += sprintf(page + len, "%02X", nic_last_rx[i]);
 		len += sprintf(page + len, "\n");
 	}
 
+	*eof = 1;
+	return len;
+
+truncated:
+	/* Reached only if the cap was hit.  `truncated 0` is never printed --
+	 * its ABSENCE is the normal state, so a card asserts on the absence and
+	 * a present line is the finding. */
+	len += sprintf(page + len, "truncated 1\n");
 	*eof = 1;
 	return len;
 }
@@ -1970,6 +2515,125 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 			return -ENXIO;
 		free_irq(NIC_IRQ, &nic_lock);
 		nic_irq_taken = 0;
+		return (int)count;
+	}
+	/* s99a (a).  `recover 0` / `recover 1`.  Default 0, so an image
+	 * carrying this driver behaves as `s32a` did until this is typed --
+	 * which is what lets one boot carry the broken arm and the repaired
+	 * arm with nothing else changed.
+	 *
+	 * Turning it OFF also disarms, so a cell can stop the detector while a
+	 * wedge is being read rather than racing it. */
+	if (!strncmp(buf, "recover ", 8)) {
+		if (!strcmp(buf + 8, "0")) {
+			nic_recov_mode = 0;
+			nic_recov_disarm();
+		} else if (!strcmp(buf + 8, "1")) {
+			nic_recov_mode = 1;
+			/* 🔴 ARM IMMEDIATELY IF THE QUEUE IS ALREADY STOPPED.
+			 * `nic_recov_arm()` is otherwise called only at the
+			 * stop TRANSITION, so a detector switched on over an
+			 * existing stall would wait for a second stall that
+			 * can never come -- the queue is stopped, so nothing
+			 * calls `nic_xmit` again (`NET-57`: `tx_queue_len 0`
+			 * means `dev_queue_xmit` does not offer to a stopped
+			 * queue).  That is `NET-99` read from the driver's
+			 * side: `n_tx` frozen at 17 for 600 s is exactly a
+			 * transition that never repeats.
+			 *
+			 * 🟢 What it buys is the single-variable experiment:
+			 * wedge with the detector OFF, read the wedge whole,
+			 * then switch the detector on IN FRONT OF the fault.
+			 * The fault is already present when the variable
+			 * moves, so nothing else has to be held constant. */
+			if (nic_ndev && nic_ndev_up &&
+			    netif_queue_stopped(nic_ndev))
+				nic_recov_arm();
+		} else {
+			return -EINVAL;
+		}
+		return (int)count;
+	}
+	/* The stall threshold in MILLISECONDS.  Bounded rather than free: a
+	 * value under a tick would make the timer fire on the healthy
+	 * transient the ISR's wake already handles, and `n_recov_spurious` is
+	 * what would show it.  `recov_jiffies` in the dump is what it actually
+	 * programs, so the conversion is readable rather than assumed. */
+	if (!strncmp(buf, "recovms ", 8)) {
+		char *p = buf + 8;
+		unsigned long v = simple_strtoul(p, &p, 0);
+
+		if (*p || v < NIC_RECOV_MS_MIN || v > NIC_RECOV_MS_MAX)
+			return -EINVAL;
+		nic_recov_ms = (unsigned int)v;
+		return (int)count;
+	}
+	/* s99a (b).  `iimr <hex>` -- the run-out mask A/B.  Any 32-bit value
+	 * is accepted, including ones this driver would never choose, because
+	 * refusing them is refusing the experiment.  It is a hardware write
+	 * and goes through `nic_wr`, so the unlock guard applies; when the
+	 * engine is off it is recorded and `engine on` writes it. */
+	/* s99a (c).  `phfollow 0` indexes the mbuf ring by the pkthdr's index,
+	 * which is what every measurement in this repository was taken under;
+	 * `phfollow 1` follows `ph_mbuf`, which is what the vendor does.  The
+	 * counters are collected either way, so the two arms share a
+	 * denominator instead of each having its own. */
+	/* s99a (c)'s POSITIVE CONTROL.  `phtest <hex-w0> <slot>` puts a typed
+	 * value through `nic_ph_class()` -- the same code the harvest uses --
+	 * and reports the class and the slot it resolved to.  It reads no
+	 * register and touches no hardware, so it is free and can be run on a
+	 * live board at any moment.
+	 *
+	 * Requires `alloc`: the classification is relative to `nic_rx_mb`, and
+	 * classifying against a base of zero would let the control pass on a
+	 * driver that has no ring.  That is the same hole `dsynctest`'s own
+	 * `-ENXIO` closes.
+	 *
+	 * ⚠️ WHAT IT DOES NOT COVER, said rather than left to be found: the
+	 * DEREFERENCE.  It exercises classification and the index arithmetic
+	 * only.  The load has its own check -- `ph_last_bf` must equal
+	 * `bufs + ph_last_j * NIC_BUF_SZ + NIC_RX_OFFSET`, and `bufs` is
+	 * printed in the same dump, so that is a prediction rather than a
+	 * restatement. */
+	if (!strncmp(buf, "phtest ", 7)) {
+		char *p = buf + 7;
+		unsigned long v, ix;
+
+		if (!nic_allocated)
+			return -ENXIO;
+		v = simple_strtoul(p, &p, 16);
+		while (*p == ' ')
+			p++;
+		ix = simple_strtoul(p, &p, 10);
+		if (ix >= NIC_RX_DESC)
+			return -EINVAL;
+		nic_ph_test_cls = nic_ph_class((u32)v, (unsigned int)ix,
+					       &nic_ph_test_j);
+		nic_ph_test_seen = 1;
+		return (int)count;
+	}
+	if (!strncmp(buf, "phfollow ", 9)) {
+		if (!strcmp(buf + 9, "0"))
+			nic_ph_follow = 0;
+		else if (!strcmp(buf + 9, "1"))
+			nic_ph_follow = 1;
+		else
+			return -EINVAL;
+		return (int)count;
+	}
+	if (!strncmp(buf, "iimr ", 5)) {
+		char *p = buf + 5;
+		u32 v = (u32)simple_strtoul(p, &p, 16);
+
+		if (*p)
+			return -EINVAL;
+		nic_iimr_base = v;
+		if (nic_engine_on) {
+			int rc = nic_wr(NIC_CPUIIMR, nic_iimr_base);
+
+			if (rc)
+				return rc;
+		}
 		return (int)count;
 	}
 	if (!strcmp(buf, "engine on")) {
@@ -2204,6 +2868,13 @@ static int __init rtl819x_nic_init(void)
 	rlxfw_markx("N2", nic_boot_iimr);
 	rlxfw_markx("N3", nic_boot_iisr);
 	rlxfw_markx("N4", nic_boot_rmdcr0);
+
+	/* s99a.  Initialised before the /proc entry exists, so no verb can
+	 * reach a timer that has not been set up. */
+	init_timer(&nic_recov_timer);
+	nic_recov_timer.function = nic_recov_fn;
+	nic_recov_timer.data = 0;
+	nic_recov_timer_ready = 1;
 
 	pde = create_proc_entry(RTL819X_NIC_PROC_NAME, 0644, NULL);
 	if (!pde) {
