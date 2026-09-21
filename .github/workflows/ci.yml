@@ -828,6 +828,16 @@ jobs:
       # down, which is the same split flashwin has and for the same reason.
       # It imports flashwin.overlaps_forbidden rather than restating the H601
       # rule, and F8 is the control that says the import is load-bearing.
+      - name: netblast
+        # 🆕 2026-09-21 (seating 36).  The instrument that drove the loader
+        # ladder.  Its C1a-C1e re-derive bench/2026-09-21e/y5-rateladder.py's
+        # constants FROM THAT FILE, so "the two runs had the same dose" is
+        # checked rather than asserted; C3a-C3e drive the liveness probe in
+        # both directions with injected runners, so a SILENT reading has a
+        # positive control behind it.  Needs no board, no network and no
+        # vendor material: C2 paces UDP to 127.0.0.1.
+        run: /usr/bin/python3 tools/netblast.py self-test 2>&1 | tee ci-out/netblast.out; exit "${PIPESTATUS[0]}"
+
       - name: flashmap
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/flashmap.py controls 2>&1 | tee ci-out/flashmap.out; exit "${PIPESTATUS[0]}"

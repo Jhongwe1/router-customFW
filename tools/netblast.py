@@ -269,8 +269,13 @@ def cmd_self_test(a):
     ran = []
 
     def ck(cid, what, cond, detail=""):
-        print("  %-4s %-5s %s%s" % (cid, "ok" if cond else "FAIL", what,
-                                    ("  -- " + detail) if detail else ""))
+        # 🔴 The leading token must be `ok`/`FAIL` at EXACTLY two spaces, and
+        # the description must follow after two or more.  量 `ci-census`'s
+        # OK_RE = `^ {2}ok\s{2,}(.*)$`: a line shaped `  C1a  ok  ...` parses
+        # as ZERO cases, which is the shape CLAUDE.md records costing two
+        # pushes (capdate/capfield at four spaces, then regcensus).
+        print("  %-5s %s  %s%s" % ("ok" if cond else "FAIL", cid, what,
+                                   ("  -- " + detail) if detail else ""))
         ran.append(cid)
         if not cond:
             fails.append(cid)

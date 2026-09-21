@@ -1825,3 +1825,82 @@ silicon reports nothing at all: no new `CPUIISR` bit, `GDSR0 0012001E`, `PCSR`
 zero, `STOPTX` clear, and the switch's 37 registers byte-identical across the
 fault. Every status bit this part exposes to us says it is healthy while it
 refuses to retire a TX descriptor.
+
+## 15 Seating 36 — the engine is exonerated, and the repair is three calls this driver already has
+
+量 2026-09-21, `bench/2026-09-21f`. The comparison itself lives in
+`docs/nic-vendor-diff.md` §§ 13–14, because its subject is *this driver against
+the loader*. What belongs here is what it says about **this driver**.
+
+### 15.1 The stall is permanent to 600 s, and the receive side loses nothing
+
+| t after the wedge | `n_irq` | `n_tx` | `n_rx` | txd OWN | `n_tx_recovered` | ping |
+|---|---:|---:|---:|---|---:|---|
+| before | 10 | 5 | 5 | `0 0 0 0` | 0 | 4/4 |
+| +16 s | 377 | **17** | 363 | `1 1 1 1` | 0 | 0/4 |
+| +46 s | 383 | **17** | 369 | `1 1 1 1` | 0 | 0/4 |
+| +120 s | 389 | **17** | 375 | `1 1 1 1` | 0 | 0/4 |
+| +600 s | 395 | **17** | 381 | `1 1 1 1` | 0 | 0/4 |
+
+🟢 **The control is inside the same two columns.** `n_rx` and `n_irq` advance
+**exactly +6** per interval, and exactly one ping — 4 ICMP requests plus 2 ARP
+— runs between consecutive cells. So RX is not merely alive; it delivers every
+probe frame while TX does not move for ten minutes. `NET-88` bounded recovery
+at microseconds; this bounds it at 600 s. `SPEC.md` `NET-99`.
+
+### 15.2 🔴 `SOFTRST` is not the repair, and two facts fell out of establishing that
+
+讀 `rtl865xc_asicregs.h:527-548` names `CPUICR` bit 22 *"Re-initialize all
+descriptors"*. 量, written to a wedged engine through the vendor's
+`/proc/rtl865x/memory` as `0xC4400000` (the live value with bit 22 set):
+
+* 🟢 **it self-clears, and it clears `TXCMD` and `RXCMD` with it** — read back
+  `04000000` on three sources: the vendor handler's own
+  `dat 0xc4400000: 0x4000000`, an independent `echo read`, and `now_icr`;
+* 🔴 **it does not touch the OWN bits in the DRAM ring** — all four
+  descriptors unchanged, ping still dead;
+* 🟢 **and it did reach the hardware**, by a negative control rather than by
+  assumption: with the engine off `n_rx` froze at **387**, not counting the 6
+  frames of the ping taken in that window, and resumed 390 → 396 after
+  `engine on`.
+
+So on this part *re-initialize all descriptors* does not include the
+descriptors. `SPEC.md` `NET-100`.
+
+### 15.3 🟢🟢 `engine off` → `arm` → `engine on`, twice from a pristine wedge
+
+讀 `rtl819x-nic.c:1462-1468`: `arm`'s TX loop writes each slot as
+`address | WRAP` with **no OWN bit** — which is `NET-72`'s one remaining
+candidate, sitting in this driver the whole time. 量, on a fresh boot whose
+wedge nothing else had touched:
+
+```
+RLXFW-N-ENGOFF
+RLXFW-N-ARM=A15B8000   RLXFW-N-ARMR=00000000
+RLXFW-N-ENGON=C4000000
+```
+
+→ `A15B81D0 / 81E8 / 8200 / 821A`, **ping 4/4**. Wedged and recovered again on
+the same boot: `n_tx_stop 2`, `n_tx_wake 2`, `tx_stopped 0`, ping 4/4.
+
+🟢 **The queue half is already written, and which code does it is a reading.**
+The dump taken after the recovery but *before* the ping reads `tx_stopped 1` /
+`n_tx_wake 0`; the one after reads `0` / `1`. The host's ARP arrives and the
+level test at `:754` — which runs on **any** interrupt, not only `TX_DONE` —
+sees the freed ring and calls `netif_wake_queue()` itself. **`P2` has only the
+detector left to write.** `SPEC.md` `NET-101`.
+
+### 15.4 🔴 Three things the repair may not be
+
+* **not `ndo_stop`/`ndo_open`**: 量, re-opening an interface that had just
+  recovered **broke it again** — 100 % loss, `n_tx_stop` back to 1. That is
+  `NET-58` reproduced on demand.
+* **not `watchdog_timeo`**: `NET-55`/`NET-57` measured it dead on this board.
+* **not `arm` with the engine running**: `NET-64`'s hard hang, which is why
+  `engine off` is first and why this sequence was safe.
+
+### 15.5 ⚠️ What it does not say
+
+It does not say why the engine stops. `NET-67 殘留` is untouched: there is a
+repair that works and no mechanism behind it. And the repair has never run from
+inside the driver — it was three `/proc` writes typed at a shell.
