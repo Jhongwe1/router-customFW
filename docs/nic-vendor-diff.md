@@ -468,3 +468,86 @@ PVID 9, port 4 carries 8, ports 5–7 carry 1 and port 8 carries 9). 讀
 later — so those values are the vendor's init, arrived at in two stages.
 **What is refuted is that `ph_vlanId = 0` on a transmitted descriptor is the
 cause; the PVID configuration itself has not been ruled out of anything.**
+
+## 10. The seating this file buys, and the order it has to run in
+
+⚠️ **This is a card DESIGN, not a card.** The card is frozen immediately before
+power, under `bench/<date>/`, and `check-predictions` reads its mtime — writing
+one now would destroy that evidence. What is below are the constraints that are
+expensive to rediscover, recorded because the next seating costs a power cycle.
+
+### The ordering rule, and why it is not a preference
+
+量 `SPEC.md` `NET-75`: in the wedged state the kernel keeps printing and the tty
+keeps echoing, but **the shell does not execute** — `echo`, an ash builtin that
+forks nothing and touches no `/proc`, returns one line (its echo) instead of
+two. 量 the same row: `busybox reboot -f` does not recover it either, because
+the shell never runs it. Seating 31 sent 7,489 bytes of ESC and seating 32 sent
+7,883, both with no prompt.
+
+🔴 **So a cell that wedges the board ends that boot.** Every wedge belongs at
+the END of its boot, and anything that needs a live shell goes before it.
+
+🔴 **And the handover is one-way per boot.** 量 `NET-58`: re-opening `rlx0`
+does not re-arm the descriptor bases, and the engine then walks off the ring
+and DMAs into arbitrary DRAM. So `eth4` → `rlx0` in the same boot is not
+available. `busybox reboot -f` costs **2.407 s** and no power press
+(`SPEC.md` `FW-37`), and that is what separates the boots.
+
+### Boot 1 — the vendor baseline
+
+| cell | what | observable, and what refutes it |
+|---|---|---|
+| `V1` | boot, `ping` both ways, `cat /proc/rtl819x-nic` whole | the pre-state; `n_writes 0` |
+| `V2` | `ifconfig rlx0 down`; `cat /proc/interrupts` | **line 12 gone.** 讀 `rtl819x-nic.c:1183-1193`, `nic_ndo_stop()` calls `free_irq(NIC_IRQ, …)`. If line 12 is still there the read did not happen and the rest of boot 1 is void |
+| `V3` | `ifconfig eth4 10.1.1.4 up`; `ifconfig eth4`; `cat /proc/interrupts` | `12: n RLX LOPI eth4`, `UP BROADCAST RUNNING`. 🔴 **If it returns `EBUSY` here, with `rlx0` down, then `notes/nic-driver.md:1428-1430` is right and `:518-519` was something else — record it and stop boot 1** |
+| `V4` | `cat /proc/rtl819x-nic` with `rlx0` down | 🟢 **rlxfw's `/proc` is now a read-only observer of the vendor's hardware state.** `now_icr`, `rpdcr0_pos`, `rmdcr0_pos`, `tpdcr0_pos` read hardware registers, not driver state, and a `cat` writes nothing (`n_writes` is a separate counter). Whether `rtl865x_init_hw()` re-armed shows as the bases LEAVING rlxfw's `A15B80xx` |
+| `V5` | `ping` both ways over `eth4` | the vendor's driver carrying ICMP |
+| `V6` | **`iperf3 -c <host>` on the vendor's driver** | see below |
+| `V7` | `/proc/rtl819x-nic`, the 37 switch registers, `GDSR0`, host `tcpdump` | taken whatever `V6` did |
+
+**`V6` has three outcomes and all three are worth the seating**, written before
+the board is powered:
+
+* **The vendor wedges too** → the fault is not in this driver. `D5` is not
+  reachable on this hardware by this method, and `R6-7` writes that with the
+  measurement behind it.
+* **The vendor survives and gives a number** → there is a platform baseline, a
+  single-variable differential, and every later hypothesis becomes an A/B.
+* **The vendor survives at about 30 Mbit/s** → § 4's copy cost is excluded and
+  `NET-76`'s 29.761 Mbit/s is the path, not the driver's bounce buffer.
+
+### Boot 2 — the candidate `NET-77` left out
+
+`NET-77` narrowed the remaining causes to two: *data actually flowing on an
+established connection*, and *`iperf3` the program*. 量, re-reading that row's
+own `/proc/net/snmp` numbers, **there is a third and it is perfectly confounded
+with the second**: every non-wedging rung is `PassiveOpens`/`OutRsts` — the
+board is the server, or refusing — and every wedging run is `ActiveOpens`,
+**the board opening an outbound TCP connection**. Four and four, no exceptions.
+
+| cell | what | what it separates |
+|---|---|---|
+| `W0` | host-side precondition, its own cell: start the listener/generator and **prove it is alive** (`ss -ltn`) | 🔴 `FW-102`: block 35's `T6` was VOID because `nohup … &` inside a heredoc died with its parent. `looprun`'s `S5c` has this shape; the card must too |
+| `W1` | board runs `iperf3 -s`, host runs `iperf3 -c` | board = server, real bulk, `iperf3` running. **If it does not wedge, direction is the factor** |
+| `W2` | board runs `iperf3 -s`, host pushes with **`socat`** | real TCP data, none of `iperf3`'s protocol. Separates *data* from *the program* |
+| `W3` | `cat /proc/net/snmp` whole | every rung reconciled from the board's own side |
+| `W4` | **last**: board runs `iperf3 -c` | the known wedge, as the positive control. This cell ends the boot |
+
+⚠️ **Do not plan a `telnetd` bulk ladder.** 量,
+`bench/2026-09-21c/PREDICTIONS-B37-block35.md:34-41`: this image has no
+`/dev/ptmx` and no `/dev/pts`, so `busybox telnetd` cannot allocate a pty —
+`T4` completed a handshake and `T5` had no listener left to talk to. That route
+needs a different image.
+
+⚠️ **`cat` is two `read_proc` invocations on this kernel** (`SPEC.md` `FW-64`),
+and this image's `ping` ignores `-c`. Both are already recorded; both have
+turned a good cell into a wrong number before.
+
+### What this seating does NOT do
+
+It does not add `txd ph2/ph3/ph4` to the dump and it does not set
+`-DRTL_DEBUG_NIC_SKB_BUFFER`. Both change `RECIPE_ID`, so they ride one image
+together, and that image is not this seating's — **a card that predicts a boot
+capture's byte count has to be written against the image that will actually
+boot.**
