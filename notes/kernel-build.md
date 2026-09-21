@@ -4510,3 +4510,48 @@ pair that measures it.
 🔴 **The discriminator is the assembled image's sha256**, which
 `looprun --image-sha256` checks. A card that separates quiet from loud
 by `RLXFW-ID0` will pass a board carrying the wrong image.
+
+
+## 🆕 A compile check that costs seconds and can save a full build
+
+*2026-09-22, seating 37. It fired on its first use.*
+
+A full `rlxfw-kbuild.sh` run re-stages a 480 MB tree before it compiles
+anything, so a syntax error in one driver file costs the whole stage. There is
+a cheaper gate, and it uses artefacts that already exist:
+
+1. take a **previously staged** cell tree, e.g.
+   `$R/cells/<oldcell>/top/linux-2.6.30`;
+2. read that tree's own recorded command line for the object --
+   `drivers/net/.rtl819x-nic.o.cmd`, first line, minus the `cmd_… :=` prefix;
+3. copy the edited source in under a **different** name, rewrite the `-o` and
+   the source path to point outside the tree, and run it.
+
+```
+CMD=$(sed -n '1p' $T/drivers/net/.rtl819x-nic.o.cmd | sed 's/^cmd_[^:]*:= //')
+CMD=${CMD//-o drivers\/net\/rtl819x-nic.o/-o $W/chk.o}
+CMD=${CMD//drivers\/net\/rtl819x-nic.c/drivers\/net\/chk99.c}
+( cd $T && eval "$CMD" )
+```
+
+🟢 **It is the real compiler with the real flags**, including
+`-Werror-implicit-function-declaration`, so an undeclared `mod_timer` or
+`msecs_to_jiffies` is an error rather than a warning. 量 seating 37: it caught
+`implicit declaration of function 'nic_dw'` -- a new helper placed above the
+accessor inlines it calls -- in **under 10 seconds**, where the same defect
+would have cost a staged build.
+
+🔴 **Two rules that make it safe**, both of which were followed and checked:
+the object and the dependency file go **outside** the staged tree, and the
+staged source is copied in under a name the tree does not build, so the cell's
+own `.o` and its mtimes are untouched. Verified after each run by reading the
+cell's `rtl819x-nic.o` mtime back.
+
+⚠️ **What it does not check**: linking, the `.config` the new code compiles
+under (it uses the OLD cell's `autoconf.h`), and anything outside the single
+translation unit. It is a syntax-and-declaration gate, not a build.
+
+⚠️ One cosmetic artefact: the recorded `.cmd` line contains a `$(pound)` that
+the shell tries to execute, printing `pound: command not found` to stderr. It
+does not affect the compile -- `COMPILE_RC` and the produced object are the
+readings.

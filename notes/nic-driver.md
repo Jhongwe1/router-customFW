@@ -2136,6 +2136,36 @@ named them and **this project had never seen them latch**. 推: the 8-deep RX
 ring runs out at ~1,500 frame/s, the engine pipelines, and the two rings
 decouple. The mechanism is unread.
 
+### 16.5a 🔴 The `/proc` handler was at 93.5 % of its page, and the first cap did not bound it
+
+`read_proc` is handed **one 4,096-byte page** and `nic_read_proc` does not
+bounds-check, so an overflow is not a truncated dump -- it is a store past the
+page into whatever follows.
+
+量 at the desk, before the build, by walking every `sprintf` format in the
+handler and charging each conversion its widest expansion (`%u` 10 digits,
+`%d` 11, `%08X` 8, `rx_bytes` at its 64-byte cap, the three loops at full trip
+count): **3,829 of 4,096 = 93.5 %**, leaving 267 bytes. The realistic figure is
+much lower -- `A4-BASE.log` measures the dump at **2,295 bytes** on the die and
+the largest committed before tonight was 1,244 -- so the page was not expected
+to overflow. **The cap exists because *not expected* is not a bound**, and the
+three cheapest things to add to this driver are all `sprintf` lines.
+
+🔴 **The first version of the cap gated ENTRY to each block, and that bounds
+nothing.** A descriptor loop admitted at `len = 3,899` then emits up to 618
+more bytes and lands at 4,517 -- past the page, which is the exact condition
+the cap was added to prevent. Moving the test **inside** each loop makes the
+ceiling provable by reading: the fixed scalar run is 2,297 worst case, a loop
+cannot start an iteration above `NIC_PROC_CAP` = 3,900, the longest line is 61
+and the marker is 12, so the handler cannot write past **3,973**.
+
+⚠️ `rtl819x-spi` 1.1 met the same limit and answered it by splitting onto a
+second `/proc` file. That answer is wrong here: this dump's readers are cells
+in frozen cards, and a second file moves every one of them.
+
+🟢 `truncated 1` is printed only when the cap is hit, so its **absence** is the
+reading. It is absent in all 37 dumps of this seating.
+
 ### 16.5 ⚠️ What this seating does not say
 
 * It does not say **why** the engine stops retiring a TX descriptor. Two
