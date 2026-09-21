@@ -1,0 +1,2 @@
+echo recover 0 > /proc/rtl819x-nic
+# 

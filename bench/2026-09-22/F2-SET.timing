@@ -1,0 +1,9 @@
+# offset seconds -- offset is the byte count in .log BEFORE this read
+0 0.017951
+21 0.025081
+22 0.025818
+24 0.026667
+27 0.027418
+31 0.028366
+34 0.029327
+38 0.030312

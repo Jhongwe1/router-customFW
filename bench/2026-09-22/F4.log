@@ -1,0 +1,10 @@
+Connecting to host 10.1.1.3, port 5201
+[  4] local 10.1.1.2 port 58744 connected to 10.1.1.3 port 5201
+[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
+[  4]   0.00-10.01  sec   532 KBytes  0.44 Mbits/sec  4698944   0.00 Bytes       
+[  4]  10.01-16.81  sec  0.00 Bytes  0.00 Mbits/sec  4290268370   0.00 Bytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-16.81  sec   532 KBytes  0.26 Mbits/sec   18             sender
+[  4]   0.00-16.81  sec  0.00 Bytes  0.00 Mbits/sec                  receiver
+iperf3: interrupt - the client has terminated

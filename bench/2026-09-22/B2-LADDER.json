@@ -1,0 +1,48 @@
+{
+  "target": "10.1.1.3",
+  "src": "10.1.1.2",
+  "dev": "enxfc19286184c9",
+  "port": 9999,
+  "payload_len": 1400,
+  "frame_bits": 11568,
+  "step_s": 8.0,
+  "rates_mbit": [
+    0.5
+  ],
+  "arp_load": false,
+  "started_wallclock": "2026-09-22T01:19:46+0800",
+  "pre": [
+    {
+      "src": "arping",
+      "ok": true,
+      "detail": "arping rc=0 received=1"
+    },
+    {
+      "src": "ip-neigh",
+      "ok": true,
+      "detail": "neigh 02:52:4c:58:46:57 REACHABLE"
+    }
+  ],
+  "steps": [
+    {
+      "rate_mbit_requested": 0.5,
+      "frames": 347,
+      "seconds": 8.005,
+      "rate_mbit_actual": 0.501,
+      "alive_after": false,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": false,
+          "detail": "arping rc=1 received=0"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": false,
+          "detail": "neigh no-lladdr INCOMPLETE"
+        }
+      ]
+    }
+  ],
+  "verdict": "stopped at 0.5 Mbit/s"
+}

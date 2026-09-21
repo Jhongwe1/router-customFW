@@ -1,0 +1,2 @@
+echo phfollow 1 > /proc/rtl819x-nic
+# 

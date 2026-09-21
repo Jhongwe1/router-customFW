@@ -1,0 +1,125 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.2
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 839
+n_writes 30
+n_refused 0
+n_irq 383
+n_irq_spurious 0
+n_tx 17
+n_rx 369
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000008
+seen_iisr 0000320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 369
+n_napi_complete 369
+n_xmit 17
+n_xmit_busy 1
+tx_mode 0
+n_tx_full 1
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/18/0
+n_skb_fail 0
+n_tx_stop 1
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 369/501922 tx 17/4428 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15B8000
+rmdcr0_pos A15B8020
+tpdcr0_pos A15B8040
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 1
+n_recov_fire 1
+n_recov_spurious 0
+n_recov_ok 1
+n_recov_fail 0
+n_recov_wake 1
+recov_rc 0 0 0
+recov_j_arm 4294957438
+recov_j_fire 4294957538
+ph_follow 0
+n_ph_chk 369
+n_ph_diff 0
+n_ph_bad 0
+n_ph_used 0
+ph_first_w0 00000000
+ph_first_exp 00000000
+ph_first_nrx 0
+ph_agree 369
+ph_last A15B8110
+ph_last_j 0
+ph_last_bf 00000000
+ph_test_cls 2
+ph_test_j 0
+ph_test_seen 1
+j_now 4294957868
+n_dsync_chk 369
+n_dsync 0
+dsync_last_d 0
+dsync_first_d 0
+dsync_first_rp 00000000
+dsync_first_rm 00000000
+dsync_first_nrx 0
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A15B8000
+mb_ring A15B8020
+tx_ring A15B8040
+bufs A15B8290
+rx_idx 0
+tx_idx 0
+rxd0 A15B8051 len 0 f 8063 pl 03
+rxd1 A15B8069 len 0 f 8063 pl 03
+rxd2 A15B8081 len 0 f 8063 pl 03
+rxd3 A15B8099 len 0 f 8063 pl 03
+rxd4 A15B80B1 len 0 f 8063 pl 03
+rxd5 A15B80C9 len 0 f 8063 pl 03
+rxd6 A15B80E1 len 0 f 8063 pl 03
+rxd7 A15B80FB len 0 f 8063 pl 03
+txd0 A15B81D0 len 594
+txd1 A15B81E8 len 594
+txd2 A15B8200 len 594
+txd3 A15B821A len 594
+mbd0 A15B8111 ph A15B8110 ml 0
+mbd1 A15B8129 ph A15B8128 ml 0
+mbd2 A15B8141 ph A15B8140 ml 0
+mbd3 A15B8159 ph A15B8158 ml 0
+mbd4 A15B8171 ph A15B8170 ml 0
+mbd5 A15B8189 ph A15B8188 ml 0
+mbd6 A15B81A1 ph A15B81A0 ml 0
+mbd7 A15B81BB ph A15B81B8 ml 0
+rx_len 0
+rx_ph1 00400C19
+rx_ph3 80630003
+rx_ph4 00090000
+# 
