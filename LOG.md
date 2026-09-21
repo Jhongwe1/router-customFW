@@ -31240,7 +31240,7 @@ seating 33 只在故障**之後**讀了交換器，讀到 `MEMCR 00007F00` 對 p
 `C0-boot.log` 十二個欄位全部是窄的，原始常數就是 6541** —— 其他四份正規化以後
 落上去的那個值，現在是一份真的存在的擷取。`test-reply-size` 加了 `SILENT` 這個
 分類，而它的解釋來自**前一格的 metadata**（`cr.*.prompt_seen == false`），不是
-一張手維護的豁免名單。兩支都綠，`ci-expected.tsv` 兩列都更新（7 與 65）。
+一張手維護的豁免名單。兩支都綠，`ci-expected.tsv` 兩列都更新（7 與 65）。🟢 **而那條「前一格」規則在一份它沒有被擬合過的擷取上也答對了**：`bench/2026-09-19/X12-phyr02` 送 `PHYR 0 2`（一個被建模的族）回 0 位元組，前一格 `X11-phyr` 也記著 `prompt_seen: false` —— 兩天前的一次上機，寫規則時沒有人在看它。n 從 1 變成 2。`FW-103`／`FW-104`。
 
 ⚠️ **完整 `desk-sweep` 這一段沒有跑**（約 31 分鐘、99 個宣告步驟）。跑過的是
 `spec-check`（rc 0）、`citecheck`、`ledgerscan check`、`capdate`、`cardcheck`
