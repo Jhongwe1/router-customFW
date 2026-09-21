@@ -1787,4 +1787,4 @@ per packet.
   **147,628**). The substance is right and the counter named is wrong.
 
 **Zero flash-write commands, zero `FLR`, `AUTOBURN 00000000` read back on all
-five uploads, and no vendor firmware executed at any point.**
+🔴 **eight** uploads -- this figure was published as *five* first, because it was measured after `L6` and then quoted rather than re-derived when `L7`, `L8` and `L9` ran; 量, `bench/2026-09-21e/*-ab2.log` is **8** files and all eight read `00000000` -- and no vendor firmware executed at any point.**
