@@ -1753,7 +1753,7 @@ ring-full contract `NET-80` added and never executed.
 | `n_tx_drop_full` | 0 | 12 |
 | board reachable | no | no |
 
-**1,548 reads of the OWN bit and not one of them found it clear.**
+**1,548 reads of the OWN bit and not one of them found it clear.** 🔴 **And *permanent* is narrower than it reads:** those 1,548 are **12 occasions x 128 iterations of a tight loop with interrupts off**, so they bound recovery on a **microsecond** scale, not on a second scale. What supports permanence over seconds is that the board stayed unreachable afterwards -- and **no ping was taken after the `tx_mode 1` run**, so for that arm it is an inference and not a reading. The next seating's first cell is that gap.
 `tx_retry_max_seen 129` is the 128-retry ceiling plus one, so every single
 occurrence ran to the limit. So the engine's refusal to retire a TX descriptor
 is **permanent**, no TX-side driver strategy masks it, and `NET-79`'s vendor
