@@ -30816,7 +30816,7 @@ ping 恢復 3/4。`now_icr` `C4000000` → **`44000000`** → `C4000000`，而�
 * **`NET-57`** 廠商把 `ether_setup` 改成 `tx_queue_len = 0` → noqueue qdisc →
   `dev_watchdog_up()` **從未被呼叫** → `ndo_tx_timeout` 永遠不可能發火。
   而第二個後果更大：`noqueue_qdisc.enqueue` 是 NULL，所以驅動自己
-  `rtl819x-nic.c:880-885` 那段「`qdisc_restart` 會重排隊」的正確性論證
+  `rtl819x-nic.c:1232-1322` 那段「`qdisc_restart` 會重排隊」的正確性論證
   **在一般 Linux 上成立、在這顆上不成立**。
 * **`NET-58`** re-open 不重新武裝描述子基底（`X12` 沒有 `N-ALLOC`/`N-ARM`），
   引擎從舊位置繼續走：`rpdcr0_pos A15B1C00 → A15B1C64` 而 `rx_ring A15B8000`。
@@ -30886,7 +30886,7 @@ reboot -f` 打在 03:13:15，**排在後面，從來沒有被執行過**。`SPEC
 ### 🟢🟢 座位本身量到的東西
 
 **`NET-61`**：一次多 frame 叢發抬起 `MBUF_RUNOUT`（`seen_iisr` `0000320E` →
-**`0001320E`**，bit 16 是驅動自己的 `NIC_IP_MBUF_RUNOUT`，`rtl819x-nic.c:292`），
+**`0001320E`**，bit 16 是驅動自己的 `NIC_IP_MBUF_RUNOUT`，`rtl819x-nic.c:323`），
 之後引擎的兩個 RX 位置暫存器**恰好錯開 4 格並停在那裡** —— 五次 Δ0、四次 Δ4、
 約 12,000 個 frame。而驅動在 `:751` 從一個環讀 OWN、在 `:758` 從另一個環讀長度、
 用的是同一個 `nic_rx_idx`，`nic_refill`（`:1227-1241`）也用同一個 `i` 補兩個環。
@@ -31325,7 +31325,7 @@ info->input = pPkthdr->ph_mbuf->skb;      /* 跟著 pkthdr word 0 的指標走 *
 
 **廠商從來不用索引去 mbuf 環找收到訊框的緩衝區。** 只有一個消費索引，
 `currRxPkthdrDescIndex[ring]`；`currRxMbufDescIndex` 屬於 refill。
-而 rlxfw 用同一個 `i` 索引兩個環（`rtl819x-nic.c:891` 拿 OWN、`:908` 拿緩衝區
+而 rlxfw 用同一個 `i` 索引兩個環（`rtl819x-nic.c:1328` 拿 OWN、`:908` 拿緩衝區
 位址）—— **`NET-61` 量到的就是這兩個環會被一次突發拉開。**
 🟢 rlxfw 建環時已經把 mbuf 描述子位址寫進 RX pkthdr 的 word 0（`:1335`），
 寫了、在 harvest 路徑上從來沒讀過。`SPEC.md` `NET-82`。
@@ -31380,7 +31380,7 @@ ifconfig: SIOCSIFFLAGS: Device or resource busy
 當時是 `UP BROADCAST RUNNING`。量 `notes/nic-driver.md:518-519`，seating 28：
 先 `rlx0 down`，交接**成功**，`12: 2 RLX LOPI eth4`、`UP BROADCAST RUNNING`。
 
-兩頭再從程式碼釘死：讀 `rtl819x-nic.c:1183-1193`，`nic_ndo_stop()` 做
+兩頭再從程式碼釘死：讀 `rtl819x-nic.c:1633-1646`，`nic_ndo_stop()` 做
 `napi_disable` → `nic_do_engine(0)` → **`free_irq(NIC_IRQ, …)`**；讀
 `rtl_nic.c:4192-4210`，廠商的第一次 open 呼叫 **`rtl865x_init_hw()`**，完整硬體
 重初始化含所有描述子基底。**所以交接過去的是一顆被廠商自己重新武裝過的
@@ -31413,7 +31413,7 @@ TX 環 4 格，`n_tx` 第一次取樣 5、第二次 37 —— **5 mod 4 = 1、37
 量，直接問工具自己而不是讀它的原始碼推論：
 
 ```
->>> citecheck.CITE_RX.findall("rtl819x-nic.c:292,891,895,898-900,908")
+>>> citecheck.CITE_RX.findall("rtl819x-nic.c:323,891,895,898-900,908")
 [('rtl819x-nic.c', '292', '')]
 ```
 
@@ -31561,7 +31561,7 @@ qdisc 時佇列一停，skb 就被丟掉並印 `Virtual device rlx0 asks to queu
 
 🔴🔴 **而 `n_tx_wake` 與 `n_tx_wake_race` 在這一段每一份 dump 裡都是 0** ——
 健康的、卡死的、`tx_mode 1` 的。**喚醒路徑從來沒有成功過一次**，而驅動自己在
-`rtl819x-nic.c:1070-1078` 的正確性論證引的是 `sch_generic.c` 的 requeue，那條
+`rtl819x-nic.c:1514-1522` 的正確性論證引的是 `sch_generic.c` 的 requeue，那條
 路徑在這個裝置上不可達。
 
 ### 🔴 一個故障態板子既不聾也不啞
@@ -31769,7 +31769,7 @@ descriptors"*。它**自清、而且連帶清掉 `TXCMD`／`RXCMD`**（寫 `C440
 硬體上，證明是一個陰性對照：引擎關著那段 `n_rx` 卡在 387 連那次 ping 的 6 個
 訊框都沒收到，開回來就繼續爬。`NET-100`。
 
-🟢 對的是我自己驅動裡就有的 `arm`：讀 `rtl819x-nic.c:1462-1468`，它的 TX 迴圈
+🟢 對的是我自己驅動裡就有的 `arm`：讀 `rtl819x-nic.c:1915-1921`，它的 TX 迴圈
 寫 `位址 | WRAP` 而**沒有 OWN**。在一次**全新開機的乾淨故障**上跑
 `engine off` → `arm` → `engine on`，四張 OWN 清掉，**ping 4/4**；同一次開機再
 弄壞再救一次，也 4/4。🟢 **佇列那一半是既有程式碼自己做的**：恢復後、ping 前
@@ -31793,7 +31793,7 @@ descriptors"*。它**自清、而且連帶清掉 `TXCMD`／`RXCMD`**（寫 `C440
 ### 🟢 一個被丟掉的格子，而丟掉它是這一段第二有價值的判斷
 
 § 12.4 的 run-out 遮罩分歧本來要用廠商的 `/proc` 寫 `CPUIIMR` 來測，不用映像。
-通電前去讀 `rtl819x-nic.c:966-968`：**NAPI complete 每一次都把那些位元 OR
+通電前去讀 `rtl819x-nic.c:1409-1412`：**NAPI complete 每一次都把那些位元 OR
 回去**，所以寫進去會被下一個進來的封包還原，**而讀回格會給假綠**，因為
 `echo read` 不產生線上流量。**那一格在桌面被丟掉，理由寫進 `§ 14.4`。**
 

@@ -260,7 +260,7 @@ regex wide.
 
 ```
 >>> import citecheck
->>> citecheck.CITE_RX.findall("rtl819x-nic.c:292,891,895,898-900,908")
+>>> citecheck.CITE_RX.findall("rtl819x-nic.c:323,891,895,898-900,908")
 [('rtl819x-nic.c', '292', '')]
 ```
 
@@ -269,7 +269,7 @@ at the comma; every line number after the first is not a citation as far as this
 tool is concerned.
 
 🔴 **How it surfaced, and the detail worth keeping.** `SPEC.md` `NET-61`
-cited `rtl819x-nic.c:292,751,758,768,1232,1239`. 量, read back one at a time:
+cited `rtl819x-nic.c:323,751,758,768,1232,1239`. 量, read back one at a time:
 `751` is `return 0;`, `758` is `nic_isr`'s signature, `768` is a blank line,
 `1232` is a comment about `FW-45`'s watchdog and `1239` is `{`. **Five of six had
 rotted.** The same run of `citecheck` reported `0 new rot`, `8 passed, 0 failed`

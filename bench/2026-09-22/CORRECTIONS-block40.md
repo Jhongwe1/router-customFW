@@ -123,3 +123,130 @@ power (one cable gives one `LinkUp`; rlxfw cannot write the VLAN table, 讀
 is already proven by `NET-100`'s three-source read-back. So a success would
 have closed nothing, and a hang costs a power press on a board with no spare.
 **Authorisation is not obligation.**
+
+
+---
+
+## § 5 What a second reader found in what I had already published
+
+Two re-derivations were run over the captures **without sight of the
+write-ups**, so a disagreement would be informative rather than an echo. Both
+independently produced finding ① below. Everything here was then re-derived
+from the captures by me before being written down.
+
+### 5.1 🔴 `n_recov_spurious` is 1, not 0, and `n_recov_fire` is 25, not 26
+
+Published: *"26 stops, 26 recoveries, `n_recov_fail` 0, `n_recov_spurious` 0"*.
+量 `E5-RST.log`, the last dump of the seating:
+
+```
+n_tx_stop 26   n_tx_wake 1
+n_recov_arm 26   n_recov_fire 25   n_recov_ok 25
+n_recov_wake 25  n_recov_fail 0    n_recov_spurious 1
+```
+
+🟢 **The corrected numbers are better, because they close two ways with no
+residual**: `fire 25 + spurious 1 = 26 = arm`, and
+`recov_wake 25 + tx_wake 1 = 26 = n_tx_stop`. The one queue restart the
+recovery did not perform was done by `:754`'s cheap path after `E0-RESC`'s
+hand rescue — so `n_tx_wake 1` beside `n_recov_wake 25` is the ISR path
+working once, not a defect.
+
+🟢 **And the single spurious firing is worth more than a zero.** It fell at
+`recovms 20`, giving that branch its first positive reading; a counter that has
+only ever read 0 is a claim with no control. It does not meet the card's
+refutation condition, which needs `spurious >= 1` **with** `fire 0`.
+
+### 5.2 🔴 The `B8` ladder produced TWO stalls, not three
+
+Published in the closeout narrative and in `run-partD.sh`'s header: *"one 8 s /
+0.5 Mbit/s ladder produces three stalls"*. 量: `B6-AFTER` reads `n_tx_stop 1`
+and `B9-AFTER` reads **3**, so the increment is **2** — and the two dumps
+bracket `B7-PING` as well as `B8-LADDER`, so even the 2 cannot be attributed to
+the ladder alone. The `recovms` sweep that reasoning motivated still happened
+and its result (throughput did not move) is unaffected; the premise was wrong
+by one and unattributed by construction.
+
+🔴 `run-partD.sh` is **not edited**. It is a record of what was typed, and its
+header's arithmetic is corrected here rather than rewritten there.
+
+### 5.3 🔴 The dereference check the card states cannot be evaluated from a dump
+
+Card § 2.4 and the driver's own comment both say: *`ph_last_bf` must equal
+`bufs + ph_last_j × NIC_BUF_SZ + NIC_RX_OFFSET`*.
+
+讀 `nic_ph_buf()`: `nic_ph_last_j` is assigned on **every** call, immediately
+after `nic_ph_class()`; `nic_ph_last_bf` is assigned **only** on the branch
+where a SKEW resolved to a usable slot. When the last classified frame was an
+AGREE, the two fields describe different events and the identity is not
+expected to hold — **and no field in the dump says which case it is in**.
+
+量 over the 25 dumps that carry both: the identity holds in **10** and fails in
+**15**, and the failures track exactly the windows where `n_ph_diff` did not
+move (`ph_last_bf` frozen at one value while `ph_last_j` walks).
+
+🔴 **So this is a defect in my driver, not in the hardware, and the card states
+the check as though it were usable.** The fix is one of: give `ph_last_bf` a
+companion `ph_last_cls`, or move `ph_last_j` onto the same branch. Neither is
+done; no image has been built since.
+
+### 5.4 🔴 The `phtest` control does not exercise the term it exists to certify
+
+All four cells pass slot **0**. With `i = 0` the AGREE test
+`w0 == nic_rx_mb + i * NIC_DESC_BYTES` is indistinguishable from
+`w0 == nic_rx_mb`, so **a driver that had dropped the `+ i * NIC_DESC_BYTES`
+term entirely would produce exactly the four readings observed**. Only
+`A3-PH2`'s `ph_test_j 1` carries information; the other three `ph_test_j 0`
+values are the echo of the typed slot argument, because `nic_ph_class()` sets
+`*j_out = i` first and overwrites it only on the SKEW path.
+
+⚠️ One more cell — `phtest A15B8128 1`, predicting AGREE — would have closed
+it, and the verb already accepts it. **A positive control that fires four times
+is not automatically a control over everything it appears to test.**
+
+### 5.5 🔴 `G1`–`G3` name three different things in one directory
+
+The frozen card's Part G is `G1-RD` / `G2-WR` / `G3-RB` / `G4-PING`, the
+`/proc/rtl865x/memory` switch-register write — the one high-risk cell, which
+**did not run** (§ 4). The files `G1.log`, `G2.log`, `G3.log` in this directory
+are `iperf3` runs from an off-card script.
+
+🔴 **A reader matching capture names to the card will read them as the switch
+test.** The card's cells carry a `-RD`/`-WR`/`-RB` suffix and mine do not, but
+that is a distinction that has to be noticed rather than one that cannot be
+missed. This is the third identifier collision this project has recorded
+(`NET-14`, `regcensus`, and this), and the first inside one bench directory.
+
+### 5.6 ⚠️ Three numbers in the `iperf3` logs that must not be quoted
+
+* **`Retr` and `Cwnd` are meaningless here.** `4698944` is the `Retr` of the
+  *first* interval row of all ten runs that produced interval rows — a per-run
+  retransmit count cannot be a constant. `F1`'s third row reads
+  `Retr 4290268702` with `Cwnd 1.08 GBytes` on a board with 32 MiB of RAM.
+  This is `TCP_INFO` coming back wrong under `qemu-mips-static`, which
+  `notes/iperf3-port.md` already records; the sender-summary `Retr` comes from
+  the same source and is no better.
+* **iperf3's own elapsed is not wall clock on a killed run.** `F4` reports
+  16.81 s for a window the host measured at 71.9 s, and `H2` reports 33.95 s
+  against 71.8 s. Its interval clock advances only when its `select` loop
+  wakes, so on a wedged socket it stops. **Every Mbit/s in § 16.3 is therefore
+  normalised on the `-t 30` window and cross-checked against the board's own
+  counters**, not taken from the `sender` row.
+* **`j_now` wrapped mid-seating.** It reads `4294943368` at `A3-PH1` and `112`
+  at `X1-REST`. `recov_j_arm`/`recov_j_fire` are raw jiffies, so those two
+  dumps carry a fire timestamp 4.29 billion ticks in the "future".
+  `fire − arm` is still exactly 100 because both sides wrapped together, but
+  any expression of the form `j_now − recov_j_fire` is wrong there. Nothing in
+  this seating computes one.
+
+### 5.7 ⚠️ `C2-IPERF` and `C3-AFTER` pass the gate while containing nothing
+
+Both are fence cells and both score as passes: `check-predictions` reads
+**existence and mtime, not content**. `C2-IPERF.log` is 84 bytes (the echoed
+command and `Connecting to host`) and `C3-AFTER.log` is 23 bytes (the echo of
+`cat /proc/rtl819x-nic` with no reply). The cell that actually carries C's
+reading, `C3b-AFTER`, is **outside** the fence.
+
+⚠️ This is the limitation `CLAUDE.md` already records for seating 20, arriving
+again. It is not a repair I can make here: repairing the card destroys the
+mtime evidence.

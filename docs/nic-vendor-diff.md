@@ -127,7 +127,7 @@ decides the egress port, `ph_portlist` is the magic `0x07`
 (讀 `rtl865xc_swNic.h:155`), and `ph_flags` carries `PKTHDR_HWLOOKUP` (`0x0020`)
 and `PKTHDR_BRIDGING` (`0x0040`) — 讀 `common/mbuf.h:117-124`.
 
-rlxfw, 讀 `rtl819x-nic.c:1113-1115`:
+rlxfw, 讀 `rtl819x-nic.c:1563-1565`:
 
 ```c
 nic_dw_set(nic_tx_ph, i, 1, NIC_PH_MK1(len + 4, 0, 0));
@@ -174,7 +174,7 @@ vendor's `/proc/rtl865x/asicCounter` without a new image.
 
 ⚠️ `ph_vlanId = 0` is a second, independent thing in the same word family and
 it has the same shape: the driver **has** the macro — `NIC_PH_MK4(vid)`,
-讀 `rtl819x-nic.c:415` — and `nic_xmit` does not call it. Whether VLAN 0 is a
+讀 `rtl819x-nic.c:477` — and `nic_xmit` does not call it. Whether VLAN 0 is a
 member set the switch resolves is unmeasured; `R6-2` put the switch in a dumb
 state whose `PVCR0`–`PVCR4` values are committed (`bench/2026-09-21d`), so this
 can be settled at the desk against those, **before any power is spent**.
@@ -191,7 +191,7 @@ rather than to hand to the engine.
 `NUM_RX_PKTHDR_DESC` **256**, usable TX depth 127 because
 `rtl865xc_swNic.c:701-704` keeps `next_index != txPktDoneDescIndex`.
 
-rlxfw: `NIC_TX_DESC 4`, `NIC_RX_DESC 8` (讀 `rtl819x-nic.c:351-352`), chosen so
+rlxfw: `NIC_TX_DESC 4`, `NIC_RX_DESC 8` (讀 `rtl819x-nic.c:382-383`), chosen so
 a full ring dump fits in one 4,096-byte `/proc` page — `FW-46` measured this
 image has no `dd` and no `md5sum`, so the dump *is* the instrument.
 
@@ -235,7 +235,7 @@ So the vendor puts **rings and descriptors** in uncached memory
 (`UNCACHED_MALLOC`, six call sites, 讀 `rtl865xc_swNic.c:1188-1242`) and leaves
 **packet data** cached, with explicit maintenance at the two hand-off points.
 
-rlxfw puts all three in KSEG1 and copies, 讀 `rtl819x-nic.c:1095-1096`
+rlxfw puts all three in KSEG1 and copies, 讀 `rtl819x-nic.c:1545-1546`
 (TX, `__raw_writeb`) and `:912-914` (RX, `__raw_readb`) — byte at a time,
 because 讀 `:823-830`: the buffers are 2 mod 4 and a word-wise copy would be an
 unaligned load, which on this core faults rather than trapping to a slow path.
@@ -275,7 +275,7 @@ pPkthdr->ph_flags = PKTHDR_USED | PKT_INCOMING;   /* RX */
 
 🟢 **Both match to the bit, from two sources that share no code** — a
 bare-metal loader's live rings on this die, and a Linux driver's source in a
-GPL drop. `rtl819x-nic.c:433-439` calls `ph_flags` *the one field this driver
+GPL drop. `rtl819x-nic.c:495-501` calls `ph_flags` *the one field this driver
 cannot derive*; on the **template** values it now is derived, and they agree.
 ⚠️ That says nothing about the *per-frame* `ph_flags`, which §2 shows the
 vendor changes and rlxfw does not.
@@ -291,7 +291,7 @@ are cited **zero** times.
 `swNic_receive` itself (`rtl865xc_swNic.c:577-692`) **is** read, at two points:
 `:604` (the `ph_flags` checksum drop, quoted at `rtl819x-nic.c:131-138`) and
 `:650` (the FCS in `ph_len`, quoted at `:1555`). And the register programming
-order **is** read — `rtl819x-nic.c:1373` cites `rtl865xc_swNic.c:1306-1384` and
+order **is** read — `rtl819x-nic.c:1826` cites `rtl865xc_swNic.c:1306-1384` and
 `:1438` cites `:1134-1384`, both accurately. A sweep restricted to `notes/`,
 `docs/` and `SPEC.md` misses these, because this project puts that kind of
 reading in the driver's own comments.
@@ -328,7 +328,7 @@ its buffer. There is exactly one consumption index in the vendor's RX path,
 `currRxPkthdrDescIndex[ring]`; `currRxMbufDescIndex` exists but belongs to
 refill.
 
-rlxfw, 讀 `rtl819x-nic.c:891` and `:908`:
+rlxfw, 讀 `rtl819x-nic.c:1328` and `:908`:
 
 ```c
 u32 e = nic_re(nic_rx_ring, i);      /* OWN, from the PKTHDR ring at i */
@@ -343,7 +343,7 @@ one `nic_rx_idx`, and frames get delivered carrying another frame's length.
 dereference.
 
 🟢 **rlxfw already holds the pointer and does not read it.** 讀
-`rtl819x-nic.c:1335` — at ring build, `nic_dw_set(nic_rx_ph, i, 0, mb)` writes
+`rtl819x-nic.c:1788` — at ring build, `nic_dw_set(nic_rx_ph, i, 0, mb)` writes
 each RX pkthdr's own mbuf-descriptor address into word 0. It is written every
 time the rings are built and never read on the harvest path.
 
@@ -385,7 +385,7 @@ cost, and it is not `NET-78`.**
 | ① | The frame is flooded to six MACs in direct mode where the vendor looks up one, and the egress decision for the four dark ports consumes something `GDSR0` cannot see | 讀 the divergence, 推 the mechanism | the switch's **per-port MIB counters** across the fault, via `/proc/rtl865x/asicCounter` — `NET-78` 殘留 already names it | no new image |
 | ② | ~~`ph_vlanId = 0` on every frame, against a switch whose dumb-state VLAN configuration is committed~~ | — | 🔴 **REFUTED at the desk, §9** | — |
 | ③ | The TX pkthdr's word 2 is written once at init and never per frame, and the ASIC may write it back — and `/proc` does not print it | 讀 | add `txd%u ph2/ph3/ph4` to the dump; needs a build | one image |
-| ④ | The vendor's `eth4` carries the same load without failing | — | `ifconfig rlx0 down` (讀 `rtl819x-nic.c:1183-1193`: it `free_irq`s), then `ifconfig eth4 … up` (讀 `rtl_nic.c:4192-4210`: first open calls `rtl865x_init_hw()`), then the same `iperf3` | rides an existing boot |
+| ④ | The vendor's `eth4` carries the same load without failing | — | `ifconfig rlx0 down` (讀 `rtl819x-nic.c:1633-1646`: it `free_irq`s), then `ifconfig eth4 … up` (讀 `rtl_nic.c:4192-4210`: first open calls `rtl865x_init_hw()`), then the same `iperf3` | rides an existing boot |
 
 ⚠️ **④ is recorded in this repository as impossible and it is not.**
 `docs/KNOWN-ISSUES.md:870` and `:941` say the contrast cannot be taken because
@@ -499,7 +499,7 @@ available. `busybox reboot -f` costs **2.407 s** and no power press
 | cell | what | observable, and what refutes it |
 |---|---|---|
 | `V1` | boot, `ping` both ways, `cat /proc/rtl819x-nic` whole | the pre-state; `n_writes 0` |
-| `V2` | `ifconfig rlx0 down`; `cat /proc/interrupts` | **line 12 gone.** 讀 `rtl819x-nic.c:1183-1193`, `nic_ndo_stop()` calls `free_irq(NIC_IRQ, …)`. If line 12 is still there the read did not happen and the rest of boot 1 is void |
+| `V2` | `ifconfig rlx0 down`; `cat /proc/interrupts` | **line 12 gone.** 讀 `rtl819x-nic.c:1633-1646`, `nic_ndo_stop()` calls `free_irq(NIC_IRQ, …)`. If line 12 is still there the read did not happen and the rest of boot 1 is void |
 | `V3` | `ifconfig eth4 10.1.1.4 up`; `ifconfig eth4`; `cat /proc/interrupts` | `12: n RLX LOPI eth4`, `UP BROADCAST RUNNING`. 🔴 **If it returns `EBUSY` here, with `rlx0` down, then `notes/nic-driver.md:1428-1430` is right and `:518-519` was something else — record it and stop boot 1** |
 | `V4` | `cat /proc/rtl819x-nic` with `rlx0` down | 🟢 **rlxfw's `/proc` is now a read-only observer of the vendor's hardware state.** `now_icr`, `rpdcr0_pos`, `rmdcr0_pos`, `tpdcr0_pos` read hardware registers, not driver state, and a `cat` writes nothing (`n_writes` is a separate counter). Whether `rtl865x_init_hw()` re-armed shows as the bases LEAVING rlxfw's `A15B80xx` |
 | `V5` | `ping` both ways over `eth4` | the vendor's driver carrying ICMP |
@@ -926,7 +926,7 @@ descriptors"*. Written to a wedged engine through the vendor's
 
 ### 14.3 🟢🟢 `engine off` → `arm` → `engine on` recovers it, twice
 
-讀 `rtl819x-nic.c:1462-1468`: `arm`'s TX loop writes each slot as
+讀 `rtl819x-nic.c:1915-1921`: `arm`'s TX loop writes each slot as
 `address | WRAP` with **no OWN bit**, which is `NET-72`'s one remaining
 candidate. 量, on a **pristine** wedge — fresh boot, ping 4/4, `Y5`'s dose,
 dead, nothing else written to the engine:
@@ -945,7 +945,7 @@ Wedged again at the same dose and recovered again on the same boot:
 reading rather than a guess.** The dump taken after the recovery but *before*
 the ping reads `tx_stopped 1` / `n_tx_wake 0`; the one after it reads
 `tx_stopped 0` / `n_tx_wake 1`. The host's ARP-for-`10.1.1.3` arrives, and the
-level test at `rtl819x-nic.c:754` — which runs on **any** interrupt, not only
+level test at `rtl819x-nic.c:1012` — which runs on **any** interrupt, not only
 `TX_DONE` — sees the freed ring and calls `netif_wake_queue()` itself.
 
 🔴 **Three things the repair may not be**, each excluded by a measurement
@@ -967,7 +967,7 @@ rather than by preference:
 * **The run-out mask divergence of § 12.4 is untested, and it cannot be tested
   without an image.** A cell was written to set `CPUIIMR` to the loader's
   `0x000007F8` through the vendor's `/proc` and was **discarded at the desk**:
-  讀 `rtl819x-nic.c:966-968`, the NAPI-complete path ORs the run-out bits back
+  讀 `rtl819x-nic.c:1409-1412`, the NAPI-complete path ORs the run-out bits back
   in on every completion, so the write would be undone by the first arriving
   packet — and the read-back cell would have shown a **false green**, because
   `echo read` puts no traffic on the wire.

@@ -926,7 +926,7 @@ supplied no `ndo_tx_timeout`, and that `R6-4a` fixes it by supplying one.
 `n_tx_timeout 0`. **`SPEC.md` `NET-57`.**
 
 🔴 **And the larger consequence lands on § 7's own argument.**
-`rtl819x-nic.c:1076-1081` argues that returning `NETDEV_TX_BUSY` while waking is
+`rtl819x-nic.c:1520-1531` argues that returning `NETDEV_TX_BUSY` while waking is
 correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue` is
 **NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
 freed. **The argument is right for the kernel it cites and wrong for this
@@ -1015,7 +1015,7 @@ confirm it refuted it instead.
    `:701` of this file as a *ping-bound floor*, and quoting it as the copy rate
    was an error in this section's first draft.
 2. `MBUF_RUNOUT` fires: `seen_iisr` goes `0000320E` → `0001320E`, and bit 16 is
-   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:292`). First seen at `C16-f14`.
+   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:323`). First seen at `C16-f14`.
 3. The engine's two RX position registers desynchronise by **exactly 4** and
    stay there. Indices are `(pos − base) / 4` with `rx_ring A15B8000` and
    `mb_ring A15B8020`:
@@ -1245,7 +1245,7 @@ at every read across six arms. The reason the loop stays is the TX side.
 * **Why the engine stops retiring TX descriptors.** Nothing was read on the
   engine's side of the ring: `tpdcr0_pos` was not sampled across a wedge, and
   🔄 **2026-09-21 (seating 32): THAT CLAUSE IS FALSE and was false when it
-  was written.** `rtl819x-nic.c:1812-1813` prints `tpdcr0_pos` on every
+  was written.** `rtl819x-nic.c:2265-2266` prints `tpdcr0_pos` on every
   `cat /proc/rtl819x-nic`, so this seating sampled it **six times** across
   the wedge without meaning to. What hid it is `wedgeprobe.sh:32`, whose
   operator filter names `rpdcr0_pos` and `rmdcr0_pos` and not
@@ -1279,7 +1279,7 @@ are told apart by the assembled image's sha256 and never by `RECIPE_ID`
 
 § 11.6 and `SPEC.md`'s `NET-67` 殘留 say the engine-side TX register *"was not
 read"*. It was read **six times**, by seating 31's own captures, because
-`rtl819x-nic.c:1812-1813` prints `tpdcr0_pos` on every `cat`. The reason nobody
+`rtl819x-nic.c:2265-2266` prints `tpdcr0_pos` on every `cat`. The reason nobody
 saw it: `bench/2026-09-21/wedgeprobe.sh` writes the full `/proc` to the `.log`
 and shows the operator a filtered view whose filter (`:32`) names `rpdcr0_pos`
 and `rmdcr0_pos` and **not** `tpdcr0_pos`. 量:
@@ -1684,7 +1684,7 @@ why it is not the obvious thing:
 
 The board's `ping` still reported 100 % loss. 🔴 **So frames arrive, are
 counted, and are delivered in a form the stack cannot use** — and 讀
-`rtl819x-nic.c:885-930`, `nic_napi_harvest()` takes the OWN bit and the length
+`rtl819x-nic.c:1322-1367`, `nic_napi_harvest()` takes the OWN bit and the length
 from `nic_rx_ring`/`nic_rx_ph` at index `i` and the buffer address from
 `nic_rx_mb` at **the same `i`**, which is exactly the coupling `NET-82` says
 the vendor does not have. The final dump reads `n_dsync 70,717` of
@@ -1707,11 +1707,11 @@ Virtual device rlx0 asks to queue packet!
 `dev_queue_xmit`, taken when the queue is stopped or `dev_hard_start_xmit`
 returns non-zero, and it **drops** the skb. 讀 `net/ethernet/eth.c:349-353`:
 under `CONFIG_RTL_819X` the vendor's `ether_setup` sets `tx_queue_len = 0`,
-and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:2226`)
+and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:2897`)
 uses that same function — so `rlx0` has no qdisc and nothing holds the frames.
 
 🔴 **And the driver's own correctness argument for the stop/wake design,
-`rtl819x-nic.c:1070-1078`, cites `sch_generic.c:124-178`'s requeue — a path
+`rtl819x-nic.c:1514-1522`, cites `sch_generic.c:124-178`'s requeue — a path
 this device cannot reach.** In this state `echo` returned one line, `ARP` went
 unanswered (six requests, zero replies), and `busybox reboot -f` could not be
 typed. That is what cost the second power press.
@@ -1781,7 +1781,7 @@ per packet.
 * 🔴 **One instrument defect was mine**: `env PATH=.:$PATH qemu-mips-static
   iperf3 …` exits **127** under WSL because this host's `PATH` carries Windows
   paths with spaces. The fix is the binary's full path.
-* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:1818-1820`
+* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:2322-2331`
   says `n_dsync_chk` is about 2× `n_napi_poll`. 量: they are **equal** (5/5,
   350/350, 73,810/73,810) and it is `n_reads` that is about 2× (18, 720,
   **147,628**). The substance is right and the counter named is wrong.
@@ -1797,7 +1797,7 @@ committed. 讀 `AsicDriver/rtl865xc_asicregs.h:561-640`:
 * **bit 17** is `PKTHDR_DESC_RUNOUT_IP0` — the RX **pkthdr** descriptor ring
   ran out.
 * **bit 16** is the **mbuf** descriptor ring run-out. Its *enable* is bit 11
-  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:283-292`
+  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:314-323`
   and `:316` already carry it.
 
 量, the seven states this seating produced:
@@ -1869,7 +1869,7 @@ descriptors. `SPEC.md` `NET-100`.
 
 ### 15.3 🟢🟢 `engine off` → `arm` → `engine on`, twice from a pristine wedge
 
-讀 `rtl819x-nic.c:1462-1468`: `arm`'s TX loop writes each slot as
+讀 `rtl819x-nic.c:1915-1921`: `arm`'s TX loop writes each slot as
 `address | WRAP` with **no OWN bit** — which is `NET-72`'s one remaining
 candidate, sitting in this driver the whole time. 量, on a fresh boot whose
 wedge nothing else had touched:
@@ -1950,10 +1950,28 @@ and the four TX descriptors return to `A15B81D0 / 81E8 / 8200 / 821A`.
 `recov_jiffies` exactly (`HZ = 100`, `msecs_to_jiffies(1000)`). A second firing
 later in the seating repeats it: 4294959483 - 4294959383 = **100**.
 
-🟢 **Over the whole seating: 26 stops, 26 recoveries, `n_recov_fail` 0,
-`n_recov_spurious` 0** -- including at `recovms 20`, where `recov_jiffies`
-reads **2** and the spurious counter still reads 0, so a threshold 50x shorter
-does not fire on transients the level test has already cleared.
+🟢 **Over the whole seating: 26 stops, 26 arms, 25 fires, 25 recoveries,
+`n_recov_fail` 0, `n_recov_spurious` 1**, and the set closes on two
+independent identities with no residual:
+
+    n_recov_fire 25 + n_recov_spurious  1  = 26 = n_recov_arm
+    n_recov_wake 25 + n_tx_wake         1  = 26 = n_tx_stop
+
+The first says every arm was accounted for; the second says every stop was,
+and that the one queue restart the recovery did **not** perform was done by
+`:754`'s cheap path after `E0-RESC`'s hand rescue.
+
+🟢 **The single spurious firing is worth more than a zero would have been.**
+It happened at `recovms 20` (`recov_jiffies` 2), which is the branch that
+had never been reached: a counter that has only ever read 0 is a claim with no
+control, and this one now has a positive reading. It does **not** meet the
+card's refutation condition, which requires `n_recov_spurious >= 1` *with*
+`n_recov_fire 0`; fire is 25.
+
+🔴 *(The first version of this section, and `SPEC.md` `NET-104` with it, read
+"26 recoveries, `n_recov_spurious` 0". That was wrong, and it was found by two
+adversarial re-derivations run over the captures without sight of this text.
+The corrected numbers are better than the ones they replaced.)*
 
 🔴 **`n_recov_arm` reading 0 at `B4-WEDGE` is the control that makes the row
 above an experiment.** It is the refutation condition the card wrote first: a
@@ -2012,8 +2030,17 @@ both ends under `qemu-mips-static`, `-t 30`, `timeout 70` on the host.
 | **`H2`** | **1** | **61.1 MBytes** | 30 s data phase | **17.09** |
 | `H3` | 1 | 7.42 MBytes | collapsed after 10 s | 0.86 |
 
-**`D5` = 17.03 / 17.76 / 17.09 Mbit/s, n = 3, spread 0.73 Mbit/s (4.2 %)**,
-against the vendor's **25.4 Mbit/s** (`NET-84`) on the same binary = **68 %**.
+**`D5`, stated over all four `phfollow 1` runs on one 30 s normalisation:
+17.03 / 17.76 / 17.09 / 2.07 Mbit/s.** Three cluster at
+**17.03-17.76 (spread 0.73, 4.2 %)** and the fourth is **2.07**. Against the
+vendor's **25.4 Mbit/s** (`NET-84`) on the same binary the cluster is **68 %**.
+
+🔴 **The three-run figure may not be quoted without the fourth.** `H3` is the
+same arm, the same command and the same board; it collapsed after its first
+interval. Excluding it because it is low is a post-hoc criterion, and n = 4
+with one collapse is what the measurement is. *(The first version of this
+table normalised `H3` on its own 72.21 s elapsed and got 0.86 Mbit/s; on the
+30 s window every other row uses, it is 2.07.)*
 
 ⚠️ **Two things about the method, said rather than left to be found.** `F1` is
 the only run that exited 0; `H1` and `H2` hit `timeout 70` in the control
@@ -2022,10 +2049,59 @@ read **0.00 Bytes**, so the extra elapsed time carries no data and the figure
 is bytes / the `-t 30` window. And `H3` collapsed after one interval — **one
 run in four**, reported rather than dropped.
 
+### 16.3a 🔴 The host's sender figure over-states the `phfollow 0` arm by up to 5x
+
+`nd_stats rx <frames>/<bytes>` brackets every run and is an instrument the
+host does not share. 讀 `nic_napi_harvest`: `rx_bytes += len` with
+`len = ph_len - 4`, i.e. the frame minus FCS.
+
+| run | `phfollow` | host sender bytes | board received | board/host |
+|---|:-:|---:|---:|---:|
+| `D0-CTRL` | 0 | 315,392 | 82,198 | **0.26** |
+| `D1-R1` | 0 | 650,240 | 262,504 | **0.40** |
+| `D1-R2` | 0 | 510,976 | 137,358 | **0.27** |
+| `D1-R3` | 0 | 502,784 | 126,024 | **0.25** |
+| `D2-R1` | 0 | 629,760 | 117,371 | **0.19** |
+| `F4` | 0 | 544,768 | 164,596 | **0.30** |
+| **`F1`** | **1** | 63,858,278 | 66,375,844 | **1.04** |
+| **`H1`** | **1** | 66,584,576 | 69,489,553 | **1.04** |
+| **`H2`** | **1** | 64,067,994 | 66,586,905 | **1.04** |
+| `H3` | 1 | 7,780,434 | 7,744,939 | **1.00** |
+
+🟢 In the `phfollow 1` arm the two instruments agree to within **0.2-0.6 %**
+once the ~54 bytes per frame of ACK and ARP traffic is allowed for — two
+independent counts of the same transfer. 🔴 In the `phfollow 0` arm the board
+received **19-40 %** of what the host says it sent, so those figures are
+mostly bytes that never left the host's socket buffer. Taken from the board's
+own counters the arm-0 throughput is **0.020-0.067 Mbit/s**, i.e. the gap is
+wider than § 16.3's table shows, not narrower.
+
 🔴 **`n_ph_used` is the refutation condition and it held**: 44,256 in `F1`'s
 arm, 0 in every `phfollow 0` arm. That counter increments only on the branch
 that returns the followed address, so a zero would have meant both arms were
 the same experiment and the whole comparison void.
+
+### 16.3b 🔴 How strong the A/B actually is, stated because the numbers invite more
+
+`run-partF.sh` was written as four alternating runs so that an ordering effect
+could be seen. **Two of the four produced no bytes**: `F2` (arm 0) and `F3`
+(arm 1) both died at `No route to host`. So the alternation has **one usable
+pair, `F1` against `F4`**.
+
+`H1`-`H3` are all arm 1 and have **no arm-0 control after them**, and
+`H0-SRV` restarted the board-side `iperf3` server in the same step -- `G1` and
+`G3` had failed with *the server is busy running a test*, so the pre-`H0`
+server was stuck. **A second variable moved between `F4` and `H1`.**
+
+`F1` is also the only run in the seating that reached `iperf Done.`; every
+other measured run was killed by `timeout 70`.
+
+⚠️ **So the honest claim is: one clean pair, plus three same-arm repeats taken
+after a confound, plus a mechanism that predicts exactly this** -- at 99.8 %
+skew the indexed path copies from the wrong 2 KiB buffer on nearly every
+frame, so every TCP segment fails its checksum. `n_ph_used 44,256` proves the
+switch took. **What would settle it is one arm-0 run after `H0-SRV`, which
+costs no power and did not happen.**
 
 ### 16.4 🔴 What it does NOT fix, and this is the part that matters
 
