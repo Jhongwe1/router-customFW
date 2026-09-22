@@ -1385,7 +1385,28 @@ def report_check():
 # **This census cannot see a paid debt.**  Its population is the table and the
 # table is a claim; the file's own ⚠️ above says it is blind to a debt
 # never written down, and this is the same blindness with the sign flipped.
-BASELINE = {'L1': 0, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
+# 🔴 2026-09-22 (101st segment): `L1` 0 -> 17, and the cause is
+# STRUCTURAL rather than seventeen new debts.  `R6` closed and the next gate
+# is the owner's to open, so for the first time in this project a segment
+# ends with NO gate open -- and the carried-forward table's owner column can
+# only name gates.  Seventeen rows that named `R6` therefore name nothing
+# live, all at once, without a single row changing.
+# 量 `PROGRESS.md`, and this is why the number is not evidence of
+# neglect: FIVE consecutive gates record *Opened ... in the same segment
+# <predecessor> closed* -- `R5`, `R1-pub + R2c`, `R1z`, `P1` and `R6`
+# itself -- so a segment has never before ended with no gate open, and
+# `L1` has never had the chance to fire this way.  The seventeen
+# are `C-15 C-18 C-19 C-6 C-9 CAPD-1 CFG-3 GREP-1 INC-2 LEDGER-3 LEDGER-4
+# LOOP-3 LOOP-4b NET-25 TC-i TERM-1 WRAP-1`.
+# 🔴 WHAT MUST HAPPEN TO THIS NUMBER, written here so the ratchet's
+# shrink direction has something to catch: the first act of the next gate is
+# to ADOPT or DECLINE each of the seventeen, and `L1` comes back down in the
+# commit that does it.  Raising it was the alternative to giving them an
+# owner, and the owner that would have been invented does not exist --
+# `cfcensus`'s own `L2` fired once on exactly that, *a disposition that
+# invented a gate while disposing of rows that name gates which do not
+# exist*.
+BASELINE = {'L1': 17, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
             'L11': 0, 'L12': 0, 'L13': 0, 'L15': 0, 'L9': 0}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
@@ -1411,7 +1432,11 @@ BASELINE = {'L1': 0, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
 # and `L11`, now true of every check.  The layer is not deleted: the moment any
 # check goes non-zero its digest has to be written here beside its count, and
 # `U14b` is the control that says a count alone is not enough.
-BASELINE_SIG = {}
+BASELINE_SIG = {'L1': 'cefc023c'}
+# 🟢 2026-09-22: the digest layer is no longer a line of code
+# nothing exercises on the LIVE file -- `L1` is the first check to go
+# non-zero since it was written, so `U12live` now compares seventeen
+# row ids and not only a count.
 # 🔄 2026-09-16, later the same segment: `L1` 44 → 42 and `L8` 16 → 19, and
 # **both moves are the instrument getting less wrong rather than a debt
 # moving.**  Teaching `hints()` the WORD `CLOSED` alongside the character `✅`

@@ -1501,8 +1501,12 @@ commands, zero power).
 ⚠️ **The power ledger is not one number and this entry does not make one.**
 The log's own segment headings for these thirteen seatings use **four different
 words** — 電源循環, 電源事件, 電源按鍵, 冷開機 — and nothing in this repository
-defines them against each other. Counting the headings gives **24**; that is a
-count of headings, not a measured total.
+defines them against each other. Counting them gives **23 by a regular expression and 24 by reading
+them** — the eighty-seventh segment's heading writes its extra press as
+prose (*一次電源循環，加一次因我的失誤而多花的電源按鍵*) rather than as
+a count, so a scan misses it. **That is the same defect one layer
+down**: the four words are not defined against each other, and they are
+not written in one shape either. Neither number is a measured total.
 
 ⚠️ **Zero flash-write commands and zero `FLR` over the whole gate.** The
 bracket stands where `R5` left it, at 1,024 of 4,194,304 bytes = **0.0244 %**,
