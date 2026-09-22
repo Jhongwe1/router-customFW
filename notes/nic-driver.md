@@ -2176,3 +2176,133 @@ reading. It is absent in all 37 dumps of this seating.
   with it as the default.
 * `recovms` was swept over two values, 1000 and 20, and the throughput did not
   move between them — so the recovery latency is not what limits the number.
+
+## 17 Seating 38 — the compiled default took and the traffic died anyway
+
+量 2026-09-22, `bench/2026-09-22b`, card `PREDICTIONS-B43-block41.md`, image
+`s100L` (`RECIPE_ID 82724c8f`, loud, `rtl819x-nic 1.3`). **One power press**,
+the 21:38 cold power-on; the second and third boots were bought with
+`busybox reboot -f` (`FW-37`).
+
+### 17.1 `phfollow` is the default now, and that is not enough
+
+`nic_ph_follow` is initialised to 1. It took, and the evidence is a counter
+rather than a throughput figure: `A4-BASE` reads `ph_follow 1`, `B3-N` reads
+`n_ph_used` **136** over `n_ph_chk 179`, and the control arm `B6-N` — the same
+image with `phfollow 0` typed — reads `n_ph_used` **0** over `n_ph_chk 92`.
+`n_ph_used` increments only on the branch that returns the followed pointer,
+so the two arms are separated by the code path itself.
+
+🔴 **And the throughput died anyway.** `B2-IPERF`, with no verb typed on that
+boot: **0.39 Mbit/s for 10.66 s, then zero**; 502 KBytes sent, receiver
+**0.00 Bytes**. `B3-N`: `n_tx_stop 1`, `tx_stopped 1`, `txd0`–`txd3` =
+`A15B81D1` / `81E9` / `8201` / `821B`, bit 0 set on all four — `NET-67`. And
+`n_recov_arm 0`, `n_recov_fire 0`.
+
+🔴🔴 **`recov_mode` reads 0 at boot.** § 16.3's 17 Mbit/s was measured with
+`recover 1` armed by hand, and no file said so. So the fix for *a driver whose
+correct behaviour requires a verb* removed one verb and shipped another. The
+repair is one initialiser and it is **not** in this image. `SPEC.md` `NET-107`.
+
+⚠️ **The card's discriminator for that cell was wrong and the counters
+corrected it.** It said a figure in the 0.04–0.07 band would mean the compiled
+default had not taken. Measured: `B2` overall **0.06** with the default in
+force, `B5-IPERF0` (arm 0) **0.04**. A throughput band cannot separate *the
+fix is not in* from *the fix is in and something else stopped the traffic*.
+
+🟢 The repair is caused rather than asserted: `X1-REC1` sets `recover 1` over
+the existing wedge, `X2-REC-FIRED` reads `n_recov_fire 1` / `ok 1` / `fail 0`,
+`tx_stopped 0`, all four `txd` bit 0 clear, and
+**`recov_j_fire − recov_j_arm = 4971 − 4871 = 100 = recov_jiffies`** — § 16.1's
+identity, reproduced on a different boot.
+
+### 17.2 🔴🔴 `NET-67` candidate 8: the three zeroed TX bases are not it
+
+`nic_do_arm` writes zero to `CPUTPDCR1/2/3`. This die's own loader runs TX0
+**and** TX1 armed (`NET-48`: `A040FC88` / `A040FCA0`), the vendor's
+`swNic_init` arms four, and `TXFD` is one doorbell bit with **no ring number**
+(`rtl865xc_asicregs.h:538`). So three zeroed bases was the only structural
+difference between this driver and **both** implementations that do not wedge.
+
+`txrings 4` points the other three at one shared idle ring whose single
+descriptor is CPU-owned with `WRAP` set. `C7-ON` reads `tx_rings 4` and
+`tpdcr1_pos` / `tpdcr2_pos` / `tpdcr3_pos` all **`A15BE290`** = `idle_ring`,
+exactly as predicted.
+
+| | arm 1 | arm 4 |
+|---|---|---|
+| dose | 20,094 frames, 29.04 Mbit/s | 20,391 frames, 29.36 Mbit/s |
+| `Δn_tx_stop` | **+1** | **+1** |
+| first miss | **1.138 s** | **1.124 s** |
+| `txd0`–`txd3` | all engine-owned | all engine-owned |
+
+One boot, one dose, `recover 0` in both arms. **1.2 % apart.** `SPEC.md`
+`NET-108`.
+
+🟢 The by-product is that `tpdcr1_pos` / `tpdcr2_pos` / `tpdcr3_pos` are **on a
+dump for the first time**: `00000000` at rest, which is what the hypothesis
+needed to be true before it could be tested at all.
+
+### 17.3 🟢🟢 The engine side, read at last — and it reads because the vendor driver STAYS
+
+`NET-67 殘留` has named `/proc/rtl865x/asicCounter`'s CPU-port `Snd` as the
+next step since seating 31, through five seatings. It ran here, and the reason
+it could is a design decision: `config/host-compat/0007` refuses the vendor's
+`open()` and leaves everything else, so `/proc/rtl865x/` survives —
+`asicCounter`, `memory`, `phyReg`, `port_status`, `mac`, `mmd`, `diagnostic`,
+`fc_threshold`. **`CONFIG_RTL_819X_SWCORE=n` would have deleted all of them**,
+which is the third reason that route was not taken (the first two —
+ten undefined symbols at the link, and the VLAN table being a `TACI` protocol
+— were measured at the desk).
+
+In a fault state:
+
+* **Port 3 `Rcv` 145,373 B = CPU port `Snd` 145,373 B**, byte for byte, with
+  119 unicast / 1 multicast / 122 broadcast on both sides. **Ingress is
+  perfect end to end** — `NET-90`/`NET-91` again.
+* **Port 3 `Snd` 4,898 B / 50 unicast** against the driver's `n_tx 76 / 5,346`
+  — **26 frames never left port 3**.
+* CPU port ingress: `Rcv 0 bytes`, `CRCAlignErr 54`, `JabberErr 2`, histogram
+  52 packets, and `pause 22` on port 3 (`NET-71` recorded all ports at zero
+  congestion).
+
+🔴 **A bracket refuted my first reading of that.** Six pings later: port 3
+`Snd` **+676 B / +7 unicast**, CPU `CRCAlignErr` **+7**, CPU ingress histogram
+**+7**. So the frames do leave. 推 *they go out with a bad FCS and the host
+NIC discards them in hardware* — and the host's own `ip -s -s link` reads
+`RX errors: crc` **0 before and 0 after**, which kills it. Mechanism 未定;
+`SPEC.md` `NET-109` and its residual carry it.
+
+⚠️ **Every `asicCounter` reading here was taken AFTER the fault.** There is no
+healthy baseline to difference against, so *the fault caused this* and *it has
+always read this way* are not separated. That is the residual's first item and
+it costs no power.
+
+### 17.4 🔴 `NET-78`'s state was transient tonight
+
+After one `NET-67` wedge and one successful recovery, 21:48–21:52: `ip neigh`
+**FAILED**, ping **100 % loss**, `tcpdump` showing six ARP requests out and
+**not one frame from the board's MAC** — while the driver read healthy
+(`tx_stopped 0`, four `txd` bit 0 clear, `n_rx` 179→235 and `n_tx` 57→76 both
+advancing, `drop 0/0`). At 21:53 it was **4/4** with the board's echo replies
+and its own ARP on the wire. Nobody typed a recovery verb.
+
+`C1-REST` says what happened in between: `n_tx_stop 2`, `n_recov_arm 2`,
+`n_recov_fire 2` — **a second wedge and a second recovery ran unattended while
+`asicCounter` was being read.** That answers half of `NET-68 殘留`: reloading
+after a recovery does not re-wedge as `NET-67`; it lands here. `SPEC.md`
+`NET-110`.
+
+### 17.5 What this seating does NOT say
+
+* It does not say why the engine stops retiring a TX descriptor. **Eight**
+  candidates are now dead and none has been replaced.
+* It does not say why the CPU port's ingress counts `CRCAlignErr` while its
+  `Rcv` byte counter stays at 0, and the one reading of that is unbracketed.
+* `recover` is still not a compiled default, so the sentence this seating set
+  out to retire is still true — of a different verb.
+* The ethtool ops were never executed: this image has no `ethtool` and the
+  unit's rootfs has no binary. Declared on the card before power, not
+  discovered at the bench.
+* `D4` is still not met as written. The vendor driver is in the image and
+  every hardware initialisation it performs still runs.
