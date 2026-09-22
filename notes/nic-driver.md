@@ -1910,7 +1910,7 @@ inside the driver — it was three `/proc` writes typed at a shell.
 
 量 2026-09-22, `bench/2026-09-22`, card `PREDICTIONS-B42-block40.md`, image
 `s99c` (`RECIPE_ID c3cb552b`, `rtl819x-nic 1.2`). **One power press**, the
-22:45 cold power-on of 2026-09-22, which was also seating 36's budget.
+**00:45** cold power-on of 2026-09-22, and it was **this seating's own budget**. 🔄 **2026-09-22（第一百段）：原文寫「22:45 … which was also seating 36's budget」，兩半都錯。** 量，擷取的 `started_wallclock`：seating 36 是 `2026-09-21T22:22:33` → `23:17:12`，seating 37 是 `2026-09-22T01:16:40` → `01:51:29`；而凍結的卡片首段逐字寫 *the power press happened at 2026-09-22 00:45 … One press, budgeted one*。所以 22:45 落在**前一天** seating 36 的視窗裡。
 
 ### 16.1 🟢🟢 The recovery runs from inside the driver, and the trigger is time
 
