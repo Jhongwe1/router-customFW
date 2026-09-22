@@ -1657,3 +1657,20 @@ None writes anything and each is one command at the prompt.
 above), so each of these reads its target plus the three words after it; none
 of those windows reaches the UART block, which is the only region a `DW` start
 address has to be constrained against.
+
+## `booting` across seatings — 2026-09-23, `CLK-31`
+
+量, the committed `tools/boot-timeline.py` over every capture in `bench/`
+(56 cold, 193 warm). For warm boots in the 16 seatings with n ≥ 3, the
+per-seating median of `booting` (anchor C → `chipName`, `CLK-15`) ranges
+**0.3371–0.3697 s**: 32.6 ms apart, 9.7 % of the smaller. The median range
+**inside** one seating is **6.5 ms**.
+
+The loader's code is the same in every one of those boots, so the drift is a
+property of the setup, not of the code. The cause is undetermined: host USB
+latency and the device are both candidates, and this measurement cannot
+separate them.
+
+Consequence for `P2`: its control segment compares the two firmwares only inside
+one seating, and the plan's *±10 % on another day* is pre-registered as at risk
+for every sub-second segment.

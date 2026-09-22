@@ -571,6 +571,11 @@ SRCREF_EXEMPT = {
         '2026-08-25.  Repairing them would destroy the record rather than fix '
         'it, which is the same call the seventeenth session made when it '
         'reverted its own over-reach into a frozen block',
+    'docs/history/':
+        'text moved verbatim out of a state document when it became '
+        'current-state only (2026-09-23).  A record: its citations '
+        'were written against the tree of their date, and repairing '
+        'them would rewrite what the record says -- the LOG.md rule',
 }
 
 

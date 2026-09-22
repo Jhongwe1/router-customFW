@@ -1406,7 +1406,7 @@ def report_check():
 # `cfcensus`'s own `L2` fired once on exactly that, *a disposition that
 # invented a gate while disposing of rows that name gates which do not
 # exist*.
-BASELINE = {'L1': 17, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
+BASELINE = {'L1': 0, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
             'L11': 0, 'L12': 0, 'L13': 0, 'L15': 0, 'L9': 0}
 # 🔴 A COUNT PER CHECK IS STILL NOT ENOUGH, AND THE ADVERSARIAL PASS SAID SO
 # BEFORE THIS LINE EXISTED: *a mutant that moves two rows in opposite
@@ -1432,7 +1432,13 @@ BASELINE = {'L1': 17, 'L2': 0, 'L3': 0, 'L6': 0, 'L8': 0, 'L10': 0,
 # and `L11`, now true of every check.  The layer is not deleted: the moment any
 # check goes non-zero its digest has to be written here beside its count, and
 # `U14b` is the control that says a count alone is not enough.
-BASELINE_SIG = {'L1': 'cefc023c'}
+BASELINE_SIG = {}
+# 🔄 2026-09-23 (`P2-0`): `L1` 17 -> 0 and the digest goes with it. The
+# seventeen were adopted by `P2` (8), re-owned to the booked `R6b` (4) or
+# declined with a re-open condition (5), each in its own row. ⚠️ Re-owning to a
+# gate that has not started works because only `✓` counts as closed
+# (`resolve`); `FW-111` records why that is right for `·` and would be wrong
+# for `⊘`.
 # 🟢 2026-09-22: the digest layer is no longer a line of code
 # nothing exercises on the LIVE file -- `L1` is the first check to go
 # non-zero since it was written, so `U12live` now compares seventeen

@@ -404,3 +404,63 @@ citation that spells the bad citation IS one to the scanner, which
 why five of the six above went unreported and this one did not — and it is the
 cheapest reason to run `citecheck` on a dirty tree even though its baseline
 rows are suspended there.
+
+## 5.3 An insertion breaks the citations no checker reads — 量 2026-09-23
+
+`citecheck` skips `bench/`, `LOG.md` and `CHANGELOG.md` (`SRCREF_EXEMPT`,
+`tools/spec-check.py:561-574`). That is right, since they are records, and it
+means their line-number citations are neither checked nor repairable: an
+insertion above a cited line moves them with no instrument noticing.
+
+Measured on a full clone of `f557873`: every `FILE:NNN` into `PROGRESS.md`,
+classified by `citecheck`'s content oracle (replicated, and identical to
+`oracle()` on all 468 scanned citations) and by **row identity** — the row's
+label (step id, `D`-id, carried-forward id, § Now label) at the citing commit
+against the label at that line now.
+
+| citing files | citations | content oracle | row identity |
+|---|---:|---|---|
+| frozen bench artefacts | 15 | 14 `CHANGED`, 1 `STABLE` | 10 on their row, 5 moved |
+| `LOG.md` | 43 | 26 `CHANGED`, 12 `ROT`, 1 multi, 4 `STABLE` | 12 on their row, 28 moved, 3 other |
+| scanned by `citecheck` | 19 | 10 `STABLE`, 8 `CHANGED`, 1 `ROT` | 14 on their row, 5 moved |
+
+**`CHANGED` is not "already broken".** Ten of the fourteen frozen `CHANGED`
+citations still land on the row they name, because the row grew in place; an
+insertion above them is what breaks them.
+
+| insertion at | working citations broken | of which not repairable |
+|---|---:|---:|
+| line 66, above § Gate board | 23 | 13 (8 frozen cards, 5 `LOG.md`) |
+| line 1787 | 7 | 3 |
+| below line 2340 | 0 | 0 |
+
+Controls: 120 lines inserted into a throwaway clone and committed. At line 66
+the committed `citecheck` reported exactly the 9 new `ROT` predicted and the row
+test flipped exactly 23; at the end of the file both read unchanged.
+
+The constraint was already known for `SPEC.md`, whose § 19 exists because of it,
+and was never applied here: `R1z`, `P1` and `R6` were each inserted at the top,
+and 5 of the 15 frozen citations had moved before this was measured. `CITE-2`'s
+answer — *maintainable by an instrument* — holds for the population `citecheck`
+scans; it never held for the one it exempts.
+
+**Rule:** new step lists go at the end of `PROGRESS.md`, and new text cites rows
+by id. The enforcer, and a resolver that reads a frozen line citation against
+the file as it was at the card's commit, belong to `R1y`.
+
+## 5.4 Owner columns nothing checks — 量 2026-09-23
+
+* `SPEC.md` § 17's `owning gate` column, resolved against § Gate board (eight
+  fixtures, all classified correctly): 70 open rows; **51 name only closed
+  gates** (23 of them `R6`), 14 name no gate, 4 a live gate, 1 unresolved.
+  `spec-check` checks that an open value appears in § 17, not that its owner
+  is alive, and `cfcensus` reads only `PROGRESS.md`.
+* `PROGRESS.md`'s generated census block read `ORPHAN 0 / LIVE 35` from
+  2026-09-16 while the live census was `ORPHAN 17 / LIVE 14`. The section said
+  *`cfcensus check` runs in CI*; CI runs `--self-test` and `ratchet`
+  (`.github/workflows/ci.yml:1075-1088`), and `check` does not read the blocks.
+* `cfcensus` treats only `✓` as closed (`tools/cfcensus.py:831-832`), so a gate
+  that has not started counts as a live owner. That is right for a booked gate
+  and would be wrong for one marked `⊘`; none is today.
+
+All three belong to `R1y`.
