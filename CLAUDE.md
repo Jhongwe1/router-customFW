@@ -246,6 +246,8 @@ agree: name the tool that could be lying and the second source that settles it.
   check `/dev/ttyUSB0` and a command round trip. Right after a detach,
   `usbipd list` looks like a drop for about a second. The drops' cause is
   undetermined.
+- An unprivileged ICMP socket is refused in this WSL (`ping_group_range`
+  `1 0`, `FW-114`); a host probe drives the system `ping`.
 - Session files never go in WSL's `/tmp`, which is emptied at every distro start;
   derived artefacts go under `$FWRE_WORK/rebuild/`.
 

@@ -16,7 +16,7 @@ the work (house rule 6).
 | **Active gate** | **`P2`** — boot-time breakdown + throughput, both firmwares, same script. Opened 2026-09-23 by the owner; its step list is at the end of this file. Booked after it, not opened: **`R6b`** (what `R6` left without an owner) and **`R1y`** (the record's maintainability, including this file's restructure). Closed gates and their evidence are on § Gate board. |
 | **Active step** | **`P2-1`** — the instrument: `boot-timeline` past the loader for both firmwares, one clock for console bytes and network events, `looprun` running N boots per power press, then the retro table over every committed boot capture. `P2-0` closed 2026-09-23. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-09-23（第一百零二段收工）**：`P2-1`，桌面，零電源循環。先建儀器，再把已提交的開機擷取全部跑一遍 —— 那張回顧表就是 `P2-3` 要被評分的預測。電源等擁有者說；`P2-2` 會先說要按幾次。 |
+| **Next after this** | 🔄 **2026-09-23（第一百零二段收工）**：`P2-1`，桌面，零電源循環。先建儀器，再把已提交的開機擷取全部跑一遍 —— 那張回顧表就是 `P2-3` 要被評分的預測。電源等擁有者說；`P2-2` 會先說要按幾次。做法已向擁有者提案（四件儀器，檔案互不重疊，可平行），擁有者決定 2026-09-23 先停；提案的兩個前提已量過，是 `P2` 的 settled items 7–8（`FW-114`）。 |
 | **Blocked on** | Nothing at the desk. Seatings wait for the owner's power, and each vendor boot costs one press (`P2`, settled item 6). |
 
 **Step list for the active gate**: `P2`'s, at the **end** of this file. It is
@@ -2493,6 +2493,19 @@ an insertion moves none. Measured and simulated 2026-09-23: `SPEC.md` `FW-110`,
 6. **Two calendar days, and one power press per vendor boot**, because no
    command leaves the vendor firmware. The card states the press count before
    a seating is booked.
+7. **`console-capture` already stamps on `CLOCK_MONOTONIC`.** 量 2026-09-23
+   under WSL's `/usr/bin/python3`: `time.monotonic()` minus
+   `clock_gettime(CLOCK_MONOTONIC)`, read back to back, is −4 µs. The
+   one-clock work is recording each capture's absolute origin, not changing
+   its clock (`FW-114`).
+8. **An unprivileged ICMP socket is refused on this host.** 量 2026-09-23:
+   `net.ipv4.ping_group_range` reads `1 0`, and
+   `socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)` raises `EACCES`. The host probe
+   drives the system `ping` and cross-checks its stamps against a second
+   clock; it does not change a system setting (`FW-114`).
+9. **`EW` and `EB` each need the owner's dated yes, with no address
+   allow-list** — the owner's ruling on 2026-09-23. `P2-2`'s `cardcheck`
+   refusal (`FW-113`) implements exactly that.
 
 ### The steps
 
