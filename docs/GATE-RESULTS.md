@@ -1412,6 +1412,89 @@ refutation condition held: `n_ph_used` read **44,256** in the arm-1 runs and
 **0** in every arm-0 run, so the switch took and the two arms were not the same
 experiment. `SPEC.md` `NET-76`, `NET-102`.
 
+### The plan's own three acceptance rows, read one at a time
+
+`R6`'s `PROGRESS.md` DoD is a decomposition *of* the plan's row, not a
+replacement for it, so the plan's own wording is read here too.
+
+| the plan says | verdict |
+|---|---|
+| **通過** `ping` 通 | 🟢 met, seating 28, both directions 4 of 4, with a **positive** discriminator — a locally administered MAC no Realtek OUI can hold. `SPEC.md` `NET-51`–`NET-54` |
+| **通過** `iperf3` 有一個數字 | 🟢 met, seating 37: **17.03 / 17.76 / 17.09 Mbit/s**, and the figure carries n = 4 with one collapse rather than the three that cluster. `NET-102` |
+| **通過** 30 分鐘 flood 不掉封包不 oops | 🟢 met, seating 32: **1,899.593 s = 31.66 min**, `drop 0/0` by the driver's counters, **0 console bytes** on a `CONFIG_PRINTK=y` image. `NET-76`. ⚠️ **Two qualifications that travel with it**: the flood was `ping -f`, not `iperf3`; and the capture ran 1,860.084 s of 1,899.593, so **coverage is 97.9 %** and an oops in the last 39.5 s would not have been recorded |
+| **否證 ①** descriptor 欄位在 big-endian 上搞錯 → 送得出去收不回來 | 🟢 **did not fire.** Rung 3 decoded a real ARP out of the RX path on seating 28, and `NET-85` later carried **203 MBytes** in one transfer |
+| **否證 ②** 快取一致性沒處理 → 間歇性、與負載相關的資料毀損 | 🔴🔴 **The symptom FIRED and the named cause was innocent, and that distinction is the most expensive thing this gate learnt.** The precondition *was* handled before a ring was allocated: `CPU-45` was answered on silicon — this D-cache is **not** coherent — and the driver put rings *and* payload buffers in the uncached window, recorded at `rtl819x-nic.c:92-113` as a measured requirement. **And intermittent, load-dependent data corruption happened anyway**: `NET-61`, a burst desynchronises the engine's two RX position registers and the driver then delivers frames carrying another frame's length. It cost four seatings. 🟢 The cause was the driver using **one index for two rings** (`NET-82`, read out of the vendor's source), and the fix measured **250×** — 0.06 → 17 Mbit/s (`NET-102`) |
+| **中間檢查點** loopback → 單向 TX → RX → NAPI，不要跳 | 🟢 walked, none skipped, each rung with an observable before the next was attempted (seating 28). 🟢 **And a rung BELOW the plan's first was added and then refuted**: `SWINTSET` does not raise a software interrupt on this part with the engine on and the mask open, with the positive control taken in the same power cycle. `NET-48`–`NET-50` |
+
+⚠️ **否證 ② is the row to re-read before `R7`.** A refutation condition names a
+cause and a symptom; this one's symptom is a good detector and its cause was a
+red herring, so *the cache was handled* did not make the class go away. **What
+made it go away was reading the vendor's driver**, which is `D3`'s own
+refutation condition (*a field-by-field comparison, written down, and not a
+retry*) being executed four seatings late.
+
+### The three questions the plan attaches to this gate
+
+讀 `plan/router-rebuild-plan.md:1946`. `PROGRESS.md` says in its own words that
+a gate which produces a working driver and cannot answer them *has produced a
+working driver and nothing else*. 🔴 **量 2026-09-23, and the owner's question
+is what found it: this entry answered none of the three when it was first
+written, and `dma_alloc_coherent` appears ZERO times anywhere in this
+repository.**
+
+**① `dma_alloc_coherent` 跟 `dma_map_single` 差在哪？** The first *allocates* a
+buffer and hands back a mapping that stays coherent with the device for the
+buffer's lifetime — on a machine whose cache is not coherent, that means an
+**uncached** mapping, paid once. It is for memory both sides touch
+continuously: descriptor rings. The second takes a buffer that already exists
+and makes it visible to the device **for one transfer**, with explicit
+ownership hand-offs, and on a non-coherent machine those calls are cache
+maintenance — writeback before the device reads, invalidate before the CPU
+does. It is for streaming data: packet payloads. 🔴 **On this board, and this
+is measured rather than recited**: `CPU-45` says the D-cache is not coherent,
+so the first API can only be uncached here — and **rlxfw calls neither.** It
+takes one `kmalloc` and uses its KSEG1 alias for all three regions, which is
+`dma_alloc_coherent`'s job done by hand, and declines the second entirely. The
+vendor does the other thing: `UNCACHED_MALLOC` for rings and descriptors (six
+call sites, 讀 `rtl865xc_swNic.c:1188-1242`) and leaves packet data **cached**
+with `_dma_cache_wback_inv()` at the two hand-off points — `dma_map_single`'s
+shape, written by hand. 🔴 **And the difference has a price this project
+measured**: per 1,446-byte frame rlxfw issues ~1,446 uncached single-byte bus
+transactions in each direction where the vendor issues one writeback over ~91
+lines. `docs/nic-vendor-diff.md` § 4.
+
+**② NAPI 為什麼要遮罩中斷？重開中斷的 race 在哪？** The interrupt is a
+doorbell that says *there is work*; once the poll loop knows there is work, one
+interrupt per frame is pure overhead, so NAPI masks it on entry and drains the
+ring in a loop. **The race is at the re-enable, and it is an ordering
+problem**: if the driver declares the ring empty and *then* unmasks, a frame
+arriving between the last ring read and the unmask raises no interrupt (still
+masked) and is seen by no poll (already finished) — the device goes silent with
+work pending. The order that closes it is drain → `napi_complete()` → unmask →
+**re-read the ring**, and re-schedule if it is not empty. 🟢 量 seating 28:
+rung 4 walked mask → drain → restore → **interrupt recovery**, with an
+observable at each step. 🔴 **And this driver's own complete path has a
+consequence nobody planned**: 讀 `rtl819x-nic.c:1475-1478`, it ORs the run-out
+bits back into `CPUIIMR` on *every* completion, which is why § 12.4's run-out
+mask experiment **cannot be done through `/proc`** — the next completion
+restores whatever was written, and a read-back gives a false green.
+
+**③ `OWN` 位元的寫入順序錯了會怎樣，你怎麼測出來？** `OWN` is the handshake.
+Every other field — buffer address, length, flags — must be visible to the
+engine **before** ownership is handed over, or the engine can start on a
+descriptor whose address field is still the previous one: it transmits from a
+stale buffer, or receives into one. An uncached mapping is what makes the
+ordering hold on this core, which is the same requirement `CPU-45` produced for
+a different reason. 🔴 **And the honest half of the answer is negative: this
+gate never ran a deliberate wrong-order experiment.** No cell ever set `OWN`
+before the fields to see what happens. What it has instead is ① the four-rung
+ladder, which fails at rung 1 if the order is wrong and was walked without
+skipping, and ② the descriptor transition captured **at the loader prompt
+before any driver of mine ran** (`notes/nic-driver.md` § 3.3), so the layout
+was known rather than guessed. **So *how would you test it* is answered by a
+ladder that would have caught it, not by an injection that proved it** — and
+that is a weaker answer than ① and ②, said here rather than left to be found.
+
 ### What `R6` did not establish
 
 🔴 **`D4` is met in part, and the remaining conjunct is a GATE, priced before
@@ -1428,8 +1511,16 @@ places**; past the link the VLAN table is not a register write but a `TACI`
 protocol inside the directory that would vanish; and the same switch deletes
 `/proc/rtl865x/` — the vendor's whole instrument set, which is what
 `NET-109 殘留`'s next step reads (`SPEC.md` `NET-109`). **So closing it is a
-gate, it removes the instruments two of this gate's own residuals need, and it
-is the next gate's headline rather than this gate's overrun.** ⚠️ The precedent
+gate, and it removes the instruments two of this gate's own residuals need.**
+~~It is the next gate's headline rather than this gate's overrun.~~ 🔴 **2026-09-23:
+that half was a prediction about a decision that was not mine, and the owner
+refuted it the next day by opening `P2`** — boot-time breakdown and
+throughput across **both** firmwares, which wants the vendor image present
+rather than the vendor tree deleted. **So `D4`'s remaining conjunct is not
+the next gate's headline; it is unowned**, and it goes on the standing list
+with the price this paragraph already measured. ⚠️ The lesson is narrow and
+worth keeping: *an entry may record what a gate did not establish; it may not
+assign the next gate's subject.* ⚠️ The precedent
 is `P4b-gate`, which closed 2026-09-01 with `D2` unmet, the reason recorded and
 two items left open *under* the gate; this is the second use of that shape and
 the first where the unmet row is priced in symbols rather than argued.

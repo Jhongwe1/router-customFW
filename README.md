@@ -922,13 +922,26 @@ R3        my kernel boots to a shell and pings  closed 2026-08-31
 P4a       reproducible build: same tree twice -> same image sha256  closed 2026-09-01
 P4b-gate  the part of the release process that blocks tagging v0.2   closed 2026-09-01
 R4        edit -> result in under 90 s   closed 2026-09-02
-R5        six drivers in tree, each diffed against two public ports
-R1-pub    ISA / hazard / Lexra-ASE table   runs alongside R5
-R6        my Ethernet driver
+R5        six drivers in tree, each diffed against two public ports  closed 2026-09-11
+R1-pub+R2c  ISA / hazard / Lexra-ASE table, and which toolchain built what  closed 2026-09-16
+R1z       the debts this repository's own record names   closed 2026-09-16
+P1        mfgtest passes on a good unit, and every check made to FAIL once  closed 2026-09-17
+R6        my Ethernet driver                closed 2026-09-22
+P2        boot-time breakdown + throughput, both firmwares, same script
 R7        my userspace
 R8        signed update, survives power cuts
 R9        three-column differential table, and the third column is not empty
+P3        board bring-up report
+P4b       complete GPL release + release process
 ```
+
+🔄 **2026-09-23: five closure dates and four rows were missing here, and the
+gap was five days old.** `R5`, `R1-pub + R2c`, `R1z`, `P1` and `R6` had all
+closed with this list unchanged, and `R1z`, `P1`, `P2`, `P3` and `P4b` had
+never appeared on it at all. ⚠️ **The rule below is why that is a defect and
+not a contradiction**: a *date something closed* is a historical fact this file
+may hold, so leaving it out is simply out of date — it is the word `active`
+that may never come back.
 
 🔴 **Which gate is ACTIVE is not written here, and the word `active` was
 removed from this list on 2026-08-31 rather than moved down it.** `PROGRESS.md`
