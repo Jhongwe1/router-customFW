@@ -393,9 +393,13 @@ rest is reading.**
 
 🟢 **And `M3` caught a sixth one in this very segment, before it was
 committed, which is the boundary from the other side.** The session brief
-handed me `bench/2026-09-21/PREDICTIONS-B35-block33.md:373` for `R6-6`'s
-weaker statement; I wrote it into `PROGRESS.md` and `citecheck` `C7` reported
-*`:373` is a blank line* on the next run. The statement is at **`:374-377`**.
+handed me line **373** of `bench/2026-09-21/PREDICTIONS-B35-block33.md` for `R6-6`'s weaker
+statement; I wrote it into `PROGRESS.md` and `citecheck` `C7` reported *that
+line is blank* on the next run. The statement is at
+`bench/2026-09-21/PREDICTIONS-B35-block33.md:374-377`. ⚠️ **And the number is
+written apart from the filename above on purpose** — a sentence about a bad
+citation that spells the bad citation IS one to the scanner, which
+`docs/KNOWN-ISSUES.md` already records one instance of.
 **`M3` sees the subset of this family that lands on a BLANK line**, which is
 why five of the six above went unreported and this one did not — and it is the
 cheapest reason to run `citecheck` on a dirty tree even though its baseline
