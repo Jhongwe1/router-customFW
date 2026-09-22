@@ -1,1450 +1,340 @@
 # CLAUDE.md
 
 rlxfw — an independent firmware for the TOTOLINK N150RT: Realtek RTL8196E, Lexra
-core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from three
-vendors' GPL drops and one leaked draft datasheet 🔁 **2026-09-17: this said *four* and it was wrong; the owner of the
-count is `notes/vendor-kernel-isa.md`, which has said *three* throughout.**
-量: `SOURCES.json` gives `frederic/rtl819x-toolchain` role **base** and
-`jameshilliard/WECB-VZ-GPL` + `Saturn49/wecb` role **reference** — three Realtek
-SDK trees, 44,297 / 45,014 / 47,050 `.c`+`.h` files. The two things that could
-have been miscounted as a fourth are both labelled by `SOURCES.json` itself and
-neither is a vendor GPL drop: `shibajee/linux-rtl8196e` is
-**reference-implementation** (a community mainline port) and
-`libc0607/Realtek_switch_hacking` is **doc** — 量, **zero** `.c` and **zero**
-`.h` files in it. ⚠️ Which of the two produced the *four* is undetermined, because TOTOLINK never
-released source.
+core, big-endian, 4 MiB SPI NOR. **One device, no spare.** Built from three staged
+Realtek SDK GPL drops (`notes/vendor-kernel-isa.md` owns the count; `SOURCES.json`
+lists every source tree with its role) and one leaked draft datasheet. TOTOLINK
+never released source.
 
-> **This file holds only what is true today.** 🔄 **2026-08-29, third update:
-> MY KERNEL BOOTED ON THE SILICON.** `loudm` — 1,053,696 bytes, the `rtkload`
-> pipeline's own `nfjrom` renamed — went to `0x80500000` over TFTP and was
-> entered with `J`. It printed all eleven boot marks, reached a shell that
-> **returns output from a typed command**, and pinged the workstation with the
-> host's own capture holding both directions. `probe3` ran on the power cycle
-> before it and measured this die's I-cache by experiment — **16 KiB, 16-byte
-> lines, 2-way** — with both of its refutation controls firing, and found that
-> **CP3 is reachable on this part** where the emulator says every `mfc3` traps.
-> 🔴 **No flash-write command was issued, and that is NOT the same sentence as
-> "not one flash byte is written"** — `RUNSHEET` `G8b` forbids the second without a
-> full re-dump, and this seating ran no `FLR` bracket, so the flash-byte count is
-> **unmeasured**. 🔄 **2026-08-30, fourth update: that bracket RAN, both
-> halves, and it is now a reading.** *(This said “the next seating's card carries
-> the bracket”.)* Three 256-byte windows over two power cycles — the loader head,
-> the `cr6c` header, and **`H601`, which no bracket in this project had ever
-> sampled** — six reads, all byte-identical to the 2026-08-16 dump; the first two windows
-> also match the 2026-08-24 captures, and 🔴 **`H601` has none — there is no
-> 2026-08-24 capture of it, so its gap is 14 days rather than 6**, with `AUTOBURN` reading `00000001` on the second cycle so
-> the second half is an instrument's word and not the operator's. **768 of
-> 4,194,304 bytes = 0.0183 %.** It still does not make the forbidden sentence
-> sayable — it cannot see two writes that cancel, and it reads 256 of `H601`'s
-> 8,192. 🔄 **2026-08-31, fifth update: 1,024 bytes = 0.0244 %, and for the
-> first time the bracket has a NEGATIVE CONTROL.** Four windows — the fourth is
-> `0x006400`, the canary page `FLS-21` measured moving — read on two power
-> cycles, and **every destination was read BEFORE its `FLR`**: all eight
-> pre-reads differed from the expectation, so *the `FLR` wrote* is measured
-> rather than assumed. `H601` reach **6.3 %**. 🟢 **And one round ran AFTER a
-> complete rlxfw boot** — kernel, userspace, 4 MiB through `mtd_read`, an
-> `EACCES` write attempt, a ping — which is the first evidence here that a full
-> boot of my firmware leaves those windows unchanged. 🔴 **The forbidden
-> sentence is no closer**: 0.0244 % cannot see a write outside the windows, and
-> no `FLR` full re-dump ran. 🔴 **Cycle 6's carded round was VOID and that is
-> the control working** — DRAM retained cycle 5's contents across the power
-> cycle (`MEM-17`), so four pre-reads came back equal to the flash and the
-> bracket moved to fresh addresses. The same seating booted `quietm` to a shell in **7.260 s** and pinged
-> 4/4. 🔴 **It also refuted its own byte prediction**: `quietm` printed 849
-> bytes where 401 was predicted, because `CONFIG_PRINTK=n` removes `printk` and
-> **not** the vendor driver's 97 `panic_printk` call sites (`SPEC.md` `FW-31`; the same
-> evening's adversarial pass corrected that number from 274, which counted seven
-> `built-in.o` aggregations alongside the leaves inside them). There is still no driver of mine —
-> the ping went out through the vendor's `rtl819x`, which is in the vendor's own
-> configuration. *(Until today this said "nothing of mine has executed on the
-> silicon", which stopped being true at 23:09; the sentence before that said "no
-> loadable image", and that stopped being true at 02:20 the same day.)*
-> 🔄 **2026-08-31, SIXTH update — seating 8, four power cycles, and the two
-> biggest results of `R3` came out of the last thing it still needed power
-> for.** 🟢 **`FW-34`'s last row is CLOSED by measurement**: `probe3`'s Group F
-> timed 1,024 uncached loads through `0xBD000000` at stride 4 and at stride
-> 1,024 and got **the same number both times** — 30,354 ticks, `R = 1.0000` —
-> so the memory-mapped SPI window serves a single-word read as its own
-> transaction and the instruction-fetch amplification is the `9×` the model
-> bounds it at. The same six words compared `0xBFC00000` against `0xBD000000`
-> for the first time in this project. 🟢 **The I-cache is two-way by a SECOND
-> route, and it is a shape rather than a count**: at the eviction walk's
-> boundary point the victims that miss on re-execution arrive as **ten
-> `{k, k+256}` pairs with no singleton**, which two-way predicts and
-> direct-mapped does not, *while both predict the same number of them*.
-> 🔴 **A bit of DRAM changed while the board was off and the block's own seal
-> caught it** — the first thing that seal has ever caught — **and a fourth
-> power cycle then refuted this session's own explanation of it**: 35.1 minutes
-> off, both ends timed, **598 of 22,976 bits = 2.603 %**, so retention falls off
-> steeply with time and one bit after two minutes needs no thermal story. The
-> thermal story is retracted in place. 🔴 **The flash sentence has not moved**:
-> the bracket ran twice on one seating, `1,024` bytes = **0.0244 %**, all
-> byte-identical — **and for the first time with an observed vendor-firmware
-> boot bracketed between the two rounds** — but no full re-dump ran and the
-> vendor firmware executed on this part for ~2 minutes. ⚠️ **Three defects in
-> the seating's own card**, two caught before power: a directory named for a day
-> the seating did not happen on, an image the card told the operator to upload
-> that was never staged, and a `J` row that had lost the ESC-after-jump that
-> hands the loader prompt back — the third cost a power cycle.
-> 🔄 **2026-09-02, seventh update: an `edit → result`
-> iteration ran as ONE COMMAND against the silicon and reported a
-> number.** `looprun --mode bench` drove reset → rescue → burn-flag
-> read-back → upload → staged-head read-back → boot → assert with **no
-> operator gap between any two stages**, and printed **34.74 s** and seven
-> assertions. The one that matters is that **the board printed the id the
-> build computed** — `RLXFW-ID0=B1434383`, a sha256 over `config/`,
-> compiled in and compared by the tool, **typed by nobody**. 🔴 **And the
-> audit run in the hour before power found three defects in that tool, two
-> of them safety**: it uploaded with the loader's *echo* as its only
-> evidence that the burn flag was off (and `C-6`, 量 2026-08-24, is
-> the measurement that says an echo and the word at `0x8040D4A0` are two
-> sources); it jumped to `0x80500000` without checking
-> what was there, on a board whose reset re-stages that address from flash;
-> and 🔴 **`S3` had never been connected to `S2` at all**, so the
-> `--skip S2,S3` the card called a convenience was **necessary** rather than
-> chosen — an explicit `--cell-top` would have worked too, and nobody knew
-> there was anything to pass. **Zero flash-write commands and no `FLR`**, decided
-> before power, so the bracket stands at **1,024 of 4,194,304 = 0.0244 %**
-> and *not one flash byte is written* is exactly as unsayable as it was.
-> 🔄 **2026-09-03, EIGHTH update — seating 11, and a sentence in the fifth
-> update above expired.** 🟢 **A driver of mine drove a peripheral.**
-> `rtl819x-timer` programmed `TC1DATA` and `TCCNR` on the silicon, registered a
-> clocksource the kernel listed as `rtl819x-tc1`, was read fourteen times and
-> unwound both writes on disarm — twice, the second after a **703-second** arm.
-> *(§ 5 above says "There is still no driver of mine"; that stopped being true
-> at 21:20. What is still true is narrower and is kept in
-> `docs/KNOWN-ISSUES.md`: nothing of mine has driven a peripheral the system
-> DEPENDS on — the timer ran at rating 0 so the kernel would not switch to it,
-> and `GIMR` bit 9 was read and never written, so no interrupt of mine was ever
-> delivered.)* 🟢 **The headline is a ratio with no residual**:
-> `ΔTC1 / ΔTC0_total = 1` over three intervals, **integer-exact**, the longest
-> 703.46 s / 140,693,532 counts and crossing one 2²⁷ wrap. 🔴 **And the first
-> cell refuted a prediction in a way that broke the card's own arithmetic
-> before it was used**: under Linux `CDBR` divides by **1000** and `TC0DATA`
-> reloads at **2,000**, where the loader left 14 and 142,858 — **the same
-> 100 Hz by two different routes**, done by a vendor file still unopened. The
-> card hardcoded the loader's constant; using it would have "refuted" the
-> headline by 71.4× with the hardware innocent. **It was caught because the
-> block ran as three commands split at the card's own decision points.**
-> 🔴 **The most valuable result is negative**: `TC1IP` does not latch while
-> `TC1IE` is clear ~~, so the driver's whole masked-observation safety strategy
-> does not work on this part and `R5-3` must arm the interrupt for real~~.
-> 🔄 **2026-09-04, and this correction is one segment late: the observation
-> stands, the attribution was retracted by `R5-10` on 2026-09-04 and this line
-> was not one of the places that got fixed.** `TCIR` read `80000000` for the whole
-> 703 s arm, so **bit 30 — the timer block's OWN interrupt enable — was clear
-> too**, and `rtl819x_tc1_arm()` never writes it. `RUNSHEET` `C5` (量 2026-08-24,
-> fourteen days older than the question) shows a `GISR` pending bit latching
-> **while masked in `GIMR`**, so the mask is not the cause. **The masked-observation
-> strategy is intact; nothing had ever set the bit that makes a pending flag happen.**
-> 🟢 **2026-09-04 (`R5-3a`): the driver now sets it** — `armirq` writes `TCIR`
-> bit 30 alone with `GIMR` bit 9 still clear, which is zero-risk BY MEASUREMENT
-> rather than by argument, and ~~`Q11` is testable again~~. `R5-3` is split into
-> `R5-3a` (that path) and `R5-3b` (clockevent); which gate is active,
-> `PROGRESS.md` says.
-> 🔄 **2026-09-04, NINTH update — seating 12, one power cycle, and `Q11` is not
-> testable, it is ANSWERED.** 🟢 **An interrupt of mine was delivered, 119,818
-> times**, `irq_spurious` **0**, `irq_stuck` **0**, across three
-> arm→deliver→disarm cycles at two periods — and the strongest evidence that
-> the line is mine is not the count but a three-state reading: `/proc/interrupts`
-> had **no line 25** before `reqirq` (`EX-0`), a line `25: … ICTL rtl819x-timer`
-> during, and **no line 25** again after `free_irq` (`EX-19`).
-> 🟢 **It arrives at the rate the driver programmed, and that is a slope rather
-> than a point**: `Δirq_count / Δjiffies` against
-> `hz_used / period_cycles / hz_kernel` is 0.0199 % at period 2⁸ and 0.0994 % at
-> 2¹², with the measured ratio between them **15.9873 against a predicted 16**.
-> A third point, taken with the NIC up and four pings in flight, reads 0.0206 %.
-> 🔴 **And the card's own decision cell came out `0|0`, which the card assigned
-> to "the timer block needs something not identified" — the assignment was
-> wrong and the reading was right.** TC1 had wrapped **16.62 times** with
-> `TC1IE` set and `TC1IP` still read 0, because the VENDOR's tick handler does
-> `REG32(BSP_TCIR) |= BSP_TC0IP` — a read-modify-write on a register whose `IP`
-> bits are write-1-to-clear — a hundred times a second, and it clears every
-> pending bit in that register including one belonging to a driver it has never
-> heard of. **So a `TCIR` pending bit on this part has a lifetime of at most one
-> 10 ms tick, which bounds every single-sample reading of that register this
-> project has ever taken.** The duty cycle was written down before the cells
-> ran — **0.19 %** at 2²⁰ and **87.20 %** at 2⁸ — and shortening the period to
-> 2⁸ made `tcir_tc1ip` and `gisr_tc1ip` both read 1 with `GIMR` bit 9 still
-> clear, which also confirms the masked-observation strategy a second time.
-> `SPEC.md` `IRQ-08`/`IRQ-09`, `docs/interrupt-map.md` § 3.6.
-> 🔴 **One inference of mine was refuted mid-seating by the same register**: I
-> read `2: 0 RLX cascade` as "no ICTL interrupt has ever been delivered", and
-> after 29,602 of them the cascade still read 0 — a chained cascade does not
-> increment its own count. The narrow claim (no line 25 beforehand) survives.
-> ⚠️ **What is still true and narrower**: nothing of mine drives a peripheral
-> the system *depends on*. `rating` read **0** in all eighteen dumps and the
-> time base was `jiffies` throughout, deliberately — that is `R5-3b`.
-> **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
-> 🔄 **2026-09-06, TENTH update — seating 13, three power cycles, and the
-> sentence two paragraphs above expired at 03:11.** 🟢 **The system tick is
-> mine.** `R5-3b-1` registered a `clock_event_device` at rating 300 and the
-> tick core exchanged the devices on **three independent cold boots** —
-> `ce_registered=1`, `ce_live=1`, **`ce_mode=2`**, **`ce_mode_calls=2`**
-> (SHUTDOWN then PERIODIC, which `clockevents_exchange_device()` and
-> `tick_setup_periodic()` were read to predict *before the board was
-> powered*), and `ce_handler` moving from **`80036D50`**
-> (`clockevents_handle_noop`) to **`80036FC4`** (`tick_handle_periodic`), both
-> resolved from this image's own `System.map` by `cardcheck numbers` and typed
-> by nobody. *(§ 9 above says "nothing of mine drives a peripheral the system
-> DEPENDS on — `rating` read 0 in all eighteen dumps and the time base was
-> `jiffies` throughout"; the clocksource half of that is still exactly true
-> and `rating` read 0 again in every dump of this seating, but the tick is a
-> clockevent and it is now mine.)*
-> 🟢 **And it is caused, not asserted.** `cereload` changes TC1's reload and
-> the kernel's clock follows: six rows, four distinct reloads, **1× to 10×**,
-> ratios `1.0000 / 2.0000 / 1.0000 / 4.0000 / 1.0000 / 10.0000`, each landing
-> on its prediction to four decimals. At 20000 the shell answered a `cat`
-> after a `sleep 5` that took **50 real seconds**, and nothing in the kernel
-> could notice. 🟢 **Zero lost ticks** over 258.53 s: `Δjiffies`,
-> `Δirq_count` and `Δce_cycles / reload` are **25,853** three ways.
-> 🟢 **The best reading was not on the card and cost 90 seconds.** The card
-> correctly refused to quote `Δjiffies == Δ(line 25)` as evidence, because
-> both timers run at 100 Hz — but `P3-6` leaves mine at 10 Hz and the
-> vendor's untouched, so `P3-7` could take the two apart: over **30.10 real
-> seconds the vendor's line 13 advanced 3,009, my line 25 advanced 301, and
-> `jiffies` advanced 301.** Residual **0**, no address quoted, no question put
-> to the tick core.
-> 🔴 **Six defects in the seating's own card, all with captures**: a predicted
-> line 12 that cannot exist before `ndo_open`; `NET-14` not reproducing;
-> an `≈800` whose interval was 11.69 s and not 8 s (`P2-3`/`P3-3`, same work
-> in one cell, read **803** twice); four cells that type only `echo` and carry
-> expectations they cannot show; a `ping` cell whose interface no cell on that
-> cycle brings up; and **PC3 entirely outside the `cells` fence, so
-> `32 of 32` is not "the whole seating was checked"**.
-> 🔴 **Two findings with reach beyond the block.** This image's `ping`
-> **ignores `-c`** — five requests including `busybox ping` directly, all four
-> packets — so every `ping -c 4` in this repository has been getting the
-> default rather than what it asked for. And **`NET-14` was an id collision**:
-> `SPEC.md` `NET-14` is the MII register row, while the `eth4` carried-forward
-> item had used the same id since 2026-09-04, **and that device measurement
-> was not in `SPEC.md` at all**. It is `NET-25` now.
-> ⚠️ **What is still true and narrower again**: the dependence is created by a
-> `/proc` write **after userspace exists**. All three boots came up on the
-> vendor's tick and were handed over by hand; arming at boot is `R5-3b-2`,
-> which needs a different image because `RECIPE_ID` is a digest over `config/`.
-> **Zero flash-write commands, zero `FLR`, bracket unchanged at 0.0244 %.**
-> 🔄 **2026-09-06, ELEVENTH update — seating 14, ONE power cycle, and the
-> sentence directly above expired at 14:48.** 🟢 **The tick is mine from boot.**
-> `R5-3b-2` arms the timer from inside the kernel — `arch_initcall` does
-> `arm`/`ackip`/`reqirq`, `late_initcall` takes the pre-check window and
-> registers the rating-300 `clock_event_device` — and the DoD's **ten boots**
-> came out identical to the field: `boot_done=1`, `boot_rc=0`, `ce_live=1`,
-> `ce_mode=2`, `ce_mode_calls=2`, `ce_handler` `80036D50` → `80036FC4`, the
-> rating-99 negative control registered and never called,
-> `irq_spurious`/`irq_stuck`/`ce_hw_bad`/`ce_badmode` all **0**, boot capture
-> **1,069 bytes** every time. An **eleventh** boot from a cold power-on is
-> byte-identical and is the control, not one of the ten.
-> 🟢 **And *before userspace* is proved by an ORDERING rather than by a field**:
-> `RLXFW-TA8` — printed the instant `clockevents_register_device()` returned —
-> precedes `RLXFW-B10`, which sits immediately before `init_post()`'s branch
-> into `/sbin/init`, in the same capture, on all eleven. Byte 887 against 925.
-> **No address quoted, nothing asked of the tick core about itself, no shell
-> required.** 🟢 Zero lost ticks over **263.73 s** (`Δjiffies` = `Δirq_count` =
-> `Δce_cycles ÷ 2000` = **26,373**) and again over **654.76 s** on the cold
-> boot (all three = **65,476**), both residuals 0 in both, and the vendor's
-> line 13 minus mine stays at **34** across the longer one.
-> 🔴 **The most valuable thing here is a REFUSAL, not the success.** Driver 4.0
-> refused its own handover on both boots it was given — `RLXFW-TA7=FFFFFFC2`,
-> `-ETIME` — with `ce_check_dj=585 / dc=574` **byte-identical on a cold boot and
-> a warm one**. Its pre-check window spanned the vendor's NIC driver
-> initialisation, over which TC1 delivers **574 of 585** interrupts: 11 short,
-> **1.88 %**, against a 1 % tolerance. The same boot at a shell loses **1 in
-> 14,385** (0.0070 %) — and there the tick was still the vendor's, so
-> `Δjiffies` and `Δirq_count` are two independent sources rather than one
-> identity. **The tolerance was not widened; the window was moved.** Widening it
-> would have been repairing the instrument to agree with the experiment, and
-> what the 1 % refused was a boot whose clock ran 1.88 % slow with nothing in
-> the kernel able to notice. `SPEC.md` `IRQ-13`.
-> 🟢 **`busybox reboot` does not reset this board and `busybox reboot -f` does**
-> — the first signals PID 1, and this image's PID 1 is a shell script — 2.407 s
-> from the command to the loader prompt, **with my clockevent driving the
-> tick**. That is why twelve boots cost one power press. `FW-37`.
-> 🔴 **Two instruments of mine produced false findings and controls caught both,
-> before power.** `awk` parses an address like `8001e714` as SCIENTIFIC NOTATION
-> (→ `inf`), so a numeric symbol lookup made every such address equal to every
-> other; and a `.timing` row is written BEFORE its chunk, so a byte's arrival is
-> the last row with `offset <= b` and not the first with `offset >= b` — the
-> draft reported a 0.67 s "difference between images" that was one read of
-> latency across a 0.63 s silence. `notes/kernel-build.md` § 17.3a documented
-> the wrong rule; **its published numbers were then audited and are right**,
-> because every landmark happened to fall on a read boundary. `FW-35`.
-> ⚠️ **What is still true and narrower again**: the **clocksource** half is
-> untouched — `rating` read **0** in all eleven dumps and the system's time
-> SOURCE is still `jiffies`; only the *tick* is this driver's. And the loss
-> mechanism in `IRQ-13` is **not isolated**: the driver works around it rather
-> than explaining it. **Zero flash-write commands, zero `FLR`, bracket unchanged
-> at 0.0244 %.**
-> 🔄 **2026-09-06, TWELFTH update — seating 15, one power cycle, and the two
-> best results came from the card being WRONG.** 🟢 **A `gpio_chip` of mine is
-> on `PABCD`**: `RLXFW-G0`…`G6` on ten boots, `G1=FFFFFFDF` and `G2=FF000000`
-> as negative controls, **`G4=00000000`** from `gpiochip_add()`, ten boot
-> captures **byte-identical at 1,184 bytes against a prediction of 1,184**, ten
-> `/proc` dumps agreeing in **27 of 27 fields**, `n_writes` **0** throughout,
-> and the write guard refusing on the die at two layers with `-EPERM` and
-> `-ENODEV`. 🟢 **`REG-35` goes 讀 → 量**: live `cnr FFFFFF8B` / `dir
-> FF000040`, the two values inferred at the desk from the vendor driver's
-> compiled form, and the initcall order (`subsys` 4 before `device` 6) is
-> **observed in every capture** rather than derived from `System.map`.
-> 🔴 **Two card predictions were refuted and both were chased to a cause.**
-> `claim` was refused by gpiolib with **`EBUSY`** — measured, by routing the
-> write through `cat` so `strerror` printed it — because `tryout 5` had already
-> auto-requested line 5 through 2.6.30's `gpio_ensure_requested()`; **the
-> card's own arithmetic contained that subtraction and nobody finished it.**
-> And the `dat` XOR is `00000060`, not `00000020`, on both boots.
-> 🟢 **Chasing that second one produced the largest result of the seating, and
-> it was not on the card.** The vendor's whole reset-button path, read out of
-> this image's compiled code with no `.c` opened: `rtl_gpio_timer` re-arms at
-> `jiffies + 100` — **one second at `HZ = 100`** — blinks bit 6 on the hold
-> counter's parity (**the 2 s alternation measured from the other side**), and
-> on release does nothing under 2 s, **SIGTERM to PID 1 at 2–4 s** (which this
-> image's PID 1 ignores — `FW-37`, the same reason `busybox reboot` without
-> `-f` does not reset the board), and at **≥ 5 s writes ASCII `'1'` into
-> `default_flag`**, whose only readers here are two `/proc` handlers.
-> **Predicted before the press, then measured**: `/proc/load_default` read `0`,
-> then **`1`**. `SPEC.md` `FW-40`. 🔴 **This says nothing about the LOADER** —
-> where the card drew its line — and no `FLR` ran, so the flash sentence has
-> not moved. 🔴 **The card's own `cells` fence is malformed and `0 of 5` was
-> on screen before power**, shaped exactly like the correct `0 of 32`; the
-> fence is **not** repaired (that would destroy 32 captures' mtime evidence)
-> and `check-predictions` gained `N8`/`N9` instead, written after measuring
-> the corpus — **54 cards with a usable fence, exactly one breaks either rule**.
-> 🔴 **`busybox ash` puts a refused write's payload on the console minus its
-> last character**, five lengths, negative control, located to ash by sending
-> the same failing write through `cat`; so a mark the board printed can be
-> absent from a `grep` (`FW-41`). ⚠️ **What is still narrower**: nothing
-> depends on this chip — ~~no consumer is bound~~, ~~`ALLOW_OUT_MASK` is 0~~
-> 🔄 **`ALLOW_OUT_MASK` is `1u << 6` on `main` since 2026-09-10 (`R5-7`), and
-> the owner of that state is `docs/KNOWN-ISSUES.md`, not this file — ~~what is
-> still true is that no artefact carrying it has ever run~~ 🔄 **and THAT
-> expired at seating 20 too, along with "no consumer is bound": `r59` ran,
-> `allow_out_mask` read `00000040` on all seventeen boots, and `leds-gpio` and
-> `rtl819x-keys` both hold a line through `gpio_request` (`n_req_ok 2` at rest
-> on every boot). The claim that survives is narrower and lives in
-> `docs/KNOWN-ISSUES.md`: nothing the system NEEDS depends on this chip — the
-> LED is an indicator nothing reads back, the button's events have no consumer
-> in this image (`FW-46`), and `.to_irq` is still NULL**, `.to_irq`
-> is NULL — and **which of `PABCD`'s four ports bit 5 belongs to is still
-> unmeasured**, which is exactly the claim a seating full of `PABCD` readings
-> looks like it closed. **Zero flash-write commands, zero `FLR`, bracket
-> unchanged at 0.0244 %.**
-> 🔄 **2026-09-08, THIRTEENTH update — seating 16, one power cycle, and the
-> experiment built to confirm a number refuted it.** 🟢 **A read-only MTD
-> device of mine issues real SPI transactions on this part**, sharing the
-> controller with the vendor's driver: `mtd2: 00400000 00001000
-> "rtl819x-spi-pio"`, `4194304` bytes through `mtd->read`, `n_state_foreign`
-> **0** across **4,115** transfers. Ten boots, **1,318 bytes each against a
-> prediction of 1,318**, `RLXFW-ID0=FCE0AF22` every time, `check-predictions`
-> **`32 of 32`**. 🟢 **Both declared coin-flips landed on the side read out of
-> the vendor's COMPILED driver, against values measured on this device at the
-> loader prompt**: `SFCR` **`FFC00000`** (÷16) not `REG-13`'s `3FC00000` (÷4),
-> `SFCSR` **`C8000000`** not `D8050000`. `REG-38` 讀 → 量. 🟢 **Ten boot
-> captures fall into TWO sha256 values and the whole difference is one bit** —
-> `RLXFW-G3` bit 6, the LED the vendor's `rtl_gpio_timer` blinks, so `FW-40` is
-> now seen from a second direction. 🔴🔴 **`D3` holds and `D1` is REFUTED.**
-> The PIO path and the memory-mapped window at `0xBD000000` agree over all
-> 4,194,304 bytes — **nothing had ever read that window under Linux before** —
-> but `H601`'s complement digests to `a1673578…100d49eb` where `FLS-24` says
-> `a9916fd8…4ce3cba`. Three ways it could have been the instrument are closed
-> by measurement: the constant recomputes to `a9916fd8…` from **both** dump
-> files under an independent implementation, the driver's own `verify 4096`
-> digest is byte-identical to the dump's first 4,096 bytes, and `C1-NG`'s
-> injected byte moved the 4 MiB digest while `C1-VF`/`C1-NF` are two
-> traversals returning the same value. ⚠️ **The `d1_match` FLAG has no positive
-> control here** — it read 0 in every cell — and the refutation rests on those
-> three, not on it. 🟢 **Nineteen off-card rungs localised it, and the safety
-> question came back right**: `verify 32768` covers exactly `[0, 0x6000)`, the
-> whole loader region, and it is byte-identical to 2026-08-16 over all
-> **24,576** bytes, where every `FLR` bracket combined had sampled **256**.
-> **The first difference is `[0x9000, 0xA000)` — 4,096 bytes, exactly one erase
-> sector.** 🔄 **The three figures in the next sentence are SUPERSEDED by the seventeenth update below — 4,177,920 / 8,192 / 8,192 — and *exactly one erase sector* was refuted with them.**
-> 🔴 **Proven identical 28,672 B (0.684 %), proven different 4,096 B
-> (0.098 %), UNDETERMINED 4,153,344 B (99.02 %)** — a prefix digest finds the
-> first difference and nothing past it, and `verify` takes a limit with **no
-> offset** *(1.1 adds one and a two-level map — the fourteenth update — and
-> neither has run, so every figure in this paragraph is unchanged)*.
-> 🔴 **So *"not one flash byte is written"* is no longer merely
-> unmeasured: it is KNOWN FALSE for the DEVICE over some interval, with the
-> write unattributed** and not attributable by this seating (not tonight —
-> loader straight to my image ten times, no vendor firmware, `n_writes` 0 in
-> every dump, no `FLW`/`EW`/`EB`/burn). What rlxfw can say is narrower and
-> measured: **its own driver counted zero writes, and the loader region is
-> intact over all of it.** `SPEC.md` `FLS-26`. 🔴 **Five defects were mine and
-> four were false stops, none costing a power cycle, and four are ONE root
-> cause**: every capture line is CRLF, so `awk`'s field is `"1\r"` and
-> `[ "1\r" = "1" ]` is false — **three gates reported STOP or VOID on cells that
-> had PASSED, each while printing the correct value beside the wrong verdict**,
-> because a carriage return is invisible in display. The fourth gated on a
-> **mark** rather than a **field**, and `rlxfw_mark()` interleaves
-> character-by-character with busybox ash's echo (`FW-47`, `FW-41`'s family).
-> **The replacement self-tests against captures whose answers are known and
-> refuses to open the port if its own comparison is broken.** 🔴 `FW-46`: this
-> image's busybox has **no `dd`, no `md5sum`, no `--list`**, so nothing on the
-> device can digest a byte and the driver's sha256 has no independent on-device
-> second source — `FW-26` is the same class one instance earlier, and nothing
-> here can ask *"can this image run this command"* before a card is frozen.
-> ⚠️ **What is still narrower**: `D2` is untouched (`H601`'s 8,192 bytes are
-> skipped by rule, their verification stays in the `FLR` bracket, which did not
-> run), and the PIO rate under Linux is a bounded QUESTION rather than a result
-> (`FW-48`, `FW-35`'s trap). **Zero flash-write commands, zero `FLR`, bracket
-> unchanged at 0.0244 %** — and that last number now sits beside a second
-> instrument that measures a different thing and found a difference.
-> 🔄 **2026-09-08, FOURTEENTH update — the forty-fourth segment, desk, no
-> power, and the two best results came out of captures that were already
-> committed.** 🟢 **A checker for `RUNSHEET` lifecycle rule 3 finally exists
-> and it fired on its first sweep.** `tools/capdate.py` compares a capture's
-> committed `started_wallclock` against the `bench/<date>/` directory it sits
-> in — the check rule 3's own ⚠️ named as missing, after three consecutive
-> seatings hit it and a human caught all three. 量: **25 directories, 762
-> captures**, and **two reds that had been in the record since 2026-08-29** —
-> `bench/2026-08-30` and `-30b` hold 37 captures taken entirely on **08-29**,
-> in directories git shows were created *before* those captures existed. **The
-> directory name was a prediction that the seating would cross midnight, and
-> it did not.** Not renamed (40 and 84 references, two frozen cards among
-> them); declared by name, with the list swept in both directions.
-> 🟢 **`FW-48` goes 推 → 量 with no new reading, because the objection was
-> pointed at the wrong term.** *(The old row said a `.timing` row cannot
-> separate "data arrived" from "the tool began waiting".)* True of the
-> **intercept**; says nothing about the **slope**. Nineteen rungs give
-> `t = −2.086 ms + 3.1434 µs × cmp_bytes`, which predicts the 4 MiB traversal
-> at **13.18 s** against three measured at **13.276 / 13.325 / 13.432 s** — a
-> **64× extrapolation** landing within 1.9 %, with repeatability free from
-> `limit &= ~(CHUNK−1)` making six rungs the same experiment. 🔴 **That slope
-> is not the PIO rate**; the PIO leg alone is **3.936 s / 4,194,304 bytes =
-> 1,040.5 KiB/s**, bracketed on both sides by the driver's own counters
-> (`0/0/0` before, `1024/4194304/0` after).
-> 🟢 **`rtl819x-spi` 1.1** adds `verify <n> <off>` and a two-level `map`
-> (32 × 32 = 1024 exactly) on a **second** `/proc` file, with
-> `tools/flashmap.py` as the desk half — it **imports**
-> `flashwin.overlaps_forbidden` instead of restating the `H601` rule. 🔴 The
-> two-level shape is a hard limit, not a preference: `read_proc_t` `sprintf`s
-> into one 4,096-byte page with no bounds check and 1,024 lines is 78 KiB.
-> **The point is that every line can be predicted from the dump before the
-> board is powered**, which a bisection's rungs cannot — that is why seating
-> 16's nineteen `BIS-*` rungs were off-card. It builds (`RECIPE_ID`
-> `fce0af22` → **`7b6bfa83`**, `vmlinux` **+33,539** bytes, `1.1` in the image
-> once and `1.0` zero times) and 🔴 **nothing of it has run on the silicon** —
-> the map's first reading is `R5-6`'s seating.
-> 🟢 **`looprun` 1.1**: an `S5c` precondition using **ARP, not ICMP** (the
-> loader answers ARP and not ping, so 100 % loss is a *pass* and a ping gate
-> would abort every healthy run), and attempt-numbered artefacts so a failed
-> run is retried with `--attempt 2` rather than the `--force` that destroys
-> the previous attempt's evidence. Ten new cases reach the shape
-> `notes/dev-loop.md` § 15 said `--self-test` could not.
-> 🔴 **A local census run caught two defects in this segment's own tools
-> before they were pushed**: `capdate` and `capfield` printed case lines with
-> four leading spaces where `ci-census` parses two, so both would have read
-> `ran 0/13` and `ran 0/10` with zero failures — green tools, red census,
-> discovered after a push. 🔴 **Two OTHER defects did reach CI, and the pair
-> is a finding about CI rather than about them**: run `34156759778` went red
-> at `text/test-file-modes` (the executable bit, which CI caught before the
-> local gate did) with `census` **skipped**; the next run, with the mode
-> fixed, went red at `census` — `RED looprun ran 66/55 … CENSUS-MISMATCH
-> 66+0+0 != 55`, the exact line predicted at the desk an hour earlier; the
-> third was green. **`census` declares `needs: [text, instruments]`, so a red
-> `text` HIDES the census entirely** — the two reds are serial by
-> construction, and one push shows one layer. A green run means *this layer*
-> is clean. 🟢 **`FW-49`**: `\r\r\n` has **two** sources and
-> only one is a wrap — ash's line editor wraps the *echo* at the terminal
-> width (33 of 713 classified captures, all `len(sent) ≥ 80`), while the other
-> 33 are the loader's own `\r` + `\r\n`; **output is never wrapped**, an
-> 88-character `/proc/version` line arriving whole in five captures.
-> ⚠️ **What is still narrower**: the scope decision this segment made is that
-> 1.1's verbs ride on `R5-6`'s image, so `FLS-26`'s **99.02 % is exactly as
-> undetermined as it was** — the instrument exists and has read nothing. And
-> 量 2026-09-08: that 99.02 % is not uniform — **180 of 1,024 chunks (17.58 %)
-> of the reference dump are entirely `0xFF`**, with a 737,280-byte blank run
-> from `0x34C000`. **Zero flash-write commands, zero `FLR`, bracket unchanged
-> at 0.0244 %.**
-> 🔄 **2026-09-08, FIFTEENTH update — the forty-fifth segment, third on one
-> calendar day, desk, no power, and the most valuable result is a prediction
-> this segment's own build refuted.** 🔴 **This board runs a 17.5 ms watchdog
-> under Linux, kicked every 10 ms, and § 13's `FW-45` had been reasoning from
-> "about one second".** 讀 `boards/rtl8196e/bsp/timer.c:75-84` and 量 on the
-> artefact at `bsp_timer_init+0xb8`: `WDTCNR = 0x00600000`, a **full-word**
-> store so `WDTE` goes to `0x00` rather than the `0xA5` stop pattern, and
-> `OVSEL` 3 = 2¹⁸ ÷ ~~14,965,000 Hz = **17,517 µs**. The margin over `HZ=100` is
-> **7.5 ms, so not one timer interrupt may be lost**~~ 🔴 **REFUTED ON THE
-> SILICON the same night — see the sixteenth update. That divisor is a
-> LOADER-state constant; under Linux the watchdog counts at 200,180 Hz and the
-> same encoding bites at 1,334.723 ms. Wrong by 76×, and the margin is ~1.3 s.**
-> The ~1 s figure is the
-> **loader's** `OVSEL=1001`; ~~wrong by 64×~~ **and it was closer than what
-> replaced it**. ~~🟢 **The correction makes an older
-> measurement worth more**: seating 16's three 4 MiB PIO traversals ran under
-> that deadline across ten boots, so **no interrupt-blocked window on that path
-> exceeded 17.5 ms** — nobody set out to measure it.~~ 🔴 **That bound is
-> 1,310 ms, i.e. 75× weaker**; the sentence is kept struck through because
-> "the correction makes an older measurement worth more" is exactly the kind of
-> claim that gets quoted onward. 🟢 **And
-> `bsp_machine_restart` is itself a bite** (`boards/rtl8196e/bsp/setup.c:114`,
-> in no `#if`): `WDTCNR = 0` then spin, with an unreachable `back_to_prom()`
-> after it — **there is no second reset controller on this part's software
-> path**, so every `busybox reboot -f` this project has run was a watchdog bite
-> at `OVSEL` 0 = 2,190 µs, which re-attributes `FW-37`'s 2.407 s and gives
-> `CLK-08`'s ≤2.3 ms bound a source-side prediction that fits.
-> 🔴 **A `/dev/watchdog` beside a 100 Hz unconditional kick cannot bite**, so
-> `CONFIG_RTL_WTDOG=n` is `R5-6`'s precondition and not a tidy-up; the blast
-> radius was enumerated first and `bsp_machine_restart` and
-> `/proc/watchdog_reboot` both survive it, so `reboot -f` still works and a
-> vendor "bite now" instrument remains as an independent control.
-> 🔴 **The refuted prediction**: `0xB800311C` references fell **9 → 6**, not
-> 9 → 2. Four wlan references survived because they are gated on
-> `CONFIG_RTL_8196E` — *which board this is* — and the `CONFIG_RTL_WTDOG`
-> wrappers the claim came from live in `drivers/net/wireless/rtl8192e/` while
-> the directory that **builds** is `rtl8192cd/`, **measured an hour earlier in
-> the same session**. The evidence was in that grep's own output and was read
-> past. 🟢 The cost is bounded by measurement: all three surviving kicks are
-> `__initcall_rtl8192cd_init6` against this driver's `…_init7`, so they cannot
-> feed a guard that does not exist yet. ⚠️ **`R5-6` therefore leaves the
-> blind-write ledger's § 4.1** — seven paths, four on the *decision* layer,
-> because a decision to delete code cannot be made blind — and
-> `driver-diff`'s watchdog section is an informed contrast rather than a blind
-> diff. 🔴 **Two gates that exist, work, and are on no path**:
-> `CONFIG_GPIO_SYSFS` has been an undeclared config difference since
-> 2026-09-06 in `r54b`, `r55b` and `spi11` — including the image seating 16 ran
-> — because `kconfig-delta check` is never invoked by `rlxfw-kbuild.sh`; and
-> `spec-check`'s `C12` took the **last** dated block of `Next after this`,
-> which on the live file has been the **oldest** since 2026-09-07. 🔴 The fix
-> is not "take the first" either — at `HEAD~40` that is wrong and the old rule
-> is right — because the row is ordered **neither way**, so it selects by date
-> now, and `P21` (the same blocks in both orders must give the same verdict) is
-> what makes that a rule. **Image `r56c`: `RECIPE_ID` `b417a3e7`, vmlinux
-> 4,049,497 bytes, `(NEW)` 0, `kconfig-delta check` green, `rlxfw-marks verify`
-> 12 marks and 6 witnesses with zero occurrences in the vendor image.**
-> ⚠️ **Nothing of this has run on the silicon**, `FLS-26`'s 99.02 % is
-> untouched, and the boot-capture prediction for the next card moves
-> **1,318 → 1,424** (spi 1.1's `S8` +10, the wdt's six marks +96), of which
-> **106 bytes are predicted and unmeasured**. **Zero flash-write commands,
-> zero `FLR`, bracket unchanged at 0.0244 %.**
-> 🔄 **2026-09-08, SIXTEENTH update — seating 17, the fourth segment on one
-> calendar day, and the paragraph directly above expired at 22:45.** 🟢 **A
-> `/dev/watchdog` of mine runs on this part and bites**: ten boots, every boot
-> capture **1,424 bytes** against the 1,424 predicted above,
-> `RLXFW-ID0=B417A3E7`, `wdtcnr_at_probe` **`A5000000`** — one field with two
-> possible values, and the whole proof that `CONFIG_RTL_WTDOG=n` did what the
-> blast radius said. `TA5` read `FFFF8D38` against a written `FFFF8D37 ± 2`,
-> all ten `ovselN` rows exact **including `ovsel3 enc 00600000`, the vendor's
-> own constant computed by a driver written blind**, and `W4` read `00240000`
-> where `00A40000` was written — so **`WDTCLR` does not read back on this die**,
-> a reading nobody planned.
-> 🔴🔴 **THE HEADLINE IS THAT THE FIFTEENTH UPDATE'S OWN NUMBER IS WRONG BY
-> 76×, AND THE SAME MISTAKE HAD ALREADY BEEN MADE FIVE DAYS EARLIER ON THE
-> REGISTER NEXT DOOR.** Two rungs 32× apart, each carrying its own `mdelay(50)`
-> ruler in the same capture (floors **0.517** and **0.868 ms** — so the
-> instrument's *"1–16 ms, unmeasured on this host"* is now measured):
-> `OVSEL` 3 = **1,334.723 ms**, `OVSEL` 8 = **41,930.599 ms**. The difference
-> cancels the offset: `(2²³−2¹⁸) / 40,595.876 ms` = **`f = 200,180 Hz`**, and
-> `CLK-17` measured `TC0CNT` under Linux at **200,005 Hz** by a different method
-> on a different register in a different seating. **Ratio 0.999.** So
-> `CLK-08b`'s 14.965 MHz is a **loader-state** constant exactly as `CLK-17`'s
-> 14,286,057 Hz is — Linux reprograms `CDBR` and both slow together — and
-> `CLK-08b`'s open residual *what does the watchdog count* is **answered**: it
-> counts what the timer block counts. ⚠️ **`RTL819X_WDT_HZ` and every `usec` in
-> the driver's table are therefore documented-wrong by 76× and deliberately NOT
-> changed**: the table is what `/proc` prints and what a card predicts against.
-> 🔴 **The `9−8` test written into the driver was CIRCULAR and `SPEC.md` already
-> said so** — 14.965 MHz was solved *from* that difference, and `CLK-08b` 殘留
-> reads *"這一格不能靠再量一次逾時解決"*. **Two files in this repository
-> disagreed about whether an experiment could succeed and nothing noticed until
-> a card had to write the prediction down.**
-> 🟢 **`FW-51` 殘留 closes and the answer is the negative one**: the carded cell
-> was void (`kickms 3000` against an 83.8 s deadline tests nothing), and re-run
-> at `OVSEL` 0 the board reset **both with `wlan0` down and with it up** — so
-> nothing else writes `WDTCLR` after `late_initcall`. 🔴 **`FW-53`: neither bit
-> 19 nor bit 20 is `OVSEL[2]`** — both *shorten* the timeout below `OVSEL` 0
-> (68.647 and 12.336 ms), which no `OVSEL` reading predicts. 🟢 **`FLS-26`
-> moves for the first time**: `rtl819x-spi` 1.1's map ran twice on silicon,
-> 31 of 32 groups identical = **4,063,232 bytes proven unchanged**, the one
-> difference being group 0, where seating 16's bisection had put it.
-> 🟢 **Constraint ① became a ratio with no residual**: `Δn_hw_kick` **485**
-> against 485.7 predicted across a 12.8 s *armed* SPI traversal, with the
-> at-rest 343/14 as its control.
-> 🔴 **It cost three power cycles against a budget of one, and both extra ones
-> were the same mistake**: a cell whose payload can reset the board, given no
-> `--esc-after`. `wedge` bit once and **did not reproduce**; rung 8's window was
-> 20 s and the answer 41.9 s — *the same root cause as the headline*, since
-> every window on the card came from the constant the card's own third cell
-> refuted. The guard added after the second (prove the loader was caught before
-> handing the board to `looprun`) fired twice more. 🔴 **`OVSEL` 0 is not
-> measurable this way at all**: `prom_putchar` fills a FIFO, not the wire, so
-> the reset lands mid-drain — the ladder has **two** clean rungs, not four.
-> 🟢 **And the loader prints its own reset cause** —
-> `Reboot Result from Watchdog Timeout!` after every watchdog reset, absent
-> after every cold power-on — **which has been on disk since 2026-08-24 and
-> nothing had read it**. ⚠️ **Zero flash-write commands, zero `FLR`,
-> `n_writes 0`, bracket unchanged at 0.0244 %** — but the **vendor firmware ran
-> twice**, ~2 and ~4 minutes, because two bites were not caught. 🟢 That
-> accident built the first half of `FLS-26`'s attribution bracket: the map ran
-> at 22:45, the vendor firmware after it, so **one `map 0` on the next
-> seating's first boot closes it at zero cost.**
-> 🔄 **2026-09-09, SEVENTEENTH update — seating 18, ONE power cycle against a
-> budget of one, fourteen boots, 828 s of chained cells with no operator gap,
-> and the best result is a mechanism nobody put on the card.**
-> 🟢🟢 **`OVSEL[2]` IS BIT 17, and `CLK-28`'s and `FW-53`'s residuals close
-> together.** `biteraw 0x00020000` bit at **2,475.923 ms** = 494,944 counts, and
-> with the deficit bounded at `kick_ms × f` = **49,976 counts** only `2^19` is
-> admissible — `2^18` would need a negative deficit and `2^20` would need
-> 553,632. **The field is non-contiguous and out of order**: `[0]`=bit21,
-> `[1]`=bit22, **`[2]`=bit17**, `[3]`=bit18, with bit 19 and `WDTIND` (bit 20)
-> sitting *inside* the range and inert for the timeout.
-> 🟢🟢 **That bound exists because the card got a column wrong.** § 3.3 tabled
-> the arming words without `WDTCLR`; the board printed `00800000` / `00E00000` /
-> `00840000` / `00A40000`, because `verb_bite` composes with `kick = 1`. **So
-> `bite` clears the counter and `biteraw` does not** — it continues from wherever
-> `BOOTGUARD`'s last kick left it. **The control is a factor of ninety** at one
-> period: **with** `WDTCLR`, two readings of the *same word* on two different
-> boots differ by **1.456 ms**; **without**, three readings spread **131.7 ms**.
-> 🔴 **`FW-53`'s conclusion is refuted and what refutes it is
-> non-reproducibility.** It read *bits 19 and 20 both shorten the timeout below
-> `OVSEL` 0, which no `OVSEL` reading predicts*. They are inert; the shortening
-> is the uncleared counter, and the proof is that the two seatings disagree by
-> **−68.1 %** and **+638.9 %**. A hardware divider bit does not change value
-> between seatings. ⚠️ **And the method's own limit, which the card did not
-> know**: 49,976 exceeds `2^15` (32,768), so an un-cleared reading cannot tell
-> `OVSEL` 0 from `OVSEL` 1 — bits 16, 20, 21 and 23 stay ambiguous, and
-> `kickms 5000` before the `biteraw` fixes it for one extra command.
-> 🟢🟢 **`FLS-26`'s attribution bracket closed BYTE-IDENTICAL.** `cmp` on the
-> two seatings' `C1-M0` logs: **identical**, and between them the vendor firmware
-> ran **twice** — so those two runs wrote nothing to 4,186,112 bytes. `map 1 0`
-> then found **TWO** differing units in group 0, not one: `009000` and
-> **`00D000`**, the second of which nothing had ever seen, because *a prefix
-> digest cannot look past its first difference* — which the card said in advance
-> and then predicted "exactly one" anyway. **Ledger: proven identical
-> 4,177,920 B (99.61 %), proven different 8,192 B (0.195 %), undetermined
-> 8,192 B (0.195 %) — and that is exactly `H601`.** ⚠️ *Proven identical* still
-> means *digests agree with the 2026-08-16 dump*: it cannot see two writes that
-> cancel, and **no `FLR` ran**.
-> 🔴 **Four rungs refute the linear model, and the fourteenth update's own
-> `d` is probably an artefact.** `OVSEL` 0/3/8/9 = **163.911 / 1,340.982 /
-> 41,910.358 / 84,001.412 ms**; least squares leaves residuals **+3.5 / +32.5 /
-> −71.0 / +35.0 ms** against a repeatability of **1.456 ms**. Read against the
-> 0 & 8 pair — `f = 200,157 Hz`, `d = +0.20 ms`, which is what the physics
-> predicts (`CLK-14`'s +2.07 ms minus `RLXFW-W-GO`'s 12 bytes at 38400) — rungs
-> 0, 8 and 9 land within **0.13 %** of their powers of two and **`OVSEL` 3 is
-> 2.26 % long**. Seating 17's rung 3 is ~1.8 % long the same way, so
-> `CLK-08b`'s `d = +25.179 ms` is most likely **a two-point fit absorbing that
-> anomaly into the offset** — which is what a two-point fit does when there are
-> no residuals to look at. **`f_wdt` is not a quantity either seating has
-> measured.**
-> 🔴 **The host-clock hypothesis is refuted and the correction goes the WRONG
-> WAY.** `C1-R` — one capture, two `/proc` reads 120 s apart, both timestamps in
-> one `.timing` — gives **board/host = −484.3 ppm** where the hypothesis needed
-> ~900 ppm the other way. Expressed against that one clock,
-> `f_tick = 199,903 Hz` and the watchdog's excess over the timer grows from
-> **+0.090 % to +0.138 %**.
-> 🟢 **`WDT-1`: seven `/proc` fields, seven hits**, derived on the die at `init`
-> from `TC0DATA` and `CDBR` by a driver written blind, every one predicted at the
-> desk from registers `TM-1` measured six days earlier. `wdt_hz 14965000` prints
-> beside `hz_derived 200000` — **the 76× on one page**, which is why the compiled
-> table was deliberately not rewritten.
-> 🟢 **The `/dev/watchdog` USER path ran end to end**: the board reset
-> **143.563 s** after the device was held open with `sleep 400 > /dev/watchdog`,
-> against 143.886 s predicted (**−0.22 %**) — and **the evidence that the open
-> reached `WDT_USER` is the bite itself**, because `BOOTGUARD` is fed every
-> 250 ms and cannot bite. A consequence, not a field. 🔴 The card's first draft
-> used `exec 3>` and `cardcheck` **refused** it: `exec` is on its `ASH_BUILTINS`
-> list, whose own comment says the list is 推 and that no card rests on it.
-> 🟢 **`console-capture` 1.4's `--until` worked on the silicon first try**, on
-> **23 of 27** cells. `C1-M0` returned **3,013 bytes in 13.684 s** where seating
-> 17 took **120.106 s** for the same 3,013 bytes. 🔴 **It exists because
-> seating 17's own rule does not fix what it was written for**: *take three times
-> the prediction* does not cover 76×, and `FW-53`'s bit scan has **no prediction
-> to multiply**. 量 `R2-B8.timing`: the console is silent for **41.931 s** while
-> a bite is pending, so `--idle` cannot wait for one either.
-> 🔴 **The boot-capture control FIRED.** All thirteen are **1,424 bytes** — the
-> length half holds exactly — but **three** fields differ from seating 17, not
-> two. `RLXFW-TA6`, which is `IRQ-13`'s lost-interrupt count, reads **8 on all
-> thirteen** against 11 on nine of seating 17's ten. 推, and the only candidate:
-> `vmlinux` grew 233 bytes and moved the vendor NIC init's I-cache alignment.
-> **Refuted by a third image whose size changes and whose `TA6` does not.**
-> ⚠️ **Zero flash-write commands, zero `FLR`, `n_writes 0`** — and that last one
-> was read by an **explicitly declared off-card cell**, because § 6 of the card
-> made the claim and no cell on the card tested it.
-> 🔴🔴 **THE FREEZE PROCEDURE HAS A HOLE AND THE DESK SWEEP IS WHAT FOUND IT.**
-> Gate 2 is `spec-check`, and `spec-check` sweeps **tracked** `.md` files — but a
-> card is untracked until the freezing commit, so **the gate that exists to check
-> the card cannot see the card**. 量: all five gates passed at 03:11, and the
-> sweep at 04:32 reported a `C8c` in the frozen card (§ 1 quotes the `RECIPE_ID`
-> formula in prose and the quotation wraps onto a line beginning `|`). It **must
-> not be repaired** — `check-predictions` reads the card's mtime and its own
-> docstring says fixing even a typo has to make the check fail — so it is
-> exempted **by name** in a new `C8C_EXEMPT`, mirroring `C10_EXEMPT` for
-> `bench/2026-08-25b`, with **`T13b`** as the control that re-runs the check with
-> the exemption off and goes red if the file is ever clean. `spec-check` 54 → 55
-> cases, its 21 mutants still all killed. *(The fix for the hole itself is
-> carried forward: gate 2 has to run on a tree where the card is staged.)*
-> 🔴 **And ONE unclosed backtick produced EIGHTY reported defects — the third
-> time, and the second time the message alone identified it.** A `` ` `` I left
-> off `f_tick = …` in a `SPEC.md` patch shifted the pairing for the rest of the
-> file: **79 `C9` + 1 `C10`**, all of them artefacts, all of them gone when the
-> one tick went in. `f451f1f` was 49 and `837cd22` was the second.
-> 🔴 **I also repeated this file's own `EXIT CODE: 0` incident.** Every
-> `spec-check rc=0` reported after the freeze came from
-> `bash -c '… ; echo "rc=$?"'` through the Bash tool, and the row above says
-> `$?` is expanded in the **outer** shell there — so those were not
-> measurements. The freeze-time one WAS real, because it ran inside `freeze.sh`.
-> **The rule is not "be careful with `$?`", it is "read an exit code only from
-> inside a script file", and this segment proves it by having done both.**
-> 🔄 **2026-09-10, EIGHTEENTH update — seating 20, ONE power cycle against a
-> budget of one, seventeen boots, and the biggest result was on no card.**
-> 🟢🟢 **Two drivers of mine ran on the silicon and both met their DoD.**
-> `R5-7`: an **unmodified upstream `leds-gpio`**, bound to a `gpio_chip` of
-> mine, produced **light** from a sysfs write — `dat 0000007C` → `0000003C`,
-> `n_set_ok` 0 → 1, `n_writes` 2 → 3, with the operator reporting LED #2 of
-> eight lit and #1/#4 unchanged as their own negative control. `R5-8`: a polled
-> input device of mine turned presses of the reset button into
-> `input_report_key()` calls, and **the three-state control is
-> `(0,0) → (1,60) → (2,120) → (2,120)`** — sixty polls per three-second open at
-> 20 Hz, twice, and **flat** for a sleep carrying no open.
-> 🟢 **§ 7 ②'s two-sided test, which `ALLOW_OUT_MASK = 0` made impossible until
-> today, ran and the readout is a photon**: `lock 6` then `brightness ← 0`
-> leaves the LED **lit** while the class device reports **0**, with `n_writes`
-> **unmoved** — the refusal is ordered before the write, not logged after it.
-> **A guard that has only ever been seen refusing is a wall**; this one was
-> taken down and put back up.
-> 🟢 **D1: seventeen boot captures, every one 1,637 bytes against a prediction
-> of 1,637** (213 of those bytes had never been on this die), falling into
-> **two sha256 values, 14 and 3, whose whole difference is ONE LINE** —
-> `RLXFW-G3`, bit 6. Ten at-rest pair reads, 68 fields each, and the only
-> fields that ever differ are the free-running `j_now` and `boot_dat`'s bit 6.
-> **62 of the card's 66 field predictions hit.**
-> 🔴🔴 **THE HEADLINE: the vendor's `rtl_gpio_timer` acts ONCE PER BOOT**,
-> started by the first press held past about two seconds, and never again on
-> that boot. **Nine button episodes, four boots, zero exceptions**, with
-> **three confounds each broken by an experiment rather than an argument**:
-> poll rate (boot 14's two holds are both at 50 ms, one blinks and one does
-> not); `default_flag` (boot 15's second hold makes a **6.85 s** contact with
-> `/proc/load_default` reading `0` **before and after**); and *any press
-> consumes it* (boot 17's first episode is a **0.45 s** press, and the 17.90 s
-> hold after it on the same boot blinks and takes the flag to `1`).
-> 🟢 **`/proc/load_default` is a second, independent observable and agrees five
-> times out of five** — the LED branch and the factory-default branch are the
-> same timer (`FW-40`), so they live and die together. 🟢 **And the new rule
-> explains seating 19's OLD observations**, which is why it stands: rebuilding
-> `bench/2026-09-09b`'s cell order shows `C1-L1` was boot 1's *first* hold
-> (blinked), `X4-relax` a *later* hold on the same boot (did not), `X5-blink`
-> boot 5's first (blinked). **`SPEC.md` `REG-37`'s "the blink is gated by
-> `default_flag`" is struck in place**, and the confound is named: **the only
-> way to set that flag is the kind of hold that consumes the timer.**
-> ⚠️ **推**: on this board the reset button's `>= 5 s` factory-default branch
-> can be reached **once per power-up**. The behaviour is 量; the mechanism is
-> unread and goes back to `FW-40`'s disassembly. `SPEC.md` `FW-62`.
-> 🟢 **`FW-63`: the counters could not have produced this and the operator's
-> eye did.** A low-fraction of 0.61 is equally consistent with *evenly spread*
-> and with *steady for the first 3.9 s, then alternating* — the driver counts
-> samples and does not timestamp their values. The operator's *"lit first, then
-> after a while it starts blinking"* chose between them, and solving
-> `T + (hold−T)/2 = low` on three holds gives **T = 3.95 / 3.05 / 3.90 s**.
-> **Ten operator readings, ten agreements with the register**, and only the
-> tenth carried information no counter had.
-> 🔴 **Five cells of the frozen card would have stopped ELEVEN TO TWENTY-ONE
-> SECONDS before their own output, and would not have looked like a failure.**
-> `--idle N` is *N seconds since the last byte*, and five cells send a payload
-> whose first act is a `sleep` longer than their `--idle` — so each would have
-> produced ~54 bytes with a clean `stop_reason`, and **`check-predictions`
-> scores existence and mtime, not content: the seating would have reported
-> `55 of 55` with the whole press ladder and both long holds empty.** Caught
-> before power by three sources — the code, **7 of 7 in the corpus** (473
-> `--idle` captures, seven carry a `sleep`, every one has `idle > sleep`), and
-> a checker whose **five positive controls all fired**. **The fix is the
-> removal of one flag and no change to any number**, written into
-> `bench/2026-09-10/CORRECTIONS-block17.md` § 0 **before it was executed**,
-> rejected alternatives included — `--until` would have been better and is
-> unusable, because the keys `/proc` ends with the 32-slot ring the ladder
-> exists to measure and a match drains only 50 ms.
-> 🔴 **Three of the card's predictions were refuted and two of them are the
-> card contradicting itself.** `cnr_as_spec`/`dir_as_spec` predicted `1/1` and
-> read `0/0` — the driver compares against `REG-26`/`REG-27`, which are
-> **loader-state** constants, while Linux reads `FFFFFF8B`/`FF000040`; 量,
-> **29 committed files, 35 occurrences, every one `0`**, so `RC3` as written
-> would have fired on every seating this project has ever run. ⚠️ **`cardcheck
-> numbers` passed 28 of 28 and could not catch it**: the `1/1` is prose in a
-> table, not a `cardnum` row. `n_get`/`n_state_chk` predicted `1/1` and read
-> `3/3` — and 🟢 **the card's numbers are right about the driver and placed
-> under the wrong cell**: `C11-P0`, the one cell with no keys read in front of
-> it, reads **`1/1`**. The cause is `FW-64`: **one `cat` is TWO `read_proc`
-> invocations** on this kernel, so both of § 4's identities carry a missing
-> factor of two.
-> 🔴 **And § 7's control was void for a reason the card itself contains**:
-> `REG-37`'s latch contaminates the second hold's starting state, and the card
-> cited `REG-37` to order the LED episode first while not applying it to the
-> second hold. 🟢 **`REG-37`'s own sentence is narrower now** — *"re-running
-> does not recover it"* is true of re-pressing and **false of writing**: one
-> `echo 0 > …/brightness` takes `dat` back to `0000007C` and it stays.
-> ⚠️ **Zero flash-write commands, zero `FLR`, `n_writes 4` with every one of
-> the four accounted for**; `C1-M0`, `C13-M1` and the off-card `X29-M2` are
-> **byte-identical to each other and to seating 19's `C1-M0`** — four maps, two
-> seatings, one digest `b3d3d7d0…`. `FLS-26`'s ledger does not move.
-> 🔴 **A guard of mine produced a false RED and it is recorded because it
-> failed in the right direction**: a pre-flight check for the `--baud` default
-> grepped for the literal `38400` two lines after `add_argument("--baud"`,
-> where the default is the named constant `DEFAULT_BAUD`. **It refused before
-> the port was opened and before the operator pressed power**, so it cost one
-> round trip and no power cycle.
-> > **Which gate that is, `PROGRESS.md` says** — this
-> file does not restate it, because one piece of state has exactly one owner
-> and a gate id copied to a second place goes stale there.
-> Conventions for files that do not exist are not written
-> here; they go in when the file appears. Where this contradicts the repo, the
-> repo wins and this file is wrong.
+**This file holds rules.** Where the project stands is `PROGRESS.md` § Now. Why a
+rule exists is in `LOG.md` under the date it was learnt, and in this file's former
+text, archived verbatim in `docs/history/claude-md-2026-09-23.md`. Where this file
+contradicts the repository, the repository wins and this file is wrong.
 
 ## Where things are
 
-|                   |                                                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **`PROGRESS.md`** | sole owner of *where I am* — active gate, active step, blockers, carried-forward. **Read it first, every session**          |
-| **`plan/`**       | gitignored, always present locally. Index: `plan/README.md`.  Whole plan: `plan/router-rebuild-plan.md`                                        |
-| **`upstream/`**   | the RE project, submodule pinned at `4d3ff26`, **read-only** — that pin is the whole credibility of R9's differential proof |
-| **`$FWRE_WORK`**  | `/home/key/fwre-work` — every binary, shared with `../router`. This project's output goes in `$FWRE_WORK/rebuild/`          |
-| **`SPEC.md`**     | every number this project holds about the device — part numbers, register readings, addresses, budgets — each with a mark for where the **value** came from and a separate mark for where its **name** came from, and a link to the file that owns the finding. **An index, not an owner**: a finding or a correction lands in the owning file first and in `SPEC.md` in the same commit. Written in Chinese |
+| | |
+|---|---|
+| `PROGRESS.md` | the only owner of *where I am*: active gate, active step, blockers, carried-forward. **Read § Now first, every session** |
+| `plan/` | gitignored, always present locally; `plan/README.md` indexes it and `plan/router-rebuild-plan.md` is the whole plan |
+| `upstream/` | the reverse-engineering project, a submodule pinned at `4d3ff26`, **read-only**: the pin is the whole credibility of `R9`'s differential proof |
+| `$FWRE_WORK` | `/home/key/fwre-work` in WSL, shared with `../router`: every binary; this project's output goes under `$FWRE_WORK/rebuild/`, and `src-vendor/` is a symlink into it |
+| `SPEC.md` | every number held about the device, each with a mark for where its value came from, a mark for where its name came from, and a link to the file that owns the finding. An index, not an owner. Written in Chinese |
+| `LOG.md` | one dated entry per segment: the history of every decision |
+| `docs/history/` | text moved verbatim out of state documents |
 
-**A gate is not a session.** R6 is 35 work-segments, about a month. A session is
-one step inside a gate. When I say "do R5", ask which driver.
+A gate is not a session: a gate spans many segments and a session is one step of
+one. When told "do `R<n>`", ask which step.
 
 ## How to work here
 
 **You build the instruments, I read the dials.** When I state a finding, do not
-agree — name the tool that could be lying and the second source that settles it.
-Agreeable understatement is how a claim reaches a hostile reader undefended.
+agree: name the tool that could be lying and the second source that settles it.
 
-- **Every sentence about this machine is marked**: *measured on the device*, *read
-  out of the code or the dump*, or *inferred, pending a measurement*. Mixed
-  together they are worth neither.
-- **No register value enters code on one source.** datasheet → SDK header →
-  `devmem`; two must agree, or it is recorded as undetermined.
-- **Nothing counts as a result until its refutation condition is written first** —
-  what outcome would have proved it wrong.
-- **A tool reporting `0` is making a claim.** Every sweep needs a positive control;
-  a tool that cannot fail proves nothing.
-- **Uncertain is a valid answer** — follow it with the experiment that decides it.
-  Five minutes at the bench beats a paragraph of reasoning.
-- **Propose before writing** anything over ~50 lines: the approach, and where it
-  will fail. **Label estimates as guesses** — nothing here is calibrated yet.
-- **Negative results stay in place.** So does the record of being wrong.
+- Mark every sentence about the machine **量** (measured on the device), **讀**
+  (read out of code or a dump) or **推** (inferred, pending a measurement), and
+  never blend them. **未定** marks an open value, which needs a `SPEC.md` § 17 row
+  saying what settles it; **殘留** is the question left after a value is settled.
+- No register value enters code on one source: two of datasheet, SDK header and
+  `devmem` must agree, or it is recorded as undetermined.
+- Nothing counts as a result until its refutation condition was written first.
+- A tool reporting 0 is making a claim. Every sweep, flag and watcher needs a
+  positive control, and a progress check must tell *running* from *never
+  started*. A guard is shown permitting as well as refusing.
+- A containment rule that holds only if the experiment comes out as expected is
+  not a containment rule.
+- Uncertain is a valid answer; follow it with the experiment that decides it.
+- Propose before writing anything over ~50 lines: the approach and where it will
+  fail. Label estimates as guesses.
+- **Never predict a Linux-state value from a loader-state constant.** Linux
+  reprograms `CDBR` (14 → 1000), `TC0DATA` (142,858 → 2,000), the watchdog's clock
+  (~200 kHz, not 14.965 MHz) and `PABCD`'s CNR and DIR.
+- Never widen a tolerance to make a result pass; change the experiment instead
+  (`IRQ-13`).
+- Two counters agreeing is not evidence while they run at the same rate; make the
+  rates differ first.
+- Never take a constant from a two-point fit. An effect that moves between
+  seatings is not a hardware constant. A prefix digest finds the first difference
+  and nothing past it.
+- Before reasoning from vendor source, confirm the file is in the tree that builds
+  (the WLAN driver that builds is `rtl8192cd/`, not `rtl8192e/`). A driver whose
+  decision needed vendor code leaves `docs/blind-write-ledger.md` § 4.1 — the
+  drivers written blind — for a section of its own, and its diff is never called
+  blind.
+- Before designing an experiment on a `SPEC.md` row, read its 殘留: it may already
+  say the experiment cannot succeed. Enumerate a config change's blast radius
+  before making it.
+- When a finding is retracted, fix every state and finding file that states it; a
+  record keeps what it said, and the retraction is a new `LOG.md` entry.
+- Make a recurring rule a tool refusal rather than a habit. Exempt a known defect
+  by name — never by date or pattern — with a control that goes red when the
+  exemption stops being needed, and sweep the exemption list both ways.
+- Before adding a checker rule, measure what it would do to the corpus. Select
+  dated entries by date, never by position, and test that the same entries in
+  either order give the same verdict (`spec-check` `P21`). Accept a changed
+  instrument only if it reproduces the old verdicts on the same population, and
+  time a suite only beside the count of what it ran — a refusing suite is fast.
+- A green suite is a claim about its controls; a mutation run is what tests them.
+  Before trusting a mutation run, confirm the unmutated suite passes.
+- Tools refuse with a reason, never a traceback. A pre-flight guard tests the real
+  value, not a grep for a literal, and refuses before the port opens.
+
+## Documents: state, record, finding
+
+- **State** — `CLAUDE.md`, `README.md`, and in `PROGRESS.md` § Now, § Gate board,
+  § Carried forward and the active gate's step list: what is true now. **Rewrite;
+  never append.** A wrong line is fixed where it stands and the fix is recorded in
+  `LOG.md`.
+- **Record** — `LOG.md`; everything under `bench/` once committed; each
+  `docs/GATE-RESULTS.md` entry; `docs/history/`; `CHANGELOG.md`; and, until `R1y`
+  moves them out, `PROGRESS.md`'s closed step lists, § Session ladder and
+  § Corrections. A record is never edited after the segment that wrote it; a
+  correction is a new dated entry. The record of being wrong lives here.
+- **Finding** — `SPEC.md` rows and the rest of `notes/` and `docs/`: the current
+  value and where it came from. A superseded value keeps one line pointing at the
+  file that owns the correction; the story of the correction lives there or in
+  `LOG.md`.
+- `tools/docsize.py` budgets `CLAUDE.md` and `PROGRESS.md` (whole file and § Now)
+  in both directions: over a budget fails, and so does under half of one, so the
+  commit that shrinks a document lowers its budget too. A budget changes only in a
+  commit that says why.
+- **Cite a row by its id** (`NET-102`, `P2-3`, `D5`), not by line number. A line
+  number in a record resolves against the file as it was at the record's commit.
+  `citecheck` checks line citations in every tracked `.md` except under `bench/`,
+  `LOG.md`, `CHANGELOG.md` and `docs/history/`; `docs/GATE-RESULTS.md` is checked.
+- Keep the line count above cited lines: new step lists go at the **end** of
+  `PROGRESS.md`, new `SPEC.md` rows at the end of § 19, and a rewrite of § Now
+  keeps its line count. An insertion or deletion that cannot be avoided — a § 17
+  row is the usual one — is compensated in the same commit by joining or splitting
+  a wrapped paragraph below it, and every cited line is asserted unchanged
+  (`FW-110`).
+- Text moved between files moves verbatim; `tools/docmove.py` proves it.
+- One piece of state has one owner. Never copy here what another file owns: the
+  active gate is `PROGRESS.md`'s; what depends on rlxfw's drivers is
+  `docs/KNOWN-ISSUES.md`'s.
+- `SPEC.md`: a value mark, a separate name mark and an owner link for every number.
+  A finding lands in its owning file first and in `SPEC.md` in the same commit, and
+  any number produced, changed or refuted changes `SPEC.md` in that commit. Check
+  that a new id is unused before using it anywhere.
+- Committed files are written for an engineer, never for a hiring panel: the
+  finding, the artefact, stop — no résumé bullets, no "this proves I can X".
+  English, except `LOG.md` and `SPEC.md`. Only `plan/` may address me. Commit
+  messages say why; the diff says what.
+- Every result states what it does not establish.
+- Conventions for files that do not exist are not written here; they go in when
+  the file appears.
 
 ## Never
 
-|                                                        |                                                                                                                             |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| write flash                                            | mainline is zero-write through R9. A write needs my explicit yes                                                            |
-| touch `0x000000–0x005FFF` or `0x006000–0x007FFF`       | loader — bricked is unrecoverable, there is no spare. `H601` — this unit's MAC and radio calibration, not restored by reset. 🔄 **2026-08-30, twice in one day — and the morning's sentence was too strong.** *(It read: “nothing has ever CHECKED the second one”.)* True of **rlxfw's own** `G8a`/`G8b` bracket; **false about the device** — `upstream/BENCH-LOG.md` holds seven baselines of `H601`'s first 4 KiB across three days, five power-ups and two flash writes, and it is the check that **caught** the 2026-08-17 write. This file's own rule is that where it contradicts the repo, the repo wins. **Evening: rlxfw's bracket now checks it too.** `bench/2026-08-30c`/`d` read `0x006000`–`0x0060FF` on both power cycles and both were byte-identical to the 2026-08-16 dump — **256 of `H601`'s 8,192 bytes, 3.1 %**, and the other 96.9 % is still unchecked. 🔄 **2026-09-01 (seating 9): a THIRD reading of the same two pages, and this time it answers a different question — whether a *scripted* reset writes them.** `bench/2026-09-01/T-flrh`/`T-flrc`, after one cold boot and twenty `J BFC00000` watchdog resets: both byte-identical to the 2026-08-16 dump, with the read-backs outside the repository and **four RAM destinations no `FLR` here had ever used**, so `MEM-17`'s retention path could not pre-fill them. The reach does not move. 🔄 **2026-08-31: 512 bytes, 6.3 %, and the other 93.7 % is still unchecked** — `bench/2026-08-31*` add `0x006400`, the canary page, on both power cycles; all four readings byte-identical to the 2026-08-16 dump. 🔴 **And a capture of one of these windows nearly entered the repository**: the card writes `FLR` PRE-reads under `bench/` because a pre-read is *expected* to be garbage, and when DRAM retention made that false two files held this unit's MAC. Untracked, moved, nothing in history — but **a containment rule whose correctness depends on the experiment coming out the expected way is not a containment rule**, and the card template still has it. ✅ **2026-09-03: an enforcer now does, and the template was still not edited.** `tools/cardcheck.py` `A19` reports an `FLR` typed inside a `--send`, which is the bypass that reaches `console-capture.py` without `flrbracket run`; `A20` excuses the two frozen cards that do it **by name**, not by date; `A21` is the control that says it is a guard and not a blanket; and `B10` sweeps the corpus **in both directions**, so the allow-list cannot accrete unreported. 量 on its first run: 50 cards, 2 type `FLR`, list exact. The morning's reading, which is what made that bracket exist: 量: `RUNSHEET` §B3's `G8a`/`G8b` flash bracket samples 256 of the loader region's 24,576 bytes, 256 bytes of the `cr6c` header — which no rule forbids writing — and **0 of `H601`'s 8,192**. Six days of write-ups called those *"the two regions that would change"*, and neither of them was the one that cannot change back. `bench/2026-08-30c/PREDICTIONS-B5-block2.md` §8 adds it; its capture may not enter this repository and **not even its sha256 may** (with the window otherwise known, a digest is a 2^24 search for the MAC), which `tools/flashwin.py` enforces rather than remembers. 🆕 **2026-08-31: the OTHER half of that rule now has an enforcer too, and it is the half the template kept getting wrong.** `flashwin` governs what may be *printed*; nothing governed *where a capture of a forbidden window may land*, and on 2026-08-31 two files inside this repository held this unit's MAC because the card wrote `H601` pre-reads under `bench/` on the assumption they would be garbage. `tools/flrbracket.py`'s `run` refuses, **before it opens the port**, to write the read-back of an `H601`-overlapping window anywhere inside this repository, and **the pre-read anywhere inside it at all, whatever the window is** — a pre-read is a `DW` of the RAM destination before the `FLR`, so its content is decided by what was last written there, and `MEM-17` measured DRAM keeping a previous cycle's `FLR` output across a power cycle. *(The first version of this row keyed both on the flash source; an adversarial pass showed that is the 2026-08-31 incident with the roles swapped.)* The line is drawn at **content, not mention**: the `FLR` echo capture holds addresses and no flash bytes, which is why `bench/2026-08-31/W-flrh.log` names `00006000` and is correctly committed. 🆕 **2026-08-31: a THIRD enforcer, and it asks the question the other two cannot.** `flashwin` governs what may be *printed*; `flrbracket` governs where a *bracket's* read-back may land; both act when a file is produced. **`flashwin scan` asks whether a file this repository has ALREADY COMMITTED holds forbidden content** — by the bytes, not by the shapes an address takes, with the probe set filtered on the reference side. 量 on its first sweep: rlxfw's own tree is **CLEAN over 1,381 files** (`--sweep . --exclude upstream`), `K-P3` included; the default `--sweep .` reads **1,683** and reports **1 HIT** — `upstream/BENCH-LOG.md:2557`, sixteen bytes of `H601` as a hexdump line. ⚠️ **`leakscan` does not name that line (it names 22 hit rows over 18 other lines of the same file); `audit-bench-log` does, on its topic keyword `H601` (the flash bytes there ARE the ASCII `H`,`6`,`0`,`1`) among 183 hits, exiting 0** — so neither identifies it as forbidden CONTENT, which is the narrower and correct claim. It does not move `FLS-22`'s decision and it is not meant to; it is the sentence *nothing checks the committed record* that stops being true |
-| build with `-march=mips32`                             | the load delay slot is architecturally exposed; mips32 miscompiles **silently** — no fault, no warning, just wrong values. 🆕 **2026-09-04 (`R5-10`): a second reason, and this one is NOT silent.** 量, the rsdk assembler: `mflxc0`/`mtlxc0` — the instructions `arch/rlx` uses to mask a LOPI interrupt, and the only way to reach `ESTATUS`/`ECAUSE`/`INTVEC`/`CCTL` — assemble at `rlx4181`, `rlx4281`, `rlx5181`, `lx5280` and `rlx5281`, and are **rejected** at `lx4180` and at `mips32`. So the ban is not only about wrong values; at `mips32` the interrupt-mask primitive does not build. 🔴 **And they are not `mfc3`**: as built they are `0x40620000`/`0x40e20000` — COP0's opcode with MIPS-unassigned `rs` 3 and 7 — while `mfc3` is `0x4c020000`. Do not carry the 2026-08-29 CP3 result across. `docs/interrupt-map.md` § 1.1   |
-| write asm under `.set reorder`                         | you cannot know what the assembler filled in. `noreorder`, fill every delay slot yourself                                   |
-| measure the ISA or a CPU hazard under Linux            | the vendor kernel emulates `ll`/`sc` (and `sync`, as a no-op), so you would measure the kernel. Bare metal only. 🔄 **2026-08-27: the reason was half wrong and is narrowed.** This row said "and the FPU" — **there is no FPU emulator in this kernel at all**: `arch/rlx` has no `math-emu`, and `do_cpu` gives `SIGILL` for any coprocessor but 0. `simulate_llsc` alone is enough, so the rule does not move; only its reason does. `CPU-47` |
-| edit vendor source by hand, or apply a patch to `src-vendor/`             | 🆕 **2026-08-29: rlxfw patches Realtek's source for the first time.** 🔄 **2026-09-01: there are TWO sanctioned ways, and this row said one.** A row in `config/rlxfw-marks.tsv` is one of them and it is the narrow one — `rlxfw-marks.py` refuses any insert that is not `rlxfw_mark("TAG");`, `rlxfw_markx("TAG", expr);`, `obj-y += NAME.o` or the mark header include, on the stated ground that *an arbitrary statement here would be a patch with no reviewer*. The other is a patch in `config/host-compat/`, applied by `rlxfw-kbuild.sh`, which **stops the build if it does not apply**; `0001` predates this row (2026-08-28) and `0002` (2026-09-01, `P4a`) is what made the omission matter. ⚠️ That directory's name is now narrower than its contents — the driver describes it as *every source change to the vendor tree*, which is the accurate scope — and a rename is carried forward rather than done in the session that widened it. 🔄 **2026-09-02: two more, and they pull the name in OPPOSITE directions.** `0004` is host compatibility in the strictest sense — a 2009 kernel's `\#` escape is a no-op under GNU Make 4.3, so every `.cmd` file is truncated at a bare `#` and every build is a full rebuild — which is the same shape as `0001` and perl 5.22. `0003` is not: it is about when kbuild rewrites a generated header. **So the directory now holds two patches its name fits and two it does not**, and the rename is still carried forward. 🔄 **2026-09-06 (`R5-4`): a FIFTH, and it is the third the name does not fit.** `0005` adds `select ARCH_WANT_OPTIONAL_GPIOLIB` to `arch/rlx/Kconfig` so a `gpio_chip` can be registered at all — 量 `FW-38`, with `CONFIG_SWAP` as the positive control in the same run. **Two fit the name, three do not.** The 594-object figure below was taken with FOUR declared and has not been re-taken. 量: with all four declared, a fresh stage builds 594 objects and a no-op `make` costs 2; the product moves by 4 bytes of 3,968,240, all of them `RLXFW_SRC_ID`, because `RECIPE_ID` is a digest over `config/` and `config/` gained two files. `notes/incremental-build.md` **The rule below is unchanged: never by hand, never inside `src-vendor/`, always to a staged tree.** Every inserted line is a row in `config/rlxfw-marks.tsv` with a reason, applied by `tools/rlxfw-marks.py` to a **staged** tree — the tool refuses any path under `src-vendor/`, and the anchor must occur **exactly once** or it refuses rather than picking one. Files of mine live in `config/rlxfw-src/`, mirroring the staged layout. ⚠️ **`check` reads the tree and `verify` reads the built artefact, and only the second one can catch a mark that compiled and is not in the image** — measured, on the first run. 🆕 **2026-09-02 (`R5-0`): a staged tree has THREE states and the third is the one that carries the rule.** `apply` used to refuse any second run outright, because applying twice emits the mark twice and a doubled mark reads in a capture as a boot loop — so `--keep --marks` could not run at all, which is what `INC-1` had to measure. `--if-needed` splits that: a **clean** tree is applied to, a **fully applied** one is a no-op, and a 🔴 **partially applied one is REFUSED** — some marks present is a tree that builds and is not what the table describes. The row's rule does not move: `A20` requires plain `apply` to still refuse a marked tree, so `A4` is bypassed only when asked for, never by default |
-| commit the datasheet, a flash dump, or a vendor binary | one is someone else's property; the others identify one physical device                                                     |
-| open `$FWRE_WORK/disclosure/`                          | unsent vulnerability reports, mode 600                                                                                      |
-| ~~write `RLX5281`~~ ✅ **lifted 2026-08-27**                | 🔴 **The `PRId` assignment table this row named arrived, and it was in a GPL drop this project already had.** `arch/rlx/include/asm/cpu.h` maps `PRID_IMP_RLX4181 = 0xcd00`; `PRId = 0x0000CD01` (量) has bits 15:8 = `0xCD`, so the core is **`RLX4181`, revision 1** — and **`RLX5281` is `0xdc01`, now positively excluded rather than merely unproven**. Write `RLX4181`, marked **讀**, with `PRId` itself still 量. Three weaknesses travel with it and must not be dropped when it is quoted: the three drops are **byte-identical** in that header (one source, three copies), **no code in the port reads the table**, and its own encoding breaks for `0xdc01`/`0xdc02`. `notes/vendor-kernel-isa.md` §5. **`RLX5281` stays unwritable, for the opposite reason from before.** *(Original row: `R1-gate` closed 2026-08-26 and did not name it … what lifts it is a `PRId` assignment table, not another seating.)* |
+| | |
+|---|---|
+| **write flash** | Mainline is zero-write through `R9`; a write needs my explicit yes. *Flash* below lists the commands that count |
+| **touch `0x000000–0x005FFF` or `0x006000–0x007FFF`** | The loader — a brick is unrecoverable and there is no spare — and `H601`, this unit's MAC and radio calibration, which no reset restores |
+| **let `H601`'s bytes, or their sha256, into this repository's tree** | Tracked or untracked. Naming the addresses is fine |
+| **commit the datasheet, a flash dump or a vendor binary** | One is someone else's property; the others identify this device (`$FWRE_WORK/stage2.bin` is one) |
+| **open `$FWRE_WORK/disclosure/`** | Unsent vulnerability reports, mode 600 |
+| **move `upstream/`'s pin** | `4d3ff26`; `R9` depends on it |
+| **build with `-march=mips32`** | The exposed load delay slot miscompiles silently, and `mflxc0`/`mtlxc0` — the LOPI interrupt-mask primitive — do not assemble there (`docs/interrupt-map.md` § 1.1). They are not `mfc3` |
+| **write asm under `.set reorder`** | `.set noreorder`, and fill every delay slot yourself |
+| **measure the ISA or a CPU hazard under Linux** | The kernel emulates `ll`/`sc`, and `sync` as a no-op; bare metal only (`CPU-47`) |
+| **edit vendor source by hand, or inside `src-vendor/`** | Vendor code changes only through a reasoned row of `config/rlxfw-marks.tsv` (`rlxfw_mark("TAG");`, `rlxfw_markx("TAG", expr);`, `obj-y += NAME.o`, the mark include; the anchor must match exactly once) or a patch in `config/host-compat/`, applied by `rlxfw-kbuild.sh` to a **staged** tree. rlxfw's own kernel files live in `config/rlxfw-src/`, mirroring the staged layout. Re-apply with `apply --if-needed`; a partially applied tree is refused. After a build, run `rlxfw-marks verify`, which reads the artefact (`check` reads only the tree), and `kconfig-delta check` |
+| **write `RLX5281`** | The core is `RLX4181` rev 1: `PRId 0x0000CD01` 量, the name 讀 from `arch/rlx/include/asm/cpu.h`; `RLX5281` is `0xdc01` and positively excluded. Quote `RLX4181` with its three weaknesses: one header copied three times, no code reads the table, and its encoding breaks for `0xdc01`/`0xdc02` |
+| **run a vendor binary outside `tools/vendor-tripwire.sh`** | `--version` included, and from a scratch directory — never the repo root or `src-vendor/`. A census once deleted 2,580 tracked files |
+| **keep binaries or vendor trees under `/mnt/c`** | DrvFs reports every file `777`, and NTFS case-folding drops 254 vendor files |
+
+## Flash
+
+- Commands that can write flash, each needing my explicit yes: `FLW`; `EW` and
+  `EB`, which write any address with no bound check (`LDR-08`, `LDR-09`), the
+  `AUTOBURN` word included; `AUTOBURN` with a non-zero value; and any upload
+  before the `AUTOBURN` word at `0x8040D4A0` reads back `00000000` — the loader's
+  echo is not evidence (`C-6`). `cardcheck` refuses none of them (`FW-113`).
+- Decide before power whether a seating issues any of them or any `FLR`, and close
+  every seating record with that count, the `FLR` status and the bracket's reach.
+- Never write *"not one flash byte is written"*: `FLS-26` proved it false for this
+  device. Claim what was measured — commands issued, rlxfw's `n_writes`, the
+  bracket's reach against the 2026-08-16 dump — and what it cannot see: two writes
+  that cancel, and every byte outside the windows read.
+- `FLR` only through `tools/flrbracket.py run`, never typed in a `--send`
+  (`cardcheck` `A19`); it keeps every pre-read and every `H601` read-back outside
+  this repository. Pre-read each destination: DRAM survives a power cycle
+  (`MEM-17`), so a pre-read equal to flash voids the round, and the next round
+  moves to RAM destinations no `FLR` has used.
+- Render a flash window only through `tools/flashwin.py`, which decides what may
+  be printed; new tools import `flashwin.overlaps_forbidden` rather than restate
+  the rule. `flashwin scan` is the only check that no committed file holds `H601`
+  bytes, and it runs only at the desk (*Closeout*).
+
+## At the bench
+
+- The console is a CP2102 at **38400 8N1**, driven through
+  `tools/console-capture.py`. Power and physical actions wait for my word;
+  everything else runs. List every question before power: one power cycle is the
+  most expensive unit here. A timed action (press, then release) starts when I say
+  so, in a window of at least 40 s, with the instrument recording the timing.
+- Before `J 80500000`, read back the staged head: a reset re-stages that address
+  from flash.
+- A cell that jumps, or whose payload can reset the board, gets `--esc-after`, so
+  the loader prompt is caught instead of the vendor firmware booting; prove the
+  prompt was caught before handing the board to `looprun`.
+- Reset with `busybox reboot -f`, a watchdog bite (`FW-37`); plain `reboot` signals
+  PID 1, which is a shell script. Keep `CONFIG_RTL_WTDOG=n` in any image carrying
+  rlxfw's `/dev/watchdog`.
+- Name `bench/<date>/` for the day the captures are taken (`tools/capdate.py`), and
+  stage every image the card uploads before power.
+- Keep every cell inside the card's `cells` fence; before power
+  `check-predictions` reads `0 of N` with N the card's own cell count. It checks
+  that captures exist and are newer than the card, never their content.
+- Predictions are written before power and re-derived from the card's own
+  arithmetic — finish every subtraction and factor (one `cat` of a `/proc` file is
+  two `read_proc` calls, `FW-64`). Every number sits in a `cardnum` row; every
+  address comes from the image's own `System.map` (`cardcheck numbers`); a cell
+  that only types `echo` carries no expectation; each cell's preconditions hold in
+  its own state. Anything run beside the card is a declared off-card cell, and
+  every claim the card makes has a cell. A control boot is kept apart from the
+  boots a DoD counts.
+- Never repair a frozen card, not even a typo: it destroys the mtime evidence.
+  A change to how a frozen card is executed goes into a `CORRECTIONS-*.md`, with
+  the alternatives rejected, before it is executed. To freeze: `git add` the card,
+  run `spec-check`, then commit.
+- Split a block into separate commands at the card's decision points, and
+  recompute later windows when an early cell refutes a constant.
+- Every capture has a terminator, and a `--send` is at most 127 characters.
+  `--idle` must exceed the longest silence the payload can produce, a leading
+  `sleep` included. When a duration cannot be predicted or a long silence is
+  expected — a pending watchdog bite keeps the console silent until it bites
+  (41.9 s at `OVSEL` 8) — use `--until PATTERN` with a `--seconds` cap; it drains
+  only 50 ms after its match.
+- `cardcheck` refuses any command not in the image's measured command table
+  (`config/image-commands.tsv`): there is no `dd` and no `md5sum`. This image's
+  `ping` ignores `-c`.
+- Captures are CRLF: strip `\r` before comparing a parsed field. Gate on a `/proc`
+  field, never a console mark — marks interleave with ash's echo (`FW-47`), and a
+  refused write is echoed minus its last character (`FW-41`). Route a refused
+  write through `cat` to see its errno. A bench gate self-tests on known captures
+  and refuses to open the port if its own comparison is broken.
+- Timing: a `.timing` row is written before its chunk, so byte `b` arrived at the
+  **last** row with `offset <= b` (`FW-35`). Take rates from slopes, not
+  intercepts. Never compare hex addresses numerically in `awk` (`8001e714` reads
+  as scientific notation).
+- The loader answers ARP, not ping; check its link with ARP. Retry a failed
+  `looprun` with `--attempt N`, never `--force`. Identify a booted image by the
+  tool comparing `RLXFW-ID0` with the build's digest, never by a typed value.
+- A `read_proc_t` handler's output stays within one 4,096-byte page. Bump
+  `console-capture`'s `tool_version` only when what it writes to the port changes.
+- Wrong on purpose — do not "fix": `RTL819X_WDT_HZ` and the watchdog driver's
+  `usec` table (76× off; `/proc` prints them and cards predict against them).
+- Before a `biteraw`, send `kickms 5000` (`biteraw` does not clear `WDTCLR`). A
+  reset-button hold meant to reach the vendor's timer is the boot's first hold over
+  ~2 s (`FW-62`). Between LED or button episodes, clear the `REG-37` latch with
+  `echo 0 > …/brightness`; pressing again does not clear it. My visual reports are
+  data (`FW-63`).
 
 ## Environment
 
-- **`usbipd` has nothing to attach to unless a WSL process is already running.**
-  Measured 2026-08-24: with the distro idle, `usbipd attach` fails with *there is
-  no WSL 2 distribution running*, and 🔄 **an attachment already made can drop
-  while the distro is still running** — it died between two tool calls mid-session
-  and took `/dev/ttyUSB0` with it. **That drop was not distro idle**, which is
-  what this line said until 2026-08-25: `uptime` ran continuously through it, and
-  what left was the **CP2102**, off the Windows USB bus after **7 min 24 s of pure
-  console idle**, with `usbipd list` moving the busid out of *Connected*. Root
-  cause **undetermined**, and none of the three candidates has been ruled out:
-  usbip socket transient, USB selective suspend not waking, a loose connector.
-  🆕 **2026-08-29: that signature is not specific, 量.** A deliberate
-  `usbipd detach` takes the busid out of *Connected* too — for about a second,
-  while Windows re-enumerates the device — so a `usbipd list` run immediately
-  after a detach reads **exactly** like the drop. **Re-read before concluding
-  anything from one listing.**
-  🆕 **2026-09-15: there IS a discriminator and it is not `usbipd`.** 量, on a
-  real drop: `[System.IO.Ports.SerialPort]::getportnames()` returns **empty**
-  and `Get-PnpDevice -FriendlyName '*CP210*'` reads Status **`Unknown`**,
-  because the device is off the Windows USB bus altogether.
-  🔴 **2026-09-17: that discriminator has a PRECONDITION this row never stated,
-  and without it the check produces a FALSE RED.** 量, seating 26, both
-  directions on one adapter within four minutes: **while the device is
-  `Attached` to WSL**, `getportnames()` returns **empty** and `Get-PnpDevice`
-  reads **`Unknown`** — the exact signature above — while the link is perfectly
-  healthy, and the positive control taken in the same minute is a console round
-  trip that came back in **0.124524 s** with the right value. **After
-  `usbipd detach`**, the same two calls return **`COM3`** and **`OK`**. The
-  cause is not subtle: *attaching to WSL is removing the device from the Windows
-  USB stack*, so having no COM port is the normal attached state. **The
-  discriminator is valid only when the device is NOT attached. While it is
-  attached the liveness question is answered on the WSL side** — `/dev/ttyUSB0`
-  present, and a command that comes back. A deliberate
-  detach leaves Windows **re-enumerating** it, so the COM port comes back —
-  the two are identical in `usbipd list` and different in `getportnames()`.
-  **Ask that first**: one call, no re-read, and it separates what four weeks
-  of `usbipd list` readings could not. ⚠️ It does **not** move the three root
-  causes; it only tells you which question you are in.
-  🔴 **And `usbipd attach` can fail while looking like it worked.** With no
-  long-lived WSL process it exits non-zero saying *there is no WSL 2
-  distribution running* — and if that line is not read, `/dev/ttyUSB0` never
-  appears and the next thing to touch the port reports a missing file.
-  量 2026-09-15: that is exactly what happened, the failed attach was recorded
-  in my head as a success, and **what caught it was the free pre-flight below**
-  an hour later. The same day the CP2102 was also absent from
-  *Connected* on **first insertion**, with no COM port on the Windows side at
-  all, and returned only after a re-seat: consistent with the loose connector
-  and separating nothing, so the three candidates stand.
-  Start a long-lived process first and leave it running:
-  `wsl -d Ubuntu-24.04 -- sleep 36000` in the background — **that is for the attach
-  step and is not a fix for the drop above; do not record it as one.** **And the busid is not
-  stable** — the USB GbE moved `3-4` → `2-4` across one re-enumeration the same
-  day, so re-read `usbipd list` every time rather than reusing the number.
-- **The Bash tool is Git Bash, not WSL.** `-lc` mangles the command: `$VAR` is
-  stripped and a leading `/` is MSYS-translated (`bash /mnt/c/x.sh` became
-  `bash C:/Program Files/Git/mnt/c/x.sh`). 🆕 **2026-08-30: "stripped" is the
-  kind half. `$?` is EXPANDED, in the OUTER shell**, so
-  `bash -lc 'cmd > f; echo "rc=$?" >> f'` records the outer shell's status and
-  not `cmd`'s — 量, it wrote `rc=0` for a suite that had exited 1, and the
-  wrong number is worse than an empty one because it reads as a measurement.
-  🔴 **2026-09-06 (seating 15): it did the worst version of this — it made a
-  VERIFICATION GATE read green, and the green was pushed.** `spec-check` was run
-  as `… > f 2>&1; echo "EXIT CODE: $?"`, printed **`EXIT CODE: 0`**, and was
-  believed; the tool was exiting **1** on a real `C5` finding, which CI then
-  caught. ⚠️ **The same run also shows the second half of the trap**: reading
-  `spec-check | tail -2` shows the *table sweep's* ok line while the file's own
-  findings sit above it, so **a tail is not a verdict**. Both halves have one
-  fix: put the command in a script file, run it by path, and read `rc=$?` there.
-  It also swallowed a whole run: a `nohup … &` inside `wsl -- bash -lc` dies
-  with its parent, and a progress check written
-  `tail -6 f 2>/dev/null || echo "still running"` cannot tell *running* from
-  *never started* — that is this project's own "a tool reporting 0 is making a
-  claim", in a one-line shell check. **Feed the script over stdin instead** —
-  🔴 **2026-09-17: and the heredoc protects the BODY, not the `wsl` command's own
-  ARGUMENTS — which is the distinction that makes this trap survive the
-  workaround.** 量, three times in one segment: `wsl -d Ubuntu-24.04 --
-  /usr/bin/python3 - <<'PY'` fails with **exit 127** and
-  `C:/Program Files/Git/usr/bin/python3: No such file or directory`, because the
-  leading `/` of the *argument* is translated before `wsl` ever sees it, heredoc
-  or no heredoc. `wsl -d Ubuntu-24.04 -- bash -ls <<'EOF'` works for exactly one
-  reason: **`bash` has no leading slash.** 🔴 The first of those three failures
-  cost the boot banner of a seating — a backgrounded ESC window never opened, and
-  the vendor firmware ran unobserved for about five minutes. **Either keep every
-  `wsl` argument slash-free, or write the script to a file and launch it from
-  PowerShell, which does no path translation at all.**
-  nothing in the body is touched, and shell variables work:
+**USB and WSL**
+- Start a long-lived WSL process before `usbipd attach`
+  (`wsl -d Ubuntu-24.04 -- sleep 36000` in the background) and read what `attach`
+  prints — it can fail with *there is no WSL 2 distribution running*. Re-read
+  `usbipd list` for the busid every time; it moves.
+- After every attach and before every seating, run the pre-flight: a 3-second
+  capture with the board off. Judge it by its three artefacts and ~3.08 s, never
+  its exit code (a healthy 0-byte run exits 1). *Could not open port* means the
+  attach did not happen.
+- Diagnose a CP2102 drop only while detached (`getportnames()` empty and
+  `Get-PnpDevice -FriendlyName '*CP210*'` reading `Unknown`); while attached,
+  check `/dev/ttyUSB0` and a command round trip. Right after a detach,
+  `usbipd list` looks like a drop for about a second. The drops' cause is
+  undetermined.
+- Session files never go in WSL's `/tmp`, which is emptied at every distro start;
+  derived artefacts go under `$FWRE_WORK/rebuild/`.
 
-  ```
-  wsl -d Ubuntu-24.04 -- bash -ls <<'EOF'
-  … ordinary shell, literal paths, $VAR all fine …
-  EOF
-  ```
-  🔴 **2026-09-08: and a heredoc terminator ENDS the command, so a `&&`
-  written after it chains nothing.** 量, on this segment's own closeout: a
-  patch script was written as `python - <<'PY' … PY` followed on the next
-  line by `git add -A && git commit …`. Those are **two commands**. The
-  script hit its own anchor check, printed a refusal and exited 1 — **and the
-  commit ran anyway**, producing a commit whose message described a change the
-  commit did not contain. That is this file's own `EXIT CODE: 0` incident with
-  the roles swapped: there a failure was reported as a success, here a failure
-  was reported correctly and nothing downstream read it. **A step whose
-  failure must stop the next one has to be on the same command line, or the
-  next one has to test for its output.
-  🔴 **2026-09-10: the same `$?` row has a third face, and this one reaches the
-  BACKGROUND-TASK COMPLETION NOTICE.** 量, this segment's first build attempt:
-  a command written `wsl … -- bash /mnt/c/…/build.sh; echo "SCRIPT EXIT: $?"`
-  was run in the background. The script never started — MSYS translated the
-  path, exactly as the row two bullets down predicts, and `bash` reported
-  `No such file or directory` — and the tool printed `SCRIPT EXIT: 127`. **The
-  completion notification said `exit code 0`**, because the outer shell's last
-  command was the `echo`, and the `echo` succeeded. The build's log file was
-  never created and the first check for it — `stat` on a path that does not
-  exist — is what caught it. **Appending `; echo "… $?"` to a backgrounded
-  command converts every failure into a green notification**, which is this
-  file's own `EXIT CODE: 0` incident in the one place where the exit code is
-  all the operator sees. **Never put anything after the command whose status
-  matters**, and treat the notice's code as a claim about the LAST thing on
-  the line rather than about the work.**
-  🆕 **But do not nest a second heredoc inside that one.** Measured 2026-08-26,
-  three times before it was believed: a `python3 - <<'PY' … PY` inside the outer
-  heredoc **loses one level of backslash**, so `\\t` reaches Python as `\t` and
-  `"…1 \\\n"` becomes a line continuation that eats the newline. The symptoms are
-  a `SyntaxWarning: invalid escape sequence` and an `assert … in s` that fails on
-  a string you can see in the file. It also breaks the outer heredoc outright if
-  the inner body contains the outer terminator. **Write the script to a file with
-  the Write tool and run it by path** — `python3 /mnt/c/…/scratchpad/x.py` — which
-  has no quoting layers at all.
-  🔄 **2026-08-27: it is not the nesting. ONE quoted heredoc from the Bash tool
-  loses a backslash level, and the note above blamed the wrong thing.** 量 with
-  `od -c`, which is the instrument to use because everything else in the path
-  re-escapes: send `re.compile(r'(?<!\\)\|')` through a single `<<'EOF'` and the
-  bytes that reach disk are `re.compile(r'(?<!\)\|')`; `printf 'a\\b'` arrives as
-  `printf 'a\b'`. It cost two `re.error: missing ), unterminated subpattern` in
-  one session, and once it went further than an error — `cat > f <<'EOF'` wrote
-  the corruption into a committed file. ⚠️ **Root cause undetermined**: the tool's
-  own command marshalling and the shell are both in the path and this measurement
-  does not separate them. **The workaround is unchanged and it is the whole
-  point** — Write the file, run it by path. 🔴 **And never `open(path, 'w')` in a
-  script that can raise before it writes**: `open()` truncates immediately, so a
-  `NameError` one line later leaves the file at zero bytes. It emptied
-  `PROGRESS.md` on 2026-08-27; `git checkout --` got it back because it was
-  committed. Build the whole string first, write to `path.tmp`, `os.replace`.
-  🔴 **2026-09-10: that rule protects ONE file, and a patch script that edits two
-  needs a second half — every anchor checked BEFORE the first write.** 量, this
-  segment's own owner-file edit: a script patched `SPEC.md` and
-  `notes/gpio-driver.md`, the first anchor matched and was written, the second
-  missed by **one space** (`it samples.  A write` against the file's `it
-  samples. A write`) and raised. `SPEC.md` was already on disk. **The result is a
-  half-applied two-file edit — the multi-file version of the `open(path, 'w')`
-  trap above**, and it is not caught by writing each file safely, because each
-  file WAS written safely. Check every anchor first, then write.
-- 🆕 **`sudo apt-get install -y` hangs, and `-y` is not the flag that stops it.**
-  量 2026-09-19: stdin here is the null device, so `dpkg-preconfigure` blocks on a
-  debconf prompt that `-y` does not cover and the command never returns. Prefix
-  **`DEBIAN_FRONTEND=noninteractive`**; `-y` alone is not enough.
-- 🔴 **`git add -A && git status && git commit` on one line prints the status
-  AFTER staging, so the thing you ran it to see is unreadable.** 量 2026-09-20
-  (seating 29): a stray `-t` file reached that seating's **freezing** commit that
-  way. This file already says a step whose failure must stop the next one has to
-  be on the same command line; this is the mirror — **a step whose OUTPUT must be
-  read has to be its own call.** Read `git status --porcelain` first, then
-  `git add` by name, then commit.
-- 🆕 **Running a vendor binary is not a read-only act, and `--version` is not a
-  safe way to ask one what it is.** Measured 2026-08-28: a census that ran every
-  executable in the three rsdk `bin/` directories with `--version` deleted
-  **2,580 tracked files** from a pinned vendor clone — mostly regular files
-  under `config/uclibc/`, not the symlink farm the first write-up said —
-  rewrote four tracked files and left seventeen ignored build products — because `rsdk-linux-config`
-  is a statically linked i386 ELF that runs `make` in the tree it lives in. It
-  also wrote an `offset.tmp` into **this repository's root**, which is a place no
-  vendor-tree check watches. It was recoverable only because the trees are clones
-  pinned at known shas. **Wrap anything that executes a vendor binary in
-  `tools/vendor-tripwire.sh`, and run it from a scratch directory**, never from
-  the repo root and never from inside `src-vendor/`.
+**Shells, quoting, exit codes**
+- The Bash tool is Git Bash: `-lc` strips `$VAR`, and a leading `/` in an argument
+  is MSYS-translated. Keep every `wsl` argument slash-free (`bash`, not
+  `/usr/bin/python3`), or launch from PowerShell.
+- Git Bash's `grep` cannot see a CR: `grep -c $'\r'` matched every line of both
+  an LF and a CRLF probe, and a literal CR matched neither (WSL's grep: 2 and 0).
+  Count line endings from the bytes, or with `git ls-files --eol`.
+- `wsl -d Ubuntu-24.04 -- bash -ls <<'EOF' … EOF` is safe only for bodies without a
+  backslash: one quoted heredoc from the Bash tool loses a backslash level. Write
+  anything else to a file with the Write tool and run it by path; never nest
+  heredocs.
+- Read an exit code only inside a script file run by path, with no pipe on that
+  command (`${PIPESTATUS[0]}` when a pipe is unavoidable). Nothing goes after a
+  backgrounded command whose status matters. A `tail`, a grep for `FAIL`, or a
+  tool's own totals line is never its verdict.
+- A step whose failure must stop the next is chained on one command line; a heredoc
+  terminator ends the command. A step whose output must be read is its own call.
+  Never `nohup … &` inside `wsl -- bash -lc`.
+- Bench commands run `/usr/bin/python3`, never `python3` (in a login shell that is
+  a venv without `pyserial`).
+- Windows Python (`C:\Program Files\Python310\python.exe`, 3.10, cp950): call
+  `sys.stdout.reconfigure(encoding="utf-8")` first and pass `encoding="utf-8"` to
+  every `subprocess` capture. `spec-check.py`, and anything importing it, runs
+  under WSL's 3.12; a tool that calls `gh` (`tools/citime.py`) runs under Windows
+  Python.
+- A `Monitor` command runs in Git Bash: spell paths `/c/Users/…`, and start by
+  checking that its input exists.
 
-- **Binaries and vendor source trees never live under `/mnt/c`.** Measured
-  2026-08-23: DrvFs *keeps* symlinks, but reports every file as `777`, so git sets
-  `core.fileMode=false` and stops seeing mode changes at all; and NTFS is
-  case-insensitive, which silently drops **254 files** from the vendor kernel trees
-  (`xt_CONNMARK.h` against `xt_connmark.h`). On this project part of the finding
-  *is* filesystem metadata. `src-vendor/` is a symlink into `$FWRE_WORK/rebuild/`.
-  - **The same blindness quietly loses the executable bit on new tools.** With
-    `core.fileMode=false` a file is recorded with whatever mode `git add` happened
-    to capture and nothing ever corrects it: **7 of the first 10 files in `tools/`
-    drifted to `100644`** while the three oldest stayed `100755`. Every tool here
-    carries a shebang, so every tool is recorded `100755`; the fix for a drifted
-    one is `git update-index --chmod=+x <path>`, and `tools/test-file-modes.sh`
-    reads the **index** — the thing DrvFs cannot lie about — in both directions.
-  - 🔴 **2026-09-08: the action that RE-INTRODUCES the drift is
-    `git restore --staged .`, and nothing had written that down.** 量, on the
-    forty-fourth segment's closeout: three new tools were added and set
-    `100755` by hand; the index was then reset to split one staged change into
-    three commits; that reset made the three files **untracked again** — they
-    were not in `HEAD` — so the re-`add` was a *first* add and recorded
-    `100644`. **The mode was right, then right in a commit, then wrong**, and
-    `test-file-modes.sh` caught it after the push. Setting the bit before
-    splitting a commit is not enough: **check it again after any
-    `git restore --staged` that touches a file `HEAD` does not have.**
-  - 🔴 **2026-09-09: there is a SECOND action, and it is one that looks like
-    the safe way to split a commit.** 量, on the forty-ninth segment's
-    closeout: a new tool was staged `100755`, verified, and then committed with
-    `git commit -F - -- tools/dtcheck.py`. A **path-limited** commit re-reads
-    the working tree for those paths, and on DrvFs `core.fileMode=false` makes
-    the working-tree mode unknowable — so the commit recorded **`100644`** while
-    the index still held `100755`. The bit was right, then right in the index,
-    then wrong in the commit, and **it was pushed**. ⚠️ `test-file-modes.sh`
-    reads the INDEX, which is the thing DrvFs cannot lie about, so it was green
-    before the commit and would have been green after it: the suite is not
-    broken, its subject is one layer away from where this drift lands. What
-    caught it was reading `git status` after the push. **Either stage the mode
-    again after a path-limited commit, or do not use one — `git add -A` plus a
-    plain `git commit` records the index and has never done this.**
-- **Session working files do not go in WSL's `/tmp`.** Measured 2026-08-23: the
-  distro restarts between tool calls (`uptime -s` moved forward mid-session,
-  `uptime -p` read "up 0 minutes"), and `/usr/lib/tmpfiles.d/tmp.conf` carries
-  `D /tmp` — a capital `D`, so `systemd-tmpfiles-setup` **empties it at every
-  start**. It is not a tmpfs; the wipe is deliberate, not a side effect. Derived
-  artefacts go in `$FWRE_WORK/rebuild/`, which is where they belong anyway.
-- 🆕 **Every bench command runs `/usr/bin/python3`, never `python3`.** Measured
-  2026-08-29 (and the tool has said so since 2026-08-24, in a message nothing in
-  this file repeated): `python3` on this host resolves to
-  `~/.venvs/thermal/bin/python3`, which has **no `pyserial`**, so
-  `console-capture.py` refuses. It refuses with the reason rather than a
-  traceback, which is the only thing that made it a two-second problem instead of
-  a bench-time one. **And a 3-second capture with the board OFF is a free
-  pre-flight**: 0 bytes, and the tool splits that into three causes — the
-  adapter, the port, or the board — before a power cycle is spent.
-  🆕 **2026-09-15: it catches a fourth thing, which is the one you cannot see
-  by looking.** A pre-flight that dies with *could not open port* is not a
-  board fault and not an adapter fault — it is an **attach that did not
-  happen**, and an attach that did not happen is invisible everywhere else
-  until a cell fails. 量 2026-09-15, board unpowered, after re-attaching:
-  **0 bytes, 3.079489 s, all three artefacts written** — the information is
-  not the zero, it is that the tool opened the port, ran the whole window and
-  produced files. Run it **after every attach**, not only before a seating.
-  🔴 **And a healthy pre-flight EXITS 1, so the exit code is the one thing
-  that must not be read as the verdict.** 量 2026-09-15 (seating 23), a
-  second instance: 0 bytes, **3.079642 s**, three artefacts, and `rc=1` —
-  `console-capture.py:833` returns 1 whenever `offset == 0`, printing the
-  three-cause line to **stderr**. With the board deliberately off that is the
-  instrument *making its claim*, not failing. **Read the three artefacts and
-  the duration; a script that gates on `$?` here will refuse a good
-  pre-flight.**
-  🔄 **2026-09-02: the resolution above is true in a LOGIN shell and not
-  otherwise, which makes the trap intermittent rather than constant — and
-  an intermittent trap is the worse kind.** 量, with the control run beside
-  it: `wsl -- bash -lc 'command -v python3'` gives
-  `/home/key/.venvs/thermal/bin/python3`, while `wsl -- bash -c` and
-  `wsl -- bash <script>` both give `/usr/bin/python3`, because the venv
-  reaches `PATH` through a login profile. **So a script that works when run
-  one way breaks when run the other, and neither run tells you which you
-  got.** The rule does not move: write `/usr/bin/python3` and the question
-  never arises.
-- 🆕 **Windows-side Python is cp950 here, and it breaks in BOTH directions.**
-  量 2026-09-09, twice in one segment. ① `subprocess.run(..., text=True)`
-  decoding a tool's UTF-8 output raises `UnicodeDecodeError: 'cp950' codec can't
-  decode byte 0xe2` — a `gh run view` whose display title held an em-dash was
-  enough. ② `print()` of any emoji raises `UnicodeEncodeError`, and **that one
-  is the dangerous direction**: it fired inside a patch script that had already
-  rewritten its target in memory and had not yet written it out, so a slightly
-  different script would have left a half-applied edit. 🟢 It did not, because
-  the write is `build the whole string, write to path.tmp, os.replace` — the
-  same rule this file already carries for `open(path, 'w')`. **Pass
-  `encoding="utf-8"` to every `subprocess` capture and put
-  `sys.stdout.reconfigure(encoding="utf-8")` at the top of every script run by
-  `C:\Program Files\Python310\python.exe`.** WSL's `/usr/bin/python3` has
-  neither problem, so a script that works one side can fail the other with no
-  code difference at all.
-- 🆕 **And the two Pythons are not the same LANGUAGE version, so a tool of this
-  repository's can fail to PARSE on one of them.** 量 2026-09-12: Windows is
-  **3.10.7**, WSL is **3.12.3**, and `tools/spec-check.py` carries an f-string
-  whose expression part holds a backslash — legal from 3.12, a `SyntaxError` at
-  3.10. So it is not that `spec-check` misbehaves under Windows Python; it never
-  runs, and **neither does anything that imports it**, which is how this was
-  found (a new tool reuses its row parser rather than writing a second one).
-  🔴 The failure is at import time and names a line inside `spec-check.py`, so
-  it reads as a defect in that file rather than as a host difference. **Run
-  anything that touches `spec-check.py`, `SPEC.md`'s parser, or any tool built
-  on them under WSL's `/usr/bin/python3`.** ⚠️ The requirement is undeclared:
-  nothing in the repository states a minimum Python version, and CI happens to
-  satisfy it because `ubuntu-latest` ships 3.12.
-- 🆕 **`gh` exists only on the Windows side and `jq` only inside WSL, so no
-  single shell can run both — and a tool that needs one runs where that one
-  is.** 量 2026-09-07: `tools/citime.py` shells out to `gh`, so running it
-  under WSL dies with `FileNotFoundError: [Errno 2] No such file or directory:
-  'gh'`; it runs under `C:\Program Files\Python310\python.exe`. The reverse
-  holds for anything wanting real `jq` (WSL has 1.7; `gh --jq` is a reduced
-  builtin that rejects `\(...)` interpolation). 🟢 **That split is what makes
-  a `citime` cross-check genuinely independent** — the `gh` JSON is produced on
-  one side and the arithmetic redone by `jq` on the other, sharing no code and
-  not even a language. ⚠️ **This was true on every previous segment and was
-  written down nowhere**, which is why it cost two failed invocations before
-  being noticed.
-- 🆕 **`gh gist view --raw` does NOT return the raw file — it prepends the
-  gist's DESCRIPTION line, and a sha256 taken from it is not that file's
-  sha256.** 量 2026-09-13, the same gist two ways: `gh gist view --raw > f`
-  gives **1,580** lines and `curl` on the `gist.githubusercontent.com/.../raw/`
-  URL gives **1,577**; the three extra are the description, a blank line after
-  it, and a trailing blank. 67 bytes, and the two hash differently. 🔴 On this
-  host the `gh` route is corrupted **twice more** before it reaches disk,
-  because PowerShell's `>` adds a UTF-8 BOM and converts every LF to CRLF: the
-  file landed at 71,482 bytes where the gist is **69,833**, so 1,649 of its
-  bytes were added by the tooling. 🟢 The counts taken from it were unaffected
-  — none of the three extra lines is an opcode-table entry, and that was
-  **checked by diffing the two copies** rather than assumed. **Fetch a gist
-  with `curl` inside WSL when the bytes matter**; `gh` is fine for reading.
-- ✅ **`console-capture.py` refuses a capture with neither `--seconds` nor
-  `--idle`, and records both in its metadata — fixed 2026-08-30.** *(Until then
-  such a capture never returned: both default to `0.0` and the read loop broke on
-  neither, so `timeout -s TERM 8` gave `rc=124`. A SIGTERM kill loses
-  `.meta.json`; the `.log` and `.timing` survive, flushed per chunk.)*
-  **Every capture command still carries a terminator** — the guard makes that a
-  refusal rather than a habit, and §B5's card now carries one on all fifteen of
-  its capture rows. 🔴 **Where the guard sits was measured, and the obvious
-  placement is wrong**: it goes after `_check_send` and before the port is
-  opened. Of the four terminator-less invocations in
-  `tools/test-console-capture.sh` only **one** changes (`P4`, the 127-character
-  line, the only one whose assertion is that the run reaches the port); the other
-  three are refused inside `_check_send` first. 🔄 **2026-08-30, later the same
-  day: this bullet said *"`N21` pins both sides with one command"* and that is
-  false.** `N21` sends **127** characters — a length `_check_send` **accepts** —
-  so it gets the terminator refusal whether or not the guard sits above
-  `_check_send`; that side was held only by `N4`/`N7`/`N8` happening to carry no
-  terminator, which is coverage by accident. **`N29` sends 128 and requires the
-  LENGTH refusal**, and `N30` pre-creates the output files and requires the
-  TERMINATOR refusal ahead of the overwrite one — those two pin the position,
-  one edge each. Found by `tools/test-console-capture-mutants.py`: **25 mutants
-  of that guard, TEN alive against the forty cases**, in four classes the cases
-  could see only one instance of each. Suite 40 → 46, 25/25 killed.
-  🔴 **And a green suite is a claim about the suite**: the mutant runner is now
-  the thing that says the cases work, and it runs in CI.
-  ⚠️ **`tool_version` deliberately did not move**: it owns *what the
-  instrument wrote to the port*, and nothing new goes on the wire — the
-  **presence** of the `seconds` key is what dates a capture instead.
-- 🆕 **PowerShell has its own four traps, and two of them make a check silently
-  useless rather than noisy.** *(①–③ 量 2026-09-01; ④ 量 2026-09-08.)*
-  ① `Get-Date -Format`
-  eats format letters **inside literal text**: `"Windows: yyyy-MM-dd"` printed
-  `Win1ow20:` because `d` and `s` are specifiers. ② `<long command> |
-  Select-Object -Last N` **buffers the whole pipeline** — a 25-minute suite
-  showed nothing until it ended, so there is no progress to watch; run it in the
-  background, or let it write files and read those. ③ `wsl -- bash -c "…$?…"`
-  dies with *unexpected EOF* on nested quotes. **Same fix as the Bash tool's:
-  write the script to a file and run it by path** — `wsl -d Ubuntu-24.04 --
-  bash /mnt/c/…/x.sh`.
-  🆕 ⑤ **A native command piped into anything gets a UTF-8 BOM prepended, and a JSON parser on the other end dies on it.** 量 2026-09-09: `gh run view … --json … | python -c "json.load(sys.stdin)"` raises `json.decoder.JSONDecodeError: Unexpected UTF-8 BOM (decode using utf-8-sig)` at line 1 column 1. ~~It is not `gh` — `gh … > file` and reading the file is clean. **Redirect to a file and read it, or use `utf-8-sig`.** Same class as ④: the pipeline, not either program, is what breaks.~~ 🔴 **2026-09-10: the remedy in that sentence is FALSE and the cause is too narrow, and the workaround it recommended is the one that failed.** 量, six cases with controls — three producers × two paths, first eight bytes read as binary: `gh --version`, `cmd /c echo` **and a plain PowerShell string** each get `EF BB BF` prepended, through `>` **and** through `|`. So it is neither `gh` nor "a native command": **`>` and `|` both prepend a BOM in this shell whatever produced the text**, and `gh … > f` followed by `json.load(open(f))` dies exactly as the pipe does — 量, that is how this row got re-measured. **The rule is one thing and it has no exceptions: read every such file or stream with `utf-8-sig`**, which also accepts a BOM-less input, so it is never wrong. ⚠️ Cause partly identified: `$PSDefaultParameterValues['Out-File:Encoding']` is `utf8`, and in Windows PowerShell 5.1 `utf8` means *with* BOM — `>` is `Out-File`, which covers the redirect half. The pipe half is **未定**: `$OutputEncoding` is `UTF8Encoding` with `GetPreamble().Length` **0**, which the simple explanation does not survive.
-  🆕 ④ **`| Select-Object -First N` KILLS the native process when `N` is fewer
-  lines than it produces, and the exit code becomes `-1` — which the tool
-  surfaces as `255` and which is indistinguishable from a real failure.** 量,
-  the same command twice: `citime.py stats 2>&1 | Select-Object -First 3`
-  → `rc=-1`; `… | Select-Object -First 100` (its output is ~17 lines, so nothing
-  is truncated) → `rc=0`; and standalone with no pipe, `rc=0`. **The truncation
-  is the cause, not the tool.** 🔴 **It fails in the safe direction — it invents
-  a red and can never invent a green — but it is still a check reporting
-  something that is not true**, and this file's own `EXIT CODE: 0` incident is
-  the same class with the sign flipped. `-First N` is fine for reading *output*;
-  **never read `$LASTEXITCODE` through it**. Run the command bare (or redirect to
-  a file) when the exit code is the thing being measured.
-  🆕 ⑦ **A `gh` argument containing a DOUBLE QUOTE loses it, and where the quote surrounded whitespace the argument also splits — so a `--jq` or `--template` expression is mangled twice over.** 量 2026-09-11, three cases with the hypothesis written first: `--jq .status` (no quote, no space) rc=0; `--jq '.status + .conclusion'` (**a space, no quote**) rc=0, **so whitespace is not the cause**; `--jq '.status + "X"'` → jq says `function not defined: X/0`, i.e. it received `.status + X` with the quotes **stripped rather than escaped**. PowerShell 5.1 re-quotes a native command's argument without escaping the quotes already inside it, so they terminate and restart quoting and the CRT splits at whatever whitespace is then exposed — which is why `gh run view --json jobs --jq '… "JOB " …'` came back **`accepts at most 1 arg(s), received 9`** and a `--template` holding `{{"\n"}}` came back `received 2`. 🔴 **It cost three failed invocations in one segment before it was measured**, which is the same shape as the `gh`/`jq` split two bullets down: true on every previous segment and written down nowhere. **Write jq expressions with no double quotes** — `@tsv` and `+` on fields are enough for most of them — **or redirect the JSON to a file and parse it in Python with `encoding='utf-8-sig'`**, which the BOM row above already requires anyway.
-  🆕 ⑥ **`Get-Date -UFormat %s` is off by the local UTC offset in Windows
-  PowerShell 5.1 — it computes the epoch from LOCAL time as though it were UTC.**
-  量 2026-09-10, one host, two routes, two controls: `-UFormat %s` gives
-  `1789060095.69966` while `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()` gives
-  `1789031295` — **28,800 apart, exactly UTC+8** — and
-  `(Get-Date).ToUniversalTime()` prints `09:08:15Z` beside a local
-  `17:08:15+08:00`. Git Bash and WSL both agree with the reference route to the
-  **byte** (`1789031272` on both), so the error is PowerShell's alone. 🔴 It is
-  the dangerous shape this file keeps recording: **a wrong number wearing a
-  measurement's clothes**, and an eight-hour error in a project whose
-  directory names are dated assertions. **Use
-  `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`, or take the epoch from Git
-  Bash or WSL.**
-- 🆕 **The `Monitor` tool's command runs in the Bash tool's shell — Git Bash —
-  so a `/mnt/c/…` path there is not a missing file, it is a DIFFERENT
-  filesystem's name for nothing.** 量 2026-09-07: a monitor watching a
-  background WSL sweep was written with the `/mnt/c/…` path its own producer
-  used. In Git Bash that path does not exist, so `grep -c` returned **0** and
-  `pgrep -f` found nothing, and the monitor's two terminal branches — *no
-  events yet* and *the process is gone* — **collapsed onto the same reading**.
-  It reported `sweep process gone, done=0/59` while the sweep was at 27/59 and
-  running. 🔴 **The coverage rule was followed and did not help**: both
-  branches were written, and both read the same unreachable path. **A watcher
-  needs a startup assertion that it can SEE its input** — `[ -f "$O" ] || {
-  echo REFUSED; exit 1; }` — because *a tool reporting 0 is making a claim*
-  applies to the watchdog too. Git Bash's form is `/c/Users/…`; WSL's is
-  `/mnt/c/Users/…`; **the producer and the watcher are in different shells and
-  need different spellings of the same file**.
-- 🆕 **A sweep that RECONSTRUCTS the command it runs will eventually run a
-  broken one and report it as a broken suite.** 量 2026-09-02: a script that
-  pulled each suite out of `ci.yml` with a regex stopped at the `&` of `2>&1`,
-  so all 48 invocations ran as `... 2>` and died in the shell — and it printed
-  **46 FAIL lines that are indistinguishable from 46 failing suites**. That is
-  this project's own rule about `test-flashwin-mutants` (a harness that kills
-  everything and a harness that tests nothing print the same thing), inside the
-  harness. **Take the whole `run:` value verbatim and hand it to `bash -c`**, so
-  what runs on the desk is character-for-character what runs in CI, and read the
-  first few lines of the output before believing any summary.
-  🔴 **And that is still not enough, measured the same hour.** The corrected
-  script grepped `^\s+run: .*tools/` and **silently dropped
-  `verify-backup-copy`**, whose step is a YAML literal block: its `run:` line is
-  just `|` and the command sits in the body. 46 suites reported ok and the
-  47th was never invoked. **`ci-census` is what named it** — `RED … no
-  verify-backup-copy.out` — which is the second time that suite has been lost
-  this way and the second time the census caught it. **A sweep that selects
-  `run:` LINES cannot see a `run:` BLOCK**; either parse the YAML or let the
-  census be the arbiter, and never read a sweep's own count as coverage.
-  🔴 **2026-09-02: and `ci-census` cannot be that arbiter ON THIS HOST, which is the half the sentence above still got wrong.** 量, running every `run:` step here: 47 of 49 suites green, and the two reds are the census **working**. `test-hazlint` (142 cases) and `test-hazlint-objs` (**41** as of 2026-09-04; 28 when this line was written) are declared `*bench-only*` in `ci-expected.tsv` because their `K4` population control is `$FWRE_WORK/stage2.bin` — 56 KiB of this unit's vendor bootloader, which may not be committed. `ci-census`'s own `C10` requires *`*bench-only*` plus a real `.out` → red*. **~~This desk has that file, so they run, so their `.out` exists, so red.~~ 🔴 **2026-09-06 (thirty-fourth segment): that attribution is FALSE, and the two reds are real.** 量, three ways: `grep -nE '^\s+run:.*hazlint' .github/workflows/ci.yml` returns **0**; `git log -S'test-hazlint.sh' -- .github/workflows/ci.yml` is **empty over the whole history**, so no such step has ever existed; and `tools/ci-expected.tsv:142` states it outright — *"CI runs zero hazlint cases"*. **Nothing in a `ci.yml` sweep invokes either suite, on any host**, so having `stage2.bin` cannot make them run. 🟢 **The two reds are `census/merge the captures` and `census/census`, and the first causes the second**: 量 2026-09-06, a full sweep of all **60** `run:` steps *(🔄 **61** from the thirty-seventh segment the same day, when `citime self-test` was added)* — **58 ok, 2 RED, 1,478 s** — where `merge the captures` dies on `cp: cannot stat 'dl/*/*.out'` (the GitHub artifact download directory does not exist at the desk) and `census` then reports `NOT-RUN-TOTAL MISMATCH: declares 491 and this job did not run 2`. ⚠️ **This paragraph's CONCLUSION is untouched** — run every suite here and read the per-suite lines, let the census on GitHub decide the census; only its reason moves.** Those two are **183** of the declared `# not-run-total: 491` *(477 when this line was written, then 478; 量 2026-09-03 against the tsv and against CI run 33747027566's census, which printed the same 478; **491 from 2026-09-04**, `R5-3a`, when `test-hazlint-objs` went 28 → 41 and the whole row is bench-only)*, so the total collapses to **2** here and the mismatch check fires too. ⚠️ **And the total is not recomputable from the table**: `ci-census`'s own docstring says a suite's skip rows are *alternatives, not additive* — which fire depends on configuration — so summing the covers column gives 517, not 478, and that is the table being right rather than wrong. **So: run every suite here and read the per-suite lines; let the census on GitHub decide the census.** A local sweep that ends in two reds every time trains a reader to ignore reds, which is the failure this whole paragraph exists to prevent.
-- 🆕 **The desk sweep is `tools/desk-sweep.py`, it runs on a COPY, and the copy
-  goes on ext4. Three rules, and each one is a refusal rather than a habit.**
-  🔴 **① The step list is READ, never reconstructed.** The tool parses
-  `.github/workflows/ci.yml` with PyYAML. Everything above this bullet about
-  regexes that stop at `2>&1`, greps that cannot see a `run:` BLOCK, and the
-  two inline `- run:` steps at the `lint` job that **every desk sweep from
-  2026-08-25 to 2026-09-07 skipped** — 59 of 61, wrong by two for six weeks —
-  is the reason. Its `C2` control runs the old line-based enumerator against
-  the same fixture and requires it to come out short, so the reason is a case
-  and not a paragraph. 量 2026-09-07: **62** `run:` steps (61 plus this tool's
-  own self-test), **2** refused here because they need root, **2** expected-red
-  (`census/merge the captures`, `census/census`), **58** runnable. 🟢 **And it
-  settled the two that were invisible**: `lint/#1` is `sudo apt-get install
-  shellcheck`, refused at a desk; `lint/#2` is `shellcheck --severity=error
-  tools/*.sh`, and it is **green here, rc 0** — the first time it had ever been
-  run at this desk.
-  🔴 **② Copy to ext4 first, VERIFY the copy, sweep the copy, delete it.**
-  量 2026-09-07, the whole sweep, both arms as COPIES so the only variable is
-  the destination filesystem: **9p 1,893.4 s → ext4 1,002.7 s = 1.89×**, and
-  the sweep phase alone 1,813.0 → 957.6 s, also **1.89×**. Per suite, 57 paired
-  legs, **median 1.77×**; 13 of them within ±15 % and **7 actually slower on
-  ext4**. Verdicts are IDENTICAL on both arms — **58 ok, 2 refused, 2
-  expected-red** — which is the control that licenses the change at all: a
-  faster sweep that reached a different conclusion would be worthless.
-  🔴 **The gain is bimodal and neither half is the filesystem in general.**
-  Three mutation suites that re-exec Python hundreds of times collapse —
-  `rbcheck` **47.75×** (326.4 → 6.8 s), `cardcheck` **37.56×** (219.4 → 5.8 s),
-  `replay-capture` **33.80×** (190.8 → 5.7 s) — together **40.6 % of the 9p
-  sweep, 736.5 s → 18.3 s**. What is left on ext4 is dominated by work no
-  filesystem touches: `test-console-capture-mutants` **0.98×**,
-  `test-console-capture` **1.00×**, `test-deskchan` **1.00×**, together
-  **54.2 % of the ext4 sweep** — the first is sleep-bound by design (ptys and
-  played gaps) and the others run `qemu-system-mips` single-threaded at 100 %
-  of one core. 🔴 **So `1.89×` is the number, and it will not improve by moving
-  the tree anywhere else — including a tmpfs.**
-  🔴 **AND THE FIGURE THIS RULE WAS FIRST WRITTEN FROM DOES NOT SURVIVE, WHICH
-  IS THE MORE USEFUL RESULT.** It was `test-spec-check-mutants` at 9p
-  **44.25 / 45.10 s** against ext4 **1.52 / 1.47 s** — *29×*. 量, chasing it:
-  the **9p leg reproduces** (45.27 s here) and the **ext4 leg does not** —
-  standalone on ext4 with n=3 it is **19.42 / 23.80 / 20.29 s**, and under the
-  sweep 16.50 s, so the suite's real ratio is **2.2–2.8×**. The 1.5 s is
-  reproducible on demand and it is **a run in which the suite REFUSED**:
-  with `.git` absent `git ls-files '*.md'` returns **0** instead of 108, and
-  the suite exits **rc 1** printing *"REFUSING: the unmutated self-test already
-  fails (rc=2) -- every mutation below would 'kill' a suite that was already
-  red"* — measured, **1.36 s**. So the 29× was
-  9p-with-a-population ÷ ext4-with-no-population, two different experiments.
-  ⚠️ **This is this project's own rule arriving in the timing domain: a suite
-  that refuses is FAST, and a fast suite looks like a win.** Time a suite only
-  beside the count of what it actually ran.
-  🟢 The mechanism is unchanged and still measured: 量 on this run's own
-  source-hash phase, **1 CPU second in 36 s of wall clock with 78,549 voluntary
-  context switches and 8 non-voluntary** — the process is asleep waiting for 9p
-  replies. ⚠️ **`iowait` does not see this** (it read **0.0 %** while that was
-  happening): iowait counts block-device waits, and a 9p wait is a sleep on a
-  transport reply, accounted as *idle*. The instrument is voluntary context
-  switches, not `iowait`.
-  ⚠️ **The verify is cheap, measured rather than assumed**: hash + copy + hash
-  is **80 s of 1,893 (4.2 %)** on 9p and **45 s of 1,003 (4.5 %)** on ext4. 🔴 **The verification is not optional and it is a refusal,
-  not a warning**: the sweep reads the copy and the conclusion is about the
-  tree, so a hash list is taken on both sides and a mismatch stops the run
-  before a single suite starts. `C3` is the positive control on it — one byte
-  changed in the copy must be caught, or *"the copy IS the source"* is a line
-  that cannot fail.
-  🔴 **③b AND A SWEEP CAN NEVER COVER THE SEGMENT'S OWN WRITE-UP, which is not a discipline problem but an ordering one.** 量 2026-09-09 (fiftieth segment): the full sweep ran at 23:12 and that segment's `LOG.md`, `PROGRESS.md` and one new note were written at 23:41. `ledgerscan check` was **green at the desk and red on CI**, on a path the write-up itself invented — a scratch filename quoted out of a compiler message, which a citation scanner cannot tell from a path this project has read. **The record is always written after the sweep that the record describes.** So the closeout re-runs the checks whose subject is a tracked `.md` — `spec-check`, `ledgerscan check`/`quarantine`, `xcheck sweep`, `flashwin scan` — on the final tree, and **which checks those are is decided by `git diff --name-only <last swept commit> HEAD`, not by memory**: on that segment everything changed after the sweep was `.md` except four tool and config files that were already final when it fingerprinted the tree, so the full sweep's verdict on every tool still stood and only the `.md` side needed re-running. 🔴 **And a re-sweep restricted with `--only` selected nothing** — `69 declared, 69 skipped, 0 ran` — because the step names were rebuilt out of `enumerate`'s display format, which is this file's own rule about not reconstructing commands. **A sweep that runs zero steps reports zero failures**; the tool printed `0 ran / 0 green` on the same line and reading that line is what caught it.
-  🔴 **③ DO NOT COMMIT WHILE A SWEEP IS RUNNING, and the reason is not that a
-  commit changes content — it does not. A commit changes the POPULATION.**
-  量 2026-09-07: `spec-check` sweeps **tracked** `.md` files; a bench card was
-  committed while the desk sweep was mid-run; the card was untracked when
-  `spec-check` walked the tree and tracked immediately after, so **neither
-  state was ever swept** and its `C8` defect reached CI. A sweep certifies the
-  tree it saw. Copying first makes "the tree it saw" a thing on disk that can
-  be compared, which turns that silent hole into a stated scope limit: the tool
-  re-reads the source at the end and says out loud whether the green is about
-  the tree on disk now. ⚠️ **The copy does not protect the copy PHASE** — a
-  commit racing `cp -a` can be captured half-applied, which the fidelity check
-  refuses. The window is the first minute or two of each run.
-  🔴 **2026-09-08: the rule is not "do not commit", it is "do not TOUCH the
-  tree" — and that is wider than it reads.** 量, on the forty-fourth
-  segment's own sweep: it ended `🔴 THE SOURCE MOVED WHILE THE SWEEP RAN -- 1
-  difference(s)`, and the difference was
-  `tools/__pycache__/flashmap.cpython-310.pyc`. Nothing was committed and no
-  source file was edited; a **read-only experiment** was run from the source
-  tree while waiting, and `import flashmap` wrote a `.pyc`. 🟢 **The guard
-  worked and it is worth what it cost**: the file is gitignored and no tracked
-  file moved, so the green stands — but the tool SAID so rather than leaving
-  it to be assumed, which is the difference between a scope limit and a hole.
-  **Run tools from a copy while a sweep is up, or read the notice and check
-  what moved.**
-  ⚠️ **What it cannot do**, stated rather than left to be found: a step naming
-  an absolute path into the source reads the SOURCE, not the copy (it greps for
-  that and reports); `$FWRE_WORK` is outside the copy for both arms on purpose;
-  and **its total is not CI's wall clock** — it runs steps sequentially where CI
-  runs four jobs in parallel, so it may never be compared with `citime`'s BIG3.
-- 🆕 **Reading a suite's output files is a measurement, so it needs a control —
-  and freshness is NOT completion.** 量 2026-09-01: `ci-out/` holds the previous
-  run's `.out` files, so a summary that just reads them scores stale results as
-  new (an mtime cut caught exactly one, and it was the one that would have been
-  misread). Then the mtime cut passed a file that was **still being written** —
-  3,645 bytes, `RESULT:` absent; 5,968 bytes forty seconds later. **Wait for the
-  process's exit code; the output file is not the instrument.**
-- Serial console: CP2102, **38400 8N1**. You cannot see it — at the bench you write
-  the commands and read what I paste back. One power cycle is the most expensive
-  unit here, so list every question before the device is plugged in.
+**Files and git**
+- Never `open(path, 'w')` before the content exists: build it, write `path.tmp`,
+  then `os.replace`. A script that edits several files checks every anchor before
+  its first write.
+- Read `git status --porcelain` as its own call, then `git add` by name, then a
+  plain `git commit`. Never a path-limited commit: on DrvFs it records `100644`.
+- Every tool carries a shebang and is `100755`. Fix drift with
+  `git update-index --chmod=+x`, and re-check after any `git restore --staged` of a
+  file `HEAD` lacks; `tools/test-file-modes.sh` reads the index.
+- `sudo apt-get install` needs `DEBIAN_FRONTEND=noninteractive`; `-y` alone hangs.
 
-## Committed files
+**PowerShell, gh, jq**
+- `>` and `|` prepend a UTF-8 BOM, so read such output as `utf-8-sig`; `>` also
+  turns LF into CRLF. `Get-Date -Format` eats letters inside literal text;
+  `Get-Date -UFormat %s` is off by UTC+8 (use
+  `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`). `Select-Object -Last N` buffers
+  the whole pipeline, and `-First N` below the output's line count kills the
+  process and fakes its exit code. Never inline `wsl -- bash -c "…$?…"`.
+- `gh` exists only on Windows and `jq` only in WSL; `gh --jq` rejects `\(...)`.
+  Write `--jq` and `--template` expressions without double quotes. Fetch a gist
+  with `curl` in WSL when its bytes matter; `gh gist view --raw` prepends the
+  description.
 
-**Written for an engineer, never for a hiring panel.** State the finding, name the
-artefact it was measured on, stop. No résumé bullets, no "this proves I can X".
-`plan/` is gitignored and may address me directly; committed files may not.
+## Closeout
 
-English, except the working log and `SPEC.md`. Commit messages say *why* — the
-diff says what.
-
-🔴 **And `ci-census --only <the suites you touched>` is the wrong rule when what you touched is `bench/`.** 量 2026-08-30: a seating that adds two captures moves the population every census-shaped case reads, and `tools/test-boot-timeline.sh`'s `B2` — a hardcoded `N cold, M warm` — went red on GitHub twice while the local `--only` run was green. **A seating changes data, and data is what those cases assert on.** After a seating, run every suite that can run on this host, not only the ones whose code changed. 🔴 **2026-09-08: and on a DESK day the same rule bites for a different reason — `--only` cannot report on a suite it was not given, so a suite you edited but did not name is invisible to the check you ran to be safe.** 量, on the forty-fourth segment's closeout: `flashmap`'s declared total was corrected 12 → 14 and the census was run `--only capdate,capfield,flashmap` and came back green, while `tools/ci-expected.tsv` still declared `looprun 55` against a suite that had grown to **66**. That is a `CENSUS-MISMATCH` on the next push, and it was found by a `git grep` for stale counts and not by the census. **Name every suite you touched, including the ones you only added cases to** — or run the census with no `--only` at all and read the reds you already expect.
-
-**Before you stop**: update `PROGRESS.md` § Now, and append a dated entry to
-`LOG.md` (create it on the first session) — **including desk-only days**, because
-a desk-only day is exactly when the next bench visit's plan changes. **If the
-session produced, changed or refuted a number, `SPEC.md` changes in the same
-commit** — a spec table that lags the finding is worse than no table, because it
-reads as current. Then run `python3 tools/spec-check.py` — it runs its eight
-controls first and refuses to report on the file if any of them fails — and
-`bash tools/test-file-modes.sh` if a file was added. Two seconds for both.
-
-🔴 **And `git add -N` every NEW `.md` file before running that gate.** 量
-2026-09-16 (seventy-eighth segment), on a red CI run: `spec-check` sweeps
-`git ls-files`, so a file that is still untracked is invisible to it, and
-`notes/record-integrity.md`'s two `C8` defects were found by CI on the commit
-that added the file — after five local runs had reported clean. This file
-already records the same hole for **bench cards** (*gate 2 is `spec-check`,
-and a card is untracked until the freezing commit, so the gate that exists to
-check the card cannot see the card*); it is not a fact about cards, it is a
-fact about every new file a sweep is supposed to cover. 🟢 `git add -N <path>`
-puts it in `git ls-files` without staging its content — measured, 0 → 1 on a
-probe — and that is the whole fix. ⚠️ **And it applies only to a file that WILL
-be tracked**: 量, the first time the rule was applied, `git add -N` on a new
-`study/` file was refused because `study/` is gitignored — so a gitignored new
-file is a third state, never swept and never meant to be. The rule is about
-files the sweep is meant to cover, not about new files.
-
-🔴 **And run `citecheck` whenever a row was ADDED to `SPEC.md`, before pushing.**
-量 2026-09-17 (eighty-fifth segment), on a red CI run: seven new rows plus five
-§ 17 residuals shifted every line below them, and **twelve citations across four
-files** went stale — `PROGRESS.md`, `SPEC.md` citing itself, `docs/FINDINGS.md`
-and `notes/slots45-draft.md`. **A line-number citation into `SPEC.md` is
-invalidated by any row inserted above it, and `citecheck` is the only thing in
-this repository that can see it.** 🔴 It is not a hypothetical drift:
-`notes/slots45-draft.md:18` already carried a note saying it had been `:625`,
-*"a different, already-closed row — the citation was measured before the commit
-that shipped it added three lines above it"*, so **that one citation has now
-rotted twice for the same reason**, and the second time it landed on a blank line.
-⚠️ The fix is cheap and must not shift anything itself: replace only the digits,
-check that the exact old token is on the exact line first, and **re-derive each
-new line number by reading it back** rather than copying it out of the checker's
-message.
-🔴 **And `citecheck`'s green says NOTHING about a line you have just edited.**
-量 2026-09-20, twice in one evening on the same question: its own control `T26`
-is *"an uncommitted citing line is skipped, not assumed stable"*, so after an
-editing session it reports `0 new rot` while `25 suspended (citing file dirty)`
-sits two lines above — and `docs/FINDINGS.md:807` was citing a row that had moved
-two lines, on a run that exited 0. **The verdict you want is the one taken AFTER
-the commit**, where `0 suspended` appears in `C4`'s line; before that, re-derive
-every citation you touched yourself, from the row name, by reading `SPEC.md`
-back.
-🔴 **And an automatic citation repairer will eventually edit a number a human
-sentence on the SAME LINE forbids editing.** 量 the same evening: `SPEC.md`
-carries *"🔄 **2026-09-17 刻意拿掉反引號,而這一處不准改號碼**"* because that
-number quotes what a **frozen card** said, and a repair loop that re-derives its
-target changed it anyway — the target check cannot see a permission. **Neither
-the repairer nor `citecheck` can tell a live pointer from a historical
-quotation**; only the prose can, and only a reader reads prose.
-
-🔴🔴 **A tool's own totals line is not its verdict either, and this is
-wider than the `tail` rule above.** 量 2026-09-17, the same red CI run:
-`capdate` printed
-
-    capdate: 36 directories, 1400 captures, 32 OK, 0 spanning, 2 declared, 0 RED, 0 stale
-      D4    2026-09-17b              on disk and not in the index
-
-and **exited 1**. `D4` is not counted in the `RED` column, so the summary line
-says `0 RED, 0 stale` on a run that is failing. Anyone reading that line
-concludes clean. 🔴 **Three instrument failures then composed, and the
-composition is the thing to remember**: ① a closeout script filtered the output
-with `grep -iE '^\s*(FAIL|RED|ERROR)'` and the finding's line begins with two
-spaces and `D4`, so the only match left on screen was a `RED` from `capdate`'s own
-self-test fixture — which made the `rc=1` look like it belonged to the fixture;
-② a second script then "confirmed" it as `capdate … | tail -6` followed by
-`echo rc=$?`, which is **`tail`'s** status, manufacturing a green; ③ the summary
-line agreed with the green. **Two individually harmless instrument defects
-composed into a green that hid a red, and the composition only ever fails toward
-green.** The rule is the one this file already has, applied one level up: **read
-the exit code, from inside a script file, with no pipe on the command that
-carries it** — and if a pipe is unavoidable, `${PIPESTATUS[0]}`, which is what
-this repository's own `ci.yml` already does.
-
-🔴 **And the targeted closeout is not a substitute for `desk-sweep`.** 量 the
-same day: a closeout that ran `spec-check`, `capdate`, `check-predictions`,
-`cardcheck`, `ledgerscan` and `xcheck` reported clean, and `tools/desk-sweep.py`
-over all 99 declared steps reported **three unexpected reds** — `capdate`,
-`citecheck` and `test-citecheck` — of which **two were completely unknown**. The
-sweep costs about 31 minutes of wall clock on ext4 and it found what three
-consecutive pushes did not.
+- Before stopping: rewrite `PROGRESS.md` § Now to the current state; append a dated
+  `LOG.md` entry, desk-only days included; land every finding and number change in
+  its owner file and in `SPEC.md` in the same commit.
+- `git add -N` every new `.md` that will be tracked before running `spec-check`,
+  which sweeps `git ls-files`.
+- Run `spec-check`, `citecheck`, `cfcensus` (`--self-test`, `ratchet`, `check`),
+  `ledgerscan check` and `quarantine`, `xcheck sweep`, `capdate`, `docsize`,
+  `test-file-modes`, and `flashwin scan --dump` with this unit's dump — no CI job
+  runs it. Take `citecheck`'s verdict after the commit (`0 suspended`); before it,
+  re-derive every citation you touched. A burst of `C9`/`C10` is usually one
+  unclosed backtick.
+- Repair a citation by changing its digits only, after confirming the old token is
+  on the old line and reading the new line back. A number that quotes a frozen card
+  is never renumbered; no tool can see that, so read each line's prose before
+  accepting an automatic repair.
+- Run `tools/desk-sweep.py` over every declared step before closing, with `--dest`
+  on ext4 under `$FWRE_WORK/rebuild/`, never under `/mnt/c` (~31 min). Targeted
+  runs are no substitute. It parses `ci.yml` — never rebuild a step's command by
+  hand, pass `--only` names exactly as declared, and read the ran count: a `--only`
+  that selects nothing prints `0 ran` and exits 0, and a sweep's own count is not
+  coverage. `census/merge the captures` and `census/census` are red at the desk by
+  design; GitHub decides the census. Read a sweep's first lines before its summary,
+  wait for a suite's exit code rather than its `.out`, and never compare the
+  sweep's total with CI's wall clock. A 9p wait shows as idle, not `iowait`; count
+  voluntary context switches instead.
+- While a sweep runs, touch nothing in the source tree — no commit, no tool run
+  (an import writes `.pyc`). If it ends with *SOURCE MOVED*, check what moved
+  before trusting the green. The record is written after the sweep, so re-run the
+  `.md`-subject checks on the final tree, chosen by
+  `git diff --name-only <swept commit> HEAD`.
+- After a seating, run every suite that can run here rather than
+  `ci-census --only`: new captures move population cases (`test-boot-timeline.sh`
+  `B2`). With `--only`, name every suite touched and `git grep`
+  `tools/ci-expected.tsv` for stale counts. Test lines carry exactly two leading
+  spaces; run the census locally before pushing a new tool. A red `text` job hides
+  `census`, and a green run certifies only the layers that ran.

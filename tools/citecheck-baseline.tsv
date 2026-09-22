@@ -29,7 +29,6 @@ M3	PROGRESS.md	tools/check-predictions.py	50	d6d8a07f8241682c	tools/check-predic
 M3	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	55ce45b90472365b	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c:471 
 M3	SPEC.md	tools/console-capture.py	431	bc270a8e75d0c313	tools/console-capture.py:431 is a blank line
 M3	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	1293	68ec71163e2f0d85	docs/probe3-cells.md:1293 is a blank line
-ROT	CLAUDE.md	tools/ci-expected.tsv	142	e8db9a299a0f1289	# -- deliberately, because hazlint is *bench-only* for exactly the opp
 ROT	PROGRESS.md	LOG.md	5859	6917a92bf34bfd3d	| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根
 ROT	PROGRESS.md	docs/FINDINGS.md	375	bb2be593c5112831	| 🔴 讀 | **`arch/rlx/bsp` is a dangling symlink in two of the three GPL
 ROT	PROGRESS.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar

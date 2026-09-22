@@ -920,6 +920,24 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-citecheck-mutants.py 2>&1 | tee ci-out/test-citecheck-mutants.out; exit "${PIPESTATUS[0]}"
 
+      # The state documents' size budgets, in both directions: a document over
+      # its budget fails, and so does a budget left at more than twice what it
+      # measures (tools/docsize.py, SPEC.md FW-112).
+      - name: docsize
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/docsize.py 2>&1 | tee ci-out/docsize.out; exit "${PIPESTATUS[0]}"
+
+      # Text moved out of a state document must arrive intact in one file.
+      - name: docmove self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/docmove.py --self-test 2>&1 | tee ci-out/docmove.out; exit "${PIPESTATUS[0]}"
+
+      # CLAUDE.md's former text, moved verbatim on 2026-09-23, stays whole.
+      # Needs this job's fetch-depth: 0 (it reads e36acb4:CLAUDE.md).
+      - name: docmove claude-md
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/docmove.py check --before e36acb4:CLAUDE.md --after docs/history/claude-md-2026-09-23.md 2>&1 | tee ci-out/docmove-claude.out; exit "${PIPESTATUS[0]}"
+
       - name: fetch-sources --list (offline; never fetches)
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/fetch-sources.sh --list

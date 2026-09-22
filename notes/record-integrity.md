@@ -405,6 +405,19 @@ why five of the six above went unreported and this one did not — and it is the
 cheapest reason to run `citecheck` on a dirty tree even though its baseline
 rows are suspended there.
 
+🔴 **And one that had been committed for two days, and was seen only because an
+insertion moved it — 量 2026-09-23.** `docs/KNOWN-ISSUES.md`'s
+`instruments/dtcheck` row cited `.github/workflows/ci.yml` at line 1163 for
+`/tmp/dtvenv/bin/pip install -q dtschema`. That command was at line 1153 in
+`ca1b16d`, the commit the red run it describes ran, and at line 1302 in
+`23a1463`, the commit that wrote the citation; line 1163 was an unrelated
+comment in both. `citecheck` called it `STABLE` for two days, because the cited
+line had not changed since the citing line was written. The commit that rewrote
+`CLAUDE.md` inserted 18 lines above it, and it went `ROT` — the first time any
+check saw it. It now cites the step by name. **An insertion is also a
+detector**: it moves a wrong citation exactly as it moves a right one, and the
+content oracle then sees the move.
+
 ## 5.3 An insertion breaks the citations no checker reads — 量 2026-09-23
 
 `citecheck` skips `bench/`, `LOG.md` and `CHANGELOG.md` (`SRCREF_EXEMPT`,
@@ -458,9 +471,49 @@ the file as it was at the card's commit, belong to `R1y`.
 * `PROGRESS.md`'s generated census block read `ORPHAN 0 / LIVE 35` from
   2026-09-16 while the live census was `ORPHAN 17 / LIVE 14`. The section said
   *`cfcensus check` runs in CI*; CI runs `--self-test` and `ratchet`
-  (`.github/workflows/ci.yml:1075-1088`), and `check` does not read the blocks.
+  (the `cfcensus` and `cfcensus ratchet` steps), and `check` does not read the blocks.
 * `cfcensus` treats only `✓` as closed (`tools/cfcensus.py:831-832`), so a gate
   that has not started counts as a live owner. That is right for a booked gate
   and would be wrong for one marked `⊘`; none is today.
 
 All three belong to `R1y`.
+
+## 5.5 The state documents grew because the record of being wrong was kept inside them — 量 2026-09-23
+
+Measured from git history (`git cat-file blob <rev>:<file>`; a line is a `\n`):
+
+| file | first commit, 2026-08-23 | end of 2026-09-16 (`76791c4`) | `f557873`, 2026-09-23 |
+|---|---:|---:|---:|
+| `CLAUDE.md` | 81 lines, 5,969 bytes | 1,342 lines, 119,933 bytes | 1,450 lines, 127,686 bytes |
+| `PROGRESS.md` | 105 lines, 7,550 bytes | 2,308 lines, 951,723 bytes | 2,434 lines, 1,025,800 bytes |
+
+Where the bytes were at `f557873`. In `CLAUDE.md`, 45.8 % of them were one
+opening blockquote of 774 lines — 16 "*N*th update" seating narratives, under a
+first sentence saying the file held only what is true today — and 35.3 % its
+Environment section, mostly incident accounts. In `PROGRESS.md` the current
+position, § Now, was 8.4 %, and its three largest cells were 31,464, 29,147 and
+12,332 bytes. Twelve closed step lists were 34.6 %, a "session ladder kept
+verbatim" 19.4 %, and the carried-forward table 24.8 %, with 68 of its 109 rows
+closed or declined (57 and 11, by `cfcensus`'s own parser). Struck-through text
+was 0.74 % and 0.52 %: the accretion was narrative added beside old text, not
+strikethrough.
+
+**The mechanism is a chain, and each link feeds the next.** ① "Negative results
+stay in place" — right for records — was applied to state documents, whose job is
+to say what is true now, so every correction arrived as a paragraph beside the
+thing it corrected. ② Frozen cards cite these files by line number, so no line
+could be added: over the 39 commits from `021753e` (2026-09-17) to `f557873`,
+`PROGRESS.md` held at 2,434 lines while its bytes grew by 65,906, pushed into
+existing cells. ③ Each session starts without the whole file in mind, and
+appending is locally safe where rewriting is not. ④ The checkers came to parse
+the accreted form (`C12`'s union of same-date blocks, `cfcensus`'s hints inside
+cells), so cleaning it risked a red CI. ⑤ Nothing measured size.
+
+**What changed, 2026-09-23.** Documents are three kinds — state (rewritten, never
+appended, with a size budget in `tools/docsize.py`), record (append-only, never
+edited, where the record of being wrong now lives), finding (current value and
+source) — and new text cites rows by id. `CLAUDE.md` was rewritten to rules only,
+its former text moved verbatim to `docs/history/claude-md-2026-09-23.md`, and
+`tools/docmove.py` checks in CI that every block of it is still there. § Now was
+rewritten the same way (`docs/history/progress-now.md`). The rest of the
+restructure — closed step lists, the ladder, closed rows, `SPEC.md` — is `R1y`'s.

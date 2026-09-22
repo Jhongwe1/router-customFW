@@ -928,6 +928,8 @@ R1z       the debts this repository's own record names   closed 2026-09-16
 P1        mfgtest passes on a good unit, and every check made to FAIL once  closed 2026-09-17
 R6        my Ethernet driver                closed 2026-09-22
 P2        boot-time breakdown + throughput, both firmwares, same script
+R6b       what R6 left: the vendor Ethernet tree out of the image, and its residuals
+R1y       the record's maintainability: state, record and finding documents
 R7        my userspace
 R8        signed update, survives power cuts
 R9        three-column differential table, and the third column is not empty
