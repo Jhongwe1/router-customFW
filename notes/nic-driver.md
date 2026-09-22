@@ -2103,6 +2103,44 @@ frame, so every TCP segment fails its checksum. `n_ph_used 44,256` proves the
 switch took. **What would settle it is one arm-0 run after `H0-SRV`, which
 costs no power and did not happen.**
 
+### 16.3c 🔴🔴 The 68 % in § 16.3 compares the board RECEIVING against the vendor TRANSMITTING — 量 2026-09-22 (desk)
+
+§ 16.3's table ends *"Against the vendor's **25.4 Mbit/s** (`NET-84`) on the
+same binary the cluster is **68 %**."* 量, from the captures rather than from
+the write-ups:
+
+| capture | who runs what | data flows | figure |
+|---|---|---|---|
+| `bench/2026-09-21e/V6-IPERF.log` (`NET-84`, vendor `eth4`) | board runs `iperf3 -c 10.1.1.2` | **board → host** | 25.4 Mbit/s |
+| `bench/2026-09-21e/W2-RIPERF.log` (`NET-85`, rlxfw) | host runs `-R`; the log says *"Reverse mode, remote host 10.1.1.3 is sending"* | **board → host** | 23.3 Mbit/s |
+| `bench/2026-09-22/F1.log` (`NET-102`, `D5`) | host connects to the board's `iperf3 -s`, no `-R` | **host → board** | 17.03 Mbit/s |
+
+**`D5`'s runs are the board RECEIVING.** § 16.3a is the second source and does
+not need reading between the lines: its bracket is `nd_stats rx`, its column is
+headed *board received*, and the arm-1 rows agree with the host's **sender**
+bytes to within 0.2–0.6 %.
+
+🔴 **So the 68 % is a ratio between two different directions, and this project
+holds NO vendor receive figure at all.** The direction-matched ratio exists and
+is somewhere else: `docs/nic-vendor-diff.md` § 11.1 puts rlxfw's 23.3 beside the
+vendor's 22.7/26.8 and reads **0.87–0.92×**. **Two ratios, 0.68 and 0.87–0.92,
+in two files, are not two estimates of one quantity**, and nothing in this
+repository said so until now.
+
+⚠️ **What this does NOT do.** It does not move `D5`: the DoD asks for *an
+`iperf3` figure with its method and its spread*, and the method is stated
+correctly in § 16.3's own first line — *"Host drives, board is the server"*.
+The figure stands, its direction is now stated with it, and the comparison is
+withdrawn rather than recomputed, because the number it would need does not
+exist. **量 to get it: one `iperf3 -s` on the board's `eth4` and one host
+client, on a boot that is happening anyway — three commands, zero power.**
+
+🔴 **And the same read makes `docs/nic-vendor-diff.md` § 4 stale inside its own
+file.** That section asks whether 29.761 Mbit/s is the path or the copy and
+says *"it cannot be known without a reference — which is what the `eth4`
+contrast is for"*. § 11 of the same file **took that contrast** at seating 35,
+one section later, and § 4 was never revisited. Corrected there.
+
 ### 16.4 🔴 What it does NOT fix, and this is the part that matters
 
 **The TX stall is not downstream of the RX corruption.** `J1` ran `Y5`'s exact

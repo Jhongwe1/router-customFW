@@ -341,3 +341,62 @@ deliberate declaration — and the second one is worse, because a declaration
 that leaves no trace in the tool is indistinguishable from never having made
 it. ⚠️ No fix is proposed here. A `QUOTED` column in the baseline would be
 one, and it needs the same positive control § 5.1's own 🔴 asks for.
+
+## 5.2 🔴 A citation can be wrong the day it is written, and `citecheck` reports it `STABLE` — five instances, 量 2026-09-22
+
+§ 5.1 is about numbers the tool **cannot see**. This is about numbers it
+**does** see, checks, and passes — because the check it runs is *has the row
+at line N moved*, and a citation that never pointed at what its sentence
+claims has nothing to move.
+
+`citecheck`'s own *WHAT IT DOES NOT DO* says it first: *"It cannot tell
+whether a citation was CORRECT when it was written. It compares the cited row
+then with the cited row now; a citation that named the wrong line from the
+start is STABLE here."* That was written as a limit. Closing `R6` walked into
+five instances of it in one desk pass.
+
+| # | citing | says | actually | state |
+|---|---|---|---|---|
+| ① | `PROGRESS.md:128` | `notes/nic-driver.md:2042` **逐字** *The three-run figure may not be quoted without the fourth* | that sentence is at **`:2038`** in every commit since it was written; `:2042` is the parenthetical about the first normalisation | repaired |
+| ② | `docs/KNOWN-ISSUES.md:1057` | the same, 逐字 | the same | repaired |
+| ③ | `bench/README.md:101` | the same, 逐字 | the same | repaired |
+| ④ | `bench/2026-09-21/PREDICTIONS-B35-block33.md:369` | `rtl819x-switch.c:88-92` — the VLAN table is reached through `TACI` | that is at **`:93-97`**; `:88-92` says the driver writes nothing at boot | **frozen card, not repaired** |
+| ⑤ | `SPEC.md:267` | `rtl819x-nic.c:891,895,898-900,908` are the harvest path | they were in `nic_wr()` and `nic_dw()` at the commit that published them (§ 5.1a) | repaired |
+
+🔴 **①–③ are one sentence written into three files in one segment, and all
+three use the word 逐字 — *verbatim*.** A quotation is a claim a checker can
+test. **The rule they were quoting is the rule against quoting a figure
+without its fourth run**, so the record's own guard against a bad quotation
+arrived as a bad quotation.
+
+🟢 **This family has an enforcer that can be bought, and `SPEC.md` `FW-109`
+says why it differs from the one at `docs/GATE-RESULTS.md`'s twelve-entry
+census.** ①–④ all **quote the cited text on the citing line**. The rule is
+therefore checkable without semantics: *if a line carries both a quoted string
+and a `FILE:NNN`, that string must occur at or near line `NNN` of that file*.
+`M4` already does a narrower version of it — a `(token)` tail — over 28
+citations; this widens the population to quoted strings. The four rows above
+are its positive controls, and ④ is the one that proves the check has to run
+over `bench/` too.
+
+🔴 **It is not written here**, and the reason is this file's own rule twice
+over: moving a checker's population needs a positive control *and* a segment
+to write it in, and this segment closed a gate. What it has is the target, the
+controls and the population — which is more than § 5.1's residual has had
+since 2026-09-21.
+
+⚠️ **What the enforcer would still not catch is ⑤**, and that is the useful
+boundary: `SPEC.md:267` quotes nothing. It says *`891` is the pkthdr ring
+read*, in prose, and only a reader who opens the file can tell that line 891
+was a register write. **A citation is checkable exactly when it quotes; the
+rest is reading.**
+
+🟢 **And `M3` caught a sixth one in this very segment, before it was
+committed, which is the boundary from the other side.** The session brief
+handed me `bench/2026-09-21/PREDICTIONS-B35-block33.md:373` for `R6-6`'s
+weaker statement; I wrote it into `PROGRESS.md` and `citecheck` `C7` reported
+*`:373` is a blank line* on the next run. The statement is at **`:374-377`**.
+**`M3` sees the subset of this family that lands on a BLANK line**, which is
+why five of the six above went unreported and this one did not — and it is the
+cheapest reason to run `citecheck` on a dirty tree even though its baseline
+rows are suspended there.

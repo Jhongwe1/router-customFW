@@ -245,9 +245,17 @@ make the engine drop frames it has accepted. **It is `D5`'s ceiling.** Per
 1,446-byte frame rlxfw issues ~1,446 uncached single-byte bus transactions in
 each direction where the vendor issues one cache-writeback over ~91 lines.
 量 `SPEC.md` `NET-76`: 29.761 Mbit/s aggregate, 1,290 frames/s each way,
-sustained over 1,899.593 s. **Whether that number is the path or the copy is
+sustained over 1,899.593 s. ~~**Whether that number is the path or the copy is
 unknown, and it cannot be known without a reference** — which is what the
-`eth4` contrast is for.
+`eth4` contrast is for.~~ 🔄 **2026-09-22: the contrast was taken, by § 11 of
+this file, one section later — and this sentence was never revisited.** 量
+`NET-84`/`NET-85`, both board→host: the vendor reaches **25.4 Mbit/s** and
+rlxfw **23.3**, so the byte-at-a-time uncached copy costs **8–13 %** in that
+direction and is **not** a ceiling anywhere near the 29.761. ⚠️ **The
+qualifier that survives is narrower and is about direction, not about the
+copy**: there is no vendor figure for the board RECEIVING, so nothing here
+bounds the copy's cost on the RX side — which is the side `D5` measures.
+`notes/nic-driver.md` § 16.3c.
 
 ⚠️ `D1` (`CPU-45`) answered *not coherent* and this driver's response was to
 make everything uncached, recorded at `rtl819x-nic.c:92-113` as a measured

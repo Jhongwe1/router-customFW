@@ -1338,7 +1338,178 @@ flash evidence is therefore wider and shallower than `D3` asked for**, and
 
 ---
 
-## The operating clause, re-run at eleven entries
+## 2026-09-22 — `R6` (an Ethernet driver of mine, and a memory model that had to be measured before a single ring was allocated)
+
+### One line
+
+**v0.4+, eighteen segments (84th–101st), thirteen seatings (26–38).**
+`rtl819x-nic` and `rtl819x-switch` bring this board's CPU port up and carry
+traffic: `rlx0` pings both ways with a **positive** discriminator, moves
+**17.03 / 17.76 / 17.09 Mbit/s** of bulk TCP (n = 4, one collapse, reported),
+and survives **31.66 minutes** of continuous flood with `drop 0/0`, zero
+console bytes and 7.067 GB moved. **`D1`, `D2`, `D3`, `D5` and `D6` are met;
+`D4` is met in part with its gap named and priced.** `R6-6` is a stretch whose
+DoD is unreachable on this hardware for two independent measured reasons, and
+what stands in its place is a weaker statement that is true.
+
+**The weakest thing here is not a reading either.** `D5`'s number was taken
+with a `/proc` verb armed by hand that is **0** at boot (`NET-107`), and the
+gate closes without the one-line change that would fix that having been built
+— so the headline figure is reproducible only by someone who knows to type
+`recover 1`.
+
+### Three claims that stand
+
+**① `D1` — the precondition this gate opened with UNANSWERED is answered, by a
+real bus master, and the answer is the inconvenient one: this D-cache is NOT
+coherent.** 量 seating 26, block 25, protocol and decision rule frozen in
+`e85fd0c` *before* the run. Cached read `V0` → the host sends eight 1,472-byte
+broadcast UDP frames, which the MAC DMAs into mbufs with the CPU storing not
+one byte → cached read `V1` → uncached read `V2` last, because of `CPU-70`.
+**Two of four buffers, in each of two independent runs: `V1 == V0` and
+`V2 ≠ V0`** — the cache returned a stale value after a real engine had
+overwritten the DRAM under it. 🟢 **And it is sealed**: `V2 ≠ V0` proves the
+DMA landed, a miss would have fetched `V2`, so the line was necessarily
+resident — which closes the *evicted* escape that five previous attempts could
+not. 🟢 **The payload value was computed before the frames were sent** (buffer
+offset 1398, 14+20+8 header, payload index 1356, `1356 mod 256 = 0x4C` →
+`4C4D4E4F 50515253 54555657 58595A5B`) and **four of four buffers hit**, which
+also establishes that this switch inserts no CPU tag ahead of the frame. 🔴
+The other two buffers returned *cannot distinguish*, and that is the control
+working: one cache cannot snoop two buffers and not the other two. **The
+consequence for the driver is a requirement rather than a precaution** — rings
+*and* payload buffers in the uncached window, recorded at
+`rtl819x-nic.c:92-113`. `SPEC.md` `CPU-45`; `docs/rlx-cache-and-cp0.md` § ②.
+
+**② `D3` — the ladder refuted its own first rung, and the refutation carries a
+positive control taken on the same boot.** 量 seating 28. Rung 0 was
+`SWINTSET`: with the engine on and the mask open the software interrupt
+**still does not raise one**, and the control that makes that a reading rather
+than a dead cell fired in the same power cycle. The four rungs above it were
+then walked without skipping, each with an observable before the next was
+attempted — loopback byte-for-byte, a TX frame captured by the workstation, an
+RX frame decoded into a real ARP, and NAPI's mask → drain → restore →
+**interrupt recovery**. `/proc/interrupts`' three-state control (no line 12
+before, `12: … RLX LOPI` during, no line 12 after `free_irq`) closes both ends.
+`SPEC.md` `NET-48`–`NET-50`; `notes/nic-driver.md` § 4.
+
+**③ `D5` and `D6` — two numbers, and each is published with the thing that
+weakens it rather than beside it.** `D6`, seating 32, image `s31L`
+(`CONFIG_PRINTK=y`, deliberately, so an oops would print): `ping -f -w 1800 -l
+32 -s 1400` for **1,899.593 s = 31.66 min**, `nd_stats … drop 0/0`,
+`n_tx_stop 0`, four `txd` OWN bits clear, **console 0 bytes**, one
+uninterrupted read-only capture — 7,066,765,224 bytes both ways = **7.067 GB,
+29.761 Mbit/s aggregate**. 🔴 Its own gap is in the entry: the capture ran
+1,860.084 s against a 1,899.593 s flood, so **coverage is 97.9 %** and an oops
+in the last 39.5 s would not have been recorded. `D5`, seating 37: **17.03 /
+17.76 / 17.09 Mbit/s**, spread 0.73 = **4.2 %**, against five `phfollow 0`
+control-arm runs at **0.04–0.07 Mbit/s** — and the arm-0 figure is *generous*,
+because 量 `nd_stats rx` the board received 19–40 % of what the host says it
+sent, so from the board's own counters that arm is 0.020–0.067. 🔴 **n = 4 and
+the fourth collapsed**, and `notes/nic-driver.md:2038` carries the rule that
+the three-run figure may not be quoted without it. 🟢 The pre-registered
+refutation condition held: `n_ph_used` read **44,256** in the arm-1 runs and
+**0** in every arm-0 run, so the switch took and the two arms were not the same
+experiment. `SPEC.md` `NET-76`, `NET-102`.
+
+### What `R6` did not establish
+
+🔴 **`D4` is met in part, and the remaining conjunct is a GATE, priced before
+this entry was written.** The row asks for *"`ping` both directions with my
+driver bound and the vendor's **not** loaded"*. The first half is met with a
+positive discriminator — a locally administered MAC (`02:` plus ASCII `RLXFW`)
+that no Realtek OUI can hold, chosen so this unit's real address in `H601`
+never has to be read. The second half is not: the vendor's driver is in the
+image, every hardware initialisation it performs runs, and its `re865x_open()`
+refuses with `-ENODEV` while `/proc/net/dev` still lists `eth0`…`eth4`
+(`NET-106`). 量 `readelf` over a fully built tree, `CONFIG_RTL_819X_SWCORE=n`
+leaves **ten undefined symbols at the vmlinux link in four independent
+places**; past the link the VLAN table is not a register write but a `TACI`
+protocol inside the directory that would vanish; and the same switch deletes
+`/proc/rtl865x/` — the vendor's whole instrument set, which is what
+`NET-109 殘留`'s next step reads (`SPEC.md` `NET-109`). **So closing it is a
+gate, it removes the instruments two of this gate's own residuals need, and it
+is the next gate's headline rather than this gate's overrun.** ⚠️ The precedent
+is `P4b-gate`, which closed 2026-09-01 with `D2` unmet, the reason recorded and
+two items left open *under* the gate; this is the second use of that shape and
+the first where the unmet row is priced in symbols rather than argued.
+
+🔴 **`R6-4`'s other two named deliverables.** The `ethtool` ops exist
+(`get_drvinfo` / `get_link` / `get_ringparam`, driver 1.3) and are **inert**:
+量 `config/image-commands.tsv` has no `ethtool` applet and the unit's own
+`squashfs-root` has no binary, so they are verified in the artefact and have
+never executed. The named next step is a small static MIPS `linkprobe`, the way
+`/bin/iperf3` already reaches this board. **`phylib` is zero lines and
+deliberately so**: 量, the CPU port has no PHY — MDIO address 6 is silent,
+`PCRP6`'s `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0 — so hanging a
+`phy_device` on `rlx0` is architecturally wrong, and the right shape is an
+`mii_bus` serving ports 0–4. The owner ruled *record and defer*.
+
+🔴 **`NET-67 殘留` — why the engine stops retiring a TX descriptor.** **Eight
+candidates are dead and none has been replaced**, the last of them by a
+single-variable A/B on one boot: three zeroed TX ring bases against
+`tpdcr1/2/3` all reading `idle_ring` gave first-miss at **1.138 s** and
+**1.124 s**, 1.2 % apart (`NET-108`). The gate ends with a repair that works
+(`NET-101`) and no mechanism.
+
+🔴 **`NET-109 殘留` — and its next step is blocked by an absence this gate
+created.** The CPU port's ingress reads `Rcv 0 bytes` while `CRCAlignErr`
+grows +7 for +7 transmitted frames; the obvious reading was refuted in the
+same seating by the host's own `RX errors: crc`, 0 before and 0 after. ⚠️
+**Every `asicCounter` reading this gate took was after the fault**, so *the
+fault caused this* and *it has always read this way* are not separated, and a
+healthy baseline costs no power.
+
+🔴 **`R6-6` is not met and two of its three clauses are unreachable for
+measured reasons, not for want of a segment.** *Two ports cannot ping each
+other* needs two hosts on two jacks at one moment; 量 thirteen reads, exactly
+one port carries `LinkUp` each time, and moving the cable tests two ports at
+two *times*. *Restoring one VLAN **table*** is unreachable independently:
+讀 `rtl819x-switch.c:93-97`, the table is reached through the `TACI` block,
+which is a protocol and not a register write — what rlxfw can restore is the
+**PVID register**. 🟢 **What stands instead**, and it is the statement the
+frozen card wrote before the readings: *on this part the per-port PVID field at
+`0xBB804A08 + (port*2 & ~3)` selects whether that physical port's ingress
+traffic reaches the CPU port, measured by ping in both directions with the port
+identity read from `PSRP` on both sides of every cable move; and writing the
+original word back restores it.* The readable half has now been read on four
+seatings (33, 34, 35, 38) and is **byte-identical every time**.
+
+🔴 **`D5`'s headline number needs a verb typed, and the gate closes without the
+initialiser that would fix it.** `recov_mode` reads **0** at boot; seating 37's
+17 Mbit/s was taken with `recover 1` armed by hand. Seating 38 measured what
+that costs on the image's own defaults: **0.39 Mbit/s for 10.66 s and then
+zero** (`NET-107`). ⚠️ This is the *second* verb dependency this project has
+shipped — `phfollow` was made the compiled default in the same image that
+exposed `recover` — and the one-line change is carried forward rather than
+done, because it needs an image and this segment had no bench half.
+
+🔴 **The comparison `D5` was published with is between two different
+directions.** 量 2026-09-22 from the captures: `NET-84` (vendor, 25.4 Mbit/s)
+and `NET-85` (rlxfw, 23.3) are both the board **sending**; `D5`'s runs are the
+board **receiving**. `notes/nic-driver.md` § 16.3's *"68 % of the vendor"* is
+therefore a ratio across directions, and **this project holds no vendor receive
+figure at all**. The direction-matched ratio is **0.87–0.92×** and lives in
+`docs/nic-vendor-diff.md` § 11.1. The comparison is withdrawn rather than
+recomputed; § 16.3c says what it would cost to get the missing number (three
+commands, zero power).
+
+🔴 **`MT-PORT` still does not say which driver served the link, and `P1` handed exactly that to `R6-0`.** `P1`'s design table declared *"link up on the connected port, **and the output names the vendor driver**"*; 量 2026-09-22, `config/mfgtest.sh:536` prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the **port**. `R6-0` quoted the residual and banked the half that was a missing measurement — `SPEC.md` `NET-31`, the Linux-side link state on a named port — and left the half that was a missing label. 🔴 **And `R6` made it matter**: there are two drivers on this board now, and `config/mfgtest.sh:57` reads the **vendor's** `/proc/rtl865x/port_status`, which reports the switch port's link state whatever `net_device` is bound. **The label is not obtainable from the source `mt_port` reads**, so the fix is a different source rather than a different line. This is what the operating clause fires on at twelve entries.
+
+⚠️ **The power ledger is not one number and this entry does not make one.**
+The log's own segment headings for these thirteen seatings use **four different
+words** — 電源循環, 電源事件, 電源按鍵, 冷開機 — and nothing in this repository
+defines them against each other. Counting the headings gives **24**; that is a
+count of headings, not a measured total.
+
+⚠️ **Zero flash-write commands and zero `FLR` over the whole gate.** The
+bracket stands where `R5` left it, at 1,024 of 4,194,304 bytes = **0.0244 %**,
+and `FLS-26`'s ledger did not move: proven identical 4,177,920 B (99.61 %),
+proven different 8,192 B, undetermined 8,192 B — which is exactly `H601`.
+
+---
+
+## The operating clause, re-run at twelve entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -1348,7 +1519,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**.)*
 
 | pair | shared? |
 |---|---|
@@ -1361,6 +1532,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R4` → `R5` 🆕 | **yes — the loop has never run `S2` → `S7` in one invocation.** `R4` carries it as *73.88 s is a sum of two runs*; `R5` carries it after six seatings that could each have closed it 🔴🔴 **2026-09-14: this firing is DISCHARGED, and the answer is negative.** The seam is not a thing a seating was going to do — `looprun --mode bench` with no `--skip` cannot run, because its `--image` pre-flight requires the file `S3` creates. Measured at the desk with two refusing arms and a control that passed the same guard, for **zero power cycles**. ⚠️ So the clause's only new firing at eight entries was real and its subject turns out to be a tool defect rather than a missing measurement — which is a reading about the clause too: it names a *thing*, and a thing can be impossible. |
 | `R1-pub + R2c` → `R1z` 🆕 | **no, and the reason is the clause's own discipline.** Both residual sets contain an instrument that could not be asked about its own subject — `hazpay`'s `check_controls` inspecting 2 of 26, and this census being blind to a paid debt — but that is the same SHAPE, not the same THING. Every previous firing named one item both entries carry verbatim (`CPU-45`; `S2`→`S7` in one invocation; a same-instant read of two counters). **A clause that fires on a resemblance measures the reader, not the ledger** |
 | `R5` → `R1-pub + R2c` 🆕 | **yes — a same-instant read of two kernel counters.** `R5` carries it as `D4` naming `/proc/timer_list`, *which exists in this kernel and cannot carry the property the row wanted — two counters read atomically*. `R1-pub` carries it as `D-cost`'s `E5` requiring `Δirq_count == Δjiffies` on every rung, failing **5 of 64**, and the one `/proc` file that serves both not sampling them together. 🔴 **The sentence that connects them is inside `R5`'s own bullet** — it says the substitute `R5-2` used *carries both counters inside one `spin_lock_irqsave`*, which is true of the pair `R5` used and **false of the pair `R1-pub` needed**: 讀 `drivers/clocksource/rtl819x-timer.c`, `j = get_jiffies_64()` is at line 2001 inside the lock held from 1998 to 2042, and `irq_count` is read live at line 2147, **105 lines after the unlock** |
+| `P1` → `R6` 🆕 | **yes — `MT-PORT`'s output does not say which driver served the link, and `P1` handed it to `R6-0` by name.** `P1` carries it as *"every `MT-PORT` line this project has captured is unlabelled as to which driver served it. Carried to `R6-0`"*; `R6` carries it because `R6-0` quoted that residual, banked **half** of it — `SPEC.md` `NET-31`, the Linux-side named-port link state — and left the other half, while `R6` landed the second driver that makes the label necessary. 量 2026-09-22: `config/mfgtest.sh:536` still prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the **port** |
 | `R1z` → `P1` 🆕 | **no, and the reason is one no previous non-firing has used: the single item both entries carry, they carry because `P1` CLOSED it.** `R1z`'s last ⚠️ is *"`RECIPE_ID` moved … the next card must re-derive `RLXFW-ID0`"*; the next segment found the superseded `c433013b` in three places here, its own step row says *"The next card was about to predict `MT-ID` against it"*, and the board then printed `RLXFW-ID0=BB684EB0`. This file's own rule governs — *a residual that a later gate closes is removed from the clause's input by being closed, not by being edited out*. ⚠️ The rest of the two sets do not touch: `R1z`'s residuals are about this repository's record, `P1`'s about a design table that over-declares on three rows and a denominator its own does-not-establish list got wrong |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
@@ -1634,6 +1806,90 @@ holds: changing a rule because it failed to produce an answer you had already
 reached is how such a rule stops being an instrument. **What is different is that
 the weaker class now has two points and a name**, so the twelfth entry can
 recognise a third rather than rediscover the class.
+
+### 🆕 At twelve entries the clause FIRES, and the thing it names was handed from one gate to the next BY NAME
+
+**What the new firing names, in the words of the two entries that share it:**
+
+* `P1`: *"`MT-PORT` declares *"link up on the connected port, **and the output
+  names the vendor driver**"* and `mt_port` prints
+  `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the **port**"* — and, in the
+  bullet after it, *"every `MT-PORT` line this project has captured is
+  unlabelled as to which driver served it. **Carried to `R6-0`.**"*
+* `R6`: `R6-0`'s own cell quotes that residual — *"a row `R6` can bank for free
+  and a thing the census must not miss"* — and banks **the half about the
+  measurement**, `SPEC.md` `NET-31`, the Linux-side link state on a named port.
+  量 2026-09-22, `config/mfgtest.sh:536` is unchanged.
+
+🟢 **This is the first firing where the earlier entry names the later gate**,
+so the `R4` → `R5` deduction does not apply: that one had to argue that `R5`
+took the residual on *in writing*, and here `P1` assigned it and `R6-0` quoted
+it back. **Nothing has to be read into either entry.**
+
+🔴 **And the firing names something that got WORSE rather than staler.** When
+`P1` wrote it there was one driver, so an unlabelled `MT-PORT` line was
+ambiguous only in principle. `R6` landed a second one. 🔴 量 2026-09-22, and
+this is the part that makes the fix bigger than a `printf`:
+`config/mfgtest.sh:57` reads `$MFG_ROOT/proc/rtl865x/port_status`, which is
+the **vendor's** `/proc` file and is present in every `R6` image
+(`SPEC.md` `NET-109`). That file reports the **switch port's** link state,
+which is true no matter which `net_device` is bound to the CPU port — so the
+label `P1`'s design table promised **is not obtainable from the source
+`mt_port` reads at all**. The fix is a different source, not a different line.
+
+⚠️ **Where it goes is the owner's**, as `CPU-45`'s firing was: the clause names
+a thing, not a gate. What it costs is small and measured — the discriminating
+reading already exists (`NET-31`'s seven fields, and `/proc/interrupts`' line
+number, which is `NET-51`'s three-state control) and neither needs power.
+
+### 🆕 The census re-run at twelve entries — THE FOURTH INSTANCE ARRIVES, and the enforcer is still not written
+
+量 2026-09-22 over the widened population, re-derived rather than carried: the
+`D`-row form is now **44 clauses across eight gates** — `R3` 5, `P4b-gate` 4,
+`R4` 4, `R5` 4, `R1-pub` 13, `R1z` 4, `P1` 4, **`R6` 6** — with the four gates
+predating the form carrying 13 more in numbered- or lettered-question tables.
+**57 clauses.**
+
+🔴🔴 **There IS a fourth instance, and it is `R6`'s own `D6`.** The row asks
+for *"zero drops **by the driver's own counters**"* — an artefact — where the
+property it wants is *no frame lost*. 量 `SPEC.md` `NET-62`, seating 30: the
+driver's `n_rx` counted **every one of 5,281 frames** while **218 datagrams
+died above it**. The named instrument reports zero, truthfully, while the
+property fails.
+
+🔴 **The pre-registered condition is still not met, and the wording is why.**
+It reads: *if the census finds a fourth instance **nobody here already knows
+about**, an enforcer has a real target and a real positive control and gets
+written in the segment that has one.* This one is known, with an id, since
+2026-09-20 — `D6`'s own row in `PROGRESS.md` says *"the DoD's own instrument is
+the one this fault is invisible to, which is `NET-62`"*. **So the trigger is
+the unknown fourth, and the fourth is not unknown.**
+
+🔴🔴 **And the second reason is the stronger one: this is the first of the four
+an enforcer could not have caught.** The other three fail *loudly*, and each
+failure is a question a checker can ask of an artefact — *does this kernel
+print `MemTotal:`*, *is this path in `git ls-files`*, *does this `/proc` file
+sample two counters together*. `D6`'s counter exists, is read on every run, and
+returns **0** correctly. To flag it a checker would have to already know which
+fault the counter is blind to — **which is the thing the check was supposed to
+find**. An enforcer fitted to the first three would have passed the fourth.
+
+🟢 **That boundary is a measurement and not an excuse, and what shows it is a
+SECOND decline made the same day for the OPPOSITE reason.** `SPEC.md` `FW-109`
+records a family found while closing this gate — a citation that was wrong the
+day it was written, five instances, every one of which `citecheck` reports
+`STABLE` — and that family **is** buyable: four of the five quote the cited
+text on the citing line, so the rule is *a line carrying a quoted string and a
+`FILE:NNN` must find that string at or near `NNN`*, `M4` already does a
+narrower version over 28 citations, and the four are its positive controls. It
+is declined for a **scheduling** reason. **Two declines, one day, two
+different reasons — which is what stops either from being a preference.**
+
+⚠️ **The weaker class does not gain a third and is left at two.** `R6`'s
+`ethtool` ops are present-and-inert, which reads like entry 11's *capable and
+idle*, but they are named by a **step's deliverable** and not by a `D` row, and
+this census's population is `D` rows. Recorded so a thirteenth entry does not
+find it and call it a third point.
 
 ### Carried unchanged from the seven-entry run
 
