@@ -294,3 +294,50 @@ population every one of this tool's cases is scored against, and this
 repository's own rule is that a checker's population may not move without a
 positive control that the new rows are really checked. That control does not
 exist yet. `SPEC.md` `FW-105`; the fix is the next segment's.
+
+### 5.1a The repair that followed it changed exactly the number the checker could see — 量 2026-09-22
+
+`5b01d73` re-derived `NET-61`'s source column one segment later and changed
+**one** number: `292` → `323`, which is the only one `CITE_RX` can see. The
+four behind the comma — `891`, `895`, `898-900`, `908` — were left. 量
+2026-09-22, reading the cited file **as it stood at that very commit**:
+`891`/`895`/`898-900` were inside `nic_wr()` and `908` inside `nic_dw()`, the
+register accessors, **not** the harvest path the row's own prose names. So
+they were not rot; they were wrong when they were committed, and they had been
+wrong since the segment that wrote them.
+
+**The mechanism this section describes produced a second instance inside the
+row that documents it**, and nothing reported it either time. `SPEC.md`
+`NET-61`'s source column now reads
+`347, 1398, 1401, 1402-1403, 1411, 1344-1386`, every one of them read back out
+of today's file; the 2026-09-21 prose keeps `891…908` because that
+sentence is dated.
+
+🔴 **And `FW-105`'s own source column had been half-repaired the same way.**
+It lists the five numbers measured rotted on 2026-09-21 — those numbers are the
+finding's *data*, not pointers into today's file — and `5b01d73` re-pointed
+`751` → `1003`, because `751` happened to be spelled with a full path and was
+therefore the one number `CITE_RX` could see. `:758`, `:768`, `:1232`, `:1239`
+stayed. The row's prose still read `751`. Put back, and marked
+**這一處不准改號碼** the way `SPEC.md:823` already is.
+
+### 5.1b Declaring a quotation launders it, and the baseline is a floor rather than a census — 量 2026-09-22
+
+The oracle digests the cited row at the commit that last wrote the **citing**
+line. Writing the note that says *this citation is a quotation, leave it*
+edits that line, so its blame becomes today, so the citation is `STABLE` by
+construction and never reaches `C3` or the baseline at all.
+
+量 2026-09-22, over this segment's own repair: four citations were classified
+as historical quotations. Three of them sit on `SPEC.md:950` — the `FW-105`
+row, which this segment annotated — and after the commit all three read
+`STABLE`. Only the fourth, § 5.1's own line above, was left untouched and is
+the one row this repair adds to `tools/citecheck-baseline.tsv`.
+
+**So the baseline is a floor on the declared quotations, not a census of
+them.** That is the laundering hole `citecheck`'s own header states, reached
+from the other side: there it hides rot that was already rot, here it hides a
+deliberate declaration — and the second one is worse, because a declaration
+that leaves no trace in the tool is indistinguishable from never having made
+it. ⚠️ No fix is proposed here. A `QUOTED` column in the baseline would be
+one, and it needs the same positive control § 5.1's own 🔴 asks for.

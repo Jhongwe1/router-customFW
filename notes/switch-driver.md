@@ -720,9 +720,9 @@ between them and no reset**, and it costs nothing.
 ## 8.13 `resetcmp` is not a verb, and this file's verb list is the one the parser has
 
 量: the token `resetcmp` occurs in this repository only as a comment at
-`rtl819x-switch.c:323` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
+`rtl819x-switch.c:375` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
 in the parser**, and a frozen card's cell 8 asked for it. Typing it returns
-`-EINVAL`. 讀 `rtl819x-switch.c:536-609`, the parser accepts exactly nine
+`-EINVAL`. 讀 `rtl819x-switch.c:588-661`, the parser accepts exactly nine
 forms and nothing else:
 
 ```

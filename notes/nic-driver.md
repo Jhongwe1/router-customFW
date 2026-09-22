@@ -926,7 +926,7 @@ supplied no `ndo_tx_timeout`, and that `R6-4a` fixes it by supplying one.
 `n_tx_timeout 0`. **`SPEC.md` `NET-57`.**
 
 🔴 **And the larger consequence lands on § 7's own argument.**
-`rtl819x-nic.c:1520-1531` argues that returning `NETDEV_TX_BUSY` while waking is
+`rtl819x-nic.c:1586-1597` argues that returning `NETDEV_TX_BUSY` while waking is
 correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue` is
 **NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
 freed. **The argument is right for the kernel it cites and wrong for this
@@ -1015,7 +1015,7 @@ confirm it refuted it instead.
    `:701` of this file as a *ping-bound floor*, and quoting it as the copy rate
    was an error in this section's first draft.
 2. `MBUF_RUNOUT` fires: `seen_iisr` goes `0000320E` → `0001320E`, and bit 16 is
-   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:323`). First seen at `C16-f14`.
+   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:347`). First seen at `C16-f14`.
 3. The engine's two RX position registers desynchronise by **exactly 4** and
    stay there. Indices are `(pos − base) / 4` with `rx_ring A15B8000` and
    `mb_ring A15B8020`:
@@ -1245,7 +1245,7 @@ at every read across six arms. The reason the loop stays is the TX side.
 * **Why the engine stops retiring TX descriptors.** Nothing was read on the
   engine's side of the ring: `tpdcr0_pos` was not sampled across a wedge, and
   🔄 **2026-09-21 (seating 32): THAT CLAUSE IS FALSE and was false when it
-  was written.** `rtl819x-nic.c:2265-2266` prints `tpdcr0_pos` on every
+  was written.** `rtl819x-nic.c:2420-2421` prints `tpdcr0_pos` on every
   `cat /proc/rtl819x-nic`, so this seating sampled it **six times** across
   the wedge without meaning to. What hid it is `wedgeprobe.sh:32`, whose
   operator filter names `rpdcr0_pos` and `rmdcr0_pos` and not
@@ -1279,7 +1279,7 @@ are told apart by the assembled image's sha256 and never by `RECIPE_ID`
 
 § 11.6 and `SPEC.md`'s `NET-67` 殘留 say the engine-side TX register *"was not
 read"*. It was read **six times**, by seating 31's own captures, because
-`rtl819x-nic.c:2265-2266` prints `tpdcr0_pos` on every `cat`. The reason nobody
+`rtl819x-nic.c:2420-2421` prints `tpdcr0_pos` on every `cat`. The reason nobody
 saw it: `bench/2026-09-21/wedgeprobe.sh` writes the full `/proc` to the `.log`
 and shows the operator a filtered view whose filter (`:32`) names `rpdcr0_pos`
 and `rmdcr0_pos` and **not** `tpdcr0_pos`. 量:
@@ -1684,7 +1684,7 @@ why it is not the obvious thing:
 
 The board's `ping` still reported 100 % loss. 🔴 **So frames arrive, are
 counted, and are delivered in a form the stack cannot use** — and 讀
-`rtl819x-nic.c:1322-1367`, `nic_napi_harvest()` takes the OWN bit and the length
+`rtl819x-nic.c:1388-1433`, `nic_napi_harvest()` takes the OWN bit and the length
 from `nic_rx_ring`/`nic_rx_ph` at index `i` and the buffer address from
 `nic_rx_mb` at **the same `i`**, which is exactly the coupling `NET-82` says
 the vendor does not have. The final dump reads `n_dsync 70,717` of
@@ -1707,11 +1707,11 @@ Virtual device rlx0 asks to queue packet!
 `dev_queue_xmit`, taken when the queue is stopped or `dev_hard_start_xmit`
 returns non-zero, and it **drops** the skb. 讀 `net/ethernet/eth.c:349-353`:
 under `CONFIG_RTL_819X` the vendor's `ether_setup` sets `tx_queue_len = 0`,
-and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:2897`)
+and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:3092`)
 uses that same function — so `rlx0` has no qdisc and nothing holds the frames.
 
 🔴 **And the driver's own correctness argument for the stop/wake design,
-`rtl819x-nic.c:1514-1522`, cites `sch_generic.c:124-178`'s requeue — a path
+`rtl819x-nic.c:1580-1588`, cites `sch_generic.c:124-178`'s requeue — a path
 this device cannot reach.** In this state `echo` returned one line, `ARP` went
 unanswered (six requests, zero replies), and `busybox reboot -f` could not be
 typed. That is what cost the second power press.
@@ -1781,7 +1781,7 @@ per packet.
 * 🔴 **One instrument defect was mine**: `env PATH=.:$PATH qemu-mips-static
   iperf3 …` exits **127** under WSL because this host's `PATH` carries Windows
   paths with spaces. The fix is the binary's full path.
-* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:2322-2331`
+* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:2494-2503`
   says `n_dsync_chk` is about 2× `n_napi_poll`. 量: they are **equal** (5/5,
   350/350, 73,810/73,810) and it is `n_reads` that is about 2× (18, 720,
   **147,628**). The substance is right and the counter named is wrong.
@@ -1797,7 +1797,7 @@ committed. 讀 `AsicDriver/rtl865xc_asicregs.h:561-640`:
 * **bit 17** is `PKTHDR_DESC_RUNOUT_IP0` — the RX **pkthdr** descriptor ring
   ran out.
 * **bit 16** is the **mbuf** descriptor ring run-out. Its *enable* is bit 11
-  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:314-323`
+  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:338-347`
   and `:316` already carry it.
 
 量, the seven states this seating produced:
@@ -1869,7 +1869,7 @@ descriptors. `SPEC.md` `NET-100`.
 
 ### 15.3 🟢🟢 `engine off` → `arm` → `engine on`, twice from a pristine wedge
 
-讀 `rtl819x-nic.c:1915-1921`: `arm`'s TX loop writes each slot as
+讀 `rtl819x-nic.c:2052-2058`: `arm`'s TX loop writes each slot as
 `address | WRAP` with **no OWN bit** — which is `NET-72`'s one remaining
 candidate, sitting in this driver the whole time. 量, on a fresh boot whose
 wedge nothing else had touched:
@@ -2306,3 +2306,35 @@ after a recovery does not re-wedge as `NET-67`; it lands here. `SPEC.md`
   discovered at the bench.
 * `D4` is still not met as written. The vendor driver is in the image and
   every hardware initialisation it performs still runs.
+
+## 18 Desk, 2026-09-22 — four of § 10's own source line numbers were wrong when they were published
+
+`NET-61`'s source column has read
+`rtl819x-nic.c:292,751,758,768,1232,1239` and then
+`rtl819x-nic.c:323,891,895,898-900,908`. `FW-105` found the first list rotted
+and repaired **the first number only**, because `citecheck`'s `CITE_RX` stops
+at the comma and the other five are invisible to it.
+
+量 2026-09-22, the four invisible ones read back against `5b01d73`, the commit
+that published them: `891`, `895` and `898-900` were inside `nic_wr()` and
+`908` inside `nic_dw()` — the register accessors at the top of the file, not
+`nic_napi_harvest()`. **A reader following any of them landed on a register
+write while the prose said pkthdr ring, OWN bit, `ph_len` and mbuf buffer.**
+
+The current rows, derived by reading the file back rather than by shifting the
+old numbers:
+
+| what § 10.2 says | today |
+|---|---|
+| the OWN test | `rtl819x-nic.c:1398` |
+| the pkthdr ring read | `:1401` |
+| `ph_len` minus FCS | `:1402-1403` |
+| the buffer address | `:1411`, which since `dfe40d9` goes through `nic_ph_buf()` (`:1344-1386`) rather than reading `nic_dw(nic_rx_mb, i, 3)` inline |
+
+⚠️ **The last row is the one to read twice.** `NET-61`'s finding is *the
+driver indexes both rings with the same `i`*; the fix in `dfe40d9` moved that
+read behind `nic_ph_buf()`, which classifies the pkthdr word and can follow the
+pointer instead. The finding's evidence is unchanged — it was measured on
+seating 30 — but the line it points at is no longer an instance of the defect
+it names. That is a citation being *correct* and *misleading at the same
+time*, and no checker in this repository can see it.
