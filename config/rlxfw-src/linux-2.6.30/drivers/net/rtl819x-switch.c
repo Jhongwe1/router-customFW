@@ -115,7 +115,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SW_VERSION	"rtl819x-switch 1.0"
+#define RTL819X_SW_VERSION	"rtl819x-switch 1.1"
 
 /* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
@@ -145,6 +145,18 @@
 #define RTL819X_SW_VCR0		0x4A00		/* :2299 */
 #define RTL819X_SW_PVCR0	0x4A08		/* :2301 */
 #define RTL819X_SW_PVCR4	0x4A18		/* :2305 */
+
+/* Port status, one register per port.  量 two sources, which is the rule
+ * for a register entering code: derived from `rtl865xc_asicregs.h`
+ * (`PCRAM_BASE = SWCORE_BASE + 0x4100` at :1132, `PSRP0 = 0x028 +
+ * PCRAM_BASE` at :1143, `PortStatusLinkUp = (1<<4)` at :1332), and
+ * cross-checked against readings this repository already holds --
+ * `PSRP6` at `0xBB804140` reading `0000007A`, which the same base
+ * arithmetic produces.  Ports 0-4 are the ones with PHYs behind them;
+ * 5-8 are not (`NET-40`). */
+#define RTL819X_SW_PSRP0	0x4128
+#define RTL819X_SW_NPHYPORT	5
+#define RTL819X_PSRP_LINKUP	(1u << 4)
 
 /* MSCR fields, `:1553`-`:1562`. */
 #define RTL819X_MSCR_MODE_L2	(1u << 0)
@@ -281,6 +293,46 @@ static int rtl819x_sw_wr(unsigned int off, u32 v)
 	__raw_writel(v, rtl819x_sw_reg(off));
 	rtl819x_sw_n_writes++;
 	return 0;
+}
+
+/* R6-4.  THE ONE THING `rtl819x-nic.c` BORROWS FROM THIS DRIVER.
+ *
+ * `ethtool rlx0` wants a link state.  The CPU port does not have one in
+ * any useful sense -- it has no PHY, so its fabric link is up by
+ * construction and `PSRP6` bit 4 has read set in every reading this
+ * project has taken.  Reporting that would be reporting a constant, and
+ * `RUNSHEET.md:317`'s house rule is that a tool which always says 1
+ * cannot fail.
+ *
+ * So this answers the question a user of `rlx0` actually has: is any
+ * jack live?  It has two states, and the operator changes it with a
+ * cable, which makes it an observable rather than a field.
+ *
+ * ⚠️ It is deliberately NOT a snapshot read.  It goes to the silicon on
+ * every call, because a cached answer would make the cable stop being
+ * the control.  `n_linkq` is its own denominator so the ethtool path is
+ * separable from every other read this driver does -- without it,
+ * `n_reads` moving would not say who moved it.
+ *
+ * 🔴 Returns 0 rather than an error when nothing is linked, and -ENODEV
+ * only before this driver has latched.  A caller that cannot tell those
+ * apart must treat both as down, which is what the NIC driver does. */
+static unsigned long rtl819x_sw_n_linkq;
+static int rtl819x_sw_latched;
+
+int rtl819x_sw_any_link(void)
+{
+	unsigned int p;
+	int any = 0;
+
+	if (!rtl819x_sw_latched)
+		return -ENODEV;
+	rtl819x_sw_n_linkq++;
+	for (p = 0; p < RTL819X_SW_NPHYPORT; p++)
+		if (rtl819x_sw_rd(RTL819X_SW_PSRP0 + p * 4)
+		    & RTL819X_PSRP_LINKUP)
+			any = 1;
+	return any;
 }
 
 /* Slot 0's value for a named register, or 0xDEADxxxx if the name is not in
@@ -628,6 +680,8 @@ static int __init rtl819x_sw_init(void)
 
 	rlxfw_mark("SW0");
 
+	rtl819x_sw_latched = 1;	/* before the first read, so the accessor
+				 * above is live for the rest of boot */
 	rtl819x_sw_boot_cvidr = rtl819x_sw_rd(0x4200);
 	rlxfw_markx("SW1", rtl819x_sw_boot_cvidr);
 

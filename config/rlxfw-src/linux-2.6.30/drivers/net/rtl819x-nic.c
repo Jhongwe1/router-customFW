@@ -115,8 +115,20 @@
  * WHAT THIS DRIVER DOES NOT DO
  * ======================================================================
  *
- * 1. It registers no `net_device` and no `ethtool` ops, and it touches no
- *    PHY.  That is R6-4.
+ * 1. ~~It registers no `net_device` and no `ethtool` ops~~, and it touches
+ *    no PHY.  🔄 2026-09-22: TWO THIRDS OF THIS ITEM EXPIRED AND NOBODY
+ *    DELETED IT.  `R6-4` landed on 2026-09-19: `register_netdev()` runs
+ *    behind the `netdev on` verb and `nic_netdev_ops` is installed at
+ *    init.  1.3 adds `nic_ethtool_ops` (get_drvinfo + get_link), so the
+ *    ethtool third expires too.  🟢 THE PHY THIRD IS STILL TRUE, and it
+ *    is true for a reason rather than by omission: 讀 + 量, the CPU port
+ *    has no PHY behind it at all -- MDIO address 6 is silent while 0-4
+ *    answer, `PCRP6`'s `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0,
+ *    and the CPU interface is in the SYSTEM window (0xB8010000) rather
+ *    than the switch core's.  A `phy_device` attached to `rlx0` would
+ *    have to name an MII address belonging to a different port.  The
+ *    `mii_bus` that IS correct here belongs to `rtl819x-switch.c` and
+ *    serves ports 0-4; it is named as not done rather than skipped.
  * 2. It writes NOTHING at boot.  Every hardware write is behind a verb AND
  *    behind a runtime unlock, so `n_writes` reading 0 on a boot capture is a
  *    measurement and not a promise.
@@ -143,10 +155,13 @@
  *    VALUE, twice: 0x80E3 for a frame the loader received and 0x8063 for one
  *    Linux received, each decomposing into named bits with no residue.
  * 5. It implements NAPI's MECHANISM -- mask at interrupt, bounded poll,
- *    unmask at exhaustion -- but does not bind a `struct napi_struct`,
+ *    unmask at exhaustion -- ~~but does not bind a `struct napi_struct`,
  *    because in 2.6.30 that needs a `net_device` and the `net_device` is
- *    R6-4.  The rung this file can walk is the masking and the re-arm race;
- *    the binding is named as not done rather than quietly skipped.
+ *    R6-4~~.  🔄 2026-09-22: EXPIRED, same day and same step as item 1,
+ *    and it survived three seatings of being false.  `netif_napi_add()`
+ *    binds `nic_napi` at init and `nic_poll` is the real NAPI poll.  Both
+ *    items were found by an audit and not by a test, which is the point
+ *    worth keeping: nothing in this repository checks a comment.
  *
  * ======================================================================
  * THE LADDER, AND THE OBSERVABLE EACH RUNG MUST PRODUCE
@@ -193,13 +208,22 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
 
 #include <linux/rlxfw-mark.h>
 #include <asm/io.h>
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_NIC_VERSION	"rtl819x-nic 1.2"
+#define RTL819X_NIC_VERSION	"rtl819x-nic 1.3"
+
+/* R6-4.  `rtl819x-switch.c` owns the switch core's window; this is the one
+ * thing this driver borrows from it, for `ethtool -> get_link`.  Both are
+ * `obj-y` in the same image, so there is no module boundary and no
+ * EXPORT_SYMBOL; the switch driver is `subsys_initcall` (4), this one is
+ * `late_initcall` (7), and `get_link` runs later than both.
+ * Returns 1 if any of PSRP0..PSRP4 has LinkUp, 0 if none. */
+extern int rtl819x_sw_any_link(void);
 #define RTL819X_NIC_PROC_NAME	"rtl819x-nic"
 
 /* 🔴 `read_proc` is handed ONE 4,096-byte page and `nic_read_proc` does not
@@ -790,8 +814,30 @@ static int		 nic_recov_rc[3];
  * it, and would leave `n_dsync` non-zero as a NORMAL reading with nothing
  * left that distinguishes normal from broken.  `SPEC.md` `NET-82` says the
  * cost has to be written down before the change is made; so the change is
- * behind `nic_ph_follow`, default 0, and the counters below are collected in
- * BOTH modes.  `n_ph_diff` is the finding; `n_ph_chk` is its denominator.
+ * behind `nic_ph_follow`, and the counters below are collected in BOTH
+ * modes.  `n_ph_diff` is the finding; `n_ph_chk` is its denominator.
+ *
+ * 🔄 1.3, 2026-09-22: THE DEFAULT IS NOW 1, AND THE COST IS PAID RATHER
+ * THAN WAIVED.  `NET-82`'s condition was that the cost be written down
+ * first; `NET-102` and `NET-103` (seating 37) are that writing-down.  What
+ * is given up is real and is stated here: following the pointer REMOVES
+ * this fault class rather than observing it, so `n_dsync` is no longer a
+ * quantity whose zero means anything about this path.
+ *
+ * 🟢 What replaces it is NOT an argument, it is two properties of the
+ * code.  (a) The comparison at `nic_ph_class()` is UNCONDITIONAL -- the
+ * switch picks which answer to return, not whether to look -- so
+ * `n_ph_chk` and `n_ph_diff` count the same thing in both modes and the
+ * fault class stays visible in the default build.  (b) `phfollow 0` still
+ * reaches the old path, and it has a MEASURED signature to be recognised
+ * by: 0.04-0.07 Mbit/s against 17 Mbit/s, `NET-102`.
+ *
+ * 🔴 What is lost is a property of the TEXT, and it is named rather than
+ * quietly dropped: while the default was 0, every return in that mode was
+ * literally `nic_dw(nic_rx_mb, i, 3)`, so *the default is today's
+ * behaviour* could be read off the source.  It cannot any more.  The
+ * replacement is weaker in kind and stronger in evidence: a boot capture
+ * carries `RLXFW-N7`, and the two modes differ by 250x on the wire.
  *
  * 🔴 THE BOUNDS TEST IS NOT DEFENSIVE PROGRAMMING, IT IS THE SAFETY
  * ARGUMENT.  `ph0` is a word a DMA engine wrote into memory this driver does
@@ -801,7 +847,15 @@ static int		 nic_recov_rc[3];
  * driver's own mbuf descriptor array.  A pointer outside it is not a crash,
  * it is a reading, and `n_ph_bad` is where it lands.
  * ------------------------------------------------------------------------ */
-static int		 nic_ph_follow;		/* 0 = index by i (today) */
+static int		 nic_ph_follow = 1;	/* 1 = follow ph_mbuf; NET-102 */
+/* NET-67 H1.  How many TX ring bases `arm` writes: 1 (today) or 4. */
+static int		 nic_tx_rings = 1;
+static u32		 nic_idle_ring;		/* one word, CPU-owned, WRAP */
+static u32		 nic_idle_ph;		/* its pkthdr, never read     */
+/* R6-4 ethtool.  `n_et_link` is the denominator: without it `et_link_last`
+ * cannot tell "no jack is live" from "nobody ever asked". */
+static unsigned long	 nic_n_et_link;
+static u32		 nic_et_link_last = 0xFFFFFFFFu;
 static unsigned long	 nic_n_ph_chk;		/* the denominator */
 static unsigned long	 nic_n_ph_diff;		/* w0 != &rx_mb[i] */
 static unsigned long	 nic_n_ph_bad;		/* w0 outside the mbuf array */
@@ -812,6 +866,17 @@ static unsigned long	 nic_ph_first_nrx;
 static u32		 nic_ph_last;		/* the raw w0, last harvest  */
 static u32		 nic_ph_last_bf;	/* the m_data it resolved to */
 static unsigned int	 nic_ph_last_j;		/* the slot it named	     */
+/* 🔴 `nic_ph_last_bf` is assigned ONLY on the SKEW branch and
+ * `nic_ph_last_j` on EVERY call, so the two adjacent dump lines describe
+ * different events whenever the last frame was an AGREE -- and no field
+ * said which case a dump was in.  量 `CORRECTIONS-block40.md` § 5.3: the
+ * dereference identity this driver's own comment states held in 10 of 25
+ * dumps and failed in 15, tracking the windows where `n_ph_diff` did not
+ * move.  This field is written unconditionally beside `nic_ph_last_j`, so
+ * a reader can tell the cases apart.  It is ADDED rather than moving
+ * `nic_ph_last_j`, because moving it would change the meaning of a field
+ * 25 committed dumps already carry. */
+static int		 nic_ph_last_cls = -1;	/* AGREE/SKEW/BAD, always  */
 static int		 nic_ph_test_cls = -1;	/* `phtest`'s answer	     */
 static unsigned int	 nic_ph_test_j;
 static int		 nic_ph_test_seen;
@@ -1287,6 +1352,7 @@ static u32 nic_ph_buf(unsigned int i)
 	nic_ph_last = w0;
 	cls = nic_ph_class(w0, i, &j);
 	nic_ph_last_j = j;
+	nic_ph_last_cls = cls;	/* unconditional -- see the declaration */
 
 	if (cls == NIC_PHC_AGREE)
 		return nic_dw(nic_rx_mb, i, 3);
@@ -1695,6 +1761,69 @@ static void nic_ndo_tx_timeout(struct net_device *dev)
 	nic_tx_try_wake();
 }
 
+/* ----------------------------------------------------------------------
+ * ethtool.  `R6-4`'s *What it produces* column named *basic ethtool ops*
+ * and this driver carried one occurrence of the word: a comment saying
+ * there were none.
+ *
+ * 🔴 `get_link` is deliberately NOT `ethtool_op_get_link`.  That helper
+ * is `netif_carrier_ok()` = `!test_bit(__LINK_STATE_NOCARRIER)`; this
+ * driver never calls `netif_carrier_off()`, so the bit is never set and
+ * the helper could only ever return 1.  `RUNSHEET.md:317` is the house
+ * rule -- *a tool that always says 1 cannot fail* -- and a field that
+ * cannot fail is not an observable.
+ *
+ * 🟢 What it reads instead is the switch's per-port LinkUp bits, which
+ * the operator can flip with a cable.  That is the right SEMANTIC as well
+ * as the testable one: 讀 + 量, the CPU port this driver serves has no
+ * PHY behind it -- MDIO address 6 is silent while 0-4 answer, `PCRP6`'s
+ * `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0, and the CPU interface
+ * lives in the SYSTEM window rather than the switch core's.  So `rlx0`'s
+ * own link is up by construction and reporting it would be reporting a
+ * constant.  What a user of `rlx0` wants to know is whether a jack is
+ * live.
+ *
+ * ⚠️ It does NOT call `netif_carrier_on/off`.  Carrier gates the
+ * datapath, and this image already carries the changes it exists to
+ * test.  The coupling is named rather than taken: `ethtool rlx0` can
+ * report no link while the interface still transmits, and that is a true
+ * statement about a CPU port whose fabric link is independent of the
+ * jacks.
+ * ---------------------------------------------------------------------- */
+static void nic_et_drvinfo(struct net_device *dev,
+			   struct ethtool_drvinfo *di)
+{
+	strncpy(di->driver,   "rtl819x-nic", sizeof(di->driver) - 1);
+	strncpy(di->version,  RTL819X_NIC_VERSION, sizeof(di->version) - 1);
+	strncpy(di->bus_info, "platform", sizeof(di->bus_info) - 1);
+}
+
+static u32 nic_et_get_link(struct net_device *dev)
+{
+	int v = rtl819x_sw_any_link();
+
+	nic_n_et_link++;
+	if (v < 0)		/* switch not latched -- say no, never yes */
+		v = 0;
+	nic_et_link_last = (u32)v;
+	return (u32)v;
+}
+
+static void nic_et_ringparam(struct net_device *dev,
+			     struct ethtool_ringparam *rp)
+{
+	rp->rx_max_pending = NIC_RX_DESC;
+	rp->tx_max_pending = NIC_TX_DESC;
+	rp->rx_pending     = NIC_RX_DESC;
+	rp->tx_pending     = NIC_TX_DESC;
+}
+
+static const struct ethtool_ops nic_ethtool_ops = {
+	.get_drvinfo	= nic_et_drvinfo,
+	.get_link	= nic_et_get_link,
+	.get_ringparam	= nic_et_ringparam,
+};
+
 static const struct net_device_ops nic_netdev_ops = {
 	.ndo_open		= nic_ndo_open,
 	.ndo_stop		= nic_ndo_stop,
@@ -1723,6 +1852,7 @@ static int nic_do_alloc(void)
 	     + (NIC_RX_DESC * NIC_DESC_BYTES) * 2
 	     + (NIC_TX_DESC * NIC_DESC_BYTES) * 2
 	     + (NIC_RX_DESC + NIC_TX_DESC) * NIC_BUF_SZ
+	     + 4 + NIC_DESC_BYTES	/* NET-67 H1's idle TX ring */
 	     + 64;
 
 	nic_alloc_raw = kmalloc(need, GFP_KERNEL);
@@ -1756,6 +1886,13 @@ static int nic_do_alloc(void)
 	 * region itself stays aligned and only the DMA target is 2 mod 4 --
 	 * which is what the loader's own rings look like on this die. */
 	nic_bufs    = p;
+	p += (NIC_RX_DESC + NIC_TX_DESC) * NIC_BUF_SZ;
+
+	/* NET-67 H1's idle TX ring, carved LAST so not one address above it
+	 * moves -- every base a frozen card predicts is unchanged, which is
+	 * what keeps this image comparable with the ten before it. */
+	nic_idle_ring = p;	p += 4;
+	nic_idle_ph   = p;	p += NIC_DESC_BYTES;
 
 	/* RX: pkthdr[i] <-> mbuf[i], mbuf[i] -> buffer[i], both rings owned by
 	 * the engine, last entry wrapping.
@@ -1935,9 +2072,27 @@ static int nic_do_arm(void)
 	nic_wr(NIC_CPURPDCR0 + 0x14, 0);
 	nic_wr(NIC_CPURMDCR0, nic_mb_ring);
 	nic_wr(NIC_CPUTPDCR0, nic_tx_ring);
-	nic_wr(NIC_CPUTPDCR1, 0);
-	nic_wr(NIC_CPUTPDCR2, 0);
-	nic_wr(NIC_CPUTPDCR3, 0);
+	/* NET-67 H1.  `nic_tx_rings == 1` is what every seating so far ran:
+	 * three TX bases holding ZERO while `TXFD` is a single doorbell bit
+	 * with no ring number (`rtl865xc_asicregs.h:538`).  This die's own
+	 * loader runs TX0 AND TX1 armed (量 `NET-48`: A040FC88 / FCA0) and
+	 * the vendor's `swNic_init` arms four -- so three zeroed bases is a
+	 * difference between this driver and BOTH implementations that do not
+	 * wedge, and no seating has read it.  At 4 they hold a well-formed
+	 * one-entry ring whose descriptor is CPU-owned, so an engine that
+	 * walks all four bases finds nothing to send instead of a base of
+	 * zero.  The idle ring is SHARED by all three on purpose: the engine
+	 * never takes ownership of it, so there is nothing to race. */
+	if (nic_tx_rings == 4) {
+		nic_re_set(nic_idle_ring, 0, nic_idle_ph | NIC_DESC_WRAP);
+		nic_wr(NIC_CPUTPDCR1, nic_idle_ring);
+		nic_wr(NIC_CPUTPDCR2, nic_idle_ring);
+		nic_wr(NIC_CPUTPDCR3, nic_idle_ring);
+	} else {
+		nic_wr(NIC_CPUTPDCR1, 0);
+		nic_wr(NIC_CPUTPDCR2, 0);
+		nic_wr(NIC_CPUTPDCR3, 0);
+	}
 
 	nic_armed = 1;
 	rlxfw_markx("N-ARM", nic_rx_ring);
@@ -2264,6 +2419,19 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 		       nic_rd(NIC_CPURMDCR0));
 	len += sprintf(page + len, "tpdcr0_pos %08X\n",
 		       nic_rd(NIC_CPUTPDCR0));
+	/* 🔴 The other three TX ring bases, which `nic_do_arm` writes ZERO to
+	 * and which no seating has ever read back.  This die's own loader runs
+	 * TX0 and TX1 armed (量 `NET-48`: A040FC88 / FCA0) and the vendor's
+	 * `swNic_init` arms four; `TXFD` is one doorbell bit with NO ring
+	 * number (`rtl865xc_asicregs.h:538`).  So "three of the four bases are
+	 * zero" is a difference between this driver and BOTH implementations
+	 * that do not wedge, and it has never been on a dump. */
+	len += sprintf(page + len, "tpdcr1_pos %08X\n",
+		       nic_rd(NIC_CPUTPDCR1));
+	len += sprintf(page + len, "tpdcr2_pos %08X\n",
+		       nic_rd(NIC_CPUTPDCR2));
+	len += sprintf(page + len, "tpdcr3_pos %08X\n",
+		       nic_rd(NIC_CPUTPDCR3));
 
 	/* R6-5's desync ledger.  `n_dsync_chk` is the denominator: without it
 	 * `n_dsync 0` cannot tell "it never happened" from "nobody looked". */
@@ -2315,6 +2483,10 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page + len, "ph_last %08X\n", nic_ph_last);
 	len += sprintf(page + len, "ph_last_j %u\n", nic_ph_last_j);
 	len += sprintf(page + len, "ph_last_bf %08X\n", nic_ph_last_bf);
+	len += sprintf(page + len, "ph_last_cls %d\n", nic_ph_last_cls);
+	len += sprintf(page + len, "tx_rings %d\n", nic_tx_rings);
+	len += sprintf(page + len, "n_et_link %lu\n", nic_n_et_link);
+	len += sprintf(page + len, "et_link_last %08X\n", nic_et_link_last);
 	len += sprintf(page + len, "ph_test_cls %d\n", nic_ph_test_cls);
 	len += sprintf(page + len, "ph_test_j %u\n", nic_ph_test_j);
 	len += sprintf(page + len, "ph_test_seen %d\n", nic_ph_test_seen);
@@ -2348,6 +2520,16 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 		len += sprintf(page + len, "mb_ring %08X\n", nic_mb_ring);
 		len += sprintf(page + len, "tx_ring %08X\n", nic_tx_ring);
 		len += sprintf(page + len, "bufs %08X\n", nic_bufs);
+		/* 🔴 rx_ph and rx_mb were NOT printed, and the `phtest` comment
+		 * claims its arguments are computed from bases "this same file
+		 * prints".  That was true of `dsynctest` and false of `phtest`:
+		 * block 40 derived A15B8110 at the desk from alloc arithmetic
+		 * instead.  Printing them makes the claim true. */
+		len += sprintf(page + len, "rx_ph %08X\n", nic_rx_ph);
+		len += sprintf(page + len, "rx_mb %08X\n", nic_rx_mb);
+		len += sprintf(page + len, "tx_ph %08X\n", nic_tx_ph);
+		len += sprintf(page + len, "tx_mb %08X\n", nic_tx_mb);
+		len += sprintf(page + len, "idle_ring %08X\n", nic_idle_ring);
 		len += sprintf(page + len, "rx_idx %u\n", nic_rx_idx);
 		len += sprintf(page + len, "tx_idx %u\n", nic_tx_idx);
 
@@ -2612,6 +2794,19 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		nic_ph_test_seen = 1;
 		return (int)count;
 	}
+	if (!strncmp(buf, "txrings ", 8)) {
+		if (!strcmp(buf + 8, "1"))
+			nic_tx_rings = 1;
+		else if (!strcmp(buf + 8, "4"))
+			nic_tx_rings = 4;
+		else
+			return -EINVAL;
+		/* Takes effect at the NEXT `arm`, because that is where the base
+		 * registers are written.  Saying so here is cheaper than a card
+		 * discovering it. */
+		return (int)count;
+	}
+
 	if (!strncmp(buf, "phfollow ", 9)) {
 		if (!strcmp(buf + 9, "0"))
 			nic_ph_follow = 0;
@@ -2900,6 +3095,7 @@ static int __init rtl819x_nic_init(void)
 		return 0;
 	}
 	nic_ndev->netdev_ops = &nic_netdev_ops;
+	SET_ETHTOOL_OPS(nic_ndev, &nic_ethtool_ops);
 	nic_ndev->irq = NIC_IRQ;
 	nic_ndev->watchdog_timeo = 5 * HZ;
 	memcpy(nic_ndev->dev_addr, nic_mac, 6);

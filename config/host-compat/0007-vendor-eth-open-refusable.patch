@@ -1,0 +1,115 @@
+Let the vendor Ethernet driver's interfaces be made un-openable.
+
+WHY THIS EXISTS.  `R6-4`'s DoD asks for `ping` in both directions "with my
+driver bound and the vendor's **not** loaded".  Three seatings have met the
+substance -- a non-shared `request_irq(12)` succeeded, `CPUICR` read
+`00000000` until my driver wrote it, and the rings sit at addresses my driver
+allocated -- and none has met its words, because the vendor driver is in the
+image.  All three are statements about things that HAPPEN NOT TO HAVE
+OCCURRED.  This patch makes one of them impossible instead, which is a
+different kind of claim and the only one of the three that a single command
+can test.
+
+REMOVING THE VENDOR DRIVER OUTRIGHT DOES NOT BUILD, and that is measured.
+`CONFIG_RTL_819X_SWCORE=n` leaves ten undefined symbols at the vmlinux link in
+four independent places: `bsp_swcore_init` (called from
+`boards/rtl8196e/bsp/setup.c:168` under `CONFIG_RTL_819X`, defined at
+`AsicDriver/96E/rtl865x_asicBasic.S:390` under `CONFIG_RTL_819X_SWCORE` -- the
+two gates come apart), three reached by `jal` from `net/rtl/fastpath/96E/*.S`
+which are compiler output carrying no cpp conditionals at all, five from
+`drivers/net/wireless/rtl8192cd/`, and `rtl865x_curOpMode` from
+`net/rtl/features/rtl_features.c:1097`.  Past the link there is the VLAN
+table, which is not a register write at all: `rtl865x_addVlan` ->
+`_rtl8651_forceAddAsicEntry(TYPE_VLAN_TABLE, ...)` ->
+`96E/rtl865x_asicBasic.S:900`, assembly inside the directory that would
+vanish.  That is a GATE, and it is named as one.
+
+THE FIRST DESIGN OF THIS PATCH WAS WRONG AND WAS ABANDONED BEFORE A BUILD.
+It suppressed the `eth*` REGISTRATION loop instead, on the reasoning that this
+removes the vendor's datapath while keeping its initialisation.  Two readings
+killed it, and both are recorded because the second is the expensive kind:
+
+  1. The four-line anchor `if (IF_ETHER!=vlanconfig[i].if_type) { continue; }`
+     occurs TWICE in `rtl_nic.c` (`:3786` and `:6403`) with identical
+     indentation, so `patch` could not seat the hunk.  A generator that
+     checks its anchor is unique is what reported it.
+
+  2. `re865x_probe` ITSELF dereferences the array the loop fills:
+     `rtl_nic.c:6615-6616` do
+         ((struct dev_priv*)((_rtl86xx_dev.dev[0])->priv))->dev_next = ...
+     unconditionally, and `one_sec_timer` at `:4071` derefs `dev[i]` every
+     second.  With the loop skipped both are NULL.  The image would have
+     oopsed inside probe, on a board with no spare and a loader DMA engine
+     still running.  Guarding all of it would have meant patching four to
+     eight further vendor sites -- the multi-variable change this ladder
+     exists to avoid.
+
+WHAT THIS PATCH DOES INSTEAD.  `re865x_open()` at `rtl_nic.c:4174` is the one
+place the vendor takes the CPU port: `rtl865x_init_hw()`, the non-shared
+`request_irq(dev->irq, ...)`, and the `rtl865x_start()` that writes
+`CPUICR = 0xC4000000` are all below its first statement.  The guard returns
+`-ENODEV` before any of them.  Every pointer the driver keeps stays valid, no
+initialisation is skipped, and no register write changes.
+
+PREDICTION, WRITTEN BEFORE THE BUILD.  With the symbol `n`: `ifconfig eth0 up`
+fails and prints an error, and `/proc/net/dev` still LISTS `eth0..eth4`
+(they are registered; they cannot be opened).  `ping` through `rlx0` still
+completes 4/4 in both directions.  `RLXFW-N1` still reads `00000000` on every
+boot -- the vendor's probe still disarms the loader's engine, because probe is
+untouched.  My driver's counters are unchanged.  REFUTED BY: `ifconfig eth0
+up` succeeding, a boot that does not reach a shell, `RLXFW-N1` reading
+anything but `00000000`, or `ping` failing where the control arm succeeds.
+
+WHAT IS GIVEN UP, WRITTEN DOWN RATHER THAN DISCOVERED LATER.  `NET-54`'s
+control -- `ifconfig rlx0 down` then `ifconfig eth4 up`, handing the hardware
+to the vendor on the same boot -- is unavailable with this symbol `n`.  Any
+seating that needs that contrast must boot the control arm, which is one delta
+row away.
+
+THE SYMBOL IS `default y`, SO THIS PATCH IS INERT UNTIL THE DELTA ROW TURNS IT
+OFF.  That is what makes the control image free.
+
+--- a/arch/rlx/Kconfig
++++ b/arch/rlx/Kconfig
+@@ -18,6 +18,22 @@
+     bool
+     default y
+ 
++config RLXFW_VENDOR_ETH_OPEN
++    bool "Allow the vendor Ethernet driver's interfaces to be brought up"
++    default y
++    help
++      Say N to make the vendor driver's re865x_open() refuse with -ENODEV.
++      Its eth* interfaces still exist and every hardware initialisation it
++      performs still runs; what becomes impossible is handing the CPU port's
++      DMA engine to it.
++
++      This exists so that "the vendor is not carrying the traffic" can be a
++      structural fact with a positive test -- `ifconfig eth0 up` returns an
++      error -- rather than an inference from three things that happen not to
++      have occurred.
++
++      If unsure, say Y.
++
+ config EMBEDDED
+     bool
+     default y
+--- a/drivers/net/rtl819x/rtl_nic.c
++++ b/drivers/net/rtl819x/rtl_nic.c
+@@ -4179,6 +4179,16 @@
+ 	#if defined(CONFIG_RTL_MULTIPLE_WAN)
+ 	char drvNetif_name[MAX_IFNAMESIZE];
+ 	#endif
++#ifndef CONFIG_RLXFW_VENDOR_ETH_OPEN
++	/* rlxfw R6-4 rung 1.  Refuse before anything is touched.  This is the
++	 * ONE place the vendor takes the CPU port: rtl865x_init_hw() and the
++	 * rtl865x_start() that writes CPUICR = 0xC4000000 are both below this
++	 * line, and its request_irq() is not shared.  Returning here leaves
++	 * every pointer the driver keeps intact -- which is why the guard is
++	 * here and not on register_netdev().
++	 * config/host-compat/0007 carries the whole reason. */
++	return -ENODEV;
++#endif
+ 
+ 	cp = dev->priv;
+ 	if (cp->opened)
