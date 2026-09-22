@@ -1,0 +1,4 @@
+echo phfollow 1 > /proc/rtl819x-nic
+# [  170.220000] Virtual device rlx0 asks to queue packet!
+[  171.250000] Virtual device rlx0 asks to queue packet!
+[  172.280000] Virtual device rlx0 asks to queue packet!

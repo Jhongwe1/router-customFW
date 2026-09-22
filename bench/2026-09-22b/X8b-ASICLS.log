@@ -1,0 +1,4 @@
+ls /proc/rtl865x/
+asicCounter   fc_threshold  memory        phyReg
+diagnostic    mac           mmd           port_status
+# 

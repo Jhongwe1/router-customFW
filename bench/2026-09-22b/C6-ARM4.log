@@ -1,0 +1,6 @@
+echo engine off > /proc/rtl819x-nic ; echo txrings 4 > /proc/rtl819x-nic ; ech
+o arRm > L/XpFroWc-/Nr-tl8E19NxG-OnFiFc
+
+RLXFW-N-ARM=A15B8000
+RLXFW-N-ARMR=00000000
+# 

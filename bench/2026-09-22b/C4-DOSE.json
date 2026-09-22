@@ -1,0 +1,87 @@
+{
+  "target": "10.1.1.3",
+  "src": "10.1.1.2",
+  "dev": "enxfc19286184c9",
+  "port": 9999,
+  "payload_len": 1400,
+  "frame_bits": 11568,
+  "step_s": 8.0,
+  "rates_mbit": [
+    43.0
+  ],
+  "arp_load": true,
+  "started_wallclock": "2026-09-22T21:55:09+0800",
+  "pre": [
+    {
+      "src": "arping",
+      "ok": true,
+      "detail": "arping rc=0 received=1"
+    },
+    {
+      "src": "ip-neigh",
+      "ok": true,
+      "detail": "neigh 02:52:4c:58:46:57 REACHABLE"
+    }
+  ],
+  "steps": [
+    {
+      "rate_mbit_requested": 43.0,
+      "frames": 20094,
+      "seconds": 8.003,
+      "rate_mbit_actual": 29.045,
+      "alive_after": false,
+      "probes": [
+        {
+          "src": "arping",
+          "ok": false,
+          "detail": "arping rc=1 received=0"
+        },
+        {
+          "src": "ip-neigh",
+          "ok": false,
+          "detail": "neigh no-lladdr INCOMPLETE"
+        }
+      ],
+      "arp_load": {
+        "samples": [
+          [
+            1.138,
+            false
+          ],
+          [
+            2.282,
+            false
+          ],
+          [
+            3.386,
+            false
+          ],
+          [
+            4.486,
+            false
+          ],
+          [
+            5.586,
+            false
+          ],
+          [
+            6.686,
+            false
+          ],
+          [
+            7.798,
+            false
+          ],
+          [
+            8.892,
+            false
+          ]
+        ],
+        "n": 8,
+        "n_ok": 0,
+        "first_fail_t": 1.138
+      }
+    }
+  ],
+  "verdict": "stopped at 43.0 Mbit/s"
+}

@@ -31951,3 +31951,143 @@ clause 的輸入集。寫上去的那一半已經存在，在 `notes/nic-driver.
 - 零 flash 寫入、零 `FLR`、上傳前 `AUTOBURN` 讀 `00000000`、括號維持 **0.0244 %**。
   🟢 順帶拿到一個罕見的讀數：**上電後、rescue 之前** `0x8040D4A0` 讀 `00000001`，
   也就是 `RUNSHEET` `B6` 記的「auto-burn 預設是開的」在這台機器上的第六份證據。
+
+## 2026-09-22 — 第一百段（20:1x 開場，seating 38，**一次電源按鍵**，三次 Linux 開機，22:0x 收工）：我修掉一個「要打動詞才會動」，然後量到自己又送出了第二個
+
+量 2026-09-22，`bench/2026-09-22b`，卡片 `PREDICTIONS-B43-block41.md`，映像 `s100L`
+（`RECIPE_ID 82724c8f`、loud、`vmlinux` 4,573,867、`nfjrom` 1,181,696、
+sha256 `671b0c87…`）。**一次電源按鍵**，21:38 的冷開機；另外兩次開機是
+`busybox reboot -f` 買來的（`FW-37`）。
+
+---
+
+🟢🟢 **`D4` 的「廠商沒有載運流量」第一次是一個命令而不是三個推論。**
+
+以前的說法全部是關於**沒有發生的事**：一個成功的非共享 `request_irq`、一個讀 0 的
+`CPUICR`、環在我配置的位址上。`config/host-compat/0007` 讓其中一件變成**做不到**：
+`re865x_open()` 回 `-ENODEV`，而 `rtl865x_init_hw()`、非共享的 `request_irq()`
+與寫 `CPUICR = 0xC4000000` 的 `rtl865x_start()` 全部在它第一個敘述之下。
+
+三個讀數，一個負控制：`ifconfig eth0 up` → `SIOCSIFFLAGS: No such device`；
+`/proc/net/dev` **仍然列出** `eth0`…`eth4`，所以它們是**已註冊而不可開啟**、不是不存在
+—— 這一半是阻止結論被讀寬的那一半；`ifconfig eth0` 顯示 `BROADCAST MULTICAST` 而
+沒有 `UP`、沒有 `RUNNING`。負控制在同一次開機：`rlx0` 開起來、`ping` **4/4、0 % loss、
+rtt 1.964/2.646/3.518 ms**。
+
+🟢 **而產物側的驗證在通電前就做完了**：`mips-linux-gnu-objdump` 在 `s100L` 的
+`re865x_open` 符號上只有四條指令（`addiu sp,-32` / `li v0,-19` / `jr ra` /
+`addiu sp,32`），同一支工具在 `s99c` 上讀到完整的 0x378 位元組函式。`SPEC.md` `NET-106`。
+
+---
+
+🔴🔴 **這一段最值錢的東西是一個被否證的預測，而它抓到我自己送出的第二個動詞依賴。**
+
+我把 `phfollow` 做成編譯預設，理由是 `docs/KNOWN-ISSUES.md` 自己寫的那句
+*a driver whose correct behaviour requires a verb is not a driver that works*。
+預設**確實生效**：`A4-BASE` 讀 `ph_follow 1`，`B3-N` 讀 `n_ph_used` **136**／
+`n_ph_chk 179`，而控制臂 `B6-N` 讀 `n_ph_used` **0**。
+
+然後 `B2-IPERF`（**那次開機一個動詞都沒打**）給的是 **0.39 Mbit/s 撐 10.66 s 後歸零**、
+總量 502 KBytes、接收端 0.00 Bytes。`B3-N`：`n_tx_stop 1`、`tx_stopped 1`、四個 `txd`
+（`A15B81D1`/`81E9`/`8201`/`821B`）bit 0 全立 = `NET-67`，而 `n_recov_arm 0`、
+`n_recov_fire 0`。
+
+**`recov_mode` 開機是 0。** seating 37 的 17 Mbit/s 是在 `recover 1` 手動武裝之下量的，
+而這件事沒有寫在任何地方。所以我修掉一個動詞依賴、又送出了第二個一模一樣的。
+`SPEC.md` `NET-107`。
+
+🔴 **而卡片為那一格寫的判別器本身是錯的。** 它說 0.04–0.07 Mbit/s 表示預設沒生效；
+實測整體是 0.06 **而且**預設生效了。控制臂 `B5-IPERF0` 是 0.04。
+**兩臂的吞吐量差 1.5 倍、`n_ph_used` 差 136 比 0** —— 一個吞吐量區間分不開
+「修正沒進去」與「修正進去了而別的東西把流量打斷」，只有修正自己那條分支上的計數器分得開。
+
+🟢 **修復是被造成的而不是被斷言的**：`X1-REC1` 下 `recover 1`，`X2-REC-FIRED` 讀
+`n_recov_fire 1`、`n_recov_ok 1`、`n_recov_fail 0`、`tx_stopped 0`、四個 `txd` bit 0 全清，
+而 **`recov_j_fire − recov_j_arm = 4971 − 4871 = 100 = recov_jiffies` 逐位相符**，
+在不同的一次開機上重現了 seating 37 的恆等式。
+
+---
+
+🔴🔴 **`NET-67` 的第八個候選死了，而它死於一個單變因 A/B。**
+
+假說是這個專案手上最強的結構性差異：`nic_do_arm` 對 `CPUTPDCR1/2/3` 寫 0，而這顆晶粒
+自己的 loader 跑 TX0 **與** TX1（`NET-48`），廠商的 `swNic_init` 武裝四個，而 `TXFD`
+是**一個沒有環號的門鈴位元**。
+
+`txrings 4` 把另外三個指向一個 CPU 擁有、帶 WRAP 的合法單項環：`C7-ON` 讀
+`tpdcr1/2/3_pos` 全部 **`A15BE290`** = `idle_ring`，與事前預測一字不差。
+
+| | 武裝 1 | 武裝 4 |
+|---|---|---|
+| 劑量 | 20,094 訊框、29.04 Mbit/s | 20,391 訊框、29.36 Mbit/s |
+| `Δn_tx_stop` | **+1** | **+1** |
+| 首次失聯 | **1.138 s** | **1.124 s** |
+| `txd0`–`txd3` | 全部引擎擁有 | 全部引擎擁有 |
+
+同一次開機、同一個劑量、兩臂 `recover 0`。**差 1.2 %。** `SPEC.md` `NET-108`。
+
+🟢 順帶收到的是 `tpdcr1_pos`／`tpdcr2_pos`／`tpdcr3_pos` **第一次出現在任何 dump 上**。
+
+---
+
+🟢🟢 **`NET-67 殘留` 從 seating 31 就指名、五次上機都沒做的引擎側讀數做了，而它讀得成
+是因為這顆映像刻意把廠商驅動留在裡面。**
+
+`/proc/rtl865x/` 完整存在。**`CONFIG_RTL_819X_SWCORE=n` 的路線會把它們一併刪掉** ——
+這是那條路線今天沒走的第三個理由，而前兩個（十個未定義符號、VLAN 表是 `TACI` 協定）
+是桌面上量到的。
+
+一個故障態下的讀數：**埠 3 `Rcv 145373` 與 CPU 埠 `Snd 145373` 逐位元組相等**
+（119 uni／1 mc／122 bc 兩邊一致），所以**入向路徑端到端完好**。同時埠 3 `Snd` 只有
+**4,898 位元組／50 unicast**，而驅動自認 `n_tx 76 / 5,346` —— **26 個訊框沒有離開埠 3**。
+CPU 埠入向 `Rcv 0 bytes` 而 `CRCAlignErr 54`。
+
+🔴 **而一個包夾就地否證了我對它的第一個解釋**：六個 ping 之後埠 3 `Snd` +7 unicast、
+CPU `CRCAlignErr` +7、CPU 入向直方圖 +7 —— 訊框確實有出去，我推「帶壞 FCS 上線、
+主機網卡硬體丟掉」，而**主機自己的 `RX errors: crc` 前後都是 0**，直接把那個推殺掉。
+機制未定，`SPEC.md` `NET-109` 與 `NET-109 殘留`。
+
+---
+
+🔴 **`NET-78` 那個「啞而不聾」的狀態這一晚是瞬態的。**
+
+一次 `NET-67` wedge 加一次成功的 `recover` 之後：21:48–21:52 之間 `ip neigh` 讀
+**FAILED**、ping **100 % loss**、`tcpdump` 看到六個 ARP request 出去而**板子的 MAC 一個
+訊框也沒有**；同時驅動側是健康的（`tx_stopped 0`、四個 `txd` bit 0 全清、`n_rx` 179→235、
+`n_tx` 57→76 都在前進、`drop 0/0`）。**21:53 再量就回來了**：ping 4/4，`tcpdump` 拍到
+`02:52:4c:58:46:57` 的四個 ICMP echo reply 與它自己的 ARP request。中間沒有任何人下過
+恢復動詞。
+
+而下一份 dump 說出中間發生什麼：`C1-REST` 讀 `n_tx_stop 2`、`n_recov_arm 2`、
+`n_recov_fire 2` —— **第二次 wedge 與第二次恢復在我讀 `asicCounter` 的時候自己跑完了**。
+這直接回答 `NET-68 殘留` 的一半。`SPEC.md` `NET-110`。
+
+---
+
+🔴 **三個是我自己的缺陷，而三個都是儀器抓到的，不是我。**
+
+① **開機擷取預測 7,717，實測 7,705。** 兩份都是 187 行、時間戳位元組兩邊都是 1,728，
+整個 12 位元組的差是廠商無線驅動印 `tmpReg[0xe]` 而 `s99c` 印 `tmpReg[0x2e]` ——
+**恰好 12 次、每次 1 位元組、零殘差**。而 `bootbytes` 的 `K7` 控制**早就把這個欄位記成
+變寬欄位**並且為此做正規化。教訓不是「預測要更小心」，是**「叫工具去預測，不要抄上一次的
+量測值」**。
+
+② **凍結的卡片有兩個缺陷。** `C2-OFF` 送 `recover 0` **與 `engine off`** —— 引擎關掉之後
+後面那個劑量什麼都量不到；在機台上就地更正並宣告。卡片把 `NB blast` 寫成
+`--host/--frames/--size/--rate`，而 `netblast blast` 收的是
+`--target/--src/--dev/--rates/--step-s`；**`cardcheck commands` 檢查命令的名字可不可以叫得動，
+不檢查它的參數**，所以它抓不到。
+
+③ **`J BFC00000` 第一次被 loader 回 `Unknown command !`**，而同一個位元組串在 seating 37
+是成功的。那是我用 `TaskStop` 砍掉 ESC 串流之後的第一個命令；一個無害的 `DW` 把它沖掉之後，
+同樣的 `J BFC00000` 就正常重置了。**砍掉一個正在串流 ESC 的擷取，會吃掉下一個命令。**
+
+---
+
+⚠️ **這一段沒有做到的事，寫在 `docs/KNOWN-ISSUES.md` 的「What seating 38 did NOT
+establish」。** 最重要的三件：`recover` 還不是編譯預設；`asicCounter` 這一晚的讀數**全部在
+故障之後取**，所以沒有健康基線可以相減；ethtool 的三個 ops 在映像裡而**不可執行**，因為這顆
+映像沒有 `ethtool`（通電前就宣告在卡片 § 0 ①）。
+
+**零 flash 寫入、零 `FLR`、`n_writes` 62 與 14、`n_refused` 0、`drop 0/0`。**
+`check-predictions` **24 of 24**。`cardcheck numbers` 11 of 11。

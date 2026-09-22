@@ -1,0 +1,12 @@
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+21:50:24.480485 fc:19:28:61:84:c9 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+21:50:25.507293 fc:19:28:61:84:c9 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+21:50:26.531337 fc:19:28:61:84:c9 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+21:50:27.555442 fc:19:28:61:84:c9 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+21:50:28.579284 fc:19:28:61:84:c9 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+21:50:29.603252 fc:19:28:61:84:c9 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 10.1.1.3 tell 10.1.1.2, length 28
+
+6 packets captured
+6 packets received by filter
+0 packets dropped by kernel

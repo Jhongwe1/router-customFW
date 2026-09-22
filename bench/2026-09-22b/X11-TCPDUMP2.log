@@ -1,0 +1,16 @@
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+21:53:55.174894 fc:19:28:61:84:c9 > 02:52:4c:58:46:57, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.3: ICMP echo request, id 23083, seq 1, length 64
+21:53:55.176320 02:52:4c:58:46:57 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.3 > 10.1.1.2: ICMP echo reply, id 23083, seq 1, length 64
+21:53:56.176041 fc:19:28:61:84:c9 > 02:52:4c:58:46:57, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.3: ICMP echo request, id 23083, seq 2, length 64
+21:53:56.178511 02:52:4c:58:46:57 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.3 > 10.1.1.2: ICMP echo reply, id 23083, seq 2, length 64
+21:53:57.177094 fc:19:28:61:84:c9 > 02:52:4c:58:46:57, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.3: ICMP echo request, id 23083, seq 3, length 64
+21:53:57.179856 02:52:4c:58:46:57 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.3 > 10.1.1.2: ICMP echo reply, id 23083, seq 3, length 64
+21:53:58.178268 fc:19:28:61:84:c9 > 02:52:4c:58:46:57, ethertype IPv4 (0x0800), length 98: 10.1.1.2 > 10.1.1.3: ICMP echo request, id 23083, seq 4, length 64
+21:53:58.180240 02:52:4c:58:46:57 > fc:19:28:61:84:c9, ethertype IPv4 (0x0800), length 98: 10.1.1.3 > 10.1.1.2: ICMP echo reply, id 23083, seq 4, length 64
+21:54:01.503249 02:52:4c:58:46:57 > fc:19:28:61:84:c9, ethertype ARP (0x0806), length 60: Request who-has 10.1.1.2 tell 10.1.1.3, length 46
+21:54:01.503266 fc:19:28:61:84:c9 > 02:52:4c:58:46:57, ethertype ARP (0x0806), length 42: Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+
+10 packets captured
+10 packets received by filter
+0 packets dropped by kernel

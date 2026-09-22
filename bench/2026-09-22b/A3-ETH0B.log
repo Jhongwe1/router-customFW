@@ -1,0 +1,10 @@
+ifconfig eth0
+eth0      Link encap:Ethernet  HWaddr 00:12:34:56:78:90  
+          BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+          Interrupt:12 
+
+# 

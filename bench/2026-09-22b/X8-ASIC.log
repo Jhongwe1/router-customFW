@@ -1,0 +1,3 @@
+ls /proc/rtl865x/ | head -20
+/bin/sh: head: not found
+# 

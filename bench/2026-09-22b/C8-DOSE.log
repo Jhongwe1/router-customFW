@@ -1,0 +1,6 @@
+  pre  arping    ANSWERS  arping rc=0 received=1
+  pre  ip-neigh  ANSWERS  neigh 02:52:4c:58:46:57 REACHABLE
+pre-ladder: target answers -- the refutation condition is armed
+ 43.0 Mbit/s requested     20391 frames in  8.03 s  = 29.36 Mbit/s actual  ->  target SILENT   [arp load 0/8 ok, first miss at t=1.124 s]
+threshold is between the previous step and 43.0 Mbit/s
+wrote bench/2026-09-22b/C8-DOSE.json
