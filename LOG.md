@@ -32199,7 +32199,7 @@ quoted without the fourth* —— 量，那句話從寫下來那天到今天都�
 ### 四、儀器
 
 `spec-check` `rc=0`；`citecheck` **8 of 8**，`C3` 69 → **0**、`C7` 9 → **0**、
-`STABLE` 310 → 374、baseline 36 → 37 列（多的那一列是 § 5.1 自己那個歷史引文）；
+`STABLE` 310 → **400**（其中 374 是純修引用之後的讀數，其餘是這一段新寫的引用）、baseline 36 → 37 列（多的那一列是 § 5.1 自己那個歷史引文）；
 `test-citecheck` **29 of 29**、mutants **23/23 全殺**；`ledgerscan check`、
 `xcheck sweep`（2,278 個 artefact、3 個 identity、0 個分歧）、`capdate`
 （48 個目錄、2,262 個擷取、0 RED）全綠。
