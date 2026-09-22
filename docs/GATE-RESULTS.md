@@ -1440,8 +1440,10 @@ the first where the unmet row is priced in symbols rather than argued.
 `squashfs-root` has no binary, so they are verified in the artefact and have
 never executed. The named next step is a small static MIPS `linkprobe`, the way
 `/bin/iperf3` already reaches this board. **`phylib` is zero lines and
-deliberately so**: 量, the CPU port has no PHY — MDIO address 6 is silent,
-`PCRP6`'s `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0 — so hanging a
+deliberately so**: 量 `SPEC.md` `NET-39`, the CPU port has no PHY — MDIO
+`0x05`–`0x1F` all read `0x0000`, `PCRP6` is `nn7F0038` where `PCRP0`–`PCRP4`
+are `nn7F0039` (bit 0 `EnablePHYIf` clear), and `PSRP`'s `PortEEEStatus` is
+set on 0–4 and clear on 5/6/7/8 — so hanging a
 `phy_device` on `rlx0` is architecturally wrong, and the right shape is an
 `mii_bus` serving ports 0–4. The owner ruled *record and defer*.
 
