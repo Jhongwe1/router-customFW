@@ -16,7 +16,7 @@ a whole desk segment had to be rewritten), ``FW-46`` the later (three bench cell
 returned ``applet not found``).  Both were found *after* something had been
 written that depended on the guess.
 
-And ``tools/cardcheck.py:370`` says the same thing in its own refusal message:
+And ``tools/cardcheck.py:451`` says the same thing in its own refusal message:
 
     f"{base}: ALLOWED as an ash builtin -- 推, this "
     f"project has never read this binary's builtin table"

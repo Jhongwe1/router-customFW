@@ -6,7 +6,7 @@ project that is written by hand and executed by a machine that cannot ask
 questions.
 
     commands   every command the card types, checked against what the image
-               it uploads DECLARES it can run
+               it uploads DECLARES it can run; a flash write needs `owner-yes`
     numbers    every number the card states, RE-DERIVED from the artefact it
                names, rather than compared against a transcription
 
@@ -406,12 +406,12 @@ def redirect_targets(cmd):
     return out
 
 
-def classify_command(cmd, names, paths, allow_flr=False):
+def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset()):
     """-> (kind, [issue, ...]).  kind is LOADER / CONFIRM / SHELL / EMPTY.
 
-    `allow_flr` excuses the one loader verb that carries a containment rule.
-    It is passed per CARD, never per command, so a card cannot silence the
-    check for one row and keep it for another.
+    Both exemptions come per CARD, never from the command: `allow_flr`
+    excuses a FROZEN card's `FLR` rows, and `flash_ok` holds the exact
+    payloads that card may send although they write flash (owner_yes()).
     """
     cmd = cmd.strip()
     if not cmd:
@@ -419,11 +419,11 @@ def classify_command(cmd, names, paths, allow_flr=False):
     if cmd in CONFIRM:
         return "CONFIRM", []
     first = cmd.split()[0]
+    # 🔴 `FW-113` ahead of the case-sensitive test below: a flash write in ANY
+    # case passes only by its exact payload.  A21: neither rule is a blanket.
+    if flash_write(cmd):
+        return "LOADER", ([] if cmd in flash_ok else [flash_write(cmd)])
     if first in LOADER_VERBS:
-        # 🔴 `FLR` and nothing else.  `DW`, `EW`, `J` and the rest read or write
-        # nothing that lands in a file, so a blanket rule over LOADER_VERBS
-        # would be noise -- and A21 is the control that says this one is a
-        # guard rather than a blanket.
         if first == "FLR" and not allow_flr:
             return "LOADER", [
                 "FLR: typed through `--send`, which calls console-capture.py "
@@ -518,14 +518,14 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
     # are excused wholesale or not at all.  Normalised because a caller may
     # hand us either separator.
     legacy_flr = card_rel.replace("\\", "/") in FLR_LEGACY_CARDS
-
-    bad, intentional, kinds = 0, 0, {}
+    flash_ok, bad = owner_yes(text, card_rel, pairs, report)  # `FW-113`
+    intentional, kinds = 0, {}
     for cid, cmd in pairs:
-        kind, issues = classify_command(cmd, names, paths, allow_flr=legacy_flr)
+        kind, issues = classify_command(cmd, names, paths, legacy_flr, flash_ok)
         kinds[kind] = kinds.get(kind, 0) + 1
         if not issues:
             continue
-        keep = [i for i in issues if i.split(":")[0] not in absent]
+        keep = unsuppressed(kind, issues, absent)
         if not keep:
             intentional += 1
             report(f"  note  {cid}: {cmd}")
@@ -651,6 +651,199 @@ def cards_numbers(card_rel, report=print):
             bad += 1
     report(f"  {len(rows) - bad} of {len(rows)} re-derived")
     return bad
+
+
+# --------------------------------------------------------------------------
+# flash writes -- `FW-113`
+#
+# ⚠️ This belongs beside FLR_LEGACY_CARDS and sits here instead, because
+# tracked prose cites this file's lines 27, 166, 322, 371-396, 451 and 560 by
+# number, and an insertion above any of them re-points every citation below
+# it (`FW-110`) -- `citecheck` is what would report it.  The edits above
+# line 560 that wire this in are line-for-line.
+#
+# 🔴 THE RULE THIS PROJECT STATES FIRST HAD NO ENFORCER WHERE CARDS ARE
+# CHECKED.  量 2026-09-23: `classify_command` returned `('LOADER', [])` for
+# `FLW 0 0 0` and for `EW 8040D4A0 1` -- a known verb and no issue -- while
+# the same call on `awk 1` returned NOT IN IMAGE.  What the four verbs do:
+#
+#   FLW       writes flash; its one guard is a `(Y)es, (N)o->` prompt, and
+#             the card that types `FLW` is what answers it (`LDR-30`)
+#   EW, EB    write ANY address with no bound check (`LDR-08`, `LDR-09`,
+#             `LDR-11`) -- the AUTOBURN word at 0x8040D4A0 included
+#   AUTOBURN  sets that word, which the upload-completion path reads to decide
+#             whether to burn (`LDR-23`).  It powers up ARMED (`REG-23`), so
+#             `AUTOBURN 0` is what a card types to DISARM it: that exact
+#             string passes, and every other `AUTOBURN` is refused
+#
+# The owner's ruling of 2026-09-23 (`PROGRESS.md` `P2` settled item 9):
+# `EW` and `EB` each need the owner's dated yes, with NO address allow-list.
+# So there is no allow-list here, and `FLW` and a non-zero `AUTOBURN` take
+# the same road (`P2-2`).  The one way through is the card's own
+# ```owner-yes fence, owner_yes(); nothing else silences the refusal -- not
+# a ```cardabsent line and not `--expect-absent` (unsuppressed(), `A35`).
+#
+# ⚠️ WHAT THIS CANNOT SEE.  It reads a single-quoted `--send '...'` (SEND_RE)
+# and nothing else, so a TFTP upload made while the word is still armed, a
+# `J` into code that writes flash, a `LOADADDR` aimed at the loader's own data
+# (`docs/loader-command-semantics.md` § b) and a command written anywhere
+# but such a `--send` all pass here.  量 2026-09-23: the committed captures'
+# `.meta.json` record 15 flash-verb payloads sent (14 `EW`, 1 `EB`), and 3
+# of them are in a `--send` this reads -- FLASH_LEGACY_CARDS, below.  Of the
+# other 12, one sits in a card this tool checks and PASSES:
+# `bench/2026-08-24c/PREDICTIONS-block3c.md`, cell `D4c`, which sent
+# `EW B800311C 40000` from a table cell.  The rest were typed from
+# `RUNSHEET.md`, which nothing here reads, or from cards that `commands`
+# refuses outright for carrying no `--send` at all.  The upload itself is
+# guarded by `looprun`'s `S5b` and nowhere else.
+
+
+def flash_write(cmd):
+    """-> the refusal for a payload that can write flash or arm a burn, or None.
+
+    🔴 CASE-INSENSITIVE ON PURPOSE.  讀: the dispatcher matches the typed token
+    with `0x80406C40`, which `docs/loader-command-semantics.md` § b reads as
+    `strcmp` (exact), so `ew` probably reaches no handler at all -- but no
+    seating has typed one, and nobody has read whether the line editor folds
+    case before the compare.  Refusing a lowercase typo costs a retyped line;
+    letting one through could cost the device (`A30`).
+    """
+    w = cmd.split()
+    v = w[0].upper() if w else ""
+    if v == "FLW":
+        why = ("writes flash, behind a (Y)es prompt the card itself answers "
+               "(LDR-30)")
+    elif v in ("EW", "EB"):
+        why = ("writes ANY address with no bound check (LDR-08, LDR-09, "
+               "LDR-11), the AUTOBURN word at 0x8040D4A0 included")
+    elif v == "AUTOBURN" and cmd.strip() != "AUTOBURN 0":
+        why = ("arms the burn of the next upload into flash (LDR-23); only the "
+               "exact string `AUTOBURN 0`, which disarms it, passes")
+    else:
+        return None
+    return (f"{w[0]}: FLASH WRITE -- {why}. It needs the owner's own dated "
+            f"yes on this card, as a ```owner-yes row "
+            f"`YYYY-MM-DD<TAB>{cmd.strip()}`; nothing else silences it "
+            f"(FW-113)")
+
+
+def unsuppressed(kind, issues, absent):
+    """-> the issues an absence declaration does not excuse.
+
+    🔴 A LOADER ISSUE IS NEVER AN ABSENCE-TEST.  An absence-test is about the
+    IMAGE -- a path or a program it lacks, on purpose (`B3`) -- and the filter
+    keys on an issue's text up to its first colon.  量 2026-09-23, before this
+    function existed: that prefix match let `--expect-absent FLR` hide
+    `FLR`'s H601 containment issue (1 bad -> 0), and `--expect-absent ew`
+    hide the lowercase verb's (1 -> 0); a flash-write refusal worded
+    `EW: ...` would have gone the same way.  So a LOADER issue passes through
+    whole, whatever is declared (`A35`).
+    """
+    if kind == "LOADER":
+        return list(issues)
+    return [i for i in issues if i.split(":")[0] not in absent]
+
+
+# ⚠️ Keyed by (card, exact payload) and not by card alone: a path would also
+# excuse a flash write added to that file later, and these three rows are the
+# whole of what the two cards sent through a `--send` before the refusal
+# existed.  Both are FROZEN -- captures have landed against them -- so they
+# are named one by one, never by a date or a pattern, and `B12` sweeps the
+# list in both directions, as `B10` sweeps FLR_LEGACY_CARDS.
+FLASH_LEGACY_CARDS = {
+    # 2026-08-24c, `D4`: arms the watchdog through WDTCNR (0xB800311C) at
+    # the longest OVSEL.  Its --send sits in the cell's HEADING, and the
+    # tool reads that as a command, as it reads every --send.
+    "bench/2026-08-24c/PREDICTIONS-block3.md": frozenset({
+        "EW B800311C 240000"}),
+    # 2026-08-25, `H3c-D4` and `H3c-D4c`: the same register, two OVSELs.
+    "bench/2026-08-25/PREDICTIONS-b4-block10.md": frozenset({
+        "EW B800311C 240000", "EW B800311C 40000"}),
+}
+
+OWNER_YES_RE = re.compile(r"```owner-yes\r?\n(.*?)\r?\n```", re.S)
+_YES_DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+
+
+def owner_yes(text, card_rel, pairs, report=print):
+    """-> (the exact payloads this card may send although they write flash,
+    the number of defects found on the way).
+
+    The way through `FW-113`'s refusal is the owner's dated yes, on the card,
+    one row per payload -- the date, one TAB, the `--send` payload exactly:
+
+        ```owner-yes
+        2026-09-23<TAB>EW B800311C 240000
+        ```
+
+    🔴 THIS ENFORCES PRESENCE AND EXACTNESS, NOT PROVENANCE.  The tool cannot
+    know the owner said it.  The rule is that only the owner's own words, on
+    the date they were said, produce such a row; what this adds is that the
+    row exists, is well formed, and names exactly what is sent.
+
+    🔴 EXACT, WITH NO WHITESPACE NORMALISATION, and that is a decision about
+    the loader, not about tidiness.  讀: its tokeniser (0x80407248) splits on
+    the space character only and stores argv[i] before testing for a
+    separator (`docs/loader-command-semantics.md` § f; `console-capture.py`'s
+    docstring, where a leading space NULed argv[0]).  So `EW B800311C  0` --
+    two spaces -- plausibly carries an EMPTY argument, which strtoul reads as
+    0, and the command writes an extra word (推).  Two strings that normalise
+    equal need not parse equal, and a yes for one must not pass the other.
+    If the loader does collapse spaces, exactness costs a retyped row.  Case
+    is exact too.
+
+    Defects, each reported and counted, and none of them permits anything: a
+    row that is not `YYYY-MM-DD<TAB>payload` with a real calendar date; a
+    second row for a payload that already has one (one yes per payload); and
+    a row that permits nothing on this card -- stale, mistyped, or for a
+    command that needs no yes.
+
+    One row covers every cell of THIS card that sends that exact payload, and
+    each such cell is reported as a note carrying the date.
+    FLASH_LEGACY_CARDS adds the frozen rows of the frozen cards, nothing else.
+    """
+    import datetime
+    yes, bad = {}, 0
+    for m in OWNER_YES_RE.finditer(text):
+        for ln in m.group(1).split("\n"):
+            ln = ln.rstrip("\r")
+            if not ln.strip() or ln.lstrip().startswith("#"):
+                continue
+            date, tab, payload = ln.partition("\t")
+            ok = bool(tab and payload and _YES_DATE_RE.fullmatch(date))
+            if ok:
+                try:
+                    datetime.date.fromisoformat(date)
+                except ValueError:
+                    ok = False
+            if not ok or payload in yes:
+                bad += 1
+                report(f"  FAIL  owner-yes row {ln!r}")
+                report("          REFUSED, and it permits nothing: " + (
+                    "a second yes for one payload" if ok else
+                    "want YYYY-MM-DD<TAB><the exact --send payload>, "
+                    "with a real date"))
+                continue
+            yes[payload] = date
+    legacy = FLASH_LEGACY_CARDS.get(card_rel.replace("\\", "/"), frozenset())
+    used = set()
+    for cid, cmd in pairs:
+        c = cmd.strip()
+        if not flash_write(c) or (c not in yes and c not in legacy):
+            continue
+        used.add(c)
+        report(f"  note  {cid}: {cmd}")
+        report(f"          a flash write under the owner's yes of {yes[c]}"
+               if c in yes else
+               "          a flash write on a FROZEN card (FLASH_LEGACY_CARDS),"
+               " sent before FW-113; running it again needs the owner's yes")
+    for payload, date in yes.items():
+        if payload not in used:
+            bad += 1
+            report(f"  FAIL  owner-yes {date}: {payload!r}")
+            report("          permits nothing on this card -- stale, "
+                   "mistyped, or for a command that needs no yes")
+    return frozenset(yes) | legacy, bad
 
 
 # --------------------------------------------------------------------------
@@ -983,11 +1176,18 @@ def run_controls():
     # 🔴 THE CONTROL THAT SAYS IT IS A GUARD AND NOT A BLANKET.  Without this,
     # a future edit that flagged every LOADER verb would pass A19 and A20 and
     # make the tool useless on every card that reads a register.
-    other = [c for c in ("DW 8040D4A0 1", "J 80500000", "EW B800311C A5000000",
-                         "AUTOBURN 0", "LOADADDR 80500000")
+    #
+    # 🔄 2026-09-23 (`P2-2`, `FW-113`): `EW B800311C A5000000` LEFT this list.
+    # A21 required it to pass, which is the exact opposite of the rule
+    # `FW-113` adds -- an `EW` now needs the owner's dated yes (A29) -- so
+    # until today this case asserted the defect.  `AUTOBURN 0` stays, and it
+    # now guards the flash rule too: it DISARMS the burn, and it is the one
+    # `AUTOBURN` a card may type without a yes.
+    other = [c for c in ("DW 8040D4A0 1", "J 80500000", "AUTOBURN 0",
+                         "LOADADDR 80500000")
              if classify_command(c, names, paths)[1]]
-    row("A21", "and no OTHER loader verb is touched by it",
-        not other, f"{len(other)} of 5 flagged" + (f": {other}" if other else ""))
+    row("A21", "and no OTHER loader verb is touched by either guard",
+        not other, f"{len(other)} of 4 flagged" + (f": {other}" if other else ""))
 
     # ----------------------------------------------------------------- A22-A24
     # 🔴 The `--idle` guard, with the same three-case shape as A19-A21: it
@@ -1124,6 +1324,183 @@ def run_controls():
         + (f"NEW offender(s): {off}" if off else "")
         + (f"STALE list entr(y/ies): {stale2}" if stale2 else "")
         + ("list exact" if not off and not stale2 else ""))
+
+    # ------------------------------------------------------------ A29-A36, B12
+    # 🔴 `FW-113`, the flash-write refusal.  The shape of A19-A21 -- it fires,
+    # the named frozen cards are excused, nothing else is touched (A21) --
+    # plus the one way through, the owner's dated yes, and B12's sweep.
+    # `quiet` was rebound to A24's list above, so these carry their own.
+    def silent(*_a, **_k):
+        pass
+
+    def card_at(d, name, body):
+        p = os.path.join(d, name)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(body)
+        return os.path.relpath(p, ROOT)
+
+    def cells(cmds, tag):
+        return "".join(f"| **{tag}{i}** | `CAP --out {tag}{i} --send '{c}'` |\n"
+                       for i, c in enumerate(cmds))
+
+    def yes_fence(rows):
+        return "\n```owner-yes\n" + "".join(r + "\n" for r in rows) + "```\n"
+
+    def not_refused(cmds):
+        """The commands that did NOT come back LOADER with exactly the one
+        flash-write issue."""
+        out = []
+        for c in cmds:
+            k, iss = classify_command(c, names, paths)
+            if not (k == "LOADER" and len(iss) == 1 and "FW-113" in iss[0]):
+                out.append(c)
+        return out
+
+    # A29 -- the two strings `FW-113` measured passing with no issue, and the
+    # other two verbs.  Fails on the code before today, where all four came
+    # back `('LOADER', [])`.
+    fw4 = ("FLW 0 0 0", "EW 8040D4A0 1", "EB 8040D4A0 1", "AUTOBURN 1")
+    miss = not_refused(fw4)
+    row("A29", "`FLW`, `EW`, `EB`, `AUTOBURN 1` are each REFUSED",
+        not miss, f"{len(fw4) - len(miss)} of {len(fw4)} refused"
+        + (f"; passed: {miss}" if miss else ""))
+
+    # A30 -- and in any case.  See flash_write(): the loader's case handling
+    # is 讀 as exact and never measured, and the refusal must not depend on
+    # which way it turns out.  Fails on the code before today, where `ew` was
+    # refused only as a program the image lacks -- which `--expect-absent ew`
+    # excused (A35).
+    low = ("ew 8040d4a0 1", "Flw 0 0 0", "eB 8040D4A0 1", "autoburn 1")
+    miss = not_refused(low)
+    row("A30", "and so is each in lower or mixed case",
+        not miss, f"{len(low) - len(miss)} of {len(low)} refused"
+        + (f"; passed: {miss}" if miss else ""))
+
+    # A31 -- 🔴 THE ONE WAY THROUGH, or the refusal is a blanket over four
+    # verbs a card may need.  Each passes by the owner's dated yes naming it
+    # exactly, and each passing cell is REPORTED with its date rather than
+    # passed in silence.
+    with tempfile.TemporaryDirectory() as d:
+        lines = []
+        n = cards_commands(card_at(d, "yes.md", cells(fw4, "Y") + yes_fence(
+            f"2026-09-23\t{c}" for c in fw4)), report=lines.append)
+        dated = sum("the owner's yes of 2026-09-23" in x for x in lines)
+    row("A31", "each is PERMITTED by the owner's dated yes for it",
+        n == 0 and dated == 4, f"{n} bad; {dated} of 4 cells noted with the yes")
+
+    # A32 -- a malformed yes is REFUSED and permits nothing: a month 13, a
+    # 30 February, a two-digit year, a space where the TAB goes, no payload.
+    # One yes per payload, so a second row for it is refused too, while the
+    # first still stands.
+    with tempfile.TemporaryDirectory() as d:
+        ew1 = cells(("EW 8040D4A0 1",), "T")
+        n_bad = cards_commands(card_at(d, "m.md", ew1 + yes_fence((
+            "2026-13-01\tEW 8040D4A0 1", "2026-02-30\tEW 8040D4A0 1",
+            "26-09-23\tEW 8040D4A0 1", "2026-09-23 EW 8040D4A0 1",
+            "2026-09-23\t"))), report=silent)
+        n_dup = cards_commands(card_at(d, "dup.md", ew1 + yes_fence((
+            "2026-09-23\tEW 8040D4A0 1", "2026-09-24\tEW 8040D4A0 1"))),
+            report=silent)
+    row("A32", "a malformed or second yes is REFUSED, permits nothing",
+        n_bad == 6 and n_dup == 1,
+        f"five malformed rows: {n_bad} bad (want 6 -- the EW too); "
+        f"a second yes: {n_dup} (want 1)")
+
+    # A33 -- 🔴 EXACT, against the three near-misses a looser match passes.
+    # One character LONGER than its yes, which a prefix match passes -- as it
+    # would pass `EW 8040D4A0 1 2`, a second word written, since `EW` writes
+    # argc - 1 words (`LDR-08`); one that differs in CASE; and a yes with a
+    # DOUBLED space, which the loader's tokeniser need not read as the same
+    # command (owner_yes()).  Every cell refused and every yes reported as
+    # permitting nothing: 3 + 3.
+    with tempfile.TemporaryDirectory() as d:
+        sent = ("EW 8040D4A0 10", "EB 8040D4A0 1", "EW 8040D4A4 1")
+        said = ("EW 8040D4A0 1", "eb 8040D4A0 1", "EW 8040D4A4  1")
+        lines = []
+        n = cards_commands(card_at(d, "near.md", cells(sent, "N") + yes_fence(
+            f"2026-09-23\t{c}" for c in said)), report=lines.append)
+        cut = sum(x.startswith("  FAIL  N") for x in lines)
+    row("A33", "a yes one character off its payload permits nothing",
+        n == 6 and cut == 3, f"{n} bad (want 6); {cut} of 3 cells refused")
+
+    # A34 -- a yes that permits nothing is a defect too: one for a payload no
+    # cell sends, and one for a cell that needs no yes at all.
+    with tempfile.TemporaryDirectory() as d:
+        lines = []
+        n = cards_commands(card_at(d, "stale.md", cells(("DW 8040D4A0 1",), "T")
+                                   + yes_fence(("2026-09-23\tEW 8040D4A0 1",
+                                                "2026-09-23\tDW 8040D4A0 1"))),
+                           report=lines.append)
+        named = sum("permits nothing on this card" in x for x in lines)
+    row("A34", "a yes that permits nothing is REPORTED, not ignored",
+        n == 2 and named == 2, f"{n} bad; {named} of 2 stale rows named")
+
+    # A35 -- 🔴 NOTHING BUT THE OWNER'S YES SILENCES IT.  See unsuppressed():
+    # both routes -- a ```cardabsent fence and `--expect-absent` -- name `EW`,
+    # `ew` and `FLR`, and all three refusals must survive both.  量 on the
+    # code before today: each route took this card from 2 bad to 0 -- the
+    # `EW` raised nothing to hide, and the other two were hidden.
+    with tempfile.TemporaryDirectory() as d:
+        three = cells(("EW 8040D4A0 1", "ew 8040d4a0 1",
+                       "FLR 80A00400 000000 100"), "H")
+        hide = ("EW", "ew", "FLR")
+        n_fence = cards_commands(card_at(d, "f.md", three + "\n```cardabsent\n"
+                                         + "\n".join(hide) + "\n```\n"),
+                                 report=silent)
+        n_flag = cards_commands(card_at(d, "g.md", three), report=silent,
+                                extra_absent=hide)
+    row("A35", "no absence declaration hides a loader-verb refusal",
+        n_fence == 3 and n_flag == 3,
+        f"cardabsent: {n_fence} of 3 still bad; --expect-absent: {n_flag} of 3")
+
+    # A36 -- the two FROZEN cards are excused by NAME and only by name: the
+    # same bytes at another path -- one that keeps the `bench/<date>/<name>`
+    # tail, so a suffix or basename key would still match it -- are refused.
+    try:
+        frozen_bad = {c: cards_commands(c, report=silent)
+                      for c in sorted(FLASH_LEGACY_CARDS)}
+        src = "bench/2026-08-25/PREDICTIONS-b4-block10.md"
+        with tempfile.TemporaryDirectory() as d:
+            dst = os.path.join(d, src)
+            os.makedirs(os.path.dirname(dst))
+            with open(dst, "wb") as f:
+                f.write(_read(src))
+            n_copy = cards_commands(os.path.relpath(dst, ROOT), report=silent)
+        row("A36", "the FROZEN cards are excused by name, a copy is not",
+            len(frozen_bad) == 2 and not any(frozen_bad.values())
+            and n_copy == 2,
+            f"frozen: {sorted(frozen_bad.values())} bad; the same bytes "
+            f"elsewhere: {n_copy} (want 2, its two EW cells)")
+    except (Refuse, OSError) as e:
+        row("A36", "the FROZEN cards are excused by name, a copy is not",
+            False, str(e)[:60])
+
+    # ------------------------------------------------------------------- B12
+    # 🔴 `FW-113`'s corpus sweep, in both directions as B10 does it, at the
+    # exemption's own grain -- a (card, exact payload) pair.  Forwards: every
+    # flash write any card sends is a frozen pair or is under that card's own
+    # yes.  Backwards: every frozen pair is still sent, or the list has begun
+    # to turn into a blanket.
+    fw_sent, fw_off = {}, []
+    for c in cards:
+        try:
+            t = _read(c).decode("utf-8", "replace")
+        except OSError:
+            continue
+        prs = sends_with_cells(t)
+        mine = {cmd.strip() for _cid, cmd in prs if flash_write(cmd.strip())}
+        if mine:
+            fw_sent[c] = mine
+            fw_ok, _n = owner_yes(t, c, prs, silent)
+            fw_off += [f"{c}: {p}" for p in sorted(mine - fw_ok)]
+    fw_stale = [f"{c}: {p}" for c, ps in sorted(FLASH_LEGACY_CARDS.items())
+                for p in sorted(ps) if p not in fw_sent.get(c, ())]
+    row("B12", "every corpus flash write is a frozen pair or has a yes",
+        not fw_off and not fw_stale,
+        f"{len(cards)} swept, {len(fw_sent)} send a flash write; "
+        + (f"NEW offender(s): {fw_off}" if fw_off else "")
+        + (f"STALE list entr(y/ies): {fw_stale}" if fw_stale else "")
+        + ("list exact" if not fw_off and not fw_stale else ""))
 
     print()
     return 0 if ok else 1

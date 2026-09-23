@@ -32,6 +32,25 @@ defect -- a build stamp is enough to move one.  So `check` compares STRUCTURE
 (header fields, the compressed payload, the decompressed image) as well as
 bytes, and says which of the two it is.
 
+🔴 `build` RUNS THE DROP'S OWN BINARIES, AND UNTIL 2026-09-23 IT RAN THEM UNWATCHED
+-----------------------------------------------------------------------------
+讀 `rtkload/Makefile`: it runs `./lzma` -- a script that runs `./lzma-26` on
+this host -- and `./cvimg`, both copies in the work directory, and
+`rsdk-linux-gcc`, `-ld`, `-objcopy`, `-nm` and `-strip` out of the drop's own
+toolchain tree, reached through the cell's `toolchain` symlink.  讀 this file
+as committed at `R3-2` (`11853cc`, 2026-08-29) and as it stood until
+2026-09-23: `build` spawned that make with a plain
+`subprocess.run(['make', ...])`, outside `vendor-tripwire.sh` -- every
+`build`, `looprun`'s S3 included, against CLAUDE.md's rule that no vendor
+binary runs outside it.  It now runs `bash vendor-tripwire.sh --quiet -- make
+-C ...` from its own work directory, as `rlxfw-kbuild.sh` does, and writes no
+record on any verdict but CLEAN.
+⚠️ That does NOT establish that any of those earlier builds wrote into a vendor
+tree, nor that none did.  Whether a tree is dirty NOW is what
+`vendor-tripwire.sh --check` answers; for the builds already past, nothing
+can -- a write undone since, or a touch that moved only an mtime, leaves
+nothing a check made today can see.
+
 THE THREE THINGS THIS TOOL CANNOT TELL YOU
 ------------------------------------------
 1.  That the image will boot.  It reads format, not behaviour.  The only desk
@@ -53,16 +72,30 @@ Usage
     rtkimage.py check --nfjrom FILE [--memload ELF] [--linuxbin FILE]
                       [--expect-img FILE] [--ceiling N] [--label NAME]
 
+`build` writes <work>/<label>/rtkimage-record.tsv beside its outputs: the full
+sha256 of the vmlinux the loader stub was built around and of the `nfjrom` it
+produced (TC-i, 2026-09-23).  A card pins the nfjrom; the build manifest
+records the vmlinux and the verdicts of the declaration gates; this record is
+the one link between them, and nothing else writes it.
+
 Exit
     0  built / checked, and every control fired
-    1  a comparison the caller asked for did not hold
-    2  a control failed -- nothing is reported
-    3  usage / environment refusal
+    1  a comparison the caller asked for did not hold -- for `build`, also:
+       make failed (other than B1's one named failure), make wrote no nfjrom,
+       or the vmlinux it consumed is not the one given
+    2  a control failed -- nothing is reported.  For `build`: the tripwire
+       said TRIPPED or TOUCHED, found a tree already dirty, could not read a
+       tree after make ran, or printed no verdict line or one at odds with
+       its exit status.  No record is written
+    3  usage / environment refusal -- for `build`, also: no tripwire, or the
+       tripwire refused before make ran (no git tree under
+       $FWRE_WORK/rebuild/src-vendor to watch, or git could not read one)
 """
 
 import hashlib
 import lzma
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -101,6 +134,97 @@ def sha(path_or_bytes):
             for c in iter(lambda: fh.read(1 << 20), b''):
                 h.update(c)
     return h.hexdigest()
+
+
+RECORD_NAME = 'rtkimage-record.tsv'
+RECORD_FORMAT = '1'
+
+# `build` runs the drop's own binaries, so it runs them the way
+# rlxfw-kbuild.sh does: under vendor-tripwire.sh, which snapshots every git
+# tree under $FWRE_WORK/rebuild/src-vendor before and after the command.
+TRIPWIRE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'vendor-tripwire.sh')
+# Its verdict, printed after the command returns: CLEAN, TRIPPED and TOUCHED
+# on stdout, REFUSED and SKIPPED on stderr.  Both streams go to make.log, so
+# the verdict is always in it.  `cmd-rc=` is make's own status; it is absent
+# when make never ran.
+VERDICT_RX = re.compile(
+    r'^VENDOR-TRIPWIRE: ([A-Z]+)\b(?:[ \t]+cmd-rc=(\d+))?.*$', re.M)
+
+
+def read_tripwire(rc, text):
+    """What the tripwire said about one make: its exit status `rc` and the
+    LAST `VENDOR-TRIPWIRE:` line of `text`, which must agree.
+
+    -> (make_rc, verdict, None, None)  make ran watched and CLEAN; go on
+    -> (None, verdict, code, why)      refuse with exit `code`: 2 when the
+                                       watch failed or cannot be read, 3 when
+                                       nothing ran for want of a tree to watch
+
+    The LAST line, because the tripwire prints its verdict after the command
+    returns: a line make's own output happened to contain comes earlier and
+    must not decide anything.  A missing line, or one that disagrees with the
+    exit status, is a refusal -- never "assume clean".
+    """
+    found = list(VERDICT_RX.finditer(text))
+    if not found:
+        return (None, None, 2,
+                'vendor-tripwire.sh exited %d and printed no VENDOR-TRIPWIRE '
+                'verdict line. Nothing certifies this make, and a missing '
+                'verdict is never read as CLEAN' % rc)
+    m = found[-1]
+    word, cmdrc, line = m.group(1), m.group(2), m.group(0).rstrip()
+    if rc == 0 and word == 'CLEAN' and cmdrc == '0':
+        return 0, line, None, None
+    if rc == 1 and word == 'CLEAN' and cmdrc is not None and int(cmdrc) != 0:
+        return int(cmdrc), line, None, None
+    if rc == 2 and word == 'TRIPPED':
+        return (None, line, 2,
+                'TRIPPED: a watched vendor tree changed while make ran. The '
+                'outputs are not a function of their declared inputs, and the '
+                'tree needs restoring -- the tripwire printed how')
+    if rc == 5 and word == 'TOUCHED':
+        return (None, line, 2,
+                'TOUCHED: git sees no change, but files in a watched vendor '
+                'tree moved past the stamp while make ran')
+    if rc == 4 and word == 'REFUSED' and cmdrc is None:
+        return (None, line, 2,
+                'a watched vendor tree was ALREADY dirty, so the tripwire did '
+                'not run make: a diff taken against dirt cannot be attributed, '
+                'and the dirt is itself a write nobody watched')
+    if rc == 3 and word in ('SKIPPED', 'REFUSED') and cmdrc is None:
+        return (None, line, 3,
+                'the tripwire refused before running make, for want of a tree '
+                'it could watch')
+    if rc == 3 and word == 'REFUSED' and cmdrc is not None:
+        return (None, line, 2,
+                'make ran (cmd-rc=%s) and git could not read a watched tree '
+                'afterwards: the build happened and nothing certifies it'
+                % cmdrc)
+    return (None, line, 2,
+            'vendor-tripwire.sh exited %d but its last verdict line is %r: the '
+            'two disagree, so neither is believed' % (rc, line))
+
+
+def write_record(path, rows):
+    """Write [(key, value)] as a two-column TSV, through .tmp + os.replace.
+
+    A reader must never find half a record, and a record that exists at all
+    says a build finished -- so the file appears whole or not at all.  A key
+    or value holding a tab or a newline would split a row, and is refused
+    rather than escaped: nothing this tool writes should contain one.
+    """
+    out = []
+    for k, v in rows:
+        v = str(v)
+        if any(c in k + v for c in '\t\r\n'):
+            die('record field %r would split a row: %r' % (k, v))
+        out.append('%s\t%s\n' % (k, v))
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(''.join(out))
+    os.replace(tmp, path)
+    return path
 
 
 def sum16(b):
@@ -374,16 +498,28 @@ def cmd_build(args):
     kroot = os.path.join(run, 'kroot')
     rtk = os.path.join(kroot, 'rtkload')
 
+    # 🔴 The existence check comes FIRST.  Until 2026-09-23 the `vmlinux` line
+    # below ran before it, so a missing --vmlinux died in os.path.getsize with
+    # a traceback and exit 1 -- the status this tool reserves for "a comparison
+    # did not hold" -- instead of the refusal written for it.
+    if not os.path.isdir(kcell):
+        die('%s: not found' % kcell)
+    for k in ('vmlinux', 'kconfig', 'sdkconfig'):
+        if not os.path.isfile(args[k]):
+            die('--%s %s: not found, or not a regular file' % (k, args[k]))
+    # rlxfw-kbuild.sh's `[ -x "$TRIPWIRE" ] || ... exit 3`, and for the same
+    # reason: make here runs the drop's lzma-26 and cvimg and the rsdk
+    # toolchain, and a build nobody watches is refused, not run.
+    if not os.access(TRIPWIRE, os.X_OK):
+        die('no tripwire at %s: `build` runs the drop\'s own binaries, and '
+            'it does not run them unwatched' % TRIPWIRE)
+    src_sha = sha(args['vmlinux'])
+
     print('rtkimage %s -- build' % VERSION)
     print('cell       %s' % cell)
     print('vmlinux    %s  (%d bytes, sha256 %s)'
-          % (args['vmlinux'], os.path.getsize(args['vmlinux']),
-             sha(args['vmlinux'])[:16]))
+          % (args['vmlinux'], os.path.getsize(args['vmlinux']), src_sha[:16]))
     print('work       %s' % run)
-
-    for p in (kcell, args['vmlinux']):
-        if not os.path.exists(p):
-            die('%s: not found' % p)
     if not os.path.isfile(os.path.join(kcell, 'include/linux/autoconf.h')):
         die('%s has no include/linux/autoconf.h -- rtkload\'s sources include '
             'it (cache.c, hfload.c, misc.c, prom_printf.c, read_memory.c, '
@@ -398,7 +534,14 @@ def cmd_build(args):
     # 480 MB and is not copied.
     for d in ('include', 'arch', 'lib'):
         os.symlink(os.path.join(kcell, d), os.path.join(kroot, d))
-    shutil.copy2(args['vmlinux'], os.path.join(kroot, 'vmlinux'))
+    vm_used = os.path.join(kroot, 'vmlinux')
+    shutil.copy2(args['vmlinux'], vm_used)
+    # The record names the vmlinux by the digest of the copy make READS, and
+    # that is only the same claim as "the file you gave me" if the two agree.
+    if sha(vm_used) != src_sha:
+        die('%s changed while it was being copied (%s before, %s after): '
+            'another writer is on it, and a record would name neither'
+            % (args['vmlinux'], src_sha[:16], sha(vm_used)[:16]))
     shutil.copy2(args['kconfig'], os.path.join(kroot, '.config'))
     shutil.copy2(args['sdkconfig'], os.path.join(run, '.config'))
     shutil.copytree(os.path.join(DROP, 'linux-2.6.30/rtkload'), rtk)
@@ -415,14 +558,40 @@ def cmd_build(args):
     env['PATH'] = rsdk + os.pathsep + env.get('PATH', '')
     env['CROSS_COMPILE'] = 'rsdk-linux-'
 
+    # 🔴 THROUGH THE TRIPWIRE, the way rlxfw-kbuild.sh runs every vendor
+    # command.  Mirrored from it, line for line:
+    #   run():        bash "$TRIPWIRE" --quiet -- "$@" > "$log.$sfx.log" 2>&1
+    #                 -- the same argv, and stdout AND stderr into one log, so
+    #                 the verdict line always lands beside make's own output;
+    #   cd "$scratch" -- nothing the vendor chain spawns starts in the
+    #                 caller's cwd, which under looprun is the repository root:
+    #                 here the per-label work directory;
+    #   run build "$@" < /dev/null  -- no recipe can wait on a terminal.
+    # kbuild takes the tripwire's exit status AS the build's status and never
+    # reads `cmd-rc`.  This tool cannot: B1 below tolerates ONE make failure by
+    # its evidence, so it needs make's own status, and read_tripwire() takes
+    # it from the verdict line -- after checking that line against the exit
+    # status.  That parse has no kbuild precedent.
     log = os.path.join(run, 'make.log')
+    argv = ['bash', TRIPWIRE, '--quiet', '--', 'make', '-C', rtk]
     with open(log, 'wb') as fh:
-        p = subprocess.run(['make', '-C', rtk], env=env,
+        p = subprocess.run(argv, env=env, cwd=run, stdin=subprocess.DEVNULL,
                            stdout=fh, stderr=subprocess.STDOUT)
-    print('make       rc=%d   (%s)' % (p.returncode, log))
     with open(log, encoding='utf-8', errors='replace') as fh:
         logtext = fh.read()
-    if p.returncode != 0:
+    make_rc, verdict, code, why = read_tripwire(p.returncode, logtext)
+    if make_rc is None:
+        print('tripwire   rc=%d   (%s)' % (p.returncode, log))
+        print('           %s' % (verdict or '(no verdict line)'))
+        print('')
+        print('  REFUSED: %s.' % why)
+        print('  No %s is written: an nfjrom made where nobody could see what '
+              'the build wrote' % RECORD_NAME)
+        print('  is not one a card may pin.')
+        return code
+    print('make       rc=%d   (%s)' % (make_rc, log))
+    print('tripwire   %s' % verdict)
+    if make_rc != 0:
         # B1 -- ONE make failure is known, named, and happens after every
         # artefact has been written.  量 2026-08-29: with the vendor's own
         # board config (CONFIG_BLK_DEV_INITRD not set, CONFIG_RTL_FLASH_MAPPING_ENABLE=y)
@@ -453,6 +622,8 @@ def cmd_build(args):
               'artefact below was')
         print('           written before it ran, and no later line produces '
               'one.')
+    tolerated = ('-' if make_rc == 0 else
+                 'cvimg flash_size_chk, which the drop\'s cvimg 1.1 lacks')
 
     print('')
     print('  %-24s %10s  %s' % ('artefact', 'bytes', 'sha256'))
@@ -467,6 +638,48 @@ def cmd_build(args):
             print('  %-24s %10s' % (o, 'ABSENT'))
     print('')
     print('  outputs are in %s' % rtk)
+
+    # TC-i: which vmlinux became which nfjrom.  Until 2026-09-23 the answer was
+    # two 16-hex prefixes on stdout, and a card pins a full sha256 of the
+    # nfjrom while the build manifest records the vmlinux -- so nothing
+    # written down connected a green `verify` to the file on the wire.
+    nf = os.path.join(rtk, 'nfjrom')
+    if not os.path.isfile(nf):
+        print('')
+        print('  REFUSED: make exited %d and wrote no nfjrom. There is nothing '
+              'to upload and' % make_rc)
+        print('  nothing to record; no %s is written.' % RECORD_NAME)
+        return 1
+    if sha(vm_used) != src_sha:
+        print('')
+        print('  REFUSED: the vmlinux make consumed (%s) is no longer the one '
+              'given' % vm_used)
+        print('  (%s, now %s): the nfjrom cannot be attributed to either, so '
+              'no record is written.' % (src_sha[:16], sha(vm_used)[:16]))
+        return 1
+    nf_sha = sha(nf)
+    rec = write_record(os.path.join(run, RECORD_NAME), [
+        ('rlxfw-rtkimage-record', RECORD_FORMAT),
+        ('tool', 'rtkimage %s' % VERSION),
+        ('label', label),
+        ('cell', cell),
+        ('vmlinux', os.path.abspath(args['vmlinux'])),
+        ('vmlinux_bytes', os.path.getsize(vm_used)),
+        ('vmlinux_sha256', src_sha),
+        ('kconfig_sha256', sha(os.path.join(kroot, '.config'))),
+        ('sdkconfig_sha256', sha(os.path.join(run, '.config'))),
+        ('make_rc', make_rc),
+        ('make_tolerated', tolerated),
+        # The build that made this nfjrom was watched, and this is what the
+        # watch said.  Only CLEAN reaches this line; every other verdict
+        # returned above without a record.
+        ('tripwire_verdict', verdict),
+        ('nfjrom', nf),
+        ('nfjrom_bytes', os.path.getsize(nf)),
+        ('nfjrom_sha256', nf_sha),
+    ])
+    print('  record -> %s' % rec)
+    print('           vmlinux %s  ->  nfjrom %s' % (src_sha, nf_sha))
 
     if args.get('compare_vendor'):
         print('')

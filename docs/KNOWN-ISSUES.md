@@ -1037,15 +1037,15 @@ onto a blank line is already meaningless.
 
 | | |
 |---|---|
-| 🔴🔴 **The driver still needs a verb to work — a DIFFERENT verb.** | `phfollow` is the compiled default now and it demonstrably took: `A4-BASE` reads `ph_follow 1` and `B3-N` reads `n_ph_used 136` over `n_ph_chk 179`. But `recov_mode` reads **0** at boot, and seating 37's 17 Mbit/s was measured with `recover 1` armed by hand. On this image's own defaults the first `NET-67` wedge is terminal: `B2-IPERF`, with no verb typed on that boot, gave **0.39 Mbit/s for 10.66 s then zero**, 502 KBytes, receiver 0.00 Bytes, and `B3-N` read `n_tx_stop 1`, `tx_stopped 1`, `txd0`–`txd3` = `A15B81D1`/`81E9`/`8201`/`821B` with bit 0 set on all four. *Next:* `recover` compiled on by default, which is one initialiser — and the reason it was not done tonight is that nobody had noticed it was a verb. `SPEC.md` `NET-107` 🔄 **2026-09-22 (101st segment, desk): the initialiser is located so the next segment does not have to find it again, and it is TWO edits rather than one.** `rtl819x-nic.c:775` is `static int nic_recov_mode;` — the declaration with no initialiser — and `rtl819x-nic.c:744-746` is a three-line comment headed **DEFAULT OFF** whose stated reason is that one boot can then produce the broken arm and the repaired arm with nothing else changed. **That reason survives the flip**: `recover 0` typed once gives the same A/B, at the cost of one command. ⚠️ Not done here, and the reason is scope rather than doubt: it changes `RECIPE_ID`, which is a digest over `config/`, so a `config/` that has moved with no image built is a trap for the next card. It rides the next image. |
+| 🔴🔴 **The driver still needs a verb to work — a DIFFERENT verb.** | `phfollow` is the compiled default now and it demonstrably took: `A4-BASE` reads `ph_follow 1` and `B3-N` reads `n_ph_used 136` over `n_ph_chk 179`. But `recov_mode` reads **0** at boot, and seating 37's 17 Mbit/s was measured with `recover 1` armed by hand. On this image's own defaults the first `NET-67` wedge is terminal: `B2-IPERF`, with no verb typed on that boot, gave **0.39 Mbit/s for 10.66 s then zero**, 502 KBytes, receiver 0.00 Bytes, and `B3-N` read `n_tx_stop 1`, `tx_stopped 1`, `txd0`–`txd3` = `A15B81D1`/`81E9`/`8201`/`821B` with bit 0 set on all four. *Next:* `recover` compiled on by default, which is one initialiser — and the reason it was not done tonight is that nobody had noticed it was a verb. `SPEC.md` `NET-107` 🔄 **2026-09-22 (101st segment, desk): the initialiser is located so the next segment does not have to find it again, and it is TWO edits rather than one.** `rtl819x-nic.c:775` is `static int nic_recov_mode;` — the declaration with no initialiser — and `rtl819x-nic.c:744-746` is a three-line comment headed **DEFAULT OFF** whose stated reason is that one boot can then produce the broken arm and the repaired arm with nothing else changed. **That reason survives the flip**: `recover 0` typed once gives the same A/B, at the cost of one command. ⚠️ Not done here, and the reason is scope rather than doubt: it changes `RECIPE_ID`, which is a digest over `config/`, so a `config/` that has moved with no image built is a trap for the next card. It rides the next image. 🟢 **2026-09-23 (`P2-2`): done, both edits** -- `rtl819x-nic 1.4`, `:744-746` now headed DEFAULT ON and `:775` initialised to 1, in recipe `a2c56bc8` (`p2q`, `p2l`). A boot prints `RLXFW-N7=00000011`, `ph_follow << 4 \| recov_mode`, so a capture says which defaults it booted with. Not yet read on silicon; `P2-3` is its first boot. |
 | 🔴 **The card's own discriminator for that cell was wrong.** | It said a figure in the 0.04–0.07 Mbit/s band would mean the compiled default had not taken. The measured overall figure **was** 0.06 Mbit/s **and** the default had taken. A throughput band cannot separate *the fix is not in* from *the fix is in and something else stopped the traffic*; only a counter on the fix's own branch can, and `n_ph_used` is that counter. |
 | 🔴🔴 **`NET-67` is not the three zeroed TX ring bases.** | The strongest structural difference between this driver and the two implementations that do not wedge, killed by a single-variable A/B on one boot: arm 1 gave `Δn_tx_stop` +1 with first miss at **t = 1.138 s**, arm 4 — `tpdcr1/2/3` all reading `A15BE290` = `idle_ring` — gave `Δn_tx_stop` +1 with first miss at **t = 1.124 s**. Same dose, same descriptor state, 1.2 % apart. Eight candidates dead, none replaced. `SPEC.md` `NET-108` |
 | 🔴 **The engine-side reading was taken and it does not close.** | `Rcv 0 bytes` on the CPU port's ingress beside `CRCAlignErr` growing +7 for +7 transmitted frames, while port 3's egress also grows +7. The obvious reading — frames leaving with a bad FCS, dropped by the host NIC in hardware — is **refuted** by the host's own `RX errors: crc`, which is 0 before and 0 after. `SPEC.md` `NET-109 殘留` |
-| ⚠️ **Every `asicCounter` reading this seating took was AFTER the fault.** | There is no healthy baseline to difference against, so *the fault caused this* and *it has always read this way* are not separated. That is the first thing the residual asks for and it costs no power. |
+| ⚠️ **Every `asicCounter` reading this seating took was AFTER the fault.** | There is no healthy baseline to difference against, so *the fault caused this* and *it has always read this way* are not separated. That is the first thing the residual asks for and it costs no power. 🔄 **2026-09-23 (`P2-2`): "no healthy baseline" overstated it.** Committed healthy readings exist and were not cited: 量 `bench/2026-09-20/D12-AC0`, after a recovery with ping answering, reads the CPU port's `Rcv 0 bytes` with `CRCAlignErr 21` = the driver's `n_tx 21`, and port 3 `Snd 1914 bytes`; `2026-09-20b/X2-asic` (`NET-65`, 217 = 217) and `2026-09-21e/V1-ACNT` read the same way. So *CPU ingress `Rcv 0` while `CRCAlignErr` tracks TX* is the healthy state and not the fault's signature. What is still missing is a fresh boot's same-instant pair of driver dump and `asicCounter`: card A's `P1-N0` → `P1-AC0`. |
 | ⚠️ **The ethtool ops were never exercised.** | Declared before power on the card: `config/image-commands.tsv` has no `ethtool` applet and the unit's rootfs has no binary, so `get_drvinfo` / `get_link` / `get_ringparam` are in the image and inert. They are verified statically only. *Next:* a small static MIPS `linkprobe`, the way `/bin/iperf3` already reaches the board. |
 | 🔴 **Two defects were in the frozen card and a third was in my prediction.** | `C2-OFF` sent `recover 0` **and `engine off`** — with the engine off the dose that follows measures nothing; corrected at the bench and declared. The card wrote `NB blast --host/--frames/--size/--rate` when `netblast blast` takes `--target/--src/--dev/--rates/--step-s`; `cardcheck commands` checks that command *names* are invocable, not that their *arguments* are, so it could not catch it. And the boot-capture prediction of 7,717 was **refuted at 7,705** — see the row below. |
 | 🔴 **The boot-byte prediction was made on a field the project's own tool normalises because it varies.** | Both captures are 187 lines with identical timestamp bytes (1,728 each); the whole 12-byte difference is the vendor wlan driver printing `tmpReg[0xe]` where `s99c` printed `tmpReg[0x2e]` — **exactly 12 occurrences, 1 byte each, no residual**. `bootbytes`' `K7` control already documents this as the varwidth field. The lesson is not *predict more carefully*; it is *ask the tool to predict rather than copying a previous measurement*. |
-| ⚠️ **`D4` is still not met as written.** | The vendor driver is in the image and every hardware initialisation it performs still runs. What is measured is one rung: its `open` refuses. `SPEC.md` `NET-106` |
+| ⚠️ **`D4` is still not met as written.** | The vendor driver is in the image and every hardware initialisation it performs still runs. What is measured is one rung: its `open` refuses. `SPEC.md` `NET-106` 🔄 **2026-09-23 (`P2-2`)**: recipe `a2c56bc8` sets `CONFIG_RLXFW_VENDOR_ETH_OPEN=y` -- `config/host-compat/0007`'s own switch, back at its Kconfig default -- so `re865x_open` is whole again, because `P2`'s `D5` measures the vendor's driver on this kernel through `eth4`. The refusal stays one delta row away, and `s100L` is still the image that measured it. |
 
 ## 🔴 What seating 37 did NOT establish — 2026-09-22 (ninety-ninth segment)
 
@@ -1061,29 +1061,88 @@ onto a blank line is already meaningless.
 | 🔴 **Four defects were mine and three are repeats of things already in the record.** ① The card put `iperf3` in the **foreground** on the board, which hangs its only shell — seating 31 recorded that exact fix (`&`) and I did not apply it. ② I read *0 bytes on a passive capture* as *the board is hung*, when an idle shell at a prompt reads the same; `CLAUDE.md` states the discriminator (*a command that comes back*) for the USB link and I applied it to the adapter and not to the board. It cost ~8 minutes and no power. ③ Piping a runner into `head` killed it with SIGPIPE at cell 6 of 8. ④ I wrote that `NET-82` was *refuted for this die* on evidence that covered one load | ①–③ are `FW-108`. ④ is corrected in place in `notes/nic-driver.md` § 16.2 and in this file's own record: the refutation was true of the UDP ladder and false of the load that matters |
 | ⚠️ **`check-predictions` will not be `39 of 39`.** Parts F and G sit outside the `cells` fence by design, and the card says so in its own § before the fence — so a green on this card is a statement about A–E and not about the seating | The closeout reports F, G and the `X*`/`H*`/`J*` cells as declared off-card work |
 
-## 🔴 No tool refuses a flash-write command on a card — 2026-09-23 (one hundred and second segment, desk)
+## 🟢 `cardcheck` refuses a flash-write command on a card — closed 2026-09-23 (`P2-2`)
 
-量 at the desk: `tools/cardcheck.py`'s `classify_command` returns
-`('LOADER', [])` for `FLW 0 0 0` and for `EW 8040D4A0 1` — a known verb and no
-issue — while its negative control, `awk 1`, returns `NOT IN IMAGE`.
-`LOADER_VERBS` lists `FLW`, `EW`, `EB` and `AUTOBURN`, and the only loader verb
-with a containment rule is `FLR` (`A19`). `EW` and `EB` write any address with no
-bound check (`SPEC.md` `LDR-08`, `LDR-09`, `LDR-11`), the `AUTOBURN` word at
-`0x8040D4A0` included, and the read-back of that word before an upload is
-enforced only inside `tools/looprun.py` (`S5b`): a card-driven or typed upload
-has the rule in `CLAUDE.md` and nothing else.
+*(was, 2026-09-23, one hundred and second segment: no tool refused one;
+`classify_command` returned `('LOADER', [])` for `FLW 0 0 0` and for
+`EW 8040D4A0 1`, so nothing but a reader stood between a card and a flash
+write.)*
 
-So the rule this project states first — no flash write without the owner's yes,
-and none at all through `R9` — has no enforcer where cards are checked. Two
-frozen cards type `EW` (`bench/2026-08-24c/PREDICTIONS-block3.md` and
-`bench/2026-08-25/PREDICTIONS-b4-block10.md`, both writing the watchdog register
-`0xB800311C`), so a refusal needs a by-name exemption for them, as `A20` has for
-`FLR`, and a corpus sweep in both directions, as `B10` has.
+量 at the desk, 2026-09-23: `FLW`, `EW` and `EB` in any case, and every
+`AUTOBURN` but the exact string `AUTOBURN 0`, each draw one `FLASH WRITE` issue
+(`A29`, `A30`); `DW`, `J`, `AUTOBURN 0` and `LOADADDR` are untouched (`A21`). The
+one way through is the owner's dated yes on the card itself: an `owner-yes`
+fence of `YYYY-MM-DD<TAB><payload>` rows, matched byte for byte and not after
+whitespace normalisation, because the loader's tokeniser splits on single
+spaces (`A31`, `A33`). A malformed row, a second row for one payload and a row
+that permits nothing each fail in their own right (`A32`, `A34`). No
+`cardabsent` line and no `--expect-absent` reaches a loader issue (`A35`);
+before this change `--expect-absent FLR` took `FLR`'s H601 containment issue
+from 1 bad to 0. The two frozen cards' three `EW B800311C …` rows are excused
+by (card, exact payload) (`A36`), and `B12` sweeps that list both ways. All 85
+cards keep their exit status against `HEAD`'s `cardcheck` run in `HEAD`'s own
+tree; only those two print a note per excused row. The mutation suite's new
+`W0` requires every kill to turn the case its row names red, and it found two
+kills counted since 2026-08-31 that were not kills: `M1` never compiled and
+`M11` died of an `AttributeError`. `SPEC.md` `FW-113`.
 
-Owner: `P2-2`, before its card is frozen. `SPEC.md` `FW-113`.
+What this does not establish: that a yes came from the owner (presence and
+exactness only). Anything written other than as a single-quoted
+`--send '...'`: of 15 flash-verb payloads the committed captures record as
+sent, 3 are in such a `--send`, and `bench/2026-08-24c/PREDICTIONS-block3c.md`
+cell `D4c` (`EW B800311C 40000`, in a table cell) still passes. Anything about an
+upload: the `AUTOBURN` read-back before a `put` is still enforced only by
+`looprun`'s `S5b`.
 
-What this does not establish: that any card issued a flash write. It says only
-that nothing but a reader would have stopped one.
+## 🔴 A frozen card declares a day none of its captures happened on — 2026-09-23 (desk)
+
+量 2026-09-23 by `tools/capdate.py`'s card checks (`D5`–`D10`, `CAPD-1`) on
+their first sweep. `bench/2026-09-21/PREDICTIONS-B35-block33.md` says
+**declared date 2026-09-21**, and all 22 of its dated fenced captures started on
+**2026-09-20**, 23:16:54–23:27:08, as did 24 of the 37 dated captures in its
+directory that no card fences (23:28:26–23:59:55; the other 13 ran 00:00:15–00:07:47
+on 2026-09-21). The card was committed at 2026-09-20 23:16:35; the seating crossed
+midnight at `W2-START`, 33 minutes after its last dated carded capture. The
+directory check could only report the directory as spanning two days (`D2`);
+the card check is what names it. This is the two misnamed directories' failure
+(the section headed *Two bench directories are named for a day none of their
+captures happened on*), one level down: a date written before power is a
+prediction, and this one was wrong by one evening.
+
+The card is **not edited**: a frozen card is never repaired, and `git grep` at
+`5972a2a` finds 11 references to it in 9 other files, one of them another frozen
+card (`bench/2026-09-21b/PREDICTIONS-B36-block34.md`). It is declared by name in
+`capdate.KNOWN_CARD_DATE`, for `D7` and `D8` only, and that list is swept in both
+directions like `KNOWN_MISNAMED`.
+
+What this does not establish: which day the seating's owner meant. It says only
+that the card's claim and the host clock disagree. The check runs after the
+captures exist; before power, a declared date can only be compared with the
+directory name, which is the same prediction written twice. `P2`'s seatings plan
+not to cross midnight, and split the directory and the card if they do.
+
+## 🔴 What the one hundred and fourth segment did NOT establish — 2026-09-23 (desk, zero power cycles)
+
+`P2-2`: two images, four closed debts, and card A frozen for seating A. **Nothing
+was run on the silicon**; every reading below is a desk measurement, a build, or
+a prediction the seating will score.
+
+| what is not established | what would settle it |
+|---|---|
+| 🔴 **That either image boots.** `p2q` and `p2l` passed both declaration gates and the tripwire, their chain is checked by card A's own rows, and a rebuild reproduced them byte for byte — and none of that is a boot | `P2-3`'s first `looprun` round |
+| 🔴 **That `/init`'s bring-up leaves `S7`'s terminator intact on a loud boot.** Every committed bring-up was typed by hand on a quiet image; the argument that nothing prints after `exec /bin/sh` is 讀 (no `printk` in either driver, every mark in process context, `CONFIG_IPV6` unset) | The first `P1L-rNN-boot` |
+| ⚠️ **`recover` as a compiled default.** `NET-107`'s repair has only ever been armed by hand; `RLXFW-N7=00000011` will say the default took, and only a trial's `n_recov_fire` will say it works unprompted | `P1-TR*`, `P1-UR*` |
+| ⚠️ **That the builds between `R3-2` (2026-08-29) and 2026-09-23 wrote nothing into a vendor tree** (`FW-122`). The trees are git-clean today; a write undone since, or a touch that moved only an mtime, is invisible to any check made now | Nothing can, for the past; every build since is watched |
+| ⚠️ **That `D2`'s same-mode design removes the confound it was built for.** The vendor is now started by `J 80500000` from a caught prompt, so both columns stream ESC; whether listen-vs-ESC matters at all is what `M1`/`M2` measure, n = 1 each | `P2-3`'s `Z9-D2`, then seating B |
+| ⚠️ **`D8` below one second.** With the host's entry flushed before each boot, network up is a bracket one ARP retransmit wide (1.00–1.09 s), and the channel offset is predicted to fail the one-byte criterion on console quantisation alone (~1 ms). Narrower needs a host setting or an `arping` loop, and that is the owner's choice | Seating B, if the owner wants it narrower |
+| ⚠️ **The vendor's per-daemon readiness beyond `boa`.** `miniigd`'s port is configured, not compiled in, so card A probes TCP 80 only and takes the port list from one census | Seating B's card, with `V1-NMAP`'s list |
+
+🟢 **What it did establish**: the build path now refuses an image whose
+declaration was never checked (`FW-121`), assembles every image under the
+tripwire (`FW-122`), and records the initramfs by content (`FW-123`); a card now
+cannot type a flash-writing verb without the owner's dated yes (`FW-113`), cannot
+declare a date its captures contradict without `capdate` saying so (`FW-120`), and
+cannot carry a host probe record `capdate` cannot date (`hostprobe` 1.2).
 
 ## Closed since `v0.2` was tagged
 

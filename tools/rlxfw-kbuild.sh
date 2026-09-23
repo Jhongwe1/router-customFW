@@ -27,7 +27,7 @@
 #     --id-scope S       where -DRLXFW_SRC_ID goes: `global` (every C
 #                        object, the default and what every measurement so
 #                        far used) or `main` (init/main.o alone, where the
-#                        only consumer is).  See INC-1 by line 412.
+#                        only consumer is).  See INC-1 by the make line.
 #     --marks            apply config/rlxfw-marks.tsv to the staged tree
 #                        (R3-6's boot ladder; off by default so every
 #                        pre-R3-6 measurement stays reproducible here)
@@ -273,12 +273,123 @@ STAMP_RENDERED=""
     STAMP_RENDERED="$(LC_ALL=C TZ=UTC date -u -d "@$STAMP_EPOCH")"
 echo "== $CELL: stamp=$STAMP_EPOCH [$STAMP_RENDERED] recipe=$RECIPE_ID  <- $STAMP_SRC"
 
+# ------------------------------------------- the initramfs, declared by CONTENT
+# A spec names paths, modes and owners; gen_init_cpio reads the CONTENTS at
+# build time.  mkinitramfs writes <name>.manifest.tsv beside each <name>.spec,
+# and a spec with no such record is refused here, where --dry-run reaches it.
+# What each digest covers and does not: the format-2 notes above write_manifest.
+IRFS_MANIFEST=""
+if [ -n "$INITRAMFS" ]; then
+    [ -f "$INITRAMFS" ] || { echo "$CELL: no initramfs spec at $INITRAMFS" >&2; exit 3; }
+    case "$INITRAMFS" in
+        *.spec) IRFS_MANIFEST="${INITRAMFS%.spec}.manifest.tsv" ;;
+        *) echo "$CELL: --initramfs $INITRAMFS is not <name>.spec, so no <name>.manifest.tsv records its contents" >&2; exit 3 ;;
+    esac
+    [ -f "$IRFS_MANIFEST" ] || { echo "$CELL: no $IRFS_MANIFEST beside the spec: nothing records which file CONTENTS this initramfs carries -- mkinitramfs.py build writes it" >&2; exit 3; }
+    echo "== $CELL: initramfs contents <- $IRFS_MANIFEST"
+fi
+
 # --dry-run answers "what would this build be" without copying anything.  It
 # exists so every guard above it is testable for free, and it is the only exit
 # in this script that reports success without producing an image.
 if [ "$DRYRUN" = 1 ]; then
     echo "== $CELL: --dry-run, nothing staged and nothing built"
     exit 0
+fi
+
+# ------------------------------------ what the two post-build gates read
+# CFG-3 / TC-i, 2026-09-23 (P2-2).  Both gates were on no path until now: 量
+# 2026-09-08, an undeclared CONFIG_GPIO_SYSFS rode three images (SPEC.md TC-47).
+# Each reads the SAME file its generator half applies -- one variable per
+# declaration, so the generator and the auditor cannot be pointed apart.
+DELTA_FILE="$REPO/config/rlxfw-kernel.delta"
+MARKS_DECL="$REPO/config/rlxfw-marks.tsv"
+KDELTA="$REPO/tools/kconfig-delta.py"
+MARKSPY="$HERE/rlxfw-marks.py"
+# `verify`'s --absent inputs.  Under tools/, not config/: config/ is what
+# RECIPE_ID digests, and this list changes no byte of any image (its header).
+ABSENT_DECL="$REPO/tools/rlxfw-marks-absent.tsv"
+ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
+
+# absent_refs -- check every row of $ABSENT_DECL against the file on disk; fill
+# ABSENT_FILES/_SHAS/_NAMES in order and return 0, or name EVERY problem and
+# return 3.  Called above the stage and again by run_gates at the point of use.
+# 🔴 A missing or changed reference is a REFUSAL, never a skipped gate.
+absent_refs() {
+    local rows ln name rel bytes want p size got bad=0
+    ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
+    if [ ! -f "$ABSENT_DECL" ]; then
+        echo "$CELL: no $ABSENT_DECL." >&2
+        echo "  It declares the vendor kernels rlxfw-marks verify reads as" >&2
+        echo "  --absent. Without it the gate has nothing to be absent from," >&2
+        echo "  and 'present in mine' alone is a label, not a discriminator." >&2
+        return 3
+    fi
+    # awk checks the SHAPE of every row; the files are checked below.  -F'\t'
+    # and not `read`: tab is IFS whitespace to `read`, so two tabs collapse
+    # into one and an empty field would vanish instead of being refused.
+    rows="$(awk -F'\t' '
+        { sub(/\r$/, "") }
+        /^#/ || /^[ \t]*$/ { next }
+        NF != 5 { printf "BAD\tline %d: %d tab-separated field(s), expected 5 (name, relpath, bytes, sha256, role)\n", NR, NF; next }
+        $1 == "" || $2 == "" || $3 == "" || $4 == "" || $5 == "" { printf "BAD\tline %d: an empty field\n", NR; next }
+        $2 ~ /^\// || $2 ~ /(^|\/)\.\.(\/|$)/ { printf "BAD\tline %d: relpath %s is not a path under $FWRE_WORK\n", NR, $2; next }
+        $3 !~ /^[0-9]+$/ { printf "BAD\tline %d: bytes %s is not a decimal count\n", NR, $3; next }
+        length($4) != 64 || $4 !~ /^[0-9a-f]+$/ { printf "BAD\tline %d: sha256 %s is not 64 lower-case hex digits\n", NR, $4; next }
+        ($1 in nm) { printf "BAD\tline %d: name %s is already used on line %d\n", NR, $1, nm[$1]; next }
+        ($4 in dg) { printf "BAD\tline %d: its sha256 is also on line %d -- one artefact counted twice\n", NR, dg[$4]; next }
+        { nm[$1] = NR; dg[$4] = NR; printf "ROW\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4 }
+    ' "$ABSENT_DECL")"
+    while IFS= read -r ln; do
+        case "$ln" in
+            BAD$'\t'*)
+                echo "$CELL: $ABSENT_DECL ${ln#BAD$'\t'}" >&2
+                bad=$((bad+1)) ;;
+            ROW$'\t'*)
+                IFS=$'\t' read -r _ name rel bytes want <<< "$ln"
+                p="$FWRE_WORK/$rel"
+                if [ ! -f "$p" ]; then
+                    echo "$CELL: $name: no file at \$FWRE_WORK/$rel" >&2
+                    bad=$((bad+1)); continue
+                fi
+                size="$(stat -c %s "$p")"
+                if [ "$size" != "$bytes" ]; then
+                    echo "$CELL: $name: \$FWRE_WORK/$rel is $size bytes, the declaration says $bytes" >&2
+                    bad=$((bad+1)); continue
+                fi
+                got="$(sha256sum "$p" | cut -d' ' -f1)"
+                if [ "$got" != "$want" ]; then
+                    echo "$CELL: $name: \$FWRE_WORK/$rel has sha256 ${got:0:16}..., the declaration says ${want:0:16}..." >&2
+                    bad=$((bad+1)); continue
+                fi
+                ABSENT_FILES+=("$p"); ABSENT_SHAS+=("$got"); ABSENT_NAMES+=("$name") ;;
+        esac
+    done <<< "$rows"
+    if [ "$bad" -ne 0 ]; then
+        echo "  $bad problem(s) in the declared --absent inputs: the build is refused" >&2
+        echo "  here -- verify neither runs on an undeclared input nor is skipped." >&2
+        ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
+        return 3
+    fi
+    if [ "${#ABSENT_FILES[@]}" -eq 0 ]; then
+        echo "$CELL: $ABSENT_DECL declares no reference image. verify with no" >&2
+        echo "  --absent reports 'present in mine' and nothing else." >&2
+        return 3
+    fi
+    return 0
+}
+
+# 🔴 BELOW --dry-run, unlike the other guards: the references live in
+# $FWRE_WORK, which a CI runner lacks, so above the exit this would refuse every
+# --dry-run case there.  Still ABOVE THE STAGE; the suite drives it with a fake
+# $FWRE_WORK (A1-A10).  --target none builds nothing, so there is nothing to
+# guard, and a refusal there would teach the reader to feed it something.
+if [ "$TARGET" = none ]; then
+    echo "== $CELL: --target none: nothing is built, so no gate runs and no reference is read"
+else
+    absent_refs || exit 3
+    refs="$(for i in "${!ABSENT_NAMES[@]}"; do printf ' %s %s' "${ABSENT_NAMES[$i]}" "${ABSENT_SHAS[$i]:0:16}"; done)"
+    echo "== $CELL: --absent references verified <- ${ABSENT_DECL#"$REPO"/}:$refs"
 fi
 
 cell="$R/cells/$CELL"
@@ -353,8 +464,8 @@ if [ "$MARKS" = 1 ]; then
     # tolerates a dirty one there would hide a bad drop.
     MARKS_IF_NEEDED=""
     [ "$KEEP" = 1 ] && MARKS_IF_NEEDED="--if-needed"
-    if ! "$PY" "$HERE/rlxfw-marks.py" apply \
-            --decl "$REPO/config/rlxfw-marks.tsv" \
+    if ! "$PY" "$MARKSPY" apply \
+            --decl "$MARKS_DECL" \
             --tree "$top" --src "$REPO/config/rlxfw-src" $MARKS_IF_NEEDED \
             > "$log.marks.log" 2>&1
     then
@@ -444,9 +555,9 @@ if [ -n "$CONFIG" ]; then
     cp "$CONFIG" "$DIR_LINUX/.config" || exit 3
     echo "== $CELL: .config <- $CONFIG"
 else
-    "$PY" "$REPO/tools/kconfig-delta.py" apply \
+    "$PY" "$KDELTA" apply \
         --baseline "$TEMPLATE" \
-        --delta "$REPO/config/rlxfw-kernel.delta" \
+        --delta "$DELTA_FILE" \
         --variant "$VARIANT" \
         --out "$DIR_LINUX/.config" || {
         echo "$CELL: kconfig-delta apply FAILED" >&2; exit 3; }
@@ -486,7 +597,15 @@ if [ -n "$INITRAMFS" ]; then
     cp "$INITRAMFS" "$log.initramfs.spec"
     sha256sum "$INITRAMFS" | cut -d" " -f1 > "$log.initramfs.spec.sha256"
     echo "== $CELL: spec sha256 $(cut -c1-16 < "$log.initramfs.spec.sha256")"
+    # The CONTENT record, copied beside the spec so the cell's own record holds
+    # both; write_manifest digests this copy (initramfs_manifest_sha256).
+    cp "$IRFS_MANIFEST" "$log.initramfs.manifest.tsv" || exit 3
+    echo "== $CELL: contents sha256 $(sha256sum "$log.initramfs.manifest.tsv" | cut -c1-16)"
 fi
+# Without --initramfs, no initramfs record of an earlier build of this cell
+# name may stand beside this one's .config.
+[ -n "$INITRAMFS" ] || rm -f "$log.initramfs.spec" "$log.initramfs.spec.sha256" \
+                             "$log.initramfs.manifest.tsv"
 
 cd "$scratch" || exit 3
 
@@ -507,20 +626,63 @@ run() {          # run() <logsuffix> <cmd...>
 # was `r51a`/`r51quiet`, and that pair does NOT collide -- `r51a` compiled
 # `078bb2b4`.)
 #
-# This file is the PROVENANCE record: what content went in.  It is not the
-# gate -- `looprun --image-sha256` is, because a gate has to run on the desk
-# beside the image about to be uploaded, and this file lives wherever the
-# build happened.
+# This file is the PROVENANCE record: what content went in, and -- since
+# format 2, CFG-3 -- what the two declaration gates said about what came out.
+# It is not the upload pin: `looprun --image-sha256` is, because a pin has to
+# run on the desk beside the file about to be uploaded, and this file lives
+# wherever the build happened.  What joins the two is `rtkimage.py build`'s
+# record, which names this manifest's vmlinux digest and the nfjrom digest a
+# card pins.
 #
 # 🔴 `config_sha256` digests `<cell>.config-installed`, the file that was
 # COPIED IN, and never `<cell>.config-built`.  量 2026-09-04: two builds whose
 # images are byte-identical have different `config-built` digests, because
 # kconfig writes a wall-clock comment on line 4.  A manifest keyed on the
 # post-oldconfig file would report every rebuild as a different recipe.
+#
+# Format 2 (2026-09-23) appends, never reorders:
+#   variant              quiet | loud | -   (- is a --config build)
+#   build_rc             the build step's status as vendor-tripwire.sh
+#                        returns it: 1 make failed, 2/5 a vendor tree was
+#                        touched, 4 one was dirty before make ran
+#   kconfig_check        green | red | refused      (gate_verdict, below)
+#   kconfig_check_rc     the tool's exit status, or - if it was not run
+#   kconfig_check_result its RESULT line, SGR escapes removed; for `refused`,
+#                        why, and the tool's last line if it ran
+#   marks_verify, marks_verify_rc, marks_verify_result    the same three
+#   marks_verify_absent  name=sha256 of every --absent file verify was given
+#   initramfs_manifest_sha256  sha256 of <cell>.initramfs.manifest.tsv, the
+#                        copy of mkinitramfs's content record for the spec
+#                        (<name>.spec -> <name>.manifest.tsv); - without
+#                        --initramfs; `missing` if given and not recorded
+#   verdict              green, or not-green -- overall_verdict, the one rule
+#                        that also decides the exit status and whether the
+#                        `manifest ->` line is printed
+#
+# 🔴 WHAT THE TWO INITRAMFS DIGESTS COVER, 2026-09-23.  `initramfs_sha256` is
+# the SPEC's digest: its text -- each entry's path, mode and owner and the
+# source path gen_init_cpio will read -- and NOT any file's contents, which
+# gen_init_cpio reads at build time.  量 the same day: _irfs-s100a and _irfs-p2
+# hold byte-identical specs (7130245fbcd92afc) whose /init differ, 988 bytes
+# e871efdd... against 2,153 bytes ef2c8797..., and this key said nothing.
+# `initramfs_manifest_sha256` is the content-level digest: every file's bytes
+# and sha256 as mkinitramfs read them (3a8bf014... against 51ea1604... for
+# those two).  It is only as good as that read, made when the spec was
+# written: a source changed between mkinitramfs and this build is in the
+# image and not in the record, and nothing here re-reads the sources.  Its
+# header also names the unit tree and the repository by absolute path, so the
+# same contents recorded from another clone digest differently.
 write_manifest() {          # write_manifest <vmlinux path>
-    local vm="$1" m="$log.manifest"
+    local vm="$1" m="$log.manifest" irm=-
+    # `missing`, not `-`, when --initramfs was given and its record is not
+    # here: an absent record must not read as "no initramfs".
+    if [ -n "$INITRAMFS" ]; then
+        irm=missing
+        [ -f "$log.initramfs.manifest.tsv" ] && \
+            irm="$(sha256sum "$log.initramfs.manifest.tsv" | cut -d' ' -f1)"
+    fi
     {
-        printf 'rlxfw-build-manifest\t1\n'
+        printf 'rlxfw-build-manifest\t2\n'
         printf 'cell\t%s\n'             "$CELL"
         printf 'recipe_id\t%s\n'        "$RECIPE_ID"
         printf 'config_sha256\t%s\n'    "$(sha256sum "$log.config-installed" | cut -d' ' -f1)"
@@ -544,9 +706,165 @@ write_manifest() {          # write_manifest <vmlinux path>
         printf 'drop\t%s\n'             "$(basename "$DROP")"
         printf 'vmlinux_sha256\t%s\n'   "$(sha256sum "$vm" | cut -d' ' -f1)"
         printf 'vmlinux_bytes\t%s\n'    "$(stat -c %s "$vm")"
+        printf 'variant\t%s\n'              "${VARIANT:--}"
+        printf 'build_rc\t%s\n'             "${BUILD_RC:--}"
+        printf 'kconfig_check\t%s\n'        "${KCHECK_VERDICT:--}"
+        printf 'kconfig_check_rc\t%s\n'     "${KCHECK_RC:--}"
+        printf 'kconfig_check_result\t%s\n' "${KCHECK_RESULT:--}"
+        printf 'marks_verify\t%s\n'         "${MVERIFY_VERDICT:--}"
+        printf 'marks_verify_rc\t%s\n'      "${MVERIFY_RC:--}"
+        printf 'marks_verify_result\t%s\n'  "${MVERIFY_RESULT:--}"
+        printf 'marks_verify_absent\t%s\n'  "${MVERIFY_ABSENT:--}"
+        printf 'initramfs_manifest_sha256\t%s\n' "$irm"
+        printf 'verdict\t%s\n'              "$(overall_verdict)"
     } > "$m"
-    echo "== $CELL: manifest -> $m"
 }
+
+# ------------------------------------------------ the two declaration gates
+# CFG-3 / TC-i.  "A build whose declaration was never checked must not reach
+# a bench."  Both gates run after every build that leaves a vmlinux, their
+# verdicts go into the manifest, and a build whose gates are not BOTH green
+#
+#   * exits 6, or the build step's own status if that was not 0 -- not 4,
+#     because vendor-tripwire.sh already returns 1-5 for the build step and
+#     its 4 means "a vendor tree was dirty"; and
+#   * does NOT print `== <cell>: manifest -> <path>` -- it prints a
+#     NOT FOR UPLOAD line that looprun's MANIFEST_RX does not match.
+#
+# 🔴 FAIL, NOT RECORD-ONLY, and the reason is the state CFG-3 was opened
+# for.  Nothing reads these verdicts yet: looprun's S2 reads the exit status
+# and the `manifest ->` line and nothing else, and a card pins an nfjrom.  A
+# red verdict that only lands in a file is a gate on no path again -- the
+# shape that carried CONFIG_GPIO_SYSFS through three images.  Failing puts it
+# on the one path that exists: S2 refuses a non-zero exit, and no S3 means
+# no nfjrom for a card to pin.  The manifest is STILL WRITTEN, red verdicts
+# and all, because a red build is a result and its record is evidence; it
+# overwrites any older manifest of the same cell name, so the file at
+# <cell>.manifest always describes this run.
+#
+# What this does NOT establish:
+#   * that the UPLOADED bytes carry the marks.  verify reads the linked ELF;
+#     the nfjrom is assembled later by rtkimage (LZMA, where a count is 0 for
+#     every image), and RUNSHEET P10's flat-image leg is not automated.
+#   * anything about a --config build's variant.  --config and --variant are
+#     refused together, so a --config build is checked against the rows
+#     common to every variant: the loud .config given as --config is RED
+#     here, and that is the declaration saying it does not know the file.
+#   * anything about code generation.  A --no-cflags image, seven load-use
+#     violations and all (TC-25), passes both gates; that is hazlint's
+#     question.
+# And a build without --marks is red by construction: its image carries none
+# of the declared marks, verify says so, and it exits 6.  Such a build is for
+# reproducing a pre-R3-6 measurement at the desk, never for a bench.
+
+# gate_verdict <rc> <log>  ->  "<verdict><TAB><text>" on stdout.
+#
+# 🔴 A VERDICT NEEDS ITS RESULT LINE.  A Python traceback exits 1, which is
+# also both tools' "red" status, so the status alone would file a crashed
+# checker as a red build -- and a checker that exits 0 without saying what it
+# found would be filed green.  So: green is status 0 with exactly one RESULT
+# line, red is status 1 with exactly one, and everything else is `refused`
+# (kconfig-delta: 2 when its own controls fail, 3 for die(); rlxfw-marks: 3).
+# Tabs in the text become spaces, so a RESULT line cannot split a TSV row.
+gate_verdict() {
+    local rc="$1" lg="$2" clean n res
+    clean="$(sed -e 's/\x1b\[[0-9;]*m//g' -e 's/\r$//' -e 's/\t/ /g' "$lg" 2>/dev/null)"
+    n="$(printf '%s\n' "$clean" | grep -c '^RESULT: ')"
+    res="$(printf '%s\n' "$clean" | grep '^RESULT: ' | tail -n 1)"
+    if [ "$n" = 1 ] && [ "$rc" = 0 ]; then
+        printf 'green\t%s\n' "$res"
+    elif [ "$n" = 1 ] && [ "$rc" = 1 ]; then
+        printf 'red\t%s\n' "$res"
+    else
+        res="$(printf '%s\n' "$clean" | grep -v '^[[:space:]]*$' | tail -n 1)"
+        printf 'refused\t%d RESULT line(s) at rc=%s; last line: %s\n' "$n" "$rc" "${res:--}"
+    fi
+}
+
+# run_gates -- sets KCHECK_* and MVERIFY_* for write_manifest.  Each gate's
+# whole output goes to <cell>.kconfig-check.log / <cell>.marks-verify.log.
+# An input that is missing is `refused` with the reason and the tool is not
+# run: a traceback is not a verdict.
+run_gates() {
+    local kargs margs line pairs i
+    KCHECK_RC=-;  KCHECK_VERDICT=refused;  KCHECK_RESULT=-
+    MVERIFY_RC=-; MVERIFY_VERDICT=refused; MVERIFY_RESULT=-; MVERIFY_ABSENT=-
+    # The .config the build USED, not the one copied in (kconfig-delta's C6).
+    if [ ! -f "$log.config-built" ]; then
+        KCHECK_RESULT="not run: there is no $log.config-built"
+    else
+        kargs=(check --baseline "$TEMPLATE" --delta "$DELTA_FILE"
+               --built "$log.config-built")
+        [ -n "$VARIANT" ] && kargs+=(--variant "$VARIANT")
+        "$PY" "$KDELTA" "${kargs[@]}" > "$log.kconfig-check.log" 2>&1
+        KCHECK_RC=$?
+        line="$(gate_verdict "$KCHECK_RC" "$log.kconfig-check.log")"
+        KCHECK_VERDICT="${line%%$'\t'*}"; KCHECK_RESULT="${line#*$'\t'}"
+    fi
+    echo "== $CELL: kconfig-delta check [${VARIANT:-no variant}] $KCHECK_VERDICT (rc=$KCHECK_RC): $KCHECK_RESULT"
+    # The artefact, not the tree (rlxfw-marks.py's own header: `check` is the
+    # weak question).  The references are re-checked HERE, at the point of
+    # use, because the pre-stage check ran before a build that took minutes.
+    if [ ! -f "$log.vmlinux.elf" ] || [ ! -f "$log.System.map" ]; then
+        MVERIFY_RESULT="not run: there is no $log.vmlinux.elf or no $log.System.map"
+    elif ! absent_refs; then
+        MVERIFY_RESULT="not run: the declared --absent inputs no longer verify (see above)"
+    else
+        margs=(verify --decl "$MARKS_DECL" --image "$log.vmlinux.elf"
+               --map "$log.System.map")
+        pairs=""
+        for i in "${!ABSENT_FILES[@]}"; do
+            margs+=(--absent "${ABSENT_FILES[$i]}")
+            pairs="$pairs${pairs:+,}${ABSENT_NAMES[$i]}=${ABSENT_SHAS[$i]}"
+        done
+        MVERIFY_ABSENT="$pairs"
+        "$PY" "$MARKSPY" "${margs[@]}" > "$log.marks-verify.log" 2>&1
+        MVERIFY_RC=$?
+        line="$(gate_verdict "$MVERIFY_RC" "$log.marks-verify.log")"
+        MVERIFY_VERDICT="${line%%$'\t'*}"; MVERIFY_RESULT="${line#*$'\t'}"
+    fi
+    echo "== $CELL: rlxfw-marks verify $MVERIFY_VERDICT (rc=$MVERIFY_RC): $MVERIFY_RESULT"
+}
+
+# overall_verdict -- the ONE rule.  The manifest's `verdict`, the exit status
+# and the `manifest ->` line all come from here, so they cannot disagree.
+overall_verdict() {
+    if [ "${BUILD_RC:-}" = 0 ] && [ "${KCHECK_VERDICT:-}" = green ] \
+       && [ "${MVERIFY_VERDICT:-}" = green ]; then
+        echo green
+    else
+        echo not-green
+    fi
+}
+
+# finish_build -- print the line looprun reads, or one it cannot mistake for
+# it, and return the exit status.
+finish_build() {
+    local m="$log.manifest"
+    if [ "$(overall_verdict)" = green ]; then
+        echo "== $CELL: manifest -> $m"
+        return 0
+    fi
+    echo "== $CELL: NOT FOR UPLOAD -- build rc=${BUILD_RC:--}," \
+         "kconfig-delta check ${KCHECK_VERDICT:--}," \
+         "rlxfw-marks verify ${MVERIFY_VERDICT:--}; the record is $m"
+    [ "${KCHECK_VERDICT:-}" = green ] || [ ! -f "$log.kconfig-check.log" ] \
+        || tail -n 12 "$log.kconfig-check.log" >&2
+    [ "${MVERIFY_VERDICT:-}" = green ] || [ ! -f "$log.marks-verify.log" ] \
+        || tail -n 12 "$log.marks-verify.log" >&2
+    if [ "${BUILD_RC:-1}" != 0 ]; then
+        return "${BUILD_RC:-1}"
+    fi
+    return 6
+}
+
+# Every file the gates and the manifest read is THIS run's.  A previous build
+# of the same cell name left .config-built, .vmlinux.elf, .System.map and
+# .manifest here, and the map is copied below with `2>/dev/null`: without
+# this, a build that produced no System.map would be verified against the
+# last one, and a build that failed would leave the last manifest standing.
+rm -f "$log.config-built" "$log.vmlinux.elf" "$log.System.map" \
+      "$log.manifest" "$log.kconfig-check.log" "$log.marks-verify.log"
 
 # ------------------------------------------------------------- oldconfig
 case "$OLDCONFIG" in
@@ -609,7 +927,11 @@ if [ -f "$out" ]; then
     cp "$out" "$log.vmlinux.elf"
     cp "$DIR_LINUX/System.map" "$log.System.map" 2>/dev/null
     echo "== OUTPUT $(stat -c %s "$out") bytes  sha256 $(sha256sum "$out" | cut -c1-16)"
+    BUILD_RC=$rc
+    run_gates
     write_manifest "$out"
+    finish_build
+    rc=$?
 else
     echo "== NO vmlinux"
     [ "$rc" -eq 0 ] && rc=9

@@ -10,21 +10,71 @@ the harness was red before any mutation was applied.
 a mutation whose anchor is missing is reported as a SURVIVOR rather than skipped
 -- a moved anchor and a mutation that changed nothing look identical from the
 exit code, and only one of them is fine.
+
+🔄 2026-09-23 (`P2-2`, `FW-113`).  THE NAMING ABOVE WAS DECORATION IN THIS FILE
+UNTIL TODAY.  A kill was `rc != 0` and nothing read WHICH case went red, so a
+mutant that crashed the tool before it reached its controls -- or turned some
+other case red -- counted as a kill.  `test-flashwin-mutants.py`'s `W0`
+records five of fourteen rows of another suite counted exactly that way on
+2026-08-31.  So now, as there: a kill must turn EVERY case its row names red
+(`^  FAIL  <tag>` in the self-test's output), a row that names none cannot be
+a kill, and a mutant that does not compile is reported INVALID, never killed.
+量 on its first run it found two such rows here, both counted as kills by
+the run just before it: `M1`, which never compiled, and `M11`, whose rc 1
+was an AttributeError before `A13` could go red.  Each row says what changed.
+
+`--jobs N` (2026-09-23)
+-----------------------
+量: serially this suite took 1,663 s, on every push.  `--jobs N` runs N rows
+at once through a thread pool, as `test-leakscan-mutants.py` does; the
+default, 1, is the serial run.  Concurrency puts three things at risk, and
+each is held by something that can fail:
+
+  * ISOLATION, `I0`.  Every row gets its own root, all allocated before the
+    pool starts so the set can be checked -- distinct, none inside another.
+    A worker CLAIMS its root with an O_EXCL owner token before writing, writes
+    only below it, and after the self-test re-reads the mutant it wrote and
+    the token it claimed.  A root handed to two workers, or a mutant another
+    worker overwrote, is a FAIL on that row, never a kill.  `I0`'s own
+    control runs first, on one root claimed twice.  And the source every
+    worker copied from must be unchanged at the end, or the run refuses.
+    ⚠️ What it cannot see: the files the TOOL writes through `tempfile`, which
+    are unique by the library's own O_EXCL, not by anything here.
+  * ORDER.  Rows are submitted, and printed, sorted by their `M<n>` id
+    whatever order they finish in, so two runs diff line for line; each line
+    carries every case that went red, not only the named ones.
+  * THE VERDICT.  A changed instrument is accepted only if it reproduces the
+    old verdicts on the same population (`CLAUDE.md`): serial and `--jobs N`
+    must print the same lines, red sets included.  The baseline, `W0` and
+    `I0` run before any row, in both.
+
+Run:  /usr/bin/python3 tools/test-cardcheck-mutants.py [--jobs N]
 """
+import argparse
+import concurrent.futures
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "tools/cardcheck.py")
 
 MUT = [
+    # 🔄 2026-09-23: THIS ROW NEVER COMPILED, and it read as a kill.  Its
+    # anchor was the first line of a two-line call, so the mutant left the
+    # second line an indented orphan -- IndentationError, rc 1, no control
+    # reached.  讀 git: the row and the two-line call are the same at every
+    # commit of either file since the suite arrived (195ae3d, 2026-08-31).
+    # The W0 check above found it on its first run; the anchor now takes
+    # both lines.
     ("M1  the NOT-IN-IMAGE verdict deleted                  (kills A2)",
-     'issues.append(f"{base}: NOT IN IMAGE -- not among the "',
-     'pass  # issues.append(f"{base}: NOT IN IMAGE -- not among the "'),
+     '        issues.append(f"{base}: NOT IN IMAGE -- not among the "\n'
+     '                      f"{len(names)} declared invocable names")',
+     '        pass  # the NOT IN IMAGE verdict, deleted'),
 
     ("M2  every name treated as invocable                   (kills A2)",
      "        if base in names:\n            continue",
@@ -50,9 +100,11 @@ MUT = [
     # applied)` and FAILED rather than passing -- which is the behaviour that
     # made the edit visible.  Re-anchored on the two lines above the branch,
     # which do not move when a branch body grows.
+    # 🔄 2026-09-23: and they moved anyway, when `FW-113`'s check went in
+    # between them.  Anchored now on the branch line alone, which occurs once.
     ("M6  loader verbs looked up as shell names             (kills A7)",
-     '    first = cmd.split()[0]\n    if first in LOADER_VERBS:',
-     '    first = cmd.split()[0]\n    if False:'),
+     '    if first in LOADER_VERBS:\n',
+     '    if False:\n'),
 
     # ------------------------------------------------------------ the FLR guard
     ("M19 the FLR bypass issue is not reported              (kills A19)",
@@ -85,6 +137,75 @@ MUT = [
      "        if base in _measured():\n            continue",
      "        if False:\n            continue"),
 
+    # ------------------------------------------------ `FW-113`, 2026-09-23
+    # The flash-write refusal.  One mutant per property the rule claims, and
+    # each names the ONE case that must go red: the refusal itself, its case
+    # blindness, the one `AUTOBURN` it permits, the exactness of the yes (a
+    # prefix, and whitespace: normalising it was the first design, and
+    # owner_yes() says why it was refused), the exemption's key, the absence
+    # filter, the yes's own defects, and B12 in both directions.
+    ("M25 the flash-write refusal removed                   (kills A29)",
+     '    if flash_write(cmd):\n'
+     '        return "LOADER", ([] if cmd in flash_ok else [flash_write(cmd)])',
+     '    if False:\n'
+     '        return "LOADER", ([] if cmd in flash_ok else [flash_write(cmd)])'),
+
+    ("M26 the verb matched case-SENSITIVELY                 (kills A30)",
+     '    v = w[0].upper() if w else ""',
+     '    v = w[0] if w else ""'),
+
+    ("M27 `AUTOBURN 0` refused along with the rest          (kills A21)",
+     '    elif v == "AUTOBURN" and cmd.strip() != "AUTOBURN 0":',
+     '    elif v == "AUTOBURN":'),
+
+    ("M28 the yes matched by PREFIX                         (kills A33)",
+     '        return "LOADER", ([] if cmd in flash_ok else [flash_write(cmd)])',
+     '        return "LOADER", ([] if any(cmd.startswith(p) for p in flash_ok)'
+     ' else [flash_write(cmd)])'),
+
+    ("M29 the yes matched after whitespace normalisation    (kills A33)",
+     '        return "LOADER", ([] if cmd in flash_ok else [flash_write(cmd)])',
+     '        return "LOADER", ([] if " ".join(cmd.split()) in '
+     '{" ".join(p.split()) for p in flash_ok} else [flash_write(cmd)])'),
+
+    ("M30 the frozen exemption keyed by a path PATTERN      (kills A36)",
+     r'    legacy = FLASH_LEGACY_CARDS.get(card_rel.replace("\\", "/"), '
+     r'frozenset())',
+     r'    legacy = next((v for k, v in FLASH_LEGACY_CARDS.items() if '
+     r'card_rel.replace("\\", "/").endswith(k)), frozenset())'),
+
+    ("M31 the absence filter reaches LOADER issues again    (kills A35)",
+     '    if kind == "LOADER":\n        return list(issues)',
+     '    if False:\n        return list(issues)'),
+
+    ("M32 a yes with an impossible date accepted            (kills A32)",
+     '                    datetime.date.fromisoformat(date)',
+     '                    pass'),
+
+    ("M33 a second yes for one payload accepted             (kills A32)",
+     '            if not ok or payload in yes:',
+     '            if not ok:'),
+
+    ("M34 a yes that permits nothing goes unreported        (kills A34)",
+     '        if payload not in used:',
+     '        if False:'),
+
+    ("M35 the owner's yes permits nothing                   (kills A31)",
+     '    return frozenset(yes) | legacy, bad',
+     '    return legacy, bad'),
+
+    # B12 is checked in BOTH directions, so it needs one mutant per direction,
+    # as B10 has M21 and M22.
+    ("M36 a frozen pair that IS sent dropped from the list  (kills B12, A36)",
+     '        "EW B800311C 240000", "EW B800311C 40000"}),',
+     '        "EW B800311C 240000"}),'),
+
+    ("M37 a pair no card sends added to the list            (kills B12)",
+     '    "bench/2026-08-24c/PREDICTIONS-block3.md": frozenset({\n'
+     '        "EW B800311C 240000"}),',
+     '    "bench/2026-08-24c/PREDICTIONS-block3.md": frozenset({\n'
+     '        "EW B800311C 240000", "EW 8040D4A0 1"}),'),
+
     ("M7  MDIOR removed from the verb list                  (kills B2)",
      '"PHYR", "PHYW", "MDIOR", "MDIOW",',
      '"PHYR", "PHYW", "MDIOW",'),
@@ -101,9 +222,13 @@ MUT = [
      '        if kind in ("slink", "file"):',
      '        if kind in ("slink", "file", "nod"):'),
 
+    # 🔄 2026-09-23: THIS ROW'S KILL WAS A CRASH.  Skipping the refusal fell
+    # through to `m.group(1)` on None -- AttributeError, a traceback, rc 1 --
+    # and A13, which catches `Refuse` only, never went red.  W0 found it.  It
+    # now does what its label says: it REPORTS, 0 bad, where it should refuse.
     ("M11 the missing cardnum fence reports instead of refusing (kills A13)",
      "    if not m:\n        raise Refuse(",
-     "    if not m and False:\n        raise Refuse("),
+     "    if not m:\n        return 0\n        raise Refuse("),
 
     ("M12 a number mismatch is not counted                  (kills A15)",
      "        if got.lower() != want.lower():",
@@ -117,9 +242,11 @@ MUT = [
      "        if isinstance(got, tuple):\n            got = got[0]",
      "        if False:\n            got = got[0]"),
 
+    # 🔄 2026-09-23: the filter moved into `unsuppressed()` (`FW-113`), and
+    # the anchor moved with it.
     ("M15 the absence declaration suppresses EVERYTHING     (kills B4)",
-     '        keep = [i for i in issues if i.split(":")[0] not in absent]',
-     "        keep = [] if absent else issues"),
+     '    return [i for i in issues if i.split(":")[0] not in absent]',
+     "    return [] if absent else list(issues)"),
 
     ("M16 the cell id is dropped from the report            (kills B5)",
      '        report(f"  FAIL  {cid}: {cmd}")',
@@ -135,71 +262,281 @@ MUT = [
 ]
 
 
+# A self-test row that went red: `  FAIL  A29 ...`.  The harness's own lines
+# never reach this; it reads the self-test's stdout only.
+CASE = re.compile(r"^  FAIL  +([AB][0-9]+)\b", re.M)
+
+
 def run(path, cwd):
     r = subprocess.run([sys.executable, path, "--self-test"],
                        capture_output=True, text=True, cwd=cwd)
-    return r.returncode
+    return r.returncode, r.stdout
+
+
+def named(name):
+    """The cases a row says it turns red: `(kills A2)` -> ['A2'],
+    `(kills B10, A11)` -> ['B10', 'A11'].  Empty when the row names none,
+    and such a row cannot be counted as a kill."""
+    m = re.search(r"\(kills ([^)]*)\)", name)
+    return re.findall(r"\b[AB][0-9]+\b", m.group(1)) if m else []
+
+
+def row_id(name):
+    """`M25 the flash-write ...` -> 25, or None.  Rows are submitted and
+    printed in this order, so the output does not depend on `--jobs`."""
+    m = re.match(r"M([0-9]+)\b", name)
+    return int(m.group(1)) if m else None
+
+
+def case_key(tag):
+    """A2 < A10 < B1: the letter, then the number."""
+    return tag[0], int(tag[1:])
+
+
+# 🔴 I0 -- see the docstring.  The token sits in the row's root, beside the
+# tree the tool runs in and never inside it.
+OWNER = ".cardcheck-mutant-owner"
+
+
+def overlapping(roots):
+    """-> pairs of roots where one IS the other or lies inside it.  With a
+    trailing separator every path under a root sorts straight after it, so
+    neighbours are enough."""
+    rs = sorted(os.path.realpath(r).rstrip(os.sep) + os.sep for r in roots)
+    return [(a, b) for a, b in zip(rs, rs[1:]) if b.startswith(a)]
+
+
+def claim(root, who):
+    """Write `who` into `root`'s owner token.  O_EXCL: of two workers handed
+    one root, exactly one succeeds and the other gets FileExistsError."""
+    fd = os.open(os.path.join(root, OWNER),
+                 os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(who)
+
+
+def owner(root):
+    try:
+        with open(os.path.join(root, OWNER), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def one(name, old, new, src, root):
+    """One row, in its own `root`.  -> {"line", "survived", "breach"} or
+    {"refuse"}.  It never exits and never raises: `sys.exit` in a pool thread
+    ends only that thread, and a traceback is not a refusal."""
+    rid, mine = name.split()[0], False
+    try:
+        try:
+            claim(root, rid)
+            mine = True
+        except FileExistsError:
+            why = f"ISOLATION: its root was already claimed by {owner(root)!r}"
+            return {"line": f"  FAIL  {name}   {why}",
+                    "survived": f"{name}  [{why}]", "breach": True}
+        work = os.path.join(root, "router-rebuild")
+        tgt = os.path.join(work, "tools/cardcheck.py")
+        if os.path.commonpath([root, tgt]) != root:
+            why = "ISOLATION: the mutant would be written outside its root"
+            return {"line": f"  FAIL  {name}   {why}",
+                    "survived": f"{name}  [{why}]", "breach": True}
+        os.makedirs(os.path.join(work, "tools"))
+        for rel in ("bench", "config"):
+            shutil.copytree(os.path.join(ROOT, rel),
+                            os.path.join(work, rel), symlinks=True)
+        for rel in ("tools/reply-size.py", "tools/ci-expected.tsv"):
+            shutil.copy(os.path.join(ROOT, rel), os.path.join(work, rel))
+        # 🔴 B0-IN-TREE.  The baseline above runs from the REAL root; this
+        # runs the UNMUTATED tool from the temp tree, which is where every
+        # mutation is judged.  A tree missing a file the tool reads makes
+        # the whole run red before any mutation is applied, and a list of
+        # kills looks identical either way.  量 2026-08-31: exactly that
+        # happened to test-replay-capture-mutants, and the only thing that
+        # caught it was a row required to SURVIVE.  It writes the bytes read
+        # at the start, not the file on disk, so every row tests the same.
+        with open(tgt, "w", encoding="utf-8") as f:
+            f.write(src)
+        if run(tgt, work)[0] != 0:
+            return {"refuse": f"REFUSING at {name}: the UNMUTATED tool fails "
+                              f"in the temp tree, so every kill would be "
+                              f"invalid"}
+        n = src.count(old)
+        if n != 1:
+            return {"line": f"  FAIL  {name}   ANCHOR x{n} (not applied)",
+                    "survived": f"{name}  [anchor occurs {n} times, "
+                                f"not applied]"}
+        mutated = src.replace(old, new, 1)
+        # A mutant that does not compile exits non-zero without reaching a
+        # single control, and would read as a kill.
+        try:
+            compile(mutated, tgt, "exec")
+        except SyntaxError as e:
+            return {"line": f"  FAIL  {name}   INVALID-MUTANT: {e}",
+                    "survived": f"{name}  [INVALID-MUTANT: {e}]"}
+        with open(tgt, "w", encoding="utf-8") as f:
+            f.write(mutated)
+        rc, out = run(tgt, work)
+        # 🔴 I0: the mutant this row judged, and the root, are still its own.
+        with open(tgt, encoding="utf-8") as f:
+            intact = f.read() == mutated and owner(root) == rid
+        # 🔴 W0: a kill is `rc != 0` AND every case the row names red.
+        want, red = named(name), set(CASE.findall(out))
+        killed = intact and rc != 0 and bool(want) and set(want) <= red
+        if not intact:
+            wrong = ("  ISOLATION: its mutant or its owner token changed "
+                     "while it ran")
+        elif killed or rc == 0:
+            wrong = ""
+        else:
+            wrong = (f"  WRONG-CASE: wanted {want or 'a (kills X) tag'} red"
+                     + ("" if red else
+                        " -- none went red, it did not reach the controls"))
+        reds = ",".join(sorted(red, key=case_key)) or "none"
+        # `  ok  ` / `  FAIL  ` is the shape tools/ci-census.py parses.
+        return {"line": f"  {'ok  ' if killed else 'FAIL'}  {name}   "
+                        f"rc={rc} ({'killed' if killed else 'SURVIVED'})"
+                        f"{wrong}  red={reds}",
+                "survived": None if killed else name + wrong,
+                "breach": not intact}
+    except Exception as e:
+        return {"refuse": f"REFUSING at {name}: the harness failed, not the "
+                          f"mutant -- {type(e).__name__}: {e}"}
+    finally:
+        # Only a root this row claimed is its to delete; one it failed to
+        # claim belongs to the row still running in it.  main() clears all.
+        if mine:
+            shutil.rmtree(root, ignore_errors=True)
 
 
 def main():
-    base = run(SRC, ROOT)
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--jobs", type=int, default=1, metavar="N",
+                    help="rows run at once (default 1: serial)")
+    a = ap.parse_args()
+    if a.jobs < 1:
+        sys.exit(f"REFUSING: --jobs {a.jobs} -- it counts the rows run at "
+                 f"once, so it is at least 1")
+    t0 = time.monotonic()
+    # Read once, before anything runs: B0-in-tree and every mutant are these
+    # bytes, and the run refuses at the end if the file on disk has moved.
+    with open(SRC, "rb") as f:
+        raw = f.read()
+    src = raw.decode("utf-8")
+
+    base, _out = run(SRC, ROOT)
     if base != 0:
         sys.exit(f"REFUSING: the unmutated controls already fail (rc={base}). "
                  f"Every 'kill' below would be invalid -- this is the "
                  f"flashwin pass's own defect and it is not repeated.")
-    print(f"baseline: unmutated --self-test rc={base}  (B0, and it is a case)\n")
+    print(f"baseline: unmutated --self-test rc={base}  (B0, and it is a case)")
 
-    src = open(SRC, encoding="utf-8").read()
-    survived = []
-    for name, old, new in MUT:
-        d = tempfile.mkdtemp()
+    # W0's own control, before any mutant runs: on a known output it must
+    # count the named case red, and refuse a different red case, a row that
+    # names two cases of which one is green, and a row that names none.
+    fake = "  ok    A29 x\n  FAIL  A30 y\n  FAIL  B12 z\n"
+    red = set(CASE.findall(fake))
+    if not (set(named("M (kills A30)")) <= red
+            and set(named("M (kills B12, A30)")) <= red
+            and not set(named("M (kills A29)")) <= red
+            and not set(named("M (kills B12, A29)")) <= red
+            and named("M names nothing") == []):
+        sys.exit("REFUSING: the named-case check cannot tell a kill from a "
+                 "wrong-case exit on a known output, so no kill below would "
+                 "mean anything")
+    print("W0: the named-case check separates a kill from a wrong-case exit")
+
+    # I0's own control, before any row runs, on real files: one root claimed
+    # twice must refuse the second claim and keep the first owner; two roots
+    # must both be claimed; and the overlap check must see a repeated root
+    # and a nested one, and pass two side by side.
+    probe = tempfile.mkdtemp(prefix="cardcheck-i0-")
+    try:
+        ra, rb = os.path.join(probe, "a"), os.path.join(probe, "b")
+        os.mkdir(ra)
+        os.mkdir(rb)
+        claim(ra, "first")
         try:
-            work = os.path.join(d, "router-rebuild")
-            os.makedirs(os.path.join(work, "tools"))
-            for rel in ("bench", "config"):
-                shutil.copytree(os.path.join(ROOT, rel),
-                                os.path.join(work, rel), symlinks=True)
-            shutil.copy(os.path.join(ROOT, "tools/reply-size.py"),
-                        os.path.join(work, "tools/reply-size.py"))
-            shutil.copy(os.path.join(ROOT, "tools/ci-expected.tsv"),
-                        os.path.join(work, "tools/ci-expected.tsv"))
-            tgt = os.path.join(work, "tools/cardcheck.py")
-            # 🔴 B0-IN-TREE.  The baseline above runs from the REAL root; this
-            # runs the UNMUTATED tool from the temp tree, which is where every
-            # mutation is judged.  A tree missing a file the tool reads makes
-            # the whole run red before any mutation is applied, and a list of
-            # kills looks identical either way.  量 2026-08-31: exactly that
-            # happened to test-replay-capture-mutants, and the only thing that
-            # caught it was a row required to SURVIVE.
-            shutil.copy(SRC, tgt)
-            if run(tgt, work) != 0:
-                sys.exit(f"REFUSING at {name}: the UNMUTATED tool fails in the "
-                         f"temp tree, so every kill would be invalid")
-            n = src.count(old)
-            if n != 1:
-                survived.append(f"{name}  [anchor occurs {n} times, "
-                                f"not applied]")
-                print(f"  FAIL  {name}   ANCHOR x{n} (not applied)")
-                continue
-            open(tgt, "w", encoding="utf-8").write(src.replace(old, new, 1))
-            rc = run(tgt, work)
-            killed = rc != 0
-            # `  ok  ` / `  FAIL  ` is the shape tools/ci-census.py parses.
-            print(f"  {'ok  ' if killed else 'FAIL'}  {name}   "
-                  f"rc={rc} ({'killed' if killed else 'SURVIVED'})")
-            if not killed:
-                survived.append(name)
-        finally:
-            shutil.rmtree(d, ignore_errors=True)
+            claim(ra, "second")
+            twice = True
+        except FileExistsError:
+            twice = False
+        claim(rb, "other")
+        i0 = (not twice and owner(ra) == "first" and owner(rb) == "other"
+              and bool(overlapping([ra, ra]))
+              and bool(overlapping([ra, os.path.join(ra, "x")]))
+              and not overlapping([ra, rb]))
+    finally:
+        shutil.rmtree(probe, ignore_errors=True)
+    if not i0:
+        sys.exit("REFUSING: the isolation check cannot tell one root handed "
+                 "to two workers from two roots, so no row below would be "
+                 "known to have run alone")
+    print("I0: a root claimed twice, or repeated, or nested, is caught; two "
+          "roots pass\n")
 
+    ids = [row_id(r[0]) for r in MUT]
+    if None in ids or len(set(ids)) != len(ids):
+        sys.exit("REFUSING: every row needs its own `M<n>` id -- the rows "
+                 "are run and printed in id order")
+    rows = sorted(MUT, key=lambda r: row_id(r[0]))
+    roots = [tempfile.mkdtemp(prefix="cardcheck-mut-") for _ in rows]
+    survived, breaches = [], []
+    try:
+        clash = overlapping(roots)
+        if clash:
+            sys.exit(f"REFUSING: two rows were handed overlapping roots, "
+                     f"{clash[0][0]} and {clash[0][1]}")
+        print(f"{len(rows)} mutation(s), {a.jobs} at a time, each in its own "
+              f"root, printed in id order\n", flush=True)
+        # Submitted in id order and consumed in id order: a line prints once
+        # its row and every row before it have finished, so the output is the
+        # same whatever order they finish in, and it still streams.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=a.jobs) as ex:
+            futs = [ex.submit(one, name, old, new, src, root)
+                    for (name, old, new), root in zip(rows, roots)]
+            for fut in futs:
+                res = fut.result()
+                if "refuse" in res:
+                    for g in futs:
+                        g.cancel()
+                    sys.exit(res["refuse"])
+                print(res["line"], flush=True)
+                if res.get("survived"):
+                    survived.append(res["survived"])
+                if res.get("breach"):
+                    breaches.append(res["line"].split()[1])
+    finally:
+        for root in roots:
+            shutil.rmtree(root, ignore_errors=True)
+    wall = time.monotonic() - t0
+
+    # 🔴 I0, the last part: every row copied the bytes read at the start, and
+    # those must still be the file on disk, or the verdicts are about a file
+    # that is no longer there.
+    with open(SRC, "rb") as f:
+        if f.read() != raw:
+            sys.exit("REFUSING: tools/cardcheck.py changed during the run, so "
+                     "every verdict above is about bytes no longer on disk")
     print()
+    if breaches:
+        print(f"I0: BREACHED on {', '.join(breaches)} -- those rows did not "
+              f"run alone")
+    else:
+        print(f"I0: {len(rows)} row(s) in {len(roots)} distinct, unnested "
+              f"roots; every row that ran found its mutant and its owner "
+              f"token intact afterwards; tools/cardcheck.py is still the "
+              f"bytes read at the start")
+    ran = f"{len(rows)} run, {a.jobs} at a time, {wall:.0f} s wall"
     if survived:
         print(f"🔴 {len(survived)} MUTATION(S) SURVIVED -- those controls "
-              f"do not work:")
+              f"do not work ({ran}):")
         for s in survived:
             print(f"    {s}")
         return 1
-    print(f"all {len(MUT)} mutations killed")
+    print(f"all {len(rows)} mutations killed, each turning every case it "
+          f"names red ({ran})")
     return 0
 
 

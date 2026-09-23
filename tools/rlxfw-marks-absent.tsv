@@ -1,0 +1,60 @@
+# tools/rlxfw-marks-absent.tsv -- the vendor kernels `rlxfw-marks.py verify`
+# reads as `--absent`, declared by path, size and sha256.  RUNSHEET `P10`.
+#
+# `tools/rlxfw-kbuild.sh` reads this file twice.  Before it stages a tree it
+# checks every row against the file on disk and refuses the build -- exit 3,
+# naming the row -- if a file is missing or has another size or another
+# sha256.  After the build it checks them again, at the point of use, and
+# passes each one to `verify` as `--absent`.  A row that does not verify is
+# never skipped: `verify` with nothing to be absent from can only say
+# *present in mine*, which is a label and not a discriminator.
+#
+# The bytes never enter this repository.  One file is this unit's own kernel,
+# decompressed from its flash dump; the other is someone else's property.
+# Paths are relative to $FWRE_WORK.
+#
+# WHY UNDER tools/ AND NOT config/.  Every file under config/ is hashed into
+# RECIPE_ID, which is compiled into every object as RLXFW_SRC_ID and printed
+# by `ID0`: it names what an image is built FROM.  This list changes no byte
+# of any image; it is what an image is compared AGAINST.  Under config/, an
+# edit here would move ID0, recompile all 592 objects (`INC-1`) and change
+# the image with its content unchanged, and every image's identity would
+# depend on where on this desk a vendor file sits.  `tools/binsim-corpus.tsv`
+# has the same shape -- vendor artefacts under $FWRE_WORK, declared by length
+# and sha256 beside the tool that reads them -- and lives here for the same
+# reason.
+#
+# Columns, tab separated; every field non-empty:
+#
+#   name   relpath (under $FWRE_WORK)   bytes   sha256   role
+#
+# WHERE EACH VALUE COMES FROM
+#   unit-kernel  量 2026-09-23 from the file: 3,374,772 bytes and the digest
+#                below.  Second source: `notes/cache-model.md`'s 2026-08-26
+#                record of the same decompression (size and full sha256),
+#                which `tools/hazlint` also pins as KERNEL_SHA / KERNEL_SIZE.
+#   drop-kernel  量 2026-09-23 from the file: 2,953,660 bytes and the digest
+#                below -- the first full sha256 of this file in the
+#                repository; `notes/kernel-build.md` § 13 carries its first
+#                16 hex digits, 48b1a17187bcc729, and they agree.  Second
+#                source: the clone `src-vendor/CLONED.tsv` pins at 5c9be5d9
+#                records this path as git blob ffe28e9017c2fc8a8e96a462fc367b2ee9d5bbca,
+#                and `git hash-object` of the file on disk reproduces it.
+#
+# 🔴 Two rows with one digest are one artefact counted twice, and the driver
+# refuses them.  `P6` carried exactly that for a day: two of its three "vendor
+# artefacts" were one kernel, one of them compressed (2026-08-29, `R3-7`).
+#
+# WHAT THIS FILE DOES NOT ESTABLISH
+#   * That no other vendor kernel holds a mark string.  The first row is the
+#     one the anti-DoD needs -- the kernel the loader re-stages at 0x80500000
+#     is this unit's -- and the second is breadth, a genuinely different build.
+#   * Anything about a compressed image.  A count over an LZMA stream is 0 for
+#     every image, this project's own `nfjrom` included (`P10`, 2026-08-29), so
+#     no compressed file may be listed here: it is a leg that cannot fail.
+#   * That the uploaded image carries the marks.  `verify` reads the linked
+#     ELF; `P10`'s flat-image leg is not automated by anything.
+#
+# name	relpath	bytes	sha256	role
+unit-kernel	rebuild/b4c-desk/vmlinux-rederived.bin	3374772	cf0d60a8ae54352e4d7d451b08a2f5551c80d8a34bf5cced19f3440dba610ec0	this unit's own vendor kernel, decompressed from its flash dump (r0-vendor-kernel.bin)
+drop-kernel	rebuild/src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/vmlinux_img	2953660	48b1a17187bcc72984bf02f5c29816f2d79e3924571cf1e9eb4559fe352a93cd	the GPL drop's own flat kernel image, a different kernel from the unit's

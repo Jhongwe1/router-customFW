@@ -503,7 +503,7 @@ tools/kconfig-delta.py     answers one question: is every difference between the
                            feeds the gate the file that was copied in rather than the one
                            the compiler saw, and must refuse. `apply` and `check` read
                            the same delta file, so the generator and the auditor cannot
-                           drift apart and both keep passing
+                           drift apart and both keep passing. Since 2026-09-23 `rlxfw-kbuild.sh` runs `check` after every build and a red verdict fails the build (CFG-3)
 tools/mkinitramfs.py       builds R3's initramfs from a declaration in which every entry
                            names its source and is tagged `unit` or `rlxfw` -- and the
                            tag is CHECKED against the path, not trusted. A declared
@@ -755,7 +755,7 @@ tools/test-flrbracket-mutants.py
                            that case failed. Both controls exist because a pass over
                            `flashwin` reported 8 of 8 killed and every kill was
                            invalid
-tools/cardcheck.py         35 controls, and it reads a card the way the DEVICE will.
+tools/cardcheck.py         48 controls, and it reads a card the way the DEVICE will.
                            `commands` checks every command a card types against what
                            the image DECLARES it can invoke; `numbers` re-derives every
                            number a card states from the artefact it names. It exists
@@ -767,9 +767,9 @@ tools/cardcheck.py         35 controls, and it reads a card the way the DEVICE w
                            exactly the two cells that failed at the bench. `numbers`
                            REFUSES a card with no ```cardnum fence rather than
                            reporting `0 of 0`, which is why the five frozen blocks
-                           come back refused and that is the correct output
+                           come back refused and that is the correct output. Since 2026-09-23 `commands` refuses `FLW`, `EW`, `EB` and a non-zero `AUTOBURN` unless the card carries the owner's dated `owner-yes` row for that exact payload (FW-113)
 tools/test-cardcheck-mutants.py
-                           22 mutants, baseline first. Two survived the 23 controls
+                           37 mutants, baseline first. Two survived the 23 controls
                            that existed when they were written, and neither was
                            visible to any card in the corpus — one of them exposed a
                            real defect, that `/proc` and `/sys` belong to the kernel
@@ -815,7 +815,9 @@ tools/rtkimage.py          runs Realtek's own nfjrom pipeline and reads what it 
                            every invocation; R2 flips one bit and requires both the
                            checksum and the payload to notice. A truncated LZMA stream
                            decodes partially WITHOUT raising, so "smaller image" was a
-                           thing this had to be stopped from printing
+                           thing this had to be stopped from printing. `build` runs the drop's make under
+                           vendor-tripwire.sh -- it did not until 2026-09-23 (FW-122) -- and writes
+                           rtkimage-record.tsv: the vmlinux it consumed -> the nfjrom it produced
 tools/hazlint-objs.py      hazlint over every object a kernel build produced under
                            arch/rlx -- following the symlink, because plain `find` misses
                            the six BSP objects and would sweep the architecture while

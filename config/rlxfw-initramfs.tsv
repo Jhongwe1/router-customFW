@@ -73,7 +73,7 @@ dir	/etc	-	0755	unit	-
 
 # --- the two files in the image that are mine.  Only the first says so on
 #     the console: the second is never executed by the boot ---
-file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discriminator, mounts /proc and /sys, execs a shell
+file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discriminator, mounts /proc and /sys, brings the LAN up (switch unlock+start, NIC unlock+netdev on, rlx0 10.1.1.3; P2-2, PROGRESS P2 settled item 3), execs a shell
 
 # --- and the two binaries of mine, which nothing at boot runs ---
 #

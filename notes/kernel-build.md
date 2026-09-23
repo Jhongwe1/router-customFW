@@ -800,7 +800,7 @@ banning a string.
 build; the auditor half runs when somebody remembers. That is the same shape as
 `rlxfw-marks.py verify`, which `LOG.md` records as never being run
 automatically either — **two working gates, neither on any path** —
-and it is carried forward as `CFG-3` (renamed from `CFG-2` 2026-09-16, `R1z-2`).
+and it is carried forward as `CFG-3` (renamed from `CFG-2` 2026-09-16, `R1z-2`). 🟢 **2026-09-23 (`P2-2`): both are on the path now.** `rlxfw-kbuild.sh` runs `kconfig-delta check` (with `--variant` when the build has one) and `rlxfw-marks verify` after every build that leaves a vmlinux, writes each verdict, exit status and RESULT line into the manifest (format 2), and exits 6 without the `manifest ->` line unless both are green. 量 on `s100L` (recipe `82724c8f`): checked as loud, green and green, the gates taking 0.39–0.47 s; checked as quiet, red (`CONFIG_PRINTK`, `CONFIG_PRINTK_TIME` undeclared); and red under `P2-2`'s own delta, on the one row it changed (`CONFIG_RLXFW_VENDOR_ETH_OPEN`, declared `y`, built `n`) -- an image built before a recipe change is refused under the new declaration. `CFG-3` closed; `SPEC.md` `FW-121`.
 
 🟢 **Repaired and re-measured the same day**: the row is declared, and `r56c`'s
 `oldconfig` log carries **0** `(NEW)` lines with `kconfig-delta check` green.
@@ -949,7 +949,7 @@ disk. The whole difference between the two files is the build timestamp in
 
 `config/rlxfw-initramfs.tsv` — ~~**29 entries**~~ 🔄 **36 entries, 量 2026-09-15: 9 dir, 6 file, 13 slink, 8 nod; 24 `unit` and 12 `rlxfw`, and the `rlxfw` byte column is no longer 988 but 30,172, because `/bin/uprobe` is the first `rlxfw` entry with content since `/init`. The per-kind and per-owner tables below this line are all at the 29-entry state**, every one tagged `unit` (carved
 out of this device's own flash dump) or `rlxfw` (mine), and the tag is
-**checked**, not trusted. `tools/mkinitramfs.py`, **23** controls — 19 → 23 on 2026-08-28/29, and the four new ones are §11.7's: the ceiling was being measured on the ELF file size.
+**checked**, not trusted. `tools/mkinitramfs.py`, **23** controls — 19 → 23 on 2026-08-28/29, and the four new ones are §11.7's: the ceiling was being measured on the ELF file size. 🔴 **2026-09-23 (`P2-2`): the build manifest's `initramfs_sha256` is a digest of the SPEC's text -- each entry's path, mode, owner and source path -- and not of the contents `gen_init_cpio` packs.** 量: `_irfs-s100a` and `_irfs-p2` hold byte-identical specs (`7130245fbcd92afc`) while `/init` went from 988 B (`e871efdd…`) to 2,153 B (`ef2c8797…`), and `p2q`'s ELF carries the new text. The content-level record was always written -- `mkinitramfs` puts `<name>.manifest.tsv`, every file's bytes and sha256, beside each `<name>.spec` -- and nothing read it: `rlxfw-kbuild.sh` now refuses a spec with no record beside it and writes `initramfs_manifest_sha256`. Over their entries, the records of `r6if1`, `s31a`, `s31b`, `s31L`, `s32a`, `s99c`, `s100a` and `s100L` agree (`ee7acf8b…`), so every card that said *only the kernel differs* on the spec's digest was right, on evidence that could not have shown it. `SPEC.md` `FW-123`.
 
 🔴 **It was 31 until the adversarial pass, and the check that found the two
 wrong ones did not exist when they were written.** The tag was verified for
@@ -1760,7 +1760,7 @@ where the change of command lives.
 
 **The step's own DoD put the control first**, and this is the result of running
 it: with the drop's own `image/vmlinux.elf` (3,441,133 bytes) fed into the
-drop's own `rtkload/Makefile`, driven by `tools/rtkimage.py build`:
+drop's own `rtkload/Makefile`, driven by `tools/rtkimage.py build` (🔴 which ran that make -- the drop's `lzma-26` and `cvimg`, and its `rsdk` toolchain through the cell's symlink into `src-vendor/rtl819x-toolchain` -- **outside `vendor-tripwire.sh`**, from this section's day until 2026-09-23, when `build` was put under it; `SPEC.md` `FW-122`):
 
 | artefact | rebuilt | the drop's | |
 |---|---:|---:|---|

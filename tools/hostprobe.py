@@ -104,7 +104,7 @@ is `<t_mono> <kind> [key=value ...]`, t_mono with six decimals:
     icmp-reply  seq= ttl= rtt_ms= ping_real=      t_mono = when the line was read
     icmp-silent seq=
     tcp         port= result= errno= start_mono= dur_ms=   t_mono = when it resolved
-    neigh       state= lladdr=
+    neigh       state= lladdr=         lladdr: an allowlisted MAC, `unlisted-N` or `-`
     udp         port= peer= len= kernel_real=
 
 A value that does not exist is `-`, never a number.  Lines ping prints that are
@@ -113,6 +113,46 @@ Unreachable`, `(DUP!)`, `(truncated)`, its statistics, stderr) become comment
 lines and are counted in the meta; a line whose lag crosses the threshold gets
 a `# ... icmp-lag ...` comment directly after it.  `PREFIX.meta.json` is
 written at the end, through `.tmp` and `os.replace`.
+
+ADDRESSES: WHAT MAY LEAVE THIS PROCESS
+--------------------------------------
+🔴 In `P2-3` the target is 10.1.1.1, the vendor firmware's LAN address
+(`upstream/notes/compcs-decode.md`: `IP_ADDR` from this unit's live config),
+and the MAC that answers ARP for it is this unit's own, from H601.  (The
+vendor NIC driver on rlxfw's kernel is NOT that: 量 `bench/2026-09-21e/V3-ETH4`
+reads `HWaddr 00:12:34:56:78:94`, the SDK's placeholder; 1.1's docstring said
+otherwise.)  It is labelled `unlisted-N` all the same.  CLAUDE.md, *Never*:
+H601's bytes may not enter this repository's tree, and `P2-3` commits these
+records under `bench/`.  Version 1.0 wrote every `lladdr` as `ip` printed it.
+
+The rule, and one owner for its list.  A hardware address is written verbatim
+only if its canonical form (six octets, lower case) is one of the addresses
+`tools/audit-bench-log.py`'s `ALLOW` names in a `("match", literal)` entry
+whose literal is itself an address -- six colon- or dash-separated octets, or
+twelve bare hex digits.  That file is read by path, the way `leakscan.py`
+reads it; no second copy of the list exists here.  Every other address is
+written `unlisted-N`, N its order of first appearance in this run's output.
+Nothing about it is derived from its bytes: no hash, prefix, OUI or length.
+The `00:12:34:56:78:9` entry is a PREFIX (five and a half octets), not an
+address, so it is not honoured: those six SDK placeholders are labelled like
+any other address.
+
+Where it holds -- every exit, not only the `lladdr` field: event lines and
+comment lines (the events file's one writer applies it), the meta (applied to
+every string in it, keys included), stdout and stderr (one print path), and
+`report`'s output.  So an address that only a sink can see is still caught:
+ping's banner naming an `enx<12 hex>` interface, the route's `dev` in the
+meta, an exception's message.  A failed `ip neigh` poll's output is withheld
+ENTIRELY, not redacted -- it can carry an lladdr, and what is needed from it
+is its exit status.  If the allowlist cannot be loaded, `--neigh` is refused;
+any other run then labels every address it meets.
+
+Not covered, and the self-test's scanner cannot see them either: an address
+in another spelling -- dotted `0011.2233.4455`, octets without a leading zero,
+one inside a longer hex run, an EUI-64 inside an IPv6 address.  `ip -4` and
+iputils print none of these.  Labels are per run: `unlisted-1` in two runs
+need not be one address, because keeping identity across runs would take a
+persistent map or a label derived from the bytes.
 
 REFUTATION CONDITIONS AND CONTROLS -- written before the code they test
 ------------------------------------------------------------------------
@@ -186,6 +226,26 @@ H10 The file format holds: every non-comment line parses as `<float> <kind>
     `stop`.  Controls: `F1`-`F5` over every file the suite made (`F0` requires
     that population to be there), and `U13` (a hand-broken line is rejected
     by the same parser).
+H11 No hardware address leaves the process unless the allowlist names it
+    (ADDRESSES above).  Refuted by any artefact of a run -- events, meta,
+    stdout, stderr, `report` -- holding an address the allowlist does not
+    name, in colon, dash, bare or `enx` form.  Controls: `A1` (a
+    non-allowlisted lladdr reads `unlisted-1`, a second `unlisted-2`, the
+    first again `unlisted-1`); `A2` (every artefact of that run scanned by a
+    scanner written apart from the tool's own pattern, and each injected
+    address searched for in six spellings: zero hits); `A3` (a failing
+    poll's output is not quoted -- its marker text is nowhere); `A4` (an
+    address only a sink sees -- ping's banner and stderr -- is labelled);
+    `A5` (the route's `enx` device, in the meta and in the host-fault
+    refusal); `A6` (allowlisted addresses written verbatim in upper and lower
+    case, one of them matched only through the canonical form); `A7`, `A8`,
+    `A9` (a missing, a raising and an `ALLOW`-less allowlist file each refuse
+    `--neigh`: exit 2, no file) against `A10` (the same broken allowlist
+    does not refuse a `--tcp` run -- the permitting half); `A11` (`report`
+    on a record version 1.0 wrote, raw lladdr in it, prints a label); `A12`
+    (argparse's own error line, quoting a bad value, is labelled);
+    `K1`-`K5` (canonical form, the loader on the real file, the redactor,
+    labels that depend on order and not on bytes).
 
 The self-test drives a FAKE ping and a FAKE `ip` -- small scripts it writes
 into a temporary directory and passes as `--ping`/`--ip` -- and real loopback
@@ -219,7 +279,8 @@ WHAT IT DOES NOT ESTABLISH
   and the ARP they provoke is a packet the board handles while it boots.  The
   rates are the card's to choose and to state.
 * Who answered.  A reply from the target's address is a reply from whatever
-  holds that address.
+  holds that address -- and an `unlisted-N` lladdr says only that it is not
+  an address the allowlist names, not whose it is.
 
 Exit codes: 0 the run ended cleanly (any stop reason, signals included) and its
             record is complete, every selected instrument having worked
@@ -235,6 +296,9 @@ Run:  tools/hostprobe.py run --out bench/<date>/X-probe --target 10.1.1.1 \\
 """
 import argparse
 import errno
+import datetime
+import importlib.machinery
+import importlib.util
 import ipaddress
 import json
 import os
@@ -252,9 +316,32 @@ import tempfile
 import time
 import traceback
 
-TOOL_VERSION = "1.0"
+# 1.0 -> 1.1 on 2026-09-23: an lladdr, and every other hardware address the
+# run meets, is written only if the allowlist names it (ADDRESSES).  A 1.0
+# record's lladdr is `ip`'s raw text; a 1.1 record's is not.
+TOOL_VERSION = "1.2"
 CLOCK = "CLOCK_MONOTONIC"
 THIS = os.path.abspath(__file__)
+ROOT = os.path.dirname(os.path.dirname(THIS))
+#: The allowlist's one owner, read by path as leakscan.py's load_abl() reads
+#: it.  Derived from this file's own location, so a copy of this file outside
+#: the repository finds no allowlist -- which is how A7-A9 break it.
+ABL_PATH = os.path.join(ROOT, "tools", "audit-bench-log.py")
+#: capdate.py, read by path for F6 only: the one reader of started_wallclock.
+CAPDATE_PATH = os.path.join(ROOT, "tools", "capdate.py")
+
+
+def capdate_when(meta_path):
+    """capdate.capture_when on meta_path: (datetime, None) or (None, reason).
+    A capdate that cannot be loaded is a reason, never a pass."""
+    try:
+        ldr = importlib.machinery.SourceFileLoader("hostprobe_capdate", CAPDATE_PATH)
+        spec = importlib.util.spec_from_loader("hostprobe_capdate", ldr)
+        mod = importlib.util.module_from_spec(spec)
+        ldr.exec_module(mod)
+        return mod.capture_when(meta_path)
+    except Exception as e:          # noqa: BLE001 -- any failure is a reason
+        return None, "capdate unavailable: %s" % e
 
 # ------------------------------------------------------------- host facts
 # iputils releases whose smallest unprivileged `-i` this project has measured,
@@ -348,6 +435,151 @@ PING_VERSION_RX = re.compile(r"\biputils[ -]s?(\d{8})\b")
 
 class Refused(Exception):
     """Raised before any output file or child process exists."""
+
+
+# -------------------------------------------------------------- addresses
+#: A string that IS one address: six octets under one separator, or twelve
+#: bare hex digits, optionally as systemd's `enx<12 hex>` interface name.
+_MAC_SEP_RX = re.compile(r"^[0-9A-Fa-f]{2}([:-])(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2}$")
+_MAC_BARE_RX = re.compile(r"^(?:[eE][nN][xX])?([0-9A-Fa-f]{12})$")
+#: What the redactor looks for in free text.  Wider than one address on
+#: purpose: a run of SIX OR MORE colon- or dash-separated octets is taken whole
+#: (a longer hardware address is labelled, not half-printed), and twelve hex
+#: digits bounded by non-hex -- which is what finds an `enx<12 hex>` name,
+#: where `\b` would not (audit-bench-log.py's own note on that pattern).  A
+#: false match costs a label; a missed one is a leak.
+MAC_TEXT_RX = re.compile(
+    r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5,}(?![0-9A-Fa-f])"
+    r"|(?<![0-9A-Fa-f])(?:[eE][nN][xX])?[0-9A-Fa-f]{12}(?![0-9A-Fa-f])")
+
+
+class AllowlistUnavailable(Exception):
+    pass
+
+
+def canonical_mac(tok):
+    """Six lower-case octets joined by `:` for any spelling of ONE address;
+    None for anything else, which the redactor then labels whole."""
+    t = (tok or "").strip()
+    if _MAC_SEP_RX.match(t):
+        h = re.sub(r"[:-]", "", t)
+    else:
+        m = _MAC_BARE_RX.match(t)
+        if not m:
+            return None
+        h = m.group(1)
+    h = h.lower()
+    return ":".join(h[i:i + 2] for i in range(0, 12, 2))
+
+
+def _rel(path):
+    try:
+        r = os.path.relpath(path, ROOT)
+    except ValueError:
+        return path
+    return path if r.startswith("..") else r
+
+
+def load_mac_allowlist(path=None):
+    """The canonical addresses `tools/audit-bench-log.py`'s ALLOW names.
+
+    Its `("match", literal)` entries whose literal is itself one address --
+    six octets under one separator, or twelve bare hex digits.  An `enx` name
+    and a prefix (`00:12:34:56:78:9`, five and a half octets) are not, and are
+    not honoured.  Read by path, the way leakscan.py's load_abl() reads it:
+    the list has one owner and no copy here.  AllowlistUnavailable, never a
+    fallback, when the file cannot be run or its ALLOW cannot be read.
+    """
+    path = path or ABL_PATH
+    try:
+        ldr = importlib.machinery.SourceFileLoader("hostprobe_abl", path)
+        spec = importlib.util.spec_from_loader("hostprobe_abl", ldr)
+        mod = importlib.util.module_from_spec(spec)
+        ldr.exec_module(mod)
+        allow = mod.ALLOW
+    except (Exception, SystemExit) as e:
+        raise AllowlistUnavailable("%s could not be loaded (%s: %s)"
+                                   % (_rel(path), type(e).__name__, e)) from None
+    macs = set()
+    try:
+        for scope, needle, _why in allow:
+            if (scope == "match" and isinstance(needle, str)
+                    and (_MAC_SEP_RX.match(needle)
+                         or re.fullmatch(r"[0-9A-Fa-f]{12}", needle))):
+                macs.add(canonical_mac(needle))
+    except (TypeError, ValueError) as e:
+        raise AllowlistUnavailable("%s's ALLOW is not a list of (scope, needle, "
+                                   "reason): %s" % (_rel(path), e)) from None
+    return frozenset(macs)
+
+
+class Redactor:
+    """The one gate a hardware address passes on its way out of this process.
+
+    `address()` takes a value known to be an address (an lladdr); `text()`
+    finds addresses in anything else by MAC_TEXT_RX; `obj()` is `text()` over
+    every string of a JSON-able object, keys included.  All three answer from
+    one allowlist and one label map, so an address has one label across the
+    events, the meta, stdout and stderr of a run.
+    """
+
+    def __init__(self, allowed=frozenset(), loaded=False, why_not=""):
+        self.allowed = frozenset(allowed)
+        self.loaded = loaded
+        self.why_not = why_not
+        self.labels = {}
+
+    def label(self, key):
+        # The ORDER of first appearance, and nothing else: no hash, no
+        # prefix, no OUI, no length (H11; K5 is the control).
+        if key not in self.labels:
+            self.labels[key] = "unlisted-%d" % (len(self.labels) + 1)
+        return self.labels[key]
+
+    def _one(self, tok):
+        c = canonical_mac(tok)
+        if c is not None and c in self.allowed:
+            return tok
+        return self.label(c if c is not None else tok.lower())
+
+    def address(self, raw):
+        if raw in (None, "", "-"):
+            return "-"
+        return self._one(raw)
+
+    def text(self, s):
+        return MAC_TEXT_RX.sub(lambda m: self._one(m.group(0)), str(s))
+
+    def obj(self, o):
+        if isinstance(o, str):
+            return self.text(o)
+        if isinstance(o, dict):
+            return {(self.text(k) if isinstance(k, str) else k): self.obj(v)
+                    for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [self.obj(v) for v in o]
+        return o
+
+
+#: One per process, so a run has one label map.  It starts with NO allowlist
+#: -- every address labelled -- until the pre-flight or `report` loads it.
+REDACT = Redactor()
+
+
+def use_allowlist():
+    """Load the owner's list into REDACT.  -> None, or why it could not."""
+    try:
+        REDACT.allowed = load_mac_allowlist()
+    except AllowlistUnavailable as e:
+        REDACT.allowed, REDACT.loaded, REDACT.why_not = frozenset(), False, str(e)
+        return str(e)
+    REDACT.loaded, REDACT.why_not = True, ""
+    return None
+
+
+def say(msg, err=False):
+    """The one print path: every line through the redactor."""
+    print(REDACT.text(msg), file=sys.stderr if err else sys.stdout)
 
 
 # ------------------------------------------------------------ pure parts
@@ -706,12 +938,15 @@ class Recorder:
         self.counts = {k: 0 for k in kinds}
         self.first = {k: None for k in first_keys}
 
+    # The events file's only writer, so the redactor here covers every event
+    # and every comment -- including text nothing upstream knew could carry
+    # an address, such as ping's banner (H11, A4).
     def comment(self, text):
-        self.fh.write("# " + " ".join(str(text).split()) + "\n")
+        self.fh.write(REDACT.text("# " + " ".join(str(text).split())) + "\n")
         self.fh.flush()
 
     def event(self, t_mono, kind, pairs, fields=None):
-        self.fh.write(fmt_event(t_mono, kind, pairs) + "\n")
+        self.fh.write(REDACT.text(fmt_event(t_mono, kind, pairs)) + "\n")
         self.fh.flush()
         self.counts[kind] = self.counts.get(kind, 0) + 1
         if kind in ("start", "stop"):
@@ -1034,16 +1269,22 @@ class Neigh:
         self.poll_ms.append((t - self.spawned) * 1e3)
         if rc != 0:
             self.errors += 1
-            self.rec.comment("%.6f neigh-error rc=%s %s"
-                             % (t, rc, " ".join(text.split())[:200]))
+            # WITHHELD, not redacted: `ip`'s output can carry an lladdr, and the
+            # exit status is what a failed poll has to say (H11, A3).
+            self.rec.comment("%.6f neigh-error rc=%s; the output of `ip` is withheld, "
+                             "because it can carry an lladdr" % (t, rc))
             return
         state, lladdr, n = parse_neigh(text, self.target)
         if n > 1:
             self.rec.comment("%.6f neigh %d entries for %s; the first is recorded"
                              % (t, n, self.target))
-        if (state, lladdr) != self.last:
-            self.last = (state, lladdr)
-            self.rec.event(t, "neigh", [("state", state), ("lladdr", lladdr)],
+        # Compared on the canonical form, so a change of case is not a change;
+        # written through the redactor, so what is compared is never printed.
+        key = (state, canonical_mac(lladdr) or lladdr.lower())
+        if key != self.last:
+            self.last = key
+            self.rec.event(t, "neigh", [("state", state),
+                                        ("lladdr", REDACT.address(lladdr))],
                            {"state": state})
 
     def _kill(self):
@@ -1118,7 +1359,17 @@ class Ctx:
 def preflight(a):
     """Every refusal, in order, before any file or child exists.  -> Ctx."""
     c = Ctx()
-    # The terminator first: its absence is the defect that leaves a process
+    # The allowlist FIRST, so every message below -- a host-fault refusal
+    # quotes a route whose `dev` can be an `enx<12 hex>` name -- is rendered
+    # through it.  Unavailable: --neigh is refused, never run on a fallback
+    # (H11, A7-A9); any other probe labels every address it meets (A10).
+    why_not = use_allowlist()
+    if why_not and a.neigh:
+        raise Refused(
+            "--neigh needs the address allowlist, and %s. Refusing rather than "
+            "writing lladdr values it cannot check: in P2-3 the address that "
+            "answers for the target is this unit's own, from H601" % why_not)
+    # The terminator next: its absence is the defect that leaves a process
     # running (console-capture `_check_terminator`, the same reasoning).
     if a.seconds is None:
         raise Refused(
@@ -1426,6 +1677,11 @@ def _run(a, c, wake_r, seen):
         "target": a.target,
         "args": {k: v for k, v in vars(a).items() if k not in ("cmd", "self_test")},
         "start_mono": round(t0, 6), "start_real": round(r0, 6),
+        # 1.2: console-capture's field, in its format, from the SAME time.time()
+        # reading as start_real -- capdate dates every .meta.json in a bench
+        # directory by it (its D7/D8), and a record without it is RED there.
+        "started_wallclock": time.strftime("%Y-%m-%dT%H:%M:%S%z",
+                                           time.localtime(r0)),
         "end_mono": round(end_mono, 6), "end_real": round(end_real, 6),
         "stop_decided_mono": round(t_stop, 6),
         "ping": ping_meta,
@@ -1438,18 +1694,25 @@ def _run(a, c, wake_r, seen):
         "route": {"dev": c.dev, "src": c.src} if not c.loopback else None,
         "counts": rec.counts, "first": rec.first,
         "stop_reason": reason, "problems": problems, "exit_code": exit_code,
+        "addresses": {"allowlist": _rel(ABL_PATH), "loaded": REDACT.loaded,
+                      "allowlisted": len(REDACT.allowed),
+                      "why_not": REDACT.why_not or None, "unlisted": None},
     }
+    # Every string in the meta, keys included, through the redactor: the
+    # route's `dev`, the neigh argv, the args, a problem's text (H11, A5).
+    meta = REDACT.obj(meta)
+    meta["addresses"]["unlisted"] = len(REDACT.labels)
     tmp = c.meta + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         json.dump(meta, f, indent=2)
         f.write("\n")
     os.replace(tmp, c.meta)
     n_events = sum(rec.counts.values())
-    print("hostprobe: %s  %d events, stop %s after %.3f s"
-          % (c.events, n_events, reason, end_mono - t0))
-    print("hostprobe: %s" % c.meta)
-    for p in problems:
-        print("hostprobe: PROBLEM %s" % p, file=sys.stderr)
+    say("hostprobe: %s  %d events, stop %s after %.3f s"
+        % (c.events, n_events, reason, end_mono - t0))
+    say("hostprobe: %s" % c.meta)
+    for p in meta["problems"]:
+        say("hostprobe: PROBLEM %s" % p, err=True)
     return exit_code
 
 
@@ -1499,12 +1762,19 @@ def _probes_from(comments):
 
 
 def report(prefix, out=sys.stdout):
+    # A record this version wrote holds no unlisted address; one written by
+    # 1.0, or edited by hand, can.  So `report` prints through the same gate,
+    # and without the allowlist it labels every address rather than refusing.
+    why_not = use_allowlist()
     events, comments, bad, meta = load_record(prefix)
 
     def pr(s=""):
-        print(s, file=out)
+        print(REDACT.text(s), file=out)
 
     pr("hostprobe report %s" % prefix)
+    pr("  allowlist %s" % ("%d address(es) from %s" % (len(REDACT.allowed), _rel(ABL_PATH))
+                           if not why_not else "NOT LOADED, so every address is "
+                           "printed as a label: %s" % why_not))
     start = next((e for e in events if e[1] == "start"), None)
     stop = next((e for e in events if e[1] == "stop"), None)
     t0 = start[0] if start else (events[0][0] if events else None)
@@ -1612,8 +1882,12 @@ if cfg.get("deaf"):
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 else:
     signal.signal(signal.SIGINT, stats)
-sys.stdout.write("PING %s (%s) 56(84) bytes of data.\n" % (sys.argv[-1], sys.argv[-1]))
+sys.stdout.write((cfg.get("header") or "PING %s (%s) 56(84) bytes of data."
+                  % (sys.argv[-1], sys.argv[-1])) + "\n")
 sys.stdout.flush()
+for s in cfg.get("stderr_lines", []):
+    sys.stderr.write(s + "\n")
+sys.stderr.flush()
 rec = open(cfg["record"], "w")
 for step in cfg["lines"]:
     time.sleep(step.get("delay", 0.0))
@@ -1651,13 +1925,16 @@ if args[:3] == ["-4", "neigh", "show"]:
     with open(cfg["counter"], "w") as f:
         f.write(str(n + 1))
     seq = cfg.get("neigh") or [""]
-    sys.stdout.write(seq[min(n, len(seq) - 1)])
-    sys.exit(cfg.get("neigh_rc", 0))
+    item = seq[min(n, len(seq) - 1)]
+    text, rc = (item, cfg.get("neigh_rc", 0)) if isinstance(item, str) else item
+    sys.stdout.write(text)
+    sys.exit(rc)
 sys.exit(127)
 '''
 
 REQUIRED_META = ("tool", "tool_version", "clock", "target", "args", "start_mono",
-                 "start_real", "end_mono", "end_real", "ping", "icmp_lag_ms",
+                 "start_real", "started_wallclock", "end_mono", "end_real",
+                 "ping", "icmp_lag_ms",
                  "counts", "first", "stop_reason")
 REQUIRED_PING = ("path", "version", "interval_s")
 REQUIRED_LAG = ("n", "median", "max", "over_threshold")
@@ -1809,6 +2086,52 @@ def selftest(out=sys.stdout):
             "12.345678 icmp-reply seq=1 ttl=64",
             "12.345678 bogus x=1",
             "12.345678 udp port=1 peer=a b len=1 kernel_real=-"))))
+
+    # ---------------- K: the address gate's parts (H11).  Every address here
+    # except the allowlisted ones is synthetic and locally administered, so
+    # none of them is anybody's.
+    ck("K1", "canonical: colon, dash, bare, enx, either case -> one form; a "
+             "prefix, 5 octets, mixed separators -> none",
+       ("02:52:4c:58:46:57",) * 5 + (None, None, None),
+       tuple(canonical_mac(s) for s in (
+           "02:52:4C:58:46:57", "02-52-4c-58-46-57", "02524C584657",
+           "enx02524c584657", "02:52:4c:58:46:57", "00:12:34:56:78:9",
+           "02:52:4c:58:46", "02:52-4c:58:46:57")))
+    try:
+        real, kerr = load_mac_allowlist(), None
+    except AllowlistUnavailable as e:
+        real, kerr = frozenset(), str(e)
+    ck("K2", "the loader on the real audit-bench-log.py: its address literals, "
+             "canonical, rlxfw's own among them, the prefix entry not",
+       (None, True, True, False, True),
+       (kerr, len(real) >= 5, "02:52:4c:58:46:57" in real,
+        any(x is None or x.startswith("00:12:34:56:78:9") for x in real),
+        all(x is not None and canonical_mac(x) == x for x in real)))
+    rk = Redactor(frozenset(["02:52:4c:58:46:57"]), True)
+    ck("K3", "redactor: allowlisted verbatim in either case; others unlisted-1, "
+             "-2, -1 again; `-` stays; a 4-octet lladdr is labelled",
+       ("02:52:4C:58:46:57", "02:52:4c:58:46:57", "unlisted-1", "unlisted-2",
+        "unlisted-1", "-", "unlisted-3"),
+       tuple(rk.address(x) for x in (
+           "02:52:4C:58:46:57", "02:52:4c:58:46:57", "0a:1b:2c:3d:4e:5f",
+           "06:00:00:00:00:02", "0A:1B:2C:3D:4E:5F", "-", "00:00:00:00")))
+    rk = Redactor(frozenset(["02:52:4c:58:46:57"]), True)
+    digest = "ab" * 32
+    ck("K4", "text: colon, dash, bare, enx -> one label; allowlisted, times, "
+             "errno names, a digest untouched; 8 octets labelled whole",
+       "a unlisted-1 b unlisted-1 c unlisted-1 d unlisted-1: keep 02:52:4C:58:46:57 "
+       "1790115167.180567 ECONNREFUSED %s eui unlisted-2" % digest,
+       rk.text("a 0a:1b:2c:3d:4e:5f b 0A-1B-2C-3D-4E-5F c 0a1b2c3d4e5f "
+               "d enx0a1b2c3d4e5f: keep 02:52:4C:58:46:57 1790115167.180567 "
+               "ECONNREFUSED %s eui 02:00:00:ff:fe:00:00:01" % digest))
+    r1, r2 = Redactor(), Redactor()
+    s1 = [r1.address(x) for x in ("0a:1b:2c:3d:4e:5f", "06:00:00:00:00:02",
+                                  "0a:1b:2c:3d:4e:5f")]
+    s2 = [r2.address(x) for x in ("16:00:00:00:00:04", "12:34:56:78:9a:bc",
+                                  "16:00:00:00:00:04")]
+    ck("K5", "labels are order alone: two different address streams of one "
+             "shape get the same labels",
+       (["unlisted-1", "unlisted-2", "unlisted-1"], True), (s1, s1 == s2))
 
     # ---------------- the end-to-end cases: this file as a subprocess, a fake
     # ping and a fake ip, loopback sockets
@@ -2138,8 +2461,8 @@ def selftest(out=sys.stdout):
         produced.append(pg)
         ev, com, bad, meta = rec_of(pg)
         ck("G1", "NONE NONE REACHABLE REACHABLE STALE -> three events, in order",
-           (0, [("NONE", "-"), ("REACHABLE", "02:00:00:00:00:01"),
-                ("STALE", "02:00:00:00:00:01")], True),
+           (0, [("NONE", "-"), ("REACHABLE", "unlisted-1"),
+                ("STALE", "unlisted-1")], True),
            (rc, [(f["state"], f["lladdr"]) for _t, k, f, _r in ev if k == "neigh"],
             ((meta.get("neigh") or {}).get("polls") or 0) >= 5))
         polls = [c for c in ip_calls("g") if c["args"][1:2] == ["neigh"]]
@@ -2168,6 +2491,210 @@ def selftest(out=sys.stdout):
         ck("G2", "a non-loopback target's polls filter on the route's dev",
            ["-4", "neigh", "show", "192.0.2.1", "dev", "eth9"],
            next((x for x in calls if x[1:2] == ["neigh"]), None))
+
+        # ---- A: no address leaves the process unless the allowlist names it
+        # (H11).  Injected addresses are synthetic and locally administered.
+        MA, MB, MC, MD, ME = ("0a:1b:2c:3d:4e:5f", "06:00:00:00:00:02",
+                              "12:34:56:78:9a:bc", "16:00:00:00:00:04",
+                              "0e:00:00:00:00:03")
+        ENX = "enx" + ME.replace(":", "")
+
+        def spellings(mac):
+            b = mac.replace(":", "")
+            d = mac.replace(":", "-")
+            return {mac, mac.upper(), d, d.upper(), b, b.upper()}
+
+        def mac_like(text):
+            """Written APART from MAC_TEXT_RX: a scanner sharing the tool's
+            pattern would share its blind spots.  Hex runs joined by : or -
+            with six or more two-digit parts, or exactly twelve hex digits
+            between non-hex characters (which is what finds an enx name)."""
+            out = []
+            for m in re.finditer(r"[0-9A-Fa-f]+(?:[:-][0-9A-Fa-f]+)*", text):
+                parts = re.split(r"[:-]", m.group(0))
+                if ((len(parts) >= 6 and all(len(x) == 2 for x in parts))
+                        or (len(parts) == 1 and len(parts[0]) == 12)):
+                    out.append(m.group(0))
+            return out
+
+        def bare12(h):
+            return re.sub(r"[^0-9a-f]", "", h.lower())[-12:]
+
+        def artefacts(prefix, so, se):
+            texts = {"stdout": so, "stderr": se}
+            for suf in (".events", ".meta.json"):
+                try:
+                    with open(prefix + suf, encoding="utf-8") as f:
+                        texts[suf] = f.read()
+                except OSError:
+                    texts[suf] = ""
+            _rc, rso, rse = hp(["report", prefix])
+            texts["report"] = rso + rse
+            return texts
+
+        def leaks(texts, injected, allowed=()):
+            """(scanner hits not allowed, injected addresses found in any of
+            six spellings) -- the second needs no pattern at all."""
+            hits = sorted({(k, h) for k, t in texts.items() for h in mac_like(t)
+                           if bare12(h) not in allowed})
+            found = sorted({(k, s) for k, t in texts.items() for mac in injected
+                            for s in spellings(mac) if s in t})
+            return hits, found
+
+        pa = P("a1")
+        neigh_a = [
+            "",
+            "127.0.0.1 dev eth9 lladdr %s REACHABLE \n" % MA,
+            "127.0.0.1 dev eth9 lladdr %s REACHABLE \n" % MB,
+            ["Cannot find device \"enx%s\"; hwaddr %s %s\n"
+             % (MC.replace(":", ""), MD.replace(":", "-").upper(), MC.upper()), 1],
+            "127.0.0.1 dev eth9 lladdr %s REACHABLE \n"
+            "127.0.0.1 dev eth8 lladdr %s STALE \n" % (MA, MD),
+            "127.0.0.1 dev tun9 lladdr 00:00:00:00 PERMANENT \n"]
+        env = icfg("a1", neigh=neigh_a)
+        rc, so, se = hp(run_args(pa, "--neigh", "--neigh-interval", "0.05", "--ip", fip,
+                                 "--seconds", "1.5"), env)
+        produced.append(pa)
+        ev, com, bad, meta = rec_of(pa)
+        ck("A1", "lladdr: unlisted-1, a second unlisted-2, the first again "
+                 "unlisted-1; a 4-octet one unlisted-3",
+           [("NONE", "-"), ("REACHABLE", "unlisted-1"), ("REACHABLE", "unlisted-2"),
+            ("REACHABLE", "unlisted-1"), ("PERMANENT", "unlisted-3")],
+           [(f["state"], f["lladdr"]) for _t, k, f, _r in ev if k == "neigh"])
+        texts = artefacts(pa, so, se)
+        raw_in = " ".join(x if isinstance(x, str) else x[0] for x in neigh_a)
+        ck("A2", "every artefact -- events, meta, stdout, stderr, report -- holds "
+                 "none of the 4, by scanner or spelling; the scanner sees all 4 in "
+                 "the input",
+           ([], [], True, sorted(bare12(m) for m in (MA, MB, MC, MD))),
+           leaks(texts, (MA, MB, MC, MD))
+           + (all(texts[k] for k in texts),
+              sorted({bare12(h) for h in mac_like(raw_in)})))
+        ck("A3", "a failing poll: a gap, exit 1, and its output quoted nowhere "
+                 "(its marker text is in no artefact)",
+           (1, True, []),
+           (rc, any("neigh-error rc=1" in x for x in com),
+            sorted(k for k, t in texts.items() if "Cannot find device" in t)))
+        pb = P("a4")
+        env = pcfg("a4", [reply(1)],
+                   header="PING 127.0.0.1 (127.0.0.1) from 127.0.0.1 %s: 56(84) "
+                          "bytes of data." % ENX,
+                   stderr_lines=["ping: %s: hwaddr %s"
+                                 % (ENX, MD.replace(":", "-").upper())])
+        rc, so, se = hp(run_args(pb, "--icmp", "--ping", fping, "--seconds", "0.6"), env)
+        produced.append(pb)
+        ev, com, bad, meta = rec_of(pb)
+        texts = artefacts(pb, so, se)
+        banner = next((x for x in com if "ping-header" in x), "")
+        ck("A4", "an address only a sink sees -- ping's banner and its stderr -- "
+                 "is labelled, and leaks nowhere",
+           (0, True, ([], [])),
+           (rc, "from 127.0.0.1 unlisted-1:" in banner, leaks(texts, (ME, MD))))
+        pr5 = P("a5")
+        env = icfg("a5", route="192.0.2.1 dev %s src 192.0.2.2 uid 1000 \n    cache \n"
+                   % ENX, neigh=["192.0.2.1 lladdr %s REACHABLE \n" % MD])
+        rc, so, se = hp(["run", "--out", pr5, "--target", "192.0.2.1", "--neigh", "--ip",
+                         fip, "--neigh-interval", "0.1", "--seconds", "0.5"], env)
+        produced.append(pr5)
+        meta = rec_of(pr5)[3]
+        texts = artefacts(pr5, so, se)
+        dev = (meta.get("route") or {}).get("dev") or ""
+        argv_dev = ((meta.get("neigh") or {}).get("argv") or [None])[-1]
+        rrc, rso, rse = hp(["run", "--out", P("a5r"), "--target", "192.0.2.1", "--neigh",
+                            "--ip", fip, "--seconds", "1"],
+                           icfg("a5r", route="192.0.2.1 dev %s uid 1000 \n    cache \n" % ENX))
+        ck("A5", "the route's enx device: labelled in the meta, in the argv, and "
+                 "in the host-fault refusal",
+           (0, True, True, ([], []), 2, True, ([], [])),
+           (rc, dev.startswith("unlisted-"), argv_dev == dev, leaks(texts, (ME, MD)),
+            rrc, "HOST FAULT" in rse and "unlisted-" in rse,
+            leaks({"stdout": rso, "stderr": rse}, (ME,))))
+        # Both on audit-bench-log.py's ALLOW today: rlxfw's own constant in both
+        # spellings, and wlan0's driver default, whose literal there is upper
+        # case only -- so its lower-case form matches only canonically.
+        UPPER, LOWER = "02:52:4C:58:46:57", "02:52:4c:58:46:57"
+        CANON = "00:E0:4C:81:86:86".lower()   # the literal's own spelling, lowered
+        pr6 = P("a6")
+        env = icfg("a6", neigh=["127.0.0.1 dev eth9 lladdr %s REACHABLE \n" % UPPER,
+                                "127.0.0.1 dev eth9 lladdr %s REACHABLE \n" % CANON,
+                                "127.0.0.1 dev eth9 lladdr %s STALE \n" % LOWER])
+        rc, so, se = hp(run_args(pr6, "--neigh", "--neigh-interval", "0.05", "--ip", fip,
+                                 "--seconds", "1.0"), env)
+        produced.append(pr6)
+        ev = rec_of(pr6)[0]
+        texts = artefacts(pr6, so, se)
+        ck("A6", "allowlisted addresses verbatim, upper and lower case, and one "
+                 "matched only through the canonical form",
+           (0, [UPPER, CANON, LOWER], [], False),
+           (rc, [f["lladdr"] for _t, k, f, _r in ev if k == "neigh"],
+            leaks(texts, (), allowed={bare12(UPPER), bare12(CANON)})[0],
+            any(re.search(r"unlisted-\d", t) for t in texts.values())))
+
+        def broken_root(name, abl_body):
+            # A copy of this file in a directory of its own finds no
+            # allowlist beside it, or the one written here.
+            tools = os.path.join(P(name), "tools")
+            os.makedirs(tools)
+            shutil.copy(THIS, os.path.join(tools, "hostprobe.py"))
+            if abl_body is not None:
+                with open(os.path.join(tools, "audit-bench-log.py"), "w") as f:
+                    f.write(abl_body)
+            return os.path.join(tools, "hostprobe.py")
+
+        def hp_at(path, args):
+            p = subprocess.run([sys.executable, path] + args, stdin=subprocess.DEVNULL,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+            return (p.returncode, p.stdout.decode("utf-8", "replace"),
+                    p.stderr.decode("utf-8", "replace"))
+
+        for cid, name, body, what in (
+                ("A7", "abl-missing", None, "a missing allowlist file"),
+                ("A8", "abl-raises", "raise RuntimeError('broken on purpose')\n",
+                 "an allowlist file that raises"),
+                ("A9", "abl-noallow", "PATTERNS = []\n", "an allowlist file with no ALLOW")):
+            copy = broken_root(name, body)
+            prefix = P(name + "-out")
+            rc, so, se = hp_at(copy, ["run", "--out", prefix, "--target", "127.0.0.1",
+                                      "--neigh", "--ip", fip, "--seconds", "1"])
+            files = [os.path.basename(x) for x in (prefix + ".events", prefix + ".meta.json")
+                     if os.path.exists(x)]
+            ck(cid, "%s refuses --neigh: exit 2, the reason, no file" % what,
+               (2, True, False, []),
+               (rc, "--neigh needs the address allowlist" in se, "Traceback" in se, files))
+        pr10 = P("a10")
+        rc, so, se = hp_at(os.path.join(P("abl-missing"), "tools", "hostprobe.py"),
+                           ["run", "--out", pr10, "--target", "127.0.0.1", "--tcp", str(PC),
+                            "--tcp-interval", "0.1", "--seconds", "0.4"])
+        produced.append(pr10)
+        a10 = rec_of(pr10)[3].get("addresses") or {}
+        ck("A10", "the same missing allowlist does NOT refuse a --tcp run, and its "
+                  "meta says the list was not loaded",
+           (0, False, True), (rc, a10.get("loaded"), bool(a10.get("why_not"))))
+        # A record version 1.0 wrote holds `ip`'s raw lladdr, and no record
+        # this suite makes can: they are all clean.  So `report`'s own gate
+        # is only visible on a planted one.
+        pr11 = P("a11")
+        with open(pr11 + ".events", "w", encoding="utf-8") as f:
+            f.write("# hostprobe 1.0: planted\n"
+                    "# probes target=10.1.1.1 icmp=- tcp=- neigh=0.2 udp=- "
+                    "seconds=1 until=-\n"
+                    "1.000000 start t_real=1.000000\n"
+                    "1.100000 neigh state=REACHABLE lladdr=%s\n"
+                    "2.000000 stop t_real=2.000000 reason=--seconds\n" % MA)
+        rc, so, se = hp(["report", pr11])
+        ck("A11", "report on a record 1.0 wrote, raw lladdr in it: the address is "
+                  "printed as a label",
+           (0, True, ([], [])),
+           (rc, "lladdr=unlisted-1" in so, leaks({"report": so + se}, (MA,))))
+        # argparse's own error line quotes the bad value and prints it itself.
+        rc, so, se = hp(["run", "--out", P("a12"), "--target", "127.0.0.1",
+                         "--tcp", MA.upper(), "--seconds", "1"])
+        ck("A12", "argparse's own error, quoting a bad --tcp value, goes through "
+                  "the gate: exit 2, labelled, no file",
+           (2, True, ([], []), False),
+           (rc, "invalid int value: 'unlisted-1'" in se,
+            leaks({"stdout": so, "stderr": se}, (MA,)),
+            os.path.exists(P("a12") + ".events")))
 
         # ---- R: refusals.  Each must be THIS refusal (its needle), exit 2, no
         # traceback, and leave no file -- a refusal for the wrong reason passes
@@ -2339,6 +2866,7 @@ def selftest(out=sys.stdout):
         ck("F0", "the format checks read the records of at least 18 runs", True,
            len(produced) >= 18)
         bad_lines, backwards, heads, missing, ends = [], [], [], [], []
+        undated = []
         for prefix in produced:
             name = os.path.basename(prefix)
             try:
@@ -2374,6 +2902,10 @@ def selftest(out=sys.stdout):
             if prefix == pc5:
                 continue            # killed on purpose: no meta by design
             meta = rec_of(prefix)[3]
+            when, why = capdate_when(prefix + ".meta.json")
+            if why or meta.get("start_real") is None or when.date() != \
+                    datetime.datetime.fromtimestamp(meta["start_real"]).date():
+                undated.append((name, why or str(when)))
             gaps = [k for k in REQUIRED_META if k not in meta]
             gaps += ["icmp_lag_ms." + k for k in REQUIRED_LAG
                      if k not in (meta.get("icmp_lag_ms") or {})]
@@ -2389,6 +2921,19 @@ def selftest(out=sys.stdout):
         ck("F4", "every record opens with the header naming CLOCK_MONOTONIC", [], heads)
         ck("F5", "one start first; one stop last, and none in the record killed "
                  "on purpose", [], ends)
+        # F6: dated the way capdate dates it -- ITS reader, loaded by path, so
+        # the two tools cannot drift apart -- on the day of start_real.  The
+        # negative half: the same reader refuses a meta with the key removed,
+        # which is what every 1.1 record was.
+        neg = P("f6-neg.meta.json")
+        if produced:
+            m1 = dict(rec_of(produced[0])[3])
+            m1.pop("started_wallclock", None)
+            with open(neg, "w", encoding="utf-8") as f:
+                json.dump(m1, f)
+        ck("F6", "every meta is dated by capdate's own reader, on start_real's "
+                 "day; without the key it is refused", ([], "no started_wallclock"),
+           (undated, capdate_when(neg)[1]))
     finally:
         for p in procs:
             if p.poll() is None:
@@ -2415,8 +2960,19 @@ def selftest(out=sys.stdout):
 
 
 # ------------------------------------------------------------------- main
+class _Parser(argparse.ArgumentParser):
+    """argparse's own error line quotes the offending value -- `invalid int
+    value: '...'` -- and prints it itself, past `say()`.  This routes it
+    through the gate (H11, A12).  Sub-parsers inherit the class."""
+
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        say("%s: error: %s" % (self.prog, message), err=True)
+        sys.exit(2)
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(
+    ap = _Parser(
         prog="hostprobe.py",
         description="host-side network events, stamped on CLOCK_MONOTONIC (P2-1)")
     ap.add_argument("--self-test", action="store_true",
@@ -2473,12 +3029,19 @@ def main(argv=None):
         ap.print_usage(sys.stderr)
         return 2
     except Refused as e:
-        print("hostprobe: %s" % e, file=sys.stderr)
+        say("hostprobe: %s" % e, err=True)
         return 2
     except KeyboardInterrupt:
-        print("hostprobe: interrupted before a run started; nothing was written",
-              file=sys.stderr)
+        say("hostprobe: interrupted before a run started; nothing was written",
+            err=True)
         return 2
+    except Exception as e:
+        if a.self_test:
+            raise
+        # A traceback prints an exception's message unfiltered, and a message
+        # can quote what it choked on; this line goes through the gate (H11).
+        say("hostprobe: internal error: %s" % _exc_line(e), err=True)
+        return 1
 
 
 if __name__ == "__main__":

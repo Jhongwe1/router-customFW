@@ -24,6 +24,14 @@
 # material at all: a refusal that costs a 480 MB copy is a refusal nobody
 # exercises.  C1 is the one that stages, and it stands down without a drop.
 #
+# 🔄 2026-09-23 (P2-2, CFG-3 / TC-i): the driver now runs `kconfig-delta check`
+# and `rlxfw-marks verify` after every build and fails one that is not green.
+# A1-A10 are the declared --absent inputs, refused above the stage; G1-G8 the
+# rule that turns a tool's exit status and RESULT line into a verdict; R0-R8
+# the two gates with the real tools on synthetic inputs, down to the line
+# looprun's S2 reads; I1-I10 the initramfs recorded by CONTENT, not by spec
+# text.  All of them run anywhere bash and python3 do.
+#
 # Usage:  tools/test-kbuild-cflags.sh
 set -o nounset
 
@@ -278,6 +286,9 @@ MTMP="$(mktemp -d)"
 sed -n '/^write_manifest() {/,/^}$/p' "$K" > "$MTMP/fn.sh"
 ck "C8 write_manifest is extractable as one function" \
    "1" "$(grep -c '^}$' "$MTMP/fn.sh")"
+# Format 2 (CFG-3) writes `verdict` through overall_verdict, the one rule
+# the exit status also comes from, so the harness sources both.
+sed -n '/^overall_verdict() {/,/^}$/p' "$K" >> "$MTMP/fn.sh"
 
 printf 'INSTALLED-BYTES\n'  > "$MTMP/c.config-installed"
 printf 'BUILT-BYTES-DIFFER\n' > "$MTMP/c.config-built"
@@ -327,7 +338,403 @@ ck "C13 no --initramfs records a dash, not an empty field" \
 run_manifest /p "$MTMP/c.initramfs.spec" 3 11
 ck "C14 and with one, the digest comes from the driver's own .sha256 file" \
    "aaaa" "$(field initramfs_sha256)"
+# C15 -- CFG-3's negative control at the level of the record: a manifest
+# written when NO gate ran must not be able to read green.  Every verdict
+# field is `-`, and `verdict` says not-green rather than inheriting a default.
+ck "C15 no gate run -> the manifest's verdict is not-green, never green" \
+   "not-green/-/-" \
+   "$(field verdict)/$(field kconfig_check)/$(field marks_verify)"
+ck "C16 the manifest says format 2" "2" \
+   "$(awk -F'\t' '$1 == "rlxfw-build-manifest" { print $2 }' "$MTMP/c.manifest")"
 rm -rf "$MTMP"
+
+echo
+echo "=== A1-A10: the declared --absent inputs, checked above the stage (CFG-3) ==="
+# rlxfw-marks verify reads vendor kernels as --absent, and until P2-2 nothing
+# declared which: the path lived in a runsheet row and in the operator's
+# shell.  tools/rlxfw-marks-absent.tsv declares them by path, size and sha256,
+# and the driver refuses a build whose references do not verify -- before the
+# stage, so a refusal costs no 480 MB copy.
+#
+# Everything here is synthetic: a fake $FWRE_WORK holding two small files and
+# a fake repository (RLXFW_REPO) holding the two declarations the guards above
+# need plus a test declaration.  With no drop under the fake $FWRE_WORK, a run
+# that gets PAST the guard stops at the next refusal, `no drop at` -- which is
+# what A7 asserts, the way C6 asserts on a later message.
+AT="$(mktemp -d)"
+FW="$AT/work"; RP="$AT/repo"
+mkdir -p "$FW/rebuild/ref" "$RP/config" "$RP/tools"
+cp "$CF" "$RP/config/rlxfw-cflags"
+cp "$SF" "$RP/config/rlxfw-build-stamp"
+AD="$RP/tools/rlxfw-marks-absent.tsv"
+printf 'the first synthetic vendor kernel\n' > "$FW/rebuild/ref/a.bin"
+printf 'the second one, a different kernel\n' > "$FW/rebuild/ref/b.bin"
+cp "$FW/rebuild/ref/a.bin" "$AT/a.orig"
+SA="$(sha256sum "$FW/rebuild/ref/a.bin" | cut -d' ' -f1)"; NA="$(stat -c %s "$FW/rebuild/ref/a.bin")"
+SB="$(sha256sum "$FW/rebuild/ref/b.bin" | cut -d' ' -f1)"; NB="$(stat -c %s "$FW/rebuild/ref/b.bin")"
+good_decl () {
+    printf '# a test declaration\n# name\trelpath\tbytes\tsha256\trole\n'
+    printf 'ref-a\trebuild/ref/a.bin\t%s\t%s\tthe first\n' "$NA" "$SA"
+    printf 'ref-b\trebuild/ref/b.bin\t%s\t%s\tthe second\n' "$NB" "$SB"
+}
+arun () {   # the real driver, the default --target, the fake inputs
+    out="$(FWRE_WORK="$FW" RLXFW_REPO="$RP" bash "$K" "$@" 2>&1)"; rc=$?
+}
+has () { printf '%s\n' "$out" | grep -c -- "$1"; }
+
+arun gcf-a1 --variant quiet
+ck "A1 no declaration file -> refuse"                     3 "$rc"
+ck "A1b and it says what the file is for"                 1 "$(has 'It declares the vendor kernels')"
+ck "A1c and it stopped there, not at the drop check"      0 "$(has 'no drop at')"
+
+good_decl > "$AD"; rm "$FW/rebuild/ref/b.bin"
+arun gcf-a2 --variant quiet
+ck "A2 a declared file missing -> refuse, naming it"      "3/1/0" "$rc/$(has 'ref-b: no file at \$FWRE_WORK/rebuild/ref/b.bin')/$(has 'no drop at')"
+printf 'the second one, a different kernel\n' > "$FW/rebuild/ref/b.bin"
+
+# One byte changed, same size: only the digest can see it.
+printf 'The first synthetic vendor kernel\n' > "$FW/rebuild/ref/a.bin"
+arun gcf-a3 --variant quiet
+ck "A3 one byte changed, same size -> refuse on sha256"   "3/1/0" "$rc/$(has 'ref-a: .* has sha256 ')/$(has 'no drop at')"
+printf 'the first synthetic vendor kernel\nX' > "$FW/rebuild/ref/a.bin"
+arun gcf-a4 --variant quiet
+ck "A4 another size -> refuse on bytes"                   "3/1/0" "$rc/$(has "is $((NA+1)) bytes, the declaration says $NA")/$(has 'no drop at')"
+cp "$AT/a.orig" "$FW/rebuild/ref/a.bin"
+
+printf '# only a comment\n\n' > "$AD"
+arun gcf-a5 --variant quiet
+ck "A5 a comments-only declaration -> refuse"             "3/1/0" "$rc/$(has 'declares no reference image')/$(has 'no drop at')"
+{ good_decl; printf 'ref-c\trebuild/ref/c.bin\t12\t%s\n' "$SA"; } > "$AD"
+arun gcf-a5b --variant quiet
+ck "A5b a four-field row is refused, not skipped"         "3/1/0" "$rc/$(has '4 tab-separated field(s), expected 5')/$(has 'no drop at')"
+# A5c -- relpaths are relative to $FWRE_WORK and stay under it.  An absolute
+# path makes the declaration a fact about one desk, and `..` can reach into
+# a tree the vendor-bytes rules keep this list out of.
+{ good_decl
+  printf 'ref-d\t/etc/hostname\t1\t%s\tabsolute\n' "$(printf '%064d' 1)"
+  printf 'ref-e\trebuild/../../x.bin\t1\t%s\tclimbs\n' "$(printf '%064d' 2)"; } > "$AD"
+arun gcf-a5c --variant quiet
+ck "A5c an absolute or climbing relpath is refused"        "3/2/0" "$rc/$(has 'is not a path under')/$(has 'no drop at')"
+
+# 🔴 P6 counted one kernel twice for a day (2026-08-28/29): two of its three
+# "vendor artefacts" were the same bytes.  A second row with the first row's
+# digest is refused, whatever it is called and wherever it lives.
+cp "$FW/rebuild/ref/a.bin" "$FW/rebuild/ref/a-copy.bin"
+{ good_decl; printf 'ref-c\trebuild/ref/a-copy.bin\t%s\t%s\ta copy\n' "$NA" "$SA"; } > "$AD"
+arun gcf-a6 --variant quiet
+ck "A6 two rows with one digest -> refuse"                "3/1/0" "$rc/$(has 'one artefact counted twice')/$(has 'no drop at')"
+
+# A9 before A7 and A8, which do get past the guard: every refusal above fired
+# before the driver created anything.
+ck "A9 the refusals created nothing under \$FWRE_WORK"    "absent" \
+   "$( [ -e "$FW/rebuild/r3-4" ] && echo present || echo absent )"
+
+# A8 -- the placement control.  --target none builds nothing, so there is no
+# gate to feed; the guard must not fire even with NO declaration at all.
+rm -f "$AD"
+arun gcf-a8 --variant quiet --target none
+ck "A8 --target none with no declaration is not refused by this guard" \
+   "3/0/1/1" "$rc/$(has 'It declares the vendor kernels')/$(has 'nothing is built, so no gate runs')/$(has 'no drop at')"
+
+# A7 -- the positive control.  Without it A1-A6 would pass against a guard
+# that refused everything.
+good_decl > "$AD"
+arun gcf-a7 --variant quiet
+ck "A7 a declaration that verifies gets past the guard"   "1/1/0" \
+   "$(has '--absent references verified')/$(has 'no drop at')/$(has 'problem(s) in the declared')"
+ck "A7b and it names each reference by digest"            1 \
+   "$(has "ref-a ${SA:0:16} ref-b ${SB:0:16}")"
+
+# A10 -- the COMMITTED declaration parses to its two rows.  Under this empty
+# $FWRE_WORK both are missing, so the refusal names both relpaths -- which is
+# a statement about the file's shape that needs no vendor byte and runs on a
+# runner.  Whether the files on the desk match it is what every real build
+# now checks.
+cp "$REPO/tools/rlxfw-marks-absent.tsv" "$AD"
+arun gcf-a10 --variant quiet
+ck "A10 the committed declaration: two rows, both named"  "3/2/1/1" \
+   "$rc/$(has 'no file at')/$(has 'unit-kernel: no file at \$FWRE_WORK/rebuild/b4c-desk/vmlinux-rederived.bin')/$(has 'drop-kernel: no file at \$FWRE_WORK/rebuild/src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/vmlinux_img')"
+rm -rf "$AT"
+
+echo
+echo "=== G1-G8: gate_verdict -- a verdict needs its RESULT line ==="
+# Both gate tools exit 1 for red, and so does an uncaught Python exception.
+# Status alone would file a crashed checker as a red build and a silent exit 0
+# as green.
+GT="$(mktemp -d)"
+sed -n '/^gate_verdict() {/,/^}$/p' "$K" > "$GT/fn.sh"
+gv () {   # gv <rc> <file> -> "<verdict>|<text>"
+    ( . "$GT/fn.sh"; gate_verdict "$1" "$2" | tr '\t' '|' )
+}
+printf 'controls\n  ok  C1\n\nRESULT: \033[32mall 12 mark(s) present\033[0m\n' > "$GT/green"
+ck "G1 rc 0 and one RESULT -> green, SGR escapes removed" \
+   "green|RESULT: all 12 mark(s) present" "$(gv 0 "$GT/green")"
+printf 'RESULT: \033[31mREFUSED\033[0m -- 2 undeclared, 0 mismatched, 0 not applied.\n' > "$GT/red"
+ck "G2 rc 1 and one RESULT -> red" \
+   "red|RESULT: REFUSED -- 2 undeclared, 0 mismatched, 0 not applied." "$(gv 1 "$GT/red")"
+printf 'kconfig-delta: --baseline x hashes 1234 and the delta declares 5678\n' > "$GT/die"
+ck "G3 rc 3 and no RESULT -> refused, with the tool's last line" \
+   "refused|0 RESULT line(s) at rc=3; last line: kconfig-delta: --baseline x hashes 1234 and the delta declares 5678" \
+   "$(gv 3 "$GT/die")"
+printf 'Traceback (most recent call last):\n  File "x", line 1\nFileNotFoundError: [Errno 2] No such file\n' > "$GT/tb"
+ck "G4 rc 1 with no RESULT (a traceback) -> refused, NOT red" \
+   "refused" "$(gv 1 "$GT/tb" | cut -d'|' -f1)"
+printf 'said nothing\n' > "$GT/silent"
+ck "G5 rc 0 with no RESULT -> refused, NOT green" \
+   "refused" "$(gv 0 "$GT/silent" | cut -d'|' -f1)"
+printf 'RESULT: one\nRESULT: two\n' > "$GT/two"
+ck "G6 rc 0 with two RESULT lines -> refused" \
+   "refused" "$(gv 0 "$GT/two" | cut -d'|' -f1)"
+printf 'RESULT: a\tb\r\n' > "$GT/tab"
+ck "G7 a tab and a CR in the RESULT line do not reach the manifest" \
+   "green|RESULT: a b" "$(gv 0 "$GT/tab")"
+ck "G8 a missing log is refused, not a crash" \
+   "refused" "$(gv 0 "$GT/nonexistent" | cut -d'|' -f1)"
+rm -rf "$GT"
+
+echo
+echo "=== R1-R8: the two gates with the REAL tools, on synthetic inputs ==="
+# run_gates, write_manifest and finish_build are extracted and sourced -- the
+# C8 reason: a build is 35 s -- but the gate tools are the real
+# tools/kconfig-delta.py and tools/rlxfw-marks.py, so a RESULT line that
+# changed shape, or an exit status that moved, turns these red.  Every input
+# is a few bytes written here: a baseline whose sha256 the delta declares, a
+# one-row marks declaration, an "image" holding the mark once, and a fake
+# $FWRE_WORK holding one reference.
+RT="$(mktemp -d)"
+for f in absent_refs gate_verdict run_gates overall_verdict write_manifest finish_build; do
+    sed -n "/^$f() {/,/^}\$/p" "$K" >> "$RT/fns.sh"
+done
+ck "R0 the six functions are extractable" "6" "$(grep -c '^}$' "$RT/fns.sh")"
+printf '#\n# synthetic baseline\n#\nCONFIG_A=y\n# CONFIG_B is not set\n' > "$RT/base.config"
+BSHA="$(sha256sum "$RT/base.config" | cut -d' ' -f1)"
+{ printf '# baseline-sha256: %s\n' "$BSHA"
+  printf 'set\tCONFIG_B\tn\ty\t-\trlxfw turns B on\n'
+  printf 'set@loud\tCONFIG_L\t-\ty\t-\tthe loud image only\n'; } > "$RT/delta"
+printf 'CONFIG_A=y\nCONFIG_B=y\n'             > "$RT/built-quiet"
+printf 'CONFIG_A=y\nCONFIG_B=y\nCONFIG_L=y\n' > "$RT/built-loud"
+printf 'CONFIG_A=y\nCONFIG_B=y\nCONFIG_X=y\n' > "$RT/built-undeclared"
+printf '# id\tfile\tposition\tanchor\tinsert\twitness\treason\nB00\tinit/main.c\tafter\tstart_kernel();\trlxfw_mark("B00");\t\tthe first mark\n' > "$RT/marks.tsv"
+printf 'head RLXFW-B00\n tail' > "$RT/marked.elf"
+printf 'head, and no mark\n'   > "$RT/unmarked.elf"
+printf '80000000 T _text\n'    > "$RT/System.map"
+mkdir -p "$RT/work/rebuild/ref"
+refdecl () {   # refdecl <file under $RT/work> <declaration out>
+    printf 'vendor\t%s\t%s\t%s\ta synthetic vendor kernel\n' "$1" \
+        "$(stat -c %s "$RT/work/$1")" "$(sha256sum "$RT/work/$1" | cut -d' ' -f1)" > "$2"
+}
+printf 'a vendor kernel\n'            > "$RT/work/rebuild/ref/vendor.bin"
+printf 'a vendor kernel RLXFW-B00\n'  > "$RT/work/rebuild/ref/dirty.bin"
+refdecl rebuild/ref/vendor.bin "$RT/absent.tsv"
+refdecl rebuild/ref/dirty.bin  "$RT/absent-dirty.tsv"
+PY3=/usr/bin/python3
+gates () {   # gates <built|-> <image> <variant> <absent decl> <build rc> [hook]
+    rm -f "$RT"/c.* "$RT"/fin.*
+    (
+        log="$RT/c"; CELL=rcell; RECIPE_ID=deadbeef; CONFIG=""; VARIANT="$3"
+        INITRAMFS=""; CFLAGS_KERNEL=-fno-if-conversion; ID_SCOPE=global
+        OLDCONFIG=devnull; TARGET=vmlinux; JOBS=4; KEEP=0; STAMP_EPOCH=1788220800
+        N_PATCHES=7; N_MARKS=25; DROP=/x/rtl819x-toolchain; PY="$PY3"
+        TEMPLATE="$RT/base.config"; DELTA_FILE="$RT/delta"; MARKS_DECL="$RT/marks.tsv"
+        KDELTA="$REPO/tools/kconfig-delta.py"; MARKSPY="$REPO/tools/rlxfw-marks.py"
+        FWRE_WORK="$RT/work"; ABSENT_DECL="$4"
+        ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
+        [ "$1" = - ] || cp "$1" "$log.config-built"
+        cp "$2" "$log.vmlinux.elf"; cp "$RT/System.map" "$log.System.map"
+        printf 'INSTALLED\n' > "$log.config-installed"
+        . "$RT/fns.sh"
+        [ -n "${6:-}" ] && eval "$6"
+        BUILD_RC="$5"
+        run_gates > "$RT/fin.gates" 2>&1
+        write_manifest "$log.vmlinux.elf"
+        finish_build > "$RT/fin.out" 2> "$RT/fin.err"
+        echo "$?" > "$RT/fin.rc"
+    )
+}
+mf () { awk -F'\t' -v k="$1" '$1 == k { print $2 }' "$RT/c.manifest"; }
+# looprun's OWN regex, read out of looprun.py rather than restated here: a
+# copy would be a second owner of what S2 accepts.
+mrx () {
+    "$PY3" - "$REPO/tools/looprun.py" "$RT/fin.out" <<'PYEOF'
+import re, sys
+rx = [l for l in open(sys.argv[1], encoding="utf-8").read().splitlines()
+      if l.startswith("MANIFEST_RX = ")]
+if len(rx) != 1:
+    print("no MANIFEST_RX in looprun.py"); sys.exit(0)
+ns = {"re": re}
+exec(rx[0], ns)
+print(1 if ns["MANIFEST_RX"].search(open(sys.argv[2], encoding="utf-8").read()) else 0)
+PYEOF
+}
+fin () { cat "$RT/fin.rc"; }
+
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0
+ck "R1 both gates green -> green/0, green/0, verdict green" \
+   "green/0/green/0/green" \
+   "$(mf kconfig_check)/$(mf kconfig_check_rc)/$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)"
+ck "R1b and the driver exits 0 with a line looprun's MANIFEST_RX reads" \
+   "0/1" "$(fin)/$(mrx)"
+ck "R1c each RESULT line is recorded, escapes removed" \
+   "RESULT: every difference between the vendor template and the .config this build used is on the list" \
+   "$(mf kconfig_check_result)"
+ck "R1d verify's RESULT names the one reference it was given" 1 \
+   "$(mf marks_verify_result | grep -c 'absent from 1 vendor artefact(s)$')"
+ck "R1e marks_verify_absent is name=sha256 of that reference" \
+   "vendor=$(sha256sum "$RT/work/rebuild/ref/vendor.bin" | cut -d' ' -f1)" \
+   "$(mf marks_verify_absent)"
+
+gates "$RT/built-undeclared" "$RT/marked.elf" quiet "$RT/absent.tsv" 0
+ck "R2 an undeclared .config difference -> kconfig_check red, rc 1" \
+   "red/1/not-green" "$(mf kconfig_check)/$(mf kconfig_check_rc)/$(mf verdict)"
+ck "R2b and its RESULT line is the tool's, verbatim" \
+   "RESULT: REFUSED -- 1 undeclared, 0 mismatched, 0 not applied." "$(mf kconfig_check_result)"
+ck "R2c exit 6, NO line MANIFEST_RX reads, and the red record is kept" \
+   "6/0/present" "$(fin)/$(mrx)/$( [ -f "$RT/c.manifest" ] && echo present || echo absent )"
+
+gates "$RT/built-quiet" "$RT/unmarked.elf" quiet "$RT/absent.tsv" 0
+ck "R3 the mark missing from the image -> marks_verify red, exit 6" \
+   "red/1/6/0" "$(mf marks_verify)/$(mf marks_verify_rc)/$(fin)/$(mrx)"
+
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-dirty.tsv" 0
+ck "R4 the mark present in the reference -> marks_verify red" \
+   "red/6" "$(mf marks_verify)/$(fin)"
+
+# R5 -- --variant reaches the check.  The delta has a @loud row, so the loud
+# .config is green under loud and RED with no variant (a --config build).
+gates "$RT/built-loud" "$RT/marked.elf" loud "$RT/absent.tsv" 0
+ck "R5 --variant loud: the loud .config is green, variant recorded" \
+   "green/loud" "$(mf kconfig_check)/$(mf variant)"
+gates "$RT/built-loud" "$RT/marked.elf" "" "$RT/absent.tsv" 0
+ck "R5b no variant (a --config build): the same file is red, variant -" \
+   "red/-" "$(mf kconfig_check)/$(mf variant)"
+
+gates - "$RT/marked.elf" quiet "$RT/absent.tsv" 0
+ck "R6 no .config-built -> refused, rc -, and the tool was not run" \
+   "refused/-/absent" \
+   "$(mf kconfig_check)/$(mf kconfig_check_rc)/$( [ -f "$RT/c.kconfig-check.log" ] && echo present || echo absent )"
+
+# R7 -- the point-of-use check.  The reference changes after the declaration
+# was written (the hook runs just before run_gates), so verify is refused
+# rather than run against bytes nobody declared.
+cp "$RT/work/rebuild/ref/vendor.bin" "$RT/vendor.orig"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'printf "a vendor kernel, edited\n" > "$RT/work/rebuild/ref/vendor.bin"'
+ck "R7 a reference changed before use -> marks_verify refused, rc -" \
+   "refused/-/6" "$(mf marks_verify)/$(mf marks_verify_rc)/$(fin)"
+cp "$RT/vendor.orig" "$RT/work/rebuild/ref/vendor.bin"
+
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 2
+ck "R8 build step not 0 (rc 2), both gates green -> exit 2, no line" \
+   "green/green/not-green/2/0" \
+   "$(mf kconfig_check)/$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)"
+rm -rf "$RT"
+
+echo
+echo "=== I1-I10: the initramfs, recorded by CONTENT (2026-09-23) ==="
+# 量 2026-09-23: `initramfs_sha256` digests the spec -- paths, modes, owners --
+# and _irfs-s100a and _irfs-p2 hold byte-identical specs whose /init differ
+# (988 against 2,153 bytes).  mkinitramfs writes the content record beside
+# each spec, <name>.spec -> <name>.manifest.tsv; the driver now refuses a spec
+# without one ABOVE --dry-run, copies it beside the cell's copied spec, and
+# digests the copy as `initramfs_manifest_sha256`.  All synthetic: the guard
+# is reached by --dry-run, the key by the write_manifest harness, and the copy
+# by one run against a fake drop (--oldconfig none, --target none) whose only
+# "toolchain" is a file nothing executes.
+IT="$(mktemp -d)"
+mkdir -p "$IT/ok" "$IT/bare" "$IT/cellrec" "$IT/mixed"
+spec_text () { printf 'dir /bin 0755 0 0\nfile /init %s 0755 0 0\n' "$1"; }
+spec_text /src/init > "$IT/ok/rlxfw-initramfs.spec"
+printf '# path\tkind\tbytes\tsha256\towner\tsource\n/init\tfile\t988\t%064d\trlxfw\t$REPO/init\n' 1 \
+    > "$IT/ok/rlxfw-initramfs.manifest.tsv"
+spec_text /src/init > "$IT/bare/rlxfw-initramfs.spec"
+spec_text /src/init > "$IT/cellrec/c9.initramfs.spec"
+cp "$IT/ok/rlxfw-initramfs.manifest.tsv" "$IT/cellrec/c9.initramfs.manifest.tsv"
+spec_text /src/init > "$IT/mixed/c9.initramfs.spec"
+cp "$IT/ok/rlxfw-initramfs.manifest.tsv" "$IT/mixed/rlxfw-initramfs.manifest.tsv"
+spec_text /src/init > "$IT/ok/spec-without-suffix"
+
+run gcf-i1 --variant quiet --initramfs "$IT/ok/rlxfw-initramfs.spec" --dry-run
+ck "I1 a spec with its content record beside it passes" "0/1" \
+   "$rc/$(printf '%s\n' "$out" | grep -c -- "initramfs contents <- $IT/ok/rlxfw-initramfs.manifest.tsv")"
+run gcf-i2 --variant quiet --initramfs "$IT/bare/rlxfw-initramfs.spec" --dry-run
+ck "I2 no record beside the spec -> 3, before the dry-run exit" "3/1/0" \
+   "$rc/$(printf '%s\n' "$out" | grep -c -- "no $IT/bare/rlxfw-initramfs.manifest.tsv beside the spec")/$(printf '%s\n' "$out" | grep -c 'nothing staged and nothing built')"
+run gcf-i3 --variant quiet --initramfs "$IT/nowhere/rlxfw-initramfs.spec" --dry-run
+ck "I3 no spec at all -> 3, and it says the SPEC is missing" "3/1" \
+   "$rc/$(printf '%s\n' "$out" | grep -c 'no initramfs spec at')"
+run gcf-i4 --variant quiet --initramfs "$IT/ok/spec-without-suffix" --dry-run
+ck "I4 a spec not named <name>.spec -> 3" "3/1" \
+   "$rc/$(printf '%s\n' "$out" | grep -c 'is not <name>.spec')"
+# I5 -- the record is paired with the spec by NAME, which is what lets a cell's
+# own recorded pair be an input again: <cell>.initramfs.spec beside the
+# <cell>.initramfs.manifest.tsv this driver now writes.  I5b is its negative: a
+# record under another name in the same directory does not count, or one record
+# could vouch for every spec beside it.
+run gcf-i5 --variant quiet --initramfs "$IT/cellrec/c9.initramfs.spec" --dry-run
+ck "I5 a cell's recorded pair (<cell>.initramfs.*) is a valid input" "0" "$rc"
+run gcf-i5b --variant quiet --initramfs "$IT/mixed/c9.initramfs.spec" --dry-run
+ck "I5b and a record under ANOTHER name beside it is not" "3" "$rc"
+
+# I6-I9 -- the key, through the extracted write_manifest.
+sed -n '/^write_manifest() {/,/^}$/p;/^overall_verdict() {/,/^}$/p' "$K" > "$IT/fn.sh"
+irman () {   # irman <spec or ''> <record copy or ''> -> $IT/c.manifest
+    rm -f "$IT"/c.*
+    printf 'INSTALLED\n' > "$IT/c.config-installed"
+    printf 'ELF\n' > "$IT/vm"
+    if [ -n "$1" ]; then sha256sum "$1" | cut -d' ' -f1 > "$IT/c.initramfs.spec.sha256"; fi
+    if [ -n "$2" ]; then cp "$2" "$IT/c.initramfs.manifest.tsv"; fi
+    (
+        log="$IT/c"; CELL=cell; RECIPE_ID=deadbeef; CONFIG=""; INITRAMFS="$1"
+        CFLAGS_KERNEL=-fno-if-conversion; ID_SCOPE=global; OLDCONFIG=devnull
+        TARGET=vmlinux; JOBS=4; KEEP=0; STAMP_EPOCH=1788220800; N_PATCHES=7
+        N_MARKS=25; DROP=/x/rtl819x-toolchain
+        . "$IT/fn.sh"
+        write_manifest "$IT/vm"
+    )
+}
+imf () { awk -F'\t' -v k="$1" '$1 == k { print $2 }' "$IT/c.manifest"; }
+irman "$IT/ok/rlxfw-initramfs.spec" "$IT/ok/rlxfw-initramfs.manifest.tsv"
+ck "I6 initramfs_manifest_sha256 is the digest of the record's copy" \
+   "$(sha256sum "$IT/ok/rlxfw-initramfs.manifest.tsv" | cut -d' ' -f1)" \
+   "$(imf initramfs_manifest_sha256)"
+irman "" ""
+ck "I7 no --initramfs -> a dash" "-" "$(imf initramfs_manifest_sha256)"
+irman "$IT/ok/rlxfw-initramfs.spec" ""
+ck "I8 --initramfs with no record copy -> missing, not a dash" \
+   "missing" "$(imf initramfs_manifest_sha256)"
+# I9 -- the finding itself, as a control.  Two specs identical in text, two
+# records differing in one file's contents: the spec digest cannot tell them
+# apart and the content digest must.
+sed 's/\t988\t[0-9]*\t/\t2153\t0000000000000000000000000000000000000000000000000000000000000002\t/' \
+    "$IT/ok/rlxfw-initramfs.manifest.tsv" > "$IT/other.manifest.tsv"
+irman "$IT/ok/rlxfw-initramfs.spec" "$IT/ok/rlxfw-initramfs.manifest.tsv"
+i9s1="$(imf initramfs_sha256)"; i9m1="$(imf initramfs_manifest_sha256)"
+irman "$IT/bare/rlxfw-initramfs.spec" "$IT/other.manifest.tsv"
+i9s2="$(imf initramfs_sha256)"; i9m2="$(imf initramfs_manifest_sha256)"
+ck "I9 identical spec text, different contents: only the content digest moves" \
+   "spec-same/contents-differ" \
+   "$( [ "$i9s1" = "$i9s2" ] && echo spec-same || echo spec-differ )/$( [ "$i9m1" != "$i9m2" ] && echo contents-differ || echo contents-same )"
+
+# I10 -- the copy, made by the driver's own main flow, against a fake drop.
+FWI="$IT/work"; RPI="$IT/repo"
+DRI="$FWI/rebuild/src-vendor/rtl819x-toolchain"
+mkdir -p "$DRI/linux-2.6.30/usr" "$DRI/boards/rtl8196e" \
+         "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin" "$RPI/config"
+printf '# a fake board template\n' > "$DRI/boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW"
+printf '#!/bin/sh\nexit 1\n' > "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin/rsdk-linux-gcc"
+chmod +x "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin/rsdk-linux-gcc"
+cp "$CF" "$RPI/config/rlxfw-cflags"; cp "$SF" "$RPI/config/rlxfw-build-stamp"
+printf '# a fake SDK config\n' > "$RPI/config/rlxfw-sdk.config"
+printf 'CONFIG_BLK_DEV_INITRD=y\nCONFIG_INITRAMFS_SOURCE="usr/rlxfw-initramfs.spec"\n' > "$IT/fake.config"
+irun () { out="$(FWRE_WORK="$FWI" RLXFW_REPO="$RPI" bash "$K" "$@" --oldconfig none --target none 2>&1)"; rc=$?; }
+IOUT="$FWI/rebuild/r3-4/out/gcf-i10"
+irun gcf-i10 --config "$IT/fake.config" --initramfs "$IT/ok/rlxfw-initramfs.spec"
+ck "I10 the build copies the record beside the copied spec" "0/same" \
+   "$rc/$(cmp -s "$IT/ok/rlxfw-initramfs.manifest.tsv" "$IOUT.initramfs.manifest.tsv" && echo same || echo differs)"
+irun gcf-i10 --config "$IT/fake.config"
+ck "I10b rebuilt without --initramfs: no earlier initramfs record stands" "0/0" \
+   "$rc/$(ls "$IOUT".initramfs.* 2>/dev/null | wc -l)"
+rm -rf "$IT"
 
 echo
 echo "=== the declaration is back, byte for byte ==="

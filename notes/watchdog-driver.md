@@ -650,7 +650,7 @@ or EOF — can change the result"*) and had been wrong for two days.
 🔴 **Why nothing caught it**: `kconfig-delta check` is not run by
 `rlxfw-kbuild.sh` and has to be typed. That is the same shape as `LOG.md`'s
 note that `rlxfw-marks verify` is never run automatically either — **two gates
-that exist, work, and are not on any path**. Carried forward as `CFG-3` (renamed from `CFG-2` 2026-09-16, `R1z-2`).
+that exist, work, and are not on any path**. Carried forward as `CFG-3` (renamed from `CFG-2` 2026-09-16, `R1z-2`). 🟢 2026-09-23 (`P2-2`): both are on the build path now, and a build whose gates are not both green exits 6 (`notes/kernel-build.md` § 6.7, `SPEC.md` `FW-121`).
 
 ### 8.1 The prediction this segment's own build has to satisfy
 

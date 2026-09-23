@@ -546,7 +546,7 @@ jobs:
       # and neither was visible to any of the 23 cases that existed then.
       - name: cardcheck mutation suite
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
-        run: /usr/bin/python3 tools/test-cardcheck-mutants.py 2>&1 | tee ci-out/test-cardcheck-mutants.out; exit "${PIPESTATUS[0]}"
+        run: /usr/bin/python3 tools/test-cardcheck-mutants.py --jobs 8 2>&1 | tee ci-out/test-cardcheck-mutants.out; exit "${PIPESTATUS[0]}"
       # replay-capture turns a committed .log + .timing back into the terminal
       # it came from, so R3-11's artefact is DERIVED from evidence rather than
       # recorded beside it. Its R4 is the reason it is worth a suite: W-3, X-3
@@ -726,7 +726,7 @@ jobs:
 
       - name: audit-bench-log (exit-code gate)
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
-        run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f -name '*.log')
+        run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f \( -name '*.log' -o -name '*.events' \))
 
       # 🔴 `check-predictions.py --sweep bench` IS NOT HERE, and the reason is
       # the whole point of the tool. A step was written for it on 2026-08-29
@@ -759,12 +759,12 @@ jobs:
       # ends with a ⚠️ naming this check as missing; three consecutive
       # seatings hit rule 3 and a human caught all three.
       #
-      # 量 on its first sweep of the real corpus: 25 directories, 762
-      # captures, and TWO reds that had been in the record since 2026-08-29 --
-      # bench/2026-08-30 and 2026-08-30b, whose captures were all taken on
-      # 08-29. They are declared by name in KNOWN_MISNAMED and the list is
-      # swept in both directions, so an entry that stops applying is an error
-      # rather than a comfort.
+      # 量 on its first sweep: bench/2026-08-30 and -30b, all captured 08-29,
+      # declared by name in KNOWN_MISNAMED. 🔄 2026-09-23 (P2-2, CAPD-1): the
+      # same run checks each CARD's **declared date** (D5-D10); its first
+      # sweep found B35 declaring 09-21 while every dated capture its cells
+      # fence ran 09-20 (KNOWN_CARD_DATE). Both lists are swept both ways, so
+      # an entry that stops applying is an error rather than a comfort.
       - name: capdate
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/capdate.py bench 2>&1 | tee ci-out/capdate.out; exit "${PIPESTATUS[0]}"

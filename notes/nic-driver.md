@@ -1606,7 +1606,7 @@ is the whole of the change. The assembled `nfjrom` is **1,180,672** bytes,
 (`eee556f46adf9c06…` against `a038044da964b833…`): `FW-99`'s lesson a second
 time, that a size cannot tell two images apart here. The initramfs spec's
 sha256 is **`7130245fbcd92afc…`, byte-identical to `s31L`'s**, which is the
-control that says only the kernel differs.
+control that says only the kernel differs. 🔴 2026-09-23: that digest covers the spec's text -- paths, modes, owners -- and not what is packed, so it could not say this; the two builds' `mkinitramfs` content records can, and over their entries they agree (`ee7acf8b…` for both), so the sentence stands on that reading instead (`notes/kernel-build.md` § 9, `SPEC.md` `FW-123`).
 
 ⚠️ **And `s32a`'s own counters say it is aimed at something that did not
 happen.** `n_tx_full` read **0**: the ring never filled, so the vendor-contract
@@ -2314,7 +2314,7 @@ NIC discards them in hardware* — and the host's own `ip -s -s link` reads
 ⚠️ **Every `asicCounter` reading here was taken AFTER the fault.** There is no
 healthy baseline to difference against, so *the fault caused this* and *it has
 always read this way* are not separated. That is the residual's first item and
-it costs no power.
+it costs no power. 🔄 **2026-09-23 (`P2-2`): "no healthy baseline" overstated it.** Committed healthy readings exist and were not cited: 量 `bench/2026-09-20/D12-AC0`, after a recovery with ping answering, reads the CPU port's `Rcv 0 bytes` with `CRCAlignErr 21` = the driver's `n_tx 21`, and port 3 `Snd 1914 bytes`; `2026-09-20b/X2-asic` (`NET-65`, 217 = 217) and `2026-09-21e/V1-ACNT` read the same way. So *CPU ingress `Rcv 0` while `CRCAlignErr` tracks TX* is the healthy state and not the fault's signature. What is still missing is a fresh boot's same-instant pair of driver dump and `asicCounter`: card A's `P1-N0` → `P1-AC0`.
 
 ### 17.4 🔴 `NET-78`'s state was transient tonight
 

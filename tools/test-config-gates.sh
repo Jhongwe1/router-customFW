@@ -197,7 +197,7 @@ PY
 # if/endif nesting tracked, not guessed, and the build agreed.  The fifth,
 # CONFIG_GPIO_SYSFS, is a CORRECTION and not part of R5-6: 量, it had been an
 # undeclared difference in r54b, r55b and spi11 since CONFIG_GPIOLIB went in on
-# 2026-09-06, because `kconfig-delta check` is never run by rlxfw-kbuild.sh.
+# 2026-09-06, because `kconfig-delta check` was not run by rlxfw-kbuild.sh (it is since 2026-09-23, CFG-3).
 # 🔴 THIS SUITE IS WHY THAT SEGMENT'S CLOSEOUT WAS INCOMPLETE.  It names the
 # suites whose CODE it touched and ran those; test-config-gates owns the two
 # files it touched most and was not among them, so four hardcoded shapes went

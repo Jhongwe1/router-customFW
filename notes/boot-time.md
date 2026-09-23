@@ -136,8 +136,21 @@ The host's half: the first ICMP echo reply (`D8`), the first TCP success on a
 daemon's port (`D4`), neighbour-table changes, and UDP arrivals, each stamped
 `t_mono` on the same clock and written one line per event to `PREFIX.events`,
 flushed per line; `PREFIX.meta.json` closes the record. No packet contents and no
-frames are kept. ICMP goes through the system `ping`, whose own `-D` realtime stamp
-is kept beside the probe's read time — the second clock the lag cross-check reads.
+frames are kept, and — from 1.1, 2026-09-23 — no hardware address the allowlist
+does not name. An `lladdr` is written verbatim only when its canonical form is one
+of the addresses `tools/audit-bench-log.py`'s `ALLOW` names; any other is
+`unlisted-N`, its order of first appearance in the run, with nothing derived from
+its bytes. The same gate covers comment lines, the meta, stdout, stderr and
+`report`, a failed `ip` poll's output is withheld, and without the allowlist
+`--neigh` is refused. 1.0 wrote `ip`'s raw `lladdr`, which against the vendor
+firmware on 10.1.1.1 — this unit's live `IP_ADDR` (`upstream/notes/compcs-decode.md`)
+— is this unit's `H601` address; no 1.0 record exists under `bench/`. The loader's
+synthesised `56:0a:01:01:01:e8` stays on the allowlist: its owner already publishes
+it, and the vendor analysis needs to tell, across runs, the loader answering for
+10.1.1.1 from the vendor doing so. Its residual — whether bytes 1 and 6 are
+per-unit — is the allowlist entry's own. ICMP goes through the system `ping`, whose
+own `-D` realtime stamp is kept beside the probe's read time — the second clock
+the lag cross-check reads. 1.2 (2026-09-23) adds `started_wallclock` to the meta -- `console-capture`'s field, in its format, from the same `time.time()` reading as `start_real` -- because `capdate` dates every `.meta.json` in a bench directory by it (`D7`, `D8`), and 量 on a scratch copy of `bench/` one 1.1 record turned `capdate` RED. `F6` reads every record through `capdate`'s own reader, loaded by path, and requires it to refuse the same meta with the key removed; the mutant without the key fails `F3` and `F6`. The 1.1 docstring's claim that the vendor NIC driver on rlxfw's kernel answers with the H601 address was wrong: 量 `bench/2026-09-21e/V3-ETH4` reads the SDK placeholder `00:12:34:56:78:94`.
 
 量, loopback only, 2026-09-23, iputils 20240117 with `cap_net_raw=ep`:
 
@@ -158,7 +171,9 @@ is kept beside the probe's read time — the second clock the lag cross-check re
 * The probe listens only once its `start` line exists: 0.271 s after launch from
   DrvFs. A card waits for that line before it powers the board or sends anything.
 
-What it does not establish: wire time (a stamp is when the probe read the line);
+What it does not establish: whose address an `unlisted-N` is, and that two runs'
+labels name the same address (labels are per run); wire time (a stamp is when the
+probe read the line);
 network-up finer than the achieved interval, which the meta records; that a
 daemon serves (`tcp ok` is a completed handshake with a listening socket); the
 channel offset (a `udp` event is the host's half only); when a neighbour entry

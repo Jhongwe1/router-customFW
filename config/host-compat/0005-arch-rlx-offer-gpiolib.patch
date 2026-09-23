@@ -99,7 +99,7 @@ this patch's to fix.
 THE DIRECTORY NAME IS NOW WRONG FOR THREE OF ITS FIVE FILES.  `0001` (perl
 5.22) and `0004` (GNU Make 4.3's `\#`) are host compatibility in the strict
 sense.  `0002`, `0003` and this one are not: they are declared source changes
-to the vendor tree, which is what `tools/rlxfw-kbuild.sh:321-324` already
+to the vendor tree, which is what `tools/rlxfw-kbuild.sh:432-435` already
 calls this directory in its own comment.  The rename is carried forward in
 `PROGRESS.md` rather than done in the segment that widened it again.
 

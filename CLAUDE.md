@@ -148,7 +148,9 @@ agree: name the tool that could be lying and the second source that settles it.
   `EB`, which write any address with no bound check (`LDR-08`, `LDR-09`), the
   `AUTOBURN` word included; `AUTOBURN` with a non-zero value; and any upload
   before the `AUTOBURN` word at `0x8040D4A0` reads back `00000000` — the loader's
-  echo is not evidence (`C-6`). `cardcheck` refuses none of them (`FW-113`).
+  echo is not evidence (`C-6`). `cardcheck` refuses the four verbs unless the
+  card carries my dated `owner-yes` row for that exact payload; it reads only a
+  single-quoted `--send`, never an upload (`FW-113`).
 - Decide before power whether a seating issues any of them or any `FLR`, and close
   every seating record with that count, the `FLR` status and the bracket's reach.
 - Never write *"not one flash byte is written"*: `FLS-26` proved it false for this

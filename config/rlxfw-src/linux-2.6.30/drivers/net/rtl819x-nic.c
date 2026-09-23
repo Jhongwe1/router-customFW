@@ -215,7 +215,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_NIC_VERSION	"rtl819x-nic 1.3"
+#define RTL819X_NIC_VERSION	"rtl819x-nic 1.4"
 
 /* R6-4.  `rtl819x-switch.c` owns the switch core's window; this is the one
  * thing this driver borrows from it, for `ethtool -> get_link`.  Both are
@@ -741,9 +741,9 @@ static u32 nic_iimr_base = NIC_IIMR_LADDER;
  * the case where it is most needed.  The kernel's own answer to this is
  * `dev_watchdog`, and the only reason it is unavailable is `NET-57`.
  *
- * DEFAULT OFF.  `nic_recov_mode` is 0, so an image carrying this behaves
- * exactly as `s32a` did until a verb is typed -- which is what lets one boot
- * produce the broken arm and the repaired arm with nothing else changed.
+ * 🔄 1.4, 2026-09-23: DEFAULT ON.  `NET-107`: seating 37's 17 Mbit/s had
+ * `recover 1` typed, and a boot that typed nothing read 0.06.  `recover 0`
+ * still reaches the old arm, so one boot can still carry both arms.
  *
  * THE READOUT IS FOUR-STATE, which is what stops a counter reading 0 for two
  * different reasons -- the defect this project recorded as `n_arm_flush`
@@ -772,7 +772,7 @@ static u32 nic_iimr_base = NIC_IIMR_LADDER;
 #define NIC_RECOV_MS_MIN	10u
 #define NIC_RECOV_MS_MAX	600000u
 
-static int		 nic_recov_mode;	/* 0 = off, the default */
+static int		 nic_recov_mode = 1;	/* 1 = on, the default since 1.4 */
 static unsigned int	 nic_recov_ms = 1000;
 static struct timer_list nic_recov_timer;
 static int		 nic_recov_timer_ready;
@@ -836,8 +836,8 @@ static int		 nic_recov_rc[3];
  * quietly dropped: while the default was 0, every return in that mode was
  * literally `nic_dw(nic_rx_mb, i, 3)`, so *the default is today's
  * behaviour* could be read off the source.  It cannot any more.  The
- * replacement is weaker in kind and stronger in evidence: a boot capture
- * carries `RLXFW-N7`, and the two modes differ by 250x on the wire.
+ * replacement is weaker in kind and stronger in evidence: from 1.4 a boot
+ * capture carries `RLXFW-N7` (1.3 said so, emitted none); modes differ 250x.
  *
  * 🔴 THE BOUNDS TEST IS NOT DEFENSIVE PROGRAMMING, IT IS THE SAFETY
  * ARGUMENT.  `ph0` is a word a DMA engine wrote into memory this driver does
@@ -2468,7 +2468,7 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	/* s99a (c).  `NET-82`.  `n_ph_diff` over `n_ph_chk` is the reading;
 	 * `ph_first_*` is the first occurrence kept whole, because a rate
 	 * cannot say WHICH slot the engine paired with which.  `n_ph_used` is
-	 * 0 unless `phfollow 1` was typed, so a dump says which behaviour
+	 * 0 after `phfollow 0` (1 is the default), so a dump says which behaviour
 	 * produced the frames it is describing. */
 	len += sprintf(page + len, "ph_follow %d\n", nic_ph_follow);
 	len += sprintf(page + len, "n_ph_chk %lu\n", nic_n_ph_chk);
@@ -2699,9 +2699,9 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		nic_irq_taken = 0;
 		return (int)count;
 	}
-	/* s99a (a).  `recover 0` / `recover 1`.  Default 0, so an image
-	 * carrying this driver behaves as `s32a` did until this is typed --
-	 * which is what lets one boot carry the broken arm and the repaired
+	/* s99a (a).  `recover 0` / `recover 1`.  Default 1 since 1.4
+	 * (`NET-107`); `recover 0` returns to `s32a`'s behaviour, which is
+	 * what still lets one boot carry the broken arm and the repaired
 	 * arm with nothing else changed.
 	 *
 	 * Turning it OFF also disarms, so a cell can stop the detector while a
@@ -3101,6 +3101,11 @@ static int __init rtl819x_nic_init(void)
 	memcpy(nic_ndev->dev_addr, nic_mac, 6);
 	netif_napi_add(nic_ndev, &nic_napi, nic_poll, NIC_NAPI_WEIGHT);
 	rlxfw_markx("N6", (u32)NIC_NAPI_WEIGHT);
+
+	/* 1.4.  The two behaviours this boot STARTS in, in every boot capture:
+	 * ph_follow << 4 | recov_mode, so a 1.4 boot that types nothing reads
+	 * 00000011.  A verb typed later changes the /proc dump, not this line. */
+	rlxfw_markx("N7", (u32)((nic_ph_follow << 4) | nic_recov_mode));
 
 	return 0;
 }
