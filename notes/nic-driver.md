@@ -2394,17 +2394,28 @@ diagnosis was retracted — is in `bench/2026-09-23/CORRECTIONS-block42.md` §§
 | `P1-TS1` | TCP, board sends | 23.6 Mbit/s, 84.2 MB, completed |
 | `P1-TS2`, `TS3` | TCP, board sends | 0.21 and 0.78 Mbit/s, 323 and 668 retransmissions by the board's own TCP; completed |
 | `P1-UR1`, `P1-UR3` | UDP, board receives | the host sent to 30 s; the exchange never completed (`UR3` ran after the host re-attach, `CORRECTIONS` § 5.1) |
-| `P1-US1` | UDP, board sends | 20.7 Mbit/s with no datagram lost in any interval for 29 s, 53,485 sent; the exchange never completed |
-| `P1-UR2`, `US2`, `US3` | — | `No route to host`: the host's ARP was never answered |
+| `P1-US1` | UDP, board sends | 20.7 Mbit/s with no datagram lost in any interval for 29 s; the host received sequence numbers 1…53,485 with no gap (the client's "Sent" line is the highest sequence number received, 讀 `iperf_api.c`; the driver's byte count puts at most 53,486 actually sent); the exchange never completed |
+| `P1-UR2`, `US2`, `US3` | — | `No route to host` (`EHOSTUNREACH`, the only thing the logs hold). Whether the board answered ARP and the answers were lost is not in these captures: the driver transmitted 25, 7 and 3 frames in those dump intervals |
 
 `recover` stopped and restarted the TX queue 7 times: `n_tx_stop` 7,
 `n_recov_fire` 7, `n_recov_ok` 7, `n_recov_fail` 0, `n_recov_spurious` 0 between
 `P1-N0` and `P1-US3-S1`, and `n_writes` 14 → 126 = 14 + 7 × 16, so the recoveries
-were the only hardware writes. The one exchange that wedged and was rescued in
-time (`P1-TS2`) completed 2.8 s after the fire. Before any traffic, `P1-N0` →
-`P1-AC0` (`NET-109`) read the healthy shape: CPU port `Rcv 0 bytes`, `CRCAlignErr`
-294, port 3's egress 294 packets, `CpuEvent 0` — a pair taken the same minute on a
-fresh boot.
+were the only `nic_wr()` writes — 讀, the TX doorbell (`CPUICR`), the interrupt
+acknowledge and the mask writes go through a bare `__raw_writel` and are not counted
+(🔄 106th segment: "the only hardware writes" until then). **Three of the seven stops
+came during a trial's setup, before any data** (量, the jiffies of each arm and fire
+placed on host monotonic between dumps; the seventh fire's `RLXFW-N-ENGOFF` arrived
+0.011 s after its jiffies date, the positive control): `TR2` armed at launch +7.11 s and
+fired at +8.10 s while its data phase began at +9.18…+11.25 s; `TR3` +7.32 / +8.30 s;
+`UR1` +11.23 / +12.21 s, with its test starting 19.55 s after launch; 推 `TS1` too
+(+5.02 / +6.00 s, no dip in its first two intervals). The one exchange that wedged and
+was rescued in time (`P1-TS2`) completed 2.8 s after the fire. The card's cells cannot
+give per-trial counters: the driver dump exists only in the rlx0 `-S1` captures, so each
+delta runs from the previous dump and holds the restart and the gap between trials (the
+seventh fire, 1.01 s after `US1`'s kill, lands in `US1-S1` → `US2-S1`). Before any
+`iperf3` traffic — 294 frames had passed each way — `P1-N0` → `P1-AC0` (`NET-109`)
+read the healthy shape: CPU port `Rcv 0 bytes`, `CRCAlignErr` 294, port 3's egress 294
+packets, `CpuEvent 0` — a pair taken the same minute on a fresh boot.
 
 ### 19.2 Receive is complete; the losses are on transmit (`NET-112`)
 
@@ -2423,23 +2434,27 @@ handover (量):
 Every frame that entered port 3 during this boot reached the driver. Of the frames
 the driver handed to the engine, at least 182 never left port 3 — a lower bound, since
 the vendor driver may have sent some before the read. The baseline at `P1-AC0` was
-294 = 294, so the deficit accrued during `P1`. 推: about 28 of the 182 are frames
-`recover`'s re-arm discards unsent (up to 4 per recovery, § 19.3); the rest, about
-130 B each on average, are small frames the engine consumed and the switch never
-emitted.
+294 = 294 frames and 29,912 = 28,736 + 4 × 294 bytes, so the deficit accrued during
+`P1`. 推: about 28 of the 182 are frames `recover`'s re-arm discards unsent (up to 4 per
+recovery, § 19.3); the rest are small frames the engine consumed and the switch never
+emitted — 23,692 / 182 = 130.2 B is the mean over all 182. The 182 can cover at most 182
+of the 991 retransmissions the board's own TCP counted in `TS2` and `TS3`.
+Second-sourced (106th segment): every number in the table reproduces from the raw text
+by a separate parser; the driver pads a frame to 60 B before counting it (讀).
 
-量: each `-S1` dump shows the TX ring's last four frames. In the failed trials a
-frame the size of the `iperf3` server's results repeats — `P1-TR3-S1` 267 B ×3,
-`P1-UR1-S1` 281 B ×3, `P1-UR3-S1` 281 B ×2, `P1-US1-S1` 280 B ×4 (engine-owned,
-`tx_stopped 1`) — while the completed `P1-TS1-S1` holds it once. 讀: `iperf3` 3.1.3
+量: each `-S1` dump shows the TX ring's last four frames. In four of the six failed
+trials a frame the size of the `iperf3` server's results repeats — `P1-TR3-S1` 267 B
+×3, `P1-UR1-S1` 281 B ×3, `P1-UR3-S1` 281 B ×2, `P1-US1-S1` 280 B ×4 (engine-owned,
+`tx_stopped 1`) — while `P1-TR1-S1` holds none, `P1-TR2-S1` one, and the completed
+`P1-TS1-S1` one. 讀: `iperf3` 3.1.3
 sends that JSON only after it has read the client's `TEST_END` and the client's own
 JSON. So the board received the end-of-test messages, answered, and kept
 retransmitting an answer the host never acknowledged. The frame identities are
 inferred from sizes (推), not captured.
 
-This is `NET-78`'s "mute, not deaf" state, counted for the first time: the
-host→board path lost nothing; the board→host path lost frames the engine reports as
-sent. The `No route to host` episodes fit the same shape — over `P1-UR2`'s 75 s the
+This is `NET-78`'s "mute, not deaf" state, counted for the first time: from port 3
+to the driver nothing was lost (the host's own side of the wire is not observed); the
+board→host path lost frames the engine reports as sent. The `No route to host` episodes fit the same shape — over `P1-UR2`'s 75 s the
 driver received 19 frames and sent 25, and the host saw no ARP answer. This
 **refutes** the hypothesis I wrote during the seating: that a receive stall
 stranded `TEST_END`.
@@ -2464,11 +2479,14 @@ After the handover `P1-EPING` read 4/4 at once. Read after `D2` held:
 |---|---|---|
 | `P1-ER1`, `ER2`, `ER3` | TCP, board receives | 24.4, 24.7, 25.0 Mbit/s (receiver) |
 | `P1-ES1`, `ES2`, `ES3` | TCP, board sends | 26.2, 26.2, 26.2 Mbit/s, 0 retransmissions |
-| `P1-EU1`, `EU2`, `EU3` | UDP 20 Mbit/s, board receives | 37,339, 37,344, 37,341 of 53,298 datagrams lost (70 %) |
+| `P1-EU1`, `EU2`, `EU3` | UDP 20 Mbit/s, board receives | 37,339, 37,344, 37,341 of 53,298 datagrams lost (70 %); the board received ≈ 5.958 / 5.956 / 5.957 Mbit/s. The summary's 19.9 Mbit/s is the host's own send rate (讀: 3.1.3's UDP summary prints the local `bytes_sent`); 53,298 is the server's highest sequence number and the host sent 53,423–53,424, so 125–126 tail datagrams are counted neither received nor lost |
 | `P1-EV1`, `EV2`, `EV3` | UDP 20 Mbit/s, board sends | 19.9, 19.9, 20.0 Mbit/s, 0 lost |
 
 All twelve end-of-test exchanges completed. The card's one prediction here, TCP
-board-sends 22–27 Mbit/s (`NET-84`: 25.4), holds; the rest are first readings.
+board-sends 22–27 Mbit/s (`NET-84`: 25.4), holds; the rest are first readings. Board
+CPU from `/proc/stat` (ticks at USER_HZ 100): TCP receive 53.5–55.7 % busy, TCP send
+89.8 %, UDP receive 38.4 %, UDP send 81.4–82.2 %, softirq the largest share except in
+the sends, where `sys` is.
 
 ### 19.5 The experiments that decide the mechanism (proposed, zero flash)
 
@@ -2496,5 +2514,34 @@ board-sends 22–27 Mbit/s (`NET-84`: 25.4), holds; the rest are first readings.
   egress — nor why.
 * Whether `TS2`/`TS3`'s collapse was loss or spurious retransmission.
 * Anything from `P1-UR3` on, cleanly: the host re-attach bounced port 3's link
-  first (`CORRECTIONS` § 5.1).
+  first (`CORRECTIONS` § 5.1). No counter in these captures can see a bounce —
+  `n_et_link` counts `ethtool` link queries, not link changes (讀), and stays 0.
 * The frame identities in § 19.2 are sizes, not captures.
+* Why `TR2`, `TR3`, `UR1` (and probably `TS1`) started with a full ring, and what took
+  `UR1`'s remaining 6.2–7.3 s of setup. A host capture of the control connection,
+  `iperf3 -d`, or `/proc/net/tcp` on the board during setup would decide it.
+
+### 19.7 Board CPU per trial, and the two clocks in a killed trial (106th segment)
+
+`rlx0`, each window from the `cpu` line of `-S0` to that of `-S1` (it includes the
+restart and any stall; ticks at USER_HZ 100, 量 101.52–102.13 ticks per host-monotonic
+second and 99.92–100.64 per realtime second, the host clock being the slow one, § 7.2
+of `notes/boot-time.md`):
+
+| trial | status | window ticks | busy % | user / sys / softirq | ΔIRQ 12 (NIC) |
+|---|---|---:|---:|---|---:|
+| `TR1` / `TR2` / `TR3` | stalled | 11,074 / 13,158 / 7,455 | 20.5 / 16.7 / 29.6 | 30/2/2,234 · 25/8/2,158 · 25/6/2,174 | 13,201 / 13,187 / 13,199 |
+| `TS1` / `TS2` / `TS3` | completed | 4,448 / 4,178 / 3,542 | 67.9 / 0.8 / 4.4 | 10/1,426/1,585 · 6/4/22 · 15/22/119 | 150,893 / 2,223 / 6,962 |
+| `UR1` / `UR3` | stalled | 7,465 / 7,468 | 33.1 / 33.2 | 52/110/2,310 · 48/119/2,309 | 11,098 / 13,536 |
+| `US1` | stalled | 7,465 | 39.5 | 709/1,430/806 | 106,334 |
+
+`n_irq` equals `/proc/stat`'s IRQ 12 count in all twelve rlx0 `-S1` dumps. Per-trial
+tables, the `eth4` matrix and the TSVs: `$FWRE_WORK/rebuild/s106/n1-d5/`.
+
+**A killed trial's two durations are two clocks.** `iperf3` times itself with
+`gettimeofday` (讀 `iperf_api.c`, `timer.c`) — realtime, which `timesyncd` steps forward —
+and `timeout 70` counts host monotonic. So `TR1`'s "70.84 s" is realtime while the kill
+came at 70 monotonic seconds, and `UR1`'s "51.55 s" is a test that began 19.55 s of
+realtime after launch. The dips in the completed trials' interval lines each match one
+realtime step (`EV1`–`EV3`: implied 0.659 / 0.679 / 0.640 s, measured 0.660 / 0.677 /
+0.639 s): 推, host-clock artefacts, not network events.

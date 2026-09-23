@@ -32528,3 +32528,70 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 八、交接
 
 下一段先做桌面兩件：① `P2-3` 還沒算完或還沒第二來源的讀數（`notes/boot-time.md` § 7.6–7.7；這一段的分析腳本與三份代理報告在 `$FWRE_WORK/rebuild/s105-analysis/`）；② `P2-4` 的卡片，先修掉上機 A 暴露的四件方法問題（`PROGRESS.md` 的 `P2-4` 列）再凍結，然後跟擁有者約上機 B（不能是 2026-09-23）。留給擁有者：`r3-4/cells` 的 55 棵舊樹（26 GB）要不要清（建議清，等他說好）；上機 B 要不要收窄 `D8` 的一秒括號（建議先不要 —— 先修卡片的時戳規則與 loud 映像拿不到讀數的問題）。
+
+## 2026-09-23 — 第一百零六段（18:2x 開場，桌面，**零電源循環**，板子全程斷電，21:02 交接，第二個 commit 未做）：上機 A 的紀錄落地、欠的讀數全部算完，而最值錢的一件是主機的時鐘被兩個校時程式一路拉慢 —— `D2` 校正後 +0.19 ms
+
+**這一段沒有上電。** 三件：第一百零五段沒收的工補完、推上去（`9e148ee`）；`P2-3` 欠的讀數由五支代理算完，我逐項核對後寫進擁有者檔；在等 sweep 的空檔量到主機時鐘的機制（`CLK-38`）。`P2-4` 的方法修正提案交給擁有者，工具還沒動。
+
+### 一、開場：量 repo，以及交接和 repo 不符的三處
+
+- HEAD `669e848`、599 行 porcelain（11 個追蹤檔 + 588 份未追蹤擷取）、study 到 `20260923-study4`、`LOG.md` 最後一則第一百零五段 —— 與交接相符。
+- 🔴 **交接說 `s105-gates.sh` 在 `$FWRE_WORK/rebuild/s105-analysis/`，不在。** 它只在舊 scratchpad：18:11 寫成，而把 scratchpad 搬到 ext4 的 `s105-keep.sh` 18:04 就跑完了。這一段起 session 的腳本直接寫在 `$FWRE_WORK/rebuild/s106/`。
+- 🔴 **交接與第一百零五段 `LOG.md` 說「`spec-check` 之外的閘門一個都沒跑」，不對。** `s105-analysis/gates-router-rebuild-181128/` 有九支 18:11–18:16 的輸出，`cfcensus` 三步紅（`CI-5` 重開後沒有擁有者，`L3`），`capdate` 是空檔（被中斷）。那一則是紀錄，不改；更正記在這裡。
+- 擁有者問上一段從 `router-rebuild/plan` 開 Claude Code 記憶會不會亂。量：從 `plan/` 開的是三個 session（第一百零二到一百零五段），三份 transcript 寫記憶的路徑全是 repo 根的 `memory\`，`-plan` 專案目錄沒有 `memory/`，`plan/` 自 09-22 20:00 起只多了交接檔。副作用只有 transcript 與 scratchpad 落在 `-plan` 目錄。
+
+### 二、收工補完：五個紅，逐一在原處修
+
+排練：HEAD 的 ext4 clone，套 `git diff HEAD --binary`，588 份未追蹤擷取按清單 `cp -a --parents`（保留內容與 mtime、不動真的 index），`core.fileMode=false`（DrvFs 每個檔都是 777），`build/` 的來源從 `config/rlxfw-initramfs.tsv` 自己讀。第一輪發現用 sweep（`4c71912`）：105 宣告、103 跑、95 綠、2 預期紅、**6 非預期紅**，外加收工閘門的同一組：
+
+1. **`boot-timeline` 把自己的報告讀成一次開機（`FW-126`）。** 卡片 `HOST` 格把 `--retro` 的輸出存成 `bench/2026-09-23/Z9-D2.log`，報告印 landmark 字串，於是下一次掃 `bench/` 多一個「韌體未知」的核心開機（`B8` 紅），而且因為它「有開機、沒有 `started_wallclock`」，同目錄每一個靠繼承決定冷／暖的核心開機都變 `?`。兩條規則先量影響：「開頭是工具報告標頭」只排除 438 個含開機文字的 `.log` 裡這一個；「沒有 `.timing` 也沒有 `.meta.json`」會多排除 `2026-08-23/A-catch`（真的擷取）—— 選前者（`REPORT_HEAD`），報告在 (c) NAMED 列名。改過的工具掃 `bench/`，與 HEAD 的工具掃去掉 `Z9-D2` 的 `bench/`，TSV 除標頭外逐列相同、報告除標頭與 NAMED 兩行外相同。`B9b` 三格（其一是控制：同樣位元組去掉標頭就把繼承打成 `?`），排除拿掉的突變體紅三格；`ci-expected` 70 → 73。
+2. **`bootbytes` `K2`／`K7`（`FW-103`）。** `p2q`／`p2l` 的 `/init` 多印兩行（21 + 30 B），而 `RLXFW-SW-UNLOCK`（17 B）在十一份開機裡十一份都跟第一行逐字元交錯、每份順序不同、不成標記 —— 常數 778（8 份）、6609（3 份），各是舊值 + 68，卡片 § 3.2 上機前寫的那件事。`K7` 原本要求「帶欄位的全部擷取正規化後一個值」，兩種 loud 設定之後它數的是設定數；改成逐映像（自己的 `RLXFW-ID0=`），拿掉正規化、弄壞欄位正規式兩個突變體都紅在 `K7`。
+3. **`cfcensus` `L3`（`CI-5`）。** 第一百零五段把 `CI-5` 從 ⊘ 重開、擁有者欄寫 `—`；改成「任何一段收工記到變更點之後的綠 run 就在那裡關它」（`SEGMENT`），生成區塊重生（`SEGMENT` 10 → 11、`DECLINED` 16 → 15、多一列，下面沒有被引用的行）。
+4. **`docsize` 兩個。** `CI-5` 那一列 31,772 B 搬到 `docs/history/` 之後，`PROGRESS.md` 最長行 9,575，低於預算一半 → 預算 32,800 → 9,870（×1.03 進位三位）；§ Now 第 19 行 1,056 B 超過 1,000 的上限 → 重寫成 807 B。
+5. **`test-config-gates` `E5`，是 clone 的不是改動的**：宣告要 `build/` 的 `uprobe`、`ucost`、`iperf3`，交辦只說 `uprobe`（`mkinitramfs` 在第一個缺的就拒絕，所以上一段只看到一個）→ 排練腳本改成從宣告讀。
+
+另一件：代理的位址掃描報 `P1-ETH4.log` 有一個不在三個允許位址裡的位址字串。我不印它，只在程式裡比：它是 SDK 佔位 `00:12:34:56:78:94`，`audit-bench-log` 用前綴條目 `00:12:34:56:78:9` 允許；它的六個位元組不在 `H601`、也不在整片 4 MiB dump。
+
+最終排練 `91725a5`、tree `1ff2b85f`：收工閘門 clone 與真的樹都綠（`check-predictions --sweep` 依設計紅在已知的凍結卡片缺陷，卡片 A 223/223）；**完整 desk sweep 105 宣告、103 跑、101 綠、2 預期紅（census）、0 非預期紅**，來源沒動。真的 commit `9e148ee` 的 tree 與排練逐位元組相同（`1ff2b85f`）；`citecheck` commit 之後 0 new、35 known、0 suspended。推上去：run `35859027101` 四個 job 全綠（`text`、`lint`、`instruments`、`census`）。`citime record` 記下 `BIG3` 1129、`suite_cost` 1223，**之後立刻跑 `segments`：3/3**（`FW-125` 說的那一步，這次手動做了；工具還沒有自己做）；`stats --since changepoint` n = 2、1129..1138 = 9 s、± 0.40 % —— **`CI-5` 照它自己寫的條件關掉**，生成區塊重生（`SEGMENT` 11 → 10、`CLOSED` 62 → 63，那一列從債務表消失，`PROGRESS.md` 回到 2,597 行）。
+
+### 三、`P2-3` 欠的讀數：五支代理，逐項核對（擁有者檔 `notes/boot-time.md` §§ 4、5、7.1–7.9，`notes/nic-driver.md` § 19）
+
+每支代理只讀 repo、只寫 `$FWRE_WORK/rebuild/s106/<name>/`；五支都說 harness 不讓它寫 `REPORT.md`，報告由我從它們的最後訊息存進各自目錄。
+
+- **`CLK-37` 第二來源**（`t-clk37`）：一支不 import 工具的解析器，先凍結自己的結果（19 個檔的摘要）再開 `Z9-D2.tsv`：共有的值全部到微秒相同。它找到第一次計算的四處錯與筆記的兩處錯；我自己核過兩處 —— `V1`–`V7-BOOT` 的摘要（`sha256sum`：`V3`、`V4`、`V6`、`V7` 與 `G6`／`G7` 逐位元組相同，§ 7.4 與 `LDR-46` 寫「一次都沒有」是錯的），以及 `C-8` 的暖行多 **37** 個位元組不是 35（我自己數 `bench/` 全部 274 個 loader 開機：冷 17 B ×68、暖 54 B ×206），還有 `D7` 的 Δ 從 TSV 自己算 1.688630 s。
+- **主機時鐘與 `D2` 校正**（`c-clock`）：四個不是主機單調時鐘的參考 —— NTP（journal 裡 `timesyncd` 的 267 次步進）、Windows（NTFS 時戳）、WSL 核心的 printk 時鐘、板子的 tick —— 每五分鐘窗彼此差 0.0005 內。r ≈ 1.000 到 ~15:49，然後一路加深：0.9861（15:52）→ 0.9693（18:17）。校正後 **`D2` 暖差 +0.19 ms**（+0.01…+2.27）、冷 +0.15 ms，`P1` 的暖分裂與 `P1-A` 的多出來都消失；控制：十三次暖接住的散布 0.859 % → 0.094 %。它也推翻了 `CLK-35` 的五句（跳動是 `timesyncd` 的不是 Hyper-V 的、不隨負載、「0.18 %」是步進次數、「慢到 2.4 %」低估、IRQ 24 是 0）與 `CLK-34` 的 −3.8 ms 情境。我自己核過 `Clock change detected` 267 次（15:50:14 → 18:17:15）。
+- **`D5` 表**（`n1-d5`）：ICMP 140 格重現；`rlx0` 七次 `recover` 有三次在試驗傳資料之前（`TR2`、`TR3`、`UR1`）；「唯一的硬體寫入」應為「唯一的 `nic_wr()` 寫入」（我讀驅動第 963／1638 行核過）；`eth4` UDP 收的 19.9 Mbit/s 是主機的送出速率，板子實收 ≈ 5.96（我讀 `iperf_api.c` 核過）；killed 試驗的兩個長度是兩個時鐘。
+- **`D4`／原廠 `D8`／`P3-TCPD`**（`n2-d4d8`）：九次原廠開機的 readiness 與括號；`P3-TCPD` 經 journal 換算到 monotonic，`D8` 的重建方法在 `P3Q-r02` 成立、有四個限制；`P3Q-r01` 沒有 `is-at`；loud 映像重開在 `N-NDOPEN` 後 0.220–0.251 s，上機 B 要至少 1.05 s。我對它的兩張 TSV 抽查過。
+- **回溯測試**（`r-retro`，事先登記在 `PREREG-clk32-host.md`，寫在計算之前）：**控制照字面失敗，方法被否證、假說沒有被檢驗。** 旁邊、不是代替、非事先登記：視窗中位數過控制，21 個目錄斜率 1.087（0.904–1.271）、r 0.943；主機時鐘正確的七個目錄 loader `booting` 在 0.3546–0.3578 s。
+
+### 四、主機時鐘（`CLK-38`，`notes/boot-time.md` § 7.9）
+
+等 sweep 的時候量的，事先寫了否證條件（「負載下 `MONOTONIC` 對 QPC 在 ±0.1 % 內就是負載重現不了」）。`adjtimex(2)` 唯讀：`tick` 18:42 是 9721–9737、19:25 是 9615–9626（標稱 10,000）；每 20 s 夾一次 Windows QPC：`MONOTONIC` 0.964972、`RAW` 1.000016、Windows `UtcNow` 1.000000（178 列、3,722.8 s），`MONOTONIC` 每五分鐘窗從 0.974 降到 0.959，跨過兩次 sweep 與中間的空檔 —— 條件照字面觸發（慢 ≥ 1 %），但它不跟著負載走，所以原因不是負載。Windows 未同步、比 NTP 慢 0.63–0.70 s；`timesyncd` 每 ~32 s 步進。`Clock change detected`：14:15 與 14:21 兩次開機零次，上機那次開機前 42 分鐘零次、15:50:14 起不斷，下一次開機從第二秒起。推：兩個校時程式在 Windows 偏離 NTP 超過步進門檻之後開始打架。誰寫 tick 沒量到（沒有追蹤工具；裝一個是改擁有者的機器）。`RAW` 不受影響 —— 上機 B 用它蓋時戳。
+
+### 五、我自己的錯
+
+- **事先登記的控制條件寫錯。** 我假設每份擷取的配對誤差約 10 ms，沒先量就拿來當門檻；量到有 0.1–0.9 s，控制照字面失敗、方法被否證，一個本來能回答 `CLK-32` 的測試什麼都沒檢驗到。**事先登記的門檻所依賴的前提，登記之前要先量。** 控制的視窗也不是 `CLK-35` jiffies 的視窗。
+- `B9b` 第三格的 `sed` 把 `)` 寫成 `;`，套件自己抓到（72/1），修掉。
+- `powershell.exe` 繼承了 heredoc 的 stdin、把後面的指令吃掉（`clocklog` 第一次），改成 `stdin=/dev/null`。
+- quoted heredoc 吃掉一層反斜線（`CI-5` 的格子檢查第一次）—— `CLAUDE.md` 寫過，改成檔案腳本。
+- 排練腳本照交辦只補 `uprobe`，`E5` 在第一輪 sweep 紅；應該從宣告讀，而不是從交辦讀。
+- `P1-ETH4.log` 的位址第一次比對方向錯（拿整串比允許清單，而工具是子字串比對），差點把一個被允許的位址報成漏網。
+- `SPEC.md` 的兩列在格子裡放了沒跳脫的 `|`（`|ln r_d|`、`|Δ|`），`CLK-38` 用了「未定」而它是殘留 —— `spec-check` `C8`／`C3` 抓到；殘留併進 § 17 既有的 `CLK-31` 殘留，不插行。
+- `NET-111` 的 🔄 初稿把「唯一的硬體寫入」說成那一列原寫的，其實是擁有者檔寫的；§ 7.9 初稿把 tick 與步進的關聯寫成上機那次開機的，其實是下一次開機；study5 初稿寫「第一百零六段找到了機制」—— 都在寫進 repo 之前改掉。
+- 兩次 `cd` 讓 shell 的工作目錄漂到 `plan/` 與 `bench/2026-09-23/`。
+
+### 六、觀察，沒有處理
+
+- 板子在 `P1-N0` → `P1-TR1-S0` 之間少走 105 tick（推 中斷被遮約一秒），哪一格沒認出來。
+- `UR1` 的設定期剩 6–7 s 沒有解釋；`TR2`、`TR3`、`UR1` 為什麼開頭環就滿。
+- `FW-124`（`HOST` 格參數）與 `FW-125`（`citime record` 之後不跑 `segments`）還不是工具的拒絕：排進 `P2-4`。
+- `$FWRE_WORK/rebuild/r3-4/cells` 的 55 棵舊樹（26 GB）：等擁有者。
+- `docs/KNOWN-ISSUES.md` 的紅 run 計數停在二十（第一百零五段的觀察，仍未處理）。
+
+### 七、閘門與 sweep
+
+見第二節。第二個 commit（這一則、讀數、`CLK-38`）只改 `.md` 與 `tools/ci-suite-cost.tsv`，所以照規則對最終的樹重跑 `.md` 類的閘門（由 `git diff --name-only 9e148ee HEAD` 選）：改完之後（`CI-5` 關掉之前）的預覽閘門在真的樹上全綠：`spec-check`、`citecheck`、`cfcensus` 三步、`ledgerscan` 兩步、`xcheck sweep`、`capdate`、`docsize` 31/31、`test-file-modes`、`citime segments` 3/3、`flashwin scan` CLEAN（`check-predictions --sweep` 依設計紅在已知的凍結卡片缺陷）。`mustrun` 說 105 步有 53 步讀到這次改的檔（多半經 `tools/ci-suite-cost.tsv` 的 `tools` 路徑），所以第二個 commit 也跑完整 desk sweep：sweep 3 在 20:39:54 對工作樹開始（`s106-final3.sh`，保留複本後在複本上跑收工閘門）。🔴 **擁有者 21:02 要求交接（context 快用完），sweep 3 還在跑，第二個 commit 沒有做**：這一則、`LOG.md` 的這兩行、以及之後寫的 `plan/handoff-s106.md` 都在 sweep 開始之後才寫，所以它結束時會報 *SOURCE MOVED* —— 下一段先確認移動的只有這幾個檔，再重跑 `.md` 類閘門、commit、push。
+
+### 八、交接
+
+`P2-3` 的紀錄與讀數都落地了。下一步是 `P2-4` 的桌面半：提案已交擁有者（`RAW` 蓋時戳、整段上機的主機時鐘紀錄、每次 rlxfw 按電源頭尾讀板子 tick、`D8` 走 probe 的 monotonic 帳本、loud 在 `N-NDOPEN` 後至少再活 1.05 s、伺服器 log 取代 `iperf3` 的結束交換、`cardcheck` 檢查 `HOST` 格、`citime record` 自己跑 `segments`），之後寫卡片 B。留給擁有者三件：要不要動主機的校時（建議不動、用 `RAW` 繞開；要讓 `MONOTONIC` 回正常就是讓 Windows 重新對時或停掉 WSL 裡的 `timesyncd`）；上機 B 的日期；`r3-4/cells` 26 GB 要不要刪。

@@ -1175,12 +1175,12 @@ mode control inside ±10 ms both cold and warm.
 
 | what is not established | what would settle it |
 |---|---|
-| 🔴 **Whose clock carries `CLK-32`'s factor.** The host's monotonic clock ran 1.7–2.4 % slow for most of the seating while the board's jiffies agreed with realtime (`CLK-35`); the loader's in-seating drift matches it, 推 | A seating that logs host monotonic against the board's jiffies, idle and loaded |
-| 🔴 **`D2` corrected for that clock.** The raw verdict holds; the corrected one is a sensitivity estimate (about −3.8 ms at a rate ratio of 1.022) | A capture-by-capture rate fit, desk, from this seating's files |
+| 🔴 **Whose clock carries `CLK-32`'s factor.** 🔄 2026-09-23 (106th segment): inside seating A it is the host — four independent references put its `CLOCK_MONOTONIC` 1.4 % slow at 15:52 and 3.1 % by 18:10, and corrected for it the loader does not drift (`CLK-35`); the host's tick is being slewed while `timesyncd` steps realtime (`CLK-38`). For earlier seatings it stays 推: the pre-registered retro test failed its own control and did not test it (`CLK-32`) | Seating B stamped on `CLOCK_MONOTONIC_RAW` (`P2-4`): the loader's `booting` within ~±0.5 % of 0.35625 s. The host's mechanism: a Windows resync, the owner's call (`notes/boot-time.md` § 7.9) |
+| ✅ **`D2` corrected for that clock** — settled 2026-09-23 (106th segment): warm +0.19 ms, cold +0.15 ms, `D2` holds raw and corrected (`CLK-34`, `notes/boot-time.md` § 7.1) | — |
 | 🔴 **Where below the DMA engine `rlx0`'s frames are lost, and why** (`NET-112`) | § 19.5's E1 and E2 |
 | ⚠️ **rlxfw's receive throughput.** No `rlx0` board-receive trial produced a `receiver` line | A driver that completes the exchange, or a trial scored on the server's own report |
-| ⚠️ **`D7`, § 3.7's segments, and the vendor's `J` → `boa` miss** — computed once (`CLK-37`) | A second, independent computation |
-| ⚠️ **The vendor's `D8`, `D4` readiness beyond `V1`, and `P3-TCPD`'s check of the `D8` reconstruction** | Desk work on this seating's files |
+| ✅ **`D7`, § 3.7's segments, and the vendor's `J` → `boa` miss** — second-sourced 2026-09-23 (106th segment): a parser sharing no code with the tool agrees to the microsecond; four statements of the first computation corrected (`CLK-37`, `notes/boot-time.md` § 7.6) | — |
+| ✅ **The vendor's `D8`, `D4` readiness beyond `V1`, and `P3-TCPD`'s check of the `D8` reconstruction** — computed 2026-09-23 (106th segment) for all nine vendor boots; the reconstruction holds on the one frame-checked boot, with four stated limits (`notes/boot-time.md` §§ 7.3, 7.5, 7.7) | Two inferences it left are seating B's tests (§ 7.7) |
 | ⚠️ **Anything from `P1-UR3` on `rlx0`, cleanly**: the host re-attach bounced port 3's link first (`bench/2026-09-23/CORRECTIONS-block42.md` § 5.1) | Seating B |
 | ⚠️ **`D3`** | `P2-4`, on another calendar day |
 
