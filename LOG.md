@@ -32358,3 +32358,57 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 十、交接
 
 下一步 `P2-1`：儀器，以及把已提交的開機擷取全部跑一遍的回顧表。`P2-2` 多了一件：`cardcheck` 拒絕寫 flash 的指令（`FW-113`）。零 flash 寫入命令、零 `FLR`、括號維持 0.0244 %。`P2-1` 的做法提案給了擁有者（四件儀器、檔案互不重疊、可平行），提案的兩個前提收工前量過（`FW-114`）：`console-capture` 已經用 `CLOCK_MONOTONIC`（−4 µs），無權限的 ICMP socket 被拒（`ping_group_range` `1 0`）。
+
+## 2026-09-23 — 第一百零三段（05:0x 開場，桌面，**零電源循環**，板子全程斷電，08:0x 收工）：`P2-1` 一段關掉，而最值錢的讀數是回顧表自己量出來的一個「每次上機一個」的時基因子
+
+**這一段沒有上電。** `P2-1` 的四件儀器由四支子代理平行建（檔案互不重疊，共用的格式由我事先定死），每一支的報告我都在自己的桌面上重跑、再用另一支自己寫的 scratch 腳本做第二來源；然後把已提交的全部開機擷取跑成回顧表。兩個 commit：`68f7fe8`（`P2-1` 的工作），以及這一筆紀錄。
+
+### 一、交辦與 repo 不符的地方
+
+- 交辦說「提案和兩個前提都在 `P2` 步驟表的第 7–9 項」：前提是 settled items **7–8**，第 9 項是 `EW`／`EB` 的裁定；**提案本身不在 repo 裡** —— 它只在上一段 `AskUserQuestion` 的預覽裡，這一段從上一段的對話紀錄把它逐字找回來。
+- 上一段收工時還在跑的 `e20ef61`、`aece416` 兩個 run 都綠（`35778786126`、`35780238822`）。`citime check` 報 7 個 run 沒有列，這一段補記（`tools/ci-suite-cost.tsv`，之後 0 missing）。
+
+### 二、四件儀器
+
+- **`boot-timeline` 過 loader（`FW-117`）。** 先修掉一個誤判：它把 22 份擷取點名成「在板子開口之後才開」，其中 **19 份是 rlxfw 的 kernel 開機** —— loud kernel 的 SPI 驅動印一張表頭，裡面有 `chipName`，而偵測認的是裸 `chipName`；loader 自己印的是 `\0chipName: `。剩下 3 份裡 `2026-08-23/A-catch` 根本不是 `console-capture` 的擷取。地標與區段改成資料（`LOADER`／`VENDOR`／`RLXFW` 三張表、每段標 identical／comparable／not-comparable），`measure()` 一個函式替兩種韌體算（`D1`）；韌體、變體、映像（`RLXFW-ID0`）與冷暖由擷取自己判；`--probe` 把主機探針的事件放到一份擷取的時間軸上；`--retro` 印回顧表。案例 19 → 70，18 個突變全抓到；預設的 loader 表從 `anchor C` 起與 HEAD 逐位元組相同。
+- **`console-capture` 記下原點（`FW-115`）。** `.meta.json` 多六個鍵（`clock`、`t0_mono`、`t0_real`、`sent_s`、`end_mono`、`end_real`），送上線的位元組一個沒變，`tool_version` 仍 1.4。案例 59 → 67、突變 39 → 47，新案例先對未改的工具跑紅（60 ok、7 FAIL，恰好是讀新鍵的七個）。
+- **`hostprobe`（新，`FW-116`）。** ICMP（系統 `ping -D -O`）、TCP、鄰居表、UDP，全部蓋在同一個 `CLOCK_MONOTONIC` 上、只記時間戳。79 個案例、33 個突變。🔴 **我給它的 brief 寫「無權限 ping 的下限是 0.2 s」，錯：這台 iputils 20240117 是 2 ms**（`-i 0.0019` 退出碼 2，我用腳本按路徑重跑確認），而且 10 ms 以上實得間隔大於要求（200 → 204 ms），`FW-97` 在板上由封包數導出 0.206 s，兩個來源一致。
+- **`looprun` 1.2（`FW-118`，`LOOP-3`、`TERM-1` 關）。** 一次電源跑 N 輪：第 1 輪 `J BFC00000`、第 2…N 輪 `busybox reboot -f`，每輪重新上傳並讀回燒錄旗標；N ≥ 2 的產出物帶 `-rNN`；階段時間寫進 `<stem>.stages.tsv`；`S4`／`S7` 以 `--until` 結束。🔴 **新的 `A0a`**：`S4` 要證明 loader 的提示字元真的被接住 —— `A0` 只看 `C-8` 那一行，而 `K-J` 就是一次「看門狗那一行有、ESC 窗錯過、原廠開機了」。代理另外抓到一個舊案例 `M14` 永遠不會失敗（它在拒絕訊息裡找 `S5b`，而 `--image` 的拒絕訊息也含 `S5b`）。自測 66 → 105，39 個突變全抓到。
+- **`S7` 仍然沒有 `--esc-after`，是決定不是疏漏**：往健康的 rlxfw console 灌 ESC 會把 ESC 放進 shell 的輸入、排在下一輪的 `busybox reboot -f` 前面，沒測過，而每一輪都靠那一行；映像裡也沒有會重置的路徑（`CONFIG_RTL_WTDOG=n`，命令列沒有 `panic=`）。不論結果都成立的圍堵歸 `P2-2` 的卡片：每一個可能開到原廠韌體的區塊 —— 含 `looprun` 區塊 —— 都用 flash `map` 包夾。
+
+### 三、回顧表（`CLK-33`）
+
+`tools/boot-timeline.py --retro bench`，重跑逐位元組相同：loader 開機 249（冷 56、暖 193）、kernel 開機 144（原廠 6、rlxfw quiet 119、loud 19）。`loader.esc` 冷 5.2101（`X8-WAIT`）、暖 5.0362（`K-J`）；原廠 `kernel.total` 暖 6.8895..6.9817、`user.ready` 暖 17.7440；rlxfw 同一個配方兩種變體 `F179CF21`：quiet `boot.jump_to_ready` 10.2435–10.5134、loud 11.8156–12.5145。**它是預測不是結果**：擷取都是為別的問題拍的；網路與 daemon 就緒沒有任何回顧值。解釋不了、照實寫進 `notes/boot-time.md` § 4 的三件：`X8-WAIT`（原廠冷開機）印完 `sysconf wlanapp kill wlan0` 之後 201.3 s 沒有一個位元組；`loader.banner` 的暖減冷剩 ≈2.4 ms 對不上；`0A3135AF` 的 `kernel.late` 0.041 對其他早期映像 0.024–0.025 s。
+
+### 四、每次上機一個時基因子（`CLK-32`）
+
+這一段最意外的讀數，而它是從**我自己核對代理數字**時冒出來的：`X8-WAIT` 相對 `K-J` **每一段都慢 3–4 %** —— loader `booting` +3.6 %、ESC 窗 +3.5 %、解壓 +3.2 %、WLAN +4.0 %、kernel 到 init +3.9 %。`kernel.wlan` 從 4.4880 拉長到 4.6673 s、多 179 ms，USB 延遲（每次讀幾 ms、加法）做不到。對全部（映像、目錄）配對驗：同一顆映像在每個目錄的區段中位數，跟著那個目錄 loader `booting` 中位數的比走（`84385D91` 在 `2026-09-21e`：loader ×0.959、`kernel.wlan` ×0.951、`kernel.total` ×0.954）；排除匯集多個 build 的 `id0=none` 之後，一秒以上每一段的 log-log 斜率 0.93–0.98、r 0.81–0.93，95 % 區間都含 1、不含 0。🔴 `68f7fe8` 的 commit 訊息與 `docs/FINDINGS.md` 那一列寫的「0.92–0.99」是全部 rtkload 與 kernel 區段的範圍、沒有說明 —— commit 訊息是紀錄不改，`FINDINGS.md` 這個 commit 就地改清楚。**所以 `CLK-31` 殘留裡「USB 延遲」這個候選被否證**；剩下「主機單調時鐘」與「裝置時基」，兩者給同一組比值，這份資料分不開。今天的主機：120 s 內 `CLOCK_MONOTONIC` 對 `CLOCK_REALTIME` 0.0 ppm（`MONOTONIC_RAW` +310.8 ppm，`systemd-timesyncd` 在跑，時鐘源 `tsc`）—— 只說今天。後果寫在 seating A 之前：`D3` 每一格另外除以它自己那次上機的 loader `booting` 比再發表一次，放在原值旁邊、不取代它，±10 % 不放寬；同一顆映像已經在兩個目錄之間差過 6.7 %。從今天起每一份擷取自己帶 `t0_real`／`end_real`，主機那一半每次上機都有讀數。
+
+### 五、更正（狀態檔就地改，這裡記一筆）
+
+- **`X8-WAIT` 是冷開機**：`C-8` 那一行在 `ramSize: 32M` 之後是一個空白。`LDR-15` 與 `P2` settled item 2 寫成暖（上一段寫的）；值也從 5.209 改成 5.210 s —— 5.209 的錨點落在 banner 的第 86–87 位元組，工具的錨點是第一個 `-`。
+- **`P2` 步驟表的「rlxfw `J` → 提示字元 10.24–10.51 s quiet、11.79–12.56 s loud，138 次」是錯的**：那是最近的映像；138 次全部是 6.97–12.56 s，因為映像在它們底下換了（300-jiffy 等待從 `EA6EE537` 起）。兩支代理各自抓到，我自己的第二來源一致。
+- `ci.yml` 兩條計時註解早就過期：`test-console-capture`「66 s」實際 124 s（CI），突變那一步「~6 min」實際 774 s。這一段讓它們再長：桌面上 suite 126.4 → 137.7 s，突變一步推估 +31 %（≈1,015 s，推，等下一次 `citime record`）。
+
+### 六、引用：十八個修復，其中四個是 `citecheck` 看不見的（`FW-119`）
+
+- 四支工具改動移走的 14 個行號引用，數字改到現在的行、先斷言新行的內容與原意相同；其中 6 個早就腐朽、掛在 `citecheck` 的基準上（`console-capture` 那幾個指向的內容早就搬走了），修好之後從基準刪掉它們的 7 列。
+- 🔴 **修引用會改那一行，而改一行會把行上每一個引用「重新定日」** —— `citecheck` 以引用那一行最後一次被改的 commit 為準。所以提交前我把「每一行被改過的行上的每一個引用」都列出來對著句子讀，找到四個 `citecheck` 看不見的（三件事）：`SEAM-1`／`RECIPE-1` 引 `rlxfw-kbuild.sh` 的 203–204 說 `RECIPE_ID`，它 2026-09-04 就搬走了，2026-09-14 `5955b36` 為別的事改了同一列之後，`citecheck` 九天都報 `STABLE`；`RECIPE-1` 的 `357,388-389` 在它寫下的那個 commit 就是錯的；`CI-4` 引 `README.md` 的 764 行，那句話從寫下那天就在 772（`FW-109` 那一類）。記成 `FW-119`，`notes/record-integrity.md` § 5.6。
+- 我的 `README.md` 修改第一版在 764 行之上加了 8 行 —— 對那個（本來就錯的）引用檢查時才發現；改成不動行數。
+
+### 七、我自己的錯（全部在提交前抓到）
+
+- 讀 `K-J` 時我自己寫的逐行列印把 `Jump to image start` 標在 2.487 s；讀原始 `.timing` 才知道那一列只涵蓋位元組 6215–6218，`Jump` 在下一列 7.506 s —— 就是 `FW-35` 那個陷阱，在沉默的邊上。沒寫進任何東西。
+- **兩次在 PowerShell 裡內嵌讀退出碼**（ping 下限那次印出 `rc=0` 黏在截斷的錯誤訊息後面；`check-predictions` 那次印 `head-rc=0`），`CLAUDE.md` 明寫過這個陷阱；兩次都改成按路徑跑的腳本重讀。規則在、讀過、照樣犯 —— 第二段連續，這一類該是工具的拒絕。
+- 給代理的 brief 有兩個錯：ping 下限 0.2 s（是 2 ms）、「138 次開機 10.24–12.56 s」（抄自我上一段寫的步驟表）。都是代理回報的。
+- `notes/boot-time.md` 初稿三處錯：`F179CF21` 的 `kernel.total` 寫成一個中位數加一個值；`D3` 的跨目錄範圍拿了兩顆不同映像的極值；「WLAN 驅動 built 2013-02-21」是推論（橫幅只寫 `version 1.6 (2013-02-21)`）。逐行對回顧表輸出時抓到。
+- § 5.6 初稿用描述而不是 id 稱呼一列（`CI-4`）。
+- sweep 跑到一半我以為過了約 15 分鐘，量 `ps -eo etime` 是 6 分 38 秒 —— 說出口之前先量了，沒有寫進任何東西。
+
+### 八、排練、閘門與 sweep
+
+整組改動先在 ext4 的完整 clone 上排練：`git diff HEAD --binary` 套到 `aece416` 的 clone（`upstream/` 從本機 checkout 取、釘 `4d3ff26`，不走網路）、commit `aa8a2e5`、tree `0be3ebd7`。在 clone 裡：`spec-check`、`citecheck`（commit 之後的判決，ROT 40 → 26，全部在基準上）、`cfcensus` 三件、`ledgerscan check`／`quarantine`、`xcheck sweep`、`capdate`、`docsize`、`docmove`、`test-file-modes` 全綠。`check-predictions --sweep` 在 clone 裡沒有意義（clone 把 mtime 全改成 checkout 時刻）；在真的樹上是 6 個 OUT OF ORDER，全部是 seating 14 那張凍結後修過表頭的卡片，早就記過。完整 desk sweep（ext4，07:27–07:59）：105 個宣告的步驟，103 個跑了、100 綠、2 個 census 步驟依設計在桌面上紅、2 個跳過（`instruments` 與 `lint` 的 apt，都需要 root），**1 個意外紅：`text/test-config-gates` 的兩個 `E5`**。它不是這一段的改動：同一個 clone 退回 `aece416`（沒有這一段的改動）一樣紅，真的樹上 60/60 綠 —— clone 沒有 `src-vendor` 這個 symlink，而 `E5` 在它缺席時是失敗而不是跳過。這是排練方法的一個洞（clone 要補 `src-vendor`），也是那一格跳過條件的一個洞，這一段沒有修。真的 repo 的 commit `68f7fe8` 與排練的 tree 逐位元組相同（`0be3ebd7`）；`citecheck` 在真的 repo 上 commit 之後：0 new、35 known、0 suspended；`test-file-modes` 5/5。
+
+### 九、交接
+
+`P2-1` 關了：四件儀器、回顧表、以及每次上機一個的時基因子。下一步 `P2-2`（桌面）：一個配方的 quiet／loud 映像（`recover` 開、`/init` 拉起 LAN）、`kbuild` 把兩個檢查寫進 manifest、`cardcheck` 拒絕寫 flash 的指令、`declared-date` 檢查器、卡片 A —— 外加 `P2-1` 交給它的四件：每一個可能開到原廠的區塊都用 `map` 包夾、上電前等探針的 `start` 那一行、原廠的 LAN 位址與主機在那個網段上的位址、原廠格在 `boa` 之前停住是一個讀數（`X8-WAIT`）。第一次按電源是 `P2-3`。零寫 flash 指令、零 `FLR`、零電源循環。
