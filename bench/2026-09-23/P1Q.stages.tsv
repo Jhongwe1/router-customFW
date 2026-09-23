@@ -1,0 +1,40 @@
+# looprun 1.2 stage times (LOOP-3): one row per stage per round, and round 0 is S2/S3, which run once.
+# start_mono/end_mono are absolute time.monotonic(), CLOCK_MONOTONIC on this host (SPEC.md FW-114) -- the clock console-capture stamps its reads on -- so a row lines up with a capture whose origin is recorded.
+# seconds = end_mono - start_mono.  rc is the command's exit status, empty for the in-process S5c and S8 and for a skipped stage.  result is ok, FAIL and the ids of the assertions that failed, or skipped.
+# cell=P1Q attempt=1 iterations=4 skip=S2,S3,S4 boot-until='job control turned off[^#]{1,2}# ' boot-seconds=45
+round	stage	name	kind	start_mono	end_mono	seconds	rc	result
+0	S2	build	desk					skipped
+0	S3	assemble	desk					skipped
+1	S4	reset	bench					skipped
+1	S5	rescue	bench	2876.547470	2876.778540	0.231070	0	ok
+1	S5b	burnflag	bench	2876.784225	2878.983718	2.199494	0	ok
+1	S5c	hostlink	bench	2878.991287	2879.998909	1.007622		ok
+1	S6	upload	bench	2880.006247	2882.109642	2.103395	0	ok
+1	S6b	staged	bench	2882.114599	2884.323878	2.209279	0	ok
+1	S7	boot	bench	2884.334123	2895.123053	10.788929	0	ok
+1	S8	assert	desk	2895.132024	2895.132059	0.000035		ok
+2	S4	reset	bench	2895.136344	2897.768975	2.632631	0	ok
+2	S5	rescue	bench	2897.776805	2898.014159	0.237354	0	ok
+2	S5b	burnflag	bench	2898.020498	2900.220496	2.199998	0	ok
+2	S5c	hostlink	bench	2900.228210	2901.233933	1.005723		ok
+2	S6	upload	bench	2901.241964	2903.095087	1.853123	0	ok
+2	S6b	staged	bench	2903.099013	2905.300908	2.201895	0	ok
+2	S7	boot	bench	2905.308579	2916.096147	10.787568	0	ok
+2	S8	assert	desk	2916.104338	2916.104372	0.000034		ok
+3	S4	reset	bench	2916.107497	2918.752116	2.644619	0	ok
+3	S5	rescue	bench	2918.761361	2919.006548	0.245187	0	ok
+3	S5b	burnflag	bench	2919.013849	2921.214702	2.200853	0	ok
+3	S5c	hostlink	bench	2921.221012	2922.225389	1.004377		ok
+3	S6	upload	bench	2922.230706	2924.082661	1.851954	0	ok
+3	S6b	staged	bench	2924.086158	2926.287840	2.201682	0	ok
+3	S7	boot	bench	2926.295380	2937.092144	10.796765	0	ok
+3	S8	assert	desk	2937.101325	2937.101355	0.000030		ok
+4	S4	reset	bench	2937.104653	2939.736848	2.632194	0	ok
+4	S5	rescue	bench	2939.746060	2939.978294	0.232234	0	ok
+4	S5b	burnflag	bench	2939.982161	2942.188364	2.206203	0	ok
+4	S5c	hostlink	bench	2942.196183	2943.200869	1.004685		ok
+4	S6	upload	bench	2943.206987	2945.139495	1.932508	0	ok
+4	S6b	staged	bench	2945.143018	2947.343902	2.200884	0	ok
+4	S7	boot	bench	2947.352492	2958.145543	10.793051	0	ok
+4	S8	assert	desk	2958.155898	2958.155932	0.000034		ok
+# status: closed -- 4 of 4 round(s), every assertion held

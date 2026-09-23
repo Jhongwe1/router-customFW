@@ -83,7 +83,10 @@ ROOT = os.path.dirname(HERE)
 # lines, 23,449 bytes, longest line 628 (line 140, a row of its Never table).
 # Before the rewrite it was 1,450 lines and 127,686 bytes.
 # `PROGRESS.md` whole file, 量 2026-09-23 at e36acb4: 961,431 bytes, longest
-# line 31,772 (line 2143, § Carried forward).
+# line 31,772 (line 2143, § Carried forward).  🔄 The longest line re-measured
+# 2026-09-23 (106th segment), after that row, `CI-5`, was moved verbatim to
+# `docs/history/progress-carried-forward.md`: 9,575 (line 2170), which put it
+# under the floor -- 9,575 x 1.03 = 9,862.25, so 9,870.
 # Every derived number is its measure +3 %, rounded UP to three significant
 # figures, so it can be re-derived rather than trusted.
 # § Now is NOT derived from a measurement: 6,000 bytes, and 1,000 bytes for
@@ -99,7 +102,7 @@ BUDGET = {
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
     "PROGRESS.md:bytes": 991000,
-    "PROGRESS.md:maxline": 32800,
+    "PROGRESS.md:maxline": 9870,
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,
 }

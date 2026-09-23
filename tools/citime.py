@@ -468,6 +468,20 @@ def band(vals):
 #: LOCATED on, one line of evidence) -- the middle field because
 #: `CHANGEPOINTS[0]` was located on `suite_cost_s` and is being applied to
 #: `big3_s`, a column that did not exist when it was chosen.
+#: 🔄 **The third entry was declared on 2026-09-23 with ONE row on its right,
+#: and here is what that does not establish.**  `segments` counts a one-row
+#: partition as inside A8's ceiling and free of an A9 step, and both counts are
+#: vacuous: A8's half-width over one value is 0 by construction, and A9 needs
+#: four rows (`separation`).  The partition's own line says so: "n=1, nothing
+#: to partition".  The entry rests on the commit and on the suites' own counts,
+#: not on the audit.  The audit starts to mean something at the second row (A8)
+#: and the fourth (A9).  Waiting for those rows could not work.  A red
+#: `citime segments` makes the `text` job red, A5 refuses every row of such a
+#: run, and `check` counts only green runs, so the series could not grow past
+#: the row that turned it red.  Run 35829717707 (669e848, `big3_s` 1130 summed
+#: from its own steps) is that case, and it has no row in this file.  A9 did
+#: not name this row either: `separation` keeps two rows on each side, so it
+#: places a step at the last row one row early (aece416, 956), below its floor.
 CHANGEPOINTS = (
     ("2026-09-01T14:27:11Z", "suite_cost_s",
      "permutation test 2026-09-06; left n=16 mean 543.75, right n=28. "
@@ -481,6 +495,15 @@ CHANGEPOINTS = (
      "量 2026-09-09: the largest adjacent jump in the whole series at 451 s "
      "against a second-largest of 13 s (34.7x), and A9 locates this exact row "
      "at 165.01 sd from either pooled view"),
+    ("2026-09-23T00:08:01Z", "big3_s",
+     "68f7fe8 (no run of its own; first run 35800675702 on 5972a2a): "
+     "test-console-capture 59->67 cases, its mutant suite 39->47 mutants, "
+     "each count printed by the suite itself in the CI log; step wall "
+     "124->131 s and 774->948 s, test-deskchan 58->59 s; big3_s 956 -> 1138. "
+     "量 2026-09-23: at 182 s this is the second-largest adjacent jump in the "
+     "file, against 14 s for the largest jump that is not a boundary (13.0x), "
+     "and it sits 45.5 sd above the mean of the partition it leaves "
+     "(n=98, mean 954.32, sd 4.04)"),
 )
 
 #: The LATEST declared boundary -- the segment the series is currently in, and

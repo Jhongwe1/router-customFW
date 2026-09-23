@@ -182,6 +182,10 @@ MARK_CALL = re.compile(r'rlxfw_(mark|markx)\(\s*"([A-Za-z0-9_-]+)"')
 #: RTL_R32(GPIO_PIN_CTRL))`.  See `varwidth_excess`.
 VARWIDTH_FIELD = re.compile(rb"tmpReg\[0x([0-9a-fA-F]+)\]")
 
+#: The image a capture booted, by its own `RLXFW-ID0=` mark line -- K7's
+#: partition key.  Content, so it cannot depend on the constant it partitions.
+ID0_LINE = re.compile(rb"^RLXFW-ID0=([0-9A-F]{8})\r\n", re.M)
+
 #: Every non-mark constant this repository has MEASURED, keyed by the
 #: NORMALISED value, each with the console configuration that owns it.
 #: K2 requires every capture to land on a key here; K6 requires every key to be
@@ -196,6 +200,18 @@ DECLARED_CONSTS = {
           "量 5 captures over two images, first on silicon 2026-09-21 "
           "(RLXFW-ID0=F179CF21 on 3, 84385D91 on 2) -- which is what makes "
           "it a property of the console configuration and not of one build",
+    778: "quiet console whose /init brings the LAN up -- recipe a2c56bc8, "
+         "`p2q` (P2-2).  710 + 68: `rlxfw: lan bring-up` (21) and `rlxfw: "
+         "lan up, rlx0 10.1.1.3` (30) from /init, and RLXFW-SW-UNLOCK (17), "
+         "which the kernel prints while /init's first line is still going "
+         "out, so the two interleave character by character and the mark "
+         "never parses as one.  量 8 captures, 2026-09-23 (seating 39): the "
+         "interleaving differs in every one and the total (2,117 B) does "
+         "not; the card named this constant change before power.  A boot "
+         "whose two lines did NOT interleave would read 761, undeclared",
+    6609: "loud console with the same /init -- recipe a2c56bc8, `p2l`.  "
+          "6541 + the same 68.  量 3 captures, 2026-09-23 (seating 39), "
+          "e = 0 in all three",
 }
 
 #: The population floor.  A sweep that finds three captures and agrees with
@@ -486,13 +502,33 @@ def check():
     # is what does that work).  Neutering `varwidth_excess` to return 0 fails
     # the second half; breaking `VARWIDTH_FIELD` empties the partition and
     # fails the first.
+    # 🔄 2026-09-23 (106th segment): judged PER IMAGE.  From seating 39 there
+    # are two loud console configurations (6541, and 6609 with /init's LAN
+    # bring-up), so one value over every capture carrying the field had
+    # stopped being a claim about the normalisation and become a count of
+    # configurations booted.  Inside one image the configuration is fixed, so
+    # the claim that survives is: WITH the term each image lands on one value,
+    # WITHOUT it at least one image lands on more than one.  The image is the
+    # capture's own `RLXFW-ID0=` -- content, never the width, never the
+    # constant.  量 at the change: 84385D91 raw {6541, 6553} and F179CF21
+    # {6550, 6552, 6553} each normalise to {6541}; A2C56BC8 is {6609} either
+    # way (e = 0 on all three).
+    by_image = {}
+    for _p, b, m in varwidth:
+        ids = ID0_LINE.findall(b)
+        by_image.setdefault(ids[0].decode() if ids else "none", []).append((b, m))
+    raw_multi = sorted(i for i, v in by_image.items()
+                       if len({raw_const(b, m) for b, m in v}) > 1)
+    norm_multi = sorted(i for i, v in by_image.items()
+                        if len({normalised_const(b, m) for b, m in v}) > 1)
     raw_set = sorted({raw_const(b, m) for _p, b, m in varwidth})
     norm_set = sorted({normalised_const(b, m) for _p, b, m in varwidth})
-    good = len(varwidth) > 0 and len(raw_set) > 1 and len(norm_set) == 1
-    detail = ("%d capture(s) carry the field, hex-digit widths %s; WITHOUT the "
-              "normalisation they give %s, WITH it %s"
-              % (len(varwidth), dict(sorted(widths.items())), raw_set,
-                 norm_set))
+    good = len(varwidth) > 0 and len(raw_multi) > 0 and not norm_multi
+    detail = ("%d capture(s) over %d image(s) carry the field, hex-digit widths "
+              "%s; WITHOUT the normalisation they give %s and image(s) %s land "
+              "on more than one value, WITH it %s and image(s) %s do"
+              % (len(varwidth), len(by_image), dict(sorted(widths.items())),
+                 raw_set, raw_multi or "none", norm_set, norm_multi or "none"))
     print("  %s  %-10s %s" % ("ok  " if good else "FAIL", "K7",
                               "the varwidth normalisation is load-bearing: %s"
                               % detail
@@ -559,7 +595,7 @@ def predict():
 
 
 def main(argv):
-    print("bootbytes 1.2  --  boot capture length, derived not copied")
+    print("bootbytes 1.3  --  boot capture length, derived not copied")
     if len(argv) > 1 and argv[1] == "predict":
         return predict()
     return check()

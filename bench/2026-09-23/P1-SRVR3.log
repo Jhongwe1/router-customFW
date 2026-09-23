@@ -1,0 +1,16 @@
+busybox killall iperf3 ; sleep 1 ; iperf3 -s > /dev/null 2>&1 & sleep 3 ; ps
+  PID USER       VSZ STAT COMMAND
+    1 0          828 S    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+   79 0          328 S    iperf3 -s 
+   81 0          816 R    ps 
+# 

@@ -1,0 +1,24 @@
+# looprun 1.2 stage times (LOOP-3): one row per stage per round, and round 0 is S2/S3, which run once.
+# start_mono/end_mono are absolute time.monotonic(), CLOCK_MONOTONIC on this host (SPEC.md FW-114) -- the clock console-capture stamps its reads on -- so a row lines up with a capture whose origin is recorded.
+# seconds = end_mono - start_mono.  rc is the command's exit status, empty for the in-process S5c and S8 and for a skipped stage.  result is ok, FAIL and the ids of the assertions that failed, or skipped.
+# cell=P2Q attempt=1 iterations=2 skip=S2,S3,S4 boot-until='job control turned off[^#]{1,2}# ' boot-seconds=45
+round	stage	name	kind	start_mono	end_mono	seconds	rc	result
+0	S2	build	desk					skipped
+0	S3	assemble	desk					skipped
+1	S4	reset	bench					skipped
+1	S5	rescue	bench	6853.949939	6854.191389	0.241450	0	ok
+1	S5b	burnflag	bench	6854.197480	6856.398367	2.200887	0	ok
+1	S5c	hostlink	bench	6856.404407	6857.409513	1.005106		ok
+1	S6	upload	bench	6857.414654	6859.571939	2.157285	0	ok
+1	S6b	staged	bench	6859.576211	6861.799716	2.223506	0	ok
+1	S7	boot	bench	6861.807305	6872.505037	10.697732	0	ok
+1	S8	assert	desk	6872.515481	6872.515516	0.000035		ok
+2	S4	reset	bench	6872.519127	6875.121026	2.601898	0	ok
+2	S5	rescue	bench	6875.129467	6875.364565	0.235099	0	ok
+2	S5b	burnflag	bench	6875.370454	6877.575711	2.205257	0	ok
+2	S5c	hostlink	bench	6877.586380	6878.592775	1.006395		ok
+2	S6	upload	bench	6878.600691	6880.464775	1.864084	0	ok
+2	S6b	staged	bench	6880.468507	6882.667732	2.199225	0	ok
+2	S7	boot	bench	6882.674285	6893.364654	10.690370	0	ok
+2	S8	assert	desk	6893.375270	6893.375304	0.000034		ok
+# status: closed -- 2 of 2 round(s), every assertion held

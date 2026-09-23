@@ -1,0 +1,44 @@
+{
+  "tool_version": "1.4",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-23T17:29:20+0800",
+  "clock": "CLOCK_MONOTONIC",
+  "t0_mono": 8375.943645658,
+  "t0_real": 1790155760.7447932,
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 20.0,
+  "esc_period_requested_s": 0.002,
+  "esc": {
+    "esc_after": {
+      "requested_period_s": 0.002,
+      "writes": 1007,
+      "window_s": 2.216327,
+      "achieved_period_s": 0.002201,
+      "ended_on_until": true
+    }
+  },
+  "cr": {
+    "esc_after": {
+      "written": true,
+      "prompt_seen": true,
+      "waited_s": 0.050197,
+      "log_offset": 276,
+      "settle_budget_s": 2.0
+    }
+  },
+  "cr_settle_s": 2.0,
+  "seconds": 40.0,
+  "idle": 0.0,
+  "until": "<RealTek>",
+  "until_offset": 250,
+  "sent": "J BFC00000",
+  "sent_hex": "4a2042464330303030300d",
+  "sent_s": 0.013482,
+  "stop_reason": "--until matched at offset 250",
+  "bytes": 307,
+  "duration_s": 2.435561,
+  "end_mono": 8378.379206952,
+  "end_real": 1790155763.1803546,
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

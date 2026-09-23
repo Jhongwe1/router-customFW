@@ -32474,3 +32474,57 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 八、交接
 
 `P2-2` 關了。下一段先在推上去的樹上跑完整 desk sweep（這一段停掉了），再做 `P2-3`：上機 A，**今天 2026-09-23**，照 `bench/2026-09-23/PREDICTIONS-B44-block42.md` 按十二次電源，每一次先等擁有者的握手；不能跨午夜，做不完或今天開不了就寫一張新日期的後繼卡片，這一張不改。零寫 flash 指令、零 `FLR`、零電源循環。
+
+## 2026-09-23 — 第一百零五段（15:0x 開場，seating 39，**十二次電源按鍵**，18:16 收工，未 commit）：`P2-3` 一段關掉，而這一段最值錢的兩件都是代理用第二來源推翻了我在上機中寫下的假說
+
+**卡片 A 整張跑完。** 十二次按電源（15:09–17:37），223 格 fenced cell 全部在宣告日期擷取（`check-predictions` 223 of 223），三個 map bracket 與預測相同，`D2` 在任何比較之前算出並成立。零寫 flash 指令、零 `FLR`。每一個離開卡片的動作都在 `bench/2026-09-23/CORRECTIONS-block42.md` §§ 1–6。
+
+### 一、上機前：CI、sweep、以及卡片自己的缺陷
+
+- **上一段的 CI（run `35829717707`，`669e848`）紅在 `text` 的 `citime segments`。** 代理診斷、我核對：`5972a2a` 那一列的 `BIG3` 1138（之前約 956）讓 2026-09-08 起的分段 A8 半幅 9.318 % 超過 5.0；原因是 `68f7fe8`（`P2-1`）讓 `test-console-capture` 59 → 67 cases、突變 39 → 47（CI log 自己印的：`67 case(s), 131s`、`47 passed … (948s wall)`，我從保存的 job log 讀回）。宣告為 `CHANGEPOINTS[2]` `2026-09-23T00:08:01Z`；`segments` 3/3、該分段 n = 1，`stats` 印 `± 0.00 %`（不是帶，不引用）。`citime record 35829717707` 被 `A5` 拒絕（紅的 run），`check` 的「0 missing」只數綠的 run —— 所以它不代表這個 run 被記了（`FW-125`）。同一個 run 的 `netblast` 沒有 `if:` 守衛、被 GitHub 隱含的 `success()` 跳過，`census` 也被跳過：這個 run 沒有覆蓋判決。`ci.yml` 補上守衛，並把同一段註解兩行併成一行，讓行數不變（`CITE-2` 指到下面的行）；兩個過期的成本註解改成 131 s／67 cases、948 s／47 mutants。`CI-5`（一列 31,772 bytes、十一個日期區塊）照文件紀律重寫成現況，舊文逐字搬到 `docs/history/progress-carried-forward.md`，`docmove` CONSERVED 830/830；第一次重寫漏了它表格的第三格（`Owning gate`），`spec-check` `C8` 抓到，補回。
+- **完整 desk sweep**（`669e848` 的 ext4 clone，補 `src-vendor` symlink 與 `upstream/` 從本機 checkout）：105 宣告、103 跑、99 綠、2 預期紅（census）、**2 非預期紅**：`citime segments`（就是上面那個）與 `test-config-gates` `E5`。`E5` 在真的樹上 60/60；clone 紅是因為 `config/rlxfw-initramfs.tsv:100` 宣告的 `/bin/uprobe` 來源在 `build/`，而 `build/` 是 gitignored —— 交辦說的 `src-vendor` 只是 clone 缺的一半。上機儀器的 suite 全綠。
+- **擁有者在 15:09 要求先開 ESC 視窗、先開電源**，我照卡片的 `P1-A` 開窗接住（冷、`prompt_seen true`），然後讓板子停在提示字元等完 sweep 才跑 `P1`（15:54）：sweep 的 8 個平行突變工作會把主機負載帶進 `D2` 的時序與 qemu 的 `iperf3` client，這個干擾在原廠那一欄不會有。
+- 🔴 **凍結卡片的缺陷，上機前抓到**：`Z9-D2` 的 `--tsv` 沒有檔名，照原樣跑只會 `argparse` 報錯。`cardcheck` 只查在板子上打的命令，`HOST` 格的參數沒有任何東西看 —— block 41 的 `netblast` 選項是同一類，這是第二次（`FW-124`）。抓到它的是上機前把每一格 `HOST` 的真實工具跑一遍：`hostprobe` 13 格對 127.0.0.1 跑 1 s、`looprun` 4 格 `--mode plan`、`flashmap compare` 對已提交的 `C7-M0`（重現卡片預測的 `0927be41e91fe4bd` 與兩行 compare）。改法寫進 `CORRECTIONS` § 1 再執行。§ 2 的順序描述與 § 5 的 fenced cells 不一致（照 § 5 跑），以及原廠七格 `J 80500000` 前面沒有讀回 staged head（不加、理由寫下），也在 `CORRECTIONS`。
+- **跑卡片的是一支 scratch runner**：巨集從卡片自己的定義行解析、cell 從 § 5 的 fence 逐字取、每個決策點一道閘門（`fl0`、`prompt`、`until`、`map`、`hpstop`、`caught`、`grep`），每一道都先在已提交的擷取上做正反控制。🔴 **我的第一版 `map` 閘門會把一個正確的 bracket 判成「不同」**（`flashmap compare` 的 `DIFFER` 行有縮排、總數行前面有 `flashmap: level 0 …`），第一版的反控制 `sed` 也因為錨在行首而等於正控制 —— 都在用之前被控制抓到。
+
+### 二、上機
+
+- **`P1`（rlxfw）**：loud 三輪、`P1-RZ`、quiet 四輪全部過；位元組全中（loud 7,948 B ×3、quiet 2,117 B ×4、map 3,013 B、`OFF` 139 B ×15），`RLXFW-ID0=A2C56BC8`、`N7=00000011`；第一個 map bracket 與預測相同；`NET-109` 開跑前那一對是健康形狀（CPU 埠 `CRCAlignErr 294` = 埠 3 送出 294）。
+- **吞吐矩陣在 `rlx0` 上失敗九次**：TCP 板子收三次結束交換沒完成（client 被 `timeout 70` 殺掉、沒有 `receiver` 那一行）；`TS1` 23.6 Mbit/s、`TS2`／`TS3` 0.21／0.78；UDP 的 `UR1`、`UR3`、`US1` 交換沒完成；`UR2`、`US2`、`US3` `No route to host`。卡片的條件式重啟 `P1-SRVR` 用了一次，之後照 `CORRECTIONS` § 4.1 事先寫下的規則重複成 `P1-SRVR2`–`6`。交給原廠驅動（`P1-DOWN`、`P1-ETH4`）之後 `P1-EPING` 立刻 4/4，`eth4` 的十二次全部完成。
+- 🔴 **`CORRECTIONS` § 5 是錯的，而我照它做了一件事。** `UR2` 連不上之後我讀 WSL 的 `dmesg`，看到 `vhci_rx` 的 BUG 警告「從 16:11 才開始」與 `-104` 的 URB unlink，判斷主機的 usbip 傳輸壞了，於是把 GbE 重新 attach。十分鐘內用 journald（第二來源）推翻：BUG 警告整個下午都在印（包括 `TS1` 那個乾淨的 23.6 Mbit/s），`dmesg` 的「從 16:11 開始」是環形緩衝已經輪替掉；`-104` 成對出現在每一次 console 擷取關閉埠的時候。§ 5 留著、§ 5.1 撤回；**重新 attach 讓板子的埠 3 link 跳了一次，`UR3` 之後的 `rlx0` 讀數帶著這個干擾發表**。§ 5.2 再記一件：§ 5 的時間是 `dmesg -T` 換算的，被主機 realtime 的跳動往後推了 24–26 s。
+- **`V1`–`V3`、`M1`、`P2`、`V4`–`V7`、`M2`、`P3`**：每次按電源先握手、ESC 視窗開好確認在跑才請擁有者開電源（`M1` 是只聽的擷取）。原廠七次 `J 80500000` 都是 1,789 B，但沒有一次與 `G6` 逐位元組相同：`iwcontrol` 與 `route` 兩行順序互換（七次的行集合都與 `G6` 相同）。`M1`／`M2` 的自己開機路徑不印 `P0phymode` 與 `Ethernet init Okay!`（`LDR-46`）。`P2-M0`、`P3-M0` 與 `P1-M0` 一樣（`FLS-30`）。每一個 `-HP` 裡原廠的位址只以 `unlisted-1` 出現；每個 `looprun` 區塊前都清了 10.1.1.1；`tcpdump` 只在 `P3`、不加 `-e`；收工時 `bench/2026-09-23/` 全部檔案裡只有四個允許的位址，**沒有 `H601`**。
+- **`D2` 在 17:41 最先算**，用 15:30 寫好的腳本：暖 +0.0078 s（±0.010）、冷 −0.0004 s（±0.025）、兩個只聽的控制都在 ±0.010 內 —— **成立**（`CLK-34`）。
+
+### 三、兩件代理推翻我的事（都自己核對過數字）
+
+- **`NET-112`：遺失在送出，不在接收。** 我上機中的假說是「接收卡住吞掉 `TEST_END`」、「沒回 ARP 是同一個接收狀態」。NIC 分析代理拿交換器自己的計數（原廠驅動 `eth4` 在 `P1-ETH4` 讀的硬體 MIB）對 `rlx0` 的計數：進來的訊框 346,724 = 346,724、位元組精確相等；出去的少 182 個、23,692 B。失敗試驗的 TX 環裡伺服器的結果 JSON 重複 2–4 次。我自己重讀 `P1-ETH4` 與 `P1-US3-S1` 的原始數字，四個全對。**`recover` 看不到這種遺失**（`NET-113`）：它只在四個描述子都被引擎持有、第五個被遞交時上膛；7 次 stop、7 次 fire、`n_writes` 14 → 126 = 14 + 7 × 16，我重讀過。
+- **`CLK-35`：主機的 `CLOCK_MONOTONIC` 在這次上機的大部分時間慢 1.7–2.4 %。** `D8` 代理的旁支發現；我用自己的算術重算（第一次漏了 jiffies 的 32 位元回繞，改正後）：149,985 jiffies 對 monotonic 1,476.20 s、realtime 1,500.98 s。時序代理再加一件：`P1-A`（主機時鐘還正常的時候擷取）比後來的冷接住長 ×1.0225／×1.0238，等於主機後來的比值 —— 推：上機內 loader 的「漂移」、`P1` 暖重置比 `P2`／`P3` 長、`D2` +7.8 ms 的大部分，以及 `CLK-32` 的每次上機因子，都至少部分是主機時鐘。這直接碰到 `notes/boot-time.md` § 5 一直開著的問題。
+
+### 四、其他讀數（擁有者檔：`notes/boot-time.md` § 7、`notes/nic-driver.md` § 19）
+
+- `D8`：通道偏移全距 701.0 µs（我與代理兩個不共用程式碼的計算十五個偏移逐一相同），穩定度測試如預測開火；quiet 映像的 network up 是 J+[9.745–9.776, 10.777–10.806] s；loud 映像沒有讀數；卡片的時戳規則被 realtime 跳動打壞；「快取」情境從沒發生（`CLK-36`）。
+- `D7` 成立、`J` → 提示字元兩顆映像都命中、原廠 `J` → `boa` 沒命中 —— **一次計算，尚未第二來源**（`CLK-37`）。
+- `D5` (a)：30 次 ICMP 全部 0 % 遺失；卡片的 56 B 1.9–3.5 ms 在六個系列都低於下緣。`eth4`：TCP 收 24.4–25.0、送 26.2 ×3、UDP 收 70 % 遺失、UDP 送零遺失（`NET-114`）。`D4`：原廠開 80、52869、52881；rlxfw 零開；`V1` 的 `tcp 80` 比 `boa` 那一行早 40 ms（`NET-115`）。`D6`：`MemTotal` 26,984 kB（`MEM-19`）。
+
+### 五、我自己的錯
+
+- **對擁有者說 `D2` 的腳本「在今天任何開機之前寫好」** —— 它是 15:30 寫的，`P1-A` 在 15:09；真的是「在組裡其他每一份擷取、以及任何 rlxfw 對原廠的數字之前」。時序代理抓到；筆記、`SPEC` 寫的是正確的版本。
+- **`CORRECTIONS` § 5 的診斷與它下令的重新 attach**（上面）。規則早就寫著「一個回報 0 的工具是在做宣稱」，我讀的 0 來自一個看不到過去的環形緩衝。
+- 給 NIC 代理的 brief 說 `NET-102` 有三個 `receiver` 行 —— 只有 `F1` 有；`H1`／`H2` 在 2026-09-22 就是今天這個樣子。
+- 我的每試驗「主機健康括號」數的是環形緩衝的行數，273 → 272 還印「CONTAMINATED」；撤掉。
+- `CORRECTIONS` § 6 初稿把失敗試驗數成七個，實際九個；第一次核對位元組的腳本 glob 沒帶 `.log`，數字全錯，丟掉重跑。
+- PowerShell 把 `$D` 吃掉一次（`CLAUDE.md` 寫過），改成檔案腳本。
+
+### 六、觀察，沒有處理
+
+- 主機核心的 `vhci_rx` BUG 警告是 `usbnet` 傳送路徑上的 debug 警告，整個下午都在印；它和 `CLK-35` 的關係未定。
+- `FW-124`（`HOST` 格參數沒人檢查）已經兩次，照 `CLAUDE.md`「重複的規則變成工具的拒絕」，下一步是 `cardcheck` 用各工具自己的 parser 驗 `HOST` 格；`FW-125` 同理，`citime record` 寫完應該自己跑一次 `segments`。這一段兩個都沒做。
+- `docs/KNOWN-ISSUES.md` 的紅 run 計數停在二十（2026-09-06），之後的紅 run 沒進任何 `.md`（代理指出，未處理）。
+
+### 七、收工
+
+🔴 **這一段沒有跑收工閘門、沒有跑完整 sweep、沒有 commit、沒有 push** —— context 用盡，擁有者要求立刻打包交接。工作樹上的全部改動（下面列）原封不動留給下一段：`spec-check` 在 `SPEC.md`／`PROGRESS.md` 改完之後單獨跑過一次是 0，其餘閘門一個都沒跑。改動：`bench/2026-09-23/`（590 個檔，未追蹤；`CORRECTIONS-block42.md` 已 `git add -N`）、`bench/README.md`、`SPEC.md`（十四列）、`PROGRESS.md`（§ Now、`CI-5`、`P2-3`／`P2-4` 列）、`LOG.md`（本段）、`notes/boot-time.md` § 7、`notes/nic-driver.md` § 19、`docs/KNOWN-ISSUES.md`（兩節）、`docs/history/progress-carried-forward.md`（新，已 `git add -N`）、`tools/citime.py`（`CHANGEPOINTS[2]`）、`.github/workflows/ci.yml`（`netblast` 守衛與兩行註解）。study 檔沒寫。
+
+### 八、交接
+
+下一段先做桌面兩件：① `P2-3` 還沒算完或還沒第二來源的讀數（`notes/boot-time.md` § 7.6–7.7；這一段的分析腳本與三份代理報告在 `$FWRE_WORK/rebuild/s105-analysis/`）；② `P2-4` 的卡片，先修掉上機 A 暴露的四件方法問題（`PROGRESS.md` 的 `P2-4` 列）再凍結，然後跟擁有者約上機 B（不能是 2026-09-23）。留給擁有者：`r3-4/cells` 的 55 棵舊樹（26 GB）要不要清（建議清，等他說好）；上機 B 要不要收窄 `D8` 的一秒括號（建議先不要 —— 先修卡片的時戳規則與 loud 映像拿不到讀數的問題）。

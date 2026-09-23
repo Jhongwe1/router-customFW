@@ -1,0 +1,16 @@
+Connecting to host 10.1.1.4, port 5201
+Reverse mode, remote host 10.1.1.4 is sending
+[  4] local 10.1.1.2 port 40492 connected to 10.1.1.4 port 5201
+[ ID] Interval           Transfer     Bandwidth
+[  4]   0.00-5.00   sec  16.0 MBytes  26.8 Mbits/sec                  
+[  4]   5.00-10.00  sec  15.8 MBytes  26.6 Mbits/sec                  
+[  4]  10.00-15.00  sec  15.9 MBytes  26.6 Mbits/sec                  
+[  4]  15.00-20.00  sec  15.9 MBytes  26.7 Mbits/sec                  
+[  4]  20.00-25.00  sec  15.8 MBytes  26.6 Mbits/sec                  
+[  4]  25.00-30.45  sec  15.3 MBytes  23.5 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-30.45  sec  95.0 MBytes  26.2 Mbits/sec    0             sender
+[  4]   0.00-30.45  sec  95.0 MBytes  26.2 Mbits/sec                  receiver
+
+iperf Done.

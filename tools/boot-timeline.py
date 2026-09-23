@@ -680,6 +680,8 @@ class Corpus:
         if d not in self._dirs:
             idx = []
             for log in sorted(glob.glob(os.path.join(d, "*.log"))):
+                if is_report(log):      # a report is no boot to inherit from
+                    continue
                 idx.append((log, wall_of(self.meta(log)), last_boot_event(self.raw(log))))
             self._dirs[d] = idx
         return self._dirs[d]
@@ -896,7 +898,30 @@ def cellstr(vals):
     return "n=%d %.4f %.4f..%.4f" % (len(v), statistics.median(v), v[0], v[-1])
 
 
-def collect_logs(paths):
+#: 🆕 2026-09-23 (106th segment).  Every `--retro` report opens with these
+#: bytes, and a report is not a capture.  A card's HOST cell saves the report
+#: as `<name>.log` beside the captures it describes (`bench/2026-09-23/Z9-D2.log`),
+#: and the report prints the landmark strings -- so, 量, the next sweep of
+#: `bench/` read it as a kernel boot of unknown firmware, and because it "holds
+#: a boot and has no started_wallclock" every inherited class in its directory
+#: went to `?`.  量 before this rule: it excludes 1 of the 438 `.log` that hold
+#: boot text, that one.  The only other boot-text `.log` with neither `.timing`
+#: nor `.meta.json`, `2026-08-23/A-catch`, is a real transcript and stays.
+#: Only `--retro` prints this line, so a saved output of another mode is not
+#: recognised -- stated, not handled.
+REPORT_HEAD = b"boot-timeline "
+
+
+def is_report(path):
+    """True when `path` opens with REPORT_HEAD: a report of this tool."""
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(len(REPORT_HEAD)) == REPORT_HEAD
+    except OSError:
+        return False
+
+
+def all_logs(paths):
     logs = []
     for p in paths:
         if os.path.isdir(p):
@@ -904,6 +929,11 @@ def collect_logs(paths):
         else:
             logs.append(p)
     return logs
+
+
+def collect_logs(paths):
+    """Every `.log` under `paths` that is a capture: REPORT_HEAD's are not."""
+    return [l for l in all_logs(paths) if not is_report(l)]
 
 
 def orphan_why(corpus, log):
@@ -1235,6 +1265,10 @@ def retro(paths, tsv_path):
 
     # (c) named -------------------------------------------------------------
     p("(c) NAMED")
+    reps = [l for l in all_logs(paths) if is_report(l)]
+    p("  reports of this tool, excluded as captures (REPORT_HEAD): %d" % len(reps))
+    for r in reps:
+        p("    %s" % r)
     nothing = [k for k in kboots if k["error"] and not k["seg"]]
     p("  kernel boots that contributed nothing: %d" % len(nothing))
     for k in nothing:

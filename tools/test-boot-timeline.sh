@@ -25,7 +25,8 @@
 #       on a vendor and an rlxfw capture; one capture through both tables
 #       differs exactly where the tables do.   B7  anchors named, n on every
 #       cell.   B8  firmware, variant and image against a grep of each capture.
-#   B9  cold/warm inherited, and when it must not be.   B10  the host-probe
+#   B9  cold/warm inherited, and when it must not be; B9b a report of this
+#       tool saved beside the captures is not a boot (2026-09-23).   B10  the host-probe
 #       join, and its refusal without t0_mono.   B11  TERM-1's silences.
 #   B12  the per-seating scale fit, with a positive and a negative control.
 #   B13  the retro's identity line and TSV.   B14  refusals.
@@ -651,6 +652,21 @@ mk(FX + "/fit3/A-cold.log", loader(warm=False), meta("10:00:00", 5.0, sent=None)
 mk(FX + "/fit3/K1-boot.log", rlxfw(), meta("10:00:10", 12.0))
 mk(FX + "/fit3/K2-boot.log", rlxfw(), meta("10:00:40", 12.0))
 
+# B9b: a report of this tool saved as `.log` beside the captures -- a card's
+# HOST cell does exactly that (bench/2026-09-23/Z9-D2.log).  rep1 plants the
+# report; rep0 plants the same bytes WITHOUT its header, the control that the
+# planted file really does poison inheritance when it is not recognised.
+REP = (b"A PREDICTION, NOT A RESULT: a synthetic report\n"
+       b"landmarks: booting `Booting...`  jump `---Jump to address=`\n"
+       b"  decomp `decompressing kernel:`  kentry `start address: 0x`\n")
+for d, head in (("rep1", b"boot-timeline --retro   tool sha256 0   paths: fx\n"),
+                ("rep0", b"")):
+    mk(FX + "/%s/A-cold.log" % d, loader(warm=False), meta("10:00:00", 5.0, sent=None))
+    mk(FX + "/%s/R-rz.log" % d, loader(warm=True), meta("10:01:00", 3.0, sent="J BFC00000"))
+    mk(FX + "/%s/K-boot.log" % d, rlxfw(), meta("10:01:05", 12.0))
+    with open(FX + "/%s/Z9-rep.log" % d, "wb") as fh:
+        fh.write(head + REP)
+
 # B10: the host-probe join.  t0_mono 5000, window 0 .. 40 s, sent_s 0.005.
 new = meta("11:00:00", 40.0, clock="CLOCK_MONOTONIC", t0_mono=5000.0,
            t0_real=1.0e9, sent_s=0.005, end_mono=5040.0, end_real=1.0e9 + 40)
@@ -912,6 +928,16 @@ ck "the unplaced catch cannot fit: warm, inherited from R-rz" "warm" "$(cls "$FX
 ck "the unplaced catch could fit: ?"                          "?"    "$(cls "$FX/fit2/K-boot.log")"
 ck "a kernel boot in between: the first cold, the second ?"   "cold ?" \
    "$(cls "$FX/fit3/K1-boot.log") $(cls "$FX/fit3/K2-boot.log")"
+# B9b.  REFUTED IF rep1's K-boot is not warm (the report was taken for a boot
+# capture with no wallclock), or rep0's is not `?` (the fixture cannot poison
+# inheritance, so rep1 would pass for a tool that never excluded anything), or
+# --retro does not name the report while counting no unknown firmware.
+ck "a report of this tool beside it: warm, from R-rz"            "warm" "$(cls "$FX/rep1/K-boot.log")"
+ck "the same bytes without the report header: ?"                 "?"    "$(cls "$FX/rep0/K-boot.log")"
+ck "--retro names the report, and counts no unknown firmware"    "1 0" \
+   "$(r="$("$PY" "$BT" --retro "$FX/rep1" 2>/dev/null)"
+      printf '%s ' "$(printf '%s\n' "$r" | sed -n 's/^  reports of this tool, excluded as captures (REPORT_HEAD): \([0-9]*\)$/\1/p')"
+      printf '%s\n' "$r" | sed -n 's/^corpus: .*firmware unknown \([0-9]*\)).*/\1/p')"
 
 echo
 echo "=== B10: the host-probe join ==="

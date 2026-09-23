@@ -1,0 +1,196 @@
+boot-timeline --retro   tool sha256 05dd4a74c349be5e   paths: bench/2026-09-23
+A PREDICTION, NOT A RESULT: every capture below was taken for another question (PROGRESS.md P2-1).
+corpus: 230 .log; loader boots 25 (cold 12, warm 13, ? 0); kernel boots 20 (vendor 9, rlxfw quiet 8, rlxfw loud 3, rlxfw ? 0, firmware unknown 0); kernel text without rtkload 0
+rules: a byte arrived at the LAST .timing row with offset <= its own (FW-35), an upper bound; landmarks and cold/warm as in the tool's header; a cell is n, median (mean of the middle two when n is even), min..max, in seconds
+
+landmarks, each table in its search order (THE SEARCH RULE in the tool's header); a kernel boot is searched with LOADER then its firmware's table;
+`=` marks a landmark defined identically in VENDOR and RLXFW; `(?P<at>...)` is the byte a landmark sits on
+  LOADER
+     booting      Booting\.\.\.[\s\S]{2}(?P<at>[\s\S])
+                    the byte after `Booting...\r\n`: anchor C, CLK-15's own
+     chipname     chipName: 
+                    the loader's `\0chipName: ` (a loud kernel's SPI table prints `chipName    |`, with no colon)
+     ramsize      ramSize: 32M
+                    C-8 reads the line after it
+     banner       ---RealTek\(RTL8196E\)
+                    the loader's banner (D1b)
+     autoboot     Jump to image start=
+                    printed only when no ESC arrived inside the window (LDR-15)
+  VENDOR
+   = jump         ---Jump to address=|Jump to image start=
+                    the loader leaving for the image: a typed `J`, or its own autoboot
+   = decomp       decompressing kernel:
+                    rtkload, inside the image; the same text in both images
+   = decomp_done  done decompressing kernel\.
+                    rtkload
+   = kentry       start address: 0x[0-9A-Fa-f]{8}
+                    rtkload's last line before it enters the kernel
+   = wlan         Realtek WLAN driver
+                    the WLAN driver's banner: in both kernels, different builds
+   = nic          Probing RTL8186 10/100 NIC
+                    the NIC driver's probe
+   = fastpath     Realtek FastPath:v1\.03
+                    the FastPath module
+     userinit     init started: BusyBox
+                    the vendor's init, BusyBox 1.13.4
+     ready        boa: starting server
+                    the last line the vendor prints: its web server starting
+  RLXFW
+   = jump         ---Jump to address=|Jump to image start=
+                    the loader leaving for the image: a typed `J`, or its own autoboot
+   = decomp       decompressing kernel:
+                    rtkload, inside the image; the same text in both images
+   = decomp_done  done decompressing kernel\.
+                    rtkload
+   = kentry       start address: 0x[0-9A-Fa-f]{8}
+                    rtkload's last line before it enters the kernel
+     b00          RLXFW-B00
+                    start_kernel, after page_address_init (config/rlxfw-marks.tsv)
+     b09          RLXFW-B09
+                    start_kernel, after console_init
+   = wlan         Realtek WLAN driver
+                    the WLAN driver's banner: in both kernels, different builds
+   = nic          Probing RTL8186 10/100 NIC
+                    the NIC driver's probe
+   = fastpath     Realtek FastPath:v1\.03
+                    the FastPath module
+     b10          RLXFW-B10
+                    init_post, before the branch that reaches userspace
+     userinit     rlxfw: init running
+                    the first line of rlxfw's /init (config/rlxfw-init.sh)
+     ready        job control turned off\r?\n(?:[^\n]*\n){0,8}?(?P<at>#)(?= |\Z)
+                    the `#` of the first prompt after the shell's own first line
+segments -- interval = t(to) - t(from); absent (`--`) unless both landmarks are in the firmware's table and in the capture
+  loader.booting       booting     -> chipname    identical       CLK-15: stage 1 copying out of SPI NOR; the loader table's `booting`
+  loader.banner        booting     -> banner      identical       the loader table's `banner` (D1b); D2's positive control
+  loader.esc           banner      -> autoboot    identical       LDR-15's ESC window; exists only when the loader autobooted
+  rtkload.decompress   decomp      -> decomp_done comparable      scales with the image, whose size this tool does not read (D4)
+  rtkload.total        jump        -> kentry      comparable      the loader's jump to rtkload's hand-over
+  kernel.early         kentry      -> wlan        comparable      
+  kernel.wlan          wlan        -> nic         comparable      the vendor's WLAN init, present in both kernels
+  kernel.nic           nic         -> fastpath    comparable      
+  kernel.late          fastpath    -> userinit    comparable      holds rlxfw's own 300-jiffy pre-check wait (CLK-27, IRQ-13)
+  kernel.total         kentry      -> userinit    comparable      
+  user.ready           userinit    -> ready       not-comparable  the vendor runs rcS and its daemons; rlxfw execs a shell
+  boot.jump_to_ready   jump        -> ready       not-comparable  TERM-1's J -> ready
+  rlxfw.setup          b00         -> b09         not-comparable  rlxfw only: start_kernel from page_address_init to console_init
+  rlxfw.initpost       b10         -> userinit    not-comparable  rlxfw only: init_post to /init's first line
+
+(a) LOADER -- the loader table's own rows (anchor C); loader.esc where the loader autobooted
+  segment              from -> to               class           cold                             warm                             ?
+  loader.booting       booting -> chipname      identical       n=12 0.3479 0.3439..0.3557       n=13 0.3474 0.3415..0.3522       n=0
+  loader.banner        booting -> banner        identical       n=12 0.5727 0.5664..0.5861       n=13 0.5822 0.5727..0.5890       n=0
+  loader.esc           banner -> autoboot       identical       n=1 5.1219 5.1219..5.1219        n=1 5.1021 5.1021..5.1021        n=0
+  identity: the landmark engine's loader.booting equals the loader table's `booting` on 25 of 25 loader boots, loader.banner equals `banner` on 25 of 25
+
+(b) KERNEL SEGMENTS per firmware, variant and cold/warm; rlxfw again per image (RLXFW-ID0), earliest image first
+  vendor (one image) -- 9 boot(s): cold 4, warm 5, ? 0
+    segment              from -> to               class           cold                             warm                             ?
+    rtkload.decompress   decomp -> decomp_done    comparable      n=4 1.0371 1.0367..1.0380        n=5 1.0337 1.0269..1.0341        n=0
+    rtkload.total        jump -> kentry           comparable      n=4 1.0512 1.0487..1.0547        n=5 1.0449 1.0398..1.0495        n=0
+    kernel.early         kentry -> wlan           comparable      n=4 0.6519 0.6515..0.6525        n=5 0.6504 0.6466..0.6507        n=0
+    kernel.wlan          wlan -> nic              comparable      n=4 4.5247 4.5221..4.5296        n=5 4.5026 4.4804..4.5106        n=0
+    kernel.nic           nic -> fastpath          comparable      n=4 0.8244 0.8155..0.8329        n=5 0.8135 0.8101..0.8148        n=0
+    kernel.late          fastpath -> userinit     comparable      n=4 0.9622 0.9515..0.9754        n=5 0.9490 0.9459..0.9515        n=0
+    kernel.total         kentry -> userinit       comparable      n=4 6.9636 6.9423..6.9879        n=5 6.9120 6.8934..6.9252        n=0
+    user.ready           userinit -> ready        not-comparable  n=4 18.1773 18.0943..18.3171     n=5 18.2492 17.4062..18.2674     n=0
+    boot.jump_to_ready   jump -> ready            not-comparable  n=4 26.2170 26.0858..26.3096     n=5 26.1917 25.3394..26.2376     n=0
+
+  rlxfw quiet (pooled over images) -- 8 boot(s): cold 2, warm 6, ? 0
+    segment              from -> to               class           cold                             warm                             ?
+    rtkload.decompress   decomp -> decomp_done    comparable      n=2 1.1885 1.1879..1.1891        n=6 1.2012 1.1880..1.2014        n=0
+    rtkload.total        jump -> kentry           comparable      n=2 1.2018 1.2013..1.2024        n=6 1.2144 1.2024..1.2159        n=0
+    kernel.early         kentry -> wlan           comparable      n=2 0.8025 0.8021..0.8030        n=6 0.8099 0.8019..0.8119        n=0
+    kernel.wlan          wlan -> nic              comparable      n=2 4.4853 4.4822..4.4884        n=6 4.5331 4.4829..4.5349        n=0
+    kernel.nic           nic -> fastpath          comparable      n=2 0.8400 0.8394..0.8406        n=6 0.8477 0.8391..0.8487        n=0
+    kernel.late          fastpath -> userinit     comparable      n=2 3.0897 3.0871..3.0923        n=6 3.1214 3.0877..3.1220        n=0
+    kernel.total         kentry -> userinit       comparable      n=2 9.2175 9.2108..9.2242        n=6 9.3138 9.2122..9.3144        n=0
+    user.ready           userinit -> ready        not-comparable  n=2 0.1134 0.1128..0.1139        n=6 0.1143 0.1121..0.1150        n=0
+    boot.jump_to_ready   jump -> ready            not-comparable  n=2 10.5327 10.5249..10.5405     n=6 10.6427 10.5267..10.6448     n=0
+    rlxfw.setup          b00 -> b09               not-comparable  n=2 0.0457 0.0456..0.0458        n=6 0.0463 0.0461..0.0466        n=0
+    rlxfw.initpost       b10 -> userinit          not-comparable  n=2 0.0115 0.0115..0.0116        n=6 0.0117 0.0116..0.0125        n=0
+
+  rlxfw loud (pooled over images) -- 3 boot(s): cold 1, warm 2, ? 0
+    segment              from -> to               class           cold                             warm                             ?
+    rtkload.decompress   decomp -> decomp_done    comparable      n=1 1.2313 1.2313..1.2313        n=2 1.2299 1.2298..1.2300        n=0
+    rtkload.total        jump -> kentry           comparable      n=1 1.2469 1.2469..1.2469        n=2 1.2423 1.2422..1.2423        n=0
+    kernel.early         kentry -> wlan           comparable      n=1 1.5058 1.5058..1.5058        n=2 1.5039 1.5036..1.5042        n=0
+    kernel.wlan          wlan -> nic              comparable      n=1 5.1410 5.1410..5.1410        n=2 5.1352 5.1347..5.1358        n=0
+    kernel.nic           nic -> fastpath          comparable      n=1 1.2245 1.2245..1.2245        n=2 1.2239 1.2238..1.2239        n=0
+    kernel.late          fastpath -> userinit     comparable      n=1 3.1401 3.1401..3.1401        n=2 3.1390 3.1389..3.1390        n=0
+    kernel.total         kentry -> userinit       comparable      n=1 11.0114 11.0114..11.0114     n=2 11.0020 11.0012..11.0028     n=0
+    user.ready           userinit -> ready        not-comparable  n=1 0.1162 0.1162..0.1162        n=2 0.1164 0.1161..0.1167        n=0
+    boot.jump_to_ready   jump -> ready            not-comparable  n=1 12.3745 12.3745..12.3745     n=2 12.3606 12.3594..12.3618     n=0
+    rlxfw.setup          b00 -> b09               not-comparable  n=1 0.2752 0.2752..0.2752        n=2 0.2746 0.2741..0.2752        n=0
+    rlxfw.initpost       b10 -> userinit          not-comparable  n=1 0.0120 0.0120..0.0120        n=2 0.0117 0.0114..0.0120        n=0
+
+  rlxfw quiet, per image, earliest first:
+    id0=A2C56BC8  first 2026-09-23/P1Q-r01-boot -- 8 boot(s): cold 2, warm 6, ? 0
+      segment              from -> to               class           cold                             warm                             ?
+      rtkload.decompress   decomp -> decomp_done    comparable      n=2 1.1885 1.1879..1.1891        n=6 1.2012 1.1880..1.2014        n=0
+      rtkload.total        jump -> kentry           comparable      n=2 1.2018 1.2013..1.2024        n=6 1.2144 1.2024..1.2159        n=0
+      kernel.early         kentry -> wlan           comparable      n=2 0.8025 0.8021..0.8030        n=6 0.8099 0.8019..0.8119        n=0
+      kernel.wlan          wlan -> nic              comparable      n=2 4.4853 4.4822..4.4884        n=6 4.5331 4.4829..4.5349        n=0
+      kernel.nic           nic -> fastpath          comparable      n=2 0.8400 0.8394..0.8406        n=6 0.8477 0.8391..0.8487        n=0
+      kernel.late          fastpath -> userinit     comparable      n=2 3.0897 3.0871..3.0923        n=6 3.1214 3.0877..3.1220        n=0
+      kernel.total         kentry -> userinit       comparable      n=2 9.2175 9.2108..9.2242        n=6 9.3138 9.2122..9.3144        n=0
+      user.ready           userinit -> ready        not-comparable  n=2 0.1134 0.1128..0.1139        n=6 0.1143 0.1121..0.1150        n=0
+      boot.jump_to_ready   jump -> ready            not-comparable  n=2 10.5327 10.5249..10.5405     n=6 10.6427 10.5267..10.6448     n=0
+      rlxfw.setup          b00 -> b09               not-comparable  n=2 0.0457 0.0456..0.0458        n=6 0.0463 0.0461..0.0466        n=0
+      rlxfw.initpost       b10 -> userinit          not-comparable  n=2 0.0115 0.0115..0.0116        n=6 0.0117 0.0116..0.0125        n=0
+
+  rlxfw loud, per image, earliest first:
+    id0=A2C56BC8  first 2026-09-23/P1L-r01-boot -- 3 boot(s): cold 1, warm 2, ? 0
+      segment              from -> to               class           cold                             warm                             ?
+      rtkload.decompress   decomp -> decomp_done    comparable      n=1 1.2313 1.2313..1.2313        n=2 1.2299 1.2298..1.2300        n=0
+      rtkload.total        jump -> kentry           comparable      n=1 1.2469 1.2469..1.2469        n=2 1.2423 1.2422..1.2423        n=0
+      kernel.early         kentry -> wlan           comparable      n=1 1.5058 1.5058..1.5058        n=2 1.5039 1.5036..1.5042        n=0
+      kernel.wlan          wlan -> nic              comparable      n=1 5.1410 5.1410..5.1410        n=2 5.1352 5.1347..5.1358        n=0
+      kernel.nic           nic -> fastpath          comparable      n=1 1.2245 1.2245..1.2245        n=2 1.2239 1.2238..1.2239        n=0
+      kernel.late          fastpath -> userinit     comparable      n=1 3.1401 3.1401..3.1401        n=2 3.1390 3.1389..3.1390        n=0
+      kernel.total         kentry -> userinit       comparable      n=1 11.0114 11.0114..11.0114     n=2 11.0020 11.0012..11.0028     n=0
+      user.ready           userinit -> ready        not-comparable  n=1 0.1162 0.1162..0.1162        n=2 0.1164 0.1161..0.1167        n=0
+      boot.jump_to_ready   jump -> ready            not-comparable  n=1 12.3745 12.3745..12.3745     n=2 12.3606 12.3594..12.3618     n=0
+      rlxfw.setup          b00 -> b09               not-comparable  n=1 0.2752 0.2752..0.2752        n=2 0.2746 0.2741..0.2752        n=0
+      rlxfw.initpost       b10 -> userinit          not-comparable  n=1 0.0120 0.0120..0.0120        n=2 0.0117 0.0114..0.0120        n=0
+
+(c) NAMED
+  kernel boots that contributed nothing: 0
+  fragments -- a landmark of the firmware's own table is absent: 0
+  class `?`: 0
+  kernel text without rtkload's `decompressing kernel:` (not a boot this tool can time): 0
+
+(d) TERM-1 -- the silences a boot cell's terminator must outlast
+  longest silence = the largest gap between consecutive .timing rows, from the boot's first landmark to `ready`;
+  p90 is nearest-rank; `max` names the capture that holds it (the first in path order on a tie)
+  echo -> jump on the 18 J-path boots whose log opens on the echo: max 0.000000 s -- what starting at the boot's first landmark instead of the echo moves
+  kernel boots
+  vendor                       longest silence   n=9    median   4.4336   p90   5.1034   max   5.1034   bench/2026-09-23/M1-BOOT.log
+  vendor                       jump -> ready     n=9    median  26.1917   p90  26.3096   max  26.3096   bench/2026-09-23/V1-BOOT.log
+  rlxfw quiet                  longest silence   n=8    median   4.4943   p90   4.5189   max   4.5189   bench/2026-09-23/P1Q-r02-boot.log
+  rlxfw quiet                  jump -> ready     n=8    median  10.5916   p90  10.6448   max  10.6448   bench/2026-09-23/P1Q-r02-boot.log
+  rlxfw loud                   longest silence   n=3    median   2.9594   p90   2.9604   max   2.9604   bench/2026-09-23/P1L-r01-boot.log
+  rlxfw loud                   jump -> ready     n=3    median  12.3618   p90  12.3745   max  12.3745   bench/2026-09-23/P1L-r01-boot.log
+  rlxfw quiet id0=A2C56BC8     longest silence   n=8    median   4.4943   p90   4.5189   max   4.5189   bench/2026-09-23/P1Q-r02-boot.log
+  rlxfw quiet id0=A2C56BC8     jump -> ready     n=8    median  10.5916   p90  10.6448   max  10.6448   bench/2026-09-23/P1Q-r02-boot.log
+  rlxfw loud id0=A2C56BC8      longest silence   n=3    median   2.9594   p90   2.9604   max   2.9604   bench/2026-09-23/P1L-r01-boot.log
+  rlxfw loud id0=A2C56BC8      jump -> ready     n=3    median  12.3618   p90  12.3745   max  12.3745   bench/2026-09-23/P1L-r01-boot.log
+  loader resets -- sent `J BFC00000` or `busybox reboot -f`, `Booting...` after the echo, then `<RealTek>`; send -> prompt
+  J BFC00000                   longest silence   n=4    median   1.5672   p90   1.5707   max   1.5707   bench/2026-09-23/V6-WZ.log
+  J BFC00000                   send -> prompt    n=4    median   2.2425   p90   2.2488   max   2.2488   bench/2026-09-23/V6-WZ.log
+  busybox reboot -f            longest silence   n=8    median   1.5876   p90   1.5886   max   1.5886   bench/2026-09-23/P1Q-r04-rz.log
+  busybox reboot -f            send -> prompt    n=8    median   2.3211   p90   2.3337   max   2.3337   bench/2026-09-23/P1Q-r02-rz.log
+  the send is `sent_s` on 12 and the first byte of the echo on 0; 1 sent a reset command and hold no reset and prompt after it (not in the population); 0 could not be timed
+
+(e) PER-SEATING SCALE -- does a directory's loader `booting` median move with the same image's kernel segments?
+  A common factor here can be the host's monotonic rate or the device's timebase; this data cannot separate them.
+  H-prop (one rate factor per seating) predicts slope ~1 for every segment; refuted for a segment whose 95 % interval holds 0.
+  H-add (USB latency, ms per read) predicts slope ~0 for a segment of >= 1 s; refuted for one whose interval excludes 0.
+  ratio = the directory's median / the image's median of its per-directory medians; a segment's fit re-normalises both sides over the directories that hold it.
+  the pairs are not independent (an image in two directories gives two points mirrored about 1): the interval is indicative.
+  fit over every (image, directory) pair: ln(segment ratio) on ln(loader ratio), least squares with an intercept
+    segment              from -> to                typical  pairs   slope      95 % interval       r  H-prop   H-add
+  fit without id0=none, which pools several builds and is not one image: ln(segment ratio) on ln(loader ratio), least squares with an intercept
+    segment              from -> to                typical  pairs   slope      95 % interval       r  H-prop   H-add
+    no image occurs in two directories that also hold loader boots: nothing to fit
+

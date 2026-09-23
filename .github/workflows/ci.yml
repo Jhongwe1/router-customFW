@@ -829,13 +829,13 @@ jobs:
       # It imports flashwin.overlaps_forbidden rather than restating the H601
       # rule, and F8 is the control that says the import is load-bearing.
       - name: netblast
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         # 🆕 2026-09-21 (seating 36).  The instrument that drove the loader
         # ladder.  Its C1a-C1e re-derive bench/2026-09-21e/y5-rateladder.py's
         # constants FROM THAT FILE, so "the two runs had the same dose" is
         # checked rather than asserted; C3a-C3e drive the liveness probe in
         # both directions with injected runners, so a SILENT reading has a
-        # positive control behind it.  Needs no board, no network and no
-        # vendor material: C2 paces UDP to 127.0.0.1.
+        # positive control behind it.  Needs no board, no network and no vendor material: C2 paces UDP to 127.0.0.1.
         run: /usr/bin/python3 tools/netblast.py self-test 2>&1 | tee ci-out/netblast.out; exit "${PIPESTATUS[0]}"
 
       - name: flashmap
@@ -1032,12 +1032,12 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mustrun.py --self-test 2>&1 | tee ci-out/mustrun.out; exit "${PIPESTATUS[0]}"
 
-      # 124 s on CI at 59 cases (run 35780238822). A pty, not a serial port.
+      # 131 s on CI at 67 cases (run 35800675702). A pty, not a serial port.
       - name: test-console-capture
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
 
-      # 774 s on CI at 39 mutants (run 35780238822); it stops the one above being a claim
+      # 948 s on CI at 47 mutants (run 35800675702); it stops the one above being a claim
       # that cannot fail: 量 2026-08-30, test-console-capture reported 40/40
       # while TEN mutations of the terminator guard it had just gained were
       # alive. Each mutant runs the WHOLE suite, because "the committed cases

@@ -2376,3 +2376,125 @@ pointer instead. The finding's evidence is unchanged — it was measured on
 seating 30 — but the line it points at is no longer an instance of the defect
 it names. That is a citation being *correct* and *misleading at the same
 time*, and no checker in this repository can see it.
+
+## 19 Seating 39 (`P2-3`, press 1) — the throughput matrix, and where the frames go
+
+Card `bench/2026-09-23/PREDICTIONS-B44-block42.md`, press 1; image `p2q`
+(`rtl819x-nic 1.4`, `recover` compiled on, `RLXFW-N7=00000011`). Twelve `iperf3`
+trials on `rlx0` (TCP and 20 Mbit/s UDP, both directions, 30 s, n = 3), then the
+handover (`P1-DOWN`, `P1-ETH4`) and the same twelve on the vendor driver's `eth4`.
+Every departure from the card — six server restarts, and a host re-attach whose
+diagnosis was retracted — is in `bench/2026-09-23/CORRECTIONS-block42.md` §§ 4–6.
+
+### 19.1 `rlx0`: what the twelve trials did (`NET-111`)
+
+| trials | what | outcome (量) |
+|---|---|---|
+| `P1-TR1`, `TR2`, `TR3` | TCP, board receives | the host client *sent* 15.3–17.9 Mbit/s per 5 s while data flowed (`TR1` 17.8 / 17.5 / 17.6 / 16.8 / 15.3, `TR2` 17.9 / 17.3 / 17.2 / 17.3 / 15.6), 61 MB each; then the end-of-test exchange never completed and `timeout 70` killed the client. No `receiver` line, which is the figure the card scores, so its 16–18 Mbit/s prediction has n = 0 |
+| `P1-TS1` | TCP, board sends | 23.6 Mbit/s, 84.2 MB, completed |
+| `P1-TS2`, `TS3` | TCP, board sends | 0.21 and 0.78 Mbit/s, 323 and 668 retransmissions by the board's own TCP; completed |
+| `P1-UR1`, `P1-UR3` | UDP, board receives | the host sent to 30 s; the exchange never completed (`UR3` ran after the host re-attach, `CORRECTIONS` § 5.1) |
+| `P1-US1` | UDP, board sends | 20.7 Mbit/s with no datagram lost in any interval for 29 s, 53,485 sent; the exchange never completed |
+| `P1-UR2`, `US2`, `US3` | — | `No route to host`: the host's ARP was never answered |
+
+`recover` stopped and restarted the TX queue 7 times: `n_tx_stop` 7,
+`n_recov_fire` 7, `n_recov_ok` 7, `n_recov_fail` 0, `n_recov_spurious` 0 between
+`P1-N0` and `P1-US3-S1`, and `n_writes` 14 → 126 = 14 + 7 × 16, so the recoveries
+were the only hardware writes. The one exchange that wedged and was rescued in
+time (`P1-TS2`) completed 2.8 s after the fire. Before any traffic, `P1-N0` →
+`P1-AC0` (`NET-109`) read the healthy shape: CPU port `Rcv 0 bytes`, `CRCAlignErr`
+294, port 3's egress 294 packets, `CpuEvent 0` — a pair taken the same minute on a
+fresh boot.
+
+### 19.2 Receive is complete; the losses are on transmit (`NET-112`)
+
+The vendor driver's `eth4` reports the switch's hardware counters summed over the
+physical ports (`CONFIG_RTL_NIC_HWSTATS`, the vendor's `rtl_nic.c`). Read at
+`P1-ETH4` against `rlx0`'s own counters at `P1-US3-S1`, the last dump before the
+handover (量):
+
+| | switch, port side | `rlx0` driver | difference |
+|---|---:|---:|---:|
+| frames into the board | 346,724 | `n_rx` 346,724 | 0 |
+| bytes into the board | 363,046,862 | 361,659,966 + 4 × 346,724 (FCS) = 363,046,862 | 0 |
+| frames out of the board | 195,145 | `n_tx` 195,327 | **182** |
+| bytes out of the board | 180,393,132 | 179,635,516 + 4 × 195,327 = 180,416,824 | **23,692** |
+
+Every frame that entered port 3 during this boot reached the driver. Of the frames
+the driver handed to the engine, at least 182 never left port 3 — a lower bound, since
+the vendor driver may have sent some before the read. The baseline at `P1-AC0` was
+294 = 294, so the deficit accrued during `P1`. 推: about 28 of the 182 are frames
+`recover`'s re-arm discards unsent (up to 4 per recovery, § 19.3); the rest, about
+130 B each on average, are small frames the engine consumed and the switch never
+emitted.
+
+量: each `-S1` dump shows the TX ring's last four frames. In the failed trials a
+frame the size of the `iperf3` server's results repeats — `P1-TR3-S1` 267 B ×3,
+`P1-UR1-S1` 281 B ×3, `P1-UR3-S1` 281 B ×2, `P1-US1-S1` 280 B ×4 (engine-owned,
+`tx_stopped 1`) — while the completed `P1-TS1-S1` holds it once. 讀: `iperf3` 3.1.3
+sends that JSON only after it has read the client's `TEST_END` and the client's own
+JSON. So the board received the end-of-test messages, answered, and kept
+retransmitting an answer the host never acknowledged. The frame identities are
+inferred from sizes (推), not captured.
+
+This is `NET-78`'s "mute, not deaf" state, counted for the first time: the
+host→board path lost nothing; the board→host path lost frames the engine reports as
+sent. The `No route to host` episodes fit the same shape — over `P1-UR2`'s 75 s the
+driver received 19 frames and sent 25, and the host saw no ARP answer. This
+**refutes** the hypothesis I wrote during the seating: that a receive stall
+stranded `TEST_END`.
+
+### 19.3 `recover` cannot see this loss (`NET-113`)
+
+讀, `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c` 1.4: `recover` is armed
+only on `nic_xmit`'s stop path — all 4 TX descriptors engine-owned and a fifth
+frame offered — and `nic_recov_fn` fires 100 jiffies later if that state still
+holds. Its re-arm rewrites the TX ring without OWN, discarding up to 4 queued
+frames, and nothing counts them. A loss in which the engine clears OWN (§ 19.2)
+never stops the queue, so it never arms `recover`. 量: all 7 fires came exactly 100
+jiffies after their arms. When a trial wedged at its end with fewer than five
+frames to send, the stop came late or never: `P1-US1`'s at its kill, 40 s after its
+exchange; `P1-TR1`'s 15 s after its kill.
+
+### 19.4 The vendor driver on rlxfw's kernel (`NET-114`)
+
+After the handover `P1-EPING` read 4/4 at once. Read after `D2` held:
+
+| trials | what | outcome (量) |
+|---|---|---|
+| `P1-ER1`, `ER2`, `ER3` | TCP, board receives | 24.4, 24.7, 25.0 Mbit/s (receiver) |
+| `P1-ES1`, `ES2`, `ES3` | TCP, board sends | 26.2, 26.2, 26.2 Mbit/s, 0 retransmissions |
+| `P1-EU1`, `EU2`, `EU3` | UDP 20 Mbit/s, board receives | 37,339, 37,344, 37,341 of 53,298 datagrams lost (70 %) |
+| `P1-EV1`, `EV2`, `EV3` | UDP 20 Mbit/s, board sends | 19.9, 19.9, 20.0 Mbit/s, 0 lost |
+
+All twelve end-of-test exchanges completed. The card's one prediction here, TCP
+board-sends 22–27 Mbit/s (`NET-84`: 25.4), holds; the rest are first readings.
+
+### 19.5 The experiments that decide the mechanism (proposed, zero flash)
+
+* **E0**: right after a stalled trial, before any restart, `cat /proc/net/tcp`. A
+  control-connection row with about 200 B queued to send and its retransmit timer
+  running supports § 19.2; nothing queued refutes it.
+* **E1**: one board-receive trial with a host frame capture (rlxfw's addresses only)
+  and `asicCounter` read before and at t ≈ 45 s: compare Δ port-3 egress with Δ
+  `n_tx` and with the frames the host saw. `n_tx` above the port count puts the loss
+  in the switch or CPU port; equal counts with the answer missing on the host put it
+  after port 3; the answer present on the host refutes § 19.2.
+* **E2**: read `/proc/rtl819x-nic` twice during a stall, 10 s apart: descriptors
+  engine-owned with `tx_stopped 0` and an unchanged `tpdcr0_pos` would be a wedge
+  `recover` cannot detect.
+* **E3**: `/proc/net/snmp` and `/proc/net/netstat` around a board-sends trial:
+  D-SACKs received near the retransmission count means `TS2`/`TS3`'s collapse was
+  spurious retransmission; none means real loss.
+* **E5**: during a `No route` episode, a host capture and `asicCounter`, then
+  `NET-101`'s `engine off` / `arm` / `engine on` and ARP again: if ARP returns, the
+  mute state lives in the CPU port or its rings.
+
+### 19.6 What this seating does not say
+
+* Where below the DMA engine the frames are lost — the switch's CPU port or port 3's
+  egress — nor why.
+* Whether `TS2`/`TS3`'s collapse was loss or spurious retransmission.
+* Anything from `P1-UR3` on, cleanly: the host re-attach bounced port 3's link
+  first (`CORRECTIONS` § 5.1).
+* The frame identities in § 19.2 are sizes, not captures.

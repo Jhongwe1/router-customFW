@@ -326,3 +326,199 @@ TX line.
   are first readings, not scored predictions.
 * The per-seating factor is a property of the setup this corpus was taken in.
   Whether the host or the device carries it is open (§ 5).
+
+## 7. Seating A (`P2-3`), 2026-09-23 — the first readings
+
+Card `bench/2026-09-23/PREDICTIONS-B44-block42.md`; every departure from it is in
+`bench/2026-09-23/CORRECTIONS-block42.md` §§ 1–6. Twelve presses, 15:09–17:37;
+`check-predictions` read 223 of 223 fenced cells captured after the card, all on
+the declared date. The three flash-map brackets matched the prediction (`FLS-30`):
+`P1-M0`, `P2-M0` and `P3-M0` are 3,013 B each with body digest `0927be41e91fe4bd`,
+one `DIFFER` in group 0 against the 2026-08-16 dump, and 31 groups the same.
+
+### 7.1 `D2` holds (`CLK-34`)
+
+Computed from `Z9-D2.tsv` (`boot-timeline --retro`, run as `CORRECTIONS` § 1 says)
+by a script written at 15:30 — after `P1-A` (15:09–15:13), before every other
+capture the groups use (the first warm reset 15:54:54, the first vendor capture
+16:36), so before any rlxfw-vs-vendor number existed. Quantity: `loader.banner`
+(`booting` → banner), s.
+
+| group (card § 3.1) | captures | n | values | median |
+|---|---|---:|---|---:|
+| rlxfw cold | `P1-A`, `P2-A`, `P3-A` | 3 | 0.5861, 0.5727, 0.5706 | 0.5727 |
+| vendor cold | `V1-A`…`V3-A` | 3 | 0.5733, 0.5729, 0.5731 | 0.5731 |
+| rlxfw warm | `P1L-r02/r03-rz`, `P1-RZ`, `P1Q-r02/r03/r04-rz`, `P2Q-r02-rz`, `P3Q-r02-rz` | 8 | 0.5890, 0.5889, 0.5878, 0.5877, 0.5890, 0.5876, 0.5822, 0.5812 | 0.5878 |
+| vendor warm | `V4-WZ`…`V7-WZ` | 4 | 0.5786, 0.5813, 0.5822, 0.5727 | 0.5800 |
+| loader-only cold (context) | `V4-A`…`V7-A`, `M2-A` | 5 | 0.5724, 0.5664, 0.5732, 0.5711, 0.5720 | 0.5720 |
+| mode control, cold (listen) | `M1-BOOT` | 1 | 0.5726 | — |
+| mode control, warm (listen) | `M2-BOOT` | 1 | 0.5808 | — |
+
+Against the bands written before power: warm rlxfw − vendor **+0.0078 s** (±0.010)
+within; cold **−0.0004 s** (±0.025, a limit at n = 3) within; `M1-BOOT` − rlxfw cold
+−0.0000 and − vendor cold −0.0005, `M2-BOOT` − rlxfw warm −0.0070 and − vendor warm
++0.0008, each within ±0.010. **`D2` holds.**
+
+**What the verdict does not carry.** The rlxfw warm group splits by press: `P1`'s
+six resets read 0.5876–0.5890 s, `P2Q-r02-rz` 0.5822 and `P3Q-r02-rz` 0.5812 — a
+6–8 ms step inside one image family, and most of the +7.8 ms. The leading
+candidate, 推, is the host clock (§ 7.2); the others are the board's state before
+the watchdog reset (`P1`'s rounds ran with the LAN under a 20 Hz probe and TFTP)
+and a drift of the loader itself.
+
+### 7.2 The host's `CLOCK_MONOTONIC` ran slow for most of the seating (`CLK-35`)
+
+量, three references that are not the host's monotonic clock:
+
+* **The board's timer.** `CONFIG_HZ=100` (讀, the image's `.config`). From `P1-N0`
+  (`j_now` 4294941931, which is −25,365 as a signed 32-bit value) to `P1-US1-S1`
+  (124,620): 149,985 jiffies over 1,476.20 s of host monotonic and 1,500.98 s of
+  host realtime — 101.60 per monotonic second, 99.93 per realtime second. A second
+  computation over the tick-IRQ count of 24 reads: 101.749 against 100.0025.
+* **Windows' clock.** The NTFS mtimes of `P1`'s `.meta.json` files advance
+  1.0137–1.0184 Windows seconds per host-monotonic second from 15:54 on, and 1.0014
+  over the 41 minutes before.
+* **WSL's realtime**, which Hyper-V time sync steps forward: +0.41 to +0.58 s every
+  20–35 s under load, six steps totalling +2.7386 s inside `P1-HP`'s 165.2 s;
+  realtime − monotonic grew 27.14 s between 15:57:43 and 16:24:41.
+
+So the host monotonic clock — the one every console and probe stamp is on — ran
+slow while the device's own timer agreed with realtime to within 0.07 %. Over the
+whole seating, from the realtime − monotonic offsets of successive captures (one
+computation, 量, assuming the steps follow Windows' clock): 0.000 % inside `P1-A`
+(15:09), 0.18 % from 15:13 to 15:55, then 1.80 % from 15:55 to 16:40 and 1.74–2.41 %
+in every window through 17:08 — the vendor presses included, whose traffic is a
+probe at 20 Hz. So the slowing began with `P1`'s traffic and did not end with it;
+§ 5's 0.0 ppm (a quiet 120 s, earlier that day) is not contradicted, and "load"
+alone does not describe it.
+
+**The loader's in-seating drift matches it** (推). `P1-A`, captured while the rate was
+near 0, exceeds the later cold catches by ×1.0225 on `loader.booting` and ×1.0238 on
+`loader.banner` — the host's later rate almost exactly; `P1`'s warm resets exceed
+`P2`'s and `P3`'s by ×1.0118 and ×1.0114, as the rate did between 15:55 and 17:03.
+If so, § 7.1's warm split and most of `D2`'s +7.8 ms are the host clock: with a
+rate ratio of 1.022 the warm Δ would read about −3.8 ms, still inside the band.
+
+**Consequences.** (1) An interval this seating measured after 15:55 is short by up
+to 2.4 %, by an amount that changed over the afternoon. (2) `CLK-32`'s per-seating
+factor is, 推, at least partly this host clock and not the device; refuted by a
+seating whose host monotonic rate, measured against the board's jiffies, stays
+constant while `CLK-32`'s factor still moves. (3) § 5's "`D2` is unaffected: both
+columns carry the same factor" holds only when both columns were captured at the
+same host rate; here most rlxfw warm catches ran at 15:55–15:57 and the vendor warm
+catches at 17:08–17:29. (4) `dmesg -T` converts old kernel lines with the current
+offset, so it shifted them by the accumulated steps — 24–26 s in this seating
+(`CORRECTIONS` § 5.2); journald's stamps do not.
+
+**Not established:** the mechanism; anything about earlier seatings, whose captures
+carry no real/mono pairs.
+
+### 7.3 `D8` on rlxfw (`CLK-36`)
+
+* **Channel offset** (card § 3.4). Fifteen `P1-OFF` cells, 139 B each; the probe
+  recorded 15 `udp` events on port 50000, each `len=10`. offset = t_udp − t_console,
+  the console event being the FW-35 time of the header's first byte (byte 66, the
+  `t` of `traceroute to 10.1.1.2`). Over `OFF02`–`OFF15` (n = 14) the offset runs
+  −206.5 to +494.4 µs, a range of **701.0 µs** with the probe's read stamps, and
+  896.6 µs with the kernel's receive stamps converted through each capture's own
+  real/mono pair. Both exceed 260.4 µs: the stability test fires, as the card
+  predicted, so network up is published only as a console-side bound. Two
+  computations sharing no code agree on all fifteen offsets.
+* **Network up, quiet image** (`P1Q-r01`…`r04`): J+[9.745–9.776, 10.777–10.806] s,
+  width 1.028–1.037 s (the card: 1.00–1.09 s); the console's own `lan up` at
+  J+10.61–10.62 lies inside every bracket. Each bracket is a reconstruction —
+  `hostprobe` records no ARP broadcasts: the lower edge is the send of the answered
+  cycle's first queued request (推, from ping's rtt), the upper edge is bounded by
+  the reply's read time (量). One computation, not yet second-sourced.
+* **The loud image has no reading.** In `P1L-r01`…`r03` no reply came before
+  `looprun`'s `busybox reboot -f`, 0.16–0.22 s after the prompt. 推: the host's ARP
+  cycle restarts at each boot's NIC probe and its answered broadcast falls 4.19 s
+  later — after the quiet image's `N-NDOPEN` (4.054 s) and before the loud one's
+  (4.449 s).
+* **The card's regimes did not occur.** At all seven jumps `--neigh` read
+  INCOMPLETE with no address: the "cached entry" regime never happened, and the one
+  flushed loud boot has no reading, so the flushed-versus-cached contrast is not
+  available from `P1`.
+* **The card's stamp rule is wrong on this host.** `ping_real − (start_real −
+  start_mono)` assumes realtime − monotonic is constant; with § 7.2's steps it
+  places the first replies 1.362–2.270 s late. The probe's own read time is what
+  survives.
+
+### 7.4 Byte predictions, the vendor's boots, and the loader's two paths (`LDR-46`)
+
+* rlxfw: every loud boot 7,948 B (`P1L` ×3, twelve `tmpReg` fields, e = 0); every
+  quiet boot 2,117 B (`P1Q` ×4, `P2Q` ×2, `P3Q` ×2); each with `RLXFW-ID0=A2C56BC8`
+  and `RLXFW-N7=00000011`; every map 3,013 B; every offset cell 139 B — all as
+  predicted.
+* The vendor: all seven `J 80500000` boots (`V1-BOOT`…`V7-BOOT`) are 1,789 B and end
+  at `boa: starting server pid=350, port 80`, as predicted. None is byte-identical to
+  `G6`/`G7`: the lines are the same, but `iwcontrol RegisterPID to (wlan0)` and
+  `route: SIOCDELRT: No such process` come out in the other order — two processes
+  printing in a race. `M1-BOOT` (cold, listen) is 1,901 B and `M2-BOOT` (warm,
+  listen) 1,979 B, both to `boa`.
+* The loader's autoboot path (`M1`, `M2`) prints `Jump to image start=0x80500000...`
+  straight after the banner, with no `P0phymode=01, embedded phy` and no
+  `---Ethernet init Okay!`: those two lines appear only on the path that enters the
+  prompt.
+* Every burn-flag read (`*-AB`, `*-AB2`) returned `00000001`, as predicted.
+
+### 7.5 `D4` and `D6`, first readings (`NET-115`, `MEM-19`)
+
+* rlxfw: `P1-PS` lists `/bin/sh`, the kernel threads, and nothing else. `P1-NMAP`
+  (a connect scan of all 65,535 TCP ports, `-T4 --max-retries 1`): none open,
+  58,989 closed, 6,546 filtered (no response).
+* The vendor (`V1-NMAP`, the same scan): 80/tcp open (predicted); 52869/tcp and
+  52881/tcp open (first reading; 推 `miniigd`'s UPnP ports); 65,381 closed, 151
+  filtered.
+* rlxfw memory after boot (`P1-FREE`): `MemTotal` 26,984 kB, `MemFree` 20,932 kB;
+  `busybox free` used 6,012 kB.
+* `D4` readiness, `V1` only (one computation): first ICMP reply J+14.541 s, first
+  `tcp port=80 result=ok` J+26.270 s, the `boa: starting server` line's first byte
+  J+26.310 s. The reply precedes the TCP success, as predicted; the TCP success comes
+  40 ms *before* the console line, where the card predicted it would follow within
+  ~1 s — a miss in sign at n = 1.
+* `D5` (a), ICMP: all 30 runs (five payloads × `P1`, `P2`, `P3`, `V1`, `V2`, `V3`)
+  20 of 20, 0 % loss, as predicted. Average rtt, rlxfw 1.516–1.815 ms at 56 B and
+  2.052–2.252 ms at 1,472 B; vendor 1.504–1.710 and 1.656–1.956 ms. The card's 56 B
+  band, 1.9–3.5 ms, misses low in all six series; it came from 4-echo pings at the
+  default 1 s interval, and these are 20 echoes at 50 ms.
+
+### 7.6 Computed once, not yet second-sourced (`CLK-37`)
+
+One computation, by hand from `Z9-D2.tsv`, with `J` the tool's `jump` landmark (the
+loader's `---Jump to address=` line, § 3.1), not `sent_s`:
+
+* f_A: this seating's warm `loader.booting` median 0.347425 s (n = 13) / 0.353718 =
+  0.98221. The other choices of B_A (cold, all, `esc_after` only) give
+  0.98302–0.98659 and change no banded verdict.
+* `J` → prompt, `p2q`: median 10.5916 s, 8 of 8 inside 10.15–11.71 s (predicted
+  f_A × 10.72 = 10.531) — **hit**. `p2l`: median 12.3618 s, 3 of 3 inside 11.84–13.12 s
+  (predicted 12.260) — **hit**.
+* The vendor's `kernel.total`: warm 6.8934–6.9252 s inside the raw 6.8895–6.9817 —
+  **hit**; 9 of 9 inside the § 5 form f_A × 6.93–7.15.
+* The vendor's `J` → `boa`: medians 26.217 s cold and 26.192 s warm against the raw
+  25.654–26.126 s — **miss**: at least five of nine above the band, one below (25.339).
+* `D7`: loud `kernel.total` median 11.0028 s; Δ(loud − quiet) inside [1.6884, 1.7906] s
+  against the registered band [1.3589, 1.9372] s — **holds** for every e from 0 to 12
+  and every f_A above. The implied rate, 3,390–3,392 B/s, is 88.3 %, about 0.1 point
+  under `FW-70`'s 88.4–92.7 %.
+* `M2`'s `loader.esc` 5.1021 s against 4.9503 predicted (+3.07 %, no band).
+
+### 7.7 Owed to the next segment — computed nowhere yet
+
+* A second, independent computation of § 7.6.
+* `D2` corrected for § 7.2's host clock, capture by capture, beside the raw verdict:
+  fit Windows' mtimes and the board's jiffies against monotonic in windows.
+* `D5`'s tables (ICMP for both firmwares; the `iperf3` matrix with board CPU per
+  trial). The outcomes on `rlx0` and `eth4` are in `notes/nic-driver.md` § 19.
+* `D4` readiness (the first `tcp 80` success against the `boa` line), the vendor's
+  `D8` from `V*-HP`/`M*-HP`, and `P3-TCPD`'s check of the `D8` reconstruction.
+
+### 7.8 What seating A does not establish
+
+* `D3`: one calendar day cannot reproduce itself (`P2-4`).
+* That § 7.2's host clock is the cause of `CLK-32`'s factor.
+* Where inside its one-second bracket rlxfw's network came up; anything about the
+  loud image's network up.
+* That no flash byte was written: the maps compare 32 digests over 4,186,112 B of
+  4,194,304, cannot see two writes that cancel, and do not read `H601`.

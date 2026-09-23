@@ -1144,6 +1144,46 @@ cannot type a flash-writing verb without the owner's dated yes (`FW-113`), canno
 declare a date its captures contradict without `capdate` saying so (`FW-120`), and
 cannot carry a host probe record `capdate` cannot date (`hostprobe` 1.2).
 
+## 🔴 rlxfw's NIC driver loses frames it reports as sent, and `recover` cannot see it — 2026-09-23 (seating 39)
+
+量, `P2-3`'s press 1 on `p2q` (`rtl819x-nic 1.4`): of the twelve `iperf3` trials on
+`rlx0`, six never completed their end-of-test exchange and three could not
+connect (`No route to host`); on the same hardware and kernel the vendor driver
+completed all twelve (`notes/nic-driver.md` § 19, `NET-111`, `NET-114`). The
+switch's own counters say why: every frame that entered port 3 reached the driver
+(346,724 = 346,724), and at least 182 frames the driver handed to the engine never
+left port 3 (`NET-112`) — the iperf3 server's results, retransmitted and never
+acknowledged, and the answers to the host's ARP. `recover` arms only when four TX
+descriptors are engine-owned and a fifth frame is offered, so a loss in which the
+engine clears OWN never triggers it (`NET-113`).
+
+**What depends on it**: any use of `rlx0` that ends a transfer with a small reply —
+a TCP session's close, a request/response, ARP after heavy traffic — can hang
+until something else fills the TX ring. A throughput figure from `rlx0` is valid
+only while data flows, and `P2`'s rlxfw receive figure has n = 0 (no `receiver`
+line exists). **What settles the mechanism**: § 19.5's experiments E0–E5, zero
+flash, one power press.
+
+## 🔴 What seating 39 did NOT establish — 2026-09-23 (the one hundred and fifth segment)
+
+Card A ran whole: twelve presses, 223 of 223 cells, three map brackets identical to
+the prediction, `D2` held (`CLK-34`). Four of the 104th segment's open items above
+are answered: both images boot (7,948 B loud, 2,117 B quiet, as predicted);
+`S7`'s terminator held on every loud boot; `recover` fired unprompted seven times
+(and cannot see the loss that mattered, `NET-113`); and the same-mode design gave a
+mode control inside ±10 ms both cold and warm.
+
+| what is not established | what would settle it |
+|---|---|
+| 🔴 **Whose clock carries `CLK-32`'s factor.** The host's monotonic clock ran 1.7–2.4 % slow for most of the seating while the board's jiffies agreed with realtime (`CLK-35`); the loader's in-seating drift matches it, 推 | A seating that logs host monotonic against the board's jiffies, idle and loaded |
+| 🔴 **`D2` corrected for that clock.** The raw verdict holds; the corrected one is a sensitivity estimate (about −3.8 ms at a rate ratio of 1.022) | A capture-by-capture rate fit, desk, from this seating's files |
+| 🔴 **Where below the DMA engine `rlx0`'s frames are lost, and why** (`NET-112`) | § 19.5's E1 and E2 |
+| ⚠️ **rlxfw's receive throughput.** No `rlx0` board-receive trial produced a `receiver` line | A driver that completes the exchange, or a trial scored on the server's own report |
+| ⚠️ **`D7`, § 3.7's segments, and the vendor's `J` → `boa` miss** — computed once (`CLK-37`) | A second, independent computation |
+| ⚠️ **The vendor's `D8`, `D4` readiness beyond `V1`, and `P3-TCPD`'s check of the `D8` reconstruction** | Desk work on this seating's files |
+| ⚠️ **Anything from `P1-UR3` on `rlx0`, cleanly**: the host re-attach bounced port 3's link first (`bench/2026-09-23/CORRECTIONS-block42.md` § 5.1) | Seating B |
+| ⚠️ **`D3`** | `P2-4`, on another calendar day |
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

@@ -1,0 +1,78 @@
+{
+  "tool": "hostprobe",
+  "tool_version": "1.2",
+  "clock": "CLOCK_MONOTONIC",
+  "target": "10.1.1.3",
+  "args": {
+    "out": "bench/2026-09-23/P1-OFF-HP",
+    "target": "10.1.1.3",
+    "seconds": 180.0,
+    "icmp": false,
+    "icmp_interval": 0.2,
+    "lag_threshold_ms": 1.0,
+    "tcp": [],
+    "tcp_interval": 0.2,
+    "tcp_timeout": 1.0,
+    "neigh": false,
+    "neigh_interval": 0.2,
+    "udp_listen": [
+      50000
+    ],
+    "until": [],
+    "ping": "ping",
+    "ip": "ip",
+    "force": false
+  },
+  "start_mono": 3000.828716,
+  "start_real": 1790150270.055437,
+  "started_wallclock": "2026-09-23T15:57:50+0800",
+  "end_mono": 3180.829171,
+  "end_real": 1790150452.843264,
+  "stop_decided_mono": 3180.829081,
+  "ping": null,
+  "icmp_lag_ms": {
+    "n": 0,
+    "median": null,
+    "max": null,
+    "min": null,
+    "over_threshold": 0,
+    "threshold_ms": 1.0
+  },
+  "udp_lag_ms": {
+    "n": 15,
+    "median": 0.14,
+    "min": 0.095,
+    "max": 0.316
+  },
+  "tcp": null,
+  "neigh": null,
+  "udp": {
+    "50000": {
+      "so_timestampns": true,
+      "why_not": ""
+    }
+  },
+  "route": {
+    "dev": "enxfc19286184c9",
+    "src": "10.1.1.2"
+  },
+  "counts": {
+    "udp": 15,
+    "start": 1,
+    "stop": 1
+  },
+  "first": {
+    "udp": 3002.00311,
+    "udp:50000": 3002.00311
+  },
+  "stop_reason": "--seconds",
+  "problems": [],
+  "exit_code": 0,
+  "addresses": {
+    "allowlist": "tools/audit-bench-log.py",
+    "loaded": true,
+    "allowlisted": 7,
+    "why_not": null,
+    "unlisted": 0
+  }
+}

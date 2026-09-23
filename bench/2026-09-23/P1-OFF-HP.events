@@ -1,0 +1,19 @@
+# hostprobe 1.2: t_mono is absolute CLOCK_MONOTONIC seconds (time.monotonic(), the clock console-capture's t0_mono is read on); t_real, ping_real and kernel_real are CLOCK_REALTIME, cross-checks only
+# probes target=10.1.1.3 icmp=- tcp=- neigh=- udp=50000 seconds=180 until=-
+3000.828716 start t_real=1790150270.055437
+3002.003110 udp port=50000 peer=10.1.1.3:32791 len=10 kernel_real=1790150271.229690472
+3005.227349 udp port=50000 peer=10.1.1.3:32793 len=10 kernel_real=1790150274.908019062
+3008.412470 udp port=50000 peer=10.1.1.3:32795 len=10 kernel_real=1790150278.093116766
+3011.637740 udp port=50000 peer=10.1.1.3:32797 len=10 kernel_real=1790150281.318207608
+3014.832515 udp port=50000 peer=10.1.1.3:32799 len=10 kernel_real=1790150284.513139981
+3018.007812 udp port=50000 peer=10.1.1.3:32801 len=10 kernel_real=1790150287.688496656
+3021.192963 udp port=50000 peer=10.1.1.3:32803 len=10 kernel_real=1790150290.873598406
+3024.387490 udp port=50000 peer=10.1.1.3:32805 len=10 kernel_real=1790150294.068153277
+3027.700195 udp port=50000 peer=10.1.1.3:32807 len=10 kernel_real=1790150297.380811307
+3030.875848 udp port=50000 peer=10.1.1.3:32809 len=10 kernel_real=1790150300.556503651
+3034.100129 udp port=50000 peer=10.1.1.3:32811 len=10 kernel_real=1790150303.780651357
+3037.294568 udp port=50000 peer=10.1.1.3:32813 len=10 kernel_real=1790150307.417909250
+3040.558458 udp port=50000 peer=10.1.1.3:32815 len=10 kernel_real=1790150310.681798374
+3043.744252 udp port=50000 peer=10.1.1.3:32817 len=10 kernel_real=1790150313.867531381
+3046.978667 udp port=50000 peer=10.1.1.3:32819 len=10 kernel_real=1790150317.101860166
+3180.829171 stop t_real=1790150452.843264 reason=--seconds
