@@ -27,7 +27,6 @@ M3	PROGRESS.md	docs/probe3-cells.md	1955	366453e0f608a85e	docs/probe3-cells.md:1
 M3	PROGRESS.md	docs/rlx-cache-and-cp0.md	777	9a441b99cea9b7c6	docs/rlx-cache-and-cp0.md:777 is a blank line
 M3	PROGRESS.md	tools/check-predictions.py	50	d6d8a07f8241682c	tools/check-predictions.py:50 is a blank line
 M3	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	55ce45b90472365b	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c:471 
-M3	SPEC.md	tools/console-capture.py	431	bc270a8e75d0c313	tools/console-capture.py:431 is a blank line
 M3	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	1293	68ec71163e2f0d85	docs/probe3-cells.md:1293 is a blank line
 ROT	PROGRESS.md	LOG.md	5859	6917a92bf34bfd3d	| ⑮ | **`isa-probe` 的 suite 有三個洞**：把 POS／NEG 控制只跑第一欄可以 40／40 全過（然後對一個根
 ROT	PROGRESS.md	docs/FINDINGS.md	375	bb2be593c5112831	| 🔴 讀 | **`arch/rlx/bsp` is a dangling symlink in two of the three GPL
@@ -38,13 +37,9 @@ ROT	SPEC.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, 
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/gpio/rtl819x-gpio.c	120	4141c46181ee6c1a	* 1. WHICH PORT LETTER BIT 5 IS. PABCD packs four ports into one word
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	6434cf036758c7c6	static int rtl819x_ack_proven; /* WE watched TC1IP go 1 -> 0 */
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	c296bd9571bdf7ac	spin_lock_irqsave(&rtl819x_tc_lock, flags);
-ROT	SPEC.md	tools/console-capture.py	431	f5d6833b72eabd21	meta["started_wallclock"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-ROT	SPEC.md	tools/console-capture.py	462	fe65d0cd4a7cc378	timing.write(f"{offset} {time.monotonic() - t0:.6f}\n")
 ROT	SPEC.md	tools/rlxfw-kbuild.sh	412	327b72644d48cdd9	esac
-ROT	SPEC.md	tools/console-capture.py	373	13441e73708565fb	r, _, _ = select.select([fd], [], [], min(remaining, 0.05))
 ROT	SPEC.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
 ROT	docs/FINDINGS.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It changed what this repository may claim about itself
-ROT	docs/FINDINGS.md	tools/console-capture.py	430	cacf9733abd348fc	t0 = time.monotonic()
 ROT	docs/KNOWN-ISSUES.md	notes/timer-driver.md	273	415d2c4eb64624a2	`kernel/time/jiffies.c:37` — `NSEC_PER_JIFFY` is `((u64)NSEC_PER_SEC <
 ROT	docs/blind-write-ledger.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It changed what this repository may claim about itself
 ROT	docs/blind-write-ledger.md	notes/timer-driver.md	273	415d2c4eb64624a2	`kernel/time/jiffies.c:37` — `NSEC_PER_JIFFY` is `((u64)NSEC_PER_SEC <
@@ -54,8 +49,6 @@ ROT	docs/probe3-cells.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedd
 ROT	docs/rlx-cache-and-cp0.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
 ROT	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	855	629b45003d38781e	> 🔴 **And in the write-through branch the two survivors are not separa
 ROT	notes/cache-model.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
-ROT	notes/dev-loop.md	tools/console-capture.py	368	8120ab3315bbc42b	_fail(f"{p} exists. Refusing to overwrite a capture; use --force or a
 ROT	notes/flash-digest-scope.md	SPEC.md	178	aea1cedcd624cc3f	| `FLS-14` 🔄 | 完整 dump | 4,194,304 bytes，`sha256 a800059a…10f37ea`，用 `
-ROT	notes/kernel-build.md	tools/console-capture.py	462	fe65d0cd4a7cc378	timing.write(f"{offset} {time.monotonic() - t0:.6f}\n")
 ROT	notes/kernel-build.md	tools/ci-census.py	201	e4651339e13566e2	for label in skips:
 ROT	notes/record-integrity.md	config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c	323	39ff2fd0ba5d2e4b	#define NIC_IP_MBUF_RUNOUT (1u << 16)

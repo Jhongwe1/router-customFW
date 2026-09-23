@@ -19,6 +19,16 @@
 #       whole run -- 0.1237 s, which is CLK-03's number and not CLK-14's.
 #   B4  the population control: pointed at a directory with no boot text it
 #       must REFUSE, not print an empty table with a clean summary.
+# P2-1 (2026-09-23), the tool past the loader:
+#   B5  the late-open detector names loader text only; kernel boots are
+#       counted, not named.   B6  D1: segments equal an independent derivation
+#       on a vendor and an rlxfw capture; one capture through both tables
+#       differs exactly where the tables do.   B7  anchors named, n on every
+#       cell.   B8  firmware, variant and image against a grep of each capture.
+#   B9  cold/warm inherited, and when it must not be.   B10  the host-probe
+#       join, and its refusal without t0_mono.   B11  TERM-1's silences.
+#   B12  the per-seating scale fit, with a positive and a negative control.
+#   B13  the retro's identity line and TSV.   B14  refusals.
 set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -547,6 +557,488 @@ mkdir -p "$T/empty"
 "$PY" "$BT" "$T/empty" >/dev/null 2>"$T/err"; rc=$?
 ck "exit code on an empty directory"     2 "$rc"
 ck "and it said so"                      1 "$(grep -c REFUSING "$T/err")"
+
+# =============================================================================
+# P2-1, 2026-09-23: the tool past the loader.  Every case below states what
+# would refute it before it runs.  Corpus cases assert PROPERTIES and FLOORS,
+# never a count of bench/ -- read B2's tape above for why.  Synthetic captures
+# are written once, here, by one generator: each part is one read() that
+# returned at the time beside it, which is exactly what console-capture's
+# .timing records (FW-35).
+# =============================================================================
+FX="$T/fx"
+"$PY" - "$FX" <<'PYEOF'
+import json, os, sys
+FX = sys.argv[1]
+
+def mk(path, parts, meta=None):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    rows, off = [], 0
+    for b, t in parts:
+        rows.append("%d %.6f" % (off, t))
+        off += len(b)
+    with open(path, "wb") as fh:
+        fh.write(b"".join(b for b, _ in parts))
+    with open(path[:-4] + ".timing", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("# offset seconds\n" + "\n".join(rows) + "\n")
+    if meta is not None:
+        with open(path[:-4] + ".meta.json", "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(meta, fh)
+
+def rlxfw(f=1.0, id0=b"AAAAAAAA"):
+    # WLAN -> NIC is the largest gap, 3.25 s exactly at f = 1: B11's plant.
+    return [(b"J 80500000\n\r---Jump to address=80500000\n", 0.010 * f),
+            (b"\rdecompressing kernel:\r\n", 0.020 * f),
+            (b"Uncompressing Linux... done, booting the kernel.\r\n", 0.030 * f),
+            (b"done decompressing kernel.\r\n", 1.125 * f),
+            (b"start address: 0x80003600\r\n", 1.250 * f),
+            (b"RLXFW-B00\r\nRLXFW-ID0=" + id0 + b"\r\n", 1.375 * f),
+            (b"RLXFW-B09\r\n", 1.500 * f),
+            (b"Realtek WLAN driver driver version 1.6 (2012-12-04)\r\n", 1.750 * f),
+            (b"\r\n\r\nProbing RTL8186 10/100 NIC-kenel stack size order[3]...\r\n", 5.000 * f),
+            (b"Realtek FastPath:v1.03\r\n", 5.750 * f),
+            (b"RLXFW-B10\r\n", 8.500 * f),
+            (b"rlxfw: init running, X\r\n", 8.625 * f),
+            (b"/bin/sh: can't access tty; job control turned off\r\n# ", 8.750 * f)]
+
+def loader(f=1.0, warm=True, tail=2.5):
+    return [(b"J BFC00000\n\r---Jump to address=BFC00000\n\r\r\n", 0.010),
+            (b"Booting...\r\n", 0.020),
+            (b"\x00", 0.030),
+            (b"chipName: UNKNOWN\n\rramSize: 32M\n\r"
+             + (b"Reboot Result from Watchdog Timeout!\n" if warm else b" \n"), 0.030 + 0.35 * f),
+            (b"\r\n\r---RealTek(RTL8196E)at 2014.04.22-16:22+0800 v1.3 [16bit](400MHz)\n",
+             0.030 + 0.58 * f),
+            (b"\r<RealTek>", tail)]
+
+def meta(wall, dur, sent="J 80500000", **kw):
+    m = {"started_wallclock": "2026-01-01T%s+0800" % wall, "duration_s": dur, "sent": sent}
+    m.update(kw)
+    return m
+
+# B5: loader text alone, and a loud kernel's SPI table alone
+mk(FX + "/b5/chip-only.log", [(b"\x00chipName: UNKNOWN\n\rramSize: 32M\n\r \n", 0.5)])
+mk(FX + "/b5/spi-table.log", [(b"[    6.800000] |No chipID  Sft chipSize blkSize secSize "
+                               b"pageSize sdCk opCk      chipName    |\r\n", 0.5)])
+
+# B6: one capture holding BOTH firmwares' strings, at binary-exact times
+mk(FX + "/both/both.log", [
+    (b"J 80500000\n\r---Jump to address=80500000\n", 0.010),
+    (b"\rdecompressing kernel:\r\n", 0.020),
+    (b"done decompressing kernel.\r\n", 1.125),
+    (b"start address: 0x80003600\r\n", 1.250),
+    (b"RLXFW-B00\r\n", 1.375),
+    (b"RLXFW-B09\r\n", 1.500),
+    (b"Realtek WLAN driver - version 1.6 (2013-02-21)(SVN:)\r\n", 2.000),
+    (b"\r\n\r\nProbing RTL8186 10/100 NIC-kenel stack size order[3]...\r\n", 6.500),
+    (b"Realtek FastPath:v1.03\r\n", 7.250),
+    (b"RLXFW-B10\r\n", 10.250),
+    (b"rlxfw: init running, X\r\n", 10.375),
+    (b"/bin/sh: can't access tty; job control turned off\r\n# \r\n", 10.500),
+    (b"\rinit started: BusyBox v1.13.4 (2018-01-10 14:56:45 CST)\r\n", 11.000),
+    (b"boa: starting server pid=350, port 80\r\n", 30.000)],
+    meta("09:00:00", 31.0))
+
+# B9: cold/warm by inheritance.  fit1: the unplaced cold catch (30 s long, no
+# .meta.json) cannot fit between R-rz and K-boot; fit2: it can; fit3: a kernel
+# boot stands between K2 and the last loader boot.
+for d, kwall in (("fit1", "10:01:05"), ("fit2", "10:02:00")):
+    mk(FX + "/%s/A-cold.log" % d, loader(warm=False), meta("10:00:00", 5.0, sent=None))
+    mk(FX + "/%s/R-rz.log" % d, loader(warm=True), meta("10:01:00", 3.0, sent="J BFC00000"))
+    mk(FX + "/%s/U-cold.log" % d, loader(warm=False, tail=30.0))
+    mk(FX + "/%s/K-boot.log" % d, rlxfw(), meta(kwall, 12.0))
+mk(FX + "/fit3/A-cold.log", loader(warm=False), meta("10:00:00", 5.0, sent=None))
+mk(FX + "/fit3/K1-boot.log", rlxfw(), meta("10:00:10", 12.0))
+mk(FX + "/fit3/K2-boot.log", rlxfw(), meta("10:00:40", 12.0))
+
+# B10: the host-probe join.  t0_mono 5000, window 0 .. 40 s, sent_s 0.005.
+new = meta("11:00:00", 40.0, clock="CLOCK_MONOTONIC", t0_mono=5000.0,
+           t0_real=1.0e9, sent_s=0.005, end_mono=5040.0, end_real=1.0e9 + 40)
+mk(FX + "/probe/cap.log", rlxfw(), new)
+old = dict(new)
+del old["t0_mono"]
+mk(FX + "/probe/old.log", rlxfw(), old)
+rt = dict(new, clock="CLOCK_REALTIME")
+mk(FX + "/probe/rt.log", rlxfw(), rt)
+with open(FX + "/probe/hp.events", "w", encoding="utf-8", newline="\n") as fh:
+    fh.write("# hostprobe events -- synthetic\n"
+             "4999.000000 start t_real=1.0\n"
+             "5000.002000 icmp-reply seq=0 ttl=64 rtt_ms=0.5 ping_real=1.0\n"
+             "5003.000000 neigh state=FAILED lladdr=-\n"
+             "5004.000000 icmp-silent seq=1\n"
+             "5009.000000 tcp port=80 result=refused errno=111 start_mono=5008.9 dur_ms=1\n"
+             "5012.500000 neigh state=REACHABLE lladdr=aa:bb:cc:dd:ee:ff\n"
+             "5012.750000 icmp-reply seq=5 ttl=64 rtt_ms=0.4 ping_real=1.0\n"
+             "5015.250000 tcp port=80 result=ok errno=0 start_mono=5015.2 dur_ms=1\n"
+             "5016.000000 udp port=9 peer=192.168.1.1:9 len=4 kernel_real=-\n"
+             "5020.000000 icmp-reply seq=12 ttl=64 rtt_ms=0.4 ping_real=1.0\n"
+             "5041.000000 icmp-reply seq=9 ttl=64 rtt_ms=0.4 ping_real=1.0\n"
+             "5042.000000 stop t_real=2.0 reason=done\n")
+with open(FX + "/probe/hp.meta.json", "w", encoding="utf-8", newline="\n") as fh:
+    json.dump({"tool": "hostprobe", "clock": "CLOCK_MONOTONIC", "start_mono": 4999.0,
+               "end_mono": 5042.0, "target": "192.168.1.1"}, fh)
+with open(FX + "/probe/bad.events", "w", encoding="utf-8", newline="\n") as fh:
+    fh.write("5012.750000 icmp-reply seq=5\n5013.000000 tcp port80\n")
+with open(FX + "/probe/bad.meta.json", "w", encoding="utf-8", newline="\n") as fh:
+    json.dump({"tool": "hostprobe", "clock": "CLOCK_MONOTONIC"}, fh)
+
+# B11: two loader resets, prompt at 2.5 s: R1 records no sent_s (timed from
+# its echo at 0.010 -> 2.490), R2 records sent_s 0.004 (-> 2.496).
+mk(FX + "/reset/R1-rz.log", loader(), meta("13:00:00", 3.0, sent="J BFC00000"))
+mk(FX + "/reset/R2-rz.log", loader(), meta("13:00:10", 3.0, sent="J BFC00000",
+                                           clock="CLOCK_MONOTONIC", sent_s=0.004))
+
+# B12: three seatings of one image.  `scale1`: every kernel time scaled with
+# the directory's loader; `scale0`: the loader scaled, the kernel not.  The
+# factors are asymmetric on purpose: their median (1.00) is not their mean
+# (1.02), so the denominator's definition is visible in the printed ratio.
+for root, scale_kernel in (("scale1", True), ("scale0", False)):
+    for i, f in enumerate((0.96, 1.00, 1.10)):
+        d = "%s/%s/d%d" % (FX, root, i)
+        mk(d + "/L-rz.log", loader(f=f), meta("12:00:0%d" % i, 3.0, sent="J BFC00000"))
+        mk(d + "/K-boot.log", rlxfw(f=f if scale_kernel else 1.0), meta("12:01:00", 12.0))
+PYEOF
+
+echo
+echo "=== B5: the late-open detector names loader text only (P2-1's defect) ==="
+# REFUTED IF: a committed LOUD kernel boot is named as a boot this tool could
+# not place (the defect: bare `chipName` matched the SPI driver's table), or a
+# capture holding only the loader's `\0chipName: ` + `ramSize:` stops being
+# named -- the fix must narrow the pattern, not stop detecting.  Positive
+# controls: SQ-A (and B3b's Y0-A) still named; the synthetic chip-only
+# capture named.  Negative controls: X20-boot, and a synthetic line holding
+# only the kernel's table header.
+# ⚠️ Two layers, and each case sees one.  A capture with rtkload's line is
+# counted as a kernel boot BEFORE any loader-text test, so X20-boot guards that
+# order; 量 2026-09-23, mutation M1 (bare `chipName` restored) left it green.
+# Only the synthetic table-header line sees the pattern itself -- M1 turned it,
+# and only it, red.
+ck "a committed loud kernel boot (X20-boot) is NOT named" 0 \
+   "$(printf '%s\n' "$base" | grep -c '2026-09-22b/X20-boot.log -- ')"
+ck "SQ-A, a true late open, is still named"               1 \
+   "$(printf '%s\n' "$base" | grep -c '2026-09-06/SQ-A.log -- boot text')"
+b5="$("$PY" "$BT" "$FX/b5" 2>&1)"
+ck "a capture of only \\0chipName: + ramSize: is named"   1 \
+   "$(printf '%s\n' "$b5" | grep -c 'chip-only.log -- boot text but no')"
+ck "the kernel's SPI table header alone is NOT named"      0 \
+   "$(printf '%s\n' "$b5" | grep -c 'spi-table.log -- ')"
+# The 19 are ACCOUNTED FOR, not dropped: the summary partitions what produced no
+# row into kernel boots / named / no boot text, and the parts must add up.
+# REFUTED IF the partition does not close, or kernel boots fall under 141 (the
+# J-path boots on 2026-09-23: 138 rlxfw + G6, G7, H2a2 + C1-DV = 142).
+nc="$(printf '%s\n' "$base" | sed -n 's/^NOT CLASSIFIED: //p')"
+nc_all="$(printf '%s\n' "$nc" | sed -n 's/^\([0-9][0-9]*\) capture.*/\1/p')"
+nc_k="$(printf '%s\n' "$nc" | sed -n 's/.*; \([0-9][0-9]*\) are kernel boots.*/\1/p')"
+nc_n="$(printf '%s\n' "$nc" | sed -n 's/.*, \([0-9][0-9]*\) hold boot text this tool.*/\1/p')"
+nc_z="$(printf '%s\n' "$nc" | sed -n 's/.*, \([0-9][0-9]*\) hold no boot text$/\1/p')"
+named="$(printf '%s\n' "$base" | grep -c -- '\.log -- ')"
+echo "  observed  no row: ${nc_all:-?} = kernel ${nc_k:-?} + named ${nc_n:-?} + none ${nc_z:-?}; named lines $named"
+ck "the no-row population closes, and kernel boots >= 141" yes \
+   "$([ -n "$nc_all" ] && [ -n "$nc_k" ] && [ -n "$nc_n" ] && [ -n "$nc_z" ] \
+      && [ $((nc_k + nc_n + nc_z)) -eq "$nc_all" ] && [ "$nc_n" -eq "$named" ] \
+      && [ "$nc_k" -ge 141 ] && echo yes || echo no)"
+# 2026-08-23/A-catch is a console-dump.py transcript: no .timing, no meta.  The
+# line must say what the capture shows, not guess a cause it cannot show.
+ck "a capture with no .timing is named for what it shows" 1 \
+   "$(printf '%s\n' "$base" | grep -c '2026-08-23/A-catch.log -- .*no .timing beside it')"
+
+echo
+echo "=== B6: D1 -- the same code for both columns; the table is the difference ==="
+# REFUTED IF a segment the tool prints for a committed capture differs from the
+# same segment derived HERE without the tool's code: offsets from `grep -abo`,
+# times by FW-35's rule applied by awk (the LAST .timing row whose offset is
+# <= the byte), the difference printed %.6f.  One vendor capture (G6) and one
+# rlxfw capture (X20-boot), five segments each.
+off () {   # off FILE STRING -> the byte offset of the first STRING in FILE
+    grep -abo -F -- "$2" "$1" | head -1 | cut -d: -f1
+}
+tat () {   # tat TIMING BYTE -> the time of the LAST row with offset <= BYTE
+    awk -v b="$2" '!/^#/ && NF == 2 && $1 + 0 <= b + 0 { t = $2 } END { print t }' "$1"
+}
+seg_by_hand () {   # seg_by_hand LOG FROM_BYTE TO_BYTE -> t(to) - t(from), %.6f
+    awk -v a="$(tat "${1%.log}.timing" "$2")" -v b="$(tat "${1%.log}.timing" "$3")" \
+        'BEGIN { printf "%.6f", b - a }'
+}
+seg_by_tool () {   # seg_by_tool KERNEL_OUTPUT SEGMENT -> the value printed on its `seg` line
+    printf '%s\n' "$1" | awk -v s="$2" '$1 == "seg" && $2 == s { print $NF }'
+}
+agree_all () {     # agree_all KERNEL_OUTPUT LOG "seg from_string to_string" ... -> k/n + misses
+    local out="$1" log="$2" n=0 k=0 miss="" sid a b ha hb want got
+    shift 2
+    for spec in "$@"; do
+        IFS='|' read -r sid a b <<<"$spec"
+        n=$((n + 1))
+        ha="$(off "$log" "$a")"; hb="$(off "$log" "$b")"
+        [ "$b" = "job control turned off" ] && hb=$((hb + 24))
+        want="$(seg_by_hand "$log" "$ha" "$hb")"
+        got="$(seg_by_tool "$out" "$sid")"
+        if [ -n "$want" ] && [ "$want" = "$got" ]; then k=$((k + 1))
+        else miss="$miss $sid(tool=$got,hand=$want)"; fi
+    done
+    echo "$k/$n$miss"
+}
+G6="$ROOT/bench/2026-08-24c/G6.log"
+X20="$ROOT/bench/2026-09-22b/X20-boot.log"
+KJ="$ROOT/bench/2026-08-31c/K-J.log"
+kg6="$("$PY" "$BT" --kernel "$G6" 2>&1)"
+kx20="$("$PY" "$BT" --kernel "$X20" 2>&1)"
+kkj="$("$PY" "$BT" --kernel "$KJ" 2>&1)"
+ck "vendor G6: 5 segments equal an independent derivation" "5/5" "$(agree_all "$kg6" "$G6" \
+   "rtkload.decompress|decompressing kernel:|done decompressing kernel." \
+   "kernel.wlan|Realtek WLAN driver|Probing RTL8186 10/100 NIC" \
+   "kernel.total|start address: 0x|init started: BusyBox" \
+   "user.ready|init started: BusyBox|boa: starting server" \
+   "boot.jump_to_ready|---Jump to address=|boa: starting server")"
+ck "rlxfw X20-boot: 5 segments equal an independent derivation" "5/5" "$(agree_all "$kx20" "$X20" \
+   "rtkload.decompress|decompressing kernel:|done decompressing kernel." \
+   "kernel.early|start address: 0x|Realtek WLAN driver" \
+   "kernel.nic|Probing RTL8186 10/100 NIC|Realtek FastPath:v1.03" \
+   "kernel.late|Realtek FastPath:v1.03|rlxfw: init running" \
+   "boot.jump_to_ready|---Jump to address=|job control turned off")"
+# K-J holds a payload's `---Jump to address=` at byte ~12 and the loader's own
+# autoboot 7.5 s later.  THE SEARCH RULE must put `jump` on the autoboot.
+# REFUTED IF `jump` sits anywhere but the first byte of `Jump to image start=`.
+ck "K-J: jump sits on the loader's autoboot (the search rule)" \
+   "$(off "$KJ" "Jump to image start=")" \
+   "$(printf '%s\n' "$kkj" | awk '$1 == "lm" && $2 == "jump" { print $4 }')"
+# LDR-15's warm ESC window, 5.036 s, re-derived from K-J by hand and by the tool.
+ck "K-J: loader.esc by hand = by the tool = LDR-15's 5.036" "5.036206 5.036206 5.036" \
+   "$(seg_by_hand "$KJ" "$(off "$KJ" "---RealTek(RTL8196E)")" "$(off "$KJ" "Jump to image start=")") $(seg_by_tool "$kkj" loader.esc) $(awk -v v="$(seg_by_tool "$kkj" loader.esc)" 'BEGIN{printf "%.3f", v}')"
+# The synthetic capture holds BOTH firmwares' strings; `--firmware` computes it
+# once with each table through the same function.  REFUTED IF a segment whose
+# two landmarks are defined identically in both tables differs between the two
+# runs, or if one whose landmark differs does NOT differ by exactly the planted
+# amount -- the difference must be the table, not the code.
+kv="$("$PY" "$BT" --kernel --firmware vendor "$FX/both/both.log" 2>&1)"
+kr="$("$PY" "$BT" --kernel --firmware rlxfw "$FX/both/both.log" 2>&1)"
+same=0
+for s in rtkload.decompress rtkload.total kernel.early kernel.wlan kernel.nic; do
+    a="$(seg_by_tool "$kv" "$s")"; b="$(seg_by_tool "$kr" "$s")"
+    [ -n "$a" ] && [ "$a" != "--" ] && [ "$a" = "$b" ] && same=$((same + 1))
+done
+ck "identically defined segments agree across the two tables" 5 "$same"
+dlt () { awk -v a="$(seg_by_tool "$kv" "$1")" -v b="$(seg_by_tool "$kr" "$1")" 'BEGIN { printf "%.6f", a - b }'; }
+ck "the others differ by exactly what was planted" \
+   "0.625000 0.625000 18.875000 19.500000" \
+   "$(dlt kernel.late) $(dlt kernel.total) $(dlt user.ready) $(dlt boot.jump_to_ready)"
+ck "a firmware-only segment exists under its own table only" "0.125000|" \
+   "$(seg_by_tool "$kr" rlxfw.setup)|$(seg_by_tool "$kv" rlxfw.setup)"
+# And the `=` marks in the legend are read off the tables, not typed: REFUTED IF
+# the set of landmarks marked identical is not exactly the seven shared ones.
+ck "the legend marks exactly the seven shared landmarks" \
+   "decomp decomp_done fastpath jump kentry nic wlan" \
+   "$("$PY" "$BT" --legend | awk '/^  VENDOR/ {v=1; next} /^  RLXFW/ {v=0} v && $1 == "=" {print $2}' | sort | tr '\n' ' ' | sed 's/ $//')"
+# With both firmwares' evidence and no override, detection must refuse to guess.
+ck "both firmwares' evidence, no override: not timed, named" 1 \
+   "$("$PY" "$BT" --kernel "$FX/both/both.log" 2>&1 | grep -c "NOT TIMED: firmware unknown -- both firmwares' evidence")"
+
+echo
+echo "=== B7: every interval names its anchors, and every cell carries n ==="
+# REFUTED IF a printed interval lacks its `from -> to`, or a summary cell of
+# the retro's (a)/(b) lacks `n=`.  The retro runs ONCE here; B8, B11 and B13
+# read the same output and TSV.
+"$PY" "$BT" --retro "$ROOT/bench" --tsv "$T/retro.tsv" >"$T/retro.txt" 2>"$T/retro.err"; rrc=$?
+ck "--retro over bench exits 0"                           0 "$rrc"
+ck "every seg line of --kernel names from -> to"          0 \
+   "$(printf '%s\n%s\n' "$kg6" "$kx20" | awk '$1 == "seg" && $4 != "->"' | wc -l)"
+sumrows="$(sed -n '/^(a) LOADER/,/^(c) NAMED/p' "$T/retro.txt" \
+           | grep -E '^ +(loader|rtkload|kernel|user|boot|rlxfw)\.[a-z_]+ +[a-z0-9_]+ -> ')"
+cells="$(printf '%s\n' "$sumrows" | grep -c .)"
+bad="$(printf '%s\n' "$sumrows" | awk '{ n = gsub(/n=/, "n="); if (n != 3) print }' | wc -l)"
+echo "  observed  summary rows with three cells: $cells"
+ck "every (a)/(b) summary row has n= in all three cells" yes \
+   "$([ "$cells" -ge 30 ] && [ "$bad" -eq 0 ] && echo yes || echo no)"
+# A TERM-1 data row is the quantity padded to its column; the section's prose
+# names the same quantities without the padding.  At least six rows, or the
+# check is vacuous.
+t1rows="$(sed -n '/^(d) TERM-1/,/^(e) /p' "$T/retro.txt" \
+          | grep -E '(longest silence|jump -> ready|send -> prompt)  +')"
+ck "every TERM-1 row carries n=" yes \
+   "$(n="$(printf '%s\n' "$t1rows" | grep -c .)"; b="$(printf '%s\n' "$t1rows" | grep -vc 'n=')"
+      [ "$n" -ge 6 ] && [ "$b" -eq 0 ] && echo yes || echo no)"
+
+echo
+echo "=== B8: firmware detection, and a fragment keeps only what it has ==="
+# REFUTED IF a capture the tool calls vendor holds `RLXFW-B00`, or one it calls
+# rlxfw lacks it or holds the vendor's `init started: BusyBox` -- checked by
+# grep on each file, not by the tool -- or a kernel boot's firmware is unknown.
+# Floors from 2026-09-23 (138 rlxfw, 6 vendor), never an equality.
+tsvcol () { awk -F'\t' -v r="$1" -v f="$2" '$1 == r && $2 == f { print $7 }' "$T/retro.tsv"; }
+vbad=0; rbad=0
+for c in $(tsvcol kboot vendor); do grep -aq 'RLXFW-B00' "$c" && vbad=$((vbad + 1)); done
+for c in $(tsvcol kboot rlxfw); do
+    { grep -aq 'RLXFW-B00' "$c" && ! grep -aq 'init started: BusyBox' "$c"; } || rbad=$((rbad + 1))
+done
+nv="$(tsvcol kboot vendor | wc -l)"; nr="$(tsvcol kboot rlxfw | wc -l)"
+echo "  observed  kernel boots: vendor $nv, rlxfw $nr"
+ck "no vendor capture holds RLXFW-B00, no rlxfw one lacks it" "0 0" "$vbad $rbad"
+corpus="$(sed -n 's/^corpus: //p' "$T/retro.txt")"
+ck "vendor >= 5, rlxfw >= 138, unknown firmware 0" yes \
+   "$([ "$nv" -ge 5 ] && [ "$nr" -ge 138 ] \
+      && printf '%s\n' "$corpus" | grep -q 'rlxfw ? 0, firmware unknown 0' && echo yes || echo no)"
+# Variant and image, on EVERY rlxfw boot, against a grep of the capture: loud
+# when the WLAN banner carries a printk time prefix, the image the first
+# `RLXFW-ID0=` or `none`.  REFUTED IF one boot disagrees.
+vi=0; vibad=""
+for c in $(tsvcol kboot rlxfw); do
+    if grep -aqE '\[ *[0-9]+\.[0-9]+\] Realtek WLAN driver' "$c"; then v=loud; else v=quiet; fi
+    i="$(grep -aoE 'RLXFW-ID0=[0-9A-F]{8}' "$c" | head -1 | cut -d= -f2)"
+    t="$(awk -F'\t' -v c="$c" '$1 == "kboot" && $7 == c { print $3 "/" $5 }' "$T/retro.tsv")"
+    [ "$t" = "$v/${i:-none}" ] || { vi=$((vi + 1)); vibad="$vibad ${c##*/bench/}"; }
+done
+ck "variant and image agree with a grep, on every rlxfw boot" "0" "$vi$vibad"
+ck "the six named vendor boots are all vendor" 6 \
+   "$(tsvcol kboot vendor | grep -cE '/(2026-08-24c/G6|2026-08-24d/G7|2026-08-25b/H2a2|2026-08-31c/K-J|2026-09-21c/X8-WAIT|2026-09-08b/C1-DV)\.log$')"
+# C1-DV opens on `Jump to image start=` and ends in the WLAN driver: exactly
+# three segments exist, and no loader segment.  REFUTED IF any other appears.
+ck "C1-DV yields exactly the three segments it has" \
+   "kernel.early rtkload.decompress rtkload.total" \
+   "$("$PY" "$BT" --kernel "$ROOT/bench/2026-09-08b/C1-DV.log" | awk '$1 == "seg" && $NF != "--" { print $2 }' | sort | tr '\n' ' ' | sed 's/ $//')"
+
+echo
+echo "=== B9: cold/warm for a kernel boot ==="
+# REFUTED IF K-J (its own C-8 line: warm), X8-WAIT (its own: cold) or C1-DV
+# (loader text, no C-8 line: ?) read otherwise.
+ck "K-J warm, X8-WAIT cold, C1-DV ? -- from their own bytes" "warm cold ?" \
+   "$(for c in 2026-08-31c/K-J 2026-09-21c/X8-WAIT 2026-09-08b/C1-DV; do
+         awk -F'\t' -v c="$ROOT/bench/$c.log" '$1 == "kboot" && $7 == c { printf "%s ", $4 }' "$T/retro.tsv"
+      done | sed 's/ $//')"
+# A boot capture with no started_wallclock blocks inheritance only when it
+# could have run in between.  Positive: fit1's 30 s catch cannot fit in the 3 s
+# gap, so K-boot inherits warm from R-rz.  Negative: fit2 leaves 58 s, so `?`.
+# And a kernel boot in between means an uncaptured reset: fit3's K2 is `?`.
+cls () { "$PY" "$BT" --kernel "$1" | sed -n 's/^  class \([^ ]*\) .*/\1/p'; }
+ck "the unplaced catch cannot fit: warm, inherited from R-rz" "warm" "$(cls "$FX/fit1/K-boot.log")"
+ck "the unplaced catch could fit: ?"                          "?"    "$(cls "$FX/fit2/K-boot.log")"
+ck "a kernel boot in between: the first cold, the second ?"   "cold ?" \
+   "$(cls "$FX/fit3/K1-boot.log") $(cls "$FX/fit3/K2-boot.log")"
+
+echo
+echo "=== B10: the host-probe join ==="
+# Planted: jump at s = 0.010; the first icmp-reply at t_mono 5012.75 with
+# t0_mono 5000 -> net.up 12.740000; the first tcp:80 ok at 5015.25 -> net.http
+# 15.240000.  A decoy reply at s = 0.002 precedes sent_s (0.005), a second
+# reply at s = 20 is not the first, and three events fall outside the window.
+# REFUTED IF either value differs, a decoy is used, or the counts differ.
+pj="$("$PY" "$BT" --probe "$FX/probe/hp" "$FX/probe/cap.log" 2>&1)"; prc=$?
+ck "the join exits 0"                                     0 "$prc"
+ck "net.up and net.http land where they were planted" "12.740000 15.240000" \
+   "$(printf '%s\n' "$pj" | awk '$1 == "net" && $2 == "net.up" { a = $NF } $1 == "net" && $2 == "net.http" { b = $NF } END { print a, b }')"
+ck "the first neigh that is up, by state"                 "12.500000" \
+   "$(printf '%s\n' "$pj" | awk '$1 == "host" && $2 == "net.neigh_first" { print $4 }')"
+ck "events before sent_s and outside the window are counted and ignored" 1 \
+   "$(printf '%s\n' "$pj" | grep -c '1 before sent_s, 8 considered, 3 outside the capture.s window')"
+# Every capture committed before P2-1 lacks t0_mono: REFUTED IF such a capture
+# is joined at all (an origin guessed from started_wallclock), or refused
+# without saying why.
+"$PY" "$BT" --probe "$FX/probe/hp" "$FX/probe/old.log" >/dev/null 2>"$T/perr"; orc=$?
+ck "no t0_mono: refused, exit 2, naming t0_mono"          "2 1" "$orc $(grep -c 't0_mono' "$T/perr")"
+"$PY" "$BT" --probe "$FX/probe/hp" "$FX/probe/rt.log" >/dev/null 2>"$T/perr"; orc=$?
+ck "a capture on another clock: refused, exit 2"          "2 1" "$orc $(grep -c 'CLOCK_MONOTONIC' "$T/perr")"
+"$PY" "$BT" --probe "$FX/probe/bad" "$FX/probe/cap.log" >/dev/null 2>"$T/perr"; orc=$?
+ck "a malformed events line: refused with file:line"      "2 1" "$orc $(grep -c 'bad.events:2' "$T/perr")"
+
+echo
+echo "=== B11: TERM-1 -- the longest silence ==="
+# Planted: 3.25 s exactly between the WLAN banner and the NIC probe, larger
+# than every other gap.  REFUTED IF the tool reports any other length or place.
+ck "a planted 3.25 s gap is reported exactly, before nic" 1 \
+   "$("$PY" "$BT" --kernel "$FX/fit1/K-boot.log" | grep -c 'longest silence 3.250000 s from `jump` to `ready`, ending at byte [0-9]* before `nic`')"
+# On the corpus the report NAMES the capture holding the max; recompute that
+# capture's longest gap by hand between `---Jump to address=` and the prompt.
+# REFUTED IF the named capture's own gap is not the reported max.
+row="$(grep -E '^  rlxfw quiet +longest silence' "$T/retro.txt")"
+mx="$(printf '%s\n' "$row" | awk '{ print $(NF-1) }')"; cap="$(printf '%s\n' "$row" | awk '{ print $NF }')"
+hand=""
+if [ -f "$cap" ]; then
+    # the boot's first landmark: anchor C when the loader's boot is in the
+    # capture (12 bytes past `Booting...`), else the jump
+    b0="$(off "$cap" "Booting...")"
+    if [ -n "$b0" ]; then b0=$((b0 + 12)); else b0="$(off "$cap" "---Jump to address=")"; fi
+    b1=$(( $(off "$cap" "job control turned off") + 24 ))
+    hand="$(awk -v b0="$b0" -v b1="$b1" '!/^#/ && NF == 2 {
+               o = $1 + 0; t = $2 + 0
+               if (o <= b0) { i0 = n } if (o <= b1) { i1 = n }
+               tt[n++] = t }
+             END { m = 0; for (k = i0 + 1; k <= i1; k++) if (tt[k] - tt[k-1] > m) m = tt[k] - tt[k-1]
+                   printf "%.4f", m }' "${cap%.log}.timing")"
+fi
+echo "  observed  rlxfw quiet max silence ${mx:-?} s in ${cap:-?}"
+ck "the named capture's own longest gap is the reported max" "$mx" "$hand"
+# The same for the loader resets' send -> prompt: the send (`sent_s` when the
+# capture records it, else the echo of `J BFC00000`) to the first `<RealTek>`
+# after `Booting...`, by hand.
+row="$(grep -E '^  J BFC00000 +send -> prompt' "$T/retro.txt")"
+mx="$(printf '%s\n' "$row" | awk '{ print $(NF-1) }')"; cap="$(printf '%s\n' "$row" | awk '{ print $NF }')"
+hand=""
+if [ -f "$cap" ]; then
+    e="$(off "$cap" "J BFC00000")"
+    p="$(grep -abo -F -- '<RealTek>' "$cap" | cut -d: -f1 | awk -v b="$(off "$cap" "Booting...")" '$1 + 0 > b + 0 { print; exit }')"
+    ts="$(sed -n 's/.*"sent_s": *\([0-9][0-9.]*\).*/\1/p' "${cap%.log}.meta.json" 2>/dev/null)"
+    hand="$(awk -v a="${ts:-$(tat "${cap%.log}.timing" "$e")}" -v b="$(tat "${cap%.log}.timing" "$p")" 'BEGIN { printf "%.4f", b - a }')"
+fi
+ck "the reset whose send -> prompt is the max, by hand" "$mx" "$hand"
+# No committed capture records sent_s yet, so its branch is controlled here.
+# REFUTED IF R2 is not timed from its sent_s (2.4960, the max), or the count
+# of each send anchor is not one and one.
+rr="$("$PY" "$BT" --retro "$FX/reset" 2>&1)"
+ck "a reset is timed from sent_s when recorded, else its echo" "2.4960 R2-rz.log|1 1" \
+   "$(printf '%s\n' "$rr" | awk '/^  J BFC00000 +send -> prompt/ { n = split($NF, a, "/"); printf "%s %s", $(NF-1), a[n] }')|$(printf '%s\n' "$rr" | sed -n 's/.*the send is `sent_s` on \([0-9]*\) and the first byte of the echo on \([0-9]*\);.*/\1 \2/p')"
+
+echo
+echo "=== B12: the per-seating scale section ==="
+# Positive control: kernel times scaled exactly with each directory's loader ->
+# slope 1.000, r 1.000.  Negative: loader scaled, kernel not -> slope 0.000
+# and the H-prop condition REFUTED for it.  If the fit cannot produce both, its
+# verdicts on the corpus mean nothing.
+fitline () { "$PY" "$BT" --retro "$1" | awk '/^  fit over every/ { on = 1; next } /^  fit without/ { on = 0 } on && $1 == "kernel.wlan"'; }
+# A fit row: segment, from, ->, to, typical, pairs, slope, lo, .., hi, r,
+# H-prop, H-add.
+ck "segments that scale with the loader: slope 1, r 1" "1.000 1.000 stands" \
+   "$(fitline "$FX/scale1" | awk '{ print $7, $11, $12 }')"
+# The ratio's denominator is the image's MEDIAN of per-directory medians (the
+# coordinator's definition): 1.10 / 1.00, not 1.10 / 1.02.
+ck "a ratio is to the median of per-directory medians" "x0.960 x1.000 x1.100" \
+   "$("$PY" "$BT" --retro "$FX/scale1" | awk '/^  image rlxfw\/quiet\/AAAAAAAA/ { on = 1 } on && $1 == "loader.booting" { print $6, $9, $12; exit }')"
+ck "segments that do not: slope 0, H-prop refuted" "0.000 refuted" \
+   "$(fitline "$FX/scale0" | awk '{ print $7, $12 }')"
+# On the corpus: REFUTED IF no image occurs in two directories (nothing is
+# fitted) or a fit rests on fewer than 20 pairs.
+np="$(awk '/^  fit over every/ { on = 1; next } /^  fit without/ { on = 0 } on && $1 == "kernel.wlan" { print $6 }' "$T/retro.txt")"
+echo "  observed  kernel.wlan fitted over ${np:-?} (image, directory) pairs"
+ck "the corpus fit has at least 20 pairs" yes "$([ "${np:-0}" -ge 20 ] && echo yes || echo no)"
+
+echo
+echo "=== B13: the retro describes itself, and the TSV carries the rows ==="
+# REFUTED IF the report stops saying it is a prediction, the loader-table
+# identity breaks (the landmark engine and `analyse` disagree on one byte), or
+# the TSV lacks its per-capture or summary records.
+ck "it says it is a prediction, not a result" 1 "$(grep -c '^A PREDICTION, NOT A RESULT' "$T/retro.txt")"
+idl="$(grep '^  identity:' "$T/retro.txt")"
+i1="$(printf '%s\n' "$idl" | sed -n 's/.* on \([0-9]*\) of \([0-9]*\) loader boots.*/\1 \2/p')"
+i2="$(printf '%s\n' "$idl" | sed -n 's/.* equals `banner` on \([0-9]*\) of \([0-9]*\)$/\1 \2/p')"
+echo "  observed  identity ${i1:-?} / ${i2:-?}"
+ck "the two code paths agree on every loader boot (>= 249)" yes \
+   "$(set -- $i1 $i2; [ "$#" -eq 4 ] && [ "$1" = "$2" ] && [ "$3" = "$4" ] && [ "$2" -ge 249 ] && echo yes || echo no)"
+ck "the TSV holds kboot, seg, cell, term1 and scalefit records" 5 \
+   "$(for r in kboot seg cell term1 scalefit; do awk -F'\t' -v r="$r" '$1 == r { print r; exit }' "$T/retro.tsv"; done | wc -l)"
+ck "every TSV cell record carries n"                       0 \
+   "$(awk -F'\t' '$1 == "cell" && $12 == ""' "$T/retro.tsv" | wc -l)"
+
+echo
+echo "=== B14: refusals are reasons with exit 2, never a traceback ==="
+"$PY" "$BT" --retro "$T/empty" >/dev/null 2>"$T/err"; rc=$?
+ck "--retro over nothing: exit 2 and REFUSING"            "2 1 0" "$rc $(grep -c REFUSING "$T/err") $(grep -c Traceback "$T/err")"
+"$PY" "$BT" --kernel "$FX/b5" >/dev/null 2>"$T/err"; rc=$?
+ck "--kernel over no kernel boot: exit 2 and REFUSING"    "2 1 0" "$rc $(grep -c REFUSING "$T/err") $(grep -c Traceback "$T/err")"
+"$PY" "$BT" --retro --kernel "$FX/b5" >/dev/null 2>"$T/err"; rc=$?
+ck "two modes at once: exit 2 and REFUSING"               "2 1" "$rc $(grep -c REFUSING "$T/err")"
+# A reader that is gone before the tool writes (`true` reads nothing and exits
+# while the retro is still computing) must not produce a traceback.  REFUTED IF
+# stderr holds one.  量: before the entry point caught it, B12's awk printed
+# `BrokenPipeError` into this suite's output.
+"$PY" "$BT" --retro "$FX/scale1" 2>"$T/err" | true
+ck "a reader that closes early gets no traceback"          0 "$(grep -c 'Traceback\|BrokenPipe' "$T/err")"
 
 echo
 if [ "$fail" -ne 0 ]; then

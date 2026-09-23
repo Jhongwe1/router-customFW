@@ -7,9 +7,9 @@
 # writer on the master side plays a known script with known gaps, and the tool
 # reads the slave believing it is a serial port.
 #
-# Forty-five cases, FORTY-SIX results (P3 checks two things). Thirty of them
-# are controls whose job is to FAIL -- the tool must refuse, or a mutant of it
-# must break a case above -- because a test suite that cannot fail proves
+# Sixty-six cases, SIXTY-SEVEN results (P3 checks two things). Forty-three of
+# them are controls whose job is to FAIL -- the tool must refuse, or a mutant of
+# it must break a case above -- because a test suite that cannot fail proves
 # nothing: the same argument tools/audit-bench-log.py
 # makes about its own patterns and the reason PROGRESS.md rejected hazlint's
 # original "stage 2 must report zero" control.
@@ -17,8 +17,9 @@
 # 🔴 That count has been wrong before and this line is re-measured rather than
 # incremented: it read "twenty-four cases, twenty-five results" while the suite
 # printed 29, for at least the three sessions between P8's arrival and
-# 2026-08-30. `tools/ci-expected.tsv` is what CHECKS the number; this comment is
-# a convenience and has no gate behind it.
+# 2026-08-30, and "forty-six results" while it printed 59, from 2026-09-09 to
+# 2026-09-23. `tools/ci-expected.tsv` is what CHECKS the number; this comment
+# is a convenience and has no gate behind it.
 #
 # 🔴 AND FORTY GREEN RESULTS WERE NOT ENOUGH. 量 2026-08-30 with
 # tools/test-console-capture-mutants.py: 25 mutants of the terminator guard,
@@ -1400,6 +1401,293 @@ if printf '%s' "$UAS" | grep -q -- '--until matched at offset' && fnum "$UAD >= 
   ok "N41 with the cap already expired on entry (${UAD}s of 2 s), stop_reason still names --until"
 else
   bad "N41 --seconds wins over a matched --until, so a caught event reads as a short window (stop=$UAS dur=$UAD)"
+fi
+
+# --------------------------------------------------------------------------
+# ONE CLOCK, 2026-09-23 (P2-1; SPEC.md FW-114).  Eight cases.
+#
+# The metadata now says where a capture's .timing seconds start on the host's
+# CLOCK_MONOTONIC: `t0_mono` is the origin itself, `t0_real` the time.time()
+# read beside it, `end_mono`/`end_real` the same pair after the port closes,
+# and `sent_s` the instant the --send line's flush() returned, in .timing
+# seconds.  A host probe stamping packets on the same clock can then put a
+# console byte and a packet on one axis, which is P2's settled item 4.
+#
+# THE ASSUMPTION THESE CASES REST ON, and it is what makes them measurements:
+# CLOCK_MONOTONIC is one clock for every process under one kernel and one time
+# namespace (Popen does not unshare one), so the reads this harness takes
+# before it launches the tool and after the tool exits BRACKET every read the
+# tool takes.  The tool's numbers are checked against a second process's
+# reads, not against each other.
+#
+# Refutation conditions, written before the tool was changed:
+#   P18  `clock` is not CLOCK_MONOTONIC; t0_mono or end_mono falls outside the
+#        harness's bracket; or the read that delivered a played byte is
+#        stamped (t0_mono + its .timing seconds) more than 1 us -- one .timing
+#        digit -- before the harness wrote that byte, or after the harness saw
+#        the tool exit.
+#   P19  end_mono - t0_mono differs from duration_s by more than 1 us, the
+#        resolution duration_s is written at, or a .timing row is later than
+#        duration_s: the three are not measured from one origin.
+#   P20  t0_real or end_real falls outside the harness's time.time() bracket,
+#        or either pair's realtime-minus-monotonic offset differs from the
+#        harness's by 0.5 s or more.  A pair read at opposite ends of this 2 s
+#        capture is off by the capture; two adjacent reads, by microseconds.
+#   P21  with the port's output held off (tcflow TCOOFF) until a known instant,
+#        t0_mono + sent_s is more than 1 us earlier than that instant: the send
+#        was stamped before the line could have gone.
+#   P22  sent_s is negative, or later than the first byte of the reply the
+#        command caused.
+#   N42  a capture with no --send records sent_s as anything but JSON null --
+#        0 would claim a send at the origin -- although its ESC loop and its
+#        CR did go out on the wire.
+#   P23  tool_version is not 1.4.  The keys are schema; nothing new is written
+#        to the port, and P5-P8 pin those bytes.
+#   N43  P18's causality check passes a record in which the harness wrote a
+#        byte 1 ms AFTER the tool stamped the read that delivered it.
+#
+# NOT COVERED, because a pty cannot show it: flush() is tcdrain(3), which a
+# pty answers at once, so a sent_s stamped between write() and flush() is
+# indistinguishable here from one stamped after flush() (bench only).
+# --------------------------------------------------------------------------
+
+clock_case() {         # clock_case <outprefix> <record.json> <reply|hold> -- <capture args...>
+  local _out="$1" _rec="$2" _mode="$3"; shift 3
+  [ "$1" = "--" ] && shift
+  "$PY" - "$TOOL" "$_out" "$_rec" "$_mode" "$@" <<'INNERPY'
+import json, os, pty, select, subprocess, sys, termios, time
+
+tool, out, recp, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+extra = sys.argv[5:]
+master, slave = pty.openpty()
+if mode == "hold":
+    # Output on the slave is suspended BEFORE the tool opens it, so a write
+    # there cannot complete until TCOON.  pyserial's tcsetattr does not undo
+    # it: a stop made by tcflow() is not one that clearing IXON restarts.
+    termios.tcflow(slave, termios.TCOOFF)
+rec = {"mode": mode, "writes": []}
+rec["b_mono"] = time.monotonic(); rec["b_real"] = time.time()
+proc = subprocess.Popen(
+    ["/usr/bin/python3", tool, "capture", "--port", os.ttyname(slave), "--out", out] + extra,
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+seen = bytearray()
+
+def pump(budget):
+    r, _, _ = select.select([master], [], [], budget)
+    if r:
+        seen.extend(os.read(master, 4096))
+
+if mode == "hold":
+    deadline = time.monotonic() + 1.5
+    while time.monotonic() < deadline:
+        pump(0.02)
+    rec["held_bytes"] = len(seen)
+    rec["on_mono"] = time.monotonic()
+    termios.tcflow(slave, termios.TCOON)
+# reply: the command's echo as soon as its CR arrives, then a prompt 0.3 s
+# later -- two reads, each with the instant the harness wrote it.
+script = [b"DW 8040DBC0 1\r\n", b"<RealTek>"]
+while proc.poll() is None:
+    pump(0.02)
+    n = len(rec["writes"])
+    if mode == "reply" and b"\r" in seen and n < len(script) \
+       and (n == 0 or time.monotonic() - rec["writes"][-1]["w_mono"] >= 0.3):
+        w = time.monotonic()
+        os.write(master, script[n])
+        rec["writes"].append({"w_mono": w, "offset": sum(len(s) for s in script[:n])})
+    if time.monotonic() - rec["b_mono"] > 30:
+        proc.kill()
+rec["a_mono"] = time.monotonic(); rec["a_real"] = time.time()
+rec["wire"] = bytes(seen).decode("latin-1")
+json.dump(rec, open(recp, "w", encoding="utf-8"))
+os.close(master); os.close(slave)
+INNERPY
+}
+
+clock_check() {        # clock_check <outprefix> <record.json> <case>  -> "OK <note>" | "BAD <why>"
+  "$PY" - "$1" "$2" "$3" <<'INNERPY'
+import json, sys
+
+out, recp, case = sys.argv[1], sys.argv[2], sys.argv[3]
+LSB = 1e-6     # .timing seconds, sent_s and duration_s are all written to 1 us
+try:
+    m = json.load(open(out + ".meta.json", encoding="utf-8"))
+    r = json.load(open(recp, encoding="utf-8"))
+    rows = [(int(o), float(s)) for o, s in
+            (l.split() for l in open(out + ".timing", encoding="ascii")
+             if not l.startswith("#"))]
+except (OSError, ValueError) as e:
+    print("BAD unreadable: %s" % e)
+    raise SystemExit
+
+def num(k):
+    v = m.get(k)
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+def raw(*ks):
+    return " ".join("%s=%r" % (k, m.get(k, "ABSENT")) for k in ks)
+
+def at(off):
+    """When the read that delivered byte `off` returned: the last row at or
+    before it (FW-35)."""
+    got = [s for o, s in rows if o <= off]
+    return got[-1] if got else None
+
+t0, end, dur = num("t0_mono"), num("end_mono"), num("duration_s")
+bad, note = [], ""
+if case == "P18":
+    if m.get("clock") != "CLOCK_MONOTONIC":
+        bad.append(raw("clock"))
+    if t0 is None or end is None:
+        bad.append(raw("t0_mono", "end_mono"))
+    else:
+        for k, v in (("t0_mono", t0), ("end_mono", end)):
+            if not r["b_mono"] <= v <= r["a_mono"]:
+                bad.append("bracket: %s %.6f outside [%.6f, %.6f]"
+                           % (k, v, r["b_mono"], r["a_mono"]))
+        if not r["writes"]:
+            bad.append("the harness played nothing")
+        for w in r["writes"]:
+            s = at(w["offset"])
+            if s is None:
+                bad.append("no .timing row delivers byte %d" % w["offset"])
+                continue
+            if t0 + s < w["w_mono"] - LSB:
+                bad.append("causality: byte %d stamped %.6f s before it was written"
+                           % (w["offset"], w["w_mono"] - (t0 + s)))
+            if t0 + s > r["a_mono"]:
+                bad.append("bracket: byte %d stamped after the tool exited" % w["offset"])
+            note += "%s byte %d read %.0f us after its write" % (
+                ";" if note else "", w["offset"], (t0 + s - w["w_mono"]) * 1e6)
+elif case == "P19":
+    if None in (t0, end, dur):
+        bad.append(raw("t0_mono", "end_mono", "duration_s"))
+    else:
+        d = (end - t0) - dur
+        if abs(d) > LSB:
+            bad.append("origin: end_mono - t0_mono - duration_s = %+.3f us" % (d * 1e6))
+        late = [s for _, s in rows if s > dur]
+        if late:
+            bad.append("%d .timing row(s) after duration_s %.6f" % (len(late), dur))
+        note = " end_mono - t0_mono - duration_s = %+.3f us; %d rows" % (d * 1e6, len(rows))
+elif case == "P20":
+    t0r, endr = num("t0_real"), num("end_real")
+    if None in (t0, end, t0r, endr):
+        bad.append(raw("t0_mono", "end_mono", "t0_real", "end_real"))
+    else:
+        for k, v in (("t0_real", t0r), ("end_real", endr)):
+            if not r["b_real"] <= v <= r["a_real"]:
+                bad.append("bracket: %s %.6f outside [%.6f, %.6f]"
+                           % (k, v, r["b_real"], r["a_real"]))
+        worst = max(abs((t0r - t0) - (r["b_real"] - r["b_mono"])),
+                    abs((endr - end) - (r["a_real"] - r["a_mono"])))
+        if worst >= 0.5:
+            bad.append("pairing: realtime minus monotonic is %.3f s off the harness's" % worst)
+        note = " both pairs agree with the harness's offset to %.0f us" % (worst * 1e6)
+elif case == "P21":
+    sent = num("sent_s")
+    if r["held_bytes"]:
+        bad.append("the hold leaked %d byte(s): the port was not held" % r["held_bytes"])
+    if r["wire"] != "DW 8040DBC0 1\r":
+        bad.append("wire %r" % r["wire"])
+    if t0 is None or sent is None:
+        bad.append(raw("t0_mono", "sent_s"))
+    else:
+        lead = r["on_mono"] - t0
+        if lead < 0.5:
+            bad.append("precondition: the origin led the release by %.3f s, not 0.5, "
+                       "so the write may never have been held" % lead)
+        if t0 + sent < r["on_mono"] - LSB:
+            bad.append("sent_s: stamped %.6f s before the output was released"
+                       % (r["on_mono"] - (t0 + sent)))
+        note = " flush() returned %.3f ms after the release, %.3f s after the origin" % (
+            (t0 + sent - r["on_mono"]) * 1e3, sent)
+elif case == "P22":
+    sent, s0 = num("sent_s"), at(0)
+    if sent is None or s0 is None:
+        bad.append("%s, first row %r" % (raw("sent_s"), s0))
+    elif not 0 <= sent <= s0:
+        bad.append("sent_s %.6f against the reply's first byte at %.6f" % (sent, s0))
+    else:
+        note = " sent_s %.6f s, the reply's first byte %.6f s" % (sent, s0)
+else:
+    bad.append("no such case %r" % case)
+print(("BAD " + "; ".join(bad)) if bad else ("OK" + note))
+INNERPY
+}
+
+clock_case "$WORK/ck1" "$WORK/ck1.rec" reply -- --send 'DW 8040DBC0 1' --seconds 2
+
+CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P18)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "P18 t0_mono, end_mono and each played byte's read sit inside the harness's own CLOCK_MONOTONIC bracket --${CK#OK}"
+else
+  bad "P18 the capture's origin is not on the harness's clock: ${CK#BAD }"
+fi
+
+CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P19)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "P19 duration_s and every .timing row are measured from t0_mono itself --${CK#OK}"
+else
+  bad "P19 t0_mono is not the origin the capture's own numbers use: ${CK#BAD }"
+fi
+
+CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P20)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "P20 t0_real and end_real are inside the harness's time.time() bracket and each is paired with its monotonic read --${CK#OK}"
+else
+  bad "P20 the realtime pair does not cross-check: ${CK#BAD }"
+fi
+
+CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P22)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "P22 sent_s is not negative and not later than the reply the command caused --${CK#OK}"
+else
+  bad "P22 sent_s is not bounded by the reply: ${CK#BAD }"
+fi
+
+CKV="$(term_meta "$WORK/ck1" tool_version)"
+if [ "$CKV" = "1.4" ]; then
+  ok "P23 tool_version is still 1.4: the six keys are schema, and P5-P8 pin the bytes on the wire"
+else
+  bad "P23 tool_version is '$CKV'; the one-clock keys write nothing new to the port, so they may not move it"
+fi
+
+# N43 doctors the record, not the capture: the byte is "written" 1 ms after
+# the tool stamped the read that delivered it, which no causal order allows.
+"$PY" - "$WORK/ck1" "$WORK/ck1.rec" "$WORK/ck1d.rec" <<'INNERPY'
+import json, sys
+m = json.load(open(sys.argv[1] + ".meta.json", encoding="utf-8"))
+r = json.load(open(sys.argv[2], encoding="utf-8"))
+rows = [float(l.split()[1]) for l in open(sys.argv[1] + ".timing", encoding="ascii")
+        if not l.startswith("#")]
+if not isinstance(m.get("t0_mono"), float) or not rows or not r["writes"]:
+    sys.exit("N43: nothing to doctor -- no t0_mono, no row or no write")
+r["writes"][0]["w_mono"] = m["t0_mono"] + rows[0] + 0.001
+json.dump(r, open(sys.argv[3], "w", encoding="utf-8"))
+INNERPY
+CK="$(clock_check "$WORK/ck1" "$WORK/ck1d.rec" P18)"
+if printf '%s' "$CK" | grep -q '^BAD .*causality'; then
+  ok "N43 a read stamped 1 ms before its byte was written is refused -- P18's causality check can fail"
+else
+  bad "N43 P18's checker did not refuse a read stamped before its byte was written: $CK"
+fi
+
+clock_case "$WORK/ck2" "$WORK/ck2.rec" hold -- --send 'DW 8040DBC0 1' --seconds 3
+CK="$(clock_check "$WORK/ck2" "$WORK/ck2.rec" P21)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "P21 with the port held off for 1.5 s, sent_s is stamped after the release -- after flush(), not before write() --${CK#OK}"
+else
+  bad "P21 sent_s does not wait for the line to go: ${CK#BAD }"
+fi
+
+wrote_case "$TOOL" "$WORK/ck3" "$WORK/ck3.sent" --esc 0.5 --cr-settle 0.2 --seconds 1.5
+CK3S="$(term_meta "$WORK/ck3" sent_s)"
+CK3W="$("$PY" -c "import re, sys; print(bool(re.fullmatch(rb'\x1b+\r', open(sys.argv[1], 'rb').read())))" "$WORK/ck3.sent")"
+if [ "$CK3S" = "None" ] && [ "$CK3W" = "True" ]; then
+  ok "N42 with no --send, sent_s is JSON null although the ESC loop and its CR went out"
+else
+  bad "N42 sent_s is '$CK3S' on a capture that sent no line (ESC+CR on the wire: $CK3W) -- null, not 0, not absent"
 fi
 
 echo

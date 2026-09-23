@@ -735,7 +735,7 @@ condition written first:
 an existing file and lets the tool touch the board. So
 `docs/GATE-RESULTS.md`'s *71 of 71 real `--mode bench` invocations carried
 `--skip`* is not a discipline finding — **the tool is structurally unable to do
-it.** And 讀 `tools/looprun.py:644`: the `--image-sha256` pin is checked above
+it.** And 讀 `tools/looprun.py:1003`: the `--image-sha256` pin is checked above
 the same loop, so on a no-skip run it pins the file `S3` is about to overwrite.
 
 ⚠️ **The repair is carried forward rather than done here**: the image pre-flight
@@ -1110,7 +1110,7 @@ lladdr must report a pass.
 ### 15.2 🔴 A failed run cannot be retried, and the obvious workaround destroys evidence
 
 The retry died at `S5b` in **0.06 s** — too fast to have opened the port.
-`console-capture.py:368` refuses to overwrite an existing capture, correctly,
+`console-capture.py:461` refuses to overwrite an existing capture, correctly,
 and `C1-ab2` was still on disk from the first attempt.
 
 🔴 **At a bench the natural response to that refusal is `--force`, and that is
@@ -1351,3 +1351,99 @@ fi
 ⚠️ And the durable form of the server is not `nohup` at all — it is a process
 the harness owns, which survived three board reboots in the same seating while
 the `nohup` one did not survive its own parent shell.
+
+
+## 19. 🆕 2026-09-23 (`P2-1`, desk): `looprun` 1.2 — N rounds on one power press, and boot cells that end on an event
+
+`LOOP-3` and `TERM-1`, both adopted by `P2-1`. **Desk only: 1.2 has never run
+against the board.** Every bench-mode case in its self-test drives a fake stage
+runner whose port is `/dev/rlxfw-no-such-port`; `P2-3` is its first bench run.
+
+**Rounds.** `--iterations N` runs `S2`/`S3` once, then N rounds of `S4`…`S8`.
+Round 1's `S4` is `J BFC00000` from the loader prompt; rounds 2…N start in
+rlxfw's shell and reach the loader through `busybox reboot -f`, a watchdog bite
+(`FW-37`), with the committed `-RB` cells' terminators
+(`--esc-after 20 --esc-period 0.002 --until '<RealTek>' --seconds 40`). Every
+reset re-stages `0x80500000` from flash (`LDR-22`), so every round uploads
+again and reads the burn flag back; `S5b` stays un-skippable in every round.
+`--skip S4` skips round 1's reset only (a card that starts from a cold ESC
+catch), and `--mode plan` says so; any other per-round stage in `--skip` is
+refused for N ≥ 2, and `--skip S8` is refused outright. N ≥ 2 names carry
+`-rNN` (`<cell>-att2-r01-rz.log`); N = 1 names are unchanged. The artefact
+pre-flight reads every round's names before anything runs, and a failing round
+stops the run. `--image-sha256` is re-checked before every round's `S6`
+(`FW-100`: a pin taken once certifies the file at that moment).
+
+🔴 **`S4` now asserts that the loader prompt was caught (`A0a`), in every
+round.** `A0` alone passes a reset whose ESC window was missed:
+`bench/2026-08-31c/K-J` holds the watchdog line and then
+`Jump to image start` — the vendor firmware booted. `A0a` reads the capture's
+final bytes (CR, LF, space and ESC stripped; nothing else). 量, read
+2026-09-23 over the committed captures: of the 193 that hold `C-8`'s line, 191
+end at `<RealTek>`; the other two are `K-J` and `C1-WG`, which `--idle 3` cut
+short. (`A0`, `A0a`) occurs in all four combinations on committed bytes —
+`C1-RB` both, `K-J` `A0` only, `E0-rz` `A0a` only, `SN-rz` neither.
+
+**Stage times** go to `<stem>.stages.tsv` in bench mode, one row per stage per
+round (`S2`/`S3` are round 0), rewritten whole after every stage through
+`.tmp` + `os.replace`. `start_mono`/`end_mono` are absolute `time.monotonic()`,
+the clock `console-capture` now records its origin on (`FW-114`, `FW-115`), so
+a stage row lines up with a capture. A last line of `running` is a run that did
+not finish; no file at all is a run refused before it started.
+
+**Boot cells end on an event (`TERM-1`).** `S4` ends on `--until '<RealTek>'`
+(`--esc-after` and `--seconds` are caps) and `S7` on
+`--until 'job control turned off[^#]{1,2}# ' --seconds 45`; neither carries
+`--idle`. The pattern has no backslash on purpose: `--mode plan` renders it into
+a card's command column, and a quoted heredoc through the Bash tool loses a
+backslash level (`CLAUDE.md`). 量, read 2026-09-23 over the committed
+captures:
+
+* the 58 `-rz` captures that hold `C-8`'s line lasted **13.126–13.185 s**; the
+  first `<RealTek>` after the watchdog line arrived **2.12–2.40 s** into the 82
+  `J BFC00000` captures and **2.22–2.57 s** into the 69 `busybox reboot -f` ones.
+  The ≈10.5 s saved per `S4` is 推 until `P2-3`'s stages file reads it;
+* the `S7` pattern matches all 138 committed rlxfw boots, each time on the
+  capture's last byte; `J` → prompt took **6.99–12.57 s**, so the 45 s cap
+  leaves 32.4 s;
+* the largest silence inside a boot has median **4.546 s** and maximum
+  **4.776 s** (`bench/2026-09-08/C6-boot`), and 124 of the 138 hold one over
+  3 s. `--idle 8` was safe but paid 8 s per boot, and the 4.576 s it was sized
+  from was one instance, not the maximum.
+
+🔴 **`S7` still carries no `--esc-after`, and that is a decision, not an
+omission.** `CLAUDE.md` asks one of a cell that jumps; the hazard is a reset
+during the boot letting the loader autoboot the vendor firmware. Streaming ESC
+into a healthy rlxfw console would put ESC bytes into the shell's input ahead of
+the next round's `busybox reboot -f`, which nothing has tested, and every round
+depends on that line. No reset is expected in these images: `CONFIG_RTL_WTDOG`
+is `n` (`config/rlxfw-kernel.delta`, whose row records that a panic then no
+longer reboots), and all 19 loud captures print the command line
+`console=ttyS0,38400`, with no `panic=`. The
+containment that holds whatever happens belongs to the card: `P2-2` brackets
+every block that could boot the vendor — a `looprun` block included — with the
+flash `map`, so an unplanned vendor boot is a reading rather than a loss. A
+preventive form, an ESC stream that starts only when the loader's `Booting...`
+appears, would change what `console-capture` writes and is not built.
+
+Found while doing this, recorded rather than changed:
+
+* `M14` could never fail: it looked for `S5b` in a refusal's text, and the
+  `--image` refusal's own message contains `S5b`. It now keys on `G2/H1a`,
+  which only the burn-flag refusal says.
+* § 18's "the only way through is `--skip S8`" was never true: before 1.2 the
+  flag was accepted and did nothing, and 1.2 refuses it.
+* § 13's "never recorded a SUCCESSFUL `S4`'s duration" is out of date: the 58
+  captures above hold it.
+* Four cases (`M10b`, `M11b`, `M11c`, `M12b`) run the real `rlxfw-kbuild.sh`.
+  At the desk that stages ≈433 MB into `$FWRE_WORK/rebuild/r3-4/cells/L1` four
+  times per self-test; CI exits at "no drop" instead. Same verdict, different
+  route. `P2-2` changes what that driver writes into its manifest (`CFG-3`), so
+  it re-verifies these four.
+* `S2`'s manifest copy overwrites an existing file and is not in the artefact
+  pre-flight. No bench plan puts `S2` in bench mode (`LOOP-4b`), so it waits.
+
+**What this does not establish:** that any round works on the board; the time
+saved; that the default `S7` pattern fits `P2-2`'s `/init`, which brings the LAN
+up and may print after the prompt. A run cannot start from rlxfw's shell: round
+1's `J BFC00000` gets `J: not found` there (seating 12, `SN-rz`).

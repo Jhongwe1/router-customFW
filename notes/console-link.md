@@ -16,7 +16,7 @@ column, so `FW-70`, `FW-69` and `CLK-29` were parked there with an owning
 | | | mark |
 |---|---|---|
 | adapter | Silicon Labs CP2102, `10c4:ea60` | 量 |
-| host settings | 38400, 8 data bits, no parity, 1 stop bit — pyserial defaults at `tools/console-capture.py:496` | 讀 |
+| host settings | 38400, 8 data bits, no parity, 1 stop bit — pyserial defaults at `tools/console-capture.py:540` | 讀 |
 | board line control | `LCR = 0x03` — 8 data bits, **1 stop bit**, parity off | **讀 ×2, 量 ×0** |
 | board baud, computed | **38,343.6** (divisor 326), −0.147 % from nominal | 讀 |
 | board baud, cross-checked | 38,378.1 from `CLK-28`'s measured 200,180 Hz, −0.057 % | 推 from 量 |

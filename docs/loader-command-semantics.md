@@ -1667,10 +1667,14 @@ per-seating median of `booting` (anchor C → `chipName`, `CLK-15`) ranges
 **inside** one seating is **6.5 ms**.
 
 The loader's code is the same in every one of those boots, so the drift is a
-property of the setup, not of the code. The cause is undetermined: host USB
-latency and the device are both candidates, and this measurement cannot
-separate them.
+property of the setup, not of the code. It is not host USB latency: every kernel
+segment of one image moves with its seating's `booting` median by one factor
+(`CLK-32`, `notes/boot-time.md` § 5), and an additive per-read latency cannot
+stretch a 4.5 s interval by 4 %. What stays open is whether the host's monotonic
+clock or the device's timebase carries that factor (`CLK-31` 殘留) — a question
+this measurement cannot answer, because every interval in it is a device event
+timed by the host.
 
 Consequence for `P2`: its control segment compares the two firmwares only inside
-one seating, and the plan's *±10 % on another day* is pre-registered as at risk
-for every sub-second segment.
+one seating, and the plan's *±10 % on another day* is at risk for every segment,
+not only the sub-second ones (`D3`).

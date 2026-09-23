@@ -2566,7 +2566,7 @@ first pair's time. Every figure below is relative to the first read.
 
 🔴 **2026-09-06 (seating 14): the rule as written above was wrong, and this
 paragraph is the correction rather than a rewrite.** 讀
-`tools/console-capture.py:462` — the row is written **before** its chunk is
+`tools/console-capture.py:608` — the row is written **before** its chunk is
 appended, so `offset seconds` means *a read finished at `seconds`, and the
 bytes it delivered begin at `offset`*. The read at row *i* therefore delivered
 bytes `[offs[i], offs[i+1])`, and a byte's arrival is the row with the largest

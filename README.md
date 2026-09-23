@@ -580,8 +580,8 @@ tools/spec-check.py        THIRTEEN checks and fifty case lines. C1-C7 are about
                            on this format's own exemplar from the day before,
                            and on the sixteen references the next payload edit
                            moved
-tools/console-capture.py   45 cases, 46 results (P3 checks two things). Four of them
-                           exist because the ESC heartbeat is
+tools/console-capture.py   records each capture's origin on CLOCK_MONOTONIC (`FW-115`);
+                           four of its cases exist because the ESC heartbeat is
                            the grid every interval is quantised to, so the period each
                            capture ACHIEVED is measured and recorded, not assumed.
                            Eleven more arrived on 2026-08-30 with the terminator
@@ -690,11 +690,11 @@ tools/looprun.py           two of its ten stages exist only to make it safe to r
                            requires the board to say the id the build just produced. A
                            stale image, the vendor's firmware, and the loader's own
                            re-staging of 0x80500000 from flash after a watchdog reset are
-                           then all red for the same reason. 66 controls, and N1..N7 each
+                           then all red for the same reason. N1..N7 each
                            require exactly ONE of the four assertions to fail: a control
                            set where one broken input trips every check cannot say which
-                           check is load-bearing. Its first run found two defects in
-                           itself and two wrong counts in its own docstring.
+                           check is load-bearing. Since 1.2 (2026-09-23) one power
+                           press runs N boots, and S4 must show the prompt caught (`FW-118`).
                            Ten arrived on 2026-09-04 and they are two guards on
                            `--image`, the one bench input that had none: it is read
                            by S6/S6b, which sit AFTER the reset, the rescue and the
@@ -832,7 +832,17 @@ tools/reply-size.py        what the loader will send back, in bytes, before it s
                            error it was built to remove
 tools/boot-timeline.py     the named intervals of a boot, with the anchor bytes stated.
                            It exists because two adjacent silences of the same length is
-                           how a measurement ends up wearing another one's name
+                           how a measurement ends up wearing another one's name. Since
+                           2026-09-23 it times the kernel and userspace of both
+                           firmwares with one function and one landmark table each,
+                           joins a host probe's events onto a capture, and prints the
+                           retro table seating A is scored against (`FW-117`, `CLK-33`)
+tools/hostprobe.py         the host's half of the one clock: the first ICMP echo reply,
+                           the first TCP success on a daemon's port, neighbour-table
+                           changes and UDP arrivals, stamped on the CLOCK_MONOTONIC a
+                           capture records its origin on. It drives the system `ping`,
+                           because this host refuses an unprivileged ICMP socket, and
+                           keeps ping's own -D stamps as a second clock (`FW-116`)
 tools/looptime.py          the wall clock of a development loop, out of its own artefacts.
                            Every capture already carried started_wallclock, duration_s and
                            a .timing; nothing had joined them, so the dead time in a

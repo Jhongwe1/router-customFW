@@ -942,6 +942,17 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/fetch-sources.sh --list
 
+      # hostprobe is P2-1's host-side instrument: the first ICMP echo reply
+      # (D8), the first TCP success on a daemon's port (D4), neighbour-table
+      # changes and UDP arrivals, stamped on CLOCK_MONOTONIC. The self-test
+      # writes a FAKE ping and a FAKE ip into a temporary directory and opens
+      # real sockets on 127.0.0.1 only: no apt, no network beyond loopback, no
+      # device. What it says about the REAL ping is a desk measurement
+      # (notes/boot-time.md), not a case: a runner's ping is not the bench's.
+      - name: hostprobe self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/hostprobe.py --self-test 2>&1 | tee ci-out/hostprobe.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:
@@ -1021,12 +1032,12 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mustrun.py --self-test 2>&1 | tee ci-out/mustrun.out; exit "${PIPESTATUS[0]}"
 
-      # 66 s. Drives a pty, not a serial port; no device is involved.
+      # 124 s on CI at 59 cases (run 35780238822). A pty, not a serial port.
       - name: test-console-capture
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
 
-      # ~6 min, and it is the step that stops the one above from being a claim
+      # 774 s on CI at 39 mutants (run 35780238822); it stops the one above being a claim
       # that cannot fail: 量 2026-08-30, test-console-capture reported 40/40
       # while TEN mutations of the terminator guard it had just gained were
       # alive. Each mutant runs the WHOLE suite, because "the committed cases

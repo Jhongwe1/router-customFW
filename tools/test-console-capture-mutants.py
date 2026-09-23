@@ -107,6 +107,30 @@ U_META = '        "until": args.until,\n        "until_offset": None,'
 U_ENDED = '                    meta["esc"]["esc_after"]["ended_on_until"] = True'
 U_META_END = "    meta[\"until_offset\"] = until_at"
 
+# One clock, 2026-09-23 (P2-1; SPEC.md FW-114).  Eight more: the origin, the
+# realtime pair, the send stamp, and the version the new keys must not move.
+# Two mutants are NOT rows, because no case can see them and a row that
+# cannot be killed is a survivor by construction, not a finding:
+#   * t0_mono read by a second time.monotonic() on the line after t0.  量
+#     2026-09-23, WSL's /usr/bin/python3: adjacent reads are 61 ns apart
+#     (median of 20,000; p99 84 ns), a sixteenth of the 1 us every field is
+#     written at and P19 allows.  K2 is the same mistake one statement
+#     further on, past the two open()s, where it is 26 us or more (量 the
+#     same day, minimum of 300) and P19 does see it.
+#   * sent_s stamped between write() and flush().  flush() is tcdrain(3) and
+#     a pty answers it at once (量 the same day: 6-16 us after write()), so on
+#     a pty the two stamps are one instant.  Only a real port separates them.
+K_T0 = '    meta["t0_mono"] = t0'
+K_T0R = '    meta["t0_real"] = time.time()'
+K_HDR = ('        timing.write("# offset seconds -- offset is the byte count in '
+         '.log BEFORE this read\\n")')
+K_ENDR = '    meta["end_real"] = time.time()'
+K_SENT = '                meta["sent_s"] = round(time.monotonic() - t0, 6)'
+K_WRITE = "                ser.write(line)"
+K_SENT0 = '        "sent_s": None,'
+K_DUR = '    meta["duration_s"] = round(end_mono - t0, 6)'
+K_VER = 'TOOL_VERSION = "1.4"'
+
 # id, what it does, [(anchor, replacement), ...]
 #
 # The classes are named because a class with one member is a class nobody has
@@ -236,6 +260,28 @@ MUT = [
      [(U_ENDED, "                    pass")]),
     ("U14", "until_offset is never written back",
      [(U_META_END, '    meta["until_offset"] = None')]),
+
+    # --- ONE CLOCK: each row names the case built to kill it -------------
+    ("K1", "t0_mono from time.time(), not the monotonic t0 (P18)",
+     [(K_T0, '    meta["t0_mono"] = time.time()')]),
+    ("K2", "t0_mono re-read after the output files open, not t0 (P19)",
+     [(K_T0, "    pass"),
+      (K_HDR, K_HDR + '\n        meta["t0_mono"] = time.monotonic()')]),
+    ("K3", "t0_real from time.monotonic() (P20)",
+     [(K_T0R, '    meta["t0_real"] = time.monotonic()')]),
+    ("K4", "end_real is the realtime read taken at t0 (P20)",
+     [(K_ENDR, '    meta["end_real"] = meta["t0_real"]')]),
+    ("K5", "sent_s stamped before write(), not after flush() (P21)",
+     [(K_SENT, "                pass"),
+      (K_WRITE, K_SENT + "\n" + K_WRITE)]),
+    ("K6", "sent_s written as 0 instead of null with no --send (N42)",
+     [(K_SENT0, '        "sent_s": 0,')]),
+    ("K7", "sent_s stamped when the metadata is written (P22)",
+     [(K_SENT, "                pass"),
+      (K_DUR, K_DUR + '\n    meta["sent_s"] = (round(time.monotonic() - t0, 6)'
+                      ' if args.send is not None else None)')]),
+    ("K8", "tool_version bumped for keys that write nothing new (P23)",
+     [(K_VER, 'TOOL_VERSION = "1.5"')]),
 ]
 
 

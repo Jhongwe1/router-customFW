@@ -517,3 +517,44 @@ its former text moved verbatim to `docs/history/claude-md-2026-09-23.md`, and
 `tools/docmove.py` checks in CI that every block of it is still there. § Now was
 rewritten the same way (`docs/history/progress-now.md`). The rest of the
 restructure — closed step lists, the ladder, closed rows, `SPEC.md` — is `R1y`'s.
+
+## 5.6 A re-dated line certifies its own rot — 量 2026-09-23
+
+`citecheck` dates a citation by the last commit that touched the citing line,
+and compares the cited line then with the cited line now. **Any edit to the
+citing line re-dates every citation on it**, including a citation that had
+already rotted: from that commit on, the oracle compares the moved line with
+itself and reports `STABLE`. § 5.2 is a citation wrong when written; this is a
+citation right when written, rotted, and then hidden by an unrelated edit.
+
+Found this segment by listing every citation on every line the segment edited
+and reading each against its prose before committing — the edits being digit
+repairs that would themselves have re-dated those lines:
+
+* `PROGRESS.md`'s `SEAM-1` row cited `tools/rlxfw-kbuild.sh` lines 203–204 for
+  how `RECIPE_ID` is computed. They held it on 2026-09-04 (`9dab609`); three
+  hours later `73646a1` moved it to 210, then `b36a1dd` to 262. On 2026-09-14
+  `5955b36` edited the same row for another reason, and `citecheck` has called
+  the citation `STABLE` since. It now cites 262–263. The `RECIPE-1` row carried
+  the same 203–204 and is repaired with it.
+* The `RECIPE-1` row also cites the driver at `357,388-389` for the two `cp`
+  lines that keep `<cell>.config-installed` and the initramfs spec. In the file
+  that citation was written against (`8daa33b`) the second pair was at
+  387–388, and the commit that wrote it (`73646a1`) moved all three by nine:
+  it was wrong at the commit that landed it, and `citecheck` has only ever read
+  its `357` (§ 5.1). It now cites `456,486-487`.
+* `PROGRESS.md`'s `CI-4` row cites the sentence *Two survived the 23
+  controls* at `README.md` line 764. It was at
+  772 on the day the row was written (`126f659`, 2026-09-16) and on every
+  commit since — the § 5.2 kind, seen because this segment's `README` edits
+  would have moved line 764.
+
+**The remedy used here is a reading, not a tool:** after a commit's edits and
+before the commit, every citation on every edited line is listed with its
+target's current text and read against its sentence. A tool could do the
+dating half — find each citation's first commit with `git log -S` and compare
+from there instead of from the line's last edit — but it would still need the
+reading, because a citation can be wrong at its first commit too.
+
+What this does not establish: how many rotted citations are hidden this way
+today. Only lines this segment edited were read.

@@ -43,7 +43,10 @@ The two output files, and why they are two
     binary, written binary.  The device's ``\\r\\n`` stays ``\\r\\n``.
 
 ``PREFIX.timing``
-    ``<byte-offset> <seconds-since-start>`` per read, one per line.
+    ``<byte-offset> <seconds-since-start>`` per read, one per line.  The
+    seconds are ``time.monotonic()`` minus the metadata's ``t0_mono``, on the
+    clock its ``clock`` names, so ``t0_mono + seconds`` is an instant on the
+    host's clock (``SPEC.md`` ``FW-114``).
 
 They are two files because on 2026-08-23 two separate things were caught
 rewriting the bench transcripts on the way into git -- ``.gitattributes``'s
@@ -231,6 +234,12 @@ DEFAULT_ESC_PERIOD = 0.02
 # window asked for. That is a wire difference, and a wire difference is the one
 # thing this field owns. The `until` key in the metadata dates the schema; the
 # version says the wire behaviour is not the same instrument's.
+#
+# 🔴 NOT bumped on 2026-09-23, when the metadata gained `clock`, `t0_mono`,
+# `t0_real`, `sent_s`, `end_mono` and `end_real` for P2-1's one clock (SPEC.md
+# FW-114), by the rule of 2026-08-30: not one byte more or less goes out on the
+# wire. The PRESENCE of `t0_mono` is what says a capture's .timing can be put on
+# the host's clock, and its absence dates the capture to before 2026-09-23.
 TOOL_VERSION = "1.4"
 
 # --until searches this many TRAILING bytes of what has arrived since it was
@@ -244,6 +253,21 @@ _UNTIL_WINDOW = 8192
 def _fail(msg: str) -> "NoReturn":  # noqa: F821
     print(f"console-capture: {msg}", file=sys.stderr)
     raise SystemExit(2)
+
+
+def _clock_name() -> str:
+    """The clock time.monotonic() reads, as the interpreter reports it.
+
+    Read rather than written as a constant: `t0_mono` joins a host probe's
+    stamps only if both are on one clock, and a constant would name
+    CLOCK_MONOTONIC on an interpreter that was not using it.  量 2026-09-23,
+    WSL's /usr/bin/python3 3.12.3 reports ``clock_gettime(CLOCK_MONOTONIC)``;
+    anything else is recorded verbatim, so a reader expecting CLOCK_MONOTONIC
+    refuses it.
+    """
+    impl = time.get_clock_info("monotonic").implementation
+    m = re.fullmatch(r"clock_gettime\((CLOCK_\w+)\)", impl)
+    return m.group(1) if m else impl
 
 
 # --------------------------------------------------------------------------
@@ -443,6 +467,17 @@ def capture(args) -> int:
         "port": args.port,
         "baud": args.baud,
         "started_wallclock": None,
+        # THE ORIGIN ON THE HOST'S CLOCK (P2-1, SPEC.md FW-114). Every .timing
+        # second is time.monotonic() - t0_mono, so t0_mono + seconds is the
+        # instant a read returned on the clock `clock` names -- the clock a
+        # host probe stamps its packets on. `t0_mono` is the variable t0
+        # itself, unrounded: JSON writes a float's shortest round-trip repr,
+        # so it comes back bit for bit. `t0_real` is time.time() read straight
+        # after it, for realtime stamps such as `ping -D`; started_wallclock
+        # is a string, to the second.
+        "clock": _clock_name(),
+        "t0_mono": None,
+        "t0_real": None,
         "esc_seconds": args.esc,
         "esc_after_seconds": args.esc_after,
         "esc_period_requested_s": args.esc_period,
@@ -482,9 +517,18 @@ def capture(args) -> int:
         "until_offset": None,
         "sent": None,
         "sent_hex": None,
+        # When ser.flush() of the --send line RETURNED, in .timing seconds.
+        # flush() is tcdrain(3), which by POSIX returns once the output has
+        # been transmitted. null when nothing was sent: 0 would claim a send
+        # at the origin.
+        "sent_s": None,
         "stop_reason": None,
         "bytes": 0,
         "duration_s": None,
+        # The pair again, read once the port is closed. duration_s is
+        # end_mono - t0 from that same reading, not from a third one.
+        "end_mono": None,
+        "end_real": None,
         "resolution_note": (
             "timestamps are per read() from userspace; the floor is the USB-serial "
             "latency timer (1-16 ms typical, unmeasured on this host), not the "
@@ -505,6 +549,8 @@ def capture(args) -> int:
     fd = ser.fileno()
     offset = 0
     t0 = time.monotonic()
+    meta["t0_real"] = time.time()
+    meta["t0_mono"] = t0
     meta["started_wallclock"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     last_byte_at = t0
     stop_reason = "interrupted"
@@ -716,6 +762,8 @@ def capture(args) -> int:
                 meta["sent_hex"] = line.hex()
                 ser.write(line)
                 ser.flush()
+                # After flush() returns, never before write(): case P21.
+                meta["sent_s"] = round(time.monotonic() - t0, 6)
                 # THE ARMING POINT. Note it is after the flush and not after
                 # the echo: the command's own echo is inside the search window,
                 # which is why a --until pattern must not be a substring of the
@@ -812,10 +860,13 @@ def capture(args) -> int:
         finally:
             ser.close()
 
+    end_mono = time.monotonic()
+    meta["end_real"] = time.time()
+    meta["end_mono"] = end_mono
     meta["stop_reason"] = stop_reason
     meta["until_offset"] = until_at
     meta["bytes"] = offset
-    meta["duration_s"] = round(time.monotonic() - t0, 6)
+    meta["duration_s"] = round(end_mono - t0, 6)
     with open(meta_path, "w", encoding="utf-8") as m:
         json.dump(meta, m, indent=2)
         m.write("\n")
