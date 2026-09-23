@@ -153,11 +153,11 @@ boot's first landmark to `ready`, and `jump -> ready`; for each loader reset
 `<RealTek>`), send -> prompt and its longest silence.  The send is `sent_s`
 where the capture records it, else the first byte of the echo.
 
-`--probe PREFIX` joins ONE capture with a host-probe `PREFIX.events` on the
-shared CLOCK_MONOTONIC (`FW-114`): an event at `t_mono` sits at
-`t_mono - t0_mono` in the capture's frame.  A capture without `t0_mono` -- every
-one committed before `P2-1` -- is REFUSED: an origin guessed from
-`started_wallclock` is whole seconds on another clock.
+`--probe PREFIX` joins ONE capture with a host-probe `PREFIX.events` when both
+declare CLOCK_MONOTONIC (`t0_mono`, `FW-114`) or both CLOCK_MONOTONIC_RAW
+(`t0_raw`, `P2-4`): an event at `t` sits at `t - t0_<clock>` in the capture's
+frame.  Anything else is REFUSED with its reason, in `origin()`'s order; a
+capture from before `P2-1` records no origin at all, and none is guessed.
 
 `--retro` runs every capture under the paths through all of it: the report
 `P2-3` is scored against.  The captures were taken for other questions, so it
@@ -743,6 +743,11 @@ def kernel_class(corpus, log, raw, lm):
     return "?", "%s holds loader text without C-8's line" % _base(l)
 
 
+def _num(v):
+    """A JSON number, and not a bool (which Python counts as an int)."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 def could_fit(corpus, d, unplaced, lo, hi):
     """-> None when `unplaced` provably did not run between the captures that
     started at `lo` and `hi` in directory `d`; otherwise a printable span.
@@ -750,18 +755,35 @@ def could_fit(corpus, d, unplaced, lo, hi):
     WEAKNESS, stated: it rests on captures in one directory never overlapping
     (one port, one process).  A placed capture with no `duration_s` counts as
     0 s long, and an unplaced one with no `.timing` as 0 s -- both only make
-    a fit MORE likely, so the error can only be a `?` too many."""
+    a fit MORE likely, so the error can only be a `?` too many.
+
+    🔄 P2-4 (107th segment): the gap is measured on REALTIME, the clock
+    `started_wallclock` is read on.  A placed capture that recorded `t0_real`
+    and `end_real` starts and ends at those.  One that did not falls back to
+    the whole-second rule -- it began before `w + 1` and ended no earlier than
+    `w + duration_s` -- EXCEPT that a `duration_s` on CLOCK_MONOTONIC_RAW is
+    never added to a wallclock: the two ran 4 % apart on 2026-09-23 (`CLK-38`),
+    and a placed capture made to look longer than it was hides a fit, which is
+    the unsafe direction here.  Such a capture counts as 0 s long, the side
+    this function already errs on.  The unplaced capture's own span stays on
+    whatever clock its `.timing` was written on: it has no meta to say which."""
     tm, _ = corpus.tm(unplaced)
     span = tm[-1][1] if tm else 0.0
     placed = []
     for l, w, _ in corpus.dir_index(d):
         if w is not None and lo <= w <= hi:
-            dur = corpus.meta(l).get("duration_s")
-            placed.append((w, dur if isinstance(dur, (int, float)) else 0.0))
+            m = corpus.meta(l)
+            if _num(m.get("t0_real")) and _num(m.get("end_real")):
+                placed.append((w, m["t0_real"], m["end_real"]))
+                continue
+            dur = m.get("duration_s")
+            if not _num(dur) or m.get("clock") == "CLOCK_MONOTONIC_RAW":
+                dur = 0.0
+            # whole-second starts: it began before w + 1, ended at w + dur or later
+            placed.append((w, w + 1, w + dur))
     placed.sort()
-    for (w1, d1), (w2, _) in zip(placed, placed[1:]):
-        # whole-second starts: the next one began before w2 + 1
-        if w2 + 1 - (w1 + d1) >= span:
+    for (_, _, end1), (_, start2, _) in zip(placed, placed[1:]):
+        if start2 - end1 >= span:
             return "%.1f" % span
     return None
 
@@ -1521,8 +1543,69 @@ def scale_section(p, tsv, loader_rows, kboots):
 
 
 # ------------------------------------------------------------------- probe
-def load_events(prefix):
-    """-> [(t_mono, kind, {key: value}, line number)] from PREFIX.events."""
+#: 🆕 P2-4 (107th segment): the two clocks a join accepts, each with the suffix
+#: of the stamp keys a record on it carries.  `_mono` keeps its meaning in
+#: every record that has it; console-capture 1.5 and hostprobe 1.3 write
+#: `_raw`, because WSL's CLOCK_MONOTONIC ran about 4 % slow for most of
+#: seating A (`CLK-35`, `CLK-38`).  A pair joins on ONE of the two: the sides
+#: are compared with each other, never each with a literal.
+CLOCKS = {"CLOCK_MONOTONIC": "mono", "CLOCK_MONOTONIC_RAW": "raw"}
+STAMP_SUFFIXES = tuple("_" + s for s in CLOCKS.values())
+
+
+def origin(meta, where, first, window):
+    """-> (clock, suffix) of one record of a join, or Refused, in this order:
+
+      1. no `clock` key and no key ending in `_mono` or `_raw`: written before
+         `P2-1`, when no record carried an origin.  量 2026-09-23 over bench/:
+         each of the 2,262 metas with no `clock` has no such key either (one
+         is `2026-09-22b/X20-boot`, B10's r6), and the join before this told
+         them `(it says None)`;
+      2. a clock other than the two in CLOCKS;
+      3. a key of the OTHER clock beside the declared one: the record
+         contradicts itself, and neither key is believed;
+      4. with `window`: `<first>_<suffix>` or `end_<suffix>` not a number.
+
+    `where` names the record in the reason.  Keys are matched by suffix on the
+    record's top level only, so `mono_at_t0` (P2-4's cross-check) is not a
+    MONOTONIC stamp and a nested key is not read."""
+    stamps = sorted(k for k in meta if k.endswith(STAMP_SUFFIXES))
+    if "clock" not in meta and not stamps:
+        raise Refused("%s records no origin -- no `clock` and no `_mono` or `_raw` key: "
+                      "written before P2-1, and an origin is not guessed from "
+                      "started_wallclock, which is whole seconds on another clock" % where)
+    clock = meta.get("clock")
+    if clock not in CLOCKS:
+        if "clock" not in meta:
+            raise Refused("%s carries %s but no `clock`: which clock they are on is not "
+                          "recorded" % (where, ", ".join(stamps)))
+        raise Refused("%s declares clock %r, which is neither CLOCK_MONOTONIC nor "
+                      "CLOCK_MONOTONIC_RAW" % (where, clock))
+    sfx = CLOCKS[clock]
+    other = [k for k in stamps if not k.endswith("_" + sfx)]
+    if other:
+        raise Refused("inconsistent record: %s declares %s and also carries %s, a key of "
+                      "the other clock" % (where, clock, ", ".join(other)))
+    if window:
+        a, b = "%s_%s" % (first, sfx), "end_%s" % sfx
+        if not _num(meta.get(a)):
+            raise Refused("%s declares %s but has no %s number: its origin is not "
+                          "recorded" % (where, clock, a))
+        if not _num(meta.get(b)):
+            raise Refused("%s has %s but no %s: the capture's window is not closed"
+                          % (where, a, b))
+    return clock, sfx
+
+
+def _boot(meta):
+    """-> the record's `boot_id` (P2-4), or None when it carries none."""
+    b = meta.get("boot_id")
+    return b.strip() if isinstance(b, str) and b.strip() else None
+
+
+def load_events(prefix, stamp="t_mono"):
+    """-> [(t, kind, {key: value}, line number)] from PREFIX.events; `t` is on
+    the record's own clock, and `stamp` is its name in a reason."""
     path = prefix + ".events"
     if not os.path.isfile(path):
         raise Refused("no %s" % path)
@@ -1536,9 +1619,9 @@ def load_events(prefix):
             try:
                 t = float(parts[0])
             except ValueError:
-                raise Refused("%s:%d: the first field is not a t_mono: %r" % (path, n, s))
+                raise Refused("%s:%d: the first field is not a %s: %r" % (path, n, stamp, s))
             if len(parts) < 2:
-                raise Refused("%s:%d: no kind after the t_mono: %r" % (path, n, s))
+                raise Refused("%s:%d: no kind after the %s: %r" % (path, n, stamp, s))
             kv = {}
             for tok in parts[2:]:
                 if "=" not in tok:
@@ -1556,20 +1639,11 @@ def probe_join(log, prefix, force):
     meta = corpus.meta(log)
     if not meta:
         raise Refused("%s has no readable .meta.json beside it" % log)
-    if meta.get("clock") != "CLOCK_MONOTONIC":
-        raise Refused("%s's .meta.json does not declare clock CLOCK_MONOTONIC (it says %r)"
-                      % (log, meta.get("clock")))
-    t0 = meta.get("t0_mono")
-    end = meta.get("end_mono")
-    if not isinstance(t0, (int, float)) or isinstance(t0, bool):
-        raise Refused("%s's .meta.json has no t0_mono -- true of every capture committed "
-                      "before P2-1 -- and an origin is not guessed from started_wallclock, "
-                      "which is whole seconds on another clock" % log)
-    if not isinstance(end, (int, float)) or isinstance(end, bool):
-        raise Refused("%s's .meta.json has t0_mono but no end_mono: the capture's window "
-                      "is not closed" % log)
+    clock, sfx = origin(meta, "%s's .meta.json" % log, "t0", True)
+    t0k, endk = "t0_" + sfx, "end_" + sfx
+    t0, end = meta[t0k], meta[endk]
     sent_s = meta.get("sent_s")
-    if sent_s is not None and (not isinstance(sent_s, (int, float)) or isinstance(sent_s, bool)):
+    if sent_s is not None and not _num(sent_s):
         raise Refused("%s's sent_s is %r, neither a number nor null" % (log, sent_s))
     pmeta_path = prefix + ".meta.json"
     try:
@@ -1579,10 +1653,19 @@ def probe_join(log, prefix, force):
         raise Refused("cannot read %s: %s" % (pmeta_path, exc))
     if not isinstance(pmeta, dict) or pmeta.get("tool") != "hostprobe":
         raise Refused("%s is not a hostprobe .meta.json" % pmeta_path)
-    if pmeta.get("clock") != "CLOCK_MONOTONIC":
-        raise Refused("%s does not declare clock CLOCK_MONOTONIC (it says %r)"
-                      % (pmeta_path, pmeta.get("clock")))
-    events = load_events(prefix)
+    # The probe's own run (start_/end_) stays optional, a NOTE below, as it was.
+    pclock, _ = origin(pmeta, pmeta_path, "start", False)
+    if pclock != clock:
+        raise Refused("%s is on %s and %s is on %s: stamps on two clocks share no frame"
+                      % (log, clock, pmeta_path, pclock))
+    # Both clocks restart with every boot of the host (RAW did twice on
+    # 2026-09-23), so two records from two boots share no frame either.
+    cboot, pboot = _boot(meta), _boot(pmeta)
+    if cboot and pboot and cboot != pboot:
+        raise Refused("%s was written in boot %s and %s in boot %s: both clocks restart "
+                      "with every boot, so their stamps share no frame"
+                      % (log, cboot, pmeta_path, pboot))
+    events = load_events(prefix, "t_" + sfx)
     rec = kernel_record(corpus, log, force)
     if rec is None:
         raise Refused("%s holds no `decompressing kernel:`: there is no boot to join" % log)
@@ -1614,14 +1697,16 @@ def probe_join(log, prefix, force):
             host.setdefault("net.neigh_first", (s, "state=%s line %d" % (kv.get("state"), n)))
         elif kind == "udp":
             host.setdefault("net.udp_first", (s, "port=%s line %d" % (kv.get("port"), n)))
-    ps, pe = pmeta.get("start_mono"), pmeta.get("end_mono")
+    # Every frame line prints the keys it read, so a reader sees which clock.
+    psk, pek = "start_" + sfx, "end_" + sfx
+    ps, pe = pmeta.get(psk), pmeta.get(pek)
     out.append("join  %s  (hostprobe, %d event(s): %s)" % (
         prefix + ".events", len(events),
         ", ".join("%d %s" % (v, k) for k, v in sorted(counts.items()))))
-    out.append("  frame: s = t_mono - t0_mono, t0_mono %.6f; the capture's window is "
-               "0 .. %.6f s; sent_s %s" % (t0, window[1],
+    out.append("  frame: s = t_%s - %s, %s %.6f; the capture's window is "
+               "0 .. %.6f s; sent_s %s" % (sfx, t0k, t0k, t0, window[1],
                                           ("%.6f" % sent_s) if sent_s is not None else "null"))
-    if isinstance(ps, (int, float)) and isinstance(pe, (int, float)):
+    if _num(ps) and _num(pe):
         cs, ce = ps - t0, pe - t0
         out.append("  the probe ran %.6f .. %.6f s in this frame" % (cs, ce))
         lo = sent_s if sent_s is not None else 0.0
@@ -1629,8 +1714,18 @@ def probe_join(log, prefix, force):
             out.append("  NOTE: the probe did not run over the whole window, so an absent "
                        "host landmark is `not seen while probing`, not `did not happen`")
     else:
-        out.append("  NOTE: the probe's start_mono/end_mono are not recorded, so an absent "
-                   "host landmark cannot be told from a probe that was not running")
+        out.append("  NOTE: the probe's %s/%s are not recorded, so an absent "
+                   "host landmark cannot be told from a probe that was not running" % (psk, pek))
+    if cboot and pboot:
+        out.append("  boot_id %s on both records" % cboot)
+    elif cboot or pboot:
+        out.append("  NOTE: %s carries no boot_id (the other record carries %s), so nothing "
+                   "here shows the two were written in one boot of the host" % (
+                       pmeta_path if cboot else "%s's .meta.json" % log, cboot or pboot))
+    else:
+        out.append("  NOTE: neither record carries a boot_id, so nothing here shows the two "
+                   "were written in one boot of the host, and both clocks restart with "
+                   "every boot")
     out.append("  the channel offset between console and host is NOT applied: D8 measures "
                "it, this tool does not")
     for name in ("net.icmp_first", "net.neigh_first", "net.udp_first"):
@@ -1803,7 +1898,8 @@ def kernel_report(logs, force, tsv_path):
     return 0
 
 
-def main():
+def build_parser():
+    """The parser `main()` itself uses -- there is no second copy (FW-124)."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("path", nargs="*", default=["bench"])
     ap.add_argument("--anchor", choices=sorted(ANCHORS), default="C")
@@ -1823,28 +1919,39 @@ def main():
                          "detecting the firmware (a control, not a correction)")
     ap.add_argument("--legend", action="store_true",
                     help="print the landmark and segment tables")
-    args = ap.parse_args()
+    return ap
 
+
+def refuse_args(a):
+    """Every refusal that reads nothing but the parsed arguments and this
+    file's own tables -- no file, environment, clock or device (FW-124).  A
+    card can run it on a HOST cell's arguments; `main()` runs it first, so the
+    check and the run cannot drift.  Paths are checked later, in `main()`."""
+    problems = check_tables()
+    if problems:
+        raise Refused("the tables are inconsistent: %s" % "; ".join(problems))
+    modes = [m for m in ("all_anchors", "kernel", "retro", "probe", "legend")
+             if getattr(a, m)]
+    if len(modes) > 1:
+        raise Refused("choose one of --all-anchors, --kernel, --retro, --probe, "
+                      "--legend (got %s)" % ", ".join("--" + m.replace("_", "-")
+                                                      for m in modes))
+    if a.tsv and not (a.retro or a.kernel):
+        raise Refused("--tsv goes with --retro or --kernel")
+    if a.firmware and not (a.kernel or a.probe):
+        raise Refused("--firmware goes with --kernel or --probe")
+    if a.probe and (len(a.path) != 1 or not a.path[0].endswith(".log")):
+        raise Refused("--probe joins exactly ONE capture: give its .log path")
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     try:
-        problems = check_tables()
-        if problems:
-            raise Refused("the tables are inconsistent: %s" % "; ".join(problems))
-        modes = [m for m in ("all_anchors", "kernel", "retro", "probe", "legend")
-                 if getattr(args, m)]
-        if len(modes) > 1:
-            raise Refused("choose one of --all-anchors, --kernel, --retro, --probe, "
-                          "--legend (got %s)" % ", ".join("--" + m.replace("_", "-")
-                                                          for m in modes))
-        if args.tsv and not (args.retro or args.kernel):
-            raise Refused("--tsv goes with --retro or --kernel")
-        if args.firmware and not (args.kernel or args.probe):
-            raise Refused("--firmware goes with --kernel or --probe")
+        refuse_args(args)
         if args.legend:
             print("\n".join(legend_lines()))
             return 0
         if args.probe:
-            if len(args.path) != 1 or not args.path[0].endswith(".log"):
-                raise Refused("--probe joins exactly ONE capture: give its .log path")
             return probe_join(args.path[0], args.probe, args.firmware)
         missing = [p for p in args.path if not os.path.exists(p)]
         if missing:

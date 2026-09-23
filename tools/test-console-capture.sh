@@ -7,7 +7,7 @@
 # writer on the master side plays a known script with known gaps, and the tool
 # reads the slave believing it is a serial port.
 #
-# Sixty-six cases, SIXTY-SEVEN results (P3 checks two things). Forty-three of
+# Seventy-seven cases, SEVENTY-EIGHT results (P3 checks two things). Fifty-three of
 # them are controls whose job is to FAIL -- the tool must refuse, or a mutant of
 # it must break a case above -- because a test suite that cannot fail proves
 # nothing: the same argument tools/audit-bench-log.py
@@ -1404,54 +1404,122 @@ else
 fi
 
 # --------------------------------------------------------------------------
-# ONE CLOCK, 2026-09-23 (P2-1; SPEC.md FW-114).  Eight cases.
+# ONE CLOCK.  P18-P23 and N42-N43 arrived 2026-09-23 with P2-1 (SPEC.md
+# FW-114/FW-115), on CLOCK_MONOTONIC.  P2-4 moved every stamp AND every
+# deadline to CLOCK_MONOTONIC_RAW the same day (CLK-38: WSL's MONOTONIC is
+# slewed percent-slow while two time daemons fight, and RAW is not),
+# re-pointed those eight at RAW and added N44-N53 and P24.
 #
-# The metadata now says where a capture's .timing seconds start on the host's
-# CLOCK_MONOTONIC: `t0_mono` is the origin itself, `t0_real` the time.time()
-# read beside it, `end_mono`/`end_real` the same pair after the port closes,
-# and `sent_s` the instant the --send line's flush() returned, in .timing
-# seconds.  A host probe stamping packets on the same clock can then put a
-# console byte and a packet on one axis, which is P2's settled item 4.
+# The metadata says where a capture's .timing seconds start on the host's
+# CLOCK_MONOTONIC_RAW: `t0_raw` is the origin itself, `t0_real` and
+# `mono_at_t0` the time.time() and CLOCK_MONOTONIC reads beside it,
+# `end_raw`/`end_real`/`mono_at_end` the same after the port closes, `sent_s`
+# the instant the --send line's flush() returned, in .timing seconds, and
+# `boot_id` the boot whose RAW it is.  A host probe stamping packets on the
+# same clock can then put a console byte and a packet on one axis.
 #
 # THE ASSUMPTION THESE CASES REST ON, and it is what makes them measurements:
-# CLOCK_MONOTONIC is one clock for every process under one kernel and one time
-# namespace (Popen does not unshare one), so the reads this harness takes
-# before it launches the tool and after the tool exits BRACKET every read the
-# tool takes.  The tool's numbers are checked against a second process's
-# reads, not against each other.
+# CLOCK_MONOTONIC_RAW is one clock for every process under one kernel (Popen
+# unshares no time namespace), so the reads this harness takes before it
+# launches the tool and after the tool exits BRACKET every read the tool
+# takes.  The tool's numbers are checked against a second process's reads,
+# not against each other.
 #
-# Refutation conditions, written before the tool was changed:
-#   P18  `clock` is not CLOCK_MONOTONIC; t0_mono or end_mono falls outside the
-#        harness's bracket; or the read that delivered a played byte is
-#        stamped (t0_mono + its .timing seconds) more than 1 us -- one .timing
-#        digit -- before the harness wrote that byte, or after the harness saw
-#        the tool exit.
-#   P19  end_mono - t0_mono differs from duration_s by more than 1 us, the
+# WHY P18-P20 CANNOT TELL RAW FROM MONOTONIC ON A RUNNER, AND N44-N48 CAN.
+# Where the two clocks agree to milliseconds a tool still reading
+# CLOCK_MONOTONIC passes every RAW bracket (量 at this desk, 2026-09-23: RAW
+# minus MONOTONIC was +189 s, which would catch it here and nowhere else).
+# N44-N48 run the tool under tools/clockshim.py: inside the tool's process
+# only, every Python-level CLOCK_MONOTONIC read runs at half rate, plus
+# 1000 s.  A MONOTONIC stamp then lands ~1000 s outside the bracket and a
+# MONOTONIC deadline lasts twice as long, on a runner and at the desk alike.
+# Kernel timers are not shimmed, so these cases assert stamps, durations and
+# what reached the wire -- never how long a select() slept.  N48 is the
+# control that the shim reached the tool at all.
+#
+# Refutation conditions, written 2026-09-23 before the tool was changed --
+# except N53, N48's relative form and the last clauses of N45 and N47,
+# written 2026-09-24 after it and each before its own first run: N45 had
+# passed against 1.4, the settle's clamp was the one deadline no case timed,
+# and N48's first form, [0.45, 0.55] absolute, would fail wherever r < 0.9.
+#   P18  `clock` is not exactly CLOCK_MONOTONIC_RAW; a key ending `_mono` is
+#        written; t0_raw or end_raw falls outside the harness's RAW bracket;
+#        or the read that delivered a played byte is stamped (t0_raw + its
+#        .timing seconds) more than 1 us -- one .timing digit -- before the
+#        harness wrote that byte, or after the harness saw the tool exit.
+#   P19  end_raw - t0_raw differs from duration_s by more than 1 us, the
 #        resolution duration_s is written at, or a .timing row is later than
 #        duration_s: the three are not measured from one origin.
 #   P20  t0_real or end_real falls outside the harness's time.time() bracket,
-#        or either pair's realtime-minus-monotonic offset differs from the
-#        harness's by 0.5 s or more.  A pair read at opposite ends of this 2 s
-#        capture is off by the capture; two adjacent reads, by microseconds.
-#   P21  with the port's output held off (tcflow TCOOFF) until a known instant,
-#        t0_mono + sent_s is more than 1 us earlier than that instant: the send
-#        was stamped before the line could have gone.
+#        or either pair's realtime-minus-RAW offset differs from the
+#        harness's by 0.5 s or more.  A run in which the harness saw realtime
+#        step -- more than 0.1 s of jump in real - raw between two of its own
+#        adjacent samples, which reads nothing of the tool's -- is VOID and
+#        run again, up to three runs (CLK-38: timesyncd stepped this desk's
+#        realtime by +0.83 to +1.04 s every 20-40 s that day).
+#   P21  with the port's output held off (tcflow TCOOFF) until a known
+#        instant, t0_raw + sent_s is more than 1 us earlier than that instant:
+#        the send was stamped before the line could have gone.
 #   P22  sent_s is negative, or later than the first byte of the reply the
 #        command caused.
 #   N42  a capture with no --send records sent_s as anything but JSON null --
 #        0 would claim a send at the origin -- although its ESC loop and its
 #        CR did go out on the wire.
-#   P23  tool_version is not 1.4.  The keys are schema; nothing new is written
-#        to the port, and P5-P8 pin those bytes.
+#   P23  tool_version is not 1.5.  The deadlines moved with the stamps, so an
+#        ESC window writes a different number of bytes on a slewed host, and
+#        a wire difference is the one fact that field owns.
 #   N43  P18's causality check passes a record in which the harness wrote a
 #        byte 1 ms AFTER the tool stamped the read that delivered it.
+#   N44  (shim) t0_raw or end_raw leaves the RAW bracket, a read is stamped
+#        before its byte was written, or a played 1.0 s gap reads more than
+#        3 % off in .timing.
+#   N45  (shim) --seconds 3 gives a duration_s outside [3.0, 3.3], the run
+#        stops for another reason, or end_raw - t0_raw differs from duration_s
+#        by more than 1 us.  The last is P19's check again, under the shim: a
+#        tool that times --seconds AND measures duration_s on one MONOTONIC
+#        agrees with itself at 3.0 -- as 1.4 did in this very case -- and only
+#        the RAW stamps beside it show the run lasted 6.
+#   N46  (shim) --idle 0.8 lets the second half of a reply, played 1.2 s after
+#        the first, reach the log, or stops more than 0.2 s past its 0.8.
+#   N47  (shim) --esc 1 then --esc-after 1 under --seconds 2.7: either ESC run
+#        spans outside [0.9, 1.1] s on the wire, either window_s is outside
+#        [1.0, 1.15], either achieved_period_s outside [0.018, 0.032] at the
+#        default 0.02, --cr-settle 0.4 holds the command line back outside
+#        [0.38, 0.55] s, or the second settle's budget -- clamped by --seconds,
+#        to 2.7 minus the RAW instant its CR reached the harness -- is recorded
+#        more than 0.05 s from that.
+#   N48  (shim) (mono_at_end - mono_at_t0) / (end_raw - t0_raw) is more than
+#        5 % from 0.5 times the harness's OWN, unshimmed MONOTONIC/RAW rate
+#        over the run: the shim did not reach the tool, or mono_at_* are not
+#        CLOCK_MONOTONIC reads.  Relative, because the record's ratio is 0.5 r
+#        and r is the host's (0.93-0.97 at this desk on 2026-09-23, CLK-38).
+#   N49  boot_id is not the /proc/sys/kernel/random/boot_id the harness read,
+#        or clocksource / clocksource_end not the clocksource it read before
+#        and after the run.
+#   N50  with time.CLOCK_MONOTONIC_RAW deleted from the interpreter, the run
+#        does not exit 2 naming it, writes to stdout, reaches the port
+#        (`cannot open`) or creates a file.
+#   P24  refuse_args(), called in-process (SPEC.md FW-124), refuses a good
+#        command line -- one naming a port that does not exist, over output
+#        files that already do: both are capture()'s to refuse, not its.
+#   N51  refuse_args(), called in-process, lets a bad command line through,
+#        or refuses it by exiting the process instead of raising Refused.
+#   N52  retired 2026-09-24, with the pyserial pre-import it controlled: it
+#        went red as designed against clockshim 1.1, which no longer breaks
+#        pyserial's Timeout, and N44-N48 now run pyserial under the shim.
+#   N53  with a +1.4 s realtime step planted in the harness's OWN time.time()
+#        0.5 s after launch (the tool untouched), P20's step detector does not
+#        record exactly one step of 1.3-1.5 s at 0.49-0.6 s, or records more
+#        than one other: the watcher that voids P20's runs is not seeing steps.
 #
 # NOT COVERED, because a pty cannot show it: flush() is tcdrain(3), which a
 # pty answers at once, so a sent_s stamped between write() and flush() is
 # indistinguishable here from one stamped after flush() (bench only).
 # --------------------------------------------------------------------------
 
-clock_case() {         # clock_case <outprefix> <record.json> <reply|hold> -- <capture args...>
+SHIM="$HERE/clockshim.py"
+
+clock_case() {         # clock_case <outprefix> <record.json> <reply|hold>[+step] -- <capture args...>
   local _out="$1" _rec="$2" _mode="$3"; shift 3
   [ "$1" = "--" ] && shift
   "$PY" - "$TOOL" "$_out" "$_rec" "$_mode" "$@" <<'INNERPY'
@@ -1459,30 +1527,79 @@ import json, os, pty, select, subprocess, sys, termios, time
 
 tool, out, recp, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 extra = sys.argv[5:]
+RAW = time.CLOCK_MONOTONIC_RAW
+BOOT_ID = "/proc/sys/kernel/random/boot_id"
+CSRC = "/sys/devices/system/clocksource/clocksource0/current_clocksource"
+
+
+def raw():
+    return time.clock_gettime(RAW)
+
+
+def host(path):
+    try:
+        with open(path, encoding="ascii") as fh:
+            return fh.read().strip()
+    except OSError:
+        return None
+
+
+# +step: N53's positive control -- a +1.4 s realtime step (CLK-38 recorded
+# +0.83 to +1.04 s) planted in THIS harness's own time.time() 0.5 s in.
+# The tool's process is not touched.
+plant = 1.4 if mode.endswith("+step") else 0.0
+mode = mode[:-len("+step")] if plant else mode
+start = raw()
+
+
+def real():
+    w = time.time()
+    return w + plant if plant and raw() - start >= 0.5 else w
+
+
 master, slave = pty.openpty()
 if mode == "hold":
     # Output on the slave is suspended BEFORE the tool opens it, so a write
     # there cannot complete until TCOON.  pyserial's tcsetattr does not undo
     # it: a stop made by tcflow() is not one that clearing IXON restarts.
     termios.tcflow(slave, termios.TCOOFF)
-rec = {"mode": mode, "writes": []}
-rec["b_mono"] = time.monotonic(); rec["b_real"] = time.time()
+rec = {"mode": mode, "planted": plant, "writes": [], "steps": []}
+rec["boot_id"], rec["cs_b"] = host(BOOT_ID), host(CSRC)
+last = [raw(), real()]
+rec["b_raw"], rec["b_real"] = last
+
+
+def sample():
+    # Realtime against RAW on every pass.  A step (timesyncd's ADJ_SETOFFSET,
+    # CLK-38) is a jump in real - raw between two adjacent samples; the slew
+    # moves it by ~1 ms per pass at most.  Reads nothing of the tool's, so it
+    # can void a run and can never pass one.  N53 is its positive control.
+    r, w = raw(), real()
+    jump = (w - r) - (last[1] - last[0])
+    if abs(jump) > 0.1:
+        rec["steps"].append([last[0], r, jump])
+    last[0], last[1] = r, w
+
+
 proc = subprocess.Popen(
     ["/usr/bin/python3", tool, "capture", "--port", os.ttyname(slave), "--out", out] + extra,
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 seen = bytearray()
 
+
 def pump(budget):
     r, _, _ = select.select([master], [], [], budget)
     if r:
         seen.extend(os.read(master, 4096))
+    sample()
+
 
 if mode == "hold":
-    deadline = time.monotonic() + 1.5
-    while time.monotonic() < deadline:
+    deadline = raw() + 1.5
+    while raw() < deadline:
         pump(0.02)
     rec["held_bytes"] = len(seen)
-    rec["on_mono"] = time.monotonic()
+    rec["on_raw"] = raw()
     termios.tcflow(slave, termios.TCOON)
 # reply: the command's echo as soon as its CR arrives, then a prompt 0.3 s
 # later -- two reads, each with the instant the harness wrote it.
@@ -1491,17 +1608,23 @@ while proc.poll() is None:
     pump(0.02)
     n = len(rec["writes"])
     if mode == "reply" and b"\r" in seen and n < len(script) \
-       and (n == 0 or time.monotonic() - rec["writes"][-1]["w_mono"] >= 0.3):
-        w = time.monotonic()
+       and (n == 0 or raw() - rec["writes"][-1]["w_raw"] >= 0.3):
+        w = raw()
         os.write(master, script[n])
-        rec["writes"].append({"w_mono": w, "offset": sum(len(s) for s in script[:n])})
-    if time.monotonic() - rec["b_mono"] > 30:
+        rec["writes"].append({"w_raw": w, "offset": sum(len(s) for s in script[:n])})
+    if raw() - rec["b_raw"] > 30:
         proc.kill()
-rec["a_mono"] = time.monotonic(); rec["a_real"] = time.time()
+sample()
+rec["a_raw"], rec["a_real"] = last
+rec["cs_a"] = host(CSRC)
 rec["wire"] = bytes(seen).decode("latin-1")
 json.dump(rec, open(recp, "w", encoding="utf-8"))
 os.close(master); os.close(slave)
 INNERPY
+}
+
+clock_steps() {        # clock_steps <record.json> -> how many realtime steps the harness saw
+  "$PY" -c "import json, sys; print(len(json.load(open(sys.argv[1], encoding='utf-8')).get('steps', [])))" "$1" 2>/dev/null || echo 0
 }
 
 clock_check() {        # clock_check <outprefix> <record.json> <case>  -> "OK <note>" | "BAD <why>"
@@ -1520,12 +1643,15 @@ except (OSError, ValueError) as e:
     print("BAD unreadable: %s" % e)
     raise SystemExit
 
+
 def num(k):
     v = m.get(k)
     return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
-def raw(*ks):
+
+def show(*ks):
     return " ".join("%s=%r" % (k, m.get(k, "ABSENT")) for k in ks)
+
 
 def at(off):
     """When the read that delivered byte `off` returned: the last row at or
@@ -1533,18 +1659,22 @@ def at(off):
     got = [s for o, s in rows if o <= off]
     return got[-1] if got else None
 
-t0, end, dur = num("t0_mono"), num("end_mono"), num("duration_s")
+
+t0, end, dur = num("t0_raw"), num("end_raw"), num("duration_s")
 bad, note = [], ""
 if case == "P18":
-    if m.get("clock") != "CLOCK_MONOTONIC":
-        bad.append(raw("clock"))
+    if m.get("clock") != "CLOCK_MONOTONIC_RAW":
+        bad.append(show("clock"))
+    old = sorted(k for k in m if k.endswith("_mono"))
+    if old:
+        bad.append("keys of the old clock are written: %s" % ", ".join(old))
     if t0 is None or end is None:
-        bad.append(raw("t0_mono", "end_mono"))
+        bad.append(show("t0_raw", "end_raw"))
     else:
-        for k, v in (("t0_mono", t0), ("end_mono", end)):
-            if not r["b_mono"] <= v <= r["a_mono"]:
+        for k, v in (("t0_raw", t0), ("end_raw", end)):
+            if not r["b_raw"] <= v <= r["a_raw"]:
                 bad.append("bracket: %s %.6f outside [%.6f, %.6f]"
-                           % (k, v, r["b_mono"], r["a_mono"]))
+                           % (k, v, r["b_raw"], r["a_raw"]))
         if not r["writes"]:
             bad.append("the harness played nothing")
         for w in r["writes"]:
@@ -1552,37 +1682,37 @@ if case == "P18":
             if s is None:
                 bad.append("no .timing row delivers byte %d" % w["offset"])
                 continue
-            if t0 + s < w["w_mono"] - LSB:
+            if t0 + s < w["w_raw"] - LSB:
                 bad.append("causality: byte %d stamped %.6f s before it was written"
-                           % (w["offset"], w["w_mono"] - (t0 + s)))
-            if t0 + s > r["a_mono"]:
+                           % (w["offset"], w["w_raw"] - (t0 + s)))
+            if t0 + s > r["a_raw"]:
                 bad.append("bracket: byte %d stamped after the tool exited" % w["offset"])
             note += "%s byte %d read %.0f us after its write" % (
-                ";" if note else "", w["offset"], (t0 + s - w["w_mono"]) * 1e6)
+                ";" if note else "", w["offset"], (t0 + s - w["w_raw"]) * 1e6)
 elif case == "P19":
     if None in (t0, end, dur):
-        bad.append(raw("t0_mono", "end_mono", "duration_s"))
+        bad.append(show("t0_raw", "end_raw", "duration_s"))
     else:
         d = (end - t0) - dur
         if abs(d) > LSB:
-            bad.append("origin: end_mono - t0_mono - duration_s = %+.3f us" % (d * 1e6))
+            bad.append("origin: end_raw - t0_raw - duration_s = %+.3f us" % (d * 1e6))
         late = [s for _, s in rows if s > dur]
         if late:
             bad.append("%d .timing row(s) after duration_s %.6f" % (len(late), dur))
-        note = " end_mono - t0_mono - duration_s = %+.3f us; %d rows" % (d * 1e6, len(rows))
+        note = " end_raw - t0_raw - duration_s = %+.3f us; %d rows" % (d * 1e6, len(rows))
 elif case == "P20":
     t0r, endr = num("t0_real"), num("end_real")
     if None in (t0, end, t0r, endr):
-        bad.append(raw("t0_mono", "end_mono", "t0_real", "end_real"))
+        bad.append(show("t0_raw", "end_raw", "t0_real", "end_real"))
     else:
         for k, v in (("t0_real", t0r), ("end_real", endr)):
             if not r["b_real"] <= v <= r["a_real"]:
                 bad.append("bracket: %s %.6f outside [%.6f, %.6f]"
                            % (k, v, r["b_real"], r["a_real"]))
-        worst = max(abs((t0r - t0) - (r["b_real"] - r["b_mono"])),
-                    abs((endr - end) - (r["a_real"] - r["a_mono"])))
+        worst = max(abs((t0r - t0) - (r["b_real"] - r["b_raw"])),
+                    abs((endr - end) - (r["a_real"] - r["a_raw"])))
         if worst >= 0.5:
-            bad.append("pairing: realtime minus monotonic is %.3f s off the harness's" % worst)
+            bad.append("pairing: realtime minus RAW is %.3f s off the harness's" % worst)
         note = " both pairs agree with the harness's offset to %.0f us" % (worst * 1e6)
 elif case == "P21":
     sent = num("sent_s")
@@ -1591,52 +1721,93 @@ elif case == "P21":
     if r["wire"] != "DW 8040DBC0 1\r":
         bad.append("wire %r" % r["wire"])
     if t0 is None or sent is None:
-        bad.append(raw("t0_mono", "sent_s"))
+        bad.append(show("t0_raw", "sent_s"))
     else:
-        lead = r["on_mono"] - t0
+        lead = r["on_raw"] - t0
         if lead < 0.5:
             bad.append("precondition: the origin led the release by %.3f s, not 0.5, "
                        "so the write may never have been held" % lead)
-        if t0 + sent < r["on_mono"] - LSB:
+        if t0 + sent < r["on_raw"] - LSB:
             bad.append("sent_s: stamped %.6f s before the output was released"
-                       % (r["on_mono"] - (t0 + sent)))
+                       % (r["on_raw"] - (t0 + sent)))
         note = " flush() returned %.3f ms after the release, %.3f s after the origin" % (
-            (t0 + sent - r["on_mono"]) * 1e3, sent)
+            (t0 + sent - r["on_raw"]) * 1e3, sent)
 elif case == "P22":
     sent, s0 = num("sent_s"), at(0)
     if sent is None or s0 is None:
-        bad.append("%s, first row %r" % (raw("sent_s"), s0))
+        bad.append("%s, first row %r" % (show("sent_s"), s0))
     elif not 0 <= sent <= s0:
         bad.append("sent_s %.6f against the reply's first byte at %.6f" % (sent, s0))
     else:
         note = " sent_s %.6f s, the reply's first byte %.6f s" % (sent, s0)
+elif case == "N49":
+    for k, want in (("boot_id", r.get("boot_id")), ("clocksource", r.get("cs_b")),
+                    ("clocksource_end", r.get("cs_a"))):
+        if not want:
+            bad.append("the harness could not read %s, so nothing is compared" % k)
+        elif m.get(k) != want:
+            bad.append("%s %r, where the harness read %r" % (k, m.get(k, "ABSENT"), want))
+    note = " boot_id %s, clocksource %s -> %s" % (
+        m.get("boot_id"), m.get("clocksource"), m.get("clocksource_end"))
+elif case == "N53":
+    # One step may be the host's own (CLK-38: one every 20-40 s at this desk
+    # that day); a detector that fires on every pass records dozens and fails.
+    st = r.get("steps", [])
+    hit = [s for s in st if 1.3 <= s[2] <= 1.5 and 0.49 <= s[1] - r["b_raw"] <= 0.6]
+    if r.get("planted") != 1.4:
+        bad.append("nothing was planted (planted=%r)" % r.get("planted"))
+    elif len(hit) != 1 or len(st) > 2:
+        bad.append("%d step(s) recorded, %d of them the planted +1.4 s near 0.5 s: %s"
+                   % (len(st), len(hit), [[round(x, 3) for x in s] for s in st[:4]]))
+    else:
+        note = " the planted +1.4 s read %+.3f s at %.3f s (%d other, the host's own)" % (
+            hit[0][2], hit[0][1] - r["b_raw"], len(st) - 1)
 else:
     bad.append("no such case %r" % case)
 print(("BAD " + "; ".join(bad)) if bad else ("OK" + note))
 INNERPY
 }
 
-clock_case "$WORK/ck1" "$WORK/ck1.rec" reply -- --send 'DW 8040DBC0 1' --seconds 2
+# The capture P18-P20, P22 and N49 read.  Re-run when the harness saw
+# realtime step (P20's refutation condition says why); P18, P19, P22 and N49
+# do not read realtime, so they take whichever run is kept.
+CKVOID=0
+for _try in 1 2 3; do
+  rm -f "$WORK/ck1.log" "$WORK/ck1.timing" "$WORK/ck1.meta.json" "$WORK/ck1.rec"
+  clock_case "$WORK/ck1" "$WORK/ck1.rec" reply -- --send 'DW 8040DBC0 1' --seconds 2
+  [ "$(clock_steps "$WORK/ck1.rec")" = "0" ] && break
+  CKVOID=$((CKVOID+1))
+done
 
 CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P18)"
 if [ "${CK%% *}" = "OK" ]; then
-  ok "P18 t0_mono, end_mono and each played byte's read sit inside the harness's own CLOCK_MONOTONIC bracket --${CK#OK}"
+  ok "P18 clock is CLOCK_MONOTONIC_RAW, no _mono key, and t0_raw, end_raw and each played byte's read sit inside the harness's own RAW bracket --${CK#OK}"
 else
-  bad "P18 the capture's origin is not on the harness's clock: ${CK#BAD }"
+  bad "P18 the capture's origin is not on the harness's RAW clock: ${CK#BAD }"
 fi
 
 CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P19)"
 if [ "${CK%% *}" = "OK" ]; then
-  ok "P19 duration_s and every .timing row are measured from t0_mono itself --${CK#OK}"
+  ok "P19 duration_s and every .timing row are measured from t0_raw itself --${CK#OK}"
 else
-  bad "P19 t0_mono is not the origin the capture's own numbers use: ${CK#BAD }"
+  bad "P19 t0_raw is not the origin the capture's own numbers use: ${CK#BAD }"
 fi
 
 CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P20)"
-if [ "${CK%% *}" = "OK" ]; then
-  ok "P20 t0_real and end_real are inside the harness's time.time() bracket and each is paired with its monotonic read --${CK#OK}"
+if [ "$CKVOID" -ge 3 ]; then
+  bad "P20 realtime stepped inside the harness's bracket in 3 of 3 runs, so the pairing cannot be measured on this host now"
+elif [ "${CK%% *}" = "OK" ]; then
+  ok "P20 t0_real and end_real are inside the harness's time.time() bracket and each is paired with its RAW read --${CK#OK} ($CKVOID run(s) voided for a realtime step)"
 else
   bad "P20 the realtime pair does not cross-check: ${CK#BAD }"
+fi
+
+clock_case "$WORK/ck4" "$WORK/ck4.rec" reply+step -- --send 'DW 8040DBC0 1' --seconds 1.5
+CK="$(clock_check "$WORK/ck4" "$WORK/ck4.rec" N53)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "N53 P20's step detector sees a +1.4 s realtime step planted in the harness's own reads --${CK#OK}"
+else
+  bad "N53 P20's step detector does not see a planted step, so its voids mean nothing: ${CK#BAD }"
 fi
 
 CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" P22)"
@@ -1647,10 +1818,10 @@ else
 fi
 
 CKV="$(term_meta "$WORK/ck1" tool_version)"
-if [ "$CKV" = "1.4" ]; then
-  ok "P23 tool_version is still 1.4: the six keys are schema, and P5-P8 pin the bytes on the wire"
+if [ "$CKV" = "1.5" ]; then
+  ok "P23 tool_version is 1.5: the deadlines moved to RAW with the stamps, so an ESC window's byte count moved on a slewed host -- a wire change"
 else
-  bad "P23 tool_version is '$CKV'; the one-clock keys write nothing new to the port, so they may not move it"
+  bad "P23 tool_version is '$CKV', not 1.5: RAW deadlines change what the ESC loops write, and that is the one fact the field owns"
 fi
 
 # N43 doctors the record, not the capture: the byte is "written" 1 ms after
@@ -1661,9 +1832,9 @@ m = json.load(open(sys.argv[1] + ".meta.json", encoding="utf-8"))
 r = json.load(open(sys.argv[2], encoding="utf-8"))
 rows = [float(l.split()[1]) for l in open(sys.argv[1] + ".timing", encoding="ascii")
         if not l.startswith("#")]
-if not isinstance(m.get("t0_mono"), float) or not rows or not r["writes"]:
-    sys.exit("N43: nothing to doctor -- no t0_mono, no row or no write")
-r["writes"][0]["w_mono"] = m["t0_mono"] + rows[0] + 0.001
+if not isinstance(m.get("t0_raw"), float) or not rows or not r["writes"]:
+    sys.exit("N43: nothing to doctor -- no t0_raw, no row or no write")
+r["writes"][0]["w_raw"] = m["t0_raw"] + rows[0] + 0.001
 json.dump(r, open(sys.argv[3], "w", encoding="utf-8"))
 INNERPY
 CK="$(clock_check "$WORK/ck1" "$WORK/ck1d.rec" P18)"
@@ -1671,6 +1842,13 @@ if printf '%s' "$CK" | grep -q '^BAD .*causality'; then
   ok "N43 a read stamped 1 ms before its byte was written is refused -- P18's causality check can fail"
 else
   bad "N43 P18's checker did not refuse a read stamped before its byte was written: $CK"
+fi
+
+CK="$(clock_check "$WORK/ck1" "$WORK/ck1.rec" N49)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "N49 boot_id, clocksource and clocksource_end are the values the harness read itself --${CK#OK}"
+else
+  bad "N49 the boot identity is not the host's: ${CK#BAD }"
 fi
 
 clock_case "$WORK/ck2" "$WORK/ck2.rec" hold -- --send 'DW 8040DBC0 1' --seconds 3
@@ -1688,6 +1866,380 @@ if [ "$CK3S" = "None" ] && [ "$CK3W" = "True" ]; then
   ok "N42 with no --send, sent_s is JSON null although the ESC loop and its CR went out"
 else
   bad "N42 sent_s is '$CK3S' on a capture that sent no line (ESC+CR on the wire: $CK3W) -- null, not 0, not absent"
+fi
+
+# --- N44..N48  the same tool with its MONOTONIC made to disagree ------------
+# Every case below runs `clockshim.py -- console-capture.py capture ...`, so a
+# CLOCK_MONOTONIC read inside the tool returns 1000 s + half its elapsed time
+# while the harness's own RAW reads -- and the kernel's timers -- run true.
+shim_case() {          # shim_case <outprefix> <record.json> <gap:S|none> -- <capture args...>
+  local _out="$1" _rec="$2" _mode="$3"; shift 3
+  [ "$1" = "--" ] && shift
+  "$PY" - "$SHIM" "$TOOL" "$_out" "$_rec" "$_mode" "$@" <<'INNERPY'
+import json, os, pty, select, subprocess, sys, time
+
+shim, tool, out, recp, mode = sys.argv[1:6]
+extra = sys.argv[6:]
+RAW = time.CLOCK_MONOTONIC_RAW
+
+
+def raw():
+    return time.clock_gettime(RAW)
+
+
+# gap:S -- once the command line's CR arrives, play the echo, then a prompt
+# S RAW-seconds later if the tool is still reading.  none -- play nothing.
+# pyserial is imported by the tool after the shim installs, so its Timeout
+# reads the shimmed clock too; the tool opens the port with timeout=0, and a
+# non-blocking Timeout reads that clock without ever waiting on it (讀,
+# pyserial 3.5 serialutil.Timeout).  Until clockshim 1.1 this harness had to
+# import pyserial first: 1.0's readers were bound as methods (N52, retired).
+gap = float(mode.split(":", 1)[1]) if mode.startswith("gap:") else None
+master, slave = pty.openpty()
+rec = {"mode": mode, "writes": [], "chunks": []}
+# The harness's own CLOCK_MONOTONIC is not shimmed: its rate against RAW over
+# the run is the host's r, which N48 needs to know what 0.5 r is.
+rec["b_mono"] = time.clock_gettime(time.CLOCK_MONOTONIC)
+rec["b_raw"] = raw()
+err = open(recp + ".err", "w", encoding="utf-8")
+proc = subprocess.Popen(
+    ["/usr/bin/python3", shim, "--", tool, "capture", "--port", os.ttyname(slave),
+     "--out", out] + extra,
+    stdout=subprocess.DEVNULL, stderr=err)
+seen = bytearray()
+script = [b"DW 8040DBC0 1\r\n", b"<RealTek>"]
+while proc.poll() is None:
+    r, _, _ = select.select([master], [], [], 0.01)
+    if r:
+        chunk = os.read(master, 4096)
+        rec["chunks"].append([raw(), chunk.decode("latin-1")])
+        seen.extend(chunk)
+    n = len(rec["writes"])
+    if gap is not None and b"\r" in seen and n < len(script) \
+       and (n == 0 or raw() - rec["writes"][-1]["w_raw"] >= gap):
+        w = raw()
+        os.write(master, script[n])
+        rec["writes"].append({"w_raw": w, "offset": sum(len(s) for s in script[:n])})
+    if raw() - rec["b_raw"] > 30:
+        proc.kill()
+rec["a_raw"] = raw()
+rec["a_mono"] = time.clock_gettime(time.CLOCK_MONOTONIC)
+rec["rc"] = proc.returncode
+err.close()
+rec["stderr"] = open(recp + ".err", encoding="utf-8").read()[-300:]
+json.dump(rec, open(recp, "w", encoding="utf-8"))
+os.close(master); os.close(slave)
+INNERPY
+}
+
+shim_check() {         # shim_check <outprefix> <record.json> <case>  -> "OK <note>" | "BAD <why>"
+  "$PY" - "$1" "$2" "$3" <<'INNERPY'
+import json, re, sys
+
+out, recp, case = sys.argv[1], sys.argv[2], sys.argv[3]
+LSB = 1e-6
+try:
+    r = json.load(open(recp, encoding="utf-8"))
+except (OSError, ValueError) as e:
+    print("BAD the harness left no record: %s" % e)
+    raise SystemExit
+try:
+    m = json.load(open(out + ".meta.json", encoding="utf-8"))
+    rows = [(int(o), float(s)) for o, s in
+            (l.split() for l in open(out + ".timing", encoding="ascii")
+             if not l.startswith("#"))]
+    log = open(out + ".log", "rb").read()
+except (OSError, ValueError) as e:
+    print("BAD no capture (%s); the shimmed run exited %r: %r" % (e, r.get("rc"), r.get("stderr")))
+    raise SystemExit
+
+
+def num(k, d=m):
+    v = d.get(k) if isinstance(d, dict) else None
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def at(off):
+    got = [s for o, s in rows if o <= off]
+    return got[-1] if got else None
+
+
+t0, end, dur = num("t0_raw"), num("end_raw"), num("duration_s")
+bad, note = [], ""
+if case == "N44":
+    if t0 is None or end is None:
+        bad.append("t0_raw=%r end_raw=%r" % (m.get("t0_raw", "ABSENT"), m.get("end_raw", "ABSENT")))
+    else:
+        for k, v in (("t0_raw", t0), ("end_raw", end)):
+            if not r["b_raw"] <= v <= r["a_raw"]:
+                bad.append("bracket: %s is %+.3f s from [%.3f, %.3f]" % (
+                    k, v - (r["b_raw"] if v < r["b_raw"] else r["a_raw"]), r["b_raw"], r["a_raw"]))
+        if len(r["writes"]) != 2:
+            bad.append("the harness played %d of 2 writes" % len(r["writes"]))
+        else:
+            for w in r["writes"]:
+                s = at(w["offset"])
+                if s is None:
+                    bad.append("no .timing row delivers byte %d" % w["offset"])
+                elif not w["w_raw"] - LSB <= t0 + s <= r["a_raw"]:
+                    bad.append("byte %d stamped %+.3f s from its write" % (
+                        w["offset"], t0 + s - w["w_raw"]))
+            s1, s2 = at(r["writes"][0]["offset"]), at(r["writes"][1]["offset"])
+            played = r["writes"][1]["w_raw"] - r["writes"][0]["w_raw"]
+            if s1 is not None and s2 is not None:
+                read = s2 - s1
+                if abs(read - played) > 0.03 * played:
+                    bad.append("gap: played %.4f s on RAW, .timing reads %.4f s" % (played, read))
+                note = " a played %.4f s gap reads %.4f s" % (played, read)
+elif case == "N45":
+    if dur is None or not 3.0 <= dur <= 3.3:
+        bad.append("duration_s %r, want [3.0, 3.3]" % m.get("duration_s", "ABSENT"))
+    if m.get("stop_reason") != "--seconds 3.0 elapsed":
+        bad.append("stop_reason %r" % m.get("stop_reason"))
+    if None in (t0, end, dur):
+        bad.append("t0_raw=%r end_raw=%r" % (m.get("t0_raw", "ABSENT"), m.get("end_raw", "ABSENT")))
+    elif abs((end - t0) - dur) > LSB:
+        bad.append("end_raw - t0_raw is %.6f s against duration_s %.6f: the duration "
+                   "is not measured on RAW" % (end - t0, dur))
+    note = " duration_s %r" % m.get("duration_s")
+elif case == "N46":
+    if m.get("stop_reason") != "--idle 0.8 with no bytes":
+        bad.append("stop_reason %r" % m.get("stop_reason"))
+    if log != b"DW 8040DBC0 1\r\n":
+        bad.append("log %r: want the first half only" % log[:40])
+    if dur is None or not rows:
+        bad.append("duration_s %r, %d rows" % (m.get("duration_s", "ABSENT"), len(rows)))
+    else:
+        idle = dur - rows[-1][1]
+        if not 0.8 - 2 * LSB <= idle <= 1.0:
+            bad.append("stopped %.3f s after the last byte, want [0.8, 1.0]" % idle)
+        note = " stopped %.3f s after the last byte, before the second half" % idle
+elif case == "N47":
+    wire = [(t, ch) for t, s in r["chunks"] for ch in s]
+    text = "".join(ch for _, ch in wire)
+    line = "DW 8040DBC0 1\r"
+    i = text.find(line)
+    if not re.fullmatch("\x1b+\r" + re.escape(line) + "\x1b+\r", text):
+        bad.append("wire shape %r...%r" % (text[:6], text[-6:]))
+    elif i > 0:
+        esc1 = [t for t, ch in wire[:i] if ch == "\x1b"]
+        cr1 = [t for t, ch in wire[:i] if ch == "\r"][0]
+        esc2 = [t for t, ch in wire[i + len(line):] if ch == "\x1b"]
+        spans = (esc1[-1] - esc1[0], esc2[-1] - esc2[0])
+        settle = wire[i][0] - cr1
+        for which, span in zip(("--esc", "--esc-after"), spans):
+            if not 0.9 <= span <= 1.1:
+                bad.append("%s run spans %.3f s on the wire" % (which, span))
+        if not 0.38 <= settle <= 0.55:
+            bad.append("the settle held the command %.3f s after the CR" % settle)
+        for k in ("esc", "esc_after"):
+            e = m.get("esc", {}).get(k, {})
+            w, a = num("window_s", e), num("achieved_period_s", e)
+            if w is None or not 1.0 <= w <= 1.15:
+                bad.append("%s window_s %r" % (k, e.get("window_s", "ABSENT")))
+            if a is None or not 0.018 <= a <= 0.032:
+                bad.append("%s achieved_period_s %r" % (k, e.get("achieved_period_s", "ABSENT")))
+        # The second settle is clamped by --seconds 2.7: its budget is what is
+        # left of 2.7 RAW-seconds when its CR -- the last byte on the wire --
+        # went out, which the harness saw on its own RAW clock.
+        b2 = num("settle_budget_s", m.get("cr", {}).get("esc_after", {}))
+        want = None if t0 is None else max(0.0, min(0.4, 2.7 - (wire[-1][0] - t0)))
+        if b2 is None or want is None or abs(b2 - want) > 0.05:
+            bad.append("the second settle's budget is %r where --seconds 2.7 leaves %s"
+                       % (b2, "?" if want is None else "%.3f" % want))
+        note = " ESC runs %.3f / %.3f s on the wire, settle %.3f s, clamped budget %r" % (
+            spans + (settle, b2))
+elif case == "N48":
+    a, b = num("mono_at_t0"), num("mono_at_end")
+    if None in (a, b, t0, end) or end <= t0:
+        bad.append("mono_at_t0=%r mono_at_end=%r t0_raw=%r end_raw=%r" % (
+            m.get("mono_at_t0", "ABSENT"), m.get("mono_at_end", "ABSENT"),
+            m.get("t0_raw", "ABSENT"), m.get("end_raw", "ABSENT")))
+    else:
+        ratio = (b - a) / (end - t0)
+        host = (r["a_mono"] - r["b_mono"]) / (r["a_raw"] - r["b_raw"])
+        if not 0.95 <= ratio / (0.5 * host) <= 1.05:
+            bad.append("the record's MONOTONIC/RAW is %.4f where a 0.5 shim on this host "
+                       "(r = %.4f, the harness's own) gives %.4f" % (ratio, host, 0.5 * host))
+        note = " MONOTONIC/RAW %.4f = %.4f x 0.5 r, host r %.4f" % (
+            ratio, ratio / (0.5 * host), host)
+else:
+    bad.append("no such case %r" % case)
+print(("BAD " + "; ".join(bad)) if bad else ("OK" + note))
+INNERPY
+}
+
+if [ ! -f "$SHIM" ]; then
+  bad "N44 tools/clockshim.py is missing, so N44-N48 cannot run"
+else
+  shim_case "$WORK/sk1" "$WORK/sk1.rec" gap:1.0 -- --send 'DW 8040DBC0 1' --seconds 3
+  CK="$(shim_check "$WORK/sk1" "$WORK/sk1.rec" N44)"
+  if [ "${CK%% *}" = "OK" ]; then
+    ok "N44 under the shim t0_raw, end_raw and both reads stay in the RAW bracket --${CK#OK}"
+  else
+    bad "N44 a stamp is not on RAW once MONOTONIC disagrees: ${CK#BAD }"
+  fi
+
+  CK="$(shim_check "$WORK/sk1" "$WORK/sk1.rec" N45)"
+  if [ "${CK%% *}" = "OK" ]; then
+    ok "N45 under the shim --seconds 3 ends on RAW time --${CK#OK}"
+  else
+    bad "N45 --seconds is not timed on RAW: ${CK#BAD }"
+  fi
+
+  CK="$(shim_check "$WORK/sk1" "$WORK/sk1.rec" N48)"
+  if [ "${CK%% *}" = "OK" ]; then
+    ok "N48 mono_at_t0/mono_at_end are CLOCK_MONOTONIC reads and the shim reached the tool --${CK#OK}"
+  else
+    bad "N48 the shim did not reach the tool, or mono_at_* are not MONOTONIC: ${CK#BAD }"
+  fi
+
+  shim_case "$WORK/sk2" "$WORK/sk2.rec" gap:1.2 -- --send 'DW 8040DBC0 1' --idle 0.8 --seconds 10
+  CK="$(shim_check "$WORK/sk2" "$WORK/sk2.rec" N46)"
+  if [ "${CK%% *}" = "OK" ]; then
+    ok "N46 under the shim --idle 0.8 still truncates a 1.2 s silence on RAW time --${CK#OK}"
+  else
+    bad "N46 --idle is not timed on RAW: ${CK#BAD }"
+  fi
+
+  shim_case "$WORK/sk3" "$WORK/sk3.rec" none -- --esc 1 --cr-settle 0.4 \
+    --send 'DW 8040DBC0 1' --esc-after 1 --seconds 2.7
+  CK="$(shim_check "$WORK/sk3" "$WORK/sk3.rec" N47)"
+  if [ "${CK%% *}" = "OK" ]; then
+    ok "N47 under the shim both ESC windows, their grid and the CR settle are RAW seconds on the wire --${CK#OK}"
+  else
+    bad "N47 an ESC or settle deadline is not on RAW: ${CK#BAD }"
+  fi
+fi
+
+# --- N50  no RAW, no run -----------------------------------------------------
+# A Python without time.CLOCK_MONOTONIC_RAW (anything but Linux) must refuse
+# before the port, the files, /proc or /sys -- and after the argument
+# refusals, whose order N4, N7, N8, N29, N30 and N33 pin.  The harness deletes
+# the constant from its own interpreter and runs the tool in-process after it.
+nr_run() {             # nr_run <capture args...>
+  "$PY" - "$TOOL" "$@" <<'INNERPY'
+import runpy, sys, time
+tool = sys.argv[1]
+del time.CLOCK_MONOTONIC_RAW
+if hasattr(time, "CLOCK_MONOTONIC_RAW"):
+    sys.exit(97)
+sys.argv = [tool, "capture"] + sys.argv[2:]
+runpy.run_path(tool, run_name="__main__")
+INNERPY
+}
+RC=0
+ROUT="$(nr_run --port /dev/null --out "$WORK/nr" --seconds 1 2>"$WORK/nr.err")" || RC=$?
+RERR="$(cat "$WORK/nr.err")"
+NRF="$(ls "$WORK/nr.log" "$WORK/nr.timing" "$WORK/nr.meta.json" 2>/dev/null | wc -l)"
+if [ "$RC" -eq 97 ]; then
+  bad "N50 the harness could not delete time.CLOCK_MONOTONIC_RAW, so nothing was tested"
+elif [ "$RC" -eq 2 ] && [ -z "$ROUT" ] && [ "$NRF" -eq 0 ] \
+     && printf '%s' "$RERR" | grep -qw 'CLOCK_MONOTONIC_RAW' \
+     && ! printf '%s' "$RERR" | grep -q 'cannot open'; then
+  ok "N50 without time.CLOCK_MONOTONIC_RAW the run exits 2 naming it, before the port and before any file"
+else
+  bad "N50 no-RAW refusal: rc=$RC, ${#ROUT} byte(s) on stdout, $NRF file(s) written"
+  printf '%s\n' "$RERR" | sed 's/^/        /' | head -3
+fi
+
+# --- P24 / N51  the refusals a card can run in-process (SPEC.md FW-124) ------
+# A frozen card's HOST cell is checked by importing the tool and calling
+# build_parser() and refuse_args() on the cell's own arguments.  That is only
+# the same check the run makes if refuse_args() reads nothing but the
+# arguments and says no by RAISING, so the checker can catch it.
+fw124() {              # fw124 <tool> <workdir> <P24|N51>  -> "OK <note>" | "BAD <why>"
+  "$PY" - "$1" "$2" "$3" <<'INNERPY'
+import contextlib, importlib.util, io, os, sys
+
+tool, work, case = sys.argv[1], sys.argv[2], sys.argv[3]
+buf = io.StringIO()
+try:
+    spec = importlib.util.spec_from_file_location("console_capture_under_test", tool)
+    cc = importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(buf):
+        spec.loader.exec_module(cc)
+    parser, refuse, Refused = cc.build_parser(), cc.refuse_args, cc.Refused
+except BaseException as e:                                   # noqa: BLE001
+    print("BAD no build_parser/refuse_args/Refused in-process: %s: %s" % (type(e).__name__, e))
+    raise SystemExit
+if buf.getvalue():
+    print("BAD importing the tool printed %r" % buf.getvalue()[:60])
+    raise SystemExit
+
+
+def verdict(argv):
+    try:
+        a = parser.parse_args(argv)
+    except SystemExit as e:
+        return "UNPARSED", repr(e.code)
+    try:
+        refuse(a)
+    except Refused as e:
+        return "REFUSED", str(e)
+    except SystemExit as e:
+        return "EXITED", "SystemExit(%r)" % (e.code,)
+    except BaseException as e:                               # noqa: BLE001
+        return "RAISED", "%s: %s" % (type(e).__name__, e)
+    return "PERMITTED", ""
+
+
+bad, note = [], ""
+if case == "P24":
+    pre = os.path.join(work, "p24")
+    for ext in (".log", ".timing", ".meta.json"):
+        open(pre + ext, "w").close()
+    before = sorted(os.listdir(work))
+    port = "/dev/ttyNONEXISTENT-p24"
+    good = [
+        ["capture", "--port", port, "--out", pre, "--seconds", "1", "--esc", "1",
+         "--send", "DW 8040DBC0 1", "--esc-after", "2", "--until", "<RealTek>"],
+        ["capture", "--port", port, "--out", pre, "--idle", "0.5"],
+        ["report", os.path.join(work, "no-such-capture"), "--from", "Jump", "--to", "RealTek"],
+    ]
+    for argv in good:
+        v, why = verdict(argv)
+        if v != "PERMITTED":
+            bad.append("%s %s: %s" % (v, argv[0], why[:90]))
+    if sorted(os.listdir(work)) != before or any(
+            os.path.getsize(pre + e) for e in (".log", ".timing", ".meta.json")):
+        bad.append("refuse_args changed the output directory")
+    note = " %d good command lines permitted, the port absent and the files present" % len(good)
+elif case == "N51":
+    out = os.path.join(work, "n51")
+    forms = [
+        (["capture", "--port", "/dev/null", "--out", out], "needs a terminator"),
+        (["capture", "--port", "/dev/null", "--out", out, "--seconds", "1",
+          "--send", " DW 8040DBC0 1"], "leading or trailing whitespace"),
+        (["capture", "--port", "/dev/null", "--out", out, "--seconds", "1",
+          "--until", "("], "bad pattern"),
+        (["report", out, "--from", "(", "--to", "x"], "bad pattern"),
+    ]
+    for argv, want in forms:
+        v, why = verdict(argv)
+        if v != "REFUSED" or want not in why:
+            bad.append("%s where Refused naming %r was wanted: %s" % (v, want, why[:90]))
+    if os.listdir(work):
+        bad.append("files appeared: %s" % sorted(os.listdir(work)))
+    note = " %d bad command lines, each refused by raising Refused" % len(forms)
+else:
+    bad.append("no such case %r" % case)
+print(("BAD " + "; ".join(bad)) if bad else ("OK" + note))
+INNERPY
+}
+
+mkdir -p "$WORK/fw124p" "$WORK/fw124n"
+CK="$(fw124 "$TOOL" "$WORK/fw124p" P24)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "P24 refuse_args() permits a good command line in-process, reading no port and no file --${CK#OK}"
+else
+  bad "P24 refuse_args() refuses a good command line, or reads beyond its arguments: ${CK#BAD }"
+fi
+CK="$(fw124 "$TOOL" "$WORK/fw124n" N51)"
+if [ "${CK%% *}" = "OK" ]; then
+  ok "N51 refuse_args() refuses bad command lines in-process by raising Refused, never by exiting --${CK#OK}"
+else
+  bad "N51 refuse_args() does not refuse in a way a card check can catch: ${CK#BAD }"
 fi
 
 echo

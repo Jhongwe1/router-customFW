@@ -100,29 +100,51 @@ harness is not committed.
 
 ## 3. One clock
 
-`P2` settled item 4: console bytes and host network events on the same
-`CLOCK_MONOTONIC`. Both premises were measured first (`FW-114`).
+`P2` settled item 4: console bytes and host network events on one clock —
+`CLOCK_MONOTONIC` through seating A, `CLOCK_MONOTONIC_RAW` from seating B, because
+WSL's `CLOCK_MONOTONIC` is slewed and RAW is not (§ 7.9, `CLK-38`). Both premises
+were measured first (`FW-114`).
 
 ### 3.1 `console-capture` records its origin (`FW-115`)
 
-`.meta.json` gains six keys. Not one byte more or less goes out on the wire, so
-`tool_version` stays 1.4; the presence of `t0_mono` dates the schema.
+1.4 (2026-09-23, `P2-1`) added six keys to `.meta.json` without one byte more or
+less on the wire, so `tool_version` stayed 1.4 and the presence of `t0_mono` dates
+that schema. 🔄 1.5 (2026-09-24, `P2-4`) moved every stamp and every deadline —
+both ESC loops, the CR settle, `--seconds`, `--idle`, the drain — to
+`CLOCK_MONOTONIC_RAW`. A deadline decides what is written (an `--esc N` loop lasts
+N RAW seconds, where 1.4's lasted N/r on a host slewed to r), so the version moved.
+🔴 To within one wait, not better: every wait is one kernel `select` of a whole quantum —
+the ESC period in the ESC loops, 50 ms elsewhere — on the slewed clock, and RAW is re-read
+only between waits, so a deadline ends up to one quantum late, and one shorter than
+q/(1 − r) — the 0.4–0.5 s CR settle whenever r > 0.9 — lasts its MONOTONIC length. 量
+2026-09-24 by the 108th segment's end-to-end run: a 0.5 s settle took 0.5284 s at r 0.948,
+and `waited_s` recorded it. With `timesyncd` stopped r is 1.00000 and nothing differs.
 
 | key | what it is |
 |---|---|
-| `clock` | the clock `time.monotonic()` reads, as the interpreter reports it: `CLOCK_MONOTONIC` here; anything else is written verbatim and a reader expecting `CLOCK_MONOTONIC` refuses it |
-| `t0_mono` | the variable every `.timing` second is measured from, unrounded: `t0_mono + seconds` is the instant a read returned on the host's clock |
-| `t0_real` | `time.time()` read on the next statement, for tools that stamp realtime (`ping -D`) |
+| `clock` | 1.5: `CLOCK_MONOTONIC_RAW`, always. 1.4: the clock `time.monotonic()` reads, as the interpreter reports it — `CLOCK_MONOTONIC` here |
+| `t0_raw` (1.5), `t0_mono` (1.4) | the origin every `.timing` second is measured from, unrounded: `t0_raw + seconds` is the instant a read returned on the host's clock. A new key, not `t0_mono` redefined |
+| `t0_real` | `time.time()` read beside the origin, for tools that stamp realtime (`ping -D`); from 1.5 `started_wallclock` is this reading, to the second |
+| `mono_at_t0`, `mono_at_end` (1.5) | one `CLOCK_MONOTONIC` read beside each end's RAW read, so a record carries its own MONOTONIC/RAW rate; nothing is timed on them |
+| `boot_id`, `clocksource`, `clocksource_end` (1.5) | the boot the RAW stamps count from — RAW restarts at every WSL boot — and the kernel's clocksource at each end; `null` if unreadable |
 | `sent_s` | seconds since `t0` at which `ser.flush()` of the `--send` line returned; `null` when nothing was sent |
-| `end_mono`, `end_real` | one pair read after the port and files are closed; `duration_s` is `end_mono - t0` from that same reading |
+| `end_raw` (1.5) or `end_mono` (1.4), `end_real` | one pair read after the port and files are closed; `duration_s` is `end - t0` from that same reading |
 
-量 by the suite on a pty (cases P18–P23, N42–N43): the tool's origin and every
+量 by the suite on a pty, 1.4 (cases P18–P23, N42–N43): the tool's origin and every
 read fall inside the harness's own `CLOCK_MONOTONIC` bracket, each read landing
 80–200 µs after the harness wrote the byte it delivered; two adjacent
 `time.monotonic()` calls are 61 ns apart (median of 20,000); a pty answers
-`tcdrain` in 6–16 µs. Every capture committed before 2026-09-23 lacks these keys,
-and a join that needs them refuses the capture rather than guess an origin from
-`started_wallclock`, which is a string to the second.
+`tcdrain` in 6–16 µs. 1.5 (P18–P24, N42–N53; 2026-09-24, the 108th segment's
+rehearsal): a read lands 159–464 µs after the harness's write inside its RAW
+bracket; `end_raw − t0_raw − duration_s` = +0.325 µs. N44–N48 run the tool under
+`tools/clockshim.py`, which slows every Python read of `CLOCK_MONOTONIC` to half
+rate plus 1000 s: a played 1.0015 s gap reads 1.0016 s, `--seconds 3` gives
+`duration_s` 3.023622, `--idle 0.8` stopped 0.822 s after the last byte, the two
+ESC runs spanned 0.996 and 0.997 s on the wire, and the record's MONOTONIC/RAW read
+0.4907 = 1.0000 × 0.5 r with the host's r at 0.9815 during the run. Every capture
+committed before 2026-09-23 lacks these keys, and a join that needs them refuses
+the capture rather than guess an origin from `started_wallclock`, which is a string
+to the second.
 
 殘留: when `flush()` returns on the real port (the CP2102 through usbip) is not
 measured. `sent_s` marks the whole line handed over; the loader echoes a line
@@ -133,9 +155,19 @@ character by character, so on the real port the first echo byte can precede
 ### 3.2 `tools/hostprobe.py` (`FW-116`)
 
 The host's half: the first ICMP echo reply (`D8`), the first TCP success on a
-daemon's port (`D4`), neighbour-table changes, and UDP arrivals, each stamped
-`t_mono` on the same clock and written one line per event to `PREFIX.events`,
-flushed per line; `PREFIX.meta.json` closes the record. No packet contents and no
+daemon's port (`D4`), neighbour-table changes, and UDP arrivals, each stamped on
+the capture's clock and written one line per event to `PREFIX.events`, flushed per
+line; `PREFIX.meta.json` closes the record. 🔄 From 1.3 (2026-09-24, `P2-4`) the
+stamp is `t_raw`, `CLOCK_MONOTONIC_RAW`, and so is every deadline the probe
+computes; the events file's first line and the meta's `clock` both declare it, a
+reader takes the clock from the header as a whole token, and a record whose two
+declarations disagree is MALFORMED. The meta gains `start_raw`, `end_raw`,
+`stop_decided_raw`, `ping.started_raw`, `mono_at_start`/`mono_at_end`,
+`clocksource`/`clocksource_end`, and `boot_id` — written only when it is a version-4
+UUID, because the address gate below would otherwise label its last group as a
+hardware address (量: `unlisted-1`). A `tcp` line's `start_mono=` is `start_raw=`,
+and a `udp` line gains `lag_ms=`, the probe's read time minus the kernel's receive
+stamp. Records 1.0–1.2 wrote `t_mono` and still read, on `CLOCK_MONOTONIC`. No packet contents and no
 frames are kept, and — from 1.1, 2026-09-23 — no hardware address the allowlist
 does not name. An `lladdr` is written verbatim only when its canonical form is one
 of the addresses `tools/audit-bench-log.py`'s `ALLOW` names; any other is
@@ -186,12 +218,19 @@ received.
 ### 3.3 The join
 
 `tools/boot-timeline.py --probe PREFIX` places one probe record on one capture's
-timeline: an event at `t_mono` sits at `t_mono - t0_mono` in the capture's
-`.timing` frame. Only events inside the capture's window (`t0_mono` … `end_mono`)
-and after `sent_s` count, and a capture with no `t0_mono`, no `end_mono`, or a
-`clock` other than `CLOCK_MONOTONIC` is refused. One probe can therefore run
-across a whole `looprun` block while each round's boot capture reads its own
-events out of it.
+timeline: an event at `t` sits at `t - t0` in the capture's `.timing` frame, where
+both sides declare `CLOCK_MONOTONIC` (`t_mono`, `t0_mono`: console-capture 1.4,
+hostprobe 1.0–1.2) or both `CLOCK_MONOTONIC_RAW` (`t_raw`, `t0_raw`: 1.5 and 1.3).
+Only events inside the capture's window (`t0` … `end`) and after `sent_s` count.
+Refused, with the reason: either record declaring no clock while carrying no
+`*_mono` or `*_raw` key (written before `P2-1`), declaring a clock other than those
+two, or carrying a key of the other clock beside the declared one; a capture with
+no `t0` or `end` number for its clock; two records on different clocks; two records
+whose `boot_id`s differ (both clocks restart at every boot). The capture is checked
+before the probe record, in `origin()`'s order. The join prints the boot identity
+on every run, and a NOTE when one side or both carry none. One
+probe can therefore run across a whole `looprun` block while each round's boot
+capture reads its own events out of it.
 
 ## 4. The retro table — what `P2-3` is scored against (`CLK-33`)
 
@@ -504,7 +543,9 @@ seatings, which have no N, W or K record of this kind.
   images up past the prompt in every round, the last included. The 1.05 s this bullet
   used to ask of the loud image alone — the longest gap between broadcasts on the wire in
   `P3`, the 1.000 s ARP retransmit plus one 50 ms ping interval — is a floor with no
-  margin for a lost first answer; seating B waits 2 s. With the wait the loud boots should
+  margin for a lost first answer; seating B waits 2.5 s (`looprun` 1.3's `S9`, `FW-127`:
+  RAW seconds, while the host's ARP timer runs on the slewed clock, so the margin is
+  wider than 2 s). With the wait the loud boots should
   be answered on a cycle's third broadcast (推, from seating A's timing), so the
   lower-edge rule above, which assumes the second, gives way to the general one used for
   the vendor's boots (§ 7.7).
@@ -678,14 +719,20 @@ remaining 6–7 s of setup (`notes/nic-driver.md` § 19.6).
 `6.6.87.2-microsoft-standard-WSL2`, clocksource `tsc`), the board off. Scripts and logs
 in `$FWRE_WORK/rebuild/s106/` (`clocklog.py`, `clockfit.py`, `clockwin.py`,
 `adjtimex-read.py`, `adjtimex-watch.sh`). The 107th segment's trace and interventions
-(21:25–22:51, a later WSL boot) are the three bullets from *Who writes the tick* on; their
-scripts, logs and registration are in `$FWRE_WORK/rebuild/s107/` (`e1-trace.sh`,
-`e1b-trace.sh`, `e2-aba.sh`, `e2-analyze.py`, `PREREG-clk38-mechanism.md`).
+(21:25–22:51, a later WSL boot, `39e37203`) are the bullets from *Who writes the tick*
+through *Stopping one controller*; its clock-log build runs and E3 (22:53–02:23, the same
+boot) are *A third rate term* and *E3*. Their scripts, logs and registration are in
+`$FWRE_WORK/rebuild/s107/` (`e1-trace.sh`, `e1b-trace.sh`, `e2-aba.sh`, `e2-analyze.py`,
+`e3/`, `b-hc/`, `PREREG-clk38-mechanism.md`); the 108th segment's re-derivations are in
+`$FWRE_WORK/rebuild/s108/`.
 
 * **The kernel's tick is being slewed.** `adjtimex(2)`, read only: `tick` 9721–9737 µs
   per jiffy at 18:42 (nominal 10,000), a new value every 5–10 s, `freq` −46…+48 ppm,
   `status` 0x2000; at 19:25, 9615–9626. So `CLOCK_MONOTONIC` runs at
-  tick/10,000 × (1 + freq) of the raw clocksource: 0.972–0.974, then 0.9615–0.9628.
+  tick/10,000 + freq of the raw clocksource — freq is added, not multiplied, and the two
+  forms differ by ≤ 2 ppm here — 0.972–0.974, then 0.9615–0.9628, in every second in which
+  the kernel PLL holds no offset. 🔄 That condition is a third term (*A third rate term*,
+  below, `CLK-39`); this bullet read "tick/10,000 × (1 + freq)" until the 108th segment.
 * **The clocks agree with the tick.** Every 20 s one Windows read (`powershell.exe`:
   QPC, its frequency, `DateTime.UtcNow`) is bracketed by two `CLOCK_MONOTONIC` reads
   (bracket 0.09–1.1 s), 178 rows over 3,722.8 s of QPC (18:40–19:43):
@@ -696,7 +743,10 @@ scripts, logs and registration are in `$FWRE_WORK/rebuild/s107/` (`e1-trace.sh`,
 * **Realtime is stepped forward.** `REALTIME − MONOTONIC` jumped +0.83…+1.04 s every
   20–40 s, +32.49 s over the log's first 1,037.7 s. `systemd-timesyncd` is active
   (ntp.ubuntu.com, poll 32 s); `status` 0x2000 has `STA_PLL` clear, which fits a step
-  rather than a slew (量, 107th segment: it steps with `clock_adjtime(ADJ_SETOFFSET)`, below). During seating A the journal (whose
+  (量, 107th segment: it steps with `clock_adjtime(ADJ_SETOFFSET)`, below). 🔄 It slews as
+  well: with a smaller offset the kernel PLL's offset is written and nothing steps (*A third
+  rate term* and *E3*, below), and `STA_PLL` is set only for seconds at a time, so one read
+  of `status` cannot tell the two apart. During seating A the journal (whose
   every entry carries both clocks) shows no step before ~15:50, then +0.40–0.53 s every
   ~32.2 s until ~16:10 and +0.70–0.87 s during the vendor presses; the first step
   visible between two captures is inside `P1L-r01-ab2` (15:54:34, +0.494549 s), because
@@ -741,19 +791,54 @@ scripts, logs and registration are in `$FWRE_WORK/rebuild/s107/` (`e1-trace.sh`,
   log, Time-Service event 37), six minutes before the stop, so A′ ran with Windows back on NTP
   and is confounded. Windows' successful syncs on 2026-09-23 are 04:08:14, 13:14:22 and
   22:20:30 — 32,768 s apart — and `w32tm` reads *not synchronized* between them.
+* **A third rate term: the kernel PLL's residual offset** (`CLK-39`). 量 2026-09-23 23:42
+  and 2026-09-24 00:12–00:13 (107th segment, boot `39e37203`, the board off) by
+  `tools/hostclock.py` 1.0's two live build runs (`$FWRE_WORK/rebuild/s107/b-hc/`
+  `live40.clock`, `desk90.clock`): `adjtimex` read-only every second and on every change at
+  10 Hz. The offset was written +147.8 ms at 23:42:14, then +271.9, +295.3 and +316.3 ms
+  31–32 s apart, each time with `status` 0x2001 (`STA_PLL`), and `status` read 0x0000 again
+  0.70–3.61 s later. The offset then decays ×7/8 per second whatever `status` reads —
+  `offset >> (2 + constant)` per second at `constant` 1 on this 6.6 kernel, where 2.6.30's
+  `SHIFT_PLL` is 4 — each decrement at the first timekeeping update after a REALTIME second,
+  and each decrement is added to that second. So MONO/RAW per 1 s pair read 0.9756–1.0166
+  (23:41–23:42) and 0.9894–1.0280 (00:12–00:13): up to 35,925 ppm beyond tick/10,000 + freq,
+  and `CLOCK_MONOTONIC` ran faster than RAW as well as slower. With the term modelled the
+  tool's tick check agrees on 28 of 28 and 62 of 62 pairs. A second arithmetic, apart from
+  the tool (`$FWRE_WORK/rebuild/s108/pll-check.py`): subtracting each pair's own decrease of
+  the offset leaves a median of 89 and 128 ppm (worst 5,281 and 1,323 ppm; 33 and 74 pairs,
+  any with a write inside skipped). 推: the writer is `timesyncd` — besides `chronyd` the
+  only caller of `clock_adjtime` in E1's census, where every call it made was a step — and
+  `chronyd`'s `ADJ_STATUS` clears `STA_PLL`.
+* **E3: the fight returns, slewing before it steps — refuted as registered.** Registered
+  before its first row: with `timesyncd` running, no step and every 60 s window's tick
+  ≥ 9,900 until at least 00:15 on 2026-09-24; the first step between 00:15 and 01:47 (point
+  estimate 00:56); within 10 min of it, a window below 9,900. 量 22:53:41–02:23:43, one WSL
+  boot (`39e37203`), a row every 30 s, no Windows sync between: not void, and refuted on two
+  conditions — the first step came at 00:14:13.9 (+0.412 s), 47 s before the window, and for
+  the 10 min after it every row's tick read ≥ 9,901. The first clause missed as well: tick
+  9752 at 23:42:11 and 9865 at 23:44:11 with no step, while MONO/RAW per row pair ran
+  0.9929–1.0075 through the 23 h. Steps to 02:23:43: 151, each seen twice — a row interval
+  whose `REALTIME − MONOTONIC` jumped, and one journal `Clock change detected` inside it (151
+  of 151; none outside a jump) — growing through the night: +0.400…+0.465 s in the 00 h (5),
+  +0.401…+0.795 s in the 01 h (102), +0.550…+0.993 s in 02:00–02:23 (44); the tick fell to
+  9167 in the 01 h and 9200 at 02:23, and MONO/RAW per row pair to 0.9686–0.9848 after 02:00.
 * **The mechanism, and what is still 推.** Two controllers: WSL's `chronyd` slews the guest
-  toward Windows' clock through the tick; Ubuntu's `timesyncd` steps it toward NTP. While
-  Windows sits on NTP they agree; as Windows drifts (−36 ppm) past `timesyncd`'s step
-  threshold they fight, chronyd undoing each step, deeper as the drift grows, until Windows'
-  next sync. Seating A's steps began 9,352 s after the 13:14:22 sync. 推 until E3 reads it:
-  with `timesyncd` running, the fight returns on its own after 22:20:30 (registered before
-  its first row: first step between 00:15 and 01:47 on 2026-09-24, point estimate 00:56).
+  toward Windows' clock through the tick; Ubuntu's `timesyncd` pulls it toward NTP, through
+  the kernel PLL while its offset is small and by a step when it is not. While Windows sits
+  on NTP they agree; as Windows drifts (−36 ppm) they fight — by slew alone at first, then
+  with steps once the offset at a poll passes about 0.4 s (推: the night's five smallest
+  steps read +0.400…+0.412 s; systemd's source is not read here), steps that grow as `chronyd`
+  pulls the tick further — until Windows' next sync. Seating A's steps began 9,352 s after
+  the 13:14:22 sync, E3's 6,824 s after the 22:20:30 one.
 * **Consequence.** Seating A's stamps are on the slewed clock (§ 7.2's four references
   agree), and `CLOCK_MONOTONIC_RAW` is not slewed. Seating B stamps `RAW` (`PROGRESS.md`,
   `P2-4`), and runs with `timesyncd` stopped and restarted after, so `CLOCK_REALTIME` makes
-  no NTP step and realtime-stamped tools convert smoothly — the rule written before E2, met
-  by its B phase; its clock log reads the host's state throughout.
+  no NTP step, no PLL offset is written, and realtime-stamped tools convert smoothly — the
+  rule written before E2, met by its B phase; its clock log (`tools/hostclock.py`) reads the
+  host's state throughout.
 * **What it does not establish:** that seating A itself ran on this mechanism (no trace then;
-  its journal's step pattern matches); why Windows' syncs are 32,768 s apart while it reports
-  a 1,024 s poll; Windows' own rate against true time; anything before 2026-09-23 05:54
-  (older journals are gone).
+  its journal's step pattern matches); who writes the PLL's offset and who clears `STA_PLL`
+  (推 above); the step threshold (推, about 0.4 s); the PLL's law beyond these ~40 minutes of
+  one boot on one kernel; why Windows' syncs are 32,768 s apart while it reports a 1,024 s
+  poll; Windows' own rate against true time; anything before 2026-09-23 05:54 (older
+  journals are gone).

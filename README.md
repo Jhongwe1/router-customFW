@@ -580,7 +580,10 @@ tools/spec-check.py        THIRTEEN checks and fifty case lines. C1-C7 are about
                            on this format's own exemplar from the day before,
                            and on the sixteen references the next payload edit
                            moved
-tools/console-capture.py   records each capture's origin on CLOCK_MONOTONIC (`FW-115`);
+tools/console-capture.py   records each capture's origin, and since 1.5 times every stamp
+                           and deadline, on CLOCK_MONOTONIC_RAW, which WSL does not
+                           slew -- a deadline to within one select wait (`FW-115`,
+                           `CLK-38`);
                            four of its cases exist because the ESC heartbeat is
                            the grid every interval is quantised to, so the period each
                            capture ACHIEVED is measured and recorded, not assumed.
@@ -694,7 +697,9 @@ tools/looprun.py           two of its ten stages exist only to make it safe to r
                            require exactly ONE of the four assertions to fail: a control
                            set where one broken input trips every check cannot say which
                            check is load-bearing. Since 1.2 (2026-09-23) one power
-                           press runs N boots, and S4 must show the prompt caught (`FW-118`).
+                           press runs N boots, and S4 must show the prompt caught (`FW-118`);
+                           since 1.3 its stage times are on CLOCK_MONOTONIC_RAW and S9 can
+                           hold the board up past every round's prompt (`FW-127`).
                            Ten arrived on 2026-09-04 and they are two guards on
                            `--image`, the one bench input that had none: it is read
                            by S6/S6b, which sit AFTER the reset, the rescue and the
@@ -841,10 +846,23 @@ tools/boot-timeline.py     the named intervals of a boot, with the anchor bytes 
                            retro table seating A is scored against (`FW-117`, `CLK-33`)
 tools/hostprobe.py         the host's half of the one clock: the first ICMP echo reply,
                            the first TCP success on a daemon's port, neighbour-table
-                           changes and UDP arrivals, stamped on the CLOCK_MONOTONIC a
-                           capture records its origin on. It drives the system `ping`,
-                           because this host refuses an unprivileged ICMP socket, and
-                           keeps ping's own -D stamps as a second clock (`FW-116`)
+                           changes and UDP arrivals, stamped on the clock a capture
+                           records its origin on -- CLOCK_MONOTONIC_RAW since 1.3. It
+                           drives the system `ping`, because this host refuses an
+                           unprivileged ICMP socket, and keeps ping's own -D stamps as
+                           a second clock (`FW-116`)
+tools/hostclock.py         the host's clocks for a whole seating, read-only, on
+                           CLOCK_MONOTONIC_RAW: the kernel's tick, frequency and PLL
+                           offset every second, a timerfd that fires on every
+                           realtime step, Windows' clock and SNTP -- and the
+                           conversion of a realtime stamp onto RAW. It exists because
+                           two time daemons slewed this host's CLOCK_MONOTONIC up to
+                           3.1 % slow during seating A (`FW-129`, `CLK-35`, `CLK-38`,
+                           `CLK-39`)
+tools/iperflog.py          the board's own iperf3 server log, read into one figure per
+                           trial, taken only from the summary a completed test prints:
+                           two of the three summaries the server can print read alike
+                           (`FW-128`, `NET-112`)
 tools/looptime.py          the wall clock of a development loop, out of its own artefacts.
                            Every capture already carried started_wallclock, duration_s and
                            a .timing; nothing had joined them, so the dead time in a

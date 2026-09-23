@@ -107,29 +107,87 @@ U_META = '        "until": args.until,\n        "until_offset": None,'
 U_ENDED = '                    meta["esc"]["esc_after"]["ended_on_until"] = True'
 U_META_END = "    meta[\"until_offset\"] = until_at"
 
-# One clock, 2026-09-23 (P2-1; SPEC.md FW-114).  Eight more: the origin, the
-# realtime pair, the send stamp, and the version the new keys must not move.
+# One clock, 2026-09-23 (P2-1; SPEC.md FW-114): K1-K8, the origin, the
+# realtime pair, the send stamp and the version -- written on CLOCK_MONOTONIC
+# and re-pointed at CLOCK_MONOTONIC_RAW when P2-4 moved every stamp and every
+# deadline there the same day (CLK-38).  K9-K23 are P2-4's own: the
+# declaration, the stamps, each deadline, the boot identity and the no-RAW
+# refusal.  On a runner RAW and MONOTONIC agree to milliseconds, so most of
+# them die only because N44-N48 run the tool under tools/clockshim.py.
+#
+# A DEADLINE MUTANT TIMES ITS WHOLE DEADLINE ON CLOCK_MONOTONIC, from a
+# MONOTONIC origin of its own -- the regression as someone would write it,
+# not a clock mixed inside one subtraction.  A mixed one is the weaker test
+# and the worse citizen: it passes untouched on a runner, and at a desk where
+# RAW - MONOTONIC was +189 s and growing (量 2026-09-23) a --seconds cap timed
+# as MONOTONIC - t0_raw never arrives -- and nothing here times out a suite.
+#
 # Two mutants are NOT rows, because no case can see them and a row that
 # cannot be killed is a survivor by construction, not a finding:
-#   * t0_mono read by a second time.monotonic() on the line after t0.  量
-#     2026-09-23, WSL's /usr/bin/python3: adjacent reads are 61 ns apart
-#     (median of 20,000; p99 84 ns), a sixteenth of the 1 us every field is
-#     written at and P19 allows.  K2 is the same mistake one statement
-#     further on, past the two open()s, where it is 26 us or more (量 the
-#     same day, minimum of 300) and P19 does see it.
+#   * t0_raw read by a second _now() on the line after t0.  量 2026-09-23,
+#     WSL's /usr/bin/python3: adjacent clock_gettime(CLOCK_MONOTONIC_RAW)
+#     reads are 127 ns apart (median of 20,000; p99 219 ns), an eighth of the
+#     1 us every field is written at and P19 allows.  K2 is the same mistake
+#     one statement further on, past the two open()s, where it is 26 us or
+#     more (量 the same day under P2-1, minimum of 300) and P19 does see it.
 #   * sent_s stamped between write() and flush().  flush() is tcdrain(3) and
 #     a pty answers it at once (量 the same day: 6-16 us after write()), so on
 #     a pty the two stamps are one instant.  Only a real port separates them.
-K_T0 = '    meta["t0_mono"] = t0'
-K_T0R = '    meta["t0_real"] = time.time()'
+K_T0 = '    meta["t0_raw"] = t0'
+K_T0R = '    meta["t0_real"], meta["mono_at_t0"] = time.time(), _mono()'
 K_HDR = ('        timing.write("# offset seconds -- offset is the byte count in '
          '.log BEFORE this read\\n")')
-K_ENDR = '    meta["end_real"] = time.time()'
-K_SENT = '                meta["sent_s"] = round(time.monotonic() - t0, 6)'
+K_ENDR = '    meta["end_real"], meta["mono_at_end"] = time.time(), _mono()'
+K_SENT = '                meta["sent_s"] = round(_now() - t0, 6)'
 K_WRITE = "                ser.write(line)"
 K_SENT0 = '        "sent_s": None,'
-K_DUR = '    meta["duration_s"] = round(end_mono - t0, 6)'
-K_VER = 'TOOL_VERSION = "1.4"'
+K_DUR = '    meta["duration_s"] = round(end_raw - t0, 6)'
+K_VER = 'TOOL_VERSION = "1.5"'
+K_CLOCK = 'CLOCK = "CLOCK_MONOTONIC_RAW"'
+K_NOW = "    return time.clock_gettime(time.CLOCK_MONOTONIC_RAW)"
+K_MONO = "    return time.clock_gettime(time.CLOCK_MONOTONIC)"
+K_BOOT = 'BOOT_ID = "/proc/sys/kernel/random/boot_id"'
+K_ORIGIN = "    last_byte_at = t0"
+K_LAST = "                last_byte_at = _now()"
+K_ROW = '                timing.write(f"{offset} {_now() - t0:.6f}\\n")'
+K_SECS = "                if args.seconds and now - t0 >= args.seconds:"
+K_IDLE = "                if args.idle and now - last_byte_at >= args.idle:"
+K_ESC = ("                esc_started = _now()\n"
+         "                esc_deadline = esc_started + args.esc\n"
+         "                esc_writes = 0\n"
+         "                while _now() < esc_deadline:\n"
+         "                    ser.write(ESC)\n"
+         "                    esc_writes += 1\n"
+         "                    drain(args.esc_period)\n"
+         '                _record_esc(meta, "esc", args.esc_period, esc_writes,\n'
+         "                            _now() - esc_started)")
+K_ESCA = ("                esc_started = _now()\n"
+          "                esc_deadline = esc_started + args.esc_after\n"
+          "                esc_writes = 0\n"
+          "                while _now() < esc_deadline:")
+K_ESCA_REC = ('                _record_esc(meta, "esc_after", args.esc_period, esc_writes,\n'
+              "                            _now() - esc_started)")
+K_DRAIN = ("            deadline = _now() + budget\n"
+           "            while True:\n"
+           "                remaining = deadline - _now()")
+K_SETTLE = ("            started = _now()\n"
+            "            deadline = started + budget\n"
+            "            seen = False\n"
+            "            while _now() < deadline:\n"
+            "                drain(0.05)\n"
+            "                if PROMPT in tail:\n"
+            "                    seen = True\n"
+            "                    break\n"
+            '            entry["prompt_seen"] = seen\n'
+            '            entry["waited_s"] = round(_now() - started, 6)')
+K_RAWCHK = "    if getattr(time, CLOCK, None) is None:"
+K_RAWCALL = "    _raw_clock()"
+K_CLAMP = ("                budget = min(budget, max(0.0, args.seconds - "
+           "(_now() - t0)))")
+
+# FW-124 (P2-4): the refusals a card's HOST-cell check runs in-process.
+R_TERM = "        raise Refused(\n" + GUARD_MSG
+MONO = "time.monotonic()"
 
 # id, what it does, [(anchor, replacement), ...]
 #
@@ -262,15 +320,15 @@ MUT = [
      [(U_META_END, '    meta["until_offset"] = None')]),
 
     # --- ONE CLOCK: each row names the case built to kill it -------------
-    ("K1", "t0_mono from time.time(), not the monotonic t0 (P18)",
-     [(K_T0, '    meta["t0_mono"] = time.time()')]),
-    ("K2", "t0_mono re-read after the output files open, not t0 (P19)",
+    ("K1", "t0_raw from time.time(), not the RAW t0 (P18)",
+     [(K_T0, '    meta["t0_raw"] = time.time()')]),
+    ("K2", "t0_raw re-read after the output files open, not t0 (P19)",
      [(K_T0, "    pass"),
-      (K_HDR, K_HDR + '\n        meta["t0_mono"] = time.monotonic()')]),
-    ("K3", "t0_real from time.monotonic() (P20)",
-     [(K_T0R, '    meta["t0_real"] = time.monotonic()')]),
+      (K_HDR, K_HDR + '\n        meta["t0_raw"] = _now()')]),
+    ("K3", "t0_real read from RAW, not time.time() (P20)",
+     [(K_T0R, '    meta["t0_real"], meta["mono_at_t0"] = _now(), _mono()')]),
     ("K4", "end_real is the realtime read taken at t0 (P20)",
-     [(K_ENDR, '    meta["end_real"] = meta["t0_real"]')]),
+     [(K_ENDR, '    meta["end_real"], meta["mono_at_end"] = meta["t0_real"], _mono()')]),
     ("K5", "sent_s stamped before write(), not after flush() (P21)",
      [(K_SENT, "                pass"),
       (K_WRITE, K_SENT + "\n" + K_WRITE)]),
@@ -278,10 +336,64 @@ MUT = [
      [(K_SENT0, '        "sent_s": 0,')]),
     ("K7", "sent_s stamped when the metadata is written (P22)",
      [(K_SENT, "                pass"),
-      (K_DUR, K_DUR + '\n    meta["sent_s"] = (round(time.monotonic() - t0, 6)'
+      (K_DUR, K_DUR + '\n    meta["sent_s"] = (round(_now() - t0, 6)'
                       ' if args.send is not None else None)')]),
-    ("K8", "tool_version bumped for keys that write nothing new (P23)",
-     [(K_VER, 'TOOL_VERSION = "1.5"')]),
+    ("K8", "tool_version left at 1.4 although the ESC windows moved (P23)",
+     [(K_VER, 'TOOL_VERSION = "1.4"')]),
+    ("K9", "every stamp and deadline on MONOTONIC, clock still says RAW (N44)",
+     [(K_NOW, "    return " + MONO)]),
+    ("K10", "clock declares CLOCK_MONOTONIC over RAW stamps (P18)",
+     [(K_CLOCK, 'CLOCK = "CLOCK_MONOTONIC"')]),
+    ("K11", "--seconds timed on MONOTONIC (N45)",
+     [(K_ORIGIN, K_ORIGIN + "\n    t0m = " + MONO),
+      (K_SECS, K_SECS.replace("now - t0", MONO + " - t0m"))]),
+    ("K12", ".timing rows stamped on MONOTONIC (N44)",
+     [(K_ORIGIN, K_ORIGIN + "\n    t0m = " + MONO),
+      (K_ROW, K_ROW.replace("_now() - t0", MONO + " - t0m"))]),
+    ("K13", "mono_at_t0 and mono_at_end read from RAW (N48)",
+     [(K_MONO, K_NOW)]),
+    ("K14", "boot_id read from the neighbouring random/uuid (N49)",
+     [(K_BOOT, 'BOOT_ID = "/proc/sys/kernel/random/uuid"')]),
+    ("K15", "--idle timed on MONOTONIC (N46)",
+     [(K_ORIGIN, "    last_byte_at = " + MONO),
+      (K_LAST, "                last_byte_at = " + MONO),
+      (K_IDLE, K_IDLE.replace("now - last_byte_at", MONO + " - last_byte_at"))]),
+    ("K16", "the --esc loop timed on MONOTONIC (N47)",
+     [(K_ESC, K_ESC.replace("_now()", MONO))]),
+    ("K17", "the no-RAW refusal deleted (N50)",
+     [(K_RAWCHK, "    if False:")]),
+    ("K18", "the no-RAW refusal moved below the port open (N50)",
+     [(K_RAWCALL, "    pass"),
+      (OPEN_PORT, OPEN_PORT + "\n        _raw_clock()")]),
+    ("K19", "the --esc-after loop timed on MONOTONIC (N47)",
+     [(K_ESCA, K_ESCA.replace("_now()", MONO)),
+      (K_ESCA_REC, K_ESCA_REC.replace("_now()", MONO))]),
+    ("K20", "drain() timed on MONOTONIC (N47)",
+     [(K_DRAIN, K_DRAIN.replace("_now()", MONO))]),
+    ("K21", "the CR settle timed on MONOTONIC (N47)",
+     [(K_SETTLE, K_SETTLE.replace("_now()", MONO))]),
+    # K22 is 1.4's own shape for one quantity: --seconds and duration_s on
+    # one MONOTONIC agree with each other at 3.0 while the run lasts 6 RAW-s.
+    # N45's range cannot see it; its end_raw - t0_raw check does.
+    ("K22", "--seconds AND duration_s on one MONOTONIC (N45)",
+     [(K_ORIGIN, K_ORIGIN + "\n    t0m = " + MONO),
+      (K_SECS, K_SECS.replace("now - t0", MONO + " - t0m")),
+      (K_DUR, '    meta["duration_s"] = round(' + MONO + " - t0m, 6)")]),
+    ("K23", "the settle's --seconds clamp timed on MONOTONIC (N47)",
+     [(K_ORIGIN, K_ORIGIN + "\n    t0m = " + MONO),
+      (K_CLAMP, K_CLAMP.replace("_now() - t0", MONO + " - t0m"))]),
+
+    # --- FW-124: what a card's HOST-cell check gets back -----------------
+    # R1 is invisible to every CLI case by construction: the process still
+    # exits 2 with the reason on stderr.  Only an in-process caller sees a
+    # SystemExit where a Refused was promised.  R2 is the other direction:
+    # a refuse_args() that reads the host says no to a card whose port the
+    # checking machine happens not to have.
+    ("R1", "an argument refusal exits the process instead of raising (N51)",
+     [(R_TERM, R_TERM.replace("raise Refused(", "_fail(", 1))]),
+    ("R2", "refuse_args() reads the host: refuses a port that is absent (P24)",
+     [(GUARD_CALL, "    if not os.path.exists(args.port):\n"
+                   '        raise Refused("no such port")\n' + GUARD_CALL)]),
 ]
 
 

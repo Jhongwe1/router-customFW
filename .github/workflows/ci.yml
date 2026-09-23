@@ -944,11 +944,14 @@ jobs:
 
       # hostprobe is P2-1's host-side instrument: the first ICMP echo reply
       # (D8), the first TCP success on a daemon's port (D4), neighbour-table
-      # changes and UDP arrivals, stamped on CLOCK_MONOTONIC. The self-test
-      # writes a FAKE ping and a FAKE ip into a temporary directory and opens
-      # real sockets on 127.0.0.1 only: no apt, no network beyond loopback, no
-      # device. What it says about the REAL ping is a desk measurement
-      # (notes/boot-time.md), not a case: a runner's ping is not the bench's.
+      # changes and UDP arrivals, stamped on CLOCK_MONOTONIC_RAW from 1.3
+      # (CLOCK_MONOTONIC to 1.2; SPEC.md CLK-38). The self-test writes a FAKE
+      # ping and a FAKE ip into a temporary directory and opens real sockets on
+      # 127.0.0.1 only: no apt, no network beyond loopback, no device. Its RAW
+      # cases run the tool under clockshim, below, which makes MONOTONIC
+      # disagree with RAW. What it says about the REAL ping is a desk
+      # measurement (notes/boot-time.md), not a case: a runner's ping is not
+      # the bench's.
       - name: hostprobe self-test
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/hostprobe.py --self-test 2>&1 | tee ci-out/hostprobe.out; exit "${PIPESTATUS[0]}"
@@ -962,6 +965,29 @@ jobs:
       - name: clockshim self-test
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/clockshim.py --self-test 2>&1 | tee ci-out/clockshim.out; exit "${PIPESTATUS[0]}"
+
+      # iperflog reads the board's own iperf 3.1.3 server log (`iperf3 -s -1
+      # -f k --logfile`, then `cat` over the console) into one row per interval
+      # and one FIGURE per trial, and `compare` checks it against the host's
+      # client log (P2-4). Seating A's board-receives trials never printed the
+      # host's `receiver` line (SPEC.md NET-112); the board's server computed
+      # the figure anyway. Its fixtures are whole server logs taken under qemu
+      # from rlxfw's own iperf3 build -- the board's /bin/iperf3 -- kept in the
+      # file as literals: no binary, no network, no device.
+      - name: iperflog self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/iperflog.py --self-test 2>&1 | tee ci-out/iperflog.out; exit "${PIPESTATUS[0]}"
+
+      # hostclock logs the host's clocks for a whole seating on
+      # CLOCK_MONOTONIC_RAW -- adjtimex read-only every second, a timerfd that
+      # fires on every REALTIME step, Windows' clock through powershell.exe,
+      # SNTP -- and converts REALTIME stamps onto RAW (SPEC.md CLK-38, CLK-39).
+      # The self-test drives a fake SNTP server on 127.0.0.1, a fake
+      # powershell and a simulated kernel PLL. HC10, a live REALTIME step, is
+      # skipped here: nothing unprivileged can set a runner's clock.
+      - name: hostclock self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/hostclock.py --self-test 2>&1 | tee ci-out/hostclock.out; exit "${PIPESTATUS[0]}"
 
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"

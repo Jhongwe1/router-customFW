@@ -32595,3 +32595,87 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 八、交接
 
 `P2-3` 的紀錄與讀數都落地了。下一步是 `P2-4` 的桌面半：提案已交擁有者（`RAW` 蓋時戳、整段上機的主機時鐘紀錄、每次 rlxfw 按電源頭尾讀板子 tick、`D8` 走 probe 的 monotonic 帳本、loud 在 `N-NDOPEN` 後至少再活 1.05 s、伺服器 log 取代 `iperf3` 的結束交換、`cardcheck` 檢查 `HOST` 格、`citime record` 自己跑 `segments`），之後寫卡片 B。留給擁有者三件：要不要動主機的校時（建議不動、用 `RAW` 繞開；要讓 `MONOTONIC` 回正常就是讓 Windows 重新對時或停掉 WSL 裡的 `timesyncd`）；上機 B 的日期；`r3-4/cells` 26 GB 要不要刪。
+
+## 2026-09-23 — 第一百零七段（21:1x 開場，桌面，**零電源循環**，板子全程斷電，2026-09-24 00:xx 交接，`453ceac` 之後的工作未提交）：上一段的讀數提交、找到拖慢主機時鐘的是 WSL 自己的 `chronyd`，七支代理照同一份規格為上機 B 造工具
+
+**這一段沒有上電。** 四件：第一百零六段的第二個 commit（`0ebacee`）；主機時鐘的機制（`CLK-38`，E1、E1b、E2 量到，E3 事先登記）；`P2-4` 桌面半的設計、`FW-125` 與 `clockshim`（`453ceac`）；七支建工具代理交回 patch，四支在 ext4 排練裡整合過，全部沒有提交。
+
+### 一、開場：量 repo，以及交接和 repo 不符的兩處
+
+- HEAD `9e148ee`、7 個 `M`、`LOG.md` 最後一則第一百零六段、study 到 `20260923-study6`、`citime check` 0 missing —— 與交接相符。擁有者貼的開場白有重複與截斷的片段，內容與 `plan/handoff-s106.md` 一致。
+- 🔴 **交接說 sweep 3「可能還在跑」，它已經死了**：目的地最後一次寫入 20:55:57，它所在的 WSL 開機在 21:11:18 結束，沒有 `sweep-3.rc`（推：上一段 session 結束時背景工作被殺）。
+- 🔴 **交接說 sweep 3 會報三個檔移動（含 `study6`）**：`study6` 的 mtime 20:21:14 早於 sweep 開始 20:39:54，之後改的只有 `LOG.md` 與交接檔。
+- WSL 在這一段開機兩次（21:12:59；~21:16:35，閒置關機之後）。
+
+### 二、第二個 commit `0ebacee`：sweep 與 CI 平行
+
+- sweep 從 `$FWRE_WORK/rebuild/s107/` 重跑（21:17:30–22:02:06）：105 宣告、2 跳過、103 跑、101 綠、2 預期紅（census）、**0 非預期紅**；*SOURCE MOVED* 只有 `.git/index`；收工閘門對複本全綠（`check-predictions` 依設計紅，6 OUT OF ORDER）。
+- 擁有者問能不能邊 sweep 邊推：真 repo 的 commit 會改寫 sweep 取指紋的 `.git/index`，所以在 ext4 clone 裡逐位元組複製 7 檔（`cmp`；7 個 blob 等於真工作檔；全 LF、0 個 CR），commit、在 clone 上跑收工閘門（`flashwin scan` CLEAN、`citecheck` 0 suspended），推進真 repo 的旁支，再由 Windows git 推 `main`；sweep 結束後先 `git add` 那 7 檔再快轉，porcelain 0。CI `35869407117` 四綠；`citime record` `BIG3` 1128、`segments` 3/3；`stats --since changepoint` n = 3、1128..1138、±0.44 %。
+- 🔴 **`.git/index` 為什麼動了**：21:40:24 被改寫 —— 我的 `c2-commit.sh` 與 hostcell 代理各在那時跑了 `git --no-optional-locks diff`。量（git 2.43，scratch 倉庫重現）：這個旗標擋得住 `status` 寫 index，擋不住工作樹 `diff`／`diff HEAD` 的自動刷新；`-c diff.autoRefreshIndex=false` 才擋得住。證明只動了 stat 快取：sweep 複本（21:17:30 之前取）與真 repo 的 `ls-files -s` 摘要相同（8,189 條），控制是改一個 mode 摘要就變。
+
+### 三、主機時鐘的機制（`CLK-38`，`notes/boot-time.md` § 7.9）
+
+擁有者把「要不要動主機校時」交給我：「用最頂的工程思維幫我解決，我想做到最頂」。條件先寫在 `$FWRE_WORK/rebuild/s107/PREREG-clk38-mechanism.md`，前提先量（無密碼 `sudo`、tracefs、這次開機正在打架：25 次步進、tick 9589）。量前提時 `journalctl` 數到 0 —— 沒有 `sudo` 看不到系統項目，加上是 25；之後每次數都帶總行數當控制。
+
+- **E1**（ftrace，核心內建、沒有裝任何東西，6 分鐘）：`chronyd`（PID 210）86 次 `clock_adjtime` 設 `ADJ_TICK` 與 `ADJ_FREQUENCY`（tick 9293–95xx），約每 8.4 s；`timesyncd` 11 次全是 `ADJ_SETOFFSET`（等於 journal 的 11 次步進），不寫 tick；沒有別人。PID 210 不在 Ubuntu、也不在 `wsl --system` 的 PID 命名空間，在 WSL 的根命名空間。kprobe 取的 tick（+88）69/69 等於之後讀回，控制 0/69。🔴 **登記的兩個正控制寫錯**：`timesyncd` 不走 `clock_settime`（0 次），函式入口的 kprobe 看到的是讀取者的輸入。
+- **E1b**（60 s，只看 PID 210）：240 次 `ioctl` 全是 `PTP_SYS_OFFSET`（0x43403d05），沒有網路呼叫 —— 它讀 `ptp_hyperv`，Windows 的時間。它的 0.25 s／8 s 在 RAW 上是 0.263／8.4 s。
+- 追查時我在 `wsl --system` 裡用 `grep -i 'chrony\|PID'` 撈 `ps`，撈到的是擁有者另一個專案（OpenBMC spdm-lab 建置）路徑裡的 `Pid`，不是 chronyd；沒有照那個輸出下結論，並當下說明。
+- **E2**（ABA，22:16–22:51）：A 19 次步進、每分鐘 MONO/RAW 0.946–0.989；B 停掉 `timesyncd`：0 步進、約 50 s 後 tick 10,000、之後每分鐘 1.00000 —— **預測成立**；A′ 重開：0 步進、tick 9976–10003 —— **預測不成立、否證也不適用**。事後查到 Windows 在 22:20:30 對上 NTP（System log 事件 37），比停掉早 6 分鐘，A′ 因此混淆；Windows 當天成功對時 04:08:14、13:14:22、22:20:30，間隔都是 32,768 s。🔴 E2 的「REALTIME − Windows 在 0.1 s 內」判不了：一次性 `powershell.exe` 的配對就有 0.3–1.8 s —— 登記前沒量前提，第一百零六段的同一課。擁有者問 E2 需要這麼久嗎：A 可以只要 3 分鐘、B 約 8 分鐘；但中途看結果停下是選擇性停止，所以跑完。
+- **E3**（22:53 起，每 30 s，事先登記）：`timesyncd` 開著時打架會自己回來，第一次步進在 2026-09-24 00:15–01:47（點估計 00:56）。**照登記被否證，兩條否證都觸發。** logger 跑滿 22:53:41–02:23:43、同一次開機、之間 Windows 沒有再對時，作廢條件都沒觸發（我在收工稿裡一度寫成「logger 隨 session 結束、01:47 之前停，照登記作廢」—— 那是把「session 會先結束」當成事實，logger 實際跑完了；在這一段內更正）。第一次步進 00:14:13.9（`REALTIME − MONOTONIC` +0.412 s），比窗口下緣 00:15 早 47 s；第一次步進之後 10 分鐘，每個 60 s 窗的 tick 都 ≥ 9,900（9901–9913）。預測的第一句（00:15 之前每分鐘 tick ≥ 9,900）也沒中：~23:42 就是 9681–9803，而那時沒有任何步進。到 02:24 共 152 次 `Clock change detected`（列間 `REALTIME − MONOTONIC` 跳動 151 個，第二來源相符）：00 點 5 次、01 點 103 次、02 點（到 24 分）45 次。所以打架確實回來了，但順序與時間都和我登記的不同：先是沒有步進的 slew（`timesyncd` 的 PLL 對 `chronyd` 的 tick，hostclock 代理量到的第三項），offset 過了約 0.4 s 才開始步進 —— 每次步進 +0.40…+0.47 s，貼著那個門檻（推）。
+- 決定（E2 之前寫好的規則，由 B 段滿足）：上機 B 用 `CLOCK_MONOTONIC_RAW` 蓋時戳，並在停掉 `timesyncd` 的狀態下上機（之後重開）。
+
+### 四、`P2-4` 桌面半的設計：三支研究代理
+
+只讀，報告存在 `$FWRE_WORK/rebuild/s107/clock-raw/`、`hostcell/`、`srvlog/` 的 `REPORT.md`；每支會改變設計的主張我都回去讀那一行或重算。
+- RAW：截止時間要跟時戳一起換，所以 `console-capture` 送出的 ESC 位元組數會變 → 1.5；新鍵名 `*_raw`；每份紀錄加 `boot_id`（RAW 每次 WSL 開機歸零）；`CLOCK_MONOTONIC` 是 `CLOCK_MONOTONIC_RAW` 的前綴，兩個現有測試分不出；`looptime` 對 `bench/2026-09-23` 已經 exit 2（我重跑確認）。
+- FW-124：`cardcheck` 完全不認得 `HOST` 格（我 grep：0 處），卡片語法只存在於暫存的 `s105-run.py`（365 行）；設計是每支工具給 `build_parser()`＋`refuse_args()`；語料 167 格、拒絕 12 格，全是舊卡片。
+- dwell：**quiet 也要**（`P1Q-r01`…`r03` 的回應只比重開早 16.1、2.5、39.5 ms，`P3Q-r01` 沒有），而 `P1L-r03` 是卡片的 `P1-RZ` 重開的（`looprun` 收尾後 0.098 s）—— 我用不共用程式碼的腳本重算，完全相同；改正寫進 `P2-4` 列、§ 7.3、`CLK-36`。1.05 s 是下限；有了等待，loud 預期在第三個廣播被回答。
+- 板子端 iperf3：`--logfile` 每區間 flush（qemu 量），stdout 導檔案則什麼都不留到結束。
+- 擁有者把方案與排程也交給我：照計畫，含 FW-124。預算：`P2` 已用 6 段（第一百零二到一百零七段），停損 11 段。
+
+### 五、`453ceac`
+
+- `CLK-38` 機制、`CLK-36` 的兩顆映像 dwell 更正、§ 17 `CLK-31` 殘留、`docs/KNOWN-ISSUES.md`。
+- `FW-125`：`citime record` 寫完對剛寫的檔跑 `segments`、以它為退出碼；命令列指名的 run 被拒回 2；UTF-8 輸出。`P21`／`P22`，四個突變各只紅自己那一格；`ci-expected` 20 → 22。第一次真用（記 `453ceac` 的 CI）自己跑了 segments，3/3。
+- `tools/clockshim.py`：讓 MONOTONIC 在測試裡慢一半、加 1000 s。🔴 第一版 S1 用 RAW 當參考，這台主機上 MONO − RAW 是 −189 s 使它失敗 → 改用 BOOTTIME。
+- 🔴 `SPEC.md` `CLK-38` 的格子裡 `ADJ_TICK|ADJ_FREQUENCY` 沒跳脫的 `|`，`spec-check` C8 抓到 —— 第一百零六段同一個錯。
+- CI `35879098367` 四綠；`citime record` `BIG3` 1139，自己跑 segments 3/3。
+
+### 六、七支建工具代理（交回 patch，未提交）
+
+共用規格 `$FWRE_WORK/rebuild/s107/P2-4-build-spec.md`；各在 `b-<name>/repo`（從 `s107/base`＝`453ceac` clone），報告存在 `b-<name>/REPORT.md`。
+- `iperflog` 1.0：31/31、21 突變；TCP 板對主機不能比速率（各除自己的時鐘）→ 比位元組欄；多一種總結（測試中被 SIGTERM）只能用 `--duration` 分。
+- `looptime`：26 → 38、突變 20 → 35。🔴 HEAD 的 A1 在紀元秒上誤拒 `2026-09-21e`（2e-6 的捨入，我重跑確認 rc 2）；HEAD 自己有 26 個 OVERLAP（我確認 `2026-09-19b` 11 個），`docs/FINDINGS.md` 的「沒有一個 < −1 s」過期；`console-capture` 原點行的引用（430–431）自 2026-09-09 起過期，`citecheck` 看不到 `.py`／`.tsv`。
+- `boot-timeline`：73 → 84、14 突變；上機 A 273 對結束碼相同、輸出只多一行 `boot_id` NOTE。
+- `looprun` 1.3：105 → 118、23 突變；`:582-600`、`:1003` 沒動；dwell 是 RAW 秒而主機 ARP 計時器在 MONOTONIC 上 → 卡片 B 用 2.5 s。
+- `console-capture` 1.5：67 → 78、突變 47 → 64（三次全殺）；被引用的行都沒移動（改在原處的是時鐘讀取那幾行，`citecheck` 8 passed、CHANGED 24 → 28，不算紅）。🔴 它抓到我的 `clockshim` 會弄壞 pyserial：pyserial 3.5 把 `Timeout.TIME = time.monotonic` 存成類別屬性，shim 先裝的話那是一個 Python 函式、會被綁成方法，每一次 `ser.read()` 都 `TypeError` —— 測試裡先 import serial 當具名豁免，控制 N52 在 shim 修好那天變紅；修法（不會被綁成方法的替代品）留給下一段。另：它預估 CI 會從 948 s 長到 ~1,430 s，`citime` 要宣告變更點（`FW-125`）。
+- `hostprobe` 1.3：97 → 109、30 突變殺 29（存活的是等價突變）。🔴 位址閘門把 `boot_id` 的最後一組當成 MAC 標成 `unlisted-1`（量），那樣接合永遠對不上 —— 改成只在它是第 4 版 UUID 時不經閘門；我的規格 § 2 沒想到 H11。
+- `hostclock` 1.0（新，1,408 行）：自測 12 ok、1 skip（活的步進只能在桌面）、0 FAIL；33 突變全殺。🔴 它推翻了我寫進 § 7.9／`CLK-38` 的速率式：freq 是加上去的（≤ 2 ppm），而且有**第三項** —— 核心 PLL 殘留的 offset（`timesyncd` 每 ~32 s 寫 +147.8…+316.3 ms，每秒 ×7/8 衰減），讓 MONO/RAW 在 23:41–00:13 每秒一對落在 0.9756…1.0280：MONOTONIC 也會**快**；放進模型後 28/28、62/62 對同意。**`timesyncd` 也會 slew**：Windows 22:20 對時之後，打架全靠 slew、零步進。改正與新列（草稿 `CLK-39`）隨下一段的整合 commit 落地。
+- 整合排練（`s107/integ`）：前四個 patch 加我的工作樹 diff，七個 suite 一起跑全綠。
+- 🔴 **一個假警報**：我為了不改寫 index 加的 `-c diff.autoRefreshIndex=false`，讓 `git diff --stat` 在 WSL git 寫過 index 之後把 272 份 bench 擷取列成 "Bin N -> N bytes"；內容雜湊（兩個 git）都等於 HEAD，mtime 沒動 —— 關掉自動刷新時，stat 過期的二進位檔會被列出而不比內容。
+- 🔴 經 `\wsl.localhost` 的 Edit 會把檔案權限改成 100644（代理量到；`git apply` 保留 100755）。
+- 我自己的 `clockshim` 違反了我寫的規格（`refuse_args` 讀檔案系統與平台、沒有 `build_parser`），且 FAIL 行只有一個空白而 `ci-census` 要兩個以上 —— `citime` 的 FAIL 行也是；兩個都改了、`clockshim` 5 → 6，**未提交**。
+
+### 七、我自己的錯
+
+- 告訴自己與三支代理「`--no-optional-locks` 讓 git 在 sweep 時安全」：對 `diff` 不成立。
+- E1 兩個正控制寫錯；E2 的 Windows 條件的前提沒先量；E2 沒想到 Windows 自己會對時。
+- `clockshim` S1 用 RAW 當參考；`SPEC.md` 格子裡沒跳脫的 `|`；我的 `clockshim` 自己違反規格 § 4。
+- `bash -lc` 吃掉 `$VAR`、開頭的 `/` 被 Git Bash 改寫、一次 `cd` 讓 shell 的工作目錄漂到 `bench/2026-09-23/`（第一百零六段同一個錯）。
+- E2 的 A 段在 E1 之後本可縮短。
+- 收工稿把 E3 寫成「logger 會隨 session 結束、01:47 之前停，照登記作廢」並告訴擁有者 —— 那是把一個預測當成事實寫下；logger 跑完了（到 02:23:43），照登記判是**被否證**，在這一段內改正並向擁有者更正。
+
+### 八、觀察，沒有處理
+
+- 擁有者的 OpenBMC 建置同時在 WSL 裡跑。
+- Windows 實際 32,768 s 才成功對時一次，它自己報 1,024 s 的輪詢。
+- `r3-4/cells` 26 GB：擁有者說先留著，之後有空再問。
+- 引用過期：`console-capture` 原點行（`looptime.py` 兩處、`ci-expected.tsv` 的 looptime 列）；`docs/FINDINGS.md` 的 overlap 句。
+
+### 九、沒有做的
+
+**`453ceac` 之後的工作沒有 commit、沒有 sweep**：工作樹上的 `tools/clockshim.py`、`tools/citime.py`、`tools/ci-expected.tsv`、`tools/ci-suite-cost.tsv`、這一則、§ Now；七個 patch 在 `$FWRE_WORK/rebuild/s107/b-*/`，前四個在排練裡跑過，後三個沒有。擁有者要求在代理跑完、乾淨的點收工，整合與 sweep 留給下一段。
+
+### 十、交接
+
+`plan/handoff-s107.md`。

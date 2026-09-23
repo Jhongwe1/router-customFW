@@ -3,8 +3,7 @@
 
 `R4-3`, `D3` and `D4`.  The gate asks for a loop that "runs unattended and
 reports a number", and for "a deliberately broken input turns it red".  Those
-are two requirements and the second is the one that makes the first worth
-having.
+are two requirements and the second is the one that makes the first worth having.
 
 WHAT IT DOES NOT OWN
 --------------------
@@ -53,6 +52,7 @@ THE STAGES, AND WHICH NEED THE BOARD
     S6b staged     console-capture --send 'DW 80500000 8'    bench  every round
     S7  boot       console-capture --send 'J 80500000'       bench  every round
     S8  assert     over S7's capture                         desk   every round
+    S9  dwell      until S7's end + --dwell-seconds (1.3)    bench  every round, if > 0
 
 ROUNDS: N BOOTS ON ONE POWER PRESS (LOOP-3, 1.2)
 ------------------------------------------------
@@ -65,7 +65,8 @@ every round reads the burn flag back.  `--skip S4` skips ROUND 1's reset only
 -- the card that starts from a cold ESC catch -- and no other per-round stage
 may be skipped when N >= 2.  With N >= 2 a round's artefacts carry `-rNN`;
 with N == 1 every name is what it always was.  In `--mode bench` the stage
-times go to `<stem>.stages.tsv`, rewritten whole after every stage.
+times go to `<stem>.stages.tsv`, rewritten whole after every stage -- since 1.3
+on CLOCK_MONOTONIC_RAW, under a header naming it and the boot_id it restarts with.
 Until 1.2 `--iterations` above 1 was refused (`M8`): S4 was a loader command
 sent into the shell iteration 1 left, and no name carried an iteration index.
 
@@ -110,7 +111,8 @@ ABORT CONDITIONS, WRITTEN HERE BECAUSE UNATTENDED MEANS NOBODY IS WATCHING
   RAM, and this file refuses to pass `--allow-autoexec` under any flag.
 
 Run:  tools/looprun.py --mode plan   --cell L1
-      tools/looprun.py --mode plan   --cell L1 --iterations 3 --skip S2,S3,S4
+      tools/looprun.py --mode plan   --cell L1 --iterations 3 --skip S2,S3,S4 \\
+                       --recipe-override b1434383 --dwell-seconds 2
       tools/looprun.py --mode replay --cell L1 --replay-boot bench/2026-08-31b/X-3
       tools/looprun.py --mode desk   --cell L1 --replay-boot bench/2026-08-31b/X-3 \\
                        --config ... --initramfs ... --image ...
@@ -135,7 +137,7 @@ import sys
 import tempfile
 import time
 
-VERSION = "1.2"
+VERSION = "1.3"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_PORT = "/dev/ttyUSB0"
@@ -217,24 +219,22 @@ S4_J_TERM = ["--esc-after", "10", "--esc-period", "0.002",
 # it and hold C-8's line: the first `<RealTek>` 2.22-2.57 s into the capture.
 S4_RB_TERM = ["--esc-after", "20", "--esc-period", "0.002",
               "--until", PROMPT, "--seconds", "40"]
-# S7 ends ON the shell's prompt.  /init (config/rlxfw-init.sh) prints `rlxfw:
-# init running, ...` and execs /bin/sh, which prints `/bin/sh: can't access
-# tty; job control turned off`, CRLF, `# `.  量, read 2026-09-23 over every
-# committed capture holding `rlxfw: init running` (138, all `J 80500000`): this
-# matches in 138 of 138, and in every one the match ends on the capture's LAST
-# byte -- so ending there loses nothing a committed boot printed.  The prompt is
-# INSIDE the pattern because console-capture drains only 50 ms after a match
-# and S8's A4 reads it.
+# S7 ends ON the shell's prompt.  /init (config/rlxfw-init.sh) prints `rlxfw: init
+# running, ...` and execs /bin/sh, which prints `/bin/sh: can't access tty; job
+# control turned off`, CRLF, `# `.  量, read 2026-09-23 over every committed capture
+# holding `rlxfw: init running` (138, all `J 80500000`): this matches in 138 of 138,
+# and in every one the match ends on the capture's LAST byte -- so ending there loses
+# nothing a committed boot printed.  The prompt is INSIDE the pattern because
+# console-capture drains only 50 ms after a match and S8's A4 reads it.
 # 🔴 No backslash, on purpose: `--mode plan` renders this into the card's
 # command column, and a quoted heredoc from the Bash tool loses a backslash
 # level (CLAUDE.md) -- `\r?\n` would arrive as `r?n`, which never matches, and
 # every boot would silently pay the whole cap.
 DEFAULT_BOOT_UNTIL = "job control turned off[^#]{1,2}# "
-# The cap, paid only when the pattern never arrives.  Over the same 138 boots
-# `J` -> the prompt's last byte took 6.99-12.57 s, so 45 leaves 32.4 s above the
-# slowest.  Until 1.2 S7 was `--idle 8 --seconds 45`, the 8 from a 4.576 s
-# silence at byte 350 of `quietm` (block 7's card): a boot holds silences, and
-# --idle ends it inside one.
+# The cap, paid only when the pattern never arrives.  Over the same 138 boots `J` ->
+# the prompt's last byte took 6.99-12.57 s, so 45 leaves 32.4 s above the slowest.
+# Until 1.2 S7 was `--idle 8 --seconds 45`, the 8 from a 4.576 s silence at byte 350
+# of `quietm` (block 7's card): a boot holds silences, and --idle ends it inside one.
 DEFAULT_BOOT_SECONDS = 45.0
 # What the loader prints for `J 80500000` before the kernel prints a byte (讀,
 # every committed `*-boot.log`).  console-capture arms --until as the command
@@ -379,6 +379,7 @@ def check_shape(a, skip):
     1.2 `plan` returned before any refusal ran at all.
     """
     n = rounds(a)
+    check_dwell(a, skip)            # 1.3: --dwell-seconds and the skips it forbids
     if n < 1:
         raise Refused("--iterations must be at least 1")
     if n > MAX_ROUNDS:
@@ -536,11 +537,10 @@ def build_plan(a):
     plan = [
         dict(id="S2", name="build", kind="desk", argv=[
             "bash", os.path.join("tools", "rlxfw-kbuild.sh"), a.cell]
-            # CFG-1, 2026-09-04: rlxfw-kbuild.sh now takes EITHER a --config
-            # path or a --variant to derive one from config/rlxfw-kernel.delta,
-            # and refuses both or neither.  Passing `--config ""` used to mean
-            # "fall through to the bare board template", which is the silent
-            # default CFG-1 removed.
+            # CFG-1, 2026-09-04: rlxfw-kbuild.sh now takes EITHER a --config path or a
+            # --variant to derive one from config/rlxfw-kernel.delta, and refuses both
+            # or neither.  Passing `--config ""` used to mean "fall through to the bare
+            # board template", which is the silent default CFG-1 removed.
             + (["--config", a.config] if a.config
                else ["--variant", a.variant])
             + ["--initramfs", a.initramfs,
@@ -618,12 +618,12 @@ def round_plan(a, rnd, cap):
                  "paid only when the pattern never arrives"),
         dict(id="S8", name="assert", kind="desk", argv=None,
              note="over S7's capture: the eleven marks, the derived id, a prompt"),
-    ]
+    ] + dwell_stage(a, rnd)         # S9, only with --dwell-seconds > 0 (1.3)
     for s in stages:
         argv = s["argv"] or []
         s["round"] = rnd
         s["out"] = argv[argv.index("--out") + 1] if "--out" in argv else None
-    stages[-1]["out"] = out + "-boot"
+    next(s for s in stages if s["id"] == "S8")["out"] = out + "-boot"  # by id, 1.3
     return stages
 
 
@@ -633,7 +633,7 @@ def render_plan(plan, a, out=sys.stdout):
     rest do not type the same S4."""
     n, skip = rounds(a), parse_skip(a)
     print("looprun %s -- the run, in order: S2/S3 once, then %d round(s) of "
-          "S4..S8" % (VERSION, n), file=out)
+          "S4..S%d" % (VERSION, n, 9 if dwell_of(a) > 0 else 8), file=out)
     if n >= 2:
         print("  one power press: round 1 starts at the loader prompt; rounds "
               "2..%d start in rlxfw's shell and reach it through `%s`"
@@ -829,7 +829,40 @@ def run_stage(s, cwd):
     return p.returncode, p.stdout.decode("utf-8", "replace")
 
 
-STAGES_COLS = ("round", "stage", "name", "kind", "start_mono", "end_mono",
+# ---------------------------------------------------------- the clock (1.3, P2-4)
+# 🔴 Every stamp in the stages file, the budget and S9's deadline read RAW.  Until
+# 1.2 they read time.monotonic(): CLOCK_MONOTONIC, which WSL's kernel slews slow
+# while two time daemons fight over it (SPEC.md CLK-38; 量 2026-09-23, MONOTONIC/RAW
+# 0.957429 over 60 s), so a row read short and lined up with no RAW capture.  Kernel
+# waits (S9's sleep) still run on MONOTONIC, so S9 re-reads RAW whenever it wakes.
+# RAW restarts with every WSL boot: the header names the boot_id beside it.
+CLOCK = "CLOCK_MONOTONIC_RAW"   # matched as a whole word: CLOCK_MONOTONIC is a prefix
+
+
+def clock_id():
+    """-> time.CLOCK_MONOTONIC_RAW, or Refused (Linux only).  Looked up per call, never
+    at import: cardcheck imports this file for refuse_args, which reads no clock."""
+    cid = getattr(time, CLOCK, None)
+    if cid is None:
+        raise Refused("this Python has no time.%s (Linux only), and looprun %s "
+                      "stamps every stage and computes every deadline on it"
+                      % (CLOCK, VERSION))
+    return cid
+
+
+def now():
+    """The one reader.  Looked up per call, so tools/clockshim.py reaches it."""
+    return time.clock_gettime(clock_id())
+
+
+def clock_triple():
+    """(raw, mono, real): a RAW read with one CLOCK_MONOTONIC and one REALTIME read
+    beside it, so the stages file carries its own MONOTONIC/RAW ratio."""
+    raw = now()
+    return raw, time.clock_gettime(time.CLOCK_MONOTONIC), time.time()
+
+
+STAGES_COLS = ("round", "stage", "name", "kind", "start_raw", "end_raw",
                "seconds", "rc", "result")
 
 
@@ -846,16 +879,17 @@ class StageLog:
     run's status -- `running` there is a run that did not finish, no file at
     all is one that never started (every refusal comes before the first
     write), and `closed`, `STOPPED` and `budget` are the three ways it ends.
+    1.3: an ended run's line above its status is `# end:`, the clock at its end.
     """
 
     def __init__(self, path, head):
-        self.path, self.head, self.rows = path, list(head), []
+        self.path, self.head, self.rows, self.tail = path, list(head), [], []
 
     def add(self, s, t0, t1, rc, result):
-        def mono(x):
+        def stamp(x):
             return "" if x is None else "%.6f" % x
         self.rows.append([str(s["round"]), s["id"], s["name"], s["kind"],
-                          mono(t0), mono(t1),
+                          stamp(t0), stamp(t1),
                           "" if t0 is None else "%.6f" % (t1 - t0),
                           "" if rc is None else str(rc), result])
         self.write("running -- round %d %s done" % (s["round"], s["id"]))
@@ -863,7 +897,7 @@ class StageLog:
     def write(self, status):
         text = "\n".join(self.head + ["\t".join(STAGES_COLS)]
                          + ["\t".join(r) for r in self.rows]
-                         + ["# status: " + status]) + "\n"
+                         + self.tail + ["# status: " + status]) + "\n"
         tmp = self.path + ".tmp"
         with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)
@@ -874,58 +908,42 @@ def stages_head(a, skip):
     return [
         "# looprun %s stage times (LOOP-3): one row per stage per round, and "
         "round 0 is S2/S3, which run once." % VERSION,
-        "# start_mono/end_mono are absolute time.monotonic(), CLOCK_MONOTONIC on "
-        "this host (SPEC.md FW-114) -- the clock console-capture stamps its "
-        "reads on -- so a row lines up with a capture whose origin is recorded.",
-        "# seconds = end_mono - start_mono.  rc is the command's exit status, "
-        "empty for the in-process S5c and S8 and for a skipped stage.  result "
-        "is ok, FAIL and the ids of the assertions that failed, or skipped.",
-        "# cell=%s attempt=%d iterations=%d skip=%s boot-until=%r "
-        "boot-seconds=%g" % (a.cell, getattr(a, "attempt", 1) or 1, rounds(a),
-                             ",".join(sorted(skip)) or "-",
-                             getattr(a, "boot_until", DEFAULT_BOOT_UNTIL),
-                             getattr(a, "boot_seconds", DEFAULT_BOOT_SECONDS)),
+        "# start_raw/end_raw: absolute CLOCK_MONOTONIC_RAW, the clock console-capture "
+        "1.5 stamps on (1.2 wrote start_mono/end_mono, CLOCK_MONOTONIC: CLK-38).",
+        "# seconds = end_raw - start_raw.  rc is the command's exit status, empty for "
+        "the in-process S5c, S8 and S9 and for a skipped stage.  result is ok, FAIL "
+        "and the ids of the assertions that failed, or skipped.",
+        "# cell=%s attempt=%d iterations=%d skip=%s boot-until=%r boot-seconds=%g "
+        "dwell-seconds=%g" % (a.cell, getattr(a, "attempt", 1) or 1, rounds(a),
+                              ",".join(sorted(skip)) or "-",
+                              getattr(a, "boot_until", DEFAULT_BOOT_UNTIL),
+                              getattr(a, "boot_seconds", DEFAULT_BOOT_SECONDS),
+                              dwell_of(a)),
     ]
 
 
+def image_args(a, skip):
+    """(uses_image, img, want): what the --image guards read, with one owner --
+    refuse_args's argument halves (1.3) and loop_once's file halves both use it,
+    so the two cannot disagree about which runs read the file."""
+    uses_image = (a.mode == "bench"
+                  and bool(set(IMAGE_STAGES) - skip))
+    img = getattr(a, "image", "") or ""
+    want = (getattr(a, "image_sha256", None) or "").strip().lower()
+    return uses_image, img, want
+
+
 def loop_once(a, out=sys.stdout):
-    """One invocation: S2/S3 once, then `--iterations` rounds of S4..S8.
+    """One invocation: S2/S3 once, then `--iterations` rounds of S4..S8 (S9).
 
     The name is from before rounds (LOOP-3, 1.2).  With `--iterations 1` this
     is exactly the one iteration it always was, and `notes/dev-loop.md` calls
-    it by this name.
+    it by this name.  1.3: the refusals that read only the arguments are
+    refuse_args's (below) and run first; then the clock; then the disk.
     """
-    skip = parse_skip(a)
-    check_shape(a, skip)
+    skip = refuse_args(a)
+    clock_id()
     plan = build_plan(a)
-    # 🔴 S3's input is S2's output, and if S2 is not going to run then nobody
-    # computes it.  Refusing here beats letting S3 exit 1 against a placeholder,
-    # which is what happened until 2026-09-02 and which reads like a broken
-    # rtkimage rather than a missing argument.
-    if ("S2" in skip and "S3" not in skip and a.mode in ("desk", "bench")
-            and getattr(a, "cell_top", PLACEHOLDER_TOP) == PLACEHOLDER_TOP):
-        raise Refused("--skip S2 with no --cell-top: S3 assembles the image out "
-                      "of the tree S2 stages, and with S2 skipped nothing "
-                      "computes that path -- S3 would run against the literal "
-                      "placeholder %r and exit 1. Pass --cell-top <tree>, or "
-                      "skip S3 as well" % PLACEHOLDER_TOP)
-    if ("S3" not in skip and a.mode in ("desk", "bench")
-            and getattr(a, "work", PLACEHOLDER_WORK) == PLACEHOLDER_WORK):
-        raise Refused("no --work: S3 would be handed the literal %r, which is a "
-                      "legal directory name -- so rtkimage would CREATE it, in "
-                      "whatever directory this was run from. A default that "
-                      "succeeds in the wrong place is worse than one that "
-                      "fails" % PLACEHOLDER_WORK)
-    if "S2" in skip and not getattr(a, "recipe_override", None):
-        raise Refused("--skip S2 removes the only thing that computes the recipe id, "
-                      "so A3 would have nothing to require. Pass --recipe-override "
-                      "with the id the staged image was built from, or do not skip S2")
-    # Up here since 1.2; until then it fired at S8, after `--mode desk` had
-    # already paid for S2 and S3.
-    if a.mode in ("desk", "replay") and not getattr(a, "replay_boot", None):
-        raise Refused("--mode %s needs --replay-boot <capture prefix>: "
-                      "S8 has to read a boot log, and inventing one would "
-                      "make every assertion below vacuous" % a.mode)
 
     # ------------------------------------------------- the artefact pre-flight
     # 🔴 量 2026-09-08 (`notes/dev-loop.md` § 15.2): a retried run died at S5b
@@ -962,18 +980,8 @@ def loop_once(a, out=sys.stdout):
     # A guard keyed on `--mode bench` alone would refuse `--mode desk`, where
     # `--image` is genuinely unused, and a guard that fires where there is
     # nothing to guard trains its reader to pass it something to shut it up.
-    uses_image = (a.mode == "bench"
-                  and bool(set(IMAGE_STAGES) - skip))
-    img = getattr(a, "image", "") or ""
-    want = (getattr(a, "image_sha256", None) or "").strip().lower()
+    uses_image, img, want = image_args(a, skip)
     if uses_image:
-        if not img:
-            raise Refused(
-                "no --image: %s consume it and its default is the empty "
-                "string, so `loader-tftp.py put --image ''` would be reached "
-                "with S4, S5 and S5b of a power cycle already spent. S3 writes "
-                "<work>/<label>/kroot/rtkload/nfjrom and nothing carries that "
-                "path here" % "/".join(IMAGE_STAGES))
         if not os.path.isfile(img):
             raise Refused("--image %r is not a regular file" % img)
         try:
@@ -991,14 +999,6 @@ def loop_once(a, out=sys.stdout):
     # "the board holds the image the card names".  Pinning the file closes
     # exactly that gap, and it is the one check that runs before the port opens.
     if want:
-        if not uses_image:
-            raise Refused(
-                "--image-sha256 with no stage that reads --image (mode=%s, "
-                "skip=%s): a pin on a file nobody opens asserts nothing, and a "
-                "check that cannot fail is the shape this repository refuses "
-                "on principle" % (a.mode, ",".join(sorted(skip)) or "-"))
-        if len(want) != 64 or any(c not in "0123456789abcdef" for c in want):
-            raise Refused("--image-sha256 %r is not 64 hex digits" % want)
         got = sha256_of(img)
         if got != want:
             raise Refused(
@@ -1010,6 +1010,139 @@ def loop_once(a, out=sys.stdout):
         print("  pre  image     sha256 %s  <- matches the pin" % got, file=out)
 
     return run_plan(a, plan, skip, want, out)
+
+
+# ------------------------------------------------------ FW-124: refuse_args (1.3)
+def refuse_args(a):
+    """Every refusal that reads nothing but the parsed arguments -> the --skip set.
+
+    No file, environment variable, clock, port or host version is read, so it runs
+    where the bench cannot.  `--mode plan` calls it: until 1.3 plan ran check_shape
+    alone, so a bench line missing `--recipe-override`, rendered as a plan, passed
+    (s107 hostcell REPORT § 1.3; SPEC.md FW-124).  loop_once calls it first, and
+    cardcheck can call it on a card's HOST line, in-process, with build_parser():
+    the check a card runs and the run it names cannot drift.  The refusals keep
+    the order they always fired in -- check_shape's, the four that opened
+    loop_once, then the argument halves of the --image guards -- so which one wins
+    when two are wrong at once (M14) is unchanged.
+    """
+    skip = parse_skip(a)
+    if getattr(a, "self_test", False):
+        return skip                     # the self-test reads no other argument
+    check_shape(a, skip)
+    # 🔴 S3's input is S2's output, and if S2 is not going to run then nobody
+    # computes it.  Refusing here beats letting S3 exit 1 against a placeholder,
+    # which is what happened until 2026-09-02 and which reads like a broken
+    # rtkimage rather than a missing argument.
+    if ("S2" in skip and "S3" not in skip and a.mode in ("desk", "bench")
+            and getattr(a, "cell_top", PLACEHOLDER_TOP) == PLACEHOLDER_TOP):
+        raise Refused("--skip S2 with no --cell-top: S3 assembles the image out "
+                      "of the tree S2 stages, and with S2 skipped nothing "
+                      "computes that path -- S3 would run against the literal "
+                      "placeholder %r and exit 1. Pass --cell-top <tree>, or "
+                      "skip S3 as well" % PLACEHOLDER_TOP)
+    if ("S3" not in skip and a.mode in ("desk", "bench")
+            and getattr(a, "work", PLACEHOLDER_WORK) == PLACEHOLDER_WORK):
+        raise Refused("no --work: S3 would be handed the literal %r, which is a "
+                      "legal directory name -- so rtkimage would CREATE it, in "
+                      "whatever directory this was run from. A default that "
+                      "succeeds in the wrong place is worse than one that "
+                      "fails" % PLACEHOLDER_WORK)
+    if "S2" in skip and not getattr(a, "recipe_override", None):
+        raise Refused("--skip S2 removes the only thing that computes the recipe id, "
+                      "so A3 would have nothing to require. Pass --recipe-override "
+                      "with the id the staged image was built from, or do not skip S2")
+    # Up here since 1.2; until then it fired at S8, after `--mode desk` had
+    # already paid for S2 and S3.
+    if a.mode in ("desk", "replay") and not getattr(a, "replay_boot", None):
+        raise Refused("--mode %s needs --replay-boot <capture prefix>: "
+                      "S8 has to read a boot log, and inventing one would "
+                      "make every assertion below vacuous" % a.mode)
+    # The argument halves of loop_once's image pre-flight (LOOP-4, RECIPE-1); the
+    # halves that open the file stay there, after the clock's check.
+    uses_image, img, want = image_args(a, skip)
+    if uses_image and not img:
+        raise Refused(
+            "no --image: %s consume it and its default is the empty "
+            "string, so `loader-tftp.py put --image ''` would be reached "
+            "with S4, S5 and S5b of a power cycle already spent. S3 writes "
+            "<work>/<label>/kroot/rtkload/nfjrom and nothing carries that "
+            "path here" % "/".join(IMAGE_STAGES))
+    # 🔴 `--mode plan` renders the S6 and S6b that read the file, so a pin there is a
+    # pin on the run it prints: refusing it would refuse every card's bench line
+    # rendered as a plan.  desk and replay never open the file (M13).
+    renders = a.mode == "plan" and bool(set(IMAGE_STAGES) - skip)
+    if want and not (uses_image or renders):
+        raise Refused(
+            "--image-sha256 with no stage that reads --image (mode=%s, "
+            "skip=%s): a pin on a file nobody opens asserts nothing, and a "
+            "check that cannot fail is the shape this repository refuses "
+            "on principle" % (a.mode, ",".join(sorted(skip)) or "-"))
+    if want and (len(want) != 64 or any(c not in "0123456789abcdef" for c in want)):
+        raise Refused("--image-sha256 %r is not 64 hex digits" % want)
+    return skip
+
+
+# ---------------------------------------------------------------- the dwell (1.3)
+# 🔴 WHY.  量 2026-09-23 (s107 srvlog REPORT § 1.10): looprun reset the board 0.189 s
+# after rlxfw's prompt -- S7's capture ends 0.085 s after it, and the next round's
+# S4 sends `busybox reboot -f` 0.104 s later -- and the prompt comes 0.029-0.031 s
+# after N-NDOPEN (量, all nine rlxfw boots of card A, both images).  The host
+# re-sends ARP about once a second (on-wire gaps 1.0004-1.048 s, 量 card A's P3), so
+# a board reset 0.2 s after its link came up is never asked again: the loud image
+# read no network-up in any boot, and the quiet image lost P3Q-r01 the same way.
+# Not only between rounds: the loud block's LAST boot was reset by the card's next
+# cell, P1-RZ, 0.098 s after looprun closed.  So S9 follows EVERY round's S8, the
+# last included, and holds the board at its prompt until S7's end + D.
+#
+# Anchored on S7's end, which is at or after the prompt (console-capture drains 50
+# ms past its --until match, then exits), so the board is up at least D past its
+# prompt -- and it works when bring-up failed and no N-NDOPEN was printed.  D is
+# RAW seconds, like every deadline here.  ⚠️ The host's ARP timer runs on
+# CLOCK_MONOTONIC (推, s107 srvlog REPORT § 1.3), which WSL slews slow: D RAW
+# seconds are D*r of the timer's own.  At r = 0.957429 (量 2026-09-23) D = 2 is
+# 1.91 s of it (推, arithmetic).  Size D against the slowest r a seating expects.
+DWELL_MAX = 60.0        # above it, not a dwell: a millisecond count typed as seconds
+#: the longest single kernel sleep inside S9.  A sleep runs on CLOCK_MONOTONIC, so
+#: at r = 0.957 each overshoots RAW by q(1/r - 1): 2.2 ms at 50 ms.
+DWELL_QUANTUM = 0.05
+
+
+def dwell_of(a):
+    """--dwell-seconds, read so that a fixture without it means no dwell: 1.2's run."""
+    d = getattr(a, "dwell_seconds", None)
+    return 0.0 if d is None else d
+
+
+def check_dwell(a, skip):
+    """check_shape's dwell refusals (1.3), in every mode: they read only arguments.
+
+    Called before check_shape's own, so `--skip S9` with a dwell is refused with the
+    reason that is true; without one S9 is not a stage and M5's guard says so."""
+    d = dwell_of(a)
+    if not 0.0 <= d <= DWELL_MAX:           # NaN fails both comparisons
+        raise Refused("--dwell-seconds %r: must lie in [0, %g]. 0, the default, is no "
+                      "dwell; above %g s it is a different experiment, or milliseconds "
+                      "typed as seconds" % (d, DWELL_MAX, DWELL_MAX))
+    if d > 0 and "S9" in skip:
+        raise Refused("--skip S9 with --dwell-seconds %g: S9 IS the dwell, and "
+                      "--dwell-seconds 0 is how a run does not wait" % d)
+    if d > 0 and rounds(a) == 1 and "S7" in skip:
+        raise Refused("--dwell-seconds %g with --skip S7: S9 waits until S7's end + "
+                      "%g s, and with S7 skipped no stage of this run reaches the "
+                      "prompt it is anchored on" % (d, d))
+
+
+def dwell_stage(a, rnd):
+    """[] or [S9], the stage round_plan closes round `rnd` with.  In-process, and
+    `bench` because it holds the board: desk and replay skip it."""
+    d = dwell_of(a)
+    if not d > 0:
+        return []
+    return [dict(id="S9", name="dwell", kind="bench", argv=None,
+                 note="holds the board at rlxfw's prompt until S7's end + %g s -- "
+                      "every round, the last included -- so the host's next ARP "
+                      "broadcast (about 1 s apart) meets a board that answers" % d)]
 
 
 def boot_ended_on(prefix):
@@ -1030,18 +1163,57 @@ def boot_ended_on(prefix):
             "arrived, so this round paid the whole cap" % meta.get("stop_reason"))
 
 
+#: the two kernel files a stages header names beside the clock (1.3, spec § 2)
+BOOT_ID_PATH = "/proc/sys/kernel/random/boot_id"
+CLOCKSOURCE_PATH = "/sys/devices/system/clocksource/clocksource0/current_clocksource"
+
+
+def kernel_line(path):
+    """A one-line kernel file, stripped -- or `unreadable:<Error>`, recorded as not
+    known rather than guessed, and never a refusal: a lost identity is a gap in
+    the record, not a reason to lose the run."""
+    try:
+        with open(path, encoding="ascii", errors="replace") as fh:
+            return fh.read().strip().replace(" ", "_") or "empty"
+    except OSError as exc:
+        return "unreadable:" + type(exc).__name__
+
+
+def clock_line(which, t):
+    """The header's clock line (`start`) or an ended run's (`end`), from one
+    clock_triple(): RAW, the CLOCK_MONOTONIC and REALTIME reads beside it, and the
+    clocksource -- so a record says which boot's RAW it is and carries its own
+    MONOTONIC/RAW ratio.  Keys holding RAW end in `_raw` (spec § 1)."""
+    raw, mono, real = t
+    if which == "start":
+        return ("# clock=%s boot_id=%s clocksource=%s start_raw=%.6f "
+                "mono_at_start=%.6f start_real=%.6f"
+                % (CLOCK, kernel_line(BOOT_ID_PATH), kernel_line(CLOCKSOURCE_PATH),
+                   raw, mono, real))
+    return ("# end: end_raw=%.6f mono_at_end=%.6f end_real=%.6f clocksource_end=%s"
+            % (raw, mono, real, kernel_line(CLOCKSOURCE_PATH)))
+
+
 def run_plan(a, plan, skip, want, out=sys.stdout):
     """Walk the plan -- S2/S3 once, then each round -- and stop at the first
     failure.  In `--mode bench` every row reaches the stages file as it
-    completes.  LOOP-3, 1.2."""
+    completes.  LOOP-3, 1.2.  1.3: every stamp and the budget on RAW, through
+    now(), and S9, the dwell, closing each round when --dwell-seconds > 0."""
     n = rounds(a)
     runner = getattr(a, "_stage_runner", None) or run_stage
+    start = clock_triple()          # 1.3: the budget's origin is the header's RAW read
     log = None
     if a.mode == "bench":
         os.makedirs(os.path.dirname(os.path.abspath(stages_path(a))),
                     exist_ok=True)
-        log = StageLog(stages_path(a), stages_head(a, skip))
+        log = StageLog(stages_path(a),
+                       stages_head(a, skip) + [clock_line("start", start)])
         log.write("started -- no stage has completed")
+
+    def finish(status):
+        # 1.3: an ended run's last write carries the clock at its end, then status
+        log.tail = [clock_line("end", clock_triple())]
+        log.write(status)
     checks = {
         "S4": lambda t: assert_reset(t) + assert_loader_prompt(t),
         "S5b": assert_autoburn,
@@ -1050,12 +1222,12 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
     recipe = getattr(a, "recipe_override", None) if "S2" in skip else None
     budget = getattr(a, "budget_seconds", 1800.0)
     results, rres, timings, pending = [], [], [], []
-    t_run, cur, closed, stop = time.monotonic(), 0, 0, None
+    t_run, cur, closed, stop, t_s7_end = start[0], 0, 0, None, None
     try:
         for s in plan:
             sid, rnd = s["id"], s["round"]
             if rnd != cur:
-                spent = time.monotonic() - t_run
+                spent = now() - t_run
                 # Checked before a round starts, never inside one: between two
                 # rounds the board sits at rlxfw's shell prompt, which is the
                 # one state a stopped run may leave it in.
@@ -1066,7 +1238,7 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
                     print("looprun: budget of %.0f s reached after %d round(s); "
                           "not starting round %d" % (budget, closed, rnd), file=out)
                     break
-                cur = rnd
+                cur, t_s7_end = rnd, None       # S9 anchors on THIS round's S7 only
                 if n >= 2:
                     print("\n=== round %d of %d   (%.1f s spent)" % (rnd, n, spent),
                           file=out)
@@ -1084,9 +1256,9 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
                 text = open(bootlog, encoding="utf-8", errors="replace").read()
                 if a.control == "truncate-boot":
                     text = text[:120]
-                t0 = time.monotonic()
+                t0 = now()
                 res = assert_boot(text, recipe, a.control)
-                t1 = time.monotonic()
+                t1 = now()
                 timings.append(("S8", t1 - t0))
                 pending.append(("S8", t1 - t0))
                 rres += res
@@ -1124,10 +1296,10 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
             if sid == "S5c":
                 # In-process, like S8: this is three commands and a parse, not one
                 # command, and rendering it as one would hide which half failed.
-                t0 = time.monotonic()
+                t0 = now()
                 ok, rows = host_reaches_board(
                     a.host, getattr(a, "_link_runner", None))
-                t1 = time.monotonic()
+                t1 = now()
                 timings.append((sid, t1 - t0))
                 pending.append((sid, t1 - t0))
                 print("  %-3s %-9s %-4s  %6.2f s"
@@ -1145,6 +1317,30 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
                         "S5c", "the HOST cannot reach %s. This is not the board: "
                                "%s" % (a.host, rows[-1][2] if rows else "?"), rnd)
                 continue
+            if sid == "S9":
+                # 1.3, the dwell (see DWELL_MAX): in-process, after S8, until this
+                # round's S7 end + D on RAW.  Each kernel sleep is at most one
+                # quantum and RAW is re-read after it, so MONOTONIC's slew costs
+                # one quantum's overshoot, not D's.  Never longer than D from its
+                # own start: the budget cannot interrupt a stage in flight.  Not
+                # machine time, so neither `timings` nor the S8 line carries it.
+                t0 = now()
+                if t_s7_end is None:
+                    if log:
+                        log.add(s, None, None, None, "FAIL")
+                    raise StageFailed("S9", "round %d has no S7 end to anchor the "
+                                            "dwell on" % rnd, rnd)
+                wake = min(t_s7_end, t0) + dwell_of(a)
+                left = wake - t0
+                while left > 0:
+                    time.sleep(min(left, DWELL_QUANTUM))
+                    left = wake - now()
+                t1 = now()
+                print("  %-3s %-9s %-4s  %6.2f s   %.3f s past S7's end"
+                      % (sid, s["name"], "ok", t1 - t0, t1 - t_s7_end), file=out)
+                if log:
+                    log.add(s, t0, t1, None, "ok")
+                continue
             if a.control == "build-fail" and sid == "S2":
                 s = dict(s, argv=s["argv"][:3] + ["--config", "/nonexistent/config"])
             # 🔴 FW-100: a check belongs at the point of USE.  The pin was taken
@@ -1152,17 +1348,21 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
             # S6b cannot see a change, because it derives its expectation from
             # the same file.  So the pin is re-taken before every upload.
             if sid == "S6" and want:
-                now = sha256_of(a.image)
-                if now != want:
+                # `taken`, not `now`: 1.3's clock reader is now(), and a local of
+                # that name would shadow it for the whole of this function.
+                taken = sha256_of(a.image)
+                if taken != want:
                     if log:
                         log.add(s, None, None, None, "FAIL")
                     raise StageFailed(
                         "S6", "--image changed after the pre-flight pinned it "
                               "(want %s, now %s); nothing was uploaded in this "
-                              "round" % (want[:16], now[:16]), rnd)
-            t0 = time.monotonic()
+                              "round" % (want[:16], taken[:16]), rnd)
+            t0 = now()
             rc, txt = runner(s, ROOT)
-            t1 = time.monotonic()
+            t1 = now()
+            if sid == "S7":
+                t_s7_end = t1               # S9's anchor: at or after the prompt
             timings.append((sid, t1 - t0))
             pending.append((sid, t1 - t0))
             print("  %-3s %-9s rc=%d  %6.2f s" % (sid, s["name"], rc, t1 - t0),
@@ -1242,27 +1442,30 @@ def run_plan(a, plan, skip, want, out=sys.stdout):
         if exc.rnd is None:
             exc.rnd = cur
         if log:
-            log.write("STOPPED at round %d %s -- %s" % (exc.rnd, exc.sid, exc.why))
+            finish("STOPPED at round %d %s -- %s" % (exc.rnd, exc.sid, exc.why))
         raise
 
     machine = sum(t for _i, t in timings if t is not None)
     print("  MACHINE TOTAL: %.2f s   (S1, the edit, and S8b, the read, are not "
           "this tool's to time -- looptime owns the served loop)" % machine,
           file=out)
+    if dwell_of(a) > 0:
+        print("  S9's dwell is a wait, not machine time: the stages file has it",
+              file=out)
     failed = [r for r in results if not r[0]]
     print("", file=out)
     if failed:
         if log:
             # Every failing result stops the run where it fails, so `stop` is
             # set here -- by reasoning.  The record must not depend on that.
-            log.write(stop or "STOPPED -- %d of %d assertion(s) failed"
-                      % (len(failed), len(results)))
+            finish(stop or "STOPPED -- %d of %d assertion(s) failed"
+                   % (len(failed), len(results)))
         print("RESULT: %d of %d assertion(s) failed" % (len(failed), len(results)),
               file=out)
         return 1
     if log:
-        log.write(stop or "closed -- %d of %d round(s), every assertion held"
-                  % (closed, n))
+        finish(stop or "closed -- %d of %d round(s), every assertion held"
+               % (closed, n))
     print("RESULT: the loop closed%s, %d assertion(s) held, %.2f s of machine time"
           % (" %d of %d round(s)" % (closed, n) if n >= 2 else "",
              len(results), machine), file=out)
@@ -1283,6 +1486,14 @@ def selftest(out=sys.stdout):
             print("  FAIL   %-4s %-50s expected %r, got %r"
                   % (cid, label, expect, got), file=out)
             failed += 1
+
+    # 1.3: the harness's own RAW reader, taken before any case patches the time
+    # module -- so neither L5f's shim nor a defect in the tool's now() can make a
+    # bracket agree with the tool by construction.
+    _gettime = time.clock_gettime
+
+    def raw_now():
+        return _gettime(time.CLOCK_MONOTONIC_RAW)
 
     good = ("J 80500000\r\n---Jump to address=80500000\r\n"
             + "".join("%s\r\n" % m for m in BOOT_MARKS)
@@ -1820,6 +2031,8 @@ def selftest(out=sys.stdout):
                 fault = faults.get((rnd, sid))
                 if fault == "crash":
                     raise RuntimeError("the process died inside %s" % sid)
+                if fault == "slow":         # 1.3: 50 ms, so a stage's start and
+                    time.sleep(0.05)        # end differ by more than a wakeup
                 if sid == "S2":
                     open(manifest, "w").write("recipe_id\tb1434383\n")
                     return 0, ("== L1: stamp=0 [] recipe=b1434383  <- fake\n"
@@ -1845,10 +2058,13 @@ def selftest(out=sys.stdout):
                 return 0, ""
             return run
 
+        last = {"head": []}
+
         def fake_run(n, skip="S2,S3", faults=None, budget=1800.0, plant=(),
-                     pin=False, boot_until=DEFAULT_BOOT_UNTIL):
+                     pin=False, boot_until=DEFAULT_BOOT_UNTIL, dwell=None):
             """-> (outcome, rows, status, calls) of one `--mode bench` run of
-            `n` rounds, every stage faked, in an --out-dir of its own."""
+            `n` rounds, every stage faked, in an --out-dir of its own.  The
+            stages file's `#` lines (1.3: the clock's too) land in last["head"]."""
             od2 = tempfile.mkdtemp(dir=d)
             img = os.path.join(od2, "image.bin")
             open(img, "wb").write(bytes(range(32)) + b"\xaa" * 64)
@@ -1864,6 +2080,8 @@ def selftest(out=sys.stdout):
             F.out_dir, F.image, F.iterations, F.skip = od2, img, n, skip
             F.budget_seconds, F.boot_until = budget, boot_until
             F.image_sha256 = sha256_of(img) if pin else None
+            if dwell is not None:
+                F.dwell_seconds = dwell
             calls = []
             F._stage_runner = fake_stages(calls, img, faults or {},
                                           os.path.join(od2, "fake.manifest"))
@@ -1875,14 +2093,17 @@ def selftest(out=sys.stdout):
                                        else "")
             except StageFailed as exc:
                 outcome = "StageFailed@r%s:%s" % (exc.rnd, exc.sid)
-            except RuntimeError as exc:
-                outcome = "crashed: %s" % exc
+            except Exception as exc:        # 1.3: a defect is a FAIL line, not a
+                outcome = "crashed: %s" % exc   # traceback that ends the suite
             rows, status, cols = [], None, None
+            last["head"] = []
             if os.path.exists(stages_path(F)):
                 for line in open(stages_path(F), encoding="utf-8").read().split("\n"):
                     if line.startswith("# status: "):
                         status = line[len("# status: "):]
-                    elif line and not line.startswith("#"):
+                    elif line.startswith("#"):
+                        last["head"].append(line)
+                    elif line:
                         if cols is None:
                             cols = line.split("\t")
                         else:
@@ -1988,26 +2209,29 @@ def selftest(out=sys.stdout):
         # of order, or a row that is not ok.  S2/S3 go through the fake too.
         order = (["0:S2", "0:S3"] + ["1:" + x for x in ROUND_STAGES]
                  + ["2:" + x for x in ROUND_STAGES])
-        t_before = time.monotonic()
+        t_before = raw_now()
         o, rows, status, calls = fake_run(2, skip="")
-        t_after = time.monotonic()
+        t_after = raw_now()
+        rows_l5 = rows
         ck("L5", "🔴 a faked bench run of N=2 writes S2, S3 and 2 x 8 round "
                  "rows, in order, every one ok", ("rc=0", 18, True, True),
            (o, len(rows), ["%s:%s" % (r["round"], r["stage"]) for r in rows] == order,
             all(r["result"] == "ok" for r in rows)))
         # L5b -- refuted by an end before its start, a start earlier than the
         # row above it, `seconds` that is not end - start, or a time that is
-        # not this host's CLOCK_MONOTONIC (relative times would sit below
-        # t_before): absolute is what lets a row sit on a capture's timeline.
-        mono = [(float(r["start_mono"]), float(r["end_mono"]), float(r["seconds"]))
-                for r in rows if r["start_mono"]]
+        # not this host's CLOCK_MONOTONIC_RAW (1.3; relative times would sit
+        # below t_before): absolute is what lets a row sit on a capture's
+        # timeline.  Where MONOTONIC and RAW agree -- a CI runner -- this cannot
+        # tell the two apart; L5f is the case that can.
+        stamps = [(float(r["start_raw"]), float(r["end_raw"]), float(r["seconds"]))
+                  for r in rows if r.get("start_raw")]
         ck("L5b", "and every row: start <= end, starts never go back, seconds "
-                  "= end - start, and all of it absolute monotonic time",
+                  "= end - start, and all of it absolute CLOCK_MONOTONIC_RAW",
            (18, True, True, True, True),
-           (len(mono), all(s0 <= s1 for s0, s1, _x in mono),
-            [s0 for s0, _s1, _x in mono] == sorted(s0 for s0, _s1, _x in mono),
-            all(abs(s1 - s0 - x) < 2e-6 for s0, s1, x in mono),
-            bool(mono) and t_before <= mono[0][0] and mono[-1][1] <= t_after))
+           (len(stamps), all(s0 <= s1 for s0, s1, _x in stamps),
+            [s0 for s0, _s1, _x in stamps] == sorted(s0 for s0, _s1, _x in stamps),
+            all(abs(s1 - s0 - x) < 2e-6 for s0, s1, x in stamps),
+            bool(stamps) and t_before <= stamps[0][0] and stamps[-1][1] <= t_after))
         # L5c -- refuted by a last line that still reads `running`, or none.
         ck("L5c", "and its last line says the run CLOSED",
            "closed -- 2 of 2 round(s), every assertion held", status)
@@ -2026,6 +2250,111 @@ def selftest(out=sys.stdout):
                   "before it on disk, and a status that says it was running",
            ("crashed: the process died inside S5", 11, "running -- round 2 S4 done"),
            (o, len(rows), status))
+
+        # ---- L5f/L5g: 1.3, the clock.  🔴 On a CI runner MONOTONIC and RAW
+        # agree to a few ms, so L5b's bracket passes a tool that still reads
+        # time.monotonic(): two counters agreeing is not evidence while they run
+        # at one rate (CLAUDE.md).  These run with CLOCK_MONOTONIC's readers
+        # patched in this process to half rate, +1000 s, by tools/clockshim.py's
+        # own install() -- imported, not copied -- and restored after; RAW passes
+        # through.  A MONOTONIC stamp then lands hundreds of seconds outside the
+        # bracket, at the desk and on CI alike.  Stamps are asserted, never how
+        # long a sleep lasted: kernel timers are out of the shim's reach.
+        def load_shim():
+            saved = sys.dont_write_bytecode
+            sys.dont_write_bytecode = True          # no .pyc written into tools/
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    "looprun_clockshim", os.path.join(ROOT, "tools", "clockshim.py"))
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                return mod, None
+            except Exception as exc:                # a missing shim is a FAIL line
+                return None, "%s: %s" % (type(exc).__name__, exc)
+            finally:
+                sys.dont_write_bytecode = saved
+        shim, shim_err = load_shim()
+        readers = ("monotonic", "monotonic_ns", "perf_counter", "perf_counter_ns",
+                   "clock_gettime", "clock_gettime_ns")
+
+        def under_shim(fn):
+            """-> (took, fn()).  `took` is True when the shim's own check() saw
+            the patch take, else why not; the readers come back either way."""
+            if shim is None:
+                return "no tools/clockshim.py: %s" % shim_err, None
+            saved = {k: getattr(time, k) for k in readers}
+            try:
+                true_mono = shim.install(0.5, 1000.0)
+                try:
+                    shim.check(true_mono, 1000.0)
+                    took = True
+                except shim.Refused as exc:
+                    took = "the shim did not take: %s" % exc
+                return took, fn()
+            finally:
+                for k, v in saved.items():
+                    setattr(time, k, v)
+
+        def mono_bracketed(fn):
+            """-> (MONOTONIC before, fn(), MONOTONIC after), read through the
+            time module -- inside under_shim, that is the patched clock."""
+            m0 = time.clock_gettime(time.CLOCK_MONOTONIC)
+            got = fn()
+            return m0, got, time.clock_gettime(time.CLOCK_MONOTONIC)
+
+        # L5f -- refuted by any row stamped on anything but RAW (it would sit
+        # ~1000 s off), by fewer rows than L5's, or by a shim that did not take.
+        t_before = raw_now()
+        took, res = under_shim(lambda: mono_bracketed(lambda: fake_run(2, skip="")))
+        t_after = raw_now()
+        m_before, res, m_after = res if res else (None, None, None)
+        o5f, rows5f = (res[0], res[1]) if res else (None, [])
+        head5f = list(last["head"]) if res else []
+        s5f = [(float(r["start_raw"]), float(r["end_raw"])) for r in rows5f
+               if r.get("start_raw")]
+        ck("L5f", "🔴 with CLOCK_MONOTONIC patched to half rate, +1000 s, every "
+                  "row still sits inside the harness's RAW bracket",
+           (True, "rc=0", 18, True),
+           (took, o5f, len(s5f), bool(s5f) and all(t_before <= x0 <= x1 <= t_after
+                                                   for x0, x1 in s5f)))
+        # L5g -- refuted by a header naming any clock but CLOCK_MONOTONIC_RAW
+        # exactly (a whole word: CLOCK_MONOTONIC is a prefix of it), a boot_id
+        # other than this boot's, 1.2's column names, or a start/end pair that is
+        # not one RAW read and one MONOTONIC read each: under L5f's shim the
+        # `_raw` keys must sit in the RAW bracket and `mono_at_*` in the patched
+        # MONOTONIC bracket, which lies ~1000 s away -- a header that read RAW
+        # twice, or went round the time module, lands outside one of them.
+        # Brackets and not the pair's ratio: 量 2026-09-23 23:4x, one 0.415 s run
+        # read MONOTONIC/RAW 1.078 where a 10 s window read 0.998 -- 推 a read
+        # descheduled inside one pair at load average 5 -- and ordering is the one
+        # thing a preemption cannot change.
+        kv = {}
+        for line in head5f:
+            for mark, cut in (("# clock=", 2), ("# end: ", 7)):
+                if line.startswith(mark):
+                    kv.update(tok.split("=", 1) for tok in line[cut:].split()
+                              if "=" in tok)
+
+        def within(lo, keys, hi):
+            try:
+                vals = [float(kv[k]) for k in keys]
+            except (KeyError, ValueError, TypeError):
+                return False
+            return lo is not None and lo <= vals[0] <= vals[-1] <= hi
+        try:
+            with open("/proc/sys/kernel/random/boot_id") as fh:
+                boot = fh.read().strip()
+        except OSError as exc:
+            boot = "the harness cannot read it: %s" % exc
+        ck("L5g", "and the header names CLOCK_MONOTONIC_RAW and this boot's "
+                  "boot_id, the columns are 1.3's, and start/end each pair one "
+                  "RAW read with one MONOTONIC read",
+           ("CLOCK_MONOTONIC_RAW", True, (True, False), True, True),
+           (kv.get("clock"), kv.get("boot_id") == boot,
+            ("start_raw" in rows5f[0], "start_mono" in rows5f[0]) if rows5f else None,
+            within(t_before, ("start_raw", "end_raw"), t_after),
+            within(m_before, ("mono_at_start", "mono_at_end"), m_after)))
 
         # L6 -- refuted by any round-3 row, any round-2 row after S6b, a last
         # row that is not round 2's S6b failing on A0c, or a status that does
@@ -2102,6 +2431,15 @@ def selftest(out=sys.stdout):
            ("rc=0", 0, True),
            (o, sum(1 for r in rows if r["round"] in ("2", "3")),
             (status or "").startswith("budget -- 1 of 3 round(s) ran")))
+        # L11b -- 1.3: refuted by a budget read on MONOTONIC.  Under the shim a
+        # MONOTONIC budget reads ~1000 s spent before round 2 and stops there; on
+        # RAW a 100 s budget has barely begun after one faked round.  L11 cannot
+        # see the clock: at 0 every clock has spent it.
+        tookb, resb = under_shim(lambda: fake_run(3, budget=100.0))
+        ck("L11b", "and the budget runs on RAW: under the shim a 100 s budget "
+                   "lets all three faked rounds run",
+           (True, "rc=0", "closed -- 3 of 3 round(s), every assertion held"),
+           (tookb, resb[0] if resb else None, resb[2] if resb else None))
 
         # L12 -- refuted by 0 or 100 accepted, or 99 refused.
         ck("L12", "--iterations 0 and 100 are REFUSED; 99, the most -rNN can "
@@ -2212,6 +2550,231 @@ def selftest(out=sys.stdout):
                  "the card, and a quoted heredoc loses one level", False,
            "\\" in DEFAULT_BOOT_UNTIL)
 
+        # ---- W: the dwell, 1.3 (s107 srvlog REPORT § 3 A).  Each case's
+        # comment says what refutes it.
+        class PW:
+            cell = "L1"; out_dir = "bench/2026-09-02"; port = DEFAULT_PORT
+            host = DEFAULT_HOST; config = "cfg"; initramfs = "spec"; jobs = 4
+            variant = "quiet"; image = "img.bin"; vmlinux = None; cell_top = "top"
+            label = "rlxfw"; work = "work"; iterations = 2; skip = "S2,S3,S4"
+            mode = "plan"; boot_until = DEFAULT_BOOT_UNTIL
+            boot_seconds = DEFAULT_BOOT_SECONDS; recipe_override = "b1434383"
+
+        class PW0(PW):
+            dwell_seconds = 0.0
+
+        class PW3(PW):
+            dwell_seconds = 0.3
+        p0, p3w = build_plan(PW0), build_plan(PW3)
+
+        # W1 -- refuted by S9 in a plan with no dwell; a round without one when
+        # D > 0; S9 anywhere but straight after S8; or -- 🔴 the :626 trap --
+        # S8 losing its `-boot` path to S9, which has S8 read None + ".log" on
+        # the bench, after the upload.
+        def s9_after_s8(plan, r):
+            return [s["id"] for s in plan if s["round"] == r][-2:] == ["S8", "S9"]
+        ck("W1", "🔴 S9 is in a plan only when --dwell-seconds > 0 -- then right "
+                 "after S8 in every round -- and S8 keeps its -boot path",
+           (0, [True, True], [True, True]),
+           (sum(1 for s in p0 if s["id"] == "S9"),
+            [s9_after_s8(p3w, r) for r in (1, 2)],
+            [[s["out"] for s in p3w if s["round"] == r and s["id"] in ("S8", "S9")]
+             == [stem(PW3, r) + "-boot", None] for r in (1, 2)]))
+
+        # W2 -- refuted by a round with no S9 row (the last included: the card's
+        # next cell resets the board too), an S9 ending less than D past its
+        # round's S7 end, or round 2's reset starting less than D after round
+        # 1's prompt.  Under the shim, so a dwell timed on MONOTONIC ends at
+        # once, at the desk and on CI alike.  Each S7 takes 50 ms, so a dwell
+        # anchored on S7's START ends 50 ms short -- far more than a wakeup's
+        # overshoot.  The file prints microseconds, so each comparison allows
+        # its 2 us of rounding.
+        def dwell_held(rows, dd, n):
+            at = {(r["round"], r["stage"]): i for i, r in enumerate(rows)}
+
+            def t(r, sid, col):
+                i = at.get((str(r), sid))
+                v = rows[i].get(col) if i is not None else None
+                return float(v) if v else None
+
+            def ge(x, y):
+                return x is not None and y is not None and x - y >= dd - 2e-6
+            return (all(at.get((str(r), "S9"), -1) == at.get((str(r), "S8"), -9) + 1
+                        for r in range(1, n + 1)),
+                    all(ge(t(r, "S9", "end_raw"), t(r, "S7", "end_raw"))
+                        for r in range(1, n + 1)),
+                    all(ge(t(r + 1, "S4", "start_raw"), t(r, "S7", "end_raw"))
+                        for r in range(1, n)))
+        slow7 = {(1, "S7"): "slow", (2, "S7"): "slow"}
+        took2, res2 = under_shim(lambda: fake_run(2, skip="", dwell=0.3, faults=slow7))
+        o2, rows2 = (res2[0], res2[1]) if res2 else (None, [])
+        ck("W2", "🔴 --dwell-seconds 0.3, N=2, under the shim: 20 rows, S9 closes "
+                 "each round (the last too), each >= 0.3 RAW-s past its S7's "
+                 "end, and round 2's reset >= 0.3 s after round 1's prompt",
+           (True, "rc=0", 20, (True, True, True)),
+           (took2, o2, len(rows2), dwell_held(rows2, 0.3, 2)))
+        # W3 -- W2's own control: the same reading, in the same harness, over a
+        # planted run WITHOUT the dwell must fail every part, or W2 cannot fail.
+        took3, res3 = under_shim(lambda: fake_run(2, skip="", faults=slow7))
+        ck("W3", "🔴 and W2's reading FAILS on a planted run with no dwell: no "
+                 "S9 rows, and round 2's reset follows round 1's prompt by "
+                 "milliseconds", (True, (False, False, False)),
+           (took3, dwell_held(res3[1] if res3 else [], 0.3, 2)))
+
+        # W4 -- refuted by any of -1, 61, NaN, inf accepted, a refusal from a
+        # guard other than the dwell's own, or 0, 2 or 60 refused.
+        ck("W4", "--dwell-seconds -1, 61, NaN and inf are each REFUSED by the "
+                 "dwell's own guard; 0, 2 and 60 are not",
+           ["refused"] * 4 + ["ok"] * 3,
+           [shape(why="must lie in", dwell_seconds=v)
+            for v in (-1.0, 61.0, float("nan"), float("inf"))]
+           + [shape(dwell_seconds=v) for v in (0.0, 2.0, 60.0)])
+        # W4b -- refuted by --skip S9 accepted with a dwell (S9 IS the dwell),
+        # --skip S7 accepted with one at N=1 (S9 would anchor on nothing), or
+        # either refusal firing without a dwell: then --skip S9 must stay M5's
+        # "no such stage", and --skip S7 stay allowed.
+        ck("W4b", "and the skips a dwell cannot run with are refused by its "
+                  "guard -- S9, and S7 at N=1 -- while without one S9 is still "
+                  "'no such stage' and S7 still allowed",
+           ["refused", "refused", "refused", "ok"],
+           [shape(why="--dwell-seconds 0 is", skip="S9", dwell_seconds=2.0),
+            shape(why="no such stage", skip="S9"),
+            shape(why="anchored on", skip="S7", dwell_seconds=2.0),
+            shape(skip="S7")])
+        # W5 -- refuted by --dwell-seconds 0 changing anything but the header's
+        # record of it: its rows (not their times) must be L5's, and its plan
+        # must render byte for byte as a plan without the argument does.
+        o5w, rows5w, _st, _c = fake_run(2, skip="", dwell=0.0)
+        head5w = list(last["head"])
+
+        def key(rows):
+            return [(r["round"], r["stage"], r["name"], r["kind"], r["rc"],
+                     r["result"]) for r in rows]
+        b0, b1 = io.StringIO(), io.StringIO()
+        render_plan(build_plan(PW0), PW0, out=b0)
+        render_plan(build_plan(PW), PW, out=b1)
+        ck("W5", "--dwell-seconds 0 is 1.2's run: L5's 18 rows in L5's order, "
+                 "the plan byte for byte a plan without the argument, and "
+                 "dwell-seconds=0 in the header",
+           ("rc=0", 18, True, True, True),
+           (o5w, len(rows5w), key(rows5w) == key(rows_l5),
+            b0.getvalue() == b1.getvalue(),
+            any(h.startswith("# cell=") and h.endswith(" dwell-seconds=0")
+                for h in head5w)))
+
+        # ---- F: FW-124, the contract a card's HOST cell is checked against.
+        # F1 -- refuted by refuse_args permitting card A's LR line with
+        # --recipe-override removed (in bench, or rendered as a plan -- the gap
+        # the 2026-09-23 one-off hit: plan ran check_shape alone), refusing the
+        # whole line, permitting a malformed pin or a bench line with no
+        # --image (M11 cannot see that one go: loop_once's isfile('') refuses
+        # after it, and cardcheck calls refuse_args alone), or needing a file,
+        # the clock or the environment to decide: the image it names does not
+        # exist, and CLOCK_MONOTONIC_RAW is deleted from the time module.
+        def no_raw(fn):
+            saved = time.CLOCK_MONOTONIC_RAW
+            del time.CLOCK_MONOTONIC_RAW
+            try:
+                return fn()
+            finally:
+                time.CLOCK_MONOTONIC_RAW = saved
+
+        lr = ["--mode", "bench", "--out-dir", "bench/2026-09-23", "--skip",
+              "S2,S3,S4", "--recipe-override", "a2c56bc8", "--cell", "P1L",
+              "--image", os.path.join(d, "no-such-image.bin"),
+              "--image-sha256", "88" * 32, "--iterations", "3"]
+
+        def verdict_of(argv):
+            try:
+                refuse_args(build_parser().parse_args(argv))
+                return "ok"
+            except Refused as exc:
+                t = str(exc)
+                return ("refused: recipe" if "--recipe-override" in t else
+                        "refused: hex" if "64 hex" in t else
+                        "refused: image" if t.startswith("no --image") else
+                        "refused: " + t[:40])
+
+        def edit(argv, flag, val=None):
+            i = argv.index(flag)
+            return argv[:i] + ([flag, val] if val is not None else []) + argv[i + 2:]
+        ck("F1", "🔴 refuse_args in-process: card A's LR line passes, in bench "
+                 "and as a plan; without --recipe-override both refuse, and so "
+                 "do a malformed pin and a bench line with no --image -- with "
+                 "no image on disk and no RAW clock",
+           ["ok", "refused: recipe", "ok", "refused: recipe", "refused: hex",
+            "refused: image"],
+           no_raw(lambda: [verdict_of(lr),
+                           verdict_of(edit(lr, "--recipe-override")),
+                           verdict_of(edit(lr, "--mode", "plan")),
+                           verdict_of(edit(edit(lr, "--mode", "plan"),
+                                           "--recipe-override")),
+                           verdict_of(edit(lr, "--image-sha256", "deadbeef")),
+                           verdict_of(edit(edit(lr, "--image"), "--image-sha256"))]))
+
+        # F2 -- refuted by --mode plan rendering a run bench mode refuses (until
+        # 1.3 plan ran check_shape alone).  Through the program, as M8 is.
+        def run_err(argv):
+            p = subprocess.run(argv, cwd=ROOT, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
+            return p.returncode, p.stderr.decode("utf-8", "replace")
+        plan_skip = [sys.executable, os.path.join(ROOT, "tools", "looprun.py"),
+                     "--mode", "plan", "--iterations", "3", "--skip", "S2,S3,S4"]
+        rc_a, err_a = run_err(plan_skip)
+        rc_b, _err_b = run_err(plan_skip + ["--recipe-override", "b1434383"])
+        ck("F2", "and main's --mode plan calls it: a plan skipping S2 with no "
+                 "--recipe-override exits 2 with that reason, and with one, 0",
+           (2, True, 0), (rc_a, "--recipe-override" in err_a, rc_b))
+
+        # ---- K: 1.3, a Python without CLOCK_MONOTONIC_RAW (P2-4 spec § 1).
+        # K1 -- refuted by such a Python getting past the pre-flight; by the
+        # refusal coming from anything but the clock -- the image named does not
+        # exist, so a clock check placed after the image pre-flight would report
+        # the image instead; by a stage called or a stages file written first;
+        # or, with the clock present, by the clock's refusal firing at all.
+        od3 = tempfile.mkdtemp(dir=d)
+        kcalls = []
+
+        class KF:
+            cell = "L1"; port = "/dev/rlxfw-no-such-port"; host = DEFAULT_HOST
+            config = "cfg"; initramfs = "spec"; jobs = 4; variant = "quiet"
+            vmlinux = None; cell_top = "top"; label = "rlxfw"; work = "work"
+            mode = "bench"; replay_boot = None; recipe_override = "b1434383"
+            control = None; attempt = 1; boot_seconds = DEFAULT_BOOT_SECONDS
+            boot_until = DEFAULT_BOOT_UNTIL; iterations = 1; skip = "S2,S3"
+            budget_seconds = 1800.0; image_sha256 = None; out_dir = od3
+        KF.image = os.path.join(od3, "absent.bin")
+        KF._stage_runner = lambda s, cwd: (kcalls.append(s["id"]), (0, ""))[1]
+
+        def k1():
+            try:
+                loop_once(KF, out=devnull)
+                return "no refusal"
+            except Refused as exc:
+                t = str(exc)
+                return ("clock" if CLOCK in t else
+                        "image" if "not a regular file" in t else "other: " + t[:40])
+            except Exception as exc:        # a refusal that is not one is a FAIL
+                return "crashed: " + type(exc).__name__
+        ck("K1", "🔴 with CLOCK_MONOTONIC_RAW deleted, loop_once refuses on the "
+                 "clock before the image pre-flight, any stage or the stages "
+                 "file; with it present, the next refusal is the image's",
+           ("clock", [], False, "image"),
+           (no_raw(k1), list(kcalls), os.path.exists(stages_path(KF)), k1()))
+        # K2 -- refuted by main() letting that refusal out as a traceback, or
+        # exiting other than 2 (spec § 1: "refuses with exit 2 and a reason").
+        # M8c is the same command with the clock present, and it exits 0.
+        code = ("import runpy, sys, time; del time.CLOCK_MONOTONIC_RAW; "
+                "sys.argv = sys.argv[1:]; "
+                "runpy.run_path(sys.argv[0], run_name='__main__')")
+        rc_k, err_k = run_err([sys.executable, "-c", code,
+                               os.path.join(ROOT, "tools", "looprun.py"),
+                               "--mode", "replay", "--replay-boot", pre,
+                               "--recipe-override", "b1434383"])
+        ck("K2", "and main() turns it into exit 2 with the reason, not a "
+                 "traceback", (2, True, False),
+           (rc_k, CLOCK in err_k, "Traceback" in err_k))
+
         B.mode = "replay"; B.skip = ""; B.image = "img.bin"; B.image_sha256 = None
 
     # ---- C11/C12: the chaining itself, on the driver's real output shape
@@ -2242,7 +2805,9 @@ def selftest(out=sys.stdout):
     return 0 if failed == 0 else 1
 
 
-def main():
+def build_parser():
+    """The one parser main() uses (FW-124, 1.3): a card's HOST line is parsed with
+    it and handed to refuse_args, in-process, with no second copy to drift."""
     ap = argparse.ArgumentParser(description="one edit->result iteration (R4-3)")
     ap.add_argument("--mode", choices=["plan", "replay", "desk", "bench"],
                     default="plan",
@@ -2288,8 +2853,9 @@ def main():
                          "(round 1 only) but no other per-round stage. Bounded, "
                          "and so is --budget-seconds")
     ap.add_argument("--budget-seconds", type=float, default=1800.0,
-                    help="stop starting new rounds once this much wall clock "
-                         "has gone. It does not interrupt one in flight")
+                    help="stop starting new rounds once this much time has "
+                         "gone (CLOCK_MONOTONIC_RAW since 1.3). It does not "
+                         "interrupt one in flight")
     ap.add_argument("--boot-until", default=DEFAULT_BOOT_UNTIL,
                     help="the regex S7's capture ends on (TERM-1). The default "
                          "is the shell prompt rlxfw's /init reaches. It must "
@@ -2298,13 +2864,26 @@ def main():
     ap.add_argument("--boot-seconds", type=float, default=DEFAULT_BOOT_SECONDS,
                     help="S7's --seconds cap, paid only when --boot-until never "
                          "arrives")
+    ap.add_argument("--dwell-seconds", type=float, default=0.0,
+                    help="1.3: S9 holds the board at rlxfw's prompt until S7's "
+                         "end + this many seconds (CLOCK_MONOTONIC_RAW), in every "
+                         "round, the last included, so the host's next ARP "
+                         "broadcast meets a board that answers. 0, the default, "
+                         "is no S9: 1.2's run. 0..60")
     ap.add_argument("--self-test", action="store_true")
-    a = ap.parse_args()
+    return ap
+
+
+def main(argv=None):
+    a = build_parser().parse_args(argv)
     try:
+        # FW-124: every argument-only refusal first, in every mode -- plan too --
+        # before anything is read; the self-test is its own case inside it.
+        refuse_args(a)
         if a.self_test:
+            clock_id()
             return selftest()
         if a.mode == "plan":
-            check_shape(a, parse_skip(a))
             render_plan(build_plan(a), a)
             return 0
         # Until 1.2 `--iterations` above 1 was refused here (讀 2026-09-02):

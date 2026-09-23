@@ -38,6 +38,15 @@ An anchor that no longer occurs exactly once is a SURVIVOR, never a skip: a
 mutation suite that silently applies nothing is this repository's "a tool
 reporting 0 is making a claim", one level up.
 
+2026-09-23: the rows after M20 arrive with the clock rules, the skip of
+non-capture records and FW-124's `refuse_args` (`looptime.py`'s header, THE
+CLOCK A GAP IS TAKEN ON and RECORDS THAT ARE NOT CAPTURES).  Five older rows
+were RE-POINTED, each to the line that now does what its anchor did -- M1 the
+sort key, M2 and M4 the gap and span on seconds since the first capture, M6
+the wall rule's bound in `overlap_bound`, M17 the `--each` loop -- with the
+same mutation and the same killing case.  Their anchors had moved, which this
+harness reports as SURVIVOR rather than skipping.
+
 Run:  /usr/bin/python3 tools/test-looptime-mutants.py [--jobs N] [--only M1,M7]
 """
 import argparse
@@ -50,25 +59,23 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'tools', 'looptime.py')
-DECLARED = 20
+DECLARED = 35
 
 # (id, class, what it breaks, the case that must go red, [(anchor, replacement)])
 MUT = [
     ('M1', 'ORDER', 'sort captures by filename instead of by wall clock', 'N1',
-     [("caps.sort(key=lambda c: (c['start'], c['name']))",
+     [("caps.sort(key=lambda c: (c['order'], c['name']))",
        "caps.sort(key=lambda c: c['name'])")]),
     ('M2', 'ARITH', 'the gap forgets to subtract the capture it follows', 'P1',
-     [("'s': b['start'].timestamp() - end}",
+     [("'s': b['start'].timestamp() - base - end}",
        "'s': b['start'].timestamp() - a['start'].timestamp()}")]),
     ('M3', 'ARITH', 'machine time sums the gaps rather than the durations',
      'P1',
      [("machine = sum(c['dur'] for c in caps)",
        "machine = sum(c['dur'] for c in caps[:-1])")]),
     ('M4', 'ARITH', 'span leaves off the last capture\'s own duration', 'P1',
-     [("span = (caps[-1]['start'].timestamp() + caps[-1]['dur']\n"
-       "            - caps[0]['start'].timestamp())",
-       "span = (caps[-1]['start'].timestamp()\n"
-       "            - caps[0]['start'].timestamp())")]),
+     [("span = caps[-1]['start'].timestamp() - base + caps[-1]['dur']",
+       "span = caps[-1]['start'].timestamp() - base")]),
     # 🔴 This row was `IDENTITY_TOL = 1e9` and it SURVIVED, correctly: the
     # identity is algebraic, so no input can make it fail by a small amount
     # and no test can constrain the constant.  What can be constrained is that
@@ -79,8 +86,8 @@ MUT = [
      [("    if abs(total - span) > IDENTITY_TOL:",
        "    if False:")]),
     ('M6', 'QUANTUM', 'any negative gap is called an OVERLAP', 'N2b',
-     [("neg = [g for g in gaps if g['s'] < -WALLCLOCK_QUANTUM]",
-       "neg = [g for g in gaps if g['s'] < 0]")]),
+     [("    return WALLCLOCK_QUANTUM if rule == 'wall' else 0.0",
+       "    return 0.0")]),
     ('M7', 'QUANTUM', 'the overlap bound is so wide nothing is ever an overlap',
      'N2',
      [('WALLCLOCK_QUANTUM = 1.0', 'WALLCLOCK_QUANTUM = 1e6')]),
@@ -113,8 +120,8 @@ MUT = [
      'N9',
      [('            if len(parts) != 2:', '            if False:')]),
     ('M17', 'REPORT', '--each prints every capture twice', 'X3',
-     [("        for c in caps:\n            print('    %8.1f  %-16s hold",
-       "        for c in caps + caps:\n            print('    %8.1f  %-16s hold")]),
+     [("        for c in caps:\n            g = after.get(c['name'])",
+       "        for c in caps + caps:\n            g = after.get(c['name'])")]),
     ('M18', 'ARITH', 'the median returns the mean', 'P6',
      [('    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0',
        '    return sum(s) / float(n)')]),
@@ -131,6 +138,71 @@ MUT = [
      [("        if 'seconds' not in j:\n            raise Refused(",
        "        if 'seconds' not in j:\n            continue\n        if False:\n"
        "            raise Refused(")]),
+    # -- 2026-09-23: records that are not captures -------------------------
+    ('M21', 'SKIP', 'the skip is silent: records are dropped with no note',
+     'S1',
+     [("    if skipped:\n        notes.append(",
+       "    if False:\n        notes.append(")]),
+    ('M22', 'SKIP', 'a skipped record\'s .log is reported as an orphan', 'S1',
+     [("have = set(c['name'] for c in caps) | set(nm for _t, nm in skipped)",
+       "have = set(c['name'] for c in caps)")]),
+    ('M23', 'SKIP', 'any meta that names a tool is skipped -- a pattern, not '
+     'the named list', 'S2',
+     [("        if tool in NON_CAPTURE_TOOLS:",
+       "        if tool is not None:")]),
+    ('M24', 'REFUSE', 'a meta that is not a JSON object reaches .get() and '
+     'raises', 'N6',
+     [("        if not isinstance(j, dict):\n            raise Refused(",
+       "        if False:\n            raise Refused(")]),
+    # -- 2026-09-23: the clock each gap is taken on ------------------------
+    ('M25', 'CLOCK', 'the raw rule ignores boot_id: stamps from two boots are '
+     'subtracted', 'C4',
+     [("\n            and a['boot_id'] and a['boot_id'] == b['boot_id']):",
+       "):")]),
+    ('M26', 'CLOCK', 'a RAW duration is added to a wall-clock start: the '
+     'refusal is gone', 'C5',
+     [("    if raw_duration(a):\n        raise Refused(",
+       "    if False:\n        raise Refused(")]),
+    ('M27', 'CLOCK', 'the raw rule is gone: RAW pairs fall to REALTIME', 'C1',
+     [("    if (a['end_raw'] is not None",
+       "    if (False and a['end_raw'] is not None")]),
+    ('M28', 'CLOCK', 'the real rule is gone: pairs without RAW fall to the '
+     'wall clock', 'C2',
+     [("    if a['end_real'] is not None and b['t0_real'] is not None:",
+       "    if False:")]),
+    ('M29', 'CLOCK', 'a RAW duration is recognised by prefix, so '
+     'CLOCK_MONOTONIC counts as RAW', 'C3',
+     [("    return (c['clock'] == RAW_CLOCK or c['t0_raw'] is not None",
+       "    return (str(c['clock']).startswith('CLOCK_MONOTONIC')\n"
+       "            or c['t0_raw'] is not None")]),
+    ('M30', 'QUANTUM', 'a negative raw or real gap is forgiven the wall '
+     'clock\'s truncation', 'C7',
+     [("    return WALLCLOCK_QUANTUM if rule == 'wall' else 0.0",
+       "    return WALLCLOCK_QUANTUM")]),
+    ('M31', 'ORDER', 'captures are ordered by the truncated wall clock even '
+     'where t0_real is there', 'C8',
+     [("'order': start.timestamp() if t0_real is None else t0_real,",
+       "'order': start.timestamp(),")]),
+    ('M32', 'ARITH', 'a ruled seating keeps the wall-clock span, so instrument '
+     '+ dead no longer adds up to it', 'C1',
+     [("        span = machine + sum(g['s'] for g in gaps)\n",
+       "        pass\n")]),
+    # Both edits, so the mutant IS the arithmetic before 2026-09-23 -- gaps
+    # and span on epoch seconds -- and not merely a span that forgot its
+    # origin, which every case would catch.
+    ('M33', 'ARITH', 'the identity is computed on epoch seconds, where its '
+     'rounding refused two seatings', 'P8',
+     [("    base = caps[0]['start'].timestamp()",
+       "    base = 0.0"),
+      ("span = caps[-1]['start'].timestamp() - base + caps[-1]['dur']",
+       "span = (caps[-1]['start'].timestamp() + caps[-1]['dur']\n"
+       "            - caps[0]['start'].timestamp())")]),
+    ('M34', 'REPORT', 'the rule is dropped from the gaps the report names',
+     'C6',
+     [("('  [%s]' % g['rule']) if ruled else ''", "''")]),
+    # -- 2026-09-23: FW-124 ------------------------------------------------
+    ('M35', 'REFUSE', 'refuse_args permits a mode with no path', 'F1',
+     [("    if not a.mode or not a.paths:", "    if not a.mode:")]),
 ]
 
 FAILRE = re.compile(r'^\s*FAIL\s+(\S+)')

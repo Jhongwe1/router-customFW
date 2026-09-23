@@ -21,6 +21,9 @@ of CLOCK_MONOTONIC to return  offset + rate * (true monotonic):
 time.monotonic, time.monotonic_ns, time.perf_counter, time.perf_counter_ns,
 and time.clock_gettime / clock_gettime_ns when asked for CLOCK_MONOTONIC.
 CLOCK_MONOTONIC_RAW, CLOCK_REALTIME and every other clock pass through.
+Each patched reader is a Reader instance, not a function, so a library that
+keeps one as a class attribute (pyserial's Timeout does) still calls it
+unbound -- 1.0 broke every pyserial read that way.
 
 What it cannot reach, by construction: the kernel's own timers (select, sleep,
 poll timeouts run on the real CLOCK_MONOTONIC) and any child process.  A test
@@ -38,11 +41,32 @@ import runpy
 import sys
 import time
 
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "1.1"
 
 
 class Refused(Exception):
     pass
+
+
+class Reader:
+    """A patched clock reader that stays a plain callable wherever it is kept.
+
+    1.0 installed Python functions, and a Python function stored as a CLASS
+    attribute is bound as a method when read through an instance.  pyserial
+    3.5's serial.serialutil.Timeout keeps `TIME = time.monotonic` and calls
+    self.TIME(), so under 1.0 every ser.read() raised TypeError (量 2026-09-23
+    by console-capture 1.5's suite, whose N52 held that defect's exemption).
+    An instance whose class defines no __get__ is never bound.  S7 checks it."""
+    __slots__ = ("fn", "name")
+
+    def __init__(self, fn, name):
+        self.fn, self.name = fn, name
+
+    def __call__(self, *args):
+        return self.fn(*args)
+
+    def __repr__(self):
+        return "<clockshim %s>" % self.name
 
 
 def install(rate, offset):
@@ -64,9 +88,12 @@ def install(rate, offset):
     def get_ns(cid):
         return mono_ns() if cid == time.CLOCK_MONOTONIC else true_get_ns(cid)
 
-    time.monotonic, time.monotonic_ns = mono, mono_ns
-    time.perf_counter, time.perf_counter_ns = mono, mono_ns
-    time.clock_gettime, time.clock_gettime_ns = get, get_ns
+    time.monotonic = Reader(mono, "monotonic")
+    time.monotonic_ns = Reader(mono_ns, "monotonic_ns")
+    time.perf_counter = Reader(mono, "perf_counter")
+    time.perf_counter_ns = Reader(mono_ns, "perf_counter_ns")
+    time.clock_gettime = Reader(get, "clock_gettime")
+    time.clock_gettime_ns = Reader(get_ns, "clock_gettime_ns")
     return true_mono
 
 
@@ -78,14 +105,19 @@ def check(true_mono, offset):
     return gap
 
 
-def parse(argv):
+def build_parser():
+    """The one parser main() uses (FW-124's contract)."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--rate", type=float, default=0.5)
     ap.add_argument("--offset", type=float, default=1000.0)
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("tool", nargs="?")
     ap.add_argument("args", nargs=argparse.REMAINDER)
-    a = ap.parse_args(argv)
+    return ap
+
+
+def parse(argv):
+    a = build_parser().parse_args(argv)
     if a.args and a.args[0] == "--":
         a.args = a.args[1:]
     return a
@@ -98,7 +130,8 @@ def refuse_platform():
 
 
 def refuse_args(a):
-    refuse_platform()
+    """Refusals that read nothing but the parsed arguments (FW-124): the platform
+    and the TOOL file are environment, checked in main() after this."""
     if not a.rate > 0 or not a.rate < 1:
         raise Refused("--rate %r: must lie strictly between 0 and 1, or the shim does not "
                       "make the clocks disagree" % a.rate)
@@ -107,6 +140,10 @@ def refuse_args(a):
                       "straddle it" % a.offset)
     if not a.tool:
         raise Refused("no TOOL given")
+
+
+def refuse_environment(a):
+    refuse_platform()
     if not os.path.isfile(a.tool):
         raise Refused("TOOL %r is not a file" % a.tool)
 
@@ -200,10 +237,59 @@ def selftest():
         assert r.returncode == 7, ("the tool's own exit status passes through", r.returncode)
     case("S5", "the tool's exit status is the shim's", s5)
 
+    def s6():
+        # FW-124's contract, in-process: refuse_args refuses on the arguments
+        # alone and permits the good form -- without touching the filesystem,
+        # so a TOOL path that does not exist yet still passes it.
+        for argv, want in ((["--rate", "2", "--", "t.py"], "strictly between"),
+                           (["--offset", "1", "--", "t.py"], "at least 10"),
+                           ([], "no TOOL")):
+            try:
+                refuse_args(parse(argv))
+            except Refused as e:
+                assert want in str(e), (argv, str(e))
+            else:
+                raise AssertionError(("refuse_args permitted", argv))
+        refuse_args(parse(["--", "/nonexistent/at/check/time.py", "--x", "1"]))
+        assert build_parser().parse_args(["--rate", "0.25", "t.py"]).rate == 0.25
+    case("S6", "refuse_args refuses on the arguments alone and permits the good form", s6)
+
+    def s7():
+        # pyserial 3.5's Timeout keeps `TIME = time.monotonic` as a class
+        # attribute and calls self.TIME().  The control first: a Python
+        # function kept that way IS bound, so the probe below can fail.
+        def plain():
+            return 0.0
+
+        class Kept:
+            TIME = plain
+        try:
+            Kept().TIME()
+        except TypeError:
+            pass
+        else:
+            raise AssertionError("control: a function kept as a class attribute was not bound")
+        code = ("import time\n"
+                "M, B = time.CLOCK_MONOTONIC, time.CLOCK_BOOTTIME\n"
+                "class T:\n"
+                "    A, B_, C = time.monotonic, time.monotonic_ns, time.perf_counter\n"
+                "    D, E, F = time.perf_counter_ns, time.clock_gettime, time.clock_gettime_ns\n"
+                "t, b = T(), time.clock_gettime(B)\n"
+                "print(t.A() - b, t.B_() / 1e9 - b, t.C() - b, t.D() / 1e9 - b,\n"
+                "      t.E(M) - b, t.F(M) / 1e9 - b)\n")
+        r = run([], code=code)
+        assert r.returncode == 0, ("a reader kept as a class attribute was bound",
+                                   r.returncode, r.stderr[-300:])
+        got = [float(x) for x in r.stdout.split()]
+        assert len(got) == 6 and all(v > 900 for v in got), (
+            "each reader, called through an instance, is still the shimmed clock", got)
+    case("S7", "a reader kept as a class attribute is not bound as a method "
+               "(pyserial's Timeout)", s7)
+
     for cid, what in ok:
         print("  ok   %-3s %s" % (cid, what))
     for cid, what, why in bad:
-        print("  FAIL %-3s %s -- %s" % (cid, what, why))
+        print("  FAIL  %-3s %s -- %s" % (cid, what, why))   # ci-census wants 2+ spaces
     print("RESULT: %d/%d" % (len(ok), len(ok) + len(bad)))
     return 1 if bad else 0
 
@@ -214,6 +300,7 @@ def main(argv=None):
         return selftest()
     try:
         refuse_args(a)
+        refuse_environment(a)
     except Refused as e:
         print("clockshim: %s" % e, file=sys.stderr)
         return 2

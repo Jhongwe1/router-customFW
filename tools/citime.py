@@ -765,7 +765,7 @@ def cmd_segments(a):
     for cid, what, _why in ok:
         print("  ok   %-4s %s" % (cid, what))
     for cid, what, why in bad:
-        print("  FAIL %-4s %s -- %s" % (cid, what, why or "see above"))
+        print("  FAIL  %-4s %s -- %s" % (cid, what, why or "see above"))
     print("RESULT: %d/%d" % (len(ok), len(ok) + len(bad)))
     return 1 if bad else 0
 
@@ -1285,7 +1285,7 @@ def selftest():
     for cid, what in ok:
         print("  ok   %-4s %s" % (cid, what))
     for cid, what, why in bad:
-        print("  FAIL %-4s %s -- %s" % (cid, what, why))
+        print("  FAIL  %-4s %s -- %s" % (cid, what, why))
     print("RESULT: %d/%d" % (len(ok), len(ok) + len(bad)))
     return 1 if bad else 0
 

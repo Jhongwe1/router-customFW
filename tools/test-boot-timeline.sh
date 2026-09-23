@@ -25,11 +25,14 @@
 #       on a vendor and an rlxfw capture; one capture through both tables
 #       differs exactly where the tables do.   B7  anchors named, n on every
 #       cell.   B8  firmware, variant and image against a grep of each capture.
-#   B9  cold/warm inherited, and when it must not be; B9b a report of this
+#   B9  cold/warm inherited, and when it must not be -- since P2-4 a placed
+#       capture's gap is on REALTIME, never a RAW duration on a wallclock; B9b a report of this
 #       tool saved beside the captures is not a boot (2026-09-23).   B10  the host-probe
-#       join, and its refusal without t0_mono.   B11  TERM-1's silences.
+#       join on either clock (P2-4), and the reason for every pair it refuses.
+#   B11  TERM-1's silences.
 #   B12  the per-seating scale fit, with a positive and a negative control.
-#   B13  the retro's identity line and TSV.   B14  refusals.
+#   B13  the retro's identity line and TSV.   B14  refusals.   B15  FW-124:
+#       refuse_args refuses and permits in-process, and main() runs it first.
 set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -568,9 +571,14 @@ ck "and it said so"                      1 "$(grep -c REFUSING "$T/err")"
 # .timing records (FW-35).
 # =============================================================================
 FX="$T/fx"
-"$PY" - "$FX" <<'PYEOF'
-import json, os, sys
+# Two boot identities for the P2-4 fixtures (the form of
+# /proc/sys/kernel/random/boot_id); B10 greps for them.
+BOOT=6a0e5c1b-3d7f-4a92-8c61-0b9d2e4f7a13
+BOOT2=c4d2b8e0-91a7-4f35-a6e8-5b3c7d1f0e29
+"$PY" - "$FX" "$BOOT" "$BOOT2" <<'PYEOF'
+import datetime, json, os, sys
 FX = sys.argv[1]
+BOOT, BOOT2 = sys.argv[2], sys.argv[3]
 
 def mk(path, parts, meta=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -652,6 +660,28 @@ mk(FX + "/fit3/A-cold.log", loader(warm=False), meta("10:00:00", 5.0, sent=None)
 mk(FX + "/fit3/K1-boot.log", rlxfw(), meta("10:00:10", 12.0))
 mk(FX + "/fit3/K2-boot.log", rlxfw(), meta("10:00:40", 12.0))
 
+# B9, P2-4: could_fit on REALTIME.  R-rz declares CLOCK_MONOTONIC_RAW and its
+# duration_s (20 s, RAW) is twice its REALTIME span t0_real .. end_real (10 s)
+# -- the shim's rate 0.5, so the two rules differ by seconds, not by CLK-38's
+# 4 %.  The unplaced catch is 5 s long.  fit4: K-boot starts 10 s (REALTIME)
+# after R-rz ended, so the catch could fit: `?` -- where R-rz's wallclock plus
+# its RAW duration leaves 1 s and says warm.  fit5: 2 s, it cannot: warm under
+# either rule.  fit6: R-rz recorded no t0_real/end_real, so its RAW duration
+# is not added at all and it counts as 0 s long: `?`.
+def wall(hms):
+    return datetime.datetime.strptime("2026-01-01T%s+0800" % hms,
+                                      "%Y-%m-%dT%H:%M:%S%z").timestamp()
+for d, kwall, real in (("fit4", "10:01:20", True), ("fit5", "10:01:12", True),
+                       ("fit6", "10:01:20", False)):
+    rz = meta("10:01:00", 20.0, sent="J BFC00000", clock="CLOCK_MONOTONIC_RAW",
+              t0_raw=7000.0, end_raw=7020.0)
+    if real:
+        rz.update(t0_real=wall("10:01:00") + 0.5, end_real=wall("10:01:00") + 10.5)
+    mk(FX + "/%s/R-rz.log" % d, loader(warm=True), rz)
+    mk(FX + "/%s/U-cold.log" % d, loader(warm=False, tail=5.0))
+    mk(FX + "/%s/K-boot.log" % d, rlxfw(), meta(kwall, 12.0, t0_real=wall(kwall) + 0.5,
+                                                end_real=wall(kwall) + 12.5))
+
 # B9b: a report of this tool saved as `.log` beside the captures -- a card's
 # HOST cell does exactly that (bench/2026-09-23/Z9-D2.log).  rep1 plants the
 # report; rep0 plants the same bytes WITHOUT its header, the control that the
@@ -697,6 +727,44 @@ with open(FX + "/probe/bad.events", "w", encoding="utf-8", newline="\n") as fh:
     fh.write("5012.750000 icmp-reply seq=5\n5013.000000 tcp port80\n")
 with open(FX + "/probe/bad.meta.json", "w", encoding="utf-8", newline="\n") as fh:
     json.dump({"tool": "hostprobe", "clock": "CLOCK_MONOTONIC"}, fh)
+
+# B10, P2-4: the same plant on CLOCK_MONOTONIC_RAW, with the keys
+# console-capture 1.5 and hostprobe 1.3 write (the P2-4 build spec, sections
+# 2 and 3): same stamps, same window, so the same two values.  Every pair a
+# refusal case uses has a complete events file beside its probe meta, so a
+# tool that lost the check under test JOINS instead of refusing for another
+# reason.
+raw = meta("11:00:00", 40.0, clock="CLOCK_MONOTONIC_RAW", t0_raw=5000.0,
+           t0_real=1.0e9, mono_at_t0=4700.0, sent_s=0.005, end_raw=5040.0,
+           end_real=1.0e9 + 40, mono_at_end=4738.3, boot_id=BOOT,
+           clocksource="tsc", clocksource_end="tsc")
+mk(FX + "/probe/cap-raw.log", rlxfw(), raw)
+mk(FX + "/probe/cap-raw-b2.log", rlxfw(), dict(raw, boot_id=BOOT2))
+mk(FX + "/probe/cap-raw-nob.log", rlxfw(), {k: v for k, v in raw.items() if k != "boot_id"})
+mk(FX + "/probe/cap-both.log", rlxfw(), dict(raw, t0_mono=5000.0))
+with open(FX + "/probe/hp.events", encoding="utf-8") as fh:
+    mono_events = fh.read()
+raw_events = ("# hostprobe 1.3 events -- synthetic; t_raw is CLOCK_MONOTONIC_RAW\n"
+              + mono_events.split("\n", 1)[1]
+              .replace(" start_mono=", " start_raw=")
+              .replace(" kernel_real=-\n", " kernel_real=- lag_ms=-\n"))
+assert raw_events.count("start_raw=") == 2 and "lag_ms=" in raw_events
+hp_raw = {"tool": "hostprobe", "tool_version": "1.3", "clock": "CLOCK_MONOTONIC_RAW",
+          "start_raw": 4999.0, "end_raw": 5042.0, "stop_decided_raw": 5041.9,
+          "mono_at_start": 4699.0, "mono_at_end": 4739.2, "boot_id": BOOT,
+          "target": "192.168.1.1"}
+hp_mono = {"tool": "hostprobe", "clock": "CLOCK_MONOTONIC", "start_mono": 4999.0,
+           "end_mono": 5042.0, "target": "192.168.1.1"}
+for name, pm, ev in (
+        ("hp-raw", hp_raw, raw_events),
+        ("hp-raw-nob", {k: v for k, v in hp_raw.items() if k != "boot_id"}, raw_events),
+        ("hp-raw-norun", {k: v for k, v in hp_raw.items()
+                          if k not in ("start_raw", "end_raw", "stop_decided_raw")}, raw_events),
+        ("hp-both", dict(hp_mono, start_raw=4999.0), mono_events)):
+    with open(FX + "/probe/%s.events" % name, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(ev)
+    with open(FX + "/probe/%s.meta.json" % name, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(pm, fh)
 
 # B11: two loader resets, prompt at 2.5 s: R1 records no sent_s (timed from
 # its echo at 0.010 -> 2.490), R2 records sent_s 0.004 (-> 2.496).
@@ -928,6 +996,12 @@ ck "the unplaced catch cannot fit: warm, inherited from R-rz" "warm" "$(cls "$FX
 ck "the unplaced catch could fit: ?"                          "?"    "$(cls "$FX/fit2/K-boot.log")"
 ck "a kernel boot in between: the first cold, the second ?"   "cold ?" \
    "$(cls "$FX/fit3/K1-boot.log") $(cls "$FX/fit3/K2-boot.log")"
+# P2-4: the gap between placed captures is REALTIME -- each one's own t0_real
+# and end_real where it recorded them.  REFUTED IF fit4 or fit6 inherits warm
+# (a RAW duration added to a wallclock hid a fit: the unsafe direction), or
+# fit5 is not warm (the rule can no longer say a capture cannot fit).
+ck "a RAW duration is not added to a wallclock (fit4 fit5 fit6)" "? warm ?" \
+   "$(cls "$FX/fit4/K-boot.log") $(cls "$FX/fit5/K-boot.log") $(cls "$FX/fit6/K-boot.log")"
 # B9b.  REFUTED IF rep1's K-boot is not warm (the report was taken for a boot
 # capture with no wallclock), or rep0's is not `?` (the fixture cannot poison
 # inheritance, so rep1 would pass for a tool that never excluded anything), or
@@ -954,15 +1028,73 @@ ck "the first neigh that is up, by state"                 "12.500000" \
    "$(printf '%s\n' "$pj" | awk '$1 == "host" && $2 == "net.neigh_first" { print $4 }')"
 ck "events before sent_s and outside the window are counted and ignored" 1 \
    "$(printf '%s\n' "$pj" | grep -c '1 before sent_s, 8 considered, 3 outside the capture.s window')"
-# Every capture committed before P2-1 lacks t0_mono: REFUTED IF such a capture
-# is joined at all (an origin guessed from started_wallclock), or refused
-# without saying why.
+# old.log keeps `clock` and drops only t0_mono -- a malformed record, NOT the
+# shape of a capture from before P2-1, which has no `clock` either (r6 below
+# joins a real one).  REFUTED IF it is joined at all, or refused without
+# naming the key it lacks.
 "$PY" "$BT" --probe "$FX/probe/hp" "$FX/probe/old.log" >/dev/null 2>"$T/perr"; orc=$?
-ck "no t0_mono: refused, exit 2, naming t0_mono"          "2 1" "$orc $(grep -c 't0_mono' "$T/perr")"
+ck "clock but no t0_mono: refused, exit 2, naming t0_mono" "2 1" "$orc $(grep -c 't0_mono' "$T/perr")"
+# 🔄 P2-4: this read `grep -c 'CLOCK_MONOTONIC'`, which also counts a line that
+# names only CLOCK_MONOTONIC_RAW.  Whole words, and all three the refusal names.
 "$PY" "$BT" --probe "$FX/probe/hp" "$FX/probe/rt.log" >/dev/null 2>"$T/perr"; orc=$?
-ck "a capture on another clock: refused, exit 2"          "2 1" "$orc $(grep -c 'CLOCK_MONOTONIC' "$T/perr")"
+ck "a capture on another clock: exit 2, naming it and the two" \
+   "2 CLOCK_REALTIME CLOCK_MONOTONIC CLOCK_MONOTONIC_RAW" \
+   "$orc $(grep -ow -e CLOCK_REALTIME -e CLOCK_MONOTONIC -e CLOCK_MONOTONIC_RAW "$T/perr" | tr '\n' ' ' | sed 's/ $//')"
 "$PY" "$BT" --probe "$FX/probe/bad" "$FX/probe/cap.log" >/dev/null 2>"$T/perr"; orc=$?
 ck "a malformed events line: refused with file:line"      "2 1" "$orc $(grep -c 'bad.events:2' "$T/perr")"
+
+# 🆕 P2-4 (107th segment): the join on CLOCK_MONOTONIC_RAW, and a reason for
+# every pair it refuses.  Written before the change ran -- REFUTED IF the RAW
+# pair (the same plant on the keys console-capture 1.5 and hostprobe 1.3
+# write) does not give 12.740000 / 15.240000; a frame line names a key the join
+# did not read; a pair on two clocks, from two boots, or with a record carrying
+# both clocks' keys joins; a refusal does not name what it found; a real
+# capture from before P2-1 is refused for anything but having no origin; or a
+# missing boot_id is silent -- or is refused.  Clock names are matched as
+# WHOLE WORDS (grep -w): CLOCK_MONOTONIC is a prefix of CLOCK_MONOTONIC_RAW.
+jn () {   # jn PREFIX LOG -> the join's exit code on line 1, then stdout+stderr
+    local o rc
+    o="$("$PY" "$BT" --probe "$1" "$2" 2>&1)"; rc=$?
+    printf '%s\n%s\n' "$rc" "$o"
+}
+netv () { awk '$1 == "net" && $2 == "net.up" { a = $NF } $1 == "net" && $2 == "net.http" { b = $NF } END { print a, b }'; }
+clk () { grep -ow -e CLOCK_MONOTONIC -e CLOCK_MONOTONIC_RAW | tr '\n' ' ' | sed 's/ $//'; }
+P="$FX/probe"
+r1="$(jn "$P/hp-raw" "$P/cap-raw.log")"
+ck "r1 a RAW pair joins, with the MONO pair's two values" "0 12.740000 15.240000" \
+   "$(printf '%s\n' "$r1" | head -1) $(printf '%s\n' "$r1" | netv)"
+rnr="$(jn "$P/hp-raw-norun" "$P/cap-raw.log")"
+ck "frame lines name the keys they read, on each clock" "1 1 1 1" \
+   "$(printf '%s\n' "$pj" | grep -c '^  frame: s = t_mono - t0_mono, t0_mono 5000\.000000;') $(printf '%s\n' "$r1" | grep -c '^  frame: s = t_raw - t0_raw, t0_raw 5000\.000000;') $(printf '%s\n' "$r1" | grep -c '^  the probe ran -1\.000000 \.\. 42\.000000 s in this frame$') $(printf '%s\n' "$rnr" | grep -c "^  NOTE: the probe's start_raw/end_raw are not recorded")"
+r2="$(jn "$P/hp" "$P/cap-raw.log")"
+ck "r2 RAW capture, MONO probe: exit 2, capture's clock then probe's" \
+   "2 CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC" "$(printf '%s\n' "$r2" | head -1) $(printf '%s\n' "$r2" | clk)"
+r3="$(jn "$P/hp-raw" "$P/cap.log")"
+ck "r3 MONO capture, RAW probe: exit 2, capture's clock then probe's" \
+   "2 CLOCK_MONOTONIC CLOCK_MONOTONIC_RAW" "$(printf '%s\n' "$r3" | head -1) $(printf '%s\n' "$r3" | clk)"
+r4="$(jn "$P/hp-raw" "$P/cap-raw-b2.log")"
+ck "r4 two boot_ids: exit 2, naming both" "2 1" \
+   "$(printf '%s\n' "$r4" | head -1) $(printf '%s\n' "$r4" | grep -c "cap-raw-b2.log was written in boot $BOOT2 and .*hp-raw.meta.json in boot $BOOT: ")"
+r5c="$(jn "$P/hp-raw" "$P/cap-both.log")"; r5p="$(jn "$P/hp-both" "$P/cap.log")"
+ck "r5 both clocks' keys in one record: exit 2, inconsistent, either side" "2 1 2 1" \
+   "$(printf '%s\n' "$r5c" | head -1) $(printf '%s\n' "$r5c" | grep -c "inconsistent record: .*cap-both.log's .meta.json declares CLOCK_MONOTONIC_RAW and also carries t0_mono, ") $(printf '%s\n' "$r5p" | head -1) $(printf '%s\n' "$r5p" | grep -c 'inconsistent record: .*hp-both.meta.json declares CLOCK_MONOTONIC and also carries start_raw, ')"
+# r6 is a REAL capture from the evening before P2-1: no `clock`, no t0_* at
+# all (its meta is checked here too, so the witness cannot drift unnoticed).
+X20M="$ROOT/bench/2026-09-22b/X20-boot.meta.json"
+r6="$(jn "$P/hp" "$ROOT/bench/2026-09-22b/X20-boot.log")"
+ck "r6 a real pre-P2-1 capture (X20-boot): no origin, not a clock" "0 0 2 1 0" \
+   "$(grep -c '"clock"' "$X20M") $(grep -c '"t0_' "$X20M") $(printf '%s\n' "$r6" | head -1) $(printf '%s\n' "$r6" | grep -c "X20-boot.log's .meta.json records no origin .*written before P2-1") $(printf '%s\n' "$r6" | grep -cw 'CLOCK_MONOTONIC')"
+r7c="$(jn "$P/hp-raw" "$P/cap-raw-nob.log")"; r7p="$(jn "$P/hp-raw-nob" "$P/cap-raw.log")"
+ck "r7 a missing boot_id is a NOTE naming the side; none when both agree" "1 0 1 0 1 0 1" \
+   "$(printf '%s\n' "$pj" | grep -c '^  NOTE: neither record carries a boot_id') $(printf '%s\n' "$r7c" | head -1) $(printf '%s\n' "$r7c" | grep -c "^  NOTE: .*cap-raw-nob.log's .meta.json carries no boot_id (the other record carries $BOOT)") $(printf '%s\n' "$r7p" | head -1) $(printf '%s\n' "$r7p" | grep -c "^  NOTE: .*hp-raw-nob.meta.json carries no boot_id (the other record carries $BOOT)") $(printf '%s\n' "$r1" | grep -c '^  NOTE: .*boot_id') $(printf '%s\n' "$r1" | grep -c "^  boot_id $BOOT on both records$")"
+# A real MONOTONIC pair from seating A (P2-3): M1-BOOT (console-capture 1.4)
+# inside M1-HP (hostprobe 1.2).  The three numbers are HEAD's (453ceac, before
+# P2-4), read before this change was written.  REFUTED IF a real pair stops
+# joining or moves.  All 273 pairs of that seating were compared with HEAD's
+# verdicts at the desk when P2-4 landed; they are not a case, for run time.
+m1="$(jn "$ROOT/bench/2026-09-23/M1-HP" "$ROOT/bench/2026-09-23/M1-BOOT.log")"
+ck "a real seating-A pair keeps HEAD's values (M1-HP, M1-BOOT)" "0 15.636799 26.058069 1076" \
+   "$(printf '%s\n' "$m1" | head -1) $(printf '%s\n' "$m1" | netv) $(printf '%s\n' "$m1" | sed -n 's/.*event(s): \([0-9]*\) considered.*/\1/p')"
 
 echo
 echo "=== B11: TERM-1 -- the longest silence ==="
@@ -1057,14 +1189,69 @@ echo "=== B14: refusals are reasons with exit 2, never a traceback ==="
 ck "--retro over nothing: exit 2 and REFUSING"            "2 1 0" "$rc $(grep -c REFUSING "$T/err") $(grep -c Traceback "$T/err")"
 "$PY" "$BT" --kernel "$FX/b5" >/dev/null 2>"$T/err"; rc=$?
 ck "--kernel over no kernel boot: exit 2 and REFUSING"    "2 1 0" "$rc $(grep -c REFUSING "$T/err") $(grep -c Traceback "$T/err")"
+# 🔄 P2-4: this counted `REFUSING` alone, and `$FX/b5` holds no boot, so with
+# the mode check deleted the retro refused it anyway and the case stayed green
+# (量, mutation M10 of the 107th segment).  It reads the reason now.
 "$PY" "$BT" --retro --kernel "$FX/b5" >/dev/null 2>"$T/err"; rc=$?
-ck "two modes at once: exit 2 and REFUSING"               "2 1" "$rc $(grep -c REFUSING "$T/err")"
+ck "two modes at once: exit 2, refused for the two modes"  "2 1" "$rc $(grep -c 'REFUSING: choose one of' "$T/err")"
 # A reader that is gone before the tool writes (`true` reads nothing and exits
 # while the retro is still computing) must not produce a traceback.  REFUTED IF
 # stderr holds one.  量: before the entry point caught it, B12's awk printed
 # `BrokenPipeError` into this suite's output.
 "$PY" "$BT" --retro "$FX/scale1" 2>"$T/err" | true
 ck "a reader that closes early gets no traceback"          0 "$(grep -c 'Traceback\|BrokenPipe' "$T/err")"
+
+echo
+echo "=== B15: FW-124 -- refuse_args is the argument check, and main() runs it first ==="
+# A card checks a HOST cell by calling build_parser() and refuse_args() on its
+# arguments.  REFUTED IF refuse_args permits a bad argument or refuses a good
+# form, or main() does not parse with build_parser() and refuse through
+# refuse_args() before it acts -- then the card would check something the run
+# does not.  In-process: the module is imported by path, as xcheck does.
+fw124="$("$PY" - "$BT" 2>&1 <<'PYEOF'
+import contextlib, importlib.util, io, sys
+sys.dont_write_bytecode = True      # no .pyc into the tree while a sweep runs
+spec = importlib.util.spec_from_file_location("bt_fw124", sys.argv[1])
+bt = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bt)
+
+def verdict(argv):
+    try:
+        bt.refuse_args(bt.build_parser().parse_args(argv))
+    except bt.Refused:
+        return "refuse"
+    return "permit"
+
+out = [verdict(a) for a in (
+    ["--probe", "P", "cap.log"],               # the good form of a join
+    ["--probe", "P", "a.log", "b.log"],        # two captures
+    ["--probe", "P", "cap.timing"],            # not a .log
+    ["--retro", "bench", "--tsv", "f.tsv"],    # the good form of a retro
+    ["--kernel", "--retro"],                   # two modes
+    ["--tsv", "f.tsv", "bench"],               # --tsv without --retro/--kernel
+    ["--firmware", "vendor", "bench"])]        # --firmware without --kernel/--probe
+built = []
+real_build = bt.build_parser
+
+def counting_build():
+    built.append(1)
+    return real_build()
+
+def sentinel(a):
+    raise bt.Refused("sentinel")
+
+bt.build_parser, bt.refuse_args = counting_build, sentinel
+err, so = io.StringIO(), io.StringIO()
+with contextlib.redirect_stderr(err), contextlib.redirect_stdout(so):
+    rc = bt.main(["--legend"])
+out.append("main:rc=%s,parsers=%d,sentinel=%s,printed=%s" % (
+    rc, len(built), "REFUSING: sentinel" in err.getvalue(), bool(so.getvalue())))
+print(" ".join(out))
+PYEOF
+)"
+ck "refuse_args refuses and permits in-process; main runs it first" \
+   "permit refuse refuse permit refuse refuse refuse main:rc=2,parsers=1,sentinel=True,printed=False" \
+   "$fw124"
 
 echo
 if [ "$fail" -ne 0 ]; then

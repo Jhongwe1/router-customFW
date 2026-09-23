@@ -1387,9 +1387,11 @@ short. (`A0`, `A0a`) occurs in all four combinations on committed bytes —
 **Stage times** go to `<stem>.stages.tsv` in bench mode, one row per stage per
 round (`S2`/`S3` are round 0), rewritten whole after every stage through
 `.tmp` + `os.replace`. `start_mono`/`end_mono` are absolute `time.monotonic()`,
-the clock `console-capture` now records its origin on (`FW-114`, `FW-115`), so
-a stage row lines up with a capture. A last line of `running` is a run that did
-not finish; no file at all is a run refused before it started.
+the clock `console-capture` 1.4 records its origin on (`FW-114`, `FW-115`), so
+a stage row lines up with a capture. 🔄 From 1.3 they are `start_raw`/`end_raw`,
+`CLOCK_MONOTONIC_RAW`, the clock `console-capture` 1.5 stamps on (§ 19.1). A
+last line of `running` is a run that did not finish; no file at all is a run
+refused before it started.
 
 **Boot cells end on an event (`TERM-1`).** `S4` ends on `--until '<RealTek>'`
 (`--esc-after` and `--seconds` are caps) and `S7` on
@@ -1447,3 +1449,77 @@ Found while doing this, recorded rather than changed:
 saved; that the default `S7` pattern fits `P2-2`'s `/init`, which brings the LAN
 up and may print after the prompt. A run cannot start from rlxfw's shell: round
 1's `J BFC00000` gets `J: not found` there (seating 12, `SN-rz`).
+
+### 19.1 🆕 2026-09-24 (`P2-4`, desk): `looprun` 1.3 — stage times on RAW, and `S9`, the dwell (`FW-127`)
+
+**Desk only: no round has run `S9` on the board.**
+
+**The clock.** Every stamp and every budget deadline reads
+`CLOCK_MONOTONIC_RAW` through one function, `now()`, looked up per call so that
+`tools/clockshim.py` reaches it; the eight sites 1.2 timed with
+`time.monotonic()` go through it. WSL's `CLOCK_MONOTONIC` is slewed and RAW is
+not (`notes/boot-time.md` § 7.9). The stages file's header names
+`clock=CLOCK_MONOTONIC_RAW`, the `boot_id` its stamps count from, the
+clocksource, and the start's RAW, MONOTONIC and realtime reads; an `# end:` line
+carries the same at the end, so the file holds its own MONOTONIC/RAW rate. A
+Python without `time.CLOCK_MONOTONIC_RAW` is refused before any stage, as exit 2.
+
+**The dwell.** `--dwell-seconds D` closes every round, the last included, with
+`S9`: right after `S8` the loop sleeps at most 50 ms at a time, re-reading RAW,
+until D past the earlier of this round's `S7` end and `S9`'s own start, and writes
+one row; `S9` is not machine time and stays out of `MACHINE TOTAL`. `S7` ends at
+or after the prompt, so the board is up at least D past it, whether or not its
+link came up. Why every round, the last included: seating A's quiet replies beat
+the next reset by 16.1, 2.5 and 39.5 ms, `P3Q-r01`'s never came, and `P1L-r03`
+was reset by the card's own `P1-RZ` 0.098 s after `looprun` closed
+(`notes/boot-time.md` § 7.3, `CLK-36`). `D = 0`, the default, is 1.2's run: the
+same 18 rows in the same order and a plan byte for byte the same (`W5`). Refused:
+`D` outside [0, 60] or not a number, `--skip S9` with a dwell, and `--skip S7`
+with a dwell at N = 1, where `S9` would anchor on nothing. 推: the host's ARP
+retransmit timer runs on `CLOCK_MONOTONIC`, so D RAW seconds are D·r of the
+timer's own, r the MONOTONIC/RAW rate — 0.946–0.989 per minute while the two time
+daemons fight, 1.00000 with `timesyncd` stopped (§ 7.9's E2). Card B holds 2.5 s
+with `timesyncd` stopped.
+
+**What the self-test shows** (118 cases; 量 2026-09-24, the 108th segment's
+rehearsal): `L5f`, `L5g`, `L11b` and `W2` run the stages under `clockshim`'s own
+`install()` — imported, not copied — so a row stamped on MONOTONIC lands ~1000 s
+outside the harness's RAW bracket on a runner as at the desk; `W3` is `W2`'s
+control, a planted run without a dwell that `W2`'s reading must fail; `F1`/`F2` are
+`FW-124`'s `refuse_args`, which card A's `LR` line passes; `K1`/`K2` the refusal
+without RAW. The builder's 23 mutants were each killed, and lines 582–600 and
+1003, which tracked prose cites, did not move.
+
+**What this does not establish:** that `S9` runs on the board, where its anchor
+is the prompt plus `console-capture`'s 50 ms drain plus its exit; that 2.5 s is
+enough on another day; RAW's accuracy against true time.
+
+### 19.2 🆕 2026-09-24 (`P2-4`, desk): `looptime` — each gap on the best clock two captures share, and seating A read (`FW-130`)
+
+§ 9's last open item, `started_wallclock` truncated to the second, no longer
+bounds a pair of captures that carry a finer clock. Each gap is taken on the
+best clock both share: **raw**, `t0_raw` minus the previous `end_raw` under one
+`boot_id`; **real**, `t0_real` minus the previous `end_real` — no truncation, but
+REALTIME steps; **wall**, the old rule. The report names each gap's rule; a raw or
+real gap below 0 is an OVERLAP, having no truncation to forgive, while the wall
+rule keeps its −1 s; a RAW duration is never added to a wall-clock start.
+`hostprobe` and `hostclock` records are skipped by name, counted and named.
+`A1`, the identity *span = instrument + gaps*, is computed on seconds since the
+first capture: on epoch seconds its rounding refused `bench/2026-09-21e`, whose
+exact residual is 0.
+
+量 2026-09-24 (the 108th segment's rehearsal), `looptime seating
+bench/2026-09-23`: 158 captures, span 9060.0 s, instrument 3030.2 s (33.4 %),
+dead 6029.8 s, all 157 gaps on the real rule, the 13 `hostprobe` records skipped.
+A second computation straight from the metas, sharing no code with the tool:
+real gaps 6029.821 s, the smallest 0.079 s, the same span; REALTIME steps inside
+the captures sum to 67.5 s, which the wall rule would have counted as dead time.
+Over every seating now in `bench/`, 26 pairs are OVERLAPs (2026-09-08b 2, -09 1,
+-10 10, -14c 2, -19b 11), all older than `t0_real`; within one wall-clock second
+`looptime` orders such captures by name, and another order reads 14 instead of 10
+in 2026-09-10, so what they are is not settled (`docs/FINDINGS.md`).
+
+**What this does not establish:** that seating A's gaps are true time — the real
+rule rides REALTIME, which the time daemons stepped 151 times in one night
+(§ 7.9 of `notes/boot-time.md`); the raw rule on a real seating (no seating has
+RAW captures yet).

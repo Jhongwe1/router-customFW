@@ -37,7 +37,8 @@ one.
 
 THE ARITHMETIC, AND THE IDENTITY THAT KEEPS IT HONEST
 ------------------------------------------------------
-For captures c1..cn of one seating, ordered by `started_wallclock`:
+For captures c1..cn of one seating, ordered by `started_wallclock` (by
+`t0_real` where a capture carries it -- THE CLOCK A GAP IS TAKEN ON, below):
 
     machine  = sum(duration_i)                       what the instrument held
     gap_i    = start_{i+1} - (start_i + duration_i)  dead time between two
@@ -51,6 +52,13 @@ That is a telescoping sum, so it holds even when a gap is negative.  `A1`
 asserts it on every run rather than only in the self-test: a decomposition
 whose parts do not add up to its whole is reporting on something else.
 
+It is computed on seconds since the first capture opened, not since 1970.  On
+epoch seconds (~1.8e9, where one float step is 2.4e-7 s) each gap carried up to
+1.2e-7 s of rounding, and 113 of them summed past `IDENTITY_TOL`: A1 refused
+`bench/2026-09-21e`, whose exact residual is 0, and would have refused
+`bench/2026-09-23` (量 2026-09-23 at 453ceac).  The tolerance did not move; the
+arithmetic did.  `P8` is that shape.
+
 🔴 ORDERED BY CLOCK, NOT BY FILENAME.  Capture names are chosen by the person
 writing the card and they are not monotonic -- `bench/2026-08-31c` holds
 `K-2a` before `K-A` alphabetically and after it in time, and seating 8's
@@ -59,10 +67,11 @@ negative gaps that are an artefact of the sort.  `N1` is that case.
 
 🔴 A GAP'S RESOLUTION IS 1 SECOND, AND THAT IS NOT A ROUNDING REMARK
 --------------------------------------------------------------------
-讀 `console-capture.py:430-431`: `t0 = time.monotonic()` and then
-`started_wallclock = time.strftime("%Y-%m-%dT%H:%M:%S%z")` -- the same instant,
-but `duration_s` keeps microseconds and the wall clock is truncated to the
-second.  So the recorded start is `floor(true_start)`, and
+讀 `console-capture.py:551-554`: the origin `t0` (CLOCK_MONOTONIC to 1.4,
+CLOCK_MONOTONIC_RAW from 1.5) and then `started_wallclock` through
+`time.strftime("%Y-%m-%dT%H:%M:%S%z")` -- the same instant, but `duration_s`
+keeps microseconds and the wall clock is truncated to the second.  So the
+recorded start is `floor(true_start)`, and
 
     true_start in [recorded, recorded + 1)
 
@@ -72,12 +81,14 @@ than in a footnote:
 
   * every gap below carries +/-1 s of quantisation.  On a gap of minutes that
     is invisible; on a gap of a second it is the whole number.
-  * a pair can only be shown to OVERLAP when `recorded_gap < -1`.  量 over
-    every seating in `bench/`: more than a hundred pairs have a gap of about
-    **-0.09 s**, and NOT ONE is below -1.  They are the truncation and nothing
-    else.  A tool that called them overlaps would be reporting on its own
-    arithmetic, so the bound is derived from the instrument's source and is
-    not a tolerance somebody chose.
+  * a pair can only be shown to OVERLAP when `recorded_gap < -1`.  量
+    2026-09-01 over every seating then in `bench/`: more than a hundred pairs
+    had a gap of about **-0.09 s**, and NOT ONE was below -1.  They are the
+    truncation and nothing else.  A tool that called them overlaps would be
+    reporting on its own arithmetic, so the bound is derived from the
+    instrument's source and is not a tolerance somebody chose.  (量
+    2026-09-23 at 453ceac: 26 pairs in five later seatings are below -1 and
+    are reported as OVERLAPs; what they are is not settled here.)
 
 `N2` is a real overlap and must be caught; `N2b` is a -0.1 s gap and must NOT
 be called one, while still being counted and printed.
@@ -90,6 +101,49 @@ command*; it measures their sum.  A gap that spans a break -- the operator
 leaving the bench -- is arithmetically identical to a very slow round trip, so
 this tool reports the distribution and the largest values by name and never
 reports a mean alone.
+
+THE CLOCK A GAP IS TAKEN ON
+---------------------------
+The rule above adds a MONOTONIC `duration_s` to a REALTIME start.  From
+`console-capture` 1.5, `duration_s` is CLOCK_MONOTONIC_RAW seconds, and on this
+host REALTIME runs several percent slow of RAW between the steps that catch it
+up (`SPEC.md` `CLK-38`), so that sum would be two clocks in one number.  Each
+gap is therefore taken on the best clock BOTH of its captures carry, and the
+report names it:
+
+  raw   next `t0_raw` - previous `end_raw`, when both carry them under one
+        `boot_id` (RAW restarts with every WSL boot, so stamps from two boots
+        have no difference).  No truncation, and within one boot RAW never
+        goes back: any negative value is an overlap.
+  real  next `t0_real` - previous `end_real`, when both carry them (every
+        capture since `P2-1`, `SPEC.md` `FW-115`).  No truncation; REALTIME
+        can step, so a negative value is an overlap or a backward step, and it
+        is reported as an OVERLAP either way.
+  wall  the rule above, when the wall clock is all the pair shares.  REFUSED
+        when the earlier capture's duration is RAW: that is the sum this
+        section exists to prevent.
+
+A seating whose every gap is `wall` prints exactly what it printed before
+these rules.  Any other prints the rule beside every gap it names, and its
+`span` is instrument + dead: each hold is its capture's own `duration_s`, each
+gap is on its rule, and no single clock was read from the first capture to the
+last -- which is why `A1` is checked on the wall clock's arithmetic and not on
+these numbers.  Captures are ordered by `t0_real` where they carry it: 78
+captures in `bench/` open in the same wall-clock second as an earlier capture
+of their directory (量 2026-09-23 at 453ceac), and ordered by name inside it, a
+clock with no truncation would call the misordering an overlap.  `C8` is that
+case.
+
+RECORDS THAT ARE NOT CAPTURES
+-----------------------------
+A bench directory also holds the `.meta.json` of recorders that are not a
+console capture: `hostprobe` runs across the captures it brackets and has no
+`duration_s`, and neither has `hostclock`.  One probe record refused the whole
+of `bench/2026-09-23` before this rule.  A meta whose `tool` is named in
+`NON_CAPTURE_TOOLS` is skipped, counted and named in the report -- never
+silently -- and its `.log` is not called an orphan.  The list holds names, not
+a pattern: a `tool` it does not name is read as a capture, and refused if it
+has no `duration_s` (`S2`).
 
 THE UPLOAD IS REPORTED FROM A DIFFERENT FILE, AND ITS ABSENCE IS NOT ZERO
 -------------------------------------------------------------------------
@@ -135,6 +189,12 @@ IDENTITY_TOL = 1e-6
 # `strftime("%S")` drops the fraction, so the true start is somewhere in
 # [recorded, recorded + WALLCLOCK_QUANTUM).  See the header.
 WALLCLOCK_QUANTUM = 1.0
+# Recorders whose `.meta.json` sits beside the captures and is not one.  NAMES,
+# not a pattern: a `tool` missing from this tuple is read as a capture.
+NON_CAPTURE_TOOLS = ('hostprobe', 'hostclock')
+# The exact `clock` string console-capture 1.5 declares.  Compared with ==,
+# never `in`: CLOCK_MONOTONIC is a prefix of it.
+RAW_CLOCK = 'CLOCK_MONOTONIC_RAW'
 
 
 class Refused(Exception):
@@ -173,6 +233,26 @@ def parse_wallclock(s, where):
 
 
 # ------------------------------------------------------------------ reading
+def _stamp(j, key, where):
+    """An absolute clock stamp: None when absent, refused when not a number."""
+    v = j.get(key)
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise Refused('%s: %s %r is not a number' % (where, key, v))
+    return float(v)
+
+
+def _by_tool(skipped):
+    """`hostprobe 2 (P1-HP, P2-HP)`, in NON_CAPTURE_TOOLS order."""
+    parts = []
+    for t in NON_CAPTURE_TOOLS:
+        names = [nm for tl, nm in skipped if tl == t]
+        if names:
+            parts.append('%s %d (%s)' % (t, len(names), ', '.join(names)))
+    return '; '.join(parts)
+
+
 def read_seating(d):
     """Every capture of one directory, ordered by clock.
 
@@ -183,6 +263,7 @@ def read_seating(d):
         raise Refused('%s: not a directory' % d)
     metas = sorted(glob.glob(os.path.join(d, '*.meta.json')))
     caps = []
+    skipped = []
     for m in metas:
         name = os.path.basename(m)[:-len('.meta.json')]
         try:
@@ -190,31 +271,61 @@ def read_seating(d):
                 j = json.load(fh)
         except (ValueError, OSError) as e:
             raise Refused('%s: %s' % (m, e))
+        if not isinstance(j, dict):
+            raise Refused('%s: not a JSON object' % m)
+        tool = j.get('tool')
+        if tool in NON_CAPTURE_TOOLS:
+            skipped.append((tool, name))
+            continue
         if 'duration_s' not in j:
             raise Refused('%s: no duration_s. A capture with no duration is '
-                          'not a zero-length capture' % m)
+                          'not a zero-length capture%s'
+                          % (m, '' if tool is None else
+                             ' (its tool is %r, which is not one of %s, the '
+                             'recorders skipped as not captures)'
+                             % (tool, ', '.join(NON_CAPTURE_TOOLS))))
         try:
             dur = float(j['duration_s'])
         except (TypeError, ValueError):
             raise Refused('%s: duration_s %r is not a number'
                           % (m, j['duration_s']))
+        start = parse_wallclock(j.get('started_wallclock'), m)
+        t0_real = _stamp(j, 't0_real', m)
         caps.append({
             'name': name,
-            'start': parse_wallclock(j.get('started_wallclock'), m),
+            'start': start,
             'dur': dur,
             'sent': j.get('sent') or '',
             'bytes': j.get('bytes'),
+            'clock': j.get('clock'),
+            'boot_id': j.get('boot_id'),
+            't0_raw': _stamp(j, 't0_raw', m),
+            'end_raw': _stamp(j, 'end_raw', m),
+            't0_real': t0_real,
+            'end_real': _stamp(j, 'end_real', m),
+            # the wall clock to the microsecond where the capture carries it:
+            # two captures inside one wall-clock second are otherwise ordered
+            # by name (THE CLOCK A GAP IS TAKEN ON)
+            'order': start.timestamp() if t0_real is None else t0_real,
         })
     if not caps:
-        raise Refused('%s: no *.meta.json. Refusing to report 0 s over an '
-                      'empty population' % d)
-    caps.sort(key=lambda c: (c['start'], c['name']))
+        raise Refused('%s: no *.meta.json%s. Refusing to report 0 s over an '
+                      'empty population'
+                      % (d, '' if not skipped else
+                         ' that is a capture -- %d skipped as not captures: %s'
+                         % (len(skipped), _by_tool(skipped))))
+    caps.sort(key=lambda c: (c['order'], c['name']))
 
     notes = []
+    if skipped:
+        notes.append('%d .meta.json file(s) are records of a recorder that is '
+                     'not a console capture, and are outside every number '
+                     'here: %s' % (len(skipped), _by_tool(skipped)))
     # A capture killed by SIGTERM keeps its .log and .timing and loses its
     # .meta.json (CLAUDE.md, 2026-08-30).  Such a capture is INVISIBLE to the
     # arithmetic above, so it is counted and named rather than passed over.
-    have = set(c['name'] for c in caps)
+    # A skipped record's .log has its .meta.json and is not one of them.
+    have = set(c['name'] for c in caps) | set(nm for _t, nm in skipped)
     orphans = []
     for lg in sorted(glob.glob(os.path.join(d, '*.log'))):
         nm = os.path.basename(lg)[:-len('.log')]
@@ -247,21 +358,64 @@ def read_puts(d):
 
 
 # ------------------------------------------------------------- the analysis
+def raw_duration(c):
+    """True when this capture's duration_s is RAW seconds: it says so, or it
+    carries the RAW stamps its duration could only have been taken from."""
+    return (c['clock'] == RAW_CLOCK or c['t0_raw'] is not None
+            or c['end_raw'] is not None)
+
+
+def clock_gap(a, b):
+    """(rule, seconds) for the dead time between capture `a` and the next, `b`.
+
+    The best clock both carry (THE CLOCK A GAP IS TAKEN ON).  `seconds` is
+    None for `wall`, whose value analyse() has already computed.
+    """
+    if (a['end_raw'] is not None and b['t0_raw'] is not None
+            and a['boot_id'] and a['boot_id'] == b['boot_id']):
+        return 'raw', b['t0_raw'] - a['end_raw']
+    if a['end_real'] is not None and b['t0_real'] is not None:
+        return 'real', b['t0_real'] - a['end_real']
+    if raw_duration(a):
+        raise Refused('%s -> %s: the wall clock is the only clock they share, '
+                      'and %s\'s duration_s is %s seconds. A RAW duration added '
+                      'to a REALTIME start is two clocks in one number; '
+                      'refusing rather than report it'
+                      % (a['name'], b['name'], a['name'], RAW_CLOCK))
+    return 'wall', None
+
+
+def overlap_bound(rule):
+    """How far below 0 a gap on this rule can read without being an overlap:
+    the wall clock's truncation, and nothing on a clock that has none."""
+    return WALLCLOCK_QUANTUM if rule == 'wall' else 0.0
+
+
 def analyse(caps):
     """machine / gaps / span, and the identity."""
     machine = sum(c['dur'] for c in caps)
+    # Seconds since the first capture opened, not since 1970 (see the header).
+    base = caps[0]['start'].timestamp()
     gaps = []
     for a, b in zip(caps, caps[1:]):
-        end = a['start'].timestamp() + a['dur']
+        end = a['start'].timestamp() - base + a['dur']
         gaps.append({'after': a['name'], 'before': b['name'],
-                     's': b['start'].timestamp() - end})
-    span = (caps[-1]['start'].timestamp() + caps[-1]['dur']
-            - caps[0]['start'].timestamp())
+                     's': b['start'].timestamp() - base - end})
+    span = caps[-1]['start'].timestamp() - base + caps[-1]['dur']
     total = machine + sum(g['s'] for g in gaps)
     if abs(total - span) > IDENTITY_TOL:
         raise Refused('A1 the decomposition does not add up: machine %.6f + '
                       'gaps %.6f = %.6f, span %.6f'
                       % (machine, sum(g['s'] for g in gaps), total, span))
+    # Each gap again, on the best clock both of its captures carry.  An
+    # all-`wall` seating keeps every number above; any other seating's span is
+    # the sum of its parts, because no one clock covers it end to end.
+    for g, a, b in zip(gaps, caps, caps[1:]):
+        g['rule'], s = clock_gap(a, b)
+        if s is not None:
+            g['s'] = s
+    if any(g['rule'] != 'wall' for g in gaps):
+        span = machine + sum(g['s'] for g in gaps)
     return machine, gaps, span
 
 
@@ -364,27 +518,48 @@ def to_prompt(prefix, marker, boot_marker=BOOT_MARKER):
 
 
 # ------------------------------------------------------------------ report
+RULE_TEXT = {
+    'raw': 'next t0_raw - previous end_raw, one boot_id: no truncation, and '
+           'it never goes back',
+    'real': 'next t0_real - previous end_real (REALTIME): no truncation, but '
+            'it can step',
+    'wall': 'next started_wallclock - (started_wallclock + duration_s): '
+            '±%.1f s, the wall clock is written to the second'
+            % WALLCLOCK_QUANTUM,
+}
+
+
 def report_seating(d, top, each=False):
     caps, notes = read_seating(d)
     machine, gaps, span = analyse(caps)
     puts = read_puts(d)
+    # An all-`wall` seating prints exactly what this tool always printed; any
+    # other names the rule beside every gap it prints.
+    ruled = any(g['rule'] != 'wall' for g in gaps)
     if each:
         # One row per capture, from the SAME objects the totals are computed
         # from, so the two cannot disagree.  `t` is seconds since the seating
-        # opened, which is the axis a loop is read on.
+        # opened, which is the axis a loop is read on -- on a ruled seating,
+        # the running sum of the holds and gaps that make its span.
         t0 = caps[0]['start'].timestamp()
-        after = {g['after']: g['s'] for g in gaps}
+        after = {g['after']: g for g in gaps}
+        pos = 0.0
         for c in caps:
-            print('    %8.1f  %-16s hold %6.1f s  gap %8.1f s  sent %r'
-                  % (c['start'].timestamp() - t0, c['name'], c['dur'],
-                     after.get(c['name'], float('nan')),
+            g = after.get(c['name'])
+            print('    %8.1f  %-16s hold %6.1f s  gap %8.1f s%s  sent %r'
+                  % (pos if ruled else c['start'].timestamp() - t0,
+                     c['name'], c['dur'],
+                     g['s'] if g else float('nan'),
+                     (' %-4s' % (g['rule'] if g else '-')) if ruled else '',
                      (c['sent'] or '')[:40]))
+            pos += c['dur'] + (g['s'] if g else 0.0)
     gv = [g['s'] for g in gaps]
-    # Provably an overlap only below -WALLCLOCK_QUANTUM; between that and 0 it
-    # is the truncation and is counted separately rather than either summed
-    # away or called something it is not.
-    neg = [g for g in gaps if g['s'] < -WALLCLOCK_QUANTUM]
-    quant = [g for g in gaps if -WALLCLOCK_QUANTUM <= g['s'] < 0]
+    # Provably an overlap only below the rule's bound (overlap_bound); between
+    # -WALLCLOCK_QUANTUM and 0 a wall gap is the truncation and is counted
+    # separately rather than either summed away or called something it is not.
+    neg = [g for g in gaps if g['s'] < -overlap_bound(g['rule'])]
+    quant = [g for g in gaps
+             if g['rule'] == 'wall' and -WALLCLOCK_QUANTUM <= g['s'] < 0]
 
     print('%s' % d)
     print('  %d capture(s)   span %.1f s   instrument %.1f s (%.1f %%)   '
@@ -405,18 +580,36 @@ def report_seating(d, top, each=False):
                      sp['hi_n'], sp['hi_sum'],
                      100.0 * sp['hi_sum'] / sum(gv) if sum(gv) else 0.0))
         for g in sorted(gaps, key=lambda x: -x['s'])[:top]:
-            print('    %8.1f s  after %-14s before %-14s'
-                  % (g['s'], g['after'], g['before']))
+            print('    %8.1f s  after %-14s before %-14s%s'
+                  % (g['s'], g['after'], g['before'],
+                     ('  [%s]' % g['rule']) if ruled else ''))
     if puts:
         print('  upload  %d put(s), %.3f s total, %s byte(s)'
               % (len(puts), sum(p['seconds'] for p in puts),
                  sum(p['bytes'] or 0 for p in puts)))
     else:
         print('  upload  unmeasured -- no *-put.json in this directory')
-    if gv:
+    if gv and not ruled:
         print('  every gap above carries ±%.1f s: started_wallclock is written '
-              'to the second (console-capture.py:431) while duration_s keeps '
+              'to the second (console-capture.py:554) while duration_s keeps '
               'microseconds' % WALLCLOCK_QUANTUM)
+    if ruled:
+        for rule in ('raw', 'real', 'wall'):
+            k = sum(1 for g in gaps if g['rule'] == rule)
+            if k:
+                print('  gap rule  %-4s %4d  %s' % (rule, k, RULE_TEXT[rule]))
+        print('  span is instrument + dead: each hold is its capture\'s own '
+              'duration_s and each gap is on its rule -- no one clock was read '
+              'from the first capture to the last')
+        byname = dict((c['name'], c) for c in caps)
+        breaks = ['%s -> %s' % (g['after'], g['before']) for g in gaps
+                  if g['rule'] != 'raw'
+                  and byname[g['after']]['end_raw'] is not None
+                  and byname[g['before']]['t0_raw'] is not None]
+        if breaks:
+            print('  %d pair(s) carry RAW stamps but not one boot_id between '
+                  'them (RAW restarts with every boot), so they are not on the '
+                  'raw rule: %s' % (len(breaks), ', '.join(breaks)))
     if quant:
         print('  %d pair(s) have a small NEGATIVE gap (min %.3f s), all inside '
               'that ±%.1f s -- the truncation, not an overlap'
@@ -425,9 +618,20 @@ def report_seating(d, top, each=False):
         print('  ⚠️  %s' % n)
     if neg:
         for g in neg:
-            print('  OVERLAP %.3f s: %s ends after %s starts, and that is more '
-                  'than the ±%.1f s the clock can explain'
-                  % (-g['s'], g['after'], g['before'], WALLCLOCK_QUANTUM))
+            if g['rule'] == 'raw':
+                print('  OVERLAP %.3f s: %s ends after %s starts on %s under '
+                      'one boot_id, a clock with no truncation that never '
+                      'goes back' % (-g['s'], g['after'], g['before'],
+                                     RAW_CLOCK))
+            elif g['rule'] == 'real':
+                print('  OVERLAP %.3f s: %s ends after %s starts on REALTIME '
+                      '(t0_real, end_real), which has no truncation -- an '
+                      'overlap, or REALTIME stepped back between them'
+                      % (-g['s'], g['after'], g['before']))
+            else:
+                print('  OVERLAP %.3f s: %s ends after %s starts, and that is '
+                      'more than the ±%.1f s the clock can explain'
+                      % (-g['s'], g['after'], g['before'], WALLCLOCK_QUANTUM))
     return 1 if neg else 0
 
 
@@ -453,10 +657,41 @@ def report_prompt(prefix, marker, boot_marker=BOOT_MARKER):
 
 
 # --------------------------------------------------------------- self-test
-def _meta(d, name, start, dur, sent=''):
+def _meta(d, name, start, dur, sent='', **extra):
+    j = {'started_wallclock': start, 'duration_s': dur, 'sent': sent,
+         'bytes': 1}
+    j.update(extra)
     with open(os.path.join(d, name + '.meta.json'), 'w', encoding='utf-8') as f:
-        json.dump({'started_wallclock': start, 'duration_s': dur,
-                   'sent': sent, 'bytes': 1}, f)
+        json.dump(j, f)
+
+
+def _record(d, name, j):
+    with open(os.path.join(d, name + '.meta.json'), 'w', encoding='utf-8') as f:
+        json.dump(j, f)
+
+
+def _m14(d, name, start, dur, t0_real, end_real):
+    """A capture as console-capture wrote it from P2-1: MONOTONIC + REALTIME."""
+    _meta(d, name, start, dur, clock='CLOCK_MONOTONIC',
+          t0_mono=100.0 + t0_real % 1000, end_mono=100.0 + t0_real % 1000 + dur,
+          t0_real=t0_real, end_real=end_real)
+
+
+def _m15(d, name, start, dur, t0_raw, t0_real, end_real, boot='B1',
+         clock=RAW_CLOCK):
+    """A capture as console-capture 1.5 writes it: duration_s = end_raw -
+    t0_raw, a REALTIME pair beside it, and the boot the RAW stamps belong to."""
+    _meta(d, name, start, dur, clock=clock, t0_raw=t0_raw,
+          end_raw=t0_raw + dur, t0_real=t0_real, end_real=end_real,
+          boot_id=boot)
+
+
+def _cap(name, start, dur):
+    """A capture as read_seating() returns it, carrying no clock stamps."""
+    st = parse_wallclock(start, name)
+    return {'name': name, 'start': st, 'dur': dur, 'sent': '', 'bytes': 1,
+            'clock': None, 'boot_id': None, 't0_raw': None, 'end_raw': None,
+            't0_real': None, 'end_real': None, 'order': st.timestamp()}
 
 
 def _fixture_simple(d):
@@ -485,6 +720,9 @@ def selftest():
         r = subprocess.run([sys.executable, here] + args,
                            capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
+
+    # The epoch second of 2026-09-01T10:00:00+0800, for REALTIME stamps.
+    W = parse_wallclock('2026-09-01T10:00:00+0800', 'x').timestamp()
 
     # -- P1 the arithmetic on a fixture whose answers are known by hand -----
     def p1():
@@ -602,15 +840,19 @@ def selftest():
     case('N5', 'a .log whose capture was killed is counted and named', n5)
 
     # -- N6 malformed JSON is refused -------------------------------------
+    # And JSON that is not an object: reading its `tool` would otherwise be a
+    # traceback, and a tool refuses with a reason.
     def n6():
-        with tempfile.TemporaryDirectory() as d:
-            _fixture_simple(d)
-            with open(os.path.join(d, 'broken.meta.json'), 'w',
-                      encoding='utf-8') as f:
-                f.write('{not json')
-            rc, out = run_cli(['seating', d])
-            assert rc == 2, 'rc %r\n%s' % (rc, out)
-    case('N6', 'a malformed .meta.json is REFUSED', n6)
+        for body in ('{not json', '[1, 2]', '5'):
+            with tempfile.TemporaryDirectory() as d:
+                _fixture_simple(d)
+                with open(os.path.join(d, 'broken.meta.json'), 'w',
+                          encoding='utf-8') as f:
+                    f.write(body)
+                rc, out = run_cli(['seating', d])
+                assert rc == 2, 'body %r: rc %r\n%s' % (body, rc, out)
+                assert 'Traceback' not in out, out
+    case('N6', 'a malformed or non-object .meta.json is REFUSED', n6)
 
     # -- N7 both offset spellings parse; a naive timestamp is refused ------
     def n7():
@@ -780,14 +1022,241 @@ def selftest():
         assert rc == 2, 'rc %r\n%s' % (rc, out)
     case('X2', 'CLI: a path that is not a directory is REFUSED', x2)
 
+    # -- P8 the identity on the shape that refused two real seatings --------
+    # 量 2026-09-23: on epoch seconds the rounding of 113 gaps summed past
+    # IDENTITY_TOL and A1 refused bench/2026-09-21e, whose exact residual is 0.
+    # Thirty-one holds of 10.000003 s at a 2026 epoch round the same way every
+    # time; the control proves the fixture still reproduces the refusal, so a
+    # pass here is the arithmetic and not a fixture gone soft.
+    def p8():
+        with tempfile.TemporaryDirectory() as d:
+            for i in range(31):
+                _meta(d, 'c%02d' % i, '2026-09-01T10:%02d:%02d+0800'
+                      % divmod(15 * i, 60), 10.000003)
+            caps, _ = read_seating(d)
+            epoch = (sum(c['dur'] for c in caps)
+                     + sum(b['start'].timestamp()
+                           - (a['start'].timestamp() + a['dur'])
+                           for a, b in zip(caps, caps[1:]))
+                     - (caps[-1]['start'].timestamp() + caps[-1]['dur']
+                        - caps[0]['start'].timestamp()))
+            assert abs(epoch) > IDENTITY_TOL, (
+                'control: epoch-second arithmetic leaves only %r here -- the '
+                'fixture no longer reproduces the refusal' % epoch)
+            machine, gaps, span = analyse(caps)
+            assert abs(machine + sum(g['s'] for g in gaps) - span) < 1e-9
+            assert abs(span - (450.0 + 10.000003)) < 1e-9, span
+    case('P8', 'A1 holds on 31 captures whose epoch-second sums round past '
+               'IDENTITY_TOL', p8)
+
+    # -- S1 a non-capture recorder's record is skipped -- counted and named -
+    # One hostprobe meta refused the whole of bench/2026-09-23.  Skipping it
+    # silently would be the orphan defect again, and so would calling its
+    # .log an orphan.
+    def s1():
+        with tempfile.TemporaryDirectory() as d:
+            _fixture_simple(d)
+            _record(d, 'hp', {'tool': 'hostprobe',
+                              'started_wallclock': '2026-09-01T10:00:00+0800'})
+            _record(d, 'clk', {'tool': 'hostclock', 'boot_id': 'B1'})
+            for nm in ('hp', 'killed'):
+                with open(os.path.join(d, nm + '.log'), 'w',
+                          encoding='utf-8') as f:
+                    f.write('x')
+            rc, out = run_cli(['seating', d])
+            assert rc == 0, 'rc %r\n%s' % (rc, out)
+            assert '3 capture(s)   span 95.0 s   instrument 30.0 s' in out, out
+            assert ('2 .meta.json file(s) are records of a recorder that is '
+                    'not a console capture') in out, out
+            assert 'hostprobe 1 (hp); hostclock 1 (clk)' in out, out
+            orph = [l for l in out.splitlines() if 'have no .meta.json' in l]
+            assert len(orph) == 1, orph
+            assert orph[0].rsplit(': ', 1)[1].split(', ') == ['killed'], orph
+        with tempfile.TemporaryDirectory() as d:
+            _record(d, 'hp', {'tool': 'hostprobe'})
+            _record(d, 'clk', {'tool': 'hostclock'})
+            rc, out = run_cli(['seating', d])
+            assert rc == 2, 'rc %r\n%s' % (rc, out)
+            assert 'empty population' in out and '2 skipped' in out, out
+    case('S1', 'hostprobe and hostclock records are skipped, counted and '
+               'named; their .log is no orphan', s1)
+
+    # -- S2 the skip list holds names, not a pattern -----------------------
+    def s2():
+        with tempfile.TemporaryDirectory() as d:
+            _fixture_simple(d)
+            _record(d, 'ip', {'tool': 'iperflog',
+                              'started_wallclock': '2026-09-01T10:05:00+0800'})
+            rc, out = run_cli(['seating', d])
+            assert rc == 2, 'rc %r\n%s' % (rc, out)
+            assert 'no duration_s' in out and "'iperflog'" in out, out
+    case('S2', 'a tool the list does not name is read as a capture and '
+               'refused, not skipped', s2)
+
+    # -- C1..C8 the clock each gap is taken on.  Every fixture plants values
+    # for which raw, real and wall give three different answers, so a gap on
+    # the wrong rule cannot pass by coincidence. ----------------------------
+    def c1():
+        with tempfile.TemporaryDirectory() as d:
+            _m15(d, 'a', '2026-09-01T10:00:00+0800', 10.5, 5000.0,
+                 W + 0.40, W + 10.45)
+            _m15(d, 'b', '2026-09-01T10:00:15+0800', 5.0, 5016.0,
+                 W + 15.30, W + 20.30)
+            caps, _ = read_seating(d)
+            machine, gaps, span = analyse(caps)
+            assert [g['rule'] for g in gaps] == ['raw'], gaps
+            assert abs(gaps[0]['s'] - 5.5) < 1e-9, gaps
+            assert abs(span - 21.0) < 1e-9, span
+    case('C1', 'raw: next t0_raw - end_raw under one boot_id (5.5; real '
+               'reads 4.85, wall 4.5)', c1)
+
+    def c2():
+        with tempfile.TemporaryDirectory() as d:
+            _m14(d, 'a', '2026-09-01T10:00:00+0800', 10.2, W + 0.60, W + 11.40)
+            _m14(d, 'b', '2026-09-01T10:00:15+0800', 5.0, W + 15.70, W + 20.70)
+            caps, _ = read_seating(d)
+            machine, gaps, span = analyse(caps)
+            assert [g['rule'] for g in gaps] == ['real'], gaps
+            assert abs(gaps[0]['s'] - 4.30) < 1e-6, gaps
+            assert abs(span - 19.5) < 1e-6, span
+    case('C2', 'real: next t0_real - end_real (4.30; wall reads 4.8)', c2)
+
+    def c3():
+        with tempfile.TemporaryDirectory() as d:
+            _meta(d, 'a', '2026-09-01T10:00:00+0800', 10.0)   # before P2-1
+            _m14(d, 'b', '2026-09-01T10:00:15+0800', 10.0, W + 15.30, W + 25.30)
+            _meta(d, 'c', '2026-09-01T10:00:30+0800', 10.0)
+            caps, _ = read_seating(d)
+            machine, gaps, span = analyse(caps)
+            assert [g['rule'] for g in gaps] == ['wall', 'wall'], gaps
+            assert [round(g['s'], 6) for g in gaps] == [5.0, 5.0], gaps
+            assert abs(span - 40.0) < 1e-9, span
+    case('C3', 'wall: a pair without a shared stamp keeps the old rule, and a '
+               'MONOTONIC duration may meet a wall start', c3)
+
+    def c4():
+        with tempfile.TemporaryDirectory() as d:
+            _m15(d, 'a', '2026-09-01T10:00:00+0800', 10.5, 5000.0,
+                 W + 0.40, W + 10.45, boot='B1')
+            _m15(d, 'b', '2026-09-01T10:00:40+0800', 5.0, 12.0,
+                 W + 40.20, W + 45.20, boot='B2')
+            caps, _ = read_seating(d)
+            _m, gaps, _s = analyse(caps)
+            # raw across the two boots would read 12.0 - 5010.5 = -4998.5
+            assert [g['rule'] for g in gaps] == ['real'], gaps
+            assert abs(gaps[0]['s'] - 29.75) < 1e-6, gaps
+            rc, out = run_cli(['seating', d])
+            assert rc == 0, 'rc %r\n%s' % (rc, out)
+            assert 'not one boot_id' in out and 'a -> b' in out, out
+    case('C4', 'RAW stamps under two boot_ids fall back to real, and the '
+               'report names the pair', c4)
+
+    def c5():
+        with tempfile.TemporaryDirectory() as d:
+            _m14(d, 'a', '2026-09-01T10:00:00+0800', 10.0, W + 0.20, W + 10.60)
+            _m15(d, 'b', '2026-09-01T10:00:15+0800', 10.0, 7000.0,
+                 W + 15.10, W + 24.70)
+            _m14(d, 'c', '2026-09-01T10:00:30+0800', 10.0, W + 30.90, W + 41.00)
+            caps, _ = read_seating(d)
+            _m, gaps, _s = analyse(caps)
+            assert [g['rule'] for g in gaps] == ['real', 'real'], gaps
+            assert [round(g['s'], 3) for g in gaps] == [4.5, 6.2], gaps
+        # a RAW duration, then a capture with no REALTIME stamp: the wall
+        # clock is all they share -- declared RAW, and RAW by its stamps alone
+        for clock in (RAW_CLOCK, None):
+            with tempfile.TemporaryDirectory() as d:
+                _m15(d, 'a', '2026-09-01T10:00:00+0800', 10.0, 7000.0,
+                     W + 0.10, W + 9.70, clock=clock)
+                _meta(d, 'b', '2026-09-01T10:00:15+0800', 10.0)
+                rc, out = run_cli(['seating', d])
+                assert rc == 2, 'clock %r: rc %r\n%s' % (clock, rc, out)
+                assert ('a -> b' in out and RAW_CLOCK in out
+                        and 'two clocks in one number' in out), out
+    case('C5', 'mixed clocks: MONOTONIC and RAW captures meet on real; a RAW '
+               'duration never meets a wall start', c5)
+
+    def c6():
+        with tempfile.TemporaryDirectory() as d:
+            _meta(d, 'a', '2026-09-01T10:00:00+0800', 10.0)
+            _m15(d, 'b', '2026-09-01T10:00:15+0800', 10.0, 5000.0,
+                 W + 15.40, W + 25.00)
+            _m15(d, 'c', '2026-09-01T10:00:31+0800', 10.0, 5016.0,
+                 W + 31.10, W + 40.70)
+            rc, out = run_cli(['seating', d, '--each'])
+            assert rc == 0, 'rc %r\n%s' % (rc, out)
+            assert 'gap rule  raw     1' in out, out
+            assert 'gap rule  wall    1' in out, out
+            assert '[raw]' in out and '[wall]' in out, out
+            assert 'span is instrument + dead' in out, out
+            assert 'every gap above carries' not in out, out
+            rows = [l.split() for l in out.splitlines() if ' sent ' in l]
+            assert [r[8] for r in rows] == ['wall', 'raw', '-'], rows
+        with tempfile.TemporaryDirectory() as d:
+            _fixture_simple(d)
+            rc, out = run_cli(['seating', d, '--each'])
+            assert rc == 0, 'rc %r\n%s' % (rc, out)
+            assert 'every gap above carries' in out, out
+            assert 'gap rule' not in out and '[wall]' not in out, out
+    case('C6', 'the report names the rule of every gap it prints; an all-wall '
+               'seating prints what it always did', c6)
+
+    def c7():
+        with tempfile.TemporaryDirectory() as d:
+            _m15(d, 'a', '2026-09-01T10:00:00+0800', 10.0, 5000.0,
+                 W + 0.10, W + 9.70)
+            _m15(d, 'b', '2026-09-01T10:00:09+0800', 10.0, 5009.8,
+                 W + 9.80, W + 19.40)
+            rc, out = run_cli(['seating', d])
+            assert rc == 1 and 'OVERLAP 0.200 s' in out, (rc, out)
+            assert RAW_CLOCK in out, out
+        with tempfile.TemporaryDirectory() as d:
+            _m14(d, 'a', '2026-09-01T10:00:00+0800', 10.0, W + 0.10, W + 10.10)
+            _m14(d, 'b', '2026-09-01T10:00:09+0800', 10.0, W + 9.90, W + 19.90)
+            rc, out = run_cli(['seating', d])
+            assert rc == 1 and 'OVERLAP 0.200 s' in out, (rc, out)
+            assert 'REALTIME' in out, out
+    case('C7', 'a raw or real gap of -0.2 s is an OVERLAP: no truncation '
+               'forgives it', c7)
+
+    def c8():
+        with tempfile.TemporaryDirectory() as d:
+            _m14(d, 'zz-early', '2026-09-01T10:00:00+0800', 0.3,
+                 W + 0.10, W + 0.40)
+            _m14(d, 'aa-late', '2026-09-01T10:00:00+0800', 0.3,
+                 W + 0.55, W + 0.85)
+            caps, _ = read_seating(d)
+            assert [c['name'] for c in caps] == ['zz-early', 'aa-late'], caps
+            rc, out = run_cli(['seating', d])
+            assert rc == 0 and 'OVERLAP' not in out, (rc, out)
+    case('C8', 'two captures in one wall-clock second are ordered by t0_real, '
+               'not by name', c8)
+
+    # -- F1 FW-124: the refusals a card's HOST cell can be checked with ----
+    def f1():
+        ap = build_parser()
+        for argv, want in ((['seating'], 'at least one path'),
+                           ([], 'a mode'),
+                           (['to-prompt'], 'at least one path'),
+                           (['seating', 'd', '--top', '-1'], '--top -1')):
+            try:
+                refuse_args(ap.parse_args(argv))
+            except Refused as e:
+                assert want in str(e), (argv, str(e))
+            else:
+                raise AssertionError('refuse_args permitted %r' % argv)
+        for argv in (['seating', 'd'], ['seating', 'd', 'e', '--top', '0'],
+                     ['to-prompt', 'p', '--marker', 'x'], ['--self-test']):
+            refuse_args(ap.parse_args(argv))       # permitted: must not raise
+        # main() runs the same check: the --top refusal exists nowhere else
+        rc, out = run_cli(['seating', tempfile.gettempdir(), '--top', '-1'])
+        assert rc == 2 and '--top -1' in out, (rc, out)
+    case('F1', 'refuse_args refuses a missing mode or path and a negative '
+               '--top, permits the good forms; main runs it', f1)
+
     # -- A1 the identity check can actually fire ---------------------------
     def a1():
-        caps = [{'name': 'a',
-                 'start': parse_wallclock('2026-09-01T10:00:00+0800', 'x'),
-                 'dur': 10.0},
-                {'name': 'b',
-                 'start': parse_wallclock('2026-09-01T10:00:20+0800', 'x'),
-                 'dur': 10.0}]
+        caps = [_cap('a', '2026-09-01T10:00:00+0800', 10.0),
+                _cap('b', '2026-09-01T10:00:20+0800', 10.0)]
         global IDENTITY_TOL
         keep = IDENTITY_TOL
         try:
@@ -814,7 +1283,7 @@ def selftest():
         ids = re.findall(r"^    case\('([A-Za-z0-9]+)'", src, re.M)
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         assert not dupes, 'duplicate case id(s): %s' % dupes
-        assert len(ids) >= 25, ids
+        assert len(ids) >= 38, ids
     case('A2', 'every case id in this file is unique', a2)
 
     print('looptime %s -- self-test' % VERSION)
@@ -832,7 +1301,9 @@ def selftest():
 
 
 # -------------------------------------------------------------------- main
-def main(argv):
+def build_parser():
+    """The parser main() itself uses (FW-124): a card's HOST cell is checked
+    with this and refuse_args(), so the check and the run cannot drift."""
     ap = argparse.ArgumentParser(add_help=True,
                                  description=__doc__.splitlines()[0])
     ap.add_argument('mode', nargs='?', choices=['seating', 'to-prompt'])
@@ -846,14 +1317,32 @@ def main(argv):
     ap.add_argument('--each', action='store_true',
                     help='one row per capture, on the seating\'s own clock')
     ap.add_argument('--self-test', action='store_true')
-    a = ap.parse_args(argv)
+    return ap
 
+
+def refuse_args(a):
+    """Every refusal that reads nothing but the parsed arguments (FW-124):
+    no file, directory, environment or clock."""
+    if a.self_test:
+        return
+    if not a.mode or not a.paths:
+        raise Refused('a mode and at least one path are required')
+    if a.top < 0:
+        raise Refused('--top %d: how many of the largest gaps to name cannot '
+                      'be negative' % a.top)
+
+
+def main(argv):
+    ap = build_parser()
+    a = ap.parse_args(argv)
+    try:
+        refuse_args(a)
+    except Refused as e:
+        ap.print_usage(sys.stderr)
+        sys.stderr.write('looptime: %s\n' % e)
+        return 2
     if a.self_test:
         return selftest()
-    if not a.mode or not a.paths:
-        ap.print_usage(sys.stderr)
-        sys.stderr.write('looptime: a mode and at least one path are required\n')
-        return 2
     worst = 0
     try:
         for p in a.paths:

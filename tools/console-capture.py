@@ -44,9 +44,9 @@ The two output files, and why they are two
 
 ``PREFIX.timing``
     ``<byte-offset> <seconds-since-start>`` per read, one per line.  The
-    seconds are ``time.monotonic()`` minus the metadata's ``t0_mono``, on the
-    clock its ``clock`` names, so ``t0_mono + seconds`` is an instant on the
-    host's clock (``SPEC.md`` ``FW-114``).
+    seconds are CLOCK_MONOTONIC_RAW minus the metadata's ``t0_raw``, the
+    clock its ``clock`` names, so ``t0_raw + seconds`` is an instant on the
+    host's unslewed clock (``SPEC.md`` ``FW-114``, ``CLK-38``).
 
 They are two files because on 2026-08-23 two separate things were caught
 rewriting the bench transcripts on the way into git -- ``.gitattributes``'s
@@ -180,7 +180,7 @@ def _record_esc(meta, which, requested, writes, window):
     """Record what the ESC heartbeat ACTUALLY was, not what it was asked for.
 
     `writes` is counted at the point of `ser.write`, so it is the number of
-    escapes that left this process; `window` is wall-clock across the loop.
+    escapes that left this process; `window` is RAW seconds across the loop.
     The quotient is therefore an upper bound on the period the device saw --
     it includes this process's own scheduling, which is exactly the term that
     made a requested 20.00 ms come out at 20.35 (SPEC.md CLK-08).
@@ -240,7 +240,18 @@ DEFAULT_ESC_PERIOD = 0.02
 # FW-114), by the rule of 2026-08-30: not one byte more or less goes out on the
 # wire. The PRESENCE of `t0_mono` is what says a capture's .timing can be put on
 # the host's clock, and its absence dates the capture to before 2026-09-23.
-TOOL_VERSION = "1.4"
+#
+# 🟢 BUMPED 1.4 -> 1.5 on 2026-09-23 (P2-4, SPEC.md CLK-38) by the 1.3 -> 1.4
+# rule: every stamp AND every deadline -- both ESC loops, the CR settle,
+# --seconds, --idle, drain() -- moved from CLOCK_MONOTONIC to
+# CLOCK_MONOTONIC_RAW, and a deadline decides what is written. Where the
+# kernel slews MONOTONIC to r = 0.965 of RAW (CLK-38, and deepening) an
+# --esc N loop now lasts N RAW seconds, not N/r: ~3.5 % fewer ESC bytes, and
+# the --send after it leaves that much sooner. select() still sleeps on the
+# kernel's clock, so achieved_period_s reads ~1/r longer there. RAW stamps
+# on MONOTONIC deadlines would keep the wire and put two clocks in one
+# capture. `t0_raw` is a new key, not `t0_mono` redefined (FW-115).
+TOOL_VERSION = "1.5"
 
 # --until searches this many TRAILING bytes of what has arrived since it was
 # armed. A pattern whose MATCH spans more than this cannot be found; a pattern
@@ -255,19 +266,8 @@ def _fail(msg: str) -> "NoReturn":  # noqa: F821
     raise SystemExit(2)
 
 
-def _clock_name() -> str:
-    """The clock time.monotonic() reads, as the interpreter reports it.
-
-    Read rather than written as a constant: `t0_mono` joins a host probe's
-    stamps only if both are on one clock, and a constant would name
-    CLOCK_MONOTONIC on an interpreter that was not using it.  量 2026-09-23,
-    WSL's /usr/bin/python3 3.12.3 reports ``clock_gettime(CLOCK_MONOTONIC)``;
-    anything else is recorded verbatim, so a reader expecting CLOCK_MONOTONIC
-    refuses it.
-    """
-    impl = time.get_clock_info("monotonic").implementation
-    m = re.fullmatch(r"clock_gettime\((CLOCK_\w+)\)", impl)
-    return m.group(1) if m else impl
+class Refused(Exception):
+    """An argument-only refusal (SPEC.md FW-124); main() prints it via _fail."""
 
 
 # --------------------------------------------------------------------------
@@ -286,16 +286,16 @@ def _check_send(value):
     if value is None:
         return None
     if value != value.strip():
-        _fail(
+        raise Refused(
             f"--send {value!r} has leading or trailing whitespace. "
             "The tokeniser at 0x80407248 stores argv[i] before testing for a "
             "separator, so a leading space NULs argv[0] and the dispatcher "
             "matches nothing (Unknown command !). Refusing."
         )
     if "\n" in value or "\r" in value:
-        _fail("--send takes one line; the carriage return is added here")
+        raise Refused("--send takes one line; the carriage return is added here")
     if any(ord(c) > 0x7F for c in value):
-        _fail(
+        raise Refused(
             f"--send {value!r} is not ASCII. capture() encodes the line with "
             ".encode('ascii') AFTER the port is open, so a non-ASCII character "
             "would raise there -- with the port already opened, which is the "
@@ -303,7 +303,7 @@ def _check_send(value):
         )
     n = len(value)
     if n >= 128:
-        _fail(
+        raise Refused(
             f"--send is {n} characters and the loader's console line buffer is "
             "128 bytes. Refusing.\n"
             "  Measured on the device 2026-08-24: exactly 128 ESC bytes came\n"
@@ -336,7 +336,7 @@ def _check_terminator(args) -> None:
     for the same never-returning loop in longhand.
 
     WHERE THIS SITS, AND IT IS NOT A STYLE CHOICE.  It runs AFTER
-    ``_check_send`` and BEFORE the port is opened.
+    ``_check_send`` and BEFORE the port is opened, inside refuse_args().
 
     * After ``_check_send``, because N4/N7/N8 pass ``--port /dev/null`` and
       expect that function's refusals.  Put in front of them and all three go
@@ -366,7 +366,7 @@ def _check_terminator(args) -> None:
     One edge each, by assertion.
     """
     if args.seconds <= 0 and args.idle <= 0:
-        _fail(
+        raise Refused(
             "capture needs a terminator: pass --seconds N or --idle N (or both).\n"
             "  Both default to 0.0 and the read loop breaks on neither, so this\n"
             "  command would not return -- measured 2026-08-29, rc=124 under\n"
@@ -418,7 +418,7 @@ def _check_until(args) -> None:
     if args.until is None:
         return
     if args.until == "":
-        _fail(
+        raise Refused(
             "--until was given an empty pattern, which matches at offset 0 of\n"
             "  every capture -- the run would stop on the first byte that\n"
             "  arrives. If the intent is 'no pattern', omit the flag."
@@ -426,7 +426,7 @@ def _check_until(args) -> None:
     try:
         re.compile(args.until.encode())
     except re.error as e:
-        _fail(
+        raise Refused(
             f"--until: bad pattern: {e}\n"
             f"  pattern was: {args.until!r}\n"
             "  It is a regex over BYTES, matched against what arrives after the\n"
@@ -437,9 +437,9 @@ def _check_until(args) -> None:
 
 
 def capture(args) -> int:
-    _check_send(args.send)
-    _check_terminator(args)
-    _check_until(args)
+    # The argument refusals ran in refuse_args() before this (FW-124). The
+    # clock is a host check, so it is here -- still before the port (N50).
+    _raw_clock()
     try:
         import serial  # type: ignore
     except ImportError:
@@ -467,17 +467,17 @@ def capture(args) -> int:
         "port": args.port,
         "baud": args.baud,
         "started_wallclock": None,
-        # THE ORIGIN ON THE HOST'S CLOCK (P2-1, SPEC.md FW-114). Every .timing
-        # second is time.monotonic() - t0_mono, so t0_mono + seconds is the
-        # instant a read returned on the clock `clock` names -- the clock a
-        # host probe stamps its packets on. `t0_mono` is the variable t0
-        # itself, unrounded: JSON writes a float's shortest round-trip repr,
-        # so it comes back bit for bit. `t0_real` is time.time() read straight
-        # after it, for realtime stamps such as `ping -D`; started_wallclock
-        # is a string, to the second.
-        "clock": _clock_name(),
-        "t0_mono": None,
-        "t0_real": None,
+        # THE ORIGIN ON THE HOST'S RAW CLOCK (FW-114; RAW from 1.5, CLK-38).
+        # Every .timing second is RAW - t0_raw, so t0_raw + seconds is the
+        # instant a read returned on the clock `clock` names. `t0_raw` is t0
+        # itself, unrounded: JSON writes a float's round-trip repr. Read
+        # beside it: `t0_real`, time.time(), for stamps such as `ping -D`
+        # (started_wallclock is it, to the second), and `mono_at_t0`,
+        # CLOCK_MONOTONIC: with mono_at_end, the record's own MONO/RAW rate.
+        "clock": CLOCK,
+        "t0_raw": None, "t0_real": None, "mono_at_t0": None,
+        "boot_id": _host_line(BOOT_ID),      # RAW restarts at every boot
+        "clocksource": _host_line(CLOCKSOURCE),
         "esc_seconds": args.esc,
         "esc_after_seconds": args.esc_after,
         "esc_period_requested_s": args.esc_period,
@@ -525,10 +525,10 @@ def capture(args) -> int:
         "stop_reason": None,
         "bytes": 0,
         "duration_s": None,
-        # The pair again, read once the port is closed. duration_s is
-        # end_mono - t0 from that same reading, not from a third one.
-        "end_mono": None,
-        "end_real": None,
+        # The same reads once the port is closed. duration_s is end_raw - t0
+        # from that same RAW reading, not from a third one.
+        "end_raw": None, "end_real": None, "mono_at_end": None,
+        "clocksource_end": None,
         "resolution_note": (
             "timestamps are per read() from userspace; the floor is the USB-serial "
             "latency timer (1-16 ms typical, unmeasured on this host), not the "
@@ -548,10 +548,10 @@ def capture(args) -> int:
         )
     fd = ser.fileno()
     offset = 0
-    t0 = time.monotonic()
-    meta["t0_real"] = time.time()
-    meta["t0_mono"] = t0
-    meta["started_wallclock"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    t0 = _now()
+    meta["t0_real"], meta["mono_at_t0"] = time.time(), _mono()
+    meta["t0_raw"] = t0
+    meta["started_wallclock"] = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(meta["t0_real"]))
     last_byte_at = t0
     stop_reason = "interrupted"
 
@@ -592,11 +592,11 @@ def capture(args) -> int:
             until_armed = True
 
         def drain(budget: float) -> None:
-            """Read whatever is there for up to `budget` seconds."""
+            """Read whatever is there for up to `budget` RAW seconds."""
             nonlocal offset, last_byte_at, matchbuf_base, until_at
-            deadline = time.monotonic() + budget
+            deadline = _now() + budget
             while True:
-                remaining = deadline - time.monotonic()
+                remaining = deadline - _now()
                 if remaining <= 0:
                     return
                 r, _, _ = select.select([fd], [], [], min(remaining, 0.05))
@@ -605,12 +605,12 @@ def capture(args) -> int:
                 chunk = ser.read(ser.in_waiting or 1)
                 if not chunk:
                     continue
-                timing.write(f"{offset} {time.monotonic() - t0:.6f}\n")
+                timing.write(f"{offset} {_now() - t0:.6f}\n")
                 log.write(chunk)
                 log.flush()
                 timing.flush()
                 offset += len(chunk)
-                last_byte_at = time.monotonic()
+                last_byte_at = _now()
                 tail.extend(chunk)
                 if len(tail) > 4096:
                     del tail[:-4096]
@@ -638,7 +638,7 @@ def capture(args) -> int:
         def terminate_esc_line(which: str, on_interrupt: bool = False) -> None:
             """End an ESC loop with a CR, and wait for the prompt it causes.
 
-            An ESC loop ends on a wall-clock deadline and writes no terminator,
+            An ESC loop ends on a RAW-clock deadline and writes no terminator,
             so it leaves `N mod 128` bytes in the loader's readline buffer and
             the next command line is appended to them. This writes the
             terminator the loop did not, which is RUNSHEET seating 2 rule 2
@@ -700,7 +700,7 @@ def capture(args) -> int:
             budget = args.cr_settle
             if args.seconds:
                 # Never let the settle push the capture past its own deadline.
-                budget = min(budget, max(0.0, args.seconds - (time.monotonic() - t0)))
+                budget = min(budget, max(0.0, args.seconds - (_now() - t0)))
             entry["settle_budget_s"] = round(budget, 6)
             if budget <= 0.0:
                 # `prompt_seen` stays None. False would mean "looked and did not
@@ -714,16 +714,16 @@ def capture(args) -> int:
                       "Give --seconds at least --cr-settle more than the ESC window.",
                       file=sys.stderr)
                 return
-            started = time.monotonic()
+            started = _now()
             deadline = started + budget
             seen = False
-            while time.monotonic() < deadline:
+            while _now() < deadline:
                 drain(0.05)
                 if PROMPT in tail:
                     seen = True
                     break
             entry["prompt_seen"] = seen
-            entry["waited_s"] = round(time.monotonic() - started, 6)
+            entry["waited_s"] = round(_now() - started, 6)
 
         try:
             if args.esc:
@@ -732,15 +732,15 @@ def capture(args) -> int:
                 # before power-on is what B1 A1 does; it is also what sets
                 # gCHKKEY_HIT, which is why B5 read 1 and not 0.
                 pending_esc = "esc"
-                esc_started = time.monotonic()
+                esc_started = _now()
                 esc_deadline = esc_started + args.esc
                 esc_writes = 0
-                while time.monotonic() < esc_deadline:
+                while _now() < esc_deadline:
                     ser.write(ESC)
                     esc_writes += 1
                     drain(args.esc_period)
                 _record_esc(meta, "esc", args.esc_period, esc_writes,
-                            time.monotonic() - esc_started)
+                            _now() - esc_started)
                 # Before --send, not after: the residue this terminates would
                 # otherwise be the front of the command line. Called whether or
                 # not --send was given: the A-catch shape is --esc with no
@@ -763,7 +763,7 @@ def capture(args) -> int:
                 ser.write(line)
                 ser.flush()
                 # After flush() returns, never before write(): case P21.
-                meta["sent_s"] = round(time.monotonic() - t0, 6)
+                meta["sent_s"] = round(_now() - t0, 6)
                 # THE ARMING POINT. Note it is after the flush and not after
                 # the echo: the command's own echo is inside the search window,
                 # which is why a --until pattern must not be a substring of the
@@ -788,10 +788,10 @@ def capture(args) -> int:
                 # repo has nearly lost to an instrument that could not do it
                 # (``A2``, ``E5``) and the first one caught in advance.
                 pending_esc = "esc_after"
-                esc_started = time.monotonic()
+                esc_started = _now()
                 esc_deadline = esc_started + args.esc_after
                 esc_writes = 0
-                while time.monotonic() < esc_deadline:
+                while _now() < esc_deadline:
                     ser.write(ESC)
                     esc_writes += 1
                     drain(args.esc_period)
@@ -805,7 +805,7 @@ def capture(args) -> int:
                         # instead of from a prediction it does not have.
                         break
                 _record_esc(meta, "esc_after", args.esc_period, esc_writes,
-                            time.monotonic() - esc_started)
+                            _now() - esc_started)
                 if until_at is not None:
                     meta["esc"]["esc_after"]["ended_on_until"] = True
                 # D1 and D4 both end here, and D2 is the command that was going
@@ -818,7 +818,7 @@ def capture(args) -> int:
 
             while True:
                 drain(0.05)
-                now = time.monotonic()
+                now = _now()
                 # --until is tested FIRST, and the order is a decision. A cell
                 # whose pattern arrived in the same 50 ms window that its
                 # --seconds cap expired in has SEEN ITS EVENT, and that is the
@@ -860,13 +860,14 @@ def capture(args) -> int:
         finally:
             ser.close()
 
-    end_mono = time.monotonic()
-    meta["end_real"] = time.time()
-    meta["end_mono"] = end_mono
+    end_raw = _now()
+    meta["end_real"], meta["mono_at_end"] = time.time(), _mono()
+    meta["end_raw"] = end_raw
+    meta["clocksource_end"] = _host_line(CLOCKSOURCE)
     meta["stop_reason"] = stop_reason
     meta["until_offset"] = until_at
     meta["bytes"] = offset
-    meta["duration_s"] = round(end_mono - t0, 6)
+    meta["duration_s"] = round(end_raw - t0, 6)
     with open(meta_path, "w", encoding="utf-8") as m:
         json.dump(meta, m, indent=2)
         m.write("\n")
@@ -951,7 +952,66 @@ def report(args) -> int:
     return 0
 
 
-def main() -> int:
+# --------------------------------------------------------------------------
+# the clock, and the refusals a card can run in-process
+# --------------------------------------------------------------------------
+
+# P2-4 (SPEC.md CLK-38): every stamp this tool writes and every deadline it
+# computes reads CLOCK_MONOTONIC_RAW.  WSL's CLOCK_MONOTONIC ran at 0.965 of
+# RAW on 2026-09-23, slower as the evening went, while two time daemons
+# fought, and a capture on it would record that in no field.  select()
+# timeouts stay on the kernel's clock and every loop re-reads RAW after its
+# wait, so a quantum q overshoots by at most q * (1/r - 1): 1.8 ms per 50 ms
+# at that r.  `clock` in the metadata declares the name whole --
+# CLOCK_MONOTONIC is a prefix of it.
+CLOCK = "CLOCK_MONOTONIC_RAW"
+BOOT_ID = "/proc/sys/kernel/random/boot_id"
+CLOCKSOURCE = "/sys/devices/system/clocksource/clocksource0/current_clocksource"
+
+
+def _now() -> float:
+    """CLOCK_MONOTONIC_RAW: every stamp and every deadline."""
+    return time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+
+
+def _mono() -> float:
+    """CLOCK_MONOTONIC, read only beside a RAW read (mono_at_t0, mono_at_end)
+    so each record carries its own MONOTONIC/RAW rate; nothing is timed on it."""
+    return time.clock_gettime(time.CLOCK_MONOTONIC)
+
+
+def _host_line(path):
+    """A one-line /proc or /sys file, stripped; None if it cannot be read.
+
+    RAW restarts at every boot -- two WSL boots on 2026-09-23 alone -- so a
+    stamp is comparable only with stamps carrying the same boot_id.
+    """
+    try:
+        with open(path, encoding="ascii") as f:
+            return f.read().strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _raw_clock() -> None:
+    """Refuse, exit 2, on a Python with no time.CLOCK_MONOTONIC_RAW.
+
+    It reads the HOST, not the arguments, so it is not in refuse_args(): a
+    card's check must say the same on any machine (FW-124).  capture() calls
+    it first -- after the argument refusals, whose order N4, N7, N8, N29, N30
+    and N33 pin, and before pyserial, the overwrite check, /proc, /sys and
+    the port (N50).
+    """
+    if getattr(time, CLOCK, None) is None:
+        _fail(f"this Python has no time.{CLOCK} ({sys.executable}, "
+              f"{sys.platform}).\n"
+              "  From 1.5 every stamp and deadline reads it (SPEC.md CLK-38):\n"
+              "  CLOCK_MONOTONIC is slewed on this project's host, and a capture\n"
+              "  on it would record that nowhere. Linux has it: /usr/bin/python3.")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """The parser main() uses -- the one a card's HOST-cell check builds too."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -1014,9 +1074,38 @@ def main() -> int:
     r.add_argument("--from", dest="pat_from", required=True, help="regex, first match")
     r.add_argument("--to", dest="pat_to", required=True, help="regex, first match after FROM")
     r.set_defaults(func=report)
+    return ap
 
-    args = ap.parse_args()
-    return args.func(args)
+
+def refuse_args(args) -> None:
+    """Every refusal that reads nothing but the parsed arguments (SPEC.md
+    FW-124), raised as Refused so a card's HOST-cell check can call this
+    in-process and catch it.  main() runs it before any side effect, so the
+    check a card runs and the run cannot drift apart.
+
+    It reads no file, environment variable, port, device, host version or
+    clock: pyserial, the clock, the overwrite check and the port stay in
+    capture().  Cases P24 (it permits) and N51 (it refuses by raising).
+    """
+    if args.cmd == "report":
+        for pat in (args.pat_from, args.pat_to):
+            try:
+                re.compile(pat.encode())
+            except re.error as e:
+                raise Refused(f"bad pattern: {e}")
+        return
+    _check_send(args.send)
+    _check_terminator(args)
+    _check_until(args)
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        refuse_args(args)
+        return args.func(args)
+    except Refused as e:
+        _fail(str(e))
 
 
 if __name__ == "__main__":

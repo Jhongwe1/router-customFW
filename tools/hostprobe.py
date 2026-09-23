@@ -11,14 +11,31 @@ nothing else -- never a packet's contents, never a frame.
 
 ONE CLOCK
 ---------
-Every `*_mono` value, and every event line's first field, is an absolute
-`time.monotonic()` reading: `CLOCK_MONOTONIC` (`SPEC.md` `FW-114`, 量
-2026-09-23: `time.monotonic()` and `clock_gettime(CLOCK_MONOTONIC)` read back
-to back differ by -4 us).  `console-capture`'s meta is gaining `t0_mono` on the
-same clock, and that is what places these events on a capture's timeline
-(`P2` settled item 4).  Every `*_real` value is `time.time()` read right after
-a `_mono` reading; it exists for cross-checks only and is never used as an
-interval.
+Since 1.3, every `*_raw` value, every event line's first field and every
+deadline the probe computes (`--seconds`, the TCP and neighbour schedules,
+ping's stop grace) is an absolute `clock_gettime(CLOCK_MONOTONIC_RAW)`
+reading.  1.0-1.2 read `time.monotonic()`, `CLOCK_MONOTONIC`, which on this
+host's WSL runs percent-slow under the tick WSL's own `chronyd` writes, while
+RAW is not slewed (`SPEC.md` `CLK-38`).  `console-capture` 1.5 reads its
+`t0_raw` on the same clock, and that is what places these events on a
+capture's timeline (`P2` settled item 4).  The kernel's own timers stay on
+`CLOCK_MONOTONIC`: `select()` waits at most 0.25 s and every pass re-reads
+RAW, so a deadline is overshot by at most 0.25 s x (1/r - 1) per wait, r the
+MONOTONIC/RAW rate (about 10 ms at `CLK-38`'s 0.959).  Every `*_real` value is
+`time.time()` read right after a RAW reading; it exists for cross-checks only
+and is never used as an interval.  `mono_at_start` and `mono_at_end` are one
+`CLOCK_MONOTONIC` reading beside each end's RAW reading, so a record carries
+its own MONOTONIC/RAW ratio; `boot_id` names the boot its RAW stamps count
+from (RAW restarts with every boot), and `clocksource`/`clocksource_end` the
+kernel's clocksource at each end.
+
+A record declares its clock twice: the events file's first line (`t_raw is
+absolute CLOCK_MONOTONIC_RAW seconds`) and the meta's `clock`.  A reader takes
+the clock from the header, as the whole token after `is absolute` --
+`CLOCK_MONOTONIC` is a prefix of `CLOCK_MONOTONIC_RAW`, so a substring test
+cannot tell them apart -- and a record whose two declarations disagree is
+MALFORMED.  Records 1.0-1.2 wrote (`*_mono` keys, a tcp line's `start_mono=`)
+still read, on `CLOCK_MONOTONIC`.
 
 THE SECOND CLOCK, AND WHY ICMP GOES THROUGH A SUBPROCESS
 --------------------------------------------------------
@@ -52,8 +69,8 @@ reading taken against 127.0.0.1 only:
   500 -> 511.981.  This kernel runs `CONFIG_HZ=250`; that the step at 10 ms is
   ping switching from spinning to a jiffy-rounded sleep is 推 (iputils'
   scheduler, not read here).  *Network up* is resolved to the ACHIEVED
-  interval, so the meta records it, measured on the monotonic clock from the
-  probe's own reads.
+  interval, so the meta records it, measured on the probe's own clock from
+  its own reads.
 * **ping flushes per line into a pipe.**  766 reply lines over four runs
   (-i 0.002 to 0.2): every one read 0.026-0.435 ms after its own `-D` stamp,
   so no reply waited for the next one -- the shortest interval is 2 ms.
@@ -96,16 +113,22 @@ WHAT IT RECORDS
                chosen `-p` port) and no `nc`/`wget` (`config/image-commands.tsv`).
 
 `PREFIX.events`, UTF-8, LF, one line per event, flushed per line so a killed
-run keeps everything up to the kill.  `#` lines are comments.  Every other line
-is `<t_mono> <kind> [key=value ...]`, t_mono with six decimals:
+run keeps everything up to the kill.  `#` lines are comments; the first is the
+header that declares the clock.  Every other line is `<t> <kind>
+[key=value ...]`, t with six decimals on that clock:
 
     start       t_real=
     stop        t_real= reason=
-    icmp-reply  seq= ttl= rtt_ms= ping_real=      t_mono = when the line was read
+    icmp-reply  seq= ttl= rtt_ms= ping_real=      t = when the line was read
     icmp-silent seq=
-    tcp         port= result= errno= start_mono= dur_ms=   t_mono = when it resolved
+    tcp         port= result= errno= start_raw= dur_ms=   t = when it resolved
     neigh       state= lladdr=         lladdr: an allowlisted MAC, `unlisted-N` or `-`
-    udp         port= peer= len= kernel_real=
+    udp         port= peer= len= kernel_real= lag_ms=
+
+A udp line's `lag_ms` is the probe's realtime read minus `kernel_real`, both
+realtime, so the kernel's receive on the probe's clock is `t - lag_ms/1000`.
+1.0-1.2 records, on `CLOCK_MONOTONIC`: a tcp line carries `start_mono=` and a
+udp line has no `lag_ms=`.
 
 A value that does not exist is `-`, never a number.  Lines ping prints that are
 not one of the two ICMP kinds (its header, `From ... Destination Host
@@ -160,7 +183,7 @@ Each claim below names the reading that would refute it and the `--self-test`
 case that holds it.  Every check has a positive and a negative control: a
 check that can only pass is not a check.
 
-H1  An `icmp-reply`'s t_mono is ping's report of a reply, stamped within the
+H1  An `icmp-reply`'s t is ping's report of a reply, stamped within the
     lag threshold of ping's own `-D` stamp.  Refuted by a run whose
     `icmp_lag_ms.over_threshold` is non-zero on an idle host, or by several ICMP
     lines per read.  Controls: `L1` (lines lagged 5 s are flagged, lines lagged
@@ -221,7 +244,7 @@ H9  No child survives a run the probe ends itself: --seconds, --until,
     which read the record while the run is live (a mutation run removing the
     flush was caught there, not by `C5`).
 H10 The file format holds: every non-comment line parses as `<float> <kind>
-    k=v...`, t_mono never decreases within a source, the meta carries every
+    k=v...`, t never decreases within a source, the meta carries every
     key the format names, a clean record starts with `start` and ends with
     `stop`.  Controls: `F1`-`F5` over every file the suite made (`F0` requires
     that population to be there), and `U13` (a hand-broken line is rejected
@@ -246,6 +269,45 @@ H11 No hardware address leaves the process unless the allowlist names it
     (argparse's own error line, quoting a bad value, is labelled);
     `K1`-`K5` (canonical form, the loader on the real file, the redactor,
     labels that depend on order and not on bytes).
+H12 Every stamp the probe writes and every deadline it computes is on
+    CLOCK_MONOTONIC_RAW, and the record says so.  Refuted by a stamp outside
+    a RAW bracket the harness draws round the run, or a `--seconds` run whose
+    RAW span is not `--seconds`, while `tools/clockshim.py` runs every
+    Python read of CLOCK_MONOTONIC at half rate and 1000 s ahead: on a CI
+    runner the two clocks otherwise agree to milliseconds, and a MONOTONIC
+    stamp would pass any bracket.  The offset alone is not enough: on this
+    host MONOTONIC - RAW is itself minutes (量 2026-09-23: -189 s) and grows
+    with every slewed hour, so it can cancel the shim's offset; the spans
+    and the ratio are rate tests, which no offset blinds.  Controls: `Q1`
+    (every event, comment stamp, tcp `start_raw`, RAW meta key and `first`
+    inside the bracket, every event kind present), `Q2` (the deadline, the
+    record's span, and `mono_at_*` running at half the harness's own
+    MONOTONIC/RAW rate, which also proves the shim took), `Q3` (the header
+    and the meta declare RAW as a whole token, no meta key ends `_mono`),
+    `Q5` (a Python without CLOCK_MONOTONIC_RAW is refused, exit 2, before
+    any file or child, and the same run with it runs), `Q6` (`boot_id` and
+    both `clocksource` readings equal the harness's own reads; `boot_id`
+    passes the address gate only as a version-4 UUID), `Q7` (a udp line's
+    `lag_ms` puts the kernel's receive between the send and the read, and
+    agrees with the lag the harness measures from the send side).
+H13 A record of every version reads on the clock its header declares:
+    1.0-1.2 on CLOCK_MONOTONIC with `start_mono=`, 1.3 on RAW with
+    `start_raw=` and `lag_ms=`.  A line carrying the other clock's keys, and
+    a header the meta contradicts, are MALFORMED.  Controls: `U14` (the
+    header's clock is the whole token after `is absolute`, so a header that
+    names RAW in passing still declares MONOTONIC), `Q4` (planted 1.1 and
+    1.2 records and this suite's 1.3 record read, and `report` labels each
+    with its own clock), `Q4b` (four mismatches are MALFORMED), `Q4c` (every
+    committed record under `bench/` reads).
+H14 The argument refusals are one function, `refuse_args`, that reads
+    nothing but the parsed arguments, and `main()` runs it on
+    `build_parser()`'s arguments before anything reads the host -- so a
+    card's check of a HOST cell (`FW-124`) and the run refuse the same
+    arguments for the same reason.  Controls: `V1` (in-process, with files,
+    subprocesses, sockets, clocks and the environment poisoned: five
+    refusals for their reasons, the good form permitted, the poison shown
+    to take), `V2` (`main()` calls `build_parser` once and `refuse_args`
+    before the allowlist is read).
 
 The self-test drives a FAKE ping and a FAKE `ip` -- small scripts it writes
 into a temporary directory and passes as `--ping`/`--ip` -- and real loopback
@@ -273,8 +335,16 @@ WHAT IT DOES NOT ESTABLISH
 * When a neighbour entry changed.  A `neigh` event is an upper bound; the
   change happened after the previous poll.
 * Anything about realtime.  A realtime step during the run corrupts every
-  `*_real` cross-check; `report` prints the realtime-minus-monotonic drift
-  between the start and stop pairs so a step is visible.
+  `*_real` cross-check, a udp line's `lag_ms` included; `report` prints the
+  drift of realtime against the record's own clock between the start and
+  stop pairs so a step is visible.  On this host realtime follows the slewed
+  MONOTONIC between steps, so a RAW record's drift carries the slew too.
+* RAW's rate against true time.  RAW is the host's unslewed counter; that it
+  is nearer true time than a slewed MONOTONIC is 推 here, and no record of
+  this tool measures it.
+* How long a kernel wait lasted.  `select()` and the library's own timeouts
+  (`subprocess`'s waits) run on CLOCK_MONOTONIC; what is RAW is every stamp
+  and every deadline this file computes.
 * That the probe is passive.  Against a real target every echo request, SYN
   and the ARP they provoke is a packet the board handles while it boots.  The
   rates are the card's to choose and to state.
@@ -295,10 +365,14 @@ Run:  tools/hostprobe.py run --out bench/<date>/X-probe --target 10.1.1.1 \\
       tools/hostprobe.py --self-test
 """
 import argparse
+import builtins
+import contextlib
 import errno
 import datetime
+import glob
 import importlib.machinery
 import importlib.util
+import io
 import ipaddress
 import json
 import os
@@ -319,10 +393,54 @@ import traceback
 # 1.0 -> 1.1 on 2026-09-23: an lladdr, and every other hardware address the
 # run meets, is written only if the allowlist names it (ADDRESSES).  A 1.0
 # record's lladdr is `ip`'s raw text; a 1.1 record's is not.
-TOOL_VERSION = "1.2"
-CLOCK = "CLOCK_MONOTONIC"
+# 1.2 -> 1.3 on 2026-09-23 (P2-4): every stamp and deadline on
+# CLOCK_MONOTONIC_RAW (ONE CLOCK).  The meta's start_mono, end_mono,
+# stop_decided_mono and ping.started_mono become *_raw, a tcp line's
+# start_mono= becomes start_raw=, a udp line gains lag_ms=, and the meta gains
+# boot_id, clocksource, clocksource_end, mono_at_start and mono_at_end.
+TOOL_VERSION = "1.3"
+CLOCK = "CLOCK_MONOTONIC_RAW"
+#: The clock every record before 1.3 was written on.
+CLOCK_LEGACY = "CLOCK_MONOTONIC"
 THIS = os.path.abspath(__file__)
 ROOT = os.path.dirname(os.path.dirname(THIS))
+#: The committed shim that makes CLOCK_MONOTONIC disagree with RAW, for Q1/Q2.
+CLOCKSHIM_PATH = os.path.join(ROOT, "tools", "clockshim.py")
+BOOT_ID_PATH = "/proc/sys/kernel/random/boot_id"
+CLOCKSOURCE_PATH = "/sys/devices/system/clocksource/clocksource0/current_clocksource"
+
+
+def now_raw():
+    """The probe's one clock: every stamp it writes, every deadline it computes.
+    Looked up at each call, so a Python without it fails here -- which
+    refuse_host() keeps from ever happening after a file or child exists."""
+    return time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+
+
+def now_mono():
+    """CLOCK_MONOTONIC, read only for mono_at_start and mono_at_end."""
+    return time.clock_gettime(time.CLOCK_MONOTONIC)
+
+
+def read_line_file(path):
+    """A one-line kernel file, stripped; None when it cannot be read."""
+    try:
+        with open(path, encoding="ascii", errors="replace") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+_UUID4_RX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+
+
+def boot_id_value(text):
+    """The kernel's boot_id if it is a version-4 (random) UUID, else None.
+
+    Only such a string skips the address gate (see run's meta): its last
+    group is 48 random bits, where a version-1 UUID's is a node address."""
+    s = (text or "").strip()
+    return s if _UUID4_RX.match(s) else None
 #: The allowlist's one owner, read by path as leakscan.py's load_abl() reads
 #: it.  Derived from this file's own location, so a copy of this file outside
 #: the repository finds no allowlist -- which is how A7-A9 break it.
@@ -392,26 +510,55 @@ SO_TIMESTAMPNS = 35
 SO_TIMESTAMPNS_MACHINES = ("x86_64", "aarch64")
 
 # ------------------------------------------------------------- the format
-#: every event kind and its keys, in the order they are written.  The format
-#: is fixed: `boot-timeline --probe` parses it.
-EVENT_KEYS = {
-    "start": ("t_real",),
-    "stop": ("t_real", "reason"),
-    "icmp-reply": ("seq", "ttl", "rtt_ms", "ping_real"),
-    "icmp-silent": ("seq",),
-    "tcp": ("port", "result", "errno", "start_mono", "dur_ms"),
-    "neigh": ("state", "lladdr"),
-    "udp": ("port", "peer", "len", "kernel_real"),
+#: every event kind and its keys, in the order they are written, per clock:
+#: 1.0-1.2 wrote CLOCK_MONOTONIC records and 1.3 writes CLOCK_MONOTONIC_RAW
+#: ones.  A reader picks the table by the clock the record's header declares
+#: (header_clock).  The format is fixed: `boot-timeline --probe` parses it.
+EVENT_KEYS_BY_CLOCK = {
+    CLOCK_LEGACY: {
+        "start": ("t_real",),
+        "stop": ("t_real", "reason"),
+        "icmp-reply": ("seq", "ttl", "rtt_ms", "ping_real"),
+        "icmp-silent": ("seq",),
+        "tcp": ("port", "result", "errno", "start_mono", "dur_ms"),
+        "neigh": ("state", "lladdr"),
+        "udp": ("port", "peer", "len", "kernel_real"),
+    },
+    CLOCK: {
+        "start": ("t_real",),
+        "stop": ("t_real", "reason"),
+        "icmp-reply": ("seq", "ttl", "rtt_ms", "ping_real"),
+        "icmp-silent": ("seq",),
+        "tcp": ("port", "result", "errno", "start_raw", "dur_ms"),
+        "neigh": ("state", "lladdr"),
+        "udp": ("port", "peer", "len", "kernel_real", "lag_ms"),
+    },
 }
-#: which clock-reading loop stamps each kind; t_mono never decreases within one
+#: what this version writes
+EVENT_KEYS = EVENT_KEYS_BY_CLOCK[CLOCK]
+#: which clock-reading loop stamps each kind; t never decreases within one
 SOURCE = {"start": "tool", "stop": "tool", "icmp-reply": "icmp",
           "icmp-silent": "icmp", "tcp": "tcp", "neigh": "neigh", "udp": "udp"}
 EVENT_RX = re.compile(r"^(\d+\.\d{6}) ([a-z][a-z-]*)((?: [a-z_]+=\S+)*)$")
-HEADER = ("hostprobe %s: t_mono is absolute CLOCK_MONOTONIC seconds "
-          "(time.monotonic(), the clock console-capture's t0_mono is read on); "
-          "t_real, ping_real and kernel_real are CLOCK_REALTIME, cross-checks "
-          "only" % TOOL_VERSION)
+HEADER = ("hostprobe %s: t_raw is absolute CLOCK_MONOTONIC_RAW seconds "
+          "(clock_gettime(CLOCK_MONOTONIC_RAW), the clock console-capture 1.5's "
+          "t0_raw is read on); t_real, ping_real and kernel_real are "
+          "CLOCK_REALTIME, cross-checks only; a udp line's lag_ms is t_real "
+          "minus kernel_real, so its kernel stamp on this clock is "
+          "t_raw - lag_ms/1000" % TOOL_VERSION)
+#: The header's declaration of the first field's clock.  1.0-1.2 wrote `t_mono
+#: is absolute CLOCK_MONOTONIC seconds`, 1.3 `t_raw is absolute
+#: CLOCK_MONOTONIC_RAW seconds`.  The clock is the whole token after `is
+#: absolute` and is compared exactly: CLOCK_MONOTONIC is a prefix of
+#: CLOCK_MONOTONIC_RAW, so `in` -- 1.2's F4 -- cannot tell them apart (U14).
+HEADER_CLOCK_RX = re.compile(r"^# hostprobe \S+: t_[a-z]+ is absolute (CLOCK_[A-Z_]+)\b")
 PROBES_RX = re.compile(r"^# probes (.*)$")
+
+
+def header_clock(line):
+    """The clock an events file's first line declares, or None."""
+    m = HEADER_CLOCK_RX.match(line or "")
+    return m.group(1) if m else None
 
 # ------------------------------------------------------ ping's own format
 # 讀 `strings /usr/bin/ping` on this host (iputils 20240117): `[%lu.%06lu] `,
@@ -639,13 +786,20 @@ def icmp_interval_floor(release):
 
 
 def check_icmp_interval(seconds, release):
-    """The whole milliseconds ping will run at, or Refused."""
+    """The whole milliseconds ping will run at, or Refused: this release's
+    floor (the host's half, preflight), then icmp_whole_ms."""
     floor, why = icmp_interval_floor(release)
     if seconds < floor - 1e-12:
         raise Refused(
             "--icmp-interval %g is below the minimum %g s a non-root ping "
             "accepts (%s). ping would exit 2 after the run had started; "
             "refusing now instead" % (seconds, floor, why))
+    return icmp_whole_ms(seconds)
+
+
+def icmp_whole_ms(seconds):
+    """The whole milliseconds ping will run at, or Refused.  Reads nothing
+    but the number, so it is refuse_args' half of the interval check."""
     ms = int(seconds * 1000)
     if abs(seconds * 1000 - ms) > 1e-6:
         raise Refused(
@@ -864,24 +1018,29 @@ def _tok(v):
     return "_".join(s.split()) if s.strip() else "-"
 
 
-def fmt_event(t_mono, kind, pairs):
-    return " ".join(["%.6f" % t_mono, kind]
+def fmt_event(t, kind, pairs):
+    return " ".join(["%.6f" % t, kind]
                     + ["%s=%s" % (k, _tok(v)) for k, v in pairs])
 
 
-def parse_event_line(line):
-    """(t_mono, kind, {key: value}) for one event line, or ValueError."""
+def parse_event_line(line, clock):
+    """(t, kind, {key: value}) for one event line of a record on `clock`, or
+    ValueError.  The keys depend on the clock (EVENT_KEYS_BY_CLOCK); the
+    caller takes it from the record's header (header_clock)."""
+    table = EVENT_KEYS_BY_CLOCK.get(clock)
+    if table is None:
+        raise ValueError("no hostprobe version writes a record on %r" % (clock,))
     m = EVENT_RX.match(line)
     if not m:
-        raise ValueError("not `<t_mono with 6 decimals> <kind> k=v...`")
+        raise ValueError("not `<t with 6 decimals> <kind> k=v...`")
     kind = m.group(2)
-    if kind not in EVENT_KEYS:
+    if kind not in table:
         raise ValueError("unknown kind %r" % kind)
     pairs = [kv.split("=", 1) for kv in m.group(3).split()]
     keys = tuple(k for k, _v in pairs)
-    if keys != EVENT_KEYS[kind]:
-        raise ValueError("%s carries %s; the format says %s"
-                         % (kind, ",".join(keys), ",".join(EVENT_KEYS[kind])))
+    if keys != table[kind]:
+        raise ValueError("%s carries %s; the format on %s says %s"
+                         % (kind, ",".join(keys), clock, ",".join(table[kind])))
     return float(m.group(1)), kind, dict(pairs)
 
 
@@ -945,8 +1104,8 @@ class Recorder:
         self.fh.write(REDACT.text("# " + " ".join(str(text).split())) + "\n")
         self.fh.flush()
 
-    def event(self, t_mono, kind, pairs, fields=None):
-        self.fh.write(REDACT.text(fmt_event(t_mono, kind, pairs)) + "\n")
+    def event(self, t, kind, pairs, fields=None):
+        self.fh.write(REDACT.text(fmt_event(t, kind, pairs)) + "\n")
         self.fh.flush()
         self.counts[kind] = self.counts.get(kind, 0) + 1
         if kind in ("start", "stop"):
@@ -954,7 +1113,7 @@ class Recorder:
         fields = fields or {}
         for key in event_first_keys(kind, fields):
             if self.first.get(key) is None:
-                self.first[key] = round(t_mono, 6)
+                self.first[key] = round(t, 6)
         if self.armed and self.until_hit is None:
             for u in self.until:
                 if until_matches(u, kind, fields):
@@ -974,7 +1133,7 @@ class Icmp:
         self.threshold = threshold_ms
         self.proc = None
         self.fds, self.buf, self.eof = {}, {}, set()
-        self.started_mono = None
+        self.started = None
         self.exited = self.exited_early = False
         self.rc = self.stopped_by = None
         self.lags, self.flagged, self.no_stamp = [], 0, 0
@@ -991,7 +1150,7 @@ class Icmp:
         self.proc = subprocess.Popen(
             self.argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, close_fds=True, start_new_session=True)
-        self.started_mono = time.monotonic()
+        self.started = now_raw()
         for f, which in ((self.proc.stdout, "stdout"), (self.proc.stderr, "stderr")):
             fd = f.fileno()
             os.set_blocking(fd, False)
@@ -1008,32 +1167,32 @@ class Icmp:
             return
         # The stamp, taken once per read: every line in this chunk was
         # delivered by this read, so every one of them gets this time.
-        t_mono = time.monotonic()
+        t = now_raw()
         t_real = time.time()
         which = self.fds[fd]
         if not chunk:
             self.eof.add(fd)
             rest, self.buf[fd] = self.buf[fd], b""
             if rest:
-                self._line(which, rest, t_mono, t_real)
+                self._line(which, rest, t, t_real)
             if len(self.eof) == len(self.fds):
-                self._reap(t_mono)
+                self._reap(t)
             return
         lines = (self.buf[fd] + chunk).split(b"\n")
         self.buf[fd] = lines.pop()
         n = 0
         for ln in lines:
-            n += self._line(which, ln, t_mono, t_real)
+            n += self._line(which, ln, t, t_real)
         self.max_per_read = max(self.max_per_read, n)
         if n > 1:
             self.multi_reads += 1
 
-    def _line(self, which, raw, t_mono, t_real):
+    def _line(self, which, raw, t, t_real):
         text = raw.decode("utf-8", "replace").rstrip("\r")
         if which == "stderr":
             if text.strip():
                 self.other["stderr"] += 1
-                self.rec.comment("%.6f ping-stderr %s" % (t_mono, text))
+                self.rec.comment("%.6f ping-stderr %s" % (t, text))
             return 0
         p = parse_ping_line(text)
         k = p["kind"]
@@ -1044,17 +1203,17 @@ class Icmp:
                 self.stats = {"transmitted": p["tx"], "received": p["rx"]}
             key = "summary" if k == "stats" else k
             self.other[key] = self.other.get(key, 0) + 1
-            self.rec.comment("%.6f ping-%s %s" % (t_mono, key, text))
+            self.rec.comment("%.6f ping-%s %s" % (t, key, text))
             return 0
         if k == "reply":
             kind = "icmp-reply"
-            self.rec.event(t_mono, kind, [("seq", p["seq"]), ("ttl", p["ttl"]),
-                                          ("rtt_ms", p["rtt"]),
-                                          ("ping_real", p["real"])],
+            self.rec.event(t, kind, [("seq", p["seq"]), ("ttl", p["ttl"]),
+                                     ("rtt_ms", p["rtt"]),
+                                     ("ping_real", p["real"])],
                            {"seq": p["seq"]})
         else:
             kind = "icmp-silent"
-            self.rec.event(t_mono, kind, [("seq", p["seq"])], {"seq": p["seq"]})
+            self.rec.event(t, kind, [("seq", p["seq"])], {"seq": p["seq"]})
         self.lines_icmp += 1
         lag = line_lag_ms(t_real, p["real"])
         if lag is None:
@@ -1065,18 +1224,18 @@ class Icmp:
                 self.flagged += 1
                 self.rec.comment(
                     "%.6f icmp-lag seq=%d lag_ms=%.3f threshold_ms=%g %s"
-                    % (t_mono, p["seq"], lag, self.threshold,
+                    % (t, p["seq"], lag, self.threshold,
                        "negative: realtime stepped back, or the stamp is not "
                        "ping's" if lag < 0 else "over the threshold"))
-        # The ACHIEVED interval, on the monotonic clock: consecutive seqs of
+        # The ACHIEVED interval, on the probe's clock: consecutive seqs of
         # one kind.  Two `no answer yet` lines are both printed at a send.
         prev = self.prev.get(kind)
         if prev is not None and p["seq"] == prev[0] + 1:
-            self.gaps_ms.append((t_mono - prev[1]) * 1e3)
-        self.prev[kind] = (p["seq"], t_mono)
+            self.gaps_ms.append((t - prev[1]) * 1e3)
+        self.prev[kind] = (p["seq"], t)
         return 1
 
-    def _reap(self, t_mono):
+    def _reap(self, t):
         try:
             self.rc = self.proc.wait(timeout=1.0)
         except subprocess.TimeoutExpired:
@@ -1084,12 +1243,12 @@ class Icmp:
         self.exited = True
         if self.stopped_by is None:
             self.exited_early = True
-            self.rec.comment("%.6f ping exited on its own, rc=%d" % (t_mono, self.rc))
+            self.rec.comment("%.6f ping exited on its own, rc=%d" % (t, self.rc))
 
     def _drain(self, budget):
-        end = time.monotonic() + budget
+        end = now_raw() + budget
         while self.read_fds():
-            left = end - time.monotonic()
+            left = end - now_raw()
             if left <= 0:
                 return
             r, _w, _x = select.select(self.read_fds(), [], [], min(left, 0.1))
@@ -1120,7 +1279,7 @@ class Icmp:
 
     def meta(self):
         return {"pid": self.proc.pid if self.proc else None, "argv": self.argv,
-                "started_mono": round(self.started_mono, 6) if self.started_mono else None,
+                "started_raw": round(self.started, 6) if self.started is not None else None,
                 "achieved_interval_ms": dist(self.gaps_ms),
                 "stopped_by": self.stopped_by, "rc": self.rc,
                 "exited_early": self.exited_early, "statistics": self.stats,
@@ -1137,7 +1296,7 @@ class Tcp:
         self.rec, self.target, self.ports = rec, target, list(ports)
         self.interval, self.timeout = interval_s, timeout_s
         self.next = {p: t0 for p in self.ports}
-        self.pending = {}           # fd -> (socket, port, start_mono)
+        self.pending = {}           # fd -> (socket, port, start: now_raw())
         self.attempts = self.aborted = 0
 
     def due(self):
@@ -1151,7 +1310,7 @@ class Tcp:
     def tick(self, now):
         for fd, (_s, _port, st) in list(self.pending.items()):
             if now - st >= self.timeout:
-                self._resolve(fd, time.monotonic(), "timeout", "-")
+                self._resolve(fd, now_raw(), "timeout", "-")
         for port in self.ports:
             if now >= self.next[port]:
                 self._start(port)
@@ -1162,7 +1321,7 @@ class Tcp:
     def _start(self, port):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setblocking(False)
-        st = time.monotonic()
+        st = now_raw()
         err = s.connect_ex((self.target, port))
         self.attempts += 1
         fd = s.fileno()
@@ -1170,14 +1329,14 @@ class Tcp:
         if err in (errno.EINPROGRESS, errno.EALREADY, errno.EWOULDBLOCK, errno.EINTR):
             return
         result, name = classify_errno(err)
-        self._resolve(fd, time.monotonic(), result, name)
+        self._resolve(fd, now_raw(), result, name)
 
     def on_write(self, fd):
         if fd not in self.pending:
             return
         s = self.pending[fd][0]
         err = s.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
-        t = time.monotonic()
+        t = now_raw()
         result, name = classify_errno(err)
         self._resolve(fd, t, result, name)
 
@@ -1188,12 +1347,12 @@ class Tcp:
         except OSError:
             pass
         self.rec.event(t, "tcp", [("port", port), ("result", result),
-                                  ("errno", name), ("start_mono", "%.6f" % st),
+                                  ("errno", name), ("start_raw", "%.6f" % st),
                                   ("dur_ms", "%.3f" % ((t - st) * 1e3))],
                        {"port": port, "result": result})
 
     def stop(self):
-        t = time.monotonic()
+        t = now_raw()
         for _fd, (s, port, st) in list(self.pending.items()):
             self.rec.comment("%.6f tcp port=%d attempt started %.6f was still "
                              "pending at stop; no event" % (t, port, st))
@@ -1230,7 +1389,7 @@ class Neigh:
             self._kill()
             self.errors += 1
             self.rec.comment("%.6f neigh-error the poll did not finish in %g s "
-                             "and was killed" % (time.monotonic(), NEIGH_POLL_CAP_S))
+                             "and was killed" % (now_raw(), NEIGH_POLL_CAP_S))
         if self.proc is None and now >= self.next:
             try:
                 self.proc = subprocess.Popen(
@@ -1238,10 +1397,10 @@ class Neigh:
                     stderr=subprocess.STDOUT, close_fds=True, start_new_session=True)
             except OSError as e:
                 self.errors += 1
-                self.rec.comment("%.6f neigh-error %s" % (time.monotonic(), e))
+                self.rec.comment("%.6f neigh-error %s" % (now_raw(), e))
                 self.next = now + self.interval
                 return
-            self.spawned = time.monotonic()
+            self.spawned = now_raw()
             self.spawn_times.append(self.spawned)
             self.fd = self.proc.stdout.fileno()
             os.set_blocking(self.fd, False)
@@ -1258,7 +1417,7 @@ class Neigh:
             return
         # EOF: the table as `ip` read it, some time between spawn and now.
         # Stamped now -- an upper bound (see WHAT IT DOES NOT ESTABLISH).
-        t = time.monotonic()
+        t = now_raw()
         try:
             rc = self.proc.wait(timeout=1.0)
         except subprocess.TimeoutExpired:
@@ -1333,17 +1492,21 @@ class Udp:
                     data, anc, _fl, addr = s.recvmsg(65536)
             except (BlockingIOError, InterruptedError):
                 return
-            t_mono = time.monotonic()
+            t = now_raw()
             t_real = time.time()
             n = len(data)
             del data                    # the payload is never kept
             kr = kernel_stamp(anc) if ts else None
-            self.rec.event(t_mono, "udp", [("port", port),
-                                           ("peer", "%s:%d" % (addr[0], addr[1])),
-                                           ("len", n), ("kernel_real", kr or "-")],
+            # 1.3: the lag goes on the line, so the kernel's realtime stamp
+            # converts to this clock line by line: t - lag_ms/1000 (Q7).
+            lag = (t_real - float(kr)) * 1e3 if kr is not None else None
+            self.rec.event(t, "udp", [("port", port),
+                                      ("peer", "%s:%d" % (addr[0], addr[1])),
+                                      ("len", n), ("kernel_real", kr or "-"),
+                                      ("lag_ms", "%.3f" % lag if lag is not None else "-")],
                            {"port": port})
-            if kr is not None:
-                self.lags.append((t_real - float(kr)) * 1e3)
+            if lag is not None:
+                self.lags.append(lag)
 
     def stop(self):
         # What is queued arrived before the stop; record it, with its true
@@ -1356,20 +1519,21 @@ class Ctx:
     pass
 
 
-def preflight(a):
-    """Every refusal, in order, before any file or child exists.  -> Ctx."""
+def refuse_args(a):
+    """Every refusal that reads nothing but the parsed arguments.  -> Ctx.
+
+    `FW-124`: no file, environment variable, network, port, device, host
+    version or clock is read here, so a card's HOST cell can be checked with
+    build_parser() and this, in-process, and reach the verdict the run would
+    (V1 poisons all of those and expects the same verdicts).  main() runs it
+    before anything reads the host (V2); preflight() runs it again after the
+    allowlist, to take the values it derives.  Only `run` has arguments to
+    refuse; `report`'s prefix is a file, which is the environment.
+    """
     c = Ctx()
-    # The allowlist FIRST, so every message below -- a host-fault refusal
-    # quotes a route whose `dev` can be an `enx<12 hex>` name -- is rendered
-    # through it.  Unavailable: --neigh is refused, never run on a fallback
-    # (H11, A7-A9); any other probe labels every address it meets (A10).
-    why_not = use_allowlist()
-    if why_not and a.neigh:
-        raise Refused(
-            "--neigh needs the address allowlist, and %s. Refusing rather than "
-            "writing lladdr values it cannot check: in P2-3 the address that "
-            "answers for the target is this unit's own, from H601" % why_not)
-    # The terminator next: its absence is the defect that leaves a process
+    if getattr(a, "self_test", False) or getattr(a, "cmd", None) != "run":
+        return c
+    # The terminator first: its absence is the defect that leaves a process
     # running (console-capture `_check_terminator`, the same reasoning).
     if a.seconds is None:
         raise Refused(
@@ -1418,6 +1582,30 @@ def preflight(a):
     c.until = [parse_until(s, a.icmp, a.tcp, a.neigh, a.udp_listen) for s in a.until]
     if not a.out or a.out.endswith(("/", os.sep)):
         raise Refused("--out %r must be a path prefix, not a directory" % a.out)
+    # ping truncates -i to whole milliseconds on every release; the floor
+    # depends on the release, which is the host's, so it stays in preflight
+    # (check_icmp_interval, which applies both halves).
+    if a.icmp:
+        icmp_whole_ms(a.icmp_interval)
+    return c
+
+
+def preflight(a):
+    """Every refusal, in order, before any file or child exists.  -> Ctx."""
+    # The allowlist FIRST, so every message below -- a host-fault refusal
+    # quotes a route whose `dev` can be an `enx<12 hex>` name -- is rendered
+    # through it.  Unavailable: --neigh is refused, never run on a fallback
+    # (H11, A7-A9); any other probe labels every address it meets (A10).
+    why_not = use_allowlist()
+    if why_not and a.neigh:
+        raise Refused(
+            "--neigh needs the address allowlist, and %s. Refusing rather than "
+            "writing lladdr values it cannot check: in P2-3 the address that "
+            "answers for the target is this unit's own, from H601" % why_not)
+    # The argument refusals (FW-124).  main() has run them already, before
+    # anything read the host; this pass takes the values they derive, and
+    # keeps this function's promise -- every refusal -- on its own.
+    c = refuse_args(a)
     c.events = a.out + ".events"
     c.meta = a.out + ".meta.json"
     if not a.force:
@@ -1546,8 +1734,13 @@ def _run(a, c, wake_r, seen):
     except OSError as e:
         raise Refused("cannot create %s: %s" % (c.events, e)) from None
 
-    t0 = time.monotonic()
+    # The boot the RAW stamps count from and the kernel's clocksource, read
+    # before the origin; then RAW, realtime and MONOTONIC back to back.
+    boot_id = boot_id_value(read_line_file(BOOT_ID_PATH))
+    clocksource = read_line_file(CLOCKSOURCE_PATH)
+    t0 = now_raw()
     r0 = time.time()
+    m0 = now_mono()
     rec.comment(HEADER)
     rec.comment(probes_comment(a))
     rec.event(t0, "start", [("t_real", "%.6f" % r0)])
@@ -1568,7 +1761,7 @@ def _run(a, c, wake_r, seen):
             udp = Udp(rec, c.udp)
         deadline = t0 + a.seconds
         while True:
-            now = time.monotonic()
+            now = now_raw()
             # A signal is the operator; --until is tested before --seconds,
             # because a run whose event arrived in the window its cap expired
             # in HAS seen its event (console-capture's N35, the same rule).
@@ -1591,7 +1784,9 @@ def _run(a, c, wake_r, seen):
             if rec.until_hit:
                 continue
             due = [deadline] + ([tcp.due()] if tcp else []) + ([neigh.due()] if neigh else [])
-            wait = max(0.0, min(min(due) - time.monotonic(), 0.25))
+            # A RAW deadline, a kernel wait: select() runs on CLOCK_MONOTONIC,
+            # so the wait is capped and the next pass re-reads RAW (ONE CLOCK).
+            wait = max(0.0, min(min(due) - now_raw(), 0.25))
             rl = [wake_r] + (icmp.read_fds() if icmp else []) \
                 + (neigh.read_fds() if neigh else []) + (udp.read_fds() if udp else [])
             wl = tcp.write_fds() if tcp else []
@@ -1610,10 +1805,10 @@ def _run(a, c, wake_r, seen):
                     udp.on_read(fd)
             for fd in w:
                 tcp.on_write(fd)
-        t_stop = time.monotonic()
+        t_stop = now_raw()
     except Exception as e:
         # A defect in this file must not cost the record or leave ping behind.
-        t_stop = time.monotonic()
+        t_stop = now_raw()
         reason = "internal-error"
         problems.append("internal error: %s" % _exc_line(e))
     rec.armed = False
@@ -1623,9 +1818,11 @@ def _run(a, c, wake_r, seen):
                 probe.stop()
             except Exception as e:
                 problems.append("stopping %s: %s" % (type(probe).__name__, _exc_line(e)))
-    end_mono = time.monotonic()
+    end_raw = now_raw()
     end_real = time.time()
-    rec.event(end_mono, "stop", [("t_real", "%.6f" % end_real), ("reason", reason)])
+    m1 = now_mono()
+    clocksource_end = read_line_file(CLOCKSOURCE_PATH)
+    rec.event(end_raw, "stop", [("t_real", "%.6f" % end_real), ("reason", reason)])
     rec.close()
 
     ping_meta = None
@@ -1641,8 +1838,8 @@ def _run(a, c, wake_r, seen):
         if icmp.exited_early:
             problems.append("ping exited on its own (rc=%s) during the run"
                             % icmp.rc)
-        ran = t_stop - icmp.started_mono if icmp.started_mono is not None else 0.0
-        if icmp.started_mono is None:
+        ran = t_stop - icmp.started if icmp.started is not None else 0.0
+        if icmp.started is None:
             problems.append("ping could not be started: %s" % " ".join(icmp.argv))
         elif icmp.lines_icmp == 0 and ran > ICMP_SILENCE_STARTUP_S + 2 * a.icmp_interval:
             problems.append(
@@ -1676,14 +1873,20 @@ def _run(a, c, wake_r, seen):
         "tool": "hostprobe", "tool_version": TOOL_VERSION, "clock": CLOCK,
         "target": a.target,
         "args": {k: v for k, v in vars(a).items() if k not in ("cmd", "self_test")},
-        "start_mono": round(t0, 6), "start_real": round(r0, 6),
+        "start_raw": round(t0, 6), "start_real": round(r0, 6),
         # 1.2: console-capture's field, in its format, from the SAME time.time()
         # reading as start_real -- capdate dates every .meta.json in a bench
         # directory by it (its D7/D8), and a record without it is RED there.
         "started_wallclock": time.strftime("%Y-%m-%dT%H:%M:%S%z",
                                            time.localtime(r0)),
-        "end_mono": round(end_mono, 6), "end_real": round(end_real, 6),
-        "stop_decided_mono": round(t_stop, 6),
+        "end_raw": round(end_raw, 6), "end_real": round(end_real, 6),
+        "stop_decided_raw": round(t_stop, 6),
+        # 1.3: one CLOCK_MONOTONIC reading beside each end's RAW reading, so
+        # the record carries its own MONOTONIC/RAW ratio (Q2); the boot the
+        # RAW stamps count from; the kernel's clocksource at each end (Q6).
+        "mono_at_start": round(m0, 6), "mono_at_end": round(m1, 6),
+        "boot_id": None,            # set after the redactor: see below
+        "clocksource": clocksource, "clocksource_end": clocksource_end,
         "ping": ping_meta,
         "icmp_lag_ms": lag,
         "udp_lag_ms": dist(udp.lags) if udp else dist([]),
@@ -1702,6 +1905,14 @@ def _run(a, c, wake_r, seen):
     # route's `dev`, the neigh argv, the args, a problem's text (H11, A5).
     meta = REDACT.obj(meta)
     meta["addresses"]["unlisted"] = len(REDACT.labels)
+    # boot_id alone skips the redactor, and only as a version-4 UUID.
+    # MAC_TEXT_RX labels any twelve hex digits between non-hex, which a UUID's
+    # last group is (量 2026-09-23: this host's boot_id came out
+    # `<first four groups>-unlisted-1`), and a mangled boot_id never equals
+    # console-capture's, so the join would refuse every pair.  A version-4
+    # UUID's last group is random bits; a version-1 UUID's is a node address,
+    # and boot_id_value() withholds that and anything else as null (Q6).
+    meta["boot_id"] = boot_id
     tmp = c.meta + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         json.dump(meta, f, indent=2)
@@ -1709,7 +1920,7 @@ def _run(a, c, wake_r, seen):
     os.replace(tmp, c.meta)
     n_events = sum(rec.counts.values())
     say("hostprobe: %s  %d events, stop %s after %.3f s"
-        % (c.events, n_events, reason, end_mono - t0))
+        % (c.events, n_events, reason, end_raw - t0))
     say("hostprobe: %s" % c.meta)
     for p in meta["problems"]:
         say("hostprobe: PROBLEM %s" % p, err=True)
@@ -1718,7 +1929,16 @@ def _run(a, c, wake_r, seen):
 
 # ------------------------------------------------------------------ report
 def load_record(prefix):
-    """(events, comments, bad, meta).  events: [(t_mono, kind, fields, raw)]."""
+    """(events, comments, bad, meta, (clock, how)).
+    events: [(t, kind, fields, raw)].
+
+    The clock is the one the header declares (header_clock, a whole token),
+    and every event line is read against that clock's keys.  A record whose
+    header declares no clock (no version of this tool wrote one) is read on
+    the meta's clock, or else on CLOCK_MONOTONIC, the clock of every record
+    before 1.3; `how` says which, and `report` prints it.  A header the meta
+    contradicts, or a clock no version writes, is MALFORMED (H13).
+    """
     path = prefix + ".events"
     if not os.path.exists(path):
         raise Refused("%s not found" % path)
@@ -1730,16 +1950,6 @@ def load_record(prefix):
         lines.pop()
     elif lines:
         bad.append((len(lines), "the last line has no newline: cut off mid-write"))
-    for n, line in enumerate(lines, 1):
-        if line.startswith("#"):
-            comments.append(line)
-            continue
-        try:
-            t, kind, fields = parse_event_line(line)
-        except ValueError as e:
-            bad.append((n, str(e)))
-            continue
-        events.append((t, kind, fields, line))
     meta = None
     if os.path.exists(prefix + ".meta.json"):
         try:
@@ -1747,7 +1957,35 @@ def load_record(prefix):
                 meta = json.load(f)
         except ValueError as e:
             bad.append((0, "meta unreadable: %s" % e))
-    return events, comments, bad, meta
+    declared = header_clock(lines[0]) if lines else None
+    mclock = meta.get("clock") if isinstance(meta, dict) else None
+    if mclock is not None and mclock not in EVENT_KEYS_BY_CLOCK:
+        bad.append((0, "the meta's clock %r is not one a hostprobe version writes"
+                    % (mclock,)))
+    if declared is not None:
+        clock, how = declared, "declared by the header"
+        if declared not in EVENT_KEYS_BY_CLOCK:
+            bad.append((1, "the header declares %s, which no hostprobe version "
+                        "writes" % declared))
+        elif mclock is not None and mclock != declared:
+            bad.append((1, "the header declares %s and the meta's clock is %r: "
+                        "one record, two clocks" % (declared, mclock)))
+    elif mclock in EVENT_KEYS_BY_CLOCK:
+        clock, how = mclock, "the meta's; the header declares none"
+    else:
+        clock, how = CLOCK_LEGACY, ("presumed: the header declares none and no meta "
+                                    "does, and every record before 1.3 was on it")
+    for n, line in enumerate(lines, 1):
+        if line.startswith("#"):
+            comments.append(line)
+            continue
+        try:
+            t, kind, fields = parse_event_line(line, clock)
+        except ValueError as e:
+            bad.append((n, str(e)))
+            continue
+        events.append((t, kind, fields, line))
+    return events, comments, bad, meta, (clock, how)
 
 
 def _probes_from(comments):
@@ -1766,7 +2004,7 @@ def report(prefix, out=sys.stdout):
     # 1.0, or edited by hand, can.  So `report` prints through the same gate,
     # and without the allowlist it labels every address rather than refusing.
     why_not = use_allowlist()
-    events, comments, bad, meta = load_record(prefix)
+    events, comments, bad, meta, (clock, how) = load_record(prefix)
 
     def pr(s=""):
         print(REDACT.text(s), file=out)
@@ -1775,6 +2013,7 @@ def report(prefix, out=sys.stdout):
     pr("  allowlist %s" % ("%d address(es) from %s" % (len(REDACT.allowed), _rel(ABL_PATH))
                            if not why_not else "NOT LOADED, so every address is "
                            "printed as a label: %s" % why_not))
+    pr("  clock  %s, %s" % (clock, how))
     start = next((e for e in events if e[1] == "start"), None)
     stop = next((e for e in events if e[1] == "stop"), None)
     t0 = start[0] if start else (events[0][0] if events else None)
@@ -1807,10 +2046,10 @@ def report(prefix, out=sys.stdout):
     if stop is not None and start is not None:
         dm = stop[0] - start[0]
         drift_ms = ((float(stop[2]["t_real"]) - float(start[2]["t_real"])) - dm) * 1e3
-        pr("  run    %.6f s on the monotonic clock, from %.6f; stop %s"
-           % (dm, start[0], stop[2]["reason"]))
-        pr("  drift  realtime minus monotonic over the run: %+.3f ms (%+.1f ppm)"
-           % (drift_ms, drift_ms / 1e3 / dm * 1e6 if dm > 0 else 0.0))
+        pr("  run    %.6f s on %s, from %.6f; stop %s"
+           % (dm, clock, start[0], stop[2]["reason"]))
+        pr("  drift  realtime minus %s over the run: %+.3f ms (%+.1f ppm)"
+           % (clock, drift_ms, drift_ms / 1e3 / dm * 1e6 if dm > 0 else 0.0))
     else:
         pr("  drift  unknown: no stop line, so the run did not end cleanly")
     for key in keys:
@@ -1932,11 +2171,12 @@ if args[:3] == ["-4", "neigh", "show"]:
 sys.exit(127)
 '''
 
-REQUIRED_META = ("tool", "tool_version", "clock", "target", "args", "start_mono",
-                 "start_real", "started_wallclock", "end_mono", "end_real",
-                 "ping", "icmp_lag_ms",
+REQUIRED_META = ("tool", "tool_version", "clock", "target", "args", "start_raw",
+                 "start_real", "started_wallclock", "end_raw", "end_real",
+                 "stop_decided_raw", "mono_at_start", "mono_at_end", "boot_id",
+                 "clocksource", "clocksource_end", "ping", "icmp_lag_ms",
                  "counts", "first", "stop_reason")
-REQUIRED_PING = ("path", "version", "interval_s")
+REQUIRED_PING = ("path", "version", "interval_s", "started_raw")
 REQUIRED_LAG = ("n", "median", "max", "over_threshold")
 LAG_COMMENT_RX = re.compile(r"icmp-lag seq=(\d+) lag_ms=(-?\d+\.\d+)")
 
@@ -2066,9 +2306,9 @@ def selftest(out=sys.stdout):
         raises(check_icmp_interval, 0.1, 20180629),
         raises(check_icmp_interval, 0.2, 20180629)))
 
-    def rejects(line):
+    def rejects(line, clock=CLOCK_LEGACY):
         try:
-            parse_event_line(line)
+            parse_event_line(line, clock)
             return False
         except ValueError:
             return True
@@ -2076,16 +2316,100 @@ def selftest(out=sys.stdout):
     ck("U13", "event parser: a good line and a round trip parse; four bad lines "
               "are rejected",
        (True, True, (True, True, True, True)),
-       (parse_event_line(good)[1:] == ("tcp", {"port": "80", "result": "ok", "errno": "0",
-                                               "start_mono": "12.300000",
-                                               "dur_ms": "45.678"}),
-        parse_event_line(fmt_event(1.5, "neigh", [("state", "NONE"), ("lladdr", "-")]))
+       (parse_event_line(good, CLOCK_LEGACY)[1:] == (
+           "tcp", {"port": "80", "result": "ok", "errno": "0",
+                   "start_mono": "12.300000", "dur_ms": "45.678"}),
+        parse_event_line(fmt_event(1.5, "neigh", [("state", "NONE"), ("lladdr", "-")]),
+                         CLOCK)
         == (1.5, "neigh", {"state": "NONE", "lladdr": "-"}),
         tuple(rejects(s) for s in (
             good.replace("12.345678", "12.34", 1),
             "12.345678 icmp-reply seq=1 ttl=64",
             "12.345678 bogus x=1",
             "12.345678 udp port=1 peer=a b len=1 kernel_real=-"))))
+    # The header every version before 1.3 wrote, verbatim (git show
+    # 68f7fe8 and 66ddb93: 1.0 and 1.2 carry the same text).
+    header_12 = ("# hostprobe 1.2: t_mono is absolute CLOCK_MONOTONIC seconds "
+                 "(time.monotonic(), the clock console-capture's t0_mono is read "
+                 "on); t_real, ping_real and kernel_real are CLOCK_REALTIME, "
+                 "cross-checks only")
+    ck("U14", "the header's clock is the whole token after `is absolute`: 1.2's -> "
+              "MONOTONIC, 1.3's -> RAW, RAW named in passing -> MONOTONIC, a RAWX "
+              "token -> RAWX, no declaration or no `#` -> none",
+       (CLOCK_LEGACY, CLOCK, CLOCK_LEGACY, "CLOCK_MONOTONIC_RAWX", None, None),
+       (header_clock(header_12), header_clock("# " + HEADER),
+        header_clock("# hostprobe 1.2: t_mono is absolute CLOCK_MONOTONIC seconds, "
+                     "not CLOCK_MONOTONIC_RAW"),
+        header_clock("# hostprobe 1.3: t_raw is absolute CLOCK_MONOTONIC_RAWX seconds"),
+        header_clock("# hostprobe 1.0: planted"),
+        header_clock("hostprobe 1.3: t_raw is absolute CLOCK_MONOTONIC_RAW seconds")))
+
+    # ---------------- V: the FW-124 contract, in-process.  V1 runs refuse_args
+    # with every host read it must not make turned into an exception: files,
+    # directory listings, subprocesses, sockets, clocks, os.environ.
+    class Poisoned(Exception):
+        pass
+
+    def trap(*_a, **_k):
+        raise Poisoned("an environment read inside refuse_args")
+
+    class PoisonEnv(dict):
+        def _no(self, *_a, **_k):
+            raise Poisoned("os.environ inside refuse_args")
+        __getitem__ = get = __contains__ = __iter__ = __len__ = _no
+        keys = items = values = copy = _no
+
+    def poisoned(fn, *args):
+        spots = [(builtins, "open"), (io, "open"), (os, "open"), (os, "stat"),
+                 (os, "lstat"), (os, "access"), (os, "listdir"), (os, "scandir"),
+                 (subprocess, "Popen"), (subprocess, "run"), (socket, "socket"),
+                 (shutil, "which"), (time, "time"), (time, "clock_gettime"),
+                 (time, "monotonic")]
+        saved = [(m, n, getattr(m, n)) for m, n in spots]
+        env = os.environ
+        try:
+            for m, n, _v in saved:
+                setattr(m, n, trap)
+            os.environ = PoisonEnv()
+            return fn(*args)
+        finally:
+            for m, n, v in saved:
+                setattr(m, n, v)
+            os.environ = env
+
+    def verdict(argv):
+        a = build_parser().parse_args(argv)      # argparse reads COLUMNS: unpoisoned
+        try:
+            c = poisoned(refuse_args, a)
+        except Refused as e:
+            return "R: " + str(e)
+        except Poisoned as e:
+            return "POISON: %s" % e
+        except Exception as e:            # noqa: BLE001 -- a crash is a verdict too
+            return "CRASH: %s: %s" % (type(e).__name__, e)
+        return ("ok", getattr(c, "until", None), getattr(c, "loopback", None))
+
+    base = ["run", "--out", "v1/p", "--target", "127.0.0.1"]
+    good_v = verdict(base + ["--seconds", "1", "--icmp", "--icmp-interval", "0.05",
+                             "--tcp", "80", "--until", "tcp:80:ok"])
+    bad_v = [verdict(base + extra) for extra in (
+        ["--tcp", "80"],
+        ["--tcp", "80", "--seconds", "0"],
+        ["--icmp", "--icmp-interval", "0.0029", "--seconds", "1"],
+        ["--tcp", "80", "--until", "tcp:81:ok", "--seconds", "1"],
+        ["--seconds", "1", "--tcp", "80", "--out", "v1/"])]
+    needles = ("--seconds N is required", "positive, finite", "whole number of "
+               "milliseconds", "is not probed", "must be a path prefix")
+    try:
+        poisoned(os.path.exists, "/")
+        takes = False
+    except Poisoned:
+        takes = True
+    ck("V1", "refuse_args in-process, every host read poisoned: the good form "
+             "permitted, five bad ones refused for their reasons, the poison takes",
+       (("ok", [("tcp", "80", "ok")], True), [True] * 5, True),
+       (good_v, [isinstance(v, str) and v.startswith("R: ") and nd in v
+                 for v, nd in zip(bad_v, needles)], takes))
 
     # ---------------- K: the address gate's parts (H11).  Every address here
     # except the allowlisted ones is synthetic and locally administered, so
@@ -2190,7 +2514,7 @@ def selftest(out=sys.stdout):
 
     def rec_of(prefix):
         try:
-            ev, com, bad, meta = load_record(prefix)
+            ev, com, bad, meta, _clock = load_record(prefix)
         except Refused:
             return [], [], [(0, "missing")], {}
         return ev, com, bad, meta or {}
@@ -2219,8 +2543,8 @@ def selftest(out=sys.stdout):
             return []
 
     def wait_for(pred, timeout):
-        end = time.monotonic() + timeout
-        while time.monotonic() < end:
+        end = now_raw() + timeout
+        while now_raw() < end:
             if pred():
                 return True
             time.sleep(0.02)
@@ -2243,6 +2567,37 @@ def selftest(out=sys.stdout):
         write_exec(fip, FAKE_IP)
         ck("C0", "the liveness check sees a live process (its own)", True,
            _alive(os.getpid()))
+
+        # V2: main() takes its parser from build_parser() and runs refuse_args
+        # before anything reads the host -- here, before the allowlist loads.
+        # refuse_args is replaced by a spy that refuses, so nothing may run.
+        calls = []
+        g = globals()
+        real = {n: g[n] for n in ("build_parser", "refuse_args", "use_allowlist")}
+
+        def spy(name, refuse=False):
+            def f(*args):
+                calls.append(name)
+                if refuse:
+                    raise Refused("V2 spy refusal")
+                return real[name](*args)
+            return f
+        pv2 = P("v2")
+        err = io.StringIO()
+        try:
+            g["build_parser"] = spy("build_parser")
+            g["refuse_args"] = spy("refuse_args", refuse=True)
+            g["use_allowlist"] = spy("use_allowlist")
+            with contextlib.redirect_stderr(err):
+                rc = main(["run", "--out", pv2, "--target", "127.0.0.1", "--tcp", "80",
+                           "--seconds", "1"])
+        finally:
+            g.update(real)
+        ck("V2", "main() calls build_parser once, then refuse_args, before the "
+                 "allowlist is read: exit 2, the refusal, no file",
+           (2, ["build_parser", "refuse_args"], True, False),
+           (rc, calls, "V2 spy refusal" in err.getvalue(),
+            os.path.exists(pv2 + ".events") or os.path.exists(pv2 + ".meta.json")))
 
         # ---- P: replies, silents, a DUP and an error line through the whole path
         pp = P("p")
@@ -2274,7 +2629,7 @@ def selftest(out=sys.stdout):
                           other.get("truncated")))
         rc2, rep, _se = hp(["report", pp])
         line = next((x for x in rep.splitlines() if x.startswith("  first  icmp-reply ")), "")
-        ck("P3", "report's first icmp-reply is seq=3 at the events' own t_mono",
+        ck("P3", "report's first icmp-reply is seq=3 at the events' own t",
            (0, True, True),
            (rc2, bool(replies) and (" %s " % replies[0][3].split()[0]) in line,
             "seq=3" in line))
@@ -2388,7 +2743,7 @@ def selftest(out=sys.stdout):
         ck("T4", "--until tcp:OPEN:ok stops at the first ok, far inside --seconds",
            ("--until=tcp:%d:ok" % PO, True, True),
            (meta.get("stop_reason"),
-            (meta.get("end_mono", 99) - meta.get("start_mono", 0)) < 2.0,
+            (meta.get("end_raw", 99) - meta.get("start_raw", 0)) < 2.0,
             bool(oks) and bool(stops) and oks[0] <= stops[0]))
         pt5 = P("t5")
         rc, so, se = hp(run_args(pt5, "--tcp", str(PC), "--until", "tcp:%d:ok" % PC,
@@ -2449,7 +2804,7 @@ def selftest(out=sys.stdout):
         ck("D3", "--until udp:PORT ends the run at the datagram",
            ("--until=udp:%d" % UP2, True),
            (meta.get("stop_reason"),
-            (meta.get("end_mono", 99) - meta.get("start_mono", 0)) < 10.0))
+            (meta.get("end_raw", 99) - meta.get("start_raw", 0)) < 10.0))
 
         # ---- G: the neighbour table, through the fake ip
         pg = P("g")
@@ -2838,9 +3193,9 @@ def selftest(out=sys.stdout):
             and fpgrp != p.pid))
         pc4 = P("c4")
         env = pcfg("c4", [reply(1)], deaf=True)
-        t = time.monotonic()
+        t = now_raw()
         rc, so, se = hp(run_args(pc4, "--icmp", "--ping", fping, "--seconds", "0.5"), env)
-        took = time.monotonic() - t
+        took = now_raw() - t
         produced.append(pc4)
         meta = rec_of(pc4)[3]
         ck("C4", "a ping deaf to SIGINT and SIGTERM is SIGKILLed and reaped",
@@ -2862,6 +3217,253 @@ def selftest(out=sys.stdout):
         ck("C5b", "and report still reads it, saying the run did not end cleanly",
            (0, True), (rc, "did not end cleanly" in rep))
 
+        # ---- Q: the clock (H12, H13).  Q1, Q2, Q3, Q6 and Q7 read one run made
+        # under tools/clockshim.py: every Python read of CLOCK_MONOTONIC in the
+        # probe's process runs at half rate and 1000 s ahead; RAW and REALTIME
+        # pass through; the kernel's timers are untouched.  The harness reads
+        # the clocks itself, unshimmed and never through now_raw().
+        def raw():
+            return time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+
+        def mono():
+            return time.clock_gettime(time.CLOCK_MONOTONIC)
+
+        UQ = free_udp()
+        pq = P("q1")
+        e = dict(os.environ)
+        e.update(pcfg("q1", [silent(1), reply(2), reply(3, lag=5.0)],
+                      idle_lines=True, idle_every=0.05))
+        e.update(icfg("q1", neigh=["", entry % "REACHABLE"]))
+        r_before, m_before = raw(), mono()
+        p = subprocess.Popen(
+            [sys.executable, CLOCKSHIM_PATH, "--", THIS] + run_args(
+                pq, "--seconds", "1.5", "--icmp", "--ping", fping, "--icmp-interval",
+                "0.05", "--lag-threshold-ms", "500", "--tcp", str(PO), "--tcp", str(PC),
+                "--tcp-interval", "0.1", "--tcp-timeout", "0.3", "--neigh", "--ip", fip,
+                "--neigh-interval", "0.05", "--udp-listen", str(UQ)),
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
+        procs.append(p)
+        started = wait_for(lambda: count_in(pq, "start") == 1, 15)
+        snd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        r_send = raw()
+        w_send = time.time()
+        snd.sendto(b"q" * 5, ("127.0.0.1", UQ))
+        snd.close()
+        p.communicate(timeout=60)
+        r_after, m_after = raw(), mono()
+        pid_of("q1")
+        produced.append(pq)
+        ev, com, bad, meta = rec_of(pq)
+        stamps = [("event " + k, t) for t, k, _f, _r in ev]
+        for _t, k, f, _r in ev:
+            if k == "tcp":
+                try:
+                    stamps.append(("tcp start_raw", float(f["start_raw"])))
+                except (KeyError, ValueError):
+                    stamps.append(("tcp start_raw", None))
+        cstamps = [float(m.group(1)) for m in (re.match(r"^# (\d+\.\d{6}) ", x) for x in com)
+                   if m]
+        stamps += [("comment", v) for v in cstamps]
+        for key in ("start_raw", "end_raw", "stop_decided_raw"):
+            stamps.append(("meta " + key, meta.get(key)))
+        stamps.append(("meta ping.started_raw", (meta.get("ping") or {}).get("started_raw")))
+        stamps += [("meta first " + k, v) for k, v in (meta.get("first") or {}).items()
+                   if v is not None]
+        outside = sorted({name for name, v in stamps
+                          if not (isinstance(v, (int, float)) and r_before <= v <= r_after)})
+        ck("Q1", "under the shim: every event, comment stamp, tcp start_raw, RAW "
+                 "meta key and first in the harness's RAW bracket; every kind fired",
+           (0, True, [], ["icmp-reply", "icmp-silent", "neigh", "start", "stop", "tcp",
+                          "udp"], True),
+           (p.returncode, started, outside, sorted({k for _t, k, _f, _r in ev}),
+            len(cstamps) >= 2))
+        t_first = next((t for t, k, _f, _r in ev if k == "start"), None)
+        t_last = next((t for t, k, _f, _r in ev if k == "stop"), None)
+        try:
+            decided = meta["stop_decided_raw"] - meta["start_raw"]
+            ratio = ((meta["mono_at_end"] - meta["mono_at_start"])
+                     / (meta["end_raw"] - meta["start_raw"]))
+            host_r = (m_after - m_before) / (r_after - r_before)
+            q2 = (meta.get("stop_reason"), 1.5 <= decided <= 1.85,
+                  1.5 <= t_last - t_first <= 2.5, abs(ratio - 0.5 * host_r) < 0.02)
+        except (KeyError, TypeError, ZeroDivisionError) as ex:
+            q2 = ("unreadable: %s" % ex,)
+        ck("Q2", "under the shim: --seconds 1.5 decided on RAW (1.5-1.85 s), the "
+                 "record spans it on RAW, mono_at_* at half the harness's MONO/RAW rate",
+           ("--seconds", True, True, True), q2)
+        try:
+            with open(pq + ".events", encoding="utf-8") as f:
+                head_q = f.readline().rstrip("\n")
+        except OSError:
+            head_q = ""
+        tcp_lines = [r for _t, k, _f, r in ev if k == "tcp"]
+
+        def keys_of(o):
+            if isinstance(o, dict):
+                return [k for k in o] + [x for v in o.values() for x in keys_of(v)]
+            if isinstance(o, list):
+                return [x for v in o for x in keys_of(v)]
+            return []
+        ck("Q3", "the header names CLOCK_MONOTONIC_RAW as a whole word and no bare "
+                 "CLOCK_MONOTONIC; meta clock and version exact; tcp start_raw; no "
+                 "meta key ends _mono",
+           (True, False, "CLOCK_MONOTONIC_RAW", "1.3", True, []),
+           (bool(re.search(r"\bCLOCK_MONOTONIC_RAW\b", head_q)),
+            bool(re.search(r"\bCLOCK_MONOTONIC\b", head_q)),
+            meta.get("clock"), meta.get("tool_version"),
+            bool(tcp_lines) and all(" start_raw=" in x and " start_mono=" not in x
+                                    for x in tcp_lines),
+            sorted(k for k in keys_of(meta) if k.endswith("_mono"))))
+
+        def slurp(path):
+            try:
+                with open(path) as f:
+                    return f.read().strip()
+            except OSError:
+                return None
+        hb = slurp("/proc/sys/kernel/random/boot_id")
+        hcs = slurp("/sys/devices/system/clocksource/clocksource0/current_clocksource")
+        # a version-1 UUID; its node field is synthetic, locally administered
+        v1_uuid = "12345678-1234-1234-8234-020000000005"
+        ck("Q6", "boot_id and both clocksources equal the harness's reads; the "
+                 "redactor would label boot_id, so it skips it -- as a v4 UUID only",
+           (True, True, True, True, True, True, None),
+           (bool(hb) and bool(hcs), meta.get("boot_id") == hb, meta.get("clocksource") == hcs,
+            meta.get("clocksource_end") == hcs, bool(hb) and Redactor().text(hb) != hb,
+            boot_id_value((hb or "") + "\n") == hb, boot_id_value(v1_uuid)))
+        # Q7's third term is the lag measured from the harness's side: the
+        # send-to-read interval on RAW minus the send-to-receive interval on
+        # realtime.  Their rates differ by up to percents (CLK-38) and the
+        # interval is milliseconds, hence 0.1 ms + 5 % of it.  The first term
+        # catches a lag written in seconds while it is small ("%.3f" prints
+        # 0.000), the third once it is not -- under load the second alone
+        # passed that mutant.
+        uq = [(t, f) for t, k, f, _r in ev if k == "udp"]
+        ts_q = ((meta.get("udp") or {}).get(str(UQ)) or {}).get("so_timestampns")
+        if expect_ts:
+            try:
+                got7 = []
+                for t, f in uq:
+                    lag = float(f["lag_ms"])
+                    est = ((t - r_send) - (float(f["kernel_real"]) - w_send)) * 1e3
+                    got7.append((lag > 0, r_send - 0.001 <= t - lag / 1e3 <= t + 1e-6,
+                                 abs(lag - est) <= 0.1 + 0.05 * (t - r_send) * 1e3))
+            except (KeyError, ValueError) as ex:
+                got7 = ["lag_ms unreadable: %s" % ex]
+            want7 = [(True, True, True)]
+        else:
+            got7, want7 = [f.get("lag_ms") for _t, f in uq], ["-"]
+        ck("Q7", "a udp line's lag_ms > 0 puts the kernel's receive, on RAW, between "
+                 "the send and the read, and agrees with the harness's own estimate",
+           (expect_ts, want7), (bool(ts_q), got7))
+
+        # Q4: records of every version read on the clock their header declares.
+        def plant(name, header, body, pmeta):
+            prefix = P(name)
+            with open(prefix + ".events", "w", encoding="utf-8", newline="\n") as f:
+                f.write("".join(x + "\n" for x in [header] + body))
+            with open(prefix + ".meta.json", "w", encoding="utf-8") as f:
+                json.dump(pmeta, f)
+            return prefix
+
+        def pmeta(version, clock):
+            return {"tool": "hostprobe", "tool_version": version, "clock": clock}
+        header_11 = header_12.replace("hostprobe 1.2:", "hostprobe 1.1:")
+        header_13 = "# hostprobe 1.3: t_raw is absolute CLOCK_MONOTONIC_RAW seconds (planted)"
+        probes_l = "# probes target=192.0.2.1 icmp=- tcp=80 neigh=- udp=50000 seconds=5 until=-"
+        start_l = "100.000000 start t_real=1790000000.000000"
+        stop_l = "105.000000 stop t_real=1790000005.000000 reason=--seconds"
+        tcp_m = "100.500000 tcp port=80 result=ok errno=0 start_mono=100.400000 dur_ms=100.000"
+        tcp_r = tcp_m.replace("start_mono=", "start_raw=")
+        udp_m = ("101.000000 udp port=50000 peer=192.0.2.3:40000 len=10 "
+                 "kernel_real=1790000000.999900000")
+        udp_r = udp_m + " lag_ms=0.100"
+
+        def body(tcp_l, udp_l):
+            return [probes_l, start_l, tcp_l, udp_l, stop_l]
+
+        def read_as(prefix):
+            try:
+                ev_, _c, bad_, _m, (clk, _how) = load_record(prefix)
+            except Refused as ex:
+                return ("refused", str(ex))
+            return clk, len(ev_), sorted(n for n, _why in bad_)
+
+        def drift_of(prefix):
+            rc_, rep_, _se = hp(["report", prefix])
+            ln = next((x for x in rep_.splitlines() if x.startswith("  drift  ")), "")
+            return (rc_, bool(re.search(r"\bCLOCK_MONOTONIC\b", ln)),
+                    bool(re.search(r"\bCLOCK_MONOTONIC_RAW\b", ln)))
+        q11 = plant("q4-11", header_11, body(tcp_m, udp_m), pmeta("1.1", CLOCK_LEGACY))
+        q12 = plant("q4-12", header_12, body(tcp_m, udp_m), pmeta("1.2", CLOCK_LEGACY))
+        clk_q, n_q, bad_q = read_as(pq)
+        ck("Q4", "planted 1.1 and 1.2 records read on CLOCK_MONOTONIC, 0 MALFORMED; "
+                 "this suite's 1.3 record on RAW; report's drift names each one's clock",
+           ((CLOCK_LEGACY, 4, []), (CLOCK_LEGACY, 4, []), (CLOCK, True, []),
+            (0, True, False), (0, False, True)),
+           (read_as(q11), read_as(q12), (clk_q, n_q >= 10, bad_q), drift_of(q12),
+            drift_of(pq)))
+        mixed = (plant("q4b-a", header_13, body(tcp_m, udp_r), pmeta("1.3", CLOCK)),
+                 plant("q4b-b", header_12, body(tcp_r, udp_m), pmeta("1.2", CLOCK_LEGACY)),
+                 plant("q4b-c", header_13, body(tcp_r, udp_m), pmeta("1.3", CLOCK)),
+                 plant("q4b-d", header_13, body(tcp_r, udp_r), pmeta("1.3", CLOCK_LEGACY)))
+        rc4b, _so, _se = hp(["report", mixed[3]])
+        ck("Q4b", "MALFORMED: a 1.3 tcp line with start_mono, a 1.2 one with start_raw, "
+                  "a 1.3 udp line without lag_ms, a 1.3 header its meta calls MONOTONIC",
+           ([4], [4], [5], [1], 1), tuple(read_as(x)[2] for x in mixed) + (rc4b,))
+        tally = {"records": 0, "tcp": 0, "udp": 0}
+        unread = []
+        for path in sorted(glob.glob(os.path.join(ROOT, "bench", "**", "*.events"),
+                                     recursive=True)):
+            prefix = path[:-len(".events")]
+            try:
+                ev_, _c, bad_, _m, (clk, how) = load_record(prefix)
+            except Refused:
+                unread.append((os.path.basename(prefix), "refused"))
+                continue
+            tally["records"] += 1
+            if bad_ or how != "declared by the header":
+                unread.append((os.path.basename(prefix), len(bad_), how[:24]))
+            tally["tcp"] += sum(1 for _t, k, f, _r in ev_ if k == "tcp" and "start_mono" in f)
+            tally["udp"] += sum(1 for _t, k, _f, _r in ev_ if k == "udp")
+        ck("Q4c", "every record under bench/ reads on its header's clock, 0 MALFORMED "
+                  "(>= 13 records, tcp start_mono and udp lines among them)",
+           ([], True, True, True),
+           (unread, tally["records"] >= 13, tally["tcp"] > 0, tally["udp"] > 0))
+
+        # Q5: a Python without CLOCK_MONOTONIC_RAW.  A bootstrap deletes the
+        # attribute and runs this file the way clockshim runs a tool; the same
+        # bootstrap without the deletion is the permitting half.  The target is
+        # not loopback, so the pre-flight's first child is `ip -4 route get`,
+        # which the fake ip logs.
+        boot_del = ("import runpy, sys, time; del time.CLOCK_MONOTONIC_RAW; "
+                    "sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], "
+                    "run_name='__main__')")
+
+        def q5(name, code):
+            prefix = P(name)
+            e = dict(os.environ)
+            e.update(icfg(name, route="192.0.2.1 dev eth9 src 192.0.2.2 uid 1000 \n"
+                                      "    cache \n", neigh=[""]))
+            r = subprocess.run([sys.executable, "-c", code, THIS, "run", "--out", prefix,
+                                "--target", "192.0.2.1", "--neigh", "--ip", fip,
+                                "--neigh-interval", "0.1", "--seconds", "0.5"],
+                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, env=e, timeout=60)
+            files = [os.path.basename(x) for x in (prefix + ".events", prefix + ".meta.json")
+                     if os.path.exists(x)]
+            return (r.returncode, r.stderr.decode("utf-8", "replace"), files,
+                    len(ip_calls(name)), prefix)
+        rc5, se5, files5, calls5, _p5 = q5("q5", boot_del)
+        rc5k, _se, files5k, calls5k, p5k = q5("q5k", boot_del.replace(
+            "del time.CLOCK_MONOTONIC_RAW; ", ""))
+        produced.append(p5k)
+        ck("Q5", "no CLOCK_MONOTONIC_RAW: exit 2 naming it, no traceback, no file, no "
+                 "child; with it, the same bootstrap runs",
+           (2, True, False, [], 0, 0, 2, True),
+           (rc5, "CLOCK_MONOTONIC_RAW" in se5, "Traceback" in se5, files5, calls5,
+            rc5k, len(files5k), calls5k >= 2))
+
         # ---- F: the format, over every record this suite made
         ck("F0", "the format checks read the records of at least 18 runs", True,
            len(produced) >= 18)
@@ -2879,11 +3481,12 @@ def selftest(out=sys.stdout):
             if lines[-1] != "":
                 bad_lines.append((name, "no final newline"))
             last, prev, seq = {}, None, []
+            hclock = header_clock(lines[0])
             for ln in lines[:-1]:
                 if ln.startswith("#"):
                     continue
                 try:
-                    t, kind, _f = parse_event_line(ln)
+                    t, kind, _f = parse_event_line(ln, hclock or CLOCK)
                 except ValueError as e:
                     bad_lines.append((name, ln[:50], str(e)))
                     continue
@@ -2897,7 +3500,11 @@ def selftest(out=sys.stdout):
                     or seq.count("stop") != want_stop
                     or (want_stop and seq[-1] != "stop")):
                 ends.append((name, seq[:1], seq[-1:], seq.count("stop")))
-            if not (lines[0].startswith("# hostprobe ") and CLOCK in lines[0]):
+            # The declared token, not 1.2's `CLOCK in lines[0]`: a substring
+            # test with CLOCK_MONOTONIC passes a header declaring RAW (a prefix),
+            # and with CLOCK_MONOTONIC_RAW passes one declaring MONOTONIC that
+            # names RAW in passing (U14).
+            if hclock != CLOCK:
                 heads.append(name)
             if prefix == pc5:
                 continue            # killed on purpose: no meta by design
@@ -2915,10 +3522,11 @@ def selftest(out=sys.stdout):
                 missing.append((name, gaps))
         ck("F1", "every non-comment line of every record parses as <float> <kind> k=v",
            [], bad_lines)
-        ck("F2", "t_mono never decreases, within a source or across the file", [],
+        ck("F2", "t never decreases, within a source or across the file", [],
            backwards)
         ck("F3", "every meta carries every key the format names", [], missing)
-        ck("F4", "every record opens with the header naming CLOCK_MONOTONIC", [], heads)
+        ck("F4", "every record's header declares CLOCK_MONOTONIC_RAW, a whole token",
+           [], heads)
         ck("F5", "one start first; one stop last, and none in the record killed "
                  "on purpose", [], ends)
         # F6: dated the way capdate dates it -- ITS reader, loaded by path, so
@@ -2971,10 +3579,13 @@ class _Parser(argparse.ArgumentParser):
         sys.exit(2)
 
 
-def main(argv=None):
+def build_parser():
+    """The parser main() uses, and the only one (FW-124: a card's HOST cell is
+    checked with it and refuse_args, in-process; V2 holds main to it)."""
     ap = _Parser(
         prog="hostprobe.py",
-        description="host-side network events, stamped on CLOCK_MONOTONIC (P2-1)")
+        description="host-side network events, stamped on CLOCK_MONOTONIC_RAW "
+                    "(P2-1; RAW since 1.3)")
     ap.add_argument("--self-test", action="store_true",
                     help="run the controls: a fake ping, a fake ip, loopback sockets")
     sub = ap.add_subparsers(dest="cmd")
@@ -3013,13 +3624,35 @@ def main(argv=None):
     r.add_argument("--force", action="store_true", help="overwrite an existing record")
     rp = sub.add_parser("report", help="first event of each kind, counts, lags, drift")
     rp.add_argument("prefix")
+    return ap
+
+
+def refuse_host(a):
+    """What `run` and `--self-test` need of the host, before any file, socket
+    or child exists: Linux, and a Python with CLOCK_MONOTONIC_RAW (Q5).
+    `report` needs neither and runs anywhere."""
+    if not (a.self_test or a.cmd == "run"):
+        return
+    if not sys.platform.startswith("linux"):
+        # select() on pipes, SIGHUP, /proc and iputils are Linux's; under
+        # Windows Python this would die with a traceback instead.
+        raise Refused("`run` and `--self-test` need Linux (this host's WSL, "
+                      "/usr/bin/python3); `report` runs anywhere")
+    if getattr(time, "CLOCK_MONOTONIC_RAW", None) is None or not hasattr(time, "clock_gettime"):
+        raise Refused("this Python has no time.CLOCK_MONOTONIC_RAW, and every stamp "
+                      "and deadline hostprobe %s writes is on it (ONE CLOCK). "
+                      "Refusing before any file, socket or child exists"
+                      % TOOL_VERSION)
+
+
+def main(argv=None):
+    ap = build_parser()
     a = ap.parse_args(argv)
     try:
-        if (a.self_test or a.cmd == "run") and not sys.platform.startswith("linux"):
-            # select() on pipes, SIGHUP, /proc and iputils are Linux's; under
-            # Windows Python this would die with a traceback instead.
-            raise Refused("`run` and `--self-test` need Linux (this host's WSL, "
-                          "/usr/bin/python3); `report` runs anywhere")
+        # FW-124: the argument refusals first, on the parser a card's check
+        # uses, before anything reads the host; then the host's own.
+        refuse_args(a)
+        refuse_host(a)
         if a.self_test:
             return selftest()
         if a.cmd == "run":
