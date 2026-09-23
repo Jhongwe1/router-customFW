@@ -32412,3 +32412,65 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 九、交接
 
 `P2-1` 關了：四件儀器、回顧表、以及每次上機一個的時基因子。下一步 `P2-2`（桌面）：一個配方的 quiet／loud 映像（`recover` 開、`/init` 拉起 LAN）、`kbuild` 把兩個檢查寫進 manifest、`cardcheck` 拒絕寫 flash 的指令、`declared-date` 檢查器、卡片 A —— 外加 `P2-1` 交給它的四件：每一個可能開到原廠的區塊都用 `map` 包夾、上電前等探針的 `start` 那一行、原廠的 LAN 位址與主機在那個網段上的位址、原廠格在 `boa` 之前停住是一個讀數（`X8-WAIT`）。第一次按電源是 `P2-3`。零寫 flash 指令、零 `FLR`、零電源循環。
+
+## 2026-09-23 — 第一百零四段（08:1x 開場，桌面，**零電源循環**，板子全程斷電，15:0x 收工）：`P2-2` 一段關掉，卡片 A 凍在今天，而這一段最值錢的兩件都是「代理讀出來的、我沒看到的東西」
+
+**這一段沒有上電。** `P2-2` 的九件由我與七支代理做完（`hostprobe` 1.1 的位址遮蔽、`capdate` 讀卡片日期、`cardcheck` 拒絕寫 flash、kbuild 的閘門與 `rtkimage` 的紀錄、以及卡片 A 的三份研究；其中 `cardcheck` 那支被續用一次、kbuild 那支兩次）；每一份報告我都在自己的桌面上重跑、並盡量用另一條路徑再導一次，下面分開寫哪些是重跑、哪些是第二來源。
+
+### 一、兩顆映像，以及它們怎麼被證明是這兩顆
+
+- **配方的三個改動，每一個都是編譯預設**：`rtl819x-nic` 1.4 把 `recover`（`NET-67` 的停滯偵測）預設打開，並加開機記號 `RLXFW-N7` = `ph_follow << 4 | recov_mode`（預設讀 `00000011`）；`/init` 自己把 LAN 拉起來（switch unlock＋start、NIC unlock＋`netdev on`、`ifconfig rlx0 10.1.1.3 up`，`P2` settled item 3）；`CONFIG_RLXFW_VENDOR_ETH_OPEN=y` —— `0007` 自己的開關回到 Kconfig 預設，給 `D5` 的原廠驅動那一臂。`hostprobe` 1.1 起不在允許清單上的硬體位址一律寫成 `unlisted-N`（`FW-116`），因為原廠在 10.1.1.1 用的是 H601 的位址。
+- **配方 `a2c56bc8`**：`p2q`（quiet）vmlinux 4,468,487 B、`c5e2cfdba7730d47…`，nfjrom 1,155,072 B、`4972edbadd2655a8…`；`p2l`（loud）vmlinux 4,575,403 B、`39a4db228131f697…`，nfjrom 1,181,696 B、`888c930aa31763d9…`。兩顆各比 `s100a`／`s100L` 多 **1,536 B**：同一個驅動改動在兩個變體上長得一樣，這一條是它們的一致性而不是證明。
+- **兩道閘門上了建置路徑（`FW-121`，`CFG-3` 關）**：`kconfig-delta check` 與 `rlxfw-marks verify` 在每次建置後跑，判決寫進 manifest 格式 2，不綠就 exit 6、不印 `manifest ->`。我在 HEAD 自己的 delta 上手動重跑 `s100L`／`s100a`：loud 綠、quiet 紅（`CONFIG_PRINTK`、`CONFIG_PRINTK_TIME` 未申報），反之亦然；對 `P2-2` 改過的 delta，兩顆都紅在 `CONFIG_RLXFW_VENDOR_ETH_OPEN`（宣告 y、建置時 n）—— 舊映像在新宣告下被拒絕，是一個沒人寫過卻自己出現的正控制。
+- 🔴 **`rtkimage.py build` 從 `R3-2`（2026-08-29）起就在 tripwire 之外執行 drop 的 `lzma-26`、`cvimg` 與經 symlink 進 `src-vendor/` 的 `rsdk` 工具鏈（`FW-122`）**，每一次 `looprun` 的 S3 也是。是寫紀錄的代理讀出來的。現在 `build` 在 `vendor-tripwire.sh` 下跑，只在 CLEAN 時寫紀錄；`p2q`／`p2l` 是第一批 tripwire 下組出的 nfjrom（CLEAN、`cmd-rc=0`）。`--check` 同日 6 棵樹 0 行；`ggbruno-openwrt` 07:32 的 mtime 我追到是 `test-vendor-tripwire.sh` 在桌面挑真樹當受試者時的 victim（`include/device_table.txt`，改完即還原），不是建置。**過去那些建置有沒有寫進廠商樹，今天沒有東西看得到。**
+- 🔴 **manifest 的 `initramfs_sha256` 是規格檔文字的摘要，不是內容（`FW-123`）**：`/init` 從 988 B 變 2,153 B，它一個位元都沒動。這是我在核對鏈的時候自己看到的。`B35`／`B38`／`B39`／`B42` 四張卡片與 `notes/nic-driver.md` § 13.5 用它說「只有核心不同」；讀 `mkinitramfs` 早就寫在規格檔旁邊的內容紀錄，`r6if1`、`s31a`、`s31b`、`s31L`、`s32a`、`s99c`、`s100a`、`s100L` 全部 `ee7acf8b…` —— **結論對、證據看不到它。** kbuild 現在拒絕旁邊沒有紀錄的規格檔並寫 `initramfs_manifest_sha256`（`p2q`／`p2l`：`51ea1604…`）。
+- **可重現**：加了內容摘要後兩顆重建，vmlinux 與 nfjrom 逐位元組相同。
+
+### 二、四筆債關掉
+
+- **`CAPD-1`（`FW-120`）**：`capdate` 的 `D5`–`D10` 讀卡片自己的宣告日期；第一次掃描 18 張裡 17 張 OK，**`B35` 宣告 2026-09-21，而它 22 份有日期的 fenced 擷取全在 09-20 23:16:54–23:27:08**（上機在最後一格之後 33 分鐘才在 `W2-START` 跨午夜）。按名字列在 `KNOWN_CARD_DATE`，卡片不改。
+- **`CFG-3`、`TC-i`**：見上；三環（manifest → 紀錄 → nfjrom）由卡片 A 的 `cardnum` 列在凍結時逐環對。
+- **`FW-113`**：`cardcheck` 拒絕 `FLW`／`EW`／`EB`（不分大小寫）與非 `AUTOBURN 0` 的 `AUTOBURN`，除非卡片帶擁有者的 `owner-yes` 列、逐位元組比對。85 張卡片結束碼無一改變。🔴 **代理新加的 `W0`（每個擊殺要打紅它所名的例）抓出兩個自 2026-08-31 起被算成擊殺的假擊殺：`M1` 從未編譯、`M11` 是 AttributeError。** 突變套件加 `--jobs 8`：序列 1,342 s、平行 378 s，37 行逐位元組相同才接受。它只讀單引號 `--send`：擷取記錄送出過 15 個寫入動詞 payload（14 `EW`、1 `EB`），它看得到 3 個 —— 這是它的邊界，寫在 `FW-113`。
+
+### 三、卡片 A（`bench/2026-09-23/PREDICTIONS-B44-block42.md`，凍結）
+
+- **十二次按電源**：`P1` rlxfw（loud 三輪、quiet 四輪、map、之後 quiet 映像上的全部量測與兩個驅動的吞吐矩陣）、`V1`–`V3` 原廠冷、`M1` 原廠冷監聽、`P2` rlxfw（bracket）、`V4`–`V7` 原廠暖、`M2` 原廠暖監聽、`P3` rlxfw（bracket＋ARP 重建對照）。223 個 fenced cell、112 個 console、71 個 host、39 列數字；`cardcheck` 100 條板上指令、39 of 39 重導出；`check-predictions` 0 of 223；`capdate` OK。
+- 🟢🟢 **`D2` 的兩欄現在用同一種擷取模式** —— 預測代理讀 `LDR-22` 找到的：任何重設之後 loader 都把原廠映像放在 `0x80500000`，從接住的提示字元 `J 80500000` 與自動開機從 `decompressing kernel:` 起逐位元組相同。所以原廠也先被接住（冷 `esc`、暖 `esc_after`），「ESC 對監聽」這個語料裡量得到的偏移（同目錄 2.6–8.6 ms、合併 12.5 ms，跟帶寬一樣大）不再在比較裡；`M1`／`M2` 把它單獨量出來。
+- **`D8`**：每次讀 network-up 的開機之前清主機的鄰居項（兩欄同一個主機 ARP 機制），network-up 發表成一秒寬的括號；通道偏移用十五格 `traceroute`（`for` 被 `cardcheck` 拒絕，所以拆成十五格），「穩定在一個位元組時間內」事先定成「第 2–15 次偏移的全距 ≤ 260.4 µs」，預測會觸發（console 讀取量化約 1 ms）。
+- 🔴 **一條 H601 洩漏路徑是研究代理找到的**：原廠開機後主機的 10.1.1.1 鄰居項是這台機器自己的位址，而 `looprun` 的 `S5c` 會原樣印出那一項 —— 所以每個 rlxfw 區塊前都先清。`hostprobe` 1.1 的紀錄會讓 `capdate` 變紅（沒有 `started_wallclock`，在 `bench/` 的 scratch 副本上量到）→ 1.2 補上，`F6` 用 `capdate` 自己的讀取器驗，拿掉它的突變 `F3`／`F6` 紅。
+- **預測全部重導**：`p2q` S7 擷取 2,117 B（1,874 + 19 + 224）精確、`p2l` 7,948 + e；`J` → 提示字元 f_A × 10.72 s ／ 12.48 s（30.1078 × 0.353718 + 0.0725 等，我逐行重算）；`D7` 的「FW-32 的殘差」事先讀成 |殘差| ≤ 0.250 s（讀成 [0.089, 0.250] 的話，語料自己那一對會失敗 —— 拒絕寫在卡片上、量測之前）；原廠 `J 80500000` 1,789 B；map 本體 `0927be41e91fe4bd`（十三份一樣）。
+
+### 四、更正（狀態／發現檔就地改，這裡記一筆）
+
+- `FLS-26` 說 `C7-M0` 是第十份 map；以 `sent` 欄選是第十三份（少算 `2026-09-16/C2-M0`、`X7-M3`、`2026-09-17/X8-M0`）。
+- `NET-109` 殘留與 `notes/nic-driver.md` § 17.3、seating 38 的 KNOWN-ISSUES 列說「沒有健康基準」：已提交的健康讀數有三份（`2026-09-20/D12-AC0` 我重讀：CPU 埠 `Rcv 0 bytes`、`CRCAlignErr 21` = 驅動 `n_tx 21`），**CPU 入向 `Rcv 0` 而 `CRCAlignErr` 跟著 TX 是健康態**，所以殘留第一項收窄成「新開機同一時刻的一對」。
+- `P2-2` 那一列寫「`0007` 不套用」；做的是 `0007` 自己的開關回到 Kconfig 預設 y，等價的論證寫在 `NET-106`。
+- `hostprobe` 的 docstring 說 rlxfw 核心上的原廠驅動用 H601 位址回 ARP；`V3-ETH4` 讀的是 SDK 佔位 `00:12:34:56:78:94`。
+- 兩個 `config/`／`tools/` 裡 `citecheck` 看不到的引用修了數字（`0005` 的 kbuild 行、`appletcensus.py` 的 `cardcheck.py:370` → 451），加上 `PROGRESS` 的 `capdate.py:250-252` → 328-330。
+
+### 五、我自己的錯（都在寫進東西之前或提交之前抓到）
+
+- **又一次在 `wsl -- bash -lc` 裡內嵌讀退出碼**：`spec-check` 印著兩個 FAIL，我讀到 `rc=0`；改用檔案腳本讀是 1。這條規則 `CLAUDE.md` 寫著、上一段也犯過；這一段起收工閘門全部走一支在腳本裡讀狀態的檔案。
+- 第一次比對 HEAD 與工作樹的 `cardcheck`，把 HEAD 的副本放在它的樹外面跑，它找不到自己的資料檔 → 67 張卡片「結束碼不同」全是假的；在 HEAD 自己的樹裡重跑是 85／85 相同。
+- `FW-120` 的初稿把 `B35` 的 off-card 範圍寫成「24 份到 23:59:55」，漏了 09-21 的 13 份；KNOWN-ISSUES 初稿的「28 個引用、11 個檔、29」重現不出來（實際 11 個引用、9 個檔）。
+- `FW-123` 標題寫「五張卡片」，實際四張；`NET-107` 的註記在表格裡放了一個沒跳脫的 `|`，`spec-check` `C8` 抓到。
+- `leakscan` 的 `TEXTY` 第一次改動多了一行，會移動 10 個引用；改成不動行數。
+- 建置腳本把 `--unit` 指到 `unit-2018` 而不是 `squashfs-root`，`mkinitramfs` 拒絕（它對）。
+- 卡片初稿：`presses` 那一列數的是標題（7）不是按電源（12）；`§ 3.3 and the table below` 指向一張不存在的表（補成 § 3.7）；三列 `cardnum` 的正規式以空白結尾，會被去除尾空白的編輯器靜靜改掉 —— 改成以可見字元結尾，`cardcheck` 的 `count` 又把兩個空白併成一個（`" ".join`），用 `\s+`。
+- 用了一句修辭「nine-tenths of the way to a flash write」，刪掉。
+
+### 六、觀察，沒有處理
+
+- `r3-4/cells` 有 55 棵舊的 staged 樹、26 GB（08-28 到 09-22），不是這一段的；這一段自己的兩棵用完即刪。要不要清是擁有者的決定。
+- 四個檔（`docs/rlx-cache-and-cp0.md`、三個 `dt/` 檔、`tools/dtcheck.py`）工作樹是 CRLF、index 是 LF，從 09-09 到 09-20 就這樣，git 不當它是改動。
+- `bench/README.md` 的 `2026-09-22b` 那一列寫 41 份擷取，目錄現在有 53 個 `.log`：那一欄是手打的快照。
+
+### 七、閘門、排練與 sweep
+
+收工閘門這一段改成一支在腳本裡逐行讀結束碼的檔案。工作樹上：`spec-check`、`citecheck`、`cfcensus`（`--self-test`／`ratchet`／`check`）、`ledgerscan check`／`quarantine`、`xcheck sweep`、`capdate`、`docsize`、`test-file-modes`、`flashwin scan --sweep bench`（對這台的 dump）全部 0；`check-predictions --sweep` 依設計紅（已知的凍結卡片缺陷，加上卡片 A 的 223 格尚未擷取）。整組改動先在 ext4 的完整 clone 上排練，這一次補上第一百零三段缺的 `src-vendor` symlink：排練 commit `6e4c51a`、tree `8ea9c282`，同一組閘門在 clone 上全部 0。真的 commit `66ddb93` 的 tree 與排練逐位元組相同（`8ea9c282`）；`citecheck` 在 commit 之後 0 new、35 known、0 suspended。
+
+🔴 **desk sweep 沒有跑完**：14:32:59 在排練 clone 上開始，14:58 依擁有者的指示停掉，一個步驟的判決都沒有讀到 —— 所以這一段的改動**沒有經過完整的 desk sweep**，只經過上面的閘門，以及各 suite 的單獨重跑：`test-kbuild-cflags` 96/0/0、`test-rtkimage` 62/0/0、`looprun --self-test` 105/0、`hostprobe --self-test` 97/0（加一個被殺掉的突變）、`cardcheck --self-test` 48、`leakscan --self-test` 17/0；`test-cardcheck-mutants` 由代理在序列與 `--jobs 8` 各跑一次，37/37。**交給下一段：上機之前，先在推上去的樹上跑完整 sweep。** CI 由推上去的 run 決定。`citime check` 報 `5972a2a` 的 run `35800675702` 沒有列，這一段補記（suite_cost 1,259 s），之後 0 missing。
+
+### 八、交接
+
+`P2-2` 關了。下一段先在推上去的樹上跑完整 desk sweep（這一段停掉了），再做 `P2-3`：上機 A，**今天 2026-09-23**，照 `bench/2026-09-23/PREDICTIONS-B44-block42.md` 按十二次電源，每一次先等擁有者的握手；不能跨午夜，做不完或今天開不了就寫一張新日期的後繼卡片，這一張不改。零寫 flash 指令、零 `FLR`、零電源循環。

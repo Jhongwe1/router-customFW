@@ -16,7 +16,7 @@ the work (house rule 6).
 | **Active gate** | **`P2`** — boot-time breakdown + throughput, both firmwares, same script. Opened 2026-09-23 by the owner; its step list is at the end of this file. Booked after it, not opened: **`R6b`** (what `R6` left without an owner) and **`R1y`** (the record's maintainability, including this file's restructure). Closed gates and their evidence are on § Gate board. |
 | **Active step** | **`P2-3`** — seating A, **2026-09-23**, from the frozen card `bench/2026-09-23/PREDICTIONS-B44-block42.md`: twelve presses (three rlxfw, nine vendor), both firmwares cold and warm with `D2`'s columns captured in one mode, the throughput matrix on both drivers, `NET-109`'s reading before traffic. `P2-0`, `P2-1` and `P2-2` closed 2026-09-23. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-09-23（第一百零四段收工）**：`P2-3`，上機 A，**今天** —— 卡片宣告 2026-09-23，不能跨午夜；若今天做不完或開不了，寫一張新日期的後繼卡片，這一張不改。每一次按電源先等擁有者的握手。`P2-2` 一段關掉：兩顆映像（`a2c56bc8` quiet／loud，在兩道閘門與 tripwire 下建成、逐位元組可重現），`CAPD-1`／`CFG-3`／`TC-i`／`FW-113` 關，卡片 A 凍結。 |
+| **Next after this** | 🔄 **2026-09-23（第一百零四段收工）**：先在推上去的樹上跑完整 `desk-sweep`（第一百零四段在 14:58 依擁有者指示停掉，沒有判決），再做 `P2-3`：上機 A，**今天** —— 卡片宣告 2026-09-23，不能跨午夜；若今天做不完或開不了，寫一張新日期的後繼卡片，這一張不改。每一次按電源先等擁有者的握手。`P2-2` 一段關掉：兩顆映像（`a2c56bc8` quiet／loud，在兩道閘門與 tripwire 下建成、逐位元組可重現），`CAPD-1`／`CFG-3`／`TC-i`／`FW-113` 關，卡片 A 凍結。 |
 | **Blocked on** | Nothing at the desk. Seatings wait for the owner's power, and each vendor boot costs one press (`P2`, settled item 6). |
 
 **Step list for the active gate**: `P2`'s, at the **end** of this file. It is
