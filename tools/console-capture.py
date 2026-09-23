@@ -245,12 +245,12 @@ DEFAULT_ESC_PERIOD = 0.02
 # rule: every stamp AND every deadline -- both ESC loops, the CR settle,
 # --seconds, --idle, drain() -- moved from CLOCK_MONOTONIC to
 # CLOCK_MONOTONIC_RAW, and a deadline decides what is written. Where the
-# kernel slews MONOTONIC to r = 0.965 of RAW (CLK-38, and deepening) an
-# --esc N loop now lasts N RAW seconds, not N/r: ~3.5 % fewer ESC bytes, and
-# the --send after it leaves that much sooner. select() still sleeps on the
-# kernel's clock, so achieved_period_s reads ~1/r longer there. RAW stamps
-# on MONOTONIC deadlines would keep the wire and put two clocks in one
-# capture. `t0_raw` is a new key, not `t0_mono` redefined (FW-115).
+# kernel slews MONOTONIC to r = 0.965 of RAW an --esc N loop lasts N RAW
+# seconds, not N/r (~3.5 % fewer ESC bytes) -- to within ONE wait: each wait
+# is a whole select() quantum on the kernel's clock, RAW is re-read between
+# waits, so a deadline under q/(1 - r) -- the 0.4 s settle at r > 0.875 --
+# still lasts its MONOTONIC length (量 2026-09-24).  `t0_raw` is a new key,
+# not `t0_mono` redefined, and no stamp sits on a MONOTONIC deadline (FW-115).
 TOOL_VERSION = "1.5"
 
 # --until searches this many TRAILING bytes of what has arrived since it was
@@ -961,9 +961,9 @@ def report(args) -> int:
 # RAW on 2026-09-23, slower as the evening went, while two time daemons
 # fought, and a capture on it would record that in no field.  select()
 # timeouts stay on the kernel's clock and every loop re-reads RAW after its
-# wait, so a quantum q overshoots by at most q * (1/r - 1): 1.8 ms per 50 ms
-# at that r.  `clock` in the metadata declares the name whole --
-# CLOCK_MONOTONIC is a prefix of it.
+# wait: each wait overshoots by q * (1/r - 1), 1.8 ms per 50 ms at that r, and
+# a whole deadline ends up to ONE quantum late.  `clock` in the metadata
+# declares the name whole -- CLOCK_MONOTONIC is a prefix of it.
 CLOCK = "CLOCK_MONOTONIC_RAW"
 BOOT_ID = "/proc/sys/kernel/random/boot_id"
 CLOCKSOURCE = "/sys/devices/system/clocksource/clocksource0/current_clocksource"

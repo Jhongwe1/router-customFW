@@ -394,6 +394,29 @@ def controls(dump_path):
     ck("F9b one wrong digest in that rendering is a DIFFER",
        s["differ"] == 1 and s["same"] == MAP_N - 1, "%r" % (s,))
 
+    # F10 FW-124: refuse_args, in-process, both ways -- the out-of-range
+    # groups refused, and every form a card or a desk run uses permitted
+    # (card B44's `flashmap.py compare <cap>.log` among them).
+    ap = build_parser()
+    passed, stopped = [], []
+    for g in ("32", "-1"):
+        try:
+            refuse_args(ap.parse_args(["predict", "--level", "1", "--group", g]))
+            passed.append(g)
+        except Refused:
+            pass
+    for argv in (["predict", "--level", "1", "--group", "0"],
+                 ["predict", "--level", "1", "--group", "31"],
+                 ["predict", "--level", "0"],
+                 ["compare", "bench/2026-09-23/P1-M0.log"], ["controls"]):
+        try:
+            refuse_args(ap.parse_args(argv))
+        except Refused as exc:
+            stopped.append("%s: %s" % (" ".join(argv), exc))
+    ck("F10 refuse_args refuses --group 32 and -1, permits the rest",
+       not passed and not stopped,
+       "not refused: %s; refused: %s" % (passed or "-", stopped or "-"))
+
     # ---- real material: the dump.  Skipped where it is absent, which is CI.
     if dump_path and os.path.isfile(dump_path):
         try:
@@ -446,8 +469,24 @@ def default_dump():
     return os.path.join(work, DEFAULT_DUMP) if work else DEFAULT_DUMP
 
 
-def main(argv=None):
+def refuse_args(a):
+    """Every refusal that reads nothing but the parsed arguments (FW-124).
+
+    Almost everything this tool refuses reads the dump or the capture --
+    the environment -- and stays where it is (load_dump, compare).  The one
+    argument-only refusal: `predict --group N` outside 0..31, which indexed
+    past the 4 MiB dump (a negative N from its end) and printed a digest of
+    no bytes as if it had hashed 4,096 of them (量 on a synthetic buffer,
+    2026-09-24).  A card's `flashmap compare <cap>.log` cell has no argument
+    this can refuse: everything that can go wrong there is the environment."""
+    if getattr(a, "cmd", None) == "predict" and not 0 <= a.group < MAP_N:
+        raise Refused("--group %d: the map's groups are 0..%d" % (a.group, MAP_N - 1))
+
+
+def build_parser():
+    """The one parser main() uses (FW-124)."""
     ap = argparse.ArgumentParser(
+        prog="flashmap.py",
         description="predict and compare rtl819x-spi's `map` output")
     ap.add_argument("--dump", default=None,
                     help="the reference dump (default: $FWRE_WORK/" +
@@ -463,8 +502,17 @@ def main(argv=None):
     p.add_argument("capture", help="a /proc/rtl819x-spi-map capture (.log)")
 
     sub.add_parser("controls", help="run the controls and stop")
+    return ap
 
+
+def main(argv=None):
+    ap = build_parser()
     args = ap.parse_args(argv)
+    try:
+        refuse_args(args)
+    except Refused as exc:
+        print("flashmap: REFUSED -- %s" % exc, file=sys.stderr)
+        return 2
     dump_path = args.dump or default_dump()
     if args.cmd is None:
         ap.print_help()

@@ -49,6 +49,8 @@ there prints ``Assertion fail at file`` and enters ``j 0x80403DC8`` -- a wedge
 this instrument cannot see and the console can.
 """
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -57,8 +59,6 @@ import subprocess
 import sys
 import threading
 import time
-
-sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 Y5 = os.path.join(ROOT, "bench", "2026-09-21e", "y5-rateladder.py")
@@ -70,6 +70,12 @@ FRAME_BITS = (PAYLOAD_LEN + 28 + 14 + 4) * 8   # UDP payload + IP/UDP + Eth + FC
 DEFAULT_PORT = 9999
 DEFAULT_STEP_S = 8.0
 DEFAULT_RATES = "0.5,1.0,2.0,4.0,8.0"
+
+
+class Refused(Exception):
+    """An argument this tool will not run with.  FW-124: a card's HOST cell
+    is checked with build_parser() and refuse_args(), in-process, so the
+    check and the run cannot drift."""
 
 
 def run(argv, timeout=None):
@@ -175,7 +181,7 @@ def blast(target, port, src, rate_mbit, step_s):
 
 # --- the ladder ---------------------------------------------------------------
 def cmd_blast(a):
-    rates = [float(x) for x in a.rates.split(",") if x.strip()]
+    rates = refuse_args(a)
     rec = {"target": a.target, "src": a.src, "dev": a.dev, "port": a.port,
            "payload_len": PAYLOAD_LEN, "frame_bits": FRAME_BITS,
            "step_s": a.step_s, "rates_mbit": rates, "arp_load": a.arp_load,
@@ -348,6 +354,47 @@ def cmd_self_test(a):
     ck("C4", "a silent pre-ladder reading is a refusal, not a result",
        "REFUSED" in _refusal_text())
 
+    # C5 -- FW-124: refuse_args, in-process, both ways.  Until it existed a bad
+    # --rates was a ValueError traceback out of cmd_blast, after the parse had
+    # accepted it; a card's HOST cell is now checked with these two functions.
+    ap = build_parser()
+    bl = ["blast", "--target", "10.1.1.3", "--src", "10.1.1.2",
+          "--dev", "enxfc19286184c9"]
+    bad = (["--rates", "0.5,abc"], ["--rates", "0"], ["--rates", "-1"],
+           ["--rates", "nan"], ["--rates", ","], ["--step-s", "0"],
+           ["--port", "0"], ["--port", "70000"])
+    passed = []
+    for extra in bad:
+        try:
+            refuse_args(ap.parse_args(bl + extra))
+            passed.append(" ".join(extra))
+        except Refused:
+            pass
+    ck("C5a", "refuse_args refuses a bad --rates, --step-s or --port",
+       not passed, "%d of %d refused%s" % (len(bad) - len(passed), len(bad),
+                                           ("; passed: %s" % passed) if passed else ""))
+    good = (bl + ["--rates", "0.5", "--step-s", "8",          # block 40's own line
+                  "--out", "bench/2026-09-22/B2-LADDER.json"],
+            bl + ["--rates", "43", "--step-s", "8", "--arp-load",  # as block 41 ran it
+                  "--out", "bench/2026-09-22b/C4-DOSE.json"],
+            bl,
+            ["probe", "--target", "10.1.1.1", "--dev", "enxfc19286184c9", "--src", "10.1.1.2"],
+            ["self-test"])
+    refused = []
+    for argv in good:
+        try:
+            refuse_args(ap.parse_args(argv))
+        except Refused as e:
+            refused.append("%s: %s" % (" ".join(argv[:2]), e))
+    ck("C5b", "and permits the cards' own forms and the defaults",
+       not refused, "; ".join(refused))
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        rc = main(bl + ["--rates", "0.5,x"])
+    ck("C5c", "main() refuses a bad --rates with exit 2, before any socket",
+       rc == 2 and "REFUSED" in err.getvalue() and "Traceback" not in err.getvalue(),
+       "rc %s: %s" % (rc, err.getvalue().strip()[:60]))
+
     # The count is the checks that RAN, not a literal.  A hardcoded total is a
     # number that goes on claiming coverage after a check is deleted.
     print("\n%s: %d checks, %d failed%s"
@@ -365,8 +412,44 @@ def _refusal_text():
     return src[i:j]
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def refuse_args(a):
+    """Every refusal that reads nothing but the parsed arguments (FW-124): no
+    socket, file, device or clock.  -> the --rates list for `blast`, else None.
+
+    量 2026-09-24, the previous blast() on loopback: a zero rate raised
+    ZeroDivisionError; a NEGATIVE one was never paced -- 11,684 frames in
+    0.05 s, a flood; `--step-s 0` sent nothing (0 frames in 0.0000 s), which
+    cmd_blast then divides by; port 0 printed `send failed: [Errno 22]` and
+    sent nothing; port 70000 raised OverflowError; and a --rates word that is
+    no number was a ValueError traceback out of cmd_blast.  Each is a refusal
+    now, before the pre-ladder probe runs."""
+    if a.cmd != "blast":
+        return None
+    rates = []
+    for x in a.rates.split(","):
+        x = x.strip()
+        if not x:
+            continue
+        try:
+            r = float(x)
+        except ValueError:
+            raise Refused("--rates %r: %r is not a number of Mbit/s" % (a.rates, x)) from None
+        if not 0 < r < float("inf"):
+            raise Refused("--rates %r: %r is not a positive, finite rate in Mbit/s"
+                          % (a.rates, x))
+        rates.append(r)
+    if not rates:
+        raise Refused("--rates %r names no rate" % a.rates)
+    if not 0 < a.step_s < float("inf"):
+        raise Refused("--step-s %r must be a positive, finite number of seconds" % a.step_s)
+    if not 1 <= a.port <= 65535:
+        raise Refused("--port %d is not a port number (1-65535)" % a.port)
+    return rates
+
+
+def build_parser():
+    """The one parser main() uses (FW-124)."""
+    ap = argparse.ArgumentParser(prog="netblast.py", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     b = sub.add_parser("blast", help="walk an inbound rate ladder")
@@ -390,8 +473,20 @@ def main():
 
     s = sub.add_parser("self-test")
     s.set_defaults(func=cmd_self_test)
+    return ap
 
-    a = ap.parse_args()
+
+def main(argv=None):
+    # 🔄 FW-124: this ran at import, where it broke every in-process loader
+    # whose sys.stdout is not a TextIOWrapper -- cardcheck loads this file.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    a = build_parser().parse_args(argv)
+    try:
+        refuse_args(a)
+    except Refused as e:
+        print("netblast: REFUSED: %s" % e, file=sys.stderr)
+        return 2
     return a.func(a)
 
 

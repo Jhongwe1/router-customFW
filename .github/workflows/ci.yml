@@ -540,10 +540,10 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/cardcheck.py --self-test 2>&1 | tee ci-out/cardcheck.out; exit "${PIPESTATUS[0]}"
 
-      # And the mutation suite, because 26 green controls is a claim about the
-      # controls. Two of these survived their first run -- a redirection target
-      # read as a command, and `nod` entries folded into the invocable set --
-      # and neither was visible to any of the 23 cases that existed then.
+      # And the mutation suite, because green controls (26 when it arrived, 63
+      # since FW-124) are a claim about the controls. Two of these survived their
+      # first run -- a redirection target read as a command, and `nod` entries
+      # folded into the invocable set -- invisible to the 23 cases of that day.
       - name: cardcheck mutation suite
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/test-cardcheck-mutants.py --jobs 8 2>&1 | tee ci-out/test-cardcheck-mutants.out; exit "${PIPESTATUS[0]}"
@@ -726,7 +726,7 @@ jobs:
 
       - name: audit-bench-log (exit-code gate)
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
-        run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f \( -name '*.log' -o -name '*.events' \))
+        run: /usr/bin/python3 tools/audit-bench-log.py $(find bench -type f \( -name '*.log' -o -name '*.events' -o -name '*.clock' -o -name '*.meta.json' \))
 
       # 🔴 `check-predictions.py --sweep bench` IS NOT HERE, and the reason is
       # the whole point of the tool. A step was written for it on 2026-08-29
@@ -989,6 +989,17 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/hostclock.py --self-test 2>&1 | tee ci-out/hostclock.out; exit "${PIPESTATUS[0]}"
 
+      # cardrun runs a frozen card's fenced cells verbatim and is the ONE owner of
+      # the card grammar (SPEC.md FW-124, FW-132): cardcheck loads its macro,
+      # HOST-line and shell readings by path, so the reading checked is the
+      # reading run. Its self-test drives synthetic cards with fake hostprobe,
+      # hostclock and console-capture programs in a temporary directory -- no
+      # board, no port, nothing under bench/ -- and R12 parses card B44's own
+      # § 5 to its 9 macros and 183 cells.
+      - name: cardrun self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/cardrun.py --self-test 2>&1 | tee ci-out/cardrun.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:
@@ -1068,12 +1079,12 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mustrun.py --self-test 2>&1 | tee ci-out/mustrun.out; exit "${PIPESTATUS[0]}"
 
-      # 131 s on CI at 67 cases (run 35800675702). A pty, not a serial port.
+      # 139 s on CI at 77 cases (run 35917302713). A pty, not a serial port.
       - name: test-console-capture
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-console-capture.sh 2>&1 | tee ci-out/test-console-capture.out; exit "${PIPESTATUS[0]}"
 
-      # 948 s on CI at 47 mutants (run 35800675702); it stops the one above being a claim
+      # 1304 s on CI at 64 mutants (run 35917302713); it stops the one above being a claim
       # that cannot fail: 量 2026-08-30, test-console-capture reported 40/40
       # while TEN mutations of the terminator guard it had just gained were
       # alive. Each mutant runs the WHOLE suite, because "the committed cases

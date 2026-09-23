@@ -760,7 +760,13 @@ for name, pm, ev in (
         ("hp-raw-nob", {k: v for k, v in hp_raw.items() if k != "boot_id"}, raw_events),
         ("hp-raw-norun", {k: v for k, v in hp_raw.items()
                           if k not in ("start_raw", "end_raw", "stop_decided_raw")}, raw_events),
-        ("hp-both", dict(hp_mono, start_raw=4999.0), mono_events)):
+        ("hp-both", dict(hp_mono, start_raw=4999.0), mono_events),
+        # r8 (108th segment): the RAW body under a header that DECLARES a clock,
+        # in hostprobe's own wording -- 1.2's (contradicts the meta) and 1.3's.
+        ("hp-hdr-mono", hp_raw, "# hostprobe 1.2: t_mono is absolute CLOCK_MONOTONIC "
+                                "seconds (planted)\n" + raw_events.split("\n", 1)[1]),
+        ("hp-hdr-raw", hp_raw, "# hostprobe 1.3: t_raw is absolute CLOCK_MONOTONIC_RAW "
+                               "seconds (planted)\n" + raw_events.split("\n", 1)[1])):
     with open(FX + "/probe/%s.events" % name, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(ev)
     with open(FX + "/probe/%s.meta.json" % name, "w", encoding="utf-8", newline="\n") as fh:
@@ -1087,6 +1093,16 @@ ck "r6 a real pre-P2-1 capture (X20-boot): no origin, not a clock" "0 0 2 1 0" \
 r7c="$(jn "$P/hp-raw" "$P/cap-raw-nob.log")"; r7p="$(jn "$P/hp-raw-nob" "$P/cap-raw.log")"
 ck "r7 a missing boot_id is a NOTE naming the side; none when both agree" "1 0 1 0 1 0 1" \
    "$(printf '%s\n' "$pj" | grep -c '^  NOTE: neither record carries a boot_id') $(printf '%s\n' "$r7c" | head -1) $(printf '%s\n' "$r7c" | grep -c "^  NOTE: .*cap-raw-nob.log's .meta.json carries no boot_id (the other record carries $BOOT)") $(printf '%s\n' "$r7p" | head -1) $(printf '%s\n' "$r7p" | grep -c "^  NOTE: .*hp-raw-nob.meta.json carries no boot_id (the other record carries $BOOT)") $(printf '%s\n' "$r1" | grep -c '^  NOTE: .*boot_id') $(printf '%s\n' "$r1" | grep -c "^  boot_id $BOOT on both records$")"
+# r8 (108th segment): hostprobe's own reader has the last word on its format.
+# Written before the change ran -- REFUTED IF a probe record whose events
+# header declares CLOCK_MONOTONIC under a CLOCK_MONOTONIC_RAW meta joins (the
+# end-to-end run found the join doing exactly that), if it is refused without
+# hostprobe's own reason and line, or if the same body under a header that
+# agrees with its meta stops joining with the planted values.
+r8m="$(jn "$P/hp-hdr-mono" "$P/cap-raw.log")"; r8r="$(jn "$P/hp-hdr-raw" "$P/cap-raw.log")"
+ck "r8 a probe header contradicting its meta is MALFORMED by hostprobe's reader; an agreeing one joins" \
+   "2 1 0 12.740000 15.240000" \
+   "$(printf '%s\n' "$r8m" | head -1) $(printf '%s\n' "$r8m" | grep -c "hp-hdr-mono is MALFORMED by hostprobe's own reader: .*hp-hdr-mono.events:1: the header declares CLOCK_MONOTONIC and the meta's clock is 'CLOCK_MONOTONIC_RAW': one record, two clocks") $(printf '%s\n' "$r8r" | head -1) $(printf '%s\n' "$r8r" | netv)"
 # A real MONOTONIC pair from seating A (P2-3): M1-BOOT (console-capture 1.4)
 # inside M1-HP (hostprobe 1.2).  The three numbers are HEAD's (453ceac, before
 # P2-4), read before this change was written.  REFUTED IF a real pair stops

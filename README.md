@@ -760,7 +760,7 @@ tools/test-flrbracket-mutants.py
                            that case failed. Both controls exist because a pass over
                            `flashwin` reported 8 of 8 killed and every kill was
                            invalid
-tools/cardcheck.py         48 controls, and it reads a card the way the DEVICE will.
+tools/cardcheck.py         63 controls, and it reads a card the way the DEVICE will.
                            `commands` checks every command a card types against what
                            the image DECLARES it can invoke; `numbers` re-derives every
                            number a card states from the artefact it names. It exists
@@ -772,9 +772,9 @@ tools/cardcheck.py         48 controls, and it reads a card the way the DEVICE w
                            exactly the two cells that failed at the bench. `numbers`
                            REFUSES a card with no ```cardnum fence rather than
                            reporting `0 of 0`, which is why the five frozen blocks
-                           come back refused and that is the correct output. Since 2026-09-23 `commands` refuses `FLW`, `EW`, `EB` and a non-zero `AUTOBURN` unless the card carries the owner's dated `owner-yes` row for that exact payload (FW-113)
+                           come back refused and that is the correct output. Since 2026-09-23 `commands` refuses `FLW`, `EW`, `EB` and a non-zero `AUTOBURN` unless the card carries the owner's dated `owner-yes` row for that exact payload (FW-113). Since 2026-09-24 it also refuses a `HOST` cell whose own tool rejects its arguments, reading the card through `tools/cardrun.py`, the runner that executes it (FW-124, FW-132)
 tools/test-cardcheck-mutants.py
-                           37 mutants, baseline first. Two survived the 23 controls
+                           59 mutants, baseline first. Two survived the 23 controls
                            that existed when they were written, and neither was
                            visible to any card in the corpus — one of them exposed a
                            real defect, that `/proc` and `/sys` belong to the kernel

@@ -32679,3 +32679,67 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 十、交接
 
 `plan/handoff-s107.md`。
+
+## 2026-09-24 — 第一百零八段（02:3x 開場，桌面，**零電源循環**，板子全程斷電，06:xx 交接，卡片 B 留給下一段）：七支工具整合進 `0dfb2dd`、`clockshim` 不再弄壞 pyserial、`FW-124` 關掉，而最值錢的是三個第二來源 —— 一支重算量出上一段「每次步進 +0.40…+0.47 s」只是前幾次，一支端到端排練抓到兩個整合後才看得到的缺陷，一支建造代理抓到我改檔時弄掉的執行權限
+
+**這一段沒有上電。** 五件：交接裡三件必須隨整合落地的改正；七個 patch 在 ext4 排練整合、驗、套到真 repo、sweep、commit（`0dfb2dd`，已推）；端到端排練（代理）與它找到的兩個缺陷；`FW-124`（代理造、我核對）；卡片 B 的證據摘要（代理，存在 `$FWRE_WORK/rebuild/s108/cardb-research/REPORT.md`）。擁有者決定卡片 B 換 session 寫。
+
+### 一、開場：量 repo
+
+- HEAD `453ceac`、WSL git porcelain 6 個 `M`、`LOG.md` 最後一則第一百零七段、study 到 `20260923-study7`、`citime check` 0 missing —— 與交接相符。
+- 🔴 **兩個老錯又犯一次**：Git Bash 下 `wsl … bash -lc '… $d …'` 把 `$d` 吃掉；`wsl … bash -lc '/usr/bin/python3 path'` 開頭的 `/` 被 MSYS 改寫成 `C:/Program Files/Git/usr/bin/python3`。`CLAUDE.md` 兩條都寫了；之後全用 heredoc。
+
+### 二、三件改正
+
+1. **`clockshim` 1.1**：六個讀時鐘的替代品改成 `Reader` 實例（有 `__call__`、沒有 `__get__`，不會被綁成方法）。讀 pyserial 3.5：`Timeout.TIME = time.monotonic` 是類別屬性、呼叫 `self.TIME()`；`console-capture` 以 `timeout=0` 開埠，`time_left()` 直接回 0，所以 shim 底下的 pyserial 只讀這個時鐘、不等它。新 `S7` ＋行程內控制（一個普通函式存成類別屬性確實被綁）；把 1.0 放回去的突變只紅 `S7`（6/7）。第二來源：`test-console-capture` 一字不改對 1.1 跑，**77 ok、1 FAIL，FAIL 的恰好是 N52**（照設計）；拿掉 serial 預先 import 與 N52 → 77/77；突變 64/64（基線 77 綠，1657 s）。`FW-131`。
+2. **第三個速率項**（`CLK-39`，§ 7.9）：我用不共用程式碼的算術重算 hostclock 代理的兩份紀錄（`s108/pll-check.py`）—— 超出 tick/10,000 + freq 的殘差最多 35,925 ppm；每一對減去 offset 自己那一秒的減少量後，中位數 128／89 ppm、最差 1,323／5,281 ppm；只用 `offset >> (2 + constant)` 的樸素模型最差仍 26,137 ppm。offset 的四次寫入從紀錄重導（+147.8、+271.9、+295.3、+316.3 ms，`status` 0.70–3.61 s 後清掉）；代理報的 +176.0 ms 不在這兩份紀錄裡，所以不引。
+3. **`timesyncd` 也會 slew**，與 **E3 的結果**（照登記被否證）寫進 § 7.9 與 `CLK-38`。
+   🔴 **更正第一百零七段的紀錄與交接**：那裡寫「每次步進 +0.40…+0.47 s」。用 `s108/e3-rederive.py` 從 E3 的列與**同一次開機的 journal**（`39e37203` 還在）重算：151 個有跳動的 30 s 列間、每一個裡恰好一則 `Clock change detected`（151/151，列間外 0 則），步進**越來越大** —— 00 點 +0.400…+0.465 s（5 次）、01 點 +0.401…+0.795 s（102 次）、02:00–02:23 +0.550…+0.993 s（44 次）；tick 低到 9167 與 9200。「+0.40…+0.47」只描述了前幾次：引用局部視圖。約 0.4 s 門檻的推論靠的是一晚**最小的五次**步進（+0.400…+0.412 s）—— 我自己的草稿一度寫成「第一批」，而第二次就是 +0.465，提交前改。第一百零七段那一則照寫的留著；`PREREG-clk38-mechanism.md` 加了帶日期的更正。
+
+### 三、整合：排練、真 repo、sweep、`0dfb2dd`
+
+- 排練 `s108/integ`：從真 repo 重新 clone `453ceac`、工作樹 6 檔逐位元組複製、七個 patch 全部 `git apply --check` 過、沒有 mode 變動行、新檔 100755。
+- 🔴 **`spec-check` 在排練裡拒絕報告**：`C12` 的活控制 `T23` —— 第一百零七段沒提交的 § Now「Next after this」一個步驟代號都沒有，所以**真 repo 的工作樹本身過不了 `spec-check`**；§ Now 重寫、點名 `P2-4`。`C5` 在 `FW-130` 開火 → 擁有者改成新寫的 `notes/dev-loop.md` § 19.2。
+- 各 suite（`ci.yml` 的命令）全綠、`ci-census --only` 12/12；建造代理自己的突變 harness 在整合後的樹上重跑也全過（iperflog 21/21、boot-timeline 14/14、looprun 22/22、hostprobe 29＋等價的 M27、hostclock 33/33）。
+- `looptime` 讀上機 A：158 份、跨度 9060.0 s、實測 3030.2 s（33.4 %）、死時間 6029.8 s；我從 meta 直接算：real 間隔 6029.821 s、擷取內步進加總 67.5 s。OVERLAP 26 對；🔴 我的樸素計數先得 33、換一種同秒排序得 10（`2026-09-10`）—— 同一秒開始的擷取誰先誰後決定答案，所以 `FINDINGS` 寫「是不是重疊沒有定論」。
+- 🔴 **我的錯**：第一次啟動 sweep 時給背景命令一個明寫的 600 s timeout，可能殺掉一小時的 sweep；14 s 後（還在只讀地取指紋）自己停掉、重跑。
+- **sweep 1**（真 repo 的工作樹，`s108/sweep-dest-1`）：108 宣告、2 跳過、106 跑、102 綠、2 預期紅（census）、**2 非預期紅**，來源沒動：
+  - `citecheck` C3：🔴 **我在 `ci-expected.tsv` 表頭把一行換成六行，`PROGRESS.md:2152`、`:2215` 引用的第 340、354 行各移了 5 行** —— `FW-110` 那一條。改成一行＋合併下一段一對換行，淨零；斷言 13 個被引用的行（142、230、232、279、338–340、350、354–357、368）與 HEAD 是同一列。
+  - `hostprobe` `G1`／`G1b`：當時另兩支代理正跑 `--jobs 8` 的突變。之後安靜 3/3 綠；8 個忙迴圈下 1.2（`453ceac`）與 1.3 的 `G1` 各一次都綠 —— 我沒能重現。建造代理也見過一次。不放寬容差，記在這裡。
+- sweep 之後的改正（端到端的量測 → § 3.1、`FW-115`、README、`ci-expected` 理由；`FW-129` 的殘留；`P2-4` 列「四個推論」→ 三個；表頭淨零）套到真 repo（五檔逐位元組）後，受影響的 8 步以 `desk-sweep --only` 重跑：8 跑、8 綠、來源沒動。對 sweep 複本的收工閘門：`flashwin scan` CLEAN、`check-predictions` 與第一百零七段同樣 6 個 OUT OF ORDER。
+- commit `0dfb2dd`（24 檔，新檔 100755）→ `citecheck` 8/8、0 suspended → push。CI `35917302713` 四綠（census 綠：runner 上的 77、64、hostclock 12＋1 skip、not-run-total 518 都對）。`citime record`：BIG3 1139 → 1502（console-capture 131 → 139 s、它的突變 950 → 1304 s、deskchan 58 → 59 s，我從 job 的步驟時間重算，相加等於 1502），`segments` 照 `FW-125` 紅在 A8（最後一個分區 14.221 %）。這個 commit 宣告變更點 2026-09-23T20:38:27Z：363 s 是檔案裡第二大的相鄰跳動（最大是 `e79ff63` 的 451 s），非邊界的最大跳動 14 s（25.9 倍），離開的分區 n=4、平均 1133.50、sd 5.80 → 63.5 sd（我從 TSV 算，不經 citime）；segments 3/3、citime 自測 22/22。
+
+### 四、端到端排練（代理，`s108/e2e`）
+
+整條鏈照事先登記全過（pty 播放一份真的 loud 開機擷取、loopback 的 hostprobe 1.3、join、looptime 的 raw 規則、hostclock 的 report／convert），三個負控制各為自己的理由被拒。兩個缺陷，我都回去讀程式碼確認：
+1. **`boot-timeline --probe` 從不讀探針事件檔的表頭**：表頭寫 `CLOCK_MONOTONIC`、meta 寫 RAW 的紀錄 join rc 0，而 `hostprobe report` 判 MALFORMED。修：join 以路徑載入 `hostprobe` 自己的 `load_record`、有 MALFORMED 行就拒（`r8`：對舊版先紅 84/1 FAIL，新版 85/85；先量過已提交的 13 份紀錄與測試固定資料都是 0 行 MALFORMED）。`FW-117`。
+2. **`console-capture` 1.5 的 RAW 截止時間只準到一次等待**：每次等待在被調的核心時鐘上睡一整個量子，比 q/(1 − r) 短的截止時間（r > 0.9 時的 settle）跑的就是 MONOTONIC 的長度；0.5 s 的 settle 在 r 0.948 下 0.5284 s；紀錄誠實（`waited_s`）。停掉 `timesyncd` 時 r = 1.00000，對上機 B 沒有影響。文件與程式碼註解改成照實說，不改行為、不升版。
+3. 低：CI 的洩漏閘門不掃 `.clock` 與 `.meta.json`。先量（2433 份 meta 0 個未列白名單的命中、整個 5114 份 rc 0）再加；`leakscan` 的可讀副檔名同時加 `.clock`（被引用的第 137 行不動）。
+- 另外它量到 hostclock 的 timerfd 在這個核心上會醒（一次活的 +0.723937 s 步進、兩個偵測器都看到）—— 我讀那份 `.clock` 與報告確認；`FW-129` 的殘留改掉。
+
+### 五、`FW-124`（代理造，`s108/fw124`）
+
+- `tools/cardrun.py`（新）：上機執行器、卡片文法唯一的擁有者（`FW-132`）；`cardcheck` 以路徑載入它的文法，把每一格 `HOST` 的專案工具命令交給那個工具自己的 `build_parser()`／`refuse_args()` 判；`netblast`、`flashmap` 補契約。
+- 代理量到而我核對過的：語料拒絕恰好是研究預測的 12 格；`netblast` 在匯入時改 stdout 會讓 `cardcheck` 每次 exit 2；它的負速率從不節流（讀 HEAD：間隔 = FRAME_BITS / rate）。
+- 🔴 **它抓到我的錯**：快照裡 `tools/looptime.py` 是 100644 —— 我經 `\\wsl.localhost` 用 Edit 改它的引用之後沒有 `chmod`，正是交接警告過的陷阱。真 repo 的 `core.fileMode` 是 false，index 保持 100755（我在 commit 前讀了 `ls-files -s`）；排練與開發副本就地改回。
+- 我在 `s108/c2b`（`0dfb2dd` ＋ 四個修正 ＋ 這個 patch）核對：`cardcheck` 自測 63、`cardrun` 18、`netblast` 15、`flashmap` 13＋2 skip、突變 59/59 各打紅所名的例；86 張卡片 `commands`／`numbers` 的結束碼新舊逐張相同（66×0／2×1／18×2；28×0／10×1／48×2）；`cardcheck` 被引用的行（27、166、322、371–396、451、560）不動，560 以上只有就地改的 8–11、87、548。
+- 🔴 我寫的 `FW-132` 格子裡一個三反引號 run 關不起來（`spec-check` C10）；§ Now 那一列超過 docsize 的 1000 **位元組**（我用字元算）—— 都在提交前改。
+- **sweep 2**（這個 commit 的樹，`s108/sweep-dest-3`）：109 宣告、2 跳過、107 跑、104 綠、2 預期紅（census）、**1 非預期紅：`mustrun` 的 `C13`**，來源沒動。`C13` 斷言預設的追蹤深度是不動點；`cardcheck` 現在以路徑載入 `hostprobe`，多出第四層（`appletcensus` → `cardcheck` → `hostprobe` → `capdate`、`audit-bench-log`、`bench/**/*.events`），深度 3 是 1492 對、4 是 1498 對。我量了深度 1–6（4、5、6 都是 1498；8193 條路徑在深度 3 就沒有一條的答案和深度 6 不同 —— 那 6 對沒有改變任何路徑該跑的 suite）。這正是 `C13` 註解寫的用途（「明天多一層就變紅，不是悄悄漏掉」），所以把預設深度改成 4、在說明加上今天的量測表，而不是把 `C13` 放寬成比路徑；自測 23/23。改了 `mustrun.py` 與 `ci-expected.tsv` 的理由之後，以 `desk-sweep --only` 重跑受影響的步驟（見下）。對 sweep 2 複本的收工閘門：`citecheck` 8/8、`flashwin scan` CLEAN、其餘全綠，`check-predictions` 同樣 6 個 OUT OF ORDER。
+
+### 六、我自己的錯（彙總）
+
+兩個 Git Bash 老錯；背景 sweep 的 timeout 參數；「+0.40…+0.47」的局部視圖（上一段）與「第一批步進」（這一段的草稿）；README 一度寫「上機 A 3.5 %」（是 1.4 → 3.1 %）；OVERLAP 的樸素計數沒想到同秒排序；`ci-expected` 表頭插入移動被引用的行；`looptime.py` 的執行權限；SPEC 格子裡的三反引號；docsize 以位元組計。其中 `ci-expected` 表頭、`looptime.py` 的權限、三反引號與 docsize 這四個是 sweep、代理或檢查器抓到的，不是我重讀抓到的；README 與「第一批」是我重讀抓到的，OVERLAP 是我的第二支腳本。
+
+### 七、觀察，沒有處理
+
+- 主機這一晚打架越來越深：02:23 tick 9200；E3 之後到 02:45 又 76 次步進。
+- join 把 UDP 事件放在讀取時間，不是 `lag_ms` 推回的核心時間（loopback 上差 0.02–0.35 ms）。
+- 卡片 B 的摘要（第 1 節）列出的陷阱：RAW 上座位因子的參考值會移（`B_REF` 是在被調的時鐘上取的）；`D8` 的下緣規則只在 k = 2 成立；`D3` 讀「網路就緒」會量到主機的 ARP 相位。
+
+### 八、沒有做的
+
+卡片 B（擁有者決定換 session）；主機時鐘的下一次檢驗（取代 E3）沒有登記；這個 commit 的 CI 的 `citime record`。
+
+### 九、交接
+
+`plan/handoff-s108.md`。

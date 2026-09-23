@@ -103,11 +103,11 @@ ABL = os.path.join(ROOT, "tools", "audit-bench-log.py")
 #: 量 before adding them: they were 14 of the tracked files this tool called NOT
 #: SCANNED, and every one of them is plain text -- two of the `.err` files carry
 #: an `enx<12 hex>` name.  A text scanner that calls a text file unreadable is
-#: making the same claim about itself that this whole tool exists to refuse. 🔄 2026-09-23 (`P2-2`): `.events` added BEFORE the first one exists -- `tools/hostprobe.py` writes `PREFIX.events` into `bench/`, host-side transcripts with `ip neigh` lines in them, and `P2-3` is its first seating; CI's audit-bench-log step globs them the same day.
+#: making the same claim about itself that this whole tool exists to refuse. 🔄 2026-09-23 (`P2-2`): `.events` added BEFORE the first one exists -- `tools/hostprobe.py` writes `PREFIX.events` into `bench/`, host-side transcripts with `ip neigh` lines in them, and `P2-3` is its first seating; CI's audit-bench-log step globs them the same day. 🔄 2026-09-24 (`P2-4`): `.clock` added the same way -- `tools/hostclock.py` writes `PREFIX.clock` into `bench/` from seating B on, and the audit-bench-log step globs it, and every `.meta.json`, from the same commit.
 TEXTY = {".md", ".txt", ".json", ".tsv", ".csv", ".py", ".sh", ".ps1", ".yml",
          ".yaml", ".toml", ".c", ".h", ".S", ".java", ".log", ".timing",
          ".cfg", ".conf", ".ini", ".delta", ".config", ".patch", ".gitignore",
-         ".gitattributes", ".gitmodules", ".err", ".s", ".build", ".lds", ".events", ""}
+         ".gitattributes", ".gitmodules", ".err", ".s", ".build", ".lds", ".events", ".clock", ""}
 
 
 #: 🔴 THE SPLIT, and it is the difference between a number and a finding.

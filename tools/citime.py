@@ -527,6 +527,14 @@ CHANGEPOINTS = (
      "file, against 14 s for the largest jump that is not a boundary (13.0x), "
      "and it sits 45.5 sd above the mean of the partition it leaves "
      "(n=98, mean 954.32, sd 4.04)"),
+    ("2026-09-23T20:38:27Z", "big3_s",
+     "0dfb2dd (run 35917302713): test-console-capture 67->77 cases, its mutant "
+     "suite 47->64 mutants, both counts checked by that run's census job; step "
+     "wall 131->139 s and 950->1304 s, test-deskchan 58->59 s; big3_s 1139 -> 1502. "
+     "量 2026-09-24: at 363 s this is the second-largest adjacent jump in the "
+     "file, against 14 s for the largest jump that is not a boundary (25.9x), and "
+     "it sits 63.5 sd above the mean of the partition it leaves (n=4, mean "
+     "1133.50, sd 5.80)"),
 )
 
 #: The LATEST declared boundary -- the segment the series is currently in, and

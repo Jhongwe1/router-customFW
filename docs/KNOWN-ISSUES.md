@@ -1184,6 +1184,29 @@ mode control inside ±10 ms both cold and warm.
 | ⚠️ **Anything from `P1-UR3` on `rlx0`, cleanly**: the host re-attach bounced port 3's link first (`bench/2026-09-23/CORRECTIONS-block42.md` § 5.1) | Seating B |
 | ⚠️ **`D3`** | `P2-4`, on another calendar day |
 
+## 🟢 `cardcheck` refuses a HOST cell its own tool rejects — closed 2026-09-24 (`P2-4`, `FW-124`)
+
+*(was, 2026-09-23, one hundred and fifth segment: nothing checked a frozen card's
+`HOST` cells; twice a card carried one whose own tool rejected its arguments,
+found only at the bench — block 41's `netblast` options and card B44's `Z9-D2`.)*
+
+量 at the desk, 2026-09-24 (108th segment): `cardcheck commands` now reads every
+`HOST <prefix> :: <cmd>` line of a card, inside a fence or not, with the grammar
+of `tools/cardrun.py` — the runner that executes cards and the grammar's one
+owner (`FW-132`) — and puts each project-tool command to that tool's own
+`build_parser()` and `refuse_args()` in-process, so the reason printed is the
+tool's own. Over the 86 committed cards it refuses exactly the twelve cells the
+107th segment's research predicted before any code existed; they are excused by
+(card, cell, a fragment of the refusal) in `FROZEN_HOST_CELLS`, swept both ways
+by `B13`. Every card keeps its `commands` and `numbers` exit status against the
+tool at `0dfb2dd`. `SPEC.md` `FW-124`.
+
+What this does not establish: anything about a system command's arguments
+(177 in the corpus are counted and named, never checked); anything a tool checks
+only after `refuse_args` — routes, interfaces, the iputils floor, image digests,
+records that already exist; what a cell means (a correctly spelled `--rates 43`
+in Mbit/s passes); that each tool's `refuse_args` is complete.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

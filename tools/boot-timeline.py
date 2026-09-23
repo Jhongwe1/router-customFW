@@ -1632,6 +1632,34 @@ def load_events(prefix, stamp="t_mono"):
     return ev
 
 
+def probe_malformed(prefix):
+    """-> hostprobe's own verdict on PREFIX: [(line, why)], [] when well formed.
+
+    The record's format has ONE owner, `tools/hostprobe.py`'s `load_record`:
+    the events header's clock read as a whole token against the meta's, and
+    every line's keys against that clock.  The join read neither until the
+    108th segment -- an end-to-end run joined, exit 0, a record whose header
+    said CLOCK_MONOTONIC under a CLOCK_MONOTONIC_RAW meta, which
+    `hostprobe report` calls MALFORMED.  Loaded by path from this tree, no .pyc."""
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hostprobe.py")
+    saved = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec = importlib.util.spec_from_file_location("boot_timeline_hostprobe", path)
+        hp = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(hp)
+    except Exception as exc:                  # a missing reader is a refusal, not a pass
+        raise Refused("cannot load hostprobe's own reader %s: %s: %s"
+                      % (path, type(exc).__name__, exc))
+    finally:
+        sys.dont_write_bytecode = saved
+    try:
+        return hp.load_record(prefix)[2]
+    except hp.Refused as exc:
+        raise Refused(str(exc))
+
+
 def probe_join(log, prefix, force):
     corpus = Corpus()
     if not os.path.isfile(log):
@@ -1665,6 +1693,12 @@ def probe_join(log, prefix, force):
         raise Refused("%s was written in boot %s and %s in boot %s: both clocks restart "
                       "with every boot, so their stamps share no frame"
                       % (log, cboot, pmeta_path, pboot))
+    bad = probe_malformed(prefix)
+    if bad:
+        where = lambda n: pmeta_path if n == 0 else "%s.events:%d" % (prefix, n)
+        raise Refused("%s is MALFORMED by hostprobe's own reader: %s%s"
+                      % (prefix, "; ".join("%s: %s" % (where(n), why) for n, why in bad[:4]),
+                         "; and %d more" % (len(bad) - 4) if len(bad) > 4 else ""))
     events = load_events(prefix, "t_" + sfx)
     rec = kernel_record(corpus, log, force)
     if rec is None:

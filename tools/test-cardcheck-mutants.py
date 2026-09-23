@@ -48,6 +48,18 @@ each is held by something that can fail:
     must print the same lines, red sets included.  The baseline, `W0` and
     `I0` run before any row, in both.
 
+🔄 2026-09-24 (`FW-124`): TWO FILES CAN BE MUTATED, AND THE TREE HOLDS
+EVERYTHING THE SELF-TEST LOADS.  cardcheck now reads a card's HOST cells
+through `tools/cardrun.py` -- the runner, the card grammar's one owner --
+and judges each project tool with that tool's own build_parser() and
+refuse_args(), loaded by path.  So a row may name a fourth field, the file
+it mutates (`tools/cardrun.py`; the default is `tools/cardcheck.py`), and
+both files are read once at the start and checked unchanged at the end.
+COPIED lists every other file the self-test opens: a file missing from it
+makes B13 or B14 red in the temp tree, and B0-in-tree refuses the whole run
+before any row counts -- which is how a tool a future card calls announces
+that it belongs on the list.
+
 Run:  /usr/bin/python3 tools/test-cardcheck-mutants.py [--jobs N]
 """
 import argparse
@@ -62,6 +74,15 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "tools/cardcheck.py")
+# The files a row may mutate, read once; cardcheck.py is the one that runs.
+TARGETS = ("tools/cardcheck.py", "tools/cardrun.py")
+# Every other file cardcheck's --self-test reads, copied as they are:
+# reply-size.py (dwreply), ci-expected.tsv, and each tool a corpus HOST cell
+# invokes -- loaded for its build_parser()/refuse_args() -- with flashwin.py,
+# which flashmap.py imports.
+COPIED = ("tools/reply-size.py", "tools/ci-expected.tsv", "tools/hostprobe.py",
+          "tools/looprun.py", "tools/boot-timeline.py", "tools/netblast.py",
+          "tools/flashmap.py", "tools/flashwin.py")
 
 MUT = [
     # 🔄 2026-09-23: THIS ROW NEVER COMPILED, and it read as a kill.  Its
@@ -259,6 +280,127 @@ MUT = [
     ("M18 word32 read little-endian                         (kills A14)",
      'return "%08X" % int.from_bytes(blob[off:off + 4], "big")',
      'return "%08X" % int.from_bytes(blob[off:off + 4], "little")'),
+
+    # ------------------------------------------------ `FW-124`, 2026-09-24
+    # A HOST cell whose own tool rejects its arguments.  One mutant per rule,
+    # each naming the case that must go red; a `[cardrun]` row mutates
+    # tools/cardrun.py, the grammar's owner, and the fourth field says so.
+    ("M38 a tool's refusal is not recorded                   (kills A37)",
+     '                census["tool_refused"] += 1\n'
+     '                why.append(reason)',
+     '                census["tool_refused"] += 1\n'
+     '                pass'),
+
+    ("M39 the parser's own error line replaced by a word     (kills A37)",
+     '            return "REFUSED", _error_line(err, rel)',
+     '            return "REFUSED", "rejected by its parser"'),
+
+    ("M40 the HOST command is not macro-expanded             (kills A38)",
+     '        sims = cr.simple_commands(cr.expand(cmd, table))',
+     '        sims = cr.simple_commands(cmd)'),
+
+    ("M41 every project-tool command refused (a blanket)     (kills A39)",
+     '    return "accepted", ""',
+     '    return "REFUSED", "every tool command refused"'),
+
+    ("M42 a tool's arguments checked against the disk        (kills A40)",
+     '        _ns, err2, ap2 = _parse(mod, path, args, exact=True)',
+     '        if any(os.path.exists(x) for x in args):\n'
+     '            return "REFUSED", "an argument names a path that exists"\n'
+     '        _ns, err2, ap2 = _parse(mod, path, args, exact=True)'),
+
+    ("M43 refuse_args never called                           (kills A41)",
+     '                mod.refuse_args(ns)',
+     '                pass'),
+
+    ("M44 a tool without the contract passes                 (kills A42)",
+     '        return "REFUSED", (f"{rel} does not carry the FW-124 contract (no "',
+     '        return "accepted", (f"{rel} does not carry the FW-124 contract (no "'),
+
+    ("M45 the undefined-macro test on every ALL-CAPS word    (kills A43)",
+     '    if not a0.quoted and re.fullmatch(r"[A-Z][A-Z0-9]*", a0.text):',
+     '    if any(re.fullmatch(r"[A-Z][A-Z0-9]*", w.text) for w in argv):'),
+
+    ("M46 [cardrun] the timeout wrapper not stripped         (kills A44)",
+     '        if t == "timeout":',
+     '        if False:',
+     "tools/cardrun.py"),
+
+    ("M47 [cardrun] single quotes not honoured               (kills A44)",
+     '        if c == "\'":',
+     '        if False:',
+     "tools/cardrun.py"),
+
+    ("M48 shell expansion accepted in a tool's arguments     (kills A44)",
+     '        exp = [w.raw for w in tool[1] if w.expands or w.globs]',
+     '        exp = []'),
+
+    ("M49 a crash counted as accepted                        (kills A45)",
+     '    except BaseException as e:\n'
+     '        raise Refuse(f"{rel} CRASHED while checking',
+     '    except BaseException as e:\n'
+     '        return "accepted", ""\n'
+     '        raise Refuse(f"{rel} CRASHED while checking'),
+
+    ("M50 the exact-option rule removed                      (kills A46)",
+     '        if err2:\n'
+     '            return "REFUSED", _abbreviation(ap2, args, err2, rel)',
+     '        if False:\n'
+     '            return "REFUSED", _abbreviation(ap2, args, err2, rel)'),
+
+    ("M51 [cardrun] a macro defined twice accepted           (kills A47)",
+     '        if name in table:\n'
+     '            raise Refused("macro',
+     '        if False:\n'
+     '            raise Refused("macro',
+     "tools/cardrun.py"),
+
+    # Not `if False:` alone: expand() would then read `.group` on None and
+    # the self-test would die before A47 -- a crash, which W0 never counts.
+    ("M52 [cardrun] a <p> macro expands with an empty argument (kills A47)",
+     '            if not a or OPERATOR_WORD_RE.match(a.group(1)):\n'
+     '                raise Refused("macro',
+     '            if not a or OPERATOR_WORD_RE.match(a.group(1)):\n'
+     '                a = re.match(r"()", "")\n'
+     '            if False:\n'
+     '                raise Refused("macro',
+     "tools/cardrun.py"),
+
+    ("M53 the unchecked system commands unnamed in the summary (kills A48)",
+     '            + (f": {names}" if names else "")',
+     '            + ""'),
+
+    ("M54 the HOST check unwired from `commands`             (kills A49)",
+     '    bad += idle_bad + host_cells(card_rel, text, report)',
+     '    bad += idle_bad'),
+
+    # B13 is swept in both directions and at the grain of the defect, so it
+    # has a mutant for each: a refused pair dropped, a pair nothing refuses
+    # added, and a pair whose fragment its refusal does not carry.
+    ("M55 a FROZEN pair that IS refused dropped from the list (kills B13, A49)",
+     '    "bench/2026-09-23/PREDICTIONS-B44-block42.md": {\n'
+     '        "Z9-D2": ("argument --tsv: expected one argument",',
+     '    "bench/2026-09-23/PREDICTIONS-B44-block42.md": {} and {\n'
+     '        "Z9-D2": ("argument --tsv: expected one argument",'),
+
+    ("M56 a pair no card refuses added to the list           (kills B13)",
+     '        "Z9-D2": ("argument --tsv: expected one argument",',
+     '        "P1-HP": ("--seconds N is required", "a pair nothing refuses"),\n'
+     '        "Z9-D2": ("argument --tsv: expected one argument",'),
+
+    ("M57 a pair's fragment is not what its refusal carries  (kills B13, A49)",
+     '        "Z9-D2": ("argument --tsv: expected one argument",',
+     '        "Z9-D2": ("argument --tsv: expected two arguments",'),
+
+    ("M58 [cardrun] the HOST line regex misses HOST&         (kills B14)",
+     'HOST_LINE_RE = re.compile(r"^(HOST&?) (\\S+) :: (.*)$", re.M)',
+     'HOST_LINE_RE = re.compile(r"^(HOST) (\\S+) :: (.*)$", re.M)',
+     "tools/cardrun.py"),
+
+    ("M59 [cardrun] a VAR= prefix not stripped               (kills B14)",
+     '        if not words and ASSIGN_RE.match(val.raw):',
+     '        if False:',
+     "tools/cardrun.py"),
 ]
 
 
@@ -323,10 +465,11 @@ def owner(root):
         return None
 
 
-def one(name, old, new, src, root):
-    """One row, in its own `root`.  -> {"line", "survived", "breach"} or
-    {"refuse"}.  It never exits and never raises: `sys.exit` in a pool thread
-    ends only that thread, and a traceback is not a refusal."""
+def one(name, old, new, target, srcs, root):
+    """One row, in its own `root`, mutating `target`.  -> {"line",
+    "survived", "breach"} or {"refuse"}.  It never exits and never raises:
+    `sys.exit` in a pool thread ends only that thread, and a traceback is
+    not a refusal."""
     rid, mine = name.split()[0], False
     try:
         try:
@@ -337,7 +480,8 @@ def one(name, old, new, src, root):
             return {"line": f"  FAIL  {name}   {why}",
                     "survived": f"{name}  [{why}]", "breach": True}
         work = os.path.join(root, "router-rebuild")
-        tgt = os.path.join(work, "tools/cardcheck.py")
+        tgt = os.path.join(work, target)
+        tool = os.path.join(work, "tools/cardcheck.py")
         if os.path.commonpath([root, tgt]) != root:
             why = "ISOLATION: the mutant would be written outside its root"
             return {"line": f"  FAIL  {name}   {why}",
@@ -346,7 +490,7 @@ def one(name, old, new, src, root):
         for rel in ("bench", "config"):
             shutil.copytree(os.path.join(ROOT, rel),
                             os.path.join(work, rel), symlinks=True)
-        for rel in ("tools/reply-size.py", "tools/ci-expected.tsv"):
+        for rel in COPIED:
             shutil.copy(os.path.join(ROOT, rel), os.path.join(work, rel))
         # 🔴 B0-IN-TREE.  The baseline above runs from the REAL root; this
         # runs the UNMUTATED tool from the temp tree, which is where every
@@ -355,13 +499,15 @@ def one(name, old, new, src, root):
         # kills looks identical either way.  量 2026-08-31: exactly that
         # happened to test-replay-capture-mutants, and the only thing that
         # caught it was a row required to SURVIVE.  It writes the bytes read
-        # at the start, not the file on disk, so every row tests the same.
-        with open(tgt, "w", encoding="utf-8") as f:
-            f.write(src)
-        if run(tgt, work)[0] != 0:
+        # at the start, not the files on disk, so every row tests the same.
+        for rel, text in srcs.items():
+            with open(os.path.join(work, rel), "w", encoding="utf-8") as f:
+                f.write(text)
+        if run(tool, work)[0] != 0:
             return {"refuse": f"REFUSING at {name}: the UNMUTATED tool fails "
                               f"in the temp tree, so every kill would be "
                               f"invalid"}
+        src = srcs[target]
         n = src.count(old)
         if n != 1:
             return {"line": f"  FAIL  {name}   ANCHOR x{n} (not applied)",
@@ -377,7 +523,7 @@ def one(name, old, new, src, root):
                     "survived": f"{name}  [INVALID-MUTANT: {e}]"}
         with open(tgt, "w", encoding="utf-8") as f:
             f.write(mutated)
-        rc, out = run(tgt, work)
+        rc, out = run(tool, work)
         # 🔴 I0: the mutant this row judged, and the root, are still its own.
         with open(tgt, encoding="utf-8") as f:
             intact = f.read() == mutated and owner(root) == rid
@@ -420,10 +566,12 @@ def main():
                  f"once, so it is at least 1")
     t0 = time.monotonic()
     # Read once, before anything runs: B0-in-tree and every mutant are these
-    # bytes, and the run refuses at the end if the file on disk has moved.
-    with open(SRC, "rb") as f:
-        raw = f.read()
-    src = raw.decode("utf-8")
+    # bytes, and the run refuses at the end if a file on disk has moved.
+    raw = {}
+    for rel in TARGETS:
+        with open(os.path.join(ROOT, rel), "rb") as f:
+            raw[rel] = f.read()
+    srcs = {rel: b.decode("utf-8") for rel, b in raw.items()}
 
     base, _out = run(SRC, ROOT)
     if base != 0:
@@ -480,7 +628,12 @@ def main():
     if None in ids or len(set(ids)) != len(ids):
         sys.exit("REFUSING: every row needs its own `M<n>` id -- the rows "
                  "are run and printed in id order")
-    rows = sorted(MUT, key=lambda r: row_id(r[0]))
+    rows = sorted(((r[0], r[1], r[2], r[3] if len(r) > 3 else TARGETS[0])
+                   for r in MUT), key=lambda r: row_id(r[0]))
+    stray = sorted({r[3] for r in rows} - set(TARGETS))
+    if stray:
+        sys.exit(f"REFUSING: a row mutates {stray}, which is not one of "
+                 f"{TARGETS}: it would never be read back or checked unchanged")
     roots = [tempfile.mkdtemp(prefix="cardcheck-mut-") for _ in rows]
     survived, breaches = [], []
     try:
@@ -494,8 +647,8 @@ def main():
         # its row and every row before it have finished, so the output is the
         # same whatever order they finish in, and it still streams.
         with concurrent.futures.ThreadPoolExecutor(max_workers=a.jobs) as ex:
-            futs = [ex.submit(one, name, old, new, src, root)
-                    for (name, old, new), root in zip(rows, roots)]
+            futs = [ex.submit(one, name, old, new, target, srcs, root)
+                    for (name, old, new, target), root in zip(rows, roots)]
             for fut in futs:
                 res = fut.result()
                 if "refuse" in res:
@@ -513,12 +666,13 @@ def main():
     wall = time.monotonic() - t0
 
     # 🔴 I0, the last part: every row copied the bytes read at the start, and
-    # those must still be the file on disk, or the verdicts are about a file
-    # that is no longer there.
-    with open(SRC, "rb") as f:
-        if f.read() != raw:
-            sys.exit("REFUSING: tools/cardcheck.py changed during the run, so "
-                     "every verdict above is about bytes no longer on disk")
+    # those must still be the files on disk, or the verdicts are about files
+    # that are no longer there.
+    for rel in TARGETS:
+        with open(os.path.join(ROOT, rel), "rb") as f:
+            if f.read() != raw[rel]:
+                sys.exit(f"REFUSING: {rel} changed during the run, so every "
+                         f"verdict above is about bytes no longer on disk")
     print()
     if breaches:
         print(f"I0: BREACHED on {', '.join(breaches)} -- those rows did not "
@@ -526,8 +680,8 @@ def main():
     else:
         print(f"I0: {len(rows)} row(s) in {len(roots)} distinct, unnested "
               f"roots; every row that ran found its mutant and its owner "
-              f"token intact afterwards; tools/cardcheck.py is still the "
-              f"bytes read at the start")
+              f"token intact afterwards; {' and '.join(TARGETS)} are still "
+              f"the bytes read at the start")
     ran = f"{len(rows)} run, {a.jobs} at a time, {wall:.0f} s wall"
     if survived:
         print(f"🔴 {len(survived)} MUTATION(S) SURVIVED -- those controls "

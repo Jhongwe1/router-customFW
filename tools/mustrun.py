@@ -48,8 +48,8 @@ METHOD
    paragraph.
 2. Derive each step's input path set statically: repo paths named in the
    step's `run:` text, plus repo paths named in the source of each
-   `tools/*.py` / `tools/*.sh` the step invokes (`--depth`, default 3 --
-   the measured fixed point, see `derive`).
+   `tools/*.py` / `tools/*.sh` the step invokes (`--depth`, default 4 --
+   the measured fixed point, see `derive`; 3 until 2026-09-24).
    `git ls-files` with no glob becomes `*`, the whole tree.
 3. Intersect with `git diff --name-only --no-renames <range>`.
 4. Print the suites that must run and how many of the total that is.
@@ -134,9 +134,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CI_REL = os.path.join(".github", "workflows", "ci.yml")
 
-# How far the step -> tool -> tool indirection is followed.  THREE is a
-# measurement and not a taste; `derive` carries it and `C13` is the control.
-DEFAULT_DEPTH = 3
+# How far the step -> tool -> tool indirection is followed.  FOUR is a
+# measurement and not a taste (THREE until 2026-09-24); `derive` carries it
+# and `C13` is the control, which is what turned red when it moved.
+DEFAULT_DEPTH = 4
 
 
 class Refuse(Exception):
@@ -410,8 +411,25 @@ def derive(step, tops, files, root=ROOT, depth=DEFAULT_DEPTH):
     adding both, and the pair count moved 676 -> 683 between two runs an hour
     apart.  The FIXED POINT is the finding, and `C13` re-derives it live.
 
-    So THREE is the fixed point, and it is the default because the 133 paths
-    depth 2 gets wrong are MISSES, not over-approximations: `SPEC.md`,
+    🔄 量 2026-09-24 (108th segment), live ci.yml at 109 `run:` steps, 8,193
+    tracked paths, the same three columns against depth 6:
+
+        depth 1    711 pairs   13 `*`   8,193 of 8,193 differ
+        depth 2  1,183 pairs   16 `*`     102 of 8,193 differ
+        depth 3  1,492 pairs   16 `*`       0
+        depth 4  1,498 pairs   16 `*`       0
+        depth 5  1,498 pairs   16 `*`       0
+
+    FW-124 added a fourth hop: `cardcheck` now loads each HOST cell's tool
+    by path, `hostprobe` among them, so `appletcensus` -> `cardcheck` ->
+    `hostprobe` -> `capdate`, `audit-bench-log` and `bench/**/*.events`.
+    Its six pairs change no path's answer (0 differ at depth 3), because
+    both steps already reach those paths another way -- but C13 asks for the
+    fixed point of the pairs, and the default moved to 4 rather than C13
+    being relaxed to the paths.
+
+    On 2026-09-15 THREE was the fixed point, and the fixed point is the default
+    because the 133 paths depth 2 got wrong were MISSES, not over-approximations: `SPEC.md`,
     `RUNSHEET.md`, `docs/loader-command-semantics.md` and 130 others all reach
     `text/cardcheck mutation suite`, which runs
     `tools/test-cardcheck-mutants.py`, which runs `tools/cardcheck.py`, which

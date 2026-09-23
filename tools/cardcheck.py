@@ -5,10 +5,10 @@ Two subcommands, and they exist because a card is the one artefact in this
 project that is written by hand and executed by a machine that cannot ask
 questions.
 
-    commands   every command the card types, checked against what the image
-               it uploads DECLARES it can run; a flash write needs `owner-yes`
-    numbers    every number the card states, RE-DERIVED from the artefact it
-               names, rather than compared against a transcription
+    commands   every command the card types at the board, against what the
+               image it uploads DECLARES (a flash write needs `owner-yes`); and
+               every HOST cell, against its own tool's parser (`FW-124`)
+    numbers    every number the card states, RE-DERIVED from what it names
 
 Why `commands` exists
 ---------------------
@@ -84,7 +84,7 @@ Run:  /usr/bin/python3 tools/cardcheck.py --self-test
 Exit codes:
     0  every command is invocable / every number re-derives
     1  at least one is not
-    2  refused before checking anything (no card, no declaration, no fence)
+    2  refused (no card, declaration or fence), or a tool crashed in its check
 """
 import hashlib
 import os
@@ -545,7 +545,7 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
             report(f"  FAIL  {cell}: --idle {idle:g} <= sleep {sl} in --send")
             report(f"          the capture stops ~{idle:g} s in and the payload "
                    f"speaks at ~{sl} s; use --seconds alone, or --idle > {sl}")
-    bad += idle_bad
+    bad += idle_bad + host_cells(card_rel, text, report)
 
     report(f"  {len(pairs)} command(s): "
            + ", ".join(f"{v} {k}" for k, v in sorted(kinds.items()))
@@ -844,6 +844,416 @@ def owner_yes(text, card_rel, pairs, report=print):
             report("          permits nothing on this card -- stale, "
                    "mistyped, or for a command that needs no yes")
     return frozenset(yes) | legacy, bad
+
+
+# --------------------------------------------------------------------------
+# HOST cells -- `FW-124`
+#
+# 🔴 量 2026-09-23 (`SPEC.md` `FW-124`): twice a FROZEN card carried a HOST
+# cell whose own tool rejected its arguments, and both were found at the
+# bench -- block 41's `NB blast --host 10.1.1.3 --frames 347 ...`
+# (`CORRECTIONS-block41.md` § 1.2) and card B44's `Z9-D2`, whose `--tsv`
+# has no FILE (`CORRECTIONS-block42.md` § 1).  Until this section `commands`
+# read `--send` payloads and nothing else: no HOST cell was ever read.
+#
+# How a HOST cell is read, and whose code reads it:
+#   * the card's macros and its `HOST <prefix> :: <cmd>` lines come from
+#     tools/cardrun.py -- the runner that executes cards -- loaded by path,
+#     so the reading checked here is the reading run (one owner of the
+#     grammar);
+#   * each simple command of the expanded line comes from cardrun's shell
+#     reading (quotes, operators, redirections, `VAR=`, keywords, and the
+#     `timeout`/`sudo` wrappers);
+#   * a project tool -- `<python> tools/NAME.py ARGS` -- is judged by that
+#     tool's OWN build_parser() and refuse_args() (P2-4 § 4), in-process.
+#     The parser's own `error:` line is the reason; an abbreviation argparse
+#     would expand is refused (the exact-option rule: `--rate` must not
+#     quietly mean `--rates`); the tool's Refused is a refusal, and any other
+#     exception is a crash -- exit 2, named, never a traceback.
+#
+# Refused without asking a tool: an unfilled `<placeholder>`; `$`, a
+# backtick or a glob in a project tool's arguments (the argv checked would
+# not be the argv run); an ALL-CAPS word in first position that no
+# line-start definition makes a macro; a bare tool name (`looprun`); a
+# `tools/*.py` in any other form (absolute, `upstream/tools/`, behind an
+# interpreter option or a wrapper this does not strip); a nested shell
+# (`bash -c`, `eval`); a `bench/` script that is not in the repository; a
+# shell construct the reading does not parse.
+#
+# ⚠️ WHAT THIS DOES NOT CHECK, and the summary line says so on every card:
+# the arguments of a SYSTEM command (`ping`, `ip`, `nmap`, `iperf3` under
+# `qemu-mips-static` ...).  They are counted and NAMED and never argument-
+# checked, so "0 refused" cannot read as "every command was checked".  Nor
+# the bench: routes, interfaces, iputils' interval floor, the address
+# allowlist, an image's digest, a record that already exists -- each tool's
+# environment checks, which run after refuse_args, at the bench.  Nor what a
+# cell MEANS: block 41's `--rates 43` was Mbit/s where frames/s were meant,
+# and it passes once spelt right.
+#
+# Imported here and not at the top: tracked prose cites this file's lines up
+# to 560 by number (the FW-113 note above), and four lines more at the top
+# would re-point every one of them.
+import argparse
+import collections
+import contextlib
+import io
+
+# ⚠️ The twelve HOST refusals of the FROZEN cards, measured over the corpus
+# by this implementation on 2026-09-24 and exactly the twelve the s107
+# research predicted.  Each is named by (card, cell) AND by a fragment its
+# refusal must carry, so what is exempt is the DEFECT, not the cell: the
+# same cell refused for another reason is a new finding.  No date and no
+# pattern; `B13` sweeps the list both ways, as B10-B12 sweep theirs.
+FROZEN_HOST_CELLS = {
+    # 2026-09-21f.  `NB` = `...` is written mid-paragraph (line 215), not at
+    # a line start, so the runner's grammar leaves NB undefined; the cells
+    # were typed by hand.  With NB supplied all seven pass netblast's own
+    # parser, and B13 re-checks that.
+    "bench/2026-09-21f/PREDICTIONS-B41-block39.md": {
+        cell: ("`NB` is in first position",
+               "NB is defined mid-paragraph (line 215), not at a line start")
+        for cell in ("A1-ARP", "A2-ARP", "A3-LADDER", "A4-ARP", "A5-LONG",
+                     "A6-ARP", "B2-LADDER")},
+    # 2026-09-22.  A bare `looprun`, which is no command on the bench host,
+    # and an unfilled `<imgwork>`; typed by hand, and no CORRECTIONS entry
+    # records how.
+    "bench/2026-09-22/PREDICTIONS-B42-block40.md": {
+        "A0": ("`looprun` is a bare tool name",
+               "a bare `looprun` and an unfilled `<imgwork>`, typed by hand")},
+    # 2026-09-22b (block 41).
+    "bench/2026-09-22b/PREDICTIONS-B43-block41.md": {
+        "A0": ("`looprun` is a bare tool name",
+               "a bare `looprun`, typed by hand"),
+        "C4-DOSE": ("the following arguments are required: --target, --src, --dev",
+                    "netblast has no --host, --frames or --size; ran corrected "
+                    "(CORRECTIONS-block41.md § 1.2)"),
+        "C8-DOSE": ("the following arguments are required: --target, --src, --dev",
+                    "netblast has no --host, --frames or --size; ran corrected "
+                    "(CORRECTIONS-block41.md § 1.2)")},
+    # 2026-09-23 (block 42, card A).
+    "bench/2026-09-23/PREDICTIONS-B44-block42.md": {
+        "Z9-D2": ("argument --tsv: expected one argument",
+                  "--tsv with no FILE; ran with the FILE supplied "
+                  "(CORRECTIONS-block42.md § 1)")},
+}
+
+TOOL_WORD_RE = re.compile(r"(?:^|/)tools/[^/\s]+\.py$")
+SHELLS = frozenset(("bash", "sh", "dash", "zsh", "ksh"))
+_CARDRUN = None
+_TOOL_MODS = {}
+
+
+def _load_by_path(path, modname):
+    """A tool, loaded by path, writing no bytecode and printing nothing.
+    Anything it raises while importing is a broken tool: Refuse, named."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(modname, path)
+    if spec is None or spec.loader is None:
+        raise Refuse(f"{os.path.relpath(path, ROOT)} cannot be loaded as a module")
+    mod = importlib.util.module_from_spec(spec)
+    old, sys.dont_write_bytecode = sys.dont_write_bytecode, True
+    sys.modules[modname] = mod
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            spec.loader.exec_module(mod)
+    except KeyboardInterrupt:
+        sys.modules.pop(modname, None)
+        raise
+    except BaseException as e:
+        sys.modules.pop(modname, None)
+        raise Refuse(f"{os.path.relpath(path, ROOT)} does not import "
+                     f"({type(e).__name__}: {e}) -- a broken tool, not a card "
+                     f"defect")
+    finally:
+        sys.dont_write_bytecode = old
+    return mod
+
+
+def _cardrun():
+    """tools/cardrun.py, loaded once: the card grammar's one owner."""
+    global _CARDRUN
+    if _CARDRUN is None:
+        _CARDRUN = _load_by_path(os.path.join(ROOT, "tools", "cardrun.py"),
+                                 "cardcheck_cardrun")
+    return _CARDRUN
+
+
+def _parser_tree(ap):
+    """The parser and every sub-parser reachable from it."""
+    out, todo = [], [ap]
+    while todo:
+        p = todo.pop()
+        if any(p is q for q in out):
+            continue
+        out.append(p)
+        for act in getattr(p, "_actions", ()):
+            if isinstance(act, argparse._SubParsersAction):
+                todo.extend(act.choices.values())
+    return out
+
+
+def _parse(mod, path, args, exact):
+    """The tool's own parser over `args` -> (namespace, None, parser), or
+    (None, (exit status, what it printed), parser).  argparse names itself
+    after argv[0], so that is the tool's path while the parser is built."""
+    buf = io.StringIO()
+    saved = sys.argv[:1]
+    sys.argv[:1] = [path]
+    try:
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            ap = mod.build_parser()
+            if exact:
+                for p in _parser_tree(ap):
+                    p.allow_abbrev = False
+            try:
+                return ap.parse_args(args), None, ap
+            except SystemExit as e:
+                return None, (e.code, buf.getvalue()), ap
+            except argparse.ArgumentError as e:     # a parser built with exit_on_error=False
+                return None, (2, f"{ap.prog}: error: {e}"), ap
+    finally:
+        sys.argv[:1] = saved
+
+
+def _error_line(err, rel):
+    code, said = err
+    if code in (0, None):
+        return (f"{rel} exits at parse time with status 0 (--help or --version): "
+                f"the cell would run nothing")
+    lines = [ln.strip() for ln in said.splitlines() if "error:" in ln]
+    return lines[-1] if lines else f"{rel}: argparse exited {code}"
+
+
+def _abbreviation(ap, args, err, rel):
+    opts = set()
+    for p in _parser_tree(ap):
+        opts.update(p._option_string_actions)
+    for a in args:
+        name = a.split("=", 1)[0]
+        if name.startswith("--") and len(name) > 2 and name not in opts:
+            cands = sorted(o for o in opts if o.startswith(name))
+            if cands:
+                return (f"`{name}` is an abbreviation argparse would read as "
+                        f"`{cands[0]}`"
+                        + (f" (or {', '.join(cands[1:])})" if cands[1:] else "")
+                        + "; spell the option out -- a card names what the tool "
+                        "reads (FW-124's exact-option rule)")
+    return _error_line(err, rel) + " (with abbreviations refused)"
+
+
+def tool_verdict(name, args, tools_dir=None):
+    """-> ("accepted", "") or ("REFUSED", reason) for `tools/NAME.py ARGS`.
+
+    The FW-124 contract, in-process: build_parser() parses, as the tool
+    would; then again with every abbreviation refused; then refuse_args().
+    A tool without the contract cannot be checked, so its cell is refused.
+    Any exception but the tool's own Refused is a crash: Refuse, named."""
+    rel = f"tools/{name}.py"
+    path = os.path.join(tools_dir or os.path.join(ROOT, "tools"), name + ".py")
+    if not os.path.isfile(path):
+        return "REFUSED", f"{rel}: no such tool"
+    mod = _TOOL_MODS.get(path)
+    if mod is None:
+        mod = _TOOL_MODS[path] = _load_by_path(path, f"cardcheck_tool_{len(_TOOL_MODS)}")
+    R = getattr(mod, "Refused", None)
+    missing = [f for f in ("build_parser", "refuse_args")
+               if not callable(getattr(mod, f, None))]
+    if not (isinstance(R, type) and issubclass(R, Exception)):
+        missing.append("Refused")
+    if missing:
+        return "REFUSED", (f"{rel} does not carry the FW-124 contract (no "
+                           f"{', '.join(missing)}), so its arguments cannot be "
+                           f"checked and the cell is refused")
+    try:
+        ns, err, _ap = _parse(mod, path, args, exact=False)
+        if err:
+            return "REFUSED", _error_line(err, rel)
+        _ns, err2, ap2 = _parse(mod, path, args, exact=True)
+        if err2:
+            return "REFUSED", _abbreviation(ap2, args, err2, rel)
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            try:
+                mod.refuse_args(ns)
+            except R as e:
+                return "REFUSED", f"{rel} refuses: {e}"
+    except KeyboardInterrupt:
+        raise
+    except BaseException as e:
+        raise Refuse(f"{rel} CRASHED while checking a HOST cell's arguments -- "
+                     f"{type(e).__name__}: {e}. A crash is not a verdict: the "
+                     f"tool is broken, not the card")
+    return "accepted", ""
+
+
+def _new_census():
+    return {"cells": 0, "tool": collections.Counter(), "accepted": 0,
+            "tool_refused": 0, "system": collections.Counter(), "keyword": 0,
+            "bench": 0, "structural": 0}
+
+
+def _classify(argv, simple):
+    """-> (kind, name, issues).  kind is tool, bench or system; issues are
+    the refusals that need no tool."""
+    cr = _cardrun()
+    issues = []
+    words = list(simple.words) + list(simple.assigns) + [t for _o, t in simple.redirs]
+    ph = sorted({p for w in words if w.placeholder for p in cr.PLACEHOLDER_RE.findall(w.text)})
+    if ph:
+        issues.append("an unfilled placeholder in " + ", ".join(f"`{p}`" for p in ph)
+                      + ": a card's template word, never a value")
+    tool = cr.tool_of(argv)
+    if tool:
+        exp = [w.raw for w in tool[1] if w.expands or w.globs]
+        if exp:
+            issues.append(f"shell expansion in tools/{tool[0]}.py's arguments ("
+                          + ", ".join(exp) + "): the argv checked here would not "
+                          "be the argv run")
+        return "tool", tool[0], issues
+    a0 = argv[0]
+    base = os.path.basename(a0.text)
+    if a0.expands or a0.globs:
+        issues.append(f"the program is a shell expansion (`{a0.raw}`): invisible "
+                      f"to this check")
+    if ((a0.text in cr.PYTHONS or base in SHELLS) and len(argv) >= 2
+            and argv[1].text.startswith("bench/")):
+        if not os.path.isfile(os.path.join(ROOT, argv[1].text)):
+            issues.append(f"`{argv[1].text}` is not in the repository")
+        return "bench", argv[1].text, issues
+    if any(TOOL_WORD_RE.search(w.text) for w in argv):
+        issues.append("a project tool in a form this check cannot argument-check: "
+                      "write `/usr/bin/python3 tools/NAME.py ARGS` (no absolute "
+                      "path, no interpreter option, no wrapper but timeout and "
+                      "sudo; upstream/tools carries no contract)")
+    elif (not a0.quoted and re.fullmatch(r"[a-z][a-z0-9-]*", a0.text)
+          and os.path.isfile(os.path.join(ROOT, "tools", a0.text + ".py"))):
+        issues.append(f"`{a0.text}` is a bare tool name: no such command on the "
+                      f"bench host's PATH; write /usr/bin/python3 tools/{a0.text}.py")
+    if not a0.quoted and re.fullmatch(r"[A-Z][A-Z0-9]*", a0.text):
+        issues.append(f"`{a0.text}` is in first position and no line-start "
+                      f"`{a0.text}` = `...` defines it: an undefined macro, which "
+                      f"bash would run as a command")
+    opts = []
+    for w in argv[1:]:
+        if not w.text.startswith("-"):
+            break
+        opts.append(w.text)
+    if a0.text == "eval" or (base in SHELLS and any(
+            re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", o) for o in opts)):
+        issues.append(f"a nested shell (`{' '.join(w.text for w in argv[:2])}`): "
+                      f"its commands are invisible to this check")
+    return "system", base, issues
+
+
+def host_command(cmd, table, census, tools_dir=None):
+    """One HOST cell's command -> its refusals, [] when nothing refuses it.
+    `census` counts what was checked, what was only counted, and why."""
+    cr = _cardrun()
+    census["cells"] += 1
+    try:
+        sims = cr.simple_commands(cr.expand(cmd, table))
+    except cr.Refused as e:
+        census["structural"] += 1
+        return [str(e)]
+    why = []
+    for s in sims:
+        argv, _wrappers, note = cr.unwrap(s)
+        if note == "keyword-only":
+            census["keyword"] += 1
+            continue
+        if note:
+            census["structural"] += 1
+            why.append(note)
+            continue
+        kind, name, issues = _classify(argv, s)
+        if issues:
+            census["structural"] += 1
+            why.extend(issues)
+            continue
+        if kind == "tool":
+            census["tool"][name] += 1
+            verdict, reason = tool_verdict(name, [w.text for w in cr.tool_of(argv)[1]],
+                                           tools_dir)
+            if verdict == "accepted":
+                census["accepted"] += 1
+            else:
+                census["tool_refused"] += 1
+                why.append(reason)
+        elif kind == "bench":
+            census["bench"] += 1
+        else:
+            census["system"][name] += 1
+    return why
+
+
+def host_check(text, tools_dir=None):
+    """-> (rows, census): rows is [(HostLine, [refusal, ...])] for every
+    HOST line of a card.  cardrun's Refused propagates for a card whose
+    grammar it refuses (a macro defined twice, a CR in a HOST line)."""
+    cr = _cardrun()
+    census = _new_census()
+    lines = cr.host_lines(text)
+    if not lines:
+        return [], census
+    table = cr.macros(text)
+    return [(h, host_command(h.cmd, table, census, tools_dir)) for h in lines], census
+
+
+def host_summary(c, refused, frozen):
+    """The line that says, on every card, what was checked and what was not."""
+    names = ", ".join(f"{k} {v}" for k, v in sorted(c["system"].items(),
+                                                    key=lambda kv: (-kv[1], kv[0])))
+    return (f"  HOST {c['cells']} cell(s), {refused} refused"
+            + (f" ({frozen} on FROZEN_HOST_CELLS)" if frozen else "")
+            + f": {sum(c['tool'].values())} project-tool command(s) checked by the "
+            f"tool's own build_parser() and refuse_args() -- {c['accepted']} "
+            f"accepted, {c['tool_refused']} REFUSED; {sum(c['system'].values())} "
+            f"system command(s) NOT argument-checked"
+            + (f": {names}" if names else "")
+            + f"; {c['keyword']} keyword-only"
+            + (f"; {c['bench']} bench script(s) present, not argument-checked"
+               if c["bench"] else "")
+            + (f"; {c['structural']} refused before any tool" if c["structural"] else ""))
+
+
+def host_cells(card_rel, text, report=print, tools_dir=None):
+    """-> the number of defects among a card's HOST cells, each reported.
+
+    A refusal on FROZEN_HOST_CELLS that carries its fragment is a note, not
+    a defect; one that does not carry it is a defect, named as such."""
+    cr = _cardrun()
+    try:
+        rows, census = host_check(text, tools_dir)
+    except cr.Refused as e:
+        report(f"  FAIL  HOST cells: {e}")
+        report("          none of this card's HOST cells is checked: "
+               "tools/cardrun.py refuses its grammar")
+        return 1
+    if not rows:
+        report("  HOST 0 cell(s): no `HOST <prefix> :: <cmd>` line in this card")
+        return 0
+    frozen = FROZEN_HOST_CELLS.get(card_rel.replace("\\", "/"), {})
+    bad = noted = 0
+    for h, why in rows:
+        if not why:
+            continue
+        text_why = "; ".join(why)
+        fz = frozen.get(h.name)
+        if fz and fz[0] in text_why:
+            noted += 1
+            report(f"  note  {h.name}: {h.kind} :: {h.cmd}")
+            report(f"          REFUSED -- {text_why}")
+            report(f"          a FROZEN card's cell (FROZEN_HOST_CELLS): {fz[1]}")
+            continue
+        bad += 1
+        report(f"  FAIL  {h.name}: {h.kind} :: {h.cmd}")
+        report(f"          {text_why}")
+        if fz:
+            report(f"          FROZEN_HOST_CELLS exempts this cell for `{fz[0]}`, "
+                   f"which this refusal does not carry: a new defect")
+    report(host_summary(census, bad + noted, noted))
+    return bad
 
 
 # --------------------------------------------------------------------------
@@ -1502,8 +1912,300 @@ def run_controls():
         + (f"STALE list entr(y/ies): {fw_stale}" if fw_stale else "")
         + ("list exact" if not fw_off and not fw_stale else ""))
 
+    # ------------------------------------------------ A37-A49, B13, B14
+    # `FW-124`, HOST cells: host_controls() below.
+    host_controls(row, cards, card_at, silent)
+
     print()
     return 0 if ok else 1
+
+
+def host_controls(row, cards, card_at, silent):
+    """`FW-124`'s cases.  Each names, in test-cardcheck-mutants.py, the
+    mutant that must turn it red; B13 and B14 are the corpus."""
+    import tempfile
+    card_a = "bench/2026-09-23/PREDICTIONS-B44-block42.md"
+    b43 = "bench/2026-09-22b/PREDICTIONS-B43-block41.md"
+    b41 = "bench/2026-09-21f/PREDICTIONS-B41-block39.md"
+    tags = ("A37", "A38", "A39", "A40", "A41", "A42", "A43", "A44", "A45",
+            "A46", "A47", "A48", "A49", "B13", "B14")
+    try:
+        cr = _cardrun()
+        t_a = _read(card_a).decode("utf-8")
+        t43 = _read(b43).decode("utf-8")
+        mac_a, mac43 = cr.macros(t_a), cr.macros(t43)
+        h_a = {h.name: h for h in cr.host_lines(t_a)}
+        h43 = {h.name: h for h in cr.host_lines(t43)}
+    except Exception as e:                                  # noqa: BLE001
+        for tag in tags:
+            row(tag, "FW-124: the HOST-cell fixtures load", False,
+                f"{type(e).__name__}: {str(e)[:50]}")
+        return
+
+    def v(cmd, table, tools_dir=None):
+        return host_command(cmd, table, _new_census(), tools_dir)
+
+    def case(tag, name, fn):
+        # Anything a case raises turns THAT case red, named, and the rest run:
+        # a mutant that crashes one case must not read as a crash of all.
+        try:
+            good, detail = fn()
+        except Exception as e:                              # noqa: BLE001
+            good, detail = False, f"{type(e).__name__}: {str(e)[:60]}"
+        row(tag, name, good, detail)
+
+    # A37 -- card A's own Z9-D2 line, with card A's own macros: refused in
+    # boot-timeline's words, the line CORRECTIONS-block42 § 1 quotes.
+    def a37():
+        w = v(h_a["Z9-D2"].cmd, mac_a)
+        want = "boot-timeline.py: error: argument --tsv: expected one argument"
+        return len(w) == 1 and w[0] == want, (w[0] if w else "accepted")[:70]
+    case("A37", "card A's Z9-D2 is REFUSED in boot-timeline's own words", a37)
+
+    # A38 -- B43's C4-DOSE with B43's own `NB`: netblast's words, which it can
+    # only say if the macro was expanded.
+    def a38():
+        w = v(h43["C4-DOSE"].cmd, mac43)
+        want = ("netblast.py blast: error: the following arguments are required: "
+                "--target, --src, --dev")
+        return len(w) == 1 and w[0] == want, (w[0] if w else "accepted")[:70]
+    case("A38", "B43's C4-DOSE is REFUSED in netblast's own words", a38)
+
+    # A39 -- and the two lines as the CORRECTIONS ran them are accepted.
+    def a39():
+        z9 = ("/usr/bin/python3 tools/boot-timeline.py --retro bench/2026-09-23 "
+              "--tsv bench/2026-09-23/Z9-D2.tsv")
+        c4 = ("NB blast --target 10.1.1.3 --src 10.1.1.2 --dev enxfc19286184c9 "
+              "--rates 43 --step-s 8 --arp-load --out bench/2026-09-22b/C4-DOSE.json")
+        w1, w2 = v(z9, mac_a), v(c4, mac43)
+        return (not w1 and not w2,
+                f"Z9-D2 as run: {len(w1)} refusal(s); C4-DOSE as run: {len(w2)}")
+    case("A39", "both lines as CORRECTIONS ran them are accepted", a39)
+
+    # A40 -- no verdict reads the disk: card A's are identical with the cwd
+    # an empty directory, and a HOST& whose record exists is not refused.
+    def a40():
+        def sweep():
+            c = _new_census()
+            return [(h.name, tuple(host_command(h.cmd, mac_a, c)))
+                    for h in cr.host_lines(t_a)]
+        here = sweep()
+        old = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            os.chdir(d)
+            try:
+                there = sweep()
+            finally:
+                os.chdir(old)
+        rec = [h.name for h in cr.host_lines(t_a) if h.kind == "HOST&" and
+               os.path.exists(os.path.join(ROOT, h.prefix + ".events"))]
+        hit = [n for n, w in here if n in rec and w]
+        return (here == there and len(rec) >= 13 and not hit,
+                f"{len(here)} cells, same verdicts in an empty cwd: {here == there}; "
+                f"{len(rec)} HOST& with a record, {len(hit)} refused")
+    case("A40", "card A's verdicts read no disk and no existing record", a40)
+
+    # A41 -- the refusals that live in refuse_args, not in the parser.
+    def a41():
+        hp = h_a["P1-HP"].cmd.replace(" --seconds 900", "")
+        lr = dict(mac_a)
+        lr["LR"] = mac_a["LR"]._replace(
+            body=mac_a["LR"].body.replace(" --recipe-override a2c56bc8", ""))
+        if hp == h_a["P1-HP"].cmd or lr["LR"] == mac_a["LR"]:
+            return False, "a fixture did not remove its flag"
+        w1, w2 = v(hp, mac_a), v(h_a["P1L"].cmd, lr)
+        return (len(w1) == 1 and "--seconds N is required" in w1[0]
+                and len(w2) == 1 and "--recipe-override" in w2[0],
+                f"P1-HP: {(w1 or ['accepted'])[0][:30]}; P1L: {(w2 or ['accepted'])[0][:30]}")
+    case("A41", "no --seconds / no --recipe-override is REFUSED (refuse_args)", a41)
+
+    # A42 -- a tool without the contract, and no tool at all, are refused.
+    def a42():
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "nocontract.py"), "w") as f:
+                f.write("import argparse\ndef main():\n    ap = argparse.ArgumentParser()\n"
+                        "    ap.add_argument('--x')\n    return ap.parse_args()\n")
+            v1 = tool_verdict("nocontract", ["--x", "1"], d)
+            v2 = tool_verdict("nosuch", [], d)
+        w3 = v("/usr/bin/python3 tools/nosuch.py --x 1", {})
+        return (v1[0] == "REFUSED" and "FW-124 contract" in v1[1]
+                and v2[0] == "REFUSED" and "no such tool" in v2[1]
+                and len(w3) == 1 and "no such tool" in w3[0],
+                f"no contract: {v1[0]}; absent: {v2[0]}; absent in a cell: {len(w3)}")
+    case("A42", "a tool without the contract, or no tool, is REFUSED", a42)
+
+    # A43 -- an undefined macro in first position, a bare tool name and a
+    # placeholder are refused; an ALL-CAPS word elsewhere is not.
+    def a43():
+        bad = (("NB probe --target 10.1.1.1 --dev lo", "`NB` is in first position"),
+               ("looprun --mode plan --cell A0", "`looprun` is a bare tool name"),
+               ("ping -c 1 <ip>", "an unfilled placeholder in `<ip>`"))
+        missed = [c for c, frag in bad if not any(frag in w for w in v(c, {}))]
+        fine = [c for c in ("/usr/bin/python3 tools/looprun.py --mode plan --cell A0",
+                            "socat -T2 STDIO TCP:10.1.1.3:9999") if v(c, {})]
+        return (not missed and not fine,
+                f"not refused: {missed or '-'}; refused but fine: {fine or '-'}")
+    case("A43", "undefined macro / bare tool / <placeholder> REFUSED, STDIO not", a43)
+
+    # A44 -- the shell reading: wrappers and VAR= stripped to reach the tool,
+    # a quoted `;` is one word, redirections dropped, `$` refused in a tool.
+    def a44():
+        bt = "/usr/bin/python3 tools/boot-timeline.py --retro bench/2026-09-23 --tsv"
+        wrapped = ("timeout 70 " + bt, "sudo -n " + bt, "FWRE_WORK=/x " + bt,
+                   "timeout -s INT 70 sudo -n FWRE_WORK=/x " + bt)
+        missed = [c.split(" /usr")[0] for c in wrapped
+                  if not any("expected one argument" in w for w in v(c, {}))]
+        quoted = len(cr.simple_commands("pkill -INT -f 'P1-HP ; --target'"))
+        redir = v("/usr/bin/python3 tools/boot-timeline.py --legend 2>&1 > /tmp/x", {})
+        dollar = v("/usr/bin/python3 tools/boot-timeline.py --retro $DIR", {})
+        return (not missed and quoted == 1 and not redir
+                and len(dollar) == 1 and "shell expansion" in dollar[0],
+                f"wrappers missed: {missed or '-'}; quoted `;` -> {quoted} command(s); "
+                f"redirections {len(redir)} refusal(s); $DIR {len(dollar)}")
+    case("A44", "wrappers, quotes, redirections and `$` read as the shell would", a44)
+
+    # A45 -- a crash is exit 2 naming the tool; no build_parser is refused.
+    def a45():
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "crashy.py"), "w") as f:
+                f.write("import argparse\nclass Refused(Exception):\n    pass\n"
+                        "def build_parser():\n    ap = argparse.ArgumentParser()\n"
+                        "    ap.add_argument('--x')\n    return ap\n"
+                        "def refuse_args(a):\n    raise ValueError('a bug in the tool')\n")
+            with open(os.path.join(d, "noparser.py"), "w") as f:
+                f.write("class Refused(Exception):\n    pass\n"
+                        "def refuse_args(a):\n    pass\n")
+            try:
+                tool_verdict("crashy", ["--x", "1"], d)
+                crashed = ""
+            except Refuse as e:
+                crashed = str(e)
+            v2 = tool_verdict("noparser", [], d)
+        return ("tools/crashy.py CRASHED" in crashed and "ValueError" in crashed
+                and v2[0] == "REFUSED" and "build_parser" in v2[1],
+                f"crash: {crashed[:36] or 'not raised'}; no parser: {v2[0]}")
+    case("A45", "a crash is Refuse naming the tool; no build_parser REFUSED", a45)
+
+    # A46 -- the exact-option rule: an abbreviation argparse would expand.
+    def a46():
+        ab = ("NB blast --target 10.1.1.3 --src 10.1.1.2 --dev enxfc19286184c9 "
+              "--rate 43")
+        w1, w2 = v(ab, mac43), v(ab.replace("--rate ", "--rates "), mac43)
+        return (len(w1) == 1 and "abbreviation" in w1[0] and "`--rates`" in w1[0]
+                and not w2, f"--rate: {(w1 or ['accepted'])[0][:40]}; --rates: {len(w2)}")
+    case("A46", "--rate 43 is REFUSED as an abbreviation; --rates 43 is not", a46)
+
+    # A47 -- the grammar's own refusals, through cardrun: a macro defined
+    # twice (and a card carrying one), a <p> macro with no argument.
+    def a47():
+        try:
+            cr.macros("`CAP` = `a`\n`CAP` = `b`\n")
+            dup = ""
+        except cr.Refused as e:
+            dup = str(e)
+        n_dup = host_cells("x.md", "`CAP` = `a`\n`CAP` = `b`\nHOST b/D1 :: echo d\n",
+                           silent)
+        fl = {"FL": mac_a["FL"]}
+        missed = []
+        for c in ("FL", "FL ; echo x", "echo x ; FL"):
+            try:
+                cr.expand(c, fl)
+                missed.append(c)
+            except cr.Refused:
+                pass
+        ok_exp = cr.expand("FL 10.1.1.1", fl)
+        return ("defined twice" in dup and n_dup == 1 and not missed
+                and "flush to 10.1.1.1/32" in ok_exp,
+                f"twice: {bool(dup)} (a card with it: {n_dup} bad); FL with no <ip> "
+                f"not refused: {missed or '-'}")
+    case("A47", "a macro defined twice, and FL with no <ip>, are REFUSED", a47)
+
+    # A48 -- the summary says what was NOT checked, by name, on every card.
+    def a48():
+        lines = []
+        bad = host_cells(card_a, t_a, lines.append)
+        s = [ln for ln in lines if ln.startswith("  HOST ")]
+        s = s[0] if len(s) == 1 else ""
+        return (bad == 0 and "HOST 71 cell(s), 1 refused (1 on FROZEN_HOST_CELLS)" in s
+                and "21 project-tool command(s)" in s and "20 accepted, 1 REFUSED" in s
+                and "100 system command(s) NOT argument-checked: ip 33, " in s
+                and "12 keyword-only" in s, s[2:64] or "no single summary line")
+    case("A48", "card A's summary names the 100 unchecked system commands", a48)
+
+    # A49 -- the check is wired into `commands`: one bad HOST cell is one bad.
+    def a49():
+        with tempfile.TemporaryDirectory() as d:
+            good = ("| **T1** | `CAP --out x --send 'cat /proc/mtd'` |\n\n"
+                    "HOST bench/x/H1 :: /usr/bin/python3 tools/boot-timeline.py "
+                    "--retro bench/2026-09-23 --tsv bench/x/H1.tsv\n")
+            n_good = cards_commands(card_at(d, "g.md", good), report=silent)
+            n_bad = cards_commands(card_at(d, "b.md", good.replace(" bench/x/H1.tsv", "")),
+                                   report=silent)
+        n_a = cards_commands(card_a, report=silent)
+        return (n_good == 0 and n_bad == 1 and n_a == 0,
+                f"good twin {n_good} bad, bad twin {n_bad}, card A {n_a}")
+    case("A49", "`commands` counts a refused HOST cell as a defect", a49)
+
+    # B13/B14 -- the corpus, swept once.
+    corpus = {}
+    for c in cards:
+        t = _read(c).decode("utf-8", "replace")
+        try:
+            if cr.host_lines(t):
+                corpus[c] = (t, host_check(t), "")
+        except cr.Refused as e:
+            corpus[c] = (t, None, str(e))
+
+    # B13 -- FROZEN_HOST_CELLS both ways, at the grain of the defect.
+    def b13():
+        refused, grammar = {}, [f"{c}: {e}" for c, (_t, _r, e) in corpus.items() if e]
+        for c, (_t, res, e) in corpus.items():
+            for h, why in (res[0] if res else ()):
+                if why:
+                    refused.setdefault((c, h.name), []).append("; ".join(why))
+        listed = {(c, cell): frag for c, cells in FROZEN_HOST_CELLS.items()
+                  for cell, (frag, _w) in cells.items()}
+        new = sorted(k for k in refused if k not in listed)
+        stale = sorted(k for k in listed if k not in refused)
+        wrong = sorted(k for k in listed if k in refused
+                       and not all(listed[k] in w for w in refused[k]))
+        twice = sorted(k for k in listed if len(refused.get(k, ())) > 1)
+        # The reason B41's seven are listed is its grammar and nothing else:
+        # with NB supplied, netblast accepts every one.
+        t41 = corpus[b41][0]
+        nb = dict(cr.macros(t41))
+        nb["NB"] = cr.Macro(None, "/usr/bin/python3 tools/netblast.py", 0)
+        still = [h.name for h in cr.host_lines(t41) if (b41, h.name) in listed and v(h.cmd, nb)]
+        ok = not (new or stale or wrong or twice or grammar or still)
+        return ok, (f"{len(refused)} corpus refusal(s), {len(listed)} listed; list exact; "
+                    f"B41's 7 pass netblast with NB supplied" if ok else
+                    f"NEW {new} STALE {stale} WRONG-REASON {wrong} TWICE {twice} "
+                    f"GRAMMAR {grammar} B41-STILL {still}")
+    case("B13", "every corpus HOST refusal is a FROZEN pair, and each still is", b13)
+
+    # B14 -- the population, and the HOST count against each card's cardnum.
+    def b14():
+        n_cells = n_tool = checked = 0
+        tools, mism = set(), []
+        for c, (t, res, _e) in corpus.items():
+            n = len(cr.host_lines(t))
+            n_cells += n
+            if res:
+                n_tool += sum(res[1]["tool"].values())
+                tools |= set(res[1]["tool"])
+            m = FENCE_RE.search(t)
+            for ln in (m.group(1).split("\n") if m else ()):
+                f = ln.split("\t")
+                if len(f) == 3 and f[0].strip() == "host-cells":
+                    checked += 1
+                    if int(f[1]) != n:
+                        mism.append(f"{c}: cardnum {f[1]}, HOST lines {n}")
+        ok = (len(corpus) >= 13 and n_cells >= 167 and n_tool >= 27 and len(tools) >= 5
+              and checked >= 13 and not mism)
+        return ok, (f"{len(corpus)} card(s), {n_cells} cell(s), {n_tool} tool command(s) "
+                    f"over {len(tools)} tool(s); host-cells cardnum agrees on "
+                    f"{checked - len(mism)} of {checked}" + (f": {mism}" if mism else ""))
+    case("B14", "the HOST population, and its count against each cardnum", b14)
 
 
 def main(argv):
