@@ -386,7 +386,7 @@ HEADER = """\
 # quantisation.  "-" means this run's CI shape has no BIG3 step at all; a run
 # with SOME of them is refused by A6 rather than written down short.
 #
-# Regenerate a row:  tools/citime.py record <run-id>
+# Regenerate a row:  tools/citime.py record <run-id>   (then runs `segments`, FW-125)
 # Recompute the band: tools/citime.py stats
 # Find missing runs:  tools/citime.py check --last 40
 #
@@ -410,28 +410,33 @@ def _gh(args):
 
 
 # ------------------------------------------------------------- subcommands
-def cmd_record(a):
+def cmd_record(a, gh=None):
+    gh = gh or _gh      # injected by P21/P22; `gh` exists only on Windows
     ids = list(a.runs)
+    named = set(ids)
     if a.last:
-        listing = _gh(["run", "list", "--limit", str(a.last),
-                       "--json", "databaseId,conclusion"])
+        listing = gh(["run", "list", "--limit", str(a.last),
+                      "--json", "databaseId,conclusion"])
         ids += [str(r["databaseId"]) for r in listing
                 if r["conclusion"] == "success"]
     if not ids:
         raise SystemExit("citime record: give run ids or --last N")
     existing = {r["run_id"]: r for r in read_tsv(a.tsv)}
     added = skipped = refused = 0
+    named_refused = []
     for rid in ids:
         if rid in existing and not a.force:
             skipped += 1
             continue
-        data = _gh(["run", "view", rid,
-                    "--json", "jobs,databaseId,headSha,createdAt"])
+        data = gh(["run", "view", rid,
+                   "--json", "jobs,databaseId,headSha,createdAt"])
         try:
             row, extra = run_row(data)
         except Refused as e:
             print("  refused %s: %s" % (rid, e))
             refused += 1
+            if rid in named:
+                named_refused.append(rid)
             continue
         existing[rid] = row
         added += 1
@@ -444,7 +449,25 @@ def cmd_record(a):
     write_tsv(a.tsv, list(existing.values()))
     print("recorded %d, already present %d, refused %d -> %s"
           % (added, skipped, refused, a.tsv))
-    return 0
+    # FW-125: the audit CI's `text` job runs on the committed file, run here
+    # on the file just written -- a red first seen after the push cost run
+    # 35829717707 its verdict.  The row stays written either way: it is a
+    # measurement, and the remedy (a CHANGEPOINTS entry naming it) needs it.
+    print()
+    rc = cmd_segments(a)
+    if rc:
+        print("citime record: the row(s) ARE in %s, and `segments` is RED on "
+              "that file -- declare the boundary in CHANGEPOINTS or explain it "
+              "before pushing; CI's text job runs this audit (FW-125)" % a.tsv,
+              file=sys.stderr)
+    # A run named on the command line and refused was asked for and not
+    # recorded: that is a refusal, not a success (under --last a refused run
+    # is the listing's business, and only its line is printed).
+    if named_refused:
+        print("citime record: %d named run(s) refused and NOT recorded: %s"
+              % (len(named_refused), ", ".join(named_refused)), file=sys.stderr)
+        return rc or 2
+    return rc
 
 
 def band(vals):
@@ -1161,6 +1184,104 @@ def selftest():
             assert len(why) > 40, (ts, why)
     case("P20", "--since changepoint is the LATEST boundary, not the first", p20)
 
+    # P21, P22 -- FW-125.  `gh` is injected; every timestamp is derived from
+    # CHANGEPOINTS, so declaring a boundary cannot break the cases, and the
+    # value that breaks A8 is derived from the ceiling, so moving the ceiling
+    # cannot make P21 vacuous.
+    def _iso(t):
+        return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _cps():
+        return [datetime.strptime(c[0], "%Y-%m-%dT%H:%M:%SZ") for c in CHANGEPOINTS]
+
+    def _ledger():
+        cps = _cps()
+        starts = [cps[0] - timedelta(days=3)] + cps
+        vals = [500] * (len(starts) - 2) + [950, 1130]   # the pooled control must fire
+        rows = []
+        for i, (t0, v) in enumerate(zip(starts, vals)):
+            for j in range(2 if i == len(starts) - 1 else 3):
+                rows.append({"run_id": str(900000 + 10 * i + j),
+                             "created_utc": _iso(t0 + timedelta(hours=j + 1)),
+                             "sha7": "f%06d" % (10 * i + j), "jobs": "x",
+                             "text_s": "1", "lint_s": "1", "lint_apt_s": "1",
+                             "instr_s": str(v + 20), "instr_apt_s": "10",
+                             "suite_cost_s": str(v + 10), "big3_s": str(v),
+                             "census_s": "1"})
+        return rows
+
+    def _new_run(rid, big3, drop=()):
+        steps = [("Set up job", 1), ("apt", 16), ("capture dir", 0)]
+        for n, sec in ((BIG3[0], big3 - 200), (BIG3[1], 150), (BIG3[2], 50)):
+            if n not in drop:
+                steps.append((n, sec))
+        steps.append(("short", 31))
+        run = _run(rid, [_job("instruments", steps),
+                         _job("text", [("spec-check", 4)]),
+                         _job("lint", [("Run sudo apt-get update -qq", 6)]),
+                         _job("census", [("census", 4)])])
+        run["createdAt"] = _iso(_cps()[-1] + timedelta(days=2))
+        return run
+
+    def _record(d, name, run, runs, last=0):
+        import contextlib
+        import io
+
+        class _A:
+            pass
+        a = _A()
+        a.runs, a.last, a.force = list(runs), last, False
+        a.tsv = os.path.join(d, name)
+        write_tsv(a.tsv, _ledger())
+
+        def gh(args):
+            if args[:2] == ["run", "list"]:
+                return [{"databaseId": run["databaseId"], "conclusion": "success"}]
+            return run
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            rc = cmd_record(a, gh=gh)
+        kept = str(run["databaseId"]) in {r["run_id"] for r in read_tsv(a.tsv)}
+        return rc, kept, a.tsv
+
+    # P21 -- `record` runs `segments` on the file it just wrote, returns its
+    # verdict, and keeps the row either way; the spy shows the verdict is
+    # segments' own and that it was taken on the path just written.
+    def p21():
+        global cmd_segments
+        breaking = int(1130 * (1 + 2.5 * PARTITION_MAX_PCT / 100.0)) + 1
+        with tempfile.TemporaryDirectory() as d:
+            rc, kept, _ = _record(d, "in.tsv", _new_run(999001, 1131), ["999001"])
+            assert rc == 0 and kept, ("a row inside its partition", rc, kept)
+            rc, kept, _ = _record(d, "out.tsv", _new_run(999001, breaking), ["999001"])
+            assert rc == 1, ("a row that breaks A8 (%d) must turn record red"
+                             % breaking, rc)
+            assert kept, "and the row must still be recorded"
+            calls, keep = [], cmd_segments
+            cmd_segments = lambda a: calls.append(a.tsv) or 1   # noqa: E731
+            try:
+                rc, _, path = _record(d, "spy.tsv", _new_run(999001, 1131), ["999001"])
+            finally:
+                cmd_segments = keep
+            assert rc == 1 and calls == [path], ("segments' verdict is record's",
+                                                 rc, calls)
+    case("P21", "record runs segments on the file it wrote, and keeps the row", p21)
+
+    # P22 -- a run NAMED on the command line and refused was asked for and not
+    # recorded, so record exits 2; the same refusal reached through --last is
+    # the listing's business and leaves the exit to segments.  The permitting
+    # half is a named run that records.
+    def p22():
+        partial = _new_run(999002, 1131, drop=(BIG3[2],))      # A6 refuses it
+        with tempfile.TemporaryDirectory() as d:
+            rc, kept, _ = _record(d, "named.tsv", partial, ["999002"])
+            assert rc == 2 and not kept, ("a named refusal is a refusal", rc, kept)
+            rc, kept, _ = _record(d, "last.tsv", partial, [], last=5)
+            assert rc == 0 and not kept, ("a refusal under --last is not", rc, kept)
+            rc, kept, _ = _record(d, "ok.tsv", _new_run(999003, 1131), ["999003"])
+            assert rc == 0 and kept, ("the permitting half", rc, kept)
+    case("P22", "a named run refused makes record exit 2; under --last it does not", p22)
+
     for cid, what in ok:
         print("  ok   %-4s %s" % (cid, what))
     for cid, what, why in bad:
@@ -1170,6 +1291,12 @@ def selftest():
 
 
 def main():
+    # `record` runs under Windows' Python (cp950), and since FW-125 it prints
+    # CHANGEPOINTS' prose after the row is written: a character outside cp950
+    # there must not turn a recorded row into a traceback.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--tsv", default=TSV_DEFAULT)

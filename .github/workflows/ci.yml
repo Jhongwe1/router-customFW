@@ -953,6 +953,16 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/hostprobe.py --self-test 2>&1 | tee ci-out/hostprobe.out; exit "${PIPESTATUS[0]}"
 
+      # clockshim is P2-4's control for "this tool stamps CLOCK_MONOTONIC_RAW":
+      # it runs a Python tool with every Python-level read of CLOCK_MONOTONIC
+      # slowed and offset, because on a runner the two clocks agree to
+      # milliseconds and a tool still stamping MONOTONIC would pass any bracket
+      # a harness can draw (SPEC.md CLK-38). Its cases run small probes from a
+      # temporary directory: no network, no gh, no device.
+      - name: clockshim self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/clockshim.py --self-test 2>&1 | tee ci-out/clockshim.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:

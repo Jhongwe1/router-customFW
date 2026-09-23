@@ -489,13 +489,25 @@ seatings, which have no N, W or K record of this kind.
   rlxfw the console's `N-NDOPEN` is the tighter lower bound (0.81 s later than the
   method's edge in `P3Q-r02`). `P3Q-r01` has no `is-at` at all: its `rlx0` was up
   0.212 s before `looprun` reset it, and no request reached it in that window.
-* **The loud image has no reading.** In `P1L-r01`…`r03` no reply came before
-  `looprun`'s `busybox reboot -f`, sent 0.189–0.221 s after the prompt (0.220–0.251 s
-  after `N-NDOPEN`). 量 from `P3-TCPD`: after the carrier loss at each NIC probe the
+* **The loud image has no reading.** In `P1L-r01`…`r03` no reply came before the next
+  `busybox reboot -f`, sent 0.189–0.221 s after the prompt (0.220–0.251 s after
+  `N-NDOPEN`) — by `looprun` after `r01` and `r02`, and after `r03` by the card's own
+  `P1-RZ`, 0.098 s after `looprun` closed (量, 107th segment, `P1L.stages.tsv` against
+  `P1-RZ.meta.json`). 量 from `P3-TCPD`: after the carrier loss at each NIC probe the
   host transmits nothing until the next ARP cycle, whose second broadcast lands at
   NIC+4.18–4.27 s; the quiet image opens `rlx0` at NIC+4.01–4.05 s, just before it, the
-  loud one at NIC+4.45 s, just after. Seating B needs the loud board up for at least
-  1.05 s past `N-NDOPEN` (the longest gap between broadcasts on the wire in `P3`).
+  loud one at NIC+4.45 s, just after.
+* 🔄 **The quiet image was read through the same window** (107th segment): its first
+  replies beat the next reset by 16.1, 2.5 and 39.5 ms in `P1Q-r01`…`r03` (量, two
+  computations sharing no code), and `P3Q-r01` got none. Which boots have a reading is
+  decided by the host's ARP phase against a 0.2 s window, so seating B keeps **both**
+  images up past the prompt in every round, the last included. The 1.05 s this bullet
+  used to ask of the loud image alone — the longest gap between broadcasts on the wire in
+  `P3`, the 1.000 s ARP retransmit plus one 50 ms ping interval — is a floor with no
+  margin for a lost first answer; seating B waits 2 s. With the wait the loud boots should
+  be answered on a cycle's third broadcast (推, from seating A's timing), so the
+  lower-edge rule above, which assumes the second, gives way to the general one used for
+  the vendor's boots (§ 7.7).
 * **The card's regimes did not occur.** At all seven jumps `--neigh` read
   INCOMPLETE with no address: the "cached entry" regime never happened, and the one
   flushed loud boot has no reading, so the flushed-versus-cached contrast is not
@@ -642,7 +654,10 @@ What seating B tests, each written with what refutes it:
   refuted by a seating-B boot whose last-refused-to-first-ok window excludes it.
 * 推 `CLK-32`'s factor is the host clock — the loader's `booting` stamped on a clock the
   host does not slew should land within ~±0.5 % of 0.35625 s in every seating (§ 5).
-* The host clock's mechanism — decided by resynchronizing Windows (§ 7.9).
+* ~~The host clock's mechanism — decided by resynchronizing Windows (§ 7.9).~~ 🔄 Decided
+  at the desk by the 107th segment without touching Windows: a trace named the process that
+  writes the tick, and stopping the other controller ended the slew (§ 7.9). Seating B no
+  longer carries it.
 
 Left open by seating A and not planned: which cell cost the board its 105 ticks
 (§ 7.2); why three `rlx0` trials started with a full TX ring and what took `UR1`'s
@@ -662,7 +677,10 @@ remaining 6–7 s of setup (`notes/nic-driver.md` § 19.6).
 量 2026-09-23 18:40–19:43 (106th segment), inside WSL (kernel
 `6.6.87.2-microsoft-standard-WSL2`, clocksource `tsc`), the board off. Scripts and logs
 in `$FWRE_WORK/rebuild/s106/` (`clocklog.py`, `clockfit.py`, `clockwin.py`,
-`adjtimex-read.py`, `adjtimex-watch.sh`).
+`adjtimex-read.py`, `adjtimex-watch.sh`). The 107th segment's trace and interventions
+(21:25–22:51, a later WSL boot) are the three bullets from *Who writes the tick* on; their
+scripts, logs and registration are in `$FWRE_WORK/rebuild/s107/` (`e1-trace.sh`,
+`e1b-trace.sh`, `e2-aba.sh`, `e2-analyze.py`, `PREREG-clk38-mechanism.md`).
 
 * **The kernel's tick is being slewed.** `adjtimex(2)`, read only: `tick` 9721–9737 µs
   per jiffy at 18:42 (nominal 10,000), a new value every 5–10 s, `freq` −46…+48 ppm,
@@ -678,7 +696,7 @@ in `$FWRE_WORK/rebuild/s106/` (`clocklog.py`, `clockfit.py`, `clockwin.py`,
 * **Realtime is stepped forward.** `REALTIME − MONOTONIC` jumped +0.83…+1.04 s every
   20–40 s, +32.49 s over the log's first 1,037.7 s. `systemd-timesyncd` is active
   (ntp.ubuntu.com, poll 32 s); `status` 0x2000 has `STA_PLL` clear, which fits a step
-  rather than a slew (推, from how `timesyncd` steps as remembered, not read here). During seating A the journal (whose
+  rather than a slew (量, 107th segment: it steps with `clock_adjtime(ADJ_SETOFFSET)`, below). During seating A the journal (whose
   every entry carries both clocks) shows no step before ~15:50, then +0.40–0.53 s every
   ~32.2 s until ~16:10 and +0.70–0.87 s during the vendor presses; the first step
   visible between two captures is inside `P1L-r01-ab2` (15:54:34, +0.494549 s), because
@@ -686,9 +704,25 @@ in `$FWRE_WORK/rebuild/s106/` (`clocklog.py`, `clockfit.py`, `clockwin.py`,
 * **Windows is not synchronized.** `w32tm /stripchart` against ntp.ubuntu.com: Windows
   0.63–0.70 s behind; `w32tm /query /status`: Leap Indicator 3 (not synchronized),
   last successful sync 13:14.
-* **Who writes the tick is not determined.** No tracer is installed, and installing one
-  changes the owner's machine. 讀: WSL's `/init` holds the string `StartTimeSyncAgent`;
-  the kernel runs with `hv_utils.timesync_implicit=1` (量, the boot's command line).
+* **Who writes the tick: WSL's own `chronyd`** (107th segment; ftrace, which the kernel
+  carries — nothing was installed; conditions written first in
+  `$FWRE_WORK/rebuild/s107/PREREG-clk38-mechanism.md`). 量 over 6 min (22:08:55–22:14:59,
+  one WSL boot): comm `chronyd`, PID 210, made 86 `clock_adjtime` calls with
+  `ADJ_TICK|ADJ_FREQUENCY` — tick 9293–95xx µs, 4.5–7 % slow — each paired with an
+  `ADJ_MAXERROR|ADJ_ESTERROR|ADJ_STATUS` call, one update per ~8.4 s; `systemd-timesyncd`
+  made 11, all `ADJ_SETOFFSET` — one step each, one per ~32 s, the journal's 11 `Clock change
+  detected` — and set no tick; no other process called. PID 210 is in neither Ubuntu's PID
+  namespace nor the system distro's (`wsl --system`), so no `ps` lists it: it runs in WSL's
+  root namespace. In 60 s it issued 240 `ioctl`s, every one `PTP_SYS_OFFSET` (0x43403d05)
+  on one descriptor, one per 0.263 s, and no network call: it reads the only PTP clock
+  present, `/dev/ptp0` → `ptp_hyperv`, the host's time. Its cadences, 0.25 s and 8 s on the
+  clock it slews, read 0.263 s and 8.4 s on RAW. The kprobe's `tick` field is the value
+  written: all 69 read-backs of a read-only `adjtimex` equal chronyd's last write before
+  them, 0 of 69 the write before that. 🔴 Both positive controls as registered were
+  mis-specified — `timesyncd` steps through `clock_adjtime(ADJ_SETOFFSET)`, not
+  `clock_settime` (0 hits), and a kprobe at function entry sees a reader's input, not what
+  it returns — so the instrument's sight rests on all three callers appearing and on the
+  read-back.
 * **When it starts.** 量 `systemd-resolved`'s `Clock change detected`, which follows
   every step: none in the boots of 14:15 and 14:21–15:03; in the seating's boot none
   for its first 42 minutes, then 267 from 15:50:14 to 18:17:15, one per ~32 s poll; in
@@ -697,16 +731,29 @@ in `$FWRE_WORK/rebuild/s106/` (`clocklog.py`, `clockfit.py`, `clockwin.py`,
   at 13:14; if it sat on NTP then, at that rate its offset reaches ~0.34 s by 15:50,
   about the 0.4 s at which `timesyncd` steps (推, the threshold as remembered). In the boot after the seating (18:42), the tick tracked the steps:
   9734–9737 within ~10 s of each step, 9721–9726 between them.
-* 推: two controllers — one slewing the guest toward Windows' clock through the tick,
-  `timesyncd` stepping it toward NTP — that coexist until Windows' drift from NTP
-  passes the step threshold, and then fight, the slewing deepening while the
-  disagreement lasts. Refuted by a host whose Windows clock is synchronized to NTP and
-  whose `CLOCK_MONOTONIC` still runs percent-slow, or by `MONOTONIC` staying slow after
-  Windows is resynchronized; decided by resynchronizing Windows (the owner's machine,
-  so the owner's call) and reading `MONOTONIC` against `RAW` for 30 minutes.
+* **Stopping one controller ends the slew** (E2, 22:16–22:51, ABA with logged boundaries).
+  A, `timesyncd` running: 19 steps in 10 min, per-minute MONOTONIC/RAW 0.946–0.989, tick
+  9256–10833. B, `systemctl stop systemd-timesyncd`: 0 steps; the tick went to 10,000 about
+  50 s later and stayed; every minute from 100 s after the stop read MONOTONIC/RAW 1.00000 —
+  the registered prediction held. A′, restarted: 0 steps and tick 9976–10003 for 10 min —
+  the registered prediction (steps and slew return) failed, and its refutation (steps return
+  without slew) did not apply. Found after the run: Windows synchronized at 22:20:30 (System
+  log, Time-Service event 37), six minutes before the stop, so A′ ran with Windows back on NTP
+  and is confounded. Windows' successful syncs on 2026-09-23 are 04:08:14, 13:14:22 and
+  22:20:30 — 32,768 s apart — and `w32tm` reads *not synchronized* between them.
+* **The mechanism, and what is still 推.** Two controllers: WSL's `chronyd` slews the guest
+  toward Windows' clock through the tick; Ubuntu's `timesyncd` steps it toward NTP. While
+  Windows sits on NTP they agree; as Windows drifts (−36 ppm) past `timesyncd`'s step
+  threshold they fight, chronyd undoing each step, deeper as the drift grows, until Windows'
+  next sync. Seating A's steps began 9,352 s after the 13:14:22 sync. 推 until E3 reads it:
+  with `timesyncd` running, the fight returns on its own after 22:20:30 (registered before
+  its first row: first step between 00:15 and 01:47 on 2026-09-24, point estimate 00:56).
 * **Consequence.** Seating A's stamps are on the slewed clock (§ 7.2's four references
-  agree), and `CLOCK_MONOTONIC_RAW` is not slewed; it tracked Windows' QPC within 0.12 %
-  in every window. This is why seating B stamps `RAW` (`PROGRESS.md`, `P2-4`).
-* **What it does not establish:** the mechanism during seating A itself (no `tick`
-  history exists; the journal keeps only realtime/monotonic pairs); anything before
-  2026-09-23 05:54 (older journals are gone); Windows' own rate against true time.
+  agree), and `CLOCK_MONOTONIC_RAW` is not slewed. Seating B stamps `RAW` (`PROGRESS.md`,
+  `P2-4`), and runs with `timesyncd` stopped and restarted after, so `CLOCK_REALTIME` makes
+  no NTP step and realtime-stamped tools convert smoothly — the rule written before E2, met
+  by its B phase; its clock log reads the host's state throughout.
+* **What it does not establish:** that seating A itself ran on this mechanism (no trace then;
+  its journal's step pattern matches); why Windows' syncs are 32,768 s apart while it reports
+  a 1,024 s poll; Windows' own rate against true time; anything before 2026-09-23 05:54
+  (older journals are gone).
