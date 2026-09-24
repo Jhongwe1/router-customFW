@@ -1,0 +1,51 @@
+cat /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/EU3.log
+cpu  2014 0 10612 87241 0 0 25162 0 0
+cpu0 2014 0 10612 87241 0 0 25162 0 0
+intr 1238451 0 0 0 0 0 0 0 0 146198 0 0 0 842163 125095 0 0 0 0 0 0 0 0 0 0 0 124995 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 39974
+btime 0
+processes 248
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 60412
+[  6] local 10.1.1.4 port 5201 connected to 10.1.1.2 port 47011
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-1.01   sec   682 KBytes  5533 Kbits/sec  0.513 ms  1015/1514 (67%)  
+[  6]   1.01-2.01   sec   752 KBytes  6160 Kbits/sec  0.604 ms  1235/1785 (69%)  
+[  6]   2.01-3.01   sec   752 KBytes  6160 Kbits/sec  0.531 ms  1236/1786 (69%)  
+[  6]   3.01-4.01   sec   752 KBytes  6160 Kbits/sec  0.107 ms  1237/1787 (69%)  
+[  6]   4.01-5.01   sec   752 KBytes  6160 Kbits/sec  0.124 ms  1238/1788 (69%)  
+[  6]   5.01-6.01   sec   753 KBytes  6171 Kbits/sec  0.528 ms  1231/1782 (69%)  
+[  6]   6.01-7.01   sec   752 KBytes  6160 Kbits/sec  0.543 ms  1235/1785 (69%)  
+[  6]   7.01-8.01   sec   752 KBytes  6160 Kbits/sec  0.490 ms  1236/1786 (69%)  
+[  6]   8.01-9.01   sec   752 KBytes  6160 Kbits/sec  0.521 ms  1236/1786 (69%)  
+[  6]   9.01-10.01  sec   752 KBytes  6160 Kbits/sec  0.512 ms  1236/1786 (69%)  
+[  6]  10.01-11.01  sec   752 KBytes  6160 Kbits/sec  0.526 ms  1235/1785 (69%)  
+[  6]  11.01-12.01  sec   752 KBytes  6160 Kbits/sec  0.492 ms  1236/1786 (69%)  
+[  6]  12.01-13.01  sec   752 KBytes  6160 Kbits/sec  0.529 ms  1236/1786 (69%)  
+[  6]  13.01-14.01  sec   752 KBytes  6160 Kbits/sec  0.534 ms  1236/1786 (69%)  
+[  6]  14.01-15.01  sec   752 KBytes  6160 Kbits/sec  0.106 ms  1235/1785 (69%)  
+[  6]  15.01-16.01  sec   752 KBytes  6160 Kbits/sec  0.548 ms  1236/1786 (69%)  
+[  6]  16.01-17.01  sec   752 KBytes  6160 Kbits/sec  0.528 ms  1236/1786 (69%)  
+[  6]  17.01-18.01  sec   752 KBytes  6160 Kbits/sec  0.512 ms  1235/1785 (69%)  
+[  6]  18.01-19.01  sec   752 KBytes  6160 Kbits/sec  0.510 ms  1236/1786 (69%)  
+[  6]  19.01-20.01  sec   752 KBytes  6160 Kbits/sec  0.486 ms  1235/1785 (69%)  
+[  6]  20.01-21.01  sec   752 KBytes  6160 Kbits/sec  0.524 ms  1236/1786 (69%)  
+[  6]  21.01-22.01  sec   752 KBytes  6160 Kbits/sec  0.527 ms  1236/1786 (69%)  
+[  6]  22.01-23.01  sec   752 KBytes  6160 Kbits/sec  0.513 ms  1236/1786 (69%)  
+[  6]  23.01-24.01  sec   752 KBytes  6160 Kbits/sec  0.536 ms  1235/1785 (69%)  
+[  6]  24.01-25.01  sec   752 KBytes  6160 Kbits/sec  0.523 ms  1237/1787 (69%)  
+[  6]  25.01-26.01  sec   752 KBytes  6160 Kbits/sec  0.545 ms  1236/1786 (69%)  
+[  6]  26.01-27.01  sec   752 KBytes  6160 Kbits/sec  0.516 ms  1235/1785 (69%)  
+[  6]  27.01-28.01  sec   752 KBytes  6160 Kbits/sec  0.520 ms  1236/1786 (69%)  
+[  6]  28.01-29.01  sec   752 KBytes  6160 Kbits/sec  0.502 ms  1235/1785 (69%)  
+[  6]  29.01-30.01  sec   752 KBytes  6160 Kbits/sec  0.533 ms  1236/1786 (69%)  
+[  6]  30.01-30.03  sec  0.00 Bytes  0.00 Kbits/sec  0.533 ms  0/0 (0%)  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-30.03  sec  0.00 Bytes  0.00 Kbits/sec  0.533 ms  36849/53299 (69%)  
+# 

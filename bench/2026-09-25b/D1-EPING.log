@@ -1,0 +1,5 @@
+PING 10.1.1.4 (10.1.1.4) from 10.1.1.2 : 56(84) bytes of data.
+
+--- 10.1.1.4 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3074ms
+rtt min/avg/max/mdev = 1.057/1.372/1.820/0.305 ms

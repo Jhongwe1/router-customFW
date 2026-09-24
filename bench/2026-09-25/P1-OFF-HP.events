@@ -1,0 +1,19 @@
+# hostprobe 1.3: t_raw is absolute CLOCK_MONOTONIC_RAW seconds (clock_gettime(CLOCK_MONOTONIC_RAW), the clock console-capture 1.5's t0_raw is read on); t_real, ping_real and kernel_real are CLOCK_REALTIME, cross-checks only; a udp line's lag_ms is t_real minus kernel_real, so its kernel stamp on this clock is t_raw - lag_ms/1000
+# probes target=10.1.1.3 icmp=- tcp=- neigh=- udp=50000 seconds=180 until=-
+3206.415332 start t_real=1790267562.354698
+3207.610725 udp port=50000 peer=10.1.1.3:32793 len=10 kernel_real=1790267563.550022346 lag_ms=0.124
+3210.850770 udp port=50000 peer=10.1.1.3:32795 len=10 kernel_real=1790267566.790093206 lag_ms=0.249
+3214.110449 udp port=50000 peer=10.1.1.3:32797 len=10 kernel_real=1790267570.049993594 lag_ms=0.173
+3217.360858 udp port=50000 peer=10.1.1.3:32799 len=10 kernel_real=1790267573.300337538 lag_ms=0.384
+3220.600104 udp port=50000 peer=10.1.1.3:32801 len=10 kernel_real=1790267576.539990190 lag_ms=0.125
+3223.841173 udp port=50000 peer=10.1.1.3:32803 len=10 kernel_real=1790267579.780883192 lag_ms=0.449
+3227.090082 udp port=50000 peer=10.1.1.3:32805 len=10 kernel_real=1790267583.030122950 lag_ms=0.265
+3230.349853 udp port=50000 peer=10.1.1.3:32807 len=10 kernel_real=1790267586.290096638 lag_ms=0.210
+3233.580310 udp port=50000 peer=10.1.1.3:32809 len=10 kernel_real=1790267589.520562896 lag_ms=0.348
+3236.840080 udp port=50000 peer=10.1.1.3:32811 len=10 kernel_real=1790267592.780517635 lag_ms=0.309
+3240.080154 udp port=50000 peer=10.1.1.3:32813 len=10 kernel_real=1790267596.020741581 lag_ms=0.308
+3243.329633 udp port=50000 peer=10.1.1.3:32815 len=10 kernel_real=1790267599.270497768 lag_ms=0.176
+3246.580317 udp port=50000 peer=10.1.1.3:32817 len=10 kernel_real=1790267602.521237093 lag_ms=0.268
+3249.829862 udp port=50000 peer=10.1.1.3:32819 len=10 kernel_real=1790267605.770802966 lag_ms=0.395
+3253.069196 udp port=50000 peer=10.1.1.3:32821 len=10 kernel_real=1790267609.010517681 lag_ms=0.160
+3386.415881 stop t_real=1790267742.363418 reason=--seconds

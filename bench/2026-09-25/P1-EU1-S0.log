@@ -1,0 +1,25 @@
+iperf3 -s -1 -f k --logfile /tmp/EU1.log > /dev/null 2>&1 & sleep 2 ; ps ; cat
+ /proc/stat
+  PID USER       VSZ STAT COMMAND
+    1 0          832 S    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+  228 0          332 S    iperf3 -s -1 -f k --logfile /tmp/EU1.log 
+  230 0          816 R    ps 
+cpu  1631 0 10051 79108 0 0 22404 0 0
+cpu0 1631 0 10051 79108 0 0 22404 0 0
+intr 1202732 0 0 0 0 0 0 0 0 136127 0 0 0 840186 113260 0 0 0 0 0 0 0 0 0 0 0 113160 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 35907
+btime 0
+processes 231
+procs_running 2
+procs_blocked 0
+# 

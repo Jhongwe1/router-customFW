@@ -1,0 +1,2 @@
+hostprobe: bench/2026-09-25/P1-OFF-HP.events  17 events, stop --seconds after 180.001 s
+hostprobe: bench/2026-09-25/P1-OFF-HP.meta.json

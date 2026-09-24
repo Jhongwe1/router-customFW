@@ -1,0 +1,57 @@
+  pre  image     sha256 4972edbadd2655a815e80606a83b8e5e5987334dfd1c990fcc806291eaf182ae  <- matches the pin
+  S2  build     SKIPPED (--skip)
+  S3  assemble  SKIPPED (--skip)
+
+=== round 1 of 2   (0.0 s spent)
+  S4  reset     SKIPPED (--skip)
+  S5  rescue    rc=0    0.24 s
+  S5b burnflag  rc=0    2.21 s
+  S5c hostlink  ok      1.01 s
+      ok   P-a the host has an address on the route to 10.1.1.1 -- dev=enxfc19286184c9 src=10.1.1.2
+      ok   P-b the board answers ARP -- 56:0a:01:01:01:e8 REACHABLE
+  S6  upload    rc=0    1.95 s
+  S6b staged    rc=0    2.20 s
+  S7  boot      rc=0   10.99 s
+      ended on --until at offset 2091
+
+  ok   A0b AUTOBURN read back at 0x8040D4A0   00000000 -- the word the burn path reads is zero
+  ok   P-a the host has an address on the route to 10.1.1.1 dev=enxfc19286184c9 src=10.1.1.2
+  ok   P-b the board answers ARP              56:0a:01:01:01:e8 REACHABLE
+  ok   A0c the words at 0x80500000 are the image S6 sent 8 words, every one derived from the image rather than typed
+  ok   A1 the eleven boot marks               all present
+  ok   A2 and in declaration order            11 present mark(s) in order
+  ok   A3 the id the build computed           board printed a2c56bc8, build computed a2c56bc8
+  ok   A4 a reachable prompt                  found
+
+  round 1 stage seconds: S2=skipped  S3=skipped  S4=skipped  S5=0.24  S5b=2.21  S5c=1.01  S6=1.95  S6b=2.20  S7=10.99  S8=0.00
+  S9  dwell     ok      2.49 s   2.500 s past S7's end
+
+=== round 2 of 2   (21.1 s spent)
+  S4  reset     rc=0    2.63 s
+  S5  rescue    rc=0    0.24 s
+  S5b burnflag  rc=0    2.22 s
+  S5c hostlink  ok      1.01 s
+      ok   P-a the host has an address on the route to 10.1.1.1 -- dev=enxfc19286184c9 src=10.1.1.2
+      ok   P-b the board answers ARP -- 56:0a:01:01:01:e8 REACHABLE
+  S6  upload    rc=0    1.94 s
+  S6b staged    rc=0    2.21 s
+  S7  boot      rc=0   10.94 s
+      ended on --until at offset 2091
+
+  ok   A0 C-8's discriminator after the reset present
+  ok   A0a the capture ends at the loader prompt <RealTek> is the last thing the board printed
+  ok   A0b AUTOBURN read back at 0x8040D4A0   00000000 -- the word the burn path reads is zero
+  ok   P-a the host has an address on the route to 10.1.1.1 dev=enxfc19286184c9 src=10.1.1.2
+  ok   P-b the board answers ARP              56:0a:01:01:01:e8 REACHABLE
+  ok   A0c the words at 0x80500000 are the image S6 sent 8 words, every one derived from the image rather than typed
+  ok   A1 the eleven boot marks               all present
+  ok   A2 and in declaration order            11 present mark(s) in order
+  ok   A3 the id the build computed           board printed a2c56bc8, build computed a2c56bc8
+  ok   A4 a reachable prompt                  found
+
+  round 2 stage seconds: S4=2.63  S5=0.24  S5b=2.22  S5c=1.01  S6=1.94  S6b=2.21  S7=10.94  S8=0.00
+  S9  dwell     ok      2.49 s   2.500 s past S7's end
+  MACHINE TOTAL: 39.79 s   (S1, the edit, and S8b, the read, are not this tool's to time -- looptime owns the served loop)
+  S9's dwell is a wait, not machine time: the stages file has it
+
+RESULT: the loop closed 2 of 2 round(s), 18 assertion(s) held, 39.79 s of machine time

@@ -32814,3 +32814,87 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 十、交接
 
 `plan/handoff-s109.md`。
+
+## 2026-09-24 — 第一百一十段（23:36 開場，上機跨日到 2026-09-25，**十三次電源按壓**：上機 B 十二按＋block 45 一按，03:5x 收工）：卡片 B 的日窗在開場時已經過去，改日期成 block 44 當晚上機、246 格全中、`D2` 成立；擁有者追加的 rlx0 診斷卡 block 45 同一晚凍結上機，把 `NET-112` 第一次定位到 TX 路徑的長度錯誤
+
+**開場時是 23:36，卡片 B 的窗到午夜為止。** 四件：卡片 B 改日期成 block 44（`bench/2026-09-25/PREDICTIONS-B46-block44.md`）並上機 B；兩個上機中途的停止（守門、map 摘要）照卡片自己的停止表處理並由擁有者讀過；MB 摘要缺陷的根本修正；擁有者追加的 rlx0 診斷卡 block 45（`bench/2026-09-25b/PREDICTIONS-B47-block45.md`）從設計、凍結到上機。
+
+### 一、開場：量時間與 repo
+
+- 23:36:14（Windows）、23:37:41（WSL）。HEAD `5780932`、`LOG.md` 最後一則第一百零九段、study 到 `20260924-study2`、CI `35962264330` 四綠（`gh run view`）—— 與簡報相符。**`citime record` 沒做**（上機優先，欠著）。
+- 🔴 **機器 14:03:43 進入睡眠、23:34:33 醒來**（量，System log：Kernel-Power 187／42 *Sleep Reason: Application API*；Power-Troubleshooter 1 *Sleep Time 06:03:40Z, Wake Time 15:34:33Z*；Kernel-Boot 27 boot type 0x1；Kernel-General 1 把時鐘改了 34,243,400 ms）。`LastBootUpTime` 仍是 2026-09-19 11:38:58：擁有者說的「關電腦」沒有重開核心。所以卡片 B 預測的 16:32:46 對時根本沒發生；醒來後 23:35:13（事件 37）、`w32tm` *Last Successful Sync Time* 23:35:29，*Poll Interval* 10 (1024 s)，*Phase Offset* 0.3208324 s、*State Machine* 1 (Hold)、*Last Sync Error* 2（00:06:39 與 00:07:58 兩次讀數完全相同）。
+- 推 H-a「1024 s 輪詢」：23:52:33 應再對時 —— 23:53:35 讀數仍 23:35:29，**否證**。H-b「32,768 s 從醒來那次重新起算」下一次 08:41:37：整場之後 02:49:38 仍 23:35:29，沒有被否證。
+
+### 二、擁有者的決定
+
+1. 「現在就要上機，為什麼要重新凍結、改個名字不行嗎」—— 可以，而我先前估的 2–3 h 錯了（見七）。
+2. **「預算無限，不用停損」**：`P2` 的 11 段停損取消（`PROGRESS.md` `P2` 步驟表的停損列改寫）。
+3. 讀過 `CORRECTIONS-block44.md` § 2 之後：**原廠開機 `V4`–`V7`、`M2` 繼續**。
+4. **rlx0 診斷卡，`P3` 之後接著上**（含 MB 修正），可以用子代理。它不是 `P2` 的步驟；`NET-112` 的機制屬於 `R6b`（預約、未開）—— 由哪個 gate 記錄，擁有者尚未裁定。
+
+### 三、卡片 B 改日期成 block 44
+
+- `s110/redate/redate.py`：卡片 B 全文，只換 `bench/2026-09-24`（517 處、482 行）、檔名（25＋2）、宣告日期、block 號；§ 4 的對時規則整段改寫（6 → 10 行：對時在場內「記錄、不避開」，推 下一次 08:41:37）；§ 0 加 ⑧ 出處說明。七處 `量 2026-09-24 …` 的過去日期不換。
+- 第二來源 `redate_proof.py`（difflib 逐行，不共用程式碼）：1,473 行相同、483 行只差替換、§ 4 與 ⑧ 各一塊 —— **PASS**；四個種下的缺陷（閘門一位數字、一條路徑留舊日期、多一行、改一個字）全部被拒。
+- `drycheck`（18 invocation、206 格、閘門回音＝圍欄）、`cardcheck commands`／`numbers` 66/66、`gatetest` 64/0、`fromcheck` 206/9（與卡片 B 相同）、`check-predictions` 0 of 246、`capdate` 0 RED、`spec-check` 綠 → **凍結 `c979621`（23:59:35）**、推。
+
+### 四、上機 B（block 44，seating 40）
+
+- 上機前：keeper（`sleep 36000`）先於 attach；CP2102 `1-1`、GbE `2-4`；兩支腳本摘要與 `cardnum` 相同；`sudo -n` 是 `NOPASSWD: ALL`（`tcpdump`、`systemctl`、`ip` 都能用 —— 交接「上機當天才知道」的一項）。
+- `I1` 00:02:48：`Z0-PRE` 0 B、3.086837 s。`I0`（`Z0-HC`）背景。
+- 🔴 **`I1b` 守門拒絕（00:05:55）**：`tick check: AGREE over 50 pair(s), worst -0.573 ppm, strong`。60 s 窗裡 `tick` 9937 → 9817 → **10834（RAW 1549.9–1575.2）** → 10001：10834 是 +8.34 %，**正是 `chronyd` 預設 `maxslewrate` 83,333 ppm**；列本身量到 MONOTONIC/RAW 1.0834（RAW 1549.907→1557.537）。`timesyncd` 已停，寫者推 為 WSL 的 `chronyd`（`CLK-38`），跟著一個剛醒、正在 Hold 的 Windows 時鐘。不通電。`CORRECTIONS-block44.md` § 1 先寫（含預測：放行，餘裕只有 2.2 ppm）。
+- **`Z0-HCG2`（00:15:57，`s110/hcg2.py`：命令與閘門從卡片抽出、`O_EXCL`、00:15:55 之前拒絕 —— 拒絕的控制先跑過）放行**：`AGREE over 52 pair(s), worst +0.452 ppm, vacuous`、`timerfd 0`。之後整場 `tick` 10001、`freq` −99.8…−2.2 ppm（淨 +0.2…+97.8 ppm）：§ 3.8 的推「每一列 `tick=10000`」被否證，它的圍堵照原文適用。
+- 十二按 00:25:58–02:48:09，每按 catch 開了才請擁有者按：
+  - `P1`：`rlx0` 十二組 **0 組完成**（rc 124 ×6、rc 1 ×6，後者都是 `No route to host`）；`eth4` 十二組全完成（~30.2 s）；`P1-MB0` 三閘門全中。
+  - `V1`–`V3` 冷：`J` 後 27.0–27.2 s 見 `port 80`，`V*-BOOT` 各 1,789 B；`M1` 45.4 s、1,901 B（＝上機 A）。
+  - `P2`：🔴 **`P2-MB0` 第一個閘門拒絕** —— 摘要 `1de86c73…`。量：`P2-M0.log` 3,009 B、以 `map_lines 32` 結尾沒有行尾；卡片的 MB 管線照抄跑在補了 `\r\n` 的副本上得 `0927be41…`；34 行區段與 P1-M0、上機 A 的 P3-M0 逐位元組相同；另外兩個閘門照 `cardrun` 的方式套用都中。`CORRECTIONS` § 2 寫明後 `--from P2-HPX` 跑完 rlxfw 那一按；擁有者讀過、裁定繼續。
+  - `V4`–`V7` 暖：`V7-BOOT` 26.0 s，比其他（27.1–27.2）早約 1 s（`CLK-37` 的型態，待核）；`M2` 32.9 s、1,979 B（＝上機 A）。
+  - `P3`：`P3-M0` 3,013 B、三閘門全中；**`D2: HOLDS`** —— 暖 rlxfw − 原廠 +0.0008 s（上機 A +0.0078）、冷 −0.0002（±0.025）、模式冷 −0.0045／−0.0046、模式暖 +0.0004／+0.0012（±0.010）。`Z9-D2A` 重現上機 A 的六個差。
+- `I9` 02:49:20：`Z0-HC` 11,375 列、RAW 1423.9–11403.9、`adj` 1,391、tick 檢查 AGREE 8,530 對、最差 +37.4 ppm、strong、**0 步進**；`timesyncd` 回 active。
+- 上機後：**`check-predictions` 246 of 246**；`capdate` 0 RED（178 格在宣告日、68 格無 meta、距上機 A 最後一格 30.4 h）；**`iperflog compare` AGREE 6 of 6**（`ER1`–`ER3`、`EU1`–`EU3`），之後才讀任何 rlx0 數字。
+- 擁有者的目視（~01:40，原廠跑著）：第 3 顆燈常亮、第 2 顆在閃 —— 記下，編號從哪一邊數未問。
+
+### 五、MB 摘要的修正（子代理＋我的第二來源）
+
+- 子代理（`s110/mbfix/`）：`awk 1` 插在 `sha256sum` 之前，5 份 map＋14 個突變，完整的區段摘要不變、P2-M0 變 `0927be41…`、每個突變仍拒絕；另建議 map 的 `--until` 改成 `'map_lines [0-9]+\r\n# '`。
+- 🔴 它讀出的：`--until` 比對後**不是再讀 50 ms**，而是讀到當下那個 `drain(0.05)` 窗的結尾（0–50 ms）。我讀 `console-capture.py` 的 `drain` 與呼叫它的迴圈核對屬實，改了 `CORRECTIONS` § 2 我那句「50 ms drain」。`CLAUDE.md` 的「it drains only 50 ms after its match」是上界 —— 要改（沒做）。
+- 我自己的第二來源（`s110/mbcheck.sh`）：今晚三份、上機 A 三份，新舊管線只在 P2-M0 不同；種下改動的副本兩版都拒絕。
+
+### 六、block 45：rlx0 在哪一層丟框
+
+- 設計：子代理的備忘（`R6b` 範圍、一到兩按），我縮成一按（E1–E6、E10、收尾的 map）。今晚 rlx0 逐組讀數（控制之後）：`TR1` stall 時 `n_recov_fire` 仍 0；`TR2`–`TS3` 約一分鐘 `No route to host` 而 `n_tx` 每組 +3；`US1` `tx_stopped 1`、四個 `txd` 在 engine 手上；`P1-NMAP` 57,296 closed、**8,239 filtered**。
+- 量：主機網卡綁 `r8153_ecm`，`ethtool -S` 讀 `no stats available`（子代理推 的 `r8152` 被否證）；eth4 的 MAC 是 `audit-bench-log` 白名單裡的 SDK 佔位值 `00:12:34:56:78:9x`（今晚與上機 A 的 `P1-ETH4` 各 1 of 1，不印值）。
+- 卡片以 `s110/card45/finalize.py` 從草稿產生（括號、執行圍欄、`cells`、TAB 分隔的 `cardnum`）；`drycheck` 4/4、`cardcheck commands` 0 拒絕、`numbers` 36/36、`fromcheck` 75/0、閘門測試 0 異常（新 MB 在 P1／P2／P3-M0 都放行、新 `--until` 在 P2-M0 不停）、`check-predictions` 0 of 78、`capdate` 0 RED、`spec-check` 綠 → **凍結 `8656c61`（03:14:11）**、推。
+- 上機 03:18:48–03:34:38，一按：
+
+| | 結果 | TX：`n_tx` → CPU 埠 `CRCAlignErr` → port 3 出 → 主機 `rx_packets` | 對預測 |
+|---|---|---|---|
+| E1 ICMP | 100/100 | 102 = 102 = 102 = 102；RX 102 ×4；port 3 位元組 71,128 = 71,000 + 2×64 | 成立；直方圖沒數那兩個 64 B 的 ARP |
+| E2 框長 | **150/1193** | 堆疊 `Ip.OutRequests` 1,202 → **935** → **894（`JabberErr` 678、`Drop` 43）** → 172 → 172；512–1023 桶 +6（ISZ 的長度填不到） | **否證**：引擎送出沒被給的長度 |
+| E3 nmap | 5,553 filtered | **71,828 ×4**；主機 `ActiveOpens` 71,825、`AttemptFails` 59,984、`TCPAbortOnData` 11,841 | 否證「RST 在路上丟」：全部到主機網卡，推 太晚到 |
+| E4 stall | rc 124 | 1,144 → 1,138 → 1,136 → 1,136 | 成立（CPU 擁有、`tx_stopped 0`）；過程中觸發一次恢復 |
+| E5／E6 | 40/40 ×3 | 各層相等（±1 讀取時差） | E5 否證：這次沒有靜默窗 |
+| E10 eth4 | 40/40、iperf 25.0 Mbit/s | 16,215 ×4，jabber 0 | 成立：丟框是 rlx0 驅動自己的 |
+
+- E2 逐長度（收到／送出）：60 B 20/20、61 B 19/181、62 B 20/74、63 B 9/180、263 B 1/179、276 B 20/25、277 B 20/134、1,511 B 0/179、1,512 B 1/179、1,513 B 20/22、1,514 B 20/20；E2 期間恢復觸發 0 → 5。不是單純的 mod 4。
+- 收尾 map：新 `--until` 停在提示字元後、3,013 B，新 MB 三閘門全中。**`check-predictions` 75 of 78** —— 卡片 `cells` 圍欄把一輪的 `looprun` 產物寫成 `D1Q-r01-*`，實際是 `D1Q-ab2/2a/boot`（`CORRECTIONS-block45.md` § 1）。
+
+### 七、我自己的錯
+
+- **改日期估 2–3 h**：照抄交接清單、沒先分哪些檢查的輸入含日期。實際從決定到凍結約 12 分鐘。擁有者的「改個名字」是對的。
+- 🔴 **PowerShell 內嵌 `wsl -- bash -c "…$?…"` 讀出 `rc=0`，實際是 1**（`hcg2.py` 的時間拒絕）—— `CLAUDE.md` 明文禁止；之後一律寫成檔案讀。`redate_proof` 的 `rc=0` 也是這樣讀的，它的判定靠印出的 `PROOF: PASS` 與 `SELF-TEST: PASS`，不靠 rc。
+- 在 `CORRECTIONS` § 2 寫「The owner powered off after it」，擁有者還沒回報 —— 寫入後自己抓到、改成「was then asked」。
+- block 45 的 `D1Q-r01-*`：從兩輪的 block 44 抄名字，沒從一輪的執行讀。
+- 自己的閘門測試腳本給 `flashmap` 加了 `--no-controls` 又只收 stdout，6 個假失敗；`cardnum` 的 map-until 列把說明文字也數進去。兩個都被自己的檢查抓到、生成前修好。
+- 一次 PowerShell 的錨點改寫在寫入前就被自己的錨點檢查拒絕（該有的樣子）。
+
+### 八、隱私稽核（commit 前）
+
+- `audit-bench-log`：兩個新命中 —— `Z9-D2A.log` 的 D2 腳本路徑（`/home/key/…`）、`D0-ETH.log` 的 `supports-eeprom-access: no`（主機網卡的能力行）。各加一條限定該行的白名單（附理由）；之後今晚兩個目錄與整個 `bench/` 都 rc 0。
+- `flashwin scan --dump`：兩個目錄都 CLEAN（623＋177 檔，113 個探針）。
+- `leakscan --attribute`：UNIT 1 在 `upstream/BENCH-LOG.md:216` —— 第十四段就量到、`FLS-22` 記錄的上游唯讀子模組，不是今晚的擷取。
+
+### 九、沒做的（交給下一段）
+
+- `P2-4` 的完整紀錄：`D3`（兩欄 ±10 %）、`D7`、`D8`、三個推論、tick 括號；每一個新發現進它的擁有檔與 `SPEC.md`（醒來重置對時節奏、`chronyd` 最大斜率段、`tick 10001` 狀態、`D2` 上機 B、MB 缺陷與修正、`--until` 的讀取窗、block 45 的六列結果、`NET-115` 的改讀、`r8153_ecm`、直方圖不數 64 B、`sudo -n`）。
+- `P2-5`；`citime record`（`5780932` 及之後）；`CLAUDE.md` `--until` 那句；完整的 desk-sweep；block 45 由哪個 gate 記錄（擁有者）；study 檔。

@@ -1,0 +1,10 @@
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-25 01:39 CST
+Nmap scan report for 10.1.1.1
+Host is up (0.074s latency).
+Not shown: 65532 closed tcp ports (conn-refused)
+PORT      STATE SERVICE
+80/tcp    open  http
+52869/tcp open  unknown
+52881/tcp open  unknown
+
+Nmap done: 1 IP address (1 host up) scanned in 35.79 seconds

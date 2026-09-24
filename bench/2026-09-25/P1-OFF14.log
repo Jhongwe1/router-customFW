@@ -1,0 +1,4 @@
+sleep 1 ; busybox traceroute -n -m 1 -q 1 -w 2 -p 49999 10.1.1.2
+traceroute to 10.1.1.2 (10.1.1.2), 1 hops max, 38 byte packets
+ 1  *
+# 

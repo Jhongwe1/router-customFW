@@ -1,0 +1,152 @@
+{
+  "tool": "hostprobe",
+  "tool_version": "1.3",
+  "clock": "CLOCK_MONOTONIC_RAW",
+  "target": "10.1.1.3",
+  "args": {
+    "out": "bench/2026-09-25/P1-HP",
+    "target": "10.1.1.3",
+    "seconds": 900.0,
+    "icmp": true,
+    "icmp_interval": 0.05,
+    "lag_threshold_ms": 1.0,
+    "tcp": [],
+    "tcp_interval": 0.2,
+    "tcp_timeout": 1.0,
+    "neigh": true,
+    "neigh_interval": 0.2,
+    "udp_listen": [],
+    "until": [],
+    "ping": "ping",
+    "ip": "ip",
+    "force": false
+  },
+  "start_raw": 3003.146934,
+  "start_real": 1790267359.077067,
+  "started_wallclock": "2026-09-25T00:29:19+0800",
+  "end_raw": 3191.044958,
+  "end_real": 1790267546.983626,
+  "stop_decided_raw": 3191.043543,
+  "mono_at_start": 2989.560857,
+  "mono_at_end": 3177.467416,
+  "boot_id": "ef62493d-746f-4d68-8a64-8fb9717bc6cb",
+  "clocksource": "tsc",
+  "clocksource_end": "tsc",
+  "ping": {
+    "path": "/usr/bin/ping",
+    "version": "ping from iputils 20240117",
+    "release": 20240117,
+    "interval_s": 0.05,
+    "interval_ms_effective": 50,
+    "pid": 5970,
+    "argv": [
+      "/usr/bin/ping",
+      "-D",
+      "-O",
+      "-n",
+      "-i",
+      "0.050",
+      "10.1.1.3"
+    ],
+    "started_raw": 3003.148496,
+    "achieved_interval_ms": {
+      "n": 1366,
+      "median": 53.724,
+      "min": 0.0,
+      "max": 60.55
+    },
+    "stopped_by": "SIGINT",
+    "rc": 0,
+    "exited_early": false,
+    "statistics": {
+      "transmitted": 1303,
+      "received": 753
+    },
+    "icmp_lines": 3711,
+    "other_lines": {
+      "header": 1,
+      "dup": 0,
+      "truncated": 0,
+      "error": 462,
+      "summary": 3,
+      "other": 0,
+      "stderr": 0
+    },
+    "no_timestamp_lines": 0,
+    "max_icmp_lines_per_read": 11,
+    "reads_with_several_icmp_lines": 11,
+    "statistics_agree": true
+  },
+  "icmp_lag_ms": {
+    "n": 3711,
+    "median": 0.118,
+    "max": 4.353,
+    "min": 0.023,
+    "over_threshold": 15,
+    "threshold_ms": 1.0
+  },
+  "udp_lag_ms": {
+    "n": 0,
+    "median": null,
+    "min": null,
+    "max": null
+  },
+  "tcp": null,
+  "neigh": {
+    "argv": [
+      "/usr/sbin/ip",
+      "-4",
+      "neigh",
+      "show",
+      "10.1.1.3",
+      "dev",
+      "enxfc19286184c9"
+    ],
+    "interval_s": 0.2,
+    "polls": 936,
+    "errors": 0,
+    "poll_ms": {
+      "n": 936,
+      "median": 1.104,
+      "min": 0.736,
+      "max": 4.582
+    },
+    "achieved_interval_ms": {
+      "n": 935,
+      "median": 200.708,
+      "min": 200.416,
+      "max": 202.44
+    }
+  },
+  "udp": null,
+  "route": {
+    "dev": "enxfc19286184c9",
+    "src": "10.1.1.2"
+  },
+  "counts": {
+    "icmp-reply": 753,
+    "icmp-silent": 2958,
+    "neigh": 25,
+    "start": 1,
+    "stop": 1
+  },
+  "first": {
+    "icmp-reply": 3024.593414,
+    "icmp-silent": 3003.206248,
+    "neigh": 3003.150425,
+    "neigh:NONE": 3003.150425,
+    "neigh:INCOMPLETE": 3003.350649,
+    "neigh:FAILED": 3018.620756,
+    "neigh:REACHABLE": 3024.655976
+  },
+  "stop_reason": "SIGINT",
+  "problems": [],
+  "exit_code": 0,
+  "addresses": {
+    "allowlist": "tools/audit-bench-log.py",
+    "loaded": true,
+    "allowlisted": 7,
+    "why_not": null,
+    "unlisted": 0
+  }
+}

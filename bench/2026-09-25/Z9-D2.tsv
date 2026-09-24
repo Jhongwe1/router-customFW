@@ -1,0 +1,721 @@
+# boot-timeline.py --retro, tool sha256 a541392a0ffe7216f176f5f50995cc6eac0bcc4a384aa407a082037d5219ec7c, paths: bench/2026-09-25
+# one record per line; columns unused by a record are empty; seconds
+# records: loader seg lm kboot cell nothing fragment class? term1 term1cell reset scale scalefit
+record	firmware	variant	class	image	directory	capture	quantity	from	to	seg_class	n	value	median	min	max	p90	argmax	ratio	slope	ci_lo	ci_hi	r	note
+loader			cold		bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	loader.booting				1	0.351504											
+loader			cold		bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	loader.banner				1	0.581514											
+loader			cold		bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	loader.esc				1	5.238773											
+loader			cold		bench/2026-09-25	bench/2026-09-25/M2-A.log	loader.booting				1	0.356084											
+loader			cold		bench/2026-09-25	bench/2026-09-25/M2-A.log	loader.banner				1	0.586178											
+loader			warm		bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	loader.booting				1	0.356390											
+loader			warm		bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	loader.banner				1	0.597166											
+loader			warm		bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	loader.esc				1	5.237828											
+loader			cold		bench/2026-09-25	bench/2026-09-25/P1-A.log	loader.booting				1	0.356068											
+loader			cold		bench/2026-09-25	bench/2026-09-25/P1-A.log	loader.banner				1	0.586094											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1-RZ.log	loader.booting				1	0.356981											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1-RZ.log	loader.banner				1	0.596783											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1L-r02-rz.log	loader.booting				1	0.356068											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1L-r02-rz.log	loader.banner				1	0.597136											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1L-r03-rz.log	loader.booting				1	0.355713											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1L-r03-rz.log	loader.banner				1	0.596019											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1Q-r02-rz.log	loader.booting				1	0.356155											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1Q-r02-rz.log	loader.banner				1	0.596997											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1Q-r03-rz.log	loader.booting				1	0.356140											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1Q-r03-rz.log	loader.banner				1	0.596998											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1Q-r04-rz.log	loader.booting				1	0.355694											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P1Q-r04-rz.log	loader.banner				1	0.595915											
+loader			cold		bench/2026-09-25	bench/2026-09-25/P2-A.log	loader.booting				1	0.355626											
+loader			cold		bench/2026-09-25	bench/2026-09-25/P2-A.log	loader.banner				1	0.585971											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P2Q-r02-rz.log	loader.booting				1	0.355917											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P2Q-r02-rz.log	loader.banner				1	0.596842											
+loader			cold		bench/2026-09-25	bench/2026-09-25/P3-A.log	loader.booting				1	0.356327											
+loader			cold		bench/2026-09-25	bench/2026-09-25/P3-A.log	loader.banner				1	0.585824											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P3Q-r02-rz.log	loader.booting				1	0.355717											
+loader			warm		bench/2026-09-25	bench/2026-09-25/P3Q-r02-rz.log	loader.banner				1	0.595782											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V1-A.log	loader.booting				1	0.355328											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V1-A.log	loader.banner				1	0.584979											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V2-A.log	loader.booting				1	0.355855											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V2-A.log	loader.banner				1	0.586138											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V3-A.log	loader.booting				1	0.355921											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V3-A.log	loader.banner				1	0.586157											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V4-A.log	loader.booting				1	0.355587											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V4-A.log	loader.banner				1	0.585756											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V4-WZ.log	loader.booting				1	0.355618											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V4-WZ.log	loader.banner				1	0.596023											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V5-A.log	loader.booting				1	0.355514											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V5-A.log	loader.banner				1	0.585957											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V5-WZ.log	loader.booting				1	0.355645											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V5-WZ.log	loader.banner				1	0.595969											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V6-A.log	loader.booting				1	0.355875											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V6-A.log	loader.banner				1	0.585938											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V6-WZ.log	loader.booting				1	0.356060											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V6-WZ.log	loader.banner				1	0.595963											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V7-A.log	loader.booting				1	0.356368											
+loader			cold		bench/2026-09-25	bench/2026-09-25/V7-A.log	loader.banner				1	0.586455											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V7-WZ.log	loader.booting				1	0.356461											
+loader			warm		bench/2026-09-25	bench/2026-09-25/V7-WZ.log	loader.banner				1	0.596007											
+cell	loader		cold	pooled			loader.booting	booting	chipname	identical	12		0.355865	0.351504	0.356368								
+cell	loader		warm	pooled			loader.booting	booting	chipname	identical	13		0.356060	0.355618	0.356981								
+cell	loader		?	pooled			loader.booting	booting	chipname	identical	0												
+cell	loader		cold	pooled			loader.banner	booting	banner	identical	12		0.585964	0.581514	0.586455								
+cell	loader		warm	pooled			loader.banner	booting	banner	identical	13		0.596023	0.595782	0.597166								
+cell	loader		?	pooled			loader.banner	booting	banner	identical	0												
+cell	loader		cold	pooled			loader.esc	banner	autoboot	identical	1		5.238773	5.238773	5.238773								
+cell	loader		warm	pooled			loader.esc	banner	autoboot	identical	1		5.237828	5.237828	5.237828								
+cell	loader		?	pooled			loader.esc	banner	autoboot	identical	0												
+cell	vendor	-	cold	pooled			rtkload.decompress	decomp	decomp_done	comparable	4		1.060132	1.060009	1.060254								
+cell	vendor	-	warm	pooled			rtkload.decompress	decomp	decomp_done	comparable	5		1.060100	1.060010	1.060331								
+cell	vendor	-	?	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	vendor	-	cold	pooled			rtkload.total	jump	kentry	comparable	4		1.073615	1.070754	1.078224								
+cell	vendor	-	warm	pooled			rtkload.total	jump	kentry	comparable	5		1.074413	1.071984	1.078121								
+cell	vendor	-	?	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	vendor	-	cold	pooled			kernel.early	kentry	wlan	comparable	4		0.666928	0.666356	0.667080								
+cell	vendor	-	warm	pooled			kernel.early	kentry	wlan	comparable	5		0.666669	0.666399	0.668028								
+cell	vendor	-	?	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	vendor	-	cold	pooled			kernel.wlan	wlan	nic	comparable	4		4.623158	4.622836	4.623566								
+cell	vendor	-	warm	pooled			kernel.wlan	wlan	nic	comparable	5		4.622567	4.621975	4.625934								
+cell	vendor	-	?	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	vendor	-	cold	pooled			kernel.nic	nic	fastpath	comparable	4		0.834141	0.833982	0.834436								
+cell	vendor	-	warm	pooled			kernel.nic	nic	fastpath	comparable	5		0.834322	0.831350	0.834775								
+cell	vendor	-	?	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	vendor	-	cold	pooled			kernel.late	fastpath	userinit	comparable	4		0.973704	0.973402	0.973907								
+cell	vendor	-	warm	pooled			kernel.late	fastpath	userinit	comparable	5		0.974138	0.973746	0.986002								
+cell	vendor	-	?	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	vendor	-	cold	pooled			kernel.total	kentry	userinit	comparable	4		7.097987	7.097306	7.098145								
+cell	vendor	-	warm	pooled			kernel.total	kentry	userinit	comparable	5		7.098146	7.097453	7.109743								
+cell	vendor	-	?	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	vendor	-	cold	pooled			user.ready	userinit	ready	not-comparable	4		18.684909	18.656161	18.802760								
+cell	vendor	-	warm	pooled			user.ready	userinit	ready	not-comparable	5		18.660134	17.677930	18.862950								
+cell	vendor	-	?	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	vendor	-	cold	pooled			boot.jump_to_ready	jump	ready	not-comparable	4		26.858313	26.828089	26.971659								
+cell	vendor	-	warm	pooled			boot.jump_to_ready	jump	ready	not-comparable	5		26.836990	25.851886	27.035197								
+cell	vendor	-	?	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			rtkload.decompress	decomp	decomp_done	comparable	2		1.217980	1.217956	1.218004								
+cell	rlxfw	quiet	warm	pooled			rtkload.decompress	decomp	decomp_done	comparable	6		1.217587	1.216993	1.218285								
+cell	rlxfw	quiet	?	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	quiet	cold	pooled			rtkload.total	jump	kentry	comparable	2		1.231186	1.229057	1.233314								
+cell	rlxfw	quiet	warm	pooled			rtkload.total	jump	kentry	comparable	6		1.230987	1.229956	1.232254								
+cell	rlxfw	quiet	?	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.early	kentry	wlan	comparable	2		0.822039	0.822030	0.822048								
+cell	rlxfw	quiet	warm	pooled			kernel.early	kentry	wlan	comparable	6		0.821913	0.821267	0.822190								
+cell	rlxfw	quiet	?	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.wlan	wlan	nic	comparable	2		4.597359	4.597089	4.597628								
+cell	rlxfw	quiet	warm	pooled			kernel.wlan	wlan	nic	comparable	6		4.597584	4.597131	4.605920								
+cell	rlxfw	quiet	?	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.nic	nic	fastpath	comparable	2		0.860345	0.860160	0.860530								
+cell	rlxfw	quiet	warm	pooled			kernel.nic	nic	fastpath	comparable	6		0.860623	0.851536	0.861355								
+cell	rlxfw	quiet	?	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.late	fastpath	userinit	comparable	2		3.165760	3.165456	3.166064								
+cell	rlxfw	quiet	warm	pooled			kernel.late	fastpath	userinit	comparable	6		3.165525	3.165364	3.165801								
+cell	rlxfw	quiet	?	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.total	kentry	userinit	comparable	2		9.445502	9.445123	9.445882								
+cell	rlxfw	quiet	warm	pooled			kernel.total	kentry	userinit	comparable	6		9.445702	9.445069	9.446463								
+cell	rlxfw	quiet	?	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	quiet	cold	pooled			user.ready	userinit	ready	not-comparable	2		0.116628	0.116111	0.117145								
+cell	rlxfw	quiet	warm	pooled			user.ready	userinit	ready	not-comparable	6		0.116047	0.115471	0.116307								
+cell	rlxfw	quiet	?	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			boot.jump_to_ready	jump	ready	not-comparable	2		10.793316	10.791050	10.795582								
+cell	rlxfw	quiet	warm	pooled			boot.jump_to_ready	jump	ready	not-comparable	6		10.792753	10.790948	10.794228								
+cell	rlxfw	quiet	?	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			rlxfw.setup	b00	b09	not-comparable	2		0.047383	0.047358	0.047407								
+cell	rlxfw	quiet	warm	pooled			rlxfw.setup	b00	b09	not-comparable	6		0.047223	0.047093	0.047440								
+cell	rlxfw	quiet	?	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			rlxfw.initpost	b10	userinit	not-comparable	2		0.011902	0.011645	0.012158								
+cell	rlxfw	quiet	warm	pooled			rlxfw.initpost	b10	userinit	not-comparable	6		0.011997	0.011823	0.012722								
+cell	rlxfw	quiet	?	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			rtkload.decompress	decomp	decomp_done	comparable	1		1.248109	1.248109	1.248109								
+cell	rlxfw	loud	warm	pooled			rtkload.decompress	decomp	decomp_done	comparable	2		1.247269	1.247053	1.247484								
+cell	rlxfw	loud	?	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	loud	cold	pooled			rtkload.total	jump	kentry	comparable	1		1.260637	1.260637	1.260637								
+cell	rlxfw	loud	warm	pooled			rtkload.total	jump	kentry	comparable	2		1.262339	1.261662	1.263017								
+cell	rlxfw	loud	?	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.early	kentry	wlan	comparable	1		1.523894	1.523894	1.523894								
+cell	rlxfw	loud	warm	pooled			kernel.early	kentry	wlan	comparable	2		1.524926	1.524901	1.524951								
+cell	rlxfw	loud	?	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.wlan	wlan	nic	comparable	1		5.207950	5.207950	5.207950								
+cell	rlxfw	loud	warm	pooled			kernel.wlan	wlan	nic	comparable	2		5.207031	5.207017	5.207046								
+cell	rlxfw	loud	?	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.nic	nic	fastpath	comparable	1		1.240909	1.240909	1.240909								
+cell	rlxfw	loud	warm	pooled			kernel.nic	nic	fastpath	comparable	2		1.240989	1.240976	1.241001								
+cell	rlxfw	loud	?	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.late	fastpath	userinit	comparable	1		3.182861	3.182861	3.182861								
+cell	rlxfw	loud	warm	pooled			kernel.late	fastpath	userinit	comparable	2		3.183365	3.183160	3.183571								
+cell	rlxfw	loud	?	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.total	kentry	userinit	comparable	1		11.155614	11.155614	11.155614								
+cell	rlxfw	loud	warm	pooled			kernel.total	kentry	userinit	comparable	2		11.156312	11.156054	11.156569								
+cell	rlxfw	loud	?	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	loud	cold	pooled			user.ready	userinit	ready	not-comparable	1		0.118239	0.118239	0.118239								
+cell	rlxfw	loud	warm	pooled			user.ready	userinit	ready	not-comparable	2		0.117668	0.117483	0.117854								
+cell	rlxfw	loud	?	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			boot.jump_to_ready	jump	ready	not-comparable	1		12.534490	12.534490	12.534490								
+cell	rlxfw	loud	warm	pooled			boot.jump_to_ready	jump	ready	not-comparable	2		12.536320	12.535714	12.536925								
+cell	rlxfw	loud	?	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			rlxfw.setup	b00	b09	not-comparable	1		0.293701	0.293701	0.293701								
+cell	rlxfw	loud	warm	pooled			rlxfw.setup	b00	b09	not-comparable	2		0.278137	0.277730	0.278543								
+cell	rlxfw	loud	?	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			rlxfw.initpost	b10	userinit	not-comparable	1		0.011702	0.011702	0.011702								
+cell	rlxfw	loud	warm	pooled			rlxfw.initpost	b10	userinit	not-comparable	2		0.012312	0.012175	0.012449								
+cell	rlxfw	loud	?	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	2		1.217980	1.217956	1.218004								
+cell	rlxfw	quiet	warm	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	6		1.217587	1.216993	1.218285								
+cell	rlxfw	quiet	?	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rtkload.total	jump	kentry	comparable	2		1.231186	1.229057	1.233314								
+cell	rlxfw	quiet	warm	A2C56BC8			rtkload.total	jump	kentry	comparable	6		1.230987	1.229956	1.232254								
+cell	rlxfw	quiet	?	A2C56BC8			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.early	kentry	wlan	comparable	2		0.822039	0.822030	0.822048								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.early	kentry	wlan	comparable	6		0.821913	0.821267	0.822190								
+cell	rlxfw	quiet	?	A2C56BC8			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.wlan	wlan	nic	comparable	2		4.597359	4.597089	4.597628								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.wlan	wlan	nic	comparable	6		4.597584	4.597131	4.605920								
+cell	rlxfw	quiet	?	A2C56BC8			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.nic	nic	fastpath	comparable	2		0.860345	0.860160	0.860530								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.nic	nic	fastpath	comparable	6		0.860623	0.851536	0.861355								
+cell	rlxfw	quiet	?	A2C56BC8			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.late	fastpath	userinit	comparable	2		3.165760	3.165456	3.166064								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.late	fastpath	userinit	comparable	6		3.165525	3.165364	3.165801								
+cell	rlxfw	quiet	?	A2C56BC8			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.total	kentry	userinit	comparable	2		9.445502	9.445123	9.445882								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.total	kentry	userinit	comparable	6		9.445702	9.445069	9.446463								
+cell	rlxfw	quiet	?	A2C56BC8			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			user.ready	userinit	ready	not-comparable	2		0.116628	0.116111	0.117145								
+cell	rlxfw	quiet	warm	A2C56BC8			user.ready	userinit	ready	not-comparable	6		0.116047	0.115471	0.116307								
+cell	rlxfw	quiet	?	A2C56BC8			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	2		10.793316	10.791050	10.795582								
+cell	rlxfw	quiet	warm	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	6		10.792753	10.790948	10.794228								
+cell	rlxfw	quiet	?	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	2		0.047383	0.047358	0.047407								
+cell	rlxfw	quiet	warm	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	6		0.047223	0.047093	0.047440								
+cell	rlxfw	quiet	?	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	2		0.011902	0.011645	0.012158								
+cell	rlxfw	quiet	warm	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	6		0.011997	0.011823	0.012722								
+cell	rlxfw	quiet	?	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	1		1.248109	1.248109	1.248109								
+cell	rlxfw	loud	warm	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	2		1.247269	1.247053	1.247484								
+cell	rlxfw	loud	?	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			rtkload.total	jump	kentry	comparable	1		1.260637	1.260637	1.260637								
+cell	rlxfw	loud	warm	A2C56BC8			rtkload.total	jump	kentry	comparable	2		1.262339	1.261662	1.263017								
+cell	rlxfw	loud	?	A2C56BC8			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			kernel.early	kentry	wlan	comparable	1		1.523894	1.523894	1.523894								
+cell	rlxfw	loud	warm	A2C56BC8			kernel.early	kentry	wlan	comparable	2		1.524926	1.524901	1.524951								
+cell	rlxfw	loud	?	A2C56BC8			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			kernel.wlan	wlan	nic	comparable	1		5.207950	5.207950	5.207950								
+cell	rlxfw	loud	warm	A2C56BC8			kernel.wlan	wlan	nic	comparable	2		5.207031	5.207017	5.207046								
+cell	rlxfw	loud	?	A2C56BC8			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			kernel.nic	nic	fastpath	comparable	1		1.240909	1.240909	1.240909								
+cell	rlxfw	loud	warm	A2C56BC8			kernel.nic	nic	fastpath	comparable	2		1.240989	1.240976	1.241001								
+cell	rlxfw	loud	?	A2C56BC8			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			kernel.late	fastpath	userinit	comparable	1		3.182861	3.182861	3.182861								
+cell	rlxfw	loud	warm	A2C56BC8			kernel.late	fastpath	userinit	comparable	2		3.183365	3.183160	3.183571								
+cell	rlxfw	loud	?	A2C56BC8			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			kernel.total	kentry	userinit	comparable	1		11.155614	11.155614	11.155614								
+cell	rlxfw	loud	warm	A2C56BC8			kernel.total	kentry	userinit	comparable	2		11.156312	11.156054	11.156569								
+cell	rlxfw	loud	?	A2C56BC8			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			user.ready	userinit	ready	not-comparable	1		0.118239	0.118239	0.118239								
+cell	rlxfw	loud	warm	A2C56BC8			user.ready	userinit	ready	not-comparable	2		0.117668	0.117483	0.117854								
+cell	rlxfw	loud	?	A2C56BC8			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	1		12.534490	12.534490	12.534490								
+cell	rlxfw	loud	warm	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	2		12.536320	12.535714	12.536925								
+cell	rlxfw	loud	?	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	1		0.293701	0.293701	0.293701								
+cell	rlxfw	loud	warm	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	2		0.278137	0.277730	0.278543								
+cell	rlxfw	loud	?	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	loud	cold	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	1		0.011702	0.011702	0.011702								
+cell	rlxfw	loud	warm	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	2		0.012312	0.012175	0.012449								
+cell	rlxfw	loud	?	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	0												
+kboot	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log																	its own C-8 line; `init started: BusyBox v1.13.4`
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	loader.booting	booting	chipname	identical	1	0.351504											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	loader.banner	booting	banner	identical	1	0.581514											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	loader.esc	banner	autoboot	identical	1	5.238773											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060254											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.078224											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.666356											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.623566											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.833982											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.973402											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.097306											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.658779											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.834309											
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	booting					12.574082											byte 14
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	chipname					12.925586											byte 15
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	ramsize					12.931967											byte 34
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	banner					13.155596											byte 51
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	autoboot					18.394369											byte 118
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	jump					18.394369											byte 118
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	decomp					18.404685											byte 153
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	decomp_done					19.464939											byte 226
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	kentry					19.472593											byte 254
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	wlan					20.138949											byte 281
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	nic					24.762515											byte 531
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	fastpath					25.596497											byte 858
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	userinit					26.569899											byte 883
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	ready					45.228678											byte 1862
+kboot	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log																	its own C-8 line; `init started: BusyBox v1.13.4`
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	loader.booting	booting	chipname	identical	1	0.356390											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	loader.banner	booting	banner	identical	1	0.597166											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	loader.esc	banner	autoboot	identical	1	5.237828											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060331											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.078121											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.666807											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.623468											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.834322											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.974138											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.098735											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.660134											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.836990											
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	booting					0.021550											byte 55
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	chipname					0.377940											byte 56
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	ramsize					0.383768											byte 75
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	banner					0.618716											byte 129
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	autoboot					5.856544											byte 196
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	jump					5.856544											byte 196
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	decomp					5.866460											byte 231
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	decomp_done					6.926791											byte 304
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	kentry					6.934665											byte 332
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	wlan					7.601472											byte 359
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	nic					12.224940											byte 609
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	fastpath					13.059262											byte 936
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	userinit					14.033400											byte 961
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	ready					32.693534											byte 1940
+kboot	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log																	inherited from P1-A; `RLXFW-B00`
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.248109											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	rtkload.total	jump	kentry	comparable	1	1.260637											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	kernel.early	kentry	wlan	comparable	1	1.523894											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	kernel.wlan	wlan	nic	comparable	1	5.207950											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	kernel.nic	nic	fastpath	comparable	1	1.240909											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	kernel.late	fastpath	userinit	comparable	1	3.182861											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	kernel.total	kentry	userinit	comparable	1	11.155614											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	user.ready	userinit	ready	not-comparable	1	0.118239											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	12.534490											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.293701											
+seg	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.011702											
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	jump					0.010810											byte 12
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	decomp					0.015263											byte 41
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	decomp_done					1.263372											byte 114
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	kentry					1.271447											byte 142
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	b00					1.291593											byte 169
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	b09					1.585294											byte 1116
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	wlan					2.795341											byte 3070
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	nic					8.003291											byte 5217
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	fastpath					9.244200											byte 7064
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	b10					12.415359											byte 7620
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	userinit					12.427061											byte 7631
+lm	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	ready					12.545300											byte 7946
+kboot	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log																	inherited from P1L-r02-rz; `RLXFW-B00`
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.247053											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	rtkload.total	jump	kentry	comparable	1	1.261662											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	kernel.early	kentry	wlan	comparable	1	1.524951											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	kernel.wlan	wlan	nic	comparable	1	5.207046											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	kernel.nic	nic	fastpath	comparable	1	1.241001											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	kernel.late	fastpath	userinit	comparable	1	3.183571											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	kernel.total	kentry	userinit	comparable	1	11.156569											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	user.ready	userinit	ready	not-comparable	1	0.117483											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	12.535714											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.278543											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.012449											
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	jump					0.009017											byte 12
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	decomp					0.015666											byte 41
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	decomp_done					1.262719											byte 114
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	kentry					1.270679											byte 142
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	b00					1.291116											byte 169
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	b09					1.569659											byte 1116
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	wlan					2.795630											byte 3070
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	nic					8.002676											byte 5217
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	fastpath					9.243677											byte 7064
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	b10					12.414799											byte 7620
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	userinit					12.427248											byte 7631
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	ready					12.544731											byte 7946
+kboot	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log																	inherited from P1L-r03-rz; `RLXFW-B00`
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.247484											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	rtkload.total	jump	kentry	comparable	1	1.263017											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	kernel.early	kentry	wlan	comparable	1	1.524901											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	kernel.wlan	wlan	nic	comparable	1	5.207017											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	kernel.nic	nic	fastpath	comparable	1	1.240976											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	kernel.late	fastpath	userinit	comparable	1	3.183160											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	kernel.total	kentry	userinit	comparable	1	11.156054											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	user.ready	userinit	ready	not-comparable	1	0.117854											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	12.536925											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.277730											
+seg	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.012175											
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	jump					0.007938											byte 12
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	decomp					0.015754											byte 41
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	decomp_done					1.263238											byte 114
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	kentry					1.270955											byte 142
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	b00					1.292086											byte 169
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	b09					1.569816											byte 1116
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	wlan					2.795856											byte 3070
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	nic					8.002873											byte 5217
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	fastpath					9.243849											byte 7064
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	b10					12.414834											byte 7620
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	userinit					12.427009											byte 7631
+lm	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	ready					12.544863											byte 7946
+kboot	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log																	inherited from P1-RZ; `RLXFW-B00`
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.216999											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	rtkload.total	jump	kentry	comparable	1	1.230863											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	kernel.early	kentry	wlan	comparable	1	0.822178											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597486											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	kernel.nic	nic	fastpath	comparable	1	0.860619											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165454											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	kernel.total	kentry	userinit	comparable	1	9.445737											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	user.ready	userinit	ready	not-comparable	1	0.116278											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.792878											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047282											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.011938											
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	jump					0.010526											byte 12
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	decomp					0.016422											byte 41
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	decomp_done					1.233421											byte 114
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	kentry					1.241389											byte 142
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	b00					1.262088											byte 169
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	b09					1.309370											byte 306
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	wlan					2.063567											byte 685
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	nic					6.661053											byte 744
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	fastpath					7.521672											byte 1291
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	b10					10.675188											byte 1789
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	userinit					10.687126											byte 1800
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	ready					10.803404											byte 2115
+kboot	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log																	inherited from P1Q-r02-rz; `RLXFW-B00`
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.218082											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	rtkload.total	jump	kentry	comparable	1	1.229956											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	kernel.early	kentry	wlan	comparable	1	0.821267											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597760											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	kernel.nic	nic	fastpath	comparable	1	0.860585											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165495											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	kernel.total	kentry	userinit	comparable	1	9.445107											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	user.ready	userinit	ready	not-comparable	1	0.115885											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.790948											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047165											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.011823											
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	jump					0.011284											byte 12
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	decomp					0.015389											byte 41
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	decomp_done					1.233471											byte 114
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	kentry					1.241240											byte 142
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	b00					1.261703											byte 169
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	b09					1.308868											byte 306
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	wlan					2.062507											byte 685
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	nic					6.660267											byte 744
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	fastpath					7.520852											byte 1291
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	b10					10.674524											byte 1789
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	userinit					10.686347											byte 1800
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	ready					10.802232											byte 2115
+kboot	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log																	inherited from P1Q-r03-rz; `RLXFW-B00`
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.218048											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	rtkload.total	jump	kentry	comparable	1	1.232254											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	kernel.early	kentry	wlan	comparable	1	0.821556											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597682											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	kernel.nic	nic	fastpath	comparable	1	0.860628											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165801											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	kernel.total	kentry	userinit	comparable	1	9.445667											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	user.ready	userinit	ready	not-comparable	1	0.116307											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.794228											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047093											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.012142											
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	jump					0.008891											byte 12
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	decomp					0.015128											byte 41
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	decomp_done					1.233176											byte 114
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	kentry					1.241145											byte 142
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	b00					1.262016											byte 169
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	b09					1.309109											byte 306
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	wlan					2.062701											byte 685
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	nic					6.660383											byte 744
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	fastpath					7.521011											byte 1291
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	b10					10.674670											byte 1789
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	userinit					10.686812											byte 1800
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	ready					10.803119											byte 2115
+kboot	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log																	inherited from P1Q-r04-rz; `RLXFW-B00`
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.217126											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	rtkload.total	jump	kentry	comparable	1	1.231111											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	kernel.early	kentry	wlan	comparable	1	0.821768											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597318											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	kernel.nic	nic	fastpath	comparable	1	0.861352											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165364											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	kernel.total	kentry	userinit	comparable	1	9.445802											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	user.ready	userinit	ready	not-comparable	1	0.116198											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.793111											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047335											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.012056											
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	jump					0.009613											byte 12
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	decomp					0.015717											byte 41
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	decomp_done					1.232843											byte 114
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	kentry					1.240724											byte 142
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	b00					1.261511											byte 169
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	b09					1.308846											byte 306
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	wlan					2.062492											byte 685
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	nic					6.659810											byte 744
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	fastpath					7.521162											byte 1291
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	b10					10.674470											byte 1789
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	userinit					10.686526											byte 1800
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	ready					10.802724											byte 2115
+kboot	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log																	inherited from P2-A; `RLXFW-B00`
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.218004											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	rtkload.total	jump	kentry	comparable	1	1.233314											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	kernel.early	kentry	wlan	comparable	1	0.822048											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597089											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	kernel.nic	nic	fastpath	comparable	1	0.860530											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165456											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	kernel.total	kentry	userinit	comparable	1	9.445123											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	user.ready	userinit	ready	not-comparable	1	0.117145											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.795582											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047358											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.011645											
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	jump					0.007723											byte 12
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	decomp					0.015005											byte 41
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	decomp_done					1.233009											byte 114
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	kentry					1.241037											byte 142
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	b00					1.261246											byte 169
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	b09					1.308604											byte 306
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	wlan					2.063085											byte 685
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	nic					6.660174											byte 744
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	fastpath					7.520704											byte 1291
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	b10					10.674515											byte 1789
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	userinit					10.686160											byte 1800
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	ready					10.803305											byte 2115
+kboot	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log																	inherited from P2Q-r02-rz; `RLXFW-B00`
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.218285											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	rtkload.total	jump	kentry	comparable	1	1.231486											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	kernel.early	kentry	wlan	comparable	1	0.822058											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	kernel.wlan	wlan	nic	comparable	1	4.605920											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	kernel.nic	nic	fastpath	comparable	1	0.851536											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165555											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	kernel.total	kentry	userinit	comparable	1	9.445069											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	user.ready	userinit	ready	not-comparable	1	0.115897											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.792452											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047165											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.011905											
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	jump					0.017595											byte 12
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	decomp					0.023036											byte 41
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	decomp_done					1.241321											byte 114
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	kentry					1.249081											byte 142
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	b00					1.269731											byte 169
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	b09					1.316896											byte 306
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	wlan					2.071139											byte 685
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	nic					6.677059											byte 744
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	fastpath					7.528595											byte 1291
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	b10					10.682245											byte 1789
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	userinit					10.694150											byte 1800
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	ready					10.810047											byte 2115
+kboot	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log																	inherited from P3-A; `RLXFW-B00`
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.217956											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	rtkload.total	jump	kentry	comparable	1	1.229057											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	kernel.early	kentry	wlan	comparable	1	0.822030											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597628											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	kernel.nic	nic	fastpath	comparable	1	0.860160											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	kernel.late	fastpath	userinit	comparable	1	3.166064											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	kernel.total	kentry	userinit	comparable	1	9.445882											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	user.ready	userinit	ready	not-comparable	1	0.116111											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.791050											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047407											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.012158											
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	jump					0.012681											byte 12
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	decomp					0.015952											byte 41
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	decomp_done					1.233908											byte 114
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	kentry					1.241738											byte 142
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	b00					1.262328											byte 169
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	b09					1.309735											byte 306
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	wlan					2.063768											byte 685
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	nic					6.661396											byte 744
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	fastpath					7.521556											byte 1291
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	b10					10.675462											byte 1789
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	userinit					10.687620											byte 1800
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	ready					10.803731											byte 2115
+kboot	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log																	inherited from P3Q-r02-rz; `RLXFW-B00`
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.216993											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	rtkload.total	jump	kentry	comparable	1	1.230694											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	kernel.early	kentry	wlan	comparable	1	0.822190											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597131											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	kernel.nic	nic	fastpath	comparable	1	0.861355											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165787											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	kernel.total	kentry	userinit	comparable	1	9.446463											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	user.ready	userinit	ready	not-comparable	1	0.115471											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.792628											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.047440											
+seg	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.012722											
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	jump					0.010236											byte 12
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	decomp					0.015950											byte 41
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	decomp_done					1.232943											byte 114
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	kentry					1.240930											byte 142
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	b00					1.261519											byte 169
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	b09					1.308959											byte 306
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	wlan					2.063120											byte 685
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	nic					6.660251											byte 744
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	fastpath					7.521606											byte 1291
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	b10					10.674671											byte 1789
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	userinit					10.687393											byte 1800
+lm	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	ready					10.802864											byte 2115
+kboot	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log																	inherited from V1-A; `init started: BusyBox v1.13.4`
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060009											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.070754											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.666851											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.622951											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.834436											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.973907											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.098145											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.802760											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.971659											
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	jump					0.014161											byte 12
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	decomp					0.016806											byte 41
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	decomp_done					1.076815											byte 114
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	kentry					1.084915											byte 142
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	wlan					1.751766											byte 169
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	nic					6.374717											byte 419
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	fastpath					7.209153											byte 746
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	userinit					8.183060											byte 771
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	ready					26.985820											byte 1750
+kboot	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log																	inherited from V2-A; `init started: BusyBox v1.13.4`
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060175											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.073260											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.667080											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.622836											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.834240											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.973861											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.098017											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.711039											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.882316											
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	jump					0.010078											byte 12
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	decomp					0.015339											byte 41
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	decomp_done					1.075514											byte 114
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	kentry					1.083338											byte 142
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	wlan					1.750418											byte 169
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	nic					6.373254											byte 419
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	fastpath					7.207494											byte 746
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	userinit					8.181355											byte 771
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	ready					26.892394											byte 1750
+kboot	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log																	inherited from V3-A; `init started: BusyBox v1.13.4`
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060088											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.073971											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.667004											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.623365											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.834042											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.973546											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.097957											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.656161											
+seg	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.828089											
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	jump					0.010047											byte 12
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	decomp					0.015942											byte 41
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	decomp_done					1.076030											byte 114
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	kentry					1.084018											byte 142
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	wlan					1.751022											byte 169
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	nic					6.374387											byte 419
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	fastpath					7.208429											byte 746
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	userinit					8.181975											byte 771
+lm	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	ready					26.838136											byte 1750
+kboot	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log																	inherited from V4-WZ; `init started: BusyBox v1.13.4`
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060010											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.071984											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.666399											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.622567											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.834775											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.986002											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.109743											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.641293											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.823020											
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	jump					0.014741											byte 12
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	decomp					0.018784											byte 41
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	decomp_done					1.078794											byte 114
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	kentry					1.086725											byte 142
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	wlan					1.753124											byte 169
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	nic					6.375691											byte 419
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	fastpath					7.210466											byte 746
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	userinit					8.196468											byte 771
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	ready					26.837761											byte 1750
+kboot	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log																	inherited from V5-WZ; `init started: BusyBox v1.13.4`
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060142											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.074413											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.666669											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.625934											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.831350											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.973881											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.097834											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.862950											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	27.035197											
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	jump					0.010053											byte 12
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	decomp					0.016324											byte 41
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	decomp_done					1.076466											byte 114
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	kentry					1.084466											byte 142
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	wlan					1.751135											byte 169
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	nic					6.377069											byte 419
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	fastpath					7.208419											byte 746
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	userinit					8.182300											byte 771
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	ready					27.045250											byte 1750
+kboot	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log																	inherited from V6-WZ; `init started: BusyBox v1.13.4`
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060100											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.072296											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.668028											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.621975											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.833704											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.973746											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.097453											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	user.ready	userinit	ready	not-comparable	1	18.788495											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	26.958244											
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	jump					0.011142											byte 12
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	decomp					0.015485											byte 41
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	decomp_done					1.075585											byte 114
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	kentry					1.083438											byte 142
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	wlan					1.751466											byte 169
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	nic					6.373441											byte 419
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	fastpath					7.207145											byte 746
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	userinit					8.180891											byte 771
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	ready					26.969386											byte 1750
+kboot	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log																	inherited from V7-WZ; `init started: BusyBox v1.13.4`
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.060074											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	rtkload.total	jump	kentry	comparable	1	1.075810											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	kernel.early	kentry	wlan	comparable	1	0.666569											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	kernel.wlan	wlan	nic	comparable	1	4.622478											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	kernel.nic	nic	fastpath	comparable	1	0.834638											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	kernel.late	fastpath	userinit	comparable	1	0.974461											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	kernel.total	kentry	userinit	comparable	1	7.098146											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	user.ready	userinit	ready	not-comparable	1	17.677930											
+seg	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	boot.jump_to_ready	jump	ready	not-comparable	1	25.851886											
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	jump					0.007842											byte 12
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	decomp					0.015724											byte 41
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	decomp_done					1.075798											byte 114
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	kentry					1.083652											byte 142
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	wlan					1.750221											byte 169
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	nic					6.372699											byte 419
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	fastpath					7.207337											byte 746
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	userinit					8.181798											byte 771
+lm	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	ready					25.859728											byte 1750
+term1cell	vendor						longest silence				9		4.532643	4.531528	5.219783	5.219783	bench/2026-09-25/M1-BOOT.log						
+term1cell	vendor						jump -> ready				9		26.836990	25.851886	27.035197	27.035197	bench/2026-09-25/V5-BOOT.log						
+term1cell	rlxfw quiet						longest silence				8		4.580203	4.579753	4.581293	4.581293	bench/2026-09-25/P1Q-r01-boot.log						
+term1cell	rlxfw quiet						jump -> ready				8		10.792753	10.790948	10.795582	10.795582	bench/2026-09-25/P2Q-r01-boot.log						
+term1cell	rlxfw loud						longest silence				3		3.002146	3.001308	3.002479	3.002479	bench/2026-09-25/P1L-r02-boot.log						
+term1cell	rlxfw loud						jump -> ready				3		12.535714	12.534490	12.536925	12.536925	bench/2026-09-25/P1L-r03-boot.log						
+term1cell	rlxfw quiet id0=A2C56BC8						longest silence				8		4.580203	4.579753	4.581293	4.581293	bench/2026-09-25/P1Q-r01-boot.log						
+term1cell	rlxfw quiet id0=A2C56BC8						jump -> ready				8		10.792753	10.790948	10.795582	10.795582	bench/2026-09-25/P2Q-r01-boot.log						
+term1cell	rlxfw loud id0=A2C56BC8						longest silence				3		3.002146	3.001308	3.002479	3.002479	bench/2026-09-25/P1L-r02-boot.log						
+term1cell	rlxfw loud id0=A2C56BC8						jump -> ready				3		12.535714	12.534490	12.536925	12.536925	bench/2026-09-25/P1L-r03-boot.log						
+term1	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/M1-BOOT.log	longest silence	booting	ready		1	5.219783											ends at byte 118 before autoboot
+term1	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/M2-BOOT.log	longest silence	booting	ready		1	5.219012											ends at byte 196 before autoboot
+term1	rlxfw	loud	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r01-boot.log	longest silence	jump	ready		1	3.001308											ends at byte 7502 before b10
+term1	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r02-boot.log	longest silence	jump	ready		1	3.002479											ends at byte 7502 before b10
+term1	rlxfw	loud	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1L-r03-boot.log	longest silence	jump	ready		1	3.002146											ends at byte 7502 before b10
+term1	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r01-boot.log	longest silence	jump	ready		1	4.581293											ends at byte 738 before nic
+term1	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r02-boot.log	longest silence	jump	ready		1	4.579753											ends at byte 738 before nic
+term1	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r03-boot.log	longest silence	jump	ready		1	4.580408											ends at byte 738 before nic
+term1	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P1Q-r04-boot.log	longest silence	jump	ready		1	4.580213											ends at byte 738 before nic
+term1	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r01-boot.log	longest silence	jump	ready		1	4.580069											ends at byte 738 before nic
+term1	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P2Q-r02-boot.log	longest silence	jump	ready		1	4.579879											ends at byte 738 before nic
+term1	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r01-boot.log	longest silence	jump	ready		1	4.580192											ends at byte 738 before nic
+term1	rlxfw	quiet	warm	A2C56BC8	bench/2026-09-25	bench/2026-09-25/P3Q-r02-boot.log	longest silence	jump	ready		1	4.581035											ends at byte 738 before nic
+term1	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V1-BOOT.log	longest silence	jump	ready		1	4.532101											ends at byte 258 before nic
+term1	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V2-BOOT.log	longest silence	jump	ready		1	4.532076											ends at byte 258 before nic
+term1	vendor	-	cold	-	bench/2026-09-25	bench/2026-09-25/V3-BOOT.log	longest silence	jump	ready		1	4.532268											ends at byte 258 before nic
+term1	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V4-BOOT.log	longest silence	jump	ready		1	4.531528											ends at byte 258 before nic
+term1	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V5-BOOT.log	longest silence	jump	ready		1	4.533079											ends at byte 258 before nic
+term1	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V6-BOOT.log	longest silence	jump	ready		1	4.533120											ends at byte 258 before nic
+term1	vendor	-	warm	-	bench/2026-09-25	bench/2026-09-25/V7-BOOT.log	longest silence	jump	ready		1	4.532643											ends at byte 258 before nic
+term1cell	J BFC00000						longest silence				4		1.610086	1.609655	1.610501	1.610501	bench/2026-09-25/V7-WZ.log						
+term1cell	J BFC00000						send -> prompt				4		2.304801	2.300066	2.305369	2.305369	bench/2026-09-25/V6-WZ.log						
+term1cell	busybox reboot -f						longest silence				8		1.609943	1.609176	1.610566	1.610566	bench/2026-09-25/P1Q-r02-rz.log						
+term1cell	busybox reboot -f						send -> prompt				8		2.350297	2.325391	2.355344	2.355344	bench/2026-09-25/P1-RZ.log						
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P1-RZ.log	send -> prompt				1	2.355344											send from sent_s; longest silence 1.609214 ending at byte 317
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P1L-r02-rz.log	send -> prompt				1	2.354156											send from sent_s; longest silence 1.610258 ending at byte 315
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P1L-r03-rz.log	send -> prompt				1	2.352914											send from sent_s; longest silence 1.609981 ending at byte 313
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P1Q-r02-rz.log	send -> prompt				1	2.347680											send from sent_s; longest silence 1.610566 ending at byte 212
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P1Q-r03-rz.log	send -> prompt				1	2.325391											send from sent_s; longest silence 1.609253 ending at byte 211
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P1Q-r04-rz.log	send -> prompt				1	2.340871											send from sent_s; longest silence 1.609904 ending at byte 212
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P2Q-r02-rz.log	send -> prompt				1	2.330574											send from sent_s; longest silence 1.609176 ending at byte 212
+reset	busybox reboot -f				bench/2026-09-25	bench/2026-09-25/P3Q-r02-rz.log	send -> prompt				1	2.353250											send from sent_s; longest silence 1.610046 ending at byte 214
+reset	J BFC00000				bench/2026-09-25	bench/2026-09-25/V4-WZ.log	send -> prompt				1	2.300066											send from sent_s; longest silence 1.609655 ending at byte 196
+reset	J BFC00000				bench/2026-09-25	bench/2026-09-25/V5-WZ.log	send -> prompt				1	2.304551											send from sent_s; longest silence 1.609750 ending at byte 196
+reset	J BFC00000				bench/2026-09-25	bench/2026-09-25/V6-WZ.log	send -> prompt				1	2.305369											send from sent_s; longest silence 1.610422 ending at byte 196
+reset	J BFC00000				bench/2026-09-25	bench/2026-09-25/V7-WZ.log	send -> prompt				1	2.305052											send from sent_s; longest silence 1.610501 ending at byte 196

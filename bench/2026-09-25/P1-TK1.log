@@ -1,0 +1,26 @@
+cat /proc/stat ; cat /proc/interrupts
+cpu  3993 0 14978 92065 0 0 27013 0 0
+cpu0 3993 0 14978 92065 0 0 27013 0 0
+intr 1601331 0 0 0 0 0 0 0 0 161631 0 0 0 1163569 138116 0 0 0 0 0 0 0 0 0 0 0 138015 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 43170
+btime 0
+processes 276
+procs_running 2
+procs_blocked 0
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:     161671        RLX LOPI  serial (0x20)
+ 12:    1163569        RLX LOPI  eth4 (0x20)
+ 13:     138117        RLX LOPI  rlx timer (0x620)
+ 25:     138017            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+
+ SW:     837065
+ TX:     729607
+ RX:     112958
+LNK:          0
+ERR:     837065
+# 

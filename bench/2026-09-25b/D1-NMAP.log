@@ -1,0 +1,8 @@
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-25 03:24 CST
+Warning: 10.1.1.3 giving up on port because retransmission cap hit (1).
+Nmap scan report for 10.1.1.3
+Host is up (0.085s latency).
+All 65535 scanned ports on 10.1.1.3 are in ignored states.
+Not shown: 59982 closed tcp ports (conn-refused), 5553 filtered tcp ports (no-response)
+
+Nmap done: 1 IP address (1 host up) scanned in 37.93 seconds

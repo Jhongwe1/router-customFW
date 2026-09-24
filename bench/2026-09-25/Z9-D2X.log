@@ -1,0 +1,41 @@
+  rlxfw cold                   P1-A         cold  0.5861
+  rlxfw cold                   P2-A         cold  0.5860
+  rlxfw cold                   P3-A         cold  0.5858
+  rlxfw cold                   n=3 median 0.5860
+  vendor cold                  V1-A         cold  0.5850
+  vendor cold                  V2-A         cold  0.5861
+  vendor cold                  V3-A         cold  0.5862
+  vendor cold                  n=3 median 0.5861
+  rlxfw warm                   P1L-r02-rz   warm  0.5971
+  rlxfw warm                   P1L-r03-rz   warm  0.5960
+  rlxfw warm                   P1-RZ        warm  0.5968
+  rlxfw warm                   P1Q-r02-rz   warm  0.5970
+  rlxfw warm                   P1Q-r03-rz   warm  0.5970
+  rlxfw warm                   P1Q-r04-rz   warm  0.5959
+  rlxfw warm                   P2Q-r02-rz   warm  0.5968
+  rlxfw warm                   P3Q-r02-rz   warm  0.5958
+  rlxfw warm                   n=8 median 0.5968
+  vendor warm                  V4-WZ        warm  0.5960
+  vendor warm                  V5-WZ        warm  0.5960
+  vendor warm                  V6-WZ        warm  0.5960
+  vendor warm                  V7-WZ        warm  0.5960
+  vendor warm                  n=4 median 0.5960
+  loader-only cold (context)   V4-A         cold  0.5858
+  loader-only cold (context)   V5-A         cold  0.5860
+  loader-only cold (context)   V6-A         cold  0.5859
+  loader-only cold (context)   V7-A         cold  0.5865
+  loader-only cold (context)   M2-A         cold  0.5862
+  loader-only cold (context)   n=5 median 0.5860
+  mode control cold (listen)   M1-BOOT      cold  0.5815
+  mode control cold (listen)   n=1 median 0.5815
+  mode control warm (listen)   M2-BOOT      warm  0.5972
+  mode control warm (listen)   n=1 median 0.5972
+
+  D2 warm: rlxfw - vendor                              +0.0008 s  band +-0.010  within
+  D2 cold: rlxfw - vendor (a limit, n=3 a side)        -0.0002 s  band +-0.025  within
+  mode cold: M1-BOOT - rlxfw cold                      -0.0045 s  band +-0.010  within
+  mode cold: M1-BOOT - vendor cold                     -0.0046 s  band +-0.010  within
+  mode warm: M2-BOOT - rlxfw warm                      +0.0004 s  band +-0.010  within
+  mode warm: M2-BOOT - vendor warm                     +0.0012 s  band +-0.010  within
+
+D2: HOLDS

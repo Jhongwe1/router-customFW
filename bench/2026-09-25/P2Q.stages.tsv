@@ -1,0 +1,28 @@
+# looprun 1.3 stage times (LOOP-3): one row per stage per round, and round 0 is S2/S3, which run once.
+# start_raw/end_raw: absolute CLOCK_MONOTONIC_RAW, the clock console-capture 1.5 stamps on (1.2 wrote start_mono/end_mono, CLOCK_MONOTONIC: CLK-38).
+# seconds = end_raw - start_raw.  rc is the command's exit status, empty for the in-process S5c, S8 and S9 and for a skipped stage.  result is ok, FAIL and the ids of the assertions that failed, or skipped.
+# cell=P2Q attempt=1 iterations=2 skip=S2,S3,S4 boot-until='job control turned off[^#]{1,2}# ' boot-seconds=45 dwell-seconds=2.5
+# clock=CLOCK_MONOTONIC_RAW boot_id=ef62493d-746f-4d68-8a64-8fb9717bc6cb clocksource=tsc start_raw=8472.047690 mono_at_start=8458.591553 start_real=1790272828.107765
+round	stage	name	kind	start_raw	end_raw	seconds	rc	result
+0	S2	build	desk					skipped
+0	S3	assemble	desk					skipped
+1	S4	reset	bench					skipped
+1	S5	rescue	bench	8472.062986	8472.303875	0.240889	0	ok
+1	S5b	burnflag	bench	8472.308072	8474.514506	2.206435	0	ok
+1	S5c	hostlink	bench	8474.520458	8475.525806	1.005348		ok
+1	S6	upload	bench	8475.533061	8477.486215	1.953154	0	ok
+1	S6b	staged	bench	8477.489696	8479.693573	2.203877	0	ok
+1	S7	boot	bench	8479.706165	8490.691919	10.985754	0	ok
+1	S8	assert	desk	8490.699102	8490.699132	0.000031		ok
+1	S9	dwell	bench	8490.703058	8493.192056	2.488998		ok
+2	S4	reset	bench	8493.195595	8495.827070	2.631474	0	ok
+2	S5	rescue	bench	8495.832560	8496.075312	0.242752	0	ok
+2	S5b	burnflag	bench	8496.079285	8498.299085	2.219800	0	ok
+2	S5c	hostlink	bench	8498.308654	8499.318460	1.009807		ok
+2	S6	upload	bench	8499.326815	8501.268813	1.941998	0	ok
+2	S6b	staged	bench	8501.272529	8503.479088	2.206559	0	ok
+2	S7	boot	bench	8503.486469	8514.428288	10.941819	0	ok
+2	S8	assert	desk	8514.435595	8514.435628	0.000033		ok
+2	S9	dwell	bench	8514.438896	8516.928396	2.489500		ok
+# end: end_raw=8516.932669 mono_at_end=8503.476925 end_real=1790272872.993137 clocksource_end=tsc
+# status: closed -- 2 of 2 round(s), every assertion held

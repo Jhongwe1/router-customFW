@@ -1,0 +1,25 @@
+iperf3 -s -1 -f k --logfile /tmp/D1E.log > /dev/null 2>&1 & sleep 2 ; ps ; cat
+ /proc/stat
+  PID USER       VSZ STAT COMMAND
+    1 0          828 S    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+   74 0          332 S    iperf3 -s -1 -f k --logfile /tmp/D1E.log 
+   76 0          816 R    ps 
+cpu  46 0 745 60065 0 0 6055 0 0
+cpu0 46 0 745 60065 0 0 6055 0 0
+intr 272611 0 0 0 0 0 0 0 0 50262 0 0 0 87932 67540 0 0 0 0 0 0 0 0 0 0 0 66877 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 15905
+btime 0
+processes 77
+procs_running 2
+procs_blocked 0
+# 

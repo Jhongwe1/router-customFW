@@ -1,0 +1,194 @@
+cat /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/UR1.log ; cat /pr
+oc/rtl819x-nic
+cpu  112 0 2145 38534 0 0 8275 0 0
+cpu0 112 0 2145 38534 0 0 8275 0 0
+intr 257026 0 0 0 0 0 0 0 0 58942 0 0 0 99920 49132 0 0 0 0 0 0 0 0 0 0 0 49032 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 12122
+btime 0
+processes 120
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 51966
+[  6] local 10.1.1.3 port 5201 connected to 10.1.1.2 port 34043
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-1.01   sec   263 KBytes  2129 Kbits/sec  495806.534 ms  948/1140 (83%)  
+[  6]   1.01-2.06   sec   321 KBytes  2507 Kbits/sec  16.453 ms  1675/1910 (88%)  
+[  6]   2.06-3.07   sec   401 KBytes  3249 Kbits/sec  3.561 ms  1730/2023 (86%)  
+[  6]   3.07-4.01   sec   401 KBytes  3491 Kbits/sec  1.147 ms  1578/1871 (84%)  
+[  6]   4.01-5.16   sec   260 KBytes  1850 Kbits/sec  0.564 ms  1441/1631 (88%)  
+iperf3: OUT OF ORDER - incoming packet = 0 and received packet = 9651 AND SP = 9651
+[  6]   5.16-6.05   sec   258 KBytes  2378 Kbits/sec  2.656 ms  1435/1623 (88%)  
+[  6]   6.05-7.01   sec   343 KBytes  2928 Kbits/sec  0.273 ms  1402/1653 (85%)  
+[  6]   7.01-8.16   sec   260 KBytes  1850 Kbits/sec  1.575 ms  1895/2085 (91%)  
+[  6]   8.16-9.06   sec   258 KBytes  2352 Kbits/sec  1.046 ms  1415/1604 (88%)  
+[  6]   9.06-10.01  sec   343 KBytes  2959 Kbits/sec  0.294 ms  1431/1682 (85%)  
+[  6]  10.01-11.16  sec   260 KBytes  1850 Kbits/sec  1.570 ms  1883/2073 (91%)  
+[  6]  11.16-12.06  sec   258 KBytes  2352 Kbits/sec  0.771 ms  1413/1602 (88%)  
+[  6]  12.06-13.01  sec   343 KBytes  2959 Kbits/sec  0.317 ms  1418/1669 (85%)  
+[  6]  13.01-14.16  sec   260 KBytes  1850 Kbits/sec  0.949 ms  1891/2081 (91%)  
+[  6]  14.16-15.06  sec   258 KBytes  2352 Kbits/sec  1.662 ms  1425/1614 (88%)  
+[  6]  15.06-16.01  sec   343 KBytes  2959 Kbits/sec  0.595 ms  1410/1661 (85%)  
+[  6]  16.01-17.16  sec   260 KBytes  1850 Kbits/sec  1.598 ms  1898/2088 (91%)  
+[  6]  17.16-18.06  sec   258 KBytes  2352 Kbits/sec  0.677 ms  1412/1601 (88%)  
+[  6]  18.06-19.01  sec   343 KBytes  2959 Kbits/sec  0.587 ms  1434/1685 (85%)  
+[  6]  19.01-20.15  sec   260 KBytes  1867 Kbits/sec  1.926 ms  1889/2079 (91%)  
+[  6]  20.15-21.06  sec   258 KBytes  2326 Kbits/sec  0.684 ms  1405/1594 (88%)  
+[  6]  21.06-22.01  sec   343 KBytes  2959 Kbits/sec  0.300 ms  1427/1678 (85%)  
+[  6]  22.01-23.15  sec   260 KBytes  1867 Kbits/sec  2.821 ms  1898/2088 (91%)  
+[  6]  23.15-24.07  sec   258 KBytes  2301 Kbits/sec  0.543 ms  1401/1590 (88%)  
+[  6]  24.07-25.01  sec   343 KBytes  2991 Kbits/sec  0.167 ms  1444/1695 (85%)  
+[  6]  25.01-26.16  sec   260 KBytes  1850 Kbits/sec  1.606 ms  1874/2064 (91%)  
+[  6]  26.16-27.07  sec   258 KBytes  2326 Kbits/sec  0.757 ms  1410/1599 (88%)  
+[  6]  27.07-28.01  sec   343 KBytes  2991 Kbits/sec  0.308 ms  1427/1678 (85%)  
+[  6]  28.01-29.16  sec   260 KBytes  1850 Kbits/sec  1.444 ms  1892/2082 (91%)  
+[  6]  29.16-30.06  sec   257 KBytes  2340 Kbits/sec  0.602 ms  956/1144 (84%)  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-30.06  sec  0.00 Bytes  0.00 Kbits/sec  0.602 ms  46157/52587 (88%)  
+[SUM]  0.0-30.1 sec  1 datagrams received out-of-order
+[  6]  29.16-30.06  sec   257 KBytes  2340 Kbits/sec  0.602 ms  956/1144 (84%)  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-30.06  sec  71.5 MBytes  19958 Kbits/sec  0.602 ms  46157/52587 (88%)  
+[SUM]  0.0-30.1 sec  1 datagrams received out-of-order
+iperf3: the client has terminated
+version rtl819x-nic 1.4
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 57264
+n_writes 46
+n_refused 0
+n_irq 99920
+n_irq_spurious 0
+n_tx 76051
+n_rx 172940
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000008
+seen_iisr 0003320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 28499
+n_napi_complete 23854
+n_xmit 76051
+n_xmit_busy 2
+tx_mode 0
+n_tx_full 2
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/76053/0
+n_skb_fail 0
+n_tx_stop 2
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 172940/149452366 tx 76051/4653539 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15C8004
+rmdcr0_pos A15C8034
+tpdcr0_pos A15C8044
+tpdcr1_pos 00000000
+tpdcr2_pos 00000000
+tpdcr3_pos 00000000
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 2
+n_recov_fire 2
+n_recov_spurious 0
+n_recov_ok 2
+n_recov_fail 0
+n_recov_wake 2
+recov_rc 0 0 0
+recov_j_arm 12053
+recov_j_fire 12153
+ph_follow 1
+n_ph_chk 172940
+n_ph_diff 170164
+n_ph_bad 0
+n_ph_used 170164
+ph_first_w0 A15C8110
+ph_first_exp A15C8170
+ph_first_nrx 12
+ph_agree 2776
+ph_last A15C8170
+ph_last_j 4
+ph_last_bf A15CA292
+ph_last_cls 1
+tx_rings 1
+n_et_link 0
+et_link_last FFFFFFFF
+ph_test_cls -1
+ph_test_j 0
+ph_test_seen 0
+j_now 19172
+n_dsync_chk 28499
+n_dsync 27709
+dsync_last_d 4
+dsync_first_d 4
+dsync_first_rp A15C8014
+dsync_first_rm A15C8024
+dsync_first_nrx 12
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A15C8000
+mb_ring A15C8020
+tx_ring A15C8040
+bufs A15C8290
+rx_ph A15C8050
+rx_mb A15C8110
+tx_ph A15C81D0
+tx_mb A15C8230
+idle_ring A15CE290
+rx_idx 1
+tx_idx 1
+rxd0 A15C8051 len 0 f 8063 pl 03
+rxd1 A15C8069 len 0 f 8063 pl 03
+rxd2 A15C8081 len 0 f 8063 pl 03
+rxd3 A15C8099 len 0 f 8063 pl 03
+rxd4 A15C80B1 len 0 f 8063 pl 03
+rxd5 A15C80C9 len 0 f 8063 pl 03
+rxd6 A15C80E1 len 0 f 8063 pl 03
+rxd7 A15C80FB len 0 f 8063 pl 03
+txd0 A15C81D0 len 70
+txd1 A15C81E8 len 281
+txd2 A15C8200 len 64
+txd3 A15C821A len 64
+mbd0 A15C8111 ph A15C8170 ml 0
+mbd1 A15C8128 ph A15C8188 ml 64
+mbd2 A15C8140 ph A15C81A0 ml 71
+mbd3 A15C8158 ph A15C81B8 ml 70
+mbd4 A15C8170 ph A15C8110 ml 64
+mbd5 A15C8189 ph A15C8128 ml 0
+mbd6 A15C81A1 ph A15C8140 ml 0
+mbd7 A15C81BB ph A15C8158 ml 0
+rx_len 0
+rx_ph1 00400411
+rx_ph3 80630003
+rx_ph4 00090000
+# 

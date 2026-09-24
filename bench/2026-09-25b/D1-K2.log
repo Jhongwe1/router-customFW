@@ -1,0 +1,87 @@
+sleep 1 ; cat /proc/rtl865x/asicCounter
+<Port: 0>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 1>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 2>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 3>
+Rx counters
+   Rcv 800103 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 1298 pkts, Multicast 0 pkts, Broadcast 1 pkts
+   < 64: 0 pkts, 64: 26 pkts, 65 -127: 455 pkts, 128 -255: 0 pkts
+   256 - 511: 358 pkts, 512 - 1023: 20 pkts, 1024 - 1518: 440 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 154876 bytes, Unicast 273 pkts, Multicast 0 pkts
+   Broadcast 1 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 4>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Port: 5>
+Rx counters
+   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<CPU port (extension port included)>
+Rx counters
+   Rcv 0 bytes, Drop 43 pkts,etherStatsDropEvents 20
+   CRCAlignErr 996, SymbolErr 0, FragErr 1, JabberErr 678
+   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+   < 64: 0 pkts, 64: 25 pkts, 65 -127: 69 pkts, 128 -255: 0 pkts
+   256 - 511: 107 pkts, 512 - 1023: 26 pkts, 1024 - 1518: 90 pkts
+   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+   Snd 800103 bytes, Unicast 1298 pkts, Multicast 0 pkts
+   Broadcast 1 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+<Whole system counters>
+   CpuEvent 0 pkts

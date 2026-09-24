@@ -1,0 +1,10 @@
+driver: r8153_ecm
+version: 6.6.87.2-microsoft-standard-WSL
+firmware-version: RTL8153 ECM Device
+expansion-rom-version: 
+bus-info: usb-vhci_hcd.0-1
+supports-statistics: no
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: no

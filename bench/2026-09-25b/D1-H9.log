@@ -1,0 +1,41 @@
+/sys/class/net/enxfc19286184c9/statistics/collisions:0
+/sys/class/net/enxfc19286184c9/statistics/multicast:0
+/sys/class/net/enxfc19286184c9/statistics/rx_bytes:703826387
+/sys/class/net/enxfc19286184c9/statistics/rx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/rx_crc_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/rx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_frame_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_length_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_missed_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_nohandler:0
+/sys/class/net/enxfc19286184c9/statistics/rx_over_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_packets:817410
+/sys/class/net/enxfc19286184c9/statistics/tx_aborted_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_bytes:946177303
+/sys/class/net/enxfc19286184c9/statistics/tx_carrier_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/tx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/tx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_heartbeat_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_packets:1004390
+/sys/class/net/enxfc19286184c9/statistics/tx_window_errors:0
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates OutTransmits
+Ip: 2 64 7643841 0 0 0 0 0 7643532 7485262 6139 0 0 0 0 0 0 0 0 7485262
+Icmp: InMsgs InErrors InCsumErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutRateLimitGlobal OutRateLimitHost OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 18867 1628 0 3516 0 0 0 0 0 15351 0 0 0 0 21411 0 344 0 3516 0 0 0 0 17895 0 0 0 0 0
+IcmpMsg: InType0 InType3 OutType3 OutType8
+IcmpMsg: 15351 3516 3516 17895
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts InCsumErrors
+Tcp: 1 200 120000 -1 225485 683 184716 10 2 7328184 8064195 194 0 158 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+Udp: 296173 151 0 295955 0 0 0 92 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+UdpLite: 0 0 0 0 0 0 0 0 0
+TcpExt: SyncookiesSent SyncookiesRecv SyncookiesFailed EmbryonicRsts PruneCalled RcvPruned OfoPruned OutOfWindowIcmps LockDroppedIcmps ArpFilter TW TWRecycled TWKilled PAWSActive PAWSEstab DelayedACKs DelayedACKLocked DelayedACKLost ListenOverflows ListenDrops TCPHPHits TCPPureAcks TCPHPAcks TCPRenoRecovery TCPSackRecovery TCPSACKReneging TCPSACKReorder TCPRenoReorder TCPTSReorder TCPFullUndo TCPPartialUndo TCPDSACKUndo TCPLossUndo TCPLostRetransmit TCPRenoFailures TCPSackFailures TCPLossFailures TCPFastRetrans TCPSlowStartRetrans TCPTimeouts TCPLossProbes TCPLossProbeRecovery TCPRenoRecoveryFail TCPSackRecoveryFail TCPRcvCollapsed TCPBacklogCoalesce TCPDSACKOldSent TCPDSACKOfoSent TCPDSACKRecv TCPDSACKOfoRecv TCPAbortOnData TCPAbortOnClose TCPAbortOnMemory TCPAbortOnTimeout TCPAbortOnLinger TCPAbortFailed TCPMemoryPressures TCPMemoryPressuresChrono TCPSACKDiscard TCPDSACKIgnoredOld TCPDSACKIgnoredNoUndo TCPSpuriousRTOs TCPMD5NotFound TCPMD5Unexpected TCPMD5Failure TCPSackShifted TCPSackMerged TCPSackShiftFallback TCPBacklogDrop PFMemallocDrop TCPMinTTLDrop TCPDeferAcceptDrop IPReversePathFilter TCPTimeWaitOverflow TCPReqQFullDoCookies TCPReqQFullDrop TCPRetransFail TCPRcvCoalesce TCPOFOQueue TCPOFODrop TCPOFOMerge TCPChallengeACK TCPSYNChallenge TCPFastOpenActive TCPFastOpenActiveFail TCPFastOpenPassive TCPFastOpenPassiveFail TCPFastOpenListenOverflow TCPFastOpenCookieReqd TCPFastOpenBlackhole TCPSpuriousRtxHostQueues BusyPollRxPackets TCPAutoCorking TCPFromZeroWindowAdv TCPToZeroWindowAdv TCPWantZeroWindowAdv TCPSynRetrans TCPOrigDataSent TCPHystartTrainDetect TCPHystartTrainCwnd TCPHystartDelayDetect TCPHystartDelayCwnd TCPACKSkippedSynRecv TCPACKSkippedPAWS TCPACKSkippedSeq TCPACKSkippedFinWait2 TCPACKSkippedTimeWait TCPACKSkippedChallenge TCPWinProbe TCPKeepAlive TCPMTUPFail TCPMTUPSuccess TCPDelivered TCPDeliveredCE TCPAckCompressed TCPZeroWindowDrop TCPRcvQDrop TCPWqueueTooBig TCPFastOpenPassiveAltKey TcpTimeoutRehash TcpDuplicateDataRehash TCPDSACKRecvSegs TCPDSACKIgnoredDubious TCPMigrateReqSuccess TCPMigrateReqFailure TCPPLBRehash
+TcpExt: 0 0 0 0 0 0 0 0 0 0 9008 0 0 0 0 270 1 1963 0 0 2457496 635872 2707939 0 4 0 13 0 1 1 0 3 2 48 0 0 0 9 0 131 266 0 0 0 0 25407 1965 0 89 0 29626 0 0 1 0 0 0 0 0 0 73 2 0 0 0 0 1 8 0 0 0 0 0 0 0 0 0 480654 1 0 0 0 0 0 0 0 0 0 0 0 49 0 293434 0 0 0 19 6048349 7 191 0 0 0 0 40 0 0 0 0 0 0 0 6057289 0 0 0 0 0 0 130 1124 93 0 0 0 0
+IpExt: InNoRoutes InTruncatedPkts InMcastPkts OutMcastPkts InBcastPkts OutBcastPkts InOctets OutOctets InMcastOctets OutMcastOctets InBcastOctets OutBcastOctets InCsumErrors InNoECTPkts InECT1Pkts InECT0Pkts InCEPkts ReasmOverlaps
+IpExt: 0 0 0 0 92 0 2056436262 2477924370 0 0 7176 0 0 7643845 0 0 0 0
+REACHABLE

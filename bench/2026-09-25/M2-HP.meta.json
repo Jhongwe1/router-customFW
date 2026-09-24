@@ -1,0 +1,180 @@
+{
+  "tool": "hostprobe",
+  "tool_version": "1.3",
+  "clock": "CLOCK_MONOTONIC_RAW",
+  "target": "10.1.1.1",
+  "args": {
+    "out": "bench/2026-09-25/M2-HP",
+    "target": "10.1.1.1",
+    "seconds": 90.0,
+    "icmp": true,
+    "icmp_interval": 0.05,
+    "lag_threshold_ms": 1.0,
+    "tcp": [
+      80,
+      52869,
+      52881
+    ],
+    "tcp_interval": 0.2,
+    "tcp_timeout": 1.0,
+    "neigh": true,
+    "neigh_interval": 0.2,
+    "udp_listen": [],
+    "until": [],
+    "ping": "ping",
+    "ip": "ip",
+    "force": false
+  },
+  "start_raw": 10772.313532,
+  "start_real": 1790275128.387345,
+  "started_wallclock": "2026-09-25T02:38:48+0800",
+  "end_raw": 10862.315768,
+  "end_real": 1790275218.389965,
+  "stop_decided_raw": 10862.313881,
+  "mono_at_start": 10758.871134,
+  "mono_at_end": 10848.873756,
+  "boot_id": "ef62493d-746f-4d68-8a64-8fb9717bc6cb",
+  "clocksource": "tsc",
+  "clocksource_end": "tsc",
+  "ping": {
+    "path": "/usr/bin/ping",
+    "version": "ping from iputils 20240117",
+    "release": 20240117,
+    "interval_s": 0.05,
+    "interval_ms_effective": 50,
+    "pid": 87677,
+    "argv": [
+      "/usr/bin/ping",
+      "-D",
+      "-O",
+      "-n",
+      "-i",
+      "0.050",
+      "10.1.1.1"
+    ],
+    "started_raw": 10772.314545,
+    "achieved_interval_ms": {
+      "n": 1423,
+      "median": 50.742,
+      "min": 43.726,
+      "max": 58.144
+    },
+    "stopped_by": "SIGINT",
+    "rc": 0,
+    "exited_early": false,
+    "statistics": {
+      "transmitted": 1425,
+      "received": 1344
+    },
+    "icmp_lines": 1765,
+    "other_lines": {
+      "header": 1,
+      "dup": 0,
+      "truncated": 0,
+      "error": 66,
+      "summary": 3,
+      "other": 0,
+      "stderr": 0
+    },
+    "no_timestamp_lines": 0,
+    "max_icmp_lines_per_read": 1,
+    "reads_with_several_icmp_lines": 0,
+    "statistics_agree": true
+  },
+  "icmp_lag_ms": {
+    "n": 1765,
+    "median": 0.141,
+    "max": 1.739,
+    "min": 0.036,
+    "over_threshold": 6,
+    "threshold_ms": 1.0
+  },
+  "udp_lag_ms": {
+    "n": 0,
+    "median": null,
+    "min": null,
+    "max": null
+  },
+  "tcp": {
+    "attempts": 1350,
+    "aborted_at_stop": 0,
+    "interval_s": 0.2,
+    "timeout_s": 1.0
+  },
+  "neigh": {
+    "argv": [
+      "/usr/sbin/ip",
+      "-4",
+      "neigh",
+      "show",
+      "10.1.1.1",
+      "dev",
+      "enxfc19286184c9"
+    ],
+    "interval_s": 0.2,
+    "polls": 448,
+    "errors": 0,
+    "poll_ms": {
+      "n": 448,
+      "median": 1.231,
+      "min": 0.741,
+      "max": 17.25
+    },
+    "achieved_interval_ms": {
+      "n": 447,
+      "median": 200.855,
+      "min": 200.477,
+      "max": 202.061
+    }
+  },
+  "udp": null,
+  "route": {
+    "dev": "enxfc19286184c9",
+    "src": "10.1.1.2"
+  },
+  "counts": {
+    "icmp-reply": 1344,
+    "icmp-silent": 421,
+    "tcp": 1350,
+    "neigh": 3,
+    "start": 1,
+    "stop": 1
+  },
+  "first": {
+    "icmp-reply": 10794.021097,
+    "icmp-silent": 10772.374532,
+    "tcp": 10773.314749,
+    "tcp:80": 10773.314749,
+    "tcp:80:ok": 10805.114924,
+    "tcp:80:refused": 10794.116633,
+    "tcp:80:timeout": 10773.314749,
+    "tcp:80:unreachable": 10775.614465,
+    "tcp:80:error": null,
+    "tcp:52869": 10773.315554,
+    "tcp:52869:ok": 10810.515973,
+    "tcp:52869:refused": 10794.117104,
+    "tcp:52869:timeout": 10773.315554,
+    "tcp:52869:unreachable": 10775.614866,
+    "tcp:52869:error": null,
+    "tcp:52881": 10773.31596,
+    "tcp:52881:ok": 10795.517334,
+    "tcp:52881:refused": 10794.117373,
+    "tcp:52881:timeout": 10773.31596,
+    "tcp:52881:unreachable": 10775.615472,
+    "tcp:52881:error": null,
+    "neigh": 10772.31623,
+    "neigh:INCOMPLETE": 10772.31623,
+    "neigh:FAILED": 10794.016229,
+    "neigh:REACHABLE": 10794.217606
+  },
+  "stop_reason": "--seconds",
+  "problems": [],
+  "exit_code": 0,
+  "addresses": {
+    "allowlist": "tools/audit-bench-log.py",
+    "loaded": true,
+    "allowlisted": 7,
+    "why_not": null,
+    "unlisted": 1
+  }
+}

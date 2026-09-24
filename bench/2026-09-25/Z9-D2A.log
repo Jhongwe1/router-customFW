@@ -1,0 +1,42 @@
+b3711d235d01788eba669b088eed1623af887d3ba105c7b9800bccfd460acc92  /home/key/fwre-work/rebuild/s105-analysis/s105-d2.py
+  rlxfw cold                   P1-A         cold  0.5861
+  rlxfw cold                   P2-A         cold  0.5727
+  rlxfw cold                   P3-A         cold  0.5706
+  rlxfw cold                   n=3 median 0.5727
+  vendor cold                  V1-A         cold  0.5733
+  vendor cold                  V2-A         cold  0.5729
+  vendor cold                  V3-A         cold  0.5731
+  vendor cold                  n=3 median 0.5731
+  rlxfw warm                   P1L-r02-rz   warm  0.5890
+  rlxfw warm                   P1L-r03-rz   warm  0.5889
+  rlxfw warm                   P1-RZ        warm  0.5878
+  rlxfw warm                   P1Q-r02-rz   warm  0.5877
+  rlxfw warm                   P1Q-r03-rz   warm  0.5890
+  rlxfw warm                   P1Q-r04-rz   warm  0.5876
+  rlxfw warm                   P2Q-r02-rz   warm  0.5822
+  rlxfw warm                   P3Q-r02-rz   warm  0.5812
+  rlxfw warm                   n=8 median 0.5878
+  vendor warm                  V4-WZ        warm  0.5786
+  vendor warm                  V5-WZ        warm  0.5813
+  vendor warm                  V6-WZ        warm  0.5822
+  vendor warm                  V7-WZ        warm  0.5727
+  vendor warm                  n=4 median 0.5800
+  loader-only cold (context)   V4-A         cold  0.5724
+  loader-only cold (context)   V5-A         cold  0.5664
+  loader-only cold (context)   V6-A         cold  0.5732
+  loader-only cold (context)   V7-A         cold  0.5711
+  loader-only cold (context)   M2-A         cold  0.5720
+  loader-only cold (context)   n=5 median 0.5720
+  mode control cold (listen)   M1-BOOT      cold  0.5726
+  mode control cold (listen)   n=1 median 0.5726
+  mode control warm (listen)   M2-BOOT      warm  0.5808
+  mode control warm (listen)   n=1 median 0.5808
+
+  D2 warm: rlxfw - vendor                              +0.0078 s  band +-0.010  within
+  D2 cold: rlxfw - vendor (a limit, n=3 a side)        -0.0004 s  band +-0.025  within
+  mode cold: M1-BOOT - rlxfw cold                      -0.0000 s  band +-0.010  within
+  mode cold: M1-BOOT - vendor cold                     -0.0005 s  band +-0.010  within
+  mode warm: M2-BOOT - rlxfw warm                      -0.0070 s  band +-0.010  within
+  mode warm: M2-BOOT - vendor warm                     +0.0008 s  band +-0.010  within
+
+D2: HOLDS

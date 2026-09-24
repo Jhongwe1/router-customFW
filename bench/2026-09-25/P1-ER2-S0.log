@@ -1,0 +1,25 @@
+iperf3 -s -1 -f k --logfile /tmp/ER2.log > /dev/null 2>&1 & sleep 2 ; ps ; cat
+ /proc/stat
+  PID USER       VSZ STAT COMMAND
+    1 0          832 R    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+  188 0          332 S    iperf3 -s -1 -f k --logfile /tmp/ER2.log 
+  190 0          816 R    ps 
+cpu  1534 0 5277 71587 0 0 13845 0 0
+cpu0 1534 0 5277 71587 0 0 13845 0 0
+intr 630017 0 0 0 0 0 0 0 0 114228 0 0 0 331272 92309 0 0 0 0 0 0 0 0 0 0 0 92209 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 25687
+btime 0
+processes 191
+procs_running 2
+procs_blocked 0
+# 

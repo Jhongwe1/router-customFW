@@ -1,0 +1,51 @@
+cat /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/ER1.log
+cpu  1531 0 5272 70885 0 0 13842 0 0
+cpu0 1531 0 5272 70885 0 0 13842 0 0
+intr 625243 0 0 0 0 0 0 0 0 110879 0 0 0 331272 91596 0 0 0 0 0 0 0 0 0 0 0 91496 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 25500
+btime 0
+processes 184
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 47158
+[  6] local 10.1.1.4 port 5201 connected to 10.1.1.2 port 47170
+[ ID] Interval           Transfer     Bandwidth
+[  6]   0.00-1.01   sec  2.89 MBytes  23994 Kbits/sec                  
+[  6]   1.01-2.01   sec  2.83 MBytes  23770 Kbits/sec                  
+[  6]   2.01-3.01   sec  2.80 MBytes  23492 Kbits/sec                  
+[  6]   3.01-4.01   sec  2.82 MBytes  23678 Kbits/sec                  
+[  6]   4.01-5.01   sec  2.83 MBytes  23770 Kbits/sec                  
+[  6]   5.01-6.01   sec  2.78 MBytes  23353 Kbits/sec                  
+[  6]   6.01-7.01   sec  2.84 MBytes  23817 Kbits/sec                  
+[  6]   7.01-8.00   sec  2.91 MBytes  24666 Kbits/sec                  
+[  6]   8.00-9.01   sec  2.89 MBytes  23971 Kbits/sec                  
+[  6]   9.01-10.00  sec  2.99 MBytes  25344 Kbits/sec                  
+[  6]  10.00-11.00  sec  3.05 MBytes  25624 Kbits/sec                  
+[  6]  11.00-12.00  sec  2.93 MBytes  24604 Kbits/sec                  
+[  6]  12.00-13.00  sec  3.05 MBytes  25577 Kbits/sec                  
+[  6]  13.00-14.01  sec  3.03 MBytes  25141 Kbits/sec                  
+[  6]  14.01-15.01  sec  2.93 MBytes  24604 Kbits/sec                  
+[  6]  15.01-16.00  sec  3.02 MBytes  25602 Kbits/sec                  
+[  6]  16.00-17.00  sec  2.94 MBytes  24628 Kbits/sec                  
+[  6]  17.00-18.01  sec  2.86 MBytes  23741 Kbits/sec                  
+[  6]  18.01-19.01  sec  2.81 MBytes  23585 Kbits/sec                  
+[  6]  19.01-20.01  sec  2.87 MBytes  24095 Kbits/sec                  
+[  6]  20.01-21.01  sec  2.97 MBytes  24929 Kbits/sec                  
+[  6]  21.01-22.00  sec  3.03 MBytes  25695 Kbits/sec                  
+[  6]  22.00-23.01  sec  3.00 MBytes  24911 Kbits/sec                  
+[  6]  23.01-24.00  sec  2.81 MBytes  23823 Kbits/sec                  
+[  6]  24.00-25.00  sec  2.89 MBytes  24280 Kbits/sec                  
+[  6]  25.00-26.00  sec  3.09 MBytes  25902 Kbits/sec                  
+[  6]  26.00-27.01  sec  3.07 MBytes  25462 Kbits/sec                  
+[  6]  27.01-28.00  sec  2.86 MBytes  24244 Kbits/sec                  
+[  6]  28.00-29.00  sec  3.09 MBytes  25948 Kbits/sec                  
+[  6]  29.00-30.01  sec  3.00 MBytes  24911 Kbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth
+[  6]   0.00-30.01  sec  0.00 Bytes  0.00 Kbits/sec                  sender
+[  6]   0.00-30.01  sec  87.9 MBytes  24572 Kbits/sec                  receiver
+# 

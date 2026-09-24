@@ -1,0 +1,2 @@
+hostprobe: bench/2026-09-25/P3-HP.events  1252 events, stop SIGINT after 62.884 s
+hostprobe: bench/2026-09-25/P3-HP.meta.json

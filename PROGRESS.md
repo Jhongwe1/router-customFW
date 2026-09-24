@@ -14,10 +14,10 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | **`P2`** — boot-time breakdown + throughput, both firmwares, same script. Opened 2026-09-23 by the owner; its step list is at the end of this file. Booked after it, not opened: **`R6b`** (what `R6` left without an owner) and **`R1y`** (the record's maintainability, including this file's restructure). Closed gates and their evidence are on § Gate board. |
-| **Active step** | **`P2-4`** — seating B, **2026-09-24**, the owner's date, after Windows' 16:32:46 sync and before midnight, from card `bench/2026-09-24/PREDICTIONS-B45-block43.md`, frozen this segment: twelve presses in seating A's order, every cell run by `tools/cardrun.py`, the host clock guarded before power and logged throughout. Its desk half is done: RAW stamps, the dwell, the board's server logs, the runner (`FW-115`–`FW-132`), and a card whose 18 invocations dry-run, whose `HOST` cells pass their own tools and whose `cardnum` rows re-derive. `P2-0`…`P2-3` closed 2026-09-23. |
+| **Active step** | **`P2-4`** — its bench half is done: seating B ran 2026-09-25 00:02–02:49 from `bench/2026-09-25/PREDICTIONS-B46-block44.md`, card B re-dated after its 2026-09-24 window passed unrun (the workstation slept 14:03–23:34), twelve presses, **246 of 246** captures after the prediction, `D2` held (warm rlxfw − vendor +0.0008 s). Two stops, each handled by the card's own table and read by the owner: the clock guard refused once and permitted at its declared repeat, and the second map bracket was refused on a digest whose section lacked only its last line terminator (`bench/2026-09-25/CORRECTIONS-block44.md`). What remains of the step is its record: `D3`, `D7`, `D8`, the three inferences, the tick brackets, and every finding into its owner file and `SPEC.md`. `P2-0`…`P2-3` closed 2026-09-23. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-09-24（第一百零九段收工）**: seating B, in a new session (`plan/handoff-s109.md`): `w32tm` reads the 16:32:46 sync, the WSL keeper, the attach, the pre-flight, every invocation `--dry`, then card B § 6 in order — `I0` (`hostclock`, whole seating) in the background, the guard `Z0-HCG` from 16:42:46, one invocation per press. Then `P2-4`'s record and `P2-5`. Found this segment: `citime segments`' S3 no longer controls A9 (`FW-133`); `cardrun` cannot gate a cell whose good exit is non-zero (`FW-134`); the guard refuses on this host while `timesyncd` runs (`CLK-40`); a second source corrected six values in `notes/boot-time.md` § 7. |
-| **Blocked on** | The owner's power for seating B, today between 16:43 and midnight; each vendor boot costs one press (`P2`, settled item 6). |
+| **Next after this** | 🔄 **2026-09-25（第一百一十段收工）**: `P2-4`'s record, in a new session (`plan/handoff-s110.md`): the desk-sweep and `citime record` first, then `D3` (both columns within ±10 %), `D7`, `D8`, and the findings into `notes/boot-time.md`, `notes/nic-driver.md` and `SPEC.md`; then `P2-5`. Found this segment: block 45 (`bench/2026-09-25b/PREDICTIONS-B47-block45.md`, the owner's `rlx0` diagnostic, one press) localized `NET-112` for the first time — the positive control agreed at the driver, the switch and the host, and the frame-length experiment lost 1,043 of 1,193 echo replies with 678 `JabberErr` at the switch's CPU port: the TX path emits lengths it was not given; `NET-115`'s filtered ports are RSTs that reached the host, late; the map digest no longer depends on the last line's terminator from block 45 on. |
+| **Blocked on** | Nothing on the owner's power. The owner's ruling on which gate records block 45 (`NET-112`'s mechanism is `R6b`'s, booked and not opened). The captures of both blocks are committed locally and not pushed until the desk-sweep reads them. |
 
 **Step list for the active gate**: `P2`'s, at the **end** of this file. It is
 the first one not inserted above § Gate board: an insertion there moves
@@ -2575,8 +2575,8 @@ an insertion moves none. Measured and simulated 2026-09-23: `SPEC.md` `FW-110`,
 
 ### Stop-loss, written now
 
-* More than **11 段** (the band's edge): the remaining steps are recorded as not
-  done, with reasons.
+* **No segment budget**: the owner removed the 11-segment stop-loss on 2026-09-25
+  (`LOG.md` 第一百一十段); segments are still counted in § Gate board's `Actual`.
 * Any difference in a `map` bracket: no further vendor boot runs until the owner
   has read it.
 * No cell touches the reset button while the vendor firmware runs (`FW-40`,

@@ -1,0 +1,160 @@
+iperf3 -s -1 -f k --logfile /tmp/D1T.log > /dev/null 2>&1 & sleep 2 ; ps ; cat
+ /proc/stat ; cat /proc/rtl819x-nic
+  PID USER       VSZ STAT COMMAND
+    1 0          828 S    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+   36 0          332 S    iperf3 -s -1 -f k --logfile /tmp/D1T.log 
+   38 0          816 R    ps 
+cpu  5 0 673 14180 0 0 3811 0 0
+cpu0 5 0 673 14180 0 0 3811 0 0
+intr 128483 0 0 0 0 0 0 0 0 16393 0 0 0 74514 18942 0 0 0 0 0 0 0 0 0 0 0 18635 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 3486
+btime 0
+processes 39
+procs_running 2
+procs_blocked 0
+version rtl819x-nic 1.4
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 11690
+n_writes 94
+n_refused 0
+n_irq 74514
+n_irq_spurious 0
+n_tx 72865
+n_rx 73127
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00003206
+seen_iisr 0003320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 5793
+n_napi_complete 1307
+n_xmit 72865
+n_xmit_busy 5
+tx_mode 0
+n_tx_full 5
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/72870/0
+n_skb_fail 0
+n_tx_stop 5
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 73127/6110137 tx 72865/5001466 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15C8000
+rmdcr0_pos A15C8020
+tpdcr0_pos A15C8044
+tpdcr1_pos 00000000
+tpdcr2_pos 00000000
+tpdcr3_pos 00000000
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 5
+n_recov_fire 5
+n_recov_spurious 0
+n_recov_ok 5
+n_recov_fail 0
+n_recov_wake 5
+recov_rc 0 0 0
+recov_j_arm 4294949412
+recov_j_fire 4294949512
+ph_follow 1
+n_ph_chk 73127
+n_ph_diff 63006
+n_ph_bad 0
+n_ph_used 63006
+ph_first_w0 A15C8110
+ph_first_exp A15C8188
+ph_first_nrx 10108
+ph_agree 10121
+ph_last A15C8158
+ph_last_j 3
+ph_last_bf A15C9A92
+ph_last_cls 1
+tx_rings 1
+n_et_link 0
+et_link_last FFFFFFFF
+ph_test_cls -1
+ph_test_j 0
+ph_test_seen 0
+j_now 4294955966
+n_dsync_chk 5793
+n_dsync 4484
+dsync_last_d 7
+dsync_first_d 5
+dsync_first_rp A15C8014
+dsync_first_rm A15C8020
+dsync_first_nrx 1317
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A15C8000
+mb_ring A15C8020
+tx_ring A15C8040
+bufs A15C8290
+rx_ph A15C8050
+rx_mb A15C8110
+tx_ph A15C81D0
+tx_mb A15C8230
+idle_ring A15CE290
+rx_idx 0
+tx_idx 1
+rxd0 A15C8051 len 0 f 8063 pl 03
+rxd1 A15C8069 len 0 f 8063 pl 03
+rxd2 A15C8081 len 0 f 8063 pl 03
+rxd3 A15C8099 len 0 f 8063 pl 03
+rxd4 A15C80B1 len 0 f 8063 pl 03
+rxd5 A15C80C9 len 0 f 8063 pl 03
+rxd6 A15C80E1 len 0 f 8063 pl 03
+rxd7 A15C80FB len 0 f 8063 pl 03
+txd0 A15C81D0 len 64
+txd1 A15C81E8 len 64
+txd2 A15C8200 len 64
+txd3 A15C821A len 64
+mbd0 A15C8110 ph A15C8170 ml 78
+mbd1 A15C8128 ph A15C8188 ml 78
+mbd2 A15C8140 ph A15C81A0 ml 78
+mbd3 A15C8158 ph A15C81B8 ml 78
+mbd4 A15C8171 ph A15C8110 ml 0
+mbd5 A15C8189 ph A15C8128 ml 0
+mbd6 A15C81A1 ph A15C8140 ml 0
+mbd7 A15C81BB ph A15C8158 ml 0
+rx_len 0
+rx_ph1 004E0411
+rx_ph3 80630003
+rx_ph4 00090000
+# 

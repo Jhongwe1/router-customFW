@@ -1,0 +1,2 @@
+hostprobe: bench/2026-09-25/M1-HP.events  10392 events, stop --seconds after 300.002 s
+hostprobe: bench/2026-09-25/M1-HP.meta.json

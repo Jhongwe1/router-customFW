@@ -273,6 +273,20 @@ ALLOW = [
      "calibration blob still fires. Renaming the check to please a scanner "
      "would desynchronise it from the table that defines it, which is the "
      "objection h601_hashed's entry already makes"),
+    ("line", "supports-eeprom-access: no",
+     "ethtool -i's capability line for the WORKSTATION's USB GbE adapter "
+     "(bound to r8153_ecm), matched by the pattern aimed at calibration "
+     "through its word `eeprom`. 量 2026-09-25, bench/2026-09-25b/D0-ETH, the "
+     "first capture of `ethtool -i` in bench/: the line says the host adapter "
+     "offers no EEPROM access, and names nothing of this unit. Scoped to this "
+     "exact line, so any other `eeprom` still fires"),
+    ("line", "/home/key/fwre-work/rebuild/s105-analysis/s105-d2.py",
+     "the D2 script's path as `sha256sum` prints it in Z9-D2A (cards B45 and "
+     "B46, section 5), matched by the home-path pattern. 量 2026-09-25, "
+     "bench/2026-09-25/Z9-D2A, the first bench log to print it. The same path "
+     "is committed in both cards' `d2-script` cardnum row and $FWRE_WORK's in "
+     "CLAUDE.md, so the line discloses nothing new. Scoped to this exact "
+     "path, so any other home path still fires"),
 ]
 
 

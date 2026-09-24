@@ -1,0 +1,1387 @@
+# hostprobe 1.3: t_raw is absolute CLOCK_MONOTONIC_RAW seconds (clock_gettime(CLOCK_MONOTONIC_RAW), the clock console-capture 1.5's t0_raw is read on); t_real, ping_real and kernel_real are CLOCK_REALTIME, cross-checks only; a udp line's lag_ms is t_real minus kernel_real, so its kernel stamp on this clock is t_raw - lag_ms/1000
+# probes target=10.1.1.3 icmp=0.05 tcp=- neigh=0.2 udp=- seconds=300 until=-
+8471.874680 start t_real=1790272827.934753
+8471.876839 neigh state=NONE lladdr=-
+# 8471.936258 ping-header PING 10.1.1.3 (10.1.1.3) 56(84) bytes of data.
+8471.936258 icmp-silent seq=1
+8471.992285 icmp-silent seq=2
+8472.048297 icmp-silent seq=3
+8472.077582 neigh state=INCOMPLETE lladdr=-
+8472.104670 icmp-silent seq=4
+8472.160280 icmp-silent seq=5
+8472.220338 icmp-silent seq=6
+8472.276293 icmp-silent seq=7
+8472.336284 icmp-silent seq=8
+8472.392302 icmp-silent seq=9
+8472.448428 icmp-silent seq=10
+8472.504459 icmp-silent seq=11
+8472.554666 icmp-silent seq=11
+8472.605166 icmp-silent seq=11
+8472.655569 icmp-silent seq=11
+8472.706017 icmp-silent seq=11
+8472.756253 icmp-silent seq=11
+8472.806620 icmp-silent seq=11
+8472.857110 icmp-silent seq=11
+8472.907465 icmp-silent seq=11
+8472.957873 icmp-silent seq=11
+8473.008090 icmp-silent seq=11
+8473.058365 icmp-silent seq=11
+8473.108803 icmp-silent seq=11
+8473.159073 icmp-silent seq=11
+8473.209508 icmp-silent seq=11
+8473.260106 icmp-silent seq=11
+8473.310464 icmp-silent seq=11
+8473.361013 icmp-silent seq=11
+8473.411604 icmp-silent seq=11
+8473.462158 icmp-silent seq=11
+8473.512631 icmp-silent seq=11
+8473.563079 icmp-silent seq=11
+8473.613605 icmp-silent seq=11
+8473.663983 icmp-silent seq=11
+8473.714288 icmp-silent seq=11
+8473.764835 icmp-silent seq=11
+8473.815291 icmp-silent seq=11
+8473.865730 icmp-silent seq=11
+8473.916108 icmp-silent seq=11
+8473.966545 icmp-silent seq=11
+8474.016745 icmp-silent seq=11
+8474.067073 icmp-silent seq=11
+8474.117743 icmp-silent seq=11
+8474.167931 icmp-silent seq=11
+8474.218218 icmp-silent seq=11
+8474.268785 icmp-silent seq=11
+8474.319108 icmp-silent seq=11
+8474.369513 icmp-silent seq=11
+8474.420089 icmp-silent seq=11
+8474.470347 icmp-silent seq=11
+8474.520658 icmp-silent seq=11
+8474.571227 icmp-silent seq=11
+8474.621725 icmp-silent seq=11
+8474.672165 icmp-silent seq=11
+8474.722613 icmp-silent seq=11
+8474.773175 icmp-silent seq=11
+8474.823630 icmp-silent seq=11
+8474.873986 icmp-silent seq=11
+8474.924351 icmp-silent seq=11
+# 8474.948467 ping-error [1790272831.008456] From 10.1.1.2 icmp_seq=1 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008500] From 10.1.1.2 icmp_seq=2 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008503] From 10.1.1.2 icmp_seq=3 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008505] From 10.1.1.2 icmp_seq=4 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008506] From 10.1.1.2 icmp_seq=5 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008508] From 10.1.1.2 icmp_seq=6 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008510] From 10.1.1.2 icmp_seq=7 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008511] From 10.1.1.2 icmp_seq=8 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008513] From 10.1.1.2 icmp_seq=9 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008515] From 10.1.1.2 icmp_seq=10 Destination Host Unreachable
+# 8474.948467 ping-error [1790272831.008516] From 10.1.1.2 icmp_seq=11 Destination Host Unreachable
+8474.974723 icmp-silent seq=11
+8475.028244 icmp-silent seq=12
+8475.084379 icmp-silent seq=13
+8475.140536 icmp-silent seq=14
+8475.196359 icmp-silent seq=15
+8475.252328 icmp-silent seq=16
+8475.308385 icmp-silent seq=17
+8475.364228 icmp-silent seq=18
+8475.420574 icmp-silent seq=19
+8475.476386 icmp-silent seq=20
+8475.532384 icmp-silent seq=21
+8475.588219 icmp-silent seq=22
+8475.638456 icmp-silent seq=22
+8475.688709 icmp-silent seq=22
+8475.738921 icmp-silent seq=22
+8475.789315 icmp-silent seq=22
+8475.839526 icmp-silent seq=22
+8475.889975 icmp-silent seq=22
+8475.939972 icmp-silent seq=22
+8475.990224 icmp-silent seq=22
+8476.039417 icmp-silent seq=22
+8476.089658 icmp-silent seq=22
+8476.139871 icmp-silent seq=22
+8476.190063 icmp-silent seq=22
+8476.240331 icmp-silent seq=22
+8476.290502 icmp-silent seq=22
+8476.340724 icmp-silent seq=22
+8476.390938 icmp-silent seq=22
+8476.441167 icmp-silent seq=22
+8476.491653 icmp-silent seq=22
+8476.541634 icmp-silent seq=22
+8476.591770 icmp-silent seq=22
+8476.641994 icmp-silent seq=22
+8476.692205 icmp-silent seq=22
+8476.742511 icmp-silent seq=22
+8476.792719 icmp-silent seq=22
+8476.844254 icmp-silent seq=22
+# 8476.844254 icmp-lag seq=22 lag_ms=1.330 threshold_ms=1 over the threshold
+8476.893202 icmp-silent seq=22
+8476.943471 icmp-silent seq=22
+8476.993775 icmp-silent seq=22
+8477.042975 icmp-silent seq=22
+8477.093599 icmp-silent seq=22
+8477.143429 icmp-silent seq=22
+8477.193634 icmp-silent seq=22
+8477.243967 icmp-silent seq=22
+8477.294502 icmp-silent seq=22
+8477.344534 icmp-silent seq=22
+8477.394810 icmp-silent seq=22
+8477.445073 icmp-silent seq=22
+8477.495305 icmp-silent seq=22
+8477.545521 icmp-silent seq=22
+8477.595731 icmp-silent seq=22
+8477.646256 icmp-silent seq=22
+8477.696743 icmp-silent seq=22
+8477.747287 icmp-silent seq=22
+8477.797506 icmp-silent seq=22
+8477.847955 icmp-silent seq=22
+8477.898375 icmp-silent seq=22
+8477.948825 icmp-silent seq=22
+8477.999098 icmp-silent seq=22
+8478.048354 icmp-silent seq=22
+# 8478.052348 ping-error [1790272834.112371] From 10.1.1.2 icmp_seq=12 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112395] From 10.1.1.2 icmp_seq=13 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112399] From 10.1.1.2 icmp_seq=14 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112401] From 10.1.1.2 icmp_seq=15 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112403] From 10.1.1.2 icmp_seq=16 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112407] From 10.1.1.2 icmp_seq=17 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112410] From 10.1.1.2 icmp_seq=18 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112412] From 10.1.1.2 icmp_seq=19 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112413] From 10.1.1.2 icmp_seq=20 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112415] From 10.1.1.2 icmp_seq=21 Destination Host Unreachable
+# 8478.052348 ping-error [1790272834.112416] From 10.1.1.2 icmp_seq=22 Destination Host Unreachable
+8478.098112 neigh state=FAILED lladdr=-
+8478.098589 icmp-silent seq=22
+8478.152410 icmp-silent seq=23
+8478.208358 icmp-silent seq=24
+8478.264316 icmp-silent seq=25
+8478.299409 neigh state=INCOMPLETE lladdr=-
+8478.320266 icmp-silent seq=26
+8478.376226 icmp-silent seq=27
+8478.432213 icmp-silent seq=28
+8478.488369 icmp-silent seq=29
+8478.544353 icmp-silent seq=30
+8478.600339 icmp-silent seq=31
+8478.656273 icmp-silent seq=32
+8478.712319 icmp-silent seq=33
+8478.762878 icmp-silent seq=33
+8478.813307 icmp-silent seq=33
+8478.863673 icmp-silent seq=33
+8478.914068 icmp-silent seq=33
+8478.964410 icmp-silent seq=33
+8479.014680 icmp-silent seq=33
+8479.064941 icmp-silent seq=33
+8479.115202 icmp-silent seq=33
+8479.165480 icmp-silent seq=33
+8479.215698 icmp-silent seq=33
+8479.265952 icmp-silent seq=33
+8479.316221 icmp-silent seq=33
+8479.366581 icmp-silent seq=33
+8479.416901 icmp-silent seq=33
+8479.467187 icmp-silent seq=33
+8479.517556 icmp-silent seq=33
+8479.568186 icmp-silent seq=33
+8479.618493 icmp-silent seq=33
+8479.669077 icmp-silent seq=33
+8479.719464 icmp-silent seq=33
+8479.769676 icmp-silent seq=33
+8479.820130 icmp-silent seq=33
+8479.870525 icmp-silent seq=33
+8479.920934 icmp-silent seq=33
+8479.971339 icmp-silent seq=33
+8480.021585 icmp-silent seq=33
+8480.072116 icmp-silent seq=33
+8480.122629 icmp-silent seq=33
+8480.173030 icmp-silent seq=33
+8480.223587 icmp-silent seq=33
+8480.274085 icmp-silent seq=33
+8480.324548 icmp-silent seq=33
+8480.374962 icmp-silent seq=33
+8480.425422 icmp-silent seq=33
+8480.475868 icmp-silent seq=33
+8480.526303 icmp-silent seq=33
+8480.576663 icmp-silent seq=33
+8480.627185 icmp-silent seq=33
+8480.677643 icmp-silent seq=33
+8480.727954 icmp-silent seq=33
+8480.778653 icmp-silent seq=33
+8480.829147 icmp-silent seq=33
+8480.879501 icmp-silent seq=33
+8480.930021 icmp-silent seq=33
+8480.980660 icmp-silent seq=33
+8481.029864 icmp-silent seq=33
+8481.080066 icmp-silent seq=33
+8481.130431 icmp-silent seq=33
+# 8481.156358 ping-error [1790272837.216419] From 10.1.1.2 icmp_seq=23 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216444] From 10.1.1.2 icmp_seq=24 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216447] From 10.1.1.2 icmp_seq=25 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216450] From 10.1.1.2 icmp_seq=26 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216452] From 10.1.1.2 icmp_seq=27 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216454] From 10.1.1.2 icmp_seq=28 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216457] From 10.1.1.2 icmp_seq=29 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216459] From 10.1.1.2 icmp_seq=30 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216462] From 10.1.1.2 icmp_seq=31 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216464] From 10.1.1.2 icmp_seq=32 Destination Host Unreachable
+# 8481.156358 ping-error [1790272837.216467] From 10.1.1.2 icmp_seq=33 Destination Host Unreachable
+8481.181539 icmp-silent seq=33
+8481.236402 icmp-silent seq=34
+8481.292589 icmp-silent seq=35
+8481.348190 icmp-silent seq=36
+8481.404161 icmp-silent seq=37
+8481.460288 icmp-silent seq=38
+8481.516305 icmp-silent seq=39
+8481.572315 icmp-silent seq=40
+8481.628322 icmp-silent seq=41
+8481.688196 icmp-silent seq=42
+8481.744250 icmp-silent seq=43
+8481.800311 icmp-silent seq=44
+8481.850683 icmp-silent seq=44
+8481.901122 icmp-silent seq=44
+8481.951534 icmp-silent seq=44
+8482.001870 icmp-silent seq=44
+8482.052524 icmp-silent seq=44
+8482.102803 icmp-silent seq=44
+8482.153265 icmp-silent seq=44
+8482.203738 icmp-silent seq=44
+8482.254147 icmp-silent seq=44
+8482.304546 icmp-silent seq=44
+8482.355024 icmp-silent seq=44
+8482.405560 icmp-silent seq=44
+8482.455909 icmp-silent seq=44
+8482.506329 icmp-silent seq=44
+8482.556733 icmp-silent seq=44
+8482.607132 icmp-silent seq=44
+8482.657479 icmp-silent seq=44
+8482.708227 icmp-silent seq=44
+8482.758643 icmp-silent seq=44
+8482.809003 icmp-silent seq=44
+8482.859479 icmp-silent seq=44
+8482.910389 icmp-silent seq=44
+8482.960731 icmp-silent seq=44
+8483.010999 icmp-silent seq=44
+8483.061526 icmp-silent seq=44
+8483.111938 icmp-silent seq=44
+8483.162308 icmp-silent seq=44
+8483.212653 icmp-silent seq=44
+8483.263156 icmp-silent seq=44
+8483.313668 icmp-silent seq=44
+8483.364016 icmp-silent seq=44
+8483.414395 icmp-silent seq=44
+8483.464812 icmp-silent seq=44
+8483.515145 icmp-silent seq=44
+8483.565625 icmp-silent seq=44
+8483.616002 icmp-silent seq=44
+8483.666428 icmp-silent seq=44
+8483.716697 icmp-silent seq=44
+8483.767109 icmp-silent seq=44
+8483.817747 icmp-silent seq=44
+8483.868282 icmp-silent seq=44
+8483.918843 icmp-silent seq=44
+8483.969583 icmp-silent seq=44
+8484.019814 icmp-silent seq=44
+8484.070257 icmp-silent seq=44
+8484.120545 icmp-silent seq=44
+8484.170997 icmp-silent seq=44
+8484.221520 icmp-silent seq=44
+# 8484.260364 ping-error [1790272840.320422] From 10.1.1.2 icmp_seq=34 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320460] From 10.1.1.2 icmp_seq=35 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320464] From 10.1.1.2 icmp_seq=36 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320467] From 10.1.1.2 icmp_seq=37 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320469] From 10.1.1.2 icmp_seq=38 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320472] From 10.1.1.2 icmp_seq=39 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320474] From 10.1.1.2 icmp_seq=40 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320475] From 10.1.1.2 icmp_seq=41 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320477] From 10.1.1.2 icmp_seq=42 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320479] From 10.1.1.2 icmp_seq=43 Destination Host Unreachable
+# 8484.260364 ping-error [1790272840.320481] From 10.1.1.2 icmp_seq=44 Destination Host Unreachable
+8484.272503 icmp-silent seq=44
+8484.328229 icmp-silent seq=45
+8484.384390 icmp-silent seq=46
+8484.440391 icmp-silent seq=47
+8484.496273 icmp-silent seq=48
+8484.552281 icmp-silent seq=49
+8484.608258 icmp-silent seq=50
+8484.664339 icmp-silent seq=51
+8484.720304 icmp-silent seq=52
+8484.776290 icmp-silent seq=53
+8484.832409 icmp-silent seq=54
+8484.888279 icmp-silent seq=55
+8484.938646 icmp-silent seq=55
+8484.988984 icmp-silent seq=55
+8485.038206 icmp-silent seq=55
+8485.088663 icmp-silent seq=55
+8485.139161 icmp-silent seq=55
+8485.189380 icmp-silent seq=55
+8485.239815 icmp-silent seq=55
+8485.290222 icmp-silent seq=55
+8485.340522 icmp-silent seq=55
+8485.390982 icmp-silent seq=55
+8485.441441 icmp-silent seq=55
+8485.491828 icmp-silent seq=55
+8485.542187 icmp-silent seq=55
+8485.592658 icmp-silent seq=55
+8485.643169 icmp-silent seq=55
+8485.693550 icmp-silent seq=55
+8485.743973 icmp-silent seq=55
+8485.794468 icmp-silent seq=55
+8485.845065 icmp-silent seq=55
+8485.895501 icmp-silent seq=55
+8485.945910 icmp-silent seq=55
+8485.996185 icmp-silent seq=55
+8486.045657 icmp-silent seq=55
+8486.095957 icmp-silent seq=55
+8486.147207 icmp-silent seq=55
+8486.197407 icmp-silent seq=55
+8486.247797 icmp-silent seq=55
+8486.299219 icmp-silent seq=55
+8486.349656 icmp-silent seq=55
+8486.400065 icmp-silent seq=55
+8486.450301 icmp-silent seq=55
+8486.500721 icmp-silent seq=55
+8486.530682 neigh state=NONE lladdr=-
+8486.551298 icmp-silent seq=55
+8486.604289 icmp-silent seq=56
+8486.660388 icmp-silent seq=57
+8486.716174 icmp-silent seq=58
+8486.730829 neigh state=INCOMPLETE lladdr=-
+8486.772373 icmp-silent seq=59
+8486.828257 icmp-silent seq=60
+8486.884265 icmp-silent seq=61
+8486.940283 icmp-silent seq=62
+8486.996362 icmp-silent seq=63
+8487.052151 icmp-silent seq=64
+8487.108203 icmp-silent seq=65
+8487.164200 icmp-silent seq=66
+8487.214414 icmp-silent seq=66
+8487.264622 icmp-silent seq=66
+8487.314885 icmp-silent seq=66
+8487.365170 icmp-silent seq=66
+8487.415393 icmp-silent seq=66
+8487.465941 icmp-silent seq=66
+8487.516520 icmp-silent seq=66
+8487.566740 icmp-silent seq=66
+8487.617030 icmp-silent seq=66
+8487.668254 icmp-silent seq=66
+8487.718244 icmp-silent seq=66
+8487.768766 icmp-silent seq=66
+8487.819019 icmp-silent seq=66
+8487.869209 icmp-silent seq=66
+8487.919506 icmp-silent seq=66
+8487.969820 icmp-silent seq=66
+8488.020298 icmp-silent seq=66
+8488.070570 icmp-silent seq=66
+8488.120830 icmp-silent seq=66
+8488.171119 icmp-silent seq=66
+8488.221360 icmp-silent seq=66
+8488.271717 icmp-silent seq=66
+8488.322010 icmp-silent seq=66
+8488.372681 icmp-silent seq=66
+8488.423098 icmp-silent seq=66
+8488.473324 icmp-silent seq=66
+8488.523840 icmp-silent seq=66
+8488.574389 icmp-silent seq=66
+8488.624768 icmp-silent seq=66
+8488.675095 icmp-silent seq=66
+8488.725286 icmp-silent seq=66
+8488.775514 icmp-silent seq=66
+8488.825768 icmp-silent seq=66
+8488.876131 icmp-silent seq=66
+8488.926490 icmp-silent seq=66
+8488.976740 icmp-silent seq=66
+8489.025998 icmp-silent seq=66
+8489.076225 icmp-silent seq=66
+8489.126562 icmp-silent seq=66
+8489.176730 icmp-silent seq=66
+8489.227154 icmp-silent seq=66
+8489.277488 icmp-silent seq=66
+8489.327759 icmp-silent seq=66
+8489.377934 icmp-silent seq=66
+8489.428291 icmp-silent seq=66
+8489.478602 icmp-silent seq=66
+8489.528918 icmp-silent seq=66
+8489.579154 icmp-silent seq=66
+# 8489.604374 ping-error [1790272845.664434] From 10.1.1.2 icmp_seq=56 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664525] From 10.1.1.2 icmp_seq=57 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664534] From 10.1.1.2 icmp_seq=58 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664539] From 10.1.1.2 icmp_seq=59 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664544] From 10.1.1.2 icmp_seq=60 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664549] From 10.1.1.2 icmp_seq=61 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664554] From 10.1.1.2 icmp_seq=62 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664558] From 10.1.1.2 icmp_seq=63 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664563] From 10.1.1.2 icmp_seq=64 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664567] From 10.1.1.2 icmp_seq=65 Destination Host Unreachable
+# 8489.604374 ping-error [1790272845.664572] From 10.1.1.2 icmp_seq=66 Destination Host Unreachable
+8489.629553 icmp-silent seq=66
+8489.684284 icmp-silent seq=67
+8489.740194 icmp-silent seq=68
+8489.796369 icmp-silent seq=69
+8489.852111 icmp-silent seq=70
+8489.908287 icmp-silent seq=71
+8489.964311 icmp-silent seq=72
+8490.020167 icmp-silent seq=73
+8490.076284 icmp-silent seq=74
+8490.136194 icmp-silent seq=75
+8490.192189 icmp-silent seq=76
+8490.248121 icmp-silent seq=77
+8490.298413 icmp-silent seq=77
+8490.348550 icmp-silent seq=77
+8490.398746 icmp-silent seq=77
+8490.448993 icmp-silent seq=77
+8490.499179 icmp-silent seq=77
+8490.549428 icmp-silent seq=77
+8490.599723 icmp-silent seq=77
+8490.650087 icmp-silent seq=77
+8490.669088 icmp-reply seq=67 ttl=64 rtt_ms=1039 ping_real=1790272846.729247
+8490.669088 icmp-reply seq=68 ttl=64 rtt_ms=985 ping_real=1790272846.729275
+8490.669088 icmp-reply seq=69 ttl=64 rtt_ms=929 ping_real=1790272846.729279
+8490.669984 icmp-reply seq=70 ttl=64 rtt_ms=873 ping_real=1790272846.729338
+8490.669984 icmp-reply seq=71 ttl=64 rtt_ms=817 ping_real=1790272846.729345
+8490.669984 icmp-reply seq=72 ttl=64 rtt_ms=761 ping_real=1790272846.729351
+8490.669984 icmp-reply seq=73 ttl=64 rtt_ms=705 ping_real=1790272846.729633
+8490.670879 icmp-reply seq=74 ttl=64 rtt_ms=650 ping_real=1790272846.730280
+8490.670879 icmp-reply seq=75 ttl=64 rtt_ms=594 ping_real=1790272846.730622
+8490.671360 icmp-reply seq=76 ttl=64 rtt_ms=535 ping_real=1790272846.731196
+8490.671639 icmp-reply seq=77 ttl=64 rtt_ms=479 ping_real=1790272846.731685
+8490.701659 icmp-reply seq=78 ttl=64 rtt_ms=0.966 ping_real=1790272846.761811
+8490.745176 neigh state=REACHABLE lladdr=02:52:4c:58:46:57
+8490.752173 icmp-reply seq=79 ttl=64 rtt_ms=1.14 ping_real=1790272846.812302
+8490.802275 icmp-reply seq=80 ttl=64 rtt_ms=0.963 ping_real=1790272846.862437
+8490.853224 icmp-reply seq=81 ttl=64 rtt_ms=1.37 ping_real=1790272846.913219
+8490.903336 icmp-reply seq=82 ttl=64 rtt_ms=0.989 ping_real=1790272846.963458
+8490.953470 icmp-reply seq=83 ttl=64 rtt_ms=0.950 ping_real=1790272847.013621
+8491.003672 icmp-reply seq=84 ttl=64 rtt_ms=0.989 ping_real=1790272847.063799
+8491.053682 icmp-reply seq=85 ttl=64 rtt_ms=0.874 ping_real=1790272847.113846
+8491.109462 icmp-reply seq=86 ttl=64 rtt_ms=1.08 ping_real=1790272847.169601
+8491.159445 icmp-reply seq=87 ttl=64 rtt_ms=0.820 ping_real=1790272847.219585
+8491.213073 icmp-reply seq=88 ttl=64 rtt_ms=0.898 ping_real=1790272847.273220
+8491.269005 icmp-reply seq=89 ttl=64 rtt_ms=0.848 ping_real=1790272847.329162
+8491.325069 icmp-reply seq=90 ttl=64 rtt_ms=0.927 ping_real=1790272847.385234
+8491.375272 icmp-reply seq=91 ttl=64 rtt_ms=0.954 ping_real=1790272847.435368
+8491.425838 icmp-reply seq=92 ttl=64 rtt_ms=1.21 ping_real=1790272847.485932
+8491.476123 icmp-reply seq=93 ttl=64 rtt_ms=1.13 ping_real=1790272847.536286
+8491.526588 icmp-reply seq=94 ttl=64 rtt_ms=1.10 ping_real=1790272847.586705
+8491.576753 icmp-reply seq=95 ttl=64 rtt_ms=0.981 ping_real=1790272847.636916
+8491.626748 icmp-reply seq=96 ttl=64 rtt_ms=0.807 ping_real=1790272847.686903
+8491.685565 icmp-reply seq=97 ttl=64 rtt_ms=1.15 ping_real=1790272847.745698
+8491.736170 icmp-reply seq=98 ttl=64 rtt_ms=1.09 ping_real=1790272847.796279
+8491.786241 icmp-reply seq=99 ttl=64 rtt_ms=0.895 ping_real=1790272847.846401
+8491.841282 icmp-reply seq=100 ttl=64 rtt_ms=0.977 ping_real=1790272847.901447
+8491.891471 icmp-reply seq=101 ttl=64 rtt_ms=0.972 ping_real=1790272847.951589
+8491.941836 icmp-reply seq=102 ttl=64 rtt_ms=1.08 ping_real=1790272848.001945
+8491.992137 icmp-reply seq=103 ttl=64 rtt_ms=0.971 ping_real=1790272848.052258
+8492.042132 icmp-reply seq=104 ttl=64 rtt_ms=0.860 ping_real=1790272848.102293
+8492.101556 icmp-reply seq=105 ttl=64 rtt_ms=1.19 ping_real=1790272848.161621
+8492.151669 icmp-reply seq=106 ttl=64 rtt_ms=0.992 ping_real=1790272848.211835
+8492.201767 icmp-reply seq=107 ttl=64 rtt_ms=0.929 ping_real=1790272848.261937
+8492.252356 icmp-reply seq=108 ttl=64 rtt_ms=1.17 ping_real=1790272848.312443
+8492.302540 icmp-reply seq=109 ttl=64 rtt_ms=1.01 ping_real=1790272848.362707
+8492.352946 icmp-reply seq=110 ttl=64 rtt_ms=1.07 ping_real=1790272848.413121
+8492.403128 icmp-reply seq=111 ttl=64 rtt_ms=0.959 ping_real=1790272848.463252
+8492.453513 icmp-reply seq=112 ttl=64 rtt_ms=1.19 ping_real=1790272848.513644
+8492.504049 icmp-reply seq=113 ttl=64 rtt_ms=1.23 ping_real=1790272848.564126
+8492.554035 icmp-reply seq=114 ttl=64 rtt_ms=0.885 ping_real=1790272848.614173
+8492.613722 icmp-reply seq=115 ttl=64 rtt_ms=1.37 ping_real=1790272848.673864
+8492.663688 icmp-reply seq=116 ttl=64 rtt_ms=0.811 ping_real=1790272848.723823
+8492.720989 icmp-reply seq=117 ttl=64 rtt_ms=0.870 ping_real=1790272848.781165
+8492.781072 icmp-reply seq=118 ttl=64 rtt_ms=0.927 ping_real=1790272848.841247
+8492.831805 icmp-reply seq=119 ttl=64 rtt_ms=1.30 ping_real=1790272848.891950
+8492.881827 icmp-reply seq=120 ttl=64 rtt_ms=0.866 ping_real=1790272848.942002
+8492.937406 icmp-reply seq=121 ttl=64 rtt_ms=1.12 ping_real=1790272848.997546
+8492.987702 icmp-reply seq=122 ttl=64 rtt_ms=1.05 ping_real=1790272849.047762
+8493.037663 icmp-reply seq=123 ttl=64 rtt_ms=0.917 ping_real=1790272849.097835
+8493.097434 icmp-reply seq=124 ttl=64 rtt_ms=1.15 ping_real=1790272849.157613
+8493.148198 icmp-reply seq=125 ttl=64 rtt_ms=1.39 ping_real=1790272849.208331
+8493.198306 icmp-reply seq=126 ttl=64 rtt_ms=0.964 ping_real=1790272849.258480
+8493.248487 icmp-reply seq=127 ttl=64 rtt_ms=0.952 ping_real=1790272849.308652
+8493.352168 icmp-silent seq=128
+8493.408089 icmp-silent seq=129
+8493.464068 icmp-silent seq=130
+8493.520325 icmp-silent seq=131
+8493.554836 neigh state=INCOMPLETE lladdr=-
+8493.576105 icmp-silent seq=132
+8493.632074 icmp-silent seq=133
+8493.692096 icmp-silent seq=134
+8493.748069 icmp-silent seq=135
+8493.804095 icmp-silent seq=136
+8493.864222 icmp-silent seq=137
+8493.924161 icmp-silent seq=138
+8493.984153 icmp-silent seq=139
+8494.040079 icmp-silent seq=140
+8494.090302 icmp-silent seq=140
+8494.140975 icmp-silent seq=140
+8494.191100 icmp-silent seq=140
+8494.241335 icmp-silent seq=140
+8494.291670 icmp-silent seq=140
+8494.341866 icmp-silent seq=140
+8494.392192 icmp-silent seq=140
+8494.442457 icmp-silent seq=140
+8494.492686 icmp-silent seq=140
+8494.543114 icmp-silent seq=140
+8494.593356 icmp-silent seq=140
+8494.643597 icmp-silent seq=140
+8494.694019 icmp-silent seq=140
+8494.744255 icmp-silent seq=140
+8494.794520 icmp-silent seq=140
+8494.844863 icmp-silent seq=140
+8494.895166 icmp-silent seq=140
+8494.945365 icmp-silent seq=140
+8494.995550 icmp-silent seq=140
+8495.044769 icmp-silent seq=140
+8495.095100 icmp-silent seq=140
+8495.145396 icmp-silent seq=140
+8495.195817 icmp-silent seq=140
+8495.246068 icmp-silent seq=140
+8495.296215 icmp-silent seq=140
+8495.346545 icmp-silent seq=140
+8495.396720 icmp-silent seq=140
+8495.447153 icmp-silent seq=140
+8495.497311 icmp-silent seq=140
+8495.547498 icmp-silent seq=140
+8495.597849 icmp-silent seq=140
+8495.648059 icmp-silent seq=140
+8495.698454 icmp-silent seq=140
+8495.748693 icmp-silent seq=140
+8495.799081 icmp-silent seq=140
+8495.849251 icmp-silent seq=140
+8495.899489 icmp-silent seq=140
+8495.949736 icmp-silent seq=140
+8495.999927 icmp-silent seq=140
+8496.049253 icmp-silent seq=140
+8496.099489 icmp-silent seq=140
+8496.149703 icmp-silent seq=140
+8496.199962 icmp-silent seq=140
+8496.250228 icmp-silent seq=140
+8496.300651 icmp-silent seq=140
+8496.350923 icmp-silent seq=140
+8496.401132 icmp-silent seq=140
+8496.451757 icmp-silent seq=140
+# 8496.484110 ping-error [1790272852.544318] From 10.1.1.2 icmp_seq=130 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544350] From 10.1.1.2 icmp_seq=131 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544353] From 10.1.1.2 icmp_seq=132 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544355] From 10.1.1.2 icmp_seq=133 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544357] From 10.1.1.2 icmp_seq=134 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544359] From 10.1.1.2 icmp_seq=135 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544361] From 10.1.1.2 icmp_seq=136 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544362] From 10.1.1.2 icmp_seq=137 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544364] From 10.1.1.2 icmp_seq=138 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544366] From 10.1.1.2 icmp_seq=139 Destination Host Unreachable
+# 8496.484110 ping-error [1790272852.544367] From 10.1.1.2 icmp_seq=140 Destination Host Unreachable
+8496.502242 icmp-silent seq=140
+8496.556075 icmp-silent seq=141
+8496.616064 icmp-silent seq=142
+8496.672890 icmp-silent seq=143
+8496.728088 icmp-silent seq=144
+8496.788403 icmp-silent seq=145
+8496.844245 icmp-silent seq=146
+8496.900152 icmp-silent seq=147
+8496.956067 icmp-silent seq=148
+8497.012125 icmp-silent seq=149
+8497.068069 icmp-silent seq=150
+8497.124106 icmp-silent seq=151
+8497.174431 icmp-silent seq=151
+8497.224705 icmp-silent seq=151
+8497.275345 icmp-silent seq=151
+8497.325528 icmp-silent seq=151
+8497.375807 icmp-silent seq=151
+8497.426172 icmp-silent seq=151
+8497.476656 icmp-silent seq=151
+8497.527262 icmp-silent seq=151
+8497.577826 icmp-silent seq=151
+8497.628547 icmp-silent seq=151
+8497.679585 icmp-silent seq=151
+8497.730655 icmp-silent seq=151
+8497.781393 icmp-silent seq=151
+8497.832154 icmp-silent seq=151
+8497.882916 icmp-silent seq=151
+8497.933381 icmp-silent seq=151
+8497.983837 icmp-silent seq=151
+8498.033033 icmp-silent seq=151
+8498.083456 icmp-silent seq=151
+8498.134137 icmp-silent seq=151
+8498.184666 icmp-silent seq=151
+8498.235140 icmp-silent seq=151
+8498.286222 icmp-silent seq=151
+8498.336468 icmp-silent seq=151
+8498.387281 icmp-silent seq=151
+8498.437994 icmp-silent seq=151
+8498.488555 icmp-silent seq=151
+8498.539532 icmp-silent seq=151
+8498.590175 icmp-silent seq=151
+8498.640502 icmp-silent seq=151
+8498.690928 icmp-silent seq=151
+8498.741651 icmp-silent seq=151
+8498.792271 icmp-silent seq=151
+8498.842930 icmp-silent seq=151
+8498.893294 icmp-silent seq=151
+8498.943608 icmp-silent seq=151
+8498.994014 icmp-silent seq=151
+8499.043244 icmp-silent seq=151
+8499.093986 icmp-silent seq=151
+8499.144646 icmp-silent seq=151
+8499.195238 icmp-silent seq=151
+8499.246032 icmp-silent seq=151
+8499.296762 icmp-silent seq=151
+8499.346895 icmp-silent seq=151
+8499.397099 icmp-silent seq=151
+8499.447304 icmp-silent seq=151
+8499.497510 icmp-silent seq=151
+8499.547744 icmp-silent seq=151
+# 8499.556087 ping-error [1790272855.616308] From 10.1.1.2 icmp_seq=141 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616333] From 10.1.1.2 icmp_seq=142 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616336] From 10.1.1.2 icmp_seq=143 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616338] From 10.1.1.2 icmp_seq=144 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616340] From 10.1.1.2 icmp_seq=145 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616342] From 10.1.1.2 icmp_seq=146 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616344] From 10.1.1.2 icmp_seq=147 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616346] From 10.1.1.2 icmp_seq=148 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616348] From 10.1.1.2 icmp_seq=149 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616350] From 10.1.1.2 icmp_seq=150 Destination Host Unreachable
+# 8499.556087 ping-error [1790272855.616351] From 10.1.1.2 icmp_seq=151 Destination Host Unreachable
+8499.577628 neigh state=FAILED lladdr=-
+8499.598180 icmp-silent seq=151
+8499.652047 icmp-silent seq=152
+8499.712084 icmp-silent seq=153
+8499.768028 icmp-silent seq=154
+8499.777976 neigh state=INCOMPLETE lladdr=-
+8499.824057 icmp-silent seq=155
+8499.880023 icmp-silent seq=156
+8499.936025 icmp-silent seq=157
+8499.992085 icmp-silent seq=158
+8500.048008 icmp-silent seq=159
+8500.104043 icmp-silent seq=160
+8500.160003 icmp-silent seq=161
+8500.216061 icmp-silent seq=162
+8500.266373 icmp-silent seq=162
+8500.316547 icmp-silent seq=162
+8500.366777 icmp-silent seq=162
+8500.417014 icmp-silent seq=162
+8500.467277 icmp-silent seq=162
+8500.517659 icmp-silent seq=162
+8500.567938 icmp-silent seq=162
+8500.618175 icmp-silent seq=162
+8500.668640 icmp-silent seq=162
+8500.718847 icmp-silent seq=162
+8500.769039 icmp-silent seq=162
+8500.819292 icmp-silent seq=162
+8500.869545 icmp-silent seq=162
+8500.920223 icmp-silent seq=162
+8500.970479 icmp-silent seq=162
+8501.020709 icmp-silent seq=162
+8501.070942 icmp-silent seq=162
+8501.121145 icmp-silent seq=162
+8501.171387 icmp-silent seq=162
+8501.221603 icmp-silent seq=162
+8501.271885 icmp-silent seq=162
+8501.322113 icmp-silent seq=162
+8501.372291 icmp-silent seq=162
+8501.422810 icmp-silent seq=162
+8501.473645 icmp-silent seq=162
+8501.524609 icmp-silent seq=162
+8501.574985 icmp-silent seq=162
+8501.625356 icmp-silent seq=162
+8501.675951 icmp-silent seq=162
+8501.726916 icmp-silent seq=162
+8501.777883 icmp-silent seq=162
+8501.828480 icmp-silent seq=162
+8501.878976 icmp-silent seq=162
+8501.929610 icmp-silent seq=162
+8501.980114 icmp-silent seq=162
+8502.029509 icmp-silent seq=162
+8502.080028 icmp-silent seq=162
+8502.130502 icmp-silent seq=162
+8502.180978 icmp-silent seq=162
+8502.231162 icmp-silent seq=162
+8502.281640 icmp-silent seq=162
+8502.332320 icmp-silent seq=162
+8502.382591 icmp-silent seq=162
+8502.433476 icmp-silent seq=162
+8502.484133 icmp-silent seq=162
+8502.534696 icmp-silent seq=162
+8502.585236 icmp-silent seq=162
+8502.635830 icmp-silent seq=162
+# 8502.660750 ping-error [1790272858.720844] From 10.1.1.2 icmp_seq=152 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720922] From 10.1.1.2 icmp_seq=153 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720931] From 10.1.1.2 icmp_seq=154 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720938] From 10.1.1.2 icmp_seq=155 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720943] From 10.1.1.2 icmp_seq=156 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720949] From 10.1.1.2 icmp_seq=157 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720955] From 10.1.1.2 icmp_seq=158 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720961] From 10.1.1.2 icmp_seq=159 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720966] From 10.1.1.2 icmp_seq=160 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720972] From 10.1.1.2 icmp_seq=161 Destination Host Unreachable
+# 8502.660750 ping-error [1790272858.720977] From 10.1.1.2 icmp_seq=162 Destination Host Unreachable
+8502.686398 icmp-silent seq=162
+8502.740160 icmp-silent seq=163
+8502.796030 icmp-silent seq=164
+8502.852047 icmp-silent seq=165
+8502.908138 icmp-silent seq=166
+8502.964120 icmp-silent seq=167
+8503.020339 icmp-silent seq=168
+8503.076085 icmp-silent seq=169
+8503.132466 icmp-silent seq=170
+8503.188008 icmp-silent seq=171
+8503.244515 icmp-silent seq=172
+8503.300598 icmp-silent seq=173
+8503.351143 icmp-silent seq=173
+8503.401473 icmp-silent seq=173
+8503.451861 icmp-silent seq=173
+8503.502154 icmp-silent seq=173
+8503.552427 icmp-silent seq=173
+8503.602730 icmp-silent seq=173
+8503.653695 icmp-silent seq=173
+8503.704650 icmp-silent seq=173
+8503.755466 icmp-silent seq=173
+8503.806317 icmp-silent seq=173
+8503.857197 icmp-silent seq=173
+8503.907662 icmp-silent seq=173
+8503.958081 icmp-silent seq=173
+8504.008457 icmp-silent seq=173
+8504.058673 icmp-silent seq=173
+8504.109367 icmp-silent seq=173
+8504.159815 icmp-silent seq=173
+8504.210006 icmp-silent seq=173
+8504.260811 icmp-silent seq=173
+8504.311706 icmp-silent seq=173
+8504.362226 icmp-silent seq=173
+8504.412814 icmp-silent seq=173
+8504.463634 icmp-silent seq=173
+8504.514198 icmp-silent seq=173
+8504.564640 icmp-silent seq=173
+8504.614997 icmp-silent seq=173
+8504.665506 icmp-silent seq=173
+8504.716275 icmp-silent seq=173
+8504.766927 icmp-silent seq=173
+8504.817174 icmp-silent seq=173
+8504.867491 icmp-silent seq=173
+8504.917866 icmp-silent seq=173
+8504.968388 icmp-silent seq=173
+8505.018800 icmp-silent seq=173
+8505.069031 icmp-silent seq=173
+8505.119214 icmp-silent seq=173
+8505.169448 icmp-silent seq=173
+8505.219677 icmp-silent seq=173
+8505.270027 icmp-silent seq=173
+8505.320909 icmp-silent seq=173
+8505.371268 icmp-silent seq=173
+8505.422010 icmp-silent seq=173
+8505.473011 icmp-silent seq=173
+8505.523654 icmp-silent seq=173
+8505.574394 icmp-silent seq=173
+8505.625516 icmp-silent seq=173
+8505.676481 icmp-silent seq=173
+8505.726891 icmp-silent seq=173
+# 8505.764416 ping-error [1790272861.824661] From 10.1.1.2 icmp_seq=163 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824697] From 10.1.1.2 icmp_seq=164 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824700] From 10.1.1.2 icmp_seq=165 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824703] From 10.1.1.2 icmp_seq=166 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824705] From 10.1.1.2 icmp_seq=167 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824707] From 10.1.1.2 icmp_seq=168 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824709] From 10.1.1.2 icmp_seq=169 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824711] From 10.1.1.2 icmp_seq=170 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824713] From 10.1.1.2 icmp_seq=171 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824715] From 10.1.1.2 icmp_seq=172 Destination Host Unreachable
+# 8505.764416 ping-error [1790272861.824717] From 10.1.1.2 icmp_seq=173 Destination Host Unreachable
+8505.777694 icmp-silent seq=173
+8505.836082 icmp-silent seq=174
+8505.892165 icmp-silent seq=175
+8505.948271 icmp-silent seq=176
+8506.004068 icmp-silent seq=177
+8506.060087 icmp-silent seq=178
+8506.116144 icmp-silent seq=179
+8506.172398 icmp-silent seq=180
+8506.232121 icmp-silent seq=181
+8506.288664 icmp-silent seq=182
+8506.344233 icmp-silent seq=183
+8506.400168 icmp-silent seq=184
+8506.450546 icmp-silent seq=184
+8506.500921 icmp-silent seq=184
+8506.551101 icmp-silent seq=184
+8506.601299 icmp-silent seq=184
+8506.651511 icmp-silent seq=184
+8506.701710 icmp-silent seq=184
+8506.751950 icmp-silent seq=184
+8506.802165 icmp-silent seq=184
+8506.852394 icmp-silent seq=184
+8506.902598 icmp-silent seq=184
+8506.952886 icmp-silent seq=184
+8507.003339 icmp-silent seq=184
+8507.053567 icmp-silent seq=184
+8507.104000 icmp-silent seq=184
+8507.154380 icmp-silent seq=184
+8507.204623 icmp-silent seq=184
+8507.255195 icmp-silent seq=184
+8507.305720 icmp-silent seq=184
+8507.356315 icmp-silent seq=184
+8507.406706 icmp-silent seq=184
+8507.457205 icmp-silent seq=184
+8507.507601 icmp-silent seq=184
+8507.558206 icmp-silent seq=184
+8507.608614 icmp-silent seq=184
+8507.659050 icmp-silent seq=184
+8507.709526 icmp-silent seq=184
+8507.759923 icmp-silent seq=184
+8507.810243 icmp-silent seq=184
+8507.860721 icmp-silent seq=184
+8507.911235 icmp-silent seq=184
+8507.961702 icmp-silent seq=184
+8508.011994 icmp-silent seq=184
+8508.062274 icmp-silent seq=184
+8508.112705 icmp-silent seq=184
+8508.163244 icmp-silent seq=184
+8508.213390 icmp-silent seq=184
+8508.263908 icmp-silent seq=184
+8508.314204 icmp-silent seq=184
+8508.364581 icmp-silent seq=184
+8508.414975 icmp-silent seq=184
+8508.465377 icmp-silent seq=184
+8508.515583 icmp-silent seq=184
+8508.566056 icmp-silent seq=184
+8508.616440 icmp-silent seq=184
+8508.666785 icmp-silent seq=184
+8508.717099 icmp-silent seq=184
+8508.767557 icmp-silent seq=184
+8508.817713 icmp-silent seq=184
+# 8508.836036 ping-error [1790272864.896368] From 10.1.1.2 icmp_seq=174 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896395] From 10.1.1.2 icmp_seq=175 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896398] From 10.1.1.2 icmp_seq=176 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896400] From 10.1.1.2 icmp_seq=177 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896402] From 10.1.1.2 icmp_seq=178 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896404] From 10.1.1.2 icmp_seq=179 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896406] From 10.1.1.2 icmp_seq=180 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896408] From 10.1.1.2 icmp_seq=181 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896409] From 10.1.1.2 icmp_seq=182 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896411] From 10.1.1.2 icmp_seq=183 Destination Host Unreachable
+# 8508.836036 ping-error [1790272864.896413] From 10.1.1.2 icmp_seq=184 Destination Host Unreachable
+8508.868169 icmp-silent seq=184
+8508.923971 icmp-silent seq=185
+8508.979920 icmp-silent seq=186
+8509.035920 icmp-silent seq=187
+8509.091934 icmp-silent seq=188
+8509.151949 icmp-silent seq=189
+8509.207936 icmp-silent seq=190
+8509.264105 icmp-silent seq=191
+8509.319990 icmp-silent seq=192
+8509.376165 icmp-silent seq=193
+8509.431929 icmp-silent seq=194
+8509.488028 icmp-silent seq=195
+8509.538269 icmp-silent seq=195
+8509.588483 icmp-silent seq=195
+8509.638701 icmp-silent seq=195
+8509.689069 icmp-silent seq=195
+8509.739286 icmp-silent seq=195
+8509.789608 icmp-silent seq=195
+8509.839828 icmp-silent seq=195
+8509.890051 icmp-silent seq=195
+8509.940426 icmp-silent seq=195
+8509.990711 icmp-silent seq=195
+8510.039942 icmp-silent seq=195
+8510.090135 icmp-silent seq=195
+8510.140398 icmp-silent seq=195
+8510.190800 icmp-silent seq=195
+8510.241087 icmp-silent seq=195
+8510.291603 icmp-silent seq=195
+8510.341858 icmp-silent seq=195
+8510.400098 icmp-silent seq=196
+8510.459940 icmp-silent seq=197
+8510.516047 icmp-silent seq=198
+8510.576085 icmp-silent seq=199
+8510.632110 icmp-silent seq=200
+8510.692106 icmp-silent seq=201
+8510.752136 icmp-silent seq=202
+8510.812091 icmp-silent seq=203
+8510.871955 icmp-silent seq=204
+8510.931952 icmp-silent seq=205
+8510.988485 icmp-silent seq=206
+8511.037562 icmp-silent seq=206
+8511.087825 icmp-silent seq=206
+8511.138058 icmp-silent seq=206
+8511.188287 icmp-silent seq=206
+8511.238505 icmp-silent seq=206
+8511.288891 icmp-silent seq=206
+8511.339109 icmp-silent seq=206
+8511.389472 icmp-silent seq=206
+8511.439740 icmp-silent seq=206
+8511.490011 icmp-silent seq=206
+8511.540328 icmp-silent seq=206
+8511.590553 icmp-silent seq=206
+8511.640789 icmp-silent seq=206
+8511.691028 icmp-silent seq=206
+8511.741213 icmp-silent seq=206
+8511.791667 icmp-silent seq=206
+8511.841918 icmp-silent seq=206
+8511.892135 icmp-silent seq=206
+8511.942486 icmp-silent seq=206
+8511.992821 icmp-silent seq=206
+8512.042126 icmp-silent seq=206
+8512.092365 icmp-silent seq=206
+8512.142869 icmp-silent seq=206
+8512.192991 icmp-silent seq=206
+8512.243291 icmp-silent seq=206
+8512.293740 icmp-silent seq=206
+8512.344110 icmp-silent seq=206
+8512.394564 icmp-silent seq=206
+8512.444720 icmp-silent seq=206
+8512.494917 icmp-silent seq=206
+8512.545128 icmp-silent seq=206
+8512.595767 icmp-silent seq=206
+8512.645917 icmp-silent seq=206
+8512.696183 icmp-silent seq=206
+8512.746432 icmp-silent seq=206
+8512.796802 icmp-silent seq=206
+8512.847291 icmp-silent seq=206
+8512.897748 icmp-silent seq=206
+8512.948288 icmp-silent seq=206
+8512.998415 icmp-silent seq=206
+8513.047648 icmp-silent seq=206
+8513.099699 icmp-silent seq=206
+# 8513.099699 icmp-lag seq=206 lag_ms=1.312 threshold_ms=1 over the threshold
+8513.149050 icmp-silent seq=206
+8513.199312 icmp-silent seq=206
+8513.249503 icmp-silent seq=206
+8513.299819 icmp-silent seq=206
+8513.350097 icmp-silent seq=206
+8513.400485 icmp-silent seq=206
+# 8513.412049 ping-error [1790272869.472389] From 10.1.1.2 icmp_seq=196 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472416] From 10.1.1.2 icmp_seq=197 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472419] From 10.1.1.2 icmp_seq=198 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472421] From 10.1.1.2 icmp_seq=199 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472423] From 10.1.1.2 icmp_seq=200 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472425] From 10.1.1.2 icmp_seq=201 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472427] From 10.1.1.2 icmp_seq=202 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472429] From 10.1.1.2 icmp_seq=203 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472431] From 10.1.1.2 icmp_seq=204 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472432] From 10.1.1.2 icmp_seq=205 Destination Host Unreachable
+# 8513.412049 ping-error [1790272869.472434] From 10.1.1.2 icmp_seq=206 Destination Host Unreachable
+8513.427630 neigh state=FAILED lladdr=-
+8513.451461 icmp-silent seq=206
+8513.504088 icmp-silent seq=207
+8513.559919 icmp-silent seq=208
+8513.616159 icmp-silent seq=209
+8513.631992 neigh state=INCOMPLETE lladdr=-
+8513.672058 icmp-silent seq=210
+8513.728048 icmp-silent seq=211
+8513.787895 icmp-silent seq=212
+8513.843959 icmp-silent seq=213
+8513.899944 icmp-silent seq=214
+8513.955891 icmp-silent seq=215
+8514.012056 icmp-silent seq=216
+8514.071894 icmp-silent seq=217
+8514.122367 icmp-silent seq=217
+8514.172649 icmp-silent seq=217
+8514.222870 icmp-silent seq=217
+8514.273085 icmp-silent seq=217
+8514.323396 icmp-silent seq=217
+8514.373673 icmp-silent seq=217
+8514.423969 icmp-silent seq=217
+8514.474179 icmp-silent seq=217
+8514.477254 icmp-reply seq=207 ttl=64 rtt_ms=1026 ping_real=1790272870.537623
+8514.477254 icmp-reply seq=208 ttl=64 rtt_ms=973 ping_real=1790272870.537657
+8514.477254 icmp-reply seq=209 ttl=64 rtt_ms=917 ping_real=1790272870.537661
+8514.477254 icmp-reply seq=210 ttl=64 rtt_ms=861 ping_real=1790272870.537664
+8514.477254 icmp-reply seq=211 ttl=64 rtt_ms=805 ping_real=1790272870.537666
+8514.477254 icmp-reply seq=212 ttl=64 rtt_ms=749 ping_real=1790272870.537668
+8514.477254 icmp-reply seq=213 ttl=64 rtt_ms=689 ping_real=1790272870.537670
+8514.478637 icmp-reply seq=214 ttl=64 rtt_ms=634 ping_real=1790272870.537968
+# 8514.478637 icmp-lag seq=214 lag_ms=1.116 threshold_ms=1 over the threshold
+8514.478637 icmp-reply seq=215 ttl=64 rtt_ms=578 ping_real=1790272870.538488
+8514.478637 icmp-reply seq=216 ttl=64 rtt_ms=523 ping_real=1790272870.538953
+8514.479325 icmp-reply seq=217 ttl=64 rtt_ms=467 ping_real=1790272870.539473
+8514.479528 icmp-reply seq=218 ttl=64 rtt_ms=5.33 ping_real=1790272870.539940
+8514.525596 icmp-reply seq=219 ttl=64 rtt_ms=0.873 ping_real=1790272870.585978
+8514.585389 icmp-reply seq=220 ttl=64 rtt_ms=1.20 ping_real=1790272870.645763
+8514.633368 neigh state=REACHABLE lladdr=02:52:4c:58:46:57
+8514.635486 icmp-reply seq=221 ttl=64 rtt_ms=0.927 ping_real=1790272870.695870
+8514.688816 icmp-reply seq=222 ttl=64 rtt_ms=2.88 ping_real=1790272870.748542
+8514.736589 icmp-reply seq=223 ttl=64 rtt_ms=1.07 ping_real=1790272870.796921
+8514.786543 icmp-reply seq=224 ttl=64 rtt_ms=0.863 ping_real=1790272870.846925
+8514.841210 icmp-reply seq=225 ttl=64 rtt_ms=1.14 ping_real=1790272870.901574
+8514.891686 icmp-reply seq=226 ttl=64 rtt_ms=1.12 ping_real=1790272870.951970
+8514.941924 icmp-reply seq=227 ttl=64 rtt_ms=1.12 ping_real=1790272871.002285
+8514.992461 icmp-reply seq=228 ttl=64 rtt_ms=1.26 ping_real=1790272871.052813
+8515.042734 icmp-reply seq=229 ttl=64 rtt_ms=1.07 ping_real=1790272871.103099
+8515.092982 icmp-reply seq=230 ttl=64 rtt_ms=0.922 ping_real=1790272871.153225
+8515.149319 icmp-reply seq=231 ttl=64 rtt_ms=1.27 ping_real=1790272871.209666
+8515.199307 icmp-reply seq=232 ttl=64 rtt_ms=0.838 ping_real=1790272871.259698
+8515.257275 icmp-reply seq=233 ttl=64 rtt_ms=1.12 ping_real=1790272871.317649
+8515.307914 icmp-reply seq=234 ttl=64 rtt_ms=1.22 ping_real=1790272871.368210
+8515.358170 icmp-reply seq=235 ttl=64 rtt_ms=1.01 ping_real=1790272871.418511
+8515.408645 icmp-reply seq=236 ttl=64 rtt_ms=1.07 ping_real=1790272871.468998
+8515.458876 icmp-reply seq=237 ttl=64 rtt_ms=0.992 ping_real=1790272871.519238
+8515.508933 icmp-reply seq=238 ttl=64 rtt_ms=0.890 ping_real=1790272871.569322
+8515.564763 icmp-reply seq=239 ttl=64 rtt_ms=0.832 ping_real=1790272871.625143
+8515.621642 icmp-reply seq=240 ttl=64 rtt_ms=1.36 ping_real=1790272871.681862
+8515.671508 icmp-reply seq=241 ttl=64 rtt_ms=0.865 ping_real=1790272871.731914
+8515.724904 icmp-reply seq=242 ttl=64 rtt_ms=0.884 ping_real=1790272871.785192
+8515.785346 icmp-reply seq=243 ttl=64 rtt_ms=1.22 ping_real=1790272871.845687
+8515.835544 icmp-reply seq=244 ttl=64 rtt_ms=0.945 ping_real=1790272871.895824
+8515.886184 icmp-reply seq=245 ttl=64 rtt_ms=1.27 ping_real=1790272871.946483
+8515.936182 icmp-reply seq=246 ttl=64 rtt_ms=0.874 ping_real=1790272871.996522
+8515.992824 icmp-reply seq=247 ttl=64 rtt_ms=0.906 ping_real=1790272872.053207
+8516.052809 icmp-reply seq=248 ttl=64 rtt_ms=0.873 ping_real=1790272872.113184
+8516.113240 icmp-reply seq=249 ttl=64 rtt_ms=1.17 ping_real=1790272872.173621
+8516.163407 icmp-reply seq=250 ttl=64 rtt_ms=0.928 ping_real=1790272872.223745
+8516.213612 icmp-reply seq=251 ttl=64 rtt_ms=1.03 ping_real=1790272872.273972
+8516.263876 icmp-reply seq=252 ttl=64 rtt_ms=1.02 ping_real=1790272872.324166
+8516.314247 icmp-reply seq=253 ttl=64 rtt_ms=1.18 ping_real=1790272872.374622
+8516.364308 icmp-reply seq=254 ttl=64 rtt_ms=0.873 ping_real=1790272872.424684
+8516.421314 icmp-reply seq=255 ttl=64 rtt_ms=1.17 ping_real=1790272872.481688
+8516.471819 icmp-reply seq=256 ttl=64 rtt_ms=1.18 ping_real=1790272872.532185
+8516.521983 icmp-reply seq=257 ttl=64 rtt_ms=0.986 ping_real=1790272872.582357
+8516.572027 icmp-reply seq=258 ttl=64 rtt_ms=0.890 ping_real=1790272872.632417
+8516.629438 icmp-reply seq=259 ttl=64 rtt_ms=1.34 ping_real=1790272872.689788
+8516.679384 icmp-reply seq=260 ttl=64 rtt_ms=0.828 ping_real=1790272872.739776
+8516.733262 icmp-reply seq=261 ttl=64 rtt_ms=1.07 ping_real=1790272872.793582
+8516.783741 icmp-reply seq=262 ttl=64 rtt_ms=1.29 ping_real=1790272872.844117
+8516.833785 icmp-reply seq=263 ttl=64 rtt_ms=0.884 ping_real=1790272872.894180
+8516.889323 icmp-reply seq=264 ttl=64 rtt_ms=1.32 ping_real=1790272872.949684
+8516.939383 icmp-reply seq=265 ttl=64 rtt_ms=0.890 ping_real=1790272872.999754
+8516.993142 icmp-reply seq=266 ttl=64 rtt_ms=1.02 ping_real=1790272873.053472
+8517.043388 icmp-reply seq=267 ttl=64 rtt_ms=1.01 ping_real=1790272873.103784
+8517.093492 icmp-reply seq=268 ttl=64 rtt_ms=0.955 ping_real=1790272873.153899
+8517.143986 icmp-reply seq=269 ttl=64 rtt_ms=1.16 ping_real=1790272873.204302
+8517.193977 icmp-reply seq=270 ttl=64 rtt_ms=0.871 ping_real=1790272873.254376
+8517.248980 icmp-reply seq=271 ttl=64 rtt_ms=1.07 ping_real=1790272873.309382
+8517.299136 icmp-reply seq=272 ttl=64 rtt_ms=0.963 ping_real=1790272873.359517
+8517.349868 icmp-reply seq=273 ttl=64 rtt_ms=1.43 ping_real=1790272873.410214
+8517.400249 icmp-reply seq=274 ttl=64 rtt_ms=1.12 ping_real=1790272873.460592
+8517.450849 icmp-reply seq=275 ttl=64 rtt_ms=1.32 ping_real=1790272873.511250
+8517.501240 icmp-reply seq=276 ttl=64 rtt_ms=1.17 ping_real=1790272873.561613
+8517.551414 icmp-reply seq=277 ttl=64 rtt_ms=1.00 ping_real=1790272873.611808
+8517.601410 icmp-reply seq=278 ttl=64 rtt_ms=0.830 ping_real=1790272873.661802
+8517.657295 icmp-reply seq=279 ttl=64 rtt_ms=1.14 ping_real=1790272873.717679
+8517.707492 icmp-reply seq=280 ttl=64 rtt_ms=1.01 ping_real=1790272873.767867
+8517.757488 icmp-reply seq=281 ttl=64 rtt_ms=0.858 ping_real=1790272873.817874
+8517.812784 icmp-reply seq=282 ttl=64 rtt_ms=0.895 ping_real=1790272873.873184
+8517.874726 icmp-reply seq=283 ttl=64 rtt_ms=2.11 ping_real=1790272873.934702
+8517.923471 icmp-reply seq=284 ttl=64 rtt_ms=0.899 ping_real=1790272873.983878
+8517.980772 icmp-reply seq=285 ttl=64 rtt_ms=0.869 ping_real=1790272874.041167
+8518.040931 icmp-reply seq=286 ttl=64 rtt_ms=0.978 ping_real=1790272874.101321
+8518.090927 icmp-reply seq=287 ttl=64 rtt_ms=0.824 ping_real=1790272874.151325
+8518.145120 icmp-reply seq=288 ttl=64 rtt_ms=1.14 ping_real=1790272874.205507
+8518.195031 icmp-reply seq=289 ttl=64 rtt_ms=0.788 ping_real=1790272874.255440
+8518.252759 icmp-reply seq=290 ttl=64 rtt_ms=0.824 ping_real=1790272874.313152
+8518.308771 icmp-reply seq=291 ttl=64 rtt_ms=0.834 ping_real=1790272874.369180
+8518.364769 icmp-reply seq=292 ttl=64 rtt_ms=0.845 ping_real=1790272874.425163
+8518.420775 icmp-reply seq=293 ttl=64 rtt_ms=0.874 ping_real=1790272874.481172
+8518.476792 icmp-reply seq=294 ttl=64 rtt_ms=0.889 ping_real=1790272874.537208
+8518.533152 icmp-reply seq=295 ttl=64 rtt_ms=1.12 ping_real=1790272874.593510
+8518.583240 icmp-reply seq=296 ttl=64 rtt_ms=0.854 ping_real=1790272874.643644
+8518.636742 icmp-reply seq=297 ttl=64 rtt_ms=0.856 ping_real=1790272874.697147
+8518.692721 icmp-reply seq=298 ttl=64 rtt_ms=0.828 ping_real=1790272874.753136
+8518.748698 icmp-reply seq=299 ttl=64 rtt_ms=0.816 ping_real=1790272874.809107
+8518.804644 icmp-reply seq=300 ttl=64 rtt_ms=0.765 ping_real=1790272874.865059
+8518.860815 icmp-reply seq=301 ttl=64 rtt_ms=0.901 ping_real=1790272874.921213
+8518.916792 icmp-reply seq=302 ttl=64 rtt_ms=0.838 ping_real=1790272874.977141
+8518.972830 icmp-reply seq=303 ttl=64 rtt_ms=0.934 ping_real=1790272875.033230
+8519.022828 icmp-reply seq=304 ttl=64 rtt_ms=0.854 ping_real=1790272875.083226
+8519.076694 icmp-reply seq=305 ttl=64 rtt_ms=0.788 ping_real=1790272875.137110
+8519.133041 icmp-reply seq=306 ttl=64 rtt_ms=1.13 ping_real=1790272875.193459
+8519.183584 icmp-reply seq=307 ttl=64 rtt_ms=1.19 ping_real=1790272875.243882
+8519.233815 icmp-reply seq=308 ttl=64 rtt_ms=1.07 ping_real=1790272875.294193
+8519.283972 icmp-reply seq=309 ttl=64 rtt_ms=0.954 ping_real=1790272875.344323
+8519.335223 icmp-reply seq=310 ttl=64 rtt_ms=1.72 ping_real=1790272875.395429
+8519.385327 icmp-reply seq=311 ttl=64 rtt_ms=1.03 ping_real=1790272875.445672
+8519.435407 icmp-reply seq=312 ttl=64 rtt_ms=0.927 ping_real=1790272875.495816
+8519.486328 icmp-reply seq=313 ttl=64 rtt_ms=1.52 ping_real=1790272875.546736
+8519.537096 icmp-reply seq=314 ttl=64 rtt_ms=1.47 ping_real=1790272875.597510
+8519.587721 icmp-reply seq=315 ttl=64 rtt_ms=1.39 ping_real=1790272875.648134
+8519.638112 icmp-reply seq=316 ttl=64 rtt_ms=1.16 ping_real=1790272875.698524
+8519.688934 icmp-reply seq=317 ttl=64 rtt_ms=1.39 ping_real=1790272875.749225
+8519.738785 icmp-reply seq=318 ttl=64 rtt_ms=0.806 ping_real=1790272875.799203
+8519.792904 icmp-reply seq=319 ttl=64 rtt_ms=1.01 ping_real=1790272875.853315
+8519.843180 icmp-reply seq=320 ttl=64 rtt_ms=1.09 ping_real=1790272875.903590
+8519.893306 icmp-reply seq=321 ttl=64 rtt_ms=0.971 ping_real=1790272875.953715
+8519.943349 icmp-reply seq=322 ttl=64 rtt_ms=0.890 ping_real=1790272876.003756
+8519.997465 icmp-reply seq=323 ttl=64 rtt_ms=1.14 ping_real=1790272876.057663
+8520.047585 icmp-reply seq=324 ttl=64 rtt_ms=0.966 ping_real=1790272876.107995
+8520.097629 icmp-reply seq=325 ttl=64 rtt_ms=0.888 ping_real=1790272876.158051
+8520.153608 icmp-reply seq=326 ttl=64 rtt_ms=1.54 ping_real=1790272876.214016
+8520.203864 icmp-reply seq=327 ttl=64 rtt_ms=1.04 ping_real=1790272876.264277
+8520.254183 icmp-reply seq=328 ttl=64 rtt_ms=1.06 ping_real=1790272876.314612
+8520.304396 icmp-reply seq=329 ttl=64 rtt_ms=1.00 ping_real=1790272876.364814
+8520.354579 icmp-reply seq=330 ttl=64 rtt_ms=0.993 ping_real=1790272876.414991
+8520.404899 icmp-reply seq=331 ttl=64 rtt_ms=1.02 ping_real=1790272876.465298
+8520.454890 icmp-reply seq=332 ttl=64 rtt_ms=0.852 ping_real=1790272876.515324
+8520.508930 icmp-reply seq=333 ttl=64 rtt_ms=1.05 ping_real=1790272876.569346
+8520.559715 icmp-reply seq=334 ttl=64 rtt_ms=1.43 ping_real=1790272876.620092
+8520.610090 icmp-reply seq=335 ttl=64 rtt_ms=1.04 ping_real=1790272876.670490
+8520.660403 icmp-reply seq=336 ttl=64 rtt_ms=1.07 ping_real=1790272876.720839
+8520.711812 icmp-reply seq=337 ttl=64 rtt_ms=1.57 ping_real=1790272876.771965
+8520.762321 icmp-reply seq=338 ttl=64 rtt_ms=1.43 ping_real=1790272876.822714
+8520.812461 icmp-reply seq=339 ttl=64 rtt_ms=0.978 ping_real=1790272876.872892
+8520.862596 icmp-reply seq=340 ttl=64 rtt_ms=0.968 ping_real=1790272876.923017
+8520.913343 icmp-reply seq=341 ttl=64 rtt_ms=1.32 ping_real=1790272876.973701
+8520.963499 icmp-reply seq=342 ttl=64 rtt_ms=1.02 ping_real=1790272877.023923
+8521.014166 icmp-reply seq=343 ttl=64 rtt_ms=1.33 ping_real=1790272877.074517
+8521.064265 icmp-reply seq=344 ttl=64 rtt_ms=0.904 ping_real=1790272877.124684
+8521.114834 icmp-reply seq=345 ttl=64 rtt_ms=1.20 ping_real=1790272877.175207
+8521.166485 icmp-reply seq=346 ttl=64 rtt_ms=2.01 ping_real=1790272877.226751
+8521.216987 icmp-reply seq=347 ttl=64 rtt_ms=1.97 ping_real=1790272877.277337
+8521.266733 icmp-reply seq=348 ttl=64 rtt_ms=1.31 ping_real=1790272877.327106
+8521.318579 icmp-reply seq=349 ttl=64 rtt_ms=2.12 ping_real=1790272877.378908
+8521.368817 icmp-reply seq=350 ttl=64 rtt_ms=1.84 ping_real=1790272877.429169
+8521.419445 icmp-reply seq=351 ttl=64 rtt_ms=1.22 ping_real=1790272877.479758
+8521.470678 icmp-reply seq=352 ttl=64 rtt_ms=1.71 ping_real=1790272877.531021
+8521.522410 icmp-reply seq=353 ttl=64 rtt_ms=2.03 ping_real=1790272877.582687
+8521.572819 icmp-reply seq=354 ttl=64 rtt_ms=1.84 ping_real=1790272877.633114
+8521.623678 icmp-reply seq=355 ttl=64 rtt_ms=2.12 ping_real=1790272877.683971
+8521.674375 icmp-reply seq=356 ttl=64 rtt_ms=2.02 ping_real=1790272877.734665
+8521.724878 icmp-reply seq=357 ttl=64 rtt_ms=1.93 ping_real=1790272877.785193
+8521.775824 icmp-reply seq=358 ttl=64 rtt_ms=2.07 ping_real=1790272877.835943
+8521.826478 icmp-reply seq=359 ttl=64 rtt_ms=2.08 ping_real=1790272877.886756
+8521.876280 icmp-reply seq=360 ttl=64 rtt_ms=1.47 ping_real=1790272877.936604
+8521.926976 icmp-reply seq=361 ttl=64 rtt_ms=1.39 ping_real=1790272877.987323
+8521.977579 icmp-reply seq=362 ttl=64 rtt_ms=1.32 ping_real=1790272878.037989
+8522.028030 icmp-reply seq=363 ttl=64 rtt_ms=1.20 ping_real=1790272878.088445
+8522.078241 icmp-reply seq=364 ttl=64 rtt_ms=0.936 ping_real=1790272878.138666
+8522.129274 icmp-reply seq=365 ttl=64 rtt_ms=1.55 ping_real=1790272878.189639
+8522.180554 icmp-reply seq=366 ttl=64 rtt_ms=1.72 ping_real=1790272878.240896
+8522.231036 icmp-reply seq=367 ttl=64 rtt_ms=1.21 ping_real=1790272878.291412
+8522.282370 icmp-reply seq=368 ttl=64 rtt_ms=1.96 ping_real=1790272878.342764
+8522.332637 icmp-reply seq=369 ttl=64 rtt_ms=1.69 ping_real=1790272878.392944
+8522.383117 icmp-reply seq=370 ttl=64 rtt_ms=1.10 ping_real=1790272878.443512
+8522.434808 icmp-reply seq=371 ttl=64 rtt_ms=2.09 ping_real=1790272878.495112
+8522.484824 icmp-reply seq=372 ttl=64 rtt_ms=1.55 ping_real=1790272878.545141
+8522.536570 icmp-reply seq=373 ttl=64 rtt_ms=1.94 ping_real=1790272878.596848
+8522.587218 icmp-reply seq=374 ttl=64 rtt_ms=2.02 ping_real=1790272878.647502
+8522.638561 icmp-reply seq=375 ttl=64 rtt_ms=2.34 ping_real=1790272878.698495
+8522.688374 icmp-reply seq=376 ttl=64 rtt_ms=1.53 ping_real=1790272878.748663
+8522.738922 icmp-reply seq=377 ttl=64 rtt_ms=1.22 ping_real=1790272878.799275
+8522.789926 icmp-reply seq=378 ttl=64 rtt_ms=1.52 ping_real=1790272878.850234
+8522.841745 icmp-reply seq=379 ttl=64 rtt_ms=2.14 ping_real=1790272878.901992
+8522.892272 icmp-reply seq=380 ttl=64 rtt_ms=1.94 ping_real=1790272878.952457
+8522.941773 icmp-reply seq=381 ttl=64 rtt_ms=1.28 ping_real=1790272879.002167
+8522.992529 icmp-reply seq=382 ttl=64 rtt_ms=1.35 ping_real=1790272879.052913
+8523.043117 icmp-reply seq=383 ttl=64 rtt_ms=1.19 ping_real=1790272879.103417
+8523.093205 icmp-reply seq=384 ttl=64 rtt_ms=0.984 ping_real=1790272879.153649
+8523.144398 icmp-reply seq=385 ttl=64 rtt_ms=1.55 ping_real=1790272879.204737
+8523.195898 icmp-reply seq=386 ttl=64 rtt_ms=1.80 ping_real=1790272879.256191
+8523.245171 icmp-reply seq=387 ttl=64 rtt_ms=1.10 ping_real=1790272879.305557
+8523.296857 icmp-reply seq=388 ttl=64 rtt_ms=1.91 ping_real=1790272879.357133
+8523.347000 icmp-reply seq=389 ttl=64 rtt_ms=1.69 ping_real=1790272879.407374
+8523.397559 icmp-reply seq=390 ttl=64 rtt_ms=1.20 ping_real=1790272879.458002
+8523.448789 icmp-reply seq=391 ttl=64 rtt_ms=1.67 ping_real=1790272879.509145
+8523.500041 icmp-reply seq=392 ttl=64 rtt_ms=1.71 ping_real=1790272879.560373
+8523.551828 icmp-reply seq=393 ttl=64 rtt_ms=2.03 ping_real=1790272879.612072
+8523.602449 icmp-reply seq=394 ttl=64 rtt_ms=2.00 ping_real=1790272879.662753
+8523.652922 icmp-reply seq=395 ttl=64 rtt_ms=1.80 ping_real=1790272879.713225
+8523.704628 icmp-reply seq=396 ttl=64 rtt_ms=2.86 ping_real=1790272879.764759
+8523.754174 icmp-reply seq=397 ttl=64 rtt_ms=2.01 ping_real=1790272879.814472
+8523.804737 icmp-reply seq=398 ttl=64 rtt_ms=1.76 ping_real=1790272879.865013
+8523.854380 icmp-reply seq=399 ttl=64 rtt_ms=1.29 ping_real=1790272879.914719
+8523.904989 icmp-reply seq=400 ttl=64 rtt_ms=1.30 ping_real=1790272879.965333
+8523.955653 icmp-reply seq=401 ttl=64 rtt_ms=1.39 ping_real=1790272880.016087
+8524.006175 icmp-reply seq=402 ttl=64 rtt_ms=1.20 ping_real=1790272880.066582
+8524.056367 icmp-reply seq=403 ttl=64 rtt_ms=0.998 ping_real=1790272880.116803
+8524.106654 icmp-reply seq=404 ttl=64 rtt_ms=1.07 ping_real=1790272880.167093
+8524.157801 icmp-reply seq=405 ttl=64 rtt_ms=1.60 ping_real=1790272880.218170
+8524.208797 icmp-reply seq=406 ttl=64 rtt_ms=1.57 ping_real=1790272880.269170
+8524.259783 icmp-reply seq=407 ttl=64 rtt_ms=1.56 ping_real=1790272880.320135
+8524.311192 icmp-reply seq=408 ttl=64 rtt_ms=1.88 ping_real=1790272880.371549
+8524.360952 icmp-reply seq=409 ttl=64 rtt_ms=1.43 ping_real=1790272880.421317
+8524.412006 icmp-reply seq=410 ttl=64 rtt_ms=1.54 ping_real=1790272880.472412
+8524.462762 icmp-reply seq=411 ttl=64 rtt_ms=1.43 ping_real=1790272880.523186
+8524.513895 icmp-reply seq=412 ttl=64 rtt_ms=1.60 ping_real=1790272880.574258
+8524.565340 icmp-reply seq=413 ttl=64 rtt_ms=2.11 ping_real=1790272880.625697
+8524.616710 icmp-reply seq=414 ttl=64 rtt_ms=2.87 ping_real=1790272880.677093
+8524.668825 icmp-reply seq=415 ttl=64 rtt_ms=3.21 ping_real=1790272880.728974
+8524.719522 icmp-reply seq=416 ttl=64 rtt_ms=2.93 ping_real=1790272880.779849
+8524.769194 icmp-reply seq=417 ttl=64 rtt_ms=2.22 ping_real=1790272880.829580
+8524.820850 icmp-reply seq=418 ttl=64 rtt_ms=3.17 ping_real=1790272880.881187
+8524.871510 icmp-reply seq=419 ttl=64 rtt_ms=2.96 ping_real=1790272880.931824
+8524.920081 icmp-reply seq=420 ttl=64 rtt_ms=1.32 ping_real=1790272880.980518
+8524.971156 icmp-reply seq=421 ttl=64 rtt_ms=1.64 ping_real=1790272881.031550
+8525.022003 icmp-reply seq=422 ttl=64 rtt_ms=1.49 ping_real=1790272881.082431
+8525.072429 icmp-reply seq=423 ttl=64 rtt_ms=1.18 ping_real=1790272881.132854
+8525.123220 icmp-reply seq=424 ttl=64 rtt_ms=1.32 ping_real=1790272881.183599
+8525.174078 icmp-reply seq=425 ttl=64 rtt_ms=1.48 ping_real=1790272881.234444
+8525.224149 icmp-reply seq=426 ttl=64 rtt_ms=0.912 ping_real=1790272881.284594
+8525.281639 icmp-reply seq=427 ttl=64 rtt_ms=1.45 ping_real=1790272881.342014
+8525.333028 icmp-reply seq=428 ttl=64 rtt_ms=2.02 ping_real=1790272881.393367
+8525.382732 icmp-reply seq=429 ttl=64 rtt_ms=1.32 ping_real=1790272881.443105
+8525.433720 icmp-reply seq=430 ttl=64 rtt_ms=1.76 ping_real=1790272881.494119
+8525.484996 icmp-reply seq=431 ttl=64 rtt_ms=1.80 ping_real=1790272881.545344
+8525.535964 icmp-reply seq=432 ttl=64 rtt_ms=2.06 ping_real=1790272881.596193
+8525.586748 icmp-reply seq=433 ttl=64 rtt_ms=2.00 ping_real=1790272881.647077
+8525.637029 icmp-reply seq=434 ttl=64 rtt_ms=1.77 ping_real=1790272881.697375
+8525.687430 icmp-reply seq=435 ttl=64 rtt_ms=1.80 ping_real=1790272881.747778
+8525.738181 icmp-reply seq=436 ttl=64 rtt_ms=2.05 ping_real=1790272881.798533
+8525.788426 icmp-reply seq=437 ttl=64 rtt_ms=1.59 ping_real=1790272881.848743
+8525.839483 icmp-reply seq=438 ttl=64 rtt_ms=1.60 ping_real=1790272881.899886
+8525.890309 icmp-reply seq=439 ttl=64 rtt_ms=1.45 ping_real=1790272881.950730
+8525.941904 icmp-reply seq=440 ttl=64 rtt_ms=2.35 ping_real=1790272882.002360
+8525.991813 icmp-reply seq=441 ttl=64 rtt_ms=1.39 ping_real=1790272882.052161
+8526.042245 icmp-reply seq=442 ttl=64 rtt_ms=1.14 ping_real=1790272882.102685
+8526.092318 icmp-reply seq=443 ttl=64 rtt_ms=0.907 ping_real=1790272882.152781
+8526.150005 icmp-reply seq=444 ttl=64 rtt_ms=1.69 ping_real=1790272882.210384
+8526.200547 icmp-reply seq=445 ttl=64 rtt_ms=1.27 ping_real=1790272882.260996
+8526.251528 icmp-reply seq=446 ttl=64 rtt_ms=1.43 ping_real=1790272882.311955
+8526.302999 icmp-reply seq=447 ttl=64 rtt_ms=1.86 ping_real=1790272882.363319
+8526.353701 icmp-reply seq=448 ttl=64 rtt_ms=1.69 ping_real=1790272882.414136
+8526.404697 icmp-reply seq=449 ttl=64 rtt_ms=1.66 ping_real=1790272882.465156
+8526.456203 icmp-reply seq=450 ttl=64 rtt_ms=1.78 ping_real=1790272882.516525
+8526.506720 icmp-reply seq=451 ttl=64 rtt_ms=1.92 ping_real=1790272882.567048
+8526.557075 icmp-reply seq=452 ttl=64 rtt_ms=1.80 ping_real=1790272882.617375
+8526.607433 icmp-reply seq=453 ttl=64 rtt_ms=1.80 ping_real=1790272882.667773
+8526.658312 icmp-reply seq=454 ttl=64 rtt_ms=1.95 ping_real=1790272882.718530
+8526.708903 icmp-reply seq=455 ttl=64 rtt_ms=1.96 ping_real=1790272882.769226
+8526.759818 icmp-reply seq=456 ttl=64 rtt_ms=2.13 ping_real=1790272882.820005
+8526.810493 icmp-reply seq=457 ttl=64 rtt_ms=1.88 ping_real=1790272882.870821
+8526.861028 icmp-reply seq=458 ttl=64 rtt_ms=1.96 ping_real=1790272882.921328
+8526.910677 icmp-reply seq=459 ttl=64 rtt_ms=1.43 ping_real=1790272882.971111
+8526.961321 icmp-reply seq=460 ttl=64 rtt_ms=1.28 ping_real=1790272883.021794
+8527.011865 icmp-reply seq=461 ttl=64 rtt_ms=1.22 ping_real=1790272883.072211
+8527.061958 icmp-reply seq=462 ttl=64 rtt_ms=0.941 ping_real=1790272883.122420
+8527.112099 icmp-reply seq=463 ttl=64 rtt_ms=0.930 ping_real=1790272883.172570
+8527.163821 icmp-reply seq=464 ttl=64 rtt_ms=2.01 ping_real=1790272883.224097
+8527.212853 icmp-reply seq=465 ttl=64 rtt_ms=0.923 ping_real=1790272883.273306
+8527.264000 icmp-reply seq=466 ttl=64 rtt_ms=1.65 ping_real=1790272883.324392
+8527.315528 icmp-reply seq=467 ttl=64 rtt_ms=1.82 ping_real=1790272883.375831
+8527.365314 icmp-reply seq=468 ttl=64 rtt_ms=1.40 ping_real=1790272883.425693
+8527.416175 icmp-reply seq=469 ttl=64 rtt_ms=1.49 ping_real=1790272883.476601
+8527.468022 icmp-reply seq=470 ttl=64 rtt_ms=2.06 ping_real=1790272883.528325
+8527.518318 icmp-reply seq=471 ttl=64 rtt_ms=1.70 ping_real=1790272883.578525
+8527.570095 icmp-reply seq=472 ttl=64 rtt_ms=2.09 ping_real=1790272883.630398
+8527.620586 icmp-reply seq=473 ttl=64 rtt_ms=2.03 ping_real=1790272883.680951
+8527.671399 icmp-reply seq=474 ttl=64 rtt_ms=2.04 ping_real=1790272883.731746
+8527.722187 icmp-reply seq=475 ttl=64 rtt_ms=1.98 ping_real=1790272883.782494
+8527.772156 icmp-reply seq=476 ttl=64 rtt_ms=1.55 ping_real=1790272883.832539
+8527.823451 icmp-reply seq=477 ttl=64 rtt_ms=1.77 ping_real=1790272883.883868
+8527.873489 icmp-reply seq=478 ttl=64 rtt_ms=1.56 ping_real=1790272883.933862
+8527.924585 icmp-reply seq=479 ttl=64 rtt_ms=1.60 ping_real=1790272883.984983
+8527.975127 icmp-reply seq=480 ttl=64 rtt_ms=1.28 ping_real=1790272884.035564
+8528.025581 icmp-reply seq=481 ttl=64 rtt_ms=1.17 ping_real=1790272884.086044
+8528.075649 icmp-reply seq=482 ttl=64 rtt_ms=0.887 ping_real=1790272884.136115
+8528.129175 icmp-reply seq=483 ttl=64 rtt_ms=1.15 ping_real=1790272884.189629
+8528.180313 icmp-reply seq=484 ttl=64 rtt_ms=1.66 ping_real=1790272884.240713
+8528.231906 icmp-reply seq=485 ttl=64 rtt_ms=1.90 ping_real=1790272884.292269
+8528.281500 icmp-reply seq=486 ttl=64 rtt_ms=1.27 ping_real=1790272884.341923
+8528.332793 icmp-reply seq=487 ttl=64 rtt_ms=1.73 ping_real=1790272884.393142
+8528.382465 icmp-reply seq=488 ttl=64 rtt_ms=1.32 ping_real=1790272884.442913
+8528.433555 icmp-reply seq=489 ttl=64 rtt_ms=1.63 ping_real=1790272884.493945
+8528.484332 icmp-reply seq=490 ttl=64 rtt_ms=1.39 ping_real=1790272884.544706
+8528.535741 icmp-reply seq=491 ttl=64 rtt_ms=1.69 ping_real=1790272884.596005
+8528.587153 icmp-reply seq=492 ttl=64 rtt_ms=1.82 ping_real=1790272884.647412
+8528.636786 icmp-reply seq=493 ttl=64 rtt_ms=1.26 ping_real=1790272884.697169
+8528.687596 icmp-reply seq=494 ttl=64 rtt_ms=1.49 ping_real=1790272884.748074
+8528.738595 icmp-reply seq=495 ttl=64 rtt_ms=1.37 ping_real=1790272884.798971
+8528.790030 icmp-reply seq=496 ttl=64 rtt_ms=1.70 ping_real=1790272884.850374
+8528.841907 icmp-reply seq=497 ttl=64 rtt_ms=2.06 ping_real=1790272884.902220
+8528.892326 icmp-reply seq=498 ttl=64 rtt_ms=1.80 ping_real=1790272884.952698
+8528.941895 icmp-reply seq=499 ttl=64 rtt_ms=1.25 ping_real=1790272885.002350
+8528.994095 icmp-reply seq=500 ttl=64 rtt_ms=2.14 ping_real=1790272885.054087
+8529.043395 icmp-reply seq=501 ttl=64 rtt_ms=1.33 ping_real=1790272885.103860
+8529.093709 icmp-reply seq=502 ttl=64 rtt_ms=1.11 ping_real=1790272885.154184
+8529.144893 icmp-reply seq=503 ttl=64 rtt_ms=1.64 ping_real=1790272885.205304
+8529.196210 icmp-reply seq=504 ttl=64 rtt_ms=1.83 ping_real=1790272885.256615
+8529.245391 icmp-reply seq=505 ttl=64 rtt_ms=0.957 ping_real=1790272885.305864
+8529.296521 icmp-reply seq=506 ttl=64 rtt_ms=1.60 ping_real=1790272885.356923
+8529.347731 icmp-reply seq=507 ttl=64 rtt_ms=1.65 ping_real=1790272885.408078
+8529.398185 icmp-reply seq=508 ttl=64 rtt_ms=1.07 ping_real=1790272885.458558
+8529.448891 icmp-reply seq=509 ttl=64 rtt_ms=1.37 ping_real=1790272885.509368
+8529.500100 icmp-reply seq=510 ttl=64 rtt_ms=1.71 ping_real=1790272885.560529
+8529.553324 icmp-reply seq=511 ttl=64 rtt_ms=3.67 ping_real=1790272885.613721
+8529.602463 icmp-reply seq=512 ttl=64 rtt_ms=1.75 ping_real=1790272885.662926
+8529.653711 icmp-reply seq=513 ttl=64 rtt_ms=1.76 ping_real=1790272885.714153
+8529.706431 icmp-reply seq=514 ttl=64 rtt_ms=2.99 ping_real=1790272885.766720
+8529.757111 icmp-reply seq=515 ttl=64 rtt_ms=3.00 ping_real=1790272885.817328
+8529.808215 icmp-reply seq=516 ttl=64 rtt_ms=3.56 ping_real=1790272885.868564
+8529.859807 icmp-reply seq=517 ttl=64 rtt_ms=3.67 ping_real=1790272885.920066
+8529.908998 icmp-reply seq=518 ttl=64 rtt_ms=1.98 ping_real=1790272885.969461
+8529.958714 icmp-reply seq=519 ttl=64 rtt_ms=1.44 ping_real=1790272886.019196
+8530.009670 icmp-reply seq=520 ttl=64 rtt_ms=1.62 ping_real=1790272886.070132
+8530.061053 icmp-reply seq=521 ttl=64 rtt_ms=1.65 ping_real=1790272886.121153
+8530.109863 icmp-reply seq=522 ttl=64 rtt_ms=0.902 ping_real=1790272886.170377
+8530.165759 icmp-reply seq=523 ttl=64 rtt_ms=1.64 ping_real=1790272886.226186
+8530.217553 icmp-reply seq=524 ttl=64 rtt_ms=2.02 ping_real=1790272886.277896
+8530.266961 icmp-reply seq=525 ttl=64 rtt_ms=1.07 ping_real=1790272886.327362
+8530.318278 icmp-reply seq=526 ttl=64 rtt_ms=1.70 ping_real=1790272886.378666
+8530.368084 icmp-reply seq=527 ttl=64 rtt_ms=1.44 ping_real=1790272886.428490
+8530.419222 icmp-reply seq=528 ttl=64 rtt_ms=1.61 ping_real=1790272886.479689
+8530.470941 icmp-reply seq=529 ttl=64 rtt_ms=1.95 ping_real=1790272886.531290
+8530.521720 icmp-reply seq=530 ttl=64 rtt_ms=1.99 ping_real=1790272886.582078
+8530.572326 icmp-reply seq=531 ttl=64 rtt_ms=2.05 ping_real=1790272886.632624
+8530.622917 icmp-reply seq=532 ttl=64 rtt_ms=1.98 ping_real=1790272886.683187
+8530.673564 icmp-reply seq=533 ttl=64 rtt_ms=2.07 ping_real=1790272886.733921
+8530.724196 icmp-reply seq=534 ttl=64 rtt_ms=1.92 ping_real=1790272886.784442
+8530.774726 icmp-reply seq=535 ttl=64 rtt_ms=1.93 ping_real=1790272886.835102
+8530.825655 icmp-reply seq=536 ttl=64 rtt_ms=2.13 ping_real=1790272886.886038
+8530.875106 icmp-reply seq=537 ttl=64 rtt_ms=1.18 ping_real=1790272886.935585
+8530.925510 icmp-reply seq=538 ttl=64 rtt_ms=1.16 ping_real=1790272886.986015
+8530.976317 icmp-reply seq=539 ttl=64 rtt_ms=1.44 ping_real=1790272887.036793
+8531.026926 icmp-reply seq=540 ttl=64 rtt_ms=1.23 ping_real=1790272887.087415
+8531.077126 icmp-reply seq=541 ttl=64 rtt_ms=0.997 ping_real=1790272887.137618
+8531.127326 icmp-reply seq=542 ttl=64 rtt_ms=0.958 ping_real=1790272887.187824
+8531.178281 icmp-reply seq=543 ttl=64 rtt_ms=1.47 ping_real=1790272887.238741
+8531.229607 icmp-reply seq=544 ttl=64 rtt_ms=1.75 ping_real=1790272887.289976
+8531.278991 icmp-reply seq=545 ttl=64 rtt_ms=1.28 ping_real=1790272887.339494
+8531.330279 icmp-reply seq=546 ttl=64 rtt_ms=1.75 ping_real=1790272887.390693
+8531.380768 icmp-reply seq=547 ttl=64 rtt_ms=1.16 ping_real=1790272887.441255
+8531.431419 icmp-reply seq=548 ttl=64 rtt_ms=1.21 ping_real=1790272887.491892
+8531.482671 icmp-reply seq=549 ttl=64 rtt_ms=1.59 ping_real=1790272887.543087
+8531.534119 icmp-reply seq=550 ttl=64 rtt_ms=1.91 ping_real=1790272887.594471
+8531.584722 icmp-reply seq=551 ttl=64 rtt_ms=1.91 ping_real=1790272887.645084
+8531.635715 icmp-reply seq=552 ttl=64 rtt_ms=2.09 ping_real=1790272887.696034
+8531.686113 icmp-reply seq=553 ttl=64 rtt_ms=1.76 ping_real=1790272887.746462
+8531.736366 icmp-reply seq=554 ttl=64 rtt_ms=1.75 ping_real=1790272887.796741
+8531.786817 icmp-reply seq=555 ttl=64 rtt_ms=1.76 ping_real=1790272887.847186
+8531.838510 icmp-reply seq=556 ttl=64 rtt_ms=2.00 ping_real=1790272887.898907
+8531.889254 icmp-reply seq=557 ttl=64 rtt_ms=2.02 ping_real=1790272887.949637
+8531.939277 icmp-reply seq=558 ttl=64 rtt_ms=1.51 ping_real=1790272887.999714
+8531.989953 icmp-reply seq=559 ttl=64 rtt_ms=1.37 ping_real=1790272888.050459
+8532.040614 icmp-reply seq=560 ttl=64 rtt_ms=1.21 ping_real=1790272888.101115
+8532.090838 icmp-reply seq=561 ttl=64 rtt_ms=0.963 ping_real=1790272888.151345
+8532.141816 icmp-reply seq=562 ttl=64 rtt_ms=1.60 ping_real=1790272888.202314
+8532.193324 icmp-reply seq=563 ttl=64 rtt_ms=1.77 ping_real=1790272888.253710
+8532.242625 icmp-reply seq=564 ttl=64 rtt_ms=1.13 ping_real=1790272888.303134
+8532.293650 icmp-reply seq=565 ttl=64 rtt_ms=1.53 ping_real=1790272888.354079
+8532.345211 icmp-reply seq=566 ttl=64 rtt_ms=1.93 ping_real=1790272888.405593
+8532.394687 icmp-reply seq=567 ttl=64 rtt_ms=1.13 ping_real=1790272888.455092
+8532.446062 icmp-reply seq=568 ttl=64 rtt_ms=1.86 ping_real=1790272888.506566
+8532.497804 icmp-reply seq=569 ttl=64 rtt_ms=1.87 ping_real=1790272888.558136
+8532.548392 icmp-reply seq=570 ttl=64 rtt_ms=1.87 ping_real=1790272888.608777
+8532.599069 icmp-reply seq=571 ttl=64 rtt_ms=1.85 ping_real=1790272888.659389
+8532.649920 icmp-reply seq=572 ttl=64 rtt_ms=2.05 ping_real=1790272888.710235
+8532.700440 icmp-reply seq=573 ttl=64 rtt_ms=1.96 ping_real=1790272888.760834
+8532.750663 icmp-reply seq=574 ttl=64 rtt_ms=1.60 ping_real=1790272888.811002
+8532.801329 icmp-reply seq=575 ttl=64 rtt_ms=1.40 ping_real=1790272888.861831
+8532.852266 icmp-reply seq=576 ttl=64 rtt_ms=1.52 ping_real=1790272888.912702
+8532.903231 icmp-reply seq=577 ttl=64 rtt_ms=1.67 ping_real=1790272888.963712
+8532.953619 icmp-reply seq=578 ttl=64 rtt_ms=1.14 ping_real=1790272889.014120
+8533.004118 icmp-reply seq=579 ttl=64 rtt_ms=1.16 ping_real=1790272889.064601
+8533.054358 icmp-reply seq=580 ttl=64 rtt_ms=1.06 ping_real=1790272889.114852
+8533.104532 icmp-reply seq=581 ttl=64 rtt_ms=0.981 ping_real=1790272889.165038
+8533.155710 icmp-reply seq=582 ttl=64 rtt_ms=1.60 ping_real=1790272889.216003
+8533.207142 icmp-reply seq=583 ttl=64 rtt_ms=1.90 ping_real=1790272889.267516
+8533.256463 icmp-reply seq=584 ttl=64 rtt_ms=1.05 ping_real=1790272889.316958
+8533.308271 icmp-reply seq=585 ttl=64 rtt_ms=1.94 ping_real=1790272889.368624
+8533.358167 icmp-reply seq=586 ttl=64 rtt_ms=1.56 ping_real=1790272889.418655
+8533.408858 icmp-reply seq=587 ttl=64 rtt_ms=1.40 ping_real=1790272889.469341
+8533.459757 icmp-reply seq=588 ttl=64 rtt_ms=1.46 ping_real=1790272889.520201
+8533.510221 icmp-reply seq=589 ttl=64 rtt_ms=1.16 ping_real=1790272889.570741
+8533.560189 icmp-reply seq=590 ttl=64 rtt_ms=0.829 ping_real=1790272889.620727
+8533.616626 icmp-reply seq=591 ttl=64 rtt_ms=0.797 ping_real=1790272889.677160
+8533.676691 icmp-reply seq=592 ttl=64 rtt_ms=0.907 ping_real=1790272889.737234
+8533.732631 icmp-reply seq=593 ttl=64 rtt_ms=0.833 ping_real=1790272889.793174
+8533.788661 icmp-reply seq=594 ttl=64 rtt_ms=0.818 ping_real=1790272889.849161
+8533.844702 icmp-reply seq=595 ttl=64 rtt_ms=0.851 ping_real=1790272889.905204
+8533.900620 icmp-reply seq=596 ttl=64 rtt_ms=0.797 ping_real=1790272889.961167
+8533.956610 icmp-reply seq=597 ttl=64 rtt_ms=0.841 ping_real=1790272890.017159
+8534.013099 icmp-reply seq=598 ttl=64 rtt_ms=1.04 ping_real=1790272890.073597
+8534.063231 icmp-reply seq=599 ttl=64 rtt_ms=0.937 ping_real=1790272890.123756
+8534.113230 icmp-reply seq=600 ttl=64 rtt_ms=0.838 ping_real=1790272890.173759
+8534.168687 icmp-reply seq=601 ttl=64 rtt_ms=0.874 ping_real=1790272890.229226
+8534.224580 icmp-reply seq=602 ttl=64 rtt_ms=0.820 ping_real=1790272890.285127
+8534.280670 icmp-reply seq=603 ttl=64 rtt_ms=0.855 ping_real=1790272890.341218
+8534.336672 icmp-reply seq=604 ttl=64 rtt_ms=0.818 ping_real=1790272890.397164
+8534.393164 icmp-reply seq=605 ttl=64 rtt_ms=1.15 ping_real=1790272890.453684
+8534.443494 icmp-reply seq=606 ttl=64 rtt_ms=1.05 ping_real=1790272890.504020
+8534.493488 icmp-reply seq=607 ttl=64 rtt_ms=0.828 ping_real=1790272890.554019
+8534.549056 icmp-reply seq=608 ttl=64 rtt_ms=1.09 ping_real=1790272890.609585
+8534.600318 icmp-reply seq=609 ttl=64 rtt_ms=1.89 ping_real=1790272890.660827
+8534.650979 icmp-reply seq=610 ttl=64 rtt_ms=1.37 ping_real=1790272890.711498
+8534.701851 icmp-reply seq=611 ttl=64 rtt_ms=1.51 ping_real=1790272890.762298
+8534.752459 icmp-reply seq=612 ttl=64 rtt_ms=1.26 ping_real=1790272890.812977
+8534.802916 icmp-reply seq=613 ttl=64 rtt_ms=1.09 ping_real=1790272890.863373
+8534.853229 icmp-reply seq=614 ttl=64 rtt_ms=1.11 ping_real=1790272890.913755
+# 8534.864497 ping-summary --- 10.1.1.3 ping statistics ---
+# 8534.864497 ping-summary 614 packets transmitted, 469 received, +121 errors, 23.6156% packet loss, time 62975ms
+# 8534.864497 ping-summary rtt min/avg/max/mdev = 0.765/36.705/1039.428/163.731 ms, pipe 12
+8534.865048 stop t_real=1790272890.925663 reason=SIGINT

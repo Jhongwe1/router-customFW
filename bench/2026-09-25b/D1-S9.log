@@ -1,0 +1,14 @@
+cat /proc/net/snmp
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 181900 0 0 0 0 0 181900 90606 86 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 1457 0 0 0 0 0 0 1457 0 0 0 0 0 1466 0 9 0 0 0 0 0 1457 0 0 0 0
+IcmpMsg: InType8 OutType0 OutType3
+IcmpMsg: 1457 1457 9
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 4 0 2 0 180443 89133 7 0 71827
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 0 0 0 0 0 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+# 

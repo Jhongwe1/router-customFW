@@ -1,0 +1,90 @@
+{
+ "args": {
+  "cmd": "run",
+  "no_sntp": true,
+  "no_windows": true,
+  "out": "bench/2026-09-25/Z0-HCG2",
+  "powershell": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+  "seconds": 60.0,
+  "sntp_every": 60.0,
+  "sntp_max_delay_ms": 300.0,
+  "sntp_median_slack_ms": 10.0,
+  "sntp_port": 123,
+  "sntp_server": null,
+  "sntp_timeout": 2.0,
+  "windows_every": 60.0,
+  "windows_timeout": 5.0
+ },
+ "boot_id": "ef62493d-746f-4d68-8a64-8fb9717bc6cb",
+ "clock": "CLOCK_MONOTONIC_RAW",
+ "clocksource": "tsc",
+ "clocksource_end": "tsc",
+ "counts": {
+  "adj": 9,
+  "armed": 1,
+  "linux": 61,
+  "start": 1,
+  "stop": 1
+ },
+ "end_raw": 2361.445702953,
+ "end_real": 1790266717.337819,
+ "instruments": [
+  "linux",
+  "adj",
+  "step"
+ ],
+ "mono_at_end": 2347.82160718,
+ "mono_at_start": 2287.81634181,
+ "notes": [],
+ "pid": 2637,
+ "problems": [],
+ "refusals": {
+  "sntp": {},
+  "win": {}
+ },
+ "sntp": {
+  "offset_real_median_ms": null,
+  "recompute_mismatch": 0,
+  "refused": {},
+  "se_ppm": null,
+  "sent": 0,
+  "server_minus_raw_ppm": null,
+  "used": 0,
+  "why_no_rate": "0 used, fewer than 60"
+ },
+ "sntp_addr": null,
+ "start_raw": 2301.444250162,
+ "start_real": 1790266657.332554,
+ "started_wallclock": "2026-09-25T00:17:37+0800",
+ "step_detector": {
+  "agreed": 0,
+  "disagreements": [],
+  "positive_control": false,
+  "timerfd_steps": 0,
+  "unchecked": 0,
+  "verdict": "NO STEPS"
+ },
+ "stop_reason": "seconds",
+ "tick_check": {
+  "disagreements": [],
+  "pairs": 52,
+  "skipped": {
+   "an adj row between": 8
+  },
+  "strong": false,
+  "verdict": "AGREE",
+  "worst_ppm": 0.452
+ },
+ "tool": "hostclock",
+ "tool_version": "1.0",
+ "windows": {
+  "bracket_median_s": null,
+  "errors": {},
+  "ok": 0,
+  "qpc_minus_raw_ppm": null,
+  "qpc_se_ppm": null,
+  "real_minus_utc_median_s": null,
+  "utc_minus_raw_ppm": null,
+  "utc_se_ppm": null
+ }
+}

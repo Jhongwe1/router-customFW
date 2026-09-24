@@ -1,0 +1,193 @@
+cat /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/D1T.log ; cat /pr
+oc/rtl819x-nic
+cpu  37 0 680 21697 0 0 6045 0 0
+cpu0 37 0 680 21697 0 0 6045 0 0
+intr 170179 0 0 0 0 0 0 0 0 25351 0 0 0 87671 28732 0 0 0 0 0 0 0 0 0 0 0 28425 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 7363
+btime 0
+processes 44
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 49762
+[  6] local 10.1.1.3 port 5201 connected to 10.1.1.2 port 49778
+[ ID] Interval           Transfer     Bandwidth
+[  6]   0.00-1.02   sec  2.04 MBytes  16785 Kbits/sec                  
+[  6]   1.02-2.01   sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]   2.01-3.00   sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]   3.00-4.02   sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]   4.02-5.01   sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]   5.01-6.00   sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]   6.00-7.02   sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]   7.02-8.01   sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]   8.01-9.00   sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]   9.00-10.02  sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]  10.02-11.01  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  11.01-12.00  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  12.00-13.02  sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]  13.02-14.01  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  14.01-15.00  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  15.00-16.00  sec  2.02 MBytes  16913 Kbits/sec                  
+[  6]  16.00-17.02  sec  2.07 MBytes  17024 Kbits/sec                  
+[  6]  17.02-18.01  sec  2.01 MBytes  17063 Kbits/sec                  
+[  6]  18.01-19.00  sec  2.01 MBytes  17025 Kbits/sec                  
+[  6]  19.00-20.02  sec  2.07 MBytes  17010 Kbits/sec                  
+[  6]  20.02-21.01  sec  2.01 MBytes  17012 Kbits/sec                  
+[  6]  21.01-22.00  sec  2.00 MBytes  16967 Kbits/sec                  
+[  6]  22.00-23.02  sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]  23.02-24.01  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  24.01-25.00  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  25.00-26.02  sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]  26.02-27.01  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  27.01-28.00  sec  2.01 MBytes  16990 Kbits/sec                  
+[  6]  28.00-29.02  sec  2.07 MBytes  16990 Kbits/sec                  
+[  6]  29.02-29.92  sec  1.76 MBytes  16424 Kbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth
+[  6]   0.00-29.92  sec  0.00 Bytes  0.00 Kbits/sec                  sender
+[  6]   0.00-29.92  sec  60.5 MBytes  16969 Kbits/sec                  receiver
+[  6]  29.02-29.92  sec  1.76 MBytes  16424 Kbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  6]   0.00-29.92  sec  60.9 MBytes  17088 Kbits/sec  389             sender
+[  6]   0.00-29.92  sec  60.5 MBytes  16969 Kbits/sec                  receiver
+iperf3: the client has terminated
+version rtl819x-nic 1.4
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 35781
+n_writes 110
+n_refused 0
+n_irq 87671
+n_irq_spurious 0
+n_tx 74009
+n_rx 117167
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00003206
+seen_iisr 0003320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 17810
+n_napi_complete 13323
+n_xmit 74009
+n_xmit_busy 6
+tx_mode 0
+n_tx_full 6
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/74015/0
+n_skb_fail 0
+n_tx_stop 6
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 117167/72543787 tx 74009/5078553 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15C8014
+rmdcr0_pos A15C8034
+tpdcr0_pos A15C804C
+tpdcr1_pos 00000000
+tpdcr2_pos 00000000
+tpdcr3_pos 00000000
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 6
+n_recov_fire 6
+n_recov_spurious 0
+n_recov_ok 6
+n_recov_fail 0
+n_recov_wake 6
+recov_rc 0 0 0
+recov_j_arm 4294962783
+recov_j_fire 4294962883
+ph_follow 1
+n_ph_chk 117167
+n_ph_diff 107041
+n_ph_bad 0
+n_ph_used 107041
+ph_first_w0 A15C8110
+ph_first_exp A15C8188
+ph_first_nrx 10108
+ph_agree 10126
+ph_last A15C8170
+ph_last_j 4
+ph_last_bf A15CB292
+ph_last_cls 0
+tx_rings 1
+n_et_link 0
+et_link_last FFFFFFFF
+ph_test_cls -1
+ph_test_j 0
+ph_test_seen 0
+j_now 4294965861
+n_dsync_chk 17810
+n_dsync 16490
+dsync_last_d 4
+dsync_first_d 5
+dsync_first_rp A15C8014
+dsync_first_rm A15C8020
+dsync_first_nrx 1317
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A15C8000
+mb_ring A15C8020
+tx_ring A15C8040
+bufs A15C8290
+rx_ph A15C8050
+rx_mb A15C8110
+tx_ph A15C81D0
+tx_mb A15C8230
+idle_ring A15CE290
+rx_idx 5
+tx_idx 3
+rxd0 A15C8051 len 0 f 8063 pl 03
+rxd1 A15C8069 len 0 f 8063 pl 03
+rxd2 A15C8081 len 0 f 8063 pl 03
+rxd3 A15C8099 len 0 f 8063 pl 03
+rxd4 A15C80B1 len 0 f 8063 pl 03
+rxd5 A15C80C9 len 0 f 8063 pl 03
+rxd6 A15C80E1 len 0 f 8063 pl 03
+rxd7 A15C80FB len 0 f 8063 pl 03
+txd0 A15C81D0 len 64
+txd1 A15C81E8 len 70
+txd2 A15C8200 len 64
+txd3 A15C821A len 267
+mbd0 A15C8111 ph A15C8110 ml 0
+mbd1 A15C8129 ph A15C8128 ml 0
+mbd2 A15C8141 ph A15C8140 ml 0
+mbd3 A15C8159 ph A15C8158 ml 0
+mbd4 A15C8171 ph A15C8170 ml 0
+mbd5 A15C8189 ph A15C81B8 ml 0
+mbd6 A15C81A1 ph A15C8140 ml 0
+mbd7 A15C81BB ph A15C8158 ml 0
+rx_len 0
+rx_ph1 00400411
+rx_ph3 80630003
+rx_ph4 00090000
+# 

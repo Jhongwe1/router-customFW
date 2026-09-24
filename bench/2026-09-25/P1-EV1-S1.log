@@ -1,0 +1,51 @@
+cat /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/EV1.log
+cpu  2654 0 12121 88686 0 0 25751 0 0
+cpu0 2654 0 12121 88686 0 0 25751 0 0
+intr 1358668 0 0 0 0 0 0 0 0 150800 0 0 0 949412 129278 0 0 0 0 0 0 0 0 0 0 0 129178 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 40982
+btime 0
+processes 256
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 55330
+[  6] local 10.1.1.4 port 5201 connected to 10.1.1.2 port 41340
+[ ID] Interval           Transfer     Bandwidth       Total Datagrams
+[  6]   0.00-1.00   sec  2.31 MBytes  19365 Kbits/sec  1729  
+[  6]   1.00-2.01   sec  2.27 MBytes  18851 Kbits/sec  1700  
+[  6]   2.01-3.00   sec  2.43 MBytes  20590 Kbits/sec  1820  
+[  6]   3.00-4.00   sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]   4.00-5.00   sec  2.46 MBytes  20597 Kbits/sec  1839  
+[  6]   5.00-6.00   sec  2.22 MBytes  18614 Kbits/sec  1662  
+[  6]   6.00-7.00   sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]   7.00-8.00   sec  2.46 MBytes  20608 Kbits/sec  1840  
+[  6]   8.00-9.00   sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]   9.00-10.00  sec  2.20 MBytes  18424 Kbits/sec  1645  
+[  6]  10.00-11.00  sec  2.48 MBytes  20810 Kbits/sec  1858  
+[  6]  11.00-12.00  sec  2.40 MBytes  20171 Kbits/sec  1801  
+[  6]  12.00-13.00  sec  2.46 MBytes  20608 Kbits/sec  1840  
+[  6]  13.00-14.00  sec  2.22 MBytes  18614 Kbits/sec  1662  
+[  6]  14.00-15.00  sec  2.46 MBytes  20608 Kbits/sec  1840  
+[  6]  15.00-16.00  sec  2.40 MBytes  20171 Kbits/sec  1801  
+[  6]  16.00-17.00  sec  2.43 MBytes  20406 Kbits/sec  1822  
+[  6]  17.00-18.01  sec  2.25 MBytes  18652 Kbits/sec  1682  
+[  6]  18.01-19.00  sec  2.43 MBytes  20590 Kbits/sec  1820  
+[  6]  19.00-20.00  sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]  20.00-21.00  sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]  21.00-22.01  sec  2.25 MBytes  18652 Kbits/sec  1682  
+[  6]  22.01-23.00  sec  2.41 MBytes  20398 Kbits/sec  1803  
+[  6]  23.00-24.00  sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]  24.00-25.00  sec  2.45 MBytes  20586 Kbits/sec  1838  
+[  6]  25.00-26.01  sec  2.25 MBytes  18652 Kbits/sec  1682  
+[  6]  26.01-27.00  sec  2.41 MBytes  20398 Kbits/sec  1803  
+[  6]  27.00-28.00  sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]  28.00-29.00  sec  2.43 MBytes  20384 Kbits/sec  1820  
+[  6]  29.00-30.00  sec  2.43 MBytes  20395 Kbits/sec  1821  
+[  6]  30.00-30.04  sec   104 KBytes  21280 Kbits/sec  76  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-30.04  sec  71.6 MBytes  19994 Kbits/sec  0.000 ms  0/53626 (0%)  
+# 
