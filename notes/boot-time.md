@@ -455,16 +455,20 @@ Four references that are not the host's monotonic clock (106th segment,
   `cpu` ticks and IRQ 13 on each rlxfw dump, placed at their lines' FW-35 arrival.
 
 In every five-minute window holding two or more of them they give r within 0.0005 of
-each other (three sparse windows 0.0013–0.0017). **r ≈ 1.000 until ~15:49** — `P1-A`
+each other (four windows 0.0013–0.0020). **r ≈ 1.000 until ~15:49** — `P1-A`
 over its own 180 s 0.99972 — **then a slowdown that grew without a break**: 0.9861 at
-15:52, 0.9824 at 16:18, 0.9781 at 16:38, 0.9767 at 16:59, 0.9727–0.9744 at
+15:52, 0.9824 at 16:18, 0.9781 at 16:38, 0.9767 at 16:59, 0.9726–0.9744 at
 17:29–17:40, 0.9693–0.9700 at 18:00–18:17; and on top of the trend, 3–20 s swings
 between 0.953 and 0.994 (`V7-WZ` fell in one: r = 0.9615, by K and W independently).
 The lag was already building by 15:49:43, before `P1`'s first probe (15:54:33), so it
 did not start with `P1`'s traffic, and it did not follow load afterwards either
 (§ 7.9). Per capture, the corrected loader values are in § 7.1 and
-`c-clock/f5-best.tsv`; for a warm catch K and W differ by at most 0.0007, and a cold
-catch's r is an average over its 180 s, uncertain by ±0.3–0.8 % at the loader instant.
+`c-clock/f5-best.tsv`; for a warm catch K and W (Windows' clock over ±10 s) differ by at
+most 0.0007 — W over the catch's own bracket, `f5-best.tsv`'s `r_W_brk`, by up to
+0.0014 (`V7-WZ`) — and a cold catch's r is an average over its 180 s, uncertain by
+±0.3–0.8 % at the loader instant. 🔄 109th segment: "three sparse windows
+0.0013–0.0017", "0.9727–0.9744" and "at most 0.0007" without its window were this
+paragraph's until a second source re-read `f5-best.tsv` and `f6-rt4.tsv`.
 
 **The board's own rate** from 16:01 to 16:32: 100.0031 ticks per Windows second (48
 values, rms 3.6 ms), 99.998 ± 0.001 per NTP second. Between `P1-N0` (15:57:43) and
@@ -483,7 +487,9 @@ the host's clock did.
 factor is, 推, mostly this host clock — § 5's retro test, where it is written what
 that test could and could not decide. (3) § 5's "`D2` is unaffected: both columns
 carry the same factor" holds only when both columns ran at the same host rate; here
-the rlxfw warm catches ran at r 0.986 and the vendor warm ones at 0.961–0.976.
+six of the eight rlxfw warm catches (press 1's) ran at r 0.986, `P2Q-r02-rz` and
+`P3Q-r02-rz` at 0.977 and 0.975, and the vendor warm ones at 0.961–0.976 (🔄 109th
+segment: this read "the rlxfw warm catches ran at r 0.986").
 (4) `dmesg -T` converts old kernel lines with the current offset, so it shifted them
 by the accumulated steps — 24–26 s in this seating (`CORRECTIONS` § 5.2); journald's
 stamps do not.
@@ -662,7 +668,8 @@ uncorrected (§ 7.2, § 7.9).
   decided by the choice of f, not by the measurement. 推: press 1's own factor is the
   like-for-like one, since each boot follows its press's loader better than the
   seating's. The card's no-residual range misses by 1.46 ms at f_A and holds for
-  f ≥ 0.983658.
+  0.983060 ≤ f ≤ 1.030872 (🔄 109th segment: "f ≥ 0.983658" until a second source found
+  that 0.983658 is the cold median's f, not the range's edge).
 * `loader.esc` (no band): `M1` 5.121936 s against f_A × 5.2 = 5.107487 (+0.28 %), `M2`
   5.102142 s against 4.950333 (+3.07 %).
 * 🔄 What the second computation corrected in the first (106th segment): `D7`'s Δ had been
@@ -694,7 +701,11 @@ What seating B tests, each written with what refutes it:
   reaches the host, and the probe's 0.2 s connect phase sets the sign of "ok − line" —
   refuted by a seating-B boot whose last-refused-to-first-ok window excludes it.
 * 推 `CLK-32`'s factor is the host clock — the loader's `booting` stamped on a clock the
-  host does not slew should land within ~±0.5 % of 0.35625 s in every seating (§ 5).
+  host does not slew should land within ~±0.5 % of 0.35625 s in every seating. 0.35625 s
+  is not a registered value: it is the 106th segment's fit of the loader factor against
+  the host rate over 21 directories, read at r = 1 (`$FWRE_WORK/rebuild/s106/r-retro/`
+  `REPORT.md`); § 5's seven directories with a right host clock, 0.3546–0.3578 s, all
+  lie inside its ±0.5 % (🔄 109th segment: this bullet cited § 5 for the number itself).
 * ~~The host clock's mechanism — decided by resynchronizing Windows (§ 7.9).~~ 🔄 Decided
   at the desk by the 107th segment without touching Windows: a trace named the process that
   writes the tick, and stopping the other controller ended the slew (§ 7.9). Seating B no
@@ -739,7 +750,12 @@ boot) are *A third rate term* and *E3*. Their scripts, logs and registration are
   `CLOCK_MONOTONIC` 0.964972 per QPC second, `CLOCK_MONOTONIC_RAW` 1.000016, Windows'
   own `UtcNow` 1.000000. Per five-minute window, `MONOTONIC` fell 0.974 → 0.959 from
   18:41 to 19:38, through two desk sweeps' load and the gap between them — so it is not
-  a function of load — while `RAW` stayed within 0.9997–1.0012.
+  a function of load — while `RAW` stayed within 0.9997–1.0012. ⚠️ 109th segment: a
+  second fit of the same log (`$FWRE_WORK/rebuild/s109/arith2/`) reproduces both
+  `MONOTONIC` values (0.964972 on 178 rows; the 106th report's 0.964925 on 177, one row
+  with a 2.223 s bracket apart) but reads `RAW` 1.000041 and 1.000024, not 1.000016 and
+  1.000010: RAW's rate against QPC is known to tens of ppm, and which fit is right is
+  not settled.
 * **Realtime is stepped forward.** `REALTIME − MONOTONIC` jumped +0.83…+1.04 s every
   20–40 s, +32.49 s over the log's first 1,037.7 s. `systemd-timesyncd` is active
   (ntp.ubuntu.com, poll 32 s); `status` 0x2000 has `STA_PLL` clear, which fits a step
@@ -842,3 +858,16 @@ boot) are *A third rate term* and *E3*. Their scripts, logs and registration are
   one boot on one kernel; why Windows' syncs are 32,768 s apart while it reports a 1,024 s
   poll; Windows' own rate against true time; anything before 2026-09-23 05:54 (older
   journals are gone).
+* **The guard card B uses, run on this host with `timesyncd` active** (`CLK-40`; 109th
+  segment, 2026-09-24 11:03:52–11:04:52, a WSL boot started ~10:49, the board off,
+  `$FWRE_WORK/rebuild/s109/guard/`). The exact command of card B's `Z0-HCG` without its
+  100 s wait — `hostclock.py run` for 60 s with `--no-sntp --no-windows`, then
+  `report` — read ticks of 9566–10000 across the minute (77 rows) and one step of
+  +0.551906 s, seen by both of `hostclock`'s detectors (so its step detector was
+  positively controlled on this kernel a second time); the report's tick check read
+  `strong`, and both of the card's gate patterns refused the report, while both permit
+  the permitting lines in the tool's own format. Windows' last successful sync was
+  07:26:38 (`w32tm /query /status`), 32,768 s after 22:20:30 as the four intervals before
+  it — but the System log carries no event 37 for it, so that log is not a complete
+  record of Windows' syncs. The fight was on 12,434 s after that sync; seating A's steps
+  began 9,352 s after its sync and E3's 6,824 s after its own.

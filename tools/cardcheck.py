@@ -2200,8 +2200,10 @@ def host_controls(row, cards, card_at, silent):
                     checked += 1
                     if int(f[1]) != n:
                         mism.append(f"{c}: cardnum {f[1]}, HOST lines {n}")
-        ok = (len(corpus) >= 13 and n_cells >= 167 and n_tool >= 27 and len(tools) >= 5
-              and checked >= 13 and not mism)
+        # The floors are the corpus as its newest card froze (B45, 2026-09-24): a card
+        # that adds HOST cells raises them, or M59 stops being B14's kill (量 109th).
+        ok = (len(corpus) >= 14 and n_cells >= 250 and n_tool >= 54 and len(tools) >= 6
+              and checked >= 14 and not mism)
         return ok, (f"{len(corpus)} card(s), {n_cells} cell(s), {n_tool} tool command(s) "
                     f"over {len(tools)} tool(s); host-cells cardnum agrees on "
                     f"{checked - len(mism)} of {checked}" + (f": {mism}" if mism else ""))

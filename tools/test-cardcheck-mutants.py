@@ -82,7 +82,7 @@ TARGETS = ("tools/cardcheck.py", "tools/cardrun.py")
 # which flashmap.py imports.
 COPIED = ("tools/reply-size.py", "tools/ci-expected.tsv", "tools/hostprobe.py",
           "tools/looprun.py", "tools/boot-timeline.py", "tools/netblast.py",
-          "tools/flashmap.py", "tools/flashwin.py")
+          "tools/flashmap.py", "tools/flashwin.py", "tools/hostclock.py")
 
 MUT = [
     # 🔄 2026-09-23: THIS ROW NEVER COMPILED, and it read as a kill.  Its
