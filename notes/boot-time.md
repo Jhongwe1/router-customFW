@@ -1039,6 +1039,15 @@ rows**. Every row reads `status` 0x2000 and `offset` 0: no PLL offset was writte
   falls at about 17:47:29, which tests it. Over those 9.1 h Windows fell 1.0815 s behind
   its source, ≈33 ppm slow on average (1.0815 / 32,768), uncertain by the 0.32 s *Phase
   Offset* it was slewing out after the wake (±10 ppm, arithmetic).
+  🔄 111th segment, 17:49:14 (量, the coordinator's read, after `41bf452` was pushed at
+  17:40:04): *Last Successful Sync Time* 17:47:30; Kernel-General 1 at 17:47:32.026
+  stepped the clock +1.1001 s (09:47:30.9207799Z → 09:47:32.0208578Z), then +1.6 ms, again
+  with no event 37 and no sleep between. The window written before it, 17:47:28–17:47:31,
+  holds, so the cadence counted from the previous sync held once as predicted: H-b is one
+  confirmed prediction, not an established rule. The old time at the step, 17:47:30.921,
+  lies 0.27 s after the previous step's new time plus 32,768 s (08:41:22.647 + 32,768 s),
+  and 1.36 s after its old time plus 32,768 s, so the count 推 starts when a sync completes.
+  Windows fell 1.1001 s behind over this interval, ≈33.6 ppm, with no wake offset inside.
 
 ### 8.3 The board's tick, and the jiffies it lost again (`CLK-42`)
 
