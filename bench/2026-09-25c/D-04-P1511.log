@@ -1,0 +1,53 @@
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 1469(1497) bytes of data.
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+ping: sendmsg: No buffer space available
+
+--- 10.1.1.3 ping statistics ---
+60 packets transmitted, 0 received, 100% packet loss, time 9394ms
+pipe 20

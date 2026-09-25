@@ -1,0 +1,2 @@
+echo txmode 0 > /proc/rtl819x-nic
+# 

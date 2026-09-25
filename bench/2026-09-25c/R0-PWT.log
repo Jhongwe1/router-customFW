@@ -1,0 +1,18 @@
+  ok    S1  first window over 3 records: window 0 3, frames 3, rc 0
+  ok    S2  second window chains from the first: window 3 10, frames 7, partial tail 7 B
+  ok    S3  window 2: the trailer 281 untagged, the priority-tagged 281 counted at byte 12 with VID 0
+  ok    S4  whole file: two 0x8100 frames, VID 0 and 5; excess 0:4 4:3 (tags and the trailer all +4)
+  ok    S5  icmp class: 7 replies, 2 tagged, one bad ICMP checksum caught
+  ok    S6  driver frames: 2 at 61 B, the corrupted last byte refused by content_ok
+  ok    S7  dst classes against the --if address (never printed)
+  ok    S8  unreadable --prev: exit 3, counts marked cumulative, window_end still printed
+  ok    S9  no address in any output (6 planted MACs searched)
+  ok    S10 big-endian nanosecond pcap read the same
+  ok    S11 a non-Ethernet capture is refused with a reason
+  ok    S12 a missing capture is refused
+  ok    S13 a snap-truncated record keeps its wire length and is counted as truncated
+  ok    S14 nothing new since the previous window: frames 0 (the empty window is counted, not refused)
+  ok    S15 capture_live and tcpdump_procs read processes named tcpdump: 0 / 1 / 2
+  ok    S16 echo replies by identifier: sequence ranges, the tagged one, one duplicate; a request not counted (got echo_ids 2; echo_seq 1 1-3,5-6,9; echo_seq_tagged 1 6; echo_seq 2 4; echo_dup 1; echo_vid 5:1)
+  ok    S17 no identifier printed; no directory in a refusal or in a prev line (basename only)
+pcapwin self-test: 17 of 17 passed

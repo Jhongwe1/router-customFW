@@ -1,0 +1,37 @@
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 18(46) bytes of data.
+26 bytes from 10.1.1.3: icmp_seq=29 ttl=64 time=1.23 ms
+26 bytes from 10.1.1.3: icmp_seq=30 ttl=64 time=1.75 ms
+26 bytes from 10.1.1.3: icmp_seq=31 ttl=64 time=1.72 ms
+26 bytes from 10.1.1.3: icmp_seq=32 ttl=64 time=1.82 ms
+26 bytes from 10.1.1.3: icmp_seq=33 ttl=64 time=1.27 ms
+26 bytes from 10.1.1.3: icmp_seq=34 ttl=64 time=0.980 ms
+26 bytes from 10.1.1.3: icmp_seq=35 ttl=64 time=0.999 ms
+26 bytes from 10.1.1.3: icmp_seq=36 ttl=64 time=1.13 ms
+26 bytes from 10.1.1.3: icmp_seq=37 ttl=64 time=0.818 ms
+26 bytes from 10.1.1.3: icmp_seq=38 ttl=64 time=1.48 ms
+26 bytes from 10.1.1.3: icmp_seq=39 ttl=64 time=2.03 ms
+26 bytes from 10.1.1.3: icmp_seq=40 ttl=64 time=0.870 ms
+26 bytes from 10.1.1.3: icmp_seq=41 ttl=64 time=1.83 ms
+26 bytes from 10.1.1.3: icmp_seq=42 ttl=64 time=1.58 ms
+26 bytes from 10.1.1.3: icmp_seq=43 ttl=64 time=1.16 ms
+26 bytes from 10.1.1.3: icmp_seq=44 ttl=64 time=1.60 ms
+26 bytes from 10.1.1.3: icmp_seq=45 ttl=64 time=1.58 ms
+26 bytes from 10.1.1.3: icmp_seq=46 ttl=64 time=1.86 ms
+26 bytes from 10.1.1.3: icmp_seq=47 ttl=64 time=1.54 ms
+26 bytes from 10.1.1.3: icmp_seq=48 ttl=64 time=1.93 ms
+26 bytes from 10.1.1.3: icmp_seq=49 ttl=64 time=1.90 ms
+26 bytes from 10.1.1.3: icmp_seq=50 ttl=64 time=1.74 ms
+26 bytes from 10.1.1.3: icmp_seq=51 ttl=64 time=1.74 ms
+26 bytes from 10.1.1.3: icmp_seq=52 ttl=64 time=1.46 ms
+26 bytes from 10.1.1.3: icmp_seq=53 ttl=64 time=1.28 ms
+26 bytes from 10.1.1.3: icmp_seq=54 ttl=64 time=1.12 ms
+26 bytes from 10.1.1.3: icmp_seq=55 ttl=64 time=1.31 ms
+26 bytes from 10.1.1.3: icmp_seq=56 ttl=64 time=0.957 ms
+26 bytes from 10.1.1.3: icmp_seq=57 ttl=64 time=1.29 ms
+26 bytes from 10.1.1.3: icmp_seq=58 ttl=64 time=1.79 ms
+26 bytes from 10.1.1.3: icmp_seq=59 ttl=64 time=0.945 ms
+26 bytes from 10.1.1.3: icmp_seq=60 ttl=64 time=1.50 ms
+
+--- 10.1.1.3 ping statistics ---
+60 packets transmitted, 32 received, 46.6667% packet loss, time 3198ms
+rtt min/avg/max/mdev = 0.818/1.443/2.026/0.346 ms

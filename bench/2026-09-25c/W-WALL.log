@@ -1,0 +1,41 @@
+pcapwin 1.1
+pcap W.pcap records 428 partial_tail_bytes 0
+capture_live no
+tcpdump_procs 0
+prev none
+window 0 428
+window_end 428
+frames 428
+len 60:270 61:4 62:7 63:11 263:2 276:64 277:10 281:9 1511:2 1512:2 1513:4 1514:43
+ethertype 0800:355 0806:9 8100:9 88b5:55
+vlan8100 9
+vlan_vid 1767:9
+class icmp_echo_reply 364 tagged 9 len 60:237 61:3 62:6 63:10 263:1 276:60 277:9 281:9 1511:1 1512:1 1514:27 ipcsum_ok 364 icmpcsum_ok 364 excess 0:355 4:9
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 9 tagged 0 len 60:9
+class rlxfw_nic 55 tagged 0 len 60:24 61:1 62:1 63:1 263:1 276:4 277:1 1511:1 1512:1 1513:4 1514:16 content_ok 55
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:355 4:9
+echo_ids 16
+echo_seq 1 1-60
+echo_seq 2 1
+echo_seq 3 38-60
+echo_seq 4 1,6,8,11,44,47
+echo_seq 5 19-60
+echo_seq 6 1,4,6,9,12,14,47,51,53,56
+echo_seq 7 29-60
+echo_seq 8 1
+echo_seq 9 1-60
+echo_seq 10 1-60
+echo_seq 11 1,3,8,10,15,17,22,24,29,31,36,38,43,45,50,52,57,59
+echo_seq_tagged 11 3,10,17,24,31,38,45,52,59
+echo_seq 12 23
+echo_seq 13 1
+echo_seq 14 34-60
+echo_seq 15 1-20
+echo_seq 16 1,20
+echo_dup 0
+echo_vid 1767:9
+dst host:372 bcast:56 mcast:0 other:0
+truncated 0

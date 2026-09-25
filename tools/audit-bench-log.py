@@ -220,6 +220,26 @@ ALLOW = [
      "and flashwin scan, which reads the BYTES against the reference dump "
      "rather than a topic keyword, is the check that cannot be widened this "
      "way at all. 量 2026-09-17: CLEAN over 4,737 committed files"),
+    ("line", "h601_ran ",
+     "rtl819x-spi 1.2's /proc field for the h601 VERB, `h601_ran %d` -- a "
+     "BOOLEAN. 讀 rtl819x-spi.c rtl819x_spi_read_proc: sprintf(page + len, "
+     "\"h601_ran %d\\n\", rtl819x_spi_h601_ran). A fifth string carrying the "
+     "region's name: h601_skipped/h601_hashed above are the map's /proc "
+     "fields, RLXFW-S-MH601 and S-H601= are marks, and this is the verb's "
+     "/proc line, which none of them covers. 量 2026-09-25 (block 46), "
+     "bench/2026-09-25c/R1-NW0 and R1-NW1 line 58 -- the first captures in "
+     "bench/ of the whole 1.2 /proc file (no committed bench .log carried "
+     "`h601_ran` before them). Scoped to the line, so a line carrying H601 "
+     "CONTENT still fires; the needle is the format string's own text up to "
+     "the value. The cost is the one measured for S-H601=: whatever "
+     "interleaves into this line is exempt with it, one line wide, and "
+     "flashwin scan is the byte check"),
+    ("line", "h601_rc ",
+     "the sibling field, `h601_rc %d` -- the verb's RETURN CODE, the same "
+     "quantity S-H601= marks (rtl819x_spi_h601_rc, initialised -EAGAIN, so "
+     "`-11` in a boot that never ran the verb). 讀 rtl819x-spi.c, the "
+     "sprintf after h601_ran's. 量 2026-09-25, the same two captures, line "
+     "59. Scoped to the line for the same reason as h601_ran"),
     ("match", "02:52:4C:58:46:57",
      "rtl819x-nic's OWN address, a constant compiled into "
      "config/rlxfw-src/.../rtl819x-nic.c: locally administered (0x02) plus "
