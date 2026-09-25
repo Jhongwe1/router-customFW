@@ -71,6 +71,8 @@ puts no frame on the wire, while RX stays healthy* (`SPEC.md` `NET-78`).
 | 8 | `ph_flags` TX / RX template | `0x8800` / `0x9000`, derived | `0x8800` / `0x9000`, measured | 🟢 **confirmed, §5** |
 | 9 | RX buffer lookup | **follows `ph_mbuf`**, the pointer in the pkthdr's word 0 — one consumption index | **indexes the mbuf ring** with the pkthdr ring's `i` | 🔴 **no** — it is `NET-61`'s, §6 |
 | 10 | register programming order | all 4 TX bases, then 6 RX pkthdr bases, then 1 mbuf base, under `local_irq_save` | same order | 🟢 same |
+| 11 | TX `m_len` | = `ph_len`: frame + 4, 64 for a runt (`_swNic_send`) | the frame padded to 60, `ph_len` − 4 (`nic_xmit`) | ⚠️ not assessed for `NET-78`: it is `R6b`'s M1 (`notes/nic-driver.md` § 21.6). The loader writes the vendor's value, § 16 |
+| 12 | TX `m_extsize` | = `ph_len` | 2,046, constant | as row 11 |
 
 ## 2. The largest divergence: the vendor does not name egress ports, and rlxfw floods
 
@@ -676,7 +678,7 @@ loader_tx_send(pkt, len)
         printf("\nAssertion fail at file");  /* 0x8040AC50 */
         for (;;) ;                           /* 0x80403DC8: j 0x80403DC8 */
     }
-    ... build pkthdr ...
+    ... build pkthdr and mbuf lengths ...    /* § 16 */
     *(u8 *)(hdr + 15) = 63;                  /* 0x80403E58: li v0,63 */
     ring[tx_idx] |= OWN;                     /* 0x80403E80 */
     CPUICR |= TXFD;                          /* 0x80403E88, 1<<23 */
@@ -1050,3 +1052,100 @@ at a rate where it does not show.
 * Whether the loader would show the same pairing behaviour. The loader's
   service loop is polled and its rings are 4 deep, so the comparison is not
   obviously transferable, and it was not attempted.
+
+## 16. The loader's TX length convention (`R6b-0`, 2026-09-25)
+
+§ 12.1's routine, read for the three length fields it writes. 讀, from a
+disassembly of this unit's `stage2.bin` made at the desk on 2026-09-25 by the
+owner's leave, with § 12's method and image. By the same ruling only the rule
+and the addresses enter this repository: the disassembly, and the script that
+checks it, stay under `$FWRE_WORK`. `SPEC.md` `NET-122` indexes this section.
+
+### 16.1 The rule
+
+For a frame of `L` bytes (header and payload, no FCS), the send routine
+`0x80403CF0` writes:
+
+| field | value | written at |
+|---|---|---|
+| `ph_len` (pkthdr bytes 4–5) | 64 if `L` < 60 (an unsigned compare), else `L` + 4 | `0x80403DF0`–`0x80403E08`, one store on each branch |
+| `m_len` (mbuf bytes 8–9) | `ph_len`, read back from the pkthdr | `0x80403E0C`–`0x80403E18` |
+| `m_extsize` (mbuf bytes 20–21) | `ph_len`, read back again | `0x80403E1C`–`0x80403E28` |
+| `m_data` and `m_extbuf` | `0xA040F3D4` for every frame in every slot: one static buffer, uncached, 0 mod 4 | `0x80403D6C`–`0x80403D78`, `0x80403E34`, `0x80403E40` |
+| bytes `L` to 59 of a runt | not written: a runt is claimed as 64 bytes over whatever the buffer last held | none of the routine's 16 stores, which were listed exhaustively |
+
+**In one line: `ph_len` = `m_len` = `m_extsize` = (`L` < 60 ? 64 : `L` + 4).**
+That is the vendor Linux driver's rule and the older bootcode's, and it is not
+rlxfw's: rlxfw 1.4 writes `m_len` = `ph_len` − 4 and `m_extsize` = 2,046 for
+every frame (`notes/nic-driver.md` § 21.6 sets the vendor's fields beside
+rlxfw's). **rlxfw is the one writer of the four whose three length fields are
+not equal** (§ 1, rows 11–12). The loader's buffer is also 0 mod 4 where
+rlxfw's start at 2 mod 4 (M2).
+
+The frame is copied into the buffer byte by byte (`0x80406D0C`, called at
+`0x80403D84`) before the routine checks the slot's OWN bit. The byte offsets
+are those of the vendor's `common/mbuf.h`, compiled at the desk with Ubuntu's
+`mips-linux-gnu-gcc -EB` as a second source (`ph_len` 4, `m_len` 8,
+`m_extsize` 20), and of the table in `notes/nic-driver.md` § 3.
+
+### 16.2 Every frame the loader sends takes this path
+
+The routine has one call site, `0x80402B58`, in the Ethernet framer
+`0x80402A5C`, which passes `L` = payload + 14 and pads nothing. The framer has
+three callers: the ARP reply (`0x80400ED8`, `L` = 42), the TFTP ACK
+(`0x80401EBC`, `L` = 46) and TFTP DATA on the read path (`0x80402020`,
+`L` = n + 46, 558 for a full 512-byte block). No pointer word and no immediate
+construction of either routine's address exists in the image, and both
+searches found their positive control. Besides the `.bss` clear at entry, the
+only stores that name TX0's index word `0x8040EABC` are at `0x80403EB0` (this
+routine) and `0x804042D8` (the init, zero), so no other routine advances TX0 by
+its address; a scan of stores through the pointers the code builds into those
+globals, which follows no register copy, found none that reaches it. So the
+loader sends only ARP replies and TFTP frames, and during an upload to the
+board only runts. It sends no ICMP, which agrees with the loader answering ARP
+and not ping.
+
+How it was checked: a script asserts the mnemonic and operands at 137
+addresses, every instruction address above among them, the framer's entry as
+the target of three of them; two deliberately wrong expectations fail; the
+image's sha256 matches `docs/loader-command-semantics.md` § 0 and § 12's VMA
+control holds; the call census reads one site and three. The stores to
+`0x8040EABC` were listed by a second script: it finds the routine's own store,
+which the first script asserts, and the pointer scan flags a store injected
+into its input.
+
+### 16.3 Against what the die measured
+
+* `bench/2026-09-19b/X14-rings-post`, after a 1 MiB upload: each of the four
+  TX0 pkthdrs holds `ph_len` 64, a runt's, as the rule gives for the ACK and
+  ARP frames an upload makes (量, agreeing with 讀). `X9-rings`, read in the
+  same power-on before that upload and before the two `J BFC00000` watchdog
+  resets that preceded it, holds `ph_len` 0 in all four: the value the init
+  stores at `0x8040437C` (量, agreeing with 讀).
+* A baseline, not a test of the rule: `bench/2026-09-17b/X10-mbufE40` and
+  `bench/2026-09-19b/X10-descs`, each read before the first upload of its
+  power-on, hold `m_len` 0 and `m_extsize` 0 in TX0 slot 0's mbuf, the state
+  the ring's init leaves (量, agreeing with the init's 讀,
+  `0x80404360`–`0x804043AC`).
+* Block 9's `G4` (`bench/2026-08-24d/G4-get.json`, a TFTP GET from the loader):
+  987,138 bytes in 1,929 blocks, 0 retransmits by the host's count, the sha256
+  equal to the one the same block uploaded — so 1,928 full blocks, each carried
+  by at least one DATA frame at `L` = 558, 562 in all three fields by the rule
+  (量 of the transfer, not of a descriptor).
+
+### 16.4 What this does not establish
+
+* **Which of the three fields the engine sizes a frame by**, for its DMA fetch
+  and on the wire. In the loader they are equal by construction, so no loader
+  read can separate them. This section is what the loader writes into a
+  descriptor, not what it puts on the wire; `R6b-2`'s A/B decides the question
+  (`notes/nic-driver.md` § 21.6, M1).
+* Whether the engine writes back into a TX mbuf when it retires a descriptor:
+  no committed capture has read a TX mbuf after a transfer, so the mbuf side of
+  the rule is 讀 only.
+* The rule at any length the die has not carried: the pkthdr side is measured
+  at 64 and the `L` + 4 branch at one length, 558, as a working transfer.
+  Nothing here speaks to 61–63, 263, 277 or 1,511–1,512.
+* What a runt's bytes `L` to 59 carry on the wire, and the buffer's size (推
+  2,048 bytes: the older bootcode declares it so, and the next object the image
+  references starts `0x800` above the buffer).

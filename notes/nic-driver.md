@@ -223,10 +223,10 @@ significant bits:
 | 10–11 | `m_flags` | **`0x009C`** in every descriptor in every ring |
 | 12 | `m_data` | |
 | 16 | `m_extbuf` | equals `m_data` |
-| 20–21 | `m_extsize` | **`0x0800` = 2048** |
+| 20–21 | `m_extsize` | **`0x0800` = 2048** in every RX mbuf; 0 in every TX mbuf, read before the power-on's first upload (`X10-descs`). The loader writes a frame's `ph_len` here when it sends (讀, `docs/nic-vendor-diff.md` § 16) |
 
 🟢 **The 2048-byte mbuf is confirmed THREE ways that share nothing**:
-`CPUICR[26:24] = 4` = `MBUF_2048BYTES`; the `0x0800` in `m_extsize`; and the
+`CPUICR[26:24] = 4` = `MBUF_2048BYTES`; the `0x0800` in the RX mbufs' `m_extsize`; and the
 data pointers `A040FF9A`, `A041079A`, `A0410F9A`, `A041179A` being **exactly
 0x800 apart**.
 
@@ -2981,9 +2981,9 @@ which `rlxfw` did not copy. Each candidate, with what refutes it:
 
 * **M1, the `m_len` / `m_extsize` convention**, the one difference in the length fields
   between `rlxfw` and both vendor paths. Refuted by a one-boot A/B behind a driver verb
-  (`txlen vendor|rlxfw`) giving identical jabbers per length. Desk precursor: the
-  loader's own TX `m_len` rule, from a disassembly of its send routine or one read of its
-  descriptor at the prompt.
+  (`txlen vendor|rlxfw`) giving identical jabbers per length. Its desk precursor is read
+  (`docs/nic-vendor-diff.md` § 16, `NET-122`): the loader writes all three fields equal, as
+  both vendor paths do, so no loader read can separate them and decide M1.
 * **M2, start offset × length**: TX buffers start at 2 mod 4 because the RX offset was
   reused. Refuted by a `txoff 0|2` A/B with the jabber pattern unchanged.
 * **M3, state from earlier frames rather than length alone**: the period 7 at 277 B, the
