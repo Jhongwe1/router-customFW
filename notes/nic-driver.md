@@ -3017,9 +3017,334 @@ needed.
   `rlx0` is known to have gone through `eth4` in E10.
 * Which frames the 678 jabbers, the 43 drops and the 19 host-rejected replies were: no
   pcap, no `-e`, no bracket per length.
-* Whether the 76 B are 19 tags: the 19 × 4 match is arithmetic, not a capture.
+* Whether the 76 B are 19 tags: the 19 × 4 match is arithmetic, not a capture. 🔄 Block
+  46 captured the tag at one run, 277 B (§ 22.2, `NET-119`); block 45's 76 B stay arithmetic.
 * That the loss depends on length rather than history: the eleven lengths ran back to
   back in one bracket.
 * Where at least 21 frames went between the driver and the CPU port in E2, and where the
   166 or more replies went between the stack and the driver.
 * More than one instance of any condition: one press, one boot.
+
+## 22 Block 46 (`R6b-1`) — a failed reproduction, and the host stopped reaching the board
+
+量 2026-09-25 21:22–21:46, `bench/2026-09-25c/`, card `PREDICTIONS-B48-block46.md` (frozen
+`f05caf6`, sha256 `169d0042cd23…`, the digest every runblock header printed): one press on
+`p2q`, the image block 45 booted (`RLXFW-ID0=A2C56BC8`, and `recipe_id A2C56BC8` through
+`/proc`). Each of E2's eleven lengths had its own bracket in four arms: **A1**, the host's
+`ping`, 60 requests at 50 ms; **A2**, 20 requests at 250 ms; **B**, the raw `tx` verb, four
+broadcast frames per run on a freshly re-armed ring with the stack silent; **C**, loopback,
+two frames per run; **D**, `txmode 1`. `check-predictions` found all 321 of the card's
+captures, each newer than the card; no § 6 stop fired, and there is no corrections file.
+Every count below was re-derived at the desk from
+`s112/read/recon/agreed.json` (two extractors that share no code, settled against the raw
+captures by a third) and from the raw captures by the landing's own scripts
+(`s112/record/work/rd*.py`, each with a planted control that goes red). Names are card
+§ 3.0's: `n` frames the driver handed the engine, `c` the CPU port's `CRCAlignErr`, `j`/`f`/`d`
+its `JabberErr`/`FragErr`/`Drop`, `o` port 3's output, `h` the host adapter's received frames,
+`w_r` echo replies on the host's capture. Bracket 0 of each arm (A1-00, B-00, C-00, D-00)
+follows no stimulus and refutes nothing (card § 3.0; D-00 carries D's `txmode 1` switch). 量
+The stimulus cells number 140 — 139 inside brackets and the closing `D-06-M0` — among them 35
+re-arms (B 19, C 11, D 5), whose four marks the extraction reads in order before the prompt:
+a console-mark reading, not a `/proc` field (`ENGOFF` interleaves with the echo, `FW-47`).
+
+### 22.1 The verdict: a failed reproduction, by the gate's own clause
+
+The gate's first refutation condition (`PROGRESS.md`, `R6b`'s step list, *Refutation
+conditions, written now*) fired. 量: arm A1 read FAULT at three controls, none of them CARRIED,
+each following a bad length with no re-arm between:
+
+| run | L | class | `c` of `n` | `w_r` of 60 | requests lost |
+|---|---:|---|---:|---:|---|
+| `A1-03` | 60 | FAULT, `j` 4 | 27 of 42 | 23 | 1–37 |
+| `A1-07` | 60 | FAULT, `f` 1 | 33 of 42 | 32 | 1–28 |
+| `A1-13` | 1,514 | FAULT, `j` 60 | 60 of 60 | 0 | all 60 |
+
+A1-13's frames were 1,514 B by two readings: every `txd` in both dumps reads `len 1518`
+(1,514 + 4), and the board's stack answered 60 requests the host sent at that size (量; the
+size 讀 from the card's `ping -s`). The clause's other form did not occur: all seven of
+block 45's losing lengths (61, 62, 63, 263, 277, 1,511, 1,512) read FAULT in A1 (量).
+
+P1's discriminator, written before power (card § 3.2: losses at a control's first sequence
+numbers are the previous length's state; losses scattered through it are the control's own):
+A1-03 lost 1–37 and A1-07 lost 1–28, each contiguous from request 1, as did the CARRIED A1-05
+(1–18) and A1-19 (1–33) (量). So the reading registered first is the previous length's state,
+one instance per run; A1-13, which lost all 60, cannot be decided by the rule (讀 the rule).
+
+The consequence (讀 the clause; the coordinator's ruling R1): `R6b-1` is a failed
+reproduction, and none of its other arms localizes anything. **`D1` is recorded
+undetermined, and the arm that failed to separate it is arm A, the reproduction control.**
+Arms B and C stand as 量 observations (§ 22.2); any localization drawn from them is 推 and is
+design input for `R6b-2` only (§ 22.5). This seating is 1 of the stop-loss's 2. Two other
+clauses of the gate fired and are void under R1: `M7`'s, since B read CLEAN at 1,514 (16 of
+16) where A1-13 refused 60 of 60 (and at 60 by the letter, where A1-03 and A1-07 lost while
+five of B's six runs read clean, below the card's 0.527 threshold for a B CLEAN to count); and
+P8's second branch, under the reading that pairs any run
+of B with any of A1, since B-09 read FAULT by one `FragErr` at 60 while A1-01 and A1-11 read
+CLEAN (推 B-09's fragment is B-08's missing frame: B-08 and B-09 together read `n` 8 = `c` 8).
+`M6`'s clause, which is the dossier's 否證 of `D1` (loopback returns the given `ph_len` at every
+losing length), did not fire (§ 22.2). The next step's `M1`-first order rests on `NET-122`,
+not on these clauses.
+
+量 The class census (card § 3.0, a CARRIED run's own class read from `j`, `f` and `d` only):
+73 runs, **28 CLEAN, 19 FAULT, 26 LOSS ELSEWHERE**, CARRIED A1-05, A1-10, A1-16 and A1-19.
+P0's two-read bound fails at 7 controls that are not CARRIED: A1-03 27 ∉ [42, 42], A1-07 33,
+A1-09 0 ∉ [13, 14], A1-15 0 ∉ [10, 11], A1-17 0 ∉ [6, 6], A2-03 1 ∉ [3, 3] and B-09
+5 ∉ [4, 4]. 讀 By P0 the stage chain is void for every run of A1, A2 and B; that void does not
+reach § 3.0's classes (judge-s34). P0's identities hold at 76 of 76 brackets: `o` = `c` − `j`
+− `d` − `f`, `h` = `o`, and `w` = `h` with both ends of the capture live (量).
+
+### 22.2 Per length, per arm (量; B and C are observations, not a localization)
+
+| L | A1 (50 ms, 60) | A2 (250 ms, 20) | B (`tx`, 4, re-armed) | C (loopback, 2) |
+|---:|---|---|---|---|
+| 60 | A1-01 and A1-11 CLEAN 60/60; A1-03, A1-07 FAULT (§ 22.1); A1-05 CARRIED, 42 replies; A1-09 LOSS, `n` 13, `c` 0 | A2-01 CLEAN 20/20; A2-03 FAULT, below | 5 of 6 CLEAN 4/4; B-09 FAULT by `f` 1 alone, `c` 5 of `n` 4, 4 intact on the wire | C-01 `00400000` = 64 = L + 4 |
+| 61 | A1-02 FAULT, `j` 59 of `c` 60; request 1 answered | A2-02 LOSS, below | FAULT, `j` 3 | `26676D10` → 9,831 |
+| 62 | A1-04 FAULT, `j` 9, `c` 15 of 42; answered 1, 6, 8, 11, 44, 47 | `n` 0 | FAULT, `j` 3 | `26676D10` → 9,831 |
+| 63 | A1-06 FAULT, `j` 13, `d` 1, `c` 24 of 42; 10 answered | `n` 0 | FAULT, `j` 3 | `26676D10` → 9,831 |
+| 263 | A1-08 FAULT, `j` 60 of `c` 61; request 1 answered | `n` 0 | FAULT, `j` 2, `c` 3 of `n` 4 | `2E6F7D02` → 11,887 |
+| 276 | A1-10 CLEAN, CARRIED, 60/60 | `n` 0 | CLEAN 4/4 | `01180000` = 280 = L + 4 |
+| 277 | A1-12 FAULT, `j` 34, `d` 8; 18 answered, the card's set exactly; 9 tagged | `n` 0 | FAULT, `j` 3; its one frame untagged | `3E7F4900` → 15,999 |
+| 1,511 | A1-14 FAULT, `j` 10, `f` 1, `c` 12 of 19; request 23 answered | `n` 0 | FAULT, `j` 2, `d` 1 | `0E4F5902` → 3,663 |
+| 1,512 | A1-16 FAULT, CARRIED, `j` 60 of `c` 62; request 1 answered | `n` 0 | FAULT, `j` 2, `d` 1 | `0E4F5902` → 3,663 |
+| 1,513 | no reading: A1-18 handed the driver 6 frames, `c` 0, every `txd` `len 64` | `n` 0 | CLEAN 4/4 | `05ED0000` = 1,517 = L + 4 |
+| 1,514 | A1-13 FAULT (§ 22.1); A1-19 CARRIED, requests 34–60 answered; A1-15 and A1-17 LOSS, every `txd` `len 64` | `n` 0 | CLEAN 16/16 | `05EE0000` = 1,518 = L + 4 |
+
+* **B.** At each of the seven lengths one frame of four reached the wire (`w_n` 1), and it was
+  the first frame after the re-arm: each arrived 0.103–0.120 s after its first `tx` cell's RUN line
+  (0.034–0.040 s after that capture began), where in the twelve four-frame runs the second frame
+  arrived 1.075–1.119 s after it (量, each frame placed against its own cell's capture, § 22.4's clock
+  note). 讀 The re-arm restarts the ring at slot 0, so the frame that got through is slot 0; of
+  slots 1–3's 21 frames the CPU port counted 20 as refused (`j` + `f` + `d`) and 1 not at all (B-08). The stack
+  was silent in every B bracket (`s` 0, Δ`Ip.OutRequests` 0, Δ`n_rx` 0). `c` = `n` at 17 of 19
+  B runs, and B-08 (3 of 4) with B-09 (5 of 4) sum to 8 = 8. 1,514 B went through 16 of 16.
+* **C.** At the seven lengths the looped descriptor's `rx_ph1` upper half is neither L + 4 nor
+  the TX word: 9,831 at 61, 62 and 63 (one word, `26676D10`), 11,887 at 263, 15,999 at 277 and
+  3,663 at 1,511 and 1,512 (one word, `0E4F5902`); there Δ`nd_stats` rx is one frame of L bytes
+  (C-02 +61 B), Δ`n_skb_fail` +1 and Δ`n_dsync` +1, while Δ`n_rx` is 2 at all 11 runs. At the
+  other four the word is L + 4 and rx is two frames of 2L bytes. The four wrong words have
+  non-zero lower halves (`6D10`, `7D02`, `4900`, `5902`); the four right ones read `0000`.
+  Nothing reached the switch, the host or the capture, and the host sent nothing during C.
+  讀 `rx_ph1` is the last harvested frame's; 推 harvest order is transmit order, so the wrong
+  word belongs to the second looped frame — only B's slot 0 and A1's request 1 are 量 as
+  "the first frame after a re-arm is right".
+* **The tag** (`M4`, `NET-119`). A1-12, 277 B: 9 of the 18 echo replies on the wire carry
+  EtherType `0x8100` at byte 12 with VID 1767, PCP 0 and one tag, inner type `0x0800`, 281 B
+  against an IPv4 total of 263 (an excess of 4); the host's `otherhost` column rose 9, and
+  `w_r` − `i` = 18 − 9 = 9. The tagged replies answer requests 3, 10, 17, 24, 31, 38, 45, 52
+  and 59, the untagged ones 1, 8, …, 57 — `ping`'s counted set. No other run holds a tagged
+  frame, and no CLEAN run does. `w_r` − `i` equals the tagged count at 76 of 76 brackets and
+  `i` − `p` is 0 at 43 of 43 stack runs.
+* **A2.** A2-01 CLEAN, 20 of 20. A2-02 (61 B): 20 requests reached the board (port 3's receive
+  counters +20 frames, +1,300 B), the stack answered 20, 4 were discarded at a stop
+  (Δ`Ip.OutDiscards` 4), 16 were handed to the driver, and the CPU port counted 2 with
+  `j` = `f` = `d` = 0; requests 1 and 20 were answered; 1 stop and 1 fire. A2-03 (60 B) is
+  FAULT on the board's own 3 frames (`j` 1 of `c` 1, `o` 0; Δ`Ip.OutRequests` 0; the board's
+  ARP flags for the host `0x2` → `0x0`; 推 ARP probes), while none of its 20 requests reached
+  port 3. From A2-04 on, no host frame reached the board (§ 22.4), so A2-04…A2-19 hand the
+  driver nothing (`n` 0) and **test nothing**: they are *not tested*, never *holds*.
+* **D.** `tx_mode` read 1 in both dumps of every D bracket, and every run handed the driver
+  0 frames: D is *not tested*, for the same reason as A2-04 on.
+* **P5.** 量 Δ`Ip.OutDiscards` is 18 at six of the nine A1 runs with a stop (A1-03, 04, 05,
+  06, 07 and 14) and 0 at the other three (A1-10, A1-16 and A1-19), and 4 at A2-02: never "18
+  per stop". No run of 73 discards without a stop. Δ`Icmp.OutDestUnreachs` is 3 at A1-09 and
+  A1-14 (the host's neighbour state FAILED there, the board's ARP flags `0x2`) and 6 at A1-17 and A1-18 (the
+  board's flags `0x0`), with Δ`Ip.OutRequests` 63, 63, 66 and 66 = 60 + the unreachables.
+  推 The board-side evidence for a failed resolution is A1-17's and A1-18's only; "× `queue_len`
+  3" at A1-09 and A1-14 is 推.
+* **A1-15, A1-17, A1-18** (the runs labelled 1,514 and 1,513) handed the driver 11, 6 and 6
+  frames with `c` 0. 量 Every `txd` reads `len 64` in both dumps, and A1-15's
+  Δ`Ip.OutRequests` is 0; 推 the frames were 60-B ARP frames, not the run's nominal length.
+  So A1 has no reading at 1,513.
+
+### 22.3 `n` − `c` per run: frames the CPU port did not count (量)
+
+The card's P3 asks for this per run. Each figure splits into three parts: frames the engine
+still owned at the bracket (the OWN bits of dump 1), frames the run's own fire discarded
+(at most 4 per fire, `NET-113`), and frames counted nowhere. The last column is the smallest
+the third part can be. The words are *not counted at the CPU port*, not *lost*.
+
+| run | `n` | `c` | `n` − `c` | OWN (dump 1) | fires | counted nowhere, at least |
+|---|---:|---:|---:|---|---:|---|
+| `A1-03` | 42 | 27 | 15 | `0000` | 1 | 11 |
+| `A1-04` | 42 | 15 | 27 | `1011` | 1 | 20 |
+| `A1-06` | 42 | 24 | 18 | `0000` | 1 | 14 |
+| `A1-07` | 42 | 33 | 9 | `0000` | 1 | 5 |
+| `A1-09` | 13 | 0 | 13 | `1101` | 0 | 10, exactly |
+| `A1-14` | 19 | 12 | 7 | `0000` | 1 | 3 |
+| `A1-15` | 11 | 0 | 11 | `1111` | 0 | 7, exactly |
+| `A1-17` | 6 | 0 | 6 | `0000` | 0 | 6, exactly |
+| `A1-18` | 6 | 0 | 6 | `1111` | 0 | 2, exactly |
+| `A2-02` | 16 | 2 | 14 | `0000` | 1 | 10 |
+| `A2-03` | 3 | 1 | 2 | `0000` | 0 | 2, exactly |
+| `B-08` | 4 | 3 | 1 | `0000` | 0 | 1, exactly |
+
+The CARRIED runs, whose fire and `n` − `c` belong to the run before (§ 3.0): A1-05 1, A1-10 1,
+A1-16 2 and A1-19 −1 (`n` read from dump 1; the two-read bound holds, 28 ≤ 29 ≤ 29). A2-01's 1
+lies inside its two-read bound [20, 21], and B-09's −1 is 推 B-08's frame. Σ(`n` − `c`) over
+A1, A2 and B is 132; with C's 22 looped frames, which the card never expected at the switch,
+the block handed the engine 924 frames and the CPU port counted 770. The clean cases of *the
+engine took the descriptor and nothing counted it* — the ring clear at the bracket and no fire
+in the run — are A1-17 (6), A2-03 (2) and B-08 (1). 讀 A "counted nowhere" frame was taken
+from the ring by the engine and appears in none of `CRCAlignErr`'s classes, so the loss is
+upstream of the CPU port's MIB; where it is (DMA, a switch counter that does not exist, a
+frame never assembled) is not in these counters.
+
+The CPU port's `Rcv` reads 0 bytes at 77 of 77 reads while `CRCAlignErr` tracks `n`, and the
+size buckets sum to `c` − `j` − `f` at 76 of 76 brackets: jabber and fragment frames fall in no
+bucket, and dropped frames in one (量; `NET-109 殘留`).
+
+### 22.4 The host stopped reaching the board (`NET-124`)
+
+量, from the port-3 receive counters in every board read, the host reads, the transcripts'
+RAW clock and the host's kernel log of the same WSL boot:
+
+* **Before.** A2-01 (RAW 627.86) put 20 frames into port 3; A2-02 (RAW 638.04) put in 20
+  more (+1,300 B), and its replies 1 and 20 reached the host. A1's fires each left port 3
+  receiving in the next run: +60, +62, +60, +60, +60, +60, +11 (A1-15: 704 B, eleven 64-B frames and
+  nothing at the board's IP layer; 推 ARP — the capture holds inbound frames only, and the host counted 9 sent) and
+  +61, then +20 at A2-01. A fire alone does not stop it.
+* **The onset** lies between A2-02's request 20 (推 ≈ RAW 642.8: 638.04 plus 19 × 0.25 s) and
+  A2-03's `ping` start (量 RAW 648.58).
+* **After.** Port 3's whole receive block — `Rcv 635048`, Unicast/Multicast/Broadcast
+  1132/2/13 and every error and size counter — is identical in **56 of 56** reads from A2-02-R
+  through D-05-R (control: A2-01's and A2-02's differ). Meanwhile the host adapter's
+  `tx_packets` rose 175 over A2-03…A2-19 (A2-03's 20 included; 155 over A2-04…A2-19), 1 in B
+  and 45 in D (9 per run); the host's neighbour state went STALE at A2-03 and FAILED at every
+  one of the 54 host reads from A2-04 to D-05. The host link read
+  `BROADCAST,MULTICAST,UP,LOWER_UP` with `transns` 4 at all 76 host reads after A1-00, and the PAUSE counters of port 3
+  and of the CPU port read 0 at all 77 reads (the counter's positive control: block 45's port
+  3 sent 23,262 during E3 and 17,564 during E4, § 21.3).
+* **Board → host still worked in B**, after B's re-arms: `o` = `h` = `w_n` at 19 of 19 runs, 55
+  frames, and port 3's output Broadcast went 1 → 56. Between A2-02's reply 20 and B-01 the
+  board's only frames, A2-03's three, reached the host 0 times.
+* **The host's kernel log** (`$FWRE_WORK/rebuild/s112/read/crit-raw/dmesg.red`, redacted)
+  begins at RAW 683.917 s: the onset has rolled out of the ring buffer. It holds 170
+  `BUG: using smp_processor_id() in preemptible` traces between RAW 684.96 and 1530.02, each
+  running from `vhci_rx` through `usb_hcd_giveback_urb` to `usbnet_start_xmit`; per host
+  bracket they equal Δ`tx_packets` in all 51 windows the log covers whole (6 per run at
+  A2-07…A2-12, 12 at A2-13…A2-19, 1 at B-11, 9 per D run; 4 in A2-06's window, which the log's
+  start cuts). 推 The trace is the same event as the count, not an independent witness. The
+  log holds no disconnect, `cp210x`, `ttyUSB`, TX-timeout or link-change line. It holds 603 `vhci_hcd: unlink->seqnum` and 603 `urb->status -104` lines (302 each up to RAW 1586, the press's end) and 261 WSL `UtilAcceptVsock` ERROR lines, all after RAW 6645; 推 the −104 lines are cancelled URBs, a capture closing the console port being one candidate, and not transmit failures. Its
+  clock is the transcripts' RAW clock: the adapter's `left promiscuous mode` is stamped 1553.117
+  against `W-TCPX`'s RUN at 1552.986.
+* **The board's jiffies wrapped** between A2-04's and A2-05's first dumps (量 RAW 668.04 and 679.63),
+  at least 19.46 s after the onset window closes; 推 about RAW 677 by 100 ticks per second from either side (774 ticks before it, 270 after), some 28 s after: the wrap is excluded as the cause.
+* **The host's clock under this record** (`CLK-38`): the capture stamps frames on `CLOCK_REALTIME` and the runner on
+  `CLOCK_MONOTONIC_RAW`, and here their difference is a sawtooth (量 from every capture's `t0`/`end`), so each frame above is placed with the offset of the capture around it, never with one offset.
+
+**Consequence** (讀): A2-04…A2-19 and all of arm D are *not tested*. A2-02 is A2's only real
+reading at a bad length.
+
+**Candidates** (推, none separated by these captures): (a) the host's RTL8153, bound to
+`r8153_ecm` under usbip, completed each transmit URB and put no frame on the wire — the
+leading candidate, since every host frame of the silence passed through that path; (b) board
+port 3's PHY or MAC receive path stopped delivering frames to its counters; (c) the jabbered,
+tagged and uncounted frames left either side in a bad state; (d) a cable-pair fault — 推
+unlikely, because each 100BASE-TX direction has its own pair and the host link stayed up
+while board → host frames arrived in B; but the board side's own link state was not read, so
+(b) and (d) need that one more 推 to be set aside, and are not.
+
+**What settles it** (`SPEC.md` § 17, `NET-124` 殘留): host → board liveness checked before
+every arm (an ARP answered, or port 3's receive counters moving by at least the stimulus); a
+timestamped host kernel log (`dmesg -w` into `$FWRE_WORK`) running from before the press, so
+the onset cannot roll out; the board's port-3 link and PHY state (`/proc/rtl865x/port_status`,
+port 3's `phyReg`) read in the silent state; and then, on the owner's word, a re-attach of the
+host adapter (or a WSL restart) as the recovery test, reading whether port 3 receives again.
+推 The adapter's own MAC tally counters would be a second host-side witness, but `r8153_ecm`
+exposes none. Nearest row: `NET-110` (a transient FAILED state in seating 38) is the other
+direction, board → host; whether the two are related is not established.
+
+### 22.5 What the arms suggest (推: design input for `R6b-2`, not `D1`)
+
+* The first frame after a re-arm is right and the frames after it are not. 量 for B's slot 0
+  (7 of 7) and for A1's request 1, which was answered in 6 of the 7 bad-length runs that
+  began with no bad frame since the last re-arm (A1-02, 04, 06, 08, 12 and A2-02); the seventh,
+  A1-16, is unresolved: it is CARRIED behind A1-15's OWN `1111`, and its request-1 reply was
+  on the wire before its fire by back-anchored jiffies only under one of two realtime maps (推: the
+  fire is anchored on RAW, but a reply is placed through the realtime → RAW offset, which stepped between
+  A1-15's read and A1-16's — +0.005 s after the fire with the earlier offset, −0.547 s with A1-16-R's own).
+  A1-14, the one bad-length run that began after bad frames, did not answer request 1 (量).
+* 推 So the change happens inside the CPU port's DMA engine on the transmit side, at or before
+  the loopback point, keyed to the length (seven of eleven) and to the state since the last
+  re-arm. Slot index and order since the re-arm coincide in both B and C, so which of the two
+  it is stays open.
+* 推 The same state carries into later frames of any length until a re-arm: A1-03, A1-07 and
+  A1-13 lost everything before their fire, or all 60. 推 By back-anchored fire times the loss
+  at A1-03, A1-05, A1-07 and A2-02 ends at the fire: the first reply after it lands −0.062…+0.070 s from it under either map (the previous capture's end offset, or the run's own read's);
+  at A1-19 the first reply came 0.95–1.03 s after the fire, with the requests between them
+  unanswered and the board's ARP flags for the host going `0x0` → `0x2` (推 neighbour
+  resolution). A1-19's 27 of 27 counts the replies the stack handed after its fire, all of
+  which went through; it is not 27 of the requests sent after the fire, about a dozen of
+  which went unanswered first (推, from the back-anchored fire time and the 50 ms spacing).
+* Beside `NET-122` (讀: the loader and both vendor paths write `ph_len` = `m_len` = `m_extsize`,
+  and rlxfw 1.4 is the one writer whose three differ), this orders `M1` and `M2` first.
+* 1,514 B on a clean history: after a re-arm it went through 16 of 16 in B, 2 of 2 in C and in
+  A1-19's 27 (量); A1-13's 60 of 60 jabbers followed a bad length with no re-arm. 推 Its own
+  rate on a clean history is still not established.
+
+The candidates of § 21.6, each with its status after this block:
+
+* **M1**, **M2** (`txlen`, `txoff`): untested by this card (讀 card § 3.9); they need
+  `R6b-2`'s image. 推 First: P9's informative direction fired at the seven, which by P9's own
+  text puts them first, and `NET-122` is the asymmetry.
+* **M3**: § 3.3's rule gives *undetermined* at all seven (A2 carried a stimulus at A2-01 and
+  A2-02 only). 推 P8's informative direction would refute its timing and in-flight part at the
+  seven (B FAULT at ~1 s on a fresh ring), and the history part is supported by the first-frame
+  and carry-over readings; under R1 both are design input.
+* **M4**: not refuted — P11 holds, and the tag is 量 at one run (A1-12). Not established:
+  whether the engine or the switch adds it, why its VID is 1767, and why only the second reply
+  of each answered pair carries it.
+* **M5**: untested; not in this card's arms.
+* **M6**: P9's informative direction fired at the seven (量). 推 By card § 3.9 that refutes M6
+  as the stage only if the loop closes before the CPU interface's framing, which is
+  unmeasured; 讀 `NIC_LBMODE` is bit 19 of `NIC_CPUICR`, the interface's own control register.
+* **M7**: P8's informative direction held at the seven — B FAULT with the stack silent (量);
+  "nor a ring in use" is not established, since only slot 0 got through.
+* **M8**: P4 is refuted as written (量): A2-02 fired with `j` = `f` = 0 and is not CARRIED, and
+  A1-09, A1-15 and A1-18 are the owners of carried fires with `c` 0. 推 Every stall followed
+  bad-length frames since the last re-arm, so `NET-67 殘留` is not shown to be a separate
+  fault. P10's two forms were not read (D carried no traffic), and neither was the gate's
+  *blackouts* clause.
+
+### 22.6 The predictions, one line each (card §§ 3.1–3.8)
+
+P0 refuted (§ 22.1). P1 refuted: FAULT at A1-03, A1-07 and A1-13, and no CLEAN run at any of
+the seven. P2 refuted: 11 of 19 counts fall outside — A1-02 answered 1 against 17 and A1-04 6
+against 17, and 277 answered the card's 18 numbers exactly; the side reading (61 and 62 answer
+E2's numbers) held at 277 only. P3 holds: over the seven lengths' A1 runs Σ`j` 245 > Σ`d` 9
+and Σ`f` 1; the `512 - 1023:` bucket moved in no CLEAN run, and its total over the FAULT runs
+is 0 against the card's 2.3 (P(0) ≈ 0.10). P13 holds: Σ`d` over 61–63 is 1 ≤ 1, 8 > 1, and
+81 > 1 and 70 > 0. P4 refuted (§ 22.5, M8). P5 holds (§ 22.2). P6 holds. P7 refuted by the
+letter at A2-03, whose FAULT is on the board's own frames in a run whose requests never
+reached port 3; its first clause was not met (A2-08, A2-14 and A2-16 have `n` 0). P8 refuted
+by the letter (B-13 CLEAN against A1-13), and its informative direction held at the seven.
+P9 refuted in its informative direction at the seven, where three of its listed clauses fired
+(the word, the bytes, `n_skb_fail`); it holds at 60, 276, 1,513 and 1,514. P10 not tested
+beyond its gate. P11 holds. P12 holds: `R1-MB0`, `R1-MB1` and block 45's `D1-MB0` are
+byte-identical, 226 B, digest `0927be41e91fe4bd`, one `DIFFER` in group 0 and 31 the same.
+P14 holds, and its `n_writes` conjunct cannot fire on any committed `rtl819x-spi`
+(`notes/spi-mtd-driver.md` § 11.6, `FW-142`).
+
+The flash claim (CLAUDE.md § Flash), 量: 0 `FLW`, `EW`, `EB` or `FLR` among the 182 `sent`
+strings, the 6 of `R1Q-rescue.json` and the 318 RUN lines; `AUTOBURN` appears only as
+`looprun`'s `AUTOBURN 0`. `n_writes` read 0 at `R1-NW0` and `R1-NW1` with `n_write_refused` 0,
+one boot (`n_xfer` 1024 → 2048). The map bracket reaches from block 45's `D1-M0` to `R1-M1`
+(map_hashed 4186112, `H601` never hashed). What it cannot see: `H601`'s 8,192 B, two writes
+that cancel, and anything after `R1-M1`.
+
+### 22.7 What block 46 does not establish
+
+* `D1`: the stage is undetermined, and everything in § 22.5 is 推.
+* Why host → board went silent, which element failed and when exactly (§ 22.4).
+* More than one instance of any run: one press, one boot. A1 reproduces E2's spacing within a
+  run, not E2's back-to-back runs, and the 5.29–5.38 s between one A1 `ping`'s end and the next's start did not end the carry-over.
+* Which frame of a run the CPU port refused: B's wire shows which slot arrived, not which were
+  refused (B-08 reads `j` 2 with 3 frames missing).
+* Whether loopback's `ph_len` is measured or carried at 60, 276, 1,513 and 1,514; at the
+  seven the looped word equals neither the TX word nor L + 4, so it is not carried there.
+* The lengths of the frames jabbered at A1-14 and A1-16: jabbered frames fall in no bucket.
+* Three card definitions the rulings had to settle: a CARRIED run's `n` − `c` taken from dump
+  1, "requests sent" in D, and whether `r` pools runs for the 0.527 and 0.776 rules.
+* That `i` saw no reply from another interface is 推: `i` is host-wide.
+* That the running `nic_xmit` and `rtl819x-spi` were compiled from HEAD's text: the image is
+  pinned by digest, the source identity is 推.

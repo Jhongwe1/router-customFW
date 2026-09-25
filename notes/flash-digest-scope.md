@@ -296,6 +296,12 @@ firmware *has* run on this part since the dump, and `[0x9000,0xA000)` is where a
 vendor firmware saves configuration — **that is a hypothesis with a mechanism and
 it is recorded as one, not as a reading.**
 
+🔄 2026-09-26: the `n_writes` clause above carries no information. 讀 No committed
+version of `rtl819x-spi` increments the counter — 1.0, 1.1 and 1.2 name it on four
+lines each and none writes it, and their `.write`/`.erase` stubs refuse
+(`notes/spi-mtd-driver.md` § 11.6, `SPEC.md` `FW-142`). "Not tonight" rests on the
+other three clauses, and "rlxfw's own driver counted zero writes" below on the stubs.
+
 🔴 **And it moves the forbidden sentence in the harder direction.** *"Not one
 flash byte is written"* was previously unmeasured; it is now **known false for the
 device** over some interval, with the write unattributed. What is measured is
@@ -595,6 +601,12 @@ X7-NW1   n_pio_bytes 4194304    n_writes 0
 ```
 
 **A counter that moved by 4,194,304 beside one that did not.**
+
+🔴 2026-09-26: that is a control on the dump, not on `n_writes`. `n_pio_bytes` moving
+shows the dump was live; it does not show that `n_writes` could move, and it cannot:
+no committed version of `rtl819x-spi` increments it (讀, `notes/spi-mtd-driver.md`
+§ 11.6, `SPEC.md` `FW-142`). The positive control this section claims for the sentence
+*zero flash writes* does not exist.
 
 **Owner of `SPEC.md` `FLS-27`.**
 

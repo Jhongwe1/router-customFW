@@ -1016,6 +1016,17 @@ correlated with long `local_irq_save` regions, the second predicts a loss rate
 that depends on the **phase** between TC0 and TC1 and would therefore drift.
 **`R6` has to touch this code anyway.**
 
+🔄 **2026-09-26: a second population, and this section now owns its mechanism** (`SPEC.md`
+`CLK-42`, `notes/boot-time.md` § 8.3). 量 One `cat /proc/rtl865x/asicCounter` — about 1.2 s
+of `panic_printk` output, each line written by `vprintk` with interrupts disabled (讀) —
+costs TC1 (IRQ 25, the jiffies) 112.55–115.72 ticks in block 46's context, while across one
+such read in block 45 TC1 fell 71 ticks further behind than TC0 (IRQ 13) — about 45 against 115, the absolutes moving by ~4.5 ticks with the anchor byte. The two
+candidates above stand, with a third (推): TC0 on the LOPI and TC1 on the ICTL may latch
+differently. The discriminator is an image whose TC0 acknowledge writes only `TC0IP`:
+candidate 2 predicts TC1's per-read loss falling to about TC0's. 讀 `R6` closed on 2026-09-22
+without touching this code, so no open gate owns the question; which gate carries that image
+is the owner's decision.
+
 ### 8.5 What the driver does about it, and what it does not
 
 `4.1` **re-bases** the pre-check window at `late_initcall` and waits `MIN_J`

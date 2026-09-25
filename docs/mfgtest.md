@@ -108,7 +108,7 @@ The line splits cleanly, because its two halves are not the same kind of thing:
 * **Erase-and-write-back is struck**, and its replacement is not a compromise
   invented to dodge the question. `rtl819x-spi`'s `trywrite` calls `mtd->write()`
   and `mtd->erase()` **through the pointers**, receives `-EOPNOTSUPP` from both
-  because `.flags = MTD_CAP_ROM`, and asserts `n_writes == 0`. *The write path
+  because `.flags = MTD_CAP_ROM`, and asserts `n_writes == 0` (🔄 2026-09-26: an assertion that cannot fail, `SPEC.md` `FW-142`). *The write path
   is reachable and refuses* is a measurable property, it has a two-sided
   injection (§3, `FAIL-FLASH-2`), and it writes nothing.
 
@@ -230,7 +230,7 @@ see §5.
 |---|---|---|---|---|:---:|---|
 | **`MT-ID`** | the image's own `RLXFW-ID0` mark | — | equals the `RECIPE_ID` the build computed, **compared case-insensitively** — 🔴 the driver prints `%08X` and `rlxfw-kbuild.sh` computes `sha256sum \| cut -c1-8`, so an `=` between them turns a good unit red | build a second image; the printed id must differ | S | n/a (build-time) |
 | **`MT-FLASH-1`** | `/proc/rtl819x-spi`, new `rdid` verb | SPI NOR · `FLS-04` | `1C7016` | feed the comparator a wrong id | S — stands in for *a different or dead flash part*, which needs class **T** | n/a |
-| **`MT-FLASH-2`** | `/proc/rtl819x-spi` after `trywrite` | SPI NOR · `FLS-27` | both pointers return `-EOPNOTSUPP`; `n_writes == 0` | build one image with `.flags` not `MTD_CAP_ROM` | S | n/a (build-time); **this is the substitute for the plan's erase/write-back** |
+| **`MT-FLASH-2`** | `/proc/rtl819x-spi` after `trywrite` | SPI NOR · `FLS-27` | both pointers return `-EOPNOTSUPP`; `n_writes == 0` (🔄 2026-09-26: this conjunct cannot fail — no committed `rtl819x-spi` increments the counter, `SPEC.md` `FW-142`. What the check still shows is that the image carries rlxfw's driver with no write path: both pointers refuse and `n_write_refused` moves. What it cannot see is a write by anything else — the loader, the vendor firmware, another kernel path) | build one image with `.flags` not `MTD_CAP_ROM` | S | n/a (build-time); **this is the substitute for the plan's erase/write-back** |
 | **`MT-FLASH-3`** | `/proc/rtl819x-spi-map`, 32 × 32 | flash content · `FLS-26` | 31 of 32 groups identical to the reference; group 0 as recorded | the driver's existing `corrupt` verb, which moved the 4 MiB digest on `C1-NG` | R | 量 — it corrupts the RAM copy, not flash; a reboot clears it |
 | **`MT-TICK`** | `/proc/rtl819x-timer` ~~+ `/proc/interrupts`~~ 🔴 **the second input was never implemented — see § 9.3** *(this read § 9.4 until 2026-09-17; § 9.4 is the shell's two properties)* | TC1 · `CLK-27` | `ce_live=1`, `ce_mode=2`, `irq_spurious=0`, `irq_stuck=0`, `Δjiffies == Δirq_count` **and `ce_reload == ce_reload_hz`** | `cereload` to a wrong value ~~: the ratio breaks~~ 🔴 **the ratio does NOT break — one interrupt advances both counters, so the old criterion is GREEN with the clock at a tenth of its rate. 量 `C10-M28`: `dj=503 di=503 skew=0` while `reload=20000 want=2000`. What breaks is the driver's own `-ERANGE` criterion** | R | 量 — seating 13 did six reloads over four values and came back each time |
 | **`MT-WDT`** | `/proc/rtl819x-wdt` | watchdog · `FW-52` | `wdtcnr_at_probe = A5000000`; ~~the ten `ovselN` rows exact~~ (the script checks two fields, not ten); `state_name = BOOTGUARD` | ~~`kickms` long enough that the bite falls outside the window~~ 🔴 **`kickms` moves NEITHER field the script reads; it lets the hardware bite, which ends the boot rather than reddening the check. `stop` — the physical counterpart of fixture row `M15`** | R | 量 — `bootguard` restores it, read back in the same field. 🔴 ~~**Ordered last: the pass path resets the board**~~ **the implemented pass path issues no verb and resets nothing; the ordering rule was about this table, not about the script** |
@@ -669,7 +669,7 @@ were not in the same twenty seconds; `CORRECTIONS-block23.md` § 3 has it. It is
 evidence about the prediction and not an execution of it.
 
 **Zero flash-write commands, zero `FLR`, `n_writes 0` in all ~~eight~~ **nine**
-`MT-FLASH-2` readings** *(量 2026-09-17 (`P1-5`): nine captures carry an `MT-FLASH-2` line, `n_write_refused` stepping 2 → 16 by twos; the ninth is off-card `X11-final`. Every one reads `n_writes=0`, so the claim holds either way and only the count moves.)*, and the 32-group map is **byte-identical** to
+`MT-FLASH-2` readings** *(量 2026-09-17 (`P1-5`): nine captures carry an `MT-FLASH-2` line, `n_write_refused` stepping 2 → 16 by twos; the ninth is off-card `X11-final`. Every one reads `n_writes=0`, so the claim holds either way and only the count moves.)* *(🔄 2026-09-26: `n_writes=0` could not read otherwise — no committed `rtl819x-spi` increments it, `SPEC.md` `FW-142`.)*, and the 32-group map is **byte-identical** to
 `bench/2026-09-09b` and `bench/2026-09-10` — digest `ae87ac03269985d6` over all
 32 lines **after `tr -d '\r'`**, so 4,186,112 bytes are unchanged across eight days and this whole
 seating.
@@ -717,7 +717,7 @@ that implements it, one row at a time:
 |---|---|---|---|
 | `MT-ID` | equals `RECIPE_ID`, case-insensitive | a lower-folded string compare | agrees |
 | `MT-FLASH-1` | `1C7016` | `rdid_id` against `$MFG_RDID`, plus `rdid_match` | agrees |
-| `MT-FLASH-2` | both pointers `-EOPNOTSUPP`; `n_writes == 0` | `n_write_refused` moves by 2, `n_writes == 0` | agrees |
+| `MT-FLASH-2` | both pointers `-EOPNOTSUPP`; `n_writes == 0` | `n_write_refused` moves by 2, `n_writes == 0` | agrees (🔄 2026-09-26: the `n_writes` half cannot disagree, `SPEC.md` `FW-142`) |
 | `MT-FLASH-3` | 31 of 32 groups identical; group 0 as recorded | `map_rc`, `h601_hashed`, `diff_units` — **and the verdict line says so**: *"(digests scored at the desk)"* | agrees, divergence declared in the output itself |
 | `MT-TICK` | ~~+ `/proc/interrupts`~~ | `/proc/rtl819x-timer` only | **over-declared — struck § 9.3** |
 | `MT-WDT` | `wdtcnr_at_probe`; ~~ten `ovselN` rows~~; `state_name` | two fields | agrees, already annotated in § 2 |

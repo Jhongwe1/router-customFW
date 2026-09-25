@@ -794,6 +794,8 @@ rather than 4,186,112.
   `n_writes 0`, `n_write_refused 0`, `n_reg_writes 0`, `n_xfer 0` — but that
   cell is off-card and after the fact. The thirteen carded boots never had the
   counter read; the card's § 6 claimed they would and no cell tested it.
+  🔄 2026-09-26: no reading of it could have said more — no committed version of
+  this file increments it (§ 11.6, `FW-142`).
 * ***Proven identical* still means *digests agree with the 2026-08-16 dump***.
   It cannot see two writes that cancel, and **no `FLR` full re-dump has run**.
 
@@ -928,3 +930,33 @@ forever.
 * **`h601`'s clamp is mine.** The vendor has no upper bound at all, so there is
   no prior art saying `0x1FFA` is the right ceiling; it is the ceiling that
   keeps every access inside the 8 KiB actually read.
+
+### 11.6 🔴 `n_writes` cannot move: no committed version increments it (`FW-142`)
+
+🆕 2026-09-26, desk, found while landing block 46's P14 (`R6b-1`). 讀 `git log --follow`
+lists three committed versions of
+`config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c`: 1.0 (`eac2070`), 1.1
+(`a62342c`) and 1.2 (`46e6df7`, still the text at `873a471`). In each,
+`rtl819x_spi_n_writes` is named on exactly four lines — its `static` declaration (1.0 `:428`,
+1.1 `:474`, 1.2 `:526`), the `/proc` print (`:1021`, `:1268`, `:1348`) and two reads in
+`trywrite` (`:1165`/`:1178`, `:1529`/`:1542`, `:1991`/`:2004`) — and on none is it
+incremented, assigned or passed by address; no `##` token-pasting occurs in any version.
+The control: the same pattern finds `rtl819x_spi_n_write_refused++` twice in 1.2 (`:1248`,
+`:1255`). 1.2's own comment says so (`:1693`–`:1694`: no code path in this translation unit
+increments it). It could not: in all three versions `.write` and `.erase` are stubs that
+return `-EOPNOTSUPP` and `.flags` is `MTD_CAP_ROM` (1.2 `:1268`, `:1275`, `:1276`), so the
+counter names a path the driver does not have.
+
+**So `n_writes 0` carries no information about writes**, on any image built from a committed
+version: every "rlxfw's `n_writes` read 0" in this repository — `FLS-26`'s "`n_writes` read 0
+in every dump", `FLS-27`'s positive control, P14's conjunct on block 46's card, the
+`MT-FLASH-2` check — says the counter was printed, not that nothing was written. What stands
+behind *rlxfw's driver wrote nothing* is the refusing stubs (讀) and the map bracket (量); what
+stands behind *nothing was written* at a press is the commands issued and the bracket's reach,
+each with its stated blind spots. 推 That each image was compiled from its committed text:
+the images are pinned by digest, not by source.
+
+Not established: that a future version with a write path will count its writes — the counter
+needs an increment site and a positive control that moves it before its 0 means anything.
+`CLAUDE.md` § Flash names the counter as part of a seating's claim; that rule is the owner's
+to change, and it is not changed here.

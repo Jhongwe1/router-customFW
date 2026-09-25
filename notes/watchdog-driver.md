@@ -698,7 +698,7 @@ never compiled at all.
 ## 10. Seating 17 — what the silicon said, and the three things it refuted
 
 **2026-09-08 evening, forty-sixth segment. Three power cycles, ten boots, nine
-watchdog resets. Zero flash-write commands, zero `FLR`, `n_writes 0`.**
+watchdog resets. Zero flash-write commands, zero `FLR`, `n_writes 0`.** 🔄 2026-09-26: that `n_writes 0` carries no information — no committed `rtl819x-spi` increments the counter (`SPEC.md` `FW-142`).
 The card is `bench/2026-09-08b/PREDICTIONS-B15-block14.md` (frozen, 42 cells);
 the seating's own record is `CORRECTIONS-block14.md` beside it.
 

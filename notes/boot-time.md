@@ -909,6 +909,20 @@ boot) are *A third rate term* and *E3*. Their scripts, logs and registration are
   it — but the System log carries no event 37 for it, so that log is not a complete
   record of Windows' syncs. The fight was on 12,434 s after that sync; seating A's steps
   began 9,352 s after its sync and E3's 6,824 s after its own.
+* 🔄 **Block 46 (2026-09-25 21:22–21:46, `timesyncd` running; its card claims no duration):
+  `CLOCK_REALTIME` − `CLOCK_MONOTONIC_RAW` is a sawtooth** (`CLK-38`; 量 from every console
+  capture's `t0`/`end` in `bench/2026-09-25c/*.meta.json`, `s112/record/work/rdJ.py`,
+  `rdL.py`). Between steps it falls 0.018–0.031 s per RAW second (10th–90th percentile of 197
+  step-free intervals, median 0.023); the 13 steps bracketed by samples under 5 s apart are
+  +0.595…+1.065 s each, and where two neighbouring steps are both visible they are 32.0–34.5 s
+  apart (`CLK-35`'s `timesyncd` cadence). Over arm B's four minutes the offset spans 0.93 s,
+  and `B-02-X` alone moves +0.738 s. **What it breaks:** any single realtime → RAW offset used
+  across more than about 30 s — `W.pcap` (realtime) against the runner (RAW) is the case. With
+  `B-01-R`'s one offset, arm B's frames read 0.50–0.86 s after their cell; each against its own
+  cell's capture, 0.103–0.120 s (`notes/nic-driver.md` § 22.2). A1-06's reply to request 1
+  reads +0.004 s after its `ping` began with the previous capture's end offset and −0.591 s with
+  A1-06-R's own, a step of +0.595 s lying between them. Every pcap ↔ RAW comparison takes the
+  offset of the capture around the frame, or `hostclock`'s step record.
 
 ## 8. Seating B (`P2-4`), 2026-09-25 — the reproduction
 
@@ -1111,7 +1125,62 @@ and `/proc/interrupts`.
   read sits between `P1-N0` and `P1-TR1-S0`.
   What decides it: a lone `cat /proc/rtl865x/asicCounter` between two `/proc/stat` reads
   (predicted ≈107 ticks lost), with a `seq_file` read of the same size as the control
-  (predicted 0).
+  (predicted 0). 🔄 Withdrawn 2026-09-26: the attribution closed without it (next bullet).
+* 🔄 **2026-09-26 (block 46, `R6b-1`): the attribution closes on two sources; the mechanism
+  stays open.** 讀 the card: each of block 46's 77 board reads is one `cat` of
+  `/proc/rtl819x-nic`, `/proc/net/snmp`, `/proc/net/arp`, `/proc/rtl865x/asicCounter` and
+  `/proc/rtl819x-nic`, so the jiffies lost between the two dumps' `j_now` are what lies
+  between them. 量 on the host's RAW clock, which is independent of the board's ticks
+  (re-derived from `bench/2026-09-25c/*-R` by `s112/record/work/rdC.py`, with a planted
+  control): jiffies advance 5–8 across each read's window, from dump 1's first byte through
+  the `CpuEvent` line, which lasts 1.1955–1.2086 s; so **each read loses 112.55–115.72
+  jiffies** (n 77, mean 114.00, sd 0.70) against 100 per RAW second. The window holds
+  4,156–4,199 B, 1.082–1.093 s of line time at 3,840 B/s, and runs 0.113–0.116 s past its
+  bytes. The 76 cycles from one read's first byte to the next last 8.28–23.97 s (the spans
+  between reads 7.08–22.76 s, with pings, driver verbs and console output in them), and each
+  loses −0.11…+0.80 tick beyond its read's window (mean 0.33, sd 0.17): nothing outside the
+  window costs a tick.
+  量 Inside the window the first `asicCounter` printk line arrives 3.0–5.2 ms after dump 1's
+  first byte, with 14–15 bytes of dump 1 before it in all 77 reads. 讀 `cat` reads its files
+  in order, so the snmp and arp handlers ran and returned inside those ≤ 5.2 ms (about half a
+  tick at most); with the between-read remainder ruling out a delay after the print, at least
+  ~112 of each read's lost ticks accrue while `asicCounter` prints its 86 lines.
+  讀 The path, in the tree that builds (`tools/rlxfw-kbuild.sh:58` stages
+  `src-vendor/rtl819x-toolchain`): `rtl865x_proc_mibCounter_read`
+  (`drivers/net/rtl819x/rtl865x_proc_debug.c:4406`) returns 0 bytes after calling
+  `rtl865xC_dumpAsicDiagCounter` (`AsicDriver/rtl865x_asicCom.c:1776`), which prints every
+  line through `rtlglue_printf`, defined as `panic_printk` (`include/net/rtl/rtl_types.h:366`);
+  `panic_printk` (`kernel/printk_log.c:668`, built under `CONFIG_RTL_819X`, `kernel/Makefile`
+  lines 5–6) calls `vprintk`, which saves and disables interrupts at `:750`, writes the console
+  through `release_console_sem()` at `:844` and restores them at `:848`. 量 The `p2q` kroot
+  `.config` has `CONFIG_PANIC_PRINTK=y`, and its `vmlinux` (`c5e2cfdba7730d47`) holds the
+  strings `rtl865x_proc_mibCounter_read`, `rtl865xC_dumpAsicDiagCounter` and `prt_start`, a
+  name `printk_log.c` has and `printk.c` does not (a string that must be absent counts 0).
+  推 That shows those functions compiled in, not that the compiled text equals the drop's.
+  So "the cell is the `asicCounter` read" is 量 + 讀 now, and the ≈107-tick estimate from line
+  time was 7 short: the window exceeds its bytes' line time by about 1.3 ms per line.
+  ⚠️ **The number belongs to its context**, a read sharing one `cat` with dump 1's pending tty
+  output: seating B's lone read lost ~105 (104.2–109.4 by placement), block 45's reads
+  111.7–114.3 and block 46's 112.55–115.72. An effect that moves between seatings is not a
+  hardware constant.
+  **The IRQ reading exists twice already** (量): across seating B's loss IRQ 13 − IRQ 25 went
+  35 → 100, +65 for one read (above); in block 45, `D1-ETH4` (`/proc/interrupts`) →
+  `D1-E-S0` (`/proc/stat`), an interval holding one lone `asicCounter` read and one
+  `/proc/net/snmp` read, moved it +71 — the difference, which no anchor moves; the absolutes do (TC0 46.2 and TC1 117.2 short over 14.622 RAW s anchored on the `CPU0` header and the `intr` line, 41.8 and 112.8 over 14.578 s anchored on the ` 13:` line),
+  `D1-T-S1` → `D1-DOWN`, holding four such reads, +286 (71.5 per read), and the intervals with
+  none moved 0 (`D1-T-S0` → `D1-T-S1`, `D1-E-S0` → `D1-E-S1`) and −1 (`D1-DOWN` → `D1-ETH4`)
+  (`s112/record/work/`, from `bench/2026-09-25b/`). So the lone-read pair once asked of
+  `R6b-3` would repeat a known result, and it is withdrawn (`PROGRESS.md`, `R6b-3`'s row).
+  **What stays open is the mechanism** (推): why TC1 (IRQ 25, the jiffies) loses about 115
+  ticks per read while TC0 (IRQ 13) loses about 45. Candidates: `docs/interrupt-map.md`
+  § 8.4's two — timeouts collapsing inside an interrupt-disabled region, and § 3.6's
+  read-modify-write of `TCIR` erasing a latched TC1 pending bit — and a third, that TC0 on the
+  LOPI and TC1 on the ICTL latch differently. The discriminating experiment is an image whose
+  TC0 acknowledge writes only `TC0IP`: § 3.6 predicts TC1's per-read loss falling to about
+  TC0's. It is not on the TX path and so not `R6b`'s; it is re-owned to `docs/interrupt-map.md`
+  § 8.4, beside `IRQ-13`'s own open mechanism, and no open gate carries it.
+  量 Side cost: the 77 reads cost the press about 8,778 ticks (~88 s) of board time; card
+  § 0 ⑥ claims no duration, so no verdict moves.
 
 ### 8.4 `D2` holds on RAW (`CLK-45`)
 
