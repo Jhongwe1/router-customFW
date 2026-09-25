@@ -966,7 +966,7 @@ rather than by preference:
   is `NET-58` reproduced;
 * not `watchdog_timeo`: `NET-55`/`NET-57` measured it dead on this board;
 * not `arm` with the engine running: that is `NET-64`'s hard hang, which is
-  why `engine off` is first.
+  why `engine off` is first. 🔄 **2026-09-26 (`R6b-5`): not `NET-64`** — its arm ran after `engine off` (`SPEC.md` `NET-64` 🔄, `docs/KNOWN-ISSUES.md` `NET-64`'s owner passage), so it is not evidence for the order; `nic_do_arm()` returns `-EBUSY` while the engine runs, and that is what orders it.
 
 `SPEC.md` `NET-101`.
 
@@ -1041,12 +1041,12 @@ router actually carries, and nothing at the load this file had been using to
 reproduce the fault.** 🔴 That is the strongest argument in this document for
 reading a second implementation rather than reasoning from one: the difference
 was in § 6 from the day it was written, and every experiment since had been run
-at a rate where it does not show.
+at a rate where it does not show. 🔄 **2026-09-26 (`R6b-5`): "rate-dependent" is narrowed** — average frame rate does not decide the pairing (`bench/2026-09-22b` `C4-DOSE`/`C8-DOSE`: one boot, ~2,510 and ~2,540 frame/s, 20,097 of 20,112 skewed against 0 of 20,409), so the table above says where it was seen, not what sets it (`SPEC.md` `NET-103` 🔄, `notes/nic-driver.md` § 16.2).
 
 ### 15.3 ⚠️ What § 15 does not establish
 
 * Why the pairing decouples at high frame rate. The correlation is two points
-  on one board on one evening; the mechanism is unread. `NET-103 殘留`.
+  on one board on one evening; the mechanism is unread. `NET-103 殘留` (🔄 2026-09-26: re-owned to `R6b-3` with `NET-61` 殘留's burst half; average rate is not sufficient, § 15.2's note).
 * Why the engine stops retiring a TX descriptor. Two candidates died in § 15.1
   and § 16.4 and neither was replaced.
 * Whether the loader would show the same pairing behaviour. The loader's

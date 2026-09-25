@@ -361,7 +361,7 @@ five instances of it in one desk pass.
 | ② | `docs/KNOWN-ISSUES.md:1057` | the same, 逐字 | the same | repaired |
 | ③ | `bench/README.md:101` | the same, 逐字 | the same | repaired |
 | ④ | `bench/2026-09-21/PREDICTIONS-B35-block33.md:369` | `rtl819x-switch.c:88-92` — the VLAN table is reached through `TACI` | that is at **`:93-97`**; `:88-92` says the driver writes nothing at boot | **frozen card, not repaired** |
-| ⑤ | `SPEC.md:267` | `rtl819x-nic.c:891,895,898-900,908` are the harvest path | they were in `nic_wr()` and `nic_dw()` at the commit that published them (§ 5.1a) | repaired |
+| ⑤ | `SPEC.md` `NET-61` | `rtl819x-nic.c:891,895,898-900,908` are the harvest path | they were in `nic_wr()` and `nic_dw()` at the commit that published them (§ 5.1a) | repaired |
 
 🔴 **①–③ are one sentence written into three files in one segment, and all
 three use the word 逐字 — *verbatim*.** A quotation is a claim a checker can
@@ -386,7 +386,7 @@ controls and the population — which is more than § 5.1's residual has had
 since 2026-09-21.
 
 ⚠️ **What the enforcer would still not catch is ⑤**, and that is the useful
-boundary: `SPEC.md:267` quotes nothing. It says *`891` is the pkthdr ring
+boundary: `SPEC.md` `NET-61` quotes nothing. It says *`891` is the pkthdr ring
 read*, in prose, and only a reader who opens the file can tell that line 891
 was a register write. **A citation is checkable exactly when it quotes; the
 rest is reading.**

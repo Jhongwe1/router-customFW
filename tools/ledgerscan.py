@@ -41,9 +41,9 @@ The division of labour, which is the design
   *fact* layer (an address, a reset value) or the *decision* layer (divisor
   semantics, wrap handling, bit-field meaning, init order) is a judgement, and
   a judgement is written by a person.
-* **``check`` joins them**: every in-scope path the scan finds must appear in
-  the ledger.  A path that appears in the tree and not in the ledger is a
-  ledger that has gone stale, and it goes red.
+* **``check`` joins them**, RED on a stale ledger (an in-scope path the scan
+  finds and the ledger lacks), and since R6b-5 on a depth cell not in DEPTHS
+  (LEDGER-3) and a path declared at most ``name`` yet cited by line (LEDGER-4).
 
 That is what makes the ledger survive the gate: writing about a new vendor file
 in ``LOG.md`` -- which is how reading gets recorded here -- makes ``check`` fail
@@ -357,12 +357,12 @@ def scan_topics(root, paths):
 # is one word too wide and cost a round trip.
 LEDGER_PATH_RX = re.compile(r"^\|\s*`([^`]+)`\s*\|")
 
-# The depth vocabulary, deepest last.  `scan` computes `line` or `name` from
-# whether any citation carried a line number; the ledger may also say `none`,
-# which `scan` has no way to produce -- a path nobody cites is a path the scan
-# never sees.
-DEPTHS = ("none", "name", "line")
-DEPTH_RANK = {"none": 0, "name": 1, "line": 2}
+# The depth vocabulary, CLOSED since R6b-5 (LEDGER-3): a row whose depth cell
+# does not BEGIN with one of these words is RED, row by row.  `scan` derives
+# only `name` and `line`; `none` and `artefact` (§ 4.3.1: a binary of mine
+# holding the vendor's code) are declared.  No `full`: see ledger_row_list.
+DEPTHS = ("none", "name", "line", "artefact")
+DEPTH_RANK = {"none": 0, "name": 1, "artefact": 1, "line": 2}
 
 
 def ledger_paths(root, rel=LEDGER):
@@ -382,49 +382,49 @@ def _depth_word(row):
     """The depth word in a ledger row, or None.  Split out so P19e can test the
     extraction without building a repository around it.
 
-    🔴 LEFT TO RIGHT, and that is the whole of it.  The first draft iterated the
-    DEPTHS vocabulary and returned the first member present, which is a
-    different function -- and the real ledger refuted it on the first run:
-    `arch/rlx/kernel/rlx-time.c`'s cell reads `🔴 **line** (was **none —
-    nothing taken**)`, so the vocabulary order returned `none`, the row's
-    struck-through HISTORY, and reported a row that had just been corrected.
-    The current claim is written first and the history follows it, so position
-    is the rule.  P19f is that cell, verbatim.
+    🔴 THE FIRST WORD, and that is the whole of it.  The first draft iterated
+    the DEPTHS vocabulary and returned the first member present -- refuted on
+    the real ledger's first run: `arch/rlx/kernel/rlx-time.c`'s cell reads `🔴
+    **line** (was **none — nothing taken**)`, and vocabulary order returned the
+    struck-through HISTORY.  The second returned the leftmost vocabulary word,
+    so `🔄 **lnie** (was **name**)` read as `name` (R6b-5, P20e).  The current
+    claim is written first, so the cell's first word must BE a depth or the
+    cell is unreadable.  P19f is the rlx-time.c cell, verbatim.
     """
     cells = row.split("|")
     if len(cells) <= 2:
         return None
-    m = re.search(r"(?<![a-z])(%s)(?![a-z])" % "|".join(DEPTHS),
-                  cells[2].lower())
-    return m.group(1) if m else None
+    m = re.search(r"[a-z0-9]+", cells[2].lower())   # markup is not a word
+    w = m.group(0) if m else None
+    return w if w in DEPTHS else None
 
 
 def ledger_rows(root, rel=LEDGER):
     """-> {path: declared depth or None}.  LEDGER-2.
 
-    The second cell of a row is the depth the ledger CLAIMS for that path.  It
-    is prose, not a token -- rows carry `line`, `name`, `none`, and decorated
-    forms like `🔴 **line**` -- so the word is extracted rather than matched
-    whole, and a cell holding none of the three words yields None (unknown)
-    rather than a guess.
+    Every row, read by ledger_row_list (defined below render_scan, so that no
+    line cited above it moves), merged per PATH.  A path declared twice keeps
+    the DEEPER claim: two rows for one file is two sections having read it,
+    and the ledger's depth for the file is the most that was taken.  That
+    merge is what makes LEDGER-4 a statement about FILES rather than rows.
+
+    🔴 It is also why LEDGER-3's refusal is made per ROW, before this: the
+    merge drops an unreadable row whenever a readable one names the same
+    path.  量 2026-09-26 over the 34 committed versions of the ledger: 2,352
+    row readings, 13 distinct depth cells, two outside the old three words
+    -- `**full**` (two rows, 137 commits) and `**`artefact`**` (one row, 440
+    commits, and hidden by this merge for 384 of them).  The merge's tie rule
+    -- an equal rank keeps the FIRST row -- is unchanged from LEDGER-2's
+    version of this function, which read and merged in one loop; P16 and
+    P19e-g pin the reading, P20b the per-row refusal.
     """
-    txt = read_text(root, rel)
-    if not txt:
+    lst = ledger_row_list(root, rel)
+    if lst is None:
         return None
     out = {}
-    for line in txt.splitlines():
-        m = LEDGER_PATH_RX.match(line)
-        if not m:
-            continue
-        span = m.group(1).strip()
-        if not PATH_RX.fullmatch(span):
-            continue
-        # cells[0] is empty (the leading pipe), cells[1] is the path.
-        depth = _depth_word(line)
-        p = strip_tree_prefix(span)
-        # A path declared twice keeps the DEEPER claim: two rows for one file
-        # is two sections having read it, and the ledger's depth for the file
-        # is the most that was taken.
+    for _i, p, depth, _cell in lst:
+        # a path declared twice keeps the deeper claim; an unreadable row
+        # (None, rank -1) never replaces a readable one
         if p in out and DEPTH_RANK.get(out[p], -1) >= DEPTH_RANK.get(depth, -1):
             continue
         out[p] = depth
@@ -552,19 +552,65 @@ def render_scan(root, only=None, show_topics=False, out=sys.stdout):
     return mine, ups
 
 
+# LEDGER-3 (R6b-5, 2026-09-26).  The vocabulary is CLOSED and a row whose
+# depth cell does not BEGIN with a word of DEPTHS is RED -- until then it was
+# skipped, so a row reading `ful1` passed exactly as the two `**full**` rows
+# did for 137 commits.  Adding `artefact` changes the word read out of none of
+# the other 2,305 row readings in the ledger's history, and reading the FIRST
+# word rather than the leftmost vocabulary word changes none of the 13
+# distinct depth cells ever committed (P20e is why it had to change at all).
+#
+# 🔴 `full` is refused ON PURPOSE.  "The whole file" is an EXTENT, and no
+# citation can witness an extent: `scan` cannot derive it, and render_check's
+# comparison runs one way only, so a `full` cell would be the one word in the
+# ledger that nothing produces and nothing checks.  The ledger records extent
+# as a RANGE in the row's prose (§ 2.1), and R5-8 moved the only two `full`
+# cells ever committed to `line` on exactly that ground.  Adding it is a design
+# change with a reopening condition -- an instrument that derives extent, e.g.
+# the union of cited ranges against the file's length in the built drop -- not
+# a table edit.
+def ledger_row_list(root, rel=LEDGER):
+    """-> [(line number in the ledger, path, depth or None, depth cell)] for
+    every row, in order and NOT merged.  A row's first code span is its path;
+    its second cell is the depth it CLAIMS -- prose, not a token (`line`,
+    `🔴 **line**`, `**`artefact`**`), so its FIRST word is taken (_depth_word)
+    and a cell whose first word is not in DEPTHS yields None."""
+    txt = read_text(root, rel)
+    if not txt:
+        return None
+    out = []
+    for i, line in enumerate(txt.splitlines(), 1):
+        m = LEDGER_PATH_RX.match(line)
+        if not m:
+            continue
+        span = m.group(1).strip()
+        if not PATH_RX.fullmatch(span):
+            continue
+        # cells[0] is empty (the leading pipe), cells[1] is the path.
+        cells = line.split("|")
+        out.append((i, strip_tree_prefix(span), _depth_word(line),
+                    cells[2].strip() if len(cells) > 2 else ""))
+    return out
+
+
 def render_check(root, out=sys.stdout):
-    """-> exit code.  Red when the ledger does not cover the scan."""
+    """-> exit code.  Red when the ledger does not cover the scan, when a
+    row's depth word is not in the vocabulary (LEDGER-3, since R6b-5), or
+    when a path the ledger declares at most `name` is cited by line
+    (LEDGER-4, since R6b-5; why that one is a rule and not the report
+    LEDGER-2 made it is written at the comparison below)."""
     own = own_sources(root)
     mine = scan_population(root, tracked_files(root), own)
     ups = scan_population(root, upstream_files(root), own)
     seen = set(mine) | set(ups)
     in_scope = {p for p in seen if domain_of(p) in IN_SCOPE}
 
-    rows = ledger_rows(root)
-    if rows is None:
+    rowlist = ledger_row_list(root)
+    if rowlist is None:
         print("RED  %s does not exist. The ledger is the deliverable of R5-0 "
               "and check has nothing to compare against." % LEDGER, file=out)
         return 2
+    rows = ledger_rows(root)
     declared = set(rows)
 
     missing = sorted(in_scope - declared)
@@ -578,14 +624,54 @@ def render_check(root, out=sys.stdout):
     # interface* and *read the code*, which is the whole reason the ledger
     # exists.
     #
-    # 🔴 It REPORTS and does not JUDGE, and that is not timidity.  The two
-    # numbers are not the same quantity: `scan`'s depth is the deepest
-    # citation anywhere in the repository, the ledger's is what a particular
-    # section says IT took.  They coincide usually, not by definition -- a row
-    # may honestly say `name` about its own reading of a file another section
-    # later quoted by line.  Equality is therefore evidence, not a rule, and a
-    # rule built on it would make the ledger's rows follow the scanner instead
-    # of the reader.
+    # LEDGER-2 REPORTED this and did not judge it, on an argument: `scan`'s
+    # depth is the deepest citation anywhere, a row's is what one section
+    # took, and "a row may honestly say `name` about its own reading of a file
+    # another section later quoted by line".
+    #
+    # LEDGER-4 (R6b-5, 2026-09-26) OVERRULES that argument for one direction
+    # -- name-or-less below a `path:NN` -- and says so rather than claiming to
+    # keep it.  Where the deeper reading has its own ledger row, nothing
+    # changes: ledger_rows() merges every row for a path into its deepest
+    # claim, so the honest section's `name` row is never compared (P21c; 量
+    # at 873a471 five paths carry rows of different depths and the merge
+    # absorbs all five).  Where the deeper reading sits only OUTSIDE the
+    # ledger -- the argument's literal case -- this is now RED, because the
+    # ledger's own § 2 sets depth by the tool and § 2.1 counts a cited range
+    # as read: the remedy is a row for the section that took the lines, and
+    # the `name` row stays as it was.
+    #
+    # 量 over all 477 commits since the ledger existed: name-below-line fired
+    # in four episodes and all four were under-declarations -- `jiffies.c` and
+    # `jiffies.h` closed by deepening their own section's row, `rtl_gpio.c` by
+    # adding § 4.10's `line` row beside § 4.9's artefact.  The fourth,
+    # `arch/rlx/kernel/irq.c`, read at `:176-180,224` on 2026-09-19 by R6-3
+    # while § 4.4's row said `name` / NOT OPENED, printed on every run for 111
+    # commits and was read on none; R6-3's own row (§ 4.13) closes it.  No RED
+    # in `check`'s history outlived three commits.
+    #
+    # 🔴 Where this is most likely to be refuted first: a symlink alias.
+    # `arch/rlx/bsp/*` and `boards/rtl8196e/bsp/*` are the same files, and
+    # the ledger declares some of them at different depths under the two
+    # names; a `path:NN` written through the shallower alias fires although
+    # the file is declared `line` (0 such citations at 873a471).  The remedy
+    # then is a NAMED exemption with a control that goes red when it is no
+    # longer needed -- not a return to report-only.
+    #
+    # What stays a REPORT: `none` against `name`.  The ledger is in the
+    # population and names every path it declares, so a `none` row is always
+    # cited by name -- by the ledger -- and no `none` row could be green.
+    #
+    # 🔴 NOT SEEN, so a green here is not read as more: line numbers written
+    # apart from the path (`gpio_keys.c` ... `:62`, which is how the reading
+    # LEDGER-4 was opened for was written -- widening the match to a detached
+    # `:NN` on a line naming one path added one episode in 477 commits, and it
+    # was a `:476-477` about another file beside a sentence saying the path was
+    # NOT opened); a bare file name with a line (`gpio_keys.c:62`, the form
+    # the same reading took in SPEC.md FW-56, and the vendor NIC tree's
+    # `rtl_nic.c:NN`) and a tree-prefixed path, neither of which PATH_RX
+    # matches; a reading committed together with its row's correction; and
+    # any change of depth within `line` (LEDGER-3's first half, ⊘).
     obs = {}
     for p in sorted(declared & seen):
         cites = (mine.get(p) or []) + (ups.get(p) or [])
@@ -593,7 +679,9 @@ def render_check(root, out=sys.stdout):
     shallow = [(p, rows[p], obs[p]) for p in sorted(obs)
                if rows[p] is not None
                and DEPTH_RANK[obs[p]] > DEPTH_RANK[rows[p]]]
-    nodepth = [p for p in sorted(declared) if rows[p] is None]
+    under = [s for s in shallow if s[2] == "line"]
+    shallow = [s for s in shallow if s[2] != "line"]
+    unreadable = [(i, p, cell) for i, p, d, cell in rowlist if d is None]
 
     print("ledgerscan check", file=out)
     print("  in-scope paths found : %d" % len(in_scope), file=out)
@@ -621,26 +709,45 @@ def render_check(root, out=sys.stdout):
               "unread the file:" % len(stale), file=out)
         for p in stale:
             print("       %s" % p, file=out)
-    if shallow:
+    if under:
+        rc = 1
         print(file=out)
-        print("⚠️  LEDGER-2: %d row(s) declare LESS depth than the repository "
-              "shows. Reported, not judged -- read the row and decide, "
-              "because the scan's depth is the deepest citation anywhere and "
-              "the row's is what that section took:" % len(shallow), file=out)
-        for p, decl, got in shallow:
+        print("RED  LEDGER-4: %d path(s) the ledger declares at most `name` "
+              "while this repository cites them BY LINE:" % len(under),
+              file=out)
+        for p, decl, got in under:
             cites = (mine.get(p) or []) + (ups.get(p) or [])
             ex = next((c for c in cites if c.with_lineno), None)
-            print("       %-50s  ledger=%-4s  scan=%-4s  %s"
+            print("       %-50s  ledger=%-8s  scan=%-4s  %s"
                   % (p, decl, got,
                      ("e.g. %s:%d" % (ex.citing, ex.line)) if ex else ""),
                   file=out)
-    if nodepth:
+        print("     § 2.1 counts a cited range as read, so the file's deepest "
+              "row must say `line`: deepen the row, or add one for the "
+              "section that took the lines, saying what was taken. Deleting "
+              "the citation to turn this green is the fix the ledger rejects "
+              "by name.", file=out)
+    if shallow:
         print(file=out)
-        print("⚠️  %d declared row(s) whose depth cell names none of %s, so "
-              "the comparison above skipped them:"
-              % (len(nodepth), "/".join(DEPTHS)), file=out)
-        for p in nodepth:
-            print("       %s" % p, file=out)
+        print("⚠️  LEDGER-2: %d row(s) declare `none` for a path the "
+              "repository names. Reported, not judged: the ledger names every "
+              "path it declares, so a rule here could never be green:"
+              % len(shallow), file=out)
+        for p, decl, got in shallow:
+            print("       %-50s  ledger=%-4s  scan=%-4s" % (p, decl, got),
+                  file=out)
+    if unreadable:
+        rc = 1
+        print(file=out)
+        print("RED  LEDGER-3: %d ledger row(s) whose depth cell does not "
+              "begin with one of %s:" % (len(unreadable), "/".join(DEPTHS)),
+              file=out)
+        for i, p, cell in unreadable:
+            print("       %s:%d  %-50s  %r" % (LEDGER, i, p, cell[:40]),
+                  file=out)
+        print("     An unrecognised depth used to be skipped, so `ful1` "
+              "passed the way `full` did. `full` is not a depth: write "
+              "`line` and the range (§ 2.1).", file=out)
     if rc == 0:
         print(file=out)
         print("ok   the ledger covers every in-scope citation", file=out)
@@ -834,13 +941,13 @@ def self_test():
         rc = render_check(r, out=buf)
         ck("P8  check is green once the row is added", rc == 0, buf.getvalue())
 
-    # ---- P19: LEDGER-2.  `check` compared PATH SETS and never read the depth
-    # column, so a row could under-declare what it took and stay green -- 量
-    # 2026-09-03 on the real ledger, `kernel/time/jiffies.c` declared `name`
-    # while the tree cited it by line.  The report fires and the exit code does
-    # NOT move, and both halves are controls: a report nothing prints is not a
-    # check, and a judgement built on this comparison would make the ledger's
-    # rows follow the scanner instead of the reader.
+    # ---- P19: LEDGER-2, and since R6b-5 LEDGER-4.  `check` compared PATH
+    # SETS and never read the depth column until 2026-09-04 (量 2026-09-03,
+    # `kernel/time/jiffies.c` declared `name` while the tree cited it by
+    # line).  LEDGER-2 REPORTED the difference; LEDGER-4 makes name-below-line
+    # RED, because the one episode after the report shipped
+    # (`arch/rlx/kernel/irq.c`, 2026-09-19) printed on 111 commits and was
+    # never read.  Both halves are controls: the refusal, and equal silent.
     for decl, want_report, cid in (("name", True, "P19a"),
                                    ("line", False, "P19b")):
         with tempfile.TemporaryDirectory() as tmp:
@@ -856,12 +963,12 @@ def self_test():
             buf = _io.StringIO()
             rc = render_check(r, out=buf)
             txt = buf.getvalue()
-            got = "LEDGER-2" in txt
+            got = "LEDGER-4" in txt
             ck("%s a row declaring %-4s against a cited line number: "
-               "report %s" % (cid, decl, "fires" if want_report else "silent"),
+               "%s" % (cid, decl, "RED" if want_report else "silent"),
                got is want_report, txt)
-            ck("%sx and the exit code is unmoved either way" % cid, rc == 0,
-               "rc=%d" % rc)
+            ck("%sx and the exit code says so" % cid,
+               rc == (1 if want_report else 0), "rc=%d" % rc)
 
     # ---- P19c: OVER-declaration is not the defect and must not be reported.
     # A row may honestly say `line` about its own reading while the repository
@@ -879,11 +986,13 @@ def self_test():
         buf = _io.StringIO()
         rc = render_check(r, out=buf)
         ck("P19c over-declaration (ledger=line, scan=name) is NOT reported",
-           "LEDGER-2" not in buf.getvalue() and rc == 0, buf.getvalue())
+           "LEDGER-2" not in buf.getvalue()
+           and "LEDGER-4" not in buf.getvalue() and rc == 0, buf.getvalue())
 
-    # ---- P19d: a depth cell naming none of the three words is reported as
-    # skipped rather than guessed at.  The alternative -- defaulting to `name`
-    # -- would manufacture a LEDGER-2 hit out of a formatting choice.
+    # ---- P19d: a depth cell naming no word of the vocabulary.  Reported as
+    # skipped until R6b-5; LEDGER-3 makes it RED.  It is still not GUESSED at
+    # -- defaulting to `name` would manufacture a LEDGER-4 hit out of a
+    # formatting choice -- so the refusal names the row, not a depth.
     with tempfile.TemporaryDirectory() as tmp:
         led = ("# ledger\n\n| path | depth | origin | what was taken |\n"
                "|---|---|---|---|\n"
@@ -896,8 +1005,9 @@ def self_test():
         buf = _io.StringIO()
         rc = render_check(r, out=buf)
         txt = buf.getvalue()
-        ck("P19d an unreadable depth cell is skipped and SAID to be skipped",
-           "names none of" in txt and "LEDGER-2" not in txt and rc == 0, txt)
+        ck("P19d an unreadable depth cell is RED (LEDGER-3), not guessed at",
+           "LEDGER-3" in txt and "does not begin with one of" in txt
+           and "LEDGER-4" not in txt and rc == 1, txt)
 
     # ---- P19e: the decoration the real ledger actually uses.  Its rows carry
     # `🔴 **line**`, not a bare word, so a matcher that required the whole cell
@@ -918,6 +1028,123 @@ def self_test():
        _depth_word("| `a/b.c` | **none** (was **line**) | vendor | x |")
        == "none",
        _depth_word("| `a/b.c` | **none** (was **line**) | vendor | x |"))
+
+    # ---- P20 / P21: LEDGER-3 and LEDGER-4 (R6b-5, 2026-09-26).
+    def _check_with(rows_md, notes):
+        with tempfile.TemporaryDirectory() as tmp_:
+            led_ = ("# ledger\n\n| path | depth | origin | what was taken |\n"
+                    "|---|---|---|---|\n" + rows_md)
+            r_ = _tmp_root(tmp_, {"notes/x.md": notes, LEDGER: led_})
+            import io as _io
+            b_ = _io.StringIO()
+            rc_ = render_check(r_, out=b_)
+            return rc_, b_.getvalue()
+
+    # P20a -- a misspelt depth.  Skipped until R6b-5, exactly as `full` was.
+    rc, txt = _check_with(
+        "| `arch/rlx/kernel/rlx-cevt.c` | ful1 | vendor | x |\n",
+        "`arch/rlx/kernel/rlx-cevt.c:139`\n")
+    ck("P20a a misspelt depth (`ful1`) is RED and names the ledger line",
+       rc == 1 and "LEDGER-3" in txt and "%s:5" % LEDGER in txt, txt)
+    # P20b -- per ROW: HEAD's merge dropped an unreadable row whenever a
+    # readable one named the same path, unreported (the real `artefact` row,
+    # 384 commits).
+    rc, txt = _check_with(
+        "| `arch/rlx/kernel/rlx-cevt.c` | line | vendor | x |\n"
+        "| `arch/rlx/kernel/rlx-cevt.c` | ful1 | vendor | y |\n",
+        "`arch/rlx/kernel/rlx-cevt.c:139`\n")
+    ck("P20b an unreadable row beside a readable one for the same path is RED",
+       rc == 1 and "%s:6" % LEDGER in txt, txt)
+    # P20c -- the real ledger's `artefact` cell, verbatim.  § 4.3.1 defines
+    # the word, and a vocabulary without it makes that row RED on HEAD.
+    _art = "| `drivers/char/rtl_gpio.c` | **`artefact`** | vendor | x |"
+    ck("P20c the ledger's own `artefact` cell reads as artefact",
+       _depth_word(_art) == "artefact", _depth_word(_art))
+    rc, txt = _check_with(
+        _art + "\n| `drivers/char/rtl_gpio.c` | line | vendor | y |\n",
+        "`drivers/char/rtl_gpio.c:2178`\n")
+    ck("P20c2 and beside a `line` row for a line-cited file it is green",
+       rc == 0, txt)
+    # P20d -- the cell the real ledger carried from 48a7a2a to cfd47ce, 137
+    # commits, verbatim.  `full` stays refused: extent is a range (§ 2.1).
+    rc, txt = _check_with(
+        "| `arch/rlx/include/asm/gpio.h` | **full** | vendor | 6 lines, "
+        "`#include <gpio.h>`. Read to confirm the mach- header above is the "
+        "one that is reached |\n",
+        "`arch/rlx/include/asm/gpio.h`\n")
+    ck("P20d the real `**full**` cell of 2026-09-06..10 is RED",
+       rc == 1 and "LEDGER-3" in txt, txt)
+    # P20e -- the FIRST word, not the leftmost vocabulary word.  The ledger
+    # writes history AFTER the current claim (P19f), so reading the leftmost
+    # vocabulary word let a misspelt claim pass as its own history, and a
+    # `full` cell pass as `line` if the prose after it said "line".  Both
+    # notes cite by NAME only, so a reader that took `name`/`line` out of
+    # the prose would go green here -- the mutant K9 is that reader.
+    rc, txt = _check_with(
+        "| `arch/rlx/kernel/rlx-cevt.c` | \U0001f504 **lnie** (was **name**) "
+        "| vendor | x |\n", "`arch/rlx/kernel/rlx-cevt.c`\n")
+    ck("P20e a misspelt current word before a history word is RED",
+       rc == 1 and "LEDGER-3" in txt, txt)
+    rc, txt = _check_with(
+        "| `arch/rlx/include/asm/gpio.h` | **full** -- every line of it "
+        "| vendor | x |\n", "`arch/rlx/include/asm/gpio.h`\n")
+    ck("P20e2 `full` followed by the word `line` is RED, not read as line",
+       rc == 1 and "LEDGER-3" in txt, txt)
+    # P20f -- case is folded, so `**Line**` is the word `line`.  Unpinned
+    # until R6b-5's review: a reader without .lower() passed all 98 others.
+    _cap = "| `a/b.c` | **Line** | vendor | x |"
+    ck("P20f a capitalised depth word reads as the word (`**Line**`)",
+       _depth_word(_cap) == "line", _depth_word(_cap))
+
+    # P21a -- LEDGER-4's own row, VERBATIM as it read at d64ee2f^.  The
+    # citation beside it is SYNTHETIC: 量, no commit before R6b-5 held
+    # `gpio_keys.c` by line after its full path -- the reading was written as
+    # detached `:62` spans, in the commit that deepened the row -- so the
+    # control LEDGER-4 named cannot come from history.  It is built at run
+    # time, so this file's own text does not become that citation.
+    _gkcite = "`drivers/input/keyboard/gpio_keys.c" + ":62`\n"
+    _gk = ("| `drivers/input/keyboard/gpio_keys.c` | name | **none — an "
+           "example** | `tools/ci-expected.tsv:232`, inside this ledger's own "
+           "instrument row, describing the classification bug where "
+           "*keyboard* contains *board*. **Nothing was read.** The file is "
+           "mainline Linux and has never been opened here |")
+    rc, txt = _check_with(_gk + "\n", _gkcite)
+    ck("P21a LEDGER-4's own row, `name` against a `path:NN`, is RED",
+       rc == 1 and "LEDGER-4" in txt, txt)
+    ck("P21a2 and it names the path and the citing line",
+       "drivers/input/keyboard/gpio_keys.c" in txt.split("LEDGER-4")[-1]
+       and "notes/x.md:1" in txt, txt)
+    rc, txt = _check_with(
+        _gk.replace("| name |", "| \U0001f504 **line** |", 1) + "\n",
+        _gkcite)
+    ck("P21b the same row deepened to `line` is green", rc == 0, txt)
+    # P21c -- the case LEDGER-2's argument protects, PERMITTED: one section's
+    # `name` row and another's `line` row for one file, the shape of the real
+    # ledger's mtdchar.c pair.  The merge keeps the deeper claim.
+    rc, txt = _check_with(
+        "| `drivers/mtd/mtdchar.c` | name | generic | the minor convention |\n"
+        "| `drivers/mtd/mtdchar.c` | **line** | generic | 73 and 94 |\n",
+        "`drivers/mtd/mtdchar.c:73`\n")
+    ck("P21c a `name` row beside a `line` row for a line-cited file is green",
+       rc == 0 and "LEDGER-4" not in txt, txt)
+    # P21d -- `none` against a citation by name stays a REPORT: the ledger's
+    # own row names the path, so no `none` row could be green under a rule.
+    rc, txt = _check_with(
+        "| `drivers/leds/rtl819x-leds-board.c` | none | none | x |\n", "\n")
+    ck("P21d `none` against the ledger's own naming is reported, rc 0",
+       rc == 0 and "LEDGER-2" in txt and "LEDGER-4" not in txt, txt)
+    # P21e -- an `artefact`-only path cited by source line: e1f8543's shape,
+    # one commit, before § 4.10 added the `line` row for rtl_gpio.c.
+    rc, txt = _check_with(_art + "\n", "`drivers/char/rtl_gpio.c:2178`\n")
+    ck("P21e an `artefact`-only row against a `path:NN` is RED",
+       rc == 1 and "LEDGER-4" in txt, txt)
+    # P21f -- the rule reads `path:NN` only.  A detached `:62` on the path's
+    # own line is not depth: widening to it added one episode in 477 commits,
+    # and that one was false.
+    rc, txt = _check_with(_gk + "\n",
+                          "`drivers/input/keyboard/gpio_keys.c` at `:62`\n")
+    ck("P21f a detached `:62` is not read as a line citation",
+       rc == 0 and "LEDGER-4" not in txt, txt)
 
     # ---- P9: a missing ledger is red, and it is a different red from P7 --
     # nothing to compare against, not a gap in the comparison.

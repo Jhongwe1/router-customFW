@@ -1382,6 +1382,9 @@ to `rlx_tc_ladder`, so it pays the leaf's own I-cache fill, where base B's rung 
 is the thirteenth. **The experiment that decides it**: discard one `lad_leg`
 before the ladder starts, exactly as `t-hit` effectively does for
 `rlx_tc_walk`. Needs a payload; costs no extra power cycle once one exists.
+🔄 2026-09-26: the `probe3` rebuild this needs also carries `lwu2` —
+`SPEC.md` § 17 `CPU-75` is ⊘ and names this rebuild as its reopening event
+(`docs/emulation-surface.md`, the `lwu2` section).
 
 
 ---

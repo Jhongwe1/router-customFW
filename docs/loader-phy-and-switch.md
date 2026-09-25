@@ -341,7 +341,9 @@ like the other four, so **the skip is about the port, not about the PHY**
 🔴 **One reason was proposed during seating 2 and is refuted.** The proposal was
 **"port 1 has no jack, so there is nothing to patch"**. It is wrong.
 *(Measured 2026-08-24, `bench/2026-08-24b/E11e.log`.)* With the cable in the
-fifth RJ45 counted from the WAN side, `PSRP1` read `0x000010F9` — bit 4
+socket behind port 1 — LAN1 on section 7's silkscreen map; this line said *the
+fifth RJ45 counted from the WAN side*, a position assigned after the read and
+withdrawn the same day, renamed 2026-09-26 — `PSRP1` read `0x000010F9` — bit 4
 `LinkUp` set, and the only port so set on that read. **Port 1 has a jack**;
 section 7 carries the whole map. The proposal rested on a jack count that was
 *reported at the bench, not measured*, and `E11e`'s refutation condition named
@@ -730,7 +732,9 @@ needs is one look at the case — not a register read.
 **Bit 8 is read-to-clear — confirmed, and only because the cell had a control.**
 In order:
 
-1. `E11a`, cable just pushed into jack 2: `PSRP2` = `0x000011F9`, **bit 8 set**.
+1. `E11a`, cable just pushed into the socket behind port 2 (this line said
+   *jack 2*, a withdrawn position label; renamed 2026-09-26): `PSRP2` =
+   `0x000011F9`, **bit 8 set**.
 2. `E11a2`, nothing touched between the two reads: `PSRP2` = `0x000011F9`,
    **bit 8 still set**. 🔴 **The conclusion drawn here — "bit 8 is sticky, and a
    `DW` read does not clear it" — is retracted.** It stays recorded because it
@@ -761,7 +765,8 @@ first will report a live 100M full-duplex link on an empty socket.**
 both say. `E11a2` is then explained as a **second, real autoneg latch on a link
 that was still settling** — an event on the wire, not a defect in the instrument
 — and a third observation agrees: `PSRP3`'s bit 8 goes 1 → 0 between `E11d` and
-`E11e` while jack 3 stayed empty throughout. **The control is the whole finding.**
+`E11e` while port 3's socket (*jack 3* until 2026-09-26, a withdrawn position
+label) stayed empty throughout. **The control is the whole finding.**
 On a port with a settling link, "a second latch" and "the read does not clear it"
 produce the identical reading, so reading the register twice is not a
 discriminator unless the port's jack is empty.
@@ -1135,6 +1140,49 @@ comment does not describe a second view of the same word. **What bit 2 is:
 未定.** ⚠️ The other three words the `DW` served are recorded so they are not
 read again as a discovery: `+0x04` `00000000`, `+0x08` `00000000`, `+0x0C`
 `0C400000`, all **uninterpreted**.
+
+🔄 **2026-09-26 (`R6b-5`, desk): nothing this project runs touches the word;
+what bit 2 is waits on `R6b-2` and is set aside (⊘) unless that mechanism
+names the CPU port's MAC-side state (`SPEC.md` § 17 `NET-41` 殘留).** Each reading below carries its control.
+
+* **The define and its only consumer are VoIP-only** (讀, the drop that builds,
+  `src-vendor/rtl819x-toolchain`). `rtl865xc_asicregs.h:1824-1826` puts
+  `PSRP6_RW` inside `#ifdef CONFIG_RTK_VOIP_QOS` — the `:1825` above leaves the
+  guard out — and the `include/asm-rlx` copy at `:1786` is under
+  `CONFIG_RTK_VOIP_865xC_QOS`. The one user is `rtl8651_cpu_tx_fc()`
+  (`rtl865x_asicL2.c:8083-8090`, inside the same `#ifdef` block), which ORs and
+  clears **bit 6** (`0x40`) as the CPU port's TX flow control; its callers
+  (`:6403-6411`, and `rtk_voip`'s `voip_mgr_do_driver.c:2560`/`:2566`) are
+  VoIP-only too. `saturn49-wecb` and `wecb-vz-gpl` hold the same copies; neither
+  public RTL8196E tree names the word. **No source names bit 2.**
+* **`p2q`, the image `R6b` boots, compiles none of it.** Its resolved
+  `kroot/.config` has 0 lines containing `VOIP` (controls: `CONFIG_MIPS=y` and
+  `CONFIG_RTL_819X_SWCORE=y` found); `nm vmlinux` has no
+  `rtl8651_cpu_tx_fc`, while the same file's
+  `rtl8651_setAsicPortEgressBandwidth` is present.
+* **No instruction forms `0x4600`–`0x460C` as a switch access**, in `p2q`'s
+  `vmlinux` or in the loader's `stage2.bin`, counting `ori`'s hexadecimal
+  immediates, `addiu`/`li`'s decimal ones and load/store displacements (objdump
+  prints `addiu`/`li` immediates in decimal, and a first census that matched
+  hexadecimal only could not see them; its `ori`-only control passed anyway).
+  Controls: `0x4410` and `0x4204` are found in both. `vmlinux`'s seven textual
+  hits in the range are none of them a switch access (`li v0,17921` = `0x4601`
+  three times in the `fasync` code, `lui v0,0x4600` in `pagemap_pte_range`,
+  two WLAN structure offsets of 17920 in `rtl8192cd_init_sw`, and a branch
+  label). ⚠️ An address computed at run time is invisible to this census —
+  `0x4140`, `PSRP6`, is one the image reads and the census does not see.
+* **rlxfw's own source never names it** (`config/rlxfw-src/`, no `4600`, no
+  `PSRP6_RW`), and D has no `0xBB8046xx` table (controls: D's `0x4000`,
+  `0x4100` and `0x4300` maps and `PSRP0`–`PSRP4` are found); the RTL8196E-CG 1.0
+  and RTL8197B-CG 1.1 datasheets on hand have no such page either.
+
+推: so bit 2 cannot change a driver `R6b` builds unless `R6b-2`'s mechanism
+lands on the CPU port's MAC-side state. **Not established**: what bit 2 is;
+whether `0xBB804600` and `0xBB804140` are two registers or two views of one
+(`NET-41` 殘留's `EW` cell, which needs an explicit yes, separates those and
+still names no bit); whether either word moves on its own (its `DW` pair); any
+Linux-state value of the word; that nothing computes `0x4600` at run time; that
+bit 6 is TX flow control on this die (one vendor function name).
 
 ### 🟢 `PSRP` bit 12 is `PortEEEStatus[0]`, and the loader-state values carry their own control
 

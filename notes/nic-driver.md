@@ -517,10 +517,10 @@ Isolation, in order:
 5. 🟢🟢 **The vendor's own driver cannot receive either.** `ifconfig rlx0 down`
    released IRQ 12, `ifconfig eth4 10.1.1.4 up` took it —
    `12: 2 RLX LOPI eth4` — and `eth4` came up `UP BROADCAST RUNNING`, sent
-   **2** packets and received **0**.
+   **2** packets and received **0**. 🔄 **2026-09-26 (`R6b-5`, desk): those two numbers are port 3's MIB counters, not the vendor driver's own count.** 讀 `include/net/rtl/rtl_nic.h` in the drop that builds defines `CONFIG_RTL_NIC_HWSTATS` unconditionally, so `re865x_get_stats` → `re865x_accumulate_port_stats` → `rtl8651_returnAsicCounter` fills `eth4`'s counters from its member ports. 量 `bench/2026-09-20/X9-eth4`, an `eth4` that never opened (`SIOCSIFFLAGS` `EBUSY`), reads `RX 7 / errors 6 / 600 B` and `TX 23 / 1776 B` — equal to port 3's `Unicast 7`, `CRCAlignErr 6`, `Rcv 600 bytes` and `Snd 1776 bytes` in `X15`/`X17`, six fields (§ 19.2). So `I4-ethstat`'s `RX packets:0 errors:0`, `TX packets:2`, `TX bytes:128` say port 3 transmitted and counted **no frame in, errored or not**: of the two cases `SPEC.md` `NET-54` 殘留's step ② asked to separate, that boot was *the port never received*, `NET-56`'s counter signature. 推: the host was sending then (step 3, `NET-53`'s baseline ping); `TX 2` shows only that the counters were not cleared after `G1-rawtx`.
 
 **So the fault is not in this driver.** It is switch or PHY ingress state that
-a watchdog reset did not clear, with the vendor's driver as the control.
+a watchdog reset did not clear, with the vendor's driver as the control. 🔄 (2026-09-26: not a separate control — item 5's note; the location holds as *at or below port 3's receive counters*.)
 
 6. 🟢🟢 **And a cold power-on clears it.** One power press, then the same
    image, the same verbs, the same address: **4 of 4, 0 % loss,
@@ -531,7 +531,7 @@ a watchdog reset did not clear, with the vendor's driver as the control.
 **`FW-37` said `busybox reboot -f` resets this board, and it does — it is a
 watchdog bite. This seating narrows that: it resets the CPU, and it does NOT
 restore the switch's ingress path from this state.** The mechanism is
-unidentified; only its location and its remedy are measured.
+unidentified; only its location and its remedy are measured. 🔄 **2026-09-26 (`R6b-5`, desk): the bold sentence is too wide.** 量: after the watchdog reset `C62-reboot3`, `r6nic3-boot` printed `RLXFW-ID0=7FE2F8C3` (the image that wedged printed `AC0464CE`), and `r6nic3-ab2` → `r6nic3-2a` took 5 s, as the same seating's four healthy uploads took 4–5 s. 推: so the loader received the 1,077,248-byte `r6nic3` through port 3 (`looprun` `S6`; a reset re-stages `0x80500000` from flash) before the Linux boot that was deaf from its start (`D3-ifup` armed, `D5-after` `n_rx 0`); what links `C58`'s wedge to that boot is only their order in time. Not established: whether the loader resets the switch core, so whether the reset cleared the state or the state never touched the loader's path. `SPEC.md` § 17 `NET-54` 殘留 is re-owned to `R6b-3` beside `NET-124` 殘留: block 46 showed the same shape with the cable untouched (§ 22.4).
 
 ⚠️ Port 3 is `eth4`: the boot log's `Member port` field is a **bitmask** —
 `eth0 0x1` = port 0, `eth2 0x2` = port 1, `eth3 0x4` = port 2,
@@ -558,7 +558,7 @@ seating carried `ph_portlist 3`.
 
 ## 8. The CPU interface's control bits (`NET-38`) — moved from `notes/switch-driver.md` § 7
 
-🔴 **THREE readings in the moved text are refuted by the seating that moved it, not two.** The stub left in `notes/switch-driver.md` names two — `SWINTSET`, and the 24-vs-32 pkthdr stride. The third is this section's *"the interrupt does not go through the ICTL cascade … the vendor's NIC driver owns IRQ 12"*: the cascade half is confirmed (§ 4), and the ownership half is **refuted** by § 1 — 讀 `rtl_nic.c:4227` puts the vendor's `request_irq` in `re865x_open()`, not probe, and 量 `irq_rc 0` says line 12 was unclaimed. A fourth is weakened rather than refuted: the 推 that `CPUIISR` bit 0 is the software-interrupt pending bit has, per § 4, no source behind it at all. **The stub's count of two is wrong and this line is the correction; the moved text below is still not edited.**
+🔴 **THREE readings in the moved text are refuted by the seating that moved it, not two.** The stub left in `notes/switch-driver.md` names two — `SWINTSET`, and the 24-vs-32 pkthdr stride. The third is this section's *"the interrupt does not go through the ICTL cascade … the vendor's NIC driver owns IRQ 12"*: the cascade half is confirmed (§ 4), and the ownership half is **refuted** by § 1 — 讀 `rtl_nic.c:4227` puts the vendor's `request_irq` in `re865x_open()`, not probe, and 量 `irq_rc 0` says line 12 was unclaimed. A fourth is weakened rather than refuted: the 推 that `CPUIISR` bit 0 is the software-interrupt pending bit has, per § 4, no source behind it at all. **The stub's count of two is wrong and this line is the correction; the moved text below is still not edited.** 🔄 **2026-09-26 (`R6b-5`, desk): and the premise under that 推 is a miscount.** 讀 the same header's `_IP` defines (`AsicDriver/rtl865xc_asicregs.h`, the `CPUIISR` field block after `:604`): they name bits 1–10 and 16–31, so **six** `CPUIISR` bits are unnamed — 0 and 11–15 — not one; the list below skips 11–15 and then calls bit 0 the only gap. Bits 12 and 13 latch on every transmit (§ 9 item 7). 量, over the committed bench logs (block 46 excluded), bit 0 is set in none of 256 `now_iisr`, 256 `boot_iisr`, 255 `last_iisr` and 255 `seen_iisr` readings, and neither bit 18 nor bit 20 in any of 257 `now_icr` or 256 `boot_icr` (each the driver's own `key value` line read byte-wise, plus one indented `now_icr` line in `bench/2026-09-21b/C-LADDER.log`; `grep` skips `K0-COLD.log` as binary and counts one fewer of each). With the engine on and the mask `000007FE` (`bench/2026-09-19b/C13-swint`, `SPEC.md` `NET-50`) a `SWINTSET` write latched no bit either, so in the two states tried it leaves no pending bit; whether bit 20 does anything on this part is open. `SPEC.md` § 17 `NET-38` 殘留: ①② ⊘, ③ waits on `R6b-2`.
 
 **Moved here verbatim from `notes/switch-driver.md` § 7 on 2026-09-19**, which is the day that section said it would move: *"It moves the day `R6-3`'s driver note appears."* The subheadings are renumbered 7.x → 8.x and nothing else in the text is changed — including the readings it makes that later sections of this file went on to refute, which are marked where they are refuted and not edited here.
 
@@ -959,7 +959,7 @@ adapter. Not counted, not even as errors. A cable re-seat at both ends —
 
 ⚠️ **推, and the honest form of it**: `NET-54`'s shape is the same, and a cold
 power-on involves handling the board. **Refuted by** `NET-54` reproducing with
-the cable demonstrably untouched. **`SPEC.md` `NET-56`.**
+the cable demonstrably untouched. **`SPEC.md` `NET-56`.** 🔄 2026-09-26: that condition was met in block 46 (§ 22.4, `NET-124`) — port 3's receive block frozen while the host sent, with the host's link `LOWER_UP` and `transns` 4 unchanged at all 76 host reads after A1-00 (量) and no physical action on the card but the power press and power-off (讀).
 
 ### 8.5 🔴 A real TCP load hangs the whole board, and the mechanism is undetermined
 
@@ -1018,7 +1018,7 @@ confirm it refuted it instead.
    `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:347`). First seen at `C16-f14`.
 3. The engine's two RX position registers desynchronise by **exactly 4** and
    stay there. Indices are `(pos − base) / 4` with `rx_ring A15B8000` and
-   `mb_ring A15B8020`:
+   `mb_ring A15B8020` (🔄 2026-09-26, `R6b-5`: *exactly 4* is this seating's reads only — seating 31 saw 1, 2 and 3, transient (`bench/2026-09-21/CORRECTIONS-block33.md` § 1), and over the committed dumps, block 46 excluded, `dsync_last_d` takes every value from 1 to 7, 4 most often (70 dumps), and `dsync_first_d` 1 to 5; a single-sample Δ is a lower bound, `SPEC.md` § 17 `NET-61` 殘留, whose burst half block 46's arm C reopened, § 22.2):
 
    | capture | `rp` | `rm` | Δ |
    |---|---:|---:|---:|
@@ -1059,7 +1059,7 @@ it: `R8-B0` is 20/20 (`NET-63`).
 
 Stated so the fix is not designed in the same breath as the measurement.
 
-* `nic_do_arm()` must reset `nic_rx_idx` (and `nic_tx_idx`). **Not doing so hard-hung the board** — `NET-64`.
+* `nic_do_arm()` must reset `nic_rx_idx` (and `nic_tx_idx`). **Not doing so hard-hung the board** — `NET-64`. 🔄 **2026-09-26 (`R6b-5`): "hard-hung" is withdrawn** — `NET-64`'s board gave 0 bytes and no echo, and its own armed-but-silent watchdog rules out the simple hang; that the missing reset was the precondition is 推, n = 1 (`SPEC.md` `NET-64` 🔄, `docs/KNOWN-ISSUES.md` `NET-64`'s owner passage). The reset itself stays, and `1ab93d0` made it.
 * `:768` reads `bf` out of a descriptor the DMA engine writes and `:772-774`
   dereferences it with no bound check. A validated `bf` turns a bus hang into a
   dropped frame, and it is the difference between a measurement that ends a
@@ -1209,7 +1209,7 @@ The chain, each link with its evidence:
   tty echoes. 量 twice, and the echo is exact: `X5-ECHO2` returned **24 bytes**,
   precisely `echo RLXFW-ECHO-PROBE2\r\n`, with `X6-SILENT2` reading **0 bytes
   over 30 s with `sent: null`** — a true silence taken with the instrument
-  demonstrably running.
+  demonstrably running. 🔄 **2026-09-26 (`R6b-5`): this bullet merges two states.** Seating 31 echoed; `NET-64`'s seating-30 silence had **no** echo at all, so this refutes a hang in seating 31's wedges and not `NET-64`'s. What refutes `NET-64`'s "hard hang" is its own branch — a watchdog armed at ~84 s that never bit — and `NET-64`'s other premise, *arming with the engine running*, is withdrawn outright (`docs/KNOWN-ISSUES.md`, `NET-64`'s owner passage).
 * 🔴 **`NET-61` as `D5`'s blocker** — `n_dsync 0` through all three wedges,
   with the detector's three-way positive control (0 / 4 / 1) proven in the same
   boot. **The desync is not involved.**
@@ -1897,7 +1897,7 @@ detector left to write.** `SPEC.md` `NET-101`.
   `NET-58` reproduced on demand.
 * **not `watchdog_timeo`**: `NET-55`/`NET-57` measured it dead on this board.
 * **not `arm` with the engine running**: `NET-64`'s hard hang, which is why
-  `engine off` is first and why this sequence was safe.
+  `engine off` is first and why this sequence was safe. 🔄 **2026-09-26 (`R6b-5`): not `NET-64`** — its arm ran after `engine off` (`SPEC.md` `NET-64` 🔄), so it is not evidence for the order. What orders it is `nic_do_arm()` itself, which returns `-EBUSY` while `nic_engine_on` (since `edb7122`).
 
 ### 15.5 ⚠️ What it does not say
 
@@ -1930,7 +1930,7 @@ when the cheap path wins first.
 
 Not `watchdog_timeo`: `NET-55`/`NET-57` measured `dev_watchdog_up()` never
 being called on this board. Not `ndo_stop`/`ndo_open`: `NET-58`, reproduced as
-seating 36's `X16`. `engine off` is ordered first: `NET-64`.
+seating 36's `X16`. `engine off` is ordered first: ~~`NET-64`~~ `nic_do_arm()` returns `-EBUSY` while the engine runs (🔄 2026-09-26: `NET-64`'s arm ran after `engine off`, so it is withdrawn as the reason).
 
 **The single-variable demonstration.** The fault was created with the detector
 OFF, read whole, and the detector switched on in front of it -- so nothing else
@@ -1994,7 +1994,7 @@ difference in **both** modes and only *uses* the followed address when
 So the pairing is the identity at 43 frame/s and diverges on essentially every
 frame at 1,500 frame/s. 🔴 **This is why Part B's reading refuted `NET-82` and
 the refutation was too broad**: `n_ph_diff 0` over 732 frames was true, and
-true only of that load.
+true only of that load. 🔄 **2026-09-26 (`R6b-5`, desk): "rate-dependent" holds only in part — average frame rate does not decide it.** 量 `bench/2026-09-22b` `C4-DOSE`/`C8-DOSE`: the same boot, ~2,510 and ~2,540 frame/s, both arms starting from aligned rings (`C1-REST` rp = rm, `C7-ON` rp/rm 0/0), 20,097 of 20,112 frames skewed against 0 of 20,409 (the arms also differ in `txrings`, 1 against 4, one dose each); and on both of `P2`'s boots a 20-frame/s ping skewed at frame 13 (`ph_first_nrx 12`, `P1-N0` in `bench/2026-09-23` and `bench/2026-09-25`). 推: the host sent eleven queued echoes at once after resolving its neighbour (`P1-HP.events`; the board side has no per-frame timing), more than the 8-slot ring holds; block 33's ladder first separated the position registers at 8 frames (`bench/2026-09-21/CORRECTIONS-block33.md` § 1). 量: all six boots' first divergence names mbuf slot 0. Not established: that rate plays no part, and the mechanism. `SPEC.md` `NET-103` 🔄; § 17 `NET-103` 殘留 is re-owned to `R6b-3`, read with `NET-61` 殘留's burst half by its ④.
 
 **The first divergence is kept whole**: `ph_first_exp A15B8170` against
 `ph_first_w0 A15B8110` -- harvesting pkthdr slot **4**, `ph_mbuf` pointed at
@@ -2172,7 +2172,7 @@ climbing and `now_iisr` read `00000000`, so this was the TX wedge and not
 Bits 17 and 16 are `PKTHDR_DESC_RUNOUT_IP0` and `MBUF_DESC_RUNOUT` — `NET-92`
 named them and **this project had never seen them latch**. 推: the 8-deep RX
 ring runs out at ~1,500 frame/s, the engine pipelines, and the two rings
-decouple. The mechanism is unread.
+decouple. The mechanism is unread. 🔄 (2026-09-26: the rate half of this is narrowed — § 16.2's note.)
 
 ### 16.5a 🔴 The `/proc` handler was at 93.5 % of its page, and the first cap did not bound it
 
@@ -2209,7 +2209,7 @@ reading. It is absent in all 37 dumps of this seating.
 * It does not say **why** the engine stops retiring a TX descriptor. Two
   candidates died here; none was replaced.
 * It does not say why the pairing decouples. The correlation with frame rate
-  rests on two points, both from one board on one evening.
+  rests on two points, both from one board on one evening. 🔄 2026-09-26: and average rate is not sufficient (§ 16.2's note); `SPEC.md` § 17 `NET-103` 殘留 is re-owned to `R6b-3`.
 * `phfollow 1` is **not** the default in this image and no image has been built
   with it as the default.
 * `recovms` was swept over two values, 1000 and 20, and the throughput did not
@@ -3252,7 +3252,7 @@ port 3's `phyReg`) read in the silent state; and then, on the owner's word, a re
 host adapter (or a WSL restart) as the recovery test, reading whether port 3 receives again.
 推 The adapter's own MAC tally counters would be a second host-side witness, but `r8153_ecm`
 exposes none. Nearest row: `NET-110` (a transient FAILED state in seating 38) is the other
-direction, board → host; whether the two are related is not established.
+direction, board → host; whether the two are related is not established. The same shape in the same direction is `NET-54` (§ 6.4, 2026-09-19), whose § 17 row `R6b-3` owns beside `NET-124` 殘留; `NET-56`'s re-attribution of it named this case — the shape with the cable untouched — as its refutation (§ 8.4): 量 the host's link read `LOWER_UP` with `transns` 4 unchanged at all 76 host reads after A1-00.
 
 ### 22.5 What the arms suggest (推: design input for `R6b-2`, not `D1`)
 

@@ -145,10 +145,10 @@ assemble at all.
 |---|---|---|---|---|
 | `GIMR` | `0xB8003000` | D § 8.1.1 Table 14 | `bspchip.h` bit list | `SPEC.md` `REG-01` |
 | `GISR` | `0xB8003004` | D § 8.1.2 Table 15 | `bspchip.h` bit list | `REG-02` |
-| `IRR0` | `0xB8003008` | `bspchip.h` `BSP_IRR0` | — | **never read** |
-| `IRR1` | `0xB800300C` | `bspchip.h` `BSP_IRR1` | A (loader disassembly) | `REG-03`, loader prompt only |
-| `IRR2` | `0xB8003010` | `bspchip.h` `BSP_IRR2` | D | **never read** |
-| `IRR3` | `0xB8003014` | `bspchip.h` `BSP_IRR3` | — | **never read** |
+| `IRR0` | `0xB8003008` | `bspchip.h` `BSP_IRR0` | — | ~~**never read**~~ 🔄 `REG-32`, both states (`TI-L`, `TI-0`, 2026-09-04) |
+| `IRR1` | `0xB800300C` | `bspchip.h` `BSP_IRR1` | A (loader disassembly) | `REG-03`, loader prompt only 🔄 and Linux (`TI-0`, 2026-09-04) |
+| `IRR2` | `0xB8003010` | `bspchip.h` `BSP_IRR2` | D | ~~**never read**~~ 🔄 both states (`TI-L`, `TI-0`, 2026-09-04) |
+| `IRR3` | `0xB8003014` | `bspchip.h` `BSP_IRR3` | 🔄 D § 8.1.5 Table 18 (2026-09-26; bits 11:8 Reserved) | ~~**never read**~~ 🔄 `REG-33`, both states (`TI-L`, `TI-0`, 2026-09-04) |
 | `TCCNR` | `0xB8003110` | D Table 24 | `bspchip.h` `BSP_TC0EN`… | `REG-09` |
 | `TCIR` | `0xB8003114` | D Table 25 | `bspchip.h` `BSP_TC0IE`… | `REG-10` |
 
@@ -590,8 +590,31 @@ transcribed.
 🔴 **`BSP_IRR3_SETTING` has no `<< 8` term.** Bits 11:8 are therefore written as
 `0`, whatever source occupies that field. If `0` means *unrouted*, the vendor
 BSP silently disables one ICTL source on every boot; if it means *CPU IRQ 0*,
-it routes it somewhere nothing handles. **Undetermined**, and it is a defect in
-the vendor's macro rather than a question about the silicon.
+it routes it somewhere nothing handles. **Undetermined**, ~~and it is a defect in
+the vendor's macro rather than a question about the silicon~~.
+
+🔄 **2026-09-26 (`R6b-5`, desk): the second half of that sentence is withdrawn —
+what is left IS a question about the silicon, and it has no consumer.** 讀 D
+§ 8.1.5 Table 18 (Rev 1.1, PDF p. 30, printed p. 22; rows located by
+`pdftotext -bbox` y-coordinates because `-layout` interleaves 11:8 and 7:4): bits
+11:8 are **Reserved**, RW, InitVal 0. Rev 1.0 (same Track ID, JATR-3375-16)
+prints the same table — one document lineage, so one vote. D's `GIMR`/`GISR`
+bit 26 is Reserved too, and the `IRRn` ↔ `GIMR` map holds on D's own names:
+the 10 fields D names in `IRR1`–`IRR3` sit on the same-named `GIMR` bit 8n+k and
+the 14 reserved nibbles on reserved bits, anchored by measurement at `IRR1`
+(`irr1_tc0_rs = 13` ↔ `13: rlx timer`, § 4.3). The header that builds calls bit
+26 `BSP_I2S_IE` with `BSP_I2S_RS` and `BSP_I2S_IRQ` commented out, and
+`boards/rtl8198`'s copy of the same macro has `(BSP_I2S_RS << 8)`: the term went
+out with the commented-out define (讀; whether on purpose, 推). ⚠️ D also names
+`IRR3` 15:12 `CPU_WAKE_RS` and 7:4 `USB1_WAKE_RS`, where the table above carries
+the vendor header's SPI and SAR. **Consequence: none.** `GIMR` bit 26 is 0 in
+all 90 `gimr=` readings in `bench/` (`REG-01`), and it is set only under
+`CONFIG_RTK_VOIP`, which no cell `.config` and not `p2q`'s sets, so whatever
+sits behind source 26 is masked (`REG-02`). **Not established**: that nothing
+sits there — D's Reserved is not absence (`GISR` bits 31 and 2, both Reserved in
+D Table 15, are set in all 90 `gisr=` readings, and D omits `IRR0`, which reads
+`22222222`) — and what `_RS` = 0 selects, which routing TC1 to 0 would answer.
+`SPEC.md` § 17 `REG-33` 殘留 is ⊘.
 
 ### 4.3 🟢 The routing HAS now been read under Linux, and the two states disagree completely — every word as predicted
 
@@ -616,7 +639,25 @@ subsystem, in the same seating — lists the vendor's tick as
 **`13:  RLX LOPI  rlx timer`**. **The field is the destination IRQ line**, by
 two independent sources. `irr1_tc1_rs = 2` = `BSP_IRQ_CASCADE`, and TC1 duly
 arrived as ICTL IRQ 25 (`TI-5`/`TI-6`). ⚠️ **The loader's `4` still fits
-neither reading and nothing here touched it.**
+neither reading and nothing here touched it.** 🔄 **2026-09-26 (`R6b-5`, desk):
+it fits the first, and the readings that say so were already here.** 讀 A:
+this unit's `timer_init` (`0x80408F20`) writes the whole word `IRR1 =
+0x00050004` at `0x80408F90` (`docs/loader-phy-and-switch.md` § 2, `RUNSHEET.md`
+`E3`), and 讀 C puts the `|= 3<<28` at `0x80402A1C` in Ethernet init
+(`upstream` `P9-18`) — together the measured `30050004`. So `IRQ-07` 殘留's
+refutation branch fired on this unit's own binary, and its consequent (*4 and
+`_RS` are not the same field*) was contradicted when written: `bspchip.h` puts
+TC0's route in nibble 0 (`BSP_TC0_RS << 0`) and the Linux-side reading above
+shows Linux writing 13 into that nibble, so the loader's 4 sits in the same
+field. `bench/2026-08-23/E.log` — `IRR1` `30050004`, `GIMR` bit 8 set, the tick only TC0's ISR (`0x80408F04`) writes advancing at ~100 Hz (`REG-25`, `CLK-04`) — is consistent: TC0 is delivered under nibble 0 = 4, but with `Status.IM[7:2]` all unmasked, delivery cannot tell route values 2–7 apart.
+The two premises of
+*fits neither* were in the wrong namespace: `IRQ-02`'s 8 is a `GIMR` source bit
+passed to `request_IRQ`, and the loader unmasks `Status.IM[7:2]` at `0x80406694`
+(讀 A) and takes interrupts on that route (量). A sibling bootcode
+(`wecb-vz-gpl` `timer_init()`, `REG32(IRR1_REG) = 0x00050004; //uart:IRQ5,
+time0:IRQ4`) explains the constant and does not replace A. **Not established**:
+which `Cause` bit 4 raises (`IP4` by Linux's decode, 推; `upstream` calls the
+nibble a priority).
 `bench/2026-09-04/CORRECTIONS-block9.md` § 7.
 
 *(The heading read "The routing has never been read under Linux" and the
@@ -696,13 +737,19 @@ only worth having if you can see what it used to say.**
    where the vendor's own tick runs.
 4. ~~**The `_RS` encoding is 未定.**~~ 🟢 **It is the destination IRQ line**,
    by two independent sources in one capture: `irr1_tc0_rs = 13` and
-   `/proc/interrupts`' `13: RLX LOPI rlx timer`. ⚠️ **The loader's `4` in the
-   same field still fits neither reading** — `SPEC.md` `IRQ-07 殘留`.
-5. **`IRR3` bits 11:8** are written as zero by a macro that skips them, and
+   `/proc/interrupts`' `13: RLX LOPI rlx timer`. ~~⚠️ **The loader's `4` in the
+   same field still fits neither reading**~~ 🟢 **2026-09-26: it is TC0's route
+   value in the same field, and TC0 is delivered under it** (§ 4.3); which
+   `Cause` line it selects is 推 — `SPEC.md` `IRQ-07 殘留`, ✅.
+5. **`IRR3` bits 11:8** are written as zero by a ~~macro that skips them~~
+   macro whose `<< 8` term went out with the commented-out `BSP_I2S_RS`, and
    what sits in that field is unknown (§ 4.2). ⚠️ **Unchanged, and the device
    reading does not change it**: `irr3` reads `22222022`, so those bits are 0
    — which is what the macro wrote. The reading confirms the write, not the
-   meaning.
+   meaning. 🔄 **2026-09-26: answered as far as a desk can** — D calls the field
+   Reserved with InitVal 0 and `GIMR` bit 26 is 0 — 量 in every `gimr=` reading, all on the 2026-09-03…06 images; 讀 for every other image, whose `.config` leaves `CONFIG_RTK_VOIP` unset — so nothing
+   reaches it; its identity and what `_RS` = 0 selects are ⊘ for want of a
+   consumer (§ 4.2, `SPEC.md` `REG-33 殘留`).
 6. ~~**§ 3.2's correction is an argument from a second reading.**~~ 🟢 `TI-2`
    set `TCIR` bit 30 and `TI-3`/`EX-2` watched the consequence, so it is a
    measurement now. 🔴 **And it needed a correction of its own**: at the

@@ -650,6 +650,41 @@ in user mode. Two states of one machine; neither refutes the other. **The
 experiment that decides it is `lwu2` timed bare metal**, which needs a `probe3`
 row and a seating.
 
+🔄 **2026-09-26 (`R6b-5`, desk): not run, set aside (⊘, `SPEC.md` § 17
+`CPU-75`), and the criterion above is corrected.**
+
+* **What would decide it.** Not a comparison with 915.5 ns: that sets Linux's
+  exception entry and return against `probe3`'s own record-and-`rfe`
+  (`tools/rlxprobe/exc.S`, about 22 instructions) — two paths, not two states
+  of the core (推, from *The exception round trip on this kernel* above, which
+  puts the dominant term in the trap and the return). The observables are the
+  handler's verdict — `ExcCode` 4 with the `EPC`, which `exc.S` records, or the
+  instruction retiring — and `lwu2`'s slope against its `lw` twin on the same
+  payload. `BadVAddr` = base + 2 is readable only if `exc.S` also records CP0
+  `$8`, which no probe does.
+* **Why it is not run.** 讀 `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c`
+  1.4: `nic_xmit`, the `tx` verb and the RX harvest copy frames one byte at a
+  time. 讀, GNU objdump 2.42 (Ubuntu `mips-linux-gnu`, not the vendor's
+  toolchain) over the image `R6b-1` boots (`p2q`, `vmlinux` sha256
+  `c5e2cfdb…ed654863`), bucketed by the disassembler's own symbol labels:
+  across the 27 `nic_*` functions, `lh` 0, `lhu` 0, `lwl`/`lwr`/`swl`/`swr`
+  0; the one `sh` stores `skb->protocol` right after `jal eth_type_trans`; none
+  of their 523 `lw` and 321 `sw` has an immediate offset that is not a multiple of 4 (a second count, taking each function's extent from the ELF's symbol sizes instead of the disassembler's labels, gives the same numbers).
+  Positive control: the same counter reads `lwl` 6, `lwr` 6, `swl` 2, `swr` 1
+  in `memcpy`/`__copy_user`. ⚠️ Only immediate offsets were checked; the
+  alignment of each base register is not proven. 推 from that: no reading of
+  this row moves `R6b`'s D1–D4. And the experiment yields a **loader-state**
+  value, which `CLAUDE.md` forbids predicting Linux state from: this section
+  measured Linux **user** mode, the drivers run in Linux **kernel** mode, and
+  nobody has measured that — a different row's question, which this one cannot
+  answer.
+* **Reopens** when any bare-metal probe payload is rebuilt for another reason —
+  `bench/2026-09-16/CORRECTIONS-block22.md` § 7 ①'s `lad_leg` discard waits on
+  the same `probe3` rebuild (`docs/rlx-cache-and-cp0.md`) — and the `lwu2` row
+  goes into it; or when a gate's DoD needs the core's loader-state behaviour on
+  an unaligned `lw`. A driver that makes its 2-mod-4 copies word-wise opens a
+  new row (the kernel-mode cost), not this one.
+
 **Owner of `SPEC.md` `CPU-73` (the four costs and the exception round trip), `CPU-74` (§ 8.2 refuted) and `CPU-75` (`CPU-15` and this document are about two different things).**
 
 ### ⚠️ What this does not price

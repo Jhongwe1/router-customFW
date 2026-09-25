@@ -676,7 +676,7 @@ tools/ledgerscan.py        R5's blind-write ledger is COMPUTED, not written. It
                            claimed those domains are empty on the real tree, which is
                            the LEDGER's claim, and it went red on this repository's own
                            prose naming a path as an example. The prose was not
-                           rewritten to make it green. 84 controls, and `check` also
+                           rewritten to make it green. 99 controls, and `check` also
                            has a negative control on real material: removing one row
                            from the committed ledger must name the path it lost.
 

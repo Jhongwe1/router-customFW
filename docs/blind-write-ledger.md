@@ -119,7 +119,7 @@ is the one that was nearly missed.
 | **completeness** | `tools/ledgerscan.py scan` | every path-shaped citation of an external source, in `git ls-files` (**1,448** on 2026-09-03 after `R5-2`, **1,447** earlier the same day at `R5-1`, 1,445 at `R5-0`; the number grows with the repository, and `ledgerscan scan` prints it rather than this table fixing it) and in `upstream/` (302, walked — `git ls-files` cannot see inside a submodule) |
 | **domain** | the tool | which of `R5`'s drivers a path could belong to. Over-inclusive by design: `dt` and `bsp` are cross-domain, because a device tree and a board file each describe every peripheral |
 | **origin** | the tool's path rules, restated per row below | *generic Linux* / *vendor Realtek* / *third-party port*. **Only the last two can cost independence** |
-| **depth** | the tool | `name` (a path appears) or `line` (a line number travels with it) |
+| **depth** | the tool | `name` (a path appears) or `line` (a line number travels with it). A row may also declare `none`, or `artefact` (§ 4.3.1), which no citation can produce. 🔄 **2026-09-26 (`R6b-5`): `check` holds the column to this** — a depth cell whose first word is not one of the four is RED (`LEDGER-3`), and a path whose deepest row says `none`, `name` or `artefact` while this repository cites it as `path:NN` is RED (`LEDGER-4`); the remedy is a row for the section that took the lines |
 | **what was taken, and on which layer** | **me** | a judgement. It is not computable and it is not delegated to a keyword |
 | **the join** | `ledgerscan check` | every in-scope path the scan finds must have a row here. A path in the tree and not in this file is a ledger that has gone stale, and it exits 1 |
 
@@ -269,12 +269,12 @@ newly-referenced, and nothing about the tree changed shape.
 > **A citation scanner detects a new PATH. It cannot detect a change of
 > DEPTH**, and depth is the whole content of an `origin: none` row.
 
-`PROGRESS.md` `LEDGER-4` carries the fix, and it is narrow enough to be cheap:
-a `line`-depth reading leaves a `path:NN` signature, so **an `origin: none` or
-`depth: name` row whose file is cited anywhere in this repository *with a line
-number* is a contradiction the tool can find**. The positive control is this
-very row: the check must fire on the tree as of the commit before the depth was
-corrected, and stop firing after.
+`PROGRESS.md` `LEDGER-4` carried the fix, and since 2026-09-26 (`R6b-5`) it is
+the tool's rule: a `line`-depth reading leaves a `path:NN` signature, so **a
+path whose deepest row says `none`, `name` or `artefact` while it is cited
+anywhere in this repository *as `path:NN`* is RED**. 🔄 ~~The positive control
+is this very row~~ — 量, it cannot be: this reading was written as detached `:62`
+spans and committed with the row's correction (`d64ee2f`); the controls are § 4.13's `irq.c` and `P21a`. The rule reads depth only. `LEDGER-4` first stated it as *an `origin: none` **or** `depth: name` row*, and the origin half is dropped because the corpus gives it nothing to add: 量 2026-09-26, every `origin: none` row ever committed — `gpio_keys.c`, `rtl819x-leds-board.c` and `timekeeping.c`, 68 row readings over the ledger's 35 versions — declares `name`. It comes back the day an `origin: none` row is declared `line`.
 
 🔴 **`origin: none` is an exemption and exemptions get abused, so it
 carries a constraint:** such a row must name the exact file and line, and that
@@ -513,7 +513,7 @@ timer routine would be a `line` reading whatever file it was printed from.
 |---|---|---|---|
 | `arch/rlx/kernel/irq_vec.c` | line | vendor | `:36`, the string literal `"RLX LOPI"` — the same `arch/rlx`-vs-`arch/mips` proof as § 4.3. ~~**No routing, no mask register**~~ 🔴 **2026-09-04, `R5-10`: that clause is now false and the file is read in full.** `unmask_rlx_vec_irq`/`mask_rlx_vec_irq` (`set_lxc0_estatus(0x10000 << (irq - BSP_IRQ_LOPI_BASE))`), the `rlx_vec_irq_controller` chip, `rlx_vec_irq_init` (`clear_lxc0_estatus(EST0_IM)`, `write_lxc0_intvec(&rlx_vec_dispatch)`, and the **assignment** `REG32(BSP_GIMR) = BSP_TC0_IE \| BSP_UART0_IE` with every conditional `\|=` after it), and `rlx_do_lopi_IRQ`. **Mask register and dispatch both** |
 | `arch/rlx/kernel/irq_cpu.c` | line | vendor | 🆕 **2026-09-04, `R5-10`.** `:44,51` — `set_c0_status(0x100 << (irq - BSP_IRQ_CPU_BASE))` / `clear_c0_status(...)`, the `rlx_cpu_irq_controller` chip, and `:69,73` (`clear_c0_status(ST0_IM)`, `set_irq_chip_and_handler`). **This is what says the CPU domain is masked in the ORDINARY `Status.IM` while LOPI is masked in `ESTATUS`** |
-| `arch/rlx/kernel/irq.c` | name | vendor | 🆕 **2026-09-14 (sixty-ninth segment).** ⚠️ **NOT OPENED, and the citation is GENERATED rather than written.** `tools/emueq.py refresh` records, per `CONFIG_` symbol, the list of files under `arch/rlx` that NAME it; `CONFIG_KGDB` is named here, so `config/emu-path-symbols.tsv` carries the path. What was taken is the fact that the token occurs in this file -- **no line, no construct, no behaviour** -- and it was taken by a `re.findall` over the file's text, not by a person reading it. Depth `name` and not `line`, for the same reason `drivers/char/keyboard.c` above is `name`: a grep hit is not a reading. 🔴 **This is the second time CLAUDE.md's rule 3b has bitten this repository and the first time a TOOL caused it**: `ledgerscan check` was green at the desk on the tree the sweep saw, and red on CI, because the citation is in a file the segment generated after its own checks ran. The fix for the class is not this row -- it is that `emueq refresh` now prints every path it wrote and says `ledgerscan check` must follow it, so the next new path is announced by the tool that creates it |
+| `arch/rlx/kernel/irq.c` | name | vendor | 🔄 **2026-09-26 (`R6b-5`): "NOT OPENED" below stopped being true on 2026-09-19**, when `R6-3` read `:176-180,224`; that reading is § 4.13's `line` row, added seven days late, after `ledgerscan`'s `LEDGER-4` refused the tree. This row stays `name`: what it records is this section's contact — a generated citation — and not that reading. 🆕 **2026-09-14 (sixty-ninth segment).** ⚠️ **NOT OPENED, and the citation is GENERATED rather than written.** `tools/emueq.py refresh` records, per `CONFIG_` symbol, the list of files under `arch/rlx` that NAME it; `CONFIG_KGDB` is named here, so `config/emu-path-symbols.tsv` carries the path. What was taken is the fact that the token occurs in this file -- **no line, no construct, no behaviour** -- and it was taken by a `re.findall` over the file's text, not by a person reading it. Depth `name` and not `line`, for the same reason `drivers/char/keyboard.c` above is `name`: a grep hit is not a reading. 🔴 **This is the second time CLAUDE.md's rule 3b has bitten this repository and the first time a TOOL caused it**: `ledgerscan check` was green at the desk on the tree the sweep saw, and red on CI, because the citation is in a file the segment generated after its own checks ran. The fix for the class is not this row -- it is that `emueq refresh` now prints every path it wrote and says `ledgerscan check` must follow it, so the next new path is announced by the tool that creates it |
 | `arch/rlx/include/asm/mach-generic/irq.h` | line | **generic** | 🆕 **2026-09-04, `R5-10`.** `NR_IRQS 48` and the `MIPS_CPU_IRQ_BASE` block. Generic Linux, unmodified upstream text |
 | `arch/rlx/include/asm/rlxregs.h` | line | 🔴 **vendor** | 🆕 **2026-09-04, `R5-10`. Declared although `ledgerscan check` did not ask for it**, on § 2.1's direction of error — the scan's domain rules put it out of scope and over-reporting contact is this file's job. `LXCP0_ESTATUS $0` / `ECAUSE $1` / `INTVEC $2` / **`CCTL $20`**, the `CCTL_*` operation bits, `EST0_IM 0x00ff0000`, the `ESTATUSF_IP*`/`ECAUSEF_IP*` lists, and the `__read_32bit_lxc0_register`/`__write_32bit_lxc0_register` macros that emit `mflxc0`/`mtlxc0` |
 | `bootcode/boot/init/irq.c` | line | **loader** | `:228` and around it. This is the **bootloader's** interrupt code, not Linux's; read for `docs/loader-command-semantics.md` and `notes/cache-model.md` |
@@ -565,8 +565,8 @@ files version 3.0's design decisions are read out of.
 
 #### 4.8.1 🔴 The depth vocabulary cannot say what changed about `rlx-cevt.c`, and that is a hole in `LEDGER-2`'s fix
 
-讀 `tools/ledgerscan.py:364`: `DEPTHS = ("none", "name", "line")`, deepest last.
-There is no word for *the whole file*.
+讀 `tools/ledgerscan.py`'s `DEPTHS` as it stood until 2026-09-26: `("none", "name", "line")`, deepest last (🔄 `R6b-5` added `artefact`, ranked with `name`).
+There is no word for *the whole file*, and there still is none (`PROGRESS.md` `LEDGER-3` ①, ⊘).
 
 So this segment's reading of `arch/rlx/kernel/rlx-cevt.c` — from **two string
 literals** (`:139`, `:226`, taken for an `arch/rlx`-vs-`arch/mips` proof) to
@@ -583,7 +583,7 @@ than failed. A row that declared `ful1` would be skipped the same way.
 fixed here: adding a fourth depth word moves `scan`'s own computation
 (`ledgerscan.py:522` derives `line` or `name` from whether a citation carries a
 line number, and nothing can derive *whole file* from a citation), so it is a
-design change to the tool and not a table edit.
+design change to the tool and not a table edit. 🔄 **2026-09-26 (`R6b-5`): the second gap is closed — a depth cell whose first word is not in the vocabulary is RED (`LEDGER-3`); the first is ⊘, with its reason and reopening condition in `PROGRESS.md` `LEDGER-3`.**
 
 ⚠️ **`arch/rlx/kernel/genex.S` is cited beside it and is NOT declared**, because
 the citation is to two lines quoted out of `ledgerscan`'s own report of
@@ -629,7 +629,7 @@ which pin on this die, which is the layer `driver-diff` compares.
 | `drivers/Kconfig` | **line** | **generic** | `:55` `source "drivers/gpio/Kconfig"` — asked because a `menuconfig` that is never sourced would have made `FW-38`'s whole question moot |
 | `drivers/input/keyboard/Kconfig` | **line** | **generic** | `:292-294` `KEYBOARD_GPIO` `depends on GENERIC_GPIO`. Read to decide `R5-4`'s shape, not `R5-8`'s: it is what makes the gpiolib route forced rather than preferred |
 | `drivers/leds/Kconfig` | **line** | **generic** | `:121-123` `LEDS_GPIO` `depends on LEDS_CLASS && GENERIC_GPIO`, for the same reason |
-| `arch/rlx/include/asm/mach-generic/gpio.h` | **line** | vendor | 🔄 **2026-09-10 (R5-8): the depth cell read `**full**` and `ledgerscan check` was SKIPPING this row for it.** 讀 `tools/ledgerscan.py:364`, `DEPTHS = ("none", "name", "line")` -- `full` is not in the vocabulary, so the tool reported it under *declared row(s) whose depth cell names none of none/name/line, so the comparison above skipped them* and the row was declared and unchecked. `line` is the correct cell and it understates nothing: the file is twenty-one lines and every one of them was read. **`config/host-compat/0006` PATCHES THIS FILE**, which is what made a skipped row matter. — **21 lines, and it decided the route.** Under `CONFIG_GPIOLIB` it aliases three `gpio_*` to `__gpio_*`; the `#else` branch declares **six** `gpio_*` functions the arch must define and `arch/rlx` defines none — so "no gpiolib" is not the cheap option it looks like. 🔴 `:16-17` declare `gpio_to_irq()`/`irq_to_gpio()` **outside** both branches, unaliased and undefined here, which is the link hazard recorded in the driver's header |
+| `arch/rlx/include/asm/mach-generic/gpio.h` | **line** | vendor | 🔄 **2026-09-10 (R5-8): the depth cell read `**full**` and `ledgerscan check` was SKIPPING this row for it.** 讀 `tools/ledgerscan.py`'s `DEPTHS` as it then stood, `("none", "name", "line")` -- `full` is not in the vocabulary, so the tool reported it under *declared row(s) whose depth cell names none of none/name/line, so the comparison above skipped them* and the row was declared and unchecked (🔄 since 2026-09-26, `R6b-5`, such a cell is RED, `LEDGER-3`). `line` is the correct cell and it understates nothing: the file is twenty-one lines and every one of them was read. **`config/host-compat/0006` PATCHES THIS FILE**, which is what made a skipped row matter. — **21 lines, and it decided the route.** Under `CONFIG_GPIOLIB` it aliases three `gpio_*` to `__gpio_*`; the `#else` branch declares **six** `gpio_*` functions the arch must define and `arch/rlx` defines none — so "no gpiolib" is not the cheap option it looks like. 🔴 `:16-17` declare `gpio_to_irq()`/`irq_to_gpio()` **outside** both branches, unaliased and undefined here, which is the link hazard recorded in the driver's header |
 | `arch/rlx/include/asm/gpio.h` | **line** | vendor | 🔄 **2026-09-10 (R5-8): `**full**` → `line`, the same repair and the same reason as the row above.** — 6 lines, `#include <gpio.h>`. Read to confirm the mach- header above is the one that is reached |
 | `arch/rlx/Kconfig` | **line** | vendor | `:12-15` `config MIPS` with its `select EMBEDDED` — the site `0005` patches — and `:275` `config GENERIC_GPIO`, a promptless `bool` nothing in the arch selects |
 
@@ -646,8 +646,8 @@ symbol was read as "both arches select the optional one", and only x86 does.
 🔄 **2026-09-15: the same file was read again, at `line` depth, from the `.c`.**
 The row below is the artefact-depth reading `FW-40` rests on and stays as it
 is; this one carries the machine-readable depth, because `ledger_rows` keeps
-the deeper of two claims for one path and `artefact` is not a word in its
-vocabulary.
+the deeper of two claims for one path and `artefact` was not a word in its
+vocabulary (🔄 it is since 2026-09-26, `R6b-5`, ranked with `name`, so this `line` row still decides).
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
@@ -927,7 +927,21 @@ not survive.
 
 | path | depth | origin | what was taken |
 |---|---|---|---|
-| `kernel/softirq.c` | line | 🔴 **vendor** | 🆕 **2026-09-20, `R6-5`.** Two constants, both inside `#if defined(CONFIG_RTL_819X)` and therefore Realtek's rather than generic: `:197-201`, `MAX_SOFTIRQ_RESTART` is **2000** where mainline is **10**; and `:646-650`, `ksoftirqd()` opens with `set_user_nice(current, -20)` where mainline leaves it at 0. 量 the built config: `CONFIG_RTL_819X=y`, so both are live. **What they were for**: they bound how long one `__do_softirq` can hold the CPU without process context, which is the *softirq livelock* hypothesis of `bench/2026-09-20b/PREDICTIONS-B32-block30.md` § 1, and the discriminator they pointed at is `/proc/net/softnet_stat` column 3 — read `net/core/dev.c:2954`, already declared. 🟢 **The hypothesis was refuted on the die**: `time_squeeze` read `00000000` at the load applied. ⚠️ **Nothing from this file entered any driver of mine**, and nothing in it touches the decision layer: the numbers sized a guess, and the guess is gone |
+| `kernel/softirq.c` | line | 🔴 **vendor** | 🆕 **2026-09-20, `R6-5`.** Two constants, both inside `#if defined(CONFIG_RTL_819X)` and therefore Realtek's rather than generic: `:197-201`, `MAX_SOFTIRQ_RESTART` is **2000** where mainline is **10**; and `:646-650`, `ksoftirqd()` opens with `set_user_nice(current, -20)` where mainline leaves it at 0. 量 the built config: `CONFIG_RTL_819X=y`, so both are live. **What they were for**: they bound how long one `__do_softirq` can hold the CPU without process context, which is the *softirq livelock* hypothesis of `bench/2026-09-20b/PREDICTIONS-B32-block30.md` § 1, and the discriminator they pointed at is `/proc/net/softnet_stat` column 3 — read `net/core/dev.c:2954`, ~~already declared~~ 🔄 **not declared until 2026-09-26 (`R6b-5`)**: no row named it, and `ledgerscan` has no `net` domain, so `check` never asked; the row below is that declaration. 🟢 **The hypothesis was refuted on the die**: `time_squeeze` read `00000000` at the load applied. ⚠️ **Nothing from this file entered any driver of mine**, and nothing in it touches the decision layer: the numbers sized a guess, and the guess is gone |
+| `net/core/dev.c` | line | **generic** | 🆕 **2026-09-20, `R6-5`; declared 2026-09-26 (`R6b-5`).** `:2954`, read for the row above: which column of `/proc/net/softnet_stat` is `time_squeeze`, the discriminator block 30's third hypothesis was refuted on. Mainline's network core: no register, no bit, nothing about this SoC. ⚠️ Out of `ledgerscan`'s scope — it has no `net` domain — so this row is declared by hand, and `check` would not have asked for it |
+
+### 4.13 🆕 `R6-3` rung 0 — one row, vendor, declared seven days late
+
+量 2026-09-26. `R6-3` read this file on 2026-09-19 (`72bfecd`) and wrote the
+reading into `notes/nic-driver.md` *Rung 0* and `SPEC.md` `NET-50`; no row said
+so, and `ledgerscan`'s report printed the gap on every run for 111 commits
+without anyone reading it. `LEDGER-4`'s rule (`R6b-5`) refused the tree, and
+this is the section that took the lines. § 4.4's `name` row for the same path
+records a different contact — a generated citation — and stays as it was.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `arch/rlx/kernel/irq.c` | line | 🔴 **vendor** | 🆕 **2026-09-19, `R6-3`.** `:176-180,224`: `cnt_swcore` and its four sibling counters are `extern int` incremented only by the vendor's ISR, which does not run in rlxfw's arrangement, so `/proc/interrupts`' ` SW: 0` line is not evidence about `SWINTSET` (`notes/nic-driver.md` *Rung 0*, `SPEC.md` `NET-50`). No register address, no bit number, no sequence: it decided what not to read as a measurement, and nothing from it entered a driver |
 
 ## 5. 🔴 What `driver-diff` compares — the two layers, and why the definition moved
 
@@ -1032,7 +1046,7 @@ written down in advance and by naming what it may look at.
    is the distinction the whole file exists to make, and **the only thing
    checking it is a human reading two outputs side by side**. Fixed in the row;
    the checker is not fixed, and the next under-declared depth will be found the
-   same way or not at all.
+   same way or not at all. 🔄 **2026-09-26 (`R6b-5`): fixed for the form the scan reads** — a path whose deepest row is below `line` while it is cited `path:NN` is RED (`LEDGER-4`); a reading written as detached `:NN`, as a bare file name or through a tree prefix is still found by a human or not at all.
 9. ⚠️ **It says nothing about the toolchain or the datasheets.** Reading
    `refs/RTL8196E-VEx-CG_Datasheet_1.1.pdf` is not contamination — a datasheet
    is the *specification*, and two implementations reading the same
@@ -1083,11 +1097,11 @@ differ by exactly that entry, and neither is wrong.
 ## § 9.4 — `drivers/char/rtl_gpio.c` was opened, 2026-09-15
 
 **Depth: `line`** — the deepest word `ledgerscan`'s vocabulary has
-(`DEPTHS = ("none", "name", "line")`), and the row in § 4.3.2's table carries
+(`DEPTHS` read `("none", "name", "line")` then; 🔄 `artefact` joined it on 2026-09-26), and the row in § 4.3.2's table carries
 it. ⚠️ *Source* below describes **what was read** — the `.c` rather than a
 disassembly — and is not a depth word; a cell holding it yields no declared
 depth at all, which is why the artefact-depth row for this file declared none
-for six weeks.
+for six weeks (🔄 since `R6b-5` such a cell is RED, `LEDGER-3`).
 
 | | |
 |---|---|
