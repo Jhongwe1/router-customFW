@@ -778,10 +778,10 @@ driver can see is a bad place to leave it; it removes a whole interrupt's
 latency from the common case; and `n_tx_wake_race` then **measures** how often
 the window is real instead of leaving it argued.
 
-Waking while returning `NETDEV_TX_BUSY` is correct — 讀
-`net/sched/sch_generic.c:124-178`: `qdisc_restart` requeues the skb and zeroes
-its return **only if the queue is still stopped**, so an un-stopped queue makes
-`__qdisc_run` re-offer the same skb, bounded by its own `jiffies != start_time`.
+Waking while returning `NETDEV_TX_BUSY` was argued correct from
+`net/sched/sch_generic.c:124-178`'s requeue, which re-offers the same skb. 🔄 On
+this board `rlx0` is noqueue and that path is never reached: BUSY is a drop (§ 8.2,
+`NET-57`), and 1.5's comment says so (§ 23).
 
 ### 7.4 🔴 `watchdog_timeo = 5 * HZ` has been DEAD CODE since it was written
 
@@ -925,13 +925,13 @@ supplied no `ndo_tx_timeout`, and that `R6-4a` fixes it by supplying one.
 ∴ the timer is never armed. 量 `X18`: `tx_stopped 1` for minutes with
 `n_tx_timeout 0`. **`SPEC.md` `NET-57`.**
 
-🔴 **And the larger consequence lands on § 7's own argument.**
-`rtl819x-nic.c:1586-1597` argues that returning `NETDEV_TX_BUSY` while waking is
-correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue` is
-**NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
-freed. **The argument is right for the kernel it cites and wrong for this
-board.** It is not deleted: what is wrong is not the reasoning but an unstated
-assumption that this device has a qdisc at all.
+🔴 **And the larger consequence lands on § 7's own argument.** 1.4's comment over
+`rtl819x-nic.c:1586-1597` (cited at `873a471`) argued that returning `NETDEV_TX_BUSY`
+while waking is correct because *"qdisc_restart requeues the skb"*. `noqueue_qdisc.enqueue`
+is **NULL**, so `dev_queue_xmit` never reaches `qdisc_restart` and the frame is
+freed. **The argument was right for the kernel it cites and wrong for this
+board.** 🔄 2026-09-26 (`R6b-2`): 1.5 corrects the comment on the same lines, and says
+BUSY is a drop; the behaviour is unchanged (§ 23).
 
 ### 8.3 🔴 A re-opened interface resumes the DMA engine outside its ring
 
@@ -1711,10 +1711,10 @@ and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:3092`)
 uses that same function — so `rlx0` has no qdisc and nothing holds the frames.
 
 🔴 **And the driver's own correctness argument for the stop/wake design,
-`rtl819x-nic.c:1580-1588`, cites `sch_generic.c:124-178`'s requeue — a path
-this device cannot reach.** In this state `echo` returned one line, `ARP` went
-unanswered (six requests, zero replies), and `busybox reboot -f` could not be
-typed. That is what cost the second power press.
+`rtl819x-nic.c:1580-1588` (cited at `873a471`; 1.5 corrects it, § 23), cited
+`sch_generic.c:124-178`'s requeue — a path this device cannot reach.** In this state
+`echo` returned one line, `ARP` went unanswered (six requests, zero replies), and
+`busybox reboot -f` could not be typed. That is what cost the second power press.
 
 ### 14.6 `Y1`, `Y4`, `Y5` — the reproducer shrinks to 347 frames
 
@@ -2845,8 +2845,8 @@ marked):
 * 推 the 86 `Ip.OutDiscards` are `NET-57`'s `noqueue` drops. 讀 the 2.6.30
   `dev_queue_xmit`: with no qdisc, a stopped queue or a `NETDEV_TX_BUSY` return frees the
   skb with `-ENETDOWN`. Five are BUSY returns (`n_xmit_busy` +5); 推 the rest were offered
-  while a recovery was pending. The comment on `nic_xmit`'s stop path still says the
-  stack retries.
+  while a recovery was pending. 1.4's comment on `nic_xmit`'s stop path said the stack
+  retries; 1.5 says it is a drop (§ 23).
 * 推 the 9 host-unreachables are three neighbour failures of 3 queued packets each: the
   board's entry for the host went `FAILED` three times.
 * 935 frames reached the driver, A of them ARP (A ≥ 3: the host saw 3 from the board),
@@ -2969,9 +2969,9 @@ The TX length fields, side by side (讀):
 | field | `rlxfw` 1.4, `nic_xmit` | vendor `_swNic_send` (`rtl865xc_swNic.c:713-721`) |
 |---|---|---|
 | `ph_len` | L + 4, with L padded to 60 (`rtl819x-nic.c:1625`) | L + 4, or 64 when L < 60 |
-| `m_len` | L (`:1622`) | = `ph_len` |
-| `m_extsize` | 2,046, constant (`:1623`) | = `ph_len` |
-| buffer | its own copy, at 2 mod 4 (`NIC_RX_OFFSET` reused, `:1610`) | `skb->data`, zero-copy, written back from the cache first (`rtl_nic.c:5159`) |
+| `m_len` | L (`:1622` at `873a471`; 1.5's default arm) | = `ph_len` |
+| `m_extsize` | 2,046, constant (`:1623` at `873a471`; 1.5's default arm) | = `ph_len` |
+| buffer | its own copy, at 2 mod 4 (`NIC_RX_OFFSET` reused, `:1610` at `873a471`; 1.5's `txoff 2`) | `skb->data`, zero-copy, written back from the cache first (`rtl_nic.c:5159`) |
 | padding | zero-fill to 60 | none |
 | `ph_portlist` | `0x3F` | masked with `0x1f` |
 
@@ -3348,3 +3348,184 @@ that cancel, and anything after `R1-M1`.
 * That `i` saw no reply from another interface is 推: `i` is host-wide.
 * That the running `nic_xmit` and `rtl819x-spi` were compiled from HEAD's text: the image is
   pinned by digest, the source identity is 推.
+
+## 23 `rtl819x-nic` 1.5 (`R6b-2`) — the TX policy behind verbs, a sweep over every length, and a default that is 1.4
+
+Written 2026-09-26 at the desk. **Nothing in this section has run on the silicon.** What the
+driver does is 讀 (its text); what is 量 is desk-only — the host-compiled header, the
+RSDK-built objects, the image digests. Everything about the engine is 推 until `R6b-3`.
+`SPEC.md` `NET-125`.
+
+### 23.1 What changed, and where
+
+1.4's 3,113 lines keep their numbers, so none of the 72 citations into the file moves. 56
+differ, all inside a declared change list of 66 lines. 43 change in place: the version
+(`:218`), the page-cap comment (inside `:229-256`, re-derived, same line count), the BUSY
+comments (`:1025-1026`, `:1554-1556`, `:1573-1585`) and the six field expressions
+(`:1610`, `:1622`, `:1623`, `:2224`, `:2255`, `:2256`), each now reading the policy, whose
+default is 1.4's value. Twelve hooks sit on lines that were blank (`:217`, `:1632`,
+`:1636`, `:1639`, `:1665`, `:2096`, `:2261`, `:2269`, `:2277`, `:2307`, `:2571`, `:3109`),
+and `:3027`'s `return -EINVAL` is now the 1.5 dispatcher, which returns -EINVAL for any
+verb it does not know. 717 lines follow `:3113`. What decides without touching hardware —
+parsers, the refusal table, the length policy, identification and the classifier, the
+sweep's bookkeeping, the dispatcher, both page formatters — is `rtl819x-nic-tx.h`, which
+`tools/nic15check.py` compiles on the host.
+
+| verb | values | default (= 1.4) | refused |
+|---|---|---|---|
+| `txlen` | `rlxfw` (`m_len` F, `m_extsize` 2,046), `mlen` (F+4, 2,046), `ext` (F, F+4), `vendor` (F+4, F+4), `d1`/`d2`/`d3` (F+3/F+2/F+1, 2,046); `ph_len` = F+4 in all | `rlxfw` | engine on, `rlx0` up or a sweep running: -EBUSY |
+| `txoff` | 2, 0 (the TX copy's offset; `m_data` = `m_extbuf`; RX untouched) | 2 | the same |
+| `txrb` | 0–15, a mask: 1 = the slot's 12 words into Q before OWN, 2 = the ring word before `TXFD`; 4 and 8 = their controls, 12 and 1 uncached loads of `nic_idle_ph` / `nic_idle_ring` at the same places | 0 | the same |
+| `sweep <from> <to> <probe> [wire]` | 60 ≤ from ≤ to ≤ 1,514; probe 0 (b at L) or 60–1,514; LOOPBACK unless the last word is exactly `wire`; `sweep L L p` is one length | — | a sweep running or `rlx0` up -EBUSY, locked -EPERM, not allocated or armed -ENXIO, a WIRE sweep with from ≠ to at any txlen but `vendor` -EPERM, records under another key -EEXIST |
+| `swshow <L>` | 60–1,514: the window below | 60 | parse only |
+| `swclear` | no argument: forget every record | — | a sweep running -EBUSY |
+
+Every accepted behaviour verb — the same value re-typed included — marks the policy
+**dirty**. While it is dirty `engine on` refuses -ESTALE (151 on this arch, 讀
+`arch/rlx/include/asm/errno.h`), and so does `ifconfig rlx0 up`: `ndo_open` asks the same
+gate at `:1665`, before `napi_enable` and `nic_ndev_up`, so a refused `up` changes nothing
+("Stale NFS file handle", 推 the libc's text). `arm` clears it and, only then, writes all
+four TX slots back to alloc's words, so both arms of an A/B start from the same descriptor
+memory. A policy switch is `ifconfig rlx0 down`; the verb; `arm`; `ifconfig rlx0 up`.
+Every refusal is recorded as `v15 last <verb> <rc>` and counted. While a sweep runs, every
+behaviour verb, a second sweep, `swclear`, and every `engine on` or `ndo_open` that is not
+the sweep's own are refused -EBUSY (16); 1.4's other verbs are not.
+
+### 23.2 The sweep
+
+**The mode is the command's, never the register's.** `sweep F T P` loops back: the sweep
+sets `LBMODE` itself after every `engine on`, which writes `CPUICR` with `=`. Only `sweep F
+T P wire` puts the sweep's frames on the wire, so a wire sweep cannot happen by accident.
+The owner allowed a wire sweep at 1.4's settings only bounded, and the bound is a refusal:
+a wire sweep with from ≠ to is -EPERM (1) at every txlen but `vendor`, the setting both
+surviving rules predict clean, so at the other six a card types `sweep L L p wire` once
+per length. Loopback is not bounded. One unit per length, fixed: **cycle** (`engine off`, `arm`, `engine on`,
+`LBMODE` again in loopback, and a drain of any CPU-owned RX slot); **a** at L through
+`nic_do_tx`, the `tx` verb's own path; **b** at L (probe 0) or at the probe, after `0x20` is
+written over the slot's buffer from the probe's end to 8⌈L/8⌉ + 8, and only when a came back
+right (on the wire: retired). The re-arm per unit is the carry-over (推, blocks 38 and 46).
+
+In loopback each frame is classified in the kernel; no looped byte leaves it. A frame is
+**ours** when bytes 6..13 (source `02:52:4C:58:46:57`, `0x88B5`) match; the digit at byte 24
+then says which of our frames it is — the previous frame's digit is **repeat**, any other
+wrong digit **digit**, both bad and neither foreign. [0, F) is compared, with
+`__raw_readb`, only for our own digit. `nic_ph_class` and `:1376`'s bounds test resolve the
+mbuf, so `NET-82`'s counters do not move, and `nic_last_rx*` is never written. The first
+unit's frame a registers delta0 = `ph_len` − (F + 4); it must be right and delta0 must be 0
+or 4, and if it is not — or frame a is foreign on the retry as well — the sweep refuses
+-EPROTO (71) and `sw noreg` names the class, `ph` and delta. Classes, a nibble per frame:
+0 none, 1 right, 2 long, 3 short, 4 content, 5 alien (not ours, `ph_len` < 64 or > 1,522),
+6 foreign (not ours, 64–1,522: the unit is retried once — counted once — then 11 void), 7
+skew (the mbuf did not resolve: never dereferenced, never bad), 8 timeout (20 ms per wait),
+9 failtx, 10 sent, 12 repeat, 13 digit. Sixteen consecutive units with a timeout abort
+-ETIMEDOUT (145); a signal stops the loop between units, -EINTR (4); a sweep that scored no
+unit ends -ENODATA (61). The end is always `engine off` and `arm`.
+
+**Records** (6 B per length) are written when a unit completes and are never erased by a
+sweep: an abort leaves every other length's record as it was, and a sweep under another key
+— txlen, txoff, txrb, mode, probe, `txrings` — is refused -EEXIST (17) while any record
+exists; `swclear` is the only eraser. So `R6b-3`'s bounded sweep — `sweep L L p` once per
+length — builds one map, and arms are separated by `swclear`.
+
+**Marks.** `RLXFW-N-SWEEP=MMFFFTTT` opens a sweep (MM `4C` loopback or `57` wire, FFF from
+and TTT to in hex); every sweep that opened closes with `RLXFW-N-SWSUM=SSSSVVVV` (units
+scored, units VOID) and then `RLXFW-N-SWEND=AAAABBBB` (bad a, bad b) or the negative errno —
+`FFFFFF6F` -ETIMEDOUT, `FFFFFFB9` -EPROTO, `FFFFFFC3` -ENODATA, `FFFFFFFC` -EINTR. A clean
+sweep reads SWSUM with S > 0 and SWEND `00000000`; one that scored nothing never does. **A
+refused sweep prints none of the three.** Each cycle also prints 1.4's four marks, 85 B or
+about 22 ms at 38400: about 32 s and 124 KB for a full sweep (a guess).
+
+`/proc/rtl819x-nic-tx` (0444): version, `tx15`, `v15`; per slot W (F, policy, writer, fill
+number), R (ring word, `ph` w0–w5, `mb` w0–w5, read uncached at page time), Q (the same 13
+as the `txrb` loads returned, printed only for a slot whose last fill loaded) and `rb` (Q
+against what the fill meant to write; a mismatch on a word only alloc writes is the engine
+writing a TX descriptor, `docs/nic-vendor-diff.md` § 16.4); the last sweep's state
+(`never`, `run`, `done`, `fail`, `intr`), mode, arguments, rc, the records' key, its counts
+(scored, bad a, bad b, void, skew, retries, foreign, alien), delta0 and its last unit; `mt`,
+the records counted by code; the **map**, `m00`–`m11`, one character per pair of lengths
+(`0-9A-Z`, 6 × first + second code), 128 lengths a line — codes 0 no record, 1 clean, 2 bad
+b, 3 bad a, 4 void, 5 skew, so an unswept length never reads clean; `hb`, `ph_b` over the
+bad-b lengths, 16 bins of ph:count:first-last, an `other`, and the void count; and `ww`, 32
+lengths from `swshow` as ph:classes:extra, `-` no record, `v` void. No looped byte and no
+RX buffer byte is printed. The main dump gains one line, `tx15 txlen rlxfw txoff 2 txrb 0
+dirty 0 p15 1`, before its 1.4 tail, so a card's `rx_ph4` terminator still matches; a card's
+version gate must now read `1\.5`.
+
+### 23.3 What the desk establishes (量 2026-09-26, desk)
+
+* `tools/nic15check.py`: 48 of 48 — K0–K21 on the header, M0, and twenty-five mutants each
+  caught by the case named for it; M23 crashes the harness on purpose and is counted as a
+  kill with its reason, not as a refused run. The wire bound is shown refusing (`rlxfw`,
+  `60 1514 60 wire`: -EPERM) and permitting (`vendor`, `60 1514 60 wire`; `rlxfw`, `61 61
+  60 wire`; loopback) through the dispatcher, over 280 points in K21, and M24 (the vendor
+  exemption lost) and M25 (the bound dropped) are killed by K21. The worst-case `/proc/rtl819x-nic-tx` page is
+  3,719 B (3,751 with the histogram at its domain bound) against the 3,900 cap; every line
+  is written through a vsnprintf bounded by the page.
+* The main dump, re-derived per conversion: 1.5 cannot write past 4,041 of 4,096. 1.4's own
+  ceiling was 4,039, not the 3,973 its comment said — the comment left out the unguarded
+  66-byte tail. The worst case, every conversion at its widest, is 3,758 (1.4: 3,695).
+  That is the 2026-09-22 walk (`scratchpad/pagebudget.py`, which gave 3,829) with two
+  changes: `rx_bytes` charged 2 a byte, not 8, and the `truncated 1` marker left out.
+  Re-run unchanged it gives 4,091 on 1.4 and 3,864 on `fae5f9a`, the commit that wrote
+  3,829: the 09-22 figure does not reproduce on its own commit, and why is open.
+* `tools/storeseq.py` against `p2q` and `p2l`: the store sequences of `nic_xmit` (33),
+  `nic_do_tx` (15, occurring exactly once, contiguously, in 1.4's `nic_write_proc`, where it
+  was inlined), `nic_do_engine` (2), `nic_do_arm` (7), `nic_ndo_open` (10), `nic_recov_fn`
+  (13) and `nic_poll` (17) are equal at the defaults; what 1.5 adds there is loads from and
+  calls to `nic15_*`, branches, register moves and stack saves. The ELF's initial words are
+  `nic15_pol` = {0, 2, 0, 0} and `nic15_show` = 60. The other 20 driver functions are
+  instruction-for-instruction 1.4's, addresses compared by symbol or by content; 9 are
+  declared by name with a reason — the seven hooked, `nic_et_drvinfo` (the version string),
+  `nic_do_tx` (out of line in 1.5). The identity check's first run read three untouched
+  functions as changed: an anonymous `.rodata` literal and a copied `lui` high half were
+  rendered by address; rendered by content, they are the same, and the check then found
+  `nic_et_drvinfo`, a real difference. Controls: `s31a` → `p2q` (on `nic_xmit` and
+  `nic_do_tx`: it predates the others) and `s99a` → `p2q` are RED on the stores that
+  changed; `s100a` → `p2q` and `p2q` → `p2l` are GREEN. Self-test 19 of 19, now in CI; a
+  mutant of each new case is caught by the case named for it.
+* Four builds, recipe `06c39ca3`: `r6b2q` = `r6b2q2` (vmlinux `900faed7…`, nfjrom
+  `7d7dd4b0…`), `r6b2l` = `r6b2l2` (`cbc03b5f…`, `6c616fe6…`), each pair `cmp` rc 0; quiet
+  ≠ loud and 1.5 ≠ `p2q`; both declaration gates green with `p2q`'s counts (12 marks, 9
+  witnesses, 1 absent); no warning from either driver file; every recipe field of the four
+  manifests but the id equals `p2q`'s. Earlier rounds of the same step reproduced across
+  sessions: recipe `b8ca270a` built both pairs twice, in two sessions, to the same digests.
+* 🔴 `MK10`'s witness `str:rtl819x-nic` **cannot fail** on these images, and could not on
+  `p2q`'s (`SPEC.md` `FW-143`): `verify` searches the whole file, and `/init`'s two
+  `/proc/rtl819x-nic` lines put the string in `.init.ramfs` whether or not the driver is
+  linked. In `.rodata` it occurs twice in `p2q` (the version, and one literal the compiler
+  shares), not three times as `MK10` said; the symbol table holds it a fifth time, as the
+  file symbol `rtl819x-nic.c`; 1.5 adds `rtl819x-nic-tx`. `MK10`'s prose now names all
+  five; the witness is the owner's to change.
+
+### 23.4 The reviews' findings, as the code cites them
+
+The code names findings of the `R6b-2` design review (session material, not in this
+repository) by number; this is where those numbers resolve. F1: foreign RX frames —
+identification, a drain after every cycle, void and retry once. F4: the refusal raced the
+recovery — tested inside `spin_lock_irqsave`, and refused while `rlx0` is up. F5: the delay
+control controlled neither position nor bus load — matched uncached loads instead. F8: the
+positive control's protocol and the DMA base — probe 0, and `bufs` as a covariate. F9: a
+verb that returns 0 is re-run by stdio — every verb returns `count`. F11: `arm` left stale
+TX words — the dirty arm rewrites them. F14: a skewed mbuf and `:1376`'s bounds test — the
+frame is SKEW and never dereferenced, and the next unit's arm hands every mbuf back. The
+review of the written driver (2026-09-26) found three sweep defects and six risks, all
+fixed before the builds above: the mode read from `CPUICR`, which `engine on` clears (now
+the command's); a second foreign frame during registration skipped instead of refusing, and
+a success value of bad b alone (now -EPROTO, and scored/VOID/bad a/bad b in the marks and on
+the page, -ENODATA for none scored); a wrong digit read as foreign, and VOID read as never
+swept (now repeat/digit, and codes of their own); delta0 unbounded; policy verbs and
+`ndo_open` not refused during a sweep; no way to interrupt one; a key without `txrings`, and
+a new key or an abort erasing records; SKEW counted as bad b; two retries counted per VOID. And the owner's "bounded wire sweep
+at 1.4's settings", a card habit in the first version, is now the wire bound above.
+
+### 23.5 What 1.5 does not establish
+
+* Anything on the silicon: that R reads back as 1.4 wrote it (`R6b-3`'s first cells, with
+  `txstall on` holding the engine and `OWN` / `tpdcr0_pos` as the control), that the sweep
+  reproduces block 46's arm C at E2's eleven lengths, that `LBMODE` isolates the CPU port.
+* That "default = 1.4" holds for timing. `storeseq` sees stores, not cycles or values in
+  registers, and the default path does gain work: `nic15_note` after `TXFD`; loads of
+  `nic15_pol` and a branch before OWN and before `TXFD`; `nic15_state` through
+  `nic15_engine_gate` in `nic_do_engine(1)` and in `ndo_open`; the `nic15_armed` call in
+  `arm`; and `nic_do_tx` is a call now, where 1.4 inlined it.
+* Which mechanism, if any, a setting names. That is `R6b-3`'s, and every candidate is 推.

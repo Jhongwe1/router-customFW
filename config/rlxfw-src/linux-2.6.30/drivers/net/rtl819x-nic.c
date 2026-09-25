@@ -214,8 +214,8 @@
 #include <asm/io.h>
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
-
-#define RTL819X_NIC_VERSION	"rtl819x-nic 1.4"
+#include "rtl819x-nic-tx.h"
+#define RTL819X_NIC_VERSION	"rtl819x-nic 1.5"
 
 /* R6-4.  `rtl819x-switch.c` owns the switch core's window; this is the one
  * thing this driver borrows from it, for `ethtool -> get_link`.  Both are
@@ -229,31 +229,31 @@ extern int rtl819x_sw_any_link(void);
 /* 🔴 `read_proc` is handed ONE 4,096-byte page and `nic_read_proc` does not
  * bounds-check, so an overflow is not a truncated dump -- it is a store past
  * the page.  `rtl819x-spi` 1.1 met this same limit and answered it by putting
- * its 1,024-line map on a SECOND /proc file.  That answer is wrong here: this
- * dump's readers are cells in frozen cards, and a second file moves every one
- * of them.
+ * its 1,024-line map on a SECOND /proc file.  That answer is wrong for what
+ * is HERE: this dump's readers are cells in frozen cards, and moving a line
+ * moves them.  1.5's new content is not here; it is /proc/rtl819x-nic-tx.
  *
- * 量 2026-09-22, `scratchpad/pagebudget.py` walking every `sprintf` format in
- * this handler and charging each conversion its widest expansion (`%u` 10
- * digits, `%d` 11, `%08X` 8, `rx_bytes` at its 64-byte cap, the three loops at
- * their full trip counts): **3,829 of 4,096 = 93.5 %**.  The realistic figure
- * is about 2.1 KB -- the largest dump committed before tonight is 1,244 B
- * (`bench/2026-09-19b/C58-afterflood2.log`).
+ * 量 2026-09-22, `scratchpad/pagebudget.py` charging every `sprintf` in this
+ * handler its widest expansion (`%u` 10, `%d` 11, `%X` 8, `%s` 15, the loops at
+ * full trip counts): **3,829 of 4,096**.  Re-run 2026-09-26 it gives 3,864 on
+ * `fae5f9a`, the commit that wrote 3,829, and 4,091 on 1.4; charging `rx_bytes`
+ * 2 a byte, not 8, and leaving out `truncated 1`: 1.4 3,695, 1.5 3,758 (tx15).
+ * The largest dump committed by 2026-09-22 was 1,244 B (`C58-afterflood2`).
  *
  * So the page is not expected to overflow.  The cap exists because *not
  * expected* is not a bound, and because the three cheapest things to add to
  * this driver are all `sprintf` lines.  A capped dump SAYS `truncated 1`
  * instead of corrupting memory.
  *
- * 🔴 THE CHECK IS PER ITERATION AND NOT PER BLOCK, and the first version of
- * this cap got that wrong: gating ENTRY to the descriptor loops bounds
- * nothing, because a loop admitted at 3,899 then emits up to 618 more bytes
- * and lands at 4,517.  Inside the loops the ceiling is provable by reading:
- * the fixed scalar run is 2,297 worst case, a loop cannot start an iteration
- * above 3,900, the longest line is 61, and the marker is 12 -- so the handler
- * cannot write past **3,973** of 4,096.  The hexdump's guard is exact rather
- * than per-iteration, because a frame dump cut in half is worse than one that
- * is absent. */
+ * 🔴 THE CHECK IS PER ITERATION AND NOT PER BLOCK: a loop cannot start an
+ * iteration above 3,900 and its longest line is 61, so the loops end at or
+ * below 3,961, plus 12 if one trips.  🔄 1.5 (R6b-2), per conversion: `tx15`
+ * is guarded the same way and bounded to 63 bytes, so it ends at or below
+ * 3,963; the unguarded tail -- rx_len, rx_ph1, rx_ph3, rx_ph4, 66 bytes --
+ * follows, and the hexdump's guard is exact (a frame dump cut in half is worse
+ * than one that is absent), so it can add only its marker: the handler cannot
+ * write past **4,041** of 4,096.  Until 1.5 this said 3,973: it left out that
+ * tail, and 1.4's own ceiling was 4,039. */
 #define NIC_PROC_CAP		3900
 
 /* ------------------------------------------------------------------------
@@ -1022,8 +1022,8 @@ static void nic_refill(unsigned int i);
  * stopped -- after which no further edge is owed and the queue stays
  * stopped for the life of the interface.  This form re-evaluates the
  * condition `nic_xmit` itself tests, on EVERY interrupt whatever raised
- * it, so a lost TX_DONE costs a delay until the next interrupt of any
- * kind instead of costing the interface.
+ * it, so a lost TX_DONE costs every frame offered until the next
+ * interrupt of any kind (noqueue drops them), not the interface.
  *
  * 🟢 That the source exists at all is 量 on this die and not assumed.
  * `bench/2026-09-19b/C19-nic6.log` is a single `tx` verb with `n_rx 0`,
@@ -1551,9 +1551,9 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (e & NIC_DESC_OWN) {
-		/* The engine still owns this slot.  Stop the queue and tell
-		 * the stack to retry -- do NOT drop, and do NOT free the skb,
-		 * which the caller still owns after NETDEV_TX_BUSY. */
+		/* The engine still owns this slot.  Stop the queue and return
+		 * NETDEV_TX_BUSY; do NOT free the skb -- the caller frees it.
+		 * On this image BUSY is a DROP and nothing retries (below). */
 		netif_stop_queue(dev);
 		nic_n_tx_stop++;
 		nic_n_xmit_busy++;
@@ -1570,19 +1570,19 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 		 * restores the mask.  The ISR then finds the queue stopped and
 		 * the slot free and wakes it.
 		 *
-		 * This re-test is here anyway for three reasons, none of which
-		 * is the classic race: a correctness argument that rests on
-		 * two Kconfig lines nobody reading this file can see is a bad
-		 * place to leave it; it removes a whole interrupt's latency
-		 * from the common case; and `n_tx_wake_race` then MEASURES how
-		 * often the window is real instead of leaving it argued.
+		 * This re-test is here anyway for two reasons, neither of them
+		 * the classic race: a correctness argument that rests on two
+		 * Kconfig lines nobody reading this file can see is a bad place
+		 * to leave it, and `n_tx_wake_race` then MEASURES how often the
+		 * window is real instead of leaving it argued.
 		 *
-		 * Waking while returning NETDEV_TX_BUSY is correct, 讀
-		 * `net/sched/sch_generic.c:124-178`: qdisc_restart requeues
-		 * the skb and then zeroes its return ONLY if the queue is
-		 * still stopped, so an un-stopped queue makes __qdisc_run loop
-		 * and re-offer the same skb -- which now finds a free slot.
-		 * That loop is bounded by its own `jiffies != start_time`. */
+		 * 1.5, CORRECTED (NET-57, NET-89): BUSY HERE IS A DROP.  `rlx0`
+		 * is noqueue (`eth.c:350`, tx_queue_len 0 under CONFIG_RTL_819X),
+		 * so dev_queue_xmit's no-queue branch (`dev.c:1933-1965`) frees
+		 * the skb on this return, returns -ENETDOWN and, on a loud image,
+		 * prints `Virtual device rlx0 asks to queue packet!`.  1.4 cited
+		 * sch_generic.c's requeue, a path this device never reaches; a
+		 * wake here saves the NEXT skb from the stopped-queue drop. */
 		e = nic_re(nic_tx_ring, i);
 		if (!(e & NIC_DESC_OWN)) {
 			nic_n_tx_wake_race++;
@@ -1607,7 +1607,7 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_OK;
 	}
 
-	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + NIC_RX_OFFSET;
+	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + nic15_pol.txoff;
 	for (k = 0; k < len; k++)
 		__raw_writeb(skb->data[k], (void __iomem *)(bf + k));
 	/* 讀 `rtl865xc_swNic.c:718-721`: a runt is padded to 64 and the FCS is
@@ -1619,8 +1619,8 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	nic_dw_set(nic_tx_mb, i, 3, bf);
 	nic_dw_set(nic_tx_mb, i, 4, bf);
-	nic_dw_set(nic_tx_mb, i, 2, NIC_MB_MK2(len, NIC_MB_FLAGS_INIT));
-	nic_dw_set(nic_tx_mb, i, 5, NIC_MB_MK5(NIC_BUF_SZ - NIC_RX_OFFSET));
+	nic_dw_set(nic_tx_mb, i, 2, NIC_MB_MK2(nic15_mlen(len, nic15_pol.txlen), NIC_MB_FLAGS_INIT));
+	nic_dw_set(nic_tx_mb, i, 5, NIC_MB_MK5(nic15_ext(len, nic15_pol.txlen, NIC_BUF_SZ - NIC_RX_OFFSET)));
 
 	nic_dw_set(nic_tx_ph, i, 1, NIC_PH_MK1(len + 4, 0, 0));
 	/* ph_flags 0x8800 and portlist 0x3F are not chosen: they are what this
@@ -1629,14 +1629,14 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * `8800003F` after a real transfer. */
 	nic_dw_set(nic_tx_ph, i, 3, NIC_PH_MK3(NIC_PH_FLAGS_TX_DEFAULT, 0x3F));
 	nic_dw_set(nic_tx_ph, i, 4, 0);
-
+	if (nic15_pol.txrb) nic15_rb_pre_own(i);	/* 1.5: before OWN */
 	wrap = (i == NIC_TX_DESC - 1) ? NIC_DESC_WRAP : 0;
 	ph = nic_tx_ph + i * NIC_DESC_BYTES;
 	nic_re_set(nic_tx_ring, i, ph | NIC_DESC_OWN | wrap);	/* OWN last */
-
+	if (nic15_pol.txrb) nic15_rb_pre_bell(i);	/* 1.5: before TXFD */
 	icr = __raw_readl(nic_reg(NIC_CPUICR));
 	__raw_writel(icr | NIC_TXFD, nic_reg(NIC_CPUICR));	/* doorbell */
-
+	nic15_note(i, len, 1);				/* 1.5: W */
 	nic_tx_idx = (i + 1) % NIC_TX_DESC;
 	nic_n_tx++;
 	nic_n_xmit++;
@@ -1662,7 +1662,7 @@ static int nic_ndo_open(struct net_device *dev)
 		nic_n_refused++;
 		return -EPERM;
 	}
-
+	if ((rc = nic15_engine_gate()) != 0)	return rc;	/* 1.5: before napi */
 	if (!nic_allocated) {
 		rc = nic_do_alloc();
 		if (rc)
@@ -2093,7 +2093,7 @@ static int nic_do_arm(void)
 		nic_wr(NIC_CPUTPDCR2, 0);
 		nic_wr(NIC_CPUTPDCR3, 0);
 	}
-
+	nic15_armed();			/* 1.5: F11, a no-op unless dirty */
 	nic_armed = 1;
 	rlxfw_markx("N-ARM", nic_rx_ring);
 	/* A mark only the re-establishing arm emits, so a capture can say WHICH
@@ -2221,7 +2221,7 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 	if (payload_len > NIC_BUF_SZ - 64)
 		payload_len = NIC_BUF_SZ - 64;
 
-	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + NIC_RX_OFFSET;
+	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + nic15_pol.txoff;
 
 	for (k = 0; k < 6; k++)
 		__raw_writeb(dst[k], (void __iomem *)(bf + k));
@@ -2252,13 +2252,13 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 
 	nic_dw_set(nic_tx_mb, i, 3, bf);
 	nic_dw_set(nic_tx_mb, i, 4, bf);
-	nic_dw_set(nic_tx_mb, i, 2, NIC_MB_MK2(frame, NIC_MB_FLAGS_INIT));
-	nic_dw_set(nic_tx_mb, i, 5, NIC_MB_MK5(NIC_BUF_SZ - NIC_RX_OFFSET));
+	nic_dw_set(nic_tx_mb, i, 2, NIC_MB_MK2(nic15_mlen(frame, nic15_pol.txlen), NIC_MB_FLAGS_INIT));
+	nic_dw_set(nic_tx_mb, i, 5, NIC_MB_MK5(nic15_ext(frame, nic15_pol.txlen, NIC_BUF_SZ - NIC_RX_OFFSET)));
 
 	nic_dw_set(nic_tx_ph, i, 1, NIC_PH_MK1(frame + 4, 0, 0));
 	nic_dw_set(nic_tx_ph, i, 3, NIC_PH_MK3(flags, portlist));
 	nic_dw_set(nic_tx_ph, i, 4, NIC_PH_MK4(vid));
-
+	if (nic15_pol.txrb) nic15_rb_pre_own(i);	/* 1.5: before OWN */
 	/* OWN last, and only now. */
 	{
 		u32 wrap = (i == NIC_TX_DESC - 1) ? NIC_DESC_WRAP : 0;
@@ -2266,7 +2266,7 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 
 		nic_re_set(nic_tx_ring, i, ph | NIC_DESC_OWN | wrap);
 	}
-
+	if (nic15_pol.txrb) nic15_rb_pre_bell(i);	/* 1.5: before TXFD */
 	/* The doorbell is a read-modify-write on the register that also holds
 	 * TXCMD, RXCMD, the burst size and the mbuf size.  讀
 	 * `rtl865xc_swNic.c:771`.  There is no separate doorbell register --
@@ -2274,7 +2274,7 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 	 * disables the engine while trying to kick it. */
 	icr = nic_rd(NIC_CPUICR);
 	nic_wr(NIC_CPUICR, icr | NIC_TXFD);
-
+	nic15_note(i, frame, 2);			/* 1.5: W */
 	nic_tx_idx = (i + 1) % NIC_TX_DESC;
 	nic_n_tx++;
 	return 0;
@@ -2304,7 +2304,7 @@ static int nic_do_engine(int on)
 		rlxfw_mark("N-ENGOFF");
 		return 0;
 	}
-
+	if ((rc = nic15_engine_gate()) != 0)	return rc;	/* 1.5 */
 	rc = nic_wr(NIC_CPUICR,
 		    NIC_TXCMD | NIC_RXCMD | NIC_BUSBURST_32W | NIC_MBUF_2048);
 	if (rc)
@@ -2568,7 +2568,7 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 				       NIC_MB_LEN(nic_dw(nic_rx_mb, i, 2)));
 		}
 	}
-
+	if (nic15_line(page, &len))	goto truncated;	/* 1.5: tx15 */
 	/* The last received frame, printed as hex.  `FW-46`: this image's
 	 * busybox has no `dd` and no `md5sum`, so there is no second way to
 	 * get bytes off this device.  Capped so the whole handler stays well
@@ -3024,7 +3024,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		return (int)count;
 	}
 
-	return -EINVAL;
+	return nic15_write(buf, count);	/* 1.5, or -EINVAL */
 }
 
 /* ------------------------------------------------------------------------
@@ -3106,8 +3106,725 @@ static int __init rtl819x_nic_init(void)
 	 * ph_follow << 4 | recov_mode, so a 1.4 boot that types nothing reads
 	 * 00000011.  A verb typed later changes the /proc dump, not this line. */
 	rlxfw_markx("N7", (u32)((nic_ph_follow << 4) | nic_recov_mode));
-
+	nic15_init();	/* 1.5: /proc/rtl819x-nic-tx; no mark */
 	return 0;
 }
 
 late_initcall(rtl819x_nic_init);
+
+/* ========================================================================
+ * 1.5 -- R6b-2.  Appended after late_initcall so that no line above moves:
+ * 1.4's text changes only on the lines that must (the version, the BUSY
+ * comment, the cap comment, and the six field expressions), and its hooks sit
+ * on lines that were blank.  What decides -- parsers, the refusal table, the
+ * length policy, the classifier, the sweep's bookkeeping, the formatters, the
+ * dispatcher -- is in rtl819x-nic-tx.h, which tools/nic15check.py compiles on
+ * the host.  What touches the engine is here.  Why each piece exists:
+ * notes/nic-driver.md.
+ *
+ * DEFAULT = 1.4, AND WHAT THAT DOES AND DOES NOT MEAN.  At the defaults every
+ * store of nic_xmit, nic_do_tx, nic_do_engine, nic_do_arm and nic_ndo_open has
+ * 1.4's value and 1.4's order (tools/storeseq.py reads that off the built
+ * objects).  The paths gain cached loads of nic15_pol, a branch before OWN
+ * and before the doorbell, a call after the doorbell (W), a call in `arm`
+ * (nic15_armed, which returns at once unless a verb made the policy dirty)
+ * and a gate call in `engine on` and in ndo_open.  If the fault is sensitive
+ * to a few cycles there, only the bench's positive control can say so.
+ * ======================================================================== */
+static struct nic15_pol nic15_pol = {
+	.txlen	= NIC15_LEN_RLXFW,	/* :1622/:1623, :2255/:2256 as 1.4 */
+	.txoff	= NIC_RX_OFFSET,	/* :1610, :2224, as 1.4            */
+	.txrb	= 0,			/* no load, as 1.4                 */
+	.dirty	= 0,
+};
+
+static int nic15_p15;			/* /proc/rtl819x-nic-tx exists      */
+static int nic15_last_v, nic15_last_rc;
+static unsigned long nic15_n_ok, nic15_n_refused, nic15_n_txq, nic15_n_arm15;
+
+static struct nic15_w nic15_w[NIC_TX_DESC];			/* W */
+static u32 nic15_q[NIC_TX_DESC][13];				/* Q */
+static u8 nic15_qv[NIC_TX_DESC];
+/* The controls' sink.  volatile so that their cached stores are not dropped
+ * as dead: bit 2 must cost what bit 0 costs, stores included. */
+static volatile u32 nic15_qd[13];
+static unsigned long nic15_rb_chk, nic15_rb_bad, nic15_rb_n;
+static u32 nic15_rb_i, nic15_rb_w, nic15_rb_got, nic15_rb_want;
+
+static u32 nic15_show = NIC15_LMIN;
+static struct nic15_sum nic15_sw;
+static struct nic15_rec nic15_rec[NIC15_NLEN];		/* 8,730 B */
+static u8 nic15_recd[(NIC15_NLEN + 7) / 8];
+static int nic15_sw_busy;		/* a sweep is running                */
+static int nic15_sw_self;		/* ...and this engine on is its own  */
+
+/* S_SWEEP is `a sweep runs and the caller is not it`: the sweep's own
+ * engine on (nic15_sw_self) passes, everything else is refused. */
+static unsigned int nic15_state(void)
+{
+	return (nic_engine_on ? NIC15_S_ENGINE : 0) |
+	       (nic_ndev_up ? NIC15_S_UP : 0) |
+	       (nic15_pol.dirty ? NIC15_S_DIRTY : 0) |
+	       (nic_unlocked ? NIC15_S_UNLOCK : 0) |
+	       (nic_allocated ? NIC15_S_ALLOC : 0) |
+	       (nic_armed ? NIC15_S_ARMED : 0) |
+	       ((nic15_sw_busy && !nic15_sw_self) ? NIC15_S_SWEEP : 0);
+}
+
+static int nic15_ret(int v, int rc)
+{
+	nic15_last_v = v;
+	nic15_last_rc = rc;
+	if (rc < 0)
+		nic15_n_refused++;
+	else
+		nic15_n_ok++;
+	return rc;
+}
+
+/* F4.  The state is read INSIDE the irqsave section: on this UP,
+ * PREEMPT_NONE build nothing -- the recovery timer's softirq included -- can
+ * run between the test and the set.  And since rlx0 must be down, the timer
+ * is disarmed anyway (:1705) and no recovery can fire mid-switch.  While a
+ * sweep runs the table refuses -EBUSY: a second shell cannot change the
+ * policy under it. */
+static int nic15_apply(int v, int val)
+{
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&nic_lock, flags);
+	rc = nic15_set(&nic15_pol, v, val, nic15_state());
+	spin_unlock_irqrestore(&nic_lock, flags);
+	return rc;
+}
+
+static void nic15_swshow_set(u32 l)
+{
+	nic15_show = l;
+}
+
+/* :1632 / :2261 -- after the last field store, before OWN.  Reached only when
+ * txrb is non-zero, so the default path pays a cached load and a branch.
+ * noinline, so that no load or store of these bodies can be scheduled into
+ * nic_xmit's own sequence. */
+static noinline void nic15_rb_pre_own(unsigned int i)
+{
+	unsigned int w;
+
+	nic15_qv[i] = 0;
+	if (nic15_pol.txrb & NIC15_RB_FIELDS) {
+		for (w = 0; w < 6; w++) {
+			nic15_q[i][1 + w] = nic_dw(nic_tx_ph, i, w);
+			nic15_q[i][7 + w] = nic_dw(nic_tx_mb, i, w);
+		}
+		nic15_qv[i] |= NIC15_RB_FIELDS;
+	}
+	if (nic15_pol.txrb & NIC15_RB_IDLE12) {
+		for (w = 0; w < 6; w++) {
+			nic15_qd[1 + w] = nic_dw(nic_idle_ph, 0, w);
+			nic15_qd[7 + w] = nic_dw(nic_idle_ph, 0, w);
+		}
+	}
+}
+
+/* :1636 / :2269 -- after OWN, before the doorbell. */
+static noinline void nic15_rb_pre_bell(unsigned int i)
+{
+	if (nic15_pol.txrb & NIC15_RB_RING) {
+		nic15_q[i][0] = nic_re(nic_tx_ring, i);
+		nic15_qv[i] |= NIC15_RB_RING;
+	}
+	if (nic15_pol.txrb & NIC15_RB_IDLE1)
+		nic15_qd[0] = nic_re(nic_idle_ring, 0);
+}
+
+/* Q against what this fill meant to write: the ring word, and every slot
+ * word but ph w3/w4, whose values come from the verb's arguments.  Words only
+ * alloc (or the dirty arm) writes are compared too, because a mismatch there
+ * is the ENGINE writing into a TX descriptor -- the open question of
+ * `docs/nic-vendor-diff.md` 16.4 -- and the word index says which.  Runs after
+ * the doorbell, so it costs nothing between the stores and OWN. */
+static void nic15_rb_check(unsigned int i, u32 f)
+{
+	u32 want[13], bf;
+	unsigned int w;
+
+	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + nic15_pol.txoff;
+	want[0] = (nic_tx_ph + i * NIC_DESC_BYTES) | NIC_DESC_OWN |
+		  ((i == NIC_TX_DESC - 1) ? NIC_DESC_WRAP : 0);
+	want[1] = nic_tx_mb + i * NIC_DESC_BYTES;		/* ph w0 */
+	want[2] = NIC_PH_MK1(f + 4, 0, 0);			/* ph w1 */
+	want[3] = 0;						/* ph w2 */
+	want[4] = 0;						/* ph w3 */
+	want[5] = 0;						/* ph w4 */
+	want[6] = 0;						/* ph w5 */
+	want[7] = 0;						/* mb w0 */
+	want[8] = nic_tx_ph + i * NIC_DESC_BYTES;		/* mb w1 */
+	want[9] = NIC_MB_MK2(nic15_mlen(f, nic15_pol.txlen),
+			     NIC_MB_FLAGS_INIT);		/* mb w2 */
+	want[10] = bf;						/* mb w3 */
+	want[11] = bf;						/* mb w4 */
+	want[12] = NIC_MB_MK5(nic15_ext(f, nic15_pol.txlen,
+					NIC_BUF_SZ - NIC_RX_OFFSET));
+	nic15_rb_chk++;
+	for (w = 0; w < 13; w++) {
+		if (w == 4 || w == 5)
+			continue;
+		if (!w && !(nic15_qv[i] & NIC15_RB_RING))
+			continue;
+		if (w && !(nic15_qv[i] & NIC15_RB_FIELDS))
+			break;
+		if (nic15_q[i][w] == want[w])
+			continue;
+		if (!nic15_rb_bad) {
+			nic15_rb_n = nic15_n_txq;
+			nic15_rb_i = i;
+			nic15_rb_w = w;
+			nic15_rb_got = nic15_q[i][w];
+			nic15_rb_want = want[w];
+		}
+		nic15_rb_bad++;
+		break;
+	}
+}
+
+/* :1639 / :2277 -- after the doorbell, on every fill: W, then Q's check. */
+static noinline void nic15_note(unsigned int i, u32 f, int path)
+{
+	nic15_w[i].f = f;
+	nic15_w[i].pol = (u8)nic15_pol.txlen;
+	nic15_w[i].off = (u8)nic15_pol.txoff;
+	nic15_w[i].rb = (u8)nic15_pol.txrb;
+	nic15_w[i].path = (u8)path;
+	nic15_w[i].n = (u32)++nic15_n_txq;
+	if (!nic15_pol.txrb)
+		nic15_qv[i] = 0;
+	else if (nic15_qv[i] & (NIC15_RB_FIELDS | NIC15_RB_RING))
+		nic15_rb_check(i, f);
+}
+
+/* :2307, every `engine on` -- 1.4's verb, the recovery, the sweep's cycle --
+ * and :1665, ndo_open BEFORE napi_enable and nic_ndev_up.  The table's engine
+ * row: -EBUSY while a sweep runs and the caller is not the sweep, so nothing,
+ * `ifconfig rlx0 up` included, can bring the datapath up underneath it;
+ * -ESTALE while the policy is dirty.  The recovery meets neither: it runs only
+ * while rlx0 is up, when no behaviour verb can have been accepted and no
+ * sweep can run, and its own arm clears dirty before its engine on.
+ * noinline, so that its record-keeping stores stay out of nic_do_engine's and
+ * nic_ndo_open's own sequences. */
+static noinline int nic15_engine_gate(void)
+{
+	int rc = nic15_gate(NIC15_V_ENGINE, nic15_state());
+
+	if (rc)
+		nic15_ret(NIC15_V_ENGINE, rc);
+	return rc;
+}
+
+/* :2096 -- the end of a successful arm.  After a behaviour verb, every TX
+ * slot's words go back to alloc's (:1937-1951), so both arms of an A/B start
+ * from the same descriptor memory whatever the previous policy left there
+ * (F11).  Without one it touches nothing and a boot that types no 1.5 verb
+ * runs 1.4's arm.  The engine is off here: arm refuses otherwise (:1981).
+ * noinline, for nic_do_arm's store sequence, as nic15_engine_gate. */
+static noinline void nic15_armed(void)
+{
+	unsigned long flags;
+	unsigned int i;
+
+	if (!nic15_pol.dirty)
+		return;
+	spin_lock_irqsave(&nic_lock, flags);
+	for (i = 0; i < NIC_TX_DESC; i++) {
+		u32 ph = nic_tx_ph + i * NIC_DESC_BYTES;
+		u32 mb = nic_tx_mb + i * NIC_DESC_BYTES;
+
+		nic_dw_set(nic_tx_ph, i, 0, mb);
+		nic_dw_set(nic_tx_ph, i, 1, 0);
+		nic_dw_set(nic_tx_ph, i, 2, 0);
+		nic_dw_set(nic_tx_ph, i, 3,
+			   NIC_PH_MK3(NIC_PH_FLAGS_TX_DEFAULT, 0));
+		nic_dw_set(nic_tx_ph, i, 4, 0);
+		nic_dw_set(nic_tx_ph, i, 5, 0);
+		nic_dw_set(nic_tx_mb, i, 0, 0);
+		nic_dw_set(nic_tx_mb, i, 1, ph);
+		nic_dw_set(nic_tx_mb, i, 2, NIC_MB_MK2(0, NIC_MB_FLAGS_INIT));
+		nic_dw_set(nic_tx_mb, i, 3, 0);
+		nic_dw_set(nic_tx_mb, i, 4, 0);
+		nic_dw_set(nic_tx_mb, i, 5, 0);
+		nic15_qv[i] = 0;
+	}
+	nic15_pol.dirty = 0;
+	nic15_n_arm15++;
+	spin_unlock_irqrestore(&nic_lock, flags);
+}
+
+/* :2571 -- the main dump's one new line, guarded like 1.4's loop lines and
+ * bounded to 63 bytes (the cap comment at :229-256 counts it). */
+static int nic15_line(char *page, int *len)
+{
+	if (*len > NIC_PROC_CAP)
+		return 1;
+	*len += nic15_fmt_tx15(page + *len, 64, &nic15_pol, nic15_p15);
+	return 0;
+}
+
+/* ------------------------------------------------------------------------
+ * The sweep.  R6b-3 needs every length from 60 to 1,514 and a card cannot
+ * loop (`for` is refused; config/image-commands.tsv has no `seq`), so the
+ * loop is here.  THE UNIT IS FIXED, one per length, because block 46 and
+ * block 38 show a carry-over (推): the faulty-length frame goes out intact and
+ * the NEXT frame is the one that goes wrong, so without a re-arm per unit each
+ * length would measure its predecessor's history.
+ *
+ *   1. cycle  engine off, arm, engine on -- the recovery's own three calls --
+ *             then, in LOOPBACK, LBMODE set again by the sweep itself,
+ *             because engine on writes CPUICR with `=` (:2308); then the RX
+ *             ring is drained
+ *   2. a      nic_do_tx at L, the `tx` verb's own path
+ *   3. b      at L (probe 0) or at the probe, after 0x20 is written over the
+ *             slot's buffer from the probe's end to 8*ceil(L/8) + 8, so that
+ *             `this slot's buffer` and `the previous frame` differ as a byte
+ *             source; sent only when a came back right (on the wire: retired)
+ *
+ * THE MODE IS THE COMMAND'S, NEVER THE REGISTER'S: `sweep F T P` loops back,
+ * and only `sweep F T P wire` sends; RLXFW-N-SWEEP's value and the page both
+ * say which ran.  And the owner's bound is a refusal, not a habit: a wire
+ * sweep over more than one length is -EPERM at every txlen but vendor
+ * (nic15_sweep_gate).
+ *
+ * In loopback each frame is classified in the kernel and no looped byte
+ * leaves it.  A frame is OURS when bytes 6..13 (source 02:52:4C:58:46:57 and
+ * 0x88B5) match; an OURS frame with the previous frame's digit is REPEAT,
+ * with any other wrong digit DIGIT -- both bad, neither FOREIGN.  [0, F) is
+ * compared only for our own digit.  nic_ph_class and :1376's bounds test
+ * resolve the mbuf (a frame that does not resolve is SKEW, never
+ * dereferenced, and neither bad nor scored), so NET-82's counters do not
+ * move; nic_last_rx* is never written, so the main dump's rx_bytes is
+ * untouched.  The first unit's frame a registers delta0 = ph_len - (F + 4),
+ * which must be 0 or 4; if it is not RIGHT, is FOREIGN on the retry too, or
+ * gives another delta0, the sweep refuses (-EPROTO) and `sw noreg` says why
+ * -- a finding about the setting.  Later, a FOREIGN frame retries its unit
+ * once (counted once), then VOIDs it.  Sixteen consecutive units with a
+ * TIMEOUT abort (-ETIMEDOUT); a signal stops the loop between units
+ * (-EINTR); a sweep that scored nothing ends -ENODATA.  The end is always
+ * engine off and arm, so the next `ifconfig rlx0 up` starts from arm's state
+ * and not NET-58's.
+ *
+ * RECORDS are written per completed unit and never erased by a sweep: an
+ * abort leaves every other length's record as it was, and a sweep under a
+ * different key (txlen, txoff, txrb, mode, probe, txrings) is refused
+ * (-EEXIST) while any record exists -- `swclear` is the only eraser.
+ *
+ * MARKS (the values: rtl819x-nic-tx.h).  RLXFW-N-SWEEP opens a sweep; every
+ * sweep that opened closes with RLXFW-N-SWSUM (scored, VOID) and then
+ * RLXFW-N-SWEND (bad a, bad b; or the negative errno), so a card's --until
+ * has a terminator on every path.  A refused sweep prints none of them.
+ * Each cycle also prints 1.4's four marks, 85 B or about 22 ms at 38400, so a
+ * full sweep is about 32 s and 124 KB of console (a guess; sw j0/j1 price it).
+ *
+ * 🔴 NOTHING ELSE MAY WRITE /proc/rtl819x-nic WHILE A SWEEP RUNS.  The sweep
+ * holds its write for the whole run and yields only in cond_resched() between
+ * units.  A second sweep, `swclear`, every behaviour verb, and any `engine
+ * on` or ndo_open that is not the sweep's own are refused (-EBUSY)
+ * meanwhile; 1.4's other verbs are not, and a `tx` or an `arm` typed from a
+ * second shell would be read as the sweep's own traffic.
+ * ------------------------------------------------------------------------ */
+#define NIC15_WAIT_US		20000
+#define NIC15_POLL_US		10
+#define NIC15_ABORT_TO		16
+
+struct nic15_obs {
+	int st;			/* 0, or NIC15_C_TIMEOUT/_FAILTX/_SKEW */
+	int ours, dig, content_ok;
+	u32 ph;
+	u8 extra;
+};
+
+/* Until slot i of `ring` is CPU-owned: TX retired, or RX filled. */
+static int nic15_wait(u32 ring, unsigned int i)
+{
+	unsigned int t;
+
+	for (t = 0; t < NIC15_WAIT_US; t += NIC15_POLL_US) {
+		if (!(nic_re(ring, i) & NIC_DESC_OWN))
+			return 1;
+		udelay(NIC15_POLL_US);
+	}
+	return !(nic_re(ring, i) & NIC_DESC_OWN);
+}
+
+/* Every CPU-owned RX slot from nic_rx_idx on, handed back in order as a
+ * harvest would, without reading it.  Returns how many. */
+static u32 nic15_drain(void)
+{
+	u32 n = 0;
+
+	while (n < NIC_RX_DESC &&
+	       !(nic_re(nic_rx_ring, nic_rx_idx) & NIC_DESC_OWN)) {
+		nic_refill(nic_rx_idx);
+		nic_rx_idx = (nic_rx_idx + 1) % NIC_RX_DESC;
+		n++;
+	}
+	return n;
+}
+
+static int nic15_cycle(u32 lb)
+{
+	int rc;
+
+	nic15_sw_self = 1;
+	rc = nic_do_engine(0);
+	if (!rc)
+		rc = nic_do_arm();
+	if (!rc)
+		rc = nic_do_engine(1);
+	nic15_sw_self = 0;
+	if (!rc && lb)
+		rc = nic_wr(NIC_CPUICR, nic_rd(NIC_CPUICR) | NIC_LBMODE);
+	nic15_sw.cycles++;
+	if (!rc)
+		nic15_sw.drained += nic15_drain();
+	return rc;
+}
+
+/* Loopback: take the frame in RX slot nic_rx_idx and say what it is.  digit
+ * is the one this frame carries, prev the one the frame before it carried. */
+static void nic15_take(u32 f, u32 digit, u32 prev, struct nic15_obs *o)
+{
+	unsigned int i = nic_rx_idx, j, k;
+	u32 w0, bf = 0;
+
+	if (!nic15_wait(nic_rx_ring, i)) {
+		o->st = NIC15_C_TIMEOUT;
+		return;
+	}
+	o->ph = NIC_PH_LEN(nic_dw(nic_rx_ph, i, 1));
+	w0 = nic_dw(nic_rx_ph, i, 0) & NIC_DESC_ADDR;
+	/* Written as one expression and not as 1.x's harvest line, which two
+	 * findings still cite at its old number: citecheck would read an
+	 * identical line here as that row having MOVED (R6b-2, 2026-09-26). */
+	bf = (nic_ph_class(w0, i, &j) == NIC_PHC_AGREE) ?
+	     nic_dw(nic_rx_mb, i, 3) : 0;
+	if (!bf || bf < nic_bufs || bf >= nic_bufs + NIC_RX_DESC * NIC_BUF_SZ) {
+		o->st = NIC15_C_SKEW;		/* never dereferenced */
+		bf = 0;
+	}
+	if (bf) {
+		u8 id[9];
+
+		for (k = 0; k < 8; k++)
+			id[k] = __raw_readb((void __iomem *)(bf + 6 + k));
+		id[8] = __raw_readb((void __iomem *)(bf + 24));
+		o->ours = nic15_identify(id, digit, prev, &o->dig);
+	}
+	if (o->ours && !o->dig) {
+		o->content_ok = 1;
+		for (k = 0; k < f; k++)
+			if (__raw_readb((void __iomem *)(bf + k)) !=
+			    nic15_txbyte(k, digit)) {
+				o->content_ok = 0;
+				break;
+			}
+	}
+	for (k = 0; k < NIC_RX_DESC; k++)
+		if (k != i && !(nic_re(nic_mb_ring, k) & NIC_DESC_OWN))
+			o->extra++;
+	nic_refill(i);
+	nic_rx_idx = (i + 1) % NIC_RX_DESC;
+}
+
+/* One frame of length l through nic_do_tx, with the prefill if pre_end > l.
+ * The previous frame is the last one nic_do_tx sent, so its digit is one
+ * behind this frame's. */
+static void nic15_frame(u32 l, u32 pre_end, u32 lb, struct nic15_obs *o)
+{
+	unsigned int i = nic_tx_idx;
+	u32 digit = nic_n_tx % 10, k;
+
+	memset(o, 0, sizeof(*o));
+	if (pre_end > l) {
+		u32 bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ +
+			 nic15_pol.txoff;
+
+		for (k = l; k < pre_end; k++)
+			__raw_writeb(0x20, (void __iomem *)(bf + k));
+	}
+	if (nic_do_tx(0x3F, NIC_PH_FLAGS_TX_DEFAULT, 0, l - 14)) {
+		o->st = NIC15_C_FAILTX;
+		return;
+	}
+	if (!nic15_wait(nic_tx_ring, i)) {
+		o->st = NIC15_C_TIMEOUT;
+		return;
+	}
+	if (lb)
+		nic15_take(l, digit, (digit + 9) % 10, o);
+	else
+		nic15_sw.drained += nic15_drain();	/* host frames */
+}
+
+static void nic15_count(int c)
+{
+	if (c == NIC15_C_FOREIGN)
+		nic15_sw.foreign++;
+	else if (c == NIC15_C_ALIEN)
+		nic15_sw.alien++;
+}
+
+/* One unit: cycle, a, then b if a was right.  Returns 0 or the errno that
+ * ends the sweep; *foreign when either frame was FOREIGN (the caller retries,
+ * then VOIDs, or refuses while nothing is registered). */
+static int nic15_unit(u32 l, u32 probe, u32 lb, struct nic15_rec *r,
+		      int *foreign)
+{
+	struct nic15_obs a, b;
+	u32 lp = probe ? probe : l;
+	long delta;
+	int ca, cb = NIC15_C_NONE, rc;
+
+	*foreign = 0;
+	memset(r, 0, sizeof(*r));
+	rc = nic15_cycle(lb);
+	if (rc)
+		return rc;
+	nic15_frame(l, 0, lb, &a);
+	delta = (long)a.ph - (long)(l + 4);
+	if (!lb) {
+		ca = a.st ? a.st : NIC15_C_SENT;
+	} else if (!nic15_sw.reg) {
+		ca = nic15_classify(a.st, a.ours, a.dig, a.content_ok, 0, 0,
+				    a.ph);
+		if (ca != NIC15_C_FOREIGN) {
+			rc = nic15_register(ca, delta);
+			if (rc) {
+				nic15_sw.noreg_cls = ca;
+				nic15_sw.noreg_ph = a.ph;
+				nic15_sw.noreg_delta = (int)delta;
+				return rc;
+			}
+			nic15_sw.delta0 = (int)delta;
+			nic15_sw.reg = 1;
+		}
+	} else {
+		ca = nic15_classify(a.st, a.ours, a.dig, a.content_ok, delta,
+				    nic15_sw.delta0, a.ph);
+	}
+	nic15_count(ca);
+	r->ph_a = (u16)a.ph;
+	r->extra = a.extra;
+	if (ca == (lb ? NIC15_C_RIGHT : NIC15_C_SENT)) {
+		nic15_frame(lp, lp < l ? 8 * ((l + 7) / 8) + 8 : 0, lb, &b);
+		if (!lb)
+			cb = b.st ? b.st : NIC15_C_SENT;
+		else
+			cb = nic15_classify(b.st, b.ours, b.dig, b.content_ok,
+					    (long)b.ph - (long)(lp + 4),
+					    nic15_sw.delta0, b.ph);
+		nic15_count(cb);
+		r->ph_b = (u16)b.ph;
+		r->extra = b.extra;
+	}
+	*foreign = (ca == NIC15_C_FOREIGN || cb == NIC15_C_FOREIGN);
+	r->cls = (u8)((ca << 4) | cb);
+	return 0;
+}
+
+static int nic15_sweep_run(u32 from, u32 to, u32 probe, int wire)
+{
+	struct nic15_rec r;
+	struct nic15_key want;
+	u32 l, lb = wire ? 0 : 1, x;
+	unsigned int consec = 0;
+	int rc, tries, foreign = 0, act = NIC15_ACT_DONE, c;
+
+	rc = nic15_sweep_gate(nic15_state(), wire, from, to, nic15_pol.txlen);
+	if (rc)
+		return rc;			/* incl. the owner's wire bound */
+	want.txlen = nic15_pol.txlen;
+	want.txoff = nic15_pol.txoff;
+	want.txrb = nic15_pol.txrb;
+	want.wire = wire;
+	want.probe = probe;
+	want.rings = nic_tx_rings;
+	rc = nic15_keycheck(&nic15_sw.key, nic15_sw.n_rec, &want);
+	if (rc)
+		return rc;			/* -EEXIST: swclear first */
+	nic15_sw.key = want;
+	nic15_sw_busy = 1;
+
+	nic15_sw.state = NIC15_SW_RUN;
+	nic15_sw.rc = 0;
+	nic15_sw.wire = wire;
+	nic15_sw.from = from;
+	nic15_sw.to = to;
+	nic15_sw.probe = probe;
+	nic15_sw.bufs = nic_bufs;	/* the covariate (F8) */
+	nic15_sw.reg = 0;
+	nic15_sw.delta0 = 0;
+	nic15_sw.noreg_cls = 0;
+	nic15_sw.noreg_ph = 0;
+	nic15_sw.noreg_delta = 0;
+	nic15_sw.units = nic15_sw.scored = nic15_sw.voids = 0;
+	nic15_sw.skews = nic15_sw.retries = 0;
+	nic15_sw.foreign = nic15_sw.alien = 0;
+	nic15_sw.timeouts = nic15_sw.cycles = 0;
+	nic15_sw.bad_a = nic15_sw.bad_b = 0;
+	nic15_sw.drained = 0;
+	nic15_sw.last_l = 0;
+	memset(&nic15_sw.last, 0, sizeof(nic15_sw.last));
+	nic15_sw.j0 = (u32)jiffies;
+	nic15_sw.j1 = nic15_sw.j0;
+	rlxfw_markx("N-SWEEP", nic15_swbegin_val(wire, from, to));
+
+	for (l = from; l <= to; l++) {
+		for (tries = 0; ; tries++) {
+			rc = nic15_unit(l, probe, lb, &r, &foreign);
+			if (rc)
+				break;
+			act = nic15_try_act(tries, foreign, nic15_sw.reg);
+			if (act != NIC15_ACT_RETRY)
+				break;
+			nic15_sw.retries++;
+		}
+		if (rc)
+			break;
+		if (act == NIC15_ACT_NOREG) {
+			nic15_sw.noreg_cls = NIC15_C_FOREIGN;
+			nic15_sw.noreg_ph = r.ph_a;
+			rc = -EPROTO;
+			break;
+		}
+		if (act == NIC15_ACT_VOID) {
+			r.cls = (NIC15_C_VOID << 4) | NIC15_C_VOID;
+			nic15_sw.voids++;
+		}
+		x = l - NIC15_LMIN;
+		if (!NIC15_RECD(nic15_recd, x)) {
+			nic15_recd[x >> 3] |= 0x80 >> (x & 7);
+			nic15_sw.n_rec++;
+		}
+		nic15_rec[x] = r;
+		nic15_sw.units++;
+		nic15_sw.last_l = l;
+		nic15_sw.last = r;
+		c = nic15_code(&r, 1);
+		if (c == NIC15_M_BADA)
+			nic15_sw.bad_a++;
+		else if (c == NIC15_M_BADB)
+			nic15_sw.bad_b++;
+		else if (c == NIC15_M_SKEW)
+			nic15_sw.skews++;
+		if (c == NIC15_M_CLEAN || c == NIC15_M_BADA ||
+		    c == NIC15_M_BADB)
+			nic15_sw.scored++;
+		if ((r.cls >> 4) == NIC15_C_TIMEOUT ||
+		    (r.cls & 0xF) == NIC15_C_TIMEOUT) {
+			nic15_sw.timeouts++;
+			consec++;
+		} else {
+			consec = 0;
+		}
+		if (consec >= NIC15_ABORT_TO) {
+			rc = -ETIMEDOUT;
+			break;
+		}
+		cond_resched();
+		if (signal_pending(current)) {
+			rc = -EINTR;
+			break;
+		}
+	}
+
+	nic15_sw_self = 1;
+	nic_do_engine(0);
+	nic_do_arm();
+	nic15_sw_self = 0;
+	nic15_sw.j1 = (u32)jiffies;
+	rc = nic15_sweep_rc(rc, nic15_sw.scored);
+	nic15_sw.rc = rc;
+	nic15_sw.state = !rc ? NIC15_SW_DONE :
+			 (rc == -EINTR ? NIC15_SW_INTR : NIC15_SW_FAIL);
+	rlxfw_markx("N-SWSUM", nic15_swsum_val(nic15_sw.scored,
+					       nic15_sw.voids));
+	rlxfw_markx("N-SWEND", nic15_swend_val(rc, nic15_sw.bad_a,
+					       nic15_sw.bad_b));
+	nic15_sw_busy = 0;
+	return rc;
+}
+
+/* `swclear`: forget every record and so the key they were under.  The last
+ * sweep's own summary stays on the page. */
+static int nic15_swclear_run(void)
+{
+	int rc = nic15_gate(NIC15_V_SWCLEAR, nic15_state());
+
+	if (rc)
+		return rc;
+	memset(nic15_rec, 0, sizeof(nic15_rec));
+	memset(nic15_recd, 0, sizeof(nic15_recd));
+	nic15_sw.n_rec = 0;
+	return 0;
+}
+
+/* /proc/rtl819x-nic-tx, read only.  R is read uncached here, at page time;
+ * the layout is nic15_format's (the header), and nic15check measures its
+ * worst case against this page. */
+static int nic15_read_proc(char *page, char **start, off_t off, int count,
+			   int *eof, void *data)
+{
+	struct nic15_view v;
+	unsigned int i, w;
+
+	memset(&v, 0, sizeof(v));
+	v.version = RTL819X_NIC_VERSION;
+	v.pol = &nic15_pol;
+	v.p15 = nic15_p15;
+	v.last_v = nic15_last_v;
+	v.last_rc = nic15_last_rc;
+	v.allocated = nic_allocated;
+	v.n_ok = (u32)nic15_n_ok;
+	v.n_refused = (u32)nic15_n_refused;
+	v.n_txq = (u32)nic15_n_txq;
+	v.n_arm15 = (u32)nic15_n_arm15;
+	v.w = nic15_w;
+	if (nic_allocated)
+		for (i = 0; i < NIC_TX_DESC; i++) {
+			v.r[i][0] = nic_re(nic_tx_ring, i);
+			for (w = 0; w < 6; w++) {
+				v.r[i][1 + w] = nic_dw(nic_tx_ph, i, w);
+				v.r[i][7 + w] = nic_dw(nic_tx_mb, i, w);
+			}
+		}
+	v.q = nic15_q;
+	v.qv = nic15_qv;
+	v.rb_chk = (u32)nic15_rb_chk;
+	v.rb_bad = (u32)nic15_rb_bad;
+	v.rb_n = (u32)nic15_rb_n;
+	v.rb_i = nic15_rb_i;
+	v.rb_w = nic15_rb_w;
+	v.rb_got = nic15_rb_got;
+	v.rb_want = nic15_rb_want;
+	v.sw = &nic15_sw;
+	v.rec = nic15_rec;
+	v.recd = nic15_recd;
+	v.show = nic15_show;
+	*eof = 1;
+	return nic15_format(page, NIC15_PAGE, NIC_PROC_CAP, &v);
+}
+
+/* :3109 -- after N7.  No boot mark: the defaults are static initialisers, so
+ * a mark could only ever read its default, and it would change every boot
+ * capture's byte count.  `p15` on the tx15 line says whether this ran. */
+static void __init nic15_init(void)
+{
+	struct proc_dir_entry *pde;
+
+	BUILD_BUG_ON(NIC15_TXD != NIC_TX_DESC);
+	pde = create_proc_entry(NIC15_PROC_NAME, 0444, NULL);
+	if (!pde)
+		return;
+	pde->read_proc = nic15_read_proc;
+	nic15_p15 = 1;
+}

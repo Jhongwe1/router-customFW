@@ -101,7 +101,7 @@ BUDGET = {
     "CLAUDE.md:lines": 351,
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 991000,
+    "PROGRESS.md:bytes": 1030000,  # 2026-09-26, R6b-2: 991,628 B +3 %, up
     "PROGRESS.md:maxline": 9870,
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,

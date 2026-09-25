@@ -1027,8 +1027,11 @@ jobs:
       # assumed: the runner image probably carries it, and "probably" is not a
       # dependency. It is also why desk-sweep's self-test is in THIS job and
       # not beside `ci-census`'s in `text`, which installs nothing.
+      # gcc is the HOST compiler, for nic15check, and it is declared for the
+      # same reason python3-yaml is. It is not the cross compiler the header
+      # talks about: it builds no MIPS code and pulls in no hazlint.
       - name: apt
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips python3-yaml device-tree-compiler
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-serial binutils-mips-linux-gnu qemu-system-mips python3-yaml device-tree-compiler gcc
 
       - name: capture dir
         id: prep
@@ -1400,6 +1403,34 @@ jobs:
       - name: dtcheck
         if: "${{ !cancelled() && steps.prep.outcome == 'success' && steps.dtschema.outcome == 'success' }}"
         run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py 2>&1 | tee ci-out/dtcheck.out; exit "${PIPESTATUS[0]}"
+
+      # nic15check (R6b-2) compiles rtl819x-nic 1.5's pure half -- the header
+      # config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic-tx.h, UNCHANGED --
+      # with the host's gcc in the kernel's dialect, warnings as errors, and
+      # drives its parsers, refusal table, length policy, identification,
+      # classifier, the sweep's bookkeeping and the owner's wire bound,
+      # dispatcher and page formatters (K0-K21). It then mutates a copy
+      # twenty-five ways and requires the case named for each mutant to go red
+      # (M1-M25), after M0 has shown the unmutated copy green through the same
+      # path; M23 crashes the harness on
+      # purpose and must be counted as a kill with its reason, not refuse the
+      # run. Without gcc it REFUSES (exit 2) rather than reporting. What it
+      # cannot see is the kernel half -- the hooks, the locks, the sweep's
+      # waits -- which is the bench's; tools/storeseq.py reads the objects for
+      # "default = 1.4".
+      - name: nic15check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/nic15check.py 2>&1 | tee ci-out/nic15check.out; exit "${PIPESTATUS[0]}"
+
+      # storeseq's comparison needs the built ELFs, which exist only under
+      # $FWRE_WORK, so it is a desk tool; its SELF-TEST needs nothing but
+      # python -- synthetic listings and symbol tables, S0-S18: the store
+      # sequence, the both-inlined container, the identity check of untouched
+      # functions (a moved global reads the same, a renamed register does
+      # not; a stale TOUCHED declaration is red) and the initial-word check.
+      - name: storeseq self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/storeseq.py --self-test 2>&1 | tee ci-out/storeseq.out; exit "${PIPESTATUS[0]}"
 
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"

@@ -71,8 +71,8 @@ puts no frame on the wire, while RX stays healthy* (`SPEC.md` `NET-78`).
 | 8 | `ph_flags` TX / RX template | `0x8800` / `0x9000`, derived | `0x8800` / `0x9000`, measured | 🟢 **confirmed, §5** |
 | 9 | RX buffer lookup | **follows `ph_mbuf`**, the pointer in the pkthdr's word 0 — one consumption index | **indexes the mbuf ring** with the pkthdr ring's `i` | 🔴 **no** — it is `NET-61`'s, §6 |
 | 10 | register programming order | all 4 TX bases, then 6 RX pkthdr bases, then 1 mbuf base, under `local_irq_save` | same order | 🟢 same |
-| 11 | TX `m_len` | = `ph_len`: frame + 4, 64 for a runt (`_swNic_send`) | the frame padded to 60, `ph_len` − 4 (`nic_xmit`) | ⚠️ not assessed for `NET-78`: it is `R6b`'s M1 (`notes/nic-driver.md` § 21.6). The loader writes the vendor's value, § 16 |
-| 12 | TX `m_extsize` | = `ph_len` | 2,046, constant | as row 11 |
+| 11 | TX `m_len` | = `ph_len`: frame + 4, 64 for a runt (`_swNic_send`) | the frame padded to 60, `ph_len` − 4 (`nic_xmit`): 1.4, and 1.5's default; the vendor's value behind `txlen vendor` or `mlen` (`notes/nic-driver.md` § 23) | ⚠️ not assessed for `NET-78`: it is `R6b`'s M1 (`notes/nic-driver.md` § 21.6). The loader writes the vendor's value, § 16 |
+| 12 | TX `m_extsize` | = `ph_len` | 2,046, constant: 1.4, and 1.5's default; `ph_len` behind `txlen vendor` or `ext` | as row 11 |
 
 ## 2. The largest divergence: the vendor does not name egress ports, and rlxfw floods
 
