@@ -452,7 +452,8 @@ Four references that are not the host's monotonic clock (106th segment,
   kernel journal entry: by 18:17 it was 205.2 s ahead of `CLOCK_MONOTONIC`, against a
   step total of 205.19 s.
 * **B — the board's tick** (`CONFIG_HZ=100`, 讀 the image's `.config`): `/proc/stat`'s
-  `cpu` ticks and IRQ 13 on each rlxfw dump, placed at their lines' FW-35 arrival.
+  `cpu` ticks — jiffies, which rlxfw's TC1 drives on IRQ 25 — and IRQ 13, the vendor's TC0,
+  on each rlxfw dump, placed at their lines' FW-35 arrival.
 
 In every five-minute window holding two or more of them they give r within 0.0005 of
 each other (four windows 0.0013–0.0020). **r ≈ 1.000 until ~15:49** — `P1-A`
@@ -472,10 +473,17 @@ paragraph's until a second source re-read `f5-best.tsv` and `f6-rt4.tsv`.
 
 **The board's own rate** from 16:01 to 16:32: 100.0031 ticks per Windows second (48
 values, rms 3.6 ms), 99.998 ± 0.001 per NTP second. Between `P1-N0` (15:57:43) and
-`P1-TR1-S0` (16:01:16) the board's counters advanced **105 ticks fewer** than that rate
+`P1-TR1-S0` (16:01:16) the board's jiffies advanced **105 ticks fewer** than that rate
 predicts (the condition written first was |Δ| ≤ 3) — which is the whole of the 99.93
 per realtime second this section used to quote over `P1-N0` → `P1-US1-S1`. 推 timer
-interrupts masked for about a second; the cell is not identified.
+interrupts masked for about a second; the cell is not identified. 🔄 111th segment: this
+section took IRQ 13 for the tick — in *B*, here ("the board's counters advanced") and in the
+note below — until seating B read `cpu` − IRQ 25 at 34 in 54 of 54 dumps across the same loss
+while IRQ 13 − IRQ 25 went 35 → 100 (§ 8.3, `CLK-42`). Jiffies are rlxfw's TC1, IRQ 25, as
+`docs/interrupt-map.md` § 7 already said; IRQ 13 is the vendor's TC0, which in seating B
+lost ~45 where jiffies lost ~105, and which here read 65 above `cpu` at `P1-TR1-S0` as well.
+A mask of both timers for about a second does not fit a loss TC0 shared only in part; 推
+the cell is `P1-AC0`'s `asicCounter` read (§ 8.3).
 
 **What the correction does.** `P1-A`'s excess over the later cold catches (×1.0225 on
 `booting`, ×1.0238 on `banner`) becomes ×0.9993 and ×1.0003; § 7.1's warm split
@@ -498,8 +506,8 @@ stamps do not.
 computation, called the steps Hyper-V's and load-driven, gave "0.000 % inside `P1-A`,
 0.18 % from 15:13 to 15:55" (step counts, not rates), put the host at "up to 2.4 %"
 slow, reached a corrected warm Δ of −3.8 ms by assuming `P1`'s resets ran at r = 1
-(they ran at 0.9861), and cited a tick count of IRQ 24 (it reads 0; the tick is
-IRQ 13).
+(they ran at 0.9861), and cited a tick count of IRQ 24 (it reads 0; jiffies are
+IRQ 25, 🔄 above).
 
 **Not established:** who writes the host's tick (§ 7.9); r at a cold catch's loader
 instant to better than ±0.3–0.8 %; that the corrected values are the loader's true
@@ -513,8 +521,10 @@ seatings, which have no N, W or K record of this kind.
   the console event being the FW-35 time of the header's first byte (byte 66, the
   `t` of `traceroute to 10.1.1.2`). Over `OFF02`–`OFF15` (n = 14) the offset runs
   −206.5 to +494.4 µs, a range of **701.0 µs** with the probe's read stamps, and
-  896.6 µs with the kernel's receive stamps converted through each capture's own
-  real/mono pair. Both exceed 260.4 µs: the stability test fires, as the card
+  896.4 µs with the kernel's receive stamps converted through each capture's own
+  real/mono pair (🔄 111th segment: 896.6 µs until the offsets were re-derived in exact
+  decimals from the recorded stamps, 896.369 µs; float arithmetic on a 1.79e9 s realtime
+  moves an offset by ~0.2 µs). Both exceed 260.4 µs: the stability test fires, as the card
   predicted, so network up is published only as a console-side bound. Two
   computations sharing no code agree on all fifteen offsets.
 * **Network up, quiet image** (`P1Q-r01`…`r04`): J+[9.745–9.776, 10.777–10.806] s,
@@ -541,10 +551,20 @@ seatings, which have no N, W or K record of this kind.
   `P1-RZ.meta.json`). 量 from `P3-TCPD`: after the carrier loss at each NIC probe the
   host transmits nothing until the next ARP cycle, whose second broadcast lands at
   NIC+4.18–4.27 s; the quiet image opens `rlx0` at NIC+4.01–4.05 s, just before it, the
-  loud one at NIC+4.45 s, just after.
+  loud one at NIC+4.45 s, just after. 🔄 111th segment: the loud image now has a reading —
+  seating B's was answered at k = 3 in 3 of 3, first replies J+13.231–13.281 s (§ 8.7,
+  `CLK-47`) — and NIC+4.01–4.05 and 4.45 s are raw values on the slow host clock: seating B's
+  RAW reads 4.103–4.113 s (quiet, n = 8) and 4.511 s (loud, n = 3), medians within 0.6 ms of
+  seating A's corrected ones. `N-NDOPEN`'s lead over the quiet image's #2 is not a board
+  quantity: 0.13–0.22 s in this seating's ledger on its own clock (量
+  `$FWRE_WORK/rebuild/s111/netup/netup-A.out`), 0.07–0.15 s by seating B's frames on RAW
+  (推 the slow clock stretching the host's ARP schedule, untested).
 * 🔄 **The quiet image was read through the same window** (107th segment): its first
   replies beat the next reset by 16.1, 2.5 and 39.5 ms in `P1Q-r01`…`r03` (量, two
-  computations sharing no code), and `P3Q-r01` got none. Which boots have a reading is
+  computations sharing no code), and `P3Q-r01` got none (🔄 111th segment: `P2Q-r01` and
+  `P2Q-r02`, which this list left out, were answered at k = 2, first replies J+10.7145 and
+  J+10.7120 — `P2Q-r01`'s read 2.6 ms *after* its next reset was sent; 量
+  `$FWRE_WORK/rebuild/s111/netup/netup-A.out`). Which boots have a reading is
   decided by the host's ARP phase against a 0.2 s window, so seating B keeps **both**
   images up past the prompt in every round, the last included. The 1.05 s this bullet
   used to ask of the loud image alone — the longest gap between broadcasts on the wire in
@@ -591,10 +611,12 @@ seatings, which have no N, W or K record of this kind.
 
 * rlxfw: `P1-PS` lists `/bin/sh`, the kernel threads, and nothing else. `P1-NMAP`
   (a connect scan of all 65,535 TCP ports, `-T4 --max-retries 1`): none open,
-  58,989 closed, 6,546 filtered (no response).
+  58,989 closed, 6,546 filtered (no response; 🔄 111th segment: 推 RSTs that arrived after
+  `nmap` gave up rather than missing ones, by block 45's E3 — an analogy, since this scan
+  had no host counters; `notes/nic-driver.md` § 21.3, `NET-120`).
 * The vendor (`V1-NMAP`, the same scan): 80/tcp open (predicted); 52869/tcp and
-  52881/tcp open (first reading; 推 `miniigd`'s UPnP ports); 65,381 closed, 151
-  filtered.
+  52881/tcp open (first reading; 推 `miniigd`'s UPnP ports — of 52869 only, 🔄 below);
+  65,381 closed, 151 filtered.
 * rlxfw memory after boot (`P1-FREE`): `MemTotal` 26,984 kB, `MemFree` 20,932 kB;
   `busybox free` used 6,012 kB.
 * `D4` readiness, all nine vendor boots (J the loader's jump line; host monotonic, raw):
@@ -618,7 +640,10 @@ seatings, which have no N, W or K record of this kind.
   reaches the host, and the probe's 0.2 s connect phase decides the sign; refuted by a
   seating-B boot whose last-refused-to-first-ok window excludes that offset. No
   cold/warm/listen difference is resolved at n = 3/4/1/1. The 52869/52881 attribution
-  stays 推 (`miniigd`'s port is configured).
+  stays 推 (`miniigd`'s port is configured). 🔄 111th segment: this bullet and the census
+  gave both ports to `miniigd` until seating B's first readiness readings put 52881's listen
+  with the WPS daemon's `WiFi Simple Config` line, 4.79–5.96 s before `MiniIGD`'s, in 9 of 9
+  boots, and the SDK tree names 52881 `RTK_WPS_LISTEN_PORT`: 推 `wscd`'s (§ 8.8, `NET-118`).
 * `D5` (a), ICMP: all 30 runs (five payloads × `P1`, `P2`, `P3`, `V1`, `V2`, `V3`)
   20 of 20, 0 % loss, as predicted. Average rtt, rlxfw 1.516–1.815 ms at 56 B and
   2.052–2.252 ms at 1,472 B; vendor 1.504–1.710 and 1.656–1.956 ms; mdev 0.280–2.080 ms.
@@ -649,7 +674,13 @@ uncorrected (§ 7.2, § 7.9).
 * `J` → prompt, `p2q`: median 10.591562 s, 8 of 8 inside 10.15–11.71 s (the point f_A ×
   10.72 = 10.529280) — **hit**. `p2l`: median 12.361805 s, 3 of 3 inside 11.84–13.12 s
   (point 12.257968) — **hit**. The first read's arrival minus `sent_s` is +61…+140 µs
-  on all 19 boots that carry a send, so neither anchor moves a verdict.
+  on all 19 boots that carry a send. 🔄 111th segment: this sentence ended "so neither
+  anchor moves a verdict", reading `sent_s` as the send, which it is not: the loader's
+  `---Jump` line, printed once it has the CR, reached the host 1.0–6.3 ms before `sent_s` in
+  23 of 23 typed-`J` captures (量 at ≤ 3,840 B/s, `$FWRE_WORK/rebuild/s111/timing-v/seatA/`),
+  so `J`'s stamp is at least 1.1–6.4 ms late, and every `J`-anchored interval here reads
+  short by that less its far end's own lateness (§ 8.5, `CLK-44`). Every verdict in this
+  section clears its band's edge by more.
 * The vendor's `kernel.total`: warm 5 of 5 inside the raw 6.8895–6.9817 s (median
   6.912024) — **hit**; 9 of 9 inside the § 5 form f_A × 6.93–7.15.
 * The vendor's `J` → `boa`: 7 of 9 outside the raw 25.654–26.126 s — **miss**. Six above
@@ -696,16 +727,23 @@ What seating B tests, each written with what refutes it:
 
 * 推 the vendor answers ARP 0.075–0.116 s before its `Start NTP daemon` line reaches the
   host (+0.924–0.997 s after `Init bridge interface...`) in all nine boots — refuted by
-  a seating-B bracket that excludes that offset.
+  a seating-B bracket that excludes that offset. 🔄 111th segment: not refuted, 9 of 9
+  brackets hold it — a weak test, each bracket 1.03–1.10 s wide (§ 8.7).
 * 推 `boa` listens 0.111–0.127 s before its `boa: server version` line's first byte
   reaches the host, and the probe's 0.2 s connect phase sets the sign of "ok − line" —
   refuted by a seating-B boot whose last-refused-to-first-ok window excludes it.
+  🔄 111th segment: not refuted, 0 of 9 exclude it; the eighteen boots of both seatings
+  intersect in (−0.117471, −0.111008], and of 41 console lines only the three `boa` lines
+  fit both days. The window's upper edge is the first ok's start + 1 ms, s106's rule
+  (§ 8.8).
 * 推 `CLK-32`'s factor is the host clock — the loader's `booting` stamped on a clock the
   host does not slew should land within ~±0.5 % of 0.35625 s in every seating. 0.35625 s
   is not a registered value: it is the 106th segment's fit of the loader factor against
   the host rate over 21 directories, read at r = 1 (`$FWRE_WORK/rebuild/s106/r-retro/`
   `REPORT.md`); § 5's seven directories with a right host clock, 0.3546–0.3578 s, all
   lie inside its ±0.5 % (🔄 109th segment: this bullet cited § 5 for the number itself).
+  🔄 111th segment: holds — warm 0.356060 s (n = 13), cold 0.355865 s (n = 12) on RAW
+  (§ 8.5, `CLK-43`).
 * ~~The host clock's mechanism — decided by resynchronizing Windows (§ 7.9).~~ 🔄 Decided
   at the desk by the 107th segment without touching Windows: a trace named the process that
   writes the tick, and stopping the other controller ended the slew (§ 7.9). Seating B no
@@ -871,3 +909,573 @@ boot) are *A third rate term* and *E3*. Their scripts, logs and registration are
   it — but the System log carries no event 37 for it, so that log is not a complete
   record of Windows' syncs. The fight was on 12,434 s after that sync; seating A's steps
   began 9,352 s after its sync and E3's 6,824 s after its own.
+
+## 8. Seating B (`P2-4`), 2026-09-25 — the reproduction
+
+Every number seating A published, measured again on a second calendar day, stamped on
+`CLOCK_MONOTONIC_RAW` with `timesyncd` stopped. The desk work over the captures is the 111th
+segment's, under `$FWRE_WORK/rebuild/s111/`: one directory per family (`timing/`, `netup/`,
+`services/`, `throughput/`, `clocks/`, `mbuntil/`), each re-derived by a second computation
+that shares no code with it (the `-v` directories), and `D3` scored three times
+(`score-S1/`, `score-S2/`, `score-judge/`). Where a primary and its second source
+disagreed, the value below is the one the disagreement settled, and the place is named.
+
+### 8.1 What ran, and what departed from the card (`FLS-31`)
+
+Card `bench/2026-09-25/PREDICTIONS-B46-block44.md` is card B (block 43, frozen for
+2026-09-24 and never run: the workstation slept from 14:03:43 to 23:34:33 that day) with
+its date, block number and file names substituted, § 4's sync rule rewritten and § 0 ⑧
+added; a line-by-line second source showed every other line to be card B's
+(`$FWRE_WORK/rebuild/s110/redate/`), and it froze at `c979621`, 23:59:35 (讀 card § 0 ⑧,
+`LOG.md` 第一百一十段). Card A's twelve presses in card A's order, 00:25:58–02:48:09; the
+first capture began at 00:02:45, the clock log closed at 02:49:20. `check-predictions` read **246 of
+246** fenced cells captured after the card, and `capdate` 0 RED (量, the bench night). Every
+departure is in `bench/2026-09-25/CORRECTIONS-block44.md`, and there are two, both stops the
+card's own stop table handled:
+
+* **§ 1, the clock guard refused** (00:05:55). `Z0-HCG`'s tick check read `strong`: inside
+  its minute the kernel's tick went 9937 → 9817 → 10834 → 10001, the 10834 run lasting
+  25.302 s. No power; ten minutes later the same line, as the declared off-card cell
+  `Z0-HCG2`, permitted (00:18:37). § 8.2 is what the clock log says about it.
+* **§ 2, `P2-MB0` refused on its digest** (02:01:30). `P2-M0.log` is 3,009 B and ends
+  `map_lines 32` with no line terminator: `--until` stops its capture 0–50 ms after the
+  match (`FW-135`), and the card's `MB` digest hashes the last line's terminator
+  (`FW-136`). The 34-line map section is byte-identical to `P1-M0`'s and to seating A's
+  `P3-M0`'s, and with `awk 1` before `sha256sum` all six maps of both seatings read
+  `0927be41e91fe4bd…` (量 `s111/services/mb.out`). The press finished `--from P2-HPX`; the
+  owner read § 2 and ruled that `V4`–`V7` and `M2` continue.
+
+**The brackets** (`FLS-31`, 量). `P1-M0`, `P2-M0` and `P3-M0` each carry the predicted header
+(`map_hashed=4186112`, `map_h601_skipped=8192`, `map_h601_hashed=0`, `map_truncated=0`),
+exactly one `DIFFER`, in group 0, against the 2026-08-16 dump, and the summary line
+`31 same, 1 DIFFER, 0 scope, 0 extra, 0 missing`; `flashmap compare` re-run at the desk
+prints the same lines. `map_jiffies` read 1300, 1301, 1301. The card carries no
+flash-writing command and no `FLR` (讀 card § 4). What the maps cannot see is § 7.8's: two
+writes that cancel, `H601`, and the 8,192 B outside the 4,186,112 hashed.
+
+**The exact predictions** (card § 3.2; 量 `s111/services/exact.out`, second source
+`services-v/`): 21 of 23 hold, and the two misses are `P2-M0`'s size and digest above. Every
+quiet boot 2,117 B (8 of 8); every loud boot 7,948 B with twelve `tmpReg[0xe]` fields, e = 0
+(3 of 3); `RLXFW-ID0=A2C56BC8` and `RLXFW-N7=00000011` in 11 of 11; every `P1-OFF` cell
+139 B, with 15 `udp` events of `len=10`; the vendor's seven `J 80500000` boots 1,789 B each,
+ending at `boa: starting server pid=350, port 80`; `M1-BOOT` 1,901 B and `M2-BOOT` 1,979 B;
+every `V*-HD` 118 B and byte-identical to `2026-08-31c/K2-2a` (7 of 7); every burn flag
+`00000001` (12) and every `looprun` `S5b` read `00000000` (11). Both line orders of § 7.4
+recur — `2f921f7508dd69b4…` in `V1`, `V2`, `V3`, `V5`, `V7`, `89df2d260b86e48d…` in `V4`,
+`V6` — and the race moves no byte count.
+
+**One WSL boot, one clock** (量). All 179 `.meta.json` of the seating (163 `console-capture`,
+13 `hostprobe`, 3 `hostclock`) carry one `boot_id` (`ef62493d…`), `clocksource` `tsc` at
+both ends and `CLOCK_MONOTONIC_RAW`; each capture's `t0_real` agrees with the clock log's
+REALTIME at its `t0_raw` to within 6.9 µs (177 metas), so RAW ran unbroken through the
+seating. That WSL boot has since ended; nothing in it can be read live.
+
+Block 45 (`R6b`'s first bench block, `bench/2026-09-25b/`, 03:18–03:34) ran on the same
+board after the seating; it is `notes/nic-driver.md` § 21's.
+
+### 8.2 The host clock (`CLK-41`)
+
+量 `bench/2026-09-25/Z0-HC.clock` (`hostclock` 1.0, `--no-sntp --no-windows`), read by
+`s111/clocks/` and again by `clocks-v/` with its own parser: 11,375 rows over RAW
+1423.921–11403.923 (00:02:59–02:49:20), 9,981 `linux` rows, 1,391 `adj` rows and **0 `step`
+rows**. Every row reads `status` 0x2000 and `offset` 0: no PLL offset was written, so
+`CLK-39`'s third term was absent.
+
+* **The tick never read 10,000** — 0 of 11,372 rows. `timesyncd` stopped at 00:03:13
+  (`Z0-TSD`); around that the tick moved in ~8 s runs between 9784 and 9863, then 9937,
+  9817, and from RAW 1549.917 to 1575.219 **10834 for 25.302 s**: on its own rows MONOTONIC
+  ran 1.083429 per RAW second (+83,428.8 ppm) and gained ~2.11 s. Then 10001 from 00:05:31,
+  with four ~1 s dips to 9999 (RAW 1861.9, 1869.9, 2887.9, 2895.9), and **9999 from RAW
+  3913.2 (00:44:29) to the end**. `freq` ran −143.56…+142.14 ppm; the net kernel rate from
+  00:05:31 on −81.5…+97.8 ppm, except in the four dips, which reached −120.9 ppm (00:10:17)
+  and −100.5 ppm (00:27:31).
+* **The rows and the rate agree.** Measured MONOTONIC/RAW equals tick/10,000 + `freq` to
+  −0.079…+0.029 ppm in every 5-minute window from RAW 1575.219 on. It fell through the
+  night, from +72.0 ppm (00:08) to +3.0 ppm (02:43–02:48); per press `P1` +40.930, `V1`–`V3`
+  and `M1` +11.752…+12.028, `P2` +8.378, `V4`–`V7` and `M2` +4.271…+5.982, `P3` +3.643 ppm
+  (over each press's captures). MONOTONIC gained 0.257030 s on RAW from 00:05:30 to
+  02:49:19, a mean of +26.15 ppm, and read 1.00000 per minute only after 02:25, in 23 of 164
+  minute windows.
+* **What that does to an interval.** A host timer runs on MONOTONIC, so a 10 s timer spanned
+  9.99959–9.99996 RAW s, short by 0.04–0.41 ms; every boot capture and probe event is
+  stamped on RAW and carries none of it. Card § 3.8's containment names every window whose
+  rows show a tick other than 10,000 or `freq` beyond ±100 ppm — here all 9,866.4 s from
+  `Z0-TSD` + 100 s to the stop. It tests the two separately, so it names a compensated pair
+  (tick 9999 with `freq` +100…+142 ppm nets 0…+42 ppm) as it names a fast clock, and it
+  states no size; the sizes above are what the host parts of `D5` and `D8` carry.
+* **E2's settled state did not recur** (`CLK-38`). With `timesyncd` stopped there was no
+  step and no PLL write, as in E2's B phase, but the tick never settled at 10,000. 推
+  stopping `timesyncd` ends the fight between the two controllers and not `chronyd`'s
+  following of Windows, and the 10834 run is `chronyd` slewing at its default
+  `maxslewrate`, 83,333.3 ppm, on a base near +95 ppm (the guard's later rows net
+  +72.7…+90.1 ppm), after a Windows clock that had just woken; and the drift after it is
+  Windows slewing out its wake offset —
+  `w32tm`'s *Phase Offset* read 0.3208324 s at 00:06:39 (quoted in `CORRECTIONS` § 1; no file
+  keeps it) and 0.0002180 s at 06:53:39, with no sync between. The run read +83,428.8 ppm,
+  not the 83,333 ppm `CORRECTIONS` § 1 names: the tick alone is +83,400 (a tick moves in
+  steps of 100 ppm) and `freq` the rest.
+* **The guard** (`CLK-40`). `Z0-HCG` refused on the 10834 run through its tick check
+  (`strong`, worst −0.573 ppm; `timerfd 0`), its step gate silent. `Z0-HCG2` permitted at
+  00:18:37 (`vacuous`, worst +0.452 ppm): every row tick 10001 with `freq` −36.426…−36.573
+  ppm, a kernel rate of +63.43…+63.57 ppm, 36.4 ppm inside the 100 ppm line and on one side
+  only — at tick 10001 any `freq` of 0 or more crosses it. The guard judges the rate and the
+  containment the tick (讀 card § 3.8), so the guard permitted a regime the containment calls
+  affected. `CORRECTIONS` § 1's "tick 10001 from RAW 1575.2 on" held for the 270 s of rows it
+  had read; from 00:44:29 the tick read 9999.
+* **Windows** (量 `s111/clocks/`: `w32tm` and the System log; the last read the
+  coordinator's, 2026-09-25 13:07). No sync fell inside the seating: *Last Successful Sync
+  Time* read 23:35:29 at 00:00:09, 02:49:38 and 06:53:39, so card § 4's 推 held, and the
+  1,024 s *Poll Interval* (H-a) is refuted by the first of those reads alone. The next sync
+  came at **08:41:21** (time.stdtime.gov.tw): the System log's Kernel-General 1 at
+  08:41:22.648 stepped the clock +1.0815 s (00:41:21.5656420Z → 00:41:22.6471540Z), then
+  +0.25 ms at 08:41:22.684, with no Time-Service event 37 for either — as for 2026-09-24's
+  07:26:38 — and no sleep since the wake. The wake sync's event 37 at 23:35:13 plus 32,768 s
+  is 08:41:21. 推 the wake sync restarted the 32,768 s cadence (H-b), counted from event 37's
+  instant and not from `w32tm`'s 23:35:29. As registered before the read, H-b does not
+  hold: card § 4 put the next sync at 08:41:37, counting from 23:35:29, and the test the
+  111th segment wrote before the read (`s111/clocks/REPORT.md` § 8) held H-b to 08:41:37
+  ± 2 s and refuted it at any other time; the sync came 16 s earlier, and the event-37
+  anchor that makes 08:41:21 fit was chosen after the read. By that anchor the next sync
+  falls at about 17:47:29, which tests it. Over those 9.1 h Windows fell 1.0815 s behind
+  its source, ≈33 ppm slow on average (1.0815 / 32,768), uncertain by the 0.32 s *Phase
+  Offset* it was slewing out after the wake (±10 ppm, arithmetic).
+
+### 8.3 The board's tick, and the jiffies it lost again (`CLK-42`)
+
+量 `s111/clocks/` and `clocks-v/`, from each rlxfw press's `TK0` and `TK1` (`/proc/stat`'s
+`cpu` and `intr` lines, each at its FW-35 arrival on `t0_raw`), every driver dump's `j_now`,
+and `/proc/interrupts`.
+
+* **Jiffies are IRQ 25, not IRQ 13.** `cpu` − IRQ 25 read 34 in 54 of 54 dumps over `P1`,
+  `P2` and `P3`, through `P1`'s loss, while IRQ 13 − IRQ 25 went 35 → 100 across it; over
+  `P1-TK0` → `P1-TR1-S0` the `cpu` ticks advanced 24,311, IRQ 25 24,311 and IRQ 13 24,376.
+  The `cpu` ticks count jiffies, which rlxfw's TC1 drives on IRQ 25 (讀 `docs/interrupt-map.md`
+  § 7, which says so); IRQ 13 is the vendor's TC0, counting on its own line. Seating A's IRQ
+  13 − `cpu` read 65 at its `P1-TR1-S0` as well. § 7.2 called the tick IRQ 13 (🔄 there).
+* **Ticks per RAW second** (card § 3.8 predicted 99.998–100.000). `P1` 99.921673 over `TK0`
+  → `TK1` (00:32:09 → 00:54:58, 1,369.35 s, 136,828 ticks), a miss by the loss below; `P2`
+  100.002276 (171.48 s, ±0.030) and `P3` 99.967306 (24.80 s, ±0.21), each inside its ±0.1
+  (`P3`'s is the second source's exact-decimal value; the primary rounded the instants first
+  and read 99.967304). After the loss `P1` runs **100.002869** per RAW second (the 25
+  stat-first reads `P1-TR1-S1` … `P1-TK1`, se 0.000102): 29 ppm above 100, outside the
+  card's band with nothing lost. `P2` and `P3` are consistent with it and cannot resolve
+  it (±0.030 and ±0.21 ticks per second against 0.0029). RAW running that much slow of
+  true time in this WSL boot, the board's crystal running that much fast of seating A's,
+  and seating A's own figure being off would each produce it — seating A's 100.0031 per
+  Windows second, with Windows' −36.42 ppm removed, is 99.9995 per NTP second, about 15 ppm
+  from the 99.998 it published, and the two are not reconciled (arithmetic; `CLK-35`). The
+  seating logged no reference that separates them. The card's ±0.001 for `P1` assumed ~35
+  minutes; `TK0` → `TK1` was 22.8, where two ticks of quantisation are ±0.0015.
+* **The loss.** Seating A's recipe — `P1-N0`'s `j_now` placed at its arrival less 1,489 B at
+  3,840 B/s, the end at the stat-first `P1-TR1-S1`, the post-loss rate — gives **105.2
+  ticks** lost between `P1-N0` and `P1-TR1-S0`, where seating A lost 105. By placement the
+  same loss reads 104.2–109.4, the top on first-output instants, against seating A's ~108.4
+  on those (seating A's `N0` dump ran at 3,527 B/s, not 3,840, so its recipe placed `N0`
+  34.5 ms late); measured from `P1-TK0` it is 110.5, which adds `TK0` → `N0`'s 1.1
+  (量 `s111/clocks-v/findings.tsv`). Nothing else lost a tick: `P1-TK0` → `P1-N0` 1.1
+  across the map, `MB0`, `HPX`, `FREE` and `PS`; each map's `map_jiffies`, 1300/1301/1301
+  over its ~13.00 s silence; and from `P1-TR1-S0` to `P1-TK1` every `rlx0` and `eth4` trial
+  0, every `-S1` residual within ±0.18 tick. TC0 lost 45.3–45.6 ticks over the same span.
+* **Where, 推.** Between `P1-N0` and `P1-TR1-S0` ran `P1-AC0` (`cat
+  /proc/rtl865x/asicCounter`), the fifteen offset cells, `P1-ICMP` and `P1-NMAP`. Block 45
+  holds a second population (量 `s111/throughput/b45jiffies.out`): each of its seven `D1-N`
+  → `D1-N` driver-dump intervals holds exactly one `asicCounter` read and loses 111.7–114.3
+  jiffies whatever its length, 15.2–134.3 RAW s; its `/proc/net/snmp` read is in every
+  interval too, and seating B's window has none. The one interval between two driver dumps
+  that holds no `asicCounter` read, `D1-TN` → `D1-TN2` (17.4 RAW s), lost 0.0 (量
+  `s111/throughput-v/tick45.out`). 推 the cell is the `asicCounter` read: in the SDK drop
+  its handler prints about 4 kB through `panic_printk` to the 38,400-baud console (讀
+  `rtl865x_proc_debug.c`, not confirmed to be the file `p2q` compiled), ~1.07 s of line
+  time, ~107 ticks. How that costs jiffies is open: interrupts held off for the
+  whole print would have stopped TC0 too, and TC0 lost ~45 where TC1 lost ~110 on
+  first-output instants (推 about 0.45 s with both timers held and ~65 TC1 deliveries lost
+  besides; `docs/interrupt-map.md` § 3.6's read-modify-write is a candidate, untested). The
+  board-timed waits inside the span show no stretch: by `clocks-v/`'s measure, from the
+  echo's last byte to the first output byte and from the header line's last byte to the
+  next line's first, `P1-AC0`'s `sleep 1` with its exec read 1.0190 s, the fifteen
+  `P1-OFF` cells' 1.0217–1.0345 s and their `-w 2` waits 1.9991–2.0011 s (the primary,
+  bracketing from `sent_s` and from the header line's first byte, reads 1.032–1.045 s and
+  2.017–2.019 s; the two brackets differ by the echo and the header line on the wire).
+  That puts the loss outside them only if those timers run on jiffies, which nothing here
+  read (`CLK-42`'s 殘留). Card § 3.8's promise that each trial's `-S0`/`-S1` would place a
+  shortfall could not be kept: the loss came before the first trial, and no `/proc/stat`
+  read sits between `P1-N0` and `P1-TR1-S0`.
+  What decides it: a lone `cat /proc/rtl865x/asicCounter` between two `/proc/stat` reads
+  (predicted ≈107 ticks lost), with a `seq_file` read of the same size as the control
+  (predicted 0).
+
+### 8.4 `D2` holds on RAW (`CLK-45`)
+
+Card § 3.1's groups, computed on the bench night by `Z9-D2X` before any comparison was read,
+and reproduced at the desk to 4 dp (量 `s111/timing/checks.out` § 8). Quantity:
+`loader.banner`, s; seating A's values are the frozen list's.
+
+| group | captures | n | seating B | seating A raw | seating A corrected |
+|---|---|---:|---:|---:|---:|
+| rlxfw cold | `P1-A`, `P2-A`, `P3-A` | 3 | 0.585971 | 0.572666 | 0.586303 |
+| vendor cold | `V1-A`…`V3-A` | 3 | 0.586138 | 0.573108 | 0.586157 |
+| rlxfw warm | `P1L-r02/r03-rz`, `P1-RZ`, `P1Q-r02/r03/r04-rz`, `P2Q-r02-rz`, `P3Q-r02-rz` | 8 | 0.596812 | 0.587768 | 0.596032 |
+| vendor warm | `V4-WZ`…`V7-WZ` | 4 | 0.595988 | 0.579959 | 0.595841 |
+| loader-only cold (context) | `V4-A`…`V7-A`, `M2-A` | 5 | 0.585957 | 0.572033 | 0.586096 |
+| mode control, cold (listen) | `M1-BOOT` | 1 | 0.581514 | 0.572643 | 0.585572 |
+| mode control, warm (listen) | `M2-BOOT` | 1 | 0.597166 | 0.580757 | 0.596113 |
+
+Warm rlxfw − vendor **+0.8245 ms** (band ±10 ms; seating A raw +7.8, corrected +0.19); cold
+**−0.167 ms** (±25 ms; seating A raw −0.4, corrected +0.15); `M1-BOOT` − rlxfw cold
+−4.457 ms and − vendor cold −4.624 ms, `M2-BOOT` − rlxfw warm +0.3535 ms and − vendor warm
++1.178 ms (±10 ms each). **`D2` holds**, on RAW with nothing corrected.
+
+* **The correction's prediction, met.** The press split seating A's raw values showed is
+  absent: `P1`'s six warm catches read 0.595915–0.597136 s, `P2Q-r02-rz` 0.596842 and
+  `P3Q-r02-rz` 0.595782. The 13 warm catches' `loader.booting` span 1.363 ms, 0.383 % of
+  their median, where seating A's spanned 3.08 % raw and 0.545 % corrected by the same
+  measure (range over median). Three of the six differences land within 0.64 ms of seating
+  A's corrected ones, and a fourth, `M2` − vendor, within 0.91 ms (量 `s111/timing/checks.out`
+  § 8: warm +0.633, cold −0.313, `M2` − rlxfw +0.273, `M2` − vendor +0.906 ms).
+* **`M1`'s two land 3.7–4.0 ms away, and 推 not through listen mode.** `M1-BOOT`'s
+  `loader.booting` is 4.371 ms under the eleven `esc` cold catches' median while its `banner`
+  − `booting` is −0.12 ms: the read that carried its anchor-C byte returned 5.39 ms after
+  the read before it, against 0.54–1.10 ms in the other 24 loader boots and 0.94 ms in
+  seating A's `M1-BOOT`. Measured from anchor A (the last `.`) instead, `M1` − rlxfw cold is
+  −0.05 ms and `M1` − vendor cold −0.19 ms (量 `s111/timing-v/vanchor.out`). 推 one late
+  read; `M2-BOOT`, listening too, shows none. Card § 3.1 said the raw differences would
+  "land near" the corrected seating-A values and gave no tolerance, so that sentence could
+  not fail; the bands could.
+
+### 8.5 Segment timing, inference (iii), and how late a stamp can be (`CLK-43`, `CLK-44`)
+
+`bench/2026-09-25/Z9-D2.tsv`, written on the bench night, is byte-identical to the desk's
+`boot-timeline --retro` over the directory (sha256 `8b40db9a862b04f6…`, tool
+`a541392a0ffe7216…`). A second reader sharing no code (`s111/timing-v/`: its own landmarks,
+FW-35 lookup in exact decimals, C-8 class by `t0_raw` order) agrees on 52 of 52 loader
+values, 208 of 208 segment values, 223 of 223 landmarks, 12 of 12 resets and 20 of 20
+kernel-boot classes, and refuses a planted +1 µs and a planted class. The classes are
+seating A's composition: `P1L-r01`, `P2Q-r01`, `P3Q-r01`, `V1`–`V3` and `M1` cold, the rest
+warm. Every cell with n, median and range, cold and warm, beside seating A's raw and
+corrected values, is `docs/boot-time-table.md`'s; the groups the tests below read:
+
+| group | n | median (s) | range (s) |
+|---|---:|---:|---|
+| `loader.booting`, cold | 12 | 0.355865 | 0.351504 (`M1-BOOT`) … 0.356368 |
+| `loader.booting`, warm | 13 | 0.356060 | 0.355618 … 0.356981 |
+| rlxfw quiet, `J` → prompt | 8 | 10.792753 | 10.790948 … 10.795582 |
+| rlxfw loud, `J` → prompt | 3 | 12.535714 | 12.534490 … 12.536925 |
+| rlxfw quiet warm, `kernel.total` | 6 | 9.445702 | 9.445069 … 9.446463 |
+| vendor, `kernel.total` | 9 | 7.098017 | 7.097306 … 7.109743 |
+| vendor, `J` → `boa` | 9 | 26.836990 | 25.851886 (`V7`) … 27.035197 |
+
+* **Inference (iii) holds** (`CLK-43`). Registered before power (card § 3.9): seating B's
+  warm `loader.booting` median (n = 13) and its cold median (n = 12) lie in [0.354469,
+  0.358031] s, 0.35625 × (1 ± 0.005). 量 warm **0.356060**, cold **0.355865** (0.355875
+  without the listen boot). Seating A's raw warm median, 0.347425 s, lies 2.0 % under the
+  band's floor, and its value corrected for the host clock, 0.355963 s, 0.027 % under
+  seating B's: the device's own factor between the days is g = 0.356060 / 0.355963 =
+  1.000273 (card band [0.99580, 1.00581]), so the 2.5 % seating A carried was its host
+  clock, and `CLK-32`'s per-seating factor, 推 in § 5, is the host clock's for these two
+  seatings. f_B = 0.356060 / 0.353718 = 1.006621 (card band [1.002122, 1.012194]). Not
+  shown: that every earlier directory's factor was the host clock's too — § 5's retro fit
+  still says so only as 推.
+* **Card § 3.7's reproduction bands: 67 of 68 medians inside.** The one outside is
+  `rlxfw.setup`, loud, cold (n = 1, `P1L-r01-boot`): 0.293701 s against [0.2757, 0.2827].
+  The read that carried `RLXFW-B09` (byte 1116) returned 15.86 ms after its predecessor, and
+  it and the next two reads delivered bytes 1115–1180 — 66 B, 17.2 ms of line time — within
+  3.18 ms; `kernel.early`, which spans `B00` and `B09`, reads 1.523894 s against the warm
+  boots' 1.524926. The boot ran on schedule and the stamp came late (量 the gap and the
+  backlog; which of the host's scheduler, usbip and the CP2102 held the bytes is 推).
+  Bounded at both ends by the line rate the interval lies in [0.278069, 0.291798] s, inside
+  the band only if `B00` arrived after 1.289105 s — likely, not shown. The smallest margins
+  among the 67: `rlxfw.initpost` loud cold 1.5 ms, `rlxfw.setup` quiet cold 1.8 ms.
+* **Card A's model at the measured f_B** (T = f·(k·0.353718 + Δ)), 4 of 4 inside the card's
+  bands: `p2q` `J` → prompt 10.792753 against its point 10.793163; `p2q` `kernel.total`
+  9.445702 against 9.447251; `p2q` `user.ready` 0.116154, 3.35 ms above 0.112806, the point
+  at card A's registered mid Δ of 67.0 ms; `p2l` `J` → prompt 12.535714 against 12.564847,
+  −0.23 % (推 the model's loud constant is ~29 ms high: seating A's corrected 12.5336–12.5490
+  s sat under its point as well).
+* **The vendor's rules** (own line landmarks, FW-35). Eight boots took the slow `WiFi Simple
+  Config` → `Register to wlan0` step (1.151434–1.163527 s) and reached `boa` at `J` +
+  26.823020…27.035197 s, 8 of 8 inside [26.553, 27.074]; `V7` took the fast one, 0.149520 s,
+  and reached `boa` at 25.851886 s, 1.0078 s under the slow median — the step's own shortfall,
+  1.006803 s, accounts for it to 1.0 ms. Seating A's fast boot was `V4` (0.146649 s), and
+  seating B's `V4` took 1.156723 s: 推 a userspace race tied to neither press nor class, two
+  in eighteen boots. `Init bridge interface...` − `sysconf wlanapp kill wlan0` 0.854441–0.860235
+  s (9 of 9 inside 0.848–0.883); `J BFC00000` → `<RealTek>` 2.300066–2.305369 s (median
+  2.304802, n = 4); `M1`/`M2` `loader.esc` 5.238773 / 5.237828 s.
+* **A console stamp can be 13.5 ms late** (`CLK-44`). Card § 3.7 allowed one FW-35 read
+  quantum, ~1 ms, at each end of an interval, and that is not a bound. Stamps provably late
+  by the line-rate bound (the board sends at most 3,840 B/s, 讀 38,400 8N1): 13.5 ms on
+  `P1L-r01`'s `B09`, 11.3 ms on `V4-BOOT`'s `userinit`, 8.4 ms on `P2Q-r02`'s `nic`, and
+  0.9–6.8 ms on the `---Jump` byte in all 23 typed-`J` captures (量
+  `s111/timing-v/vlate.out`). Reads that stall past 10 ms and then deliver a backlog occur in
+  both seatings (seating A's `P1-EV2-S1` 25.7 ms, `P1-TS3-S1` 20.8 ms). The closing rule's
+  "under 20 ms" criterion rests on the same ~1 ms premise.
+* **`sent_s` is not the send** (`CLK-44`). The loader prints `---Jump to address=` only after
+  it has the line's CR, and that byte reached the host 0.8–6.6 ms before `sent_s` in 23 of
+  23 typed-`J` captures here, and 1.0–6.3 ms before it in 23 of 23 in seating A (量, at
+  ≤ 3,840 B/s; `s111/timing-v/vlate.out`, `seatA/vlate-A.out`). `sent_s` is where `flush()`
+  returned — later than the line left, on this port — and the first read after it carries
+  a backlog of 14–39 B. So `J`'s stamp is at least 0.9–6.8 ms late (1.1–6.4 ms in seating
+  A), and a `J`-anchored interval reads short by that less its far end's own lateness, in
+  both seatings alike: `D3`, which compares them, does not move. `SEG+`, the first read's
+  arrival minus `sent_s`, reads 60–122 µs in 18 of 19 boots and 375 µs in `P3Q-r02-boot`
+  (median 85 µs; seating A 61–140 µs): it measures `flush()`'s return to the next read.
+  The control that could have failed: re-stamping `J` at its line-rate bound pulls
+  identical boots together — quiet `rtkload.total`'s spread 4.26 → 0.71 ms (n = 8), the
+  vendor's 5.06 → 1.19 ms (n = 7), loud 2.38 → 0.63 ms (n = 3). This answers § 3.1's
+  殘留; § 7.6 read it the other way (🔄 there).
+
+### 8.6 `D7` holds (`CLK-46`)
+
+量 `s111/timing/checks.out` § 11, second source `timing-v/`. Press 1's `kernel.total`: loud
+`P1L-r01`…`r03` 11.155614, 11.156569, 11.156054 s (median 11.156054); quiet
+`P1Q-r01`…`r04` 9.445737, 9.445107, 9.445667, 9.445802 s (median 9.445702). **Δ = 1.710352
+s**, inside the test band at the measured f_B, [1.398905, 1.979101] s — **holds**; inside card
+A's no-residual range at f_B, [1.648905, 1.729101] (18.7 ms under its top), and inside the
+card's 1.705…1.722 s (1.712433 × g = 1.712900). Every loud boot is 7,948 B with twelve
+`tmpReg[0xe]` fields (e = 0), every quiet boot 2,117 B, and in 12 of 12 pairs ΔB = 5,831 B
+= 810 (`B00` → `B09`) + 5,021 (`B09` → `B10`); the 5,021 splits 1,575 + 2,088 + 1,300 + 58
+over `B09` → `wlan` → `nic` → `fastpath` → `B10`, and every other landmark pair differs by 0.
+The implied rate f_B·ΔB/Δ is 3,431.8 B/s, **89.370 %** of 3,840 (88.782 % at f = 1): inside
+`FW-70`'s 88.4–92.7 % at either f, where seating A's raw 88.325 % fell under it (§ 7.6).
+Against seating A's raw Δ, 1.688630 s, (a) +1.29 %; against its corrected Δ, 1.712433 s,
+(b) −0.12 %. Not established:
+which f belongs in the rate; `FW-70`'s range was itself measured on host clocks of unknown
+rate.
+
+### 8.7 `D8` (`CLK-47`)
+
+Card § 3.4's rules over `hostprobe` 1.3's RAW ledger (量 `s111/netup/`; its second source
+`netup-v/`, with its own parsers, equals it to 1 µs on 71 of 72 shared ids, and the one
+difference — one `b3-fail` value the primary read 1.58 ms late, because two error lines
+arrived in two reads — is settled in the second source's favour). `J` is the loader's jump landmark and
+every figure is seconds after it on RAW. Frames: `P1-TCPD` and `P3-TCPD` (1,859 and 1,192
+frames, 0 dropped), placed on RAW by `tools/hostclock.py convert` against `Z0-HC` (0 of
+3,051 stamps refused); no reply was read before its frame (753 in `P1`, 474 in `P3`).
+
+* **Channel offset: the test fires again.** 15 `udp` events on port 50000, each `len=10`, one
+  per `P1-OFF` cell; offset = t_udp − t_console (byte 66). Over `OFF02`–`OFF15` (n = 14):
+  read stamps −277.4…+215.2 µs, range **492.6 µs**; kernel stamps (`t_raw − lag_ms/1000`)
+  −545.4…−94.6 µs, range **450.8 µs**; both over 260.4 µs, as the card predicted (seating A
+  701.0 / 896.4 µs). The kernel stamp precedes the console's read of byte 66 in all 14.
+  Network up stays a console-side bound.
+
+| round | class | NIC → `N-NDOPEN` | `J` → `N-NDOPEN` | first reply | k | width, card rule (mid) | width, frames |
+|---|---|---:|---:|---:|---|---:|---:|
+| `P1L-r01` | loud, cold | 4.511256 | 12.503737 | 13.230903 | 3 (frames) | 0.713143 | 0.7150 |
+| `P1L-r02` | loud, warm | 4.511009 | 12.504668 | 13.281312 | 3 (frames) | 0.738561 | 0.7662 |
+| `P1L-r03` | loud, warm | 4.510966 | 12.505901 | 13.262704 | 3 (frames) | 0.719894 | 0.7449 |
+| `P1Q-r01` | quiet, warm | 4.111323 | 10.761850 | 10.876994 | 2 (frames) | 0.117001 | 0.1050 |
+| `P1Q-r02` | quiet, warm | 4.111984 | 10.760967 | 10.845176 | 2 (frames) | 0.082275 | 0.0778 |
+| `P1Q-r03` | quiet, warm | 4.111742 | 10.763234 | 10.897048 | 2 (frames) | 0.134960 | 0.1276 |
+| `P1Q-r04` | quiet, warm | 4.112900 | 10.763097 | 10.840007 | 2 (frames) | 0.081153 | 0.0715 |
+| `P2Q-r01` | quiet, cold | 4.111776 | 10.764227 | 10.884312 | 2 (ledger) | 0.094550 | — |
+| `P2Q-r02` | quiet, warm | 4.102999 | 10.762463 | 10.904706 | 2 (ledger) | 0.130450 | — |
+| `P3Q-r01` | quiet, cold | 4.111394 | 10.760109 | 10.869487 | 2 (frames) | 0.114647 | 0.1031 |
+| `P3Q-r02` | quiet, warm | 4.111886 | 10.761901 | 10.910604 | 2 (frames) | 0.129736 | 0.1449 |
+
+* **rlxfw: both images answered in every round**, 11 of 11 before the next reset (1.967–2.702
+  s ahead of it where one followed: the 2.5 s dwell, `FW-127`, was enough); `--neigh` read
+  `INCOMPLETE` at all 11 jumps, and every lower edge is `N-NDOPEN`. Quiet: the `is-at` follows
+  the cycle's second who-has in 6 of 6 framed boots, and `N-NDOPEN` leads that #2 by
+  0.0715–0.1449 s. **Loud, the first reading**: the `is-at` follows the cycle's **third**
+  who-has, 2.8–3.6 ms after it, in 3 of 3; #2 came 0.258–0.309 s before `N-NDOPEN` and went
+  unanswered — the k = 3 the 107th segment inferred from seating A's timing (§ 7.3). First
+  reply `J` + 13.230903…13.281312 s; bracket [`N-NDOPEN`, #3], 0.715–0.766 s wide by frames.
+* **What the board decides reproduces seating A's corrected values**: on `J` → NIC, `J` →
+  `N-NDOPEN`, NIC → `N-NDOPEN` and `J` → `lan up`, `D3` (b) −0.16…+0.02 % and (a)
+  +1.25…+2.48 %, the host clock seating A carried. NIC → `N-NDOPEN` is 4.102999–4.112900 s
+  quiet (n = 8, median 4.111759) and 4.510966–4.511256 s loud (n = 3, median 4.511009): the
+  medians lie within 0.6 ms of seating A's corrected ones, 4.111872 and 4.511570, and
+  `P2Q-r02`'s 4.102999 lies 8.9 ms under the quiet one. § 7.3's NIC+4.01–4.05 / 4.45 s
+  were slow-clock values (🔄 there). The lead of `N-NDOPEN` over the quiet image's #2 is
+  the host's ARP phase against the board and moved between the days: 0.0715–0.1449 s here
+  by frames, 0.13–0.22 s in seating A's ledger on its own clock (量
+  `s111/netup/netup-A.out`; 推 the slow clock stretching the host's ARP schedule,
+  untested). The host's first who-has after the NIC probe is the next cycle's #1, at
+  NIC+3.180–3.233 s (9 of 9), and its #2 at NIC+4.184–4.257 s.
+* **The vendor answered on a cycle's first broadcast in 9 of 9** (seating A: the third in
+  five, the first in four), by the ledger's reconstruction: no capture ran on a vendor
+  press. First reply `J` + 15.725381…15.781849 s, a 56 ms spread where seating A's was
+  1.16 s. Each answered who-has opened the cycle after a failed one and was
+  answered in 2–5 ms; the failed cycle's #3, reconstructed at `J` + 14.628…14.746, went
+  unanswered in all nine. The phase is set by the carrier loss at the vendor's NIC probe (one
+  purged cycle per boot, then failed cycles from `J` + 6.45–6.52). 推 seating A's five/four
+  split is its slow host clock stretching the ~9 s of host ARP timers after the NIC probe by
+  ~0.2 s of true time; not tested. `Start NTP daemon` reached the host at `J` +
+  14.852597…14.926873 s, (b) −1.07…+0.10 % against seating A.
+* **Inference (i): not refuted, 9 of 9.** The window `Start NTP daemon` − 0.116…−0.075 s lies
+  inside every bracket [the failed cycle's #3, the answered #1], each 1.03–1.10 s wide; the
+  window's upper end falls 0.055–0.146 s after the latest possible lower edge. A weak test:
+  refuting it needed the vendor to answer a #3 at least 55 ms later than the reconstruction
+  allows.
+* **Where the card's reconstruction was too narrow** (量 the frames). #1 → #2 on the wire ran
+  1.001240–1.033472 s (n = 47), 8 of them above the rule's 1.028; #2 → #3 1.019934–1.027979
+  s (n = 36); #3 − T1 reached 2.0575 s against the rule's 2.056. `P3Q-r02`'s answered #2
+  lies 1.2 ms past its reconstructed upper edge; no verdict moved. The card's fixed 5.0 ms
+  from the answered broadcast to the reply's read is not a constant: 3.780–10.128 ms quiet,
+  10.490–12.149 ms loud (推 the loud image's console load). An `icmp-reply` line carries no
+  `lag_ms`, so the card's second stamp for a reply does not exist; `ping -D` stamps the
+  printing of the line, 0.056–0.215 ms after the echo-reply frame.
+* **Broadcasts missing from the wire.** Of those the ledger implies, 107 of 158 reached the
+  wire in `P1` and 31 of 42 in `P3` (seating A's `P3`: 31 of 42 too); the missing ones are
+  exactly the cycle opened ~0.1 s after each NIC probe and the five after each reset (推
+  carrier loss; no carrier log was kept).
+* **The host clock under these windows** (§ 8.2): named affected by card § 3.8, at no more
+  than +46 ppm — ≤ 0.05 ms on a 1 s retransmit and ≤ 0.2 ms on NIC → #2, under the
+  reconstruction's ±14–28 ms. `tools/boot-timeline.py --probe` reads no network up for 7 of
+  the 11 rlxfw rounds: it counts only events inside the capture's window, and the first reply
+  comes in the dwell after the prompt (`FW-137`); where it reads, it equals this join to the
+  microsecond.
+
+### 8.8 `D4`, `D6` and inference (ii) (`NET-118`, `MEM-20`)
+
+The vendor's readiness (量 `s111/services/`, second source `services-v/`); `hostprobe` 1.3
+tried 80, 52869 and 52881 every 0.2 s each; seconds after `J`, on RAW:
+
+| boot | class | first ICMP reply | first `tcp:80` ok | `boa: starting server` | ok − line | first `tcp:52881` ok | first `tcp:52869` ok | `MiniIGD` line |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `V1` | cold | 15.741339 | 27.020731 | 26.971659 | +0.049072 | 17.421601 | 32.421049 | 23.194764 |
+| `V2` | cold | 15.747473 | 26.872633 | 26.882316 | −0.009683 | 17.273567 | 32.273124 | 23.091256 |
+| `V3` | cold | 15.771203 | 26.875883 | 26.828089 | +0.047794 | 17.272929 | 32.272360 | 23.044914 |
+| `V4` | warm | 15.781849 | 26.818717 | 26.823020 | −0.004303 | 17.219634 | 32.219094 | 23.045880 |
+| `V5` | warm | 15.747125 | 27.095343 | 27.035197 | +0.060146 | 17.296168 | 32.495463 | 23.250394 |
+| `V6` | warm | 15.749031 | 26.868374 | 26.958244 | −0.089870 | 17.268969 | 32.268255 | 23.173328 |
+| `V7` | warm | 15.725381 | 25.873200 | 25.851886 | +0.021314 | 17.274216 | 31.273790 | 22.066864 |
+| `M1` | listen, cold | 15.771420 | 26.878518 | 26.834309 | +0.044209 | 17.079865 | 32.278574 | 23.040289 |
+| `M2` | listen, warm | 15.740246 | 26.834073 | 26.836990 | −0.002917 | 17.236483 | 32.235122 | 23.046628 |
+
+* **Card § 3.6.** The first port-80 success within ±0.14 s of `boa: starting server` in 9 of
+  9 (−0.089870…+0.060146; after the line in five, before it in four); inside the slow-step
+  band `J` + 26.53…27.08 s in 7 of 8, `V5` 15.3 ms past it at 27.095343 (the band is seating
+  A's eight-boot extreme × g, not a bound on the next boot); the fast boot `V7` inside `J` +
+  25.72…26.01; the first ICMP reply ahead of it by 10.4–12.2 s in 8 of 9, `V7` at 10.147819 s,
+  where the fast step met the late ARP phase every seating-B boot had — a pair seating A did
+  not sample. `D3` on the load-bearing rows: `D4|p80|cold` 26.875883 s, (a) +2.31 %, (b)
+  +0.07 %; `D4|p80|warm` 26.843546 s (the exact median, 26.8435455; the primary's float read
+  26.843545), (a) +2.65 %, (b) +0.10 %.
+* **Inference (ii): not refuted, and now the only fit.** Per boot the window is (last refused
+  connect start, first ok start + 1 ms] less the FW-35 time of `boa: server version`'s first
+  byte — s106's rule, whose + 1 ms § 7.5 and § 7.7 do not state (without it seating A's
+  nine intersect in (−0.127283, −0.112008]; no verdict moves). 0 of 9 windows exclude
+  (−0.1273, −0.1110]; seating B's nine intersect in (−0.117471, −0.067905], and the eighteen
+  of both seatings in **(−0.117471, −0.111008]**, 6.5 ms: `boa` listens 0.111–0.117 s before
+  that line reaches the host, if one offset holds for all eighteen. Of the 41 console lines
+  present exactly once in all 18 vendor captures, eleven give port 80 a single-offset fit on
+  seating B alone (among them `Register to wlan0` and `MiniIGD`), and across both days only
+  the three `boa` lines do: `server version` (−0.117471, −0.111008], `server built`
+  (−0.128385, −0.121603], `starting server` (−0.141224, −0.134056] (量
+  `s111/services-v/linescan.out`). Timing, not a mechanism: that `boa` listens before it
+  prints stays 推.
+* **52881, 推 not `miniigd`'s** (`NET-118`). Its first success comes at `J` +
+  17.079865…17.421601 s (median 17.272929), 4.79–5.96 s *before* the `MiniIGD v1.09.1` line
+  in 9 of 9, and its listen windows fit one offset from the `WiFi Simple Config
+  v2.18-wps1.0` line, (−0.018571, +0.011910] s (+0.012910] with the + 1 ms), and none from
+  `Register to wlan0`, `MiniIGD` or the `boa` lines. 讀 the SDK tree:
+  `src-vendor/rtl819x-toolchain/linux-2.6.30/net/bridge/br_input.c` has `#define
+  RTK_WPS_LISTEN_PORT 52881`; the vendor's rootfs starts `/bin/wscd` through `sysconf
+  wlanapp` (讀 `s111/feature-table/FEATURES.md`). 推 52881 is the WPS daemon `wscd`'s
+  listener: the SDK is a related drop, not TOTOLINK's build, and neither the unit's `wscd`
+  nor a boot with `wscd` stopped has been read. § 7.5 gave it to `miniigd` (🔄 there).
+* **52869, 推 `miniigd`'s.** First success at `J` + 31.273790…32.495463 s (median 32.272360),
+  9.09–9.25 s after the `MiniIGD` line. Its windows fit one offset from each of three lines —
+  `Register to wlan0` (13.870540, 13.898714], `MiniIGD` (9.043636, 9.093208], `boa: server
+  version` (5.282586, 5.332085] — so timing cannot choose; `V7`'s fast step moves all three.
+  讀 the same tree: `linux-2.6.30/net/ipv4/ip_input.c`, `if (hdr->dest == 52869) // IGD
+  port`, and `users/script/picsdesc.xml`'s `URLBase` on port 52869.
+* **The census** (量). `V1-NMAP`: open 80, 52869, 52881 (as predicted), 65,532 closed, 0
+  filtered (seating A 65,381 and 151). `P1-NMAP`: none open (as predicted), 57,296 closed,
+  8,239 filtered (seating A 58,989 and 6,546); what the filtered ports are is `notes/nic-driver.md`
+  § 21's (`NET-120`). `P1-PS`: `/bin/sh`, the kernel threads and `ps`, as in seating A; `ps`
+  is PID 20 against seating A's 18 (推 the two `cat`s of `P1-TK0`, a cell seating A did not
+  have).
+* **`D6`** (`MEM-20`; 量 `P1-FREE`, `p2q`). `MemTotal` 26,984 kB (the exact prediction);
+  `MemFree` 20,924 kB (seating A 20,932, −0.04 %); `busybox free` total/used/free 26,984 /
+  6,028 / 20,956 kB (seating A used 6,012). `busybox free` runs first in the same send, and
+  its `free` column reads 32 kB above `/proc/meminfo`'s `MemFree` (seating A 40 kB). One
+  reading after one boot sequence, not a steady state.
+
+### 8.9 `D3`: `P2`'s table is reproduced (`CLK-48`)
+
+The contract is `docs/boot-time-d3-list.tsv`, committed at `76deef8` before any seating-B
+value of a listed number was read: 294 rows generated from seating-A files only, with the
+rulings R1–R6 in its `adjudication` column. The closing rule is `PROGRESS.md`'s (`P2`,
+*Refutation conditions*), committed at `e2f15ff` before any seating-B interval was computed.
+Per number: (a) seating B against seating A raw, (b) against seating A corrected, a hit when
+both lie within ±10 %; (c), each over its seating's warm `loader.booting` median, is
+published and decides nothing. Two scorers wrote their verdicts from the same B values
+independently (`s111/score-S1/`, `score-S2/`) and a third, in exact fractions
+(`score-judge/final.py`), agrees with both on every row; the B values' own second sources
+are the `-v` directories above. The judge's controls: a planted miss on a load-bearing row
+turns the verdict to "stays open", and +10 % exactly scores a hit where 1e-9 past it scores a
+miss. The score is `docs/boot-time-d3-score.tsv`, and the table `P2` exists to publish is
+`docs/boot-time-table.md`.
+
+| verdict | rows |
+|---|---:|
+| stable, hit | 134 |
+| stable, miss | 6 |
+| exact, hit | 27 |
+| exact, miss | 2 |
+| not stable, inside ±10 % | 43 |
+| not stable, outside ±10 % | 43 |
+| not stable, no ratio | 19 |
+| not stable, no seating-B value | 5 |
+| first reading (no seating-A value) | 15 |
+
+* **No stable miss on a load-bearing row.** Nothing falls on a row of the segmented table
+  or on `D7`'s Δ, so rule (2) keeps nothing open. The 114 stable board rows hit with (a)
+  +1.10…+6.71 % and (b) −1.10…+5.23 %; without the one stalled read of § 8.5 (`rlxfw.setup`,
+  loud, cold, whose |a| 6.712 % and |b| 5.229 % are the largest on a load-bearing row), (a)
+  +1.10…+3.58 % and (b) −1.10…+0.98 %. Column (a) carries seating A's slow host clock by
+  construction; column (b) is seating A's correction checked against an unslewed clock.
+  `D7`'s Δ: (a) +1.29 %, (b) −0.12 %. The stable hit closest to the edge is
+  `D5b|eth4|ER|cpu`, −8.214 %, of which ~3.3 points are the longer `/proc/stat` bracket (every
+  seating-B `eth4` window is 3.1–3.4 % longer, and idle).
+* **The six stable misses**, published with both columns as not reproduced (rule (3)) and
+  carried forward as `D3-MISS`, each with the experiment that decides it:
+  * `D8|width|quiet|cold`, (a) −44.30 %, (b) +13.71 %: a defect of the list. Seating A's
+    value is one boot, `P2Q-r01`, stable by n = 1, and its raw and corrected values differ
+    ×2.04, so the two ±10 % windows, [0.169, 0.207] and [0.083, 0.101] s, are disjoint and
+    no seating-B value could hit both; (b) misses on the reconstruction's midpoint (±14 ms
+    against a ±9.2 ms band), and `P3Q-r01`'s frame puts its #2 11.5 ms before that midpoint.
+    Experiment: a third day on RAW, B compared with C.
+  * `D5a|rlxfw|256|avg` +18.05 %, `D5a|rlxfw|1472|avg` +12.16 %, `D5a|rlxfw|1472|mdev`
+    +16.60 % (realtime, so (a) = (b)): rlxfw's rtt rose 12–18 % while the vendor's fell 12–26 %
+    against seating A. The capture's own stamps agree with `ping`'s to 0.043 ms, so `ping`'s
+    userspace is not the cause; split by whether `tcpdump` ran, rlxfw's 256 B and 1,472 B
+    averages moved +7.2 % and +9.9 % without it and +13.5 % and +19.7 % with it (n = 1–2 per
+    stratum). Experiment: the same ICMP series with and without the host capture inside one
+    boot — `R6b`'s, whose regression re-measures ICMP (`NET-121`, `notes/nic-driver.md`
+    § 20).
+  * `NET109|crcalignerr` and `NET109|p3egress`, 294 → 414 (+40.8 %): a run length, not a
+    device quantity. In both seatings the count is the echo replies `P1-HP` drew inside the
+    last boot plus two (量: 412 + 2 here, `P1-TCPD` holding 412 echo replies, one ARP reply
+    and one ARP request; 292 + 2 in seating A), and the list's n = 1 rule made it stable. The
+    property the rows stand for held: `CRCAlignErr` − port-3 egress 0 in both seatings, 414 =
+    414. Experiment: none — redefine the row as that per-echo identity.
+* **The two exact misses** are `P2-M0`'s 3,009 B and its digest (§ 8.1): the capture tool's
+  tail, an instrument miss (`FW-136`), not a device quantity.
+
+### 8.10 What seating B does not establish
+
+* That any number is stable beyond two samples: a hit says the second day landed within
+  ±10 % of the first, and `D3`'s verdict is a statement about the frozen list only.
+* RAW's rate against true time. The clock log ran `--no-sntp --no-windows`, so the board's
+  post-loss 100.002869 ticks per RAW second cannot be split between RAW and the board
+  (§ 8.3), and the WSL boot has ended.
+* What held the stalled reads (15.86 ms on `P1L-r01`'s `B09`, 5.39 ms on `M1-BOOT`'s anchor):
+  the host's scheduler, usbip and the CP2102 were not told apart; nor that `M1`'s late read
+  is no property of listen mode (n = 1 in each seating).
+* Which cell cost the jiffies, or why TC0 lost fewer: the `asicCounter` read is 推 (§ 8.3),
+  and the board-timed waits exclude a loss inside them only if they run on jiffies.
+* Where inside its bracket either firmware's network came up. The vendor's brackets rest on a
+  reconstruction no frame checks, and the rlxfw frames show it too narrow by up to 5.5 ms for
+  #2; the channel offset is measured on rlxfw only.
+* That the vendor's k = 1 in 9 of 9 belongs to the vendor rather than to this host's timers.
+* Which daemon owns 52881 or 52869 on this unit (timing and a related SDK drop, 推); that any
+  daemon serves (`tcp ok` is a completed handshake); anything about the vendor's UDP daemons.
+* Which f belongs in `D7`'s implied rate; how often the vendor's fast WSC step happens (two
+  in eighteen boots).
+* That no flash byte was written: the maps compare 32 digests over 4,186,112 B of 4,194,304,
+  cannot see two writes that cancel, and do not read `H601`.
+* Windows' own rate during the seating, and that its slew after the wake drove the guest's
+  +0.257030 s (推, § 8.2).

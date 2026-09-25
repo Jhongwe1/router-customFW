@@ -205,8 +205,8 @@ agree: name the tool that could be lying and the second source that settles it.
   `--idle` must exceed the longest silence the payload can produce, a leading
   `sleep` included. When a duration cannot be predicted or a long silence is
   expected — a pending watchdog bite keeps the console silent until it bites
-  (41.9 s at `OVSEL` 8) — use `--until PATTERN` with a `--seconds` cap; it drains
-  only 50 ms after its match.
+  (41.9 s at `OVSEL` 8) — use `--until PATTERN` with a `--seconds` cap. It reads
+  on 0–50 ms, or ~150 ms after an `--esc-after` match; gate on no byte past it.
 - `cardcheck` refuses any command not in the image's measured command table
   (`config/image-commands.tsv`): there is no `dd` and no `md5sum`. This image's
   `ping` ignores `-c`.

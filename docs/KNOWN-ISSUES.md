@@ -1135,7 +1135,7 @@ a prediction the seating will score.
 | ⚠️ **That the builds between `R3-2` (2026-08-29) and 2026-09-23 wrote nothing into a vendor tree** (`FW-122`). The trees are git-clean today; a write undone since, or a touch that moved only an mtime, is invisible to any check made now | Nothing can, for the past; every build since is watched |
 | ⚠️ **That `D2`'s same-mode design removes the confound it was built for.** The vendor is now started by `J 80500000` from a caught prompt, so both columns stream ESC; whether listen-vs-ESC matters at all is what `M1`/`M2` measure, n = 1 each | `P2-3`'s `Z9-D2`, then seating B |
 | ⚠️ **`D8` below one second.** With the host's entry flushed before each boot, network up is a bracket one ARP retransmit wide (1.00–1.09 s), and the channel offset is predicted to fail the one-byte criterion on console quantisation alone (~1 ms). Narrower needs a host setting or an `arping` loop, and that is the owner's choice | Seating B, if the owner wants it narrower |
-| ⚠️ **The vendor's per-daemon readiness beyond `boa`.** `miniigd`'s port is configured, not compiled in, so card A probes TCP 80 only and takes the port list from one census | Seating B's card, with `V1-NMAP`'s list |
+| ✅ **The vendor's per-daemon readiness beyond `boa`** — read 2026-09-25 (111th segment): seating B's card probed 80, 52869 and 52881 every 0.2 s, the list `V1-NMAP` gave; the first success on 52881 came at J+17.08–17.42 s and on 52869 at J+31.27–32.50 s in 9 of 9 vendor boots, 推 `wscd`'s and `miniigd`'s (`NET-118`, `notes/boot-time.md` § 8.8). *(Was: `miniigd`'s port is configured, not compiled in, so card A probed TCP 80 only.)* | Which daemon owns each port on this unit, beyond timing and a related SDK drop: nothing planned |
 
 🟢 **What it did establish**: the build path now refuses an image whose
 declaration was never checked (`FW-121`), assembles every image under the
@@ -1150,8 +1150,11 @@ cannot carry a host probe record `capdate` cannot date (`hostprobe` 1.2).
 `rlx0`, six never completed their end-of-test exchange and three could not
 connect (`No route to host`); on the same hardware and kernel the vendor driver
 completed all twelve (`notes/nic-driver.md` § 19, `NET-111`, `NET-114`). The
-switch's own counters say why: every frame that entered port 3 reached the driver
-(346,724 = 346,724), and at least 182 frames the driver handed to the engine never
+switch's own counters say why: no receive loss the counters can resolve (346,724 =
+346,724; 🔄 111th segment: "every frame that entered port 3 reached the driver" until
+seating B's same comparison read +2 frames and +134 B across a handover, so the method
+bounds a receive loss and cannot show it zero, `notes/nic-driver.md` § 20.4), and at
+least 182 frames the driver handed to the engine never
 left port 3 (`NET-112`) — the iperf3 server's results, retransmitted and never
 acknowledged, and the answers to the host's ARP. `recover` arms only when four TX
 descriptors are engine-owned and a fifth frame is offered, so a loss in which the
@@ -1160,9 +1163,14 @@ engine clears OWN never triggers it (`NET-113`).
 **What depends on it**: any use of `rlx0` that ends a transfer with a small reply —
 a TCP session's close, a request/response, ARP after heavy traffic — can hang
 until something else fills the TX ring. A throughput figure from `rlx0` is valid
-only while data flows, and `P2`'s rlxfw receive figure has n = 0 (no `receiver`
-line exists). **What settles the mechanism**: § 19.5's experiments E0–E5, zero
-flash, one power press.
+only while data flows, and `P2`'s rlxfw receive figure has n = 1: `TR1`'s 16.953
+Mbit/s, read in seating B from the board's own server log, the host having no
+`receiver` line (`NET-116`; 🔄 111th segment: "n = 0 (no `receiver` line exists)"
+until then). **What settles the mechanism**: § 19.5's experiments E0–E5, zero
+flash, one power press. 🔄 111th segment: block 45, `R6b`'s first bench block, ran
+E1–E6 and E10 and placed the loss in frames of lengths the engine was not given
+(`NET-119`); the mechanism is `R6b`'s, its eight candidates all 推
+(`notes/nic-driver.md` § 21).
 
 ## 🔴 What seating 39 did NOT establish — 2026-09-23 (the one hundred and fifth segment)
 
@@ -1175,14 +1183,14 @@ mode control inside ±10 ms both cold and warm.
 
 | what is not established | what would settle it |
 |---|---|
-| 🔴 **Whose clock carries `CLK-32`'s factor.** 🔄 2026-09-23 (106th segment): inside seating A it is the host — four independent references put its `CLOCK_MONOTONIC` 1.4 % slow at 15:52 and 3.1 % by 18:10, and corrected for it the loader does not drift (`CLK-35`); the host's tick is being slewed while `timesyncd` steps realtime (`CLK-38`) — 🔄 107th segment: by WSL's own `chronyd`, which steers the guest to Windows' clock while `timesyncd` pulls it to NTP; stopping `timesyncd` ended the slew. 🔄 108th segment: `timesyncd` slews as well as steps — through the kernel PLL while its offset is small, a third rate term that ran `CLOCK_MONOTONIC` up to 2.8 % fast (`CLK-39`) — and steps only above about 0.4 s. For earlier seatings it stays 推: the pre-registered retro test failed its own control and did not test it (`CLK-32`) | Seating B stamped on `CLOCK_MONOTONIC_RAW` (`P2-4`): the loader's `booting` within ~±0.5 % of 0.35625 s |
+| ✅ **Whose clock carries `CLK-32`'s factor, for seatings A and B** — settled 2026-09-25 (111th segment): the host's. Seating B, stamped on `CLOCK_MONOTONIC_RAW` with `timesyncd` stopped, put the loader's `booting` at 0.356060 s warm (n 13) and 0.355865 s cold (n 12), inside the registered ±0.5 % of 0.35625 s (`CLK-43`). How seating A's came about: 🔄 2026-09-23 (106th segment): inside seating A it is the host — four independent references put its `CLOCK_MONOTONIC` 1.4 % slow at 15:52 and 3.1 % by 18:10, and corrected for it the loader does not drift (`CLK-35`); the host's tick is being slewed while `timesyncd` steps realtime (`CLK-38`) — 🔄 107th segment: by WSL's own `chronyd`, which steers the guest to Windows' clock while `timesyncd` pulls it to NTP; stopping `timesyncd` ended the slew. 🔄 108th segment: `timesyncd` slews as well as steps — through the kernel PLL while its offset is small, a third rate term that ran `CLOCK_MONOTONIC` up to 2.8 % fast (`CLK-39`) — and steps only above about 0.4 s. For earlier seatings it stays 推: the pre-registered retro test failed its own control and did not test it (`CLK-32`) | For earlier seatings: nothing planned |
 | ✅ **`D2` corrected for that clock** — settled 2026-09-23 (106th segment): warm +0.19 ms, cold +0.15 ms, `D2` holds raw and corrected (`CLK-34`, `notes/boot-time.md` § 7.1) | — |
-| 🔴 **Where below the DMA engine `rlx0`'s frames are lost, and why** (`NET-112`) | § 19.5's E1 and E2 |
-| ⚠️ **rlxfw's receive throughput.** No `rlx0` board-receive trial produced a `receiver` line | A driver that completes the exchange, or a trial scored on the server's own report |
+| 🔴 **Why `rlx0`'s frames are lost below the DMA engine** (`NET-112`). 🔄 2026-09-25 (111th segment): block 45 ran E1 and E2 and placed it — the engine hands the switch frames of lengths it was not given, 678 `JabberErr` at the CPU port in E2, while 60- and 1,514-B replies went through clean (`NET-119`, `notes/nic-driver.md` § 21.2). *(Was: where below the DMA engine, and why.)* | `R6b`: the eight candidates of `notes/nic-driver.md` § 21.6, all 推 |
+| ⚠️ **rlxfw's receive throughput, beyond n = 1.** 🔄 2026-09-25 (111th segment): the server's own report was read — seating B's `TR1` logged 16.953 Mbit/s received over 30.01 s on `rlx0` (`NET-116`), one trial; the host still has no `receiver` line, and the UDP trials lost 86.6–87.8 % above the driver (`NET-117`). *(Was: no `rlx0` board-receive trial produced a `receiver` line.)* | A driver that completes the exchange; more trials scored on the server's own report (`R6b`'s regression) |
 | ✅ **`D7`, § 3.7's segments, and the vendor's `J` → `boa` miss** — second-sourced 2026-09-23 (106th segment): a parser sharing no code with the tool agrees to the microsecond; four statements of the first computation corrected (`CLK-37`, `notes/boot-time.md` § 7.6) | — |
 | ✅ **The vendor's `D8`, `D4` readiness beyond `V1`, and `P3-TCPD`'s check of the `D8` reconstruction** — computed 2026-09-23 (106th segment) for all nine vendor boots; the reconstruction holds on the one frame-checked boot, with four stated limits (`notes/boot-time.md` §§ 7.3, 7.5, 7.7) | Two inferences it left are seating B's tests (§ 7.7) |
 | ⚠️ **Anything from `P1-UR3` on `rlx0`, cleanly**: the host re-attach bounced port 3's link first (`bench/2026-09-23/CORRECTIONS-block42.md` § 5.1) | Seating B |
-| ⚠️ **`D3`** | `P2-4`, on another calendar day |
+| ✅ **`D3`** — settled 2026-09-25 (111th segment): on a second calendar day 134 of the 140 numbers the frozen list called stable reproduced within ±10 % on both columns, and none of the six misses is a row of the segmented table or `D7`'s Δ (`CLK-48`, `docs/boot-time-table.md` § 10); the six are carried as `D3-MISS` | — |
 
 ## 🟢 `cardcheck` refuses a HOST cell its own tool rejects — closed 2026-09-24 (`P2-4`, `FW-124`)
 

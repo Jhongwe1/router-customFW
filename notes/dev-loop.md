@@ -1490,9 +1490,14 @@ control, a planted run without a dwell that `W2`'s reading must fail; `F1`/`F2` 
 without RAW. The builder's 23 mutants were each killed, and lines 582–600 and
 1003, which tracked prose cites, did not move.
 
-**What this does not establish:** that `S9` runs on the board, where its anchor
-is the prompt plus `console-capture`'s 50 ms drain plus its exit; that 2.5 s is
-enough on another day; RAW's accuracy against true time.
+**What this does not establish:** that 2.5 s is enough beyond seating B, whose
+first replies came 1.967–2.702 s before the next reset (`FW-127`); RAW's
+accuracy against true time. On the board `S9`'s anchor is the prompt plus
+`console-capture`'s 0–50 ms read-on (§ 20.1) plus its exit. 量 seating B ran `S9`
+in all 11 rounds, each row `ok` and 2.4846–2.4895 s long, ending 2.5001–2.5005 s
+after `S7`'s end (`bench/2026-09-25/P*.stages.tsv`). (🔄 111th segment: "that
+`S9` runs on the board" and "the prompt plus `console-capture`'s 50 ms drain" were
+this paragraph's until seating B ran it and § 20.1 measured the read-on.)
 
 ### 19.2 🆕 2026-09-24 (`P2-4`, desk): `looptime` — each gap on the best clock two captures share, and seating A read (`FW-130`)
 
@@ -1523,3 +1528,240 @@ in 2026-09-10, so what they are is not settled (`docs/FINDINGS.md`).
 rule rides REALTIME, which the time daemons stepped 151 times in one night
 (§ 7.9 of `notes/boot-time.md`); the raw rule on a real seating (no seating has
 RAW captures yet).
+
+
+## 20. 🆕 2026-09-25 (`P2-4`, desk): five instrument defects seating B exposed — bytes after a match, events after a window, the rest of a line, and a comment (`FW-135`–`FW-139`)
+
+Found while reading seating B (`bench/2026-09-25`) and block 45
+(`bench/2026-09-25b`) for `P2-4`'s record. None moves a device value. One refused
+a gate (`P2-MB0`, § 20.2) and one decides which join `D8` can be read with
+(§ 20.3); the other three are a rule, two reasons and a comment that say
+something other than what the code does. The seating's own account is
+`notes/boot-time.md` § 8.
+
+### 20.1 `console-capture --until` reads on after its match for 0–50 ms, ~150 ms or ~2.1 s, by path (`FW-135`)
+
+讀 `tools/console-capture.py` 1.5: `drain(budget)` reads until a RAW deadline set
+when it is entered; it records the match (`until_at`) and never returns early.
+What follows the match depends on the loop it lands in:
+
+* **the final loop** — every `--until` capture without `--esc-after`, and every
+  `--esc` one, whose search is armed only after the `--esc` window and its CR
+  settle. The loop tests `until_at` only when `drain(0.05)` returns, so the tool
+  reads on for the rest of that read: **0–50 ms**;
+* **a match that ends `--esc-after`'s loop**: the rest of that
+  `drain(esc_period)`, `terminate_esc_line`'s full `drain(0.05)`, the CR, whole
+  50 ms settle reads until `<RealTek>` arrives after the CR or `--cr-settle`
+  (2.0 s by default, clipped to what `--seconds` has left) runs out, then one more
+  `drain(0.05)`: **≈150 ms** when the prompt answers in the first settle read,
+  **≈`--cr-settle` + 0.15 s** when it never answers;
+* a match after `--esc-after`'s loop ran out, in that pre-CR drain or in the
+  settle: the rest of those, plus 50 ms. `--no-cr`, a self-test flag no bench
+  cell has used: the `--esc-after` loop's end plus 50 ms, up to one ESC period
+  more than 50 ms.
+
+On every path the bench has used, **it stops 0–50 ms after the match, or 50 ms
+after `--esc-after`'s CR settles, whichever is later.** The rule `CLAUDE.md`
+carried until this segment, *"it drains only 50 ms after its match"*, is wrong in
+both directions, and `LOG.md`'s 110th-segment entry calls the 50 ms an upper
+bound, which it is not after `--esc-after`.
+
+量 2026-09-25 (desk): `console-capture` run unmodified, as a script, against a pty
+whose writer never stops, on two rigs that share no code. Rig 1 brackets each
+read-on between the last write wholly in the log and the first that is not, and
+checks that the log equals the concatenated writes and `until_offset` the offset
+the pattern was written at; rig 2 takes the last `.timing` row minus the row that
+brought the match, to within its ~1 ms filler period, and checks that every run
+stopped on `--until`.
+
+| path | rig 1 | rig 2 |
+|---|---|---|
+| final loop | 0–50.0 ms, n 40 | 0–48.4 ms, n 40 |
+| `--esc` | 1.0–49.8 ms, n 20 | 6.7–49.5 ms, n 6 |
+| `--esc-after`, the CR answered | 149.7–153.3 ms, n 20 | 150.0–152.1 ms, n 12 |
+| `--esc-after`, the CR never answered | 2.106–2.120 s, n 3 | 2.108–2.111 s, n 3 |
+| `--esc-after` expired, the match in the settle | 1.225–1.322 s, n 5 | — |
+| `--esc-after --no-cr` | — | 49.4–50.6 ms, n 6 |
+
+On the pty the tool exits 0.04–1.21 ms after its last read (rig 2, n 67).
+
+量 seating B, from each capture's `.timing` (a byte's time is the last row at or
+below it, `FW-35`) and `.meta.json`:
+
+* the 39 final-loop `--until` captures: the last read came 0–2.0 ms after the
+  read that completed the match (median 0) — in most of them the board had nothing
+  more to send — and `duration_s` minus that read is 55.6–108.2 ms (median 78.7), a
+  52.7 ms spread: one 50 ms read plus an exit the pty does not have;
+* the 12 that ended `--esc-after` on the match (`P1-RZ`, seven `looprun` `-rz`,
+  `V4`–`V7-WZ`; all `ended_on_until`, all `prompt_seen`): one settle read each
+  (`waited_s` 50.13–50.42 ms), the CR's `<RealTek>` 60.3–62.2 ms after the ESC
+  loop's end, and a read-on of **150.4–152.6 ms** from the recorded fields
+  (the ESC loop's end, plus 0.05 s, plus `waited_s`, plus 0.05 s, minus the match
+  read) plus the CR's write and flush, which no field records. `duration_s` minus
+  the match read is 206.7–215.4 ms.
+
+The exit after the last read is not a constant at the bench: at most 54.4 ms in
+block 45's `D1-K2` (`duration_s` minus its last read) and at most 55.2 ms in
+`P1Q-r04-rz` (`duration_s` minus the computed stop, which cannot be early), and
+larger in others. 推 `ser.close()` on the CP2102 over usbip; it was not timed step
+by step. So `duration_s` does not give a bench read-on.
+
+**What this does not establish:** any capture's stop on the board — no field
+stamps a drain's end, and the bench shows it only as a bound; the CR's write and
+flush time on the CP2102; how far a slewed `CLOCK_MONOTONIC` stretches the last
+`select()` (推 by the slew fraction of 50 ms; the host clock is
+`notes/boot-time.md` § 8.2's); `--no-cr` on the board.
+
+### 20.2 🔴 A byte-exact prediction over an `--until` capture predicts bytes the instrument does not guarantee, and `P2-MB0` refused on one (`FW-136`)
+
+量 seating B: `P2-M0.log` is **3,009 B** and ends `map_lines 32` with no line
+terminator; `P1-M0`, `P3-M0`, seating A's three maps and block 45's `D1-M0` are
+3,013 B and end `map_lines 32\r\n# `. The cell's `--until 'map_lines'` matches the
+field's name, so seven bytes (` 32\r\n# `) follow the match. Reads were arriving
+about every millisecond (`P2-M0`'s last six gaps 0.93–1.18 ms); its last read, at
+13.905489 s, brought `s 32` — the match's last byte and the value — and no read
+followed. In `P1-M0` the terminator came +0.98 ms (`\r\n#`) and +2.00 ms (the
+last space) after the match read, in `P3-M0` +0.97 and +1.93 ms.
+(`bench/2026-09-25/CORRECTIONS-block44.md` § 2's "the four bytes after the match"
+are the last four of the seven that follow it.)
+
+讀 card B's `MB` strips CRs, prints from the first map entry to `map_lines` with
+`sed -n`, and hashes that. GNU `sed` prints an unterminated last line without a
+newline, so the section hashed as 2,620 B instead of 2,621 and the digest read
+`1de86c73…` against the predicted `0927be41…`; `flashmap compare` splits on `\n`
+and needs no terminator, so the other two gates matched. 量 (desk) the control:
+`P1-M0` cut to 3,009 B digests to exactly `1de86c73…`, and `P2-M0` with `\r\n`
+appended to `0927be41…`. **The refusal was the instrument's, not the flash's**:
+the stop is `notes/boot-time.md` § 8.1's, what the maps say about the flash is
+`FLS-31`'s, and the two misses among the 29 exact rows of `D3`'s list,
+`EXACT|map|bytes` and `EXACT|map|body-digest`, are this capture's (§ 8.9
+there). 推 `P2-M0`'s read ended less than ~1 ms after its match read — no field
+stamps it; consistent with that, its `duration_s` minus the match read,
+55.694 ms, is the second smallest of the 39.
+
+Block 45's repair, 量 `bench/2026-09-25b`: `awk 1` before `sha256sum`, which
+restores a missing last newline and changes nothing else, and
+`--until 'map_lines [0-9]+\r\n# '`, which ends on the capture's last byte.
+`D1-M0` read 3,013 B, its match ran 2,997 → 3,013, and `D1-MB0`'s three gates
+matched. 量 (desk) `awk 1` gives `0927be41…` on all seven maps, and planted
+mutations, their verdicts written first, went as written (12 of 12 in one set;
+10 map and 6 read-timing cases in another): a cut inside the value, a deleted or
+duplicated entry, `map_lines 33` and one extra space change the digest; a dropped
+prompt, a dropped CRLF and prompt, and LF-only endings do not.
+
+🔴 **The repair is local to the map cell, and the exposure is not.** Of the 51
+final-loop `--until` captures of seating B and block 45 (39 + 12), five ended
+before the output they belong to: seating B's `P2-M0` (−4 B) and `P1-AC0` (−2 B,
+the `# `), and block 45's `D1-K2` (−4 B), `D1-K4` (−3 B) and `D1-K9` (−1 B). The
+block that repaired the map kept `--until 'CpuEvent'`, a field name eleven bytes
+before the output ends, on its ten `D1-Kk` cells, as card B had on `P1-AC0`.
+Every `CpuEvent 0 pkts` value arrived, and no prediction read the lost bytes. The
+predictions that held rested on the same read: of the 22 captures behind card B
+§ 3.2's `V*-BOOT` 1,789 B (and one of two sha256s, ×7) and `P1-OFFnn` 139 B
+(×15), 13 got their last 1–4 bytes in a read 0.59–1.86 ms after the match read.
+推 with the 50 ms read's phase uniform, about 1.4 of the 51 would be cut; five
+were (Poisson p ≈ 1.4 %). Why is not established: the reads start at the send, so
+for a fixed-length command the phase need not be uniform.
+
+**The rule this leaves: end the pattern on the last byte a gate or a prediction
+reads.** `looprun`'s `S7` pattern does — its match ends on the capture's last byte
+in the 138 committed boots of § 19 and in the 12 rlxfw boots of seating B and
+block 45 — and `S4`'s `<RealTek>` is the prompt itself.
+
+量 (desk): the bench night's planted control
+(`$FWRE_WORK/rebuild/s110/mbcheck.sh`) was meant to change "the first map entry
+line's last hex digit". On CRLF lines `awk` took the CR for the last character,
+replaced it with `0`, and by printing every line added the final newline `P2-M0`
+lacked (3,010 B). The digest changed, so its verdict holds; the mutation was not
+the one described, and it repaired the defect under test.
+
+**What this does not establish:** that the board sent `P2-M0`'s last four bytes
+(推 yes: every sibling got them, and they did not reach `P2-TK1`, the next
+capture, either); that no earlier seating lost bytes this way (none was
+surveyed); any `--until` cell other than the map made safe.
+
+### 20.3 `boot-timeline --probe` counts only what arrived inside the capture, and seven of seating B's eleven first replies did not (`FW-137`)
+
+讀 `tools/boot-timeline.py --probe PREFIX CAPTURE.log` joins one capture with a
+`hostprobe` record and considers only events stamped inside the capture's window,
+0 to `end_raw − t0_raw`; the rest are counted as *outside the capture's window*.
+Its NOTE, that an absent host landmark is *not seen while probing*, prints only
+when the probe did not run over the whole window.
+
+量 seating B: every rlxfw `-boot` capture is `looprun`'s `S7`, which ends on the
+shell prompt, and the first ICMP reply comes after it, in `S9`'s dwell, in **7 of
+the 11 rounds**: all three loud rounds, 0.618–0.642 s after the window closed, and
+four of the eight quiet ones, 1.3–55.7 ms after it. The other four quiet replies
+fell 1.8–51.4 ms inside it. For the seven the tool prints `host net.icmp_first --`
+and `net.up … --` with no NOTE, because the probe ran from before the send to
+31.3–179.7 s into the capture's frame. Where it reads — four rlxfw rounds, and all
+nine vendor boots, whose captures ran on 10.2–11.4 s past their first reply — it
+equals the `D8` join to 1 µs (量, two joins that share no code). So whether a
+quiet round reads at all is decided by tens of milliseconds (推 the host's ARP
+cycle against the moment the prompt's capture closes).
+
+Card B's `D8` rule has no window — *the first ICMP echo reply hostprobe records
+after the boot's jump* — so `--probe` is a second source for it only where it
+reads; `D8` itself is `notes/boot-time.md` § 8.7's. What would settle the tool
+(`R1y`): the join reports the first event after the window with its distance, or
+takes a declared end such as the round's `S9` end. The control is seating B: the
+seven `--` must read the `D8` join's values to 1 µs, and the thirteen that read
+must not move.
+
+**What this does not establish:** anything about the board — every value the
+tool printed is right; that seating A's rounds would read the same way through
+`--probe` (not re-run).
+
+### 20.4 `audit-bench-log`'s `"line"` scope exempts every pattern on any line holding the needle, and two reasons say otherwise (`FW-138`)
+
+讀 `tools/audit-bench-log.py` `allowed()`: a `"line"` entry is `needle in line`,
+a substring test on the whole line, and it returns that entry for every pattern's
+match on the line. The list's header states the scope (*benign ONLY on a line
+containing `needle`*), and the `S-H601=` entry measured its cost on 2026-09-17.
+The two entries `e1be508` added for seating B and block 45 —
+`supports-eeprom-access: no` and the `s105-d2.py` path — end *"Scoped to this
+exact line, so any other `eeprom` still fires"* and *"Scoped to this exact path,
+so any other home path still fires"*. Neither is what the code does.
+
+量 2026-09-25 (desk), the tool run as a script on two probe sets that share no
+code: **12 of 12 widening probes pass silently** (rc 0) — a MAC, a calibration
+word, an IP, a second home path, or an SSID and a password on the needle's line;
+the needle as the prefix of a longer value or embedded mid-line; the path with a
+`.bak` suffix — while **9 of 9 near-miss controls fire** (rc 1): `yes` for `no`,
+`eeprom` on another line, another script's path, another home path on the next
+line. The two real lines stay silent in both sets. Over `ci.yml`'s corpus (5,682
+tracked files of four kinds) each needle sits on exactly one line of one file,
+`D0-ETH.log` and `Z9-D2A.log`, and suppresses one match: today the two rows are
+exactly as wide as those two lines.
+
+What would settle it (`R1y`, proposed only): a scope that must equal the whole
+stripped line, for entries whose reasons say "exact", or reasons that state the
+substring cost as `S-H601=`'s does. The widening probes are the control: under an
+exact-line scope they must fire, and the two real lines must stay silent.
+
+**What this does not establish:** that a future log holding either needle will
+not hide a real hit on the same line; nothing in today's corpus is hidden.
+
+### 20.5 "Case N35 pins it" names the wrong case, and the pointer was copied (`FW-139`)
+
+讀 `tools/console-capture.py`, the final read loop's comment on testing `--until`
+before `--seconds`: *"Case N35 pins it."* `N35` in `tools/test-console-capture.sh`
+is the empty-pattern refusal. The case that pins the order is **`N41`**:
+`--esc-after 4 --seconds 2` with the pattern at 1.0 s, so the final loop is
+entered with the cap already expired and the match already recorded, and only the
+order decides. The comment and both cases arrived in `d765567` (2026-09-09), and
+`N35` has been the empty-pattern case ever since: the pointer was wrong the day it
+was written. `tools/hostprobe.py` copied it on 2026-09-23 (`68f7fe8`),
+*"console-capture's N35, the same rule"*; no check of `hostprobe --self-test` names
+that order (讀, its labels only).
+
+量 2026-09-25 (desk, a clone at `76deef8`):
+`tools/test-console-capture-mutants.py --only U3`, `--until` tested after
+`--seconds`, found the unmutated suite green (77 cases) and the mutant **killed by
+`N41` alone**.
+
+The repair is two comments (`R1y`). No tool reads a comment's case pointer, so
+nothing caught this one and nothing will catch the next.
+
+**What this does not establish:** that any other case pointer in `tools/` is
+right (none was surveyed).

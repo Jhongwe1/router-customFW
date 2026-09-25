@@ -1,0 +1,295 @@
+id	family	class	kind	stable	load_bearing	A_raw_median	A_corr_median	B_n	B_median	a	b	c_raw	c_corr	verdict	edge	closing_rule	S1_verdict	S2_verdict	agreement
+SEG|loader|-|cold|loader.booting	SEG	cold	board	Y	Y	0.347938	0.355962	12	0.355865	+0.022783	-0.000273	-0.002021	-0.000545	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|loader|-|cold|loader.banner	SEG	cold	board	Y	Y	0.572655	0.586127	12	0.585964	+0.023241	-0.000278	-0.001574	-0.000550	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|loader|-|cold|loader.esc	SEG	cold	board	N	Y	5.121936	5.237582	1	5.238773	+0.022811	+0.000227	-0.001994	-0.000045	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+SEG|loader|-|warm|loader.booting	SEG	warm	board	Y	Y	0.347425	0.355963	13	0.356060	+0.024854	+0.000273	+0.000000	+0.000000	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|loader|-|warm|loader.banner	SEG	warm	board	Y	Y	0.582232	0.596025	13	0.596023	+0.023686	-0.000003	-0.001140	-0.000276	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|loader|-|warm|loader.esc	SEG	warm	board	N	Y	5.102142	5.237048	1	5.237828	+0.026594	+0.000149	+0.001697	-0.000124	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|rtkload.decompress	SEG	cold	board	Y	Y	1.231281	1.248637	1	1.248109	+0.013667	-0.000423	-0.010916	-0.000695	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|rtkload.total	SEG	cold	board	Y	Y	1.246918	1.264494	1	1.260637	+0.011002	-0.003050	-0.013516	-0.003322	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|kernel.early	SEG	cold	board	Y	Y	1.505786	1.527011	1	1.523894	+0.012026	-0.002041	-0.012518	-0.002313	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|kernel.wlan	SEG	cold	board	Y	Y	5.140987	5.213454	1	5.207950	+0.013025	-0.001056	-0.011542	-0.001328	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|kernel.nic	SEG	cold	board	Y	Y	1.224543	1.241804	1	1.240909	+0.013365	-0.000721	-0.011211	-0.000993	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|kernel.late	SEG	cold	board	Y	Y	3.140063	3.184325	1	3.182861	+0.013630	-0.000460	-0.010952	-0.000732	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|kernel.total	SEG	cold	board	Y	Y	11.011379	11.166595	1	11.155614	+0.013099	-0.000983	-0.011470	-0.001256	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|rlxfw.setup	SEG	cold	board	Y	Y	0.275227	0.279107	1	0.293701	+0.067123	+0.052288	+0.041243	+0.052002	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|rlxfw.initpost	SEG	cold	board	N	Y	0.012049	0.012219	1	0.011702	-0.028799	-0.042311	-0.052352	-0.042572	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|user.ready	SEG	cold	board	Y	Y	0.116240	0.117879	1	0.118239	+0.017197	+0.003054	-0.007471	+0.002781	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|cold|boot.jump_to_ready	SEG	cold	board	Y	Y	12.374537	12.548968	1	12.534490	+0.012926	-0.001154	-0.011639	-0.001426	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|rtkload.decompress	SEG	warm	board	Y	Y	1.229918	1.247255	2	1.247268	+0.014107	+0.000011	-0.010487	-0.000262	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|rtkload.total	SEG	warm	board	Y	Y	1.242260	1.259771	2	1.262339	+0.016164	+0.002039	-0.008480	+0.001766	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|kernel.early	SEG	warm	board	Y	Y	1.503931	1.525130	2	1.524926	+0.013960	-0.000134	-0.010630	-0.000406	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|kernel.wlan	SEG	warm	board	Y	Y	5.135207	5.207593	2	5.207032	+0.013987	-0.000108	-0.010604	-0.000380	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|kernel.nic	SEG	warm	board	Y	Y	1.223883	1.241135	2	1.240989	+0.013976	-0.000118	-0.010614	-0.000390	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|kernel.late	SEG	warm	board	Y	Y	3.138953	3.183200	2	3.183365	+0.014149	+0.000052	-0.010446	-0.000220	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|kernel.total	SEG	warm	board	Y	Y	11.001975	11.157058	2	11.156311	+0.014028	-0.000067	-0.010564	-0.000339	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|rlxfw.setup	SEG	warm	board	Y	Y	0.274638	0.278509	2	0.278137	+0.012739	-0.001337	-0.011822	-0.001610	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|rlxfw.initpost	SEG	warm	board	N	Y	0.011735	0.011900	2	0.012312	+0.049169	+0.034622	+0.023725	+0.034340	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|user.ready	SEG	warm	board	Y	Y	0.116382	0.118023	2	0.117668	+0.011054	-0.003004	-0.013465	-0.003275	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|warm|boot.jump_to_ready	SEG	warm	board	Y	Y	12.360617	12.534851	2	12.536319	+0.014215	+0.000117	-0.010382	-0.000155	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|rtkload.decompress	SEG	cold	board	Y	Y	1.188529	1.219194	2	1.217980	+0.024779	-0.000996	-0.000073	-0.001268	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|rtkload.total	SEG	cold	board	Y	Y	1.201842	1.232852	2	1.231186	+0.024415	-0.001352	-0.000428	-0.001624	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|kernel.early	SEG	cold	board	Y	Y	0.802541	0.823248	2	0.822039	+0.024295	-0.001469	-0.000545	-0.001741	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|kernel.wlan	SEG	cold	board	Y	Y	4.485276	4.601001	2	4.597359	+0.024989	-0.000792	+0.000131	-0.001064	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|kernel.nic	SEG	cold	board	Y	Y	0.839959	0.861630	2	0.860345	+0.024270	-0.001491	-0.000570	-0.001763	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|kernel.late	SEG	cold	board	Y	Y	3.089722	3.169439	2	3.165760	+0.024610	-0.001161	-0.000238	-0.001433	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|kernel.total	SEG	cold	board	Y	Y	9.217497	9.455319	2	9.445502	+0.024736	-0.001038	-0.000115	-0.001310	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|rlxfw.setup	SEG	cold	board	Y	Y	0.045743	0.046923	2	0.047383	+0.035842	+0.009793	+0.010721	+0.009518	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|rlxfw.initpost	SEG	cold	board	N	Y	0.011523	0.011820	2	0.011902	+0.032847	+0.006895	+0.007799	+0.006621	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|user.ready	SEG	cold	board	Y	Y	0.113378	0.116303	2	0.116628	+0.028665	+0.002794	+0.003718	+0.002521	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|cold|boot.jump_to_ready	SEG	cold	board	Y	Y	10.532718	10.804474	2	10.793316	+0.024742	-0.001033	-0.000110	-0.001305	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|rtkload.decompress	SEG	warm	board	Y	Y	1.201162	1.218125	6	1.217587	+0.013674	-0.000442	-0.010909	-0.000714	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|rtkload.total	SEG	warm	board	Y	Y	1.214380	1.232980	6	1.230987	+0.013675	-0.001616	-0.010908	-0.001888	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|kernel.early	SEG	warm	board	Y	Y	0.809943	0.821945	6	0.821913	+0.014779	-0.000039	-0.009831	-0.000311	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|kernel.wlan	SEG	warm	board	Y	Y	4.533120	4.597239	6	4.597584	+0.014221	+0.000075	-0.010376	-0.000197	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|kernel.nic	SEG	warm	board	Y	Y	0.847733	0.860023	6	0.860623	+0.015206	+0.000698	-0.009414	+0.000426	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|kernel.late	SEG	warm	board	Y	Y	3.121415	3.165674	6	3.165525	+0.014131	-0.000047	-0.010463	-0.000319	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|kernel.total	SEG	warm	board	Y	Y	9.313759	9.445436	6	9.445702	+0.014166	+0.000028	-0.010429	-0.000244	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|rlxfw.setup	SEG	warm	board	Y	Y	0.046263	0.047136	6	0.047224	+0.020762	+0.001856	-0.003993	+0.001583	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|rlxfw.initpost	SEG	warm	board	N	Y	0.011720	0.011939	6	0.011997	+0.023635	+0.004858	-0.001190	+0.004584	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|user.ready	SEG	warm	board	Y	Y	0.114286	0.115914	6	0.116047	+0.015413	+0.001152	-0.009212	+0.000879	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|warm|boot.jump_to_ready	SEG	warm	board	Y	Y	10.642682	10.793760	6	10.792753	+0.014101	-0.000093	-0.010493	-0.000366	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|rtkload.decompress	SEG	cold	board	Y	Y	1.037063	1.060934	4	1.060132	+0.022244	-0.000756	-0.002547	-0.001029	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|rtkload.total	SEG	cold	board	Y	Y	1.051220	1.075694	4	1.073616	+0.021304	-0.001932	-0.003464	-0.002204	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|kernel.early	SEG	cold	board	Y	Y	0.651945	0.666951	4	0.666928	+0.022981	-0.000035	-0.001828	-0.000308	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|kernel.wlan	SEG	cold	board	Y	Y	4.524712	4.630051	4	4.623158	+0.021757	-0.001489	-0.003022	-0.001761	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|kernel.nic	SEG	cold	board	Y	Y	0.824428	0.843410	4	0.834141	+0.011782	-0.010990	-0.012756	-0.011259	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|kernel.late	SEG	cold	board	Y	Y	0.962161	0.984264	4	0.973704	+0.011996	-0.010729	-0.012546	-0.010999	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|kernel.total	SEG	cold	board	Y	Y	6.963590	7.123691	4	7.097987	+0.019300	-0.003608	-0.005420	-0.003880	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|user.ready	SEG	cold	board	Y	Y	18.177337	18.611937	4	18.684909	+0.027923	+0.003921	+0.002995	+0.003647	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|cold|boot.jump_to_ready	SEG	cold	board	Y	Y	26.216994	26.843809	4	26.858313	+0.024462	+0.000540	-0.000383	+0.000268	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|rtkload.decompress	SEG	warm	board	Y	Y	1.033709	1.059804	5	1.060100	+0.025530	+0.000279	+0.000660	+0.000007	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|rtkload.total	SEG	warm	board	Y	Y	1.044943	1.071956	5	1.074413	+0.028202	+0.002292	+0.003267	+0.002019	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|kernel.early	SEG	warm	board	Y	Y	0.650366	0.666921	5	0.666669	+0.025067	-0.000378	+0.000208	-0.000650	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|kernel.wlan	SEG	warm	board	Y	Y	4.502612	4.622880	5	4.622567	+0.026641	-0.000068	+0.001744	-0.000340	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|kernel.nic	SEG	warm	board	Y	Y	0.813533	0.833880	5	0.834322	+0.025554	+0.000530	+0.000683	+0.000257	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|kernel.late	SEG	warm	board	Y	Y	0.948988	0.973590	5	0.974138	+0.026502	+0.000563	+0.001608	+0.000290	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|kernel.total	SEG	warm	board	Y	Y	6.912024	7.096403	5	7.098146	+0.026927	+0.000246	+0.002023	-0.000027	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|user.ready	SEG	warm	board	Y	Y	18.249218	18.705636	5	18.660134	+0.022517	-0.002433	-0.002281	-0.002704	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|warm|boot.jump_to_ready	SEG	warm	board	Y	Y	26.191747	26.855067	5	26.836990	+0.024635	-0.000673	-0.000214	-0.000945	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|pooled|boot.jump_to_ready	SEG	pooled	board	Y	N	10.591562	10.793760	8	10.792753	+0.018995	-0.000093	-0.005717	-0.000366	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|pooled|boot.jump_to_ready	SEG	pooled	board	Y	N	12.361805	12.536056	3	12.535714	+0.014068	-0.000027	-0.010524	-0.000300	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|pooled|kernel.total	SEG	pooled	board	Y	N	9.268900	9.445436	8	9.445702	+0.019075	+0.000028	-0.005639	-0.000244	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|loud|pooled|kernel.total	SEG	pooled	board	Y	N	11.002774	11.157868	3	11.156054	+0.013931	-0.000163	-0.010658	-0.000435	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|rlxfw|quiet|pooled|user.ready	SEG	pooled	board	Y	N	0.114073	0.115963	8	0.116154	+0.018247	+0.001651	-0.006447	+0.001379	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|pooled|kernel.total	SEG	pooled	board	Y	N	6.925221	7.097777	9	7.098017	+0.024952	+0.000034	+0.000095	-0.000239	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG|vendor|-|pooled|boot.jump_to_ready	SEG	pooled	board	Y	N	26.191747	26.855067	9	26.836990	+0.024635	-0.000673	-0.000214	-0.000945	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+SEG+|J_first_read_minus_sent	SEG+	pooled	host-timer	N	N	0.000081	0.000081	19	0.000085	+0.049383	+0.049383	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D2G|rlxfw-cold|loader.banner	D2G	cold	board	Y	N	0.572666	0.586303	3	0.585971	+0.023233	-0.000566	-0.001582	-0.000839	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D2G|vendor-cold|loader.banner	D2G	cold	board	Y	N	0.573108	0.586157	3	0.586138	+0.022736	-0.000032	-0.002067	-0.000305	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D2G|rlxfw-warm|loader.banner	D2G	warm	board	Y	N	0.587768	0.596032	8	0.596812	+0.015388	+0.001309	-0.009237	+0.001037	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D2G|vendor-warm|loader.banner	D2G	warm	board	Y	N	0.579959	0.595841	4	0.595988	+0.027638	+0.000247	+0.002716	-0.000026	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D2G|loader-only-cold|loader.banner	D2G	cold	board	Y	N	0.572033	0.586096	5	0.585957	+0.024341	-0.000237	-0.000501	-0.000510	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D2G|M1-BOOT|loader.banner	D2G	listen	board	N	N	0.572643	0.585572	1	0.581514	+0.015491	-0.006930	-0.009136	-0.007201	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D2G|M2-BOOT|loader.banner	D2G	listen	board	N	N	0.580757	0.596113	1	0.597166	+0.028255	+0.001766	+0.003318	+0.001494	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D2D|warm:rlxfw-vendor	D2D	warm	board	N	N	0.007810	0.000191	1	0.000824	-0.894494	+3.314136	-0.897053	+3.312961	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D2D|cold:rlxfw-vendor	D2D	cold	board	N	N	-0.000442	0.000146	1	-0.000167	-0.622172	-2.143836	-0.631335	-2.143524	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D2D|M1-rlxfw_cold	D2D	listen	board	N	N	-0.000023	-0.000731	1	-0.004457	+192.782609	+5.097127	+188.083084	+5.095466	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D2D|M1-vendor_cold	D2D	listen	board	N	N	-0.000465	-0.000585	1	-0.004624	+8.944086	+6.904274	+8.702927	+6.902120	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D2D|M2-rlxfw_warm	D2D	listen	board	N	N	-0.007012	0.000080	1	0.000354	-1.050485	+3.425000	-1.049261	+3.423795	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D2D|M2-vendor_warm	D2D	listen	board	N	N	0.000798	0.000272	1	0.001178	+0.476190	+3.330882	+0.440391	+3.329703	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D7|delta	D7	pooled	board	Y	Y	1.688630	1.712433	1	1.710352	+0.012864	-0.001215	-0.011700	-0.001487	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D7|rate_pct3840	D7	pooled	board	Y	N	88.324507	89.237208	1	89.370121	+0.011838	+0.001489	-0.012700	+0.001217	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic|loud|cold	D8	cold	board	Y	N	7.893691	8.004960	1	7.992481	+0.012515	-0.001559	-0.012040	-0.001831	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|ndopen|loud|cold	D8	cold	board	Y	Y	12.343919	12.517918	1	12.503737	+0.012947	-0.001133	-0.011618	-0.001405	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic2ndopen|loud|cold	D8	cold	board	Y	N	4.450228	4.512958	1	4.511256	+0.013713	-0.000377	-0.010871	-0.000649	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|lanup|loud|cold	D8	cold	board	Y	N	12.350177	12.524264	1	12.509383	+0.012891	-0.001188	-0.011673	-0.001460	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic|loud|pooled	D8	pooled	board	Y	N	7.882315	7.993424	3	7.993659	+0.014126	+0.000029	-0.010468	-0.000243	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|ndopen|loud|pooled	D8	pooled	board	Y	N	12.331174	12.504993	3	12.504668	+0.014070	-0.000026	-0.010523	-0.000298	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic2ndopen|loud|pooled	D8	pooled	board	Y	N	4.448859	4.511570	3	4.511009	+0.013970	-0.000124	-0.010620	-0.000397	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|lanup|loud|pooled	D8	pooled	board	Y	N	12.336896	12.510796	3	12.510918	+0.014106	+0.000010	-0.010488	-0.000263	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic|loud|warm	D8	warm	board	Y	N	7.881398	7.992494	2	7.994297	+0.014325	+0.000226	-0.010274	-0.000047	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|ndopen|loud|warm	D8	warm	board	Y	Y	12.330045	12.503849	2	12.505285	+0.014212	+0.000115	-0.010384	-0.000158	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic2ndopen|loud|warm	D8	warm	board	Y	N	4.448647	4.511355	2	4.510987	+0.014013	-0.000081	-0.010578	-0.000354	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|lanup|loud|warm	D8	warm	board	Y	N	12.336029	12.509917	2	12.511527	+0.014226	+0.000129	-0.010370	-0.000144	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic|quiet|cold	D8	cold	board	Y	N	6.489660	6.657101	2	6.650583	+0.024797	-0.000979	-0.000056	-0.001251	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|ndopen|quiet|cold	D8	cold	board	Y	Y	10.502947	10.773935	2	10.762168	+0.024681	-0.001092	-0.000169	-0.001364	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic2ndopen|quiet|cold	D8	cold	board	Y	N	4.013287	4.116834	2	4.111585	+0.024493	-0.001275	-0.000352	-0.001547	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|lanup|quiet|cold	D8	cold	board	Y	N	10.508954	10.780097	2	10.768369	+0.024685	-0.001088	-0.000165	-0.001360	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic|quiet|pooled	D8	pooled	board	Y	N	6.527344	6.651671	8	6.650362	+0.018847	-0.000197	-0.005862	-0.000469	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|ndopen|quiet|pooled	D8	pooled	board	Y	N	10.561141	10.763262	8	10.762182	+0.019036	-0.000100	-0.005677	-0.000373	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic2ndopen|quiet|pooled	D8	pooled	board	Y	N	4.034903	4.111872	8	4.111759	+0.019048	-0.000027	-0.005666	-0.000300	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|lanup|quiet|pooled	D8	pooled	board	Y	N	10.567183	10.769415	8	10.768408	+0.019042	-0.000094	-0.005671	-0.000366	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic|quiet|warm	D8	warm	board	Y	N	6.558784	6.651671	6	6.650362	+0.013963	-0.000197	-0.010627	-0.000469	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|ndopen|quiet|warm	D8	warm	board	Y	Y	10.612572	10.763262	6	10.762182	+0.014097	-0.000100	-0.010496	-0.000373	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|nic2ndopen|quiet|warm	D8	warm	board	Y	N	4.053788	4.111591	6	4.111814	+0.014314	+0.000054	-0.010285	-0.000218	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|lanup|quiet|warm	D8	warm	board	Y	N	10.618589	10.769415	6	10.768408	+0.014109	-0.000094	-0.010485	-0.000366	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|reply|quiet|cold	D8	cold	mixed	N	N	10.714530	10.869444	2	10.876900	+0.015154	+0.000686	-0.009465	+0.000413	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|k|quiet|cold	D8	cold	exact	exact	N	2	2	2	2.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.4: quiet k = 2]	S1 same/num-same S2 same/num-same
+D8|width|quiet|cold	D8	cold	mixed	Y	N	0.187804	0.091986	2	0.104598	-0.443044	+0.137113	-0.456551	+0.136803	MISS		rule (3): published, carried forward	MISS (a,b)	stable MISS on (a)+(b)	S1 same/num-same S2 same/num-same
+D8|reply|quiet|warm	D8	warm	mixed	N	N	10.782034	10.884176	6	10.887021	+0.009737	+0.000261	-0.014750	-0.000011	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|k|quiet|warm	D8	warm	exact	exact	N	2	2	6	2.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.4: quiet k = 2]	S1 same/num-same S2 same/num-same
+D8|width|quiet|warm	D8	warm	mixed	N	N	0.177245	0.100081	6	0.123369	-0.303966	+0.232687	-0.320846	+0.232351	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|reply|quiet|pooled	D8	pooled	mixed	N	N	10.776374	10.880147	8	10.880653	+0.009677	+0.000047	-0.014810	-0.000226	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|k|quiet|pooled	D8	pooled	exact	exact	N	2	2	8	2.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.4: quiet k = 2]	S1 same/num-same S2 same/num-same
+D8|width|quiet|pooled	D8	pooled	mixed	N	N	0.180637	0.094295	8	0.115824	-0.358802	+0.228315	-0.374352	+0.227981	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|reply|loud|cold	D8	cold	mixed	none	N	-	-	1	13.230903	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|k|loud|cold	D8	cold	clock-free	none	N	-	-	1	3.000000	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|width|loud|cold	D8	cold	mixed	none	N	-	-	1	0.713143	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|reply|loud|warm	D8	warm	mixed	none	N	-	-	2	13.272008	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|k|loud|warm	D8	warm	clock-free	none	N	-	-	2	3.000000	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|width|loud|warm	D8	warm	mixed	none	N	-	-	2	0.729228	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|reply|loud|pooled	D8	pooled	mixed	none	N	-	-	3	13.262704	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|k|loud|pooled	D8	pooled	clock-free	none	N	-	-	3	3.000000	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|width|loud|pooled	D8	pooled	mixed	none	N	-	-	3	0.719894	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D8|offset|read	D8	-	mixed	N	N	0.000103	0.000103	14	-0.000041	-1.402913	-1.402913	-1.393141	-1.402803	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|offset|kernel	D8	-	mixed	N	N	-0.000034	-0.000034	14	-0.000249	+6.323529	+6.323529	+6.145923	+6.321534	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|offsetrange|read	D8	-	mixed	N	N	0.000701	0.000701	1	0.000493	-0.296719	-0.296719	-0.313775	-0.296911	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|offsetrange|kernel	D8	-	mixed	N	N	0.000896	0.000896	1	0.000451	-0.496652	-0.496652	-0.508859	-0.496789	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|reply|cold	D8	cold	mixed	N	N	14.985655	14.985655	3	15.747473	+0.050836	+0.050836	+0.025352	+0.050550	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|ntp|cold	D8	cold	board	Y	N	14.575531	14.901882	3	14.917240	+0.023444	+0.001031	-0.001376	+0.000758	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|vendor|k|cold	D8	cold	clock-free	N	N	1	1	3	1.000000	+0.000000	+0.000000	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|width|cold	D8	cold	host-timer	N	N	1.062070	1.062070	3	1.061212	-0.000808	-0.000808	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|p80|cold	D4	cold	board	Y	Y	26.269813	26.858003	3	26.875883	+0.023071	+0.000666	-0.001740	+0.000393	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D4|ok-line|cold	D4	cold	mixed	N	N	-0.016114	-0.016114	3	0.047794	-3.965992	-3.965992	-3.894062	-3.965184	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|reply|warm	D8	warm	mixed	N	N	14.504839	14.504839	4	15.748078	+0.085712	+0.085712	+0.059382	+0.085416	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|ntp|warm	D8	warm	board	Y	N	14.545084	14.903508	4	14.887889	+0.023568	-0.001048	-0.001255	-0.001320	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|vendor|k|warm	D8	warm	clock-free	N	N	3	3	4	1.000000	-0.666667	-0.666667	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|width|warm	D8	warm	host-timer	N	N	1.014000	1.014000	4	1.064113	+0.049422	+0.049422	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|p80|warm	D4	warm	board	Y	Y	26.150749	26.816242	4	26.843546	+0.026492	+0.001018	+0.001598	+0.000745	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D4|ok-line|warm	D4	warm	mixed	N	N	-0.042028	-0.042028	4	0.008505	-1.202377	-1.202377	-1.197469	-1.202322	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|reply|listen-M1	D8	listen	mixed	N	N	15.636799	15.636799	1	15.771420	+0.008609	+0.008609	-0.015851	+0.008334	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|ntp|listen-M1	D8	listen	board	N	N	14.666099	15.012897	1	14.852597	+0.012716	-0.010677	-0.011844	-0.010947	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|k|listen-M1	D8	listen	clock-free	N	N	1	1	1	1.000000	+0.000000	+0.000000	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|width|listen-M1	D8	listen	host-timer	N	N	1.083690	1.083690	1	1.072798	-0.010051	-0.010051	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|p80|listen-M1	D4	listen	board	N	Y	26.058069	26.674244	1	26.878518	+0.031485	+0.007658	+0.006470	+0.007384	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|ok-line|listen-M1	D4	listen	mixed	N	N	-0.117678	-0.117678	1	0.044209	-1.375678	-1.375678	-1.366567	-1.375575	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|reply|listen-M2	D8	listen	mixed	N	N	14.530736	14.530736	1	15.740246	+0.083238	+0.083238	+0.056968	+0.082943	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|ntp|listen-M2	D8	listen	board	N	N	14.512260	14.904242	1	14.887062	+0.025827	-0.001153	+0.000949	-0.001425	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|k|listen-M2	D8	listen	clock-free	N	N	3	3	1	1.000000	-0.666667	-0.666667	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|width|listen-M2	D8	listen	host-timer	N	N	1.014000	1.014000	1	1.061736	+0.047077	+0.047077	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|p80|listen-M2	D4	listen	board	N	Y	26.109674	26.814906	1	26.834073	+0.027744	+0.000715	+0.002820	+0.000442	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|ok-line|listen-M2	D4	listen	mixed	N	N	0.052296	0.052296	1	-0.002917	-1.055779	-1.055779	-1.054426	-1.055763	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|reply|pooled	D8	pooled	mixed	N	N	14.540642	14.540642	9	15.747473	+0.082997	+0.082997	+0.056733	+0.082702	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|ntp|pooled	D8	pooled	board	Y	N	14.565043	14.904242	9	14.887062	+0.022109	-0.001153	-0.002679	-0.001425	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|vendor|k|pooled	D8	pooled	clock-free	N	N	3	3	9	1.000000	-0.666667	-0.666667	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D8|vendor|width|pooled	D8	pooled	host-timer	N	N	1.014000	1.014000	9	1.062931	+0.048255	+0.048255	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|p80|pooled	D4	pooled	board	Y	N	26.109674	26.814906	9	26.872633	+0.029221	+0.002153	+0.004261	+0.001880	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D4|ok-line|pooled	D4	pooled	mixed	N	N	-0.016114	-0.016114	9	0.021314	-2.322701	-2.322701	-2.290623	-2.322340	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D4|p80|mode-slow	D4	pooled	board	Y	N	26.176496	26.836455	8	26.874258	+0.026656	+0.001409	+0.001758	+0.001136	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D4|p80|mode-fast	D4	pooled	board	Y	N	25.249568	25.862509	1	25.873200	+0.024699	+0.000413	-0.000152	+0.000141	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D4|reply-to-p80|pooled	D4	pooled	mixed	Y	N	11.083983	11.083983	9	11.107098	+0.002085	+0.002085	-0.022217	+0.001812	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D4|V1-NMAP|open	D4	-	exact	exact	N	-	-	3	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.6: 80, 52869 and 52881 open]	S1 same/num-same S2 same/num-same
+D4|V1-NMAP|closed	D4	-	clock-free	N	N	65381	65381	1	65532.000000	+0.002310	+0.002310	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|V1-NMAP|filtered	D4	-	clock-free	N	N	151	151	1	0.000000	-1.000000	-1.000000	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D4|P1-NMAP|open	D4	-	exact	exact	N	-	-	1	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.6: no TCP port open]	S1 same/num-same S2 same/num-same
+D4|P1-NMAP|closed	D4	-	clock-free	N	N	58989	58989	1	57296.000000	-0.028700	-0.028700	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D4|P1-NMAP|filtered	D4	-	clock-free	N	N	6546	6546	1	8239.000000	+0.258631	+0.258631	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D4|P1-PS|set	D4	-	exact	exact	N	-	-	1	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.6: /bin/sh, the kernel threads and ps]	S1 same/num-same S2 same/num-same
+D4|p52869|vendor	D4	-	board	none	N	-	-	9	32.272360	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D4|p52881|vendor	D4	-	board	none	N	-	-	9	17.272929	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D6|MemTotal	D6	-	exact	exact	N	26984	26984	1	26984.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: MemTotal 26,984 kB]	S1 same/num-same S2 same/num-same
+D6|MemFree	D6	-	clock-free	Y	N	20932	20932	1	20924.000000	-0.000382	-0.000382	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D6|free-used	D6	-	clock-free	Y	N	6012	6012	1	6028.000000	+0.002661	+0.002661	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5a|rlxfw|56|avg	D5a	-	realtime	N	N	1.586	1.586	3	1.723000	+0.086381	+0.086381	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|56|mdev	D5a	-	realtime	N	N	0.682	0.682	3	0.689000	+0.010264	+0.010264	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|56|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|256|avg	D5a	-	realtime	Y	N	1.518	1.518	3	1.792000	+0.180501	+0.180501	-	-	MISS		rule (3): published, carried forward	MISS (a,b)	stable MISS on (a)+(b)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|256|mdev	D5a	-	realtime	N	N	0.92	0.92	3	0.376000	-0.591304	-0.591304	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|256|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|512|avg	D5a	-	realtime	Y	N	1.64	1.64	3	1.743000	+0.062805	+0.062805	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5a|rlxfw|512|mdev	D5a	-	realtime	N	N	0.401	0.401	3	0.387000	-0.034913	-0.034913	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|512|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|1024|avg	D5a	-	realtime	Y	N	2.086	2.086	3	2.020000	-0.031640	-0.031640	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5a|rlxfw|1024|mdev	D5a	-	realtime	N	N	0.509	0.509	3	0.394000	-0.225933	-0.225933	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|1024|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|1472|avg	D5a	-	realtime	Y	N	2.139	2.139	3	2.399000	+0.121552	+0.121552	-	-	MISS		rule (3): published, carried forward	MISS (a,b)	stable MISS on (a)+(b)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|1472|mdev	D5a	-	realtime	Y	N	0.476	0.476	3	0.555000	+0.165966	+0.165966	-	-	MISS		rule (3): published, carried forward	MISS (a,b)	stable MISS on (a)+(b)	S1 same/num-same S2 same/num-same
+D5a|rlxfw|1472|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|vendor|56|avg	D5a	-	realtime	N	N	1.516	1.516	3	1.197000	-0.210422	-0.210422	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|56|mdev	D5a	-	realtime	N	N	0.708	0.708	3	0.231000	-0.673729	-0.673729	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|56|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|vendor|256|avg	D5a	-	realtime	N	N	1.895	1.895	3	1.406000	-0.258047	-0.258047	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|256|mdev	D5a	-	realtime	N	N	0.723	0.723	3	0.287000	-0.603043	-0.603043	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|256|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|vendor|512|avg	D5a	-	realtime	N	N	1.644	1.644	3	1.323000	-0.195255	-0.195255	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|512|mdev	D5a	-	realtime	N	N	0.37	0.37	3	0.293000	-0.208108	-0.208108	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|512|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|vendor|1024|avg	D5a	-	realtime	N	N	1.782	1.782	3	1.347000	-0.244108	-0.244108	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|1024|mdev	D5a	-	realtime	N	N	0.472	0.472	3	0.195000	-0.586864	-0.586864	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|1024|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5a|vendor|1472|avg	D5a	-	realtime	N	N	1.69	1.69	3	1.490000	-0.118343	-0.118343	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|1472|mdev	D5a	-	realtime	N	N	0.334	0.334	3	0.169000	-0.494012	-0.494012	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5a|vendor|1472|loss	D5a	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5b|eth4|ER|mbps	D5b	-	realtime	Y	N	24.7	24.7	3	24.572000	-0.005182	-0.005182	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|ES|mbps	D5b	-	realtime	Y	N	26.2	26.2	3	26.100000	-0.003817	-0.003817	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|ES|retr	D5b	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5b|eth4|EU|mbps	D5b	-	realtime	Y	N	5.957	5.957	3	6.141333	+0.030944	+0.030944	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|EU|lost	D5b	-	clock-free	N	N	37341	37341	3	36849.000000	-0.013176	-0.013176	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|eth4|EU|lostpct	D5b	-	clock-free	N	N	70.061	70.061	3	69.136382	-0.013197	-0.013197	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|eth4|EV|mbps	D5b	-	realtime	Y	N	19.9	19.9	3	20.000000	+0.005025	+0.005025	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|EV|lost	D5b	-	clock-free	N	N	0	0	3	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5b|eth4|ER|cpu	D5b	-	clock-free	Y	N	54.66	54.66	3	50.170000	-0.082144	-0.082144	-	-	HIT	near-edge	reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|ES|cpu	D5b	-	clock-free	Y	N	89.79	89.79	3	86.870000	-0.032520	-0.032520	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|EU|cpu	D5b	-	clock-free	Y	N	38.37	38.37	3	35.530000	-0.074016	-0.074016	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|eth4|EV|cpu	D5b	-	clock-free	Y	N	81.72	81.72	3	78.830000	-0.035365	-0.035365	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D5b|rlx0|TR|sender5s	D5b	-	realtime	N	N	17.3	17.3	5	17.000000	-0.017341	-0.017341	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|TR|board-receiver	D5b	-	realtime	none	N	-	-	1	16.953000	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D5b|rlx0|TS|mbps	D5b	-	realtime	N	N	0.78	0.78	1	-	-	-	-	-	N: no B value		not stable: scored, decides nothing	no B value	no seating-B value (stable N)	S1 same/num-same S2 same/num-same
+D5b|rlx0|TS|retr	D5b	-	clock-free	N	N	323	323	1	-	-	-	-	-	N: no B value		not stable: scored, decides nothing	no B value	no seating-B value (stable N)	S1 same/num-same S2 same/num-same
+D5b|rlx0|TR|cpu	D5b	-	clock-free	N	N	20.46	20.46	1	28.390000	+0.387586	+0.387586	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|TS|cpu	D5b	-	clock-free	N	N	4.4	4.4	1	-	-	-	-	-	N: no B value		not stable: scored, decides nothing	no B value	no seating-B value (stable N)	S1 same/num-same S2 same/num-same
+D5b|rlx0|UR|cpu	D5b	-	clock-free	N	N	33.13	33.13	2	32.965000	-0.004980	-0.004980	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|US|cpu	D5b	-	clock-free	N	N	39.45	39.45	2	39.070000	-0.009632	-0.009632	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|UR|hostsent	D5b	-	clock-free	N	N	53514.5	53514.5	2	53543.000000	+0.000533	+0.000533	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|UR|board-log	D5b	-	clock-free	none	N	-	-	2	6745.000000	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D5b|rlx0|US1|hostseq	D5b	-	clock-free	N	N	53485	53485	1	-	-	-	-	-	N: no B value		not stable: scored, decides nothing	no B value	no seating-B value (stable N)	S1 same/num-same S2 same/num-same
+D5b|rlx0|US1|mbps	D5b	-	realtime	N	N	20.7	20.7	1	-	-	-	-	-	N: no B value		not stable: scored, decides nothing	no B value	no seating-B value (stable N)	S1 same/num-same S2 same/num-same
+D5b|rlx0|failed-exchanges	D5b	-	clock-free	N	N	6	6	1	5.000000	-0.166667	-0.166667	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|no-connect	D5b	-	clock-free	N	N	3	3	1	6.000000	+1.000000	+1.000000	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|n_tx_stop	D5b	-	clock-free	N	N	7	7	1	6.000000	-0.142857	-0.142857	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|n_recov_fire	D5b	-	clock-free	N	N	7	7	1	6.000000	-0.142857	-0.142857	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|n_recov_ok	D5b	-	clock-free	N	N	7	7	1	6.000000	-0.142857	-0.142857	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|n_recov_fail	D5b	-	clock-free	N	N	0	0	1	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|n_recov_spurious	D5b	-	clock-free	N	N	0	0	1	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|n_writes	D5b	-	clock-free	N	N	112	112	1	96.000000	-0.142857	-0.142857	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|recover|per-trial	D5b	-	clock-free	none	N	-	-	12	0.000000	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+D5b|rlx0|NET112|frames	D5b	-	clock-free	N	N	182	182	1	128.000000	-0.296703	-0.296703	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|NET112|bytes	D5b	-	clock-free	N	N	23692	23692	1	11935.000000	-0.496243	-0.496243	-	-	N: outside		not stable: scored, decides nothing	N: outside	N: scored, no verdict (outside +-10 %)	S1 same/num-same S2 same/num-same
+D5b|rlx0|NET112|rxframes	D5b	-	clock-free	N	N	0	0	1	2.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 2)	S1 same/num-same S2 same/num-same
+D5b|rlx0|NET112|rxbytes	D5b	-	clock-free	N	N	0	0	1	134.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 134)	S1 same/num-same S2 same/num-same
+NET109|crcalignerr	NET109	-	clock-free	Y	N	294	294	1	414.000000	+0.408163	+0.408163	-	-	MISS		rule (3): published, carried forward	MISS (a,b)	stable MISS on (a)+(b)	S1 same/num-same S2 same/num-same
+NET109|p3egress	NET109	-	clock-free	Y	N	294	294	1	414.000000	+0.408163	+0.408163	-	-	MISS		rule (3): published, carried forward	MISS (a,b)	stable MISS on (a)+(b)	S1 same/num-same S2 same/num-same
+NET109|crc-minus-egress	NET109	-	clock-free	N	N	0	0	1	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+NET109|cpu-rcv-bytes	NET109	-	clock-free	N	N	0	0	1	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+NET109|cpuevent	NET109	-	clock-free	N	N	0	0	1	0.000000	-	-	-	-	N: no ratio		not stable: scored, decides nothing	N: no ratio	N: scored, no ratio (A median 0; B 0)	S1 same/num-same S2 same/num-same
+CLK|ticks-per-RAW-s	CLK	-	clock-free	none	N	-	-	3	99.967306	-	-	-	-	first reading		-	none: first reading	none: first reading, listed	S1 same/num-same S2 same/num-same
+CLK|tick-shortfall	CLK	-	clock-free	N	N	105	105	1	105.200000	+0.001905	+0.001905	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+VEND|wsc2reg|slow	VEND	pooled	board	Y	N	1.123785	1.152541	8	1.156323	+0.028954	+0.003281	+0.004000	+0.003008	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+VEND|wsc2reg|fast	VEND	pooled	board	Y	N	0.146649	0.150209	1	0.149520	+0.019577	-0.004587	-0.005149	-0.004858	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+VEND|bridge-minus-wlanappkill	VEND	pooled	board	Y	N	0.838676	0.858508	9	0.856761	+0.021564	-0.002035	-0.003211	-0.002307	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+VEND|jbfc2realtek|warm	VEND	warm	board	Y	N	2.242456	2.303356	4	2.304801	+0.027802	+0.000628	+0.002877	+0.000355	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+VEND|loader.esc|M1	VEND	listen	board	N	Y	5.121936	5.237582	1	5.238773	+0.022811	+0.000227	-0.001994	-0.000045	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+VEND|loader.esc|M2	VEND	listen	board	N	Y	5.102142	5.237048	1	5.237828	+0.026594	+0.000149	+0.001697	-0.000124	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+VEND|j2boa|mode-slow	VEND	pooled	board	Y	N	26.203781	26.863274	8	26.859653	+0.025030	-0.000135	+0.000171	-0.000407	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+VEND|j2boa|mode-fast	VEND	pooled	board	Y	N	25.339388	25.954510	1	25.851886	+0.020225	-0.003954	-0.004517	-0.004225	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|arp|b1-b2	D8	-	host-timer	Y	N	1.007092	1.007092	47	1.018528	+0.011355	+0.011355	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|arp|b2-b3	D8	-	host-timer	Y	N	1.024005	1.024005	36	1.023983	-0.000022	-0.000022	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|arp|b3-fail	D8	-	host-timer	Y	N	1.024357	1.024357	37	1.024218	-0.000136	-0.000136	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D8|arp|b1-trigger	D8	-	host-timer	N	N	-0.0000685	-0.0000685	46	-0.000063	-0.072993	-0.072993	-	-	N: inside		not stable: scored, decides nothing	N: inside	N: scored, no verdict (inside +-10 %)	S1 same/num-same S2 same/num-same
+D8|nic2bcast2|quiet|pooled	D8	pooled	host-timer	Y	N	4.240696	4.240696	6	4.215438	-0.005956	-0.005956	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D7|dB|B00-B09	D7	-	clock-free	Y	N	810	810	12	810.000000	+0.000000	+0.000000	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D7|dB|B09-B10	D7	-	clock-free	Y	N	5021	5021	12	5021.000000	+0.000000	+0.000000	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+D7|dB|total	D7	-	clock-free	Y	N	5831	5831	12	5831.000000	+0.000000	+0.000000	-	-	HIT		reproduced	HIT	stable HIT	S1 same/num-same S2 same/num-same
+EXACT|PQ-boot|bytes	EXACT	-	exact	exact	N	2117	2117	8	2117.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every P*Q-rNN-boot 2,117 B (8 boots)]	S1 same/num-same S2 same/num-same
+EXACT|P1L-boot|bytes	EXACT	-	exact	exact	N	-	-	7	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every P1L-rNN-boot 7,948 + e B, normalised 7,948 (3 boots)]	S1 same/num-same S2 same/num-same
+EXACT|boot|RLXFW-ID0	EXACT	-	exact	exact	N	-	-	11	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: RLXFW-ID0=A2C56BC8 in all 11 boots]	S1 same/num-same S2 same/num-same
+EXACT|boot|RLXFW-N7	EXACT	-	exact	exact	N	-	-	11	11.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: RLXFW-N7=00000011 in all 11 boots]	S1 same/num-same S2 same/num-same
+EXACT|map|bytes	EXACT	-	exact	exact	N	3013	3013	3	3013.000000	-	-	-	-	EXACT MISS		not a D3 number (card B 3.2)	EXACT MISS	exact MISS [card B 3.2: every map 3,013 B]	S1 same/num-same S2 same/num-same
+EXACT|map|body-digest	EXACT	-	exact	exact	N	-	-	3	-	-	-	-	-	EXACT MISS		not a D3 number (card B 3.2)	EXACT MISS	exact MISS [card B 3.2: MB body digest 0927be41e91fe4bd... by the card's pipeline]	S1 same/num-same S2 same/num-same
+EXACT|map|compare-differ-line	EXACT	-	exact	exact	N	-	-	3	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: exactly the group-0 DIFFER line]	S1 same/num-same S2 same/num-same
+EXACT|map|compare-summary	EXACT	-	exact	exact	N	-	-	3	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: 31 same, 1 DIFFER, 0 scope, 0 extra, 0 missing]	S1 same/num-same S2 same/num-same
+EXACT|map|header	EXACT	-	exact	exact	N	-	-	3	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: the ten header fields]	S1 same/num-same S2 same/num-same
+EXACT|P1-OFF|bytes	EXACT	-	exact	exact	N	139	139	15	139.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every P1-OFFnn 139 B (15)]	S1 same/num-same S2 same/num-same
+EXACT|P1-OFF-HP|udp	EXACT	-	exact	exact	N	-	-	1	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: 15 udp events on port 50000, each len=10]	S1 same/num-same S2 same/num-same
+EXACT|V-BOOT|bytes	EXACT	-	exact	exact	N	1789	1789	7	1789.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every V*-BOOT 1,789 B (7)]	S1 same/num-same S2 same/num-same
+EXACT|V-BOOT|end	EXACT	-	exact	exact	N	-	-	7	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: ends 'boa: starting server pid=350, port 80' (source token boa-end; 3rd reading checks the bytes)]	S1 same/num-same S2 same/num-same
+EXACT|V-BOOT|digest	EXACT	-	exact	exact	N	-	-	7	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: sha256 in one of seating A's two orders]	S1 same/num-same S2 same/num-same
+EXACT|M1-BOOT|bytes	EXACT	listen	exact	exact	N	1901	1901	1	1901.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: M1-BOOT 1,901 B]	S1 same/num-same S2 same/num-same
+EXACT|M2-BOOT|bytes	EXACT	listen	exact	exact	N	1979	1979	1	1979.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: M2-BOOT 1,979 B]	S1 same/num-same S2 same/num-same
+EXACT|V-HD|bytes	EXACT	-	exact	exact	N	-	-	7	118.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every V*-HD 118 B, byte-identical to 2026-08-31c/K2-2a.log (3rd reading cmp)]	S1 same/num-same S2 same/num-same
+EXACT|burn-flag	EXACT	-	exact	exact	N	1	1	12	1.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every *-AB/*-AB2 00000001 (12)]	S1 same/num-same S2 same/num-same
+EXACT|looprun-S5b	EXACT	-	exact	exact	N	0	0	11	0.000000	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: every looprun S5b read 00000000 (11)]	S1 same/num-same S2 same/num-same
+EXACT|P1-N0|flags	EXACT	-	exact	exact	N	-	-	2	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: recov_mode 1, ph_follow 1]	S1 same/num-same S2 same/num-same
+EXACT|P1-ETH4	EXACT	-	exact	exact	N	-	-	1	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: HWaddr as the card's, inet 10.1.1.4, Mask 255.0.0.0, line 12 eth4 (address compared by the source, not printed)]	S1 same/num-same S2 same/num-same
+EXACT|P1-DOWN	EXACT	-	exact	exact	N	-	-	1	-	-	-	-	-	EXACT HIT		not a D3 number (card B 3.2)	EXACT HIT	exact HIT [card B 3.2: RLXFW-N-ENGOFF, RLXFW-N-NDSTOP, no line 12]	S1 same/num-same S2 same/num-same

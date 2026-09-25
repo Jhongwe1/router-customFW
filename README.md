@@ -957,7 +957,7 @@ R1-pub+R2c  ISA / hazard / Lexra-ASE table, and which toolchain built what  clos
 R1z       the debts this repository's own record names   closed 2026-09-16
 P1        mfgtest passes on a good unit, and every check made to FAIL once  closed 2026-09-17
 R6        my Ethernet driver                closed 2026-09-22
-P2        boot-time breakdown + throughput, both firmwares, same script
+P2        boot-time breakdown + throughput, both firmwares, same script  closed 2026-09-25
 R6b       what R6 left: the vendor Ethernet tree out of the image, and its residuals
 R1y       the record's maintainability: state, record and finding documents
 R7        my userspace

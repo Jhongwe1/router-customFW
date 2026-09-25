@@ -1606,7 +1606,254 @@ proven different 8,192 B, undetermined 8,192 B — which is exactly `H601`.
 
 ---
 
-## The operating clause, re-run at twelve entries
+## 2026-09-25 — `P2` (both firmwares' boot time through one script, and the same numbers on a second calendar day)
+
+### One line
+
+**v0.4+, ten segments (102nd–111th) against the plan's eight, two seatings (39
+and 40) of twelve presses each.** `tools/boot-timeline.py` splits both
+firmwares' boots into segments with one function that reads a landmark table per
+firmware, on one host clock. The segment both firmwares run as the same code —
+the loader's `Booting` → banner — measured the same in both columns inside each
+seating, and on a second calendar day **134 of the 140 numbers the frozen
+contract called stable reproduced within ±10 % on both of its columns; none of
+the six that did not is a row of the segmented table or `D7`'s Δ.** The table,
+and the feature table beside it, are `docs/boot-time-table.md`. **`D1`–`D4` and
+`D6`–`D8` are met. `D5` is met for ICMP and for the vendor's driver; for
+rlxfw's own driver its reading is a failure** (`NET-116`), which `R6b` now owns.
+The plan's interrupt latency by logic analyser (`P2-6`) never ran and is carried
+to `P3` as `LA-1`.
+
+**The weakest thing here is a column with one boot in it.** The loud image boots
+cold once per seating (`P1L-r01`), so 11 of the 69 load-bearing stable rows are
+one boot against one boot. The largest deviation among all 69, loud cold
+`rlxfw.setup` at +6.712 % against seating A's raw value and +5.229 % against
+its corrected one, is one of the 11, and its seating-B value carries a console
+stamp that arrived provably 13.5 ms late (`CLK-44`). Behind it sits the
+contract's own criterion: stability is the spread of seating A's readings, and a
+single reading has a spread of 0. **So 24 of the 140 stable numbers rest on one
+seating-A value, and three of the six misses are among them.**
+
+### Three claims that stand
+
+**① `D2` held on both days, and what moved every segment of seating A by one
+factor was the host's clock, not the board.** 量 seating 40, every capture
+stamped on `CLOCK_MONOTONIC_RAW`, which the host does not slew. The loader's
+`Booting` → banner in rlxfw's warm boots and the vendor's differ by
+**+0.8245 ms**, the cold boots by −0.167 ms, and the four listen-mode
+differences run −4.624…+1.178 ms, against the bands card A wrote before seating
+A (±10 ms, ±25 ms cold). All six were computed on the bench night by the card's
+own `Z9-D2X` and reproduce at the desk to 4 dp. 🟢 **On `RAW` the control is
+tighter than seating A could make it**: the 13 warm loader catches span
+1.363 ms, 0.383 % of their median, against 3.08 % in seating A on its slewed
+clock and 0.545 % after correction. 🟢 **And inference (iii) holds as
+registered**: the warm `loader.booting` median on `RAW` is 0.356060 s (n 13),
+inside [0.354469, 0.358031], the ±0.5 % of 0.35625 s that seating A's record
+wrote down before this seating. So between seatings A and B, `CLK-32`'s factor
+was the host's clock (`CLK-43`); for earlier directories it stays 推. 🔴 One
+control read was late, and it is named: `M1-BOOT`'s two differences sit
+3.7–4.0 ms from seating A's corrected values, the read that carried its anchor
+byte came 5.39 ms after its predecessor, against 0.54–1.10 ms in the other 24
+loader boots, and measured from the loader's last `.` instead they are −0.05
+and −0.19 ms (推 one late read). ⚠️ What this does not reach: `RAW` against
+true time, which nothing in seating B logged.
+`SPEC.md` `CLK-45`, `CLK-43`; `notes/boot-time.md` §§ 8.4–8.5.
+
+**② `D3` — the segmented table reproduced on a second calendar day, scored
+three times against a contract committed before seating B's intervals were
+computed.** 讀: the closing rule (`e2f15ff`, 05:19:39) and the list of 294
+numbers with their classes (`76deef8`, 06:31:39; `docs/boot-time-d3-list.tsv`)
+were both committed before any seating-B interval was computed at the desk; the
+only seating-B values read before them are the ones `LOG.md` 第一百一十段
+quotes. 量: **140 stable, 134 hits, 6 misses, 0 on a load-bearing row.** On the
+other 68 load-bearing rows, column (a) — seating B against seating A's raw
+values — reads +1.1…+3.6 %, which is the size of seating A's slow host clock,
+and column (b) — against the corrected values — stays within ±1.1 %. 🟢 Two
+scorers put all 294 rows in the same category and agree on (a), (b) and (c) to
+1e-9. A third, the judge's, in exact fractions, agrees on every verdict; a
+planted load-bearing miss turns its verdict to *stays open*, and +10 % exactly
+scores a hit while 1e-9 past it scores a miss. ⚠️ **Their agreement tests the
+scoring, not the seating-B values, which all three took from the same
+pipelines.** Those have second sources of their own, one per family, each
+sharing no code with its primary: 208 of 208 segment records, for one, and 71 of
+72 common `D8` rows, where the one disagreement is a read 1.58 ms late on the
+primary's side that moves no verdict. `SPEC.md` `CLK-48`;
+`docs/boot-time-d3-score.tsv`; `notes/boot-time.md` § 8.9.
+
+**③ `D7` — the instrument resolves the difference it is asked to compare, and
+the bytes that make the difference were counted before either image booted.**
+量 press 1 of seating 40: the loud image's kernel entry → init exceeds the quiet
+one's by **Δ = 1.710352 s** (medians of 3 and 4 boots), inside the band
+[1.398905, 1.979101] that its extra console bytes predict at the measured
+factor. The extra bytes are **5,831 in 12 of 12 loud–quiet pairs**, 810 of them
+between `RLXFW-B00` and `RLXFW-B09` and 5,021 between `RLXFW-B09` and
+`RLXFW-B10`, and every other landmark pair differs by 0. The rate Δ implies,
+3,431.8 B/s, is **89.370 %** of 38400-8N1's 3,840 B/s, inside `FW-70`'s
+88.4–92.7 %. It reproduces seating A to +1.29 % raw and −0.12 % corrected.
+⚠️ Which factor belongs in that rate is not established; at a factor of 1 it is
+88.782 %, also inside. `SPEC.md` `CLK-46`; `notes/boot-time.md` § 8.6.
+
+### The plan's own acceptance rows, and `P2`'s DoD, read one at a time
+
+`P2`'s DoD is a decomposition of the plan's two rows, not a replacement for
+them, so both are read.
+
+| the plan says / the DoD says | verdict |
+|---|---|
+| **通過** 一張表，**分段**，每個數字有量測方法與重複次數，且**功能對照表在旁邊** | 🟢 met: `docs/boot-time-table.md` — cold and warm tables, each cell with n, median and range for seating A raw, seating A corrected and seating B, its class and its `D3` verdict; the feature table beside it, two sources per firmware; a method section naming the instruments, the one clock and the `D3` contract. ⚠️ The loud image's cold column is one boot per day |
+| **否證 ①** 任何一個數字無法在另一天重現到 ±10% 以內 → 量測方法有問題 | 🔴 **fired, on six of the 140 stable numbers, and on none of the table's rows.** By the plan's letter the method is broken for those six; `D3`'s own refutation condition says the same and publishes each with its miss. Three are defects of the contract rather than of a measurement: `D8`'s quiet cold network-up width, whose single seating-A reading has raw and corrected values 2.04× apart, so column (a) could not hit; and `NET-109`'s two counts, which on both days are the probe's echo replies plus 2 — a run length, not a device quantity. Three are rlxfw's ICMP round trip at 256 and 1472 B (+12.16…+18.05 %) on a day the vendor's average rtt was 11.8–25.8 % lower; split by whether the host was capturing they move +7.2 % and +9.9 % without and +13.5 % and +19.7 % with, and the pair captured on both days still moves +18.1 % and +12.3 %, so the host's capture is 推 part of the shift and not all of it (`NET-121`). One carried-forward row, `D3-MISS`, names the experiment for each |
+| **否證 ②** `ROM → ESC 視窗` 那一段在兩欄之間不同 → 量測方法有問題 | 🟢 **did not fire, on either day** (`CLK-34`, `CLK-45`; claim ①) |
+| **`D1`** one script for both firmwares; every comparable segment computed by the same code | 🟢 met at `P2-1` (`FW-117`). 量 seating 40: a second parser sharing no code with the tool agrees on 52 of 52 loader records, 208 of 208 segment records and 223 of 223 landmarks, and the desk's re-run equals the bench night's `Z9-D2.tsv` byte for byte |
+| **`D2`** the identical-code control, inside one seating | 🟢 met on both days (claim ①) |
+| **`D3`** every number on a second calendar day within ±10 %; cold and warm apart; misses published | 🟢 met under its closing rule (claim ②): six misses published and carried; column (c), each cell over its own seating's warm `loader.booting`, published beside the raw figures and deciding nothing. Of the contract's 29 exact rows 27 hit. The two that missed are one capture's size and digest, `P2-M0`, which the capture tool stopped 4 B short, before the map's last line terminator (`FW-136`); its 34 section lines are the other five maps' byte for byte, less that terminator |
+| **`D4`** identical / comparable / not comparable; each daemon's start and readiness; the feature table from two sources each | 🟢 met, and its refutation did not fire: every open port and every announced daemon (量 census and console) traces to `rcS` or `sysconf` (讀), and the scripted daemons never seen are gated (telnet: port 23 closed) or UDP. Readiness has first readings for 52881 (J+17.08–17.42 s) and 52869 (J+31.27–32.50 s). 量 52881 answers 4.79–5.96 s before the `MiniIGD` line in 9 of 9 boots and fits one offset from the `WiFi Simple Config` line; 讀 the SDK drop names 52881 `RTK_WPS_LISTEN_PORT`; so, 推, it is `wscd`'s port and not `miniigd`'s (`NET-118`; `NET-115` corrected in place). Inference (ii) is not refuted in 9 of 9, and the 18 windows of both days intersect in 6.5 ms. The method states `GREP-1`'s enumeration rule (`FW-141`) |
+| **`D5`** throughput: ICMP, both firmwares; `iperf3` on both drivers, n ≥ 3; CPU from `/proc/stat`, no typed verb; ⊘ `iperf3` on the vendor firmware | ⚠️ **met for ICMP and for the vendor's driver. For rlxfw's driver the trials ran, and the figure mostly did not.** 量 seating 40: 600 of 600 echoes, 0 % loss in all 30 series. `eth4` completed 12 of 12 trials on both days, and every rate and CPU median is within ±10 % of seating A — TCP board-receive 24.572 / 24.653 / 23.923 Mbit/s from the board's own server log. No verb was typed: `P1-N0` read `recov_mode 1`, `ph_follow 1` as compiled. `rlx0` completed 0 of 12 exchanges (seating A: 3 of 12), and its one TCP board-receive figure is `TR1`'s 16.953 Mbit/s from the board's log, n = 1 (`NET-116`) |
+| **`D6`** kernel and rootfs sizes for both (讀); rlxfw memory free after boot (量); ⊘ vendor runtime memory | 🟢 met: 量 `MemFree` 20,924 kB of 26,984 (seating A 20,932; `MEM-20`). 讀 sizes: the compressed images the loader receives, 1,155,072 B quiet and 1,181,696 B loud, each carrying its initramfs, against the vendor's LZMA kernel of 987,138 B and its SquashFS of 1,876,033 B |
+| **`D7`** loud − quiet kernel entry → init = extra console bytes ÷ the sustained rate | 🟢 met on both days (claim ③) |
+| **`D8`** network up = the first ICMP echo reply, on the console's clock, with the channel offset measured | 🟢 met, with its own refutation fired on both days as predicted: the channel offset spans 701.0 / 896.4 µs (seating A, read / kernel stamps) and 492.6 / 450.8 µs (seating B), beyond one byte time, 260.4 µs, so network up is a console-side bound. 量 seating 40: quiet rlxfw answered the host's second broadcast of a cycle in 8 of 8 boots (6 by frames, 2 by the probe's ledger), `N-NDOPEN` the lower edge each time; **the loud image has its first reading**, on the third broadcast in 3 of 3 by frames, J+13.230903–13.281312 s; the vendor answered a cycle's first broadcast in 9 of 9 by the probe's ledger, no capture having run on a vendor press (seating A: 4 of 9). Inference (i) is not refuted in 9 of 9, and it is a weak test: its brackets are 1.03–1.10 s wide (`CLK-47`) |
+
+### The three questions this gate must be able to answer
+
+讀 `PROGRESS.md`, `P2`'s step list: the plan's § 11 has no `P2` row, so the
+questions are derived there.
+
+**① 「你開機比較快，是不是只因為你少跑了東西？」** The table puts the whole
+difference in the vendor's userspace, which starts what rlxfw does not run; it
+does not show how that time divides among the daemons, or whether it is spent
+running rather than waiting. 量 seating 40: **rlxfw's kernel is the slower
+one** — kernel entry → init 9.445702 s (quiet, n 8) against the vendor's
+7.098017 s (n 9) — and about 3.0 s of rlxfw's is its own timer driver waiting
+on purpose (讀 `CLK-27`, `IRQ-13`). rlxfw reaches its prompt at J+10.792753 s
+(n 8) and the vendor reaches `boa` at J+26.836990 s (n 9) because the
+vendor's userspace then runs for 18.66–18.68 s (warm and cold medians) against
+rlxfw's 0.116 s, starting what the feature table lists and rlxfw does not run:
+a web server, UPnP, WPS, the WLAN applications, a bridge, NTP and IPv6, each
+announced on the console in 9 of 9 boots. ⚠️ What the table does not give is
+each vendor daemon's own start cost as an interval: for the three TCP daemons
+it has readiness from `J`, and for the rest only the time of a console line.
+
+**② 「換一天量，還是這個數字嗎？」** For the table, yes (claim ②): 134 of 140 stable
+numbers, and none of the six misses is a table row. The six are printed with
+both columns in `docs/boot-time-table.md` and carried as `D3-MISS`.
+
+**③ 「你的儀器分得出你在比的差嗎？」** For what `P2` compares, yes: `D7`'s
+1.710352 s is resolved from bytes counted before the boots (claim ③), and the
+identical-code control spans 1.363 ms over 13 boots. 🔴 **For one stamp, no
+better than about 14 ms.** 量: a console stamp can arrive provably 13.5 ms late
+(`P1L-r01`'s `RLXFW-B09`), which the capture floor seating 17 measured, 0.517
+and 0.868 ms, does not bound. The `---Jump` line the board prints on receiving
+the typed `J` reaches the host 0.8–6.6 ms (seating B) and 1.0–6.3 ms (seating
+A) *before* `console-capture` records the send, and its own stamp is at least
+0.9–6.8 ms late, so every `J`-anchored interval reads short by that less its
+far end's own lateness, in every boot of both seatings (`CLK-44`). That is
+systematic on both days, so no `D3` verdict moves, and the contract already
+declines to score a number under 20 ms, where two read quanta alone move it by
+10 % — a line that itself assumes quanta of about 1 ms, which one late read
+(13.5 ms here) exceeds.
+
+### What `P2` did not establish
+
+🔴 **`P2-6` — the plan's interrupt latency, measured with a logic analyser —
+never ran.** The analyser the plan lists as on hand was never connected. By the
+stop-loss written with this gate, *中斷延遲* is recorded as not done and is not
+substituted by the on-die counter under the plan's name. It is carried forward
+as `LA-1`, owned by `P3`, the bring-up report, which is where a latency figure
+would be read.
+
+🔴 **Six numbers did not reproduce, and three of them say more about the
+contract than about the board.** One carried-forward row, `D3-MISS`:
+* `D8|width|quiet|cold` — one seating-A boot, 0.187804 s raw and 0.091986 s
+  corrected, against seating B's 0.1045985 s (n 2): (a) −44.30 %, (b) +13.71 %.
+  Column (a) could not hit by construction. The experiment: a third calendar
+  day on `RAW`, which compares seating B with a seating C on one clock.
+* `D5a|rlxfw|256|avg`, `D5a|rlxfw|1472|avg`, `D5a|rlxfw|1472|mdev` — +18.05 %,
+  +12.16 %, +16.60 % in both columns. ⚠️ The host's capture explains part of it
+  and not all: 量 the third press's pair, run under capture on both days, still
+  moves +18.1 % and +12.3 % at the capture tap. The experiment: the same ICMP
+  series with and without the host capture inside one boot. It is `R6b`'s,
+  whose regression re-measures ICMP.
+* `NET109|crcalignerr`, `NET109|p3egress` — 294 → 414, +40.8 %. 量 on both
+  days the count is the probe's echo replies inside the last boot plus 2, a
+  measure of how long the host's schedule ran; the property the rows stand for
+  held, `CRCAlignErr` equal to port 3's egress, 414 = 414. No experiment: the
+  rows are redefined as that per-echo identity.
+
+🔴 **rlxfw's own driver has no throughput figure at the n the DoD asks for, and
+why is `R6b`'s.** Over the two days `rlx0` completed 3 of 24 end-of-test
+exchanges (seating B: 5 connected and failed the exchange, 6 `No route to
+host`, 1 hung), and its only TCP board-receive figure is n = 1. 量 seating 40:
+at least 128 frames the driver counted as sent never left port 3 (seating A:
+182; `NET-112`); UDP board-receive lost 86.6–87.8 % *above* the
+driver, whose `n_rx` exceeded what the host sent (`NET-117`); and block 45 —
+`R6b`'s first bench block, the same night — placed the transmit loss in frames
+of lengths the engine was not given: 1,043 of 1,193 echo replies lost, 678
+`JabberErr` at the switch's CPU port (`NET-119`). The mechanisms are eight
+candidates, all 推 (`notes/nic-driver.md` § 21). ⚠️ Seating A's exact 0 on the
+receive side — every frame into port 3 reached the driver — did not reproduce:
++2 frames and 134 B, with IRQ 12 rising 6 after the last dump, so this method
+cannot give an exact 0 (`notes/nic-driver.md` § 19.2, corrected in place).
+
+🔴 **The board lost about 105 jiffies again, in the same stretch as seating A,
+and the counter that lost them is not the one `notes/boot-time.md` § 7.2
+named.** 量: between `P1-N0` and `P1-TR1-S0`, 105.2 ticks by seating A's
+recipe (seating A: 105) and 104.2–109.4 by placement (`notes/boot-time.md`
+§ 8.3), and none in any trial. Over
+`P1-TK0` → `P1-TR1-S0` the `cpu` line advanced 24,311 ticks and IRQ 25 exactly
+24,311, while IRQ 13 advanced 24,376: jiffies are rlxfw's TC1 on IRQ 25, and
+TC0 on IRQ 13 lost about 45, the same split as seating A. 推 the cell is the
+switch's `asicCounter` read, which in block 45 cost 112–114 jiffies every time,
+while the one driver-dump interval without it lost none.
+What the read does to the timers is open: the obvious mechanism, interrupts off
+for the whole print, cannot explain IRQ 13 counting 65 ticks that jiffies did
+not (`CLK-42`).
+
+⚠️ **Where inside its bracket either firmware's network came up.** Network up is
+a console-side bound on both days. The vendor's brackets are 1.03–1.10 s wide
+and rest on a reconstruction from the probe's own ledger that no frame checks,
+since no capture ran on a vendor press, and 量 seating B's frames show that
+reconstruction's retransmit range too narrow: the host's first-to-second
+broadcast reached 1.033472 s against the 1.028 s it allows. That the vendor
+answered at the first broadcast in 9 of 9 against seating A's 4 of 9 is 推 the
+host clock, untested.
+
+⚠️ **The vendor's UDP services, and whether any daemon serves.** The port census
+is TCP only, so DHCP, the DNS relay and NTP are neither confirmed nor refuted by
+a port, and readiness here is a TCP connect accepted, not a request served.
+Which daemon owns 52869 and 52881 rests on timing and on a related SDK drop, not
+on TOTOLINK's binaries.
+
+⚠️ **The host's clock is measured, not calibrated.** Seating B logged its tick
+and frequency every second (`CLK-41`) but no reference for `RAW`, whose WSL
+boot is gone; and 量 after the loss the board's timer ran 100.002869 ticks per
+`RAW` second against the card's 99.998–100.000. Whether `RAW` or the board is
+the one off is not decided (`CLK-42`).
+
+⚠️ **Byte-exact predictions over `--until` captures were predictions about the
+instrument's tail as much as about the device.** 讀 and 量 on a pty,
+`console-capture` stops 0–50 ms after a match, or about 150 ms after one that
+ends `--esc-after` (`FW-135`). 量: of the 51 final-loop `--until` captures of
+seating B and block 45, five ended short of their siblings' bytes — 2 of seating
+B's 39 and 3 of block 45's 12 — and of the 22 captures behind byte-exact
+predictions that held, 13 needed a read that came after the match (`FW-136`).
+`boot-timeline --probe` reads network up only inside a capture's window, which
+misses 7 of seating B's 11 rlxfw rounds (`FW-137`).
+
+⚠️ **Flash.** No `--send` in card B carries `FLR`, `FLW`, `EW` or `EB` (讀, its
+two `cardnum` rows read 0), and every upload was `looprun`'s, each after its
+`S5b` read of the `AUTOBURN` word returned `00000000` (量, 11 of 11). The three
+maps bracketing the nine vendor boots compare **31 groups the same and 1
+`DIFFER`, the expected group 0**, over 4,186,112 B with `H601` not hashed
+(`FLS-31`). They cannot see two writes that cancel, `H601`, or any byte outside
+the 4,186,112. The `FLR` bracket stays at 1,024 of 4,194,304 bytes =
+**0.0244 %**, and `FLS-26`'s ledger does not move.
+
+⊘ **Structural, not deferred:** the vendor firmware has no shell, so its
+`iperf3`, its `/proc`, its runtime memory and its per-daemon CPU time are not
+measurable (`P2`'s settled item 1).
+
+---
+
+## The operating clause, re-run at thirteen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -1616,7 +1863,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults.)*
 
 | pair | shared? |
 |---|---|
@@ -1631,6 +1878,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R5` → `R1-pub + R2c` 🆕 | **yes — a same-instant read of two kernel counters.** `R5` carries it as `D4` naming `/proc/timer_list`, *which exists in this kernel and cannot carry the property the row wanted — two counters read atomically*. `R1-pub` carries it as `D-cost`'s `E5` requiring `Δirq_count == Δjiffies` on every rung, failing **5 of 64**, and the one `/proc` file that serves both not sampling them together. 🔴 **The sentence that connects them is inside `R5`'s own bullet** — it says the substitute `R5-2` used *carries both counters inside one `spin_lock_irqsave`*, which is true of the pair `R5` used and **false of the pair `R1-pub` needed**: 讀 `drivers/clocksource/rtl819x-timer.c`, `j = get_jiffies_64()` is at line 2001 inside the lock held from 1998 to 2042, and `irq_count` is read live at line 2147, **105 lines after the unlock** |
 | `P1` → `R6` 🆕 | **yes — `MT-PORT`'s output does not say which driver served the link, and `P1` handed it to `R6-0` by name.** `P1` carries it as *"every `MT-PORT` line this project has captured is unlabelled as to which driver served it. Carried to `R6-0`"*; `R6` carries it because `R6-0` quoted that residual, banked **half** of it — `SPEC.md` `NET-31`, the Linux-side named-port link state — and left the other half, while `R6` landed the second driver that makes the label necessary. 量 2026-09-22: `config/mfgtest.sh:536` still prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the **port** |
 | `R1z` → `P1` 🆕 | **no, and the reason is one no previous non-firing has used: the single item both entries carry, they carry because `P1` CLOSED it.** `R1z`'s last ⚠️ is *"`RECIPE_ID` moved … the next card must re-derive `RLXFW-ID0`"*; the next segment found the superseded `c433013b` in three places here, its own step row says *"The next card was about to predict `MT-ID` against it"*, and the board then printed `RLXFW-ID0=BB684EB0`. This file's own rule governs — *a residual that a later gate closes is removed from the clause's input by being closed, not by being edited out*. ⚠️ The rest of the two sets do not touch: `R1z`'s residuals are about this repository's record, `P1`'s about a design table that over-declares on three rows and a denominator its own does-not-establish list got wrong |
+| `R6` → `P2` 🆕 | **no — `P2` CLOSED three of `R6`'s residuals, each taken on in writing by one of its own steps, and the one subject both still carry is two different observations.** Closed: *"`D5`'s headline number needs a verb typed"* — `P2-2` compiled `recover` on, and `P1-N0` read `recov_mode 1` on both days with no verb typed; *"this project holds no vendor receive figure at all"* — `P2-3`'s `eth4` board-receive trials (`NET-114`), reproduced in seating B at 24.572 / 24.653 / 23.923 Mbit/s; and `NET-109 殘留`'s healthy baseline — `P2-3`'s pre-traffic pair, 294 = 294, and 414 = 414 in seating B. The other half of `NET-109 殘留`, its mechanism, has been `R6b`'s in the row's owner cell since the commit that opened `P2`, so `P2` never took it on. ⚠️ `rlx0`'s transmit path is in both sets: `R6` as `NET-67 殘留`, *why the engine stops retiring a TX descriptor*, and `P2` as frames the driver counts as sent that do not leave port 3 intact (`NET-112`, `NET-116`). What would join them is `R6b`'s candidate M8, and M8 is 推 — the same subject, not yet the same thing |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -1987,6 +2235,130 @@ different reasons — which is what stops either from being a preference.**
 idle*, but they are named by a **step's deliverable** and not by a `D` row, and
 this census's population is `D` rows. Recorded so a thirteenth entry does not
 find it and call it a third point.
+
+### 🆕 At thirteen entries the clause does not fire, and the later gate had closed three of the earlier one's residuals
+
+**What the new pair shares, item by item.** `R6`'s entry lists ten things it did
+not establish. `P2` closed three of them, and closed each because one of its own
+steps took it on in writing before its first seating:
+
+* *"`D5`'s headline number needs a verb typed"* — `P2-2`'s images compiled
+  `recover` on (`NET-107`), and `P1-N0` read `recov_mode 1`, `ph_follow 1` on
+  both days with no verb typed.
+* *"this project holds no vendor receive figure at all"* — `P2`'s list opens by
+  saying so, `D5` (b) asks for both directions on both drivers, and `P2-3`'s
+  `eth4` board-receive trials made one (`NET-114`), reproduced in seating B.
+* `NET-109 殘留`'s *"a healthy baseline costs no power"* — `P2-3`'s own row
+  names the pre-traffic `asicCounter` reading, and 量 the pair read the healthy
+  shape on both days (294 = 294, 414 = 414).
+
+Three more went to `R6b` by the owner's word when it was booked and opened —
+`D4`'s second conjunct, `R6-4`'s `ethtool` and `phylib`, and `MT-PORT`'s
+driver label, which was the twelve-entry firing's subject and so now has an
+owner (讀 § Gate board, `R6b`). This file's own rule decides the closed three:
+*a residual that a later gate closes is removed from the clause's input by being
+closed, not by being edited out.* The other half of `NET-109 殘留`, its
+mechanism, was never `P2`'s: the row's owner cell has read *`P2`（`P2-3`
+流量前的讀數）／`R6b`（機制）* since the commit that opened `P2`. **A gate does
+not inherit its predecessor's residuals by default**, which is the guard this
+section wrote at eight entries, so the mechanism is not counted as `P2`'s. Two
+more, `R6-6`'s unreachable clauses and the power ledger's four undefined words,
+are not in `P2`'s list at all. That leaves two, and both are below.
+
+🟢 **And that ends a coincidence this section wrote down at eleven entries.** It
+recorded exactly two residuals ever discharged by a later gate rather than
+repeated, and noted *"Both are the same field"* — `RLXFW-ID0` — *"written down
+so a third can be recognised rather than discovered."* The third, fourth and
+fifth arrive together here, and none of them is that field. What the three new
+ones share is that a step of the closing gate took each on in writing before its
+first seating. ⚠️ Whether `P4a`'s and `R1z`'s were taken on the same way is not
+re-read here, so that is not offered as the pattern.
+
+⚠️ **The nearest candidate is one subject seen as two faults, and it is declined
+as a resemblance.** `R6` carries `NET-67 殘留`, *why the engine stops retiring a
+TX descriptor*: four descriptors held, the queue stopped. `P2` carries what it
+found and did not explain: frames the driver counted as sent that never left
+port 3 (`NET-112`, reproduced as `NET-116`), which block 45 then placed in
+frames of lengths the engine was not given (`NET-119`). Both are `rlx0`'s
+transmit path, and `P2`'s trials stopped the queue six times as well. But the
+observations differ — in one the engine keeps its descriptors, in the other it
+hands them back with the frame wrong — and what would make them one fault is the
+candidate `R6b` calls M8, *an overlong frame keeps the engine from retiring
+descriptors*, which is 推 (`notes/nic-driver.md` § 21). The ten-entry run's rule
+governs: *a clause that fires on a resemblance measures the reader, not the
+ledger.* 🔴 **The honest deduction against declining it**: if M8 holds, the
+stall and the corruption are one fault and this pair should have fired. A clause
+that compares what two entries say cannot see a common cause behind two symptoms
+that each entry measured on its own. Declining costs nothing here: the owner
+opened `R6b` on this fault on 2026-09-25, before this run, and the entry that
+closes `R6b`, which owns both, decides it with M8's result in view.
+
+⚠️ **One item is in both lists, and in `R1z`'s and `P1`'s before them, and
+neither of the last two runs mentioned it: the flash boundary** — zero
+flash-write commands and zero `FLR`, the reach of the maps or the bracket, and
+the 0.0244 % the `FLR` bracket covers. Counted by the letter, it has been a
+shared item at every pair since eleven entries. **It is not counted, and this
+run says why instead of passing over it a third time**: `CLAUDE.md` § Flash
+requires every seating record to close with exactly this — the commands issued,
+the bracket's reach and what it cannot see — and each entry carries it forward
+from its seatings. It is a sentence the rules put in every entry, not a thing a
+gate set out to establish and did not, and a clause that fired on it would be
+measuring the rule. ⚠️ What it describes is real and open all the same:
+`FLS-26`'s undetermined 8,192 B are exactly `H601`, which the map skips by rule,
+and no before-and-after comparison sees two writes that cancel. Where that goes,
+if anywhere, is the owner's.
+
+### 🆕 The census re-run at thirteen entries — a fifth instance, and the second an enforcer could not have caught
+
+量 2026-09-25 over a population re-derived by a script
+(`$FWRE_WORK/rebuild/s111/land/gate/census.py`, its control `census-ctl.sh`
+beside it) that first reproduces the twelve-entry figures from `PROGRESS.md` —
+44 clauses across eight gates — and goes red on a copy with one of `P1`'s rows
+un-bolded: the `D`-row form is now
+**52 clauses across nine gates** — `R3` 5, `P4b-gate` 4, `R4` 4, `R5` 4,
+`R1-pub` 13, `R1z` 4, `P1` 4, `R6` 6, **`P2` 8** — with the four gates
+predating the form carrying 13 more in numbered- or lettered-question tables,
+carried rather than re-derived because those step lists are records. **65
+clauses.**
+
+🔴 **There is a fifth instance, and it is `P2`'s own `D8`.** The row reads
+*"network up is the first ICMP echo reply"* — an artefact named as the property.
+The first reply comes when the host's ARP broadcast of that cycle is answered,
+so its time carries the host's retransmit schedule. 量: the vendor's first
+replies in seating A spread over 1.1 s, *"made by the host's ARP retransmit
+timing, not by the boot"* (`notes/boot-time.md` § 7.7); the vendor answered a
+cycle's third broadcast in five boots that day and a cycle's first in all nine
+the next; and the contract's quiet cold `D8` width — the host's ARP phase
+against `N-NDOPEN` — is one of the six numbers that did not reproduce. The
+row's own refutation condition guards the channel offset, a quantity of
+hundreds of microseconds; the artefact it named carries an error of up to about
+a second. The gate measured around it — every network up is a bracket whose
+upper edge is the reply — so what failed is the row's wording, the way
+`P4b-gate`'s `D2` named a path while the property landed at another.
+
+🔴 **The pre-registered trigger is still not met, and the twelve-entry run's
+second reason decides it on its own.** Whether this instance counts as one
+*nobody here already knows about* is arguable: the host-phase dependence has
+been written down since seating A's record, two days before this census, but no
+one had named it as a DoD defect. It does not need settling, because **like
+`R6`'s `D6`, this is an instance an enforcer could not have caught.** The reply
+is real and correctly stamped; to flag the row a checker would have to know the
+host's ARP schedule, which is the finding and not a property of the artefact.
+**Two of the five are now of that kind, and they are the two most recent** —
+recorded, not made into a rule, for the reason this section has given since
+seven entries. ⚠️ And for the first time two instances sit at consecutive
+entries, 12 and 13. The seven-entry run named non-consecutiveness as the reason
+the clause could not reach this class; with that gone, the clause still does not
+reach it, for the reason the ten-entry run gave: what repeats is a shape of DoD
+row, not a thing either entry lists as not established.
+
+⚠️ **The weaker class stays at two.** `P2`'s `D4` names *"a host port census"*,
+and the census that ran was TCP only, so for the vendor's UDP daemons the
+scripts and the console did the work — which reads like entry 11's *capable and
+idle*. It is not counted: the census was not idle, it did the TCP half, and the
+gap is a choice of scan the row never made, which the feature table's method
+states. Recorded so a fourteenth entry does not find it and call it a third
+point.
 
 ### Carried unchanged from the seven-entry run
 

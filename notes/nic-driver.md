@@ -2417,7 +2417,7 @@ seventh fire, 1.01 s after `US1`'s kill, lands in `US1-S1` → `US2-S1`). Before
 read the healthy shape: CPU port `Rcv 0 bytes`, `CRCAlignErr` 294, port 3's egress 294
 packets, `CpuEvent 0` — a pair taken the same minute on a fresh boot.
 
-### 19.2 Receive is complete; the losses are on transmit (`NET-112`)
+### 19.2 No receive loss the counters can resolve; the losses are on transmit (`NET-112`)
 
 The vendor driver's `eth4` reports the switch's hardware counters summed over the
 physical ports (`CONFIG_RTL_NIC_HWSTATS`, the vendor's `rtl_nic.c`). Read at
@@ -2431,7 +2431,13 @@ handover (量):
 | frames out of the board | 195,145 | `n_tx` 195,327 | **182** |
 | bytes out of the board | 180,393,132 | 179,635,516 + 4 × 195,327 = 180,416,824 | **23,692** |
 
-Every frame that entered port 3 during this boot reached the driver. Of the frames
+Port 3's receive count equals the driver's here, frame for frame and byte for byte, but
+the two reads are not simultaneous: seating B's same comparison reads +2 frames and
++134 B, and IRQ 12 had taken six more interrupts by the later read than the dump
+counted (§ 20.4), so the method bounds a receive loss and cannot show that it is zero
+(🔄 111th segment: the heading read "Receive is complete" and this sentence "Every frame
+that entered port 3 during this boot reached the driver" until then;
+`tools/iperflog.py`'s docstring still quotes the old heading). Of the frames
 the driver handed to the engine, at least 182 never left port 3 — a lower bound, since
 the vendor driver may have sent some before the read. The baseline at `P1-AC0` was
 294 = 294 frames and 29,912 = 28,736 + 4 × 294 bytes, so the deficit accrued during
@@ -2442,18 +2448,24 @@ of the 991 retransmissions the board's own TCP counted in `TS2` and `TS3`.
 Second-sourced (106th segment): every number in the table reproduces from the raw text
 by a separate parser; the driver pads a frame to 60 B before counting it (讀).
 
-量: each `-S1` dump shows the TX ring's last four frames. In four of the six failed
-trials a frame the size of the `iperf3` server's results repeats — `P1-TR3-S1` 267 B
-×3, `P1-UR1-S1` 281 B ×3, `P1-UR3-S1` 281 B ×2, `P1-US1-S1` 280 B ×4 (engine-owned,
+量: each `-S1` dump shows the TX ring's last four descriptors, and a descriptor's `len`
+is the frame + 4 (讀 `rtl819x-nic.c:1625` writes `ph_len` as `len + 4` and `:2551-2553`
+prints it; 量 in seating B, `P1-TR2` sent five frames, 503 B by `nd_stats` = 263 + 4 ×
+60, and its ring read `len` 267 and three 64s, § 20.1). In four of the six failed trials
+a frame the size of the `iperf3` server's results repeats — `P1-TR3-S1` 263 B ×3,
+`P1-UR1-S1` 277 B ×3, `P1-UR3-S1` 277 B ×2, `P1-US1-S1` 276 B ×4 (engine-owned,
 `tx_stopped 1`) — while `P1-TR1-S1` holds none, `P1-TR2-S1` one, and the completed
-`P1-TS1-S1` one. 讀: `iperf3` 3.1.3
+`P1-TS1-S1` one (🔄 111th segment: the descriptor lengths 267, 281, 281 and 280 B stood
+here as frame sizes until then; block 45 lost frames of exactly 263, 276 and 277 B,
+§ 21.2). 讀: `iperf3` 3.1.3
 sends that JSON only after it has read the client's `TEST_END` and the client's own
 JSON. So the board received the end-of-test messages, answered, and kept
 retransmitting an answer the host never acknowledged. The frame identities are
 inferred from sizes (推), not captured.
 
 This is `NET-78`'s "mute, not deaf" state, counted for the first time: from port 3
-to the driver nothing was lost (the host's own side of the wire is not observed); the
+to the driver no loss the counters can resolve (the host's own side of the wire is not
+observed; 🔄 111th segment: "nothing was lost" until then); the
 board→host path lost frames the engine reports as sent. The `No route to host` episodes fit the same shape — over `P1-UR2`'s 75 s the
 driver received 19 frames and sent 25, and the host saw no ARP answer. This
 **refutes** the hypothesis I wrote during the seating: that a receive stall
@@ -2545,3 +2557,469 @@ came at 70 monotonic seconds, and `UR1`'s "51.55 s" is a test that began 19.55 s
 realtime after launch. The dips in the completed trials' interval lines each match one
 realtime step (`EV1`–`EV3`: implied 0.659 / 0.679 / 0.640 s, measured 0.660 / 0.677 /
 0.639 s): 推, host-clock artefacts, not network events.
+
+## 20 Seating 40 (`P2-4`, press 1) — the twelve `rlx0` trials again, with the board's own logs
+
+Card `bench/2026-09-25/PREDICTIONS-B46-block44.md` (card B, re-dated as block 44),
+press 1; image `p2q` unchanged (`rtl819x-nic 1.4`; 量 `P1-N0` reads `recov_mode 1`,
+`ph_follow 1`). The same twelve `iperf3` trials as § 19 on `rlx0`, the handover, and
+the same twelve on `eth4`. Card B added a driver dump and a `/proc/stat` read before
+(`-S0`) and after (`-S1`) every trial, and the board's own `iperf3` server log
+(`--logfile`), so every counter below is per trial for the first time. The two
+stops recorded in `CORRECTIONS-block44.md` (§ 1, the host-clock guard before power;
+§ 2, `P2-MB0`'s digest) fell outside these cells. The positive control
+was read before any `rlx0` board figure: `iperflog compare` read AGREE 6 of 6 on `eth4`'s
+`ER1`–`ER3` and `EU1`–`EU3`, and DISAGREE on copies with one printed number moved one
+step. Every number here was derived twice, by `$FWRE_WORK/rebuild/s111/throughput/` and
+by parsers sharing no code with it in `s111/throughput-v/` (67 of 67 frozen `D3` rows
+equal); where the two differ, the text uses the value the second source established.
+Host times are `CLOCK_MONOTONIC_RAW`.
+
+### 20.1 What the twelve trials did (`NET-116`)
+
+| trial | what | host (量) | board's `iperf3` log (量) | driver, `-S0` → `-S1` (量) |
+|---|---|---|---|---|
+| `TR1` | TCP, board receives | connected; 17.6 / 17.0 / 16.9 / 17.0 / 17.0 Mbit/s per 5 s, then 0 B from 30.00 to 69.83 s; killed by `timeout 70` (rc 124) | `TEST_END` receiver **16.953 Mbit/s**, 60.7 MBytes over 30.01 s; then a `CLIENT_TERMINATE` summary carrying the client's figures (sender 61.1 MBytes, 391 retransmissions) | `n_tx` +1,100, `n_rx` +44,444; no stop; no descriptor engine-owned at `-S1` |
+| `TR2`, `TR3`, `TS1`, `TS2`, `TS3` | TCP, both directions | `No route to host` after 3.1 s each | listening, then stopped by `killall` | `n_tx` +3 and `n_rx` +3 each, 180 B each way; `TR2` +5 / +5 with one recovery |
+| `UR1`, `UR2` | UDP 20 Mbit/s, board receives | connected; sent 53,565 / 53,521 datagrams; killed (rc 124) | 46,157 of 52,587 / 45,686 of 52,745 lost (87.8 / 86.6 %): 6,431 / 7,059 received, 2.396 / 2.631 Mbit/s; `CLIENT_TERMINATE` | `n_rx` +53,586 / +53,541; `UR1` one recovery at its start |
+| `UR3` | UDP 20 Mbit/s, board receives | no `Connecting to host` line, which 3.1.3 prints only after the parameter exchange (讀 `iperf_client_api.c`); killed (rc 124) | never `Accepted` | two recoveries |
+| `US1` | UDP 20 Mbit/s, board sends | `No route to host` after 1.1 s | stopped by `killall` | one stop and arm; four `txd` engine-owned with `tx_stopped 1` at `-S1`; the fire came after the dump |
+| `US2`, `US3` | UDP 20 Mbit/s, board sends | connected; received sequence numbers to 53,576 / 53,492, none lost; killed (rc 124); `US3`'s test began 19.60 s after launch | sender 19.982 / 19.950 Mbit/s; `CLIENT_TERMINATE` with jitter equal to the host's (1.105 / 1.434 ms) | `n_tx` +53,602 / +53,526; `US3` one recovery before its test |
+
+量, counted: **0 of 12 completed** (seating A: 3, all board-sends). Five connected and
+then failed the end-of-test exchange (`TR1`, `UR1`, `UR2`, `US2`, `US3`); six read
+`No route to host`; `UR3` never completed the parameter exchange.
+
+**The board's log settles which message is lost.** In all five connected trials the
+server log ends in the `CLIENT_TERMINATE` shape and carries the client's own figures,
+and `killall` found no process: the board received the client's results and then the
+host's terminate, and its server exited by itself. 讀 (§ 19.2): the server sends its own
+results only after it has the client's. So the message lost is the board's reply, which
+§ 19.2 inferred from TX-ring sizes and which seating B reads from the board's side.
+Card B's § 5 predicted the SIGTERM shape for a stalled trial; that shape appears only in
+the seven trials that never connected.
+
+**The no-route trials show both forms of the loss.** Each of `TR3`, `TS1`, `TS2` and
+`TS3` moved exactly three 60-B frames each way (推 the host's ARP requests and the
+board's replies; sizes only, since `P1-TCPD` had ended). In `TR3` and `TS1` the ring at
+`-S1` holds no engine-owned descriptor: the engine took the replies and the host still
+got none, `NET-112`'s form. From `TS2` on, the replies stayed in the ring (§ 20.2).
+`TR2` moved five frames each way, one of them 263 B (`nd_stats` 503 B = 263 + 4 × 60;
+its ring reads `len` 267 and three 64s), with one recovery. The bench night's account
+and block 45's card (§ 0 ②) say +3 for every trial from `TR2` to `TS3`.
+
+Board CPU (`/proc/stat` ticks, `-S0` → `-S1`, the connected trials, seating A's
+population rule): `TR1` 28.39 % (softirq 27.91), `UR1` / `UR2` 32.63 / 33.30 % (seating
+A 33.1 / 33.2, § 19.7), `US2` / `US3` 39.04 / 39.10 % (seating A 39.5); the windows of
+the trials that never connected read 0.12–0.63 %. No tick was lost inside a trial
+window; this press's one loss sits before `TR1-S0` (`CLK-42`, `notes/boot-time.md`
+§ 8.3).
+
+### 20.2 `recover` again, and a wedge it could not see (`NET-113`)
+
+From `P1-N0` to `P1-US3-S1` (量): `n_tx_stop` 6, `n_recov_fire` 6, `n_recov_ok` 6,
+`n_recov_fail` 0, `n_recov_spurious` 0, and `n_writes` 14 → 110, 6 × 16 (seating A: 7,
+and 14 → 126). Each arm and fire placed on host time from both dumps of its trial
+(`s111/throughput-v/recov2.out`); every fire came 100 jiffies after its arm:
+
+| trial | stops | arm, after launch | fire, after launch | what the trial was doing |
+|---|---:|---|---|---|
+| `TR2` | 1 | +2.00…+2.10 s | +3.00…+3.10 s | ARP; the host gave up at 3.08 s |
+| `UR1` | 1 | −0.04…+0.21 s | +0.96…+1.21 s | it began with the ring full (`UR1-S0`); its data began at +1.12 s, so the fire straddles the start |
+| `UR3` | 2 | last +50.14…+50.24 s | last +51.14…+51.24 s | a connect that never completed |
+| `US1` | 1 | +2.09…+2.19 s | after `US1-S1` | the host had given up at 1.12 s; the fire's `RLXFW-N-ENGOFF` follows that capture's prompt by 0.037 s |
+| `US3` | 1 | +10.58…+10.83 s | +11.58…+11.83 s | setup; its test began at +19.60 s |
+
+No stop fell inside a data phase. `US3` repeats seating A's `UR1` closely (setup 19.55 s,
+fire at +12.21 s, § 19.1).
+
+🔴 **A wedge `recover` could not see, read four times.** 量 `P1-TS2-S1`, `P1-TS3-S0`,
+`P1-TS3-S1` and `P1-UR1-S0`, whose dumps span 21.6 s (RAW 3556.134 → 3577.743), all read
+`tpdcr0_pos` `A15C8040` — slot 0 — with `txd0` engine-owned and `tx_stopped 0`: the
+engine stood on an owned descriptor and did not retire it. `TS2`'s third frame was in
+that slot (`TS2-S0` read `tpdcr0_pos` at slot 2 and nothing owned); `TS3`'s three
+frames went into slots 1–3 behind it, all four were owned at `TS3-S1`, and `TS3` read
+`No route to host`. Nothing reacted until `UR1` offered a frame to the full ring: stop,
+arm, fire 100 jiffies later, re-arm, which discards whatever the four slots still hold,
+without a count (讀 `NET-113`). This is § 19.5's E2 signature, read four times rather
+than twice, and
+`NET-113`'s blind spot measured: a ring on which fewer than five frames are offered
+never arms `recover`, however long the engine holds it. Why the engine stopped on
+slot 0 is `NET-67 殘留`.
+
+### 20.3 The UDP datagrams die above the driver (`NET-117`)
+
+量 `UR1` and `UR2`: the host sent 53,565 and 53,521 datagrams and the driver's `n_rx`
+rose 53,586 and 53,541, at least as many frames as datagrams (推 the 21 and 20 over are
+the control connection and ARP). The board's `iperf3` counted 46,157 of the first 52,587
+and 45,686 of the first 52,745 lost; the host's last 978 and 776 fell after it stopped
+counting. So about 46,000 datagrams per trial reached the driver and not the server
+(`iperf3`). The vendor driver on the same kernel, board and stimulus (`EU1`–`EU3`,
+§ 20.5) delivered 16,450–16,463 to its server (69.1 % lost, 6.14 Mbit/s); whether that
+loss is also above its driver is not measured, since `eth4` has no driver counter here.
+Where above the driver, the socket included, is `NET-117`'s 殘留: card B reads no board
+`/proc/net/snmp`, whose `Udp:` `InErrors` and `RcvbufErrors` would say whether the
+socket's buffer overflowed. 推: the receive
+path is CPU-bound — `UR1`'s window holds 2,286 softirq ticks, 76 % of its 30-s data
+phase if they all fell there.
+
+The sending direction lost no datagram: `US2` and `US3` put 53,602 and 53,526 frames
+through the driver — 1,442 B each (讀 the card's `-l 1400`; `nd_stats` averages 1,441.4
+and 1,441.2 B per frame) — and the host received sequence numbers to 53,576 and 53,492
+with none lost. Only their end-of-test exchanges failed.
+
+### 20.4 `NET-112` in seating B: 128 frames short on transmit, and receive's exact 0 not reproduced
+
+`P1-ETH4`'s switch counters against `P1-US3-S1`, the last `rlx0` dump (量):
+
+| | switch, port side | `rlx0` driver | difference |
+|---|---:|---:|---:|
+| frames into the board | 226,569 | `n_rx` 226,567 | +2 |
+| bytes into the board | 227,544,248 | 226,637,846 + 4 × 226,567 = 227,544,114 | +134 |
+| frames out of the board | 183,132 | `n_tx` 183,260 | **128** |
+| bytes out of the board | 159,781,188 | 159,060,083 + 4 × 183,260 = 159,793,123 | **11,935** |
+
+The transmit deficit reproduces in kind: 128 frames and 11,935 B, 93.2 B per missing
+frame (seating A 182 frames, 23,692 B, 130.2 B), a lower bound for § 19.2's reason. At
+most 24 of the 128 are frames the six re-arms discarded (≤ 4 per fire, `NET-113`); 推
+four of those are the frames queued behind § 20.2's wedge. The control holds exactly:
+`P1-AC0` against `P1-N0`, before any `iperf3` traffic, 414 = 414 frames each way,
+42,152 = 40,496 + 4 × 414 bytes, CPU port `CRCAlignErr` 414, `CpuEvent` 0.
+
+Receive does not reproduce seating A's exact 0: +2 frames, +134 B. IRQ 12 reads 326,504
+at `P1-ETH4` against `rlx0`'s last `n_irq` of 326,498, so the line took six interrupts
+after the dump — from `rlx0` before `P1-DOWN`, or from `eth4` after it came up; the
+line is shared and `/proc/interrupts` does not say which. Frames moved after the dump,
+and the two can be among them. That is not shown to be a receive loss, but it shows the
+comparison cannot give an exact 0: its two reads have a handover between them. § 19.2
+is corrected in place.
+
+### 20.5 The vendor driver, `eth4`
+
+量 all twelve completed (`iperf Done.`, rc 0, 30.20–30.58 s):
+
+| trials | what | outcome (量) | board CPU busy % |
+|---|---|---|---|
+| `ER1`–`ER3` | TCP, board receives | 24.572 / 24.653 / 23.923 Mbit/s (the board's `TEST_END`; host receiver lines 24.6 / 24.7 / 23.9) | 47.35 / 50.17 / 74.03 |
+| `ES1`–`ES3` | TCP, board sends | 25.8 / 26.2 / 26.1 Mbit/s, 0 retransmissions | 86.85 / 87.09 / 86.87 |
+| `EU1`–`EU3` | UDP 20 Mbit/s, board receives | 36,851 / 36,838 / 36,849 of 53,301 / 53,301 / 53,299 lost (69.14 / 69.11 / 69.14 %); 16,450 / 16,463 / 16,450 received, 6.141 / 6.146 / 6.141 Mbit/s (× 1,400 × 8 / 30 s) | 35.53 / 35.74 / 35.08 |
+| `EV1`–`EV3` | UDP 20 Mbit/s, board sends | 20.0 Mbit/s ×3, 0 lost | 78.83 / 77.17 / 79.71 |
+
+Every rate and CPU median is within ±10 % of seating A's (§ 19.4): rates −0.52, −0.38,
++3.09 and +0.50 %; CPU −8.21, −3.25, −7.40 and −3.54 %. About 3 % of each relative CPU
+drop is the bracket, not the board: every seating-B `eth4` window is 3.1–3.4 % longer
+(about 1.1 s), while the busy ticks moved −0.2 % (`ES`), −0.4 % (`EV`), −4.3 % (`EU`)
+and −5.2 % (`ER`) (量 `s111/score-judge/cpu.out`). `ER3`'s 74 % is unexplained: 2,499
+softirq ticks against 1,610 and 1,689, with about the same IRQ 12 count (4,764 against
+4,756 and 4,798) and a lower rate.
+Card B's CPU bullet gave seating A's literal ranges with no tolerance; read literally,
+all twelve readings fall outside them.
+
+### 20.6 ICMP: `rlxfw`'s rtt rose and the vendor's fell between the days (`NET-121`)
+
+量 600 of 600 echoes, 0 % loss in all 30 series (20 echoes at 50 ms per payload, three
+`rlxfw` and three vendor boots). Medians of the three series' averages, ms:
+
+| payload (B) | `rlxfw` B | `rlxfw` A | vendor B | vendor A |
+|---:|---:|---:|---:|---:|
+| 56 | 1.723 | 1.586 | 1.197 | 1.516 |
+| 256 | 1.792 | 1.518 | 1.406 | 1.895 |
+| 512 | 1.743 | 1.640 | 1.323 | 1.644 |
+| 1,024 | 2.020 | 2.086 | 1.347 | 1.782 |
+| 1,472 | 2.399 | 2.139 | 1.490 | 1.690 |
+
+Five `D5a` rows of `D3`'s list are stable, all `rlxfw`'s: the 256 and 1,472 averages and
+the 1,472 mdev (0.476 → 0.555 ms) miss (+18.05, +12.16 and +16.60 %), the 512 and 1,024
+averages hit (+6.28, −3.16 %). By `D3`'s closing rule (3) the three are published
+outside the results and carried forward as `D3-MISS`. The vendor's averages are 11.8–25.8 % lower on day B
+at every payload; they are not stable rows, since seating A's own spread passes ±10 %.
+
+What is known about the shift (量 unless marked; `s111/score-judge/`):
+
+* It is not `ping`'s userspace: the host capture's own stamps put each average 0.025–
+  0.043 ms below `ping`'s, the same in both seatings.
+* It is not the floor: at the capture's level, `P3` against `P3` moves +18.1 % (256 B)
+  and +12.3 % (1,472 B) in the average while the minimum does not rise (day B 1.021
+  against day A 1.080 ms; 1.419 against 1.466 ms).
+* The host capture is a candidate that does not explain all of it. On day B `P1-ICMP`
+  ran inside `P1-TCPD`'s `tcpdump`, and `P3` ran under a capture on both days; seating
+  A's `P1` and `P2` had none. Split that way, `rlxfw`'s 256 / 1,472 averages move +7.2 /
+  +9.9 % without a capture and +13.5 / +19.7 % with one (n = 1–2 per stratum); 1,472's
+  mdev misses without one too (+14.4 %); and `P3` against `P3`, captured on both days,
+  still moves +18.1 / +12.3 %. The vendor, never under a capture, moved the other way.
+* 推: a ±10 % band on the median of three 20-echo standard deviations is narrower than
+  that statistic's own sampling error, about 16 % per SD.
+
+The experiment that settles it belongs to `R6b`, whose regression re-measures ICMP
+(`D3-MISS`): at least five interleaved `rlxfw` series, with the host capture on and off,
+in one seating, with vendor series beside them.
+
+### 20.7 What this seating does not say
+
+* Where above the driver `rlx0`'s UDP datagrams die, or why (§ 20.3).
+* That the `rlx0` board-side figures are right: the positive control is `eth4`'s, and a
+  failed exchange has no host counterpart; `TR1`'s 16.953 Mbit/s is n = 1, and no `rlx0`
+  TCP board-sends trial connected.
+* The identities of the 60-B frames in the no-route trials and of `TR2`'s 263-B frame:
+  sizes, not captures.
+* Why the engine stopped on slot 0 in § 20.2, what `UR3`'s connect lost, and what took
+  `US3` 19.6 s to start.
+* Whether the +2 frames of § 20.4 are a receive loss.
+* Why the ICMP rtt moved between the days (§ 20.6), or why `ER3` read 74 % busy.
+* Host rates against true time: every host window is "affected" under card B § 3.8
+  (`tick` 10001, then 9999 from RAW 3913.2; at most 46 ppm measured against RAW), which
+  moves no figure here by more than 0.005 %.
+
+## 21 Block 45 (`R6b`'s first bench block) — where `rlx0`'s transmitted frames go wrong
+
+量 2026-09-25 03:18–03:34, `bench/2026-09-25b/`, card `PREDICTIONS-B47-block45.md`
+(frozen `8656c61`): one press after seating B's twelve, the same board, host, image
+`p2q` and attaches. It is not a `P2` step: the owner opened `R6b` at the 110th segment's
+close with this block as its first bench block. Ten brackets, each read while nothing
+generates traffic: the driver (`D1-Nk`), the board's stack (`D1-Sk`, `/proc/net/snmp`),
+the switch (`D1-Kk`, `asicCounter`) and the host adapter (`D1-Hk`: sysfs statistics and
+the host's `/proc/net/snmp` and `netstat`; the adapter is bound to `r8153_ecm`, which
+exposes no tally counters), plus a host `tcpdump` of ICMP and two ARP shapes, never
+`-e`. The one departure (`CORRECTIONS-block45.md` § 1) is three misnamed `looprun`
+artefacts that no prediction reads. Every count below was re-derived at the desk by two
+parsers that share no code with each other or with the bench night's
+`s110/card45/analyze45.py`: `s111/r6b-dossier/a45b.py` and
+`s111/land/nic/check/b45chain.py`. The bench night's errors are in § 21.5. Each of
+the seven `D1-N` → `D1-N` intervals, each holding one `asicCounter` read, lost 112–114
+jiffies, and the one interval between two driver dumps that holds no such read,
+`D1-TN` → `D1-TN2`, lost 0.0 (量 `s111/throughput-v/tick45.out`; `CLK-42`; 推 the read
+is the cause); no count here depends on the board's time.
+
+### 21.1 E1: the stage chain holds, and its premise needs `FragErr`
+
+量 `D1-ICMP` (five payloads × 20): 100 of 100. The TX chain reads `n_tx` 102 = CPU
+port `CRCAlignErr` 102 = port-3 output 102 = host `rx_packets` 102, and the RX chain 102
+at all four stages; the bytes are exact, the driver's 70,720 = port 3's 71,128 − 4 × 102
+= the host's 69,292 + 14 × 102. The CPU port's size histogram moved exactly as the card
+predicted: 64 +2 (the board's two ARP frames), 65–127 +20, 256–511 +20, 512–1023 +20,
+1024–1518 +40. So `CRCAlignErr` — the vendor's print of `dot3StatsFCSErrors` (讀
+`rtl865x_asicCom.c:1790-1798`) — counts every frame the CPU port takes from the DMA
+engine, and in every bracket of this block port 3's output equals `CRCAlignErr` −
+`JabberErr` − `FragErr` − `Drop` exactly. The card's premise (§ 0 ③) left `FragErr` out
+and is one frame off in E2 (173 against 172) and E4 (1,137 against 1,136).
+
+推: since every CPU frame counts as an FCS error there, at the CPU port `JabberErr`
+means longer than 1,518 B and `FragErr` shorter than 64 B, and `Rcv 0 bytes`
+(`ifInOctets`) is the octets of error-free frames, of which it receives none. That is a
+desk reading of `NET-109 殘留`, not a measurement.
+
+### 21.2 E2: the engine sends lengths it was not given (`NET-119`)
+
+量 `D1-ISZ`: eleven `ping` runs (`-c 20 -i 0.05 -w 10 -q`) whose replies are frames of
+60, 61, 62, 63, 263, 276, 277, 1,511, 1,512, 1,513 and 1,514 B, every residue mod 4
+(讀 the card: every control before this block used lengths ≡ 2 mod 4). One bracket
+covers all eleven. Per length, from `ping`'s summary and the host's capture (`D1-TCPD`):
+
+| frame (B) | requests | `ping` counted | replies on the wire | their sequence numbers |
+|---:|---:|---:|---:|---|
+| 60 | 20 | 20 | 20 | 1–20 |
+| 61 | 181 | 19 | 19 | 1, 5, 7, 13, 15, 20, 22, …, 64, 66 (gaps 2 and 5–6); none after 66 |
+| 62 | 74 | 20 | 20 | 5, 7, 13, 15, 20, 22, …, 72, 74: from 5 on, the same numbers as 61 |
+| 63 | 180 | 9 | 9 | 6, 7, 40, 44, 46, 50, 52, 57, 59; none after 59 |
+| 263 | 179 | 1 | 1 | 78 |
+| 276 | 25 | 20 | 20 | 6–25 |
+| 277 | 134 | 20 | **39** | 1, 3, 8, 10, 15, 17, …: period 7 (gaps 2, 5) throughout |
+| 1,511 | 179 | 0 | 0 | — |
+| 1,512 | 179 | 1 | 1 | 136 |
+| 1,513 | 22 | 20 | 20 | 3–22 |
+| 1,514 | 20 | 20 | 20 | 1–20 |
+
+Three shapes (推 from the time structure): clean (60 and 1,514, and 276 and 1,513 after
+losing their first 5 and 2, each run right after a bad length); periodic (61 before its
+tail, 62, 63's middle, 277); and blackouts lasting seconds (263, 1,511, 1,512, the tails
+of 61 and 63), far longer than `recov_ms` 1000, with only five fires in all of E2. 61 and
+62 are separate runs, and they lost the same sequence numbers: 推 the pattern is locked
+to each run's start (its 50-ms timing or its numbers), not to the four-slot ring, which
+would repeat every four frames rather than seven.
+
+Where the 1,193 replies went, bracket `D1-*1` → `D1-*2` (量 counts; 讀 and 推 where
+marked):
+
+* The stack generated 1,193 echo replies (`Icmp.OutEchoReps`) and 9 host-unreachables:
+  1,202 `Ip.OutRequests`.
+* 推 the 86 `Ip.OutDiscards` are `NET-57`'s `noqueue` drops. 讀 the 2.6.30
+  `dev_queue_xmit`: with no qdisc, a stopped queue or a `NETDEV_TX_BUSY` return frees the
+  skb with `-ENETDOWN`. Five are BUSY returns (`n_xmit_busy` +5); 推 the rest were offered
+  while a recovery was pending. The comment on `nic_xmit`'s stop path still says the
+  stack retries.
+* 推 the 9 host-unreachables are three neighbour failures of 3 queued packets each: the
+  board's entry for the host went `FAILED` three times.
+* 935 frames reached the driver, A of them ARP (A ≥ 3: the host saw 3 from the board),
+  so 163 + A — at least 166 — replies vanished between the stack and the driver without
+  a count (推 the queue of an unresolved neighbour overflowing).
+* Driver → CPU port: 935 → 894. At most 20 of the 41 are frames the five re-arms
+  discarded unsent (≤ 4 per fire, `NET-113`); at least 21 are unexplained.
+* CPU port: 894 = **678 `JabberErr` + 1 `FragErr` + 43 `Drop` + 172 forwarded**,
+  exactly. The histogram counts only legal-length frames, 215 = 172 + 43. Less the
+  forwarded frames of each size, the 43 legal-length drops sit in 65–127 (1), 256–511
+  (27), 1024–1518 (9) and **512–1023 (6)**, a bucket no reply in E2 can fill. Positive
+  control, the same bracket: port 3's ingress histogram lands exactly on the 1,193
+  requests and 4 other host frames (推 ARP) by size (64 +24, 65–127 +435, 256–511 +338,
+  1024–1518 +400).
+* Port 3 → host: 172 = 172, which is 169 replies and 3 board ARP frames.
+* Host: `Icmp.InEchoReps` +150 = `ping`'s 150. The 19 missing are all 277-B replies
+  (39 on the wire, 20 counted), and no host error counter moved: `InHdrErrors`,
+  `InCsumErrors`, `InTruncatedPkts`, `InDiscards`, ICMP `InErrors`, `rx_errors` and
+  `rx_dropped` all read Δ 0. They were dropped before IP's accounting.
+
+🔴 **E2 delivered 76 B more than its content.** The host's `rx_bytes` + 14 per frame =
+port 3's `Snd` − 4 per frame = 83,060 B over 172 frames, against 169 replies at their
+wire lengths (82,804 B) and 3 × 60 B of ARP, 82,984 B; the same identity is exact in E1
+(70,720 = 70,720). 76 = 19 × 4. 推, the strongest clue this block gives: each of the 19
+host-rejected 277-B replies carried 4 bytes more than its content. An 802.1Q tag fits
+both facts (推, the host's kernel not read: the host drops a frame tagged with a VLAN it
+has no device for before IP, with no SNMP count, and `tcpdump` without `-e` decodes
+through the tag), and it would mean the engine or the switch used descriptor content
+rlxfw did not write for that frame. The committed captures cannot decide it: no `-e`,
+no pcap, no host `otherhost` counter.
+
+推, reading the CPU port's counters as § 21.1 does: the DMA engine handed the switch 678
+frames longer than 1,518 B although no reply was that long, one frame shorter than
+64 B and 6 of lengths no reply had, and 19 frames reached the host and were rejected
+there, while 60, 276, 1,513 and 1,514 B went through. Which length produced which
+jabber is not in the data, since one bracket covered all eleven. 推: 263, 276 and
+277 B are exactly the frames § 19.2 found repeating in seating A's TX ring, so
+`NET-111`'s failed end-of-test exchanges may be this length error rather than a
+separate fault; `R6b`'s regression over the twelve trials decides it. Seating B's
+`US2` and `US3` sent 53,602 and 53,526 frames of 1,442 B with none lost (§ 20.3), a
+length E2 did not test.
+
+### 21.3 E3: every RST reached the host, some after `nmap` had given up (`NET-120`)
+
+量 `D1-NMAP` (`-sT -p- -T4 --max-retries 1`, 37.93 s): 59,982 closed, 5,553 filtered.
+The board's TCP sent 71,825 RSTs (`Tcp.OutRsts`), and `n_tx`, the CPU port's
+`CRCAlignErr`, port 3's output and the host's `rx_packets` all read **71,828** (推 the
+other 3 are ARP): no stage lost a frame. On the host, `ActiveOpens` 71,825 =
+`AttemptFails` 59,984 + `TCPAbortOnData` 11,841 exactly. 讀 (`tcp_close`,
+`net/ipv4/tcp.c` in the staged 2.6.30 tree; the host runs a later kernel):
+`TCPAbortOnData` counts a close with zero linger, which is how a connect scan ends a
+probe it has stopped waiting for. So each connect either failed on its RST or was
+closed before the RST came. 71,825 − 65,535 = 6,290 retransmitted probes, and 6,290 +
+5,553 = 11,843, within 2 of 11,841 (推 one retransmission per unanswered probe). The
+RSTs were late, not lost. The card's 推, a shortfall between `n_tx` and `CRCAlignErr`,
+is refuted: no stage falls short.
+
+推, why late: port 3 sent the host 23,262 PAUSE frames during the scan (and 17,564
+during E4), and the driver's NAPI ran at its budget almost throughout (`n_napi_poll`
++4,494 against `n_napi_complete` +8). The board's receive side was saturated, and the
+RST for a SYN went out behind the queue.
+
+`NET-115` recorded `rlxfw`'s 6,546 filtered ports in seating A as ports that did not
+answer, and seating B's `P1-NMAP` read 8,239 (57,296 closed). 推 by this block, those
+are late RSTs rather than missing ones; the two scans had no host counters to show it,
+so this is an analogy, not a measurement of them.
+
+### 21.4 E4, E5, E6 and E10
+
+* **E4** (`D1-T`, TCP, board receives): the host's intervals read 18.0 / 17.3 / 17.3 /
+  15.3 / 17.2 Mbit/s per 5 s, then 0 B from 30.00 to 71.12 s; killed (rc 124). The stall
+  reproduced. TX chain 1,144 → 1,138 → 1,136 → 1,136, with `JabberErr` +1 and `FragErr`
+  +1; RX 44,040 at all four stages. One recovery fired (5 → 6). `D1-TN` and, 17.4 s
+  later, `D1-TN2` read `tx_stopped 0` with every `txd` CPU-owned, and the ring holds a
+  263-B frame (`len` 267; twice at `D1-TN`): 推 the server's results, the shape of § 19.2
+  and § 20.1.
+* **E5, E6** (`D1-P1` right after the kill; `D1-P2` after `engine off` / `arm` /
+  `engine on`; `D1-P3` 120 s later): 40 of 40 each, with the stages equal within one
+  read (`n_tx` 40 / 41 / 42 against `CRCAlignErr` 41 / 41 / 42). E5's predicted mute did
+  not occur.
+* **E10** (`eth4`, the vendor driver, after `D1-DOWN`): `D1-EPING` 4 of 4; `D1-E` 25.0
+  Mbit/s sender and 24.9 receiver, completed; `D1-EP` 40 of 40. The board's stack sent
+  16,214 IP datagrams, the switch took 16,215, port 3 sent 16,215 and the host received
+  16,215, with `JabberErr`, `FragErr` and `Drop` all 0. The same switch, cable and host
+  adapter carried the vendor driver's frames clean. That does not refute the attribution
+  of E2's length errors to `rlx0`, and cannot confirm it: E10's `ping` frames were 98 and
+  642 B (讀 card 45's `PRB`, `-s 56` and `-s 600`, and `D1-EPING`'s default), both ≡ 2
+  mod 4 like the lengths E1 carried clean on `rlx0`, and the lengths of `iperf3`'s frames
+  through `eth4` were not recorded.
+
+### 21.5 Corrections to the bench night's account
+
+The record (`LOG.md`, 110th segment § 六) is not edited. What it says and the captures
+do not (量, both desk parsers):
+
+1. *直方圖沒數那兩個 64 B 的 ARP* (the CPU port's histogram did not count the two 64-B
+   ARP frames) is false. The raw lines read the CPU port's `64:` bucket 0, 2, 25 and
+   71,853 at `D1-K0`…`D1-K3`, with `< 64:` at 0 throughout. `s110/card45/analyze45.py`
+   line 58 builds each bucket's pattern as `r"%s: (\d+) pkts" % re.escape(bk)`; for the
+   bucket `64` that matches first inside `< 64: 0 pkts`, so its "64" column was the
+   `< 64` bucket. The card's E1 prediction (64 +a) held, with a = 2. `FW-140`.
+2. The E2 and E4 rows leave out `FragErr` +1 each and E4's `JabberErr` +1 (§ 21.1);
+   `analyze45.py` reads no `FragErr` field.
+3. E2's *1,202 → 935* is one arrow over three mechanisms (§ 21.2), and *277 B 20/134* is
+   `ping`'s count: 39 of those replies reached the host adapter.
+4. E10's *16,215 ×4* is 16,214 + 16,215 × 3: the stack stage counts IP datagrams, and
+   the extra frame is 推 an ARP.
+5. `s110/card45/analyze-r1.out` was written at 03:33:19, one second after `D1-DOWN`
+   began (03:33:18) and before `D1-ETH4` (03:33:22); it prints *E10 eth4 bracket 8 or 9
+   missing*. The record's E10 numbers came from a computation that was not saved.
+6. The card's E4 detail, *`n_recov_fire` as at `D1-T-S0`*, missed: 5 → 6. The record's
+   *成立* follows the refutation clause, which did not name it.
+7. The card's § 0 ② and the record say `n_tx` rose by 3 in each trial from `TR2` to
+   `TS3`; `TR2` rose by 5, with one recovery (§ 20.1).
+
+### 21.6 The mechanisms handed to `R6b` (all 推)
+
+The TX length fields, side by side (讀):
+
+| field | `rlxfw` 1.4, `nic_xmit` | vendor `_swNic_send` (`rtl865xc_swNic.c:713-721`) |
+|---|---|---|
+| `ph_len` | L + 4, with L padded to 60 (`rtl819x-nic.c:1625`) | L + 4, or 64 when L < 60 |
+| `m_len` | L (`:1622`) | = `ph_len` |
+| `m_extsize` | 2,046, constant (`:1623`) | = `ph_len` |
+| buffer | its own copy, at 2 mod 4 (`NIC_RX_OFFSET` reused, `:1610`) | `skb->data`, zero-copy, written back from the cache first (`rtl_nic.c:5159`) |
+| padding | zero-fill to 60 | none |
+| `ph_portlist` | `0x3F` | masked with `0x1f` |
+
+The comment at `rtl819x-nic.c:1613` cites the vendor's lines 718–721 for the padding and
+the FCS in `ph_len`; the same four lines set `m_len` and `m_extsize` equal to `ph_len`,
+which `rlxfw` did not copy. Each candidate, with what refutes it:
+
+* **M1, the `m_len` / `m_extsize` convention**, the one difference in the length fields
+  between `rlxfw` and both vendor paths. Refuted by a one-boot A/B behind a driver verb
+  (`txlen vendor|rlxfw`) giving identical jabbers per length. Desk precursor: the
+  loader's own TX `m_len` rule, from a disassembly of its send routine or one read of its
+  descriptor at the prompt.
+* **M2, start offset × length**: TX buffers start at 2 mod 4 because the RX offset was
+  reused. Refuted by a `txoff 0|2` A/B with the jabber pattern unchanged.
+* **M3, state from earlier frames rather than length alone**: the period 7 at 277 B, the
+  same sequence numbers lost in the separate 61 and 62 runs, and 276 and 1,513 losing
+  their first frames right after a bad length. Refuted by a bracket per length at
+  ≥ 200 ms per frame: a length that stays bad in isolation needs no state.
+* **M4, descriptor content the frame was not given** (the 76 B = 19 × 4). Refuted by a
+  host pcap kept outside the repository and checked by a script that prints, per frame,
+  only the tag's presence and the excess length: no tagged frame and no excess at the
+  lengths that lose.
+* **M5, `portlist 0x3F` against the vendor's `0x1f` mask.** Length-dependence is not
+  expected; the `tx` verb with other portlists settles it at runtime, with no image.
+* **M6, the CPU interface's own framing, below the DMA engine.** Located by the loopback
+  arm (`lb on`, the looped frame's `ph_len`): a correct `ph_len` while the switch counts
+  jabbers puts the fault between the CPU interface and the switch.
+* **M7, the stack path** (the byte copy, the skb's geometry, concurrency with the ISR).
+  Refuted by the raw `tx` verb reproducing the stack arm's jabbers per length.
+* **M8, jabber → stall**, the link to `NET-67 殘留`: an over-long frame keeps the engine
+  from retiring descriptors (five fires in E2 and one in E4, each beside jabbers).
+  Refuted by a recovery at a length whose `JabberErr` Δ is 0.
+
+Not a candidate (讀): cache coherency. Rings, descriptors and buffers are one region,
+written back once at allocation (`rtl819x-nic.c:1872`) and used through `CKSEG1ADDR`
+(`:1875`), uncached; the vendor's per-frame writeback has no counterpart because none is
+needed.
+
+### 21.7 What block 45 does not establish
+
+* The mechanism: every M above is 推, and the block names stages, not a field.
+* That the length errors are `rlx0`'s rather than the path's: no length that fails on
+  `rlx0` is known to have gone through `eth4` in E10.
+* Which frames the 678 jabbers, the 43 drops and the 19 host-rejected replies were: no
+  pcap, no `-e`, no bracket per length.
+* Whether the 76 B are 19 tags: the 19 × 4 match is arithmetic, not a capture.
+* That the loss depends on length rather than history: the eleven lengths ran back to
+  back in one bracket.
+* Where at least 21 frames went between the driver and the CPU port in E2, and where the
+  166 or more replies went between the stack and the driver.
+* More than one instance of any condition: one press, one boot.
