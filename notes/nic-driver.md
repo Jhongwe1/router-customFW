@@ -3650,3 +3650,456 @@ as well as by the clock, so a sleep that returned early could not raise it.
 * 1.5's source comment at `:122` still says 1.3 added *"get_drvinfo +
   get_link"*; it also added `get_ringparam`. The fix changes no object byte
   and is deferred to a commit that touches `rtl819x-nic.c` anyway.
+
+## 25 Block 47 (`R6b-3`, card 1) — the fix A/B on one boot: the vendor's lengths clean over every swept length, 1.4 faulting beside them, and one rule left standing
+
+量 2026-09-26 13:33–14:04, `bench/2026-09-26/`, card `PREDICTIONS-B49-block47.md` (frozen
+`a9e2501`, sha256 `129a7c90d882…`, the digest every runblock header printed): one press on
+`r6b2q`, driver `rtl819x-nic 1.5` (`RLXFW-ID0=06C39CA3` at boot, `recipe_id 06C39CA3` through
+`/proc`, the `nfjrom` digest equal to the pin). `check-predictions` found 421 of the card's 445
+captures, each newer than the card; the 24 it did not find are `I-RQ`'s, which runs only after
+a VOID of the read-back (§ 25.1: none). One stop: `RB-02-R`'s `until` gate; the declared re-read
+`X-RT1` (`CORRECTIONS-block47.md` § 1) ended on the prompt and `I-RB` continued from `RB-02-C`.
+Every other invocation ends `ALL ITEMS DONE`, and every GATE line reads ok. The readings: two
+readers that share no code (A and B), a judge with instruments of its own and a critic with
+instruments of its own, each shown refusing a mutated input or failing a planted control
+(`$FWRE_WORK/rebuild/s112/r6b3/read/{a,b,j,crit}/`); where they differ the ruling is § 25.11.
+Every number below was re-derived from the raw captures or from those readers' outputs; the
+landing's own counts are `s112/r6b3/record/work/{c19,hwin,pings,flashc}.py`, each with a
+control. Names are card § 3.0's: `n` Δ`n_tx`; the CPU port's `c` (`CRCAlignErr`), `j`, `f`,
+`d` (`JabberErr`, `FragErr`, `Drop`) and `dropev`; port 3's output `o`; the host adapter's
+received `h`; the host's Δ`Icmp.InEchoReps` `i`; the capture's `w`. 量 67 board reads carry
+`asicCounter`, so the block has 66 brackets.
+
+### 25.1 The read-back first (`R6b-2`'s DoD): EQUAL twice
+
+* **`RB-01-C`**, on a ring re-armed with `rlx0` down: slots 0, 1 and 2 hold the `tx` verb's
+  fills at 60, 61 and 1,514 B, each `fill-words 8 of 8 equal; alloc-only 5 of 5 equal`; the
+  control reads OWN `1110` and `tpdcr0_pos` `A15C8040`, still at `tx_ring` (量, `rbcheck` 1.2).
+  Reader B's own grade of all 13 words (the ring word, `ph` w0–w5, `mb` w0–w5) against 1.4's
+  text at `f758d62` agrees (量 against 讀, second source).
+* **`RB-02-C`**: from `RB-02-S` (`txq` 8) two fills, 9 and 10, went to slots 1 and 2, both
+  `nic_xmit` at F 61 (the host's two 61-B echo replies, held by `txstall on`; `RB-02-P` read 2
+  sent, 0 received, as declared), each 8 of 8 and 5 of 5; the control reads OWN `0110`,
+  `tpdcr0_pos` unmoved and `n_recov_fire 0` on the graded page, `RB-02-R`'s (量).
+* So P1 holds and P1b did not run (its condition, a VOID, did not occur). 讀 The alloc-only words
+  of the held slots equal alloc's: the engine did not write them while fetch was held; whether
+  it writes a descriptor it fetches is not shown.
+* **After the graded page** (量, `RB-02-R` → `X-RT1`): `txq` 10 → 12 (fill 11 in slot 3, fill
+  12 in slot 0, both `nic_xmit` at F 60), `n_tx` 10 → 12, `n_xmit` 7 → 9, `n_xmit_busy`,
+  `n_tx_full` and `n_tx_stop` 0 → 1, `n_recov_arm`, `n_recov_fire` and `n_recov_ok` 0 → 1,
+  `n_recov_fail` 0; `recov_j_arm` 294 jiffies after `RB-02-R`'s `j_now`, `recov_j_fire` 100
+  after the arm. The recovery's four marks follow the page's last `ww` line, interleaved into
+  the prompt, so the `until` pattern never matched (`FW-47`). 推 The held ring filled, the queue
+  stopped and the recovery timer fired, in that order: the counters and the recovery's design,
+  not a timestamp.
+
+### 25.2 The guards (P2): every one as written
+
+量, each against the page's `v15 last`: `VC-01` `txlen` −16 with `rlx0` up (`tx15 … rlxfw …
+dirty 0`); `VC-02` `sweep 60 60 0` −16, `sw never`, no mark; `VC-03` `sweep 59 1514 60` −22, no
+mark; `VC-04` with `rlx0` down `txlen vendor` accepted, 13, `dirty 1`; `VC-05` `engine on`
+−151; `VC-06` `ifconfig rlx0 up` refused (`nd_up 0`, the shell printing ESTALE's text), refused
+count 4 → 5; `VC-07` `arm` clears dirty (`arm15` 0 → 1) and `VC-07-C` reads alloc's 13 words in
+all four slots; `VC-08-R` `txlen rlxfw` 12, `nd_up 1`, `dirty 0`, and the host reached the
+board (`VC-09-L` 4 of 4); `VC-EE` a sweep under another key −17, no mark, `rec 11` untouched;
+`SW-CLR` `swclear` 8, `mt none 1455`, `rec 0`; `W-2-EP` a two-length wire sweep at `txlen
+rlxfw` −1 (EPERM), refused count 6 → 7, the wire records (`rec 1455`) untouched. `W-1` at `txlen
+vendor` is the bound's permitting half (§ 25.6). Not tested: the `-EBUSY` a second writer meets
+during a sweep (card § 7).
+
+### 25.3 The stack A/B: E2 under the fix, under 1.4, under the fix
+
+Each arm is the policy switch, the port-3 and liveness gates, a bracket, block 45's E2 (eleven
+`ping -c 20 -i 0.05 -w 10` back to back) and a bracket; only the `txlen` word differs (讀 card
+§ 3.3). 量:
+
+| arm | `txlen` | sent | `i` | echo replies on the capture | `c` | `j`/`f`/`d`/`dropev` | 512–1023 | `o` | `h` | port 3 in | `n_recov_fire` |
+|---|---|---:|---:|---|---:|---|---:|---:|---:|---:|---:|
+| `E-F1` | `vendor` | 220 | 220 | 220, untagged, + 1 ARP | 221 | 0/0/0/0 | 0 | 221 | 221 | 221 | 0 |
+| `E-L1` | `rlxfw` (1.4) | 1,327 | 145 | 145 untagged + 19 tagged, + 4 ARP | 789 | 581/3/41/32 | 3 | 168 | 168 | 1,335 | 10 |
+| `E-F2` | `vendor` | 220 | 220 | 220, untagged, + 1 ARP | 221 | 0/0/0/0 | 0 | 221 | 221 | 221 | 0 |
+
+* **Under the fix**, in each arm: all eleven `ping`s read `20 packets transmitted, 20
+  received`; the capture holds eleven identifiers × sequence numbers 1–20, each reply at its own
+  length; no `0x8100` frame and no excess byte, under the card's formula and the tag-excluding
+  one; buckets 64: 21, 65–127: 60, 128–255: 0, 256–511: 60, 512–1023: 0, 1024–1518: 80, so `c`
+  221 = 220 + 1 ARP. 讀 A frame 4 bytes longer would move a bucket only at 60 and at
+  1,511–1,514; at the other lengths the capture's own length field says each reply was its own
+  length. The path gate read `covered yes` in every arm (port 3 received every echo request).
+* **Under 1.4** (`E-L1`): buckets 24/54/0/81/3/43, summing to 205 = `c` − `j` − `f`;
+  Δ`n_tx_stop` 10, Δ`n_dsync` 105, Δ`n_ph_diff` 105. The capture window that matches `h` is
+  records 233–400 (§ 25.4): 168 frames.
+* **Order**: `E-F2` repeats `E-F1` after `E-L1` faulted on the same boot.
+
+E-L1 per length (量, `ping`'s own lines, answered of sent), beside block 45's E2
+(`bench/2026-09-25b/D1-ISZ`). Card § 0 ② draws no per-length figure from this arm: it is one
+bracket, back to back.
+
+| L | 60 | 61 | 62 | 63 | 263 | 276 | 277 | 1,511 | 1,512 | 1,513 | 1,514 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| block 47 | 20/20 | 1/179 | 20/138 | 20/176 | 2/171 | 20/49 | 20/134 | 2/179 | 0/179 | 20/82 | 20/20 |
+| block 45 | 20/20 | 19/181 | 20/74 | 9/180 | 1/179 | 20/25 | 20/134 | 0/179 | 1/179 | 20/22 | 20/20 |
+
+In both blocks fewer were answered than sent at every length but 60 and 1,514 (量). Which side
+was lost is not measured: port 3 received every request (1,335 ≥ 1,327), the CPU port saw 789
+board frames of which 581 were jabbers, and at 276 and 1,513, which § 25.7's rule calls clean,
+the side is unknown. On the capture the replies at 276 are sequence numbers 30–49 and those at
+1,513 are 63–82 (量).
+
+**The tag** (`M4`, `NET-119`). 量 At 277 the capture holds 39 replies: 20 untagged at sequence
+numbers ≡ 1 (mod 7) and 19 carrying `0x8100` at byte 12 with VID 1767, 281 B, at ≡ 3 (mod 7) —
+the same 39 and 20 as block 45's E2 — and the host's ICMP layer counted none of the tagged ones
+(`i` 145 = the untagged replies). By the card's excess formula (frame − IP total − 14,
+`pcapwin`'s) exactly those 19 read 4, and 0 after the tag. No tagged frame under the fix, none
+among the sweeps' 2,961 frames, and `W-2`'s 1.4 wire row at 277 put frame a on the wire
+untagged: the tag appeared under 1.4's stack path (`nic_xmit`) only.
+
+**P3** (`F1` and `F2`) holds, and so does its order reading. **P4** is not refuted: its
+refutation, *220 of 220 with no refusal*, is excluded by `ping`'s own counts (145 of 1,327)
+without reading any bracket, and its `ping` conjunct holds (61, 263, 1,511 and 1,512 answered
+fewer than 20). Its `j + f + d ≥ 1` conjunct (625) reads `E-L1`'s own bracket, whose stage chain
+is void under P0 (§ 25.4); card § 3.1 voids *every verdict below that reads it*, so that
+conjunct is void (block 46's void reached the stage chain only: that card's P0 was worded
+otherwise). Beside it, not P4: `W-2`'s single-length 1.4 wire brackets, none void, read `jfd`
+19 on this boot (§ 25.6). **`D2`'s refutation scope** holds on boot 1: every bracket whose whole
+board window ran at `txlen vendor` reads `jfd` 0 — `E-F1`, `E-F2`, `LB-2-R` → `LB-V-R`, and
+`LB-V-R` → `W-1a-R` … `W-1c-R` → `W-1d-R`.
+
+### 25.4 P0 refuted in 3 of 66 brackets
+
+量, the judge's `p0j` and the critic's `br.py` (own parsers; a duplicated CPU section refused;
+`E-L1`'s `j` 581 the positive control) and both readers agree:
+
+* `E-F1-R1` → `E-L1-R0`: `h` 6 against `o` 5.
+* `E-L1-R0` → `E-L1-R1`: `o` 168 against `c` − `j` − `f` − `d` = 789 − 581 − 3 − 41 = 164.
+* `E-L1-R1` → `E-F2-R0`: `h` 5 against `o` 6.
+
+**The two `h` ≠ `o` misses** are a board ARP request crossing the gap between the board's
+switch read and the host's read. 量 by record order: the six host frames of the first bracket
+can only be capture records 227–232, and record 232 is a board ARP request, so the host counted
+it before `E-L1-H0`'s read while the board's `o` counts it in `E-L1`'s bracket; record 400, also
+a board ARP request, is in `E-L1`'s host window and the next board window. The window of
+`E-L1` that reconciles with `h` is records 233–400: 145 untagged replies, 19 tagged, 4 ARP. 推
+The clock agrees in sign: record 232 maps 8–37 ms before `E-L1-H0`'s RUN stamp, depending on
+which of `E-L1-R0`'s two stamp pairs is used; the identity rests on the count, not on it.
+
+**The `o` identity's miss of 4** lies inside one dump pair — all five counters come from one
+`asicCounter` read at each end — so it is no window effect; its cause is **未定** (`NET-131`).
+Readings beside it (量): the good buckets sum to 205 = `c` − `j` − `f`, so 205 − 168 = 37 = `d`
+− 4 frames in good buckets were not forwarded; port 3's output in the bracket is 167 unicast and
+1 broadcast, and the broadcast is capture record 293, the board's only broadcast frame (an ARP
+request) in the whole stack capture; `W-2`'s nineteen single-length jabbers moved `d` by 0 in
+every bracket, so a lone jabber did not come with a Drop. Block 46 held the identity in 76 of 76
+brackets (§ 22.1) and block 45 in every bracket (§ 21). Candidates (推): (1) four frames counted
+as Drop and also as `JabberErr` or `FragErr`; (2) four Drop-counted frames forwarded to port 3.
+Re-running the same aggregate bracket cannot separate them — both predict the same excess.
+**What separates them** (`SPEC.md` § 17, `NET-131` 殘留): card 2's per-length stack arm, E2's
+eleven each in its own bracket at 1.4 and at the fix with identical cells, compared per frame
+with the capture. (1) predicts the identity holds in every bracket where `d` moves with `j` =
+`f` = 0 and misses only where `d` moves together with `j` or `f`, by at most the smaller of
+them; (2) predicts a miss in a bracket where `d` moves, with the capture holding more frames
+than `c` − `j` − `f` − `d`. An arm where the identity holds everywhere reproduces nothing, and
+the row stays open.
+
+**Consequence** (讀 card § 3.1): the three brackets' stage chains are void, and so is every
+verdict that reads them; only P4's `jfd` conjunct reads one. The rest of P0 (量): the path
+conjunct holds in all three stack arms; the sweeps' capture reads `w` = `h` in all 53 brackets
+with `rlx0` down (reader B's record-order windows); the stack capture's per-bracket `w` was not
+measured as the card designed it (§ 25.11).
+
+### 25.5 Loopback: the positive control, containment, the byte's source, the full maps
+
+**P5, `LB-1`** (`sweep L L 0` at E2's eleven, block 46's protocol) holds (量): map code 2 at
+61, 62, 63, 263, 277, 1,511 and 1,512 with `ph_b` 9,831, 9,831, 9,831, 11,887, 15,999, 3,663
+and 3,663 — block 46's arm C values (§ 22.2) — and code 1 with `ph_b` = L + 4 at 60, 276, 1,513
+and 1,514; frame a right at all eleven (`ph_a` L + 4, class 1); `delta0 0`; after the eleven,
+`mt none 1444 clean 4 bad_b 7` and `hb 9831:3:61-63 11887:1:263-263 15999:1:277-277
+3663:2:1511-1512`. Frame b's class, which the card did not predict, is 5 at all seven: alien, a
+head that is not ours (讀 § 23.2's classes). The marks (readings) read `SWSUM=00010000` each,
+`SWEND=00000001` at the seven and `00000000` at the four.
+
+**P6, containment** (`LB-1-G`) holds: `leak none` over `LB-00-R2` → `LB-1-R` with `rlx0` down
+throughout — `c`, `o` and `h` Δ 0, host transmit Δ 0, the sweeps' capture 0 (量). So the
+looped frames reached none of the three: 22 here, and 44 more in `NET-61`'s runs, where
+`DS-9-D` reads the CPU port's `c` Δ 0 and port 3's output Δ 0 (量).
+
+**P7, the byte's source** holds (量):
+
+| cell | sweep | `ph_b` | H-prev | H-own | H-slot |
+|---|---|---:|---:|---:|---:|
+| `CO-1` | `61 61 1514` | 9,831 | 9,831 | 5,719 | 9,831 |
+| `CO-2` | `277 277 61` | 15,999 | 15,999 | 9,831 | 8,224 |
+
+Both code 2, frame b class 5, `delta0 0`. H-prev fits both cells; H-own is refuted at both and
+H-slot at `CO-2`; no fourth source is needed there.
+
+**P8, `LB-2`** (1.4, probe 60) holds (量): `rc 0`, scored 1,455, `bad_b 728` = `alien 728`,
+`bad_a`, `void` and `skew` 0, `delta0 0`, `mt none 0 clean 727 bad_b 728`; the bad set is exactly
+the 728 lengths with L mod 8 ∈ {5, 6, 7, 0}, by `swcheck` (1,455 of 1,455) and by three decoders
+that share no code with it or each other; `hb` is H-prev's block — 1,607, 3,663, 5,719, 7,775,
+9,831, 11,887, 13,943 and 15,999 at 92/92/88/88/92/92/92/92 lengths — and neither H-own's nor
+H-slot's; `SWSUM=05AF0000`, `SWEND=000002D8`. **P9, `LB-V`** (the fix) holds, and is informative
+because P8 read 728 on the same boot: 0 bad of 1,455, `delta0 0` (not 4), `SWEND=00000000`; the
+bracket `LB-2-R` → `LB-V-R` reads `jfd` 0, and `W-00`'s gate passed on this page.
+
+量 A full loopback sweep took 3,566–3,568 jiffies over the twelve maps, 35.7 s at `HZ` 100 (讀
+`.config`); the card guessed 40 s.
+
+### 25.6 The wire
+
+**P10, the fix over every length** (`W-1a`…`W-1d`, `txlen vendor`, `sweep … 60 wire`) holds (量):
+
+| quarter | lengths | units scored | `c` = `o` = `h` | `j`/`f`/`d` | 60-B frames on the capture |
+|---|---|---:|---:|---|---:|
+| `W-1a` | 60–423 | 364 | 728 | 0/0/0 | 365 |
+| `W-1b` | 424–787 | 364 | 728 | 0/0/0 | 364 |
+| `W-1c` | 788–1,151 | 364 | 728 | 0/0/0 | 364 |
+| `W-1d` | 1,152–1,514 | 363 | 726 | 0/0/0 | 363 |
+
+2,910 frames and `jfd` 0 in all; each quarter's page `rc 0`, `void` and `skew` 0; the marks
+read `SWSUM=016C0000` three times and `016B0000`, `SWEND=00000000`. On the capture each unit's
+frame a sits at its own length followed by its 60-B probe, in unit order, unshifted and
+untagged — every length from 61 to 1,514 exactly once — and the first ≤ 64 bytes of all 2,961
+sweep frames match the `tx` verb's pattern (the critic's `wsc.py`, a flipped byte detected;
+reader B the same). The buckets agree with each
+frame's own length + 4. P10's zero is informative because P11 read `jfd` 19. 讀 What it holds
+for: `nic_do_tx`'s fills in TX slots 0 and 1, each the first or second frame after a re-arm
+(card § 7).
+
+**P11, 1.4 bounded, one bracket per length**, holds, 35 of 35 rows (量). At the 19 lengths with
+L mod 8 ∈ {5, 6, 7, 0} — 61–64, 69–71, 263, 277, 768, 773–775, 1,496, 1,501–1,503, 1,511 and
+1,512 — `j` 1, `c` 2, `o` 1, `h` 1, and the capture holds frame a at L and no probe; at the other
+16 — 60, 65–68, 276, 769–772, 1,497–1,500, 1,513 and 1,514 — `j` 0 and `c` = `o` = `h` = 2, the
+capture holding L and the probe. `f` = `d` = 0 everywhere; in all `jfd` 19, `c` 70, `h` 51, 51
+frames on the capture; every sweep `rc 0`. One frame per bracket was a jabber (量); that it was
+frame b is by elimination — the capture holds frame a and no probe (推).
+
+### 25.7 The mechanism maps (P12): `M1`-cover8 is the one rule left standing
+
+量, loopback, probe 60, `ph_len` = F + 4 in every setting (讀 § 23.1); each map `rc 0`, `bad_a`,
+`void` and `skew` 0, `delta0 0`, no `-71` end, `bad_b` = `alien`; the count each rule predicts is
+card § 3.7's (`arith49.out`):
+
+| map | `m_len`, `m_extsize` | bad b | residues | cover8 | room8ph | shift8 | shift8m |
+|---|---|---:|---|---:|---:|---:|---:|
+| `LB-2`, `rlxfw` | F, 2,046 | 728 | {5, 6, 7, 0} | 728 | 728 | 728 | 728 |
+| `LB-V`, `vendor` | F + 4, F + 4 | 0 | — | 0 | 0 | 728 | 727 |
+| `M-mlen` | F + 4, 2,046 | 0 | — | 0 | 728 | 728 | 727 |
+| `M-ext` | F, F + 4 | 728 | {5, 6, 7, 0} | 728 | 0 | 728 | 728 |
+| `M-d1` | F + 3, 2,046 | 182 | {5} | 182 | 728 | 728 | 727 |
+| `M-d2` | F + 2, 2,046 | 364 | {5, 6} | 364 | 728 | 728 | 727 |
+| `M-d3` | F + 1, 2,046 | 546 | {5, 6, 7} | 546 | 728 | 728 | 728 |
+| `M-off0`, `txoff 0` | F, 2,046 | 728 | {5, 6, 7, 0} | 728 | 728 | 728 ({7, 0, 1, 2}) | 728 ({7, 0, 1, 2}) |
+| `M-rb1`, `rb2`, `rb4`, `rb8` | F, 2,046 | 728 each | {5, 6, 7, 0} | 728 | 728 | 728 | 728 |
+
+* **In loopback, frame b goes wrong exactly where frame a's 8⌈`m_len`/8⌉ < `ph_len`** (量,
+  twelve maps, length by length: `swcheck` agrees 1,455 of 1,455 in each, and so do the three
+  decoders). `SWEND` equals the rule's column in all ten `M` maps. The rule is 推: it was fitted
+  after blocks 45 and 46 (`PROPOSAL-R6b-2.md` § 2), and it names no cause. It does not explain
+  the stack arm's losses at 276 and 1,513 (§ 25.3), which it calls clean.
+* `M1`-room8ph is refuted by `M-mlen`, `M-ext` and `M-d1`…`M-d3`; `M2`-shift8 and shift8m by
+  `M-mlen`, `M-d1`…`M-d3`, `M-off0` and `LB-V` (量). By field (量 the maps, the fields 讀
+  § 23.1): `m_extsize` alone at F + 4 (`M-ext`) leaves the fault as 1.4 has it, and `m_len`
+  alone at F + 4 (`M-mlen`) clears it.
+* **An ordering fault** (OWN written before the fields land) **is refuted as the cure**:
+  `txrb 1` and `2` clear nothing, like their controls 4 and 8. 1.5's own check of each fill's
+  queue-time load against what it meant to write read `rb chk` 0 → 2,910 with `bad 0` over
+  `M-rb1` and 2,910 → 5,820 with `bad 0` over `M-rb2` (量): the faulting maps' own fills were
+  stored as intended, by the CPU's own uncached load (P1b's caveat: it may not show DRAM).
+  `M-rb1-S` also read `drained 1`, beside one host frame in that bracket (host transmit Δ 1,
+  port 3 input Δ 1).
+* **The byte's source**: H-prev fits the frame immediately after a bad-length frame — every bad
+  map's `hb` in value, count and first–last length, `CO-1` and `CO-2` (量; H-own, H-slot and a
+  `c = 8` control do not). It does not fit the carried frame of `HI-4` (§ 25.8).
+* **Where the change sits** (推 from 量 parts): the descriptor words in memory equal what 1.4
+  writes (§ 25.1, on held fills; `rb chk` on the faulting maps' fills), and the frames go wrong
+  before the CPU port's receive counters (jabbers on the wire, § 25.6; a wrong `ph_len` in
+  loopback). Naming the NIC's TX DMA engine as the place is 推: nothing between descriptor memory
+  and the CPU port's receive MAC was measured. `R6b-1`'s reopening condition, *`R6b-3`'s sweeps
+  leave the stage undetermined*, did not fire.
+
+### 25.8 History (P13): refuted at `HI-3` and `HI-4`
+
+Four `tx` frames after one re-arm, `rlx0` down, the looped `ph_len` read from `rxd0`…`rxd3`
+(r right, w wrong, `-` not landed by `rbcheck`, which grades landing by the OWN bit alone):
+
+| cell | sequence | read | carried rule, H-prev / H-own | second-frame rule, H-prev / H-own |
+|---|---|---|---|---|
+| `HI-1` | 60, 61, 61, 60 | `rrw-` | `rrw-` / `rrw-` | `rw--` / `rw--` |
+| `HI-2` | 61, 60, 60, 60 | `rw--` | `rw--` / `rw--` | `rrrr` / `rrrr` |
+| `HI-3` | 60, 1,511, 1,511, 60 | `rrwr` | `rrww` / `rrw-` | `rww-` / `rwwr` |
+| `HI-4` | 1,511, 60, 60, 60 | `rwwr` | `rww-` / `rw--` | `rrrr` / `rrrr` |
+
+量, and `rbcheck` agrees with the raw lines: `HI-3` reads `rxd0` 64, `rxd1` 1,515, `rxd2` 3,663
+(flags `AC52`) and `rxd3` 64 with flags `A6C2`, `pl 02`; `HI-4` reads `rxd0` 1,515, `rxd1` 3,663
+(`AC52`), `rxd2` 2,048 with flags `B6D1`, `pl 03` (chained as `mbd3` 2,042 + `mbd4` 6) and `rxd3`
+64 with flags `821F`, `pl 05`. Not void: the host transmitted nothing over `HI-00` → `HI-9`.
+
+* **Refuted** (P13's own clause: equal to none of the four in its row): the carried rule — in
+  `HI-3` the wrongness did not carry (frame 4 at 60 read right after a wrong 3,663), in `HI-4`
+  the carried value was wrong (frame 3 read 2,048, not 9,831) — and the second-frame rule (`HI-3`
+  frame 2 at 1,511 right, `HI-4` frame 2 at 60 wrong). `HI-1` and `HI-2` fit the carried rule,
+  where both byte sources give the same pattern.
+* **Not tested**: the landing model (推 in the card: a frame whose chain does not fit does not
+  land, and nothing after it lands). The chains of `HI-3` and `HI-4` fit the 8-mbuf ring (64,
+  1,515, 3,663 and 64 take 1 + 1 + 2 + 1 = 5; 1,515, 3,663, 2,048 and 64 take 1 + 2 + 2 + 1 = 6),
+  and every frame landed.
+* **The `MBUF_RUNOUT` reading** P13 asked for (量 raw lines; after `arm` every unused `rxd`
+  reads `len 0` flags `8063`, as `rxd4`…`rxd7` do in all four cells, so any other value was
+  written during the cell): `HI-1`'s `rxd3` reads OWN 1, `len 9831`, flags `B0DD`, with `mbd7`
+  `ml 0`; `HI-2`'s `rxd2` reads OWN 1, `len 9831`, flags `B6D1`, with `mbd6` holding 2,042 B and
+  `mbd7` 0, and its `rxd3` OWN 1, `len 0`, flags `B0DD`. 推 A frame that did not fit wrote its
+  length and at most its first mbuf, and left OWN set: `HI-1`'s frame 4 no mbuf, `HI-2`'s frame 3
+  one. The flags `B6D1` also mark `HI-4`'s 2,048-B frame.
+* **`HI-4` frame 3's 2,048** is a value none of the three byte sources gives for a carried frame:
+  all three give 9,831 at that position (a 60-B frame after a 60-B frame), which is what the
+  carried rule under H-prev predicts. Its source is **未定** (`NET-130`). 推 2,048 is the RX
+  mbufs' `m_extsize` and the CPU interface's mbuf size (`NET-49`), a candidate only. **What settles it** (`SPEC.md` § 17,
+  `NET-130` 殘留): `HI-4`'s sequence repeated on one boot, each after its own re-arm with `rlx0`
+  down (n ≥ 3), beside variants that change frame 3's predecessor (1,511, 60, 61, 60) and frame
+  2's length (1,511, 61, 60, 60), reading `rxd0`…`rxd7` and `mbd0`…`mbd7` each time: 2,048 at
+  every repeat and variant says a constant not drawn from the frames' bytes; a value that
+  follows the variants names a byte source; no repeat says a one-off. Loopback with `rlx0` down:
+  no frame reaches the wire.
+
+### 25.9 `NET-61` 殘留's burst half and `NET-103` 殘留 ④ (`DS-r`, `DS-v`; P6b)
+
+量, `brdelta`'s series over each setting's twelve dumps, and both readers agree:
+
+* **`DS-r`** (1.4): Δ`n_dsync` +1 and Δ`n_skb_fail` +1 at 61, 62, 63, 263, 277, 1,511 and 1,512,
+  and 0 at 60, 276, 1,513 and 1,514 — this boot's `LB-1` bad-b set exactly. The looped `rx_ph1`
+  words are block 46's (`26676D10` at 61–63, `2E6F7D02` at 263, `3E7F4900` at 277, `0E4F5902` at
+  1,511 and 1,512) and L + 4 at the four.
+* **`DS-v`** (the fix): Δ`n_dsync` 0 and Δ`n_skb_fail` 0 at all eleven, every `rx_ph1` upper
+  half L + 4 except `DS-v-0063`'s, which reads `004A`.
+* The denominator: Δ`n_dsync_chk` 2 in every run, 3 at `DS-v-0063`; Δ`n_rx` 2 in 21 of 22 runs
+  and 3 at `DS-v-0063`, whose `nd_stats` rx rose 196 B = 2 × 63 + 70. `DS-9-D`'s bracket holds
+  exactly one host frame, 74 B at port 3 (70 + FCS), and `DS-v-0063`'s last harvested frame's
+  `ph_len` reads 74 (`004A`). 推 The third frame is that host frame: count, size and length agree,
+  and its content was not read.
+* **P6b holds.** `NET-61` 殘留's prediction, written before power, held at E2's eleven lengths:
+  its burst half is closed for those eleven. Not established: the other 1,444 lengths, and the
+  ring's mechanism.
+* **`NET-103` 殘留 ④, read.** Over the 22 DS runs Δ`n_ph_diff` 0 and Δ`n_ph_bad` 0 (Δ`n_ph_chk` 2,
+  3 at `DS-v-0063`), and `ph_first_nrx` 866 unchanged; `n_ph_bad` reads 0 for the whole boot
+  (`M-9-R`), so its ① does not fire. `n_ph_diff` 0 → 105 happened, with `n_dsync` 0 → 105, only
+  inside `E-L1`'s bracket — 1.4's stack E2, with jabber — and read Δ 0 in `E-F1` and `E-F2`. The
+  mechanism remains.
+
+### 25.10 The host path (`NET-124` 殘留, `NET-54` 殘留; P15) and `C-19`
+
+* **Liveness held in every arm** (量): all 9 liveness gates read 4 of 4 with `follower 1`; all 8
+  port-3 gates read `PSRP3` `000000F9` (LinkUp, bit 8 clear) through rlxfw's switch driver and
+  LinkUp through `port_status`; all 3 stack arms read `covered yes`. `RB-02-P`'s 2 sent and 0
+  received is the declared `txstall` reading. No gate failed, so `NET-54` 殘留's ② read set never
+  ran: not triggered. `NET-124` did not recur.
+* **The host's kernel log**, followed with `dmesg -w` from before power, the log beginning at
+  the WSL kernel's boot (`first_t 0.000`) (量, `dmesgwin`'s counts; no line of the log is in
+  `bench/`). Before power (`R0-DW0`, its first
+  60,769 B): `bug_preempt`, `usbnet_xmit` and `call_trace` 0 — the three gated signatures — while
+  the log already held 302 `urb->status -104` lines with the board off, and the attach's 4
+  `cp210x` and 1 `ttyUSB` lines. To `Z-DWALL` (417,919 B): 282 `BUG: using smp_processor_id() in
+  preemptible` traces, each with `usbnet_start_xmit` and a call trace, all in the press; 869 more
+  −104 lines (1,171); no USB disconnect, no TX timeout, and no link-up, link-down or carrier line
+  anywhere in the log. `dmesgwin`'s windows tile 0–417,919 with `follower 1` in each (reader A).
+  Per window (`hwin.py`): `E-F1` 29 traces for host transmit Δ 221, `E-L1` 150 for 1,335, `E-F2`
+  29 for 221; 0 in every window where the host sent nothing; and two misses of one shape at
+  window edges, `LB-00-H2` and `M-mlen-H`, each host transmit Δ 1 with 0 traces, the window
+  before each holding 1 trace for Δ 5 (推 the frames' identities). The log kept growing after
+  `I-Z`: more −104 lines, no BUG line.
+* **P15, the rule applied**: the trace appears while the path works and not once per transmit
+  (29 of 221), so it is this host's `usbnet` under `usbip` and not `NET-124`'s silent-state
+  marker. That takes from candidate (a) of § 22.4 the support the trace gave it: weakened, not
+  excluded. The in-press positive control (`link_up` at the board's power) could not fire: the
+  log holds no carrier line at all; that this host's driver prints none is 推. `NET-124` 殘留
+  stays open, not reproduced; `NET-54` 殘留 stays with `R6b-3`.
+* **`C-19`** (量, `c19.py`): 284 console captures, RAW 57.1–1,968.7 s, one `boot_id`; 283 carry
+  bytes, and the pre-flight `R0-PRE` read 0 B by design; stops `--until` 194, `--idle` 87,
+  `--seconds` 3. **0 drops**: the kernel log has no disconnect line in the whole press, and its
+  `cp210x` and `ttyUSB` lines are the attach before power. Gaps between consecutive console
+  captures longer than a minute: 98.6 s before `X-RT1` (`RB-02-R`'s stop and its correction)
+  and 73.9 s before `E-L1-R1` (`E-L1`'s `ping`s ran on the host); the next is 39.3 s. Neither
+  preceded a drop. The row's trigger, a drop after a long idle, was not exercised.
+
+### 25.11 Instruments, and the readers' disagreements ruled
+
+* **`pcapwin` 1.2's `--prev` never gave a true window** (`FW-145`; 讀 the card's `pcapwin.py`,
+  量 the captures). Its `prev_end` is the last `window_end` in the `--prev` log, and every host
+  cell runs `pcapwin` before `dmesgwin`, so that line is `dmesgwin`'s byte offset: 63 of the 67
+  `pcapwin` blocks print `prev_beyond_file` and `cumulative 0 N` (exit 3), the other four `prev
+  none` (`E-F1-H0`, `LB-00-H`, `W-EWALL`, `W-SWALL`); `E-L1-H0`, for one, prints `prev
+  E-F1-H1.log window_end 164295` and `prev_beyond_file 164295 > 231`. The cell's rc is `dmesgwin`'s, so the
+  refusal was masked; no gate read `w` (card § 6). Every per-bracket `w` in this section is a
+  difference of cumulative counts or a reader's own record-order window; per-identifier sequence
+  lists are exact regardless, since `ping` identifiers are distinct.
+* **`E-L1`'s excess**: reader A 19, reader B 0. A is right by the card's instrument: `pcapwin`
+  computes frame − IP total − 14, and its self-test counts a tag as +4; its cumulative histograms
+  read `excess 0:228` at `E-L1-H0` and `0:373 4:19` at `E-L1-H1`. B measured bytes beyond the tag,
+  of which there are none: also true, a different question. `D2` is unaffected: the fix arms
+  read 0 under both.
+* **`E-L1`'s `w`**: A 169, B 168. B's matches `h`; A's is a correct difference of `pcapwin`'s
+  read-time counts (231, 400), whose window lags the host counter by record 232 (§ 25.4). P0 is
+  unchanged: both brackets were already void on counters.
+* **Traces in `E-F1` and `E-F2`**: A 29 each (`dmesgwin`'s windows, the card's), B 30 (windows
+  from cell RUN stamps). Both read the log correctly; in each arm one trace was printed inside
+  the `H0` cell, after its counter read and before its `DW` read, beside a board ARP request on
+  the capture (推 the host's reply is its source).
+* **`DS-v-0063`'s third frame**: A marked its attribution to the host's 74-B frame 量; it is 推
+  (§ 25.9). Reader B's Δ`n_ph_chk` *2 in every run* misses `DS-v-0063`'s 3 (`brdelta`'s `DS-v-C`).
+* The frozen card cites `NET-1AA` twice, a placeholder that is no row; its `storeseq` proof is
+  `NET-125` (讀). Recorded here; the card is not edited.
+
+### 25.12 The predictions, one line each (card § 3)
+
+P0 refuted in 3 of 66 brackets (§ 25.4). P1 holds (EQUAL, EQUAL). P1b not run (no VOID). P2
+holds. P3 holds for `F1` and `F2`, and so does its order reading. P4 not refuted: its `ping`
+conjunct holds, its `jfd` conjunct is void. P5, P6, P6b, P7 and P8 hold. P9 holds, informative.
+P10 holds, informative. P11 holds, 35 of 35. P12 holds: `M1`-cover8 equals every map, and no map
+equals none of the four rules. P13 refuted at `HI-3` and `HI-4`, not void. P14 holds:
+`R1-MB0` = `R1-MB1` = block 46's map digest `0927be41…`, 31 groups the same and 1 `DIFFER` in
+group 0; `n_writes 0` at `R1-NW0` and `R1-NW1` with `n_write_refused 0` (`n_xfer` 1024 → 2048),
+carrying no information about writes (`FW-142`); `recipe_id 06C39CA3`. P15 is a decision rule,
+applied in § 25.10. The scope clause of `D2`'s refutation holds on boot 1 (§ 25.3).
+
+The flash claim (CLAUDE.md § Flash), 量 (`flashc.py`): 0 `FLW`, `EW`, `EB` or `FLR` among the 282
+`sent` strings and the 418 RUN lines; `AUTOBURN` appears only as `looprun`'s `AUTOBURN 0`. The
+map bracket reaches from `R1-M0` to `R1-M1` (`map_hashed 4186112`, `H601` never hashed). What it
+cannot see: `H601`'s 8,192 B, two writes that cancel, and anything after `R1-M1`.
+
+### 25.13 `D1` and `D2`
+
+* **`D1` is not met by its letter.** Its experiment is three arms — the stack, the `tx` verb,
+  loopback — each at every one of E2's eleven lengths in its own bracket. The `tx`-verb arm
+  (`W-2`) and the loopback arm (`LB-1`, and the full maps) were; the stack arm was one E2 bracket
+  by design (card § 0 ②), and that bracket's stage chain is void under P0. The placement is 推
+  from 量 parts (§ 25.7). `D1` stays open until card 2 adds the per-length stack arm — E2's eleven,
+  each its own bracket, at 1.4 and at the fix, identical cells — which is also `NET-131`'s
+  discriminating experiment.
+* **`D2`, boot 1 of 2, is met** on P4's `ping` conjunct as the same-boot positive control (1.4
+  reproducing the loss: 145 of 1,327 answered), with every fix-arm conjunct 量: `E-F1` and `E-F2`
+  220 of 220; the CPU port's `j`, `f`, `d` and `dropev` Δ 0 and 512–1023 Δ 0 there; no `0x8100`
+  frame and no excess byte; `n_recov_fire` Δ 0; and `W-1` `JabberErr` Δ 0 at all 1,455 lengths,
+  2,910 frames. `D2` itself needs boot 2, with 1.4 reproducing the loss there: card 2.
+
+### 25.14 What block 47 does not establish
+
+* `D2`'s second boot; `D3`, `NET-117` 殘留, `D3-MISS` ① and ②, and `P2`'s quiet-image cold boot
+  (cards 2 and 3). Any second instance of any reading: one press, one boot.
+* Why the `o` identity missed by 4 in `E-L1` (`NET-131`); where `HI-4` frame 3's 2,048 comes from
+  (`NET-130`).
+* What the engine fetched, and whether it writes a TX descriptor it fetched: the read-back reads
+  memory with fetch held.
+* The fix through `nic_xmit` outside E2's eleven lengths and the 60-B liveness frames; in TX
+  slots 2 and 3 on the wire; under load or over time (`R6b-4`). That the fix is the vendor's
+  convention on the wire beyond the three length fields.
+* The bytes past 64 of every wire frame: the capture keeps 64.
+* Any mechanism as a cause; where the loop closes, and whether the looped `ph_len` is measured
+  or carried where it is right; why the tag appears only on the stack path.
+* Which frame of a bracket the CPU port refused: b by elimination (推).
+* `NET-61`'s prediction outside E2's eleven lengths; `NET-124`'s cause; the host adapter's own
+  drops.
+* The `-EBUSY` guard; the stack capture's per-bracket `w` as the card designed it; writes the
+  map cannot see.
+* That the running driver was compiled from HEAD's text: the image is pinned by digest, the
+  source identity is 推.

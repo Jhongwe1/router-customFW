@@ -1139,7 +1139,7 @@ into its input.
   and on the wire. In the loader they are equal by construction, so no loader
   read can separate them. This section is what the loader writes into a
   descriptor, not what it puts on the wire; `R6b-2`'s A/B decides the question
-  (`notes/nic-driver.md` § 21.6, M1).
+  (`notes/nic-driver.md` § 21.6, M1). 🔄 2026-09-26 (block 47, `R6b-3`'s first card): in loopback the fault follows `m_len` against `ph_len`, not `m_extsize` — `m_extsize` alone at F + 4 leaves 1.4's 728 bad lengths and `m_len` alone at F + 4 clears them (量, one boot; `notes/nic-driver.md` § 25.7, `SPEC.md` `NET-129`); what the engine fetches, and which field sizes the frame past the loopback point, is still not read.
 * Whether the engine writes back into a TX mbuf when it retires a descriptor:
   no committed capture has read a TX mbuf after a transfer, so the mbuf side of
   the rule is 讀 only.
