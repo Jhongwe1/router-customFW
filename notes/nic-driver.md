@@ -4388,3 +4388,481 @@ reading fixed in writing before it is scored again, on the boot shape it was def
 * § 26.4's block-48 whole-boot numbers and block-47 brackets were not re-derived by the merge.
 * A score of `D3-MISS` ③'s rows on a healthy boot, or under any reading fixed before power.
 * More than one boot per path and per block; nothing here ran on the silicon.
+
+## 27 Block 48 (`R6b-3`, card 2) — `D2` on its second boot, `D1`'s stack arm one length a bracket, `D3`'s first boot, and a 1.4 TX stall at a liveness gate
+
+量 2026-09-26 19:03:40–19:41:49, `bench/2026-09-26b/`, card `PREDICTIONS-B50-block48.md` (frozen
+`7c4df71`, sha256 `6f79f3066c79…`, the digest all fourteen transcript headers print; captures
+`2a3f5e2`): one press on `r6b2q`, driver `rtl819x-nic 1.5`, the image block 47 booted
+(`recipe_id 06C39CA3` at `R1-NW0` and at `R1-NW1`). Every transcript ends `ALL ITEMS DONE` but
+the first of `I-D3`'s, which stopped at `D3-LUS1-L`'s liveness gate; the read set and the host's
+recovery the card's § 6 decides ran as `CORRECTIONS-block48.md` § 1, and `I-D3` continued
+(§ 27.1, § 27.9). The readings: two readers that share no code (A and B), a judge, and a critic
+with instruments of its own, each with controls (`$FWRE_WORK/rebuild/s113/read48/{a,b,crit}/`),
+and the coordinator's rulings on where they differ (`ADJ-b48.md` there, R1–R11, cited as ADJ
+R*n*). Every number below was re-derived by the landing's own scripts
+(`$FWRE_WORK/rebuild/s113/rec48/work/`: `rd48.py`, `c19.py`, `d3lines.py`, `udptx.py`,
+`misc.py`) from the captures, the transcripts in `$FWRE_WORK/rebuild/s112/r6b3/run2/` and the
+two captures in `$FWRE_WORK/rebuild/s112/r6b3/pcap2/`, read in place and printing counts,
+lengths and sequence numbers only; their controls: the board parser refuses a read whose
+CPU-port section is renamed, and the capture parser refuses a file cut inside a record. Names
+are card § 3.0's, as in § 25: `n` Δ`n_tx`; the CPU port's `c` (`CRCAlignErr`), `j`, `f`, `d`
+(`JabberErr`, `FragErr`, `Drop`) and `dropev`; port 3's output `o`; the host adapter's received
+`h`; the host's Δ`Icmp.InEchoReps` `i`; K = `o` − (`c` − `j` − `f` − `d`). 量 87 board reads
+carry `asicCounter` — the card's 86 and `X-BR1` — so the block has 86 consecutive pairs.
+
+### 27.1 What ran, and the stop
+
+量, the transcripts: `I-0` 18:57:59–18:58:08, before power; the catch window opened at 19:03:40
+(`R1-CATCH`, caught at 19:07:00); `I-B` 19:08:33; the stack capture from `I-WE0` at 19:08:45;
+`I-E` 19:08:46–19:11:14; `I-S` 19:11:15–19:18:51; `I-W` 19:19:12–19:22:33; `I-U`
+19:23:20–19:23:35; `I-D3` 19:23:35–19:35:04, stopped, and continued 19:39:59–19:41:29; `I-Z`
+19:41:30–19:41:49. `I-U` ended 19 min 55 s after the catch window opened, inside § 6's 27
+minutes, so `I-D3` ran (讀 card § 6); catch to `I-Z`'s end took 38 min 9 s, where the card
+guessed about 35 (§ 2).
+
+量 Every cell that exited non-zero is a reading the card declared (`NAME?`): `R0-PRE` rc 1 (the
+pre-flight's 0 B, by design); `D3-TR1-IC` rc 2 (§ 27.8); `D3-TS1-IL`…`D3-TS3-IL` and
+`D3-US1-IL`…`D3-US3-IL` rc 1 (`iperflog parse` on a trial where the board sent, exit 1 by its
+design); `D3-LUS1` rc 124 at 73.4 s and `D3-LUS1-IL` rc 1 (§ 27.9).
+
+**The stop.** 量 `I-D3` stopped at 19:35:04 on `D3-LUS1-L`'s gate — `4 packets transmitted, 0
+received`, `follower 1` — the cell after 1.4's UDP receive trial `LUR1` and its bracket. 讀 Card
+§ 6 decides a liveness failure with `follower 1`: `NET-54` 殘留 ②'s read set, before any recovery
+and with `rlx0` left as it was, then the host's recovery, then the liveness again. As run (量 the
+captures' metadata; 讀 `CORRECTIONS-block48.md` § 1 for what was typed from PowerShell): `X-SW1`
+19:37:08, `X-PHY1` 19:37:12, `X-HP1`, `X-BR1` 19:37:15, `X-PS1` 19:37:20–19:37:23 and `X-HN1`;
+then `X-RA1`: `usbipd detach` rc 0 at 19:37:46.9, an `attach` typed 70 ms later printed *There
+is no device with busid* (rc 1), the list was read again, and `attach` returned rc 0 at
+19:38:01.9; then `X-SW1b` 19:38:25, `X-PHY1b`, `X-PS1b`, `X-TC1` `0` (no `tcpdump` ran in
+`I-D3`, 讀 card § 0 ⑤) and `X-L1` 4 of 4 with `follower 1` at 19:38:36. 讀 § 6: the liveness
+passed, so `I-D3` continued `--from D3-LUS1-S0`. The failed first attach falls inside (6)'s
+*reading what each prints* and voids nothing (ADJ R5; CLAUDE.md: the list reads as a drop for
+about a second after a detach).
+
+### 27.2 The opening state (P1)
+
+量 `B-00-T` reads `tx15 txlen rlxfw txoff 2 txrb 0 dirty 0`, `v15 last - 0 ok 0 refused 0 txq 0
+arm15 0`, `sw never mode loop from 0 to 0 probe 0 rc 0 bufs 00000000` and `mt none 1455`: 1.5
+untouched since boot, and P1 holds. 讀 The descriptor read-back is block 47's (§ 25.1) and was
+not repeated (card § 0 ①).
+
+### 27.3 `D2`'s second boot: E2 under the fix, under 1.4, under the fix
+
+讀 Each arm is card 1's cells, only the `txlen` word differing (card § 3.3). 量, each arm's
+bracket and its record-order window from `-H0` to `-P1` (§ 27.5 (c)):
+
+| arm | `txlen` | sent | `i` | the window `-H0`→`-P1` | `c` | `j`/`f`/`d`/`dropev` | 512–1023 | `o` | `h` | port 3 in | `n_recov_fire` |
+|---|---|---:|---:|---|---:|---|---:|---:|---:|---:|---:|
+| `E-F1` | `vendor` | 220 | 220 | 220 replies, untagged, excess 0 | 221 | 0/0/0/0 | 0 | 221 | 220 | 221 | 0 |
+| `E-L1` | `rlxfw` (1.4) | 1,189 | 144 | 144 untagged + 19 tagged replies, 3 ARP | 1,000 | 790/2/44/33 | 3 | 167 | 166 | 1,195 | 7 |
+| `E-F2` | `vendor` | 220 | 220 | 220 replies, untagged, excess 0 | 221 | 0/0/0/0 | 0 | 221 | 220 | 221 | 0 |
+
+* **Under the fix**, in each arm (量): all eleven `ping`s read `20 packets transmitted, 20
+  received`; the window holds eleven identifiers × sequence numbers 1–20, no `0x8100` frame and
+  no excess byte; buckets 64: 21, 65–127: 60, 128–255: 0, 256–511: 60, 512–1023: 0, 1024–1518:
+  80 (readers A and B), so `c` 221 = 220 + 1 ARP; `n_tx_stop` Δ 0; the path gate `covered yes`.
+* **Under 1.4** (`E-L1`, 量): buckets 24/55/0/80/3/46, summing to 208 = `c` − `j` − `f`; Δ`n_tx`
+  1,062 and Δ`n_tx_stop` 7.
+* **Order** (量): `E-F2` repeats `E-F1` after `E-L1` faulted on the same boot.
+
+`E-L1` per length (量 block 48, `ping`'s own lines, answered of sent; blocks 47 and 45 讀 § 25.3's
+table):
+
+| L | 60 | 61 | 62 | 63 | 263 | 276 | 277 | 1,511 | 1,512 | 1,513 | 1,514 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| block 48 | 20/20 | 1/178 | 20/131 | 20/103 | 1/179 | 20/41 | 20/134 | 1/179 | 1/179 | 20/25 | 20/20 |
+| block 47 | 20/20 | 1/179 | 20/138 | 20/176 | 2/171 | 20/49 | 20/134 | 2/179 | 0/179 | 20/82 | 20/20 |
+| block 45 | 20/20 | 19/181 | 20/74 | 9/180 | 1/179 | 20/25 | 20/134 | 0/179 | 1/179 | 20/22 | 20/20 |
+
+On all three boots fewer were answered than sent at the nine lengths 61, 62, 63, 263, 276, 277,
+1,511, 1,512 and 1,513, and 60 and 1,514 were clean; 277 read 20 of 134 on all three.
+
+**The tag** (量): the 19 tagged frames of `E-L1`'s window are 281-B replies at 277 carrying TCI
+`06E7` (VID 1,767), and the host's ICMP layer counted none of them (`i` 144 = the untagged
+replies). By the card's excess formula (frame − IP total − 14) exactly those 19 read 4
+(`W-EORD`'s `excess 0:144 4:19` and `vlan8100 19` for the window, and the landing's own count).
+The stack capture holds 22 tagged frames in all, these 19 and three in `SL-0277` (§ 27.4); the
+sweeps' capture holds none.
+
+**P2** holds in `F1` and in `F2`. **P3** holds (量 the counts; 讀 the rule, card § 3.1): all seven
+faulty lengths left requests unanswered, and `j + f + d` = 836 lies at least |K| = 3 beyond its
+threshold of 1, so the threshold verdict stands under P0 (a) (§ 27.5). **P4** holds.
+
+### 27.4 `D1`'s stack arm, one length a bracket (P5–P8)
+
+讀 At each of E2's eleven lengths, the fix (`SF`) and then 1.4 (`SL`), each arm the switch (a
+re-arm), the port-3 and liveness gates, a bracket, `ping -c 20 -s L−42 -i 0.05 -W 1` and a
+bracket, the cells identical but for the `txlen` word (card § 3.4). 量, every one of the 22
+brackets `n` 21, Δ`n_recov_fire` 0, Ip `OutDiscards` Δ 0 and the path gate `covered yes`:
+
+| L | `SF` ping | `SF` `j`/`f`/`d`, K | `SL` ping | `SL` `j`/`f`/`d` | `SL` K | `SL` sequence numbers answered on the capture | k |
+|---|---|---|---|---|---:|---|---:|
+| 60 | 20/20 | 0/0/0, 0 | 20/20 | 0/0/0 | 0 | 1–20 | — |
+| 61 | 20/20 | 0/0/0, 0 | 1/20 | 19/0/0 | 0 | 1 | 7 |
+| 62 | 20/20 | 0/0/0, 0 | 6/20 | 11/0/4 | +1 | 1, 4, 7, 13, 15, 18 | 6 |
+| 63 | 20/20 | 0/0/0, 0 | 6/20 | 11/0/3 | 0 | 1, 4, 10, 12, 18, 20 | 15 |
+| 263 | 20/20 | 0/0/0, 0 | 1/20 | 19/0/0 | 0 | 1 | 13 |
+| 276 | 20/20 | 0/0/0, 0 | 20/20 | 0/0/0 | 0 | 1–20 | — |
+| 277 | 20/20 | 0/0/0, 0 | 3/20 | 11/0/3 | 0 | 1, 8, 15; tagged 3, 10, 17 | 12 |
+| 1,511 | 20/20 | 0/0/0, 0 | 1/20 | 19/0/0 | 0 | 1 | 9 |
+| 1,512 | 20/20 | 0/0/0, 0 | 1/20 | 19/0/0 | 0 | 1 | 6 |
+| 1,513 | 20/20 | 0/0/0, 0 | 20/20 | 0/0/0 | 0 | 1–20 | — |
+| 1,514 | 20/20 | 0/0/0, 0 | 20/20 | 0/0/0 | 0 | 1–20 | — |
+
+"ping" is `ping`'s own received of 20, which at 277 counts the untagged replies only; k is reply
+1's payload byte 10 on the capture, given at the seven faulty lengths (P7 reads it at 61–63).
+
+* **P5** holds, 11 of 11 (量): at each length the `SF` window `-H0`→`-P1` holds 20 echo replies
+  of one identifier, sequence numbers 1–20, untagged, excess 0; `j` = `f` = `d` = 0, K 0,
+  `dropev` 0; the CPU port's bucket of L + 4 moved by 20, beside the board's one ARP frame in
+  `64:` (readers A and B).
+* **P6** holds, 4 of 4 (量): `SL` at 60, 276, 1,513 and 1,514 read 20 of 20 with `j` = `f` = `d`
+  = 0 and K 0. Block 47's E2 losses at 276 and 1,513 (讀 card § 0 ②: the first 29 and the first
+  62 requests) did not recur with each length on its own re-armed ring.
+* **P7** is not refuted (量 the capture and the counters): sequence 1 was answered at all seven
+  faulty lengths and sequence 2 at none, each with `j` ≥ 1. At 263, 277, 1,511 and 1,512, and at
+  61 (k 7) and 63 (k 15), that is the jabber P7 predicts (讀 at 61–63 its branch k ≥ 7). At 62, k
+  = 6 is the case P7 does not predict (推 under H-prev at offset 52, a `ph_len` of exactly
+  1,536): sequence 2 went unanswered with `j` 11 and `d` 4 — read, not scored. 讀 At every one of
+  the seven more than one frame of the length went wrong (14 or 19 unanswered), so reply 2's own
+  branch is undetermined: the counters sum over all of them (P7's rule).
+* **P8** holds at all seven (量): `SL` reads `j + f + d` = 19, 15, 14, 19, 14, 19 and 19 at 61,
+  62, 63, 263, 277, 1,511 and 1,512, with `n` 21 ≥ 20 − Ip `OutDiscards` Δ 0, while `SF` at the
+  same length reads `j` = `f` = `d` = 0. Under `txlen` alone the stack arm's frames change
+  length after the driver's fill and at or before the CPU port's receive MAC (推 from 量 parts;
+  § 27.13).
+* **The tag after a re-armed ring** (量): `SL-0277` answered sequence numbers 1, 8 and 15
+  untagged and 3, 10 and 17 as 281-B frames with TCI `06E7` — the ≡ 1 and ≡ 3 (mod 7) pattern
+  block 47's `E-L1` read at 277 (§ 25.3).
+
+### 27.5 P0, and the o-identity (P9)
+
+量, the 86 consecutive pairs of the 87 board reads (`rd48.py`; the critic's `kpairs.py` and
+`hbound.py` and reader A's `allpairs.py` agree):
+
+* **(a)** K = 0 at 84 of 86. The misses: `E-L1-R0` → `E-L1-R1`, `o` 167 against `c` − `j` − `f`
+  − `d` = 1,000 − 790 − 2 − 44 = 164, K +3; `SL-0062-R0` → `SL-0062-R1`, `o` 7 against 21 − 11 −
+  0 − 4 = 6, K +1. No pair reads a negative K, so there is no read-skew pair (讀 P9). The six
+  legal buckets sum to `c` − `j` − `f` at 86 of 86.
+* **(b)** `inner ≤ o ≤ outer` at 85 of 86. The 86th, `X-BR1` → `D3-LUS1-R`, reads inner = outer
+  = −269,026: the host adapter's `rx_packets` read 322,330 at `X-HN1` and 53,304 at `D3-LUS1-P`,
+  restarted by `X-RA1`'s re-attach, which card § 6 (7) named before power. The card's own
+  `D3-LUS1-D`, `D3-LUR1-R` → `D3-LUS1-R` across `X-BR1`, prints `hbound inner d -269023 outer d
+  -269023 … within no`. The condition is unmeasurable at that pair, not observed false (ADJ R4).
+* **(c)** Both record-order anchors hold: `WE.pcap` 1,078 records, tcpdump 1,078 captured and 0
+  dropped, the host's `rx_packets` 3,347 on both sides of the stop; `WS.pcap` 2,925 records,
+  2,925 captured, 0 dropped, 6,272 on both sides (`W-EORD`, `W-SORD`; the record counts and the
+  stop reads also the landing's own).
+* **(d)** 25 of 25 stack brackets `covered yes`: port 3's input Δ at least the host's
+  Δ`Icmp.OutEchos`.
+
+**P0 is refuted by (a) at 2 of 86 pairs; (b) is unmeasurable at 1** (ADJ R4). 讀 What that voids,
+by card § 3.1's text: the stage chains of `E-L1` and `SL-0062`, whose threshold verdicts stand —
+`E-L1`'s `j + f + d` 836 ≥ 1 + 3, and `SL-0062`'s 15 ≥ 1 + 1 with `n` 21 ≥ 20 + 1, exactly at
+its margin — and the host side (`h`, `i`) of the pair across `X-RA1` and of `D3-LUS1-D`, whose
+board counters stand (量 `D3-LUS1-D`: `j` 10, `d` 2, `n_recov_fire` 1, K 0). Nothing else.
+
+**P9.** 量 The prediction holds: K = 0 in every bracket at the fix and in every bracket with `d`
+= 0, and both misses are 1.4 brackets with `d` > 0. 讀 Both fall under P9 (iii) — `j + f` > 0 and
+`d` > 0 — with K ≤ min(`d`, `j + f`): 3 ≤ min(44, 792) and 1 ≤ min(4, 11), which candidate (1)
+alone, candidate (2) or both allow, so the card does not decide it. Beside `SL-0062` (量): the
+legal buckets hold 10 frames and the window `-H0`→`-P1` holds 7 — six replies and one ARP —
+equal to `o`, so 3 legal frames were not forwarded against `d` 4. 推 The fourth Drop is a
+forwarded frame (candidate 2) or a jabber counted as Drop too (candidate 1); this bracket cannot
+separate them. Beside `E-L1` (量): 208 legal frames against `o` 167, so 41 = `d` − 3 were not
+forwarded. 量 `d` moved in six pairs — `E-L1`, `SL-0062`, `SL-0063`, `SL-0277`, `D3-LUR1-R` →
+`X-BR1` and `X-BR1` → `D3-LUS1-R` — each with `j` ≥ 1, and K ≠ 0 in two of them; the seven
+single-length jabbers of `W-2` moved `d` by 0. No pair of this boot moved `Drop` with `j` = `f`
+= 0, the bracket P9 names as the one that decides. `NET-131` stays open (`SPEC.md` § 17,
+`NET-131` 殘留).
+
+### 27.6 The wire (P10–P13)
+
+* **P10, `LB-P`** (1.4, probe 60, one loopback unit at 61 and then at 1,511, `rlx0` down) holds
+  (量): `LB-P-1511`'s page reads `mt none 1453 clean 0 bad_b 2 bad_a 0 void 0 skew 0` and `hb
+  9831:1:61-61 3663:1:1511-1511`, H-prev's values (§ 25.5); each unit's `sw scored` line counts
+  its bad frame b as `alien 1`, class 5; `LB-P-D` reads `leak none`.
+* **P11, `W-00`**, the fix's loopback map, holds (量): `sw done … rc 0`, `sw scored 1455 bad_a 0
+  bad_b 0 void 0 skew 0`, `delta0 0`, `mt none 0 clean 1455`, `SWEND=00000000` (`LB-V-S`). 讀 The
+  gate says something because `LB-P` saw 1.4's fault in loopback on this boot first (card § 0
+  ⑤).
+* **P12, the fix over every length on the wire** (`W-1a`…`W-1d`, `txlen vendor`) holds (量):
+
+| quarter | lengths | units | `c` = `o` = `h` | `j`/`f`/`d` | 60-B frames on the capture |
+|---|---|---:|---:|---|---:|
+| `W-1a` | 60–423 | 364 | 728 | 0/0/0 | 365 |
+| `W-1b` | 424–787 | 364 | 728 | 0/0/0 | 364 |
+| `W-1c` | 788–1,151 | 364 | 728 | 0/0/0 | 364 |
+| `W-1d` | 1,152–1,514 | 363 | 726 | 0/0/0 | 363 |
+
+量 2,910 frames and `jfd` 0 in all; each page `rc 0` with `bad_a`, `bad_b`, `void` and `skew` 0,
+`SWSUM=016C0000` three times and `016B0000`, `SWEND=00000000`; `inner` = `outer` in all four
+(`rlx0` down). On the capture every unit is frame a at its own length followed by its 60-B
+probe, untagged, and frame a covers every length from 60 to 1,514 exactly once. 讀 What it holds
+for: `nic_do_tx`'s fills in TX slots 0 and 1 (card § 7).
+
+* **P13, 1.4 bounded** holds (量): `W-2-EP`, a two-length wire sweep at `txlen rlxfw`, was
+  refused −1 (EPERM) — `v15 last sweep -1 … refused 1` — with the `sw key` line as at `W-2-V`
+  (`txlen vendor … mode wire probe 60 rings 1 rec 1455`); then, one bracket per length, `jfd` 1,
+  `c` 2 and `h` 1 at 61, 62, 63, 263, 277, 1,511 and 1,512, the capture holding frame a at L and
+  no probe, and `jfd` 0, `c` 2 and `h` 2 at 60, 276, 1,513 and 1,514, the capture holding L and
+  the probe; in all `jfd` 7, `c` 22, `h` 15. That the jabber was frame b is by elimination (推).
+
+### 27.7 `D2`'s refutation clause (P14)
+
+量 The 30 brackets whose whole board window ran at `txlen vendor` — `E-F1`, `E-F2`, the eleven
+`SF`, `LB-P-R` → `LB-V-R`, `LB-V-R` → `W-1a-R` … `W-1c-R` → `W-1d-R` and the twelve trials'
+brackets — read `jfd` 0, every one. P14 holds.
+
+### 27.8 `D3`'s first boot, and `NET-117` 殘留 (P15–P18)
+
+量, the host's output, the board's server logs and the trial cells' rc:
+
+| trial | the host's summary | the board's own figure | rc |
+|---|---|---|---:|
+| `TR1` | receiver 57.1 MBytes, 16.0 Mbit/s | receiver 16,040 Kbit/s | 0 |
+| `TR2` | receiver 53.5 MBytes, 14.9 Mbit/s | receiver 15,015 Kbit/s | 0 |
+| `TR3` | receiver 41.8 MBytes, 11.7 Mbit/s | receiver 11,707 Kbit/s | 0 |
+| `TS1` | sender 75.5 MBytes, 21.1 Mbit/s, Retr 0 | sender 21,079 Kbit/s, Retr 0 | 0 |
+| `TS2` | sender 63.8 MBytes, 17.9 Mbit/s, Retr 1 | sender 17,828 Kbit/s, Retr 1 | 0 |
+| `TS3` | sender 70.0 MBytes, 19.6 Mbit/s, Retr 0 | sender 19,906 Kbit/s, Retr 0 | 0 |
+| `UR1` | lost 42,466 of 53,188 (80 %) | the same | 0 |
+| `UR2` | lost 37,991 of 50,368 (75 %) | the same | 0 |
+| `UR3` | lost 44,362 of 53,414 (83 %) | the same | 0 |
+| `US1` | lost 0 of 53,187 | 0 of 53,187, 19,936 Kbit/s | 0 |
+| `US2` | lost 0 of 53,419 | 0 of 53,419, 19,990 Kbit/s | 0 |
+| `US3` | lost 0 of 53,300 | 0 of 53,300, 19,992 Kbit/s | 0 |
+| `LUR1` (1.4) | lost 39,781 of 48,544 (82 %) | the same | 0 |
+| `LUS1` (1.4) | lost 1 of 53,285 over 0–72.80 s, then `iperf3: interrupt - the client has terminated` | 0 of 53,285, then 1 of 53,285, then `iperf3: the client has terminated` | 124 |
+
+* **P15** holds, 12 of 12 (量): every host log at the fix ends `iperf Done.` after its summary;
+  every trial cell rc 0, 29.9–30.4 s; none prints `No route to host` or `iperf3: error`;
+  `iperflog parse` found a TEST_END figure in each board-receives trial's log (exit 0). In every
+  trial bracket `n` = `c` = `o` — from 19 frames (`UR3`) to 54,911 (`TS1`) — with `jfd` 0, K 0,
+  `n_recov_fire` Δ 0 and `n_tx_stop` Δ 0. 讀 D3's clause, E2 passing while `NET-111`'s exchanges
+  still fail, did not fire.
+* **P16** holds (量): `LUS1` ended without `iperf Done.` (rc 124 at 73.4 s) and `LUR1` completed.
+  A count beside it (量 this block; 讀 `NET-111` and `NET-116` for seatings 39 and 40): UDP trials
+  at 1.4, both directions, have completed 1 of 14 over seatings 39, 40 and 42, `LUR1` the one. 推
+  `LUS1` ran after the stall and the re-attach of § 27.9, so P16's positive control is weaker
+  than its letter.
+* **P17** is not refuted (量): `iperflog compare` read AGREE at `TR2`, `TR3`, `UR1`, `UR2` and
+  `UR3` and refused `TR1` (exit 2): the host's line 9 is an iperf-shaped line in no format the
+  tool knows, its last two columns reading `4290268710` and `-1369714944.00 Bytes`. `TR1` is
+  undetermined by P17's instrument; by hand the host's receiver 57.1 MBytes equals the board's
+  57.1 MBytes at printed resolution, a reading only.
+* **P18** holds (量): with L = the host's `Sent` − Δ`Udp.InDatagrams` over `-S0` → `-S1`,
+  Δ`RcvbufErrors` ≥ 0.9 L in all four UDP receive trials, so the datagrams the board did not
+  read died at the socket. Ip `InReceives` = `InDelivers` and the driver's `n_rx` Δ − Ip
+  `InReceives` Δ is 1, 1, 1 and 2, so neither IP nor the path below it places them:
+
+| trial | `Sent` | host `Udp.OutDatagrams` Δ | Δ`InDatagrams` | L | Δ`RcvbufErrors` | arrivals − `Sent` | host transmit Δ = port 3 in Δ = `n_rx` Δ |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `UR1` | 53,188 | 53,340 | 10,723 | 42,465 | 42,552 | +87 | 53,359 |
+| `UR2` | 50,368 | 50,487 | 12,378 | 37,990 | 38,045 | +55 | 50,507 |
+| `UR3` | 53,414 | 53,506 | 9,053 | 44,361 | 44,388 | +27 | 53,526 |
+| `LUR1` | 48,544 | 51,655 | 8,764 | 39,780 | 42,826 | +3,046 | 51,681 (host 51,679–51,681) |
+
+量 Arrivals — Δ`InDatagrams` + Δ`RcvbufErrors` — exceed the host's `Sent` in all four, by the
+most at 1.4, and the extra datagrams were on the wire: the host adapter's transmit count over
+each bracket equals port 3's input and the driver's `n_rx`, and the host kernel's own
+`Udp.OutDatagrams` between the trial's `-H` reads exceeds `Sent` by 152, 119 and 92 at the fix
+and by 3,111 at 1.4. `Sent` is the smallest of the three counts. 推 The client, run under
+`qemu-mips-static`, prints a `Sent` short of what it sent; why is **未定** (`SPEC.md` § 17,
+`NET-117` 殘留). 量 The host kernel's count in turn exceeds the board's arrivals by 65, 64, 65 and
+65, where a TCP trial's window (`TR2`) and a UDP board-send trial's (`US2`) read 2, and the
+board's IP took that difference in: Ip `InReceives` − arrivals − the host's non-UDP transmits
+(`tx_packets` − `Udp.OutDatagrams`, 19 to 25) is 64, 63, 64 and 64, with `NoPorts` 0 (the host's
+ARP frames, if any, would add to these). So about 64 datagrams a trial reached the board's IP
+and were counted neither as read nor as refused (量 by difference). 推 A candidate: the datagrams
+still queued on the socket when the one-off server exits; what they are is **未定**. Why the
+socket refuses is **未定** too. 推 The receive path is CPU-bound: 量 over `-S0` → `-S1` the board
+was 72.0, 70.6 and 71.7 % busy at the fix (69.1 % in `LUR1`), softirq 2,332, 2,223 and 2,300 of
+3,569, 3,531 and 3,505 ticks (2,207 of 3,510). Beside it (量 this block; 讀 `NET-117`): the fix
+lost 80, 75 and 83 %, where seating 40 lost 87.8 and 86.6 % at 1.4.
+
+**`NET-103` 殘留's reopening conditions ① and ③**, read on the same dumps (量): `n_ph_diff` moved
+in 14 pairs, all in `I-D3` and 391,855 in all — at every harvest of `UR1`, `UR2` and `UR3`
+(53,359, 50,507 and 53,526) and at 50,661 of `LUR1`'s 51,681 — and in each of those pairs Udp
+`InErrors` = `RcvbufErrors` and Ip `InHdrErrors` and Tcp `InErrs` moved by 0, so ③ did not fire;
+`n_ph_bad` read 0 for the whole boot, so ① did not either. `E-L1`'s bracket read Δ`n_ph_diff` 0,
+where block 47's read 105 (§ 25.9). The row stays ⊘.
+
+### 27.9 The stop: the host reached the board, and the board's TX stalled at 1.4 (P20; `NET-124` 殘留, `NET-54` 殘留, `NET-67` 殘留)
+
+**P20 is refuted as written** (量): `D3-LUS1-L` read 0 of 4. Before it all 41 liveness gates read
+4 of 4, all 28 port-3 gates read `PSRP3` LinkUp and `port_status` LinkUp, all 25 stack brackets
+`covered yes`, and every kernel-log window of the press prints `follower 1` (132 of 132); the
+log was clean of the three gated signatures before power (§ 27.10). What stands: the board's
+counters, and every trial before the stop.
+
+**The host reached the board; the board's replies did not come back** (量, `D3-LUR1-R` →
+`X-BR1`):
+
+* host → board: port 3 received 6 frames, 4 of them broadcast, and the driver's `n_rx` rose 6,
+  within the host adapter's transmit count, 6 inner and 7 outer (one host frame left during
+  `D3-LUR1-R`'s own read); the board's IP counted `InReceives` +1 (`Tcp.InSegs` +1) and
+  `Icmp.InEchos` 0.
+* board → host: the driver handed the engine 7 frames (`n` 7) against the CPU port's `c` 5 (`j`
+  1, `d` 1); port 3 output 3 and the host adapter received 3; `n_tx_stop` +1 and `n_recov_fire`
+  +1 by `X-BR1`; the board's `Tcp.RetransSegs` +2.
+* the host (`D3-LUR1-H` → `X-HN1`): `Icmp.OutEchos` +4, `InEchoReps` 0, `InDestUnreachs` and
+  `OutDestUnreachs` +5 each. 推 The host's ARP requests reached the board and its replies did not
+  reach the host, so the host never resolved the board and put no echo request on the wire. The
+  neighbour entry read `STALE` at `X-HN1`, which does not discriminate: ageing and a board ARP
+  request both give it (ADJ R5).
+
+**The stall began inside `LUR1`'s own bracket** (量): `D3-X-00-R` → `D3-LUR1-R` reads `n` 33
+against `c` 22 (`j` 3, `d` 0, `o` 19, K 0), where every trial bracket at the fix and `X-BR1` →
+`D3-LUS1-R` read `n` = `c`; at `D3-LUR1-R` the low bit is set in `txd0` and `txd1` and clear in
+`txd2` and `txd3`, and it is clear in all four at `D3-X-00-R`. 讀 That bit is the descriptor's
+engine-own bit, so 2 of the 4 descriptors were engine-owned. Those 2 of the 11 are accounted
+for; where the other 9 went is not established (§ 26.4 counts them as counted nowhere). So the
+stall began at or after `LUR1`'s data phase, within its bracket and not after it (ADJ R5).
+
+**The board recovered by itself, a few seconds after the failed liveness** (量 the dump fields; 推
+the times): at `D3-LUR1-R` the queue was running (`tx_stopped 0`) with those 2 descriptors
+engine-owned, and `n_recov_arm` = `n_recov_fire` = `n_recov_ok` = 7, so no recovery was pending;
+by `X-BR1` an eighth recovery had armed at jiffy 127,417 — 533 and 527 jiffies after
+`D3-LUR1-R`'s two `j_now` — and fired at 127,517, and `n_recov_ok` read 8. 讀 A recovery arms
+only when all four TX descriptors are engine-owned and a fifth frame is offered (`NET-113`), and
+fires `recov_jiffies` 100 later (量 the dump). 推 At `HZ` 100 (讀 `.config`), from `D3-LUR1-R`'s
+own stamps, the arm fell at 19:35:03.6–19:35:06.7 and the fire at 19:35:04.6–19:35:07.7
+(`X-BR1`'s stamps, counting 132 s of jiffies rather than 6, give 19:35:05.6–19:35:08.6; both
+assume no lost ticks, `CLK-42`): during or just after `D3-LUS1-L`'s `ping`s (19:35:02–19:35:04),
+so the frames that filled the ring were most likely the board's answers to that cell. So § 6's
+*read set before any recovery* read the ring after the board's own recovery and before the
+host's only; `X-RA1`'s detach came about 2.7 min after the fire and `X-L1` passed about 3.5 min
+after it, so the re-attach is not shown to have healed anything (推).
+
+**推 This was a 1.4 TX stall during 1.4's UDP receive trial — `NET-67`'s shape — and not
+`NET-124`'s host → board silence.** `NET-124` 殘留 is not reproduced on this press: the episode is
+one more host-path failure, localized to the board's TX side.
+
+**`NET-54` 殘留 ②, the read set, its first run** (量 values; 讀 their meaning, card § 6):
+
+* `PSRP3` read `000000F9` at `D3-X-LS`, before `LUR1`, and at `X-SW1`, bit 8 clear; 讀 a read of
+  `/proc/rtl819x-switch` clears that bit on switch driver 1.1, so no port-3 link event was
+  latched from `D3-X-LS` through `LUR1`, the stall and the failed liveness. It read `000001F9`
+  at `X-SW1b`, after `X-RA1` (推: the re-attach bounced port 3's link). `MACCR` `804A0185`,
+  `FFCR` `00000009`, `SWTCR0` `00097DE0` and the other four `PSRP`s read the same at `D3-LS`,
+  `D3-X-LS`, `X-SW1` and `X-SW1b`.
+* Port 3's `BMCR` read `0x1100` and its `BMSR` `0x78ED` on both reads of `X-PHY1` and both of
+  `X-PHY1b`: the latched link bit set on all four, so `BMSR` is not shown to witness a drop (推:
+  the switch's PHY polling clears the latch). `port_status` read Port 3 `LinkUp` at `X-PS1` and
+  `X-PS1b`.
+
+**`LUS1`, after the recovery and the re-attach** (量): the host's client ran to `timeout 70` (rc
+124 at 73.4 s); its data phase put 53,285 datagrams through with 1 lost; the board's server
+printed its summary twice, `0/53285` and then `1/53285`, and then `iperf3: the client has
+terminated`; the board's `Tcp.RetransSegs` rose 9 → 16 over `-S0` → `-S1`. 推 That is `NET-112`'s
+results-exchange shape, and it cannot be separated from the episode's aftermath.
+
+**Recoveries on this boot** (量, a reading beside `NET-67` 殘留, not `D4`'s 30-minute test): only
+at 1.4 — 7 in `E-L1` and 1 in `LUR1`'s aftermath; 0 in the other 84 pairs, every bracket at the
+fix among them.
+
+### 27.10 The host's kernel log, and `C-19`
+
+量 `dmesgwin`'s counts over the host's kernel log `host/dmesg-w2.log`, followed from before power
+and beginning at the WSL kernel's boot, with the landing's own counts agreeing (no line of the
+log is in `bench/`):
+
+* before power (`R0-DW0`, 0–60,724 B): `bug_preempt`, `usbnet_xmit` and `call_trace` 0, the
+  three gated signatures, with 302 `urb->status -104` lines and the attach's 4 `cp210x` and 1
+  `ttyUSB` lines already there and the board off.
+* to `Z-DWALL` (0–1,464,733 B): 1,350 `BUG: using smp_processor_id() in preemptible` traces,
+  each with `usbnet_start_xmit` and a call trace; 1,027 −104 lines; one USB disconnect; no
+  link-up, link-down, carrier or TX-timeout line; `follower 1` in every window. The log also
+  holds 104 `callbacks suppressed` lines summing 396,235 (量), so the printed traces are
+  rate-limited and are not an event count (推).
+* `D3-LUS1-H`'s window spans the episode: `bug_preempt` 39, `vhci_unlink` 20, `usb_disc` 1. The
+  log's one USB disconnect is at kernel time 2,463.09 s on bus device `2-1`, beside an `r8153`
+  line: the GbE adapter's at `X-RA1` (推 by time and device).
+
+**`C-19`** (量, `c19.py`): 212 console captures, RAW 74.3–2,704.5 s, one `boot_id`; 211 carry
+bytes and the pre-flight `R0-PRE` read 0 B by design; stops `--until` 114, `--idle` 96,
+`--seconds` 2. **0 console drops**: every `cp210x` and `ttyUSB` line of the log is the attach at
+kernel time 17.28 s, before power, and its one disconnect is the GbE adapter's. Gaps between
+consecutive console captures longer than a minute: 338.4 s `R0-PRE` → `R1-CATCH` (before power);
+127.0 s `D3-LUR1-R` → `X-SW1` (the stop and its correction); 82.9 s `X-PS1b` → `D3-LUS1-S0`
+(`X-TC1`, `X-L1` and the continuation); 73.6 s `D3-LUS1-S0` → `D3-LUS1-S1` (`LUS1` on the host);
+68.7 s `E-L1-R0` → `E-L1-R1` (`E-L1`'s `ping`s on the host); 61.7 s `X-PS1` → `X-SW1b` (`X-HN1`
+and `X-RA1`). None preceded a drop; the row's trigger, a drop after a long idle, was not
+exercised.
+
+### 27.11 Mechanisms
+
+* **`M1`-cover8 stands one boot more** (推: a rule fitted after blocks 45–46, not a cause;
+  `NET-129`). Consistent with it on this boot (量): `LB-P`'s bad frame b at 61 and 1,511 with
+  `hb` at H-prev's values; `W-2`'s eleven rows; `SL`'s sequence 1 answered and sequence 2 not at
+  all seven faulty lengths, each on a re-armed ring; and the 277-B replies' tag, TCI `06E7`, on
+  the stack path again.
+* **62's k = 6**, under H-prev at offset 52 a `ph_len` of exactly 1,536 (推), is a case P7 did
+  not predict; read, not scored.
+* M2-shift8's count for this boot's fix map was not recomputed here; block 47's maps refuted it
+  (§ 25.7).
+
+### 27.12 The predictions, one line each (card § 3)
+
+P0 refuted by (a) at 2 of 86 pairs, (b) unmeasurable at 1 (§ 27.5). P1 holds. P2 holds in `F1`
+and `F2`. P3 and P4 hold. P5 holds, 11 of 11; P6, 4 of 4. P7 not refuted, 62's k = 6 read and
+not scored. P8 holds at 7 of 7. P9 holds; its two K ≠ 0 brackets fall under (iii), undecided.
+P10, P11, P12 and P13 hold. P14 holds over 30 brackets. P15 holds, 12 of 12. P16 holds on
+`LUS1`. P17 not refuted: AGREE at 5, undetermined at `TR1`. P18 holds: the socket, 4 of 4. P19
+holds: `R1-MB0` = `R1-MB1` = blocks 46 and 47's map digest `0927be41…`, 31 groups the same and 1
+`DIFFER` in group 0; `n_writes 0` at `R1-NW0` and `R1-NW1`, carrying no information about writes
+(`FW-142`); `recipe_id 06C39CA3`. P20 refuted: `D3-LUS1-L` 0 of 4.
+
+The flash claim (CLAUDE.md § Flash), 量 (`c19.py`): 0 `FLW`, `EW`, `EB`, `FLR` or `AUTOBURN`
+among the 210 `sent` strings of the 212 console captures and the 577 RUN lines of the fourteen
+transcripts. The map bracket reaches from `R1-M0` to `R1-M1` (`map_hashed 4186112` at both,
+`H601` never hashed). What it cannot see: `H601`'s 8,192 B, two writes that cancel, and anything
+after `R1-M1`.
+
+### 27.13 `D1`, `D2` and `D3`
+
+* **`D1` is met by its letter** (ADJ R2). Its experiment is three arms, each at every one of
+  E2's eleven lengths in its own bracket: block 47 ran the `tx`-verb arm (`W-2`) and the
+  loopback arm (`LB-1` and the full maps) per length (§ 25.13); this block ran the stack arm per
+  length, at the fix and at 1.4, identical cells, each on a re-armed ring, and P8 is met at all
+  seven faulty lengths with P5 at 11 and P6 at 4 (§ 27.4). The stage is named as a span: after
+  the driver's fill in descriptor memory and at or before the CPU port's receive MAC (推 from 量
+  parts). On the stack path the lower bound is block 47's `tx`-verb read-back (§ 25.1), carried
+  across arm and boot (讀/推): no stack-arm descriptor was read back on either boot. Not
+  established: that the stage is the TX DMA engine, what the engine fetched, or anything between
+  descriptor memory and the CPU port's MAC. At 62 the stage chain is void (K +1); its threshold
+  verdict stands.
+* **`D2` is met on two boots** (ADJ R1). Boot 2 is this block (量): E2 220 of 220 by the host's
+  ICMP layer and on the capture in `F1` and in `F2`; the CPU port's `j`, `f`, `d` and `dropev` Δ
+  0 and 512–1023 Δ 0; no `0x8100` frame and no excess byte; `n_recov_fire` Δ 0; 1.4 reproducing
+  the loss on the same boot (`E-L1`, 144 of 1,189 answered, `j + f + d` 836 against K 3); and
+  the wire sweep over 60–1,514 at the fix, `JabberErr` Δ 0 over 2,910 frames, behind `LB-P`'s
+  positive control and `W-00`'s clean map. Boot 1 is block 47 (讀 § 25.13 and `ADJ-b47.md` R2):
+  met on the `ping` conjunct, its `jfd` conjunct void under card B49's P0 wording; the gate's
+  text asks for 1.4 reproducing the loss, which the `ping` counts show. Not established: the fix
+  under load or over time (`D4`, `R6b-4`); the stack path at lengths other than E2's eleven.
+* **`D3`, boot 1 of 2, is met** (量, ADJ R3): 12 of 12 exchanges completed at the fix, and `D3`'s
+  refutation clause did not fire. Boot 2 is card 3's.
+
+### 27.14 What block 48 does not establish
+
+* `D3`'s second boot; `D3-MISS` ①, ② and ③; `P2`'s quiet-image cold boot (card 3). A second
+  instance of the per-length stack arm: one press, one boot.
+* The fix under load or over time (`R6b-4`); through `nic_xmit` at lengths other than E2's
+  eleven, the 60-B liveness frames and what the twelve trials carry; in TX slots 2 and 3 on the
+  wire; any wire byte past 64.
+* The stage as the TX DMA engine; what the engine fetched; a stack-arm descriptor read back.
+* Any mechanism as a cause; M2-shift8's count on this boot.
+* Why K ≠ 0 (`NET-131`): no bracket moved `Drop` with `j` = `f` = 0.
+* Why the socket refuses UDP datagrams; why the client's `Sent` is short of the host kernel's
+  count; what the ~64 datagrams a trial are that the board's IP took in and its UDP counted
+  neither as read nor as refused (`NET-117` 殘留).
+* Why `D3-LUS1-L` failed beyond the stalled-ring reading; where 9 of `LUR1`'s 11 frames went;
+  which frames the host received in the read set's bracket; whether `X-L1` would have passed
+  without the re-attach; `TR1` by P17's instrument.
+* The kernel's `BUG` traces as an event count; `NET-124`'s cause; the host adapter's own drops.
+* Which frame of a bracket the CPU port refused: by elimination (推).
+* Writes the map cannot see; that the running driver was compiled from HEAD's text (the image is
+  pinned by digest, the source identity is 推).
