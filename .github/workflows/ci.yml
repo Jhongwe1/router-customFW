@@ -1465,6 +1465,23 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mdiocheck.py 2>&1 | tee ci-out/mdiocheck.out; exit "${PIPESTATUS[0]}"
 
+      # test-ethcensus (R6b-8 8a) is the suite for tools/ethcensus.py, the census
+      # that decides D8's "no vendor Ethernet code in vmlinux": an object, a
+      # symbol and a string census, each with a control that must read
+      # non-zero on a vendor-present build, on synthetic kbuild trees the
+      # self-test assembles with the host binutils; the mutation layer (M0,
+      # X1-X17) must turn each named case red. It needs
+      # binutils-mips-linux-gnu, which this job installs, and declares NO skip
+      # for it: without the binutils the self-test REFUSES (NB) and the suite
+      # goes red, so the step must not move to a job without them. Its
+      # reference layer reads r6b6q2's build tree under $FWRE_WORK; here it
+      # prints ONE skip line, `reference build`, covering 8
+      # (tools/ci-expected.tsv). What the census cannot see is in
+      # notes/switch-driver.md section 11.6.
+      - name: test-ethcensus
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: bash tools/test-ethcensus.sh 2>&1 | tee ci-out/test-ethcensus.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:

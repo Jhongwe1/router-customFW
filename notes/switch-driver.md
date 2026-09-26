@@ -782,10 +782,10 @@ name is a NUL-delimited `.rodata` literal**: search the image for
 **2**, `rtl819x-switch` **1** (this driver's own entry, which must be found or
 the search is not looking at the right image) and a synthetic name **0**. It
 reads **13**, and five of the thirteen are not vendor strings. 量 2026-09-26,
-the same search per object, over the `.rodata`/`.data` of `r6b6q2`'s 667
-compiled objects (controls: `rtl819x-switch` found in `rtl819x-switch.o`, the
+the same search per object, over the `.rodata`/`.data` of `r6b6q2`'s 634
+objects with content, 594 compiled leaves and 40 archive members (🔄 2026-09-27: this said *667 compiled objects*, § 11.7; controls: `rtl819x-switch` found in `rtl819x-switch.o`, the
 synthetic name nowhere): `stats` (`8192cd_proc.o`), `arp` (`arp.o`,
-`x_tables.o`), `ip` (`x_tables.o`), `pppoe` (`pppoe.o`) and `igmp` (`igmp.o`)
+`x_tables.o`; 🔄 2026-09-27: also `usr/initramfs_data.o`'s `.init.ramfs`, which this search did not read, § 11.7), `ip` (`x_tables.o`; also that `.init.ramfs`), `pppoe` (`pppoe.o`) and `igmp` (`igmp.o`)
 occur only in retained non-vendor code; `memory` (`sock.o`) and `mac`
 (`xt_mac.o`) occur in both; six names occur only in vendor objects. A name in
 the image is a name some object carries, not an entry some driver registered —
@@ -1424,3 +1424,182 @@ Numbers are typed in decimal without leading zeros.
   register 31 that reads 0 whatever it holds. `dirty` and `rs` say which was
   seen; the desk excludes neither.
 * `D7` and `C-18`. `R6b-7` stays open for its card and its seating.
+
+# 11. 2026-09-27 (`R6b-8` 8a) — the census: is any of the vendor's Ethernet driver left in `vmlinux`
+
+## 11.1 Why, and the scope
+
+`R6b-8`'s DoD (`PROGRESS.md`) asks for `ping` both ways "with no vendor
+Ethernet code in `vmlinux` (a symbol census)". A census that reads 0 is making
+a claim, so `tools/ethcensus.py` is three censuses, two of which share no
+parsing, each with a control that must read non-zero on a vendor-present build:
+
+1. **object** — the leaves the link names, walked from `.vmlinux.cmd` down
+   every `ld -r` `.cmd`: 0 in scope;
+2. **symbol** — the FUNC and OBJECT names the reference build's in-scope
+   objects define, looked up in the new `vmlinux`: exactly the ten seam names
+   (the design's § 1.2), each defined by the seam object alone;
+3. **string** — `imgprocs`' NUL-bounded search, inverted, on the flat image:
+   0 of the vendor-unique `/proc/rtl865x/` names, with `rtl819x-switch`
+   present and a synthetic name absent.
+
+`SPEC.md` `NET-137`. The scope is the owner's ruling of 2026-09-26: vendor
+Ethernet code is every object under `drivers/net/rtl819x/` plus
+`drivers/net/rtk_vlan.o`. The vendor code that stays is printed by every run
+with its leaf count in the build read — on `r6b6q2` the IPv4 fast path
+(`net/rtl/fastpath/`, 7 leaves), the feature glue (`net/rtl/features/`, 3),
+the WLAN driver (`drivers/net/wireless/rtl8192cd/`, 42) and
+`drivers/char/rtl_gpio.o` (1), which writes `PIN_MUX_SEL` (§ 8.9). That
+printout is the owner's four, not every vendor leaf the census does not read:
+`spi_probe.o`, `spi_cmd.o`, `spi_common.o` and `spi_flash.o` under
+`drivers/mtd/chips/rtl819x/`, and `drivers/mtd/maps/rtl819x_flash.o`, are
+vendor sources with no counterpart in `config/rlxfw-src/`, outside the scope
+and not printed (the review's A10).
+
+## 11.2 The numbers on `r6b6q2`, and how each was derived
+
+Every number here is 讀: read at the desk on 2026-09-27 out of `r6b6q2`'s build
+artefacts (recipe `acf8ed3d`, `vmlinux` sha256 `9e0ff326…`, 4,486,315 bytes,
+the tree `$FWRE_WORK/rebuild/r3-4/cells/r6b6q2/top/linux-2.6.30`) by an
+instrument, static and true of that build; none was measured on the device.
+(The tool's docstring, and § 8.14 for its per-object search, mark this kind of
+reading 量.) Every row was produced by the tool and again by a second source
+that shares no code with it — a walker that classifies each `.cmd` by the
+program it runs, a hand ELF32 and `ar` reader, `nm` and `objdump -t`
+(`$FWRE_WORK/rebuild/s114/r6b8a/second/` and `adv/`) — and the two agree.
+
+| what | value | V | how |
+|---|---|:-:|---|
+| leaves the link reads | 627, through 89 `ld -r` links from the 22 roots in `.vmlinux.cmd` | 讀 | every `.cmd` whose command has `-r` and `-o`, walked down: 594 gcc-built leaves, 31 empty `rm; ar rcs` `built-in.o` (8 bytes, `!<arch>\n`), and `lib/lib.a` and `arch/rlx/lib/lib.a` with 31 and 9 members. No object is reached twice and none is missing on disk. Completeness control: the 119 `vmlinux` globals no walked object defines are all named in `arch/rlx/bsp/vmlinux.lds`, and dropping `rtl_nic.o` from the walk raises them to 187 |
+| in scope | 22: 21 under `drivers/net/rtl819x/`, and `rtk_vlan.o` | 讀 | after `os.path.normpath`, which folds the `rtl865x/../common/` spellings. Composite control: the FUNC/OBJECT entries of `drivers/net/rtl819x/built-in.o` equal the union of its 21 leaves' as a multiset (905 = 905) |
+| symbols the two parsers agree on | 13,897 defined, named, non-SECTION/FILE entries over the 634 objects with content (594 leaves and 40 archive members); 0 read by one parser only | 讀 | `mips-linux-gnu-readelf -W -S -s`, split field by field with `st_other` taken as a bracket group, against `mips-linux-gnu-nm -f sysv` (BFD, not readelf's own reader), compared as multisets on member, name, binding, type, value, size and section. `vmlinux`'s 13,821 agree the same way |
+| FUNC/OBJECT names in scope | 907 (920 entries: 722 FUNC, 198 OBJECT), 512 of them global or weak; 0 NOTYPE or other-typed | 讀 | the 22 leaves' symbol tables |
+| MIPS16 among them | 13: `_swNic_send`, `dev_alloc_skb_priv_eth`, `interrupt_dsr_rx`, `interrupt_isr`, `is_rtl865x_eth_priv_buf`, `re865x_start_xmit`, `release_pkthdr`, `rtk_dequeue`, `rtk_queue_tail`, `rtl8651_rxPktPreprocess`, `rtl_MulticastRxCheck`, `rtl_rxSetTxDone`, `swNic_receive` | 讀 | `st_other` `0xf0`, which `nm` cannot show. Over all leaves: 39 defined MIPS16 entries, 0 undefined |
+| excluded by name | 8: `__func__.0`–`__func__.3`; `early_console_write` and `prom_putchar`, also in `arch/rlx/kernel/early_printk.o`; `rtk_dequeue` and `rtl_isPassthruFrame`, also in `drivers/net/wireless/rtl8192cd/8192cd_util.o` | 讀 | a name an object outside scope also defines is in every `vmlinux` and cannot discriminate. `rtk_dequeue` is the eighth: MIPS16, and LOCAL in both `rtl_nic.o` and `8192cd_util.o` |
+| the population | 899 = 907 − 8 | 讀 | `tools/ethcensus-population.txt`, written by `ethcensus.py population`; a second run reproduces it byte for byte, and the second source's set equals it |
+| population names in `System.map` | 898; `__exitcall_re865x_exit` is not there | 讀 | `System.map`'s third column, and again through `vmlinux`'s own symbol table: the same 898 |
+| registered `/proc/rtl865x/` names | 42 | 讀 | `imgprocs.parse_names` over the tree's `rtl865x_proc_debug.c`; an independent regex also gives 42 |
+| vendor-unique `/proc` names | 6: `asicCounter`, `diagnostic`, `fc_threshold`, `mmd`, `phyReg`, `port_status` | 讀 | a NUL-bounded search of every `SHF_ALLOC`, non-`NOBITS` section of the 634 objects, through the tool's own ELF and `ar` reader rather than `objcopy`: each of the six is carried by `drivers/net/rtl819x/rtl865x_proc_debug.o` alone. The seven carried by retained code — `arp`, `igmp`, `ip`, `mac`, `memory`, `pppoe`, `stats` — equal `imgprocs.SHARED`, and the tool refuses if they differ. Of the seven only `mac` and `memory` are also carried by the vendor object, which therefore carries 8, `NET-42`'s 8: the 42 split 6 vendor-only, 2 both, 5 retained-only and 29 carried by nothing |
+| the string control on the flat image | 6 of 6, each once, all in `.rodata` (`0x8029ae34`–`0x8029ae68`); `rtl819x-switch` 1; `zzzz-not-a-name` 0 | 讀 | `objcopy -O binary` of `vmlinux`: 3,961,344 bytes, sha256 `8e0799f1…`, the same bytes as a hand concatenation of its one `PT_LOAD` at `0x80000000`. Each hit is attributed to `rtl865x_proc_debug.o` |
+| the segment-113 parser against `nm` | REFUSED: 43 disagreements, 14 of them in scope | 讀 | the tool with its parser swapped for the design's regex. 43 = 39 `[MIPS16]` lines + 4 sizes above 99,999, which readelf prints in hex (`desc_buf`, `obj_buf`, `skb_buf`, `eth_skb_buf`); in scope, 13 MIPS16 names + `eth_skb_buf` = 14 = 907 − 893 |
+
+`check` on `r6b6q2` itself, the vendor-present reference, reads RED on all
+three, and that is the positive control: object 22 of 627, symbol 898 of 899
+(`System.map` agreeing), string 6 of 6, and each of the ten seam names printed
+with the vendor object that defines it.
+
+## 11.3 The design's numbers this supersedes
+
+The design (segment 113, `$FWRE_WORK/rebuild/s113/r6b8/`, not committed) read
+`readelf -sW` with a regex that assumed `Vis` is followed by `Ndx`. A MIPS16
+function carries `[MIPS16]` between them, so its line did not match and was
+dropped without a word — the vendor's `swNic_receive`, `_swNic_send`,
+`re865x_start_xmit` and `interrupt_isr` among them — and a size above 99,999
+prints in hex, which a `\d+` field also drops. Each of its numbers, once:
+893 FUNC/OBJECT names → **907**; 505 global → **512**; 7 excluded → **8**
+(it could not see that `rtk_dequeue` collides with the WLAN driver's); a
+population of 886 → **899** (the difference is the 12 non-excluded MIPS16 names
+and `eth_skb_buf`, and nothing the other way); 885 in `System.map` → **898**;
+the string control's 13 → **6** (13 was the flat image's whole-registry count,
+retracted by `NET-42` on 2026-09-26, § 8.14). The step row's *22 objects and
+898 names* put the population's `System.map` subset where the population
+belongs. The 627 leaves and the 22 in scope stand as the design wrote them.
+
+## 11.4 The flat image a census must refuse: the staged tree's `rtkload/vmlinux_img` is the vendor drop's kernel
+
+讀: `r6b6q2`'s staged tree holds `rtkload/vmlinux_img` (2,953,660 bytes), and its
+sha256 is `48b1a171…` — the value the `marks_verify_absent` line of
+`r6b6q2.manifest` calls `drop-kernel`, the vendor drop's own kernel, under the
+name a flat image goes by. A census, or a card, that took "the tree's
+`vmlinux_img`" would read the vendor's image as this build's. `ethcensus check`
+refuses any image that is not `objcopy -O binary` of the build's own `vmlinux`,
+and refuses this one at the desk (`tools/test-ethcensus.sh`, the reference
+layer). That gate matches the real pipeline: for all 37 rlxfw builds under
+`$FWRE_WORK/rebuild`, rtkimage's `vmlinux_img` is byte-identical to host
+`objcopy` of its `vmlinux` (the review, 2026-09-27). `tools/imgprocs.py` has
+no such guard: it reads the image it is given.
+
+## 11.5 The controls
+
+`ethcensus.py self-test`: 51 of 51, on synthetic kbuild trees assembled with the
+host binutils — a vendor-present reference, a vendor-free tree with the seam,
+the five required mutants (an eleventh vendor name in the seam, a seam name
+defined by a second object, an empty population, a surviving MIPS16 vendor
+function in a kept object, the segment-113 parser against `nm` in both modes),
+and one tree per census and per guard on which only that one decides.
+`tools/test-ethcensus.sh`: 74 of 74 at the desk; 66 in CI's `instruments` job,
+where one skip line, `reference build`, stands for the 8 cases that read
+`r6b6q2`'s tree (`tools/ci-expected.tsv`). Its mutation layer turns each named
+case red with one of seventeen edits to the tool (`X1`–`X17`), runs the
+unmutated copy through the same path (`M0`), and requires the self-test to
+REFUSE without the host binutils (`NB`): there is no binutils skip. The review
+wrote 24 further mutants; the full suite kills all 24 and the self-test alone
+19. The other five — `nm`'s `W`/`w` mapping, the left NUL in the carrier
+search, the walk into composite links that are not `built-in.o` and into `.a`
+inputs, and `ABS` symbols — die only in the reference layer, so CI cannot kill
+them.
+
+## 11.6 What the census does not establish
+
+As the tool prints: vendor code under another path (the scope is a path rule);
+a vendor function the compiler inlined into an out-of-scope object (it leaves
+no symbol); a NOTYPE label (0 in scope on `r6b6q2`, counted and printed, not in
+the population); and whether the image is the one the board boots —
+`RLXFW-ID0` is the bench's half. A name absent is a name no symbol-table entry
+carries, not proof that no byte of vendor code survives. And, where the review
+limits a reading:
+
+* **A RED can be an operator's error** (A7). An empty `--seam`, or one given as
+  an absolute path, reads RED as *seam names not defined by the seam object
+  alone*, so a RED from `check` can mean vendor code or a misspelled seam; a
+  repeated `--seam` silently takes the last value. Read the seam line before
+  the verdict.
+* **A COMMON symbol cannot pass the parser cross-check** (A8): readelf prints
+  its alignment as the value and `nm` its size, so a leaf with a `.comm` is
+  REFUSED as a disagreement between the parsers rather than named. `r6b6q2`
+  has none (the kernel builds with `-fno-common`).
+* **The string census reads the embedded initramfs too** (A9, § 11.7's S2).
+  The flat image carries `.init.ramfs` (934,400 bytes, an uncompressed cpio),
+  while the vendor-unique derivation reads kernel objects. On `r6b6q2` the
+  ramfs holds no NUL-bounded occurrence of the six or of `rtl819x-switch`.
+  推: a NUL-bounded literal in a future userland reads RED as *carried by no
+  leaf* — a false RED, never a false GREEN — and the `rtl819x-switch` control
+  could be met from the ramfs rather than the kernel.
+* **Five population names are compiler-numbered function-static locals**
+  (A12): `info.4`, `pMbufList_start.3`, `pPkthdrList_start.2`,
+  `totalRxPkthdrRingCnt.0`, `totalTxPkthdrRingCnt.1`. A new rlxfw static with
+  the same name and ordinal reads RED; the RED names its definer, and it is a
+  collision to read before acting.
+* **The seam object's path is not decided.** The suite uses
+  `drivers/net/rlxfw-seam.o` as a placeholder, which on `r6b6q2` reads *not
+  among the leaves*; 8b's path goes in when the seam lands. The ten seam names
+  are a constant from the design's § 1.2, and the tool refuses a population
+  that lacks one.
+* **The fixture is a vendor name list.** It commits the 899 names (names, no
+  bytes) and the reference tree's local path on its `# build` line.
+* The vendor Ethernet section sizes the design quotes were not re-derived; the
+  census does not use them.
+
+## 11.7 Two corrections to § 8.14 and `NET-42`, and one carried item
+
+The census's second source re-read the per-object `/proc` search of 2026-09-26
+and found two errors in how it was stated; neither changes a name set.
+
+* **S1 — 667 was not a count of compiled objects.** `r6b6q2`'s link has 634
+  objects with content: 594 gcc-built leaves and 40 archive members. 667 is
+  627 leaves + 40 members, so it also counts the 31 empty `built-in.o`
+  archives and the two `lib.a` containers, which carry no strings of their own
+  (推: that is how 8-0 got 667 — its search script was not read, and 627 + 40
+  is the only decomposition found).
+* **S2 — `arp` and `ip` have a third carrier.** `usr/initramfs_data.o` carries
+  both, NUL-bounded, in `.init.ramfs` (`PROGBITS`, `SHF_ALLOC`, `0xe4200`
+  bytes; its `.data` is empty). The 2026-09-26 search read `.rodata` and
+  `.data` only; the census reads every `SHF_ALLOC`, non-`NOBITS` section, as
+  the flat image does. The six vendor-unique names have no carrier outside
+  `rtl865x_proc_debug.o`, so the 6 and the 7 stand.
+
+Both are fixed where they stand, in § 8.14 and in `SPEC.md` `NET-42`.
+🔄 **Carried: `tools/imgprocs.py`'s comment above `SHARED` states both**
+(*667 compiled objects searched*; `arp` from `arp.o, x_tables.o`, `ip` from
+`x_tables.o`). It stays as it is until seating 43 has run, because a card may
+pin the tool by digest, and is corrected after it.
