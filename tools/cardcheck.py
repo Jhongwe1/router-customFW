@@ -464,7 +464,7 @@ def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset()):
             continue
         if t not in paths:
             issues.append(f"{t}: redirection target is not declared")
-    return "SHELL", issues
+    return "SHELL", issues + memnode(cmd, flash_ok)
 
 
 ABSENT_RE = re.compile(r"```cardabsent\n(.*?)\n```", re.S)
@@ -518,7 +518,7 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
     # are excused wholesale or not at all.  Normalised because a caller may
     # hand us either separator.
     legacy_flr = card_rel.replace("\\", "/") in FLR_LEGACY_CARDS
-    flash_ok, bad = owner_yes(text, card_rel, pairs, report)  # `FW-113`
+    flash_ok, bad = memnode_ok(text, card_rel, pairs, report, owner_yes(text, card_rel, pairs, report))
     intentional, kinds = 0, {}
     for cid, cmd in pairs:
         kind, issues = classify_command(cmd, names, paths, legacy_flr, flash_ok)
@@ -739,6 +739,8 @@ def unsuppressed(kind, issues, absent):
     `EW: ...` would have gone the same way.  So a LOADER issue passes through
     whole, whatever is declared (`A35`).
     """
+    if any(i.endswith("(HW-1)") for i in issues):   # the memory node: A55
+        return list(issues)
     if kind == "LOADER":
         return list(issues)
     return [i for i in issues if i.split(":")[0] not in absent]
@@ -844,6 +846,197 @@ def owner_yes(text, card_rel, pairs, report=print):
             report("          permits nothing on this card -- stale, "
                    "mistyped, or for a command that needs no yes")
     return frozenset(yes) | legacy, bad
+
+
+# --------------------------------------------------------------------------
+# the vendor's /proc/rtl865x/memory -- HW-1, 2026-09-27 (R6b-8 8c's review)
+#
+# 讀 drivers/net/rtl819x/rtl865x_proc_debug.c as the 8c images build it
+# (CONFIG_RTL_DEBUG_TOOL=y, CONFIG_RTL_PROC_DEBUG unset): proc_mem_write()
+# hands `read ADDR LEN` to memDump(ADDR, LEN) and `write ADDR DATA` to
+# WRITE_MEM32(ADDR, DATA) and then a READ_MEM32 of that word, each number
+# through simple_strtol with base 0, and bounds neither.  memDump prints
+# LEN/16 + 1 lines of 16 bytes and LOADS five words for each line --
+# (line & ~3) + 0 .. + 16 -- the last line's before its `max == 0` break,
+# so `read A 4` loads A through A + 16.  And a 64-byte write passes the
+# handler's `len > 64` test and NULs tmpbuf[64], one past its buffer.
+#
+# So one typed address puts H601's bytes in a capture under bench/
+# (`read 0xBD006000 4`), consumes PSRP's read-to-clear bit, or stores
+# anywhere.  rtl819x-view refuses flash and PSRP for itself; this refuses
+# them for a card that reaches the same words through the vendor's node,
+# as 8c-cells does by decision (D4's one write, D5's one-source reads).
+#
+# ONE FORM per simple command, and any other that names `memory` refused:
+#     echo read 0xADDR LEN > /proc/rtl865x/memory       LEN decimal, 1-256
+#     echo write 0xADDR 0xDATA > /proc/rtl865x/memory
+# (`>` with or without a space after it; ADDR, DATA 1-8 hex digits).  A
+# number in any other spelling -- decimal, octal, signed, trailed by a word
+# -- is refused rather than read by a rule that could differ from the
+# kernel's.  The longest form is 28 bytes with echo's newline, under 64.
+#
+# A read is permitted when its whole footprint lies in one MEMNODE_READ
+# window and touches no MEMNODE_HOT word; a footprint on a flash alias is
+# refused naming flashwin.overlaps_forbidden's region when it has one.  A
+# write is permitted when its word lies in a MEMNODE_WRITE window, is no
+# MEMNODE_HOT word, and the card declares that exact simple command in a
+# ```memwrite fence, one per line; a fence row that permits nothing is a
+# defect.  The three FROZEN cards that sent anything else are excused by
+# (card, exact --send payload), and B15 sweeps that list both ways.  No
+# absence declaration hides one of these refusals (unsuppressed(), A55).
+#
+# ⚠️ WHAT THIS CANNOT SEE: a send outside a single-quoted `--send` (the
+# FW-113 note above says which), and what a permitted word does when it is
+# loaded -- a window says where a read may land, not that it is free of side
+# effects.  0xBB804600 is refused on its name alone (推).
+import flashwin  # noqa: E402
+
+MEMNODE = "/proc/rtl865x/memory"
+MEMNODE_RE = re.compile(r"echo (read|write) 0x([0-9A-Fa-f]{1,8}) (\S+) ?> ?"
+                        r"/proc/rtl865x/memory")
+_MEMNODE_SEP_RE = re.compile(r"\s+(?:;|&&|\|\||\|)\s+")
+MEMWRITE_RE = re.compile(r"```memwrite\r?\n(.*?)\r?\n```", re.S)
+# The 4 MiB flash as KSEG1 and KSEG0 see it: its window and the boot alias.
+FLASH_ALIASES = (0xBD000000, 0x9D000000, 0xBFC00000, 0x9FC00000)
+FLASH_SIZE = 0x400000
+MEMNODE_READ = (
+    (0xB8000000, 0xB8000100, "the system block's first 64 words (PIN_MUX)"),
+    (0xB8010000, 0xB8010100, "the CPU interface (NET-48)"),
+    (0xBB801000, 0xBB802000, "the MIB"),
+    (0xBB804000, 0xBB805000, "the switch registers"),
+    (0xBB806000, 0xBB807000, "the 0xBB806000 block blocks 34 and 45 read"),
+)
+MEMNODE_WRITE = (
+    (0xB8010000, 0xB8010100, "the CPU interface"),
+    (0xBB804000, 0xBB805000, "the switch registers"),
+)
+MEMNODE_HOT = (
+    (0xBB804128, 0xBB80414C, "PSRP0-PSRP8, whose bit 8 clears when read "
+     "(NET-11)"),
+    (0xBB804600, 0xBB804604, "0xBB804600, which B names PSRP6_RW in a "
+     "branch this build does not compile (推; 8d tests it first)"),
+)
+
+# ⚠️ Keyed by (card, exact --send payload), never by a date or a pattern,
+# as FLASH_LEGACY_CARDS is; all three cards are FROZEN.
+MEMNODE_LEGACY_CARDS = {
+    # 2026-09-17b, block 26: a read of PSRP0 whose footprint runs to PSRP4.
+    "bench/2026-09-17b/PREDICTIONS-B27-block26.md": frozenset({
+        "echo read 0xBB804128 4 > /proc/rtl865x/memory"}),
+    # 2026-09-19, block 27: CPUICR written and restored, undeclared.
+    "bench/2026-09-19/PREDICTIONS-B28-block27.md": frozenset({
+        "sleep 1 ; echo write 0xB8010000 0x00100000 > /proc/rtl865x/memory",
+        "sleep 1 ; echo write 0xB8010000 0x00000000 > /proc/rtl865x/memory"}),
+    # 2026-09-22, block 40: a read with no LEN (讀: the handler goes to its
+    # errout at the missing token) and PITCR written, undeclared.
+    "bench/2026-09-22/PREDICTIONS-B42-block40.md": frozenset({
+        "echo read 0xbb804100 > /proc/rtl865x/memory",
+        "echo write 0xbb804100 0x00000001 > /proc/rtl865x/memory"}),
+}
+
+
+def memnode_span(verb, addr, arg):
+    """-> the half-open [lo, hi) a well-formed send loads (a read) or stores
+    and then loads (a write)."""
+    if verb == "read":
+        lo = addr & ~3
+        return lo, lo + 16 * (int(arg) // 16) + 20
+    return addr, addr + 4
+
+
+def memnode_why(lo, hi, windows):
+    """'' if [lo, hi) is permitted in `windows`, else why it is not."""
+    for base in FLASH_ALIASES:
+        if lo < base + FLASH_SIZE and hi > base:
+            a, b = max(lo, base) - base, min(hi, base + FLASH_SIZE) - base
+            hit = flashwin.overlaps_forbidden(a, b - a)
+            return (f"flash 0x{a:06X}-0x{b - 1:06X} through its alias at "
+                    f"0x{base:08X}" + (f", inside {hit[2]}" if hit else "")
+                    + "; no flash word is read or written through the node")
+    for h0, h1, name in MEMNODE_HOT:
+        if lo < h1 and hi > h0:
+            return f"it loads {name}"
+    if not any(w0 <= lo and hi <= w1 for w0, w1, _ in windows):
+        return "outside every window this rule admits (" + "; ".join(
+            f"{w0:08X}-{w1 - 1:08X} {n}" for w0, w1, n in windows) + ")"
+    return ""
+
+
+def memnode(cmd, ok=frozenset()):
+    """-> [issue, ...], one per simple command of `cmd` that names `memory`
+    and is not permitted.  `ok` holds this card's ("memwrite", command)
+    declarations and ("memlegacy", --send payload) exemptions."""
+    if "memory" not in cmd or ("memlegacy", cmd.strip()) in ok:
+        return []
+    out = []
+    for part in _MEMNODE_SEP_RE.split(cmd.strip()):
+        if "memory" not in part:
+            continue
+        m = MEMNODE_RE.fullmatch(part)
+        if not m:
+            why = ("not `echo read 0xADDR LEN` or `echo write 0xADDR 0xDATA` "
+                   f"into {MEMNODE}, the one form this tool bounds")
+        else:
+            verb, addr, arg = m.group(1), int(m.group(2), 16), m.group(3)
+            if verb == "read" and not (re.fullmatch(r"[1-9][0-9]{0,2}", arg)
+                                       and int(arg) <= 256):
+                why = f"LEN `{arg}` is not a decimal 1-256"
+            elif verb == "write" and not re.fullmatch(r"0x[0-9A-Fa-f]{1,8}",
+                                                      arg):
+                why = f"DATA `{arg}` is not 0x and 1-8 hex digits"
+            elif verb == "write" and addr & 3:
+                why = f"0x{addr:08X} is not a word address"
+            else:
+                lo, hi = memnode_span(verb, addr, arg)
+                why = memnode_why(lo, hi, MEMNODE_READ if verb == "read"
+                                  else MEMNODE_WRITE)
+                if why:
+                    why = f"it touches {lo:08X}-{hi - 1:08X}: {why}"
+                elif verb == "write" and ("memwrite", part) not in ok:
+                    why = ("a write this card does not declare: its exact "
+                           "text belongs in the card's ```memwrite fence")
+        if why:
+            out.append(f"{MEMNODE}: `{part}`: {why} (HW-1)")
+    return out
+
+
+def memnode_ok(text, card_rel, pairs, report, prior):
+    """-> owner_yes()'s (permitted, defects) with this card's memory-node
+    permissions added: each ```memwrite row as ("memwrite", command) and each
+    MEMNODE_LEGACY_CARDS payload of this card as ("memlegacy", payload).
+    Defects, each reported and counted, none of them permitting anything: a
+    row that is not one well-formed write, a second row for one write, and a
+    row no cell of this card sends."""
+    ok, bad = prior
+    rows = []
+    for m in MEMWRITE_RE.finditer(text):
+        for ln in m.group(1).split("\n"):
+            ln = ln.rstrip("\r")
+            if not ln.strip() or ln.lstrip().startswith("#"):
+                continue
+            w = MEMNODE_RE.fullmatch(ln)
+            if not w or w.group(1) != "write" or ln in rows:
+                bad += 1
+                report(f"  FAIL  memwrite row {ln!r}")
+                report("          REFUSED, and it permits nothing: " + (
+                    "a second row for one write" if w and w.group(1) == "write"
+                    else f"want exactly `echo write 0xADDR 0xDATA > {MEMNODE}`"))
+                continue
+            rows.append(ln)
+    sent = {p for _cid, cmd in pairs for p in _MEMNODE_SEP_RE.split(cmd.strip())}
+    for ln in rows:
+        if ln not in sent:
+            bad += 1
+            report(f"  FAIL  memwrite {ln!r}")
+            report("          permits nothing on this card -- no cell sends it")
+    legacy = MEMNODE_LEGACY_CARDS.get(card_rel.replace("\\", "/"), frozenset())
+    for cid, cmd in pairs:
+        if cmd.strip() in legacy:
+            report(f"  note  {cid}: {cmd}")
+            report("          a memory-node send on a FROZEN card "
+                   "(MEMNODE_LEGACY_CARDS), sent before HW-1")
+    return (ok | {("memwrite", r) for r in rows}
+            | {("memlegacy", p) for p in legacy}), bad
 
 
 # --------------------------------------------------------------------------
@@ -1916,6 +2109,10 @@ def run_controls():
     # `FW-124`, HOST cells: host_controls() below.
     host_controls(row, cards, card_at, silent)
 
+    # ------------------------------------------------------- A50-A55, B15
+    # HW-1, the vendor's memory node: memnode_controls() below.
+    memnode_controls(row, cards, card_at, silent, names, paths)
+
     print()
     return 0 if ok else 1
 
@@ -2209,6 +2406,175 @@ def host_controls(row, cards, card_at, silent):
                     f"over {len(tools)} tool(s); host-cells cardnum agrees on "
                     f"{checked - len(mism)} of {checked}" + (f": {mism}" if mism else ""))
     case("B14", "the HOST population, and its count against each cardnum", b14)
+
+
+def memnode_controls(row, cards, card_at, silent, names, paths):
+    """HW-1's cases.  Each names, in test-cardcheck-mutants.py, the mutant
+    that must turn it red; B15 is the corpus."""
+    import tempfile
+    node = " > /proc/rtl865x/memory"
+
+    def hw1(cmd):
+        """The command's memory-node issues, through classify_command."""
+        return [i for i in classify_command(cmd, names, paths)[1]
+                if i.endswith("(HW-1)")]
+
+    def refused(cmds, needle=""):
+        return [c for c in cmds if not any(needle in i for i in hw1(c))]
+
+    def passed(cmds):
+        return [c for c in cmds if hw1(c)]
+
+    def case(tag, name, fn):
+        try:
+            good, detail = fn()
+        except Exception as e:                              # noqa: BLE001
+            good, detail = False, f"{type(e).__name__}: {str(e)[:60]}"
+        row(tag, name, good, detail)
+
+    # A50 -- the planted read, and every flash alias.  The fifth word of a
+    # read at 0xBD005FF0 is H601's first: the LEN asked for stops short of
+    # it and memDump's footprint does not.  Flash outside H601 is refused
+    # too, without H601's name.
+    def a50():
+        h601 = ["echo read 0xBD006000 4" + node, "echo read 0xBFC07FF0 4" + node,
+                "echo read 0x9D006100 16" + node, "echo read 0xBD005FF0 4" + node,
+                "echo write 0xBD006000 0x0" + node]
+        other = ["echo read 0xBD000000 4" + node, "echo read 0x9FC00000 4" + node]
+        miss = refused(h601, "H601")
+        miss2 = refused(other, "flash 0x")
+        named = [c for c in other if any("H601" in i for i in hw1(c))]
+        return (not miss and not miss2 and not named,
+                f"{len(h601) - len(miss)} of {len(h601)} refused naming H601, "
+                f"{len(other) - len(miss2)} of {len(other)} other flash reads "
+                f"refused without it" + (f"; passed: {miss + miss2 + named}"
+                                          if miss or miss2 or named else ""))
+    case("A50", "a read or write reaching flash is REFUSED, H601 named", a50)
+
+    # A51 -- the footprint against the hot words and the window edges, each
+    # refusal beside a permitted twin one word away.
+    def a51():
+        bad = ["echo read 0xBB804118 4" + node, "echo read 0xBB804148 4" + node,
+               "echo read 0xBB8045F0 4" + node, "echo read 0xBB804100 64" + node,
+               "echo read 0xBB801FF0 4" + node, "echo read 0xB80100F0 4" + node]
+        good = ["echo read 0xBB804114 4" + node, "echo read 0xBB80414C 4" + node,
+                "echo read 0xBB8045EC 4" + node, "echo read 0xBB804100 16" + node,
+                "echo read 0xBB801FEC 4" + node, "echo read 0xB80100EC 4" + node,
+                "echo read 0xBB804754 4" + node, "echo read 0xB8000040 4" + node]
+        miss, over = refused(bad), passed(good)
+        return (not miss and not over,
+                f"{len(bad) - len(miss)} of {len(bad)} refused, "
+                f"{len(good) - len(over)} of {len(good)} twins permitted"
+                + (f"; wrong: {miss + over}" if miss or over else ""))
+    case("A51", "memDump's footprint, not LEN, meets PSRP and the edges", a51)
+
+    # A52 -- the one form.  Every other spelling that names `memory` is
+    # refused; the forms the committed cards used pass.
+    def a52():
+        bad = ["echo read 0xbb804100" + node, "echo read 3145728256 4" + node,
+               "echo read 0xBB804100 010" + node, "echo read 0xBB804100 257" + node,
+               "echo read 0xBB804100 -4" + node, "echo read 0xBB804100 4 x" + node,
+               "echo read 0x1BB804100 4" + node,
+               "echo read 0xBB804100 4 >> /proc/rtl865x/memory",
+               "cat /proc/rtl865x/memory", "echo read 0xBB804100 4 > memory",
+               "echo read 0xBB804000 4" + node + " ; echo read 0xBD006000 4" + node]
+        good = ["sleep 1 ; echo read 0xBB806100 4 >/proc/rtl865x/memory",
+                "echo read 0xBB806100 4 >/proc/rtl865x/memory ; "
+                "echo read 0xBB806104 4 >/proc/rtl865x/memory",
+                "echo read 0xbb804000 4" + node, "echo read 0xBB804000 256" + node]
+        miss, over = refused(bad), passed(good)
+        return (not miss and not over,
+                f"{len(bad) - len(miss)} of {len(bad)} refused, "
+                f"{len(good) - len(over)} of {len(good)} committed forms pass"
+                + (f"; wrong: {miss + over}" if miss or over else ""))
+    case("A52", "only `echo read|write 0xADDR N > the node` passes", a52)
+
+    # A53 -- writes, through a card: declared and in a write window passes;
+    # undeclared, outside a write window (the MIB is read-only here),
+    # unaligned or on a hot word is refused, declared or not; a malformed,
+    # a second, and an unused ```memwrite row are each a defect.
+    def a53():
+        w_ok = "echo write 0xBB804110 0x80000000" + node
+        sent = [w_ok, "echo write 0xBB804110 0x00000000" + node,
+                "echo write 0xB8001200 0x0" + node, "echo write 0xBB801100 0x0" + node,
+                "echo write 0xBB804111 0x1" + node, "echo write 0xBB804128 0x0" + node]
+        decl = [w_ok] + sent[2:] + [w_ok, "echo write 0xBB804110" + node,
+                                    "echo write 0xBB804114 0x1" + node]
+        with tempfile.TemporaryDirectory() as d:
+            lines = []
+            body = "".join(f"| **W{i}** | `CAP --out W{i} --send '{c}'` |\n"
+                           for i, c in enumerate(sent))
+            n = cards_commands(card_at(d, "w.md", body + "\n```memwrite\n"
+                                       + "".join(x + "\n" for x in decl) + "```\n"),
+                               report=lines.append)
+        cut = [x.split()[1].rstrip(":") for x in lines if x.startswith("  FAIL  W")]
+        rows = sum(x.startswith("  FAIL  memwrite") for x in lines)
+        good = n == 8 and cut == ["W1", "W2", "W3", "W4", "W5"] and rows == 3
+        return good, (f"{n} bad (want 8); refused cells {cut} (want W1-W5); "
+                      f"{rows} of 3 fence defects named")
+    case("A53", "a write passes only declared, in a write window", a53)
+
+    # A54 -- the FROZEN cards are excused by NAME: each reads no memory-node
+    # refusal, and the same bytes at another path read all of theirs.
+    def a54():
+        at_home, away = {}, {}
+        for c, pays in sorted(MEMNODE_LEGACY_CARDS.items()):
+            lines = []
+            cards_commands(c, report=lines.append)
+            at_home[c] = sum("(HW-1)" in x for x in lines)
+            with tempfile.TemporaryDirectory() as d:
+                dst = os.path.join(d, c)
+                os.makedirs(os.path.dirname(dst))
+                with open(dst, "wb") as f:
+                    f.write(_read(c))
+                lines = []
+                cards_commands(os.path.relpath(dst, ROOT), report=lines.append)
+                away[c] = sum("(HW-1)" in x for x in lines)
+        ok = (len(at_home) == 3 and not any(at_home.values())
+              and all(v > 0 for v in away.values()))
+        return ok, (f"at their own paths {sorted(at_home.values())} refused; "
+                    f"the same bytes elsewhere {sorted(away.values())}")
+    case("A54", "the FROZEN cards are excused by name, a copy is not", a54)
+
+    # A55 -- no absence declaration hides it: a ```cardabsent fence and
+    # --expect-absent, each naming the node, leave the planted read refused.
+    def a55():
+        hide = ("/proc/rtl865x/memory", "echo")
+        body = "| **P0** | `CAP --out P0 --send 'echo read 0xBD006000 4" + node + "'` |\n"
+        with tempfile.TemporaryDirectory() as d:
+            n_fence = cards_commands(card_at(d, "f.md", body + "\n```cardabsent\n"
+                                             + "\n".join(hide) + "\n```\n"),
+                                     report=silent)
+            n_flag = cards_commands(card_at(d, "g.md", body), report=silent,
+                                    extra_absent=hide)
+        return n_fence == 1 and n_flag == 1, (
+            f"cardabsent: {n_fence} of 1 still bad; --expect-absent: {n_flag} of 1")
+    case("A55", "no absence declaration hides a memory-node refusal", a55)
+
+    # B15 -- the corpus, both ways, at the exemption's grain: every send any
+    # card makes to the node is permitted by the rule or is a FROZEN pair,
+    # and every FROZEN pair is still sent and still refused without it.
+    def b15():
+        n_send, off, refused_pairs = 0, [], set()
+        for c in cards:
+            t = _read(c).decode("utf-8", "replace")
+            prs = sends_with_cells(t)
+            decl, _n = memnode_ok(t, "", prs, silent, (frozenset(), 0))
+            for _cid, cmd in prs:
+                if "memory" not in cmd:
+                    continue
+                n_send += 1
+                if memnode(cmd, decl):
+                    refused_pairs.add((c, cmd.strip()))
+        listed = {(c, p) for c, ps in MEMNODE_LEGACY_CARDS.items() for p in ps}
+        new = sorted(refused_pairs - listed)
+        stale = sorted(listed - refused_pairs)
+        ok = not new and not stale and n_send >= 31
+        return ok, (f"{len(cards)} swept, {n_send} send(s) name the node, "
+                    f"{len(refused_pairs)} refused; " + (
+                        "list exact" if not new and not stale else
+                        f"NEW offender(s): {new} STALE: {stale}"))
+    case("B15", "every corpus memory-node refusal is a FROZEN pair", b15)
 
 
 def main(argv):

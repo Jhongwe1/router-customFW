@@ -404,6 +404,58 @@ MUT = [
      '        if not words and ASSIGN_RE.match(val.raw):',
      '        if False:',
      "tools/cardrun.py"),
+
+    # ------------------------------------------------ HW-1, 2026-09-27
+    # The vendor's /proc/rtl865x/memory.  One mutant per property the rule
+    # claims: wired in, memDump's footprint, the hot words, the flash alias
+    # naming H601, the one form, the write declaration, its unused-row
+    # defect, the absence filter, the exemption's key, and B15 both ways.
+    ("M60 the memory-node check unwired                      (kills A50)",
+     '    return "SHELL", issues + memnode(cmd, flash_ok)',
+     '    return "SHELL", issues'),
+
+    ("M61 the footprint is LEN, not five words a line        (kills A51, A50)",
+     '        return lo, lo + 16 * (int(arg) // 16) + 20',
+     '        return lo, lo + int(arg)'),
+
+    ("M62 PSRP and 0xBB804600 off the hot list               (kills A51)",
+     'MEMNODE_HOT = (',
+     'MEMNODE_HOT = () and ('),
+
+    ("M63 the flash alias check removed                      (kills A50)",
+     '    for base in FLASH_ALIASES:',
+     '    for base in ():'),
+
+    ("M64 LEN read in any spelling of digits                 (kills A52)",
+     're.fullmatch(r"[1-9][0-9]{0,2}", arg)',
+     're.fullmatch(r"[0-9]+", arg)'),
+
+    ("M65 an undeclared write permitted                      (kills A53)",
+     '                elif verb == "write" and ("memwrite", part) not in ok:',
+     '                elif False:'),
+
+    ("M66 the frozen exemption keyed by a path suffix        (kills A54)",
+     r'    legacy = MEMNODE_LEGACY_CARDS.get(card_rel.replace("\\", "/"), '
+     r'frozenset())',
+     r'    legacy = next((v for k, v in MEMNODE_LEGACY_CARDS.items() if '
+     r'card_rel.replace("\\", "/").endswith(k)), frozenset())'),
+
+    ("M67 a frozen pair that IS sent dropped from the list   (kills B15, A54)",
+     '        "echo read 0xBB804128 4 > /proc/rtl865x/memory"}),',
+     '        "echo read 0xBB804128 4 > /proc/rtl865x/memory-NOTHING"}),'),
+
+    ("M68 a pair no card sends added to the list             (kills B15)",
+     '        "echo write 0xbb804100 0x00000001 > /proc/rtl865x/memory"}),',
+     '        "echo write 0xbb804100 0x00000001 > /proc/rtl865x/memory",\n'
+     '        "echo read 0xBB804000 4 > /proc/rtl865x/memory"}),'),
+
+    ("M69 an absence declaration hides the node's refusal    (kills A55)",
+     '    if any(i.endswith("(HW-1)") for i in issues):   # the memory node: A55',
+     '    if False:'),
+
+    ("M70 a memwrite row that permits nothing unreported     (kills A53)",
+     '        if ln not in sent:',
+     '        if False:'),
 ]
 
 
