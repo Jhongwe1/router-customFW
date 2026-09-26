@@ -474,6 +474,16 @@ configuration and nothing to do with port 1; both omitting 1 makes it about
 port 1. Failing that, the FT2 test procedure, or the bootcode source this
 loader was built from.
 
+🔄 **2026-09-26 (讀, not a device reading): the vendor's Linux path has no
+port-1 exception either.** `r6b6q`'s and `r6b6q2`'s `System.map` hold 0 matches
+for `set_gray_code`, `setPhyGrayCode` and `set_ram_code` (control: `Set_GPHYWB`
+is present in both); the built `.config` has no `CONFIG_RTL8196C_ETH_IOT`, the
+guard on `re865x_setPhyGrayCode` above; and `Set_GPHYWB(999, …)` (call sites
+`rtl865x_asicL2.c:621`–`646`) walks PHYs 0–4 (`:1236`–`:1238`, *total
+phyid=0~4*). So no port-1 patch routine is linked into the image. Not
+established: that no other vendor code treats PHY 1 differently; what
+register-level difference PHY 1 carries is `R6b-7`'s reading.
+
 **`PORT1` goes on `RUNSHEET.md`'s do-not-type list.** It was not on it before,
 because that list was written from the four memory-write paths, and `PORT1`
 writes neither memory nor flash.
@@ -546,7 +556,7 @@ displacement — 48 sites, 13 distinct addresses, **all in `0xBB804xxx`**. **(A.
 | `0xBB804100` | `PITCR` | **Table 63** | `\|= 0x1`, twice |
 | `0xBB804104` | `PCRP0` | **Table 64** | read-modify-write, 5 sites |
 | `0xBB80414C` | `P0GMIICR` | **absent** | 5 sites |
-| `0xBB804234` | **absent** | **absent** | 1 site — **undetermined** |
+| `0xBB804234` | ~~**absent**~~ `MEMCR` (`:1438`; 🔄 named 2026-09-17, `SPEC.md` `NET-29`) | **absent** | 1 site — **undetermined** |
 | `0xBB804418` | `SWTCR0` | absent | 8 sites |
 | `0xBB804428` | `FFCR` | absent | 1 site |
 | `0xBB804A08` | `PVCR0` | absent | 1 site |
@@ -555,16 +565,17 @@ displacement — 48 sites, 13 distinct addresses, **all in `0xBB804xxx`**. **(A.
 | `0xBB804D3C` | `TCR7` | absent | 1 site |
 
 Four addresses have two documentary sources plus A's behaviour. Eight have one,
-and that one is a different generation. **One has none.** R6 inherits that list
+and that one is a different generation. ~~**One has none.**~~ 🔄 It has one since 2026-09-17 (`MEMCR`, `NET-29`). R6 inherits that list
 as it stands; nothing here is promoted by being adjacent to something documented.
 
 🔴 **The count of 13 is a floor, and the reason is the census's own
 form — 2026-09-14 (desk).** A function does one `lui` into a base
 register and then many `ori`s off it, so pairing each `lui` with its
 FOLLOWING `ori` sees one offset per function. A census of `ori rX,rY,0x4xxx`
-immediates finds **33 distinct `0xBB804xxx` offsets**, all 13 above among
-them and 20 more that this table does not carry: `0x4108`, `0x410C`,
-`0x4110`, `0x4114`, `0x4204`, `0x4300`, `0x4410`, `0x4754`, `0x4924`,
+immediates finds **33 distinct `0xBB804xxx` offsets** (🔄 2026-09-26: **32** —
+one of them, `0x4924`, is an `ori` into a `PIN_MUX_SEL2` mask, not a switch offset), all 13 above among
+them and ~~20~~ 19 more that this table does not carry: `0x4108`, `0x410C`,
+`0x4110`, `0x4114`, `0x4204`, `0x4300`, `0x4410`, `0x4754`, ~~`0x4924`~~,
 `0x4A0C`, `0x4A10`, `0x4A14`, `0x4D04`, `0x4D20`, `0x4D24`, `0x4D28`,
 `0x4D2C`, `0x4D30`, `0x4D34`, `0x4D38`. ⚠️ **The new census has a
 form limitation of its own**: it counts one instruction form, does not verify
@@ -572,7 +583,10 @@ the base register held `0xbb800000` at every site, and cannot see
 displacement forms such as `lw v1,16644(v0)` — which is exactly how the
 table above missed the `PCRP` loop below. 33 is a floor, not a total. The
 consequence for `PROGRESS.md`'s `C-15` is that the set of unnamed addresses
-is LARGER than one, so that row widens rather than closes.
+is LARGER than one, so that row widens rather than closes. 🔄 **2026-09-26: all
+twenty are accounted for** — nineteen named (the census-floor table in the
+2026-09-19 section below), `0x4924` struck as this census's own blind spot —
+and `C-15` is closed.
 
 **`0xBB802000` is not in this table, and that matters.** **B**'s `asicregs.h`
 defines `PHY_BASE (SWCORE_BASE + 0x00002000)` with a memory-mapped shadow of MII
@@ -964,6 +978,18 @@ through `/proc/rtl865x/memory`, which needs no new image.
 | `0xBB804D08` | `SWTAA` | `BB060100` | `BB040020` |
 | `0xBB804D3C` | `TCR7` | `00000000` | `07000030` |
 
+🔄 **2026-09-26 (讀): the loader-state `MDCIOCR` word decodes, and the loader
+stores it.** The header's field defines (`rtl865xc_asicregs.h:1047`–`:1056`)
+split `96181441` as `COMMAND_WRITE` (bit 31), `PHYADD` 22, `REGADD` 24,
+`WRDATA` `0x1441` — a write command to an MDIO address that does not answer
+(§ 6). The loader forms that constant at `0x804046C8` and stores it to
+`0xBB804004` at `0x804046D8`, with no `MDCIOSR` poll after it, inside the routine
+at `0x80403F54`; `0x804028B4` calls that routine and `goToDownMode`
+(`0x80408468`) calls `0x804028B4`. B carries the same constant commented out,
+`rtl865x_asicL2.c:5209`, *"enable Giga port 8211B LED"*. Only the rule and the
+addresses are here. Not established: whether the command completes, or what
+it does to anything at MDIO address 22.
+
 🔴 **Before this, no word in `0xBB804xxx` had ever been read under Linux** —
 量, `grep -rl BB804 bench/` returns 41 files in four directories, newest
 `bench/2026-08-25`.
@@ -1023,7 +1049,9 @@ line they came out of.
 not"*, with the refutation *"all 32 addresses returning the same plausible
 value means the bus is echoing and nothing was measured."*
 
-量 `X8-mdior02` — the first execution of `MDIOR` in either project:
+量 `X8-mdior02` — `MDIOR` of register 0 (🔄 2026-09-26: this read *the first
+execution of `MDIOR` in either project*; it is not — `F2` ran `MDIOR 2` on
+2026-08-24, `bench/2026-08-24c/F2`, `SPEC.md` `NET-24`):
 
 > **MDIO addresses `0x00`–`0x04` read `0x1100`. Addresses `0x05`–`0x1F` read
 > `0x0000`.**
@@ -1231,11 +1259,19 @@ re-found**:
 |---|---|---|
 | `0xBB804108` · `0x410C` · `0x4110` · `0x4114` | **`PCRP1`–`PCRP4`** | two sites each: `0x80403494`… and the `J` handler |
 | `0xBB804204` | `SSIR` — `\|= 1` (`TRXRDY`) | `0x80403970` |
-| `0xBB804300` | unnamed in every source here — written `0x00200000` | `0x804039B0` |
+| `0xBB804300` | **`LEDCREG`** (B `:2627`, and `LEDCR` `:2633`; D Table 68 `LEDCR0`) — written `0x00200000` (superseded 2026-09-26: *unnamed in every source here*) | `0x804039B0` |
 | `0xBB804410` | **`MSCR`** — written the literal `0x00000001` | `0x80403950` |
-| `0xBB804754` | unnamed in every source here — written `0x00001249` | `0x8040395C` |
+| `0xBB804754` | **`QNUMCR`** (B `:1850`) — written `0x00001249` (superseded 2026-09-26: *unnamed in every source here*) | `0x8040395C` |
 | `0xBB804A0C` · `0x4A10` · `0x4A14` | **`PVCR1`–`PVCR3`** — written `0x00080008` | `0x80403930`… |
-| `0xBB804D04` · `0x4D20`–`0x4D38` | the TACI block's interior | one site each |
+| `0xBB804D04` · `0x4D20`–`0x4D38` | the TACI block's interior: **`SWTASR`**, **`TCR0`–`TCR6`** (B `:197`, `:199`–`:205`, names added 2026-09-26) | one site each |
+| ~~`0x4924`~~ | 🔴 **not a switch address**: the low half of the `PIN_MUX_SEL2` mask `0xFFFC4924` (= `~0x3B6DB`), and the base register held `0xFFFC0000`, not `0xBB800000` — the 2026-09-14 census's stated blind spot (added 2026-09-26) | `0x80403998`–`0x8040399C` |
+
+🔄 **2026-09-26: the names in the table's `QNUMCR`, `LEDCREG`, `SWTASR` and
+`TCR0`–`TCR6` rows were in `tools/hdrcensus.py`'s output from 2026-09-17**
+(`SPEC.md` `NET-134`). B is `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h`,
+the copy eleven `.cmd` files of the build name, read with
+`-D CONFIG_RTL_8196E -D CONFIG_RTL_819X`; the names carry 讀 ×1 (B) and
+`LEDCR0` a second (D). No value in this table enters code on these sources.
 
 🔴🔴 **The most consequential of those is in the `J` handler, and it explains a
 state transition two projects have measured.** 讀 `0x804092F4`–`0x80409354`,

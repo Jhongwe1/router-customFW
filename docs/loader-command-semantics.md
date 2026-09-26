@@ -1598,13 +1598,13 @@ first never does.** So they measure, with three values and an identical output,
 that **the second argument is ignored**; they cannot measure that the first one
 is the register, because it was `0` every time and `Reg=0` is what a handler
 that ignored *both* would also print. *"Reads register 0 regardless of its
-arguments"* is not what was tested. 🟢 **The discriminating cell is one command
-and it is zero-risk**: `MDIOR 2` must print `Reg=2` on all 32 lines — **not
-`Reg=02`**, by the padding measurement above — with `Data` equal to `PHYIDR1`
-on addresses 0–4, which seating 27 measured through Linux as `0x001c`
-(`docs/loader-phy-and-switch.md`). Carried forward. ⚠️ It is `MDIOR 2` and not
-`MDIOR 2 0`: a second argument is accepted and ignored, and including one makes
-the cell unable to distinguish the two readings it exists to separate.
+arguments"* is not what was tested. 🟢 **The discriminating cell is one command,
+and it had already run** (🔄 2026-09-26: this read *Carried forward*). 量
+`bench/2026-08-24c/F2`, `MDIOR 2` on 2026-08-24, printed `Reg=2` on all 32 lines
+— not `Reg=02`, as the padding measurement above predicts — with `Data` `0x001c`
+on addresses 0–4 and `0x0000` on 5–31. With `X8`'s `Reg=0`, the first argument
+is the register, 量 (`SPEC.md` `NET-24`, `NET-39`). ⚠️ It was `MDIOR 2` and not
+`MDIOR 2 0`: a second argument is accepted and ignored, so one could not separate.
 
 ### Why nothing recovered the fault: the loader does not arm the watchdog
 

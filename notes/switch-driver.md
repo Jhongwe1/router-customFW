@@ -618,9 +618,9 @@ one of its three registers:
 | `0x80403918` | `P0GMIICR (0x414C) \|= 0x40` | — |
 | `0x8040392C`–`0x80403944` | `PVCR0`–`PVCR3` = `0x00080008` | 🟢 **yes**, 量 `X4`/`X5` — all four read `00080008` |
 | `0x80403950` | **`MSCR (0x4410) = 0x00000001`** | 🟢 **yes**, 量 `X3-L4410` |
-| `0x8040395C` | `0xBB804754 = 0x00001249` | unnamed in every source here |
+| `0x8040395C` | **`QNUMCR (0x4754) = 0x00001249`** | never read on this die; the name 讀 ×1, B `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h:1850` (superseded: *unnamed in every source here*, 2026-09-19 — `LOG.md` 2026-09-26) |
 | `0x80403970` | `SSIR (0x4204) \|= 0x1` (`TRXRDY`) | 🟢 consistent — `S0′` latches `00000001` |
-| `0x804039B0` | `0xBB804300 = 0x00200000` | unnamed in every source here |
+| `0x804039B0` | **`LEDCREG (0x4300) = 0x00200000`** | never read on this die; the name 讀 ×2 — B `:2627` (`LEDCR` `:2633` is a second, unlabelled name for the address) and D Table 68 `LEDCR0` (superseded: *unnamed in every source here*, 2026-09-19 — `LOG.md` 2026-09-26) |
 
 🔴 **So § 1's *"why the loader never touched it"* is false for `MSCR`**, and the
 row is struck in place above. The reason given there — *the loader never leaves
@@ -629,6 +629,36 @@ and no L3/L4, which is exactly the value the `dumb` verb writes. **The loader
 had already written the acceleration master switch to the dumb value, and this
 file said it had never addressed the register.** `VCR0` and `SWTCR1`, the other
 two rows, survive: the census finds no site for either (§ 8.6).
+
+🔄 **2026-09-26 (desk): the two names were in a committed tool's output since
+2026-09-17** (`SPEC.md` `NET-134`). `tools/hdrcensus.py` over the header copy
+the build compiles (the one eleven `.cmd` files of `r6b6q2` name, not
+`include/asm-rlx/rtl865x/`), `-D CONFIG_RTL_8196E -D CONFIG_RTL_819X`, prints
+`0xBB804754 QNUMCR(:1850)` and `0xBB804300 LEDCR(:2633), LEDCREG(:2627)`; the
+commit that wrote *unnamed in every source here* reasons about the same tool's
+`cover` mode in this file and did not consult its census. The names are not
+values, and neither value may enter code on these sources (讀 only, and
+disassembly is not one of the admitted two):
+
+* **`QNUMCR`'s CPU field disagrees between the two readings.** 讀 the loader's
+  whole-word `0x00001249` leaves P0–P4 = 1, P5 = 0 and the CPU port's field
+  (`P6QNum`, bits 20:18, `:2005`–`:2007`, *"Valid for 1~6"*) = 0; the vendor
+  writes that field to 1 (`rtl_nic.c:7306` →
+  `rtl865x_asicL2.c:6554`–`6555`, `RTL_CPU_RX_RING_NUM` = 1). The loader
+  receives TFTP with the field at 0 (推: the field is not needed for CPU RX).
+  Open in `SPEC.md` § 17 `NET-134` 殘留, settled by `R6b-8` 8c's reads.
+* **`LEDCREG`'s value agrees between the two readings and not with D.** The
+  vendor writes the same `2<<20` (`rtl865x_asicL2.c:4571`); D Table 68 calls
+  bits 21:20 `LedTopology` and marks `10` Reserved.
+* **The same routine writes outside this block, and the vendor repeats it.**
+  讀 the loader clears `PIN_MUX_SEL &= ~0x8F18` at `0x8040398C` and
+  `PIN_MUX_SEL2 &= ~0x3B6DB` at `0x804039A4`, the two masks the vendor applies
+  at `rtl865x_asicL2.c:4568`–`4569` (the arm without `CONFIG_RTK_VOIP_BOARD`):
+  讀 ×2. The mask `0xFFFC4924` is the source of `C-15`'s `0x4924`, which is not
+  a switch address (`docs/loader-phy-and-switch.md`, the census-floor table).
+  Retained vendor code also writes `PIN_MUX_SEL`: `drivers/char/rtl_gpio.c:2258`
+  ORs its GPIO mux bits in (`SPEC.md` `REG-35` reads `|= 0x6` in the compiled
+  code), bits outside `0x8F18`.
 
 ## 8.10 🔴 `dumb` kills the network, and `restore 0` does not bring it back
 
@@ -735,30 +765,45 @@ operator's to overwrite. What the missing verb was for was composed instead out
 of `reset full` → `snap` → `reset vendor` → `snap` → `diff`, and § 8.5 records
 what composing it exposed.
 
-## 8.14 🔴🔴 What `/proc/rtl865x/` this image actually has — 13 of the vendor's 42
+## 8.14 🔴🔴 What `/proc/rtl865x/` this image actually has — 8 of the vendor's 42
 
-**`SPEC.md` `NET-42`.** The vendor registers **42** distinct
-`/proc/rtl865x/` entries. **Thirteen survive into this image**: `stats`, `arp`,
-`ip`, `pppoe`, `igmp`, `memory`, `diagnostic`, `port_status`, `phyReg`,
-`asicCounter`, `mmd`, `mac`, `fc_threshold`. **Twenty-nine do not**, among them
-`vlan`, `pvid`, `rxRing`, `txRing`, `mbufRing` and `nic_mbuf`.
+**`SPEC.md` `NET-42`.** The vendor registers **42** distinct `/proc/rtl865x/`
+entries. **Eight are registered on this image**: `asicCounter`, `diagnostic`,
+`fc_threshold`, `mac`, `memory`, `mmd`, `phyReg`, `port_status` — 量 the
+device's own `ls /proc/rtl865x/` (`bench/2026-09-22b/X8b-ASICLS`), and the
+gates below give the same eight (讀). **Thirty-four are not**, among them
+`vlan`, `pvid`, `rxRing`, `txRing`, `mbufRing` and `nic_mbuf`. 🔄 **This
+section said thirteen from 2026-09-19 to 2026-09-26: the flat-image count below
+read as a registration count** (`LOG.md` 2026-09-26).
 
 **The method, 量 2026-09-19 on the built flat image, because a `/proc` entry's
 name is a NUL-delimited `.rodata` literal**: search the image for
 `b"\x00name\x00"`. Four controls ran with it — `port_status` **1**, `memory`
 **2**, `rtl819x-switch` **1** (this driver's own entry, which must be found or
-the search is not looking at the right image) and a synthetic name **0**.
+the search is not looking at the right image) and a synthetic name **0**. It
+reads **13**, and five of the thirteen are not vendor strings. 量 2026-09-26,
+the same search per object, over the `.rodata`/`.data` of `r6b6q2`'s 667
+compiled objects (controls: `rtl819x-switch` found in `rtl819x-switch.o`, the
+synthetic name nowhere): `stats` (`8192cd_proc.o`), `arp` (`arp.o`,
+`x_tables.o`), `ip` (`x_tables.o`), `pppoe` (`pppoe.o`) and `igmp` (`igmp.o`)
+occur only in retained non-vendor code; `memory` (`sock.o`) and `mac`
+(`xt_mac.o`) occur in both; six names occur only in vendor objects. A name in
+the image is a name some object carries, not an entry some driver registered —
+`tools/imgprocs.py`'s header already said the second half, and the first half
+is why `memory` is no longer one of its controls.
 
-🟢 **讀, the three gates that decide it** (`rtl865x_proc_debug.c`):
+🟢 **讀, the gates that decide it** (`rtl865x_proc_debug.c`, byte-identical in the staged tree and `src-vendor`):
 
 | line | gate | effect here |
 |---|---|---|
-| `:5227` | `#ifdef CONFIG_RTL_PROC_DEBUG` | off in rlxfw — takes `vlan` and most of the 29 |
-| `:5817` | `#if defined(CONFIG_RTL_PROC_DEBUG)\|\|defined(CONFIG_RTL_DEBUG_TOOL)` | **rlxfw has the second**, which is why `memory` survives and is the path every register reading in § 8.11 went through |
-| `:5396` | `#if defined(RTL_DEBUG_NIC_SKB_BUFFER)` | a plain `#define`, **not a Kconfig symbol** — it gates `nic_mbuf`, `rxRing`, `txRing`, `mbufRing`, `pvid` |
+| `:5227` | `#ifdef CONFIG_RTL_PROC_DEBUG` | off in rlxfw — takes all 34, `stats`, `arp`, `ip`, `pppoe` and `igmp` among them |
+| `:5817` | `#if defined(CONFIG_RTL_PROC_DEBUG)\|\|defined(CONFIG_RTL_DEBUG_TOOL)` | **rlxfw has the second**, which is why the eight survive and is the path every register reading in § 8.11 went through |
+| `:5396` | `#if defined(RTL_DEBUG_NIC_SKB_BUFFER)` | a plain `#define`, **not a Kconfig symbol**, nested inside `:5227` and closed at `:5412` — it gates `nic_mbuf` alone (🔄 2026-09-26: this row said it also gated `rxRing`, `txRing`, `mbufRing` and `pvid`, which sit under `:5227` only) |
 
-🔴 **The four `R6-3` would want are behind the one gate that costs a `-D` and
-nothing else.** `rxRing`, `txRing`, `mbufRing` and `nic_mbuf` are the vendor's
+🔴 **The four `R6-3` would want are behind `CONFIG_RTL_PROC_DEBUG`, a Kconfig
+symbol, and `nic_mbuf` needs the `-D` besides** (🔄 2026-09-26: this paragraph
+said *behind the one gate that costs a `-D` and nothing else*).
+`rxRing`, `txRing`, `mbufRing` and `nic_mbuf` are the vendor's
 own view of the descriptor rings — the second source the descriptor argument in
 § 7.1 was refuted for lacking — and they are absent from rlxfw's board template
 by a configuration decision nobody made deliberately. Carried forward rather
