@@ -64,8 +64,13 @@ Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
        -- -EINVAL with no load -- beside permitted twins, and the 32-bit wrap
        the driver's comment names, shown
   V16  the /proc entry failing at init marks VW0-NOPROC and nothing else
+  V17  tbl vlan, mib, then tbl netif refused -EBUSY at slot 0, then tbl vlan:
+       both tbl pages whole -- no slot line, `polls` and `busy` from this
+       verb alone after the refusal, and no `busy` line after the success.
+       V7 stops at s05, where slots 0-4 rewrite every per-slot field first,
+       so a reset missing at the top of the verb shows only here
 
-M0..M22 then mutate a COPY of the cut, one defect each, and require the case
+M0..M25 then mutate a COPY of the cut, one defect each, and require the case
 named for it to go red.  M0 is the unmutated copy through the same path: if
 it is not green, no kill is counted.  A mutant whose anchor does not occur
 exactly once, that does not compile, or whose named case stays green is a
@@ -933,6 +938,39 @@ def cases(exe, cut, version):
           and r.stat(0, "loads") == "0")
     yield "V16", ok, "mark %s" % (r.stat(0, "mark") if r.stats else r.why())
 
+    # V17 a tbl refused -EBUSY at slot 0 after other verbs filled the cache,
+    # then a tbl that completes; both pages compared whole.  V7's stop at s05
+    # comes after slots 0-4 have rewritten every per-slot field, so a missing
+    # reset of nslot, polls or busy_s at the top of the verb shows only here.
+    B = 10000
+    r = Run(exe, ["init", "w tbl vlan", "loads", "w mib", "loads",
+                  "set busy 0 %d" % (B + 1), "w tbl netif", "loads", "r",
+                  "stat", "w tbl vlan", "loads", "r"])
+    n1 = 16 * 17 + 225 + B + 1
+    want_b = header("netif", 4242, E["EBUSY"], 1, 2, 0, 0, 1, n1, 0,
+                    "none") + \
+        ["tbl netif base BB040000 slots 8 words 8 polls %d" % (B + 1),
+         "busy s00", "jiffies 4242"]
+    want_v = header("vlan", 4242, 0, 1, 3, 0, 0, 1, n1 + 16 * 17, 0,
+                    "none") + \
+        ["tbl vlan base BB060000 slots 16 words 8 polls 16"] + \
+        [slot_line("vlan", s) for s in range(16)] + ["jiffies 4242"]
+    ok_b = r.lines(0) == want_b
+    ok_v = r.lines(1) == want_v
+    ok = (r.rc == 0 and ok_b and ok_v
+          and r.rcs()[1:] == [ok_len("tbl vlan"), ok_len("mib"), E["EBUSY"],
+                              ok_len("tbl vlan")]
+          and len(r.loads) == 4 and r.loads[2] == [SWTACR] * (B + 1)
+          and r.loads[3] == tbl_loads("vlan")
+          and r.stat(0, "busyleft") == "0")
+    yield "V17", ok, "busy at s00 after vlan and mib: page %s; the vlan " \
+        "after it: page %s%s" % (
+            "exact" if ok_b else "differs",
+            "exact" if ok_v else "differs",
+            "" if ok else " (%s; first differing line %r)" % (
+                r.why(), next((x for x in r.lines(0) + r.lines(1)
+                               if x not in want_b + want_v), None)))
+
 
 STORE_RE = re.compile(r"\b(?:__raw_)?write[bwlq]\b|\bout[bwl]\b|\biowrite")
 
@@ -1078,6 +1116,14 @@ MUTANTS = [
     ("M22", "no cap on a field's length", "V15",
      "\t\tif (e - s > RTL819X_VIEW_FIELD_MAX ||\n\t\t    *e != (i + 1 < n ? ' ' : '\\0'))",
      "\t\tif (*e != (i + 1 < n ? ' ' : '\\0'))"),
+    # The three resets at the top of rtl819x_view_tbl.  Each survived V0-V16
+    # (a review, 2026-09-27); V17 is the case written for them.
+    ("M23", "tbl keeps the last tbl's slot count", "V17",
+     "\trtl819x_view_nslot = 0;\n", ""),
+    ("M24", "tbl keeps the last tbl's poll count", "V17",
+     "\trtl819x_view_polls = 0;\n", ""),
+    ("M25", "tbl keeps the last tbl's busy slot", "V17",
+     "\trtl819x_view_busy_s = -1;\n", ""),
 ]
 
 

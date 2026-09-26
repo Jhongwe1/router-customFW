@@ -86,7 +86,7 @@ partially decoded
 SELF-TEST (each case prints one `  ok`/`  FAIL` line, two leading spaces)
 --------------------------------------------------------------------------
   A1  every committed asicCounter capture -- each tracked bench/**/*.log with
-      any line of the dump in it; 266 at 8520b6c, the floor -- is one of three
+      any line of the dump in it; 266 at 8520b6c, the floor -- is one of four
       shapes, and nothing else.  Clean (23) or printk-timed (12): it parses
       into seven port sections and CpuEvent and re-renders to its own CRLF
       bytes (2 of the clean ones end inside the last CRLF) -- the parser's
@@ -94,9 +94,19 @@ SELF-TEST (each case prints one `  ok`/`  FAIL` line, two leading spaces)
       parser REFUSES it, and a self-test-only reader finds all 86 lines in
       order behind the foreign characters and re-renders them from their
       values, so the refusal is shown to be of a whole dump and not of a
-      line the parser cannot read.  Each shape has its 8520b6c count as a
-      floor.  (The 8c proposal's section 3 expected every capture to
-      re-render; 231 of 266 cannot.)
+      line the parser cannot read.  Cut (0): the parser REFUSES it, and a
+      self-test-only reader finds the dump's first lines in order (behind
+      foreign characters or not) and after them at most one line that is no
+      whole line of the dump -- the shape a capture's `--seconds` cap leaves.
+      A record is never edited, so without this shape one such capture
+      under bench/ would turn this case red for good.  Each shape has its
+      8520b6c count as a floor.  (The 8c proposal's section 3 expected every
+      capture to re-render; 231 of 266 cannot.)
+  A2  A1's own classifier on built captures: a dump cut after 1, 40 and 85
+      lines, inside a line and at a line end, bare and behind foreign
+      characters, is `cut`; a whole dump is `clean`; a dump with a middle line
+      missing, a cut dump with more output after it, and a cut dump followed
+      by a whole line out of order are refused
   B1  rtl819x-view.c's 21 sprintf literals, function by function, are this
       file's copies verbatim, and they are all the sprintf calls in it; the
       version, the three name tables, eq/mis and the constants the page's
@@ -122,7 +132,7 @@ SELF-TEST (each case prints one `  ok`/`  FAIL` line, two leading spaces)
       or a command line) that is accepted as it stands; the refusal's code
       and the words of its reason are checked, not only that one happened
 
-M0..M8 then mutate a COPY of this file and run its self-test (no mutants)
+M0..M10 then mutate a COPY of this file and run its self-test (no mutants)
 against the same root; each must turn the case named for it red.  M0 is the
 unmutated copy through the same path, and no kill counts unless it is green.
 An anchor that does not occur exactly once is a survivor, never a skip.  The
@@ -137,6 +147,8 @@ does not match itself.
   M6  a cut page skipped instead of refused        E1
   M7  reversed ends not called reversed            D2
   M8  the re-render gate removed                   E2
+  M9  a cut dump refused, as before A2 existed     A2
+  M10 anything after a cut accepted                A2
 
 WHAT IT CANNOT SEE
 ------------------
@@ -1326,72 +1338,166 @@ def deinterleave(text):
     return vals, got, foreign
 
 
+def cut_dump(text):
+    """SELF-TEST ONLY, never a decoding path.  For a capture whose dump
+    asic_blocks refuses and deinterleave cannot rebuild: the dump's first j
+    lines (0 < j < 86), in order, each behind zero or more foreign
+    characters, and after them at most one non-empty line, which is no whole
+    line of the dump -- the line a capture's end cut in two -- and nothing
+    else.  That is what a `--seconds` cap leaves.  (j, foreign characters)
+    or None."""
+    lines = text.split("\n")
+    starts = [k for k, ln in enumerate(lines) if ln.endswith("<Port: 0>")]
+    if len(starts) != 1:
+        return None
+    k, j, foreign = starts[0], 0, 0
+    for c, _, body, _, _, p in ASIC_TEMPLATES:
+        while k < len(lines) and lines[k] == "":
+            k += 1
+        m = re.fullmatch("(.*?)(" + body + ")", lines[k]) \
+            if k < len(lines) else None
+        if not m:
+            break
+        if c == ASIC_PORT_HEAD and int(m.group(3)) != p:
+            return None
+        foreign += len(m.group(1))
+        j += 1
+        k += 1
+    rest = [ln for ln in lines[k:] if ln != ""]
+    if not 0 < j < ASIC_LINES or len(rest) > 1:
+        return None
+    if rest and ASIC_ANY.search(rest[0]):
+        return None
+    return j, foreign
+
+
+def nbig(vals):
+    return sum(1 for p in range(MIB_PORTS) for n in OCTETS
+               if vals[(p, n)] >= 1 << 22)
+
+
+def a1_classify(raw, rel):
+    """A1's reading of one capture that holds a line of the dump: a list of
+    (shape, foreign characters, byte counts >= 2^22, ends inside the last
+    CRLF), one per dump, or Refused("a1", why)."""
+    text = strip_cr(raw.decode("utf-8", "replace"))
+    try:
+        blocks = asic_blocks(text, rel)
+    except Refused as e:
+        d = deinterleave(text)
+        if e.code == "asic" and d is None:
+            cu = cut_dump(text)
+            if cu is not None:
+                return [("cut", cu[1], 0, False)]
+        if e.code != "asic" or d is None or d[2] == 0:
+            raise Refused("a1", "%s: refused (%s), and neither a whole dump "
+                          "behind foreign characters nor one cut by the "
+                          "capture's end" % (rel, e))
+        if render_asic(d[0]) != "".join(g + "\n" for g in d[1]):
+            raise Refused("a1", "%s: its 86 de-interleaved lines do not "
+                          "re-render" % rel)
+        return [("interleaved", d[2], nbig(d[0]), False)]
+    if not blocks:
+        raise Refused("a1", "%s: a line of the dump and no dump" % rel)
+    out = []
+    for b in blocks:
+        again = render_asic(b["vals"], b["stamps"])
+        crlf = again.replace("\n", "\r\n").encode("ascii")
+        if b["at_eof"]:
+            same = raw.endswith(crlf[:-2]) or raw.endswith(crlf[:-1])
+        else:
+            at = raw.find(crlf)
+            same = at == 0 or (at > 0 and raw[at - 1:at] == b"\n")
+        if again != b["text"] or not same:
+            raise Refused("a1", "%s line %d: does not re-render to its own "
+                          "bytes" % (rel, b["first"]))
+        out.append(("printk-time" if b["stamps"] else "clean", 0,
+                    nbig(b["vals"]), b["at_eof"]))
+    return out
+
+
 # The shapes of the committed dumps at 8520b6c, 量 by this case's first run:
-# floors, because a record is never removed.
-A1_FLOORS = (("clean", 23), ("printk-time", 12), ("interleaved", 231))
+# floors, because a record is never removed.  `cut` has none there; its floor
+# is 0 and A2 is its positive control.
+A1_FLOORS = (("clean", 23), ("printk-time", 12), ("interleaved", 231),
+             ("cut", 0))
 
 
 def case_a1(root):
     logs = git_bench_logs(root)
     cls = dict((c, 0) for c, _ in A1_FLOORS)
     hits, at_eof, foreign, big, bad = 0, 0, 0, 0, []
-
-    def nbig(vals):
-        return sum(1 for p in range(MIB_PORTS) for n in OCTETS
-                   if vals[(p, n)] >= 1 << 22)
     for rel in logs:
         with open(os.path.join(root, rel), "rb") as fh:
             raw = fh.read()
-        text = strip_cr(raw.decode("utf-8", "replace"))
-        if not has_asic(text):
+        if not has_asic(strip_cr(raw.decode("utf-8", "replace"))):
             continue
         hits += 1
         try:
-            blocks = asic_blocks(text, rel)
+            for shape, fo, bg, eof in a1_classify(raw, rel):
+                cls[shape] += 1
+                foreign += fo
+                big += bg
+                at_eof += 1 if eof else 0
         except Refused as e:
-            d = deinterleave(text)
-            if e.code != "asic" or d is None or d[2] == 0:
-                bad.append("%s: refused (%s) and not a whole dump behind "
-                           "foreign characters" % (rel, e))
-            elif render_asic(d[0]) != "".join(g + "\n" for g in d[1]):
-                bad.append("%s: its 86 de-interleaved lines do not re-render"
-                           % rel)
-            else:
-                cls["interleaved"] += 1
-                foreign += d[2]
-                big += nbig(d[0])
-            continue
-        if not blocks:
-            bad.append("%s: a line of the dump and no dump" % rel)
-        for b in blocks:
-            again = render_asic(b["vals"], b["stamps"])
-            crlf = again.replace("\n", "\r\n").encode("ascii")
-            if b["at_eof"]:
-                at_eof += 1
-                same = raw.endswith(crlf[:-2]) or raw.endswith(crlf[:-1])
-            else:
-                at = raw.find(crlf)
-                same = at == 0 or (at > 0 and raw[at - 1:at] == b"\n")
-            if again != b["text"] or not same:
-                bad.append("%s line %d: does not re-render to its own bytes"
-                           % (rel, b["first"]))
-                continue
-            cls["printk-time" if b["stamps"] else "clean"] += 1
-            big += nbig(b["vals"])
+            bad.append(str(e))
     ok = (not bad and hits >= 266 and big > 0 and
           all(cls[c] >= f for c, f in A1_FLOORS))
     return ok, (
         "%d captures of %d tracked bench .log (floor 266): %d clean and %d "
         "printk-timed, parsed into 7 port sections + CpuEvent and re-rendered "
         "to their own CRLF bytes (%d end the capture inside the last CRLF); "
-        "%d interleaved with other console output (%d foreign characters) "
-        "REFUSED, each with all 86 lines present behind them and re-rendered; "
-        "%d byte "
+        "%d interleaved with other console output and %d cut by the "
+        "capture's end (%d foreign characters) REFUSED, the interleaved each "
+        "with all 86 lines present behind them and re-rendered; %d byte "
         "counts >= 2^22; floors %s%s"
         % (hits, len(logs), cls["clean"], cls["printk-time"], at_eof,
-           cls["interleaved"], foreign, big,
+           cls["interleaved"], cls["cut"], foreign, big,
            " ".join("%s %d" % cf for cf in A1_FLOORS),
            "" if ok else "; " + "; ".join(bad[:3])))
+
+
+def case_a2():
+    """A1's classifier on captures built here from one rendered dump."""
+    vals = dict((key, 1000 + 7 * i) for i, key in enumerate(COUNTER_KEYS))
+    dump = render_asic(vals).split("\n")[:-1]
+    if len(dump) != ASIC_LINES:
+        return False, "the rendered dump has %d lines, not %d" % (
+            len(dump), ASIC_LINES)
+    head = "# cat /proc/rtl865x/asicCounter\n"
+
+    def cap(lines, tail="", front=""):
+        return (head + "".join(front + ln + "\n" for ln in lines) +
+                tail).replace("\n", "\r\n").encode("ascii")
+    # (name, capture, the shape A1 must read, or None for a refusal)
+    runs = [
+        ("40 lines, the 41st cut", cap(dump[:40], dump[40][:12]), "cut"),
+        ("40 lines, cut at a line end", cap(dump[:40]), "cut"),
+        ("40 lines behind foreign characters, the 41st cut",
+         cap(dump[:40], "x" + dump[40][:9], front="xy"), "cut"),
+        ("<Port: 0> alone, the next line cut", cap(dump[:1], dump[1][:5]),
+         "cut"),
+        ("85 lines, CpuEvent cut", cap(dump[:85], dump[85][:6]), "cut"),
+        ("the whole dump", cap(dump), "clean"),
+        ("a middle line missing", cap(dump[:40] + dump[41:]), None),
+        ("more output after the cut",
+         cap(dump[:40], dump[40][:12] + "\n# ls\nbin"), None),
+        ("a whole line out of order after the cut",
+         cap(dump[:40] + [dump[85]]), None),
+    ]
+    bad = []
+    for name, raw, want in runs:
+        try:
+            got = [s for s, _, _, _ in a1_classify(raw, "t")]
+        except Refused as e:
+            got = "refused [%s]" % e.code
+        if got != ([want] if want else "refused [a1]"):
+            bad.append("%s: %s" % (name, got))
+    n_cut = sum(1 for _, _, w in runs if w == "cut")
+    n_ref = sum(1 for _, _, w in runs if w is None)
+    return not bad, "%d cut captures read as `cut`, the whole dump as " \
+        "`clean`, %d others refused%s" % (
+            n_cut, n_ref, "" if not bad else ": " + "; ".join(bad[:3]))
 
 
 def source_literals(src):
@@ -2008,7 +2114,8 @@ def selftest(root):
     work = tempfile.mkdtemp(prefix="viewdecode-")
     fails, n = 0, 0
     try:
-        cases = [("A1", lambda: case_a1(root)), ("B1", lambda: case_b1(src)),
+        cases = [("A1", lambda: case_a1(root)), ("A2", case_a2),
+                 ("B1", lambda: case_b1(src)),
                  ("B2", case_b2), ("B3", lambda: case_b3(root, src)),
                  ("B4", lambda: case_b4(src)), ("C1", case_c1),
                  ("C2", case_c2), ("D1", lambda: case_d1(work)),
@@ -2065,11 +2172,15 @@ MUTANTS = [
      [("rev = b >" " a", "rev = False")]),
     ("M8", "the re-render gate removed", "E2",
      [("    if again !" "= text:", "    if False:")]),
+    ("M9", "a cut dump refused, as before A2 existed", "A2",
+     [("cu = cut_dump(" "text)", "cu = None")]),
+    ("M10", "anything after a cut accepted", "A2",
+     [("ASIC_LINES or len(rest) " "> 1:", "ASIC_LINES:")]),
 ]
 
 
 def mutants(root):
-    """Print M0..M8; return the number of survivors."""
+    """Print M0..M10; return the number of survivors."""
     me = os.path.abspath(__file__)
     with open(me, encoding="utf-8") as fh:
         own = fh.read()

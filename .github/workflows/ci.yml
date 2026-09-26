@@ -1488,10 +1488,10 @@ jobs:
       # MMIO model: the 298 words the 8c admission table admits and the 192
       # words of the VLAN and netif tables each have a value, and any store,
       # or a load of any other address, ends the harness (exit 9), so a
-      # refusal before the load is observable. V0-V16: every verb refused and
+      # refusal before the load is observable. V0-V17: every verb refused and
       # permitted beside its twin, every word of the four windows, the SWTACR
-      # bound, a torn slot, a cat that loads nothing, the page at its widest.
-      # M0 runs the unmutated cut through the mutation path, and M1-M22 must
+      # bound at s05 and at s00, a torn slot, a cat that loads nothing, the
+      # widest page. M0 runs the unmutated cut through the mutation path; M1-M25 must
       # each turn the case they name red. Without gcc it REFUSES (exit 3).
       # What it cannot see is the silicon, and its model shares the admission
       # table's sources.
@@ -1504,14 +1504,14 @@ jobs:
       # (low + (high << 22)), and a before <= view <= after bracket. Its
       # self-test: A1 classifies every committed asicCounter capture under
       # bench/ (266 at 8520b6c) as clean or printk-timed -- parsed and
-      # re-rendered to its own CRLF bytes -- or interleaved with other console
-      # output, which the parser must REFUSE while a self-test-only reader
-      # finds all 86 lines behind the foreign characters; B1 the driver's 21
+      # re-rendered to its own CRLF bytes -- or interleaved or cut by the
+      # capture's end, which the parser must REFUSE while a self-test-only
+      # reader finds the lines behind them (A2 on built captures); B1 the driver's 21
       # sprintf literals verbatim; B3 the pages viewcheck's harness gets from
       # the COMPILED driver (host gcc) decode and re-render byte for byte;
       # C1/C2 the << 22 and B's offsets against values written by hand; D1/D2
       # the bracket permitting and refusing; E1-E12 every refusal. M0 runs
-      # the unmutated copy through the mutation path, and M1-M8 must each
+      # the unmutated copy through the mutation path, and M1-M10 must each
       # turn the case they name red. Without gcc or git it REFUSES (exit 3).
       # What it cannot see is the silicon: the names, the table field layouts
       # and the << 22 are B's alone.
