@@ -1,0 +1,8 @@
+brdelta 1.1 RB-00-R.log -> RB-09-R.log
+board n_tx d 17 n_recov_fire d 1 n_tx_stop d 1 n_rx d 13 nd_up 1 tx_stopped 0
+cpu crc d 10 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 10 b65 d 0 b128 d 0 b256 d 0 b512 d 0 b1024 d 0
+p3 out d 10 rx d 13 rxbytes d 844
+host rx d 10 tx d 13 inechoreps d 8 outechos d 10
+path p3 rx d 13 host outechos d 10 covered yes
+fault jfd 0
+leak cpu 10 p3 10 host 10

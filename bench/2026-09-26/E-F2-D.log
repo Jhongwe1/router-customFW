@@ -1,0 +1,8 @@
+brdelta 1.1 E-F2-R0.log -> E-F2-R1.log
+board n_tx d 221 n_recov_fire d 0 n_tx_stop d 0 n_rx d 221 nd_up 1 tx_stopped 0
+cpu crc d 221 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 21 b65 d 60 b128 d 0 b256 d 60 b512 d 0 b1024 d 80
+p3 out d 221 rx d 221 rxbytes d 143184
+host rx d 221 tx d 221 inechoreps d 220 outechos d 220
+path p3 rx d 221 host outechos d 220 covered yes
+fault jfd 0
+leak cpu 221 p3 221 host 221

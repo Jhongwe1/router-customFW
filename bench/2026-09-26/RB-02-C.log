@@ -1,0 +1,8 @@
+rbcheck 1.2 fill txlen rlxfw txoff 2
+bases tx_ring A15C8040 tx_ph A15C81D0 tx_mb A15C8230 bufs A15C8290 tpdcr0_pos A15C8040
+base tpdcr0_pos A15C8040 n_recov_fire 0 txq 8
+filled since the stall: 2 in slots 1,2; xmit with F 61: 2 (at least 2 expected)
+slot 1 own 1 path xmit F 61 fill-words 8 of 8 equal; alloc-only 5 of 5 equal
+slot 2 own 1 path xmit F 61 fill-words 8 of 8 equal; alloc-only 5 of 5 equal
+control own 0110 tpdcr0_pos unmoved
+rbcheck verdict EQUAL

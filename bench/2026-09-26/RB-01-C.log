@@ -1,0 +1,7 @@
+rbcheck 1.2 fill txlen rlxfw txoff 2
+bases tx_ring A15C8040 tx_ph A15C81D0 tx_mb A15C8230 bufs A15C8290 tpdcr0_pos A15C8040
+slot 0 own 1 path tx F 60 fill-words 8 of 8 equal; alloc-only 5 of 5 equal
+slot 1 own 1 path tx F 61 fill-words 8 of 8 equal; alloc-only 5 of 5 equal
+slot 2 own 1 path tx F 1514 fill-words 8 of 8 equal; alloc-only 5 of 5 equal
+control own 1110 tpdcr0_pos unmoved
+rbcheck verdict EQUAL

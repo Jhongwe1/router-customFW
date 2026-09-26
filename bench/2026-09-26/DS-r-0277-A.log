@@ -1,0 +1,2 @@
+echo lb on > /proc/rtl819x-nic ; echo tx 0x3f 0x8800 0 263 > /proc/rtl819x-nic
+# 

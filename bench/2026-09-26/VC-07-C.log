@@ -1,0 +1,6 @@
+rbcheck 1.2 alloc
+slot 0 alloc-words 13 of 13 equal
+slot 1 alloc-words 13 of 13 equal
+slot 2 alloc-words 13 of 13 equal
+slot 3 alloc-words 13 of 13 equal
+rbcheck verdict EQUAL

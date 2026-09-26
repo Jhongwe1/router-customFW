@@ -1,0 +1,7 @@
+echo engine off > /proc/rtl819x-nic ; echo arm > /proc/rtl819x-nic ; echo engi
+ne onR L>X F/Wp-rNo-cE/rNtlG8O19FxF-nic
+
+RLXFW-N-ARM=A15C8000
+RLXFW-N-ARMR=00000000
+RLXFW-N-ENGON=C4000000
+# 

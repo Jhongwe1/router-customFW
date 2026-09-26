@@ -1,0 +1,8 @@
+brdelta 1.1 W-1c-R.log -> W-1d-R.log
+board n_tx d 726 n_recov_fire d 0 n_tx_stop d 0 n_rx d 0 nd_up 0 tx_stopped 1
+cpu crc d 726 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 363 b65 d 0 b128 d 0 b256 d 0 b512 d 0 b1024 d 363
+p3 out d 726 rx d 0 rxbytes d 0
+host rx d 726 tx d 0 inechoreps d 0 outechos d 0
+path p3 rx d 0 host outechos d 0 covered none
+fault jfd 0
+leak cpu 726 p3 726 host 726

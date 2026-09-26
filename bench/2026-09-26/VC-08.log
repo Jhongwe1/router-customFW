@@ -1,0 +1,7 @@
+echo txlen rlxfw > /proc/rtl819x-nic ; echo arm > /proc/rtl819x-nic ; ifconfig
+ RrlLxX0F W1-0.N1-.A1R.M3= Au1p5C
+8000
+RLXFW-N-ARMR=00000000
+RLXFW-N-ENGON=C4000000
+RLXFW-N-NDOPEN
+# 

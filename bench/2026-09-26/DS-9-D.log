@@ -1,0 +1,8 @@
+brdelta 1.1 LB-1-R.log -> DS-9-R.log
+board n_tx d 44 n_recov_fire d 0 n_tx_stop d 0 n_rx d 45 nd_up 1 tx_stopped 0
+cpu crc d 0 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 0 b65 d 0 b128 d 0 b256 d 0 b512 d 0 b1024 d 0
+p3 out d 0 rx d 1 rxbytes d 74
+host rx d 0 tx d 1 inechoreps d 0 outechos d 0
+path p3 rx d 1 host outechos d 0 covered none
+fault jfd 0
+leak none

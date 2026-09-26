@@ -1,0 +1,112 @@
+  ok    S1  first window over 3 records: window 0 3, frames 3, rc 0
+  ok    S2  second window chains from the first: window 3 10, frames 7, partial tail 7 B
+  ok    S3  window 2: the trailer 281 untagged, the priority-tagged 281 counted at byte 12 with VID 0
+  ok    S4  whole file: two 0x8100 frames, VID 0 and 5; excess 0:4 4:3 (tags and the trailer all +4)
+  ok    S5  icmp class: 7 replies, 2 tagged, one bad ICMP checksum caught
+  ok    S6  driver frames: 2 at 61 B, the corrupted last byte refused by content_ok
+  ok    S7  dst classes against the --if address (never printed)
+  ok    S8  unreadable --prev: exit 3, counts marked cumulative, window_end still printed
+  ok    S9  no address in any output (6 planted MACs searched)
+  ok    S10 big-endian nanosecond pcap read the same
+  ok    S11 a non-Ethernet capture is refused with a reason
+  ok    S12 a missing capture is refused
+  ok    S13 a snap-truncated record keeps its wire length and is counted as truncated
+  ok    S14 nothing new since the previous window: frames 0 (the empty window is counted, not refused)
+  ok    S15 capture_live and tcpdump_procs read processes named tcpdump: 0 / 1 / 2
+  ok    S16 echo replies by identifier: sequence ranges, the tagged one, one duplicate; a request not counted (got echo_ids 2; echo_seq 1 1-3,5-6,9; echo_seq_tagged 1 6; echo_seq 2 4; echo_dup 1; echo_vid 5:1)
+  ok    S17 no identifier printed; no directory in a refusal or in a prev line (basename only)
+  ok    S18 snap 64: 3 cut replies keep class, sequence and length; only the whole one is csum-checked
+  ok    S19 lenby: 1:61-63,70 / 2:1514 / 4:60; content_ok 7, the whole (60-63 B) frames only
+pcapwin self-test: 19 of 19 passed
+  ok    R1  fx-rb-fill-ok.log fill --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 0, rbcheck verdict EQUAL
+  ok    R2  fx-rb-fill-bad.log fill --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict DIFFER
+  ok    R2a the planted m_len (F+4 at slot 1) is named by slot and word
+  ok    R3  fx-rb-fill-void.log fill --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict VOID
+  ok    R4  fx-rb-fill-wb.log fill --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 0, rbcheck verdict EQUAL
+  ok    R4a an alloc-only difference is printed as a reading and does not decide the verdict
+  ok    R5  fx-rb-fill-ok.log fill --expect 0:tx:60,1:tx:61,2:tx:1514 --txlen vendor -> rc 1, rbcheck verdict DIFFER
+  ok    R6  fx-rb-xmit-ok.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 0, rbcheck verdict EQUAL
+  ok    R6a the held slots are found by fill number, starting at slot 1 where the ring's index put them
+  ok    R7  fx-rb-xmit-short.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict VOID
+  ok    R8  fx-rb-xmit-moved.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict VOID
+  ok    R9  fx-rb-xmit-recov.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict VOID
+  ok    R10 fx-rb-xmit-bad.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict DIFFER
+  ok    R11 fx-rb-fill-ok.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict VOID
+  ok    R12 fx-rb-alloc-ok.log alloc -> rc 0, rbcheck verdict EQUAL
+  ok    R13 fx-rb-alloc-bad.log alloc -> rc 1, rbcheck verdict DIFFER
+  ok    R14 fx-rb-hist.log hist --seq 60,61,61,60 -> rc 0, rbcheck hist rrww
+  ok    R15 fx-rq-tx-ok.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 0, rbcheck verdict EQUAL
+  ok    R16 fx-rq-tx-same.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict DIFFER
+  ok    R16a memory holding the word Q loaded (not 1.4's) is named `same`, not marked alloc's
+  ok    R17 fx-rq-tx-unlanded.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict DIFFER
+  ok    R17a `same` at alloc's own word is marked as a store that may not have landed
+  ok    R18 fx-rq-tx-early.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict DIFFER
+  ok    R18a a word Q loaded before the store landed (memory holds 1.4's) is named `load-early`
+  ok    R19 fx-rq-tx-other.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict DIFFER
+  ok    R19a memory holding neither 1.4's word nor Q's is named `other`
+  ok    R20 fx-rq-tx-rlate.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 0, rbcheck verdict EQUAL
+  ok    R20a a right Q with memory changed after the load is printed as a reading, not a verdict
+  ok    R21 fx-rq-tx-noq.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict VOID
+  ok    R22 fx-rq-tx-rb0.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict VOID
+  ok    R22a a q line left by an earlier fill is refused by its w line's rb
+  ok    R23 fx-rq-tx-v3.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict VOID
+  ok    R23a a q line with the ring bit set (not txrb 1) is refused by its v
+  ok    R24 fx-rq-tx-path.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict VOID
+  ok    R24a a slot whose w line names another fill is refused (the --expect mode's own control)
+  ok    R25 fx-rq-tx-ok.log q --expect 0:tx:60,1:tx:61,2:tx:1514 --txlen vendor -> rc 1, rbcheck verdict DIFFER
+  ok    R26 fx-rb-fill-ok.log q --expect 0:tx:60,1:tx:61,2:tx:1514 -> rc 1, rbcheck verdict VOID
+  ok    R27 fx-rq-xmit-ok.log q --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 0, rbcheck verdict EQUAL
+  ok    R27a Q's held slots are found by fill number, as fill's are
+  ok    R28 fx-rq-xmit-moved.log q --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 0, rbcheck verdict EQUAL
+  ok    R29 fx-rq-xmit-moved.log fill --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict VOID
+  ok    R30 fx-rq-xmit-short.log q --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict VOID
+  ok    R31 fx-rq-xmit-same.log q --expect-xmit 61:2 --base fx-rb-xmit-base.log -> rc 1, rbcheck verdict DIFFER
+  ok    R31a the stack path's DIFFER is classified as the tx path's is
+  ok    X1  refused before reading: fill x.log
+  ok    X2  refused before reading: fill x.log --expect 4:tx:60
+  ok    X3  refused before reading: hist x.log --seq 60
+  ok    X5  refused before reading: fill x.log --expect-xmit 61:2
+  ok    X6  refused before reading: fill x.log --expect 0:tx:60 --base y.log
+  ok    X7  refused before reading: q x.log
+  ok    X8  refused before reading: q x.log --expect-xmit 61:2
+  ok    X4  an unreadable log is refused by its basename
+rbcheck self-test: 52 of 52 passed
+  ok    W1  fx-sw-lb2-hprev.log rlxfw probe 60
+  ok    W2  fx-sw-lb2-hslot.log rlxfw probe 60
+  ok    W3  fx-sw-lb2-flip65.log rlxfw probe 60
+  ok    W4  fx-sw-vendor.log vendor probe 60
+  ok    W5  fx-sw-lb1.log rlxfw probe 0
+  ok    W6  fx-sw-wire.log vendor probe 60
+  ok    W7  fx-sw-void.log vendor probe 60
+  ok    W8  fx-sw-repeat.log rlxfw probe 0
+  ok    W9  fx-sw-noreg.log d1 probe 60
+  ok    D1  decoder: F at m00 char 0 = bad b, bad a at 60, 61; T6 at m11 chars 22-23 = void, skew, clean at 1512-1514
+  ok    D2  a code beyond 1,514 is refused
+  ok    D3  a page with 11 of the 12 map lines is refused, never read as unswept
+swcheck self-test: 12 of 12 passed
+  ok    D1  first window: 5 lines, one BUG trace with its transmit frame, one unlink
+  ok    D2  second window chains from the first; a half-written last line waits for the next window
+  ok    D3  an unreadable --prev: exit 3, the counts cumulative and marked so
+  ok    D4  no line of the log and no directory is printed
+  ok    D5  a missing log is refused by its basename
+  ok    D6  follower counts a started `dmesg -w` (1 -> 2) and forgets it killed (1)
+dmesgwin self-test: 6 of 6 passed
+  ok    B1  A1-01 -> A1-02: fault jfd 59; p3 out d 1 rx d 60 rxbytes d 3900
+  ok    B2  A1-03 -> A1-04: board n_tx d 42 
+  ok    B3  A1-05 -> A1-06: board n_tx d 42 ; fault jfd 14
+  ok    B4  A1-07 -> A1-08: fault jfd 60
+  ok    B5  C-00 -> C-01: leak none; host rx d 0 tx d 0 
+  ok    B6  A2-02 -> A2-03: p3 out d 0 rx d 0 rxbytes d 0
+  ok    B7  A2-01 -> A2-02: rx d 20 rxbytes d 1300
+  ok    B8  A2-01 -> A2-02: path p3 rx d 20 host outechos d 20 covered yes
+  ok    B9  A2-02 -> A2-03: path p3 rx d 0 host outechos d 20 covered no
+  ok    C1  A1-01 -> A1-02: cpu crc d 60 jab d 59 
+  ok    C2  A1-03 -> A1-04: cpu crc d 15 jab d 9 
+  ok    C3  A1-05 -> A1-06: cpu crc d 24 jab d 13 frag d 0 drop d 1 
+  ok    C4  A1-07 -> A1-08: cpu crc d 61 jab d 60 
+  ok    C5  C-00 -> C-01: cpu crc d 0 jab d 0 
+  ok    S1  series over block 46's arm C, C-00 ... C-11: dsync/skb_fail 0 1 1 1 1 0 1 1 1 0 0, rx 2 each
+  ok    S2  a series of one dump is refused
+  ok    X1  a bracket whose CPU-port section is missing is refused, never read as zero
+  ok    X2  a missing bracket is refused by its basename
+brdelta self-test: 18 of 18 passed

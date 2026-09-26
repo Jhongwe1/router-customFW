@@ -1,0 +1,8 @@
+brdelta 1.1 E-L1-R0.log -> E-L1-R1.log
+board n_tx d 895 n_recov_fire d 10 n_tx_stop d 10 n_rx d 1335 nd_up 1 tx_stopped 0
+cpu crc d 789 jab d 581 frag d 3 drop d 41 dropev d 32 b64 d 24 b65 d 54 b128 d 0 b256 d 81 b512 d 3 b1024 d 43
+p3 out d 168 rx d 1335 rxbytes d 828661
+host rx d 168 tx d 1335 inechoreps d 145 outechos d 1327
+path p3 rx d 1335 host outechos d 1327 covered yes
+fault jfd 625
+leak cpu 789 p3 168 host 168

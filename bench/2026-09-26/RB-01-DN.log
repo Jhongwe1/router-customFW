@@ -1,0 +1,4 @@
+ifconfig rlx0 down
+RLXFW-N-ENGOFF
+RLXFW-N-NDSTOP
+# 

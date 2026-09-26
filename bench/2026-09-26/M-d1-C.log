@@ -1,0 +1,21 @@
+swcheck 1.1 setting d1 probe 60
+sw done mode loop from 60 to 1514 probe 60 rc 0 bufs A15C8290
+key txlen d1 txoff 2 txrb 0 mode loop probe 60 rings 1 rec 1455
+counts scored 1455 bad_a 0 bad_b 182 void 0 skew 0 retry 0 foreign 0 alien 182
+counts delta0 0 reg 1 units 1455 timeout 0 cycles 1455 drained 0 j0 84617 j1 88183
+last 1514 a 1518 class 1 b 64 class 1 x 0
+map codes none:0 clean:1273 bad_b:182 bad_a:0 void:0 skew:0
+mt equals the decoded map (0 1273 182 0 0 0)
+records 1455, the page's rec 1455
+void 0 at -
+skew 0 at -
+scored 1455; bad-b 182 at 61,69,77,85,93,101,109,117,125,133,141,149,...
+bad-a 0 at -
+rule M1-cover8  predicted  182 measured  182 agree 1455 of 1455 disagree -
+rule M1-room8ph predicted  728 measured  182 agree 909 of 1455 disagree 62-64,70-72,78-80,86,...
+rule M2-shift8  predicted  728 measured  182 agree 909 of 1455 disagree 62-64,70-72,78-80,86,...
+rule M2-shift8m predicted  727 measured  182 agree 910 of 1455 disagree 60,66-68,74-76,82-84,...
+hb H-prev equal
+hb H-own differ
+hb H-slot differ
+hb as read: hb n 8 other 0 void 0 | hb 9831:23:61-1469 11887:23:69-1477 13943:23:77-1485 15999:23:85-1493 | hb 1607:23:93-1501 3663:23:101-1509 5719:22:109-1453 7775:22:117-1461

@@ -1,0 +1,12 @@
+brdelta 1.1 series 12 dumps
+ds DS-v-0060-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 00400000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-0061-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 00410000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-0062-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 00420000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-0063-B dsync d 0 chk d 3 skb_fail d 0 rx d 3 napi d 3 ph_chk d 3 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 004A0C19 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-0263-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 010B0000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-0276-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 01180000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-0277-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 01190000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-1511-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 05EB0000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-1512-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 05EC0000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-1513-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 05ED0000 dsync_last_d 7 ph_first_nrx 866
+ds DS-v-1514-B dsync d 0 chk d 2 skb_fail d 0 rx d 2 napi d 2 ph_chk d 2 ph_diff d 0 ph_bad d 0 | rx_len 0 rx_ph1 05EE0000 dsync_last_d 7 ph_first_nrx 866

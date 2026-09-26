@@ -1,0 +1,7 @@
+rbcheck 1.2 hist seq 61,60,60,60
+frame 1 F 61 rxd0 own 0 len 65 right
+frame 2 F 60 rxd1 own 0 len 9831 wrong
+frame 3 F 60 rxd2 own 1 len 9831 not landed
+frame 4 F 60 rxd3 own 1 len 0 not landed
+landed beyond the sequence: 0
+rbcheck hist rw--

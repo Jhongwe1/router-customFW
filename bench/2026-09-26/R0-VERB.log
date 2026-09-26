@@ -1,0 +1,12 @@
+verbcheck 1.0: 292 cells in run order, 336 payloads, 64 sweeps accepted, 7 refusals (every one a gated guard), longest --send 126
+verbcheck verdict PASS
+  ok    V0  the card itself: verbcheck verdict PASS
+  ok    V1  a misspelt 1.4 verb -> RB-01-S: 'txstal on' is neither a 1.4 verb nor a 1.5 one (-EINVAL, recorded nowhere)
+  ok    V2  a misspelt 1.5 verb -> E-F1-SW: 'txln vendor' is neither a 1.4 verb nor a 1.5 one (-EINVAL, recorded nowhere)
+  ok    V3  the wire token misspelt -> W-1a-S: unplanned refusal: sweep -22 (no gate on this cell expects it)
+  ok    V4  a bad 1.4 argument -> DS-r-0060-A: 1.4 verb 'lb of': BAD-ARG
+  ok    V5  a swclear removed (an unplanned -EEXIST) -> LB-2-S: unplanned refusal: sweep -17 (no gate on this cell expects it)
+  ok    V6  a wire token removed -> W-1a-S: 'sweep 60 423 60' is a loopback sweep in a cell named W-1a-S
+  ok    V7  a guard's expected errno changed -> VC-EE: unplanned refusal: sweep -17 (no gate on this cell expects it)
+  ok    V8  a sweep's key gate naming another txlen -> LB-V-S: no gate binds the page's `sw key` line to the key run here (sw key txlen vendor txoff 2 txrb 0 mode loop pr
+verbcheck self-test: 9 of 9 passed
