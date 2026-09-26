@@ -79,10 +79,13 @@ TARGETS = ("tools/cardcheck.py", "tools/cardrun.py")
 # Every other file cardcheck's --self-test reads, copied as they are:
 # reply-size.py (dwreply), ci-expected.tsv, and each tool a corpus HOST cell
 # invokes -- loaded for its build_parser()/refuse_args() -- with flashwin.py,
-# which flashmap.py imports.
+# which flashmap.py imports.  🔄 2026-09-26: iperflog.py joined when card B50
+# (7c4df71) called it from 21 HOST cells; without it B0-in-tree refused the
+# whole run on CI (B13: 21 NEW refusals, every one an iperflog cell).
 COPIED = ("tools/reply-size.py", "tools/ci-expected.tsv", "tools/hostprobe.py",
           "tools/looprun.py", "tools/boot-timeline.py", "tools/netblast.py",
-          "tools/flashmap.py", "tools/flashwin.py", "tools/hostclock.py")
+          "tools/flashmap.py", "tools/flashwin.py", "tools/hostclock.py",
+          "tools/iperflog.py")
 
 MUT = [
     # 🔄 2026-09-23: THIS ROW NEVER COMPILED, and it read as a kill.  Its
