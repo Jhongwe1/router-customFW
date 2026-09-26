@@ -31,13 +31,23 @@
  * A word is loaded only if it lies inside one of four named blocks AND two of
  * three sources place it: B, the header the build compiles
  * (drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h, sha256 e29c3051...);
- * D, the draft datasheet; and 量, a reading this repository already holds.
- * That is CLAUDE.md's rule for a register value entering code, applied to an
- * address entering a read path.  298 words pass, and they are the table
- * below, word for word -- every run carries its sources.  One-source words
- * (QNUMCR, CSCR, EEECR, IBCR0-2, WFQRCRPn and the rest) are NOT admitted:
- * 8c-cells reads the ones it needs through the vendor's /proc/rtl865x/memory
- * and the loader's DW, and 8d admits each once that second reading exists.
+ * D, the draft datasheet; and 量, a value this die printed for the word in a
+ * capture committed under bench/: a loader DW dump, or, for the MIB, the
+ * vendor's /proc/rtl865x/asicCounter dump.  That is CLAUDE.md's rule for a
+ * register value entering code, applied to an address entering a read path.
+ * 298 words pass under it, and they are the table below, word for word --
+ * every run carries its sources.
+ *
+ * That 量 is narrower than "any reading": a read through the vendor's
+ * /proc/rtl865x/memory does not count, and one word turns on it.
+ * 0xBB804500, SBFCTR/SBFCR0 (B :1673-:1674), printed 000000F4 on all three
+ * such reads (bench/2026-09-21b: B5-REGc, B5-REGc2, D2-REGa-a2), so it has B
+ * and a reading and is still refused here: the 8c admission census counts
+ * 299 with it and 298 with 量 limited as above, and 8c's ruling (D2) is 298.
+ * It is 8d's to admit, with the one-source words (QNUMCR, CSCR, EEECR,
+ * IBCR0-2, WFQRCRPn and the rest): 8c-cells reads the ones it needs through
+ * the loader's DW and the vendor's /proc/rtl865x/memory -- which bounds
+ * nothing itself; tools/cardcheck.py bounds what a card sends it (HW-1).
  *
  * Everything else is refused BEFORE ANY LOAD, the whole request with it:
  * `peek A n` checks all n words first, and loads none unless all n pass.
@@ -218,10 +228,12 @@ static const struct rtl819x_view_run rtl819x_view_runs[] = {
 	{ 0xBB804D3C,  1, 1, 0 },	/* TCR7, B :206; 量 DW BB804D3C 4 */
 
 	/* ---- the MIB, 0xBB801000: 225 words.  B :275-:315; 量 the vendor's
-	 * asicCounter dump of exactly these words in 291 committed bench/
-	 * files, equal to the netdev's own counts byte for byte (NET-46) and
-	 * cumulative across 76 reads (notes/nic-driver.md section 26).  D has
-	 * no MIB section.  Ports 0-6, 0x80 apart. ---- */
+	 * asicCounter dump of exactly these words in 266 committed bench/
+	 * .log captures, equal to the netdev's own counts byte for byte
+	 * (NET-46) and cumulative across 76 reads (notes/nic-driver.md
+	 * section 26).  For the 28 words of the 14 byte-counter pairs the dump
+	 * prints only lo + (hi << 22), so their 量 is of that sum, not of
+	 * each word.  D has no MIB section.  Ports 0-6, 0x80 apart. ---- */
 	{ 0xBB801100,  2, 7, 0x80 },	/* ifInOctets, lo and hi, B :282 */
 	{ 0xBB801108,  1, 7, 0x80 },	/* ifInUcastPkts, B :283 */
 	{ 0xBB801114, 18, 7, 0x80 },	/* etherStatsUndersizePkts ... dot3InPauseFrames, B :285-:302 */
