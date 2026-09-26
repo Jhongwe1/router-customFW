@@ -119,8 +119,8 @@
  *    no PHY.  🔄 2026-09-22: TWO THIRDS OF THIS ITEM EXPIRED AND NOBODY
  *    DELETED IT.  `R6-4` landed on 2026-09-19: `register_netdev()` runs
  *    behind the `netdev on` verb and `nic_netdev_ops` is installed at
- *    init.  1.3 adds `nic_ethtool_ops` (get_drvinfo + get_link), so the
- *    ethtool third expires too.  🟢 THE PHY THIRD IS STILL TRUE, and it
+ *    init.  1.3 adds `nic_ethtool_ops` (get_drvinfo, get_link,
+ *    get_ringparam): it expired too.  🟢 THE PHY THIRD IS STILL TRUE, and it
  *    is true for a reason rather than by omission: 讀 + 量, the CPU port
  *    has no PHY behind it at all -- MDIO address 6 is silent while 0-4
  *    answer, `PCRP6`'s `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0,
