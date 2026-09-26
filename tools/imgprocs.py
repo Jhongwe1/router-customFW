@@ -52,6 +52,13 @@ image -- `rtl819x-mdio` exists from switch 1.3 on, and the images cards still
 boot before that (`r6b2q`, `r6b6q`) must keep passing the default run.
 `--self-test` shows it refusing and permitting (W1-W3).
 
+1.3 (2026-09-27, `R6b-8` 8c): `vlan` and `netif` are also rlxfw's own
+literals from rtl819x-view on (`OWN_LITERALS`), so on an 8c image they read
+PRESENT with no vendor code behind them.  量 `r6b8cq`: 15 of 42 PRESENT
+against `r6b7q`'s 13, and the two are exactly these.  They are now printed
+as rlxfw's and counted apart (I12); `NET-42`'s "no `/proc/rtl865x/vlan`"
+still stands on the device's own `ls`, which this tool cannot replace.
+
 WHAT IT CANNOT DO
 -----------------
 It reads a **flat** image (`vmlinux_img`, the `objcopy -O binary` output), not
@@ -92,6 +99,18 @@ SHARED = {"stats": "8192cd_proc.o",
           "igmp": "igmp.o",
           "memory": "sock.o",
           "mac": "xt_mac.o"}
+
+#: 量 2026-09-27 (`R6b-8` 8c's review): names of the vendor's set that
+#: rlxfw's OWN code carries as NUL-delimited literals, and the one object
+#: that carries each.  rtl819x-view's `tbl vlan|netif` verbs name the two
+#: tables by these words (its rtl819x_view_tbls and rtl819x_view_lname).
+#: Searched raw over every object of the `r6b8cq` tree: rtl819x-view.o and
+#: the vmlinux.o link, nothing else; `r6b7q`'s flat image carries neither.
+#: Kept apart from SHARED, which is the measured set of RETAINED NON-VENDOR
+#: code on `r6b6q2` and which tools/ethcensus.py derives a second time: an
+#: image before 8c has no carrier of these, and PRESENT there is the vendor.
+OWN_LITERALS = {"vlan": "rtl819x-view.o",
+                "netif": "rtl819x-view.o"}
 
 
 def parse_names(txt):
@@ -177,16 +196,22 @@ def evaluate(img, names, out, controls=None, witnesses=()):
     present = [n for n in names if count(img, n)]
     absent = [n for n in names if not count(img, n)]
     shared = [n for n in present if n in SHARED]
+    own = [n for n in present if n in OWN_LITERALS and n not in SHARED]
     out.append("")
     out.append("PRESENT in this image (%d of %d):" % (len(present), len(names)))
     for n in present:
         if n in SHARED:
             out.append("    %-16s shared: also in %s" % (n, SHARED[n]))
+        elif n in OWN_LITERALS:
+            out.append("    %-16s rlxfw: also in %s" % (n, OWN_LITERALS[n]))
         else:
             out.append("    %s" % n)
     out.append("  %d of the %d are shared with retained non-vendor code: "
                "present there is not evidence the vendor registers them"
                % (len(shared), len(present)))
+    out.append("  %d of the %d are literals of rlxfw's own code as well "
+               "(OWN_LITERALS): the same holds for them"
+               % (len(own), len(present)))
     out.append("")
     out.append("ABSENT from this image (%d of %d):" % (len(absent), len(names)))
     out.append("    " + " ".join(absent))
@@ -302,6 +327,24 @@ def self_test():
          "--witness repeats and leaves the positionals alone; a --witness "
          "with no name is a refusal (got %s; bare %s)" % (got, bare[2]))
 
+    # OWN_LITERALS (R6b-8 8c): rtl819x-view's table names, printed as
+    # rlxfw's and counted apart from the vendor, on an image that carries
+    # them; the measured pair is checked against the dict, as I6 does SHARED.
+    measured_own = ("vlan", "netif")
+    out = []
+    rc = evaluate(img_of(*(positives + ["vlan", "netif", "mmd"])),
+                  base + ["netif"], out)
+    marked = [n for n in measured_own
+              if any(l.startswith("    " + n) and "rlxfw: also in "
+                     "rtl819x-view.o" in l for l in out)]
+    counted = any(l.startswith("  2 of the 5 are literals of rlxfw") for l in out)
+    lost = [n for n in measured_own if n not in OWN_LITERALS]
+    case("I12", rc == 0 and marked == list(measured_own) and counted
+         and not lost and not set(OWN_LITERALS) & set(SHARED),
+         "vlan and netif print as rlxfw's rtl819x-view.o literals and are "
+         "counted apart (rc %d, marked %s, counted %s; missing from "
+         "OWN_LITERALS: %s)" % (rc, marked, counted, ", ".join(lost) or "none"))
+
     good = 0
     for label, ok, detail in cases:
         good += ok
@@ -312,7 +355,7 @@ def self_test():
 
 def main(argv):
     if len(argv) >= 2 and argv[1] == "--self-test":
-        print("imgprocs 1.2  --  self-test")
+        print("imgprocs 1.3  --  self-test")
         return self_test()
     args, witnesses, err = parse_args(argv[1:])
     if err:
@@ -330,7 +373,7 @@ def main(argv):
 
     txt = open(src_path, encoding="utf-8", errors="replace").read()
     names = parse_names(txt)
-    print("imgprocs 1.2")
+    print("imgprocs 1.3")
     print("  image   %s  (%d bytes)" % (img_path, os.path.getsize(img_path)))
     print("  source  %s" % src_path)
     print("  vendor registers %d distinct entry name(s)" % len(names))

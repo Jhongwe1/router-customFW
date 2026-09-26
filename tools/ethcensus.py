@@ -113,7 +113,7 @@ except ImportError as _e:
         print("REFUSED: imgprocs.py beside ethcensus.py does not import: "
               "%s: %s" % (type(_e).__name__, _e))
     sys.exit(2)
-_lack = [a for a in ("OWN", "SHARED", "parse_names", "count")
+_lack = [a for a in ("OWN", "SHARED", "OWN_LITERALS", "parse_names", "count")
          if not hasattr(imgprocs, a)]
 if _lack:
     print("REFUSED: imgprocs.py beside ethcensus.py lacks %s"
@@ -593,6 +593,17 @@ def population(tree, out_path):
           "only: %d (%s); also by retained code: %d (%s)"
           % (len(regs), len(unique), " ".join(unique), len(shared),
              " ".join(shared)))
+    # rlxfw's own literals (imgprocs.OWN_LITERALS, R6b-8 8c): a name whose
+    # every out-of-scope carrier is the rlxfw object named there is rlxfw's,
+    # not retained code of the vendor tree, and SHARED does not list it.
+    # 量 2026-09-27: on r6b8cq's tree `vlan` and `netif` are carried by
+    # rtl819x-view.o alone, and without this the census refused there.
+    own = sorted(n for n in shared if n in imgprocs.OWN_LITERALS and all(
+        os.path.basename(m) == imgprocs.OWN_LITERALS[n]
+        for m in hit.get(n, []) if not in_scope(m)))
+    if own:
+        print("          of those, rlxfw's own literals: %s" % " ".join(own))
+    shared = [n for n in shared if n not in own]
     if shared != theirs:
         raise Refusal("the shared /proc names derived here (%s) are not "
                       "imgprocs.SHARED's (%s) -- two derivations disagree"
