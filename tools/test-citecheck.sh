@@ -200,8 +200,11 @@ if [ "$rc" = 2 ]; then
 else
     n_new="$(grep -cE '^ {2}(ok|FAIL)\b' "$T/head.out" || true)"
     n_old="$(grep -cE '^ {2}(ok|FAIL)\b' "$T/old.out" || true)"
-    c_new="$(sed -n 's/.*  \([0-9]*\) citations over.*/\1/p' "$T/head.out")"
-    c_old="$(sed -n 's/.*  \([0-9]*\) citations over.*/\1/p' "$T/old.out")"
+    # Citations and files together: 36bfff8 and 3e72889 each carry 450
+    # citations at HEAD and at HEAD~30 (203 and 192 files), so the count
+    # alone read two different corpora as one.
+    c_new="$(sed -n 's/.*  \([0-9]* citations over [0-9]* tracked\).*/\1/p' "$T/head.out")"
+    c_old="$(sed -n 's/.*  \([0-9]* citations over [0-9]* tracked\).*/\1/p' "$T/old.out")"
     ck "case count invariant to corpus size" "$n_new" "$n_old"
     ck "and the two corpora really differ"   1 \
        "$([ "$c_new" != "$c_old" ] && echo 1 || echo 0)"
