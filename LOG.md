@@ -33134,3 +33134,74 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 - `R6b-4`（`NET-67`／`NET-68` 在修好的映像上 ≥ 30 分鐘，跟著一次上機）；`R6b-6` 的上機（`R6b-3` 之後；B1 的資料表核對在它的卡片凍結之前）；`R6b-7`（`mii_bus`，桌面）、`R6b-8`（拿掉廠商的乙太網路樹，桌面＋上機）、`R6b-9`（寫作與 `docs/GATE-RESULTS.md` 的一則）。
 - 建置格在磁碟上：`r6b2q`／`r6b2q2`／`r6b2l`／`r6b2l2`（`06c39ca3`）、`r6b6q`／`r6b6q2`（`acf8ed3d`），合計約 28 GB —— 收工時 `du` 一次。
 - 等擁有者的兩個問題（§ 十二 第 9 條）。交接 `plan/handoff-s112.md`；study `study/20260925-study2.md`。
+
+## 2026-09-26 — 第一百一十三段（18:55 開場，跨日到 2026-09-27，**一次電源按壓**：block 48，2026-09-26 19:03–19:42）：`R6b-3` 卡片 2 上機並記錄 —— `D2` 兩次開機成立、`D1` 照字面成立、`D3` 第一次開機 12／12；上一段留下的紅 CI 修好；`R6b-2` 關閉；8-0 的三個撤回與 `C-15` 關閉；`R6b-7` 的程式落地；seating 43 的兩張卡起草（未凍結）
+
+交接 `plan/handoff-s112.md`。開場量 repo：HEAD `f9abbb2`、乾淨、已推；`LOG.md` 最後一條是第一百一十二段；study 最後是 `20260925-study2.md`；`citime check` 0 missing；18:55，卡片的時窗還在。與交接不符的兩處：交接寫「CI 全綠」，但 `7c4df71` 與 `f9abbb2` 兩個 run 都是 failure（§ 三）；交接說的 `FREEZE-READY.txt` 不在 card2 目錄（有 `freeze-*.out`）。這一段的 commit：`2a3f5e2`、`e42f884`、`c08999e`、`e922066`、`38a8639`、`4b43278`，與這一條的收工 commit；全部推上，CI 在 `e42f884`、`c08999e`、`e922066`、`38a8639` 綠。
+
+### 一、block 48：一次上機與 flash 的宣稱
+
+- 量 卡片 B50（凍結 `7c4df71`），seating 42 的第二個 block，映像 `r6b2q`（`RLXFW-ID0` 由 `looprun` 比對）。上電前照它的 § 6：WSL 本來就停著、`wsl --shutdown`、keeper、`dmesg -w` 跟隨寫 `host/dmesg-w2.log`、重讀 `usbipd list`、CP2102 `1-1` 與 GbE `2-4` attach；`cardcheck numbers` 220／220、`check-predictions` 0 of 580、13 個 `runblock --dry` 全部 `ALL ITEMS DONE`；`I-0` 30 個閘門全過（板子關著，`bug_preempt 0`、`usbnet_xmit 0`、`call_trace 0`）。
+- catch 19:03:40 開窗，擁有者在窗內按下；`I-U` 19:23:35 結束（開窗後 19 分 55 秒，§ 6 的 27 分鐘規則放行 `I-D3`）；`I-Z` 19:41:49 結束，擁有者隨即關電。
+- 發出的命令（量）：沒有 `FLW`、`EW`、`EB`、非零的 `AUTOBURN` 或 `FLR`（卡片的 210 個送出字串、577 個 RUN 行，與我手打的 X 格）。map 括號（量）：開頭與結尾同一摘要 `0927be41…`、32 組裡 31 組相同 1 組 DIFFER；`n_writes` 兩端 0（它不帶資訊，`FW-142`）。看不見的：互相抵銷的兩次寫入、讀過的窗以外的每一個位元組。
+- 上機後：`check-predictions` 580 of 580、`capdate`、`audit-bench-log`（CI 的形式）、`flashwin scan --sweep bench/2026-09-26b` CLEAN；擷取提交 `2a3f5e2`（1,020 檔），`bench/README.md` 三列的擷取數順手改對（`2026-09-25c` 321、`2026-09-26` 422、`2026-09-26b` 592）。
+
+### 二、唯一的停止與恢復（`bench/2026-09-26b/CORRECTIONS-block48.md` § 1）
+
+- 量 `I-D3` 停在 `D3-LUS1-L`（1.4 的 UDP 送出試驗前的存活檢查）0／4，緊接在 1.4 的 UDP 接收試驗 `LUR1` 之後；那一格的核心 log 窗 `bug_preempt 2`、`usbnet_xmit 2`、`call_trace 2`。照 § 6：先寫 CORRECTIONS，再跑 `NET-54` 殘留 ② 的讀取組（`X-SW1`、`X-PHY1`、`X-HP1`、`X-BR1`、`X-PS1`、`X-HN1`，板子每格都答、沒有 loader 文字），再恢復（`X-RA1` GbE 重新 attach、`X-SW1b`、`X-PHY1b`、`X-PS1b`、`X-TC1` 0、`X-L1` 4／4），`I-D3` 從 `D3-LUS1-S0` 續跑，然後 `I-Z`。
+- 🔴 我的錯一：第一次 `usbipd attach` 在 detach 之後 70 ms 打，印 *There is no device with busid '2-4'*（detach 後約一秒 list 看起來像掉線，CLAUDE.md 早就寫了）；重讀 list 再 attach 才成。
+- 🔴 我的錯二（R10，批評代理抓到）：CORRECTIONS § 1 寫讀取組「ran 19:36–19:37:23」，但它的第一格 `X-SW1` 依 meta.json 在 19:37:08 才開始 —— 那是我估的，不是讀 meta.json。更正檔是紀錄，不改，記在這裡。另外每一個 invocation 的 `INVOCATION rc` 行都只印到終端機、沒有存成檔（`inv50.sh` 只 echo 到 stdout）；卡片 B52 的 `inv43b.sh` 已改成把它寫進 `rc.tsv`。
+- 事後讀出（`notes/nic-driver.md` § 27，量 dump、推 時序）：主機 → 板子是通的；是 1.4 的 TX 在 `LUR1` 自己的括號裡就卡住（`n` 33 對 `c` 22），描述子被引擎持有、沒有恢復在待命；恢復在存活檢查那一格前後才待命、約一秒後開火（`n_recov_ok` 7 → 8），在讀取組之前約兩分鐘 —— 重新 attach 沒有被證明需要。`NET-124` 殘留沒有再現；`PSRP3` bit 8 從 `D3-X-LS` 到 `X-SW1` 一直是清的，`X-RA1` 之後才設（推：重新 attach 讓埠 3 彈了一下）。所以下一張卡的停止表加 S1：存活失敗先從板子分類，再碰主機（§ 九）。
+
+### 三、CI：上一段交接說全綠，其實兩個 run 是紅的（`e42f884`）
+
+- 🔴 擁有者要我用 `gh` 看：`7c4df71`（run 36236782611）與 `f9abbb2`（36237057775）的 `text` job 都在 cardcheck mutation suite 失敗，`REFUSING at M1 … the UNMUTATED tool fails in the temp tree`。第一百一十二段的紀錄與交接寫的「CI 全綠」不成立（紀錄不改，更正在這裡）；`citime check` 只數成功的 run，所以看不到紅的（記憶已加 `gh run list` 的 conclusion 一步）。
+- 量 桌面重現：只含 suite 複製的檔的縮減樹裡，`cardcheck --self-test` 的 `B13` 有 21 個 NEW 拒絕，全是 B50 呼叫 `tools/iperflog.py` 的格；把它複製進去就 63／63。我先猜 iperflog、又因 B45／B46 也呼叫它而自己削弱了那個猜測，最後由縮減樹的兩向試驗定案；為什麼 B45／B46 的呼叫沒被當成工具命令，沒有查，不確立。
+- 修好之後 M59 成了 WRONG-CASE：`B14` 的下限是 B45 的語料，B50 讓 M59 的突變仍有 97 個工具命令、高於 54。下限升到 B50 的語料（19 張卡、1,023 格、113 個工具命令、7 支工具），未突變剛好等於，M59 的突變 97／6 變紅；整個 suite 59／59 殺死、rc 0；CI 在 `e42f884` 綠。
+
+### 四、block 48 的讀數與紀錄（`e922066`，`notes/nic-driver.md` § 27，`NET-132`、`NET-133`）
+
+- 兩個不共用程式碼的讀者＋裁判＋批評（workflow，約 52 分鐘）；協調者的裁決 `$FWRE_WORK/rebuild/s113/read48/ADJ-b48.md` R1–R11，批評的十項全採納；紀錄代理以自己的腳本重導每個數，也把規劃代理轉來的兩個讀數重導過才寫。
+- `D2` **兩次開機成立**：E-F1、E-F2 各 220／220，CPU 埠 j／f／d 與 dropev Δ 0、512–1023 Δ 0、沒有 0x8100、沒有多餘位元組、`n_recov_fire` Δ 0；同一次開機 1.4 答 1,189 個裡 144 個；線上掃描 60–1,514 在 fix 下 `JabberErr` 0（2,910 框），在 `LB-P` 的正控制與 `W-00` 的乾淨 map 之後。block 47 是第一次（它的 `jfd` 連言照 B49 的 P0 作廢）。
+- `D1` **照字面成立**：堆疊 arm 逐長度、fix 與 1.4 同格；1.4 在七個壞長度 `jfd` 19／15／14／19／14／19／19，fix 在十一個長度全 0。位置記成一段：驅動填完之後、CPU 埠接收 MAC 之前或當下（推，由量的部分組成）；堆疊路徑的下界是 block 47 的 `tx` 動詞讀回，跨 arm、跨開機移用。不確立：是 DMA 引擎、引擎取到了什麼。
+- `D3` 第一次開機 12／12；1.4 對照 `LUR1` 完成、`LUS1` 沒完成（P16 成立）；1.4 的 UDP 試驗三次 seating 共 14 次裡完成 1 次。
+- P0：(a) 86 對裡 2 對 K ≠ 0（E-L1 +3、SL-0062 +1，都落在 P9 (iii)）；(b) 1 對量不到（`X-RA1` 讓主機 `rx_packets` 重來，§ 6 (7) 事先宣告）。`NET-131` 沒有決定；判它的括號是 1.4 下 `Drop` 動而 `j` = `f` = 0。P20 照字面被否證；P17 在 TR1 未定（工具拒收）。
+- `NET-117` 殘留（新的 § 17 列；插入用 § 18 ③④ 合併補回）：遺失在 socket；`Sent` 是三個數裡最小的；規劃代理的「約 65 是主機其他 socket」被紀錄代理否證（非 UDP 接收的窗口只差 2），改成每次約 64 個 datagram 進了板子的 IP、UDP 既沒讀也沒拒（量，相減），三個判定格寫進列裡。
+
+### 五、`R6b-2` ✅ 關閉（`c08999e`，`notes/nic-driver.md` § 26）
+
+- 兩個開放項讀完：五個問題各兩個讀者＋裁判，批評的十四項全採納；一條「自上次 re-arm」的規則給 NET78-A／B 共用（只認括號層級的放置，要靠括號內時序才放得下的判未定）；合併代理的腳本重導每個數、種了控制。否證條件全是 § 22 公開後寫的，標為事後；空括號不算通過。我自己核了一個數：block 46 `B-19` 的 CPU 埠 Σ 桶 439 = 770 − 328 − 3。
+- `NET-109` 殘留：block 46 沒推翻桌面讀法，同樣的樣子在廠商 `eth4` 與 1.5 的廠商長度上也成立，不是 1.4 的描述子；零沒有正控制，「為什麼」未定。`NET-78` 殘留：括號層級上沒有一個計數不見的 run 跟在乾淨歷史後（兩個跟在 bad8 後、四個未定），對手「跟在最近開火後」分不開。`D3-MISS` ③：讀法之間不一致，沒有單一的「成立」。
+- 關閉時把殘留轉走、不留孤兒：`NET-109` 殘留 → `R6b-8`（能判的那一格要寫交換器暫存器，排在 8c 的廠商在場儀器上機、`asicCounter` 拿掉之前；合併代理建議卡片 3，我改判 8c：卡片 3 已滿、`r6b2q` 的交換器驅動不確定能寫 `PCRP3`）；`NET-78` 殘留 → `R6b-4`；`D3-MISS` ③ → `R6b-3` 的卡片 3。
+
+### 六、兩份設計審查與擁有者的裁示（2026-09-26）
+
+- `R6b-7`（`mii_bus`）：設計代理＋三個鏡頭的對抗審查＋綜合，找到八個要改的（還原可能被跳過、小的 `bound` 燒掉一次性 `probe`、Kconfig 列少 7 列等）。擁有者：`CONFIG_NET_ETHERNET`／`PHYLIB` 開；PHY 暫存器 31 只寫 page 0／1、新 token `mdio-i-mean-it`、廠商 `extRead` 當 page 1 的第二來源；自己一次上機，在 `R6b-6` 之後。「port 1 需不需要 patch」擁有者交給我：只做暫存器層級，功能那半 ⊘（代價：兩次移線加一個比較 arm；理由：一個對端證明不了「不需要」，資訊量低，又會碰到今晚出事的主機路徑）；PHY 1 的 page-1 reg 19 bits 15:1 與其他四個一致的值不同就重開 `C-18`。
+- `R6b-8`（拿掉廠商乙太網路樹）：設計代理＋三鏡頭審查＋綜合；審查抓到普查的字串檢查在正確映像上永遠讀不到 0、population 的 parser 丟掉 MIPS16 符號（包括廠商整條熱路徑）。擁有者：`NET-25` 的十次冷開機**要跑**，搭 8c 的廠商在場儀器上機（約 10 次按壓，協定「只 NB-1」在那張卡之前改成「NB-1 先」）；`MSCR` 留 `0x01`（有條件的偏離）；`SWCORE=n` 先做變體格、8g 才翻主線；停損：arm I 失敗兩次上機 → D8 ⊘。我決定：普查範圍 `rtl819x/` ∪ `rtk_vlan.o`，輸出印出留下的廠商碼；`R6b-7` 只是 8c-code 的前提。
+- `R6b-6` 的 B1 **自動拿掉**（擁有者 2026-09-26 的裁示）：資料表完全沒有 PHY MII 暫存器表，BMCR bit 9 只有 SDK 一個來源；arm P（拔插網路線）留作 `get_link` 的正控制。`rtl819x-nic.c:122` 的註解修正會移動配方，排在 `R6b-6` 上機之後。
+- seating 43：擁有者選兩次按壓（A `p2q` 約 10 分、B `r6b6q` 約 71 分，猜）、接受 `R6b-4` 的 31 分鐘 `ping -f` 洪流；`D3-MISS` ② 的「廠商序列」擁有者交給我：`eth4`（同核心、同映像、同開機，驅動是唯一變數），廠商韌體序列 ⊘（全部都變、分不開驅動，又要一個 flash 寫入例外）。`D3` 的第二次開機在 `r6b6q` 上（它的 `rtl819x-nic.o` 與 `r6b2q` 的逐位元組相同），卡片上電前寫明。
+
+### 七、8-0：三個撤回與 `C-15` 關閉（`38a8639`）
+
+- 🔴 `NET-42` 的「有的 13 個」撤回：13 是扁平映像裡 NUL 界定字面值的個數；量 裝置自己的 `ls /proc/rtl865x/` 是 8 個（`bench/2026-09-22b/X8b-ASICLS`，我讀回過）。`imgprocs` 的 `memory` 正控制在沒有廠商樹的映像上照樣會亮（`sock.o`），改成 `asicCounter`（1.1，自測 13 格）；同一列的 `RTL_DEBUG_NIC_SKB_BUFFER` 也寫錯（它只閘 `nic_mbuf`）。
+- 🔴 `C-15` 的「unnamed in every source here」撤回：`0xBB804754` = `QNUMCR`、`0xBB804300` = `LEDCREG`（資料表 Table 68 叫 `LEDCR0`）、`441C`／`4420` = `SWTCR1`／`PLITIMR`、`0xB8000040` = `PIN_MUX_SEL`；`tools/hdrcensus.py` 從 `c426590`（2026-09-17）就在 CI，寫下 unnamed 的 `a8db599` 在同一個檔討論過它，卻沒讀它的普查輸出 —— `NET-29` 的形狀第二次。`C-15` 關閉；名字不是值，`QNUMCR` 的 CPU 欄位 loader 0 對廠商 1 歸 8c（`NET-134` 殘留）。
+- 🔴 `NET-39` 的「`MDIOR` 兩個專案都從來沒有執行過」撤回：`bench/2026-08-24c/F2` 在 2026-08-24 就跑過；`NET-08`、`NET-06` 的陳述同日收窄。審查自己說過頭的一處（`MEMCR` `7F7F→7F00` 不是 C27 量到的）寫成推。旗標、沒改：`docs/KNOWN-ISSUES.md` 與 `docs/nic-vendor-diff.md` 各有一處以錯的 `-D` 前提計畫映像；`RUNSHEET.md` 還寫 F2 pending。
+
+### 八、`R6b-7` 的程式落地（`4b43278`，`notes/switch-driver.md` § 10，`NET-135`、`NET-136`、`FW-146`、`FW-147`）
+
+- `rtl819x-switch` 1.3：phylib `mii_bus`、註冊時全遮、`probe` 用 `mdiobus_scan` 掃 0–4（5–31 的 reg 2 讀 0，不遮會註冊 27 個幻影）；每個 MDIO 命令走同一條有上界、關中斷、要 `mdio-i-mean-it` 的路；`pread` 只准 page 0／1，還原一定寫、不然之後全拒；`bound` 不是 10,000 時 `probe`／`pread` 拒絕；沒有東西掛到 `rlx0`。實作代理在審查之外改了三處（數字解析更嚴、`pread` 關中斷前先拿 `mdio_lock`、`scan_rc` 從 1 起算），我讀過、接受。
+- delta 31 列由探測建置 `r6b7p0` 宣告（22 個 `(NEW)` 加 7 個沒有 prompt 的 `IBM_NEW_EMAC_*`），不是由預測；`r6b7q` = `r6b7q2`（配方 `50e4af55`），映像多 40,960 位元組、到天花板的 76.3 %（設計猜 20 KB，只有實際的一半）；`kconfig-delta check`、`rlxfw-marks verify`、`bootbytes`、`storeseq`、`hazlint` 綠；`mdiocheck` 46／46、20 個突變各被點名的案例殺死，進 CI —— 擁有者 2026-09-26「不再加檢查器」的例外（動詞誤報會誤判 `D7`）；`imgprocs` 1.2 併入 `--witness`。
+- 🔴 一個子代理（`R6b-7` 審查的綜合）把命令內嵌在 PowerShell `wsl -- bash -c` 裡，引號被攪壞，bash 把 repo 檔（`docs/loader-phy-and-switch.md`、資料表 PDF，DrvFs 上全是 777）當 shell 腳本執行。量：我自己用 `git status --untracked-files=all`、90 分鐘內修改的檔與家目錄複查，沒有寫入。之後每份 brief 都寫明「命令寫成腳本檔、用路徑跑」；三個代理仍各自報了一兩次唯讀的內嵌，無害。另一個讀者把 `cpurcv_elsewhere.out` 留在 repo 根，已搬到 `$FWRE_WORK/rebuild/s113/r6b2rem/`。
+
+### 九、seating 43 的兩張卡（起草，未凍結）
+
+- 卡片 A = B51（block 49，`p2q` 冷開機）：`D3-MISS` ① ② ③ 與 `eth4` 的 ② 序列；274 格、216 cardnum、`check-predictions` 0 of 274、9 個 invocation dry 綠、約 11 分鐘（猜）；草稿與工具在 `$FWRE_WORK/rebuild/s113/card43a/`，有過一輪審查。
+- 卡片 B = B52（block 50，`r6b6q`）：`D3` 第二次開機、`NET-131` 的判定括號、fix 下的 ②、`R6b-6` 的 arm（擁有者兩次、各 ≥ 40 s 視窗的拔插）、`R6b-4` 的 31 分鐘洪流與 1.4 arm、切點；510 格、196 cardnum、`check-predictions` 0 of 510、22 個 dry 綠、§ 6 路徑 2,297 條無發現、約 71 分鐘（猜），catch 最晚當天 23:24；在 `$FWRE_WORK/rebuild/s113/card43b/`，還沒有獨立審查。
+- 兩張共用 S1 分類器 `$FWRE_WORK/rebuild/s113/shared/s1class.py`（自測 15／15、14 個突變殺死；block 48 的 `D3-LUS1-L` 讀 a、block 46 從 A2-03 起讀 b）。
+
+### 十、不確立、與下一段
+
+- 不確立：`D3` 的第二次開機；`D4`；固定映像在負載下或長時間後；那一段就是 DMA 引擎；任何機制是原因；`NET-131`、`NET-117` 殘留的原因；矽上的 MDIO；讀過的窗以外的 flash 位元組。
+- 下一段：卡片 B 的獨立審查 → 擁有者選日期 → 兩張重定位（各一個產生器參數）、`bench/README.md` 兩列、卡片 B 改指卡片 A 的已追蹤卡片並重生 → 凍結 → seating 43；之後 `rtl819x-nic.c:122`、`R6b-7` 自己的上機（卡片格在 § 10.8）、`R6b-8` 從 8a 起、`R6b-9`。
+- 擁有者仍待決（不擋任何步驟）：CLAUDE.md § Flash 仍要每次上機宣稱 `n_writes`（`FW-142` 證明它不帶資訊）；`MK10` 的 witness 不會失敗（`FW-143`）。
+- 磁碟：`r3-4/cells` 加了 `r6b7q`／`r6b7q2`（各 487 MB）；`$FWRE_WORK/rebuild/s113/` 的各個 clone 合計約 2 GB，可刪。交接 `plan/handoff-s113.md`；study `study/20260926-study1.md`。
