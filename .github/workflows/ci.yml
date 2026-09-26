@@ -1482,6 +1482,23 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-ethcensus.sh 2>&1 | tee ci-out/test-ethcensus.out; exit "${PIPESTATUS[0]}"
 
+      # viewcheck (R6b-8 8c) cuts config/rlxfw-src/linux-2.6.30/drivers/net/
+      # rtl819x-view.c below its includes, UNCHANGED, and compiles it with the
+      # HOST gcc in the kernel's dialect (-std=gnu89 -Werror) against a sparse
+      # MMIO model: the 298 words the 8c admission table admits and the 192
+      # words of the VLAN and netif tables each have a value, and any store,
+      # or a load of any other address, ends the harness (exit 9), so a
+      # refusal before the load is observable. V0-V16: every verb refused and
+      # permitted beside its twin, every word of the four windows, the SWTACR
+      # bound, a torn slot, a cat that loads nothing, the page at its widest.
+      # M0 runs the unmutated cut through the mutation path, and M1-M22 must
+      # each turn the case they name red. Without gcc it REFUSES (exit 3).
+      # What it cannot see is the silicon, and its model shares the admission
+      # table's sources.
+      - name: viewcheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/viewcheck.py 2>&1 | tee ci-out/viewcheck.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:
