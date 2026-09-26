@@ -91,6 +91,60 @@ MUT = [
     ("M10 the failing return code turned into a pass        (kills V2)",
      '    print("\\033[31mFAILED\\033[0m  %d difference(s) between %s and %s"',
      '    return 0\n    print("\\033[31mFAILED\\033[0m  %d difference(s) between %s and %s"'),
+
+    # --- M11..M25: `--init FILE` (1.2, R6b-8 8c-code, 2026-09-27) ----------
+    # Each removes one refusal, or one link between the flag and the image,
+    # and names the I-case that must go red.
+    # M11 is a REASON kill, like V5's: without its branch an untracked file is
+    # still refused, by the mode check, as "None in the index" -- so what I3
+    # sees is that the refusal no longer says why.
+    ("M11 the untracked refusal deleted                     (kills I3)",
+     "    if mode is None:", "    if False:"),
+    ("M12 the index-bytes comparison deleted                (kills I3)",
+     '    if algo(b"blob %d\\0" % len(data) + data).hexdigest() != obj:',
+     "    if False:"),
+    ("M13 the config/ prefix check deleted                  (kills I4)",
+     '    if not rel.startswith("config/"):', "    if False:"),
+    ("M14 the index mode check deleted                      (kills I5)",
+     '    if mode != "100755":', "    if False:"),
+    ("M15 the first-command check never called              (kills I6)",
+     "    why = first_command_problem(data)", "    why = None"),
+    # M16: CRLF alone cannot kill this -- `#!/bin/sh\r` fails the #! test
+    # anyway.  I6's "a CR after it" is the input only the CR check refuses.
+    ("M16 the CR refusal deleted                            (kills I6)",
+     '    if b"\\r" in data:', "    if False:"),
+    ("M17 the #! line not checked                           (kills I6)",
+     '    if lines[0] != "#!/bin/sh":', "    if False:"),
+    ("M18 the rung-1 match made a substring match           (kills I6)",
+     "        if ln != RUNG1:", "        if RUNG1 not in ln:"),
+    ("M19 the /init row's source not replaced               (kills I1)",
+     '    row.source = "$REPO/" + rel', "    pass"),
+    ("M20 the work-tree-top check deleted                   (kills I9)",
+     "    if os.path.normcase(top) != os.path.normcase(real_repo):",
+     "    if False:"),
+    ("M21 cmd_build drops --init                            (kills I2)",
+     'def cmd_build(a):\n    decl = a["decl"]\n'
+     '    entries = load_entries(decl, a["unit"], a["repo"], a.get("init"))',
+     'def cmd_build(a):\n    decl = a["decl"]\n'
+     '    entries = load_entries(decl, a["unit"], a["repo"])'),
+    ("M22 cmd_verify drops --init                           (kills I8)",
+     'def cmd_verify(a):\n    decl = a["decl"]\n'
+     '    entries = load_entries(decl, a["unit"], a["repo"], a.get("init"))',
+     'def cmd_verify(a):\n    decl = a["decl"]\n'
+     '    entries = load_entries(decl, a["unit"], a["repo"])'),
+    # The leading newline pins build_args's copy: verify's is indented four
+    # more, and without it the anchor would match inside that one too.
+    ("M23 a second --init silently wins                     (kills I7)",
+     '\n            if x == "--init" and a["init"] is not None:',
+     "\n            if False:"),
+    ("M24 the manifest's --init line dropped                (kills I2)",
+     "for e in entries if e.declared_source is not None]",
+     "for e in entries if False]"),
+    # check_required() has its own `if init is not None:`, so the anchor
+    # carries the call it guards (A0 found the first spelling ambiguous).
+    ("M25 the pipeline never calls override_init            (kills I1)",
+     "    if init is not None:\n        override_init(",
+     "    if False:\n        override_init("),
 ]
 
 
@@ -154,12 +208,17 @@ def main():
             open(tgt, "w", encoding="utf-8").write(src.replace(old, new, 1))
             r, out = run(tgt, work)
             killed = r != 0
-            want = re.search(r"\(kills (V[0-9]+)\)", name)
+            want = re.search(r"\(kills ([VI][0-9]+)\)", name)
             wrong = ""
+            if not want:
+                # W0 needs a named case; a row without one would be judged by
+                # its exit code alone, which is what W0 exists to refuse.
+                killed = False
+                wrong = "  NO-CASE: the row names no (kills V<n>|I<n>)"
             if killed and want:
                 tag = want.group(1)
                 if not re.search(r"^  FAIL  +" + tag + r"\b", out, re.M):
-                    red = sorted(set(re.findall(r"^  FAIL  +(V[0-9]+)\b",
+                    red = sorted(set(re.findall(r"^  FAIL  +([AVI][0-9]+)\b",
                                                 out, re.M)))
                     killed = False
                     wrong = (f"  WRONG-CASE: wanted {tag} red, red were "

@@ -27,10 +27,15 @@ WHAT IT REFUSES TO DO, and each refusal is a control:
     then goes stale without saying so.
   * An entry tagged `unit` whose source is not inside the unit tree is an ERROR.
     That tag is the traceability claim; it is checked, not trusted.
+  * `--init FILE` replaces the source of the one `/init` row and nothing else,
+    and refuses a FILE that is not tracked under config/, not 100755 in the
+    index, or whose first command is not the rung-1 echo (override_init).
 
 Usage
     tools/mkinitramfs.py build --decl F --unit DIR --repo DIR --out DIR
-                              [--kernel-image F] [--ceiling N]
+                              [--kernel-image F] [--ceiling N] [--init FILE]
+    tools/mkinitramfs.py verify --decl F --unit DIR --repo DIR --image F
+                               [--built-spec F] [--init FILE]
     tools/mkinitramfs.py self-test
 """
 
@@ -40,9 +45,10 @@ import posixpath
 import re
 import stat
 import struct
+import subprocess
 import sys
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 # `notes/kernel-build.md` §3.4: the image is entered at 0x80500000 and
 # decompresses to 0x80000000, so the decompressed image must end below its own
@@ -83,6 +89,9 @@ class Entry(object):
         self.resolved = None
         self.size = 0
         self.digest = "-"
+        # Set only by override_init(): the source the declaration names, kept
+        # so the report and the manifest say it was replaced.
+        self.declared_source = None
 
 
 def parse_decl(path, text=None):
@@ -374,6 +383,161 @@ def check_required(entries, decl_path):
                     "row green" % (decl_path, e.lineno, e.source))
 
 
+# --------------------------------------------------------------------------
+# `--init FILE`: one image with a different /init, and no second declaration.
+# R6b-8 8c-code, 2026-09-27.
+#
+# `NET-25` needs eth4 to be the first interface opened after power-on, and the
+# declared /init (config/rlxfw-init.sh) runs `ifconfig rlx0 ... up` before the
+# shell starts (讀).  A second declaration would be a second owner of the file
+# list, so this replaces the SOURCE of the one `/init` row and nothing else:
+# its path, kind, mode and owner stay the declaration's, check_required() has
+# already passed them, and resolve() then checks the new source exactly as it
+# checks the declared one.
+#
+# WHAT IT REFUSES, and why:
+#   * a FILE not under config/.  RECIPE_ID is `find config -type f` hashed
+#     (tools/rlxfw-kbuild.sh), so a file there moves the id the board prints
+#     and a file anywhere else does not.
+#   * a FILE git does not track, or whose bytes differ from the index: either
+#     moves RECIPE_ID to a value no commit reproduces.
+#   * a FILE the index does not record as 100755.  The index and not the file
+#     system: DrvFs reports every file 777 and Windows reports by extension,
+#     and the index is the one value every checkout gets.  The image's own
+#     mode is the declaration's row, which check_required() requires to be
+#     executable; this check is about which files may be made PID 1 at all.
+#   * a first line other than `#!/bin/sh`, a CR anywhere, or a first command
+#     other than the rung-1 echo.  讀 fs/binfmt_script.c: no `#!` is -ENOEXEC,
+#     and the interpreter name ends only at a space, a tab or NUL, so
+#     `#!/bin/sh\r` names a file that does not exist.  讀 init/main.c
+#     init_post(): an /init that fails to exec is followed by
+#     run_init_process("/bin/sh"), which this image has -- a shell with no
+#     rung-1 line and no /proc, and on the quiet console (CONFIG_PRINTK=n) no
+#     "Failed to execute" line either.  Nothing may run before the rung-1
+#     line: it is how a capture says /init started, and tools/bootbytes.py
+#     counts on it being byte-identical.
+#
+# WHAT IT DOES NOT ESTABLISH.  RECIPE_ID hashes every file under config/,
+# the /init that was not chosen included, so two images built from one tree,
+# one with --init and one without, print the SAME RLXFW-ID0.  The boot capture
+# tells them apart (the declared /init prints two LAN lines), and so does the
+# image's sha256 -- the hole config/rlxfw-initramfs.tsv already records for
+# the products under build/.
+
+#: The rung-1 discriminator, as config/rlxfw-init.sh prints it.
+RUNG1 = 'echo "rlxfw: init running, RLXFW-R3-RUNG1-OK"'
+
+
+def _git(repo, *args):
+    """git in `repo` -> stdout.  Refuses, never raises, if git cannot answer.
+
+    Every GIT_* variable is dropped: under a hook GIT_DIR and GIT_INDEX_FILE
+    name the repository running the hook, and `-C` does not override them.
+    """
+    env = dict((k, v) for k, v in os.environ.items()
+               if not k.startswith("GIT_"))
+    try:
+        r = subprocess.run(["git", "-C", repo, "--literal-pathspecs"]
+                           + list(args), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", env=env)
+    except OSError as ex:
+        die("--init needs git to read the index, and git did not run: %s" % ex)
+    if r.returncode != 0:
+        die("--init: `git %s` in %s failed (rc %d): %s"
+            % (" ".join(args), repo, r.returncode, r.stderr.strip()[:200]))
+    return r.stdout
+
+
+def first_command_problem(data):
+    """-> None if `data` may be installed as /init, else the reason not."""
+    if b"\r" in data:
+        return ("it contains a CR (line %d). On the #! line, 讀 "
+                "fs/binfmt_script.c: the interpreter name ends only at a "
+                "space, a tab or NUL, so `#!/bin/sh\\r` names no file and "
+                "init_post() falls through to /bin/sh. On any other line 推 "
+                "ash keeps the CR in the word, and `exec /bin/sh\\r` failing "
+                "ends PID 1" % (data[:data.index(b"\r")].count(b"\n") + 1))
+    try:
+        lines = data.decode("utf-8").split("\n")
+    except UnicodeDecodeError:
+        return "it is not UTF-8 text"
+    if lines[0] != "#!/bin/sh":
+        return ("its first line is %r, not '#!/bin/sh'. 讀 init/main.c "
+                "init_post(): an /init the kernel cannot exec is followed by "
+                "run_init_process(\"/bin/sh\"), which this image has -- a "
+                "shell with no rung-1 line and no /proc" % lines[0][:40])
+    for ln in lines[1:]:
+        if not ln.strip() or ln.lstrip().startswith("#"):
+            continue
+        if ln != RUNG1:
+            return ("its first command is %r, not the rung-1 line %r. Nothing "
+                    "may run before it: it is how a capture says /init "
+                    "started" % (ln[:60], RUNG1))
+        return None
+    return "it holds no command at all, so not the rung-1 line either"
+
+
+def override_init(entries, init, repo, decl_path):
+    """Point the declaration's one /init row at `init`, after checking it."""
+    row = [e for e in entries if e.path == "/init"][0]   # check_required ran
+    if os.path.islink(init):
+        die("--init %s is a symlink. Name the file itself, so the manifest "
+            "records the bytes that were packed" % init)
+    if not os.path.isfile(init):
+        die("--init %s: no such regular file" % init)
+    top = os.path.realpath(_git(repo, "rev-parse", "--show-toplevel").strip())
+    real_repo = os.path.realpath(repo)
+    if os.path.normcase(top) != os.path.normcase(real_repo):
+        die("--init: --repo %s is not the top of a git work tree (git reads "
+            "the index of %s), so the index checked would not be this "
+            "repository's" % (repo, top))
+    rel = os.path.relpath(os.path.realpath(init), real_repo).replace(os.sep, "/")
+    if not rel.startswith("config/"):
+        die("--init %s is %s from the repository root, not under config/. "
+            "RECIPE_ID is `find config -type f` hashed (tools/rlxfw-kbuild.sh), "
+            "so an /init from anywhere else changes the image and not the id "
+            "the board prints" % (init, rel))
+    listed = [ln.split()[:2] for ln
+              in _git(repo, "ls-files", "-s", "--", rel).splitlines()
+              if ln.split("\t", 1)[-1] == rel]
+    mode, obj = listed[0] if listed else (None, None)
+    if mode is None:
+        die("--init %s is not tracked: `git ls-files` does not list %s. An "
+            "untracked file moves RECIPE_ID to a value no commit reproduces"
+            % (init, rel))
+    if mode != "100755":
+        die("--init %s is %s in the index, not 100755. The index is the value "
+            "every checkout gets; this repository records its executables as "
+            "100755 (tools/test-file-modes.sh)" % (init, mode))
+    with open(init, "rb") as f:
+        data = f.read()
+    algo = hashlib.sha1 if len(obj) == 40 else hashlib.sha256
+    if algo(b"blob %d\0" % len(data) + data).hexdigest() != obj:
+        die("--init %s differs from the index (object %s). `git add` it "
+            "first: the bytes packed must be bytes a commit can hold"
+            % (init, obj[:12]))
+    why = first_command_problem(data)
+    if why:
+        die("--init %s: %s" % (init, why))
+    row.declared_source = row.source
+    row.source = "$REPO/" + rel
+
+
+def load_entries(decl_path, unit, repo, init=None, text=None):
+    """parse -> check_required -> the --init override -> resolve.
+
+    ONE pipeline for build, verify and the controls, for the reason
+    check_no_writable_flash_node() gives: a step added to one caller alone is
+    exercised by nothing.
+    """
+    entries = parse_decl(decl_path, text)
+    check_required(entries, decl_path)
+    if init is not None:
+        override_init(entries, init, repo, decl_path)
+    resolve(entries, unit, repo, decl_path)
+    return entries
+
+
 def emit_spec(entries):
     lines = []
     for e in entries:
@@ -393,6 +557,9 @@ def emit_manifest(entries, unit, repo):
     out = ["# path\tkind\tbytes\tsha256\towner\tsource",
            "# unit = carved from this device's own flash dump (%s)" % unit,
            "# rlxfw = mine (%s)" % repo]
+    out += ["# %s: --init replaced the declared source %s"
+            % (e.path, e.declared_source)
+            for e in entries if e.declared_source is not None]
     for e in entries:
         src = e.resolved if e.resolved else e.source
         if e.resolved:
@@ -607,14 +774,20 @@ def declared_shape(entries):
     return shape
 
 
+def report_init(entries):
+    for e in entries:
+        if e.declared_source is not None:
+            print("init        %s <- %s   (--init; the declaration names %s)"
+                  % (e.path, e.source, e.declared_source))
+
+
 def cmd_verify(a):
     decl = a["decl"]
-    entries = parse_decl(decl)
-    check_required(entries, decl)
-    resolve(entries, a["unit"], a["repo"], decl)
+    entries = load_entries(decl, a["unit"], a["repo"], a.get("init"))
 
     print("mkinitramfs %s   verify" % VERSION)
     print("declaration %s   (%d entries)" % (decl, len(entries)))
+    report_init(entries)
     print("image       %s" % a["image"])
 
     # --- the declaration as it stands, against the spec the build consumed ---
@@ -703,9 +876,7 @@ def cmd_verify(a):
 
 def cmd_build(a):
     decl = a["decl"]
-    entries = parse_decl(decl)
-    check_required(entries, decl)
-    resolve(entries, a["unit"], a["repo"], decl)
+    entries = load_entries(decl, a["unit"], a["repo"], a.get("init"))
 
     unit = os.path.abspath(a["unit"])
     repo = os.path.abspath(a["repo"])
@@ -722,6 +893,7 @@ def cmd_build(a):
         by_owner[e.owner][1] += e.size
     print("mkinitramfs %s" % VERSION)
     print("declaration %s   (%d entries)" % (decl, len(entries)))
+    report_init(entries)
     print("unit tree   %s" % unit)
     print("spec        %s" % spec_path)
     print("manifest    %s" % man_path)
@@ -891,20 +1063,21 @@ _VFIX = [
 ]
 
 
-def _verify_run(d, items, decl_text=None, built_spec=None, secname=".init.ramfs"):
+def _verify_run(d, items, decl_text=None, built_spec=None, secname=".init.ramfs",
+                init=None, repo=None):
     """Run cmd_verify over a synthesised image.  -> (rc, stdout, refusal)."""
     import contextlib
     import io as _io
     global _RAISE
     unit = os.path.join(d, "unit")
-    repo = os.path.join(d, "repo")
+    repo = repo or os.path.join(d, "repo")
     decl = os.path.join(d, "decl.tsv")
     with open(decl, "w", encoding="utf-8") as fh:
         fh.write(decl_text if decl_text is not None else GOOD)
     img = _elf_with_section(os.path.join(d, "fx.elf"), secname,
                             _cpio_newc(items))
     a = {"decl": decl, "unit": unit, "repo": repo, "image": img,
-         "built_spec": built_spec}
+         "built_spec": built_spec, "init": init}
     buf = _io.StringIO()
     _RAISE = True
     try:
@@ -917,16 +1090,100 @@ def _verify_run(d, items, decl_text=None, built_spec=None, secname=".init.ramfs"
         _RAISE = False
 
 
-def _try(decl_text, unit, repo):
+def _try(decl_text, unit, repo, init=None):
     global _RAISE
     _RAISE = True
     try:
-        e = parse_decl("<decl>", decl_text)
-        check_required(e, "<decl>")
-        resolve(e, unit, repo, "<decl>")
+        e = load_entries("<decl>", unit, repo, init, decl_text)
         return None, e
     except Refused as ex:
         return str(ex), None
+    finally:
+        _RAISE = False
+
+
+# --- the `--init` fixture ---------------------------------------------------
+# A git work tree of its own, built in the controls' temp directory, so I1..I9
+# read nothing of this repository and run wherever git does.  Index modes are
+# set with `update-index --chmod`, never taken from the file system: the
+# property under test is the INDEX mode, and on disk every file here is
+# whatever open() made it (0644 under the usual umask) -- which is also what
+# shows the disk mode is not consulted.
+
+_QUIET_FX = ("#!/bin/sh\n# a comment and a blank line may come first\n\n"
+             + RUNG1 + "\n\nmount -t proc  proc  /proc\nexec /bin/sh\n")
+
+#: I6's inputs: (what, bytes).  Each must be refused for its first command.
+_BAD_FIRST = [
+    ("a command first", "#!/bin/sh\nmount -t proc  proc  /proc\n"
+     + RUNG1 + "\n"),
+    ("a command first on its line", "#!/bin/sh\ntrue; " + RUNG1 + "\n"),
+    ("no #! line", RUNG1 + "\nexec /bin/sh\n"),
+    ("#!/bin/ash", "#!/bin/ash\n" + RUNG1 + "\n"),
+    ("CRLF", "#!/bin/sh\r\n" + RUNG1 + "\r\n"),
+    ("a CR after it", "#!/bin/sh\n" + RUNG1 + "\nexec /bin/sh\r\n"),
+    ("0K for OK", "#!/bin/sh\n" + RUNG1.replace("-OK", "-0K") + "\n"),
+    ("comments only", "#!/bin/sh\n# nothing runs\n"),
+]
+
+#: (path in the work tree, text, tracked, index mode)
+_INIT_FX = [
+    ("init.sh", "#!/bin/sh\n", True, "+x"),         # GOOD's declared /init
+    ("config/quiet.sh", _QUIET_FX, True, "+x"),     # the permitted one
+    ("config/plain.sh", _QUIET_FX, True, "-x"),
+    ("config/untracked.sh", _QUIET_FX, False, None),
+    ("config/edited.sh", _QUIET_FX, True, "+x"),    # edited after the add
+    ("tools/outside.sh", _QUIET_FX, True, "+x"),
+    ("sub/config/quiet.sh", _QUIET_FX, True, "+x"),  # I9's nested config/
+] + [("config/bad%d.sh" % i, t, True, "+x")
+     for i, (_w, t) in enumerate(_BAD_FIRST)]
+
+
+def _init_fixture(g):
+    """Build the --init work tree at `g`.  -> None, or why it could not."""
+    env = dict((k, v) for k, v in os.environ.items()
+               if not k.startswith("GIT_"))
+
+    def git(*args):
+        try:
+            r = subprocess.run(["git", "-C", g, "-c", "core.autocrlf=false"]
+                               + list(args), capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", env=env)
+        except OSError as ex:
+            return "git did not run: %s" % ex
+        return None if r.returncode == 0 else (
+            "git %s rc %d: %s" % (args[0], r.returncode, r.stderr.strip()[:60]))
+
+    os.makedirs(g)
+    why = git("init", "-q")
+    for rel, text, tracked, chmod in _INIT_FX:
+        if why:
+            return why
+        p = os.path.join(g, *rel.split("/"))
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "wb") as f:
+            f.write(text.encode("utf-8"))
+        if tracked:
+            why = (git("add", "--", rel)
+                   or git("update-index", "--chmod=" + chmod, "--", rel))
+    with open(os.path.join(g, "config", "edited.sh"), "ab") as f:
+        f.write(b"# edited after `git add`\n")
+    return why
+
+
+def _build_run(argv):
+    """build_args + cmd_build, stdout captured.  -> (rc, stdout, refusal)."""
+    import contextlib
+    import io as _io
+    global _RAISE
+    buf = _io.StringIO()
+    _RAISE = True
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = cmd_build(build_args(argv))
+        return rc, buf.getvalue(), None
+    except Refused as ex:
+        return None, buf.getvalue(), str(ex)
     finally:
         _RAISE = False
 
@@ -1317,7 +1574,207 @@ def run_controls():
               vrc == 0 and "identical to what this declaration emits" in vout,
               "rc=%s" % vrc)
 
+        # --- I1..I9: `--init FILE` (R6b-8 8c-code, 2026-09-27) --------------
+        # Each case goes through load_entries(), the pipeline build and verify
+        # use; I2 goes through build's own argument parse and cmd_build, and
+        # I8 through cmd_verify.  Each refusal is paired with a permitted
+        # input: I1 is the permit the others are measured against.
+        g = os.path.join(d, "g")
+        fx = _init_fixture(g)
+
+        def gp(rel):
+            return os.path.join(g, *rel.split("/"))
+
+        def init_row(es):
+            return [e for e in es if e.path == "/init"][0]
+
+        def i1():
+            err, es = _try(GOOD, unit, g, gp("config/quiet.sh"))
+            err0, es0 = _try(GOOD, unit, g)
+            if err or err0:
+                return False, (err or err0)[:70]
+            row, row0 = init_row(es), init_row(es0)
+            rest = [ln for ln in emit_spec(es).split("\n")
+                    if not ln.startswith("file /init ")]
+            rest0 = [ln for ln in emit_spec(es0).split("\n")
+                     if not ln.startswith("file /init ")]
+            want = hashlib.sha256(_QUIET_FX.encode("utf-8")).hexdigest()
+            ok = (os.path.samefile(row.resolved, gp("config/quiet.sh"))
+                  and row.digest == want
+                  and row.declared_source == "$REPO/init.sh"
+                  and ("file /init %s 0755 0 0" % row.resolved)
+                  in emit_spec(es)
+                  and os.path.samefile(row0.resolved, gp("init.sh"))
+                  and row0.declared_source is None
+                  and rest == rest0 and len(rest) == len(es))
+            return ok, ("sha256 %s packed; %d other rows unchanged"
+                        % (row.digest[:12], len(rest) - 1))
+
+        def i2():
+            decl = os.path.join(d, "i2-decl.tsv")
+            with open(decl, "w", encoding="utf-8") as fh:
+                fh.write(GOOD)
+            base = ["--decl", decl, "--unit", unit, "--repo", g]
+            want = os.path.normpath(os.path.join(os.path.abspath(g),
+                                                 "config", "quiet.sh"))
+            sha = hashlib.sha256(_QUIET_FX.encode("utf-8")).hexdigest()
+            rc, out, ref = _build_run(base + ["--out", os.path.join(d, "i2a"),
+                                              "--init", gp("config/quiet.sh")])
+            rc0, _o, ref0 = _build_run(base + ["--out", os.path.join(d, "i2b")])
+            if ref or ref0:
+                return False, (ref or ref0)[:70]
+
+            def read(sub, name):
+                with open(os.path.join(d, sub, name), encoding="utf-8") as fh:
+                    return fh.read()
+            spec, man = (read("i2a", "rlxfw-initramfs.spec"),
+                         read("i2a", "rlxfw-initramfs.manifest.tsv"))
+            spec0, man0 = (read("i2b", "rlxfw-initramfs.spec"),
+                           read("i2b", "rlxfw-initramfs.manifest.tsv"))
+            note = "# /init: --init replaced the declared source $REPO/init.sh"
+            ok = (rc == 0 and rc0 == 0
+                  and ("file /init %s 0755 0 0\n" % want) in spec
+                  and ("/init\tfile\t%d\t%s\trlxfw\t$REPO/config/quiet.sh\n"
+                       % (len(_QUIET_FX), sha)) in man
+                  and note in man.split("\n")
+                  and "init        /init <- $REPO/config/quiet.sh" in out
+                  and "file /init %s" % want not in spec0
+                  and "--init" not in man0)
+            return ok, "spec, manifest and report name config/quiet.sh"
+
+        def i3():
+            e1, _ = _try(GOOD, unit, g, gp("config/untracked.sh"))
+            e2, _ = _try(GOOD, unit, g, gp("config/edited.sh"))
+            ok = (e1 is not None and "is not tracked" in e1
+                  and e2 is not None and "differs from the index" in e2)
+            return ok, "untracked refused %s, edited refused %s" % (
+                e1 is not None, e2 is not None)
+
+        def i4():
+            elsewhere = os.path.join(d, "elsewhere.sh")
+            with open(elsewhere, "w", encoding="utf-8") as fh:
+                fh.write(_QUIET_FX)
+            bads = [("tools/", gp("tools/outside.sh"), "not under config/"),
+                    ("config/../", os.path.join(g, "config", "..", "tools",
+                                                "outside.sh"),
+                     "not under config/"),
+                    ("outside the tree", elsewhere, "not under config/")]
+            if can_link:
+                os.symlink("quiet.sh", gp("config/link.sh"))
+                bads.append(("a symlink", gp("config/link.sh"), "symlink"))
+            missed = [w for w, p, why in bads
+                      if why not in (_try(GOOD, unit, g, p)[0] or "")]
+            return not missed, ("%d/%d refused" % (len(bads), len(bads))
+                                if not missed else "accepted: " + ", ".join(missed))
+
+        def i5():
+            err, _ = _try(GOOD, unit, g, gp("config/plain.sh"))
+            disk = stat.S_IMODE(os.stat(gp("config/quiet.sh")).st_mode)
+            return (err is not None and "100644 in the index" in err,
+                    "100644 refused %s; I1's file is %04o on disk"
+                    % (err is not None, disk))
+
+        def i6():
+            keys = ("first line", "first command", "contains a CR",
+                    "no command")
+            missed = []
+            for i, (what, _t) in enumerate(_BAD_FIRST):
+                err, _ = _try(GOOD, unit, g, gp("config/bad%d.sh" % i))
+                if not (err and any(k in err for k in keys)):
+                    missed.append(what)
+            n = len(_BAD_FIRST)
+            return not missed, ("%d/%d refused" % (n, n) if not missed
+                                else "accepted: " + ", ".join(missed))
+
+        def i7():
+            global _RAISE
+            bads = [("--init twice", ["--init", "a", "--init", "b"], "twice"),
+                    ("--init with no value", ["--init"], "needs a value"),
+                    ("--ceiling x", ["--ceiling", "x"], "not an integer")]
+            missed = []
+            for what, argv, why in bads:
+                _RAISE = True
+                try:
+                    build_args(argv)
+                    missed.append(what)
+                except Refused as ex:
+                    if why not in str(ex):
+                        missed.append(what)
+                finally:
+                    _RAISE = False
+            ok1 = build_args(["--init", "x"])["init"] == "x"
+            return not missed and ok1, ("3/3 refused, one --init kept"
+                                        if not missed and ok1 else
+                                        "accepted: " + ", ".join(missed))
+
+        def i8():
+            _e, es = _try(GOOD, unit, g, gp("config/quiet.sh"))
+            bs = os.path.join(d, "i8.spec")
+            with open(bs, "w", encoding="utf-8") as fh:
+                fh.write(emit_spec(es) if es else "")
+            r1, o1, f1 = _verify_run(d, _VFIX, built_spec=bs, repo=g,
+                                     init=gp("config/quiet.sh"))
+            r2, o2, f2 = _verify_run(d, _VFIX, built_spec=bs, repo=g)
+            ok = (r1 == 0 and "identical to what this declaration" in o1
+                  and "init        /init <- $REPO/config/quiet.sh" in o1
+                  and r2 == 2 and "has CHANGED" in o2)
+            return ok, "with --init rc=%s, without rc=%s %s" % (
+                r1, r2, (f1 or f2 or "")[:40])
+
+        def i9():
+            e1, _ = _try(GOOD, unit, gp("sub"), gp("sub/config/quiet.sh"))
+            e2, _ = _try(GOOD, unit, repo, gp("config/quiet.sh"))
+            ok = (e1 is not None and "not the top of a git work tree" in e1
+                  and e2 is not None)
+            return ok, "nested --repo refused %s, plain dir refused %s" % (
+                e1 is not None, e2 is not None)
+
+        for name, fn in (
+                ("I1  --init packs FILE as /init and moves no other row", i1),
+                ("I2  build's argv -> spec, manifest and report name FILE", i2),
+                ("I3  an untracked or edited FILE is refused", i3),
+                ("I4  a FILE outside config/, however spelled, is refused", i4),
+                ("I5  a FILE the index records as 100644 is refused", i5),
+                ("I6  a FILE whose first command is not rung-1 is refused", i6),
+                ("I7  a repeated or empty --init, a bad --ceiling, refuse", i7),
+                ("I8  verify carries --init to the built-spec check", i8),
+                ("I9  a --repo that is not a work tree's top is refused", i9)):
+            if fx is not None:
+                c.add(name, False, "no git work tree to run in: " + fx[:40])
+            else:
+                ok, detail = fn()
+                c.add(name, ok, detail)
+
     return c
+
+
+def build_args(rest):
+    """`build`'s options -> a dict.  Its own function so I2 can drive the
+    parse and cmd_build together without main(), which runs the controls."""
+    a = {"decl": None, "unit": None, "repo": None, "out": None,
+         "kernel_image": None, "ceiling": CEILING, "init": None}
+    i = 0
+    while i < len(rest):
+        x = rest[i]
+        key = x[2:].replace("-", "_")
+        if x in ("--decl", "--unit", "--repo", "--out", "--kernel-image",
+                 "--init", "--ceiling"):
+            if i + 1 >= len(rest):
+                die("%s needs a value" % x)
+            if x == "--init" and a["init"] is not None:
+                die("--init given twice; which /init the image carries must "
+                    "not depend on argument order")
+            if x == "--ceiling":
+                try:
+                    a["ceiling"] = int(rest[i + 1], 0)
+                except ValueError:
+                    die("--ceiling %r is not an integer" % rest[i + 1])
+            else:
+                a[key] = rest[i + 1]
+            i += 2
+        else:
+            die("unknown option %s" % x)
+    return a
 
 
 def main(argv):
@@ -1345,13 +1802,17 @@ def main(argv):
 
     if cmd == "verify":
         a = {"decl": None, "unit": None, "repo": None, "image": None,
-             "built_spec": None}
+             "built_spec": None, "init": None}
         i = 0
         while i < len(rest):
             x = rest[i]
-            if x in ("--decl", "--unit", "--repo", "--image", "--built-spec"):
+            if x in ("--decl", "--unit", "--repo", "--image", "--built-spec",
+                     "--init"):
                 if i + 1 >= len(rest):
                     die("%s needs a value" % x)
+                if x == "--init" and a["init"] is not None:
+                    die("--init given twice; which /init the image carries "
+                        "must not depend on argument order")
                 a[x[2:].replace("-", "_")] = rest[i + 1]
                 i += 2
             else:
@@ -1372,22 +1833,7 @@ def main(argv):
     if cmd != "build":
         die("unknown command %r" % cmd)
 
-    a = {"decl": None, "unit": None, "repo": None, "out": None,
-         "kernel_image": None, "ceiling": CEILING}
-    i = 0
-    while i < len(rest):
-        x = rest[i]
-        key = x[2:].replace("-", "_")
-        if x in ("--decl", "--unit", "--repo", "--out", "--kernel-image"):
-            if i + 1 >= len(rest):
-                die("%s needs a value" % x)
-            a[key] = rest[i + 1]
-            i += 2
-        elif x == "--ceiling":
-            a["ceiling"] = int(rest[i + 1], 0)
-            i += 2
-        else:
-            die("unknown option %s" % x)
+    a = build_args(rest)
     for k in ("decl", "unit", "repo", "out"):
         if not a[k]:
             die("build needs --%s" % k)

@@ -508,17 +508,17 @@ tools/mkinitramfs.py       builds R3's initramfs from a declaration in which eve
                            names its source and is tagged `unit` or `rlxfw` -- and the
                            tag is CHECKED against the path, not trusted. A declared
                            source that is not there is refused, never replaced with
-                           something similar. THIRTY-FOUR controls, four of which exist
-                           because the ceiling was being measured on the ELF FILE SIZE
-                           rather than on the image the decompressor writes -- 495,729
-                           bytes out, 75.7 % reported where the truth is 66.2 % -- and
-                           EIGHT of which arrived on 2026-08-31 as the first this
-                           tool's `verify` subcommand has ever had. Every one of the
-                           other twenty-six is about the DECLARATION; `verify` is the
-                           half that reads the built artefact, and it is the only one
-                           that can catch a mark that compiled and is not in the image
+                           something similar. FORTY-THREE controls: four exist because
+                           the ceiling was being measured on the ELF FILE SIZE rather
+                           than on the image the decompressor writes -- 495,729 bytes
+                           out, 75.7 % reported where the truth is 66.2 % -- EIGHT
+                           (2026-08-31) are the first `verify` has had, and NINE
+                           (2026-09-27) are `build --init`'s. The other twenty-six are
+                           about the DECLARATION; `verify` is the half that reads the
+                           built artefact, and it is the only one that can catch a
+                           mark that compiled and is not in the image
 tools/test-mkinitramfs-mutants.py
-                           10 mutants, baseline first, and it is the answer to a debt
+                           25 mutants, baseline first, and it is the answer to a debt
                            this repository carried for five sessions. It could not be
                            written earlier: with no control touching `verify`, every
                            mutation of it would have survived and said nothing. Two
