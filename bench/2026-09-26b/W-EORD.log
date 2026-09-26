@@ -1,0 +1,2225 @@
+pcapwin 1.3 order
+pcap WE.pcap records 1078 partial_tail_bytes 0
+tcpdump captured 1078 received 1078 dropped 0
+stop W-TCPEX.log rx_pre 3347 rx_post 3347
+anchor ok base 2269
+at E-F1-P0.log rx 2274 idx 5 readtime - lag -
+at E-F1-H0.log rx 2275 idx 6 readtime 5 lag 1
+at E-F1-P1.log rx 2495 idx 226 readtime - lag -
+at E-F1-H1.log rx 2495 idx 226 readtime 226 lag 0
+at E-L1-P0.log rx 2500 idx 231 readtime - lag -
+at E-L1-H0.log rx 2501 idx 232 readtime 231 lag 1
+at E-L1-P1.log rx 2667 idx 398 readtime - lag -
+at E-L1-H1.log rx 2667 idx 398 readtime 398 lag 0
+at E-F2-P0.log rx 2672 idx 403 readtime - lag -
+at E-F2-H0.log rx 2673 idx 404 readtime 404 lag 0
+at E-F2-P1.log rx 2893 idx 624 readtime - lag -
+at E-F2-H1.log rx 2893 idx 624 readtime 624 lag 0
+at SF-0060-P0.log rx 2898 idx 629 readtime - lag -
+at SF-0060-H0.log rx 2899 idx 630 readtime 630 lag 0
+at SF-0060-P1.log rx 2919 idx 650 readtime - lag -
+at SF-0060-H1.log rx 2919 idx 650 readtime 650 lag 0
+at SL-0060-P0.log rx 2924 idx 655 readtime - lag -
+at SL-0060-H0.log rx 2925 idx 656 readtime 655 lag 1
+at SL-0060-P1.log rx 2945 idx 676 readtime - lag -
+at SL-0060-H1.log rx 2945 idx 676 readtime 676 lag 0
+at SF-0061-P0.log rx 2950 idx 681 readtime - lag -
+at SF-0061-H0.log rx 2951 idx 682 readtime 681 lag 1
+at SF-0061-P1.log rx 2971 idx 702 readtime - lag -
+at SF-0061-H1.log rx 2971 idx 702 readtime 702 lag 0
+at SL-0061-P0.log rx 2976 idx 707 readtime - lag -
+at SL-0061-H0.log rx 2976 idx 707 readtime 707 lag 0
+at SL-0061-P1.log rx 2978 idx 709 readtime - lag -
+at SL-0061-H1.log rx 2978 idx 709 readtime 709 lag 0
+at SF-0062-P0.log rx 2983 idx 714 readtime - lag -
+at SF-0062-H0.log rx 2983 idx 714 readtime 714 lag 0
+at SF-0062-P1.log rx 3004 idx 735 readtime - lag -
+at SF-0062-H1.log rx 3004 idx 735 readtime 735 lag 0
+at SL-0062-P0.log rx 3009 idx 740 readtime - lag -
+at SL-0062-H0.log rx 3009 idx 740 readtime 740 lag 0
+at SL-0062-P1.log rx 3016 idx 747 readtime - lag -
+at SL-0062-H1.log rx 3016 idx 747 readtime 747 lag 0
+at SF-0063-P0.log rx 3021 idx 752 readtime - lag -
+at SF-0063-H0.log rx 3022 idx 753 readtime 752 lag 1
+at SF-0063-P1.log rx 3042 idx 773 readtime - lag -
+at SF-0063-H1.log rx 3042 idx 773 readtime 773 lag 0
+at SL-0063-P0.log rx 3047 idx 778 readtime - lag -
+at SL-0063-H0.log rx 3047 idx 778 readtime 778 lag 0
+at SL-0063-P1.log rx 3054 idx 785 readtime - lag -
+at SL-0063-H1.log rx 3054 idx 785 readtime 785 lag 0
+at SF-0263-P0.log rx 3059 idx 790 readtime - lag -
+at SF-0263-H0.log rx 3059 idx 790 readtime 790 lag 0
+at SF-0263-P1.log rx 3080 idx 811 readtime - lag -
+at SF-0263-H1.log rx 3080 idx 811 readtime 811 lag 0
+at SL-0263-P0.log rx 3085 idx 816 readtime - lag -
+at SL-0263-H0.log rx 3086 idx 817 readtime 816 lag 1
+at SL-0263-P1.log rx 3087 idx 818 readtime - lag -
+at SL-0263-H1.log rx 3087 idx 818 readtime 818 lag 0
+at SF-0276-P0.log rx 3092 idx 823 readtime - lag -
+at SF-0276-H0.log rx 3093 idx 824 readtime 823 lag 1
+at SF-0276-P1.log rx 3113 idx 844 readtime - lag -
+at SF-0276-H1.log rx 3113 idx 844 readtime 844 lag 0
+at SL-0276-P0.log rx 3118 idx 849 readtime - lag -
+at SL-0276-H0.log rx 3119 idx 850 readtime 849 lag 1
+at SL-0276-P1.log rx 3139 idx 870 readtime - lag -
+at SL-0276-H1.log rx 3139 idx 870 readtime 870 lag 0
+at SF-0277-P0.log rx 3144 idx 875 readtime - lag -
+at SF-0277-H0.log rx 3145 idx 876 readtime 875 lag 1
+at SF-0277-P1.log rx 3165 idx 896 readtime - lag -
+at SF-0277-H1.log rx 3165 idx 896 readtime 896 lag 0
+at SL-0277-P0.log rx 3170 idx 901 readtime - lag -
+at SL-0277-H0.log rx 3171 idx 902 readtime 902 lag 0
+at SL-0277-P1.log rx 3177 idx 908 readtime - lag -
+at SL-0277-H1.log rx 3177 idx 908 readtime 908 lag 0
+at SF-1511-P0.log rx 3182 idx 913 readtime - lag -
+at SF-1511-H0.log rx 3183 idx 914 readtime 913 lag 1
+at SF-1511-P1.log rx 3203 idx 934 readtime - lag -
+at SF-1511-H1.log rx 3203 idx 934 readtime 934 lag 0
+at SL-1511-P0.log rx 3208 idx 939 readtime - lag -
+at SL-1511-H0.log rx 3209 idx 940 readtime 939 lag 1
+at SL-1511-P1.log rx 3210 idx 941 readtime - lag -
+at SL-1511-H1.log rx 3210 idx 941 readtime 941 lag 0
+at SF-1512-P0.log rx 3215 idx 946 readtime - lag -
+at SF-1512-H0.log rx 3216 idx 947 readtime 947 lag 0
+at SF-1512-P1.log rx 3236 idx 967 readtime - lag -
+at SF-1512-H1.log rx 3236 idx 967 readtime 967 lag 0
+at SL-1512-P0.log rx 3241 idx 972 readtime - lag -
+at SL-1512-H0.log rx 3242 idx 973 readtime 973 lag 0
+at SL-1512-P1.log rx 3243 idx 974 readtime - lag -
+at SL-1512-H1.log rx 3243 idx 974 readtime 974 lag 0
+at SF-1513-P0.log rx 3248 idx 979 readtime - lag -
+at SF-1513-H0.log rx 3249 idx 980 readtime 979 lag 1
+at SF-1513-P1.log rx 3269 idx 1000 readtime - lag -
+at SF-1513-H1.log rx 3269 idx 1000 readtime 1000 lag 0
+at SL-1513-P0.log rx 3274 idx 1005 readtime - lag -
+at SL-1513-H0.log rx 3275 idx 1006 readtime 1005 lag 1
+at SL-1513-P1.log rx 3295 idx 1026 readtime - lag -
+at SL-1513-H1.log rx 3295 idx 1026 readtime 1026 lag 0
+at SF-1514-P0.log rx 3300 idx 1031 readtime - lag -
+at SF-1514-H0.log rx 3301 idx 1032 readtime 1031 lag 1
+at SF-1514-P1.log rx 3321 idx 1052 readtime - lag -
+at SF-1514-H1.log rx 3321 idx 1052 readtime 1052 lag 0
+at SL-1514-P0.log rx 3326 idx 1057 readtime - lag -
+at SL-1514-H0.log rx 3327 idx 1058 readtime 1058 lag 0
+at SL-1514-P1.log rx 3347 idx 1078 readtime - lag -
+at SL-1514-H1.log rx 3347 idx 1078 readtime 1078 lag 0
+order_window E-F1-P0.log E-F1-H0.log 5 6
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window E-F1-H0.log E-F1-P1.log 6 226
+frames 220
+len 60:20 61:20 62:20 63:20 263:20 276:20 277:20 1511:20 1512:20 1513:20 1514:20
+ethertype 0800:220
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 220 tagged 0 len 60:20 61:20 62:20 63:20 263:20 276:20 277:20 1511:20 1512:20 1513:20 1514:20 ipcsum_ok 220 icmpcsum_ok 80 excess 0:220
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:220
+echo_ids 11
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 4
+echo_seq 2 1-20
+echo_first 2 seq 1 b10 4
+echo_seq 3 1-20
+echo_first 3 seq 1 b10 4
+echo_seq 4 1-20
+echo_first 4 seq 1 b10 3
+echo_seq 5 1-20
+echo_first 5 seq 1 b10 3
+echo_seq 6 1-20
+echo_first 6 seq 1 b10 2
+echo_seq 7 1-20
+echo_first 7 seq 1 b10 2
+echo_seq 8 1-20
+echo_first 8 seq 1 b10 1
+echo_seq 9 1-20
+echo_first 9 seq 1 b10 1
+echo_seq 10 1-20
+echo_first 10 seq 1 b10 0
+echo_seq 11 1-20
+echo_first 11 seq 1 b10 15
+echo_dup 0
+echo_vid -
+dst host:220 bcast:0 mcast:0 other:0
+truncated 140
+icmp_partial 140
+lenby 20:60-63,263,276-277,1511-1514
+order_window E-F1-P1.log E-F1-H1.log 226 226
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window E-F1-H1.log E-L1-P0.log 226 231
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 2
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window E-L1-P0.log E-L1-H0.log 231 232
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window E-L1-H0.log E-L1-P1.log 232 398
+frames 166
+len 60:23 61:1 62:20 63:20 263:1 276:20 277:20 281:19 1511:1 1512:1 1513:20 1514:20
+ethertype 0800:144 0806:3 8100:19
+vlan8100 19
+vlan_vid 1767:19
+class icmp_echo_reply 163 tagged 19 len 60:20 61:1 62:20 63:20 263:1 276:20 277:20 281:19 1511:1 1512:1 1513:20 1514:20 ipcsum_ok 163 icmpcsum_ok 61 excess 0:144 4:19
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 3 tagged 0 len 60:3
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:144 4:19
+echo_ids 11
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 5
+echo_seq 2 1
+echo_first 2 seq 1 b10 5
+echo_seq 3 5,7,14,16,22,24,55,61,63,66,72,74,77,83,85,88,94,96,128,131
+echo_first 3 seq 5 b10 14
+echo_seq 4 6,8,14,16,19,25,27,30,36,38,70,73,79,81,84,86,93,95,98,103
+echo_first 4 seq 6 b10 3
+echo_seq 5 50
+echo_first 5 seq 50 b10 6
+echo_seq 6 22-41
+echo_first 6 seq 22 b10 12
+echo_seq 7 1,3,8,10,15,17,22,24,29,31,36,38,43,45,50,52,57,59,64,66,71,73,78,80,85,87,92,94,99,101,106,108,113,115,120,122,127,129,134
+echo_seq_tagged 7 3,10,17,24,31,38,45,52,59,66,73,80,87,94,101,108,115,122,129
+echo_first 7 seq 1 b10 3
+echo_excess 7 3:4 10:4 17:4 24:4 31:4 38:4 45:4 52:4 59:4 66:4 73:4 80:4 87:4 94:4 101:4 108:4 115:4 122:4 129:4
+echo_seq 8 149
+echo_first 8 seq 149 b10 13
+echo_seq 9 13
+echo_first 9 seq 13 b10 3
+echo_seq 10 6-25
+echo_first 10 seq 6 b10 12
+echo_seq 11 1-20
+echo_first 11 seq 1 b10 12
+echo_dup 0
+echo_vid 1767:19
+dst host:164 bcast:2 mcast:0 other:0
+truncated 102
+icmp_partial 102
+lenby 1:61,263,1511-1512
+lenby 19:281
+lenby 20:62-63,276-277,1513-1514
+lenby 23:60
+order_window E-L1-P1.log E-L1-H1.log 398 398
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window E-L1-H1.log E-F2-P0.log 398 403
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 3
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window E-F2-P0.log E-F2-H0.log 403 404
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window E-F2-H0.log E-F2-P1.log 404 624
+frames 220
+len 60:20 61:20 62:20 63:20 263:20 276:20 277:20 1511:20 1512:20 1513:20 1514:20
+ethertype 0800:220
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 220 tagged 0 len 60:20 61:20 62:20 63:20 263:20 276:20 277:20 1511:20 1512:20 1513:20 1514:20 ipcsum_ok 220 icmpcsum_ok 80 excess 0:220
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:220
+echo_ids 11
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 2
+echo_seq 2 1-20
+echo_first 2 seq 1 b10 2
+echo_seq 3 1-20
+echo_first 3 seq 1 b10 1
+echo_seq 4 1-20
+echo_first 4 seq 1 b10 1
+echo_seq 5 1-20
+echo_first 5 seq 1 b10 1
+echo_seq 6 1-20
+echo_first 6 seq 1 b10 0
+echo_seq 7 1-20
+echo_first 7 seq 1 b10 0
+echo_seq 8 1-20
+echo_first 8 seq 1 b10 15
+echo_seq 9 1-20
+echo_first 9 seq 1 b10 14
+echo_seq 10 1-20
+echo_first 10 seq 1 b10 14
+echo_seq 11 1-20
+echo_first 11 seq 1 b10 13
+echo_dup 0
+echo_vid -
+dst host:220 bcast:0 mcast:0 other:0
+truncated 140
+icmp_partial 140
+lenby 20:60-63,263,276-277,1511-1514
+order_window E-F2-P1.log E-F2-H1.log 624 624
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window E-F2-H1.log SF-0060-P0.log 624 629
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 14
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0060-P0.log SF-0060-H0.log 629 630
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-0060-H0.log SF-0060-P1.log 630 650
+frames 20
+len 60:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 60:20 ipcsum_ok 20 icmpcsum_ok 20 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 7
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 20:60
+order_window SF-0060-P1.log SF-0060-H1.log 650 650
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0060-H1.log SL-0060-P0.log 650 655
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 9
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0060-P0.log SL-0060-H0.log 655 656
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-0060-H0.log SL-0060-P1.log 656 676
+frames 20
+len 60:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 60:20 ipcsum_ok 20 icmpcsum_ok 20 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 2
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 20:60
+order_window SL-0060-P1.log SL-0060-H1.log 676 676
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0060-H1.log SF-0061-P0.log 676 681
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0061-P0.log SF-0061-H0.log 681 682
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-0061-H0.log SF-0061-P1.log 682 702
+frames 20
+len 61:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 61:20 ipcsum_ok 20 icmpcsum_ok 20 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 7
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 20:61
+order_window SF-0061-P1.log SF-0061-H1.log 702 702
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0061-H1.log SL-0061-P0.log 702 707
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 4
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0061-P0.log SL-0061-H0.log 707 707
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0061-H0.log SL-0061-P1.log 707 709
+frames 2
+len 60:1 61:1
+ethertype 0800:1 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 1 tagged 0 len 61:1 ipcsum_ok 1 icmpcsum_ok 1 excess 0:1
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:1
+echo_ids 1
+echo_seq 1 1
+echo_first 1 seq 1 b10 7
+echo_dup 0
+echo_vid -
+dst host:2 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60-61
+order_window SL-0061-P1.log SL-0061-H1.log 709 709
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0061-H1.log SF-0062-P0.log 709 714
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 7
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0062-P0.log SF-0062-H0.log 714 714
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0062-H0.log SF-0062-P1.log 714 735
+frames 21
+len 60:1 62:20
+ethertype 0800:20 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 62:20 ipcsum_ok 20 icmpcsum_ok 20 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 8
+echo_dup 0
+echo_vid -
+dst host:21 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+lenby 20:62
+order_window SF-0062-P1.log SF-0062-H1.log 735 735
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0062-H1.log SL-0062-P0.log 735 740
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0062-P0.log SL-0062-H0.log 740 740
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0062-H0.log SL-0062-P1.log 740 747
+frames 7
+len 60:1 62:6
+ethertype 0800:6 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 6 tagged 0 len 62:6 ipcsum_ok 6 icmpcsum_ok 6 excess 0:6
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:6
+echo_ids 1
+echo_seq 1 1,4,7,13,15,18
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:7 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+lenby 6:62
+order_window SL-0062-P1.log SL-0062-H1.log 747 747
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0062-H1.log SF-0063-P0.log 747 752
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 11
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0063-P0.log SF-0063-H0.log 752 753
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-0063-H0.log SF-0063-P1.log 753 773
+frames 20
+len 63:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 63:20 ipcsum_ok 20 icmpcsum_ok 20 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 0
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 20:63
+order_window SF-0063-P1.log SF-0063-H1.log 773 773
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0063-H1.log SL-0063-P0.log 773 778
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 14
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0063-P0.log SL-0063-H0.log 778 778
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0063-H0.log SL-0063-P1.log 778 785
+frames 7
+len 60:1 63:6
+ethertype 0800:6 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 6 tagged 0 len 63:6 ipcsum_ok 6 icmpcsum_ok 6 excess 0:6
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:6
+echo_ids 1
+echo_seq 1 1,4,10,12,18,20
+echo_first 1 seq 1 b10 15
+echo_dup 0
+echo_vid -
+dst host:7 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+lenby 6:63
+order_window SL-0063-P1.log SL-0063-H1.log 785 785
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0063-H1.log SF-0263-P0.log 785 790
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 8
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0263-P0.log SF-0263-H0.log 790 790
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0263-H0.log SF-0263-P1.log 790 811
+frames 21
+len 60:1 263:20
+ethertype 0800:20 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 263:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 8
+echo_dup 0
+echo_vid -
+dst host:21 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 1:60
+lenby 20:263
+order_window SF-0263-P1.log SF-0263-H1.log 811 811
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0263-H1.log SL-0263-P0.log 811 816
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 12
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0263-P0.log SL-0263-H0.log 816 817
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-0263-H0.log SL-0263-P1.log 817 818
+frames 1
+len 263:1
+ethertype 0800:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 1 tagged 0 len 263:1 ipcsum_ok 1 icmpcsum_ok 0 excess 0:1
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:1
+echo_ids 1
+echo_seq 1 1
+echo_first 1 seq 1 b10 13
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 1
+icmp_partial 1
+lenby 1:263
+order_window SL-0263-P1.log SL-0263-H1.log 818 818
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0263-H1.log SF-0276-P0.log 818 823
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 8
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0276-P0.log SF-0276-H0.log 823 824
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-0276-H0.log SF-0276-P1.log 824 844
+frames 20
+len 276:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 276:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 9
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:276
+order_window SF-0276-P1.log SF-0276-H1.log 844 844
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0276-H1.log SL-0276-P0.log 844 849
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 12
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0276-P0.log SL-0276-H0.log 849 850
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-0276-H0.log SL-0276-P1.log 850 870
+frames 20
+len 276:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 276:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 2
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:276
+order_window SL-0276-P1.log SL-0276-H1.log 870 870
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0276-H1.log SF-0277-P0.log 870 875
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-0277-P0.log SF-0277-H0.log 875 876
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-0277-H0.log SF-0277-P1.log 876 896
+frames 20
+len 277:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 277:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 7
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:277
+order_window SF-0277-P1.log SF-0277-H1.log 896 896
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-0277-H1.log SL-0277-P0.log 896 901
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 3
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-0277-P0.log SL-0277-H0.log 901 902
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-0277-H0.log SL-0277-P1.log 902 908
+frames 6
+len 277:3 281:3
+ethertype 0800:3 8100:3
+vlan8100 3
+vlan_vid 1767:3
+class icmp_echo_reply 6 tagged 3 len 277:3 281:3 ipcsum_ok 6 icmpcsum_ok 0 excess 0:3 4:3
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:3 4:3
+echo_ids 1
+echo_seq 1 1,3,8,10,15,17
+echo_seq_tagged 1 3,10,17
+echo_first 1 seq 1 b10 12
+echo_excess 1 3:4 10:4 17:4
+echo_dup 0
+echo_vid 1767:3
+dst host:6 bcast:0 mcast:0 other:0
+truncated 6
+icmp_partial 6
+lenby 3:277,281
+order_window SL-0277-P1.log SL-0277-H1.log 908 908
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-0277-H1.log SF-1511-P0.log 908 913
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 11
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-1511-P0.log SF-1511-H0.log 913 914
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-1511-H0.log SF-1511-P1.log 914 934
+frames 20
+len 1511:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 1511:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 1
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:1511
+order_window SF-1511-P1.log SF-1511-H1.log 934 934
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-1511-H1.log SL-1511-P0.log 934 939
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 5
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-1511-P0.log SL-1511-H0.log 939 940
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-1511-H0.log SL-1511-P1.log 940 941
+frames 1
+len 1511:1
+ethertype 0800:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 1 tagged 0 len 1511:1 ipcsum_ok 1 icmpcsum_ok 0 excess 0:1
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:1
+echo_ids 1
+echo_seq 1 1
+echo_first 1 seq 1 b10 9
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 1
+icmp_partial 1
+lenby 1:1511
+order_window SL-1511-P1.log SL-1511-H1.log 941 941
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-1511-H1.log SF-1512-P0.log 941 946
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-1512-P0.log SF-1512-H0.log 946 947
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-1512-H0.log SF-1512-P1.log 947 967
+frames 20
+len 1512:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 1512:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 9
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:1512
+order_window SF-1512-P1.log SF-1512-H1.log 967 967
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-1512-H1.log SL-1512-P0.log 967 972
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 4
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-1512-P0.log SL-1512-H0.log 972 973
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-1512-H0.log SL-1512-P1.log 973 974
+frames 1
+len 1512:1
+ethertype 0800:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 1 tagged 0 len 1512:1 ipcsum_ok 1 icmpcsum_ok 0 excess 0:1
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:1
+echo_ids 1
+echo_seq 1 1
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 1
+icmp_partial 1
+lenby 1:1512
+order_window SL-1512-P1.log SL-1512-H1.log 974 974
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-1512-H1.log SF-1513-P0.log 974 979
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 11
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-1513-P0.log SF-1513-H0.log 979 980
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-1513-H0.log SF-1513-P1.log 980 1000
+frames 20
+len 1513:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 1513:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 12
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:1513
+order_window SF-1513-P1.log SF-1513-H1.log 1000 1000
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-1513-H1.log SL-1513-P0.log 1000 1005
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 15
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-1513-P0.log SL-1513-H0.log 1005 1006
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-1513-H0.log SL-1513-P1.log 1006 1026
+frames 20
+len 1513:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 1513:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 12
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:1513
+order_window SL-1513-P1.log SL-1513-H1.log 1026 1026
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SL-1513-H1.log SF-1514-P0.log 1026 1031
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 7
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SF-1514-P0.log SF-1514-H0.log 1031 1032
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SF-1514-H0.log SF-1514-P1.log 1032 1052
+frames 20
+len 1514:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 1514:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 10
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:1514
+order_window SF-1514-P1.log SF-1514-H1.log 1052 1052
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window SF-1514-H1.log SL-1514-P0.log 1052 1057
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 11
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+order_window SL-1514-P0.log SL-1514-H0.log 1057 1058
+frames 1
+len 60:1
+ethertype 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:1 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+order_window SL-1514-H0.log SL-1514-P1.log 1058 1078
+frames 20
+len 1514:20
+ethertype 0800:20
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 20 tagged 0 len 1514:20 ipcsum_ok 20 icmpcsum_ok 0 excess 0:20
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:20
+echo_ids 1
+echo_seq 1 1-20
+echo_first 1 seq 1 b10 9
+echo_dup 0
+echo_vid -
+dst host:20 bcast:0 mcast:0 other:0
+truncated 20
+icmp_partial 20
+lenby 20:1514
+order_window SL-1514-P1.log SL-1514-H1.log 1078 1078
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+pcapwin end rc 0

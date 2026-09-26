@@ -1,0 +1,14 @@
+brdelta 1.2 SL-0062-R0.log -> SL-0062-R1.log
+resolve prev SL-0062-R0.log 1 of 2
+resolve cur SL-0062-R1.log 1 of 2
+board n_tx d 21 n_recov_fire d 0 n_tx_stop d 0 n_rx d 21 nd_up 1 tx_stopped 0
+cpu crc d 21 jab d 11 frag d 0 drop d 4 dropev d 1 b64 d 1 b65 d 7 b128 d 0 b256 d 0 b512 d 1 b1024 d 1
+p3 out d 7 rx d 21 rxbytes d 1384
+ident o d 7 cjfd d 6 k 1
+buckets legal d 10 cjf d 10 lt64 d 0
+host rx d 7 tx d 21 inechoreps d 6 outechos d 20
+path p3 rx d 21 host outechos d 20 covered yes
+hbound inner d 7 outer d 7 o d 7 within yes
+snmp ip inrecv d 20 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 20 outreq d 20 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 15
+leak cpu 21 p3 7 host 7

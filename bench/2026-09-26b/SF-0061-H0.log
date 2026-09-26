@@ -1,0 +1,93 @@
+/sys/class/net/enxfc19286184c9/statistics/collisions:0
+/sys/class/net/enxfc19286184c9/statistics/multicast:0
+/sys/class/net/enxfc19286184c9/statistics/rx_bytes:468032
+/sys/class/net/enxfc19286184c9/statistics/rx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/rx_crc_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/rx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_frame_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_length_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_missed_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_nohandler:0
+/sys/class/net/enxfc19286184c9/statistics/rx_over_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_packets:2951
+/sys/class/net/enxfc19286184c9/statistics/tx_aborted_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_bytes:2285534
+/sys/class/net/enxfc19286184c9/statistics/tx_carrier_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/tx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/tx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_heartbeat_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_packets:3985
+/sys/class/net/enxfc19286184c9/statistics/tx_window_errors:0
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates OutTransmits
+Ip: 2 64 380830 0 0 0 0 0 380814 381100 0 0 0 0 0 0 0 0 0 381100
+Icmp: InMsgs InErrors InCsumErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutRateLimitGlobal OutRateLimitHost OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 648 0 0 0 0 0 0 0 0 648 0 0 0 0 1694 0 0 0 0 0 0 0 0 1694 0 0 0 0 0
+IcmpMsg: InType0 OutType8
+IcmpMsg: 648 1694
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts InCsumErrors
+Tcp: 1 200 120000 -1 5 0 0 0 2 377856 377693 2 0 0 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+Udp: 2304 0 0 2304 0 0 0 6 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+UdpLite: 0 0 0 0 0 0 0 0 0
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    RX:  bytes packets errors dropped  missed   mcast           
+        468032    2951      0       0       0       0 
+    RX errors:  length    crc   frame    fifo overrun otherhost
+                     0      0       0       0       0        19 
+    TX:  bytes packets errors dropped carrier collsns           
+       2285534    3985      0       0       0       0 
+    TX errors: aborted   fifo  window heartbt transns
+                     0      0       0       0       4 
+REACHABLE
+pcapwin 1.3
+pcap WE.pcap records 681 partial_tail_bytes 0
+capture_live yes
+tcpdump_procs 1
+prev SL-0060-H1.log window_end 676
+prev_list 2 candidates, used 2
+window 676 681
+window_end 681
+frames 5
+len 60:5
+ethertype 0800:4 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 4 tagged 0 len 60:4 ipcsum_ok 4 icmpcsum_ok 4 excess 0:4
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:4
+echo_ids 1
+echo_seq 1 1-4
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:5 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 5:60
+pcapwin end rc 0
+dmesgwin 1.2 prev SF-0061-L.log window_end 366030
+window 366030 367194
+window_end 367194
+lines 24 first_t 925.361 last_t 925.413
+bug_preempt 1
+usbnet_xmit 1
+vhci_unlink 2
+urb_104 2
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 1
+follower 1

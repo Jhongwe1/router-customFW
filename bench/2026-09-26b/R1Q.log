@@ -1,0 +1,29 @@
+  pre  image     sha256 7d7dd4b03a1fdaaf68c29c2212891eb4aa2db8453961eb4728328630c5823ce9  <- matches the pin
+  S2  build     SKIPPED (--skip)
+  S3  assemble  SKIPPED (--skip)
+  S4  reset     SKIPPED (--skip)
+  S5  rescue    rc=0    0.27 s
+  S5b burnflag  rc=0    2.24 s
+  S5c hostlink  ok      1.05 s
+      ok   P-a the host has an address on the route to 10.1.1.1 -- dev=enxfc19286184c9 src=10.1.1.2
+      ok   P-b the board answers ARP -- 56:0a:01:01:01:e8 REACHABLE
+  S6  upload    rc=0    5.11 s
+  S6b staged    rc=0    2.27 s
+  S7  boot      rc=0   11.00 s
+      ended on --until at offset 2091
+
+  ok   A0b AUTOBURN read back at 0x8040D4A0   00000000 -- the word the burn path reads is zero
+  ok   P-a the host has an address on the route to 10.1.1.1 dev=enxfc19286184c9 src=10.1.1.2
+  ok   P-b the board answers ARP              56:0a:01:01:01:e8 REACHABLE
+  ok   A0c the words at 0x80500000 are the image S6 sent 8 words, every one derived from the image rather than typed
+  ok   A1 the eleven boot marks               all present
+  ok   A2 and in declaration order            11 present mark(s) in order
+  ok   A3 the id the build computed           board printed 06c39ca3, build computed 06c39ca3
+  ok   A4 a reachable prompt                  found
+
+  stage seconds: S2=skipped  S3=skipped  S4=skipped  S5=0.27  S5b=2.24  S5c=1.05  S6=5.11  S6b=2.27  S7=11.00  S8=0.00
+  S9  dwell     ok      2.49 s   2.500 s past S7's end
+  MACHINE TOTAL: 21.94 s   (S1, the edit, and S8b, the read, are not this tool's to time -- looptime owns the served loop)
+  S9's dwell is a wait, not machine time: the stages file has it
+
+RESULT: the loop closed, 8 assertion(s) held, 21.94 s of machine time

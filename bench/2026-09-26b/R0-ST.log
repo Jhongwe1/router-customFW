@@ -1,0 +1,126 @@
+  ok    S1  first window over 3 records: window 0 3, frames 3, rc 0
+  ok    S2  second window chains from the first: window 3 10, frames 7, partial tail 7 B
+  ok    S3  window 2: the trailer 281 untagged, the priority-tagged 281 counted at byte 12 with VID 0
+  ok    S4  whole file: two 0x8100 frames, VID 0 and 5; excess 0:4 4:3 (tags and the trailer all +4)
+  ok    S5  icmp class: 7 replies, 2 tagged, one bad ICMP checksum caught
+  ok    S6  driver frames: 2 at 61 B, the corrupted last byte refused by content_ok
+  ok    S7  dst classes against the --if address (never printed)
+  ok    S8  unreadable --prev: exit 3, counts marked cumulative, window_end still printed
+  ok    S9  no address in any output (6 planted MACs searched)
+  ok    S10 big-endian nanosecond pcap read the same
+  ok    S11 a non-Ethernet capture is refused with a reason
+  ok    S12 a missing capture is refused
+  ok    S13 a snap-truncated record keeps its wire length and is counted as truncated
+  ok    S14 nothing new since the previous window: frames 0 (the empty window is counted, not refused)
+  ok    S15 capture_live and tcpdump_procs read processes named tcpdump: 0 / 1 / 2
+  ok    S16 echo replies by identifier: sequence ranges, the tagged one, one duplicate; a request not counted (got echo_ids 2; echo_seq 1 1-3,5-6,9; echo_seq_tagged 1 6; echo_first 1 seq 1 b10 18; echo_excess 1 6:4; echo_seq 2 4; echo_first 2 seq 4 b10 18; echo_dup 1; echo_vid 5:1)
+  ok    S17 no identifier printed; no directory in a refusal or in a prev line (basename only)
+  ok    S18 snap 64: 3 cut replies keep class, sequence and length; only the whole one is csum-checked
+  ok    S19 lenby: 1:61-63,70 / 2:1514 / 4:60; content_ok 7, the whole (60-63 B) frames only
+  ok    S20 FW-145: a dmesgwin window_end after pcapwin's block is not read (1.3 end line: window 3 10; 1.2, no end line: window 3 10); a block cut before its window_end is unreadable (p13.log rc 0, p12.log rc 0, pcut.log rc 3, pcutb.log rc 3)
+  ok    S21 the end line closes a window (rc 0), an unreadable --prev (rc 3) and a refusal (rc 2)
+  ok    S22 order, anchor ok: base 100; idx 0/3/3/8 from each log's FIRST read; read time from the LAST block (lag 1); windows 1-3 / none / 4-8 by sequence; body = window's, line for line; tcpdump's LAST summary read
+  ok    S23 anchor void on dropped 1 / rx_pre != rx_post / captured != records / an idx beyond N (named) / an idx running back / four at once, in order; at lines kept, no window, rc 3
+  ok    S24 order refuses (rc 2, refusal then end line only): tcpdump running (fake /proc); a host log without rx_packets; a stop with one read; no `dropped` summary; a missing log
+  ok    S25 order: no address, no identifier, no directory (no `/` at all) in 12 outputs and refusals
+  ok    S26 echo_first: the lowest sequence's data byte 10, not the first seen; `-` past the snap; echo_excess by sequence (got echo_ids 2; echo_seq 1 1-3; echo_first 1 seq 1 b10 5; echo_excess 1 3:188; echo_seq 2 1; echo_first 2 seq 1 b10 -; echo_dup 0; echo_vid -)
+  ok    S27 window --prev a,b,c: the last present is read (b of gone,w1,gone; w2 of w1,w2,gone), absent ones skipped
+  ok    S28 order: a host log never written is listed absent and skipped (got absent h1-never.log; at h0.log rx 100 idx 0 readtime - lag -; at h2.log rx 103 idx 3 readtime - lag -; at h3.log rx 108 idx 8 readtime - lag -; order_window h0.log h2.log 0 3; order_window h2.log h3.log 3 8)
+  ok    S29 window --prev none,a: the capture's start with a absent, a when present; a,none: unreadable, and a present a read (none counts only first)
+pcapwin self-test: 29 of 29 passed
+  ok    B1  A1-01 -> A1-02: fault jfd 59; p3 out d 1 rx d 60 rxbytes d 3900
+  ok    B2  A1-03 -> A1-04: board n_tx d 42 
+  ok    B3  A1-05 -> A1-06: board n_tx d 42 ; fault jfd 14
+  ok    B4  A1-07 -> A1-08: fault jfd 60
+  ok    B5  C-00 -> C-01: leak none; host rx d 0 tx d 0 
+  ok    B6  A2-02 -> A2-03: p3 out d 0 rx d 0 rxbytes d 0
+  ok    B7  A2-01 -> A2-02: rx d 20 rxbytes d 1300
+  ok    B8  A2-01 -> A2-02: path p3 rx d 20 host outechos d 20 covered yes
+  ok    B9  A2-02 -> A2-03: path p3 rx d 0 host outechos d 20 covered no
+  ok    C1  A1-01 -> A1-02: cpu crc d 60 jab d 59 
+  ok    C2  A1-03 -> A1-04: cpu crc d 15 jab d 9 
+  ok    C3  A1-05 -> A1-06: cpu crc d 24 jab d 13 frag d 0 drop d 1 
+  ok    C4  A1-07 -> A1-08: cpu crc d 61 jab d 60 
+  ok    C5  C-00 -> C-01: cpu crc d 0 jab d 0 
+  ok    S1  series over block 46's arm C, C-00 ... C-11: dsync/skb_fail 0 1 1 1 1 0 1 1 1 0 0, rx 2 each
+  ok    S2  a series of one dump is refused
+  ok    X1  a bracket whose CPU-port section is missing is refused, never read as zero
+  ok    X2  a missing bracket is refused by its basename
+  ok    D1  E-L1-R0 -> E-L1-R1: block 47's o-identity miss, o 168 against c 789 - j 581 - f 3 - d 41 = 164; legal 24+54+0+81+3+43 = 205 = c - j - f
+  ok    D2  E-F1-R0 -> E-F1-R1: o 221 = c 221, legal 21+60+0+60+0+80 = 221
+  ok    D3  E-F1-R1 -> E-L1-R0 with the host: host rx 6 against p3 out 5 (the gap race)
+  ok    D4a hbound, the H logs standing in for P: inner = outer = o = 168, within yes
+  ok    D4b hbound, P planted 2 and 3 below H: inner 2683 - 2518 = 165, outer 2686 - 2516 = 170, within yes
+  ok    D4c hbound, CUR_P planted 1 above CUR_H: inner 169 exceeds o 168, within no
+  ok    D4d hbound, PREV_P planted 1 above PREV_H: outer 167 below o 168, within no
+  ok    D5a E-F1-R0 -> E-F1-R1: Ip InReceives/InDelivers/OutRequests 18 -> 238, Udp still
+  ok    D5b E-L1-R0 -> E-L1-R1: InReceives 242 -> 1569, OutRequests 242 -> 1584, OutDiscards 0 -> 155
+  ok    D6a snmp E-F1-R0 E-F1-R1 prints D5a's line
+  ok    D6b snmp over two synthetic iperf cells (CRLF, echoed command, other output): udp indg d 6431 inerr d 46157 rcvbuf d 46157
+  ok    D7  snmp over two cells that each print /proc/net/snmp twice reads the LAST print
+  ok    D8  snmp over a kernel whose Ip and Udp columns run in reverse order reads by header name
+  ok    D9  pair with candidate lists: the last present is read (a stand-in X- after its read; absent ones skipped)
+  ok    O1  line order: brdelta board cpu p3 ident buckets host path hbound snmp fault leak (host, path, hbound only with the host)
+  ok    X3  a board read whose Udp values line is cut short is refused, never read as zero
+  ok    X4  --pre without --host is refused with a reason, before any line is printed
+  ok    X5  a board read holding two Udp pairs is refused
+  ok    X6  a board read whose Ip values hold a non-integer is refused
+  ok    X7  snmp over a log with no Udp pair is refused
+  ok    X8  snmp over a log whose Ip header has no values line is refused
+  ok    X9  a board read with a line between the Udp header and its values is refused
+brdelta self-test: 40 of 40 passed
+  ok    W1  fx-sw-lb2-hprev.log rlxfw probe 60
+  ok    W2  fx-sw-lb2-hslot.log rlxfw probe 60
+  ok    W3  fx-sw-lb2-flip65.log rlxfw probe 60
+  ok    W4  fx-sw-vendor.log vendor probe 60
+  ok    W5  fx-sw-lb1.log rlxfw probe 0
+  ok    W6  fx-sw-wire.log vendor probe 60
+  ok    W7  fx-sw-void.log vendor probe 60
+  ok    W8  fx-sw-repeat.log rlxfw probe 0
+  ok    W9  fx-sw-noreg.log d1 probe 60
+  ok    D1  decoder: F at m00 char 0 = bad b, bad a at 60, 61; T6 at m11 chars 22-23 = void, skew, clean at 1512-1514
+  ok    D2  a code beyond 1,514 is refused
+  ok    D3  a page with 11 of the 12 map lines is refused, never read as unswept
+swcheck self-test: 12 of 12 passed
+  ok    D1  first window: 5 lines, one BUG trace with its transmit frame, one unlink
+  ok    D2  second window chains from the first; a half-written last line waits for the next window
+  ok    D3  an unreadable --prev: exit 3, the counts cumulative and marked so
+  ok    D4  no line of the log and no directory is printed
+  ok    D5  a missing log is refused by its basename
+  ok    D6  follower counts a started `dmesg -w` (1 -> 2) and forgets it killed (1)
+  ok    D7  a list: the last candidate present is used (the two absent ones skipped), its window chains
+  ok    D8  window_end is dmesgwin's own, not a later pcapwin line's (the FW-145 shape, turned round)
+  ok    D9  the last candidate present holds no window_end: unreadable (exit 3), never a fall back to w1
+dmesgwin self-test: 9 of 9 passed
+  ok    U1   printed numbers: value and half-unit from the digits; 100 % as 1e+02
+  ok    P1   UDP -f k -1 (R6): 11 intervals, TEST_END, 24,659,600 B exact over 10.04 +/- 0.005 s
+  ok    P2   UDP adaptive (R5): losses in three intervals, a zero-length one; 17,591 received
+  ok    P3   client SIGTERM mid-test (K4): re-print dropped, stale summary ignored, exit 1
+  ok    P4   results lost, -1 (K5c): first summary used (line 21), re-print dropped, exit 0
+  ok    P5   TCP adaptive (R1): TEST_END; the idle server's 'interrupt' stays outside the trial
+  ok    P6   deaf (K6): summary + 'interrupt' is TEST_END only with --duration in reach
+  ok    P7   server SIGKILL (K1): intervals only, their sum is the fallback, exit 1
+  ok    P8   client SIGKILL (K3): zero-length interval kept, no summary, message recorded
+  ok    P9   card B's CRLF -S1 capture (echo wrapped CR CR LF, /proc text, prompt): P1's figure
+  ok    P10  real CRLF from a pty (R3): TEST_END at 10.03
+  ok    P11  K1 with its 1.00-2.00 line removed (edited): the gap is named
+  ok    P12  R6 with one interval total changed by one (edited): only the exact sum fires
+  ok    P13  --datagram 1470 on R6 is refused by the transfer columns; 1400 fits
+  ok    P14  K4 with its re-print altered (edited): a non-repeat is flagged, not dropped
+  ok    P15  R1 with one line on stream 7 (edited): a second stream is flagged
+  ok    P16  sender-format lines (the qemu client's own, under a server banner): refused as -R
+  ok    P17  no trial (empty log; lines with no 'Accepted connection'): exit 1, stray named
+  ok    P18  R6 plus a 2-datagram out-of-order line (edited): received = total - lost + 2
+  ok    C1   TCP (R1 board vs its client): AGREE, common bits [199229440, 199599750]
+  ok    C2   UDP (R6 -f k board vs its -f m client): lost/total and jitter agree
+  ok    C3   TCP with a CRLF board log (R3): AGREE
+  ok    C4   host receiver rate 19.9 -> 19.6 (edited): DISAGREE on the bits
+  ok    C5   host transfer 23.8 -> 23.7 (edited): only the exact transfer check fires
+  ok    C6   host lost 71 -> 72 (edited): DISAGREE on the integers
+  ok    C7   K5c board vs its killed client: refused, the host cannot be the control
+  ok    C8   two complete but different trials (R6/R5, R1/seating A's ER1): refused
+  ok    C9   a board log with no TEST_END summary; UDP against TCP: refused
+  ok    C10  K6 without --duration refused; two trials need --trial, and --trial 1 agrees
+  ok    F1   refuse_args refuses 9 bad argument sets and permits the 4 good forms, in-process
+  ok    F2   main() refuses the argument before opening the file; a good one reaches the file
+RESULT: 31/31

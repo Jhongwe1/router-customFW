@@ -1,0 +1,18 @@
+dmesgwin 1.2 prev D3-LUS1-H.log window_end 1464377
+prev_list 21 candidates, used 21
+window 1464377 1464733
+window_end 1464733
+lines 8 first_t 2700.516 last_t 2704.507
+bug_preempt 0
+usbnet_xmit 0
+vhci_unlink 4
+urb_104 4
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 0
+follower 1

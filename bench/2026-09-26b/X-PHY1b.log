@@ -1,0 +1,6 @@
+echo read 3 0 > /proc/rtl865x/phyReg ; echo read 3 1 > /proc/rtl865x/phyReg ; 
+echo read 3 1 > /proc/rtread phyId(3), regId(0),regData:0x1100
+l86read phyId(3), regId(1),regData:0x78ed
+5x/read phyId(3), regId(1),regData:0x78ed
+phyReg
+# 

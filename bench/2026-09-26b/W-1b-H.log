@@ -1,0 +1,91 @@
+/sys/class/net/enxfc19286184c9/statistics/collisions:0
+/sys/class/net/enxfc19286184c9/statistics/multicast:0
+/sys/class/net/enxfc19286184c9/statistics/rx_bytes:1013803
+/sys/class/net/enxfc19286184c9/statistics/rx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/rx_crc_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/rx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_frame_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_length_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_missed_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_nohandler:0
+/sys/class/net/enxfc19286184c9/statistics/rx_over_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_packets:4803
+/sys/class/net/enxfc19286184c9/statistics/tx_aborted_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_bytes:2573840
+/sys/class/net/enxfc19286184c9/statistics/tx_carrier_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/tx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/tx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_heartbeat_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_packets:4500
+/sys/class/net/enxfc19286184c9/statistics/tx_window_errors:0
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates OutTransmits
+Ip: 2 64 642220 0 0 0 0 0 642196 640542 0 0 0 0 0 0 0 0 0 640542
+Icmp: InMsgs InErrors InCsumErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutRateLimitGlobal OutRateLimitHost OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 1003 0 0 0 0 0 0 0 0 1003 0 0 0 0 2170 0 0 0 0 0 0 0 0 2170 0 0 0 0 0
+IcmpMsg: InType0 OutType8
+IcmpMsg: 1003 2170
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts InCsumErrors
+Tcp: 1 200 120000 -1 6 0 0 0 2 638860 636798 3 0 2 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+Udp: 2324 0 0 2324 0 0 0 9 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+UdpLite: 0 0 0 0 0 0 0 0 0
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    RX:  bytes packets errors dropped  missed   mcast           
+       1013803    4803      0       0       0       0 
+    RX errors:  length    crc   frame    fifo overrun otherhost
+                     0      0       0       0       0        22 
+    TX:  bytes packets errors dropped carrier collsns           
+       2573840    4500      0       0       0       0 
+    TX errors: aborted   fifo  window heartbt transns
+                     0      0       0       0       4 
+STALE
+pcapwin 1.3
+pcap WS.pcap records 1456 partial_tail_bytes 0
+capture_live yes
+tcpdump_procs 1
+prev W-1a-H.log window_end 728
+window 728 1456
+window_end 1456
+frames 728
+len 60:364 424:1 425:1 426:1 427:1 428:1 429:1 430:1 431:1 432:1 433:1 434:1 435:1 436:1 437:1 438:1 439:1 440:1 441:1 442:1 443:1 444:1 445:1 446:1 447:1 448:1 449:1 450:1 451:1 452:1 453:1 454:1 455:1 456:1 457:1 458:1 459:1 460:1 461:1 462:1 463:1 464:1 465:1 466:1 467:1 468:1 469:1 470:1 471:1 472:1 473:1 474:1 475:1 476:1 477:1 478:1 479:1 480:1 481:1 482:1 483:1 484:1 485:1 486:1 487:1 488:1 489:1 490:1 491:1 492:1 493:1 494:1 495:1 496:1 497:1 498:1 499:1 500:1 501:1 502:1 503:1 504:1 505:1 506:1 507:1 508:1 509:1 510:1 511:1 512:1 513:1 514:1 515:1 516:1 517:1 518:1 519:1 520:1 521:1 522:1 523:1 524:1 525:1 526:1 527:1 528:1 529:1 530:1 531:1 532:1 533:1 534:1 535:1 536:1 537:1 538:1 539:1 540:1 541:1 542:1 543:1 544:1 545:1 546:1 547:1 548:1 549:1 550:1 551:1 552:1 553:1 554:1 555:1 556:1 557:1 558:1 559:1 560:1 561:1 562:1 563:1 564:1 565:1 566:1 567:1 568:1 569:1 570:1 571:1 572:1 573:1 574:1 575:1 576:1 577:1 578:1 579:1 580:1 581:1 582:1 583:1 584:1 585:1 586:1 587:1 588:1 589:1 590:1 591:1 592:1 593:1 594:1 595:1 596:1 597:1 598:1 599:1 600:1 601:1 602:1 603:1 604:1 605:1 606:1 607:1 608:1 609:1 610:1 611:1 612:1 613:1 614:1 615:1 616:1 617:1 618:1 619:1 620:1 621:1 622:1 623:1 624:1 625:1 626:1 627:1 628:1 629:1 630:1 631:1 632:1 633:1 634:1 635:1 636:1 637:1 638:1 639:1 640:1 641:1 642:1 643:1 644:1 645:1 646:1 647:1 648:1 649:1 650:1 651:1 652:1 653:1 654:1 655:1 656:1 657:1 658:1 659:1 660:1 661:1 662:1 663:1 664:1 665:1 666:1 667:1 668:1 669:1 670:1 671:1 672:1 673:1 674:1 675:1 676:1 677:1 678:1 679:1 680:1 681:1 682:1 683:1 684:1 685:1 686:1 687:1 688:1 689:1 690:1 691:1 692:1 693:1 694:1 695:1 696:1 697:1 698:1 699:1 700:1 701:1 702:1 703:1 704:1 705:1 706:1 707:1 708:1 709:1 710:1 711:1 712:1 713:1 714:1 715:1 716:1 717:1 718:1 719:1 720:1 721:1 722:1 723:1 724:1 725:1 726:1 727:1 728:1 729:1 730:1 731:1 732:1 733:1 734:1 735:1 736:1 737:1 738:1 739:1 740:1 741:1 742:1 743:1 744:1 745:1 746:1 747:1 748:1 749:1 750:1 751:1 752:1 753:1 754:1 755:1 756:1 757:1 758:1 759:1 760:1 761:1 762:1 763:1 764:1 765:1 766:1 767:1 768:1 769:1 770:1 771:1 772:1 773:1 774:1 775:1 776:1 777:1 778:1 779:1 780:1 781:1 782:1 783:1 784:1 785:1 786:1 787:1
+ethertype 88b5:728
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 728 tagged 0 len 60:364 424:1 425:1 426:1 427:1 428:1 429:1 430:1 431:1 432:1 433:1 434:1 435:1 436:1 437:1 438:1 439:1 440:1 441:1 442:1 443:1 444:1 445:1 446:1 447:1 448:1 449:1 450:1 451:1 452:1 453:1 454:1 455:1 456:1 457:1 458:1 459:1 460:1 461:1 462:1 463:1 464:1 465:1 466:1 467:1 468:1 469:1 470:1 471:1 472:1 473:1 474:1 475:1 476:1 477:1 478:1 479:1 480:1 481:1 482:1 483:1 484:1 485:1 486:1 487:1 488:1 489:1 490:1 491:1 492:1 493:1 494:1 495:1 496:1 497:1 498:1 499:1 500:1 501:1 502:1 503:1 504:1 505:1 506:1 507:1 508:1 509:1 510:1 511:1 512:1 513:1 514:1 515:1 516:1 517:1 518:1 519:1 520:1 521:1 522:1 523:1 524:1 525:1 526:1 527:1 528:1 529:1 530:1 531:1 532:1 533:1 534:1 535:1 536:1 537:1 538:1 539:1 540:1 541:1 542:1 543:1 544:1 545:1 546:1 547:1 548:1 549:1 550:1 551:1 552:1 553:1 554:1 555:1 556:1 557:1 558:1 559:1 560:1 561:1 562:1 563:1 564:1 565:1 566:1 567:1 568:1 569:1 570:1 571:1 572:1 573:1 574:1 575:1 576:1 577:1 578:1 579:1 580:1 581:1 582:1 583:1 584:1 585:1 586:1 587:1 588:1 589:1 590:1 591:1 592:1 593:1 594:1 595:1 596:1 597:1 598:1 599:1 600:1 601:1 602:1 603:1 604:1 605:1 606:1 607:1 608:1 609:1 610:1 611:1 612:1 613:1 614:1 615:1 616:1 617:1 618:1 619:1 620:1 621:1 622:1 623:1 624:1 625:1 626:1 627:1 628:1 629:1 630:1 631:1 632:1 633:1 634:1 635:1 636:1 637:1 638:1 639:1 640:1 641:1 642:1 643:1 644:1 645:1 646:1 647:1 648:1 649:1 650:1 651:1 652:1 653:1 654:1 655:1 656:1 657:1 658:1 659:1 660:1 661:1 662:1 663:1 664:1 665:1 666:1 667:1 668:1 669:1 670:1 671:1 672:1 673:1 674:1 675:1 676:1 677:1 678:1 679:1 680:1 681:1 682:1 683:1 684:1 685:1 686:1 687:1 688:1 689:1 690:1 691:1 692:1 693:1 694:1 695:1 696:1 697:1 698:1 699:1 700:1 701:1 702:1 703:1 704:1 705:1 706:1 707:1 708:1 709:1 710:1 711:1 712:1 713:1 714:1 715:1 716:1 717:1 718:1 719:1 720:1 721:1 722:1 723:1 724:1 725:1 726:1 727:1 728:1 729:1 730:1 731:1 732:1 733:1 734:1 735:1 736:1 737:1 738:1 739:1 740:1 741:1 742:1 743:1 744:1 745:1 746:1 747:1 748:1 749:1 750:1 751:1 752:1 753:1 754:1 755:1 756:1 757:1 758:1 759:1 760:1 761:1 762:1 763:1 764:1 765:1 766:1 767:1 768:1 769:1 770:1 771:1 772:1 773:1 774:1 775:1 776:1 777:1 778:1 779:1 780:1 781:1 782:1 783:1 784:1 785:1 786:1 787:1 content_ok 364
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:728 mcast:0 other:0
+truncated 364
+icmp_partial 0
+lenby 1:424-787
+lenby 364:60
+pcapwin end rc 0
+dmesgwin 1.2 prev W-1a-H.log window_end 675406
+window 675406 675762
+window_end 675762
+lines 8 first_t 1436.205 last_t 1441.731
+bug_preempt 0
+usbnet_xmit 0
+vhci_unlink 4
+urb_104 4
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 0
+follower 1

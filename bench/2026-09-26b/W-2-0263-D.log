@@ -1,0 +1,14 @@
+brdelta 1.2 W-2-0063-R.log -> W-2-0263-R.log
+resolve prev W-2-0063-R.log 1 of 2
+resolve cur W-2-0263-R.log 1 of 2
+board n_tx d 2 n_recov_fire d 0 n_tx_stop d 0 n_rx d 0 nd_up 0 tx_stopped 1
+cpu crc d 2 jab d 1 frag d 0 drop d 0 dropev d 0 b64 d 0 b65 d 0 b128 d 0 b256 d 1 b512 d 0 b1024 d 0
+p3 out d 1 rx d 0 rxbytes d 0
+ident o d 1 cjfd d 1 k 0
+buckets legal d 1 cjf d 1 lt64 d 0
+host rx d 1 tx d 0 inechoreps d 0 outechos d 0
+path p3 rx d 0 host outechos d 0 covered none
+hbound inner d 1 outer d 1 o d 1 within yes
+snmp ip inrecv d 0 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 0 outreq d 0 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 1
+leak cpu 2 p3 1 host 1

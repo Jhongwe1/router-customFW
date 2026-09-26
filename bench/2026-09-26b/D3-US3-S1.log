@@ -1,0 +1,63 @@
+cat /proc/net/snmp /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/us
+3.log
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 343507 0 0 0 0 0 343507 318181 107 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 2225 0 0 0 0 0 0 2225 0 0 0 0 0 2225 0 0 0 0 0 0 0 2225 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 2225 2225
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 18 0 3 0 183951 156043 1 0 6
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 32157 0 124985 159912 124985 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+cpu  2508 0 18485 110067 0 0 18971 0 0
+cpu0 2508 0 18485 110067 0 0 18971 0 0
+intr 1627849 0 0 0 0 0 0 0 0 753101 0 0 0 569153 155599 0 0 0 0 0 0 0 0 0 0 0 149997 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 42969
+btime 0
+processes 408
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 55694
+[  6] local 10.1.1.3 port 5201 connected to 10.1.1.2 port 33669
+[ ID] Interval           Transfer     Bandwidth       Total Datagrams
+[  6]   0.00-1.00   sec  2.16 MBytes  18144 Kbits/sec  1620  
+[  6]   1.00-2.00   sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]   2.00-3.00   sec  2.44 MBytes  20496 Kbits/sec  1830  
+[  6]   3.00-4.00   sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]   4.00-5.00   sec  2.40 MBytes  20104 Kbits/sec  1795  
+[  6]   5.00-6.00   sec  2.23 MBytes  18682 Kbits/sec  1668  
+[  6]   6.00-7.00   sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]   7.00-8.00   sec  2.45 MBytes  20530 Kbits/sec  1833  
+[  6]   8.00-9.00   sec  2.20 MBytes  18458 Kbits/sec  1648  
+[  6]   9.00-10.00  sec  2.45 MBytes  20530 Kbits/sec  1833  
+[  6]  10.00-11.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  11.00-12.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  12.00-13.00  sec  2.30 MBytes  19286 Kbits/sec  1722  
+[  6]  13.00-14.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  14.00-15.01  sec  2.27 MBytes  18874 Kbits/sec  1702  
+[  6]  15.01-16.00  sec  2.42 MBytes  20533 Kbits/sec  1815  
+[  6]  16.00-17.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  17.00-18.00  sec  2.45 MBytes  20530 Kbits/sec  1833  
+[  6]  18.00-19.00  sec  2.20 MBytes  18458 Kbits/sec  1648  
+[  6]  19.00-20.00  sec  2.45 MBytes  20530 Kbits/sec  1833  
+[  6]  20.00-21.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  21.00-22.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  22.00-23.00  sec  2.28 MBytes  19096 Kbits/sec  1705  
+[  6]  23.00-24.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  24.00-25.00  sec  2.35 MBytes  19701 Kbits/sec  1759  
+[  6]  25.00-26.00  sec  2.45 MBytes  20530 Kbits/sec  1833  
+[  6]  26.00-27.00  sec  2.28 MBytes  19085 Kbits/sec  1704  
+[  6]  27.00-28.00  sec  2.45 MBytes  20530 Kbits/sec  1833  
+[  6]  28.00-29.00  sec  2.45 MBytes  20518 Kbits/sec  1832  
+[  6]  29.00-29.86  sec  2.05 MBytes  19978 Kbits/sec  1534  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-29.86  sec  71.2 MBytes  19992 Kbits/sec  0.000 ms  0/53300 (0%)  
+# 

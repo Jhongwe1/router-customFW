@@ -1,0 +1,38 @@
+iperflog 1.0 parse: bench/2026-09-26b/D3-TR3-S1.log -- 64 lines, 1 trial(s)
+trial 1  lines 27-64  tcp  board receives  stream [  6] 10.1.1.3:5201 <- 10.1.1.2:48674 (line 28)
+   line  row      interval      transfer      bandwidth         jitter     lost/total   status
+     30  interval   0.00-1.01   1.28 MBytes   10598 Kbits/sec   -          -            kept
+     31  interval   1.01-2.01   1.49 MBytes   12464 Kbits/sec   -          -            kept
+     32  interval   2.01-3.00   1.62 MBytes   13737 Kbits/sec   -          -            kept
+     33  interval   3.00-4.01   2.02 MBytes   16814 Kbits/sec   -          -            kept
+     34  interval   4.01-5.03   1.56 MBytes   12833 Kbits/sec   -          -            kept
+     35  interval   5.03-6.00   1.97 MBytes   17045 Kbits/sec   -          -            kept
+     36  interval   6.00-7.01   1.90 MBytes   15756 Kbits/sec   -          -            kept
+     37  interval   7.01-8.01   1.87 MBytes   15719 Kbits/sec   -          -            kept
+     38  interval   8.01-9.00   1.84 MBytes   15633 Kbits/sec   -          -            kept
+     39  interval   9.00-10.01  1.17 MBytes   9737 Kbits/sec    -          -            kept
+     40  interval  10.01-11.01  146 KBytes    1193 Kbits/sec    -          -            kept
+     41  interval  11.01-12.00  93.3 KBytes   772 Kbits/sec     -          -            kept
+     42  interval  12.00-13.01  527 KBytes    4278 Kbits/sec    -          -            kept
+     43  interval  13.01-14.01  1.07 MBytes   9012 Kbits/sec    -          -            kept
+     44  interval  14.01-15.00  1.92 MBytes   16241 Kbits/sec   -          -            kept
+     45  interval  15.00-16.02  1.52 MBytes   12470 Kbits/sec   -          -            kept
+     46  interval  16.02-17.00  1.19 MBytes   10225 Kbits/sec   -          -            kept
+     47  interval  17.00-18.00  1.15 MBytes   9638 Kbits/sec    -          -            kept
+     48  interval  18.00-19.01  1.27 MBytes   10575 Kbits/sec   -          -            kept
+     49  interval  19.01-20.00  1.13 MBytes   9595 Kbits/sec    -          -            kept
+     50  interval  20.00-21.01  923 KBytes    7489 Kbits/sec    -          -            kept
+     51  interval  21.01-22.01  1.61 MBytes   13507 Kbits/sec   -          -            kept
+     52  interval  22.01-23.00  1.44 MBytes   12204 Kbits/sec   -          -            kept
+     53  interval  23.00-24.00  1.54 MBytes   12951 Kbits/sec   -          -            kept
+     54  interval  24.00-25.01  1.61 MBytes   13411 Kbits/sec   -          -            kept
+     55  interval  25.01-26.01  1.48 MBytes   12450 Kbits/sec   -          -            kept
+     56  interval  26.01-27.01  1.61 MBytes   13530 Kbits/sec   -          -            kept
+     57  interval  27.01-28.02  1.67 MBytes   13881 Kbits/sec   -          -            kept
+     58  interval  28.02-29.01  1.80 MBytes   15223 Kbits/sec   -          -            kept
+     59  interval  29.01-29.93  1.36 MBytes   12437 Kbits/sec   -          -            kept
+     62  summary    0.00-29.93  0.00 Bytes    0.00 Kbits/sec    -          -            TEST_END sender
+     63  summary    0.00-29.93  41.8 MBytes   11707 Kbits/sec   -          -            TEST_END receiver: used
+                  TEST_END: not re-printed by a terminate path
+  FIGURE trial=1 proto=tcp source=TEST_END lines=63 rate="11707 Kbits/sec" rate_bps=11707000+/-500 end_s=29.93+/-0.005 transfer="41.8 MBytes" bytes=[43789627,43808002] rounding=the rate column is the figure, printed in steps of 1 Kbits/sec; the transfer column (steps of 0.1 MBytes, 1024-based) is checked, not used
+RESULT: every trial has a TEST_END figure

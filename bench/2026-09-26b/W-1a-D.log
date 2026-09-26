@@ -1,0 +1,14 @@
+brdelta 1.2 LB-V-R.log -> W-1a-R.log
+resolve prev LB-V-R.log 1 of 2
+resolve cur W-1a-R.log 1 of 2
+board n_tx d 728 n_recov_fire d 0 n_tx_stop d 0 n_rx d 0 nd_up 0 tx_stopped 1
+cpu crc d 728 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 365 b65 d 63 b128 d 128 b256 d 172 b512 d 0 b1024 d 0
+p3 out d 728 rx d 0 rxbytes d 0
+ident o d 728 cjfd d 728 k 0
+buckets legal d 728 cjf d 728 lt64 d 0
+host rx d 728 tx d 0 inechoreps d 0 outechos d 0
+path p3 rx d 0 host outechos d 0 covered none
+hbound inner d 728 outer d 728 o d 728 within yes
+snmp ip inrecv d 0 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 0 outreq d 0 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 728 p3 728 host 728

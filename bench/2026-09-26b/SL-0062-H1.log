@@ -1,0 +1,93 @@
+/sys/class/net/enxfc19286184c9/statistics/collisions:0
+/sys/class/net/enxfc19286184c9/statistics/multicast:0
+/sys/class/net/enxfc19286184c9/statistics/rx_bytes:471095
+/sys/class/net/enxfc19286184c9/statistics/rx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/rx_crc_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/rx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_frame_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_length_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_missed_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_nohandler:0
+/sys/class/net/enxfc19286184c9/statistics/rx_over_errors:0
+/sys/class/net/enxfc19286184c9/statistics/rx_packets:3016
+/sys/class/net/enxfc19286184c9/statistics/tx_aborted_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_bytes:2291426
+/sys/class/net/enxfc19286184c9/statistics/tx_carrier_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_compressed:0
+/sys/class/net/enxfc19286184c9/statistics/tx_dropped:0
+/sys/class/net/enxfc19286184c9/statistics/tx_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_fifo_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_heartbeat_errors:0
+/sys/class/net/enxfc19286184c9/statistics/tx_packets:4083
+/sys/class/net/enxfc19286184c9/statistics/tx_window_errors:0
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates OutTransmits
+Ip: 2 64 413422 0 0 0 0 0 413406 413695 0 0 0 0 0 0 0 0 0 413695
+Icmp: InMsgs InErrors InCsumErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutRateLimitGlobal OutRateLimitHost OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 707 0 0 0 0 0 0 0 0 707 0 0 0 0 1786 0 0 0 0 0 0 0 0 1786 0 0 0 0 0
+IcmpMsg: InType0 OutType8
+IcmpMsg: 707 1786
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts InCsumErrors
+Tcp: 1 200 120000 -1 5 0 0 0 2 410387 410194 2 0 0 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+Udp: 2306 0 0 2306 0 0 0 6 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+UdpLite: 0 0 0 0 0 0 0 0 0
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    RX:  bytes packets errors dropped  missed   mcast           
+        471095    3016      0       0       0       0 
+    RX errors:  length    crc   frame    fifo overrun otherhost
+                     0      0       0       0       0        19 
+    TX:  bytes packets errors dropped carrier collsns           
+       2291426    4083      0       0       0       0 
+    TX errors: aborted   fifo  window heartbt transns
+                     0      0       0       0       4 
+REACHABLE
+pcapwin 1.3
+pcap WE.pcap records 747 partial_tail_bytes 0
+capture_live yes
+tcpdump_procs 1
+prev SL-0062-H0.log window_end 740
+window 740 747
+window_end 747
+frames 7
+len 60:1 62:6
+ethertype 0800:6 0806:1
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 6 tagged 0 len 62:6 ipcsum_ok 6 icmpcsum_ok 6 excess 0:6
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 1 tagged 0 len 60:1
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:6
+echo_ids 1
+echo_seq 1 1,4,7,13,15,18
+echo_first 1 seq 1 b10 6
+echo_dup 0
+echo_vid -
+dst host:7 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+lenby 1:60
+lenby 6:62
+pcapwin end rc 0
+dmesgwin 1.2 prev SL-0062-H0.log window_end 413898
+window 413898 422950
+window_end 422950
+lines 184 first_t 985.881 last_t 992.263
+bug_preempt 9
+usbnet_xmit 9
+vhci_unlink 2
+urb_104 2
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 9
+follower 1

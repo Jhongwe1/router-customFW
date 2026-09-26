@@ -1,0 +1,5 @@
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 18(46) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 0.901/1.680/3.550/0.771 ms

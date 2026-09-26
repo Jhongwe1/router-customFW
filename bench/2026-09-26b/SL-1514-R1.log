@@ -1,0 +1,375 @@
+sleep 2 ; cat /proc/rtl819x-nic /proc/net/snmp /proc/net/arp /proc/rtl865x/asi
+cCounter /proc/rtl819x-nic
+version rtl819<Port: 0>
+xRx counters
+-   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+n   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+i   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+c   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+    256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+1   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+.Output counters
+5   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+u<Port: 1>
+nRx counters
+l   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+o   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+c   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+k   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+e   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+d   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+ Output counters
+1   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+a<Port: 2>
+lRx counters
+l   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+o   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+c   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+a   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+t   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+e   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+dOutput counters
+    Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+1   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+
+<Port: 3>
+aRx counters
+r   Rcv 1318632 bytes, Drop 0 pkts,etherStatsDropEvents 0
+m   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+e   Unicast 2199 pkts, Multicast 1 pkts, Broadcast 25 pkts
+d   < 64: 0 pkts, 64: 255 pkts, 65 -127: 653 pkts, 128 -255: 0 pkts
+    256 - 511: 594 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 723 pkts
+1   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+
+   Snd 597229 bytes, Unicast 1076 pkts, Multicast 0 pkts
+e   Broadcast 2 pkts, Late collision 0, Deferred transmission 0 
+n   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+g<Port: 4>
+iRx counters
+n   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+e   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+_   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+o   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+n   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+    oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+1Output counters
+   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+i   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+r<Port: 5>
+qRx counters
+_   Rcv 0 bytes, Drop 0 pkts,etherStatsDropEvents 0
+t   CRCAlignErr 0, SymbolErr 0, FragErr 0, JabberErr 0
+a   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+k   < 64: 0 pkts, 64: 0 pkts, 65 -127: 0 pkts, 128 -255: 0 pkts
+e   256 - 511: 0 pkts, 512 - 1023: 0 pkts, 1024 - 1518: 0 pkts
+n   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+ Output counters
+1   Snd 0 bytes, Unicast 0 pkts, Multicast 0 pkts
+   Broadcast 0 pkts, Late collision 0, Deferred transmission 0 
+
+   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+i<CPU port (extension port included)>
+rRx counters
+q   Rcv 0 bytes, Drop 54 pkts,etherStatsDropEvents 39
+_   CRCAlignErr 2029, SymbolErr 0, FragErr 2, JabberErr 899
+r   Unicast 0 pkts, Multicast 0 pkts, Broadcast 0 pkts
+c   < 64: 0 pkts, 64: 253 pkts, 65 -127: 251 pkts, 128 -255: 0 pkts
+    256 - 511: 290 pkts, 512 - 1023: 5 pkts, 1024 - 1518: 329 pkts
+0   oversize: 0 pkts, Control unknown 0 pkts, Pause 0 pkts
+Output counters
+
+   Snd 1318632 bytes, Unicast 2199 pkts, Multicast 1 pkts
+n   Broadcast 25 pkts, Late collision 0, Deferred transmission 0 
+_   Collisions 0 Single collision 0 Multiple collision 0 pause 0
+r<Whole system counters>
+e   CpuEvent 0 pkts
+ads 6363
+n_writes 526
+n_refused 0
+n_irq 4319
+n_irq_spurious 0
+n_tx 2091
+n_rx 2225
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00003206
+seen_iisr 0000320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 2225
+n_napi_complete 2225
+n_xmit 2091
+n_xmit_busy 7
+tx_mode 0
+n_tx_full 7
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/2098/0
+n_skb_fail 0
+n_tx_stop 7
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 2225/1309732 tx 2091/1228746 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15C8008
+rmdcr0_pos A15C8028
+tpdcr0_pos A15C8048
+tpdcr1_pos 00000000
+tpdcr2_pos 00000000
+tpdcr3_pos 00000000
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 7
+n_recov_fire 7
+n_recov_spurious 0
+n_recov_ok 7
+n_recov_fail 0
+n_recov_wake 7
+recov_rc 0 0 0
+recov_j_arm 4294956112
+recov_j_fire 4294956212
+ph_follow 1
+n_ph_chk 2225
+n_ph_diff 0
+n_ph_bad 0
+n_ph_used 0
+ph_first_w0 00000000
+ph_first_exp 00000000
+ph_first_nrx 0
+ph_agree 2225
+ph_last A15C8128
+ph_last_j 1
+ph_last_bf 00000000
+ph_last_cls 0
+tx_rings 1
+n_et_link 0
+et_link_last FFFFFFFF
+ph_test_cls -1
+ph_test_j 0
+ph_test_seen 0
+j_now 33790
+n_dsync_chk 2225
+n_dsync 0
+dsync_last_d 0
+dsync_first_d 0
+dsync_first_rp 00000000
+dsync_first_rm 00000000
+dsync_first_nrx 0
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A15C8000
+mb_ring A15C8020
+tx_ring A15C8040
+bufs A15C8290
+rx_ph A15C8050
+rx_mb A15C8110
+tx_ph A15C81D0
+tx_mb A15C8230
+idle_ring A15CE290
+rx_idx 2
+tx_idx 2
+rxd0 A15C8051 len 0 f 8063 pl 03
+rxd1 A15C8069 len 0 f 8063 pl 03
+rxd2 A15C8081 len 0 f 8063 pl 03
+rxd3 A15C8099 len 0 f 8063 pl 03
+rxd4 A15C80B1 len 0 f 8063 pl 03
+rxd5 A15C80C9 len 0 f 8063 pl 03
+rxd6 A15C80E1 len 0 f 8063 pl 03
+rxd7 A15C80FB len 0 f 8063 pl 03
+txd0 A15C81D0 len 1518
+txd1 A15C81E8 len 1518
+txd2 A15C8200 len 1518
+txd3 A15C821A len 1518
+mbd0 A15C8111 ph A15C8110 ml 0
+mbd1 A15C8129 ph A15C8128 ml 0
+mbd2 A15C8141 ph A15C8140 ml 0
+mbd3 A15C8159 ph A15C8158 ml 0
+mbd4 A15C8171 ph A15C8170 ml 0
+mbd5 A15C8189 ph A15C8188 ml 0
+mbd6 A15C81A1 ph A15C81A0 ml 0
+mbd7 A15C81BB ph A15C81B8 ml 0
+tx15 txlen rlxfw txoff 2 txrb 0 dirty 0 p15 1
+rx_len 0
+rx_ph1 05EE0411
+rx_ph3 80630003
+rx_ph4 00090000
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 2169 0 0 0 0 0 2169 2169 107 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 2169 0 0 0 0 0 0 2169 0 0 0 0 0 2169 0 0 0 0 0 0 0 2169 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 2169 2169
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 0 0 0 0 0 0 0 0 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 0 0 0 0 0 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+IP address       HW type     Flags       HW address            Mask     Device
+10.1.1.2         0x1         0x2         fc:19:28:61:84:c9     *        rlx0
+version rtl819x-nic 1.5
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 6381
+n_writes 526
+n_refused 0
+n_irq 4319
+n_irq_spurious 0
+n_tx 2091
+n_rx 2225
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00003206
+seen_iisr 0000320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 2225
+n_napi_complete 2225
+n_xmit 2091
+n_xmit_busy 7
+tx_mode 0
+n_tx_full 7
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/2098/0
+n_skb_fail 0
+n_tx_stop 7
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 2225/1309732 tx 2091/1228746 drop 0/0
+boot_icr 00000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 00000000
+boot_rmdcr0 00000000
+boot_tpdcr0 00000000
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A15C8008
+rmdcr0_pos A15C8028
+tpdcr0_pos A15C8048
+tpdcr1_pos 00000000
+tpdcr2_pos 00000000
+tpdcr3_pos 00000000
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 7
+n_recov_fire 7
+n_recov_spurious 0
+n_recov_ok 7
+n_recov_fail 0
+n_recov_wake 7
+recov_rc 0 0 0
+recov_j_arm 4294956112
+recov_j_fire 4294956212
+ph_follow 1
+n_ph_chk 2225
+n_ph_diff 0
+n_ph_bad 0
+n_ph_used 0
+ph_first_w0 00000000
+ph_first_exp 00000000
+ph_first_nrx 0
+ph_agree 2225
+ph_last A15C8128
+ph_last_j 1
+ph_last_bf 00000000
+ph_last_cls 0
+tx_rings 1
+n_et_link 0
+et_link_last FFFFFFFF
+ph_test_cls -1
+ph_test_j 0
+ph_test_seen 0
+j_now 33797
+n_dsync_chk 2225
+n_dsync 0
+dsync_last_d 0
+dsync_first_d 0
+dsync_first_rp 00000000
+dsync_first_rm 00000000
+dsync_first_nrx 0
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A15C8000
+mb_ring A15C8020
+tx_ring A15C8040
+bufs A15C8290
+rx_ph A15C8050
+rx_mb A15C8110
+tx_ph A15C81D0
+tx_mb A15C8230
+idle_ring A15CE290
+rx_idx 2
+tx_idx 2
+rxd0 A15C8051 len 0 f 8063 pl 03
+rxd1 A15C8069 len 0 f 8063 pl 03
+rxd2 A15C8081 len 0 f 8063 pl 03
+rxd3 A15C8099 len 0 f 8063 pl 03
+rxd4 A15C80B1 len 0 f 8063 pl 03
+rxd5 A15C80C9 len 0 f 8063 pl 03
+rxd6 A15C80E1 len 0 f 8063 pl 03
+rxd7 A15C80FB len 0 f 8063 pl 03
+txd0 A15C81D0 len 1518
+txd1 A15C81E8 len 1518
+txd2 A15C8200 len 1518
+txd3 A15C821A len 1518
+mbd0 A15C8111 ph A15C8110 ml 0
+mbd1 A15C8129 ph A15C8128 ml 0
+mbd2 A15C8141 ph A15C8140 ml 0
+mbd3 A15C8159 ph A15C8158 ml 0
+mbd4 A15C8171 ph A15C8170 ml 0
+mbd5 A15C8189 ph A15C8188 ml 0
+mbd6 A15C81A1 ph A15C81A0 ml 0
+mbd7 A15C81BB ph A15C81B8 ml 0
+tx15 txlen rlxfw txoff 2 txrb 0 dirty 0 p15 1
+rx_len 0
+rx_ph1 05EE0411
+rx_ph3 80630003
+rx_ph4 00090000
+# 

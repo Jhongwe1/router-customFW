@@ -1,0 +1,64 @@
+cat /proc/net/snmp /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/tr
+3.log
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 113407 0 0 0 0 0 113407 5931 107 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 2189 0 0 0 0 0 0 2189 0 0 0 0 0 2189 0 0 0 0 0 0 0 2189 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 2189 2189
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 6 0 3 0 111218 3742 0 0 6
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 0 0 0 0 0 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+cpu  131 0 10051 89680 0 0 5845 0 0
+cpu0 131 0 10051 89680 0 0 5845 0 0
+intr 900562 0 0 0 0 0 0 0 0 631903 0 0 0 52337 110650 0 0 0 0 0 0 0 0 0 0 0 105673 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 30632
+btime 0
+processes 318
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 48662
+[  6] local 10.1.1.3 port 5201 connected to 10.1.1.2 port 48674
+[ ID] Interval           Transfer     Bandwidth
+[  6]   0.00-1.01   sec  1.28 MBytes  10598 Kbits/sec                  
+[  6]   1.01-2.01   sec  1.49 MBytes  12464 Kbits/sec                  
+[  6]   2.01-3.00   sec  1.62 MBytes  13737 Kbits/sec                  
+[  6]   3.00-4.01   sec  2.02 MBytes  16814 Kbits/sec                  
+[  6]   4.01-5.03   sec  1.56 MBytes  12833 Kbits/sec                  
+[  6]   5.03-6.00   sec  1.97 MBytes  17045 Kbits/sec                  
+[  6]   6.00-7.01   sec  1.90 MBytes  15756 Kbits/sec                  
+[  6]   7.01-8.01   sec  1.87 MBytes  15719 Kbits/sec                  
+[  6]   8.01-9.00   sec  1.84 MBytes  15633 Kbits/sec                  
+[  6]   9.00-10.01  sec  1.17 MBytes  9737 Kbits/sec                  
+[  6]  10.01-11.01  sec   146 KBytes  1193 Kbits/sec                  
+[  6]  11.01-12.00  sec  93.3 KBytes   772 Kbits/sec                  
+[  6]  12.00-13.01  sec   527 KBytes  4278 Kbits/sec                  
+[  6]  13.01-14.01  sec  1.07 MBytes  9012 Kbits/sec                  
+[  6]  14.01-15.00  sec  1.92 MBytes  16241 Kbits/sec                  
+[  6]  15.00-16.02  sec  1.52 MBytes  12470 Kbits/sec                  
+[  6]  16.02-17.00  sec  1.19 MBytes  10225 Kbits/sec                  
+[  6]  17.00-18.00  sec  1.15 MBytes  9638 Kbits/sec                  
+[  6]  18.00-19.01  sec  1.27 MBytes  10575 Kbits/sec                  
+[  6]  19.01-20.00  sec  1.13 MBytes  9595 Kbits/sec                  
+[  6]  20.00-21.01  sec   923 KBytes  7489 Kbits/sec                  
+[  6]  21.01-22.01  sec  1.61 MBytes  13507 Kbits/sec                  
+[  6]  22.01-23.00  sec  1.44 MBytes  12204 Kbits/sec                  
+[  6]  23.00-24.00  sec  1.54 MBytes  12951 Kbits/sec                  
+[  6]  24.00-25.01  sec  1.61 MBytes  13411 Kbits/sec                  
+[  6]  25.01-26.01  sec  1.48 MBytes  12450 Kbits/sec                  
+[  6]  26.01-27.01  sec  1.61 MBytes  13530 Kbits/sec                  
+[  6]  27.01-28.02  sec  1.67 MBytes  13881 Kbits/sec                  
+[  6]  28.02-29.01  sec  1.80 MBytes  15223 Kbits/sec                  
+[  6]  29.01-29.93  sec  1.36 MBytes  12437 Kbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth
+[  6]   0.00-29.93  sec  0.00 Bytes  0.00 Kbits/sec                  sender
+[  6]   0.00-29.93  sec  41.8 MBytes  11707 Kbits/sec                  receiver
+# 

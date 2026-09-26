@@ -1,0 +1,6 @@
+ifconfig rlx0 down ; echo txlen rlxfw > /proc/rtl819x-nic ; echo irqon > /proc
+/rtl819x-nic
+RLXFW-N-ENGOFF
+RLXFW-N-NDSTOP
+RLXFW-N-IRQON
+# 

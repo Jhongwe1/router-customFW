@@ -1,0 +1,28 @@
+0
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 18(46) bytes of data.
+26 bytes from 10.1.1.3: icmp_seq=1 ttl=64 time=73.1 ms
+26 bytes from 10.1.1.3: icmp_seq=2 ttl=64 time=5.17 ms
+26 bytes from 10.1.1.3: icmp_seq=3 ttl=64 time=1.70 ms
+26 bytes from 10.1.1.3: icmp_seq=4 ttl=64 time=1.47 ms
+
+--- 10.1.1.3 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 778ms
+rtt min/avg/max/mdev = 1.474/20.371/73.136/30.499 ms
+dmesgwin 1.2 prev SF-1511-H1.log window_end 564048
+prev_list 2 candidates, used 2
+window 564048 569400
+window_end 569400
+lines 109 first_t 1181.699 last_t 1186.652
+bug_preempt 5
+usbnet_xmit 5
+vhci_unlink 4
+urb_104 4
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 5
+follower 1

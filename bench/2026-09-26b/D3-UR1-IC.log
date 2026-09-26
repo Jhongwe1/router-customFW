@@ -1,0 +1,9 @@
+iperflog 1.0 compare
+  board: bench/2026-09-26b/D3-UR1-S1.log trial 1, TEST_END line 62: [  6]   0.00-29.91  sec  0.00 Bytes  0.00 Kbits/sec  0.769 ms  42466/53188 (80%)
+  host:  bench/2026-09-26b/D3-UR1.log line 36: [  4]   0.00-30.00  sec  71.2 MBytes  19.9 Mbits/sec  0.769 ms  42466/53188 (80%)
+  stream: board 10.1.1.3:5201 <- 10.1.1.2:60595 (line 28) is host 10.1.1.2:60595 -> 10.1.1.3:5201 (line 2)
+  lost/total: board 42466/53188, host 42466/53188: equal, as the integers the results exchange carried must be
+  jitter: board 0.769 ms, host 0.769 ms: difference 0.000 ms, allowed 0.001 (double rounding)
+  (the host's rate, 19.9 Mbits/sec, is its own send rate and is not compared)
+  FIGURE trial=1 proto=udp source=TEST_END lines=62 received=10722 (=53188 total-42466 lost+0 out-of-order) datagram_B=1400 bytes=15010800 end_s=29.91+/-0.005 rate_bps=4014925 range=[4014254,4015596] rounding=exact integers; only the printed end time (+/-0.005 s)
+AGREE: the board log's figure is the host's within both lines' printed rounding

@@ -1,0 +1,14 @@
+brdelta 1.2 E-F1-R0.log -> E-F1-R1.log
+resolve prev E-F1-R0.log 1 of 2
+resolve cur E-F1-R1.log 1 of 2
+board n_tx d 221 n_recov_fire d 0 n_tx_stop d 0 n_rx d 221 nd_up 1 tx_stopped 0
+cpu crc d 221 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 21 b65 d 60 b128 d 0 b256 d 60 b512 d 0 b1024 d 80
+p3 out d 221 rx d 221 rxbytes d 143184
+ident o d 221 cjfd d 221 k 0
+buckets legal d 221 cjf d 221 lt64 d 0
+host rx d 220 tx d 220 inechoreps d 220 outechos d 220
+path p3 rx d 221 host outechos d 220 covered yes
+hbound inner d 220 outer d 221 o d 221 within yes
+snmp ip inrecv d 220 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 220 outreq d 220 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 221 p3 221 host 220

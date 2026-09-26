@@ -1,0 +1,14 @@
+brdelta 1.2 SL-1514-R0.log -> SL-1514-R1.log
+resolve prev SL-1514-R0.log 1 of 2
+resolve cur SL-1514-R1.log 1 of 2
+board n_tx d 21 n_recov_fire d 0 n_tx_stop d 0 n_rx d 21 nd_up 1 tx_stopped 0
+cpu crc d 21 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 1 b65 d 0 b128 d 0 b256 d 0 b512 d 0 b1024 d 20
+p3 out d 21 rx d 21 rxbytes d 30424
+ident o d 21 cjfd d 21 k 0
+buckets legal d 21 cjf d 21 lt64 d 0
+host rx d 20 tx d 20 inechoreps d 20 outechos d 20
+path p3 rx d 21 host outechos d 20 covered yes
+hbound inner d 20 outer d 21 o d 21 within yes
+snmp ip inrecv d 20 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 20 outreq d 20 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 21 p3 21 host 20

@@ -1,0 +1,37 @@
+iperflog 1.0 parse: bench/2026-09-26b/D3-UR2-S1.log -- 63 lines, 1 trial(s)
+trial 1  lines 27-63  udp  board receives  stream [  6] 10.1.1.3:5201 <- 10.1.1.2:58910 (line 28)
+   line  row      interval      transfer      bandwidth         jitter     lost/total   status
+     30  interval   0.00-1.07   488 KBytes    3737 Kbits/sec    18.701 ms  938/1295     kept
+     31  interval   1.07-2.07   558 KBytes    4570 Kbits/sec    8.098 ms   1282/1690    kept
+     32  interval   2.07-3.12   793 KBytes    6187 Kbits/sec    8.874 ms   1027/1607    kept
+     33  interval   3.12-4.14   645 KBytes    5183 Kbits/sec    11.837 ms  1172/1644    kept
+     34  interval   4.14-5.02   703 KBytes    6542 Kbits/sec    2.776 ms   1153/1667    kept
+     35  interval   5.02-6.01   990 KBytes    8191 Kbits/sec    0.681 ms   344/1068     kept
+     36  interval   6.01-7.20   427 KBytes    2936 Kbits/sec    19.792 ms  1323/1635    kept
+     37  interval   7.20-8.09   216 KBytes    1988 Kbits/sec    41.540 ms  1060/1218    kept
+     38  interval   8.09-9.11   462 KBytes    3711 Kbits/sec    1.627 ms   2532/2870    kept
+     39  interval   9.11-10.01  679 KBytes    6185 Kbits/sec    0.295 ms   1232/1729    kept
+     40  interval  10.01-11.10  390 KBytes    2928 Kbits/sec    5.329 ms   1155/1440    kept
+     41  interval  11.10-12.00  304 KBytes    2763 Kbits/sec    9.752 ms   1455/1677    kept
+     42  interval  12.00-13.00  740 KBytes    6059 Kbits/sec    5.327 ms   1230/1771    kept
+     43  interval  13.00-14.02  878 KBytes    7049 Kbits/sec    3.045 ms   1037/1679    kept
+     44  interval  14.02-15.02  919 KBytes    7526 Kbits/sec    6.981 ms   563/1235     kept
+     45  interval  15.02-16.00  621 KBytes    5189 Kbits/sec    5.654 ms   1244/1698    kept
+     46  interval  16.00-17.00  913 KBytes    7482 Kbits/sec    2.739 ms   564/1232     kept
+     47  interval  17.00-18.00  859 KBytes    7034 Kbits/sec    3.882 ms   1136/1764    kept
+     48  interval  18.00-19.07  1006 KBytes   7704 Kbits/sec    6.356 ms   288/1024     kept
+     49  interval  19.07-20.06  1.21 MBytes   10216 Kbits/sec   5.973 ms   463/1366     kept
+     50  interval  20.06-21.04  533 KBytes    4457 Kbits/sec    7.212 ms   918/1308     kept
+     51  interval  21.04-22.01  562 KBytes    4746 Kbits/sec    0.510 ms   1268/1679    kept
+     52  interval  22.01-23.01  792 KBytes    6485 Kbits/sec    4.533 ms   564/1143     kept
+     53  interval  23.01-25.21  373 KBytes    1390 Kbits/sec    78.275 ms  1532/1805    kept
+     54  interval  25.21-25.21  0.00 Bytes    nan Kbits/sec     78.275 ms  0/0          kept
+     55  interval  25.21-26.58  499 KBytes    2984 Kbits/sec    50.851 ms  3761/4126    kept
+     56  interval  26.58-29.36  86.1 KBytes   254 Kbits/sec     121.981 ms 1923/1986    kept
+     57  interval  29.36-29.36  0.00 Bytes    nan Kbits/sec     121.981 ms 0/0          kept
+     58  interval  29.36-29.36  0.00 Bytes    nan Kbits/sec     121.981 ms 0/0          kept
+     59  interval  29.36-29.65  253 KBytes    7145 Kbits/sec    0.372 ms   6827/7012    kept
+     62  summary    0.00-29.65  0.00 Bytes    0.00 Kbits/sec    0.372 ms   37991/50368  TEST_END: used (lost/total; its transfer and bandwidth are bytes the server SENT)
+                  TEST_END: not re-printed by a terminate path
+  FIGURE trial=1 proto=udp source=TEST_END lines=62 received=12377 (=50368 total-37991 lost+0 out-of-order) datagram_B=1400 bytes=17327800 end_s=29.65+/-0.005 rate_bps=4675292 range=[4674503,4676080] rounding=exact integers; only the printed end time (+/-0.005 s)
+RESULT: every trial has a TEST_END figure

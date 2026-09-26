@@ -1,0 +1,37 @@
+iperf3 -s -1 -f k --logfile /tmp/lur1.log > /dev/null 2>&1 & sleep 2 ; ps ; ca
+t /proc/net/snmp /proc/stat
+  PID USER       VSZ STAT COMMAND
+    1 0          832 R    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+  420 0          332 S    iperf3 -s -1 -f k --logfile /tmp/lur1.log 
+  422 0          816 R    ps 
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 343515 0 0 0 0 0 343515 318189 107 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 2233 0 0 0 0 0 0 2233 0 0 0 0 0 2233 0 0 0 0 0 0 0 2233 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 2233 2233
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 18 0 3 0 183951 156043 1 0 6
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 32157 0 124985 159912 124985 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+cpu  2510 0 18515 112650 0 0 18972 0 0
+cpu0 2510 0 18515 112650 0 0 18972 0 0
+intr 1653624 0 0 0 0 0 0 0 0 773483 0 0 0 569175 158354 0 0 0 0 0 0 0 0 0 0 0 152613 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 43641
+btime 0
+processes 423
+procs_running 2
+procs_blocked 0
+# 

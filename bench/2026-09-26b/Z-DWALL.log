@@ -1,0 +1,17 @@
+dmesgwin 1.2 prev none
+window 0 1464733
+window_end 1464733
+lines 29686 first_t 0.000 last_t 2704.507
+bug_preempt 1350
+usbnet_xmit 1350
+vhci_unlink 1027
+urb_104 1027
+usb_disc 1
+cp210x 4
+ttyusb 1
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 1350
+follower 1

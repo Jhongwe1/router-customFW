@@ -1,0 +1,16 @@
+brdelta 1.2 D3-UR2-R.log -> D3-UR3-R.log
+resolve prev D3-UR2-R.log 3 of 4
+resolve cur D3-UR3-R.log 1 of 2
+resolve host_prev D3-UR2-H.log 2 of 2
+resolve pre_prev D3-UR2-P.log 2 of 2
+board n_tx d 19 n_recov_fire d 0 n_tx_stop d 0 n_rx d 53526 nd_up 1 tx_stopped 0
+cpu crc d 19 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 6 b65 d 12 b128 d 0 b256 d 1 b512 d 0 b1024 d 0
+p3 out d 19 rx d 53526 rxbytes d 77367268
+ident o d 19 cjfd d 19 k 0
+buckets legal d 19 cjf d 19 lt64 d 0
+host rx d 19 tx d 53526 inechoreps d 4 outechos d 4
+path p3 rx d 53526 host outechos d 4 covered yes
+hbound inner d 19 outer d 19 o d 19 within yes
+snmp ip inrecv d 53525 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 53525 outreq d 18 outdisc d 0 | udp indg d 9053 noports d 0 inerr d 44388 outdg d 1 rcvbuf d 44388 sndbuf d 0
+fault jfd 0
+leak cpu 19 p3 19 host 19
