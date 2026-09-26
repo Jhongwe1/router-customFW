@@ -390,8 +390,8 @@ verdict is a measurement and not a confirmation — say so in the cell.
 | **E12c/E12d** 🆕 | `PHYR 1 1` -> `78ED` (linked); `PHYR 0 1` -> `78C9` (unlinked) | **`E12`'s pair reproduced exactly, on different physical ports.** `XOR = 0x24` -- bits 5 (Autoneg Complete) and 2 (Link Status) **and nothing else**. Two power cycles, two port pairs, same two bits: `BMSR`'s link half is not port-specific and not a one-off |
 | **E12e** 🆕 | `PHYR 0 5`, an **unlinked** port -> `UID=0x00000001` | 🆕 **`ANLPAR` is per-port, and an unlinked port's is cleared rather than stale.** `0x0001` is the 802.3 selector alone, every ability bit clear. **Different from `E12b`'s value read seconds earlier, which is the control**: one register shared across ports would have voided `E12b` entirely. No source predicted this and seating 1 never read it |
 | | 🆕 *(these four are also `F1`'s positive control)* | the MDIO controller completed transactions on addresses 0 and 1 over four registers seconds before `§F` would run, so **a hang at `PHYR 5 2` would be attributable to address 5 alone** and not to the controller, the bus or the command. `F1`'s risk paragraph argues that from the register's role; this is the measured half |
-| F1 | | pending -- the one cell that can end a visit |
-| F2 | | pending |
+| F1 | | pending -- the one cell that can end a visit (🔄 2026-09-26: it ran 2026-08-24, `bench/2026-08-24c/F1`, `UID=0x00000000`, and the prompt returned — `SPEC.md` `NET-08`) |
+| F2 | | pending (🔄 2026-09-26: it ran 2026-08-24, `bench/2026-08-24c/F2`, 32 lines — `SPEC.md` `NET-24`, `NET-39`) |
 
 ---
 

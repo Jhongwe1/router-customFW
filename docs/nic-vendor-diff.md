@@ -557,7 +557,7 @@ turned a good cell into a wrong number before.
 ### What this seating does NOT do
 
 It does not add `txd ph2/ph3/ph4` to the dump and it does not set
-`-DRTL_DEBUG_NIC_SKB_BUFFER`. Both change `RECIPE_ID`, so they ride one image
+`-DRTL_DEBUG_NIC_SKB_BUFFER` (🔄 2026-09-26: it gates `nic_mbuf` alone, `notes/switch-driver.md` § 8.14). Both change `RECIPE_ID`, so they ride one image
 together, and that image is not this seating's — **a card that predicts a boot
 capture's byte count has to be written against the image that will actually
 boot.**
