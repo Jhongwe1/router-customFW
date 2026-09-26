@@ -3529,3 +3529,124 @@ at 1.4's settings", a card habit in the first version, is now the wire bound abo
   `nic15_engine_gate` in `nic_do_engine(1)` and in `ndo_open`; the `nic15_armed` call in
   `arm`; and `nic_do_tx` is a call now, where 1.4 inlined it.
 * Which mechanism, if any, a setting names. That is `R6b-3`'s, and every candidate is 推.
+
+## 24 `R6b-6` — the ethtool ops get a caller: `linkprobe`
+
+`nic_et_drvinfo`, `nic_et_get_link` and `nic_et_ringparam` have been in the
+driver since 1.3 (`2aae301`) and have never run: 量, all 217 committed NIC dumps
+read `n_et_link 0` and `et_link_last FFFFFFFF`. This image has no `ethtool`
+binary, and `config/image-commands.tsv`'s fifty busybox applets hold none that
+issues `SIOCETHTOOL`. **So `R6b-6` writes no ethtool code; it writes the caller.**
+Driver 1.5 is unchanged: its ops are right as written.
+
+### 24.1 What `linkprobe` is
+
+A static MIPS program, `config/rlxfw-user/linkprobe/linkprobe.c` (652 lines)
+and its `Makefile` (238), declared in `config/rlxfw-initramfs.tsv` as
+`/bin/linkprobe`; nothing execs it. It issues `ETHTOOL_GDRVINFO`, `GLINK` and
+`GRINGPARAM` through `SIOCETHTOOL` on an `AF_INET` datagram socket, and nothing
+else: the request table is a `const` with three `G*` entries, and
+`tools/linkprobecheck.py` refuses a source that names an `ETHTOOL_S*`.
+
+```
+linkprobe get <if>...                 1 to 8 interface names
+linkprobe watch <if> <ms> <s>         10 <= ms <= 10000, 1 <= s <= 600
+```
+
+The ABI, two sources each (讀; byte-identical between the staged kernel and the
+toolchain's userspace headers, which gate G6 re-checks on every build):
+`SIOCETHTOOL` `0x8946`; the three structs, 196, 8 and 36 bytes; `EOPNOTSUPP`
+**122** on this ABI (`arch/rlx/include/asm/errno.h:76`), not a PC's 95;
+`ENODEV` 19; `__NR_clock_gettime` 4263. The source asserts every size and
+offset it reads at compile time.
+
+### 24.2 The controls are in one invocation
+
+`linkprobe get rlx0 lo eth4 nosuch0` makes twelve calls, predicted (讀
+`net/core/ethtool.c`, `drivers/net/loopback.c`):
+
+```
+LP0 linkprobe 1 build 1bce836f2e21c43a
+LP drv rlx0 rc 0 driver "rtl819x-nic" version "rtl819x-nic 1.5" fw "" bus "platform" can 0
+LP link rlx0 rc 0 data 00000001 can 0          (cable in)
+LP ring rlx0 rc 0 rx 8/8 mini 0/0 jumbo 0/0 tx 4/4 can 0
+LP drv lo rc 122 can 192
+LP link lo rc 0 data 00000001 can 0            (loopback's always_on)
+LP ring lo rc 122 can 32
+LP drv eth4 rc 122 can 192                     (the vendor sets no ethtool_ops)
+LP link eth4 rc 122 can 4
+LP ring eth4 rc 122 can 32
+LP drv nosuch0 rc 19 can 192
+LP link nosuch0 rc 19 can 4
+LP ring nosuch0 rc 19 can 32
+LP9 calls 12 ok 4 refused 8 nowrite 0
+```
+
+* Before every call the whole buffer past `cmd` is filled with `0xA5`, and
+  `can` counts the bytes still equal to it after the call. A kernel that
+  returned 0 **without writing** prints `data A5A5A5A5 can 4`, never
+  `data 00000001`, and `LP9`'s `nowrite` counts it.
+* `lo` prints 1 through a driver that is not rlxfw's.
+* Gate G5: the linked ELF and the stripped binary hold the bytes `rtl819x`
+  zero times, so a driver name `linkprobe` prints came from the kernel.
+* On the board, one `rlx0` `GLINK` is the only call that reaches rlxfw's
+  `get_link`: `n_et_link` Δ = 1, `n_linkq` Δ = 1, `et_link_last` 1. The probe
+  counts twelve and the kernel one — two counters at different rates, so their
+  agreement on the `rlx0` share is evidence.
+
+`watch` prints `LPW start <if> v <x> rc <r>` after its first sample (running
+told from never started), one `LPW t <ms> i <n> v <x> rc <r>` per change, and
+`LPW end n … ms … ones … zeros … other … err … nowrite … trans …`, where the
+five classes sum to `n`. The clock is `CLOCK_MONOTONIC` through
+`syscall(4263)`. `n <= floor(s·1000/ms) + 1` is enforced by a schedule counter
+as well as by the clock, so a sleep that returned early could not raise it.
+讀 `.config`: `HZ` 100 and no `HIGH_RES_TIMERS`, so the achieved period is
+10–20 ms (推).
+
+### 24.3 What the desk measured (量 2026-09-26)
+
+* **Build**, `rsdk-1.3.6-4181-EB-2.6.30-0.9.30`, `-Os -static -fno-builtin`,
+  no `-march`, under `vendor-tripwire` (clean): 16,240 bytes stripped, sha256
+  `071c8f81…`, `build_id 1bce836f2e21c43a`; a second build from a clean stage
+  is byte-identical. G1 0 `break` in our object; G1b exactly 2 in the linked
+  ELF, both inside `__GI_abort`; G2 hazlint 0 violations in 658 loads; G4 the
+  link printed nothing; G5 0 `rtl819x` (the counter shown finding 1 in a
+  control file first); G6 13 items identical (the comparison shown calling
+  drvinfo and ringparam different first); G7 no `-march`, no `PT_INTERP`.
+* 🔴 **G7 as proposed was wrong, and the build said so.** The proposal asked
+  for `e_flags` equal to `uprobe`'s; `linkprobe` reads `0x1007`
+  (noreorder, pic, cpic, o32, mips1) and `uprobe` `0x1005`. The one bit is
+  `EF_MIPS_PIC`, and it follows from what is linked: `uprobe` and `ucost` link
+  a hand-written non-PIC `.S` (both `0x1005`, both with the link warning
+  "linking PIC files with non-PIC files"), while `linkprobe` and `iperf3` are C
+  only (both `0x1007`, no warning). G7 now masks bit 1 and requires every other
+  bit equal, and is shown refusing a changed arch field first; G4 requires an
+  empty link log rather than uprobe's one known warning.
+* **Host proof**, `tools/linkprobecheck.py`: 37 of 37 — K0–K13 (the fourteen
+  lines above with the fake's scripted kernel; the canary; refusals on both
+  sides of every bound with no call made; the watch's transitions, times and
+  both bounds; the source rules) and M0 plus M1–M22, each mutant killed by the
+  case it names, among them a fake that returns 0 without writing (K1 red), a
+  fake that answers 95 in place of 122 (K1 red) and a probe that prints its
+  data as a constant 1 (K3 red).
+* **qemu-mips-static 8.2.2 does not translate `SIOCETHTOOL`.** Every call on
+  `lo`, `eth0` and `nosuch0` returned 25 (`ENOTTY`), with the canary untouched
+  (`can 192`/`4`/`32`); the proposal's § 8 item 1 was this, as 推, and it is
+  now 量. So the kernel path is tested only on the board. The same qemu run
+  did exercise the clock and the sleep: `watch lo 10 1` took 100 samples in
+  1,007 ms of host time.
+* **The image** `r6b6q` = `r6b6q2` carries it: the literal `LP0 linkprobe `
+  once, in `.init.ramfs`, and the declaration's spec differs from `_irfs-p2`'s
+  by exactly that one row (and `/bin/mfgtest` 1.1).
+
+### 24.4 What this does not establish
+
+* Anything on the silicon. The marshalling on a big-endian kernel is G6's
+  text comparison and the board's; the host fake covers the logic only.
+* `get_link` means "any of jacks 0–4 has LinkUp", not "port 3": it is what
+  `rtl819x_sw_any_link()` computes.
+* The `eth4` prediction (122 on all three) holds while the vendor tree is in
+  the image; after `R6b-8` it becomes 19.
+* 1.5's source comment at `:122` still says 1.3 added *"get_drvinfo +
+  get_link"*; it also added `get_ringparam`. The fix changes no object byte
+  and is deferred to a commit that touches `rtl819x-nic.c` anyway.

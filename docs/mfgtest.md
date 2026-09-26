@@ -236,7 +236,7 @@ see §5.
 | **`MT-WDT`** | `/proc/rtl819x-wdt` | watchdog · `FW-52` | `wdtcnr_at_probe = A5000000`; ~~the ten `ovselN` rows exact~~ (the script checks two fields, not ten); `state_name = BOOTGUARD` | ~~`kickms` long enough that the bite falls outside the window~~ 🔴 **`kickms` moves NEITHER field the script reads; it lets the hardware bite, which ends the boot rather than reddening the check. `stop` — the physical counterpart of fixture row `M15`** | R | 量 — `bootguard` restores it, read back in the same field. 🔴 ~~**Ordered last: the pass path resets the board**~~ **the implemented pass path issues no verb and resets nothing; the ordering rule was about this table, not about the script** |
 | **`MT-LED`** | `/proc/rtl819x-gpio`, `/sys/class/leds/*/brightness`, **and the operator's eye** | LED · `BRD-13` (driver: none) | `dat` bit 6 clears, `n_set_ok` increments, `n_writes` increments, operator sees LED #2 of eight lit | `lock 6` first: the write is refused **before** it happens, `n_writes` unmoved, the lamp does not change | R | 量 — `unlock 6` restores it; both directions ran at seating 20 |
 | **`MT-BUTTON`** | `/proc/rtl819x-keys` | button · `BRD-05`, `REG-28` (driver: none) | 🔴 ~~a 3 s hold at 20 Hz gives `(n_open, n_poll)` `(1, 60)`~~ **that pair comes from the OPEN, not from the press, and reading it as the press is what made the first implementation score a quantity nothing in it caused.** Three terms: `n_open` moved (the node opened), `n_poll` moved (the poller ran), **`b0_n_press` moved** (a debounced press was seen) | do not press: **`b0_n_press` stays flat while the first two MOVE** | P | 量 — the flat control already ran at seating 20 |
-| **`MT-PORT`** | vendor `/proc/rtl865x/port_status` 推 | Ethernet · **no Linux-state id** — every `NET-*` is loader-state | link up on the connected port, ~~and the output **names the vendor driver**~~ 🔴 **the second conjunct was never implemented — 量 2026-09-17 (`P1-5`), `mt_port` prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the PORT. It is the conjunct `R6` needs** (the plan's own ordering note: the port check runs against the *vendor's* driver until `R6` lands, so the output has to say which one served it, or the historical numbers mean nothing afterwards). Carried to `R6-0`; § 9.9 | unplug the cable | P | 量 — plug it back in |
+| **`MT-PORT`** | ~~vendor `/proc/rtl865x/port_status` 推~~ 🔄 **rlxfw's `/proc/rtl819x-switch` 1.2** (`R6b-6`): its `version` and `psrp3` lines, from one `snap` | Ethernet · `NET-11` (bit 4 LinkUp), `NET-127` (the driver's lines) | link up on the connected port (`psrp3 … up 1`) **and the output names the driver that reported it, and whether the vendor tree is present** — `Port3 LinkUp by rtl819x-switch 1.2; vendor tree present`. 🔄 **Implemented in `mfgtest` 1.1** (`R6b-6`); until then the second conjunct was declared and not tested (§ 9.9, 量 2026-09-17). A page with no `version` line, or no `psrp3` line (switch 1.1), is red. The label says who REPORTED the link, not who configured the PHY — that is the vendor's probe until `R6b-8` | unplug the cable | P | 量 — plug it back in |
 | **`MT-MAC`** | `H601` header + body, in the kernel, **verdict only** | `H601` · see §4 | signature `H6`, version `1`, ~~body checksum 0,~~ MAC not all-`00`, not all-`FF`, group bit clear | feed the parser a synthetic buffer (`$FWRE_WORK/h601-synth.bin`) | S — stands in for *清 MAC*, which is **permanently forbidden** | n/a |
 | **`MT-RFCAL`** | the same read, the same verdict | `H601` · see §4 | the 8-bit sum of all `len` body bytes, checksum byte included, is 0 | the same synthetic buffer with one byte moved | S | n/a |
 | **`MT-DDR`** | 🔴 **struck, with the reason** | — | — | — | — | — |
@@ -723,7 +723,7 @@ that implements it, one row at a time:
 | `MT-WDT` | `wdtcnr_at_probe`; ~~ten `ovselN` rows~~; `state_name` | two fields | agrees, already annotated in § 2 |
 | `MT-LED` | `dat` bit 6 clears, `n_set_ok` ↑, `n_writes` ↑, operator sees it | `lit && b1>b0 && w1>w0`, then the operator prompt | agrees |
 | `MT-BUTTON` | `n_open` moved, `n_poll` moved, `b0_n_press` moved | all three | agrees |
-| `MT-PORT` | link up **and the output names the vendor driver** | link up | 🔴 **over-declares** |
+| `MT-PORT` | link up **and the output names the vendor driver** | link up | 🔴 **over-declares** — 🔄 **agrees since `mfgtest` 1.1** (`R6b-6`): the line names the reporting driver and the vendor tree's presence, and `tools/mfginject.py` M31/M33 (red) and M32 (green with its text) test the label |
 | `MT-MAC` | sig, version, **body checksum 0**, MAC not `00`/`FF`, group bit clear | sig, version, `hw_len_sane`, `mac_not_zero`, `mac_not_ff`, `mac_group_bit` | 🔴 **over-declares** |
 | `MT-RFCAL` | 8-bit sum over `len` body bytes is 0 | `hw_sum_ok` | agrees |
 
@@ -741,7 +741,13 @@ because the recording is what a later reader needs. 🔴 **This is the conjunct
 it or the historical numbers stop meaning anything the moment mine does.
 **Every `MT-PORT` line this project has captured is unlabelled.** Carried to
 `R6-0` rather than fixed here: fixing it moves `RECIPE_ID`, and `RECIPE_ID` is
-what `MT-ID` compares against.
+what `MT-ID` compares against. 🔄 **2026-09-26 (`R6b-6`): fixed, against the
+driver that outlives the vendor tree** — `mfgtest` 1.1 reads rlxfw's
+`/proc/rtl819x-switch` 1.2 and prints `Port3 LinkUp by rtl819x-switch 1.2;
+vendor tree present` (or `absent`, which `mfginject` M32 proves at the desk
+before `R6b-8` boots an image without the vendor tree). `RECIPE_ID` moved with
+it (`acf8ed3d` on `r6b6q`). No `MT-PORT` line has yet been captured with the
+label.
 
 **`MT-MAC`.** `mt_h601` gates `MT-MAC` on
 `rc && sig && ver && sane && nz && nf && !gb` and puts `hw_sum_ok` in

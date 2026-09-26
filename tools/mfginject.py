@@ -305,6 +305,57 @@ PORT_DOWN = PORT_A.replace(
     "\tDuplex Enabled | Speed 100M\n",
     "Port3 Force Mode disable\nEEE Status 0\nLinkDown\n")
 
+# 🔄 R6b-6, 2026-09-26: MT-PORT reads rlxfw's `/proc/rtl819x-switch` 1.2 and
+# not the vendor's port_status, which leaves with the vendor tree at R6b-8.
+# PORT_A stays in state A only as the vendor tree's PRESENCE -- the script
+# tests `[ -d .../proc/rtl865x ]` for its label and reads nothing in it.
+# The format is 1.2's sprintf strings (C1 reads them); the PSRP words are the
+# loader-state readings `NET-10` holds (ports 0-4 `000010E0` but the cable's
+# port 3 `000010F9`, PSRP5 `000000E2`, PSRP6/7 `0000007A`), and the table is
+# cut to its first rows -- mfgtest reads `version` and `psrp3`, nothing else.
+SWITCH_A = """version rtl819x-switch 1.2
+nreg 37
+unlocked 1
+n_writes 1
+n_refused 0
+n_reads 1120
+n_reset 0
+n_dumb 0
+n_restore 0
+boot_cvidr 81964000
+slot0_full 1
+slot1_full 0
+slot2_full 0
+slot3_full 0
+n_linkq 0
+lde0 00
+psrp0 000010E0 up 0 lde 0 lj 0
+psrp1 000010E0 up 0 lde 0 lj 0
+psrp2 000010E0 up 0 lde 0 lj 0
+psrp3 000010F9 up 1 lde 0 lj 0
+psrp4 000010E0 up 0 lde 0 lj 0
+psrp5 000000E2 up 0 lde 0 lj 0
+psrp6 0000007A up 1 lde 0 lj 0
+psrp7 0000007A up 1 lde 0 lj 0
+jiffies 4294940001
+r CVIDR     4200 81964000 81964000 00
+r SSIR      4204 00000001 00000000 00
+"""
+
+# The same page with no version line: a reporter nobody can name.
+SWITCH_NOVER = SWITCH_A.replace("version rtl819x-switch 1.2\n", "", 1)
+
+# 1.1's page: a version line, and no psrp line at all.  The image that
+# boots 1.1 must make MT-PORT red, never green on a missing line.
+SWITCH_11 = "\n".join(ln for ln in SWITCH_A.split("\n")
+                      if not ln.startswith(("psrp", "lde0", "n_linkq",
+                                            "jiffies"))).replace(
+    "version rtl819x-switch 1.2", "version rtl819x-switch 1.1")
+
+#: An edit value that DELETES the file, so a directory the script tests with
+#: `[ -d ]` can be made absent.  Not a string, so no fixture can equal it.
+ABSENT = object()
+
 
 def state_a(rid=FIXTURE_ID):
     return {
@@ -314,6 +365,7 @@ def state_a(rid=FIXTURE_ID):
         "proc/rtl819x-wdt": WDT_A,
         "proc/rtl819x-gpio": GPIO_A,
         "proc/rtl819x-keys": KEYS_A,
+        "proc/rtl819x-switch": SWITCH_A,
         "proc/rtl865x/port_status": PORT_A,
         "sys/class/leds/n150rt:green:led2/brightness": "0\n",
     }
@@ -340,6 +392,10 @@ def state_b():
 
 EQUIV = "equivalent"
 BENCH = "bench-only"
+#: A row that must stay GREEN and print a stated text on its check's line.
+#: The flag is (GREEN, text); EQUIV proves only that no check moved, and
+#: M32's claim is stronger -- that MT-PORT passes AND says why.
+GREEN = "green-with"
 
 MUT = [
     # ---- MT-ID -----------------------------------------------------------
@@ -386,8 +442,12 @@ MUT = [
      "MT-WDT", [("A", "proc/rtl819x-wdt", "state_name", "IDLE")], None),
 
     # ---- MT-PORT ---------------------------------------------------------
+    # 🔄 R6b-6: the fixture moved to /proc/rtl819x-switch; M16's injection
+    # is now psrp3's `up 0`, the line 1.2 prints for a port whose bit 4 is
+    # clear.  PORT_DOWN stays defined above for the record of what M16 was.
     ("M16", "P", "the cable is out of the jack",
-     "MT-PORT", [("A", "proc/rtl865x/port_status", None, PORT_DOWN)], None),
+     "MT-PORT", [("A", "proc/rtl819x-switch", "psrp3",
+                  "000010E9 up 0 lde 1 lj 4294937500")], None),
 
     # ---- MT-MAC ----------------------------------------------------------
     ("M17", "S", "the block is not the uncompressed H6 form",
@@ -443,13 +503,33 @@ MUT = [
                  "matches the ce_reload_hz that HZ implies",
      "MT-TICK", [("A", "proc/rtl819x-timer", "ce_reload", "20000"),
                  ("B", "proc/rtl819x-timer", "ce_reload", "20000")], None),
+
+    # ---- MT-PORT, R6b-6: the label is a tested conjunct ------------------
+    ("M31", "S", "the switch page has no version line, so nobody can be named "
+                 "as the reporter",
+     "MT-PORT", [("A", "proc/rtl819x-switch", None, SWITCH_NOVER)], None),
+    # 🟢 The desk proof of "outlives R6b-8": the vendor tree is gone and
+    # MT-PORT must still pass, and say so.  REQUIRED TO SURVIVE, with its text.
+    ("M32", "S", "the vendor tree is absent (R6b-8's image): MT-PORT must stay "
+                 "green and say `vendor tree absent`",
+     "MT-PORT", [("A", "proc/rtl865x/port_status", None, ABSENT)],
+     (GREEN, "Port3 LinkUp by rtl819x-switch 1.2; vendor tree absent")),
+    ("M33", "S", "an image that boots switch 1.1: a version line and no psrp "
+                 "line, which must be red and never a silent pass",
+     "MT-PORT", [("A", "proc/rtl819x-switch", None, SWITCH_11)], None),
+    ("M34", "S", "the wrong jack: port 2 is up and port 3 is down",
+     "MT-PORT", [("A", "proc/rtl819x-switch", "psrp2",
+                  "000010F9 up 1 lde 0 lj 0"),
+                 ("A", "proc/rtl819x-switch", "psrp3",
+                  "000010E0 up 0 lde 0 lj 0")], None),
 ]
 
 #: TYPED, never computed.  A deleted row would otherwise read as
 #: "n of n killed, 0 alive" and exit 0.
-DECLARED = 30
+#: 🔄 30 -> 34 on 2026-09-26 (R6b-6): M31-M34, all runnable.
+DECLARED = 34
 #: Of those, the ones this harness can actually run.
-DECLARED_RUNNABLE = 25
+DECLARED_RUNNABLE = 29
 
 CASE_RE = re.compile(r"^ {2}(ok|FAIL)\s{2,}(\S+)")
 
@@ -471,6 +551,10 @@ def apply_edits(files, edits, which):
         if state != which:
             continue
         if rel not in out:
+            continue
+        if fieldname is None and value is ABSENT:
+            del out[rel]
+            took = True
             continue
         if fieldname is None:
             if out[rel] != value:
@@ -532,6 +616,8 @@ DRIVERS = {
     "P_WDT": "drivers/watchdog/rtl819x-wdt.c",
     "P_GPIO": "drivers/gpio/rtl819x-gpio.c",
     "P_KEYS": "drivers/input/keyboard/rtl819x-keys.c",
+    # R6b-6: MT-PORT's file is rlxfw's own switch driver since 1.2.
+    "P_PORT": "drivers/net/rtl819x-switch.c",
 }
 SRCROOT = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30")
 
@@ -561,9 +647,15 @@ BOARD_SRC = os.path.join(SRCROOT, "arch", "rlx", "kernel", "rlxfw-devices.c")
 #: guessing the very thing this control exists to check.
 INDEX_BOUNDS = {
     ("drivers/input/keyboard/rtl819x-keys.c", "b"): ("rlxfw_board_keys", ".code"),
+    # 🔄 R6b-6: `psrp%u` is bounded by the loop that prints it, whose bound
+    # is a `#define` in the driver -- a second kind of bound, read from the
+    # driver's own text rather than from the board file, because the number
+    # of port status registers is a property of the switch, not of the board.
+    ("drivers/net/rtl819x-switch.c", "psrp"): ("#define", "RTL819X_SW_NPSRP"),
 }
 
-INDEXED_RE = re.compile(r"^([a-z]+)([0-9]+)(_[a-z0-9_]+)$")
+#: 🔄 R6b-6: the suffix is optional, because `psrp%u` has none.
+INDEXED_RE = re.compile(r"^([a-z]+)([0-9]+)(_[a-z0-9_]+)?$")
 
 
 def _strip_c_comments(src):
@@ -586,10 +678,34 @@ def driver_index_templates(relpath):
     about the driver, so it is taught rather than relaxed.
 
     Returns {(prefix, suffix)}, e.g. {("b", "_n_press")}.
+
+    🔄 R6b-6: `%u` as well as `%d`, and an empty suffix, because the switch
+    driver prints `"psrp%u %08X ..."` -- which the first pattern read as no
+    template at all, the same blindness as the one above.
     """
     src = open(os.path.join(SRCROOT, relpath), encoding="utf-8").read()
-    return (set(re.findall(r'"([a-z0-9_]*)%d([a-z0-9_]+) %', src)) |
-            set(re.findall(r'"([a-z0-9_]*)%d([a-z0-9_]+)=%', src)))
+    return (set(re.findall(r'"([a-z0-9_]*)%[du]([a-z0-9_]*) %', src)) |
+            set(re.findall(r'"([a-z0-9_]*)%[du]([a-z0-9_]*)=%', src)))
+
+
+def bound_of(relpath, spec):
+    """How many indices `spec` allows.  An array spec counts the board file's
+    initialiser (board_array_count); a ("#define", NAME) spec reads that
+    define out of the DRIVER, and it must occur exactly once with a positive
+    integer.  RAISES rather than guessing, for board_array_count's reason."""
+    if spec[0] != "#define":
+        return board_array_count(*spec)
+    src = open(os.path.join(SRCROOT, relpath), encoding="utf-8").read()
+    got = re.findall(r"^#define\s+%s\s+(\d+)\b" % re.escape(spec[1]), src, re.M)
+    if len(got) != 1 or int(got[0]) < 1:
+        raise RuntimeError("%s: `#define %s` occurs %d time(s) with %s; the "
+                           "bound would be a guess"
+                           % (os.path.basename(relpath), spec[1], len(got), got))
+    return int(got[0])
+
+
+def bound_name(spec):
+    return spec[1] if spec[0] == "#define" else "%s[]" % spec[0]
 
 
 def board_array_count(symbol, member):
@@ -644,19 +760,20 @@ def resolve_indexed(relpath, fld, templates, bounds):
     m = INDEXED_RE.match(fld)
     if not m:
         return False, "not an indexed name"
-    prefix, idx, suffix = m.group(1), int(m.group(2)), m.group(3)
+    prefix, idx, suffix = m.group(1), int(m.group(2)), m.group(3) or ""
     if (prefix, suffix) not in templates:
         return False, "no `%s%%d%s` template in that driver" % (prefix, suffix)
     key = (relpath, prefix)
     if key not in INDEX_BOUNDS:
         return False, "no declared bounding array for `%s%%d_` in that driver" % prefix
-    sym, member = INDEX_BOUNDS[key]
-    n = bounds[key] if key in bounds else board_array_count(sym, member)
+    spec = INDEX_BOUNDS[key]
+    n = bounds[key] if key in bounds else bound_of(relpath, spec)
     bounds[key] = n
     if idx >= n:
-        return False, ("index %d is outside %s[], which declares %d"
-                       % (idx, sym, n))
-    return True, "%s%%d%s with %d < %s[]=%d" % (prefix, suffix, idx, sym, n)
+        return False, ("index %d is outside %s, which declares %d"
+                       % (idx, bound_name(spec), n))
+    return True, "%s%%d%s with %d < %s=%d" % (prefix, suffix, idx,
+                                              bound_name(spec), n)
 
 
 #: TYPED, never computed, for the same reason DECLARED is.
@@ -668,8 +785,10 @@ def resolve_indexed(relpath, fld, templates, bounds):
 #: population floor was `checked >= 15`.  A control that silently covers less
 #: prints the same green as one that covers everything.  C1b -- "the indexed
 #: path must have been taken" -- is what fired.
-DECLARED_READS = 36
-DECLARED_DRIVERS = 5
+#: 🔄 36/5 -> 38/6 on 2026-09-26 (R6b-6): MT-PORT reads `version` and
+#: `psrp3` out of rtl819x-switch, the sixth driver.
+DECLARED_READS = 38
+DECLARED_DRIVERS = 6
 
 
 def script_fields():
@@ -848,14 +967,57 @@ def main(argv):
         tcache[rel_k] = driver_index_templates(rel_k)
     over, over_why = resolve_indexed(rel_k, "b%d_n_press" % nb, tcache[rel_k], bounds)
     bogus, bogus_why = resolve_indexed(rel_k, "b0_no_such_field", tcache[rel_k], bounds)
-    good = (not over) and (not bogus) and nb >= 1
+    # 🔄 R6b-6: the same two-sided probe on the `#define` bound.  psrp7 must
+    # resolve and psrp8 must not; 8 is typed here, so a driver whose loop
+    # bound drifted is named rather than followed.
+    sw = DRIVERS["P_PORT"]
+    if sw not in tcache:
+        tcache[sw] = driver_index_templates(sw)
+    try:
+        npsrp, perr = bound_of(sw, INDEX_BOUNDS[(sw, "psrp")]), ""
+    except RuntimeError as e:
+        npsrp, perr = 0, str(e)
+    pin, pin_why = resolve_indexed(sw, "psrp%d" % (npsrp - 1), tcache[sw], bounds)
+    pover, pover_why = resolve_indexed(sw, "psrp%d" % npsrp, tcache[sw], bounds)
+    good = ((not over) and (not bogus) and nb >= 1
+            and pin and (not pover) and npsrp == 8)
     print("  %s  %-14s %s" % ("ok  " if good else "FAIL", "C1c",
                               "b%d_n_press is REFUSED (%s) and b0_no_such_field "
-                              "is REFUSED (%s) -- the bound and the suffix both bite"
-                              % (nb, over_why, bogus_why)
+                              "is REFUSED (%s); psrp%d resolves and psrp%d is "
+                              "REFUSED (%s) -- the bounds and the suffix bite"
+                              % (nb, over_why, bogus_why, npsrp - 1, npsrp,
+                                 pover_why)
                               if good else
-                              "over=%s(%s) bogus=%s(%s)"
-                              % (over, over_why, bogus, bogus_why)))
+                              "over=%s(%s) bogus=%s(%s) psrp: bound=%d %s in=%s(%s) "
+                              "over=%s(%s)"
+                              % (over, over_why, bogus, bogus_why, npsrp, perr,
+                                 pin, pin_why, pover, pover_why)))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+
+    # --- C1d: the port the script reads is the port it names --------------
+    #
+    # MT-PORT prints `$MFG_PORT` (Port3) and reads `psrp3`: two spellings of
+    # one number in one script, which is one owner too many unless something
+    # holds them together.  This does, both ways: the script as it is must
+    # agree, and a copy whose MFG_PORT says Port2 must be caught.
+    def port_agreement(text):
+        mp = re.findall(r'^MFG_PORT="Port(\d+)"', text, re.M)
+        reads = re.findall(r'field "\$MFG_SNAP" psrp(\d+)', text)
+        return (len(mp) == 1 and len(reads) == 1 and mp[0] == reads[0],
+                "MFG_PORT=Port%s, reads psrp%s" % ("/".join(mp) or "?",
+                                                    "/".join(reads) or "?"))
+    stext = open(SCRIPT, encoding="utf-8").read()
+    agree, agree_why = port_agreement(stext)
+    probe2 = stext.replace('MFG_PORT="Port3"', 'MFG_PORT="Port2"', 1)
+    caught, caught_why = port_agreement(probe2)
+    good = agree and probe2 != stext and not caught
+    print("  %s  %-14s %s" % ("ok  " if good else "FAIL", "C1d",
+                              "%s agree, and a copy saying Port2 is caught (%s)"
+                              % (agree_why, caught_why)
+                              if good else
+                              "agree=%s (%s) probe-took=%s caught=%s (%s)"
+                              % (agree, agree_why, probe2 != stext, not caught,
+                                 caught_why)))
     ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
 
     # --- C2: every command the script types exists in this image ----------
@@ -952,6 +1114,18 @@ def main(argv):
             write_state(d, a)
             rc, out = _run(d, FIXTURE_ID, shell, b)
             red = reds(out)
+            if isinstance(flag, tuple) and flag[0] == GREEN:
+                line = [ln for ln in out.splitlines()
+                        if CASE_RE.match(ln) and CASE_RE.match(ln).group(2) == wants]
+                said = bool(line) and line[0].rstrip().endswith(flag[1])
+                if rc == 0 and not red and said:
+                    results.append((mid, "survived", klass, what, wants,
+                                    "green, and %s says `%s`" % (wants, flag[1])))
+                else:
+                    results.append((mid, "WRONG-GREEN", klass, what, wants,
+                                    "rc=%d red=%s line=%r" % (rc, sorted(red),
+                                                              line[:1])))
+                continue
             if flag == EQUIV:
                 if rc == 0 and not red:
                     results.append((mid, "survived", klass, what, wants,

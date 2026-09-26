@@ -801,3 +801,161 @@ sound — it is port 3's **receive** side, i.e. the wire. The CPU port's is a
 different counter with the same name, and reading it as an error indicator
 would report a healthy board as broken on every frame it transmits.
 `SPEC.md` `NET-65`.
+
+# 9. 2026-09-26 (`R6b-6`) — 1.2: every `PSRP` read keeps what it consumes
+
+## 9.1 Why
+
+`PSRP` bit 8, `LinkDownEventFlag`, latches a link-down and **clears when read**.
+Two sources: the vendor header, `rtl865xc_asicregs.h:1328` (the copy under
+`drivers/net/rtl819x/AsicDriver/`, 3,537 lines), and the datasheet's Table 65
+(`docs/loader-phy-and-switch.md`, the `PSRP` paragraph); and 量 `SPEC.md`
+`NET-11`, where one read of a port whose jack was already empty cleared it. The
+vendor's own comment in `rtl_nic.c:3206` says the same.
+
+So every reader of `PSRP` destroys the evidence the next reader needs. 1.1 had
+three readers — the slot-0 snapshot at `subsys_initcall`, the `/proc` table,
+and `rtl819x_sw_any_link()`, which `rtl819x-nic`'s ethtool `get_link` calls —
+and none of them kept the bit. `R6b-6`'s positive control is a cable pull, read
+back through `get_link`; in 1.1 that read would have erased the latch the pull
+set, and nothing afterwards could have shown the pull happened.
+
+The vendor has two readers of its own, and neither keeps the bit either:
+`port_status_read` (`rtl865x_proc_debug.c:4182-4246`) reads every `PSRP` twice
+(`:4194`, `:4221`) and prints bit 4, never bit 8; and the link DSR
+(`rtl_nic.c:3613-3618`) reads `PSRP` through
+`rtl865x_getPhysicalPortLinkStatus`. Its one named consumer of bit 8,
+`re865x_setPhyGrayCode` (`:3197-3232`), is under `CONFIG_RTL8196C_ETH_IOT`,
+which this image does not set.
+
+## 9.2 What changed
+
+* **No line of 1.1 moved.** Seven lines changed, each one that was blank or in
+  place: the version string (`:118`); three prototypes (`:269`, `:532`, `:676`);
+  and three call sites — `rtl819x_sw_rd` (`:278`), the `/proc` page before its
+  table (`:553`), the initcall after the slot-0 snapshot (`:689`). 154 lines are
+  appended after `:716`. 量 at `f758d62`: seventeen committed files cite this
+  driver by line, 23 citations, and no cited range holds a changed line.
+* `rtl819x_sw_rd()` — the one read path — hands every value to
+  `rtl819x_sw_lde_note()` (`noinline`, 17 call sites in the object), which
+  counts a set bit 8 per port and stamps the jiffies of the last one.
+* `/proc/rtl819x-switch` prints, **before** the register table, so that the
+  table's last line is still the page's last line:
+
+  ```
+  n_linkq %lu
+  lde0 %02X
+  psrp%u %08X up %u lde %lu lj %lu      (x8, PSRP0..PSRP7)
+  jiffies %lu
+  ```
+
+  Each `psrpN` line is read live and printed after that read's accounting, so a
+  latch its own read consumed is already in its `lde`. `n_linkq` is
+  `get_link`'s own counter, which 1.1 kept and never printed. `jiffies` is
+  printed after the eight reads, so every `lj` on the page is at or before it.
+  One render now reads 45 registers (37 table rows and 8 `psrp` lines), so
+  `n_reads` grows by 90 per `cat` (`FW-64`: one `cat` is two renders).
+* At boot, after the slot-0 snapshot, the `PSRP`s the census table does not
+  hold (1, 2 and 4 — asked of the table, not typed) are read once, and
+  `RLXFW-SW7=000000XX` carries the S0' mask: bit *p* set if `PSRPp`'s bit 8 was
+  set at `subsys_initcall`. It prints between `SW1` and `SW2`, because that is
+  when it is known. 20 bytes of boot capture; `bootbytes` derives it from the
+  source.
+* `#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)` → `#error`: the counters
+  are unlocked because this `.config` is UP and `PREEMPT_NONE` and no reader
+  runs in interrupt context, and that assumption is now a refusal.
+* `PSRP8` is not read: nothing has ever read it under Linux, and the
+  datasheet's port table stops at `PSRP7`.
+
+## 9.3 What the desk measured
+
+* **The file compiles as the kernel compiles it.** 量, `rtl819x-switch.c` alone
+  with the command line kbuild recorded for this object (`s100a`'s
+  `.rtl819x-switch.o.cmd`, dependency writer removed), reading that tree and
+  writing only to scratch, under `vendor-tripwire`: 1.1 and 1.2 each print the
+  one warning 1.1 always had (`rtl819x_sw_lock` defined but not used) and no
+  other; 1.2 with `-DCONFIG_SMP=1` prints its own `#error`; a planted syntax
+  error fails. The two images' build logs carry the same one warning.
+* **The page.** Walked from the driver's own `sprintf` formats, every field at
+  the widest its variable can hold: 1.1's worst page is 1,642 bytes, 1.2's
+  2,080 (+438: 19 + 8 + 8 × 49 + 19). The table's budget check (3,600) is
+  never what ends it, and the page stays inside one 4,096-byte page.
+* **The image.** `r6b6q` and `r6b6q2` (quiet, `92aeaa8` + this change, recipe
+  `acf8ed3d`) are byte-identical — vmlinux `9e0ff326…`, nfjrom `ef5622d2…`,
+  `cmp` rc 0 on both — and both differ from `r6b2q`. Declared gates green
+  (12 marks, 9 witnesses, 1 ABSENT); `kconfig-delta` quiet green; `storeseq`
+  `r6b2q` → `r6b6q` green on its seven functions, and `rtl819x-nic.c` is
+  `92aeaa8`'s byte for byte. In the vmlinux: `RLXFW-SW7=` once,
+  `rtl819x-switch 1.2` twice (`.rodata` and `/bin/mfgtest`'s text),
+  `rtl819x-switch 1.1` never.
+* **S0' already holds bit 8, twice in thirteen boots** — § 9.4.
+
+## 9.4 S0' and bit 8, over every committed dump (`NET-126`)
+
+量 2026-09-26, zero power. The 32 committed `/proc/rtl819x-switch` dumps fall
+into 13 boot groups, each bounded by the capture that booted it (session script
+`s112/r6b6/work/s0table.py`, written apart from the proposal's survey and
+reproducing its count). Control: no group carries two slot-0 values for any
+register — slot 0 is written once per boot. Five `PSRP`s are in the table
+(0, 3, 5, 6, 7); S0' bit 8 appears on `PSRP3` only, and twice:
+
+| boot capture | `RLXFW-ID0` | S0' `PSRP3` | reading |
+|---|---|---|---|
+| `2026-09-19b/r6nic3-boot` | `7FE2F8C3` | `000011E9` | bit 8 set, **LinkUp clear**: the link was down at `subsys_initcall`; `D7` at 13:04:44 reads it back up (`000000F9`) |
+| `2026-09-20/C2-BOOT` | `EDC94765` | `000011F9` | bit 8 set, link up |
+| the other 11 | seven images | `000010F9` | no bit 8 |
+
+**Live words with bit 8 set: two, not the proposal's one.**
+
+* `2026-09-19/C32-CATV`, `PSRP0` = `000011E0`, 36 s after `C31-RSTV`'s
+  `reset vendor` (`FULL_RST` plus the four `SYS_CLK_MAG` writes, § 8.8). Port 0
+  has no link partner — bit 4 is clear before (`C30-SNP2D`, `000010E0`) and
+  after — and the same dump's `PSRP3` reads `000010F9`. **A software reset of
+  the switch sets bit 8 on a port that had no link to lose.**
+* `2026-09-20/X19-sw`, `PSRP3` = `000001F9`, after the cable was re-seated
+  (`PREDICTIONS-B30-block29.md`).
+
+**The windows, joined with their history** (讀, per group: the bench
+directory's card and corrections, every capture's `meta.json` `sent` field,
+`LOG.md`). No window of the 13 contains a run of the vendor firmware or a
+recorded attach of the host's GbE adapter. `C2-BOOT`'s is the one gap: the
+adapter was brought up before that card froze, at a time nothing recorded.
+All 13 boots went rescue → TFTP → `J 80500000`, and none read `PSRP` or ran
+`PHYR`/`PHYW` at the prompt. `r6nic3-boot` followed `C62`'s
+`busybox reboot -f` at 13:02:18, inside `NET-54`'s wedge and a run of `rlx0`
+down/up.
+
+So `NET-30` 殘留's decisive experiment rested on a premise that is not
+established — that a clean boot reads bit 8 = 0 — and its two candidates are
+not the whole list: bit 8 has been set by a software reset (`C32`) and by a
+re-seat (`X19`), and `r6nic3` booted with the link actually down with neither
+candidate in its window. 推: both bit-8 boots came before the 09-20 re-seat
+(2 of 4 before it, 0 of 9 after), and both started with port 3's receive
+already impaired (`r6nic3` deaf; `C2-BOOT`'s first ping lost 2 of 4) — which
+fits `NET-56`'s contact-fault 推 and does not prove it.
+
+**Open**: whether a cold power-on, the loader's rescue path or its TFTP sets or
+clears the latch (the loader census finds no `PSRP` site, and states that it
+cannot see computed addresses). What settles it: a cold power-on with the
+adapter attached and untouched since before power, `DW BB804134 1` at the
+prompt, again after `IPCONFIG`, again after the upload. 1.2's `SW7` then gives
+the kernel's side of the same boot for nothing.
+
+`study/20260919-study1.md` says the boot read makes that experiment
+impossible. Half of that is wrong: slot 0 keeps the value the read consumed.
+The study file is a record; the correction is `LOG.md`'s.
+
+## 9.5 What 1.2 does not establish
+
+* Nothing about the silicon: not one line of 1.2 has run.
+* `lde` counts **this driver's reads that saw the latch**. It is a lower bound
+  on link-down events — the latch saturates, so two events between two reads
+  count once — and it is blind to the vendor's reads. A card that reads
+  `/proc/rtl865x/port_status` between two reads of this file makes `lde`
+  under-count; that is why such a card reads this file first and
+  `port_status` last.
+* `SW7` records the latch at `subsys_initcall`, after the loader and anything
+  the loader ran. It is not "immediately after a cold boot".
+* The three reads at `subsys_initcall` clear ports 1, 2 and 4's bit 8 before
+  the vendor's probe; that costs nothing only as long as the vendor's one
+  consumer stays unbuilt.

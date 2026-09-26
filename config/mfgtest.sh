@@ -44,7 +44,7 @@
 # be able to issue an SPI transaction, and the way to guarantee that is for
 # the write to be unreachable rather than for the path to be wrong.
 
-MFG_VERSION="mfgtest 1.0"
+MFG_VERSION="mfgtest 1.1"
 
 : "${MFG_ROOT:=}"
 
@@ -54,7 +54,7 @@ P_TIMER="$MFG_ROOT/proc/rtl819x-timer"
 P_WDT="$MFG_ROOT/proc/rtl819x-wdt"
 P_GPIO="$MFG_ROOT/proc/rtl819x-gpio"
 P_KEYS="$MFG_ROOT/proc/rtl819x-keys"
-P_PORT="$MFG_ROOT/proc/rtl865x/port_status"
+P_PORT="$MFG_ROOT/proc/rtl819x-switch"
 P_LED="$MFG_ROOT/sys/class/leds/n150rt:green:led2/brightness"
 # evdev's node for rtl819x-keys, and OPENING IT IS THE ONLY REASON THE DRIVER
 # EVER POLLS -- see mt_button.  Prefixed like every other path here so a
@@ -64,9 +64,9 @@ P_EVENT="$MFG_ROOT/dev/input/event0"
 
 # The switch port the cable is in.  量 NET-13: this kernel's netdev numbering
 # is the MIRROR of the vendor's (mine = 4 - vendor), so the jack the operator
-# uses is switch port 3, which this kernel calls eth4.  The proc file prints
-# SWITCH port indices, so the token is Port3.  Writing Port4 here -- the
-# netdev number -- would pass on the wrong hole.
+# uses is switch port 3, which this kernel calls eth4.  Both proc files print
+# SWITCH port indices (Port3, psrp3), so the token is Port3 and mt_port reads
+# psrp3.  Writing Port4 here -- the netdev number -- would pass on the wrong hole.
 MFG_PORT="Port3"
 
 # The JEDEC id this part answers.  FLS-04, and REG-21's descriptor holds the
@@ -225,12 +225,12 @@ hexupper() {
 # `irq_count` 105 lines later outside it, and the old code compounded that by
 # opening the file twice more.
 #
-# ⚠️ ONLY THE THREE CHECKS THAT COMPARE ACROSS TIME USE THIS, and the reason is
-# a measurement rather than a preference: in the same capture that caught
-# MT-TICK, the eight other checks read /proc/rtl819x-spi, /proc/rtl819x-wdt and
-# the vendor's port_status correctly, because those files' fields are static
-# between verbs.  The hazard is latent for them and is carried forward rather
-# than fixed blind.
+# ⚠️ THE THREE CHECKS THAT COMPARE ACROSS TIME USE THIS, and MT-PORT since
+# R6b-6: /proc/rtl819x-switch renders live registers and counters that move on
+# every render (n_reads alone grows by 45), which is the hazard above exactly.
+# In the capture that caught MT-TICK, the other checks read /proc/rtl819x-spi,
+# /proc/rtl819x-wdt and the vendor's port_status correctly: their fields are
+# static between verbs, so the hazard is latent there and is carried forward.
 : "${MFG_SNAP:=/tmp/mfgtest.snap}"
 
 snap() {
@@ -508,34 +508,34 @@ mt_wdt() {
 	fi
 }
 
-# MT-PORT.  Link on the connected switch port.
-#
-# The block for a port runs from the line beginning `PortN ` to the next such
-# line.  A down port prints LinkDown and `continue`s, so it emits three fewer
-# lines -- the block length is itself a discriminator, and that is why this
-# tracks blocks instead of grepping the file for LinkUp anywhere.
+# MT-PORT.  Link on the connected switch port, as rlxfw's own switch driver
+# reports it (R6b-6): rtl819x-switch 1.2 prints `psrpN <word> up <0|1> ...`
+# and a `version` line that names the reporter; the vendor's port_status leaves
+# with the vendor tree at R6b-8.  psrp3 is MFG_PORT's port (mfginject C1d holds
+# the two together).  The label says who REPORTED the link and whether the
+# vendor tree is present -- never who configured the PHY.
 mt_port() {
-	if [ ! -r "$P_PORT" ]; then
+	snap "$P_PORT" || {
 		chk MT-PORT 0 "$P_PORT is not readable"
 		return
-	fi
-	inblk=0
+	}
+	ver=$(field "$MFG_SNAP" version) || ver="(absent)"
+	case "$ver" in
+	"rtl819x-switch "*) ;;
+	*)	chk MT-PORT 0 "no driver label in $P_PORT (version $ver)"
+		return ;;
+	esac
+	pw=$(field "$MFG_SNAP" psrp3) || pw="(absent)"
+	vt="vendor tree absent"
+	[ -d "$MFG_ROOT/proc/rtl865x" ] && vt="vendor tree present"
 	up=0
-	while read -r line; do
-		case "$line" in
-		"$MFG_PORT "*) inblk=1 ;;
-		Port[0-9]" "*|CPUPort" "*) inblk=0 ;;
-		esac
-		if [ "$inblk" = "1" ]; then
-			case "$line" in
-			*LinkUp*) up=1 ;;
-			esac
-		fi
-	done < "$P_PORT"
+	case "$pw" in
+	*" up 1 "*) up=1 ;;
+	esac
 	if [ "$up" = "1" ]; then
-		chk MT-PORT 1 "$MFG_PORT LinkUp"
+		chk MT-PORT 1 "$MFG_PORT LinkUp by $ver; $vt"
 	else
-		chk MT-PORT 0 "$MFG_PORT has no LinkUp -- cable out, or the wrong jack"
+		chk MT-PORT 0 "$MFG_PORT has no LinkUp -- cable out, or the wrong jack (by $ver; psrp3 $pw)"
 	fi
 }
 

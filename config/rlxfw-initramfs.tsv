@@ -349,3 +349,31 @@ nod	/dev/input/event0	c:13:64	0600	rlxfw	R5-8: evdev's node for the first regist
 # Nothing execs it: /init does not, so Decision B is unchanged and the boot
 # capture's predicted length is unchanged by it.
 file	/bin/iperf3	$REPO/build/rlxfw-user/iperf3/iperf3	0755	rlxfw	R6-5's throughput instrument, and the FOURTH executable here that is not this unit's. iperf 3.1.3, 252,644 bytes stripped, static, no PT_INTERP, MIPS-I MSB o32. Built by config/rlxfw-user/iperf3/ with no ./configure -- every line of iperf_config.h came from a compile probe against THIS toolchain rather than a cross-compile guess. Needs /tmp writable for mkstemp+mmap on every stream; needs no /dev/urandom (量, negative control). Nothing execs it
+
+# ----------------------------------------------------------------------------
+# R6b-6, 2026-09-26.  One file: the caller of the three ethtool ops that
+# rtl819x-nic has carried since 1.3 and that nothing had ever called (量, all
+# 217 committed NIC dumps read `n_et_link 0`).
+#
+# APPENDED AT THE END for R6-5's reason above: rows here are cited by line.
+#
+# NOTHING EXECS IT.  /init does not; an operator types it at the shell, on a
+# card, after the boot the card predicts.  So Decision B is unchanged, and the
+# boot capture's length is unchanged by this row: a file in the initramfs
+# prints nothing, and `bootbytes` derives the boot length from the marks.
+#
+# HOW TO PRODUCE IT.  config/rlxfw-user/linkprobe/Makefile, run under
+# tools/vendor-tripwire.sh; its INSTALL is $(REPO)/build/rlxfw-user/linkprobe,
+# which is where the path below comes from, and it is the owner of the gates.
+# Like uprobe, ucost and iperf3 the product lives under build/, outside
+# config/, so RECIPE_ID cannot see it: two builds of linkprobe give two images
+# with one RLXFW-ID0.  What pins it is the assembled image's sha256 (looprun
+# --image-sha256) and the digest the program prints on its LP0 line, which is
+# its source and its Makefile.
+#
+# HOW A CARD TYPES IT.  tools/cardcheck.py's load_decl admits the basename of
+# every `file` row here, which is how uprobe, ucost, mfgtest and iperf3 reach
+# cards today.  config/image-commands.tsv is the busybox census, regenerated
+# from the ELF, and does not grow a row: one there would call linkprobe an
+# applet and be deleted by the next regeneration.
+file	/bin/linkprobe	$REPO/build/rlxfw-user/linkprobe/linkprobe	0755	rlxfw	R6b-6's caller of rtl819x-nic's ethtool ops, and the FIFTH executable here that is not this unit's. ETHTOOL_GDRVINFO, GLINK and GRINGPARAM through SIOCETHTOOL and nothing else -- no ETHTOOL_S*, which tools/linkprobecheck.py refuses in the source. 16,240 bytes stripped, static, no PT_INTERP, e_flags 0x1007 (量 2026-09-26, `make show`; build_id 1bce836f2e21c43a, sha256 071c8f81a47cc8ed84ad9d6ddce8a7e5b4db45ca1ba35fd457a1d9f47bd3d723). Holds the bytes `rtl819x` zero times (gate G5), so a driver name it prints came from the kernel. Nothing execs it

@@ -1432,6 +1432,21 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/storeseq.py --self-test 2>&1 | tee ci-out/storeseq.out; exit "${PIPESTATUS[0]}"
 
+      # linkprobecheck (R6b-6) compiles config/rlxfw-user/linkprobe/linkprobe.c
+      # with the HOST gcc and -DLP_HOST, which swaps its four system shims for
+      # a scripted SIOCETHTOOL, a clock that moves only when the program
+      # sleeps, and a call log. K1-K13: the fourteen lines of `get rlx0 lo eth4
+      # nosuch0` with the board's errno numbers (122, 19, not a PC's 95); the
+      # canary (a kernel that returns 0 without writing reads A5A5A5A5, never
+      # 1); every argument refusal on both sides of its bound, with no call
+      # made; the watch mode's transitions and both bounds on n. M0 runs the
+      # unmutated source through the mutation path, and M1-M22 must each turn
+      # the case they name red. Without gcc it REFUSES (exit 2). What it cannot
+      # see is the ABI: that is the MIPS build's gate G6, and the board's.
+      - name: linkprobecheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/linkprobecheck.py 2>&1 | tee ci-out/linkprobecheck.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:

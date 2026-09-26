@@ -115,7 +115,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SW_VERSION	"rtl819x-switch 1.1"
+#define RTL819X_SW_VERSION	"rtl819x-switch 1.2"
 
 /* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
@@ -266,7 +266,7 @@ static unsigned long rtl819x_sw_n_restore;
 /* Latched at init before anything else, so a later reader can see whether the
  * switch moved between boot and now without having captured the boot. */
 static u32 rtl819x_sw_boot_cvidr;
-
+static void rtl819x_sw_lde_note(unsigned int off, u32 v);	/* 1.2, below */
 static inline void __iomem *rtl819x_sw_reg(unsigned int off)
 {
 	return (void __iomem *)KSEG1ADDR(RTL819X_SW_PHYS + off);
@@ -275,7 +275,7 @@ static inline void __iomem *rtl819x_sw_reg(unsigned int off)
 static inline u32 rtl819x_sw_rd(unsigned int off)
 {
 	u32 v = __raw_readl(rtl819x_sw_reg(off));
-
+	rtl819x_sw_lde_note(off, v);	/* 1.2: keep a PSRP bit 8 this read consumed */
 	rtl819x_sw_n_reads++;
 	return v;
 }
@@ -529,7 +529,7 @@ static int rtl819x_sw_do_restore(int slot)
  * table is 37 registers at ~22 bytes plus ~20 fields, which is ~1.2 KiB; the
  * budget below is what keeps that a fact rather than a hope. */
 #define RTL819X_SW_PAGE_BUDGET	3600
-
+static int rtl819x_sw_lde_lines(char *page);	/* 1.2, below */
 static int rtl819x_sw_read_proc(char *page, char **start, off_t off,
 				int count, int *eof, void *data)
 {
@@ -550,7 +550,7 @@ static int rtl819x_sw_read_proc(char *page, char **start, off_t off,
 	for (i = 0; i < RTL819X_SW_NSLOT; i++)
 		len += sprintf(page + len, "slot%u_full %d\n", i,
 			       (int)rtl819x_sw_slot_full[i]);
-
+	len += rtl819x_sw_lde_lines(page + len);	/* 1.2: before the table */
 	/* live, plus slot 0 (S0', latched at subsys_initcall) beside it, so a
 	 * single read answers "did this move since boot" without arithmetic
 	 * by the reader. */
@@ -673,7 +673,7 @@ static int rtl819x_sw_write_proc(struct file *file, const char __user *ubuf,
  * nothing in this project has ever measured -- so every boot of this image
  * yields a reading that costs nothing and did not exist before.
  * ------------------------------------------------------------------------ */
-
+static void __init rtl819x_sw_lde_boot(void);	/* 1.2, below */
 static int __init rtl819x_sw_init(void)
 {
 	struct proc_dir_entry *pde;
@@ -686,7 +686,7 @@ static int __init rtl819x_sw_init(void)
 	rlxfw_markx("SW1", rtl819x_sw_boot_cvidr);
 
 	rtl819x_sw_snapshot(RTL819X_SW_SLOT_BOOT);
-
+	rtl819x_sw_lde_boot();	/* 1.2: the other PSRPs, then SW7 = S0' bit-8 mask */
 	/* The ones that have never been read on this die, marked individually
 	 * so they are in the boot capture of EVERY boot rather than only in a
 	 * /proc read somebody remembered to take.
@@ -714,3 +714,157 @@ static int __init rtl819x_sw_init(void)
 }
 
 subsys_initcall(rtl819x_sw_init);
+
+/* ========================================================================
+ * 1.2 (R6b-6, 2026-09-26): EVERY PSRP READ THIS DRIVER MAKES KEEPS WHAT IT
+ * CONSUMES.
+ *
+ * Appended rather than threaded through the file, and every line above that
+ * changed is one that was blank or is changed in place (the version string,
+ * three prototypes, and the three call sites -- `rtl819x_sw_rd`, the /proc
+ * page, the init), so no line number above this block moved: 量 at
+ * `f758d62`, seventeen committed files cite this driver by line, 23
+ * citations, and none of the cited ranges holds a changed line (FW-110).
+ *
+ * WHY.  `PSRP` bit 8, `LinkDownEventFlag`, is a latch that CLEARS WHEN READ.
+ * Two sources: the vendor header, `rtl865xc_asicregs.h:1328`
+ * (`LinkDownEventFlag (1<<8)`, "Port Link Down Event detecting monitor
+ * flag"), and the datasheet's Table 65 (docs/loader-phy-and-switch.md, the
+ * PSRP paragraph); and 量 `SPEC.md` `NET-11`, where one read of a port whose
+ * jack was already empty cleared it.  So every reader of `PSRP` destroys the
+ * evidence the next reader would need.  1.1 had three such readers -- the
+ * slot-0 snapshot, the `/proc` table and `rtl819x_sw_any_link()`, which
+ * `rtl819x-nic`'s ethtool `get_link` calls -- and none of them kept the bit.
+ * A cable pull followed by `get_link` would therefore leave NO trace in any
+ * later read, and R6b-6's positive control would be erased by the call it
+ * controls.
+ *
+ * WHAT 1.2 DOES.  `rtl819x_sw_rd()` -- the one read path -- hands every value
+ * to `rtl819x_sw_lde_note()`, which counts a set bit 8 per port and stamps
+ * the jiffies of the last one.  `/proc/rtl819x-switch` prints, BEFORE the
+ * register table (so the table's last line is still the page's last line, the
+ * terminator every card waits for):
+ *
+ *     n_linkq %lu                          get_link's own counter, never
+ *                                          printed by 1.1
+ *     lde0 %02X                            S0' mask: bit p set if PSRPp's
+ *                                          bit 8 was set at subsys_initcall
+ *     psrp%u %08X up %u lde %lu lj %lu     x8: the live word, bit 4, the
+ *                                          count, the last one's jiffies
+ *     jiffies %lu                          the clock `lj` is read against,
+ *                                          printed after the eight reads
+ *
+ * Each `psrpN` line is read live and printed AFTER that read's accounting, so
+ * a latch its own read consumed is already in its `lde`.  The boot adds
+ * `RLXFW-SW7=000000XX`, the S0' mask, and reads the PSRPs the census table
+ * does not hold (1, 2 and 4 today) so that the mask covers all eight.
+ *
+ * WHAT `lde` IS, AND IS NOT.
+ *   - A count of THIS DRIVER'S reads that saw the latch set.  It is a lower
+ *     bound on link-down events: the latch saturates, so two events between
+ *     two reads count once.
+ *   - Blind to the vendor's reads.  `rtl865x_proc_debug.c`'s `port_status`
+ *     printer reads every PSRP twice and never prints bit 8, so a card that
+ *     reads `/proc/rtl865x/port_status` between two reads of this file makes
+ *     `lde` under-count.  That is why such a card reads this file FIRST.
+ *   - Not a statement about PSRP8, which is not read: nothing has ever read
+ *     it under Linux, and the datasheet's port table stops at PSRP7.
+ *
+ * WHAT IT COSTS.  Three reads at subsys_initcall (the PSRPs the table lacks),
+ * each of which clears that port's bit 8 before the vendor's probe; the
+ * vendor's one consumer of bit 8, `re865x_setPhyGrayCode`, is under
+ * CONFIG_RTL8196C_ETH_IOT, which this image does not set, and runs only
+ * from its link DSR.  About 20 boot-capture bytes (the SW7 line: `bootbytes`
+ * derives it from the source, never by hand).  At most 438 bytes of /proc
+ * page: walked from the formats, every field at its widest, the page's worst
+ * case goes from 1,642 to 2,080 of 4,096, so the table's budget check above
+ * (3,600) is never what ends it.  No write: `n_writes` is untouched.
+ *
+ * Included here, not with the includes above, so that no line above moves.
+ */
+#include <linux/jiffies.h>
+
+/* The counters are unlocked, and that is a stated assumption turned into a
+ * refusal rather than left as a comment: this .config has SMP off and
+ * PREEMPT_NONE, and no reader runs in interrupt context -- `rtl819x_sw_rd`'s
+ * callers are the /proc handlers, `rtl819x_sw_any_link` (ethtool, process
+ * context under rtnl_lock) and this file's initcall. */
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+#error "rtl819x-switch 1.2 keeps its PSRP bit-8 counters unlocked; they need a lock before this build can be SMP or preemptible"
+#endif
+
+/* PSRP0..PSRP7 at 0xBB804128 + 4p.  Two sources: `rtl865xc_asicregs.h:1143`-
+ * `:1150` (`PSRPn (0x028 + 4n + PCRAM_BASE)`), and the reads this project has
+ * decoded against the vendor's `port_status` (量 `NET-10`); the LinkUp and
+ * bit-8 fields are `NET-11`'s.  PSRP8 is excluded (see above). */
+#define RTL819X_SW_NPSRP	8
+#define RTL819X_PSRP_LDE	(1u << 8)	/* LinkDownEventFlag, :1328 */
+#define RTL819X_SW_PSRP_LAST	(RTL819X_SW_PSRP0 + (RTL819X_SW_NPSRP - 1) * 4)
+
+static unsigned long rtl819x_sw_lde_n[RTL819X_SW_NPSRP];
+static unsigned long rtl819x_sw_lde_j[RTL819X_SW_NPSRP];
+static u32 rtl819x_sw_lde0;
+
+/* noinline: `rtl819x_sw_rd` is inlined at every call site, and this keeps
+ * each of them to one call rather than a copy of the range check. */
+static noinline void rtl819x_sw_lde_note(unsigned int off, u32 v)
+{
+	unsigned int p;
+
+	if (off < RTL819X_SW_PSRP0 || off > RTL819X_SW_PSRP_LAST || (off & 3))
+		return;
+	if (!(v & RTL819X_PSRP_LDE))
+		return;
+	p = (off - RTL819X_SW_PSRP0) >> 2;
+	rtl819x_sw_lde_n[p]++;
+	rtl819x_sw_lde_j[p] = jiffies;
+}
+
+/* Is `off` in the census table -- i.e. did the slot-0 snapshot read it?
+ * Asked of the table, not typed as "1, 2 and 4", so a register added to or
+ * removed from the table cannot leave a port out of the S0' mask. */
+static int __init rtl819x_sw_in_table(unsigned int off)
+{
+	unsigned int i;
+
+	for (i = 0; i < RTL819X_SW_NREG; i++)
+		if (rtl819x_sw_regs[i].off == off)
+			return 1;
+	return 0;
+}
+
+static void __init rtl819x_sw_lde_boot(void)
+{
+	unsigned int p;
+	u32 m = 0;
+
+	for (p = 0; p < RTL819X_SW_NPSRP; p++)
+		if (!rtl819x_sw_in_table(RTL819X_SW_PSRP0 + p * 4))
+			(void)rtl819x_sw_rd(RTL819X_SW_PSRP0 + p * 4);
+	for (p = 0; p < RTL819X_SW_NPSRP; p++)
+		if (rtl819x_sw_lde_n[p])
+			m |= 1u << p;
+	rtl819x_sw_lde0 = m;
+	rlxfw_markx("SW7", m);
+}
+
+/* The lines `read_proc` prints before its register table.  Worst case, every
+ * counter at its widest (a 32-bit %lu is 10 digits): 19 + 8 + 8 x 49 + 19 =
+ * 438 bytes, against the page budget above. */
+static int rtl819x_sw_lde_lines(char *page)
+{
+	unsigned int p;
+	int len = 0;
+
+	len += sprintf(page + len, "n_linkq %lu\n", rtl819x_sw_n_linkq);
+	len += sprintf(page + len, "lde0 %02X\n", rtl819x_sw_lde0);
+	for (p = 0; p < RTL819X_SW_NPSRP; p++) {
+		u32 v = rtl819x_sw_rd(RTL819X_SW_PSRP0 + p * 4);
+
+		len += sprintf(page + len, "psrp%u %08X up %u lde %lu lj %lu\n",
+			       p, v, (v & RTL819X_PSRP_LINKUP) ? 1u : 0u,
+			       rtl819x_sw_lde_n[p], rtl819x_sw_lde_j[p]);
+	}
+	len += sprintf(page + len, "jiffies %lu\n", jiffies);
+	return len;
+}

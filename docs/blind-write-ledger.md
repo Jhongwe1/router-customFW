@@ -1220,3 +1220,42 @@ across a line break and left a line starting with `|`. `spec-check`'s `C8c`
 caught it — the same defect the seventeenth update of `CLAUDE.md` records in a
 frozen card, and the reason it is worth repeating is that a pipe at the start
 of a wrapped line is invisible in a rendered view.)*
+
+---
+
+## § 9.6 — `R6b-6`: the ethtool path, the `PSRP` latch, and who else reads it, 2026-09-26
+
+**Not one of these paths is in scope, and `ledgerscan check` was green before
+they were declared** (量 on the tree carrying `rtl819x-switch` 1.2 and
+`config/rlxfw-user/linkprobe/`: 84 in-scope paths, green; every path below
+classes `out-of-scope`). They are declared for § 9.5's reason: a ledger whose
+only rows are the ones a checker demanded cannot be audited for what it left
+out. Two of the drivers they touch are this project's own and were never blind
+— `rtl819x-switch` has cited the vendor header since 1.0 — so what these rows
+bound is the new code's reasoning, not a blind-write claim.
+
+⚠️ **What was taken, by kind.** From the generic kernel: the `SIOCETHTOOL`
+path and its refusal order, which decide what `linkprobe`'s controls print.
+From the vendor's switch code: one bit (`PSRP` bit 8, beside the header's
+bit 4 that 1.0 already used) and the fact that two vendor readers consume it
+without keeping it. No vendor sequence entered a driver.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `net/core/ethtool.c` | line | **generic** | 🆕 2026-09-26. `dev_ethtool` `:896-939`: no device → `-ENODEV` (`:904-905`), no `ethtool_ops` → `-EOPNOTSUPP` before the command is read (`:907-908`), and `GDRVINFO`/`GRINGPARAM` in the allow-anyone list while `GLINK` needs `CAP_NET_ADMIN` (`:913-939`). `ethtool_get_drvinfo` `:170-200` (the whole struct `memset` before the driver fills it), `ethtool_get_ringparam` `:466-478` and `ethtool_get_value` `:850-863` (`= { cmd }`). **Why**: `linkprobe`'s predicted lines — `rc 122` for `eth4` on all three requests, `can 0` for a written struct — are this file's order and zeroing |
+| `net/core/dev.c` | line | **generic** | 🆕 2026-09-26 (a second row; § 4.12's is `R6-5`'s). `:4235-4247`, `case SIOCETHTOOL`: `dev_load`, `rtnl_lock`, `dev_ethtool`, and the `ifreq` copied back only on success |
+| `net/socket.c` | line | **generic** | 🆕 2026-09-26. `:968-969`: an `AF_INET` socket's `-ENOIOCTLCMD` falls through to `dev_ioctl`, which is why a datagram socket reaches the path at all |
+| `drivers/net/loopback.c` | line | **generic** | 🆕 2026-09-26. `:113`, `:118-124`: `loopback_ethtool_ops` has `.get_link = always_on` and no `get_drvinfo` or `get_ringparam`, so `lo` is `linkprobe`'s other-driver control — link 1, the other two `-EOPNOTSUPP` |
+| `include/linux/ethtool.h` | line | **generic** | 🆕 2026-09-26. The three structs `:51-65`, `:77-80`, `:196-215` (196, 8 and 36 bytes) and `ETHTOOL_GDRVINFO`/`GLINK`/`GRINGPARAM` `:494`, `:501`, `:506`. `linkprobe`'s gate G6 requires the toolchain's copy byte-identical and its source asserts the sizes and offsets |
+| `include/linux/sockios.h` | line | **generic** | 🆕 2026-09-26. `SIOCETHTOOL` `0x8946` `:78` |
+| `include/asm-generic/errno-base.h` | line | **generic** | 🆕 2026-09-26. `ENODEV` 19 `:22` |
+| `arch/rlx/include/asm/errno.h` | line | 🔴 **vendor** | 🆕 2026-09-26. `EOPNOTSUPP` **122** `:76` — the MIPS ABI's number, not the 95 a PC prints; a card that predicted 95 would read a correct refusal as a wrong one. Already cited by line in `SPEC.md` and `notes/nic-driver.md` and never declared, because the path is out of scope |
+| `arch/rlx/include/asm/unistd.h` | line | 🔴 **vendor** | 🆕 2026-09-26 (a second row; § 9.5's is `R1c`'s). `__NR_Linux` 4000 `:20` and `__NR_clock_gettime` `(__NR_Linux + 263)` `:284`: `linkprobe`'s watch clock is `syscall(4263)`, asserted at compile time |
+| `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-26, and the copy the vendor NIC driver builds with (§ 4.10's row is the `include/asm-rlx/rtl865x/` copy, a different file of 3,483 lines against this one's 3,537). `PSRP0`-`PSRP7` `:1143-1150` and `LinkDownEventFlag (1<<8)` `:1328` beside `PortStatusLinkUp` `:1332`, which `rtl819x-switch` 1.0 already used. **Bit 8 entered `rtl819x-switch` 1.2** with two sources beside this one: the datasheet's Table 65 (`docs/loader-phy-and-switch.md`, the `PSRP` paragraph) and `SPEC.md` `NET-11` (量, read-to-clear). `RESTART_AUTONEGO (1 << 9)` `:438` was read for a card arm (`B1`) that stays conditional on the datasheet's PHY table |
+| `drivers/net/rtl819x/rtl865x_proc_debug.c` | line | 🔴 **vendor** | 🆕 2026-09-26. `port_status_read` `:4182-4246`: it reads each `PSRP` twice (`:4194`, `:4221`) and prints bit 4 and never bit 8 — so it CONSUMES the latch silently, which is why `rtl819x-switch` 1.2's `lde` is blind to it and why a card reads `/proc/rtl819x-switch` first. Nothing from it entered a driver |
+| `drivers/net/rtl819x/rtl_nic.c` | line | 🔴 **vendor** | 🆕 2026-09-26. `re865x_setPhyGrayCode` `:3197-3232`, the vendor's one named consumer of bit 8, is under `CONFIG_RTL8196C_ETH_IOT` (not set in this image's `.config`, 量 `grep -c` 0) and is called only from the link DSR `:3613-3616`, whose next line `:3618` reads `PSRP` again through `rtl865x_getPhysicalPortLinkStatus`. Its comment says the bit is read-clear — a third, weaker source (the vendor's word about its own register). Taken: that 1.2's three extra reads at `subsys_initcall` clear a latch no built consumer uses |
+
+| path, under `rsdk-1.3.6-4181-EB-2.6.30-0.9.30/include/` | depth | origin | what was taken |
+|---|---|---|---|
+| `linux/ethtool.h`, `linux/sockios.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-26. The same three structs `:51-65`, `:77-80`, `:196-215` and defines `:366`, `:373`, `:378`; `SIOCETHTOOL` `:78`. `linkprobe` includes these; G6 compares them with the kernel's, byte for byte |
+| `asm/errno.h`, `asm-generic/errno-base.h`, `asm/unistd.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-26. `EOPNOTSUPP` 122 `:76`, `ENODEV` 19 `:22`, `__NR_clock_gettime` `:284` — each equal to the kernel's line (G6) |
