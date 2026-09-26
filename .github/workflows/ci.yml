@@ -1499,6 +1499,26 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/viewcheck.py 2>&1 | tee ci-out/viewcheck.out; exit "${PIPESTATUS[0]}"
 
+      # viewdecode (R6b-8 8c) is the host decoder for /proc/rtl819x-view
+      # pages: decode, the vendor's asicCounter rendered from the raw words
+      # (low + (high << 22)), and a before <= view <= after bracket. Its
+      # self-test: A1 classifies every committed asicCounter capture under
+      # bench/ (266 at 8520b6c) as clean or printk-timed -- parsed and
+      # re-rendered to its own CRLF bytes -- or interleaved with other console
+      # output, which the parser must REFUSE while a self-test-only reader
+      # finds all 86 lines behind the foreign characters; B1 the driver's 21
+      # sprintf literals verbatim; B3 the pages viewcheck's harness gets from
+      # the COMPILED driver (host gcc) decode and re-render byte for byte;
+      # C1/C2 the << 22 and B's offsets against values written by hand; D1/D2
+      # the bracket permitting and refusing; E1-E12 every refusal. M0 runs
+      # the unmutated copy through the mutation path, and M1-M8 must each
+      # turn the case they name red. Without gcc or git it REFUSES (exit 3).
+      # What it cannot see is the silicon: the names, the table field layouts
+      # and the << 22 are B's alone.
+      - name: viewdecode
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/viewdecode.py --self-test 2>&1 | tee ci-out/viewdecode.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:
