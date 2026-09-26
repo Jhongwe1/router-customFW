@@ -115,7 +115,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SW_VERSION	"rtl819x-switch 1.2"
+#define RTL819X_SW_VERSION	"rtl819x-switch 1.3"
 
 /* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
@@ -280,10 +280,10 @@ static inline u32 rtl819x_sw_rd(unsigned int off)
 	return v;
 }
 
-/* THE ONLY WRITE PATH.  Everything that writes goes through here, so
- * `n_writes` is a count of writes and not a count of callers who remembered
- * to increment it, and the guard is ordered BEFORE the store rather than
- * logged after it. */
+/* THE ONLY CONFIGURATION WRITE PATH, so `n_writes` counts writes, not callers
+ * who remembered to, and the guard comes BEFORE the store.  1.3: MDIO commands
+ * (MDCIOCR stores) have one path of their own, `rtl819x_mdio_xfer` at the end
+ * of this file, with their own counters and their own gate. */
 static int rtl819x_sw_wr(unsigned int off, u32 v)
 {
 	if (!rtl819x_sw_unlocked) {
@@ -868,3 +868,596 @@ static int rtl819x_sw_lde_lines(char *page)
 	len += sprintf(page + len, "jiffies %lu\n", jiffies);
 	return len;
 }
+
+/* ========================================================================
+ * 1.3 (R6b-7): AN mii_bus FOR THE FIVE EMBEDDED PHYs, AND THE ONE PATH THIS
+ * DRIVER ISSUES MDIO COMMANDS THROUGH.
+ *
+ * Appended, as 1.2 was.  Above this block only the version string and the
+ * comment over `rtl819x_sw_wr` changed, each in place, so no line above
+ * moves (FW-110).
+ *
+ * THE REGISTER CONTRACT.  MDCIOCR 0xBB804004: bit 31 COMMAND (1 = write),
+ * 28:24 PHYADD, 20:16 REGADD, 15:0 WRDATA.  MDCIOSR 0xBB804008: bit 31 STATUS
+ * (1 = in progress), 15:0 RDATA.  讀 x3: the datasheet's Tables 58-59,
+ * `rtl865xc_asicregs.h:1046-1062`, and the loader's primitives at 0x80402F80
+ * and 0x80402FF8 (SPEC.md NET-15).  One store of the whole word issues the
+ * command; STATUS clear is completion.  MDCIOSR 30:16: the datasheet says
+ * Reserved and the header names bit 30 `MDCIOSR_ReadError` (:1267) -- two
+ * sources that disagree, so 未定: this block records those bits (`hi`) and
+ * never decides on them.
+ *
+ * NO 10 ms DELAY.  The tree that builds delays only on 8198 and 8196C
+ * revision A (`rtl865x_asicL2.c:5558-5564`, whose erratum is "mdio data read
+ * will delay 1 mdc clock"); the loader delays 10 ms before every poll,
+ * unconditionally (0x80402FC0).  量: on PHY 0 the vendor's UNDELAYED /proc
+ * path read registers 2, 3, 0 and 1 as 001C, C880, 1100 and 78C9
+ * (bench/2026-09-19 C19-PHYID, C20-PHYST) -- the values the loader's DELAYED
+ * read returned for the same registers (F2, E6, X8, E12d).  A shifted or
+ * late-latched RDATA would have made the two paths disagree.  That is four
+ * values on PHY 0 only; `scan` against the loader's MDIOR rows re-tests it
+ * on 0-4.
+ *
+ * WHO ELSE ISSUES MDIO COMMANDS IN THIS IMAGE, AND WHY IRQs GO OFF.  讀, a
+ * call census of r6b6q's vmlinux: 25 read and 43 write call sites in 20
+ * vendor functions, all through the vendor's two accessors.  All run in
+ * process context -- the probe, the /proc writers, re865x_close -- except
+ * `one_sec_timer`, a kernel timer that re865x_open arms for eth0 only and
+ * that runs `refine_phy_setting()` once a second (`rtl_nic.c:3813-3841`):
+ * page-0 writes to registers 25, 26, 17 and 21 of PHYs 0-4, under
+ * local_irq_save.  None of them takes a lock this driver could share.  On
+ * this .config (UP, PREEMPT_NONE, refused otherwise by 1.2's #error) another
+ * MDIO user can run between our store of MDCIOCR and our read of MDCIOSR
+ * only from interrupt context, so every transaction runs with IRQs off; and
+ * `pread` runs its page select, its read and its page restore inside ONE
+ * IRQs-off section, because a timer tick between them would land
+ * refine_phy_setting's page-0 writes on the selected page.
+ *
+ * WHAT IRQs OFF COSTS, AT WORST.  A transaction polls STATUS at most
+ * RTL819X_MDIO_BOUND + 1 times before its store and as many after it, with
+ * udelay(1) between polls: <= 2 x 10 ms of delay, nominal.  `pread` holds
+ * IRQs off across at most seven transactions (six, and one retried restore
+ * whose first attempt never stored, so has no poll after it): <= 13 x 10 ms
+ * = 130 ms, nominal, plus the reads.  推 a transaction that completes takes
+ * tens of us (`spin` measures it); the worst case is the failure the bound
+ * exists for.  At HZ 100 it would cost ~13 ticks, and at 38400 baud the
+ * UART's FIFO overruns after ~4 ms of host input, so a card does not type
+ * while a pread may be timing out.
+ *
+ * WHAT IS GATED.  Every MDCIOCR store -- a read is a store too (NET-16) --
+ * needs `unlock mdio-i-mean-it` on /proc/rtl819x-mdio: a gate of its own,
+ * because /init writes the switch's unlock on every boot
+ * (config/rlxfw-init.sh).  So a boot issues no MDIO command, `mdio_rd` and
+ * `mdio_wr` read 0 until a card unlocks, and this file's header item 2 stays
+ * true.  `probe` and `pread` also refuse (-EAGAIN, counted in `again`, the
+ * one-shot probe not spent) unless `bound` is RTL819X_MDIO_BOUND: `bound`
+ * exists to make `scan` time out on purpose, and at a small bound a probe
+ * would spend its one shot on phylib's -EIO and a pread's restore could be
+ * refused, leaving the PHY on page 1.
+ *
+ * THE ONLY PHY WRITES: REGISTER 31, THE PAGE SELECT, VALUES 1 AND 0.  讀 x2,
+ * code only -- the loader's PORT1 (0x8040A0A0, docs/loader-phy-and-switch.md
+ * section 4) and the tree that builds (`Set_GPHYWB`, rtl865x_asicL2.c:1230-
+ * 1266) both select a page by writing it to register 31 and restore by
+ * writing 0; the datasheet has no PHY register map.  C-18 needs page 1 alone,
+ * and 7 is the vendor's gateway to register 30's extension pages
+ * (`Set_GPHYWB`'s page >= 31 arm), so `pread` takes page 0 (no select: the
+ * control) or 1 and nothing else.  What register 31 reads back is 未定 -- no
+ * source reads it -- so `p0`, `ps` and `p1` are recorded, and the page-0
+ * control is what says whether the select changed what is read.  The
+ * restore is made whatever happened before it; if its store is refused
+ * because a command is still in flight (-EBUSY), it waits out one more full
+ * bound and stores again.  Left: hardware busy past both bounds (~20 ms),
+ * or a register 31 that reads 0 whatever it holds -- `dirty` and `rs` say
+ * which was seen.  The bus's own write op refuses always (`wr_refused`), so
+ * a phylib write would be counted rather than done.
+ *
+ * WHY phy_mask IS ~0 AT REGISTRATION.  phylib calls an address empty only
+ * when `(id & 0x1fffffff) == 0x1fffffff` (phy_device.c:231).  Register 2
+ * reads 0x0000 at 5-31 (量 SPEC.md NET-24), so their IDs cannot be all-ones
+ * in bits 28:0 whatever register 3 holds, and an unmasked scan would
+ * register 27 phantom phy_devices.  The bus registers with every address
+ * masked -- registration issues no MDIO command -- and `probe` scans 0-4 one
+ * by one through `mdiobus_scan`, phylib's own path.  phylib turns every
+ * failed read into -EIO (get_phy_id), so each of 0-4 also keeps the rc of the
+ * last transaction the bus's read op issued to it (`xrc`).  5-31 are only
+ * ever READ (`scan`).  On a loud image (PRINTK=y) a probe prints
+ * `rtl819x-mdio: probed` (mdio_bus.c:129); the quiet image prints nothing.
+ *
+ * WHY NOTHING IS ATTACHED.  rlx0 is the CPU port and has no PHY (NET-39).
+ * Nothing in rlxfw calls phy_connect or phy_attach; genphy matches only ID
+ * FFFFFFFF and config/rlxfw-kernel.delta pins every other phy_driver off, so
+ * the five devices stay unbound, and `drv` and `att` print that per address.
+ * `pread` takes bus->mdio_lock, the lock phylib's own reads take, before
+ * IRQs go off.
+ *
+ * THE PAGE.  /proc/rtl819x-mdio prints cached results only: a `cat` issues
+ * no MDIO command (`mdio_rd` does not move across one), which matters
+ * because one `cat` renders twice (FW-64).  The rows print last, under a
+ * budget, and `jiffies` is the last line.
+ */
+#include <linux/err.h>
+#include <linux/mutex.h>
+#include <linux/phy.h>
+
+#ifndef CONFIG_PHYLIB
+#error "rtl819x-switch 1.3 registers an mii_bus: CONFIG_PHYLIB, and CONFIG_NET_ETHERNET which it depends on, must be y (config/rlxfw-kernel.delta)"
+#endif
+
+#define RTL819X_SW_MDCIOCR	0x4004
+#define RTL819X_SW_MDCIOSR	0x4008
+#define RTL819X_MDIO_WRITE	(1u << 31)		/* MDCIOCR COMMAND */
+#define RTL819X_MDIO_PHYADD(a)	(((u32)(a) & 0x1Fu) << 24)
+#define RTL819X_MDIO_REGADD(r)	(((u32)(r) & 0x1Fu) << 16)
+#define RTL819X_MDIO_STATUS	(1u << 31)		/* MDCIOSR, 1 = in progress */
+#define RTL819X_MDIO_RDATA	0xFFFFu
+#define RTL819X_MDIO_HIBITS	0x7FFF0000u		/* 30:16, 未定: recorded only */
+#define RTL819X_MDIO_NPHY	5			/* MDIO 0-4 (NET-39) */
+#define RTL819X_MDIO_NADDR	32
+#define RTL819X_MDIO_NROW	6			/* registers 0-5 per scan row */
+#define RTL819X_MDIO_NPR	8			/* pread results kept */
+#define RTL819X_MDIO_PAGEREG	31
+#define RTL819X_MDIO_PAGE	1			/* the one page pread selects */
+#define RTL819X_MDIO_BOUND	10000u	/* polls of (read + udelay(1)): >= 10 ms */
+#define RTL819X_MDIO_NOXFER	1			/* xrc/rs: none issued */
+#define RTL819X_MDIO_PROC	"rtl819x-mdio"
+#define RTL819X_MDIO_TOKEN	"mdio-i-mean-it"
+
+struct rtl819x_mdio_row {
+	int		v[RTL819X_MDIO_NROW];	/* >= 0 a reading, < 0 an errno */
+	u32		hi;	/* OR of MDCIOSR 30:16 over the row's reads */
+	u32		psrp;	/* PSRPa read after the row, a < 5 */
+	unsigned int	n;	/* times scanned; 0 = never, and not printed */
+};
+
+struct rtl819x_mdio_pr {
+	u8	a, page, reg;
+	u8	rt;		/* 1: the restore's store was retried */
+	int	p0;		/* register 31 before: must read 0 */
+	int	ps;		/* register 31 after the select: page, if it reads back */
+	int	v;		/* the reading */
+	int	rs;		/* the restore's store: 0, or its errno */
+	int	p1;		/* register 31 after the restore: must read 0 */
+	int	rc;
+	u32	psrp0, psrp1;	/* PSRPa either side of the section */
+};
+
+static struct mii_bus *rtl819x_mdio_bus;
+static int rtl819x_mdio_reg_rc = 1;	/* 1: `probe` never ran */
+static int rtl819x_mdio_scan_rc[RTL819X_MDIO_NPHY] = {	/* 1: not scanned */
+	RTL819X_MDIO_NOXFER, RTL819X_MDIO_NOXFER, RTL819X_MDIO_NOXFER,
+	RTL819X_MDIO_NOXFER, RTL819X_MDIO_NOXFER
+};
+static int rtl819x_mdio_xrc[RTL819X_MDIO_NPHY] = {
+	RTL819X_MDIO_NOXFER, RTL819X_MDIO_NOXFER, RTL819X_MDIO_NOXFER,
+	RTL819X_MDIO_NOXFER, RTL819X_MDIO_NOXFER
+};
+static int rtl819x_mdio_unlocked;
+static int rtl819x_mdio_dirty;		/* a+1 of a PHY whose restore did not verify */
+static unsigned int rtl819x_mdio_bound = RTL819X_MDIO_BOUND;
+static unsigned long rtl819x_mdio_n_rd, rtl819x_mdio_n_wr;
+static unsigned long rtl819x_mdio_n_to, rtl819x_mdio_n_busy;
+static unsigned long rtl819x_mdio_n_retry;	/* restores stored a second time */
+static unsigned long rtl819x_mdio_n_refused, rtl819x_mdio_n_wr_refused;
+static unsigned long rtl819x_mdio_n_again;	/* probe/pread refused at a small bound */
+static unsigned long rtl819x_mdio_n_spin;	/* completed polls */
+static unsigned int rtl819x_mdio_spin_min, rtl819x_mdio_spin_max;
+static u32 rtl819x_mdio_hi_or, rtl819x_mdio_last_hi;
+static struct rtl819x_mdio_row rtl819x_mdio_rows[RTL819X_MDIO_NADDR];
+static u32 rtl819x_mdio_scanned;
+static unsigned long rtl819x_mdio_scan_j;
+static struct rtl819x_mdio_pr rtl819x_mdio_prs[RTL819X_MDIO_NPR];
+static unsigned int rtl819x_mdio_npr;
+
+/* One MDIO transaction.  THE ONLY PLACE MDCIOCR IS STORED.  The caller holds
+ * IRQs off.  Returns the 16-bit reading, 0 for a completed write, -EBUSY
+ * (STATUS still set before the store, which is then NOT made: a command
+ * already in flight) or -ETIMEDOUT (STATUS still set after the store; 145 on
+ * this arch, arch/rlx/include/asm/errno.h:98) at the bound -- the loader's
+ * own wait has no bound at all (SPEC.md NET-17). */
+static int rtl819x_mdio_xfer(int write, int a, int r, u16 val)
+{
+	unsigned int n;
+	u32 st;
+
+	rtl819x_mdio_last_hi = 0;
+	for (n = 0; __raw_readl(rtl819x_sw_reg(RTL819X_SW_MDCIOSR)) &
+		    RTL819X_MDIO_STATUS; n++) {
+		if (n >= rtl819x_mdio_bound) {
+			rtl819x_mdio_n_busy++;
+			return -EBUSY;
+		}
+		udelay(1);
+	}
+	__raw_writel((write ? RTL819X_MDIO_WRITE | val : 0) |
+		     RTL819X_MDIO_PHYADD(a) | RTL819X_MDIO_REGADD(r),
+		     rtl819x_sw_reg(RTL819X_SW_MDCIOCR));
+	if (write)
+		rtl819x_mdio_n_wr++;
+	else
+		rtl819x_mdio_n_rd++;
+	for (n = 0; ; n++) {
+		st = __raw_readl(rtl819x_sw_reg(RTL819X_SW_MDCIOSR));
+		if (!(st & RTL819X_MDIO_STATUS))
+			break;
+		if (n >= rtl819x_mdio_bound) {
+			rtl819x_mdio_n_to++;
+			return -ETIMEDOUT;
+		}
+		udelay(1);
+	}
+	if (!rtl819x_mdio_n_spin++ || n < rtl819x_mdio_spin_min)
+		rtl819x_mdio_spin_min = n;
+	if (n > rtl819x_mdio_spin_max)
+		rtl819x_mdio_spin_max = n;
+	rtl819x_mdio_last_hi = st & RTL819X_MDIO_HIBITS;
+	rtl819x_mdio_hi_or |= rtl819x_mdio_last_hi;
+	return write ? 0 : (int)(st & RTL819X_MDIO_RDATA);
+}
+
+/* The bus's read op: every phylib read of this bus comes through here, and
+ * for 0-4 it keeps what the transaction itself returned, because phylib
+ * reports every failure as -EIO. */
+static int rtl819x_mdio_read(struct mii_bus *bus, int a, int r)
+{
+	unsigned long flags;
+	int v;
+
+	if (!rtl819x_mdio_unlocked) {
+		rtl819x_mdio_n_refused++;
+		v = -EPERM;
+	} else {
+		local_irq_save(flags);
+		v = rtl819x_mdio_xfer(0, a, r, 0);
+		local_irq_restore(flags);
+	}
+	if (a >= 0 && a < RTL819X_MDIO_NPHY)
+		rtl819x_mdio_xrc[a] = v < 0 ? v : 0;
+	return v;
+}
+
+/* The bus's write op refuses, always.  Nothing in rlxfw writes a PHY through
+ * the bus; phylib would only through a bound phy_driver or an attached
+ * netdev, and neither may exist here.  A non-zero `wr_refused` says one
+ * tried. */
+static int rtl819x_mdio_write(struct mii_bus *bus, int a, int r, u16 val)
+{
+	rtl819x_mdio_n_wr_refused++;
+	return -EPERM;
+}
+
+/* `probe`: register the bus with every address masked, then let phylib scan
+ * 0-4.  One-shot, even after a failure: a second mdiobus_scan of an address
+ * registers a second device under the same name, which device_register
+ * refuses, and mdio_bus.c:218 then overwrites phy_map with NULL.  Refused
+ * without spending the shot while `bound` is not RTL819X_MDIO_BOUND. */
+static int rtl819x_mdio_probe(void)
+{
+	struct mii_bus *bus;
+	struct phy_device *pd;
+	unsigned int a, m = 0;
+	int rc;
+
+	if (rtl819x_mdio_reg_rc != 1)
+		return -EEXIST;
+	if (rtl819x_mdio_bound != RTL819X_MDIO_BOUND) {
+		rtl819x_mdio_n_again++;
+		return -EAGAIN;
+	}
+	bus = mdiobus_alloc();
+	if (!bus) {
+		rtl819x_mdio_reg_rc = -ENOMEM;
+		return -ENOMEM;
+	}
+	bus->name = RTL819X_MDIO_PROC;
+	snprintf(bus->id, MII_BUS_ID_SIZE, "rlxsw");
+	bus->read = rtl819x_mdio_read;
+	bus->write = rtl819x_mdio_write;
+	bus->phy_mask = ~0u;	/* register() scans nothing, issues nothing */
+	rc = mdiobus_register(bus);
+	rtl819x_mdio_reg_rc = rc;
+	if (rc) {
+		mdiobus_free(bus);
+		rlxfw_markx("MD1-REG", (unsigned)-rc);
+		return rc;
+	}
+	rtl819x_mdio_bus = bus;
+	for (a = 0; a < RTL819X_MDIO_NPHY; a++) {
+		pd = mdiobus_scan(bus, a);
+		rtl819x_mdio_scan_rc[a] = IS_ERR(pd) ? (int)PTR_ERR(pd) :
+					  (pd ? 0 : -ENODEV);
+		if (bus->phy_map[a])
+			m |= 1u << a;
+	}
+	rlxfw_markx("MD1", m);
+	return 0;
+}
+
+/* `scan lo hi`: registers 0-5 of every address in [lo, hi] through
+ * mdiobus_read, and PSRPa after each row for a < 5 through the one switch
+ * read path, so a PSRP bit 8 consumed here is counted (1.2).  Reading
+ * register 1 clears the PHY's latched-low link bit (推, IEEE 802.3
+ * 22.2.4.2.13): a card that wants a link-down latch reads it before a scan.
+ * The bound's positive control: at `bound 0` a read whose STATUS is still
+ * set when first polled prints E145, and the next one may print E016. */
+static int rtl819x_mdio_scan(unsigned int lo, unsigned int hi)
+{
+	struct rtl819x_mdio_row *w;
+	unsigned int a, r;
+
+	for (a = lo; a <= hi; a++) {
+		w = &rtl819x_mdio_rows[a];
+		w->hi = 0;
+		for (r = 0; r < RTL819X_MDIO_NROW; r++) {
+			w->v[r] = mdiobus_read(rtl819x_mdio_bus, a, r);
+			w->hi |= rtl819x_mdio_last_hi;
+		}
+		w->psrp = a < RTL819X_MDIO_NPHY ?
+			  rtl819x_sw_rd(RTL819X_SW_PSRP0 + a * 4) : 0;
+		w->n++;
+		rtl819x_mdio_scanned |= 1u << a;
+	}
+	rtl819x_mdio_scan_j = jiffies;
+	rlxfw_markx("MD2", (hi << 8) | lo);
+	return 0;
+}
+
+/* `pread a page reg`: one register of PHY a on page 1, for C-18's page-1
+ * reads; page 0 reads the same register number unpaged, the control that the
+ * select changed what is read (讀: the vendor's 8196E init leaves page-1
+ * register 16 bits 15:13 at 110 on PHYs 0-4, Setting_RTL8196E_PHY,
+ * rtl865x_asicL2.c:4177).  At page 1, in ONE IRQs-off section: read register
+ * 31 (must be 0, or nothing is written), select the page, read register 31
+ * back, read the register, restore page 0 (retried once if refused busy),
+ * read register 31 back (must be 0, and the restore must have been stored,
+ * or every later pread is refused: the PHY may be left on a page the
+ * vendor's page-0 writes would then land on).  PSRPa is read either side
+ * through the one switch read path.  The vendor's Setting_RTL8196E_PHY and
+ * enable_EEE set EnForceMode on PCRP0-4 around their paged writes and its
+ * /proc `extRead` does not; this does not, so the switch's own PHY polling
+ * may meet a selected page (推), and PSRP bit 8 either side is the only
+ * detector here -- valid only while no vendor eth is open, whose link DSR
+ * reads PSRP too. */
+static int rtl819x_mdio_pread(unsigned int a, unsigned int page,
+			      unsigned int reg)
+{
+	struct rtl819x_mdio_pr *p;
+	unsigned long flags;
+	int rc;
+
+	if (rtl819x_mdio_bound != RTL819X_MDIO_BOUND) {
+		rtl819x_mdio_n_again++;
+		return -EAGAIN;
+	}
+	if (rtl819x_mdio_dirty)
+		return -EIO;
+	p = &rtl819x_mdio_prs[rtl819x_mdio_npr++ % RTL819X_MDIO_NPR];
+	memset(p, 0, sizeof(*p));
+	p->a = a;
+	p->page = page;
+	p->reg = reg;
+	p->rs = RTL819X_MDIO_NOXFER;
+	p->psrp0 = rtl819x_sw_rd(RTL819X_SW_PSRP0 + a * 4);
+
+	mutex_lock(&rtl819x_mdio_bus->mdio_lock);
+	local_irq_save(flags);
+	if (!page) {		/* the same register unpaged: the control */
+		p->v = rtl819x_mdio_xfer(0, a, reg, 0);
+		rc = p->v < 0 ? p->v : 0;
+		goto out;
+	}
+	p->p0 = rtl819x_mdio_xfer(0, a, RTL819X_MDIO_PAGEREG, 0);
+	if (p->p0 != 0) {	/* not on page 0, or unreadable: write nothing */
+		rc = p->p0 < 0 ? p->p0 : -EPROTO;
+		goto out;
+	}
+	rc = rtl819x_mdio_xfer(1, a, RTL819X_MDIO_PAGEREG, (u16)page);
+	p->ps = rc ? rc : rtl819x_mdio_xfer(0, a, RTL819X_MDIO_PAGEREG, 0);
+	p->v = rc ? rc : rtl819x_mdio_xfer(0, a, reg, 0);
+	p->rs = rtl819x_mdio_xfer(1, a, RTL819X_MDIO_PAGEREG, 0);  /* always */
+	if (p->rs == -EBUSY) {	/* never stored: one more full bound */
+		p->rt = 1;
+		rtl819x_mdio_n_retry++;
+		p->rs = rtl819x_mdio_xfer(1, a, RTL819X_MDIO_PAGEREG, 0);
+	}
+	p->p1 = rtl819x_mdio_xfer(0, a, RTL819X_MDIO_PAGEREG, 0);
+	if (p->rs == -EBUSY || p->p1 != 0) {
+		rtl819x_mdio_dirty = (int)a + 1;
+		rc = -EIO;
+	} else {
+		rc = p->v < 0 ? p->v : p->ps != (int)page ? -EPROTO : 0;
+	}
+out:
+	local_irq_restore(flags);
+	mutex_unlock(&rtl819x_mdio_bus->mdio_lock);
+
+	p->psrp1 = rtl819x_sw_rd(RTL819X_SW_PSRP0 + a * 4);
+	p->rc = rc;
+	rlxfw_markx("MD3", (a << 16) | (page << 8) | reg);
+	return rc;
+}
+
+/* Rows print last, each only while len is under the budget, so the page
+ * ends inside one 4,096-byte page whatever the counters hold.  Walked from
+ * the formats with every field at its type's widest (32-bit longs, as here;
+ * a row's values are the read op's, 0-FFFF or E001/E016/E145): everything
+ * before the rows is <= 1,735 B, a row <= 69 B and the trailer <= 19 B, so
+ * the page is <= 3,962 B and the budget is a guard that cannot fire at these
+ * widths (tools/mdiocheck.py K16 measures all four). */
+#define RTL819X_MDIO_PAGE_BUDGET	3900
+static int rtl819x_mdio_read_proc(char *page, char **start, off_t off,
+				  int count, int *eof, void *data)
+{
+	struct phy_device *pd;
+	const struct rtl819x_mdio_row *w;
+	const struct rtl819x_mdio_pr *p;
+	unsigned int a, r, i, n;
+	int len = 0;
+
+	len += sprintf(page + len, "version %s\n", RTL819X_SW_VERSION);
+	len += sprintf(page + len, "unlocked %d\n", rtl819x_mdio_unlocked);
+	len += sprintf(page + len, "bus %d reg_rc %d\n",
+		       rtl819x_mdio_bus != NULL, rtl819x_mdio_reg_rc);
+	len += sprintf(page + len, "bound %u\n", rtl819x_mdio_bound);
+	len += sprintf(page + len, "mdio_rd %lu\n", rtl819x_mdio_n_rd);
+	len += sprintf(page + len, "mdio_wr %lu\n", rtl819x_mdio_n_wr);
+	len += sprintf(page + len, "mdio_to %lu busy %lu retry %lu\n",
+		       rtl819x_mdio_n_to, rtl819x_mdio_n_busy,
+		       rtl819x_mdio_n_retry);
+	len += sprintf(page + len, "refused %lu wr_refused %lu again %lu\n",
+		       rtl819x_mdio_n_refused, rtl819x_mdio_n_wr_refused,
+		       rtl819x_mdio_n_again);
+	len += sprintf(page + len, "spin %lu %u %u\n", rtl819x_mdio_n_spin,
+		       rtl819x_mdio_spin_min, rtl819x_mdio_spin_max);
+	len += sprintf(page + len, "hi_or %08X\n", rtl819x_mdio_hi_or);
+	len += sprintf(page + len, "dirty %d\n", rtl819x_mdio_dirty);
+	len += sprintf(page + len, "scanned %08X j %lu\n",
+		       rtl819x_mdio_scanned, rtl819x_mdio_scan_j);
+
+	for (a = 0; a < RTL819X_MDIO_NPHY; a++) {
+		pd = rtl819x_mdio_bus ? rtl819x_mdio_bus->phy_map[a] : NULL;
+		if (pd)
+			len += sprintf(page + len,
+				       "phy%u id %08X rc %d xrc %d drv %d att %d\n",
+				       a, pd->phy_id, rtl819x_mdio_scan_rc[a],
+				       rtl819x_mdio_xrc[a],
+				       pd->dev.driver != NULL,
+				       pd->attached_dev != NULL);
+		else
+			len += sprintf(page + len, "phy%u id - rc %d xrc %d\n",
+				       a, rtl819x_mdio_scan_rc[a],
+				       rtl819x_mdio_xrc[a]);
+	}
+
+	n = rtl819x_mdio_npr < RTL819X_MDIO_NPR ? rtl819x_mdio_npr :
+						 RTL819X_MDIO_NPR;
+	for (i = 0; i < n; i++) {
+		p = &rtl819x_mdio_prs[(rtl819x_mdio_npr - n + i) %
+				      RTL819X_MDIO_NPR];
+		len += sprintf(page + len,
+			       "pr a%u p%u r%02u v %d p0 %d ps %d p1 %d rs %d rt %u rc %d psrp %08X %08X\n",
+			       p->a, p->page, p->reg, p->v, p->p0, p->ps,
+			       p->p1, p->rs, p->rt, p->rc, p->psrp0, p->psrp1);
+	}
+
+	for (a = 0; a < RTL819X_MDIO_NADDR &&
+		    len < RTL819X_MDIO_PAGE_BUDGET; a++) {
+		w = &rtl819x_mdio_rows[a];
+		if (!w->n)
+			continue;
+		len += sprintf(page + len, "a%02u", a);
+		for (r = 0; r < RTL819X_MDIO_NROW; r++)
+			len += w->v[r] < 0 ?
+			       sprintf(page + len, " E%03d", -w->v[r]) :
+			       sprintf(page + len, " %04X", w->v[r]);
+		len += sprintf(page + len, " hi %04X psrp %08X n %u\n",
+			       w->hi >> 16, w->psrp, w->n);
+	}
+
+	len += sprintf(page + len, "jiffies %lu\n", jiffies);	/* terminator */
+	*eof = 1;
+	return len;
+}
+
+/* Exactly n space-separated numbers, each starting with a digit, the last one
+ * ending the string.  simple_strtoul skips nothing and reads a field that does
+ * not start with a digit as 0 (lib/vsprintf.c), so without this a doubled
+ * space would turn `pread 0  1` into a read of register 1 on page 0, and
+ * trailing letters would be ignored rather than refused. */
+static int rtl819x_mdio_nums(const char *s, unsigned long *v, int n)
+{
+	char *e;
+	int i;
+
+	for (i = 0; i < n; i++) {
+		if (*s < '0' || *s > '9')
+			return -EINVAL;
+		v[i] = simple_strtoul(s, &e, 0);
+		if (*e != (i + 1 < n ? ' ' : '\0'))
+			return -EINVAL;
+		s = e + 1;
+	}
+	return 0;
+}
+
+static int rtl819x_mdio_write_proc(struct file *file, const char __user *ubuf,
+				   unsigned long count, void *data)
+{
+	char buf[48];
+	unsigned long n = count, v[3];
+	int rc;
+
+	if (n >= sizeof(buf))
+		return -EINVAL;
+	if (copy_from_user(buf, ubuf, n))
+		return -EFAULT;
+	buf[n] = '\0';
+	while (n && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
+		buf[--n] = '\0';
+
+	if (!strcmp(buf, "unlock " RTL819X_MDIO_TOKEN)) {
+		rtl819x_mdio_unlocked = 1;
+		rlxfw_mark("MD-UNLOCK");
+		return (int)count;
+	}
+	if (!strcmp(buf, "lock")) {
+		rtl819x_mdio_unlocked = 0;
+		rlxfw_mark("MD-LOCK");
+		return (int)count;
+	}
+	if (!strncmp(buf, "bound ", 6)) {	/* the timeout's positive control */
+		if (rtl819x_mdio_nums(buf + 6, v, 1) || v[0] > RTL819X_MDIO_BOUND)
+			return -EINVAL;
+		rtl819x_mdio_bound = (unsigned int)v[0];
+		return (int)count;
+	}
+
+	/* Everything below issues MDIO commands. */
+	if (!rtl819x_mdio_unlocked) {
+		rtl819x_mdio_n_refused++;
+		return -EPERM;
+	}
+	if (!strcmp(buf, "probe")) {
+		rc = rtl819x_mdio_probe();
+		return rc ? rc : (int)count;
+	}
+	if (!rtl819x_mdio_bus)
+		return -ENODEV;
+	if (!strncmp(buf, "scan ", 5)) {
+		if (rtl819x_mdio_nums(buf + 5, v, 2) || v[0] > v[1] ||
+		    v[1] >= RTL819X_MDIO_NADDR)
+			return -EINVAL;
+		rc = rtl819x_mdio_scan((unsigned int)v[0], (unsigned int)v[1]);
+		return rc ? rc : (int)count;
+	}
+	if (!strncmp(buf, "pread ", 6)) {
+		/* PHYs 0-4 only; page 0 (no select: the control) or page 1
+		 * (register 31 <- 1, then <- 0); never register 31 itself. */
+		if (rtl819x_mdio_nums(buf + 6, v, 3) ||
+		    v[0] >= RTL819X_MDIO_NPHY || v[1] > RTL819X_MDIO_PAGE ||
+		    v[2] >= RTL819X_MDIO_PAGEREG)
+			return -EINVAL;
+		rc = rtl819x_mdio_pread((unsigned int)v[0], (unsigned int)v[1],
+					(unsigned int)v[2]);
+		return rc ? rc : (int)count;
+	}
+	return -EINVAL;
+}
+
+/* The /proc entry only: no MDIO command and no phylib call at boot, so the
+ * boot capture does not change (and nothing prints unless this fails). */
+static int __init rtl819x_mdio_init(void)
+{
+	struct proc_dir_entry *pde;
+
+	pde = create_proc_entry(RTL819X_MDIO_PROC, 0644, NULL);
+	if (!pde) {
+		rlxfw_mark("MD0-NOPROC");
+		return 0;
+	}
+	pde->read_proc  = rtl819x_mdio_read_proc;
+	pde->write_proc = rtl819x_mdio_write_proc;
+	return 0;
+}
+
+device_initcall(rtl819x_mdio_init);

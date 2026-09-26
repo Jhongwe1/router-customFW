@@ -1259,3 +1259,52 @@ without keeping it. No vendor sequence entered a driver.
 |---|---|---|---|
 | `linux/ethtool.h`, `linux/sockios.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-26. The same three structs `:51-65`, `:77-80`, `:196-215` and defines `:366`, `:373`, `:378`; `SIOCETHTOOL` `:78`. `linkprobe` includes these; G6 compares them with the kernel's, byte for byte |
 | `asm/errno.h`, `asm-generic/errno-base.h`, `asm/unistd.h` | **line** | 🔴 **toolchain** | 🆕 2026-09-26. `EOPNOTSUPP` 122 `:76`, `ENODEV` 19 `:22`, `__NR_clock_gettime` `:284` — each equal to the kernel's line (G6) |
+
+## § 9.7 — `R6b-7`: the MDIO path, phylib, and what the vendor pages without, 2026-09-26
+
+**Not one of these paths is in scope, and `ledgerscan check` was green before
+they were declared** (量 on the tree carrying `rtl819x-switch` 1.3 and
+`tools/mdiocheck.py`: 84 in-scope paths, green). They are declared for § 9.5's
+reason. `rtl819x-switch` is this project's own driver and has cited the vendor
+header since 1.0, so it never sat in § 4.1 and 1.3's diff is not a blind
+write: what these rows bound is the reasoning behind 1.3's decisions. Every
+line below was read in the staged tree the images `r6b7q` and `r6b7q2` were
+built from — the tree that builds — and each line number was re-read there
+before it was written here.
+
+⚠️ **What was taken, by kind.** From the vendor's switch code: the
+`MDCIOCR`/`MDCIOSR` field layout, as the third of three sources (`SPEC.md`
+`NET-15`); the page-select idiom at register 31, as the second of two, both of
+them code; two default values the card predicts; and the fact that one vendor
+timer writes PHY registers once a second with IRQs off. From the generic
+kernel: phylib's registration, scan and read path and its empty-address test,
+which decide `probe`'s shape; `simple_strtoul`'s rules, which decide the
+parser's strictness; and the errno numbers the page prints. No vendor sequence
+entered the driver: 1.3 copies neither the vendor's 10 ms delay, nor its
+`EnForceMode` bracket, nor its unbounded poll.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-26 (a second row; § 9.6's is `R6b-6`'s). `MDCIOCR`'s fields `:1046-1056`, `MDCIOSR`'s `:1058-1062`, and `MDCIOSR_ReadError (1<<30)` `:1267`. **The field layout entered `rtl819x-switch` 1.3** as the third source beside the datasheet's Tables 57–59 and the loader's two primitives (`SPEC.md` `NET-15`). Bit 30's name is a disagreement with the datasheet, which says Reserved: recorded, never decided on (`NET-136`) |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicL2.c` | line | 🔴 **vendor** | 🆕 2026-09-26. The two accessors `:5552-5580`: one store issues, `STATUS` clear completes, and the poll has no bound. Their 10 ms delay `:5558-5564`, only on 8198 and 8196C revision A, was **not copied**: the undelayed and delayed paths reading the same values decided it (`NET-136`). `Set_GPHYWB` `:1230-1266`: a page selected by register 31, a page ≥ 31 by 31 ← 7 and 30 ← page, page 0 restored — **the idiom entered 1.3's `pread`** as the second of two sources (the loader's `PORT1` is the first), and it is why `pread` refuses page 7. `Setting_RTL8196E_PHY` `:4170-4195`: `EnForceMode` on `PCRP0`–`4` `:4173-4174`, not copied; page 1 register 16 bits 15:13 ← 110 `:4177` and page 1 register 19 bit 0 ← 0 in the B-cut branch `:4193`, two values the card predicts and nothing in the driver. `:5209`, a commented-out store of `0x96181441` to `MDCIOCR`, read for the design's reading of `NET-28`'s word and taken into nothing |
+| `drivers/net/rtl819x/rtl_nic.c` | line | 🔴 **vendor** | 🆕 2026-09-26 (a second row; § 9.6's is `R6b-6`'s). `refine_phy_setting` `:3813-3841` — page-0 writes to registers 25, 26, 17 and 21 of PHYs 0–4 — called at `:4140` from `one_sec_timer` `:3845`, which saves IRQs off at `:3856` and which `re865x_open` arms for `eth0` only, `:4257-4266`. **Taken: why every 1.3 transaction runs with IRQs off, and why `pread`'s select, read and restore share one section.** Nothing copied |
+| `drivers/net/rtl819x/rtl865x_proc_debug.c` | line | 🔴 **vendor** | 🆕 2026-09-26 (a second row; § 9.6's is `R6b-6`'s). The `/proc/rtl865x/phyReg` writer's `extRead` branch `:4836-4881`: a page selected through register 31, one read, page 0 restored — no `EnForceMode`, no gate — and its reply format `:4874`. Taken: the card's second source for the page-1 values (the owner's decision B) and the line it predicts. Nothing entered the driver |
+| `drivers/net/phy/phy_device.c` | line | **generic** | 🆕 2026-09-26. `get_phy_id` `:187-209` (every negative read becomes `-EIO`), `get_phy_device` `:220-237` with the empty test `:231`, `genphy_driver` `:886-888` (ID and mask `0xffffffff`), and `phy_init`, a `subsys_initcall`, `:899-920`. **Why**: `phy_mask` `~0` and `probe`'s own scan of 0–4 (unmasked, 27 phantom devices), `xrc` kept beside phylib's rc, "nothing binds", and why the bus is not registered from `rtl819x_sw_init`. `tools/mdiocheck.py` transcribes `:187-236` |
+| `drivers/net/phy/mdio_bus.c` | line | **generic** | 🆕 2026-09-26. `mdiobus_register` `:87-139` — with every address masked it issues no command, and its `pr_info` `:129` prints `probed` on a loud image; `mdiobus_scan` `:182-221` — a refused `device_register` leaves `phy_map` `NULL` at `:218`, which is why `probe` is one-shot; `mdiobus_read` `:234-246` — it takes `mdio_lock` and `BUG_ON(in_interrupt())`, which is why `pread` takes the same lock before IRQs go off. `mdiocheck` transcribes all three |
+| `drivers/net/phy/realtek.c` | line | **generic** | 🆕 2026-09-26. `:53-55`: its one driver matches `001CC912` under mask `001FFFFF`, so it would not bind this die's `001CC880`; `config/rlxfw-kernel.delta` pins it n all the same |
+| `include/linux/phy.h` | line | **generic** | 🆕 2026-09-26. The API 1.3 calls: `struct mii_bus` `:88`, `phy_map` `:112`, `MII_BUS_ID_SIZE` `:82`, and `PHY_ID_FMT` `"%s:%02x"` `:76`, which names the devices `rlxsw:00` … `rlxsw:04` |
+| `arch/rlx/include/asm/errno.h` | line | 🔴 **vendor** | 🆕 2026-09-26 (a second row; § 9.6's is `R6b-6`'s). `ETIMEDOUT` **145** `:98` and `EPROTO` 71 `:48`: the numbers 1.3's page prints (`E145`) and the card predicts, where asm-generic's `ETIMEDOUT` is 110 |
+| `include/asm-generic/errno-base.h` | line | **generic** | 🆕 2026-09-26 (a second row). `EPERM` 1 `:4`, `EIO` 5 `:8`, `EAGAIN` 11 `:14`, `ENOMEM` 12 `:15`, `EFAULT` 14 `:17`, `EBUSY` 16 `:19`, `EEXIST` 17 `:20`, `ENODEV` 19 `:22`, `EINVAL` 22 `:25` |
+| `lib/vsprintf.c` | line | **generic** | 🆕 2026-09-26. `simple_guess_base` `:36-46` and `simple_strtoul` `:54-76`: no whitespace skipped, a field that does not start with a digit reads 0, and base 0 takes `0x` as hex and a leading `0` as octal. **Taken: the parser's strictness** (1.3's comment cites the file by name); `mdiocheck` transcribes `:36-75` |
+
+The rows `config/rlxfw-kernel.delta` needed read files `ledgerscan` does not see
+— a Kconfig or a Makefile has no source suffix, and `scripts/` is not one of its
+top-level directories — so they are declared here by hand, in the same tree:
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/net/Kconfig` | line | **generic** | 🆕 2026-09-26. `NET_ETHERNET` `:184-186` (a prompt, `depends on !UML`), its `if` block `:211`–`:1917`, the seven prompts it opens (`MII` `:213`, `AX88796` `:233`, `SMC91X` `:902`, `DM9000` `:930`, `ETHOC` `:975`, `DNET` `:1062`, `B44` `:1381`) and `source "drivers/net/ibm_newemac/Kconfig"` `:1302` |
+| `drivers/net/phy/Kconfig` | line | **generic** | 🆕 2026-09-26. `PHYLIB` `:5-8` (`depends on !S390`, `depends on NET_ETHERNET`), its `if` block `:14`–`:112`, the fifteen prompts from `MARVELL_PHY` `:18` to `MDIO_BITBANG` `:94`, and `MDIO_GPIO` `:103`, which `MDIO_BITBANG` n keeps unreachable |
+| `drivers/net/ibm_newemac/Kconfig` | line | **generic** | 🆕 2026-09-26. The seven `IBM_NEW_EMAC_*` `:50`–`:74`: `bool`, no prompt, `default n` — the promptless rows |
+| `drivers/net/Makefile`, `drivers/net/phy/Makefile` | line | **generic** | 🆕 2026-09-26. The staged `drivers/net/Makefile` links `rtl819x-switch.o` at `:98` before `obj-$(CONFIG_PHYLIB) += phy/` at `:100`; `phy/Makefile` builds `libphy.o` from `phy.o`, `phy_device.o` and `mdio_bus.o` |
+| `scripts/kconfig/symbol.c` | line | **generic** | 🆕 2026-09-26. `:313-322`: a symbol with a default property is flagged `SYMBOL_WRITE`, so a promptless `bool` inside an opened `if` is written out as `# … is not set` — why the seven were undeclared and no prompt showed them |

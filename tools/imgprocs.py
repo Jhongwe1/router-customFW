@@ -45,6 +45,13 @@ an image with no vendor tree at all: a control that could not fail where a
 vendor control has to.  The tool now REFUSES any vendor positive control that
 is on `SHARED`, and `--self-test` fails if one is.
 
+`--witness NAME` (repeatable, 2026-09-26, `R6b-7`) names an entry THIS image
+must carry, with the same NUL-bounded search: absent, the run is REFUSED.
+It is an option and not a fourth control because it is a property of one
+image -- `rtl819x-mdio` exists from switch 1.3 on, and the images cards still
+boot before that (`r6b2q`, `r6b6q`) must keep passing the default run.
+`--self-test` shows it refusing and permitting (W1-W3).
+
 WHAT IT CANNOT DO
 -----------------
 It reads a **flat** image (`vmlinux_img`, the `objcopy -O binary` output), not
@@ -57,7 +64,7 @@ one cell.  ABSENT is the half this tool can stand behind: a name absent from
 the image is a name no object in it carries.
 
 usage
-    imgprocs.py <flat-image> [<vendor-source.c>]
+    imgprocs.py <flat-image> [<vendor-source.c>] [--witness NAME]...
     imgprocs.py --self-test
 """
 import os
@@ -96,11 +103,27 @@ def parse_names(txt):
     return names
 
 
+def parse_args(argv):
+    """(positional args, witnesses, refusal or None) from argv[1:]."""
+    args, witnesses = [], []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--witness":
+            if i + 1 >= len(argv) or not argv[i + 1]:
+                return args, witnesses, "REFUSED: --witness needs a name"
+            witnesses.append(argv[i + 1])
+            i += 2
+            continue
+        args.append(argv[i])
+        i += 1
+    return args, witnesses, None
+
+
 def count(img, n):
     return img.count(b"\x00" + n.encode() + b"\x00")
 
 
-def evaluate(img, names, out, controls=None):
+def evaluate(img, names, out, controls=None, witnesses=()):
     """The whole verdict on one image; `out` collects the printed lines.
     Returns 0 on a report, 2 on a refusal.  `controls` exists for the
     self-test, which must see the guard below refuse a bad set."""
@@ -135,6 +158,21 @@ def evaluate(img, names, out, controls=None):
         out.append("REFUSED: %d control(s) failed -- the search is broken and "
                    "the absences below would be meaningless." % bad)
         return 2
+
+    if witnesses:
+        out.append("")
+        out.append("witnesses (this image must carry each)")
+        missing = 0
+        for n in witnesses:
+            c = count(img, n)
+            missing += 0 if c else 1
+            out.append("  %-18s %d   present   %s"
+                       % (n, c, "ok" if c else "ABSENT"))
+        if missing:
+            out.append("")
+            out.append("REFUSED: %d witness(es) absent -- this is not the "
+                       "image the card was written for." % missing)
+            return 2
 
     present = [n for n in names if count(img, n)]
     absent = [n for n in names if not count(img, n)]
@@ -237,6 +275,33 @@ def self_test():
          "`memory`, is refused before anything is counted, though every "
          "control in it would read ok (rc %d)" % rc)
 
+    # --witness, both ways (R6b-7).  The witness is a name the default run
+    # does not know, so only the option can make its absence a refusal.
+    out = []
+    rc = evaluate(img_of(*(positives + ["mmd", "rtl819x-mdio"])), base, out,
+                  witnesses=["rtl819x-mdio"])
+    carried = any(l.startswith("  rtl819x-mdio") and l.endswith("ok")
+                  for l in out)
+    case("W1", rc == 0 and carried, "a witness the image carries is printed "
+         "ok and the run reports (rc %d, printed %s)" % (rc, carried))
+
+    out = []
+    rc = evaluate(img_of(*(positives + ["mmd"])), base, out,
+                  witnesses=["rtl819x-mdio"])
+    plain = []
+    rc0 = evaluate(img_of(*(positives + ["mmd"])), base, plain)
+    case("W2", rc == 2 and rc0 == 0
+         and any("witness(es) absent" in l for l in out),
+         "the same image without the witness entry is REFUSED with the "
+         "option (rc %d) and reported without it (rc %d)" % (rc, rc0))
+
+    got = parse_args(["img", "--witness", "a", "src", "--witness", "b"])
+    bare = parse_args(["img", "--witness"])
+    case("W3", got == (["img", "src"], ["a", "b"], None)
+         and bare[2] is not None,
+         "--witness repeats and leaves the positionals alone; a --witness "
+         "with no name is a refusal (got %s; bare %s)" % (got, bare[2]))
+
     good = 0
     for label, ok, detail in cases:
         good += ok
@@ -247,13 +312,17 @@ def self_test():
 
 def main(argv):
     if len(argv) >= 2 and argv[1] == "--self-test":
-        print("imgprocs 1.1  --  self-test")
+        print("imgprocs 1.2  --  self-test")
         return self_test()
-    if len(argv) < 2:
+    args, witnesses, err = parse_args(argv[1:])
+    if err:
+        print(err)
+        return 3
+    if not args or len(args) > 2:
         print(__doc__.strip())
         return 3
-    img_path = argv[1]
-    src_path = argv[2] if len(argv) > 2 else DEFAULT_SRC
+    img_path = args[0]
+    src_path = args[1] if len(args) > 1 else DEFAULT_SRC
     for p in (img_path, src_path):
         if not os.path.isfile(p):
             print("REFUSED: no such file: %s" % p)
@@ -261,7 +330,7 @@ def main(argv):
 
     txt = open(src_path, encoding="utf-8", errors="replace").read()
     names = parse_names(txt)
-    print("imgprocs 1.1")
+    print("imgprocs 1.2")
     print("  image   %s  (%d bytes)" % (img_path, os.path.getsize(img_path)))
     print("  source  %s" % src_path)
     print("  vendor registers %d distinct entry name(s)" % len(names))
@@ -269,7 +338,7 @@ def main(argv):
     with open(img_path, "rb") as fh:
         img = fh.read()
     out = []
-    rc = evaluate(img, names, out)
+    rc = evaluate(img, names, out, witnesses=witnesses)
     for line in out:
         print(line)
     return rc

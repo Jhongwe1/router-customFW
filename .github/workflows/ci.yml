@@ -1447,6 +1447,24 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/linkprobecheck.py 2>&1 | tee ci-out/linkprobecheck.out; exit "${PIPESTATUS[0]}"
 
+      # mdiocheck (R6b-7) cuts rtl819x-switch 1.3's MDIO block out of
+      # config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c, UNCHANGED,
+      # and compiles it with the HOST gcc in the kernel's dialect (-std=gnu89
+      # -Werror) against a scripted MDIO controller, phylib's register, scan
+      # and read path transcribed from the staged 2.6.30 tree, the kernel's
+      # simple_strtoul and this arch's errno values (ETIMEDOUT 145), with the
+      # IRQs-off sections, udelay and the mutex counted. K0-K23 and K14b: every
+      # verb refused and permitted beside its twin, the exact MDCIOCR words, a
+      # pread's six stores in ONE IRQs-off section, the page restore retried
+      # and `dirty`, the bound's positive control, the page at its widest. M0
+      # runs the unmutated block through the mutation path, and M1-M20 must
+      # each turn the case they name red. Without gcc it REFUSES (exit 3). It
+      # is here because a verb that misreports would misjudge D7; what it
+      # cannot see is the silicon, and its fake shares the driver's sources.
+      - name: mdiocheck
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/mdiocheck.py 2>&1 | tee ci-out/mdiocheck.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:

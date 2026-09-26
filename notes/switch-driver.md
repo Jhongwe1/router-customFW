@@ -1004,3 +1004,423 @@ The study file is a record; the correction is `LOG.md`'s.
 * The three reads at `subsys_initcall` clear ports 1, 2 and 4's bit 8 before
   the vendor's probe; that costs nothing only as long as the vendor's one
   consumer stays unbuilt.
+
+# 10. 2026-09-26 (`R6b-7`) — 1.3: an `mii_bus` for PHYs 0–4, and one path for every MDIO command
+
+## 10.1 Why
+
+`R6b-7`'s DoD asks for the PHY IDs read *through Linux's MDIO API* and compared
+with the loader's, and for `C-18`'s reopening condition read through the same
+path. 1.0–1.2 issue no MDIO command at all. 1.3 adds a phylib `mii_bus` for
+the five embedded PHYs rather than a private accessor, because the step names
+the kernel's API (the owner's decision A, § 10.7). `SPEC.md` `NET-135`.
+
+## 10.2 The register contract, and where each part comes from
+
+The fields are `SPEC.md` `NET-15`'s; what 1.3 adds is what each part rests on,
+and which parts are open. `SPEC.md` `NET-136`.
+
+| part | value | V | N | sources |
+|---|---|:-:|:-:|---|
+| `MDCIOCR` `0xBB804004` | bit 31 `COMMAND` (0 read, 1 write), 28:24 `PHYADD`, 20:16 `REGADD`, 15:0 `WRDATA`; 30:29 and 23:21 reserved | 讀 | 讀 | ×3 (`NET-15`): D, Tables 57–59; B, `rtl865xc_asicregs.h:1046-1056` (the `drivers/net/rtl819x/AsicDriver/` copy, 3,537 lines); A, the loader's `phy_read`/`phy_write` at `0x80402F80`/`0x80402FF8` |
+| `MDCIOSR` `0xBB804008` | bit 31 `STATUS` (1 = in progress), 15:0 `RDATA` | 讀 | 讀 | D Table 59; B `:1058-1062`; A |
+| issue, completion | one store of the whole command word issues it; `STATUS` clear is completion | 讀 | 讀 | D's procedure; A; B's two accessors, `rtl865x_asicL2.c:5552-5580` |
+| `MDCIOSR` 30:16 | **未定**: D says Reserved, B names bit 30 `MDCIOSR_ReadError` (`:1267`) | — | — | two sources that disagree; 1.3 records the bits (`hi`, `hi_or`) and decides nothing on them |
+| `STATUS` set | never observed: all 70 `MDCIOSR` rows in the committed `/proc/rtl819x-switch` dumps read bit 31 clear, live and slot 0 (live `00001100` ×58, `00000000` ×10, `000078C9` ×1, `000078ED` ×1; slot 0 `00000000` ×70) | 量 | 讀 | S; a dump reads the register long after any command, so this bounds nothing about a transaction's length — `spin` measures that |
+| the 10 ms delay | not needed: the vendor's **undelayed** `/proc/rtl865x/phyReg` path read PHY 0 registers 2, 3, 0 and 1 as `0x1c`, `0xc880`, `0x1100`, `0x78c9` (`bench/2026-09-19` `C19-PHYID`, `C20-PHYST`), the values the loader's **delayed** reads returned (`F2`, `bench/2026-08-23/E.log`, `X8`, `E12d`); a shifted or late-latched `RDATA` would have made the two paths disagree | 量 | 讀 | B delays only on 8198 and 8196C revision A (`rtl865x_asicL2.c:5558-5564`: "mdio data read will delay 1 mdc clock"); A delays 10 ms before every poll (`0x80402FC0`). Four values on PHY 0; `scan` re-tests 0–4 |
+| register 31 | the page select: a page is selected by writing it to register 31 and left by writing 0; a page ≥ 31 goes through 31 ← 7, then 30 ← page | 讀 | 讀 | ×2, code only: A, `PORT1` (`0x8040A0A0`, `docs/loader-phy-and-switch.md` § 4); B, `Set_GPHYWB` (`rtl865x_asicL2.c:1230-1266`). D has no PHY register map |
+| register 31, read back | **未定**: no source reads it | — | — | `NET-136` 殘留 in `SPEC.md` § 17; the card's (g) |
+| page 1, register 16, bits 15:13 | 110 on PHYs 0–4 after the vendor's init ("Iq Current 110:175uA") | 讀 | 讀 | B, `Setting_RTL8196E_PHY`, `rtl865x_asicL2.c:4177` |
+| page 1, register 19, bit 0 | 0 on all five: cleared in the B-cut branch | 讀 | 讀 | B `:4193`; the branch runs because `REVR` reads `0x8196E001` (量, `SPEC.md` `CPU-32`) and the A-cut test is `== 0x8196e000` |
+| an empty address, to phylib | `(id & 0x1fffffff) == 0x1fffffff` | 讀 | 讀 | `drivers/net/phy/phy_device.c:231`. Register 2 reads `0x0000` at 5–31 (量, `NET-24`), so none of those 27 IDs can pass as empty, whatever register 3 holds |
+| a failed read, to phylib | every negative read becomes `-EIO` | 讀 | 讀 | `get_phy_id`, `phy_device.c:187-209` |
+| `ETIMEDOUT`, `EPROTO` | 145 and 71 on this arch, not asm-generic's 110 | 讀 | 讀 | `arch/rlx/include/asm/errno.h:98`, `:48` |
+
+## 10.3 Who else issues MDIO commands in this image, and why IRQs go off
+
+讀, a call census of `r6b6q`'s vmlinux (the design's, not re-derived here): 25
+read and 43 write call sites in 20 vendor functions, all through the two
+accessors. All of them run in process context — the probe, the `/proc`
+writers, `re865x_close` — except `one_sec_timer` (`rtl_nic.c:3845`), a kernel
+timer that `re865x_open` arms for `eth0` only (`:4257-4266`). It saves IRQs off
+(`:3856`) and calls `refine_phy_setting()` (`:3813-3841`, called at `:4140`)
+once a second: page-0 writes to registers 25, 26, 17 and 21 of PHYs 0–4. None
+of these paths takes a lock 1.3 could share.
+
+On this `.config` — UP, `PREEMPT_NONE`, and 1.2's `#error` otherwise — another
+MDIO user can run between 1.3's store of `MDCIOCR` and its read of `MDCIOSR`
+only from interrupt context. So every transaction runs with IRQs off, and
+`pread`'s select, read and restore run inside **one** IRQs-off section: a timer
+tick between them would land `refine_phy_setting`'s page-0 writes on the
+selected page. `/init` opens `rlx0` only, so the timer is not armed unless a
+card opens `eth0`.
+
+## 10.4 The design
+
+* **One path.** `rtl819x_mdio_xfer()` is the only `MDCIOCR` store in rlxfw. A
+  bounded pre-check (`STATUS` still set after `bound` polls: `-EBUSY`, counted
+  in `busy`, and the store is **not** made — a command is still in flight), the
+  store, a bounded poll (`-ETIMEDOUT`, counted in `mdio_to`), then `RDATA`.
+  `spin` counts the transactions that completed and the fewest and most polls
+  any of them needed; bits 30:16 are kept per transaction and ORed into
+  `hi_or`. The loader's own wait has no bound at all (`SPEC.md` `NET-17`).
+* **The gate** (decision C). Every `MDCIOCR` store — a read is a store too
+  (`NET-16`) — needs `unlock mdio-i-mean-it` on `/proc/rtl819x-mdio`: a token of
+  its own, because `/init` writes the switch's `unlock i-mean-it` on every boot
+  (`config/rlxfw-init.sh`). So a boot issues no MDIO command, `mdio_rd` and
+  `mdio_wr` read 0 until a card unlocks, and the header's item 2 (*it writes
+  NOTHING at boot*) stays true. `bound` is accepted while locked; it issues
+  nothing.
+* **`probe`: registration.** One-shot. `mdiobus_alloc`, name `rtl819x-mdio`,
+  id `rlxsw`, the two ops, and `phy_mask` = `~0`, so `mdiobus_register` issues
+  no command; then `mdiobus_scan(bus, a)` for a = 0–4, phylib's own path: ten
+  reads, registers 2 and 3 of each. Each address keeps phylib's result (`rc`)
+  beside the rc of the last transaction the read op issued to it (`xrc`),
+  because phylib turns every failed read into `-EIO`. Masked, because an
+  unmasked scan would register 27 phantom `phy_device`s (§ 10.2). One-shot even
+  after a failure, because a second `mdiobus_scan` of an address registers a
+  second device under the same name, `device_register` refuses it, and
+  `mdio_bus.c:218` then writes `NULL` into `phy_map`. Not at boot: nothing may
+  issue MDIO at boot, and `phy_init` is a `subsys_initcall`
+  (`phy_device.c:899-920`) in an object linked after `rtl819x-switch.o` (the
+  staged `drivers/net/Makefile`, lines 98 and 100), so `rtl819x_sw_init` could
+  not register a bus anyway. The boot creates only the `/proc` entry, at
+  `device_initcall`: no MDIO command, no phylib call, and no mark unless that
+  fails (`MD0-NOPROC`).
+* **Nothing attached.** `rlx0` is the CPU port and has no PHY (`NET-39`).
+  Nothing calls `phy_connect` or `phy_attach`; genphy matches only the ID
+  `FFFFFFFF` (`phy_device.c:886-888`), and the delta pins every other
+  `phy_driver` off, so the five devices stay unbound. `drv` and `att` print that
+  per address.
+* **The bus's write op refuses, always** (`wr_refused`): a phylib write would be
+  counted, not done. The only PHY writes 1.3 makes are `pread`'s register-31
+  select and restore.
+* **`bound n`** (0–10,000) exists to make `scan` time out on purpose: the
+  timeout's positive control. `probe` and `pread` refuse with `-EAGAIN`
+  (counted in `again`, the one-shot probe not spent) unless `bound` is the fixed
+  10,000: at a small bound a probe would spend its one shot on phylib's `-EIO`,
+  and a `pread`'s restore could be refused and leave the PHY on page 1.
+* **`scan lo hi`**: registers 0–5 of every address in [lo, hi] through
+  `mdiobus_read`, then `PSRPa` for a < 5 through the one switch read path, so a
+  bit 8 consumed here is counted by 1.2's `lde`. Reading register 1 clears the
+  PHY's latched-low link bit (推, IEEE 802.3 22.2.4.2.13): a card that wants a
+  link-down latch reads it before a scan.
+* **`pread a page reg`**: a 0–4; page 0 (no select — the same register
+  unpaged, the control) or 1; reg 0–30. At page 1, after taking
+  `bus->mdio_lock` (the lock phylib's own reads take) and inside one IRQs-off
+  section: read register 31 (`p0`; not 0 → `-EPROTO`, and nothing is written);
+  31 ← 1; read 31 back (`ps`); read the register (`v`); 31 ← 0, always, and
+  once more at the full bound if that store was refused `-EBUSY` (`rt`,
+  `retry`); read 31 back (`p1`). A restore never stored, or `p1` ≠ 0, sets
+  `dirty` to a + 1 and returns `-EIO`, and every later `pread` is refused
+  `-EIO` with no store: the PHY may be left on a page the vendor's page-0
+  writes would land on. `ps` ≠ 1 returns `-EPROTO` with `v` kept. `PSRPa` is read
+  either side, outside the section. A page-1 `pread` is six transactions — four
+  reads, two writes; a page-0 `pread` is one read.
+* **No `EnForceMode` bracket.** The vendor's `Setting_RTL8196E_PHY` sets
+  `EnForceMode` on `PCRP0`–`PCRP4` before its paged writes
+  (`rtl865x_asicL2.c:4173-4174`); its `/proc` `extRead` pages without it
+  (`rtl865x_proc_debug.c:4836-4881`). 1.3 does not bracket, so the switch's own
+  PHY polling may meet a selected page (推). `PSRP` bit 8 either side of the
+  section is the only detector, and only while no vendor `eth*` is open, whose
+  link DSR reads `PSRP` too.
+* **IRQs off, at worst.** A transaction polls `STATUS` at most `bound` + 1
+  times before its store and as many after it, with `udelay(1)` between polls:
+  ≤ 2 × 10 ms of delay, nominal. A `pread` holds IRQs off across at most seven
+  transactions — six, and one retried restore whose first attempt never stored
+  and so never polled after — so ≤ 13 × 10 ms = 130 ms nominal, plus the reads.
+  推: a transaction that completes takes tens of µs; the worst case is the
+  failure the bound exists for. At `HZ` 100 it would cost ~13 ticks, and at
+  38,400 baud the UART's FIFO fills in ~4 ms of host input (推), so a card does
+  not type while a `pread` may be timing out.
+* **The page.** `/proc/rtl819x-mdio` prints cached results only: a `cat` issues
+  no MDIO command, which matters because one `cat` renders twice (`FW-64`).
+
+  ```
+  version rtl819x-switch 1.3
+  unlocked %d
+  bus %d reg_rc %d
+  bound %u
+  mdio_rd %lu
+  mdio_wr %lu
+  mdio_to %lu busy %lu retry %lu
+  refused %lu wr_refused %lu again %lu
+  spin %lu %u %u
+  hi_or %08X
+  dirty %d
+  scanned %08X j %lu
+  phyN id %08X rc %d xrc %d drv %d att %d     N = 0-4; before a probe: phyN id - rc %d xrc %d
+  pr aA pP rRR v %d p0 %d ps %d p1 %d rs %d rt %u rc %d psrp %08X %08X     the last eight preads
+  aNN %04X x6 hi %04X psrp %08X n %u     each scanned address; an error prints as Ennn
+  jiffies %lu
+  ```
+
+  Walked from the formats with every field at its widest: the head is ≤ 1,735
+  bytes, a row ≤ 69, the trailer 19, so the page is ≤ 3,962 bytes with all 32
+  rows. The rows print under a 3,900-byte budget that cannot fire at these
+  widths (the 32nd row starts at ≤ 3,874).
+* **The parser.** A numeric field must start with a digit, fields are separated
+  by exactly one space, and the last one ends the line. 讀 `simple_strtoul`
+  skips no whitespace and reads a field that does not start with a digit as 0
+  (`lib/vsprintf.c:54-76`), so under the draft's parser `pread 0  1` (two
+  spaces) became a page-0 read of register 1, and trailing letters were
+  ignored. Base 0: `0x` is hex and a leading `0` is octal.
+* **Marks**, printed when a verb runs: `RLXFW-MD-UNLOCK`, `RLXFW-MD-LOCK`,
+  `RLXFW-MD1=` (probe: the mask of addresses holding a device),
+  `RLXFW-MD1-REG=` (registration failed: −rc), `RLXFW-MD2=` (scan:
+  `hi << 8 | lo`), `RLXFW-MD3=` (pread: `a << 16 | page << 8 | reg`), and
+  `RLXFW-MD0-NOPROC`. A card gates on the page, never on a mark (`FW-47`).
+* **`#ifndef CONFIG_PHYLIB` → `#error`**: a delta without phylib refuses at
+  compile time instead of failing at link.
+
+## 10.5 What the desk measured
+
+* **The delta: 31 rows, declared from a build, not a prediction.** Appended
+  after `config/rlxfw-kernel.delta`'s line 294, so none of its cited lines
+  moves (2, 82, 89, 138 and 174–177; all of 1–294 read as before). The two
+  decisions, `CONFIG_NET_ETHERNET` and `CONFIG_PHYLIB`, went alone into a probe
+  cell, `r6b7p0`. 量: its oldconfig log held 22 `(NEW)` prompts — 15 in
+  `drivers/net/phy/Kconfig` (fourteen PHY drivers and `MDIO_BITBANG`) and 7 in
+  `drivers/net/Kconfig`'s `if NET_ETHERNET` block (`MII`, `AX88796`, `SMC91X`,
+  `DM9000`, `ETHOC`, `DNET`, `B44`) — and `kconfig-delta check` refused it with
+  29 undeclared: those 22, and seven promptless `CONFIG_IBM_NEW_EMAC_*` that a
+  count of prompts cannot show. Both predictions on file before that build
+  held (22; 22 + 7). The 31 are 24 `set` (the two decisions, and the 22 pinned
+  n) and 7 `derive … promptless`. `SPEC.md` `FW-147`.
+* **The images.** `r6b7q` and `r6b7q2` — quiet, `2a3f5e2` plus this change,
+  recipe `50e4af55`, each from a fresh stage, one at a time, with `R6b-6`'s
+  recipe (`rlxfw-kbuild.sh --variant quiet --initramfs _irfs-r6b6 spec --marks
+  --jobs 4`, then `rtkimage.py build`) — are byte-identical: vmlinux
+  `b926105b…` (4,530,877 bytes) and nfjrom `548f4fae…` (1,169,408 bytes), `cmp`
+  rc 0 on both; the two manifests differ only in the cell name; the initramfs
+  digest `d6882c14` is `r6b6q`'s. Both read `(NEW)` 0 and `kconfig-delta check`
+  green with 30 derived and 74 set, against `r6b6q`'s 23 and 50 — the 31 rows
+  exactly. `rlxfw-marks verify`: 12 marks, 9 witnesses, 1 ABSENT. The loud
+  variant's oldconfig alone ran (`r6b7L0`): `(NEW)` 0, `check --variant loud`
+  green with 30 and 76. `config/` has not changed between `2a3f5e2` and the
+  commit this lands on, so the recipe stands.
+* **The size.** `vmlinux_img` is 4,002,304 bytes against the 5,242,880-byte
+  ceiling (`SPEC.md` `FW-23`): 76.3 %, margin 1,240,576. `r6b6q`'s is
+  3,961,344, so 1.3 and libphy cost 40,960 bytes, and `__init_end` moved by the
+  same amount, from `0x803C8000` to `0x803D2000`. The design's guess, +~20 KB,
+  was half.
+* **In the ELF** (量, byte search of `r6b7q.vmlinux.elf`): `rtl819x-switch 1.3`
+  once; `rtl819x-switch 1.2` once, a comment in `config/mfgtest.sh`, whose
+  `MT-PORT` accepts any `rtl819x-switch ` version; `rtl819x-mdio` once;
+  `mdio-i-mean-it` once. Against `r6b6q`'s `System.map`, 103 global names are
+  new — 32 `rtl819x_mdio_*`, the rest libphy's — and none is gone. The build
+  logs carry 162 warnings each; this file's one is 1.1's `rtl819x_sw_lock`
+  defined but not used.
+* **No cited line of the driver moved.** Above the appended block, only the
+  version string (line 118) and the comment over `rtl819x_sw_wr` (four lines,
+  cited nowhere) changed, each in place. The ranges cited elsewhere — 88–92,
+  93–97, 209–213, 323, 375, 560–564, 588–661 — and § 9.2's and `NET-127`'s
+  (269, 278, 532, 553, 676, 689, 716) read as they did.
+* **`imgprocs` 1.2**, 量 on the commit this lands in: 1.1's controls
+  (`asicCounter` in `memory`'s place, § 8.14) with a `--witness NAME` option
+  merged in. On `r6b7q` the default run prints what it prints on `r6b6q`, line
+  for line (13 of 42 literals, 7 of them shared with retained non-vendor code),
+  and `--witness rtl819x-mdio` finds the entry once; the same witness on
+  `r6b6q` refuses (rc 2) — the control. `--witness` is an option rather than a
+  fourth fixed control because the images cards still boot before 1.3 would
+  then be refused. `--self-test` 16 of 16: W1 a carried witness reports, W2 the
+  same image without the entry is refused with the option and reported without
+  it, W3 the option repeats and a bare `--witness` is refused; three hand
+  mutants (no refusal, no bare-name check, no `ok` label) each turn their own
+  case red.
+* **The suites that read this driver or its image**, run by the
+  implementation on `2a3f5e2` plus this change: `storeseq` `r6b6q` → `r6b7q`
+  green on every NIC function; `hazlint` 0 violations in 115,650 loads
+  (`r6b6q`: 0 in 115,080); `mfginject` identical to `2a3f5e2`'s output (its
+  fixtures stay 1.2); `bootbytes` 7 of 7, identical to `2a3f5e2`'s.
+
+## 10.6 `mdiocheck`: the verbs, refusing and permitting, on the host
+
+`tools/mdiocheck.py` cuts the appended block out of the driver **unchanged**
+and compiles it with the host's gcc in the kernel's dialect (`-std=gnu89
+-Werror`) inside a generated harness: a scripted MDIO controller (`STATUS` held
+for a scripted number of reads, PHYs 0–4 with a register-31 page select,
+`0x0000` at 5–31); phylib's register, scan and read path transcribed from the
+staged tree (`mdio_bus.c:87-139`, `:182-221`, `:234-246`;
+`phy_device.c:187-236`); the kernel's `simple_strtoul` (`lib/vsprintf.c:36-75`);
+this arch's errno values; and IRQs-off sections, `udelay` and a mutex that are
+counted.
+
+Twenty-five cases, K0–K23 and K14b: every verb refused and permitted beside its
+twin; the exact `MDCIOCR` words; a `pread` as six stores in one IRQs-off
+section with the mutex taken outside it; the restore's retry and `dirty`,
+including a register 31 that reads 0 over a restore that was never stored; the
+timeout's positive control (at `bound 0`, with `STATUS` held for 3 reads, a row
+reads `E145 E016 E016 E145 E016 E016`); the page at its widest (the four figures
+in § 10.4 are K16's); a `cat` that issues nothing; stuck hardware spending the
+one shot with `xrc -16` kept on every address. M0 runs the unmutated copy
+through the mutants' own path, and M1–M20 each break one thing and must turn
+the case named for them red. 量 on the commit this lands in: 46 of 46 — 25
+cases, M0, and 20 of 20 mutants each killed by its named case. `SPEC.md`
+`FW-146`.
+
+It is a CI step, beside `linkprobecheck` in the `instruments` job (host gcc
+only; nothing stands down). 量: `desk-sweep` ran that declared step from
+`ci.yml` on a verified copy of the tree — 1 ran, 1 green, 13.7 s for its 46
+lines — and `ci-census` over the capture reads 46 of 46 against the row's 46,
+and red with the row set to 47. The owner's rule of 2026-09-26 admits a new
+checker only against bricking, an `H601` leak or a misjudged result. This is the
+driver's verb harness, the kind `nic15check` and `linkprobecheck` are, and a
+verb that printed a wrong ID or a refusal it did not make would misjudge `D7`.
+
+What it cannot see: the silicon — how long `STATUS` stays set, what register
+31 reads back, whether the switch's PHY poller meets a selected page, what
+`MDCIOSR` 30:16 means. Its fake was written from the same sources as the
+driver, so a misreading shared by both passes. Nor phylib's device model beyond
+the name check, nor sysfs, nor whether rsdk's gcc 3.4.6 compiles the block — the
+two image builds answered that one.
+
+## 10.7 The review and the owner's decisions, 2026-09-26
+
+The design went through an adversarial review in three lenses (register and
+API, build and blast radius, bench and DoD) and a synthesis. Its eight required
+changes are in the code: the restore guaranteed or the operation refused; the
+bound guard on `probe` and `pread`; the seven promptless rows; the vendor's
+`/proc/rtl865x/phyReg` as a planned third source for `D7`; the delay argued by
+equality; pages 0 and 1 only, with register 31's marks; `C-18`'s trigger
+narrowed; and a per-address prediction for `scan`. The owner decided:
+
+* **A.** `CONFIG_NET_ETHERNET=y` and `CONFIG_PHYLIB=y`, with every row
+  `kconfig-delta check` enumerates declared from a build (§ 10.5).
+* **B.** rlxfw writes PHY register 31, for the first time, for pages 0 and 1
+  only; the restore is guaranteed at the fixed bound or the operation refused;
+  `probe` and `pread` refuse with `-EAGAIN` unless `bound` is 10,000, without
+  spending the one-shot probe; each address keeps its last transaction's rc.
+  The vendor's `extRead N 1 19` through `/proc/rtl865x/phyReg` is a second
+  source for the page-1 values on the card, and is not code in the driver.
+  推: a power cycle resets the PHY registers.
+* **C.** A new unlock token, `mdio-i-mean-it`, separate from the switch's.
+* **D.** *Whether port 1 needs the patch* is observed at register level only.
+  The functional clause is ⊘. Its price: two cable moves and a comparison arm —
+  the cable moved to port 1, the same traffic sent, port 1's per-port counters
+  compared with port 3's, and the host path lost while the cable moves. Its
+  reason: one link partner cannot establish *not needed*. `C-18` reopens if PHY
+  1's page-1 register 19 bits 15:1 differ from the value PHYs 0, 2, 3 and 4
+  agree on (void if those four disagree), or if a port-1 link fault is ever
+  observed. PHY 4's page-1 register 20 is recorded only: the vendor reads it
+  back before adding to it, so its default is 未定 and its bit 1 triggers
+  nothing.
+* **E.** The seating is its own press on the 1.3 image, after `R6b-6`'s. (h),
+  the start of `PSRP`'s 保留態, is ⊘ for now: it needs a cable move and a
+  prediction. (i), `reset full` followed by `scan 0 4` (MDIO with
+  `EnablePHYIf` 0), is `R6b-8`'s question, and it kills the network for that
+  boot.
+* **F.** Every change and wording fix of the synthesis applied.
+
+Beyond the review, three changes the implementation made: the strict parser
+(§ 10.4), which the harness found; `pread` takes `bus->mdio_lock` before IRQs
+go off; and each address's scan rc starts at 1, *not scanned*, rather than 0.
+
+## 10.8 The card, for after `R6b-6`'s seating
+
+Pinned: nfjrom `548f4fae…`; the booted image identified by the tool comparing
+`RLXFW-ID0` with `50E4AF55`, never by a typed value; every address from
+`r3-4/out/r6b7q.System.map`. Zero flash-write commands, zero `FLR`, the map
+bracket. Errno values on this arch: `EPERM` 1, `EIO` 5, `EAGAIN` 11, `EBUSY` 16,
+`EEXIST` 17, `ENODEV` 19, `EINVAL` 22, `EPROTO` 71, `ETIMEDOUT` 145. Every
+prediction below becomes a `cardnum` row when the card is written.
+
+**At the loader**, same power cycle, prompt caught:
+
+* **L1** `MDIOR 2`: 0–4 read `0x001c`, 5–31 `0x0000` (量, repeats `F2`).
+* **L2** `MDIOR 3`: 0 and 1 read `0xc880` (量, `bench/2026-08-23/E.log` — the
+  only register-3 reads in `bench/`); 2–4 `0xc880` (推); 5–31 `0x0000` (推).
+* Then TFTP, the staged head read back, `J`.
+
+**Under Linux:**
+
+* **(a)** `cat /proc/rtl819x-switch`, first. `version rtl819x-switch 1.3`.
+  Slot-0 `MDCIOCR`/`MDCIOSR` read `1F030000`/`00000000` (推: L2's last command
+  is a read of address 31, register 3). `96181441`, slot 0's value in all 70
+  committed dumps (`NET-28`), would mean the TFTP/`J` path issues that store
+  after the prompt. `PSRP3` is the only `LinkUp` port, and `ifconfig` shows
+  `rlx0` and `lo` only — otherwise the bit-8 detector is void for this boot.
+* **(b)** `cat /proc/rtl819x-mdio`, still locked, byte for byte `mdiocheck`'s
+  K1: `version rtl819x-switch 1.3`, `unlocked 0`, `bus 0 reg_rc 1`,
+  `bound 10000`, `mdio_rd 0`, `mdio_wr 0`, `mdio_to 0 busy 0 retry 0`,
+  `refused 0 wr_refused 0 again 0`, `spin 0 0 0`, `hi_or 00000000`, `dirty 0`,
+  `scanned 00000000 j 0`, `phy0`–`phy4` `id - rc 1 xrc 1`, then `jiffies`.
+* **(c)** The guards and the probe. `probe` while locked → `EPERM`.
+  `unlock mdio-i-mean-it` → `RLXFW-MD-UNLOCK`. `bound 0`, then `probe` →
+  `EAGAIN`: the page reads `again 1`, `reg_rc 1`, `mdio_rd 0`. `bound 10000`,
+  then `probe` → `RLXFW-MD1=0000001F`: `bus 1 reg_rc 0`, `mdio_rd 10`,
+  `mdio_wr 0`, `phy0`–`phy4` `id 001CC880 rc 0 xrc 0 drv 0 att 0`,
+  `refused 1`, `again 1`. `ls /sys/bus/mdio_bus/devices` → `rlxsw:00` …
+  `rlxsw:04` (`/init` mounts sysfs). A second `probe` → `EEXIST`.
+* **(d)** `D7`: `phyN`'s id = `L1[N] << 16 | L2[N]`, for N = 0–4. The loader
+  side is `NET-06` and `NET-24`, not `NET-39`, which holds BMCR and the port
+  map. The third source: `echo read N 2` and `echo read N 3` into
+  `/proc/rtl865x/phyReg` → `read phyId(N), regId(2),regData:0x1c` and
+  `…regData:0xc880`, the form `C19-PHYID` printed; those reads do not move
+  rlxfw's counters.
+* **(e)** `scan 0 31`: `mdio_rd` 10 → 202.
+  * 0, 1, 2 and 4: r0 `1100` (量 `C20` on PHY 0 under Linux, `X8` on 0–4 at the
+    loader; 推 on 1, 2 and 4 under Linux); r1 `78C9` (量 `E12d` and `C20` on PHY
+    0; 推 on the others); r2 `001C`; r3 `C880`; r4 recorded; r5 `0001` (量
+    `E12e` on PHY 0; 推 on the others).
+  * 3, the cabled port: r1 with bits 2 and 5 set (量 `X5`, `78ED`); r5 non-zero
+    with bit 0 set (量 `X4`, `CDE1`, against this desk's RTL8153).
+  * 5–31: r0 and r2 `0000` (量 `X8`, `F2`); r1 and r3–r5 `0000` (推).
+  * `hi` `0000` on every row (推; the bits are 未定). Record `spin` and `hi_or`.
+  * A mismatch refutes 1.3's address path even when `D7` holds: all five IDs
+    are equal, so `D7` alone cannot see addresses 0–4 swapped among themselves.
+* **(f)** The timeout's positive control: `bound 0`; `pread 0 0 16` → `EAGAIN`
+  (`again 2`); `scan 5 5`; `bound 10000`; `scan 5 5`. Conditional on (e)'s
+  `spin`: if its min is ≥ 1, the first row holds at least one `E145`; if its
+  max is 0, it reads `0000` ×6 with no timeout, and the control is ⊘ for this
+  press; between the two, only the accounting is predicted. In every branch
+  each `E145` is one `mdio_to`, each `E016` one `busy` with no store, and
+  `mdio_rd` rises by 6 − Δ`busy`. (The harness's model, `STATUS` held for 3
+  reads, gives `E145 E016 E016 E145 E016 E016`.) The second `scan 5 5` reads
+  `0000` ×6 and `mdio_to` does not move.
+* **(g)** `C-18`: eight `pread`s, which fill the eight kept. `pread 0 0 16`,
+  the unpaged control; `pread 0 1 16` (bits 15:13 read 110, 讀
+  `rtl865x_asicL2.c:4177`); `pread a 1 19` for a = 0, 1, 2, 4, then 3, the
+  cabled port, last; `pread 4 1 20`, recorded only. Predicted: `p0 0`, `p1 0`,
+  `rs 0`, `rt 0`, `dirty 0` (推). `ps` is 未定: if register 31 does not read
+  back, every paged read returns `-71` with `v` kept, and that is a reading,
+  not a failure. If `p0` ≠ 0 at rest, `-71` with nothing written, and `C-18` is
+  not observed this seating. Register 19's bit 0 reads 0 on all five (讀
+  `:4193`, 量 `REVR`). With no retry: `mdio_rd` +29, `mdio_wr` +14. Read the page
+  at once; then `scan 0 4` and `cat /proc/rtl819x-switch` must equal (e)'s,
+  with the `lde` counts unmoved — the detector for a paged write landing on
+  the wrong page.
+* **(g′)** Decision B: `echo extRead N 1 19` into `/proc/rtl865x/phyReg`, for
+  N = 0–4 → `extRead phyId(N), pageId(1), regId(19), regData:0x…`, equal to
+  (g)'s `v`. That vendor path pages with no gate, no IRQs off and an unbounded
+  poll, which is why it runs after (g).
+* **`C-18`'s rule** is decision D's (§ 10.7).
+* **(h)** ⊘ this press; **(i)** `R6b-8`'s.
+* **(j)** `lock`, then a final page: `dirty 0`, `wr_refused 0`, `mdio_to` and
+  `busy` as (f) predicted. A final `probe` → `EPERM`.
+
+Card notes: nothing is typed while a `pread` may be timing out (≤ 130 ms with
+IRQs off, nominal). Each `cat` renders twice and issues no MDIO command.
+Numbers are typed in decimal without leading zeros.
+
+## 10.9 What 1.3 does not establish
+
+* Anything on the silicon: not one line of the block has run. `STATUS`'s
+  latency, what register 31 reads back, whether the switch's PHY poller meets a
+  selected page, what `MDCIOSR` 30:16 means, the probe on the die and the sysfs
+  names are the card's.
+* That the quiet boot capture is unchanged is 推: no boot mark was added and
+  `bootbytes` reads 7 of 7, but nothing was booted. On a loud image a probe
+  prints `rtl819x-mdio: probed` (`mdio_bus.c:129`).
+* `mdiocheck`'s fake shares the driver's sources. 130 ms is an upper bound by
+  counting; no scripted case exceeds 3 × bound.
+* The loud image: only its oldconfig and its delta check ran.
+* How the 40,960 bytes divide between libphy and the block.
+* The vendor MDIO call census (25 read, 43 write, 20 functions) is the design's,
+  not re-derived.
+* That IRQs off contains `one_sec_timer` is 推; `/init` does not arm it, and a
+  card that opens `eth0` does.
+* The restore's residual: hardware busy past both bounds (~20 ms), or a
+  register 31 that reads 0 whatever it holds. `dirty` and `rs` say which was
+  seen; the desk excludes neither.
+* `D7` and `C-18`. `R6b-7` stays open for its card and its seating.
