@@ -1529,7 +1529,7 @@ miss. The score is `docs/boot-time-d3-score.tsv`, and the table `P2` exists to p
     last boot plus two (量: 412 + 2 here, `P1-TCPD` holding 412 echo replies, one ARP reply
     and one ARP request; 292 + 2 in seating A), and the list's n = 1 rule made it stable. The
     property the rows stand for held: `CRCAlignErr` − port-3 egress 0 in both seatings, 414 =
-    414. Experiment: none — redefine the row as that per-echo identity.
+    414. Experiment: none — redefine the row as that per-echo identity. Scored on block 46, where the readings disagree: `notes/nic-driver.md` § 26.5.
 * **The two exact misses** are `P2-M0`'s 3,009 B and its digest (§ 8.1): the capture tool's
   tail, an instrument miss (`FW-136`), not a device quantity.
 

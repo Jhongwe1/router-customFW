@@ -4103,3 +4103,288 @@ cannot see: `H601`'s 8,192 B, two writes that cancel, and anything after `R1-M1`
   map cannot see.
 * That the running driver was compiled from HEAD's text: the image is pinned by digest, the
   source identity is 推.
+
+## 26 `R6b-2`'s open items read on committed captures: `NET-109` 殘留, `NET-78` 殘留 and `D3-MISS` ③
+
+Read 2026-09-26 at the desk (113th segment); nothing here ran on the silicon. Five questions,
+each read by two readers that share no code, whose disagreements a judge settled against the
+raw captures; a critic re-read the raw captures and listed fourteen defects, all adopted, and
+every number those defects or the coordinator's rulings changed was re-derived once more by
+the merge's own scripts (`$FWRE_WORK/rebuild/s113/r6b2rem/merge/`: `m46.py`, `sl48.py`,
+`n109b.py`, `bcast.py`, `cpuscan.py`). Their planted controls go red where they should: one
+frame counted at A1-17 turns P0's `o` identity to 75 of 76 and adds A1-17 to the misses of
+§ 26.5's (a) and W forms; one B-10 frame counted nowhere makes B-10 a refuter under every
+reading of § 26.3. Names are card B48 § 3.0's (§ 22).
+
+**What was written before power, and what was not.** 讀 `git log`: the only texts written
+before block 46's power (its catch began 2026-09-25 21:22:46) are card B48's § 3.0 — among
+them the rule that a frame of L bytes lands in the bucket of L + 4 — and § 3.1's P0, both
+frozen in `f05caf6` (16:49:52), and `D3-MISS` ③'s redefinition in `41bf452` (16:47:35). Every
+refutation condition below was written on 2026-09-26, after § 22's per-run numbers were
+public, and is **post hoc**; where one restates or extends a pre-power text, the text is named.
+A bracket that carries nothing — `c` = `o` = `w` = 0 — is *not tested* and is left out of every
+pass count; a count over all 76 is given beside it where the two differ.
+
+### 26.1 `NET-109` 殘留 on block 46: the CPU port's counters against the desk reading
+
+The desk reading (推, § 21.1): the CPU port counts every frame it takes from the DMA engine as
+an FCS error, so there `JabberErr` means longer than 1,518 B, `FragErr` shorter than 64 B, and
+`Rcv` and the good-frame counters stay 0. Post hoc, it is refuted by a non-vacuous bracket
+where (a) Δ`Rcv` or Δ(Rx `Unicast` + `Multicast` + `Broadcast`) is not 0; (b) Δ`< 64:` or
+Δ`oversize:` is not 0; (c) the six in-range buckets do not sum to `c` − `j` − `f`; (d) a CLEAN
+bracket's buckets differ from the capture's lengths + 4 (card § 3.0's rule, applied here as a
+refutation); or (f) `c` exceeds P0's upper bound `n2_k − n1_(k−1)`, which P0 applied at
+control runs and this applies at every bracket, B-09 (5 > 4) exempted by name (推 B-08's
+frame). (e), port 3's `Snd` bytes against Σ(F + 4), tests the corollary that the switch
+forwards each such frame whole, not the reading.
+
+量, 37 non-vacuous brackets of 76 (the 39 vacuous: A1-09, A1-15, A1-17, A1-18, A2-04…A2-19,
+B-00, C-00…C-11, D-00…D-05):
+
+* (a) and (b) hold at 37 of 37; the four counters read 0 at 77 of 77 reads, and none of the
+  block's 328 jabber and 3 fragment frames (19 brackets) reached `< 64:` or `oversize:`.
+* (c) holds at 37 of 37 (76 of 76 with the vacuous ones); over the block 439 = 770 − 328 − 3.
+* (d): 17 of § 22.1's 28 CLEAN brackets hold frames (the 11 C runs hold none), and in all 17
+  the six buckets equal the capture's lengths + 4 — 321 frames: 210 at 60 B in `64:`, 64 at
+  276 B in `256 - 511:`, 43 at 1,514 B and 4 at 1,513 B in `1024 - 1518:`.
+* (e): port 3's Δ`Snd` = Σ(F · k) + 4 × frames at 17 of 17 CLEAN (102,702 = 102,702 B) and at 37
+  of 37 non-vacuous brackets; the host adapter's `rx_crc_errors` reads 0 at 77 of 77 host reads.
+* (f) holds at 36 of 37; the 37th is B-09, the exempted excess.
+* The buckets minus the capture's lengths + 4 are non-zero at four brackets, and there equal
+  `d`: A1-06 +1 in `1024 - 1518:` (the capture holds ten 63-B frames), A1-12 +8 in
+  `256 - 511:`, B-14 and B-16 +1 each in `1024 - 1518:`.
+
+Nothing fired: the desk reading stands un-refuted on block 46. **The zeros of (a) and (b)
+have no positive control.** The rival reading — the CPU port's Rx good-frame, undersize and
+oversize counters never count at all — predicts the same zeros, and no committed capture holds
+a CPU-port block where one of them is non-zero (量, `cpuscan.py`, whose synthetic non-zero block
+is counted: 0 of 179 blocks at `f9abbb2`, `CRCAlignErr` > 0 in 174; 0 of 266 at `2a3f5e2`,
+> 0 in 260). The vendor's own driver reads the same zeros (§ 26.2), so a read under it cannot
+be the control. Only (c), (d) and (e) separate the two readings. 讀 The field names are the
+vendor print's, `rtl865xC_dumpAsicDiagCounter` in `AsicDriver/rtl865x_asicCom.c` (`Rcv` =
+`ifInOctets`, `CRCAlignErr` = `dot3StatsFCSErrors`, `FragErr` = `etherStatsFragments`,
+`JabberErr` = `etherStatsJabbers`), a file the build compiles (§ 26.2); that undersize and
+oversize count only good-FCS frames is RFC 2819's definition, 推 for this silicon.
+
+### 26.2 `NET-109` 殘留 on three TX paths: not 1.4's descriptors
+
+Block 46 has one driver and one setting. Two other TX paths are committed: the vendor's `eth4`
+driver (block 45, D1-K8 → D1-K9, `rlx0` down) and driver 1.5 at the vendor's lengths (block
+47, `txlen vendor` in both dumps at each end, 量 each dump's `tx15` line). Post hoc — written
+after the raw values had been seen — "the pattern belongs to 1.4's descriptors" would have
+been read from any of these brackets where the CPU port counted a frame as good or `c` < `o`.
+
+| path | bracket | `c` | `o` | `n` | `j`/`f`/`d` |
+|---|---|---:|---:|---:|---|
+| vendor `eth4` (block 45) | D1-K8 → D1-K9 | 16,215 | 16,215 | — | 0/0/0 |
+| 1.5 `txlen vendor` (block 47) | E-F1 | 221 | 221 | 221 | 0/0/0 |
+| | E-F2 | 221 | 221 | 221 | 0/0/0 |
+| | LB-V-R → W-1a | 728 | 728 | 728 | 0/0/0 |
+| | W-1a → W-1b | 728 | 728 | 728 | 0/0/0 |
+| | W-1b → W-1c | 728 | 728 | 728 | 0/0/0 |
+| | W-1c → W-1d | 726 | 726 | 726 | 0/0/0 |
+| 1.4 (block 47, same boot) | E-L1 | 789 | 168 | 895 | 581/3/41 |
+
+量, each row re-derived by the merge's own parser: on the seven non-1.4 brackets Δ`Rcv`,
+Δ(Rx U+M+B), Δ`< 64:` and Δ`oversize:` are 0, `c` = `o` with `j` = `f` = `d` = 0, and on the six
+1.5 brackets `c` = `n` exactly, 3,352 frames. `eth4` has no driver count in these reads; its
+proxies are the host's Δ`rx_packets` 16,215 (read after the switch reads) and the board's
+Δ`Ip.OutRequests` 16,214 (read before them). E-L1, on the same boot, is where the counting
+checks go red: `o` + `j` + `f` + `d` misses `c` by −4 (`NET-131`), and 106 frames handed over
+were counted nowhere. It is no control for the zero checks — E-L1 reads the same zeros — so
+"not specific to 1.4" rests on `c` = `o` on every other path and on `CRCAlignErr` counting
+every `eth4` frame, and the zero checks inherit § 26.1's caveat. `NET-109` stays out of `M1`
+(`NET-129`).
+
+量 counts, 讀 lengths: on these brackets every frame is binned at F + 4 (W-1a…d: 365/63/128/
+172/0/0, 364/0/0/84/280/0, 364/0/0/0/232/132, 363/0/0/0/0/363; E-F1 and E-F2: 21/60/0/60/0/80);
+binning at F would put 368, 364, 364, 363 and 81 frames in `< 64:`, which read 0. Under `txlen
+vendor` the descriptor's `ph_len` is F + 4 too (讀 § 25.7), so these brackets cannot tell the
+declared length from the frame's bytes plus an FCS; the brackets that could — 1.4's, where the
+engine's length departs from the descriptor's (E-L1, block 48's `SL`) — were not used for this.
+
+**A desk lead, not a result.** 量 on block 47 only (`r PCRP3` in 8 of 8 `-LS` reads): port 3's
+`PCRP3` reads `0C7F0039` live and `0C7F0038` at boot, so bit 31 is 0. 讀, two sources: bit 31 is
+`ByPassTCRC`, 0 meaning *Recalculate CRC for CRC error frame* — the datasheet's Table 64, and
+`BYPASS_TCRC (1 << 31)` in `rtl865xc_asicregs.h`'s `CONFIG_RTL_8196E` branch, the table in
+`notes/switch-driver.md` § 4. That header is the copy the build compiles (讀 the `r6b2q` build
+tree: `rtl865x_asicCom.o`'s dependency list names `AsicDriver/rtl865xc_asicregs.h`, `.config`
+has `CONFIG_RTL_8196E=y`, and `System.map` carries `rtl865xC_dumpAsicDiagCounter`; the copy
+under `include/asm-rlx/rtl865x/` differs and is not included). 推 If port 3 recalculates the
+CRC of a frame the CPU port flagged, the host's `rx_crc_errors` 0 cannot tell whether the CPU
+port received a valid FCS: it still kills "frames on the wire with a bad FCS, dropped by the
+host" (`NET-109`), and it no longer bears on the desk reading. Whether bit 31 acts on port 3 as
+the egress port or on the ingress port — the CPU port, whose `PCRP` was not read — is 推,
+settled by neither source. What would decide it (a register write, no flash; card, predictions
+and blast radius not written): bit 31 set on port 3, N frames, the host's `rx_crc_errors` read.
+
+### 26.3 `NET-78` 殘留 on block 46: counted-nowhere runs against the `M1`-cover8 history
+
+The question: does every run with a frame counted nowhere follow a frame of an `M1`-cover8 bad
+length handed since the last re-arm? `cn` = `n_lo` − `c` − OWN − 4 · fires, floored at 0, where
+`n_lo` = `n_tx` (dump 1 of this read) − `n_tx` (dump 2 of the previous) is the lower half of P0's
+two-read bound; on the first-dump `n`, A2-01 reads `cn` 1, a frame handed during A1-19's read
+(`n_tx` 786 → 787) and counted in A1-19's `c` (29 for `n` 28; over the pair `n` 49 = `c` 49, 量).
+OWN is the engine-held slots of dump 1, and a fire discards at most four (`NET-113`), so `cn` is
+exact only at fires 0. bad8(F) ⇔ 8⌈F/8⌉ < F + 4 ⇔ F mod 8 ∈ {5, 6, 7, 0} (§ 25.7; 推 as a
+mechanism). Post hoc: refuted by a non-CARRIED run with fires 0, `cn` ≥ 1 and a clean history.
+
+**One rule for "since the last re-arm"**, the coordinator's, written before the re-score: a
+frame counts as handed since the last re-arm only where bracket-level data place it after the
+re-arm — a recovery fire counted in an earlier bracket, or a B run's switch cell (`engine off`,
+`arm`, `engine on`) before its `tx` cells. A bracket's frames are its nominal length where the
+driver was handed anything, 60 B for ARP in the stack arms, and every `txd` length first seen
+in a dump inside the bracket's window; a length its dumps share with the dump before is not
+placed, since the re-arm does not rewrite `ph_len` (讀 1.4's `nic_do_arm`). Where the placement
+needs intra-bracket timing — a host sequence number, an rtt, back-anchored jiffies — the run is
+**undetermined**, neither Bad nor clean. A run with a fire in its own bracket is read on both
+histories, before its fire and after it, and is Bad or clean only where both agree.
+
+量 counts, placed by the rule: the 53 non-CARRIED runs of A1, A2 and B (C and D excluded;
+CARRIED A1-05, A1-10, A1-16 and A1-19 apart), of which the 16 that handed nothing (A2-04…A2-19)
+are not tested:
+
+| cell | runs (`cn`) | Σ`n` | Σ`cn` | a fire in this or the previous bracket |
+|---|---|---:|---:|---|
+| `cn` ≥ 1, Bad | A1-09 (10), B-08 (1) | 17 | 11 | 0 of 2 |
+| `cn` ≥ 1, clean | — | 0 | 0 | — |
+| `cn` ≥ 1, undetermined | with a fire: A1-03 (11), A1-04 (20), A1-06 (14), A1-07 (5), A1-14 (3), A2-02 (10); fires 0: A1-15 (6), A1-17 (6), A1-18 (2), A2-03 (2) | 229 | 79 | 9 of 10, not A1-18 |
+| `cn` = 0, Bad | A1-02, A1-08, A1-12, A1-13, B-02, B-04, B-06, B-12, B-14, B-16 | 265 | 0 | 1 of 10, A1-08 |
+| `cn` = 0, clean | A1-01, A1-11, A2-01, B-01, B-03, B-05, B-07, B-09, B-10, B-11, B-13, B-15, B-17, B-18, B-19 | 191 | 0 | 2 of 15, A1-11 and A2-01 |
+
+**Verdict: not refuted on bracket-level data at the runs that decide it; four runs
+undetermined (placement 推).** The runs that can refute it are the six non-CARRIED runs with
+fires 0 and `cn` ≥ 1 (Σ`cn` 27). Two are Bad on bracket-level data — A1-09 after A1-08's 263-B
+replies (A1-08 fires 0, so all of them followed A1-07's fire), and B-08 on its own 263 B after
+its switch cell — and none is clean. Four, Σ`cn` 16 of the 27, are undetermined: the one bad
+frame before each lies inside a fire's own bracket (A1-14's 1,511 B before A1-15; A1-16's
+1,512 B before A1-17 and A1-18; A2-02's 61 B before A2-03), and placing it after the fire needs
+the host's sequence numbers or rtts. A2-03's dumps hold a 65-B length in slot 0, but slot 0 of
+A2-02's dumps holds the same word: not placed.
+
+The readers' three readings, for comparison (their frame sets: the nominal length, 60 B, and
+every `txd` length in either dump, stale ones included): refuters under **V1** (the fire's
+bracket included) 0; under **V2** (the fire's bracket excluded) 3 — A1-15, A1-17 and A1-18,
+Σ`cn` 14, with A2-03 kept Bad only by the stale 65 B; under **V3** (V1, and for a fire in the
+run's own bracket the history before it too) 0. On the first-dump `cn`, A2-01 adds one refuter
+to each.
+
+**The rival predictor.** "Lost frames follow a recent fire" fits the same table almost as well:
+9 of the 12 `cn` ≥ 1 runs have a fire in this or the previous bracket, against 3 of the 25
+non-vacuous `cn` = 0 runs; counting an engine-held OWN at the end of this or the previous bracket
+as well, 11 of 12 (A1-09 ends `1101`, A1-18 `1111`) and still 3 of 25, and only B-08 — whose one
+frame may be B-09's fragment (§ 22.3) — has neither. Block 46 cannot separate the two: every
+stall there followed bad-length frames since the last re-arm (§ 22.5, M8, 推).
+
+Power, arithmetic on 量 counts under an independence assumption that is 推 (lost frames cluster
+by run): p = 11/282 over the determined Bad runs, so ln(0.05)/ln(1 − p) = 75.3 frames are
+needed in the clean cells, which hold 191 (15 runs, all fires 0). Two runs carry p, and A1-09
+carries 10 of its 11.
+
+### 26.4 `NET-78` 殘留 by length setting: blocks 47 and 48
+
+The question: on one boot, are descriptors taken and counted nowhere only under 1.4's length
+fields and never under the vendor's? The count is § 26.3's `cn` per bracket, with the slots the
+engine held at the bracket's start added back (block 48's D3-LUR1 → D3-LUS1 reads −2 without
+that term and 0 with it). Post hoc for block 47. For block 48 the two readers froze their code
+by sha256 before opening `bench/2026-09-26b/` for this — A's `net78b.py` `bff33570…` at 19:43:57,
+B's nine scripts at 19:47:20, both after the block's last capture (19:41) — a claim about the
+readers only: the main line read `X-BR1` and the `LUR1` host path during the seating
+(`CORRECTIONS-block48.md` § 1), and the freezes are self-attested.
+
+**The designated test, block 48's per-length stack arm, is untested, and was expected to be.**
+量 At each of E2's eleven lengths `SF` (the vendor's lengths) and `SL` (1.4) read `n` 21 = `c` 21,
+fires 0, OWN `0000`, `cn` 0. At 1.4 that is 231 frames, 147 of them at the seven bad8 lengths:
+140 echo replies (Δ`Icmp.OutEchoReps` 20 in each bracket) and one other frame per bracket
+(Δ`n_tx` − replies; 推 ARP — the capture holds an ARP frame in five of the seven windows). 1.4
+faulted in the counted way — `JabberErr` 19 at 61, 263, 1,511 and 1,512, and 11 at 62, 63 and 277
+with `Drop` 4, 3 and 3, Σ`j` 109 — and counted every frame. With p = 0 on the 1.4 side the vendor
+side tests nothing. 讀 card B50 § 3.4: every `SF` and `SL` bracket begins with the switch, which
+re-arms the ring, and P5 and P6 predict fires Δ 0; on § 26.3's association — lost frames come
+with a stall history — p = 0 was the expected outcome of that design, not bad luck.
+
+量, the same frozen code on brackets that were not the designated test, from the two readers and
+a third computation at the bracket they disputed (not re-derived by the merge):
+
+* Block 48, every non-loop bracket: the vendor's lengths 30 brackets, Σ`n` 319,608 = Σ`c`, Σ`cn`
+  0, fires 0; 1.4 26 brackets, Σ`n` 54,672, Σ`cn` 43 — E-L1 34 (`n` 1,062, `c` 1,000, 7 fires, so
+  34–62) and D3-X-00 → D3-LUR1 9 exactly (`n` 33, `c` 22, fires 0, OWN `1100` at its end, the held
+  slots F 66 and F 78, 78 bad8; the 9 were not counted later: D3-LUR1 → X-BR1 reads `n` 7, `c` 5,
+  two slots held at its start, one fire). ln(0.05)/ln(1 − 43/54,672) = 3,807 vendor frames needed,
+  319,608 held; the vendor side is `iperf3`-dominated and the 1.4 side is not.
+* Block 47, post hoc: the vendor's lengths 6 brackets, Σ`n` 3,352 = Σ`c`, Σ`cn` 0; 1.4 37
+  brackets, Σ`n` 968, Σ`cn` 66, all in E-L1 (`n` 895, `c` 789, 10 fires, so 66–106); the 34
+  single-length W-2 brackets under 1.4 read `n` 2 = `c` 2 each, 19 of them with a jabber. Set
+  apart: RB-00 → RB-09 (`cn` 3 with three operator arms inside; 推 the three fills held at RB-01,
+  OWN `1110`) and the loopback brackets (`c` 0 by design).
+
+Neither clause fired on either boot. "`cn` only under 1.4" is not refuted and has no clean test;
+"1.4's length fields alone suffice" is not supported — 140 bad8 replies without a stall were
+counted whole. 推 (n = 3) Every `cn` ≥ 1 instance coincides with a TX stall — a fire inside the
+bracket, or engine-held OWN at its end followed by a fire — and the vendor's lengths never
+stalled on either boot, so the length setting and the stall are confounded. What would separate
+them: a stall at the vendor's lengths on one boot, beside 1.4's, with `cn` read on both.
+
+`NET-78`'s original mute (seatings 33 and 34, driver 1.1): 量 16 committed dumps hold 56 written
+`txd` slots at F ∈ {60, 66, 74, 98, 148}, none bad8 (F mod 8 ∈ {4, 2, 2, 2, 4}); 讀 1.1's
+`nic_xmit` at `b4facf8` writes the same three length fields as 1.4. These dumps give no ground to
+call the mute cover8-caused; its onset frames are not in them, so they do not exclude it.
+
+### 26.5 `D3-MISS` ③ scored on block 46
+
+The pre-power text (`41bf452`) on `NET109|crcalignerr` and `NET109|p3egress`, 294 → 414: *"The
+property the rows stand for held: `CRCAlignErr` − port-3 egress 0 in both seatings, 414 = 414.
+Experiment: none — redefine the row as that per-echo identity"* (`notes/boot-time.md` § 8.9), and
+in `D3-MISS` ③ *"the next reading of the counters is scored on that"*. It names no domain, so the
+domain is every non-vacuous live bracket, refusing ones included; a clause restricting it to
+Δ`j` = Δ`f` = Δ`d` = 0 was written on 2026-09-26, is post hoc, and is reported beside the score,
+not as it. It names no single reading either: "that" is `CRCAlignErr` − port-3 egress = 0,
+reading (a); "per-echo" and the rows' own values, echo replies + 2, read as each counter equal to
+the frames the capture holds (W, P0's `w`) or to its echo replies and ARP (W_lit). 讀
+`docs/boot-time-d3-list.tsv`: the rows as measured are absolute values at one read, `P1-AC0`, on a
+healthy fresh boot, and `p3egress` is port 3's egress **unicast**. **Block 46 is outside that boot
+shape**: a 1.4 fault boot, 19 of its 37 non-vacuous brackets refusing frames at the CPU port.
+
+量, the 76 brackets live at both ends (`capture_live yes` and `tcpdump_procs 1`), 37 non-vacuous;
+at A1-00 every counter read 0, so the absolute form counts from the boot:
+
+| reading | `crcalignerr` (`c`) | `p3egress`, U+M+B (`o`) | `p3egress` as measured, unicast |
+|---|---|---|---|
+| (a) `c` − `o` = 0, per bracket | 18 of 37 | the same identity | — |
+| W, per bracket | 18 of 37 | 37 of 37 | 17 of 37 (misses A1-19 and all 19 of B) |
+| W_lit, per bracket | 7 of 37 | 18 of 37 (misses all 19 of B) | 36 of 37 (misses A1-19) |
+| absolute against the capture's cumulative frames | holds at 1 of 76 reads; 770 against 428 at the end | 76 of 76; 428 = 428 | 18 of 76; 372 against 428 |
+| post-hoc scope, Δ`j` = Δ`f` = Δ`d` = 0 (18 brackets) | (a) and W 18 of 18, W_lit 7 of 18 | W 18 of 18, W_lit 7 of 18 | W 6 of 18, W_lit 17 of 18 |
+
+量 At the 19 refusing brackets `c` − W = `j` + `f` + `d` exactly, 19 of 19: `CRCAlignErr` reads W +
+`j` + `f` + `d` at 37 of 37, which under P0's `o` identity is `p3egress` restated. W and W_lit
+differ in B by its `0x88B5` frames, and U+M+B and unicast by the broadcasts: 量 the capture's 56
+broadcast-destination frames (`bcast.py`, frame bytes past the type and opcode not printed) are
+the 55 `0x88B5` frames of arm B and one ARP request (opcode 1) in A1-19's window, equal to port
+3's Δ`Broadcast` 56.
+
+**No single "met".** The readings disagree for both rows: `p3egress` holds under W, per bracket
+and absolute, and misses under (a), W_lit and its own measured quantity; `crcalignerr` holds
+under none of them on the pre-power domain, and under (a) and W only on the post-hoc scope. What
+the score does establish (量): on this boot port 3's egress equals the capture's frames at 37 of
+37 brackets and `CRCAlignErr` equals them plus the refused frames at 37 of 37. Each row needs its
+reading fixed in writing before it is scored again, on the boot shape it was defined on.
+
+### 26.6 What this section does not establish
+
+* Why the CPU port counts every frame from the engine as an FCS error and reads `Rcv` 0
+  (`NET-109` 殘留, 未定). The datasheet has no MIB section (讀: 0 lines name `MIB`, `Jabber`,
+  `dot3Stats`, `etherStats`, `CRCAlign` or `ifInOctets`, against 282 naming `Register`), and the
+  SDK names counters without defining them; its `rx_errors` sum in `rtl_nic.c` (compiled in the
+  same build) adds `oversize` where its own comment says fragments. The zeros of § 26.1 (a) and
+  (b), and their counterparts in § 26.2, have no positive control.
+* Whether the pattern belongs to the CPU port's receive MAC or to the NIC's TX DMA engine that
+  all three paths share: no committed path into the CPU port bypasses that engine.
+* What the 4 bytes past F are, and whether `ByPassTCRC` acts on frames from the CPU port.
+* What makes the engine take a descriptor and put no frame on the wire (`NET-78` 殘留): § 26.3 is
+  an association on one boot, post hoc, with four of its six deciding runs undetermined and a
+  rival it cannot separate; § 26.4's designated test is untested.
+* That the power rule's independence holds: lost frames come in stall-linked bursts.
+* § 26.4's block-48 whole-boot numbers and block-47 brackets were not re-derived by the merge.
+* A score of `D3-MISS` ③'s rows on a healthy boot, or under any reading fixed before power.
+* More than one boot per path and per block; nothing here ran on the silicon.
