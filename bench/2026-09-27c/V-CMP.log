@@ -1,0 +1,7 @@
+mdpage 1.1 vend: the vendor's extRead N 1 19 against (g)'s v (select shown: ps 1 on every paged read that made its select)
+vend a0 extRead 7380 pread 7380 equal yes
+vend a1 extRead 7380 pread 7380 equal yes
+vend a2 extRead 7380 pread 7380 equal yes
+vend a3 extRead 7380 pread 7380 equal yes
+vend a4 extRead 7380 pread 7380 equal yes
+vend verdict 5 of 5 equal

@@ -1,0 +1,6 @@
+mdpage 1.1 mdcio
+mdciocr live 84001300 slot0 1F030000
+mdciosr live 00001100 slot0 00000000
+a slot0 MDCIOCR 1F030000 as predicted: L2's last command (a read of address 31, register 3) is the last MDIO store before subsys_initcall
+a slot0 MDCIOSR bit 31 0 bits 15:0 0000 (0 and 0000 predicted after L2's read: as predicted)
+a slot0 MDCIOSR bits 30:16 0000 (NET-136's reading, never compared)

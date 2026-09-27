@@ -1,0 +1,8 @@
+mdpage 1.1 final: J-PR against V-SC.log, the last page before lock
+j holds   unlocked 0 (unlocked 0)
+j holds   dirty 0 (dirty 0)
+j holds   wr_refused 0 (wr_refused 0)
+j holds   mdio_to and busy as the last unlocked page (f's figures) ((1, 5) -> (1, 5))
+j holds   the final probe refused -EPERM (refused +1, no MDIO command) (refused 1 -> 2, mdio_rd 302 -> 302)
+j holds   spin n = mdio_rd + mdio_wr - mdio_to (317 = 302 + 16 - 1)
+j verdict hold

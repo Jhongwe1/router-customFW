@@ -1,0 +1,36 @@
+mdpage 1.1 loader: MDIOR 2 and MDIOR 3, 32 addresses each
+loader a00 r2 001C r3 C880 id 001CC880
+loader a01 r2 001C r3 C880 id 001CC880
+loader a02 r2 001C r3 C880 id 001CC880
+loader a03 r2 001C r3 C880 id 001CC880
+loader a04 r2 001C r3 C880 id 001CC880
+loader a05 r2 0000 r3 0000 id 00000000
+loader a06 r2 0000 r3 0000 id 00000000
+loader a07 r2 0000 r3 0000 id 00000000
+loader a08 r2 0000 r3 0000 id 00000000
+loader a09 r2 0000 r3 0000 id 00000000
+loader a10 r2 0000 r3 0000 id 00000000
+loader a11 r2 0000 r3 0000 id 00000000
+loader a12 r2 0000 r3 0000 id 00000000
+loader a13 r2 0000 r3 0000 id 00000000
+loader a14 r2 0000 r3 0000 id 00000000
+loader a15 r2 0000 r3 0000 id 00000000
+loader a16 r2 0000 r3 0000 id 00000000
+loader a17 r2 0000 r3 0000 id 00000000
+loader a18 r2 0000 r3 0000 id 00000000
+loader a19 r2 0000 r3 0000 id 00000000
+loader a20 r2 0000 r3 0000 id 00000000
+loader a21 r2 0000 r3 0000 id 00000000
+loader a22 r2 0000 r3 0000 id 00000000
+loader a23 r2 0000 r3 0000 id 00000000
+loader a24 r2 0000 r3 0000 id 00000000
+loader a25 r2 0000 r3 0000 id 00000000
+loader a26 r2 0000 r3 0000 id 00000000
+loader a27 r2 0000 r3 0000 id 00000000
+loader a28 r2 0000 r3 0000 id 00000000
+loader a29 r2 0000 r3 0000 id 00000000
+loader a30 r2 0000 r3 0000 id 00000000
+loader a31 r2 0000 r3 0000 id 00000000
+L1 rule 0-4 001C, 5-31 0000 (量, F2 repeated): hold
+L2 量 rule 0-1 C880 (E6/E8b): hold
+L2 推 rule 2-4 C880, 5-31 0000 (a reading: NET-06's open half at 2-4): as inferred

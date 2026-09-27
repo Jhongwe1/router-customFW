@@ -1,0 +1,135 @@
+  ok    M1 every page format this reader renders occurs verbatim in the driver source
+  ok    M2 a source whose `dirty` format changed is caught (M1's own control)
+  ok    M3 the source is rtl819x-switch 1.3
+  ok    M4 K1's page with its own jiffies reads `boot same yes`  (boot same yes (18 lines, jiffies 1234))
+  ok    M5 the same page with mdio_rd 1 reads `boot same no` at line 5  (boot same no: line 5 reads 'mdio_rd 1', K1 has 'mdio_rd 0')
+  ok    M6 F2 (MDIOR 2, measured) holds 32 addresses of register 2
+  ok    M7 F2 with a predicted MDIOR 3: L1 and L2's 量 rules hold, L2's 推 rule as inferred, a00 id 001CC880  (L1 rule 0-4 001C, 5-31 0000 (量, F2 repeated): hold; L2 量 rule 0-1 C880 (E6/E8b): hold; L2 推 rule 2-4 C880, 5-31 0000 (a reading: NET-06's open half at 2-4): as inferred)
+  ok    M8 a05 register 3 reading 0001 is L2's 推 part differing there (a reading), its 量 part holding  (L2 量 rule 0-1 C880 (E6/E8b): hold; L2 推 rule 2-4 C880, 5-31 0000 (a reading: NET-06's open half at 2-4): differs at a05)
+  ok    M9 an MDIOR 3 reply missing address 0x1f is refused  (l2c.log: 31 of the 32 addresses (missing [31]))
+  ok    M42 a01 register 3 reading C881 refutes L2's 量 part (E8b measured it)  (L2 量 rule 0-1 C880 (E6/E8b): refuted at a01; L2 推 rule 2-4 C880, 5-31 0000 (a reading: NET-06's open half at 2-4): as inferred)
+  ok    M10 the switch page's row format occurs in the source
+  ok    M11 slot 0 1F030000/00000000 reads `as predicted`, MDCIOSR too  (mdpage 1.1 mdcio; mdciocr live 84001300 slot0 1F030000; mdciosr live 00001100 slot0 00000000; a slot0 MDCIOCR 1F030000 as predicted: L2's last command (a read of address 31, register 3) is the last MDIO store before subsys_initcall; a slot0 MDCIOSR bit 31 0 bits 15:0 0000 (0 and 0000 predicted after L2's read: as predicted); a slot0 MDCIOSR bits 30:16 0000 (NET-136's reading, never compared))
+  ok    M12 slot 0 96181441 reads as the TFTP/J path's store
+  ok    M43 MDCIOSR bits 30:16 set (1234) leave MDCIOCR's verdict `as predicted` and are printed as NET-136's reading  (mdpage 1.1 mdcio; mdciocr live 84001300 slot0 1F030000; mdciosr live 00001100 slot0 12340000; a slot0 MDCIOCR 1F030000 as predicted: L2's last command (a read of address 31, register 3) is the last MDIO store before subsys_initcall; a slot0 MDCIOSR bit 31 0 bits 15:0 0000 (0 and 0000 predicted after L2's read: as predicted); a slot0 MDCIOSR bits 30:16 1234 (NET-136's reading, never compared))
+  ok    M44 five rlxsw names and nothing else read `as predicted`  (mdpage 1.1 sys: /sys/bus/mdio_bus/devices, rlxsw:00-04 and nothing else (PHY_ID_FMT "%s:%02x"); sys names rlxsw:00 rlxsw:01 rlxsw:02 rlxsw:03 rlxsw:04; sys rlxsw 5 of 5, other 0: as predicted)
+  ok    M45 a sixth name differs  (mdpage 1.1 sys: /sys/bus/mdio_bus/devices, rlxsw:00-04 and nothing else (PHY_ID_FMT "%s:%02x"); sys names rlxsw:00 rlxsw:01 rlxsw:02 rlxsw:03 rlxsw:04 rlxsw:05; sys rlxsw 5 of 5, other 1: differs (missing none; other rlxsw:05))
+  ok    M13 D7 holds 5 of 5 with the vendor agreeing (each vendor log holding a page after the replies)  (d7 verdict hold: 5 of 5, Linux's MDIO API equals the loader address by address; d7 vendor agrees 5 of 5; d7 note: the five IDs are equal, so D7 cannot see addresses 0-4 swapped among themselves; `rows` sees only a swap that involves port 3)
+  ok    M14 a Linux ID of 001CC881 at a2 refutes D7 there  (d7 verdict refuted at a2; d7 vendor agrees 5 of 5; d7 note: the five IDs are equal, so D7 cannot see addresses 0-4 swapped among themselves; `rows` sees only a swap that involves port 3)
+  ok    M15 a page before any probe reads D7 void, not hold
+  ok    M16 a vendor reply after an interleaved echo is found at the line's end (X-PHY1b's shape)  ({(3, 0): 4352, (3, 1): 30957})
+  ok    M46 a missing vendor reply at a3 and an absent log at a4 read `unmeasured at a3,a4`, D7's own verdict kept  (d7 verdict hold: 5 of 5, Linux's MDIO API equals the loader address by address; d7 vendor unmeasured at a3,a4 (a reply missing: a reading, not a verdict); d7 vendor agrees 3 of 3 measured; d7 note: the five IDs are equal, so D7 cannot see addresses 0-4 swapped among themselves; `rows` sees only a swap that involves port 3)
+  ok    M17 the predicted 32 rows read 32 of 32 and hold, 推 as inferred  (rows 量 32 of 32 as predicted; rows hi all 0000 yes; rows verdict hold; rows 推 reading as inferred at all 32; spin 202 2 5 hi_or 00000000 mdio_rd 202 mdio_to 0 busy 0)
+  ok    M18 port 3's r1 without bit 2 and 5 (78C9) differs at a03 r1 (量) and refutes
+  ok    M19 a1 r5 0000 (推 there) is a reading: the verdict holds and the 推 reading names a01 r5  (rows hi all 0000 yes; rows verdict hold; rows 推 reading differs at a01:r5 (NET-08's answer at 5-31, NET-06's at 2-4, a Linux value at 1, 2, 4, register 5's Linux value); spin 202 2 5 hi_or 00000000 mdio_rd 202 mdio_to 0 busy 0)
+  ok    M47 a0 r5 0000 (推: E12e read it at the loader, and register 5 is link state) is a reading: the verdict holds and the 推 reading names a00 r5  (rows hi all 0000 yes; rows verdict hold; rows 推 reading differs at a00:r5 (NET-08's answer at 5-31, NET-06's at 2-4, a Linux value at 1, 2, 4, register 5's Linux value); spin 202 2 5 hi_or 00000000 mdio_rd 202 mdio_to 0 busy 0)
+  ok    M64 a3 r5 0000 (推: X4 read it at the loader) is a reading: the verdict holds and the 推 reading names a03 r5  (rows hi all 0000 yes; rows verdict hold; rows 推 reading differs at a03:r5 (NET-08's answer at 5-31, NET-06's at 2-4, a Linux value at 1, 2, 4, register 5's Linux value); spin 202 2 5 hi_or 00000000 mdio_rd 202 mdio_to 0 busy 0)
+  ok    M65 a0 r2 001D (量: an ID register) still refutes  (rows hi all 0000 yes; rows verdict refuted: 1.3's address path (a 量 value differs), whatever D7 read; rows 推 reading as inferred at all 32; spin 202 2 5 hi_or 00000000 mdio_rd 202 mdio_to 0 busy 0)
+  ok    M48 a09 r1 7949 (推, NET-08) is NET-08's answer, a reading  (rows verdict hold; rows 推 reading differs at a09:r1 (NET-08's answer at 5-31, NET-06's at 2-4, a Linux value at 1, 2, 4, register 5's Linux value); spin 202 2 5 hi_or 00000000 mdio_rd 202 mdio_to 0 busy 0)
+  ok    M20 addresses 1 and 3 swapped are seen by rows (D7 cannot)
+  ok    M21 a scan page with 31 rows is refused  (the page holds rows for 31 addresses, not the 32 of `scan 0 31`)
+  ok    M22 a row whose hi reads 4000 is reported, not hidden
+  ok    M23 fpred min 2 -> timeout  (timeout)
+  ok    M23 fpred max 0 -> void  (void)
+  ok    M23 fpred min 0 max 3 -> between  (between)
+  ok    M24 mdiocheck K7's model (E145 E016 E016 E145 E016 E016, to +2, busy +4, rd +2) holds
+  ok    M25 two E145 against mdio_to +1 is refuted
+  ok    M26 PHY 1 agreeing: C-18 stays, ps 1 reads back, r16 110, r19 bit 0 holds, accounting 29/14 (k 0)  (g dirty 0 (after the eight); g ps 1 on all 7 that made their select: register 31 reads back the page it was given; g select shown: ps 1 on every paged read that made its select; g page-1 r16 bits 15:13 110 (110 predicted, rtl865x_asicL2.c:4177): holds; g r19 bit 0 on a0 0,a1 0,a2 0,a3 0,a4 0 (0 predicted on all five, :4193): holds; c18 stays void-by-ruling: PHY 1's page-1 register 19 bits 15:1 5400 equal the value 0, 2, 3 and 4 agree on (register level only; the functional clause is the owner's ruling); g PHY 4 page-1 r20 0B20 (recorded only); g accounting mdio_rd d 29 mdio_wr d 14 mdio_to d 0 busy d 0 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 0, b 0 refused busy at rest with no read: 29 and 14, mdio_to 0 busy 0, no retry): holds; g scan 0 4 after equals (e)'s rows 0-4: yes, 5 of 5)
+  ok    M27 PHY 1 differing in bit 3: C-18 REOPENS
+  ok    M28 PHY 1 differing in bit 0 only: C-18 stays (bits 15:1), bit 0's rule refuted
+  ok    M29 PHYs 0, 2, 3, 4 disagreeing: C-18 void
+  ok    M30 ps 0 with page 1's r16 unlike page 0's: the select works, the read-back does not; C-18 still read
+  ok    M31 ps 0 with page 1's r16 equal to page 0's: cannot be told apart, the select not shown, and C-18 not observed  (g dirty 0 (after the eight); g ps 0, and page 1's register 16 equals page 0's (0210): 'the select has no effect' and 'the read-back fails' cannot be told apart; g select not shown: ps not 1 and page 1's register 16 not shown unlike page 0's; g page-1 r16 bits 15:13 not observed (ps not 1 and page 1's register 16 not shown unlike page 0's); g r19 bit 0 not observed (ps not 1 and page 1's register 16 not shown unlike page 0's); c18 not observed (the select not shown: ps not 1 and page 1's register 16 not shown unlike page 0's); g PHY 4 page-1 r20 0B20 (recorded only); g accounting mdio_rd d 29 mdio_wr d 14 mdio_to d 0 busy d 0 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 0, b 0 refused busy at rest with no read: 29 and 14, mdio_to 0 busy 0, no retry): holds; g scan 0 4 after equals (e)'s rows 0-4: yes, 5 of 5)
+  ok    M32 seven pr lines are refused  (the page's eight pr lines are [(0, 1, 16), (0, 1, 19), (1, 1, 19), (2, 1, 19), (4, 1, 19), (3, 1, 19), (4, 1, 20)], not the card's order)
+  ok    M33 a scan 0 4 after (g) unlike (e)'s at a3 is reported
+  ok    M49 PHY 1's pread finding p0 1 at rest (it made no select): C-18 not observed, no bit-0 or rs verdict there, accounting 29 - 3 and 14 - 2 (k 1) holds  (g dirty 0 (after the eight); g ps 1 on all 6 that made their select: register 31 reads back the page it was given; g select shown: ps 1 on every paged read that made its select; g page-1 r16 bits 15:13 110 (110 predicted, rtl865x_asicL2.c:4177): holds; g r19 bit 0 on a0 0,a2 0,a3 0,a4 0 (0 predicted on all five, :4193): incomplete; c18 not observed (p0 not 0 at rest on a1: no select made there); g PHY 4 page-1 r20 0B20 (recorded only); g accounting mdio_rd d 26 mdio_wr d 12 mdio_to d 0 busy d 0 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 1, b 0 refused busy at rest with no read: 26 and 12, mdio_to 0 busy 0, no retry): holds; g scan 0 4 after equals (e)'s rows 0-4: yes, 5 of 5)
+  ok    M50 the page-1 register-16 read finding p0 1 (it made no select): the select not shown, no r16 or C-18 verdict  (g dirty 0 (after the eight); g ps 1 on all 6 that made their select: register 31 reads back the page it was given; g select not shown: the page-1 register-16 read made no select (p0 1); g page-1 r16 bits 15:13 not observed (the page-1 register-16 read made no select (p0 1)); g r19 bit 0 not observed (the page-1 register-16 read made no select (p0 1)); c18 not observed (the select not shown: the page-1 register-16 read made no select (p0 1)); g PHY 4 page-1 r20 0B20 (recorded only); g accounting mdio_rd d 26 mdio_wr d 12 mdio_to d 0 busy d 0 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 1, b 0 refused busy at rest with no read: 26 and 12, mdio_to 0 busy 0, no retry): holds; g scan 0 4 after equals (e)'s rows 0-4: yes, 5 of 5)
+  ok    M66 PHY 1's pread refused busy at rest (p0 -16: no read, one busy): the accounting 25/12, busy +1 holds, never 29 - 3k's 26  (c18 not observed (p0 not 0 at rest on a1: no select made there); g accounting mdio_rd d 25 mdio_wr d 12 mdio_to d 0 busy d 1 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 1, b 1 refused busy at rest with no read: 25 and 12, mdio_to 0 busy 1, no retry): holds)
+  ok    M67 PHY 1's pread timing out at rest (p0 -145: one read, one mdio_to): the accounting 26/12, mdio_to +1 holds  (g accounting mdio_rd d 26 mdio_wr d 12 mdio_to d 1 busy d 0 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 1, b 0 refused busy at rest with no read: 26 and 12, mdio_to 1 busy 0, no retry): holds)
+  ok    M51 page 1's register 2 reading 001C (page 0's) reads `pctl blind yes`  (mdpage 1.1 pctl: page 1's register 2 on PHY 0 against page 0's (the scan's a00 r2 001C); pctl pr a0 p1 r02 v 001C p0 0 ps 1 p1 0 rs 0 rc 0; pctl blind yes: page 1's register 2 reads page 0's 001C, so a PHY left on page 1 reads the same registers 0-5 and the scan rows and lde cannot see it (P7, P8, section 7))
+  ok    M52 page 1's register 2 reading 8B00 reads `pctl blind no`  (mdpage 1.1 pctl: page 1's register 2 on PHY 0 against page 0's (the scan's a00 r2 001C); pctl pr a0 p1 r02 v 8B00 p0 0 ps 1 p1 0 rs 0 rc 0; pctl blind no: page 1's register 2 (8B00) differs from page 0's (001C), so a PHY left on page 1 shows in its scan row)
+  ok    M53 the control's pread finding p0 1 reads `not observed`, never blind yes/no  (mdpage 1.1 pctl: page 1's register 2 on PHY 0 against page 0's (the scan's a00 r2 001C); pctl pr a0 p1 r02 v 0000 p0 1 ps 0 p1 0 rs 1 rc -71; pctl not observed (p0 1: no select made))
+  ok    M54 rows04 of two equal scans reads `equal yes, 5 of 5`  (rows04 a04 1100 78C9 001C C880 05E1 0001 | 1100 78C9 001C C880 05E1 0001 equal yes; rows04 equal yes, 5 of 5)
+  ok    M55 rows04 against a scan whose a3 r1 moved reads `equal no, at a3`
+  ok    M34 extRead equal to (g)'s v on all five  (vend a4 extRead 5400 pread 5400 equal yes; vend verdict 5 of 5 equal)
+  ok    M35 extRead unlike (g)'s v at PHY 1 is reported
+  ok    M56 PHY 1's pread with p0 1 (it made no select): extRead there not compared, the rest equal  (vend a4 extRead 5400 pread 5400 equal yes; vend verdict 4 of 4 compared equal; not compared at a1)
+  ok    M57 an absent extRead log reads `unmeasured at a2`: a reading, not a refusal  (vend a4 extRead 5400 pread 5400 equal yes; vend verdict 4 of 4 compared equal; unmeasured at a2)
+  ok    M36 the locked final page holds against V-SC (every block ran), spin n = rd + wr - to  (mdpage 1.1 final: J-PR against V-SC.log, the last page before lock)
+  ok    M37 an MDIO read after lock (mdio_rd +1) is refuted
+  ok    M68 I-V skipped (no V-SC log): J-FIN reads D-MD, the last page before lock, and holds -- never refused  (mdpage 1.1 final: J-PR against D-MD.log, the last page before lock; j holds   unlocked 0 (unlocked 0))
+  ok    M58 the hand-typed full run (dbusy 4, dto 2, k 1 at G-P5) reads `chain verdict hold` and the final 300/14  (chain final J-PR rd 300 wr 14 (the full run: 307 - dbusy 4 - 3k 3 - b 0 = 300, 16 - 2k = 14; k 1): as modelled)
+  ok    M69 the same run with G-P5's pread refused busy at rest (p0 -16: no read, one busy) holds, final 299/14, J-PR's busy F-S1's + 1  (chain J-PR mdio_to 2 busy 5 against F-S1's 2 4 (+0 timed out and +1 refused busy at rest in (g)): equal; chain final J-PR rd 299 wr 14 (the full run: 307 - dbusy 4 - 3k 3 - b 1 = 299, 16 - 2k = 14; k 1): as modelled)
+  ok    M59 G-P4 with one read too many differs at G-P4 (and at G-P5, whose delta starts there)  (chain final J-PR rd 300 wr 14 (the full run: 307 - dbusy 4 - 3k 3 - b 0 = 300, 16 - 2k = 14; k 1): as modelled; chain verdict differs at G-P4,G-P5)
+  ok    M60 J-PR's busy moving after lock differs (J-PR against V-SC and against F-S1)  (chain final J-PR rd 300 wr 14 (the full run: 307 - dbusy 4 - 3k 3 - b 0 = 300, 16 - 2k = 14; k 1): differs at busy; chain verdict differs at J-PR,J-PR/F-S1,final)
+  ok    M61 the vendor cells not run (no logs): the chain holds across them, the final is path-dependent  (chain final: path-dependent (not run D-V0,D-V1,D-V2,D-V3,D-V4; no page none; not modelled none); chain not run (no log): D-V0,D-V1,D-V2,D-V3,D-V4; chain verdict hold)
+  ok    M62 G-P3 with no page: G-P4 is not modelled across it, never read as as-modelled  (chain G-P1 G-P1.log d rd 1 spin 1 (p0 0): as modelled; chain G-P2 G-P2.log d rd 4 wr 2 spin 6 (p0 0): as modelled; chain G-P3 G-P3.log: no page (the cell ran); chain G-P4 G-P4.log not modelled since G-P2: G-P3 (a pread's cost is read from its own pr line); chain G-P5 G-P5.log d rd 1 spin 1 (p0 1): a)
+  ok    M63 C-PR's phy2 xrc -5 differs at C-PR-phy  (chain not run (no log): D-V0,D-V1,D-V2,D-V3,D-V4; chain verdict differs at C-PR-phy)
+  ok    M38 a page missing phy2 is refused  (r1.log: no `phy2` line where the page has it)
+  ok    M39 a page with no jiffies line (truncated) is refused  (r2.log holds no intact /proc/rtl819x-mdio page)
+  ok    M40 a 1.2 page is refused  (r3.log: the page is rtl819x-switch 1.2, not rtl819x-switch 1.3)
+  ok    M41 of two pages in one capture the LAST is read
+mdpage self-test: 71 of 71 passed
+  ok    S1 every format this renderer uses occurs verbatim in the driver source
+  ok    S16 a source whose psrp format changed is caught (the check's own control)
+  ok    S2 the source's version is 1.3
+  ok    S3 the source's table has 37 rows, five PSRP  (37 rows)
+  ok    S4 the lde lines print before the table (its last row stays the page's last line)
+  ok    S5 a rendered boot page reads  (swpage13 1.3 version rtl819x-switch 1.3; counters n_writes 0 n_reads 1200 n_refused 0 n_linkq 0; lde0 00; psrp 0 000010E0 up 0 lde 0 lj 0)
+  ok    S6 cable out: psrp3 up 1->0, lde 3 d 1, n_linkq d 51  (swpage13 1.3 delta; delta n_linkq d 51 n_reads d 100 n_writes d 0; delta lde 0 d 0)
+  ok    S7 re-plugged: masked same yes
+  ok    S8 bit 8 set in B is masked: same yes, bit8 0 1
+  ok    S9 a different word reads same no
+  ok    S10 a missing psrp5 line is refused  (0 `psrp5` lines (want 1))
+  ok    S11 a 36-row table is refused  (the `r` table holds 36 rows, not 37)
+  ok    S12 a 1.2 page is refused  (the page is rtl819x-switch 1.2, not rtl819x-switch 1.3)
+  ok    S13 a page with no lde0 line is refused  (0 `lde0` lines (want 1))
+  ok    S14 counters going down (a reboot) are refused  (n_linkq went down (51 -> 0): a reboot between the two pages)
+  ok    S17 an lde count going down (every other counter up) is refused  (lde 3 went down (1 -> 0))
+  ok    S18 an `up` that is not the word's bit 4 is refused  (psrp3's `up 0` is not its word's bit 4 (000000F9))
+  ok    S15 a -LS capture (page then port_status) reads the page
+swpage13 self-test: 18 of 18 passed
+  ok    D1  first window: 5 lines, one BUG trace with its transmit frame, one unlink
+  ok    D2  second window chains from the first; a half-written last line waits for the next window
+  ok    D3  an unreadable --prev: exit 3, the counts cumulative and marked so
+  ok    D4  no line of the log and no directory is printed
+  ok    D5  a missing log is refused by its basename
+  ok    D6  follower counts a started `dmesg -w` (1 -> 2) and forgets it killed (1)
+  ok    D7  a list: the last candidate present is used (the two absent ones skipped), its window chains
+  ok    D8  window_end is dmesgwin's own, not a later pcapwin line's (the FW-145 shape, turned round)
+  ok    D9  the last candidate present holds no window_end: unreadable (exit 3), never a fall back to w1
+dmesgwin self-test: 9 of 9 passed
+  ok   K1 block 48, D3-LUS1-L's episode (D3-LUR1-R -> X-BR1): branch a, host tx d 6 = port 3 rx d 6 -- rc 0, s1 branch a
+  ok   K2 block 46, A2-02-R -> A2-03-R (NET-124's onset): branch b, host tx d 20, port 3 rx d 0 -- rc 0, s1 branch b
+  ok   K3 block 46, A2-03-R -> A2-04-R: branch b, port 3 rx d 0 -- rc 0, s1 branch b
+  ok   K4 block 46, the 55 pairs from A2-02-R -> A2-03-R (NET-124's onset) to D-04-R -> D-05-R: branch b at every one, port 3 rx d 0 -- b 55 of 55
+  ok   K5 block 46, the 21 pre-onset pairs with -H standing in for -P: branch a at 19, branch b at exactly A1-08-R -> A1-09-R (host tx d 63, port 3 rx d 62) and A1-13-R -> A1-14-R (63, 61) -- a 19, b [('A1-08-R', 'A1-09-R', ('63', '62')), ('A1-13-R', 'A1-14-R', ('63', '61'))]
+  ok   K6 block 48's 56 `BD pair` pairs: branch a wherever the host sent (38), branch b only where it sent nothing (17), refused only across X-RA1 (1, D3-LUS1-D) -- as expected
+  ok   M1 K1 with port 3's Rx Unicast 1 lower at X-BR1 (port 3 rx d 5 < host tx d 6): flips to branch b -- rc 0, s1 branch b
+  ok   M2 K2 with port 3's Rx Unicast 20 higher at A2-03-R: flips to branch a -- rc 0, s1 branch a
+  ok   M3 K1 with X-HP1's tx_packets equal to D3-LUR1-H's (the host sent nothing): flips to branch b -- rc 0, s1 branch b
+  ok   K7 --nic holding two intact dumps (D3-LUR1-R's, then X-BR1's): the last is read, engine-owned 0 of 4 -- rc 0, s1 branch a
+  ok   R1 X-BR1 without its port 3 section: refused, branch b by default -- rc 2, s1 branch b
+  ok   R2 --prev-br and --br swapped (counters backwards): refused -- rc 2, s1 branch b
+  ok   R3 X-HP1 without tx_packets: refused -- rc 2, s1 branch b
+  ok   R4 a log that does not exist: refused -- rc 2, s1 branch b
+  ok   R5 --nic whose every driver dump is broken: refused -- rc 2, s1 branch b
+s1class self-test: 15 of 15 passed
+  ok    C1 30 min after the catch, 19:33, since-max 35 / start-by 23:05: permit  (rc 0: cut permit)
+  ok    C2 36 min after the catch: refuse since-max  (rc 1: cut refuse since-max)
+  ok    C3 23:06: refuse start-by (the since-max rule off)  (rc 1: cut refuse start-by)
+  ok    C4 end-by 23:52 need 43 at 23:00: permit  (rc 0: cut permit)
+  ok    C5 end-by 23:52 need 43 at 23:10: refuse end-by  (rc 1: cut refuse end-by)
+  ok    C6 --date DRAFT is refused to decide  (rc 2: REFUSED --date 'DRAFT' is not a date (a draft card is never run))
+  ok    C7 a catch on another day is refused to decide  (rc 2: REFUSED the catch window opened on 2026-09-26, not the declared 2026-09-27: re-date the card)
+  ok    C8 no condition is refused  (rc 2: REFUSED no condition: a gate that cannot refuse is not a gate)
+  ok    C9 --need without --end-by is refused  (rc 2: REFUSED --need and --end-by go together)
+  ok    C10 a meta whose two stamps disagree is refused  (rc 2: REFUSED started_wallclock and t0_real disagree by -3600.3 s)
+  ok    C11 both since-max and start-by over: both named  (rc 1: cut refuse since-max start-by)
+  ok    W1 100 s after the watch's start: waits 505 s (not slept under --now)  (rc 0: cutgate wait end since 605.0 s)
+  ok    W2 700 s after: waits nothing  (rc 0: cutgate wait end since 700.0 s)
+  ok    W3 a wait over --max (the metadata's start in the future) is refused  (rc 2: REFUSED the wait 705.0 s exceeds --max 605 (a metadata from another run, or a stepped clock))
+  ok    W4 a metadata that cannot be read is refused  (rc 2: REFUSED cannot read the metadata none.meta.json: [Errno 2] No such file or directory: '/tmp/cutgate-)
+  ok    W5 no --max is refused  (rc 2: REFUSED --max is required)
+  ok    W6 two stamps that disagree are refused  (rc 2: REFUSED started_wallclock and t0_real disagree by -3600.3 s)
+cutgate self-test: 17 of 17 passed

@@ -1,0 +1,9 @@
+mdpage 1.1 d7: phyN's id = L1[N] << 16 | L2[N], N = 0-4; the vendor's phyReg a third source
+d7 a0 loader 001CC880 linux 001CC880 vendor 001CC880 equal yes
+d7 a1 loader 001CC880 linux 001CC880 vendor 001CC880 equal yes
+d7 a2 loader 001CC880 linux 001CC880 vendor 001CC880 equal yes
+d7 a3 loader 001CC880 linux 001CC880 vendor 001CC880 equal yes
+d7 a4 loader 001CC880 linux 001CC880 vendor 001CC880 equal yes
+d7 verdict hold: 5 of 5, Linux's MDIO API equals the loader address by address
+d7 vendor agrees 5 of 5
+d7 note: the five IDs are equal, so D7 cannot see addresses 0-4 swapped among themselves; `rows` sees only a swap that involves port 3

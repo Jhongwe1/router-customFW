@@ -1,0 +1,3 @@
+mdpage 1.1 sys: /sys/bus/mdio_bus/devices, rlxsw:00-04 and nothing else (PHY_ID_FMT "%s:%02x")
+sys names rlxsw:00 rlxsw:01 rlxsw:02 rlxsw:03 rlxsw:04
+sys rlxsw 5 of 5, other 0: as predicted

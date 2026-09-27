@@ -1,0 +1,18 @@
+dmesgwin 1.2 prev V-L.log window_end 816361
+prev_list 4 candidates, used 4
+window 816361 883343
+window_end 883343
+lines 866 first_t 264.198 last_t 289.036
+bug_preempt 1
+usbnet_xmit 1
+vhci_unlink 12
+urb_104 12
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 1
+follower 1

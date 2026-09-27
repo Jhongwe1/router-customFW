@@ -1,0 +1,20 @@
+mdpage 1.1 c18: the eight preads, oldest first
+pr a0 p0 r16 v 031F p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000000E0 000000E0
+pr a0 p1 r16 v D100 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+pr a0 p1 r19 v 7380 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+pr a1 p1 r19 v 7380 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+pr a2 p1 r19 v 7380 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+pr a4 p1 r19 v 7380 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+pr a3 p1 r19 v 7380 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000F9 000000F9
+pr a4 p1 r20 v 0000 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+g p0 0 on all seven paged reads: k 0
+g p1 0 rs 0 rt 0 on the 7 paged reads that made their select: yes
+g dirty 0 (after the eight)
+g ps 1 on all 7 that made their select: register 31 reads back the page it was given
+g select shown: ps 1 on every paged read that made its select
+g page-1 r16 bits 15:13 110 (110 predicted, rtl865x_asicL2.c:4177): holds
+g r19 bit 0 on a0 0,a1 0,a2 0,a3 0,a4 0 (0 predicted on all five, :4193): holds
+c18 stays void-by-ruling: PHY 1's page-1 register 19 bits 15:1 7380 equal the value 0, 2, 3 and 4 agree on (register level only; the functional clause is the owner's ruling)
+g PHY 4 page-1 r20 0000 (recorded only)
+g accounting mdio_rd d 29 mdio_wr d 14 mdio_to d 0 busy d 0 retry d 0 (each pread's cost from its pr line: 29 - 3k - b and 14 - 2k, k 0, b 0 refused busy at rest with no read: 29 and 14, mdio_to 0 busy 0, no retry): holds
+g scan 0 4 after equals (e)'s rows 0-4: yes, 5 of 5

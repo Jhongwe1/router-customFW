@@ -1,0 +1,41 @@
+mdpage 1.1 chain: every page from A-MD to J-PR, B minus A against the model (rtl819x_mdio_xfer, _pread, _scan 1.3)
+chain A-MD A-MD.log rd 0 wr 0 to 0 busy 0 retry 0 refused 0 wr_refused 0 again 0 spin 0: all 0 as the boot page
+chain C-P0 C-P0.log d refused 1: as modelled
+chain C-UN C-UN.log d 0: as modelled
+chain C-PR C-PR.log d rd 10 spin 10: as modelled
+chain C-PR2 C-PR2.log d 0: as modelled
+chain E-SC E-SC.log d rd 192 spin 192: as modelled
+chain F-B0 F-B0.log d again 1: as modelled
+chain F-S0 F-S0.log d rd 1 to 1 busy 5 (dbusy 5 dto 1): as modelled
+chain F-B1 F-B1.log d 0: as modelled
+chain F-S1 F-S1.log d rd 6 spin 6: as modelled
+chain G-P1 G-P1.log d rd 1 spin 1 (p0 0): as modelled
+chain G-P2 G-P2.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P3 G-P3.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P4 G-P4.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P5 G-P5.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P6 G-P6.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P7 G-P7.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P8 G-P8.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-P9 G-P9.log d rd 4 wr 2 spin 6 (p0 0): as modelled
+chain G-SC G-SC.log d rd 30 spin 30: as modelled
+chain D-V0 D-V0.log d 0: as modelled
+chain D-V1 D-V1.log d 0: as modelled
+chain D-V2 D-V2.log d 0: as modelled
+chain D-V3 D-V3.log d 0: as modelled
+chain D-V4 D-V4.log d 0: as modelled
+chain D-MD D-MD.log d 0: as modelled
+chain V-X0 V-X0.log d 0: as modelled
+chain V-X1 V-X1.log d 0: as modelled
+chain V-X2 V-X2.log d 0: as modelled
+chain V-X3 V-X3.log d 0: as modelled
+chain V-X4 V-X4.log d 0: as modelled
+chain V-SC V-SC.log d rd 30 spin 30: as modelled
+chain J-LK J-LK.log d 0: as modelled
+chain J-PR J-PR.log d refused 1: as modelled
+chain J-PR mdio_to 1 busy 5 against F-S1's 1 5 (+0 timed out and +0 refused busy at rest in (g)): equal
+chain C-PR phy0-4 rc 0 xrc 0 drv 0 att 0: yes
+chain J-PR phy0-4 rc 0 xrc 0 drv 0 att 0: yes
+chain J-PR spin 317 = mdio_rd 302 + mdio_wr 16 - mdio_to 1: holds
+chain final J-PR rd 302 wr 16 (the full run: 307 - dbusy 5 - 3k 0 - b 0 = 302, 16 - 2k = 16; k 0): as modelled
+chain verdict hold
