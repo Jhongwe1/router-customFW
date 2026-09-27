@@ -4871,7 +4871,7 @@ after `R1-M1`.
 
 量 2026-09-27, seating 43, two presses. **Block 49**: `bench/2026-09-27/`, card A
 (`PREDICTIONS-B51-block49.md`, frozen `cc5e39d`), one press of `p2q` (`rtl819x-nic 1.4`, `rtl819x-switch 1.1`,
-`RLXFW-ID0=A2C56BC8` at `A1Q-boot.log:8`, `recipe_id A2C56BC8` at `A1-NW0` and `A1-NW1`), a
+`RLXFW-ID0=A2C56BC8` at `bench/2026-09-27/A1Q-boot.log:8`, `recipe_id A2C56BC8` at `A1-NW0` and `A1-NW1`), a
 cold quiet boot, no stop. **Block 50**: `bench/2026-09-27b/`, card B
 (`PREDICTIONS-B52-block50.md`, frozen `255af14`), one press of `r6b6q` (`rtl819x-nic 1.5`, `rtl819x-switch 1.2`,
 `RLXFW-ID0=ACF8ED3D` at `bench/2026-09-27b/R1Q-boot.log:8`, `recipe_id ACF8ED3D` at `R1-NW0` and `R1-NW1`), two
@@ -5024,7 +5024,7 @@ depends on rtt jitter is built.
 
 ### 28.5 Block 50: the opening state (card B P1–P4), and the loader half of P2
 
-**P1 holds** (量): `B-SW.log:2` `version rtl819x-switch 1.2`, `:16` `n_linkq 0`, `:17` `lde0 00`,
+**P1 holds** (量): `bench/2026-09-27b/B-SW.log:2` `version rtl819x-switch 1.2`, `:16` `n_linkq 0`, `:17` `lde0 00`,
 `:21` `psrp3 000000F9 up 1 lde 0 lj 0`; `bench/2026-09-27b/B-00-T.log:2–4` 1.5 untouched since boot (`tx15 txlen
 rlxfw txoff 2 txrb 0 dirty 0`, `v15 last - 0 ok 0 refused 0 txq 0 arm15 0`); `B-RMEM.log:2–3`
 `116736` and `116736`.
@@ -5034,13 +5034,13 @@ rlxfw txoff 2 txrb 0 dirty 0`, `v15 last - 0 ok 0 refused 0 txq 0 arm15 0`); `B-
 `^BB804134:\t[0-9A-F]{8}$`) wanted one word, which `SPEC.md` `LDR-07` — `DW <addr> N` prints
 4 × ceil(N/4) words — contradicted before the freeze; the four-word form was already committed
 (block 48's `bench/2026-09-26b/R1Q-ab2.log:2`) and recurs in this seating's own `DW 8040D4A0 1`
-lines (`A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). By card B § 6 (lines 3332–3339), when `R1-DW`'s gate
+lines (`bench/2026-09-27/A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). By card B § 6 (lines 3332–3339), when `R1-DW`'s gate
 refuses, P2's loader half is **unmeasured** (a reading about the reply's form), and that is the
 score. The reading stands beside it (讀 `LDR-07` ①: `DW` does not align the address down, so the
 first word is `PSRP3`): `000010E0` — bit 8 clear, bit 12 set, bit 4 clear. The card's 推 "bit 4
 set" was wrong: port 3 had no link when `R1-DW` read it, 2.62 s after the banner (`notes/switch-driver.md` § 14.9). 推 the other three
 words are `PSRP4`–`PSRP6`, whose bit 8 the same read cleared, which the card did not plan.
-`bench/2026-09-27b/R1-SW7.log:1` reads `RLXFW-SW7=00000000` and `B-SW.log:17` `lde0 00`. What it adds to
+`bench/2026-09-27b/R1-SW7.log:1` reads `RLXFW-SW7=00000000` and `bench/2026-09-27b/B-SW.log:17` `lde0 00`. What it adds to
 `NET-30` 殘留 is `notes/switch-driver.md` § 14.9. The board's off-time, from the owner's reply
 confirming card A's power-off to the banner: at least 316 s — the reply preceded `X-OFF1`'s end,
 14:33:14.8, and the banner's wall time carries the 0.84 s above; the reply's own lag is
@@ -5350,7 +5350,7 @@ idle, was not exercised; the row stays open for the gate's later seatings.
 write strings and on 0 of 4 clean ones): 0 `FLW`, `EW`, `EB`, `FLR` or non-zero `AUTOBURN` among
 the 210 sent strings of the 251 console captures (38 in block 49, 172 in block 50; 41 captures
 sent nothing). `looprun`'s rescue sent `AUTOBURN 0` (`A1Q-rescue.json`, `R1Q-rescue.json`), and
-the `AUTOBURN` word read `00000000` before each upload (`A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). The
+the `AUTOBURN` word read `00000000` before each upload (`bench/2026-09-27/A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). The
 maps: `A1-MB0`, `A1-MB1`, `R1-MB0` and `R1-MB1` each read `0927be41…`, 31 groups the same and 1
 `DIFFER` in group 0, blocks 46–48's; `n_writes 0` at all four `NW` reads, carrying no
 information about writes (`FW-142`); `n_write_refused` 0 → 4 across block 50
