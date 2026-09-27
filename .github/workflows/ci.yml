@@ -1416,18 +1416,18 @@ jobs:
       # purpose and must be counted as a kill with its reason, not refuse the
       # run. Without gcc it REFUSES (exit 2) rather than reporting. What it
       # cannot see is the kernel half -- the hooks, the locks, the sweep's
-      # waits, the initialiser that reads NIC15_LEN_BOOT -- which is the
-      # bench's and the ELF's; tools/storeseq.py reads 1.4's store sequence.
+      # waits, the initialiser that reads NIC15_LEN_BOOT -- the bench's, and the
+      # ELF's: tools/storeseq.py reads the store sequence, and --defaults the words.
       - name: nic15check
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/nic15check.py 2>&1 | tee ci-out/nic15check.out; exit "${PIPESTATUS[0]}"
 
       # storeseq's comparison needs the built ELFs, which exist only under
       # $FWRE_WORK, so it is a desk tool; its SELF-TEST needs nothing but
-      # python -- synthetic listings and symbol tables, S0-S18: the store
-      # sequence, the both-inlined container, the identity check of untouched
-      # functions (a moved global reads the same, a renamed register does
-      # not; a stale TOUCHED declaration is red) and the initial-word check.
+      # python -- synthetic listings, symbol tables and ELFs, S0-S19: the store
+      # sequence, the both-inlined container, the identity check (a moved global
+      # reads the same, a renamed register does not; a stale TOUCHED is red),
+      # the initial words (1.6's {3,2,0,0} green, 1.5's red), --defaults' reader.
       - name: storeseq self-test
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/storeseq.py --self-test 2>&1 | tee ci-out/storeseq.out; exit "${PIPESTATUS[0]}"

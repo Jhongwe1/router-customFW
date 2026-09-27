@@ -36,8 +36,8 @@ the paths a default boot runs -- nic_xmit, nic_do_tx, nic_do_engine,
 nic_do_arm, nic_ndo_open -- and two it must leave alone, nic_recov_fn and
 nic_poll.
 
-When the new ELF has `nic15_pol` and the old one does not (1.4 against 1.5),
-two more checks run and must hold:
+When the new ELF has `nic15_pol` and the old one does not (1.4 against 1.5
+or later), two more checks run and must hold:
   IDENTITY  every driver function (`nic_*`, `rtl819x_nic*`) in both ELFs that
             TOUCHED below does not name is instruction-for-instruction the same:
             mnemonic, registers, immediates, relative branch targets, and
@@ -45,8 +45,15 @@ two more checks run and must hold:
             reads the same.  A function named in TOUCHED that is identical is
             RED too: the declaration is stale.  A function in one ELF only must
             be `nic15_*` or named in NEW_ONLY.
-  DEFAULTS  the ELF's initial words: nic15_pol = {txlen 0, txoff 2, txrb 0,
-            dirty 0} and nic15_show = 60.
+  DEFAULTS  the ELF's initial words: nic15_pol = {txlen 3, txoff 2, txrb 0,
+            dirty 0} and nic15_show = 60.  🔄 1.6 (R6b-10): txlen 3 is
+            `vendor`, the policy a boot starts in (NIC15_LEN_BOOT); 1.5's was
+            txlen 0, `rlxfw`, 1.4's lengths, so a 1.5 ELF now reads RED here.
+            `--defaults FILE` runs this check alone on one file -- a vmlinux or
+            a relocatable rtl819x-nic.o -- read in Python, with no binutils:
+            a relocatable object's sections all start at address 0, so
+            `nm`-style addresses cannot name its data, and the reader addresses
+            a symbol by (its section, its offset) instead.
 
 `nic_do_tx` is inlined into `nic_write_proc` in 1.4's images (one call site,
 -Os) and out of line in 1.5's (two).  When a function exists in one ELF and
@@ -69,6 +76,7 @@ paths, so an address formed on one path and used on another can print as `?`
 trusted.  A RED from this tool is a difference in the objects, to be read.
 
     storeseq.py --old OLD.elf --new NEW.elf [--func F[@CONTAINER]]... [--show]
+    storeseq.py --defaults FILE      (a vmlinux or an rtl819x-nic.o)
     storeseq.py --self-test
 """
 import argparse
@@ -98,11 +106,16 @@ TOUCHED = {
     "nic_do_arm": "nic15_armed at :2096 (store-compared)",
     "nic_ndo_open": "the engine gate at :1665 (store-compared)",
     "rtl819x_nic_init": "nic15_init at :3109",
-    "nic_et_drvinfo": "ethtool's version is RTL819X_NIC_VERSION, :218 1.4 -> 1.5",
+    "nic_et_drvinfo": "ethtool's version is RTL819X_NIC_VERSION, :218 1.4 -> 1.5, 1.6",
 }
 NEW_ONLY = {"nic_do_tx": "out of line in 1.5, inlined into nic_write_proc in 1.4"}
 DRIVER = re.compile(r"^(nic_|rtl819x_nic)")
-DEFAULT_WORDS = {"nic15_pol": [0, 2, 0, 0], "nic15_show": [60]}
+# 1.6's boot policy: txlen 3 = NIC15_LEN_VENDOR (rtl819x-nic-tx.h's
+# NIC15_LEN_BOOT), txoff 2 = NIC_RX_OFFSET, txrb 0, dirty 0; nic15_show 60.
+# 1.5's was {0, 2, 0, 0}: txlen 0, rlxfw, 1.4's lengths.
+DEFAULT_WORDS = {"nic15_pol": [3, 2, 0, 0], "nic15_show": [60]}
+SHT_SYMTAB, SHT_NOBITS, SHF_ALLOC = 2, 8, 2
+ET_REL, ET_EXEC = 1, 2
 
 STORES = {"sb", "sh", "sw", "swl", "swr", "sc", "sd", "swc1", "sdc1"}
 LOADS = {"lb", "lbu", "lh", "lhu", "lw", "lwl", "lwr", "ll", "ld", "lwc1",
@@ -193,6 +206,80 @@ class Syms:
                     return "anon:%s" % name
             return None
         return cls(rows, data, anon)
+
+    @classmethod
+    def from_file(cls, path):
+        """For --defaults: the allocated symbols of one ELF, read in Python by
+        read_elf32be.  An address here is (section index << 32) + the offset
+        in that section, so a relocatable object -- every section at 0 -- and
+        an executable read the same way; a NOBITS section reads 0."""
+        blob, et, secs, syms = read_elf32be(path)
+        if et not in (ET_REL, ET_EXEC):
+            raise Refused("%s: ELF type %d is neither relocatable nor "
+                          "executable" % (path, et))
+        rows = []
+        for name, val, size, ndx in syms:
+            s = secs[ndx]
+            if not s["flags"] & SHF_ALLOC:
+                continue
+            rel = val - (s["addr"] if et == ET_EXEC else 0)
+            if 0 <= rel <= s["size"]:
+                rows.append(((ndx << 32) + rel, size,
+                             "b" if s["type"] == SHT_NOBITS else "d", name))
+
+        def data(addr, n=4):
+            ndx, rel = addr >> 32, addr & 0xFFFFFFFF
+            if not 0 < ndx < len(secs) or rel + n > secs[ndx]["size"]:
+                return None
+            s = secs[ndx]
+            if s["type"] == SHT_NOBITS:
+                return 0
+            o = s["off"] + rel
+            return struct.unpack(">I", blob[o:o + 4])[0] if n == 4 else blob[o]
+        return cls(rows, data)
+
+
+def read_elf32be(path):
+    """-> (bytes, e_type, sections, symbols) of an ELF32 big-endian file, read
+    in Python so the self-test can drive it.  sections: dicts of name, type,
+    flags, addr, off, size, link; symbols: (name, value, size, shndx) for
+    every named symbol that lives in a real section."""
+    try:
+        blob = open(path, "rb").read()
+    except OSError as e:
+        raise Refused("cannot read %s: %s" % (path, e))
+    if len(blob) < 52 or blob[:4] != b"\x7fELF" or blob[4] != 1 or blob[5] != 2:
+        raise Refused("%s is not an ELF32 big-endian file" % path)
+    e_type, = struct.unpack(">H", blob[16:18])
+    shoff, = struct.unpack(">I", blob[0x20:0x24])
+    shentsize, shnum, shstrndx = struct.unpack(">HHH", blob[0x2E:0x34])
+    if (not shoff or shentsize != 40 or shstrndx >= shnum or
+            shoff + 40 * shnum > len(blob)):
+        raise Refused("%s has no usable section header table" % path)
+    secs = []
+    for i in range(shnum):
+        f = struct.unpack(">10I", blob[shoff + 40 * i:shoff + 40 * i + 40])
+        secs.append({"name_off": f[0], "type": f[1], "flags": f[2],
+                     "addr": f[3], "off": f[4], "size": f[5], "link": f[6]})
+
+    def cstr(base, off):
+        end = blob.find(b"\0", base + off)
+        return blob[base + off:end if end >= 0 else len(blob)].decode(
+            "utf-8", "replace")
+    for s in secs:
+        s["name"] = cstr(secs[shstrndx]["off"], s["name_off"])
+    syms = []
+    for s in secs:
+        if s["type"] != SHT_SYMTAB or s["link"] >= len(secs):
+            continue
+        stroff = secs[s["link"]]["off"]
+        for k in range(s["size"] // 16):
+            o = s["off"] + 16 * k
+            st_name, val, size, _info, _other, ndx = struct.unpack(
+                ">IIIBBH", blob[o:o + 16])
+            if st_name and 0 < ndx < len(secs):
+                syms.append((cstr(stroff, st_name), val, size, ndx))
+    return blob, e_type, secs, syms
 
 
 # --------------------------------------------------------------- listing
@@ -801,6 +888,48 @@ def _syn(text, repl=()):
     return parse(text)
 
 
+def _syn_elf(e_type, words, base=0):
+    """A minimal ELF32 big-endian file for S19: .data holding nic15_pol (four
+    words) and nic15_show (one), .bss holding `other`, then .symtab, .strtab
+    and .shstrtab.  base 0 is a relocatable object's layout; any other base
+    puts .data there and .bss at base + 0x100, as an executable would."""
+    shstr = b"\0.data\0.bss\0.symtab\0.strtab\0.shstrtab\0"
+    strtab = b"\0nic15_pol\0nic15_show\0other\0"
+
+    def nm(tab, s):
+        return tab.index(b"\0" + s + b"\0") + 1
+    bss = base + 0x100 if base else 0
+    data = struct.pack(">5I", *words)
+    sym = struct.pack(">IIIBBH", 0, 0, 0, 0, 0, 0)
+    for name, val, size, ndx in ((b"nic15_pol", base, 16, 1),
+                                 (b"nic15_show", base + 16, 4, 1),
+                                 (b"other", bss, 4, 2)):
+        sym += struct.pack(">IIIBBH", nm(strtab, name), val, size, 1, 0, ndx)
+    o_data = 52
+    o_shstr = o_data + len(data)
+    o_str = o_shstr + len(shstr)
+    o_sym = (o_str + len(strtab) + 3) & ~3
+    shoff = (o_sym + len(sym) + 3) & ~3
+    body = bytearray(shoff)
+    for o, part in ((o_data, data), (o_shstr, shstr), (o_str, strtab),
+                    (o_sym, sym)):
+        body[o:o + len(part)] = part
+
+    def sh(name, typ, flags, addr, off, size, link=0, entsize=0):
+        return struct.pack(">10I", name, typ, flags, addr, off, size, link, 0,
+                           4, entsize)
+    shdrs = (sh(0, 0, 0, 0, 0, 0) +
+             sh(nm(shstr, b".data"), 1, 3, base, o_data, len(data)) +
+             sh(nm(shstr, b".bss"), SHT_NOBITS, 3, bss, shoff, 16) +
+             sh(nm(shstr, b".symtab"), SHT_SYMTAB, 0, 0, o_sym, len(sym), 4, 16) +
+             sh(nm(shstr, b".strtab"), 3, 0, 0, o_str, len(strtab)) +
+             sh(nm(shstr, b".shstrtab"), 3, 0, 0, o_shstr, len(shstr)))
+    hdr = b"\x7fELF" + bytes([1, 2, 1]) + bytes(9)
+    hdr += struct.pack(">HHIIIIIHHHHHH", e_type, 8, 1, 0, 0, shoff, 0, 52, 0,
+                       0, 40, 6, 5)
+    return hdr + bytes(body[52:]) + shdrs
+
+
 def self_test():
     rows = []
 
@@ -984,19 +1113,50 @@ def self_test():
        "declaration and an undeclared new function are RED")
     wsyms = Syms([(0x802B0000, 16, "d", "nic15_pol"),
                   (0x802B0010, 4, "d", "nic15_show")],
-                 data=lambda a, n=4: {0x802B0004: 2, 0x802B0010: 60}.get(a, 0))
+                 data=lambda a, n=4: {0x802B0000: 3, 0x802B0004: 2,
+                                      0x802B0010: 60}.get(a, 0))
+    b15 = Syms(wsyms.rows,
+               data=lambda a, n=4: {0x802B0004: 2, 0x802B0010: 60}.get(a, 0))
     bsyms = Syms(wsyms.rows,
-                 data=lambda a, n=4: {0x802B0010: 60}.get(a, 0))
-    ck("S17", defaults_check(wsyms)[0] and not defaults_check(bsyms)[0] and
-       not defaults_check(SYN_SYMS)[0],
-       "defaults: {0, 2, 0, 0} and 60 are GREEN; txoff 0 is RED; a missing "
-       "nic15_show is RED")
+                 data=lambda a, n=4: {0x802B0000: 3, 0x802B0010: 60}.get(a, 0))
+    ck("S17", defaults_check(wsyms)[0] and not defaults_check(b15)[0] and
+       not defaults_check(bsyms)[0] and not defaults_check(SYN_SYMS)[0],
+       "defaults: 1.6's {3, 2, 0, 0} and 60 are GREEN; 1.5's {0, 2, 0, 0} is "
+       "RED; txoff 0 is RED; a missing nic15_show is RED")
     ck("S18", "nic_do_engine" in DEFAULT_FUNCS and "nic_ndo_open" in
        DEFAULT_FUNCS and "nic_recov_fn" in DEFAULT_FUNCS and "nic_poll" in
        DEFAULT_FUNCS and set(TOUCHED) & set(DEFAULT_FUNCS) >= {
            "nic_xmit", "nic_do_engine", "nic_do_arm", "nic_ndo_open"},
        "the default list carries the review's functions, and every hooked "
        "function on the default path is store-compared")
+    # --defaults' reader, on ELFs written here: relocatable (every section
+    # at 0) and executable (sections at their addresses), a .bss symbol that
+    # reads 0, 1.5's words RED, and a file that is not an ELF refused
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        def rd(name, et, words, base=0):
+            p = os.path.join(td, name)
+            with open(p, "wb") as fh:
+                fh.write(_syn_elf(et, words, base))
+            s = Syms.from_file(p)
+            return defaults_check(s)[0], s.data(s.by_name["other"][0], 4)
+        r_ok, r_bss = rd("rel.o", ET_REL, [3, 2, 0, 0, 60])
+        r_15, _ = rd("rel15.o", ET_REL, [0, 2, 0, 0, 60])
+        e_ok, e_bss = rd("exec.elf", ET_EXEC, [3, 2, 0, 0, 60], 0x80400000)
+        e_15, _ = rd("exec15.elf", ET_EXEC, [0, 2, 0, 0, 60], 0x80400000)
+        junk = os.path.join(td, "junk")
+        with open(junk, "wb") as fh:
+            fh.write(b"not an ELF at all" * 8)
+        try:
+            Syms.from_file(junk)
+            refused = False
+        except Refused:
+            refused = True
+    ck("S19", r_ok and not r_15 and e_ok and not e_15 and r_bss == 0 and
+       e_bss == 0 and refused,
+       "--defaults' reader: 1.6's words GREEN and 1.5's RED in a relocatable "
+       "object and in an executable, a .bss symbol reads 0, a non-ELF is "
+       "REFUSED")
     fails = 0
     for cid, ok, note in rows:
         print("  %-4s %-4s %s" % ("ok" if ok else "FAIL", cid, note))
@@ -1011,10 +1171,33 @@ def main():
     ap.add_argument("--old")
     ap.add_argument("--new")
     ap.add_argument("--func", action="append")
+    ap.add_argument("--defaults", metavar="FILE",
+                    help="check one file's initial nic15_pol/nic15_show words "
+                         "(a vmlinux or an rtl819x-nic.o) against 1.6's")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.defaults:
+        try:
+            syms = Syms.from_file(a.defaults)
+            dup = [n for n in sorted(DEFAULT_WORDS)
+                   if sum(1 for r in syms.rows if r[3] == n) > 1]
+            if dup:
+                raise Refused("%s holds more than one symbol named %s: which "
+                              "one a boot starts from is not decidable here"
+                              % (a.defaults, ", ".join(dup)))
+            g, lines = defaults_check(syms)
+        except Refused as e:
+            print("storeseq: REFUSED: %s" % e)
+            return 2
+        for x in lines:
+            print(x)
+        print("RESULT: %s -- %s's initial words against 1.6's boot policy "
+              "(nic15_pol %s, nic15_show %s)" % (
+                  "GREEN" if g else "RED", os.path.basename(a.defaults),
+                  DEFAULT_WORDS["nic15_pol"], DEFAULT_WORDS["nic15_show"]))
+        return 0 if g else 1
     try:
         if not a.old or not a.new:
             raise Refused("give --old ELF and --new ELF, or --self-test")
@@ -1043,7 +1226,7 @@ def main():
                 print("  %s %s" % ("GREEN" if g else "RED  ", label))
         else:
             print("identity, defaults: not run -- only for 1.4 (no nic15_pol) "
-                  "against 1.5")
+                  "against 1.5 or later; --defaults FILE checks one file")
     except Refused as e:
         print("storeseq: REFUSED: %s" % e)
         return 2

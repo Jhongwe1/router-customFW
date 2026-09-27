@@ -5493,9 +5493,14 @@ appended region, which nothing cites.
   the initialiser.
 * `storeseq` `r6b8by` → `r6b10y` and `r6b8bn` → `r6b10n`: GREEN. It compares where stores go, not
   what they store, so it says nothing about the new default; that `m_len` and `m_extsize` are F + 4
-  at the boot policy is `nic15check`'s K22 and the ELF word above. Its `DEFAULTS` check —
-  `nic15_pol` = {0, 2, 0, 0}, run only 1.4 → new — is 1.5's claim and is left as it is: against 1.6
-  it reads red, which is the truth, 1.6's default not being 1.4's.
+  at the boot policy is `nic15check`'s K22 and the ELF word above. Its `DEFAULTS` check now states
+  1.6's claim, `nic15_pol` = {3, 2, 0, 0}, and `storeseq --defaults FILE` runs it alone on one
+  file, read in Python (a relocatable object's sections all start at 0): **GREEN on `r6b10y`'s and
+  `r6b10n`'s `rtl819x-nic.o` and on `r6b10y`'s `vmlinux`; RED on 1.5's — `r6b8cr`'s and `r6b6q2`'s
+  `rtl819x-nic.o` and `r6b8cr`'s `vmlinux` read {0, 2, 0, 0}**, the control. `p2q` → `r6b10y`
+  (1.4 → 1.6) is GREEN on the store sequences, the defaults and the identity check; `p2q` →
+  `r6b8cr` is RED on the defaults alone, by design. Self-test 20 of 20 (S17 on 1.6's words, S19 the
+  reader); `tools/ci-expected.tsv` 19 → 20.
 
 ### 29.3 `N1`: the driver only comments, and the comment was a `SWCORE=y` statement
 
@@ -5578,6 +5583,6 @@ longest send 108 characters); every line dry-run through `cardrun --dry`, rc 0.
   one.
 * That the default is 1.5's `txlen vendor` in time as well as in code: the code is 1.5's, and
   § 23.5's caveat about cycles carries.
-* `NET-67` 殘留 and `NET-78` 殘留 ⊘: the ruling makes them ⊘ once the flip lands, which is the
-  landing's to record, not a desk reading.
+* `NET-67` 殘留 and `NET-78` 殘留: they stay `R6b-10`'s until its regression has run on the
+  silicon (the main session's ruling, 2026-09-27); nothing here closes them.
 * The mechanism: `M1`-cover8 stays the one rule left standing, 推 (`NET-129`).
