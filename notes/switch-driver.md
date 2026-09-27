@@ -2848,3 +2848,385 @@ with a planted `EW` and `FLR` is refused (rc 1). Every line dry-run through `car
   switch init (arm I).
 * That the transcription `mdiocheck` drives is the driver's code: the read and write paths above the
   cut are copied into the harness, not compiled from the driver.
+
+# 16. 2026-09-27/28 (`R6b-8` 8c-cells, group A; arm II) — the take-over list in three columns, `reset vendor`, `ByPassTCRC`, and arm II as `D8`'s control
+
+Group A of 8c-cells and arm II, read at the desk (segment 115). `NET-25`'s ten cold boots, `M3`'s
+isolated-spacing arm and `R6b-10`'s regression are `notes/nic-driver.md` § 30's. The design is
+`$FWRE_WORK/rebuild/s115/r6b8c-cells/DESIGN.md` (not in this repository) and the card `CELLS-A.md`,
+committed beside the captures in both directories that hold them — the owner's relaxed process for
+`R6b`, no freeze; arm II's sheet is `bench/2026-09-28/RUN-armII.md`. The readings are two readers'
+(`$FWRE_WORK/rebuild/s115/read-night/READING-1.md` and `READING-2.md`) and the main session's
+rulings on them (`RULINGS-night.md`, same directory, cited as ruling *n*), which bind this record.
+Every number below was re-read from its capture for this record by scripts that share no code with
+the readers' (`$FWRE_WORK/rebuild/s115/rec-night/scripts/`: `v_cols.py`, `v_all.py`, `v_phy.py`,
+`v_s0.py`, `v_xc.py`, `v_mib.py`, `v_clock.py`, `v_sent.py`; each refuses when a planted defect does
+not turn it red, and `v_mib.py` reads `tools/viewdecode.py`'s own rendering of the view's words).
+
+Capture names are `bench/2026-09-28/`'s unless marked `27d/` (`bench/2026-09-27d/`). `NAME:N` is
+line N of `NAME.log`, counted on LF with CR stripped. Marks: 量 a capture, 讀 code or a document,
+推 inferred.
+
+## 16.1 What ran
+
+* **`bench/2026-09-27d/`, a cold power-on** (量; `CORRECTIONS-8c-A.md` there). The owner powered
+  the board on for later unattended use, and the loader was caught at 18:01:26 (`27d/S-CATCH`,
+  whose line 5 is `C-8`'s one-space line: cold, `CLK-15`). At 20:09:24–20:09:39 `A-L` read the
+  **loader-inherited column** at that prompt: 27 cells, 19 `DW` and 6 `MDIOR`, 105 gates, all ok
+  (the run record, `$FWRE_WORK/rebuild/s115/r6b8c-cells/run/A/`). The design's two positive
+  controls held: `REVR` `8196E001` (`27d/AL-D01:2`) and `CVIDR` `81964000` (`27d/AL-D08:2`).
+* **The standby failure** (ruling 9; `NET-165`). `A-B`'s `looprun` round (`27d/A1Q`) passed S5 —
+  `AUTOBURN 0`, `LOADADDR` and `IPCONFIG 10.1.1.1` each accepted (`27d/A1Q-rescue.json`) — and
+  S5b, the `AUTOBURN` word read back `00000000` (`DW 8040D4A0 1`, `27d/A1Q-ab2:2`), and failed
+  S5c: the loader answered no ARP and the host's entry stayed `INCOMPLETE` (`27d/A1Q:10`), 2 h 8
+  min after the catch. Nothing was uploaded, and the tail watch ended on the loader prompt. Why an accepted
+  `IPCONFIG` was followed by no ARP answer is undetermined: about two hours at the prompt and
+  `A-L`'s reads both came before it, and nothing separates them. The loader answers the network
+  only after `IPCONFIG` (`NET-95`); a fresh prompt and `IPCONFIG` answered ARP 3 of 3 twice later
+  that night (the main session's `arping`, whose output is in no committed file). Ruling 9 records
+  it as a bench rule — no unattended standby — and not as a question with an experiment owed.
+* **The power cycle after midnight, `bench/2026-09-28/`** (量; `CORRECTIONS-A-r6b10-armII.md`
+  there). 27d's power cycle ended with the owner's power-off before `NET-25`'s boot 1. Group A
+  resumed from `A-B` at 00:05:31 on boot 10's power cycle, after that boot's `busybox reboot -f`
+  (a watchdog reset, `FW-37`; `bench/2026-09-27n/B-RB`, ended 23:55:16) and an off-card `IPCONFIG`
+  (`bench/2026-09-27n/X-ARP1`, 23:55:54). Eleven invocations, `A-B` to `A-Z`, ran to 00:13:33,
+  each rc 0: 295 cells and 892 gates, all ok (`AT-T1`'s rc 1, the test ping's 0 of 20, is declared
+  a reading). `R6b-10`'s regression (`notes/nic-driver.md` § 30.4) and arm II (§ 16.7) followed on
+  the same power cycle, with no power action between.
+* **So the columns come from two power-ons.** **L** is 27d's cold prompt. **V** (vendor-configured:
+  after the vendor's probe, before any rlxfw write or interface open) and **R** (after
+  `reset vendor`) are one Linux boot of 28 that followed a watchdog reset. That boot's own
+  loader-inherited sample is **S0′**, the 37 words `rtl819x-switch` latches at `subsys_initcall`
+  (§ 8.3): `A2-SW`'s S0′ equals, word for word, the S0′ of the ten cold boots
+  (`bench/2026-09-27e/B-SW` to `bench/2026-09-27n/B-SW`) and of `Y2-SW` and `M2-SW`, the two later
+  boots of 28's power cycle — 37 of 37 each (量). L and S0′ share 30 words: 25 are equal, and the
+  other 5 are `PCRP0`–`PCRP4`, differing in bit 0 alone — the loader's `J` clearing `EnablePHYIf`
+  (§ 8.3). 推: for words outside the switch page, L stands in for 28's loader-inherited state.
+
+## 16.2 The take-over list: three columns (量 unless marked; `NET-160`)
+
+Δ codes: **LV** changed by the vendor's init (against S0′ where S0′ holds the word); **VR** changed
+by `reset vendor`; **LR** R differs from L. `*` marks a one-source word (B only), read through the
+vendor's memory node; `=M08:4` says a second instrument printed the same value in `AV-M08:4`. The
+cites are L (`27d/`, but `A2-SW`, which is 28's); V; R.
+
+| register | L (S0′) | V | R | Δ | L; V; R |
+|---|---|---|---|---|---|
+| `MACCR` 4000 | `804A0185` | `804A0185` | `80420186` | VR LR | `AL-D03:2`; `AV-P01:8` =M08:4; `AR-P01:8` |
+| `BSCR` 4044 | 0 | 0 | 0 | = | `AL-D04:2`; `AV-P02:8` =P02b; `AR-P02:8` |
+| `CSCR`* 4048 | `00000008` | `00000018` | `00000008` | LV VR | `AL-D04:2`; `AV-M02:4`; `AR-M02:4` |
+| `PCRP0`–`4` 4104–14 | `nn7F0039` (S0′ `nn7F0038`) | `nn7F0039` | `nn7F0038` | LV VR | `AL-D05:2–3`, `A2-SW:33–37`; `AV-P03:9–13` =M09:4, M10:4; `AR-P03:9–13` |
+| `PCRP5`–`8` 4118–24 | 0, `187F0038`, `1C7F0038`, `207F0038` | the same | the same | = | `AL-D06:2`; `AV-P03:14–17` =P03b; `AR-P03:14–17` |
+| `EEECR`* 4160 | `294A5294` | 0 | `294A5294` | LV VR | `AL-D07:2`; `AV-M03:4`; `AR-M03:4` |
+| `SSIR` 4204 | 1 (S0′ 1) | 0 | 0 | LV LR | `AL-D08:2`; `AV-P05:9` =M11:4; `AR-P05:9` |
+| `MEMCR` 4234 | S0′ `00007F7F` | `00007F00` | `00007F00` | LV | `A2-SW:46`; `AV-P06:8`; `AR-P06:8` |
+| `LEDCREG` 4300 | `00200000` | `00200000` | 0 | VR LR | `AL-D09:2`; `AV-P07:8` =P07b, M12:4; `AR-P07:8` |
+| `LEDCR1`, `LEDBCR` | 0 | 0 | 0 | = | `AL-D09:2`; `AV-P07:9`, `AV-P08:8` =P07b, P08b; `AR-P07:9`, `AR-P08:8` |
+| `TEACR` 4400 | 0 | 2 | 0 | LV VR | `AL-D10:2`; `AV-P09:8` =M13:4; `AR-P09:8` |
+| `ALECR` 440C | 0 | `000505F2` | 0 | LV VR | `AL-D10:2`; `AV-P09:11`; `AR-P09:11` |
+| `MSCR` 4410 | 1 | `00000011` | 1 | LV VR | `AL-D10:3`; `AV-P09:12` =M13:5; `AR-P09:12` |
+| `SWTCR0` 4418 | `00080000` | `00097DE0` | `00080000` | LV VR | `AL-D10:3`; `AV-P09:14`; `AR-P09:14` |
+| `SWTCR1` 441C | `00000200` | `00000E00` | `00000200` | LV VR | `AL-D10:3`; `AV-P09:15`; `AR-P09:15` |
+| `PLITIMR` 4420 | `07FAC688` | `00001000` | `07FAC688` | LV VR | `AL-D10:4`; `AV-P09:16` =M13:6; `AR-P09:16` |
+| `DACLRCR` 4424 | 0 | `0FBF7EFD` | 0 | LV VR | `AL-D10:4`; `AV-P09:17`; `AR-P09:17` |
+| `FFCR` 4428 | 3 | 9 | 0 | LV VR LR | `AL-D10:4`; `AV-P09:18`; `AR-P09:18` |
+| `SBFCTR`* 4500 | `000000F4` | `000000F4` | `000000F4` | = | `AL-D11:2`; `AV-M06:4`; `AR-M06:4` |
+| `IBCR0`–`2`* 4704–0C | 0 | 0 | 0 | = | `AL-D12:2`; `AV-M04:4`; `AR-M04:4` |
+| `QNUMCR`* 4754 | `00001249` | `00041249` | `00041249` | LV LR | `AL-D13:2`; `AV-M01:4`; `AR-M01:4` |
+| `WFQRCRP0`–`4`* / `P5`* | `00003FFF` / 0 | the same | the same | = | `AL-D14:2–5`; `AV-M05:4–7`; `AR-M05:4–7` |
+| `VCR0` 4A00 | `000001FF` | 0 | `000001FF` | LV VR | `AL-D15:2`; `AV-P10:8` =M14:4; `AR-P10:8` |
+| `PVCR0`–`4` 4A08–18 | `00080008` ×4, 1 | `00090009`, `00090009`, `00010008`, `00010001`, 9 | `00010001` ×4, 1 | LV VR LR | `AL-D15:2–3`; `AV-P10:10–14` =M14:4–5; `AR-P10:10–14` |
+| `PBVCR0` 4A1C | 0 | `00021B74` | 0 | LV VR | `AL-D15:3`; `AV-P10:15`; `AR-P10:15` |
+| `SWTAA` 4D08 | `BB060100` | `BB040020` | 0 | LV VR LR | `AL-D16:2`; `AV-P11:10` =M15:4; `AR-P11:10` |
+| `TCR7` 4D3C | 0 | `07000030` | 0 | LV VR | `AL-D17:2`; `AV-P12:8`; `AR-P12:8` |
+| `0x4D48`* | `BB060100` | `BB040020` | 0 | LV VR LR | `AL-D17:2`; `AV-M07:4`; `AR-M07:4` |
+| `PSRP0` / `PSRP3` bit 12 | S0′ `000010E0` / `000010F9` | `000000E0` / `000000F9` | `000010E0` / `000010E0`, relinked `000010F9` | LV VR | `A2-SW:40–41`; `AV-SW:40–41`; `AR-RST:41–42`, `AR-MDS:31` |
+| `PIN_MUX_SEL` / `SEL2` | 6 / 0 | 6 / 0 | 6 / 0 | = | `AL-D02:2`; `AV-P15:8–9` =P15b, M18:4; `AR-P15:8–9` |
+| `CPUICR` B8010000 | `C4000000` | 0 | 0 (`04000000` before) | LV LR | `AL-D18:2`; `AV-P13:8` =M16:4; `AR-P13:8` (`AR-C0:8`) |
+| the CPU ring registers (`RPDCR0`, `RMDCR0`, `TPDCR0`–`3`) | the loader's ring addresses | 0 | 0 | LV LR | `AL-D18:2–4`, `AL-D19:2`; `AV-P13:9–17`, `AV-P14:8–9`; `AR-P13`, `AR-P14`, the same lines |
+| `CPUIIMR` / `CPUIISR` | `000007F8` / 0 | 0 / `80000000` | 0 / `80000000` | LV LR | `AL-D18:4`; `AV-P13:18–19` =M16:6, M17:4; `AR-P13:18–19` |
+| `CPUQDM0`–`5` | 0 | 0 | 0 | = | `AL-D18:5`; `AV-P13:20–22`; `AR-P13:20–22` |
+| VLAN table | not read | s00 `00921F0F`, s01 `00842010`, 14 zero | 16 zero | VR | —; `AV-TV:8–23`; `AR-TV:8–23` |
+| netif table | not read | s00 and s01 set, 6 zero | 8 zero | VR | —; `AV-TN:8–15`; `AR-TN:8–15` |
+| MIB, 225 words | — | all 0 | all 0 (non-zero just before: `AT-R9:44`) | VR | —; `AV-VM1:9–16`; `AR-VM:9–16` |
+
+**The PHY registers.** PHYs 0–4 read the same in every cell. Where both instruments read a register
+(17, 21, 22, 26, and page 1's 16 and 19), rlxfw's `pread` equals the vendor's `phyReg` in 30 of 30
+reads (量).
+
+| reg | L | V | R | Δ | L; V; R |
+|---|---|---|---|---|---|
+| 0 | `1100` | `1100` | `3100` | VR LR | `AL-R00:2–6`; `AV-MDS:20–24`; `AR-MDS:28–32` |
+| 4 | `0DE1` | `0DE1` | `0DE1` | = | `AL-R04:2–6`; `AV-MDS:20–24`; `AR-MDS:28–32` |
+| 17 | `1F10` | `1E10` | `1F10` | LV VR | `AL-R17:2–6`; `AV-MP01:22` to `AV-MP03:26`, `AV-PV01:3` to `AV-PV03:3`; `AR-MP01:28` to `AR-MP03:28` |
+| 21 | `02C2` | `02C2` | `02C5` | VR LR | `AL-R21:2–6`; `AV-MP03:27` to `AV-MP05:29`; `AR-MP03:29` to `AR-MP05:29` |
+| 22 | `5BC7` | `5BC7` | `5B8F` | VR LR | `AL-R22:2–6`; `AV-MP06:28` to `AV-MP08:28`; `AR-MP06:28` to `AR-MP08:28` |
+| 26 | `4000` | `0000` | `4000` | LV VR | `AL-R26:2–6`; `AV-MP08:29` to `AV-MP10:29`; `AR-MP08:29` to `AR-MP10:29` |
+| page 1, 16 | — | `D100` | `9100` | VR | —; `AV-MP11:28` to `AV-MP13:28`, `AV-PV11:3` to `AV-PV13:3`; `AR-MP11:28` to `AR-MP13:28` |
+| page 1, 19 | — | `7380` | `7381` | VR | —; `AV-MP13:29` to `AV-MP15:29`; `AR-MP13:29` to `AR-MP15:29` |
+
+Registers 1–3 and 5 read the same in V and R (`AV-MDS:20–24`, `AR-MDS:28–32`). A `pread` page keeps
+its last eight results, so in each `AR-MP` page only lines 28–29 are the post-reset reads; the lines
+above them are the page's history. Page 4's register 16 (EEE) has no reading in any column: the
+owner's pages-0-and-1 limit, applied to the vendor's `extRead` too (the main session's ruling of
+2026-09-27, the design's § 7).
+
+**What the vendor's init changes (the LV rows).** `TRXRDY` off, and `EnablePHYIf` set again on
+`PCRP0`–`4`; `CSCR` bit 4 set; `EEECR` cleared to 0; `TEACR`, `ALECR`, `SWTCR0`, `SWTCR1`,
+`PLITIMR`, `DACLRCR`, `FFCR`; `MSCR` 1 → `0x11`; `QNUMCR`'s CPU field 0 → 1; `VCR0` → 0; the PVIDs
+(the LAN ports 9, port 4 8; 讀 `NET-37`'s field split); `PBVCR0`; `SWTAA`, `0x4D48` and `TCR7`;
+`MEMCR`'s low byte; `PSRP` bit 12; both tables written; the loader's CPU ring registers and
+`CPUIIMR` set to 0 and `CPUIISR` bit 31 set; PHY register 17 bit 8 and register 26 bit 14 cleared.
+
+**What it leaves alone (L = V).** `MACCR`, `BSCR`, `PCRP5`–`8`, `CVIDR`, `CRMR`, `BISTCR`, `LEDCREG`,
+`LEDCR1`, `LEDBCR`, `TEATCR`, `RMACR`, `L4TOCR`, `MGFCR_E0R0`, `SBFCTR`, `IBCR0`–`2`,
+`WFQRCRP0`–`5`, `VCR1`, `SWTACR`, `SWTASR`, `P0GMIICR`, the `PIN_MUX` pair, `CPUQDM0`–`5`, and PHY
+registers 0, 4, 21 and 22 (量; `v_all.py` lists every word read in V with its L and R).
+
+## 16.3 What `reset vendor` does (量, one boot; `NET-161`)
+
+Before the reset `CPUICR` read `04000000` by two instruments, the NIC page's `now_icr`
+(`AR-NIC:49`) and a `peek` (`AR-C0:8`) — `TXCMD` and `RXCMD` clear, 8d's `reset` refusal applied by
+hand after `disarm`. `AR-RST:2` reads `RLXFW-SW-RST=00000002` and `:9` `n_reset 1`.
+
+* **Back to L:** `CSCR`, `EEECR`, `TEACR`, `ALECR`, `MSCR`, `SWTCR0`, `SWTCR1`, `PLITIMR`,
+  `DACLRCR`, `VCR0`, `PBVCR0`, `TCR7`, `PSRP` bit 12, and PHY registers 17 and 26.
+* **Not back:** `MACCR` `80420186`; `EnablePHYIf` clear (`PCRP0`–`4` `nn7F0038`) and `TRXRDY` 0;
+  `FFCR` and `LEDCREG` 0; the PVIDs 1 (`PVCR0`–`3` `00010001`, `PVCR4` 1); `SWTAA` and `0x4D48` 0;
+  both tables empty and the MIB zeroed; `CPUICR` `04000000` → 0; PHY registers 0 (`BMCR` `3100`),
+  21 and 22 and page 1's 16 and 19 at new values. `QNUMCR` stays `00041249`, and `MEMCR` stays
+  `00007F00`, the value the reset started from.
+
+**So R is not the loader's state.** 推: the PHY changes are the reset's own, not a vendor handler's
+reaction to the link drop the reset causes. Not separated: `FULL_RST` from the 650-ms clock gate,
+which the one verb does together.
+
+## 16.4 The reads the design lacked (`NET-162`)
+
+* **`PCRP7` and `PCRP8`**, `1C7F0038` and `207F0038` in all three columns (量), `EnablePHYIf` clear
+  throughout. `PCRP8`'s first reading on this die: no committed capture before the night holds
+  the word (`PCRP7` was read once, at a prompt, `bench/2026-09-19/C2-L4114:2`). `DW` and `peek`
+  are one kind of source, so a write of these values would be undetermined; the vendor does not
+  change them, so 8d writes nothing there and the two-source rule is not engaged.
+* **`PIN_MUX_SEL` and `SEL2`**, `00000006` and `00000000` in all three columns (量), their first
+  readings. The vendor's clears (`PIN_MUX_SEL &= ~0x8F18`, `PIN_MUX_SEL2 &= ~0x3B6DB`, 讀
+  `rtl865x_asicL2.c:4568`–`:4569` in the tree that builds) change nothing on these values, and
+  `rtl_gpio`'s `|= 6` (`REG-35`) agrees. 8d needs no write.
+* **`QNUMCR`**: L `00001249`, the CPU port's field (bits 20:18) 0; V and R `00041249`, field 1. The
+  field's value 1 has two sources — the vendor's write (讀 `rtl865x_asicL2.c:6554`–`:6555`) and
+  the reads (量) — so it meets the rule **for the field only**, written read-modify-write. The
+  other fields rest on the reads and on the loader's disassembly, which is not an admitted source,
+  and D does not place the register. V = R: the reset leaves it alone (推 `FULL_RST` does not
+  reset it; the clock gate is not separated). Which value rlxfw wants is 8d's to decide; the
+  loader receives with the field at 0.
+* **`LEDCREG`**: the SDK's `2<<20` (讀 `rtl865x_asicL2.c:4571`) and the reads agree on
+  `00200000`, and D's Table 68 calls `10` reserved (`NET-134`): two sources of three, which meets
+  the rule. A `reset vendor` clears it.
+* **`PLITIMR`**: L `07FAC688` (the value block 24 read, `bench/2026-09-17b/C4-SW418:2`), V
+  `00001000` (`peek` and the memory node agree), R `07FAC688`. `NET-28` 殘留's 推 *Linux 態是 0*
+  is **refuted**, and the design's prediction of `00001000` held. V rests on reads alone, and the
+  one vendor write on record writes 0 (讀 `rtl_nic.c:6370`, under `CONFIG_RTK_VLAN_SUPPORT`, which
+  the build sets), so as a register value it stays undetermined (ruling 5). 推: port 4's interface
+  index set to 1 (B's one-source field layout). R = L supports `07FAC688` as the reset value (推).
+* **`0x4D48` equals `SWTAA` in all three states** — `BB060100`, `BB040020`, 0 — and moved with it
+  from V to R on one boot (量). That meets `NET-28` 殘留's condition (*Linux 也讀 `BB040020`*) in
+  substance, but L and V are two power-ons, not the one boot the row asked for. The word still
+  has no name and one source.
+* `QNUMCR`, `CSCR`, `EEECR`, `IBCR0`–`2`, `WFQRCRP0`–`5` and `SBFCTR` now have loader `DW`
+  readings (the kind of 量 the view's admission table counts), so each has B and 量 for 8d's
+  admission to `rtl819x-view`; `0x4D48` stays one-source.
+
+## 16.5 `NET-109` 殘留: port 3's `ByPassTCRC` (`NET-163`)
+
+The cell is the design's § 2.7 (`AT-*`, four invocations), its three readings written before power.
+
+* **Pre-read**: `PCRP3` `0C7F0039` by `peek` (`AT-P0:8`) and by the memory node (`AT-M0:4`).
+* **Control, bit 31 clear**: 20 of 20 (`AT-C0:4`).
+* **Write, bit 31 set**: the node's read-back `0x8c7f0039` (`AT-W1:3`), `peek` `8C7F0039`
+  (`AT-V1:8`); the word written is the pre-read with bit 31 added, nothing else.
+* **Test, bit 31 set: 0 of 20** (`AT-T1:4`).
+* **The host, `AT-H1` → `AT-H2`**: `rx_packets` 27886 → 27886 (`AT-H1:14`, `AT-H2:14`),
+  **`rx_crc_errors` 0 → 0** (`:5` of both), every other receive counter unchanged, `tx_packets`
+  +20 (量).
+* **The board, `AT-R0` → `AT-R1`** (control and test together, `AT-D1:2–4`, `:7`, `:10`): `n_tx`
+  +40, the CPU port's `CRCAlignErr` +40, **port 3's output +40**; the host +20; `fault jfd 0`.
+  Port 3 counted the 20 test frames as sent. That the control accounts for the other 20 is 推: no
+  board read sits between control and test.
+* **Restore**: the node `0xc7f0039` (`AT-W9:3`), `peek` `0C7F0039` (`AT-V9:8`); liveness 4 of 4
+  (`AT-L9:9`); the control again 20 of 20 (`AT-C9:4`); host +25 = board +25 (`AT-D9:2`, `:4`,
+  `:7`).
+
+**Against the cell's own three readings** (ruling 4): the result is the third — **0 of 20
+received, host CRC Δ 0**, *frames lost on the wire and the adapter counts nothing*. The desk
+reading's confirmation (CRC Δ ≥ 20) is not met, and the *not separated* outcome (20 of 20) is
+excluded. 量: bit 31 acts on the CPU → port-3 path — 20, 0, 20 on one boot, each write read back
+by two instruments — and port 3's MIB counts the lost frames as sent. Open: whether the frames
+left with a bad FCS that the adapter drops without counting (推, the likelier; that counter never
+had a positive control) or never left port 3; and whether bit 31 means *don't regenerate the CRC
+of CRC-errored frames* (D Table 64, B) or no CRC generation at all — both predict this for CPU
+frames. Separating them needs a non-CPU source into port 3's egress or a receiver whose CRC counter
+has a positive control, and one link offers neither: `NET-109` 殘留 is ⊘ with that reason, reopened
+when either exists.
+
+## 16.6 The cross-checks, and what the instruments could not see (`FW-155`)
+
+1. **The quiet MIB bracket** (`AV-AC0`, `AV-VM1`, `AV-AC1`): `viewdecode bracket` holds, 211
+   counters pinned (量) — but all zero, since `TRXRDY` was 0 until `start` (推), so it tests no
+   offset.
+2. **Read-to-clear**, `AV-VM1` against `AV-VM2`: equal and all zero, so vacuous. **Instrument
+   gap:** `viewdecode decode --one-boot` compares only a page's own counters (`COUNTS`,
+   `tools/viewdecode.py:490`; `one_boot`, `:809`–`:825`), never the MIB words, so it could not have
+   shown `VM2` < `VM1`; and it voided the `VM2` → `AX` pair on a `jiffies` wrap.
+3. **The `…b` double reads**, 16 words: all equal (量). Blind to a side effect on a zero word.
+4. **The tables**: the design's prediction met exactly; 48 slot reads `t1 eq`, no `mis` and no
+   `busy`; every view page `refused 0 busy 0` (`AV-VZ:5`, `AR-VZ:5`).
+5. **`peek` against the memory node**, the V boot: 57 of 57 words equal, 25 of them non-zero with
+   23 distinct values (量).
+6. **The node's positive control**: `CVIDR` `81964000` (`AV-M11:4`).
+7. **rlxfw's MDIO against the vendor's `phyReg`**: 30 of 30; the probe found five `001CC880`
+   (`AV-MDP:15–19`); the locked page read nothing (`AV-MD0:14–18`).
+8. **`port_status` against `PSRPn` and `PCRPn` bit 25**: 7 of 7 ports agree (the reading's count).
+9. **`peek` against the switch page**: 30 of 32 registers equal. `MDCIOCR` and `MDCIOSR` differ
+   (`AV-P01:9–10` `84001300`, `00001100`; `AV-SW:30–31` `841F0000`, `00007380`) because MDIO
+   commands ran between the two reads (推: `841F0000` is PHY 4's page-0 restore after `AV-PV15`'s
+   paged read). No address fault.
+10. **The MIB after traffic** (`AX-AC0`, `AX-VM`, `AX-AC1`): holds, 211 pinned, 17 non-zero, and
+    neither reader clears them (量). Control: `AX-VM` placed between `AV`'s two ends fails on 17
+    counters. `lo + (hi << 22)` is not exercised: port 3 carried 147,664 bytes (`AX-VM:12`, word
+    0 of `m3`, `000240D0`), below 2²². Its in and out byte counts are equal and two buckets tie at
+    60, so a swap between tied counters would pass.
+11. **The map bracket**: the same digest at both ends (§ 16.9).
+12. **`CPUICR` before the reset**: `04000000` by `now_icr` and by `peek` (§ 16.3).
+13. **`NET-28` 殘留**: `0x4D48` = `SWTAA` in all three states (§ 16.4).
+14. **Unplanned**: rlxfw's `ENGON` value `C4000000` (`AN-N2:6`) equals the loader's `CPUICR`
+    (`27d/AL-D18:2`).
+
+Two § 17 rows move and stay open. **`NET-31` 殘留**: `PSRP` bit 12 moves with `EEECR` and PHY
+register 26 in all three states — set, `294A5294`, `4000` in L/S0′ and R; clear, 0, `0000` in V —
+so which vendor step clears it is still not separated. **`NET-33` 殘留 ②**: the reset again
+started from `7F00`, so it cannot show what `FULL_RST` does to `MEMCR`'s low byte. Arm II (§ 16.7)
+adds the first half of both rows' settling reads on a boot with no vendor probe.
+
+## 16.7 Arm II on `r6b10n`: `D8`'s control, passing (`NET-164`)
+
+量 unless marked, `bench/2026-09-28/` `M*` and the run record
+`$FWRE_WORK/rebuild/s115/run10/2026-09-28/`: `n-line1` (00:21:34–00:22:58, rc 0), `n-line2`
+(00:23:32–00:23:44, rc 3 at `M5-REF`'s `--until`) and `n-line2b` (00:27:11–00:28:03, rc 0; the
+resume, correction 6 of `CORRECTIONS-A-r6b10-armII.md`). The image is `r6b10n` (`SWCORE=n`,
+`rtl819x-switch` 1.4, `rtl819x-nic` 1.6 at its default; `FW-154`), `RLXFW-ID0=1CC05E88`
+(`M1-MK:1`). `ethcensus` is green on it (讀 `FW-154`) and `/proc/rtl865x` is absent
+(`M2-DEV:20`).
+
+* **Reads before any write.** At the loader prompt `PCRP0`–`4` read `nn7F0039` (`M1-DWP:2–3`);
+  after `J`, `nn7F0038`, live equal to slot 0 (`M2-SW:39–43`), and `rtl819x-view`'s `peek` agrees
+  (`M2-VP1:9–13`); `PCRP7` and `PCRP8` `1C7F0038` and `207F0038` (`M2-VP1:16–17`). `psrp3
+  000010F9 up 1` (`M2-SW:27`), `MSCR` `00000001` (`:55`), `VCR0` `000001FF`, `PVCR0`–`3`
+  `00080008` and `PVCR4` 1 (`:59–65`): with no vendor probe the whole page reads live = S0′
+  (`M2-SW:33–69`). The seam's marks: `RLXFW-SM0=C4000000`, `RLXFW-SM1=04000000` and
+  `RLXFW-N1=04000000` (`M1-MK:2–3`, `:11`), the value § 13.5 predicted (`NET-150`'s 推, now read).
+  **The loader's VLAN table** holds one entry, slot 8 (`M2-VV:16`, `00807E3F`: VID 8, member and
+  untagged ports 0–5, `extMemberPort` 0 — 讀 B's field layout, `rtl865x_asicCom.h:230`–`:242`), and
+  the netif table one, slot 0 — valid, VID 8, MTU 1500, ACL ranges 0–0 (the reader's decode of
+  `M2-VN:8`, whose words carry a MAC address and are not reproduced here).
+* **Step (4), before any switch write: no ping either way.** Host → board 0 of 4 at 46 B and 0 of 4
+  at 84 B (`M4-PL:4`, `M4-PD:4`), the host's neighbour entry `FAILED` (`M4-NB:1`); board → host 0
+  of 4 (`M4-BP:5`). `rlx0` sent 6 frames (`M4-NIC:42`, `nd_stats … tx 6/360`); between `M2-VM`
+  and `M4-VM` the CPU port's FCS count and 64-byte bucket rose by 6 and port 3's broadcast output
+  by 6 (`viewdecode`'s names), while port 3's input did not move and the host received 0 and sent
+  3 (`M4-HP0:1–2` → `M4-HN:14`, `:23`). 推: the loss is at port 3's MAC–PHY interface, which
+  `EnablePHYIf` = 0 isolates (D Table 64).
+* **The refusal control.** `M5-REF`, `phyif all` without the class token: `refused 1`
+  (`M5-REF:12`), `n_writes 0` (`:5`), every port `rc 1` — no register read (`:13–17`) — and
+  `PCRP` unchanged (`:39–43`). `phyif al` at `:70` is the refused write's echo (`FW-41`).
+* **The write.** `M5-PHY:13–18`: `ok 1 stored 5 already 0 refused 1 idfail 0 rbfail 0` (the
+  `refused 1` is `M5-REF`'s), each port `pre nn7F0038 rb nn7F0039 rc 0 st 1`; the switch's
+  `n_writes 5` (`:6`). The second reader agrees (`M5-VP1:9–13`).
+* **The pings after** (both locks restored): host → board 4 of 4 at 46 B and at 84 B
+  (`M5-PL:8`, `M5-PD:8`); board → host 4 of 4 (`M5-BP:9`). The host's neighbour entry is
+  `REACHABLE` at rlxfw's locally administered address (`M5-NB:1`, compared by script and not
+  printed here): the positive discriminator of `R6`'s `D4` kind. Four counters agree each way
+  (`M4-VM` → `M5-VM`; `M4-NIC:14–15` → `M5-NIC:14–15`; `M5-HP0:1–2` → `M5-HN:14`, `:23`): host →
+  board, host `tx` +14 = port 3 in +14 (13 unicast, 1 broadcast) = the CPU port's output +14 =
+  `n_rx` 14; board → host, `n_tx` +14 (6 → 20) = the CPU port's FCS +14 = port 3's unicast output
+  +14 = host `rx` +14.
+* **The reads after.** `M6-SW`: `psrp3` unchanged (`:27`), `PCRP0`–`4` live `nn7F0039`
+  (`:39–43`), `MSCR` `00000001` (`:55`), `ALECR`, `SWTCR0`, `SWTCR1`, `FFCR`, `VCR0` and the `PVCR`s
+  unchanged (`:54–65`); `CPUICR` `C4000000` (`M6-VP5:8`). The VLAN and netif tables were not
+  re-read after the write, and no L2 or ACL table was read at all.
+
+**The `MSCR` 0x01 condition** (ruling 6; the owner's ruling of 2026-09-26 in the `R6b-8` row). 量:
+with `MSCR` `00000001` (no ACL) throughout and the loader's one VLAN and one netif entry, all 14
+frames port 3 received were delivered to the CPU. So *that* the loader's tables reach the CPU
+without ACL rules is shown. *How* is 未定 and is `SPEC.md` § 17 `NET-37` 殘留's: VLAN 8 has
+`extMemberPort` 0 (讀 B), so the CPU is not a member and delivery is not by VLAN membership. The
+candidates are L2 learning of `rlx0`'s source address, a netif rule, or an implicit CPU
+membership — none read. Arm I's card reads the L2 and netif path.
+
+**`D8` by its letter** (ruling 6). Arm II establishes, on one boot: no vendor Ethernet code in the
+image; ping both ways with four-counter agreement; a positive discriminator; and that the NIC and
+the seam work and the switch was the stop. The `phyif` before and after is a single-variable
+control at register level — only `PCRP0`–`4` bit 0 moved on the switch page (`M2-SW` against
+`M6-SW`) — though the refused write, the unlocks, 4.5 minutes and the host's neighbour flush also
+came between; it ties the recovered link to the five bits, and the locally administered address
+ties the ping to rlxfw's code. **`D8` is not met**: `R6b-8`'s DoD gives it to arm I, 8d's `init` on
+its own boots, with arm II as its control. D1–D4 are met in the record (blocks 47, 48 and 50);
+the reading's "D1 and D2 open" is a misreading (ruling 6).
+
+The console during the resume did not go quiet; the main session's "89 seconds of silence" was its
+own instrument error and is retracted (`notes/nic-driver.md` § 30.6, `FW-152`).
+
+## 16.8 8d's scope, given arm II (ruling 7; 推 throughout, for arm I to test)
+
+* Arm II ran on S0′ plus `PCRP0`–`4 |= EnablePHYIf` and pinged both ways: the loader's VLAN table,
+  PVID 8, `VCR0` `1FF`, `MSCR` 1, `TRXRDY` 1 and `PSRP` bit 12 set (`M2-SW`, `M2-VV`).
+* **Must be written for arm I on `SWCORE=n`**: of the vendor's values, only `EnablePHYIf`.
+* **May stay loader-inherited, for that ping criterion**: `SSIR`; `MSCR` at the owner's `0x01`;
+  `QNUMCR`; `EEECR` with PHY registers 17 and 26; `CSCR`, `ALECR`, `TEACR`, `SWTCR0`, `SWTCR1`,
+  `DACLRCR`, `FFCR`, `TCR7`, `MEMCR`; every register where L = V.
+* **Matter beyond one ping, plausibly**: the VLAN group — the table, `PVCR0`–`4`, `VCR0`, `PBVCR0`,
+  the netif table and `PLITIMR` — is either left loader-inherited as a unit or taken over as a unit,
+  never partially. § 8.10's `dumb` loss has the partial shape: `restore 0` put PVID 8 under
+  ingress filtering over the vendor's vid-8 entry, which decodes as port 4 only, so port 3 would be
+  dropped. EEE, which the vendor turns off (link stability with it on is untested), and `QNUMCR`'s
+  CPU field are 8d's to decide with their sources.
+* **`init` does not `reset`**: a reset inherits all of R's differences — empty tables, PVID 1
+  under `VCR0` `1FF`, `EnablePHYIf` clear, `TRXRDY` 0, `MACCR`, `FFCR`, `LEDCREG`, `BMCR` `3100` —
+  about ten register groups to take over instead of one.
+* The page-4 EEE register cannot be taken over under the pages-0-and-1 limit; `EEECR` can.
+
+## 16.9 The flash claim, the maps, and the record
+
+* **What was sent** (量, `v_sent.py`, whose control catches six planted verbs and passes six clean
+  strings): the night's twelve directories, `bench/2026-09-27d/` to `bench/2026-09-28/`, hold 490
+  strings sent to the console — every capture's `sent` and every `looprun` rescue step — and none
+  is `FLW`, `EW`, `EB`, `DB`, `FLR` or a non-zero `AUTOBURN`. The loader verbs among them: 49 `DW`,
+  6 `MDIOR`, 14 `AUTOBURN 0`, 14 `LOADADDR`, 17 `IPCONFIG` and 13 `J`. The memory node took 2
+  writes, both to `PCRP3` (§ 16.5), within `cardcheck`'s HW-1 fence; `AUTOBURN` read back
+  `00000000` before every upload.
+* **The maps**: `A2-MAPH` and `AZ-MAPH` (group A), `Y2-MB0` and `Y6-MB1` (`R6b-10`), `M2-MB0` and
+  `M6-MB1` (arm II) and `bench/2026-09-27e/B-MAPH` and `bench/2026-09-27n/B-MAPH` (boots 1 and 10)
+  each read the digest `0927be41…`, 31 groups the same and 1 `DIFFER` at `000000`, as blocks 46 to
+  51 did; `n_writes` and `n_write_refused` read 0 at every `NW` read, and `n_writes` carries no
+  information about writes (`FW-142`). What the brackets cannot see: `H601`'s 8,192 bytes, never
+  hashed; two writes that cancel; anything outside the map's windows; the time between a closing
+  map and the next opening one, and after the last.
+* **The record's deviations**, each already in a `CORRECTIONS` file: group A split over two
+  directories (`CORRECTIONS-8c-A.md`); boot 10's late prep at the owner's request inside the
+  driver's pre-midnight window, and the off-card `X-ARP1` (`CORRECTIONS-8c-B10.md`); the first
+  `y-line1` stopped at its ARP gate and renamed, the off-card `X-ARP2` and `X-ARP3`, `M5-REF`'s
+  `--until`, the watch `X-M2`, and the `n-line2b` resume (`CORRECTIONS-A-r6b10-armII.md`). Ruling
+  10 records the late prep and the resume as deviations.
+
+## 16.10 What group A and arm II do not establish
+
+* L and V/R are two power-ons, a cold one and one after a watchdog reset; only S0′'s 37 words
+  share V's boot.
+* R's changes are not split between `FULL_RST` and the clock gate; that the PHY changes are the
+  reset's own is 推.
+* A PHY page-1 reading in L, and a page-4 reading anywhere.
+* MIB offsets beyond 17 counters, some of them tied; a read side effect on a zero-valued word.
+* What `ByPassTCRC` means, and what happened to the test frames on the wire.
+* How the loader's tables deliver port 3's frames to the CPU (`NET-37` 殘留); that any one of the
+  five `EnablePHYIf` bits is necessary; a second boot of arm II; anything about arm I or `D8`.
+* The standby failure's cause.
+* § 16.8, which is inference for arm I to test.

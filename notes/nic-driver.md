@@ -5586,3 +5586,196 @@ longest send 108 characters); every line dry-run through `cardrun --dry`, rc 0.
 * `NET-67` 殘留 and `NET-78` 殘留: they stay `R6b-10`'s until its regression has run on the
   silicon (the main session's ruling, 2026-09-27); nothing here closes them.
 * The mechanism: `M1`-cover8 stays the one rule left standing, 推 (`NET-129`).
+
+## 30 The night of 2026-09-27/28 — `NET-25`'s ten cold boots, `R6b-10`'s regression at the default, and `M3`'s isolated-spacing arm
+
+量 2026-09-27 23:37 to 2026-09-28 00:28, read at the desk (segment 115). **`NET-25`**: ten power
+cycles, one directory each, `bench/2026-09-27e/` (boot 1) to `bench/2026-09-27n/` (boot 10), each
+run from its own generated card `CELLS-B01.md` … `CELLS-B10.md` (`tools/gen8c.py`, the owner's
+relaxed process for `R6b`: no freeze). **`R6b-10`** and **`M3`'s arm**: `bench/2026-09-28/`, the
+power cycle boot 10 began, after group A's reads (`notes/switch-driver.md` § 16): the regression
+from `RUN-r6b10.md` on `r6b10y` (`Y*`), and `M3`'s arm as group A's `A-M` on `r6b8cr` (`AM-*`).
+The readings are `$FWRE_WORK/rebuild/s115/read-night/READING-1.md` and `READING-2.md`, and the
+main session's rulings on them (`RULINGS-night.md`, cited as ruling *n*) bind this record. Every
+number below was re-read from its capture for this record by scripts that share no code with the
+readers' (`$FWRE_WORK/rebuild/s115/rec-night/scripts/`: `v_net25.py`, `v_y4.py`, `v_y5.py`,
+`v_jnow.py`, `v_clock.py`; each refuses when a planted defect does not turn it red). Capture
+names in §§ 30.1–30.3 are the boot directories' (the same line numbers in all ten) and in
+§§ 30.4–30.6 `bench/2026-09-28/`'s. `NAME:N` is line N of `NAME.log`, counted on LF with CR
+stripped.
+
+### 30.1 What ran
+
+* **`NET-25`'s ten** (量; the run records `$FWRE_WORK/rebuild/s115/r6b8c-cells/run/B01/` …
+  `B10/`). Each boot: `B-PRE`, 3 s with the board off; `B-CATCH`, the catch opened before the
+  owner's power-on; `BQ`, `looprun`'s upload and boot of `r6b8cr` (recipe `527e683b`, quiet
+  `/init`); the host cells `B-MK` and `B-HP0`; `NB-1`; `NB-1R`, `B-HP1`, `B-SW` and `B-AC`; and
+  `B-RB`, `busybox reboot -f` into a catch, so the power-off found the board at its prompt. Boots
+  1 and 10 carry the map bracket (`B-MAP`, `B-MAPH`, `B-NW`). The catches opened at 23:38:01,
+  23:40:31, 23:41:44, 23:43:09, 23:45:19, 23:46:56, 23:48:19, 23:49:47, 23:51:11 and 23:54:12, and
+  boot 10's `B-RB` ended on the loader prompt at 23:55:16. Boot 10 was prepped at 23:53:46 inside
+  the driver's pre-midnight refusal window, at the owner's request, and an off-card `IPCONFIG`
+  (`X-ARP1`) followed it (`bench/2026-09-27n/CORRECTIONS-8c-B10.md`; ruling 10 records both).
+  `NB-2` and the failure cells never ran.
+* **`R6b-10`'s regression** (量; the run record `$FWRE_WORK/rebuild/s115/run10/2026-09-28/`,
+  `bench/2026-09-28/CORRECTIONS-A-r6b10-armII.md` § 2). The first `y-line1` stopped at its own
+  gate before any upload: the loader, reset by group A's closing reboot, had had no `IPCONFIG`
+  and answered no ARP (`X-Y1ARP0:8`, 4 transmitted and 0 received; `NET-95`). After an off-card
+  `IPCONFIG` (`X-ARP2`) the line ran again, 00:16:01–00:21:08, rc 0 (`Y1-ARP:8`, 4 of 4).
+* **`M3`'s arm** ran as group A's invocation `A-M`, 121 cells, to 00:11:57, rc 0, after `A-N`
+  had started the switch and brought `rlx0` up with `txlen vendor` typed (`notes/switch-driver.md`
+  § 16.1).
+
+### 30.2 `NET-25`: ten cold boots, ten successes (`NET-156`)
+
+| boot | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bench/2026-09-27…` | e | f | g | h | i | j | k | l | m | n |
+| catch open → first byte (s) | 45.9 | 9.9 | 17.0 | 11.5 | 18.6 | 11.5 | 11.2 | 10.3 | 10.7 | 12.9 |
+
+Every counted field is the same in all ten boots, on the same lines (量, `v_net25.py`):
+
+* **A cold catch.** `B-CATCH:4–5`: `ramSize: 32M`, then `C-8`'s one-space line (cold, `CLK-15`);
+  no watchdog line. The catch was open before the power-on every time: the first byte came 9.9 to
+  45.9 s into it (each `B-CATCH.timing`'s first row).
+* **`looprun` closed on the image.** `BQ:21` `board printed 527e683b, build computed 527e683b`,
+  `BQ:29` `RESULT: the loop closed`; `BQ-boot:8` `RLXFW-ID0=527E683B`.
+* **`NB-1` the first board command.** In every run record the cells after `BQ` are the host cells
+  `B-MK` and `B-HP0` and then `NB-1` (`run/B01/B-C.log`: `BQ` at line 11, `B-MK` at 19, `B-HP0`
+  at 24, `NB-1` at 30; `B02` to `B10` the same order). `NB-1.meta.json`'s `sent` is the registered
+  text followed by one CR, with no settling CR; `looprun`'s S9 only sleeps (讀
+  `tools/looprun.py:1320`–`:1343`).
+* **The result.** `NB-1:10` `4 packets transmitted, 4 packets received, 0% packet loss`; `:15`
+  `RX packets:5`; `:16` `TX packets:5`. The host, a second source (`B-HP0` → `B-HP1`): `rx_packets`
+  +5, `tx_packets` +5, `InEchos` +4, `OutEchoReps` +4.
+
+**Count: 10 counted, 10 successes**; none at 0 of 4 and none at 1–3. **By its own rule** (`SPEC.md`
+§ 17 `NET-25`, amended at `4defd04` before its card) — *若十次都成功，這一列改記為「一次未重現的觀察」並關掉*
+— the row closes as one unreproduced observation (ruling 1), and `NB-2` has nothing to isolate.
+The one-sided 95 % upper bound on the per-cold-boot failure rate is 1 − 0.05^(1/10) = 25.9 %
+(arithmetic, re-derived), for `r6b8cr` (`527E683B`) on catch → `looprun` → quiet `/init` only. The
+design's § 3.4 adds: pooled with the four earlier cold first opens (one failure), 1 in 14 bounds
+it near 29.7 %; and a true rate of 10 % would pass ten boots 0.9¹⁰ = 34.9 % of the time — ten
+passes close the row as registered and do not show the phenomenon is rare.
+
+**Beside the count** (量):
+
+* **Ten power-ons, one loader-inherited state.** `B-SW` differs between the ten only in its
+  `jiffies` line, so the 37-word S0′ column is identical across ten cold power-ons; it also equals
+  the S0′ of 28's three boots (`notes/switch-driver.md` § 16.1). `B-MK:2` reads
+  `RLXFW-SW7=00000000` in all ten: ten more samples of `PSRP` bit 8 clear at S0′ (`NET-126`).
+* `B-AC` is byte-identical in all ten, and in it the CPU port's `CRCAlignErr` 6 equals port 3's
+  output, 5 unicast and 1 broadcast.
+* **`eth4`'s `RX packets` is port 3's MIB** (§ 6.4's note, `CONFIG_RTL_NIC_HWSTATS`): 5 at
+  `NB-1`'s end, and port 3's received unicast 6 at `B-AC`, read after `NB-1R`, `B-HP1` and `B-SW`
+  (推: one host frame arrived in between).
+* **`NET-30` 殘留's hand-off was not carried.** Its row asks for a `PSRP3` `DW` at each caught
+  prompt; the B cards typed no loader command. It stays open, owned by `R6b-8`'s remaining
+  seatings (ruling 1).
+
+Not established: seating 12's mechanism; that ten boots in 17 minutes, on one host, one cable and
+one room, are independent; any other image or boot path.
+
+### 30.3 The `ERR` column of `/proc/interrupts` is not an error count (`NET-157`)
+
+讀, in the staged `r6b8cr` tree (`rtl_nic.o` is built): `arch/rlx/kernel/irq.c:224`–`:228` prints
+`SW`, `TX`, `RX`, `LNK` and `ERR` from `cnt_swcore`, `cnt_swcore_tx`, `cnt_swcore_rx`,
+`cnt_swcore_link` and `cnt_swcore_err`, under `CONFIG_RTL_819X_SWCORE`. The vendor's ISR
+(`drivers/net/rtl819x/rtl_nic.c:3733`–`:3742`) increments `cnt_swcore` on every interrupt, `TX`,
+`RX` and `LNK` by the masked `CPUIISR`'s bits, and `cnt_swcore_err` once for every interrupt whose
+masked `CPUIISR` holds `RX_DONE_IP_ALL | TX_ALL_DONE_IP_ALL | LINK_CHANGE_IP` — an interrupt that
+did work. No line of the five counts an error bit.
+
+量, the second source: `ERR` = `SW` = `TX` + `RX` + `LNK` in all ten boots — `NB-1R:13–17`,
+10 = 5 + 5 + 0 — so each interrupt carried exactly one of the three; seating 12's own recovery
+read agrees, 25 = 17 + 5 + 3 (`bench/2026-09-04/EX-15:30–34`). **So seating 12's `ERR 6`**
+(`bench/2026-09-04/EX-11:12–16`: `SW 6`, `TX 6`, `RX 0`, `LNK 0`) **was six TX-done interrupts**,
+not six errors (ruling 1): the phenomenon is transmit with no receive and no link event, which is
+what `LNK: 0` already said. The records that call the column an error count are not edited;
+`SPEC.md`'s `NET-25` row points here.
+
+### 30.4 `R6b-10`: the regression at the default, with no verb typed (`NET-158`)
+
+**The policy before any write.** `Y2-NIC:2` `version rtl819x-nic 1.6`, `:102` `tx15 txlen vendor
+txoff 2 txrb 0 dirty 0 p15 1` and `:10` `n_writes 0`; `Y2-TX:4` `v15 last - 0 ok 0 refused 0 txq 0
+arm15 0`. None of the 46 strings the `Y` cells sent names `txlen`, `txoff`, `txrb` or `arm`. The
+records never written print `rlxfw` at boot (`Y2-TX:5–8`, `pol rlxfw`, and `:15`, `sw key txlen
+rlxfw`) beside the policy line; 推 a zeroed record's `txlen` field printed by name.
+
+**E2** (`ping -c 20 -i 0.05 -w 10` at each of the eleven lengths, each in its own `R0` → `R1`
+bracket of board and host reads, as `RUN-r6b10.md` laid it out (§ 29.6) rather than back to back
+as block 45's loop ran them; 量, `v_y4.py`):
+
+| L | replies (`Y4-L-PG:4`) | host `InEchoReps` Δ | the CPU port's `JabberErr`, `FragErr`, `Drop`, `etherStatsDropEvents` Δ | its 512–1023 bucket Δ | its `CRCAlignErr` = port 3's output = `n_tx`, Δ | `n_recov_fire` Δ |
+|---|---|---|---|---|---|---|
+| 60, 1,513 | 20/20 | 20 | 0, 0, 0, 0 | 0 | 21 (an ARP with the 20) | 0 |
+| the other nine | 20/20 | 20 | 0, 0, 0, 0 | 0 | 20 | 0 |
+
+* **220 of 220**; the host's `InEchoReps` Δ sums to 220 and its `rx_crc_errors` Δ to 0.
+* The CPU port's `JabberErr`, `FragErr`, `Drop` and `etherStatsDropEvents` read 0 at `Y5-R1`
+  (`:83–84`), the boot's last `asicCounter` read, so 0 at every read before it; `n_recov_fire` 0 at
+  the end (`Y6-NIC:65`).
+* **The loopback gate**: `Y5-LB:5840–5845`, `rc 0`, `scored 1455 bad_a 0 bad_b 0 void 0 skew 0`,
+  `clean 1455`. Across it the CPU port's `CRCAlignErr` stayed at 278 (`Y4-1514-R1`, `Y5-R0`) while
+  `n_tx` rose by 2,910 (278 → 3,188).
+* **The wire sweep**, 60–1,514 in one bracket: `Y5-W:5841–5846`, `rc 0`, `scored 1455`, `clean
+  1455`. From `Y5-R0` to `Y5-R1` the CPU port's `JabberErr`, `FragErr`, `Drop` and
+  `etherStatsDropEvents` Δ 0; its `CRCAlignErr` +2,910 (278 → 3,188) = port 3's broadcast output
+  +2,910 = `n_tx` +2,910 (3,188 → 6,098) = the host's `rx_packets` +2,910 (`Y5-H0` → `Y5-H1`),
+  `rx_crc_errors` +0. The 512–1023 bucket rose by 512 here: the sweep sends those lengths.
+* **The `arm15` gate**: `Y6-TX:4` `v15 last sweep 22 ok 3 refused 0 txq 6103 arm15 0` — the
+  sweep verbs accepted, no behaviour verb (`y-line1.log:768` in the run record). The map bracket
+  (`Y2-MB0`, `Y6-MB1`) is `notes/switch-driver.md` § 16.9's; `YZ-RB` returned the board to its
+  prompt.
+
+**The verdict** (ruling 2). **`R6b-10`'s DoD is met**, on one boot: E2's eleven at block 45's
+spacing 220 of 220 with the CPU port's counters Δ 0, and the `tx` sweep 60–1,514 with `JabberErr`
+Δ 0, at the default with no verb typed. Against `D2`: `D2` stays met on blocks 47 and 48, as
+recorded; this run adds a boot at the default, not a third `D2` boot — no host capture, so neither
+"on the host's capture" nor "no `0x8100` or excess byte" is measured, and no 1.4 arm reproduced
+the loss beside it. **`NET-67` 殘留 and `NET-78` 殘留 are ⊘**, with `M8`'s reason: at `txlen
+vendor` no stimulus reached the stalling state — 0 fires over block 50's 2,363,511-frame flood, its
+TCP tail and this regression (and `M3`'s isolated arm, § 30.5) — while the mechanism stays unknown
+(`M8` fired on block 46, at 1.4); each reopens on any `n_recov_fire` at `txlen vendor`.
+
+Not established: a third `D2` boot; where in 60–1,514 a fault would sit (the sweep is one
+bracket); another boot of 1.6.
+
+### 30.5 `M3`'s isolated-spacing fix arm (`NET-159`)
+
+量, `v_y4.py`'s parser over the `brdelta` pages: all eleven lengths at `ping -c 20 -s L−42 -i 0.2
+-W 1` (≥ 200 ms a frame, the design's § 2.5), each **20 of 20** (`AM-L-PG:4`), each liveness 4 of
+4 (`AM-L-L:9`). Every bracket (`AM-L-D:2–4`, `:11`): `n_tx` +21 and `n_recov_fire` +0; the CPU
+port's `CRCAlignErr` +21 = port 3's output +21; `JabberErr`, `FragErr` and `Drop` 0; `fault jfd
+0`; the L + 4 bucket +20 — 60 in 64, 61–63 in 65–127, 263–277 in 256–511, 1,511–1,514 in
+1024–1518 — and one frame more in 64 (推 an ARP); the host +21 (at 1,513 +20, `hbound within yes`).
+**Clean at every length.** With `D2` met at E2's spacing (`NET-128`, `NET-132`), `D2`'s pattern
+holds at both spacings on 1.5 with `txlen vendor` (`r6b8cr`, one boot). `M3`'s own conditional
+stays untriggered — its premise did not hold (ruling 6 of `$FWRE_WORK/rebuild/s115/r6b9/RULINGS-D1D2.md`)
+— and `R6b-9` reports this arm (ruling 3).
+
+Not established: 1.4 at this spacing; frame order; other images.
+
+### 30.6 A retraction: the "89 seconds of silence" (`FW-152`)
+
+During arm II's run (`notes/switch-driver.md` § 16.7), after `n-line2` stopped at `M5-REF`'s
+`--until`, the main session said the console had gone silent for about 89 s. **It had not, and the
+claim is retracted** (ruling 8): the main session had read `X-M2.log`'s size from Windows while
+WSL was still writing the file, and that view read 0 bytes until later.
+
+量, what the capture says: `X-M2` holds 9,160 bytes, 9,156 of them BEL; its first read came 0.0165
+s after the capture opened (`X-M2.timing`'s first row), the last at +195.675 s, and no two reads are
+more than 0.081 s apart — the shell answering the watch's ESC stream (`FW-150`). `M5-REF`'s 2,298
+bytes had all arrived by +0.684 s (`M5-REF.timing`'s last row); `FW-41`'s echo of the refused
+write, `phyif al` (`M5-REF:70`), sat between the page's last line and the prompt, where the
+`--until` pattern wanted nothing, so the capture ran to its 10-s cap. The board's own clock ran
+through it: `jiffies` 4294947649 (`M5-REF:32`) to 2357 (`M5-PHY:33`), wrapping past 2³², is 22,004
+ticks over 220.04 s of the host's raw clock (the chunks that carry the two lines, `FW-35`) — 100.00
+a second at `HZ` 100 (`M2-NW0:45`). The method's positive control, on the same night: in each of
+`r6b10y`'s 24 bracket pages the two `j_now` lines arrive 1.08–1.10 s apart and differ by 5–7
+ticks — each `asicCounter` read holds the tick for 1.01–1.05 s (`CLK-42`, `v_jnow.py`) — and the
+same arithmetic sees that. So neither the kernel nor the console stalled.
+
+**The lesson**: a file another operating system is writing is read through the writer. The size
+Windows showed for a file under `\\wsl.localhost` while WSL appended to it was not the file's
+size; the capture's own `.timing` was the instrument, and it was read only afterwards.

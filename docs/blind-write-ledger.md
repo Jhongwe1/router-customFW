@@ -1403,3 +1403,23 @@ decided by bench readings (`notes/nic-driver.md` § 29.1).
 | `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-27 (a fifth row). `EnablePHYIf (1<<0)` `:1258`, in the `CONFIG_RTL_8196E` arm opened at `:1168` (the `#else` arm's `:1322` is the same bit) — **entered 1.4 as the B of bit 0's two sources**; `ExtPHYID_OFFSET (26)` and `ExtPHYID_MASK (0x1f<<26)` `:1174-1175` (the `#else` arm's `:1277-1278` are 24 and `0x1f<<24`) — **the B of the identity check's field**; `PCRAM_BASE` and `PCRP0`–`PCRP4` `:1132-1138`, the addresses, already 1.0's |
 | `arch/rlx/include/asm/errno.h` | line | 🔴 **vendor** | 🆕 2026-09-27 (a third row). `EPROTO` 71 `:48`: the identity refusal's number, which the page prints |
 | `include/asm-generic/errno-base.h` | line | **generic** | 🆕 2026-09-27 (a fourth row). `EPERM` 1 `:4`, `EIO` 5 `:8`, `EINVAL` 22 `:25`: the class's other refusals |
+
+## § 9.11 — `R6b-8` 8c-cells: what the night's reading opened, 2026-09-28
+
+**Declared by hand for § 9.5's reason; none of these paths is in `ledgerscan`'s scope.** No driver
+changed: these rows bound the reading behind `notes/switch-driver.md` § 16 and
+`notes/nic-driver.md` § 30, on which 8d's `init` will build. Every line below was re-read in the
+staged tree `r6b8cr` was built from (`$FWRE_WORK/rebuild/r3-4/cells/r6b8cr/`), the tree that
+builds, before it was written here.
+
+⚠️ **What was taken, by kind.** Names and positions only: what a counter counts, one field's
+per-port position, the vendor's value for three registers, and a table entry's field layout — each
+the B beside a 量 reading (`SPEC.md` `NET-157`, `NET-162`, `NET-164`). No vendor sequence enters
+rlxfw from this reading; 8d decides what it writes, with its sources, and declares that there.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `arch/rlx/kernel/irq.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a third row). `:224-228`: the five `/proc/interrupts` lines under `CONFIG_RTL_819X_SWCORE`, `ERR` printing `cnt_swcore_err` — with `rtl_nic.c`'s ISR below, what the column counts (`NET-157`) |
+| `drivers/net/rtl819x/rtl_nic.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a fourth row). The ISR's counters `:3733-3742`: `cnt_swcore_err` +1 for any interrupt whose masked `CPUIISR` holds an RX-done, TX-done or link-change bit (`NET-157`); `WRITE_MEM32(PLITIMR,0)` `:6370` under `CONFIG_RTK_VLAN_SUPPORT`, the one vendor write of `PLITIMR` on record, which the read value `00001000` contradicts (`NET-162`) |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicL2.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a second row). The `PIN_MUX_SEL &= ~0x8F18` and `PIN_MUX_SEL2 &= ~0x3B6DB` clears `:4568-4569` and `LEDCREG = (2<<20)` `:4571`, in the `CONFIG_RTL_8196E` arm under `BICOLOR_LED` (defined `:4284`); `QNUMCR`'s per-port field `:6554-6555`, three bits at `3*port` — each the B of `NET-162`'s count of sources |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicCom.h` | line | 🔴 **vendor** | 🆕 2026-09-28 (a second row). The VLAN entry's word 0 `:230-242` — `vid`, `fid`, `extEgressUntag`, `egressUntag`, `extMemberPort`, `memberPort`, in the `CONFIG_RTL_8196E` arm — the decode of the loader's slot 8 (`NET-164`) |
