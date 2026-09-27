@@ -33205,3 +33205,43 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 - 下一段：卡片 B 的獨立審查 → 擁有者選日期 → 兩張重定位（各一個產生器參數）、`bench/README.md` 兩列、卡片 B 改指卡片 A 的已追蹤卡片並重生 → 凍結 → seating 43；之後 `rtl819x-nic.c:122`、`R6b-7` 自己的上機（卡片格在 § 10.8）、`R6b-8` 從 8a 起、`R6b-9`。
 - 擁有者仍待決（不擋任何步驟）：CLAUDE.md § Flash 仍要每次上機宣稱 `n_writes`（`FW-142` 證明它不帶資訊）；`MK10` 的 witness 不會失敗（`FW-143`）。
 - 磁碟：`r3-4/cells` 加了 `r6b7q`／`r6b7q2`（各 487 MB）；`$FWRE_WORK/rebuild/s113/` 的各個 clone 合計約 2 GB，可刪。交接 `plan/handoff-s113.md`；study `study/20260926-study1.md`。
+
+## 2026-09-27 — 第一百一十四段（00:54 開場，桌面＋上機，**兩次電源按壓**：block 49，14:24–14:33；block 50，14:38–16:26）：seating 43 的前兩張卡上機（未讀）；8a 的普查工具落地；8c-code 在分支上建好；上一段的紅 CI 修好
+
+交接 `plan/handoff-s113.md`。開場量 repo：HEAD `3e72889`、乾淨、已推；`LOG.md` 最後一條第一百一十三段；study 最後 `20260926-study1.md`；`citime check` 5 missing；`gh run list`：`36bfff8` 紅、`3e72889` 在跑。與交接不符的一處：交接寫 CI 綠到 `38a8639`、之後三個看開場 —— 其中 `36bfff8` 是紅的（下面一）。
+
+### 一、CI：`test-citecheck` 的控制在兩個不同的語料上讀到同一個數（`ecac5b1`）
+
+- 量 `36bfff8` 與 `3e72889` 的 HEAD 與 HEAD~30 各有 450 個引用（203 與 192 個 `.md`），「兩個語料確實不同」的控制只比引用數，所以巧合地讀成相同而紅。改成比（引用數、檔數）這一對；本機 29 of 29，CI 綠。
+
+### 二、`R6b-8` 8a ✅：普查工具（`8520b6c`，`notes/switch-driver.md` § 11，`NET-137`）
+
+- `tools/ethcensus.py`、`test-ethcensus.sh`（CI step，74 cases，CI 上 66＋一個跳過涵蓋 8）、`ethcensus-population.txt`（899 個名字）。讀 `r6b6q2`：627 個 leaf、範圍內 22；readelf 逐欄切與 `nm` 對 13,897 個符號完全一致；範圍內 907 個 FUNC/OBJECT（13 個 MIPS16）、依名字排除 8、母體 899、898 在 `System.map`；廠商獨有 `/proc` 名字 6。設計寫的 893/886/885 被取代：上一段的正則漏了 `[MIPS16]` 那一欄（43 個不一致、範圍內 14）。對抗審查的五個 must-fix 全修、24 個突變全殺。`NET-42` 的「667 個物件」更正為 634 個有內容的物件；`tools/imgprocs.py` 的同一句註解留到 seating 43 之後（卡片可能 pin 它）。
+
+### 三、三張卡的審查與修正，以及一個我講錯的前提
+
+- 卡片 B 的三鏡頭審查＋裁判：3 個擋凍結（看門狗 BOOTGUARD 在主機獨佔的窗口無擷取可接、D4 只看主機「送出」、`linkprobe watch` 300 s 會被人的回覆延遲打斷）、14 個凍結前修；卡片 A 的晚到審查逐條核對（大多已處理，約十條未處理）。之後 A、B 各三到四輪修正與獨立核對，C 兩輪。
+- **我講錯的前提**：我對擁有者說「漏接的廠商開機會寫 flash（VDR-1）」。卡片 C 的裁判指出 `VDR-1` 是 `formSysCmd` 進廠商 userspace 的那一條，不是開機；`FLS-30` 量了九次廠商開機、map 看得到的範圍沒有變化。改為：廠商開機的 flash 效應是推，受 `FLS-30` 限定；containment 照留（`CLAUDE.md`：抓 loader 而不讓廠商韌體開機）。三張卡都改了措辭。
+- **握手的時序漏洞**（我的裁定，擁有者 2026-09-27 同意）：「回覆後數到五再按」沒算進 session 自己開 catch 的延遲，catch 可能晚於按壓、錯過 loader 約 4.9 s 的窗。改為：擁有者回覆只授權開窗 → session 在背景開 catch、以 `.timing` 存在確認 → 說「catch 已開，現在開電，最晚 HH:MM:SS」→ 擁有者才按；關電與拔插同。
+- 修正中量到的：hold 改成 90 s（量到的咬合 84.001 s，`CLK-08b`，加 loader 從 banner 到 prompt 的 2.288 s，加 3 s 猜）；背景用 `&` 開的 watch 繼承 SIGINT 忽略、`pkill -INT` 停不掉（卡片 A 的 `line43a.sh`、卡片 B 的 `inv43b.sh` 各有 shim）。
+
+### 四、block 49（卡片 B51，`cc5e39d` 凍結，`bench/2026-09-27/`）
+
+- 上電前照 § 6：`w32tm`（Leap 3、未同步，最後 06:12）、`wsl --shutdown`、keeper、follower、attach、檢查、九個 invocation `--dry`、`I-0`、`I-C0`（時鐘紀錄）、`I-C1`（`NO STEPS`）。
+- catch 14:24:42，`gate:caught` ok、`C-8 cold`；五個 invocation 全 rc 0，無停止；關電視窗 `X-OFF1` 後擁有者 14:33 前關電；`I-C9` rc 0。沒有送出 `FLW`、`EW`、`EB`、非零 `AUTOBURN` 或 `FLR`（`cardcheck commands`）。未讀。
+
+### 五、block 50（卡片 B52，`255af14` 凍結，`bench/2026-09-27b/`）與六條 CORRECTIONS
+
+- catch 14:38:16，`C-8 cold`。`R1-DW` 的 gate 以為 `DW BB804134 1` 只印一個字，loader 印整行四個字（量；也讀到 PSRP4–6，其 bit 8 讀清）：照卡片的 `R1-DW` 規則從 `R1-FL` 接續，P2 的 loader 那一半 unmeasured。
+- D3 的十二個 fix 試驗與 1.4 的 `LUR1` 跑完；`LUS1` 自己的 1.4 ring 存活 0／4 → S1 branch a（主機的 6 個 frame 都到 port 3，板子 TX 側 CRC＋3）→ `X-L1a` 0／4 → branch b。`X-RE1` 的 attach 落在 detach 後一秒內的消失期（§ 1，以 `X-RE1b` 補 attach）；`X-L1b` 仍 0／4；擁有者選 (B)：在 fix 上 `X-L1c` 4／4，`LUS1` void，從 `I-CN` 接回（§ 2）。
+- `NET-131` 的區塊（`I-N0`/`I-N`/`I-N9`）跑完。arm P：擁有者在窗口前誤拔又插回（主機 `carrier_changes` 0 → 2），照 `P-WT1` 的重啟路徑重開板子的 watch（§ 3）；正式的拔、插各在 100 s 窗內錄到。
+- `CUT-4` 的 44 分鐘規則會切掉 R6b-4；擁有者把上限從 85 延到約 110 分鐘，`I-C4` 省略，31 分鐘洪流、T arm、1.4 arm、`I-Z` 跑完（§ 4）。**我漏了 `X-PLW1`**：重啟那個 watch 的 log 在關電前沒讀，隨 RAM 消失，P11 的重啟 watch 一半 unmeasured（§ 5）。`X-RE1b.log` 含主機的 WSL NAT 位址，`audit-bench-log` 擋下，留在 repo 外（§ 6）。擁有者 16:26:37 前關電。
+- 上機後：`check-predictions` 274 of 274 與 506 of 523（17 個是 void 與省略的格）、`capdate`、`audit-bench-log` 0、`flashwin scan` 兩個目錄 CLEAN；擷取提交 `3897b26`（1,355 檔）。未讀。
+
+### 六、`R6b-8` 8c-code 在分支上建好（未落地）
+
+- 擁有者裁定前我照 `CLAUDE.md` 先寫提案（`$FWRE_WORK/rebuild/s114/r6b8c/PROPOSAL.md`），D1–D7 我裁定：新檔 `rtl819x-view.c` 1.0（不動 1.3 與 `mdiocheck`，因卡片 C pin 它們）、每個字要兩個來源（298 個字；flash 在任何 load 前拒絕）、安靜 `/init`、`ByPassTCRC` 經廠商 `memory`、落地在 seating 43 之後。分支 `r6b8-8c`（HEAD `92eb9b6`）含 `R6b-6` 的 `rtl819x-nic.c:122` 註解（`64fa37b`）、`viewcheck`、`viewdecode`、`mkinitramfs --init`、`cardcheck` 對廠商 `memory` 讀的視窗規則（擋 H601 進擷取）；映像 `r6b8cr` = `r6b8cr2`（recipe `527e683b`，76.96 %）。
+
+### 七、不確立、與下一段
+
+- block 49 與 50 都還沒讀；卡片 C 未凍結（要先對齊 A、B 的握手、catch、關電窗、hold、SIGINT，並吃進 block 50 的教訓）；8c-code 未落地；`R6b-9` 的 D1、D2 草稿在 `$FWRE_WORK/rebuild/s114/r6b9/D1-D2.md`（它指出 M3 的後果沒被讀、D2 的「fixed image」其實是打字的 `txlen vendor` 等，給 `R6b-9` 裁）。這一段沒寫 study 檔，留給下一段。
