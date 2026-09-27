@@ -902,7 +902,7 @@ boot) are *A third rate term* and *E3*. Their scripts, logs and registration are
   100 s wait — `hostclock.py run` for 60 s with `--no-sntp --no-windows`, then
   `report` — read ticks of 9566–10000 across the minute (77 rows) and one step of
   +0.551906 s, seen by both of `hostclock`'s detectors (so its step detector was
-  positively controlled on this kernel a second time); the report's tick check read
+  positively controlled on this kernel a second time; 🔄 a third time on 2026-09-27, +0.973812 s at RAW 117.521573882 in seating 43's clock log, `timerfd 1, agreed with the rows 1, AGREE; positively controlled: yes` — `bench/2026-09-27/Z9-HCR.log:4–5`, `FW-149`); the report's tick check read
   `strong`, and both of the card's gate patterns refused the report, while both permit
   the permitting lines in the tool's own format. Windows' last successful sync was
   07:26:38 (`w32tm /query /status`), 32,768 s after 22:20:30 as the four intervals before
@@ -1515,7 +1515,7 @@ miss. The score is `docs/boot-time-d3-score.tsv`, and the table `P2` exists to p
     ×2.04, so the two ±10 % windows, [0.169, 0.207] and [0.083, 0.101] s, are disjoint and
     no seating-B value could hit both; (b) misses on the reconstruction's midpoint (±14 ms
     against a ±9.2 ms band), and `P3Q-r01`'s frame puts its #2 11.5 ms before that midpoint.
-    Experiment: a third day on RAW, B compared with C.
+    Experiment: a third day on RAW, B compared with C. 🔄 **2026-09-27 (block 49, `CLK-49`): decided, not stable.** The third day's cold quiet boot on RAW read 0.125265 s by the rule (0.122098 s by the frames; k 2, lower edge `N-NDOPEN`, no void rule fired: `bench/2026-09-27/Z9-W1.log:2–4`). Over the three cold widths — 0.094550, 0.114647 and 0.125265 s — the median is 0.114647 and the largest deviation from it is 0.175, outside the list's 0.10 and outside the window [0.104225, 0.105055] that alone kept the row stable, so the row is reclassified not stable by the list's own rule and stops being open; the reclassification lives here, in `CLK-49` and in `D3-MISS`, and the frozen list and its score are not edited. No clock step fell in the press window, a zero the step detector's third live positive control stands behind (`FW-149`, § 7.9). The width is the host's ARP phase against `N-NDOPEN`, one per day: nothing here is about the board (`notes/nic-driver.md` § 28.3).
   * `D5a|rlxfw|256|avg` +18.05 %, `D5a|rlxfw|1472|avg` +12.16 %, `D5a|rlxfw|1472|mdev`
     +16.60 % (realtime, so (a) = (b)): rlxfw's rtt rose 12–18 % while the vendor's fell 12–26 %
     against seating A. The capture's own stamps agree with `ping`'s to 0.043 ms, so `ping`'s
@@ -1523,13 +1523,13 @@ miss. The score is `docs/boot-time-d3-score.tsv`, and the table `P2` exists to p
     averages moved +7.2 % and +9.9 % without it and +13.5 % and +19.7 % with it (n = 1–2 per
     stratum). Experiment: the same ICMP series with and without the host capture inside one
     boot — `R6b`'s, whose regression re-measures ICMP (`NET-121`, `notes/nic-driver.md`
-    § 20).
+    § 20). 🔄 **2026-09-27 (blocks 49 and 50): run, and decided as case (ii).** Twelve series a state on three arms — `rlx0` at 1.4 and `eth4` on `p2q`'s cold quiet boot, `rlx0` at the fix on `r6b6q` — read `unresolved` at every size; with the capture off, `256|avg` closed within ±10 % of its A median (−0.56 %) and `1472|avg` inside its off band; `1472|mdev` is ⊘ by the coordinator's ruling: the 1,472-B mdev rose again on both drivers and in both capture states, 0.5880–0.7325 against seating A's 0.476, so it is not `rlx0`'s, and a one-day, three-series reference decides nothing at six series a side (`NET-121`, `notes/nic-driver.md` § 28.4).
   * `NET109|crcalignerr` and `NET109|p3egress`, 294 → 414 (+40.8 %): a run length, not a
     device quantity. In both seatings the count is the echo replies `P1-HP` drew inside the
     last boot plus two (量: 412 + 2 here, `P1-TCPD` holding 412 echo replies, one ARP reply
     and one ARP request; 292 + 2 in seating A), and the list's n = 1 rule made it stable. The
     property the rows stand for held: `CRCAlignErr` − port-3 egress 0 in both seatings, 414 =
-    414. Experiment: none — redefine the row as that per-echo identity. Scored on block 46, where the readings disagree: `notes/nic-driver.md` § 26.5.
+    414. Experiment: none — redefine the row as that per-echo identity. Scored on block 46, where the readings disagree: `notes/nic-driver.md` § 26.5. 🔄 **2026-09-27 (block 49): met, both rows exact** — on the rows' own shape, one absolute read on a healthy fresh boot of `p2q` with the reading fixed before power, `CRCAlignErr` 63 and port 3's unicast egress 63 against the capture's 63 frames (`bench/2026-09-27/W3.log:2–8`; `notes/nic-driver.md` § 28.2).
 * **The two exact misses** are `P2-M0`'s 3,009 B and its digest (§ 8.1): the capture tool's
   tail, an instrument miss (`FW-136`), not a device quantity.
 

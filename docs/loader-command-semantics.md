@@ -792,7 +792,7 @@ positive of precisely the thing it exists to catch.** Corrected at the bench to
 `28`, `16` and `16`.
 
 **Refutation condition, and it costs nothing to check on every future cell:** a
-`DW <addr> N` whose reply carries anything other than `4 × ceil(N/4)` words.
+`DW <addr> N` whose reply carries anything other than `4 × ceil(N/4)` words. 🔄 **2026-09-27 (seating 43, block 50): not fired, and a new source.** `DW BB804134 1` at the caught prompt printed four words, 71 bytes, the first at the unaligned KSEG1 address it was given, so that word is `PSRP3` and the address was not aligned down (`bench/2026-09-27b/R1-DW.log:2`); the same seating's `DW 8040D4A0 1` printed four words twice (`bench/2026-09-27/A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). Card B52's gate on that read wanted one word, against this row, and stopped the press: the card's defect, not the loader's (`notes/nic-driver.md` § 28.5).
 
 #### What a reply weighs
 

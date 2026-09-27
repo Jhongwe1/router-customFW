@@ -4866,3 +4866,579 @@ after `R1-M1`.
 * Which frame of a bracket the CPU port refused: by elimination (推).
 * Writes the map cannot see; that the running driver was compiled from HEAD's text (the image is
   pinned by digest, the source identity is 推).
+
+## 28 Blocks 49 and 50 (`R6b-3` card 3, `R6b-4`, `R6b-6`) — `D3`'s second boot, `D3-MISS` decided, `D4` at the fix, `get_link` on the cable, and a fresh 1.4 ring that failed its liveness
+
+量 2026-09-27, seating 43, two presses. **Block 49**: `bench/2026-09-27/`, card A
+(`PREDICTIONS-B51-block49.md`, frozen `cc5e39d`), one press of `p2q` (`rtl819x-nic 1.4`, `rtl819x-switch 1.1`,
+`RLXFW-ID0=A2C56BC8` at `A1Q-boot.log:8`, `recipe_id A2C56BC8` at `A1-NW0` and `A1-NW1`), a
+cold quiet boot, no stop. **Block 50**: `bench/2026-09-27b/`, card B
+(`PREDICTIONS-B52-block50.md`, frozen `255af14`), one press of `r6b6q` (`rtl819x-nic 1.5`, `rtl819x-switch 1.2`,
+`RLXFW-ID0=ACF8ED3D` at `bench/2026-09-27b/R1Q-boot.log:8`, `recipe_id ACF8ED3D` at `R1-NW0` and `R1-NW1`), two
+stops and six entries in `CORRECTIONS-block50.md`. Captures committed `3897b26`. The readings,
+segment 115: two readers who share no code — A card-first, B capture-first — a judge with a
+bracket parser of its own over every consecutive pair of board reads (`jbr.py`), a critic with
+scripts of its own, and the coordinator's rulings where they differ, which bind this record
+(`$FWRE_WORK/rebuild/s115/read4950/`: `JUDGMENT.md`, `CRITIQUE-and-RULINGS.md`, cited as the
+judgment, the critique and ruling *n*). Every number below was re-read from its capture line by
+the landing's own helpers (`$FWRE_WORK/rebuild/s115/rec4951/`: `cl.py`, which prints the cited
+lines, and `dtally.py`, `gaps.py`, `c19gaps.py`, `flashsent.py` and `xtimes2.py`, each refusing
+when its own control on a synthetic input fails); a count attributed to a reader or the judge is one the landing did not recompute.
+Names are § 27's: `n` Δ`n_tx`; the CPU port's `c` (`CRCAlignErr`), `j`, `f`, `d` (`JabberErr`,
+`FragErr`, `Drop`); port 3's output `o`; K = `o` − (`c` − `j` − `f` − `d`); `cn` = `n` − `c`,
+the frames the engine took that the CPU port did not count (§ 26.3).
+
+### 28.1 What ran
+
+**Block 49** (量, the captures' metadata; 讀 the transcripts in
+`$FWRE_WORK/rebuild/s113/card43a/run/`): `I-0` at 14:20:11, before power; the host clock's log
+`Z0-HC` from 14:20:27 and its guard `I-C1` 14:20:49–14:23:29; the catch window at 14:24:42.660,
+`Booting...` at 14:24:56.912 and the prompt at 14:24:59.198 (`A1-CATCH`, a cold catch); `J` at
+about 14:25:08; ③'s one read `B-AC0-R` at 14:25:33; twelve `rlx0` series (`I-R`, 14:26 to
+`R-S12-R` at 14:28:24); `rlx0` down (`H-DOWN`, 14:28:25) and twelve `eth4` series from `E-00-R`
+(14:28:35) to `E-S12-R` (14:31:00); `I-Z`; the tail watch `X-W1` 14:31:19–14:32:40; the
+power-off window `X-OFF1` from 14:32:47, the board's last byte at 14:32:59.248; `X-W2` 0 B. Every
+fenced cell ran (the readers' count, 271) and the three X-cells; every invocation rc 0 but
+`X-W2`'s rc 1, the normal exit of an empty capture. 43 console captures on one `boot_id`; stops
+`--until` 30, `--idle` 9, interrupted 3, `--seconds` 1.
+
+**Block 50** (量; 讀 `$FWRE_WORK/rebuild/s113/run43b/`): `I-0` at 14:36:27, WSL restarted
+between the cards; the catch window at 14:38:16.869, `Booting...` about 14.8 s into it and the
+prompt 2.3 s later (the host's realtime clock advanced 0.84 s less than RAW across `R1-CATCH`,
+so no sub-second wall time of block 50 is used here); `R1-DW` at the prompt printed four words where
+its gate wanted one, and `I-1` stopped with rc 3 (**stop 1**, § 28.5); the board sat 133.4 s at
+the loader's prompt with no capture open (`X-W15` ended on the loader's own `<RealTek>`); `I-1`
+continued `--from R1-FL`; `D3`'s twelve trials at the fix 14:42:06–14:52:16 and `LUR1` at 1.4
+14:52:33–14:54:06; the re-arm for `LUS1` and `D3-Y-L` 0 of 4 (**stop 2**, § 28.7); S1 and
+corrections 1–2 from 14:55:45; `NET-131`'s six runs 15:15:58–15:17:59; the twelve rtt series at
+the fix 15:18:15–15:20:43; arm P from `P-SW0` (15:20:44) to `P-PS` (15:38:29), with the owner's
+unplanned pull and re-plug (correction 3); the 31-minute flood under `X-W44` 15:38:45–16:09:46
+(correction 4); `NET-76`'s reads from 16:10:02, the TCP tail, the 1.4 load 16:16:04–16:18:17,
+`LE`, `Z-SW` at 16:18:32; `X-W47` to 16:26:05; `X-OFF1` from 16:26:06, the power-off confirmed
+before 16:26:37. `X-PLW1` was never typed (correction 5) and `X-RE1b.log` is kept outside the
+repository (correction 6). 208 console captures on one `boot_id`; stops `--until` 88, `--idle`
+86, interrupted 33, `--seconds` 1. Never run (readers A and B agree): `D3-Y-00-P`, `-R` and
+`-H`, every `D3-LUS1-*` cell and `I-WLUS1`, `D3-Z-SW`, `D3-Z-LS`, `D3-SUM`, `CUT-4`, `X-W29`
+(its number skipped, as the card requires), `X-PLW1`, `X-PLWR1`.
+
+### 28.2 Block 49: the boot, and `D3-MISS` ③ (card A P1–P3)
+
+**P1** holds (量): a cold catch (`C-8`'s one space); `looprun`'s gates passed; `A1-PS` shows
+`/bin/sh` as PID 1; `A1-MB0` and `A1-MB1` read the map digest `0927be41…`, 31 groups the same and
+1 `DIFFER` in group 0; `n_writes 0` at `A1-NW0.log:25` and `A1-NW1.log:25`.
+
+**③, the two `NET109` rows in their own shape** (card A § 3.3). 量 `B-AC0-R`, the one read, after
+the probe's stop with nothing typed between: the CPU port's `CRCAlignErr 63` with `SymbolErr`,
+`FragErr` and `JabberErr` 0 (`B-AC0-R.log:84`) and `Drop 0` (:83), its buckets `64: 2 pkts, 65
+-127: 61 pkts` (:86); port 3's output `Unicast 63 pkts, Multicast 0 pkts` (:52) and `Broadcast 0
+pkts` (:53). `w3` (`W3.log:2–8`): `anchor ok base 2259 records 63`; the record index 63 at
+`B-AC0-P` and at `B-AC0-H`, `exact yes`; `healthy yes` (P2: `j` = `f` = `d` = 0, `n_recov_fire
+0`, `n_tx_stop 0`, `tx_stopped 0`, and `R-S01-L` 4 of 4); `row crcalignerr c 63 against [63, 63]
+holds exact`; `row p3egress-unicast u 63 … holds exact`; `row p3egress o 63 … holds exact` (the
+reading beside them). The 63 frames are 61 echo replies of 98 B and 2 ARP frames of 60 B, a reply
+and a request (readers A and B from the capture; the CPU port's buckets say the same). **Both
+rows are met exactly**, and `D3-MISS` ③ is closed by card A's own rule: each row is the identity
+the record says it stands for, read in its own shape on a healthy fresh boot. Not established: a
+device quantity — 63 is the probe's 61 replies plus 2 — or the rows' premise beyond this boot.
+
+### 28.3 Block 49: `D3-MISS` ① on a third calendar day, and the clock (P4, P5; `CLK-49`, `FW-149`)
+
+量 `Z9-W1.log:2–4`: `J` at RAW 381.420972; `nic 6.645383`, `ndopen 10.757296` and the first reply
+at `10.885281` after it, `k 2`, `neigh_at_j INCOMPLETE`; on the capture the who-has at place 2 was
+answered at 10.879394, **width 0.122098 s by the frames**; by card B's rule (seating B's card
+§ 3.4, as `w1width` states it, the registered measure — card A § 3.0) `[0.111265, 0.139265] mid
+0.125265`, lower edge `N-NDOPEN`, `void none`. **P4 holds**: 0.125265 s lies inside seating B's
+quiet range [0.081153, 0.134960] with k 2 — weak evidence, a new draw landing inside with
+probability 7/9 (card A § 3.4). Beside it: inside seating B's two cold widths ±10 %,
+[0.085095, 0.126112], by 0.85 ms.
+
+**① is decided: not stable** (the judgment; card A § 3.4's rule, fixed before power). Over the
+three cold widths on RAW — seating B's `P2Q-r01` 0.094550 s and `P3Q-r01` 0.114647 s, both by the
+rule (`notes/boot-time.md` § 8.7), and this one — the median is 0.114647 and the largest
+deviation from it, |value/median − 1|, is 0.175 (at 0.094550), not under the list's 0.10; the
+width lies outside the window [0.104225, 0.105055] that alone kept the row stable. By the
+frames' 0.122098 the largest deviation is 0.175 as well, so the verdict does not rest on the
+choice. `D8|width|quiet|cold` is reclassified not stable and `D3-MISS` ① stops being open; the
+reclassification is
+recorded in `CLK-49` and the `D3-MISS` row, not in the frozen list or `CLK-48`'s score file
+(critique E). 推 the width is the host's ARP phase against `N-NDOPEN`, one per day; nothing here
+is about the board.
+
+**P5 holds** (量): `bench/2026-09-27/Z0-HCG.log:4–5` reads `AGREE … vacuous` and `timerfd 0, agreed with the rows
+0, NO STEPS`, so the guard permitted; no step lies inside RAW [376.42, 392.31], `J` − 5 s to the
+first reply, and the net kernel rate there stayed inside ±100 ppm by far (reader A −1.11…+0.12
+ppm, reader B −1.1…−0.3 ppm, on their own windows). **The step detector's third live positive
+control** (`FW-149`): `bench/2026-09-27/Z9-HCR.log:4–5` reads `steps: timerfd 1, agreed with the rows 1, AGREE;
+positively controlled: yes` and `step at RAW 117.521573882: +0.973812 s, bracketed 0.0585 s`
+(the row `bench/2026-09-27/Z0-HC.clock:23`, `by=timerfd`), before the press and 4.4 s before `timesyncd` was
+stopped (讀 `run-I-C1.log`; `Z0-TSD` reads `ActiveState=inactive`, `Z9-TSD` `active` again at
+the end). The earlier two are `FW-129`'s +0.723937 s and the 109th segment's +0.551906 s. So the
+press window's *no step* is a controlled zero; `Z0-HCG`'s own window (RAW 223.1–283.1) stays an
+uncontrolled one, as its own line 5 says.
+
+### 28.4 `D3-MISS` ② on three arms (card A P6–P10, card B P10), and `NET-121`'s mdev
+
+量, the three `rttseries` pages, six series a state in the plan `011001100110`, every series
+counted (five sizes 20 of 20, both `pgrep` counts at the planned state, liveness 4 of 4, the pair
+`covered yes` and `fault jfd 0`). Each cell is E = median(on) − median(off) of the series'
+averages, as a percentage of median(off), and U of 36; `lowers` at U ≤ 5, `raises` at U ≥ 31:
+
+| arm | 56 B | 256 B | 512 B | 1,024 B | 1,472 B | source |
+|---|---|---|---|---|---|---|
+| `rlx0`, 1.4, `p2q` (card A) | +6.38 %, U 28 | +1.32 %, U 20 | −2.37 %, U 10 | −0.39 %, U 21 | −5.92 %, U 10 | `R-RTS.log:16–20` |
+| `eth4`, `p2q` (card A) | +8.02 %, U 30 | +2.37 %, U 17.5 | −0.23 %, U 17 | +1.45 %, U 22 | −3.14 %, U 17 | `E-RTS.log:16–20` |
+| `rlx0` at the fix, `r6b6q` (card B) | +3.62 %, U 23 | −3.16 %, U 16 | +0.12 %, U 15 | −1.91 %, U 13.5 | +6.72 %, U 27 | `M2F-RTT.log:16–20` |
+
+Every one of the fifteen cells reads `unresolved`. P8 and P9 (card A) and P10 (card B) hold: no
+`lowers` anywhere, and nothing resolved in opposite directions. The test's power is low (card A
+§ 3.5): a capture effect of a few percent is not excluded, and at 56 B E > 0 on all three arms
+with U 23–30.
+
+**The decision on `rlx0`, card A § 3.5.** P6 (a) holds: every off-state median lies inside its
+off band (`R-RTS.log:21–25`). P6 (b) is not met: the on-state medians lie *inside* the on band at
+256 B (1.5295 in [1.4769, 1.8051], :27) and 1,472 B (2.1840 in [1.9251, 2.3529], :30). So the
+reading is **case (ii)**: `256|avg` is closed on P7 — off 1.5095 against the A median 1.518,
+−0.56 % (:31); `1472|avg` is closed by the case's own entry condition — off 2.3215 inside
+[1.8468, 2.4772] (:25) — with its P7 against the captured reference published beside it, +8.53 %
+(:34); the captured state did not reproduce seating B's shift on this boot. P7 holds: 256, 512
+and 1,024 B read −0.56, +2.84 and −7.43 % (:31–33).
+
+**`1472|mdev`, and `NET-121`'s mdev half (ruling 1, critique A).** 量 `R-RTS.log:35` reads `row
+1472 mdev off 0.6490 A 0.476 ratio +0.3634 within10 no`, which card A left open. Every group
+median of the 1,472-B mdev — 0.6490 and 0.6325 (`rlx0` 1.4, off and on), 0.6990 and 0.7325
+(`eth4`), 0.5880 and 0.6500 (`rlx0` at the fix; the `:14–15` lines of the three pages) — exceeds
+all three of seating A's series, 0.462, 0.508 and 0.476 (`bench/2026-09-23/P1-ICMP.log:25`,
+`bench/2026-09-23/P2-ICMP.log:25`, `bench/2026-09-23/P3-ICMP.log:25`), and 31 of the 36 series exceed 0.508 (the pages' series
+lines 2–13). So the mdev half of `NET-121` recurred and grew — 0.476 (seating A's captured `P3`)
+→ 0.555 (seating B, `NET-121`) → 0.5880–0.7325 — on both boots, both drivers and both capture
+states: it is not `rlx0`'s, and its cause is undetermined. The averages did not recur (above).
+The spread of one 20-echo mdev between identical series is wide (the critic, from the per-series
+logs: coefficient of variation 23.0 % off and 14.8 % on for `rlx0` at 1.4, 21.5 and 20.6 % for
+`eth4`, 11.1 and 18.8 % at the fix; rms 18.8 %, against normal theory's 16.2 %), but the miss is
+not that spread: with no change, a six-series median lands within ±10 % of a three-series median
+only 58 % of the time (38–76 % by group), and a decision needs about 24 series a side (推, the
+same resampling). **Ruling 1**: `1472|mdev` is ⊘ — a one-day, three-series reference and a ±10 %
+band decide nothing at six series a side — and `NET-121`'s mdev rise is ⊘ as a gate row (it is
+not on the TX-loss path and it is seen on the vendor's `eth4` too), reopened if a feature that
+depends on rtt jitter is built.
+
+### 28.5 Block 50: the opening state (card B P1–P4), and the loader half of P2
+
+**P1 holds** (量): `B-SW.log:2` `version rtl819x-switch 1.2`, `:16` `n_linkq 0`, `:17` `lde0 00`,
+`:21` `psrp3 000000F9 up 1 lde 0 lj 0`; `bench/2026-09-27b/B-00-T.log:2–4` 1.5 untouched since boot (`tx15 txlen
+rlxfw txoff 2 txrb 0 dirty 0`, `v15 last - 0 ok 0 refused 0 txq 0 arm15 0`); `B-RMEM.log:2–3`
+`116736` and `116736`.
+
+**P2's loader half.** 量 `R1-DW.log:1–2`: `DW BB804134 1` printed
+`BB804134:<tab>000010E0<tab>000010E0<tab>000000E2<tab>0000007A`. The card's gate (line 1874,
+`^BB804134:\t[0-9A-F]{8}$`) wanted one word, which `SPEC.md` `LDR-07` — `DW <addr> N` prints
+4 × ceil(N/4) words — contradicted before the freeze; the four-word form was already committed
+(block 48's `bench/2026-09-26b/R1Q-ab2.log:2`) and recurs in this seating's own `DW 8040D4A0 1`
+lines (`A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). By card B § 6 (lines 3332–3339), when `R1-DW`'s gate
+refuses, P2's loader half is **unmeasured** (a reading about the reply's form), and that is the
+score. The reading stands beside it (讀 `LDR-07` ①: `DW` does not align the address down, so the
+first word is `PSRP3`): `000010E0` — bit 8 clear, bit 12 set, bit 4 clear. The card's 推 "bit 4
+set" was wrong: port 3 had no link when `R1-DW` read it, 2.62 s after the banner (`notes/switch-driver.md` § 14.9). 推 the other three
+words are `PSRP4`–`PSRP6`, whose bit 8 the same read cleared, which the card did not plan.
+`bench/2026-09-27b/R1-SW7.log:1` reads `RLXFW-SW7=00000000` and `B-SW.log:17` `lde0 00`. What it adds to
+`NET-30` 殘留 is `notes/switch-driver.md` § 14.9. The board's off-time, from the owner's reply
+confirming card A's power-off to the banner: at least 316 s — the reply preceded `X-OFF1`'s end,
+14:33:14.8, and the banner's wall time carries the 0.84 s above; the reply's own lag is
+unmeasured.
+
+**P3 holds exactly** (量 `LP-G.log:2–15`): `LP drv rlx0 rc 0 driver "rtl819x-nic" version
+"rtl819x-nic 1.5" fw "" bus "platform" can 0`, `LP link rlx0 rc 0 data 00000001`, `LP ring rlx0 rc
+0 rx 8/8 mini 0/0 jumbo 0/0 tx 4/4`; `lo` rc 122, 0 (data `00000001`) and 122; `eth4` rc 122 at
+all three; `nosuch0` rc 19 at all three; `LP9 calls 12 ok 4 refused 8 nowrite 0`. The kernel's
+side: `n_et_link` 0 → 1 and `et_link_last` `FFFFFFFF` → `00000001` (`LP-N0.log:87–88` →
+`LP-N1.log:87–88`), `n_linkq` Δ 1 and `lde 3` Δ 0 (`LP-DS.log:2`, `:6`). **P4 (arm N) holds**:
+`AN-D.log:2`, `:6`, `:19` — `n_linkq` Δ 0, `lde` Δ 0, `masked 3 000000F9 000000F9 bit8 0 0 same
+yes`.
+
+### 28.6 `D3`'s second boot (P5–P7), and `NET-117` 殘留 (P8; `NET-140`, `NET-142`)
+
+量, the host's output, the board's server logs as `iperflog parse` reads them (the `-IL` pages)
+and the trial brackets (`dtally.py` over the `-D` pages):
+
+| trial | the host's summary | the board's own figure | bracket `n` = `c` = `o` |
+|---|---|---|---:|
+| `TR1` | receiver 60.4 MBytes, 16.9 Mbit/s (`bench/2026-09-27b/D3-TR1.log:13`) | TEST_END receiver 16,986 Kbit/s | 1,144 |
+| `TR2` | receiver 60.6 MBytes, 16.9 Mbit/s | 17,010 Kbit/s | 1,169 |
+| `TR3` | receiver 60.4 MBytes, 16.9 Mbit/s | 16,975 Kbit/s | 1,133 |
+| `TS1` | 77.4 MBytes, 21.6 Mbit/s, Retr 0 (`bench/2026-09-27b/D3-TS1.log:13–14`) | sender 21,562 Kbit/s | 56,348 |
+| `TS2` | 79.3 MBytes, 22.2 Mbit/s, Retr 0 | 22,134 Kbit/s | 57,747 |
+| `TS3` | 80.0 MBytes, 22.4 Mbit/s, Retr 0 | 22,244 Kbit/s | 58,266 |
+| `UR1` | lost 46,006 of 52,745 (87 %) (`bench/2026-09-27b/D3-UR1.log:36`) | the same | 20 |
+| `UR2` | lost 42,071 of 47,745 (88 %) | the same | 20 |
+| `UR3` | lost 46,389 of 52,744 (88 %) | the same | 21 |
+| `US1` | lost 0 of 52,471 | sender 19,635 Kbit/s | 52,493 |
+| `US2` | lost 0 of 51,952 | 19,493 Kbit/s | 51,974 |
+| `US3` | lost 0 of 52,543 (`bench/2026-09-27b/D3-US3.log:37`) | 19,688 Kbit/s | 52,564 |
+
+**P5 holds, 12 of 12** (`NET-140`): every host log ends `iperf Done.` after its summary
+(`bench/2026-09-27b/D3-TR1.log:15` … `bench/2026-09-27b/D3-US3.log:40`); none prints `No route to host` or `iperf3: error`; every
+trial cell rc 0 (讀 the transcripts); `iperflog parse` found a TEST_END figure in each
+board-receives trial's log; every trial bracket reads `n` = `c` = `o`, `jfd` 0, K 0,
+`n_recov_fire` Δ 0 and `n_tx_stop` Δ 0. **P7 holds**: `iperflog compare` AGREE at all six
+board-receives trials (`D3-TR1-IC` … `D3-UR3-IC`). By P5's own text a pass is boot 2 of driver
+1.5 at `txlen vendor`, and with block 48's (§ 27.8) **`D3` is met on two boots**. Not
+established: that the pass is the fix's alone — `rtl819x-switch` 1.2, the initramfs's two files
+and the watch's ESC stream through every trial differ from block 48, and none is separated.
+
+**P8.** (i) holds, 3 of 3 (量 the `-SN` pages): `RcvbufErrors` Δ 46,706, 46,275 and 47,085
+against L = `Sent` − Δ`InDatagrams` = 46,005, 42,070 and 46,388, each ≥ 0.9 L (`LUR1` at 1.4:
+46,483 against 46,545). (ii), **the ~64, decided at 63** (the judgment; the critique F). 量
+`B-RMEM.log:2` `rmem_default` 116,736; `udpq`'s queue samples, two a trial at about 20 s and 32 s
+(`D3-UR1-UQ.log:3–4` … `D3-LUR1-UQ.log:3–4`): 115,416 in five of the eight, 108,088 in one and 0
+in two; and the board-only count — Ip `InReceives` − `InDatagrams` − `RcvbufErrors` − `NoPorts`
+− Tcp `InSegs` − Icmp `InMsgs` — is 63 in all four trials (the judge's `j06` and reader A's
+`net117.py`, from the same pages). 115,416 = 63 × 1,832 and 108,088 = 59 × 1,832, and 1,832 is
+the only common divisor above 1,504. 讀 the build cell `$FWRE_WORK/rebuild/r3-4/cells/r6b6q/top`
+(`.config:6` `CONFIG_RTL_819X=y`): `include/linux/skbuff.h:35–37` defines `RTL_PRIV_DATA_SIZE`
+128 under `CONFIG_RTL_819X`, and `__alloc_skb` aligns `size + RTL_PRIV_DATA_SIZE`
+(`net/core/skbuff.c:195`) before `truesize = size + sizeof(struct sk_buff)` (:211); with the
+driver's `dev_alloc_skb(len + 2)` for a 1,442-B frame (`rtl819x-nic.c:1412`), `NET_SKB_PAD` 32
+(`skbuff.h:1421`) and `SMP_CACHE_BYTES` 32 (`arch/rlx/include/asm/cache.h:14`, `:18`: `L1_CACHE_SHIFT` 5 and
+`SMP_CACHE_BYTES` = `L1_CACHE_BYTES`, the build's constants, not a measured line size), SKB_DATA_ALIGN(1,442 + 2 + 32 + 128) = 1,632 and the
+**truesize is 1,632 + 200 = 1,832 B** (`NET-142`). S = 200 has two routes: `rmem_default` =
+256 × (S + 256) (`net/core/sock.c:202–211`) and 1,832 − 1,632. `sock_queue_rcv_skb` refuses when
+`sk_rmem_alloc + truesize >= sk_rcvbuf` (`sock.c:354` ff.): the 63rd datagram is taken (115,416)
+and the 64th refused (117,248 ≥ 116,736), so **the capacity is 63**, and the 63 left unread at
+the server's exit are a full queue in 4 of 4 trials. The card's model (`udpq`'s `capacity
+rmem_default 116736 S 200 T 1704 N 68`, `D3-UR1-UQ.log:1`) omits the vendor's +128 — its
+arithmetic is right and its model wrong; it predicted S 161–168 and N = 64. Score: "N = 64" is
+not met; the refutation clause did not fire (the readers' difference counts, 59, 59, 58 and 55,
+lie within N less the window's non-UDP transmits); the prediction's substance holds at 63. (iii) the eight
+samples are readings. So `NET-117` 殘留's ~64 datagrams are the full queue at exit; why the
+socket refuses (the reader is slower than the arrivals, 推 CPU) and why the client's `Sent` is
+short (reader B: the per-second sums match the host kernel's `Udp.OutDatagrams` within 3, 推 the
+`Sent` summary undercounts) stay open, and ③, the rate and buffer arms, never ran.
+
+### 28.7 `LUR1`, `LUS1` and S1 (P6; corrections 1–2; ruling 2)
+
+**`LUR1`** (1.4 on `D3-X`'s re-armed ring; P6 holds on it alone). 量 the host's client ran to its
+timeout (rc 124 at 73.5 s, 讀 the transcript): `30.00-73.03 sec 0.00 Bytes` (`bench/2026-09-27b/D3-LUR1.log:33`),
+`Sent 52282 datagrams` (:37), `iperf3: interrupt - the client has terminated` (:38). The board's
+server summarised twice, `40651/46383 (88%)` (`bench/2026-09-27b/D3-LUR1-S1.log:64`, `:69`), then printed
+`iperf3: the client has terminated` (:71), with four `OUT OF ORDER … incoming packet = 0` lines
+before them; Tcp `RetransSegs` 0 → 7 (`bench/2026-09-27b/D3-LUR1-S0.log:26` → `bench/2026-09-27b/D3-LUR1-S1.log:10`). The bracket
+`D3-X-00-R` → `D3-LUR1-R` (`bench/2026-09-27b/D3-LUR1-D.log:4–13`): `n` 37, `c` 28, `j` 10, `f` 0, `d` 0, `o` 18, K
+0, `n_recov_fire` Δ 0, `n_tx_stop` Δ 0 — `cn` 9, a reading and not a stall; `txd0 len 82` at
+`bench/2026-09-27b/D3-LUR1-R.log:208`, a 78-B frame.
+
+**The stop** (P19 not met): `D3-Y-SW` re-armed the ring at 1.4 for `LUS1`, and `D3-Y-L` read `4
+packets transmitted, 0 received` (`D3-Y-L.log:5`) with `follower 1`. S1 as card B § 6 writes it,
+from the board first: `X-C1` (`X-C1.log:1–6`) read **branch a** — the host's six frames reached
+port 3 (host tx Δ 6, port 3 rx Δ 6: 1 unicast, 1 multicast, 4 broadcast; the driver's `n_rx` Δ
+6); the board's side `n` 6, `c` 3, `j` 0, `f` 0, `d` 1, `o` 2, the host adapter received 2; and
+`X-NIC1`'s ring held no engine-owned descriptor (`0 of 4`), `n_tx_stop` 0, no recovery armed or
+fired — unlike block 48's stall (§ 27.9). `X-L1a` read 0 of 4 (`X-L1a.log:5`); branch b's
+re-attach went through correction 1 (`X-RE1`'s attach fell inside the post-detach drop,
+`X-RE1b` rc 0); `X-L1b` read 0 of 4 (`X-L1b.log:5`); under correction 2 (the owner's decision)
+`X-RA1v` re-armed at the fix (`X-RA1v.log:1–8`) and `X-L1c` read 4 of 4 (`X-L1c.log:9`): the host
+path reached the board and the board answered at the fix, so **`LUS1` is void**, never a result.
+
+**What the ring held** (ruling 2: the critique B, which corrects the judgment's row 14). 量
+between `D3-LUR1-R` and `X-BR1` the board's IP sent two datagrams (Ip `OutRequests` 332,912 →
+332,914, `bench/2026-09-27b/D3-LUR1-R.log:226` → `bench/2026-09-27b/X-BR1.log:226`) and TCP counted one retransmission
+(`RetransSegs` 7 → 8) and one more segment (`OutSegs` 175,872 → 175,873) (:232); 讀 the build
+cell's `net/ipv4/tcp_output.c:696–697` counts `OutSegs` only for a new segment or a pure ACK, and
+`tcp_retransmit_skb` (:1926–1930) counts `RetransSegs` alone — so **two TCP segments**, a
+retransmission and one new segment or pure ACK, the ACK plausibly answering the host's one
+segment (`InSegs` 219,192 → 219,193). The failed liveness was an **ARP failure**: the host's six
+frames were 4 broadcast, 1 multicast and 1 unicast (`X-C1.log:4`); the board's `InEchos` did not
+move (60 at both, `:228`); the host's `OutEchos` went 61 → 65 and its `InDestUnreachs` and
+`OutDestUnreachs` 0 → 4 (`bench/2026-09-27b/D3-LUR1-H.log:28` → `bench/2026-09-27b/X-HN1.log:28`). At `X-BR1` the ring index read 1
+and `txd1` held 82 (`bench/2026-09-27b/X-BR1.log:199`, `:209`) — a 78-B frame, 78 mod 8 = 6, a length `M1`-cover8
+calls wrong — where `D3-LUR1-R` read `tx_idx 2` and `txd0 len 82` (`bench/2026-09-27b/D3-LUR1-R.log:199`, `:208`),
+and `n_tx` went 332,946 → 332,952 (`:101`). Which segment was the 78-B frame is undetermined: an
+ACK with timestamps and one SACK block is 14 + 20 + 44 = 78 B, and so is a 12-B data
+retransmission (推 both). **It was the second of five frames after the re-arm** (量 + 讀).
+`D3-Y-SW` typed `txlen rlxfw` before `arm`, and every accepted behaviour verb marks the TX policy
+dirty, the same value re-typed included (讀 `rtl819x-nic-tx.h`); `nic_do_arm` (build cell
+`rtl819x-nic.c:1973–2107`) sets `nic_tx_idx = 0` (:2062) and calls `nic15_armed()` (:2096),
+which with the policy dirty zeroes every TX slot's `ph_len` word (:3344). The six `K` runs,
+each re-armed with the same text, read `tx_idx 0` and `len 0` in all four slots right after it
+(`bench/2026-09-27b/K1-0061-R0.log:199`, `:208–211`, and the other five alike): every length at
+`X-BR1` was written after the re-arm. With `tx_idx` 1 that is 1, 5 or 9 frames; four written
+slots make it at least 4, and `n_tx` +6 over the whole window makes it at most 6. So five
+frames followed the re-arm and one preceded it, and slot 1's 82 is the second of the five.
+Reader A's reading — the board's own retransmission of `LUR1`'s unfinished control connection
+poisoned a fresh ring — is consistent and not established (n = 1). Reader B's "the failure
+outlived a 1.4 re-arm" holds as an observation (`D3-Y-L`, `X-L1a` and `X-L1b` read 0 of 4 after
+the one re-arm at 1.4, `X-L1c` 4 of 4 after one at the fix); its interpretation is unsupported:
+the frames on the ring at `X-BR1` were all written after that re-arm, so the bad state was
+re-created rather than carried over (推 for the state, 量 + 讀 for the frames). "Cleared only
+at the fix" was never tested. `NET-124` 殘留 and `NET-54` 殘留 were not reproduced: the host reached
+the board.
+
+### 28.8 `NET-131` 殘留's deciding bracket (P9)
+
+量, six runs at 1.4, each on its own re-armed ring (`K<n>-<L>-E`), `ping -c 2`, one bracket each;
+k is reply 1's payload byte 10 on `N1.pcap` (`W-NORD`'s `echo_first … b10`), which records 42 of
+42 received, 0 dropped, anchor ok (`W-NORD.log:2–5`):
+
+| run | L | k | answered | `j`/`f`/`d` | `o` | K | the CPU port's bucket that moved beside 64 and 65–127 |
+|---|---:|---:|---|---|---:|---:|---|
+| `K1-0061` | 61 | 3 (`W-NORD.log:64`) | 1 of 2 | 0/0/1 | 2 | 0 | 512–1023 (`K1-0061-D.log:5`) |
+| `K2-0062` | 62 | 4 (`:146`) | 1 of 2 | 0/0/1 | 2 | 0 | 1024–1518 (`K2-0062-D.log:5`) |
+| `K3-0063` | 63 | 15 (`:228`) | 1 of 2 | 1/0/0 | 2 | 0 | — |
+| `K4-0061` | 61 | 8 (`:310`) | 1 of 2 | 1/0/0 | 2 | 0 | — |
+| `K5-0062` | 62 | 7 (`:392`) | 1 of 2 | 1/0/0 | 2 | 0 | — |
+| `K6-0063` | 63 | 8 (`:474`) | 1 of 2 | 1/0/0 | 2 | 0 | — |
+
+Every run `n` 3, `c` 3, `n_recov_fire` Δ 0, `covered yes` (`K<n>-D.log:4–13`); each `ping` read
+`2 packets transmitted, 1 received` (`K<n>-PG.log:4`). **P9 holds, 6 of 6**: sequence 1 answered
+at every run, sequence 2 at none at its own length, and each k in its predicted branch — k ≥ 7 a
+jabber, 1 ≤ k ≤ 5 branch (b) (`j` = `f` = 0, `d` = 1). 推 under H-prev at offset 52 reply 2's
+`ph_len` is 256 k: 768 B at k 3 and 1,024 B at k 4, which is where the Drop-counted frame fell.
+**The registered decision**: at `K1` and `K2`, `j` = `f` = 0 and `d` = 1 with K = 0, so the
+Drop-counted frame was not forwarded and **candidate (2) is excluded** for it; `E-L1`'s (block
+47) and `SL-0062`'s (block 48) K is candidate (1) or a third cause, and `NET-131` is not decided.
+
+Beside it (量): at two inter-run pairs at 1.4 the CPU port counted one frame more than the driver
+handed it, with `FragErr` + 1 — `K3-0063-R1.log:84` → `K4-0061-R0.log:84`: `CRCAlignErr`
+332,970 → 332,976 against `n_tx` 332,988 → 332,993, `FragErr` 0 → 1; `K5-0062-R1.log:84` →
+`K6-0063-R0.log:84`: 332,987 → 332,993 against 333,004 → 333,009, `FragErr` 1 → 2. K stays 0.
+Not after `K4` or `K6`, which also jabbered. What the extra fragment was is not established.
+
+### 28.9 Arm P: the `ethtool` ops on the cable (P11, P12; `R6b-6`)
+
+量, the owner's planned pull and re-plug, each inside its 100-s window: the host's carrier
+watcher read `CW t 21054 … carrier 0 operstate down` (`P-PULL.log:2`) and `CW t 11799 … carrier
+1 operstate up` (`P-PLUG.log:2`). **`get_link` follows the cable**: `LP link rlx0 rc 0 data
+00000001` before (`P-LG0.log:4`), `data 00000000` with the cable out beside `lo`'s `00000001` in
+the same call (`P-LG1.log:4`, `:7`), `00000001` after (`P-LG2.log:4`); the switch pages read
+`psrp3 000000E9 up 0 lde 3` out (`P-SW1.log:21`, the predicted word) and `000000F9 up 1` back
+(`P-SW2.log:21`); `P-N1.log:88` `et_link_last 00000000`. **`drvinfo`** returns rlxfw's string:
+`driver "rtl819x-nic" version "rtl819x-nic 1.5" … bus "platform"` (`LP-G.log:3`, each `P-LG`'s
+line 3). **`MT-PORT` names the reporting driver** (`mfgtest` 1.1): out, `FAIL MT-PORT Port3 has
+no LinkUp -- cable out, or the wrong jack (by rtl819x-switch 1.2; psrp3 000000E9 up 0 lde 3 lj
+241691)` and `8 of 9 ok, 1 FAIL` (`P-MT1.log:15`, `:18`); back, `ok MT-PORT Port3 LinkUp by
+rtl819x-switch 1.2; vendor tree present` and `9 of 9 ok, 0 FAIL` (`P-MT2.log:15`, `:18`) — the
+switch driver that reported the link, not whoever configured the PHY (card B § 7). `lde 3` rose
+2 from `P-SW0` across the unplanned pair and the pull (`P-D1.log:6`), 1 from `X-SW2`'s baseline
+(`X-SW2.log:21` `lde 2`); `P-D2.log:19` `same yes`.
+
+**The watch.** The first watch's log, read by `P-LW2` (`P-LW2.log:3–7`): `LPW start rlx0 v 1`,
+`v 0` at t 102,820 ms and `v 1` at 114,600 ms (the owner's unplanned pull and re-plug, correction
+3), `v 0` at 381,100 ms (the planned pull), `end n 29919 ms 600000 … trans 3`; it ended before
+the re-plug, and it recorded a transition at every cable event it spanned. `P-LWR` reads RED
+against the expected `[1, 0, 1]` because the first watch holds the unplanned pair
+(`P-LWR.log:8`): a reading, not the watch mode's refutation. It sampled every 20.05 ms against
+the 10 ms asked (600,000 ms over 29,919 samples; `t` is exactly 20 × `i` at lines 4–6), 推 the
+sleep rounded to `HZ` 100 (`FW-144`). The restarted watch's log was lost at the power-off
+(correction 5), so P11's restarted-watch half and the identity `n_et_link` Δ = the watch's `n` +
+3 are **unmeasured**: `P-N3.log:87` − `P-N0.log:87` = 59,747 − 1 = 59,746, which would give the
+restarted watch 29,824 samples — a derivation, not a check.
+
+**H1 and H2** (P12): H1, the host's `ip link set` down and up, moved no `lde` (`P-DH1.log:3–10`);
+H2, `ethtool -r`, returned 0 (`P-H2.log:1`) where the card predicted a refusal (推), and `P-SWH2`
+read `up 0 lde 4` (`P-DH2.log:6`, `:14`): one link event followed one `ethtool -r`. P12 holds at
+H1 and is refuted at H2; by the card's own clause H2 answers `NET-30` 殘留 ②, and "makes" is 推 at
+n = 1 (`notes/switch-driver.md` § 14.9, `NET-143`). The link was back by `P-PS` (15:38:26).
+
+`R6b-6`'s DoD, clause by clause: `drvinfo` returns rlxfw's string — met (`LP-G.log:3`); `get_link`
+flips with the cable, the owner's physical action the positive control — met (`P-LG0`, `P-LG1`,
+`P-LG2` line 4, on the planned pull and re-plug); `MT-PORT`'s line names the driver — met
+(`P-MT1.log:15`, `P-MT2.log:15`). Not established: that `get_link` reads port 3 in particular (it
+reads any of 0–4 with `LinkUp`, `FW-144`); why the host adapter's driver honours `ethtool -r`
+(seen once); the watch mode over a span that held only the planned actions; `MT-PORT` outliving
+the vendor tree (`R6b-8` 8f, arm II).
+
+### 28.10 `D4` at the fix, the 1.4 control, `NET-76` 殘留 and `M8` (P13–P16; `NET-141`)
+
+**P13, `D4` at the fix** (量 `F-D.log:4–13`, `F-00-R` 15:38:39 → `F-99-R` 16:10:00): `n`
+2,363,511 = `c` = `o`, `n_recov_fire` Δ 0, `n_tx_stop` Δ 0, `j` = `f` = `d` = 0, K 0, `within
+yes`, the host adapter received 2,363,511 (:9); the CPU port's buckets 64: 185, 65–127: 4,851,
+128–255: 9,815, 256–511: 19,456, 512–1023: 38,912, 1024–1518: 2,290,292 (:5). The traffic
+conjunct (`F-COV.log:2–5`): `sent-all yes`, `answered-all yes min-sent 76` — every `ping` size
+18–1,472, so every frame length 60–1,514 each way — over 77 passes and 110,731 `ping`s all
+answered (`F-FLOOD.log:4`); `low-intervals 0` over 186 counter rows spanning 1,852 s; the flood
+`2252672 packets transmitted, 2252655 received`, 1,859,999 ms (`F-FLOOD.log:2`), above the
+1,199,591 floor; `n` above 1,201,046. `F-SWD` reads `lde` Δ 0 at every port. **`D4`'s criterion
+holds at the fix**: no recovery over 31 minutes of traffic that includes every formerly bad
+length. **P15** holds: `T-TR.log:37–40` 797 MBytes at 22.3 Mbit/s, Retr 0, `iperf Done.`;
+`T-D.log:4–13` `n` 580,253 = `c` = `o`, fire 0, `jfd` 0, K 0.
+
+**P16, 1.4 on the same boot, the positive control** (量 `L-D.log:4–13`, `L-00-R` 16:16:04 →
+`L-99-R` 16:18:17): `n` 32,665, `n_recov_fire` 12, `n_tx_stop` 12, `c` 32,619, `j` 2,800, `f` 2,
+`d` 1,168, `o` 28,649, K 0; `cn` 46. `within no`: `o` 28,649 lies above the outer host bound
+28,644 (:11), so this bracket's host side is void by P0 (b); the host adapter's `otherhost`
+count reads 5 (`L-99-H.log:40–41`; 推 frames the host saw and did not take as its own). The load
+(`L-COV.log:2–5`, `L-LOAD.log:2`): 35,099 transmitted, 28,548 received, 5 of 12 intervals low,
+`sent-all no`. So 1.4 stalled on the boot where the fix did not: **`D4` is met** (`NET-141`), and
+`LE-L` read 4 of 4 after the re-arm back to the fix. **`NET-68` 殘留, the reading**:
+`L-99-R.log:151–155` `n_recov_arm 12`, `n_recov_fire 12`, `n_recov_ok 12`, `n_recov_fail 0`,
+each 0 at `L-00-R` (no recovery fired earlier on this boot, `LUR1`'s aftermath included): each
+recovery restored TX and traffic flowed between them (28,548 of 35,099 answered across the 120
+s); that the next stall follows the next bad frame is 推.
+
+**`M8`** (ruling 3; the critique C). M8's clause — a recovery firing in a bracket whose
+`JabberErr` Δ is 0 — fired on block 46 (A2-02, 61 B: a fire and a stop with `j` = `f` = `d` = 0,
+`n` 16, `c` 2, not CARRIED; §§ 22.2–22.3), which `SPEC.md` § 17 `NET-67` 殘留 records as
+refuted as written (2026-09-26); the clause (`41bf452`) predates that card's freeze. On blocks 49
+and 50 it did not fire: of the 74 consecutive pairs (the judge's count) only `L-00-R` →
+`L-99-R` holds a fire, 12 fires with `j` 2,800 in one 120-s bracket, which cannot test M8 fire
+by fire — not testable there, not a negative. R1, which voided M7 in block 46 (§ 22.1), leaves
+M8 standing: M8 is a count inside one bracket and localizes nothing. `D4`'s verdict reads only
+the fix's fire count and the 1.4 control, so M8 does not change it; it changes `D4`'s reach.
+The 1.4 stall follows wrong-length frames, jabbered or counted nowhere (A2-02 had `cn` 14), and
+the fix removes both together, so block 50 cannot say which engine state stops descriptor
+retirement: **`D4` met, `NET-67` 殘留 open (narrowed)**, re-owned to `R6b-10` (ruling 5) and ⊘
+once `txlen vendor` is the default, with M8's own reason — over 2,363,511 frames covering every
+length 60–1,514 at `txlen vendor` no stimulus reached the stalling state; the mechanism is
+unknown; reopened on any fire at `txlen vendor`. **`NET-78` 殘留** the same: its condition, a
+stall at the vendor's lengths, never arose — `cn` 0 in every bracket at the fix, 46 at 1.4
+(`L-D`), 9 in `LUR1` and 3 in the S1 episode (`X-C1`: `n` 6, `c` 3).
+
+**P14, `NET-76` 殘留** (after the flood, before any re-arm): `N76-A.log:8` 4 of 4 answered;
+`N76-PL.log:8` 4 of 4; Icmp `InEchos` and `OutEchoReps` +4 each (`N76-S0.log:5` →
+`N76-S1.log:5`), Ip `InReceives` and `OutRequests` +4 (`N76-SN.log:2`). `N76-W` holds 4 ARP frames
+and 0 echo replies (`N76-W.log:8–15`), and `N76-T.log:2–3` reads `4 packets captured`, `8 packets
+received by filter`: the capture stopped with 4 frames unwritten (推) — the `N76-W` clause is not
+met as written, an instrument's miss; the card's "generated but lost" placement is contradicted by
+`N76-PL`'s 4 of 4. After a 31-minute flood at the fix the board answered ARP and ICMP both:
+**`NET-76` 殘留 was not reproduced** (driver 1.5 at `txlen vendor`). Not established: what seating
+32's state was.
+
+Port 3's output `pause` counter rose by 1,180,022 over the flood and not at all over the TCP
+tail, where the board sends: `notes/switch-driver.md` § 14.9, `NET-144`.
+
+### 28.11 The host path, the console under load, and `C-19`
+
+**P11 (card A) and P19 (card B)**, 量: block 49's 24 liveness gates read 4 of 4 and its 24
+`brdelta` pages `covered yes`; block 50's liveness captures read 4 of 4 at 40 and 0 of 4 at
+`D3-Y-L` and at S1's `X-L1a` and `X-L1b`; its `brdelta` pages read `covered yes` at 34 of 35 (`T-D`
+`covered none`: the tail sends no echo); every port-3 gate read `PSRP3` `000000F9`, `LinkUp`
+(block 50's fourteen `-LS` pages `psrp3 000000F9 up 1`, block 49's `R-LS` and `E-LS`), with
+`port_status` `LinkUp` beside it (the readers); every kernel-log window `follower 1` (53 in block
+49, 95 in block 50). P19 is not met: `D3-Y-L` (§ 28.7).
+
+**The console under load** (`FW-150`). 量 (`gaps.py` over the watches' `.timing`): in block 50 the
+watch's BEL stream fell silent for up to 5.0, 1.6, 3.8 and 2.5 s in `X-W22`, `X-W23`, `X-W24`
+(`UR1`–`UR3`) and `X-W28` (`LUR1`), and in `X-W44`, over the flood, for up to 290.8 s, with the
+console silent in gaps over 60 ms for 1,856.5 of 1,860.7 s; block 49's `X-W1`, the board idle
+at its shell, had its longest gap between bytes at 0.060 s. The ESC rate that BEL stream stands for: at an idle prompt this shell
+answers two ESC with one BEL — four committed idle-shell captures that recorded their ESC
+writes read 4,497 writes → 2,249 BEL (`2026-09-04/SN-rz`), 9,145 → 4,573 (`2026-09-06b/K1-Z`),
+8,634 → 4,317 (`2026-09-08b/R2-WG`) and 4,362 → 2,181 (`2026-09-17/p11e-rz`), and a fifth
+fits too (`2026-09-19/C31-RSTV`, 591 → 296), each ceil(writes / 2), no echo — and
+`X-W15.meta.json` records 129 writes in 1.321 s (97.7 a second) at the requested 0.01 s. The
+watches' own write count is empty (`"esc": {}`: interrupted), so 推 from those two: the idle
+cadence of about 48 BEL a second (the judge: 44.5–49) is about 96 ESC a second, the card's
+"about 100", and reader B's "about 48 ESC a second" is refuted. 推 the console starves while the board's receive path is
+saturated; not established: that the ESC stream affected any trial.
+
+**`C-19`**, 量: **0 console drops** in either block. The host's kernel logs (kept outside the
+repository; counts only): block 49's has no USB disconnect, its `cp210x` and `ttyUSB` lines are
+the attach at kernel time 32.17 s, before power, and 511 `BUG: using smp_processor_id() in
+preemptible` traces; block 50's has one USB disconnect, bus device `2-1` at 1,438.63 s, the GbE
+adapter's at `X-RE1` (推 by time and device), its `cp210x` and `ttyUSB` lines the attach at 14.97
+s, and 5,731 traces. Gaps longer than a minute between consecutive console captures, on RAW
+(`c19gaps.py`): block 49, 268.1 s `R0-PRE` → `A1-CATCH` (the board off); block 50, 107.2 s
+`R0-PRE` → `R1-CATCH` (the board off) and 133.4 s `X-W15` → `R1Q-ab2` (the board at the loader's
+prompt, stop 1). No drop followed any; after the round the longest gaps were 14.7 s (block 49,
+`A1Q-boot` → `B-AC0-R`) and 7.3 s (block 50, between rtt series). Block 50 ran 33 watches and
+`X-OFF1`; `X-W15` ended on the loader's reply and every other was interrupted; the longest,
+`X-W44` (1,860.7 s) and `X-W33` (755.8 s), preceded no drop. The trigger, a drop after a long
+idle, was not exercised; the row stays open for the gate's later seatings.
+
+### 28.12 The flash claim, the maps, and the record
+
+**The flash claim** (CLAUDE.md § Flash), 量 (`flashsent.py`, whose control fires on 5 planted
+write strings and on 0 of 4 clean ones): 0 `FLW`, `EW`, `EB`, `FLR` or non-zero `AUTOBURN` among
+the 210 sent strings of the 251 console captures (38 in block 49, 172 in block 50; 41 captures
+sent nothing). `looprun`'s rescue sent `AUTOBURN 0` (`A1Q-rescue.json`, `R1Q-rescue.json`), and
+the `AUTOBURN` word read `00000000` before each upload (`A1Q-ab2.log:2`, `bench/2026-09-27b/R1Q-ab2.log:2`). The
+maps: `A1-MB0`, `A1-MB1`, `R1-MB0` and `R1-MB1` each read `0927be41…`, 31 groups the same and 1
+`DIFFER` in group 0, blocks 46–48's; `n_writes 0` at all four `NW` reads, carrying no
+information about writes (`FW-142`); `n_write_refused` 0 → 4 across block 50
+(`bench/2026-09-27b/R1-NW1.log:26`), `mfgtest`'s two runs refusing twice each, as P18 predicted. No reset. What the
+brackets cannot see: `H601`'s 8,192 B, two writes that cancel, anything outside the map, and
+anything after `A1-M1` or `R1-M1`.
+
+**The record** (讀 the two cards against the captures):
+
+* `R1-DW`'s gate contradicted `LDR-07`, a row that existed before the freeze, and the committed
+  four-word replies could have tested it (§ 28.5).
+* `N76`'s capture stopped with 4 frames unwritten (推, § 28.10), and no correction records it.
+* Card A § 4 asked for the X-cells to be logged in `bench/2026-09-27/CORRECTIONS-block49.md` as
+  they ran; the file did not exist. It is written late, in segment 115, with `X-W1`, `X-OFF1` and
+  `X-W2` and their times, as `bench/2026-09-27c/CORRECTIONS-block51.md` is for block 51.
+* Off-card host jobs overlapped block 50's trials, unrecorded in `CORRECTIONS-block50.md`
+  (`$FWRE_WORK/rebuild/s114/card43c/bench-overlap.log`; each `nice -n 19 taskset -c 0`, the
+  judgment): 14:48:12–14:48:29 inside `UR2` (14:48:11–14:48:41), 14:51:55–14:52:14 over `US3`'s
+  last 10 s, and 14:54:28–14:55:20 over the S1 hold. No effect is separable: `UR2`'s per-second
+  counts during the overlap match the rest and its one stall (27.00–28.61 s) came after; `US3`'s
+  stall at 25.00–26.96 s has twins without an overlap in `US1`, `US2`, `UR1` and `UR3`.
+
+### 28.13 The predictions, one line each
+
+**Card A (block 49).** P0 holds: K 0, `within yes` and `covered yes` at 24 of 24 pages. P1 holds.
+P2 holds: healthy. P3 holds, both rows exact, `o` = W a reading; ③ decided: both rows met. P4
+holds (0.125265 s, k 2; weak evidence); P5 holds; ① decided: not stable. P6 (a) holds; P6 (b) is
+not met (on medians inside the band at 256 and 1,472 B). P7 holds. P8 and P9 hold. P10 holds:
+`jfd` 0 and K 0 at the twelve `rlx0` pages, every size of every series 20 of 20. ② decided: case
+(ii), `1472|mdev` ⊘ (ruling 1). P11 holds.
+
+**Card B (block 50).** P0 (a) holds at every pair (reader B and the judge: 49 of 49; the 35
+`brdelta` pages all read K 0); (b) is not met at `L-D` (host side void) and void at the pair
+across the re-attach; (c) holds; (d) holds. P1 holds. P2's loader half is unmeasured by the
+card's own rule; bit 8 = 0 and bit 4 = 0 are readings. P3 holds exactly; P4 holds. P5 holds, 12
+of 12. P6 holds on `LUR1`; `LUS1` is void. P7 holds, 6 of 6. P8 (i) holds, 3 of 3; (ii) "N = 64"
+is not met, the substance holding at 63, the refutation clause not fired; (iii) readings. P9
+holds, 6 of 6: candidate (2) excluded, `NET-131` open. P10 holds. P11: before, out, carrier,
+`MT-PORT` and after hold; the restarted watch's half and the `n_et_link` identity are unmeasured.
+P12 holds at H1 and is refuted at H2. P13 holds: `D4`'s criterion at the fix. P14: `N76-A`,
+`N76-PL` and the SNMP reads hold; `N76-W` is not met as written (the capture). P15 holds. P16
+holds (12 fires). P17 holds at 26 of 26 brackets (`LE`'s pair excluded, as written). P18 holds.
+P19 is not met: `D3-Y-L` 0 of 4.
+
+### 28.14 `R6b-3`, `R6b-4` and `R6b-6`, clause by clause (the judgment § 4; critique D)
+
+* **`R6b-3`.** `D2` on two boots — met by block 48's ruling (§ 27.13), which accepted block 47's
+  CPU-port conjunct, void under that card's P0; block 50 ran no E2, so `D2`'s refutation clause had
+  nothing to read here. `D3` on two boots — met, blocks 48 and 50, 12 of 12 each. The rtt arms
+  with the capture's effect stated for both drivers and for `P2`'s quiet image — met: unresolved
+  on all 15 arm-size cells, E −5.92 to +8.02 %; `eth4`'s series ran on `p2q` (card A's boot), not
+  beside the fix, and neither the DoD nor `D3-MISS` ② asks for more. `NET-117` 殘留's `Udp:`
+  counters — read (§ 28.6). `C-19`'s drops — 0. `NET-61` 殘留's burst half and `NET-103` 殘留 —
+  block 47 (§ 25.9). `D3-MISS` ① and ③ decided (§§ 28.2–28.3); ② decided as case (ii) with
+  `1472|mdev` ⊘. **All clauses met.**
+* **`R6b-4`.** `D4` met on this boot (§ 28.10); `NET-67` 殘留 and `NET-78` 殘留 re-owned to
+  `R6b-10`; `NET-68` 殘留 read; `NET-76` 殘留 not reproduced. **Met.**
+* **`R6b-6`.** `drvinfo`, `get_link` on the cable and `MT-PORT` — met (§ 28.9). The
+  `rtl819x-nic.c:122` comment is not a DoD clause; it landed at `5b946cc` with 8c-code. **Met.**
+* **`D5`'s rtt part** is closed by `R6b-3`'s reading with `1472|mdev` ⊘ (ruling 1) — a ruling the
+  owner may override, flagged for the gate's write-up. **`D6`**: the ops ran with a positive
+  control; "outlives the vendor tree" is 讀 by design (`FW-93`) and shown only by `R6b-8`'s
+  vendor-free boot.
+* **The gap the judgment flagged**: no step owned making `txlen vendor` the default, and
+  `docs/KNOWN-ISSUES.md` still says the default is 1.4's; the ⊘ proposals for `NET-67` 殘留 and
+  `NET-78` 殘留 assume that flip. It is `R6b-10`'s (ruling 5).
+
+### 28.15 What blocks 49 and 50 do not establish
+
+* That `D3`'s second pass is the fix's alone (switch driver 1.2, the initramfs and the ESC stream
+  differ from block 48 and are not separated).
+* Anything about the board from ① (the host's ARP phase against `N-NDOPEN`, one per day); a
+  distribution of cold widths.
+* The absence of a capture effect of a few percent on the rtt (low power); why the 1,472-B mdev
+  rose between the days.
+* A device quantity from ③ (63 is the probe's 61 replies plus 2).
+* Whether `E-L1`'s +4 and `SL-0062`'s +1 are candidate (1) or a third cause (`NET-131`); what the
+  extra fragment at two inter-run pairs was.
+* That `get_link` reads port 3 in particular; why `r8153_ecm` honours `ethtool -r`; the watch mode
+  over a span that held only the planned actions.
+* The stall's mechanism (`M8`); `D4` beyond one boot and two traffic types; that the shipped
+  default, still 1.4's, is fixed.
+* What seating 32's `NET-76` state was.
+* Why the one-off server reads too slowly (`NET-117` 殘留 ③), and the 1–3 datagrams between the
+  arrivals + 63 and the host's count.
+* Where bit 8 comes from on the boots that set it (P2's loader half is one more reading at 0).
+* Which frames `LUS1`'s liveness lost, or that the retransmission caused the failure (n = 1).
+* That the host honoured port 3's PAUSE frames, or that they caused the per-second stalls.
+* `H601`, writes that cancel, anything outside the map or after the closing maps.
+* `C-19`'s trigger: not exercised.
+* Anything about `M8` from blocks 49–50: the one 1.4 fire bracket was too coarse.

@@ -2243,3 +2243,485 @@ refused) and refuses a copy with a planted `EW` and `FLR`.
 * Anything about the fast path's NAPT entry with no WAN device: `rtl865x_getWanDev()`
   returns NULL at `SWCORE=n` (no `ppp0`, no `eth1`), and its caller in
   `fastpath_core.S:785` was read no further than its address.
+
+# 14. 2026-09-27 (`R6b-7`, block 51) — 1.3 on the die: `D7` met, `C-18` stays ⊘, and block 50's switch side
+
+## 14.1 What ran
+
+量 2026-09-27 17:51:51–17:57:13, `bench/2026-09-27c/`: card C,
+`PREDICTIONS-B53-block51.md` (committed `1b7c1fd` at 17:49:03, two minutes
+before the catch opened, with no freeze ceremony — the owner's relaxed
+process for `R6b` of 2026-09-27; sha256 `be534627…`, the digest all twelve
+transcript headers print; the captures are `fb4226d`). One press of `r6b7q`,
+seating 43's third: `rtl819x-switch` 1.3 and `rtl819x-nic` 1.5,
+`recipe_id 50E4AF55` at `R1-NW0:51` and `R1-NW1:51`; a cold boot (the catch's
+gate in `run-I-1.log` reads `C-8 cold`) after card B's power-off and a host
+restart (the host's kernel log starts at its kernel's boot, `R0-DW0:4`).
+Twelve invocations, `I-0` to `I-Z`, exited rc 0 and each transcript ends
+`ALL ITEMS DONE` (`$FWRE_WORK/rebuild/s114/run43c/`); 267 of 267 gates
+passed; 107 cells ran, each once, and every one of the fence's 110 names has
+a capture (the 107 and `looprun`'s three). Before power `check-predictions`
+read `0 of 110 captures came after the prediction, 110 did not`.
+
+The readings: one reader with parsers of its own, set against `mdpage` 1.1's
+verdicts on every value, and the main session's spot checks and rulings
+(`$FWRE_WORK/rebuild/s115/read51/`, `READING.md`). Every number below was
+re-read from its capture line for this record. Where the reading and a
+capture differ, the capture's figure is the one written here: `A-SW`'s first
+`psrp3` read came 29.2–29.3 s after the banner (the reading: 28.5 s), the
+gap from `X-W1` to `X-OFF1` is 0.45 s on the raw clock (0.46 s by wall
+clock), and the reading does not list the 0.43 s before `X-W1`.
+
+Capture names are `bench/2026-09-27c/`'s unless a subsection says otherwise.
+`NAME:N` is line N of `NAME.log`, counted on LF with CR stripped (`sed -n`'s
+numbering), and `NAME:N–M` a range; "card line N" is line N of card C.
+
+量, each capture's own `.meta.json` and `.timing` (a `.timing` row precedes its
+chunk, `FW-35`); wall-clock stamps, intervals on `CLOCK_MONOTONIC_RAW`:
+
+| time | event |
+|---|---|
+| 17:51:51.26 | `R1-CATCH` opens |
+| 17:52:01.50 | its first byte, `Booting...`, 10.25 s into the catch: the power-on is at or before it |
+| 17:52:03.79 | the loader's first prompt, 2.29 s after the banner |
+| 17:52:03.99–17:52:05.20 | `L1-MD2` and `L2-MD3` |
+| 17:52:05.45–17:52:26.63 | `looprun`'s round, `S5` to `S9` (`R1Q.stages.tsv`) |
+| 17:52:26.89–17:54:33.59 | the Linux cells, `R1-PS` to `R1-NW1` |
+| 17:54:34.01–17:56:26.95 | `X-W1`, `L1`'s tail watch, opened 0.23 s after `I-Z`'s last stamp |
+| 17:56:27.41–17:57:07.07 | `X-OFF1`; the board's last byte at 17:56:43.95, 16.54 s into the window |
+| 17:57:07.36–17:57:13.72 | `X-W2`: 0 bytes, and rc 1 is an empty capture's normal exit |
+
+The board's last byte is the power-off (推: nothing else ends the replies to
+the window's ESC stream). The owner confirmed the power-off in words, which
+no capture holds. After `R1-NW1` the port went without a capture three times:
+0.43 s to `X-W1`, 0.45 s from `X-W1` to `X-OFF1` and 0.29 s from `X-OFF1` to
+`X-W2` (raw clock). The captures' wall-clock stamps wander against the raw
+clock by 0.16 s over the press (`t0_real − t0_raw` across `R1-CATCH`,
+`R1-NW1`, `X-W1`, `X-OFF1` and `X-W2`), so the difference of two wall-clock
+stamps above is good to about ±0.2 s.
+
+## 14.2 `D7`: met (`SPEC.md` `NET-145`)
+
+The predicate is card P4 (card lines 431–442): for N = 0–4, `phyN`'s id is
+`L1[N] << 16 | L2[N]`. 量, every cell of this table reads register 2
+`0x001C` and register 3 `0xC880`, the ID `001CC880`:
+
+| address | Linux's MDIO API: `phyN id` (`C-PR`), r2 and r3 by `mdiobus_read` (`E-SC`) | the loader, this boot (`L1-MD2`, `L2-MD3`) | the vendor's `phyReg` | earlier loader reads, r2 / r3 |
+|---|---|---|---|---|
+| 0 | `C-PR:15`, `E-SC:20` | `L1-MD2:2`, `L2-MD3:2` | `D-V0:3–4` | `F2`, `E4` / `E6` |
+| 1 | `C-PR:16`, `E-SC:21` | `L1-MD2:3`, `L2-MD3:3` | `D-V1:3–4` | `F2`, `E8` / `E8b` |
+| 2 | `C-PR:17`, `E-SC:22` | `L1-MD2:4`, `L2-MD3:4` | `D-V2:3–4` | `F2` / none |
+| 3 | `C-PR:18`, `E-SC:23` | `L1-MD2:5`, `L2-MD3:5` | `D-V3:3–4` | `F2` / none |
+| 4 | `C-PR:19`, `E-SC:24` | `L1-MD2:6`, `L2-MD3:6` | `D-V4:3–4` | `F2` / none |
+
+* 量 `D-D7:2–6` read `equal yes` at each address, `D-D7:7`
+  `d7 verdict hold: 5 of 5` and `D-D7:8` `d7 vendor agrees 5 of 5`. The probe
+  registered the five (`C-PR:5` `bus 1 reg_rc 0`; `C-PR:15–19`
+  `rc 0 xrc 0 drv 0 att 0`), and sysfs holds `rlxsw:00` to `rlxsw:04` and
+  nothing else (`C-SYS:2`, `C-SYR:3`). The loader's `MDIOR 2` and `MDIOR 3`
+  read `0x0000` at 5–31 (`L1-MD2:7–33`, `L2-MD3:7–33`), and each reply is
+  1,042 bytes up to its first prompt, `F2`'s size (量, both).
+* **`NET-06`'s open half is closed.** Register 3 at addresses 2, 3 and 4 had
+  never been read; it reads `0xC880` at the loader (`L2-MD3:4–6`), through
+  Linux's MDIO API (`C-PR:17–19`) and through the vendor's `phyReg`
+  (`D-V2:4`, `D-V3:4`, `D-V4:4`). Both halves of `0x001CC880` are now 量 at
+  all five addresses.
+* The vendor's reads moved none of rlxfw's counters (量): every page from
+  `D-V0` to `D-MD` reads `mdio_rd 272` and `mdio_wr 16`, `G-SC`'s
+  (`J-CH:22–27`, each `d 0`).
+
+Not established: a permutation among 0–4 — the five IDs are equal, so `D7`
+cannot see two of them swapped, and § 14.4's rows see only a swap that
+involves port 3 (which of 0, 1, 2 and 4 is port 1 stays `NET-39`'s); that the
+three sources are independent below software — all three issue their reads
+through the one `MDCIOCR`/`MDCIOSR` pair (讀: the loader's `phy_read`, the
+vendor's accessor, `rtl819x_mdio_xfer`), so a controller fault common to all
+three is not excluded; any other boot.
+
+## 14.3 `C-18` at register level: the reopening condition is not met, and `C-18` stays ⊘ (`NET-146`)
+
+The rule is card P7's (card lines 512–515; decision D, § 10.7): `C-18`
+reopens if PHY 1's page-1 register 19 bits 15:1 differ from the value PHYs 0,
+2, 3 and 4 agree on (void if those four disagree), or if a port-1 link fault
+is ever observed.
+
+* 量 Page-1 register 19 reads `0x7380` on all five PHYs: `G-P8:22–26`
+  (`v 29568` on a0, a1, a2, a4 and a3, in `pread` order; in hex at
+  `G-C18:4–8`). PHYs 0, 2, 3 and 4 agree, and PHY 1 equals their value
+  (`G-C18:17`: `c18 stays void-by-ruling`, PHY 1's bits 15:1 `7380` equal
+  the value the other four agree on). Bit 0 reads 0 on all five
+  (`G-C18:16`).
+* 量 The select is shown two ways: `ps 1` on each of the seven paged reads of
+  (g) (`G-C18:13`), and, on PHY 0, page 1's register 16 reads `0xD100`
+  against page 0's `0x031F` (`G-P8:21`, `G-P8:20`).
+* 量 The vendor's `extRead N 1 19` reads `0x7380` on all five (`V-X0:2` …
+  `V-X4:2`), equal to rlxfw's `v` at each (`V-CMP:2–6`; `V-CMP:7`
+  `vend verdict 5 of 5 equal`). That path writes register 31 with no gate —
+  1, then 0 unconditionally (讀 `rtl865x_proc_debug.c`, card C's `cardnum`
+  row) — so (g′) made ten PHY writes that rlxfw's counters do not see.
+* 讀, in the tree that builds (`r3-4/cells/r6b7q`): `Setting_RTL8196E_PHY`
+  clears only bit 0 of page-1 register 19 (`rtl865x_asicL2.c:4193`,
+  `Set_GPHYWB(999, 1, 19, 0xffff-(0x1<<0), 0x0<<0)`), and `Set_GPHYWB`'s
+  `999` walks PHYs 0–4 alike (`:1236`–`:1238`, `NET-07`); the function is in
+  `r6b7q`'s `System.map`. The five equal words agree with that.
+* The link-fault clause could not fire: port 1 had no link, reading
+  `psrp1 000000E0 up 0 lde 0` on all five switch pages (量, line 19 of `A-SW`,
+  `E-SW`, `G-SW`, `V-SW` and `Z-SW`).
+
+By the main session's ruling (segment 115) the reopening condition is not
+met and `C-18` stays ⊘. Not established: whether port 1 *needs* the patch —
+the functional clause is ⊘ by the owner's ruling of 2026-09-26 (two cable
+moves and a comparison arm; one link partner cannot establish "not needed");
+what register 19 does (the rule compares bit patterns, not function); another
+die or another boot.
+
+## 14.4 `NET-08`: registers 0–5 at addresses 5–31 read `0x0000`
+
+量 `E-SC:25–51`: at every address from 5 to 31, registers 0–5 read `0000`
+with `hi 0000` — 27 of 27 rows. Every read completed: `mdio_to 0 busy 0`
+(`E-SC:9`) and no `E` token in any row. The loader's `MDIOR 3` reads `0x0000`
+at 5–31 on the same boot (`L2-MD3:7–33`), beside `MDIOR 2`'s `0x0000`
+(`L1-MD2:7–33`, `F2` repeated). Card P5 (card lines 461–467) registered
+registers 1 and 3–5 there as 推 `0000`; they came out as inferred
+(`E-RW:37`). `NET-08`'s § 17 question — registers 1, 3, 4 and 5 at 5–31 —
+has its answer, one read each.
+
+Not established: that `0x0000` means "no device" rather than the word the
+controller returns for a read no device answers; this boot cannot tell the
+two apart. phylib's own test for an empty address,
+`(id & 0x1fffffff) == 0x1fffffff` (§ 10.2), would call all 27 present, which
+is why 1.3 masks them.
+
+## 14.5 `NET-136`'s open contract on the die (`NET-147`; `mdiocheck`'s K7, `FW-151`)
+
+* **Register 31 reads back** (量). Every paged read found register 31 at 0
+  before its select (`p0 0`), read 1 after selecting page 1 (`ps 1`) and 0
+  after the restore (`p1 0`): the eight at `G-P9:20–27`, each PHY's first
+  select among them. That is the `ps 1` branch of `NET-136` 殘留's rule (card
+  lines 497–503).
+* **Every paged read restored page 0 and read it back** (量): `rs 0`, `rt 0`
+  and `p1 0` on 8 of 8 (`G-P9:20–27`), and `retry 0` and `dirty 0` on every
+  page from `A-MD` to `J-PR`. The page-0 control reads `rs 1` (`G-P1:20`):
+  `rtl819x-switch.c:1002 (RTL819X_MDIO_NOXFER)`, "none issued" — a page-0
+  `pread` makes no restore (讀; § 14.8).
+* **`MDCIOSR` 30:16** (量): `hi_or 00000000` on every page from `A-MD` to
+  `J-PR`, and `hi 0000` on every row of every page — the 5 addresses holding
+  a PHY and the 27 that hold none — and on the timeout's row (`F-S0:25`).
+  The live register and slot 0 read bits 30:16 as 0 on all five switch pages
+  (`A-SW:31`, `E-SW:31`, `G-SW:31`, `V-SW:31`, `Z-SW:31`). What the bits mean
+  stays 未定: they moved with neither whether an address answers nor a
+  timeout.
+* **`STATUS`'s length** (量). Completed transactions needed 22 to 40 polls
+  (`spin`'s minimum and maximum over the run, `J-PR:11` `spin 317 22 40`). At
+  `bound 0` the first read of `scan 5 5` timed out and `STATUS` was still set
+  at the next five pre-checks: `F-S0:25` `a05 E145 E016 E016 E016 E016 E016`,
+  and `F-AC:3–5` accounts it (one `E145`, one `mdio_to`; five `E016`, five
+  `busy` with no store; `mdio_rd` +1 = 6 − 5). `mdiocheck`'s K7 scripts
+  `STATUS` held for three reads (`busy_post 3`) and gives
+  `E145 E016 E016 E145 E016 E016`: two busy pre-checks after the timeout,
+  where the die gave five (`FW-151`). Back at the full bound, 10,000, the die
+  and K7 agree: `F-S1` reads `0000` ×6 and `mdio_to` does not move
+  (`F-AC:10–11`).
+  At `bound 0` each check is one poll with no `udelay(1)` after it (讀
+  § 10.4); 推: the row's six reads all fall inside the first read's
+  `STATUS`, which a completed read holds for 22–40 polls with a `udelay(1)`
+  between each. The time is not measured: `spin` counts polls, and the MDC
+  rate is unknown.
+* **P9's absolutes.** `J-CH:40`: `mdio_rd` 302 and `mdio_wr` 16, the
+  registered formula (card line 547: 307 − Δ`busy` − 3k − b, with Δ`busy` 5,
+  k 0, b 0). The card's "303 under K7's model" on the same line was that
+  formula at K7's Δ`busy` of 4.
+* **The switch's own poller against a selected page: undetermined.** 量
+  `PSRP` bit 8 was clear on both sides of every `pread` (each `pr` line's
+  `psrp` pair, `G-P9:20–27`), `lde` rose by 0 at every port after (g) and
+  after (g′) (`G-SWD:3–10`, `V-SWD:3–10`), and the livenesses after each read
+  4 of 4 (`G-L:9`, `V-L:9`). But `G-PCTL:3` reads `pctl blind yes`: page 1's
+  register 2 reads `0x001C` (`G-P9:27`), page 0's value, so a PHY left on page
+  1 reads the same registers 0–5, and the scan and `lde` detectors could not
+  have seen one (card § 7).
+
+Not established: `STATUS`'s length in time; what `MDCIOSR` 30:16 means;
+whether the switch's poller ever meets a selected page; any other boot.
+
+## 14.6 Values read for the first time (`NET-148`)
+
+量, each once, on one boot. "First" rests on a search of the committed
+captures under `bench/` (5,282 `.log` files at `95dabac`) for every form in
+which this repository has read a PHY register — the loader's `PHYR` and
+`MDIOR`, the vendor's `phyReg` `read` and `extRead`, rlxfw's `pread` — which
+finds none of these registers read before block 51 (its only hits are the
+loader's help text naming `PHYW`).
+
+| PHY | page | register | value | line |
+|---|---|---|---|---|
+| 0 | 0 | 16 | `0x031F` | `G-P1:20` (`v 799`) |
+| 0 | 1 | 16 | `0xD100` | `G-P8:21` (`v 53504`) |
+| 0–4 | 1 | 19 | `0x7380` | `G-P8:22–26` (`v 29568`) |
+| 4 | 1 | 20 | `0x0000` | `G-P8:27` |
+| 0 | 1 | 2 | `0x001C` | `G-P9:27` (`v 28`) |
+
+* Page 1's register 16 reads bits 15:13 = `110` (`G-C18:15`), where the
+  source states the default as `100` and writes `110` (讀
+  `rtl865x_asicL2.c:4176`–`:4177`, "Iq Current 110:175uA (default 100:
+  125uA)"). 推: the vendor's init ran on this boot.
+* Page 1's register 19 is `0x7380` with bit 0 clear on all five (§ 14.3); what
+  its other bits do is not read. PHY 4's page-1 register 20 is recorded only
+  (decision D: the vendor reads it back before adding to it, so its default is
+  未定).
+* Page 1's register 2 equals page 0's `0x001C`, so `G-PCTL` reads
+  `blind yes`, and the scan and `lde` detectors of (g) and (g′) could not have
+  seen a PHY left on page 1 (§ 14.5).
+* The `EAGAIN` refusal's text is now 量: `F-B0:3`,
+  `cat: write error: Resource temporarily unavailable` (card line 475 had it
+  推).
+
+## 14.7 Slot 0's `MDCIOCR` records the loader's last MDIO command (`NET-149`)
+
+* 量 `A-SW:30` reads `MDCIOCR` live `84001300` and slot 0 `1F030000`. Slot 0,
+  the latch taken at `subsys_initcall` (§ 8.3), holds by `NET-15`'s fields
+  (讀) a read (bit 31 clear) of PHY address 31, register 3 — the last command
+  of the typed `MDIOR 3` (`L2-MD3:33`, `PhyID=0x1f`). Card P1's 推 (card line
+  387) holds (`A-MDC:4`).
+* 量 Every earlier committed switch page in `bench/` — 103, one rendering
+  each, in 13 directories from `2026-09-19` to `2026-09-27b` — reads slot 0
+  `96181441`, the loader's own store on its way to the prompt (`NET-28`;
+  `docs/loader-phy-and-switch.md`, *The register readings, both states*). So
+  on this boot nothing between the prompt and `subsys_initcall` — the rescue,
+  `IPCONFIG`, the TFTP upload and `J` — stored `MDCIOCR`: the TFTP/`J` path
+  stores none. 推: the earlier boots' uniform `96181441` means none typed an
+  MDIO command at the loader after that store and before its `J`; that is not
+  checked boot by boot here.
+* 量 The live register reads `84001300`, as on 68 of the 103 earlier pages
+  (the other 35 read `03010000` ×24, `00000000` ×10 and `00010000` ×1). 讀
+  `NET-15`: a write (bit 31) to PHY 4, register 0 (`BMCR`), data `0x1300` —
+  `0x1100`, what register 0 reads at address 4 (量 `E-SC:24`), with bit 9,
+  restart auto-negotiation, set. 推: the vendor's side wrote it during the
+  boot. 1.3 issued no MDIO command before `A-SW` (`A-MDP:2`: the boot page is
+  `mdiocheck`'s K1, `mdio_rd 0` and `mdio_wr 0`), and
+  `rtl8651_restartAsicEthernetPHYNway` reads register 0 and writes it back
+  with `RESTART_AUTONEGO` (`1 << 9`) set (讀 `rtl865x_asicL2.c:5613`,
+  `rtl865xc_asicregs.h:438`; in `r6b7q`'s `System.map`); which of its callers
+  issued this one is not read.
+* 量 After `E-SC` the live register holds rlxfw's last transaction, `1F050000`
+  (`E-SW:30`: a read of address 31, register 5, the last of `scan 0 31`), and
+  after `G-SC` `04050000` with `RDATA` `0001` in `MDCIOSR` (`G-SW:30–31`:
+  address 4, register 5, whose row reads `0001`). `V-SW` and `Z-SW` read the
+  same pair after `V-SC`'s `scan 0 4`. The address encoding of 1.3's command
+  word is checked at register level.
+
+Not established: that no earlier boot typed a loader MDIO command before its
+`J`; what `96181441`'s write does at MDIO address 22; which vendor call wrote
+`84001300`.
+
+## 14.8 The fix, the brackets, liveness (P10), and every prediction
+
+**The fix and the host path** (P10, card lines 561–573), 量: `A-NIC0:133`
+read `tx15 txlen rlxfw …` at boot, a reading; `A-FIX` ended on the shell's
+prompt (`A-FIX:9`); `A-FIXR` read `txlen vendor`, `armed 1` and `nd_up 1`
+(`A-FIXR:133`, `:5`, `:23`). `B-00-R`, `G-99-R` and `V-99-R` passed every
+gate, and `B-L`, `G-L` and `V-L` each read 4 transmitted and 4 received with
+`follower 1` (`B-L:9`, `:27`; `G-L:9`, `:28`; `V-L:9`, `:28`). Port 3's
+output `pause` reads 0 on all three brackets (§ 14.9). Not established: port
+3's function beyond 60-B echoes.
+
+**The predictions, one line each** (card § 3; the reading's § 6 table, its
+counts re-derived here):
+
+| P (card lines) | what | verdict |
+|---|---|---|
+| P0 (374–382) | L1 at 0–31; L2 at 0–1; L2 at 2–31, 推; each reply 1,042 B | 3 met, 1 as inferred (`L-RD:34–36`) |
+| P1 (386–402) | version 1.3; `psrp3 up 1`; 0–2 and 4 `up 0`; slot-0 `1F030000`; `MDCIOSR` 31 and 15:0 zero; 30:16 recorded; `ifconfig` `0` and `1`; `lo` recorded; "the rest `up 0`" | 6 met, 2 readings, 1 not met as written |
+| P2 (403–410) | the locked page is `mdiocheck`'s K1 | met (`A-MDP:2`) |
+| P3 (414–427) | the locked probe refused; unlock; the probe; `rlxsw:00`–`04` only; a second probe `EEXIST` | 5 met |
+| P4 (431–442) | the IDs; the vendor's; rlxfw's counters unmoved | 3 met |
+| P5 (446–470) | `mdio_rd` 202; the 量 rows; the 推 rows; `hi`; (f)'s branch | 3 met, 2 as inferred |
+| P6 (474–483) | the `EAGAIN` refusal; the timeout identities; the bound restored; the clean rescan | 4 met |
+| P7 (487–519) | the twelve `pread` checks | 8 met, 2 readings, 1 not met as written (`rs`), 1 void as written (`lde`) |
+| P8 (523–538) | the gates; `extRead` equal to (g)'s; the rows; `lde` | 4 met |
+| P9 (542–557) | lock; the counters; the final probe refused; `spin`'s identity; 302 and 16; the chain | 6 met |
+| P10 (561–573) | the fix, livenesses, maps, `n_writes`, `recipe_id` | 6 met, 1 reading (`n_write_refused` Δ 0, `Z-NWR:1–2`) |
+
+P7's twelve: `p0 0`; the select shown; `p1`, `rt` and `dirty` 0; `rs 0`;
+register 16's bits `110`; register 19's bit 0 clear; the `C-18` rule;
+register 20 (a reading); the accounting, 29 reads and 14 writes (`G-C18:19`);
+`pctl` (a reading); rows 0–4 unchanged (`G-C18:20`); `lde` Δ 0. **Totals: 60
+predicates — 49 met, 3 as inferred, 5 readings, 2 not met as written, 1 void
+as written.** No refutation clause fired.
+
+**The two misses are drafting errors in the card** (committed, left as it is),
+each with the main session's ruling (segment 115):
+
+* **P1, card line 396**, predicts `psrp5`–`psrp7` `up 0`. 量 `psrp6` and
+  `psrp7` read `0000007A up 1` (`A-SW:24–25`), as on all 31 earlier committed
+  pages that print the `psrp` lines (switch 1.2, all block 50's) and on all
+  five of this block's; `NET-10` reads those two words as the CPU side's.
+  Taken literally, line 399's clause, "a port other than 3 up", then voids
+  (g)'s bit-8 detector for this boot. **Ruling:** the clause is read with the
+  scope its own reason gives — PHYs 0–4 and the vendor's link DSR — so it does
+  not fire, and the detector is not void; P7's `lde` check is counted void as
+  written and read under the ruling as Δ 0 (§ 14.5, blind to a PHY left on
+  page 1).
+* **P7, card line 490**, predicts `rs 0` for all eight `pread`s; the page-0
+  control prints `rs 1` (`G-P1:20`), `RTL819X_MDIO_NOXFER`, "none issued"
+  (讀, in the built driver, byte-identical to HEAD's, sha256 `80bb3f26…`).
+  **Ruling:** the refutation clause (card line 517) covers only reads that
+  made their select, so it does not fire.
+
+## 14.9 Block 50's switch side (`bench/2026-09-27b/`, card B52)
+
+Capture names in this subsection are `bench/2026-09-27b/`'s; card B52 is
+`PREDICTIONS-B52-block50.md` (frozen `255af14`), and its transcripts are in
+`$FWRE_WORK/rebuild/s113/run43b/`. The rest of block 50 is
+`notes/nic-driver.md` § 28's.
+
+**One link event after one host `ethtool -r` (`NET-143`).** 量: H2,
+`P-H2:1` `ethtool-r-rc 0`, ran between two switch pages (`run-I-P3.log`:
+15:33:11, rc 0). Before it, `P-SWH1:21` `psrp3 000000F9 up 1 lde 3 lj 241691`;
+0.79 s later (the two pages' starts on the raw clock; `jiffies` 277998 →
+278077), `P-SWH2:21` `psrp3 000000E9 up 0 lde 4 lj 278067`. `P-DH2:6` reads
+`delta lde 3 d 1` and `P-DH2:14` `delta psrp 3 000000F9->000000E9 up 1->0`.
+The next switch page, `F-LS` (15:38:34), reads
+`psrp3 000000F9 up 1 lde 4 lj 278067`: the link came back and no second
+event was counted. The control, H1 (`ip link set` down, 3 s, up), reads `lde`
+Δ 0 at every port (`P-DH1:3–10`). Card B52's P12 (its lines 629–638)
+predicted H2 refused (推: `r8153_ecm` implements no `nway_reset`) and `lde 3`
+Δ 0; `ethtool -r` returned 0 and `lde 3` rose by one, so P12 is refuted at
+H2, and by its own clause that answers `NET-30` 殘留 ②: a command on the host
+makes a link event at this desk. One event, at n = 1: that it *makes* one is
+推 until it repeats. Not established: why the host adapter's driver honours
+`ethtool -r` (seen once); which end dropped the link; how long it was down.
+
+**Port 3's output `pause` counter (`NET-144`).** 量, the vendor's
+`asicCounter` dump on every bracket page, read from `<Port: 3>` to
+`<Port: 4>` (line 54 of every page but `F-99-R`, where it is line 55), in
+capture order:
+
+| pages | arm | port 3 `Output` `pause` |
+|---|---|---:|
+| `B-00-R`, `D3-00-R` | before the trials | 0 |
+| `D3-TR1-R`, `D3-TR2-R`, `D3-TR3-R` | TCP, the board receives | 17,672; 35,530; 53,360 |
+| `D3-TS1-R` to `D3-TS3-R` | TCP, the board sends | 53,360 |
+| `D3-UR1-R`, `D3-UR2-R`, `D3-UR3-R` | UDP, the board receives | 79,526; 105,108; 131,374 |
+| `D3-US1-R` to `D3-US3-R`, `D3-X-00-R` | UDP, the board sends | 131,374 |
+| `D3-LUR1-R` | UDP at 1.4, the board receives | 152,616 |
+| `X-BR1`, `K1-0061-R0` to `K6-0063-R1`, `M2F-00-R` to `M2F-S12-R`, `P-99-R`, `F-00-R` | the rtt series and the rest | 152,616 |
+| `F-99-R` | the 31-minute flood of echo requests | 1,332,638 (Δ 1,180,022) |
+| `T-00-R`, `T-R` | TCP, the board sends | 1,332,638 |
+| `L-00-R` → `L-99-R` | the 1.4 load | 1,332,638 → 1,346,946 (Δ 14,308) |
+| `LE-00-R` | after the re-arm to the fix | 1,346,946 |
+
+Block 49's 26 bracket pages (`bench/2026-09-27/`) and block 51's three read 0
+throughout, and port 3's `Rx` `Pause` reads 0 on every page of all three
+blocks. So the counter rose only in the arms where the host drove traffic
+into the board — TCP and UDP the board receives, the flood, the 1.4 load —
+and not while the board sent. The values are 量; the name `pause` is 讀 (the
+vendor's `asicCounter` label); "PAUSE frames port 3 sent to the host" is 推.
+Not established: that the host honoured them, or that they caused block 50's
+per-second stalls (`notes/nic-driver.md` § 28); the counter's width.
+
+**`PSRP3` at the loader's prompt.** 量 `R1-DW:2`: `BB804134:` followed by four
+tab-separated words, `000010E0`, `000010E0`, `000000E2`, `0000007A`.
+`DW BB804134 1` printed four words (`SPEC.md` `LDR-07`: `DW` prints
+4 × ceil(N/4) words and does not align the address down), so the first is
+`PSRP3`, read 2.62 s after the banner (0.33 s after the loader's first prompt;
+its reply line's arrival, raw clock): bit 8 clear, bit 12 set (the
+loader-state bit, `NET-34`), bit 4 clear — no link yet, and the speed and
+duplex field at `E0`, the word of a port that has not negotiated since
+power-on (`NET-11`). Card B52's P2 (its
+lines 418–440) predicted bit 4 set (推, from block 24's `C10-PS0`, `000011F9`
+at a prompt); at 2.62 s it was clear. Words 2–4 are 推 `PSRP4`–`PSRP6`:
+`000000E2` and `0000007A` equal slot 0's `PSRP5` and `PSRP6` on the first
+switch page (`B-SW:42–43`), and `000010E0` is slot 0's word for an unlinked
+port (`PSRP0`, `B-SW:40`); a read clears `PSRP` bit 8 (`NET-11`), and all
+three read it clear, so the read consumed nothing there. The boot's
+`R1-SW7:1` reads `RLXFW-SW7=00000000` and `B-SW:17` `lde0 00`: no `PSRP` held
+bit 8 at S0′.
+
+Card B52's gate for that cell (its line 1874, `^BB804134:\t[0-9A-F]{8}$`)
+expected one word, contradicting `LDR-07`, and stopped `I-1` (`run-I-1.log`:
+`STOP: gate grep R1-DW`, rc 3). By the card's § 6 rule (its lines 3332–3338)
+the run went on from `R1-FL` as `I-1-r2`, and P2's loader half is
+**unmeasured**: bit 8 = 0 stands as a reading, not as P2's decision. It is one
+more reading for `NET-30` 殘留 (where a latched link-down comes from), not a
+decision. Beside `PSRP` 保留態的起點 (§ 14.11): port 3's field was `E0` at
+this read and `F9` at S0′ (slot 0 `000010F9`, `B-SW:41`, latched before the
+`SW7` mark 150.0 s after the banner), so it left `E0` inside that window on
+that power-on — a bracket, not the moment.
+
+## 14.10 `C-19`, the flash bracket and the record (block 51)
+
+* **What was sent** (量): 65 strings — the 59 `sent` fields of the captures'
+  `.meta.json` and the six steps of `looprun`'s `R1Q-rescue.json`. The card's
+  cells typed `MDIOR 2`, `MDIOR 3` and shell lines; `looprun` typed
+  `AUTOBURN`, `LOADADDR` and `IPCONFIG`, each first in a colon form the
+  loader rejects as an unknown command and then in the form it takes
+  (`AUTOBURN 0` among them), and `DW 8040D4A0 1`, `DW 80500000 8` and
+  `J 80500000`. **Zero `FLW`, `EW`, `EB`, `DB`, non-zero `AUTOBURN` and
+  `FLR`**; the two `DW`s are `looprun`'s reads. The `AUTOBURN` word read
+  `00000000` (`R1Q-ab2:2`, the first of the four words `LDR-07` prints) in the
+  capture that ran 17:52:05.78–17:52:07.96, before the upload stage began at
+  17:52:08.92 (`R1Q.stages.tsv`'s `S6`, placed with the file's own
+  `start_raw`/`start_real`). The only write to `/proc/rtl819x-nic` was
+  `A-FIX`'s; `/proc/rtl819x-spi` took `map 0` twice (`R1-M0`, `R1-M1`).
+* **The map bracket** (量): `R1-MB0` and `R1-MB1` read the digest `0927be41…`
+  with `31 same, 1 DIFFER` in group 0, as blocks 46–48 did (`R1-MB0:1–3`,
+  `R1-MB1:1–3`); the two map sections are identical byte for byte, with
+  `map_hashed 4186112` at both (`R1-M0:12`, `R1-M1:12`). `n_writes` and
+  `n_write_refused` read 0 at both ends (`R1-NW0:25–26`, `R1-NW1:25–26`);
+  `n_writes` carries no information about writes (`FW-142`). The bracket
+  reaches from `R1-M0`'s start, 17:52:35.25, to `R1-M1`'s end, 17:54:29.66.
+  What it cannot see: the boot before `R1-M0`; the 2 min 14 s from `R1-M1`'s
+  end to the power-off, in which only `R1-NW1`'s `cat` and the watches' ESC
+  bytes reached the board; `H601`'s 8,192 bytes, never hashed; two writes
+  that cancel; any byte outside the map's windows.
+* **`C-19`: no console drop** (量). The host's kernel log
+  (`$FWRE_WORK/rebuild/s114/host43c/dmesg-w43c.log`, followed from before the
+  attach; no line of it is in `bench/`) holds no `USB disconnect` line up to
+  its last stamp, 469.8 s, past `X-W2`, and `usb_disc 0` in every window
+  (`R0-DW0:9`, `B-L:19`, `G-L:20`, `V-L:20`, `Z-DW:10`, `Z-DWALL:9`); its four
+  `cp210x` lines and one `ttyUSB` line are the attach at 22.35 s, before
+  power (`R0-DW0:10–11`). One gap between consecutive console captures
+  exceeded a minute — 62.18 s, `R0-PRE` to `R1-CATCH`, with the board off —
+  and no drop followed it; the board then sat at its shell for 112.94 s
+  inside `X-W1`. Readings beside it: 31 `smp_processor_id()` in preemptible
+  `BUG` traces inside the windows (17, 7, 6 and 1 at `B-L:15`, `G-L:16`,
+  `V-L:16` and `Z-DW:6`; `Z-DWALL:5`) and one more at kernel time 366.1 s,
+  during `X-W1` (推, placed by the transcripts' monotonic stamps); block 49
+  logged 511 (`bench/2026-09-27/Z-DWALL.log`).
+* **What the watch does to a live shell** (card § 7's 推), 量: the board
+  answered the ESC stream with BEL bytes (`0x07`) and nothing else — 5,433 in
+  `X-W1`, its longest silence 84 ms, and 800 in `X-OFF1`. The closing CR
+  `X-W1` wrote on its stop brought back one more BEL and no line of text; the
+  card's 推 of an error line at the head of the next capture was not seen.
+* **The record.** Card § 4 (card lines 604–606) wanted the X-cells logged in
+  `bench/2026-09-27c/CORRECTIONS-block51.md` as they ran; no such file was
+  written at the press and `fb4226d` has none, so it is written late, this
+  segment, as a record of the three X-cells that ran, and says so.
+
+## 14.11 What block 51, and § 14.9, do not establish
+
+* **`PSRP` 保留態的起點**: undetermined. The card put it ⊘ (decision E: it
+  needs a cable move and a prediction). 量 Port 3 already read `F9` at S0′
+  (slot 0 `000010F9`, `A-SW:41`) and at the first Linux read (`A-SW:21`,
+  29.2–29.3 s after the banner), and ports 0–2 and 4 read `E0` on all five
+  switch pages. Block 50's prompt read (§ 14.9) brackets port 3's leaving
+  `E0` on that power-on between 2.62 s after the banner and S0′: a reading,
+  not the moment.
+* Whether `0x0000` at addresses 5–31 means "no device" (§ 14.4).
+* Whether the switch's own PHY poller meets a selected page: the scan and
+  `lde` detectors were blind (`G-PCTL`, § 14.5).
+* **The vendor's page-0 restores after (g′).** No `pread` ran after `V-X4`,
+  and (g′)'s detectors were blind, so which page PHYs 0–4 sat on from the
+  vendor's `extRead`s (17:53:49.80–17:54:00.42) to the power-off is known only
+  from the vendor's code (讀: `extRead` writes register 31 ← 0
+  unconditionally).
+* Whether port 1 needs the patch; what page-1 registers 19 and 20 do.
+* `STATUS`'s length in time; what `MDCIOSR` 30:16 means.
+* A permutation among addresses 0–4 (§ 14.2).
+* The probe's own `-EAGAIN` guard on the die (card § 0 ⑦ (1)); that a power
+  cycle resets PHY registers (推, decision B); the loud image and phylib's
+  `rtl819x-mdio: probed` line; a second boot of 1.3.
+* From § 14.9: why the host adapter's driver honours `ethtool -r`; that the
+  host honoured port 3's PAUSE frames or that they caused the per-second
+  stalls; P2's loader half (unmeasured); where block 24's latched link-down
+  came from (`NET-30` 殘留).
