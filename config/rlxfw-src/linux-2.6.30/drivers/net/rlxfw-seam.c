@@ -132,8 +132,10 @@ int bsp_swcore_init(unsigned int version)
 }
 
 /* ----------------------------------------------------------------------
- * 2-4. The vendor fast path, net/rtl/fastpath/96E/*.S: compiler output with
- * no cpp conditionals, so its three calls survive any configuration.
+ * 2-4. The vendor fast path, the .S files in net/rtl/fastpath/96E/: compiler
+ * output with no cpp conditionals, so its three calls survive any
+ * configuration.  (Spelt this way because a slash-star inside a comment is
+ * a warning, and the first build of this file had one.)
  * ---------------------------------------------------------------------- */
 
 /* 2. Callers: fast_l2tp_core.S:334 and :422 (`jal`); the return value is
@@ -149,7 +151,7 @@ int rtl865x_setNetifType(char *name, unsigned int ifType)
 
 /* 3. Caller: fastpath_core.S:3016, in rtl_br_fdb_time_update(), which moves
  * a bridge FDB timestamp only when the hardware age is exactly 150, 300 or
- * 450 (:3019-3040).  Vendor definition: drivers/net/rtl819x/l2Driver/
+ * 450 (:3020-:3036).  Vendor definition: drivers/net/rtl819x/l2Driver/
  * rtl865x_fdb.c:234, which reads the switch's L2 table.  0 is none of the
  * three, so the bridge's own ageing stands -- the "no hardware entry"
  * answer.  Reachable only with a bridge, which no rlxfw image configures
@@ -175,7 +177,7 @@ int igmp_delete_init_netlink(void)
  * (the tree that builds; rtl8192e/ does not).  Vendor definitions:
  * drivers/net/rtl819x/rtl_nic.c:210-226, set non-NULL only by the vendor
  * Ethernet RX path (rtl_nic.c:2707-2715).  The WLAN objects the link names
- * (量, probe cell r6b8bp1) read them in 8192cd_rx.o (8192cd_rx.c:878-896,
+ * (讀, probe cell r6b8bp1's link) read them in 8192cd_rx.o (8192cd_rx.c:878-896,
  * get_eth_cached_dev) and write only NULL and zeroes in 8192cd_osdep.o
  * (8192cd_osdep.c:7885-7897, clear_shortcut_cache).  Zero storage is the
  * vendor's empty-cache state, and nothing here fills it.
