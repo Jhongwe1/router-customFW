@@ -1308,3 +1308,37 @@ top-level directories — so they are declared here by hand, in the same tree:
 | `drivers/net/ibm_newemac/Kconfig` | line | **generic** | 🆕 2026-09-26. The seven `IBM_NEW_EMAC_*` `:50`–`:74`: `bool`, no prompt, `default n` — the promptless rows |
 | `drivers/net/Makefile`, `drivers/net/phy/Makefile` | line | **generic** | 🆕 2026-09-26. The staged `drivers/net/Makefile` links `rtl819x-switch.o` at `:98` before `obj-$(CONFIG_PHYLIB) += phy/` at `:100`; `phy/Makefile` builds `libphy.o` from `phy.o`, `phy_device.o` and `mdio_bus.o` |
 | `scripts/kconfig/symbol.c` | line | **generic** | 🆕 2026-09-26. `:313-322`: a symbol with a default property is flagged `SYMBOL_WRITE`, so a promptless `bool` inside an opened `if` is written out as `# … is not set` — why the seven were undeclared and no prompt showed them |
+
+## § 9.8 — `R6b-8` 8c-code: the switch tables, the MIB, and the vendor's memory node, 2026-09-27
+
+**Not one of these paths is in scope, and `ledgerscan check` was green before
+they were declared** (量 on this landing's tree before this section was
+written: green, every in-scope citation covered). They are declared for § 9.5's
+reason. `rtl819x-view` is this project's own driver and was never blind: its
+admission table cites the vendor header row by row, so what these rows bound is
+the reasoning behind 1.0's decisions and behind the host tools', not a
+blind-write claim. Every line below was re-read in the staged tree the images
+`r6b8cr` and `r6b8cr2` were built from — the tree that builds — before it was
+written here; the header is byte-identical to the `src-vendor` copy.
+
+⚠️ **What was taken, by kind.** From the vendor's switch code: 298 addresses
+and their names, each as one of two sources (the other a datasheet table or a
+committed reading, `notes/switch-driver.md` § 12.3); the shape of the table
+reader — the `SWTACR` wait, two passes compared, ten tries, the second buffer
+out — copied with the wait bounded; the MIB footprint of the vendor's dump and
+its `<< 22`, which the host decoder renders; and the memory node's load
+footprint, which `cardcheck`'s HW-1 bounds. No vendor store sequence entered
+the driver: it stores nothing.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-27 (a third row; § 9.6's and § 9.7's are `R6b-6`'s and `R6b-7`'s). The admission table's names, each the B of its two sources: `MACCR`…`PMCR` `:997-1000`, `BSCR` `:1014`, `PITCR` and `PCRP0`–`PCRP8` `:1133-1142`, `P0GMIICR` and `P5GMIICR` `:1152-1153`, `CVIDR`…`BISTTSDR3` `:1401-1410` (`BISTTSDR0` and `BISTTSDR1` share one address), `MEMCR` `:1438`, `TEACR`…`MGFCR_E0R2` `:1479-1493`, `VCR0`…`PBVCR0` `:2299-2306`, `LEDCREG`, `LEDCR1` and `LEDBCR` `:2627-2629` with `LEDCR` `:2633`, `SWTACR`, `SWTASR` and `SWTAA` `:196-198`, `TCR7` `:206`; the MIB `:275-315`, with `MIB_ADDROFFSETBYPORT` `:280` and `CpuEvent` `:281`; the CPU interface `:492-519`, `CPUTPDCR2` and `CPUTPDCR3` `:508-509` under `CONFIG_RTL_8196E`; `PIN_MUX_SEL` and `PIN_MUX_SEL2` `:3115-3116`. For the table read, `REAL_SWTBL_BASE` `:151` and `ACTION_START` `:209-211`; for the refusals, `PSRP0`–`PSRP8` `:1143-1151` and `LinkDownEventFlag` `:1328`. And `SBFCTR`/`SBFCR0` `:1673-1674`, the one word the census adds when any reading counts, which 1.0 refuses |
+| `drivers/net/rtl819x/AsicDriver/96E/rtl865x_asicBasic.S` | line | 🔴 **vendor** | 🆕 2026-09-27. `_rtl8651_readAsicEntry` `:1043-1215`: `rtl865x_accessAsicTable` first, the unbounded `SWTACR` wait, ten tries (`li $16,10` `:1060`), the slot at `(type << 16) + (slot << 5)` (`sll $2,$18,5` `:1084`), two passes compared and the second buffer out, and no store. **That shape entered `tbl`** with the wait bounded, and it is why `NET-28` 殘留's premise was wrong. `rtl865x_accessAsicTable` `:531-617`: types 4 and 6 are in none of its masks, so `tbl` does not call it. `_rtl8651_readAsicEntryStopTLU` `:1216-1362`, which stores `SWTCR0` bit 18: not copied, and no C file in `drivers/net/rtl819x/` calls it |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicBasic.h` | line | 🔴 **vendor** | 🆕 2026-09-27. `RTL8651_ASICTABLE_ENTRY_LENGTH`, eight words, `:13`; `REAL_SWTBL_BASE` as every table's base `:17`; the `TYPE_*` enum `:27-44` (netif `:32`, VLAN `:34`); `rtl8651_asicTableAccessAddrBase` `:47`; the `StopTLU` variant's one declaration `:58` |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicCom.h` | line | 🔴 **vendor** | 🆕 2026-09-27. `RTL865XC_VLANTBL_SIZE` 16 under `CONFIG_RTL_8196E` `:13-14` and `RTL865XC_NETIFTBL_SIZE` 8 `:19`, the slot counts `tbl` reads; `RTL8651_PORT_NUMBER` `:24-25`, which bounds the vendor's dump at seven sections; the netif and VLAN entries' big-endian arms `:171-191` and `:230-242`, which `viewdecode` decodes on B alone |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicCom.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `rtl8651_getAsicVlan` reads index = vid `:146`, which is why a slot is never taken for a VID; the netif getter's field decode `:604-636`; the first-read comment `:1485`; `rtl865xC_returnAsicCounter64`'s `<< 22` `:1506`; `rtl865xC_dumpAsicDiagCounter` `:1776-1838` — **the footprint the admission table's 225 MIB words are**, and the text `viewdecode asic` renders |
+| `drivers/net/rtl819x/rtl865x_proc_debug.c` | line | 🔴 **vendor** | 🆕 2026-09-27 (a third row). `memDump` `:115`: LEN/16 + 1 lines `:131-132`, five loads per line `:139-143`, before the `max == 0` break `:150`; `proc_mem_write` `:4115-4178`: `read` to `memDump`, `write` to a store and a load, both numbers through `simple_strtol` base 0, and the `len > 64` test `:4122` before `tmpbuf[len]`. **Taken: `cardcheck`'s HW-1 footprint rule**, and the instrument `NET-134` 殘留's `QNUMCR` read moves to. Nothing entered the driver |
+| `include/asm-generic/errno-base.h` | line | **generic** | 🆕 2026-09-27 (a third row). `EACCES` 13 `:16`, `peek`'s refusal and the page's `refused` count, beside the values § 9.7's row names |
+
+`viewcheck` transcribes `lib/vsprintf.c:36-75` as `mdiocheck` does, so § 9.7's
+row covers it; the view's parser adds only a length cap to 1.3's.

@@ -33,9 +33,10 @@ CONTROLS, and they are the point
 --------------------------------
 A tool reporting `0` is making a claim.  Every run prints four:
   * `port_status` and `asicCounter` — read on this die, must be PRESENT, and
-    VENDOR-UNIQUE: 量 2026-09-26, over the `.rodata`/`.data` of `r6b6q2`'s 667
-    compiled objects one by one, each name's literal occurs in a vendor object
-    and in no other
+    VENDOR-UNIQUE: 量 2026-09-26, over the `.rodata`/`.data` of `r6b6q2`'s 634
+    objects with content one by one (594 leaves and 40 archive members; this
+    said 667 until 2026-09-27, `SPEC.md` `NET-42`), each name's literal occurs
+    in a vendor object and in no other
   * `rtl819x-switch` — this project's own driver, must be PRESENT
   * a synthetic name — must be ABSENT
 If the three positives do not fire, the search is broken and the absences
@@ -89,9 +90,13 @@ CONTROLS = (("port_status", True), ("asicCounter", True),
 
 #: 量 2026-09-26 (`SPEC.md` `NET-42`): names of the vendor's `/proc/rtl865x/`
 #: set whose NUL-delimited literal ALSO occurs in the `.rodata`/`.data` of a
-#: retained, non-vendor object of `r6b6q2` (667 compiled objects searched one
-#: by one; controls: `rtl819x-switch` found in `rtl819x-switch.o`, the
-#: synthetic name nowhere).  PRESENT says nothing about the vendor for these.
+#: retained, non-vendor object of `r6b6q2` (634 objects with content -- 594
+#: leaves and 40 archive members, not the 667 this said until 2026-09-27 --
+#: searched one by one; controls: `rtl819x-switch` found in `rtl819x-switch.o`,
+#: the synthetic name nowhere).  The carriers below are those two sections':
+#: `arp` and `ip` are also carried by `usr/initramfs_data.o`'s `.init.ramfs`,
+#: which that search did not read (notes/switch-driver.md section 11.7).
+#: PRESENT says nothing about the vendor for these.
 SHARED = {"stats": "8192cd_proc.o",
           "arp": "arp.o, x_tables.o",
           "ip": "x_tables.o",

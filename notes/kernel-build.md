@@ -949,7 +949,7 @@ disk. The whole difference between the two files is the build timestamp in
 
 `config/rlxfw-initramfs.tsv` — ~~**29 entries**~~ 🔄 **36 entries, 量 2026-09-15: 9 dir, 6 file, 13 slink, 8 nod; 24 `unit` and 12 `rlxfw`, and the `rlxfw` byte column is no longer 988 but 30,172, because `/bin/uprobe` is the first `rlxfw` entry with content since `/init`. The per-kind and per-owner tables below this line are all at the 29-entry state**, every one tagged `unit` (carved
 out of this device's own flash dump) or `rlxfw` (mine), and the tag is
-**checked**, not trusted. `tools/mkinitramfs.py`, **23** controls — 19 → 23 on 2026-08-28/29, and the four new ones are §11.7's: the ceiling was being measured on the ELF file size. 🔴 **2026-09-23 (`P2-2`): the build manifest's `initramfs_sha256` is a digest of the SPEC's text -- each entry's path, mode, owner and source path -- and not of the contents `gen_init_cpio` packs.** 量: `_irfs-s100a` and `_irfs-p2` hold byte-identical specs (`7130245fbcd92afc`) while `/init` went from 988 B (`e871efdd…`) to 2,153 B (`ef2c8797…`), and `p2q`'s ELF carries the new text. The content-level record was always written -- `mkinitramfs` puts `<name>.manifest.tsv`, every file's bytes and sha256, beside each `<name>.spec` -- and nothing read it: `rlxfw-kbuild.sh` now refuses a spec with no record beside it and writes `initramfs_manifest_sha256`. Over their entries, the records of `r6if1`, `s31a`, `s31b`, `s31L`, `s32a`, `s99c`, `s100a` and `s100L` agree (`ee7acf8b…`), so every card that said *only the kernel differs* on the spec's digest was right, on evidence that could not have shown it. `SPEC.md` `FW-123`.
+**checked**, not trusted. `tools/mkinitramfs.py`, ~~**23**~~ 🔄 **43** controls (2026-09-27: 34 before 8c-code's nine `build --init` controls, `notes/switch-driver.md` § 12.7) — 19 → 23 on 2026-08-28/29, and the four new ones are §11.7's: the ceiling was being measured on the ELF file size. 🔴 **2026-09-23 (`P2-2`): the build manifest's `initramfs_sha256` is a digest of the SPEC's text -- each entry's path, mode, owner and source path -- and not of the contents `gen_init_cpio` packs.** 量: `_irfs-s100a` and `_irfs-p2` hold byte-identical specs (`7130245fbcd92afc`) while `/init` went from 988 B (`e871efdd…`) to 2,153 B (`ef2c8797…`), and `p2q`'s ELF carries the new text. The content-level record was always written -- `mkinitramfs` puts `<name>.manifest.tsv`, every file's bytes and sha256, beside each `<name>.spec` -- and nothing read it: `rlxfw-kbuild.sh` now refuses a spec with no record beside it and writes `initramfs_manifest_sha256`. Over their entries, the records of `r6if1`, `s31a`, `s31b`, `s31L`, `s32a`, `s99c`, `s100a` and `s100L` agree (`ee7acf8b…`), so every card that said *only the kernel differs* on the spec's digest was right, on evidence that could not have shown it. `SPEC.md` `FW-123`.
 
 🔴 **It was 31 until the adversarial pass, and the check that found the two
 wrong ones did not exist when they were written.** The tag was verified for
@@ -4510,7 +4510,7 @@ pair that measures it.
 🔴 **The discriminator is the assembled image's sha256**, which
 `looprun --image-sha256` checks. A card that separates quiet from loud
 by `RLXFW-ID0` will pass a board carrying the wrong image.
-
+🔄 2026-09-27: a second instance, 讀 — `mkinitramfs` 1.2's `--init` (`notes/switch-driver.md` § 12.7).
 
 ## 🆕 A compile check that costs seconds and can save a full build
 

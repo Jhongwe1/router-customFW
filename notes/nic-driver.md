@@ -3495,7 +3495,7 @@ version gate must now read `1\.5`.
   linked. In `.rodata` it occurs twice in `p2q` (the version, and one literal the compiler
   shares), not three times as `MK10` said; the symbol table holds it a fifth time, as the
   file symbol `rtl819x-nic.c`; 1.5 adds `rtl819x-nic-tx`. `MK10`'s prose now names all
-  five; the witness is the owner's to change.
+  five; the witness is the owner's to change. 🔄 2026-09-27: `MK6`, `MK7` and `MK9` cannot fail either, through `/bin/mfgtest`'s text, and on the quiet image `MK10` can (`notes/switch-driver.md` § 12.8).
 
 ### 23.4 The reviews' findings, as the code cites them
 
@@ -3647,9 +3647,9 @@ as well as by the clock, so a sleep that returned early could not raise it.
   `rtl819x_sw_any_link()` computes.
 * The `eth4` prediction (122 on all three) holds while the vendor tree is in
   the image; after `R6b-8` it becomes 19.
-* 1.5's source comment at `:122` still says 1.3 added *"get_drvinfo +
-  get_link"*; it also added `get_ringparam`. The fix changes no object byte
-  and is deferred to a commit that touches `rtl819x-nic.c` anyway.
+* 1.5's source comment at `:122` said 1.3 added *"get_drvinfo + get_link"*;
+  it also added `get_ringparam`. 🔄 2026-09-27: fixed in place, landed with
+  8c-code; it moved no store (`storeseq`, `notes/switch-driver.md` § 12.8).
 
 ## 25 Block 47 (`R6b-3`, card 1) — the fix A/B on one boot: the vendor's lengths clean over every swept length, 1.4 faulting beside them, and one rule left standing
 

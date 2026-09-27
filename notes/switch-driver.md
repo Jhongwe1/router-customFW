@@ -1599,7 +1599,406 @@ and found two errors in how it was stated; neither changes a name set.
   `rtl865x_proc_debug.o`, so the 6 and the 7 stand.
 
 Both are fixed where they stand, in § 8.14 and in `SPEC.md` `NET-42`.
-🔄 **Carried: `tools/imgprocs.py`'s comment above `SHARED` states both**
-(*667 compiled objects searched*; `arp` from `arp.o, x_tables.o`, `ip` from
-`x_tables.o`). It stays as it is until seating 43 has run, because a card may
-pin the tool by digest, and is corrected after it.
+🔄 **2026-09-27: `tools/imgprocs.py`'s comment above `SHARED` is corrected**
+with 8c-code's landing (§ 12.7). It said *667 compiled objects searched* and
+named only the `.rodata`/`.data` carriers of `arp` and `ip`, and it waited for
+seating 43 in case a card pinned the tool by digest; none of the three did.
+
+# 12. 2026-09-27 (`R6b-8` 8c-code) — `rtl819x-view` 1.0: a `/proc` node that only loads, admitted word by word
+
+## 12.1 Why, and why a file of its own
+
+8c-cells reads the MIB, the VLAN and netif tables and a set of switch
+registers on this die before `asicCounter` leaves the image (8g), and the step
+row asks for each instrument to be shown refusing and permitting before it
+runs. rlxfw has to do those reads without writing anything. The page-0 MDIO
+read needs no new code: 1.3's `pread a 0 r` is one read and no write, with
+IRQs off, behind `mdio-i-mean-it` and `bound 10000` (讀, `mdiocheck` K10, K8
+and K2). Everything else is `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c`,
+`rtl819x-view` 1.0, 709 lines. `SPEC.md` `NET-138`.
+
+It is a file of its own and not a 1.4 of `rtl819x-switch.c` (decision D1).
+Seating 43's third press, card C, pins HEAD's `rtl819x-switch.c` and
+`tools/mdiocheck.py` by sha256 (讀, the draft's `drv-head-is-cell` and
+`sha-mdiocheck` rows), and `mdiocheck` cuts that driver from its 1.3 banner to
+the end of the file, so a block appended there would enter its harness. The
+new file shares no code and no symbol with `rtl819x-switch`, which keeps its
+own read path, its `PSRP` bookkeeping and its MDIO gate.
+
+## 12.2 The node
+
+`/proc/rtl819x-view` (0644) is created at `device_initcall`. The boot loads
+nothing and prints nothing unless the creation fails (`RLXFW-VW0-NOPROC`).
+Three verbs are written to it:
+
+```
+mib              the 225 MIB words of ports 0-6, one load each
+tbl vlan|netif   the VLAN table's 16 slots, or the netif table's 8
+peek A [n]       n words (1-16, default 1) from the KSEG1 address A
+```
+
+A `cat` prints the cached result of the last verb that loaded anything, and
+loads nothing itself, so one `cat` rendering twice (`FW-64`) costs no load.
+The page is five header lines (`version rtl819x-view 1.0`, `admit 298`,
+`last` with that verb's jiffies and rc, the counters `n_mib n_tbl n_peek
+refused busy ld`, and `ref`, the last refused word and its reason), the
+result, and `jiffies` as the terminator. `ld` counts every load the file
+makes: `rtl819x_view_ld()` is its only load, and **it has no store accessor
+at all**, so there is no unlock. The parser is 1.3's strict one — a field
+starts with a digit, one space between fields, nothing after the last — with
+a 10-character cap per field. A ten-digit decimal above 4294967295 still wraps
+modulo 2³² on this kernel; the admission check sees the wrapped word and the
+page prints it, so a wrap can reach only an admitted word, under its own
+address. `#error` under `CONFIG_SMP` or `CONFIG_PREEMPT`, as 1.2's counters.
+
+Walked from the formats with every field at its widest: the header is at most
+193 bytes, the widest result (`mib`) 2,231, the trailer 19, so a page is at
+most 2,443 bytes; the widest real page is 2,441 (`last mib`). The 3,900-byte
+budget cannot fire at these widths. `viewcheck` V14 measures all four figures
+against the driver's comment. The page format, its 21 `sprintf` literals and
+what `viewdecode` refuses were frozen for the decoder by the file's sha256,
+`68ec4f21…` (session material, not in this repository); the source owns the
+format, and a changed literal is a version change.
+
+## 12.3 The admission table: 298 words, and the one word the rule turns on
+
+**The rule** (decision D2): a word is loaded only if it lies inside one of four
+named blocks **and** two of three sources place it — B, the header the build
+compiles (`drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h`, sha256
+`e29c3051…`, 3,537 lines); D, the draft datasheet; and 量, a value this die
+printed for the word in a capture committed under `bench/`: a loader `DW`
+dump, or, for the MIB, the vendor's `/proc/rtl865x/asicCounter` dump.
+`CLAUDE.md`'s rule for a register value entering code, applied to an address
+entering a read path.
+
+| block | words | what (B's names) | second source |
+|---|---:|---|---|
+| switch `0xBB804000`–`0xBB804FFF` | 54 | `MACCR`…`PMCR`; `BSCR`; `PITCR`, `PCRP0`–`PCRP8`; `P0GMIICR`, `P5GMIICR`; `CVIDR`, `SSIR`, `CRMR`, `BISTCR`; `MEMCR`, `BISTTSDR0`–`3`; `LEDCREG`, `LEDCR1`, `LEDBCR`; `TEACR`…`MGFCR_E0R2`; `VCR0`, `VCR1`, `PVCR0`–`PVCR4`, `PBVCR0`; `SWTACR`, `SWTASR`, `SWTAA`; `TCR7` | loader `DW` dumps, or D Tables 57, 60–62, 67–70 |
+| MIB `0xBB801000` | 225 | the 32 words per port `rtl865xC_dumpAsicDiagCounter` reads, ports 0–6, and `CpuEvent` at `0x084`: 7 × 32 + 1 | the vendor's `asicCounter` dump |
+| CPU interface `0xB8010000` | 17 | `CPUICR` … `CPUQDM4`/`5` (`0x00`–`0x38`), `CPUTPDCR2`, `CPUTPDCR3` (`0x60`, `0x64`) | `NET-48` (`DW B8010000 16` twice, `DW B8010060 4`) |
+| `PIN_MUX` | 2 | `PIN_MUX_SEL`, `PIN_MUX_SEL2` (`0xB8000040`, `0xB8000044`) | D Tables 35–36 |
+
+`PSRP0`–`PSRP8` (`0xBB804128`–`0xBB804148`) are refused with a reason of their
+own, `psrp`: bit 8 clears when read (B `:1328`, D Table 65, 量 `NET-11`), and
+`/proc/rtl819x-switch` 1.2 already reads them and keeps what it consumes.
+Everything else is refused **before any load, the whole request with it**:
+`peek A n` checks all n words first. Flash (`0xBD000000`–`0xBD3FFFFF` and
+`0xBFC00000` up) lies in no block, so `H601` cannot reach a capture through
+this node. The admission is by exact KSEG1 address, so a KSEG0 alias of an
+admitted register and its physical address are refused like any other word.
+Out of the MIB: `MIB_CONTROL` at `0x000` (a write restarts the counters, and it
+is not read either), the five B-only words per port the vendor's dump does not
+read (`0x10C`, `0x110`, `0x814`, `0x828`, `0x830`), and ports 7–8. Out of the
+CPU interface: `0x3C`, `0x68`, `0x6C` (a reading, no name) and `0x40`/`0x44`
+(`DMA_CR1`/`2`, B only).
+
+**The MIB's 量** is the vendor's dump of exactly these words in 266 committed
+`.log` captures at `8520b6c` (291 files hold the string `CpuEvent`), equal to
+the netdev's own counts byte for byte (`NET-46`) and cumulative across 76 reads
+(`notes/nic-driver.md` § 26). For the 28 words of the 14 byte-counter pairs
+(`ifInOctets` and `ifOutOctets`, lo and hi, on seven ports) the dump prints
+only `lo + (hi << 22)`, so their 量 is of that sum and not of each word. D has
+no MIB section.
+
+**The second source for the table itself** (the proposal's R5: driver and
+harness are two copies of one transcription and agree by construction) is a
+census that shares no code with either, in the session's scratch area
+(`$FWRE_WORK/rebuild/s114/r6b8c/census/`): B parsed with the build's defines
+(`-D CONFIG_RTL_8196E -D CONFIG_RTL_819X`), D's extract parsed for register
+placements (41 placements, 27 distinct addresses in the four blocks), and every
+loader `DW` and every vendor-memory read committed under `bench/` at `8520b6c`
+(11,410 files; 692 `DW` commands, 71 memory-node reads). Counted with **any**
+reading as 量, it admits **299**; the one difference is `0xBB804500`. Counted
+with 量 limited to `DW` dumps and the `asicCounter` dump, it reproduces the
+table's **298** exactly (its control C7) — no word the table lacks and none it
+has that the census does not place. The review's sweep of the compiled driver
+(40,960 `peek` requests in a model where every word of the four blocks can be
+loaded) found the same single difference and no other.
+
+**`0xBB804500`**, `SBFCTR`/`SBFCR0` in B (`:1673`–`:1674`, *System Based Flow
+Control Threshold Register*), printed `000000F4` on each of the three reads
+this repository holds, all through the vendor's `/proc/rtl865x/memory`
+(`bench/2026-09-21b/B5-REGc`, `B5-REGc2`, `D2-REGa-a2`; the first shares its
+command line with a corrupted read of another word and was counted from its
+own clean line). D does not place it. 1.0 refuses it because its 量 does not
+count a memory-node read; the driver's comment says so and names the word.
+Whether it is admitted in a later version is open: B and a memory-node reading
+are two of `CLAUDE.md`'s three source kinds (the header and a `devmem`-class
+read), and the narrower 量 1.0 applies is the table's own convention, not a
+repository rule. The one-source words (`QNUMCR`, `CSCR`, `EEECR`, `IBCR0`–`2`,
+`WFQRCRPn` and the rest) are 8d's to admit once 8c-cells has read them another
+way. `SPEC.md` `NET-139`.
+
+## 12.4 The table read, and the premise of `NET-28` 殘留 it refutes
+
+讀 `_rtl8651_readAsicEntry`
+(`drivers/net/rtl819x/AsicDriver/96E/rtl865x_asicBasic.S:1043-1215`), the
+reader the vendor's VLAN and netif getters call. It first asks
+`rtl865x_accessAsicTable` (`:531-617`) whether the table may be read, and for
+types 4 (netif) and 6 (VLAN) the answer is yes whatever the ASIC function
+word holds: neither type's bit is in its three masks (`0xe22`, `0x8`,
+`0x4000`). It then loads `SWTACR` (`0xBB804D00`) until bit 0,
+`ACTION_START`, reads clear, with no bound, and then, up to ten times
+(`li $16,10`), loads the slot's eight words at `0xBB000000 + (type << 16) +
+(slot << 5)` into a first buffer and the same eight into a second and compares
+them. Equal ends the tries; after ten unequal ones it copies the second buffer
+out and returns success. **It stores nothing.** The `StopTLU` variant (`:1216`
+on), which sets `EN_STOP_TLU` in `SWTCR0`, has no caller in
+`drivers/net/rtl819x/` (讀, a grep over its `.c` and `.h`: one declaration in
+`rtl865x_asicBasic.h`, no call).
+
+`tbl` copies that reader with the `SWTACR` wait bounded at 10,000 polls,
+`udelay(1)` apart (1.3's MDIO bound): past it, `-EBUSY` with the slot named and
+no table load after it. It prints the second buffer, the number of tries, and
+`eq` or `mis`. Base, types and slot counts are B's (`REAL_SWTBL_BASE` `:151`;
+`TYPE_NETINTERFACE_TABLE` 4 and `TYPE_VLAN_TABLE` 6 in `rtl865x_asicBasic.h`;
+16 VLAN slots under `CONFIG_RTL_8196E` and 8 netifs in `rtl865x_asicCom.h`),
+the stride is the reader's `sll $2,$18,5`, and D has no table section. 量:
+`SWTAA` reads `BB060100` at the loader prompt (`NET-28`) and `BB040020` under
+Linux on the vendor-present image (`NET-34`), both inside these windows on
+slot boundaries. ⚠️ `rtl8651_getAsicVlan` reads index = vid
+(`rtl865x_asicCom.c:146`) while the vendor's writer searches for a free slot,
+so a slot number here is not a VID, and the decoder never takes one for the
+other.
+
+**`NET-28` 殘留's settling cell rested on a false premise.** It read *the same
+boot reads `SWTAA` and `0x4D48` before and after 8c's table-read verb changes
+`SWTAA`*. Neither the vendor's reader nor `tbl` writes `SWTAA`, so no table read
+can move it. The two states this die has already been read in do differ:
+`SWTAA` is `BB060100` at the loader, where `0x4D48` reads the same value (量,
+block 24), and `BB040020` under Linux (量, `NET-34`). One boot that reads both
+words at the loader prompt and again under Linux therefore decides whether
+`0x4D48` follows `SWTAA` (推: it is a mirror of it). `0x4D48` has one source —
+a reading, no name in B's live branch, none in D — so `peek` refuses it, and its
+Linux-side read goes through the vendor's `/proc/rtl865x/memory`, bounded by
+`cardcheck`'s HW-1 (§ 12.7): `read 0xBB804D48 4` loads `0xBB804D48` to
+`0xBB804D58`. The § 17 row is reworded to that cell. Its other half stands:
+`PLITIMR` (`0xBB804420`) is admitted, so 8c-cells reads it on the vendor boot
+with `peek` and compares it with the loader's `07FAC688`.
+
+## 12.5 `NET-134` 殘留 changes instrument for `QNUMCR`
+
+`NET-134` 殘留's cell read `0xBB804754` (`QNUMCR`) and `0xBB804300` (`LEDCREG`)
+at the loader prompt and again on the vendor boot *with `peek`*. `LEDCREG` is
+admitted (B, and D Tables 67–70), so `peek` reads it. `QNUMCR` has one source,
+B, so `peek` refuses it before any load; its vendor-boot read goes through the
+vendor's `/proc/rtl865x/memory` (`read 0xBB804754 4`, which loads
+`0xBB804754` to `0xBB804764`, inside HW-1's switch window and touching no
+refused word). The loader half is unchanged. The § 17 row is reworded to say
+so; the rule that a value enters code only on two sources is unchanged.
+
+## 12.6 The vendor's `/proc/rtl865x/memory` loads five words for every line it prints
+
+讀 `drivers/net/rtl819x/rtl865x_proc_debug.c` as this image builds it
+(`CONFIG_RTL_DEBUG_TOOL=y`, `CONFIG_RTL_PROC_DEBUG` unset). `proc_mem_write`
+(`:4115-4178`) hands `read ADDR LEN` to `memDump(ADDR, LEN)` (`:115`) and
+`write ADDR DATA` to a store of that word followed by a load of it, each number
+through `simple_strtol` with base 0 and neither bounded. `memDump` prints
+LEN/16 + 1 lines of up to 16 bytes (`:131`–`:132`) and, for every line, **loads
+five words**, `(line & ~3) + 0, 4, 8, 12, 16` (`:139`–`:143`), before its
+`max == 0` break (`:150`). So `read A 4` loads `A` to `A + 16` — five words —
+and prints one; `read A 16` makes ten loads over `A` to `A + 32` and prints
+four. The `4` a card types is a byte count: `NET-33` measured that it prints one
+word. A memory-node read is therefore never a one-word read, and what bounds it
+is its footprint, not LEN. One more thing the same reading found: the handler
+refuses `len > 64` and then writes `tmpbuf[len] = '\0'` into a 64-byte buffer,
+so a 64-byte write stores one byte past it (讀; no card sends one, and HW-1's
+longest form is 28 bytes). `SPEC.md` `NET-139`.
+
+## 12.7 The host tools
+
+**`tools/viewcheck.py`** cuts `rtl819x-view.c` below its includes, unchanged,
+and compiles it with the host gcc in the kernel's dialect (`-std=gnu89
+-Werror`) inside a generated harness: a sparse MMIO model in which each of the
+298 admitted words and the 192 table words has a value and a load counter, and
+**any store, or a load of any other address, ends the harness with exit 9**,
+so a refusal before the load is observable. The model's word list is written
+from the proposal's table, not from the driver. V0–V17, 18 cases: every verb
+refused and permitted beside its twin, every word of the four blocks, the
+`SWTACR` bound at slot 5 and at slot 0, a torn slot, a `cat` that loads
+nothing, the widest page, the strict parser and its wrap. M0 runs the unmutated
+cut through the mutation path; M1–M25 each turn the case named for them red.
+V17 and M23–M25 came from the review: the three resets at the top of
+`rtl819x_view_tbl` survived V0–V16 when deleted, because V7 stops at slot 5,
+after slots 0–4 have rewritten every per-slot field. 44 lines, a CI step in the
+`instruments` job and its `tools/ci-expected.tsv` row. What it cannot see is
+the silicon, and its model shares the table's sources.
+
+**`tools/viewdecode.py`** decodes `/proc/rtl819x-view` pages (every word named
+from B, with D's name beside it where D's differs), renders the vendor's
+`asicCounter` text from a `mib` page's raw words with the vendor's
+`lo + (hi << 22)` (`rtl865x_asicCom.c:1506`, one source), and brackets a view
+read between two counter readings (`before <= view <= after` for each of the
+211 counters the vendor prints). Its self-test is 22 cases — A1, A2, B1–B4,
+C1, C2, D1, D2, E1–E12 — M0 and M1–M10: 33 lines, a CI step and its row. B1
+requires the driver's 21 `sprintf` literals verbatim; B3 decodes the pages
+`viewcheck`'s harness gets from the compiled driver. **A1 is a finding.** The
+proposal expected every committed `asicCounter` capture to re-render byte for
+byte; at `8520b6c`, 231 of the 266 cannot — 23 are clean, 12 carry printk
+times, 231 are interleaved with other console output (one foreign character in
+front of each of their lines; traced in one capture to `cat`'s tty output of
+`/proc/rtl819x-nic` draining between printks) and 0 are cut by the capture's
+end. The parser refuses the interleaved ones, and a self-test-only reader finds
+all 86 lines behind the foreign characters. On this landing's base, `558bd4e`,
+with seating 43's captures in, it reads 342: 23 clean, 12 printk-timed, 307
+interleaved, 0 cut. A cut shape (floor 0) exists so that one capture ended by a
+`--seconds` cap cannot hold the step red for good (A2 is its positive control,
+M9 and M10 its mutants). The names, the VLAN and netif field layouts and the
+`<< 22` rest on B alone.
+
+**`tools/mkinitramfs.py` 1.2**: `build --init FILE` replaces the source of the
+declaration's one `/init` row and nothing else (decision D6: no second
+declaration, which would be a second owner of the file list). It refuses a
+file that is not tracked under `config/`, differs from the index, is not
+`100755` there, or whose first command is not the rung-1 `echo`, because the
+kernel falls through to `/bin/sh` when `/init` cannot be executed and on the
+quiet console that is a shell with nothing saying why. Without `--init`, 1.2
+emits a spec and manifest byte-identical to 1.1's. Controls 34 → 43 (I1–I9),
+`test-mkinitramfs-mutants` 12 → 27 lines (M11–M25). `notes/kernel-build.md`
+§ 9's count, which still read 23, now reads 43. `config/rlxfw-init-quiet.sh`,
+1,859 bytes, sha256 `fd78c441…`, is `config/rlxfw-init.sh` (2,153 bytes)
+without its LAN block: the rung-1 line, the two mounts and `exec /bin/sh`. It
+opens no interface and writes to no `/proc` node, so `eth4` can be the first
+interface opened after power (`NET-25`'s NB-1), and it names no driver's node,
+so no marks witness can be met by its text (`FW-143`). **`RECIPE_ID` cannot
+tell an image built with `--init` from one built without it from the same
+tree** (讀: both `/init` files are always under `config/`, which is all the id
+digests) — `FW-99`'s second instance; the image sha256 and the boot capture
+can.
+
+**`tools/cardcheck.py`, HW-1**: rtl819x-view refuses flash and `PSRP` for
+itself, but 8c-cells reaches one-source words (D5) and makes its one write (D4)
+through the vendor's memory node, which bounds nothing (§ 12.6), and no tool
+screened what a card sends it. One form per simple command, `echo read 0xADDR
+LEN` (LEN a decimal 1–256) or `echo write 0xADDR 0xDATA` into the node; a
+read's whole footprint must lie in one register window and touch no `PSRP` word
+and not `0xBB804600`; a flash alias is refused naming `flashwin`'s region; a
+write must lie in a write window and be declared in the card's `memwrite`
+fence. Measured before the rule was written: 31 committed sends name the node,
+and 5 distinct (card, payload) pairs on three frozen cards are refused; those
+three are excused by that exact pair, and B15 sweeps the list both ways.
+`cardcheck` 63 → 70 cases (A50–A55, B15), `test-cardcheck-mutants` 59 → 70
+(M60–M70). On `558bd4e` B15 sweeps 94 cards and still finds 31 sends and the
+same 5: seating 43's two frozen cards send nothing to the node. What it cannot
+see: a command outside a single-quoted `--send`, and what a permitted word does
+when it is loaded.
+
+**`tools/imgprocs.py` 1.3 and `tools/ethcensus.py`**: rtl819x-view names its
+two tables `vlan` and `netif`, which are also two of the vendor's
+`/proc/rtl865x/` names. On an 8c image `imgprocs` read 15 of 42 PRESENT
+against `r6b7q`'s 13 and called the two the vendor's — the evidence `NET-42`'s
+*no `/proc/rtl865x/vlan`* would be misread against — and `ethcensus population`
+on the 8c tree `r6b8cq` REFUSED, deriving 9 shared names where
+`imgprocs.SHARED` lists 7. 1.3's `OWN_LITERALS` maps each of the two to the one
+rlxfw object that carries it, `rtl819x-view.o`, prints them as rlxfw's and
+counts them apart (I12; the self-test is 17 lines), and `ethcensus` drops a
+shared name only when every carrier outside its scope is that object. Measured
+at this landing, with the landed tools: `population` on `r6b8cr`'s tree exits 0,
+prints *rlxfw's own literals: netif vlan* and agrees with `SHARED`, and its 899
+names are the committed fixture's; on `r6b6q2` it reproduces
+`tools/ethcensus-population.txt` byte for byte; a scratch copy with `vlan`'s
+carrier renamed `rtl819x-switch.o` REFUSES on `r6b8cr`, and the unmutated
+scratch copy through the same path does not. `NET-42`'s *no
+`/proc/rtl865x/vlan`* still stands on the device's own `ls`, which neither
+tool replaces.
+
+**§ 11.7's carried item is done**: `tools/imgprocs.py`'s comment above `SHARED`
+and its docstring now say 634 objects with content (594 leaves and 40 archive
+members, not 667), and that `arp` and `ip` have a third carrier,
+`usr/initramfs_data.o`'s `.init.ramfs`, which that `.rodata`/`.data` search did
+not read. It had waited for seating 43 because a card might pin the tool by
+digest; none of seating 43's three cards does (讀, their text). `SPEC.md`
+`FW-148`.
+
+## 12.8 The images, and what the build read
+
+`r6b8cr` and `r6b8cr2`, the quiet variant, `rlxfw-kbuild.sh --variant quiet
+--initramfs _irfs-r6b8c spec --marks --jobs 4` then `rtkimage.py build`, each
+from a fresh stage, one at a time; `_irfs-r6b8c` is `mkinitramfs build --init
+config/rlxfw-init-quiet.sh`. Every figure below was read at the desk on
+2026-09-27 out of the build artefacts by an instrument, and none on the device.
+
+| what | value |
+|---|---|
+| recipe | `527e683b` (both manifests) |
+| `vmlinux` | `d57b02e2…`, 4,564,761 bytes; `cmp` rc 0 between the two |
+| `nfjrom` | `a6c9c818…`, 1,171,456 bytes; `cmp` rc 0 |
+| flat image (`vmlinux_img`) | `921f681d…`, 4,035,072 bytes, 76.963 % of the 5,242,880-byte ceiling (`FW-23`), margin 1,207,808 |
+| manifests | differ in `cell` only |
+| the image's `/init` | `config/rlxfw-init-quiet.sh`, 1,859 bytes, `fd78c441…` (both initramfs manifests; `r6b7q`'s is `config/rlxfw-init.sh`, `ef2c8797…`) |
+| `(NEW)` in `oldconfig` | 0 and 0 |
+| `kconfig-delta check` | green, 30 derived and 74 set — `r6b7q`'s |
+| `rlxfw-marks verify` | 12 marks, 10 witnesses, 1 ABSENT; `MK11`'s `str:rtl819x-view` 3 times in each image (`mine:3`), 0 in the two vendor artefacts |
+| `storeseq r6b7q → r6b8cr` | GREEN on the seven NIC functions: the `rtl819x-nic.c:122` comment moved no store |
+| `hazlint` | 0 violations in 115,786 loads (`r6b7q`: 0 in 115,650) |
+| build warnings | 162 in each log, the same lines as `r6b7q`'s; none from `rtl819x-view.c` |
+| `imgprocs` | 15 of 42 PRESENT, 7 shared and 2 rlxfw's; `--witness rtl819x-view` found once, and refused on `r6b7q` (rc 2) |
+| `ethcensus check` | RED on all three, the vendor-present positive control: object 22 of 631 leaves, symbol 898 of 899, string 6 of 6; the tree's `rtkload/vmlinux_img` (the drop's kernel, `48b1a171…`) refused |
+
+**The size grew by alignment, not by the driver.** `r6b7q`'s flat image is
+4,002,304 bytes; `r6b8cr`'s is 32,768 more. The driver's own loadable bytes
+are 4,764 (`size`: text 4,768, which counts its 24-byte `.reginfo`, and data
+20). `.text` grew by 3,924 bytes, its five functions, which took `__ex_table`'s
+end past `0x8027C000`, so `.iram`, which starts on a 16 KB boundary, moved
+from `0x8027C000` to `0x80280000`. The stretch from `.iram` to the end of
+`__param`, which ends on a 4 KB boundary, then grew by one 4 KB step and ended
+past `0x802B0000`, so the 32 KB-aligned `.data` moved from `0x802B0000` to
+`0x802B8000`, and `__init_end` with it, from `0x803D2000` to `0x803DA000`. The
+quiet `/init` is 294 bytes shorter than the standard one and `.init.ramfs` is
+`0xE4200` bytes in both images. The proposal's guess, at most 76.6 %, priced
+the driver's bytes and not the linker's steps; `FW-147` recorded the same
+lesson for 1.3.
+
+**`config/` is what the images were built from.** `git diff 92eb9b6` against
+this landing's tree is empty under `config/`, and the landing's own
+`RECIPE_ID` derivation (`find config -type f`, sorted, digested, as
+`rlxfw-kbuild.sh` computes it) prints `527e683b`, so `r6b8cr` is this
+commit's image.
+
+**Four marks witnesses cannot fail, not one.** `FW-143` found that `MK10`'s
+`str:rtl819x-nic` is met by the standard `/init`'s own text in `.init.ramfs`.
+The same whole-file search finds three more in `/bin/mfgtest`, declared in the
+initramfs since `P1-1` and packed in `r6b7q` and `r6b8cr` alike (the same
+sha256, `d954de73…`): `config/mfgtest.sh` holds `rtl819x-switch` 4 times,
+`rtl819x-wdt` twice and `n150rt:green:led2` once, so `MK9`'s, `MK6`'s and
+`MK7`'s witnesses are met without their drivers. Counted over the two ELF files
+(the whole-file search `FW-143` marks 量): `rtl819x-switch` 9 times in `r6b7q`
+and 7 in `r6b8cr` (the standard `/init`'s
+two are gone), `rtl819x-nic` 6 and 4, `rtl819x-wdt` 6 and 6,
+`n150rt:green:led2` 2 and 2. On the quiet image `MK10` can fail again — its 4
+are the driver's own — and only there. A witness is a gate, so changing one
+is the owner's (`FW-143`).
+
+## 12.9 The review, and the landing
+
+The implementation went through an adversarial review in three lenses
+(hardware, hygiene, a judge) before these images were built; what it changed
+is in the code and above: `viewcheck`'s V17, `viewdecode`'s cut shape,
+`cardcheck`'s HW-1, `imgprocs` 1.3 and `ethcensus`'s own-literal rule, and the
+driver comment's statement of which 量 the table applies (§ 12.3), a comment
+change that moved `RECIPE_ID` and so rebuilt both images. It lands with
+`R6b-6`'s `rtl819x-nic.c:122` comment (`notes/nic-driver.md` § 24.4), rebased
+without a conflict onto seating 43's captures; the vendor files this reading
+opened are `docs/blind-write-ledger.md` § 9.8.
+
+## 12.10 What 8c-code does not establish
+
+* Anything on the silicon: not one line of the file has run. How long `SWTACR`
+  stays busy, whether a slot tears, what `tbl` reads on the die against what
+  the vendor's reader reads, and the view's page on a real boot are 8c-cells'.
+* That the 298 words are free of read side effects: none is known (推), and
+  which of them were read on this die before is the table's sources column.
+  Five were never read here — `BSCR` (`0x4044`), `PCRP8` (`0x4124`), `LEDCREG`,
+  `LEDCR1` and `LEDBCR` — and the `PIN_MUX` pair has no reading at all.
+* That a `mib` read clears nothing. The vendor's dump of the same words was
+  cumulative across 76 reads (§ 12.3), so 推 it does not, and 8c-cells'
+  brackets read it. Nor that a byte-counter pair cannot tear across a carry
+  between its two loads (推 it can, and nothing here would tell), nor what
+  `<< 22` means (B alone; `asicCounter` agreeing with the decoder shows the
+  decoder copies the vendor, not that the formula is right).
+* That the quiet `/init`'s boot capture falls in `bootbytes`' 710 class (推):
+  nothing was booted.
+* Whether `0xBB804500` is admitted (§ 12.3), and anything about a one-source
+  word.
+* A second copy of the admission table: the census is a second source by
+  counts, and `admit 298` on the page is a count, not a list.
