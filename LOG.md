@@ -33245,3 +33245,61 @@ gate，就是產出了一個可以動的驅動而已」*。**量：`dma_alloc_co
 ### 七、不確立、與下一段
 
 - block 49 與 50 都還沒讀；卡片 C 未凍結（要先對齊 A、B 的握手、catch、關電窗、hold、SIGINT，並吃進 block 50 的教訓）；8c-code 未落地；`R6b-9` 的 D1、D2 草稿在 `$FWRE_WORK/rebuild/s114/r6b9/D1-D2.md`（它指出 M3 的後果沒被讀、D2 的「fixed image」其實是打字的 `txlen vendor` 等，給 `R6b-9` 裁）。這一段沒寫 study 檔，留給下一段。
+
+## 2026-09-27 — 第一百一十五段（16:56 開場，跨日到 2026-09-28 約 03:30，**十二次開電**：卡片 C 17:52–17:56；待機 18:01–23:38；`NET-25` 十次冷開機 23:38–23:55）：擁有者為 `R6b` 撤掉凍結與預測；seating 43 三個 block 讀完、`R6b-3`／`R6b-4`／`R6b-6`／`R6b-7` 關；8c-code、8b、驅動 1.6 落地，`R6b-10` 關；`NET-25` 十次 10 of 10 關；arm II 在沒有原廠乙太網路程式碼的映像上雙向 ping 通；`D8` 還差 arm I
+
+交接 `plan/handoff-s114.md`。開場量 repo：HEAD `558bd4e`、乾淨；`LOG.md` 最後一條第一百一十四段；study 最後 `20260926-study1.md`（114 沒寫）；沒有 `C:` 空樹；`citime check` 9 missing（這段沒補）；`gh run list`：`255af14` 綠、`558bd4e` 在跑（後來綠）。與交接相符。
+
+### 〇、擁有者的新規則（只限 `R6b`）
+
+- 擁有者：這個 gate 坐太久、超過心中的停損段數，但仍要把該測的、該做的功能做出來；**從現在起只在 `R6b`：不必凍結、不一定要預測、可以一邊做一邊測**。上機仍是「在主 session 講 → 停 → 回覆只授權 → 開 catch／esc 窗 → 說『現在…，最晚 HH:MM:SS』」。我的讀法（記在記憶 `rlxfw-r6b-relaxed`）：flash 的禁令（`FLW`／`EW`／`EB`／非零 `AUTOBURN`、`0x0–0x7FFF`、`H601`）是擋磚不是流程，照舊，flash 動詞的拒絕仍由 `cardcheck` 守。
+
+### 一、seating 43 的 block 49、50：兩個讀者＋裁判＋批評（`6fd0749`）
+
+- 讀者 A 由卡片出發（78 條預測），讀者 B 由擷取出發（45 項 59 列），實質一致。裁判：P2 的 loader 那一半是一個 量 值（`PSRP3` = `000010E0`、bit 8 清）但照卡片規則記 unmeasured；① 的寬度照卡片規則是 0.125265 s，判決不依賴它；`NET-117` 的每個資料報 1,832 B 有第二來源（`RTL_PRIV_DATA_SIZE` 128），佇列容量 63；port 3 的 PAUSE 計數核實；「ESC 只有每秒 48 個」被推翻（BEL:ESC 是 1:2）；`M8` 在 block 46 有觸發，所以 `NET-67` 殘留在修正之後仍開著。
+- 批評：`1472|mdev` 的散佈量出來（CV 約 19 %），但 `NET-121` 的 mdev 那一半逐日變大（0.476 → 0.555 → 0.588–0.733），兩個驅動都是 → 記 量、原因未定；`LUS1` 的窗裡是兩個 TCP segment 不是一個。
+- 我的裁決：`1472|mdev` ⊘（照批評的理由），`D5` 的 rtt 部分帶這個 ⊘ 關（擁有者可推翻）；新增 `R6b-10`（修正設成預設）接走 `NET-67`／`NET-78` 殘留。寫手讀到 `nic15_armed()` 在 dirty 的重新 arm 時把四個 TX 長度清零，「78 B 那一框是重新 arm 後第二框」成為 量＋讀，推翻批評的 推，我接受。
+- 落地：`notes/nic-driver.md` § 28、`notes/switch-driver.md` § 14、`NET-140`–`NET-149`、`CLK-49`、`FW-149`–`FW-151`、晚寫的 `CORRECTIONS-block49.md`、`CORRECTIONS-block51.md`；**`R6b-3`、`R6b-4`、`R6b-6`、`R6b-7` 關**；`R6b-10` 插在 `R6b-9` 之後，下面用合併換行補回行號（`FW-110`）。
+
+### 二、卡片 C（B53，`R6b-7` 在 `r6b7q`）= block 51（`1b7c1fd`、`fb4226d`）
+
+- prep 代理把執行器對齊卡片 A、B（catch 形式、`X-OFF` 窗、90 s hold、SIGINT shim）並吃進 block 50 的教訓（修正設成一格帶 gate）。`runblock` 拒絕沒提交的卡片，所以卡片照舊提交（不做凍結儀式）。上電前 `wsl --shutdown`（先讓 8c 落地代理停在安全點）。
+- 按壓：catch 17:51:51、開電約 17:52:01、十二段 invocation 全 rc 0、沒有停止；`X-OFF1` 內斷電 17:56:44。讀（一個讀者＋我抽查原始行）：**`D7` 成立**（位址 0–4 的 PHY ID 經 Linux MDIO API、loader、原廠 `phyReg` 三來源都是 `001C`/`C880`），`C-18` 維持 ⊘（五顆 PHY page-1 reg 19 都是 `0x7380`），`NET-08` 在 5–31 讀 `0x0000`，`NET-136` 的契約回答了；卡片兩處寫錯，裁定不觸發。
+- 擁有者問：關電為什麼也要 esc 窗、我們的韌體不是能自己 reboot —— 答：關電窗是防護＋記錄斷電時刻；之後凡不需要冷開機的格子一律 `busybox reboot -f`＋catch 接續，只有冷開機要他動手。
+
+### 三、`R6b-8`：8c-code、8b、`NET-25` 的修訂、8c-cells（`95dabac`、`9107b20`、`4defd04`）
+
+- 8c-code 落地：`rtl819x-view` 1.0、`viewcheck`／`viewdecode`、`mkinitramfs --init`、`rtl819x-nic.c:122` 的註解（`R6b-6` 最後一項）；`0xBB804500` 在 1.0 不收。一次 fast-forward 撞到 Windows git 的暫時 `index.lock`，重試成功。
+- 8b 落地：`SWCORE=n` 成為 `quiet-noswcore` 變體；設計錯了一處（三個巨集在 `CONFIG_RTL_LAYERED_DRIVER` 底下 → `host-compat/0008`）；連結器的清單正好十個、四處（`nm` 同意）；接縫 `rlxfw-seam.c` 補上十個並在 `bsp_setup` 做原廠 probe 的 DMA disarm（我接受：只清致能位元）；`sk_buff` 200 → 192；`0x8040FC70` 在 n 上是 WLAN 的 `obj_buf`；`ethcensus` 在 n 上 GREEN。`rtl819x-spi.o`／`main.o` 在 y 上的差異證明只有 recipe id 的 lui/ori。
+- `NET-25` 的協定照擁有者 2026-09-26 的裁定改成「每次**先**做 NB-1」，在它的卡片之前寫進 § 17。8c-cells 設計成 A 組（待機跑）與 B 組（十次冷開機），拿掉原廠 page-4 的讀（擁有者只准 page 0/1）。
+
+### 四、`R6b-10`：驅動 1.6（`ceefd90`）
+
+- `rtl819x-nic` 1.6 開機就是 `txlen vendor`（`.o` 與 1.5 只差兩個 byte）；`rtl819x-switch` 1.4 加 `phyif`（自己的 token＋switch 的 unlock；`EnablePHYIf` bit 0 兩來源：資料表 Table 64、`rtl865xc_asicregs.h:1258`；量 提示字元 `…39`、`J` 之後 `…38`）；`storeseq` 的 `DEFAULTS` 改成 1.6（1.6 綠、1.5 紅當控制）；`KNOWN-ISSUES` 的「預設仍是 1.4」拿掉。
+
+### 五、夜間上機（`2470d6f`、`402b068`）
+
+- **待機失敗**（`bench/2026-09-27d`）：擁有者 18:01 開電讓我之後自己用；20:09 A 組的 `A-L`（19 個 `DW`＋6 個 `MDIOR`）正常，`A-B` 的 `looprun` 停在 S5c：loader 接受 `IPCONFIG` 卻不回 ARP（主機 carrier 1），只能斷電。原因未定（久待 vs `A-L` 的讀）。規則：不再無人待機（`NET-165`、記憶）。
+- **`NET-25` 十次冷開機**（`2026-09-27e`…`n`，23:38–23:55）：十次都冷 catch、`looprun` 閉合 `527E683B`、NB-1 是第一個板子命令，**十次都 4 of 4、`eth4` RX 5** → 照它自己的規則關成「一次未重現的觀察」，0 of 10 把每次冷開機失敗率的單側 95 % 上界壓在 25.9 %（只對這顆映像與這條開機路徑）。`/proc/interrupts` 的 `ERR` 欄是 RX／TX／link 中斷的計數，不是錯誤數（`NET-157`）—— seating 12 的 `ERR 6` 是六個 TX 完成中斷。第十次照擁有者「我要現在」在工具的 23:52–00:00 拒絕窗內準備（`b8c-late.sh`，把窗移到 23:58），23:55:16 做完、沒跨午夜。
+- **午夜後同一次上電**（`bench/2026-09-28`）：A 組從 `A-B` 起全 rc 0 —— 三欄接管表（loader／原廠 init 後／`reset vendor` 後，`notes/switch-driver.md` § 16）、`M3` 的隔開臂十一種長度都 20／20（`NET-159`）、`ByPassTCRC` 得到事先寫的第三種結果（0 of 20、主機 CRC Δ 0，`NET-109` 殘留 ⊘ 帶理由）、`PLITIMR` 的 推「Linux 態是 0」被推翻；`R6b-10` 的回歸在預設、沒打動詞：E2 220／220、sweep 60–1,514 `JabberErr` Δ 0 → **`R6b-10` 關**，`NET-67`／`NET-78` 殘留帶 `M8` 自己的理由 ⊘。
+- **arm II**（`r6b10n`，`SWCORE=n`、`ethcensus` GREEN、`/proc/rtl865x` 不在）：寫入前主機 → 板子 0 of 4 兩次；拒絕控制 `refused 1`；`phyif all` 把 `PCRP0–4` 的 bit 0 設起來（五個 pre `…38` → rb `…39`）；之後主機 → 板子 4／4 兩次、板子 → 主機 4／4，四個計數一致，主機解析到 rlxfw 的本地管理位址。**`D8` 還沒成立**：它的字面把 `D8` 給 arm I（8d 的 `init`），arm II 是對照。`MSCR` 0x01 的條件：「到得了 CPU」有了、「怎麼到」未定。
+- 過程裡的偏離都在三份 `CORRECTIONS`：`R6b-10` 自己的 ARP gate 排在 `IPCONFIG` 之前（改名保留、送 `IPCONFIG` 後重跑）；arm II 的 `M5-REF` 的 `--until` 太嚴（被拒寫入的回顯夾在中間）→ 我用 `n-line2b` 從 `M5-UNL` 接續。
+
+### 六、`R6b-9`
+
+- D1/D2 草稿附錄的十一條裁完（`$FWRE_WORK/rebuild/s115/r6b9/RULINGS-D1D2.md`）；`M3` 的隔開臂今晚跑了、乾淨，交給 `R6b-9` 報告。
+
+### 七、我做錯的
+
+- **「console 沉默 89 秒」是我的儀器錯誤，撤回**：我從 Windows 看一個 WSL 正在寫的 `X-M2.log` 的大小，讀到 0；`X-M2.timing` 第 0.017 s 就有 byte、沒有超過 0.081 s 的空檔，板子 `jiffies` 以 100.00/s 前進（`FW-152`）。我在那之前還因此懷疑板子卡住。
+- **等午夜的背景迴圈把 `$(date +%F)` 內嵌在 `wsl` 參數裡**，啟動時就展開成 2026-09-27、永遠不成立；擁有者問「09-28 你的程式怎麼沒自動執行」才抓到。`CLAUDE.md` 早就寫了。
+- 一個等待條件用了 `refused`，匹配到正常輸出的 `refused 0` 而提早結束。
+- `R6b-10` 的 ARP gate 是我交代「上傳前先驗 ARP」，卻沒寫明 loader 要先收到 `IPCONFIG`（`NET-95`）；8c-cells 的代理有提醒，另一支沒有。
+
+### 八、下一段
+
+- 收 `R6b`：8d（`init` = `PCRP0–4` 設 `EnablePHYIf`、**不 reset**；VLAN 那一組整組沿用 loader 或整組接管、不要部分）→ arm I（8e／8f，一次冷開機之後用 `reboot -f` 接續）→ 8g（紀錄、移走儀器的列改指、mainline 翻 `SWCORE=n`）→ `R6b-9`（D1–D8 逐條、`docs/GATE-RESULTS.md`、關 gate 的全套檢查）。交接 `plan/handoff-s115.md`。
+- study：`study/20260927-study1.md`（114，補）、`study/20260927-study2.md`（115）。
+- 板子收工時停在 loader 提示字元（arm II 的 `MZ-RB` 之後），擁有者可以直接關電。
+
+commit：`1b7c1fd`、`fb4226d`、`95dabac`（8c-code 十個）、`9107b20`（8b 五個）、`4defd04`、`6fd0749`（兩個）、`ceefd90`（三個）、`2470d6f`、`402b068`（三個）、本條。
