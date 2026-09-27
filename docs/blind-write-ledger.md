@@ -1342,3 +1342,42 @@ the driver: it stores nothing.
 
 `viewcheck` transcribes `lib/vsprintf.c:36-75` as `mdiocheck` does, so § 9.7's
 row covers it; the view's parser adds only a length cap to 1.3's.
+
+## § 9.9 — `R6b-8` 8b: the seam, the ten, and the one header 0008 patches, 2026-09-27
+
+**Declared by hand for § 9.5's reason; none of these paths is in `ledgerscan`'s
+scope.** `rlxfw-seam.c` is this project's own file and was never blind: each of the ten
+it provides cites its vendor definition and its caller, and its one write cites the
+vendor's. Every line below was re-read in the staged, marked tree the images `r6b8bn`
+and `r6b8by` were built from — the tree that builds — before it was written here.
+
+⚠️ **What was taken, by kind.** From the vendor's Ethernet tree: the ten names and the
+signatures their callers use, and for each the value the vendor's code gives when it has
+nothing to report (`notes/switch-driver.md` § 13.5); the probe's disarm — two stores, in
+their order — which entered `bsp_swcore_init()` with each register and bit on two sources;
+and three `#define`s whose place `config/host-compat/0008` moves, the first vendor-source
+change 8b needed. From the callers outside that tree: only what each does with the
+answer.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/net/rtl819x/rtl_nic.c` | line | 🔴 **vendor** | 🆕 2026-09-27. The probe's disarm, `:6224-6225` staged (`:6214-6215` in the drop, before 0007's ten lines): `CPUIIMR = 0x00`, then `CPUICR &= ~(TXCMD \| RXCMD)` — **entered the seam's `bsp_swcore_init()`, in that order**. `cached_eth_addr`, `cached_dev`, `cached_eth_addr2`, `cached_dev2` `:210-226`, set only by the RX path `:2707-2715`: taken as zero storage. `rtl865x_curOpMode` `:515-517` (`GATEWAY_MODE` on this configuration): taken as 0 |
+| `drivers/net/rtl819x/AsicDriver/96E/rtl865x_asicBasic.S` | line | 🔴 **vendor** | 🆕 2026-09-27 (a second row; § 9.8's is the table reader). `bsp_swcore_init` `:393`: it reads `REVR` and `BOND_OPTION`, calls `rtl865x_initAsicFun(&fun_enable)` `:419` and returns non-zero for an unrecognised chip. **Not copied**: the seam returns 0, the value every committed `RLXFW-B07` reads |
+| `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-27 (a fourth row). `CPU_IFACE_BASE` `:491`, `CPUICR` `:492`, `CPUIIMR` `:512`, `TXCMD` `:527`, `RXCMD` `:528` — the seam's five constants, each beside `NET-48`'s loader reading |
+| `drivers/net/rtl819x/common/rtl865x_netif.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `rtl865x_setNetifType` `:4085`, a lookup in the switch's netif table: the seam returns its not-found value |
+| `drivers/net/rtl819x/common/rtl_errno.h` | line | 🔴 **vendor** | 🆕 2026-09-27. `RTL_EENTRYNOTFOUND` −3 `:22`, that value |
+| `drivers/net/rtl819x/l2Driver/rtl865x_fdb.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `rtl_get_hw_fdb_age` `:234-259` (reads the switch's L2 table) and `update_hw_l2table` `:879` (refreshes a WLAN station's L2 entry): the seam returns 0 and does nothing |
+| `drivers/net/rtl819x/igmpsnooping/igmp_delete.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `igmp_delete_init_netlink` `:116-125`: its failure value `-EIO` `:122` |
+| `drivers/net/rtl819x/Kconfig` | line | 🔴 **vendor** | 🆕 2026-09-27. `menuconfig RTL_819X_SWCORE` `:1-4` (a prompt, `depends on NET && RTL_819X`, `default y`) and the `if` block `:16-:432`; each of the forty derived rows of `config/rlxfw-kernel.delta`'s `quiet-noswcore` block cites its symbol's line |
+| `drivers/net/Makefile` | line | 🔴 **vendor** | 🆕 2026-09-27. `obj-$(CONFIG_RTL_819X_SWCORE) += rtl819x/built-in.o` and its `subdir-` line `:276-277`, `obj-$(CONFIG_RTK_VLAN_SUPPORT) += rtk_vlan.o` `:279` (the drop's lines; four lower once MK9–MK12 are applied): what `SWCORE=n` takes out of the link. MK12's anchor is MK11's own inserted line |
+| `include/net/rtl/rtl_nic.h` | line | 🔴 **vendor** | 🆕 2026-09-27. `#ifdef CONFIG_RTL_LAYERED_DRIVER` `:213-246` holding `GATEWAY_MODE`, `BRIDGE_MODE`, `WISP_MODE` `:228-230`. **Changed**, by `config/host-compat/0008`: two lines rewritten, none added, so the three leave the `#ifdef` and `SWCORE=y` preprocesses to the same tokens |
+| `net/rtl/features/rtl_features.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `rtl865x_getWanDev()` `:1097-1127` under `CONFIG_NET_SCHED && CONFIG_RTL_IPTABLES_FAST_PATH`, reading `rtl865x_curOpMode` against the three modes `:1103`, `:1117`, `:1125` — the compile error 0008 answers; its `rtl_nic.h` include `:30` |
+| `net/rtl/fastpath/96E/fast_l2tp_core.S` | line | 🔴 **vendor** | 🆕 2026-09-27. The two `jal rtl865x_setNetifType` `:334`, `:422`, whose results are overwritten — `lui $2` at `:337`, `li $2,2` at `:425` (the delay slot `:423` stores the value from before the call) |
+| `net/rtl/fastpath/96E/fastpath_core.S` | line | 🔴 **vendor** | 🆕 2026-09-27. `jal rtl_get_hw_fdb_age` `:3016` in `rtl_br_fdb_time_update`, the comparisons with 300, 450 and 150 `:3020-:3036`; `jal rtl865x_getWanDev` `:785`, read no further than its address |
+| `net/rtl/fastpath/96E/filter.S` | line | 🔴 **vendor** | 🆕 2026-09-27. `jal igmp_delete_init_netlink` `:8211`, the caller's `move $2,$0` `:8217` |
+| `drivers/net/wireless/rtl8192cd/8192cd_rx.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `get_eth_cached_dev` `:878-896`, the reader of the four `cached_*` |
+| `drivers/net/wireless/rtl8192cd/8192cd_osdep.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `clear_shortcut_cache` `:7845` (its NULL and zero writes `:7885-7897`) and `update_fwtbl_asoclst` `:7911` (the `update_hw_l2table` call `:7983`; the eCos arm `:7974` is not built) |
+| `drivers/net/wireless/rtl8192cd/8192cd_util.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `obj_buf` `:176`/`:203`, the `.bss` array that owns `0x8040FC70` at `SWCORE=n` (`SPEC.md` `NET-153`) |
+| `boards/rtl8196e/bsp/setup.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `extern int bsp_swcore_init(unsigned int version)` `:31` and its call `:173` under `CONFIG_RTL_819X` (staged; the drop's `:169`) — the seam's signature |
+| `arch/rlx/kernel/setup.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `arch_mem_init()`: `bsp_setup()` `:464` before `bootmem_init()` `:481` and `paging_init()` `:483` — why the disarm runs before any allocator exists |
+| `include/linux/skbuff.h` | line | **generic** (vendor-edited) | 🆕 2026-09-27. `struct sk_buff` `:331-473` with the vendor's conditional fields `:415`, `:429`, `:431`: read to establish that `SWCORE=n` changes the layout (`SPEC.md` `NET-152`); nothing taken |

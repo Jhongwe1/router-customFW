@@ -1572,7 +1572,8 @@ limits a reading:
   collision to read before acting.
 * **The seam object's path is not decided.** The suite uses
   `drivers/net/rlxfw-seam.o` as a placeholder, which on `r6b6q2` reads *not
-  among the leaves*; 8b's path goes in when the seam lands. The ten seam names
+  among the leaves*; 8b's path goes in when the seam lands. 🔄 2026-09-27: it
+  landed at that path (§ 13.5), and `check` on `r6b8bn` names it. The ten seam names
   are a constant from the design's § 1.2, and the tool refuses a population
   that lacks one.
 * **The fixture is a vendor name list.** It commits the 899 names (names, no
@@ -2011,3 +2012,234 @@ opened are `docs/blind-write-ledger.md` § 9.8.
   readings: it is refused in 1.0 (§ 12.3), and its place in 8d's table is 8d's.
 * A second copy of the admission table: the census is a second source by
   counts, and `admit 298` on the page is a count, not a list.
+
+# 13. 2026-09-27 (`R6b-8` 8b) — `CONFIG_RTL_819X_SWCORE=n` as a variant: the ten, the seam, and what the link measured
+
+**Every number in this section is 讀**: read at the desk on 2026-09-27 out of build
+artefacts by an instrument, true of those builds; none was measured on the device.
+The session material, scripts included, is `$FWRE_WORK/rebuild/s115/r6b8b/` (not in
+this repository). `SPEC.md` `NET-150`–`NET-153` and `FW-153`.
+
+## 13.1 Why a variant, and the vocabulary it needed
+
+`R6b-8`'s 8b is `SWCORE=n` as its own cell: the owner's rulings of 2026-09-26 keep
+`SWCORE=y` in mainline until 8g, after D1–D4, with the `y` config building from every
+later tree. A `--config` build cannot carry it — its `kconfig-delta check` reads the
+rows common to every variant, and a `SWCORE=n` `.config` is red there — so
+`config/rlxfw-kernel.delta` gained a third exclusive variant, `quiet-noswcore`: the
+quiet kernel with the vendor Ethernet tree out of the link. `tools/kconfig-delta.py`'s
+`VARIANTS` and `tools/rlxfw-kbuild.sh`'s accepted names are the two places that spell
+the vocabulary; the script's edits keep its line count (939), because notes and
+`config/` cite it by line. `kconfig-delta` self-test 24 of 24, `test-config-gates` 60
+of 60 and `test-kbuild-cflags` 96 of 96 on that tree, the counts `tools/ci-expected.tsv`
+holds; a dry run takes the new name and refuses a typo of it.
+
+## 13.2 The first probe did not reach the link: three macros, and `host-compat` 0008
+
+Probe `r6b8bp0` carried one delta row, `set@quiet-noswcore CONFIG_RTL_819X_SWCORE y n`,
+and nothing else of 8b. The prediction written before it (the design's, segment 113)
+was that every object compiles and the link fails on ten names. **Refuted at the first
+clause**: `net/rtl/features/rtl_features.c` failed to compile — `GATEWAY_MODE`
+undeclared at `:1103`, `WISP_MODE` at `:1117`, `BRIDGE_MODE` at `:1125`, all in
+`rtl865x_getWanDev()`, compiled under `CONFIG_NET_SCHED && CONFIG_RTL_IPTABLES_FAST_PATH`
+(`:1097`), both of which stay `y`. 讀 `include/net/rtl/rtl_nic.h:213-246`: the three
+`#define`s sit inside `#ifdef CONFIG_RTL_LAYERED_DRIVER`, one of the symbols the SWCORE
+block declares. The design's census preprocessed 232 objects through a host `cpp` and
+counted references to vendor **symbols**; a missing **macro** is a compile error it
+could not see, and its conclusion that no vendor line need change does not survive
+the build.
+
+`config/host-compat/0008-rtl-nic-h-op-modes-outside-layered-driver.patch` rewrites two
+lines of that header and adds none: the blank line after `RTL865X_CONFIG_END` becomes
+the `#endif`, and the commented-out `MULTIPLE_VLAN_BRIDGE_MODE` line becomes the
+`#ifdef CONFIG_RTL_LAYERED_DRIVER`, the comment kept after it. At `SWCORE=y` both halves
+are included, so the preprocessor emits the tokens the unpatched header gives and no
+`__LINE__` moves. The patch's prediction — the `y` build's objects byte-identical to
+`r6b8cr`'s except those whose inputs 8b changes — held (§ 13.6). It applies once, and a
+second `patch --forward` refuses it.
+
+## 13.3 The linker's list: ten names in four places, from two sources
+
+Probe `r6b8bp1` (the row and 0008, still no seam): 0 compile errors, and the link failed
+on exactly ten undefined names — `bsp_swcore_init`, `rtl865x_setNetifType`,
+`rtl_get_hw_fdb_age`, `igmp_delete_init_netlink`, `cached_dev`, `cached_dev2`,
+`cached_eth_addr`, `cached_eth_addr2`, `update_hw_l2table`, `rtl865x_curOpMode` — in
+26 reference lines (`r3-4/out/r6b8bp1.build.log`). The second source shares no code with
+the linker: over the 22 inputs of `r6b8cr`'s `cmd_vmlinux`, read in the probe's tree
+with the host's `mips-linux-gnu-nm`, (every non-weak `U`) − (every defined name) − (every
+word of `arch/rlx/bsp/vmlinux.lds`) leaves the same ten, from 1,649 undefined and 12,715
+defined names. By leaf, walking each `built-in.o`'s `ld -r` `.cmd`: the BSP
+(`arch/rlx/bsp/setup.o`: 1), the vendor fast path (`net/rtl/fastpath/96E/fast_l2tp_core.o`,
+`fastpath_core.o`, `filter.o`: 3), the WLAN driver (`drivers/net/wireless/rtl8192cd/
+8192cd_rx.o` and `8192cd_osdep.o`: 5 names) and the feature glue
+(`net/rtl/features/rtl_features.o`: 1) — the four places `config/host-compat/0007`'s
+header records from `R6-4`'s link. `net/core/dev.c` and `net/bridge/br_fdb.c` name two
+of the ten in their source and reference neither: `CONFIG_RTL_BATTLENET_ALG` is unset
+and the bridge's call is under `#if 0`. `8192cd_sme.c` names the four `cached_*` in its
+source and no object references them.
+
+## 13.4 The delta: forty derived rows and one decision, generated from the probe's report
+
+`r6b8bp0`'s oldconfig log held 0 `(NEW)`, and `kconfig-delta check --variant
+quiet-noswcore` refused it with 40 undeclared, 0 mismatched, 0 not applied: every one a
+symbol `drivers/net/rtl819x/Kconfig` declares inside `if RTL_819X_SWCORE` (`:16-:432`),
+every one going to absent (26 from `y` or a value, 14 from `is not set` — the design's
+host count, which was not the source). The block appended at the end of
+`config/rlxfw-kernel.delta` is one `set@quiet-noswcore` row and forty
+`derive@quiet-noswcore … dep-unmet` rows generated from that report, each with the
+`Kconfig` line it was read at. The variant parses to 145 rules (75 set, 70 derived),
+`quiet` and `loud` to 104 and 106 as before. On the images: `r6b8bn` green (70 derived,
+75 set), `r6b8by` green (30, 74); the controls refuse — `r6b8bn`'s `.config` checked as
+`quiet` reads 41 undeclared, `r6b8by`'s as `quiet-noswcore` 41 not applied. `emueq check`
+green: `CONFIG_RTL_819X_SWCORE` is in `config/emu-path-symbols.tsv` with `exc_path n`,
+and none of the forty is.
+
+## 13.5 The seam, and the one write it makes
+
+`config/rlxfw-src/linux-2.6.30/drivers/net/rlxfw-seam.c`, linked by
+`config/rlxfw-marks.tsv` `MK12` (`obj-y += rlxfw-seam.o` after MK11's line) — the path
+`tools/ethcensus.py` already named as its placeholder (§ 11.6). Its body is under
+`#ifndef CONFIG_RTL_819X_SWCORE`; outside it, `const char rlxfw_seam_id[] = "rlxfw-seam
+1.0"` is `MK12`'s `str:rlxfw-seam` witness, in both images. The ten, each with the value
+the vendor's own code gives when it has nothing to report: `rtl865x_setNetifType` −3
+(`RTL_EENTRYNOTFOUND`; both callers overwrite the return); `rtl_get_hw_fdb_age` 0 (the
+caller moves a bridge timestamp only at 150, 300 or 450); `igmp_delete_init_netlink`
+`-EIO`, no socket (the caller returns 0 whatever it gets); the four `cached_*` as zero
+storage, the vendor's empty cache; `update_hw_l2table` a no-op; `rtl865x_curOpMode` 0,
+`GATEWAY_MODE`.
+
+`bsp_swcore_init()` makes **the vendor probe's disarm of the loader's DMA engine**, in
+the vendor's order: `CPUIIMR = 0`, then `CPUICR &= ~(TXCMD | RXCMD)` (讀 the staged
+`rtl_nic.c:6224-6225`; the header's `:491-492`, `:512`, `:527-528`, and 量 `NET-48`'s
+loader `C4000000`), between `RLXFW-SM0=` (`CPUICR` before) and `RLXFW-SM1=` (read back
+after). With `SWCORE=n` nothing else disarms that engine (`docs/KNOWN-ISSUES.md`,
+`R6-4`'s `D4` row). It returns 0 without reading `REVR`, where the vendor's returns
+non-zero for an unrecognised chip: `RLXFW-B07=00000000` is the only value of `B07` in a
+committed capture (169 lines at `95dabac`). `bsp_setup()` is `arch_mem_init()`'s first
+call (`arch/rlx/kernel/setup.c:464`, before `bootmem_init()` at `:481` and
+`paging_init()` at `:483`), so the disarm runs before any allocator exists and earlier
+than the vendor's `device_initcall`. At `SWCORE=y` neither mark is linked (`RLXFW-SM0=`
+0 times in `r6b8by`'s ELF, once in `r6b8bn`'s).
+
+⚠️ **`N1`'s prediction does not carry across, and a gate that copied it would misread a
+disarmed engine as a running one** (推). `rtl819x-nic.c` says `N1` must read `00000000`;
+63 committed `N1` lines do, on images where the vendor's probe also full-resets the
+switch core and `boot_rpdcr0`/`boot_rmdcr0`/`boot_tpdcr0` read 0 (card C's `A-FIXR`).
+The seam clears bits 31 and 30 only, so on `r6b8bn` `SM1` and `N1` are predicted
+`04000000` — the `MBUF_2048BYTES` field left as the loader set it — and the ring
+registers the loader's `A040Fxxx`. Arm II's run gates on bits 31:30 (`RUN-armII.md`,
+`N1-MK`); the driver's comment is a `SWCORE=y` statement, and 8g's to revise.
+
+## 13.6 The images, and what the build read
+
+`r6b8bn`/`r6b8bn2` (`--variant quiet-noswcore`) and `r6b8by`/`r6b8by2` (`--variant
+quiet`) at `e4c0834`, each `rlxfw-kbuild.sh … --initramfs _irfs-r6b8b spec --marks --jobs 4` from a
+fresh stage, one at a time, then `rtkimage.py build`; `_irfs-r6b8b` is `mkinitramfs
+build --init config/rlxfw-init-quiet.sh`, spec and manifest equal to `_irfs-r6b8c`'s but
+for the repository path, every file re-hashed.
+
+| what | `r6b8bn` (SWCORE=n) | `r6b8by` (SWCORE=y) |
+|---|---|---|
+| recipe | `024eab44` | `024eab44` |
+| `vmlinux` | `9b703bab…`, 4,255,029 B | `f68f6c36…`, 4,564,844 B |
+| flat image | `19c632f3…`, 3,764,736 B, 71.807 % of 5,242,880, margin 1,478,144 | `cd2b18bd…`, 4,035,072 B, 76.963 % (as `r6b8cr`) |
+| `nfjrom` | `c0e1704a…`, 1,113,088 B | `a7856192…`, 1,171,456 B |
+| rebuild | `cmp` rc 0: vmlinux, flat, `nfjrom`; manifests differ in `cell` only | the same |
+| `(NEW)` | 0 | 0 |
+| `rlxfw-marks verify` | green: 12 marks, 11 witnesses, 1 ABSENT; `MK12` `mine:2` | the same |
+| `hazlint` | 0 violations in 108,443 loads | 0 in 115,786 (`r6b8cr`'s count) |
+| build warnings | 153, none from `rlxfw-seam.c` | 162, `r6b8cr`'s count |
+
+8b's first builds, at `5bb672d` (recipe `047b31d9`), carried one warning
+from the seam, a slash-star inside a comment; `e4c0834` reworded it and the four images
+were rebuilt, and nothing of the first build is kept but its logs. The flat images are
+`objcopy -O binary` of their `vmlinux` (`cmp` rc 0). **0008 is inert
+at `SWCORE=y`**: of `r6b8by`'s 763 objects against `r6b8cr`'s 762, the one new is
+`drivers/net/rlxfw-seam.o` and the eight that differ are `init/main.o` and
+`drivers/mtd/devices/rtl819x-spi.o` — the two consumers of `RLXFW_SRC_ID` — and the six
+links above them (`drivers/built-in.o`, `drivers/mtd/built-in.o`,
+`drivers/mtd/devices/built-in.o`, `drivers/net/built-in.o`, `init/built-in.o`,
+`vmlinux.o`); `net/rtl/features/rtl_features.o` is identical. The same loop, composites included,
+reads 144 objects different between `r6b8by` and `r6b8bn`. `storeseq r6b8cr → r6b8by` is GREEN.
+
+## 13.7 `struct sk_buff` changes, and what `rtl819x-nic` depends on
+
+讀 `include/linux/skbuff.h:331-473`: `srcPort` and `srcVlanId` are under
+`CONFIG_RTL_HARDWARE_MULTICAST` (`:415`), `tag` under `CONFIG_RTK_VLAN_SUPPORT` (`:429`)
+and `src_info` under `CONFIG_RTK_VLAN_NEW_FEATURE` (`:431`) — three of the forty symbols
+`SWCORE=n` takes away. So **the layout changes**, measured by compiling a probe of
+`offsetof()` and `sizeof()` to assembly with `rtl819x-nic.o`'s own command line from
+each tree, through `tools/vendor-tripwire.sh` (CLEAN both times): `sizeof(struct
+sk_buff)` 200 → 192; `srcPhyPort` and `dstPhyPort` 132/133 → 128/129 (−4); every field
+from `inDev` on — `mark`, `vlan_tci`, the three header offsets, `tail`, `end`, `head`,
+`data`, `truesize`, `users` — −12; everything before `srcPort` unmoved;
+`sizeof(struct vlan_tag)` 4; `sizeof(struct net_device)` 688 in both.
+
+**What `rtl819x-nic` compiles to follows exactly that.** `rtl819x-nic.o`, `r6b8by`
+against `r6b8bn`, host `objdump -d`: 7,955 instructions each, 7,949 identical, and the
+6 that differ differ only in a displacement that moved by the measured shift — `tail`
+176 → 164 (one `lw`, one `sw`), `data` 188 → 176 (three `lw`, one `sw`) — 0 unexplained;
+its four non-executable allocated sections are byte-identical. That is `storeseq
+r6b8by → r6b8bn`'s one RED, in `nic_poll`: it aligns stores by displacement, and the
+shifted `tail` and `data` stores cannot align. `rtl819x-switch.o` and `rtl819x-view.o`
+are byte-identical between the two images, as are rlxfw's other seven objects; of
+rlxfw's own, only the seam and `rtl819x-nic.o` differ. Of the 640 objects the two trees
+share outside the `built-in.o` composites, 122 differ — 41 under `net/ipv4`, 17 under
+`net/netfilter`, 10 under `net/core`: an
+`n` image is not a single-variable change against a `y` image's rtt or throughput, and a
+number from one is not carried to the other.
+
+## 13.8 What owns `0x8040FC70`
+
+The loader's RX engine writes, when a frame arrives, into rings from `0xA040FC70`,
+descriptors, mbufs and four 2,048-byte buffers ending at `0xA0411F9A` (量 at the loader
+prompt, `notes/nic-driver.md` §§ 2–3): KSEG0 `[0x8040FC70, 0x80411F9A)`.
+
+* `r6b8bn`: `.bss` (`0x80398000`–`0x804E6650`). One symbol covers the whole footprint:
+  `obj_buf`, a static array of the WLAN driver (`drivers/net/wireless/rtl8192cd/
+  8192cd_util.o`; `8192cd_util.c:176`/`:203`, the two arms of `#ifdef CONCURRENT_MODE`),
+  432,432 bytes at `0x803E9638`, which that driver clears and fills at its own init.
+* `r6b8by` and `r6b8cr`: `.bss` (`0x803DA000`–`0x80673950`); `icv_pool` (4,100 B at
+  `0x8040F544`, which holds `0x8040FC70`), `mic_pool` (4,100 B) and `desc_buf`
+  (106,368 B), all `8192cd_osdep.o`.
+
+Both from `System.map` and again from the ELF's sized symbols. 推: from kernel entry to
+the seam's disarm the footprint is `.bss` that `head.S` has zeroed and no code has used,
+and a zeroed ring word is CPU-owned (bit 0 clear, `notes/nic-driver.md` § 3.2), so the
+engine finds no descriptor to fill; on the `y` images the same memory is the WLAN
+driver's until the vendor's `device_initcall` disarms the engine, so the `n` image's
+window is the shorter one. Whether the engine caches a descriptor across `head.S`'s
+clear is not known here.
+
+## 13.9 The census on the `n` image
+
+`tools/ethcensus.py check --build r6b8bn … --seam drivers/net/rlxfw-seam.o`: **GREEN** —
+object 0 of 610 leaves in scope (84 `ld -r` links); symbol 10 of the 899 population names
+in `vmlinux` (10 by `System.map`), the ten seam names each defined by
+`drivers/net/rlxfw-seam.o` alone, none `[MIPS16]`, the parsers agreeing on the 610 leaves
+and on `vmlinux`'s 12,973 symbols; string 0 of the 6 vendor-unique `/proc` names, with
+`rtl819x-switch` 1 and the synthetic name 0. On `r6b8by`, RED on all three (22 of 632
+leaves, 898 of 899, the positive control); the tree's `rtkload/vmlinux_img` (the drop's
+kernel) is refused. **`tools/imgprocs.py` REFUSES the `n` image** (rc 2: its controls
+`port_status` and `asicCounter` read 0), which is its design on an image without the
+vendor tree — the inverted mode 8e names — and on `r6b8by` reads 15 of 42, as on
+`r6b8cr`. `RUN-armII.md` in the session directory is arm II's quick run on `r6b8bn`;
+`cardcheck commands` passes it (32 commands, 3 loader, 29 shell, 13 HOST cells, 0
+refused) and refuses a copy with a planted `EW` and `FLR`.
+
+## 13.10 What 8b does not establish
+
+* Anything on the silicon: `r6b8bn` has not booted. That the seam's marks print, that
+  `N1` reads `04000000`, that `rlx0` comes up without the vendor's probe, and what the
+  loader's switch state carries, are arm II's.
+* That the kernel's behaviour outside the Ethernet path is unchanged: the forty symbols
+  also recompile the bridge, the IPv4 stack, netfilter and the WLAN driver (§ 13.7), and
+  none of that was exercised.
+* That the ten stand-ins are right for every caller: the census shows who references
+  them, not what a WLAN station, an L2TP netif or a bridge would do with the answers; no
+  rlxfw image configures any of the three (推).
+* A second reading of the variant's forty from anything but `kconfig-delta` and the
+  block's `Kconfig` lines, or the `loud` variant at `SWCORE=n`, which no variant builds.
+* Anything about the fast path's NAPT entry with no WAN device: `rtl865x_getWanDev()`
+  returns NULL at `SWCORE=n` (no `ppp0`, no `eth1`), and its caller in
+  `fastpath_core.S:785` was read no further than its address.
