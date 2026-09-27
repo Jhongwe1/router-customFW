@@ -1,0 +1,57 @@
+Make the three operating-mode constants visible without the layered driver.
+
+WHY THIS EXISTS.  R6b-8 8b builds CONFIG_RTL_819X_SWCORE=n as a variant,
+`quiet-noswcore` in config/rlxfw-kernel.delta.  量 2026-09-27, probe cell
+r6b8bp0 (that one delta row, no seam): the build does not reach the link.
+net/rtl/features/rtl_features.c fails to COMPILE -- `GATEWAY_MODE'
+undeclared at :1103, `WISP_MODE' at :1117, `BRIDGE_MODE' at :1125, all in
+rtl865x_getWanDev(), which is compiled under
+`CONFIG_NET_SCHED && CONFIG_RTL_IPTABLES_FAST_PATH` (:1097); both stay y.
+讀 include/net/rtl/rtl_nic.h:213-246: the three #defines sit inside
+`#ifdef CONFIG_RTL_LAYERED_DRIVER`, a symbol the SWCORE block declares, so
+SWCORE=n takes them from the one file outside the block that still reads
+them.  The segment-113 design's census counted references to vendor SYMBOLS
+through a host preprocessor and could not see a missing MACRO; it concluded
+that no vendor line need change, and this build refutes that.
+
+WHAT IT DOES.  Two lines of the header change and none is added or removed:
+the blank line after RTL865X_CONFIG_END becomes the `#endif`, and the
+commented-out MULTIPLE_VLAN_BRIDGE_MODE line becomes
+`#ifdef CONFIG_RTL_LAYERED_DRIVER`, with that comment kept after it.  The
+three constants are then defined whatever CONFIG_RTL_LAYERED_DRIVER says;
+struct rtl865x_vlanConfig, RTL865X_CONFIG_END, CONFIG_CHECK and INIT_CHECK
+stay under it.
+
+WHY IT IS INERT AT SWCORE=y.  With CONFIG_RTL_LAYERED_DRIVER defined -- the
+mainline, and every image built before this patch -- both halves are
+included, so the preprocessor emits the tokens the unpatched header gives,
+and no line moves, so no __LINE__ does.  PREDICTION, written before the
+mainline build: that build's objects are byte-identical to r6b8cr's except
+those whose inputs 8b changes (the seam object, init/main.o through
+RLXFW_SRC_ID, and the links that carry them).  REFUTED BY any other object
+differing -- net/rtl/features/rtl_features.o first.
+
+WHAT IT DOES NOT DO.  It defines no storage: rtl865x_getWanDev() reads
+rtl865x_curOpMode, which at SWCORE=n is the seam's
+(config/rlxfw-src/linux-2.6.30/drivers/net/rlxfw-seam.c, the vendor's
+GATEWAY_MODE, 0).  With no vendor netdev it finds neither ppp0 nor eth1 and
+returns NULL; its one caller in the fast path (net/rtl/fastpath/96E/
+fastpath_core.S:785) is in the NAPT-entry path, which no rlxfw image
+configures (推).
+
+--- a/include/net/rtl/rtl_nic.h
++++ b/include/net/rtl/rtl_nic.h
+@@ -224,11 +224,11 @@
+ 	uint8			is_slave;
+ };
+ #define RTL865X_CONFIG_END					{ "", 0, 0, 0, 0, 0, 0, 0, {{0}}, 0 }
+-
++#endif /* rlxfw host-compat 0008: the three op modes below leave the #ifdef */
+ #define GATEWAY_MODE				0
+ #define BRIDGE_MODE					1
+ #define WISP_MODE					2
+-//#define MULTIPLE_VLAN_BRIDGE_MODE 3
++#ifdef CONFIG_RTL_LAYERED_DRIVER //#define MULTIPLE_VLAN_BRIDGE_MODE 3
+ //#define MULTIPLE_VLAN_WISP_MODE 4
+ #define CONFIG_CHECK(expr) do {\
+ 	if(((int32)expr)!=SUCCESS){\

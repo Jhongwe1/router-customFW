@@ -350,3 +350,70 @@ derive	CONFIG_IBM_NEW_EMAC_EMAC4	-	n	promptless	as CONFIG_IBM_NEW_EMAC_ZMII's ro
 derive	CONFIG_IBM_NEW_EMAC_NO_FLOW_CTRL	-	n	promptless	as CONFIG_IBM_NEW_EMAC_ZMII's row; drivers/net/ibm_newemac/Kconfig:66
 derive	CONFIG_IBM_NEW_EMAC_MAL_CLR_ICINTSTAT	-	n	promptless	as CONFIG_IBM_NEW_EMAC_ZMII's row; drivers/net/ibm_newemac/Kconfig:70
 derive	CONFIG_IBM_NEW_EMAC_MAL_COMMON_ERR	-	n	promptless	as CONFIG_IBM_NEW_EMAC_ZMII's row; drivers/net/ibm_newemac/Kconfig:74
+
+# ----------------------------------------------------------------------------
+# R6b-8 8b, 2026-09-27.  THE `quiet-noswcore` VARIANT: FORTY-ONE ROWS, one
+# decision and the forty symbols it takes away, each declared from the report
+# of a build that carried the decision alone -- not from a prediction.
+#
+# `@quiet-noswcore` rows are in that image only (tools/kconfig-delta.py
+# VARIANTS); the quiet and loud images read none of them.  The block is at
+# the END of this file on purpose: tools/bootbytes.py and three notes cite
+# lines of it by number, and an insertion above them would move what they
+# cite.
+#
+# HOW THE FORTY WERE FOUND.  Probe cell r6b8bp0 carried the set row below and
+# nothing else of this block.  量: its oldconfig log held 0 `(NEW)` prompts,
+# and kconfig-delta check REFUSED it with 40 UNDECLARED, 0 mismatched, 0 not
+# applied -- every one a symbol that drivers/net/rtl819x/Kconfig declares
+# inside `if RTL_819X_SWCORE` (:16-:432), every one going to absent.  The rows
+# are generated from that report, each with the Kconfig line it was read at.
+# The segment-113 design's host reading predicted the same forty (26 from y
+# or a value, 14 from `is not set`), and it was not the source.
+#
+# REFUTED BY, in a build carrying these rows: any `(NEW)` line in the
+# oldconfig log, or kconfig-delta check anything but green with 0
+# undeclared.  config/emu-path-symbols.tsv lists CONFIG_RTL_819X_SWCORE with
+# exc_path n and none of the forty, so emueq has nothing to adjudicate here.
+# ----------------------------------------------------------------------------
+set@quiet-noswcore	CONFIG_RTL_819X_SWCORE	y	n	-	R6b-8 8b, 2026-09-27. THE VENDOR ETHERNET TREE OUT OF THE LINK, IN A VARIANT. 讀 the drop's drivers/net/Makefile:276-277, `obj-$(CONFIG_RTL_819X_SWCORE) += rtl819x/built-in.o` and its subdir line, and :279 `obj-$(CONFIG_RTK_VLAN_SUPPORT) += rtk_vlan.o`, whose symbol is one of the forty below (each four lines lower once MK9-MK12 are applied). 讀 drivers/net/rtl819x/Kconfig:1-4, `menuconfig RTL_819X_SWCORE` with a prompt, `depends on NET && RTL_819X` (both y here) and `default y`, so it is settable; the baseline has it y. A VARIANT AND NOT THE MAINLINE: the owner's ruling of 2026-09-26 keeps SWCORE=y in mainline until R6b-8's 8g, after D1-D4, and the SWCORE=y config goes on building from every later tree (PROGRESS.md, R6b-8). 量, probe cell r6b8bp0 (this row alone): `(NEW)` 0, the forty rows below, and no link -- net/rtl/features/rtl_features.c failed to COMPILE on three constants the block's CONFIG_RTL_LAYERED_DRIVER had carried, which config/host-compat/0008 answers. 量, probe cell r6b8bp1 (this row and 0008, no seam): every object compiled and the link failed on exactly ten undefined names in four places -- the BSP, the vendor fast path, the WLAN driver and the feature glue -- the ten R6-4 counted (config/host-compat/0007's header), and an object census over the link's 22 inputs gives the same ten; config/rlxfw-src/linux-2.6.30/drivers/net/rlxfw-seam.c (config/rlxfw-marks.tsv MK12) provides them. WHAT n GIVES UP, stated rather than found later: /proc/rtl865x/ (asicCounter, port_status, memory and the rest) and eth0-eth4; the vendor probe's disarm of the loader's DMA engine, which the seam's bsp_swcore_init makes instead, earlier; and four fields of struct sk_buff (include/linux/skbuff.h: srcPort and srcVlanId under RTL_HARDWARE_MULTICAST, tag and src_info under RTK_VLAN_SUPPORT and RTK_VLAN_NEW_FEATURE, all three below), so every object that touches an skb is compiled against a different layout, and an n image is not a single-variable change against a y image's rtt or throughput. REFUTED BY, in a build carrying this block: any `(NEW)` line, kconfig-delta check anything but green, or an undefined symbol at the link.
+derive@quiet-noswcore	CONFIG_DEFAULTS_KERNEL_2_6	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:18, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_EXTRTL8212_PHYID_P1	18	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:284, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_EXTRTL8212_PHYID_P3	20	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:289, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_EXTRTL8212_PHYID_P5	22	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:294, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTK_VLAN_FOR_CABLE_MODEM	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:374, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTK_VLAN_NEW_FEATURE	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:379, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTK_VLAN_SUPPORT	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:363, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTK_VLAN_WAN_TAG_SUPPORT	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:368, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL865X_KERNEL_MIPS16	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:50, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL865X_LANPORT_RESTRICTION	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:223, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL865X_MBUF_HEADROOM	128	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:258, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL865X_ROMEPERF	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:358, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_DEBUG_TOOL	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:45, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_EEE_DISABLED	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:419, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_ETH_PRIV_SKB	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:264, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_ETH_PRIV_SKB_DEBUG	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:269, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_EXTPORT_VLANID	9	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:167, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_FAST_FILTER	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:253, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_HARDWARE_MULTICAST	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:322, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_HW_L2_ONLY	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:202, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_HW_MULTICAST_ONLY	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:193, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_HW_NAPT	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:179, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_IGMP_PROXY	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:27, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_IGMP_SNOOPING	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:31, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_IPTABLES_RULE_2_ACL	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:248, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_IVL_SUPPORT	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:233, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LAYERED_ASIC_DRIVER	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:116, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LAYERED_ASIC_DRIVER_L3	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:121, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LAYERED_DRIVER	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:111, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LAYERED_DRIVER_ACL	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:132, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LAYERED_DRIVER_L2	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:137, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LAYERED_DRIVER_L3	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:148, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LINKCHG_PROCESS	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:41, :162, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_LOG_DEBUG	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:354, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_MLD_SNOOPING	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:36, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_NETIF_MAPPING	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:212, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_PROC_DEBUG	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:349, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_REINIT_SWITCH_CORE	y	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:424, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_SOCK_DEBUG	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:429, inside `if RTL_819X_SWCORE` (:16-:432)
+derive@quiet-noswcore	CONFIG_RTL_UNKOWN_UNICAST_CONTROL	n	-	dep-unmet	as CONFIG_RTL_819X_SWCORE's row above; drivers/net/rtl819x/Kconfig:404, inside `if RTL_819X_SWCORE` (:16-:432)
