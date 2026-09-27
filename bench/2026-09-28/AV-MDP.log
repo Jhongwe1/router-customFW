@@ -1,0 +1,21 @@
+echo probe | cat > /proc/rtl819x-mdio ; cat /proc/rtl819x-mdio
+RLXFW-MD1=0000001F
+version rtl819x-switch 1.3
+unlocked 1
+bus 1 reg_rc 0
+bound 10000
+mdio_rd 10
+mdio_wr 0
+mdio_to 0 busy 0 retry 0
+refused 0 wr_refused 0 again 0
+spin 10 25 39
+hi_or 00000000
+dirty 0
+scanned 00000000 j 0
+phy0 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy1 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy2 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy3 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy4 id 001CC880 rc 0 xrc 0 drv 0 att 0
+jiffies 4294944851
+# 

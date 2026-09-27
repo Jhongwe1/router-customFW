@@ -1,0 +1,36 @@
+bench/2026-09-27g/B-PRE.log
+bench/2026-09-27g/B-PRE.meta.json
+bench/2026-09-27g/B-PRE.timing
+{
+  "tool_version": "1.5",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-27T23:41:40+0800",
+  "clock": "CLOCK_MONOTONIC_RAW",
+  "t0_raw": 21116.555649513,
+  "t0_real": 1790523700.9818373,
+  "mono_at_t0": 20456.524492902,
+  "boot_id": "3f875596-054c-417e-84bd-0f9df1e48572",
+  "clocksource": "tsc",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 0.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {},
+  "cr": {},
+  "cr_settle_s": 2.0,
+  "seconds": 3.0,
+  "idle": 0.0,
+  "until": null,
+  "until_offset": null,
+  "sent": null,
+  "sent_hex": null,
+  "sent_s": null,
+  "stop_reason": "--seconds 3.0 elapsed",
+  "bytes": 0,
+  "duration_s": 3.066759,
+  "end_raw": 21119.622408932,
+  "end_real": 1790523703.8982403,
+  "mono_at_end": 20459.440897701,
+  "clocksource_end": "tsc",
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

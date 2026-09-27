@@ -1,0 +1,5 @@
+sleep 1 ; echo read 0xBB804110 4 > /proc/rtl865x/memory
+cmd read
+
+bb804110:  0C7F0039  		 	 	 	 	 	 	 	 	 	 	 	 	  9
+# 

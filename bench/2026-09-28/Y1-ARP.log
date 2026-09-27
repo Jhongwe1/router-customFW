@@ -1,0 +1,9 @@
+ARPING 10.1.1.1
+60 bytes from 56:0a:01:01:01:e8 (10.1.1.1): index=0 time=1.083 msec
+60 bytes from 56:0a:01:01:01:e8 (10.1.1.1): index=1 time=960.035 usec
+60 bytes from 56:0a:01:01:01:e8 (10.1.1.1): index=2 time=911.761 usec
+60 bytes from 56:0a:01:01:01:e8 (10.1.1.1): index=3 time=1.393 msec
+
+--- 10.1.1.1 statistics ---
+4 packets transmitted, 4 packets received,   0% unanswered (0 extra)
+rtt min/avg/max/std-dev = 0.912/1.087/1.393/0.187 ms

@@ -1,0 +1,5 @@
+sleep 1 ; echo read 0xB801002C 12 > /proc/rtl865x/memory
+cmd read
+
+b801002c:  80000000  00000000    00000000  	 	 	 	 	€           
+# 

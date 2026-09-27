@@ -1,0 +1,10 @@
+looprun: STOPPED at S5c -- the HOST cannot reach 10.1.1.1. This is not the board: no lladdr INCOMPLETE
+  pre  image     sha256 a6c9c818d5cb36fc04f24495c196206406ad3b84212663ae810113b45fbba7e7  <- matches the pin
+  S2  build     SKIPPED (--skip)
+  S3  assemble  SKIPPED (--skip)
+  S4  reset     SKIPPED (--skip)
+  S5  rescue    rc=0    0.34 s
+  S5b burnflag  rc=0    2.31 s
+  S5c hostlink  FAIL    1.05 s
+      ok   P-a the host has an address on the route to 10.1.1.1 -- dev=enxfc19286184c9 src=10.1.1.2
+      FAIL P-b the board answers ARP -- no lladdr INCOMPLETE

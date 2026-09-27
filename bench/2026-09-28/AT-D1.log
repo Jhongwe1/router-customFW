@@ -1,0 +1,11 @@
+brdelta 1.2 AT-R0.log -> AT-R1.log
+board n_tx d 40 n_recov_fire d 0 n_tx_stop d 0 n_rx d 40 nd_up 1 tx_stopped 0
+cpu crc d 40 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 40 b65 d 0 b128 d 0 b256 d 0 b512 d 0 b1024 d 0
+p3 out d 40 rx d 40 rxbytes d 2560
+ident o d 40 cjfd d 40 k 0
+buckets legal d 40 cjf d 40 lt64 d 0
+host rx d 20 tx d 40 inechoreps d 20 outechos d 40
+path p3 rx d 40 host outechos d 40 covered yes
+snmp ip inrecv d 40 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 40 outreq d 40 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 40 p3 40 host 20

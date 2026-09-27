@@ -1,0 +1,36 @@
+echo pread 4 0 17 | cat > /proc/rtl819x-mdio ; echo pread 0 0 21 | cat > /proc
+/rtl819x-mdio ; cat /proc/rtl819x-mdio
+RLXFW-MD3=00040011
+RLXFW-MD3=00000015
+version rtl819x-switch 1.3
+unlocked 1
+bus 1 reg_rc 0
+bound 10000
+mdio_rd 136
+mdio_wr 20
+mdio_to 0 busy 0 retry 0
+refused 0 wr_refused 0 again 0
+spin 156 19 40
+hi_or 00000000
+dirty 0
+scanned 0000001F j 10467
+phy0 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy1 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy2 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy3 id 001CC880 rc 0 xrc 0 drv 0 att 0
+phy4 id 001CC880 rc 0 xrc 0 drv 0 att 0
+pr a3 p1 r19 v 29568 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000F9 000000F9
+pr a4 p1 r19 v 29568 p0 0 ps 1 p1 0 rs 0 rt 0 rc 0 psrp 000000E0 000000E0
+pr a0 p0 r17 v 7952 p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000010E0 000010E0
+pr a1 p0 r17 v 7952 p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000010E0 000010E0
+pr a2 p0 r17 v 7952 p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000010E0 000010E0
+pr a3 p0 r17 v 7952 p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000010F9 000010F9
+pr a4 p0 r17 v 7952 p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000010E0 000010E0
+pr a0 p0 r21 v 709 p0 0 ps 0 p1 0 rs 1 rt 0 rc 0 psrp 000010E0 000010E0
+a00 3100 78C9 001C C880 0DE1 0001 hi 0000 psrp 000010E0 n 2
+a01 3100 78C9 001C C880 0DE1 0001 hi 0000 psrp 000010E0 n 2
+a02 3100 78C9 001C C880 0DE1 0001 hi 0000 psrp 000010E0 n 2
+a03 3100 78ED 001C C880 0DE1 CDE1 hi 0000 psrp 000010F9 n 2
+a04 3100 78C9 001C C880 0DE1 0001 hi 0000 psrp 000010E0 n 2
+jiffies 10667
+# 

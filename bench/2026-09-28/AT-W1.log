@@ -1,0 +1,4 @@
+sleep 1 ; echo write 0xBB804110 0x8C7F0039 > /proc/rtl865x/memory
+cmd write
+Write memory 0xbb804110 dat 0x8c7f0039: 0x8c7f0039
+# 

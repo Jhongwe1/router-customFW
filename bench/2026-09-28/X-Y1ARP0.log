@@ -1,0 +1,9 @@
+ARPING 10.1.1.1
+Timeout
+Timeout
+Timeout
+Timeout
+
+--- 10.1.1.1 statistics ---
+4 packets transmitted, 0 packets received, 100% unanswered (0 extra)
+

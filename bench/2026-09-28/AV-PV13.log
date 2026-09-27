@@ -1,0 +1,5 @@
+sleep 1 ; echo extRead 4 1 16 > /proc/rtl865x/phyReg ; echo extRead 0 1 19 > /
+proc/rtl865x/phyReg
+extRead phyId(4), pageId(1), regId(16), regData:0xd100
+extRead phyId(0), pageId(1), regId(19), regData:0x7380
+# 

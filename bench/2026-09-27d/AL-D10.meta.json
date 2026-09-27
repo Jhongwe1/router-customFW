@@ -1,0 +1,49 @@
+{
+  "tool_version": "1.5",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-09-27T20:09:28+0800",
+  "clock": "CLOCK_MONOTONIC_RAW",
+  "t0_raw": 8384.400108006,
+  "t0_real": 1790510968.6339173,
+  "mono_at_t0": 8232.334955769,
+  "boot_id": "3f875596-054c-417e-84bd-0f9df1e48572",
+  "clocksource": "tsc",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 10.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {
+    "esc_after": {
+      "requested_period_s": 0.02,
+      "writes": 3,
+      "window_s": 0.069478,
+      "achieved_period_s": 0.023159,
+      "ended_on_until": true
+    }
+  },
+  "cr": {
+    "esc_after": {
+      "written": true,
+      "prompt_seen": true,
+      "waited_s": 0.050966,
+      "log_offset": 216,
+      "settle_budget_s": 2.0
+    }
+  },
+  "cr_settle_s": 2.0,
+  "seconds": 25.0,
+  "idle": 0.0,
+  "until": "RealTek>",
+  "until_offset": 205,
+  "sent": "DW BB804400 16",
+  "sent_hex": "44572042423830343430302031360d",
+  "sent_s": 0.018379,
+  "stop_reason": "--until matched at offset 205",
+  "bytes": 247,
+  "duration_s": 0.309203,
+  "end_raw": 8384.709310863,
+  "end_real": 1790510968.936923,
+  "mono_at_end": 8232.637962479,
+  "clocksource_end": "tsc",
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

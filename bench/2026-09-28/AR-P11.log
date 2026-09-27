@@ -1,0 +1,12 @@
+echo peek 0xBB804D00 3 | cat > /proc/rtl819x-view ; cat /proc/rtl819x-view
+version rtl819x-view 1.0
+admit 298
+last peek j 9287 rc 0
+n_mib 3 n_tbl 2 n_peek 37 refused 0 busy 0 ld 1239
+ref 00000000 none
+peek BB804D00 n 3
+a BB804D00 00000000
+a BB804D04 00000000
+a BB804D08 00000000
+jiffies 9288
+# 
