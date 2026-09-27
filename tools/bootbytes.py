@@ -212,6 +212,20 @@ DECLARED_CONSTS = {
     6609: "loud console with the same /init -- recipe a2c56bc8, `p2l`.  "
           "6541 + the same 68.  量 3 captures, 2026-09-23 (seating 39), "
           "e = 0 in all three",
+    339: "quiet console with the vendor's switch core out of the link -- "
+         "recipe 1cc05e88, `r6b10n`, R6b-8's arm II: `set@quiet-noswcore "
+         "CONFIG_RTL_819X_SWCORE y n` in config/rlxfw-kernel.delta.  710 - "
+         "371: 讀 the drop's drivers/net/Makefile:276-277 links "
+         "drivers/net/rtl819x/ only under SWCORE, and that directory prints "
+         "the vendor NIC driver's thirteen boot lines -- rtl_nic.c:6213 "
+         "(`\\n\\n\\nProbing RTL8186 ...`, three blank lines with it), :6479 "
+         "(`eth%d added`, six), :9574 (`[%s] added, mapping to`), "
+         "AsicDriver/rtl865x_asicL2.c:4381 (`chip name:`) and :5899 (`NOT "
+         "YET`), 371 B.  量 1 capture, 2026-09-28 "
+         "(bench/2026-09-28/M1Q-boot.log): its non-mark lines are the same "
+         "night's A1Q-boot.log (710, banner present) minus exactly those "
+         "thirteen, none added; bench/2026-09-28/RUN-armII.md § 1 expected "
+         "no `Probing RTL8186` and no `ethN added`, and its M1-VT counted 0",
 }
 
 #: The population floor.  A sweep that finds three captures and agrees with
