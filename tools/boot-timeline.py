@@ -1456,6 +1456,15 @@ def scale_section(p, tsv, loader_rows, kboots):
     keys = [key for key in sorted(img) if sum(1 for d in img[key] if ldir.get(d)) >= 2]
     pairs = defaultdict(list)      # segment -> [(x, y, key, dir)]
     seg_len = defaultdict(list)
+    # 🆕 2026-09-28: a directory median of 0 is printed and kept in its image's
+    # median, and left out of the fit, which takes its logarithm.  0 is what a
+    # segment reads when both of its anchors arrived in one read() (`~`):
+    # 量 `bench/2026-09-27k/BQ-boot.log`, whose last read delivered `RLXFW-B10`,
+    # `rlxfw: init running` and the prompt together, so `rlxfw.initpost` and
+    # `user.ready` are 0.0 there, n = 1, and `math.log(0)` stopped the retro with
+    # a traceback.  No directory median was 0 before it: the output over the
+    # older captures is unchanged apart from the count line this adds.
+    nolog = []                     # (segment, key, dir, median, n)
     for key in keys:
         dirs = sorted(d for d in img[key] if ldir.get(d))
         lmed = {d: statistics.median(ldir[d]) for d in dirs}
@@ -1494,10 +1503,15 @@ def scale_section(p, tsv, loader_rows, kboots):
                 if (s.id, d) in smed:
                     m, n = smed[(s.id, d)]
                     cells.append("%-22s" % ("%.4f x%.3f (%d)" % (m, m / s0, n)))
-                    pairs[s.id].append((math.log(lmed[d] / l0s), math.log(m / s0), key, d))
+                    note = "loader ratio over the same directories %.6f" % (lmed[d] / l0s)
+                    if m > 0:
+                        pairs[s.id].append((math.log(lmed[d] / l0s), math.log(m / s0), key, d))
+                    else:
+                        nolog.append((s.id, key, d, m, n))
+                        note += "; not in the fit: a median of %g has no logarithm" % m
                     tsv.add(record="scale", image=key, directory=d, quantity=s.id,
                             **{"from": s.a}, to=s.b, n=n, median=m, ratio=m / s0,
-                            note="loader ratio over the same directories %.6f" % (lmed[d] / l0s))
+                            note=note)
                 else:
                     cells.append("%-22s" % "--")
             seg_len[s.id].append(s0)
@@ -1539,6 +1553,10 @@ def scale_section(p, tsv, loader_rows, kboots):
                     note="H-prop %s; H-add %s" % (hp, ha))
     if not pairs:
         p("    no image occurs in two directories that also hold loader boots: nothing to fit")
+    p("  left out of both fits, a directory median of 0 or less (no logarithm; 0 is both "
+      "anchors in one read()): %d" % len(nolog))
+    for sid, key, d, m, n in nolog:
+        p("    %-20s %s  %s  median %.4f (%d)" % (sid, key, d, m, n))
     p("")
 
 
