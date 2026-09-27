@@ -74,7 +74,15 @@ ABSENT = "-"
 
 # A mechanism is a closed vocabulary on purpose.  "because kconfig does that" is
 # not a reason, and a free-text field would accept it.
-VARIANTS = ("quiet", "loud")
+#
+# 🔄 R6b-8 8b, 2026-09-27: a third variant, `quiet-noswcore` -- the quiet image
+# with CONFIG_RTL_819X_SWCORE=n, the vendor Ethernet tree out of the link.  It
+# is a variant and not the mainline because `R6b-8`'s owner rulings keep
+# SWCORE=y in mainline until 8g, after D1-D4.  Variants stay exclusive: a
+# `@quiet-noswcore` row is in that image only, a `@loud` row is not in it, and
+# a row with no variant is in all three.  There is no loud-noswcore; if one is
+# needed it is a fourth name here, not a combination rule.
+VARIANTS = ("quiet", "loud", "quiet-noswcore")
 
 MECHANISMS = {
     "promptless":  "declared with no prompt string, so its value is its default "

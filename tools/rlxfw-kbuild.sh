@@ -5,7 +5,7 @@
 #     --config FILE      .config to install VERBATIM.  Without it the
 #                        .config is DERIVED from the board template plus
 #                        config/rlxfw-kernel.delta -- see CFG-1 below.
-#     --variant V        quiet | loud, the delta's two variants.  Required
+#     --variant V        quiet | loud | quiet-noswcore, the delta's variants.  Required
 #                        when deriving; refused together with --config.
 #     --oldconfig MODE   how `make oldconfig` gets its stdin:
 #                          none      -- do not run oldconfig at all
@@ -235,15 +235,15 @@ if [ -z "$CONFIG" ] && [ -z "$VARIANT" ]; then
     echo "$CELL: no --config and no --variant." >&2
     echo "  With no --config the .config is DERIVED from the board template" >&2
     echo "  plus config/rlxfw-kernel.delta (CFG-1), and that delta declares" >&2
-    echo "  two variants. Pass --variant quiet or --variant loud." >&2
-    echo "  There is no default: they differ by CONFIG_PRINTK, so a silent" >&2
+    echo "  three variants. Pass --variant quiet, loud or quiet-noswcore." >&2
+    echo "  There is no default: they differ by CONFIG_PRINTK or SWCORE, so a silent" >&2
     echo "  choice between them is a silent choice of which image booted." >&2
     exit 3
 fi
 case "${VARIANT:-quiet}" in
-    quiet|loud) ;;
-    *) echo "$CELL: unknown --variant '$VARIANT' (quiet|loud)" >&2
-       echo "  These are config/rlxfw-kernel.delta's own two names; " >&2
+    quiet|loud|quiet-noswcore) ;;
+    *) echo "$CELL: unknown --variant '$VARIANT' (quiet|loud|quiet-noswcore)" >&2
+       echo "  These are config/rlxfw-kernel.delta's own three names; " >&2
        echo "  kconfig-delta.py refuses an undeclared one rather than" >&2
        echo "  falling through to 'no variant', and so does this." >&2
        exit 3 ;;
@@ -641,7 +641,7 @@ run() {          # run() <logsuffix> <cmd...>
 # post-oldconfig file would report every rebuild as a different recipe.
 #
 # Format 2 (2026-09-23) appends, never reorders:
-#   variant              quiet | loud | -   (- is a --config build)
+#   variant              quiet | loud | quiet-noswcore | -   (- is a --config build)
 #   build_rc             the build step's status as vendor-tripwire.sh
 #                        returns it: 1 make failed, 2/5 a vendor tree was
 #                        touched, 4 one was dirty before make ran
