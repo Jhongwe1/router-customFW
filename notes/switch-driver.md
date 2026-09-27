@@ -1722,12 +1722,21 @@ this repository holds, all through the vendor's `/proc/rtl865x/memory`
 command line with a corrupted read of another word and was counted from its
 own clean line). D does not place it. 1.0 refuses it because its 量 does not
 count a memory-node read; the driver's comment says so and names the word.
-Whether it is admitted in a later version is open: B and a memory-node reading
-are two of `CLAUDE.md`'s three source kinds (the header and a `devmem`-class
-read), and the narrower 量 1.0 applies is the table's own convention, not a
-repository rule. The one-source words (`QNUMCR`, `CSCR`, `EEECR`, `IBCR0`–`2`,
-`WFQRCRPn` and the rest) are 8d's to admit once 8c-cells has read them another
-way. `SPEC.md` `NET-139`.
+**Decided at the landing, 2026-09-27: refused in 1.0, and the `peek` window
+stays at 298 two-source words.** By `CLAUDE.md`'s letter the word has two of
+the three source kinds — the header, and a `devmem`-class read (a kernel load
+of the address, three times the same value) — so the narrower 量 is the
+table's own convention, not a repository rule, and the refusal does not rest
+on it. It rests on cost against need: admitting one word changes the table,
+which is a version change (the page's `admit 298`, which `viewdecode` checks;
+`viewcheck`'s model and tallies; the format the decoder was frozen against)
+and two rebuilds from a fresh stage, while 8c-cells can read the word on the
+same vendor-present image through the vendor's memory node under `cardcheck`'s
+HW-1 (`read 0xBB804500 4` loads `0xBB804500` to `0xBB804510`, inside the switch
+window, touching no refused word) — the way all three readings were taken. It
+is 8d's to admit, with the one-source words (`QNUMCR`, `CSCR`, `EEECR`,
+`IBCR0`–`2`, `WFQRCRPn` and the rest), once 8c-cells has read them another
+way and the table changes anyway. `SPEC.md` `NET-139`.
 
 ## 12.4 The table read, and the premise of `NET-28` 殘留 it refutes
 
@@ -1998,7 +2007,7 @@ opened are `docs/blind-write-ledger.md` § 9.8.
   decoder copies the vendor, not that the formula is right).
 * That the quiet `/init`'s boot capture falls in `bootbytes`' 710 class (推):
   nothing was booted.
-* Whether `0xBB804500` is admitted (§ 12.3), and anything about a one-source
-  word.
+* Anything about a one-source word, or about `0xBB804500` beyond its three
+  readings: it is refused in 1.0 (§ 12.3), and its place in 8d's table is 8d's.
 * A second copy of the admission table: the census is a second source by
   counts, and `admit 298` on the page is a count, not a list.
