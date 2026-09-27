@@ -1,0 +1,36 @@
+rttseries 1.1 arm R plan 011001100110 (0 off, 1 on)
+series S01 state off c0 0 c1 0 live yes sizes 5 loss 0 counts yes | 56 1.320/0.317 256 1.532/0.324 512 1.774/0.378 1024 1.955/0.458 1472 2.347/0.625
+series S02 state on c0 1 c1 1 live yes sizes 5 loss 0 counts yes | 56 1.430/0.466 256 1.556/0.385 512 1.718/0.423 1024 2.013/0.494 1472 2.171/0.625
+series S03 state on c0 1 c1 1 live yes sizes 5 loss 0 counts yes | 56 1.503/0.395 256 1.613/0.396 512 1.652/0.416 1024 1.962/0.476 1472 2.146/0.639
+series S04 state off c0 0 c1 0 live yes sizes 5 loss 0 counts yes | 56 1.358/0.468 256 1.487/0.384 512 1.542/0.381 1024 1.944/0.423 1472 2.533/0.836
+series S05 state off c0 0 c1 0 live yes sizes 5 loss 0 counts yes | 56 1.460/0.475 256 1.447/0.350 512 1.696/0.409 1024 1.844/0.488 1472 2.355/0.708
+series S06 state on c0 1 c1 1 live yes sizes 5 loss 0 counts yes | 56 1.466/0.459 256 1.546/0.371 512 1.611/0.381 1024 2.011/0.487 1472 1.958/0.499
+series S07 state on c0 1 c1 1 live yes sizes 5 loss 0 counts yes | 56 1.402/0.343 256 1.485/0.366 512 1.665/0.393 1024 1.885/0.383 1472 2.197/0.626
+series S08 state off c0 0 c1 0 live yes sizes 5 loss 0 counts yes | 56 1.433/0.312 256 1.550/0.362 512 1.654/0.357 1024 2.046/0.409 1472 2.296/0.673
+series S09 state off c0 0 c1 0 live yes sizes 5 loss 0 counts yes | 56 1.314/0.289 256 1.628/0.370 512 1.677/0.391 1024 1.918/0.390 1472 1.987/0.387
+series S10 state on c0 1 c1 1 live yes sizes 5 loss 0 counts yes | 56 1.570/0.561 256 1.513/0.370 512 1.641/0.409 1024 1.875/0.356 1472 2.281/0.776
+series S11 state on c0 1 c1 1 live yes sizes 5 loss 0 counts yes | 56 1.544/0.587 256 1.452/0.380 512 1.634/0.340 1024 1.878/0.441 1472 2.377/0.730
+series S12 state off c0 0 c1 0 live yes sizes 5 loss 0 counts yes | 56 1.507/0.339 256 1.467/0.398 512 1.755/0.317 1024 1.843/0.390 1472 2.256/0.618
+state off n 6 | 56 avg 1.3955 mdev 0.3280 | 256 avg 1.5095 mdev 0.3660 | 512 avg 1.6865 mdev 0.3795 | 1024 avg 1.9310 mdev 0.4160 | 1472 avg 2.3215 mdev 0.6490
+state on n 6 | 56 avg 1.4845 mdev 0.4625 | 256 avg 1.5295 mdev 0.3755 | 512 avg 1.6465 mdev 0.4010 | 1024 avg 1.9235 mdev 0.4585 | 1472 avg 2.1840 mdev 0.6325
+effect 56 on 1.4845 off 1.3955 d +0.0890 ms pct +6.38 % U 28 of 36 lo 5 hi 31 verdict unresolved
+effect 256 on 1.5295 off 1.5095 d +0.0200 ms pct +1.32 % U 20 of 36 lo 5 hi 31 verdict unresolved
+effect 512 on 1.6465 off 1.6865 d -0.0400 ms pct -2.37 % U 10 of 36 lo 5 hi 31 verdict unresolved
+effect 1024 on 1.9235 off 1.9310 d -0.0075 ms pct -0.39 % U 21 of 36 lo 5 hi 31 verdict unresolved
+effect 1472 on 2.1840 off 2.3215 d -0.1375 ms pct -5.92 % U 10 of 36 lo 5 hi 31 verdict unresolved
+ref 56 off 1.3955 range [1.3644, 1.7446] inside
+ref 256 off 1.5095 range [1.2303, 1.6698] inside
+ref 512 off 1.6865 range [1.4760, 1.9096] inside
+ref 1024 off 1.9310 range [1.8270, 2.3364] inside
+ref 1472 off 2.3215 range [1.8468, 2.4772] inside
+refon 56 on 1.4845 range [1.6335, 1.9965] below
+refon 256 on 1.5295 range [1.4769, 1.8051] inside
+refon 512 on 1.6465 range [1.4562, 1.7798] inside
+refon 1024 on 1.9235 range [1.8774, 2.2946] inside
+refon 1472 on 2.1840 range [1.9251, 2.3529] inside
+row 256 avg off 1.5095 A 1.518 ratio -0.0056 within10 yes
+row 512 avg off 1.6865 A 1.64 ratio +0.0284 within10 yes
+row 1024 avg off 1.9310 A 2.086 ratio -0.0743 within10 yes
+row 1472 avg off 2.3215 A 2.139 ratio +0.0853 within10 yes
+row 1472 mdev off 0.6490 A 0.476 ratio +0.3634 within10 no
+rttseries end rc 0

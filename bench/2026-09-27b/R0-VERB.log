@@ -1,0 +1,9 @@
+verbcheck 1.0: 163 cells in run order, 42 payloads, 0 sweeps accepted, 0 refusals (every one a gated guard), longest --send 117
+verbcheck verdict PASS
+  ok    V0  the card itself: verbcheck verdict PASS
+  ok    V1  a misspelt 1.4 verb (arm) -> D3-SW: 'amr' is neither a 1.4 verb nor a 1.5 one (-EINVAL, recorded nowhere)
+  ok    V2  a misspelt 1.5 verb (txlen) -> D3-SW: 'txln vendor' is neither a 1.4 verb nor a 1.5 one (-EINVAL, recorded nowhere)
+  ok    V3  a bad 1.5 argument (txlen rlxfx) -> D3-X-SW: unplanned refusal: txlen -22 (no gate on this cell expects it)
+  ok    V4  an arm while the engine is on (the down removed: -EBUSY, ungated) -> D3-SW: unplanned refusal: txlen -16 (no gate on this cell expects it)
+  ok    V5  a gate on a console mark planted on a NIC cell -> D3-00-R: a gate reads a console mark (FW-47: marks interleave with ash's echo)
+verbcheck self-test: 6 of 6 passed

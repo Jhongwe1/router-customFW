@@ -1,0 +1,154 @@
+  ok    S1  first window over 3 records: window 0 3, frames 3, rc 0
+  ok    S2  second window chains from the first: window 3 10, frames 7, partial tail 7 B
+  ok    S3  window 2: the trailer 281 untagged, the priority-tagged 281 counted at byte 12 with VID 0
+  ok    S4  whole file: two 0x8100 frames, VID 0 and 5; excess 0:4 4:3 (tags and the trailer all +4)
+  ok    S5  icmp class: 7 replies, 2 tagged, one bad ICMP checksum caught
+  ok    S6  driver frames: 2 at 61 B, the corrupted last byte refused by content_ok
+  ok    S7  dst classes against the --if address (never printed)
+  ok    S8  unreadable --prev: exit 3, counts marked cumulative, window_end still printed
+  ok    S9  no address in any output (6 planted MACs searched)
+  ok    S10 big-endian nanosecond pcap read the same
+  ok    S11 a non-Ethernet capture is refused with a reason
+  ok    S12 a missing capture is refused
+  ok    S13 a snap-truncated record keeps its wire length and is counted as truncated
+  ok    S14 nothing new since the previous window: frames 0 (the empty window is counted, not refused)
+  ok    S15 capture_live and tcpdump_procs read processes named tcpdump: 0 / 1 / 2
+  ok    S16 echo replies by identifier: sequence ranges, the tagged one, one duplicate; a request not counted (got echo_ids 2; echo_seq 1 1-3,5-6,9; echo_seq_tagged 1 6; echo_first 1 seq 1 b10 18; echo_excess 1 6:4; echo_seq 2 4; echo_first 2 seq 4 b10 18; echo_dup 1; echo_vid 5:1)
+  ok    S17 no identifier printed; no directory in a refusal or in a prev line (basename only)
+  ok    S18 snap 64: 3 cut replies keep class, sequence and length; only the whole one is csum-checked
+  ok    S19 lenby: 1:61-63,70 / 2:1514 / 4:60; content_ok 7, the whole (60-63 B) frames only
+  ok    S20 FW-145: a dmesgwin window_end after pcapwin's block is not read (1.3 end line: window 3 10; 1.2, no end line: window 3 10); a block cut before its window_end is unreadable (p13.log rc 0, p12.log rc 0, pcut.log rc 3, pcutb.log rc 3)
+  ok    S21 the end line closes a window (rc 0), an unreadable --prev (rc 3) and a refusal (rc 2)
+  ok    S22 order, anchor ok: base 100; idx 0/3/3/8 from each log's FIRST read; read time from the LAST block (lag 1); windows 1-3 / none / 4-8 by sequence; body = window's, line for line; tcpdump's LAST summary read
+  ok    S23 anchor void on dropped 1 / rx_pre != rx_post / captured != records / an idx beyond N (named) / an idx running back / four at once, in order; at lines kept, no window, rc 3
+  ok    S24 order refuses (rc 2, refusal then end line only): tcpdump running (fake /proc); a host log without rx_packets; a stop with one read; no `dropped` summary; a missing log
+  ok    S25 order: no address, no identifier, no directory (no `/` at all) in 12 outputs and refusals
+  ok    S26 echo_first: the lowest sequence's data byte 10, not the first seen; `-` past the snap; echo_excess by sequence (got echo_ids 2; echo_seq 1 1-3; echo_first 1 seq 1 b10 5; echo_excess 1 3:188; echo_seq 2 1; echo_first 2 seq 1 b10 -; echo_dup 0; echo_vid -)
+  ok    S27 window --prev a,b,c: the last present is read (b of gone,w1,gone; w2 of w1,w2,gone), absent ones skipped
+  ok    S28 order: a host log never written is listed absent and skipped (got absent h1-never.log; at h0.log rx 100 idx 0 readtime - lag -; at h2.log rx 103 idx 3 readtime - lag -; at h3.log rx 108 idx 8 readtime - lag -; order_window h0.log h2.log 0 3; order_window h2.log h3.log 3 8)
+  ok    S29 window --prev none,a: the capture's start with a absent, a when present; a,none: unreadable, and a present a read (none counts only first)
+pcapwin self-test: 29 of 29 passed
+  ok    B1  A1-01 -> A1-02: fault jfd 59; p3 out d 1 rx d 60 rxbytes d 3900
+  ok    B2  A1-03 -> A1-04: board n_tx d 42 
+  ok    B3  A1-05 -> A1-06: board n_tx d 42 ; fault jfd 14
+  ok    B4  A1-07 -> A1-08: fault jfd 60
+  ok    B5  C-00 -> C-01: leak none; host rx d 0 tx d 0 
+  ok    B6  A2-02 -> A2-03: p3 out d 0 rx d 0 rxbytes d 0
+  ok    B7  A2-01 -> A2-02: rx d 20 rxbytes d 1300
+  ok    B8  A2-01 -> A2-02: path p3 rx d 20 host outechos d 20 covered yes
+  ok    B9  A2-02 -> A2-03: path p3 rx d 0 host outechos d 20 covered no
+  ok    C1  A1-01 -> A1-02: cpu crc d 60 jab d 59 
+  ok    C2  A1-03 -> A1-04: cpu crc d 15 jab d 9 
+  ok    C3  A1-05 -> A1-06: cpu crc d 24 jab d 13 frag d 0 drop d 1 
+  ok    C4  A1-07 -> A1-08: cpu crc d 61 jab d 60 
+  ok    C5  C-00 -> C-01: cpu crc d 0 jab d 0 
+  ok    S1  series over block 46's arm C, C-00 ... C-11: dsync/skb_fail 0 1 1 1 1 0 1 1 1 0 0, rx 2 each
+  ok    S2  a series of one dump is refused
+  ok    X1  a bracket whose CPU-port section is missing is refused, never read as zero
+  ok    X2  a missing bracket is refused by its basename
+  ok    D1  E-L1-R0 -> E-L1-R1: block 47's o-identity miss, o 168 against c 789 - j 581 - f 3 - d 41 = 164; legal 24+54+0+81+3+43 = 205 = c - j - f
+  ok    D2  E-F1-R0 -> E-F1-R1: o 221 = c 221, legal 21+60+0+60+0+80 = 221
+  ok    D3  E-F1-R1 -> E-L1-R0 with the host: host rx 6 against p3 out 5 (the gap race)
+  ok    D4a hbound, the H logs standing in for P: inner = outer = o = 168, within yes
+  ok    D4b hbound, P planted 2 and 3 below H: inner 2683 - 2518 = 165, outer 2686 - 2516 = 170, within yes
+  ok    D4c hbound, CUR_P planted 1 above CUR_H: inner 169 exceeds o 168, within no
+  ok    D4d hbound, PREV_P planted 1 above PREV_H: outer 167 below o 168, within no
+  ok    D5a E-F1-R0 -> E-F1-R1: Ip InReceives/InDelivers/OutRequests 18 -> 238, Udp still
+  ok    D5b E-L1-R0 -> E-L1-R1: InReceives 242 -> 1569, OutRequests 242 -> 1584, OutDiscards 0 -> 155
+  ok    D6a snmp E-F1-R0 E-F1-R1 prints D5a's line
+  ok    D6b snmp over two synthetic iperf cells (CRLF, echoed command, other output): udp indg d 6431 inerr d 46157 rcvbuf d 46157
+  ok    D7  snmp over two cells that each print /proc/net/snmp twice reads the LAST print
+  ok    D8  snmp over a kernel whose Ip and Udp columns run in reverse order reads by header name
+  ok    D9  pair with candidate lists: the last present is read (a stand-in X- after its read; absent ones skipped)
+  ok    O1  line order: brdelta board cpu p3 ident buckets host path hbound snmp fault leak (host, path, hbound only with the host)
+  ok    X3  a board read whose Udp values line is cut short is refused, never read as zero
+  ok    X4  --pre without --host is refused with a reason, before any line is printed
+  ok    X5  a board read holding two Udp pairs is refused
+  ok    X6  a board read whose Ip values hold a non-integer is refused
+  ok    X7  snmp over a log with no Udp pair is refused
+  ok    X8  snmp over a log whose Ip header has no values line is refused
+  ok    X9  a board read with a line between the Udp header and its values is refused
+brdelta self-test: 40 of 40 passed
+  ok    D1  first window: 5 lines, one BUG trace with its transmit frame, one unlink
+  ok    D2  second window chains from the first; a half-written last line waits for the next window
+  ok    D3  an unreadable --prev: exit 3, the counts cumulative and marked so
+  ok    D4  no line of the log and no directory is printed
+  ok    D5  a missing log is refused by its basename
+  ok    D6  follower counts a started `dmesg -w` (1 -> 2) and forgets it killed (1)
+  ok    D7  a list: the last candidate present is used (the two absent ones skipped), its window chains
+  ok    D8  window_end is dmesgwin's own, not a later pcapwin line's (the FW-145 shape, turned round)
+  ok    D9  the last candidate present holds no window_end: unreadable (exit 3), never a fall back to w1
+dmesgwin self-test: 9 of 9 passed
+  ok   K1 block 48, D3-LUS1-L's episode (D3-LUR1-R -> X-BR1): branch a, host tx d 6 = port 3 rx d 6 -- rc 0, s1 branch a
+  ok   K2 block 46, A2-02-R -> A2-03-R (NET-124's onset): branch b, host tx d 20, port 3 rx d 0 -- rc 0, s1 branch b
+  ok   K3 block 46, A2-03-R -> A2-04-R: branch b, port 3 rx d 0 -- rc 0, s1 branch b
+  ok   K4 block 46, the 55 pairs from A2-02-R -> A2-03-R (NET-124's onset) to D-04-R -> D-05-R: branch b at every one, port 3 rx d 0 -- b 55 of 55
+  ok   K5 block 46, the 21 pre-onset pairs with -H standing in for -P: branch a at 19, branch b at exactly A1-08-R -> A1-09-R (host tx d 63, port 3 rx d 62) and A1-13-R -> A1-14-R (63, 61) -- a 19, b [('A1-08-R', 'A1-09-R', ('63', '62')), ('A1-13-R', 'A1-14-R', ('63', '61'))]
+  ok   K6 block 48's 56 `BD pair` pairs: branch a wherever the host sent (38), branch b only where it sent nothing (17), refused only across X-RA1 (1, D3-LUS1-D) -- as expected
+  ok   M1 K1 with port 3's Rx Unicast 1 lower at X-BR1 (port 3 rx d 5 < host tx d 6): flips to branch b -- rc 0, s1 branch b
+  ok   M2 K2 with port 3's Rx Unicast 20 higher at A2-03-R: flips to branch a -- rc 0, s1 branch a
+  ok   M3 K1 with X-HP1's tx_packets equal to D3-LUR1-H's (the host sent nothing): flips to branch b -- rc 0, s1 branch b
+  ok   K7 --nic holding two intact dumps (D3-LUR1-R's, then X-BR1's): the last is read, engine-owned 0 of 4 -- rc 0, s1 branch a
+  ok   R1 X-BR1 without its port 3 section: refused, branch b by default -- rc 2, s1 branch b
+  ok   R2 --prev-br and --br swapped (counters backwards): refused -- rc 2, s1 branch b
+  ok   R3 X-HP1 without tx_packets: refused -- rc 2, s1 branch b
+  ok   R4 a log that does not exist: refused -- rc 2, s1 branch b
+  ok   R5 --nic whose every driver dump is broken: refused -- rc 2, s1 branch b
+s1class self-test: 15 of 15 passed
+  ok   T1 on 0.2 ms above off at every size: raises at all five, U 36 of 36, lo 5 hi 31 -- rc 0; effect 256 on 1.8000 off 1.5950 d +0.2050 ms pct +12.85 % U 36 of 36 lo 5 hi 31 verdict raises
+  ok   T2 on 0.2 ms below off: lowers at all five, U 0 -- rc 0; effect 256 on 1.4000 off 1.5950 d -0.1950 ms pct -12.23 % U 0 of 36 lo 5 hi 31 verdict lowers
+  ok   T3 values rising with run order only (the ABBA order balances it): unresolved at all five -- rc 0; effect 256 on 1.7100 off 1.7100 d +0.0000 ms pct +0.00 % U 18 of 36 lo 5 hi 31 verdict unresolved
+  ok   T4 an on-series losing 1 echo at 256: void, n on 5, still measured (lo 3 hi 27) -- rc 0; effect 256 on 1.8000 off 1.5950 d +0.2050 ms pct +12.85 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T5 an on-series whose C0 reads 0 (the capture not yet running): void -- rc 0; effect 256 on 1.8000 off 1.5950 d +0.2050 ms pct +12.85 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T6 an off-series behind a failed liveness gate: void -- rc 0; effect 256 on 1.8000 off 1.6000 d +0.2000 ms pct +12.50 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T7 two on-series void (a second tcpdump, none): n on 4, every size unmeasured -- rc 0; effect 256 unmeasured: n on 4, n off 6 (each needs 5)
+  ok   T8 a series whose 1472 header is missing: void (sizes 56,256,512,1024) -- rc 0; effect 256 on 1.8000 off 1.5950 d +0.2050 ms pct +12.85 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T9 --ref: off median inside [0.9 LO, 1.1 HI] (also between 0.9 LO and LO); above when HI is lower -- rc 0; effect 256 on 1.8000 off 1.6000 d +0.2000 ms pct +12.50 % U 36 of 36 lo 5 hi 31 verdict raises
+  ok   T10 --row: off median 1.6 against A 1.518 is +5.40 % (within); against 1.43 +11.89 % and 1.4 +21.43 % (not) -- rc 0; effect 256 on 1.8000 off 1.6000 d +0.2000 ms pct +12.50 % U 36 of 36 lo 5 hi 31 verdict raises
+  ok   T17 U exactly 31 of 36 (five on-series above every off, one above one): raises; off median 1.25 (the mean of the middle two) -- rc 0; effect 256 on 2.1500 off 1.2500 d +0.9000 ms pct +72.00 % U 31 of 36 lo 5 hi 31 verdict raises
+  ok   T18 an on-series whose C1 reads 0 (the capture ended inside the series): void -- rc 0; effect 256 on 1.8000 off 1.5950 d +0.2050 ms pct +12.85 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T19 an off-series whose pair log reads covered no: void -- rc 0; effect 256 on 1.8000 off 1.6000 d +0.2000 ms pct +12.50 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T20 an on-series whose pair log reads fault jfd 3: void -- rc 0; effect 256 on 1.8000 off 1.5950 d +0.2050 ms pct +12.85 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T21 a series with no pair log: void -- rc 0; effect 256 on 1.8000 off 1.6000 d +0.2000 ms pct +12.50 % U 30 of 30 lo 3 hi 27 verdict raises
+  ok   T22 --ref-on: on median 1.8 inside [0.9 x 1.7, 1.1 x 1.7]; above against 1.6; the off median is not read -- rc 0; effect 256 on 1.8000 off 1.6000 d +0.2000 ms pct +12.50 % U 36 of 36 lo 5 hi 31 verdict raises
+  ok   T11 seating B's P3-ICMP bytes as S01: 5 sizes, 0 loss, 256 1.933/0.796, 1472 2.399/0.622 -- rc 0; effect 256 on 1.8000 off 1.6050 d +0.1950 ms pct +12.15 % U 30 of 36 lo 5 hi 31 verdict unresolved
+  ok   T12 exact null thresholds: lo(6,6) 5, lo(5,6) 3, lo(5,5) 2 -- lo 5 3 2
+  ok   T16 every series identical: U 18 of 36 (ties count 0.5), unresolved, d 0 -- rc 0; effect 256 on 1.6000 off 1.6000 d +0.0000 ms pct +0.00 % U 18 of 36 lo 5 hi 31 verdict unresolved
+  ok   T13 a plan with a letter: refused -- rc 2; rttseries: REFUSED: --plan is a string of 0 (off) and 1 (on), one per series: '0110x1100110'
+  ok   T14 a directory with none of the arm's series: refused -- rc 2; rttseries: REFUSED: no series log of arm R in c-bokggfvg
+  ok   T15 --ref at a size the series do not carry: refused -- rttseries: REFUSED: --ref is SIZE:LO:HI with SIZE one of (56, 256, 512, 1024, 1472) and LO <= HI: '300:1:2'
+rttseries self-test: 22 of 22 passed
+  ok   R1 block 48's D3-LUR1-R: crc 321019 jab 909 frag 2 drop 54, p3 out 317131/0/2927, n_recov_fire 7 n_tx_stop 7 tx_stopped 0 -- {'ou': 317131, 'om': 0, 'ob': 2927, 'crc': 321019, 'frag': 2, 'jab': 909, 'drop': 54, 'n_recov_fire': 7, 'n_tx_stop': 7, 'tx_stopped': 0}
+  ok   R2 block 46's A1-00-R (the first read of a boot, driver 1.4): every counter 0 -- {'ou': 0, 'om': 0, 'ob': 0, 'crc': 0, 'frag': 0, 'jab': 0, 'drop': 0, 'n_recov_fire': 0, 'n_tx_stop': 0, 'tx_stopped': 0}
+  ok   R3 block 48's W-EWALL: records 1078, dst host 1076 bcast 2 mcast 0 other 0 -- 1078 (1076, 2, 0, 0)
+  ok   R4 block 48's W-EORD (100 host reads, no stop log in its list) is refused as a ③ order log -- W-EORD.log: 100 `at` lines, 3 expected (B-AC0-P, B-AC0-H and the stop log)
+  ok   S1 W 430 at both reads, 2 broadcasts, c 430 o 430 u 428: every row holds, exact, healthy -- rc 0; row crcalignerr c 430 against [430, 430] holds exact | row p3egress o 430 against [430, 430] holds exact | row p3egress-unicast u 428 against [428, 42
+  ok   S2 W 429 at P and 430 at H, one broadcast after H: bounded; c 432 = W + jfd 2 holds; not healthy -- rc 0; row crcalignerr c 432 against [431, 432] holds bounded | row p3egress o 430 against [429, 430] holds bounded | row p3egress-unicast u 429 against [428
+  ok   S3 o 434 against W 430 (the counters did not start with the capture): p3egress and crcalignerr miss -- rc 0; row crcalignerr c 434 against [430, 430] misses exact | row p3egress o 434 against [430, 430] misses exact | row p3egress-unicast u 432 against [428, 
+  ok   S4 unicast destinations split host 200 / other 228: unicast 428 at both reads, the unicast row holds -- rc 0; row crcalignerr c 430 against [430, 430] holds exact | row p3egress o 430 against [430, 430] holds exact | row p3egress-unicast u 428 against [428, 42
+  ok   S5 jfd 0 but n_recov_fire 1 at the last dump: not healthy -- rc 0; row crcalignerr c 430 against [430, 430] holds exact | row p3egress o 430 against [430, 430] holds exact | row p3egress-unicast u 428 against [428, 42
+  ok   S6 two intact dumps, the earlier with a recovery and the last clean: the last is read, healthy -- rc 0; row crcalignerr c 430 against [430, 430] holds exact | row p3egress o 430 against [430, 430] holds exact | row p3egress-unicast u 428 against [428, 42
+  ok   V1 anchor void: no row scored, rc 3 -- rc 3; anchor void (pcapwin's own reasons are in ov.log): no row is scored
+  ok   X1 the order log's windows do not reach its record count (stop idx 431 vs a window ending 430) -- rc 2; w3: REFUSED: ob.log: order_window B-AC0-H.log -> W-TCPX.log holds 1 records, its dst classes 0
+  ok   X2 the wall's records 431 against the order's 430: refused -- rc 2; w3: REFUSED: o0.log's record count 430 is not lb.log's 431
+  ok   X3 a wall whose dst classes sum to 429 of 430: refused -- rc 2; w3: REFUSED: ld.log: the dst classes sum to 429, the file holds 430
+  ok   X4 a board read without port 3: refused -- rc 2; w3: REFUSED: bn.log has no port 3 section
+  ok   X5 a board log that does not exist: refused -- rc 2; w3: REFUSED: cannot read B-AC0-R.log: No such file or directory
+  ok   X6 the stop log's index 430 against the record count 431: refused -- rc 2; w3: REFUSED: ox.log: the stop log's index 430 is not the record count 431
+w3 self-test: 17 of 17 passed
+  ok   C1 seating B P2Q-r01 (cold, ledger): mid 0.094550, k 2, lower N-NDOPEN, void none -- rc 0; width card-rule [0.080550, 0.108550] mid 0.094550 lower ndopen void none
+  ok   C2 seating B P3Q-r01 (cold, frames P3-TCPD): mid 0.114647, frame #2, frame width 0.1031 -- rc 0; frames who-has 2 answered 10.863251 is-at 10.864386 width 0.103142 | width card-rule [0.100647, 0.128647] mid 0.114647 lower ndopen void none
+  ok   C3 seating B P2Q-r02 (warm, ledger): mid 0.130450 -- rc 0; width card-rule [0.116450, 0.144450] mid 0.130450 lower ndopen void none
+  ok   C4 seating B P3Q-r02 (warm, frames): mid 0.129736, frame width 0.1449 -- rc 0; frames who-has 2 answered 10.906824 is-at 10.907616 width 0.144923 | width card-rule [0.115736, 0.143736] mid 0.129736 lower ndopen void none
+  ok   C5 the loud image, seating B P1L-r01 (cold, frames P1-TCPD): mid 0.713143, k 3, frame width 0.7150 -- rc 0; frames who-has 3 answered 13.218754 is-at 13.222016 width 0.715017 | width card-rule [0.685143, 0.741143] mid 0.713143 lower ndopen void none
+  ok   K1 kfrom equals netup.py's own kfrom at every offset 0-6 s in 1 ms steps -- lifted; first difference none
+  ok   X3 P3Q-r01 against its capture less the answered who-has: the last who-has before rlx0's is-at is #1, void 3 -- rc 3; frames who-has 1 answered 9.860697 is-at 10.864386 width -0.899412 | width card-rule [0.100647, 0.128647] mid 0.114647 lower ndopen void 3
+  ok   X1 a boot the retro table does not hold: refused -- rc 2; w1width: REFUSED: P9Q-r01-boot is not a kernel boot of the retro table
+  ok   X2 the frame check against the wrong capture (P1-TCPD for P3Q-r01): void 3 -- rc 3; frames no rlx0 is-at before the reply | width card-rule [0.100647, 0.128647] mid 0.114647 lower ndopen void 3
+w1width self-test: 9 of 9 passed
+  ok    K1 a step both detectors see | steps: timerfd 1, agreed with the rows 1, AGREE; positively controlled: yes | gate refuses
+  ok    K2 a step the timerfd missed | steps: timerfd 0, agreed with the rows 0, DISAGREE; positively controlled: NO -- no step both de | gate refuses
+  ok    K3 a timerfd step the rows never show | steps: timerfd 1, agreed with the rows 0, DISAGREE; positively controlled: NO -- no step both de | gate refuses
+  ok    K4 no step | steps: timerfd 0, agreed with the rows 0, NO STEPS; positively controlled: NO -- no step both de | gate permits
+  ok    K5 block 44's gate text permits K2's report (its exit 1 refuses it); the card's gate refuses it
+hcstepctl self-test: 5 of 5 passed

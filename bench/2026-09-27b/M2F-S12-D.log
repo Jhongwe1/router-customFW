@@ -1,0 +1,14 @@
+brdelta 1.2 M2F-S11-R.log -> M2F-S12-R.log
+resolve prev M2F-S11-R.log 1 of 2
+resolve cur M2F-S12-R.log 1 of 2
+board n_tx d 105 n_recov_fire d 0 n_tx_stop d 0 n_rx d 106 nd_up 1 tx_stopped 0
+cpu crc d 105 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 5 b65 d 20 b128 d 0 b256 d 20 b512 d 20 b1024 d 40
+p3 out d 105 rx d 106 rxbytes d 71394
+ident o d 105 cjfd d 105 k 0
+buckets legal d 105 cjf d 105 lt64 d 0
+host rx d 105 tx d 105 inechoreps d 104 outechos d 104
+path p3 rx d 106 host outechos d 104 covered yes
+hbound inner d 105 outer d 105 o d 105 within yes
+snmp ip inrecv d 104 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 104 outreq d 104 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 105 p3 105 host 105

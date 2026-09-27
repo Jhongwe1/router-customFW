@@ -1,0 +1,16 @@
+lp0 version 1 build 1bce836f2e21c43a
+call drv rlx0 rc 0 driver "rtl819x-nic" version "rtl819x-nic 1.5" fw "" bus "platform" can 0
+call link rlx0 rc 0 data 00000001 can 0
+call ring rlx0 rc 0 rx 8/8 mini 0/0 jumbo 0/0 tx 4/4 can 0
+call drv lo rc 122 can 192
+call link lo rc 0 data 00000001 can 0
+call ring lo rc 122 can 32
+call drv eth4 rc 122 can 192
+call link eth4 rc 122 can 4
+call ring eth4 rc 122 can 32
+call drv nosuch0 rc 19 can 192
+call link nosuch0 rc 19 can 4
+call ring nosuch0 rc 19 can 32
+lp9 calls 12 ok 4 refused 8 nowrite 0
+summary calls 12 ok 4 refused 8 nowrite 0
+lpread get verdict read

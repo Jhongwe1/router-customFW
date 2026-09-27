@@ -1,0 +1,6 @@
+d4load 1.0 if enxfc19286184c9 dst 10.1.1.3 seconds 120 flood yes flood-size 1400 preload 32 sizes 18-1472 period 10
+flood 35099 packets transmitted, 28548 received, +3 duplicates, 18.6643% packet loss, time 119997ms
+flood rtt min/avg/max/mdev = 1.320/17.511/1014.671/11.650 ms, pipe 25, ipg/ewma 3.418/16.689 ms
+loop passes 1 pings 198 answered 80
+counters rows 12
+d4load end rc 0

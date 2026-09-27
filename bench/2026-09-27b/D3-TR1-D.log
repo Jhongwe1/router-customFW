@@ -1,0 +1,14 @@
+brdelta 1.2 D3-00-R.log -> D3-TR1-R.log
+resolve prev D3-00-R.log 1 of 2
+resolve cur D3-TR1-R.log 1 of 2
+board n_tx d 1144 n_recov_fire d 0 n_tx_stop d 0 n_rx d 44316 nd_up 1 tx_stopped 0
+cpu crc d 1144 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 7 b65 d 1136 b128 d 0 b256 d 1 b512 d 0 b1024 d 0
+p3 out d 1144 rx d 44316 rxbytes d 66549472
+ident o d 1144 cjfd d 1144 k 0
+buckets legal d 1144 cjf d 1144 lt64 d 0
+host rx d 1144 tx d 44316 inechoreps d 4 outechos d 4
+path p3 rx d 44316 host outechos d 4 covered yes
+hbound inner d 1144 outer d 1144 o d 1144 within yes
+snmp ip inrecv d 44313 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 44313 outreq d 1141 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 1144 p3 1144 host 1144

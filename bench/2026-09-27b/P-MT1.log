@@ -1,0 +1,19 @@
+cd /tmp && /bin/mfgtest auto acf8ed3d > mt1.log 2>&1 ; cat /tmp/mt1.log ; cd /
+RLXFW-S-RDID=001C7016
+RLXFW-S-TRYW=00000001
+RLXFW-S-MRC=00000000
+RLXFW-S-MDIFF=00000000
+RLXFW-S-MH601=00000000
+RLXFW-S-H601=00000000
+mfgtest 1.1  phase=auto
+  ok    MT-ID        recipe_id=ACF8ED3D expected=ACF8ED3D
+  ok    MT-FLASH-1   rdid_id=1C7016 rdid_match=1
+  ok    MT-FLASH-2   n_write_refused=2 n_writes=0
+  ok    MT-FLASH-3   map_rc=0 h601_hashed=0 diff_units=0 (digests scored at the desk)
+  ok    MT-TICK      ce_live=1 ce_mode=2 reload=2000=2000 dj=526 di=526 skew=0
+  ok    MT-WDT       wdtcnr_at_probe=A5000000 state=BOOTGUARD
+  FAIL  MT-PORT      Port3 has no LinkUp -- cable out, or the wrong jack (by rtl819x-switch 1.2; psrp3 000000E9 up 0 lde 3 lj 241691)
+  ok    MT-MAC       sig_ok=1 ver=1 len=1166 mac unicast
+  ok    MT-RFCAL     hw_sum_ok=1 over 1166 body bytes
+8 of 9 ok, 1 FAIL
+# 

@@ -1,0 +1,4 @@
+cat /proc/sys/net/core/rmem_default /proc/sys/net/core/rmem_max
+116736
+116736
+# 

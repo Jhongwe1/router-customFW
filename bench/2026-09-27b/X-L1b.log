@@ -1,0 +1,23 @@
+0
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 18(46) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+4 packets transmitted, 0 received, 100% packet loss, time 832ms
+
+dmesgwin 1.2 prev none
+window 0 6620356
+window_end 6620356
+lines 90525 first_t 0.000 last_t 2188.313
+bug_preempt 792
+usbnet_xmit 792
+vhci_unlink 795
+urb_104 795
+usb_disc 1
+cp210x 4
+ttyusb 1
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 792
+follower 1

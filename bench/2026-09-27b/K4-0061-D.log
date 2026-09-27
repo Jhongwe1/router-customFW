@@ -1,0 +1,14 @@
+brdelta 1.2 K4-0061-R0.log -> K4-0061-R1.log
+resolve prev K4-0061-R0.log 1 of 2
+resolve cur K4-0061-R1.log 1 of 2
+board n_tx d 3 n_recov_fire d 0 n_tx_stop d 0 n_rx d 3 nd_up 1 tx_stopped 0
+cpu crc d 3 jab d 1 frag d 0 drop d 0 dropev d 0 b64 d 1 b65 d 1 b128 d 0 b256 d 0 b512 d 0 b1024 d 0
+p3 out d 2 rx d 3 rxbytes d 194
+ident o d 2 cjfd d 2 k 0
+buckets legal d 2 cjf d 2 lt64 d 0
+host rx d 2 tx d 3 inechoreps d 1 outechos d 2
+path p3 rx d 3 host outechos d 2 covered yes
+hbound inner d 2 outer d 2 o d 2 within yes
+snmp ip inrecv d 2 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 2 outreq d 2 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 1
+leak cpu 3 p3 2 host 2

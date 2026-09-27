@@ -1,0 +1,7 @@
+s1 branch a
+s1 reason host tx d 6 (D3-LUR1-H.log -> X-HP1.log), port 3 rx d 6 (D3-LUR1-R.log -> X-BR1.log): every frame the host sent reached port 3
+s1 reason rule: branch a iff host tx d >= 1 and port 3 rx d >= host tx d (s1class 1.0)
+s1 reason board rx: port 3 rx unicast d 1 multicast d 1 broadcast d 4, driver n_rx d 6, nd_up 1
+s1 reason board tx: n_tx d 6 cpu crc d 3 jab d 0 frag d 0 drop d 1 p3 out d 2 host rx d 2
+s1 reason nic page X-NIC1.log: nd_up 1 tx_stopped 0 engine-owned txd 0 of 4 (bits 0000) n_tx_stop 0 n_recov arm 0 fire 0 ok 0; at D3-LUR1-R.log tx_stopped 0 engine-owned 0 n_tx_stop 0 n_recov arm 0 fire 0 ok 0
+s1class end rc 0

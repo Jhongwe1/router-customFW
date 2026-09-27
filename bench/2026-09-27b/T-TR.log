@@ -1,0 +1,40 @@
+Connecting to host 10.1.1.3, port 5201
+Reverse mode, remote host 10.1.1.3 is sending
+[  4] local 10.1.1.2 port 51682 connected to 10.1.1.3 port 5201
+[ ID] Interval           Transfer     Bandwidth
+[  4]   0.00-10.00  sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4]  10.00-20.00  sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4]  20.00-30.00  sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4]  30.00-40.00  sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4]  40.00-50.00  sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4]  50.00-60.00  sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4]  60.00-70.00  sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4]  70.00-80.00  sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4]  80.00-90.00  sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4]  90.00-100.00 sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4] 100.00-110.00 sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4] 110.00-120.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 120.00-130.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 130.00-140.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 140.00-150.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 150.00-160.00 sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4] 160.00-170.00 sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4] 170.00-180.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 180.00-190.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 190.00-200.00 sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4] 200.00-210.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 210.00-220.00 sec  26.5 MBytes  22.3 Mbits/sec                  
+[  4] 220.00-230.00 sec  26.6 MBytes  22.3 Mbits/sec                  
+[  4] 230.00-240.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 240.00-250.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 250.00-260.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 260.00-270.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 270.00-280.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 280.00-290.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+[  4] 290.00-300.00 sec  26.5 MBytes  22.2 Mbits/sec                  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-300.00 sec   797 MBytes  22.3 Mbits/sec    0             sender
+[  4]   0.00-300.00 sec   797 MBytes  22.3 Mbits/sec                  receiver
+
+iperf Done.

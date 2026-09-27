@@ -1,0 +1,12 @@
+iperflog 1.0 compare
+  board: bench/2026-09-27b/D3-TR1-S1.log trial 1, TEST_END line 63: [  6]   0.00-29.85  sec  60.4 MBytes  16986 Kbits/sec                  receiver
+  host:  bench/2026-09-27b/D3-TR1.log line 13: [  4]   0.00-30.00  sec  60.4 MBytes  16.9 Mbits/sec                  receiver
+  stream: board 10.1.1.3:5201 <- 10.1.1.2:42804 (line 28) is host 10.1.1.2:42804 -> 10.1.1.3:5201 (line 2)
+  transfer: board "60.4 MBytes", host "60.4 MBytes": identical, as one integer through one formatter must be
+  bits: board rate x end   [506932248, 507131958]
+  bits: host rate x end    [505415750, 508584750]
+  bits: board transfer x 8 [506252493, 507091354]
+  bits: host transfer x 8  [506252493, 507091354]
+  bits: common             [506932248, 507091354]
+  FIGURE trial=1 proto=tcp source=TEST_END lines=63 rate="16986 Kbits/sec" rate_bps=16986000+/-500 end_s=29.85+/-0.005 transfer="60.4 MBytes" bytes=[63366531,63386419] rounding=the rate column is the figure, printed in steps of 1 Kbits/sec; the transfer column (steps of 0.1 MBytes, 1024-based) is checked, not used
+AGREE: the board log's figure is the host's within both lines' printed rounding

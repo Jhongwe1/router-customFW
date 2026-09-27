@@ -1,0 +1,19 @@
+swpage 1.2 delta
+delta n_linkq d 1381 n_reads d 7085 n_writes d 0
+delta lde 0 d 0
+delta lde 1 d 0
+delta lde 2 d 0
+delta lde 3 d 0
+delta lde 4 d 0
+delta lde 5 d 0
+delta lde 6 d 0
+delta lde 7 d 0
+delta psrp 0 000000E0->000000E0 up 0->0
+delta psrp 1 000000E0->000000E0 up 0->0
+delta psrp 2 000000E0->000000E0 up 0->0
+delta psrp 3 000000F9->000000F9 up 1->1
+delta psrp 4 000000E0->000000E0 up 0->0
+delta psrp 5 000000E2->000000E2 up 0->0
+delta psrp 6 0000007A->0000007A up 1->1
+delta psrp 7 0000007A->0000007A up 1->1
+masked 3 000000F9 000000F9 bit8 0 0 same yes

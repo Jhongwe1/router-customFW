@@ -1,0 +1,47 @@
+pcapwin 1.3 order
+pcap A.pcap records 63 partial_tail_bytes 0
+tcpdump captured 63 received 63 dropped 0
+stop W-TCPX.log rx_pre 2322 rx_post 2322
+anchor ok base 2259
+at B-AC0-P.log rx 2322 idx 63 readtime - lag -
+at B-AC0-H.log rx 2322 idx 63 readtime - lag -
+at W-TCPX.log rx 2322 idx 63 readtime - lag -
+order_window B-AC0-P.log B-AC0-H.log 63 63
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+order_window B-AC0-H.log W-TCPX.log 63 63
+frames 0
+len -
+ethertype -
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 0 tagged 0 len -
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess -
+echo_ids 0
+echo_dup 0
+echo_vid -
+dst host:0 bcast:0 mcast:0 other:0
+truncated 0
+icmp_partial 0
+pcapwin end rc 0

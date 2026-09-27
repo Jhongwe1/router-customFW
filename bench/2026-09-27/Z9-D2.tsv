@@ -1,0 +1,178 @@
+# boot-timeline.py --retro, tool sha256 a541392a0ffe7216f176f5f50995cc6eac0bcc4a384aa407a082037d5219ec7c, paths: bench/2026-09-27
+# one record per line; columns unused by a record are empty; seconds
+# records: loader seg lm kboot cell nothing fragment class? term1 term1cell reset scale scalefit
+record	firmware	variant	class	image	directory	capture	quantity	from	to	seg_class	n	value	median	min	max	p90	argmax	ratio	slope	ci_lo	ci_hi	r	note
+loader			cold		bench/2026-09-27	bench/2026-09-27/A1-CATCH.log	loader.booting				1	0.356035											
+loader			cold		bench/2026-09-27	bench/2026-09-27/A1-CATCH.log	loader.banner				1	0.585790											
+cell	loader		cold	pooled			loader.booting	booting	chipname	identical	1		0.356035	0.356035	0.356035								
+cell	loader		warm	pooled			loader.booting	booting	chipname	identical	0												
+cell	loader		?	pooled			loader.booting	booting	chipname	identical	0												
+cell	loader		cold	pooled			loader.banner	booting	banner	identical	1		0.585790	0.585790	0.585790								
+cell	loader		warm	pooled			loader.banner	booting	banner	identical	0												
+cell	loader		?	pooled			loader.banner	booting	banner	identical	0												
+cell	loader		cold	pooled			loader.esc	banner	autoboot	identical	0												
+cell	loader		warm	pooled			loader.esc	banner	autoboot	identical	0												
+cell	loader		?	pooled			loader.esc	banner	autoboot	identical	0												
+cell	vendor	-	cold	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	vendor	-	warm	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	vendor	-	?	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	vendor	-	cold	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	vendor	-	warm	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	vendor	-	?	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	vendor	-	cold	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	vendor	-	warm	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	vendor	-	?	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	vendor	-	cold	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	vendor	-	warm	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	vendor	-	?	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	vendor	-	cold	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	vendor	-	warm	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	vendor	-	?	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	vendor	-	cold	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	vendor	-	warm	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	vendor	-	?	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	vendor	-	cold	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	vendor	-	warm	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	vendor	-	?	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	vendor	-	cold	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	vendor	-	warm	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	vendor	-	?	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	vendor	-	cold	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	vendor	-	warm	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	vendor	-	?	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			rtkload.decompress	decomp	decomp_done	comparable	1		1.217593	1.217593	1.217593								
+cell	rlxfw	quiet	warm	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	quiet	?	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	quiet	cold	pooled			rtkload.total	jump	kentry	comparable	1		1.226110	1.226110	1.226110								
+cell	rlxfw	quiet	warm	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	quiet	?	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.early	kentry	wlan	comparable	1		0.821489	0.821489	0.821489								
+cell	rlxfw	quiet	warm	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	quiet	?	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.wlan	wlan	nic	comparable	1		4.597784	4.597784	4.597784								
+cell	rlxfw	quiet	warm	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	quiet	?	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.nic	nic	fastpath	comparable	1		0.860832	0.860832	0.860832								
+cell	rlxfw	quiet	warm	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	quiet	?	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.late	fastpath	userinit	comparable	1		3.165270	3.165270	3.165270								
+cell	rlxfw	quiet	warm	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	quiet	?	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	quiet	cold	pooled			kernel.total	kentry	userinit	comparable	1		9.445375	9.445375	9.445375								
+cell	rlxfw	quiet	warm	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	quiet	?	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	quiet	cold	pooled			user.ready	userinit	ready	not-comparable	1		0.116619	0.116619	0.116619								
+cell	rlxfw	quiet	warm	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	quiet	?	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			boot.jump_to_ready	jump	ready	not-comparable	1		10.788104	10.788104	10.788104								
+cell	rlxfw	quiet	warm	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	?	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			rlxfw.setup	b00	b09	not-comparable	1		0.046998	0.046998	0.046998								
+cell	rlxfw	quiet	warm	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	quiet	?	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	quiet	cold	pooled			rlxfw.initpost	b10	userinit	not-comparable	1		0.011834	0.011834	0.011834								
+cell	rlxfw	quiet	warm	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	quiet	?	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	loud	warm	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	loud	?	pooled			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	loud	cold	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	loud	warm	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	loud	?	pooled			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	loud	warm	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	loud	?	pooled			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	loud	warm	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	loud	?	pooled			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	loud	warm	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	loud	?	pooled			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	loud	warm	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	loud	?	pooled			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	loud	cold	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	loud	warm	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	loud	?	pooled			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	loud	cold	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	loud	warm	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	loud	?	pooled			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	loud	warm	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	loud	?	pooled			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	loud	warm	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	loud	?	pooled			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	loud	cold	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	loud	warm	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	loud	?	pooled			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	1		1.217593	1.217593	1.217593								
+cell	rlxfw	quiet	warm	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			rtkload.decompress	decomp	decomp_done	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rtkload.total	jump	kentry	comparable	1		1.226110	1.226110	1.226110								
+cell	rlxfw	quiet	warm	A2C56BC8			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			rtkload.total	jump	kentry	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.early	kentry	wlan	comparable	1		0.821489	0.821489	0.821489								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			kernel.early	kentry	wlan	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.wlan	wlan	nic	comparable	1		4.597784	4.597784	4.597784								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			kernel.wlan	wlan	nic	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.nic	nic	fastpath	comparable	1		0.860832	0.860832	0.860832								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			kernel.nic	nic	fastpath	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.late	fastpath	userinit	comparable	1		3.165270	3.165270	3.165270								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			kernel.late	fastpath	userinit	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			kernel.total	kentry	userinit	comparable	1		9.445375	9.445375	9.445375								
+cell	rlxfw	quiet	warm	A2C56BC8			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			kernel.total	kentry	userinit	comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			user.ready	userinit	ready	not-comparable	1		0.116619	0.116619	0.116619								
+cell	rlxfw	quiet	warm	A2C56BC8			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			user.ready	userinit	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	1		10.788104	10.788104	10.788104								
+cell	rlxfw	quiet	warm	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			boot.jump_to_ready	jump	ready	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	1		0.046998	0.046998	0.046998								
+cell	rlxfw	quiet	warm	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			rlxfw.setup	b00	b09	not-comparable	0												
+cell	rlxfw	quiet	cold	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	1		0.011834	0.011834	0.011834								
+cell	rlxfw	quiet	warm	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	0												
+cell	rlxfw	quiet	?	A2C56BC8			rlxfw.initpost	b10	userinit	not-comparable	0												
+kboot	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log																	inherited from A1-CATCH; `RLXFW-B00`
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	rtkload.decompress	decomp	decomp_done	comparable	1	1.217593											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	rtkload.total	jump	kentry	comparable	1	1.226110											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	kernel.early	kentry	wlan	comparable	1	0.821489											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	kernel.wlan	wlan	nic	comparable	1	4.597784											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	kernel.nic	nic	fastpath	comparable	1	0.860832											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	kernel.late	fastpath	userinit	comparable	1	3.165270											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	kernel.total	kentry	userinit	comparable	1	9.445375											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	user.ready	userinit	ready	not-comparable	1	0.116619											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	boot.jump_to_ready	jump	ready	not-comparable	1	10.788104											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	rlxfw.setup	b00	b09	not-comparable	1	0.046998											
+seg	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	rlxfw.initpost	b10	userinit	not-comparable	1	0.011834											
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	jump					0.016302											byte 12
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	decomp					0.016878											byte 41
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	decomp_done					1.234471											byte 114
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	kentry					1.242412											byte 142
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	b00					1.263279											byte 169
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	b09					1.310277											byte 306
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	wlan					2.063901											byte 685
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	nic					6.661685											byte 744
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	fastpath					7.522517											byte 1291
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	b10					10.675953											byte 1789
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	userinit					10.687787											byte 1800
+lm	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	ready					10.804406											byte 2115
+term1cell	vendor						longest silence				0												
+term1cell	vendor						jump -> ready				0												
+term1cell	rlxfw quiet						longest silence				1		4.580290	4.580290	4.580290	4.580290	bench/2026-09-27/A1Q-boot.log						
+term1cell	rlxfw quiet						jump -> ready				1		10.788104	10.788104	10.788104	10.788104	bench/2026-09-27/A1Q-boot.log						
+term1cell	rlxfw loud						longest silence				0												
+term1cell	rlxfw loud						jump -> ready				0												
+term1cell	rlxfw quiet id0=A2C56BC8						longest silence				1		4.580290	4.580290	4.580290	4.580290	bench/2026-09-27/A1Q-boot.log						
+term1cell	rlxfw quiet id0=A2C56BC8						jump -> ready				1		10.788104	10.788104	10.788104	10.788104	bench/2026-09-27/A1Q-boot.log						
+term1	rlxfw	quiet	cold	A2C56BC8	bench/2026-09-27	bench/2026-09-27/A1Q-boot.log	longest silence	jump	ready		1	4.580290											ends at byte 738 before nic
+term1cell	J BFC00000						longest silence				0												
+term1cell	J BFC00000						send -> prompt				0												
+term1cell	busybox reboot -f						longest silence				0												
+term1cell	busybox reboot -f						send -> prompt				0												

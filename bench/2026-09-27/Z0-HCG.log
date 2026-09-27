@@ -1,0 +1,7 @@
+hostclock 1.0: bench/2026-09-27/Z0-HCG.clock, pid 5264, SNTP off
+hostclock report bench/2026-09-27/Z0-HCG: 77 rows, RAW 223.098659577..283.100313319, boot_id ed3dec98-2ee0-4875-a226-8d6243fcde62, instruments linux,adj,step
+  counts: adj 13, armed 1, linux 61, start 1, stop 1
+  tick check: AGREE over 48 pair(s), worst +0.667 ppm, vacuous: MONO runs at RAW's rate here, so agreement cannot tell them apart; not checked {'an adj row between': 12}
+  steps: timerfd 0, agreed with the rows 0, NO STEPS; positively controlled: NO -- no step both detectors saw, so zero steps is an uncontrolled claim
+  windows: 0 read(s), errors none; QPC-RAW None ppm (se None), UtcNow-RAW None ppm (se None); REALTIME-UtcNow median None s, bracket median None s
+  sntp: 0 sent, 0 used, refused none; rate not claimed: 0 used, fewer than 60; server-REALTIME median None ms

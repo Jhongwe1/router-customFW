@@ -1,0 +1,39 @@
+iperflog 1.0 parse: bench/2026-09-27b/D3-TS1-S1.log -- 64 lines, 1 trial(s)
+trial 1  lines 27-64  tcp  board sends  stream [  6] 10.1.1.3:5201 <- 10.1.1.2:45856 (line 28)
+   line  row      interval      transfer      bandwidth         jitter     lost/total   status
+     30  interval   0.00-1.89   5.00 MBytes   22192 Kbits/sec   -          -            kept
+     31  interval   1.89-2.84   2.50 MBytes   22075 Kbits/sec   -          -            kept
+     32  interval   2.84-3.78   2.50 MBytes   22310 Kbits/sec   -          -            kept
+     33  interval   3.78-4.73   2.50 MBytes   22075 Kbits/sec   -          -            kept
+     34  interval   4.73-5.31   1.57 MBytes   22753 Kbits/sec   -          -            kept
+     35  interval   5.31-6.00   1.79 MBytes   21753 Kbits/sec   -          -            kept
+     36  interval   6.00-7.01   2.41 MBytes   20029 Kbits/sec   -          -            kept
+     37  interval   7.01-8.00   2.10 MBytes   17822 Kbits/sec   -          -            kept
+     38  interval   8.00-9.02   2.35 MBytes   19349 Kbits/sec   -          -            kept
+     39  interval   9.02-10.02  2.23 MBytes   18693 Kbits/sec   -          -            kept
+     40  interval  10.02-11.01  2.15 MBytes   18233 Kbits/sec   -          -            kept
+     41  interval  11.01-12.55  4.10 MBytes   22353 Kbits/sec   -          -            kept
+     42  interval  12.55-13.50  2.50 MBytes   22075 Kbits/sec   -          -            kept
+     43  interval  13.50-14.91  3.75 MBytes   22310 Kbits/sec   -          -            kept
+     44  interval  14.91-15.27  975 KBytes    22191 Kbits/sec   -          -            kept
+     45  interval  15.27-16.86  4.21 MBytes   22229 Kbits/sec   -          -            kept
+     46  interval  16.86-17.81  2.50 MBytes   22075 Kbits/sec   -          -            kept
+     47  interval  17.81-18.76  2.50 MBytes   22075 Kbits/sec   -          -            kept
+     48  interval  18.76-19.70  2.50 MBytes   22310 Kbits/sec   -          -            kept
+     49  interval  19.70-20.65  2.50 MBytes   22075 Kbits/sec   -          -            kept
+     50  interval  20.65-21.59  2.50 MBytes   22310 Kbits/sec   -          -            kept
+     51  interval  21.59-22.51  2.44 MBytes   22209 Kbits/sec   -          -            kept
+     52  interval  22.51-23.07  1.49 MBytes   22314 Kbits/sec   -          -            kept
+     53  interval  23.07-24.91  4.59 MBytes   20919 Kbits/sec   -          -            kept
+     54  interval  24.91-25.85  2.50 MBytes   22310 Kbits/sec   -          -            kept
+     55  interval  25.85-26.80  2.50 MBytes   22075 Kbits/sec   -          -            kept
+     56  interval  26.80-27.74  2.50 MBytes   22310 Kbits/sec   -          -            kept
+     57  interval  27.74-28.69  2.50 MBytes   22075 Kbits/sec   -          -            kept
+     58  interval  28.69-29.63  2.50 MBytes   22310 Kbits/sec   -          -            kept
+     59  interval  29.63-30.11  1.25 MBytes   21845 Kbits/sec   -          -            kept
+     62  summary    0.00-30.11  77.4 MBytes   21562 Kbits/sec   -          -            sender
+     63  summary    0.00-30.11  0.00 Bytes    0.00 Kbits/sec    -          -            receiver: ignored
+                  None: 
+  PROBLEM line 27: the server was the sender in this trial (the client ran -R): iperflog reads the board's receive figure only
+  FIGURE trial=1 proto=tcp source=none -- the board sent in this trial (-R)
+RESULT: NOT every trial has a clean TEST_END figure (exit 1)

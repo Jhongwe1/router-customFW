@@ -1,0 +1,14 @@
+brdelta 1.2 F-00-R.log -> F-99-R.log
+resolve prev F-00-R.log 1 of 2
+resolve cur F-99-R.log 1 of 2
+board n_tx d 2363511 n_recov_fire d 0 n_tx_stop d 0 n_rx d 2363513 nd_up 1 tx_stopped 0
+cpu crc d 2363511 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 185 b65 d 4851 b128 d 9815 b256 d 19456 b512 d 38912 b1024 d 2290292
+p3 out d 2363511 rx d 2363513 rxbytes d 3344860617
+ident o d 2363511 cjfd d 2363511 k 0
+buckets legal d 2363511 cjf d 2363511 lt64 d 0
+host rx d 2363511 tx d 2363514 inechoreps d 2363403 outechos d 2363403
+path p3 rx d 2363513 host outechos d 2363403 covered yes
+hbound inner d 2363510 outer d 2363511 o d 2363511 within yes
+snmp ip inrecv d 2363403 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 2363403 outreq d 2363403 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 2363511 p3 2363511 host 2363511

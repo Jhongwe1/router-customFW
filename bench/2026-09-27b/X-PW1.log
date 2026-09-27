@@ -1,0 +1,2 @@
+cd /tmp && linkprobe watch rlx0 10 600 > lpw1.log 2>&1 &
+# 

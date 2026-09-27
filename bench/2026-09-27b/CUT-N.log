@@ -1,0 +1,4 @@
+cutgate 1.1 now 2026-09-27T15:15:18+08:00 (clock) catch 2026-09-27T14:38:16+08:00 since 37.0 min
+cond end-by now+19 min = 15:34:18 <= 23:52 ok
+cut permit
+cutgate end rc 0

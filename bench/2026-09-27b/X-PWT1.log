@@ -1,0 +1,4 @@
+cutgate 1.1 now 2026-09-27T15:29:07+08:00 (clock) catch 2026-09-27T15:25:47+08:00 since 3.3 min
+cond since-max 3.3 <= 5.66 ok
+cut permit
+cutgate end rc 0

@@ -1,0 +1,4 @@
+sleep 1 ; cat /tmp/lpw.log
+LP0 linkprobe 1 build 1bce836f2e21c43a
+LPW start rlx0 v 1 rc 0
+# 

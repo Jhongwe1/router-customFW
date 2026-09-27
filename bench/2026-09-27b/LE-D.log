@@ -1,0 +1,16 @@
+brdelta 1.2 L-99-R.log -> LE-00-R.log
+resolve prev L-99-R.log 2 of 3
+resolve cur LE-00-R.log 1 of 2
+resolve host_prev L-99-H.log 4 of 4
+resolve pre_prev L-99-P.log 2 of 2
+board n_tx d 5 n_recov_fire d 0 n_tx_stop d 0 n_rx d 5 nd_up 1 tx_stopped 0
+cpu crc d 5 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 5 b65 d 0 b128 d 0 b256 d 0 b512 d 0 b1024 d 0
+p3 out d 5 rx d 5 rxbytes d 320
+ident o d 5 cjfd d 5 k 0
+buckets legal d 5 cjf d 5 lt64 d 0
+host rx d 6 tx d 6 inechoreps d 4 outechos d 4
+path p3 rx d 5 host outechos d 4 covered yes
+hbound inner d 5 outer d 6 o d 5 within yes
+snmp ip inrecv d 4 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 4 outreq d 4 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 5 p3 5 host 6

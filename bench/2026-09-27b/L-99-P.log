@@ -1,0 +1,7 @@
+/sys/class/net/enxfc19286184c9/statistics/rx_packets:2973754
+/sys/class/net/enxfc19286184c9/statistics/tx_packets:2692872
+/sys/class/net/eth0/statistics/tx_packets:11344642
+Icmp: InMsgs InErrors InCsumErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutRateLimitGlobal OutRateLimitHost OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 2393412 0 0 12 0 0 0 0 0 2393400 0 0 0 0 2400097 0 0 0 12 0 0 0 0 2400085 0 0 0 0 0
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors InCsumErrors IgnoredMulti MemErrors
+Udp: 159366 0 0 213705 0 0 0 78 0

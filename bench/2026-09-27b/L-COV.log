@@ -1,0 +1,6 @@
+d4cover 1.0 sizes 18-1472 (1455) passes 1 pings 198
+d4cover sent-all no missing 1257 first-missing 216
+d4cover answered-all no min-sent 1 never-answered 118 first 20
+d4cover counters rows 12 span 110 s max-gap 10.0 s rx-per-interval median 2974 low-intervals 5
+d4cover flood transmitted 35099 received 28548
+d4cover end rc 1

@@ -1,0 +1,25 @@
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 56(84) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 973ms
+rtt min/avg/max/mdev = 0.820/1.460/2.719/0.475 ms
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 256(284) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 974ms
+rtt min/avg/max/mdev = 0.897/1.447/2.070/0.350 ms
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 512(540) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 962ms
+rtt min/avg/max/mdev = 1.047/1.696/2.237/0.409 ms
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 1024(1052) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 964ms
+rtt min/avg/max/mdev = 1.223/1.844/2.629/0.488 ms
+PING 10.1.1.3 (10.1.1.3) from 10.1.1.2 enxfc19286184c9: 1472(1500) bytes of data.
+
+--- 10.1.1.3 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 968ms
+rtt min/avg/max/mdev = 1.544/2.355/3.869/0.708 ms

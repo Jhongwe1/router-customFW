@@ -1,0 +1,7 @@
+hostclock report bench/2026-09-27/Z0-HC: 933 rows, RAW 101.713750222..880.170092429, boot_id ed3dec98-2ee0-4875-a226-8d6243fcde62, instruments linux,adj,step
+  counts: adj 149, armed 2, linux 779, start 1, step 1, stop 1
+  tick check: AGREE over 621 pair(s), worst -1.088 ppm, strong: the kernel's rate is off nominal here; not checked {'an offset write, or no boundary since it': 4, 'an adj row between': 144, 'a change': 9}
+  steps: timerfd 1, agreed with the rows 1, AGREE; positively controlled: yes
+    step at RAW 117.521573882: +0.973812 s, bracketed 0.0585 s
+  windows: 0 read(s), errors none; QPC-RAW None ppm (se None), UtcNow-RAW None ppm (se None); REALTIME-UtcNow median None s, bracket median None s
+  sntp: 0 sent, 0 used, refused none; rate not claimed: 0 used, fewer than 60; server-REALTIME median None ms

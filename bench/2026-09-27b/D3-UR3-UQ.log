@@ -1,0 +1,4 @@
+capacity rmem_default 116736 S 200 T 1704 N 68
+udpq 1.0 port 5201 (hex 1451) prints 2
+sample 1 rx_queue 115416 drops 21159 k not whole (67 rem 1248)
+sample 2 rx_queue 115416 drops 38324 k not whole (67 rem 1248)

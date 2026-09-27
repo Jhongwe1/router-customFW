@@ -1,0 +1,64 @@
+cat /proc/net/snmp /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/ts
+3.log
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 219101 0 0 0 0 0 219101 175798 0 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 28 0 0 0 0 0 0 28 0 0 0 0 0 28 0 0 0 0 0 0 0 28 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 28 28
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 12 0 2 0 219073 175770 0 0 30
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 0 0 0 0 0 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+cpu  147 0 6631 16654 0 0 11145 0 0
+cpu0 147 0 6631 16654 0 0 11145 0 0
+intr 510036 0 0 0 0 0 0 0 0 131033 0 0 0 309417 35042 0 0 0 0 0 0 0 0 0 0 0 34545 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 34387
+btime 0
+processes 89
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 51218
+[  6] local 10.1.1.3 port 5201 connected to 10.1.1.2 port 51226
+[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
+[  6]   0.00-1.88   sec  5.00 MBytes  22310 Kbits/sec    0   42.4 KBytes       
+[  6]   1.88-2.82   sec  2.50 MBytes  22310 Kbits/sec    0   46.7 KBytes       
+[  6]   2.82-3.77   sec  2.50 MBytes  22075 Kbits/sec    0   52.3 KBytes       
+[  6]   3.77-4.71   sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]   4.71-5.65   sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]   5.65-6.60   sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]   6.60-7.54   sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]   7.54-8.49   sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]   8.49-9.90   sec  3.75 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]   9.90-10.84  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  10.84-11.79  sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]  11.79-12.73  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  12.73-13.67  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  13.67-14.62  sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]  14.62-15.56  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  15.56-16.51  sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]  16.51-17.92  sec  3.75 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  17.92-18.86  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  18.86-19.80  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  19.80-20.74  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  20.74-21.69  sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]  21.69-22.63  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  22.63-23.57  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  23.57-24.51  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  24.51-25.93  sec  3.75 MBytes  22153 Kbits/sec    0   53.7 KBytes       
+[  6]  25.93-26.87  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  26.87-27.81  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  27.81-28.75  sec  2.50 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+[  6]  28.75-29.70  sec  2.50 MBytes  22075 Kbits/sec    0   53.7 KBytes       
+[  6]  29.70-30.17  sec  1.25 MBytes  22310 Kbits/sec    0   53.7 KBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  6]   0.00-30.17  sec  80.0 MBytes  22244 Kbits/sec    0             sender
+[  6]   0.00-30.17  sec  0.00 Bytes  0.00 Kbits/sec                  receiver
+# 

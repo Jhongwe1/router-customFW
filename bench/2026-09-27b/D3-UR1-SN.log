@@ -1,0 +1,2 @@
+brdelta 1.2 snmp D3-UR1-S0.log -> D3-UR1-S1.log
+snmp ip inrecv d 53525 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 53525 outreq d 15 outdisc d 0 | udp indg d 6740 noports d 0 inerr d 46706 outdg d 1 rcvbuf d 46706 sndbuf d 0

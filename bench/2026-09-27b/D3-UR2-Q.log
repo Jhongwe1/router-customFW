@@ -1,0 +1,3 @@
+cd /tmp && sleep 20 && busybox cp /proc/net/udp ur2a && sleep 12 && busybox cp
+ /proc/net/udp ur2b &
+# 

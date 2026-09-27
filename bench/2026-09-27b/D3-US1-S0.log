@@ -1,0 +1,37 @@
+iperf3 -s -1 -f k --logfile /tmp/us1.log > /dev/null 2>&1 & sleep 2 ; ps ; cat
+ /proc/net/snmp /proc/stat
+  PID USER       VSZ STAT COMMAND
+    1 0          832 S    /bin/sh 
+    2 0            0 SW<  [kthreadd]
+    3 0            0 SW<  [ksoftirqd/0]
+    4 0            0 SW<  [events/0]
+    5 0            0 SW<  [khelper]
+    6 0            0 SW<  [async/mgr]
+    7 0            0 SW<  [kblockd/0]
+    8 0            0 SW   [pdflush]
+    9 0            0 SW<  [kswapd0]
+   10 0            0 SW<  [mtdblockd]
+   11 0            0 SW<  [kpktgend_0]
+  138 0          332 S    iperf3 -s -1 -f k --logfile /tmp/us1.log 
+  140 0          816 R    ps 
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 378193 0 0 0 0 0 378193 175858 0 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 44 0 0 0 0 0 0 44 0 0 0 0 0 44 0 0 0 0 0 0 0 44 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 44 44
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 15 0 2 0 219123 175811 0 0 30
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 18771 0 140066 3 140066 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+cpu  367 0 6991 26161 0 0 18076 0 0
+cpu0 367 0 6991 26161 0 0 18076 0 0
+intr 652073 0 0 0 0 0 0 0 0 198465 0 0 0 349719 52326 0 0 0 0 0 0 0 0 0 0 0 51563 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 41930
+btime 0
+processes 141
+procs_running 2
+procs_blocked 0
+# 

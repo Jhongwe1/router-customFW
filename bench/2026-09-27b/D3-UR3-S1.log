@@ -1,0 +1,68 @@
+cat /proc/net/snmp /proc/stat ; busybox killall iperf3 ; sleep 1 ; cat /tmp/ur
+3.log /tmp/ur3a /tmp/ur3b
+Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs ReasmFails FragOKs FragFails FragCreates
+Ip: 2 64 378189 0 0 0 0 0 378189 175854 0 0 0 0 0 0 0 0 0
+Icmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps
+Icmp: 40 0 0 0 0 0 0 40 0 0 0 0 0 40 0 0 0 0 0 0 0 40 0 0 0 0
+IcmpMsg: InType8 OutType0
+IcmpMsg: 40 40
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts
+Tcp: 1 200 120000 -1 0 15 0 2 0 219123 175811 0 0 30
+Udp: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+Udp: 18771 0 140066 3 140066 0
+UdpLite: InDatagrams NoPorts InErrors OutDatagrams RcvbufErrors SndbufErrors
+UdpLite: 0 0 0 0 0 0
+cpu  365 0 6977 24893 0 0 18075 0 0
+cpu0 365 0 6977 24893 0 0 18075 0 0
+intr 637298 0 0 0 0 0 0 0 0 186338 0 0 0 349709 50974 0 0 0 0 0 0 0 0 0 0 0 50278 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 41594
+btime 0
+processes 132
+procs_running 2
+procs_blocked 0
+killall: iperf3: no process killed
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 10.1.1.2, port 48600
+[  6] local 10.1.1.3 port 5201 connected to 10.1.1.2 port 41781
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-1.01   sec   179 KBytes  1453 Kbits/sec  25416642.241 ms  944/1075 (88%)  
+[  6]   1.01-2.01   sec   343 KBytes  2811 Kbits/sec  2.535 ms  1418/1669 (85%)  
+[  6]   2.01-3.20   sec   260 KBytes  1788 Kbits/sec  0.313 ms  1890/2080 (91%)  
+[  6]   3.20-4.13   sec   258 KBytes  2276 Kbits/sec  0.384 ms  1420/1609 (88%)  
+[  6]   4.13-5.08   sec   258 KBytes  2228 Kbits/sec  0.821 ms  1418/1607 (88%)  
+[  6]   5.08-6.01   sec   258 KBytes  2276 Kbits/sec  0.444 ms  1417/1606 (88%)  
+[  6]   6.01-7.01   sec   343 KBytes  2811 Kbits/sec  0.480 ms  1419/1670 (85%)  
+[  6]   7.01-8.19   sec   260 KBytes  1803 Kbits/sec  0.203 ms  1890/2080 (91%)  
+[  6]   8.19-12.07  sec  86.1 KBytes   182 Kbits/sec  223.075 ms  473/536 (88%)  
+[  6]  12.07-12.07  sec  0.00 Bytes   nan Kbits/sec  223.075 ms  0/0 (0%)  
+[  6]  12.07-12.07  sec  0.00 Bytes   nan Kbits/sec  223.075 ms  0/0 (0%)  
+[  6]  12.07-12.07  sec  0.00 Bytes   nan Kbits/sec  223.075 ms  0/0 (0%)  
+[  6]  12.07-13.01  sec   343 KBytes  2991 Kbits/sec  0.490 ms  9811/10062 (98%)  
+[  6]  13.01-14.22  sec   260 KBytes  1759 Kbits/sec  0.784 ms  1893/2083 (91%)  
+[  6]  14.22-15.16  sec   258 KBytes  2252 Kbits/sec  0.418 ms  1416/1605 (88%)  
+[  6]  15.16-16.09  sec   258 KBytes  2276 Kbits/sec  0.874 ms  1419/1608 (88%)  
+[  6]  16.09-17.03  sec   258 KBytes  2252 Kbits/sec  0.391 ms  1417/1606 (88%)  
+[  6]  17.03-18.01  sec   343 KBytes  2869 Kbits/sec  0.326 ms  1419/1670 (85%)  
+[  6]  18.01-19.21  sec   260 KBytes  1773 Kbits/sec  0.862 ms  1890/2080 (91%)  
+[  6]  19.21-20.13  sec   338 KBytes  3007 Kbits/sec  9.859 ms  1371/1618 (85%)  
+[  6]  20.13-21.07  sec   517 KBytes  4504 Kbits/sec  4.670 ms  1281/1659 (77%)  
+[  6]  21.07-22.13  sec   412 KBytes  3180 Kbits/sec  3.535 ms  1247/1548 (81%)  
+[  6]  22.13-23.01  sec   633 KBytes  5893 Kbits/sec  1.098 ms  1297/1760 (74%)  
+[  6]  23.01-24.01  sec   573 KBytes  4693 Kbits/sec  0.545 ms  1193/1612 (74%)  
+[  6]  24.01-25.01  sec   429 KBytes  3517 Kbits/sec  0.259 ms  1051/1365 (77%)  
+[  6]  25.01-26.00  sec   346 KBytes  2862 Kbits/sec  5.764 ms  1524/1777 (86%)  
+[  6]  26.00-27.01  sec   353 KBytes  2861 Kbits/sec  0.555 ms  1145/1403 (82%)  
+[  6]  27.01-28.21  sec   260 KBytes  1773 Kbits/sec  0.806 ms  1890/2080 (91%)  
+[  6]  28.21-29.15  sec   258 KBytes  2252 Kbits/sec  0.289 ms  1418/1607 (88%)  
+[  6]  29.15-30.09  sec   258 KBytes  2252 Kbits/sec  0.277 ms  1418/1607 (88%)  
+[  6]  30.09-30.29  sec  84.8 KBytes  3472 Kbits/sec  0.153 ms  0/62 (0%)  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  6]   0.00-30.29  sec  0.00 Bytes  0.00 Kbits/sec  0.153 ms  46389/52744 (88%)  
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops             
+  81: 0A010103:1451 0A010102:A335 01 00000000:0001C2D8 00:00000000 00000000     0        0 311 2 81c65de0 21159                
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops             
+  81: 0A010103:1451 0A010102:A335 01 00000000:0001C2D8 00:00000000 00000000     0        0 311 2 81c65de0 38324                
+# 

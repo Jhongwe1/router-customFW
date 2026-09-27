@@ -1,0 +1,5 @@
+w1width 1.0 boot A1Q-boot probe A1-HP
+j 381.420972 nic 6.645383 ndopen 10.757296 reply 10.885281 seq 67 rtt 1017.0 k 2 t1 9.868561 neigh_at_j INCOMPLETE
+frames who-has 2 answered 10.879394 is-at 10.880644 width 0.122098
+width card-rule [0.111265, 0.139265] mid 0.125265 lower ndopen void none
+w1width end rc 0

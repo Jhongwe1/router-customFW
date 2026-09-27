@@ -1,0 +1,10 @@
+linkprobe get rlx0 lo
+LP0 linkprobe 1 build 1bce836f2e21c43a
+LP drv rlx0 rc 0 driver "rtl819x-nic" version "rtl819x-nic 1.5" fw "" bus "platform" can 0
+LP link rlx0 rc 0 data 00000001 can 0
+LP ring rlx0 rc 0 rx 8/8 mini 0/0 jumbo 0/0 tx 4/4 can 0
+LP drv lo rc 122 can 192
+LP link lo rc 0 data 00000001 can 0
+LP ring lo rc 122 can 32
+LP9 calls 6 ok 4 refused 2 nowrite 0
+# 

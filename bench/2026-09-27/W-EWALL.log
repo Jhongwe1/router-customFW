@@ -1,0 +1,30 @@
+pcapwin 1.3
+pcap A.pcap records 63 partial_tail_bytes 0
+capture_live no
+tcpdump_procs 0
+prev none
+window 0 63
+window_end 63
+frames 63
+len 60:2 98:61
+ethertype 0800:61 0806:2
+vlan8100 0
+vlan_vid -
+class icmp_echo_reply 61 tagged 0 len 98:61 ipcsum_ok 61 icmpcsum_ok 0 excess 0:61
+class ipv4_other 0 tagged 0 len - ipcsum_ok 0 icmpcsum_ok 0 excess -
+class arp 2 tagged 0 len 60:2
+class rlxfw_nic 0 tagged 0 len - content_ok 0
+class other 0 tagged 0 len -
+class runt 0 tagged 0 len -
+excess 0:61
+echo_ids 1
+echo_seq 1 67-127
+echo_first 1 seq 67 b10 8
+echo_dup 0
+echo_vid -
+dst host:63 bcast:0 mcast:0 other:0
+truncated 61
+icmp_partial 61
+lenby 2:60
+lenby 61:98
+pcapwin end rc 0

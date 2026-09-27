@@ -1,0 +1,27 @@
+0
+PING 10.1.1.4 (10.1.1.4) from 10.1.1.2 enxfc19286184c9: 18(46) bytes of data.
+26 bytes from 10.1.1.4: icmp_seq=1 ttl=64 time=1.71 ms
+26 bytes from 10.1.1.4: icmp_seq=2 ttl=64 time=1.58 ms
+26 bytes from 10.1.1.4: icmp_seq=3 ttl=64 time=3.07 ms
+26 bytes from 10.1.1.4: icmp_seq=4 ttl=64 time=2.32 ms
+
+--- 10.1.1.4 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 755ms
+rtt min/avg/max/mdev = 1.581/2.170/3.072/0.589 ms
+dmesgwin 1.2 prev E-S11-H.log window_end 2460274
+window 2460274 2467965
+window_end 2467965
+lines 135 first_t 723.724 last_t 724.545
+bug_preempt 5
+usbnet_xmit 5
+vhci_unlink 0
+urb_104 0
+usb_disc 0
+cp210x 0
+ttyusb 0
+link_down 0
+link_up 0
+tx_timeout 0
+vsock_err 0
+call_trace 5
+follower 1

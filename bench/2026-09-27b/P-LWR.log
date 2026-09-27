@@ -1,0 +1,9 @@
+watch start rlx0 v 1 rc 0
+watch t 102820 i 5141 v 0 rc 0
+watch t 114600 i 5730 v 1 rc 0
+watch t 381100 i 19055 v 0 rc 0
+watch sequence 1,0,1,0
+end n 29919 ms 600000 ones 18466 zeros 11453 other 0 err 0 nowrite 0 trans 3
+bound n 29919 max 60001 within yes
+RED sequence [1, 0, 1, 0] is not the expected [1, 0, 1]
+lpread watch verdict RED

@@ -1,0 +1,14 @@
+brdelta 1.2 T-00-R.log -> T-R.log
+resolve prev T-00-R.log 1 of 2
+resolve cur T-R.log 1 of 2
+board n_tx d 580253 n_recov_fire d 0 n_tx_stop d 0 n_rx d 292665 nd_up 1 tx_stopped 0
+cpu crc d 580253 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 9 b65 d 19 b128 d 0 b256 d 1 b512 d 6370 b1024 d 573854
+p3 out d 580253 rx d 292665 rxbytes d 20486891
+ident o d 580253 cjfd d 580253 k 0
+buckets legal d 580253 cjf d 580253 lt64 d 0
+host rx d 580252 tx d 292664 inechoreps d 0 outechos d 0
+path p3 rx d 292665 host outechos d 0 covered none
+hbound inner d 580252 outer d 580253 o d 580253 within yes
+snmp ip inrecv d 292656 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 292656 outreq d 580244 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 580253 p3 580253 host 580252

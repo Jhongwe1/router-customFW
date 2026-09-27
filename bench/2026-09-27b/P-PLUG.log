@@ -1,0 +1,3 @@
+CW start if enxfc19286184c9 raw 3328.212111 carrier 0 operstate down changes 3
+CW t 11799 raw 3340.011028 carrier 1 operstate up
+CW end n 1984 ms 100032 trans 1 carrier 1 operstate up changes 4

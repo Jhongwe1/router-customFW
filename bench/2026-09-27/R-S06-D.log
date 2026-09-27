@@ -1,0 +1,14 @@
+brdelta 1.2 R-S05-R.log -> R-S06-R.log
+resolve prev R-S05-R.log 1 of 2
+resolve cur R-S06-R.log 1 of 2
+board n_tx d 106 n_recov_fire d 0 n_tx_stop d 0 n_rx d 106 nd_up 1 tx_stopped 0
+cpu crc d 106 jab d 0 frag d 0 drop d 0 dropev d 0 b64 d 6 b65 d 20 b128 d 0 b256 d 20 b512 d 20 b1024 d 40
+p3 out d 106 rx d 106 rxbytes d 71384
+ident o d 106 cjfd d 106 k 0
+buckets legal d 106 cjf d 106 lt64 d 0
+host rx d 106 tx d 106 inechoreps d 104 outechos d 104
+path p3 rx d 106 host outechos d 104 covered yes
+hbound inner d 106 outer d 106 o d 106 within yes
+snmp ip inrecv d 104 inhdrerr d 0 inaddrerr d 0 indisc d 0 indeliv d 104 outreq d 104 outdisc d 0 | udp indg d 0 noports d 0 inerr d 0 outdg d 0 rcvbuf d 0 sndbuf d 0
+fault jfd 0
+leak cpu 106 p3 106 host 106

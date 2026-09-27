@@ -1,0 +1,9 @@
+w3 1.0 board B-AC0-R.log order W-EORD.log wall W-EWALL.log
+anchor ok base 2259 records 63
+w at B-AC0-P idx 63 unicast 63 bcast 0 mcast 0 | at B-AC0-H idx 63 unicast 63 bcast 0 mcast 0 | exact yes
+board crc 63 jab 0 frag 0 drop 0 | p3 out unicast 63 multicast 0 broadcast 0 total 63 | drv n_recov_fire 0 n_tx_stop 0 tx_stopped 0
+healthy yes
+row crcalignerr c 63 against [63, 63] holds exact
+row p3egress o 63 against [63, 63] holds exact
+row p3egress-unicast u 63 against [63, 63] holds exact
+w3 end rc 0
