@@ -27,9 +27,10 @@ mainline, and every image built before this patch -- both halves are
 included, so the preprocessor emits the tokens the unpatched header gives,
 and no line moves, so no __LINE__ does.  PREDICTION, written before the
 mainline build: that build's objects are byte-identical to r6b8cr's except
-those whose inputs 8b changes (the seam object, init/main.o through
-RLXFW_SRC_ID, and the links that carry them).  REFUTED BY any other object
-differing -- net/rtl/features/rtl_features.o first.
+those whose inputs 8b changes -- the seam object, the two consumers of
+RLXFW_SRC_ID (init/main.o and drivers/mtd/devices/rtl819x-spi.o), and the
+links that carry them.  REFUTED BY any other object differing --
+net/rtl/features/rtl_features.o first.
 
 WHAT IT DOES NOT DO.  It defines no storage: rtl865x_getWanDev() reads
 rtl865x_curOpMode, which at SWCORE=n is the seam's

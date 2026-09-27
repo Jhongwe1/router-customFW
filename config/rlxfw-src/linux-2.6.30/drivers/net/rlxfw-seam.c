@@ -29,7 +29,7 @@
  *
  * The loader leaves the CPU port's DMA engine RUNNING: `CPUICR = C4000000`
  * at the prompt (量 `bench/2026-09-19b/X7-cpufull-a`), RXCMD set, rings at
- * `0xA040FC70` -- physical `0x0040FC70`, inside the kernel's own image.
+ * `0xA040FC70` -- physical `0x0040FC70`, memory this kernel uses.
  * With SWCORE=y the vendor's `re865x_probe()` disarms it at
  * `device_initcall` (讀 `rtl_nic.c:6224-6225` in the staged tree:
  * `CPUIIMR = 0x00` then `CPUICR &= ~(TXCMD | RXCMD)`), and `RLXFW-N1` reads
@@ -41,10 +41,11 @@
  *
  * So the seam's `bsp_swcore_init()` makes the vendor's two writes, in the
  * vendor's order.  It is called from `bsp_setup()` (the `B07` mark's
- * anchor), i.e. inside `setup_arch()` and before `paging_init()` (`B08`) --
- * EARLIER than the vendor's `device_initcall`, before the page allocator
- * owns any page.  A disarm moved into `rtl819x-nic`'s `late_initcall` would
- * be later than today's, and is the wrong place.
+ * anchor), the first call in `arch_mem_init()`, so it runs before
+ * `bootmem_init()` and `paging_init()` (`B08`) -- before any allocator
+ * exists, and EARLIER than the vendor's `device_initcall`.  A disarm moved
+ * into `rtl819x-nic`'s `late_initcall` would be later than today's, and is
+ * the wrong place.
  *
  * Each register and bit has two sources, as `rtl819x-nic.c` records for the
  * same names: 讀 `rtl865xc_asicregs.h` (`CPUICR` :492, `CPUIIMR` :512,
