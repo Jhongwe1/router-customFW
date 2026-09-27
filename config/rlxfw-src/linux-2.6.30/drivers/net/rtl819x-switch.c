@@ -115,7 +115,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SW_VERSION	"rtl819x-switch 1.3"
+#define RTL819X_SW_VERSION	"rtl819x-switch 1.4"
 
 /* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
@@ -523,7 +523,7 @@ static int rtl819x_sw_do_restore(int slot)
 /* ------------------------------------------------------------------------
  * /proc
  * ------------------------------------------------------------------------ */
-
+static int rtl819x_sw_v14_lines(char *page);	/* 1.4, below */
 /* 🔴 `read_proc_t` sprintfs into ONE 4,096-byte page with no bounds check --
  * the same hard limit `rtl819x-spi` 1.1's two-level map was shaped by.  The
  * table is 37 registers at ~22 bytes plus ~20 fields, which is ~1.2 KiB; the
@@ -546,7 +546,7 @@ static int rtl819x_sw_read_proc(char *page, char **start, off_t off,
 	len += sprintf(page + len, "n_dumb %lu\n", rtl819x_sw_n_dumb);
 	len += sprintf(page + len, "n_restore %lu\n", rtl819x_sw_n_restore);
 	len += sprintf(page + len, "boot_cvidr %08X\n", rtl819x_sw_boot_cvidr);
-
+	len += rtl819x_sw_v14_lines(page + len);	/* 1.4: before the table */
 	for (i = 0; i < RTL819X_SW_NSLOT; i++)
 		len += sprintf(page + len, "slot%u_full %d\n", i,
 			       (int)rtl819x_sw_slot_full[i]);
@@ -584,7 +584,7 @@ static int rtl819x_sw_verb_diff(int a, int b)
 	rlxfw_markx("SW-DIFF", n);
 	return 0;
 }
-
+static int rtl819x_sw_v14_write(const char *buf, unsigned long count); /* 1.4 */
 static int rtl819x_sw_write_proc(struct file *file, const char __user *ubuf,
 				 unsigned long count, void *data)
 {
@@ -661,7 +661,7 @@ static int rtl819x_sw_write_proc(struct file *file, const char __user *ubuf,
 		return rc ? rc : (int)count;
 	}
 
-	return -EINVAL;
+	return rtl819x_sw_v14_write(buf, count);	/* 1.4, or -EINVAL */
 }
 
 /* ------------------------------------------------------------------------
@@ -1461,3 +1461,202 @@ static int __init rtl819x_mdio_init(void)
 }
 
 device_initcall(rtl819x_mdio_init);
+
+/* ========================================================================
+ * 1.4 (R6b-10): ARM II'S ONE WRITE CLASS -- `EnablePHYIf` SET IN PCRP0-PCRP4,
+ * THE INVERSE OF WHAT THE LOADER'S `J` DOES.
+ *
+ * Appended, as 1.2 and 1.3 were.  Above this block the version string and
+ * the write handler's closing `return -EINVAL` changed in place, and three
+ * lines that were blank hold two prototypes and the page hook, so no line
+ * above moves (FW-110).
+ *
+ * WHY.  The loader's `J` handler clears bit 0 of PCRP0-PCRP4 as its last act
+ * before it enters the payload (讀 its code, 0x804092F4-0x80409354;
+ * notes/switch-driver.md section 8.3), and 量 the prompt reads `nn7F0039`
+ * (bench/2026-09-19 C1-L4104, C2-L4114) where the S0' latch reads `nn7F0038`
+ * (C9-SW0).  At SWCORE=y the vendor's probe sets the bit again (C9-SW0's live
+ * column, SPEC.md NET-52); at SWCORE=n nothing does, and arm II's step (5)
+ * is the inverse of `J`: this verb.
+ *
+ * THE BIT: TWO SOURCES AND A MEASUREMENT.  `EnablePHYIf` is bit 0 of PCRPn.
+ * D, the draft datasheet's Table 64: bit 0 `EnablePHYIf`, "Enable PHY
+ * Interface", RW, default 0 -- "When disabled, the PHY interface will be
+ * isolated from the MAC."  B, `rtl865xc_asicregs.h:1258`, `(1<<0)`, in the
+ * CONFIG_RTL_8196E arm that opens at :1168 (the #else arm's :1322 gives the
+ * same bit).  量, the 0x39/0x38 transition above, on all five ports.  The
+ * addresses, 0xBB804104 + 4n, were already this driver's table (B
+ * :1132-:1138, D Table 62, 量 the same captures).
+ *
+ * THE IDENTITY CHECK.  No store is made unless the pre-read carries the
+ * port's own number in `ExtPHYID`, bits 30:26: D Table 64 (default port 0-4
+ * = 0x0-0x4), B :1174-:1175 in the same arm (the #else arm puts the field
+ * at 28:24, which is why the arm is named), and 量 SPEC.md NET-09 (0, 1, 2,
+ * 3, 4, bench/2026-08-24b E9).  A word that fails it is not port n's PCRP by
+ * its own field: -EPROTO, nothing written.
+ *
+ * THE VERBS, on /proc/rtl819x-switch, whose parser hands this block every
+ * write it does not know:
+ *   unlock phyif-i-mean-it   this class's own token, as MDIO has its own:
+ *                            /init types the switch's `unlock i-mean-it`
+ *                            on every standard boot (config/rlxfw-init.sh)
+ *   lock phyif               takes it back
+ *   phyif <n>                n = 0..4: one digit, nothing after it
+ *   phyif all                0, 1, 2, 3, 4 in that order, stopping at the
+ *                            first port that fails
+ * Anything else is -EINVAL, the handler's answer before this block existed.
+ * A store also needs the switch's own unlock: it goes through
+ * rtl819x_sw_wr, the one guarded write path, so `n_writes` counts it and a
+ * locked switch refuses it (-EPERM, counted in `n_refused`).
+ *
+ * ONE PORT, with IRQs off from the pre-read to the read-back, so nothing that
+ * runs from an interrupt writes the register between them (UP, PREEMPT_NONE:
+ * 1.2's #error): read PCRPn; -EPROTO unless ExtPHYID is n; if bit 0 is
+ * already set, store nothing (`already`); else store exactly the word read
+ * with bit 0 set -- no other bit is ever stored differently from how it was
+ * read -- and read it back, which must equal that word, or -EIO (`rbfail`).
+ * A bit 0 that does not stick and another bit that moved both fail it.
+ *
+ * THE PAGE.  Before the register table (whose last line stays the page's
+ * last line): a counter line, and per port the last verb's pre-read, its
+ * read-back (00000000 unless `st 1`), its rc (1: the last verb did not reach
+ * the port) and whether it stored.  Cached values only: a `cat` reads no
+ * register for these lines.  Walked from the formats, every field at its
+ * widest: 133 + 5 x 54 = 403 bytes (tools/mdiocheck.py K36 measures it), so
+ * 1.2's worst case of 2,080 of 4,096 becomes 2,483 and the table's budget
+ * (3,600) still never ends the page.  The boot capture does not change: no
+ * mark and no read at boot.
+ *
+ * WHAT IT DOES NOT DO.  Clear the bit (that is `J`'s; nothing here undoes a
+ * `phyif`); touch PCRP5-PCRP8 or any bit but bit 0; run at boot.  Nor does
+ * it say that EnablePHYIf is what arm II's ping lacks -- that is the bench's
+ * reading, and why RUN-armII types it only after the pings.
+ */
+#define RTL819X_SW_PCRP0		0x4104	/* B :1134, D Table 62 */
+#define RTL819X_PHYIF_NPORT		5	/* the PHY ports, 0-4 (NET-39) */
+#define RTL819X_PCRP_ENPHYIF		(1u << 0)	/* B :1258, D Table 64 */
+#define RTL819X_PCRP_EXTPHYID(v)	(((v) >> 26) & 0x1Fu)	/* B :1174 */
+#define RTL819X_PHYIF_TOKEN		"phyif-i-mean-it"
+#define RTL819X_PHYIF_UNTRIED		1	/* rc: the last verb did not reach it */
+
+struct rtl819x_phyif_res {
+	u32	pre;	/* the pre-read */
+	u32	rb;	/* the read-back; 0 unless st */
+	int	rc;	/* 0, an errno, or RTL819X_PHYIF_UNTRIED */
+	u8	st;	/* 1: this verb stored to the port */
+};
+
+static struct rtl819x_phyif_res rtl819x_phyif_res[RTL819X_PHYIF_NPORT] = {
+	{ 0, 0, RTL819X_PHYIF_UNTRIED, 0 }, { 0, 0, RTL819X_PHYIF_UNTRIED, 0 },
+	{ 0, 0, RTL819X_PHYIF_UNTRIED, 0 }, { 0, 0, RTL819X_PHYIF_UNTRIED, 0 },
+	{ 0, 0, RTL819X_PHYIF_UNTRIED, 0 }
+};
+static int rtl819x_phyif_unlocked;
+static unsigned long rtl819x_phyif_n_ok, rtl819x_phyif_n_stored;
+static unsigned long rtl819x_phyif_n_already, rtl819x_phyif_n_refused;
+static unsigned long rtl819x_phyif_n_idfail, rtl819x_phyif_n_rbfail;
+
+static int rtl819x_phyif_port(unsigned int n)
+{
+	struct rtl819x_phyif_res *r = &rtl819x_phyif_res[n];
+	unsigned int off = RTL819X_SW_PCRP0 + 4 * n;
+	unsigned long flags;
+	u32 want;
+	int rc;
+
+	local_irq_save(flags);
+	r->pre = rtl819x_sw_rd(off);
+	if (RTL819X_PCRP_EXTPHYID(r->pre) != n) {
+		rtl819x_phyif_n_idfail++;
+		rc = -EPROTO;
+	} else if (r->pre & RTL819X_PCRP_ENPHYIF) {
+		rtl819x_phyif_n_already++;
+		rc = 0;
+	} else {
+		want = r->pre | RTL819X_PCRP_ENPHYIF;
+		rc = rtl819x_sw_wr(off, want);
+		if (!rc) {
+			r->st = 1;
+			rtl819x_phyif_n_stored++;
+			r->rb = rtl819x_sw_rd(off);
+			if (r->rb != want) {
+				rtl819x_phyif_n_rbfail++;
+				rc = -EIO;
+			}
+		}
+	}
+	local_irq_restore(flags);
+	r->rc = rc;
+	return rc;
+}
+
+/* From the switch's write handler, which has stripped the trailing CR and
+ * LF, for every write none of its own verbs took. */
+static int rtl819x_sw_v14_write(const char *buf, unsigned long count)
+{
+	unsigned int n, lo, hi, stored = 0, on = 0;
+	int rc = 0;
+
+	if (!strcmp(buf, "unlock " RTL819X_PHYIF_TOKEN)) {
+		rtl819x_phyif_unlocked = 1;
+		rlxfw_mark("SW-PHYIF-UNLOCK");
+		return (int)count;
+	}
+	if (!strcmp(buf, "lock phyif")) {
+		rtl819x_phyif_unlocked = 0;
+		rlxfw_mark("SW-PHYIF-LOCK");
+		return (int)count;
+	}
+	if (!strcmp(buf, "phyif all")) {
+		lo = 0;
+		hi = RTL819X_PHYIF_NPORT - 1;
+	} else if (!strncmp(buf, "phyif ", 6) && buf[6] >= '0' &&
+		   buf[6] < '0' + RTL819X_PHYIF_NPORT && buf[7] == '\0') {
+		lo = hi = (unsigned int)(buf[6] - '0');
+	} else {
+		return -EINVAL;
+	}
+	if (!rtl819x_phyif_unlocked) {
+		rtl819x_phyif_n_refused++;
+		return -EPERM;
+	}
+	for (n = 0; n < RTL819X_PHYIF_NPORT; n++) {
+		rtl819x_phyif_res[n].pre = 0;
+		rtl819x_phyif_res[n].rb = 0;
+		rtl819x_phyif_res[n].rc = RTL819X_PHYIF_UNTRIED;
+		rtl819x_phyif_res[n].st = 0;
+	}
+	for (n = lo; n <= hi; n++) {
+		rc = rtl819x_phyif_port(n);
+		if (rtl819x_phyif_res[n].st)
+			stored |= 1u << n;
+		if (rc)
+			break;
+		on |= 1u << n;
+	}
+	if (!rc)
+		rtl819x_phyif_n_ok++;
+	/* stored ports in bits 12:8, ports verified set in 4:0 */
+	rlxfw_markx("SW-PHYIF", (stored << 8) | on);
+	return rc ? rc : (int)count;
+}
+
+static int rtl819x_sw_v14_lines(char *page)
+{
+	const struct rtl819x_phyif_res *r;
+	unsigned int n;
+	int len = 0;
+
+	len += sprintf(page + len, "phyif unlocked %d ok %lu stored %lu "
+		       "already %lu refused %lu idfail %lu rbfail %lu\n",
+		       rtl819x_phyif_unlocked, rtl819x_phyif_n_ok,
+		       rtl819x_phyif_n_stored, rtl819x_phyif_n_already,
+		       rtl819x_phyif_n_refused, rtl819x_phyif_n_idfail,
+		       rtl819x_phyif_n_rbfail);
+	for (n = 0; n < RTL819X_PHYIF_NPORT; n++) {
+		r = &rtl819x_phyif_res[n];
+		len += sprintf(page + len, "phyif%u pre %08X rb %08X rc %d st %u\n",
+			       n, r->pre, r->rb, r->rc, (unsigned int)r->st);
+	}
+	return len;
+}

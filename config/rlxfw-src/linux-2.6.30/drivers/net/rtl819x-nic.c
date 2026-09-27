@@ -215,7 +215,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 #include "rtl819x-nic-tx.h"
-#define RTL819X_NIC_VERSION	"rtl819x-nic 1.5"
+#define RTL819X_NIC_VERSION	"rtl819x-nic 1.6"
 
 /* R6-4.  `rtl819x-switch.c` owns the switch core's window; this is the one
  * thing this driver borrows from it, for `ethtool -> get_link`.  Both are
@@ -3054,11 +3054,11 @@ static int __init rtl819x_nic_init(void)
 	nic_boot_rmdcr0 = nic_rd(NIC_CPURMDCR0);
 	nic_boot_tpdcr0 = nic_rd(NIC_CPUTPDCR0);
 
-	/* Marked individually so they are in the boot capture of EVERY boot
-	 * rather than only in a /proc read somebody remembered to take.
-	 * `N1` is the one that carries a prediction: it must read 00000000,
-	 * and if it does not, the vendor's probe did not disarm the engine on
-	 * this boot and every verb below is operating on a running engine. */
+	/* Marked individually so they are in the boot capture of EVERY boot.
+	 * `N1` carries the prediction: bits 31:30 (TXCMD/RXCMD) clear, or no
+	 * one disarmed the loader's engine.  SWCORE=y reads 00000000 (63 boots:
+	 * the vendor's probe also resets the core); SWCORE=n's seam clears 31:30
+	 * only, so 04000000, MBUF_2048BYTES (推).  Printed; nothing gates on it. */
 	rlxfw_markx("N1", nic_boot_icr);
 	rlxfw_markx("N2", nic_boot_iimr);
 	rlxfw_markx("N3", nic_boot_iisr);
@@ -3122,17 +3122,23 @@ late_initcall(rtl819x_nic_init);
  * the host.  What touches the engine is here.  Why each piece exists:
  * notes/nic-driver.md.
  *
- * DEFAULT = 1.4, AND WHAT THAT DOES AND DOES NOT MEAN.  At the defaults every
- * store of nic_xmit, nic_do_tx, nic_do_engine, nic_do_arm and nic_ndo_open has
- * 1.4's value and 1.4's order (tools/storeseq.py reads that off the built
- * objects).  The paths gain cached loads of nic15_pol, a branch before OWN
- * and before the doorbell, a call after the doorbell (W), a call in `arm`
- * (nic15_armed, which returns at once unless a verb made the policy dirty)
- * and a gate call in `engine on` and in ndo_open.  If the fault is sensitive
- * to a few cycles there, only the bench's positive control can say so.
+ * THE BOOT POLICY, AND WHAT IT DOES AND DOES NOT MEAN.  1.5 started a boot at
+ * 1.4's settings, and at them every store of nic_xmit, nic_do_tx,
+ * nic_do_engine, nic_do_arm and nic_ndo_open has 1.4's value and 1.4's order
+ * (tools/storeseq.py reads that off the built objects).  🔄 1.6 (R6b-10)
+ * starts a boot at `txlen vendor` (NIC15_LEN_BOOT, rtl819x-nic-tx.h, whose
+ * comment says why), so a boot that types no verb stores m_len and m_extsize
+ * as F + 4 -- the only values that differ; txoff and txrb stay 1.4's, and
+ * `txlen rlxfw` puts 1.4's lengths back, by verb.  The code of every path is
+ * 1.5's: 1.6 changes this initialiser and the version string.  The paths
+ * gain cached loads of nic15_pol, a branch before OWN and before the
+ * doorbell, a call after the doorbell (W), a call in `arm` (nic15_armed,
+ * which returns at once unless a verb made the policy dirty) and a gate call
+ * in `engine on` and in ndo_open.  If the fault is sensitive to a few cycles
+ * there, only the bench's positive control can say so.
  * ======================================================================== */
 static struct nic15_pol nic15_pol = {
-	.txlen	= NIC15_LEN_RLXFW,	/* :1622/:1623, :2255/:2256 as 1.4 */
+	.txlen	= NIC15_LEN_BOOT,	/* :1622/:1623, :2255/:2256; 1.6: vendor */
 	.txoff	= NIC_RX_OFFSET,	/* :1610, :2224, as 1.4            */
 	.txrb	= 0,			/* no load, as 1.4                 */
 	.dirty	= 0,

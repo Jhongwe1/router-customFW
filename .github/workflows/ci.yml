@@ -1404,20 +1404,20 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' && steps.dtschema.outcome == 'success' }}"
         run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py 2>&1 | tee ci-out/dtcheck.out; exit "${PIPESTATUS[0]}"
 
-      # nic15check (R6b-2) compiles rtl819x-nic 1.5's pure half -- the header
+      # nic15check (R6b-2) compiles rtl819x-nic's pure half -- the header
       # config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic-tx.h, UNCHANGED --
       # with the host's gcc in the kernel's dialect, warnings as errors, and
       # drives its parsers, refusal table, length policy, identification,
       # classifier, the sweep's bookkeeping and the owner's wire bound,
-      # dispatcher and page formatters (K0-K21). It then mutates a copy
-      # twenty-five ways and requires the case named for each mutant to go red
-      # (M1-M25), after M0 has shown the unmutated copy green through the same
-      # path; M23 crashes the harness on
+      # dispatcher, page formatters and 1.6's boot policy (K0-K22). It then
+      # mutates a copy twenty-six ways and requires the case named for each
+      # mutant to go red (M1-M26), after M0 has shown the unmutated copy green
+      # through the same path; M23 crashes the harness on
       # purpose and must be counted as a kill with its reason, not refuse the
       # run. Without gcc it REFUSES (exit 2) rather than reporting. What it
       # cannot see is the kernel half -- the hooks, the locks, the sweep's
-      # waits -- which is the bench's; tools/storeseq.py reads the objects for
-      # "default = 1.4".
+      # waits, the initialiser that reads NIC15_LEN_BOOT -- which is the
+      # bench's and the ELF's; tools/storeseq.py reads 1.4's store sequence.
       - name: nic15check
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/nic15check.py 2>&1 | tee ci-out/nic15check.out; exit "${PIPESTATUS[0]}"
@@ -1447,20 +1447,20 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/linkprobecheck.py 2>&1 | tee ci-out/linkprobecheck.out; exit "${PIPESTATUS[0]}"
 
-      # mdiocheck (R6b-7) cuts rtl819x-switch 1.3's MDIO block out of
-      # config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c, UNCHANGED,
-      # and compiles it with the HOST gcc in the kernel's dialect (-std=gnu89
-      # -Werror) against a scripted MDIO controller, phylib's register, scan
-      # and read path transcribed from the staged 2.6.30 tree, the kernel's
-      # simple_strtoul and this arch's errno values (ETIMEDOUT 145), with the
-      # IRQs-off sections, udelay and the mutex counted. K0-K23 and K14b: every
-      # verb refused and permitted beside its twin, the exact MDCIOCR words, a
-      # pread's six stores in ONE IRQs-off section, the page restore retried
-      # and `dirty`, the bound's positive control, the page at its widest. M0
-      # runs the unmutated block through the mutation path, and M1-M20 must
-      # each turn the case they name red. Without gcc it REFUSES (exit 3). It
-      # is here because a verb that misreports would misjudge D7; what it
-      # cannot see is the silicon, and its fake shares the driver's sources.
+      # mdiocheck (R6b-7) cuts rtl819x-switch 1.3's MDIO block and 1.4's phyif
+      # block out of config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c,
+      # UNCHANGED, and compiles them with the HOST gcc (-std=gnu89 -Werror)
+      # against a scripted MDIO controller, phylib's register, scan and read
+      # path from the staged 2.6.30 tree, a PCRP model reached through the
+      # switch's own read and write paths, the kernel's simple_strtoul and
+      # this arch's errno values, with IRQs-off sections, udelay and the mutex
+      # counted. K0-K36 and K14b: every verb refused and permitted beside its
+      # twin, the exact MDCIOCR words and PCRP accesses, a pread's six stores
+      # and a phyif port's three accesses each in ONE IRQs-off section, the
+      # bound's positive control, both pages at their widest. M0 runs the
+      # unmutated cut through the mutation path; M1-M32 must each turn the case
+      # they name red. Without gcc it REFUSES (exit 3). What it cannot see is
+      # the silicon, and its fakes share the driver's sources.
       - name: mdiocheck
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mdiocheck.py 2>&1 | tee ci-out/mdiocheck.out; exit "${PIPESTATUS[0]}"

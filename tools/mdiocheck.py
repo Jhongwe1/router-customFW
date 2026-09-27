@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""mdiocheck -- rtl819x-switch 1.3's MDIO block, compiled and driven on the host.
+"""mdiocheck -- rtl819x-switch 1.3's MDIO block and 1.4's `phyif` block,
+compiled and driven on the host.
 
 WHAT IT CHECKS, AND WHY IT CAN
 ------------------------------
 `R6b-7` appended one block to `rtl819x-switch.c`: the bus's read and write
 ops, `probe`, `scan`, `pread`, `bound`, the gate, and /proc/rtl819x-mdio.
-This tool cuts that block out of the driver UNCHANGED (from its banner to the
-end of the file) and compiles it with the host's gcc in the kernel's dialect
+`R6b-10` appended a second after it (1.4): arm II's one write class,
+`EnablePHYIf` set in PCRP0-PCRP4, behind its own token.  This tool cuts both
+out of the driver UNCHANGED (from the 1.3 banner to the end of the file) and
+compiles them with the host's gcc in the kernel's dialect
 (`-std=gnu89 -Werror`) inside a generated harness that supplies, in place of
 the kernel:
 
@@ -24,7 +27,13 @@ the kernel:
     violation;
   * the kernel's own simple_strtoul (lib/vsprintf.c:36-75, no whitespace
     skipped) and this arch's errno values (ETIMEDOUT 145,
-    arch/rlx/include/asm/errno.h:98).
+    arch/rlx/include/asm/errno.h:98);
+  * for 1.4: the switch's one read path and one guarded write path, as the
+    driver writes them above the cut, over a PCRP0-PCRP8 model whose
+    default is the post-`J` state (nn7F0038 on 0-4, 量 C9-SW0), with two
+    faults per port -- bit 0 does not stick, or bit 3 flips on a store --
+    and every PCRP access logged with whether IRQs were off and in which
+    section.
 
 Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
 
@@ -77,8 +86,33 @@ Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
   K23  scan's and bound's refusals beside permitted neighbours: lo > hi, hi
        32, a doubled space, a trailing letter, a missing field, bound 10001,
        -1, 5x -- -EINVAL; `bound 0x10` reads 16; an unknown verb -EINVAL
+  1.4, `phyif` (the write handler's fall-through and its page lines):
+  K24  boot: the six lines byte for byte (rc 1: never reached), and a cat
+       reads no register
+  K25  the class token absent: `phyif all`, `phyif 0` -EPERM, counted, no
+       PCRP access
+  K26  the token: the switch's `unlock i-mean-it`, a near miss and a doubled
+       space do not open it; `unlock phyif-i-mean-it` does; `lock phyif`
+       closes it
+  K27  `phyif all` from the post-`J` state: exactly R pre, W pre|1, R for
+       ports 0..4 in order, each port's three in one IRQs-off section of its
+       own; the lines, the mark 00001F1F, the model; a second cat reads nothing
+  K28  `phyif 3` alone: one port's three accesses; the previous verb's
+       results do not survive into this verb's lines
+  K29  ports 5, 6, 8, 9 and fifteen malformed or unknown forms -EINVAL with no
+       access, each beside a permitted neighbour
+  K30  bit 0 already set: one read, no store (`already`)
+  K31  a word without the port's ExtPHYID: -EPROTO, no store, and `phyif all`
+       stops at that port
+  K32  bit 0 does not stick: -EIO (`rbfail`), and `phyif all` stops there
+  K33  another bit moved on the store: -EIO although bit 0 stuck
+  K34  the switch locked: the store is rtl819x_sw_wr's to refuse (-EPERM,
+       `n_refused`), after the one pre-read
+  K35  64 drawn pre-read words: the word stored is the word read with bit 0
+       set, and nothing else differs
+  K36  the lines at their widest against the block comment's figures
 
-M0..M20 then mutate a COPY of the block, one defect each, and require the case
+M0..M32 then mutate a COPY of the block, one defect each, and require the case
 named for it to go red.  M0 is the unmutated copy through the same path: if it
 is not green, no kill is counted.  A mutant whose anchor does not occur
 exactly once, that does not compile, or whose named case stays green is a
@@ -92,13 +126,17 @@ The fake is a model written from the same sources the driver was, so a
 misreading shared by both passes here; the bench is the second source.
 Nor the rest of the kernel: phylib's device model beyond the name check,
 sysfs, and whether rsdk's gcc 3.4.6 compiles the block -- the image build
-answers that.
+answers that.  For 1.4: the switch's read and write paths and its handler's
+CR/LF stripping are the harness's transcription of the driver above the cut,
+not the driver's own code; and what the silicon does with bit 0 -- whether
+it sticks, whether the link follows -- is the bench's.
 
 Needs gcc and nothing else: no toolchain, no $FWRE_WORK, no device.
     mdiocheck.py [--source PATH] [--keep DIR] [--no-mutants]
 """
 import argparse
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -348,8 +386,44 @@ static UNUSED void __raw_writel(u32 v, void *p)
 {
 	fake_writel(v, (unsigned int)(uintptr_t)p);
 }
+/* 1.4's PCRP model: PCRP0-PCRP8 at 0x4104 + 4n, reached only through the
+ * switch's own read and write paths, which the harness supplies below.  The
+ * default is the post-`J` state, nn7F0038 on ports 0-4 (量 C9-SW0), with
+ * PCRP6/7 as read at the prompt and PCRP5 zero.  Two faults per port: bit 0
+ * does not stick, or bit 3 flips on a store. */
+static u32 pcrp[9] = { 0x007F0038, 0x047F0038, 0x087F0038, 0x0C7F0038,
+		       0x107F0038, 0x00000000, 0x187F0038, 0x1C7F0038, 0 };
+static int pcrp_nostick[9], pcrp_flip[9];
+static int pcrp_rd, pcrp_rd_insec, pcrp_wr, pcrp_wr_insec, pcrp_illegal;
+static int rtl819x_sw_unlocked;
+static unsigned long sw_n_writes, sw_n_refused;
+struct pa { char k; unsigned int off; u32 v; int irq; int sec; };
+static struct pa pacc[512];
+static int n_pacc, n_pacc_dumped;
+
+static void pacc_log(char k, unsigned int off, u32 v)
+{
+	if (n_pacc < 512) {
+		pacc[n_pacc].k = k;
+		pacc[n_pacc].off = off;
+		pacc[n_pacc].v = v;
+		pacc[n_pacc].irq = irq_depth > 0;
+		pacc[n_pacc].sec = irq_sections;
+	}
+	n_pacc++;
+}
+
 static UNUSED u32 rtl819x_sw_rd(unsigned int off)
 {
+	if (off >= 0x4104 && off <= 0x4124 && !(off & 3)) {
+		u32 v = pcrp[(off - 0x4104) / 4];
+
+		pcrp_rd++;
+		if (irq_depth)
+			pcrp_rd_insec++;
+		pacc_log('R', off, v);
+		return v;
+	}
 	psrp_rd++;
 	if (irq_depth)
 		psrp_insec++;
@@ -358,6 +432,35 @@ static UNUSED u32 rtl819x_sw_rd(unsigned int off)
 		return 0;
 	}
 	return psrp_val[(off - 0x4128) / 4];
+}
+
+/* The switch's one guarded write path, as rtl819x-switch.c:287 writes it:
+ * refused, counted, while the switch is locked.  A store anywhere but
+ * PCRP0-PCRP4 is counted as illegal and not applied. */
+static UNUSED int rtl819x_sw_wr(unsigned int off, u32 v)
+{
+	unsigned int p;
+
+	if (!rtl819x_sw_unlocked) {
+		sw_n_refused++;
+		return -EPERM;
+	}
+	pacc_log('W', off, v);
+	pcrp_wr++;
+	if (irq_depth)
+		pcrp_wr_insec++;
+	sw_n_writes++;
+	if (off < 0x4104 || off > 0x4114 || (off & 3)) {
+		pcrp_illegal++;
+		return 0;
+	}
+	p = (off - 0x4104) / 4;
+	pcrp[p] = v;
+	if (pcrp_nostick[p])
+		pcrp[p] &= ~1u;
+	if (pcrp_flip[p])
+		pcrp[p] ^= 0x8u;
+	return 0;
 }
 
 /* ------------------------------------------------ phylib, 2.6.30's shape */
@@ -557,6 +660,33 @@ static void set_widest(void)
 	}
 }
 
+/* 1.4's lines with every field at its widest (32-bit longs, as the target) */
+static void set_widest14(void)
+{
+	int n;
+
+	rtl819x_phyif_unlocked = INT_MIN;
+	rtl819x_phyif_n_ok = rtl819x_phyif_n_stored = 0xFFFFFFFFUL;
+	rtl819x_phyif_n_already = rtl819x_phyif_n_refused = 0xFFFFFFFFUL;
+	rtl819x_phyif_n_idfail = rtl819x_phyif_n_rbfail = 0xFFFFFFFFUL;
+	for (n = 0; n < 5; n++) {
+		rtl819x_phyif_res[n].pre = rtl819x_phyif_res[n].rb = 0xFFFFFFFFu;
+		rtl819x_phyif_res[n].rc = INT_MIN;
+		rtl819x_phyif_res[n].st = 255;
+	}
+}
+
+static void pstat_line(void)
+{
+	printf("PSTAT rd=%d rd_insec=%d wr=%d wr_insec=%d illegal=%d "
+	       "sw_writes=%lu sw_refused=%lu sections=%d imbalance=%d depth=%d "
+	       "marks=%d mark=%s pcrp=%08X,%08X,%08X,%08X,%08X\n",
+	       pcrp_rd, pcrp_rd_insec, pcrp_wr, pcrp_wr_insec, pcrp_illegal,
+	       sw_n_writes, sw_n_refused, irq_sections, irq_imbalance,
+	       irq_depth, n_marks, last_mark[0] ? last_mark : "-", pcrp[0],
+	       pcrp[1], pcrp[2], pcrp[3], pcrp[4]);
+}
+
 static void stat_line(void)
 {
 	int i;
@@ -639,6 +769,35 @@ int main(void)
 			rc = rtl819x_mdio_bus->write(rtl819x_mdio_bus, (int)a,
 						     (int)b, (u16)c);
 			printf("OP buswrite -> %d\n", rc);
+		} else if (sscanf(line, "set swunlock %ld", &a) == 1) {
+			rtl819x_sw_unlocked = (int)a;
+		} else if (sscanf(line, "set pcrp %ld %li", &a, &b) == 2) {
+			pcrp[a] = (u32)b;
+		} else if (sscanf(line, "set nostick %ld %ld", &a, &b) == 2) {
+			pcrp_nostick[a] = (int)b;
+		} else if (sscanf(line, "set flip %ld %ld", &a, &b) == 2) {
+			pcrp_flip[a] = (int)b;
+		} else if (!strncmp(line, "v ", 2)) {
+			/* what the switch's handler passes on: CR/LF stripped,
+			 * count the bytes written, newline included */
+			rc = rtl819x_sw_v14_write(line + 2, strlen(line + 2) + 1);
+			printf("OP v %s -> %d\n", line + 2, rc);
+		} else if (!strcmp(line, "l")) {
+			memset(page, 0x5A, sizeof(page));
+			rc = rtl819x_sw_v14_lines(page);
+			page[rc < 0 ? 0 : rc] = '\0';
+			printf("LINES-BEGIN\n%sLINES-END len=%d\n", page, rc);
+		} else if (!strcmp(line, "pacc")) {
+			for (i = n_pacc_dumped; i < n_pacc && i < 512; i++)
+				printf("PA %c %04X %08X irq %d sec %d\n",
+				       pacc[i].k, pacc[i].off, pacc[i].v,
+				       pacc[i].irq, pacc[i].sec);
+			n_pacc_dumped = n_pacc;
+			printf("PA-END\n");
+		} else if (!strcmp(line, "pstat")) {
+			pstat_line();
+		} else if (!strcmp(line, "widest14")) {
+			set_widest14();
 		} else {
 			printf("HARNESS unknown op: %s\n", line);
 			return 3;
@@ -680,10 +839,11 @@ class Run:
         self.rc = p.returncode
         self.err = p.stderr
         self.ops, self.pages, self.stats, self.stores = [], [], [], []
+        self.lines14, self.pacc, self.pstats = [], [], []
         self.errno = {}
         self.bound = None
-        cur = None
-        st = []
+        cur = cur14 = None
+        st, pa = [], []
         for ln in p.stdout.split("\n"):
             if cur is not None:
                 m = re.match(r"PAGE-END len=(-?\d+) eof=(\d+)$", ln)
@@ -693,7 +853,30 @@ class Run:
                 else:
                     cur.append(ln + "\n")
                 continue
-            if ln == "PAGE-BEGIN":
+            if cur14 is not None:
+                m = re.match(r"LINES-END len=(-?\d+)$", ln)
+                if m:
+                    self.lines14.append(("".join(cur14), int(m.group(1))))
+                    cur14 = None
+                else:
+                    cur14.append(ln + "\n")
+                continue
+            if ln == "LINES-BEGIN":
+                cur14 = []
+            elif ln.startswith("PA "):
+                f = ln.split()
+                pa.append((f[1], int(f[2], 16), int(f[3], 16), int(f[5]),
+                           int(f[7])))
+            elif ln == "PA-END":
+                self.pacc.append(pa)
+                pa = []
+            elif ln.startswith("PSTAT "):
+                d = {}
+                for kv in ln[6:].split(" "):
+                    k, _, v = kv.partition("=")
+                    d[k] = v
+                self.pstats.append(d)
+            elif ln == "PAGE-BEGIN":
                 cur = []
             elif ln.startswith("OP "):
                 m = re.match(r"OP (.*) -> (-?\d+)$", ln)
@@ -730,6 +913,18 @@ class Run:
                 return ln[len(key) + 1:]
         return None
 
+    def line14(self, i, key):
+        """The rest of 1.4's line starting with `key ` in the i-th render."""
+        if i >= len(self.lines14):
+            return None
+        for ln in self.lines14[i][0].split("\n"):
+            if ln.startswith(key + " "):
+                return ln[len(key) + 1:]
+        return None
+
+    def pst(self, i, k):
+        return self.pstats[i][k] if i < len(self.pstats) else None
+
 
 def rd(a, r):
     return (a << 24) | (r << 16)
@@ -745,7 +940,7 @@ PAGE1 = 0x8000		# the fake's page-1 marker bit
 
 
 def boot_page(bound=10000):
-    lines = ["version rtl819x-switch 1.3", "unlocked 0", "bus 0 reg_rc 1",
+    lines = ["version rtl819x-switch 1.4", "unlocked 0", "bus 0 reg_rc 1",
              "bound %d" % bound, "mdio_rd 0", "mdio_wr 0",
              "mdio_to 0 busy 0 retry 0", "refused 0 wr_refused 0 again 0",
              "spin 0 0 0", "hi_or 00000000", "dirty 0", "scanned 00000000 j 0"]
@@ -785,7 +980,7 @@ def cases(exe, block, version):
 
     # K1 boot
     r = track(Run(exe, ["init", "r", "stat"]))
-    ok = (r.rc == 0 and r.op(0) == 0 and version == "rtl819x-switch 1.3"
+    ok = (r.rc == 0 and r.op(0) == 0 and version == "rtl819x-switch 1.4"
           and r.pages[0][0] == boot_page() and r.stat(0, "nstores") == "0"
           and r.stat(0, "pde") == "1")
     yield "K1", ok, "boot page %s" % ("exact" if ok else repr(r.pages[:1])[:300])
@@ -1098,6 +1293,264 @@ def cases(exe, block, version):
           and r.field(0, "scanned") == "00000008 j 4242")
     yield "K23", ok, "rcs %s" % rcs
 
+    # ---------------------------------------- 1.4: the phyif write class
+    for item in cases14(exe, block):
+        yield item
+
+
+# 1.4 (R6b-10).  The PCRP model's default is the post-`J` state (量 C9-SW0).
+POSTJ = [0x007F0038, 0x047F0038, 0x087F0038, 0x0C7F0038, 0x107F0038]
+PHYUNLOCK = "v unlock phyif-i-mean-it"
+PERMIT = ["set swunlock 1", PHYUNLOCK]
+
+
+def lines14_boot():
+    return ("phyif unlocked 0 ok 0 stored 0 already 0 refused 0 idfail 0 "
+            "rbfail 0\n" + "".join("phyif%d pre 00000000 rb 00000000 rc 1 st 0\n"
+                                   % n for n in range(5)))
+
+
+def rwr(n, pre, rb=None, sec=None):
+    """The accesses one stored port makes: R pre, W pre|1, R rb."""
+    off = 0x4104 + 4 * n
+    rb = (pre | 1) if rb is None else rb
+    return [("R", off, pre), ("W", off, pre | 1), ("R", off, rb)]
+
+
+def acc(run, i):
+    """(kind, off, value) of the i-th pacc dump, without irq/section."""
+    return [x[:3] for x in run.pacc[i]] if i < len(run.pacc) else None
+
+
+def one_section(run, i, per):
+    """Every access of dump i with IRQs off, `per` accesses a section, each
+    group in its own section."""
+    if i >= len(run.pacc):
+        return False
+    d = run.pacc[i]
+    secs = [x[4] for x in d]
+    groups = [secs[k:k + per] for k in range(0, len(secs), per)]
+    return (all(x[3] == 1 for x in d) and all(len(set(g)) == 1 for g in groups)
+            and len({g[0] for g in groups}) == len(groups))
+
+
+def comment_figures14(block):
+    body = " ".join(re.sub(r"^\s*/?\*+/?\s?", "", ln).strip()
+                    for ln in block.split("\n"))
+    m = re.search(r"widest: (\d+) \+ 5 x (\d+) = (\d+) bytes", body)
+    return tuple(int(g) for g in m.groups()) if m else None
+
+
+def cases14(exe, block):
+    """Yield (name, ok, detail) for K24..K36: 1.4's `phyif` class."""
+    einval, eperm = -ERRNO["EINVAL"], -ERRNO["EPERM"]
+    eproto, eio = -ERRNO["EPROTO"], -ERRNO["EIO"]
+
+    # K24 boot, and a cat reads nothing
+    r = Run(exe, ["l", "l", "pstat"])
+    ok = (r.rc == 0 and len(r.lines14) == 2
+          and r.lines14[0][0] == lines14_boot()
+          and r.lines14[1] == r.lines14[0]
+          and r.lines14[0][1] == len(r.lines14[0][0])
+          and r.pst(0, "rd") == "0" and r.pst(0, "wr") == "0"
+          and r.pst(0, "marks") == "0")
+    yield "K24", ok, "boot lines %s, reads %s" % (
+        "exact" if r.lines14 and r.lines14[0][0] == lines14_boot()
+        else repr(r.lines14[:1])[:200], r.pst(0, "rd"))
+
+    # K25 the class token absent: refused, counted, no access
+    r = Run(exe, ["set swunlock 1", "v phyif all", "v phyif 0", "l", "pacc",
+                  "pstat"])
+    ok = (r.rc == 0 and [x[1] for x in r.ops] == [eperm, eperm]
+          and r.line14(0, "phyif") == "unlocked 0 ok 0 stored 0 already 0 "
+                                      "refused 2 idfail 0 rbfail 0"
+          and r.line14(0, "phyif0") == "pre 00000000 rb 00000000 rc 1 st 0"
+          and acc(r, 0) == [] and r.pst(0, "marks") == "0")
+    yield "K25", ok, "ops %s" % [x[1] for x in r.ops]
+
+    # K26 the token: near misses, the switch's own, then unlock and lock
+    r = Run(exe, ["set swunlock 1", "v unlock i-mean-it",
+                  "v unlock phyif-i-mean-it2", "v unlock  phyif-i-mean-it",
+                  "l", PHYUNLOCK, "pstat", "l", "v lock phyif", "pstat", "l",
+                  "v phyif 0", "pacc"])
+    rcs = [x[1] for x in r.ops]
+    ok = (r.rc == 0
+          and rcs == [einval, einval, einval,
+                      len("unlock phyif-i-mean-it\n"), len("lock phyif\n"),
+                      eperm]
+          and (r.line14(0, "phyif") or "").startswith("unlocked 0 ")
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF-UNLOCK"
+          and (r.line14(1, "phyif") or "").startswith("unlocked 1 ")
+          and r.pst(1, "mark") == "RLXFW-SW-PHYIF-LOCK"
+          and (r.line14(2, "phyif") or "").startswith("unlocked 0 ")
+          and acc(r, 0) == [])
+    yield "K26", ok, "ops %s" % rcs
+
+    # K27 phyif all from the post-J state: the exact accesses, one IRQs-off
+    # section a port, the page, the mark, the model -- and a cat after it
+    # still reads nothing
+    r = Run(exe, PERMIT + ["v phyif all", "pacc", "l", "l", "pstat"])
+    want = [a for n in range(5) for a in rwr(n, POSTJ[n])]
+    ports = all(r.line14(0, "phyif%d" % n) ==
+                "pre %08X rb %08X rc 0 st 1" % (POSTJ[n], POSTJ[n] | 1)
+                for n in range(5))
+    ok = (r.rc == 0 and r.op(1) == len("phyif all\n")
+          and acc(r, 0) == want and one_section(r, 0, 3)
+          and r.line14(0, "phyif") == "unlocked 1 ok 1 stored 5 already 0 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and ports and len(r.lines14) == 2 and r.lines14[1] == r.lines14[0]
+          and r.pst(0, "rd") == "10" and r.pst(0, "wr") == "5"
+          and r.pst(0, "rd_insec") == "10" and r.pst(0, "wr_insec") == "5"
+          and r.pst(0, "illegal") == "0" and r.pst(0, "sw_writes") == "5"
+          and r.pst(0, "imbalance") == "0" and r.pst(0, "depth") == "0"
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00001F1F"
+          and r.pst(0, "pcrp") == ",".join("%08X" % (v | 1) for v in POSTJ))
+    yield "K27", ok, "rc %s, %d accesses, mark %s" % (
+        r.op(1) if len(r.ops) > 1 else "-", len(acc(r, 0) or []),
+        r.pst(0, "mark"))
+
+    # K28 one port; the previous verb's results do not survive the next
+    r = Run(exe, PERMIT + ["v phyif all"] +
+            ["set pcrp %d 0x%08X" % (n, POSTJ[n]) for n in range(5)] +
+            ["pacc", "v phyif 3", "pacc", "l", "pstat"])
+    others = all(r.line14(0, "phyif%d" % n) ==
+                 "pre 00000000 rb 00000000 rc 1 st 0" for n in (0, 1, 2, 4))
+    ok = (r.rc == 0 and r.op(2) == len("phyif 3\n")
+          and acc(r, 1) == rwr(3, POSTJ[3]) and one_section(r, 1, 3)
+          and r.line14(0, "phyif3") == "pre %08X rb %08X rc 0 st 1"
+          % (POSTJ[3], POSTJ[3] | 1)
+          and others
+          and r.line14(0, "phyif") == "unlocked 1 ok 2 stored 6 already 0 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00000808"
+          and r.pst(0, "pcrp") == ",".join("%08X" % (POSTJ[n] | (n == 3))
+                                           for n in range(5)))
+    yield "K28", ok, "accesses %s, others reset %s" % (acc(r, 1), others)
+
+    # K29 every other port and every malformed form refused beside a
+    # permitted neighbour, with no access; unknown verbs as before 1.4
+    bad = ["phyif 5", "phyif 9", "phyif 05", "phyif -1", "phyif",
+           "phyif  0", "phyif 0 ", "phyif 0x", "phyif a", "phyif al",
+           "phyif all ", "phyif 0 1", "phyif 6", "phyif 8", "PHYIF 0",
+           "phyifall", "lock", "unlock", "bogus"]
+    r = Run(exe, PERMIT + ["pacc", "v phyif 5", "v phyif 4"] +
+            ["v " + b for b in bad[1:]] + ["v phyif all", "pacc", "l",
+                                          "pstat"])
+    rcs = [x[1] for x in r.ops][1:]
+    want_rcs = [einval, len("phyif 4\n")] + [einval] * (len(bad) - 1) + \
+        [len("phyif all\n")]
+    want = rwr(4, POSTJ[4]) + [a for n in range(4) for a in rwr(n, POSTJ[n])] \
+        + [("R", 0x4114, POSTJ[4] | 1)]
+    ok = (r.rc == 0 and rcs == want_rcs and acc(r, 1) == want
+          and r.line14(0, "phyif") == "unlocked 1 ok 2 stored 5 already 1 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00000F1F"
+          and r.pst(0, "illegal") == "0")
+    yield "K29", ok, "%d refusals, rcs %s" % (len(bad), rcs if rcs != want_rcs
+                                             else "as written")
+
+    # K30 already set: read, not stored
+    r = Run(exe, PERMIT + ["set pcrp 3 0x0C7F0039", "v phyif 3", "pacc", "l",
+                           "pstat"])
+    ok = (r.rc == 0 and r.op(1) == len("phyif 3\n")
+          and acc(r, 0) == [("R", 0x4110, 0x0C7F0039)]
+          and r.line14(0, "phyif3") == "pre 0C7F0039 rb 00000000 rc 0 st 0"
+          and r.line14(0, "phyif") == "unlocked 1 ok 1 stored 0 already 1 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and r.pst(0, "wr") == "0"
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00000008")
+    yield "K30", ok, "accesses %s" % acc(r, 0)
+
+    # K31 the identity check: port 2's word carries ExtPHYID 1 -- nothing
+    # stored there, and `all` stops there
+    r = Run(exe, PERMIT + ["set pcrp 2 0x047F0038", "v phyif all", "pacc",
+                           "l", "pstat", "v phyif 2", "pacc", "pstat"])
+    want = rwr(0, POSTJ[0]) + rwr(1, POSTJ[1]) + [("R", 0x410C, 0x047F0038)]
+    ok = (r.rc == 0 and r.op(1) == eproto and acc(r, 0) == want
+          and r.line14(0, "phyif2") == "pre 047F0038 rb 00000000 rc %d st 0"
+          % eproto
+          and all(r.line14(0, "phyif%d" % n) ==
+                  "pre 00000000 rb 00000000 rc 1 st 0" for n in (3, 4))
+          and r.line14(0, "phyif") == "unlocked 1 ok 0 stored 2 already 0 "
+                                      "refused 0 idfail 1 rbfail 0"
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00000303"
+          and r.op(2) == eproto and acc(r, 1) == [("R", 0x410C, 0x047F0038)]
+          and r.pst(1, "wr") == "2")
+    yield "K31", ok, "rc %s, accesses %d" % (r.op(1) if len(r.ops) > 1
+                                              else "-", len(acc(r, 0) or []))
+
+    # K32 bit 0 does not stick on port 1: -EIO, and `all` stops there
+    r = Run(exe, PERMIT + ["set nostick 1 1", "v phyif all", "pacc", "l",
+                           "pstat"])
+    want = rwr(0, POSTJ[0]) + rwr(1, POSTJ[1], rb=POSTJ[1])
+    ok = (r.rc == 0 and r.op(1) == eio and acc(r, 0) == want
+          and r.line14(0, "phyif1") == "pre %08X rb %08X rc %d st 1"
+          % (POSTJ[1], POSTJ[1], eio)
+          and r.line14(0, "phyif") == "unlocked 1 ok 0 stored 2 already 0 "
+                                      "refused 0 idfail 0 rbfail 1"
+          and r.line14(0, "phyif2") == "pre 00000000 rb 00000000 rc 1 st 0"
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00000301")
+    yield "K32", ok, "rc %s phyif1 %s" % (r.op(1) if len(r.ops) > 1 else "-",
+                                         r.line14(0, "phyif1"))
+
+    # K33 another bit moved on the store (bit 3): -EIO although bit 0 stuck
+    r = Run(exe, PERMIT + ["set flip 2 1", "v phyif 2", "pacc", "l", "pstat"])
+    moved = (POSTJ[2] | 1) ^ 0x8
+    ok = (r.rc == 0 and r.op(1) == eio
+          and acc(r, 0) == rwr(2, POSTJ[2], rb=moved)
+          and r.line14(0, "phyif2") == "pre %08X rb %08X rc %d st 1"
+          % (POSTJ[2], moved, eio)
+          and (r.line14(0, "phyif") or "").endswith("rbfail 1")
+          and r.pst(0, "mark") == "RLXFW-SW-PHYIF=00000400")
+    yield "K33", ok, "rc %s phyif2 %s" % (r.op(1) if len(r.ops) > 1 else "-",
+                                         r.line14(0, "phyif2"))
+
+    # K34 the switch locked: the store is rtl819x_sw_wr's to refuse
+    r = Run(exe, ["set swunlock 0", PHYUNLOCK, "v phyif 0", "pacc", "l",
+                  "pstat"])
+    ok = (r.rc == 0 and r.op(1) == eperm
+          and acc(r, 0) == [("R", 0x4104, POSTJ[0])]
+          and r.line14(0, "phyif0") == "pre %08X rb 00000000 rc %d st 0"
+          % (POSTJ[0], eperm)
+          and r.line14(0, "phyif") == "unlocked 1 ok 0 stored 0 already 0 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and r.pst(0, "sw_refused") == "1" and r.pst(0, "wr") == "0")
+    yield "K34", ok, "rc %s sw_refused %s" % (r.op(1) if len(r.ops) > 1
+                                               else "-", r.pst(0, "sw_refused"))
+
+    # K35 over 64 pre-read words (bit 31 and bits 25:1 drawn, ExtPHYID the
+    # port's, bit 0 clear), the word stored differs from the one read in
+    # bit 0 alone
+    rng = random.Random(1427)
+    words = []
+    for i in range(64):
+        n = i % 5
+        w = ((rng.getrandbits(32) & 0x83FFFFFE) | (n << 26)) & ~1
+        words.append((n, w))
+    script = list(PERMIT)
+    for n, w in words:
+        script += ["set pcrp %d 0x%08X" % (n, w), "v phyif %d" % n]
+    script += ["pacc", "pstat"]
+    r = Run(exe, script)
+    want = [a for n, w in words for a in rwr(n, w)]
+    rcs = [x[1] for x in r.ops][1:]
+    ok = (r.rc == 0 and rcs == [len("phyif 0\n")] * 64
+          and acc(r, 0) == want and r.pst(0, "illegal") == "0")
+    yield "K35", ok, "64 words, %s" % ("each stored as read with bit 0 set"
+                                       if ok else "rcs/accesses differ")
+
+    # K36 the page's lines at their widest against the comment's figures
+    r = Run(exe, ["widest14", "l"])
+    text, n = r.lines14[0] if r.lines14 else ("", -1)
+    ls = text.split("\n")[:-1]
+    head = len(ls[0]) + 1 if ls else -1
+    per = {len(x) + 1 for x in ls[1:]}
+    fig = comment_figures14(block)
+    ok = (r.rc == 0 and len(ls) == 6 and len(per) == 1
+          and fig == (head, min(per) if per else -1, n) and n == len(text))
+    yield "K36", ok, "comment %s, measured %d + 5 x %s = %d" % (
+        fig, head, sorted(per), n)
+
 
 def build(block, version, work, tag):
     """Compile the harness around `block`; (exe or None, compiler output)."""
@@ -1186,6 +1639,40 @@ MUTANTS = [
      "(write ? RTL819X_MDIO_WRITE | val : 0)", "(write ? val : 0)"),
     ("M20", "a numeric field need not start with a digit", "K8",
      "\t\tif (*s < '0' || *s > '9')\n\t\t\treturn -EINVAL;\n", ""),
+    # 1.4 (R6b-10): the phyif class
+    ("M21", "phyif's own token is not asked", "K25",
+     "\tif (!rtl819x_phyif_unlocked) {\n\t\trtl819x_phyif_n_refused++;\n"
+     "\t\treturn -EPERM;\n\t}\n", ""),
+    ("M22", "the port bound admits port 5", "K29",
+     "buf[6] < '0' + RTL819X_PHYIF_NPORT",
+     "buf[6] <= '0' + RTL819X_PHYIF_NPORT"),
+    ("M23", "the store sets bit 1 as well", "K35",
+     "\t\twant = r->pre | RTL819X_PCRP_ENPHYIF;",
+     "\t\twant = r->pre | RTL819X_PCRP_ENPHYIF | 0x2u;"),
+    ("M24", "the ExtPHYID identity check removed", "K31",
+     "\tif (RTL819X_PCRP_EXTPHYID(r->pre) != n) {", "\tif (0) {"),
+    ("M25", "the read-back is not compared", "K32",
+     "\t\t\tif (r->rb != want) {", "\t\t\tif (0) {"),
+    ("M26", "the read-back compares bit 0 alone", "K33",
+     "\t\t\tif (r->rb != want) {",
+     "\t\t\tif (!(r->rb & RTL819X_PCRP_ENPHYIF)) {"),
+    ("M27", "a port already set is stored again", "K30",
+     "\t} else if (r->pre & RTL819X_PCRP_ENPHYIF) {", "\t} else if (0) {"),
+    ("M28", "`phyif all` goes on past a failed port", "K31",
+     "\t\tif (rc)\n\t\t\tbreak;\n\t\ton |= 1u << n;",
+     "\t\tif (!rc)\n\t\t\ton |= 1u << n;"),
+    ("M29", "the pre-read made with IRQs on", "K27",
+     "\tlocal_irq_save(flags);\n\tr->pre = rtl819x_sw_rd(off);",
+     "\tr->pre = rtl819x_sw_rd(off);\n\tlocal_irq_save(flags);"),
+    ("M30", "the switch's token opens the phyif class", "K26",
+     "#define RTL819X_PHYIF_TOKEN\t\t\"phyif-i-mean-it\"",
+     "#define RTL819X_PHYIF_TOKEN\t\t\"i-mean-it\""),
+    ("M31", "a cat reads PCRP", "K24",
+     "\t\tr = &rtl819x_phyif_res[n];\n",
+     "\t\tr = &rtl819x_phyif_res[n];\n"
+     "\t\t(void)rtl819x_sw_rd(RTL819X_SW_PCRP0 + 4 * n);\n"),
+    ("M32", "a verb's results survive into the next verb's lines", "K28",
+     "\t\trtl819x_phyif_res[n].rc = RTL819X_PHYIF_UNTRIED;\n", ""),
 ]
 
 
@@ -1202,7 +1689,7 @@ def main():
     block, version = extract(open(a.source, encoding="utf-8").read())
     work = a.keep or tempfile.mkdtemp(prefix="mdiocheck-")
     os.makedirs(work, exist_ok=True)
-    print("mdiocheck 1.0")
+    print("mdiocheck 1.1")
     print("  source  %s  (block %d lines, version %r)"
           % (a.source, block.count("\n"), version))
     try:

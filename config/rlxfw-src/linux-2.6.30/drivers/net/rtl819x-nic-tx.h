@@ -1,7 +1,8 @@
 /*
- * rtl819x-nic-tx.h -- rtl819x-nic 1.5 (R6b-2): the TX policy's declarations
- * and every part of 1.5 that decides something without touching hardware.
- * THIS FILE IS NOT REALTEK'S.
+ * rtl819x-nic-tx.h -- rtl819x-nic 1.5 (R6b-2) and 1.6 (R6b-10): the TX
+ * policy's declarations and every part of 1.5 that decides something without
+ * touching hardware.  1.6 changes one thing here: the policy a boot starts
+ * in, NIC15_LEN_BOOT, is `vendor`.  THIS FILE IS NOT REALTEK'S.
  *
  * Included once, by rtl819x-nic.c, on 1.4's blank line 217, so that no line
  * of 1.4 moves (the 72 citations into that file stay where they are).  What
@@ -17,7 +18,8 @@
  * NIC15_TXD is checked against NIC_TX_DESC by a BUILD_BUG_ON in nic15_init.
  *
  * WHAT 1.5 IS, IN FIVE LINES (the reasons: notes/nic-driver.md, R6b-2):
- *   txlen    which TX length fields the two writers store (default 1.4's)
+ *   txlen    which TX length fields the two writers store (1.6: the boot
+ *            policy is `vendor`; `rlxfw`, 1.4's lengths, is a verb setting)
  *   txoff    the TX copy's buffer offset, 2 (1.4) or 0
  *   txrb     descriptor read-backs and their load-matched controls
  *   sweep    re-arm; frame a at L; probe b -- once per length, in the kernel;
@@ -26,8 +28,9 @@
  * Each behaviour verb is refused while the engine is on, rlx0 is up or a
  * sweep runs, and marks the policy dirty; `engine on` (and `ifconfig rlx0
  * up`) then refuses (-ESTALE) until `arm` has run, so no frame is ever sent
- * under a new policy from a ring the old one left.  A boot that types no 1.5
- * verb runs 1.4's stores in 1.4's order.
+ * under a new policy from a ring the old one left.  A boot that types no verb
+ * runs 1.4's stores in 1.4's order; since 1.6 two of the values stored differ
+ * from 1.4's, m_len and m_extsize, both F + 4 (`vendor`).
  */
 #ifndef RTL819X_NIC_TX_H
 #define RTL819X_NIC_TX_H
@@ -69,6 +72,20 @@ static const struct nic15_len_row nic15_len_tab[NIC15_LEN_N] = {
 	{ "d3",     3, 0 },
 };
 
+/* THE BOOT POLICY (1.6, R6b-10): the txlen a boot starts in.  Blocks 47 and
+ * 48 ran `vendor` on the silicon -- E2 220 of 220 twice on each of two boots,
+ * and a wire sweep over every length from 60 to 1,514 with JabberErr 0 --
+ * while 1.4's lengths faulted beside it on the same boots (量, NET-128,
+ * NET-132).  So `vendor` is where a boot starts, and `rlxfw` (1.4's lengths)
+ * stays a verb setting, for regression.  This one macro is the whole change:
+ * the kernel's static initialiser and nic15check's harness both read it, and
+ * nic15check asserts it (K10, K22).  The rest is 1.5's, unchanged: the boot
+ * policy is not dirty, so `engine on` and `ifconfig rlx0 up` are not refused
+ * at boot; and a wire sweep over more than one length is permitted at boot,
+ * because the owner's bound exempts `vendor`, and refused after `txlen
+ * rlxfw`, until `txlen vendor` is typed again. */
+#define NIC15_LEN_BOOT		NIC15_LEN_VENDOR
+
 /* The policy.  One struct so that the pure setter below can be driven on the
  * host; 1.4's lines read its fields.  `dirty` is set by EVERY accepted
  * behaviour verb, the same value re-typed included: both A/B arms type their
@@ -85,10 +102,11 @@ static inline const char *nic15_len_name(int pol)
 	return (pol >= 0 && pol < NIC15_LEN_N) ? nic15_len_tab[pol].name : "?";
 }
 
-/* THE DEFAULT ARM FIRST, AND IT IS 1.4's VALUE LITERALLY: at pol 0 (and at any
- * value this table does not hold) m_len is the F the caller passed and
- * m_extsize is the 1.4 expression the caller passed.  nic15check drives both
- * over F = 0..2,047. */
+/* THE `rlxfw` ARM FIRST, AND IT IS 1.4's VALUE LITERALLY: at pol 0 (and at
+ * any value this table does not hold, which no parser produces) m_len is the
+ * F the caller passed and m_extsize is the 1.4 expression the caller passed.
+ * nic15check drives both over F = 0..2,047.  Since 1.6 this is not the arm a
+ * boot starts in: NIC15_LEN_BOOT is. */
 static inline u32 nic15_mlen(u32 f, int pol)
 {
 	if (pol <= NIC15_LEN_RLXFW || pol >= NIC15_LEN_N)

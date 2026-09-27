@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """nic15check -- rtl819x-nic 1.5's pure half, compiled and driven on the host.
 
+1.6 (R6b-10) changes one thing the header decides: the policy a boot starts
+in, `NIC15_LEN_BOOT`, is `vendor`.  The harness takes its reset policy from
+that macro, K10 and K22 assert it, and M26 reverts it.
+
 WHAT IT CHECKS, AND WHY IT CAN
 ------------------------------
 `R6b-2` put every part of driver 1.5 that DECIDES something into
@@ -23,19 +27,23 @@ asserts, case by case:
       sweep refuses every behaviour verb, `engine on`/ndo_open, a second
       sweep and `swclear`), written out again below in Python
   K4  at `txlen rlxfw`, m_len = F and m_extsize = 1.4's value for F = 0..2,047
-      -- and at every value the table does not hold, which is the default arm
+      -- and at every value the table does not hold, which is the functions'
+      fallback arm (since 1.6 not the policy a boot starts in: K22)
   K5  the seven `txlen` values give the (m_len, m_extsize) section 3 names
   K6  every verb's success path returns `count`, every refusal its errno and
-      a v15_last record; an unknown verb returns -EINVAL and records nothing;
-      `sweep F T P` reaches the sweep as loopback and `... wire` as wire
+      a v15_last record -- txlen, txoff and txrb each refused and permitted
+      through the dispatcher; an unknown verb returns -EINVAL and records
+      nothing; `sweep F T P` reaches the sweep as loopback and `... wire` as
+      wire; at the boot policy a full wire sweep is permitted with no verb
+      typed, after `txlen rlxfw` refused, after `txlen vendor` permitted
   K7  a refused behaviour verb leaves the policy alone; an accepted one --
       the same value re-typed included -- sets it and marks it dirty
   K8  the loopback classifier on its boundary cases (REPEAT, DIGIT included)
   K9  the frame bytes the sweep compares against equal, for every offset and
       digit, what `nic_do_tx` writes, re-derived here from 1.4's text
   K10 /proc/rtl819x-nic-tx with every counter at its widest fits under the
-      3,900 cap, and the boot defaults print `tx15 txlen rlxfw txoff 2 txrb 0
-      dirty 0 p15 1` -- the line R6b-3's first cell predicts
+      3,900 cap, and the boot policy prints `tx15 txlen vendor txoff 2 txrb 0
+      dirty 0 p15 1` (1.6; 1.5 printed `txlen rlxfw` there)
   K11 the map's encoding (one character per pair of lengths, six codes, VOID
       and SKEW their own): chosen codes at chosen lengths, decoded back by a
       decoder written here, nothing else set, and the `mt` counts
@@ -55,8 +63,13 @@ asserts, case by case:
   K21 the owner's wire bound (nic15_sweep_gate): a wire sweep over more than
       one length is -EPERM at every txlen but vendor, after the table's row;
       loopback is unaffected
+  K22 the boot policy (1.6): NIC15_LEN_BOOT is `vendor`, the harness resets
+      to it clean (not dirty), its lengths are the vendor's (m_len and
+      m_extsize F + 4 at 60, 61 and 1,514), a full wire sweep is permitted at
+      it with no verb typed, and `txlen rlxfw` -- 1.4's lengths, kept for
+      regression -- is still accepted and still bounded
 
-M0..M25 then mutate a COPY of the header, one defect each, and require the
+M0..M26 then mutate a COPY of the header, one defect each, and require the
 case named for it to go red.  M0 is the unmutated copy through the same path:
 if it is not green, no kill is counted.  A mutant whose anchor does not occur
 exactly once, that does not compile, or that is caught by a different case is
@@ -68,7 +81,9 @@ WHAT IT CANNOT SEE
 ------------------
 The kernel half: the hooks in rtl819x-nic.c that touch the engine, the locks,
 the sweep's loop and its waits.  `tools/storeseq.py` reads the built objects
-for "default = 1.4" and the bench reads the rest.  The generated driver's
+for 1.4's store sequence, and the bench reads the rest.  Nor the kernel's own
+initialiser: that `nic15_pol` starts at NIC15_LEN_BOOT is a line of
+rtl819x-nic.c, read in the ELF (the symbol's first word, 3) and not here.  The generated driver's
 hooks are stubs that apply the same `nic15_set` and `nic15_gate` the kernel
 applies; what the kernel does around them is not exercised here.
 
@@ -170,7 +185,7 @@ static int nic15_ret(int v, int rc)
 
 static void reset(void)
 {
-	pol.txlen = NIC15_LEN_RLXFW;
+	pol.txlen = NIC15_LEN_BOOT;	/* 1.6: the header's boot policy */
 	pol.txoff = 2;
 	pol.txrb = 0;
 	pol.dirty = 0;
@@ -211,11 +226,11 @@ static void scenario(const char *name, struct nic15_view *v)
 	memset(&sum, 0, sizeof(sum));
 	memset(rec, 0, sizeof(rec));
 	memset(recd, 0, sizeof(recd));
-	vpol.txlen = NIC15_LEN_RLXFW;
+	vpol.txlen = NIC15_LEN_BOOT;
 	vpol.txoff = 2;
 	vpol.txrb = 0;
 	vpol.dirty = 0;
-	v->version = "rtl819x-nic 1.5";
+	v->version = "rtl819x-nic 1.6";
 	v->pol = &vpol;
 	v->p15 = 1;
 	v->allocated = 1;
@@ -356,6 +371,9 @@ int main(void)
 			       nic15_ext((u32)f, p, (u32)e));
 		} else if (!strcmp(line, "R")) {
 			reset();
+		} else if (!strcmp(line, "P")) {
+			printf("P %d %s %d\n", NIC15_LEN_BOOT,
+			       nic15_len_name(NIC15_LEN_BOOT), NIC15_LEN_VENDOR);
 		} else if (line[0] == 'D') {
 			unsigned long count;
 			int off = 0, r;
@@ -705,9 +723,14 @@ def k6(exe):
     E = errno
     script = [
         ("R", None),
-        # the owner's bound, through the dispatcher: at rlxfw (the reset
-        # policy) a wire sweep over 1,455 lengths is refused, one length is
-        # not, loopback is not; at vendor the full wire sweep is permitted
+        # the owner's bound, through the dispatcher.  1.6: at the boot policy
+        # (vendor) a wire sweep over 1,455 lengths is permitted with no verb
+        # typed; at rlxfw (1.4's lengths, by verb) it is refused while one
+        # length and loopback are not; at vendor again it is permitted
+        ("D %d 19 sweep 60 1514 60 wire" % ok, (19, 5, 19)),
+        ("D %d 18 sweep 61 61 60 wire" % ok, (18, 5, 18)),
+        ("D %d 14 sweep 60 1514 60" % ok, (14, 5, 14)),
+        ("D %d 12 txlen rlxfw" % ok, (12, 1, 12)),
         ("D %d 19 sweep 60 1514 60 wire" % ok, (-E.EPERM, 5, -E.EPERM)),
         ("D %d 18 sweep 61 61 60 wire" % ok, (18, 5, 18)),
         ("D %d 14 sweep 60 1514 60" % ok, (14, 5, 14)),
@@ -724,6 +747,8 @@ def k6(exe):
         ("D %d 12 txlen vendor" % (ok | 1), (-E.EBUSY, 1, -E.EBUSY)),
         ("D %d 12 txlen vendor" % (ok | 2), (-E.EBUSY, 1, -E.EBUSY)),
         ("D %d 12 txlen vendor" % (ok | SWEEPING), (-E.EBUSY, 1, -E.EBUSY)),
+        ("D %d 8 txoff 2" % (ok | 1), (-E.EBUSY, 2, -E.EBUSY)),
+        ("D %d 7 txrb 0" % (ok | 2), (-E.EBUSY, 3, -E.EBUSY)),
         ("D %d 14 sweep 60 60 0" % (ok | 2), (-E.EBUSY, 5, -E.EBUSY)),
         ("D %d 14 sweep 60 60 0" % (ok | SWEEPING), (-E.EBUSY, 5, -E.EBUSY)),
         ("D %d 14 sweep 60 60 0" % (16 | 32), (-E.EPERM, 5, -E.EPERM)),
@@ -748,22 +773,32 @@ def k6(exe):
         if got != want:
             bad.append((cmd, got, want))
     last = rows[-1]
-    # 10 accepted; 15 refusals recorded; the two unknown verbs record nothing
-    tail_ok = int(last[4]) == 10 and int(last[5]) == 15
-    # what reached the sweep hook: (from, to, probe, wire) after each sweep
+    # 14 accepted; 17 refusals recorded; the two unknown verbs record nothing
+    tail_ok = int(last[4]) == 14 and int(last[5]) == 17
+    # the policy after R is the boot one, clean; after `txlen rlxfw`, dirty
+    pol_ok = (rows[0][6] == "3" and rows[0][9] == "0" and
+              rows[3][6] == "0" and rows[3][9] == "1")
+    # what reached the sweep hook: (from, to, probe, wire) after each command
     hook = [tuple(r[13:16]) + (r[17],) for r in rows]
-    modes_ok = (hook[1] == ("61", "61", "60", "1") and
+    modes_ok = (hook[0] == ("60", "1514", "60", "1") and
+                hook[1] == ("61", "61", "60", "1") and
                 hook[2] == ("60", "1514", "60", "0") and
-                hook[4] == ("60", "1514", "60", "1") and
-                hook[7] == ("60", "60", "0", "0") and
-                hook[8] == ("61", "61", "60", "1"))
-    return (not bad and tail_ok and modes_ok,
+                hook[4] == ("60", "1514", "60", "0") and
+                hook[5] == ("61", "61", "60", "1") and
+                hook[6] == ("60", "1514", "60", "0") and
+                hook[8] == ("60", "1514", "60", "1") and
+                hook[11] == ("60", "60", "0", "0") and
+                hook[12] == ("61", "61", "60", "1"))
+    return (not bad and tail_ok and pol_ok and modes_ok,
             "%d writes: every accepted verb returned count, every refusal its "
-            "errno; at rlxfw `60 1514 60 wire` -EPERM, `61 61 60 wire` and "
-            "loopback permitted, at vendor `60 1514 60 wire` permitted%s%s%s" % (
+            "errno; at the boot policy `60 1514 60 wire` permitted, after "
+            "`txlen rlxfw` -EPERM while `61 61 60 wire` and loopback are "
+            "permitted, after `txlen vendor` permitted%s%s%s%s" % (
                 len(script) - 1, first(bad),
                 "" if tail_ok else "; counters %r" % (last[4:6],),
-                "" if modes_ok else "; the hook saw %r" % (hook[:9],)))
+                "" if pol_ok else "; policy %r %r" % (rows[0][6:10],
+                                                      rows[3][6:10]),
+                "" if modes_ok else "; the hook saw %r" % (hook[:13],)))
 
 
 def k7(exe):
@@ -833,7 +868,7 @@ def k10(exe):
           sum(1 for x in rows_ if x.startswith("hb ") and ":" in x) == 4)
     _, _, dtext, _ = page(exe, "default")
     dline = dtext.split("\n")[1] if dtext.count("\n") > 1 else ""
-    want_line = "tx15 txlen rlxfw txoff 2 txrb 0 dirty 0 p15 1"
+    want_line = "tx15 txlen vendor txoff 2 txrb 0 dirty 0 p15 1"
     return (ok and dline == want_line,
             "worst case %d, %d with the histogram at its bound, of %d (cap); "
             "longest line %d; default %r%s"
@@ -995,11 +1030,42 @@ def k21(exe):
                         len(lines), first(bad))
 
 
+def k22(exe):
+    """1.6: the policy a boot starts in is `vendor`, and 1.4's is a verb."""
+    ok = 8 | 16 | 32
+    vendor = LENS.index("vendor")
+    lines = (["P", "R",
+              "D %d 19 sweep 60 1514 60 wire" % ok,
+              "D %d 12 txlen rlxfw" % ok,
+              "D %d 19 sweep 60 1514 60 wire" % ok] +
+             ["L %d %d 2046" % (f, vendor) for f in (60, 61, 1514)])
+    out = drive(exe, lines)
+    p = [x for x in out if x.startswith("P ")]
+    d = [x.split() for x in out if x.startswith("D ")]
+    lv = [x for x in out if x.startswith("L ")]
+    boot_ok = p == ["P %d vendor %d" % (vendor, vendor)]
+    # after R: the wire range permitted, the policy vendor and not dirty
+    d0_ok = (len(d) == 3 and d[0][1] == "19" and d[0][6] == str(vendor) and
+             d[0][9] == "0")
+    # `txlen rlxfw` is accepted and brings the owner's bound back
+    d1_ok = (len(d) == 3 and d[1][1] == "12" and d[1][6] == "0" and
+             d[1][9] == "1" and d[2][1] == str(-errno.EPERM))
+    len_ok = lv == ["L %d %d" % (f + 4, f + 4) for f in (60, 61, 1514)]
+    return (boot_ok and d0_ok and d1_ok and len_ok,
+            "NIC15_LEN_BOOT %s; at it the wire range %s, m_len/m_extsize %s; "
+            "`txlen rlxfw` %s" % (
+                p[0][2:] if p else "-",
+                "permitted, clean" if d0_ok else "NOT permitted or dirty %r"
+                % (d[:1],),
+                "F + 4" if len_ok else "%r" % (lv,),
+                "accepted, then the range -EPERM" if d1_ok else "%r" % (d[1:],)))
+
+
 CASES = [("K1", k1), ("K2", k2), ("K3", k3), ("K4", k4), ("K5", k5),
          ("K6", k6), ("K7", k7), ("K8", k8), ("K9", k9), ("K10", k10),
          ("K11", k11), ("K12", k12), ("K13", k13), ("K14", k14),
          ("K15", k15), ("K16", k16), ("K17", k17), ("K18", k18),
-         ("K19", k19), ("K20", k20), ("K21", k21)]
+         ("K19", k19), ("K20", k20), ("K21", k21), ("K22", k22)]
 
 
 def cases(exe):
@@ -1020,7 +1086,7 @@ MUTANTS = [
     ("M1", "K3", "the gate stops refusing a behaviour verb while rlx0 is up",
      "(st & (NIC15_S_ENGINE | NIC15_S_UP | NIC15_S_SWEEP)) ?",
      "(st & (NIC15_S_ENGINE | NIC15_S_SWEEP)) ?"),
-    ("M2", "K4", "the default arm of m_len changes (F becomes F + 4)",
+    ("M2", "K4", "the rlxfw (fallback) arm of m_len changes (F becomes F + 4)",
      "\t\treturn f;\n\treturn f + 4 - nic15_len_tab[pol].d;",
      "\t\treturn f + 4;\n\treturn f + 4 - nic15_len_tab[pol].d;"),
     ("M3", "K6", "a success path returns 0 instead of count",
@@ -1080,6 +1146,9 @@ MUTANTS = [
     ("M25", "K21", "the wire bound is dropped (a full wire sweep at rlxfw passes)",
      "\tif (wire && from != to && txlen != NIC15_LEN_VENDOR)\n"
      "\t\treturn -EPERM;\n", ""),
+    ("M26", "K22", "1.6's boot policy reverts to 1.4's lengths (rlxfw)",
+     "#define NIC15_LEN_BOOT\t\tNIC15_LEN_VENDOR",
+     "#define NIC15_LEN_BOOT\t\tNIC15_LEN_RLXFW"),
     ("M23", "K8", "CONTROL: the harness crashes in the classifier -- a kill "
      "with its reason, not a refused run",
      "\tif (st)\n\t\treturn st;\n\tif (!ours)",
