@@ -1381,3 +1381,25 @@ answer.
 | `boards/rtl8196e/bsp/setup.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `extern int bsp_swcore_init(unsigned int version)` `:31` and its call `:173` under `CONFIG_RTL_819X` (staged; the drop's `:169`) — the seam's signature |
 | `arch/rlx/kernel/setup.c` | line | 🔴 **vendor** | 🆕 2026-09-27. `arch_mem_init()`: `bsp_setup()` `:464` before `bootmem_init()` `:481` and `paging_init()` `:483` — why the disarm runs before any allocator exists |
 | `include/linux/skbuff.h` | line | **generic** (vendor-edited) | 🆕 2026-09-27. `struct sk_buff` `:331-473` with the vendor's conditional fields `:415`, `:429`, `:431`: read to establish that `SWCORE=n` changes the layout (`SPEC.md` `NET-152`); nothing taken |
+
+## § 9.10 — `R6b-10`: the `phyif` bit, its identity field, and the numbers it prints, 2026-09-27
+
+**Declared by hand for § 9.5's reason; none of these paths is in `ledgerscan`'s scope.**
+`rtl819x-switch` is this project's own driver and has cited the vendor header since 1.0, so 1.4's
+diff is not a blind write: these rows bound the reasoning behind its one write class
+(`notes/switch-driver.md` § 15). Every line below was re-read in the staged tree the images `r6b10y`
+and `r6b10n` were built from — the tree that builds — before it was written here; the header is
+byte-identical to the `src-vendor` copy under `rtl819x-toolchain/`.
+
+⚠️ **What was taken, by kind.** From the vendor's switch header: one bit's position and one field's,
+each the B of two sources (the D is the datasheet's Table 64); the addresses were already 1.0's (§ 9.8's
+row). From the errno headers: the numbers the page prints. No vendor sequence entered the driver:
+the vendor sets `EnablePHYIf` inside its own init, and 1.4 copies neither that code nor its
+`EnForceMode` brackets. `rtl819x-nic` 1.6 read no vendor source: its one change, the boot policy, is
+decided by bench readings (`notes/nic-driver.md` § 29.1).
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-27 (a fifth row). `EnablePHYIf (1<<0)` `:1258`, in the `CONFIG_RTL_8196E` arm opened at `:1168` (the `#else` arm's `:1322` is the same bit) — **entered 1.4 as the B of bit 0's two sources**; `ExtPHYID_OFFSET (26)` and `ExtPHYID_MASK (0x1f<<26)` `:1174-1175` (the `#else` arm's `:1277-1278` are 24 and `0x1f<<24`) — **the B of the identity check's field**; `PCRAM_BASE` and `PCRP0`–`PCRP4` `:1132-1138`, the addresses, already 1.0's |
+| `arch/rlx/include/asm/errno.h` | line | 🔴 **vendor** | 🆕 2026-09-27 (a third row). `EPROTO` 71 `:48`: the identity refusal's number, which the page prints |
+| `include/asm-generic/errno-base.h` | line | **generic** | 🆕 2026-09-27 (a fourth row). `EPERM` 1 `:4`, `EIO` 5 `:8`, `EINVAL` 22 `:25`: the class's other refusals |

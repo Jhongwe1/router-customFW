@@ -3371,7 +3371,7 @@ parsers, the refusal table, the length policy, identification and the classifier
 sweep's bookkeeping, the dispatcher, both page formatters — is `rtl819x-nic-tx.h`, which
 `tools/nic15check.py` compiles on the host.
 
-| verb | values | default (= 1.4) | refused |
+| verb | values | default (= 1.4; 🔄 1.6 boots at `txlen vendor`, § 29) | refused |
 |---|---|---|---|
 | `txlen` | `rlxfw` (`m_len` F, `m_extsize` 2,046), `mlen` (F+4, 2,046), `ext` (F, F+4), `vendor` (F+4, F+4), `d1`/`d2`/`d3` (F+3/F+2/F+1, 2,046); `ph_len` = F+4 in all | `rlxfw` | engine on, `rlx0` up or a sweep running: -EBUSY |
 | `txoff` | 2, 0 (the TX copy's offset; `m_data` = `m_extbuf`; RX untouched) | 2 | the same |
@@ -5442,3 +5442,142 @@ P19 is not met: `D3-Y-L` 0 of 4.
 * `H601`, writes that cancel, anything outside the map or after the closing maps.
 * `C-19`'s trigger: not exercised.
 * Anything about `M8` from blocks 49–50: the one 1.4 fire bracket was too coarse.
+
+## 29 `rtl819x-nic` 1.6 (`R6b-10`) — `txlen vendor` the default, and `N1`'s comment
+
+Written 2026-09-27 at the desk (segment 115). **Nothing in this section has run on the silicon.**
+What the driver does is 讀 (its text); the object and image facts are 讀 out of build artefacts by
+an instrument; the regression at the default is `RUN-r6b10.md`'s, drafted and not run. `SPEC.md`
+`NET-154`; the images are `FW-154`. The session material, scripts included, is
+`$FWRE_WORK/rebuild/s115/r6b10/` (not in this repository).
+
+### 29.1 What changed, and why
+
+No step owned making the fix the default (§ 28.14, the coordinator's ruling 5); `R6b-10` does.
+Blocks 47 and 48 ran the vendor's lengths on the silicon — E2 220 of 220 twice on each of two
+boots and a wire sweep over every length from 60 to 1,514 with `JabberErr` 0 — while 1.4's lengths
+faulted beside them on the same boots (量, `NET-128`, `NET-132`), and block 50 read no recovery at
+the fix over 31 minutes and 2,363,511 frames (`NET-141`). So 1.6 starts a boot there.
+
+The change is one macro and one initialiser. `rtl819x-nic-tx.h` defines `NIC15_LEN_BOOT` as
+`NIC15_LEN_VENDOR`, with the reason beside it; `nic15_pol`'s static initialiser reads it, and so does
+`nic15check`'s harness, so the kernel and the host check start from the same policy. The version
+string is `rtl819x-nic 1.6`. Everything else is 1.5's (§ 23), unchanged:
+
+* `txlen rlxfw` — 1.4's lengths — and the other five settings stay verb settings; `rlxfw` is the
+  one the regression needs.
+* The boot policy is not dirty, so `engine on` and `ifconfig rlx0 up` are not refused at boot; a
+  policy switch is still `ifconfig rlx0 down`, the verb, `arm`, `ifconfig rlx0 up`.
+* The owner's wire bound is the same function: a wire sweep over more than one length is permitted
+  only at `vendor` — so at boot, with no verb typed — and refused after `txlen rlxfw` until
+  `txlen vendor` is typed again.
+* Which setting is in force is the main dump's `tx15` line, unchanged in form: at boot
+  `tx15 txlen vendor txoff 2 txrb 0 dirty 0 p15 1` (1.5 printed `txlen rlxfw` there). Whether any
+  verb was typed is `/proc/rtl819x-nic-tx`'s `v15` line (`ok 0 refused 0` at boot), and whether a
+  behaviour verb was ever accepted is its `arm15`: only an accepted `txlen`, `txoff` or `txrb`
+  makes the policy dirty, and only a dirty arm counts.
+
+Of the file's first 3,113 lines, which carry every citation into it, two places changed and both in
+place: `:218` (the version) and `:3057`–`:3061` (§ 29.3, five lines for five). The rest is in the
+appended region, which nothing cites.
+
+### 29.2 What the objects say (讀)
+
+* `rtl819x-nic.o`, 1.5 (8b's `r6b8by` and `r6b8bn`, at `e4c0834`) against 1.6 (`r6b10y` and
+  `r6b10n`): 69,592 bytes and 98 sections each, and exactly two bytes differ — `.data` at `+0x0008`
+  (`nic15_pol.txlen`, 0 → 3) and the version string in `.rodata` (`1.5` → `1.6`). `.text`, the
+  relocations and every other section are identical, in both variants.
+* In each `vmlinux`, `nic15_pol`'s initial words are {3, 2, 0, 0} on `r6b10y` and `r6b10n` and {0, 2,
+  0, 0} on `r6b8by` and `r6b8bn`, read at the symbol's address through the section that holds it;
+  `nic15_show` is 60 on all four. This is the check `nic15check` cannot make: it sees the macro, not
+  the initialiser.
+* `storeseq` `r6b8by` → `r6b10y` and `r6b8bn` → `r6b10n`: GREEN. It compares where stores go, not
+  what they store, so it says nothing about the new default; that `m_len` and `m_extsize` are F + 4
+  at the boot policy is `nic15check`'s K22 and the ELF word above. Its `DEFAULTS` check —
+  `nic15_pol` = {0, 2, 0, 0}, run only 1.4 → new — is 1.5's claim and is left as it is: against 1.6
+  it reads red, which is the truth, 1.6's default not being 1.4's.
+
+### 29.3 `N1`: the driver only comments, and the comment was a `SWCORE=y` statement
+
+The brief's condition was whether the driver refuses to arm when `N1` is not `00000000`. 讀: it does
+not. `nic_boot_icr` is read at `late_initcall`, printed as `boot_icr` and marked as `N1`, and nothing
+reads it again; `arm` refuses only -ENXIO (not allocated), -EBUSY (engine on) and -EPERM (locked),
+and neither `ndo_open` nor `engine on` looks at the boot values. So `SWCORE=n` needs no functional
+change.
+
+The comment said `N1` "must read 00000000, and if it does not, the vendor's probe did not disarm the
+engine on this boot". At `SWCORE=n` there is no vendor probe: the seam clears bits 31 and 30 only,
+so `N1` is predicted `04000000`, `MBUF_2048BYTES` (`CPUICR` bits 26:24, § 8) as the loader left it
+(`notes/switch-driver.md` § 13.5, 推), and the 63 committed `N1` lines that read `00000000` are
+`SWCORE=y` boots whose vendor probe also resets the core. The five lines now say that the prediction
+is bits 31:30 clear, `00000000` at `SWCORE=y`, `04000000` at `SWCORE=n` (推), and that nothing gates
+on it.
+
+### 29.4 The checker: `nic15check` 50 of 50
+
+K22 is new: `NIC15_LEN_BOOT` is `vendor`; the harness resets to it, not dirty; its lengths are the
+vendor's (`m_len` and `m_extsize` F + 4 at 60, 61 and 1,514); a full wire sweep is permitted at it
+with no verb typed; and `txlen rlxfw` is accepted and brings the bound back. K6 was rewritten
+around the new reset policy and now shows `txlen`, `txoff` and `txrb` each refused and permitted
+through the dispatcher, the wire bound permitted at the boot policy, refused after `txlen rlxfw`
+and permitted after `txlen vendor`, 14 accepted and 17 refusals recorded. K10's boot line reads
+`txlen vendor`. M26 reverts the macro to `rlxfw` and is killed by K22; the other 25 mutants and M0
+are unchanged. `tools/ci-expected.tsv` 48 → 50.
+
+### 29.5 The images (讀; `FW-154`)
+
+Built from `bc3311b` (rebased as `5b69659`, the `config/` digest unchanged, `1cc05e88fc84ab5f`), each
+from a fresh stage, one at a time, `-j4`, with `_irfs-r6b10` — `mkinitramfs build --init
+config/rlxfw-init-quiet.sh`, its spec and manifest equal to 8b's `_irfs-r6b8b` but for the
+repository path, every file re-hashed. Both carry `rtl819x-switch` 1.4 (`notes/switch-driver.md`
+§ 15).
+
+| what | `r6b10y` (SWCORE=y, `quiet`) | `r6b10n` (SWCORE=n, `quiet-noswcore`) |
+|---|---|---|
+| recipe | `1cc05e88` | `1cc05e88` |
+| `vmlinux` | `c4d9eb30…`, 4,565,149 B | `a0559133…`, 4,255,334 B |
+| flat image | `54642b69…`, 4,035,072 B, 76.963 % of 5,242,880 (8b's size) | `1b463210…`, 3,764,736 B, 71.807 % (8b's size) |
+| `nfjrom` | `c22a9611…`, 1,171,456 B | `e587fa35…`, 1,113,088 B |
+| rebuild | `r6b10y2`: `cmp` rc 0 for vmlinux, flat, `nfjrom`; manifests differ in `cell` only | `r6b10n2`: the same |
+| `(NEW)` | 0 | 0 |
+| `kconfig-delta check` | green, 30 derived, 74 set | green, 70 derived, 75 set |
+| `rlxfw-marks verify` | green: 12 marks, 11 witnesses, 1 ABSENT | the same |
+| `hazlint` | 0 violations in 115,837 loads | 0 in 108,494 |
+| build warnings | 162, 8b's count | 153, 8b's count |
+
+The `.config` each variant built is 8b's, comment lines aside; the controls refuse (`r6b10n`'s
+checked as `quiet`: 41 undeclared; `r6b10y`'s as `quiet-noswcore`: 41 not applied). Against 8b's
+trees, 10 objects differ in each variant: `rtl819x-nic.o`, `rtl819x-switch.o`, the two consumers of
+`RLXFW_SRC_ID` (`init/main.o`, `drivers/mtd/devices/rtl819x-spi.o`) and the six links above them;
+none is only in one tree. The one warning naming an rlxfw file is 1.0's (`rtl819x_sw_lock` unused,
+`rtl819x-switch.c:256`), in 8b's builds too. `ethcensus check`: **GREEN on `r6b10n`** (0 of 610
+leaves in scope; 10 of 899 population names, the seam's, each from `drivers/net/rlxfw-seam.o` alone;
+0 of 6 vendor-unique `/proc` names), **RED on `r6b10y`** (22 of 632, 898 of 899, 6 of 6), each flat
+image `objcopy -O binary` of its `vmlinux`. `imgprocs` on `r6b10y`: 15 of 42.
+
+### 29.6 The regression's run sheet (desk)
+
+`RUN-r6b10.md`, in the session directory, is the regression at the default for the main session to
+run from the board's loader prompt on `r6b10y`, in card grammar, with its three line scripts. No cell
+types `txlen`, `txoff`, `txrb` or `arm`; the LAN comes up with the standard `/init`'s own verbs. The
+boot page must read `version rtl819x-nic 1.6`, the boot policy and `v15 … ok 0 refused 0` before any
+cell types a verb (`Y2-NIC`, `Y2-TX`: the `R6b-10` row's named way to be wrong). Then E2's eleven
+lengths at block 45's spacing (`ping -c 20 -i 0.05 -w 10`), each in its own bracket of host and
+board reads behind a liveness gate, with no re-arm between lengths — block 48's `SF` re-armed
+through `arm`, a verb — so each bracket carries the previous length's history; the loopback map at
+the default as the containment gate block 48 ran as `W-00`; the `tx` sweep over 60–1,514 on the wire
+in one bracket; and at the end a gate on `arm15 0`, no behaviour verb accepted on the boot.
+`cardcheck commands`: rc 0, 43 sends, 0 flash-write verbs, 0 `FLR` (a second reading by `grep`:
+longest send 108 characters); every line dry-run through `cardrun --dry`, rc 0.
+
+### 29.7 What 1.6 does not establish
+
+* Anything on the silicon: that a boot of `r6b10y` or `r6b10n` reads `txlen vendor`, that E2 is 220
+  of 220 at the default with no verb typed, that the sweep is clean — `RUN-r6b10.md`'s.
+* A third `D2` boot: the regression runs no 1.4 arm beside the default, and `D2`'s clause asks for
+  one.
+* That the default is 1.5's `txlen vendor` in time as well as in code: the code is 1.5's, and
+  § 23.5's caveat about cycles carries.
+* `NET-67` 殘留 and `NET-78` 殘留 ⊘: the ruling makes them ⊘ once the flip lands, which is the
+  landing's to record, not a desk reading.
+* The mechanism: `M1`-cover8 stays the one rule left standing, 推 (`NET-129`).

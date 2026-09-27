@@ -2725,3 +2725,126 @@ that power-on — a bracket, not the moment.
   host honoured port 3's PAUSE frames or that they caused the per-second
   stalls; P2's loader half (unmeasured); where block 24's latched link-down
   came from (`NET-30` 殘留).
+
+# 15. 2026-09-27 (`R6b-10`) — 1.4: `phyif`, arm II's one write class
+
+**Everything in this section is 讀 at the desk** — the driver's text, and build artefacts read by an
+instrument — except the readings it cites as 量, which are older captures. Nothing of 1.4 has run on
+the silicon. `SPEC.md` `NET-155`; the images are `FW-154` (`notes/nic-driver.md` § 29.5). The session
+material is `$FWRE_WORK/rebuild/s115/r6b10/` (not in this repository).
+
+## 15.1 Why
+
+Arm II's step (5) is the one declared write class the plan names, `PCRP0`–`PCRP4 |= EnablePHYIf`,
+the inverse of what the loader's `J` does (§ 8.3). 8b found that nothing on the `SWCORE=n` image can
+make it — `restore` skips `PCRP`, `rtl819x-view` has no store, `rtl819x-nic` stops at `0x064`, the
+vendor's memory node is gone, `EW` writes flash — and named what had to be added (8b's
+`RUN-armII.md` § 2). 1.4 is that verb, so arm II can type (5) on the boot that reads (4).
+
+## 15.2 The bit, and where each part comes from
+
+* **`EnablePHYIf` is bit 0 of `PCRPn`, on two sources and a measurement.** D, the draft datasheet's
+  Table 64: bit 0 `EnablePHYIf`, *Enable PHY Interface*, RW, default 0 — *"When disabled, the PHY
+  interface will be isolated from the MAC. Packets will not be transmitted or received to/from the
+  PHY to/from the MAC interface."* B, `rtl865xc_asicregs.h:1258`, `EnablePHYIf (1<<0)`, in the
+  `CONFIG_RTL_8196E` arm that opens at `:1168` — the arm the build compiles; the `#else` arm's
+  `:1322` names the same bit. 量, the transition: `PCRP0`–`PCRP4` read `nn7F0039` at the prompt and
+  `nn7F0038` at `S0′` (`bench/2026-09-19` `C1-L4104`, `C2-L4114`, `C9-SW0`; `NET-43`), and the
+  vendor's probe sets the bit back (`C9-SW0`'s live column, `NET-52`). The loader's `J` clears
+  exactly this bit, ports 0 to 4 in that order (讀 `0x804092F4`–`0x80409354`, § 8.3); the verb sets
+  it in the same order.
+* **The identity check's field, `ExtPHYID`, bits 30:26**, is on three: D Table 64 (default ports
+  0–4 = `0x0`–`0x4`), B `:1174`–`:1175` in the same arm — the `#else` arm puts it at 28:24
+  (`:1277`–`:1278`), which is why the arm is named — and 量 `NET-09` (0, 1, 2, 3, 4 on `E9`).
+* **The addresses**, `0xBB804104` + 4n, were already this driver's table since 1.0: B `:1132`–`:1138`,
+  D Table 62, and the same captures.
+
+D's default of 0 agrees with `FULL_RST`'s `PCRP0` of `007F0038` (§ 3.1, `C27-RST1`).
+
+## 15.3 The verb
+
+On `/proc/rtl819x-switch`, whose handler now passes every write none of its own verbs took to 1.4
+(the old `return -EINVAL` at `:664`); anything 1.4 does not know is still -EINVAL.
+
+| verb | what it does | refused |
+|---|---|---|
+| `unlock phyif-i-mean-it` | opens this class | — |
+| `lock phyif` | closes it | — |
+| `phyif <n>` | n = 0–4, one digit and nothing after it: port n | the class locked: -EPERM, counted in `refused`, no register read |
+| `phyif all` | ports 0, 1, 2, 3, 4 in that order, stopping at the first that fails | the same |
+
+**Why a token of its own**: `/init` types the switch's `unlock i-mean-it` on every standard boot
+(`config/rlxfw-init.sh`) — MDIO's reason (§ 10.4). The store also needs that unlock, because it goes
+through `rtl819x_sw_wr`, the one guarded write path: `n_writes` counts it, and a locked switch
+refuses it (-EPERM, counted in the switch's `n_refused`). So on a quiet-`/init` image a `phyif` store
+needs two words typed, and on a standard one it needs one more word than any other switch write.
+
+**One port**, with IRQs off from the pre-read to the read-back, so nothing that runs from an
+interrupt writes the register between them (UP and `PREEMPT_NONE`, which 1.2's `#error` enforces):
+read `PCRPn`; -EPROTO, nothing written, unless its `ExtPHYID` is n; if bit 0 is already set, store
+nothing (`already`, rc 0); else store exactly the word read with bit 0 set and read it back, which
+must equal that word or the port fails -EIO (`rbfail`). A bit 0 that does not stick and any other bit
+that moved both fail it. No other bit is ever stored differently from how it was read, and no
+register but `PCRP0`–`PCRP4` is ever stored. A verb that reaches the ports resets all five results
+first, so the page shows one verb's results; the mark is `RLXFW-SW-PHYIF=` with the stored ports in
+bits 12:8 and the ports verified set in bits 4:0.
+
+**The page** gains six lines before the register table, whose last line stays the page's last line:
+`phyif unlocked … ok … stored … already … refused … idfail … rbfail …`, then per port `phyifN pre
+XXXXXXXX rb XXXXXXXX rc D st D` — the pre-read, the read-back (`00000000` unless `st 1`), the rc (1:
+the last verb did not reach the port) and whether it stored. Cached values: a `cat` reads no
+register for them. Walked from the formats, every field at its widest, 133 + 5 × 54 = 403 bytes, so
+1.2's worst case of 2,080 of 4,096 becomes 2,483 and the table's budget (3,600) still never ends the
+page. No mark and no read at boot: the boot capture does not change.
+
+**Line numbers.** 1.3's 1,463 lines keep their numbers: `:118` (the version) and `:664` changed in
+place, and `:526`, `:549` and `:587` were blank and hold two prototypes and the page hook. The ranges
+other files cite — `:88`–`:92`, `:93`–`:97`, `:375`, `:560`–`:564`, `:588`–`:661` — are byte-identical
+to 1.3's. 199 lines are appended after the MDIO block.
+
+## 15.4 What the desk measured
+
+* **`tools/mdiocheck.py` 71 of 71.** Its cut, from the 1.3 banner to the end of the file, now holds
+  1.4's block, compiled with the host's gcc (`-std=gnu89 -Werror`) against a transcription of the
+  switch's one read path and one guarded write path over a `PCRP0`–`PCRP8` model whose default is
+  the post-`J` state, with two faults per port (bit 0 does not stick; bit 3 flips on a store) and
+  every `PCRP` access logged with its IRQs-off section. Thirteen new cases, K24–K36: the boot lines
+  byte for byte and a `cat` that reads nothing; the class locked (-EPERM, counted, no access); the
+  switch's own token, a near miss and a doubled space refused, `unlock phyif-i-mean-it` and `lock
+  phyif`; `phyif all` from the post-`J` state — R `nn7F0038`, W `nn7F0039`, R for ports 0 to 4 in
+  order, each port's three in one IRQs-off section of its own, mark `00001F1F`; `phyif 3` alone, the
+  previous verb's results cleared; ports 5, 6, 8 and 9 and fifteen malformed or unknown forms
+  -EINVAL with no access, each beside a permitted neighbour; bit 0 already set (one read, no store);
+  a word with port 1's `ExtPHYID` in port 2 (-EPROTO, no store, `all` stops there); bit 0 not
+  sticking (-EIO, `all` stops); bit 3 moved (-EIO although bit 0 stuck); the switch locked (one
+  read, no store, the switch's `n_refused`); 64 drawn words stored with bit 0 alone changed; the
+  lines at their widest against the comment's 403. Twelve new mutants, M21–M32, each killed by the
+  case it names. K1's boot page reads `version rtl819x-switch 1.4`. `tools/ci-expected.tsv` 46 → 71.
+* **The object.** `rtl819x-switch.o` is byte-identical between `r6b10y` and `r6b10n`, as 8b found
+  1.3's. Each `vmlinux` holds `rtl819x-switch 1.4`, `phyif-i-mean-it` and `lock phyif` once. The
+  builds add no warning.
+
+## 15.5 Arm II, updated: `RUN-armII.md`
+
+8b's sheet with the image changed to `r6b10n`, the cells renamed (`M…`: `bench/2026-09-27d/`
+already holds `X-W1`), step (3) typing no `txlen` — `M3-NICR` gates on the boot policy instead —
+and step (5) typeable. **(4) → (5) is a decision point, so it is two lines**: `n-line1` runs (1) to
+(4) and ends in Linux; if (4) had no reply, `n-line2` types (5): `M5-REF`, `phyif all` without the
+class token, which must be refused with `n_writes 0` — the guard seen refusing on the silicon before
+it is seen permitting — then both unlocks, `phyif all` (gated on `ok 1`, `idfail 0`, `rbfail 0` and
+every port `rc 0`), both locks, a `peek` of `PCRP` through `rtl819x-view` as a second reader, the
+pings again, (6) and the reboot; if (4) was answered, `n-line3` runs (6) and the reboot.
+`cardcheck commands`: rc 0, 41 sends (3 loader `DW`, 38 shell), 0 flash-write verbs, 0 `FLR`; a copy
+with a planted `EW` and `FLR` is refused (rc 1). Every line dry-run through `cardrun --dry`, rc 0.
+
+## 15.6 What 1.4 does not establish
+
+* Anything on the silicon: whether bit 0 sticks, whether the link follows, whether (4) fails and
+  whether (5) is then sufficient — arm II's.
+* That `EnablePHYIf` is necessary on any one port: the verb sets five, and a pass at (5) cannot say
+  which mattered.
+* That the vendor's other `PCRP` writes are unneeded — its `EnForceMode` brackets around paged PHY
+  writes (`Setting_RTL8196E_PHY`), for one — or anything about `D8`, which asks for rlxfw's own
+  switch init (arm I).
+* That the transcription `mdiocheck` drives is the driver's code: the read and write paths above the
+  cut are copied into the harness, not compiled from the driver.
