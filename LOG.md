@@ -33309,3 +33309,120 @@ commit：`1b7c1fd`、`fb4226d`、`95dabac`（8c-code 十個）、`9107b20`（8b 
 - `2470d6f`（夜間擷取）上 CI 紅四組；`402b068` 修了 `citecheck` C2（§ 28 五個引用被新擷取弄成有歧義）與隨之紅的 `test-citecheck`；剩下 `test-boot-timeline`（10 of 85）與 `bootbytes` K2。**是我的錯**：`CLAUDE.md` 收工那節寫明上機後要跑每一個能跑的套件（新擷取會移動母體案例），我把擷取提交當成文件改動、只跑了輕量檢查。
 - 修正代理在 ext4 上跑完整 desk-sweep（116 步宣告、114 步跑、未修時紅的正好是 CI 的兩個）：`4e1a700` —— `2026-09-27k/BQ-boot.log` 最後一次 `read()` 把 `B10`、`/init` 第一行與提示字元一起帶來，兩段量到 0.0，比例擬合的 `math.log` 讓 `--retro` 崩潰；零中位數留在表裡、不進擬合、另起一行點名；在舊母體（`ceefd90`）上新舊工具判決相同。`88b7262` —— `bootbytes` 宣告 339：arm II 的映像沒有原廠 switch core，原廠 NIC 驅動的 13 行開機訊息（371 B）不印，710 − 371 = 339；`FW-103` 同一個 commit 更新，拿掉那一列 K2 就紅。沒有改擷取、沒有豁免、沒有放寬容差。修後 sweep：114 跑、112 綠、2 個設計上紅的 `census/*`。
 - 桌面上另一件：真 repo 的 `build/` 沒有 `linkprobe`，桌面 sweep 真樹時 `test-config-gates` E5 會紅（CI 跳過 E5）。
+
+## 2026-09-28 — 第一百一十六段（14:49 開場，**一次電源循環**：arm I，約 17:15:40 開電、約 17:25 關電，約 21:39 收工）：`R6b-8` 8d 落地 —— `rtl819x-switch` 1.5 的 `init` 由標準 `/init` 打、`rtl819x-view` 1.1 讀 L2 表；arm I 在沒有原廠乙太網路程式碼的映像上，冷上電與 `busybox reboot -f` 兩次開機各 7／7，**`D8` 成立**；8g 把主線翻成 `SWCORE=n`；`R6b-9` 寫第十四條 gate 結果，**`R6b` 關閉**（`5bef4d8`）
+
+交接 `plan/handoff-s115.md`。開場量 repo：HEAD `0cf8719` 等於 `origin/main`、WSL 的 git 乾淨；`LOG.md` 最後一條第一百一十五段；study 最後 `20260927-study2.md`；`citime check` 18 missing（這段沒補）；`gh run list`：`88b7262`、`0cf8719` success，`2470d6f`、`402b068`、`ba8d2c2` failure（上一段的紅，`88b7262` 修好）。與交接相符。另量到一件：`$FWRE_WORK` 在非互動的 WSL shell（`bash -lc`）裡沒有設定，這一段的腳本一律寫 `/home/key/fwre-work`。
+
+### 一、8d 的裁決，與平行的代理
+
+- 裁決 1–9 寫在 repo 外（`$FWRE_WORK/rebuild/s116/RULINGS-8d.md`，檔案時間 14:59；`notes/switch-driver.md` § 17 引為 8d ruling *n*）：`init` 是 `rtl819x-switch` 1.5 的動詞，由標準 `/init` 在 `unlock i-mean-it` 與 `start` 之間打 —— 驅動自己開機時照舊不寫、安靜 `/init` 的開機不變；擁有者「產品不能靠手打動詞」說的是操作者，不是 `/proc`。只寫 `PCRP0`–`4` 的 `EnablePHYIf`，不 reset。VLAN 那一組（表、`PVCR0`–`4`、`VCR0`、`PBVCR0`、netif 表、`PLITIMR`）整組沿用 loader 的：接手要的值只有 loader 的讀數一個來源，兩來源規則做不到，所以有界的 `TACI` 寫入器不建。EEE 與 `QNUMCR` 的 CPU 欄沿用；`dumb`／`restore` 保留、`/init` 不打；`reset full`／`reset vendor` 在 `CPUICR` 的 `TXCMD` 或 `RXCMD` 立著時，於任何寫入之前回 `-EBUSY`；`rtl819x-view` 1.1 加 `tbl l2`、`peek` 多收 § 16.4 的 13 個字；arm I 的映像；每次開機的七個通過條件（裁決 9）。這七個條件寫在 17:15 開電之前 —— 放寬流程下沒有凍結，證據是一個檔案時間，不是 commit。
+- 同時開出去的代理：交換器 1.5 與 `mdiocheck`（約 45 分鐘）；view 1.1 與 `viewcheck`、`viewdecode`（約 60 分鐘）；arm I 的跑表（`$FWRE_WORK/rebuild/s116/run-armI/`）；8g 的影響範圍（唯讀）；`D5` 的逐列掃描。
+- 8g 的影響範圍（讀）：delta 第 294 列是 `CONFIG_RLXFW_VENDOR_ETH_OPEN`；第 379 列 `set@quiet-noswcore` 的 `SWCORE y n` 加第 380–419 列四十列 derived。`kconfig-delta` 的語意是「沒有標籤的列屬於每一個變體、`@X` 只屬於 X」，所以「`quiet` 與 `loud` 翻、一個具名變體留 `y`」現在寫不出來；代理提的「把 41 列的標籤拿掉、第三個變體改名、零列」與它自己的約束矛盾（沒標籤的列也會進留 `y` 的那個變體）→ 8g 要改工具。我的裁決：`loud` 是 `quiet` 加 `PRINTK`（`test-config-gates` 的 E1b 斷言 loud 與 quiet 的集合差是 2），跟著 `quiet` 翻。它另外找到：`bootbytes` 的 710 標著「預設變體」、339 是 arm II 的，arm I 的擷取要在同一個 commit 帶一列新常數（K2）；`docs/KNOWN-ISSUES.md` 沒有 `D16` 那一句（`D16` 在 `RUNSHEET.md:2368` 與 `plan/README.md:116`），8g 要新起一條；`NET-54` 殘留的「`R6b-8` 之後主線沒有 port 3 計數」早於 view 1.0 的 `mib`；`imgprocs` 拒絕 `SWCORE=n` 的映像（反向模式是 8e 的，沒做）。
+- `D5` 的掃描（讀）：母體 40 列（8 ＋ 23 ＋ 4 ＋ 3 ＋ 2）。還沒有去處的七列：`C-19` 與 `NET-28`、`NET-30`、`NET-31`、`NET-33`、`NET-37`、`NET-54` 的殘留。我的分派：`NET-37` 由 arm I 的 L2／netif 讀數關；`NET-28` 由 8d 裁決 4（什麼都不寫）關；`NET-31` 與 `NET-33` ② 缺的「重設之後」讀數，交跑表在 arm I 第二次開機加一段尾 —— `ifconfig down` 與 `disarm` 之後 `reset full`，順便讓護欄在矽片上先拒後放；`NET-54` 歸 8g；`C-19` 歸 `R6b-9`。陳舊處：`R6b-8` 列的 8g 項目仍列 `NET-109` 與 `NET-30` ②（都已關）；`NET-136` 殘留的 id 標 🆕、依列的慣例該是 ⊘；`NET-54` 殘留沒有標記；`1472|mdev` 的裁決在第一百一十五段的 `LOG.md` 與 `NET-121`，不在 `RULINGS-D1D2.md`。
+- 15:20 過後（量，`$FWRE_WORK/rebuild/s116/macprobe.py`，只印計數）：已提交的三份 netif 表擷取（`bench/2026-09-28/M2-VN`、`AV-TN`、`AR-TN`）以 `viewdecode` 的公式解出位址，在傾印裡找原樣、反序與四種 ASCII 寫法：0 個命中；正控制（用傾印自己 `H601` 的一段位元組造一個）命中。照 `leakscan` 的定義，那三份擷取沒有 `H601` 的位元組。
+
+### 二、8d 與 view 1.1 落地（`1f9ebf1`、`010fb1a`、`b173746`、`884b1b0`）
+
+- `1f9ebf1`（16:06:58）：`rtl819x-switch` 1.5 —— `init`、`reset` 的護欄、頁面多一行（最寬 108 B，最壞 2,483 → 2,591／4,096）；標準 `/init` 打 `init`；`mdiocheck` 38 → 48 個案例、32 → 49 個突變體，每一個被點名的案例殺掉；§ 17.1–17.4、`NET-166`、`NET-28` 殘留 ⊘（沒有要寫的）；`ci-expected` 71 → 98。我重跑（`verify-sw15.sh`）：rc 0、98 行 ok、48 個案例 0 失敗、49 個突變體全殺；`FW-110`：上面 7 行原地改（118、569、637、1592、1617、1643、1661）、沒有一行移動、附加 203 行；`sh -n` 新 `/init` rc 0；提交前 `spec-check` rc 0、`test-file-modes` 5／5。代理改正了我 brief 引錯的行（§ 九），另外找到兩句陳舊的話 —— `ci.yml` 1450–1463 的註解、§ 8.13 的「九種形式」（1.4 起就不對）—— 同一個 commit 原地改。
+- `010fb1a`（16:14:12）：`rtl819x-view` 1.1 —— `tbl l2` 以 1.0 的表讀協定讀 L2 表的 1,024 格（只載入；每格讀兩份直到相同、最多十次；留第二份不全為零的前 40 格、加一行計數；全頁最多 3,774 B，在 3,900 的預算與 4,096 之內）；`peek` 多收 13 個有 B 與 loader `DW` 讀數的字，共 311，`0x4D48` 照樣拒絕。名字寫成 `"tbl l2" + 4`，免得映像裡多一個 NUL 界住的 `l2` 被 `imgprocs`／`ethcensus population` 讀成原廠的 `/proc/rtl865x/l2`。`viewcheck` 24 個案例、44 個突變體（44 → 69 行）；`viewdecode` 24 個案例、16 個突變體（33 → 41 行），已提交的 65 份 1.0 擷取新舊判決相同。`FW-110`：1.0 的 709 行沒有一行移動、40 行原地改（我重跑 `verify-view11.sh`，同意）。讀 B：L2 的原始字帶著交換器學到的每個站台的位址，第六個位元組不存、由格號與另外五個位元組 XOR 回來 —— 所以一份 `tbl l2` 擷取能不能照原樣提交，要先查（§ 六）。
+- `b173746`（16:33:37）：view 1.1 的紀錄（§ 17.5、`FW-156`、`NET-138`／`NET-139`／`FW-148` 的指標、帳本 § 9.8 七列、`ci-expected`），由 view 代理寫。之後 `citecheck` 抓到 `viewdecode.py:490` 爛了（`FW-155` 與 notes 引用它）→ `884b1b0`（16:35:48）只改數字（490 → 567、809–825 → 998–1014，被引的本體不變）；`citecheck` 8 項全過。
+- 推上 `0cf8719..884b1b0`：量 CI run `36398427986` 建立於 16:37:07，success，30 分 15 秒。
+
+### 三、映像與跑表
+
+- 建置代理在 `010fb1a` 上建 `r6b8i`（16:26:00–16:28:02）與 `r6b8i2`（16:29:14–16:30:33），逐位元組相同（量）：`RLXFW-ID0=3685A3A4`、配方 `3685a3a4`、`vmlinux_img` 3,765,248 B（上限的 71.816 %）；`kconfig-delta check` 以 `quiet-noswcore` 綠（以 `quiet` 查，41 個未宣告：控制）；`rlxfw-marks verify` 綠；`ethcensus` GREEN、控制 `r6b10y` RED；和 `r6b10n` 相比 12 個目的檔不同，每一個都有來源（`rtl819x-switch.o`、`rtl819x-view.o`、initramfs，`init/main.o` 與 `rtl819x-spi.o` 經 `RLXFW_SRC_ID`，7 個 `ld -r` 聚合）；一個 rlxfw 警告（`rtl819x_sw_lock` 沒用到，`:256`）；`imgprocs` 以 rc 2 拒絕（它的控制 `port_status`、`asicCounter` 在 `SWCORE=n` 上讀不到，設計如此）；initramfs 與 `r6b6` 的標準版只差 `/init`（2,153 → 2,582 B）。兩個 cell 各 483 MB。
+- 🔴 8g 代理在 worktree 裡跑的 `test-kbuild-cflags`，它的 C1 會 stage 一個 cell（`gcf-c1`），跑的時候 `r6b8i` 正在收尾（量 檔案時間：它的基準輸出 16:28:03 寫完；`r6b8i` 16:26:00–16:28:02）。「一次只跑一個建置」破了一次（§ 九）；沒看到後果：`r6b8i2` 在之後單獨建，與 `r6b8i` 逐位元組相同。
+- 跑表的裁決：主機核心 log 的 follower 與 `C-19` 照留；`NET-30` 上傳之後那一讀經 `looprun` 做不到（`looprun` 在 S6b 與 S7 之間沒有停點），`SW7` 代替；兩次開機都跑 `mfgtest auto`；目錄 `bench/2026-09-28b`；第一次開機失敗也照跑第二次。跑表填好後 `check-armI.sh` PASS 85、FAIL 0（我 16:50 重跑）。
+- 16:43 之前 `usbipd list`：CP2102 與 Realtek USB GbE 網卡都沒接（只有 *Persisted*）。什麼時候、為什麼拔掉，沒有記錄。插回去是實體動作，先問擁有者。
+
+### 四、上機：arm I（`bench/2026-09-28b/`，一次電源循環）
+
+- 16:50 到 17:14 之間（時刻沒量；我前後兩次讀鐘是 16:50:21 與 17:14:08）擁有者兩個都插上。CP2102 第一次在 `1-1` 列舉成 *Unknown USB Device (Device Descriptor Request Failed)*（`Get-PnpDevice` 的 CP210x 讀 `Unknown`、沒有 COM 埠）→ 擁有者重插 → `1-1` `10c4:ea60`、COM3。量 session 的命令輸出，沒有存成擷取。這不是 seating 中的掉線（`C-19` 那種），是插上時的一次失敗，發生在任何 attach 之前。17:14 `usbipd attach` `1-1` 與 `2-4` 都 rc 0，`/dev/ttyUSB0` 與主機網卡的介面都在。
+- `line0`（17:15:01–17:15:05）rc 0：板子關著時 3 秒的 pre-flight（`I0-PRE`）、主機 carrier 0／down、一個 follower、各工具自測（`armI-nb.py` 9／9，`I0-ST:10`）、清掉主機對板子的鄰居項。
+- 握手：擁有者「可以」→ `line1` 在背景開 catch（17:15:26）→ `say.sh`「現在開電，最晚 17:21:16」（剩 346 s）→ 擁有者開電；catch 收到第一個位元組在 17:15:40.8（量 `I1-CATCH.timing`；開電在這之前）。冷開機（`I1-CATCH:5` 的單空格行、沒有看門狗那一行）；提示字元上 `PSRP3` 在 `IPCONFIG` 前後都 `000010E0`；`IPCONFIG` 之後 ARP 4／4；`AUTOBURN` 讀 `00000000`；`looprun` 8 個斷言（S8 以 `--recipe-override 3685a3a4` 比 `RLXFW-ID0`）；`J 80500000` 17:15:58；開機印 `RLXFW-ID0=3685A3A4`、`SM0=C4000000`、`SM1=04000000`、`N1=04000000`、`SW7=00000000`、`SW-INIT=00001F1F`，10.05 s 的開機擷取裡到 `lan up`。
+- 🔴 `line1` 停在 `I1-MK` 的第一個閘門 `^RLXFW-ID0=@FILL:RID@$`（rc 3）：`gen-armI.py` 填了卡片文字裡的 `@FILL:…@`，它的 `write_all` 寫各線腳本的閘門參數時沒填，而腳本自己的佔位符檢查只讀卡片。`line1-cold.sh` 兩處（`I1-MK` 的 `ID0`、`I3-NW0` 的 `recipe_id`）、`line2-warm.sh` 兩處，`line3`、`line4` 沒有。停下時板子在 Linux、開機後沒有打過任何命令、沒有 ping；`I1-MK.log` 本身四個值都在（`ID0`、`SM0`、`SM1`、`N1`）。線照設計開了 watch `X-I1`（17:16:11 起 142.8 s；shell 回 6,643 個 BEL，一個 CR 換來一個空提示符），我用 `stopwatch.sh` 停掉。
+- 我在改正的線跑之前寫 `CORRECTIONS-armI.md`（§ 1–3），備份 `run-armI.bak-1720`，用 `mk-line1b.py` 產生 `line1b`（`line1-cold` 從 `I1-VT` 起的各格，只把 `I3-NW0` 的 `RID` 填成 `3685A3A4`；watch 改叫 `X-I1b`；不重寫 `catch.t0`），`line2-warm` 的兩個 `RID` 填上；`line1b --dry` 124 項 ok。拒絕的兩個作法：照停止規則直接關電 —— 一次工具已確認身分的冷開機會因跑表的缺陷作廢，擁有者要多一次電源循環；以新名字重跑 `I1-MK` —— 卡片沒有那一格，原紀錄已有那四個值。
+- `line1b`（17:19:52–17:21:28）rc 0。`X-I1` 結束到 `I2-SW` 之間有 79.0 s 沒有擷取在埠上，ping 在 `J` 之後 3 分 57 秒。主機 → 板子 46 B 4／4、84 B 4／4，板子 → 主機 4／4，主機的鄰居項 `REACHABLE`（`lladdr=rlxfw-laa`：腳本比對，不印）；第二組 ping 帶四個計數；`mfgtest auto` 9／9；map `I3-MB0` ok；`I3-NW0` `n_writes 0`、`recipe_id 3685A3A4`。🔴 `I2-V` 拒絕（`no bench/2099-12-31/I1Q.stages.tsv`，rc 2）：判決格的參數是樣板目錄 `bench/2099-12-31`，沒有結尾斜線，卡片實例化時沒被改寫（更正 2）；它是宣告的讀數、不停線。我在線之後從 repo 根對 `bench/2026-09-28b` 手動跑同一支 `armI-verdict.py`：**開機 1 PASS 7／7**（`init calls 1 ok 1 … stored 1F on 1F`；交換器頁 live 與 S0′ 只差 `PCRP0`–`4`；主機送 ＋14 = `n_rx` ＋14、`n_tx` ＋14 = 主機收 ＋14）。🔴 `stopwatch.sh` 的名字檢查只收 `X-I<數字>`、不收 `X-I1b`（更正 3）；放寬一行 `case` 之後停掉 `X-I1b`，在 `line2` 開埠之前。
+- `line2`（17:22:11–17:24:17）rc 0：`busybox reboot -f` 被接住（`I4-RB:8` `Reboot Result from Watchdog Timeout!`）；提示字元上 `PSRP3` 前後各讀一次、ARP、`looprun` 8 個斷言、`J` 17:22:29；`I4-MK` 過（已填）；ping 三組各 4／4、`REACHABLE`；`mfgtest auto`；map `I6-MB1`；`I6-NW1` ok。手動判決 **開機 2 PASS 7／7**。
+- `line3`（17:24:36–17:24:49）rc 0，開機 2 的尾段，在每一個 `D8` 格與讀數之後：`I7-SW0`；`reset full` 被拒（`I7-RF` `cat: write error: Device or resource busy`、`reset_busy 1`）；`ifconfig rlx0 down ; echo disarm`（`I7-DN`）；`I7-NIC1`、`I7-C1`；`reset full` 放行（`I7-RS`）；`I7-SW1`、`I7-MEM`；`IZ-RB`：`busybox reboot -f`、接住提示字元 —— 「板子在 loader 提示字元」。問擁有者 → 17:25「關了」。沒有擷取記下斷電的時刻。
+- follower 停下：console 轉接器的行 4 行（都是 attach 的），全部 41,473 行（§ 五）。
+- flash（量；讀者的 `r9_flash.py`，它的控制抓到六個植入的動詞、放過八個乾淨字串）：送出 104 個字串（loader 30、Linux 74），另有 16 段 ESC；沒有 `FLW`、`EW`、`EB`、`DB`、`FLR` 或非零的 `AUTOBURN`，沒有 `FLR` 所以沒有 `flrbracket` 那一輪；兩次上傳前 `AUTOBURN` 都讀 `00000000`；兩張 map 都是 `0927be41…`（31 組相同、`000000` 那組 `DIFFER`，block 46 以來每一張都這樣）；`n_writes` 0（它不帶資訊，`FW-142`）。看不見的：`H601`、互相抵銷的兩次寫入、map 窗以外的位元組、`I3-M0` 之前與 `I6-M1` 之後的時間。
+
+### 五、讀數與裁決（`RULINGS-armI.md` 1–11；`1fbd719`、`025b336`）
+
+- 一個讀者以不與跑表判決共用程式碼的腳本（`$FWRE_WORK/rebuild/s116/read-armI/scripts/`，每支先過植入缺陷的對照）把每一個數從擷取重導一次。它有兩支（`r4_words.py`、`r5_tail.py`）第一版在讀植入檔之前先以寫入模式打開它，`r4` 的第一個控制在空檔上過了；改成先讀、`r4` 要未突變的複本讀到 13／13 才植入，紀錄裡的數都來自改好之後（§ 17.9）。
+- **`D8` 成立**（裁決 1；`NET-167`，§ 17.6）：兩次開機都 7／7 —— `RLXFW-ID0=3685A3A4` 等於 manifest 的 `recipe_id`、也等於 `/proc` 讀到的；`/init` 到 `lan up`、開機擷取唯一送出的是 `J`；`init calls 1 ok 1 refused 0 rc 0 stored 1F on 1F reset_busy 0`、`n_writes 6`、`RLXFW-SW-INIT=00001F1F` 在 `SW-START` 之前；46 B 與 84 B 各 4／4；板子 → 主機 4／4；`REACHABLE` 在 rlxfw 的本地管理位址。`J` 到 ping 之間 console 上沒有動詞、沒有寫入（開機 1 多了 `X-I1` 的 ESC 串與一個 CR）。`ethcensus` 在映像上 GREEN（範圍內 0／610 個 leaf、只有 10 個 seam 名、0／6 個原廠 `/proc` 名），控制 `r6b10y` RED；`/proc/rtl865x` 不在。arm II（`NET-164`）是對照。位址那一半只有一個讀者（`armI-nb.py`）：按設計沒有擷取存著位址。
+- 交換器狀態（裁決 2）：ping 前後 37 列只有 `PCRP0`–`4` 的 bit 0 與 S0′ 不同；VLAN、netif 表與 arm II 的逐字相同；13 個新收的字等於 L。8d 裁決 2–4（只寫 `EnablePHYIf`；VLAN 那一組、EEE、`QNUMCR` 沿用）是量到的，不只是設計。
+- **`NET-37` 殘留 ⊘，收窄**（裁決 3；`NET-169`，§ 17.8）。量：L2 表第一次在矽片上讀，兩次開機都只有三個項目 —— slot 1 全零位址（靜態、toCPU、埠 0–2），slot 600 netif 的本地管理位址（同樣的欄位），slot 900 主機網卡、在埠 3 學到的（動態）；主機網卡的雜湊指的列正是 slot 900 所在的列 225 —— § 17.5 要的比對，窗、欄位、雜湊一起驗。rlxfw 的位址不在表裡 → 「L2 學到 `rlx0` 的來源位址」被否證。讀 B（一個來源）：`FFCR` `00000003`，bit 1 `EnUnkUC2CPU`、bit 0 `EnUnkMC2CPU`。推：送給 rlxfw 的單播以未知單播經那個陷阱進 CPU、廣播經多播的那個；擁有者的 `MSCR` `0x01` 條件實質成立。代價寫明：沿用 `FFCR`，任何 LAN 埠的每一個未知單播與多播訊框也進 CPU；這張桌子的一條線只接主機，沒量到它加的負載。判定它的是 RX 標頭的 `ph_reason`，或一次經裁定、清 `FFCR` bit 1 的寫入。讀者之前我先用 B 的雜湊自己核過一次（主機網卡在 slot 900 的列；rlxfw 的位址與 loader 回 ARP 的位址所雜湊到的列都沒有它們），當時記成推、交給讀者分類。擁有者可推翻。
+- **`NET-33` 殘留 ②**（裁決 4；`NET-168`，§ 17.7）：`FULL_RST` 單獨從 loader 的 `MEMCR` `00007F7F` 得到 `00007F00`，頁與 `peek` 兩個儀器；兩個位元組的意思沒有來源，命名 ⊘。
+- **`NET-31` 殘留 ⊘**（裁決 5）：`PSRP0`–`4` bits 13:12 在 `init` 之後與 `reset full` 之後都是 `01`；原廠哪一步清它，沒有原廠程式碼就分不開。
+- **`NET-30` 殘留 ⊘**（裁決 6）：它自己的判定實驗跑了 —— 主機網卡上電前 attach、不動；兩次開機的提示字元上，`IPCONFIG` 前後 `PSRP3` 四次都 `000010E0`（bit 8 = 0）；兩次開機 `RLXFW-SW7=00000000`。上傳之後那一讀經 `looprun` 做不到；block 24 那一次閂住的事件，事後無從歸因。
+- **護欄在矽片上**（裁決 7）：引擎開著（`CPUICR` `C4000000`，NIC 頁與 `peek` 兩個儀器）時 `reset full` 被拒、交換器頁一列都沒動；`ifconfig rlx0 down` 與 `disarm` 之後（`04000000`）放行（`RLXFW-SW-RST=00000001`、`n_reset 1`）。一次開機、一次拒絕、一次放行。
+- **從 L 出發的 `reset full` 等於從 V 出發的 `reset vendor`**（裁決 8）：`I7-SW1` 的 live 欄與 `bench/2026-09-28/AR-RST` 的 37／37 相同。推：在這 37 個字上，原廠 650 ms 的時脈閘看不出作用。§ 16.3 的「沒回去」清單漏了 `MDCIOCR` → 0，兩次重設都有。重設之後的表、MIB、`CPUICR`、PHY 暫存器沒讀。
+- 四個計數的括號（裁決 9）：開機 2 兩個方向都 13 = 13 = 13 = 13；開機 1 主機送 ＋14、埠 3、CPU 埠與 `n_rx` 都是 13。推：括號邊緣多一個 70 位元組的訊框；沒有主機的封包擷取，分不開。兩個計數的那一半兩次開機都成立。
+- **`C-19` 沒觸發**（裁決 10）：console 轉接器的 4 行都是 attach 的；41,473 行是 WSL 9p 的 `LookupFid` 錯誤 36,447 行、`vhci_hcd` 兩種各 1,700 行、`vhci_rx` 的追蹤 79 個，沒有一行是轉接器的。
+- 跑錯的是跑表、不是板子（裁決 11）：更正 1–3。
+- `1fbd719`（18:08:48）：擷取（345 個檔、145 個 `.log`）、實例化的卡片 `RUN-armI.md`（它的兩個 `bench/2099-12-31 <boot>` 判決參數照執行時的樣子留著）、`CORRECTIONS-armI.md`、`bench/README.md` 一列（插在 `2026-09-28` 那列之後，第 125 行）、`bootbytes` 宣告 407（339 ＋ 標準 `/init` 的 68）；提交前 `bootbytes` 7／7、`capdate` rc 0、`audit-bench-log` rc 0。`025b336`（18:30:46）：§ 17.6–17.10、`NET-167`–`NET-169`、四個殘留 ⊘；`spec-check` 0，之後 `citecheck` 8 項全過。
+
+### 六、洩漏探針的假陽性，與它缺的熵門檻
+
+- 量（`$FWRE_WORK/rebuild/s116/macprobe_l2.py`，只印計數）：`bench/2026-09-28b` 有 `tbl l2` 或 `tbl netif` 頁的四份擷取（`I3-VL`、`I6-VL`、`I3-VN`、`I6-VN`），每個位址由兩個解碼器（探針自己的、`viewdecode` 的）各組一次、必須相等，再到傾印裡找原樣、反序與 12 種 ASCII 寫法。`I3-VL`、`I6-VL` 各 1 個命中，落在 `H601`。
+- `hitshape.py`（只印形狀、不印值）：命中的是 slot 1，解出的位址全零 —— 只有一種位元組值；這六個位元組在 `H601` 的填充裡與整個傾印裡都出現很多次（整個傾印 92,372 次），命中處周圍 16 位元組的窗只有 2 種值。🔴 這是我的探針的**假陽性**：它沒有 `flashwin` 的門檻。`flashwin` 只拿至少 4 種位元組值的 16 位元組窗去找（它的註解叫 entropy filter，放在參考那一側），因為一串重複的位元組到處都找得到，找到了什麼都不說明；`H601` 絕大部分是同一個重複的位元組（`tools/flashwin.py` 的註解：98.22 %）。
+- 修正：解出的位址少於 4 種位元組值就另計，永遠不算洩漏；重跑四份都是 0 個命中、rc 0。門檻是看到命中之後才加的；但那一格只有一種值，任何 ≥ 2 的門檻都會把它分開，4 是 `flashwin` 原有的值，不是為這個結果選的（讀）。
+- L2 的形狀（兩次開機相同）：slot 1 全零、靜態、toCPU、埠 0–2；slot 600 本地管理位址、靜態、toCPU、埠 0–2；slot 900 全域位址、動態（`agingTime` 2、3）、埠 3。原始字帶著主機網卡與 netif 的位址（連同格號）；沒有 `H601` 的位元組 → 擷取照原樣提交（§ 17.5 把「能不能照原樣提交」留給擁有者，§ 十二）。19:02 `flashwin scan` 掃這個目錄 345 個檔：CLEAN（`$FWRE_WORK/rebuild/s116/flashwin-28b.out`）—— 在 `1fbd719` 之後跑。
+
+### 七、8g：主線翻轉（`18c9068`，19:00:08）
+
+- 8g 代理在 worktree 裡從 `010fb1a` 做（分支上的 `94e2f09`）：`kconfig-delta` 1.1 的變體清單 `set@quiet,loud`，依序拒絕 `@` 後面空的、空的名字、沒宣告的、重複的，每次說出讀到的清單；41 列改標 `@quiet,loud`；`SWCORE=y` 成為具名變體 `quiet-swcore`；`quiet-noswcore` 以名字退役 —— 它和 `quiet-swcore` 差兩個字母、指相反的映像，拒絕時說出取代它的名字；第 294 列 `CONFIG_RLXFW_VENDOR_ETH_OPEN` 量過之後留在每個變體（改標或刪掉，`SWCORE=n` 的 `.config` 都多一個未宣告）；`docs/KNOWN-ISSUES.md` 一條 `R9`；自測 24 → 34、`test-config-gates` 60 → 71、`test-kbuild-cflags` 96 → 99；預設的配方 `3685a3a4` → `8b5ae480`。改之前量語料（讀）：1.1 讀 HEAD 的 delta 與 1.0 逐列相同（104、106、145、104 條）；讀新 delta 時 `quiet` 等於 HEAD 的 `quiet-noswcore`、`quiet-swcore` 等於 HEAD 的 `quiet`。
+- 落地：`git cherry-pick --no-commit 94e2f09` 到 `025b336` 上，乾淨（帳本自動合併），10 個檔 staged；紀錄（`FW-157`、§ 18、`NET-151` 與 § 13.10 的指標、`bootbytes` 710／339 的標籤、`ci-expected` 34／71／99、`NET-54` 與 `NET-124` 殘留改指）交回 8g 代理寫。🔴 它是 worktree 代理，寫不了主 checkout（harness 的守衛；它改在自己的 worktree 裡 cherry-pick，也被分類器拒絕）：交回兩個 patch（`8g-record`、`8g-knownissues`），另有一個 `ci-expected` 的寫入在守衛之前就落地了。我先 `git apply --check` 再套：`spec-check` 0、`bootbytes` 7／7、`kconfig-delta` 34／34、`test-config-gates` 69 過、2 個是已知的 E5。`KNOWN-ISSUES` 的 R9 那一條剪回 `D16` 自己的話（`RUNSHEET.md:2368`）：初稿多說了「`R9` 的卡片要帶起原廠的 `eth*` 而不是 `rlx0`」。之後 `citecheck` 8 項全過。
+- `NET-54` 與 `NET-124` 殘留：讀具改指 `SWCORE=n` 上還在的（交換器頁、`rtl819x-view` 的 `mib`、`/proc/rtl819x-mdio`），兩列 ⊘（`R6b` 收尾，再現才重開）。
+- 量（`ls`，寫這一條時）：§ 18.4 寫 E5 紅的原因是 `/bin/uprobe` 的 build 產物不在 —— 那是在代理的 worktree 裡跑的，worktree 沒有 `build/`；主 checkout 的 `build/rlxfw-user/` 有 `isaprobe/uprobe`、沒有 `linkprobe`，第一百一十五段記的正是 `linkprobe`。兩處都是「gitignored 的 build 產物不在」，名字隨樹不同。`5bef4d8` 在 § 18.4 原地補上（兩處都是「gitignored 的 build 產物不在」，名字隨樹不同），§ 18.7 的 `NET-150` 同時改成「有指標」。
+
+### 八、`R6b-9` 與 gate 關閉
+
+- 起草代理寫了第十四條的草稿、列出 13 個矛盾或缺口（`$FWRE_WORK/rebuild/s116/r6b9/`）。我的裁決：operating clause 在 `P2` → `R6b` **觸發**，觸發的東西是「`rlx0` 傳送故障的機制，作為原因」，扣分那段保留 —— 這件事 `R6b` 做的比 `P2` 留下時多得多（修好、成為預設），剩的是原因：描述子記憶體與 CPU 埠之間那一段裡面，這張桌子上沒有儀器量得到；七段（第一百一十段到第一百一十六段）、十九次開電；`C-19` ⊘，類別「刻意替代」（它的問題由 `CLAUDE.md` § Environment 診斷掉線的那條規則持有；今天 16:50–17:14（時刻沒量） 的列舉失敗記成插上時的一個資料點）；`NET-134` 殘留關；id 標記修正；§ Now 第 47 行；`NET-150` 的指標；`R6b-8` 列的歸屬改正（普查範圍是主 session 定的，第一百一十三段 § 六）；`NET-132` 與 `notes/nic-driver.md` § 27.13 照 D1/D2 裁決 1 收窄；`PCRP0`–`4` bit 0 加進 `NET-54`／`NET-124` 的重開讀取；arm I 讀的原廠檔進帳本。草稿另讀到：前一晚（2026-09-27／28）的卡片與跑表沒有一張寫 `C-19`、沒有跑 follower（讀）。
+- `D5`：40 列，11 列由讀數關閉、28 列 ⊘（其中 `D3-MISS` 與 `NET-08` 是主體由讀數關閉、剩一部分 ⊘ 的分列，照分列的慣例標 ⊘；草稿的點法是 13／26）、1 列轉走（`CLK-42` 殘留）、0 列開著；`1472|mdev` 仍是主 session 的 ⊘。
+- `5bef4d8`（`R6b-9` 的落地，套用代理寫、我審）：第十四條與 operating clause 那一節（十四條時重跑）；`PROGRESS.md` § Now（54 行不變）、§ Gate board、`R6b` 的標題與 `R6b-8`／`R6b-9` 的關閉句、`C-19` ⊘ 與 `D3-MISS` 的標記；`NET-134` 殘留關、四列標記、`NET-54`／`NET-124` 的重開讀取加 `PCRP0`–`4` bit 0、`NET-132` 與 `notes/nic-driver.md` § 27.13 收窄、`NET-150` 的指標；帳本 § 9.12（arm I 讀的原廠行）。檢查逼出來的兩處：§ Now 的 `Next after this` 要一個日期標記（`spec-check` 的 T23）與 `C12` 的「兩個 gate 之間」記號；`cfcensus` 的解析器在 `1472\|mdev` 的跳脫直線上切錯欄 → 那一列改寫成「the 1,472-B rtt mdev」。提交前 `cfcensus write` 重算計數塊（`PROGRESS.md` 改 3 行），`cfcensus` self-test 64／64、ratchet、check 0 個 finding，`spec-check`、`docsize`（§ Now 4,997／6,000 B）、`ledgerscan` check 與 quarantine、`xcheck`（4,171 個、0 分歧）、`test-file-modes`、`capdate` 都 rc 0；之後 `citecheck` 8 項全過。
+- 完整 desk-sweep（`5bef4d8` 的樹，`--dest` 在 ext4，20:10:30–21:29:11；指紋 171 s、複製 214 s、sweep 4,167 s）：116 步宣告、2 步略過（`instruments/apt`、`lint/#1`，要 root）、114 步跑、111 綠、2 個設計上的紅（`census/*`）、1 個非預期紅 —— `text/test-config-gates` 的 E5 兩格：主 checkout 的 `build/rlxfw-user/` 沒有 `linkprobe`（gitignored 的 build 產物，CI 跳過 E5）；最後一行 `the source did not move`。sweep 之後，§ Now 的 `Next after this` 原地改成照 operating clause 原文的說法（觸發的那件事就是下一個 gate，開不開由擁有者定）。
+
+### 九、我做錯的，與教訓
+
+- 🔴 **佔位符**：產生器填了卡片裡的 `@FILL:…@`，沒填腳本的閘門參數；腳本自己的佔位符檢查只讀卡片、不讀自己。卡片給人讀，腳本才是被執行的 —— 佔位符的檢查要讀被執行的那一份。被 `I1-MK` 的閘門自己擋下，停下時板子上什麼都還沒做。同一個產生器還有兩處：判決格的樣板目錄（更正 2）、`stopwatch.sh` 的名字（更正 3）。三個都是 `check-armI.sh` 的 PASS 85 沒看到的。
+- 🔴 **洩漏探針沒有熵門檻**（§ 六）：它在填充上觸發。`flashwin` 早就有這個門檻，我新寫的探針沒有照做。被 `hitshape.py`（只印形狀）抓到。
+- 🔴 **一個會 stage cell 的測試就是一次建置**（§ 三）：我讓 8g 代理與建置代理同時跑，沒想到 `test-kbuild-cflags` 的 C1 會 stage；「一次只跑一個建置」破了一次，這次沒看到後果。
+- 🔴 **我的 brief 引錯行**：給交換器 1.5 代理的 brief 把 `AR-NIC:49`、`AR-C0:8` 當成 `C4000000`（引擎開著）的來源，那兩行讀 `04000000`（`disarm` 之後）；開著的是 `bench/2026-09-28/M6-VP5:8`（`peek`）與 `AN-N2:6`（`RLXFW-N-ENGON`）。代理照規則重讀被引的行才寫，§ 17.2 與 `NET-166` 引的是對的。
+- 🔴 **worktree 代理寫不了主 checkout**（§ 七）：派 worktree 代理之前就要計畫它交 patch，不是交檔案。
+- 🔴 **報時刻用心算**（記憶裡記過的那一類，又犯）：擁有者插上轉接器的時刻我寫成 17:03，沒有量過 —— 前後兩次讀鐘是 16:50:21 與 17:14:08 —— 還把它寫進給套用代理的 `C-19` 指示；起草代理拿檔案時間比對時抓到，`5bef4d8` 之前全部改回量得到的上下界。同一類還有兩個：「`line1b` 約 17:25 開始」（量 17:19:52）、「約 17:00 推上」（CI run 16:37:07 建立）。
+- 8g 影響範圍代理的提議和它自己的約束矛盾（§ 一），我讀 `kconfig-delta` 的語意抓到；`KNOWN-ISSUES` 的初稿說得比 `D16` 多，我剪回（§ 七）。
+- `flashwin scan` 對這個目錄在擷取提交之後才跑（讀 檔案時間：`1fbd719` 18:08:48，輸出 19:02；block 48 那次在提交之前）；提交之前擋 `H601` 的只有我自己那支探針 —— 剛出過假陽性、改過門檻的那一支。沒推上之前都還能撤回，這次掃出來 CLEAN。
+
+### 十、沒做的
+
+- `citime` 的 18 列。
+- 推送：`884b1b0` 之後的 commit（`1fbd719` 起）在這一條提交之後才推；它們的 CI 下一段開場量（`gh run list` 的 conclusion 欄）。
+- `R6b-8` 列點名、沒建或沒跑的：有界的 `TACI` 寫入器（8d 裁決 3）、`imgprocs` 的反向模式、在沒有原廠程式碼的映像上跑 `linkprobe`、`mfgtest led`／`button`（要擁有者的眼與手）。
+- 翻轉之後的預設（配方 `8b5ae480`）沒建過任何映像、沒上過板子；`SWCORE=n` 的 `loud` 沒建過。
+
+### 十一、不確立
+
+- 給 `rlx0` 的訊框怎麼進 CPU：`FFCR` 的陷阱是推、單一來源（B），`ph_reason` 沒讀；CPU NIC 是哪一個成員位元；loader 回 ARP 的位址為什麼兩張表都沒有。
+- 鄰居項的位址那一半只有一個讀者。
+- 一次上機：一顆映像、一次冷開機、一次暖開機、埠 3 上一台主機；loader 沒把網路帶起來的開機路徑（從 flash 自動開機）沒走過，`R9` 的零寫入規則讓它走不到。
+- 五個 `EnablePHYIf` 位元哪一個是必要的；EEE 開著的長時間連線穩定度；`FFCR` 代價的負載；護欄只有一次拒絕、一次放行，`start`／`dumb`／`restore` 沒有護欄；`reset full` 之後的表與 MIB。
+- 開機 1 多出來的一個訊框是括號邊緣（推）。
+- § 17.5 說 rsdk gcc 3.4.6 有沒有替 `"tbl l2" + 4` 另外產生 NUL 界住的 `l2`，由 arm I 映像上的 `imgprocs` 回答；`imgprocs` 以 rc 2 拒絕了這顆映像（讀 `$FWRE_WORK/rebuild/s116/build/gates/imgprocs-r6b8i.out`），紀錄裡沒看到別的回答。
+
+### 十二、等擁有者的（不擋任何步驟）
+
+- 主 session 的裁決，可推翻：`NET-37` 殘留 ⊘ 與 `FFCR` 的代價；operating clause 在 `P2` → `R6b` 觸發；`C-19` ⊘（刻意替代）；`D5` 帶 `1472|mdev` ⊘ 關（`NET-121`）；`tbl l2` 擷取照原樣提交（§ 17.5 原本留給擁有者）。這個 gate 裡全部的主 session 裁決列在第十四條的最後一節。
+- 上一段交接留下、還開著的三件：`CLAUDE.md` § Flash 仍要每次按壓宣稱 `n_writes`（`FW-142`，那個計數不帶資訊）；`MK6`／`MK7`／`MK9`／`MK10` 的見證不會失敗（`FW-143`）；「不要無人待機」還只在 `NET-165` 與記憶，沒進 `CLAUDE.md`。
+- **下一個 gate**：第十四條的 operating clause 觸發，而這條規則的原文是「兩個連續條目『沒有建立的』裡有同一件事，那件事就是下一個 gate」—— 所以照規則，下一個 gate 是「`rlx0` 傳送故障的機制」；它能做的部分是 `M5`（1.4 的長度下用原廠的埠清單遮罩跑 `tx`，一次按壓、不用新映像），其餘在這張桌子上沒有儀器看得進去。開它、記成做不到、或改開別的（`R1y` 已預訂），由擁有者決定。§ Now 的 `Next after this` 原本寫它「沒有主人」，收工時原地改成照規則的說法。`CLK-42` 殘留的列要擁有者指一個 gate。
+
+### 十三、下一段
+
+- 沒有開著的 gate。交接 `plan/handoff-s116.md`；study `study/20260928-study1.md`。
+- 板子 17:25 起斷電（停在 loader 提示字元時關的）；下一次上機從冷開機開始。
+- 磁碟：`r3-4/cells/r6b8i`、`r6b8i2` 各 483 MB；`s113`–`s116` 的 clone 與舊 cell，`R6b` 關了可清 （量 20:10：`r3-4/cells` 37 G、`r3-4/out` 426 M、`s113` 3.1 G、`s114` 2.3 G、`s115` 3.2 G、`s116` 1.1 G；ext4 還有 826 G；沒刪，等擁有者）。
+
+commit：`1f9ebf1`、`010fb1a`、`b173746`、`884b1b0`、`1fbd719`、`025b336`、`18c9068`、`5bef4d8`、本條。
