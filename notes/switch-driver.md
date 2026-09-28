@@ -2995,7 +2995,7 @@ hand after `disarm`. `AR-RST:2` reads `RLXFW-SW-RST=00000002` and `:9` `n_reset 
   `FFCR` and `LEDCREG` 0; the PVIDs 1 (`PVCR0`–`3` `00010001`, `PVCR4` 1); `SWTAA` and `0x4D48` 0;
   both tables empty and the MIB zeroed; `CPUICR` `04000000` → 0; PHY registers 0 (`BMCR` `3100`),
   21 and 22 and page 1's 16 and 19 at new values. `QNUMCR` stays `00041249`, and `MEMCR` stays
-  `00007F00`, the value the reset started from.
+  `00007F00`, the value the reset started from. Also not back: `MDCIOCR` → 0 (§ 17.7).
 
 **So R is not the loader's state.** 推: the PHY changes are the reset's own, not a vendor handler's
 reaction to the link drop the reset causes. Not separated: `FULL_RST` from the 650-ms clock gate,
@@ -3494,3 +3494,314 @@ tracked files; a planted one is found.
   they do match `viewdecode`'s output, which prints whole MACs. Whether such a capture is committed
   as it is (as the netif page `M2-VN`, whose words also carry a MAC, was) and what `flashwin scan`
   must see first are the owner's to decide.
+
+## 17.6 Arm I on `r6b8i`: `D8` met (`NET-167`)
+
+Arm I ran on one power cycle, 2026-09-28 17:15–17:25, into `bench/2026-09-28b/` (committed at
+`1fbd719`, with the sheet `RUN-armI.md` and `CORRECTIONS-armI.md` beside the captures): the owner's
+cold power-on, caught; boot 1; `busybox reboot -f` and a catch; boot 2; the tail on boot 2 (§ 17.7);
+`busybox reboot -f` to the loader prompt for the owner's power-off. Every number below was re-read
+from its capture by scripts that share no code with the sheet's verdict (`armI-verdict.py`), with
+`armI-nb.py` or with `viewdecode`'s verdict paths (`$FWRE_WORK/rebuild/s116/read-armI/scripts/`;
+each refuses when a planted defect does not turn it red, and `r7_mib.py` reads
+`tools/viewdecode.py`'s own rendering of the MIB words). The main session's rulings on that reading
+(`$FWRE_WORK/rebuild/s116/RULINGS-armI.md`, cited as arm I ruling *n*) bind this record. Capture
+names are `bench/2026-09-28b/`'s unless marked; `NAME:N` is line N of `NAME.log`, counted on LF with
+CR stripped. Marks: 量 a capture, 讀 code or a document, 推 inferred.
+
+* **The image** (讀 the build's records; 8d ruling 8). `r6b8i`: `CONFIG_RTL_819X_SWCORE=n`,
+  `rtl819x-switch` 1.5, `rtl819x-view` 1.1, `rtl819x-nic` 1.6 at its default, the standard `/init`
+  typing `init` between `unlock i-mean-it` and `start`; recipe `3685a3a4`
+  (`$FWRE_WORK/rebuild/r3-4/out/r6b8i.manifest`); `nfjrom` 1,114,112 bytes, which `looprun` pinned
+  by digest before the port opened (`I1Q:1`, `I4Q:1`). `ethcensus` is GREEN on it — 0 of 610
+  in-scope leaves linked, only the 10 seam names, 0 of 6 vendor-unique `/proc` names — and RED on
+  its control `r6b10y`: 22 of 632 leaves, 898 of 899 names, 6 of 6 (量 on the host,
+  `$FWRE_WORK/rebuild/s116/build/gates/ethcensus-r6b8i.out` and `ethcensus-r6b10y.out`). On the die,
+  `/proc/rtl865x` is absent (`I3-DEV:21`, `I6-DEV:21`) and neither boot prints a vendor probe line
+  (`I1-VT:1`, `I4-VT:1`: 0).
+* **The two boots** (量). Boot 1 is cold — the catch's one-space line (`I1-CATCH:5`), no watchdog
+  line — with `J 80500000` at 17:15:58 and `rlxfw: lan up, rlx0 10.1.1.3` inside the 10.05-s boot
+  capture (`I1Q-boot:96`). Boot 2 follows `busybox reboot -f`, caught after
+  `Reboot Result from Watchdog Timeout!` (`I4-RB:8`), with `J` at 17:22:29 and `lan up` at
+  `I4Q-boot:96`. Each boot capture is 1,830 bytes, and `looprun` closed on each with every assertion
+  held (`I1Q.stages.tsv:19`, `I4Q.stages.tsv:19`); `bootbytes` reads both at the non-mark constant
+  407, arm II's 339 plus the standard `/init`'s 68 bytes (§ 17.9).
+* **Ruling 9, re-derived** (量; arm I ruling 1): 7 of 7 conjuncts on each boot. (1)
+  `RLXFW-ID0=3685A3A4` (`I1Q-boot:8`, `I4Q-boot:8`) is the manifest's `recipe_id`, and the `/proc`
+  route agrees (`I3-NW0:51`, `I6-NW1:51`). (2) `/init` reached `lan up` (`:96` of each boot
+  capture), and the capture's only send is `J 80500000` (its `.meta.json`'s `sent`, which `sent_hex`
+  repeats). (3) The first command after `J` is `cat /proc/rtl819x-switch` (`I2-SW`, `I5-SW`), whose
+  `init` line reads `init calls 1 ok 1 refused 0 rc 0 stored 1F on 1F reset_busy 0` (`I2-SW:18`,
+  `I5-SW:18`), each port `pre nn7F0038 rb nn7F0039 rc 0 st 1` (`:13–17`), the phyif line
+  `stored 5 already 0` and `rbfail 0` (`:12`), `n_writes 6` (`:5`), and the boot printed
+  `RLXFW-SW-INIT=00001F1F` before `RLXFW-SW-START` (`I1Q-boot:87–88`, `I4Q-boot:87–88`). (4) Host →
+  board 4 of 4 at 18(46) B (`I2-PL:8`, `I5-PL:8`). (5) 4 of 4 at 56(84) B (`I2-PD:8`, `I5-PD:8`).
+  (6) Board → host 4 of 4, seq 0–3 (`I2-BP:9`, `I5-BP:9`). (7) The host's entry `REACHABLE` at
+  rlxfw's locally administered address (`I2-NB:1`, `I5-NB:1`: `lladdr=rlxfw-laa`), the state read
+  again by a second command (`I2-HN:46`, `I5-HN:46`).
+* **The counts each way, the pass bracket** (量). Host tx +14 = `n_rx` +14, and `n_tx` +14 = host rx
+  +14, on both boots: boot 1 host rx/tx 2183/2188 (`I2-HP0:1–2`) → 2197/2202 (`I2-HN:14`, `:23`),
+  `n_tx`/`n_rx` 0/2 (`I2-NIC0:14–15`) → 14/16 (`I2-NIC1:14–15`); boot 2 4393/4402 → 4407/4416 and
+  0/0 → 14/14 at the same lines of `I5-`. The host's ICMP moved by 8 echo requests, 8 replies, 4
+  requests from the board and 4 replies to it (`I2-HP0:4` → `I2-HN:28`), and the board's own
+  counters read 8, 8, 4, 4 (`I2-SN:5`, `I5-SN:5`).
+* **The address half of conjunct 7 has one reader** (arm I ruling 1): `armI-nb.py`, whose self-test
+  read 9 of 9 before power (`I0-ST:10`). By design no capture holds the address, and the host's
+  table held no entry for 10.1.1.3 when the reading was done, so no second reader can compare it
+  after the fact. What the reader re-derived is the comparand: the six bytes of `rtl819x-nic.c`'s
+  `nic_mac[6]`, as `notes/nic-driver.md` describes them, are in the vmlinux whose sha256 the image
+  record names (three occurrences; 讀 on the binary); the address is locally administered and
+  unicast, and it is neither the host adapter's nor the loader's.
+* **What reached the console between `J` and the pings** (量, every capture's `.meta.json`). Boot 1:
+  `J`; then `X-I1`, the watch line 1 started when it stopped at `I1-MK` (correction 1) — an ESC
+  stream for 142.8 s (its write count is not recorded; the shell echoed 6,643 BEL bytes) and one CR,
+  which the shell answered with a bare prompt (`X-I1:2`); then 79.0 s with no capture on the port;
+  then `cat /proc/rtl819x-switch`, `cat /proc/rtl819x-nic-tx` and `cat /proc/rtl819x-nic` (`I2-SW`,
+  `I2-TX`, `I2-NIC0`) and the ping cell `I2-BP`. Boot 2: `J`, the same three `cat`s and `I5-BP`. No
+  send in either window carries a redirect, `echo`, `ifconfig`, `reboot`, `mfgtest` or a loader
+  verb, and the NIC reports no 1.5 or 1.6 verb since boot (`I2-TX:4`, `I5-TX:4`:
+  `v15 last - 0 ok 0 refused 0`). Boot 1's pings came 3 min 57 s after `J`, boot 2's 15 s after.
+* **The switch page against S0′** (量; arm I ruling 2). Before the pings (`I2-SW`, `I5-SW`), after
+  them (`I3-SW`, `I6-SW`) and at the tail's start (`I7-SW0`), 5 of the 37 rows differ from slot 0 —
+  `PCRP0`–`4`, live `nn7F0039` against S0′ `nn7F0038`, XOR `00000001` each (`I2-SW:40–44`) — and the
+  other 32 are equal. S0′ is the same, 37 of 37, on all eight arm I pages, and equals
+  `bench/2026-09-28/`'s `M2-SW`, `M6-SW` and `A2-SW`. Live: `MSCR` `00000001` (`I2-SW:56`), `VCR0`
+  `000001FF` (`:60`), `VCR1` 0 (`:61`), `PVCR0`–`3` `00080008` (`:62–65`), `PVCR4` 1 (`:66`),
+  `PBVCR0` 0 (`:67`), `FFCR` `00000003` (`:59`); the same on `I5-SW` and after the pings. At the
+  prompt 13 S0′ rows were also read by `DW`: 7 are equal, and the other six are `PCRP0`–`4` in bit 0
+  (`nn7F0039`, `I1-DWP:2–3`, `I4-DWP:2–3`) and `PSRP3` (`000010E0` at the prompt, `000010F9` in S0′;
+  § 17.8).
+* **The tables against arm II's** (量; 讀 B for the fields). `tbl vlan` and `tbl netif` equal
+  `bench/2026-09-28/M2-VV` and `M2-VN` word for word on both boots — 16 slots × 8 words and 8 × 8,
+  no word different (`I3-VV`, `I6-VV`, `I3-VN`, `I6-VN`), every slot `t1 eq`, `polls` equal to the
+  slots (`I3-VV:7`, `I3-VN:7`). VLAN: slot 8 alone (`I3-VV:16`) — VID 8, fid 0, member and untagged
+  ports 0–5, `extMemberPort` and `extEgressUntag` 0 (B `rtl865x_asicCom.h:230`–`:242`). netif: slot
+  0 alone (`I3-VN:8`) — valid, VID 8, MTU 1500, `macMask` 7, `enHWRoute` 0, ACL ranges 0–0 (B
+  `:171`–`:226`; the address assembled as `rtl8651_getAsicNetInterface` does,
+  `rtl865x_asicCom.c:607`–`:612`); its address is locally administered, is not rlxfw's, and is the
+  address in the L2 table's slot 600 (§ 17.8).
+* **The 13 words** (量; arm I ruling 2; 8d ruling 4). By `peek` on both boots, each admitted
+  (`refused 0`, `rc 0`): `QNUMCR` `00001249` (`I3-QN:8`), `CSCR` `00000008` (`I3-CS:8`), `EEECR`
+  `294A5294` (`I3-EE:8`), `IBCR0`–`2` 0 (`I3-IB:8–10`), `SBFCTR` `000000F4` (`I3-SB:8`),
+  `WFQRCRP0`–`4` `00003FFF` and `P5` 0 (`I3-WQ0:8` to `I3-WQ5:8`), and the same at the same lines of
+  `I6-`. 13 of 13 equal group A's L as the loader `DW` captures hold it
+  (`bench/2026-09-27d/AL-D04:2`, `AL-D07:2`, `AL-D11:2`, `AL-D12:2`, `AL-D13:2`, `AL-D14:2–5`) and
+  as § 16.2 types it.
+* **The four-counter bracket** (量; arm I ruling 9; the counter names are `viewdecode`'s, from B, one
+  source). Boot 2 (`I6-VM0` → `I6-VM1`, `I6-NIC0` → `I6-NIC1`, `I6-HP0` → `I6-HN`): host → board,
+  host tx +13 = port 3 in +13 (12 unicast, 1 broadcast) = the CPU port's out +13 (12, 1) = `n_rx`
+  +13; board → host, `n_tx` +13 = the CPU port's FCS count +13 = port 3's unicast out +13 = host rx
+  +13; port 3's in and out octets and the CPU port's out octets move by 1,136 each. Boot 1 (`I3-*`)
+  reads the same except host tx, +14 (`I3-HP0:2` 2202 → `I3-HN:23` 2216) against 13 at port 3, at
+  the CPU port and in `n_rx`. The host's ICMP moved by 12 each way on both boots, so the extra frame
+  is not a ping; `rlx0` received one more 70-byte frame between `I3-NIC1` (`nd_stats rx 29/2368`,
+  `:42`) and `I3-DEV` (30 packets, 2,438 bytes, `:20`), and the host's bracket closed about 1 s
+  after the MIB read and 0.01 s after `I3-NIC1`. 推: the host sent that frame at the bracket's edge
+  and it reached the board after the NIC page was read; not separated, for there is no host packet
+  capture. The two-counter half of ruling 9 holds on both boots (above).
+* **`mfgtest auto`** (量). 9 of 9 ok, 0 FAIL on each boot (`I3-MT:18`, `I6-MT:18`); the nine lines at
+  `:9–17` are identical but for `MT-TICK`'s `dj` and `di` (523, 522): `MT-ID` `recipe_id=3685A3A4`;
+  `MT-FLASH-1` RDID `1C7016`, matched; `MT-FLASH-2` `n_write_refused=2 n_writes=0`; `MT-FLASH-3`
+  `map_rc=0 h601_hashed=0 diff_units=0`; `MT-TICK` `reload=2000=2000`, skew 0; `MT-WDT`
+  `wdtcnr_at_probe=A5000000 state=BOOTGUARD`; `MT-PORT`
+  `Port3 LinkUp by rtl819x-switch 1.5; vendor tree absent`; `MT-MAC`
+  `sig_ok=1 ver=1 len=1166 mac unicast`; `MT-RFCAL` `hw_sum_ok=1 over 1166 body bytes`.
+  `mfgtest led` and `mfgtest button`, which need the owner's eye and hand, were not run.
+* **The corrections** (`CORRECTIONS-armI.md`; arm I ruling 11: the sheet's defects, not the
+  board's). 1: `line1-cold` stopped at `I1-MK`'s first gate on an unfilled `@FILL:RID@` —
+  `gen-armI.py`'s `write_all` wrote two scripts' gate arguments unfilled; `I1-MK` itself holds
+  `RLXFW-ID0=3685A3A4`, `RLXFW-SM0=C4000000`, `RLXFW-SM1=04000000` and `RLXFW-N1=04000000`
+  (`I1-MK:1–3`, `:11`); the line resumed as `line1b` from `I1-VT`, and `line2-warm`'s two
+  placeholders were filled with `3685A3A4`. 2: the verdict cells named the template directory and
+  refused (`I2-V:1`, `I5-V:1`); the main session ran the same script on the seating's directory by
+  hand, PASS 7 of 7 on each boot (`$FWRE_WORK/rebuild/s116/run-armI/run/2026-09-28b/I2-V-hand.out`,
+  `I5-V-hand.out`), and the reading above agrees. 3: `stopwatch.sh` did not accept `X-I1b`; its name
+  check was widened before `line2` opened the port.
+
+**So `D8` is met** (arm I ruling 1): on its own boots, cold and warm, the `SWCORE=n` image whose
+standard `/init` types `init` passes ruling 9 with no verb and no write on the console between `J`
+and the pings, the census GREEN on the image. Arm II (`NET-164`, § 16.7) is the control: the same
+loader state, the same five `EnablePHYIf` bits, typed by hand. 8d's rulings 2–4 — only `EnablePHYIf`
+written; the VLAN group, EEE and `QNUMCR` inherited — hold as measured, not only as designed (arm I
+ruling 2).
+
+## 17.7 The reset guard on silicon, and `reset full` from the loader's state (`NET-168`)
+
+Line 3's tail ran on boot 2, after every `D8` cell and every read (`I7-*`, 17:24:36–17:24:46). Marks
+as in § 17.6.
+
+* **The premise** (量). `I7-SW0`: `unlocked 1` (`:4`), `n_writes 6` (`:5`), `n_reset 0` (`:8`),
+  `reset_busy 0` (`:18`). The engine on, by two instruments: `I7-NIC0` `armed 1`, `engine_on 1`,
+  `now_icr C4000000` (`:5`, `:6`, `:49`), and `peek` `C4000000` (`I7-C0:8`: bits 31, 30 and 26 set).
+* **Refused** (量; arm I ruling 7). `I7-RF:2` reads `cat: write error: Device or resource busy`; the
+  page the same `cat` printed after it reads `n_writes 6` (`:6`), `n_reset 0` (`:9`) and
+  `reset_busy 1` (`:19`), and its 37 live rows and eight `psrp` lines all equal `I7-SW0`'s: nothing
+  on the switch page moved.
+* **Disarmed** (量). `ifconfig rlx0 down ; echo disarm > /proc/rtl819x-nic` printed `RLXFW-N-ENGOFF`,
+  `RLXFW-N-NDSTOP`, `RLXFW-N-ENGOFF` and `RLXFW-N-DISARM` (`I7-DN:2–5`); `I7-NIC1` reads `armed 0`,
+  `engine_on 0`, `nd_up 0` and `now_icr 04000000` (`:5`, `:6`, `:23`, `:49`), the NIC's `n_writes`
+  14 → 21 (`I7-NIC0:10` → `I7-NIC1:10`); `peek` reads `04000000` (`I7-C1:8`: bits 31:30 clear, bit
+  26 still set). `CPUICR` `C4000000` → `04000000` by two instruments, the state group A made by hand
+  (`bench/2026-09-28/AR-NIC:49`, `AR-C0:8`).
+* **Permitted** (量; arm I ruling 7). `I7-RS:2` reads `RLXFW-SW-RST=00000001` and no `write error`
+  follows; `n_writes` 6 → 7 (`:6`), `n_reset 1` (`:9`), `reset_busy` still 1 (`:19`). One boot, one
+  refusal, one permit.
+* **`MEMCR`, `NET-33` 殘留 ②** (量, two instruments; arm I ruling 4). `00007F7F` before (`I7-SW0:53`;
+  S0′ the same) and `00007F00` after, by the page (`I7-RS:54`, `I7-SW1:53`) and by `peek`
+  (`I7-MEM:8`). `FULL_RST` alone, from the loader's value, clears the low byte; § 16.3's
+  `reset vendor` could not show it, having started from `7F00`. What the two bytes mean has no
+  source, and no rlxfw write depends on them.
+* **`PSRP0`–`4` bits 13:12, `NET-31` 殘留** (量; arm I ruling 5). `01` on all five after `/init`'s
+  `init` (`I2-SW:25–29`, `I5-SW:25–29`), before the reset (`I7-SW0:25–29`) and after it
+  (`I7-RS:26–30`, `I7-SW1:25–29`): `PortEEEStatus[0]` set and `[1]` clear throughout. Which step of
+  the vendor's init clears bit 12 (§ 16.2 V) is not separable on an image without the vendor's code.
+  Port 3's link went down with the reset — `PSRP3` `000010F9` → `000010E0`, `up 1` → `up 0` — and
+  had not come back by `I7-SW1`, 88 jiffies after `I7-RS`.
+* **What moved** (量). Across the reset (`I7-SW0` → `I7-SW1`, live), 16 of the 37 rows: `SSIR` 1 → 0
+  (`TRXRDY`); `MACCR` `804A0185` → `80420186`; `MDCIOCR` `96181441` → 0; `PCRP0`–`4` `nn7F0039` →
+  `nn7F0038` (`EnablePHYIf`); `PSRP3` `000010F9` → `000010E0`; `MEMCR` `00007F7F` → `00007F00`;
+  `FFCR` 3 → 0; `PVCR0`–`3` `00080008` → `00010001`; `SWTAA` `BB060100` → 0. The other 21 did not
+  move: `CVIDR`, `MDCIOSR`, `PITCR`, `PCRP5`, `PCRP6`, `PSRP0`, `PSRP5`–`7`, `P0GMIICR`, `TEACR`,
+  `ALECR`, `MSCR`, `SWTCR0`, `SWTCR1`, `VCR0`, `VCR1`, `PVCR4`, `PBVCR0`, `SWTACR`, `TCR7`. `I7-RS`
+  and `I7-SW1` are equal on all 37.
+* **`reset full` from L lands where `reset vendor` from V landed** (量; arm I ruling 8). `I7-SW1`'s
+  live column equals `bench/2026-09-28/AR-RST`'s on 37 of 37 words, and its `psrp0`–`4` lines too:
+  two boots, two recipes, two starting states. 推: on these 37 words the vendor's 650-ms clock gate
+  adds nothing visible, so § 16.3's "not separated" is separated here for these words only. Every
+  § 16.3 "not back" item the page shows reappears — `MACCR`, `EnablePHYIf`, `TRXRDY`, `FFCR`, the
+  PVIDs, `SWTAA` — and `MDCIOCR` → 0, which § 16.3 did not list, is in both (`AR-RST:31`,
+  `I7-SW1:37`).
+* **Not read after this reset**: the VLAN, netif and L2 tables, the MIB, `CPUICR`, the PHY
+  registers, `LEDCREG`, `0x4D48`, `CSCR`, `EEECR`, `QNUMCR`, `PLITIMR` and `DACLRCR`. Nothing here
+  says whether `FULL_RST` from L empties the tables or zeroes the MIB, as `reset vendor` from V did.
+
+## 17.8 How port 3's frames reach the CPU (`NET-37` 殘留), and `NET-30` 殘留 (`NET-169`)
+
+* **The L2 table, first read on the die** (量; 讀 B for the fields; arm I ruling 3).
+  `tbl l2 base BB000000 slots 1024 words 8 polls 1024 read 1024 nz 3 shown 3 mis 0` on both boots
+  (`I3-VL:7`, `I6-VL:7`); every slot `t1 eq`, words 2–7 zero. Each slot is decoded by B's entry
+  (`rtl865x_asicL2.h:140`–`:190`), its address assembled as `rtl8651_getAsicL2Table` does
+  (`rtl865x_asicL2.c:815`–`:820`, `fidHashTable` at `:22`) and compared by script — never printed —
+  with the host adapter's address, rlxfw's, the address the loader answers ARP with, and broadcast.
+* **Slot 1** (row 0, column 1; `I3-VL:8`, `I6-VL:8`): the all-zero address. `isStatic` 1, `toCPU` 1,
+  `memberPort` ports 0–2, `extMemberPort` 0, fid 0, `auth` 1, `srcBlock` and `nxtHostFlag` 0,
+  `agingTime` 1 on boot 1 and 3 on boot 2.
+* **Slot 600** (row 150, column 0; `:9` of each): the netif table's locally administered address
+  (§ 17.6) — two of B's layouts decode the same 48 bits — with slot 1's fields. It shares octets 0
+  and 5 with the address the loader answers ARP with and differs from it in octets 1–4.
+* **Slot 900** (row 225, column 0; `:10` of each): the host adapter's address, learned — `isStatic`
+  0, `toCPU` 0, `memberPort` port 3, fid 0, `auth` 0, `agingTime` 2 on boot 1 and 3 on boot 2. Its
+  hash for fid 0 (`rtl8651_filterDbIndex`, `rtl865x_asicL2.c:706`–`:711`) names row 225 on both
+  boots: § 17.5's settling comparison holds, and with it the window, the field layout and the hash
+  (量, 讀 B).
+* **Not in the table**, on either boot: rlxfw's locally administered address, the loader's ARP
+  address and the broadcast address. No slot rebuilds to any of them, and no slot holds their octets
+  0–4 at any row — after `rlx0` had sent 27 frames on each boot (`I3-NIC1:14`, `I6-NIC1:14`). So
+  § 16.7's first candidate, "L2 learning of `rlx0`'s source address", is refuted (量).
+* **So how** (讀 B, one source; 推; arm I ruling 3). The one field of an L2 entry that sends a frame
+  to the CPU is `toCPU` (word 1 bit 17, `rtl865x_asicL2.h:154`), set here only on the two static
+  entries, neither of them rlxfw's; VLAN 8's `extMemberPort` is 0; the netif entry holds another
+  address and has `enHWRoute` 0. `FFCR` (`0xBB804428`, B `rtl865xc_asicregs.h:1490`) reads
+  `00000003` in S0′ and live (`I2-SW:59`), and B names its bit 1 `EnUnkUC2CPU`, "Enable Unknown
+  Unicast Packet Trap to CPU port", and its bit 0 `EnUnkMC2CPU`, the multicast one
+  (`:1666`–`:1667`). 推: frames to rlxfw's address reach the CPU as unknown unicast through that
+  trap, and broadcasts through the multicast one; implicit CPU membership is not excluded, and D was
+  not consulted, so the bits' names have one source. The owner's `MSCR` `0x01` condition (§ 16.7) is
+  met in substance: the loader's own state delivers to the CPU without ACL rules, by the `FFCR`
+  traps (推 on one source). The vendor does it the other way: `FFCR` 9 (§ 16.2 V:
+  `IPMltCstCtrl_Enable` and bit 0, B `:1662`, `:1667`; the unknown-unicast trap off) and a static
+  `toCPU` L2 entry for its own address and one for broadcast (讀 `rtl865x_fdb.c:93`, `:98`,
+  `:559`–`:560`).
+* **The price** (推; arm I ruling 3). With `FFCR` inherited, every unknown-unicast and multicast
+  frame from any LAN port also reaches the CPU. This bench's one link carries only the host, so
+  nothing here measures the load that adds.
+* **What would settle it** (arm I ruling 3; the owner may override the ruling). The RX packet
+  header's `ph_reason` — its word 2, B `common/mbuf.h:107` — which `rtl819x-nic`'s page does not
+  print (it prints words 1, 3 and 4 as `rx_ph1`, `rx_ph3` and `rx_ph4`); or a ruled write clearing
+  `FFCR` bit 1, with a unicast ping. A lead, not an answer (讀 B, one source): `rx_ph1` `00400819`
+  (`I2-NIC1:135`) decodes to `ph_extPortList` 8, the CPU bit (`mbuf.h:66`, `:77`) — the frame's
+  destination list held the CPU, not why. Which member bit the CPU NIC is, `NET-37` 殘留's last
+  question, is not answered: VLAN 8 has no CPU bit.
+* **`NET-30` 殘留, its own deciding experiment** (量; arm I ruling 6). The host adapter was attached
+  before power and not touched (carrier 0 with the board off, `I0-LINK:1`), and `DW BB804134 1` read
+  `PSRP3` at the caught prompt before and after `IPCONFIG`, on the cold boot and after
+  `busybox reboot -f`: `000010E0` all four times (`I1-PSA:2`, `I1-PSB:2`, `I4-PSA:2`, `I4-PSB:2`) —
+  bit 8 (`LinkDownEventFlag`) 0, bit 12 1, bit 4 (`LinkUp`) 0. Port 3 had no link at either read of
+  either prompt, and the loader answered ARP 4 of 4 right after (`I1-ARP:8`, `I4-ARP:8`). The same
+  reply lines hold `PSRP4`–`6`, `000010E0`, `000000E2` and `0000007A`, and every `DW` of the seating
+  got `LDR-07`'s reply — ceil(N/4) lines of four words from the address given, 14 of 14. The kernel
+  side: `RLXFW-SW7=00000000` on both boots (`I1Q-boot:36`, `I4Q-boot:36`), `lde0 00` and
+  `psrp3 000010F9 up 1 lde 0` (`I2-SW:24`, `:28`; `I5-SW` the same). The row's read after the upload
+  is not reachable through `looprun`, which has no stop between S6b and S7, and block 24's latched
+  event stays unattributable after the fact.
+
+## 17.9 The flash claim, the maps, and the record
+
+* **What was sent** (量; `r9_flash.py`, whose control catches six planted verbs and passes eight
+  clean strings, `AUTOBURN 0` and `DW 8040D4A0 1` among them). `bench/2026-09-28b/` holds 104
+  strings sent to the console: 92 captures' `sent` — the sheet's 86 `--send` cells, and `looprun`'s
+  S5b, S6b and S7 in each of two rounds; each `sent_hex` agrees with its `sent` — and 12 rescue
+  steps. Loader, 30: `DW` 14 (10 the card's, 2 × `DW 8040D4A0 1`, 2 × `DW 80500000 8`), `IPCONFIG`
+  4, `AUTOBURN 0` 2, `LOADADDR` 2, `J` 2, and the rescue's three colon forms twice, each answered
+  `Unknown command !`. Linux, 74: `cat` 26; `rtl819x-view` verbs 35 (`peek` 25, `tbl` 6, `mib` 4);
+  `echo map 0` 2; `reset full` 2; `ifconfig rlx0 down ; echo disarm` 1; the board's `ping` 4;
+  `busybox reboot -f` 2; `mfgtest auto` 2. Besides these, 16 ESC streams, each followed by one CR:
+  the three catches (`I1-CATCH` 7,445 writes, `I4-RB` 1,021, `IZ-RB` 1,037), the ten prompt `DW`s (1
+  to 3 each) and the three watches `X-I1`, `X-I1b` and `X-I2` (counts not recorded; 6,643, 1,660 and
+  505 BEL bytes echoed). None is `FLW`, `EW`, `EB`, `DB`, `FLR` or a non-zero `AUTOBURN`; there is
+  no `FLR` at all, so no `flrbracket` round.
+* **`AUTOBURN` before each upload** (量). `I1Q-ab2:2` and `I4Q-ab2:2` read `00000000` at
+  `0x8040D4A0`; each S5b ended before S6 began (`I1Q.stages.tsv:11`, `:13`, and the same lines of
+  `I4Q.stages.tsv`); each rescue's `AUTOBURN 0` was answered `AutoBurning=0` (step 2 of
+  `I1Q-rescue.json` and `I4Q-rescue.json`).
+* **The maps** (量). `I3-M0` (boot 1, after its reads) and `I6-M1` (boot 2, before the tail) each end
+  `map_lines 32` (`:52`). The digest re-computed here from each capture's own 34 lines is
+  `0927be41…`, the value `I3-MB0:1` and `I6-MB1:1` gated, and the two maps' lines are identical;
+  `flashmap compare` reads 31 same and 1 `DIFFER` at `000000` (`:2–3` of each), as every map since
+  block 46 has. `I3-NW0` and `I6-NW1`: `n_writes 0` (`:25`), `n_write_refused 2` (`:26`, after
+  `mfgtest`'s `MT-FLASH-2`, which reads the same pair, `I3-MT:11`), `h601_hashed 0` (`:36`),
+  `map_rc 0` (`:47`), `recipe_id 3685A3A4` (`:51`). What the bracket cannot see: `H601`, two writes
+  that cancel, anything outside the map's windows, and the time before `I3-M0` (the prompt cells,
+  the upload and boot 1's reads) and after `I6-M1` (the tail and the last reboot).
+* **`C-19`** (量; arm I ruling 10). One host kernel-log follower ran from before the attach
+  (`I0-DMSG:1`); its console-adapter lines (`USB disconnect`, `cp210x`, `ttyUSB`) count 4 at
+  `I0-C19:1`, `I3-C19:1`, `I6-C19:1` and `IZ-C19:1`, all four from the attach, before the run: no
+  drop in the seating. Its 41,473 lines (9,352, 27,358, 36,340 and 39,036 at those cells) are 36,447
+  WSL 9p `LookupFid` errors, 1,700 `vhci_hcd` `unlink->seqnum` lines and 1,700 `urb->status` lines,
+  and 79 `vhci_rx` preemption-warning traces — 53 shapes, none the adapter's. One interval over a
+  minute had no capture on the port: 79.0 s between `X-I1` and `I2-SW`, the board in Linux (§ 17.6).
+* **The record.** The captures and the sheet are committed (`1fbd719`), with `bootbytes`' row for
+  the new constant 407 = 339 + 68 = 778 − 371: `I1Q-boot`'s non-mark lines are arm II's `M1Q-boot`'s
+  plus exactly the standard `/init`'s 68 bytes (`lan bring-up` with `RLXFW-SW-UNLOCK` interleaved,
+  38, and `lan up`, 30), and `bench/2026-09-23/P1Q-r01-boot`'s (778) minus the vendor NIC driver's
+  thirteen boot lines (371). The `tbl l2` pages' raw words carry, with their slot numbers, the host
+  adapter's address and the netif's; slot 1's is all-zero. Two of the reader's scripts,
+  `r4_words.py` and `r5_tail.py`, first opened their plant file for writing before reading it, so
+  `r4`'s first control passed on an empty file; both read first now, `r4` requires the unmutated
+  copy to read 13 of 13 before it plants, and every number above comes from the corrected runs.
+
+## 17.10 What arm I does not establish
+
+* The neighbour conjunct's address beyond one reader: no capture holds it, by design, and the host's
+  entry was gone by the reading.
+* More than one cold and one warm boot, on one seating and one power cycle. S0′'s 37 words now read
+  the same on 15 boots of the catch → upload → `J` path (§ 16.1's 13 and these two); the tables were
+  read on three (arm II's and these).
+* How the frames reach the CPU: the `FFCR` mechanism is 推 on one source (B's bit names; D not
+  consulted), implicit CPU membership is not excluded, `ph_reason` was not read, and which member
+  bit the CPU NIC is stays open. Why the loader's ARP address is in neither table.
+* Anything about a boot path on which the loader has not brought its network up (autoboot from
+  flash, which `R9`'s zero-write rule keeps unreachable): the VLAN group, the L2 entries and `FFCR`
+  are the loader's.
+* The tables, the MIB, `CPUICR` and the PHY registers after `reset full`, and whether `FULL_RST`
+  alone empties the tables as `reset vendor` did; what the 650-ms clock gate does to words off the
+  switch page.
+* The guard beyond one refusal and one permit on one boot: it is a check at one instant, not a lock,
+  and `start`, `dumb` and `restore` are not guarded (§ 17.4).
+* Which of the five `EnablePHYIf` bits is necessary: only port 3 has a link and a peer.
+* Link stability with EEE on beyond these minutes (8d ruling 4), and any length, load or traffic
+  beyond these pings, `mfgtest auto` and the reads: no throughput, no second host, no other port.
+* That boot 1's one-frame gap is the bracket's edge (推), and what the host's 70-byte frames are.
+* What `MEMCR`'s two bytes mean; which vendor step clears `PortEEEStatus`; `NET-30`'s read after the
+  upload.
+* `mfgtest led` and `mfgtest button`.
