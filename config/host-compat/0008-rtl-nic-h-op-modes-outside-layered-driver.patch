@@ -1,7 +1,7 @@
 Make the three operating-mode constants visible without the layered driver.
 
-WHY THIS EXISTS.  R6b-8 8b builds CONFIG_RTL_819X_SWCORE=n as a variant,
-`quiet-noswcore` in config/rlxfw-kernel.delta.  量 2026-09-27, probe cell
+WHY THIS EXISTS.  R6b-8 8b built CONFIG_RTL_819X_SWCORE=n as a variant; since
+8g it is `quiet` and `loud` in config/rlxfw-kernel.delta.  量 2026-09-27, probe cell
 r6b8bp0 (that one delta row, no seam): the build does not reach the link.
 net/rtl/features/rtl_features.c fails to COMPILE -- `GATEWAY_MODE'
 undeclared at :1103, `WISP_MODE' at :1117, `BRIDGE_MODE' at :1125, all in

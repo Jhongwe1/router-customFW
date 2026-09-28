@@ -748,9 +748,10 @@ ck "the file under test is unmodified" "$CF_SHA0" "$(sha256sum "$CF" | cut -d' '
 # CMDLINE among them, every one of them a row in config/rlxfw-kernel.delta.
 # So the .config is DERIVED now, and the variant has to be chosen.
 #
-# 🔴 There is no default. The delta declares `quiet` and `loud`, and today NO
-# row is tagged @quiet -- so omitting the flag and passing `quiet` produce the
-# same bytes, and a default would be right by coincidence. kconfig-delta's own
+# 🔴 There is no default. 🔄 Since R6b-8 8g (2026-09-28) the delta declares
+# quiet, loud and quiet-swcore and its SWCORE rows are `@quiet,loud`, so no two
+# names give the same bytes, and omitting the flag reads the untagged rows --
+# quiet-swcore's set by coincidence, and never the mainline. kconfig-delta's own
 # C24 refuses an undeclared variant one layer down for the same reason.
 run gcf-v1 --dry-run
 ck "V1 neither --config nor --variant is REFUSED"   3 "$rc"
@@ -775,6 +776,16 @@ run gcf-v5 --variant loud --dry-run
 ck "V5 --variant loud is accepted too"              0 "$rc"
 run gcf-v6 --config /dev/null --dry-run
 ck "V6 --config alone is accepted"                  0 "$rc"
+
+# V7/V8 -- R6b-8 8g's vocabulary. quiet-swcore (the SWCORE=y image) is taken;
+# 8b's quiet-noswcore is refused ABOVE the stage and says what replaced it,
+# because the two names are two letters apart and mean opposite images.
+run gcf-v7 --variant quiet-swcore --dry-run
+ck "V7 --variant quiet-swcore is accepted"          0 "$rc"
+run gcf-v8 --variant quiet-noswcore --dry-run
+ck "V8 the retired quiet-noswcore is REFUSED"       3 "$rc"
+ck "V8b and it names what replaced it"              1 \
+   "$(printf '%s\n' "$out" | grep -c "retired.*SWCORE=n is 'quiet' now.*'quiet-swcore'")"
 
 
 echo

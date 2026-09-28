@@ -17,6 +17,15 @@
 #   D6  `apply` stops applying anything                      -> C17 must fail
 #   M4  the `unit` counterpart check becomes a no-op         -> A13 must fail
 #   M5  the manifest digest is of the path, not the bytes    -> A11 must fail
+#   D7  a `@a,b` row reaches only the first image it lists   -> C25 must fail
+#   D8  an undeclared name in a variant list is accepted     -> C29 must fail
+#   D9  `@` with no list loses its own refusal               -> C30 must fail
+#   D10 a name given twice in a variant list is accepted     -> C32 must fail
+#
+# D7-D10 arrive with kconfig-delta 1.1's variant LISTS (R6b-8 8g, 2026-09-28),
+# the syntax the mainline flip is written in: each breaks one of the list's
+# rules, and each control it must turn red pairs a refusal with a list one edit
+# away that parses.
 #
 # D5, D6, M4 and M5 exist because the adversarial pass of 2026-08-28 pointed
 # out that all seven original mutations sat in one place per tool -- the
@@ -48,7 +57,7 @@ sk () { printf '  skip   %-52s %s\n' "$1" "$2"; skip=$((skip+1)); }
 echo "=== S1: both tools pass their own controls, unmutated ==="
 o="$("$PY" "$KD" self-test 2>&1)"; rc=$?
 ck "kconfig-delta self-test exit 0"        0 "$rc"
-ck "kconfig-delta 24 controls"             1 "$(printf '%s\n' "$o" | grep -c '24 passed, 0 failed')"
+ck "kconfig-delta 34 controls"             1 "$(printf '%s\n' "$o" | grep -c '34 passed, 0 failed')"
 o="$("$PY" "$MK" self-test 2>&1)"; rc=$?
 ck "mkinitramfs self-test exit 0"          0 "$rc"
 ck "mkinitramfs A2 present"                1 "$(printf '%s\n' "$o" | grep -c 'A2 ')"
@@ -111,6 +120,32 @@ mutkd d6 's|^    sets = {s: r for s, r in rules.items() if r.kind == "set"}|    
 ck "D6 mutation landed"   1 "$(grep -c 'MUTATED: apply applies nothing' "$T/d6")"
 o="$("$PY" "$T/d6" self-test 2>&1)"
 ck "D6 fails C17"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  C17 ')"
+
+echo
+echo "=== D7-D10: break kconfig-delta 1.1's variant lists ==="
+# D7: membership read off the list's first name -- `@quiet,loud` would land in
+# quiet and silently miss loud, which is the one image the flip must not miss.
+mutkd d7 's|^        if vnames is not None and variant not in vnames:|        if vnames is not None and variant != vnames[0]:  # MUTATED: only the first listed image gets the row|'
+ck "D7 mutation landed"   1 "$(grep -c 'MUTATED: only the first listed image' "$T/d7")"
+o="$("$PY" "$T/d7" self-test 2>&1)"
+ck "D7 fails C25"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  C25 ')"
+
+mutkd d8 's|^        if n not in VARIANTS:|        if False:  # MUTATED: an undeclared name in a list is accepted|'
+ck "D8 mutation landed"   1 "$(grep -c 'MUTATED: an undeclared name in a list' "$T/d8")"
+o="$("$PY" "$T/d8" self-test 2>&1)"
+ck "D8 fails C29"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  C29 ')"
+
+# D9: `set@` is still refused without its own check -- by the empty-name one --
+# so C30 asserts the reason as well as the refusal, and that is what goes red.
+mutkd d9 's|^    if names == \[""\]:|    if False:  # MUTATED: an empty list loses its own refusal|'
+ck "D9 mutation landed"   1 "$(grep -c 'MUTATED: an empty list loses' "$T/d9")"
+o="$("$PY" "$T/d9" self-test 2>&1)"
+ck "D9 fails C30"         1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  C30 ')"
+
+mutkd d10 's|^    if twice:|    if False:  # MUTATED: a repeated name is accepted|'
+ck "D10 mutation landed"  1 "$(grep -c 'MUTATED: a repeated name is accepted' "$T/d10")"
+o="$("$PY" "$T/d10" self-test 2>&1)"
+ck "D10 fails C32"        1 "$(printf '%s\n' "$o" | grep -c '^  FAIL  C32 ')"
 
 echo
 echo "=== M4-M5: the mkinitramfs checks that had no mutation ==="
@@ -258,8 +293,8 @@ ck "E1 the committed delta parses and its arithmetic closes" yes \
 # C23 fixture, and the COMMITTED delta could carry a malformed `@loud` row that
 # nothing ever reads.  The three cases are a set: loud must pick the two extra
 # rows up, quiet must NOT, and a variant nobody declared must be refused rather
-# than falling through to "no variant" -- which would build the quiet image and
-# label it whatever was typed.
+# than falling through to "no variant" -- which would build the untagged rows'
+# image (quiet-swcore's since R6b-8 8g) and label it whatever was typed.
 cat > "$T/e1b.py" <<'PY'
 import importlib.machinery, importlib.util, sys
 ldr = importlib.machinery.SourceFileLoader("kd", sys.argv[1])
@@ -295,6 +330,37 @@ ck "E1b quiet is the same file without them, and its arithmetic closes" yes \
       && [ "$qu_set" -ge 49 ] && echo yes || echo no)"
 ck "E1b an undeclared variant is refused, not ignored" "REFUSED 3" \
    "$("$PY" "$T/e1b.py" "$KD" "$DELTA" loudd 2>&1 | tail -1)"
+
+# E1c -- R6b-8 8g's mainline flip, stated on the COMMITTED file, and it runs on
+# a clean clone.  quiet and loud carry CONFIG_RTL_819X_SWCORE y -> n, the
+# SWCORE=y configuration (`quiet-swcore`) declares no row for it and reads the
+# untagged rows alone -- the same rule set as no variant -- and 8b's name for
+# the n image is refused.  Re-tagging the SWCORE block to one image, or giving
+# quiet-swcore a row of its own, turns this red: both are the owner's decisions
+# of 2026-09-28, not edits to make quietly.
+cat > "$T/e1c.py" <<'PY'
+import importlib.machinery, importlib.util, sys
+ldr = importlib.machinery.SourceFileLoader("kd", sys.argv[1])
+m = importlib.util.module_from_spec(importlib.util.spec_from_loader("kd", ldr))
+ldr.exec_module(m)
+out = []
+for v in ("quiet", "loud", "quiet-swcore"):
+    r = m.parse_delta(sys.argv[2], variant=v)[0].get("CONFIG_RTL_819X_SWCORE")
+    out.append("%s=%s" % (v, "%s>%s" % (r.frm, r.to) if r else "none"))
+qs = m.parse_delta(sys.argv[2], variant="quiet-swcore")[0]
+nv = m.parse_delta(sys.argv[2], variant=None)[0]
+out.append("same=%s" % ("yes" if sorted(qs) == sorted(nv) else "no"))
+print(" ".join(out))
+PY
+e1c="$("$PY" "$T/e1c.py" "$KD" "$DELTA" 2>&1 | tail -1)"
+echo "  observed  $e1c"
+ck "E1c quiet and loud flip SWCORE y -> n, quiet-swcore has no row" \
+   "quiet=y>n loud=y>n quiet-swcore=none" \
+   "$(printf '%s\n' "$e1c" | awk '{print $1, $2, $3}')"
+ck "E1c quiet-swcore reads the untagged rows alone" "same=yes" \
+   "$(printf '%s\n' "$e1c" | awk '{print $4}')"
+ck "E1c the retired name quiet-noswcore is refused" "REFUSED 3" \
+   "$("$PY" "$T/e1b.py" "$KD" "$DELTA" quiet-noswcore 2>&1 | tail -1)"
 
 BASE="$WORK/rebuild/src-vendor/rtl819x-toolchain/boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW"
 if [ -f "$BASE" ]; then

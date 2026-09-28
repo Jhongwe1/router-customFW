@@ -2238,8 +2238,8 @@ refused) and refuses a copy with a planted `EW` and `FLR`.
 * That the ten stand-ins are right for every caller: the census shows who references
   them, not what a WLAN station, an L2TP netif or a bridge would do with the answers; no
   rlxfw image configures any of the three (推).
-* A second reading of the variant's forty from anything but `kconfig-delta` and the
-  block's `Kconfig` lines, or the `loud` variant at `SWCORE=n`, which no variant builds.
+* A second reading of the variant's forty from anything but `kconfig-delta` and the `Kconfig`
+  lines, or `loud` at `SWCORE=n`, which no variant builds (🔄 8g: `loud`'s, never built; § 18).
 * Anything about the fast path's NAPT entry with no WAN device: `rtl865x_getWanDev()`
   returns NULL at `SWCORE=n` (no `ppp0`, no `eth1`), and its caller in
   `fastpath_core.S:785` was read no further than its address.
@@ -3805,3 +3805,193 @@ as in § 17.6.
 * What `MEMCR`'s two bytes mean; which vendor step clears `PortEEEStatus`; `NET-30`'s read after the
   upload.
 * `mfgtest led` and `mfgtest button`.
+
+# 18. 2026-09-28 (`R6b-8` 8g) — the mainline flip: `quiet` and `loud` build SWCORE=n, `quiet-swcore` keeps y
+
+**Every number in this section is 讀**: read at the desk on 2026-09-28 out of committed files and
+build artefacts by an instrument. No image was built from the flipped default and nothing ran on
+the device. The scripts and their outputs are `$FWRE_WORK/rebuild/s116/r8g/` (not in this
+repository): `v03-corpus.py` is the corpus measurement and `v04-gates.sh` the checks. `SPEC.md`
+`FW-157`.
+
+## 18.1 The rulings
+
+The owner's ruling of 2026-09-26 (`PROGRESS.md`, `R6b-8`) kept `SWCORE=n` a variant through 8f and
+flips the mainline in 8g, after D1–D4, with the `SWCORE=y` config building from every later tree.
+D1–D4 are met (blocks 47, 48 and 50) and arm I met `D8` (§ 17.6). What 8g implements are the main
+session's 8g rulings, given in its brief for this step:
+
+1. `quiet` and `loud` both flip to `SWCORE=n`: `loud` is `quiet` plus `CONFIG_PRINTK`, which is
+   exactly what `test-config-gates`' E1b asserts.
+2. The `SWCORE=y` configuration becomes the named variant `quiet-swcore`, with no rows of its own
+   for these symbols, so on every SWCORE symbol its built `.config` is the vendor baseline. 8b's
+   name, `quiet-noswcore`, is retired; the records that say it are records and are not edited.
+3. `kconfig-delta` takes a variant list, `verb@a,b`, which applies to each listed variant and to no
+   other. Every listed name must be declared, and an unknown name, an empty list or a repeated name
+   refuses with a reason, never a traceback; the corpus is measured before the change.
+4. `tools/rlxfw-kbuild.sh` and `tools/kconfig-delta.py` spell `quiet`, `loud` and `quiet-swcore`,
+   and the delta's comment blocks that the flip makes wrong are rewritten, with the reason of its
+   `CONFIG_RLXFW_VENDOR_ETH_OPEN` row.
+5. `docs/KNOWN-ISSUES.md` gains one entry: `R9`'s controlled variable no longer holds for the
+   mainline default.
+
+## 18.2 `kconfig-delta` 1.1: a variant list
+
+`set@quiet,loud` puts a row in each listed image and in no other; a row with no list is in every
+image, and one name is a list of one, so every `@loud` row reads as before. `parse_variants` checks
+the list on every row whatever variant was asked for, so a malformed list anywhere in the file
+refuses every image's check. It refuses in this order, each time naming the list it read: `@` with
+nothing after it, an empty name (a stray comma), a name that is not declared, a name given twice.
+Nothing is dropped or de-duplicated to make a list pass. `VARIANTS` is `quiet`, `loud`,
+`quiet-swcore`, and `RETIRED` maps `quiet-noswcore` to what replaced it: the two names are two
+letters apart and mean opposite images, so a refusal of the old one, as `--variant` or as a tag,
+names the new ones. A list that names all three variants is not refused; it differs from an
+untagged row only when no variant is given (a `--config` build), and no ruling asked for more.
+
+The self-test grows from 24 to 34 controls, each refusal beside a list one edit away that parses.
+C25: a `@quiet,loud` row is in each image it lists. C26: it is in no image it does not list, nor
+with no variant. C27: the flip's two `.config` shapes, the n one green as `quiet` and the y one
+green as `quiet-swcore`. C28: each refused as the other image. C29–C32: an undeclared name, `@`
+with an empty list, an empty name, a name given twice. C33: `quiet-noswcore` refused as
+`--variant` and as a tag, pointing at `quiet-swcore`. C34: `apply --variant` writes each image's
+own input from one list; C17–C20 give no variant, so nothing drove that before.
+
+`tools/test-config-gates.sh` gains D7–D10, which mutate the membership test (the first listed name
+only), the undeclared-name refusal, the empty-list refusal and the duplicate refusal; each turns
+the control it names red: C25, C29 (and C33), C30, C32. E1c states the flip on the committed delta:
+`quiet` and `loud` carry `CONFIG_RTL_819X_SWCORE y -> n`, `quiet-swcore` has no row for it and
+reads the untagged rows alone, and `quiet-noswcore` is refused. The suite reads 69 passed and 2
+failed of 71 (58 and 2 of 60 before); the two are E5, red at the desk before and after (§ 18.4).
+`tools/test-kbuild-cflags.sh` gains V7 (`--variant quiet-swcore` accepted), V8 (`quiet-noswcore`
+refused above the stage, rc 3) and V8b (the refusal names what replaced it): 99 of 99, from 96.
+
+`tools/rlxfw-kbuild.sh` keeps its 939 lines, and the seventeen lines that tracked files cite (58,
+203, 204, 255, 262, 263, 357, 388, 389, 412, 432–435, 567, 597, 598) are unchanged;
+`quiet-noswcore` has a refusal arm of its own. `config/rlxfw-kernel.delta` keeps its 419 lines: the
+lines cited elsewhere (2, 82, 89, 138, 174–177) are unchanged, and line 294 is still the
+`CONFIG_RLXFW_VENDOR_ETH_OPEN` row. Its `loud` block and its SWCORE block's header are rewritten in
+place; the header above the derived rows (its "21") is not made wrong by the flip and is left.
+
+## 18.3 The corpus, measured before the change
+
+`v03-corpus.py` loads `kconfig-delta` 1.0 and 1.1 side by side and compares the rules each reads
+from a delta, symbol by symbol, on kind, from, to, mechanism, line and reason.
+
+* **The parser change alone.** 1.1, with the retired name put back into its `VARIANTS` for this
+  measurement only, reads HEAD's delta exactly as 1.0 does for `quiet`, `loud`, `quiet-noswcore`
+  and no variant: 104, 106, 145 and 104 rules.
+* **The flip.** 1.1 on the new delta against 1.0 on HEAD's: `quiet` 145 rules (75 set, 70
+  derived) = HEAD's `quiet-noswcore`; `quiet-swcore` 104 (74, 30) = HEAD's `quiet`; no variant 104
+  = HEAD's no variant; `loud` 147 (77, 70) = HEAD's `loud` plus the same forty-one. `loud` minus
+  `quiet` is `CONFIG_PRINTK` and `CONFIG_PRINTK_TIME`, and loud's forty derived rows are quiet's.
+  Only the two rows whose reasons 8g rewrites, `CONFIG_RLXFW_VENDOR_ETH_OPEN` and
+  `CONFIG_RTL_819X_SWCORE`, differ in reason; both are on their old lines.
+* **Controls.** Comparisons that must come out unequal do: the new `quiet` against HEAD's `quiet`,
+  the new `loud` against HEAD's `loud`, and the reasons compared with nothing skipped. 1.0 refuses
+  the new delta, whose list tags it cannot parse.
+
+## 18.4 The checks, each with its control
+
+`kconfig-delta check` on configurations already built under `$FWRE_WORK/rebuild/r3-4/out/`,
+against the baseline whose sha256 the delta's header names (`44f781de…`); nothing was built.
+
+| `.config` | checked as | rc | reading |
+|---|---|---|---|
+| `r6b10n` (`SWCORE=n`) | `quiet` | 0 | 70 derived, 75 set |
+| `r6b10y` (`SWCORE=y`) | `quiet-swcore` | 0 | 30 derived, 74 set |
+| `r6b10y` | `quiet` | 1 | 41 not applied: the control |
+| `r6b10n` | `quiet-swcore` | 1 | 41 undeclared: the control |
+| `r6b8bn`, `r6b8by` | the same four | 0, 0, 1, 1 | the same four readings |
+| `r6b10y`, `r6b10n` | no variant | 0, 1 | green; 41 undeclared |
+| `r6b7L0` (loud, `SWCORE=y`) | `loud` | 1 | 41 not applied; HEAD's 1.0 read it green as `loud` |
+| `r6b7L0` | `quiet-swcore` | 1 | 2 undeclared: `CONFIG_PRINTK`, `CONFIG_PRINTK_TIME` |
+| `r6b10n` | `loud` | 1 | 2 not applied, the same two |
+| `r6b10n` | `quiet-noswcore` | 3 | refused, naming what replaced it |
+
+No loud `.config` with `SWCORE=n` exists, so `loud` is checked in two halves: the SWCORE rows
+through quiet's configuration, the PRINTK rows through `r6b7L0`. Under HEAD's 1.0 and delta the
+same files read as they did before the flip: `r6b10n` green as `quiet-noswcore`, `r6b10y` green as
+`quiet`, `r6b10n` 41 undeclared as `quiet`.
+
+`emueq check` is green, and a planted `set@quiet,loud CONFIG_CPU_HAS_LLSC` row turns it red on E1
+(rc 1), so it reads list-tagged rows; `emueq --self-test` passes 19 of 19. A dry run of
+`rlxfw-kbuild.sh` takes `quiet`, `loud` and `quiet-swcore` (rc 0) and refuses `quiet-noswcore` and
+`quiett` (rc 3), without reaching a vendor binary or staging a cell. The recipe the default builds
+from, a digest over `config/`, moves from `3685a3a4` to `8b5ae480`. `test-config-gates`' E5 is red
+at the desk before and after, for one reason: the initramfs declaration's `/bin/uprobe` names
+`build/rlxfw-user/isaprobe/uprobe`, a gitignored build product that is not there.
+
+## 18.5 The `CONFIG_RLXFW_VENDOR_ETH_OPEN` row stays in every variant
+
+讀 `config/host-compat/0007`: the symbol is declared in `arch/rlx/Kconfig`, outside
+`if RTL_819X_SWCORE`, as a `bool` with a prompt, `default y` and no `depends on`, and its one reader
+is the guard 0007 puts at the top of `re865x_open()` in `drivers/net/rtl819x/rtl_nic.c`. A search
+of the staged `r6b10y` tree finds those two and the generated `autoconf.h` line, nothing else. So
+kconfig writes the symbol into every variant's `.config` (`r6b8bn`'s and `r6b10n`'s, `SWCORE=n`,
+carry `=y`), while at `SWCORE=n` its reader is not compiled and its value does nothing.
+
+`v04-gates.sh` tried the other two placements. With the row re-tagged `set@quiet-swcore`, `r6b10n`
+and `r6b8bn` checked as `quiet` read 1 undeclared, `CONFIG_RLXFW_VENDOR_ETH_OPEN - -> y`, while
+`r6b10y` as `quiet-swcore` stays green; with the row deleted, both sides read that 1 undeclared. So
+the row stays common. 推: without it `apply` would stop pinning the symbol and `oldconfig` would ask
+for it `(NEW)`. Its value matters in `quiet-swcore` alone: `y` keeps the vendor's `eth*` openable,
+and `n` there still rebuilds `R6-4` rung 1's control arm. The row's reason now opens with this;
+P2-2's text and `R6-4` rung 1's follow whole, the second one's argument for the symbol instead of
+`SWCORE=n` marked superseded, since 8b's seam defines the ten names and 8g made `SWCORE=n` the
+mainline.
+
+## 18.6 `R9`'s controlled variable (`docs/KNOWN-ISSUES.md`)
+
+The plan's `D16` builds the vendor's `drivers/net/rtl819x/` into rlxfw's kernel so that the network
+driver is the same vendor code in both columns of `R9`'s table (`plan/README.md`, gitignored: its
+v3 → v4 table, change 3), and `RUNSHEET.md`'s `K6` calls it *D16's controlled variable*. The
+mainline default no longer carries it: `--variant quiet`, `tools/looprun.py`'s default, builds an
+image whose only Ethernet driver is `rtl819x-nic`. The new entry in `docs/KNOWN-ISSUES.md` says so,
+and that `R9` must build from `quiet-swcore`, the variant that still carries the vendor's driver.
+Its first wording also said that an `R9` card must bring up the vendor's `eth*` rather than `rlx0`;
+that is more than D16 says, and it was cut back to D16's words. The WLAN driver, the plan's other
+identical driver, is the same source at `SWCORE=n` and not the same object: the forty symbols
+recompile it against a `struct sk_buff` four fields shorter (§ 13.7), and five of the ten names
+the seam defines are its references (§ 13.3).
+
+## 18.7 The rows re-pointed, and the other files
+
+* **`NET-54` 殘留 ⊘.** Its read set named `asicCounter`'s port 3 and CPU port, and it said the
+  mainline would have no port-3 counter after `R6b-8`; that sentence predates `rtl819x-view`'s
+  `mib`, which on a `SWCORE=n` image reads both ports' MIB, 量 in arm I's four-counter bracket
+  (§ 17.6, `NET-167`). The row now names `mib` and `/proc/rtl819x-switch`'s page as its instruments
+  on `SWCORE=n`, and says that the hand-over to `eth4` exists in `quiet-swcore` only. With `R6b`
+  closing it is ⊘: since block 46 (`NET-124`) the shape has not recurred in any seating (blocks
+  47–51, 8c-cells, arm II, arm I), and the one network failure since was the loader's standby
+  failure (`NET-165`), outside Linux. It reopens on the reproduction the row already names.
+* **`NET-124` 殘留 ⊘.** Its instruments `/proc/rtl865x/port_status` and `phyReg` are gone at
+  `SWCORE=n`; the row now names the `psrp3` line of `/proc/rtl819x-switch` for the link,
+  `/proc/rtl819x-mdio` for the PHY (30 of 30 against `phyReg`, `FW-155`) and `mib` for port 3's
+  receive counts. ⊘ for the same reason; it reopens on a liveness failure with the host sending and
+  the cable untouched.
+* **`NET-109` 殘留 and `NET-30` 殘留** were closed on readings taken before any instrument left:
+  `NET-109`'s `ByPassTCRC` cell on the vendor-present image in 8c-cells (`NET-163`), `NET-30`'s
+  prompt reads in arm I (`NET-169`). There is nothing to re-point.
+* **`NET-151`** carries a pointer to `FW-157` where its third-exclusive-name claim and its counts
+  (104, 106, 145) are superseded.
+* **`tools/bootbytes.py`**: 710 is `quiet-swcore`'s console, the default until 8g, and 339's row is
+  named `set@quiet,loud` since 8g. **`tools/ci-expected.tsv`**: `kconfig-delta` 34,
+  `test-config-gates` 71 on both of its rows, `test-kbuild-cflags` 99, each with a note.
+* **`quiet-noswcore` elsewhere.** Fixed in place where a file states what is current:
+  `config/host-compat/0008`'s header, `MK12`'s reason in `config/rlxfw-marks.tsv`, the comment in
+  `rlxfw-seam.c` (its line count kept), and the `Kconfig` row of `docs/blind-write-ledger.md`. Left
+  as records: `LOG.md`, `bench/2026-09-28/RUN-armII.md`, § 13 of this file (with a pointer in
+  § 13.10), `notes/nic-driver.md` § 29.5, and `SPEC.md` `NET-150`, `FW-103` and `FW-154`.
+
+## 18.8 What 8g does not establish
+
+* Anything about a `loud` image at `SWCORE=n`: no such `.config` has been built or checked, loud's
+  forty derived rows are 推 until the first loud build's `kconfig-delta check` reads them, and
+  `bootbytes` declares no constant for such a boot.
+* Anything built from the flipped default, or run on the device at recipe `8b5ae480`. `r6b8i`
+  (arm I, § 17.6) was built as `quiet-noswcore` at `3685a3a4`: the same rules as the new `quiet`
+  (§ 18.3), not the same recipe.
+* That a `quiet-swcore` image's `eth*` carries traffic under this kernel, or that `quiet-swcore`
+  makes `R9`'s NIC column equal to the vendor firmware's, whose kernel configuration, toolchain and
+  userspace still differ.
+* Whether a list naming every variant should be refused (§ 18.2).

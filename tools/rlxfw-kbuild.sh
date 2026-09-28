@@ -5,7 +5,7 @@
 #     --config FILE      .config to install VERBATIM.  Without it the
 #                        .config is DERIVED from the board template plus
 #                        config/rlxfw-kernel.delta -- see CFG-1 below.
-#     --variant V        quiet | loud | quiet-noswcore, the delta's variants.  Required
+#     --variant V        quiet | loud | quiet-swcore, the delta's variants.  Required
 #                        when deriving; refused together with --config.
 #     --oldconfig MODE   how `make oldconfig` gets its stdin:
 #                          none      -- do not run oldconfig at all
@@ -235,17 +235,17 @@ if [ -z "$CONFIG" ] && [ -z "$VARIANT" ]; then
     echo "$CELL: no --config and no --variant." >&2
     echo "  With no --config the .config is DERIVED from the board template" >&2
     echo "  plus config/rlxfw-kernel.delta (CFG-1), and that delta declares" >&2
-    echo "  three variants. Pass --variant quiet, loud or quiet-noswcore." >&2
+    echo "  three variants. Pass --variant quiet, loud or quiet-swcore." >&2
     echo "  There is no default: they differ by CONFIG_PRINTK or SWCORE, so a silent" >&2
     echo "  choice between them is a silent choice of which image booted." >&2
     exit 3
 fi
 case "${VARIANT:-quiet}" in
-    quiet|loud|quiet-noswcore) ;;
-    *) echo "$CELL: unknown --variant '$VARIANT' (quiet|loud|quiet-noswcore)" >&2
-       echo "  These are config/rlxfw-kernel.delta's own three names; " >&2
-       echo "  kconfig-delta.py refuses an undeclared one rather than" >&2
-       echo "  falling through to 'no variant', and so does this." >&2
+    quiet|loud|quiet-swcore) ;;
+    quiet-noswcore) echo "$CELL: --variant quiet-noswcore is retired (R6b-8 8g, 2026-09-28): SWCORE=n is 'quiet' now, and SWCORE=y is 'quiet-swcore'" >&2; exit 3 ;;
+    *) echo "$CELL: unknown --variant '$VARIANT' (quiet|loud|quiet-swcore)" >&2
+       echo "  These are config/rlxfw-kernel.delta's own three names; kconfig-delta.py" >&2
+       echo "  refuses an undeclared one rather than falling through to 'no variant', and so does this." >&2
        exit 3 ;;
 esac
 
@@ -547,10 +547,10 @@ fi
 # difference the declaration does not already carry.
 #
 # --variant is REQUIRED when deriving, and is refused when --config is given.
-# The delta declares `quiet` and `loud`, and today no row is tagged @quiet --
-# so omitting the flag and passing `quiet` produce the same bytes, and a
-# default would be right by coincidence.  kconfig-delta's own C24 refuses a
-# variant nobody declared for exactly this reason one layer down.
+# The delta declares quiet, loud and quiet-swcore, and since R6b-8 8g its
+# SWCORE rows are `@quiet,loud` -- so no two names give the same .config, and
+# omitting the flag reads the untagged rows alone, quiet-swcore's set by
+# coincidence.  kconfig-delta's own C24 refuses an undeclared name one layer down.
 if [ -n "$CONFIG" ]; then
     cp "$CONFIG" "$DIR_LINUX/.config" || exit 3
     echo "== $CELL: .config <- $CONFIG"
@@ -641,7 +641,7 @@ run() {          # run() <logsuffix> <cmd...>
 # post-oldconfig file would report every rebuild as a different recipe.
 #
 # Format 2 (2026-09-23) appends, never reorders:
-#   variant              quiet | loud | quiet-noswcore | -   (- is a --config build)
+#   variant              quiet | loud | quiet-swcore | -   (- is a --config build)
 #   build_rc             the build step's status as vendor-tripwire.sh
 #                        returns it: 1 make failed, 2/5 a vendor tree was
 #                        touched, 4 one was dirty before make ran
@@ -748,8 +748,8 @@ write_manifest() {          # write_manifest <vmlinux path>
 #     every image), and RUNSHEET P10's flat-image leg is not automated.
 #   * anything about a --config build's variant.  --config and --variant are
 #     refused together, so a --config build is checked against the rows
-#     common to every variant: the loud .config given as --config is RED
-#     here, and that is the declaration saying it does not know the file.
+#     common to every variant (since R6b-8 8g, quiet-swcore's): a loud or quiet
+#     .config given as --config is RED here, the declaration not knowing it.
 #   * anything about code generation.  A --no-cflags image, seven load-use
 #     violations and all (TC-25), passes both gates; that is hazlint's
 #     question.

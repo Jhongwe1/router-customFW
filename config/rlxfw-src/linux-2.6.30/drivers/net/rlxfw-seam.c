@@ -6,8 +6,8 @@
  * WHAT IT IS
  * ======================================================================
  *
- * `CONFIG_RTL_819X_SWCORE=n` (config/rlxfw-kernel.delta, the
- * `quiet-noswcore` variant) drops `drivers/net/rtl819x/` and
+ * `CONFIG_RTL_819X_SWCORE=n` (config/rlxfw-kernel.delta: `quiet` and
+ * `loud` since R6b-8 8g) drops `drivers/net/rtl819x/` and
  * `drivers/net/rtk_vlan.o` from the link.  Ten symbols that code OUTSIDE
  * that tree references are then defined nowhere -- R6-4's count, in four
  * places (config/host-compat/0007's header, and the R6-4 row of

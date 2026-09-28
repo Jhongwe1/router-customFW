@@ -41,10 +41,12 @@ in.  How oldconfig was invoked is recorded in the delta file's header for the
 reader; it is not what is checked, because checking it would prove nothing.
 
 Usage
-    tools/kconfig-delta.py apply   --baseline F --delta F --out F
-    tools/kconfig-delta.py check   --baseline F --delta F --built F
-    tools/kconfig-delta.py explain --baseline F --built F [--delta F]
+    tools/kconfig-delta.py apply   --baseline F --delta F --out F   [--variant V]
+    tools/kconfig-delta.py check   --baseline F --delta F --built F [--variant V]
+    tools/kconfig-delta.py explain --baseline F --built F [--delta F] [--variant V]
     tools/kconfig-delta.py self-test
+
+V is one of VARIANTS; with no --variant only the untagged rows are read.
 
 `apply` writes the .config to feed the tree; `check` reads the .config the
 build actually used.  Both read the same delta file, on purpose: if the
@@ -58,7 +60,7 @@ import re
 import sys
 import tempfile
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 RE_SET = re.compile(r"^(CONFIG_[A-Za-z0-9_]+)=(.*)$")
 # NOT anchored at the end, and that is not sloppiness -- it is agreement with
@@ -72,18 +74,69 @@ RE_NOT = re.compile(r"^# (CONFIG_[A-Za-z0-9_]+) is not set")
 
 ABSENT = "-"
 
+# 🔄 R6b-8 8g, 2026-09-28: the mainline flip.  `quiet` and `loud` carry
+# CONFIG_RTL_819X_SWCORE=n -- the vendor Ethernet tree out of the link -- and the
+# SWCORE=y configuration goes on building as `quiet-swcore`, which has no rows
+# of its own: its rule set is the untagged rows, so on every SWCORE symbol its
+# built .config is the vendor baseline.  8b's name for the n image,
+# `quiet-noswcore`, is retired (RETIRED below); records that say it stay as
+# they are.
+#
+# So since 1.1 a kind carries a variant LIST, `set@quiet,loud`: the row is in
+# each listed image and in no other, and a row with no list is in every image.
+# One name is a list of one, so every `@loud` row reads as it did.  The list
+# is a set of declared names, and it is refused -- never repaired -- when it
+# names an undeclared one, is empty, holds an empty name, or repeats one:
+# each of those is a typo that would put a row in the wrong image, or in none.
+# A new variant is a new name here, never a combination rule.
+VARIANTS = ("quiet", "loud", "quiet-swcore")
+
+# Names that were variants once.  They are refused like any undeclared name,
+# and the refusal says what replaced them, because `quiet-noswcore` and
+# `quiet-swcore` are two letters apart and name opposite configurations.
+RETIRED = {
+    "quiet-noswcore": "retired by R6b-8 8g (2026-09-28): SWCORE=n is `quiet` "
+                      "(and `loud`) now, and the SWCORE=y image is "
+                      "`quiet-swcore`",
+}
+
+
+def _retired(name):
+    """' <name> was <why>.' for a retired variant name, '' for any other."""
+    why = RETIRED.get(name)
+    return " %r was %s." % (name, why) if why else ""
+
+
+def parse_variants(field, where):
+    """The list after a kind's `@` -> a tuple of declared variant names.
+
+    Checked in this order, and each refusal names the list it read: `@` with
+    nothing after it; an empty name (a stray comma); a name that is not
+    declared; a name given twice.  Nothing is dropped or de-duplicated to make
+    a list pass -- a list that needs repair was written by someone who meant
+    a different list.
+    """
+    names = field.split(",")
+    if names == [""]:
+        die("%s: `@` with no variant after it. A row for no image is a row "
+            "nobody checks: name the images, or drop the `@`" % where)
+    if "" in names:
+        die("%s: the variant list %r holds an empty name. A stray comma is "
+            "refused, not read as one name fewer" % (where, field))
+    for n in names:
+        if n not in VARIANTS:
+            die("%s: variant %r in the list %r is not one of: %s.%s"
+                % (where, n, field, ", ".join(sorted(VARIANTS)), _retired(n)))
+    twice = sorted(set(n for n in names if names.count(n) > 1))
+    if twice:
+        die("%s: the variant list %r names %s twice. A list is a set, and a "
+            "repeat is a typo for some other name" % (where, field,
+                                                      ", ".join(twice)))
+    return tuple(names)
+
+
 # A mechanism is a closed vocabulary on purpose.  "because kconfig does that" is
 # not a reason, and a free-text field would accept it.
-#
-# 🔄 R6b-8 8b, 2026-09-27: a third variant, `quiet-noswcore` -- the quiet image
-# with CONFIG_RTL_819X_SWCORE=n, the vendor Ethernet tree out of the link.  It
-# is a variant and not the mainline because `R6b-8`'s owner rulings keep
-# SWCORE=y in mainline until 8g, after D1-D4.  Variants stay exclusive: a
-# `@quiet-noswcore` row is in that image only, a `@loud` row is not in it, and
-# a row with no variant is in all three.  There is no loud-noswcore; if one is
-# needed it is a fourth name here, not a combination rule.
-VARIANTS = ("quiet", "loud", "quiet-noswcore")
-
 MECHANISMS = {
     "promptless":  "declared with no prompt string, so its value is its default "
                    "and no .config line can change it",
@@ -194,12 +247,14 @@ def parse_delta(path, text=None, variant=None):
     """
     # Validated HERE and not only in parse_args.  C24 caught that gap: the
     # command line refused `--variant quiett` while a programmatic caller got
-    # a silent fall-through to "no variant", which builds the quiet image and
-    # labels it whatever was asked for.
+    # a silent fall-through to "no variant", which builds the untagged rows'
+    # image (then quiet's, since 8g quiet-swcore's) and labels it whatever was
+    # asked for.
     if variant is not None and variant not in VARIANTS:
-        die("%s: variant %r is not one of: %s. It is NOT ignored -- falling "
+        die("%s: variant %r is not one of: %s.%s It is NOT ignored -- falling "
             "through would apply the common rows only and call the result by "
-            "the name that was typed" % (path, variant, ", ".join(VARIANTS)))
+            "the name that was typed" % (path, variant, ", ".join(VARIANTS),
+                                         _retired(variant)))
     if text is None:
         with open(path, encoding="utf-8", errors="replace") as f:
             text = f.read()
@@ -219,22 +274,25 @@ def parse_delta(path, text=None, variant=None):
                 "(kind, symbol, from, to, mechanism, reason). Line was: %r"
                 % (path, lineno, len(f), ln[:120]))
         kind, sym, frm, to, tag, reason = f
-        # A kind may carry a VARIANT: `set@loud`.  R3-6 builds two images from
-        # one declaration -- `quiet`, which is the vendor's configuration, and
+        # A kind may carry a VARIANT: `set@loud`.  R3-6 built two images from
+        # one declaration -- `quiet`, then the vendor's configuration, and
         # `loud`, which is quiet plus CONFIG_PRINTK.  The alternative was a
         # second delta file, and that is two owners of one table: 35 rules
         # copied, and the copy going stale is the failure this whole file
         # exists to prevent.  A row with no variant is in every image.
-        vname = None
+        # 🔄 1.1 (R6b-8 8g): `@` takes a LIST, `set@quiet,loud`, checked by
+        # parse_variants on EVERY row whatever variant was asked for, so a
+        # malformed list anywhere in the file refuses every image's check.
+        # `quiet` is no longer the vendor's configuration; `quiet-swcore` is
+        # the one closest to it (VARIANTS).
+        vnames = None
         if "@" in kind:
-            kind, vname = kind.split("@", 1)
-            if vname not in VARIANTS:
-                die("%s:%d: variant %r is not one of: %s"
-                    % (path, lineno, vname, ", ".join(sorted(VARIANTS))))
+            kind, tags = kind.split("@", 1)
+            vnames = parse_variants(tags, "%s:%d" % (path, lineno))
         if kind not in ("derive", "set"):
             die("%s:%d: kind %r is not 'derive' or 'set'" % (path, lineno, kind))
-        if vname is not None and vname != variant:
-            continue          # a row for the other image
+        if vnames is not None and variant not in vnames:
+            continue          # a row for other images
 
         if not sym.startswith("CONFIG_"):
             die("%s:%d: %r does not look like a symbol" % (path, lineno, sym))
@@ -252,7 +310,7 @@ def parse_delta(path, text=None, variant=None):
                 "symbol means one of them is never checked"
                 % (path, lineno, sym, rules[sym].lineno))
         r = Rule(kind, sym, frm, to, tag, reason, lineno)
-        r.variant = vname
+        r.variants = vnames       # None: every image
         rules[sym] = r
     return rules, headers
 
@@ -636,9 +694,9 @@ def run_controls():
           % (sorted(rq), sorted(rl), sorted(rn)))
 
     # C24 -- and a variant nobody declared is an error.  Falling through to
-    # "no variant" would build the quiet image and label it whatever was
-    # typed, which is the shape of every mislabelled artefact in this repo's
-    # correction log.
+    # "no variant" would build the untagged rows' image (quiet-swcore's since
+    # 8g) and label it whatever was typed, which is the shape of every
+    # mislabelled artefact in this repo's correction log.
     try:
         parse_delta("<v>", dv, variant="quiett")
         ok24, why24 = False, "accepted an undeclared variant"
@@ -646,6 +704,134 @@ def run_controls():
         ok24, why24 = True, "refused (%s)" % (getattr(e, "code", e) or "raise")
     c.add("C24 an undeclared variant is an error, not a fall-through",
           ok24, why24)
+
+    # --- C25-C34: variant LISTS (1.1, R6b-8 8g) ----------------------------
+    # The flip's shape in miniature: CONFIG_QL is SWCORE (y -> n in quiet and
+    # loud), CONFIG_QLDER one of the forty it takes away, and quiet-swcore
+    # lists neither.  Every refusal below has a permitting twin one edit away,
+    # so a parser that refused every list would fail them as surely as one
+    # that refused none.
+    dl = dv + ("set@quiet,loud\tCONFIG_QL\ty\tn\t-\tquiet and loud only\n"
+               "derive@quiet,loud\tCONFIG_QLDER\ty\t-\tdep-unmet\tgoes with QL\n")
+
+    def _plist(delta_text, variant):
+        """(refused, why, rules) for one parse; a refusal is data here."""
+        global _RAISE
+        _RAISE = True
+        try:
+            rr, _ = parse_delta("<l>", delta_text, variant=variant)
+            return False, "did NOT refuse", rr
+        except Refused as e:
+            return True, str(e), None
+        finally:
+            _RAISE = False
+
+    _, _, lq = _plist(dl, "quiet")
+    _, _, ll = _plist(dl, "loud")
+    ql = {"CONFIG_QL", "CONFIG_QLDER"}
+    c.add("C25 a `@quiet,loud` row is in each image it lists",
+          lq is not None and ll is not None and ql <= set(lq) and ql <= set(ll)
+          and set(ll) - set(lq) == {"CONFIG_ONLYLOUD"},
+          "quiet %d rules, loud %d, loud - quiet = %s"
+          % (len(lq or ()), len(ll or ()),
+             sorted(set(ll or ()) - set(lq or ()))))
+
+    _, _, ls = _plist(dl, "quiet-swcore")
+    _, _, ln = _plist(dl, None)
+    c.add("C26 ... and in no image it does not list, nor with no variant",
+          ls is not None and ln is not None
+          and set(ls) == {"CONFIG_BOTH"} and set(ln) == {"CONFIG_BOTH"},
+          "quiet-swcore %s, no variant %s"
+          % (sorted(ls or ()), sorted(ln or ())))
+
+    # C27/C28 -- the gate itself, not only the parser: the two .configs the
+    # flip produces, each checked as its own image and as the other one.
+    bl = ("# CONFIG_BOTH is not set\n# CONFIG_ONLYLOUD is not set\n"
+          "CONFIG_QL=y\nCONFIG_QLDER=y\n")
+    b_n = ("CONFIG_BOTH=y\n# CONFIG_ONLYLOUD is not set\n"
+           "# CONFIG_QL is not set\n")
+    b_y = ("CONFIG_BOTH=y\n# CONFIG_ONLYLOUD is not set\n"
+           "CONFIG_QL=y\nCONFIG_QLDER=y\n")
+
+    def _chk(built, variant):
+        r_, _, _, _ = check("<b>", "<l>", "<c>", bl, dl, built, variant=variant)
+        return r_
+
+    rn_q, ry_s = _chk(b_n, "quiet"), _chk(b_y, "quiet-swcore")
+    c.add("C27 the n-shaped .config is green as quiet, the y one as quiet-swcore",
+          not rn_q.failed and not ry_s.failed
+          and (rn_q.ok_set, rn_q.ok_derive, ry_s.ok_set) == (2, 1, 1),
+          "quiet %d set + %d derived, quiet-swcore %d set"
+          % (rn_q.ok_set, rn_q.ok_derive, ry_s.ok_set))
+    ry_q, rn_s = _chk(b_y, "quiet"), _chk(b_n, "quiet-swcore")
+    c.add("C28 ... and each is REFUSED as the other image",
+          sorted(r.sym for r in ry_q.unapplied) == ["CONFIG_QL", "CONFIG_QLDER"]
+          and sorted(u[0] for u in rn_s.undeclared) == ["CONFIG_QL",
+                                                        "CONFIG_QLDER"],
+          "y as quiet: %d not applied; n as quiet-swcore: %d undeclared"
+          % (len(ry_q.unapplied), len(rn_s.undeclared)))
+
+    # C29-C32 -- the list's four refusals.  Each bad list is parsed for
+    # quiet-swcore, an image it does not name: a malformed list must refuse
+    # every image's check, not only the ones it would have landed in.
+    def _pair(bad_tag, good_tag, needle):
+        row = "\tCONFIG_T\tn\ty\t-\tx\n"
+        bad, why, _ = _plist(dl + "set@" + bad_tag + row, "quiet-swcore")
+        good, _, _ = _plist(dl + "set" + good_tag + row, "quiet-swcore")
+        return bad and not good and needle in why, why
+
+    ok, why = _pair("quiet,laud", "@quiet,loud", "'laud'")
+    c.add("C29 an undeclared name in a list is REFUSED; spelled right, parses",
+          ok, why[why.find("variant"):][:62])
+    ok, why = _pair("", "", "no variant after it")
+    c.add("C30 `@` with an empty list is REFUSED; no `@`, parses", ok,
+          why[why.find("`@`"):][:62])
+    ok, why = _pair("quiet,", "@quiet", "empty name")
+    c.add("C31 an empty name (a stray comma) is REFUSED; without it, parses",
+          ok, why[why.find("the variant"):][:62])
+    ok, why = _pair("loud,quiet,loud", "@loud,quiet", "names loud twice")
+    c.add("C32 a name given twice is REFUSED; given once, parses", ok,
+          why[why.find("names"):][:62])
+
+    # C33 -- the retired name, as a --variant and as a tag, is refused with
+    # the name that replaced it; the new name for the old y image parses.
+    r1, w1, _ = _plist(dl, "quiet-noswcore")
+    r2, w2, _ = _plist(dl + "set@quiet-noswcore\tCONFIG_T\tn\ty\t-\tx\n",
+                       "quiet")
+    r3, _, _ = _plist(dl, "quiet-swcore")
+    c.add("C33 `quiet-noswcore` is REFUSED, pointing at `quiet-swcore`",
+          r1 and r2 and not r3 and all("`quiet-swcore`" in w for w in (w1, w2)),
+          "as --variant and as a tag; quiet-swcore itself parses")
+
+    # C34 -- `apply`, the generator half, honours the list: quiet's input
+    # .config carries the pin and quiet-swcore's keeps the baseline value.
+    # C17-C20 drive apply with no variant at all, so until 1.1 nothing showed
+    # that --variant reaches the file a build is fed.
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as d:
+        bp, dp = os.path.join(d, "base"), os.path.join(d, "delta")
+        with open(bp, "w", encoding="utf-8") as f:
+            f.write(bl)
+        with open(dp, "w", encoding="utf-8") as f:
+            f.write(dl)
+        got = {}
+        for v in ("quiet", "quiet-swcore"):
+            op = os.path.join(d, "out-" + v)
+            _RAISE = True
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    cmd_apply({"baseline": bp, "delta": dp, "out": op,
+                               "variant": v})
+                got[v] = parse_config(op).get("CONFIG_QL")
+            except Refused as e:
+                got[v] = "refused: %s" % e
+            finally:
+                _RAISE = False
+    c.add("C34 apply writes each image's own input from one list",
+          got == {"quiet": "n", "quiet-swcore": "y"},
+          "CONFIG_QL: quiet %s, quiet-swcore %s"
+          % (str(got.get("quiet"))[:20], str(got.get("quiet-swcore"))[:20]))
 
     # C16 -- the only control that leaves this process, and the reason it can:
     # `main` checks the three paths exist BEFORE it runs the controls, so this
@@ -782,11 +968,12 @@ def parse_args(argv):
             die("unknown option %s" % x)
     # A variant that is not in the vocabulary must be an error and never a
     # silent fall-through to "no variant": `--variant loudd` would otherwise
-    # build the quiet image and call it loud.
+    # build the untagged rows' image (quiet-swcore's since 8g) and call it loud.
     if a["variant"] is not None and a["variant"] not in VARIANTS:
-        die("--variant %r is not one of: %s. It is NOT ignored: a typo here "
+        die("--variant %r is not one of: %s.%s It is NOT ignored: a typo here "
             "would build the other image and label it this one"
-            % (a["variant"], ", ".join(sorted(VARIANTS))))
+            % (a["variant"], ", ".join(sorted(VARIANTS)),
+               _retired(a["variant"])))
     return cmd, a
 
 

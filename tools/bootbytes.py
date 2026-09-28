@@ -193,8 +193,8 @@ ID0_LINE = re.compile(rb"^RLXFW-ID0=([0-9A-F]{8})\r\n", re.M)
 #: 🔴 Adding a row is a claim that a new console configuration exists.  It is
 #: not a way to make K2 green, and no checker can tell the two apart.
 DECLARED_CONSTS = {
-    710: "quiet console, CONFIG_PRINTK=n -- the default variant.  量 111 "
-         "captures over ten distinct totals, 2026-09-02 to 2026-09-21",
+    710: "quiet console, SWCORE=y -- `quiet-swcore` since 8g, the default until "
+         "then.  量 111 captures over ten distinct totals, 2026-09-02 to 2026-09-21",
     6541: "loud console, CONFIG_PRINTK=y -- the `loud` variant, "
           "`set@loud CONFIG_PRINTK n y` at config/rlxfw-kernel.delta:138.  "
           "量 5 captures over two images, first on silicon 2026-09-21 "
@@ -213,8 +213,8 @@ DECLARED_CONSTS = {
           "6541 + the same 68.  量 3 captures, 2026-09-23 (seating 39), "
           "e = 0 in all three",
     339: "quiet console with the vendor's switch core out of the link -- "
-         "recipe 1cc05e88, `r6b10n`, R6b-8's arm II: `set@quiet-noswcore "
-         "CONFIG_RTL_819X_SWCORE y n` in config/rlxfw-kernel.delta.  710 - "
+         "recipe 1cc05e88, `r6b10n`, R6b-8's arm II: the delta's `set@quiet,loud "
+         "CONFIG_RTL_819X_SWCORE y n` since 8g (8b: `@quiet-noswcore`).  710 - "
          "371: 讀 the drop's drivers/net/Makefile:276-277 links "
          "drivers/net/rtl819x/ only under SWCORE, and that directory prints "
          "the vendor NIC driver's thirteen boot lines -- rtl_nic.c:6213 "
