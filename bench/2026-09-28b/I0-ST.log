@@ -1,0 +1,29 @@
+  ok    N1   the driver's constant is 0x02 plus ASCII RLXFW
+  ok    N2   arm II's M5-NB (REACHABLE at rlxfw's address) reads rlxfw-laa -- 10.1.1.3 lladdr=rlxfw-laa REACHABLE 
+  ok    N3   arm II's M4-NB (FAILED, no lladdr) passes through unchanged -- 10.1.1.3 FAILED 
+  ok    N4   planted 02... reads lladdr=OTHER -- 10.1.1.3 lladdr=OTHER REACHABLE 
+  ok    N5   planted fc... reads lladdr=OTHER -- 10.1.1.3 lladdr=OTHER STALE 
+  ok    N6   planted 02... reads lladdr=rlxfw-laa -- 10.1.1.3 lladdr=rlxfw-laa REACHABLE 
+  ok    N7   planted 02... reads lladdr=OTHER -- 10.1.1.3 lladdr=OTHER REACHABLE 
+  ok    N8   no output line holds a MAC-shaped token
+  ok    N9   a source with no constant, or two, is refused
+armI-nb self-test: 9 of 9 passed
+  ok    P1   arm II's captures dressed as a passing boot 1 read PASS -- rc 0 []
+  ok    P2   and the info line reads the bracket's 14/14 both ways
+  ok    P3   and M6-SW's moved rows are PCRP0-PCRP4 alone, of 37
+  ok    F1   looprun stopped: FAIL on V1 alone -- rc 1, failed ['V1']
+  ok    F2   another RLXFW-ID0: FAIL on V1 alone -- rc 1, failed ['V1']
+  ok    F3   no lan up line: FAIL on V2 alone -- rc 1, failed ['V2']
+  ok    F4   a verb typed in the boot capture: FAIL on V2 alone -- rc 1, failed ['V2']
+  ok    F5   init refused: FAIL on V3 alone -- rc 1, failed ['V3']
+  ok    F6   a port's rc: FAIL on V3 alone -- rc 1, failed ['V3']
+  ok    F7   a read-back that is not pre | 1: FAIL on V3 alone -- rc 1, failed ['V3']
+  ok    F8   the 1.4 driver: FAIL on V3 alone -- rc 1, failed ['V3']
+  ok    F9   four stored: FAIL on V3 alone -- rc 1, failed ['V3']
+  ok    F10  3 of 4 at 46 B: FAIL on V4 alone -- rc 1, failed ['V4']
+  ok    F11  0 of 4 at 84 B: FAIL on V5 alone -- rc 1, failed ['V5']
+  ok    F12  board -> host 3 of 4: FAIL on V6 alone -- rc 1, failed ['V6']
+  ok    F13  another address: FAIL on V7 alone -- rc 1, failed ['V7']
+  ok    F14  STALE, not REACHABLE: FAIL on V7 alone -- rc 1, failed ['V7']
+  ok    R1   a missing capture is a refusal (exit 2), not a FAIL -- no /tmp/tmp7sdq2og6/I2-BP.log
+armI-verdict self-test: 18 of 18 passed

@@ -1,0 +1,32 @@
+cat /proc/net/dev ; ls /proc/rtl865x ; cat /proc/interrupts
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ wlan0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds3:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds4:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds5:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds6:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-wds7:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-vxd:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-va0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-va1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-va2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+wlan0-va3:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+pwlan0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rlx0:    2228      27    0    0    0     0          0         0     2228      27    0    0    0     0       0          0
+ls: /proc/rtl865x: No such file or directory
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:      32582        RLX LOPI  serial (0x20)
+ 12:         54        RLX LOPI  rtl819x-nic (0x20)
+ 13:       6264        RLX LOPI  rlx timer (0x620)
+ 25:       6236            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+# 

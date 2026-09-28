@@ -226,6 +226,14 @@ DECLARED_CONSTS = {
          "night's A1Q-boot.log (710, banner present) minus exactly those "
          "thirteen, none added; bench/2026-09-28/RUN-armII.md § 1 expected "
          "no `Probing RTL8186` and no `ethN added`, and its M1-VT counted 0",
+    407: "quiet console with the vendor's switch core out of the link and the "
+         "standard /init, which brings the LAN up and types `init` -- recipe "
+         "3685a3a4, `r6b8i`, R6b-8's arm I.  339 + 68 = 778 - 371: arm II's "
+         "non-mark lines plus /init's `rlxfw: lan bring-up` and `rlxfw: lan "
+         "up, rlx0 10.1.1.3`, with RLXFW-SW-UNLOCK interleaved as in 778; "
+         "rtl819x-switch 1.5's RLXFW-SW-INIT= line parses as a mark.  量 2 "
+         "captures, 2026-09-28 (bench/2026-09-28b/I1Q-boot.log after a cold "
+         "power-on, I4Q-boot.log after busybox reboot -f), 1,830 B each",
 }
 
 #: The population floor.  A sweep that finds three captures and agrees with

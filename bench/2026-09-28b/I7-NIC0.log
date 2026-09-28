@@ -1,0 +1,138 @@
+cat /proc/rtl819x-nic
+version rtl819x-nic 1.6
+unlocked 1
+allocated 1
+armed 1
+engine_on 1
+irq_taken 1
+irq_rc 0
+n_reads 143
+n_writes 14
+n_refused 0
+n_irq 54
+n_irq_spurious 0
+n_tx 27
+n_rx 27
+n_rx_empty 0
+n_poll 0
+n_poll_masked 0
+last_iisr 00000008
+seen_iisr 0000320E
+nd_alloc 1
+nd_registered 1
+nd_up 1
+nd_name rlx0
+n_napi_poll 27
+n_napi_complete 27
+n_xmit 27
+n_xmit_busy 0
+tx_mode 0
+n_tx_full 0
+n_tx_retry 0
+tx_retry_max_seen 0
+n_tx_recovered 0
+n_tx_drop_full 0
+n_xmit_ctx 0/27/0
+n_skb_fail 0
+n_tx_stop 0
+n_tx_wake 0
+n_tx_wake_race 0
+n_tx_timeout 0
+tx_stopped 0
+nd_stats rx 27/2228 tx 27/2228 drop 0/0
+boot_icr 04000000
+boot_iimr 00000000
+boot_iisr 00000000
+boot_rpdcr0 A040FC70
+boot_rmdcr0 A040FCD0
+boot_tpdcr0 A040FC88
+now_icr C4000000
+now_iimr 007E0FFE
+now_iisr 00000000
+rpdcr0_pos A159000C
+rmdcr0_pos A159002C
+tpdcr0_pos A159004C
+tpdcr1_pos 00000000
+tpdcr2_pos 00000000
+tpdcr3_pos 00000000
+n_arm_flush 0
+iimr_base 007E0FFE
+iimr_ladder 007E0FFE
+recov_mode 1
+recov_ms 1000
+recov_jiffies 100
+n_recov_arm 0
+n_recov_fire 0
+n_recov_spurious 0
+n_recov_ok 0
+n_recov_fail 0
+n_recov_wake 0
+recov_rc 0 0 0
+recov_j_arm 0
+recov_j_fire 0
+ph_follow 1
+n_ph_chk 27
+n_ph_diff 0
+n_ph_bad 0
+n_ph_used 0
+ph_first_w0 00000000
+ph_first_exp 00000000
+ph_first_nrx 0
+ph_agree 27
+ph_last A1590140
+ph_last_j 2
+ph_last_bf 00000000
+ph_last_cls 0
+tx_rings 1
+n_et_link 0
+et_link_last FFFFFFFF
+ph_test_cls -1
+ph_test_j 0
+ph_test_seen 0
+j_now 4294949943
+n_dsync_chk 27
+n_dsync 0
+dsync_last_d 0
+dsync_first_d 0
+dsync_first_rp 00000000
+dsync_first_rm 00000000
+dsync_first_nrx 0
+dsync_test_d 0
+dsync_test_seen 0
+rx_ring A1590000
+mb_ring A1590020
+tx_ring A1590040
+bufs A1590290
+rx_ph A1590050
+rx_mb A1590110
+tx_ph A15901D0
+tx_mb A1590230
+idle_ring A1596290
+rx_idx 3
+tx_idx 3
+rxd0 A1590051 len 0 f 80E3 pl 03
+rxd1 A1590069 len 0 f 80E3 pl 03
+rxd2 A1590081 len 0 f 80E3 pl 03
+rxd3 A1590099 len 0 f 80E3 pl 03
+rxd4 A15900B1 len 0 f 80E3 pl 03
+rxd5 A15900C9 len 0 f 80E3 pl 03
+rxd6 A15900E1 len 0 f 80E3 pl 03
+rxd7 A15900FB len 0 f 80E3 pl 03
+txd0 A15901D0 len 102
+txd1 A15901E8 len 102
+txd2 A1590200 len 102
+txd3 A159021A len 102
+mbd0 A1590111 ph A1590110 ml 0
+mbd1 A1590129 ph A1590128 ml 0
+mbd2 A1590141 ph A1590140 ml 0
+mbd3 A1590159 ph A1590158 ml 0
+mbd4 A1590171 ph A1590170 ml 0
+mbd5 A1590189 ph A1590188 ml 0
+mbd6 A15901A1 ph A15901A0 ml 0
+mbd7 A15901BB ph A15901B8 ml 0
+tx15 txlen vendor txoff 2 txrb 0 dirty 0 p15 1
+rx_len 0
+rx_ph1 00660819
+rx_ph3 80E30003
+rx_ph4 20080000
+# 

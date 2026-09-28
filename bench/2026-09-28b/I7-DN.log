@@ -1,0 +1,6 @@
+ifconfig rlx0 down ; echo disarm > /proc/rtl819x-nic
+RLXFW-N-ENGOFF
+RLXFW-N-NDSTOP
+RLXFW-N-ENGOFF
+RLXFW-N-DISARM
+# 
