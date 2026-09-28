@@ -1853,7 +1853,342 @@ measurable (`P2`'s settled item 1).
 
 ---
 
-## The operating clause, re-run at thirteen entries
+## 2026-09-28 — `R6b` (`rlx0`'s transmit fault located at its descriptor lengths and fixed as the default, and `rlx0` pinging with no vendor Ethernet code in the image)
+
+### One line
+
+**v0.4+, seven segments (110th–116th; the 110th and 111th are `P2`'s as well), no plan estimate to
+divide by, and nineteen power-ons: seatings 40 (its second block) to 43, then twelve the record does
+not number.** `rlx0`'s transmit loss is a descriptor-length fault, and one variable shows it: with
+the vendor's convention — `m_len` = `m_extsize` = `ph_len`, as the loader and both vendor paths write
+them — E2's eleven lengths answered 220 of 220 on two boots on which 1.4's convention answered 145 of
+1,327 and 144 of 1,189, and a sweep over every frame length from 60 to 1,514 moved `JabberErr` by 0.
+The end-of-test exchanges that `P2` could not finish now complete 12 of 12 on two boots; 31 minutes of
+traffic at the fix fired no recovery while 1.4 fired 12 in two minutes on the same boot; and since
+`rtl819x-nic` 1.6 the fix is the driver's default, so no verb is typed. On an image with no vendor
+Ethernet code in it, the standard `/init` brings the switch up with one write class and `rlx0` pings
+both ways, after a cold power-on and after `busybox reboot -f`. **All eight DoD rows are met; `D5`
+carries one ⊘ that a ruling put there (`1472|mdev`).** Since 8g (`18c9068`) the mainline builds that
+image's configuration.
+
+**The weakest thing here is that `D8` passes on switch state rlxfw did not write.** `init` sets five
+bits; the VLAN table, the PVIDs, the netif entry, `FFCR`'s two traps, EEE and `QNUMCR` are the
+loader's. The registers among them read the same on 15 boots of the catch → upload → `J` path and
+the tables on three, and none was read on a boot for which the loader did not bring its network up —
+the way a product boots, from flash, and the path `R9`'s zero-write rule keeps out of reach. How a
+frame addressed to `rlx0` reaches the CPU is 推 on one source: the loader's unknown-unicast trap
+(`NET-169`). And the pass is one seating: one image, one cold and one warm boot, one host on port 3.
+
+### Three claims that stand
+
+**① `D2` with `D1` — one variable, on the same boots, separates the fault from the traffic, and the
+stage is a span.** 量 blocks 47 and 48 (seating 42, `r6b2q`, driver 1.5, 2026-09-26): E2 at block
+45's spacing ran the fix (`E-F1`), then 1.4's lengths (`E-L1`), then the fix again (`E-F2`), in cells
+that differ only in the `txlen` word. The fix read 220 of 220 by the host's ICMP layer and on its
+capture in both fix arms of both boots, with the CPU port's `JabberErr`, `FragErr`, `Drop` and
+`etherStatsDropEvents`, its 512–1023 bucket and `n_recov_fire` Δ 0, no `0x8100` frame and no excess
+byte; 1.4 answered 145 of 1,327 and 144 of 1,189 between them. The wire sweep at the fix, every
+length 60–1,514 behind its own clean loopback map, read `JabberErr` 0 over 2,910 frames on each boot,
+where 1.4, one length a sweep, jabbered on block 47 at exactly the 19 of 35 lengths its card had
+predicted (`NET-128`, `NET-132`). 🟢 **The stage** (`D1`): 1.4 went wrong at the same seven lengths —
+61, 62, 63, 263, 277, 1,511 and 1,512 — in the stack, the `tx`-verb and the loopback arms, one length a
+bracket, and the fix at none; the descriptor words read back as 1.4 wrote them with the engine's
+fetch held (`RB-01-C`, `RB-02-C` EQUAL), and the CPU port counted the damaged frames as jabbers — so
+the change happens after the driver's fill in descriptor memory and at or before the CPU port's
+receive MAC (推 from 量 parts, `NET-132`). 🟢 In loopback the field is `m_len`: raising it alone to
+`ph_len` clears all 728 bad lengths, and changing `m_extsize` alone clears none (量, twelve
+full-length maps, on each of which `M1`-cover8 matched 1,455 of 1,455 lengths; `NET-129`). ⚠️ What
+this does not reach: which component inside the span changes the frame, what the engine fetched, or
+why — `M1`-cover8 is a rule fitted after blocks 45 and 46 and names no cause; both `D2` boots are one
+image, one seating and one day, with the fix typed as a verb. `SPEC.md` `NET-123`, `NET-128`,
+`NET-129`, `NET-132`; `notes/nic-driver.md` §§ 22, 25, 27.
+
+**② `D4` with `R6b-10` — the fix holds under load and over time, and it is the default: the third
+verb dependency this project has shipped was retired inside the gate that shipped it.** 量 block 50
+(2026-09-27, `r6b6q`): a 31-minute `ping -f` flood at the fix, every `ping` size 18–1,472 so every
+frame length 60–1,514 each way, carried 2,363,511 frames with `n` = `c` = `o`, `JabberErr` 0 and
+`n_recov_fire` Δ 0, and a TCP tail after it carried 797 MBytes with none; 1.4 on the same boot fired
+12 recoveries in 120 s (`NET-141`). 讀 `rtl819x-nic` 1.6 starts every boot at `txlen vendor`
+(`NET-154`); 量 one boot of `r6b10y` from the loader prompt, its page reading `txlen vendor` before any
+cell and no policy verb typed, read E2's eleven 220 of 220 with the CPU port's counters Δ 0 and the
+`tx` sweep 60–1,514 with `JabberErr` Δ 0 (`NET-158`). `R6`'s entry closed with `recover` needing a
+typed verb and carried it to `P2-2`; here the fix was a typed setting wherever it ran before 1.6 —
+blocks 47, 48, 50 and 51 and the night's `r6b8cr` — and it is the default on every image built since:
+`r6b10y`, `r6b10n` and `r6b8i`. ⚠️ The default-setting run is one boot with no host capture and no
+1.4 arm beside it — not a third `D2` boot — and `D4` is one boot and two kinds of traffic. The stall's
+mechanism is not named: `M8`'s clause fired on block 46 (a recovery at 61 B with `j` = `f` = `d` =
+0), so jabber is not what stalls the ring, and `NET-67` 殘留 is ⊘ with `M8`'s own reason — at `txlen
+vendor` no stimulus has reached the stalling state (`notes/nic-driver.md` §§ 28.10, 30.4).
+
+**③ `D8` — `rlx0` pings both ways with no vendor Ethernet code in the image, and the one write that
+makes the difference is known to the bit.** 量 arm I (`bench/2026-09-28b/`, one power cycle, `r6b8i`:
+`SWCORE=n`, `rtl819x-switch` 1.5, `rtl819x-view` 1.1, `rtl819x-nic` 1.6 at its default, the standard
+`/init` typing `init`): after the owner's cold power-on and after `busybox reboot -f`, each of the
+seven conditions written before power held — `RLXFW-ID0=3685A3A4`; `/init` reaching `lan up` with no
+verb typed; `init … stored 1F on 1F`; host → board 4 of 4 at 46 B and at 84 B; board → host 4 of 4;
+and the host's neighbour entry `REACHABLE` at rlxfw's locally administered address, the positive
+discriminator `R6`'s `D4` used. `ethcensus` is GREEN on the image and RED on its control `r6b10y`, and
+`/proc/rtl865x` is absent (`NET-167`). 🟢 After `init` the switch page differs from the loader's
+state in five bits, `PCRP0`–`4` bit 0, and in nothing else; the VLAN and netif tables equal arm II's
+word for word. Arm II — the same state with the five bits written by hand — is the control that
+separates the NIC and the seam from the switch init: 0 of 4 either way before the write, 4 of 4 after
+(`NET-164`). 🟢 `MT-PORT` read `Port3 LinkUp by rtl819x-switch 1.5; vendor tree absent` on both
+boots: `D6`'s last clause, on the image it was written for. ⚠️ What is inherited, and on which boot
+path, is the weakest-thing paragraph above; the address half of the discriminator has one reader,
+by design (`armI-nb.py`: no capture holds the address). `notes/switch-driver.md` §§ 16.7, 17.6–17.10;
+`SPEC.md` `NET-164`, `NET-167`–`NET-169`.
+
+### The DoD, read one row at a time
+
+`R6b` has no row in the plan, so its DoD is the only one read. `D8` is `R6`'s `D4` second conjunct,
+which `R6`'s entry priced at ten undefined symbols in four places.
+
+| the DoD says | verdict |
+|---|---|
+| **`D1`** the stage at which a transmitted frame's length or content changes, named by a single-variable experiment — the stack, the `tx` verb and loopback at each of E2's eleven lengths, each in its own bracket — or recorded undetermined with the arm that failed to separate it | 🟢 **met by its letter, after a first boot had recorded it undetermined.** Block 46 (seating 41) was a failed reproduction by the gate's own clause, so `D1` was recorded undetermined with arm A, the reproduction control, as the arm that failed (`NET-123`). Block 47 ran the `tx`-verb arm (`W-2`) and the loopback arm (`LB-1`, the full maps) one length a bracket; block 48 ran the stack arm (`SF`, `SL`), fix and 1.4 in cells that differ only in `txlen` (`NET-132`). The stage is a span, after the driver's fill and at or before the CPU port's receive MAC, 推 from 量 parts (claim ①). ⚠️ Block 47's two arms were assigned to `D1` after that press (the ruling on block 47; card B50's P8 wrote it down before block 48's power); no one boot holds all three arms at all eleven lengths at 1.4; the loopback arm's bracket is the driver's own dump pair, not the switch's counters; the stack path's own descriptors were read back at one length, 61 B, on block 47 only (`RB-02-C`). Earlier records (§ 25.7, `NET-129`) put the upper bound *before the CPU port's receive counters*, which also admits the stretch between that port's MAC and its counters; card B50's P8 wrote *at or before the receive MAC* before block 48's power, `D1` was met under it, and this entry uses it |
+| **`D2`** on a fixed image, E2's eleven at block 45's spacing 220 of 220 by the host's ICMP layer and on its capture; the CPU port's four error counters, the 512–1023 bucket, tags, excess bytes and `n_recov_fire` all Δ 0; on two boots, each with 1.4 reproducing the loss; and a `tx` sweep 60–1,514 with `JabberErr` Δ 0 | 🟢 **met on two boots, blocks 47 and 48** (claim ①; `NET-128`, `NET-132`). Boot 1's positive control is `ping`'s count alone, 145 of 1,327: its CPU-port conjunct is void under card B49's P0, whose bracket read port 3 four frames above `c` − `j` − `f` − `d` (`NET-131`). ⚠️ "A fixed image" was `r6b2q` with the fix typed (`txlen vendor`): the image's default was 1.4's until 1.6. Beside it, at the isolated spacing of `M3`'s clause (≥ 200 ms a frame), the fix read 20 of 20 at each of the eleven with the CPU port clean (`NET-159`; one boot, `r6b8cr`, driver 1.5, `txlen vendor` typed) |
+| **`D3`** `NET-111`'s end-of-test exchange completes in 12 of 12 `rlx0` trials on the fixed image, or the remaining failure is named | 🟢 **met on two boots: 12 of 12 in block 48 and 12 of 12 in block 50** (`NET-133`, `NET-140`). On block 50, TCP board-receive 16.9 Mbit/s and board-send 21.6–22.4 Mbit/s, the board's figures and the host's agreeing (`iperflog compare` AGREE at all six board-receive trials). ⚠️ UDP board-receive still loses 87–88 %, at the board's socket: `RcvbufErrors` Δ ≥ 0.9 of the loss, and the ~64 datagrams left at exit are a full queue of 63 (`NET-142`). The row asks for the exchange, not the rate, and why the socket refuses is ⊘ (`NET-117` 殘留). Block 50's pass is not the fix's alone: `rtl819x-switch` 1.2, the initramfs and the watch's ESC stream differ from block 48's |
+| **`D4`** `NET-67` 殘留: no recovery over ≥ 30 min of traffic that includes every formerly bad length, on the fixed setting, while 1.4's setting stalls on the same boot; or the remaining stall named as a separate fault | 🟢 **met on one boot, block 50** (claim ②; `NET-141`). The first branch holds, so no separate stall is named. ⚠️ `M8`'s clause fired on block 46, so what stops descriptor retirement is not jabber, and it is not known; `NET-67` 殘留 and `NET-78` 殘留 are ⊘ with `M8`'s reason since 1.6 made the fix the default (`NET-158`), each reopened on any fire at `txlen vendor`. `NET-68` 殘留 was read on the same boot (12 fired, 12 recovered, 0 failed); `NET-76` 殘留 was not reproduced |
+| **`D5`** every row of the population closed by a reading, re-owned, or ⊘ with a refutable reason; `D3-MISS`'s rtt part closed by `R6b-3`'s reading | ⚠️ **met with a named ⊘.** The population is 40 rows: `R6b-0`'s 35, the two § 19 residuals `P2` assigned, and `D3-MISS`, `WRAP-1` and `C-19`, re-owned at `P2`'s close. 11 are closed by a reading; 28 are ⊘, each with its reopening condition — two of them, `D3-MISS` and `NET-08`, split rows whose main part a reading closed; and 1 is re-owned (`CLK-42` 殘留, to `docs/interrupt-map.md` § 8.4) — each in its own row (`SPEC.md` §§ 17 and 19, `PROGRESS.md` § Carried forward). `D3-MISS`'s rtt part: `256\|avg` and `1472\|avg` closed by block 49's reading with the host's capture off; **`1472\|mdev` ⊘ by the main session's ruling**, which the owner may override — the 1,472-B mdev rose again on a third day, on both drivers and in both capture states, so it is not `rlx0`'s, and a one-day, three-series reference decides nothing at six series a side (`NET-121`, `notes/nic-driver.md` § 28.4). `C-19` is ⊘, deliberately replaced by `CLAUDE.md` § Environment's statement of its question; `NET-54` 殘留 went ⊘ at 8g with its instruments re-pointed (`FW-157`) |
+| **`D6`** the `ethtool` ops executed on the board with a positive control; `MT-PORT` names the driver that served the link, from a source that outlives the vendor tree | 🟢 **met.** 量 block 50 (`r6b6q`): `/bin/linkprobe` read `drvinfo` `rtl819x-nic 1.5`, and `get_link` 1, 0, 1 across the owner's pull and re-plug of the cable, the positive control (`FW-144`, `notes/nic-driver.md` § 28.9); `MT-PORT` named `rtl819x-switch 1.2` both ways, from `/proc/rtl819x-switch` (`FW-93`). That the source outlives the tree is 量 on arm I's two boots of the vendor-free image (claim ③). ⚠️ `get_link` means any of ports 0–4 has `LinkUp`, not port 3; the restarted watch's half is unmeasured, its log lost at the power-off; `linkprobe` has not run on a vendor-free image, where `eth4`'s answer is expected to change from 122 to 19 (`notes/nic-driver.md` § 24.4) |
+| **`D7`** an `mii_bus` for ports 0–4 whose PHY IDs equal the loader-side values address by address | 🟢 **met** (block 51, `r6b7q`; `NET-145`, `notes/switch-driver.md` § 14.2): `001CC880` at 0–4 through Linux's MDIO API, through the loader on the same boot and through the vendor's `phyReg`, register 3 at 2–4 read for the first time. ⚠️ Five equal IDs cannot show two addresses swapped, and the three sources share one MDIO controller, so a fault common to it is not excluded; one boot. Whether port 1 needs the loader's patch is read at register level only — `C-18` stays ⊘ (`NET-146`) — and the functional clause is ⊘ with its price |
+| **`D8`** `R6`'s `D4` conjunct: `ping` both ways with no vendor Ethernet code in the image and a positive discriminator, or ⊘ with its price — only after `D1`–`D4` | 🟢 **met** (claim ③; `NET-167`), after `D1`–`D4` were met in the record (blocks 47, 48 and 50, read in the 113th and 115th segments); the stop-loss, two seatings with arm I failing, was not reached. ⚠️ "No vendor Ethernet code" is the census's scope, `rtl819x/` ∪ `rtk_vlan.o`, read as symbol names: a name absent is not proof that no byte survives (`notes/switch-driver.md` § 11.6), and the fast path, the feature glue, the WLAN driver and `rtl_gpio.c` stay vendor code in the image, which the census prints |
+
+### The refutation conditions, and what each came to
+
+Written with the step list on 2026-09-25, before `R6b-1`'s power.
+
+* **`R6b-1`'s control fired** (block 46): arm A at E2's spacing read FAULT at three controls, so
+  `R6b-1` was a failed reproduction, `D1` was recorded undetermined and none of its other arms
+  localized anything (`NET-123`). It sent the gate to `R6b-2`'s image A/B, the stop-loss's end
+  point, and not to a second per-length seating.
+* **`M7`** fired on block 46 at 1,514 B and is void there under the first condition. Where the two
+  arms could be compared, on block 48, the stack and the `tx` verb went wrong at the same seven
+  lengths: the fault is not in `nic_xmit`'s path.
+* **`M3`**: its premise did not hold — 61 B lost at the isolated spacing too (`A2-02`) — so its
+  consequence was not triggered. Beside it the isolated-spacing fix arm ran clean (`NET-159`). At
+  276 and 1,513 B, E2's losses were the previous length's state: each read 20 of 20 on its own
+  re-armed ring (card B50's P6).
+* **`M6` did not fire**: the looped `ph_len` was wrong at the seven lengths on blocks 46, 47 and 48.
+  Its last sentence — a wrong looped `ph_len` puts the fault in the DMA engine — is not applied:
+  where the loop closes was not measured, so no engine is named.
+* **`M4` did not fire**, so it stands: at 277 B, on the stack path under 1.4, some replies carried an
+  802.1Q tag on every boot (TCI `06E7`, 281 B, 4 bytes past the IP length); none under the fix, and
+  none in either boot's sweep.
+* **`M8` fired** (block 46, `A2-02`): a recovery in a bracket with `JabberErr` Δ 0. Jabber is not what
+  stalls the ring, and `NET-67` 殘留 stayed open after the fix until 1.6 made the fix the default and
+  it went ⊘ with `M8`'s reason.
+* **The blackouts** were never tested: arm D ran while the host was not reaching the board
+  (`NET-124`).
+* **`D2`'s clause did not fire**: 0 in every bracket each card had scoped to the fix before its power
+  — on block 48 thirty of them, TCP and UDP trials included — and 1.4 never read clean beside it.
+* **`D3`'s clause did not fire**: E2 passed and the exchanges completed, 12 of 12 twice.
+
+### The stop-loss, and what it came to
+
+* **No segment cap** (the owner, 2026-09-25): seven segments. On 2026-09-27 the owner said the gate
+  had run past the count he had in mind and relaxed its process — no freeze, predictions optional —
+  for `R6b` only, the flash rules unchanged (`LOG.md` 第一百一十五段).
+* **Zero flash-write commands and zero `FLR`, every press bracketed by a map**: held; see the flash
+  paragraph below.
+* **No step removes `/proc/rtl865x/` before `D1`–`D4`**: held, in the step list's sense — no image
+  without it booted, and the mainline did not flip, before `D1`–`D4` were met in the record. 8b's
+  variant build (`9107b20`, 2026-09-27 19:54) preceded the commit that recorded `D3`'s second boot and
+  `D4` (`6fd0749`, 20:29) by 35 minutes; arm II first booted `SWCORE=n` at 00:21 on 2026-09-28; the
+  mainline flipped at 8g (`18c9068`, `FW-157`).
+* **Two seatings of per-length brackets that leave the stage undetermined**: stood at one of two
+  after block 46 and never reached two — block 47's sweeps placed the stage, so `R6b-1`'s reopening
+  condition did not fire.
+* **`D8`'s, the owner's of 2026-09-26** — two seatings with arm I failing end `D8` ⊘ with its price:
+  not reached; arm I passed on its first.
+
+### The questions this gate must be able to answer
+
+Derived in the step list; the plan has no `R6b`.
+
+**① 「驅動說送出去了，那個訊框是在哪一層變掉的？」** Between descriptor memory and the switch's CPU
+port, and no nearer. 量 the words the driver wrote read back as written with the engine's fetch held
+(block 47); the CPU port counts the damaged frames as jabbers; and in loopback, which reaches no
+switch counter, the looped `ph_len` comes back wrong at the same seven lengths. Inside that span are
+the engine's fetch, its DMA and the CPU interface's framing, and none of them was measured: that it
+is the TX DMA engine is 推.
+
+**② 「你怎麼知道是修好了，而不是流量剛好變了？」** Because the unfixed setting failed on the same boot,
+in the same cells, at the same spacing (claim ①), and stalled on the same boot under the same kind of
+load (claim ②); and because the fix is clean at a spacing four times wider (`NET-159`). What the
+answer does not cover: a second image, seating or day for `D2`, and the stack path at lengths other
+than E2's eleven — the 1,455-length sweep went through `nic_do_tx`, in TX slots 0 and 1.
+
+**③ 「廠商的驅動為什麼沒事？」** Because it writes the three length fields equal and rlxfw 1.4 did not.
+讀 the vendor's `_swNic_send` and the loader's send routine both set `m_len` = `m_extsize` = `ph_len`
+(`NET-122`); 1.4 set `m_len` four bytes short and `m_extsize` to a constant 2,046, the one writer of
+four that differed. 量 copying the convention clears the fault (claim ①), and in loopback `m_len`
+alone does. Why the engine needs them equal — why frame b breaks exactly where 8⌈`m_len`/8⌉ <
+`ph_len` — is not known: the rule was fitted, not derived.
+
+**④ 「把廠商的樹拿掉之後，你還看得到什麼？」** `asicCounter`, `port_status` and `eth4` are gone from
+the mainline image. In their place `rtl819x-view` reads the MIB, the VLAN, netif and L2 tables and
+311 two-source words, loading only (`NET-138`, `FW-156`), and `rtl819x-switch`'s page carries the link
+state `MT-PORT` reads; arm I read all of them on the vendor-free image. The first `tbl l2` on the die
+decoded its one learned entry at the row its hash names, which checks the window, the field layout
+and the hash together (`NET-169`). Lost: `eth4` as a control driver on the same kernel, and the
+vendor's memory node.
+
+**⑤ `R6`'s third question — `OWN` 位元的寫入順序錯了會怎樣，你怎麼測出來？** It is not what broke
+here, and that is measured. 量 1.5's read-back verb returned each descriptor as 1.4 wrote it with the
+fetch held; reading each descriptor back before handing it to the engine (`txrb 1`, `2`) — the cure an
+`OWN`-before-the-fields fault would need — left all 728 bad lengths bad; and 1.5's own check counted
+0 bad of 5,820 fills (`NET-125`, `NET-129`). ⚠️ The injection `R6`'s entry said it never ran — `OWN`
+set before the fields — has still not run.
+
+### What `R6b` did not establish
+
+🔴 **The mechanism of the transmit fault, as a cause.** The stage is a span with none of its
+components measured; what the engine fetched is unseen, because the read-back reads memory with the
+fetch held; `M1`-cover8 matches twelve maps length by length and is a rule fitted after blocks 45
+and 46, not a derivation. `M5` — the port list, `0x3F` against the vendor's `0x1f` — never ran, though
+it needs no image. The 802.1Q tag at 277 B (`M4`) is observed under 1.4 and unexplained. `NET-130`
+殘留 (a looped `ph_len` of 2,048 that no byte source gives) and `NET-131` 殘留 (port 3's output above
+`c` − `j` − `f` − `d` in 1.4 brackets) are ⊘, each reopened only at `txlen vendor`. No step owns the
+mechanism (`docs/KNOWN-ISSUES.md`, `NET-112`'s row). It is what the operating clause fires on at
+fourteen entries.
+
+🔴 **The stall's mechanism.** `M8` as written is refuted, and the fix removed the stall together with
+the corruption, so which engine state stops descriptor retirement is not separated; `NET-67` 殘留 and
+`NET-78` 殘留 are ⊘ with `M8`'s reason, and what seating 32's `NET-76` state was stays unknown.
+
+🔴 **The fix's regression on the mainline image.** `R6b-10`'s regression at the default ran on
+`r6b10y`, a `SWCORE=y` image. At `SWCORE=n` — the mainline since 8g — `struct sk_buff` is 192 bytes,
+not 200, and six of `rtl819x-nic.o`'s 7,955 instructions differ, each by that offset (讀 `NET-152`).
+What has run on `SWCORE=n` at 1.6's default is arm I's and arm II's pings of 46 and 84 B and arm I's
+`mfgtest auto`: not E2's eleven lengths, not the sweep, not a flood, not `iperf3`. And nothing has
+been built from the flipped default: its recipe is `8b5ae480`, and `r6b8i` was built as
+`quiet-noswcore` at `3685a3a4` with the same rules (讀, `notes/switch-driver.md` § 18.8).
+
+🔴 **`D8`'s switch state is the loader's, on one boot path.** The weakest-thing paragraph. Beside it:
+which of the five `EnablePHYIf` bits is necessary (only port 3 has a peer); link stability with EEE on
+beyond arm I's minutes (8d ruling 4); one CPU receive queue (`QNUMCR`'s field inherited at 0); and the
+price of the inherited `FFCR` — every unknown-unicast and multicast frame from any LAN port also
+reaches the CPU — unmeasured, since this bench's one link carries only the host.
+
+⚠️ **`D8` is one seating.** One image, `r6b8i`; one cold and one warm boot; port 3 and one host. The
+discriminator's address half has one reader; boot 1's four-counter bracket is one host frame off,
+推 its edge (`notes/switch-driver.md` § 17.6).
+
+⚠️ **"No vendor Ethernet code" is a scope, and `R9`'s controlled variable moved with it.** The census
+reads symbol names over `rtl819x/` ∪ `rtk_vlan.o`; vendor code outside that scope stays, and the ten
+seam stand-ins answer the WLAN driver, bridge and L2TP paths, none of which was exercised
+(`notes/switch-driver.md` § 13.10). Since 8g the mainline carries rlxfw's NIC driver where `R9`'s plan
+wanted the vendor's as a controlled variable, so `R9` must build `quiet-swcore` (`docs/KNOWN-ISSUES.md`,
+`notes/switch-driver.md` § 18.6, `FW-157`; 讀, nothing of it run).
+
+⚠️ **The reset guard is one refusal and one permit**, on one boot, at one instant: `start`, `dumb` and
+`restore` are not guarded, and `dumb`'s loss (`notes/switch-driver.md` § 8.10) is kept unexplained
+(8d ruling 5). After `reset full` from the loader's state the tables, the MIB, `CPUICR` and the PHY
+registers were not read (`NET-168`).
+
+⚠️ **What `R6b-8`'s list named and did not build or run**: the bounded `TACI` writer (8d ruling 3: no
+table write exists for it to bound), `imgprocs`' inverted mode (it refuses a `SWCORE=n` image by
+design), `linkprobe` on a vendor-free image, and `mfgtest led` and `mfgtest button`, which need the
+owner's eye and hand.
+
+⚠️ **`D2`'s reach.** One image, one seating, one day, the fix typed; the stack path at lengths other
+than E2's eleven; TX slots 2 and 3 on the wire at those lengths; any wire byte past 64, where both
+captures were cut; 1.4 at the isolated spacing. On boot 1 every per-bracket capture count is the
+readers' own, because the card's `pcapwin` never gave a true window (`FW-145`).
+
+⚠️ **`D3`'s rate.** UDP board-receive loses 87–88 % at the socket; why the socket refuses (推 CPU),
+why the client's `Sent` is short of the host kernel's count, and the rate and buffer arms (`NET-117`
+殘留 ③), which never ran, are ⊘.
+
+⚠️ **`D6` and `D7`'s edges.** `get_link` reads "any of 0–4 has `LinkUp`"; the restarted watch's half is
+unmeasured; why the host adapter honoured `ethtool -r` is n = 1 (`NET-143`); a permutation among PHYs
+0–4 is invisible to `D7`, and its three sources share one controller.
+
+⚠️ **What `D5` carries.** `1472|mdev` is ⊘ by a ruling (`NET-121`): why the 1,472-B mdev rose across
+three days is undetermined, and a capture effect of a few percent is not excluded at this test's
+power. Re-owned rather than answered: `CLK-42` 殘留's mechanism, to `docs/interrupt-map.md` § 8.4,
+whose row asks the owner to assign it a gate. At the close, `NET-54` 殘留 and `NET-124` 殘留 went ⊘ at
+8g with their instruments re-pointed, and each now reopens with a read of `PCRP0`–`4` bit 0: arm II
+made their counter shape — `LinkUp`, the host sending, port 3's input still — with `EnablePHYIf` clear
+(`notes/switch-driver.md` § 16.7), and neither event read it (推, a candidate, not a cause).
+`NET-134` 殘留 closed: `LEDCREG`'s value has three sources (`NET-162`) and 8d writes nothing to
+`QNUMCR` (`NET-166`). `NET-25` closed as one unreproduced observation — 0 of 10 bounds the
+per-cold-boot failure rate below 25.9 % — for `r6b8cr`'s boot path only, and the driver it was about,
+`eth4`, is not in the mainline image any more.
+
+⚠️ **Evidence taken under the relaxed process.** From 2026-09-27, block 51, the night's runs
+(`NET-25`, `R6b-10`, `M3`'s arm, arm II) and arm I ran from committed, unfrozen cards and run sheets,
+predictions optional, so `check-predictions`' mtime evidence does not exist for `D7`, `D8` or
+`NET-25`. What stands in for arm I: its seven conditions were written at 14:59, before the 17:15
+power-on, in the main session's rulings file outside the repository — a file's mtime, not a commit —
+and 1.5's predicted boot mark, `RLXFW-SW-INIT=00001F1F`, was committed before power (`1f9ebf1`,
+`NET-166`).
+
+⚠️ **`C-19`'s instruction was not carried out on one night.** The night's cards and run sheets —
+`CELLS-A`, `CELLS-B01`–`B10`, `RUN-r6b10` and `RUN-armII` — name no `C-19` and ran no host kernel-log
+follower (讀; arm I's sheet, the control, names both), so the gate's longest idle — 2 h 8 min at the
+loader prompt before group A's reads (`bench/2026-09-27d/`) — has no record against the row; the
+console answered 27 cells after it (量). The row is ⊘ at this close (§ Carried forward).
+
+⚠️ **The power ledger.** Nineteen power-ons by the segment headings' own counts (1, 2, 1, 2, 12, 1):
+the headings say 電源按壓, 開電 and power cycle, and here each names one power-on. Seatings after 43
+carry no number in the record.
+
+⚠️ **Flash.** No card or run sheet of the gate sent `FLW`, `EW`, `EB`, `DB`, `FLR` or a non-zero
+`AUTOBURN` (量, per block: block 45's card refused nothing under `cardcheck commands`; blocks 46–48's
+sent strings, 182, 282 and 210; blocks 49 and 50's 210; block 51's 65; the night's 490; arm I's 104),
+and the `AUTOBURN` word read `00000000` before every upload. Every map read in the gate, from block
+45's closing map on, gave `0927be41…`, 31 groups the same and group 0 `DIFFER` as expected, over
+4,186,112 B with `H601` not hashed; the standby power-on of 2026-09-27 and eight of `NET-25`'s ten
+power cycles have no map of their own and lie between maps that agree. The maps cannot see `H601`,
+two writes that cancel, or any byte outside their windows, and `n_writes` carries no information
+(`FW-142`). The `FLR` bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %**, and `FLS-26`'s ledger
+does not move.
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own rulings — no segment cap, the relaxed process, `NET-25` run with NB-1 first, `MSCR`
+at `0x01`, `SWCORE=n` as a variant until 8g, `D8`'s stop-loss, PHY pages 0 and 1 only — are not
+listed. Each below is recorded where it is cited.
+
+1. `1472|mdev` ⊘, and `D5`'s rtt part closed with it (segment 115; `NET-121`, `notes/nic-driver.md`
+   § 28.4).
+2. `R6b-10` created because no step owned making the fix the default (segment 115), and `NET-67`
+   殘留 and `NET-78` 殘留 ⊘ with `M8`'s reason once it landed (`NET-158`).
+3. `NET-109` 殘留 ⊘ after `ByPassTCRC` gave the third pre-registered outcome (`NET-163`).
+4. `D8` read by its letter as arm I's, with arm II its control rather than its pass
+   (`notes/switch-driver.md` § 16.7).
+5. 8d's scope: `init` a verb the standard `/init` types, not a driver-side boot write; `EnablePHYIf`
+   and nothing else, no reset; the VLAN group inherited as a unit and the bounded `TACI` writer not
+   built; EEE and `QNUMCR`'s CPU field inherited; `dumb` and `restore` kept (`NET-166`,
+   `notes/switch-driver.md` § 17.1). `NET-28` 殘留 ⊘ with it.
+6. `NET-37` 殘留 ⊘, narrowed, with the `MSCR` `0x01` condition called met in substance by the loader's
+   `FFCR` traps (推 on one source) and its price stated (`NET-169`); `NET-33` 殘留 ②'s naming, `NET-31`
+   殘留 and `NET-30` 殘留 ⊘ (`NET-168`, `NET-169`).
+7. The mainline flip covers `quiet` and `loud`, `loud` being `quiet` plus `CONFIG_PRINTK`, and
+   `quiet-swcore` keeps `y` (`notes/switch-driver.md` § 18.1, `FW-157`).
+8. `R6b-1` recorded ⊘ rather than rerun, the image A/B being the stop-loss's end point (segment 112).
+9. `D2`'s first boot met on its `ping` conjunct with its CPU-port conjunct void under card B49's P0;
+   block 47's `tx`-verb and loopback arms read as `D1`'s (the rulings on block 47).
+10. `D3-MISS` ②'s vendor series run on `eth4`, not on the vendor firmware; "whether port 1 needs the
+    patch" read at register level, its functional clause ⊘ — both delegated by the owner to the main
+    session (`LOG.md` 第一百一十三段 § 六), though the `R6b-7` row calls the second the owner's ruling.
+11. The census's scope, `rtl819x/` ∪ `rtk_vlan.o`, and `R6b-7` as a precondition of 8c-code only —
+    the main session's (`LOG.md` 第一百一十三段 § 六), as the `R6b-8` row now says.
+12. Block 51's two missed predictions ruled drafting errors, not firings (segment 115).
+13. `CLK-42` 殘留 re-owned to `docs/interrupt-map.md` § 8.4 as off the transmit path (segment 112).
+14. The standby failure recorded as a bench rule — no unattended standby — not as a device question
+    (`NET-165`).
+15. `NET-54` 殘留 and `NET-124` 殘留 ⊘ at 8g (`FW-157`), with a read of `PCRP0`–`4` bit 0 added to
+    each reopening condition at this close.
+16. `C-19` ⊘, deliberately replaced (`PROGRESS.md` § Carried forward); `NET-134` 殘留 closed; and id
+    marks set to ⊘ where the cell had already disposed of the row (`PSRP` 保留態的起點, `NET-07`,
+    `NET-136` 殘留) and by the split-row rule (`NET-08`, `D3-MISS`).
+
+---
+
+## The operating clause, re-run at fourteen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -1863,7 +2198,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry.)*
 
 | pair | shared? |
 |---|---|
@@ -1878,7 +2213,8 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R5` → `R1-pub + R2c` 🆕 | **yes — a same-instant read of two kernel counters.** `R5` carries it as `D4` naming `/proc/timer_list`, *which exists in this kernel and cannot carry the property the row wanted — two counters read atomically*. `R1-pub` carries it as `D-cost`'s `E5` requiring `Δirq_count == Δjiffies` on every rung, failing **5 of 64**, and the one `/proc` file that serves both not sampling them together. 🔴 **The sentence that connects them is inside `R5`'s own bullet** — it says the substitute `R5-2` used *carries both counters inside one `spin_lock_irqsave`*, which is true of the pair `R5` used and **false of the pair `R1-pub` needed**: 讀 `drivers/clocksource/rtl819x-timer.c`, `j = get_jiffies_64()` is at line 2001 inside the lock held from 1998 to 2042, and `irq_count` is read live at line 2147, **105 lines after the unlock** |
 | `P1` → `R6` 🆕 | **yes — `MT-PORT`'s output does not say which driver served the link, and `P1` handed it to `R6-0` by name.** `P1` carries it as *"every `MT-PORT` line this project has captured is unlabelled as to which driver served it. Carried to `R6-0`"*; `R6` carries it because `R6-0` quoted that residual, banked **half** of it — `SPEC.md` `NET-31`, the Linux-side named-port link state — and left the other half, while `R6` landed the second driver that makes the label necessary. 量 2026-09-22: `config/mfgtest.sh:536` still prints `chk MT-PORT 1 "$MFG_PORT LinkUp"`, which names the **port** |
 | `R1z` → `P1` 🆕 | **no, and the reason is one no previous non-firing has used: the single item both entries carry, they carry because `P1` CLOSED it.** `R1z`'s last ⚠️ is *"`RECIPE_ID` moved … the next card must re-derive `RLXFW-ID0`"*; the next segment found the superseded `c433013b` in three places here, its own step row says *"The next card was about to predict `MT-ID` against it"*, and the board then printed `RLXFW-ID0=BB684EB0`. This file's own rule governs — *a residual that a later gate closes is removed from the clause's input by being closed, not by being edited out*. ⚠️ The rest of the two sets do not touch: `R1z`'s residuals are about this repository's record, `P1`'s about a design table that over-declares on three rows and a denominator its own does-not-establish list got wrong |
-| `R6` → `P2` 🆕 | **no — `P2` CLOSED three of `R6`'s residuals, each taken on in writing by one of its own steps, and the one subject both still carry is two different observations.** Closed: *"`D5`'s headline number needs a verb typed"* — `P2-2` compiled `recover` on, and `P1-N0` read `recov_mode 1` on both days with no verb typed; *"this project holds no vendor receive figure at all"* — `P2-3`'s `eth4` board-receive trials (`NET-114`), reproduced in seating B at 24.572 / 24.653 / 23.923 Mbit/s; and `NET-109 殘留`'s healthy baseline — `P2-3`'s pre-traffic pair, 294 = 294, and 414 = 414 in seating B. The other half of `NET-109 殘留`, its mechanism, has been `R6b`'s in the row's owner cell since the commit that opened `P2`, so `P2` never took it on. ⚠️ `rlx0`'s transmit path is in both sets: `R6` as `NET-67 殘留`, *why the engine stops retiring a TX descriptor*, and `P2` as frames the driver counts as sent that do not leave port 3 intact (`NET-112`, `NET-116`). What would join them is `R6b`'s candidate M8, and M8 is 推 — the same subject, not yet the same thing |
+| `R6` → `P2` 🆕 | **no — `P2` CLOSED three of `R6`'s residuals, each taken on in writing by one of its own steps, and the one subject both still carry is two different observations.** Closed: *"`D5`'s headline number needs a verb typed"* — `P2-2` compiled `recover` on, and `P1-N0` read `recov_mode 1` on both days with no verb typed; *"this project holds no vendor receive figure at all"* — `P2-3`'s `eth4` board-receive trials (`NET-114`), reproduced in seating B at 24.572 / 24.653 / 23.923 Mbit/s; and `NET-109 殘留`'s healthy baseline — `P2-3`'s pre-traffic pair, 294 = 294, and 414 = 414 in seating B. The other half of `NET-109 殘留`, its mechanism, has been `R6b`'s in the row's owner cell since the commit that opened `P2`, so `P2` never took it on. ⚠️ `rlx0`'s transmit path is in both sets: `R6` as `NET-67 殘留`, *why the engine stops retiring a TX descriptor*, and `P2` as frames the driver counts as sent that do not leave port 3 intact (`NET-112`, `NET-116`). What would join them is `R6b`'s candidate M8, and M8 is 推 — the same subject, not yet the same thing 🔄 **2026-09-28, decided at fourteen entries with `M8`'s result in view, as that run asked:** `M8` as written is refuted — block 46 stalled with no jabber — and one variable, `txlen`, removes both symptoms, the corruption (`D2`) and the stall (`D4`: 0 fires at the fix, 12 at 1.4 on the same boot). So the two were one fault at the level of the fix (量) and not of a mechanism (推). The verdict above is what that run could see, recorded and not re-scored (below, fourteen entries) |
+| `P2` → `R6b` 🆕 | **yes — the mechanism of `rlx0`'s transmit fault, as a cause.** `P2` carries it as *"rlxfw's own driver has no throughput figure at the n the DoD asks for, and why is `R6b`'s"* and, in the same paragraph, *"The mechanisms are eight candidates, all 推"*; `R6b`'s step list took the candidates on in writing (*"… read on silicon by `R6b-3`, with every mechanism"*), and its entry carries *"the mechanism of the transmit fault, as a cause"*: the stage a span with no component measured, `M1`-cover8 a fitted rule (`NET-129`, `NET-132`). ⚠️ Four more items sit in both lists and are declined, each for its reason below |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -2359,6 +2695,97 @@ idle*. It is not counted: the census was not idle, it did the TCP half, and the
 gap is a choice of scan the row never made, which the feature table's method
 states. Recorded so a fourteenth entry does not find it and call it a third
 point.
+
+### 🆕 At fourteen entries the clause FIRES, on the mechanism of `rlx0`'s transmit fault — handed from one gate to the next by name
+
+**What the new firing names, in the words of the two entries that share it:**
+
+* `P2`: *"rlxfw's own driver has no throughput figure at the n the DoD asks for, and why is
+  `R6b`'s"* — and in the same paragraph, *"The mechanisms are eight candidates, all 推
+  (`notes/nic-driver.md` § 21)."*
+* `R6b`: *"The mechanism of the transmit fault, as a cause"* — the stage a span with none of its
+  components measured, what the engine fetched unseen, `M1`-cover8 a rule fitted after blocks 45
+  and 46. Its step list took the candidates on in writing when it opened: *"M1, M2 and M3's
+  descriptor read-back go to `R6b-2`'s image and are read on silicon by `R6b-3`, with every
+  mechanism; M5 still has no step"*, with a refutation condition written for five of them.
+
+🟢 **This is the second firing where the earlier entry names the later gate**, after `P1` → `R6`, so
+nothing has to be read into either entry: `P2` wrote *"why is `R6b`'s"*, and `R6b`'s list quoted
+the candidates back.
+
+🔴 **And `R6b` took it much further than `P2` left it, which is the deduction against the
+firing.** `P2`'s throughput half is closed — `D3` met 12 of 12 on two boots — and seven of the eight
+candidates were read: `M2` and `M7` refuted, `M1` narrowed in loopback to one field, `m_len`, `M3`
+reduced to two lengths' history, `M4` observed and kept, `M6` not fired, `M8` refuted as written;
+only `M5` never ran. The fault is fixed, at the default. What both entries still carry is a cause
+inside a span no instrument on this bench sees into — the engine's fetch, its DMA, the CPU
+interface's framing — for which the documents held (D, B) give the fields and not the engine's
+rule. **So the clause names an explanation, not a defect**, and like `R4` → `R5`'s firing it may be
+a thing that cannot be done here: the read-back that would show the fetch is a read of memory with
+the fetch held. 🟢 What it would cost, for the part that can be done: `M5`, the `tx` verb with the
+vendor's port-list mask at the seven lengths under 1.4 — one press, no image.
+
+**The thirteen-entry run's deferred question, decided.** That run declined `R6` → `P2` as one subject
+seen as two faults and wrote: *"the entry that closes `R6b`, which owns both, decides it with M8's
+result in view."* `M8`'s clause fired on block 46, so `M8` as written — *an overlong frame keeps the
+engine from retiring descriptors* — is refuted: a stall came with no jabber. But what that run
+needed `M8` for, that the stall and the corruption are one fault, holds at the level of a single
+variable: `txlen` removes the corruption on blocks 47 and 48 (`D2`) and the stall on block 50 (`D4`:
+0 fires at the fix, 12 at 1.4 on the same boot), 量. At the level of a mechanism it is 推: the
+stall follows wrong-length frames, jabbered or counted nowhere (`A2-02` had 14 counted nowhere). So
+`R6`'s `NET-67` 殘留 and `P2`'s corruption were one fault seen through two symptoms — the case that
+run described, *"a clause that compares what two entries say cannot see a common cause behind two
+symptoms that each entry measured on its own."* 🔴 **Recorded, not re-scored**: the thirteen-entry
+verdict stands as what it could see, and its row carries this decision. With it, the mechanism of
+`rlx0`'s transmit fault has been in three consecutive entries' *what it did not establish* — `R6`'s
+as the stall's why, `P2`'s as eight candidates, `R6b`'s as the cause behind the one variable that
+removes both.
+
+⚠️ **What the firing does NOT name, item by item — four more things are in both lists:**
+
+* **`1472|mdev`.** `P2` carried it as a miss; `R6b` ran the experiment `P2` named, and the rise
+  recurred on both drivers and in both capture states, so it is not `rlx0`'s; the row is ⊘ by a
+  ruling with a reopening condition. Declined because the record already decided it: the clause
+  surfaces what nobody decided, and a ⊘ is a decision. 🔴 This reason is used here for the first
+  time and is weaker than the others — the decision is the main session's, and **if the owner
+  overrides it, `1472|mdev` is a second shared item and the pair fires on it too.**
+* **The UDP receive loss.** `P2` carried *where above the driver the datagrams die*; `R6b` answered
+  it — at the socket, 量, the ~64 a full queue of 63 (`NET-142`) — and carries a narrower question,
+  why the socket refuses, which is ⊘ (`NET-117` 殘留). Closed where it was asked; the remainder is
+  ⊘.
+* **`CLK-42`.** `P2` carried *what the `asicCounter` read does to the timers*; `R6b` closed the
+  attribution (block 46: the read, 112.55–115.72 jiffies each) and its own step list re-owned the
+  mechanism, in writing, to `docs/interrupt-map.md` § 8.4 as off its path. The guard written at
+  eight entries decides it — *a gate does not inherit its predecessor's residuals by default* — and
+  here the later gate's list gave it away in writing. ⚠️ Its row asks the owner to assign a gate,
+  and none is assigned.
+* **The flash boundary**, for the reason the thirteen-entry run gave.
+
+🟢 **And three of `R6`'s residuals, which the owner gave `R6b` when it opened, are closed** — `D4`'s
+second conjunct (`D8`), `R6-4`'s `ethtool` ops and `phylib` (`D6`, `D7`), and `MT-PORT`'s driver
+label, the twelve-entry firing's subject: `MT-PORT` reads `Port3 LinkUp by rtl819x-switch 1.5;
+vendor tree absent` on the vendor-free image (量, arm I). **The twelve-entry firing is discharged**,
+by a measurement of the property it named.
+
+⚠️ **Where the new firing goes is the owner's**, as every firing's has been.
+
+### 🆕 The census re-run at fourteen entries — no sixth instance, and one candidate recorded
+
+量 2026-09-28 with the thirteen-entry script (`$FWRE_WORK/rebuild/s111/land/gate/census.py`, read
+only), whose control reproduced the twelve-entry figures — 44 clauses across eight gates — before it
+printed anything else: the `D`-row form is now **60 clauses across ten gates** — `R3` 5, `P4b-gate`
+4, `R4` 4, `R5` 4, `R1-pub` 13, `R1z` 4, `P1` 4, `R6` 6, `P2` 8, **`R6b` 8** — with the four gates
+before the form carrying 13 more, carried rather than re-derived because those step lists are
+records. **73 clauses.** ⚠️ The script's closing line still says *thirteen-entry*; it was written for
+that run, and what is read here is its per-gate lines.
+
+**No sixth instance.** One candidate, recorded so a fifteenth entry does not find it and call it a
+sixth: `D2`'s *"on a fixed image"*. Both of its boots ran an image whose default was 1.4's, with the
+fix typed as a verb; the image whose default is the fix ran afterwards, once, and not as a `D2` boot
+(`NET-158`). It is not counted: the row names a property of the object under test, and that property
+was measured on that object in the typed setting, by the same cells as the unfixed setting; what the
+word *image* promised arrived one step later, inside the gate. It is `R6`'s verb shape — `recover`
+then — and not the artefact-for-property shape. ⚠️ **The weaker class stays at two.**
 
 ### Carried unchanged from the seven-entry run
 

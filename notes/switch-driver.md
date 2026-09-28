@@ -3918,8 +3918,8 @@ same files read as they did before the flip: `r6b10n` green as `quiet-noswcore`,
 `rlxfw-kbuild.sh` takes `quiet`, `loud` and `quiet-swcore` (rc 0) and refuses `quiet-noswcore` and
 `quiett` (rc 3), without reaching a vendor binary or staging a cell. The recipe the default builds
 from, a digest over `config/`, moves from `3685a3a4` to `8b5ae480`. `test-config-gates`' E5 is red
-at the desk before and after, for one reason: the initramfs declaration's `/bin/uprobe` names
-`build/rlxfw-user/isaprobe/uprobe`, a gitignored build product that is not there.
+at the desk before and after, for one reason: a gitignored build product the initramfs declaration
+names is missing (`isaprobe/uprobe` in the worktree these ran in, `linkprobe` in the main tree).
 
 ## 18.5 The `CONFIG_RLXFW_VENDOR_ETH_OPEN` row stays in every variant
 
@@ -3981,7 +3981,7 @@ the seam defines are its references (§ 13.3).
   `config/host-compat/0008`'s header, `MK12`'s reason in `config/rlxfw-marks.tsv`, the comment in
   `rlxfw-seam.c` (its line count kept), and the `Kconfig` row of `docs/blind-write-ledger.md`. Left
   as records: `LOG.md`, `bench/2026-09-28/RUN-armII.md`, § 13 of this file (with a pointer in
-  § 13.10), `notes/nic-driver.md` § 29.5, and `SPEC.md` `NET-150`, `FW-103` and `FW-154`.
+  § 13.10), `notes/nic-driver.md` § 29.5, and `SPEC.md` `FW-103` and `FW-154` (`NET-150`: a pointer).
 
 ## 18.8 What 8g does not establish
 

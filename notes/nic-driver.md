@@ -4829,8 +4829,10 @@ after `R1-M1`.
   length, at the fix and at 1.4, identical cells, each on a re-armed ring, and P8 is met at all
   seven faulty lengths with P5 at 11 and P6 at 4 (§ 27.4). The stage is named as a span: after
   the driver's fill in descriptor memory and at or before the CPU port's receive MAC (推 from 量
-  parts). On the stack path the lower bound is block 47's `tx`-verb read-back (§ 25.1), carried
-  across arm and boot (讀/推): no stack-arm descriptor was read back on either boot. Not
+  parts). On the stack path the lower bound is block 47's `RB-02-C`, two `nic_xmit` fills at 61 B
+  read back EQUAL with the fetch held (§ 25.1), carried across length and boot (讀/推); no
+  stack-arm descriptor was read back on this boot. 🔄 2026-09-28 (`R6b-9`'s ruling 1): this said
+  *"block 47's `tx`-verb read-back … carried across arm and boot … on either boot"*. Not
   established: that the stage is the TX DMA engine, what the engine fetched, or anything between
   descriptor memory and the CPU port's MAC. At 62 the stage chain is void (K +1); its threshold
   verdict stands.

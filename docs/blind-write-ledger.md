@@ -1438,3 +1438,25 @@ rlxfw from this reading; 8d decides what it writes, with its sources, and declar
 | `drivers/net/rtl819x/rtl_nic.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a fourth row). The ISR's counters `:3733-3742`: `cnt_swcore_err` +1 for any interrupt whose masked `CPUIISR` holds an RX-done, TX-done or link-change bit (`NET-157`); `WRITE_MEM32(PLITIMR,0)` `:6370` under `CONFIG_RTK_VLAN_SUPPORT`, the one vendor write of `PLITIMR` on record, which the read value `00001000` contradicts (`NET-162`) |
 | `drivers/net/rtl819x/AsicDriver/rtl865x_asicL2.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a second row). The `PIN_MUX_SEL &= ~0x8F18` and `PIN_MUX_SEL2 &= ~0x3B6DB` clears `:4568-4569` and `LEDCREG = (2<<20)` `:4571`, in the `CONFIG_RTL_8196E` arm under `BICOLOR_LED` (defined `:4284`); `QNUMCR`'s per-port field `:6554-6555`, three bits at `3*port` — each the B of `NET-162`'s count of sources |
 | `drivers/net/rtl819x/AsicDriver/rtl865x_asicCom.h` | line | 🔴 **vendor** | 🆕 2026-09-28 (a second row). The VLAN entry's word 0 `:230-242` — `vid`, `fid`, `extEgressUntag`, `egressUntag`, `extMemberPort`, `memberPort`, in the `CONFIG_RTL_8196E` arm — the decode of the loader's slot 8 (`NET-164`) |
+
+## § 9.12 — `R6b-8` arm I: how port 3's frames reach the CPU, 2026-09-28
+
+**Declared by hand for § 9.5's reason; none of these paths is in `ledgerscan`'s scope.** No driver
+changed: these rows bound the reading behind `notes/switch-driver.md` §§ 17.6 and 17.8 (`SPEC.md`
+`NET-167`, `NET-169`), which decoded the tables `rtl819x-view` 1.1 read on arm I's boots. Every line
+below was re-read in the staged tree `r6b8cr` was built from (`$FWRE_WORK/rebuild/r3-4/cells/r6b8cr/`),
+where the vendor tree builds, before it was written here; each of the five files is byte-identical
+(`cmp`) to its copy in `r6b8i`'s staged tree, whose image does not link them.
+
+⚠️ **What was taken, by kind.** Names, bit and field positions and one hash, each the B beside a 量
+reading on arm I's boots (`NET-169`); and the vendor's own route to the CPU, read to be compared and
+not taken. No vendor sequence enters rlxfw from this reading: 8d's `init` writes `EnablePHYIf` alone
+(`NET-166`), and `FFCR` stays the loader's.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h` | line | 🔴 **vendor** | 🆕 2026-09-28 (a seventh row). `FFCR`'s bits `:1658-1669`: `EnUnkUC2CPU (1<<1)` `:1666` and `EnUnkMC2CPU (1<<0)` `:1667` — **the B of the two traps the loader's `FFCR` `00000003` sets**, the one source behind `NET-37` 殘留's inferred path — and `IPMltCstCtrl_Enable (1<<3)` `:1662`, the other bit of the vendor's `FFCR` 9. `FFCR`'s address, `:1490`, is in § 9.8's first row |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicL2.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a fourth row). `rtl8651_filterDbIndex` `:706-711`: an L2 row is the XOR of the address's six octets and `fidHashTable[fid]` (§ 9.8's `:22`), masked to eight bits — **the hash that put the host adapter's learned entry at row 225, and by which no slot holds rlxfw's address** |
+| `drivers/net/rtl819x/l2Driver/rtl865x_fdb.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a second row; § 9.9's is the seam's). `_rtl865x_layer2_patch`'s static entries for broadcast `:93` and for `cpu_mac` `:98`, both `FDB_TYPE_TRAPCPU`, and `FDB_TYPE_TRAPCPU` giving `toCpu = TRUE` `:559-560`: **the vendor's route to the CPU, compared and not taken** — rlxfw inherits the loader's `FFCR` traps instead (`NET-169`) |
+| `drivers/net/rtl819x/common/mbuf.h` | line | 🔴 **vendor** | 🆕 2026-09-28. The packet header's `ph_extPortList` `:66`, with `PKTHDR_EXTPORT_LIST_CPU` 3 `:77`, the CPU bit `rx_ph1` `00400819` decodes to; and `ph_reason` `:107`, *"indicates wh[y] the packet is received by CPU"* — **the word that would settle `NET-37` 殘留**, which `rtl819x-nic`'s page does not print |
+| `drivers/net/rtl819x/AsicDriver/rtl865x_asicCom.h` | line | 🔴 **vendor** | 🆕 2026-09-28 (a third row). The rest of `rtl865xc_tblAsic_netifTable_t` `:171-226`, which § 17.6 cites whole: the little-endian arm `:192-217`, not built on this big-endian target, and the reserved words 4–7 `:218-226`. Nothing was taken beyond § 9.8's big-endian arm `:171-191` |
