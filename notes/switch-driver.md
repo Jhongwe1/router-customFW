@@ -1659,7 +1659,7 @@ budget cannot fire at these widths. `viewcheck` V14 measures all four figures
 against the driver's comment. The page format, its 21 `sprintf` literals and
 what `viewdecode` refuses were frozen for the decoder by the file's sha256,
 `68ec4f21…` (session material, not in this repository); the source owns the
-format, and a changed literal is a version change.
+format, and a changed literal is a version change (1.1: 311 words, 26 literals, ≤ 3,774 B, § 17.5).
 
 ## 12.3 The admission table: 298 words, and the one word the rule turns on
 
@@ -1737,7 +1737,7 @@ HW-1 (`read 0xBB804500 4` loads `0xBB804500` to `0xBB804510`, inside the switch
 window, touching no refused word) — the way all three readings were taken. It
 is 8d's to admit, with the one-source words (`QNUMCR`, `CSCR`, `EEECR`,
 `IBCR0`–`2`, `WFQRCRPn` and the rest), once 8c-cells has read them another
-way and the table changes anyway. `SPEC.md` `NET-139`.
+way and the table changes anyway (1.1 admits the thirteen: 311, § 17.5). `SPEC.md` `NET-139`.
 
 ## 12.4 The table read, and the premise of `NET-28` 殘留 it refutes
 
@@ -1830,7 +1830,7 @@ nothing, the widest page, the strict parser and its wrap. M0 runs the unmutated
 cut through the mutation path; M1–M25 each turn the case named for them red.
 V17 and M23–M25 came from the review: the three resets at the top of
 `rtl819x_view_tbl` survived V0–V16 when deleted, because V7 stops at slot 5,
-after slots 0–4 have rewritten every per-slot field. 44 lines, a CI step in the
+after slots 0–4 have rewritten every per-slot field. 44 lines (1.1: 69, § 17.5), a CI step in the
 `instruments` job and its `tools/ci-expected.tsv` row. What it cannot see is
 the silicon, and its model shares the table's sources.
 
@@ -1840,7 +1840,7 @@ from B, with D's name beside it where D's differs), renders the vendor's
 `lo + (hi << 22)` (`rtl865x_asicCom.c:1506`, one source), and brackets a view
 read between two counter readings (`before <= view <= after` for each of the
 211 counters the vendor prints). Its self-test is 22 cases — A1, A2, B1–B4,
-C1, C2, D1, D2, E1–E12 — M0 and M1–M10: 33 lines, a CI step and its row. B1
+C1, C2, D1, D2, E1–E12 — M0 and M1–M10: 33 lines (1.1: 41, § 17.5), a CI step and its row. B1
 requires the driver's 21 `sprintf` literals verbatim; B3 decodes the pages
 `viewcheck`'s harness gets from the compiled driver. **A1 is a finding.** The
 proposal expected every committed `asicCounter` capture to re-render byte for
@@ -1996,7 +1996,7 @@ opened are `docs/blind-write-ledger.md` § 9.8.
 * Anything on the silicon: not one line of the file has run. How long `SWTACR`
   stays busy, whether a slot tears, what `tbl` reads on the die against what
   the vendor's reader reads, and the view's page on a real boot are 8c-cells'.
-* That the 298 words are free of read side effects: none is known (推), and
+* That the 298 words (1.1: 311, § 17.5) are free of read side effects: none is known (推), and
   which of them were read on this die before is the table's sources column.
   Five were never read here — `BSCR` (`0x4044`), `PCRP8` (`0x4124`), `LEDCREG`,
   `LEDCR1` and `LEDBCR` — and the `PIN_MUX` pair has no reading at all.
@@ -2009,7 +2009,7 @@ opened are `docs/blind-write-ledger.md` § 9.8.
 * That the quiet `/init`'s boot capture falls in `bootbytes`' 710 class (推):
   nothing was booted.
 * Anything about a one-source word, or about `0xBB804500` beyond its three
-  readings: it is refused in 1.0 (§ 12.3), and its place in 8d's table is 8d's.
+  readings: it is refused in 1.0 (§ 12.3), and its place in 8d's table is 8d's (in 1.1, § 17.5).
 * A second copy of the admission table: the census is a second source by
   counts, and `admit 298` on the page is a count, not a list.
 
@@ -3325,3 +3325,172 @@ store and `RLXFW-SW-INIT=0000001F`.
   built.
 * Anything about the VLAN group on a boot path on which the loader has not brought its network up
   (autoboot from flash), which `R9`'s zero-write rule keeps unreachable.
+
+## 17.5 rtl819x-view 1.1: tbl l2 and 13 more words
+
+8d ruling 7 asks for `rtl819x-view` 1.1, so that arm I can read on an image with no vendor node:
+`tbl l2`, the L2 table read by the existing table protocol, printing only slots whose words are not
+all zero, under a page budget, with a count line (ruling 6 of the night gave arm I's card the L2
+path, § 16.7); and `peek` admitting the 13 words § 16.4 lists as having B and 量, with `0x4D48` still
+refused. The file is `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c`, 709 → 994 lines,
+sha256 `68ec4f21…` → `03109a3c…`; the main session accepted it as written. Marks as in § 17; 量 on
+the host is a desk tool's measurement. `SPEC.md` `FW-156`.
+
+**The thirteen words.** Each has B (the header the build compiles, `rtl865xc_asicregs.h`, sha256
+`e29c3051…`; the addresses compiled from it with the build's defines,
+`-D CONFIG_RTL_8196E -D CONFIG_RTL_819X`, not added up by hand) and 量, a loader `DW` reading of this
+die in 8c-cells group A's L column (`bench/2026-09-27d/`, the cold prompt of 2026-09-27), each line
+re-read to carry its word; D places none. `NAME:N wK` is word K on line N of `NAME.log`, counted on
+LF with CR stripped:
+
+* `CSCR` `0xBB804048`, B `:1015`; `AL-D04:2` w2, `00000008`.
+* `EEECR` `0xBB804160`, B `:1365`; `AL-D07:2` w4, `294A5294`.
+* `SBFCTR`/`SBFCR0` `0xBB804500` (one address, two names), B `:1673`–`:1674`; `AL-D11:2` w1,
+  `000000F4` — the word 1.0 refused (§ 12.3).
+* `IBCR0`–`2` `0xBB804704`–`0xBB80470C`, B `:1831`–`:1833`; `AL-D12:2` w2–w4, 0.
+* `QNUMCR` `0xBB804754`, B `:1850`; `AL-D13:2` w2, `00001249`.
+* `WFQRCRP0`–`5` `0xBB8048B0` + 12p (`PSCR` + `0x0B0`; `PSCR` is B `:2159`), B `:2202`, `:2205`,
+  `:2208`, `:2211`, `:2214`, `:2217`; `AL-D14:2–5`, the dump's words 1, 4, 7, 10, 13 and 16:
+  `00003FFF` for P0–P4, 0 for P5.
+
+Refused beside them: `0x4D48` (`AL-D17:2` w4, `BB060100`; no name in B's live branch, none in D) and
+`WFQRCRP6` (`0xBB8048F8`, B `:2220`; `AL-D14`'s sixteen words end at `0xBB8048EC`, so it was never
+read). The thirteen are a second run table at the end of the file, `rtl819x_view_runs11[]`, each row
+citing its B lines and its capture; `rtl819x_view_admit` consults it through its last `return`,
+after the `PSRP` test, and `rtl819x_view_nadmit` adds it to its sum: `admit 311`. All thirteen were
+also read on the V and R boots of 2026-09-28, through the vendor's memory node (§ 16.2).
+
+**The L2 table** (讀; every file cited here is byte-identical, `cmp`, between `r6b8cr`'s staged tree
+and `src-vendor/rtl819x-toolchain/linux-2.6.30`):
+
+* Type 0, `TYPE_L2_SWITCH_TABLE` (`rtl865x_asicBasic.h:28`); the window is `REAL_SWTBL_BASE` (B
+  `:151`) + (0 << 16), `0xBB000000`–`0xBB007FFF`.
+* 1,024 slots: `RTL8651_L2TBL_ROW` 256 × `RTL8651_L2TBL_COLUMN` 4 (B `:2587`–`:2588`, under no
+  `#if`). D gives the count too — "a 1024-entry address look-up table with a 10-bit 4-way XOR
+  hashing algorithm" (its § 1) and "Internal 1024 entry 4-way hash L2 look-up table" (its § 2) — so
+  the count has two sources.
+* Slot = row << 2 | column. The vendor's own L2 read path, `rtl8651_getAsicL2Table`
+  (`rtl865x_asicL2.c:803-837`), bounds row < 256 and column < 4 (`:806`) and calls
+  `_rtl8651_readAsicEntry(TYPE_L2_SWITCH_TABLE, row<<2 | column, &entry)` (`:810`), the reader 1.0's
+  `tbl` copies (§ 12.4). Its `rtl865x_accessAsicTable` (`96E/rtl865x_asicBasic.S:531-617`) lets type
+  0 through whatever the ASIC function word holds, as it does 4 and 6: bit 0 is in none of `0xe22`,
+  `0x8` and `0x4000`.
+* 32 bytes a slot: the reader's `sll $2,$18,5` (`:1084`). For type 0 it copies out two words
+  (`_rtl8651_asicTableSize`, `:185`), the entry's words 0–1 (`rtl865x_asicL2.h:140-190`; words 2–7
+  are reserved), and it loads and compares all eight, as `tbl l2` does.
+* `AsicDriver/Makefile` builds `96E/rtl865x_asicBasic.o` and `rtl865x_asicL2.o` when
+  `CONFIG_RTL_8196E` is set: the files are in the tree that builds.
+
+量: none. No committed capture has loaded an address in the window (a `git grep` of `bench/` for a
+`DW` or a memory-node read of `0xBB000000`–`0xBB007FFF` finds none), and `SWTAA` has never read an
+address in it (`BB060100`, `BB040020` and 0 in § 16.2). Type 0 rests on B's enum, whose 4 and 6
+`SWTAA` places (§ 12.4); the first `tbl l2` on the die is its reading (推 until then).
+
+**The verb and the page.** `tbl l2` reads all 1,024 slots by 1.0's protocol unchanged — per slot,
+`SWTACR` polled to the same 10,000-poll bound with `udelay(1)` between, then up to ten double reads
+of the eight words, the second buffer kept — in a helper of its own, because 1.0's `tbl` caches
+every slot and 1,024 do not fit. It keeps the first 40 slots whose second buffer is not all zero, in
+slot order, and counts the rest. It loads `SWTACR` and the table's words, nothing else, and stores
+nothing; a `cat` still loads nothing. After the five header lines:
+
+```
+tbl l2 base BB000000 slots 1024 words 8 polls P read R nz N shown S mis M
+sNNNN tK eq|mis  the eight words of the second buffer, per kept slot
+busy sNNNN       only after -EBUSY, the slot it stopped at
+```
+
+`read` is the slots read (1,024 unless `-EBUSY`), `nz` those not all zero, `shown` the slot lines
+(`nz` or 40, the smaller), and `mis` the slots whose ten tries all disagreed, shown or not: a torn
+slot whose second buffer is zero is counted there and printed nowhere. The filter judges the buffer
+the page prints.
+
+**The page's arithmetic** (量 on the host: `viewcheck` V14 measures every term and reads them out of
+the driver's comments). At 1.0's widths — every counter at its type's widest; `shown`, the slot
+number and `t` at their bounds — the count line is 111 B, a slot line 86 (`s1023 t10 mis` and eight
+words) and the busy line 11, so the result is at most 111 + 40 × 86 + 11 = 3,562 B and the page at
+most 193 + 3,562 + 19 = 3,774 B: under the 3,900-byte budget, which therefore cannot fire, and under
+4,096. The widest real `tbl l2` page is 3,771 B (`last l2` is 3 bytes shorter than `last netif`). 41
+kept slots would still fit (3,860 B); 40 is a round number with room. `mib`'s result stays 2,231 B.
+
+**Time, and IRQs.** IRQs stay on, as in 1.0's `tbl`: nothing in the verb masks them. It never
+sleeps, so on this UP, `PREEMPT_NONE` kernel no other process runs until it returns; interrupts and
+timers do. With `SWTACR` idle and no tear it makes 1,024 × 17 = 17,408 loads (a guess: milliseconds;
+no time per load on this bus is on record). At the worst the bound allows — `SWTACR` busy for 10,000
+polls at every slot, and ten tries each — it spends 1,024 × 10,000 µs = 10.24 s in `udelay` alone
+and makes 1,024 × 10,161 = 10,404,864 loads. Nothing on a `SWCORE=n` image issues a table command
+(rlxfw issues none), so that case needs the vendor's driver (推); the six `tbl` pages committed so
+far read `polls` equal to their slots, 72 slot reads with `SWTACR` never busy (`bench/2026-09-28/`:
+`AV-TV`, `AR-TV`, `M2-VV`, `AV-TN`, `AR-TN`, `M2-VN`). The standard `/init` names no watchdog (讀).
+
+**The name.** `rtl819x_view_lname[5]` is `"tbl l2" + 4`: `l2`, printed from inside the verb's own
+literal. `/proc/rtl865x/l2` is one of the vendor's 42 `/proc` names (`rtl865x_proc_debug.c`, parsed
+as `tools/imgprocs.py` parses it), which `imgprocs` looks for in an image as NUL-bounded literals
+and `ethcensus population` derives its shared set from; a bare `"l2"` in `rtl819x-view.o` would read
+there as the vendor's, as `vlan` and `netif` did (§ 12.7). `ethcensus check`, arm I's gate, reads
+only its fixture's six vendor-unique names and is untouched either way. `viewcheck` V0 refuses a
+bare `"l2"` in the driver's code (M40 is its mutant). The prediction for arm I's build (推 until it
+is built): `imgprocs` on the flat image reads `l2` ABSENT. If it reads PRESENT, rsdk gcc 3.4.6
+emitted the literal anyway, and the answer is an `OWN_LITERALS` row for `l2`, measured on that
+build.
+
+**FW-110.** No line of 1.0 moved (量, `$FWRE_WORK/rebuild/s116/view11/fw110.py`, whose control is a
+planted insertion): `git diff -U0` has 27 hunks, 26 replacing N lines with N at the same numbers and
+one appending after line 709; 669 of the 709 lines are HEAD's and 40 changed in place — the version,
+the `#error` text, the comments that state a count or a list, `lname`'s sixth name, three hooks
+(`rtl819x_view_admit`'s last `return`, `rtl819x_view_nadmit`'s sum and the write handler's `tbl`
+branch) and five formerly blank lines, four holding prototypes and `:622` the render hook — and none
+outside a hunk. citecheck's own `CITE_RX` finds no citation of `rtl819x-view.c:NNN` in the 14,935
+tracked files; a planted one is found.
+
+**The host tools** (量 on the host; each unmutated run first, green before its mutants counted):
+
+* `tools/viewcheck.py`: the model holds 311 words (§ 16.4's 13 written again in the tool, not read
+  from the driver) and the L2 table's 1,024 slots of 8 words, zero unless a script sets a slot's
+  words, tearable on either buffer. V0–V23, 24 cases: V18 an all-zero table (17,408 loads in slot
+  order, no slot line); V19 five non-zero slots among zeros, in order, their exact words; V20 the
+  cap at 40, 41 and 100 non-zero slots; V21 `SWTACR` past the bound at slot 700, at the bound, and a
+  refusal at slot 0 between `tbl l2`, `mib`, `tbl vlan` and `tbl l2`, where the four resets at the
+  top of the verb show; V22 tears on either buffer, a zero slot torn on the first counted in `mis`
+  and not shown; V23 each of the 13 permitted beside a refused neighbour, `0x4D48` and `WFQRCRP6`
+  refused, the three IBCRs permitted as one span and three spans refused whole. M0 and M1–M44, each
+  killed by the case named for it; M23–M25 now anchor on 1.0's three resets together, since `tbl l2`
+  repeats two of those lines. 69 lines, 44 before (`tools/ci-expected.tsv`); the whole run took 27 s
+  at the desk, 10 s before.
+* `tools/viewdecode.py`: decodes 1.1 pages and still 1.0's; the version line picks `admit` 298 or
+  311, the `last` names and the word set. An L2 slot is decoded from B's entry
+  (`rtl865x_asicL2.h:140-190`): word 0 is `mac39_24` (31:16) and `mac23_8` (15:0); word 1 is
+  `reserv0` (31:26), `auth` (25), `fid` (24:23), `nxtHostFlag` (22), `srcBlock` (21), `agingTime`
+  (20:19), `isStatic` (18), `toCPU` (17), `extMemberPort` (16:14), `memberPort` (13:8) and
+  `mac47_40` (7:0). B's two arms, big-endian `:141-157` and little-endian `:159-176`, put every
+  field at the same bits of its word (讀), so the decode does not rest on which arm the build takes —
+  one document agreeing with itself, not a second source. The MAC is assembled as the getter does
+  (`rtl865x_asicL2.c:815-820`): the sixth octet is the row (slot >> 2) XOR the other five XOR
+  `fidHashTable[fid]` (`:22`, `00 0F F0 FF`); the getter skips an entry whose `agingTime` is 0 and
+  which is not static (`:813-814`) and gives its age as `agingTime` × 150 s (`:832`). 24 cases (C3:
+  five slots whose words and decode were written by hand, every `fid` and every flag; E13: 25
+  `tbl l2` refusals), M0 and M1–M16, each killed by the case named for it: 41 lines, 33 before; the
+  whole run took 278 s at the desk, 148 s before. HEAD's decoder and this one give the same verdict
+  on the 65 committed captures holding a view page (all 1.0), and a planted `admit 297` is refused
+  by both.
+
+**What 1.1 does not establish.**
+
+* Anything on the silicon: not one line of 1.1 has run, and rsdk gcc 3.4.6 has not compiled it; the
+  image build does that.
+* That `0xBB000000` holds the L2 table: no reading has touched the window. The read that settles it
+  is arm I's: compare by script, never printing, whether the host's MAC decodes at the row its hash
+  names — one comparison that checks the window, the field layout and the hash together.
+* The decoded fields beyond B: the layout, `fidHashTable` and the 150-second age step have one
+  source.
+* That the thirteen words have no read side effect (推: none is known), how long a `tbl l2` takes on
+  the die, and whether an L2 slot tears there.
+* That rsdk gcc 3.4.6 emits no NUL-bounded `l2` for `"tbl l2" + 4`: `imgprocs` on arm I's image
+  answers.
+* That a `tbl l2` capture may be committed as it stands. Its raw words carry the MAC of every
+  station the switch has learned — possibly the loader's own address, which may be `H601`'s (not
+  checked here) — split across word 0 (octets 1–4) and word 1's low byte (octet 0). The sixth octet
+  is not stored, but it is the row XOR the other five XOR `fidHashTable[fid]`, so the slot number on
+  the same line gives it back. `tools/audit-bench-log.py`'s MAC patterns do not match that raw form;
+  they do match `viewdecode`'s output, which prints whole MACs. Whether such a capture is committed
+  as it is (as the netif page `M2-VN`, whose words also carry a MAC, was) and what `flashwin scan`
+  must see first are the owner's to decide.

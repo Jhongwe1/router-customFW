@@ -1482,39 +1482,39 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-ethcensus.sh 2>&1 | tee ci-out/test-ethcensus.out; exit "${PIPESTATUS[0]}"
 
-      # viewcheck (R6b-8 8c) cuts config/rlxfw-src/linux-2.6.30/drivers/net/
-      # rtl819x-view.c below its includes, UNCHANGED, and compiles it with the
-      # HOST gcc in the kernel's dialect (-std=gnu89 -Werror) against a sparse
-      # MMIO model: the 298 words the 8c admission table admits and the 192
-      # words of the VLAN and netif tables each have a value, and any store,
-      # or a load of any other address, ends the harness (exit 9), so a
-      # refusal before the load is observable. V0-V17: every verb refused and
-      # permitted beside its twin, every word of the four windows, the SWTACR
-      # bound at s05 and at s00, a torn slot, a cat that loads nothing, the
-      # widest page. M0 runs the unmutated cut through the mutation path; M1-M25 must
-      # each turn the case they name red. Without gcc it REFUSES (exit 3).
-      # What it cannot see is the silicon, and its model shares the admission
-      # table's sources.
+      # viewcheck (R6b-8 8c; 1.1 is 8d's) cuts config/rlxfw-src/linux-2.6.30/
+      # drivers/net/rtl819x-view.c below its includes, UNCHANGED, and compiles
+      # it with the HOST gcc in the kernel's dialect (-std=gnu89 -Werror)
+      # against a sparse MMIO model: the 311 words the admission tables admit,
+      # the 192 words of the VLAN and netif tables and the L2 table's 8,192
+      # each have a value, and any store, or a load of any other address, ends
+      # the harness (exit 9), so a refusal before the load is observable.
+      # V0-V23: every verb refused and permitted beside its twin, every word of
+      # the four windows, the SWTACR bound at s05, s00 and s0700, torn slots, a
+      # cat that loads nothing, the widest page, tbl l2's zero filter and 40-slot
+      # cap, the 13 words. M0 runs the unmutated cut through the mutation path;
+      # M1-M44 must each turn the case they name red. Without gcc it REFUSES
+      # (exit 3). It cannot see the silicon; its model shares the tables' sources.
       - name: viewcheck
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/viewcheck.py 2>&1 | tee ci-out/viewcheck.out; exit "${PIPESTATUS[0]}"
 
-      # viewdecode (R6b-8 8c) is the host decoder for /proc/rtl819x-view
-      # pages: decode, the vendor's asicCounter rendered from the raw words
-      # (low + (high << 22)), and a before <= view <= after bracket. Its
-      # self-test: A1 classifies every committed asicCounter capture under
-      # bench/ (266 at 8520b6c) as clean or printk-timed -- parsed and
-      # re-rendered to its own CRLF bytes -- or interleaved or cut by the
-      # capture's end, which the parser must REFUSE while a self-test-only
-      # reader finds the lines behind them (A2 on built captures); B1 the driver's 21
-      # sprintf literals verbatim; B3 the pages viewcheck's harness gets from
-      # the COMPILED driver (host gcc) decode and re-render byte for byte;
-      # C1/C2 the << 22 and B's offsets against values written by hand; D1/D2
-      # the bracket permitting and refusing; E1-E12 every refusal. M0 runs
-      # the unmutated copy through the mutation path, and M1-M10 must each
-      # turn the case they name red. Without gcc or git it REFUSES (exit 3).
-      # What it cannot see is the silicon: the names, the table field layouts
-      # and the << 22 are B's alone.
+      # viewdecode (R6b-8 8c; 1.1 is 8d's) is the host decoder for
+      # /proc/rtl819x-view pages, 1.1's and the 1.0 pages committed before it:
+      # decode (tbl l2 slots from B's L2 entry among them), the vendor's
+      # asicCounter rendered from the raw words (low + (high << 22)), and a
+      # before <= view <= after bracket. Its self-test: A1 classifies every
+      # committed asicCounter capture under bench/ (266 at 8520b6c) as clean or
+      # printk-timed -- parsed and re-rendered to its own CRLF bytes -- or
+      # interleaved or cut by the capture's end, which the parser must REFUSE
+      # while a self-test-only reader finds the lines behind them (A2 on built
+      # captures); B1 the driver's 26 sprintf literals verbatim; B3 the pages
+      # viewcheck's harness gets from the COMPILED driver (host gcc) decode and
+      # re-render byte for byte; C1-C3 the << 22, B's offsets and the L2 fields
+      # against values written by hand; D1/D2 the bracket; E1-E13 every refusal.
+      # M0 runs the unmutated copy through the mutation path, and M1-M16 must
+      # each turn the case they name red. Without gcc or git it REFUSES (exit 3).
+      # It cannot see the silicon: the names, field layouts and << 22 are B's.
       - name: viewdecode
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/viewdecode.py --self-test 2>&1 | tee ci-out/viewdecode.out; exit "${PIPESTATUS[0]}"
