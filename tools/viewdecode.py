@@ -5,12 +5,27 @@ asicCounter text from them, and bracket them between two counter readings.
 WHAT IT READS
 -------------
 `R6b-8` 8c's node, config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c
-(`rtl819x-view 1.0`), prints raw words and nothing else: no register name, no
-meaning, no 64-bit byte count.  Those three are this tool's, and they come from
-B -- the header the build compiles, drivers/net/rtl819x/AsicDriver/
-rtl865xc_asicregs.h, sha256 e29c3051... -- one source each (讀 x1).  Where the
-draft datasheet names a word differently, its name is printed beside B's:
-LEDCR0 for LEDCREG|LEDCR, PIN_MUX_SEL_2 for PIN_MUX_SEL2.
+(`rtl819x-view 1.1`, and the 1.0 pages committed before it), prints raw words
+and nothing else: no register name, no meaning, no 64-bit byte count.  Those
+three are this tool's, and they come from B -- the header the build compiles,
+drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h, sha256 e29c3051... -- one
+source each (讀 x1).  Where the draft datasheet names a word differently, its
+name is printed beside B's: LEDCR0 for LEDCREG|LEDCR, PIN_MUX_SEL_2 for
+PIN_MUX_SEL2.  A page's version line decides what it may hold: 1.0's admits
+298 words and has no tbl l2; 1.1's admits 311 and does.
+
+A tbl l2 slot is decoded from B's L2 entry, rtl865xc_tblAsic_l2Table_t
+(drivers/net/rtl819x/AsicDriver/rtl865x_asicL2.h:140-190): word 0 is
+mac39_24 (31:16) and mac23_8 (15:0); word 1 is reserv0 (31:26), auth (25),
+fid (24:23), nxtHostFlag (22), srcBlock (21), agingTime (20:19), isStatic
+(18), toCPU (17), extMemberPort (16:14), memberPort (13:8) and mac47_40
+(7:0) -- the big-endian arm (:141-157), whose bits the little-endian arm
+(:159-176) places identically, word for word; words 2-7 are reserved.  The
+MAC is assembled as the vendor's getter does (rtl8651_getAsicL2Table,
+rtl865x_asicL2.c:815-820): the sixth octet is not stored but is the row
+(slot >> 2) XOR the other five XOR fidHashTable[fid] (rtl865x_asicL2.c:22:
+00 0F F0 FF).  The getter skips an entry whose agingTime is 0 and which is
+not static (:813-814), and gives the age as agingTime x 150 s (:832).
 
 An input is a console capture (tools/console-capture.py's .log: CRLF, the echoed
 command before the page and the prompt after it) or a bare page.  CRs are
@@ -39,7 +54,8 @@ decoded must re-render, through those literals, to its own bytes.
 WHAT IT REFUSES (exit 2), each with its reason; a refused page is never
 partially decoded
 -------------------------------------------------------------------------------
-  version     a version line other than `version rtl819x-view 1.0`
+  version     a version line other than `version rtl819x-view 1.0` or `1.1`,
+              or `last l2` on a 1.0 page
   terminator  a page with no `jiffies N` line before the input ends or the next
               page begins: a cut page; or a `jiffies N` line with no line end,
               whose number may be cut
@@ -47,10 +63,11 @@ partially decoded
               one, `count`)
   header      the five header lines missing, out of order, or malformed
   range       a number wider than its C type (%u/%lu 32 bits, %d int32)
-  admit       admit != 298: another admission table
+  admit       admit != 298 on a 1.0 page or != 311 on a 1.1 page: another
+              admission table
   ref         `ref none` with an address or with refused > 0; refused 0 with a
               reason; `psrp` outside BB804128-BB804148; `out` inside it; a
-              refused word that 1.0 admits
+              refused word that the page's version admits
   result-none a result line under `last none`
   mib         rc != 0; ports != 7; port lines not m0..m6 in order; a port line
               whose word count differs from `mo`'s; words != 7 x mo + mc; more
@@ -62,15 +79,23 @@ partially decoded
               lines; polls < slot lines, or < slot lines + 10,001 with busy
   peek        rc != 0; an address not a multiple of 4; n outside 1-16; `a`
               addresses other than A + 4i
+  l2          rc not 0 or -16; (base, slots) not (BB000000, 1024); words != 8;
+              read > slots, nz > read or mis > read; shown != the smaller of
+              nz and 40; slot lines out of slot order, for a slot not read,
+              with t outside 1-10, mis without t10, without eight words, or
+              with all eight zero; fewer mis than mis lines; busy with rc 0;
+              rc -16 without busy; busy sNNNN != read; rc 0 with read != 1024;
+              polls < read, or < read + 10,001 with busy
   cut         fewer result lines than the page's own header implies
   extra       a result line after the last one the header implies
-  line        a result line that is not what 1.0 prints there (an interleaved
-              console line is one)
+  line        a result line that is not what its version prints there (an
+              interleaved console line is one)
   render      the page does not re-render, through the driver's literals, to
               its own bytes (a leading zero, a doubled space)
   name        this decoder's own, beyond the format: a MIB layout (base,
-              stride, mo, mc) other than 1.0's, or a peeked word 1.0 does not
-              admit -- it names words by 1.0's table and would misname them
+              stride, mo, mc) other than 1.0's, or a peeked word the page's
+              version does not admit -- it names words by that version's
+              tables and would misname them
   one-boot    --one-boot only: a counter that decreased between two pages
               whose jiffies did not (a jiffies decrease voids the pair: a
               32-bit wrap and a reboot look the same, and it says so)
@@ -107,19 +132,28 @@ SELF-TEST (each case prints one `  ok`/`  FAIL` line, two leading spaces)
       characters, is `cut`; a whole dump is `clean`; a dump with a middle line
       missing, a cut dump with more output after it, and a cut dump followed
       by a whole line out of order are refused
-  B1  rtl819x-view.c's 21 sprintf literals, function by function, are this
+  B1  rtl819x-view.c's 26 sprintf literals, function by function, are this
       file's copies verbatim, and they are all the sprintf calls in it; the
-      version, the three name tables, eq/mis and the constants the page's
-      values come from (MIB base, stride, ports, 225, PSRP0/8, tries, bound,
-      peek max, table base) are this file's
-  B2  synthetic pages of every kind, rendered through those literals, decode
-      and re-render byte for byte, bare and wrapped as a CRLF capture
+      version, the three name tables (lname's sixth written "tbl l2" + 4),
+      eq/mis in both table renders and the constants the page's values come
+      from (MIB base, stride, ports, 225, PSRP0/8, tries, bound, peek max,
+      table base, and 1.1's L2 type, slots, kept slots and `last` index) are
+      this file's
+  B2  synthetic pages of every kind, 1.0's included, rendered through those
+      literals, decode and re-render byte for byte, bare and wrapped as a
+      CRLF capture
   B3  the pages tools/viewcheck.py's harness gets from the COMPILED driver
       (boot, mib, both tables, a torn slot, t10 mis, busy, peeks, two
-      refusals) decode, re-render byte for byte, are the kinds the script
+      refusals, three tbl l2 reads -- sparse, torn, busy -- and a peek of
+      1.1's words) decode, re-render byte for byte, are the kinds the script
       asked for, and pass --one-boot
-  B4  the words this decoder names are exactly the words the driver's runs
-      table admits (read from the source): 298
+  B4  the words this decoder names are exactly the words the driver's two
+      runs tables admit (read from the source): 298 and 13, and 1.0's name
+      set is the first table's alone
+  C3  the L2 entry's fields: four slots whose words were written here by
+      hand from chosen fields (every flag set once, each fid, reserved bits,
+      a stale entry) decode to the MAC and fields written by hand -- the
+      sixth octet computed by hand from the row and fidHashTable
   C1  the byte counts: built (lo, hi) pairs with hi != 0 against decimal
       values written here by hand, not computed by the tool's formula
   C2  the offsets: a page whose every word is its own offset (+ 0x1000 x port)
@@ -128,11 +162,12 @@ SELF-TEST (each case prints one `  ok`/`  FAIL` line, two leading spaces)
   D1  bracket permitting: between, at either end, pinned -- exit 0
   D2  bracket refusing: below, above, ends reversed -- each counter named
       with its reason, exit 1, and no other counter named
-  E1-E12  each refusal above, made by editing one of B2's pages (or a dump,
+  E1-E13  each refusal above, made by editing one of B2's pages (or a dump,
       or a command line) that is accepted as it stands; the refusal's code
-      and the words of its reason are checked, not only that one happened
+      and the words of its reason are checked, not only that one happened.
+      E13 is tbl l2's
 
-M0..M10 then mutate a COPY of this file and run its self-test (no mutants)
+M0..M16 then mutate a COPY of this file and run its self-test (no mutants)
 against the same root; each must turn the case named for it red.  M0 is the
 unmutated copy through the same path, and no kill counts unless it is green.
 An anchor that does not occur exactly once is a survivor, never a skip.  The
@@ -149,12 +184,18 @@ does not match itself.
   M8  the re-render gate removed                   E2
   M9  a cut dump refused, as before A2 existed     A2
   M10 anything after a cut accepted                A2
+  M11 fidHashTable's 0F and F0 swapped             C3
+  M12 memberPort read from bit 9                   C3
+  M13 the row taken as the slot's low byte         C3
+  M14 age in 100 s steps, the 865x's               C3
+  M15 an all-zero L2 slot line accepted            E13
+  M16 more slot lines than 40 accepted (no cap)    E13
 
 WHAT IT CANNOT SEE
 ------------------
 The silicon.  A decoded word is what the driver loaded, named by B alone; the
-names, the VLAN and netif field layouts (B's big-endian arm) and the << 22 have
-no second source here.  `asic` agreeing with a real asicCounter capture shows
+names, the VLAN, netif and L2 field layouts (B's big-endian arm) and the << 22
+have no second source here, and no capture has read the L2 table yet.  `asic` agreeing with a real asicCounter capture shows
 this tool copies the vendor's arithmetic, not that the arithmetic is right: the
 << 22 makes the two words overlap (bits 22-31 of low), and a capture above
 2^22 bytes is what exercises it on the die.  `bracket` compares what it is
@@ -183,18 +224,20 @@ import tempfile
 
 sys.dont_write_bytecode = True
 
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "1.1"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_PARTS = ("config", "rlxfw-src", "linux-2.6.30", "drivers", "net",
                 "rtl819x-view.c")
 
 # ------------------------------------------------------------------------
-# rtl819x-view 1.0, as the driver defines it (B1 checks every one of these
-# against the source).
+# rtl819x-view 1.1, as the driver defines it (B1 checks every one of these
+# against the source), and 1.0, whose pages are committed under bench/.
 # ------------------------------------------------------------------------
-VERSION = "rtl819x-view 1.0"
+VERSION = "rtl819x-view 1.1"
+VERSION_10 = "rtl819x-view 1.0"
 VERSION_PREFIX = "version rtl819x-view"
-ADMIT = 298
+ADMIT = 311
+ADMIT_10 = 298
 MIB_BASE = 0xBB801000
 MIB_STRIDE = 0x80
 MIB_PORTS = 7
@@ -206,15 +249,22 @@ BOUND = 10000
 PEEK_MAX = 16
 TBL_BASE = 0xBB000000
 EBUSY = 16
-LAST_NAMES = ("none", "mib", "vlan", "netif", "peek")
+LAST_NAMES = ("none", "mib", "vlan", "netif", "peek", "l2")
+LAST_NAMES_10 = LAST_NAMES[:5]
 WHY_NAMES = ("none", "out", "psrp")
 TBL_TYPES = (("vlan", 6, 16), ("netif", 4, 8))
 TABLES = {n: (TBL_BASE + (t << 16), s) for n, t, s in TBL_TYPES}
+# 1.1's tbl l2: TYPE_L2_SWITCH_TABLE, 256 rows x 4 columns, the non-zero
+# slots a page keeps, and its `last` index.
+L2_TYPE, L2_SLOTS, L2_SHOW, L_L2 = 0, 1024, 40, 5
+L2_BASE = TBL_BASE + (L2_TYPE << 16)
+# fidHashTable, rtl865x_asicL2.c:22 (讀 x1)
+FID_HASH = (0x00, 0x0F, 0xF0, 0xFF)
 U32 = 0xFFFFFFFF
 U64 = (1 << 64) - 1
 
-# The 21 format literals, as C text between the quotes, per function in the
-# order the source holds them.
+# The 26 format literals, as C text between the quotes, per function in the
+# order the source holds them (1.0's 21 and 1.1's tbl l2 five).
 FORMATS = {
     "rtl819x_view_mib_lines": [
         r"mib base %08X stride %03X ports %u words %u\n", r"mo", r" %03X",
@@ -227,6 +277,9 @@ FORMATS = {
         r"version %s\n", r"admit %u\n", r"last %s j %lu rc %d\n",
         r"n_mib %lu n_tbl %lu n_peek %lu refused %lu busy %lu ld %lu\n",
         r"ref %08X %s\n", r"jiffies %lu\n"],
+    "rtl819x_view_l2_lines": [
+        r"tbl l2 base %08X slots %u words %u polls %lu read %u nz %u shown %u "
+        r"mis %u\n", r"s%04u t%u %s", r" %08X", r"\n", r"busy s%04d\n"],
 }
 EQ_MIS = ("eq", "mis")
 
@@ -249,6 +302,8 @@ F_TBL, F_SLOT, F_SLOT_W, F_SLOT_END, F_BUSY = _F["rtl819x_view_tbl_lines"]
 F_PEEK, F_A = _F["rtl819x_view_peek_lines"]
 (F_VERSION, F_ADMIT, F_LAST, F_COUNTS, F_REF,
  F_JIFFIES) = _F["rtl819x_view_read_proc"]
+F_L2, F_L2SLOT, F_L2SLOT_W, F_L2SLOT_END, F_L2BUSY = \
+    _F["rtl819x_view_l2_lines"]
 
 # ------------------------------------------------------------------------
 # B's names.  ":N" is a line of rtl865xc_asicregs.h (sha256 e29c3051...).
@@ -359,6 +414,17 @@ REG_NAMES = ([
     (0xB8000040, "PIN_MUX_SEL", ":3115", None),
     (0xB8000044, "PIN_MUX_SEL2", ":3116", "PIN_MUX_SEL_2"),
 ])
+# 1.1's thirteen (notes/switch-driver.md section 16.4): B's names and lines.
+REG_NAMES_11 = ([
+    (0xBB804048, "CSCR", ":1015", None),
+    (0xBB804160, "EEECR", ":1365", None),
+    (0xBB804500, "SBFCTR|SBFCR0", ":1673 :1674", None),
+    (0xBB804704, "IBCR0", ":1831", None),
+    (0xBB804708, "IBCR1", ":1832", None),
+    (0xBB80470C, "IBCR2", ":1833", None),
+    (0xBB804754, "QNUMCR", ":1850", None)] +
+    [(0xBB8048B0 + 12 * p, "WFQRCRP%d" % p, ":%d" % (2202 + 3 * p), None)
+     for p in range(6)])
 
 
 def _offset_names():
@@ -374,10 +440,10 @@ def _offset_names():
 OFF_NAME = _offset_names()
 
 
-def _word_names():
-    """KSEG1 address -> printed name, for every word 1.0 admits."""
+def _word_names(regs):
+    """KSEG1 address -> printed name, for every word a version admits."""
     out = {}
-    for a, n, lines, d in REG_NAMES:
+    for a, n, lines, d in regs:
         out[a] = "%s  B %s%s" % (n, lines, "  (D: %s)" % d if d else "")
     for p in range(MIB_PORTS):
         for off in MIB_OFFS:
@@ -388,7 +454,12 @@ def _word_names():
     return out
 
 
-WORD_NAME = _word_names()
+WORD_NAME_10 = _word_names(REG_NAMES)
+WORD_NAME = _word_names(REG_NAMES + REG_NAMES_11)
+# What a page's version line decides: its admit count, its `last` names, and
+# the words it can hold.
+SPECS = {VERSION_10: (ADMIT_10, LAST_NAMES_10, WORD_NAME_10),
+         VERSION: (ADMIT, LAST_NAMES, WORD_NAME)}
 
 # ------------------------------------------------------------------------
 # The vendor's asicCounter text: rtl865xC_dumpAsicDiagCounter,
@@ -469,7 +540,7 @@ NUM = r"([0-9]+)"
 HEX8 = r"([0-9A-F]{8})"
 HEADER_RES = [
     ("admit", re.compile(r"admit " + NUM)),
-    ("last", re.compile(r"last (none|mib|vlan|netif|peek) j " + NUM +
+    ("last", re.compile(r"last (none|mib|vlan|netif|peek|l2) j " + NUM +
                         r" rc (-?[0-9]+)")),
     ("n_mib", re.compile(r"n_mib %s n_tbl %s n_peek %s refused %s busy %s "
                          r"ld %s" % ((NUM,) * 6))),
@@ -487,6 +558,12 @@ SLOT_RE = re.compile(r"s([0-9]{2}) t([0-9]+) (eq|mis)((?: [0-9A-F]{8})*)")
 BUSY_RE = re.compile(r"busy s([0-9]{2})")
 PEEK_RE = re.compile(r"peek " + HEX8 + r" n " + NUM)
 A_RE = re.compile(r"a " + HEX8 + " " + HEX8)
+L2_RE = re.compile(r"tbl l2 base " + HEX8 + r" slots " + NUM + r" words " +
+                   NUM + r" polls " + NUM + r" read " + NUM + r" nz " + NUM +
+                   r" shown " + NUM + r" mis " + NUM)
+L2SLOT_RE = re.compile(r"s([0-9]{4,}) t([0-9]+) (eq|mis)((?: [0-9A-F]{8})*)")
+L2BUSY_RE = re.compile(r"busy s([0-9]{4,})")
+L2_KEYS = ("slots", "words", "polls", "read", "nz", "shown", "mis")
 COUNTS = ("n_mib", "n_tbl", "n_peek", "refused", "busy", "ld")
 
 
@@ -499,8 +576,8 @@ def u32(s, what, where):
 
 
 def render_page(pg):
-    """The page 1.0 prints for these values, through the driver's literals."""
-    s = F_VERSION % VERSION
+    """The page the driver prints for these values, through its literals."""
+    s = F_VERSION % pg.get("version", VERSION)
     s += F_ADMIT % pg["admit"]
     s += F_LAST % (pg["last"], pg["j"], pg["rc"])
     s += F_COUNTS % tuple(pg[k] for k in COUNTS)
@@ -527,6 +604,15 @@ def render_page(pg):
         s += F_PEEK % (r["a"], r["n"])
         for i, w in enumerate(r["w"]):
             s += F_A % ((r["a"] + 4 * i) & U32, w)
+    elif pg["last"] == "l2":
+        r = pg["l2"]
+        s += F_L2 % ((r["base"],) + tuple(r[k] for k in L2_KEYS))
+        for sl in r["slot_lines"]:
+            s += F_L2SLOT % (sl["s"], sl["t"], EQ_MIS[0] if sl["eq"] else
+                             EQ_MIS[1])
+            s += "".join(F_L2SLOT_W % w for w in sl["w"]) + F_L2SLOT_END
+        if r["busy"] is not None:
+            s += F_L2BUSY % r["busy"]
     s += F_JIFFIES % pg["jiffies"]
     return s
 
@@ -695,25 +781,123 @@ def parse_peek(R, pg, at):
     if len(ws) < n:
         raise Refused("cut", "%s: %d `a` line(s) under n %d"
                       % (at(5), len(ws), n))
+    names = SPECS[pg["version"]][2]
     for i in range(n):
-        if (a + 4 * i) & U32 not in WORD_NAME:
-            raise Refused("name", "%s: %08X is not a word 1.0 admits, so 1.0 "
-                          "never loaded it" % (at(6 + i), (a + 4 * i) & U32))
+        if (a + 4 * i) & U32 not in names:
+            raise Refused("name", "%s: %08X is not a word %s admits, so it "
+                          "never loaded it" % (at(6 + i), (a + 4 * i) & U32,
+                                               pg["version"]))
     pg["peek"] = {"a": a, "n": n, "w": ws}
+
+
+def parse_l2(R, pg, at):
+    """1.1's `last l2` result: the tbl l2 line, the kept slot lines, busy."""
+    rc = pg["rc"]
+    if rc not in (0, -EBUSY):
+        raise Refused("l2", "%s: `last l2` with rc %d; tbl l2 caches only "
+                      "with 0 or -16" % (at(2), rc))
+    if not R:
+        raise Refused("cut", "%s: `last l2` with no result line" % at(5))
+    m = L2_RE.fullmatch(R[0]) or _refuse_line("line", at(5), R[0],
+                                              "the `tbl l2 ...` line")
+    r = {"base": int(m.group(1), 16)}
+    for i, k in enumerate(L2_KEYS, 2):
+        r[k] = u32(m.group(i), k, at(5))
+    if (r["base"], r["slots"]) != (L2_BASE, L2_SLOTS):
+        raise Refused("l2", "%s: l2 base %08X slots %d; 1.1's is base %08X "
+                      "slots %d" % (at(5), r["base"], r["slots"], L2_BASE,
+                                    L2_SLOTS))
+    if r["words"] != 8:
+        raise Refused("l2", "%s: words %d, not 8" % (at(5), r["words"]))
+    if r["read"] > r["slots"]:
+        raise Refused("l2", "%s: read %d of %d slots" % (at(5), r["read"],
+                                                          r["slots"]))
+    if r["nz"] > r["read"] or r["mis"] > r["read"]:
+        raise Refused("l2", "%s: nz %d and mis %d, each at most read %d"
+                      % (at(5), r["nz"], r["mis"], r["read"]))
+    if r["shown"] != min(r["nz"], L2_SHOW):
+        raise Refused("l2", "%s: shown %d with nz %d; 1.1 keeps the first "
+                      "%d non-zero slots, or all if fewer"
+                      % (at(5), r["shown"], r["nz"], L2_SHOW))
+    lines, busy = [], None
+    for k in range(1, len(R)):
+        mb = L2BUSY_RE.fullmatch(R[k])
+        if mb:
+            if k != len(R) - 1:
+                raise Refused("extra", "%s: %r follows the busy line"
+                              % (at(5 + k + 1), R[k + 1]))
+            busy = int(mb.group(1))
+            continue
+        ms = L2SLOT_RE.fullmatch(R[k]) or _refuse_line(
+            "line", at(5 + k), R[k], "an l2 slot line or the busy line")
+        s, t, eq = int(ms.group(1)), int(ms.group(2)), ms.group(3) == "eq"
+        ws = [int(x, 16) for x in ms.group(4).split()]
+        if len(lines) >= r["shown"]:
+            raise Refused("extra", "%s: slot line %d under shown %d"
+                          % (at(5 + k), len(lines) + 1, r["shown"]))
+        if lines and s <= lines[-1]["s"]:
+            raise Refused("l2", "%s: s%04d after s%04d; kept slots run in "
+                          "slot order" % (at(5 + k), s, lines[-1]["s"]))
+        if s >= r["read"]:
+            raise Refused("l2", "%s: s%04d, but read %d; a slot line for a "
+                          "slot not read" % (at(5 + k), s, r["read"]))
+        if not 1 <= t <= TRIES:
+            raise Refused("l2", "%s: t%d outside 1 to 10" % (at(5 + k), t))
+        if not eq and t != TRIES:
+            raise Refused("l2", "%s: mis with t%d; mis means ten passes "
+                          "disagreed" % (at(5 + k), t))
+        if len(ws) != 8:
+            raise Refused("l2", "%s: s%04d holds %d words, not eight"
+                          % (at(5 + k), s, len(ws)))
+        if not any(ws):
+            raise Refused("l2", "%s: s%04d's eight words are all zero; 1.1 "
+                          "prints only slots that are not" % (at(5 + k), s))
+        lines.append({"s": s, "t": t, "eq": eq, "w": ws})
+    if len(lines) < r["shown"]:
+        raise Refused("cut", "%s: %d slot line(s) under shown %d"
+                      % (at(5), len(lines), r["shown"]))
+    if sum(1 for sl in lines if not sl["eq"]) > r["mis"]:
+        raise Refused("l2", "%s: mis %d under %d mis slot lines"
+                      % (at(5), r["mis"], sum(1 for sl in lines
+                                              if not sl["eq"])))
+    if busy is not None and rc == 0:
+        raise Refused("l2", "%s: a busy line with rc 0" % at(5 + len(R) - 1))
+    if rc == -EBUSY and busy is None:
+        raise Refused("l2", "%s: rc -16 without a busy line" % at(2))
+    if busy is not None and busy != r["read"]:
+        raise Refused("l2", "%s: busy s%04d after read %d; the busy slot is "
+                      "the one after the last read" % (at(5 + len(R) - 1),
+                                                       busy, r["read"]))
+    if rc == 0 and r["read"] != r["slots"]:
+        raise Refused("l2", "%s: rc 0 with read %d of %d" % (
+            at(5), r["read"], r["slots"]))
+    if r["polls"] < r["read"]:
+        raise Refused("l2", "%s: polls %d for read %d; each slot polls "
+                      "SWTACR at least once" % (at(5), r["polls"], r["read"]))
+    if busy is not None and r["polls"] < r["read"] + BOUND + 1:
+        raise Refused("l2", "%s: polls %d with busy after read %d; the busy "
+                      "slot alone polls %d" % (at(5), r["polls"], r["read"],
+                                               BOUND + 1))
+    r["slot_lines"], r["busy"] = lines, busy
+    pg["l2"] = r
 
 
 def parse_page(L, where, first):
     """One page: L runs from the version line to the jiffies line."""
     def at(k):
         return "%s line %d" % (where, first + k)
-    if L[0] != "version " + VERSION:
+    ver = L[0][len("version "):] if L[0].startswith("version ") else None
+    if ver not in SPECS:
         raise Refused("version", "%s: %r; this decoder was written for "
-                      "`version %s` and a changed literal is a changed "
-                      "version" % (at(0), L[0], VERSION))
+                      "`version %s` and `version %s`, and a changed literal "
+                      "is a changed version" % (at(0), L[0], VERSION_10,
+                                                VERSION))
+    admit_n, lnames, names = SPECS[ver]
     if len(L) < 6:
         raise Refused("header", "%s: a page of %d lines; the five header "
                       "lines and the terminator are six" % (at(0), len(L)))
-    pg = {"where": where, "first": first, "end": first + len(L) - 1}
+    pg = {"where": where, "first": first, "end": first + len(L) - 1,
+          "version": ver}
     ms = {}
     for k, (key, rx) in enumerate(HEADER_RES, 1):
         m = rx.fullmatch(L[k])
@@ -723,6 +907,9 @@ def parse_page(L, where, first):
         ms[key] = m
     pg["admit"] = u32(ms["admit"].group(1), "admit", at(1))
     pg["last"] = ms["last"].group(1)
+    if pg["last"] not in lnames:
+        raise Refused("version", "%s: `last %s` on a %s page, which has no "
+                      "such verb" % (at(2), pg["last"], ver))
     pg["j"] = u32(ms["last"].group(2), "j", at(2))
     rc = int(ms["last"].group(3))
     if not -(1 << 31) <= rc < (1 << 31):
@@ -734,10 +921,10 @@ def parse_page(L, where, first):
     pg["ref_why"] = ms["ref"].group(2)
     pg["jiffies"] = u32(JIFFIES_RE.fullmatch(L[-1]).group(1), "jiffies",
                         at(len(L) - 1))
-    if pg["admit"] != ADMIT:
-        raise Refused("admit", "%s: admit %d; 1.0's table admits 298, and "
+    if pg["admit"] != admit_n:
+        raise Refused("admit", "%s: admit %d; %s's tables admit %d, and "
                       "this decoder was written for no other" %
-                      (at(1), pg["admit"]))
+                      (at(1), pg["admit"], ver, admit_n))
     why, ra = pg["ref_why"], pg["ref_a"]
     if why == "none" and ra != 0:
         raise Refused("ref", "%s: `ref none` with address %08X" % (at(4), ra))
@@ -752,9 +939,9 @@ def parse_page(L, where, first):
     if why == "out" and PSRP0 <= ra <= PSRP8:
         raise Refused("ref", "%s: out at %08X, inside the PSRP range"
                       % (at(4), ra))
-    if why != "none" and ra in WORD_NAME:
-        raise Refused("ref", "%s: a refusal of %08X, a word 1.0 admits"
-                      % (at(4), ra))
+    if why != "none" and ra in names:
+        raise Refused("ref", "%s: a refusal of %08X, a word %s admits"
+                      % (at(4), ra, ver))
     R = L[5:-1]
     if pg["last"] == "none":
         if R:
@@ -764,6 +951,8 @@ def parse_page(L, where, first):
         parse_mib(R, pg, at)
     elif pg["last"] == "peek":
         parse_peek(R, pg, at)
+    elif pg["last"] == "l2":
+        parse_l2(R, pg, at)
     else:
         parse_tbl(R, pg, at)
     text = "\n".join(L) + "\n"
@@ -772,9 +961,9 @@ def parse_page(L, where, first):
         a, b = text.split("\n"), again.split("\n")
         k = next(i for i in range(max(len(a), len(b)))
                  if i >= len(a) or i >= len(b) or a[i] != b[i])
-        raise Refused("render", "%s: %r, where 1.0's literals print %r for "
+        raise Refused("render", "%s: %r, where %s's literals print %r for "
                       "the same values" % (at(k), a[k] if k < len(a) else "",
-                                           b[k] if k < len(b) else ""))
+                                           ver, b[k] if k < len(b) else ""))
     return pg
 
 
@@ -999,9 +1188,39 @@ def netif_fields(ws):
                (w2 >> 12) & 0x7F, (w2 >> 19) & 0x7F, (w1 >> 29) & 1))
 
 
+def l2_fields(s, ws):
+    """rtl865xc_tblAsic_l2Table_t words 0-1 (rtl865x_asicL2.h:140-190), the
+    big-endian arm (:141-157; the little-endian arm, :159-176, puts every
+    field at the same bits of its word).  The MAC as rtl8651_getAsicL2Table
+    assembles it (rtl865x_asicL2.c:815-820): octet 5 is row ^ octets 0-4 ^
+    fidHashTable[fid] (:22), the row being slot >> 2 (:810's row<<2 |
+    column).  Valid as the getter decides (:813-814); age x 150 s (:832)."""
+    w0, w1 = ws[0], ws[1]
+    row = s >> 2
+    fid = (w1 >> 23) & 3
+    age = (w1 >> 19) & 3
+    static = (w1 >> 18) & 1
+    octs = [w1 & 0xFF, w0 >> 24, (w0 >> 16) & 0xFF, (w0 >> 8) & 0xFF,
+            w0 & 0xFF]
+    o5 = row
+    for o in octs:
+        o5 ^= o
+    o5 = (o5 ^ FID_HASH[fid]) & 0xFF
+    return ("mac %s fid %d memberPort %02X extMemberPort %d toCPU %d "
+            "isStatic %d agingTime %d (%d s) srcBlock %d nxtHostFlag %d "
+            "auth %d reserv0 %d; %s%s"
+            % (":".join("%02x" % o for o in octs + [o5]), fid,
+               (w1 >> 8) & 0x3F, (w1 >> 14) & 7, (w1 >> 17) & 1, static, age,
+               age * 150, (w1 >> 21) & 1, (w1 >> 22) & 1, (w1 >> 25) & 1,
+               w1 >> 26,
+               "the vendor's getter returns it" if age or static else
+               "the vendor's getter skips it (agingTime 0, not static)",
+               "" if not any(ws[2:]) else "; reserved words 2-7 not zero"))
+
+
 def describe(pg, index):
-    out = ["page %d: %s lines %d-%d" % (index, pg["where"], pg["first"],
-                                        pg["end"]),
+    out = ["page %d: %s lines %d-%d, %s" % (index, pg["where"], pg["first"],
+                                            pg["end"], pg["version"]),
            "  last %s  j %d  rc %d  jiffies %d" % (pg["last"], pg["j"],
                                                    pg["rc"], pg["jiffies"]),
            "  " + "  ".join("%s %d" % (k, pg[k]) for k in COUNTS) +
@@ -1051,10 +1270,32 @@ def describe(pg, index):
                        "polls; no table word was loaded after it" % r["busy"])
     elif pg["last"] == "peek":
         r = pg["peek"]
+        names = SPECS[pg["version"]][2]
         out.append("  peek %08X n %d" % (r["a"], r["n"]))
         for i, w in enumerate(r["w"]):
             a = (r["a"] + 4 * i) & U32
-            out.append("    %08X  %08X  %s" % (a, w, WORD_NAME[a]))
+            out.append("    %08X  %08X  %s" % (a, w, names[a]))
+    elif pg["last"] == "l2":
+        r = pg["l2"]
+        out.append("  tbl l2 base %08X: %d slots (row << 2 | column) of 8 "
+                   "words; read %d, not all zero %d, shown %d, mis %d; polls "
+                   "%d; fields from B alone" % (
+                       r["base"], r["slots"], r["read"], r["nz"], r["shown"],
+                       r["mis"], r["polls"]))
+        for sl in r["slot_lines"]:
+            out.append("    s%04d row %d col %d t%d %-3s %s" % (
+                sl["s"], sl["s"] >> 2, sl["s"] & 3, sl["t"],
+                "eq" if sl["eq"] else "mis",
+                " ".join("%08X" % w for w in sl["w"])))
+            out.append("        B, big-endian arm: " +
+                       l2_fields(sl["s"], sl["w"]))
+        if r["nz"] > r["shown"]:
+            out.append("    %d more non-zero slot(s) read and not shown: the "
+                       "page keeps the first %d" % (r["nz"] - r["shown"],
+                                                    L2_SHOW))
+        if r["busy"] is not None:
+            out.append("    busy at s%04d: SWTACR stayed busy past 10,000 "
+                       "polls; no table word was loaded after it" % r["busy"])
     return out
 
 
@@ -1219,11 +1460,31 @@ def load_viewcheck(root):
 
 
 def make_page(last, **kw):
-    pg = {"admit": ADMIT, "last": last, "j": 4242, "rc": 0, "n_mib": 0,
-          "n_tbl": 0, "n_peek": 0, "refused": 0, "busy": 0, "ld": 0,
-          "ref_a": 0, "ref_why": "none", "jiffies": 4242}
+    pg = {"version": VERSION, "admit": ADMIT, "last": last, "j": 4242,
+          "rc": 0, "n_mib": 0, "n_tbl": 0, "n_peek": 0, "refused": 0,
+          "busy": 0, "ld": 0, "ref_a": 0, "ref_why": "none", "jiffies": 4242}
     pg.update(kw)
     return pg
+
+
+def l2_page(slots, rc=0, read=L2_SLOTS, nz=None, mis=None, polls=None,
+            busy=None, **kw):
+    """A 1.1 `last l2` page over these slot lines (dicts s, t, eq, w)."""
+    nz = len(slots) if nz is None else nz
+    mis = sum(1 for sl in slots if not sl["eq"]) if mis is None else mis
+    polls = read + (BOUND + 1 if busy is not None else 0) \
+        if polls is None else polls
+    return make_page("l2", rc=rc, n_tbl=1, busy=1 if busy is not None else 0,
+                     ld=17 * read + (BOUND + 1 if busy is not None else 0),
+                     l2={"base": L2_BASE, "slots": L2_SLOTS, "words": 8,
+                         "polls": polls, "read": read, "nz": nz,
+                         "shown": len(slots), "mis": mis,
+                         "slot_lines": slots, "busy": busy}, **kw)
+
+
+def l2_slot(s, t=1, eq=True):
+    return {"s": s, "t": t, "eq": eq,
+            "w": [mix(13, 32 * s + 4 * k) | 1 for k in range(8)]}
 
 
 def mib_result(word, cpu):
@@ -1270,6 +1531,27 @@ def base_pages():
         "peek", n_peek=1, ld=16, refused=1, ref_a=0xBD006000, ref_why="out",
         peek={"a": 0xBB801114, "n": 16, "w": [mix(12, k) for k in
                                               range(16)]})))
+    # 1.1: tbl l2 -- sparse, capped, busy, empty -- and a peek of its words
+    sparse = [l2_slot(0), l2_slot(5, t=4), l2_slot(256),
+              l2_slot(257, t=10, eq=False), l2_slot(1023)]
+    sparse[1]["w"] = [0] * 7 + [0x00000100]
+    out.append(("l2", l2_page(sparse, mis=2)))
+    out.append(("l2-cap", l2_page([l2_slot(10 * i) for i in range(L2_SHOW)],
+                                  nz=100)))
+    out.append(("l2-busy", l2_page([l2_slot(3), l2_slot(699)], rc=-EBUSY,
+                                   read=700, busy=700)))
+    out.append(("l2-zero", l2_page([], mis=1)))
+    out.append(("peek11", make_page(
+        "peek", n_peek=1, ld=3, refused=1, ref_a=0xBB804D48, ref_why="out",
+        peek={"a": 0xBB804704, "n": 3, "w": [0, 0, 0x00003FFF]})))
+    # 1.0's pages, as committed under bench/: its admit, and a refusal of a
+    # word 1.1 admits, which 1.0 did not
+    out.append(("boot10", make_page("none", j=0, version=VERSION_10,
+                                     admit=ADMIT_10)))
+    out.append(("peek10-ref", make_page(
+        "peek", version=VERSION_10, admit=ADMIT_10, n_peek=1, ld=1,
+        refused=1, ref_a=0xBB804754, ref_why="out",
+        peek={"a": 0xBB804300, "n": 1, "w": [0x00200000]})))
     return out
 
 
@@ -1526,7 +1808,9 @@ def case_b1(src):
             "RTL819X_VIEW_MIB_PORTS": MIB_PORTS, "RTL819X_VIEW_NMIB": NMIB,
             "RTL819X_VIEW_PSRP0": PSRP0, "RTL819X_VIEW_PSRP8": PSRP8,
             "RTL819X_VIEW_TRIES": TRIES, "RTL819X_VIEW_BOUND": BOUND,
-            "RTL819X_VIEW_PEEK_MAX": PEEK_MAX, "RTL819X_VIEW_TBL_BASE": TBL_BASE}
+            "RTL819X_VIEW_PEEK_MAX": PEEK_MAX, "RTL819X_VIEW_TBL_BASE": TBL_BASE,
+            "RTL819X_VIEW_L2_TYPE": L2_TYPE, "RTL819X_VIEW_L2_SLOTS": L2_SLOTS,
+            "RTL819X_VIEW_L2_SHOW": L2_SHOW, "RTL819X_VIEW_L_L2": L_L2}
     for k, v in want.items():
         tok = d.get(k, "")
         try:
@@ -1545,20 +1829,38 @@ def case_b1(src):
         return tuple(re.findall(r'"([^"]*)"', m.group(1))) if m else None
     if strs(r"rtl819x_view_why\[\] = \{([^}]*)\}") != WHY_NAMES:
         bad.append("rtl819x_view_why")
-    if strs(r"rtl819x_view_lname\[\] = \{([^}]*)\}") != LAST_NAMES:
-        bad.append("rtl819x_view_lname")
+    if lname_names(src) != LAST_NAMES:
+        bad.append("rtl819x_view_lname %r" % (lname_names(src),))
     m = re.search(r"rtl819x_view_tbls\[\] = \{(.*?)\n\};", src, re.S)
     tb = tuple((a, int(b), int(c)) for a, b, c in re.findall(
         r'\{ "(\w+)",\s*(\d+),\s*(\d+) \}', m.group(1))) if m else None
     if tb != TBL_TYPES:
         bad.append("rtl819x_view_tbls %r" % (tb,))
-    if re.findall(r'\? "(\w+)" : "(\w+)"', src) != [EQ_MIS]:
+    if re.findall(r'\? "(\w+)" : "(\w+)"', src) != [EQ_MIS, EQ_MIS]:
         bad.append("eq/mis")
-    ok = not bad and total == n == 21
-    return ok, ("%d of %d literals verbatim in 4 functions, %d sprintf calls "
-                "in the file; version, why/last/tbls, eq/mis and 10 constants "
-                "%s" % (n - len([b for b in bad if b in FORMATS]), n, total,
-                        "equal" if ok else "DIFFER: " + ", ".join(bad)))
+    ok = not bad and total == n == 26
+    return ok, ("%d of %d literals verbatim in 5 functions, %d sprintf calls "
+                "in the file; version, why/last/tbls, eq/mis twice and 14 "
+                "constants %s" % (n - len([b for b in bad if b in FORMATS]),
+                                  n, total, "equal" if ok else "DIFFER: " +
+                                  ", ".join(bad)))
+
+
+def lname_names(src):
+    """rtl819x_view_lname's names as the page prints them: each item a
+    literal, or a literal + N (1.1's sixth, "tbl l2" + 4, is "l2"); None if
+    an item is neither."""
+    m = re.search(r"rtl819x_view_lname\[\] = \{\n\t(.*?)(?:\t/\*.*?\*/)?\n\};",
+                  src)
+    if not m:
+        return None
+    out = []
+    for item in m.group(1).split(", "):
+        mi = re.fullmatch(r'"([^"]*)"(?: \+ (\d+))?', item.strip())
+        if not mi:
+            return None
+        out.append(mi.group(1)[int(mi.group(2) or 0):])
+    return tuple(out)
 
 
 def case_b2():
@@ -1598,6 +1900,13 @@ B3_SCRIPT = [
     ("peek", ["w peek 0xBD006000"]), ("peek", ["w peek 0xBB801114 16"]),
     ("peek", ["w peek 0xB8000040 2"]), ("peek", ["w peek 0xBB804300 2"]),
     ("mib", ["w mib"]),
+    # 1.1: three reads of the L2 table -- sparse, torn, busy at slot 700 --
+    # then a peek of three of its words, and a refusal of 0x4D48
+    ("l2", ["set l2 0 255", "set l2 5 128", "set l2 256 1", "w tbl l2"]),
+    ("l2", ["set l2 257 255", "set l2tear 257 12 5 1",
+            "set l2tear 40 10 0 0", "w tbl l2"]),
+    ("l2", ["set busy 700 10001", "w tbl l2"]),
+    ("peek", ["w peek 0xBB804704 3"]), ("peek", ["w peek 0xBB804D48"]),
 ]
 
 
@@ -1635,27 +1944,40 @@ def case_b3(root, src):
     want = [k for k, _ in B3_SCRIPT]
     extra = []
     if pages and len(pages) == len(want):
+        l2a, l2b, l2c = (pages[i]["l2"] for i in (14, 15, 16))
         extra = [pages[6]["tbl"]["busy"] == 5 and pages[6]["rc"] == -EBUSY,
                  not pages[4]["tbl"]["slot_lines"][3]["eq"],
                  pages[5]["tbl"]["slot_lines"][5]["t"] == 5,
-                 pages[8]["ref_why"] == "psrp", pages[9]["ref_why"] == "out"]
+                 pages[8]["ref_why"] == "psrp", pages[9]["ref_why"] == "out",
+                 [sl["s"] for sl in l2a["slot_lines"]] == [0, 5, 256]
+                 and (l2a["read"], l2a["nz"], l2a["mis"]) == (1024, 3, 0),
+                 [sl["s"] for sl in l2b["slot_lines"]] == [0, 5, 256, 257]
+                 and not l2b["slot_lines"][3]["eq"] and l2b["mis"] == 2,
+                 l2c["busy"] == 700 and pages[16]["rc"] == -EBUSY
+                 and (l2c["read"], l2c["nz"]) == (700, 4),
+                 pages[17]["peek"]["n"] == 3 and pages[17]["version"] ==
+                 VERSION,
+                 (pages[18]["ref_a"], pages[18]["ref_why"]) ==
+                 (0xBB804D48, "out")]
     try:
         notes = one_boot(pages)
     except Refused as e:
         bad.append(str(e))
         notes = None
     ok = (r.rc == 0 and not bad and kinds == want and all(extra) and
-          len(extra) == 5 and notes == [])
+          len(extra) == 10 and notes == [])
     return ok, ("%d pages from the compiled driver (%s) decode and re-render "
-                "byte for byte, busy s05 / t10 mis / t5 / psrp / out as "
-                "scripted, one boot%s"
+                "byte for byte, busy s05 / t10 mis / t5 / psrp / out, and "
+                "l2's three slots / a torn slot and a hidden mis / busy "
+                "s0700 / three IBCRs / 0x4D48 out as scripted, one boot%s"
                 % (len(pages), " ".join(kinds),
                    "" if ok else ": %s; kinds %s; rc %d; %s" % (
                        "; ".join(bad[:2]), kinds, r.rc, extra)))
 
 
-def case_b4(src):
-    m = re.search(r"rtl819x_view_runs\[\] = \{(.*?)\n\};", src, re.S)
+def runs_words(src, table):
+    """(rows, the set of words) of one of the driver's runs tables."""
+    m = re.search(r"%s\[\] = \{(.*?)\n\};" % table, src, re.S)
     rows = re.findall(r"\{ 0x([0-9A-F]{8}),\s*(\d+), (\d+), (0x[0-9A-F]+|0) "
                       r"\}", m.group(1)) if m else []
     words = set()
@@ -1663,12 +1985,23 @@ def case_b4(src):
         for k in range(int(rep)):
             for i in range(int(n)):
                 words.add(int(a, 16) + k * int(stride, 16) + 4 * i)
+    return rows, words
+
+
+def case_b4(src):
+    rows10, w10 = runs_words(src, "rtl819x_view_runs")
+    rows11, w11 = runs_words(src, "rtl819x_view_runs11")
+    words = w10 | w11
     names = set(WORD_NAME)
-    ok = words == names and len(words) == ADMIT and len(REG_NAMES) == 73
-    return ok, ("%d runs in the driver's table expand to %d words; this "
-                "decoder names %d; %s"
-                % (len(rows), len(words), len(names),
-                   "the same set" if ok else "only in the driver: %s; only "
+    ok = (words == names and len(words) == ADMIT and w10 == set(WORD_NAME_10)
+          and len(w10) == ADMIT_10 and len(w11) == ADMIT - ADMIT_10
+          and not (w10 & w11) and len(REG_NAMES) == 73
+          and len(REG_NAMES_11) == 13)
+    return ok, ("%d + %d runs in the driver's two tables expand to %d + %d "
+                "words; this decoder names %d, 1.0's %d; %s"
+                % (len(rows10), len(rows11), len(w10), len(w11), len(names),
+                   len(WORD_NAME_10),
+                   "the same sets" if ok else "only in the driver: %s; only "
                    "here: %s" % (sorted("%08X" % a for a in words - names)[:4],
                                  sorted("%08X" % a for a in names - words)[:4])))
 
@@ -1765,6 +2098,73 @@ def case_c2():
                           diff[0] + 1, have[diff[0]] if diff[0] < len(have)
                           else None, want[diff[0]] if diff[0] < len(want)
                           else None)))
+
+
+# (slot, word 0, word 1, words 2-7, the decode) -- each written by hand from
+# the fields named in its comment, not by this tool's formula.  Octet 5 is
+# row ^ octets 0-4 ^ fidHashTable[fid], worked here in the comment.
+C3_SLOTS = [
+    # row 0 col 2; mac47_40 01, fid 1 (<< 23), agingTime 2 (<< 19):
+    # w1 = 00800000 + 00100000 + 01; octet 5 = 0 ^ 01 ^ 0F = 0E
+    (2, 0x00000000, 0x00900001, [0] * 6,
+     "mac 01:00:00:00:00:0e fid 1 memberPort 00 extMemberPort 0 toCPU 0 "
+     "isStatic 0 agingTime 2 (300 s) srcBlock 0 nxtHostFlag 0 auth 0 "
+     "reserv0 0; the vendor's getter returns it"),
+    # row 1 col 0; a word left behind: agingTime 0, not static;
+    # octet 5 = 1 ^ 01 ^ fidHashTable[0] 00 = 00
+    (4, 0x00000001, 0x00000000, [0] * 6,
+     "mac 00:00:00:00:01:00 fid 0 memberPort 00 extMemberPort 0 toCPU 0 "
+     "isStatic 0 agingTime 0 (0 s) srcBlock 0 nxtHostFlag 0 auth 0 "
+     "reserv0 0; the vendor's getter skips it (agingTime 0, not static)"),
+    # row 3 col 1; mac47_40 02, mac39_24 1234, mac23_8 5678, memberPort 08
+    # (port 3, << 8), agingTime 3: w1 = 00180000 + 0800 + 02;
+    # octet 5 = 3 ^ 02 ^ 12 ^ 34 ^ 56 ^ 78 ^ 00 = 09
+    (13, 0x12345678, 0x00180802, [0] * 6,
+     "mac 02:12:34:56:78:09 fid 0 memberPort 08 extMemberPort 0 toCPU 0 "
+     "isStatic 0 agingTime 3 (450 s) srcBlock 0 nxtHostFlag 0 auth 0 "
+     "reserv0 0; the vendor's getter returns it"),
+    # row 129 col 0; reserv0 2A (<< 26) A8000000, fid 3 01800000, agingTime
+    # 1 00080000, extMemberPort 7 (<< 14) 0001C000, memberPort 3F 3F00,
+    # mac47_40 0A; octet 5 = 81 ^ 0A ^ BC ^ DE ^ F0 ^ 01 ^ FF = E7
+    (516, 0xBCDEF001, 0xA989FF0A, [0, 0, 0, 0x00000100, 0, 0],
+     "mac 0a:bc:de:f0:01:e7 fid 3 memberPort 3F extMemberPort 7 toCPU 0 "
+     "isStatic 0 agingTime 1 (150 s) srcBlock 0 nxtHostFlag 0 auth 0 "
+     "reserv0 42; the vendor's getter returns it; reserved words 2-7 not "
+     "zero"),
+    # row 255 col 3; auth 02000000, fid 2 01000000, nxtHostFlag 00400000,
+    # srcBlock 00200000, isStatic 00040000, toCPU 00020000, extMemberPort
+    # 1 00004000, mac47_40 FF; octet 5 = FF ^ (FF five times) ^ F0 = F0
+    (1023, 0xFFFFFFFF, 0x036640FF, [0] * 6,
+     "mac ff:ff:ff:ff:ff:f0 fid 2 memberPort 00 extMemberPort 1 toCPU 1 "
+     "isStatic 1 agingTime 0 (0 s) srcBlock 1 nxtHostFlag 1 auth 1 "
+     "reserv0 0; the vendor's getter returns it"),
+]
+
+
+def case_c3():
+    """The L2 entry's fields against C3_SLOTS, directly and through a page."""
+    slots = [{"s": s, "t": 1, "eq": True, "w": [w0, w1] + rest}
+             for s, w0, w1, rest, _ in C3_SLOTS]
+    bad = []
+    for (s, _, _, _, want), sl in zip(C3_SLOTS, slots):
+        got = l2_fields(s, sl["w"])
+        if got != want:
+            bad.append("s%04d: %r" % (s, got))
+    try:
+        pg = find_pages(render_page(l2_page(slots)), "c3")[0]
+        text = describe(pg, 1)
+    except Refused as e:
+        return False, "the built page is refused: %s" % e
+    via = [ln.split("B, big-endian arm: ", 1)[1] for ln in text
+           if "B, big-endian arm: " in ln]
+    if via != [w for _, _, _, _, w in C3_SLOTS]:
+        bad.append("through the page: %r" % (via[:1],))
+    fids = sorted({(w1 >> 23) & 3 for _, _, w1, _, _ in C3_SLOTS})
+    return not bad and fids == [0, 1, 2, 3], (
+        "%d slots, fids %s, every flag set once, reserved bits and a stale "
+        "entry: the MAC (octet 5 from the row and fidHashTable) and every "
+        "field as written by hand, directly and through a page%s"
+        % (len(C3_SLOTS), fids, "" if not bad else ": " + "; ".join(bad[:2])))
 
 
 def _bracket_files(work, tag, before_vals, view_page, after_vals):
@@ -1868,8 +2268,11 @@ def e_cases(work):
     s04 = next(x for x in vl if x.startswith("s04 "))
     groups = [
         ("E1", [
-            ("version 1.1", expect_refusal(rep("boot", "view 1.0", "view 1.1"),
+            ("version 1.2", expect_refusal(rep("boot", "view 1.1", "view 1.2"),
                                            "version")),
+            ("last l2 on a 1.0 page", expect_refusal(rep(
+                "l2", "view 1.1\nadmit 311", "view 1.0\nadmit 298"),
+                "version", "`last l2`")),
             ("no terminator", expect_refusal(drop("peek", lambda x:
                                                   x.startswith("jiffies")),
                                              "terminator", "input ends")),
@@ -1892,18 +2295,22 @@ def e_cases(work):
                                               "header", "last")),
             ("lower-case ref", expect_refusal(rep(
                 "peek-ref", "ref BB804128", "ref bb804128"), "header", "ref")),
-            ("admit 0298", expect_refusal(rep("boot", "admit 298",
-                                              "admit 0298"), "render",
-                                          "admit 298")),
+            ("admit 0311", expect_refusal(rep("boot", "admit 311",
+                                              "admit 0311"), "render",
+                                          "admit 311")),
             ("ld 4294967296", expect_refusal(rep("mib", "ld 225",
                                                  "ld 4294967296"), "range")),
             ("a doubled space", expect_refusal(rep("peek", "a BB804104 ",
                                                    "a BB804104  "), "line"))]),
         ("E3", [
-            ("admit 297", expect_refusal(rep("boot", "admit 298",
-                                             "admit 297"), "admit")),
-            ("admit 299", expect_refusal(rep("mib", "admit 298",
-                                             "admit 299"), "admit"))]),
+            ("admit 310", expect_refusal(rep("boot", "admit 311",
+                                             "admit 310"), "admit")),
+            ("admit 312", expect_refusal(rep("mib", "admit 311",
+                                             "admit 312"), "admit")),
+            ("1.1 with 1.0's 298", expect_refusal(rep(
+                "boot", "admit 311", "admit 298"), "admit", "admit 311")),
+            ("1.0 with 1.1's 311", expect_refusal(rep(
+                "boot10", "admit 298", "admit 311"), "admit", "admit 298"))]),
         ("E4", [
             ("a result line under last none", expect_refusal(ins(
                 "boot", "jiffies", "a BB804000 00000000"), "result-none"))]),
@@ -1991,7 +2398,14 @@ def e_cases(work):
             ("a word 1.0 does not admit", expect_refusal(rep(
                 "peek-ref", "peek B8000040 n 2\na B8000040 00000000\n"
                 "a B8000044", "peek B8000044 n 2\na B8000044 00000000\n"
-                "a B8000048"), "name", "B8000048"))]),
+                "a B8000048"), "name", "B8000048")),
+            ("a 1.1 word on a 1.0 page", expect_refusal(rep(
+                "peek10-ref", "peek BB804300 n 1\na BB804300",
+                "peek BB804754 n 1\na BB804754"), "name", "BB804754")),
+            ("0x4D48 on a 1.1 page", expect_refusal(rep(
+                "peek11", "peek BB804704 n 3\na BB804704 00000000\n"
+                "a BB804708 00000000\na BB80470C",
+                "peek BB804D48 n 1\na BB804D48"), "name", "BB804D48"))]),
         ("E8", [
             ("none with an address", expect_refusal(rep(
                 "boot", "ref 00000000 none", "ref BB804128 none"), "ref")),
@@ -2004,7 +2418,10 @@ def e_cases(work):
             ("out inside", expect_refusal(rep(
                 "peek-ref", "ref BB804128 psrp", "ref BB804130 out"), "ref")),
             ("out naming an admitted word", expect_refusal(rep(
-                "peek-out", "ref BD006000 out", "ref BB804000 out"), "ref"))]),
+                "peek-out", "ref BD006000 out", "ref BB804000 out"), "ref")),
+            ("out naming one of 1.1's words", expect_refusal(rep(
+                "peek11", "ref BB804D48 out", "ref BB804754 out"), "ref",
+                "rtl819x-view 1.1 admits"))]),
         ("E9", [
             ("a console line inside a mib page", expect_refusal(as_capture(ins(
                 "mib", "m3 ", "[   12.340000] eth4: link up")), "line",
@@ -2100,6 +2517,76 @@ def e_cases(work):
     e12.append(("without --one-boot no cross-page check",
                 "" if rc == 0 else "rc %d" % rc))
     groups.append(("E12", e12))
+    # E13: tbl l2 (1.1)
+    lz = T["l2"].split("\n")
+    s0000 = next(x for x in lz if x.startswith("s0000 "))
+    s0256 = next(x for x in lz if x.startswith("s0256 "))
+    s0257 = next(x for x in lz if x.startswith("s0257 "))
+    zero_line = "s0000 t1 eq" + " 00000000" * 8
+    extra_line = "s0999 t1 eq" + " 00000001" * 8
+    cap41 = edit(rep("l2-cap", "shown 40", "shown 41"), lambda ls: [
+        x for y in ls for x in ([y, "s0400 t1 eq" + " 00000001" * 8]
+                                if y.startswith("s0390 ") else [y])])
+    groups.append(("E13", [
+        ("rc -13", expect_refusal(rep("l2", "rc 0", "rc -13"), "l2",
+                                  "rc -13")),
+        ("base BB010000", expect_refusal(rep(
+            "l2", "tbl l2 base BB000000", "tbl l2 base BB010000"), "l2",
+            "base BB010000")),
+        ("slots 1023", expect_refusal(rep("l2", "slots 1024", "slots 1023"),
+                                      "l2", "slots 1023")),
+        ("words 7", expect_refusal(rep("l2", "words 8", "words 7"), "l2",
+                                   "words 7")),
+        ("read 1025", expect_refusal(rep("l2", "read 1024", "read 1025"),
+                                     "l2", "read 1025")),
+        ("nz above read", expect_refusal(rep("l2-busy", "nz 2", "nz 701"),
+                                         "l2", "nz 701")),
+        ("shown 4 of nz 5", expect_refusal(rep("l2", "nz 5 shown 5",
+                                               "nz 5 shown 4"), "l2",
+                                           "shown 4 with nz 5")),
+        ("41 kept of nz 100", expect_refusal(cap41, "l2",
+                                             "shown 41 with nz 100")),
+        ("shown 6 with 5 lines", expect_refusal(rep(
+            "l2", "nz 5 shown 5", "nz 6 shown 6"), "cut", "5 slot line")),
+        ("a sixth line under shown 5", expect_refusal(ins(
+            "l2", "jiffies", extra_line), "extra", "slot line 6")),
+        ("slots out of order", expect_refusal(rep(
+            "l2", s0256 + "\n" + s0257, s0257 + "\n" + s0256), "l2",
+            "slot order")),
+        ("a slot not read", expect_refusal(rep("l2-busy", "s0699 ", "s0700 "),
+                                           "l2", "not read")),
+        ("an all-zero slot line", expect_refusal(rep("l2", s0000, zero_line),
+                                                 "l2", "all zero")),
+        ("t0", expect_refusal(rep("l2", "s0000 t1 eq", "s0000 t0 eq"), "l2",
+                              "t0 outside")),
+        ("t11", expect_refusal(rep("l2", "s0000 t1 eq", "s0000 t11 eq"),
+                               "l2", "t11 outside")),
+        ("mis with t9", expect_refusal(rep("l2", "s0257 t10 mis",
+                                           "s0257 t9 mis"), "l2",
+                                       "mis with t9")),
+        ("seven words", expect_refusal(rep("l2", s0000,
+                                           s0000.rsplit(" ", 1)[0]), "l2",
+                                       "7 words")),
+        ("mis under the mis lines", expect_refusal(rep(
+            "l2", "shown 5 mis 2", "shown 5 mis 0"), "l2", "mis 0 under")),
+        ("busy with rc 0", expect_refusal(ins("l2", "jiffies", "busy s1024"),
+                                          "l2", "busy line with rc 0")),
+        ("rc -16 without busy", expect_refusal(drop(
+            "l2-busy", lambda x: x.startswith("busy ")), "l2",
+            "without a busy")),
+        ("busy s0699 after read 700", expect_refusal(rep(
+            "l2-busy", "busy s0700", "busy s0699"), "l2", "busy s0699")),
+        ("rc 0 with read 700", expect_refusal(edit(rep(
+            "l2-busy", "rc -16", "rc 0"), lambda ls: [
+                x for x in ls if not x.startswith("busy s")]), "l2",
+            "read 700 of 1024")),
+        ("polls under read", expect_refusal(rep("l2", "polls 1024",
+                                                "polls 1023"), "l2",
+                                            "polls 1023")),
+        ("busy with too few polls", expect_refusal(rep(
+            "l2-busy", "polls 10701", "polls 10700"), "l2", "polls 10700")),
+        ("a line after busy", expect_refusal(ins(
+            "l2-busy", "jiffies", extra_line), "extra"))]))
     return groups
 
 
@@ -2118,7 +2605,8 @@ def selftest(root):
                  ("B1", lambda: case_b1(src)),
                  ("B2", case_b2), ("B3", lambda: case_b3(root, src)),
                  ("B4", lambda: case_b4(src)), ("C1", case_c1),
-                 ("C2", case_c2), ("D1", lambda: case_d1(work)),
+                 ("C2", case_c2), ("C3", case_c3),
+                 ("D1", lambda: case_d1(work)),
                  ("D2", lambda: case_d2(work))]
         for cid, fn in cases:
             try:
@@ -2163,7 +2651,7 @@ MUTANTS = [
     ("M4", "< for <= at the bracket's lower end", "D1",
      [("below = not (b <" "= v)", "below = not (b < v)")]),
     ("M5", "the admit check removed", "E3",
-     [('if pg["admit"] !' '= ADMIT:', "if False:")]),
+     [('if pg["admit"] !' '= admit_n:', "if False:")]),
     ("M6", "a cut page skipped instead of refused", "E1",
      [("            raise Refused(\n                \"terminator\"" ", ",
        "            i = j\n            continue\n            raise Refused(\n"
@@ -2176,11 +2664,28 @@ MUTANTS = [
      [("cu = cut_dump(" "text)", "cu = None")]),
     ("M10", "anything after a cut accepted", "A2",
      [("ASIC_LINES or len(rest) " "> 1:", "ASIC_LINES:")]),
+    # 1.1: the L2 decode and tbl l2's refusals
+    ("M11", "fidHashTable's 0F and F0 swapped", "C3",
+     [("FID_HASH = (0x00, 0x0" "F, 0xF0, 0xFF)",
+       "FID_HASH = (0x00, 0xF0, 0x0F, 0xFF)")]),
+    ("M12", "memberPort read from bit 9", "C3",
+     [("(w1 >> 8) & 0x3" "F, (w1 >> 14) & 7",
+       "(w1 >> 9) & 0x3F, (w1 >> 14) & 7")]),
+    ("M13", "the row taken as the slot's low byte", "C3",
+     [("    row = s >" "> 2\n", "    row = s & 0xFF\n")]),
+    ("M14", "age in 100 s steps, the 865x's", "C3",
+     [("age * 15" "0, (w1 >> 21) & 1", "age * 100, (w1 >> 21) & 1")]),
+    ("M15", "an all-zero L2 slot line accepted", "E13",
+     [("        if not any(w" "s):\n            raise Refused(\"l2\"",
+       "        if False:\n            raise Refused(\"l2\"")]),
+    ("M16", "more slot lines than 40 accepted (no cap)", "E13",
+     [('if r["shown"] != min(r["nz"], L2_SHO' 'W):',
+       'if r["shown"] > r["nz"]:')]),
 ]
 
 
 def mutants(root):
-    """Print M0..M10; return the number of survivors."""
+    """Print M0..M16; return the number of survivors."""
     me = os.path.abspath(__file__)
     with open(me, encoding="utf-8") as fh:
         own = fh.read()

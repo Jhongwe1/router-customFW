@@ -1,12 +1,12 @@
 /*
  * rtl819x-view.c -- a read-only view of the RTL8196E's switch registers, its
- * MIB counters, its CPU interface, PIN_MUX, and two of its tables.
+ * MIB counters, its CPU interface, PIN_MUX, and three of its tables.
  *
- * R6b-8 8c.  One node, /proc/rtl819x-view, and three verbs written to it:
+ * R6b-8 8c, and 8d for 1.1.  One node, /proc/rtl819x-view, three verbs:
  *
  *     mib              the 225 MIB words of ports 0-6, one load each
- *     tbl vlan|netif   the VLAN table's 16 slots or the netif table's 8, read
- *                      the way the vendor's own reader reads them
+ *     tbl vlan|netif|l2  the VLAN table's 16 slots, the netif table's 8 or
+ *                      the L2 table's 1,024 (1.1), as the vendor's reader does
  *     peek A [n]       n words (1-16, default 1) from the KSEG1 address A
  *
  * A `cat` prints the cached result of the last verb that loaded anything, and
@@ -35,19 +35,19 @@
  * capture committed under bench/: a loader DW dump, or, for the MIB, the
  * vendor's /proc/rtl865x/asicCounter dump.  That is CLAUDE.md's rule for a
  * register value entering code, applied to an address entering a read path.
- * 298 words pass under it, and they are the table below, word for word --
- * every run carries its sources.
+ * 311 words pass under it -- the table below, 298, and 1.1's at the end of
+ * this file, 13 -- word for word, and every run carries its sources.
  *
  * That 量 is narrower than "any reading": a read through the vendor's
- * /proc/rtl865x/memory does not count, and one word turns on it.
+ * /proc/rtl865x/memory does not count, and in 1.0 one word turned on it:
  * 0xBB804500, SBFCTR/SBFCR0 (B :1673-:1674), printed 000000F4 on all three
- * such reads (bench/2026-09-21b: B5-REGc, B5-REGc2, D2-REGa-a2), so it has B
- * and a reading and is still refused here: the 8c admission census counts
- * 299 with it and 298 with 量 limited as above, and 8c's ruling (D2) is 298.
- * It is 8d's to admit, with the one-source words (QNUMCR, CSCR, EEECR,
- * IBCR0-2, WFQRCRPn and the rest): 8c-cells reads the ones it needs through
- * the loader's DW and the vendor's /proc/rtl865x/memory -- which bounds
- * nothing itself; tools/cardcheck.py bounds what a card sends it (HW-1).
+ * such reads (bench/2026-09-21b: B5-REGc, B5-REGc2, D2-REGa-a2), and 1.0
+ * refused it (8c's census: 299 with it, 298 with 量 limited as above; 8c's
+ * ruling D2: 298).  8c-cells then read it and twelve one-source words with
+ * the loader's DW (bench/2026-09-27d/AL-D*), so 1.1 admits the thirteen
+ * (notes/switch-driver.md section 16.4).  0x4D48 stays out: a reading and
+ * no name in B's live branch.  Such words go through the vendor's memory
+ * node, which bounds nothing itself; tools/cardcheck.py does (HW-1).
  *
  * Everything else is refused BEFORE ANY LOAD, the whole request with it:
  * `peek A n` checks all n words first, and loads none unless all n pass.
@@ -75,7 +75,7 @@
  *    change because of it; see the table read below.
  * 4. It issues no MDIO command.  MDIO stays rtl819x-switch 1.3's.
  * 5. It says nothing about read side effects beyond the ones named here:
- *    none is known for the 298 (推), and which of them were read on this die
+ *    none is known for the 311 (推), and which of them were read on this die
  *    before is in the sources column.  The MIB's read-to-clear is 未定.
  *
  * ======================================================================
@@ -83,7 +83,7 @@
  * ======================================================================
  *
  * 讀 `_rtl8651_readAsicEntry`, drivers/net/rtl819x/AsicDriver/96E/
- * rtl865x_asicBasic.S:1043-1215, the reader the vendor's VLAN and netif
+ * rtl865x_asicBasic.S:1043-1215, the reader the vendor's VLAN, netif and L2
  * getters call.  Per slot: load SWTACR (0xBB804D00) until bit 0,
  * ACTION_START (B :209-:211), reads clear -- the vendor's wait is unbounded;
  * this one gives up after RTL819X_VIEW_BOUND polls with udelay(1) between
@@ -96,11 +96,11 @@
  * `eq` or `mis`.  The StopTLU variant (:1216 on) sets EN_STOP_TLU in SWTCR0
  * and has no C caller in the tree (讀, grep); it is not what this copies.
  * Base 0xBB000000 is REAL_SWTBL_BASE (B :151), the type numbers are the
- * enum in rtl865x_asicBasic.h (VLAN 6, netif 4), the slot counts are
+ * enum in rtl865x_asicBasic.h (VLAN 6, netif 4; L2 0), the slot counts are
  * rtl865x_asicCom.h's (16 VLAN slots under CONFIG_RTL_8196E, 8 netifs), and
  * the 32-byte stride is the `sll $2,$18,5` of the reader; 量 SWTAA reads
  * BB060100 at the loader and BB040020 under Linux (NET-28), both inside
- * these windows on slot boundaries.  D has no table section.
+ * these windows on slot boundaries.  D has no table section (L2: 1.1's).
  *
  * ⚠️ `rtl8651_getAsicVlan` reads index = vid (rtl865x_asicCom.c:146) while
  * the vendor's writer searches for a free slot, so a slot number here is NOT
@@ -125,9 +125,9 @@
  * THE PAGE
  * ======================================================================
  *
- *     version rtl819x-view 1.0
- *     admit %u                 words the table admits, summed at render
- *     last %s j %lu rc %d      none|mib|vlan|netif|peek, its jiffies, its rc
+ *     version rtl819x-view 1.1
+ *     admit %u                 words the tables admit, summed at render
+ *     last %s j %lu rc %d      none|mib|vlan|netif|peek|l2, its jiffies, rc
  *     n_mib %lu n_tbl %lu n_peek %lu refused %lu busy %lu ld %lu
  *     ref %08X %s              the last refused word and none|out|psrp
  *     ...the last verb's result...
@@ -160,7 +160,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_VIEW_VERSION	"rtl819x-view 1.0"
+#define RTL819X_VIEW_VERSION	"rtl819x-view 1.1"
 #define RTL819X_VIEW_PROC	"rtl819x-view"
 
 /* The counters and the cache are unlocked, as rtl819x-switch 1.2's are, and
@@ -168,7 +168,7 @@
  * PREEMPT_NONE, no verb sleeps once it has started loading, and both /proc
  * handlers run in process context. */
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
-#error "rtl819x-view 1.0 keeps its counters and its cache unlocked; they need a lock before this build can be SMP or preemptible"
+#error "rtl819x-view 1.1 keeps its counters and its cache unlocked; they need a lock before this build can be SMP or preemptible"
 #endif
 
 /* The MIB block, B :275 (MIB_COUNTER_BASE = SWCORE_BASE + 0x1000), and the
@@ -260,7 +260,7 @@ static const struct rtl819x_view_run rtl819x_view_runs[] = {
 #define RTL819X_VIEW_PSRP	2
 static const char *const rtl819x_view_why[] = { "none", "out", "psrp" };
 
-/* The two tables `tbl` reads: the name typed, the type number, the slots. */
+/* Two of `tbl`'s three tables (l2: 1.1, at the end): name, type, slots. */
 struct rtl819x_view_tbl {
 	const char	*name;
 	u8		type;
@@ -272,13 +272,13 @@ static const struct rtl819x_view_tbl rtl819x_view_tbls[] = {
 	{ "netif", 4,  8 },	/* TYPE_NETINTERFACE_TABLE; RTL865XC_NETIFTBL_SIZE, rtl865x_asicCom.h:19 */
 };
 
-/* What `last` says: none, mib, then the tables in the order above, peek. */
+/* What `last` says: none, mib, the tables in the order above, peek, l2. */
 #define RTL819X_VIEW_L_NONE	0
 #define RTL819X_VIEW_L_MIB	1
 #define RTL819X_VIEW_L_TBL	2	/* + index into rtl819x_view_tbls */
 #define RTL819X_VIEW_L_PEEK	4
 static const char *const rtl819x_view_lname[] = {
-	"none", "mib", "vlan", "netif", "peek"
+	"none", "mib", "vlan", "netif", "peek", "tbl l2" + 4	/* 1.1: why at the end */
 };
 
 /* The cache: the last verb's result, which is all a `cat` prints. */
@@ -307,9 +307,9 @@ static inline u32 rtl819x_view_ld(u32 a)
 	rtl819x_view_n_ld++;
 	return __raw_readl((void __iomem *)(unsigned long)a);
 }
-
-/* RTL819X_VIEW_IN if the table admits `a`, else the reason it does not.
- * The table alone decides; the PSRP range only names the reason. */
+static int rtl819x_view_admit11(u32 a);		/* 1.1, at the end of the file */
+/* RTL819X_VIEW_IN if a table admits `a`, else the reason it does not.
+ * The tables alone decide (1.1's last); the PSRP range names the reason. */
 static int rtl819x_view_admit(u32 a)
 {
 	const struct rtl819x_view_run *r;
@@ -326,16 +326,16 @@ static int rtl819x_view_admit(u32 a)
 	}
 	if (a >= RTL819X_VIEW_PSRP0 && a <= RTL819X_VIEW_PSRP8)
 		return RTL819X_VIEW_PSRP;
-	return RTL819X_VIEW_OUT;
+	return rtl819x_view_admit11(a);		/* 1.1's table, or out */
 }
-
+static unsigned int rtl819x_view_nadmit11(void);	/* 1.1, at the end */
 static unsigned int rtl819x_view_nadmit(void)
 {
 	unsigned int i, n = 0;
 
 	for (i = 0; i < RTL819X_VIEW_NRUN; i++)
 		n += rtl819x_view_runs[i].n * rtl819x_view_runs[i].rep;
-	return n;
+	return n + rtl819x_view_nadmit11();
 }
 
 static int rtl819x_view_in_mib(const struct rtl819x_view_run *r)
@@ -497,7 +497,7 @@ static int rtl819x_view_peek(unsigned long a, unsigned long n)
 /* ------------------------------------------------------------------------
  * /proc
  *
- * After the five header lines, the last verb's result:
+ * After the five header lines, the last verb's result (tbl l2's: 1.1's):
  *
  *   mib    mib base BB801000 stride 080 ports 7 words 225
  *          mo  the 32 offsets of a port's words from the MIB base, port 0
@@ -511,9 +511,9 @@ static int rtl819x_view_peek(unsigned long a, unsigned long n)
  * Result lines print only while the page is under the budget.  Walked from
  * the formats with every field at its type's widest (32-bit longs, as on
  * this kernel): everything before the result is <= 193 B, the widest result
- * (mib's) is <= 2,231 B and the trailer <= 19 B, so the page is <= 2,443 B,
- * and the budget is a guard that cannot fire at these widths
- * (tools/viewcheck.py V14 measures all four).
+ * (tbl l2's) is <= 3,562 B and the trailer <= 19 B, so the page is <= 3,774 B,
+ * and the budget is a guard that cannot fire at these widths (mib's result
+ * is <= 2,231 B; tools/viewcheck.py V14 measures all five).
  * ------------------------------------------------------------------------ */
 
 #define RTL819X_VIEW_PAGE_BUDGET	3900
@@ -592,7 +592,7 @@ static int rtl819x_view_peek_lines(char *page, int len)
 			       rtl819x_view_pa + 4u * i, rtl819x_view_w[i]);
 	return len;
 }
-
+static int rtl819x_view_r11(char *page, int len);	/* 1.1, at the end */
 static int rtl819x_view_read_proc(char *page, char **start, off_t off,
 				  int count, int *eof, void *data)
 {
@@ -619,7 +619,7 @@ static int rtl819x_view_read_proc(char *page, char **start, off_t off,
 		 rtl819x_view_last < RTL819X_VIEW_L_PEEK)
 		len = rtl819x_view_tbl_lines(page, len, (unsigned int)
 				(rtl819x_view_last - RTL819X_VIEW_L_TBL));
-
+	len = rtl819x_view_r11(page, len);	/* 1.1: tbl l2's lines, if last */
 	len += sprintf(page + len, "jiffies %lu\n", jiffies);	/* terminator */
 	*eof = 1;
 	return len;
@@ -650,7 +650,7 @@ static int rtl819x_view_nums(const char *s, unsigned long *v, int n)
 	}
 	return 0;
 }
-
+static int rtl819x_view_w11(const char *buf, unsigned long count);	/* 1.1 */
 static int rtl819x_view_write_proc(struct file *file, const char __user *ubuf,
 				   unsigned long count, void *data)
 {
@@ -677,7 +677,7 @@ static int rtl819x_view_write_proc(struct file *file, const char __user *ubuf,
 				rc = rtl819x_view_tbl(i);
 				return rc ? rc : (int)count;
 			}
-		return -EINVAL;
+		return rtl819x_view_w11(buf, count);	/* 1.1: tbl l2, or -EINVAL */
 	}
 	if (!strncmp(buf, "peek ", 5)) {
 		if (!rtl819x_view_nums(buf + 5, v, 1))
@@ -707,3 +707,288 @@ static int __init rtl819x_view_init(void)
 }
 
 device_initcall(rtl819x_view_init);
+
+/* ========================================================================
+ * 1.1 (R6b-8 8d): `tbl l2`, and thirteen more words for `peek`
+ * ========================================================================
+ *
+ * Appended here so that no line above moves (FW-110).  Above this block 1.1
+ * changed lines in place only -- the version, the comments that state a
+ * count or a list, rtl819x_view_lname's sixth name, and three hooks:
+ * rtl819x_view_admit's last return and rtl819x_view_nadmit's sum consult
+ * the table below, and the write handler's `tbl ` branch hands every name
+ * but vlan and netif to rtl819x_view_w11 -- and it filled five blank lines,
+ * four with prototypes of the functions below and one with the render hook
+ * in rtl819x_view_read_proc.
+ *
+ * THE THIRTEEN WORDS
+ *
+ * Each has B and 量, a loader DW reading of this die: the L column of
+ * 8c-cells group A, the cold prompt of 2026-09-27, committed under
+ * bench/2026-09-27d/ (notes/switch-driver.md sections 16.2 and 16.4).
+ * "AL-D04:2 w2" is the second word on line 2 of AL-D04.log, lines counted
+ * on LF with CR stripped.  D places none of them.  All thirteen were read
+ * again on the V and R boots of 2026-09-28 through the vendor's memory
+ * node; nothing is known of a read side effect (推).  0x4D48 is not here:
+ * a reading (AL-D17:2) and no name in B's live branch.  Nor is WFQRCRP6
+ * (0xBB8048F8, B :2220): AL-D14's sixteen words end at 0xBB8048EC.
+ */
+static const struct rtl819x_view_run rtl819x_view_runs11[] = {
+	{ 0xBB804048,  1, 1, 0 },	/* CSCR, B :1015; 量 DW BB804044 4, AL-D04:2 w2 */
+	{ 0xBB804160,  1, 1, 0 },	/* EEECR, B :1365; 量 DW BB804154 4, AL-D07:2 w4 */
+	{ 0xBB804500,  1, 1, 0 },	/* SBFCTR|SBFCR0 (one address, two names), B :1673-:1674; 量 DW BB804500 4, AL-D11:2 w1 */
+	{ 0xBB804704,  3, 1, 0 },	/* IBCR0 IBCR1 IBCR2, B :1831-:1833; 量 DW BB804700 4, AL-D12:2 w2-w4 */
+	{ 0xBB804754,  1, 1, 0 },	/* QNUMCR, B :1850; 量 DW BB804750 4, AL-D13:2 w2 */
+	{ 0xBB8048B0,  1, 6, 0x0C },	/* WFQRCRP0-WFQRCRP5, PSCR (B :2159) + 0x0B0 + 12p, B :2202 :2205 :2208 :2211 :2214 :2217; 量 DW BB8048B0 16, AL-D14:2-5, the dump's words 1, 4, 7, 10, 13 and 16 */
+};
+
+#define RTL819X_VIEW_NRUN11	ARRAY_SIZE(rtl819x_view_runs11)
+
+/* rtl819x_view_admit's last step: 1.0's test, over 1.1's table. */
+static int rtl819x_view_admit11(u32 a)
+{
+	const struct rtl819x_view_run *r;
+	unsigned int i, k;
+	u32 b;
+
+	for (i = 0; i < RTL819X_VIEW_NRUN11; i++) {
+		r = &rtl819x_view_runs11[i];
+		for (k = 0; k < r->rep; k++) {
+			b = r->a + k * r->stride;
+			if (a >= b && a < b + 4u * r->n && !((a - b) & 3u))
+				return RTL819X_VIEW_IN;
+		}
+	}
+	return RTL819X_VIEW_OUT;
+}
+
+/* rtl819x_view_nadmit's addend: the words of 1.1's table. */
+static unsigned int rtl819x_view_nadmit11(void)
+{
+	unsigned int i, n = 0;
+
+	for (i = 0; i < RTL819X_VIEW_NRUN11; i++)
+		n += rtl819x_view_runs11[i].n * rtl819x_view_runs11[i].rep;
+	return n;
+}
+
+/* ------------------------------------------------------------------------
+ * THE L2 TABLE
+ *
+ * `tbl l2` reads it by THE TABLE READ above, 1.0's protocol unchanged: per
+ * slot, SWTACR polled to the same bound, then up to ten double reads of the
+ * slot's eight words, the second buffer kept.  Its constants, 讀 in the
+ * tree that builds (drivers/net/rtl819x/AsicDriver/, whose Makefile builds
+ * 96E/rtl865x_asicBasic.o and rtl865x_asicL2.o when CONFIG_RTL_8196E):
+ *
+ *   type 0       TYPE_L2_SWITCH_TABLE, rtl865x_asicBasic.h:28; the window is
+ *                REAL_SWTBL_BASE (B :151) + (0 << 16), 0xBB000000-0xBB007FFF
+ *   1,024 slots  RTL8651_L2TBL_ROW 256 x RTL8651_L2TBL_COLUMN 4, B
+ *                :2587-:2588.  D gives the count too: "a 1024-entry address
+ *                look-up table with a 10-bit 4-way XOR hashing algorithm"
+ *                (section 1) and "Internal 1024 entry 4-way hash L2 look-up
+ *                table" (section 2) -- two sources for it
+ *   slot         row << 2 | column.  The vendor's own L2 read path,
+ *                rtl8651_getAsicL2Table (rtl865x_asicL2.c:803-837), checks
+ *                row < 256 and column < 4 (:806) and calls
+ *                _rtl8651_readAsicEntry(TYPE_L2_SWITCH_TABLE, row<<2 |
+ *                column, &entry) (:810), the reader THE TABLE READ copies.
+ *                Its rtl865x_accessAsicTable (rtl865x_asicBasic.S:531-617)
+ *                lets type 0 through whatever the ASIC function word holds,
+ *                as it does 4 and 6: bit 0 is in none of 0xe22, 0x8, 0x4000
+ *   32 bytes     the reader's `sll $2,$18,5` (rtl865x_asicBasic.S:1084).  It
+ *                copies two words out for type 0 (_rtl8651_asicTableSize,
+ *                :185), an entry's words 0-1 (rtl865x_asicL2.h:140-190; 2-7
+ *                are reserved), and loads and compares all eight, as this does
+ *
+ * 量: none.  No committed capture has loaded an address in the window (a
+ * grep of bench/ for a DW or memory-node read of 0xBB000000-0xBB007FFF
+ * finds none), and SWTAA has never read an address in it.  Type 0 rests on
+ * B's enum, whose 4 and 6 SWTAA places (THE TABLE READ); the first `tbl l2`
+ * on the die is its reading (推 until then).  An entry's fields are
+ * tools/viewdecode.py's, from B alone.
+ *
+ * THE FILTER, AND THE PAGE
+ *
+ * The verb reads all 1,024 slots and keeps the first RTL819X_VIEW_L2_SHOW
+ * whose second buffer is not all zero, in slot order.  After the header:
+ *
+ *   tbl l2 base BB000000 slots 1024 words 8 polls %lu read %u nz %u shown %u mis %u
+ *   sNNNN tK eq|mis  the eight words of the second buffer, per kept slot
+ *   busy sNNNN       only after -EBUSY, the slot it stopped at
+ *
+ * `read` is the slots read (1,024 unless -EBUSY), `nz` those not all zero,
+ * `shown` the slot lines (nz or RTL819X_VIEW_L2_SHOW, the smaller), `mis`
+ * the slots whose ten tries all disagreed, shown or not: a torn slot whose
+ * second buffer is zero is counted there and printed nowhere.  At 1.0's
+ * widths (every counter at its type's widest; shown, the slot number and t
+ * at their bounds) the tbl l2 line is 111 B, a slot line 86 and the busy
+ * line 11, so the result is <= 111 + 40 x 86 + 11 = 3,562 B and the page
+ * <= 193 + 3,562 + 19 = 3,774 B: under the budget, so it cannot fire, and
+ * under 4,096 (tools/viewcheck.py V14).  41 slots would still fit (3,860 B);
+ * 40 is a round number with room.
+ *
+ * TIME, AND IRQS
+ *
+ * IRQs stay on, as in 1.0's `tbl`: nothing here masks them.  The verb never
+ * sleeps, so on this UP, PREEMPT_NONE kernel no other process runs until it
+ * returns; interrupts and timers do.  With SWTACR idle and no tear it makes
+ * 1,024 x 17 = 17,408 loads (a guess: milliseconds; no time per load on this
+ * bus was read for it).  At the worst the bound allows -- SWTACR busy for
+ * 10,000 polls at every slot, and ten tries each -- it spends 1,024 x
+ * 10,000 us = 10.24 s in udelay alone and makes 1,024 x 10,161 =
+ * 10,404,864 loads.  Nothing on a SWCORE=n image issues a table command
+ * (rlxfw issues none), so that case needs the vendor's driver (推); the six
+ * tbl pages committed so far read polls equal to slots, 72 slot reads with
+ * SWTACR never busy (bench/2026-09-28: AV-TV, AR-TV, M2-VV, AV-TN, AR-TN,
+ * M2-VN).  The standard /init arms no watchdog.
+ *
+ * THE NAME
+ *
+ * rtl819x_view_lname[5] is "tbl l2" + 4: "l2", printed from inside the
+ * verb's own literal.  /proc/rtl865x/l2 is one of the vendor's 42 /proc
+ * names (rtl865x_proc_debug.c), which tools/imgprocs.py looks for in an
+ * image as NUL-bounded literals and tools/ethcensus.py derives its shared
+ * set from; a bare "l2" here would read there as the vendor's, as `vlan`
+ * and `netif` did (notes/switch-driver.md section 12.7).  "tbl l2" holds no
+ * NUL-bounded "l2", and tools/viewcheck.py V0 refuses a bare one.
+ * ------------------------------------------------------------------------ */
+
+#define RTL819X_VIEW_L_L2	5		/* `last`: rtl819x_view_lname[5] */
+#define RTL819X_VIEW_L2_TYPE	0		/* TYPE_L2_SWITCH_TABLE */
+#define RTL819X_VIEW_L2_SLOTS	1024		/* 256 rows x 4 columns */
+#define RTL819X_VIEW_L2_SHOW	40		/* non-zero slots kept for the page */
+
+static unsigned int rtl819x_view_l2_read, rtl819x_view_l2_nz;
+static unsigned int rtl819x_view_l2_shown, rtl819x_view_l2_mis;
+static u16 rtl819x_view_l2_s[RTL819X_VIEW_L2_SHOW];	/* the slot */
+static u8 rtl819x_view_l2_t[RTL819X_VIEW_L2_SHOW];	/* its tries */
+static u8 rtl819x_view_l2_eq[RTL819X_VIEW_L2_SHOW];	/* 1: its buffers agreed */
+static u32 rtl819x_view_l2_w[RTL819X_VIEW_L2_SHOW * RTL819X_VIEW_ENTRY];
+
+/* One slot by THE TABLE READ.  0, with the second buffer in b1, the tries
+ * in *t and whether the two buffers agreed in *eq; or -EBUSY past the
+ * bound, the slot kept for the page and no table word loaded. */
+static int rtl819x_view_l2_slot(unsigned int s, u32 *b1, unsigned int *t,
+				int *eq)
+{
+	u32 a = RTL819X_VIEW_TBL_BASE + ((u32)RTL819X_VIEW_L2_TYPE << 16) +
+		((u32)s << 5);
+	u32 b0[RTL819X_VIEW_ENTRY];
+	unsigned int n, k;
+
+	for (n = 0; ; n++) {
+		rtl819x_view_polls++;
+		if (!(rtl819x_view_ld(RTL819X_VIEW_SWTACR) &
+		      RTL819X_VIEW_ACTION))
+			break;
+		if (n >= RTL819X_VIEW_BOUND) {
+			rtl819x_view_n_busy++;
+			rtl819x_view_busy_s = (int)s;
+			return -EBUSY;
+		}
+		udelay(1);
+	}
+	for (*t = 1; ; (*t)++) {
+		for (k = 0; k < RTL819X_VIEW_ENTRY; k++)
+			b0[k] = rtl819x_view_ld(a + 4u * k);
+		for (k = 0; k < RTL819X_VIEW_ENTRY; k++)
+			b1[k] = rtl819x_view_ld(a + 4u * k);
+		*eq = 1;
+		for (k = 0; k < RTL819X_VIEW_ENTRY; k++)
+			if (b0[k] != b1[k])
+				*eq = 0;
+		if (*eq || *t >= RTL819X_VIEW_TRIES)
+			return 0;
+	}
+}
+
+/* `tbl l2`: see THE L2 TABLE.  Loads SWTACR and the L2 table's words and
+ * nothing else; stores nothing. */
+static int rtl819x_view_l2(void)
+{
+	u32 b1[RTL819X_VIEW_ENTRY], nz;
+	unsigned int s, k, i, t = 0;
+	int eq = 0, rc = 0;
+
+	rtl819x_view_l2_read = rtl819x_view_l2_nz = 0;
+	rtl819x_view_l2_shown = rtl819x_view_l2_mis = 0;
+	rtl819x_view_polls = 0;
+	rtl819x_view_busy_s = -1;
+	for (s = 0; s < RTL819X_VIEW_L2_SLOTS; s++) {
+		rc = rtl819x_view_l2_slot(s, b1, &t, &eq);
+		if (rc)
+			break;
+		rtl819x_view_l2_read = s + 1;
+		if (!eq)
+			rtl819x_view_l2_mis++;
+		nz = 0;
+		for (k = 0; k < RTL819X_VIEW_ENTRY; k++)
+			nz |= b1[k];
+		if (!nz)
+			continue;
+		if (rtl819x_view_l2_shown < RTL819X_VIEW_L2_SHOW) {
+			i = rtl819x_view_l2_shown++;
+			rtl819x_view_l2_s[i] = (u16)s;
+			rtl819x_view_l2_t[i] = (u8)t;
+			rtl819x_view_l2_eq[i] = (u8)eq;
+			for (k = 0; k < RTL819X_VIEW_ENTRY; k++)
+				rtl819x_view_l2_w[i * RTL819X_VIEW_ENTRY + k] =
+					b1[k];
+		}
+		rtl819x_view_l2_nz++;
+	}
+	rtl819x_view_last = RTL819X_VIEW_L_L2;
+	rtl819x_view_last_rc = rc;
+	rtl819x_view_last_j = jiffies;
+	rtl819x_view_n_tbl++;
+	return rc;
+}
+
+static int rtl819x_view_l2_lines(char *page, int len)
+{
+	unsigned int i, k;
+
+	len += sprintf(page + len,
+		       "tbl l2 base %08X slots %u words %u polls %lu read %u nz %u shown %u mis %u\n",
+		       RTL819X_VIEW_TBL_BASE +
+		       ((u32)RTL819X_VIEW_L2_TYPE << 16),
+		       (unsigned int)RTL819X_VIEW_L2_SLOTS,
+		       (unsigned int)RTL819X_VIEW_ENTRY, rtl819x_view_polls,
+		       rtl819x_view_l2_read, rtl819x_view_l2_nz,
+		       rtl819x_view_l2_shown, rtl819x_view_l2_mis);
+	for (i = 0; i < rtl819x_view_l2_shown &&
+		    len < RTL819X_VIEW_PAGE_BUDGET; i++) {
+		len += sprintf(page + len, "s%04u t%u %s",
+			       (unsigned int)rtl819x_view_l2_s[i],
+			       (unsigned int)rtl819x_view_l2_t[i],
+			       rtl819x_view_l2_eq[i] ? "eq" : "mis");
+		for (k = 0; k < RTL819X_VIEW_ENTRY; k++)
+			len += sprintf(page + len, " %08X",
+				       rtl819x_view_l2_w[i * RTL819X_VIEW_ENTRY + k]);
+		len += sprintf(page + len, "\n");
+	}
+	if (rtl819x_view_busy_s >= 0)
+		len += sprintf(page + len, "busy s%04d\n", rtl819x_view_busy_s);
+	return len;
+}
+
+/* rtl819x_view_read_proc's hook: tbl l2's lines, when it was the last verb. */
+static int rtl819x_view_r11(char *page, int len)
+{
+	if (rtl819x_view_last != RTL819X_VIEW_L_L2)
+		return len;
+	return rtl819x_view_l2_lines(page, len);
+}
+
+/* The write handler's `tbl ` branch, for every name but vlan and netif:
+ * exactly "tbl l2", or -EINVAL with nothing loaded. */
+static int rtl819x_view_w11(const char *buf, unsigned long count)
+{
+	int rc;
+
+	if (strcmp(buf, "tbl l2"))
+		return -EINVAL;
+	rc = rtl819x_view_l2();
+	return rc ? rc : (int)count;
+}
